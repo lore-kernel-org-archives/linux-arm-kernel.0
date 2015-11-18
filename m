@@ -1,70 +1,51 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Wed, 18 Nov 2015 17:29:19 +0200
-Subject: [PATCH] mmc: dw_mmc: use resource_size_t to store physical address
-In-Reply-To: <5141236.CHnzdS7Lto@wuerfel>
-References: <28102387.ALpaBHpim0@wuerfel> <6288847.N1QBIiXedG@wuerfel>
- <CAHp75Vf4oaLZE27bC+aH9HD6W4E8Gditoz=HF0Z1WwcLWJnSKA@mail.gmail.com>
- <5141236.CHnzdS7Lto@wuerfel>
-Message-ID: <CAHp75VfE2DWYB5GwSe1WLPb+gTnhNpYz5qo7jNfMK4tXbEWioQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Nov 2015 16:33:54 +0100
+Subject: [PATCH v3] crypto: atmel: fix bogus select
+Message-ID: <12173927.U7ILfy5BBh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2015 at 2:38 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 18 November 2015 11:35:27 Andy Shevchenko wrote:
->> On Fri, Nov 13, 2015 at 11:35 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Friday 13 November 2015 03:10:13 Andy Shevchenko wrote:
->> >> On Thu, Nov 12, 2015 at 4:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>From 0d53d42a56e9a3769847fd03c703876f2c063fb4 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Tue, 27 Jan 2015 22:34:04 +0100
+Subject: [PATCH] [SUBMITTED] crypto: atmel: fix bogus select
 
-[]
+The Atmel at91 crypto driver unconditionally selects AT_HDMAC,
+which results in a Kconfig warning if that driver is not enabled:
 
->> >> If dst_addr is dma_addr_t wouldn't be a problem when
->> >> resource_size_t is defined as 64-bit address, and dma_addr_t as 32-bit?
->> >>
->> >> Btw, for me casting to dma_addr_t looks sane.
->> >
->> > The background here is that the address comes from a resource_size_t
->> > that describes the MMIO register area as seen from the CPU, and that
->> > is normally a phys_addr_t (resource_size_t is defined as being long
->> > enough to store a phys_addr_t or various other things depending on
->> > resource->flags).
->> >
->> > dma_addr_t strictly speaking refers to a RAM location as seen by a
->> > DMA master, and that only comes out of dma_map_*() or
->> > dma_alloc_coherent().
->> >
->> > The DMA engine wants something else here, which is an MMIO register
->> > address as seen by a DMA master, and we don't have a separate typedef
->> > for that. Almost universally all of resource_size_t, phys_addr_t and
->> > dma_addr_t are the same type, and if we ever get a platform that
->> > wants something other than a phys_addr_t to put into cfg.dst_addr,
->> > we are in deep trouble.
->>
->> DMA operates with address space covered by dma_addr_t, if you use
->> phys_addr_t you may get address out of DMA boundaries. This is should
->> be done in hardware / firmware / platform representation.
->> So, I don't see any reason not to use dma_addr_t here.
->
-> As I said above, this isn't really the same as DMA: all normal
-> dma_addr_t are returned from dma_alloc_* or dma_map_*, point
-> to RAM and might go trhough an IOMMU, all of which is not true
-> here, hence the patch to change the type to phys_addr_t.
->
-> You really can't get out of bounds because the data comes from a
-> phys_addr_t and refers to a fixed location in hardware. If a
-> platform has registers higher than a 32-bit address, its phys_addr_t
-> must be 64-bit, but its dma_addr_t not necessarily so (even though
-> the two are the same almost always in practice).
+warning: (CRYPTO_DEV_ATMEL_AES) selects AT_HDMAC which has unmet direct dependencies (DMADEVICES && ARCH_AT91)
 
-I understand most of the things here, what I don't is how a platform
-is supposed to work if you have the following:
-a) HW, that uses register space let's say higher than 32-bit;
-b) DMA engine, which should provide a DMA capability for above HW block;
-c) dma_addr_t which does not cover the HW register space.
+The crypto driver itself does not actually have a dependency
+on a particular dma engine, other than this being the one that
+is used in at91.
 
-For me it clearly looks like a platform (HW / SW) configuration issue.
+Removing the 'select' gets rid of the warning, but can cause
+the driver to be unusable if the HDMAC is not enabled at the
+same time. To work around that, this patch clarifies the runtime
+dependency to be 'AT_HDMAC || AT_XDMAC', but adds an alternative
+for COMPILE_TEST, which lets the driver get build on all systems.
 
-In case of bounce buffers I can't understand how it helps there.
+The ARCH_AT91 dependency is implied by AT_XDMAC || AT_HDMAC now
+and no longer needs to be listed separately.
 
--- 
-With Best Regards,
-Andy Shevchenko
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+I found this one in my backlog, it still seems relevant and I forgot
+to send a new version after the last round of comments.
+
+diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
+index 2569e043317e..5357bc1f9e4b 100644
+--- a/drivers/crypto/Kconfig
++++ b/drivers/crypto/Kconfig
+@@ -378,10 +378,9 @@ config CRYPTO_DEV_BFIN_CRC
+ 
+ config CRYPTO_DEV_ATMEL_AES
+ 	tristate "Support for Atmel AES hw accelerator"
+-	depends on ARCH_AT91
++	depends on AT_XDMAC || AT_HDMAC || COMPILE_TEST
+ 	select CRYPTO_AES
+ 	select CRYPTO_BLKCIPHER
+-	select AT_HDMAC
+ 	help
+ 	  Some Atmel processors have AES hw accelerator.
+ 	  Select this if you want to use the Atmel module for
