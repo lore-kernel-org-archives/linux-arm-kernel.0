@@ -1,48 +1,58 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Nov 2015 09:24:54 +0100
-Subject: [PATCH v3 04/62] arm/acpi: Emulate io ports for arm
-In-Reply-To: <564C2246.2010906@huawei.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <4167037.Po02bj0iif@wuerfel> <564C2246.2010906@huawei.com>
-Message-ID: <6117965.bKauib65dS@wuerfel>
+Date: Wed, 18 Nov 2015 09:30:04 +0100
+Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <alpine.LFD.2.20.1511172129060.22569@knanqh.ubzr>
+References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
+ <HK2PR06MB0561B7675F17A81B54A65CA28A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511172129060.22569@knanqh.ubzr>
+Message-ID: <5236157.AUJjCLOEeJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 November 2015 15:01:26 Shannon Zhao wrote:
-> Hi Arnd,
+On Tuesday 17 November 2015 22:17:41 Nicolas Pitre wrote:
+> On Wed, 18 Nov 2015, Chris Brandt wrote:
 > 
-> On 2015/11/17 17:50, Arnd Bergmann wrote:
-> > On Tuesday 17 November 2015 17:40:03 shannon.zhao at linaro.org wrote:
-> >> +/*
-> >> + * Emulate x86 io ports for arm.
-> >> + */
-> >> +#define __armio(addr) ( (void __iomem *)addr )
-> >> +
-> >> +#define inb(c) ( readb( __armio(c) ) )
-> >> +#define inw(c) ( readw( __armio(c) ) )
-> >> +#define inl(c) ( readl( __armio(c) ) )
-> >> +
-> >> +#define outb(v, c) ( writeb(v, __armio(c) ) )
-> >> +#define outw(v, c) ( writew(v, __armio(c) ) )
-> >> +#define outl(v, c) ( writel(v, __armio(c) ) )
-> >> +
-> > 
-> > This is almost certainly wrong. There might be I/O port accesses, but they
-> > won't be in the same place as normal pointers.
-> > 
-> Sorry, maybe I didn't get what you mean. Here it just wants emulate the
-> in(b,w,l) and out(b,w,l) which exist on x86 while not on ARM. So it
-> could introduce less change to the common ACPI codes, for example
-> acpi_os_write_port().
+> > It sounds like there would still be a request to split up the linker 
+> > scripts in order to remove the 6 XIP_KERNEL references scattered 
+> > throughout vmlinux.lds.S. However, it would still be nice to keep the 
+> > two versions looking as close as they can to each other with only the 
+> > obvious changes (like removing XIP_KERNEL from the non-XIP version, 
+> > and removing SMP_ON_UP from the XIP version)
 > 
-> I see there is the same thing in Linux arch/arm/include/asm/io.h
+> I don't think so. XIP and non-XIP are fundamentally looking different 
+> these days.  Trying to keep them as similar as possible is rather an 
+> impediment to both cases and brings no real benefits.
+> 
+> Not only should .init.smpalt be gone from the XIP version, but it might 
+> be safer to put that into a special "should_be_empty" section and bail 
+> out with ASSERT() if that section size isn't zero. Same thing for 
+> pv_table. This way we'll be sure that nothing in the kernel config 
+> expects self-modified code to be present.
+> 
+> With XIP there is still an init section, but it is pointless to store 
+> .init.text stuff in there. That should instead stay in ROM and never be 
+> discarded (obviously). No need to page align it either at that point 
+> which should save some ROM space.
+> 
+> Things like .kprobes.text should be in ROM, but the entire executable in 
+> ROM should be surrounded by __kprobes_text_start and __kprobes_text_end 
+> to prevent any attempt to put kprobes there. This way, kprobes could 
+> still work for modules.
+> 
+> Etc. Etc.
+> 
+> There are simply too many things these days that require special 
+> considerations with XIP. And freeing the main script from XIP 
+> considerations will ease maintenance as well, more than the added 
+> maintenance from the duplicated parts.
 
-The problem is that your definition of __armio() is wrong. If you want to
-do it right, you need to first find the PCI I/O port ranges and map them
-into a virtual address, and then define __armio() in a way to add
-the virtual address you have mapped them to.
+[Adding Uwe and Maxime to Cc]
 
-Alternatively, define the functions so they don't try to access the
-pointers but instead just print a warning.
+I believe Uwe has been running XIP_KERNEL on efm32 for a while now,
+but he also mentioned that he needed some extra hacks in the linker
+script and elsewhere to get it to work.
+
+It would be good to coordinate this, he may have found additional
+problems, or he can maybe help test the new approach on his hardware.
 
 	Arnd
