@@ -1,38 +1,25 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 18 Nov 2015 13:52:44 +0000
-Subject: [PATCH v2] cpufreq: scpi: Depend on SCPI clk driver
-Message-ID: <1447854764-9865-1-git-send-email-punit.agrawal@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 18 Nov 2015 14:54:48 +0100
+Subject: [PATCH] pinctrl: mediatek: Add get_direction support.
+In-Reply-To: <1447798633-24586-1-git-send-email-hongzhou.yang@mediatek.com>
+References: <1447798633-24586-1-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <CACRpkdYbY7vDNRdMF_goUkwNHnoDAF9RMmAt-+sPqA1=8Hxouw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SCPI clk driver registers the virtual cpufreq device that kicks off
-initialisation of the SCPI cpufreq driver. Also, clk_get() will fail for
-the cpufreq driver if the scpi clk driver is missing.
+On Tue, Nov 17, 2015 at 11:17 PM, Hongzhou Yang
+<hongzhou.yang@mediatek.com> wrote:
 
-Fix this by making the scpi cpufreq driver explicitly depend on the scpi
-clk driver.
+> Since Linux gpio framework return 0 for output, 1 for input.
+> But HW use 0 stands for input, and 1 stands for output.
+> So use negative to correct it.
+>
+> And gpio_chip.get is used to get input value, no need to get
+> output value, so removing it.
+>
+> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
 
-Fixes: 8def31034d03 ("cpufreq: arm_big_little: add SCPI interface driver")
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/Kconfig.arm | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Patch applied for fixes.
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 1582c1c..dadfdd4 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -201,7 +201,7 @@ config ARM_SA1110_CPUFREQ
- 
- config ARM_SCPI_CPUFREQ
-         tristate "SCPI based CPUfreq driver"
--	depends on ARM_BIG_LITTLE_CPUFREQ && ARM_SCPI_PROTOCOL
-+	depends on ARM_BIG_LITTLE_CPUFREQ && ARM_SCPI_PROTOCOL && COMMON_CLK_SCPI
-         help
- 	  This adds the CPUfreq driver support for ARM big.LITTLE platforms
- 	  using SCPI protocol for CPU power management.
--- 
-2.6.2
+Yours,
+Linus Walleij
