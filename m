@@ -1,33 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Nov 2015 17:18:40 +0100
-Subject: [PATCH] usb: musb: USB_TI_CPPI41_DMA requires dmaengine support
-Message-ID: <4370741.70D0kgBgnp@wuerfel>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Wed, 18 Nov 2015 18:21:40 +0200
+Subject: [GIT PULL] LPC32xx DTS changes for v4.4
+Message-ID: <1447863700-15681-1-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CPPI-4.1 driver selects TI_CPPI41, which is a dmaengine
-driver and that may not be available when CONFIG_DMADEVICES
-is not set:
+Hi arm-soc team,
 
-warning: (USB_TI_CPPI41_DMA) selects TI_CPPI41 which has unmet direct dependencies (DMADEVICES && ARCH_OMAP)
+Please consider pulling these DTS changes for the NXP LPC32xx
+platform and related boards.
 
-This adds an extra dependency to avoid generating warnings in randconfig
-builds. Ideally we'd remove the 'select' statement, but that has the
-potential to break defconfig files.
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 411dd19c682d ("usb: musb: Kconfig: Select the DMA driver if DMA mode of MUSB is enabled")
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
 
-diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
-index 1f2037bbeb0d..45c83baf675d 100644
---- a/drivers/usb/musb/Kconfig
-+++ b/drivers/usb/musb/Kconfig
-@@ -159,7 +159,7 @@ config USB_TI_CPPI_DMA
- 
- config USB_TI_CPPI41_DMA
- 	bool 'TI CPPI 4.1 (AM335x)'
--	depends on ARCH_OMAP
-+	depends on ARCH_OMAP && DMADEVICES
- 	select TI_CPPI41
- 
- config USB_TUSB_OMAP_DMA
+are available in the git repository at:
+
+  https://github.com/vzapolskiy/linux.git lpc32xx-dts
+
+for you to fetch changes up to aa29efb445f11506daca0db934331f144b38ddc4:
+
+  arm: dts: lpc32xx: move USB controller subdevices into own device node (2015-11-18 18:01:27 +0200)
+
+----------------------------------------------------------------
+Main changes in the series:
+- Added description of the second PWM controller device
+- Added External Memory Controller device tree node (Primecell PL175)
+- Added device tree nodes for standard timer controllers
+- USB controllers are grouped
+- Various minor clean-ups needed for further development of LPC32xx
+
+----------------------------------------------------------------
+Vladimir Zapolskiy (8):
+      arm: dts: lpc32xx: change include syntax to be C preprocessor friendly
+      arm: dts: lpc32xx: add labels to all defined peripheral nodes
+      arm: dts: lpc32xx: add reg property to cpu device node
+      arm: dts: lpc32xx: add device node for the second pwm controller
+      arm: dts: ea3250/phy3250: specify phys memory offset for lpc32xx boards
+      arm: dts: lpc32xx: add external memory controller device node
+      arm: dts: lpc32xx: add device nodes for standard timers
+      arm: dts: lpc32xx: move USB controller subdevices into own device node
+
+ arch/arm/boot/dts/ea3250.dts   |  41 +++++-------
+ arch/arm/boot/dts/lpc32xx.dtsi | 142 ++++++++++++++++++++++++++++++-----------
+ arch/arm/boot/dts/phy3250.dts  |  41 +++++-------
+ 3 files changed, 139 insertions(+), 85 deletions(-)
