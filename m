@@ -1,29 +1,180 @@
 From: jonmason@broadcom.com (Jon Mason)
-Date: Wed, 18 Nov 2015 18:13:47 -0500
-Subject: [PATCH 0/3] ARM: dts: add support for NS, NSP, and NS2 clocks
-Message-ID: <1447888430-4451-1-git-send-email-jonmason@broadcom.com>
+Date: Wed, 18 Nov 2015 18:13:48 -0500
+Subject: [PATCH 1/3] ARM: dts: enable clock support for BCM5301X
+In-Reply-To: <1447888430-4451-1-git-send-email-jonmason@broadcom.com>
+References: <1447888430-4451-1-git-send-email-jonmason@broadcom.com>
+Message-ID: <1447888430-4451-2-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Replace current device tree dummy clocks with real clock support for
+Broadcom Northstar SoCs.
 
-This patch series adds device tree support for the Broadcom Northstar,
-Northstar Plus, and Northstar 2 clocks.
+Signed-off-by: Jon Mason <jonmason@broadcom.com>
+---
+ arch/arm/boot/dts/bcm5301x.dtsi | 92 +++++++++++++++++++++++++++++++----------
+ 1 file changed, 71 insertions(+), 21 deletions(-)
 
-Last sent as an RFC (see https://lkml.org/lkml/2015/10/13/882) due to
-the inability to merge because of the driver dependencies.  Those
-necessary driver changes were merged into 4.4.  All comments have been
-addressed and it is ready to be pulled in.
-
-
-Jon Mason (3):
-  ARM: dts: enable clock support for BCM5301X
-  ARM: dts: enable clock support for Broadcom NSP
-  ARM64: dts: enable clock support for Broadcom NS2
-
- arch/arm/boot/dts/bcm-nsp.dtsi        | 99 ++++++++++++++++++++++++++---------
- arch/arm/boot/dts/bcm5301x.dtsi       | 92 ++++++++++++++++++++++++--------
- arch/arm64/boot/dts/broadcom/ns2.dtsi | 80 +++++++++++++++++++++++++++-
- 3 files changed, 225 insertions(+), 46 deletions(-)
-
+diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+index 6f50f67..65a1309 100644
+--- a/arch/arm/boot/dts/bcm5301x.dtsi
++++ b/arch/arm/boot/dts/bcm5301x.dtsi
+@@ -8,6 +8,7 @@
+  * Licensed under the GNU/GPL. See COPYING for details.
+  */
+ 
++#include <dt-bindings/clock/bcm-nsp.h>
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/input/input.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+@@ -27,7 +28,7 @@
+ 			compatible = "ns16550";
+ 			reg = <0x0300 0x100>;
+ 			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+-			clock-frequency = <100000000>;
++			clocks = <&iprocslow>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -35,48 +36,55 @@
+ 			compatible = "ns16550";
+ 			reg = <0x0400 0x100>;
+ 			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+-			clock-frequency = <100000000>;
++			clocks = <&iprocslow>;
+ 			status = "disabled";
+ 		};
+ 	};
+ 
+ 	mpcore {
+ 		compatible = "simple-bus";
+-		ranges = <0x00000000 0x19020000 0x00003000>;
++		ranges = <0x00000000 0x19000000 0x00023000>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 
+-		scu at 0000 {
++		a9pll: arm_clk at 00000 {
++			#clock-cells = <0>;
++			compatible = "brcm,nsp-armpll";
++			clocks = <&osc>;
++			reg = <0x00000 0x1000>;
++		};
++
++		scu at 20000 {
+ 			compatible = "arm,cortex-a9-scu";
+-			reg = <0x0000 0x100>;
++			reg = <0x20000 0x100>;
+ 		};
+ 
+-		timer at 0200 {
++		timer at 20200 {
+ 			compatible = "arm,cortex-a9-global-timer";
+-			reg = <0x0200 0x100>;
++			reg = <0x20200 0x100>;
+ 			interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&clk_periph>;
++			clocks = <&periph_clk>;
+ 		};
+ 
+-		local-timer at 0600 {
++		local-timer at 20600 {
+ 			compatible = "arm,cortex-a9-twd-timer";
+-			reg = <0x0600 0x100>;
++			reg = <0x20600 0x100>;
+ 			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&clk_periph>;
++			clocks = <&periph_clk>;
+ 		};
+ 
+-		gic: interrupt-controller at 1000 {
++		gic: interrupt-controller at 21000 {
+ 			compatible = "arm,cortex-a9-gic";
+ 			#interrupt-cells = <3>;
+ 			#address-cells = <0>;
+ 			interrupt-controller;
+-			reg = <0x1000 0x1000>,
+-			      <0x0100 0x100>;
++			reg = <0x21000 0x1000>,
++			      <0x20100 0x100>;
+ 		};
+ 
+-		L2: cache-controller at 2000 {
++		L2: cache-controller at 22000 {
+ 			compatible = "arm,pl310-cache";
+-			reg = <0x2000 0x1000>;
++			reg = <0x22000 0x1000>;
+ 			cache-unified;
+ 			arm,shared-override;
+ 			prefetch-data = <1>;
+@@ -94,14 +102,37 @@
+ 
+ 	clocks {
+ 		#address-cells = <1>;
+-		#size-cells = <0>;
++		#size-cells = <1>;
++		ranges;
+ 
+-		/* As long as we do not have a real clock driver us this
+-		 * fixed clock */
+-		clk_periph: periph {
++		osc: oscillator {
++			#clock-cells = <0>;
+ 			compatible = "fixed-clock";
++			clock-frequency = <25000000>;
++		};
++
++		iprocmed: iprocmed {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&genpll BCM_NSP_GENPLL_IPROCFAST_CLK>;
++			clock-div = <2>;
++			clock-mult = <1>;
++		};
++
++		iprocslow: iprocslow {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&genpll BCM_NSP_GENPLL_IPROCFAST_CLK>;
++			clock-div = <4>;
++			clock-mult = <1>;
++		};
++
++		periph_clk: periph_clk {
+ 			#clock-cells = <0>;
+-			clock-frequency = <400000000>;
++			compatible = "fixed-factor-clock";
++			clocks = <&a9pll>;
++			clock-div = <2>;
++			clock-mult = <1>;
+ 		};
+ 	};
+ 
+@@ -178,6 +209,25 @@
+ 		};
+ 	};
+ 
++	lcpll0: lcpll0 at 1800c100 {
++		#clock-cells = <1>;
++		compatible = "brcm,nsp-lcpll0";
++		reg = <0x1800c100 0x14>;
++		clocks = <&osc>;
++		clock-output-names = "lcpll0", "pcie_phy", "sdio",
++				     "ddr_phy";
++	};
++
++	genpll: genpll at 1800c140 {
++		#clock-cells = <1>;
++		compatible = "brcm,nsp-genpll";
++		reg = <0x1800c140 0x24>;
++		clocks = <&osc>;
++		clock-output-names = "genpll", "phy", "ethernetclk",
++				     "usbclk", "iprocfast", "sata1",
++				     "sata2";
++	};
++
+ 	nand: nand at 18028000 {
+ 		compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1", "brcm,brcmnand";
+ 		reg = <0x18028000 0x600>, <0x1811a408 0x600>, <0x18028f00 0x20>;
 -- 
 1.9.1
