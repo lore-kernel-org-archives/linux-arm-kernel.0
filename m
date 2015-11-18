@@ -1,44 +1,48 @@
-From: joshua.clayton@uniwest.com (Joshua Clayton)
-Date: Wed, 18 Nov 2015 11:03:43 -0800
-Subject: rtc test 2
-In-Reply-To: <006901d12230$a8641180$f92c3480$@uniwest.com>
-References: <2038851.J2zvFTXF8S@jclayton-pc> <3458577.MLHbIx9t1o@jclayton-pc>
- <006901d12230$a8641180$f92c3480$@uniwest.com>
-Message-ID: <2089317.kdLWbOenKr@jclayton-pc>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Wed, 18 Nov 2015 19:04:21 +0000
+Subject: [PATCH] iio: adc: xilinx: constify iio_buffer_setup_ops structure
+In-Reply-To: <5648E8DA.3070509@metafoo.de>
+References: <1447617602-12922-1-git-send-email-Julia.Lawall@lip6.fr>
+ <5648E8DA.3070509@metafoo.de>
+Message-ID: <564CCBB5.6000607@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 18, 2015 10:40:53 AM Alan Miller wrote:
-
-> With 2 points we can generate a time per setting slope (like shown).    
-> This graph point is 3 seconds out of 172800 or .000174 sec/sec.   That?s
-> get us to within 4 minutes in a year so a longer test may be needed and a
-> better setting passed on with an upgrade. Not sure about the math you have
-> Josh ? to get parts per billion, billion should be in the denominator.
-Hah. You almost got me there. Made my head spin a little.
-To convert from seconds per second to parts per billion, the numerator gets multiplied by a billion. 
-(technically the denominator gets multiplied too, but the billion is folded into the unit),
-i.e. the billion in the denominator is implicit.
-
+On 15/11/15 20:19, Lars-Peter Clausen wrote:
+> On 11/15/2015 09:00 PM, Julia Lawall wrote:
+>> The iio_buffer_setup_ops structures are never modified, so declare this one
+>> as const, like the others.
+>>
+>> Done with the help of Coccinelle.
+>>
+>> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 > 
-> Best accuracy to graph with would use the min & max settings for 2 points
-> like below ? we now have 1. Maybe the slope is negative but would still
-> work if our min/max adjustments can over/under compensate.
+> Acked-by: Lars-Peter Clausen <lars@metafoo.de>
+Applied.
 
-We actually do have a second and third data point:
-	the first test with Adams calculated guess
-	the test with the maximum adjustsment
+Thanks,
 
-
-I will dig out the emails with those results when I have time,
-and when I have recovered some from the math fatigue :)
-
-hopefully they are linear.
-
--- 
-Joshua Clayton
-Software Engineer
-UniWest
-122 S. 4th Avenue
-Pasco, WA 99301
-(509) 544-0720
+Jonathan
+> 
+> Thanks.
+> 
+>>
+>> ---
+>>  drivers/iio/adc/xilinx-xadc-core.c |    2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
+>> index 0370624..c2b5f10 100644
+>> --- a/drivers/iio/adc/xilinx-xadc-core.c
+>> +++ b/drivers/iio/adc/xilinx-xadc-core.c
+>> @@ -803,7 +803,7 @@ err:
+>>  	return ret;
+>>  }
+>>  
+>> -static struct iio_buffer_setup_ops xadc_buffer_ops = {
+>> +static const struct iio_buffer_setup_ops xadc_buffer_ops = {
+>>  	.preenable = &xadc_preenable,
+>>  	.postenable = &iio_triggered_buffer_postenable,
+>>  	.predisable = &iio_triggered_buffer_predisable,
+>>
+> 
