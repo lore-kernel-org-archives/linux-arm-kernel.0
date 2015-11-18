@@ -1,94 +1,115 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 18 Nov 2015 09:18:11 +0100
-Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
-In-Reply-To: <20151113112636.GA12760@e104805>
-References: <1447064013-13026-1-git-send-email-s.hauer@pengutronix.de>
- <1447064013-13026-3-git-send-email-s.hauer@pengutronix.de>
- <20151110120554.GB3551@e104805>
- <20151110182629.GA5240@localhost.localdomain>
- <20151111072747.GI8526@pengutronix.de>
- <20151113100912.GE8526@pengutronix.de>
- <20151113112636.GA12760@e104805>
-Message-ID: <20151118081811.GW8526@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Nov 2015 08:21:44 +0000
+Subject: [PATCH v3 2/5] mfd: syscon: add a DT property to set value width
+In-Reply-To: <20151117172649.GA11035@roeck-us.net>
+References: <1447700814-5391-1-git-send-email-damien.riegel@savoirfairelinux.com>
+ <1447700814-5391-3-git-send-email-damien.riegel@savoirfairelinux.com>
+ <20151117091946.GG17829@x1> <20151117172649.GA11035@roeck-us.net>
+Message-ID: <20151118082144.GB3534@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 13, 2015 at 11:26:37AM +0000, Javi Merino wrote:
-> On Fri, Nov 13, 2015 at 11:09:12AM +0100, Sascha Hauer wrote:
-> > On Wed, Nov 11, 2015 at 08:27:47AM +0100, Sascha Hauer wrote:
-> > > On Tue, Nov 10, 2015 at 10:26:30AM -0800, Eduardo Valentin wrote:
-> > > > On Tue, Nov 10, 2015 at 12:05:54PM +0000, Javi Merino wrote:
-> > > > > On Mon, Nov 09, 2015 at 11:13:32AM +0100, Sascha Hauer wrote:
-> > > > 
-> > > > <cut>
-> > > > 
-> > > > > > +
-> > > > > > +/*
-> > > > > > + * The MT8173 thermal controller has four banks. Each bank can read up to
-> > > > > > + * four temperature sensors simultaneously. The MT8173 has a total of 5
-> > > > > > + * temperature sensors. We use each bank to measure a certain area of the
-> > > > > > + * SoC. Since TS2 is located centrally in the SoC it is influenced by multiple
-> > > > > > + * areas, hence is used in different banks.
-> > > > > > + */
-> > > > > > +static const struct mtk_thermal_bank_cfg bank_data[] = {
-> > > > > > +	{
-> > > > > > +		.num_sensors = 2,
-> > > > > > +		.sensors = { MT8173_TS2, MT8173_TS3 },
-> > > > > > +	}, {
-> > > > > > +		.num_sensors = 2,
-> > > > > > +		.sensors = { MT8173_TS2, MT8173_TS4 },
-> > > > > > +	}, {
-> > > > > > +		.num_sensors = 3,
-> > > > > > +		.sensors = { MT8173_TS1, MT8173_TS2, MT8173_TSABB },
-> > > > > > +	}, {
-> > > > > > +		.num_sensors = 1,
-> > > > > > +		.sensors = { MT8173_TS2 },
-> > > > > > +	},
-> > > > > > +};
-> > > > 
-> > > > Would it make sense to simply expose all sensors and let the
-> > > > configuration of their aggregation be done by DT?
+On Tue, 17 Nov 2015, Guenter Roeck wrote:
+
+> On Tue, Nov 17, 2015 at 09:19:46AM +0000, Lee Jones wrote:
+> > On Mon, 16 Nov 2015, Damien Riegel wrote:
+> > 
+> > > Currently syscon has a fixed configuration of 32 bits for register and
+> > > values widths. In some cases, it would be desirable to be able to
+> > > customize the value width.
 > > > 
-> > > This particular layout has been chosen because there's also the Smart
-> > > Voltage Scaler (SVS) in the SoC. The SVS uses the same banks for
-> > > measuring temperatures. I don't know the details yet, I just asked the
-> > > Mediatek guys.
+> > > For example, certain boards (like the ones manufactured by Technologic
+> > > Systems) have a FPGA that is memory-mapped, but its registers are only
+> > > 16-bit wide.
+> > > 
+> > > This patch adds an optional "bus-width" DT binding for syscon that
+> > > allows to change the width for the data bus (i.e. val_bits). If this
+> > > property is provided, it will also adjust the register stride to
+> > > bus-width / 8. If not provided, the default configuration is used.
+> > > 
+> > > Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+> > > ---
+> > >  Documentation/devicetree/bindings/mfd/syscon.txt |  3 +++
+> > >  drivers/mfd/syscon.c                             | 12 ++++++++++++
+> > >  2 files changed, 15 insertions(+)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
+> > > index fe8150b..4c9d187 100644
+> > > --- a/Documentation/devicetree/bindings/mfd/syscon.txt
+> > > +++ b/Documentation/devicetree/bindings/mfd/syscon.txt
+> > > @@ -13,6 +13,9 @@ Required properties:
+> > >  - compatible: Should contain "syscon".
+> > >  - reg: the register region can be accessed from syscon
+> > >  
+> > > +Optional property:
+> > > +- bus-width: width of the data bus. Can be <8>, <16>, <32>, or <64>.
+> > > +
+> > >  Examples:
+> > >  gpr: iomuxc-gpr at 020e0000 {
+> > >  	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
+> > > diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
+> > > index 176bf0f..00b0995 100644
+> > > --- a/drivers/mfd/syscon.c
+> > > +++ b/drivers/mfd/syscon.c
+> > > @@ -47,6 +47,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
+> > >  	struct syscon *syscon;
+> > >  	struct regmap *regmap;
+> > >  	void __iomem *base;
+> > > +	u32 bus_width;
+> > >  	int ret;
+> > >  	struct regmap_config syscon_config = syscon_regmap_config;
+> > >  
+> > > @@ -69,6 +70,17 @@ static struct syscon *of_syscon_register(struct device_node *np)
+> > >  	 else if (of_property_read_bool(np, "little-endian"))
+> > >  		syscon_config.val_format_endian = REGMAP_ENDIAN_LITTLE;
+> > >  
+> > > +	 ret = of_property_read_u32(np, "bus-width", &bus_width);
+> > > +	 if (!ret) {
 > > 
-> > Ok, the job of the SVS is to always pick the best voltage for a given
-> > CPU frequency based on the temperature of the CPU cluster. How I
-> > understand it the SVS engine automatically reads temperatures from bank0
-> > for the first CPU cluster and from bank1 for the second CPU cluster. For
-> > this to work we are not free to assign the sensors to the banks
-> > arbitrarily.
+> > This syntax is confusing, as we normally associate it with an error
+> > condition.  Instead, I'd use:
 > > 
-> > I was told that controlling the CPU frequency the performance is better
-> > if we use the maximum temperature of the whole die rather than the
-> > temperature of individual clusters.
-> > 
-> > I would prefer to keep the sensor/bank association like it currently is
-> > as it allows for easy SVS engine integration. Also I would prefer to
-> > expose a single thermal zone for now, it will be easier to add
-> > additional zones later than it is to remove them later once we have
-> > exposed them to the device tree.
-> > 
-> > Is that ok with you?
+> >   if (of_property_read_u32(np, "bus-width", &bus_width) == 0)
 > 
-> Fair enough.  I agree that it's easier to add thermal zones in the
-> future than to remove it.  Thanks for the explanation.
+> Or maybe better
+> 
+> 	if (!of_property_read_u32(np, "bus-width", &bus_width))
 
-I added this comment to make this a bit clearer for the next version:
+Not sure if it's better, but it's also suitable.
 
-/*
- * The thermal core only gets the maximum temperature of all banks, so
- * the bank concept wouldn't be necessary here. However, the SVS (Smart
- * Voltage Scaling) unit makes its decisions based on the same bank
- * data, and this indeed needs the temperatures of the individual
- * banks
- * for making better decisions.
- */
+> > Or, for more clarity:
+> > 
+> >   of_property_read_u32(np, "bus-width", &bus_width);
+> >   if (bus_width)
+> > 
+> > If you choose this version (which I think is my preferred method, don't
+> > forget to initialise 'bus_width' to zero.
+> > 
+> Ignoring an error and depending on bus_width==0 to determine if the property
+> was provided seems odd, especially since it would "hide" if the bus-width
+> property is set to 0. In the original code, this would be detected as error.
+
+I'm not sure what you mean.  If bus_width==0, then a problem has
+occurred and we will not use the value.  If bus_width!=0 then we can
+assume that it's been set and (as the comment describes) the value
+will be checked for errors in regmap_init_mmio().
+
+> > > +		 /*
+> > > +		  * the property has been provided, regmap_init_mmio
+> > > +		  * will return an error if these values are invalid
+> > > +		  * so there is no need to check them here.
+> > > +		  */
+> > > +		 syscon_config.val_bits = bus_width;
+> > > +		 syscon_config.reg_stride = syscon_config.val_bits / 8;
+> > > +	 }
+> > > +
+> > >  	regmap = regmap_init_mmio(NULL, base, &syscon_config);
+> > >  	if (IS_ERR(regmap)) {
+> > >  		pr_err("regmap init failed\n");
+> > 
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
