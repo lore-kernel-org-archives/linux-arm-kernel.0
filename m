@@ -1,80 +1,45 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 18 Nov 2015 23:36:20 +0300
-Subject: [PATCH v6 16/19] aarch64: ilp32: use generic stat64 structure
-In-Reply-To: <4020528.IPMzSqapue@wuerfel>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <1447795019-30176-17-git-send-email-ynorov@caviumnetworks.com>
- <4020528.IPMzSqapue@wuerfel>
-Message-ID: <20151118203620.GC11264@yury-N73SV>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Wed, 18 Nov 2015 21:38:02 +0100 (CET)
+Subject: [PATCH 4/7] phy: rockchip-usb: add missing of_node_put
+In-Reply-To: <3792177.PEjN5hRYe2@diego>
+References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
+ <19587543.sZ81DoLUBT@diego> <20151118193129.GA48815@google.com>
+ <3792177.PEjN5hRYe2@diego>
+Message-ID: <alpine.DEB.2.02.1511182136270.2059@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 11:09:05PM +0100, Arnd Bergmann wrote:
-> On Wednesday 18 November 2015 00:16:56 Yury Norov wrote:
-> > Generic 32-bit and AARCH32 stat64 structures has same names.
-> > ILP32 needs generic stat64. So we can either make ILP32 mutual
-> > exclusive with AARCH32, or duplicate generic cp_new_stat64 code
-> > and struct stat64 to sys_ilp32.c. We choose second because it's
-> > more flexible to have independend support for ABIs.
+
+
+On Wed, 18 Nov 2015, Heiko St?bner wrote:
+
+> Am Mittwoch, 18. November 2015, 11:31:29 schrieb Brian Norris:
+> > On Wed, Nov 18, 2015 at 08:27:07PM +0100, Heiko St?bner wrote:
+> > > Am Montag, 16. November 2015, 12:33:17 schrieb Julia Lawall:
+> > > hmm, while I agree that the rockchip phy has an issue in the node
+> > > lifecycle, I'm not sure that patch fixes it fully.
+> > > 
+> > > It currently iterates over each phy, but would only of_node_put the phy it
+> > > handled last. So if an error happens on the 3rd phy, the first 2 are
+> > > already instantiated and would also get removed when the overall probe
+> > > fails, but their of_node would never be "put".
 > > 
+> > Note the behavior of of_get_next_child() (and
+> > of_get_next_available_child()); it "Decrements the refcount of prev." So
+> > the loop only keeps a reference for (at most) one node at a time.
+> > 
+> > I believe Julia's patch is correct. It's possible the commit description
+> > could have made this aspect clearer though, since I was confused about
+> > this at first as well.
 > 
-> I commented on the previous version, but you have not replied to that,
-> or changed anything.
+> oh, I hadn't realized that :-) .
 > 
-> 	Arnd
+> Although in this case, what happens with the last child, if only "prev"s get 
+> decremented? When the loop finished I'd think that the last one would keep 
+> it's reference, as the patch stand right - or I'm just blind.
 
-Hi Arnd,
+The loop finishes when the child is NULL.  So there is nothing to put in 
+that case.  The process of getting from the last child to the NULL does 
+the of_node_put.
 
-It seems I misunderstood you.
-
-Are you OK if we'll enable __ARCH_WANT_COMPAT_STAT64
-for ILP32, as for AARCH32_EL0, and turn glibc to use
-struct stat from sysdeps/unix/sysv/linux/bits/stat.h
-with this calls? It seems, this is how ARM ABI works.
-
-Yury.
-
----
- arch/arm64/include/asm/stat.h   | 2 --
- arch/arm64/include/asm/unistd.h | 2 +-
- 2 files changed, 1 insertion(+), 3 deletions(-)
-
-diff --git a/arch/arm64/include/asm/stat.h b/arch/arm64/include/asm/stat.h
-index af04276..15e3559 100644
---- a/arch/arm64/include/asm/stat.h
-+++ b/arch/arm64/include/asm/stat.h
-@@ -22,7 +22,6 @@
- 
- #include <asm/compat.h>
- 
--#ifdef CONFIG_AARCH32_EL0
- /*
-  * struct stat64 is needed for compat tasks only. Its definition is different
-  * from the generic struct stat64.
-@@ -60,4 +59,3 @@ struct stat64 {
- 
- #endif
- #endif
--#endif
-diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
-index 696e638..3b196f3 100644
---- a/arch/arm64/include/asm/unistd.h
-+++ b/arch/arm64/include/asm/unistd.h
-@@ -19,7 +19,6 @@
- #endif
- #ifdef CONFIG_AARCH32_EL0
- #define __ARCH_WANT_COMPAT_SYS_GETDENTS64
--#define __ARCH_WANT_COMPAT_STAT64
- #define __ARCH_WANT_SYS_GETHOSTNAME
- #define __ARCH_WANT_SYS_PAUSE
- #define __ARCH_WANT_SYS_GETPGRP
-@@ -42,6 +41,7 @@
- #define __NR_compat_sigreturn		119
- #define __NR_compat_rt_sigreturn	173
- 
-+#define __ARCH_WANT_COMPAT_STAT64
- #define __ARCH_WANT_SYS_LLSEEK
- 
- /*
--- 
-2.1.4
+julia
