@@ -1,36 +1,34 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 18 Nov 2015 07:10:55 -0800
-Subject: [PATCH v3 2/5] mfd: syscon: add a DT property to set value width
-In-Reply-To: <20151118082144.GB3534@x1>
-References: <1447700814-5391-1-git-send-email-damien.riegel@savoirfairelinux.com>
- <1447700814-5391-3-git-send-email-damien.riegel@savoirfairelinux.com>
- <20151117091946.GG17829@x1> <20151117172649.GA11035@roeck-us.net>
- <20151118082144.GB3534@x1>
-Message-ID: <564C94FF.10004@roeck-us.net>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Wed, 18 Nov 2015 16:09:25 +0100
+Subject: [PATCH v9 0/2] Sigma Designs Tango4 port
+Message-ID: <564C94A5.4060301@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2015 12:21 AM, Lee Jones wrote:
-[ ... ]
->>> Or, for more clarity:
->>>
->>>    of_property_read_u32(np, "bus-width", &bus_width);
->>>    if (bus_width)
->>>
->>> If you choose this version (which I think is my preferred method, don't
->>> forget to initialise 'bus_width' to zero.
->>>
->> Ignoring an error and depending on bus_width==0 to determine if the property
->> was provided seems odd, especially since it would "hide" if the bus-width
->> property is set to 0. In the original code, this would be detected as error.
->
-> I'm not sure what you mean.  If bus_width==0, then a problem has
-> occurred and we will not use the value.  If bus_width!=0 then we can
-> assume that it's been set and (as the comment describes) the value
-> will be checked for errors in regmap_init_mmio().
->
+Marc Gonzalez (2):
+  arm-soc: Import initial tango4 device tree
+  arm-soc: Add support for tango4 platforms
 
-Your proposed code does not distinguish a missing property from "bus-width = <0>;".
-It will silently ignore this case.
+ arch/arm/Kconfig                          |   2 +
+ arch/arm/Makefile                         |   1 +
+ arch/arm/boot/dts/Makefile                |   2 +
+ arch/arm/boot/dts/tango4-common.dtsi      | 121 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/tango4-smp8758.dtsi     |  31 ++++++++
+ arch/arm/boot/dts/tango4-vantage-1172.dts |  29 +++++++
+ arch/arm/mach-tangox/Kconfig              |  12 +++
+ arch/arm/mach-tangox/Makefile             |   2 +
+ arch/arm/mach-tangox/setup.c              |  32 ++++++++
+ arch/arm/mach-tangox/smc.S                |   9 +++
+ arch/arm/mach-tangox/smc.h                |   5 ++
+ 11 files changed, 246 insertions(+)
+ create mode 100644 arch/arm/boot/dts/tango4-common.dtsi
+ create mode 100644 arch/arm/boot/dts/tango4-smp8758.dtsi
+ create mode 100644 arch/arm/boot/dts/tango4-vantage-1172.dts
+ create mode 100644 arch/arm/mach-tangox/Kconfig
+ create mode 100644 arch/arm/mach-tangox/Makefile
+ create mode 100644 arch/arm/mach-tangox/setup.c
+ create mode 100644 arch/arm/mach-tangox/smc.S
+ create mode 100644 arch/arm/mach-tangox/smc.h
 
-Guenter
+-- 
+2.4.5
