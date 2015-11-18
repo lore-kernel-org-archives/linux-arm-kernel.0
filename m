@@ -1,56 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 18 Nov 2015 17:24:23 +0000
-Subject: [PATCH v7 0/4] KASAN for arm64
-In-Reply-To: <564C8C47.1080904@gmail.com>
-References: <1444665180-301-1-git-send-email-ryabinin.a.a@gmail.com>
- <20151013083432.GG6320@e104818-lin.cambridge.arm.com>
- <5649BAFD.6030005@arm.com> <5649F783.40109@gmail.com>
- <20151116165100.GE6556@e104818-lin.cambridge.arm.com>
- <564C8C47.1080904@gmail.com>
-Message-ID: <20151118172422.GA5799@e104818-lin.cambridge.arm.com>
+From: joshua.clayton@uniwest.com (Joshua Clayton)
+Date: Wed, 18 Nov 2015 09:38:03 -0800
+Subject: rtc test 2
+In-Reply-To: <564A1679.9070700@uniwest.com>
+References: <2038851.J2zvFTXF8S@jclayton-pc> <6767947.aE8xIVpPRR@jclayton-pc>
+ <564A1679.9070700@uniwest.com>
+Message-ID: <3458577.MLHbIx9t1o@jclayton-pc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2015 at 05:33:43PM +0300, Andrey Ryabinin wrote:
-> On 11/16/2015 07:51 PM, Catalin Marinas wrote:
-> > On Mon, Nov 16, 2015 at 06:34:27PM +0300, Andrey Ryabinin wrote:
-> >> On 11/16/2015 02:16 PM, Suzuki K. Poulose wrote:
-> >>> arch/arm64/mm/kasan_init.c:95:2: note: in expansion of macro ?BUILD_BUG_ON?
-> >>>   BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE));
-> >>>
-> >>> The problem is that the PGDIR_SIZE is (1UL << 47) with 16K+48bit, which makes
-> >>> the KASAN_SHADOW_END unaligned(which is aligned to (1UL << (48 - 3)) ). Is the
-> >>> alignment really needed ? Thoughts on how best we could fix this ?
-> >>
-> >> Yes, it's really needed, because some code relies on this (e.g.
-> >> clear_pgs() and kasan_init()). But it should be possible to get rid of
-> >> this requirement.
+> On Monday, November 16, 2015 09:46:33 AM Steve Eagan wrote:
+> 
+> I agree, setting to the opposite extreme is a good idea
+> 
+> On Friday, November 13, 2015 03:45:56 PM Joshua Clayton wrote:
+> > rtc on 109 was set to the maximum adjustment value 273420 parts per
+> > billion.
+> > synchronized at 3:39:00 pm Today.
+> > I'll check it again on Monday to see how far it has drifted.
+> > Monday November 16 at 7:42:00 on my PC clock, the rtc on109 reads 07:40:36
 > > 
-> > I don't think clear_pgds() and kasan_init() are the only problems. IIUC,
-> > kasan_populate_zero_shadow() also assumes that KASan shadow covers
-> > multiple pgds. You need some kind of recursive writing which avoids
-> > populating an entry which is not empty (like kasan_early_pud_populate).
-> 
-> I think kasan_populate_zero_shadow() should be fine. We call pgd_populate() only
-> if address range covers the entire pgd:
-> 
-> 		if (IS_ALIGNED(addr, PGDIR_SIZE) && end - addr >= PGDIR_SIZE) {
-> ....
-> 			pgd_populate(&init_mm, pgd, kasan_zero_pud);
-> ....
-> 
-> and otherwise we check for pgd_none(*pgd):
-> 		if (pgd_none(*pgd)) {
-> 			pgd_populate(&init_mm, pgd,
-> 				early_alloc(PAGE_SIZE, NUMA_NO_NODE));
-> 		}
+> > My expectation was that the time would be ahead, instead it is 1 minute 24
+> > seconds behind. Perhaps I misunderstand which way the adjustment pushes
+> > the
+> > clock?
+> > 
+> > On the bright side, the effect is pronounced. It seemws to support the
+> > idea
+> > that it is doing something.
+> > 
+> > Any thoughts on a value to try next? My first thought is to set to the
+> > opposite extreme... Going ahead with that.
+> > 
+> > OK then. Setting adjust to
+> > 
+> > root at evi:~# cat /sys/class/rtc/rtc0/device/adjust
+> > -277760
+> > root at evi:~# cat /sys/class/rtc/rtc0/device/d
+> > 0xc0
+> > 
+> > Monday November 16 at 7:51:00  Clock syncronized to my PC clock.
 
-OK, I missed the fact that zero_pud_populate() handles the pmd/pte
-population with kasan_zero_*.
+Tested rtc this morning
+November 18 7:45:00 AM, instrument 109 shows November 18 7:45:03
+So the adjusment has made the clock fast. The adjustment is in the opposite direction previously thought.
 
-So if it's only tmp_pg_dir, as you said already, you can add a tmp_pud
-for the case where KASAN_SHADOW_SIZE is smaller than PGDIR_SIZE and
-change clear_pgds() to erase the puds.
+3 seconds * 1 billion / 172440 seconds = 17397 parts per billion
+
+ 
+I am going to try another setting:
+
+if the setting -277760 yields 17397....
+
+I'm kind of in a boggle.
+-277760 + 17397 would be -260363... the closest available value is -260400
+
+synchronized November 18 09:33:00
+
+root at evi:~# cat /sys/class/rtc/rtc0/device/d
+0xc4
+root at evi:~# cat /sys/class/rtc/rtc0/device/adjust 
+-260400
+
+Since my understanding of the math involved was upside down, I have little confidence in the above figures (except the empirical numbers),
+but the testing will continue.
+
+One thing to think about: The closer we get, the longer it will take to make a good measurement. Data is only available at one second
+granularity 
 
 -- 
-Catalin
+Joshua Clayton
+Software Engineer
+UniWest
+122 S. 4th Avenue
+Pasco, WA 99301
+(509) 544-0720
