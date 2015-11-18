@@ -1,74 +1,38 @@
 From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Wed, 18 Nov 2015 21:09:01 +0800
-Subject: [PATCH v3 01/62] Revert "xen/arm: vgic-v2: Drop cbase from
- arch_domain"
-In-Reply-To: <564C63E6.2080104@citrix.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-2-git-send-email-shannon.zhao@linaro.org>
- <564B0F1E.9040804@citrix.com> <564B1E62.8080208@huawei.com>
- <564B3255.6040108@citrix.com> <564BE23C.6020808@huawei.com>
- <564C63E6.2080104@citrix.com>
-Message-ID: <564C786D.5050108@linaro.org>
+Date: Wed, 18 Nov 2015 21:15:30 +0800
+Subject: [Xen-devel] [PATCH 06/13] Xen: ARM: Add support for mapping amba
+ device mmio
+In-Reply-To: <564C6EBF.7010105@citrix.com>
+References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
+ <1447754231-7772-7-git-send-email-shannon.zhao@linaro.org>
+ <20151117144040.GI3003@char.us.oracle.com> <564C14CA.9080601@huawei.com>
+ <564C6EBF.7010105@citrix.com>
+Message-ID: <564C79F2.6050708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 2015/11/18 19:41, Julien Grall wrote:
-> Hi Shannon,
->
-> On 18/11/15 02:28, Shannon Zhao wrote:
->
->> On 2015/11/17 21:57, Julien Grall wrote:
->>> On 17/11/15 12:32, Shannon Zhao wrote:
->>>>> Hi Julien,
->>>>>
->>>>> On 2015/11/17 19:27, Julien Grall wrote:
->>>>>>> Hi Shannon,
->>>>>>>
->>>>>>> Why do you want to revert this patch?
->>>>>>>
->>>>> Because d->arch.vgic.cbase will be used by creating Dom0 MADT table
->>>>> later. See [PATCH v3 43/62].
->>>>> +            gicc.base_address = d->arch.vgic.cbase;
->>>>>
->>>>> My previous way is get this from ACPI table but someone suggest get it
->>>>> from struct domain and I think this way is better too since it uses the
->>>>> value after being parsed.
->>> It's pointless to store the value in arch_domain for something that it's
->>> only use during building...
+On 2015/11/18 20:27, Julien Grall wrote:
+> On 18/11/15 06:03, Shannon Zhao wrote:
 >>>
->>> We have struct kernel_info which store any information related to the
->>> DOM0 during the building.
+>>> What about the removal of a bus device? No need to handle that?
 >>>
->>
->> Yeah, that would be better if it could use kernel_info. But the problem
->> is that kernel_info is firstly used in construct_dom0(), while it needs
->> to store the cbase in domain_create() which is called before
->> construct_dom0(). And if we pass kernel_info as parameter to
->> domain_create(), this would introduce more changes to common codes.
->>
->> Do you have any better idea to handle this?
+>> I have thought about removal before. I think there is little(or no)
+>> chance for AMBA and platform bus devices to be removed. It's not like
+>> the PCI devices which will be hot-unplug.
+>> Maybe I'm not right. If so, it's fine to add a case to handle the removal.
 >
-> Yes, introducing callback to create the ACPI table in the GIC driver.
-> See what we did for make_hwdom_dt_node.
+> What about the platform device passthrough case?
 >
-> We are trying to make the domain_build domain as agnostic as possible
-> from the GIC version. However in patch #43, you implement specific
-> version in the domain builder.
+No, it will add the platform passthrough device at booting step while 
+it's only removed when Dom0 shutdowns unless it supports platform device 
+hot-unplug.
+
+> In anycase, if the AMBA platform provides a removal method, there is
+> harmless to implement it.
 >
-> It will also not scale very well when we will introduce GICv2m and ITS.
->
-> The version of the GIC (ACPI_MADT_GIC_*) could be introduced in the
-> vgic_ops.
->
-> The re-distributor could be moved in gic-v3.c and the generic interrupt
-> controller in gic-v2.c.
->
-> Note it's a mandatory to emulate the same version as the hardware for
-> the virtual GIC.
->
-So it doesn't support vGICv2 on GICv3 hardware for Xen?
+Sure, as you said, it's harmless to add.
 
 Thanks,
 -- 
