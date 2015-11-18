@@ -1,164 +1,88 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 18 Nov 2015 18:42:45 +0000
-Subject: [PATCH RFC 18/27] drivers: cpu-pd: Add PM Domain governor for CPUs
-In-Reply-To: <1447799871-56374-19-git-send-email-lina.iyer@linaro.org>
-References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
- <1447799871-56374-19-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20151118184245.GA28755@red-moon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 18 Nov 2015 18:47:36 +0000
+Subject: [PATCH] arm64: restore bogomips information in /proc/cpuinfo
+In-Reply-To: <1447870505-19319-1-git-send-email-yang.shi@linaro.org>
+References: <1447870505-19319-1-git-send-email-yang.shi@linaro.org>
+Message-ID: <20151118184736.GM1588@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 03:37:42PM -0700, Lina Iyer wrote:
-> A PM domain comprising of CPUs may be powered off when all the CPUs in
-> the domain are powered down. Powering down a CPU domain is generally a
-> expensive operation and therefore the power performance trade offs
-> should be considered. The time between the last CPU powering down and
-> the first CPU powering up in a domain, is the time available for the
-> domain to sleep. Ideally, the sleep time of the domain should fulfill
-> the residency requirement of the domains' idle state.
+Hello,
+
+On Wed, Nov 18, 2015 at 10:15:05AM -0800, Yang Shi wrote:
+> As what Pavel Machek reported [1], some userspace applications depend on
+> bogomips showed by /proc/cpuinfo.
 > 
-> To do this effectively, read the time before the wakeup of the cluster's
-> CPUs and ensure that the domain's idle state sleep time guarantees the
-> QoS requirements of each of the CPU, the PM QoS CPU_DMA_LATENCY and the
-> state's residency.
+> Although there is much less legacy impact on aarch64 than arm, but it does
+> break libvirt.
+> 
+> Basically, this patch reverts commit 326b16db9f69fd0d279be873c6c00f88c0a4aad5
+> ("arm64: delay: don't bother reporting bogomips in /proc/cpuinfo"), but with
+> some tweak due to context change.
+> 
+> [1] https://lkml.org/lkml/2015/1/4/132
 
-To me this information should be part of the CPUidle governor (it is
-already there), we should not split the decision into multiple layers.
+I lost this argument last time around, so I won't re-tread that path this
+time around. I do, however, have some comments on the patch.
 
-The problem you are facing is that the CPUidle governor(s) do not take
-cross cpus relationship into account, I do not think that adding another
-decision layer in the power domain subsystem helps, you are doing that
-just because adding it to the existing CPUidle governor(s) is invasive.
-
-Why can't we use the power domain work you put together to eg disable
-idle states that share multiple cpus and make them "visible" only
-when the power domain that encompass them is actually going down ?
-
-You could use the power domains information to detect states that
-are shared between cpus.
-
-It is just an idea, what I am saying is that having another governor in
-the power domain subsytem does not make much sense, you split the
-decision in two layers while there is actually one, the existing
-CPUidle governor and that's where the decision should be taken.
-
-Thoughts appreciated.
-
-Lorenzo
-
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> 
+> Signed-off-by: Yang Shi <yang.shi@linaro.org>
 > ---
->  drivers/base/power/cpu-pd.c | 83 ++++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 82 insertions(+), 1 deletion(-)
+>  arch/arm64/kernel/cpuinfo.c | 5 +++++
+>  arch/arm64/kernel/smp.c     | 7 ++++++-
+>  2 files changed, 11 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/base/power/cpu-pd.c b/drivers/base/power/cpu-pd.c
-> index 617ce54..a00abc1 100644
-> --- a/drivers/base/power/cpu-pd.c
-> +++ b/drivers/base/power/cpu-pd.c
-> @@ -21,6 +21,7 @@
->  #include <linux/pm_qos.h>
->  #include <linux/rculist.h>
->  #include <linux/slab.h>
-> +#include <linux/tick.h>
+> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+> index 706679d..8d4ba77 100644
+> --- a/arch/arm64/kernel/cpuinfo.c
+> +++ b/arch/arm64/kernel/cpuinfo.c
+> @@ -30,6 +30,7 @@
+>  #include <linux/seq_file.h>
+>  #include <linux/sched.h>
+>  #include <linux/smp.h>
+> +#include <linux/delay.h>
 >  
->  #define CPU_PD_NAME_MAX 36
+>  /*
+>   * In case the boot CPU is hotpluggable, we record its initial state and
+> @@ -112,6 +113,10 @@ static int c_show(struct seq_file *m, void *v)
+>  		 */
+>  		seq_printf(m, "processor\t: %d\n", i);
 >  
-> @@ -66,6 +67,86 @@ static void get_cpus_in_domain(struct generic_pm_domain *genpd,
->  	}
->  }
+> +		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n\n",
+
+This double newline makes /proc/cpuinfo looks really odd. Can we just
+have one, please?
+
+> +			   loops_per_jiffy / (500000UL/HZ),
+> +			   loops_per_jiffy / (5000UL/HZ) % 100);
+> +
+>  		/*
+>  		 * Dump out the common processor features in a single line.
+>  		 * Userspace should read the hwcaps with getauxval(AT_HWCAP)
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index b1adc51..1bed772 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -326,7 +326,12 @@ static void __init hyp_mode_check(void)
 >  
-> +static bool cpu_pd_down_ok(struct dev_pm_domain *pd)
-> +{
-> +	struct generic_pm_domain *genpd = pd_to_genpd(pd);
-> +	struct cpu_pm_domain *cpu_pd = to_cpu_pd(genpd);
-> +	int qos = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
-> +	u64 sleep_ns = ~0;
-> +	ktime_t earliest;
-> +	int cpu;
-> +	int i;
-> +
-> +	/* Reset the last set genpd state, default to index 0 */
-> +	genpd->state_idx = 0;
-> +
-> +	/* We dont want to power down, if QoS is 0 */
-> +	if (!qos)
-> +		return false;
-> +
-> +	/*
-> +	 * Find the sleep time for the cluster.
-> +	 * The time between now and the first wake up of any CPU that
-> +	 * are in this domain hierarchy is the time available for the
-> +	 * domain to be idle.
-> +	 */
-> +	earliest.tv64 = KTIME_MAX;
-> +	for_each_cpu_and(cpu, cpu_pd->cpus, cpu_online_mask) {
-> +		struct device *cpu_dev = get_cpu_device(cpu);
-> +		struct gpd_timing_data *td;
-> +
-> +		td = &dev_gpd_data(cpu_dev)->td;
-> +
-> +		if (earliest.tv64 < td->next_wakeup.tv64)
-> +			earliest = td->next_wakeup;
-> +	}
-> +
-> +	sleep_ns = ktime_to_ns(ktime_sub(earliest, ktime_get()));
-> +	if (sleep_ns <= 0)
-> +		return false;
-> +
-> +	/*
-> +	 * Find the deepest sleep state that satisfies the residency
-> +	 * requirement and the QoS constraint
-> +	 */
-> +	for (i = genpd->state_count - 1; i > 0; i--) {
-> +		u64 state_sleep_ns;
-> +
-> +		state_sleep_ns = genpd->states[i].power_off_latency_ns +
-> +			genpd->states[i].power_on_latency_ns +
-> +			genpd->states[i].residency_ns;
-> +
-> +		/*
-> +		 * If we cant sleep to save power in the state, move on
-> +		 * to the next lower idle state.
-> +		 */
-> +		if (state_sleep_ns > sleep_ns)
-> +		       continue;
-> +
-> +		/*
-> +		 * We also dont want to sleep more than we should to
-> +		 * gaurantee QoS.
-> +		 */
-> +		if (state_sleep_ns < (qos * NSEC_PER_USEC))
-> +			break;
-> +	}
-> +
-> +	if (i >= 0)
-> +		genpd->state_idx = i;
-> +
-> +	return  (i >= 0) ? true : false;
-> +}
-> +
-> +static bool cpu_stop_ok(struct device *dev)
-> +{
-> +	return true;
-> +}
-> +
-> +struct dev_power_governor cpu_pd_gov = {
-> +	.power_down_ok = cpu_pd_down_ok,
-> +	.stop_ok = cpu_stop_ok,
-> +};
-> +
->  static int cpu_pd_power_off(struct generic_pm_domain *genpd)
+>  void __init smp_cpus_done(unsigned int max_cpus)
 >  {
->  	struct cpu_pm_domain *pd = to_cpu_pd(genpd);
-> @@ -183,7 +264,7 @@ int of_register_cpu_pm_domain(struct device_node *dn,
->  
->  	/* Register the CPU genpd */
->  	pr_debug("adding %s as CPU PM domain.\n", pd->genpd->name);
-> -	ret = of_pm_genpd_init(dn, pd->genpd, &simple_qos_governor, false);
-> +	ret = of_pm_genpd_init(dn, pd->genpd, &cpu_pd_gov, false);
->  	if (ret) {
->  		pr_err("Unable to initialize domain %s\n", dn->full_name);
->  		return ret;
-> -- 
-> 2.1.4
-> 
+> -	pr_info("SMP: Total of %d processors activated.\n", num_online_cpus());
+> +	unsigned long bogosum = loops_per_jiffy * num_online_cpus();
+> +
+> +	pr_info("SMP: Total of %d processors activated (%lu.%02lu BogoMIPS).\n",
+> +		num_online_cpus(), bogosum / (500000/HZ),
+> +		(bogosum / (5000/HZ)) % 100);
+
+Can we drop this hunk? I don't see a pressing need to print this in
+dmesg.
+
+With those two changes:
+
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+I guess this needs Cc'ing to stable, too.
+
+Thanks,
+
+Will
