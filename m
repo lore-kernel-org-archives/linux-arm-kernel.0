@@ -1,54 +1,77 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 18 Nov 2015 13:06:57 +0800
-Subject: [PATCH 2/4] arm64: dts: Add msm8996 SoC and MTP board support
-In-Reply-To: <1447809149-29724-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <201511181303.U0nlsppa%fengguang.wu@intel.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 18 Nov 2015 14:12:01 +0900
+Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <alpine.LFD.2.20.1511172255410.22569@knanqh.ubzr>
+References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
+ <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
+ <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
+ <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
+ <HK2PR06MB056142FFDA4E99A764DF9ECB8A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511161730030.5826@knanqh.ubzr>
+ <HK2PR06MB05614D47A9C35ECB4CA72D3F8A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511162127180.5826@knanqh.ubzr>
+ <HK2PR06MB056175E6E4356DD8C3566D758A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511172255410.22569@knanqh.ubzr>
+Message-ID: <CANqRtoTkHecGEsbi3EtM8dkHQ=V0RGm7iZcU_igMqLE7Od=xBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Nicolas,
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.4-rc1 next-20151117]
+On Wed, Nov 18, 2015 at 12:58 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Tue, 17 Nov 2015, Chris Brandt wrote:
+>
+>> I think this one is more of a coding issue.
+>> These were the attempts to fix the temporary stack issue:
+>>
+>> My first patch:
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/357106.html
+>>
+>> Magnus's try:
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/383394.html
+>
+> Here's my proposal:
+>
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index de2b246fed..2d0ac32320 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -274,10 +274,12 @@ __v7_ca15mp_setup:
+>  __v7_b15mp_setup:
+>  __v7_ca17mp_setup:
+>         mov     r10, #0
+> -1:     adr     r12, __v7_setup_stack           @ the local stack
+> -       stmia   r12, {r0-r5, lr}                @ v7_invalidate_l1 touches r0-r6
+> +1:     adr     r0, __v7_setup_stack_ptr
+> +       ldr     r12, [r0]
+> +       add     r12, r12, r0                    @ the local stack
+> +       stmia   r12, {r1-r6, lr}                @ v7_invalidate_l1 touches r0-r6
+>         bl      v7_invalidate_l1
+> -       ldmia   r12, {r0-r5, lr}
+> +       ldmia   r12, {r1-r6, lr}
+>  #ifdef CONFIG_SMP
+>         ALT_SMP(mrc     p15, 0, r0, c1, c0, 1)
+>         ALT_UP(mov      r0, #(1 << 6))          @ fake it for UP
 
-url:    https://github.com/0day-ci/linux/commits/Stephen-Boyd/devicetree-bindings-Document-Kryo-cpu/20151118-091558
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
-config: arm64-allmodconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+[snip]
 
-All errors (new ones prefixed by >>):
+> @@ -480,11 +484,16 @@ __errata_finish:
+>         orr     r0, r0, r6                      @ set them
+>   THUMB(        orr     r0, r0, #1 << 30        )       @ Thumb exceptions
+>         ret     lr                              @ return to head.S:__ret
+> +
+> +       .align  2
+> +__v7_setup_stack_ptr:
+> +       .word   __v7_setup_stack - .
+>  ENDPROC(__v7_setup)
 
-   In file included from arch/arm64/boot/dts/qcom/msm8996-mtp.dtsi:14:0,
-                    from arch/arm64/boot/dts/qcom/msm8996-mtp.dts:16:
->> arch/arm64/boot/dts/qcom/msm8996.dtsi:14:48: fatal error: dt-bindings/clock/qcom,gcc-msm8996.h: No such file or directory
-    #include <dt-bindings/clock/qcom,gcc-msm8996.h>
-                                                   ^
-   compilation terminated.
+Thanks for your take on this. I did a couple of local implementations
+before submitting, and one of the issues I ran into was the need to
+get rid of PAGE_OFFSET due to the code running without MMU enabled. I
+suppose that is taken care of the "__v7_setup_stack - ." calculation
+above?
 
-vim +14 arch/arm64/boot/dts/qcom/msm8996.dtsi
+Cheers,
 
-     8	 * but WITHOUT ANY WARRANTY; without even the implied warranty of
-     9	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    10	 * GNU General Public License for more details.
-    11	 */
-    12	
-    13	#include <dt-bindings/interrupt-controller/arm-gic.h>
-  > 14	#include <dt-bindings/clock/qcom,gcc-msm8996.h>
-    15	#include <dt-bindings/clock/qcom,mmcc-msm8996.h>
-    16	
-    17	/ {
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 45533 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151118/49315e76/attachment-0001.obj>
+/ magnus
