@@ -1,99 +1,53 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 18 Nov 2015 22:42:32 +0100
-Subject: [PATCH 4/7] phy: rockchip-usb: add missing of_node_put
-In-Reply-To: <1447673600-8881-5-git-send-email-Julia.Lawall@lip6.fr>
-References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
- <1447673600-8881-5-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <3319805.OP3X7Mj3av@diego>
+From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
+Date: Wed, 18 Nov 2015 22:47:08 +0100
+Subject: [PATCH v6 18/19] arm64:ilp32: change COMPAT_ELF_PLATFORM to
+ report a a subplatform for ILP32
+In-Reply-To: <20151118202543.GB11264@yury-N73SV>
+References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
+ <1447795019-30176-19-git-send-email-ynorov@caviumnetworks.com>
+ <564C32AB.4070901@huawei.com>
+ <E53A0D4E-EAAF-4956-9E21-599254EB80BB@gmail.com>
+ <20151118202543.GB11264@yury-N73SV>
+Message-ID: <85D7EAC4-B4FD-44D8-B1EC-BDEFD1DC1229@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 16. November 2015, 12:33:17 schrieb Julia Lawall:
-> for_each_available_child_of_node performs an of_node_get on each iteration,
-> so a return from the middle of the loop requires an of_node_put.
-> 
-> A simplified version of the semantic patch that finds this problem is as
-> follows (http://coccinelle.lip6.fr):
-> 
-> // <smpl>
-> @@
-> expression root,e;
-> local idexpression child;
-> @@
-> 
->  for_each_available_child_of_node(root, child) {
->    ... when != of_node_put(child)
->        when != e = child
-> (
->    return child;
-> 
-> *  return ...;
-> )
->    ...
->  }
-> // </smpl>
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Yury,
 
-After 
+We had implemented gdb-support against the the earlier ILP32 incarnation.
+I?ll take a look with the latest patch-set and see whether these still apply.
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Best,
+Philipp.
 
-on a rk3288-veyron chromebook
-Tested-by: Heiko Stuebner <heiko@sntech.de>
-
+> On 18 Nov 2015, at 21:25, Yury Norov <ynorov@caviumnetworks.com> wrote:
 > 
-> ---
->  drivers/phy/phy-rockchip-usb.c |   17 ++++++++++++-----
->  1 file changed, 12 insertions(+), 5 deletions(-)
+> On Wed, Nov 18, 2015 at 03:21:05AM -0800, pinskia at gmail.com wrote:
+>> 
+>> 
+>>> On Nov 18, 2015, at 12:11 AM, Zhangjian (Bamvor) <bamvor.zhangjian@huawei.com> wrote:
+>>> 
+>>> Hi, Yury
+>>> 
+>>>> On 2015/11/18 5:16, Yury Norov wrote:
+>>>> From: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+>>>> 
+>>>> To make life for tools (such as gdb) easier when dealing with ILP32 processes,
+>>>> we report a proper subarchitecture for ILP32 in the ELF auxiliary vectors.
+>>> I saw some ilp32 relative patches in binutils mailing list. Does gdb
+>>> fully support ilp32?
+>> 
+>> I have a patch set but I have not tested them with the latest kernel patch set yet. The branch is located in the binutils-gdb git is https://sourceware.org/git/?p=binutils-gdb.git;a=shortlog;h=refs/heads/users/pinskia/gdb-aarch64-ilp32 .
+>> I think it will mostly work except for core support might need to be changed slightly. 
+>> 
+>> Thanks,
+>> Andrew
+>>> 
 > 
-> diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
-> index 91d6f34..62c43c4 100644
-> --- a/drivers/phy/phy-rockchip-usb.c
-> +++ b/drivers/phy/phy-rockchip-usb.c
-> @@ -108,13 +108,16 @@ static int rockchip_usb_phy_probe(struct
-> platform_device *pdev)
+> Yes, it works mostly. I can read and modify text/data, set breakpoints
+> etc.
 > 
->  	for_each_available_child_of_node(dev->of_node, child) {
->  		rk_phy = devm_kzalloc(dev, sizeof(*rk_phy), GFP_KERNEL);
-> -		if (!rk_phy)
-> -			return -ENOMEM;
-> +		if (!rk_phy) {
-> +			err = -ENOMEM;
-> +			goto put_child;
-> +		}
-> 
->  		if (of_property_read_u32(child, "reg", &reg_offset)) {
->  			dev_err(dev, "missing reg property in node %s\n",
->  				child->name);
-> -			return -EINVAL;
-> +			err = -EINVAL;
-> +			goto put_child;
->  		}
-> 
->  		rk_phy->reg_offset = reg_offset;
-> @@ -127,18 +130,22 @@ static int rockchip_usb_phy_probe(struct
-> platform_device *pdev) rk_phy->phy = devm_phy_create(dev, child, &ops);
->  		if (IS_ERR(rk_phy->phy)) {
->  			dev_err(dev, "failed to create PHY\n");
-> -			return PTR_ERR(rk_phy->phy);
-> +			err = PTR_ERR(rk_phy->phy);
-> +			goto put_child;
->  		}
->  		phy_set_drvdata(rk_phy->phy, rk_phy);
-> 
->  		/* only power up usb phy when it use, so disable it when init*/
->  		err = rockchip_usb_phy_power(rk_phy, 1);
->  		if (err)
-> -			return err;
-> +			goto put_child;
->  	}
-> 
->  	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
->  	return PTR_ERR_OR_ZERO(phy_provider);
-> +put_child:
-> +	of_node_put(child);
-> +	return err;
->  }
-> 
->  static const struct of_device_id rockchip_usb_phy_dt_ids[] = {
+>>> Regards
+>>> 
+>>> Bamvor
+>>> 
