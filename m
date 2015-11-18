@@ -1,249 +1,157 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Wed, 18 Nov 2015 15:35:23 +0800
-Subject: [PATCH] phy: add phy-hi6220-usb
-Message-ID: <1447832123-27245-1-git-send-email-zhangfei.gao@linaro.org>
+From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
+Date: Wed, 18 Nov 2015 16:00:26 +0800
+Subject: [RFC2 PATCH v6 00/19] ILP32 for ARM64
+In-Reply-To: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <564C301A.5080707@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support hi6220 use phy for HiKey board
+Hi, Yury
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
- .../devicetree/bindings/phy/phy-hi6220-usb.txt     |  16 ++
- drivers/phy/Kconfig                                |   9 ++
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-hi6220-usb.c                       | 168 +++++++++++++++++++++
- 4 files changed, 194 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/phy-hi6220-usb.txt
- create mode 100644 drivers/phy/phy-hi6220-usb.c
+Glad to see the new version of ilp32. Here is some general questions:
 
-diff --git a/Documentation/devicetree/bindings/phy/phy-hi6220-usb.txt b/Documentation/devicetree/bindings/phy/phy-hi6220-usb.txt
-new file mode 100644
-index 0000000..f17a56e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/phy-hi6220-usb.txt
-@@ -0,0 +1,16 @@
-+Hisilicon hi6220 usb PHY
-+-----------------------
-+
-+Required properties:
-+- compatible: should be "hisilicon,hi6220-usb-phy"
-+- #phy-cells: must be 0
-+- hisilicon,peripheral-syscon: phandle of syscon used to control phy.
-+Refer to phy/phy-bindings.txt for the generic PHY binding properties
-+
-+Example:
-+	usb_phy: usbphy {
-+		compatible = "hisilicon,hi6220-usb-phy";
-+		#phy-cells = <0>;
-+		phy-supply = <&fixed_5v_hub>;
-+		hisilicon,peripheral-syscon = <&sys_ctrl>;
-+	};
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index 47da573..c91a612 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -206,6 +206,15 @@ config PHY_HIX5HD2_SATA
- 	help
- 	  Support for SATA PHY on Hisilicon hix5hd2 Soc.
- 
-+config PHY_HI6220_USB
-+	tristate "hi6220 USB PHY support"
-+	select GENERIC_PHY
-+	select MFD_SYSCON
-+	help
-+	  Enable this to support the HISILICON HI6220 USB PHY.
-+
-+	  To compile this driver as a module, choose M here.
-+
- config PHY_SUN4I_USB
- 	tristate "Allwinner sunxi SoC USB PHY driver"
- 	depends on ARCH_SUNXI && HAS_IOMEM && OF
-diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-index a5b18c1..0c5ccc9 100644
---- a/drivers/phy/Makefile
-+++ b/drivers/phy/Makefile
-@@ -23,6 +23,7 @@ obj-$(CONFIG_TI_PIPE3)			+= phy-ti-pipe3.o
- obj-$(CONFIG_TWL4030_USB)		+= phy-twl4030-usb.o
- obj-$(CONFIG_PHY_EXYNOS5250_SATA)	+= phy-exynos5250-sata.o
- obj-$(CONFIG_PHY_HIX5HD2_SATA)		+= phy-hix5hd2-sata.o
-+obj-$(CONFIG_PHY_HI6220_USB)		+= phy-hi6220-usb.o
- obj-$(CONFIG_PHY_SUN4I_USB)		+= phy-sun4i-usb.o
- obj-$(CONFIG_PHY_SUN9I_USB)		+= phy-sun9i-usb.o
- obj-$(CONFIG_PHY_SAMSUNG_USB2)		+= phy-exynos-usb2.o
-diff --git a/drivers/phy/phy-hi6220-usb.c b/drivers/phy/phy-hi6220-usb.c
-new file mode 100644
-index 0000000..b2141cb
---- /dev/null
-+++ b/drivers/phy/phy-hi6220-usb.c
-@@ -0,0 +1,168 @@
-+/*
-+ * Copyright (c) 2015 Linaro Ltd.
-+ * Copyright (c) 2015 Hisilicon Limited.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/phy/phy.h>
-+#include <linux/regmap.h>
-+
-+#define SC_PERIPH_CTRL4			0x00c
-+
-+#define CTRL4_PICO_SIDDQ		BIT(6)
-+#define CTRL4_PICO_OGDISABLE		BIT(8)
-+#define CTRL4_PICO_VBUSVLDEXT		BIT(10)
-+#define CTRL4_PICO_VBUSVLDEXTSEL	BIT(11)
-+#define CTRL4_OTG_PHY_SEL		BIT(21)
-+
-+#define SC_PERIPH_CTRL5			0x010
-+
-+#define CTRL5_USBOTG_RES_SEL		BIT(3)
-+#define CTRL5_PICOPHY_ACAENB		BIT(4)
-+#define CTRL5_PICOPHY_BC_MODE		BIT(5)
-+#define CTRL5_PICOPHY_CHRGSEL		BIT(6)
-+#define CTRL5_PICOPHY_VDATSRCEND	BIT(7)
-+#define CTRL5_PICOPHY_VDATDETENB	BIT(8)
-+#define CTRL5_PICOPHY_DCDENB		BIT(9)
-+#define CTRL5_PICOPHY_IDDIG		BIT(10)
-+
-+#define SC_PERIPH_CTRL8			0x018
-+#define SC_PERIPH_RSTEN0		0x300
-+#define SC_PERIPH_RSTDIS0		0x304
-+
-+#define RST0_USBOTG_BUS			BIT(4)
-+#define RST0_POR_PICOPHY		BIT(5)
-+#define RST0_USBOTG			BIT(6)
-+#define RST0_USBOTG_32K			BIT(7)
-+
-+#define EYE_PATTERN_PARA		0x7053348c
-+
-+struct hi6220_priv {
-+	struct regmap *reg;
-+	struct device *dev;
-+};
-+
-+static void hi6220_phy_init(struct hi6220_priv *priv)
-+{
-+	struct regmap *reg = priv->reg;
-+	u32 val, mask;
-+
-+	val = RST0_USBOTG_BUS | RST0_POR_PICOPHY |
-+	      RST0_USBOTG | RST0_USBOTG_32K;
-+	mask = val;
-+	regmap_update_bits(reg, SC_PERIPH_RSTEN0, mask, val);
-+	regmap_update_bits(reg, SC_PERIPH_RSTDIS0, mask, val);
-+}
-+
-+static int hi6220_phy_setup(struct hi6220_priv *priv, bool on)
-+{
-+	struct regmap *reg = priv->reg;
-+	u32 val, mask;
-+	int ret;
-+
-+	if (on) {
-+		val = CTRL5_USBOTG_RES_SEL | CTRL5_PICOPHY_ACAENB;
-+		mask = val | CTRL5_PICOPHY_BC_MODE;
-+		ret = regmap_update_bits(reg, SC_PERIPH_CTRL5, mask, val);
-+		if (ret)
-+			goto out;
-+
-+		val =  CTRL4_PICO_VBUSVLDEXT | CTRL4_PICO_VBUSVLDEXTSEL |
-+		       CTRL4_OTG_PHY_SEL;
-+		mask = val | CTRL4_PICO_SIDDQ | CTRL4_PICO_OGDISABLE;
-+		ret = regmap_update_bits(reg, SC_PERIPH_CTRL4, mask, val);
-+		if (ret)
-+			goto out;
-+
-+		ret = regmap_write(reg, SC_PERIPH_CTRL8, EYE_PATTERN_PARA);
-+		if (ret)
-+			goto out;
-+	} else {
-+		val = CTRL4_PICO_SIDDQ;
-+		mask = val;
-+		ret = regmap_update_bits(reg, SC_PERIPH_CTRL4, mask, val);
-+		if (ret)
-+			goto out;
-+	}
-+
-+	return 0;
-+out:
-+	dev_err(priv->dev, "failed to setup phy ret: %d\n", ret);
-+	return ret;
-+}
-+
-+static int hi6220_phy_start(struct phy *phy)
-+{
-+	struct hi6220_priv *priv = phy_get_drvdata(phy);
-+
-+	return hi6220_phy_setup(priv, true);
-+}
-+
-+static int hi6220_phy_exit(struct phy *phy)
-+{
-+	struct hi6220_priv *priv = phy_get_drvdata(phy);
-+
-+	return hi6220_phy_setup(priv, false);
-+}
-+
-+static struct phy_ops hi6220_phy_ops = {
-+	.init		= hi6220_phy_start,
-+	.exit		= hi6220_phy_exit,
-+	.owner		= THIS_MODULE,
-+};
-+
-+static int hi6220_phy_probe(struct platform_device *pdev)
-+{
-+	struct phy_provider *phy_provider;
-+	struct device *dev = &pdev->dev;
-+	struct phy *phy;
-+	struct hi6220_priv *priv;
-+
-+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	priv->dev = dev;
-+	priv->reg = syscon_regmap_lookup_by_phandle(dev->of_node,
-+					"hisilicon,peripheral-syscon");
-+	if (IS_ERR(priv->reg)) {
-+		dev_err(dev, "no hisilicon,peripheral-syscon\n");
-+		return PTR_ERR(priv->reg);
-+	}
-+
-+	hi6220_phy_init(priv);
-+
-+	phy = devm_phy_create(dev, NULL, &hi6220_phy_ops);
-+	if (IS_ERR(phy))
-+		return PTR_ERR(phy);
-+
-+	phy_set_drvdata(phy, priv);
-+	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
-+	return PTR_ERR_OR_ZERO(phy_provider);
-+}
-+
-+static const struct of_device_id hi6220_phy_of_match[] = {
-+	{.compatible = "hisilicon,hi6220-usb-phy",},
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, hi6220_phy_of_match);
-+
-+static struct platform_driver hi6220_phy_driver = {
-+	.probe	= hi6220_phy_probe,
-+	.driver = {
-+		.name	= "hi6220-usb-phy",
-+		.of_match_table	= hi6220_phy_of_match,
-+	}
-+};
-+module_platform_driver(hi6220_phy_driver);
-+
-+MODULE_DESCRIPTION("HISILICON HI6220 USB PHY driver");
-+MODULE_ALIAS("platform:hi6220-usb-phy");
-+MODULE_LICENSE("GPL");
--- 
-1.9.1
+On 2015/11/18 5:16, Yury Norov wrote:
+> ------8<-----
+> Colleagues, I'm gonna to send it to list.
+> Please, take a look.
+> ------8<-----
+> 
+> This is still RFC because ~20 tests still fail,
+> and because it's based on 4.3 kernel version, and
+> some work is needed to rebase on 4.4. I'd preffer
+> to do it later. 
+> 
+> v3: https://lkml.org/lkml/2014/9/3/704
+> v4: https://lkml.org/lkml/2015/4/13/691
+> v5: https://lkml.org/lkml/2015/9/29/911
+> 
+> v6:
+>  - time_t, __kenel_off_t and other types turned to be 32-bit
+>    for compatibility reasons (after v5 discussion);
+Is there any performance comparison between v6 and v5, especially for
+these changes? Compatibility is important for us, meanwhile we need to
+take performance into account.
+>  - related changes applied to ILP32 syscall table and handlers;
+>  - ILP32 VDSO code excluded. It's not mandatory, and caused questions
+>    during review process. We definitely make sure we will follow up
+>    with a VDSO later on because it is needed for performance reasons;
+>  - fixed build issues with different combinations of AARCH32 / ILP32
+>    enabling in config;
+>  - ILP32 TLS bug fixed;
+>  - entry32-common.S introduced to hold wrappers needed for both ILP32
+>    and AARCH32_EL0;
+>  - documentation updated according to latest changes;
+>  - rebased to the current head;
+>  - coding style re-checked;
+>  - ILP32 syscall table turned around.
+> 
+> Testing is performed using LTP with scenario 'ltplite'.
+> Tested on QEMU + vanilla defconfig kernel.
+Do you tested on both big endian and little endian?
+
+Regards
+
+Bamvor
+> Regressions are mostly related to core dump genereation,
+> readdir(), and futex(). Some tests fail both in ILP32, and LP64.
+> 
+> The full regression table is:
+> 		ILP32		LP64
+> 
+> float_bessel    FAIL	 134    PASSED	0
+> float_exp_log   FAIL	 134    PASSED	0
+> float_iperb     FAIL	 134    PASSED	0
+> float_power     FAIL	 134    PASSED	0
+> float_trigo     FAIL	 134    PASSED	0
+> abort01         FAIL       2    FAIL 	2
+> fcntl14         FAIL       2    FAIL 	2
+> kill11          FAIL       2    FAIL 	2
+> mmap16          FAIL       6    PASSED	0
+> open12          FAIL       2    PASSED	0
+> pause01         PASSED     0    FAIL 	9
+> pipe07          FAIL       2    PASSED	0
+> readdir01       FAIL       1    PASSED	0
+> rename11        FAIL       2    PASSED	0
+> rmdir02         FAIL       2    PASSED	0
+> setregid02      FAIL       1    FAIL 	1
+> settimeofday01  FAIL       1    FAIL 	1
+> umount2_01      FAIL       2    PASSED	0
+> umount2_02      FAIL       2    PASSED	0
+> umount2_03      FAIL       2    PASSED	0
+> utime06         FAIL       2    PASSED	0
+> 
+> Kernel with this patchset, and corresponding
+> version of glibc is here:
+> https://github.com/norov/
+> 
+> Andrew Pinski (14):
+>   arm64: ensure the kernel is compiled for LP64
+>   arm64: rename COMPAT to AARCH32_EL0 in Kconfig
+>   arm64: change some CONFIG_COMPAT over to use CONFIG_AARCH32_EL0
+>     instead
+>   arm64:uapi: set __BITS_PER_LONG correctly for ILP32 and LP64
+>   arm64:ilp32: share signal structures between ILP32 and LP64 ABIs
+>   arm64: introduce is_a32_task and is_a32_thread (for AArch32 compat)
+>   arm64:ilp32: add is_ilp32_compat_{task,thread} and TIF_32BIT_AARCH64
+>   arm64:ilp32: share HWCAP between LP64 and ILP32
+>   arm64:ilp32 use the native LP64 'start_thread' for ILP32 threads
+>   arm64:ilp32: support core dump generation for ILP32
+>   ptrace: Allow compat to use the native siginfo
+>   arm64:ilp32: add sys_ilp32.c and a separate table (in entry.S) to use
+>     it
+>   arm64:ilp32: use the native siginfo instead of the compat siginfo
+>   arm64:ilp32: add ARM64_ILP32 to Kconfig
+> 
+> Jan Dakinevich (2):
+>   ilp32: common 32-bit wrappers
+>   arm64: ilp32: force IPC_64 in msgctl, shmctl, semctl
+> 
+> Philipp Tomsich (2):
+>   arm64:ilp32: add documentation on the ILP32 ABI for ARM64
+>   arm64:ilp32: change COMPAT_ELF_PLATFORM to report a a subplatform for
+>     ILP32
+> 
+> Yury Norov (1):
+>   aarch64: ilp32: use generic stat64 structure
+> 
+>  Documentation/arm64/ilp32.txt             |  47 +++++++
+>  arch/arm64/Kconfig                        |  12 ++
+>  arch/arm64/Makefile                       |   5 +
+>  arch/arm64/include/asm/compat.h           |  70 +++++++++-
+>  arch/arm64/include/asm/elf.h              | 105 ++++++++++++--
+>  arch/arm64/include/asm/fpsimd.h           |   2 +-
+>  arch/arm64/include/asm/hwcap.h            |  12 +-
+>  arch/arm64/include/asm/memory.h           |   2 +-
+>  arch/arm64/include/asm/processor.h        |  18 ++-
+>  arch/arm64/include/asm/ptrace.h           |   2 +-
+>  arch/arm64/include/asm/signal32.h         |  19 +++
+>  arch/arm64/include/asm/stat.h             |   2 +
+>  arch/arm64/include/asm/thread_info.h      |   3 +-
+>  arch/arm64/include/asm/unistd.h           |  11 +-
+>  arch/arm64/include/uapi/asm/bitsperlong.h |   9 +-
+>  arch/arm64/include/uapi/asm/siginfo.h     |  21 +++
+>  arch/arm64/include/uapi/asm/signal.h      |  31 +++++
+>  arch/arm64/kernel/Makefile                |   4 +-
+>  arch/arm64/kernel/asm-offsets.c           |   2 +-
+>  arch/arm64/kernel/entry.S                 |  18 ++-
+>  arch/arm64/kernel/entry32-common.S        |  37 +++++
+>  arch/arm64/kernel/entry32.S               |  29 ----
+>  arch/arm64/kernel/head.S                  |   2 +-
+>  arch/arm64/kernel/hw_breakpoint.c         |   7 +-
+>  arch/arm64/kernel/perf_regs.c             |   2 +-
+>  arch/arm64/kernel/process.c               |   4 +-
+>  arch/arm64/kernel/ptrace.c                |  47 ++++---
+>  arch/arm64/kernel/signal.c                |  21 ++-
+>  arch/arm64/kernel/sys_ilp32.c             | 223 ++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/traps.c                 |   4 +-
+>  arch/arm64/kernel/vdso.c                  |  12 +-
+>  include/linux/compat.h                    |   4 +
+>  include/uapi/asm-generic/siginfo.h        |  17 ++-
+>  include/uapi/asm-generic/signal.h         |  27 +++-
+>  kernel/ptrace.c                           |  24 +++-
+>  35 files changed, 745 insertions(+), 110 deletions(-)
+>  create mode 100644 Documentation/arm64/ilp32.txt
+>  create mode 100644 arch/arm64/kernel/entry32-common.S
+>  create mode 100644 arch/arm64/kernel/sys_ilp32.c
+> 
