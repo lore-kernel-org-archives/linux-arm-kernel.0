@@ -1,29 +1,70 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Wed, 18 Nov 2015 15:28:46 +0000
-Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <5236157.AUJjCLOEeJ@wuerfel>
-References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
- <HK2PR06MB0561B7675F17A81B54A65CA28A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511172129060.22569@knanqh.ubzr>
- <5236157.AUJjCLOEeJ@wuerfel>
-Message-ID: <HK2PR06MB0561DABA3F9198803825E80F8A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 18 Nov 2015 17:29:19 +0200
+Subject: [PATCH] mmc: dw_mmc: use resource_size_t to store physical address
+In-Reply-To: <5141236.CHnzdS7Lto@wuerfel>
+References: <28102387.ALpaBHpim0@wuerfel> <6288847.N1QBIiXedG@wuerfel>
+ <CAHp75Vf4oaLZE27bC+aH9HD6W4E8Gditoz=HF0Z1WwcLWJnSKA@mail.gmail.com>
+ <5141236.CHnzdS7Lto@wuerfel>
+Message-ID: <CAHp75VfE2DWYB5GwSe1WLPb+gTnhNpYz5qo7jNfMK4tXbEWioQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> [Adding Uwe and Maxime to Cc]
-> 
-> I believe Uwe has been running XIP_KERNEL on efm32 for a while now,
-> but he also mentioned that he needed some extra hacks in the linker
-> script and elsewhere to get it to work.
+On Wed, Nov 18, 2015 at 2:38 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 18 November 2015 11:35:27 Andy Shevchenko wrote:
+>> On Fri, Nov 13, 2015 at 11:35 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Friday 13 November 2015 03:10:13 Andy Shevchenko wrote:
+>> >> On Thu, Nov 12, 2015 at 4:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
+[]
 
-Yes, Maxime got the XIP fix for scripts/link-vmlinux.sh into the kernel ([PATCH v6 01/15] scripts: link-vmlinux: Don't pass page offset to kallsyms if XIP Kernel), which of course made one less file I have to patch.
+>> >> If dst_addr is dma_addr_t wouldn't be a problem when
+>> >> resource_size_t is defined as 64-bit address, and dma_addr_t as 32-bit?
+>> >>
+>> >> Btw, for me casting to dma_addr_t looks sane.
+>> >
+>> > The background here is that the address comes from a resource_size_t
+>> > that describes the MMIO register area as seen from the CPU, and that
+>> > is normally a phys_addr_t (resource_size_t is defined as being long
+>> > enough to store a phys_addr_t or various other things depending on
+>> > resource->flags).
+>> >
+>> > dma_addr_t strictly speaking refers to a RAM location as seen by a
+>> > DMA master, and that only comes out of dma_map_*() or
+>> > dma_alloc_coherent().
+>> >
+>> > The DMA engine wants something else here, which is an MMIO register
+>> > address as seen by a DMA master, and we don't have a separate typedef
+>> > for that. Almost universally all of resource_size_t, phys_addr_t and
+>> > dma_addr_t are the same type, and if we ever get a platform that
+>> > wants something other than a phys_addr_t to put into cfg.dst_addr,
+>> > we are in deep trouble.
+>>
+>> DMA operates with address space covered by dma_addr_t, if you use
+>> phys_addr_t you may get address out of DMA boundaries. This is should
+>> be done in hardware / firmware / platform representation.
+>> So, I don't see any reason not to use dma_addr_t here.
+>
+> As I said above, this isn't really the same as DMA: all normal
+> dma_addr_t are returned from dma_alloc_* or dma_map_*, point
+> to RAM and might go trhough an IOMMU, all of which is not true
+> here, hence the patch to change the type to phys_addr_t.
+>
+> You really can't get out of bounds because the data comes from a
+> phys_addr_t and refers to a fixed location in hardware. If a
+> platform has registers higher than a 32-bit address, its phys_addr_t
+> must be 64-bit, but its dma_addr_t not necessarily so (even though
+> the two are the same almost always in practice).
 
+I understand most of the things here, what I don't is how a platform
+is supposed to work if you have the following:
+a) HW, that uses register space let's say higher than 32-bit;
+b) DMA engine, which should provide a DMA capability for above HW block;
+c) dma_addr_t which does not cover the HW register space.
 
-> It would be good to coordinate this, he may have found additional
-> problems, or he can maybe help test the new approach on his hardware.
+For me it clearly looks like a platform (HW / SW) configuration issue.
 
-The part I'm using (RZ/A1H) is a Cortex A9 and the EFM32 is a Cortex M3, so we'd be able to test both MMU and non-MMU XIP systems.
+In case of bounce buffers I can't understand how it helps there.
 
-
-Chris
+-- 
+With Best Regards,
+Andy Shevchenko
