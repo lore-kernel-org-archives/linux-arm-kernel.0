@@ -1,25 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 18 Nov 2015 14:54:48 +0100
-Subject: [PATCH] pinctrl: mediatek: Add get_direction support.
-In-Reply-To: <1447798633-24586-1-git-send-email-hongzhou.yang@mediatek.com>
-References: <1447798633-24586-1-git-send-email-hongzhou.yang@mediatek.com>
-Message-ID: <CACRpkdYbY7vDNRdMF_goUkwNHnoDAF9RMmAt-+sPqA1=8Hxouw@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 18 Nov 2015 16:01:55 +0200
+Subject: [4.4-rc][PATCH] ARM: dts: am4372: disable arm twd and global timer's
+ nodes
+Message-ID: <1447855315-419-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 11:17 PM, Hongzhou Yang
-<hongzhou.yang@mediatek.com> wrote:
+Keep ARM TWD and Global timer's nodes disabled by default - if someone
+would like to use them then those nodes have to be enabled explicitly
+in board file.
 
-> Since Linux gpio framework return 0 for output, 1 for input.
-> But HW use 0 stands for input, and 1 stands for output.
-> So use negative to correct it.
->
-> And gpio_chip.get is used to get input value, no need to get
-> output value, so removing it.
->
-> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+The reason for this change is:
+- ARM TWD is not always-on timer on am437x and it will stop in low
+  CPUIdle states and, therefore, broadcast timer has to configured
+  properly if CPU_IDLE=y.
+- ARM Global timer is not always-on timer on am437x and it can't be
+  used as clocksource device if CPU_IDLE=y.
+- ARM Global timer driver doesn't support CPUfreq now.
 
-Patch applied for fixes.
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Santosh Shilimkar <ssantosh@kernel.org>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ arch/arm/boot/dts/am4372.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+index d83ff9c..11376e3 100644
+--- a/arch/arm/boot/dts/am4372.dtsi
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -75,6 +75,7 @@
+ 		interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupt-parent = <&gic>;
+ 		clocks = <&dpll_mpu_m2_ck>;
++		status = "disabled";
+ 	};
+ 
+ 	local_timer: timer at 48240600 {
+@@ -83,6 +84,7 @@
+ 		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupt-parent = <&gic>;
+ 		clocks = <&dpll_mpu_m2_ck>;
++		status = "disabled";
+ 	};
+ 
+ 	l2-cache-controller at 48242000 {
+-- 
+2.6.3
