@@ -1,66 +1,76 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 18 Nov 2015 14:33:12 +0800
-Subject: [Xen-devel] [PATCH 07/13] ARM: Xen: Document UEFI support on
- Xen ARM virtual platforms
-In-Reply-To: <564B59F3.2060801@citrix.com>
-References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
- <1447754231-7772-8-git-send-email-shannon.zhao@linaro.org>
- <564B59F3.2060801@citrix.com>
-Message-ID: <564C1BA8.9090109@huawei.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 18 Nov 2015 07:42:27 +0100
+Subject: [RFC PATCH] arm64: use non-global mappings for UEFI runtime
+ regions
+In-Reply-To: <20151117171709.GB12266@leverpostej>
+References: <1447750411-6424-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20151117152558.GK12586@leverpostej>
+ <20151117163445.GE30101@arm.com>
+ <20151117164759.GA12266@leverpostej>
+ <CAKv+Gu8Z=Jb-x1ZL7YSYpLWsEBqh7z0EQ0myg2Gz5asAuHdNbg@mail.gmail.com>
+ <20151117171709.GB12266@leverpostej>
+Message-ID: <CAKv+Gu8DZRmbV-wFrp7vCRVq9iO8pRKPEOOJcEtn3tz3oPrvfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/11/18 0:46, David Vrabel wrote:
-> On 17/11/15 09:57, shannon.zhao at linaro.org wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
+On 17 November 2015 at 18:17, Mark Rutland <mark.rutland@arm.com> wrote:
+>> >> > For backporting, I'm not sure that this is necessarily safe prior to
+>> >> > Will's rework of the ASID allocator. I think we can IPI in this context,
+>> >> > and it looks like the cpu_set_reserved_ttbr0() in flush_context() would
+>> >> > save us from the problem described above, but I may have missed
+>> >> > something.
+>> >> >
+>> >> > Will, are you aware of anything that could bite us here?
+>> >>
+>> >> Can we guarantee that efi_virtmap_{load,unload} are called with interrupts
+>> >> enabled?
+>> >
+>> > Unfortuantely, it looks like we can guarantee interrupts are _disabled_.
+>> >
+>> > Every function in drivers/firmware/efi/runtime-wrappers.c which uses
+>> > efi_call_virt (and hence efi_virtmap_{load,unload}) wraps the call in a
+>> > spin_lock_irq{save,restore} pair. Those appear to be the only uses of
+>> > efi_call_virt.
+>> >
 >>
->> Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
->> scan this to get the UEFI information.
-> [...]
->> --- a/Documentation/devicetree/bindings/arm/xen.txt
->> +++ b/Documentation/devicetree/bindings/arm/xen.txt
->> @@ -15,6 +15,24 @@ the following properties:
->>  - interrupts: the interrupt used by Xen to inject event notifications.
->>    A GIC node is also required.
->>  
->> +To support UEFI on Xen ARM virtual platforms, Xen pupulates the FDT "uefi" node
->> +under /hypervisor with following parameters:
-> 
-> It's not really clear why this is under /hypervisor and why xen needs to
-> define its own nodes.
-> 
-> The handling of the existing linux standard nodes can be made
-> Xen-specific by the presence of the /hypervisor/compatible == "xen" node
-> (or similar), right?
-> 
-Right. The reason is that we want to separate this Xen specific UEFI
-from the normal UEFI. Don't make them mixed together.
+>> There is actually no need from the UEFI pov to invoke the UEFI runtime
+>> services with interrupts disabled, this is simply an implementation
+>> detail of the kernel support, and I think it is primarily for x86 (but
+>> I have to dig up the old thread for the details)
+>>
+>> And even if we stick with spin_lock_irqsave(), we could refactor the
+>> runtime wrappers to perform the mm switch outside of them.
+>
+> Ok.
+>
+> I'm only thinking about stable here.
+>
+> In the context of a stable backport, I think the simplest thing to do is
+> always go via the resesrved ttbr0 to perform the TLB flush, and
+> hand-code the save/restore of the active mm's TTBR0_EL1 value rather
+> than going through cpu_switch_mm (which I believe we can't call with
+> interrupts disabled).
+>
 
->> +________________________________________________________________________________
->> +Name                      | Size   | Description
->> +================================================================================
->> +xen,uefi-system-table     | 64-bit | Physical address of the UEFI System Table.
->> +--------------------------------------------------------------------------------
->> +xen,uefi-mmap-start       | 64-bit | Physical address of the UEFI memory map.
->> +--------------------------------------------------------------------------------
-> 
-> I would probably say "Guest physical address..." just to be clear.
-> 
->> +xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
->> +                          |        | pointed to in previous entry.
->> +--------------------------------------------------------------------------------
->> +xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
->> +                          |        | memory map.
->> +--------------------------------------------------------------------------------
->> +xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
->> +--------------------------------------------------------------------------------
-> 
-> Need a reference to the mmap descriptor format here.
-> 
-> David
-> 
-> .
-> 
+I think calling cpu_switch_mm() should be fine. It does set the ASID
+to #0 (which shouldn't matter since we only create global mappings)
+but does not invoke any of the logic regarding ASID assignment or
+rollover.
+
+> It doesn't look like it's easy to stash the value given
+> efi_virtmap_{load,unload} are separate functions, and I don't think we
+> can just restore from current->active_mm in case there was a concurrent
+> rollover on another CPU.
+>
+
+OK, so the fact that we switch to the UEFI page tables and back with
+interrupts disabled is keeping us safe here, and whether we use global
+mappings or not is completely irrelevant.
+
+In any case, I am going to check with Matt if we can leave interrupts
+enabled during the UEFI Runtime Services (since the execution time is
+not bounded by the spec), but I will keep this in mind in case anyone
+tries to backport that.
 
 -- 
-Shannon
+Ard.
