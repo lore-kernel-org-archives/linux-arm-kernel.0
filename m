@@ -1,45 +1,58 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 18 Nov 2015 14:41:18 +0000
-Subject: [PATCH 8/9] ARM: meson: serial: ensure tx irq on if more work to do
-In-Reply-To: <1447857679-30158-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1447857679-30158-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1447857679-30158-9-git-send-email-ben.dooks@codethink.co.uk>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Wed, 18 Nov 2015 07:57:36 -0700
+Subject: [PATCH] ARM: imx6: pm: declare pm domain latency on power_state
+ struct.
+In-Reply-To: <1447799871-56374-6-git-send-email-lina.iyer@linaro.org>
+References: <1447799871-56374-6-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1447858656-62464-1-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tx_stop() call turns the interrupt off, but the tx_start() does not
-check if the interrupt is enabled. Switch it back on if there is more
-work to do.
+From: Axel Haslam <ahaslam+renesas@baylibre.com>
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+The generic_pm_domain structure uses an array of latencies to be able to
+declare multiple intermediate states.
+
+Declare a single "OFF" state with the default latencies So that the
+power_off_latency_ns and power_on_latency_ns fields of generic_pm_domain
+structure can be eventualy removed.
+
+Signed-off-by: Axel Haslam <ahaslam+renesas@baylibre.com>
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+[Lina: pm_genpd_init() argument change]
 ---
- drivers/tty/serial/meson_uart.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/mach-imx/gpc.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
-index 12436cc..6c36526 100644
---- a/drivers/tty/serial/meson_uart.c
-+++ b/drivers/tty/serial/meson_uart.c
-@@ -144,6 +144,7 @@ static void meson_uart_start_tx(struct uart_port *port)
- {
- 	struct circ_buf *xmit = &port->state->xmit;
- 	unsigned int ch;
-+	u32 val;
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index 8e7976a..b070e06 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -368,13 +368,23 @@ static struct generic_pm_domain imx6q_arm_domain = {
+ 	.name = "ARM",
+ };
  
- 	if (uart_tx_stopped(port)) {
- 		meson_uart_stop_tx(port);
-@@ -167,6 +168,12 @@ static void meson_uart_start_tx(struct uart_port *port)
- 		port->icount.tx++;
- 	}
- 
-+	if (!uart_circ_empty(xmit)) {
-+		val = readl(port->membase + AML_UART_CONTROL);
-+		val |= AML_UART_TX_INT_EN;
-+		writel(val, port->membase + AML_UART_CONTROL);
-+	}
++static struct genpd_power_state imx6q_arm_domain_states[] = {
++	{
++		.name = "OFF",
++		.power_off_latency_ns = 25000,
++		.power_on_latency_ns = 2000000,
++	},
++};
 +
- 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
- 		uart_write_wakeup(port);
- }
+ static struct pu_domain imx6q_pu_domain = {
+ 	.base = {
+ 		.name = "PU",
+ 		.power_off = imx6q_pm_pu_power_off,
+ 		.power_on = imx6q_pm_pu_power_on,
+-		.power_off_latency_ns = 25000,
+-		.power_on_latency_ns = 2000000,
++		.gov = NULL,
++		.status = GPD_STATE_POWER_OFF,
++		.states = imx6q_arm_domain_states,
++		.state_count = ARRAY_SIZE(imx6q_arm_domain_states),
+ 	},
+ };
+ 
 -- 
-2.6.2
+2.1.4
