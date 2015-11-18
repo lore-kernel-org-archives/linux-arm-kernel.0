@@ -1,96 +1,54 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 18 Nov 2015 11:01:54 +0800
-Subject: [PATCH v3 38/62] arm/acpi: Add placeholder for efi and acpi load
- address
-In-Reply-To: <564B3845.4060801@citrix.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-39-git-send-email-shannon.zhao@linaro.org>
- <564B1666.4060008@citrix.com> <564B2152.9000904@huawei.com>
- <564B3845.4060801@citrix.com>
-Message-ID: <564BEA22.1040909@huawei.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 17 Nov 2015 22:17:41 -0500 (EST)
+Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <HK2PR06MB0561B7675F17A81B54A65CA28A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
+ <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
+ <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
+ <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
+ <HK2PR06MB056196B2E169A504A16ED9738A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511171155240.5826@knanqh.ubzr>
+ <HK2PR06MB0561B7675F17A81B54A65CA28A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+Message-ID: <alpine.LFD.2.20.1511172129060.22569@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/11/17 22:23, Julien Grall wrote:
-> Hi Shannon,
-> 
-> On 17/11/15 12:45, Shannon Zhao wrote:
->>
->>
->> On 2015/11/17 19:58, Julien Grall wrote:
->>> Hi Shannon,
->>>
->>> On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
->>>> From: Shannon Zhao <shannon.zhao@linaro.org>
->>>>
->>>> EFI table, memory description table and some of acpi tables will be
->>>> placed after DOM0 memory space. Add placeholder for the starting address
->>>> for loading in DOM0 and the size of new added tables. Also add a
->>>> placeholder to store the new created tables.
->>>>
->>>> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
->>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->>>> ---
->>>>  xen/include/asm-arm/domain.h | 5 +++++
->>>>  1 file changed, 5 insertions(+)
->>>>
->>>> diff --git a/xen/include/asm-arm/domain.h b/xen/include/asm-arm/domain.h
->>>> index 1e61f30..91272e5 100644
->>>> --- a/xen/include/asm-arm/domain.h
->>>> +++ b/xen/include/asm-arm/domain.h
->>>> @@ -125,6 +125,11 @@ struct arch_domain
->>>>      } vuart;
->>>>  
->>>>      unsigned int evtchn_irq;
->>>> +#ifdef CONFIG_ACPI
->>>> +    void *efi_acpi_table;
->>>> +    paddr_t efi_acpi_gpa;
->>>> +    paddr_t efi_acpi_len;
->>>> +#endif
->>>
->>> Why do you need this in the arch_domain? AFAICT those 3 variables should
->>> only be used while building DOM0, so a better place would be in struct
->>> kernel_info (see xen/arch/arm/kernel.h).
->>>
->>
->> Since I use efi_acpi_table to store the allocated pages pointer which
->> are used to store newly created ACPI and EFI tables.
->> See [PATCH v3 40/62]:
->> +    order = get_order_from_bytes(d->arch.efi_acpi_len);
->> +    d->arch.efi_acpi_table = alloc_xenheap_pages(order, 0);
->>
->> And it free these pages when destroying this domain:
->> +#ifdef CONFIG_ACPI
->> +    free_xenheap_pages(d->arch.efi_acpi_table,
->> +                       get_order_from_bytes(d->arch.efi_acpi_len));
->> +#endif
-> 
-> But this is wrong. You are assuming that DOM0 memory is direct mapped
-> which may not be true in the future.
-> 
-I think we have discussed this when we discussed the design doc.
+On Wed, 18 Nov 2015, Chris Brandt wrote:
 
-"All above tables will be mapped to Dom0 non-RAM space. Since when
-booting through ACPI it doesn't need the grant table region(see below
-section 3), it could use this region to store the tables or use the same
-way to find one memory region to store them."
+> It sounds like there would still be a request to split up the linker 
+> scripts in order to remove the 6 XIP_KERNEL references scattered 
+> throughout vmlinux.lds.S. However, it would still be nice to keep the 
+> two versions looking as close as they can to each other with only the 
+> obvious changes (like removing XIP_KERNEL from the non-XIP version, 
+> and removing SMP_ON_UP from the XIP version)
 
-Firstly, as Jan suggested, these tables should not be in RAM space, so
-we drop the previous way that copying these tables to Dom0 RAM.
-Then I suggested map these tables to the space after the Dom0 RAM space,
-but this not right because Dom0 RAM region might be at the edge of
-physical RAM space and there might be device MMIO regions.
-Then you suggest it could map these tables to the region which is used
-for grant table(or the region found by the same way) while it's not used
-when it boots with ACPI. These regions are not used by Xen and will not
-be used by Dom0 either currently. But as you say, it will be wrong if
-Dom0 memory is not 1:1 mapped.
+I don't think so. XIP and non-XIP are fundamentally looking different 
+these days.  Trying to keep them as similar as possible is rather an 
+impediment to both cases and brings no real benefits.
 
-So how about below idea:
-We still copy these tables to Dom0 RAM space but when we create
-EFI_MMAP_TABLE, we remove the space occupied by these tables from the
-EfiConventionalMemory descriptor.
+Not only should .init.smpalt be gone from the XIP version, but it might 
+be safer to put that into a special "should_be_empty" section and bail 
+out with ASSERT() if that section size isn't zero. Same thing for 
+pv_table. This way we'll be sure that nothing in the kernel config 
+expects self-modified code to be present.
 
-Thanks,
---
-Shannon
+With XIP there is still an init section, but it is pointless to store 
+.init.text stuff in there. That should instead stay in ROM and never be 
+discarded (obviously). No need to page align it either at that point 
+which should save some ROM space.
+
+Things like .kprobes.text should be in ROM, but the entire executable in 
+ROM should be surrounded by __kprobes_text_start and __kprobes_text_end 
+to prevent any attempt to put kprobes there. This way, kprobes could 
+still work for modules.
+
+Etc. Etc.
+
+There are simply too many things these days that require special 
+considerations with XIP. And freeing the main script from XIP 
+considerations will ease maintenance as well, more than the added 
+maintenance from the duplicated parts.
+
+
+Nicolas
