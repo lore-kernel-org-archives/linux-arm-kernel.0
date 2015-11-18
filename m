@@ -1,107 +1,112 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 18 Nov 2015 11:17:50 +0800
-Subject: [PATCH] USB: USB_OTG does not depend on PM
-In-Reply-To: <5647698.81XCu85L5D@wuerfel>
-References: <7521777.8ZmnT3AlIC@wuerfel> <874mgkjoh2.fsf@saruman.tx.rr.com>
- <5647698.81XCu85L5D@wuerfel>
-Message-ID: <20151118031748.GA4228@shlinux2>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Wed, 18 Nov 2015 11:22:09 +0800
+Subject: [PATCH] pinctrl: mediatek: fix a memleak when do dt maps.
+In-Reply-To: <1447799622-3340-1-git-send-email-hongzhou.yang@mediatek.com>
+References: <1447799622-3340-1-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <1447816929.14382.0.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 11:00:18PM +0100, Arnd Bergmann wrote:
-> On Tuesday 17 November 2015 15:38:33 Felipe Balbi wrote:
-> > 
-> > Arnd Bergmann <arnd@arndb.de> writes:
-> > > USB_OTG initially depended on USB_SUSPEND, which was later turned into
-> > > PM_RUNTIME and finally into PM. I don't know at what point the dependency
-> > > became unnecessary but it appears to work fine without CONFIG_PM now.
-> > >
-> > > However, we get lots of warnings in randconfig kernels like:
-> > >
-> > > warning: (USB_OTG_FSM && FSL_USB2_OTG && USB_MV_OTG) selects USB_OTG which has unmet direct dependencies (USB_SUPPORT && USB && PM)
-> > >
-> > > whenever CONFIG_PM is disabled and something else selects USB_OTG.
-> > > Let's just drop the dependency to avoid the warnings.
-> > >
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > ---
-> > > I keep seeing this one in my ARM randconfig test
-> > 
-> > and how did you test this ? Did you make sure you're not breaking HNP ?
-> > For HNP to happen we depend on a bus_suspend and bus_suspend is only
-> > available on CONFIG_PM, unless that has changed.
-> > 
-> > Seems like you've only compile tested this patch, is that correct ?
+On Tue, 2015-11-17 at 14:33 -0800, Hongzhou Yang wrote:
+> configs will kmemdup to dup_configs in pictrl util function.
+> So configs need to be freed.
 > 
-> Yes, I compile-tested only and inspected the code briefly without finding
-> anything that contradicted this. It seems I missed the important part
-> as you say, so we should instead add 'depends on PM' for the other
-> symbols.
+> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+> ---
+>  Fix a memleak issue.
+>  According to Yingjoe's comment, add return checek for pinconf_generic_parse_dt_config.
+
+Reviewed-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+
+Joe.C
+
+>  drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   27 ++++++++++++++++---------
+>  1 file changed, 17 insertions(+), 10 deletions(-)
 > 
-> 	Arnd
-
-Hi Arnd, would you kindly try if below patch can fix your problem
-
->From 3a6918dae038aadc200dcf0263f4440acc2353d4 Mon Sep 17 00:00:00 2001
-From: Peter Chen <peter.chen@freescale.com>
-Date: Wed, 18 Nov 2015 11:06:34 +0800
-Subject: [PATCH 1/1] usb: kconfig: fix warning of select USB_OTG
-
-When choose randconfig for kernel build, it reports below warning:
-"warning: (USB_OTG_FSM && FSL_USB2_OTG && USB_MV_OTG) selects USB_OTG
-which has unmet direct dependencies (USB_SUPPORT && USB && PM)"
-
-In fact, USB_OTG is visual symbol and depends on PM, so the driver
-needs to depend on it to reduce dependency problem.
-
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Felipe Balbi <balbi@ti.com>
----
- drivers/usb/core/Kconfig | 3 +--
- drivers/usb/phy/Kconfig  | 4 +---
- 2 files changed, 2 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
-index a99c89e..dd28010 100644
---- a/drivers/usb/core/Kconfig
-+++ b/drivers/usb/core/Kconfig
-@@ -77,8 +77,7 @@ config USB_OTG_BLACKLIST_HUB
- 
- config USB_OTG_FSM
- 	tristate "USB 2.0 OTG FSM implementation"
--	depends on USB
--	select USB_OTG
-+	depends on USB && USB_OTG
- 	select USB_PHY
- 	help
- 	  Implements OTG Finite State Machine as specified in On-The-Go
-diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
-index 1731324..22e8ecb 100644
---- a/drivers/usb/phy/Kconfig
-+++ b/drivers/usb/phy/Kconfig
-@@ -21,7 +21,6 @@ config AB8500_USB
- config FSL_USB2_OTG
- 	bool "Freescale USB OTG Transceiver Driver"
- 	depends on USB_EHCI_FSL && USB_FSL_USB2 && USB_OTG_FSM && PM
--	select USB_OTG
- 	select USB_PHY
- 	help
- 	  Enable this to support Freescale USB OTG transceiver.
-@@ -168,8 +167,7 @@ config USB_QCOM_8X16_PHY
- 
- config USB_MV_OTG
- 	tristate "Marvell USB OTG support"
--	depends on USB_EHCI_MV && USB_MV_UDC && PM
--	select USB_OTG
-+	depends on USB_EHCI_MV && USB_MV_UDC && PM && USB_OTG
- 	select USB_PHY
- 	help
- 	  Say Y here if you want to build Marvell USB OTG transciever
--- 
-1.9.1
-
--- 
-
-Best Regards,
-Peter Chen
+> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> index 5c71727..8db7cdf 100644
+> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> @@ -509,6 +509,9 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+>  
+>  	err = pinconf_generic_parse_dt_config(node, pctldev, &configs,
+>  		&num_configs);
+> +	if (err)
+> +		return err;
+> +
+>  	if (num_configs)
+>  		has_config = 1;
+>  
+> @@ -520,21 +523,23 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+>  	if (has_config && num_pins >= 1)
+>  		maps_per_pin++;
+>  
+> -	if (!num_pins || !maps_per_pin)
+> -		return -EINVAL;
+> +	if (!num_pins || !maps_per_pin) {
+> +		err = -EINVAL;
+> +		goto exit;
+> +	}
+>  
+>  	reserve = num_pins * maps_per_pin;
+>  
+>  	err = pinctrl_utils_reserve_map(pctldev, map,
+>  			reserved_maps, num_maps, reserve);
+>  	if (err < 0)
+> -		goto fail;
+> +		goto exit;
+>  
+>  	for (i = 0; i < num_pins; i++) {
+>  		err = of_property_read_u32_index(node, "pinmux",
+>  				i, &pinfunc);
+>  		if (err)
+> -			goto fail;
+> +			goto exit;
+>  
+>  		pin = MTK_GET_PIN_NO(pinfunc);
+>  		func = MTK_GET_PIN_FUNC(pinfunc);
+> @@ -543,20 +548,21 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+>  				func >= ARRAY_SIZE(mtk_gpio_functions)) {
+>  			dev_err(pctl->dev, "invalid pins value.\n");
+>  			err = -EINVAL;
+> -			goto fail;
+> +			goto exit;
+>  		}
+>  
+>  		grp = mtk_pctrl_find_group_by_pin(pctl, pin);
+>  		if (!grp) {
+>  			dev_err(pctl->dev, "unable to match pin %d to group\n",
+>  					pin);
+> -			return -EINVAL;
+> +			err = -EINVAL;
+> +			goto exit;
+>  		}
+>  
+>  		err = mtk_pctrl_dt_node_to_map_func(pctl, pin, func, grp, map,
+>  				reserved_maps, num_maps);
+>  		if (err < 0)
+> -			goto fail;
+> +			goto exit;
+>  
+>  		if (has_config) {
+>  			err = pinctrl_utils_add_map_configs(pctldev, map,
+> @@ -564,13 +570,14 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+>  					configs, num_configs,
+>  					PIN_MAP_TYPE_CONFIGS_GROUP);
+>  			if (err < 0)
+> -				goto fail;
+> +				goto exit;
+>  		}
+>  	}
+>  
+> -	return 0;
+> +	err = 0;
+>  
+> -fail:
+> +exit:
+> +	kfree(configs);
+>  	return err;
+>  }
+>  
