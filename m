@@ -1,47 +1,50 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Wed, 18 Nov 2015 18:21:40 +0200
-Subject: [GIT PULL] LPC32xx DTS changes for v4.4
-Message-ID: <1447863700-15681-1-git-send-email-vz@mleia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Nov 2015 17:22:47 +0100
+Subject: [PATCH] mmc: dw_mmc: use resource_size_t to store physical address
+In-Reply-To: <CAHp75VfnD=MPigeTdo8YKPTs4zZN+XcSiMBZkma3ibaT4DEZiQ@mail.gmail.com>
+References: <28102387.ALpaBHpim0@wuerfel> <7083277.bjzG62aVmx@wuerfel>
+ <CAHp75VfnD=MPigeTdo8YKPTs4zZN+XcSiMBZkma3ibaT4DEZiQ@mail.gmail.com>
+Message-ID: <6347082.461jehYssD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi arm-soc team,
+On Wednesday 18 November 2015 18:17:32 Andy Shevchenko wrote:
+> On Wed, Nov 18, 2015 at 5:45 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 18 November 2015 17:29:19 Andy Shevchenko wrote:
 
-Please consider pulling these DTS changes for the NXP LPC32xx
-platform and related boards.
+> >> For me it clearly looks like a platform (HW / SW) configuration issue.
+> >
+> > I think some people have argued in the past that we should always use
+> > the same type for dma_addr_t, resource_size_t and phys_addr_t. That
+> > would certainly fix the problem you describe as well. In practice,
+> > everyone has that already, and my patch by itself fixes all the
+> > cases where the FIFO is at a high address and dma_addr_t is already
+> > 64-bit wide.
+> 
+> Let me summarize.
+> 
+> We have to have classification by address space
+> 1) physical
+> 2) virtual
 
-The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+That classification is oversimplified, as the DMA address space
+is often not the same as physical.
 
-  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+> Therefore
+> resource_addr_t must be equal to phys_addr_t since it may carry any
+> possible physical address.
 
-are available in the git repository at:
+Right, in theory it can also be larger than phys_addr_t, but there is no
+need for that.
 
-  https://github.com/vzapolskiy/linux.git lpc32xx-dts
+> dma_addr_t is a physical address wrt DMA mask.
+> 
+> Correct?
 
-for you to fetch changes up to aa29efb445f11506daca0db934331f144b38ddc4:
+dma_addr_t is how a device sees RAM, it is limited by the DMA mask
+that is a subset of the capabilities of the device and the buses
+through which it is connected, and is subject to IOMMU translation
+and possible platform or bus specific offsets from the physical
+memory. I still don't know where you're getting with this.
 
-  arm: dts: lpc32xx: move USB controller subdevices into own device node (2015-11-18 18:01:27 +0200)
-
-----------------------------------------------------------------
-Main changes in the series:
-- Added description of the second PWM controller device
-- Added External Memory Controller device tree node (Primecell PL175)
-- Added device tree nodes for standard timer controllers
-- USB controllers are grouped
-- Various minor clean-ups needed for further development of LPC32xx
-
-----------------------------------------------------------------
-Vladimir Zapolskiy (8):
-      arm: dts: lpc32xx: change include syntax to be C preprocessor friendly
-      arm: dts: lpc32xx: add labels to all defined peripheral nodes
-      arm: dts: lpc32xx: add reg property to cpu device node
-      arm: dts: lpc32xx: add device node for the second pwm controller
-      arm: dts: ea3250/phy3250: specify phys memory offset for lpc32xx boards
-      arm: dts: lpc32xx: add external memory controller device node
-      arm: dts: lpc32xx: add device nodes for standard timers
-      arm: dts: lpc32xx: move USB controller subdevices into own device node
-
- arch/arm/boot/dts/ea3250.dts   |  41 +++++-------
- arch/arm/boot/dts/lpc32xx.dtsi | 142 ++++++++++++++++++++++++++++++-----------
- arch/arm/boot/dts/phy3250.dts  |  41 +++++-------
- 3 files changed, 139 insertions(+), 85 deletions(-)
+	Arnd
