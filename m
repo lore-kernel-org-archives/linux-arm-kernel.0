@@ -1,30 +1,41 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 18 Nov 2015 17:03:53 +0000
-Subject: [PATCH 0/5] arm64: cpufeature: Fixes for 4.4-rc1
-Message-ID: <1447866238-22970-1-git-send-email-suzuki.poulose@arm.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 18 Nov 2015 12:07:58 -0500 (EST)
+Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <HK2PR06MB0561077CA74074E175561D7F8A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
+ <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
+ <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
+ <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
+ <HK2PR06MB056196B2E169A504A16ED9738A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511171155240.5826@knanqh.ubzr>
+ <HK2PR06MB0561B7675F17A81B54A65CA28A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511172129060.22569@knanqh.ubzr>
+ <HK2PR06MB0561077CA74074E175561D7F8A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+Message-ID: <alpine.LFD.2.20.1511181204240.22569@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 18 Nov 2015, Chris Brandt wrote:
 
-This series contains fixes for two issues.
+> > With XIP there is still an init section, [snip]
+> > No need to page align it either at that point which should save some
+> > ROM space.
+> 
+> Good point.
+> 
+> > Things like .kprobes.text should be in ROM, [snip]
+> >
+> > Etc. Etc.
+> 
+> Here's the thing...I'm probably out of my depth on most of this. But, 
+> I'd be happy to post up a RFC patch and then start collecting the 
+> feedback on what can be removed. I can at least test it on a real XIP 
+> system.
 
- Patches 1 - 3:	Handling of unsigned feature values, issu reported
-		by AKASHI Takahiro.
+Sure.  You should start by splitting the XIP stuff out to a separate 
+script so functionally it is the same (broken) end result.  And from 
+there adding incremental fixes to the XIP script.
 
- Patches 4 - 5:	Adds a check to make sure all the secondary CPUs have
-		compatible ASIDBits to prevent system crashes.
 
-Suzuki K. Poulose (5):
-  arm64: cpufeature: Add helpers for extracting unsigned values
-  arm64: cpufeature: Track unsigned fields
-  arm64: debug: Treat the BRPs/WRPs as unsigned
-  arm64: Make fail_incapable_cpu reusable
-  arm64: Ensure the secondary CPUs have safe ASIDBits size
-
- arch/arm64/include/asm/cpufeature.h    |   22 +++++-
- arch/arm64/include/asm/hw_breakpoint.h |    6 +-
- arch/arm64/kernel/cpufeature.c         |  132 ++++++++++++++++++++++----------
- 3 files changed, 116 insertions(+), 44 deletions(-)
-
--- 
-1.7.9.5
+Nicolas
