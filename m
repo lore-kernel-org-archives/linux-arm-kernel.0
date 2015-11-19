@@ -1,41 +1,114 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 19 Nov 2015 08:39:27 +0800
-Subject: [PATCH v3 3/5] soc: rockchip: add reboot notifier driver
-In-Reply-To: <1447840582-19850-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <201511190859.zI1agDhC%fengguang.wu@intel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 19 Nov 2015 09:42:49 +0900
+Subject: [RESEND PATCH v3] dt-bindings: Consolidate SRAM bindings from all
+ vendors
+Message-ID: <1447893769-17088-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+SRAM bindings for various SoCs, using the mmio-sram genalloc
+API, are spread over different places - per SoC vendor. Since all of
+these are quite similar (they depend on mmio-sram) move them to a common
+place.
 
-[auto build test WARNING on rockchip/for-next]
-[also build test WARNING on v4.4-rc1 next-20151118]
-
-url:    https://github.com/0day-ci/linux/commits/Andy-Yan/Add-reboot-notifier-driver-for-rockchip-platform/20151118-181000
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git for-next
-config: arm64-allmodconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
-
-All warnings (new ones prefixed by >>):
-
->> WARNING: drivers/soc/built-in.o(.data+0x718): Section mismatch in reference from the variable rockchip_reboot_driver to the function .init.text:rockchip_reboot_probe()
-   The variable rockchip_reboot_driver references
-   the function __init rockchip_reboot_probe()
-   If the reference is valid then annotate the
-   variable with or __refdata (see linux/init.h) or name the variable:
-   
+Suggested-by: Rob Herring <robh+dt@kernel.org>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Chen-Yu Tsai <wens@csie.org>
+Cc: Kukjin Kim <kgene@kernel.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Heiko Stuebner <heiko@sntech.de>
 
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 45486 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151119/d84f7a40/attachment-0001.obj>
+
+Changes since v2:
+1. Update paths to sram.txt.
+
+Changes since v1:
+1. New patch. Extended suggestion from Rob.
+---
+ Documentation/devicetree/bindings/arm/arm,scpi.txt                      | 2 +-
+ .../bindings/{arm/rockchip/pmu-sram.txt => sram/rockchip-pmu-sram.txt}  | 0
+ .../bindings/{arm/rockchip/smp-sram.txt => sram/rockchip-smp-sram.txt}  | 2 +-
+ .../bindings/{arm/exynos/smp-sysram.txt => sram/samsung-sram.txt}       | 2 +-
+ Documentation/devicetree/bindings/{misc => sram}/sram.txt               | 0
+ .../devicetree/bindings/{soc/sunxi/sram.txt => sram/sunxi-sram.txt}     | 2 +-
+ 6 files changed, 4 insertions(+), 4 deletions(-)
+ rename Documentation/devicetree/bindings/{arm/rockchip/pmu-sram.txt => sram/rockchip-pmu-sram.txt} (100%)
+ rename Documentation/devicetree/bindings/{arm/rockchip/smp-sram.txt => sram/rockchip-smp-sram.txt} (92%)
+ rename Documentation/devicetree/bindings/{arm/exynos/smp-sysram.txt => sram/samsung-sram.txt} (95%)
+ rename Documentation/devicetree/bindings/{misc => sram}/sram.txt (100%)
+ rename Documentation/devicetree/bindings/{soc/sunxi/sram.txt => sram/sunxi-sram.txt} (97%)
+
+diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+index 86302de67c2c..313dabdc14f9 100644
+--- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
++++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+@@ -63,7 +63,7 @@ Required properties:
+ - compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno
+ 
+ The rest of the properties should follow the generic mmio-sram description
+-found in ../../misc/sysram.txt
++found in ../../sram/sram.txt
+ 
+ Each sub-node represents the reserved area for SCPI.
+ 
+diff --git a/Documentation/devicetree/bindings/arm/rockchip/pmu-sram.txt b/Documentation/devicetree/bindings/sram/rockchip-pmu-sram.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/arm/rockchip/pmu-sram.txt
+rename to Documentation/devicetree/bindings/sram/rockchip-pmu-sram.txt
+diff --git a/Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt b/Documentation/devicetree/bindings/sram/rockchip-smp-sram.txt
+similarity index 92%
+rename from Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
+rename to Documentation/devicetree/bindings/sram/rockchip-smp-sram.txt
+index d9416fb8db6f..800701ecffca 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
++++ b/Documentation/devicetree/bindings/sram/rockchip-smp-sram.txt
+@@ -12,7 +12,7 @@ Required sub-node properties:
+ - compatible : should be "rockchip,rk3066-smp-sram"
+ 
+ The rest of the properties should follow the generic mmio-sram discription
+-found in ../../misc/sram.txt
++found in Documentation/devicetree/bindings/sram/sram.txt
+ 
+ Example:
+ 
+diff --git a/Documentation/devicetree/bindings/arm/exynos/smp-sysram.txt b/Documentation/devicetree/bindings/sram/samsung-sram.txt
+similarity index 95%
+rename from Documentation/devicetree/bindings/arm/exynos/smp-sysram.txt
+rename to Documentation/devicetree/bindings/sram/samsung-sram.txt
+index 4a0a4f70a0ce..6bc474b2b885 100644
+--- a/Documentation/devicetree/bindings/arm/exynos/smp-sysram.txt
++++ b/Documentation/devicetree/bindings/sram/samsung-sram.txt
+@@ -15,7 +15,7 @@ Required sub-node properties:
+ 		"samsung,exynos4210-sysram-ns" : for Non-secure SYSRAM
+ 
+ The rest of the properties should follow the generic mmio-sram discription
+-found in ../../misc/sysram.txt
++found in Documentation/devicetree/bindings/sram/sram.txt
+ 
+ Example:
+ 
+diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/sram/sram.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/misc/sram.txt
+rename to Documentation/devicetree/bindings/sram/sram.txt
+diff --git a/Documentation/devicetree/bindings/soc/sunxi/sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+similarity index 97%
+rename from Documentation/devicetree/bindings/soc/sunxi/sram.txt
+rename to Documentation/devicetree/bindings/sram/sunxi-sram.txt
+index 067698112f5f..8d5665468fe7 100644
+--- a/Documentation/devicetree/bindings/soc/sunxi/sram.txt
++++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+@@ -16,7 +16,7 @@ SRAM nodes
+ ----------
+ 
+ Each SRAM is described using the mmio-sram bindings documented in
+-Documentation/devicetree/bindings/misc/sram.txt
++Documentation/devicetree/bindings/sram/sram.txt
+ 
+ Each SRAM will have SRAM sections that are going to be handled by the
+ SRAM controller as subnodes. These sections are represented following
+-- 
+1.9.1
