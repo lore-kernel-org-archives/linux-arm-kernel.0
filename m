@@ -1,15 +1,15 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 19 Nov 2015 08:46:27 -0600
-Subject: [PATCH 1/2] pinctrl: qcom: spmi-gpio: Add pm8994 gpio support
-In-Reply-To: <1447807953-11924-2-git-send-email-sboyd@codeaurora.org>
+Date: Thu, 19 Nov 2015 08:47:23 -0600
+Subject: [PATCH 2/2] pinctrl: qcom: spmi-mpp: Add pm8994 mpp support
+In-Reply-To: <1447807953-11924-3-git-send-email-sboyd@codeaurora.org>
 References: <1447807953-11924-1-git-send-email-sboyd@codeaurora.org>
- <1447807953-11924-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20151119144627.GA17570@rob-hp-laptop>
+ <1447807953-11924-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20151119144723.GA19266@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 04:52:32PM -0800, Stephen Boyd wrote:
-> Update the binding and driver for pm8994-gpio devices.
+On Tue, Nov 17, 2015 at 04:52:33PM -0800, Stephen Boyd wrote:
+> Update the driver and binding for pm8994-mpp devices.
 > 
 > Cc: <devicetree@vger.kernel.org>
 > Cc: "Ivan T. Ivanov" <iivanov@mm-sol.com>
@@ -19,40 +19,32 @@ On Tue, Nov 17, 2015 at 04:52:32PM -0800, Stephen Boyd wrote:
 Acked-by: Rob Herring <robh@kernel.org>
 
 > ---
->  Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt | 2 ++
->  drivers/pinctrl/qcom/pinctrl-spmi-gpio.c                     | 1 +
->  2 files changed, 3 insertions(+)
+>  Documentation/devicetree/bindings/pinctrl/qcom,pmic-mpp.txt | 1 +
+>  drivers/pinctrl/qcom/pinctrl-spmi-mpp.c                     | 1 +
+>  2 files changed, 2 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt b/Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt
-> index 1ae63c0acd40..a90c812ad642 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt
-> @@ -14,6 +14,7 @@ PMIC's from Qualcomm.
->  		    "qcom,pm8917-gpio"
->  		    "qcom,pm8921-gpio"
->  		    "qcom,pm8941-gpio"
-> +		    "qcom,pm8994-gpio"
->  		    "qcom,pma8084-gpio"
+> diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,pmic-mpp.txt b/Documentation/devicetree/bindings/pinctrl/qcom,pmic-mpp.txt
+> index d7803a2a94e9..d74e631e10da 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/qcom,pmic-mpp.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/qcom,pmic-mpp.txt
+> @@ -15,6 +15,7 @@ of PMIC's from Qualcomm.
+>  		    "qcom,pm8917-mpp",
+>  		    "qcom,pm8921-mpp",
+>  		    "qcom,pm8941-mpp",
+> +		    "qcom,pm8994-mpp",
+>  		    "qcom,pma8084-mpp",
 >  
 >  - reg:
-> @@ -79,6 +80,7 @@ to specify in a pin configuration subnode:
->  		    gpio1-gpio38 for pm8917
->  		    gpio1-gpio44 for pm8921
->  		    gpio1-gpio36 for pm8941
-> +		    gpio1-gpio22 for pm8994
->  		    gpio1-gpio22 for pma8084
->  
->  - function:
-> diff --git a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-> index 6c42ca14d2fd..df4413023e21 100644
-> --- a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-> +++ b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-> @@ -804,6 +804,7 @@ static int pmic_gpio_remove(struct platform_device *pdev)
->  static const struct of_device_id pmic_gpio_of_match[] = {
->  	{ .compatible = "qcom,pm8916-gpio" },	/* 4 GPIO's */
->  	{ .compatible = "qcom,pm8941-gpio" },	/* 36 GPIO's */
-> +	{ .compatible = "qcom,pm8994-gpio" },	/* 22 GPIO's */
->  	{ .compatible = "qcom,pma8084-gpio" },	/* 22 GPIO's */
+> diff --git a/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c b/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c
+> index 9ce0e30e33e8..7b4136a22c5b 100644
+> --- a/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c
+> +++ b/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c
+> @@ -907,6 +907,7 @@ static const struct of_device_id pmic_mpp_of_match[] = {
+>  	{ .compatible = "qcom,pm8841-mpp" },	/* 4 MPP's */
+>  	{ .compatible = "qcom,pm8916-mpp" },	/* 4 MPP's */
+>  	{ .compatible = "qcom,pm8941-mpp" },	/* 8 MPP's */
+> +	{ .compatible = "qcom,pm8994-mpp" },	/* 8 MPP's */
+>  	{ .compatible = "qcom,pma8084-mpp" },	/* 8 MPP's */
 >  	{ },
 >  };
 > -- 
