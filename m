@@ -1,105 +1,64 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 19 Nov 2015 13:51:30 +0900
-Subject: [PATCH 1/2] clk: samsung: Don't build ARMv8 clock drivers on ARMv7
-In-Reply-To: <CA+Ln22HAGwfPDqXBQatBraLd=DyGYF2WyV4wJ9RvGOc58puymQ@mail.gmail.com>
-References: <1447637775-9887-1-git-send-email-k.kozlowski@samsung.com>
- <1447637775-9887-2-git-send-email-k.kozlowski@samsung.com>
- <CA+Ln22HAGwfPDqXBQatBraLd=DyGYF2WyV4wJ9RvGOc58puymQ@mail.gmail.com>
-Message-ID: <564D5552.4070806@samsung.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 19 Nov 2015 05:57:02 +0100
+Subject: [PATCH v4 3/3] ARM: dts: rockchip: Add the OTP gpio pinctrl
+In-Reply-To: <564D3772.9050402@gmail.com>
+References: <1445599528-18825-1-git-send-email-wxt@rock-chips.com>
+ <2741625.HAsG2fX6yg@diego> <564D3772.9050402@gmail.com>
+Message-ID: <1668139.HQCaUDeMrM@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.11.2015 13:18, Tomasz Figa wrote:
-> Hi Krzysztof,
+Hi Caesar,
+
+Am Donnerstag, 19. November 2015, 10:44:02 schrieb Caesar Wang:
+> ? 2015?10?25? 15:55, Heiko St?bner ??:
+> > Am Freitag, 23. Oktober 2015, 08:25:08 schrieb Doug Anderson:
+> >> On Fri, Oct 23, 2015 at 4:25 AM, Caesar Wang <wxt@rock-chips.com> wrote:
+> >>> Add the "init" anf "sleep" pinctrl as the OTP gpio state.
+> >>> We need the OTP pin is gpio state before resetting the TSADC controller,
+> >>> since the tshut polarity will generate a high signal.
+> >>>
+> >>> "init" pinctrl property is defined by Doug's Patch[0].
+> >>>
+> >>> Patch[0]:
+> >>> https://patchwork.kernel.org/patch/7454311/
+> >>>
+> >>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> >>> Reviewed-by: Douglas Anderson <dianders@chromium.org>
+> >>> ---
+> >>>
+> >>> Changes in v4: None
+> >>>
+> >>> Changes in v3:
+> >>>    - Add the "sleep" pinctrl as the gpio state in PATCH[3/3]
+> >>>
+> >>> Changes in v2:
+> >>>    - Add some commits for more obvious in PATCH[2/2]
+> >>>
+> >>> Changes in v1:
+> >>>    - As the Doug comments, drop the thermal driver patchs since
+> >>>    
+> >>>      we can with pinctrl changing to work.
+> >>>    
+> >>>    - As the Doug's patch to add the 'init' property.
+> >>>   
+> >>>   arch/arm/boot/dts/rk3288.dtsi | 10 ++++++++--
+> >>>   1 file changed, 8 insertions(+), 2 deletions(-)
+> >> I realized that the subject of this patch should probably contain the
+> >> word rk3288, but I presume Heiko would rather add that himself than
+> >> for you to spin this again.  ;)
+> > yep :-) ... no need to respin for such an easy change
 > 
-> Good idea, just a couple of nits inline. Other than that:
+> That's seem this patch didn't merge into your v4.5-armsoc/soc branch.:-)
 > 
-> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
-> 
-> 2015-11-16 10:36 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
->> Currently the Exynos5433 (ARMv8 SoC) clock driver depends on ARCH_EXYNOS
->> so it is built also on ARMv7. This does not bring any kind of benefit.
->> There won't be a single kernel image for ARMv7 and ARMv8 SoCs (like
->> multi_v7 for ARMv7).
->>
->> Instead build clock drivers only for respective SoC's architecture.
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> ---
->>  drivers/clk/samsung/Kconfig  | 13 +++++++++++++
->>  drivers/clk/samsung/Makefile |  4 ++--
->>  2 files changed, 15 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/clk/samsung/Kconfig b/drivers/clk/samsung/Kconfig
->> index 84196ecdaa12..5f138fc4d84d 100644
->> --- a/drivers/clk/samsung/Kconfig
->> +++ b/drivers/clk/samsung/Kconfig
->> @@ -2,6 +2,7 @@ config COMMON_CLK_SAMSUNG
->>         bool
->>         select COMMON_CLK
->>
->> +# ARMv7 SoCs:
-> 
-> nit: I'm not aware of any recent upgrade of the S3C24xx line-up to
-> ARMv7 cores. ;) I'd suggest "32-bit ARM SoCs" or just "ARM SoCs"...
+> I guess this patch should merge into  kernel-4.4 since the Patch[1/3] / 
+> [2/3] have been merged into 4.4-rc1.:-P
 
-okay
+thanks for the reminder :-)
 
-> 
->>  config S3C2410_COMMON_CLK
->>         bool
->>         select COMMON_CLK_SAMSUNG
->> @@ -24,3 +25,15 @@ config S3C2443_COMMON_CLK
->>         bool
->>         select COMMON_CLK_SAMSUNG
->>
->> +# ARMv8 SoCs:
-> 
-> and then here "64-bit ARM SoCs" or "ARM64 SoCs", whichever you prefer.
-> I'd lean towards simple "ARM" and "ARM64".
+It seems I didn't get a notice when the core thermal changes were merged, so 
+this patch seems to have dropped of my radar. It is clearly a fix for a real 
+issue, so I've added it to my fixes branch for 4.4.
 
-ARM64 sounds good.
 
-> 
->> +config EXYNOS5433_COMMON_CLK
->> +       bool
->> +       depends on ARM64 || COMPILE_TEST
->> +       default ARCH_EXYNOS
-> 
-> nit: bool and default can be combined into def_bool ARCH_EXYNOS
-> 
-
-Right.
-
->> +       select COMMON_CLK_SAMSUNG
->> +
->> +config EXYNOS7_COMMON_CLK
->> +       bool
->> +       depends on ARM64 || COMPILE_TEST
->> +       default ARCH_EXYNOS
-> 
-> nit: See above.
-> 
-> However, I don't think we can disable compilation of particular 64-bit
-> SoCs, so maybe there isn't much sense in splitting their clock drivers
-> into separate symbols?
-
-To me it does not really matter. Indeed as you said one cannot disable
-building of one particular Exynos SoCs.
-
-However we could still want not build some parts of such SoCs (like
-clock, pinctrl etc). I don't see much benefit for such case except when
-someone would like to drastically reduce the size of kernel image (for
-whatever reasons he has.).
-
-On the other hand having separate symbols causes duplication and
-obfuscates a little the Kconfig/Makefile. I like keeping things simple
-so one symbol for all ARM64 Exynos clocks sounds good.
-
-Sylwester preferred current approach. You and Pankaj seem to prefer one
-symbol-way.
-
-Should we make a voting? :)
-
-Best regards,
-Krzysztof
+Heiko
