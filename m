@@ -1,45 +1,254 @@
-From: mmarek@suse.com (Michal Marek)
-Date: Thu, 19 Nov 2015 17:21:06 +0100
-Subject: [PATCH] ARM: xip: Move XIP linking to a separate file
-In-Reply-To: <HK2PR06MB0561F1A746E04D0A205B2DBB8A1B0@HK2PR06MB0561.apcprd06.prod.outlook.com>
-References: <1447943047-22427-1-git-send-email-chris.brandt@renesas.com>
- <alpine.LFD.2.20.1511191050080.22569@knanqh.ubzr>
- <HK2PR06MB0561F1A746E04D0A205B2DBB8A1B0@HK2PR06MB0561.apcprd06.prod.outlook.com>
-Message-ID: <564DF6F2.5090808@suse.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Thu, 19 Nov 2015 08:25:12 -0800
+Subject: [PATCH 2/3] ARM: dts: enable clock support for Broadcom NSP
+In-Reply-To: <20151119154810.GC23560@broadcom.com>
+References: <1447888430-4451-1-git-send-email-jonmason@broadcom.com>
+ <1447888430-4451-3-git-send-email-jonmason@broadcom.com>
+ <564D1070.2040200@broadcom.com> <20151119154810.GC23560@broadcom.com>
+Message-ID: <564DF7E8.7020404@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-11-19 17:04, Chris Brandt wrote:
-> On Thu, 19 Nov 2015, Michal Marek wrote:
->> Why not have a vmlinux.lds.S and #include a vmlinux-xip.lds.S / 
->> vmlinux-nonxip.lds.S from there? That way, you do not clutter the
->> main Makefile and you can reuse the boilerplate of the linker script.
+
+
+On 11/19/2015 7:48 AM, Jon Mason wrote:
+> On Wed, Nov 18, 2015 at 03:57:36PM -0800, Ray Jui wrote:
+>> Would this patch merge properly with the other NSP DT clean up patch
+>> + I2C DT patch that you worked out internally but have not sent out?
 >>
->> Michal
-> 
-> On Thu, 19 Nov 2015, Nicolas Pitre wrote:
->> I agree with Michal's suggestion to do the selection locally with an
->> include.
-> 
-> 
-> That's actually how I started out locally, but I thought if I tried submitting that, I'd get a bunch of "Eww, that's ugly".
+>> I thought it's going to make the maintainers' life easier if you can
+>> group DT changes per platform and send them out in the same series.
+>>
+>> I also have some inline comments below.
+>>
+>> On 11/18/2015 3:13 PM, Jon Mason wrote:
+>>> Replace current device tree dummy clocks with real clock support for
+>>> Broadcom Northstar Plus SoC
+>>>
+>>> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+>>> ---
+>>>   arch/arm/boot/dts/bcm-nsp.dtsi | 99 ++++++++++++++++++++++++++++++++----------
+>>>   1 file changed, 75 insertions(+), 24 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
+>>> index 4bcdd28..f85a4f1 100644
+>>> --- a/arch/arm/boot/dts/bcm-nsp.dtsi
+>>> +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
+>>> @@ -32,6 +32,7 @@
+>>>
+>>>   #include <dt-bindings/interrupt-controller/arm-gic.h>
+>>>   #include <dt-bindings/interrupt-controller/irq.h>
+>>> +#include <dt-bindings/clock/bcm-nsp.h>
+>>>
+>>>   #include "skeleton.dtsi"
+>>>
+>>> @@ -42,7 +43,7 @@
+>>>
+>>>   	mpcore {
+>>>   		compatible = "simple-bus";
+>>> -		ranges = <0x00000000 0x19020000 0x00003000>;
+>>> +		ranges = <0x00000000 0x19000000 0x00023000>;
+>>
+>> Why does this have anything to do with clocks? Shouldn't it be a
+>> separate patch?
+>
+> No, this is correct (though the patch is a little odd to look at).
+> The a9pll starts at 0x19000000 instead of 0x19020000.  So, everything
+> needs to be adjusted.
+>
 
-:-). It arguably is not the most beautiful pattern, but it is still easy
-to understand and there is some prior art in the kernel already, where
-we include variants of C / asm files from other source files:
+Okay.
 
-arch/arm/mm/fault.c:#include "fsr-3level.c"
-arch/arm/mm/fault.c:#include "fsr-2level.c"
-arch/m68k/kernel/setup.c:#include "setup_mm.c"
-arch/m68k/kernel/setup.c:#include "setup_no.c"
-arch/powerpc/kvm/book3s_segment.S:#include "book3s_64_slb.S"
-arch/powerpc/kvm/book3s_segment.S:#include "book3s_32_sr.S"
-mm/percpu.c:#include "percpu-km.c"
-mm/percpu.c:#include "percpu-vm.c"
+>>
+>>>   		#address-cells = <1>;
+>>>   		#size-cells = <1>;
+>>>
+>>> @@ -58,32 +59,23 @@
+>>>   			};
+>>>   		};
+>>>
+>>> -		L2: l2-cache {
+>>> -			compatible = "arm,pl310-cache";
+>>> -			reg = <0x2000 0x1000>;
+>>> -			cache-unified;
+>>> -			cache-level = <2>;
+>>> -		};
+>>> -
+>>> -		gic: interrupt-controller at 19021000 {
+>>> -			compatible = "arm,cortex-a9-gic";
+>>> -			#interrupt-cells = <3>;
+>>> -			#address-cells = <0>;
+>>> -			interrupt-controller;
+>>> -			reg = <0x1000 0x1000>,
+>>> -			      <0x0100 0x100>;
+>>> +		a9pll: arm_clk at 19000000 {
+>>> +			#clock-cells = <0>;
+>>> +			compatible = "brcm,nsp-armpll";
+>>> +			clocks = <&osc>;
+>>> +			reg = <0x00000 0x1000>;
+>>>   		};
+>>>
+>>>   		timer at 19020200 {
+>>>   			compatible = "arm,cortex-a9-global-timer";
+>>> -			reg = <0x0200 0x100>;
+>>> +			reg = <0x20200 0x100>;
+>>>   			interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
+>>>   			clocks = <&periph_clk>;
+>>>   		};
+>>>
+>>>   		twd-timer at 19020600 {
+>>>   			compatible = "arm,cortex-a9-twd-timer";
+>>> -			reg = <0x0600 0x20>;
+>>> +			reg = <0x20600 0x20>;
+>>>   			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
+>>>   						  IRQ_TYPE_LEVEL_HIGH)>;
+>>>   			clocks = <&periph_clk>;
+>>> @@ -91,11 +83,27 @@
+>>>
+>>>   		twd-watchdog at 19020620 {
+>>>   			compatible = "arm,cortex-a9-twd-wdt";
+>>> -			reg = <0x0620 0x20>;
+>>> +			reg = <0x20620 0x20>;
+>>>   			interrupts = <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
+>>>   						  IRQ_TYPE_LEVEL_HIGH)>;
+>>>   			clocks = <&periph_clk>;
+>>>   		};
+>>> +
+>>> +		gic: interrupt-controller at 19021000 {
+>>> +			compatible = "arm,cortex-a9-gic";
+>>> +			#interrupt-cells = <3>;
+>>> +			#address-cells = <0>;
+>>> +			interrupt-controller;
+>>> +			reg = <0x21000 0x1000>,
+>>> +			      <0x20100 0x100>;
+>>> +		};
+>>> +
+>>> +		L2: l2-cache {
+>>> +			compatible = "arm,pl310-cache";
+>>> +			reg = <0x22000 0x1000>;
+>>> +			cache-unified;
+>>> +			cache-level = <2>;
+>>> +		};
+>>
+>>  From here and above, all labels are wrong. You are moving them into
+>> a bus that has translated bus addresses, but you still use absolute
+>> addresses for all labels.
+>>
 
-UM even uses it in its linker script:
+Please fix all the labels.
 
-arch/um/kernel/vmlinux.lds.S:#include "uml.lds.S"
-arch/um/kernel/vmlinux.lds.S:#include "dyn.lds.S"
+>> And again, 1) Why is this change imbedded in a patch meant for
+>> adding DT clock support according to the commit message; 2) how does
+>> the dependency work with the other patches that you are about to
+>> send out?
+>
+> This was already discussed in the original series.  See
+> http://www.spinics.net/lists/arm-kernel/msg451580.html
 
-Michal
+The discussion explains my first question. But what about my second 
+question? How does the dependency work with other NSP DT patches that 
+you have on hand? Will there be conflicts? If so, do you expect the 
+maintainers need to manually fix all the conflicts?
+
+>>
+>>
+>>>   	};
+>>>
+>>>   	clocks {
+>>> @@ -103,10 +111,34 @@
+>>>   		#size-cells = <1>;
+>>>   		ranges;
+>>>
+>>> -		periph_clk: periph_clk {
+>>> +		osc: oscillator {
+>>> +			#clock-cells = <0>;
+>>>   			compatible = "fixed-clock";
+>>> +			clock-frequency = <25000000>;
+>>> +		};
+>>> +
+>>> +		iprocmed: iprocmed {
+>>> +			#clock-cells = <0>;
+>>> +			compatible = "fixed-factor-clock";
+>>> +			clocks = <&genpll BCM_NSP_GENPLL_IPROCFAST_CLK>;
+>>> +			clock-div = <2>;
+>>> +			clock-mult = <1>;
+>>> +		};
+>>> +
+>>> +		iprocslow: iprocslow {
+>>> +			#clock-cells = <0>;
+>>> +			compatible = "fixed-factor-clock";
+>>> +			clocks = <&genpll BCM_NSP_GENPLL_IPROCFAST_CLK>;
+>>> +			clock-div = <4>;
+>>> +			clock-mult = <1>;
+>>> +		};
+>>> +
+>>> +		periph_clk: periph_clk {
+>>>   			#clock-cells = <0>;
+>>> -			clock-frequency = <500000000>;
+>>> +			compatible = "fixed-factor-clock";
+>>> +			clocks = <&a9pll>;
+>>> +			clock-div = <2>;
+>>> +			clock-mult = <1>;
+>>>   		};
+>>>   	};
+>>>
+>>> @@ -118,17 +150,17 @@
+>>>
+>>>   		uart0: serial at 18000300 {
+>>>   			compatible = "ns16550a";
+>>> -			reg = <0x0300 0x100>;
+>>> +			reg = <0x000300 0x100>;
+>>>   			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+>>> -			clock-frequency = <62499840>;
+>>> +			clocks = <&osc>;
+>>>   			status = "disabled";
+>>>   		};
+>>>
+>>>   		uart1: serial at 18000400 {
+>>>   			compatible = "ns16550a";
+>>> -			reg = <0x0400 0x100>;
+>>> +			reg = <0x000400 0x100>;
+>>>   			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+>>> -			clock-frequency = <62499840>;
+>>> +			clocks = <&osc>;
+>>>   			status = "disabled";
+>>>   		};
+>>>
+>>> @@ -217,5 +249,24 @@
+>>>
+>>>   			brcm,nand-has-wp;
+>>>   		};
+>>> +
+>>> +		lcpll0: lcpll0 at 1803f100 {
+>>
+>> wrong label
+>>
+
+Please fix
+
+>>> +			#clock-cells = <1>;
+>>> +			compatible = "brcm,nsp-lcpll0";
+>>> +			reg = <0x03f100 0x14>;
+>>> +			clocks = <&osc>;
+>>> +			clock-output-names = "lcpll0", "pcie_phy", "sdio",
+>>> +					     "ddr_phy";
+>>> +		};
+>>> +
+>>> +		genpll: genpll at 1803f140 {
+>>
+>> wrong label
+>>
+
+Please fix
+
+>>> +			#clock-cells = <1>;
+>>> +			compatible = "brcm,nsp-genpll";
+>>> +			reg = <0x03f140 0x24>;
+>>> +			clocks = <&osc>;
+>>> +			clock-output-names = "genpll", "phy", "ethernetclk",
+>>> +					     "usbclk", "iprocfast", "sata1",
+>>> +					     "sata2";
+>>> +		};
+>>>   	};
+>>>   };
+>>>
