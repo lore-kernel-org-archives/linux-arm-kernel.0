@@ -1,45 +1,48 @@
 From: pramodku@broadcom.com (Pramod Kumar)
-Date: Thu, 19 Nov 2015 09:22:12 +0530
-Subject: [PATCH v2 0/7] Generalized broadcom cygnus gpio driver
-Message-ID: <1447905139-16002-1-git-send-email-pramodku@broadcom.com>
+Date: Thu, 19 Nov 2015 09:22:14 +0530
+Subject: [PATCH v2 2/7] dts: define ngpios property in gpio controller's node
+In-Reply-To: <1447905139-16002-1-git-send-email-pramodku@broadcom.com>
+References: <1447905139-16002-1-git-send-email-pramodku@broadcom.com>
+Message-ID: <1447905139-16002-3-git-send-email-pramodku@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Generalized pinctrl-cygnus-gpio driver so that it could be used for all
-iProc architecture based future SoCs having same gpio pin controller.
-Generalization process made the below changes in driver-
+Add ngpios property in cygnus ASIU, CCM and CRMU gpio controller's node
 
-1. Addressed number of pins from DT through "ngpios" property and removed
-from driver.
-2. Since all iProc based SoCs would use this driver hence renamed all
-variables/macros/functions and even file name on iproc.
+Signed-off-by: Pramod Kumar <pramodku@broadcom.com>
+Reviewed-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Scott Branden <sbranden@broadcom.com>
+---
+ arch/arm/boot/dts/bcm-cygnus.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-
-This patchset applies on v4.4-rc1 and is tested on cygnus SVK and could be
-find at-
-https://github.com/Broadcom/arm64-linux/tree/iproc-gpio-v2
-
-Changes from v1:
--Rebased patches to v4.4-rc1
--Removed accepted patches
-
-Pramod Kumar (7):
-  dt-binding: Add ngpios property to GPIO controller node
-  dts: define ngpios property in gpio controller's node
-  pinctrl: use ngpios propety from DT
-  pinctrl: Add new compatible string to GPIO controller driver
-  gpio: Rename func/macro/var to IP-block,iproc
-  Documentation: Rename gpio controller name from cygnus to iproc
-  pinctrl: Rename gpio driver from cygnus to iproc
-
- .../{brcm,cygnus-gpio.txt => brcm,iproc-gpio.txt}  |   9 +-
- arch/arm/boot/dts/bcm-cygnus.dtsi                  |   3 +
- drivers/pinctrl/bcm/Kconfig                        |  30 +-
- drivers/pinctrl/bcm/Makefile                       |   2 +-
- ...{pinctrl-cygnus-gpio.c => pinctrl-iproc-gpio.c} | 355 ++++++++++-----------
- 5 files changed, 198 insertions(+), 201 deletions(-)
- rename Documentation/devicetree/bindings/pinctrl/{brcm,cygnus-gpio.txt => brcm,iproc-gpio.txt} (94%)
- rename drivers/pinctrl/bcm/{pinctrl-cygnus-gpio.c => pinctrl-iproc-gpio.c} (56%)
-
+diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
+index 2778533..59c4330 100644
+--- a/arch/arm/boot/dts/bcm-cygnus.dtsi
++++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
+@@ -101,6 +101,7 @@
+ 			compatible = "brcm,cygnus-crmu-gpio";
+ 			reg = <0x03024800 0x50>,
+ 			      <0x03024008 0x18>;
++			ngpios = <6>;
+ 			#gpio-cells = <2>;
+ 			gpio-controller;
+ 		};
+@@ -127,6 +128,7 @@
+ 			compatible = "brcm,cygnus-ccm-gpio";
+ 			reg = <0x1800a000 0x50>,
+ 			      <0x0301d164 0x20>;
++			ngpios = <24>;
+ 			#gpio-cells = <2>;
+ 			gpio-controller;
+ 			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+@@ -245,6 +247,7 @@
+ 		gpio_asiu: gpio at 180a5000 {
+ 			compatible = "brcm,cygnus-asiu-gpio";
+ 			reg = <0x180a5000 0x668>;
++			ngpios = <146>;
+ 			#gpio-cells = <2>;
+ 			gpio-controller;
+ 
 -- 
 1.9.1
