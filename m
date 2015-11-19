@@ -1,200 +1,25 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Thu, 19 Nov 2015 09:22:46 +0100
-Subject: [PATCH] ARM: socfpga: Add support for DENX MCV SoM and MCVEVK
- baseboard
-In-Reply-To: <1446420549-5572-1-git-send-email-marex@denx.de>
-References: <1446420549-5572-1-git-send-email-marex@denx.de>
-Message-ID: <20151119082246.GA3833@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Nov 2015 09:23:43 +0100
+Subject: [PATCH] PCI: Fix logic OF logic in pci_dma_configure()
+In-Reply-To: <1447894192-17210-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1447894192-17210-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <4205822.O3dsjd4r6S@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-On Mon, Nov 02, 2015 at 12:29:09AM +0100, Marek Vasut wrote:
-> Add support for the DENX MCV SoM and MCVEVK baseboard. The SoM contains
-> eMMC, DRAM, Altera Cyclone V SoC. The baseboard contains CAN ports, UART
-> ports, STMPE811 touchscreen controller, USB OTG port, ethernet port and
-> a lot of IO pins.
+On Wednesday 18 November 2015 16:49:52 Suravee Suthikulpanit wrote:
+> -       if (IS_ENABLED(CONFIG_OF) && dev->dev.of_node) {
+> -               if (bridge->parent)
+> +       if (IS_ENABLED(CONFIG_OF) &&
+> +               bridge->parent && bridge->parent->of_node) {
+>                         of_dma_configure(&dev->dev, bridge->parent->of_node);
 > 
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Vince Bridgers <vbridgers2013@gmail.com>
-> Cc: Alan Tull <atull@altera.com>
-> Cc: Thor Thayer <tthayer@altera.com>
-> Cc: Dinh Nguyen <dinguyen@altear.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> ---
->  arch/arm/boot/dts/Makefile                    |  1 +
->  arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi   | 33 ++++++++++
->  arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts | 94 +++++++++++++++++++++++++++
->  3 files changed, 128 insertions(+)
->  create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
->  create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 7d3e495..8f322be 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -555,6 +555,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
->  dtb-$(CONFIG_ARCH_SOCFPGA) += \
->  	socfpga_arria5_socdk.dtb \
->  	socfpga_arria10_socdk_sdmmc.dtb \
-> +	socfpga_cyclone5_mcvevk.dtb \
->  	socfpga_cyclone5_socdk.dtb \
->  	socfpga_cyclone5_de0_sockit.dtb \
->  	socfpga_cyclone5_sockit.dtb \
-> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi b/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
-> new file mode 100644
-> index 0000000..70dacf3
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
-> @@ -0,0 +1,33 @@
-> +/*
-> + * Copyright (C) 2015 Marek Vasut <marex@denx.de>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include "socfpga_cyclone5.dtsi"
-> +
-> +/ {
-> +	model = "DENX MCV";
-> +	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-> +
-> +	memory {
-> +		name = "memory";
-> +		device_type = "memory";
-> +		reg = <0x0 0x40000000>;	/* 1 GiB */
-> +	};
-> +};
-> +
-> +&mmc0 {	/* On-SoM eMMC */
-> +	bus-width = <8>;
-> +};
-> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts b/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-> new file mode 100644
-> index 0000000..7cbe9b3
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-> @@ -0,0 +1,94 @@
-> +/*
-> + * Copyright (C) 2015 Marek Vasut <marex@denx.de>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include "socfpga_cyclone5_mcv.dtsi"
-> +
-> +/ {
-> +	model = "DENX MCV EVK";
-> +	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-> +
-> +	aliases {
-> +		ethernet0 = &gmac0;
-> +		stmpe-i2c0 = &stmpe1;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +};
-> +
-> +&gpio0 {	/* GPIO  0 ... 28 */
-> +	status = "okay";
-> +};
-> +
-> +&gpio1 {	/* GPIO 29 ... 57 */
-> +	status = "okay";
-> +};
-> +
-> +&gpio2 {	/* GPIO 58..66 (HLGPI 0..13 at offset 13) */
-> +	status = "okay";
-> +};
-> +
-> +&can0 {
-> +	status = "okay";
-> +};
-> +
-> +&can1 {
-> +	status = "okay";
-> +};
-> +
-> +&i2c0 {
-> +	status = "okay";
-> +	speed-mode = <0>;
-> +
-> +	stmpe1: stmpe811 at 41 {
-> +		compatible = "st,stmpe811";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		reg = <0x41>;
-> +		id = <0>;
-> +		blocks = <0x5>;
-> +		irq-gpio = <&portb 28 0x4>;	/* GPIO 57, trig. level HI */
-> +
-> +		stmpe_touchscreen {
-> +			compatible = "st,stmpe-ts";
-> +			reg = <0>;
-> +			ts,sample-time = <4>;
-> +			ts,mod-12b = <1>;
-> +			ts,ref-sel = <0>;
-> +			ts,adc-freq = <1>;
-> +			ts,ave-ctrl = <1>;
-> +			ts,touch-det-delay = <3>;
-> +			ts,settling = <4>;
-> +			ts,fraction-z = <7>;
-> +			ts,i-drive = <1>;
-> +		};
-> +	};
-> +};
-> +
-> +&gmac0 {
-> +	phy-mode = "rgmii";
-> +	status = "okay";
-> +};
-> +
-> +&uart0 {
-> +	status = "okay";
-> +};
-> +
-> +&usb1 {
-> +	status = "okay";
-> +};
 
-Could you please sort the nodes alphabetically? I guess the risk of merge conflicts
-is pretty low as this seems to be a complete description of the hardware, but I would
-still prefer it that way.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Otherwise:
+I was wondering for a bit whether we should warn about the case where there
+is no of_node pointer, as that would mean we cannot do DMA on that PCI
+device, but on second thought we have to do it exactly like you do, because
+we would otherwise break machines that do not use DT.
 
-	Reviewed-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-
-Regards,
-Steffen
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
