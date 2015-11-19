@@ -1,47 +1,45 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 19 Nov 2015 20:17:37 +0100
-Subject: [PATCH 3/3] leds/pwm: fix driver description and make license
- match the header
-In-Reply-To: <1385412225-29740-4-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1385412225-29740-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1385412225-29740-4-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20151119191737.GF22022@pengutronix.de>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 19 Nov 2015 11:19:24 -0800
+Subject: [PATCH 02/27] mtd: nand: add an mtd_to_nand() helper
+In-Reply-To: <1447681080-31232-3-git-send-email-boris.brezillon@free-electrons.com>
+References: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1447681080-31232-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20151119191924.GF64635@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-while the other two patches in this thread are controversal, this one
-shouldn't. It still sits in my branch with unapplied patches since
-nearly two years, which is enormous considering it's such an easy patch.
-
-Best regards
-Uwe
-
-On Mon, Nov 25, 2013 at 09:43:45PM +0100, Uwe Kleine-K?nig wrote:
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+On Mon, Nov 16, 2015 at 02:37:35PM +0100, Boris Brezillon wrote:
+> Some drivers are retrieving the nand_chip pointer using the container_of
+> macro on a struct wrapping both the nand_chip and the mtd_info struct while
+> the standard way of retrieving this pointer is through mtd->priv.
+> Provide an helper to do that.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > ---
->  drivers/leds/leds-pwm.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  include/linux/mtd/nand.h | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
-> index cdc3e4d..0796ca3 100644
-> --- a/drivers/leds/leds-pwm.c
-> +++ b/drivers/leds/leds-pwm.c
-> @@ -239,6 +239,6 @@ static struct platform_driver led_pwm_driver = {
->  module_platform_driver(led_pwm_driver);
+> diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
+> index 4f7c9b9..056d165 100644
+> --- a/include/linux/mtd/nand.h
+> +++ b/include/linux/mtd/nand.h
+> @@ -730,6 +730,11 @@ static inline struct device_node *nand_get_flash_node(struct nand_chip *chip)
+>  	return chip->flash_node;
+>  }
 >  
->  MODULE_AUTHOR("Luotao Fu <l.fu@pengutronix.de>");
-> -MODULE_DESCRIPTION("PWM LED driver for PXA");
-> -MODULE_LICENSE("GPL");
-> +MODULE_DESCRIPTION("generic PWM LED driver");
-> +MODULE_LICENSE("GPL v2");
->  MODULE_ALIAS("platform:leds-pwm");
-> -- 
-> 1.8.4.2
-> 
-> 
+> +static inline struct nand_chip *mtd_to_nand(struct mtd_info *mtd)
+> +{
+> +	return mtd->priv;
+> +}
+> +
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Pushed this patch to l2-mtd.git, though I rebased it directly onto
+4.4-rc1 and then merged it in. That way, if any other subsystems want to
+start using this in the 4.5 -next cycle (e.g., for patches 4-8), they
+can pull it in without taking the rest of MTD.
+
+I can push this to a separate branch or signed tag, if anyone wants.
+
+Or, I can take the arch/ patches via MTD, if that's a better option.
+
+Brian
