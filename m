@@ -1,299 +1,52 @@
 From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 19 Nov 2015 12:02:03 -0800
-Subject: [PATCH 1/2] ARM: dts: imx: ventana: add PWM nodes for Ventana boards
-Message-ID: <1447963323-21919-1-git-send-email-tharvey@gateworks.com>
+Date: Thu, 19 Nov 2015 12:02:24 -0800
+Subject: [PATCH 2/2] ARM: dts: imx: ventana: Add SPI support for GW52xx
+Message-ID: <1447963344-21996-1-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ventana boards have an off-board connector with signals that can be pinmuxed
-as either GPIO or PWM. This patch adds pwm device-tree nodes in the disabled
-state which the bootloader can decide to enable based on bootloader config.
+This addes support for SPI available on an off-board connector available on
+some models of the GW52xx.
 
 Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 ---
- arch/arm/boot/dts/imx6qdl-gw51xx.dtsi | 36 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 24 +++++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 24 +++++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 36 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-gw551x.dtsi | 24 +++++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-gw552x.dtsi | 24 +++++++++++++++++++++++
- 6 files changed, 168 insertions(+)
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
-index 7b31fdb..fb0abd6 100644
---- a/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
-@@ -174,6 +174,24 @@
- 	status = "okay";
- };
- 
-+&pwm2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm2>; /* MX6_DIO1 */
-+	status = "disabled";
-+};
-+
-+&pwm3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm3>; /* MX6_DIO2 */
-+	status = "disabled";
-+};
-+
-+&pwm4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm4>; /* MX6_DIO3 */
-+	status = "disabled";
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-@@ -294,6 +312,24 @@
- 			>;
- 		};
- 
-+		pinctrl_pwm2: pwm2grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_DAT2__PWM2_OUT		0x1b0b1
-+			>;
-+		};
-+
-+		pinctrl_pwm3: pwm3grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
-+			>;
-+		};
-+
-+		pinctrl_pwm4: pwm4grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD4_DAT2__PWM4_OUT		0x1b0b1
-+			>;
-+		};
-+
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
 diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-index 9709728..e4a1e72 100644
+index e4a1e72..7fc45a4 100644
 --- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-@@ -282,6 +282,18 @@
- 	status = "okay";
+@@ -158,6 +158,14 @@
+ 	                  <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
  };
  
-+&pwm2 {
++&ecspi3 {
++	fsl,spi-num-chipselects = <1>;
++	cs-gpios = <&gpio4 24 GPIO_ACTIVE_HIGH>;
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm2>; /* MX6_DIO1 */
-+	status = "disabled";
++	pinctrl-0 = <&pinctrl_ecspi3>;
++	status = "okay";
 +};
 +
-+&pwm3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm3>; /* MX6_DIO2 */
-+	status = "disabled";
-+};
-+
- &pwm4 {
+ &fec {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_pwm4>;
-@@ -436,6 +448,18 @@
+ 	pinctrl-0 = <&pinctrl_enet>;
+@@ -357,6 +365,15 @@
  			>;
  		};
  
-+		pinctrl_pwm2: pwm2grp {
++		pinctrl_ecspi3: escpi3grp {
 +			fsl,pins = <
-+				MX6QDL_PAD_SD1_DAT2__PWM2_OUT		0x1b0b1
++				MX6QDL_PAD_DISP0_DAT0__ECSPI3_SCLK	0x100b1
++				MX6QDL_PAD_DISP0_DAT1__ECSPI3_MOSI	0x100b1
++				MX6QDL_PAD_DISP0_DAT2__ECSPI3_MISO	0x100b1
++				MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24	0x100b1
 +			>;
 +		};
 +
-+		pinctrl_pwm3: pwm3grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
-+			>;
-+		};
-+
- 		pinctrl_pwm4: pwm4grp {
+ 		pinctrl_enet: enetgrp {
  			fsl,pins = <
- 				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
-diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-index dc1cd13..c37f89d 100644
---- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-@@ -287,6 +287,18 @@
- 	};
- };
- 
-+&pwm2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm2>; /* MX6_DIO1 */
-+	status = "disabled";
-+};
-+
-+&pwm3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm3>; /* MX6_DIO2 */
-+	status = "disabled";
-+};
-+
- &pwm4 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_pwm4>;
-@@ -442,6 +454,18 @@
- 			>;
- 		};
- 
-+		pinctrl_pwm2: pwm2grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_DAT2__PWM2_OUT		0x1b0b1
-+			>;
-+		};
-+
-+		pinctrl_pwm3: pwm3grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
-+			>;
-+		};
-+
- 		pinctrl_pwm4: pwm4grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
-diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-index d8aa22e..2b3c877 100644
---- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-@@ -378,6 +378,24 @@
- 	};
- };
- 
-+&pwm1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm1>; /* MX6_DIO0 */
-+	status = "disabled";
-+};
-+
-+&pwm2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm2>; /* MX6_DIO1 */
-+	status = "disabled";
-+};
-+
-+&pwm3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm3>; /* MX6_DIO2 */
-+	status = "disabled";
-+};
-+
- &pwm4 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_pwm4>;
-@@ -537,6 +555,24 @@
- 			>;
- 		};
- 
-+		pinctrl_pwm1: pwm1grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_GPIO_9__PWM1_OUT		0x1b0b1
-+			>;
-+		};
-+
-+		pinctrl_pwm2: pwm2grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_DAT2__PWM2_OUT		0x1b0b1
-+			>;
-+		};
-+
-+		pinctrl_pwm3: pwm3grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
-+			>;
-+		};
-+
- 		pinctrl_pwm4: pwm4grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
-diff --git a/arch/arm/boot/dts/imx6qdl-gw551x.dtsi b/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
-index 741f3d5..118bea5 100644
---- a/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
-@@ -198,6 +198,18 @@
- 	status = "okay";
- };
- 
-+&pwm2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm2>; /* MX6_DIO1 */
-+	status = "disabled";
-+};
-+
-+&pwm3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm3>; /* MX6_DIO2 */
-+	status = "disabled";
-+};
-+
- &ssi1 {
- 	status = "okay";
- };
-@@ -290,6 +302,18 @@
- 			>;
- 		};
- 
-+		pinctrl_pwm2: pwm2grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_DAT2__PWM2_OUT		0x1b0b1
-+			>;
-+		};
-+
-+		pinctrl_pwm3: pwm3grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_DAT1__PWM3_OUT		0x1b0b1
-+			>;
-+		};
-+
- 		pinctrl_uart2: uart2grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA	0x1b0b1
-diff --git a/arch/arm/boot/dts/imx6qdl-gw552x.dtsi b/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
-index d1e5048..cca39f1 100644
---- a/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
-@@ -164,6 +164,18 @@
- 	status = "okay";
- };
- 
-+&pwm2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm2>; /* MX6_DIO1 */
-+	status = "disabled";
-+};
-+
-+&pwm3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm3>; /* MX6_DIO2 */
-+	status = "disabled";
-+};
-+
- &uart2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart2>;
-@@ -242,6 +254,18 @@
- 			>;
- 		};
- 
-+		pinctrl_pwm2: pwm2grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_DAT2__PWM2_OUT		0x1b0b1
-+			>;
-+		};
-+
-+		pinctrl_pwm3: pwm3grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
-+			>;
-+		};
-+
- 		pinctrl_uart2: uart2grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA	0x1b0b1
+ 				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
 -- 
 1.9.1
