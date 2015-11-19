@@ -1,51 +1,49 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 19 Nov 2015 16:42:58 +0100
-Subject: [PATCH 01/19] clk: sunxi: Add display clock
-In-Reply-To: <20151112203154.GE15032@codeaurora.org>
+Date: Thu, 19 Nov 2015 16:43:47 +0100
+Subject: [PATCH 05/19] clk: sunxi: add DRAM gates
+In-Reply-To: <CAGb2v65qjKCNER=5Gq5UXnvY_nia+EQYRAk3U9hokmXuxHoi_Q@mail.gmail.com>
 References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
- <1446214865-3972-2-git-send-email-maxime.ripard@free-electrons.com>
- <20151030212902.GG19782@codeaurora.org>
- <20151106233926.GN6114@lukather>
- <20151112203154.GE15032@codeaurora.org>
-Message-ID: <20151119154258.GQ32142@lukather>
+ <1446214865-3972-6-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v66B7X5xQGMq_MzAHGz4OLsnDQStVHcQaMGO+HYY43kjBQ@mail.gmail.com>
+ <CAGb2v65qjKCNER=5Gq5UXnvY_nia+EQYRAk3U9hokmXuxHoi_Q@mail.gmail.com>
+Message-ID: <20151119154347.GR32142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 12, 2015 at 12:31:54PM -0800, Stephen Boyd wrote:
-> On 11/06, Maxime Ripard wrote:
-> > Hi Stephen,
-> > 
-> > Thanks for your feedback!
-> > 
-> > On Fri, Oct 30, 2015 at 02:29:02PM -0700, Stephen Boyd wrote:
-> > > > +
-> > > > +	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-> > > > +	if (!mux)
-> > > [..]
-> > > > +		goto free_reset;
-> > > > +	}
-> > > > +
-> > > > +	return;
-> > > > +
-> > > > +free_reset:
-> > > > +	kfree(reset_data);
-> > > > +free_clk:
-> > > > +	clk_unregister(clk);
-> > > 
-> > > We really ought to have a clk_composite_unregister() API.
-> > 
-> > Can we?
-> > 
-> > We can always unregister the clock itself, but do we have a way to
-> > retrieve the structure that has been allocated in there?
-> > 
-> > (note that it also applies to the generic clocks registration: muxes,
-> > dividers, and so on).
+On Fri, Nov 13, 2015 at 04:08:53PM +0800, Chen-Yu Tsai wrote:
+> On Mon, Nov 9, 2015 at 12:18 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> > On Fri, Oct 30, 2015 at 10:20 PM, Maxime Ripard
+> > <maxime.ripard@free-electrons.com> wrote:
+> >> The Allwinner SoCs have a gate controller to gate the access to the DRAM
+> >> clock to the some devices that need to access the DRAM directly (mostly
+> >> display / image related IPs).
+> >>
+> >> Use a simple gates driver to support it.
+> >>
+> >> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >
+> > Acked-by: Chen-Yu Tsai <wens@csie.org>
+> >
+> >> ---
+> >>  drivers/clk/sunxi/clk-simple-gates.c | 2 ++
+> >>  1 file changed, 2 insertions(+)
+> >>
+> >> diff --git a/drivers/clk/sunxi/clk-simple-gates.c b/drivers/clk/sunxi/clk-simple-gates.c
+> >> index 0214c6548afd..5666c767fa14 100644
+> >> --- a/drivers/clk/sunxi/clk-simple-gates.c
+> >> +++ b/drivers/clk/sunxi/clk-simple-gates.c
+> >> @@ -112,6 +112,8 @@ CLK_OF_DECLARE(sun5i_a13_apb0, "allwinner,sun5i-a13-apb0-gates-clk",
+> >>                sunxi_simple_gates_init);
+> >>  CLK_OF_DECLARE(sun5i_a13_apb1, "allwinner,sun5i-a13-apb1-gates-clk",
+> >>                sunxi_simple_gates_init);
+> >> +CLK_OF_DECLARE(sun5i_a13_dram, "allwinner,sun5i-a13-dram-gates-clk",
+> >> +              sunxi_simple_gates_init);
 > 
-> Yes we have a way. We've done the same sort of design for other
-> generic clocks. Do the __clk_get_hw() thing like in clk-divider.c
+> Nit: Since the compatible added is sun5i, could you mention it in the
+> commit message,
+> to avoid confusion when we do this for the other families?
 
-Ack. I'll cook up a patch for this then.
+It will be fixed in the v2.
 
 Thanks!
 Maxime
@@ -60,4 +58,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151119/2f6046ef/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151119/e0f85642/attachment-0001.sig>
