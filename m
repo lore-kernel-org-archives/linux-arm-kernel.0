@@ -1,32 +1,33 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Fri, 20 Nov 2015 09:59:11 +1100
-Subject: [linux-sunxi] [PATCH] spi: dts: sun4i: Add support for inter-word
- wait cycles using the SPI Wait Clock Register
-In-Reply-To: <1447948422-4915-2-git-send-email-mweseloh42@gmail.com>
-References: <1447948422-4915-1-git-send-email-mweseloh42@gmail.com>
- <1447948422-4915-2-git-send-email-mweseloh42@gmail.com>
-Message-ID: <CAGRGNgWQLE5h03+4shLmqD6iW_p=L-i3ewdLb8ndWpxGHWh4rQ@mail.gmail.com>
+From: jonmason@broadcom.com (Jon Mason)
+Date: Thu, 19 Nov 2015 18:05:06 -0500
+Subject: [PATCH v2 0/3] ARM: dts: add support for NS, NSP, and NS2 clocks
+Message-ID: <1447974309-29566-1-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcus,
+Changes in v2:
+Rebased off of outstanding NSP DT patches and tweaked the entry names
+per Ray Jui
 
-On Fri, Nov 20, 2015 at 2:53 AM, Marcus Weseloh <mweseloh42@gmail.com> wrote:
-> Adds support and documentation for a new slave device property
-> "sun4i,spi-wdelay" that allows to set the SPI Wait Clock Register per
-> device / transfer. The SPI hardware will wait the specified amount of
-> SPI clock periods (plus a constant 3 clock periods) before transmitting
-> the next word.
 
-Should you possibly hide the 3 clock periods from the user?
+This patch series adds device tree support for the Broadcom Northstar,
+Northstar Plus, and Northstar 2 clocks.
 
-I.e. they set whatever they want for the wdelay, we set it to the
-closest number we can that's greater or equal to what they ask for.
+Last sent as an RFC (see https://lkml.org/lkml/2015/10/13/882) due to
+the inability to merge because of the driver dependencies.  Those
+necessary driver changes were merged into 4.4.  All comments have been
+addressed and it is ready to be pulled in.
 
-Thanks,
+
+Jon Mason (3):
+  ARM: dts: enable clock support for BCM5301X
+  ARM: dts: enable clock support for Broadcom NSP
+  ARM64: dts: enable clock support for Broadcom NS2
+
+ arch/arm/boot/dts/bcm-nsp.dtsi        | 77 ++++++++++++++++++++++++-----
+ arch/arm/boot/dts/bcm5301x.dtsi       | 92 +++++++++++++++++++++++++++--------
+ arch/arm64/boot/dts/broadcom/ns2.dtsi | 80 +++++++++++++++++++++++++++++-
+ 3 files changed, 214 insertions(+), 35 deletions(-)
 
 -- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+1.9.1
