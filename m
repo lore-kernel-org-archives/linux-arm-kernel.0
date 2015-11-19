@@ -1,61 +1,63 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 19 Nov 2015 11:28:28 -0300
-Subject: [PATCH] modpost: don't add a trailing wildcard for OF module aliases
-Message-ID: <1447943308-27689-1-git-send-email-javier@osg.samsung.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 19 Nov 2015 08:30:34 -0600
+Subject: [PATCH v6 3/6] dt/bindings: add bindings for optee
+In-Reply-To: <20151119091810.GA15974@ermac>
+References: <1446106888-8983-1-git-send-email-jens.wiklander@linaro.org>
+ <1446106888-8983-4-git-send-email-jens.wiklander@linaro.org>
+ <20151116170109.GA20076@rob-hp-laptop> <20151119091810.GA15974@ermac>
+Message-ID: <CAL_JsqLCW6Wekccwqc4U8qFO9thuNQ4+EO6-AoasQtH+Z6CdrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit ac551828993ee ("modpost: i2c aliases need no trailing wildcard")
-removed the wildcard at the end of the I2C module aliases because I2C
-devices have no IDs so the aliases are just arbitrary device names.
+On Thu, Nov 19, 2015 at 3:18 AM, Jens Wiklander
+<jens.wiklander@linaro.org> wrote:
+> On Mon, Nov 16, 2015 at 11:01:10AM -0600, Rob Herring wrote:
+>> On Thu, Oct 29, 2015 at 09:21:25AM +0100, Jens Wiklander wrote:
+>> > Introduces optee prefix and adds bindings for ARM TrustZone based OP-TEE
+>> > implementation.
+>> >
+>> > Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+>> > ---
+>> >  .../bindings/arm/firmware/optee,optee-tz.txt       | 29 ++++++++++++++++++++++
+>> >  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+>> >  2 files changed, 30 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/arm/firmware/optee,optee-tz.txt
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/arm/firmware/optee,optee-tz.txt b/Documentation/devicetree/bindings/arm/firmware/optee,optee-tz.txt
+>> > new file mode 100644
+>> > index 0000000..0a8ed0d
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/arm/firmware/optee,optee-tz.txt
+>> > @@ -0,0 +1,29 @@
+>> > +OP-TEE Device Tree Bindings
+>> > +
+>> > +OP-TEE is a piece of software using hardware features to provide a Trusted
+>> > +Execution Environment. The security can be provided with ARM TrustZone, but
+>> > +also by virtualization or a separate chip. As there's no single OP-TEE
+>> > +vendor we're using "optee" as the first part of compatible property,
+>> > +indicating the OP-TEE protocol is used when communicating with the secure
+>> > +world.
 
-This is also true for OF modaliases since a compatible string is used
-to define a specific IP hardware block. So the modalias should match a
-specific compatible string and not attempt to match a compatible string
-whose name matches the beginning of another one.
+[...]
 
-For example, the following driver module:
+>> > +Example:
+>> > +   optee {
+>>
+>> This should go under a /firmware node similar to
+>> Documentation/devicetree/bindings/arm/firmware/tlm,trusted-foundations.txt.
+>
+> I tried that and discovered that a
+> compatible = "simple-bus";
+> is needed for the firmware node for optee to get probed. Is it OK to write
+> the example as:
+>
+> firmware {
+>         compatible = "simple-bus";
+>
+>         optee {
 
-$ modinfo cros_ec_keyb | grep alias
-alias:          platform:cros-ec-keyb
-alias:          of:N*T*Cgoogle,cros-ec-keyb*
+That would needlessly create devices for any other child nodes and it
+is not a bus. Just find the node and call of_platform_device_create
+for that node in an initcall.
 
-will be tried to be loaded for an alias of:N*T*Cgoogle,cros-ec-keyb-v2
-but there could be a different driver that supports the device for that
-compatible string so it's better to remove the trailing wildcard for OF.
-
-Also, remove the word "always" from the add_wildcard() function comment
-since that was carried from the time where a wildcard was always added
-at the end of the module alias for all the devices.
-
-Suggested-by: Brian Norris <computersforpeace@gmail.com>
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
----
-
- scripts/mod/file2alias.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/scripts/mod/file2alias.c b/scripts/mod/file2alias.c
-index 5b96206e9aab..65eaab8b7798 100644
---- a/scripts/mod/file2alias.c
-+++ b/scripts/mod/file2alias.c
-@@ -125,7 +125,7 @@ do {                                                            \
-                 sprintf(str + strlen(str), "*");                \
- } while(0)
- 
--/* Always end in a wildcard, for future extension */
-+/* End in a wildcard, for future extension */
- static inline void add_wildcard(char *str)
- {
- 	int len = strlen(str);
-@@ -704,7 +704,6 @@ static int do_of_entry (const char *filename, void *symval, char *alias)
- 		if (isspace (*tmp))
- 			*tmp = '_';
- 
--	add_wildcard(alias);
- 	return 1;
- }
- ADD_TO_DEVTABLE("of", of_device_id, do_of_entry);
--- 
-2.4.3
+Rob
