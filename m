@@ -1,61 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Nov 2015 19:14:28 +0000
-Subject: device_node lifetime (was: Re: [PATCH 1/7] phy: brcmstb-sata:
- add missing of_node_put)
-In-Reply-To: <CAL_JsqLQWh8-gshYLrYwrrRjBRXiOACh9LzVn2HUU38mfgYGoQ@mail.gmail.com>
-References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
- <1447673600-8881-2-git-send-email-Julia.Lawall@lip6.fr>
- <20151117013830.GV8456@google.com>
- <alpine.DEB.2.02.1511170711340.2045@localhost6.localdomain6>
- <20151117174430.GA8456@google.com>
- <alpine.DEB.2.10.1511171846120.2455@hadrien>
- <20151117183036.GF8456@google.com>
- <alpine.DEB.2.02.1511172327030.2121@localhost6.localdomain6>
- <20151118190500.GE140057@google.com>
- <CAL_JsqLQWh8-gshYLrYwrrRjBRXiOACh9LzVn2HUU38mfgYGoQ@mail.gmail.com>
-Message-ID: <20151119191428.GB8644@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 19 Nov 2015 20:17:37 +0100
+Subject: [PATCH 3/3] leds/pwm: fix driver description and make license
+ match the header
+In-Reply-To: <1385412225-29740-4-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1385412225-29740-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1385412225-29740-4-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20151119191737.GF22022@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2015 at 12:44:11PM -0600, Rob Herring wrote:
-> On Wed, Nov 18, 2015 at 1:05 PM, Brian Norris
-> <computersforpeace@gmail.com> wrote:
-> > (changing subject, add devicetree at vger.kernel.org)
-> >
-> > On Tue, Nov 17, 2015 at 11:33:25PM +0100, Julia Lawall wrote:
-> >> On Tue, 17 Nov 2015, Brian Norris wrote:
-> >> > On Tue, Nov 17, 2015 at 06:48:39PM +0100, Julia Lawall wrote:
-> >> > > Is this something that should be checked for elsewhere?
-> >> >
-> >> > I expect the same sort of problem shows up plenty of other places. I
-> >> > don't think many people use CONFIG_OF_DYNAMIC, so the effects of these
-> >> > failures probably aren't felt by many.
+Hello,
+
+while the other two patches in this thread are controversal, this one
+shouldn't. It still sits in my branch with unapplied patches since
+nearly two years, which is enormous considering it's such an easy patch.
+
+Best regards
+Uwe
+
+On Mon, Nov 25, 2013 at 09:43:45PM +0100, Uwe Kleine-K?nig wrote:
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  drivers/leds/leds-pwm.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> The "problem" is non-existent because either CONFIG_OF_DYNAMIC is off
-> or where it is used is limited (memory and cpus on PSeries) and now
-> overlays. Overlays have the potential to be problematic, but we should
-> manage ref counting for overlays in a completely different way. What
-> that looks like, I don't know. I'll leave that to the person that
-> cares about removing overlays.
-
-So are you saying we should just forget about of_node_put and delete all
-of_node_put/of_node_get references in code outside drivers/of ?  That
-seems pretty obtuse given that we do have the overlay code merged, and
-sounds to me like a very bad idea.
-
-Expecting those who want to use overlays to run around checking that
-the refcounting is correct in drivers is a really silly idea IMHO -
-the existing API is refcounted, so either people really ought to be
-using it correctly as it's already been designed (in other words, with
-correct refcounting, and we shouldn't be shovelling this problem onto
-other people) or the refcounting should be completely killed.
-
-The existing half-way house of "we have refcounting, but we don't care
-about it" is really insane.
-
-Either we have refcounting, and it's used properly, or we don't have
-refcounting.  No middle ground IMHO.
+> diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
+> index cdc3e4d..0796ca3 100644
+> --- a/drivers/leds/leds-pwm.c
+> +++ b/drivers/leds/leds-pwm.c
+> @@ -239,6 +239,6 @@ static struct platform_driver led_pwm_driver = {
+>  module_platform_driver(led_pwm_driver);
+>  
+>  MODULE_AUTHOR("Luotao Fu <l.fu@pengutronix.de>");
+> -MODULE_DESCRIPTION("PWM LED driver for PXA");
+> -MODULE_LICENSE("GPL");
+> +MODULE_DESCRIPTION("generic PWM LED driver");
+> +MODULE_LICENSE("GPL v2");
+>  MODULE_ALIAS("platform:leds-pwm");
+> -- 
+> 1.8.4.2
+> 
+> 
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
