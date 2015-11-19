@@ -1,48 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Nov 2015 17:35:14 +0100
-Subject: [PATCH] include: asm-generic: page.h: Remove useless
- get_user_page and free_user_page
-In-Reply-To: <20151119161843.GA8644@n2100.arm.linux.org.uk>
-References: <COL130-W7B5F0BB94C76AF6B12EA7B91C0@phx.gbl>
- <5663971.11WtULN11Y@wuerfel> <20151119161843.GA8644@n2100.arm.linux.org.uk>
-Message-ID: <4559060.7YuVHsgd4d@wuerfel>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 19 Nov 2015 17:39:50 +0100
+Subject: [PATCH v2] pinctrl: at91-pio4: use %pr format string for resource
+In-Reply-To: <5199877.GVYeflqET9@wuerfel>
+References: <5199877.GVYeflqET9@wuerfel>
+Message-ID: <20151119163950.GD23317@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 November 2015 16:18:43 Russell King - ARM Linux wrote:
-> On Thu, Nov 19, 2015 at 12:25:45PM +0100, Arnd Bergmann wrote:
-> > On Thursday 19 November 2015 03:40:25 Chen Gang wrote:
-> > > diff --git a/include/asm-generic/page.h b/include/asm-generic/page.h
-> > > index 37d1fe2..67cfb7d 100644
-> > > --- a/include/asm-generic/page.h
-> > > +++ b/include/asm-generic/page.h
-> > > @@ -24,9 +24,6 @@
-> > >  
-> > >  #ifndef __ASSEMBLY__
-> > >  
-> > > -#define get_user_page(vaddr)           __get_free_page(GFP_KERNEL)
-> > > -#define free_user_page(page, addr)     free_page(addr)
-> > > -
-> > >  #define clear_page(page)       memset((page), 0, PAGE_SIZE)
-> > >  #define copy_page(to,from)     memcpy((to), (from), PAGE_SIZE)
-> > >  
-> > > 
-> > 
-> > Looks good. I can take the asm-generic portion when you split it up, and
-> > I can also help you merge the remaining patches in case some of
-> > the arch maintainers fail to pick them up. I think all five of them
-> > are actively maintained though, so the patches should just go through
-> > the respective architecture trees.
+On Wed, Nov 18, 2015 at 04:21:17PM +0100, Arnd Bergmann wrote:
+> resource_size_t may be defined as 32 or 64 bit depending on configuration,
+> so it cannot be printed using the normal format strings, as gcc correctly
+> warns:
 > 
-> Or we just ack the patch and have it go through one tree, which I think
-> is the most sensible.  I can't imagine that there would be any major
-> conflicts here, surely no one is constantly changing their asm/page.h ?
+> pinctrl-at91-pio4.c: In function 'atmel_pinctrl_probe':
+> pinctrl-at91-pio4.c:1003:41: warning: format '%u' expects argument of type 'unsigned int', but argument 5 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
+>    dev_dbg(dev, "bank %i: hwirq=%u\n", i, res->start);
+> 
+> This changes the format string to use the special "%pr" format
+> string that prints a resource, and changes the arguments so we
+> the resource structure directly.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Yes, good point, there is really very little potential for conflicts
-here. I've applied it into my asm-generic tree for now, but will
-revert it if we get regressions or NAKs.
+Thanks.
 
-For some reason, the patch was whitespace broken, but I managed to
-extract it from the attachment.
-
-	Arnd
+> ---
+> v2: don't break ordering of arguments, that part was correct already, unlike
+> what I said in v1.
+> 
+> diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
+> index 33edd07d9149..abdc16e5a970 100644
+> --- a/drivers/pinctrl/pinctrl-at91-pio4.c
+> +++ b/drivers/pinctrl/pinctrl-at91-pio4.c
+> @@ -1000,7 +1000,7 @@ static int atmel_pinctrl_probe(struct platform_device *pdev)
+>  		atmel_pioctrl->irqs[i] = res->start;
+>  		irq_set_chained_handler(res->start, atmel_gpio_irq_handler);
+>  		irq_set_handler_data(res->start, atmel_pioctrl);
+> -		dev_dbg(dev, "bank %i: hwirq=%u\n", i, res->start);
+> +		dev_dbg(dev, "bank %i: irq=%pr\n", i, res);
+>  	}
+>  
+>  	atmel_pioctrl->irq_domain = irq_domain_add_linear(dev->of_node,
+> 
