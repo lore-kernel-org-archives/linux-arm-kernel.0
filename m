@@ -1,59 +1,30 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Thu, 19 Nov 2015 10:05:16 -0500 (EST)
-Subject: [PATCH RFC v2] apei: Add ACPI APEI event notification support
-In-Reply-To: <20151119141816.GH22786@arm.com>
-References: <1445458480-6493-1-git-send-email-lho@apm.com>
- <20151022095716.GC3671@pd.tnic> <20151119141816.GH22786@arm.com>
-Message-ID: <F77E0D1A-FE01-4BA8-B72C-AA6CB7DAD61C@redhat.com>
+From: mmarek@suse.com (Michal Marek)
+Date: Thu, 19 Nov 2015 16:07:04 +0100
+Subject: [PATCH] ARM: xip: Move XIP linking to a separate file
+In-Reply-To: <1447943047-22427-1-git-send-email-chris.brandt@renesas.com>
+References: <1447943047-22427-1-git-send-email-chris.brandt@renesas.com>
+Message-ID: <564DE598.7060404@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Top post - quick reply - you are correct. This is a vendor specific implementation. APEI is generic, and in the general case there should not be a need to do anything with a special driver. Some will need their own special solution in the early days, but everyone else should be able to go generic. In particular I expect those implementing EL3 to do firmware first handling and to signal the event independently of any OS specific hooks.
+On 2015-11-19 15:24, Chris Brandt wrote:
+> When building an XIP kernel, the linker script needs to be much different
+> than a conventional kernel's script. Over time, it's been difficult to
+> maintain both XIP and non-XIP layouts in one linker script. Therefore,
+> this patch separates the two procedures into two completely different
+> files.
+> 
+> The new linker script is essentially a straight copy of the current script
+> with all the non-CONFIG_XIP_KERNEL portions removed.
+> 
+> Additionally, all CONFIG_XIP_KERNEL portions have been removed from the
+> existing linker script...never to return again.
+> 
+> From now on, for any architecture, when CONFIG_XIP_KERNEL is enabled, you
+> must provide a vmlinux-xip.lds.S for the build process.
 
--- 
-Computer Architect | Sent from my 64-bit #ARM Powered phone
+Why not have a vmlinux.lds.S and #include a vmlinux-xip.lds.S /
+vmlinux-nonxip.lds.S from there? That way, you do not clutter the main
+Makefile and you can reuse the boilerplate of the linker script.
 
-> On Nov 19, 2015, at 08:18, Will Deacon <will.deacon@arm.com> wrote:
-> 
-> [Thanks Boris for CC'ing me]
-> 
-> Hi all,
-> 
-> Sorry for the delay on this, I had to do some research and this isn't
-> really my area of expertise.
-> 
->> On Thu, Oct 22, 2015 at 11:57:16AM +0200, Borislav Petkov wrote:
->> I'm top-posting here because I'm adding some more ARM people to CC and
->> would like for them to see the whole thing.
->> 
->> Ok, so what's the strategy here?
->> 
->> I know Tomasz did some untangling of GHES stuff to make it load on ARM
->> too and be arch-agnostic. The registration code in it is more than the
->> tiny edac_apei_irq_handler().
->> 
->> So why is this thing a separate driver? It is called EDAC_APEI although
->> it is ARM-specific.
->> 
->> Why can't it be part of ghes_edac.c with ARM-specific section, if
->> absolutely needed?
->> 
->> If this is going to implement the ACPI spec, then I don't see anything
->> vendor-, or arch-specific getting in the way except maybe that APMC0D51
->> id.
->> 
->> Hmmm?
-> 
-> I think you've hit the nail on the head. As far as I can tell, this is
-> *not* conformant to ACPI APEI (which should be platform and architecture
-> agnostic) and is actually an implementation-specific interface. However,
-> I'm happy to be proven wrong if somebody can point me at a document
-> describing ACPI APEI in a way that matches this implementation.
-> 
->>> +static const struct acpi_device_id edac_apei_match[] = {
->>> +    { "APMC0D51", 0},
->>> +    {},
-> 
-> This, in particular, gives the game away methinks.
-> 
-> Will
+Michal
