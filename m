@@ -1,56 +1,39 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 20 Nov 2015 00:59:13 +0800
-Subject: [PATCH RESEND] arm64: berlin: add the pinctrl dependency for
- Marvell Berlin SoCs
-In-Reply-To: <20151117134154.GJ6556@e104818-lin.cambridge.arm.com>
-References: <1447670170-7597-1-git-send-email-jszhang@marvell.com>
- <20151117134154.GJ6556@e104818-lin.cambridge.arm.com>
-Message-ID: <20151120005913.3f57a5e8@xhacker>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 19 Nov 2015 15:03:42 -0200
+Subject: [PATCH 1/2] ARM: dts: imx6: Add support for Toradex Apalis SoM
+In-Reply-To: <2750586.NCJNTpnM3N@jclayton-pc>
+References: <1447935900-13635-1-git-send-email-ynezz@true.cz>
+ <1447935900-13635-2-git-send-email-ynezz@true.cz>
+ <1447942325.3144.86.camel@pengutronix.de>
+ <2750586.NCJNTpnM3N@jclayton-pc>
+Message-ID: <CAOMZO5DnXDJ76u9eqXWM3aSXW7XaWn4M_i2B=e24uz5NiWExHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015 13:41:54 +0000
-Catalin Marinas wrote:
+On Thu, Nov 19, 2015 at 2:59 PM, Joshua Clayton
+<stillcompiling@gmail.com> wrote:
+> On Thursday, November 19, 2015 03:12:05 PM Lucas Stach wrote:
+>> > +
+>> > +/* PAD Ctrl values for common settings */
+>> > +/* (PAD_CTL_HYS | PAD_CTL_PUS_100K_UP | PAD_CTL_PUE | PAD_CTL_PKE | PAD_CTL_SPEED_MED | PAD_CTL_DSE_40ohm) */
+>> > +#define PAD_CTRL_HYS_PU 0x1b0b0
+>> > +
+>> > +/* (PAD_CTL_HYS | PAD_CTL_PUE | PAD_CTL_PKE | PAD_CTL_SPEED_MED | PAD_CTL_DSE_40ohm) */
+>> > +#define PAD_CTRL_HYS_PD 0x130b0
+>> > +
+>> > +/* (PAD_CTL_PUS_22K_UP | PAD_CTL_PUE | PAD_CTL_PKE | PAD_CTL_SPEED_LOW | PAD_CTL_DSE_80ohm) */
+>> > +#define PAD_CTRL_PU_22k 0x0f058
+>> > +
+>> I don't particularly like those defines. Maybe just replace by the hex
+>> values?
+> Hold on. Lets not throw the baby out with the bathwater.
+> These macros (or something similar) look much nicer than hex values that I
+> have to look up in the imx6 user manual over and over.
+>
+> Seems like a genuine improvement to me,
+> except that they should not be in the dts itself.
+> Rather in arch/arm/boot/dts/imx6<num>-pinfunc.h, or another include file
+>
+> What do you think?
 
-> On Mon, Nov 16, 2015 at 06:36:10PM +0800, Jisheng Zhang wrote:
-> > This is to add the pinctrl dependency for Marvell Berlin SoCs.
-> > 
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> > ---
-> >  this small patch is missed:
-> >  http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/378638.html
-> >  arch/arm64/Kconfig.platforms | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> > index 4043c35..905d308 100644
-> > --- a/arch/arm64/Kconfig.platforms
-> > +++ b/arch/arm64/Kconfig.platforms
-> > @@ -9,6 +9,7 @@ config ARCH_BERLIN
-> >  	bool "Marvell Berlin SoC Family"
-> >  	select ARCH_REQUIRE_GPIOLIB
-> >  	select DW_APB_ICTL
-> > +	select PINCTRL
-> >  	help
-> >  	  This enables support for Marvell Berlin SoC Family  
-> 
-> Cc'ing arm-soc.
-> 
-
-Dear Sebastian,
-
-when adding clk support for BG4CT, I found
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/378634.html
-and
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/378635.html
-
-are also missed in v4.4-rc1.
-
-I know you are very busy but I dunno what's wrong. Can you please check?
-
-Thanks in advance,
-Jisheng
+Seems like a good idea to me.
