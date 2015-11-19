@@ -1,31 +1,19 @@
-From: lho@apm.com (Loc Ho)
-Date: Thu, 19 Nov 2015 12:20:30 -0700
-Subject: [PATCH] clk: xgene: Fix divider with non-zero shift value
-Message-ID: <1447960830-8675-1-git-send-email-lho@apm.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 19 Nov 2015 11:22:07 -0800
+Subject: [PATCH 03/27] mtd: nand: update examples in the documentation to
+ use mtd_to_nand()
+In-Reply-To: <1447681080-31232-4-git-send-email-boris.brezillon@free-electrons.com>
+References: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1447681080-31232-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20151119192207.GG64635@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The X-Gene clock driver missed the divider shift operation when
-set the divider value.
+On Mon, Nov 16, 2015 at 02:37:36PM +0100, Boris Brezillon wrote:
+> mtd_to_nand() has been introduced to hide accesses to mtd->priv.
+> All NAND controller drivers should use it instead of directly accessing
+> the ->priv field.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Signed-off-by: Loc Ho <lho@apm.com>
----
- drivers/clk/clk-xgene.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/clk/clk-xgene.c b/drivers/clk/clk-xgene.c
-index 27c0da2..10224b0 100644
---- a/drivers/clk/clk-xgene.c
-+++ b/drivers/clk/clk-xgene.c
-@@ -351,7 +351,8 @@ static int xgene_clk_set_rate(struct clk_hw *hw, unsigned long rate,
- 		/* Set new divider */
- 		data = xgene_clk_read(pclk->param.divider_reg +
- 				pclk->param.reg_divider_offset);
--		data &= ~((1 << pclk->param.reg_divider_width) - 1);
-+		data &= ~((1 << pclk->param.reg_divider_width) - 1)
-+				<< pclk->param.reg_divider_shift;
- 		data |= divider;
- 		xgene_clk_write(data, pclk->param.divider_reg +
- 					pclk->param.reg_divider_offset);
--- 
-1.7.1
+Pushed to l2-mtd.git
