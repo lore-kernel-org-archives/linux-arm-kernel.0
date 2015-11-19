@@ -1,30 +1,27 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Thu, 19 Nov 2015 12:31:02 +0530
-Subject: [PATCH 2/2] arm: dts: am4372: add spi alias for qspi
-In-Reply-To: <1447916462-1007-1-git-send-email-mugunthanvnm@ti.com>
-References: <1447916462-1007-1-git-send-email-mugunthanvnm@ti.com>
-Message-ID: <1447916462-1007-3-git-send-email-mugunthanvnm@ti.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Thu, 19 Nov 2015 15:08:29 +0800
+Subject: [PATCH v3 03/12] drm/rockchip: return a true clock rate to
+ adjusted_mode
+In-Reply-To: <1447904131-29328-4-git-send-email-zyw@rock-chips.com>
+References: <1447904131-29328-1-git-send-email-zyw@rock-chips.com>
+ <1447904131-29328-4-git-send-email-zyw@rock-chips.com>
+Message-ID: <564D756D.9050000@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set the alias for qspi to spi0
+On 2015?11?19? 11:35, Chris Zhong wrote:
+> +
+> +	/*
+> +	 * Sometimes the clock driver can not set a accurate clock_rate for vop,
+> +	 * get the true rate of vop_dclk and set it back to adjusted_mode.
+> +	 */
+> +	adjusted_mode->clock = clk_get_rate(vop->dclk) / 1000;
+>   out:
+>   	ret_clk = clk_enable(vop->dclk);
+>   	if (ret_clk < 0) {
+Hi Chris
+      How about use clk_round_rate to check the clock rate first?
+      I think we can check it on vop_crtc_mode_fixup.
 
-Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
----
- arch/arm/boot/dts/am4372.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index d83ff9c..bb03b80 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -30,6 +30,7 @@
- 		serial5 = &uart5;
- 		ethernet0 = &cpsw_emac0;
- 		ethernet1 = &cpsw_emac1;
-+		spi0 = &qspi;
- 	};
- 
- 	cpus {
--- 
-2.6.2.280.g74301d6
+Thanks.
+- ?ark Yao
