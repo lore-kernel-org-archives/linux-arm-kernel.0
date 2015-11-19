@@ -1,67 +1,74 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Thu, 19 Nov 2015 10:44:02 +0800
-Subject: [PATCH v4 3/3] ARM: dts: rockchip: Add the OTP gpio pinctrl
-In-Reply-To: <2741625.HAsG2fX6yg@diego>
-References: <1445599528-18825-1-git-send-email-wxt@rock-chips.com>
- <1445599528-18825-4-git-send-email-wxt@rock-chips.com>
- <CAD=FV=WBCD8WsXV2mAGUD6y=BFScbFc9U3XA7jAB-rqOLp4qGA@mail.gmail.com>
- <2741625.HAsG2fX6yg@diego>
-Message-ID: <564D3772.9050402@gmail.com>
+From: andrew-ct.chen@mediatek.com (andrew-ct chen)
+Date: Thu, 19 Nov 2015 10:47:10 +0800
+Subject: [RESEND RFC/PATCH 1/8] dt-bindings: Add a binding for Mediatek
+ Video Processor Unit
+In-Reply-To: <20151117141320.GJ12586@leverpostej>
+References: <1447764885-23100-1-git-send-email-tiffany.lin@mediatek.com>
+ <1447764885-23100-2-git-send-email-tiffany.lin@mediatek.com>
+ <20151117141320.GJ12586@leverpostej>
+Message-ID: <1447901230.6731.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Tue, 2015-11-17 at 14:13 +0000, Mark Rutland wrote:
+> On Tue, Nov 17, 2015 at 08:54:38PM +0800, Tiffany Lin wrote:
+> > From: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+> > 
+> > Add a DT binding documentation of Video Processor Unit for the
+> > MT8173 SoC from Mediatek.
+> > 
+> > Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/media/mediatek-vpu.txt     |   27 ++++++++++++++++++++
+> >  1 file changed, 27 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/media/mediatek-vpu.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/media/mediatek-vpu.txt b/Documentation/devicetree/bindings/media/mediatek-vpu.txt
+> > new file mode 100644
+> > index 0000000..99a4e5e
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/media/mediatek-vpu.txt
+> > @@ -0,0 +1,27 @@
+> > +* Mediatek Video Processor Unit
+> > +
+> > +Video Processor Unit is a HW video controller. It controls HW Codec including
+> > +H.264/VP8/VP9 Decode, H.264/VP8 Encode and Image Processor (scale/rotate/color convert).
+> > +
+> > +Required properties:
+> > +  - compatible: "mediatek,mt8173-vpu"
+> > +  - reg: Must contain an entry for each entry in reg-names.
+> > +  - reg-names: Must include the following entries:
+> > +    "sram": SRAM base
+> > +    "cfg_reg": Main configuration registers base
+> > +  - interrupts: interrupt number to the cpu.
+> > +  - clocks : clock name from clock manager
+> > +  - clock-names: the clocks of the VPU H/W
+> 
+> You need to explicitly define the set of clock-names you expect here.
+> 
+> Mark.
 
-? 2015?10?25? 15:55, Heiko St?bner ??:
-> Am Freitag, 23. Oktober 2015, 08:25:08 schrieb Doug Anderson:
->> On Fri, Oct 23, 2015 at 4:25 AM, Caesar Wang <wxt@rock-chips.com> wrote:
->>> Add the "init" anf "sleep" pinctrl as the OTP gpio state.
->>> We need the OTP pin is gpio state before resetting the TSADC controller,
->>> since the tshut polarity will generate a high signal.
->>>
->>> "init" pinctrl property is defined by Doug's Patch[0].
->>>
->>> Patch[0]:
->>> https://patchwork.kernel.org/patch/7454311/
->>>
->>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->>> Reviewed-by: Douglas Anderson <dianders@chromium.org>
->>> ---
->>>
->>> Changes in v4: None
->>>
->>> Changes in v3:
->>>    - Add the "sleep" pinctrl as the gpio state in PATCH[3/3]
->>>
->>> Changes in v2:
->>>    - Add some commits for more obvious in PATCH[2/2]
->>>
->>> Changes in v1:
->>>    - As the Doug comments, drop the thermal driver patchs since
->>>    
->>>      we can with pinctrl changing to work.
->>>    
->>>    - As the Doug's patch to add the 'init' property.
->>>   
->>>   arch/arm/boot/dts/rk3288.dtsi | 10 ++++++++--
->>>   1 file changed, 8 insertions(+), 2 deletions(-)
->> I realized that the subject of this patch should probably contain the
->> word rk3288, but I presume Heiko would rather add that himself than
->> for you to spin this again.  ;)
-> yep :-) ... no need to respin for such an easy change
+Sorry, only one clock to enable VPU hardware.
+We will modify to
+- clocks : must contain one entry for each clock-names.
+- clock-names : must be "main", It is the main clock of VPU.
 
-That's seem this patch didn't merge into your v4.5-armsoc/soc branch.:-)
+Thanks..
 
-I guess this patch should merge into  kernel-4.4 since the Patch[1/3] / 
-[2/3] have been merged into 4.4-rc1.:-P
-
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
-
-
--- 
-Thanks,
-Caesar
+> 
+> > +  - iommus : phandle and IOMMU spcifier for the IOMMU that serves the VPU.
+> > +
+> > +Example:
+> > +	vpu: vpu at 10020000 {
+> > +		compatible = "mediatek,mt8173-vpu";
+> > +		reg = <0 0x10020000 0 0x30000>,
+> > +		      <0 0x10050000 0 0x100>;
+> > +		reg-names = "sram", "cfg_reg";
+> > +		interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
+> > +		clocks = <&topckgen TOP_SCP_SEL>;
+> > +		clock-names = "main";
+> > +		iommus = <&iommu M4U_PORT_VENC_RCPU>;
+> > +	};
+> > -- 
+> > 1.7.9.5
+> > 
