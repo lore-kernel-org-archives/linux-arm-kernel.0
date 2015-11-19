@@ -1,28 +1,61 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 19 Nov 2015 21:31:13 +0100
-Subject: [PATCH v2 PART-RESEND 0/2] berlin sdhci clock clean up
-In-Reply-To: <1447671395-8023-1-git-send-email-jszhang@marvell.com>
-References: <1447671395-8023-1-git-send-email-jszhang@marvell.com>
-Message-ID: <564E3191.8060109@gmail.com>
+From: salil.mehta@huawei.com (Salil Mehta)
+Date: Fri, 20 Nov 2015 04:58:26 +0800
+Subject: [PATCH V3 net-next 5/5] net:hns: Add the init code to disable Hip06
+ "Hardware VLAN assist"
+In-Reply-To: <1447966706-16219-1-git-send-email-salil.mehta@huawei.com>
+References: <1447966706-16219-1-git-send-email-salil.mehta@huawei.com>
+Message-ID: <1447966706-16219-6-git-send-email-salil.mehta@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.11.2015 11:56, Jisheng Zhang wrote:
-> Add or fix the optional clock property, then remove the CLK_IGNORE_UNUSED
-> flag for sdio clk(s).
-> 
-> This is a partialy resend of 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/379457.html
-> 
-> patch3, patch4 has been merged.
+This patch adds the initializzation code to disable the hardware
+vlan support for VLAN Tag stripping by default for now.
 
-Great! Really!
+Proper support of "hardware VLAN assitance" feature would
+soon come in the next coming patches.
 
-As they have been taken without my Acked-by, ignoring my request to
-_not_ remove the CLK_IGNORE_UNUSED flags _before_ these two, the
-remaining patches now become fixes.
+Signed-off-by: Salil Mehta <salil.mehta@huawei.com>
+---
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c |    7 +++++++
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h |    1 +
+ 2 files changed, 8 insertions(+)
 
-Please resend the patches with a proper description what and why they
-are fixes now.
-
-Sebastian
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
+index b6bf292..544f323 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
+@@ -176,6 +176,11 @@ static void hns_ppe_cnt_clr_ce(struct hns_ppe_cb *ppe_cb)
+ 			 PPE_CNT_CLR_CE_B, 1);
+ }
+ 
++static void hns_ppe_set_vlan_strip(struct hns_ppe_cb *ppe_cb, int en)
++{
++	dsaf_write_dev(ppe_cb, PPEV2_VLAN_STRIP_EN_REG, en);
++}
++
+ /**
+  * hns_ppe_checksum_hw - set ppe checksum caculate
+  * @ppe_device: ppe device
+@@ -345,6 +350,8 @@ static void hns_ppe_init_hw(struct hns_ppe_cb *ppe_cb)
+ 	hns_ppe_cnt_clr_ce(ppe_cb);
+ 
+ 	if (!AE_IS_VER1(dsaf_dev->dsaf_ver)) {
++		hns_ppe_set_vlan_strip(ppe_cb, 0);
++
+ 		hns_ppe_set_rss_key(ppe_cb, rss_key);
+ 
+ 		for (i = 0; i < HNS_PPEV2_RSS_IND_TBL_SIZE; i++)
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
+index 98c163e..6c18ca9 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
+@@ -318,6 +318,7 @@
+ #define PPE_CFG_PARSE_TAG_REG			0x94
+ #define PPE_CFG_PRO_CHECK_EN_REG		0x98
+ #define PPEV2_CFG_TSO_EN_REG                    0xA0
++#define PPEV2_VLAN_STRIP_EN_REG                 0xAC
+ #define PPE_INTEN_REG				0x100
+ #define PPE_RINT_REG				0x104
+ #define PPE_INTSTS_REG				0x108
+-- 
+1.7.9.5
