@@ -1,52 +1,80 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 Nov 2015 14:18:16 +0000
-Subject: [PATCH RFC v2] apei: Add ACPI APEI event notification support
-In-Reply-To: <20151022095716.GC3671@pd.tnic>
-References: <1445458480-6493-1-git-send-email-lho@apm.com>
- <20151022095716.GC3671@pd.tnic>
-Message-ID: <20151119141816.GH22786@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 19 Nov 2015 14:19:47 +0000
+Subject: [PATCH] ARM: tegra: Ensure entire dcache is flushed on entering LP0/1
+Message-ID: <1447942787-31137-1-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Thanks Boris for CC'ing me]
+Tegra support several low-power (LPx) states, which are:
+- LP0: CPU + Core voltage off and DRAM in self-refresh
+- LP1: CPU voltage off and DRAM in self-refresh
+- LP2: CPU voltage off
 
-Hi all,
+When entering any of the above states the tegra_disable_clean_inv_dcache()
+function is called to flush the dcache. The function
+tegra_disable_clean_inv_dcache() will either flush the entire data cache or
+up to the Level of Unification Inner Shareable (LoUIS) depending on the
+value in r0. When tegra_disable_clean_inv_dcache() is called by
+tegra20_sleep_core_finish() or tegra30_sleep_core_finish(), to enter LP0
+and LP1 power state, the r0 register contains a physical memory address
+which will not be equal to TEGRA_FLUSH_CACHE_ALL (1) and so the data cache
+will be only flushed to the LoUIS. However, when
+tegra_disable_clean_inv_dcache() called by tegra_sleep_cpu_finish() to
+enter to LP2 power state, r0 is set to TEGRA_FLUSH_CACHE_ALL to flush the
+entire dcache.
 
-Sorry for the delay on this, I had to do some research and this isn't
-really my area of expertise.
+Please note that tegra20_sleep_core_finish(), tegra30_sleep_core_finish()
+and tegra_sleep_cpu_finish() are called by the boot CPU once all other CPUs
+have been disabled and so it seems appropriate to flush the entire cache at
+this stage.
 
-On Thu, Oct 22, 2015 at 11:57:16AM +0200, Borislav Petkov wrote:
-> I'm top-posting here because I'm adding some more ARM people to CC and
-> would like for them to see the whole thing.
-> 
-> Ok, so what's the strategy here?
-> 
-> I know Tomasz did some untangling of GHES stuff to make it load on ARM
-> too and be arch-agnostic. The registration code in it is more than the
-> tiny edac_apei_irq_handler().
-> 
-> So why is this thing a separate driver? It is called EDAC_APEI although
-> it is ARM-specific.
-> 
-> Why can't it be part of ghes_edac.c with ARM-specific section, if
-> absolutely needed?
-> 
-> If this is going to implement the ACPI spec, then I don't see anything
-> vendor-, or arch-specific getting in the way except maybe that APMC0D51
-> id.
-> 
-> Hmmm?
+Therefore, ensure that r0 is set to TEGRA_FLUSH_CACHE_ALL when calling
+tegra_disable_clean_inv_dcache() from tegra20_sleep_core_finish() and
+tegra30_sleep_core_finish().
 
-I think you've hit the nail on the head. As far as I can tell, this is
-*not* conformant to ACPI APEI (which should be platform and architecture
-agnostic) and is actually an implementation-specific interface. However,
-I'm happy to be proven wrong if somebody can point me at a document
-describing ACPI APEI in a way that matches this implementation.
+Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+---
 
-> > +static const struct acpi_device_id edac_apei_match[] = {
-> > +	{ "APMC0D51", 0},
-> > +	{},
+Please note that I have not encountered any problems without this change
+so far, but I noticed this from reviewing the suspend sequence. I have
+tested this on tegra20, tegra30, tegra114 and tegra124 and verified that
+suspend/resume to LP1 is working fine.
 
-This, in particular, gives the game away methinks.
+ arch/arm/mach-tegra/sleep-tegra20.S | 3 +++
+ arch/arm/mach-tegra/sleep-tegra30.S | 3 +++
+ 2 files changed, 6 insertions(+)
 
-Will
+diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
+index e6b684e14322..f5d19667484e 100644
+--- a/arch/arm/mach-tegra/sleep-tegra20.S
++++ b/arch/arm/mach-tegra/sleep-tegra20.S
+@@ -231,8 +231,11 @@ ENDPROC(tegra20_cpu_is_resettable_soon)
+  * tegra20_tear_down_core in IRAM
+  */
+ ENTRY(tegra20_sleep_core_finish)
++	mov     r4, r0
+ 	/* Flush, disable the L1 data cache and exit SMP */
++	mov     r0, #TEGRA_FLUSH_CACHE_ALL
+ 	bl	tegra_disable_clean_inv_dcache
++	mov     r0, r4
+ 
+ 	mov32	r3, tegra_shut_off_mmu
+ 	add	r3, r3, r0
+diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
+index 9a2f0b051e10..16e5ff03383c 100644
+--- a/arch/arm/mach-tegra/sleep-tegra30.S
++++ b/arch/arm/mach-tegra/sleep-tegra30.S
+@@ -242,8 +242,11 @@ ENDPROC(tegra30_cpu_shutdown)
+  * tegra30_tear_down_core in IRAM
+  */
+ ENTRY(tegra30_sleep_core_finish)
++	mov	r4, r0
+ 	/* Flush, disable the L1 data cache and exit SMP */
++	mov	r0, #TEGRA_FLUSH_CACHE_ALL
+ 	bl	tegra_disable_clean_inv_dcache
++	mov	r0, r4
+ 
+ 	/*
+ 	 * Preload all the address literals that are needed for the
+-- 
+2.1.4
