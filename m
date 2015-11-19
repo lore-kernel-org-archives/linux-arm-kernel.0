@@ -1,61 +1,37 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 18 Nov 2015 22:41:45 -0800
-Subject: [PATCH] ARM: dts: vfxxx: Include support for dspi[23]
- functionality.
-In-Reply-To: <1447905280-5172-2-git-send-email-cory.tusar@pid1solutions.com>
-References: <1447905280-5172-2-git-send-email-cory.tusar@pid1solutions.com>
-Message-ID: <eefcbf4a3e7d3477546b3b8a97eb9c22@agner.ch>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 19 Nov 2015 07:56:44 +0100
+Subject: [PATCH] ARM: dts: rockchip: temporarily remove emmc hs200 speed from
+ rk3288 minnie
+Message-ID: <1816392.5rIXY9jxRH@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Verified too, looks good to me.
+The eMMC of the minnie Chromebook doesn't like our current method of
+tuning and while there are solutions on the horizon, they still need
+investigating. Other Chromebooks tune just fine with the emmc, so
+simply disable tuning on Minnie for now.
 
-Acked-by: Stefan Agner <stefan@agner.ch>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+Already in my fixes branch, but posted for completenes sake
 
---
-Stefan
+ arch/arm/boot/dts/rk3288-veyron-minnie.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-On 2015-11-18 19:54, Cory Tusar wrote:
-> Extend the existing Vybrid DSPI devicetree implementation to also
-> describe the dspi2 and dspi3 functional blocks.
-> 
-> Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
-> ---
->  arch/arm/boot/dts/vfxxx.dtsi | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-> index 1cca43a..858e60a 100644
-> --- a/arch/arm/boot/dts/vfxxx.dtsi
-> +++ b/arch/arm/boot/dts/vfxxx.dtsi
-> @@ -453,6 +453,30 @@
->  				status = "disabled";
->  			};
->  
-> +			dspi2: dspi2 at 400ac000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "fsl,vf610-dspi";
-> +				reg = <0x400ac000 0x1000>;
-> +				interrupts = <69 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks VF610_CLK_DSPI2>;
-> +				clock-names = "dspi";
-> +				spi-num-chipselects = <2>;
-> +				status = "disabled";
-> +			};
-> +
-> +			dspi3: dspi3 at 400ad000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "fsl,vf610-dspi";
-> +				reg = <0x400ad000 0x1000>;
-> +				interrupts = <70 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks VF610_CLK_DSPI3>;
-> +				clock-names = "dspi";
-> +				spi-num-chipselects = <2>;
-> +				status = "disabled";
-> +			};
-> +
->  			adc1: adc at 400bb000 {
->  				compatible = "fsl,vf610-adc";
->  				reg = <0x400bb000 0x1000>;
+diff --git a/arch/arm/boot/dts/rk3288-veyron-minnie.dts b/arch/arm/boot/dts/rk3288-veyron-minnie.dts
+index 8fd8ef2..85f0373 100644
+--- a/arch/arm/boot/dts/rk3288-veyron-minnie.dts
++++ b/arch/arm/boot/dts/rk3288-veyron-minnie.dts
+@@ -86,6 +86,10 @@
+ 	};
+ };
+ 
++&emmc {
++	/delete-property/mmc-hs200-1_8v;
++};
++
+ &gpio_keys {
+ 	pinctrl-0 = <&pwr_key_l &ap_lid_int_l &volum_down_l &volum_up_l>;
+ 
+-- 
+2.6.2
