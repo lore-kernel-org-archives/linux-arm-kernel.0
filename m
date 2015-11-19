@@ -1,73 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Nov 2015 13:59:34 +0100
-Subject: [PATCH] [media] davinci: add i2c Kconfig dependencies
-Message-ID: <4284996.N31E5Y01de@wuerfel>
+From: schwab@suse.de (Andreas Schwab)
+Date: Thu, 19 Nov 2015 14:21:16 +0100
+Subject: [PATCH v6 14/19] arm64:ilp32: add sys_ilp32.c and a separate
+ table (in entry.S) to use it
+In-Reply-To: <3754277.KmO9Nk3XLD@wuerfel> (Arnd Bergmann's message of "Tue, 17
+ Nov 2015 22:57:52 +0100")
+References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
+ <1447795019-30176-15-git-send-email-ynorov@caviumnetworks.com>
+ <3754277.KmO9Nk3XLD@wuerfel>
+Message-ID: <mvm37w2p1kj.fsf@hawking.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the davinci media drivers are using the i2c framework, and
-fail to build if that is ever disabled, e.g.:
+Arnd Bergmann <arnd@arndb.de> writes:
 
-media/platform/davinci/vpif_display.c: In function 'vpif_probe':
-media/platform/davinci/vpif_display.c:1298:14: error: implicit declaration of function 'i2c_get_adapter' [-Werror=implicit-function-declaration]
+> On Wednesday 18 November 2015 00:16:54 Yury Norov wrote:
+>> +#define sys_lseek                      sys_llseek
+>
+> This seems pointless, as there is no sys_lseek
 
-This adds explicit Kconfig dependencies so we don't see the
-driver options if I2C is turned off.
+I think it should be the other way round.  Why would you want to use
+llseek if you can pass loff_t in a single register?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-This is a very rare randconfig error, normally I2C is enabled for some reason
-already.
+Andreas.
 
-diff --git a/drivers/media/platform/davinci/Kconfig b/drivers/media/platform/davinci/Kconfig
-index 469e9d28cec0..554e710de487 100644
---- a/drivers/media/platform/davinci/Kconfig
-+++ b/drivers/media/platform/davinci/Kconfig
-@@ -3,6 +3,7 @@ config VIDEO_DAVINCI_VPIF_DISPLAY
- 	depends on VIDEO_V4L2
- 	depends on ARCH_DAVINCI || COMPILE_TEST
- 	depends on HAS_DMA
-+	depends on I2C
- 	select VIDEOBUF2_DMA_CONTIG
- 	select VIDEO_ADV7343 if MEDIA_SUBDRV_AUTOSELECT
- 	select VIDEO_THS7303 if MEDIA_SUBDRV_AUTOSELECT
-@@ -19,6 +20,7 @@ config VIDEO_DAVINCI_VPIF_CAPTURE
- 	depends on VIDEO_V4L2
- 	depends on ARCH_DAVINCI || COMPILE_TEST
- 	depends on HAS_DMA
-+	depends on I2C
- 	select VIDEOBUF2_DMA_CONTIG
- 	help
- 	  Enables Davinci VPIF module used for capture devices.
-@@ -33,6 +35,7 @@ config VIDEO_DM6446_CCDC
- 	depends on VIDEO_V4L2
- 	depends on ARCH_DAVINCI || COMPILE_TEST
- 	depends on HAS_DMA
-+	depends on I2C
- 	select VIDEOBUF_DMA_CONTIG
- 	help
- 	   Enables DaVinci CCD hw module. DaVinci CCDC hw interfaces
-@@ -49,6 +52,7 @@ config VIDEO_DM355_CCDC
- 	depends on VIDEO_V4L2
- 	depends on ARCH_DAVINCI || COMPILE_TEST
- 	depends on HAS_DMA
-+	depends on I2C
- 	select VIDEOBUF_DMA_CONTIG
- 	help
- 	   Enables DM355 CCD hw module. DM355 CCDC hw interfaces
-@@ -64,6 +68,7 @@ config VIDEO_DM365_ISIF
- 	tristate "TI DM365 ISIF video capture driver"
- 	depends on VIDEO_V4L2 && ARCH_DAVINCI
- 	depends on HAS_DMA
-+	depends on I2C
- 	select VIDEOBUF_DMA_CONTIG
- 	help
- 	   Enables ISIF hw module. This is the hardware module for
-@@ -77,6 +82,7 @@ config VIDEO_DAVINCI_VPBE_DISPLAY
- 	tristate "TI DaVinci VPBE V4L2-Display driver"
- 	depends on VIDEO_V4L2 && ARCH_DAVINCI
- 	depends on HAS_DMA
-+	depends on I2C
- 	select VIDEOBUF2_DMA_CONTIG
- 	help
- 	    Enables Davinci VPBE module used for display devices.
+-- 
+Andreas Schwab, SUSE Labs, schwab at suse.de
+GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+"And now for something completely different."
