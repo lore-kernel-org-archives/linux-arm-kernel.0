@@ -1,34 +1,150 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Nov 2015 12:25:45 +0100
-Subject: [PATCH] include: asm-generic: page.h: Remove useless
- get_user_page and free_user_page
-In-Reply-To: <COL130-W7B5F0BB94C76AF6B12EA7B91C0@phx.gbl>
-References: <COL130-W7B5F0BB94C76AF6B12EA7B91C0@phx.gbl>
-Message-ID: <5663971.11WtULN11Y@wuerfel>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 19 Nov 2015 12:29:47 +0100
+Subject: [PATCH v4] mmc: sdhci at91: add PM support
+In-Reply-To: <1447265508-8583-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1447265508-8583-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <CAPDyKFoFhQg1sFRbPgtCGEc0dPeyVSHVSZhWztSnBAxpeSn7uQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 November 2015 03:40:25 Chen Gang wrote:
-> diff --git a/include/asm-generic/page.h b/include/asm-generic/page.h
-> index 37d1fe2..67cfb7d 100644
-> --- a/include/asm-generic/page.h
-> +++ b/include/asm-generic/page.h
-> @@ -24,9 +24,6 @@
->  
->  #ifndef __ASSEMBLY__
->  
-> -#define get_user_page(vaddr)           __get_free_page(GFP_KERNEL)
-> -#define free_user_page(page, addr)     free_page(addr)
-> -
->  #define clear_page(page)       memset((page), 0, PAGE_SIZE)
->  #define copy_page(to,from)     memcpy((to), (from), PAGE_SIZE)
->  
-> 
+On 11 November 2015 at 19:11, Ludovic Desroches
+<ludovic.desroches@atmel.com> wrote:
+> Add runtime PM support and use runtime_force_suspend|resume() for system
+> PM.
+>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Looks good. I can take the asm-generic portion when you split it up, and
-I can also help you merge the remaining patches in case some of
-the arch maintainers fail to pick them up. I think all five of them
-are actively maintained though, so the patches should just go through
-the respective architecture trees.
+Thanks, applied for next!
 
-	Arnd
+Kind regards
+Uffe
+
+> ---
+>
+> Changes:
+> - from v3: add error handling of runtime PM
+> - from v2: cleanup thanks to Ulf feedback
+> - from v1: take a runtime PM centric approach
+>
+>  drivers/mmc/host/sdhci-of-at91.c | 72 ++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 70 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-of-at91.c b/drivers/mmc/host/sdhci-of-at91.c
+> index 06d0b50..81ab9db 100644
+> --- a/drivers/mmc/host/sdhci-of-at91.c
+> +++ b/drivers/mmc/host/sdhci-of-at91.c
+> @@ -21,6 +21,8 @@
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+> +#include <linux/pm.h>
+> +#include <linux/pm_runtime.h>
+>
+>  #include "sdhci-pltfm.h"
+>
+> @@ -51,6 +53,60 @@ static const struct of_device_id sdhci_at91_dt_match[] = {
+>         {}
+>  };
+>
+> +#ifdef CONFIG_PM
+> +static int sdhci_at91_runtime_suspend(struct device *dev)
+> +{
+> +       struct sdhci_host *host = dev_get_drvdata(dev);
+> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct sdhci_at91_priv *priv = pltfm_host->priv;
+> +       int ret;
+> +
+> +       ret = sdhci_runtime_suspend_host(host);
+> +
+> +       clk_disable_unprepare(priv->gck);
+> +       clk_disable_unprepare(priv->hclock);
+> +       clk_disable_unprepare(priv->mainck);
+> +
+> +       return ret;
+> +}
+> +
+> +static int sdhci_at91_runtime_resume(struct device *dev)
+> +{
+> +       struct sdhci_host *host = dev_get_drvdata(dev);
+> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct sdhci_at91_priv *priv = pltfm_host->priv;
+> +       int ret;
+> +
+> +       ret = clk_prepare_enable(priv->mainck);
+> +       if (ret) {
+> +               dev_err(dev, "can't enable mainck\n");
+> +               return ret;
+> +       }
+> +
+> +       ret = clk_prepare_enable(priv->hclock);
+> +       if (ret) {
+> +               dev_err(dev, "can't enable hclock\n");
+> +               return ret;
+> +       }
+> +
+> +       ret = clk_prepare_enable(priv->gck);
+> +       if (ret) {
+> +               dev_err(dev, "can't enable gck\n");
+> +               return ret;
+> +       }
+> +
+> +       return sdhci_runtime_resume_host(host);
+> +}
+> +#endif /* CONFIG_PM */
+> +
+> +static const struct dev_pm_ops sdhci_at91_dev_pm_ops = {
+> +       SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
+> +                               pm_runtime_force_resume)
+> +       SET_RUNTIME_PM_OPS(sdhci_at91_runtime_suspend,
+> +                          sdhci_at91_runtime_resume,
+> +                          NULL)
+> +};
+> +
+>  static int sdhci_at91_probe(struct platform_device *pdev)
+>  {
+>         const struct of_device_id       *match;
+> @@ -144,12 +200,20 @@ static int sdhci_at91_probe(struct platform_device *pdev)
+>
+>         sdhci_get_of_property(pdev);
+>
+> +       pm_runtime_set_active(&pdev->dev);
+> +       pm_runtime_enable(&pdev->dev);
+> +       pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
+> +       pm_runtime_use_autosuspend(&pdev->dev);
+> +
+>         ret = sdhci_add_host(host);
+>         if (ret)
+> -               goto clocks_disable_unprepare;
+> +               goto pm_runtime_disable;
+>
+>         return 0;
+>
+> +pm_runtime_disable:
+> +       pm_runtime_disable(&pdev->dev);
+> +       pm_runtime_set_suspended(&pdev->dev);
+>  clocks_disable_unprepare:
+>         clk_disable_unprepare(priv->gck);
+>         clk_disable_unprepare(priv->mainck);
+> @@ -165,6 +229,10 @@ static int sdhci_at91_remove(struct platform_device *pdev)
+>         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>         struct sdhci_at91_priv  *priv = pltfm_host->priv;
+>
+> +       pm_runtime_get_sync(&pdev->dev);
+> +       pm_runtime_disable(&pdev->dev);
+> +       pm_runtime_put_noidle(&pdev->dev);
+> +
+>         sdhci_pltfm_unregister(pdev);
+>
+>         clk_disable_unprepare(priv->gck);
+> @@ -178,7 +246,7 @@ static struct platform_driver sdhci_at91_driver = {
+>         .driver         = {
+>                 .name   = "sdhci-at91",
+>                 .of_match_table = sdhci_at91_dt_match,
+> -               .pm     = SDHCI_PLTFM_PMOPS,
+> +               .pm     = &sdhci_at91_dev_pm_ops,
+>         },
+>         .probe          = sdhci_at91_probe,
+>         .remove         = sdhci_at91_remove,
+> --
+> 2.5.0
+>
