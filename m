@@ -1,479 +1,85 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 19 Nov 2015 12:31:59 -0500 (EST)
-Subject: [PATCH v2] ARM: xip: Move XIP linking to a separate file
-In-Reply-To: <1447952889-18561-1-git-send-email-chris.brandt@renesas.com>
-References: <1447943047-22427-1-git-send-email-chris.brandt@renesas.com>
- <1447952889-18561-1-git-send-email-chris.brandt@renesas.com>
-Message-ID: <alpine.LFD.2.20.1511191231300.22569@knanqh.ubzr>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 19 Nov 2015 17:37:36 +0000
+Subject: [PATCH] arm64: efi: correctly align vaddr for runtime maps
+Message-ID: <1447954656-10435-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Nov 2015, Chris Brandt wrote:
+The kernel may use a page granularity of 4K, 16K, or 64K depending on
+configuration.
 
-> When building an XIP kernel, the linker script needs to be much different
-> than a conventional kernel's script. Over time, it's been difficult to
-> maintain both XIP and non-XIP layouts in one linker script. Therefore,
-> this patch separates the two procedures into two completely different
-> files.
-> 
-> The new linker script is essentially a straight copy of the current script
-> with all the non-CONFIG_XIP_KERNEL portions removed.
-> 
-> Additionally, all CONFIG_XIP_KERNEL portions have been removed from the
-> existing linker script...never to return again.
-> 
-> It should be noted that this does not fix any current XIP issues, but
-> rather is the first move in fixing them properly with subsequent patches.
-> 
-> Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+When mapping EFI runtime regions, we use memrange_efi_to_native to round
+the physical base address of a region down to a granule-aligned
+boundary, and round the size up to a granule-aligned boundary. However,
+we fail to similarly round the virtual base address down to a
+granule-aligned boundary.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+The virtual base address may be up to PAGE_SIZE - 4K above what it
+should be, and in create_pgd_mapping, we may erroneously map an
+additional page at the end of any region which does not have a
+granule-aligned virtual base address.
 
-> ---
-> v2:
-> * Removed modifications to main Makefile and instead just #include
-> ---
->  arch/arm/kernel/vmlinux-xip.lds.S |  322 +++++++++++++++++++++++++++++++++++++
->  arch/arm/kernel/vmlinux.lds.S     |   37 ++---
->  2 files changed, 332 insertions(+), 27 deletions(-)
->  create mode 100644 arch/arm/kernel/vmlinux-xip.lds.S
-> 
-> diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
-> new file mode 100644
-> index 0000000..1fd938d
-> --- /dev/null
-> +++ b/arch/arm/kernel/vmlinux-xip.lds.S
-> @@ -0,0 +1,322 @@
-> +/* ld script to make ARM Linux kernel
-> + * taken from the i386 version by Russell King
-> + * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>
-> + */
-> +
-> +#include <asm-generic/vmlinux.lds.h>
-> +#include <asm/cache.h>
-> +#include <asm/thread_info.h>
-> +#include <asm/memory.h>
-> +#include <asm/page.h>
-> +#ifdef CONFIG_ARM_KERNMEM_PERMS
-> +#include <asm/pgtable.h>
-> +#endif
-> +
-> +#define PROC_INFO							\
-> +	. = ALIGN(4);							\
-> +	VMLINUX_SYMBOL(__proc_info_begin) = .;				\
-> +	*(.proc.info.init)						\
-> +	VMLINUX_SYMBOL(__proc_info_end) = .;
-> +
-> +#define IDMAP_TEXT							\
-> +	ALIGN_FUNCTION();						\
-> +	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
-> +	*(.idmap.text)							\
-> +	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
-> +	. = ALIGN(PAGE_SIZE);						\
-> +	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;			\
-> +	*(.hyp.idmap.text)						\
-> +	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
-> +
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +#define ARM_CPU_DISCARD(x)
-> +#define ARM_CPU_KEEP(x)		x
-> +#else
-> +#define ARM_CPU_DISCARD(x)	x
-> +#define ARM_CPU_KEEP(x)
-> +#endif
-> +
-> +#if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
-> +	defined(CONFIG_GENERIC_BUG)
-> +#define ARM_EXIT_KEEP(x)	x
-> +#define ARM_EXIT_DISCARD(x)
-> +#else
-> +#define ARM_EXIT_KEEP(x)
-> +#define ARM_EXIT_DISCARD(x)	x
-> +#endif
-> +
-> +OUTPUT_ARCH(arm)
-> +ENTRY(stext)
-> +
-> +#ifndef __ARMEB__
-> +jiffies = jiffies_64;
-> +#else
-> +jiffies = jiffies_64 + 4;
-> +#endif
-> +
-> +SECTIONS
-> +{
-> +	/*
-> +	 * XXX: The linker does not define how output sections are
-> +	 * assigned to input sections when there are multiple statements
-> +	 * matching the same input section name.  There is no documented
-> +	 * order of matching.
-> +	 *
-> +	 * unwind exit sections must be discarded before the rest of the
-> +	 * unwind sections get included.
-> +	 */
-> +	/DISCARD/ : {
-> +		*(.ARM.exidx.exit.text)
-> +		*(.ARM.extab.exit.text)
-> +		ARM_CPU_DISCARD(*(.ARM.exidx.cpuexit.text))
-> +		ARM_CPU_DISCARD(*(.ARM.extab.cpuexit.text))
-> +		ARM_EXIT_DISCARD(EXIT_TEXT)
-> +		ARM_EXIT_DISCARD(EXIT_DATA)
-> +		EXIT_CALL
-> +#ifndef CONFIG_MMU
-> +		*(.text.fixup)
-> +		*(__ex_table)
-> +#endif
-> +#ifndef CONFIG_SMP_ON_UP
-> +		*(.alt.smp.init)
-> +#endif
-> +		*(.discard)
-> +		*(.discard.*)
-> +	}
-> +
-> +	. = XIP_VIRT_ADDR(CONFIG_XIP_PHYS_ADDR);
-> +
-> +	.head.text : {
-> +		_text = .;
-> +		HEAD_TEXT
-> +	}
-> +
-> +#ifdef CONFIG_ARM_KERNMEM_PERMS
-> +	. = ALIGN(1<<SECTION_SHIFT);
-> +#endif
-> +
-> +	.text : {			/* Real text segment		*/
-> +		_stext = .;		/* Text and read-only data	*/
-> +			IDMAP_TEXT
-> +			__exception_text_start = .;
-> +			*(.exception.text)
-> +			__exception_text_end = .;
-> +			IRQENTRY_TEXT
-> +			TEXT_TEXT
-> +			SCHED_TEXT
-> +			LOCK_TEXT
-> +			KPROBES_TEXT
-> +			*(.gnu.warning)
-> +			*(.glue_7)
-> +			*(.glue_7t)
-> +		. = ALIGN(4);
-> +		*(.got)			/* Global offset table		*/
-> +			ARM_CPU_KEEP(PROC_INFO)
-> +	}
-> +
-> +#ifdef CONFIG_DEBUG_RODATA
-> +	. = ALIGN(1<<SECTION_SHIFT);
-> +#endif
-> +	RO_DATA(PAGE_SIZE)
-> +
-> +	. = ALIGN(4);
-> +	__ex_table : AT(ADDR(__ex_table) - LOAD_OFFSET) {
-> +		__start___ex_table = .;
-> +#ifdef CONFIG_MMU
-> +		*(__ex_table)
-> +#endif
-> +		__stop___ex_table = .;
-> +	}
-> +
-> +#ifdef CONFIG_ARM_UNWIND
-> +	/*
-> +	 * Stack unwinding tables
-> +	 */
-> +	. = ALIGN(8);
-> +	.ARM.unwind_idx : {
-> +		__start_unwind_idx = .;
-> +		*(.ARM.exidx*)
-> +		__stop_unwind_idx = .;
-> +	}
-> +	.ARM.unwind_tab : {
-> +		__start_unwind_tab = .;
-> +		*(.ARM.extab*)
-> +		__stop_unwind_tab = .;
-> +	}
-> +#endif
-> +
-> +	NOTES
-> +
-> +	_etext = .;			/* End of text and rodata section */
-> +
-> +	/*
-> +	 * The vectors and stubs are relocatable code, and the
-> +	 * only thing that matters is their relative offsets
-> +	 */
-> +	__vectors_start = .;
-> +	.vectors 0 : AT(__vectors_start) {
-> +		*(.vectors)
-> +	}
-> +	. = __vectors_start + SIZEOF(.vectors);
-> +	__vectors_end = .;
-> +
-> +	__stubs_start = .;
-> +	.stubs 0x1000 : AT(__stubs_start) {
-> +		*(.stubs)
-> +	}
-> +	. = __stubs_start + SIZEOF(.stubs);
-> +	__stubs_end = .;
-> +
-> +	INIT_TEXT_SECTION(8)
-> +	.exit.text : {
-> +		ARM_EXIT_KEEP(EXIT_TEXT)
-> +	}
-> +	.init.proc.info : {
-> +		ARM_CPU_DISCARD(PROC_INFO)
-> +	}
-> +	.init.arch.info : {
-> +		__arch_info_begin = .;
-> +		*(.arch.info.init)
-> +		__arch_info_end = .;
-> +	}
-> +	.init.tagtable : {
-> +		__tagtable_begin = .;
-> +		*(.taglist.init)
-> +		__tagtable_end = .;
-> +	}
-> +#ifdef CONFIG_SMP_ON_UP
-> +	.init.smpalt : {
-> +		__smpalt_begin = .;
-> +		*(.alt.smp.init)
-> +		__smpalt_end = .;
-> +	}
-> +#endif
-> +	.init.pv_table : {
-> +		__pv_table_begin = .;
-> +		*(.pv_table)
-> +		__pv_table_end = .;
-> +	}
-> +	.init.data : {
-> +		INIT_SETUP(16)
-> +		INIT_CALLS
-> +		CON_INITCALL
-> +		SECURITY_INITCALL
-> +		INIT_RAM_FS
-> +	}
-> +
-> +#ifdef CONFIG_SMP
-> +	PERCPU_SECTION(L1_CACHE_BYTES)
-> +#endif
-> +
-> +	__data_loc = ALIGN(4);		/* location in binary */
-> +	. = PAGE_OFFSET + TEXT_OFFSET;
-> +
-> +	.data : AT(__data_loc) {
-> +		_data = .;		/* address in memory */
-> +		_sdata = .;
-> +
-> +		/*
-> +		 * first, the init task union, aligned
-> +		 * to an 8192 byte boundary.
-> +		 */
-> +		INIT_TASK_DATA(THREAD_SIZE)
-> +
-> +		. = ALIGN(PAGE_SIZE);
-> +		__init_begin = .;
-> +		INIT_DATA
-> +		ARM_EXIT_KEEP(EXIT_DATA)
-> +		. = ALIGN(PAGE_SIZE);
-> +		__init_end = .;
-> +
-> +		NOSAVE_DATA
-> +		CACHELINE_ALIGNED_DATA(L1_CACHE_BYTES)
-> +		READ_MOSTLY_DATA(L1_CACHE_BYTES)
-> +
-> +		/*
-> +		 * and the usual data section
-> +		 */
-> +		DATA_DATA
-> +		CONSTRUCTORS
-> +
-> +		_edata = .;
-> +	}
-> +	_edata_loc = __data_loc + SIZEOF(.data);
-> +
-> +#ifdef CONFIG_HAVE_TCM
-> +        /*
-> +	 * We align everything to a page boundary so we can
-> +	 * free it after init has commenced and TCM contents have
-> +	 * been copied to its destination.
-> +	 */
-> +	.tcm_start : {
-> +		. = ALIGN(PAGE_SIZE);
-> +		__tcm_start = .;
-> +		__itcm_start = .;
-> +	}
-> +
-> +	/*
-> +	 * Link these to the ITCM RAM
-> +	 * Put VMA to the TCM address and LMA to the common RAM
-> +	 * and we'll upload the contents from RAM to TCM and free
-> +	 * the used RAM after that.
-> +	 */
-> +	.text_itcm ITCM_OFFSET : AT(__itcm_start)
-> +	{
-> +		__sitcm_text = .;
-> +		*(.tcm.text)
-> +		*(.tcm.rodata)
-> +		. = ALIGN(4);
-> +		__eitcm_text = .;
-> +	}
-> +
-> +	/*
-> +	 * Reset the dot pointer, this is needed to create the
-> +	 * relative __dtcm_start below (to be used as extern in code).
-> +	 */
-> +	. = ADDR(.tcm_start) + SIZEOF(.tcm_start) + SIZEOF(.text_itcm);
-> +
-> +	.dtcm_start : {
-> +		__dtcm_start = .;
-> +	}
-> +
-> +	/* TODO: add remainder of ITCM as well, that can be used for data! */
-> +	.data_dtcm DTCM_OFFSET : AT(__dtcm_start)
-> +	{
-> +		. = ALIGN(4);
-> +		__sdtcm_data = .;
-> +		*(.tcm.data)
-> +		. = ALIGN(4);
-> +		__edtcm_data = .;
-> +	}
-> +
-> +	/* Reset the dot pointer or the linker gets confused */
-> +	. = ADDR(.dtcm_start) + SIZEOF(.data_dtcm);
-> +
-> +	/* End marker for freeing TCM copy in linked object */
-> +	.tcm_end : AT(ADDR(.dtcm_start) + SIZEOF(.data_dtcm)){
-> +		. = ALIGN(PAGE_SIZE);
-> +		__tcm_end = .;
-> +	}
-> +#endif
-> +
-> +	BSS_SECTION(0, 0, 0)
-> +	_end = .;
-> +
-> +	STABS_DEBUG
-> +}
-> +
-> +/*
-> + * These must never be empty
-> + * If you have to comment these two assert statements out, your
-> + * binutils is too old (for other reasons as well)
-> + */
-> +ASSERT((__proc_info_end - __proc_info_begin), "missing CPU support")
-> +ASSERT((__arch_info_end - __arch_info_begin), "no machine record defined")
-> +
-> +/*
-> + * The HYP init code can't be more than a page long,
-> + * and should not cross a page boundary.
-> + * The above comment applies as well.
-> + */
-> +ASSERT(__hyp_idmap_text_end - (__hyp_idmap_text_start & PAGE_MASK) <= PAGE_SIZE,
-> +	"HYP init code too big or misaligned")
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index 8b60fde..093d532 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -3,6 +3,10 @@
->   * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>
->   */
->  
-> +#ifdef CONFIG_XIP_KERNEL
-> +#include "vmlinux-xip.lds.S"
-> +#else
-> +
->  #include <asm-generic/vmlinux.lds.h>
->  #include <asm/cache.h>
->  #include <asm/thread_info.h>
-> @@ -84,11 +88,7 @@ SECTIONS
->  		*(.discard.*)
->  	}
->  
-> -#ifdef CONFIG_XIP_KERNEL
-> -	. = XIP_VIRT_ADDR(CONFIG_XIP_PHYS_ADDR);
-> -#else
->  	. = PAGE_OFFSET + TEXT_OFFSET;
-> -#endif
->  	.head.text : {
->  		_text = .;
->  		HEAD_TEXT
-> @@ -152,14 +152,13 @@ SECTIONS
->  
->  	_etext = .;			/* End of text and rodata section */
->  
-> -#ifndef CONFIG_XIP_KERNEL
-> -# ifdef CONFIG_ARM_KERNMEM_PERMS
-> +#ifdef CONFIG_ARM_KERNMEM_PERMS
->  	. = ALIGN(1<<SECTION_SHIFT);
-> -# else
-> +#else
->  	. = ALIGN(PAGE_SIZE);
-> -# endif
-> -	__init_begin = .;
->  #endif
-> +	__init_begin = .;
-> +
->  	/*
->  	 * The vectors and stubs are relocatable code, and the
->  	 * only thing that matters is their relative offsets
-> @@ -208,29 +207,21 @@ SECTIONS
->  		__pv_table_end = .;
->  	}
->  	.init.data : {
-> -#ifndef CONFIG_XIP_KERNEL
->  		INIT_DATA
-> -#endif
->  		INIT_SETUP(16)
->  		INIT_CALLS
->  		CON_INITCALL
->  		SECURITY_INITCALL
->  		INIT_RAM_FS
->  	}
-> -#ifndef CONFIG_XIP_KERNEL
->  	.exit.data : {
->  		ARM_EXIT_KEEP(EXIT_DATA)
->  	}
-> -#endif
->  
->  #ifdef CONFIG_SMP
->  	PERCPU_SECTION(L1_CACHE_BYTES)
->  #endif
->  
-> -#ifdef CONFIG_XIP_KERNEL
-> -	__data_loc = ALIGN(4);		/* location in binary */
-> -	. = PAGE_OFFSET + TEXT_OFFSET;
-> -#else
->  #ifdef CONFIG_ARM_KERNMEM_PERMS
->  	. = ALIGN(1<<SECTION_SHIFT);
->  #else
-> @@ -238,7 +229,6 @@ SECTIONS
->  #endif
->  	__init_end = .;
->  	__data_loc = .;
-> -#endif
->  
->  	.data : AT(__data_loc) {
->  		_data = .;		/* address in memory */
-> @@ -250,15 +240,6 @@ SECTIONS
->  		 */
->  		INIT_TASK_DATA(THREAD_SIZE)
->  
-> -#ifdef CONFIG_XIP_KERNEL
-> -		. = ALIGN(PAGE_SIZE);
-> -		__init_begin = .;
-> -		INIT_DATA
-> -		ARM_EXIT_KEEP(EXIT_DATA)
-> -		. = ALIGN(PAGE_SIZE);
-> -		__init_end = .;
-> -#endif
-> -
->  		NOSAVE_DATA
->  		CACHELINE_ALIGNED_DATA(L1_CACHE_BYTES)
->  		READ_MOSTLY_DATA(L1_CACHE_BYTES)
-> @@ -351,3 +332,5 @@ ASSERT((__arch_info_end - __arch_info_begin), "no machine record defined")
->   */
->  ASSERT(__hyp_idmap_text_end - (__hyp_idmap_text_start & PAGE_MASK) <= PAGE_SIZE,
->  	"HYP init code too big or misaligned")
-> +
-> +#endif /* CONFIG_XIP_KERNEL */
-> -- 
-> 1.7.9.5
-> 
-> 
-> 
+Depending on the memory map, this page may be in a region we are not
+intended/permitted to map, or may clash with a different region that we
+wich to map.
+
+Prevent this issue by rounding the virtual base address down to the
+kernel page granularity, matching what we do for the physical base
+address.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Leif Lindholm <leif.lindholm@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/efi.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+I spotted this by playing with Will's break-before-make checker [1], which
+detected an erroneously created PTE being overwritten with a different output
+address.
+
+It looks like the VA bug was introduced in commit f3cdfd239da56a4c ("arm64/efi:
+move SetVirtualAddressMap() to UEFI stub").
+
+Prior to commit 60305db9884515ca ("arm64/efi: move virtmap init to early
+initcall") so manual fixup is required, but the logic fix is the same.
+
+Mark.
+
+[1] https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/?h=aarch64/devel&id=372f39220ad35fa39a75419f2221ffeb6ffd78d3
+
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index de46b50..7855b69 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -225,7 +225,7 @@ static bool __init efi_virtmap_init(void)
+ 	efi_memory_desc_t *md;
+ 
+ 	for_each_efi_memory_desc(&memmap, md) {
+-		u64 paddr, npages, size;
++		u64 paddr, vaddr, npages, size;
+ 		pgprot_t prot;
+ 
+ 		if (!(md->attribute & EFI_MEMORY_RUNTIME))
+@@ -237,6 +237,8 @@ static bool __init efi_virtmap_init(void)
+ 		npages = md->num_pages;
+ 		memrange_efi_to_native(&paddr, &npages);
+ 		size = npages << PAGE_SHIFT;
++		vaddr = md->virt_addr;
++		vaddr &= PAGE_MASK;
+ 
+ 		pr_info("  EFI remap 0x%016llx => %p\n",
+ 			md->phys_addr, (void *)md->virt_addr);
+@@ -254,7 +256,7 @@ static bool __init efi_virtmap_init(void)
+ 		else
+ 			prot = PAGE_KERNEL;
+ 
+-		create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size, prot);
++		create_pgd_mapping(&efi_mm, paddr, vaddr, size, prot);
+ 	}
+ 	return true;
+ }
+-- 
+1.9.1
