@@ -1,41 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Nov 2015 20:36:47 +0100
-Subject: [GIT PULL] at91: fixes for 4.4 #1
-In-Reply-To: <564E0A99.9020707@atmel.com>
-References: <1447760158-20204-1-git-send-email-nicolas.ferre@atmel.com>
- <5616576.CPP4uTUkOp@wuerfel> <564E0A99.9020707@atmel.com>
-Message-ID: <4698828.tp5rD5DIKm@wuerfel>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 19 Nov 2015 11:49:08 -0800
+Subject: [PATCH v9 2/2] arm-soc: Add support for tango4 platforms
+In-Reply-To: <564C9558.4020100@sigmadesigns.com> (Marc Gonzalez's message of
+ "Wed, 18 Nov 2015 16:12:24 +0100")
+References: <564C94A5.4060301@sigmadesigns.com>
+ <564C9558.4020100@sigmadesigns.com>
+Message-ID: <7hwptdu5vv.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 November 2015 18:44:57 Nicolas Ferre wrote:
-> Le 19/11/2015 16:22, Arnd Bergmann a ?crit :
-> > On Tuesday 17 November 2015 12:35:58 Nicolas Ferre wrote:
-> >> Arnd, Olof, Kevin,
-> >>
-> >> This is the first "fixes" pull-request for AT91. I tried to collect little
-> >> patches that didn't make it for -rc1.
-> >> It can be due to synchronization between trees like the addition of some
-> >> sama5d2 Xplained nodes (MFD tree) or the change of the watchdog compatible
-> >> string for sama5d4 (watchdog tree).
-> >> It can also be due to trivial cleanups that were spotted or submitted late like
-> >> the replacement of "wakeup" properties or removal of unneeded defconfig option.
-> >> The removal of some dead legacy DT properties or nodes is, in my opinion worth
-> >> it as well in order to prevent us from abusive cut'n paste.
-> >> NAND and ISI Atmel MAINTAINERS entries are also updated.
-> >>
-> >> Tell me if it's okay for you.
-> > 
-> > I'd be happier to get the patches late in the process and then push back
-> > myself than to get them as fixes, there was really no reason to wait
-> > for the merge window to end with the ones that you already had.
-> 
-> I thought than having a precise milestone as a base for this
-> pull-request would be preferred.
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
 
-It is, but if you have a branch that introduces or exposes a bug,
-then I'd prefer to get a pull request with the bug fixes on top
-of the branch that we already have, e.g. the at91/dt branch
-(as opposed to next/dt or for-next, which would be wrong).
+> Add support for Sigma Designs ARM-based Tango4 "Secure Media Processor"
+> platforms (i.e. smp8734, smp8756, smp8758, smp8759) built around the
+> Cortex-A9 MPCore r3p0 (all dual-core, except the 8756).
+>
+> Support for older MIPS-based platforms can be found elsewhere:
+> https://github.com/mansr/linux-tangox
+>
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 
-	Arnd
+[...]
+
+> +static void tango_l2c_write(unsigned long val, unsigned int reg)
+> +{
+> +	pr_debug("%s: reg=0x%x val=0x%lx\n", __func__, reg, val);
+
+leftover debugging aid?
+
+> +	if (reg == L2X0_CTRL)
+> +		tango_set_l2_control(val);
+> +}
+> +
+
+[...]
+
+> diff --git a/arch/arm/mach-tangox/smc.S b/arch/arm/mach-tangox/smc.S
+> new file mode 100644
+> index 000000000000..5d932ce3c1bd
+> --- /dev/null
+> +++ b/arch/arm/mach-tangox/smc.S
+> @@ -0,0 +1,9 @@
+> +#include <linux/linkage.h>
+> +
+> +ENTRY(tango_smc)
+> +	push	{lr}
+> +	mov	ip, r1
+> +	dsb	/* This barrier is probably unnecessary */
+
+Then remove it?
+
+> +	smc	#0
+> +	pop	{pc}
+> +ENDPROC(tango_smc)
+
+Otherwise looks pretty simple and straight forward to me.
+
+FWIW, one of the benefits of starting with the small/minimum set and
+adding as you go is that it's much easier on reviewers.
+
+Kevin
