@@ -1,57 +1,50 @@
 From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Thu, 19 Nov 2015 11:50:08 +0100
-Subject: [PATCH 1/3] rtc: sunxi: fix signedness issues
-Message-ID: <1447930210-27008-1-git-send-email-clabbe.montjoie@gmail.com>
+Date: Thu, 19 Nov 2015 11:50:09 +0100
+Subject: [PATCH 2/3] rtc: sunxi: constify the data_year_param structure
+In-Reply-To: <1447930210-27008-1-git-send-email-clabbe.montjoie@gmail.com>
+References: <1447930210-27008-1-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <1447930210-27008-2-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The variable year must be set as unsigned since it is used with
-sunxi_rtc_data_year{.min|.max} and as parameter of is_leap_year() which
-wait for unsigned int.
-Only tm_year is not unsigned, but it is long.
-This patch fix also the format of printing of min/max. (must use %u since
-they are unsigned)
-
-The parameter to of sunxi_rtc_setaie() must be set to uint since callers
-give always uint data.
+The data_year_param struct is never modified, so lets constify it.
+This permit to remove cast since of_device_id is const also.
 
 Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
 ---
- drivers/rtc/rtc-sunxi.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/rtc/rtc-sunxi.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/rtc/rtc-sunxi.c b/drivers/rtc/rtc-sunxi.c
-index 52543ae..b4f35ac 100644
+index b4f35ac..0c08a5b 100644
 --- a/drivers/rtc/rtc-sunxi.c
 +++ b/drivers/rtc/rtc-sunxi.c
-@@ -175,7 +175,7 @@ static irqreturn_t sunxi_rtc_alarmirq(int irq, void *id)
- 	return IRQ_NONE;
- }
+@@ -133,7 +133,7 @@ struct sunxi_rtc_data_year {
+ 	unsigned char leap_shift;	/* bit shift to get the leap year */
+ };
  
--static void sunxi_rtc_setaie(int to, struct sunxi_rtc_dev *chip)
-+static void sunxi_rtc_setaie(unsigned int to, struct sunxi_rtc_dev *chip)
- {
- 	u32 alrm_val = 0;
- 	u32 alrm_irq_val = 0;
-@@ -343,7 +343,7 @@ static int sunxi_rtc_settime(struct device *dev, struct rtc_time *rtc_tm)
- 	struct sunxi_rtc_dev *chip = dev_get_drvdata(dev);
- 	u32 date = 0;
- 	u32 time = 0;
--	int year;
-+	unsigned int year;
- 
- 	/*
- 	 * the input rtc_tm->tm_year is the offset relative to 1900. We use
-@@ -353,8 +353,8 @@ static int sunxi_rtc_settime(struct device *dev, struct rtc_time *rtc_tm)
- 
- 	year = rtc_tm->tm_year + 1900;
- 	if (year < chip->data_year->min || year > chip->data_year->max) {
--		dev_err(dev, "rtc only supports year in range %d - %d\n",
--				chip->data_year->min, chip->data_year->max);
-+		dev_err(dev, "rtc only supports year in range %u - %u\n",
-+			chip->data_year->min, chip->data_year->max);
- 		return -EINVAL;
+-static struct sunxi_rtc_data_year data_year_param[] = {
++static const struct sunxi_rtc_data_year data_year_param[] = {
+ 	[0] = {
+ 		.min		= 2010,
+ 		.max		= 2073,
+@@ -151,7 +151,7 @@ static struct sunxi_rtc_data_year data_year_param[] = {
+ struct sunxi_rtc_dev {
+ 	struct rtc_device *rtc;
+ 	struct device *dev;
+-	struct sunxi_rtc_data_year *data_year;
++	const struct sunxi_rtc_data_year *data_year;
+ 	void __iomem *base;
+ 	int irq;
+ };
+@@ -468,7 +468,7 @@ static int sunxi_rtc_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "Unable to setup RTC data\n");
+ 		return -ENODEV;
  	}
+-	chip->data_year = (struct sunxi_rtc_data_year *) of_id->data;
++	chip->data_year = of_id->data;
  
+ 	/* clear the alarm count value */
+ 	writel(0, chip->base + SUNXI_ALRM_DHMS);
 -- 
 2.4.10
