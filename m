@@ -1,35 +1,44 @@
-From: songjun.wu@atmel.com (Songjun Wu)
-Date: Thu, 19 Nov 2015 11:26:30 +0800
-Subject: [PATCH] ASoC: Atmel: ClassD: Set GCK's parent clock
-Message-ID: <1447903590-3285-1-git-send-email-songjun.wu@atmel.com>
+From: pramodku@broadcom.com (Pramod Kumar)
+Date: Thu, 19 Nov 2015 03:34:58 +0000
+Subject: [PATCH 03/11] dts: pinctrl: Add GPIO to Pinctrl pin mapping in DT
+In-Reply-To: <564CC5E2.2070809@gmail.com>
+References: <1445233398-27129-1-git-send-email-pramodku@broadcom.com>
+ <1445233398-27129-4-git-send-email-pramodku@broadcom.com>
+ <564CC5E2.2070809@gmail.com>
+Message-ID: <0C803592FC378B4E83922050AB46442A2AD9ECBD@SJEXCHMB10.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set GCK's parent clock as audio clock, make
-sure the GCK's parent clock is audio clock.
+Hi Florian,
 
-Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
----
+> -----Original Message-----
+> From: Florian Fainelli [mailto:f.fainelli at gmail.com]
+> Sent: 19 November 2015 00:10
+> To: Pramod Kumar; Rob Herring; Pawel Moll; Mark Rutland; Ian Campbell;
+> Kumar Gala; Ray Jui; Scott Branden; Russell King; Linus Walleij; linux-
+> gpio at vger.kernel.org
+> Cc: bcm-kernel-feedback-list; Jason Uy; Masahiro Yamada; Thomas Gleixner;
+> Laurent Pinchart; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Jonas Gorski
+> Subject: Re: [PATCH 03/11] dts: pinctrl: Add GPIO to Pinctrl pin mapping in DT
+> 
+> On 18/10/15 22:43, Pramod Kumar wrote:
+> > ASIU gpio controller's pins are muxed with pin-cntroller.
+> > Add this mapping through property "gpio-ranges".
+> >
+> > Signed-off-by: Pramod Kumar <pramodku@broadcom.com>
+> > Reviewed-by: Ray Jui <rjui@broadcom.com>
+> > Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> 
+> Applied to devicetree/next, since there was a bit of restructuring, I had to
+> manually apply it, please verify the resolution looks correct to you.
 
- sound/soc/atmel/atmel-classd.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+Applied patch looks fine. Thanks for having time in restructuring. 
 
-diff --git a/sound/soc/atmel/atmel-classd.c b/sound/soc/atmel/atmel-classd.c
-index 8276675..2f5190b 100644
---- a/sound/soc/atmel/atmel-classd.c
-+++ b/sound/soc/atmel/atmel-classd.c
-@@ -588,6 +588,12 @@ static int atmel_classd_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	ret = clk_set_parent(dd->gclk, dd->aclk);
-+	if (ret) {
-+		dev_err(dev, "failed to set GCK parent clock: %d\n", ret);
-+		return ret;
-+	}
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res) {
- 		dev_err(dev, "no memory resource\n");
--- 
-1.7.9.5
+Regards,
+Pramod
+
+> 
+> Thanks!
+> --
+> Florian
