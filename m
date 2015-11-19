@@ -1,72 +1,20 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 19 Nov 2015 12:08:07 +0000
-Subject: [PATCH V3 2/6] acpi: pci: Setup MSI domain for ACPI based pci
- devices
-In-Reply-To: <1445453249-32557-3-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1445453249-32557-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1445453249-32557-3-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <20151119120807.07ffd476@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Nov 2015 13:15:09 +0100
+Subject: [PATCH] mmc: sh_mmcif: rework dma channel handling
+In-Reply-To: <CAPDyKFqRbD7qS=sgapw50uTNpvErEshwtLn2Ve3LeN__RqQ_Sg@mail.gmail.com>
+References: <5324212.8m5CM0vuVo@wuerfel>
+ <CAPDyKFqRbD7qS=sgapw50uTNpvErEshwtLn2Ve3LeN__RqQ_Sg@mail.gmail.com>
+Message-ID: <9644497.Tqgh6AHSLs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Oct 2015 11:47:25 -0700
-Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> wrote:
-
-Hi Suravee,
-
-Sorry it took so long to get to this series. Comments below.
-
-> This patch introduces pci_host_bridge_acpi_msi_domain(), which returns
-> the MSI domain of the specified PCI host bridge with DOMAIN_BUS_PCI_MSI
-> bus token. Then, it is assigned to pci device.
+On Thursday 19 November 2015 13:00:48 Ulf Hansson wrote:
+> Thanks, applied for next!
 > 
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> ---
->  drivers/pci/pci-acpi.c | 13 +++++++++++++
->  drivers/pci/probe.c    |  2 ++
->  include/linux/pci.h    |  7 +++++++
->  3 files changed, 22 insertions(+)
+> FYI: There were some check patch warnings, I decided to fix them
+> myself before applying.
 > 
-> diff --git a/drivers/pci/pci-acpi.c b/drivers/pci/pci-acpi.c
-> index a32ba75..0e21ef4 100644
-> --- a/drivers/pci/pci-acpi.c
-> +++ b/drivers/pci/pci-acpi.c
-> @@ -9,7 +9,9 @@
->  
->  #include <linux/delay.h>
->  #include <linux/init.h>
-> +#include <linux/irqdomain.h>
->  #include <linux/pci.h>
-> +#include <linux/msi.h>
->  #include <linux/pci_hotplug.h>
->  #include <linux/module.h>
->  #include <linux/pci-aspm.h>
-> @@ -689,6 +691,17 @@ static struct acpi_bus_type acpi_pci_bus = {
->  	.cleanup = pci_acpi_cleanup,
->  };
->  
-> +struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus)
-> +{
-> +	struct irq_domain *dom = NULL;
-> +	struct fwnode_handle *fwnode = pci_msi_get_fwnode(&bus->dev);
-> +
-> +	if (fwnode)
-> +		dom = irq_find_matching_fwnode(fwnode,
-> +					       DOMAIN_BUS_PCI_MSI);
-> +	return dom;
-> +}
-> +
 
-Given this, I really question the need for what you define in patch #1
-to be standalone. It is only used by ACPI (DT has its own private
-helpers), and it is so far unlikely that it will be of any use for
-other firmware interfaces.
+Ok, thanks!
 
-My suggestion is to get rid of pci_msi_get_fwnode() and move the
-registration helper into this file. That'd be much simpler.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+	Arnd
