@@ -1,34 +1,44 @@
-From: Vineet.Gupta1@synopsys.com (Vineet Gupta)
-Date: Thu, 19 Nov 2015 11:44:34 +0530
-Subject: [PATCH] include: asm-generic: page.h: Remove useless
- get_user_page and free_user_page
-In-Reply-To: <COL130-W7B5F0BB94C76AF6B12EA7B91C0@phx.gbl>
-References: <COL130-W7B5F0BB94C76AF6B12EA7B91C0@phx.gbl>
-Message-ID: <564D68CA.6010708@synopsys.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 18 Nov 2015 22:36:40 -0800
+Subject: [PATCH] ARM: dts: vfxxx: Fix dspi[01] spi-num-chipselects.
+In-Reply-To: <1447905280-5172-1-git-send-email-cory.tusar@pid1solutions.com>
+References: <1447905280-5172-1-git-send-email-cory.tusar@pid1solutions.com>
+Message-ID: <a2287b99e8f9aa378e9c7c3750d1a7e5@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 November 2015 01:10 AM, Chen Gang wrote:
-> From ba7c00c4cb976109b6a35812ce9649aaeda81e2d Mon Sep 17 00:00:00 2001
-> From: Chen Gang <gang.chen.5i5j@gmail.com>
-> Date: Thu, 19 Nov 2015 03:24:42 +0800
-> Subject: [PATCH] include: asm-generic: page.h: Remove useless get_user_page and free_user_page
-> 
-> They are not symmetric with each other, neither are used in real world
-> (can not be found by grep command in source code root directory), so
-> remove them.
-> 
-> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
-> ---
->  arch/arc/include/asm/page.h       | 3 ---
->  arch/arm/include/asm/page-nommu.h | 3 ---
->  arch/frv/include/asm/page.h       | 3 ---
->  arch/m68k/include/asm/page_mm.h   | 3 ---
->  arch/m68k/include/asm/page_no.h   | 3 ---
->  arch/openrisc/include/asm/page.h  | 3 ---
->  include/asm-generic/page.h        | 3 ---
->  7 files changed, 21 deletions(-)
+On 2015-11-18 19:54, Cory Tusar wrote:
+> Per the Vybrid Reference Manual (section 3.8.6.1), dspi0 has 6 chip
+> select signals associated with it, while dspi1 has only 4.
 
-So this is one huge patch touching several arches with potential to cause
-conflicts when merged. Can u divy them up and then the maintainers can simply
-merge them individually given there is no common dependency !
+That is right, verified by in my RM!
+
+Acked-by: Stefan Agner <stefan@agner.ch>
+
+> 
+> Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
+> ---
+>  arch/arm/boot/dts/vfxxx.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+> index 6736bae..1cca43a 100644
+> --- a/arch/arm/boot/dts/vfxxx.dtsi
+> +++ b/arch/arm/boot/dts/vfxxx.dtsi
+> @@ -158,7 +158,7 @@
+>  				interrupts = <67 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks VF610_CLK_DSPI0>;
+>  				clock-names = "dspi";
+> -				spi-num-chipselects = <5>;
+> +				spi-num-chipselects = <6>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -170,7 +170,7 @@
+>  				interrupts = <68 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&clks VF610_CLK_DSPI1>;
+>  				clock-names = "dspi";
+> -				spi-num-chipselects = <5>;
+> +				spi-num-chipselects = <4>;
+>  				status = "disabled";
+>  			};
