@@ -1,68 +1,69 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 19 Nov 2015 10:33:45 -0800
-Subject: [PATCH] ARM: OMAP2: use correct timer function for AM43XX and
- TI81XX
-In-Reply-To: <87io4yezi9.fsf@saruman.tx.rr.com>
-References: <4016134.4bReocePei@wuerfel> <87egfplka4.fsf@saruman.tx.rr.com>
- <6973517.kQfhdpsmVt@wuerfel> <87io4yezi9.fsf@saruman.tx.rr.com>
-Message-ID: <20151119183345.GT2498@atomide.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 19 Nov 2015 12:44:11 -0600
+Subject: device_node lifetime (was: Re: [PATCH 1/7] phy: brcmstb-sata: add
+ missing of_node_put)
+In-Reply-To: <20151118190500.GE140057@google.com>
+References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1447673600-8881-2-git-send-email-Julia.Lawall@lip6.fr>
+ <20151117013830.GV8456@google.com>
+ <alpine.DEB.2.02.1511170711340.2045@localhost6.localdomain6>
+ <20151117174430.GA8456@google.com>
+ <alpine.DEB.2.10.1511171846120.2455@hadrien>
+ <20151117183036.GF8456@google.com>
+ <alpine.DEB.2.02.1511172327030.2121@localhost6.localdomain6>
+ <20151118190500.GE140057@google.com>
+Message-ID: <CAL_JsqLQWh8-gshYLrYwrrRjBRXiOACh9LzVn2HUU38mfgYGoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [151119 08:16]:
-> 
-> Hi,
-> 
-> Arnd Bergmann <arnd@arndb.de> writes:
-> > On Monday 16 November 2015 15:13:55 Felipe Balbi wrote:
-> >> Arnd Bergmann <arnd@arndb.de> writes:
-> >> > AM43XX and TI81XX use omap3_gptimer_timer_init(), but that is only
-> >> > built into the kernel for OMAP3 and AM33XX, otherwise we get:
-> >> >
-> >> > arch/arm/mach-omap2/built-in.o:(.arch.info.init+0x124): undefined reference to `omap3_gptimer_timer_init'
-> >> >
-> >> > This changes the Kconfig logic for building the function to
-> >> > match the callers. Consequently, we no longer need to build
-> >> > the omap3_secure_sync32k_timer_init and omap4_local_timer_init
-> >> > for the platforms that have been moved over to other functions.
-> >> >
-> >> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> >> 
-> >> no, AM43xx uses omap4_local_timer_init(), there's already a fix in
-> >> Tony's tree IIRC.
-> > ...
-> >  
-> >> care to provide a defconfig which would cause a build error ?
-> >
-> > My mistake, the code has changed several times and I adapted it to
-> > the latest version each time, but the version I sent out is indeed
-> > useless.
-> >
-> > The only hunk that still makes sense is
-> >
-> > diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> > index b18ebbefae09..b7ab09cc5ca2 100644
-> > --- a/arch/arm/mach-omap2/timer.c
-> > +++ b/arch/arm/mach-omap2/timer.c
-> > @@ -494,7 +494,7 @@ void __init omap_init_time(void)
-> >  		clocksource_probe();
-> >  }
-> >  
-> > -#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM43XX)
-> > +#if defined(CONFIG_ARCH_OMAP3)
-> >  void __init omap3_secure_sync32k_timer_init(void)
-> >  {
-> >  	__omap_sync32k_timer_init(12, "secure_32k_fck", "ti,timer-secure",
-> >
-> >
-> > but that is harmless as it does not cause a build error, just a few extra
-> > bytes for an unused function in a AM43XX-only configuration.
-> 
-> I think that's still useful. Tony ?
+On Wed, Nov 18, 2015 at 1:05 PM, Brian Norris
+<computersforpeace@gmail.com> wrote:
+> (changing subject, add devicetree at vger.kernel.org)
+>
+> On Tue, Nov 17, 2015 at 11:33:25PM +0100, Julia Lawall wrote:
+>> On Tue, 17 Nov 2015, Brian Norris wrote:
+>> > On Tue, Nov 17, 2015 at 06:48:39PM +0100, Julia Lawall wrote:
+>> > > Is this something that should be checked for elsewhere?
+>> >
+>> > I expect the same sort of problem shows up plenty of other places. I
+>> > don't think many people use CONFIG_OF_DYNAMIC, so the effects of these
+>> > failures probably aren't felt by many.
 
-Yeah makes sense to me. We already have omap4_sync32k_timer_init() when
-am437x PM gets enabled.
+The "problem" is non-existent because either CONFIG_OF_DYNAMIC is off
+or where it is used is limited (memory and cpus on PSeries) and now
+overlays. Overlays have the potential to be problematic, but we should
+manage ref counting for overlays in a completely different way. What
+that looks like, I don't know. I'll leave that to the person that
+cares about removing overlays.
 
-Regards,
+>> basically, this says that a structure field is initilized to a device node
+>> value, the structure is returned by the containing function, and the
+>> containing function contains no of_node_get at all.  Certainly this is
+>> quite constrained, but it does produce a number of examples.
 
-Tony
+I've got no idea if this is right or not.
+
+>> drivers/of/pdt.c, function of_pdt_create_node
+>
+> Not real sure about this one.
+
+SPARC. Stay away.
+
+>
+>> Any idea whether these need of_node_get?  In all cases the device node
+>> value comes in as a parameter.
+>
+> I'm really not an expert on this stuff. I just saw a potential problem
+> that I happen to be looking at in other subsystems, and I wanted to know
+> what others thought. I think this discussion should include the DT folks
+> and the subsystems in question. For one, I'm as interested as anyone in
+> getting this todo clarified:
+>
+> Documentation/devicetree/todo.txt
+> - Document node lifecycle for CONFIG_OF_DYNAMIC
+
+Step 2 after figuring out it can't be documented is "define a new way
+to handle dynamic DT refcounting aka how to get rid of
+of_node_get/put."
+
+Rob
