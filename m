@@ -1,69 +1,57 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 19 Nov 2015 13:23:55 +0900
-Subject: [PATCH 2/2] arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into
- ARCH_EXYNOS
-In-Reply-To: <1447637775-9887-3-git-send-email-k.kozlowski@samsung.com>
-References: <1447637775-9887-1-git-send-email-k.kozlowski@samsung.com>
- <1447637775-9887-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CA+Ln22FP60Zc4cQmztNTy+2ZbhE1T7pgPXBMb9T=YZcYPo0EdA@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 19 Nov 2015 05:35:48 +0100
+Subject: [PATCH v3 2/5] dt-bindings: soc: add document for rockchip reboot
+ notifier driver
+In-Reply-To: <564D2331.8070503@rock-chips.com>
+References: <1447840044-19689-1-git-send-email-andy.yan@rock-chips.com>
+ <20151118225904.GA5429@rob-hp-laptop> <564D2331.8070503@rock-chips.com>
+Message-ID: <2082288.pD4oKxtaXL@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi Andy,
 
-2015-11-16 10:36 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
-> The ARMv8 Exynos family SoCs in Linux kernel are currently:
->  - Exynos5433 (controlled by ARCH_EXYNOS),
->  - Exynos7 (controlled by ARCH_EXYNOS7).
->
-> It duplicates Kconfig symbols unnecessarily, so consolidate them into
-> one ARCH_EXYNOS. Future SoCs could fall also under the ARCH_EXYNOS
-> symbol.
->
-> The commit should not bring any visible functional change.
+Am Donnerstag, 19. November 2015, 09:17:37 schrieb Andy Yan:
+> Hi Rob:
+> 
+> On 2015?11?19? 06:59, Rob Herring wrote:
+> > On Wed, Nov 18, 2015 at 05:53:30PM +0800, Andy Yan wrote:
+> >> Add devicetree binding document for rockchip reboot nofifier driver
+> > Just reading the subject this is way too specific to the Linux driver
+> > needs rather than a h/w description. Please don't create fake DT nodes
+> > just to bind to drivers. Whatever &pmu is is probably what should have
+> > the DT node. Let the driver for it create child devices if you need
+> > that.
+> 
+>      This is note a fake DT nodes, we really need it to tell the driver
+>       which register to use to store the reboot mode. Because rockchip
+>       use different register file to store the reboot mode on different
+>       platform, on rk3066,rk3188, rk3288,it use  one of the PMU 
+> register, on
+>       the incoming RK3036, it use one of the GRF register, and it use 
+> one  of
+>       the PMUGRF register for arm64 platform rk3368. On the other hand, the
+>       PMU/GRF/PMUGRF register file are mapped as "syscon", then referenced
+>       by other DT nodes by phandle. So maybe let it as a separate DT 
+> node here
+>       is better.
 
-I think this basically matches the general recommendation for ARM64,
-so excluding the single nitpick inline and assuming that, after this
-patch, grep ARCH_EXYNOS7 gives no results:
+or alternatively we could do something similar to what the bl-switcher 
+cupfreq-driver does. Take a look at
 
-Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
+drivers/cpufreq/arm_big_little.c
+drivers/clk/clk-mb86s7x.c
 
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  arch/arm64/Kconfig.platforms        | 11 ++---------
->  arch/arm64/boot/dts/exynos/Makefile |  2 +-
->  arch/arm64/configs/defconfig        |  2 +-
->  3 files changed, 4 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> index 4043c35962cc..afa19baca94e 100644
-> --- a/arch/arm64/Kconfig.platforms
-> +++ b/arch/arm64/Kconfig.platforms
-> @@ -13,21 +13,14 @@ config ARCH_BERLIN
->           This enables support for Marvell Berlin SoC Family
->
->  config ARCH_EXYNOS
-> -       bool
-> -       help
-> -         This enables support for Samsung Exynos SoC family
-> -
-> -config ARCH_EXYNOS7
-> -       bool "ARMv8 based Samsung Exynos7"
-> -       select ARCH_EXYNOS
-> +       bool "ARMv8 based Samsung Exynos SoC family"
->         select COMMON_CLK_SAMSUNG
->         select HAVE_S3C2410_WATCHDOG if WATCHDOG
->         select HAVE_S3C_RTC if RTC_CLASS
->         select PINCTRL
->         select PINCTRL_EXYNOS
-> -
->         help
-> -         This enables support for Samsung Exynos7 SoC family
-> +         This enables support for Samsung Exynos ARMv8 SoC family
+We already have the core restart-handler code in the clock-tree, so could 
+maybe simply do the
+	platform_device_register_simple("rockchip-reboot", -1, NULL, 0);
+in that common code?
 
-nit: Sounds a little bit strange. Maybe "This enables support for
-ARMv8 based Samsung Exynos SoC family"?
+Though I'm not yet sure how to get the platform-data. I guess one option would 
+be to do things like the 3288 suspend code does (arch/arm/mach-rockchip/pm.c 
+at the bottom), by having the per-soc-data in the driver and then matching 
+against the pmu. Because the pmu is not part of the clock controller binding 
+(and probably also shouldn't be).
 
-Best regards,
-Tomasz
+
+Heiko
