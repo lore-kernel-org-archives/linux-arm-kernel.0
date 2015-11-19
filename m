@@ -1,36 +1,45 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 19 Nov 2015 16:51:58 +0100
-Subject: [PATCH RFC v2] apei: Add ACPI APEI event notification support
-In-Reply-To: <F77E0D1A-FE01-4BA8-B72C-AA6CB7DAD61C@redhat.com>
-References: <1445458480-6493-1-git-send-email-lho@apm.com>
- <20151022095716.GC3671@pd.tnic> <20151119141816.GH22786@arm.com>
- <F77E0D1A-FE01-4BA8-B72C-AA6CB7DAD61C@redhat.com>
-Message-ID: <20151119155158.GE6065@pd.tnic>
+From: mweseloh42@gmail.com (Marcus Weseloh)
+Date: Thu, 19 Nov 2015 16:53:41 +0100
+Subject: [PATCH] spi: dts: sun4i: Add support for inter-word wait cycles
+Message-ID: <1447948422-4915-1-git-send-email-mweseloh42@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2015 at 10:05:16AM -0500, Jon Masters wrote:
-> Top post - quick reply - you are correct. This is a vendor specific
-> implementation. APEI is generic, and in the general case there should
-> not be a need to do anything with a special driver. Some will need
-> their own special solution in the early days, but everyone else should
-> be able to go generic. In particular I expect those implementing EL3
-> to do firmware first handling and to signal the event independently of
-> any OS specific hooks.
+Hi all,
 
-In the meantime, I got these two patches:
+the Allwinner A10/A20 SPI module supports an option to configure a number of
+clock periods to wait between each word ("SPI Wait Clock Register" in the A20
+manual). This is a very useful option if talking to devices which specify a
+minimum amount of inter-word wait time.
 
-https://lkml.kernel.org/r/1446857519-5908-1-git-send-email-lho at apm.com
+I initially tried to find a way to let SPI protocol drivers specify this
+option, but I couldn't find a mechanism to pass additional options to the spi
+master. So I took the spi-davinci driver as an example (it implements a very
+similiar functionality) and added a new devicetree property.
 
-which makes the GHES IRQ shared and, apparently solves the issue for
-APM.
+While testing this patch I noticed that the SPI module always adds a constant
+3 clock cycles to the number set in the Wait Clock Register. That number stays
+constant across many different baud rates, so I documented it in the
+devicetree binding file.
 
-I'd appreciate it if you guys took a look.
+One thing I am unsure of is the device example in the binding
+documentation.  I used "example,dummy" as compatible... is this acceptable or
+should I use a device/compatible that actually exists somewhere?
 
-Thanks!
+Oh... and should I split binding documentation and code changing patch?
+
+Best regards,
+
+  Marcus
+
+
+Marcus Weseloh (1):
+  spi: dts: sun4i: Add support for inter-word wait cycles using the SPI
+    Wait Clock Register
+
+ Documentation/devicetree/bindings/spi/spi-sun4i.txt | 11 +++++++++++
+ drivers/spi/spi-sun4i.c                             |  7 +++++++
+ 2 files changed, 18 insertions(+)
 
 -- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
+1.9.1
