@@ -1,214 +1,59 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 19 Nov 2015 14:54:00 +0000
-Subject: [PATCH v4 10/13] KVM: arm/arm64: vgic: forwarding control
-In-Reply-To: <1447944843-17731-1-git-send-email-eric.auger@linaro.org>
-References: <1447944843-17731-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1447944843-17731-11-git-send-email-eric.auger@linaro.org>
+From: jcm@redhat.com (Jon Masters)
+Date: Thu, 19 Nov 2015 10:05:16 -0500 (EST)
+Subject: [PATCH RFC v2] apei: Add ACPI APEI event notification support
+In-Reply-To: <20151119141816.GH22786@arm.com>
+References: <1445458480-6493-1-git-send-email-lho@apm.com>
+ <20151022095716.GC3671@pd.tnic> <20151119141816.GH22786@arm.com>
+Message-ID: <F77E0D1A-FE01-4BA8-B72C-AA6CB7DAD61C@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implements kvm_vgic_[set|unset]_forward.
+Top post - quick reply - you are correct. This is a vendor specific implementation. APEI is generic, and in the general case there should not be a need to do anything with a special driver. Some will need their own special solution in the early days, but everyone else should be able to go generic. In particular I expect those implementing EL3 to do firmware first handling and to signal the event independently of any OS specific hooks.
 
-Handle low-level VGIC programming: physical IRQ/guest IRQ mapping,
-list register cleanup, VGIC state machine. Also interacts with
-the irqchip.
-
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
-
----
-v3 -> v4:
-- use the target vCPU in set/unset_forward
-- rebase after removal of vgic_irq_lr_map
-- clarify set/unset_forward comments,
-- host_irq renamed into irq and virt_irq (SPI ID) now used in
-  place of SPI index (former guest_irq)
-- replaced BUG_ON by WARN_ON
-- simplify unset_forward implementation by using vgic_unqueue_irqs
-- handle edge mapped unshared IRQs
-
-v2 -> v3:
-- on unforward, we do not compute & output the active state anymore.
-  This means if the unforward happens while the physical IRQ is
-  active, we will not VFIO mask the IRQ while deactiving it. If a
-  new physical IRQ hits, the corresponding virtual IRQ might not
-  be injected (hence lost) due to VGIC state machine.
-
-bypass rfc v2:
-- use irq_set_vcpu_affinity API
-- use irq_set_irqchip_state instead of chip->irq_eoi
-
-bypass rfc:
-- rename kvm_arch_{set|unset}_forward into
-  kvm_vgic_{set|unset}_forward. Remove __KVM_HAVE_ARCH_HALT_GUEST.
-  The function is bound to be called by ARM code only.
-
-v4 -> v5:
-- fix arm64 compilation issues, ie. also defines
-  __KVM_HAVE_ARCH_HALT_GUEST for arm64
-
-v3 -> v4:
-- code originally located in kvm_vfio_arm.c
-- kvm_arch_vfio_{set|unset}_forward renamed into
-  kvm_arch_{set|unset}_forward
-- split into 2 functions (set/unset) since unset does not fail anymore
-- unset can be invoked at whatever time. Extra care is taken to handle
-  transition in VGIC state machine, LR cleanup, ...
-
-v2 -> v3:
-- renaming of kvm_arch_set_fwd_state into kvm_arch_vfio_set_forward
-- takes a bool arg instead of kvm_fwd_irq_action enum
-- removal of KVM_VFIO_IRQ_CLEANUP
-- platform device check now happens here
-- more precise errors returned
-- irq_eoi handled externally to this patch (VGIC)
-- correct enable_irq bug done twice
-- reword the commit message
-- correct check of platform_bus_type
-- use raw_spin_lock_irqsave and check the validity of the handler
----
- include/kvm/arm_vgic.h |   5 +++
- virt/kvm/arm/vgic.c    | 118 +++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 123 insertions(+)
-
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 9bf6a30..8090ab4 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -368,4 +368,9 @@ static inline int vgic_v3_probe(struct device_node *vgic_node,
- }
- #endif
- 
-+int kvm_vgic_set_forward(struct kvm *kvm, unsigned int irq,
-+			 unsigned int virt_irq);
-+void kvm_vgic_unset_forward(struct kvm *kvm, unsigned int irq,
-+			    unsigned int virt_irq);
-+
- #endif
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index e96f79e..bd500b4 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -2500,3 +2500,121 @@ int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
- {
- 	return 0;
- }
-+
-+/**
-+ * kvm_vgic_set_forward - Set IRQ forwarding
-+ *
-+ * @kvm: handle to the VM
-+ * @irq: the host linux IRQ
-+ * @virt_irq: the guest SPI ID
-+ *
-+ * This function is supposed to be called only if the IRQ
-+ * is not in progress: ie. not active at GIC level and not
-+ * currently under injection in the guest. The physical IRQ must
-+ * also be disabled and all vCPUs must have been exited and
-+ * prevented from being re-entered.
-+ */
-+int kvm_vgic_set_forward(struct kvm *kvm, unsigned int irq,
-+			 unsigned int virt_irq)
-+{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+	struct kvm_vcpu *vcpu;
-+	struct irq_phys_map *map;
-+	int cpu_id;
-+
-+	kvm_debug("%s irq=%d virt_irq=%d\n", __func__, irq, virt_irq);
-+
-+	cpu_id = dist->irq_spi_cpu[virt_irq - VGIC_NR_PRIVATE_IRQS];
-+	vcpu = kvm_get_vcpu(kvm, cpu_id);
-+	if (!vcpu)
-+		return 0;
-+	/*
-+	 * let's tell the irqchip driver that after this function
-+	 * returns, a new occurrence of that physical irq will be handled
-+	 * as a forwarded IRQ, ie. the host will only perform priority
-+	 * drop but will not deactivate the physical IRQ: guest will
-+	 */
-+	irq_set_vcpu_affinity(irq, vcpu);
-+
-+	/*
-+	 * let's program the vgic so that after this function returns
-+	 * any subsequent virt_irq injection will be considered as
-+	 * forwarded and LR will be programmed with HWbit set
-+	 */
-+	map = kvm_vgic_map_phys_irq(vcpu, virt_irq, irq, false);
-+
-+	return !map;
-+}
-+
-+/**
-+ * kvm_vgic_unset_forward - Unset IRQ forwarding
-+ *
-+ * @kvm: handle to the VM
-+ * @irq: host Linux IRQ number
-+ * @virt_irq: virtual SPI ID
-+ *
-+ * This function must be called when the host irq is disabled
-+ * and all vCPUs have been exited and prevented from being re-entered.
-+ */
-+void kvm_vgic_unset_forward(struct kvm *kvm,
-+			      unsigned int irq,
-+			      unsigned int virt_irq)
-+{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+	struct kvm_vcpu *vcpu;
-+	int cpu_id;
-+	bool active, is_level;
-+	struct irq_phys_map *map;
-+
-+	kvm_debug("%s irq=%d virt_irq=%d\n", __func__, irq, virt_irq);
-+
-+	spin_lock(&dist->lock);
-+
-+	cpu_id = dist->irq_spi_cpu[virt_irq - VGIC_NR_PRIVATE_IRQS];
-+	vcpu = kvm_get_vcpu(kvm, cpu_id);
-+	is_level = !vgic_irq_is_edge(vcpu, virt_irq);
-+
-+	irq_get_irqchip_state(irq, IRQCHIP_STATE_ACTIVE, &active);
-+
-+	if (!vcpu)
-+		goto out;
-+
-+	map = vgic_irq_map_search(vcpu, virt_irq);
-+	if (!map || map->shared || kvm_vgic_unmap_phys_irq(vcpu, map)) {
-+		WARN_ON(1);
-+		goto out;
-+	}
-+
-+	if (!active) {
-+		/*
-+		 * The physical IRQ is not active so no virtual IRQ
-+		 * is under injection, reset the level state which was
-+		 * not modelled.
-+		 */
-+		vgic_dist_irq_clear_level(vcpu, virt_irq);
-+		goto out;
-+	}
-+
-+	vgic_unqueue_irqs(vcpu);
-+
-+	if (vgic_dist_irq_is_pending(vcpu, virt_irq) ||
-+	    vgic_irq_is_active(vcpu, virt_irq)) {
-+		/*
-+		 * on next flush, LR for virt_irq will be programmed
-+		 * with maintenance IRQ. For level sensitive IRQ,
-+		 * let's set the level which was not modelled up to now
-+		 */
-+		if (is_level)
-+			vgic_dist_irq_set_level(vcpu, virt_irq);
-+	} else {
-+		vgic_dist_irq_clear_level(vcpu, virt_irq);
-+	}
-+
-+out:
-+	/* Let's deactivate and unmap the physical IRQ from the vCPU */
-+	irq_set_irqchip_state(irq, IRQCHIP_STATE_ACTIVE, false);
-+	irq_set_vcpu_affinity(irq, NULL);
-+
-+	spin_unlock(&dist->lock);
-+}
-+
 -- 
-1.9.1
+Computer Architect | Sent from my 64-bit #ARM Powered phone
+
+> On Nov 19, 2015, at 08:18, Will Deacon <will.deacon@arm.com> wrote:
+> 
+> [Thanks Boris for CC'ing me]
+> 
+> Hi all,
+> 
+> Sorry for the delay on this, I had to do some research and this isn't
+> really my area of expertise.
+> 
+>> On Thu, Oct 22, 2015 at 11:57:16AM +0200, Borislav Petkov wrote:
+>> I'm top-posting here because I'm adding some more ARM people to CC and
+>> would like for them to see the whole thing.
+>> 
+>> Ok, so what's the strategy here?
+>> 
+>> I know Tomasz did some untangling of GHES stuff to make it load on ARM
+>> too and be arch-agnostic. The registration code in it is more than the
+>> tiny edac_apei_irq_handler().
+>> 
+>> So why is this thing a separate driver? It is called EDAC_APEI although
+>> it is ARM-specific.
+>> 
+>> Why can't it be part of ghes_edac.c with ARM-specific section, if
+>> absolutely needed?
+>> 
+>> If this is going to implement the ACPI spec, then I don't see anything
+>> vendor-, or arch-specific getting in the way except maybe that APMC0D51
+>> id.
+>> 
+>> Hmmm?
+> 
+> I think you've hit the nail on the head. As far as I can tell, this is
+> *not* conformant to ACPI APEI (which should be platform and architecture
+> agnostic) and is actually an implementation-specific interface. However,
+> I'm happy to be proven wrong if somebody can point me at a document
+> describing ACPI APEI in a way that matches this implementation.
+> 
+>>> +static const struct acpi_device_id edac_apei_match[] = {
+>>> +    { "APMC0D51", 0},
+>>> +    {},
+> 
+> This, in particular, gives the game away methinks.
+> 
+> Will
