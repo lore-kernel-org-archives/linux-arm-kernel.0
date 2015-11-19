@@ -1,89 +1,70 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Thu, 19 Nov 2015 11:35:26 +0800
-Subject: [PATCH v3 08/12] Documentation: dt-bindings: Add bindings for rk3288
- DW MIPI DSI driver
+Date: Thu, 19 Nov 2015 11:35:30 +0800
+Subject: [PATCH v3 12/12] ARM: dts: rockchip: add support mipi panel
+ tv080wum-nl0 for rk3288-evb
 In-Reply-To: <1447904131-29328-1-git-send-email-zyw@rock-chips.com>
 References: <1447904131-29328-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1447904131-29328-9-git-send-email-zyw@rock-chips.com>
+Message-ID: <1447904131-29328-13-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add device tree bindings for rk3288 specific Synopsys DW MIPI DSI driver
+This tv080wum-nl0 panel is a mipi panel, it can use in MIPI_TX socket
+of rk3288 evb board.
 
 Signed-off-by: Chris Zhong <zyw@rock-chips.com>
 
 ---
 
-Changes in v3:
-move dw_mipi_dsi_rockchip.txt to bindings/display/rockchip/
-
+Changes in v3: None
 Changes in v2: None
 
- .../display/rockchip/dw_mipi_dsi_rockchip.txt      | 56 ++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
+ arch/arm/boot/dts/rk3288-evb.dtsi | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
-new file mode 100644
-index 0000000..acd9ec9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
-@@ -0,0 +1,56 @@
-+Rockchip specific extensions to the Synopsys Designware MIPI DSI
-+================================
+diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
+index f6d2e78..d04878f 100644
+--- a/arch/arm/boot/dts/rk3288-evb.dtsi
++++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+@@ -47,7 +47,7 @@
+ 		reg = <0x0 0x80000000>;
+ 	};
+ 
+-	backlight {
++	backlight: backlight {
+ 		compatible = "pwm-backlight";
+ 		brightness-levels = <
+ 			  0   1   2   3   4   5   6   7
+@@ -177,6 +177,21 @@
+ 	status = "okay";
+ };
+ 
++&mipi_dsi {
++	status = "okay";
 +
-+Required properties:
-+- compatible: "rockchip,rk3288-mipi-dsi", "snps,dw-mipi-dsi".
-+- rockchip,grf: this soc should set GRF regs to mux vopl/vopb.
-+- ports: contain a port node with endpoint definitions as defined in [1].
-+  For vopb,set the reg = <0> and set the reg = <1> for vopl.
++	panel {
++		compatible ="boe,tv080wum-nl0";
++		reg = <0>;
 +
-+For more required properties, please refer to [2].
-+
-+[1] Documentation/devicetree/bindings/media/video-interfaces.txt
-+[2] Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
-+
-+Example:
-+	mipi_dsi: mipi at ff960000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "rockchip,rk3288-mipi-dsi", "snps,dw-mipi-dsi";
-+		reg = <0xff960000 0x4000>;
-+		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_MIPI_24M>, <&cru PCLK_MIPI_DSI0>;
-+		clock-names = "ref", "pclk";
-+		rockchip,grf = <&grf>;
++		enable-gpios = <&gpio7 3 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&lcd_en>;
++		backlight = <&backlight>;
 +		status = "okay";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+
-+			mipi_in: port {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				mipi_in_vopb: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&vopb_out_mipi>;
-+				};
-+				mipi_in_vopl: endpoint at 1 {
-+					reg = <1>;
-+					remote-endpoint = <&vopl_out_mipi>;
-+				};
-+			};
-+		};
-+
-+		panel {
-+			compatible ="boe,tv080wum-nl0";
-+			reg = <0>;
-+
-+			enable-gpios = <&gpio7 3 GPIO_ACTIVE_HIGH>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&lcd_en>;
-+			backlight = <&backlight>;
-+			status = "okay";
-+		};
 +	};
++};
++
+ &sdmmc {
+ 	bus-width = <4>;
+ 	cap-mmc-highspeed;
+@@ -247,6 +262,9 @@
+ 		bl_en: bl-en {
+ 			rockchip,pins = <7 2 RK_FUNC_GPIO &pcfg_pull_none>;
+ 		};
++		lcd_en: lcd-en {
++			rockchip,pins = <7 3 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
+ 	};
+ 
+ 	buttons {
 -- 
 2.6.3
