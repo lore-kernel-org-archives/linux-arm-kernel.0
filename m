@@ -1,189 +1,106 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Thu, 19 Nov 2015 15:40:04 -0800
-Subject: [PATCH v2 2/3] ARM: dts: enable clock support for Broadcom NSP
-In-Reply-To: <1447974309-29566-3-git-send-email-jonmason@broadcom.com>
-References: <1447974309-29566-1-git-send-email-jonmason@broadcom.com>
- <1447974309-29566-3-git-send-email-jonmason@broadcom.com>
-Message-ID: <564E5DD4.2070406@broadcom.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 20 Nov 2015 00:43:31 +0100
+Subject: [PATCH] ARM: sunxi: Re-enable SID driver in sunxi_defconfig
+In-Reply-To: <1447969715.1730.5.camel@silentcreek.de>
+References: <1447724578-4786-1-git-send-email-public_timo.s@silentcreek.de>
+ <1447969715.1730.5.camel@silentcreek.de>
+Message-ID: <20151119234331.GT32142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Thu, Nov 19, 2015 at 10:48:35PM +0100, Timo Sigurdsson wrote:
+> Hi Maxime,
+> Hi Chen-Yu,
+> 
+> Am Dienstag, den 17.11.2015, 02:42 +0100 schrieb Timo Sigurdsson:
+> > Commit 3d0b16a66c8a ("nvmem: sunxi: Move the SID driver to the nvmem
+> > framework") moved the the sunxi SID driver to a new framework, but left
+> > sunxi_defconfig with the deprecated config symbol EEPROM_SUNXI_SID
+> > instead of the new symbold NVMEM_SUNXI_SID. Hence, re-enable the driver
+> > in sunxi_defconfig.
+> > 
+> > While at it, clean up sunxi_defconfig by generating a fresh file via
+> >   make sunxi_defconfig
+> >   make savedefconfig
+> > While this moves around a few lines and removes unnecessary symbols,
+> > it doesn't introduce any functional changes.
+> > 
+> > Signed-off-by: Timo Sigurdsson <public_timo.s@silentcreek.de>
+> > 
+> > diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+> > index 3c36e16..904ea52 100644
+> > --- a/arch/arm/configs/sunxi_defconfig
+> > +++ b/arch/arm/configs/sunxi_defconfig
+> > @@ -11,14 +11,12 @@ CONFIG_SMP=y
+> >  CONFIG_NR_CPUS=8
+> >  CONFIG_AEABI=y
+> >  CONFIG_HIGHMEM=y
+> > -CONFIG_HIGHPTE=y
+> >  CONFIG_ARM_APPENDED_DTB=y
+> >  CONFIG_ARM_ATAG_DTB_COMPAT=y
+> >  CONFIG_CPU_FREQ=y
+> >  CONFIG_CPUFREQ_DT=y
+> >  CONFIG_VFP=y
+> >  CONFIG_NEON=y
+> > -CONFIG_PM=y
+> >  CONFIG_NET=y
+> >  CONFIG_PACKET=y
+> >  CONFIG_UNIX=y
+> > @@ -37,7 +35,6 @@ CONFIG_CAN_SUN4I=y
+> >  # CONFIG_WIRELESS is not set
+> >  CONFIG_DEVTMPFS=y
+> >  CONFIG_DEVTMPFS_MOUNT=y
+> > -CONFIG_EEPROM_SUNXI_SID=y
+> >  CONFIG_BLK_DEV_SD=y
+> >  CONFIG_ATA=y
+> >  CONFIG_AHCI_SUNXI=y
+> > @@ -63,11 +60,10 @@ CONFIG_STMMAC_ETH=y
+> >  # CONFIG_INPUT_MOUSEDEV is not set
+> >  # CONFIG_INPUT_KEYBOARD is not set
+> >  # CONFIG_INPUT_MOUSE is not set
+> > -CONFIG_INPUT_MISC=y
+> > -CONFIG_INPUT_AXP20X_PEK=y
+> >  CONFIG_INPUT_TOUCHSCREEN=y
+> > -CONFIG_KEYBOARD_SUN4I_LRADC=y
+> >  CONFIG_TOUCHSCREEN_SUN4I=y
+> > +CONFIG_INPUT_MISC=y
+> > +CONFIG_INPUT_AXP20X_PEK=y
+> >  CONFIG_SERIAL_8250=y
+> >  CONFIG_SERIAL_8250_CONSOLE=y
+> >  CONFIG_SERIAL_8250_NR_UARTS=8
+> > @@ -123,6 +119,8 @@ CONFIG_PWM=y
+> >  CONFIG_PWM_SUN4I=y
+> >  CONFIG_PHY_SUN4I_USB=y
+> >  CONFIG_PHY_SUN9I_USB=y
+> > +CONFIG_NVMEM=y
+> > +CONFIG_NVMEM_SUNXI_SID=y
+> >  CONFIG_EXT4_FS=y
+> >  CONFIG_VFAT_FS=y
+> >  CONFIG_TMPFS=y
+> 
+> Would you also prefer to see this patch split up into two patches (one
+> for re-enabling the SID driver and one for the extra cleanup of
+> sunxi_defconfg) as I was asked to do for my other patch for
+> multi_v7_defconfig?
 
-On 11/19/2015 3:05 PM, Jon Mason wrote:
-> Replace current device tree dummy clocks with real clock support for
-> Broadcom Northstar Plus SoC
->
-> Signed-off-by: Jon Mason <jonmason@broadcom.com>
-> ---
->   arch/arm/boot/dts/bcm-nsp.dtsi | 77 +++++++++++++++++++++++++++++++++++-------
->   1 file changed, 64 insertions(+), 13 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-> index b74438c..361c2a6 100644
-> --- a/arch/arm/boot/dts/bcm-nsp.dtsi
-> +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-> @@ -32,6 +32,7 @@
->
->   #include <dt-bindings/interrupt-controller/arm-gic.h>
->   #include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/clock/bcm-nsp.h>
->
->   #include "skeleton.dtsi"
->
-> @@ -42,7 +43,7 @@
->
->   	mpcore {
->   		compatible = "simple-bus";
-> -		ranges = <0x00000000 0x19020000 0x00003000>;
-> +		ranges = <0x00000000 0x19000000 0x00023000>;
->   		#address-cells = <1>;
->   		#size-cells = <1>;
->
-> @@ -58,16 +59,23 @@
->   			};
->   		};
->
-> +		a9pll: arm_clk at 0000 {
-> +			#clock-cells = <0>;
-> +			compatible = "brcm,nsp-armpll";
-> +			clocks = <&osc>;
-> +			reg = <0x0000 0x1000>;
-> +		};
-> +
->   		timer at 0200 {
+Yes, please do.
 
-timer at 20200. Or is this addressed in another patch? I completely lose 
-track of these....
+Also why CONFIG_PM CONFIG_KEYBOARD_SUN4I_LRADC and CONFIG_HIGHPTE got
+removed ?
 
->   			compatible = "arm,cortex-a9-global-timer";
-> -			reg = <0x0200 0x100>;
-> +			reg = <0x20200 0x100>;
->   			interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
->   			clocks = <&periph_clk>;
->   		};
->
->   		twd-timer at 0600 {
+Thanks,
+Maxime
 
-twd-timer at 20600
-
->   			compatible = "arm,cortex-a9-twd-timer";
-> -			reg = <0x0600 0x20>;
-> +			reg = <0x20600 0x20>;
->   			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
->   						  IRQ_TYPE_LEVEL_HIGH)>;
->   			clocks = <&periph_clk>;
-> @@ -75,7 +83,7 @@
->
->   		twd-watchdog at 0620 {
-
-same here
-
->   			compatible = "arm,cortex-a9-twd-wdt";
-> -			reg = <0x0620 0x20>;
-> +			reg = <0x20620 0x20>;
->   			interrupts = <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
->   						  IRQ_TYPE_LEVEL_HIGH)>;
->   			clocks = <&periph_clk>;
-> @@ -86,13 +94,13 @@
->   			#interrupt-cells = <3>;
->   			#address-cells = <0>;
->   			interrupt-controller;
-> -			reg = <0x1000 0x1000>,
-> -			      <0x0100 0x100>;
-> +			reg = <0x21000 0x1000>,
-> +			      <0x20100 0x100>;
->   		};
->
->   		L2: l2-cache {
->   			compatible = "arm,pl310-cache";
-> -			reg = <0x2000 0x1000>;
-> +			reg = <0x22000 0x1000>;
->   			cache-unified;
->   			cache-level = <2>;
->   		};
-> @@ -103,10 +111,34 @@
->   		#size-cells = <1>;
->   		ranges;
->
-> -		periph_clk: periph_clk {
-> +		osc: oscillator {
-> +			#clock-cells = <0>;
->   			compatible = "fixed-clock";
-> +			clock-frequency = <25000000>;
-> +		};
-> +
-> +		iprocmed: iprocmed {
-> +			#clock-cells = <0>;
-> +			compatible = "fixed-factor-clock";
-> +			clocks = <&genpll BCM_NSP_GENPLL_IPROCFAST_CLK>;
-> +			clock-div = <2>;
-> +			clock-mult = <1>;
-> +		};
-> +
-> +		iprocslow: iprocslow {
-> +			#clock-cells = <0>;
-> +			compatible = "fixed-factor-clock";
-> +			clocks = <&genpll BCM_NSP_GENPLL_IPROCFAST_CLK>;
-> +			clock-div = <4>;
-> +			clock-mult = <1>;
-> +		};
-> +
-> +		periph_clk: periph_clk {
->   			#clock-cells = <0>;
-> -			clock-frequency = <500000000>;
-> +			compatible = "fixed-factor-clock";
-> +			clocks = <&a9pll>;
-> +			clock-div = <2>;
-> +			clock-mult = <1>;
->   		};
->   	};
->
-> @@ -118,17 +150,17 @@
->
->   		uart0: serial at 0300 {
->   			compatible = "ns16550a";
-> -			reg = <0x0300 0x100>;
-> +			reg = <0x000300 0x100>;
->   			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-> -			clock-frequency = <62499840>;
-> +			clocks = <&osc>;
->   			status = "disabled";
->   		};
->
->   		uart1: serial at 0400 {
->   			compatible = "ns16550a";
-> -			reg = <0x0400 0x100>;
-> +			reg = <0x000400 0x100>;
->   			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-> -			clock-frequency = <62499840>;
-> +			clocks = <&osc>;
->   			status = "disabled";
->   		};
->
-> @@ -226,5 +258,24 @@
->   			interrupts = <GIC_SPI 89 IRQ_TYPE_NONE>;
->   			clock-frequency = <100000>;
->   		};
-> +
-> +		lcpll0: lcpll0 at 3f100 {
-> +			#clock-cells = <1>;
-> +			compatible = "brcm,nsp-lcpll0";
-> +			reg = <0x3f100 0x14>;
-> +			clocks = <&osc>;
-> +			clock-output-names = "lcpll0", "pcie_phy", "sdio",
-> +					     "ddr_phy";
-> +		};
-> +
-> +		genpll: genpll at 3f140 {
-> +			#clock-cells = <1>;
-> +			compatible = "brcm,nsp-genpll";
-> +			reg = <0x3f140 0x24>;
-> +			clocks = <&osc>;
-> +			clock-output-names = "genpll", "phy", "ethernetclk",
-> +					     "usbclk", "iprocfast", "sata1",
-> +					     "sata2";
-> +		};
->   	};
->   };
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/cdf3bdc5/attachment.sig>
