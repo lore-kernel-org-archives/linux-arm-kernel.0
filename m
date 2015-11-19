@@ -1,93 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Nov 2015 18:17:24 +0000
-Subject: [PATCH] arm64: efi: correctly align vaddr for runtime maps
-In-Reply-To: <CAKv+Gu9OoRmV5hDsN9MrnKEVV85EFPpN_tW7S1WoFMxNxoY73Q@mail.gmail.com>
-References: <1447954656-10435-1-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu9OoRmV5hDsN9MrnKEVV85EFPpN_tW7S1WoFMxNxoY73Q@mail.gmail.com>
-Message-ID: <20151119181724.GC15231@leverpostej>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 19 Nov 2015 15:18:47 -0300
+Subject: [PATCH v2 0/6] Switch to generic syscon regmap based drivers
+In-Reply-To: <CAGOxZ50b3cGXQSFL1uXt7O=CyBOaE=7WRQ-tSz8NUmWzBdhxoQ@mail.gmail.com>
+References: <1445333085-22837-1-git-send-email-alim.akhtar@samsung.com>
+ <CAGOxZ50G-ttivhVjbozUisA0HXcFz7bvRUuPR67xR88TTCa_wQ@mail.gmail.com>
+ <CAGOxZ51_JPy51htzD_M_=qaPVUexkVhoA2ANLS2-rpK3QDT=8A@mail.gmail.com>
+ <1606098.olLAyTIhB3@dell2.five-lan.de>
+ <56272C1C.8040007@samsung.com> <562765F3.9010306@osg.samsung.com>
+ <CAGOxZ52-ia8uhgGg5CiU9TSYkfAsRD52zvLqq++Y-mr4uaFOpg@mail.gmail.com>
+ <5627A75E.60509@osg.samsung.com>
+ <CAGOxZ537QuzBP4tcG9qh-+iXK-Y=WwZGiJ1-cwtLqwRf0a+wVA@mail.gmail.com>
+ <56282B2D.6000708@samsung.com>
+ <CAGOxZ50b3cGXQSFL1uXt7O=CyBOaE=7WRQ-tSz8NUmWzBdhxoQ@mail.gmail.com>
+Message-ID: <CABxcv=nr3ueCouu5R-z7uVbYx4nkOgqbY0s8Vh8hPBKpLj1FTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2015 at 07:08:53PM +0100, Ard Biesheuvel wrote:
-> On 19 November 2015 at 18:37, Mark Rutland <mark.rutland@arm.com> wrote:
-> > The kernel may use a page granularity of 4K, 16K, or 64K depending on
-> > configuration.
-> >
-> > When mapping EFI runtime regions, we use memrange_efi_to_native to round
-> > the physical base address of a region down to a granule-aligned
-> > boundary, and round the size up to a granule-aligned boundary. However,
-> > we fail to similarly round the virtual base address down to a
-> > granule-aligned boundary.
-> >
-> 
-> Actually, __create_mapping() (which is called by create_pgd_mapping())
-> does the following
-> 
-> """
-> static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
->                                     phys_addr_t phys, unsigned long virt,
->                                     phys_addr_t size, pgprot_t prot,
->                                     void *(*alloc)(unsigned long size))
-> {
->         unsigned long addr, length, end, next;
-> 
->         addr = virt & PAGE_MASK;
->         length = PAGE_ALIGN(size + (virt & ~PAGE_MASK));
-> """
-> 
-> so it does the rounding of the virtual address for us, but we are
-> rounding up the length twice.
-> I'd rather simply get rid of memrange_efi_to_native() instead, as it
-> is obviously redundant.
+Hello Alim,
 
-We'd have to have our own conversion from EFI page size to kernel page
-size, but otherwise that would be fine, yes.
+On Thu, Nov 19, 2015 at 3:06 PM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
 
-I'll spin a v2 to that effect.
+[snip]
 
-> > The virtual base address may be up to PAGE_SIZE - 4K above what it
-> > should be, and in create_pgd_mapping, we may erroneously map an
-> > additional page at the end of any region which does not have a
-> > granule-aligned virtual base address.
-> >
-> > Depending on the memory map, this page may be in a region we are not
-> > intended/permitted to map, or may clash with a different region that we
-> > wich to map.
-> >
-> > Prevent this issue by rounding the virtual base address down to the
-> > kernel page granularity, matching what we do for the physical base
-> > address.
-> >
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Leif Lindholm <leif.lindholm@linaro.org>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/kernel/efi.c | 6 ++++--
-> >  1 file changed, 4 insertions(+), 2 deletions(-)
-> >
-> > I spotted this by playing with Will's break-before-make checker [1], which
-> > detected an erroneously created PTE being overwritten with a different output
-> > address.
-> >
-> > It looks like the VA bug was introduced in commit f3cdfd239da56a4c ("arm64/efi:
-> > move SetVirtualAddressMap() to UEFI stub").
-> >
-> > Prior to commit 60305db9884515ca ("arm64/efi: move virtmap init to early
-> > initcall") so manual fixup is required, but the logic fix is the same.
-> >
-> 
-> I don't follow
+>>
+>> Javier, Alim, Ulf,
+>>
+>> I am not grabbing any more patches for v4.4 because I doubt that they
+>> could be merged to arm-soc for this cycle. My last pull requests for
+>> v4.4 is still pending...
+>>
+>> This means that I plan to pick up these series for v4.5, after closing
+>> v4.4 merge window (unless Kukjin picks it also). Because of that, we
+>> have plenty of time, so my idea is:
+>> 1. Wait for some comments from Ulf on Javier's fix.
+>> 2. If the fix goes into v4.4, then problem solved.
+>> 3. If not and it get acked, then it can go with this set.
+>> 4. If not and it get applied by Ulf for v4.5, then a tag from him would
+>> be a nice way to solve dependency.
+>>
+>> Either way we don't have to hurry, I think.
+>>
+>
+> Is It the right time to get this series in?
 
-Prior to f3cdfd239da56a4c we didn't align the PA and VA separately, so
-we didn't have this bug.
+The patch that the series had as a dependency made it to v4.4-rc1 as
+commit 1c6e58d83615 ("mmc: pwrseq: Use highest priority for eMMC
+restart handler") so it should be safe now to pick this series for
+v4.5.
 
-In 60305db9884515ca we moved the code around a bit, so the patch won't
-apply, but the diff is practically identical.
+> Thanks!!
+>
 
-When running with Will's patch, I spotted the bug due to the additional
-page clashing with the mapping created for an adjacent region.
-
-Thanks,
-Mark.
+Best regards,
+Javier
