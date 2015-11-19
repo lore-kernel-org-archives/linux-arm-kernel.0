@@ -1,34 +1,32 @@
-From: rklein@nvidia.com (Rhyland Klein)
-Date: Thu, 19 Nov 2015 17:40:07 -0500
-Subject: [PATCH] clk: tegra: move _calc_dynamic_ram_rate out of #ifdef
-In-Reply-To: <4290741.p1jMzEOUEU@wuerfel>
-References: <4290741.p1jMzEOUEU@wuerfel>
-Message-ID: <564E4FC7.9040302@nvidia.com>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Fri, 20 Nov 2015 09:59:11 +1100
+Subject: [linux-sunxi] [PATCH] spi: dts: sun4i: Add support for inter-word
+ wait cycles using the SPI Wait Clock Register
+In-Reply-To: <1447948422-4915-2-git-send-email-mweseloh42@gmail.com>
+References: <1447948422-4915-1-git-send-email-mweseloh42@gmail.com>
+ <1447948422-4915-2-git-send-email-mweseloh42@gmail.com>
+Message-ID: <CAGRGNgWQLE5h03+4shLmqD6iW_p=L-i3ewdLb8ndWpxGHWh4rQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2015 5:32 PM, Arnd Bergmann wrote:
-> _calc_dynamic_ram_rate is defined inside an #ifdef but called
-> later in the same file outside of that #ifdef, which can cause a
-> build error:
-> 
-> drivers/clk/tegra/clk-pll.c: In function '_tegra_clk_register_pll':
-> drivers/clk/tegra/clk-pll.c:1541:29: error: '_calc_dynamic_ramp_rate' undeclared (first use in this function)
-> 
-> This moves both _calc_dynamic_ram_rate and _pll_fixed_mdiv in
-> front of the #ifdef to make all configurations compile again.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 44c8b9fa432c ("clk: tegra: pll: Fix _pll_ramp_calc_pll logic and _calc_dynamic_ramp_rate")
-> ----
-> The patch that caused it appears to be older, but I only ran into
-> the randconfig bug today for the first time. Apparently the commit
-> is only in linux-next at the moment, not in 4.4-rc1
-> 
+Hi Marcus,
 
-Acked-by: Rhyland Klein <rklein@nvidia.com>
+On Fri, Nov 20, 2015 at 2:53 AM, Marcus Weseloh <mweseloh42@gmail.com> wrote:
+> Adds support and documentation for a new slave device property
+> "sun4i,spi-wdelay" that allows to set the SPI Wait Clock Register per
+> device / transfer. The SPI hardware will wait the specified amount of
+> SPI clock periods (plus a constant 3 clock periods) before transmitting
+> the next word.
 
--rhyland
+Should you possibly hide the 3 clock periods from the user?
+
+I.e. they set whatever they want for the wdelay, we set it to the
+closest number we can that's greater or equal to what they ask for.
+
+Thanks,
 
 -- 
-nvpublic
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
