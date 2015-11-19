@@ -1,99 +1,49 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 19 Nov 2015 11:19:03 -0600
-Subject: [PATCH v3 08/12] Documentation: dt-bindings: Add bindings for
- rk3288 DW MIPI DSI driver
-In-Reply-To: <1447904131-29328-9-git-send-email-zyw@rock-chips.com>
-References: <1447904131-29328-1-git-send-email-zyw@rock-chips.com>
- <1447904131-29328-9-git-send-email-zyw@rock-chips.com>
-Message-ID: <20151119171903.GA16682@rob-hp-laptop>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Thu, 19 Nov 2015 18:24:50 +0100
+Subject: [PATCH v9 2/2] arm-soc: Add support for tango4 platforms
+In-Reply-To: <7ha8qbyyiz.fsf@deeprootsystems.com>
+References: <564C94A5.4060301@sigmadesigns.com>
+ <564C9558.4020100@sigmadesigns.com> <7ha8qbyyiz.fsf@deeprootsystems.com>
+Message-ID: <564E05E2.3060004@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2015 at 11:35:26AM +0800, Chris Zhong wrote:
-> add device tree bindings for rk3288 specific Synopsys DW MIPI DSI driver
-> 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+Kevin Hilman wrote:
 
-Acked-by: Rob Herring <robh@kernel.org>
+> Marc Gonzalez wrote:
+> 
+>> Add support for Sigma Designs ARM-based Tango4 "Secure Media Processor"
+>> platforms (i.e. smp8734, smp8756, smp8758, smp8759) built around the
+>> Cortex-A9 MPCore r3p0 (all dual-core, except the 8756).
+>>
+>> Support for older MIPS-based platforms can be found elsewhere:
+>> https://github.com/mansr/linux-tangox
+>>
+>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>> ---
+>>  arch/arm/Kconfig              |  2 ++
+>>  arch/arm/Makefile             |  1 +
+>>  arch/arm/mach-tangox/Kconfig  | 12 ++++++++++++
+>>  arch/arm/mach-tangox/Makefile |  2 ++
+>>  arch/arm/mach-tangox/setup.c  | 32 ++++++++++++++++++++++++++++++++
+>>  arch/arm/mach-tangox/smc.S    |  9 +++++++++
+>>  arch/arm/mach-tangox/smc.h    |  5 +++++
+> 
+> Potential bike-shed fodder, but, a dumb question: is the family name
+> actually "tangox" or is the "x" for the number (tango3, tango4, etc.)
+> 
+> Assuming it's the later based on usage throughout the patch, I think
+> it'd be better to just use "tango" throughout instead of tangox.
 
-> 
-> ---
-> 
-> Changes in v3:
-> move dw_mipi_dsi_rockchip.txt to bindings/display/rockchip/
-> 
-> Changes in v2: None
-> 
->  .../display/rockchip/dw_mipi_dsi_rockchip.txt      | 56 ++++++++++++++++++++++
->  1 file changed, 56 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
-> new file mode 100644
-> index 0000000..acd9ec9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
-> @@ -0,0 +1,56 @@
-> +Rockchip specific extensions to the Synopsys Designware MIPI DSI
-> +================================
-> +
-> +Required properties:
-> +- compatible: "rockchip,rk3288-mipi-dsi", "snps,dw-mipi-dsi".
-> +- rockchip,grf: this soc should set GRF regs to mux vopl/vopb.
-> +- ports: contain a port node with endpoint definitions as defined in [1].
-> +  For vopb,set the reg = <0> and set the reg = <1> for vopl.
-> +
-> +For more required properties, please refer to [2].
-> +
-> +[1] Documentation/devicetree/bindings/media/video-interfaces.txt
-> +[2] Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
-> +
-> +Example:
-> +	mipi_dsi: mipi at ff960000 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "rockchip,rk3288-mipi-dsi", "snps,dw-mipi-dsi";
-> +		reg = <0xff960000 0x4000>;
-> +		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru SCLK_MIPI_24M>, <&cru PCLK_MIPI_DSI0>;
-> +		clock-names = "ref", "pclk";
-> +		rockchip,grf = <&grf>;
-> +		status = "okay";
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <1>;
-> +
-> +			mipi_in: port {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				mipi_in_vopb: endpoint at 0 {
-> +					reg = <0>;
-> +					remote-endpoint = <&vopb_out_mipi>;
-> +				};
-> +				mipi_in_vopl: endpoint at 1 {
-> +					reg = <1>;
-> +					remote-endpoint = <&vopl_out_mipi>;
-> +				};
-> +			};
-> +		};
-> +
-> +		panel {
-> +			compatible ="boe,tv080wum-nl0";
-> +			reg = <0>;
-> +
-> +			enable-gpios = <&gpio7 3 GPIO_ACTIVE_HIGH>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&lcd_en>;
-> +			backlight = <&backlight>;
-> +			status = "okay";
-> +		};
-> +	};
-> -- 
-> 2.6.3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I should just change tangox to tango everywhere?
+
+This port supports tango4. I will submit a tango5 port in 2016.
+Does that change anything?
+
+> Also a MAINTAINERS file entry is appropriate for this new platform
+> support (as scripts/checkpatch.pl should have told you.)
+
+Thanks for pointing that out. I'll send a v10.
+Are these the only issues in your opinion?
+
+Regards.
