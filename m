@@ -1,58 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Nov 2015 15:33:41 +0100
-Subject: [PATCH] [RESEND 2] SCSI: initio: remove duplicate module device table
-Message-ID: <5318263.D61echQrl2@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 19 Nov 2015 08:36:52 -0600
+Subject: [PATCH RFC 25/27] devicetree: bindings: Document qcom,
+ msm-id and qcom, board-id
+In-Reply-To: <1447799871-56374-26-git-send-email-lina.iyer@linaro.org>
+References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
+ <1447799871-56374-26-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAL_JsqJAOEvs08Jydn9wWtM7-Oxd=MmmDER48VRF7z3Gkzt0CQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The initio driver has for many years had two copies of the
-same module device table. One of them is also used for registering
-the other driver, the other one is entirely useless after the
-large scale cleanup that Alan Cox did back in 2007.
+On Tue, Nov 17, 2015 at 4:37 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> From: Kumar Gala <galak@codeaurora.org>
+>
+> The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
+> on Qualcomm MSM platforms to determine which device tree should be
+> utilized and passed to the kernel.
 
-The compiler warns about this whenever the driver is built-in:
+See [1] and the link there to the prior version which is like this one.
 
-drivers/scsi/initio.c:131:29: warning: 'i91u_pci_devices' defined but not used [-Wunused-variable]
+Rob
 
-This removes the extraneous table and the warning.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 72d39fea901 ("[SCSI] initio: Convert into a real Linux driver and update to modern style")
----
-I sent this patch originally in January 2015, then again in May, but got no
-reply. Please apply.
-
-diff --git a/drivers/scsi/initio.c b/drivers/scsi/initio.c
-index 6a926bae76b2..7a91cf3ff173 100644
---- a/drivers/scsi/initio.c
-+++ b/drivers/scsi/initio.c
-@@ -110,11 +110,6 @@
- #define i91u_MAXQUEUE		2
- #define i91u_REVID "Initio INI-9X00U/UW SCSI device driver; Revision: 1.04a"
- 
--#define I950_DEVICE_ID	0x9500	/* Initio's inic-950 product ID   */
--#define I940_DEVICE_ID	0x9400	/* Initio's inic-940 product ID   */
--#define I935_DEVICE_ID	0x9401	/* Initio's inic-935 product ID   */
--#define I920_DEVICE_ID	0x0002	/* Initio's other product ID      */
--
- #ifdef DEBUG_i91u
- static unsigned int i91u_debug = DEBUG_DEFAULT;
- #endif
-@@ -127,17 +122,6 @@ static int setup_debug = 0;
- 
- static void i91uSCBPost(u8 * pHcb, u8 * pScb);
- 
--/* PCI Devices supported by this driver */
--static struct pci_device_id i91u_pci_devices[] = {
--	{ PCI_VENDOR_ID_INIT,  I950_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
--	{ PCI_VENDOR_ID_INIT,  I940_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
--	{ PCI_VENDOR_ID_INIT,  I935_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
--	{ PCI_VENDOR_ID_INIT,  I920_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
--	{ PCI_VENDOR_ID_DOMEX, I920_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
--	{ }
--};
--MODULE_DEVICE_TABLE(pci, i91u_pci_devices);
--
- #define DEBUG_INTERRUPT 0
- #define DEBUG_QUEUE     0
- #define DEBUG_STATE     0
+[1] https://lkml.org/lkml/2015/10/26/651
