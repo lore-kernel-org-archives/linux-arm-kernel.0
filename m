@@ -1,60 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Nov 2015 18:32:01 +0000
-Subject: [PATCH] arm64: efi: correctly align vaddr for runtime maps
-In-Reply-To: <CAKv+Gu_KK_0DE668jz7gaJHwr3RFz0kAX=sokCG91+xWy6T-+A@mail.gmail.com>
-References: <1447954656-10435-1-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu9OoRmV5hDsN9MrnKEVV85EFPpN_tW7S1WoFMxNxoY73Q@mail.gmail.com>
- <20151119181724.GC15231@leverpostej>
- <CAKv+Gu_KK_0DE668jz7gaJHwr3RFz0kAX=sokCG91+xWy6T-+A@mail.gmail.com>
-Message-ID: <20151119183201.GD15231@leverpostej>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 19 Nov 2015 10:33:45 -0800
+Subject: [PATCH] ARM: OMAP2: use correct timer function for AM43XX and
+ TI81XX
+In-Reply-To: <87io4yezi9.fsf@saruman.tx.rr.com>
+References: <4016134.4bReocePei@wuerfel> <87egfplka4.fsf@saruman.tx.rr.com>
+ <6973517.kQfhdpsmVt@wuerfel> <87io4yezi9.fsf@saruman.tx.rr.com>
+Message-ID: <20151119183345.GT2498@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2015 at 07:29:18PM +0100, Ard Biesheuvel wrote:
-> On 19 November 2015 at 19:17, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Thu, Nov 19, 2015 at 07:08:53PM +0100, Ard Biesheuvel wrote:
-> >> On 19 November 2015 at 18:37, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> > The kernel may use a page granularity of 4K, 16K, or 64K depending on
-> >> > configuration.
-> >> >
-> >> > When mapping EFI runtime regions, we use memrange_efi_to_native to round
-> >> > the physical base address of a region down to a granule-aligned
-> >> > boundary, and round the size up to a granule-aligned boundary. However,
-> >> > we fail to similarly round the virtual base address down to a
-> >> > granule-aligned boundary.
-> >> >
-> >>
-> >> Actually, __create_mapping() (which is called by create_pgd_mapping())
-> >> does the following
-> >>
-> >> """
-> >> static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
-> >>                                     phys_addr_t phys, unsigned long virt,
-> >>                                     phys_addr_t size, pgprot_t prot,
-> >>                                     void *(*alloc)(unsigned long size))
-> >> {
-> >>         unsigned long addr, length, end, next;
-> >>
-> >>         addr = virt & PAGE_MASK;
-> >>         length = PAGE_ALIGN(size + (virt & ~PAGE_MASK));
-> >> """
-> >>
-> >> so it does the rounding of the virtual address for us, but we are
-> >> rounding up the length twice.
-> >> I'd rather simply get rid of memrange_efi_to_native() instead, as it
-> >> is obviously redundant.
-> >
-> > We'd have to have our own conversion from EFI page size to kernel page
-> > size, but otherwise that would be fine, yes.
-> >
-> > I'll spin a v2 to that effect.
-> >
+* Felipe Balbi <balbi@ti.com> [151119 08:16]:
 > 
-> The size is simply 'md->num_pages << EFI_PAGE_SHIFT'
+> Hi,
+> 
+> Arnd Bergmann <arnd@arndb.de> writes:
+> > On Monday 16 November 2015 15:13:55 Felipe Balbi wrote:
+> >> Arnd Bergmann <arnd@arndb.de> writes:
+> >> > AM43XX and TI81XX use omap3_gptimer_timer_init(), but that is only
+> >> > built into the kernel for OMAP3 and AM33XX, otherwise we get:
+> >> >
+> >> > arch/arm/mach-omap2/built-in.o:(.arch.info.init+0x124): undefined reference to `omap3_gptimer_timer_init'
+> >> >
+> >> > This changes the Kconfig logic for building the function to
+> >> > match the callers. Consequently, we no longer need to build
+> >> > the omap3_secure_sync32k_timer_init and omap4_local_timer_init
+> >> > for the platforms that have been moved over to other functions.
+> >> >
+> >> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> >> 
+> >> no, AM43xx uses omap4_local_timer_init(), there's already a fix in
+> >> Tony's tree IIRC.
+> > ...
+> >  
+> >> care to provide a defconfig which would cause a build error ?
+> >
+> > My mistake, the code has changed several times and I adapted it to
+> > the latest version each time, but the version I sent out is indeed
+> > useless.
+> >
+> > The only hunk that still makes sense is
+> >
+> > diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> > index b18ebbefae09..b7ab09cc5ca2 100644
+> > --- a/arch/arm/mach-omap2/timer.c
+> > +++ b/arch/arm/mach-omap2/timer.c
+> > @@ -494,7 +494,7 @@ void __init omap_init_time(void)
+> >  		clocksource_probe();
+> >  }
+> >  
+> > -#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM43XX)
+> > +#if defined(CONFIG_ARCH_OMAP3)
+> >  void __init omap3_secure_sync32k_timer_init(void)
+> >  {
+> >  	__omap_sync32k_timer_init(12, "secure_32k_fck", "ti,timer-secure",
+> >
+> >
+> > but that is harmless as it does not cause a build error, just a few extra
+> > bytes for an unused function in a AM43XX-only configuration.
+> 
+> I think that's still useful. Tony ?
 
-Indeed, I figured this out immediately after sending the last mail.
+Yeah makes sense to me. We already have omap4_sync32k_timer_init() when
+am437x PM gets enabled.
 
-It looks much nicer now. I'll post it once I've given it a spin.
+Regards,
 
-Thanks,
-Mark.
+Tony
