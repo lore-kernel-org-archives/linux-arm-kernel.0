@@ -1,52 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Nov 2015 13:49:59 +0100
-Subject: [PATCH] netfilter: avoid harmless unnitialized variable warnings
-Message-ID: <5585663.OcpAQiytKY@wuerfel>
+From: treding@nvidia.com (Thierry Reding)
+Date: Thu, 19 Nov 2015 13:56:45 +0100
+Subject: [PATCH v3 2/5] dt-bindings: soc: add document for rockchip
+ reboot notifier driver
+In-Reply-To: <564D2331.8070503@rock-chips.com>
+References: <1447840044-19689-1-git-send-email-andy.yan@rock-chips.com>
+ <1447840410-19794-1-git-send-email-andy.yan@rock-chips.com>
+ <20151118225904.GA5429@rob-hp-laptop>
+ <564D2331.8070503@rock-chips.com>
+Message-ID: <20151119125643.GE21862@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Several ARM default configurations give us warnings on recent
-compilers about potentially uninitialized variables in the
-nfnetlink code in two functions:
+On Thu, Nov 19, 2015 at 09:17:37AM +0800, Andy Yan wrote:
+> Hi Rob:
+> 
+> On 2015?11?19? 06:59, Rob Herring wrote:
+> >On Wed, Nov 18, 2015 at 05:53:30PM +0800, Andy Yan wrote:
+> >>Add devicetree binding document for rockchip reboot nofifier driver
+> >Just reading the subject this is way too specific to the Linux driver
+> >needs rather than a h/w description. Please don't create fake DT nodes
+> >just to bind to drivers. Whatever &pmu is is probably what should have
+> >the DT node. Let the driver for it create child devices if you need
+> >that.
+> 
+>     This is note a fake DT nodes, we really need it to tell the driver
+>      which register to use to store the reboot mode. Because rockchip
+>      use different register file to store the reboot mode on different
+>      platform, on rk3066,rk3188, rk3288,it use  one of the PMU register, on
+>      the incoming RK3036, it use one of the GRF register, and it use one  of
+>      the PMUGRF register for arm64 platform rk3368. On the other hand, the
+>      PMU/GRF/PMUGRF register file are mapped as "syscon", then referenced
+>      by other DT nodes by phandle. So maybe let it as a separate DT node
+> here
+>      is better.
 
-net/netfilter/nfnetlink_queue.c: In function 'nfqnl_build_packet_message':
-net/netfilter/nfnetlink_queue.c:519:19: warning: 'nfnl_ct' may be used uninitialized in this function [-Wmaybe-uninitialized]
-  if (ct && nfnl_ct->build(skb, ct, ctinfo, NFQA_CT, NFQA_CT_INFO) < 0)
+In that case you should probably implement a reboot notifier in each of
+the drivers you list and depending on the generation of the SoC. You can
+easily parameterize this by matching on the compatible string.
 
-Moving the rcu_dereference(nfnl_ct_hook) call outside of the
-conditional code avoids the warning without forcing us to
-preinitialize the variable.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: a4b4766c3ceb ("netfilter: nfnetlink_queue: rename related to nfqueue attaching conntrack info")
-
----
-
-diff --git a/net/netfilter/nfnetlink_queue.c b/net/netfilter/nfnetlink_queue.c
-index 7d81d280cb4f..3e240544f346 100644
---- a/net/netfilter/nfnetlink_queue.c
-+++ b/net/netfilter/nfnetlink_queue.c
-@@ -365,8 +365,9 @@ nfqnl_build_packet_message(struct net *net, struct nfqnl_instance *queue,
- 		break;
- 	}
- 
-+	nfnl_ct = rcu_dereference(nfnl_ct_hook);
-+
- 	if (queue->flags & NFQA_CFG_F_CONNTRACK) {
--		nfnl_ct = rcu_dereference(nfnl_ct_hook);
- 		if (nfnl_ct != NULL) {
- 			ct = nfnl_ct->get_ct(entskb, &ctinfo);
- 			if (ct != NULL)
-@@ -1064,9 +1065,10 @@ nfqnl_recv_verdict(struct sock *ctnl, struct sk_buff *skb,
- 	if (entry == NULL)
- 		return -ENOENT;
- 
-+	/* rcu lock already held from nfnl->call_rcu. */
-+	nfnl_ct = rcu_dereference(nfnl_ct_hook);
-+
- 	if (nfqa[NFQA_CT]) {
--		/* rcu lock already held from nfnl->call_rcu. */
--		nfnl_ct = rcu_dereference(nfnl_ct_hook);
- 		if (nfnl_ct != NULL)
- 			ct = nfqnl_ct_parse(nfnl_ct, nlh, nfqa, entry, &ctinfo);
- 	}
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151119/16e5f3bc/attachment.sig>
