@@ -1,27 +1,44 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 19 Nov 2015 20:58:58 +0100
-Subject: [PATCH 2/2] ARM: use const and __initconst for smp_operations
-In-Reply-To: <1447551593-22246-3-git-send-email-yamada.masahiro@socionext.com>
-References: <1447551593-22246-1-git-send-email-yamada.masahiro@socionext.com>
- <1447551593-22246-3-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <564E2A02.90903@gmail.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Thu, 19 Nov 2015 12:02:17 -0800
+Subject: [PATH RESEND v2 03/10] tty: xuartps: Always enable transmitter in
+ start_tx
+In-Reply-To: <1447963344-16266-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1447963344-16266-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1447963344-16266-4-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.11.2015 02:39, Masahiro Yamada wrote:
-> These smp_operations structures are not over-written, so add "const"
-> qualifier and replace __initdata with __initconst.
-> 
-> Also, add "static" where it is possible.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+start_tx must start transmitting characters. Regardless of the state of
+the circular buffer, always enable the transmitter hardware.
 
-> ---
-[...]
->  arch/arm/mach-berlin/platsmp.c       | 2 +-
-[...]
->  54 files changed, 64 insertions(+), 64 deletions(-)
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+ drivers/tty/serial/xilinx_uartps.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-For berlin,
-
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index 2c98c357d9a0..df6778d17949 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -512,9 +512,6 @@ static void cdns_uart_start_tx(struct uart_port *port)
+ {
+ 	unsigned int status, numbytes = port->fifosize;
+ 
+-	if (uart_circ_empty(&port->state->xmit) || uart_tx_stopped(port))
+-		return;
+-
+ 	/*
+ 	 * Set the TX enable bit and clear the TX disable bit to enable the
+ 	 * transmitter.
+@@ -524,6 +521,9 @@ static void cdns_uart_start_tx(struct uart_port *port)
+ 	status |= CDNS_UART_CR_TX_EN;
+ 	writel(status, port->membase + CDNS_UART_CR_OFFSET);
+ 
++	if (uart_circ_empty(&port->state->xmit) || uart_tx_stopped(port))
++		return;
++
+ 	while (numbytes-- && ((readl(port->membase + CDNS_UART_SR_OFFSET) &
+ 				CDNS_UART_SR_TXFULL)) != CDNS_UART_SR_TXFULL) {
+ 		/* Break if no more data available in the UART buffer */
+-- 
+2.6.3.3.g9bb996a
