@@ -1,116 +1,34 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Thu, 19 Nov 2015 22:34:30 +0000
-Subject: [PATCH v2 04/12] arm64/efi: split off EFI init and runtime code
- for reuse by 32-bit ARM
-In-Reply-To: <1447698757-8762-5-git-send-email-ard.biesheuvel@linaro.org>
-References: <1447698757-8762-1-git-send-email-ard.biesheuvel@linaro.org>
- <1447698757-8762-5-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20151119223430.GB2577@codeblueprint.co.uk>
+From: rklein@nvidia.com (Rhyland Klein)
+Date: Thu, 19 Nov 2015 17:40:07 -0500
+Subject: [PATCH] clk: tegra: move _calc_dynamic_ram_rate out of #ifdef
+In-Reply-To: <4290741.p1jMzEOUEU@wuerfel>
+References: <4290741.p1jMzEOUEU@wuerfel>
+Message-ID: <564E4FC7.9040302@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Nov, at 07:32:29PM, Ard Biesheuvel wrote:
-> +
-> +	pr_info("EFI v%u.%.02u by %s\n",
-> +		efi.systab->hdr.revision >> 16,
-> +		efi.systab->hdr.revision & 0xffff, vendor);
-> +
-> +	table_size = sizeof(efi_config_table_64_t) * efi.systab->nr_tables;
-> +	config_tables = early_memremap(efi_to_phys(efi.systab->tables),
-> +				       table_size);
+On 11/19/2015 5:32 PM, Arnd Bergmann wrote:
+> _calc_dynamic_ram_rate is defined inside an #ifdef but called
+> later in the same file outside of that #ifdef, which can cause a
+> build error:
+> 
+> drivers/clk/tegra/clk-pll.c: In function '_tegra_clk_register_pll':
+> drivers/clk/tegra/clk-pll.c:1541:29: error: '_calc_dynamic_ramp_rate' undeclared (first use in this function)
+> 
+> This moves both _calc_dynamic_ram_rate and _pll_fixed_mdiv in
+> front of the #ifdef to make all configurations compile again.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 44c8b9fa432c ("clk: tegra: pll: Fix _pll_ramp_calc_pll logic and _calc_dynamic_ramp_rate")
+> ----
+> The patch that caused it appears to be older, but I only ran into
+> the randconfig bug today for the first time. Apparently the commit
+> is only in linux-next at the moment, not in 4.4-rc1
+> 
 
-You should probably check the return value of early_memremap().
+Acked-by: Rhyland Klein <rklein@nvidia.com>
 
-> +
-> +	retval = efi_config_parse_tables(config_tables, efi.systab->nr_tables,
-> +					 sizeof(efi_config_table_64_t), NULL);
-> +
-> +	early_memunmap(config_tables, table_size);
-> +out:
-> +	early_memunmap(efi.systab,  sizeof(efi_system_table_t));
-> +	return retval;
-> +}
-> +
-> +/*
-> + * Return true for RAM regions we want to permanently reserve.
-> + */
-> +static __init int is_reserve_region(efi_memory_desc_t *md)
-> +{
-> +	switch (md->type) {
-> +	case EFI_LOADER_CODE:
-> +	case EFI_LOADER_DATA:
-> +	case EFI_BOOT_SERVICES_CODE:
-> +	case EFI_BOOT_SERVICES_DATA:
-> +	case EFI_CONVENTIONAL_MEMORY:
-> +	case EFI_PERSISTENT_MEMORY:
-> +		return 0;
-> +	default:
-> +		break;
-> +	}
-> +	return is_normal_ram(md);
-> +}
-> +
-> +static __init void reserve_regions(void)
-> +{
-> +	efi_memory_desc_t *md;
-> +	u64 paddr, npages, size;
-> +
-> +	if (efi_enabled(EFI_DBG))
-> +		pr_info("Processing EFI memory map:\n");
-> +
-> +	for_each_efi_memory_desc(&memmap, md) {
-> +		paddr = md->phys_addr;
-> +		npages = md->num_pages;
-> +
-> +		if (efi_enabled(EFI_DBG)) {
-> +			char buf[64];
-> +
-> +			pr_info("  0x%012llx-0x%012llx %s",
-> +				paddr, paddr + (npages << EFI_PAGE_SHIFT) - 1,
-> +				efi_md_typeattr_format(buf, sizeof(buf), md));
-> +		}
-> +
-> +		memrange_efi_to_native(&paddr, &npages);
-> +		size = npages << PAGE_SHIFT;
+-rhyland
 
-The use of EFI_PAGE_SHIFT and PAGE_SHIFT seem to get mingled in this
-code. What's the correct constant to use throughout, because it
-doesn't look like PAGE_SHIFT == EFI_PAGE_SHIFT always?
-
-> +
-> +		if (is_normal_ram(md))
-> +			early_init_dt_add_memory_arch(paddr, size);
-> +
-> +		if (is_reserve_region(md)) {
-> +			memblock_mark_nomap(paddr, size);
-
-Hmm.. I was going to point out the fact that you're not checking the
-return value of memblock_mark_nomap() which can fail if you run out of
-memory when resizing the memblock arrays, until I realised that you
-haven't called memblock_allow_resize() yet. Oh well.
-
-> +			if (efi_enabled(EFI_DBG))
-> +				pr_cont("*");
-> +		}
-> +
-> +		if (efi_enabled(EFI_DBG))
-> +			pr_cont("\n");
-> +	}
-> +
-> +	set_bit(EFI_MEMMAP, &efi.flags);
-> +}
-> +
-> +void __init efi_init(void)
-> +{
-> +	struct efi_fdt_params params;
-> +
-> +	/* Grab UEFI information placed in FDT by stub */
-> +	if (!efi_get_fdt_params(&params))
-> +		return;
-> +
-> +	efi_system_table = params.system_table;
-> +
-> +	memmap.phys_map = params.mmap;
-> +	memmap.map = early_memremap(params.mmap, params.mmap_size);
-
-Better check the return value?
+-- 
+nvpublic
