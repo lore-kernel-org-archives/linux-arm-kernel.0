@@ -1,32 +1,40 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 19 Nov 2015 12:05:38 -0800
-Subject: [PATCH] soc: Mediatek: Enable SCPSYS power domain driver by
- default
-In-Reply-To: <7h4mgpdh6f.fsf@deeprootsystems.com>
-References: <1447411835-19035-1-git-send-email-eddie.huang@mediatek.com>
- <7h4mgpdh6f.fsf@deeprootsystems.com>
-Message-ID: <CAMAWPa8ZcD30-06K3w1EewPMPA6LmU7bpOWbxi=VfsByyQT3Sw@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 19 Nov 2015 21:21:06 +0100
+Subject: [PATCH RESEND] arm: dts: berlin2q-marvell-dmp: remove broken-cd
+ from eMMC node
+In-Reply-To: <1447670617-7778-1-git-send-email-jszhang@marvell.com>
+References: <1447670617-7778-1-git-send-email-jszhang@marvell.com>
+Message-ID: <564E2F32.40202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 13, 2015 at 7:59 AM, Kevin Hilman <khilman@kernel.org> wrote:
-> Eddie Huang <eddie.huang@mediatek.com> writes:
->
->> If enable Mediatek 8173 SoC, it should also enable power domain
->> driver. Otherwise access clk subsystem register will fail.
->>
->> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
->
-> Tested-by: Kevin Hilman <khilman@linaro.org>
->
-> This gets the mt8173-evb booting again with arm-soc/for-next and
-> mainline for me.
->
-> I'll let Matthias queue this up and send it with any other fixes for
-> v4.4-rc1.
+On 16.11.2015 11:43, Jisheng Zhang wrote:
+> The eMMC is non-removable so is marked with the non-removable DT
+> property to avoid having to redetect it after a suspend/resume.
+> 
+> But it also has the broken-cd property which is wrong since only
+> one of the DT properties for card detection should be used
+> 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 
-Matthias, this is still broken in arm-soc.  Curious if your planning
-on sending a fix?  If you prefer, with your ack, we can apply directly
-to arm-soc/fixes.
+Applied to berlin64/dt.
 
-Kevin
+Thanks!
+
+> ---
+>  arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+> index da28c97..cdcf89b 100644
+> --- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+> +++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+> @@ -94,7 +94,6 @@
+>  };
+>  
+>  &sdhci2 {
+> -	broken-cd;
+>  	bus-width = <8>;
+>  	non-removable;
+>  	status = "okay";
+> 
