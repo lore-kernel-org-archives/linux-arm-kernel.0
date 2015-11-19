@@ -1,51 +1,61 @@
-From: xili_gchen_5257@hotmail.com (Chen Gang)
-Date: Fri, 20 Nov 2015 03:13:39 +0800
-Subject: [PATCH] mm: include linux/pfn.h for PHYS_PFN definition
-In-Reply-To: <5841074.QcbTqgbsZz@wuerfel>
-References: <5841074.QcbTqgbsZz@wuerfel>
-Message-ID: <BLU436-SMTP20633C03AB00B1A9777C8C8B91B0@phx.gbl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 19 Nov 2015 19:14:28 +0000
+Subject: device_node lifetime (was: Re: [PATCH 1/7] phy: brcmstb-sata:
+ add missing of_node_put)
+In-Reply-To: <CAL_JsqLQWh8-gshYLrYwrrRjBRXiOACh9LzVn2HUU38mfgYGoQ@mail.gmail.com>
+References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1447673600-8881-2-git-send-email-Julia.Lawall@lip6.fr>
+ <20151117013830.GV8456@google.com>
+ <alpine.DEB.2.02.1511170711340.2045@localhost6.localdomain6>
+ <20151117174430.GA8456@google.com>
+ <alpine.DEB.2.10.1511171846120.2455@hadrien>
+ <20151117183036.GF8456@google.com>
+ <alpine.DEB.2.02.1511172327030.2121@localhost6.localdomain6>
+ <20151118190500.GE140057@google.com>
+ <CAL_JsqLQWh8-gshYLrYwrrRjBRXiOACh9LzVn2HUU38mfgYGoQ@mail.gmail.com>
+Message-ID: <20151119191428.GB8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Nov 19, 2015 at 12:44:11PM -0600, Rob Herring wrote:
+> On Wed, Nov 18, 2015 at 1:05 PM, Brian Norris
+> <computersforpeace@gmail.com> wrote:
+> > (changing subject, add devicetree at vger.kernel.org)
+> >
+> > On Tue, Nov 17, 2015 at 11:33:25PM +0100, Julia Lawall wrote:
+> >> On Tue, 17 Nov 2015, Brian Norris wrote:
+> >> > On Tue, Nov 17, 2015 at 06:48:39PM +0100, Julia Lawall wrote:
+> >> > > Is this something that should be checked for elsewhere?
+> >> >
+> >> > I expect the same sort of problem shows up plenty of other places. I
+> >> > don't think many people use CONFIG_OF_DYNAMIC, so the effects of these
+> >> > failures probably aren't felt by many.
+> 
+> The "problem" is non-existent because either CONFIG_OF_DYNAMIC is off
+> or where it is used is limited (memory and cpus on PSeries) and now
+> overlays. Overlays have the potential to be problematic, but we should
+> manage ref counting for overlays in a completely different way. What
+> that looks like, I don't know. I'll leave that to the person that
+> cares about removing overlays.
 
-On 11/19/15 20:41, Arnd Bergmann wrote:
-> A change to asm-generic/memory_model.h caused a new build error
-> in some configurations:
-> 
-> mach-clps711x/common.c:39:10: error: implicit declaration of function 'PHYS_PFN'
->    .pfn  = __phys_to_pfn(CLPS711X_PHYS_BASE),
-> 
-> This includes the linux/pfn.h header from the same file to avoid the
-> error.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: bf1c6c9895de ("mm: add PHYS_PFN, use it in __phys_to_pfn()")
-> ---
-> I was listed as 'Cc' on the original patch, but don't see it in my inbox.
-> 
-> I can queue up the fixed version in the asm-generic tree if you like that,
-> otherwise please fold this fixup into the patch, or drop it if we want to
-> avoid the extra #include.
-> 
-> diff --git a/include/asm-generic/memory_model.h b/include/asm-generic/memory_model.h
-> index c785a79d9385..5148150cc80b 100644
-> --- a/include/asm-generic/memory_model.h
-> +++ b/include/asm-generic/memory_model.h
-> @@ -1,6 +1,8 @@
->  #ifndef __ASM_MEMORY_MODEL_H
->  #define __ASM_MEMORY_MODEL_H
->  
-> +#include <linux/pfn.h>
-> +
+So are you saying we should just forget about of_node_put and delete all
+of_node_put/of_node_get references in code outside drivers/of ?  That
+seems pretty obtuse given that we do have the overlay code merged, and
+sounds to me like a very bad idea.
 
-For me, it is OK, thanks.
+Expecting those who want to use overlays to run around checking that
+the refcounting is correct in drivers is a really silly idea IMHO -
+the existing API is refcounted, so either people really ought to be
+using it correctly as it's already been designed (in other words, with
+correct refcounting, and we shouldn't be shovelling this problem onto
+other people) or the refcounting should be completely killed.
 
->  #ifndef __ASSEMBLY__
->  
->  #if defined(CONFIG_FLATMEM)
-> 
+The existing half-way house of "we have refcounting, but we don't care
+about it" is really insane.
+
+Either we have refcounting, and it's used properly, or we don't have
+refcounting.  No middle ground IMHO.
 
 -- 
-Chen Gang (??)
-
-Open, share, and attitude like air, water, and life which God blessed
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
