@@ -1,58 +1,148 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Thu, 19 Nov 2015 18:15:09 -0500
-Subject: [PATH RESEND v2 03/10] tty: xuartps: Always enable transmitter in
- start_tx
-In-Reply-To: <1447963344-16266-4-git-send-email-soren.brinkmann@xilinx.com>
-References: <1447963344-16266-1-git-send-email-soren.brinkmann@xilinx.com>
- <1447963344-16266-4-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <564E57FD.8080900@hurleysoftware.com>
+From: mmcclint@qca.qualcomm.com (Matthew McClintock)
+Date: Thu, 19 Nov 2015 17:19:31 -0600
+Subject: [PATCH v3 4/6] qcom: ipq4019: Add basic board/dts support for IPQ4019
+ SoC
+In-Reply-To: <1447975173-29485-1-git-send-email-mmcclint@qca.qualcomm.com>
+References: <1447975173-29485-1-git-send-email-mmcclint@qca.qualcomm.com>
+Message-ID: <1447975173-29485-5-git-send-email-mmcclint@qca.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2015 03:02 PM, Soren Brinkmann wrote:
-> start_tx must start transmitting characters. Regardless of the state of
-> the circular buffer, always enable the transmitter hardware.
+From: Matthew McClintock <mmcclint@codeaurora.org>
 
-Why?
+Add initial dts files and SoC support for IPQ4019
 
-Does cdns_uart_stop_tx() actually stop the transmitter so that
-data is remains in the transmitter?
+Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
+---
 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
->  drivers/tty/serial/xilinx_uartps.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-> index 2c98c357d9a0..df6778d17949 100644
-> --- a/drivers/tty/serial/xilinx_uartps.c
-> +++ b/drivers/tty/serial/xilinx_uartps.c
-> @@ -512,9 +512,6 @@ static void cdns_uart_start_tx(struct uart_port *port)
->  {
->  	unsigned int status, numbytes = port->fifosize;
->  
-> -	if (uart_circ_empty(&port->state->xmit) || uart_tx_stopped(port))
-> -		return;
+v2
+- add sleep_clk
 
-The test for tx stopped needs to remain; otherwise, transmission will
-restart even if the tty has been stopped (for example by userspace)
-or IXON software flow control.
+ arch/arm/boot/dts/qcom-ipq4019.dtsi | 115 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 115 insertions(+)
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019.dtsi
 
-Regards,
-Peter Hurley
-
-> -
->  	/*
->  	 * Set the TX enable bit and clear the TX disable bit to enable the
->  	 * transmitter.
-> @@ -524,6 +521,9 @@ static void cdns_uart_start_tx(struct uart_port *port)
->  	status |= CDNS_UART_CR_TX_EN;
->  	writel(status, port->membase + CDNS_UART_CR_OFFSET);
->  
-> +	if (uart_circ_empty(&port->state->xmit) || uart_tx_stopped(port))
-> +		return;
-> +
->  	while (numbytes-- && ((readl(port->membase + CDNS_UART_SR_OFFSET) &
->  				CDNS_UART_SR_TXFULL)) != CDNS_UART_SR_TXFULL) {
->  		/* Break if no more data available in the UART buffer */
-> 
+diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+new file mode 100644
+index 0000000..fc73822
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+@@ -0,0 +1,115 @@
++/*
++ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/dts-v1/;
++
++#include "skeleton.dtsi"
++#include <dt-bindings/clock/qcom,gcc-ipq4019.h>
++
++/ {
++	model = "Qualcomm Technologies, Inc. IPQ4019";
++	compatible = "qcom,ipq4019";
++	interrupt-parent = <&intc>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x0>;
++			clocks = <&gcc GCC_APPS_CLK_SRC>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x1>;
++			clocks = <&gcc GCC_APPS_CLK_SRC>;
++		};
++
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x2>;
++			clocks = <&gcc GCC_APPS_CLK_SRC>;
++		};
++
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x3>;
++			clocks = <&gcc GCC_APPS_CLK_SRC>;
++		};
++	};
++
++	clocks {
++		sleep_clk: sleep_clk {
++			compatible = "fixed-clock";
++			clock-frequency = <32768>;
++			#clock-cells = <0>;
++		};
++	};
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		compatible = "simple-bus";
++
++		intc: interrupt-controller at b000000 {
++			compatible = "qcom,msm-qgic2";
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			reg = <0x0b000000 0x1000>,
++			<0x0b002000 0x1000>;
++		};
++
++		gcc: clock-controller at 1800000 {
++			compatible = "qcom,gcc-ipq4019";
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++			reg = <0x1800000 0x60000>;
++		};
++
++		tlmm: pinctrl at 0x01000000 {
++			compatible = "qcom,ipq4019-pinctrl";
++			reg = <0x01000000 0x300000>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			interrupts = <0 208 0>;
++		};
++
++		serial at 78af000 {
++			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
++			reg = <0x78af000 0x200>;
++			interrupts = <0 107 0>;
++			status = "disabled";
++			clocks = <&gcc GCC_BLSP1_UART1_APPS_CLK>,
++				<&gcc GCC_BLSP1_AHB_CLK>;
++			clock-names = "core", "iface";
++		};
++
++		serial at 78b0000 {
++			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
++			reg = <0x78b0000 0x200>;
++			interrupts = <0 108 0>;
++			status = "disabled";
++			clocks = <&gcc GCC_BLSP1_UART2_APPS_CLK>,
++				<&gcc GCC_BLSP1_AHB_CLK>;
++			clock-names = "core", "iface";
++		};
++	};
++};
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
