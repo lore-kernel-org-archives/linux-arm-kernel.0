@@ -1,48 +1,52 @@
 From: pramodku@broadcom.com (Pramod Kumar)
-Date: Thu, 19 Nov 2015 09:22:14 +0530
-Subject: [PATCH v2 2/7] dts: define ngpios property in gpio controller's node
+Date: Thu, 19 Nov 2015 09:22:13 +0530
+Subject: [PATCH v2 1/7] dt-binding: Add ngpios property to GPIO controller node
 In-Reply-To: <1447905139-16002-1-git-send-email-pramodku@broadcom.com>
 References: <1447905139-16002-1-git-send-email-pramodku@broadcom.com>
-Message-ID: <1447905139-16002-3-git-send-email-pramodku@broadcom.com>
+Message-ID: <1447905139-16002-2-git-send-email-pramodku@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ngpios property in cygnus ASIU, CCM and CRMU gpio controller's node
+Add ngpios property to the gpio controller's DT node so that controller
+driver extracts total number of in-use gpio lines from DT and removes
+dependency on driver.
 
 Signed-off-by: Pramod Kumar <pramodku@broadcom.com>
 Reviewed-by: Ray Jui <rjui@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- arch/arm/boot/dts/bcm-cygnus.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+ Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-index 2778533..59c4330 100644
---- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-+++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-@@ -101,6 +101,7 @@
- 			compatible = "brcm,cygnus-crmu-gpio";
- 			reg = <0x03024800 0x50>,
- 			      <0x03024008 0x18>;
-+			ngpios = <6>;
- 			#gpio-cells = <2>;
- 			gpio-controller;
- 		};
-@@ -127,6 +128,7 @@
- 			compatible = "brcm,cygnus-ccm-gpio";
- 			reg = <0x1800a000 0x50>,
- 			      <0x0301d164 0x20>;
-+			ngpios = <24>;
- 			#gpio-cells = <2>;
- 			gpio-controller;
- 			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-@@ -245,6 +247,7 @@
- 		gpio_asiu: gpio at 180a5000 {
- 			compatible = "brcm,cygnus-asiu-gpio";
- 			reg = <0x180a5000 0x668>;
-+			ngpios = <146>;
- 			#gpio-cells = <2>;
- 			gpio-controller;
+diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
+index 16589fb6..8b1e5d1 100644
+--- a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
++++ b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
+@@ -10,6 +10,9 @@ Required properties:
+     Define the base and range of the I/O address space that contains the Cygnus
+ GPIO/PINCONF controller registers
  
++- ngpios:
++    Total number of in-use slots in GPIO controller
++
+ - #gpio-cells:
+     Must be two. The first cell is the GPIO pin number (within the
+ controller's pin space) and the second cell is used for the following:
+@@ -57,6 +60,7 @@ Example:
+ 		compatible = "brcm,cygnus-ccm-gpio";
+ 		reg = <0x1800a000 0x50>,
+ 		      <0x0301d164 0x20>;
++		ngpios = <24>;
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
+ 		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+@@ -78,6 +82,7 @@ Example:
+ 	gpio_asiu: gpio at 180a5000 {
+ 		compatible = "brcm,cygnus-asiu-gpio";
+ 		reg = <0x180a5000 0x668>;
++		ngpios = <146>;
+ 		#gpio-cells = <2>;
+ 		gpio-controller;
+ 		interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
 -- 
 1.9.1
