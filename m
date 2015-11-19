@@ -1,120 +1,114 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 19 Nov 2015 08:50:17 -0600
-Subject: [RFC/PATCH] pinctrl: qcom: Add generic ssbi and spmi GPIO/MPP
- bindings
-In-Reply-To: <1447808426-21834-1-git-send-email-sboyd@codeaurora.org>
-References: <1447808426-21834-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20151119145017.GA19795@rob-hp-laptop>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 19 Nov 2015 14:52:27 +0000
+Subject: [PATCH] KVM: arm/arm64: vgic: leave the LR active state on
+ GICD_ICENABLERn access
+Message-ID: <1447944747-17689-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 05:00:26PM -0800, Stephen Boyd wrote:
-> The drivers don't really need to know which PMIC they're for, so
-> make a generic binding for them. This alleviates us from updating
-> the drivers every time a new PMIC comes out. It's still
-> recommended that we update the binding with new PMIC models and
-> always specify the specific model for the MPPs and gpios before
-> the generic compatible string in devicetree, but this at least
-> cuts down on adding more and more compatible strings to the
-> drivers until we actually need them.
-> 
-> Cc: <devicetree@vger.kernel.org>
-> Cc: "Ivan T. Ivanov" <iivanov@mm-sol.com>
-> Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
+Currently on clear-enable MMIO we retire the corresponding LR whatever
+its state. More precisely we do not sync ACTIVE state but we erase the LR
+state.
 
-Seems okay to me. I assume you are going to update all the dts files?
+In case of a forwarded IRQ, the physical IRQ source is also erased meaning
+the physical IRQ will never be deactivated. In case of a non forwarded
+IRQ, the LR can be reused (since the state was reset) and the guest can
+deactivate an IRQ that is not marked in the LR anymore.
 
-Rob
+This patch adds a parameter to vgic_retire_lr that makes possible to select
+the type of the LR that must be retired.  unqueue will retire/sync all LR's
+while disable will leave the active LR's.
 
-> 
-> We can also figure out the number of the pins from the number
-> of interrupts, so we really don't need to even look at the size of the
-> reg property or model number for the spmi and ssbi modules. I'll propose
-> that change as well tomorrow.
-> 
->  Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt | 5 ++++-
->  Documentation/devicetree/bindings/pinctrl/qcom,pmic-mpp.txt  | 5 ++++-
->  drivers/pinctrl/qcom/pinctrl-spmi-gpio.c                     | 1 +
->  drivers/pinctrl/qcom/pinctrl-spmi-mpp.c                      | 1 +
->  4 files changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt b/Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt
-> index a90c812ad642..f1e4643f4132 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt
-> @@ -17,6 +17,9 @@ PMIC's from Qualcomm.
->  		    "qcom,pm8994-gpio"
->  		    "qcom,pma8084-gpio"
->  
-> +		    And must contain either "qcom,spmi-gpio" or "qcom,ssbi-gpio"
-> +		    if the device is on an spmi bus or an ssbi bus respectively
-> +
->  - reg:
->  	Usage: required
->  	Value type: <prop-encoded-array>
-> @@ -183,7 +186,7 @@ to specify in a pin configuration subnode:
->  Example:
->  
->  	pm8921_gpio: gpio at 150 {
-> -		compatible = "qcom,pm8921-gpio";
-> +		compatible = "qcom,pm8921-gpio", "qcom,ssbi-gpio";
->  		reg = <0x150 0x160>;
->  		interrupts = <192 1>, <193 1>, <194 1>,
->  			     <195 1>, <196 1>, <197 1>,
-> diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,pmic-mpp.txt b/Documentation/devicetree/bindings/pinctrl/qcom,pmic-mpp.txt
-> index d74e631e10da..e28320b18ecb 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/qcom,pmic-mpp.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/qcom,pmic-mpp.txt
-> @@ -18,6 +18,9 @@ of PMIC's from Qualcomm.
->  		    "qcom,pm8994-mpp",
->  		    "qcom,pma8084-mpp",
->  
-> +		    And must contain either "qcom,spmi-mpp" or "qcom,ssbi-mpp"
-> +		    if the device is on an spmi bus or an ssbi bus respectively.
-> +
->  - reg:
->  	Usage: required
->  	Value type: <prop-encoded-array>
-> @@ -157,7 +160,7 @@ to specify in a pin configuration subnode:
->  Example:
->  
->  	mpps at a000 {
-> -		compatible = "qcom,pm8841-mpp";
-> +		compatible = "qcom,pm8841-mpp", "qcom,spmi-mpp";
->  		reg = <0xa000>;
->  		gpio-controller;
->  		#gpio-cells = <2>;
-> diff --git a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-> index df4413023e21..9f9979903fcb 100644
-> --- a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-> +++ b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-> @@ -806,6 +806,7 @@ static const struct of_device_id pmic_gpio_of_match[] = {
->  	{ .compatible = "qcom,pm8941-gpio" },	/* 36 GPIO's */
->  	{ .compatible = "qcom,pm8994-gpio" },	/* 22 GPIO's */
->  	{ .compatible = "qcom,pma8084-gpio" },	/* 22 GPIO's */
-> +	{ .compatible = "qcom,spmi-gpio" }, /* Generic */
->  	{ },
->  };
->  
-> diff --git a/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c b/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c
-> index 7b4136a22c5b..5a4373dd9c61 100644
-> --- a/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c
-> +++ b/drivers/pinctrl/qcom/pinctrl-spmi-mpp.c
-> @@ -909,6 +909,7 @@ static const struct of_device_id pmic_mpp_of_match[] = {
->  	{ .compatible = "qcom,pm8941-mpp" },	/* 8 MPP's */
->  	{ .compatible = "qcom,pm8994-mpp" },	/* 8 MPP's */
->  	{ .compatible = "qcom,pma8084-mpp" },	/* 8 MPP's */
-> +	{ .compatible = "qcom,spmi-mpp" },	/* Generic */
->  	{ },
->  };
->  
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ virt/kvm/arm/vgic.c | 45 +++++++++++++++++++++++----------------------
+ 1 file changed, 23 insertions(+), 22 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 5335383..bc30d93 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -105,7 +105,7 @@
+ #include "vgic.h"
+ 
+ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu);
+-static void vgic_retire_lr(int lr_nr, struct kvm_vcpu *vcpu);
++static void vgic_retire_lr(int lr_nr, struct kvm_vcpu *vcpu, unsigned state);
+ static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr);
+ static void vgic_set_lr(struct kvm_vcpu *vcpu, int lr, struct vgic_lr lr_desc);
+ static u64 vgic_get_elrsr(struct kvm_vcpu *vcpu);
+@@ -713,18 +713,10 @@ void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
+ 			add_sgi_source(vcpu, lr.irq, lr.source);
+ 
+ 		/*
+-		 * If the LR holds an active (10) or a pending and active (11)
+-		 * interrupt then move the active state to the
+-		 * distributor tracking bit.
++		 * retire pending, active, active and pending LR's and
++		 * sync their state back to the distributor
+ 		 */
+-		if (lr.state & LR_STATE_ACTIVE)
+-			vgic_irq_set_active(vcpu, lr.irq);
+-
+-		/*
+-		 * Reestablish the pending state on the distributor and the
+-		 * CPU interface and mark the LR as free for other use.
+-		 */
+-		vgic_retire_lr(i, vcpu);
++		vgic_retire_lr(i, vcpu, LR_STATE_ACTIVE | LR_STATE_PENDING);
+ 
+ 		/* Finally update the VGIC state. */
+ 		vgic_update_state(vcpu->kvm);
+@@ -1077,22 +1069,25 @@ static inline void vgic_enable(struct kvm_vcpu *vcpu)
+ 	vgic_ops->enable(vcpu);
+ }
+ 
+-static void vgic_retire_lr(int lr_nr, struct kvm_vcpu *vcpu)
++static void vgic_retire_lr(int lr_nr, struct kvm_vcpu *vcpu, unsigned state)
+ {
+ 	struct vgic_lr vlr = vgic_get_lr(vcpu, lr_nr);
+ 
+-	vgic_irq_clear_queued(vcpu, vlr.irq);
++	if (vlr.state & LR_STATE_ACTIVE & state) {
++		vgic_irq_set_active(vcpu, vlr.irq);
++		vlr.state &= ~LR_STATE_ACTIVE;
++	}
+ 
+-	/*
+-	 * We must transfer the pending state back to the distributor before
+-	 * retiring the LR, otherwise we may loose edge-triggered interrupts.
+-	 */
+-	if (vlr.state & LR_STATE_PENDING) {
++	if (vlr.state & LR_STATE_PENDING & state) {
+ 		vgic_dist_irq_set_pending(vcpu, vlr.irq);
+-		vlr.hwirq = 0;
++		vlr.state &= ~LR_STATE_PENDING;
+ 	}
+ 
+-	vlr.state = 0;
++	if (!(vlr.state & LR_STATE_MASK)) {
++		vlr.hwirq = 0;
++		vlr.state = 0;
++		vgic_irq_clear_queued(vcpu, vlr.irq);
++	}
+ 	vgic_set_lr(vcpu, lr_nr, vlr);
+ }
+ 
+@@ -1114,8 +1109,14 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
+ 	for_each_clear_bit(lr, elrsr_ptr, vgic->nr_lr) {
+ 		struct vgic_lr vlr = vgic_get_lr(vcpu, lr);
+ 
++		/*
++		 * retire pending only LR's and sync their state
++		 * back to the distributor. Active LR's cannot be
++		 * retired since the guest will attempt to deactivate
++		 * the IRQ.
++		 */
+ 		if (!vgic_irq_is_enabled(vcpu, vlr.irq))
+-			vgic_retire_lr(lr, vcpu);
++			vgic_retire_lr(lr, vcpu, LR_STATE_PENDING);
+ 	}
+ }
+ 
+-- 
+1.9.1
