@@ -1,114 +1,38 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 19 Nov 2015 09:42:49 +0900
-Subject: [RESEND PATCH v3] dt-bindings: Consolidate SRAM bindings from all
- vendors
-Message-ID: <1447893769-17088-1-git-send-email-k.kozlowski@samsung.com>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Wed, 18 Nov 2015 16:49:52 -0800
+Subject: [PATCH] PCI: Fix logic OF logic in pci_dma_configure()
+Message-ID: <1447894192-17210-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SRAM bindings for various SoCs, using the mmio-sram genalloc
-API, are spread over different places - per SoC vendor. Since all of
-these are quite similar (they depend on mmio-sram) move them to a common
-place.
+This patch fixes a bug introduced by previous commit,
+which incorrectly checkes the of_node of the end-point device.
+Instead, it should check the of_node of the host bridge.
 
-Suggested-by: Rob Herring <robh+dt@kernel.org>
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Chen-Yu Tsai <wens@csie.org>
-Cc: Kukjin Kim <kgene@kernel.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Heiko Stuebner <heiko@sntech.de>
-
+Fixes: 50230713b639 ("PCI: OF: Move of_pci_dma_configure() to pci_dma_configure()")
+Reported-by: Robin Murphy <robin.murphy@arm.com>
+Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
 ---
+ drivers/pci/probe.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Changes since v2:
-1. Update paths to sram.txt.
-
-Changes since v1:
-1. New patch. Extended suggestion from Rob.
----
- Documentation/devicetree/bindings/arm/arm,scpi.txt                      | 2 +-
- .../bindings/{arm/rockchip/pmu-sram.txt => sram/rockchip-pmu-sram.txt}  | 0
- .../bindings/{arm/rockchip/smp-sram.txt => sram/rockchip-smp-sram.txt}  | 2 +-
- .../bindings/{arm/exynos/smp-sysram.txt => sram/samsung-sram.txt}       | 2 +-
- Documentation/devicetree/bindings/{misc => sram}/sram.txt               | 0
- .../devicetree/bindings/{soc/sunxi/sram.txt => sram/sunxi-sram.txt}     | 2 +-
- 6 files changed, 4 insertions(+), 4 deletions(-)
- rename Documentation/devicetree/bindings/{arm/rockchip/pmu-sram.txt => sram/rockchip-pmu-sram.txt} (100%)
- rename Documentation/devicetree/bindings/{arm/rockchip/smp-sram.txt => sram/rockchip-smp-sram.txt} (92%)
- rename Documentation/devicetree/bindings/{arm/exynos/smp-sysram.txt => sram/samsung-sram.txt} (95%)
- rename Documentation/devicetree/bindings/{misc => sram}/sram.txt (100%)
- rename Documentation/devicetree/bindings/{soc/sunxi/sram.txt => sram/sunxi-sram.txt} (97%)
-
-diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-index 86302de67c2c..313dabdc14f9 100644
---- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
-+++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-@@ -63,7 +63,7 @@ Required properties:
- - compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index e735c72..edb1984 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1685,8 +1685,8 @@ static void pci_dma_configure(struct pci_dev *dev)
+ {
+ 	struct device *bridge = pci_get_host_bridge_device(dev);
  
- The rest of the properties should follow the generic mmio-sram description
--found in ../../misc/sysram.txt
-+found in ../../sram/sram.txt
- 
- Each sub-node represents the reserved area for SCPI.
- 
-diff --git a/Documentation/devicetree/bindings/arm/rockchip/pmu-sram.txt b/Documentation/devicetree/bindings/sram/rockchip-pmu-sram.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/arm/rockchip/pmu-sram.txt
-rename to Documentation/devicetree/bindings/sram/rockchip-pmu-sram.txt
-diff --git a/Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt b/Documentation/devicetree/bindings/sram/rockchip-smp-sram.txt
-similarity index 92%
-rename from Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
-rename to Documentation/devicetree/bindings/sram/rockchip-smp-sram.txt
-index d9416fb8db6f..800701ecffca 100644
---- a/Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
-+++ b/Documentation/devicetree/bindings/sram/rockchip-smp-sram.txt
-@@ -12,7 +12,7 @@ Required sub-node properties:
- - compatible : should be "rockchip,rk3066-smp-sram"
- 
- The rest of the properties should follow the generic mmio-sram discription
--found in ../../misc/sram.txt
-+found in Documentation/devicetree/bindings/sram/sram.txt
- 
- Example:
- 
-diff --git a/Documentation/devicetree/bindings/arm/exynos/smp-sysram.txt b/Documentation/devicetree/bindings/sram/samsung-sram.txt
-similarity index 95%
-rename from Documentation/devicetree/bindings/arm/exynos/smp-sysram.txt
-rename to Documentation/devicetree/bindings/sram/samsung-sram.txt
-index 4a0a4f70a0ce..6bc474b2b885 100644
---- a/Documentation/devicetree/bindings/arm/exynos/smp-sysram.txt
-+++ b/Documentation/devicetree/bindings/sram/samsung-sram.txt
-@@ -15,7 +15,7 @@ Required sub-node properties:
- 		"samsung,exynos4210-sysram-ns" : for Non-secure SYSRAM
- 
- The rest of the properties should follow the generic mmio-sram discription
--found in ../../misc/sysram.txt
-+found in Documentation/devicetree/bindings/sram/sram.txt
- 
- Example:
- 
-diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/sram/sram.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/misc/sram.txt
-rename to Documentation/devicetree/bindings/sram/sram.txt
-diff --git a/Documentation/devicetree/bindings/soc/sunxi/sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-similarity index 97%
-rename from Documentation/devicetree/bindings/soc/sunxi/sram.txt
-rename to Documentation/devicetree/bindings/sram/sunxi-sram.txt
-index 067698112f5f..8d5665468fe7 100644
---- a/Documentation/devicetree/bindings/soc/sunxi/sram.txt
-+++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-@@ -16,7 +16,7 @@ SRAM nodes
- ----------
- 
- Each SRAM is described using the mmio-sram bindings documented in
--Documentation/devicetree/bindings/misc/sram.txt
-+Documentation/devicetree/bindings/sram/sram.txt
- 
- Each SRAM will have SRAM sections that are going to be handled by the
- SRAM controller as subnodes. These sections are represented following
+-	if (IS_ENABLED(CONFIG_OF) && dev->dev.of_node) {
+-		if (bridge->parent)
++	if (IS_ENABLED(CONFIG_OF) &&
++		bridge->parent && bridge->parent->of_node) {
+ 			of_dma_configure(&dev->dev, bridge->parent->of_node);
+ 	} else if (has_acpi_companion(bridge)) {
+ 		struct acpi_device *adev = to_acpi_device_node(bridge->fwnode);
 -- 
-1.9.1
+2.1.0
