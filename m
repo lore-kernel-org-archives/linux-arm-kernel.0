@@ -1,175 +1,299 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Thu, 19 Nov 2015 12:02:24 -0800
-Subject: [PATH RESEND v2 10/10] tty: xuartps: Cleanup: Reformat if-else
-In-Reply-To: <1447963344-16266-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1447963344-16266-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1447963344-16266-11-git-send-email-soren.brinkmann@xilinx.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 19 Nov 2015 12:02:03 -0800
+Subject: [PATCH 1/2] ARM: dts: imx: ventana: add PWM nodes for Ventana boards
+Message-ID: <1447963323-21919-1-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert an if-else into the more common early return on error, reducing
-the indent level of the happy path.
+Ventana boards have an off-board connector with signals that can be pinmuxed
+as either GPIO or PWM. This patch adds pwm device-tree nodes in the disabled
+state which the bootloader can decide to enable based on bootloader config.
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 ---
-v2:
- - added this patch
----
- drivers/tty/serial/xilinx_uartps.c | 124 ++++++++++++++++++-------------------
- 1 file changed, 62 insertions(+), 62 deletions(-)
+ arch/arm/boot/dts/imx6qdl-gw51xx.dtsi | 36 +++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 24 +++++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 24 +++++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 36 +++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-gw551x.dtsi | 24 +++++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-gw552x.dtsi | 24 +++++++++++++++++++++++
+ 6 files changed, 168 insertions(+)
 
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 413229661f5d..aed8a31f3399 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -203,58 +203,55 @@ static void cdns_uart_handle_rx(struct uart_port *port, unsigned int isrstatus)
- 	isrstatus &= port->read_status_mask;
- 	isrstatus &= ~port->ignore_status_mask;
+diff --git a/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
+index 7b31fdb..fb0abd6 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
+@@ -174,6 +174,24 @@
+ 	status = "okay";
+ };
  
--	if ((isrstatus & CDNS_UART_IXR_TOUT) ||
--		(isrstatus & CDNS_UART_IXR_RXTRIG)) {
--		/* Receive Timeout Interrupt */
--		while (!(readl(port->membase + CDNS_UART_SR_OFFSET) &
--					CDNS_UART_SR_RXEMPTY)) {
--			u32 data;
--			char status = TTY_NORMAL;
--
--			data = readl(port->membase + CDNS_UART_FIFO_OFFSET);
--
--			/* Non-NULL byte after BREAK is garbage (99%) */
--			if (data && (port->read_status_mask &
--						CDNS_UART_IXR_BRK)) {
--				port->read_status_mask &= ~CDNS_UART_IXR_BRK;
--				port->icount.brk++;
--				if (uart_handle_break(port))
--					continue;
--			}
-+	if (!(isrstatus & (CDNS_UART_IXR_TOUT | CDNS_UART_IXR_RXTRIG)))
-+		return;
++&pwm2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm2>; /* MX6_DIO1 */
++	status = "disabled";
++};
 +
-+	while (!(readl(port->membase + CDNS_UART_SR_OFFSET) &
-+				CDNS_UART_SR_RXEMPTY)) {
-+		u32 data;
-+		char status = TTY_NORMAL;
++&pwm3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm3>; /* MX6_DIO2 */
++	status = "disabled";
++};
 +
-+		data = readl(port->membase + CDNS_UART_FIFO_OFFSET);
++&pwm4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm4>; /* MX6_DIO3 */
++	status = "disabled";
++};
 +
-+		/* Non-NULL byte after BREAK is garbage (99%) */
-+		if (data && (port->read_status_mask & CDNS_UART_IXR_BRK)) {
-+			port->read_status_mask &= ~CDNS_UART_IXR_BRK;
-+			port->icount.brk++;
-+			if (uart_handle_break(port))
-+				continue;
-+		}
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1>;
+@@ -294,6 +312,24 @@
+ 			>;
+ 		};
  
- #ifdef SUPPORT_SYSRQ
--			/*
--			 * uart_handle_sysrq_char() doesn't work if
--			 * spinlocked, for some reason
--			 */
--			 if (port->sysrq) {
--				spin_unlock(&port->lock);
--				if (uart_handle_sysrq_char(port,
--							(unsigned char)data)) {
--					spin_lock(&port->lock);
--					continue;
--				}
-+		/*
-+		 * uart_handle_sysrq_char() doesn't work if
-+		 * spinlocked, for some reason
-+		 */
-+		 if (port->sysrq) {
-+			spin_unlock(&port->lock);
-+			if (uart_handle_sysrq_char(port, data)) {
- 				spin_lock(&port->lock);
-+				continue;
- 			}
-+			spin_lock(&port->lock);
-+		}
- #endif
- 
--			port->icount.rx++;
--
--			if (isrstatus & CDNS_UART_IXR_PARITY) {
--				port->icount.parity++;
--				status = TTY_PARITY;
--			} else if (isrstatus & CDNS_UART_IXR_FRAMING) {
--				port->icount.frame++;
--				status = TTY_FRAME;
--			} else if (isrstatus & CDNS_UART_IXR_OVERRUN) {
--				port->icount.overrun++;
--			}
-+		port->icount.rx++;
- 
--			uart_insert_char(port, isrstatus, CDNS_UART_IXR_OVERRUN,
--					 data, status);
-+		if (isrstatus & CDNS_UART_IXR_PARITY) {
-+			port->icount.parity++;
-+			status = TTY_PARITY;
-+		} else if (isrstatus & CDNS_UART_IXR_FRAMING) {
-+			port->icount.frame++;
-+			status = TTY_FRAME;
-+		} else if (isrstatus & CDNS_UART_IXR_OVERRUN) {
-+			port->icount.overrun++;
- 		}
--		tty_flip_buffer_push(&port->state->port);
++		pinctrl_pwm2: pwm2grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_DAT2__PWM2_OUT		0x1b0b1
++			>;
++		};
 +
-+		uart_insert_char(port, isrstatus, CDNS_UART_IXR_OVERRUN,
-+				 data, status);
- 	}
-+	tty_flip_buffer_push(&port->state->port);
- }
++		pinctrl_pwm3: pwm3grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
++			>;
++		};
++
++		pinctrl_pwm4: pwm4grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD4_DAT2__PWM4_OUT		0x1b0b1
++			>;
++		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
+diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+index 9709728..e4a1e72 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+@@ -282,6 +282,18 @@
+ 	status = "okay";
+ };
  
- /**
-@@ -1431,27 +1428,30 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "Cannot get uart_port structure\n");
- 		rc = -ENODEV;
- 		goto err_out_notif_unreg;
--	} else {
--		/* Register the port.
--		 * This function also registers this device with the tty layer
--		 * and triggers invocation of the config_port() entry point.
--		 */
--		port->mapbase = res->start;
--		port->irq = irq;
--		port->dev = &pdev->dev;
--		port->uartclk = clk_get_rate(cdns_uart_data->uartclk);
--		port->private_data = cdns_uart_data;
--		cdns_uart_data->port = port;
--		platform_set_drvdata(pdev, port);
--		rc = uart_add_one_port(&cdns_uart_uart_driver, port);
--		if (rc) {
--			dev_err(&pdev->dev,
--				"uart_add_one_port() failed; err=%i\n", rc);
--			goto err_out_notif_unreg;
--		}
--		return 0;
- 	}
++&pwm2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm2>; /* MX6_DIO1 */
++	status = "disabled";
++};
++
++&pwm3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm3>; /* MX6_DIO2 */
++	status = "disabled";
++};
++
+ &pwm4 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pwm4>;
+@@ -436,6 +448,18 @@
+ 			>;
+ 		};
  
-+	/*
-+	 * Register the port.
-+	 * This function also registers this device with the tty layer
-+	 * and triggers invocation of the config_port() entry point.
-+	 */
-+	port->mapbase = res->start;
-+	port->irq = irq;
-+	port->dev = &pdev->dev;
-+	port->uartclk = clk_get_rate(cdns_uart_data->uartclk);
-+	port->private_data = cdns_uart_data;
-+	cdns_uart_data->port = port;
-+	platform_set_drvdata(pdev, port);
++		pinctrl_pwm2: pwm2grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_DAT2__PWM2_OUT		0x1b0b1
++			>;
++		};
 +
-+	rc = uart_add_one_port(&cdns_uart_uart_driver, port);
-+	if (rc) {
-+		dev_err(&pdev->dev,
-+			"uart_add_one_port() failed; err=%i\n", rc);
-+		goto err_out_notif_unreg;
-+	}
++		pinctrl_pwm3: pwm3grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
++			>;
++		};
 +
-+	return 0;
+ 		pinctrl_pwm4: pwm4grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
+diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+index dc1cd13..c37f89d 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+@@ -287,6 +287,18 @@
+ 	};
+ };
+ 
++&pwm2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm2>; /* MX6_DIO1 */
++	status = "disabled";
++};
 +
- err_out_notif_unreg:
- #ifdef CONFIG_COMMON_CLK
- 	clk_notifier_unregister(cdns_uart_data->uartclk,
++&pwm3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm3>; /* MX6_DIO2 */
++	status = "disabled";
++};
++
+ &pwm4 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pwm4>;
+@@ -442,6 +454,18 @@
+ 			>;
+ 		};
+ 
++		pinctrl_pwm2: pwm2grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_DAT2__PWM2_OUT		0x1b0b1
++			>;
++		};
++
++		pinctrl_pwm3: pwm3grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
++			>;
++		};
++
+ 		pinctrl_pwm4: pwm4grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
+diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+index d8aa22e..2b3c877 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+@@ -378,6 +378,24 @@
+ 	};
+ };
+ 
++&pwm1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm1>; /* MX6_DIO0 */
++	status = "disabled";
++};
++
++&pwm2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm2>; /* MX6_DIO1 */
++	status = "disabled";
++};
++
++&pwm3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm3>; /* MX6_DIO2 */
++	status = "disabled";
++};
++
+ &pwm4 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pwm4>;
+@@ -537,6 +555,24 @@
+ 			>;
+ 		};
+ 
++		pinctrl_pwm1: pwm1grp {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_9__PWM1_OUT		0x1b0b1
++			>;
++		};
++
++		pinctrl_pwm2: pwm2grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_DAT2__PWM2_OUT		0x1b0b1
++			>;
++		};
++
++		pinctrl_pwm3: pwm3grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
++			>;
++		};
++
+ 		pinctrl_pwm4: pwm4grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
+diff --git a/arch/arm/boot/dts/imx6qdl-gw551x.dtsi b/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
+index 741f3d5..118bea5 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
+@@ -198,6 +198,18 @@
+ 	status = "okay";
+ };
+ 
++&pwm2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm2>; /* MX6_DIO1 */
++	status = "disabled";
++};
++
++&pwm3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm3>; /* MX6_DIO2 */
++	status = "disabled";
++};
++
+ &ssi1 {
+ 	status = "okay";
+ };
+@@ -290,6 +302,18 @@
+ 			>;
+ 		};
+ 
++		pinctrl_pwm2: pwm2grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_DAT2__PWM2_OUT		0x1b0b1
++			>;
++		};
++
++		pinctrl_pwm3: pwm3grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_DAT1__PWM3_OUT		0x1b0b1
++			>;
++		};
++
+ 		pinctrl_uart2: uart2grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA	0x1b0b1
+diff --git a/arch/arm/boot/dts/imx6qdl-gw552x.dtsi b/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
+index d1e5048..cca39f1 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
+@@ -164,6 +164,18 @@
+ 	status = "okay";
+ };
+ 
++&pwm2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm2>; /* MX6_DIO1 */
++	status = "disabled";
++};
++
++&pwm3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm3>; /* MX6_DIO2 */
++	status = "disabled";
++};
++
+ &uart2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart2>;
+@@ -242,6 +254,18 @@
+ 			>;
+ 		};
+ 
++		pinctrl_pwm2: pwm2grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_DAT2__PWM2_OUT		0x1b0b1
++			>;
++		};
++
++		pinctrl_pwm3: pwm3grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
++			>;
++		};
++
+ 		pinctrl_uart2: uart2grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA	0x1b0b1
 -- 
-2.6.3.3.g9bb996a
+1.9.1
