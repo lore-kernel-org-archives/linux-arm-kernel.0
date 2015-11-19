@@ -1,64 +1,154 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 19 Nov 2015 05:57:02 +0100
-Subject: [PATCH v4 3/3] ARM: dts: rockchip: Add the OTP gpio pinctrl
-In-Reply-To: <564D3772.9050402@gmail.com>
-References: <1445599528-18825-1-git-send-email-wxt@rock-chips.com>
- <2741625.HAsG2fX6yg@diego> <564D3772.9050402@gmail.com>
-Message-ID: <1668139.HQCaUDeMrM@phil>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 19 Nov 2015 13:57:46 +0900
+Subject: [PATCH 2/5] arm64: cpufeature: Track unsigned fields
+In-Reply-To: <1447866540-23207-2-git-send-email-suzuki.poulose@arm.com>
+References: <1447866238-22970-1-git-send-email-suzuki.poulose@arm.com>
+ <1447866540-23207-1-git-send-email-suzuki.poulose@arm.com>
+ <1447866540-23207-2-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <564D56CA.60502@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
+Hi
 
-Am Donnerstag, 19. November 2015, 10:44:02 schrieb Caesar Wang:
-> ? 2015?10?25? 15:55, Heiko St?bner ??:
-> > Am Freitag, 23. Oktober 2015, 08:25:08 schrieb Doug Anderson:
-> >> On Fri, Oct 23, 2015 at 4:25 AM, Caesar Wang <wxt@rock-chips.com> wrote:
-> >>> Add the "init" anf "sleep" pinctrl as the OTP gpio state.
-> >>> We need the OTP pin is gpio state before resetting the TSADC controller,
-> >>> since the tshut polarity will generate a high signal.
-> >>>
-> >>> "init" pinctrl property is defined by Doug's Patch[0].
-> >>>
-> >>> Patch[0]:
-> >>> https://patchwork.kernel.org/patch/7454311/
-> >>>
-> >>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> >>> Reviewed-by: Douglas Anderson <dianders@chromium.org>
-> >>> ---
-> >>>
-> >>> Changes in v4: None
-> >>>
-> >>> Changes in v3:
-> >>>    - Add the "sleep" pinctrl as the gpio state in PATCH[3/3]
-> >>>
-> >>> Changes in v2:
-> >>>    - Add some commits for more obvious in PATCH[2/2]
-> >>>
-> >>> Changes in v1:
-> >>>    - As the Doug comments, drop the thermal driver patchs since
-> >>>    
-> >>>      we can with pinctrl changing to work.
-> >>>    
-> >>>    - As the Doug's patch to add the 'init' property.
-> >>>   
-> >>>   arch/arm/boot/dts/rk3288.dtsi | 10 ++++++++--
-> >>>   1 file changed, 8 insertions(+), 2 deletions(-)
-> >> I realized that the subject of this patch should probably contain the
-> >> word rk3288, but I presume Heiko would rather add that himself than
-> >> for you to spin this again.  ;)
-> > yep :-) ... no need to respin for such an easy change
-> 
-> That's seem this patch didn't merge into your v4.5-armsoc/soc branch.:-)
-> 
-> I guess this patch should merge into  kernel-4.4 since the Patch[1/3] / 
-> [2/3] have been merged into 4.4-rc1.:-P
+ From my curiosity,
+can you please clarify your criteria regarding which fields of a register should be signed or unsigned?
+I guessed that the fields marked with FTR_LOWER_SAFE or FTR_HIGHER_SAFE could be unsigned,
+but it seems to be not always true looking at your patch.
+Anyhow, for example,
 
-thanks for the reminder :-)
+On 11/19/2015 02:08 AM, Suzuki K. Poulose wrote:
+> Some of the feature bits have unsigned values and need
+> to be treated accordingly to avoid errors. Adds the property
+> to the feature bits and use the appropriate field extract helpers.
+>
+> Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> ---
+>   arch/arm64/include/asm/cpufeature.h |   10 ++++++++--
+>   arch/arm64/kernel/cpufeature.c      |   37 ++++++++++++++++++++++-------------
+>   2 files changed, 31 insertions(+), 16 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index 7a16102..29c3f5d 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -46,8 +46,12 @@ enum ftr_type {
+>   #define FTR_STRICT	true	/* SANITY check strict matching required */
+>   #define FTR_NONSTRICT	false	/* SANITY check ignored */
+>
+> +#define FTR_SIGNED	true	/* Value should be treated as signed */
+> +#define FTR_UNSIGNED	false	/* Value should be treated as unsigned */
+> +
+>   struct arm64_ftr_bits {
+> -	bool		strict;	  /* CPU Sanity check: strict matching required ? */
+> +	bool		sign;	/* Value is signed ? */
+> +	bool		strict;	/* CPU Sanity check: strict matching required ? */
+>   	enum ftr_type	type;
+>   	u8		shift;
+>   	u8		width;
+> @@ -142,7 +146,9 @@ static inline u64 arm64_ftr_mask(struct arm64_ftr_bits *ftrp)
+>
+>   static inline s64 arm64_ftr_value(struct arm64_ftr_bits *ftrp, u64 val)
+>   {
+> -	return cpuid_feature_extract_field_width(val, ftrp->shift, ftrp->width);
+> +	return ftrp->sign ?
+> +		cpuid_feature_extract_field_width(val, ftrp->shift, ftrp->width) :
+> +		cpuid_feature_extract_unsigned_field_width(val, ftrp->shift, ftrp->width);
+>   }
+>
+>   static inline bool id_aa64mmfr0_mixed_endian_el0(u64 mmfr0)
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index c8cf892..0669c63 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -44,8 +44,9 @@ unsigned int compat_elf_hwcap2 __read_mostly;
+>
+>   DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+>
+> -#define ARM64_FTR_BITS(STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
+> +#define __ARM64_FTR_BITS(SIGNED, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
+>   	{						\
+> +		.sign = SIGNED,				\
+>   		.strict = STRICT,			\
+>   		.type = TYPE,				\
+>   		.shift = SHIFT,				\
+> @@ -53,6 +54,14 @@ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+>   		.safe_val = SAFE_VAL,			\
+>   	}
+>
+> +/* Define a feature with signed values */
+> +#define ARM64_FTR_BITS(STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
+> +	__ARM64_FTR_BITS(FTR_SIGNED, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL)
+> +
+> +/* Define a feature with unsigned value */
+> +#define U_ARM64_FTR_BITS(STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
+> +	__ARM64_FTR_BITS(FTR_UNSIGNED, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL)
+> +
+>   #define ARM64_FTR_END					\
+>   	{						\
+>   		.width = 0,				\
+> @@ -99,7 +108,7 @@ static struct arm64_ftr_bits ftr_id_aa64mmfr0[] = {
+>   	 * Differing PARange is fine as long as all peripherals and memory are mapped
+>   	 * within the minimum PARange of all CPUs
+>   	 */
+> -	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_PARANGE_SHIFT, 4, 0),
+> +	U_ARM64_FTR_BITS(FTR_NONSTRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_PARANGE_SHIFT, 4, 0),
+>   	ARM64_FTR_END,
+>   };
 
-It seems I didn't get a notice when the core thermal changes were merged, so 
-this patch seems to have dropped of my radar. It is clearly a fix for a real 
-issue, so I've added it to my fixes branch for 4.4.
+BigEnd, bits[11:8], is 0b0000 for "No mixed-endian support", and 0b0001 for
+"Mixed-endian support". But can any other value be possible? If not, why signed?
+If there are some hidden (or undocumented) specifications, as Ard mentioned, that's fine.
+Please ignore my comments.
+
+Thanks,
+-Takahiro AKASHI
 
 
-Heiko
+> @@ -115,18 +124,18 @@ static struct arm64_ftr_bits ftr_id_aa64mmfr1[] = {
+>   };
+>
+>   static struct arm64_ftr_bits ftr_ctr[] = {
+> -	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 31, 1, 1),	/* RAO */
+> +	U_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 31, 1, 1),	/* RAO */
+>   	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 28, 3, 0),
+> -	ARM64_FTR_BITS(FTR_STRICT, FTR_HIGHER_SAFE, 24, 4, 0),	/* CWG */
+> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),	/* ERG */
+> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 1),	/* DminLine */
+> +	U_ARM64_FTR_BITS(FTR_STRICT, FTR_HIGHER_SAFE, 24, 4, 0),	/* CWG */
+> +	U_ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),	/* ERG */
+> +	U_ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 1),	/* DminLine */
+>   	/*
+>   	 * Linux can handle differing I-cache policies. Userspace JITs will
+>   	 * make use of *minLine
+>   	 */
+> -	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, 14, 2, 0),	/* L1Ip */
+> +	U_ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, 14, 2, 0),	/* L1Ip */
+>   	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 10, 0),	/* RAZ */
+> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* IminLine */
+> +	U_ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* IminLine */
+>   	ARM64_FTR_END,
+>   };
+>
+> @@ -144,12 +153,12 @@ static struct arm64_ftr_bits ftr_id_mmfr0[] = {
+>
+>   static struct arm64_ftr_bits ftr_id_aa64dfr0[] = {
+>   	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 32, 32, 0),
+> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_TRACEVER_SHIFT, 4, 0),
+> -	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_DEBUGVER_SHIFT, 4, 0x6),
+> +	U_ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_CTX_CMPS_SHIFT, 4, 0),
+> +	U_ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_WRPS_SHIFT, 4, 0),
+> +	U_ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, ID_AA64DFR0_BRPS_SHIFT, 4, 0),
+> +	U_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_PMUVER_SHIFT, 4, 0),
+> +	U_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_TRACEVER_SHIFT, 4, 0),
+> +	U_ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64DFR0_DEBUGVER_SHIFT, 4, 0x6),
+>   	ARM64_FTR_END,
+>   };
+>
+>
