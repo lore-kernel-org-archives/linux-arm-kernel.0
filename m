@@ -1,50 +1,38 @@
-From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Thu, 19 Nov 2015 13:38:18 +0100
-Subject: [PATCH 2/2] crypto: picoxcell: set [src|dst]_nents and nents as
- signed int
-In-Reply-To: <1447936699-26854-1-git-send-email-clabbe.montjoie@gmail.com>
-References: <1447936699-26854-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <1447936699-26854-2-git-send-email-clabbe.montjoie@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Nov 2015 13:41:53 +0100
+Subject: [PATCH] mm: include linux/pfn.h for PHYS_PFN definition
+Message-ID: <5841074.QcbTqgbsZz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The unsigned int variables [src|dst]_nents and nents can be assigned
-signed value (-EINVAL) from sg_nents_for_len().
-Furthermore they are used only by dma_map_sg and dma_unmap_sg which wait
-for an signed int, so they must be set as int.
+A change to asm-generic/memory_model.h caused a new build error
+in some configurations:
 
-Fixes: f051f95eb47b ("crypto: picoxcell - check return value of sg_nents_for_len")
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+mach-clps711x/common.c:39:10: error: implicit declaration of function 'PHYS_PFN'
+   .pfn  = __phys_to_pfn(CLPS711X_PHYS_BASE),
+
+This includes the linux/pfn.h header from the same file to avoid the
+error.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: bf1c6c9895de ("mm: add PHYS_PFN, use it in __phys_to_pfn()")
 ---
- drivers/crypto/picoxcell_crypto.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+I was listed as 'Cc' on the original patch, but don't see it in my inbox.
 
-diff --git a/drivers/crypto/picoxcell_crypto.c b/drivers/crypto/picoxcell_crypto.c
-index a9c6367..15b5e39 100644
---- a/drivers/crypto/picoxcell_crypto.c
-+++ b/drivers/crypto/picoxcell_crypto.c
-@@ -289,10 +289,11 @@ static struct spacc_ddt *spacc_sg_to_ddt(struct spacc_engine *engine,
- 					 enum dma_data_direction dir,
- 					 dma_addr_t *ddt_phys)
- {
--	unsigned nents, mapped_ents;
-+	unsigned mapped_ents;
- 	struct scatterlist *cur;
- 	struct spacc_ddt *ddt;
- 	int i;
-+	int nents;
+I can queue up the fixed version in the asm-generic tree if you like that,
+otherwise please fold this fixup into the patch, or drop it if we want to
+avoid the extra #include.
+
+diff --git a/include/asm-generic/memory_model.h b/include/asm-generic/memory_model.h
+index c785a79d9385..5148150cc80b 100644
+--- a/include/asm-generic/memory_model.h
++++ b/include/asm-generic/memory_model.h
+@@ -1,6 +1,8 @@
+ #ifndef __ASM_MEMORY_MODEL_H
+ #define __ASM_MEMORY_MODEL_H
  
- 	nents = sg_nents_for_len(payload, nbytes);
- 	if (nents < 0) {
-@@ -326,7 +327,7 @@ static int spacc_aead_make_ddts(struct aead_request *areq)
- 	struct spacc_engine *engine = req->engine;
- 	struct spacc_ddt *src_ddt, *dst_ddt;
- 	unsigned total;
--	unsigned int src_nents, dst_nents;
-+	int src_nents, dst_nents;
- 	struct scatterlist *cur;
- 	int i, dst_ents, src_ents;
++#include <linux/pfn.h>
++
+ #ifndef __ASSEMBLY__
  
--- 
-2.4.10
+ #if defined(CONFIG_FLATMEM)
