@@ -1,47 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Nov 2015 15:16:30 +0100
-Subject: [PATCH RESEND v2] sata/mvebu: use #ifdef around suspend/resume code
-Message-ID: <8025767.rG7ykO9yUZ@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 19 Nov 2015 14:18:16 +0000
+Subject: [PATCH RFC v2] apei: Add ACPI APEI event notification support
+In-Reply-To: <20151022095716.GC3671@pd.tnic>
+References: <1445458480-6493-1-git-send-email-lho@apm.com>
+ <20151022095716.GC3671@pd.tnic>
+Message-ID: <20151119141816.GH22786@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added suspend/resume implementation for ahci_mvebu causes
-a link error when CONFIG_PM_SLEEP is disabled:
+[Thanks Boris for CC'ing me]
 
-ERROR: "ahci_platform_suspend_host" [drivers/ata/ahci_mvebu.ko] undefined!
-ERROR: "ahci_platform_resume_host" [drivers/ata/ahci_mvebu.ko] undefined!
+Hi all,
 
-This adds the same #ifdef here that exists in the ahci_platform driver
-which defines the above functions.
+Sorry for the delay on this, I had to do some research and this isn't
+really my area of expertise.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: d6ecf1581488 ("ata: ahci_mvebu: add suspend/resume support")
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
-The patch hasn't shown up in linux-next yet, but is still needed, resending.
+On Thu, Oct 22, 2015 at 11:57:16AM +0200, Borislav Petkov wrote:
+> I'm top-posting here because I'm adding some more ARM people to CC and
+> would like for them to see the whole thing.
+> 
+> Ok, so what's the strategy here?
+> 
+> I know Tomasz did some untangling of GHES stuff to make it load on ARM
+> too and be arch-agnostic. The registration code in it is more than the
+> tiny edac_apei_irq_handler().
+> 
+> So why is this thing a separate driver? It is called EDAC_APEI although
+> it is ARM-specific.
+> 
+> Why can't it be part of ghes_edac.c with ARM-specific section, if
+> absolutely needed?
+> 
+> If this is going to implement the ACPI spec, then I don't see anything
+> vendor-, or arch-specific getting in the way except maybe that APMC0D51
+> id.
+> 
+> Hmmm?
 
-Also fixed a typo in description.
+I think you've hit the nail on the head. As far as I can tell, this is
+*not* conformant to ACPI APEI (which should be platform and architecture
+agnostic) and is actually an implementation-specific interface. However,
+I'm happy to be proven wrong if somebody can point me at a document
+describing ACPI APEI in a way that matches this implementation.
 
-diff --git a/drivers/ata/ahci_mvebu.c b/drivers/ata/ahci_mvebu.c
-index 8490d37aee2a..f7a7fa81740e 100644
---- a/drivers/ata/ahci_mvebu.c
-+++ b/drivers/ata/ahci_mvebu.c
-@@ -62,6 +62,7 @@ static void ahci_mvebu_regret_option(struct ahci_host_priv *hpriv)
- 	writel(0x80, hpriv->mmio + AHCI_VENDOR_SPECIFIC_0_DATA);
- }
- 
-+#ifdef CONFIG_PM_SLEEP
- static int ahci_mvebu_suspend(struct platform_device *pdev, pm_message_t state)
- {
- 	return ahci_platform_suspend_host(&pdev->dev);
-@@ -81,6 +82,10 @@ static int ahci_mvebu_resume(struct platform_device *pdev)
- 
- 	return ahci_platform_resume_host(&pdev->dev);
- }
-+#else
-+#define ahci_mvebu_suspend NULL
-+#define ahci_mvebu_resume NULL
-+#endif
- 
- static const struct ata_port_info ahci_mvebu_port_info = {
- 	.flags	   = AHCI_FLAG_COMMON,
+> > +static const struct acpi_device_id edac_apei_match[] = {
+> > +	{ "APMC0D51", 0},
+> > +	{},
+
+This, in particular, gives the game away methinks.
+
+Will
