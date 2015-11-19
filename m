@@ -1,15 +1,20 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Thu, 19 Nov 2015 09:40:34 +0530
-Subject: [1/2] clk: samsung: Don't build ARMv8 clock drivers on ARMv7
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 19 Nov 2015 13:18:38 +0900
+Subject: [PATCH 1/2] clk: samsung: Don't build ARMv8 clock drivers on ARMv7
 In-Reply-To: <1447637775-9887-2-git-send-email-k.kozlowski@samsung.com>
-References: <1447637775-9887-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <564D4BBA.5060406@samsung.com>
+References: <1447637775-9887-1-git-send-email-k.kozlowski@samsung.com>
+ <1447637775-9887-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <CA+Ln22HAGwfPDqXBQatBraLd=DyGYF2WyV4wJ9RvGOc58puymQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Krzysztof,
 
-On 11/16/2015 07:06 AM, Krzysztof Kozlowski wrote:
+Good idea, just a couple of nits inline. Other than that:
+
+Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+
+2015-11-16 10:36 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
 > Currently the Exynos5433 (ARMv8 SoC) clock driver depends on ARCH_EXYNOS
 > so it is built also on ARMv7. This does not bring any kind of benefit.
 > There won't be a single kernel image for ARMv7 and ARMv8 SoCs (like
@@ -18,62 +23,55 @@ On 11/16/2015 07:06 AM, Krzysztof Kozlowski wrote:
 > Instead build clock drivers only for respective SoC's architecture.
 >
 > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->
-
-Tested $SUBJECT patch on exynos7-espresso board, so
-Tested-by: Alim Akhtar <alim.akhtar@samsung.com>
-
 > ---
-> drivers/clk/samsung/Kconfig  | 13 +++++++++++++
->   drivers/clk/samsung/Makefile |  4 ++--
->   2 files changed, 15 insertions(+), 2 deletions(-)
+>  drivers/clk/samsung/Kconfig  | 13 +++++++++++++
+>  drivers/clk/samsung/Makefile |  4 ++--
+>  2 files changed, 15 insertions(+), 2 deletions(-)
 >
 > diff --git a/drivers/clk/samsung/Kconfig b/drivers/clk/samsung/Kconfig
 > index 84196ecdaa12..5f138fc4d84d 100644
 > --- a/drivers/clk/samsung/Kconfig
 > +++ b/drivers/clk/samsung/Kconfig
 > @@ -2,6 +2,7 @@ config COMMON_CLK_SAMSUNG
->   	bool
->   	select COMMON_CLK
+>         bool
+>         select COMMON_CLK
 >
 > +# ARMv7 SoCs:
->   config S3C2410_COMMON_CLK
->   	bool
->   	select COMMON_CLK_SAMSUNG
+
+nit: I'm not aware of any recent upgrade of the S3C24xx line-up to
+ARMv7 cores. ;) I'd suggest "32-bit ARM SoCs" or just "ARM SoCs"...
+
+>  config S3C2410_COMMON_CLK
+>         bool
+>         select COMMON_CLK_SAMSUNG
 > @@ -24,3 +25,15 @@ config S3C2443_COMMON_CLK
->   	bool
->   	select COMMON_CLK_SAMSUNG
+>         bool
+>         select COMMON_CLK_SAMSUNG
 >
 > +# ARMv8 SoCs:
+
+and then here "64-bit ARM SoCs" or "ARM64 SoCs", whichever you prefer.
+I'd lean towards simple "ARM" and "ARM64".
+
 > +config EXYNOS5433_COMMON_CLK
-> +	bool
-> +	depends on ARM64 || COMPILE_TEST
-> +	default ARCH_EXYNOS
-> +	select COMMON_CLK_SAMSUNG
+> +       bool
+> +       depends on ARM64 || COMPILE_TEST
+> +       default ARCH_EXYNOS
+
+nit: bool and default can be combined into def_bool ARCH_EXYNOS
+
+> +       select COMMON_CLK_SAMSUNG
 > +
 > +config EXYNOS7_COMMON_CLK
-> +	bool
-> +	depends on ARM64 || COMPILE_TEST
-> +	default ARCH_EXYNOS
-> +	select COMMON_CLK_SAMSUNG
-> diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
-> index 5f6833ea355d..a31332a24ef4 100644
-> --- a/drivers/clk/samsung/Makefile
-> +++ b/drivers/clk/samsung/Makefile
-> @@ -10,11 +10,11 @@ obj-$(CONFIG_SOC_EXYNOS5250)	+= clk-exynos5250.o
->   obj-$(CONFIG_SOC_EXYNOS5260)	+= clk-exynos5260.o
->   obj-$(CONFIG_SOC_EXYNOS5410)	+= clk-exynos5410.o
->   obj-$(CONFIG_SOC_EXYNOS5420)	+= clk-exynos5420.o
-> -obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos5433.o
-> +obj-$(CONFIG_EXYNOS5433_COMMON_CLK)	+= clk-exynos5433.o
->   obj-$(CONFIG_SOC_EXYNOS5440)	+= clk-exynos5440.o
->   obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-audss.o
->   obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-clkout.o
-> -obj-$(CONFIG_ARCH_EXYNOS7)	+= clk-exynos7.o
-> +obj-$(CONFIG_EXYNOS7_COMMON_CLK)	+= clk-exynos7.o
->   obj-$(CONFIG_S3C2410_COMMON_CLK)+= clk-s3c2410.o
->   obj-$(CONFIG_S3C2410_COMMON_DCLK)+= clk-s3c2410-dclk.o
->   obj-$(CONFIG_S3C2412_COMMON_CLK)+= clk-s3c2412.o
->
+> +       bool
+> +       depends on ARM64 || COMPILE_TEST
+> +       default ARCH_EXYNOS
+
+nit: See above.
+
+However, I don't think we can disable compilation of particular 64-bit
+SoCs, so maybe there isn't much sense in splitting their clock drivers
+into separate symbols?
+
+Best regards,
+Tomasz
