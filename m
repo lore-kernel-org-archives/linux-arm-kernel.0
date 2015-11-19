@@ -1,50 +1,90 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 19 Nov 2015 22:22:25 +0100
-Subject: [PATCH v3 4/8] phy: rockchip-usb: add compatible values for rk3066a
- and rk3188
+Date: Thu, 19 Nov 2015 22:22:27 +0100
+Subject: [PATCH v3 6/8] ARM: dts: rockchip: add clock-cells for usb phy nodes
 In-Reply-To: <1447968149-10979-1-git-send-email-heiko@sntech.de>
 References: <1447968149-10979-1-git-send-email-heiko@sntech.de>
-Message-ID: <1447968149-10979-5-git-send-email-heiko@sntech.de>
+Message-ID: <1447968149-10979-7-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need custom handling for these two socs in the driver shortly,
-so add the necessary compatible values to binding and driver.
+Add the #clock-cells properties for the usbphy nodes as they
+provide the pll-clocks now.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
 ---
- Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt | 5 ++++-
- drivers/phy/phy-rockchip-usb.c                             | 2 ++
- 2 files changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/rk3066a.dtsi | 2 ++
+ arch/arm/boot/dts/rk3188.dtsi  | 2 ++
+ arch/arm/boot/dts/rk3288.dtsi  | 3 +++
+ 3 files changed, 7 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
-index 826454a..9b37242 100644
---- a/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
-@@ -1,7 +1,10 @@
- ROCKCHIP USB2 PHY
+diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+index 946f187..3e4b41b 100644
+--- a/arch/arm/boot/dts/rk3066a.dtsi
++++ b/arch/arm/boot/dts/rk3066a.dtsi
+@@ -181,6 +181,7 @@
+ 			reg = <0x17c>;
+ 			clocks = <&cru SCLK_OTGPHY0>;
+ 			clock-names = "phyclk";
++			#clock-cells = <0>;
+ 		};
  
- Required properties:
-- - compatible: rockchip,rk3288-usb-phy
-+ - compatible: matching the soc type, one of
-+     "rockchip,rk3066a-usb-phy"
-+     "rockchip,rk3188-usb-phy"
-+     "rockchip,rk3288-usb-phy"
-  - rockchip,grf : phandle to the syscon managing the "general
-    register files"
-  - #address-cells: should be 1
-diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
-index ff3ac33..16cd533 100644
---- a/drivers/phy/phy-rockchip-usb.c
-+++ b/drivers/phy/phy-rockchip-usb.c
-@@ -176,6 +176,8 @@ static int rockchip_usb_phy_probe(struct platform_device *pdev)
- }
+ 		usbphy1: usb-phy1 {
+@@ -188,6 +189,7 @@
+ 			reg = <0x188>;
+ 			clocks = <&cru SCLK_OTGPHY1>;
+ 			clock-names = "phyclk";
++			#clock-cells = <0>;
+ 		};
+ 	};
  
- static const struct of_device_id rockchip_usb_phy_dt_ids[] = {
-+	{ .compatible = "rockchip,rk3066a-usb-phy" },
-+	{ .compatible = "rockchip,rk3188-usb-phy" },
- 	{ .compatible = "rockchip,rk3288-usb-phy" },
- 	{}
- };
+diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+index 6399942..48a287e 100644
+--- a/arch/arm/boot/dts/rk3188.dtsi
++++ b/arch/arm/boot/dts/rk3188.dtsi
+@@ -156,6 +156,7 @@
+ 			reg = <0x10c>;
+ 			clocks = <&cru SCLK_OTGPHY0>;
+ 			clock-names = "phyclk";
++			#clock-cells = <0>;
+ 		};
+ 
+ 		usbphy1: usb-phy1 {
+@@ -163,6 +164,7 @@
+ 			reg = <0x11c>;
+ 			clocks = <&cru SCLK_OTGPHY1>;
+ 			clock-names = "phyclk";
++			#clock-cells = <0>;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 6a79c9c..9c71b5e 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -896,6 +896,7 @@
+ 			reg = <0x320>;
+ 			clocks = <&cru SCLK_OTGPHY0>;
+ 			clock-names = "phyclk";
++			#clock-cells = <0>;
+ 		};
+ 
+ 		usbphy1: usb-phy1 {
+@@ -903,6 +904,7 @@
+ 			reg = <0x334>;
+ 			clocks = <&cru SCLK_OTGPHY1>;
+ 			clock-names = "phyclk";
++			#clock-cells = <0>;
+ 		};
+ 
+ 		usbphy2: usb-phy2 {
+@@ -910,6 +912,7 @@
+ 			reg = <0x348>;
+ 			clocks = <&cru SCLK_OTGPHY2>;
+ 			clock-names = "phyclk";
++			#clock-cells = <0>;
+ 		};
+ 	};
+ 
 -- 
 2.6.2
