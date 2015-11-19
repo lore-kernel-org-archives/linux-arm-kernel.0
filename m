@@ -1,156 +1,61 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Thu, 19 Nov 2015 23:26:08 +0900
-Subject: [PATCH v7 3/3] arm64: Add do_softirq_own_stack() and enable
- irq_stacks
-In-Reply-To: <1447698128-8490-4-git-send-email-james.morse@arm.com>
-References: <1447698128-8490-1-git-send-email-james.morse@arm.com>
- <1447698128-8490-4-git-send-email-james.morse@arm.com>
-Message-ID: <8F6484A9-18B9-4A81-B58D-528D81BC196D@gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 19 Nov 2015 11:28:28 -0300
+Subject: [PATCH] modpost: don't add a trailing wildcard for OF module aliases
+Message-ID: <1447943308-27689-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Nov 17, 2015, at 3:22 AM, James Morse wrote:
+Commit ac551828993ee ("modpost: i2c aliases need no trailing wildcard")
+removed the wildcard at the end of the I2C module aliases because I2C
+devices have no IDs so the aliases are just arbitrary device names.
 
-Hi James,
+This is also true for OF modaliases since a compatible string is used
+to define a specific IP hardware block. So the modalias should match a
+specific compatible string and not attempt to match a compatible string
+whose name matches the beginning of another one.
 
-First of all, thanks for this work!
+For example, the following driver module:
 
-> entry.S is modified to switch to the per_cpu irq_stack during el{0,1}_irq.
-> irq_count is used to detect recursive interrupts on the irq_stack, it is
-> updated late by do_softirq_own_stack(), when called on the irq_stack, before
-> __do_softirq() re-enabled interrupts to process softirqs.
-> 
-> This patch adds the dummy stack frame and data needed by the previous
-> stack tracing patches.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
-> arch/arm64/include/asm/irq.h |  2 ++
-> arch/arm64/kernel/entry.S    | 30 ++++++++++++++++++++++++++++++
-> arch/arm64/kernel/irq.c      | 34 ++++++++++++++++++++++++++++++++++
-> 3 files changed, 66 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-> index bf823c5f8cbd..04aae95dee8d 100644
-> --- a/arch/arm64/include/asm/irq.h
-> +++ b/arch/arm64/include/asm/irq.h
-> @@ -6,6 +6,8 @@
-> #include <asm-generic/irq.h>
-> #include <asm/thread_info.h>
-> 
-> +#define __ARCH_HAS_DO_SOFTIRQ
-> +
-> struct pt_regs;
-> 
-> DECLARE_PER_CPU(unsigned long, irq_stack_ptr);
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 1971da98dfad..45473838fe21 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -175,6 +175,34 @@ alternative_endif
-> 	mrs	\rd, sp_el0
-> 	.endm
-> 
-> +	.macro	irq_stack_entry
-> +	mov	x19, sp			// preserve the original sp
-> +	adr_l   x25, irq_count		// incremented by do_softirq_own_stack()
-> +	mrs	x26, tpidr_el1
-> +	add	x25, x25, x26
-> +	ldr	w25, [x25]
-> +	cbnz	w25, 1f			// recursive use?
-> +
-> +	/* switch to the irq stack */
-> +	adr_l	x25, irq_stack_ptr
-> +	add	x25, x25, x26
-> +	ldr	x25, [x25]
-> +	mov	sp, x25
-> +
-> +	/* Add a dummy stack frame */
-> +	stp     x29, x22, [sp, #-16]!           // dummy stack frame
-> +	mov	x29, sp
-> +	stp     xzr, x19, [sp, #-16]!
-> +1:
-> +	.endm
-> +
-> +	/*
-> +	 * x19 is preserved between irq_stack_entry and irq_stack_exit.
-> +	 */
-> +	.macro	irq_stack_exit
-> +	mov	sp, x19
-> +	.endm
-> +
-> /*
->  * These are the registers used in the syscall handler, and allow us to
->  * have in theory up to 7 arguments to a function - x0 to x6.
-> @@ -192,7 +220,9 @@ tsk	.req	x28		// current thread_info
-> 	.macro	irq_handler
-> 	ldr_l	x1, handle_arch_irq
-> 	mov	x0, sp
-> +	irq_stack_entry
-> 	blr	x1
-> +	irq_stack_exit
-> 	.endm
-> 
-> 	.text
-> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-> index da752bb18bfb..838541cf5e5d 100644
-> --- a/arch/arm64/kernel/irq.c
-> +++ b/arch/arm64/kernel/irq.c
-> @@ -25,6 +25,7 @@
-> #include <linux/irq.h>
-> #include <linux/smp.h>
-> #include <linux/init.h>
-> +#include <linux/interrupt.h>
-> #include <linux/irqchip.h>
-> #include <linux/seq_file.h>
-> 
-> @@ -34,6 +35,13 @@ unsigned long irq_err_count;
-> DEFINE_PER_CPU(unsigned long [IRQ_STACK_SIZE/sizeof(long)], irq_stack) __aligned(16);
-> DEFINE_PER_CPU(unsigned long, irq_stack_ptr);
-> 
-> +/*
-> + * irq_count is used to detect recursive use of the irq_stack, it is lazily
-> + * incremented very late, by do_softirq_own_stack(), which is called on the
-> + * irq_stack, before re-enabling interrupts to process softirqs.
-> + */
-> +DEFINE_PER_CPU(unsigned int, irq_count);
-> +
-> int arch_show_interrupts(struct seq_file *p, int prec)
-> {
-> 	show_ipi_list(p, prec);
-> @@ -66,3 +74,29 @@ void init_irq_stack(unsigned int cpu)
-> 
-> 	per_cpu(irq_stack_ptr, cpu) = stack + IRQ_STACK_START_SP;
-> }
-> +
-> +/*
-> + * do_softirq_own_stack() is called from irq_exit() before __do_softirq()
-> + * re-enables interrupts, at which point we may re-enter el?_irq(). We
-> + * increase irq_count here so that el1_irq() knows that it is already on the
-> + * irq stack.
-> + *
-> + * Called with interrupts disabled, so we don't worry about moving cpu, or
-> + * being interrupted while modifying irq_count.
-> + *
-> + * This function doesn't actually switch stack.
-> + */
-> +void do_softirq_own_stack(void)
-> +{
-> +	int cpu = smp_processor_id();
-> +
-> +	WARN_ON_ONCE(!irqs_disabled());
-> +
-> +	if (on_irq_stack(current_stack_pointer, cpu)) {
-> +		per_cpu(irq_count, cpu)++;
-> +		__do_softirq();
-> +		per_cpu(irq_count, cpu)--;
-> +	} else {
-> +		__do_softirq();
-> +	}
-> +}
+$ modinfo cros_ec_keyb | grep alias
+alias:          platform:cros-ec-keyb
+alias:          of:N*T*Cgoogle,cros-ec-keyb*
 
-I'm really interested in feedbacks from other folks since, as you know
-well, softirq could be handled using a process stack under this design.
+will be tried to be loaded for an alias of:N*T*Cgoogle,cros-ec-keyb-v2
+but there could be a different driver that supports the device for that
+compatible string so it's better to remove the trailing wildcard for OF.
 
-Best Regards
-Jungseok Lee
+Also, remove the word "always" from the add_wildcard() function comment
+since that was carried from the time where a wildcard was always added
+at the end of the module alias for all the devices.
+
+Suggested-by: Brian Norris <computersforpeace@gmail.com>
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+---
+
+ scripts/mod/file2alias.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/scripts/mod/file2alias.c b/scripts/mod/file2alias.c
+index 5b96206e9aab..65eaab8b7798 100644
+--- a/scripts/mod/file2alias.c
++++ b/scripts/mod/file2alias.c
+@@ -125,7 +125,7 @@ do {                                                            \
+                 sprintf(str + strlen(str), "*");                \
+ } while(0)
+ 
+-/* Always end in a wildcard, for future extension */
++/* End in a wildcard, for future extension */
+ static inline void add_wildcard(char *str)
+ {
+ 	int len = strlen(str);
+@@ -704,7 +704,6 @@ static int do_of_entry (const char *filename, void *symval, char *alias)
+ 		if (isspace (*tmp))
+ 			*tmp = '_';
+ 
+-	add_wildcard(alias);
+ 	return 1;
+ }
+ ADD_TO_DEVTABLE("of", of_device_id, do_of_entry);
+-- 
+2.4.3
