@@ -1,49 +1,34 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 19 Nov 2015 18:44:57 +0100
-Subject: [GIT PULL] at91: fixes for 4.4 #1
-In-Reply-To: <5616576.CPP4uTUkOp@wuerfel>
-References: <1447760158-20204-1-git-send-email-nicolas.ferre@atmel.com>
- <5616576.CPP4uTUkOp@wuerfel>
-Message-ID: <564E0A99.9020707@atmel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 19 Nov 2015 17:59:06 +0000
+Subject: [V2 PATCH] arm64: restore bogomips information in /proc/cpuinfo
+In-Reply-To: <1447872535-31117-1-git-send-email-yang.shi@linaro.org>
+References: <1447872535-31117-1-git-send-email-yang.shi@linaro.org>
+Message-ID: <20151119175906.GA10823@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 19/11/2015 16:22, Arnd Bergmann a ?crit :
-> On Tuesday 17 November 2015 12:35:58 Nicolas Ferre wrote:
->> Arnd, Olof, Kevin,
->>
->> This is the first "fixes" pull-request for AT91. I tried to collect little
->> patches that didn't make it for -rc1.
->> It can be due to synchronization between trees like the addition of some
->> sama5d2 Xplained nodes (MFD tree) or the change of the watchdog compatible
->> string for sama5d4 (watchdog tree).
->> It can also be due to trivial cleanups that were spotted or submitted late like
->> the replacement of "wakeup" properties or removal of unneeded defconfig option.
->> The removal of some dead legacy DT properties or nodes is, in my opinion worth
->> it as well in order to prevent us from abusive cut'n paste.
->> NAND and ISI Atmel MAINTAINERS entries are also updated.
->>
->> Tell me if it's okay for you.
+On Wed, Nov 18, 2015 at 10:48:55AM -0800, Yang Shi wrote:
+> As what Pavel Machek reported [1], some userspace applications depend on
+> bogomips showed by /proc/cpuinfo.
 > 
-> I'd be happier to get the patches late in the process and then push back
-> myself than to get them as fixes, there was really no reason to wait
-> for the merge window to end with the ones that you already had.
-
-I thought than having a precise milestone as a base for this
-pull-request would be preferred.
-
-> None of the changes look too invasive for -rc2, so I'm taking it anyway,
-> but please try to let us know what you have earlier next time, so we
-> can get the first fixes into the merge window, or add them as late
-> additions on the branches before sending the main pull requests.
+> Although there is much less legacy impact on aarch64 than arm, but it does
+> break libvirt.
 > 
-> Inter-tree dependencies should never be a reason to send stuff after
-> -rc1, let's talk about that before the merge window if you know you
-> have those.
+> Basically, this patch reverts commit 326b16db9f69fd0d279be873c6c00f88c0a4aad5
+> ("arm64: delay: don't bother reporting bogomips in /proc/cpuinfo"), but with
+> some tweak due to context change.
+> 
+> [1] https://lkml.org/lkml/2015/1/4/132
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Cc: <stable@vger.kernel.org> #3.12+
+> Signed-off-by: Yang Shi <yang.shi@linaro.org>
 
-Sure, the communication in advance with you would have make all this
-easier, sorry for not having done this.
+Patch applied as a fix for stable, basically returning back to the
+pre-3.12 behaviour. If there is a need for some more useful information
+here, it can be done as an additional patch, though without cc: stable.
 
-Thanks Arnd. Bye,
+Thanks.
+
 -- 
-Nicolas Ferre
+Catalin
