@@ -1,45 +1,31 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 19 Nov 2015 11:19:24 -0800
-Subject: [PATCH 02/27] mtd: nand: add an mtd_to_nand() helper
-In-Reply-To: <1447681080-31232-3-git-send-email-boris.brezillon@free-electrons.com>
-References: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
- <1447681080-31232-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20151119191924.GF64635@google.com>
+From: lho@apm.com (Loc Ho)
+Date: Thu, 19 Nov 2015 12:20:30 -0700
+Subject: [PATCH] clk: xgene: Fix divider with non-zero shift value
+Message-ID: <1447960830-8675-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 02:37:35PM +0100, Boris Brezillon wrote:
-> Some drivers are retrieving the nand_chip pointer using the container_of
-> macro on a struct wrapping both the nand_chip and the mtd_info struct while
-> the standard way of retrieving this pointer is through mtd->priv.
-> Provide an helper to do that.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  include/linux/mtd/nand.h | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-> index 4f7c9b9..056d165 100644
-> --- a/include/linux/mtd/nand.h
-> +++ b/include/linux/mtd/nand.h
-> @@ -730,6 +730,11 @@ static inline struct device_node *nand_get_flash_node(struct nand_chip *chip)
->  	return chip->flash_node;
->  }
->  
-> +static inline struct nand_chip *mtd_to_nand(struct mtd_info *mtd)
-> +{
-> +	return mtd->priv;
-> +}
-> +
+The X-Gene clock driver missed the divider shift operation when
+set the divider value.
 
-Pushed this patch to l2-mtd.git, though I rebased it directly onto
-4.4-rc1 and then merged it in. That way, if any other subsystems want to
-start using this in the 4.5 -next cycle (e.g., for patches 4-8), they
-can pull it in without taking the rest of MTD.
+Signed-off-by: Loc Ho <lho@apm.com>
+---
+ drivers/clk/clk-xgene.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-I can push this to a separate branch or signed tag, if anyone wants.
-
-Or, I can take the arch/ patches via MTD, if that's a better option.
-
-Brian
+diff --git a/drivers/clk/clk-xgene.c b/drivers/clk/clk-xgene.c
+index 27c0da2..10224b0 100644
+--- a/drivers/clk/clk-xgene.c
++++ b/drivers/clk/clk-xgene.c
+@@ -351,7 +351,8 @@ static int xgene_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+ 		/* Set new divider */
+ 		data = xgene_clk_read(pclk->param.divider_reg +
+ 				pclk->param.reg_divider_offset);
+-		data &= ~((1 << pclk->param.reg_divider_width) - 1);
++		data &= ~((1 << pclk->param.reg_divider_width) - 1)
++				<< pclk->param.reg_divider_shift;
+ 		data |= divider;
+ 		xgene_clk_write(data, pclk->param.divider_reg +
+ 					pclk->param.reg_divider_offset);
+-- 
+1.7.1
