@@ -1,29 +1,32 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 19 Nov 2015 16:06:12 +0000
-Subject: [PATCH RFC 0/4] ARM: bcm2835: assign pins to sdhci pinctrl
-Message-ID: <1447949176-21926-1-git-send-email-stefan.wahren@i2se.com>
+Date: Thu, 19 Nov 2015 16:06:14 +0000
+Subject: [PATCH RFC 2/4] ARM: bcm2835: rename sdhci pin group
+In-Reply-To: <1447949176-21926-1-git-send-email-stefan.wahren@i2se.com>
+References: <1447949176-21926-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1447949176-21926-3-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series fixes the pinctrl of the sdhci pins for all
-Raspberry Pis.
+The node name of the sdhci pin group doesn't explain it's
+real function. So rename it.
 
-The pin configuration based on the proprietary DTS [1].
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ arch/arm/boot/dts/bcm2835-rpi.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-[1] - https://www.raspberrypi.org/documentation/configuration/images/dt-blob.dts
-
-Stefan Wahren (4):
-  ARM: bcm2835: remove sdhci pins from GPIO pinctrl
-  ARM: bcm2835: rename sdhci pin group
-  ARM: bcm2835: specify card detect pin for RPi B
-  ARM: bcm2835: assign pins to sdhci pinctrl
-
- arch/arm/boot/dts/bcm2835-rpi-a-plus.dts |    6 +++++-
- arch/arm/boot/dts/bcm2835-rpi-b-plus.dts |    6 +++++-
- arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts |    6 +++++-
- arch/arm/boot/dts/bcm2835-rpi-b.dts      |   11 ++++++++++-
- arch/arm/boot/dts/bcm2835-rpi.dtsi       |    2 +-
- 5 files changed, 26 insertions(+), 5 deletions(-)
-
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index 3572f03..c5dc57f 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -36,7 +36,7 @@
+ 		brcm,function = <BCM2835_FSEL_ALT0>;
+ 	};
+ 
+-	alt3: alt3 {
++	sdhci_alt3: sdhci_alt3 {
+ 		brcm,pins = <48 49 50 51 52 53>;
+ 		brcm,function = <BCM2835_FSEL_ALT3>;
+ 	};
 -- 
 1.7.9.5
