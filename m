@@ -1,33 +1,69 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 19 Nov 2015 16:06:15 +0000
-Subject: [PATCH RFC 3/4] ARM: bcm2835: specify card detect pin for RPi B
+Date: Thu, 19 Nov 2015 16:06:16 +0000
+Subject: [PATCH RFC 4/4] ARM: bcm2835: assign pins to sdhci pinctrl
 In-Reply-To: <1447949176-21926-1-git-send-email-stefan.wahren@i2se.com>
 References: <1447949176-21926-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1447949176-21926-4-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1447949176-21926-5-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only the Raspberry Pi B has a card detect pin. Specify it
-on board level because it's not free to use.
+Finally this patch assign all relevant pins to the sdhci pinctrl.
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- arch/arm/boot/dts/bcm2835-rpi-b.dts |    5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/bcm2835-rpi-a-plus.dts |    4 ++++
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts |    4 ++++
+ arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts |    4 ++++
+ arch/arm/boot/dts/bcm2835-rpi-b.dts      |    4 ++++
+ 4 files changed, 16 insertions(+)
 
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
+index 50be11d..4d562d9 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
+@@ -28,3 +28,7 @@
+ 		brcm,function = <BCM2835_FSEL_ALT0>;
+ 	};
+ };
++
++&sdhci {
++	pinctrl-0 = <&sdhci_alt3>;
++};
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
+index 43dd5ef..27a533a 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
+@@ -28,3 +28,7 @@
+ 		brcm,function = <BCM2835_FSEL_ALT0>;
+ 	};
+ };
++
++&sdhci {
++	pinctrl-0 = <&sdhci_alt3>;
++};
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
+index e5a65a8..dcc1627 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
+@@ -21,3 +21,7 @@
+ 		brcm,function = <BCM2835_FSEL_ALT2>;
+ 	};
+ };
++
++&sdhci {
++	pinctrl-0 = <&sdhci_alt3>;
++};
 diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-index e6cd93b..1be2220 100644
+index 1be2220..bdb9308 100644
 --- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
 +++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-@@ -14,4 +14,9 @@
- 
- &gpio {
- 	pinctrl-0 = <&gpioout &alt0>;
-+
-+	sdhci_cd: sdhci_cd {
-+		brcm,pins = <47>;
-+		brcm,function = <BCM2835_FSEL_GPIO_IN>;
-+	};
+@@ -20,3 +20,7 @@
+ 		brcm,function = <BCM2835_FSEL_GPIO_IN>;
+ 	};
  };
++
++&sdhci {
++	pinctrl-0 = <&sdhci_alt3 &sdhci_cd>;
++};
 -- 
 1.7.9.5
