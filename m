@@ -1,31 +1,34 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 19 Nov 2015 00:04:26 -0600
-Subject: [PATCH] pinctrl: qcom: pmic-gpio/mpp: of_irq_count() == npins
-In-Reply-To: <1447875197-21645-1-git-send-email-sboyd@codeaurora.org>
-References: <1447808426-21834-1-git-send-email-sboyd@codeaurora.org>
- <1447875197-21645-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20151119060426.GA22622@qualcomm.com>
+From: Vineet.Gupta1@synopsys.com (Vineet Gupta)
+Date: Thu, 19 Nov 2015 11:44:34 +0530
+Subject: [PATCH] include: asm-generic: page.h: Remove useless
+ get_user_page and free_user_page
+In-Reply-To: <COL130-W7B5F0BB94C76AF6B12EA7B91C0@phx.gbl>
+References: <COL130-W7B5F0BB94C76AF6B12EA7B91C0@phx.gbl>
+Message-ID: <564D68CA.6010708@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2015 at 11:33:17AM -0800, Stephen Boyd wrote:
-> The number of interrupts is always equal to the number of pins
-> provided by the PMIC gpio and MPP hardware blocks. Count the
-> number of irqs to figure out the number of pins instead of adding
-> more compatible strings or doing math on the reg property. This
-> should make the code more generic and ease the number of changes
-> we have to make to the driver for each new pmic revision.
+On Thursday 19 November 2015 01:10 AM, Chen Gang wrote:
+> From ba7c00c4cb976109b6a35812ce9649aaeda81e2d Mon Sep 17 00:00:00 2001
+> From: Chen Gang <gang.chen.5i5j@gmail.com>
+> Date: Thu, 19 Nov 2015 03:24:42 +0800
+> Subject: [PATCH] include: asm-generic: page.h: Remove useless get_user_page and free_user_page
 > 
-> Cc: "Ivan T. Ivanov" <iivanov@mm-sol.com>
-> Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> They are not symmetric with each other, neither are used in real world
+> (can not be found by grep command in source code root directory), so
+> remove them.
+> 
+> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
 > ---
+>  arch/arc/include/asm/page.h       | 3 ---
+>  arch/arm/include/asm/page-nommu.h | 3 ---
+>  arch/frv/include/asm/page.h       | 3 ---
+>  arch/m68k/include/asm/page_mm.h   | 3 ---
+>  arch/m68k/include/asm/page_no.h   | 3 ---
+>  arch/openrisc/include/asm/page.h  | 3 ---
+>  include/asm-generic/page.h        | 3 ---
+>  7 files changed, 21 deletions(-)
 
-This is pretty nice. 
-
-Reviewed-by: Andy Gross <agross@codeaurora.org>
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+So this is one huge patch touching several arches with potential to cause
+conflicts when merged. Can u divy them up and then the maintainers can simply
+merge them individually given there is no common dependency !
