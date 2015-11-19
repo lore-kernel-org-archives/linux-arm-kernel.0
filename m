@@ -1,80 +1,46 @@
-From: jgross@suse.com (Juergen Gross)
-Date: Thu, 19 Nov 2015 10:10:46 +0100
-Subject: [PATCH v2] xen/events: Always allocate legacy interrupts on PV
- guests
-In-Reply-To: <1447870445-17199-1-git-send-email-boris.ostrovsky@oracle.com>
-References: <1447870445-17199-1-git-send-email-boris.ostrovsky@oracle.com>
-Message-ID: <564D9216.7010307@suse.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 19 Nov 2015 18:16:18 +0900
+Subject: [PATCH 1/2] clk: samsung: Don't build ARMv8 clock drivers on ARMv7
+In-Reply-To: <564D5552.4070806@samsung.com>
+References: <1447637775-9887-1-git-send-email-k.kozlowski@samsung.com>
+ <1447637775-9887-2-git-send-email-k.kozlowski@samsung.com>
+ <CA+Ln22HAGwfPDqXBQatBraLd=DyGYF2WyV4wJ9RvGOc58puymQ@mail.gmail.com>
+ <564D5552.4070806@samsung.com>
+Message-ID: <CA+Ln22GTPFk6KpWZPDzLRBqO8B+iwwesQEzBwYikXnf0gr3Csg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/11/15 19:14, Boris Ostrovsky wrote:
-> After commit 8c058b0b9c34 ("x86/irq: Probe for PIC presence before
-> allocating descs for legacy IRQs") early_irq_init() will no longer
-> preallocate descriptors for legacy interrupts if PIC does not
-> exist, which is the case for Xen PV guests.
-> 
-> Therefore we may need to allocate those descriptors ourselves.
-> 
-> Signed-off-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-> Suggested-by: Thomas Gleixner <tglx@linutronix.de>
+2015-11-19 13:51 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+> On 19.11.2015 13:18, Tomasz Figa wrote:
+>> However, I don't think we can disable compilation of particular 64-bit
+>> SoCs, so maybe there isn't much sense in splitting their clock drivers
+>> into separate symbols?
+>
+> To me it does not really matter. Indeed as you said one cannot disable
+> building of one particular Exynos SoCs.
+>
+> However we could still want not build some parts of such SoCs (like
+> clock, pinctrl etc). I don't see much benefit for such case except when
+> someone would like to drastically reduce the size of kernel image (for
+> whatever reasons he has.).
 
-Tested-by: Juergen Gross <jgross@suse.com>
+Can we really build a kernel that support selected Exynos SoC without
+its clock driver? Actually I don't think we even allow deselecting
+clock drivers currently, because they are not visible in menuconfig.
+Unless there is a clear goal to separate ARCH level Kconfig symbol for
+particular ARM64-based Exynos SoCs, I don't think it makes any sense
+to keep the clock-related symbols separate.
 
+>
+> On the other hand having separate symbols causes duplication and
+> obfuscates a little the Kconfig/Makefile. I like keeping things simple
+> so one symbol for all ARM64 Exynos clocks sounds good.
+>
+> Sylwester preferred current approach. You and Pankaj seem to prefer one
+> symbol-way.
 
-Juergen
+Hmm, I read Sylwester's post as a reply to your original message and
+not Pankaj's. Sylwester, could you clarify?
 
-> ---
-> 
-> v2: Use nr_legacy_irqs() instead of NR_IRQS_LEGACY (needs definition for ARM)
-> 
->  arch/arm/include/asm/irq.h       | 4 ++++
->  drivers/xen/events/events_base.c | 5 +++--
->  2 files changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
-> index be1d07d..b864f60 100644
-> --- a/arch/arm/include/asm/irq.h
-> +++ b/arch/arm/include/asm/irq.h
-> @@ -2,6 +2,10 @@
->  #define __ASM_ARM_IRQ_H
->  
->  #define NR_IRQS_LEGACY	16
-> +static inline int nr_legacy_irqs(void)
-> +{
-> +	return NR_IRQS_LEGACY;
-> +}
->  
->  #ifndef CONFIG_SPARSE_IRQ
->  #include <mach/irqs.h>
-> diff --git a/drivers/xen/events/events_base.c b/drivers/xen/events/events_base.c
-> index 849500e..524c221 100644
-> --- a/drivers/xen/events/events_base.c
-> +++ b/drivers/xen/events/events_base.c
-> @@ -39,6 +39,7 @@
->  #include <asm/irq.h>
->  #include <asm/idle.h>
->  #include <asm/io_apic.h>
-> +#include <asm/i8259.h>
->  #include <asm/xen/pci.h>
->  #endif
->  #include <asm/sync_bitops.h>
-> @@ -420,7 +421,7 @@ static int __must_check xen_allocate_irq_gsi(unsigned gsi)
->  		return xen_allocate_irq_dynamic();
->  
->  	/* Legacy IRQ descriptors are already allocated by the arch. */
-> -	if (gsi < NR_IRQS_LEGACY)
-> +	if (gsi < nr_legacy_irqs())
->  		irq = gsi;
->  	else
->  		irq = irq_alloc_desc_at(gsi, -1);
-> @@ -446,7 +447,7 @@ static void xen_free_irq(unsigned irq)
->  	kfree(info);
->  
->  	/* Legacy IRQ descriptors are managed by the arch. */
-> -	if (irq < NR_IRQS_LEGACY)
-> +	if (irq < nr_legacy_irqs())
->  		return;
->  
->  	irq_free_desc(irq);
-> 
+Best regards,
+Tomasz
