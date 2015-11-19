@@ -1,85 +1,49 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Nov 2015 17:37:36 +0000
-Subject: [PATCH] arm64: efi: correctly align vaddr for runtime maps
-Message-ID: <1447954656-10435-1-git-send-email-mark.rutland@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 19 Nov 2015 18:44:57 +0100
+Subject: [GIT PULL] at91: fixes for 4.4 #1
+In-Reply-To: <5616576.CPP4uTUkOp@wuerfel>
+References: <1447760158-20204-1-git-send-email-nicolas.ferre@atmel.com>
+ <5616576.CPP4uTUkOp@wuerfel>
+Message-ID: <564E0A99.9020707@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel may use a page granularity of 4K, 16K, or 64K depending on
-configuration.
+Le 19/11/2015 16:22, Arnd Bergmann a ?crit :
+> On Tuesday 17 November 2015 12:35:58 Nicolas Ferre wrote:
+>> Arnd, Olof, Kevin,
+>>
+>> This is the first "fixes" pull-request for AT91. I tried to collect little
+>> patches that didn't make it for -rc1.
+>> It can be due to synchronization between trees like the addition of some
+>> sama5d2 Xplained nodes (MFD tree) or the change of the watchdog compatible
+>> string for sama5d4 (watchdog tree).
+>> It can also be due to trivial cleanups that were spotted or submitted late like
+>> the replacement of "wakeup" properties or removal of unneeded defconfig option.
+>> The removal of some dead legacy DT properties or nodes is, in my opinion worth
+>> it as well in order to prevent us from abusive cut'n paste.
+>> NAND and ISI Atmel MAINTAINERS entries are also updated.
+>>
+>> Tell me if it's okay for you.
+> 
+> I'd be happier to get the patches late in the process and then push back
+> myself than to get them as fixes, there was really no reason to wait
+> for the merge window to end with the ones that you already had.
 
-When mapping EFI runtime regions, we use memrange_efi_to_native to round
-the physical base address of a region down to a granule-aligned
-boundary, and round the size up to a granule-aligned boundary. However,
-we fail to similarly round the virtual base address down to a
-granule-aligned boundary.
+I thought than having a precise milestone as a base for this
+pull-request would be preferred.
 
-The virtual base address may be up to PAGE_SIZE - 4K above what it
-should be, and in create_pgd_mapping, we may erroneously map an
-additional page at the end of any region which does not have a
-granule-aligned virtual base address.
+> None of the changes look too invasive for -rc2, so I'm taking it anyway,
+> but please try to let us know what you have earlier next time, so we
+> can get the first fixes into the merge window, or add them as late
+> additions on the branches before sending the main pull requests.
+> 
+> Inter-tree dependencies should never be a reason to send stuff after
+> -rc1, let's talk about that before the merge window if you know you
+> have those.
 
-Depending on the memory map, this page may be in a region we are not
-intended/permitted to map, or may clash with a different region that we
-wich to map.
+Sure, the communication in advance with you would have make all this
+easier, sorry for not having done this.
 
-Prevent this issue by rounding the virtual base address down to the
-kernel page granularity, matching what we do for the physical base
-address.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Leif Lindholm <leif.lindholm@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/efi.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
-
-I spotted this by playing with Will's break-before-make checker [1], which
-detected an erroneously created PTE being overwritten with a different output
-address.
-
-It looks like the VA bug was introduced in commit f3cdfd239da56a4c ("arm64/efi:
-move SetVirtualAddressMap() to UEFI stub").
-
-Prior to commit 60305db9884515ca ("arm64/efi: move virtmap init to early
-initcall") so manual fixup is required, but the logic fix is the same.
-
-Mark.
-
-[1] https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/?h=aarch64/devel&id=372f39220ad35fa39a75419f2221ffeb6ffd78d3
-
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index de46b50..7855b69 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -225,7 +225,7 @@ static bool __init efi_virtmap_init(void)
- 	efi_memory_desc_t *md;
- 
- 	for_each_efi_memory_desc(&memmap, md) {
--		u64 paddr, npages, size;
-+		u64 paddr, vaddr, npages, size;
- 		pgprot_t prot;
- 
- 		if (!(md->attribute & EFI_MEMORY_RUNTIME))
-@@ -237,6 +237,8 @@ static bool __init efi_virtmap_init(void)
- 		npages = md->num_pages;
- 		memrange_efi_to_native(&paddr, &npages);
- 		size = npages << PAGE_SHIFT;
-+		vaddr = md->virt_addr;
-+		vaddr &= PAGE_MASK;
- 
- 		pr_info("  EFI remap 0x%016llx => %p\n",
- 			md->phys_addr, (void *)md->virt_addr);
-@@ -254,7 +256,7 @@ static bool __init efi_virtmap_init(void)
- 		else
- 			prot = PAGE_KERNEL;
- 
--		create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size, prot);
-+		create_pgd_mapping(&efi_mm, paddr, vaddr, size, prot);
- 	}
- 	return true;
- }
+Thanks Arnd. Bye,
 -- 
-1.9.1
+Nicolas Ferre
