@@ -1,47 +1,117 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 19 Nov 2015 14:19:57 -0800
-Subject: [PATCH RFC 15/27] PM / Domains: Add next_wakeup to device's
- timing data
-In-Reply-To: <1447799871-56374-16-git-send-email-lina.iyer@linaro.org> (Lina
- Iyer's message of "Tue, 17 Nov 2015 15:37:39 -0700")
-References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
- <1447799871-56374-16-git-send-email-lina.iyer@linaro.org>
-Message-ID: <7h8u5ttywi.fsf@deeprootsystems.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Nov 2015 23:32:33 +0100
+Subject: [PATCH] clk: tegra: move _calc_dynamic_ram_rate out of #ifdef
+Message-ID: <4290741.p1jMzEOUEU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lina Iyer <lina.iyer@linaro.org> writes:
+_calc_dynamic_ram_rate is defined inside an #ifdef but called
+later in the same file outside of that #ifdef, which can cause a
+build error:
 
-> Allow devices that know when their next wakeup event is, to record save
-> it as part of timing data. A genpd governor may use this data to
-> determine if suspending the domain is going to affect the QoS of its
-> devices.
->
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> ---
->  include/linux/pm_domain.h | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-> index f1329ea..9ac089d 100644
-> --- a/include/linux/pm_domain.h
-> +++ b/include/linux/pm_domain.h
-> @@ -16,6 +16,7 @@
->  #include <linux/of.h>
->  #include <linux/notifier.h>
->  #include <linux/spinlock.h>
-> +#include <linux/ktime.h>
->  
->  /* Defines used for the flags field in the struct generic_pm_domain */
->  #define GENPD_FLAG_PM_CLK	(1U << 0) /* PM domain uses PM clk */
-> @@ -104,6 +105,7 @@ struct gpd_timing_data {
->  	s64 effective_constraint_ns;
->  	bool constraint_changed;
->  	bool cached_stop_ok;
-> +	ktime_t next_wakeup;
->  };
+drivers/clk/tegra/clk-pll.c: In function '_tegra_clk_register_pll':
+drivers/clk/tegra/clk-pll.c:1541:29: error: '_calc_dynamic_ramp_rate' undeclared (first use in this function)
 
-The addition of a new field should be combined with the patch that uses
-it (e.g. PATCH 16/27)
+This moves both _calc_dynamic_ram_rate and _pll_fixed_mdiv in
+front of the #ifdef to make all configurations compile again.
 
-Kevin
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 44c8b9fa432c ("clk: tegra: pll: Fix _pll_ramp_calc_pll logic and _calc_dynamic_ramp_rate")
+----
+The patch that caused it appears to be older, but I only ran into
+the randconfig bug today for the first time. Apparently the commit
+is only in linux-next at the moment, not in 4.4-rc1
+
+diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
+index 9734ffa185d3..94f3a6d34e3a 100644
+--- a/drivers/clk/tegra/clk-pll.c
++++ b/drivers/clk/tegra/clk-pll.c
+@@ -967,11 +967,6 @@ const struct clk_ops tegra_clk_plle_ops = {
+ 	.enable = clk_plle_enable,
+ };
+ 
+-#if defined(CONFIG_ARCH_TEGRA_114_SOC) || \
+-	defined(CONFIG_ARCH_TEGRA_124_SOC) || \
+-	defined(CONFIG_ARCH_TEGRA_132_SOC) || \
+-	defined(CONFIG_ARCH_TEGRA_210_SOC)
+-
+ static int _pll_fixed_mdiv(struct tegra_clk_pll_params *pll_params,
+ 			   unsigned long parent_rate)
+ {
+@@ -990,6 +985,40 @@ static int _pll_fixed_mdiv(struct tegra_clk_pll_params *pll_params,
+ 		return 1;
+ }
+ 
++static int _calc_dynamic_ramp_rate(struct clk_hw *hw,
++				struct tegra_clk_pll_freq_table *cfg,
++				unsigned long rate, unsigned long parent_rate)
++{
++	struct tegra_clk_pll *pll = to_clk_pll(hw);
++	unsigned int p;
++	int p_div;
++
++	if (!rate)
++		return -EINVAL;
++
++	p = DIV_ROUND_UP(pll->params->vco_min, rate);
++	cfg->m = _pll_fixed_mdiv(pll->params, parent_rate);
++	cfg->output_rate = rate * p;
++	cfg->n = cfg->output_rate * cfg->m / parent_rate;
++	cfg->input_rate = parent_rate;
++
++	p_div = _p_div_to_hw(hw, p);
++	if (p_div < 0)
++		return p_div;
++
++	cfg->p = p_div;
++
++	if (cfg->n > divn_max(pll) || cfg->output_rate > pll->params->vco_max)
++		return -EINVAL;
++
++	return 0;
++}
++
++#if defined(CONFIG_ARCH_TEGRA_114_SOC) || \
++	defined(CONFIG_ARCH_TEGRA_124_SOC) || \
++	defined(CONFIG_ARCH_TEGRA_132_SOC) || \
++	defined(CONFIG_ARCH_TEGRA_210_SOC)
++
+ u16 tegra_pll_get_fixed_mdiv(struct clk_hw *hw, unsigned long input_rate)
+ {
+ 	struct tegra_clk_pll *pll = to_clk_pll(hw);
+@@ -1039,35 +1068,6 @@ static int _setup_dynamic_ramp(struct tegra_clk_pll_params *pll_params,
+ 	return 0;
+ }
+ 
+-static int _calc_dynamic_ramp_rate(struct clk_hw *hw,
+-				struct tegra_clk_pll_freq_table *cfg,
+-				unsigned long rate, unsigned long parent_rate)
+-{
+-	struct tegra_clk_pll *pll = to_clk_pll(hw);
+-	unsigned int p;
+-	int p_div;
+-
+-	if (!rate)
+-		return -EINVAL;
+-
+-	p = DIV_ROUND_UP(pll->params->vco_min, rate);
+-	cfg->m = _pll_fixed_mdiv(pll->params, parent_rate);
+-	cfg->output_rate = rate * p;
+-	cfg->n = cfg->output_rate * cfg->m / parent_rate;
+-	cfg->input_rate = parent_rate;
+-
+-	p_div = _p_div_to_hw(hw, p);
+-	if (p_div < 0)
+-		return p_div;
+-
+-	cfg->p = p_div;
+-
+-	if (cfg->n > divn_max(pll) || cfg->output_rate > pll->params->vco_max)
+-		return -EINVAL;
+-
+-	return 0;
+-}
+-
+ static int _pll_ramp_calc_pll(struct clk_hw *hw,
+ 			      struct tegra_clk_pll_freq_table *cfg,
+ 			      unsigned long rate, unsigned long parent_rate)
