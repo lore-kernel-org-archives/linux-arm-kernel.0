@@ -1,73 +1,50 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Thu, 19 Nov 2015 12:02:19 -0800
-Subject: [PATH RESEND v2 05/10] tty: xuartps: Improve startup function
-In-Reply-To: <1447963344-16266-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1447963344-16266-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1447963344-16266-6-git-send-email-soren.brinkmann@xilinx.com>
+Date: Thu, 19 Nov 2015 12:02:14 -0800
+Subject: [PATH RESEND v2 00/10] tty: xuartps: Fix lock ups
+Message-ID: <1447963344-16266-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The startup function is supposed to initialize the UART for receiving.
-Hence, don't enable the TX part. Also, protect HW accesses with the port
-lock.
+Hi,
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
- drivers/tty/serial/xilinx_uartps.c | 20 ++++++++++++--------
- 1 file changed, 12 insertions(+), 8 deletions(-)
+I guess this series got probably lost during the merge window. Hence, I
+resend the patches.
 
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index b7fc30639292..167e0f4bcf7a 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -755,6 +755,7 @@ static void cdns_uart_set_termios(struct uart_port *port,
-  */
- static int cdns_uart_startup(struct uart_port *port)
- {
-+	unsigned long flags;
- 	unsigned int retval = 0, status = 0;
- 
- 	retval = request_irq(port->irq, cdns_uart_isr, 0, CDNS_UART_NAME,
-@@ -762,6 +763,8 @@ static int cdns_uart_startup(struct uart_port *port)
- 	if (retval)
- 		return retval;
- 
-+	spin_lock_irqsave(&port->lock, flags);
-+
- 	/* Disable the TX and RX */
- 	writel(CDNS_UART_CR_TX_DIS | CDNS_UART_CR_RX_DIS,
- 			port->membase + CDNS_UART_CR_OFFSET);
-@@ -772,15 +775,14 @@ static int cdns_uart_startup(struct uart_port *port)
- 	writel(CDNS_UART_CR_TXRST | CDNS_UART_CR_RXRST,
- 			port->membase + CDNS_UART_CR_OFFSET);
- 
--	status = readl(port->membase + CDNS_UART_CR_OFFSET);
--
--	/* Clear the RX disable and TX disable bits and then set the TX enable
--	 * bit and RX enable bit to enable the transmitter and receiver.
-+	/*
-+	 * Clear the RX disable bit and then set the RX enable bit to enable
-+	 * the receiver.
- 	 */
--	writel((status & ~(CDNS_UART_CR_TX_DIS | CDNS_UART_CR_RX_DIS))
--			| (CDNS_UART_CR_TX_EN | CDNS_UART_CR_RX_EN |
--			CDNS_UART_CR_STOPBRK),
--			port->membase + CDNS_UART_CR_OFFSET);
-+	status = readl(port->membase + CDNS_UART_CR_OFFSET);
-+	status &= CDNS_UART_CR_RX_DIS;
-+	status |= CDNS_UART_CR_RX_EN;
-+	writel(status, port->membase + CDNS_UART_CR_OFFSET);
- 
- 	/* Set the Mode Register with normal mode,8 data bits,1 stop bit,
- 	 * no parity.
-@@ -811,6 +813,8 @@ static int cdns_uart_startup(struct uart_port *port)
- 		CDNS_UART_IXR_RXTRIG | CDNS_UART_IXR_TOUT,
- 		port->membase + CDNS_UART_IER_OFFSET);
- 
-+	spin_unlock_irqrestore(&port->lock, flags);
-+
- 	return retval;
- }
- 
+This is v2, hopefully without any build issues. The changes are the same
+as before, just the warning reported by kbuild test robot about unused
+variables have been fixed. And, I added one more patch with some
+cleanup/refactoring.
+
+I recently found my system locking up under some conditions. I dug
+through the code a bit and the result is this collections of various
+changes. Some of it may not be required and has just been created out of
+half-baked theories and re-reading the documentation. The actual failing
+scenarios seem to be:
+ - RX IRQ conditions are handled while the receiver is disabled, leaving
+   the driver in an infinite loop
+ - console_put_char seems to be interrupted by uart_shutdown disabling
+   the transmitter while/just before printing
+
+I.e. overall I tried to serialize all operations using the port lock to
+avoid such interaction.
+
+	Thanks,
+	S?ren
+
+S?ren Brinkmann (10):
+  tty: xuartps: Beautify read-modify writes
+  tty: xuartps: Use spinlock to serialize HW access
+  tty: xuartps: Always enable transmitter in start_tx
+  tty: xuartps: Clear interrupt status register in shutdown
+  tty: xuartps: Improve startup function
+  tty: xuartps: Keep lock for whole ISR
+  tty: xuartps: Acquire port lock for shutdown
+  tty: xuartps: Move RX path into helper function
+  tty: xuartps: Only handle RX IRQs when RX is enabled
+  tty: xuartps: Cleanup: Reformat if-else
+
+ drivers/tty/serial/xilinx_uartps.c | 247 ++++++++++++++++++++-----------------
+ 1 file changed, 136 insertions(+), 111 deletions(-)
+
 -- 
 2.6.3.3.g9bb996a
