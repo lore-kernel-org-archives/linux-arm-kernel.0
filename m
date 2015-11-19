@@ -1,29 +1,25 @@
-From: schwab@suse.de (Andreas Schwab)
-Date: Thu, 19 Nov 2015 14:21:16 +0100
-Subject: [PATCH v6 14/19] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <3754277.KmO9Nk3XLD@wuerfel> (Arnd Bergmann's message of "Tue, 17
- Nov 2015 22:57:52 +0100")
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <1447795019-30176-15-git-send-email-ynorov@caviumnetworks.com>
- <3754277.KmO9Nk3XLD@wuerfel>
-Message-ID: <mvm37w2p1kj.fsf@hawking.suse.de>
+From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
+Date: Thu, 19 Nov 2015 13:26:06 +0000
+Subject: [PATCH] [media] davinci: add i2c Kconfig dependencies
+In-Reply-To: <4284996.N31E5Y01de@wuerfel>
+References: <4284996.N31E5Y01de@wuerfel>
+Message-ID: <CA+V-a8tuUS2x5vdFUZVWvd2C7LiiCQhvpH-zmTsii3uMcJCLmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
-
-> On Wednesday 18 November 2015 00:16:54 Yury Norov wrote:
->> +#define sys_lseek                      sys_llseek
+On Thu, Nov 19, 2015 at 12:59 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> All the davinci media drivers are using the i2c framework, and
+> fail to build if that is ever disabled, e.g.:
 >
-> This seems pointless, as there is no sys_lseek
+> media/platform/davinci/vpif_display.c: In function 'vpif_probe':
+> media/platform/davinci/vpif_display.c:1298:14: error: implicit declaration of function 'i2c_get_adapter' [-Werror=implicit-function-declaration]
+>
+> This adds explicit Kconfig dependencies so we don't see the
+> driver options if I2C is turned off.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-I think it should be the other way round.  Why would you want to use
-llseek if you can pass loff_t in a single register?
+Acked-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-Andreas.
-
--- 
-Andreas Schwab, SUSE Labs, schwab at suse.de
-GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
-"And now for something completely different."
+Cheers,
+--Prabhakar Lad
