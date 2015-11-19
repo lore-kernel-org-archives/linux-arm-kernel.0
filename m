@@ -1,65 +1,172 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 19 Nov 2015 12:32:45 +0100
-Subject: [PATCH 05/19] mmc: core/host: enable support for the standard
- "wakeup-source" property
-In-Reply-To: <1445422216-29375-6-git-send-email-sudeep.holla@arm.com>
-References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
- <1445422216-29375-6-git-send-email-sudeep.holla@arm.com>
-Message-ID: <CAPDyKFrB7-SsBt_C9hvgwY-NHL-S8pvXmKc70f2Z_G2RoEpk9Q@mail.gmail.com>
+Date: Thu, 19 Nov 2015 13:00:48 +0100
+Subject: [PATCH] mmc: sh_mmcif: rework dma channel handling
+In-Reply-To: <5324212.8m5CM0vuVo@wuerfel>
+References: <5324212.8m5CM0vuVo@wuerfel>
+Message-ID: <CAPDyKFqRbD7qS=sgapw50uTNpvErEshwtLn2Ve3LeN__RqQ_Sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 October 2015 at 12:10, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> Though the mmc core driver should/will continue to support the legacy
-> "enable-sdio-wakeup" property to enable SDIO as the wakeup source, we
-> need to add support for the new standard property "wakeup-source".
+On 16 November 2015 at 17:08, Arnd Bergmann <arnd@arndb.de> wrote:
+> When compiling the sh_mmcif driver for ARM64, we currently
+> get a harmless build warning:
 >
-> This patch adds support for "wakeup-source" property in addition to the
-> existing "enable-sdio-wakeup" property.
+> ../drivers/mmc/host/sh_mmcif.c: In function 'sh_mmcif_request_dma_one':
+> ../drivers/mmc/host/sh_mmcif.c:417:4: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+>     (void *)pdata->slave_id_tx :
+>     ^
+> ../drivers/mmc/host/sh_mmcif.c:418:4: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+>     (void *)pdata->slave_id_rx;
 >
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Adrian Hunter <adrian.hunter@intel.com>
-> Cc: linux-mmc at vger.kernel.org
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> This could be worked around by adding another cast to uintptr_t, but
+> I decided to simplify the code a little more to avoid that. This
+> splits out the platform data using code into a separate function
+> and builds that only for CONFIG_SUPERH. This part still has a typecast
+> but does not need a second one. The SH platform code could be further
+> modified to pass a pointer directly as we do on other architectures
+> when we have a filter function.
+>
+> The normal case is simplified further and now just calls
+> dma_request_slave_channel() directly without going through the
+> compat handling.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
 Thanks, applied for next!
+
+FYI: There were some check patch warnings, I decided to fix them
+myself before applying.
 
 Kind regards
 Uffe
 
 > ---
->  drivers/mmc/core/host.c        | 3 ++-
->  drivers/mmc/host/sdhci-pltfm.c | 3 ++-
->  2 files changed, 4 insertions(+), 2 deletions(-)
+>  drivers/mmc/host/sh_mmcif.c | 80 +++++++++++++++++---------------------------------
+>  1 file changed, 34 insertions(+), 46 deletions(-)
 >
-> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-> index 5466f25f0281..85222bb56c73 100644
-> --- a/drivers/mmc/core/host.c
-> +++ b/drivers/mmc/core/host.c
-> @@ -513,7 +513,8 @@ int mmc_of_parse(struct mmc_host *host)
->                 host->caps2 |= MMC_CAP2_FULL_PWR_CYCLE;
->         if (of_property_read_bool(np, "keep-power-in-suspend"))
->                 host->pm_caps |= MMC_PM_KEEP_POWER;
-> -       if (of_property_read_bool(np, "enable-sdio-wakeup"))
-> +       if (of_property_read_bool(np, "wakeup-source") ||
-> +           of_property_read_bool(np, "enable-sdio-wakeup")) /* legacy */
->                 host->pm_caps |= MMC_PM_WAKE_SDIO_IRQ;
->         if (of_property_read_bool(np, "mmc-ddr-1_8v"))
->                 host->caps |= MMC_CAP_1_8V_DDR;
-> diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-> index a207f5aaf62f..f00374bdafc9 100644
-> --- a/drivers/mmc/host/sdhci-pltfm.c
-> +++ b/drivers/mmc/host/sdhci-pltfm.c
-> @@ -108,7 +108,8 @@ void sdhci_get_of_property(struct platform_device *pdev)
->         if (of_find_property(np, "keep-power-in-suspend", NULL))
->                 host->mmc->pm_caps |= MMC_PM_KEEP_POWER;
 >
-> -       if (of_find_property(np, "enable-sdio-wakeup", NULL))
-> +       if (of_property_read_bool(np, "wakeup-source") ||
-> +           of_property_read_bool(np, "enable-sdio-wakeup")) /* legacy */
->                 host->mmc->pm_caps |= MMC_PM_WAKE_SDIO_IRQ;
+> diff --git a/drivers/mmc/host/sh_mmcif.c b/drivers/mmc/host/sh_mmcif.c
+> index ad9ffea7d659..d964c99f3a30 100644
+> --- a/drivers/mmc/host/sh_mmcif.c
+> +++ b/drivers/mmc/host/sh_mmcif.c
+> @@ -397,38 +397,26 @@ static void sh_mmcif_start_dma_tx(struct sh_mmcif_host *host)
 >  }
->  #else
-> --
-> 1.9.1
+>
+>  static struct dma_chan *
+> -sh_mmcif_request_dma_one(struct sh_mmcif_host *host,
+> -                        struct sh_mmcif_plat_data *pdata,
+> -                        enum dma_transfer_direction direction)
+> +sh_mmcif_request_dma_pdata(struct sh_mmcif_host *host, uintptr_t slave_id)
+>  {
+> -       struct dma_slave_config cfg = { 0, };
+> -       struct dma_chan *chan;
+> -       void *slave_data = NULL;
+> -       struct resource *res;
+> -       struct device *dev = sh_mmcif_host_to_dev(host);
+>         dma_cap_mask_t mask;
+> -       int ret;
+>
+>         dma_cap_zero(mask);
+>         dma_cap_set(DMA_SLAVE, mask);
+> +       if (slave_id <= 0)
+> +               return NULL;
+>
+> -       if (pdata)
+> -               slave_data = direction == DMA_MEM_TO_DEV ?
+> -                       (void *)pdata->slave_id_tx :
+> -                       (void *)pdata->slave_id_rx;
+> -
+> -       chan = dma_request_slave_channel_compat(mask, shdma_chan_filter,
+> -                               slave_data, dev,
+> -                               direction == DMA_MEM_TO_DEV ? "tx" : "rx");
+> -
+> -       dev_dbg(dev, "%s: %s: got channel %p\n", __func__,
+> -               direction == DMA_MEM_TO_DEV ? "TX" : "RX", chan);
+> +       return dma_request_channel(mask, shdma_chan_filter, (void *)slave_id);
+> +}
+>
+> -       if (!chan)
+> -               return NULL;
+> +static int sh_mmcif_dma_slave_config(struct sh_mmcif_host *host,
+> +                                    struct dma_chan *chan,
+> +                                    enum dma_transfer_direction direction)
+> +{
+> +       struct resource *res;
+> +       struct dma_slave_config cfg = { 0, };
+>
+>         res = platform_get_resource(host->pd, IORESOURCE_MEM, 0);
+> -
+>         cfg.direction = direction;
+>
+>         if (direction == DMA_DEV_TO_MEM) {
+> @@ -439,38 +427,38 @@ sh_mmcif_request_dma_one(struct sh_mmcif_host *host,
+>                 cfg.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+>         }
+>
+> -       ret = dmaengine_slave_config(chan, &cfg);
+> -       if (ret < 0) {
+> -               dma_release_channel(chan);
+> -               return NULL;
+> -       }
+> -
+> -       return chan;
+> +       return dmaengine_slave_config(chan, &cfg);
+>  }
+>
+> -static void sh_mmcif_request_dma(struct sh_mmcif_host *host,
+> -                                struct sh_mmcif_plat_data *pdata)
+> +static void sh_mmcif_request_dma(struct sh_mmcif_host *host)
+>  {
+>         struct device *dev = sh_mmcif_host_to_dev(host);
+>         host->dma_active = false;
+>
+> -       if (pdata) {
+> -               if (pdata->slave_id_tx <= 0 || pdata->slave_id_rx <= 0)
+> -                       return;
+> -       } else if (!dev->of_node) {
+> -               return;
+> +       /* We can only either use DMA for both Tx and Rx or not use it at all */
+> +       if (IS_ENABLED(CONFIG_SUPERH) && dev->platform_data) {
+> +               struct sh_mmcif_plat_data *pdata = dev->platform_data;
+> +               host->chan_tx = sh_mmcif_request_dma_pdata(host, pdata->slave_id_tx);
+> +               host->chan_rx = sh_mmcif_request_dma_pdata(host, pdata->slave_id_rx);
+> +       } else {
+> +               host->chan_tx = dma_request_slave_channel(dev, "tx");
+> +               host->chan_tx = dma_request_slave_channel(dev, "rx");
+>         }
+> +       dev_dbg(dev, "%s: got channel TX %p RX %p\n", __func__, host->chan_tx, host->chan_rx);
+>
+> -       /* We can only either use DMA for both Tx and Rx or not use it at all */
+> -       host->chan_tx = sh_mmcif_request_dma_one(host, pdata, DMA_MEM_TO_DEV);
+> -       if (!host->chan_tx)
+> -               return;
+> +       if (!host->chan_tx || !host->chan_rx ||
+> +           sh_mmcif_dma_slave_config(host, host->chan_tx, DMA_MEM_TO_DEV) ||
+> +           sh_mmcif_dma_slave_config(host, host->chan_rx, DMA_DEV_TO_MEM))
+> +               goto error;
+>
+> -       host->chan_rx = sh_mmcif_request_dma_one(host, pdata, DMA_DEV_TO_MEM);
+> -       if (!host->chan_rx) {
+> +       return;
+> +
+> +error:
+> +       if (host->chan_tx)
+>                 dma_release_channel(host->chan_tx);
+> -               host->chan_tx = NULL;
+> -       }
+> +       if (host->chan_rx)
+> +               dma_release_channel(host->chan_rx);
+> +       host->chan_tx = host->chan_rx = NULL;
+>  }
+>
+>  static void sh_mmcif_release_dma(struct sh_mmcif_host *host)
+> @@ -1102,7 +1090,7 @@ static void sh_mmcif_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>         if (ios->power_mode == MMC_POWER_UP) {
+>                 if (!host->card_present) {
+>                         /* See if we also get DMA */
+> -                       sh_mmcif_request_dma(host, dev->platform_data);
+> +                       sh_mmcif_request_dma(host);
+>                         host->card_present = true;
+>                 }
+>                 sh_mmcif_set_power(host, ios);
 >
