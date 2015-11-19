@@ -1,37 +1,69 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 19 Nov 2015 21:49:31 +0100
-Subject: [PATCH] arm64: dts: berlin: PSCI-1.0 support
-In-Reply-To: <1447673869-842-1-git-send-email-jszhang@marvell.com>
-References: <1447673869-842-1-git-send-email-jszhang@marvell.com>
-Message-ID: <564E35DB.9080902@gmail.com>
+From: salil.mehta@huawei.com (Salil Mehta)
+Date: Fri, 20 Nov 2015 04:58:21 +0800
+Subject: [PATCH V3 net-next 0/5] net:hns: Add support of Hip06 SoC to the
+ Hislicon Network Subsystem
+Message-ID: <1447966706-16219-1-git-send-email-salil.mehta@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.11.2015 12:37, Jisheng Zhang wrote:
-> The firmware can support PSCI-1.0 in fact. This change also enables
-> suspend to ram on Marvell berlin arm64 SoC.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+This PATCH V3 addresses the comment floated by David Miller and
+has been created over PATCH V2 sent earlier. 
 
-Appled to berlin64/dt.
+PATCH V2:
+1) Bug Fixes and Clean-up: Internally identified
+2) Addresses internal review comments by Kenneth Lee and
+   by Huang Daode
+3) Addresses the review comment from "Yisen.Zhuang(Zhuangyuzeng)"
+4) Adds fix from Fengguang Wu for an error generated from 
+   "kbuild test robot" from Intel
+5) Ethtool support for TSO set option from Lisheng
 
-Thanks!
+PATCH V1:
+Adds initial support of Hip06 SoC with below changes:  
+This patch-set adds support of new Hisilicon Hip06 SoC to the existing
+(already part of net-next) HNS ethernet driver for Hip05 SoC. Hip06 is
+a multi-core SoC and is a derivative of Hip05 SoC with lots of new
+hardware featres supported like RSS, TSO, hardware VLAN assist etc. 
 
-> ---
->  arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> index 8eddf10..a87f1a2 100644
-> --- a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> @@ -55,7 +55,7 @@
->  	};
->  
->  	psci {
-> -		compatible = "arm,psci-0.2";
-> +		compatible = "arm,psci-1.0", "arm,psci-0.2";
->  		method = "smc";
->  	};
->  
-> 
+The changes in the driver are mainly due to following:
+ 1) changes in the DMA descriptor provided by the Hip06 ethernet 
+    hardware. These changes need to co-exist with already present
+    Hip05 DMA descriptor and its operating functions. The decision
+    to choose the correct type of DMA descriptor is taken dynamically
+    depending upon the version of the hardware (i.e. V1/hip05 or
+    V2/hip06, see already existing hisilicon-hns-nic.txt binding file
+    for the detailed description version and naming).
+ 2) To support new features added to the Hip06 ethernet hardware:
+    a. RSS (Receive Side Scaling)
+    b. TSO (TCP Segment Offload)
+    c. Hardware VLAN support (currently we are initializing hardware
+       to not assist in stripping the vlan tag at hardware level.
+       Proper support of this feature and ethtool would come after
+       these patches have been accepted)
+
+Kindly note that, this patchset has been based on latest net-next.
+
+Salil Mehta (5):
+  net:hns: Add support of Hip06 SoC to the Hislicon Network Subsystem
+  net:hns: Add Hip06 "RSS(Receive Side Scaling)" support to HNS Driver
+  net:hns: Add Hip06 "TSO(TCP Segment Offload)" support HNS Driver
+  net:hns: Add support of ethtool TSO set option for Hip06 in HNS
+  net:hns: Add the init code to disable Hip06 "Hardware VLAN assist"
+
+ drivers/net/ethernet/hisilicon/hns/hnae.h          |   56 ++-
+ drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c  |   90 +++-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c |  213 +++++++--
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h |   25 +-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c |    6 +-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c  |   79 +++-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.h  |   32 +-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c  |   68 ++-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.h  |    8 +-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h  |   88 +++-
+ drivers/net/ethernet/hisilicon/hns/hns_enet.c      |  487 +++++++++++++++++---
+ drivers/net/ethernet/hisilicon/hns/hns_enet.h      |   12 +
+ drivers/net/ethernet/hisilicon/hns/hns_ethtool.c   |   95 +++-
+ 13 files changed, 1072 insertions(+), 187 deletions(-)
+
+-- 
+1.7.9.5
