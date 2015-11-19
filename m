@@ -1,35 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 Nov 2015 16:23:31 +0100
-Subject: [PATCH] scpi: hide get_scpi_ops in module from built-in code
-In-Reply-To: <9hhoaespm8p.fsf@e105922-lin.cambridge.arm.com>
-References: <4740279.aWlP1tqJLa@wuerfel>
- <9hhoaespm8p.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <3802372.zWzDBWFCTp@wuerfel>
+Date: Thu, 19 Nov 2015 16:22:07 +0100
+Subject: [GIT PULL] at91: fixes for 4.4 #1
+In-Reply-To: <1447760158-20204-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1447760158-20204-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <5616576.CPP4uTUkOp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 November 2015 17:30:14 Punit Agrawal wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
+On Tuesday 17 November 2015 12:35:58 Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
 > 
-> > The scpi_clock driver can be built-in when CONFIG_COMPILE_TEST
-> > is set even when ARM_SCPI_PROTOCOL is a loadable module, and
-> > that results in a link error:
-> >
-> > drivers/built-in.o: In function `scpi_clocks_probe':
-> > (.text+0x14453c): undefined reference to `get_scpi_ops'
-> >
-> > Using #if IS_REACHABLE() around the get_scpi_ops() declaration
-> > makes it build successfully in this case for compile-testing,
-> > but the effect is the same as when ARM_SCPI_PROTOCOL is
-> > disabled, as the code will not be used.
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> This is the first "fixes" pull-request for AT91. I tried to collect little
+> patches that didn't make it for -rc1.
+> It can be due to synchronization between trees like the addition of some
+> sama5d2 Xplained nodes (MFD tree) or the change of the watchdog compatible
+> string for sama5d4 (watchdog tree).
+> It can also be due to trivial cleanups that were spotted or submitted late like
+> the replacement of "wakeup" properties or removal of unneeded defconfig option.
+> The removal of some dead legacy DT properties or nodes is, in my opinion worth
+> it as well in order to prevent us from abusive cut'n paste.
+> NAND and ISI Atmel MAINTAINERS entries are also updated.
 > 
-> Makes sense. Thanks, Arnd!
-> 
->        Acked-by: Punit Agrawal <punit.agrawal@arm.com>
-> 
+> Tell me if it's okay for you.
 
-I've added it to arm-soc fixes now.
+I'd be happer to get the patches late in the process and then push back
+myself than to get them as fixes, there was really no reason to wait
+for the merge window to end with the ones that you already had.
+
+None of the changes look too invasive for -rc2, so I'm taking it anway,
+but please try to let us know what you have earlier next time, so we
+can get the first fixes into the merge window, or add them as late
+additions on the branches before sending the main pull requests.
+
+Inter-tree dependencies should never be a reason to send stuff after
+-rc1, let's talk about that before the merge window if you know you
+have those.
 
 	Arnd
