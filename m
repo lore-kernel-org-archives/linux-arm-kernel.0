@@ -1,64 +1,65 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Nov 2015 11:31:34 +0000
-Subject: [PATCH] [PATCH] arm64: Boot failure on m400 with new cont PTEs
-In-Reply-To: <564CD206.9040402@arm.com>
-References: <1447858999-26665-1-git-send-email-jeremy.linton@arm.com>
- <20151118152044.GD10644@leverpostej> <564CA29A.9050905@arm.com>
- <20151118162932.GA13355@leverpostej> <564CB1DA.4090304@arm.com>
- <20151118180434.GB13355@leverpostej> <564CD206.9040402@arm.com>
-Message-ID: <20151119112923.GA24570@leverpostej>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 19 Nov 2015 12:32:45 +0100
+Subject: [PATCH 05/19] mmc: core/host: enable support for the standard
+ "wakeup-source" property
+In-Reply-To: <1445422216-29375-6-git-send-email-sudeep.holla@arm.com>
+References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
+ <1445422216-29375-6-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CAPDyKFrB7-SsBt_C9hvgwY-NHL-S8pvXmKc70f2Z_G2RoEpk9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2015 at 01:31:18PM -0600, Jeremy Linton wrote:
-> On 11/18/2015 12:04 PM, Mark Rutland wrote:
-> 
-> >You're racing against other parts of the CPU (the page table walker(s),
-> >I-caches, etc). The flushing only minimises the window for a race, and
-> >does not prevent the race from being possible.
-> >
-> >Given that the envelope is constantly pushing forward w.r.t. how
-> >aggressive CPUs may be in this area, we need to fix the issue by
-> >reasoning against what the architecture guarantees us.
-> 	Its also not suppose to fault on speculative access, and to me that
-> means page table walks/etc that are the result of speculative
-> access.
+On 21 October 2015 at 12:10, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> Though the mmc core driver should/will continue to support the legacy
+> "enable-sdio-wakeup" property to enable SDIO as the wakeup source, we
+> need to add support for the new standard property "wakeup-source".
+>
+> This patch adds support for "wakeup-source" property in addition to the
+> existing "enable-sdio-wakeup" property.
+>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Adrian Hunter <adrian.hunter@intel.com>
+> Cc: linux-mmc at vger.kernel.org
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
-I was under the impression that TLB conflict abort could be delivered
-for asynchronous events (e.g. speculative I-cache fetches rather than
-for speculative execution of already fetched instructions).
+Thanks, applied for next!
 
-Having looked at the ARM ARM, I appear to have been mistaken. As you
-say, it appears that TLB conflict aborts are always delivered
-synchronously.
+Kind regards
+Uffe
 
-> Which AFAIK, closes the window significantly. I would only
-> really worry about interrupt activity, and updates to the memory
-> containing the PTE's themselves. Either way the simple change
-> (rather than rewriting the whole code path) is probably to flag the
-> fault handler to simply resume from these kinds of faults during
-> create_mapping_late().
-
-Unfortunately that may not be sufficient. The conflicting address range
-might cover the current stack or the text of the exception handler, and
-in those cases trying to handle the exception would result in taking
-another TLB conflict abort recursively.
-
-> 	But that isn't what is happening here AFAIK, the faults are long
-> after the PTE's have been updated, and are the result of failure to
-> flush the TLB..
-
-It's not quite the same case, certainly.
-
-It's also possible that the faults you are seeing see are also possible
-earlier, but simply less likely, and that we get away without seeing the
-other potential issues because of things that may change (i.e. the way
-the compiler lays out the text).
-
-I think that if we need to do something more drastic to account for the
-other issues above (e.g. by ensuring that we can never allocate
-conflicting TLB entries in the first place), and that said strategy
-would also fix this problem, that would be preferable, given that we're
-going to have to do that eventually anyway.
-
-Mark.
+> ---
+>  drivers/mmc/core/host.c        | 3 ++-
+>  drivers/mmc/host/sdhci-pltfm.c | 3 ++-
+>  2 files changed, 4 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+> index 5466f25f0281..85222bb56c73 100644
+> --- a/drivers/mmc/core/host.c
+> +++ b/drivers/mmc/core/host.c
+> @@ -513,7 +513,8 @@ int mmc_of_parse(struct mmc_host *host)
+>                 host->caps2 |= MMC_CAP2_FULL_PWR_CYCLE;
+>         if (of_property_read_bool(np, "keep-power-in-suspend"))
+>                 host->pm_caps |= MMC_PM_KEEP_POWER;
+> -       if (of_property_read_bool(np, "enable-sdio-wakeup"))
+> +       if (of_property_read_bool(np, "wakeup-source") ||
+> +           of_property_read_bool(np, "enable-sdio-wakeup")) /* legacy */
+>                 host->pm_caps |= MMC_PM_WAKE_SDIO_IRQ;
+>         if (of_property_read_bool(np, "mmc-ddr-1_8v"))
+>                 host->caps |= MMC_CAP_1_8V_DDR;
+> diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
+> index a207f5aaf62f..f00374bdafc9 100644
+> --- a/drivers/mmc/host/sdhci-pltfm.c
+> +++ b/drivers/mmc/host/sdhci-pltfm.c
+> @@ -108,7 +108,8 @@ void sdhci_get_of_property(struct platform_device *pdev)
+>         if (of_find_property(np, "keep-power-in-suspend", NULL))
+>                 host->mmc->pm_caps |= MMC_PM_KEEP_POWER;
+>
+> -       if (of_find_property(np, "enable-sdio-wakeup", NULL))
+> +       if (of_property_read_bool(np, "wakeup-source") ||
+> +           of_property_read_bool(np, "enable-sdio-wakeup")) /* legacy */
+>                 host->mmc->pm_caps |= MMC_PM_WAKE_SDIO_IRQ;
+>  }
+>  #else
+> --
+> 1.9.1
+>
