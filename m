@@ -1,69 +1,50 @@
-From: salil.mehta@huawei.com (Salil Mehta)
-Date: Fri, 20 Nov 2015 04:58:21 +0800
-Subject: [PATCH V3 net-next 0/5] net:hns: Add support of Hip06 SoC to the
- Hislicon Network Subsystem
-Message-ID: <1447966706-16219-1-git-send-email-salil.mehta@huawei.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 19 Nov 2015 22:22:25 +0100
+Subject: [PATCH v3 4/8] phy: rockchip-usb: add compatible values for rk3066a
+ and rk3188
+In-Reply-To: <1447968149-10979-1-git-send-email-heiko@sntech.de>
+References: <1447968149-10979-1-git-send-email-heiko@sntech.de>
+Message-ID: <1447968149-10979-5-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This PATCH V3 addresses the comment floated by David Miller and
-has been created over PATCH V2 sent earlier. 
+We need custom handling for these two socs in the driver shortly,
+so add the necessary compatible values to binding and driver.
 
-PATCH V2:
-1) Bug Fixes and Clean-up: Internally identified
-2) Addresses internal review comments by Kenneth Lee and
-   by Huang Daode
-3) Addresses the review comment from "Yisen.Zhuang(Zhuangyuzeng)"
-4) Adds fix from Fengguang Wu for an error generated from 
-   "kbuild test robot" from Intel
-5) Ethtool support for TSO set option from Lisheng
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt | 5 ++++-
+ drivers/phy/phy-rockchip-usb.c                             | 2 ++
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
-PATCH V1:
-Adds initial support of Hip06 SoC with below changes:  
-This patch-set adds support of new Hisilicon Hip06 SoC to the existing
-(already part of net-next) HNS ethernet driver for Hip05 SoC. Hip06 is
-a multi-core SoC and is a derivative of Hip05 SoC with lots of new
-hardware featres supported like RSS, TSO, hardware VLAN assist etc. 
-
-The changes in the driver are mainly due to following:
- 1) changes in the DMA descriptor provided by the Hip06 ethernet 
-    hardware. These changes need to co-exist with already present
-    Hip05 DMA descriptor and its operating functions. The decision
-    to choose the correct type of DMA descriptor is taken dynamically
-    depending upon the version of the hardware (i.e. V1/hip05 or
-    V2/hip06, see already existing hisilicon-hns-nic.txt binding file
-    for the detailed description version and naming).
- 2) To support new features added to the Hip06 ethernet hardware:
-    a. RSS (Receive Side Scaling)
-    b. TSO (TCP Segment Offload)
-    c. Hardware VLAN support (currently we are initializing hardware
-       to not assist in stripping the vlan tag at hardware level.
-       Proper support of this feature and ethtool would come after
-       these patches have been accepted)
-
-Kindly note that, this patchset has been based on latest net-next.
-
-Salil Mehta (5):
-  net:hns: Add support of Hip06 SoC to the Hislicon Network Subsystem
-  net:hns: Add Hip06 "RSS(Receive Side Scaling)" support to HNS Driver
-  net:hns: Add Hip06 "TSO(TCP Segment Offload)" support HNS Driver
-  net:hns: Add support of ethtool TSO set option for Hip06 in HNS
-  net:hns: Add the init code to disable Hip06 "Hardware VLAN assist"
-
- drivers/net/ethernet/hisilicon/hns/hnae.h          |   56 ++-
- drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c  |   90 +++-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c |  213 +++++++--
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h |   25 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c |    6 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c  |   79 +++-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.h  |   32 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c  |   68 ++-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.h  |    8 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h  |   88 +++-
- drivers/net/ethernet/hisilicon/hns/hns_enet.c      |  487 +++++++++++++++++---
- drivers/net/ethernet/hisilicon/hns/hns_enet.h      |   12 +
- drivers/net/ethernet/hisilicon/hns/hns_ethtool.c   |   95 +++-
- 13 files changed, 1072 insertions(+), 187 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
+index 826454a..9b37242 100644
+--- a/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
++++ b/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
+@@ -1,7 +1,10 @@
+ ROCKCHIP USB2 PHY
+ 
+ Required properties:
+- - compatible: rockchip,rk3288-usb-phy
++ - compatible: matching the soc type, one of
++     "rockchip,rk3066a-usb-phy"
++     "rockchip,rk3188-usb-phy"
++     "rockchip,rk3288-usb-phy"
+  - rockchip,grf : phandle to the syscon managing the "general
+    register files"
+  - #address-cells: should be 1
+diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
+index ff3ac33..16cd533 100644
+--- a/drivers/phy/phy-rockchip-usb.c
++++ b/drivers/phy/phy-rockchip-usb.c
+@@ -176,6 +176,8 @@ static int rockchip_usb_phy_probe(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id rockchip_usb_phy_dt_ids[] = {
++	{ .compatible = "rockchip,rk3066a-usb-phy" },
++	{ .compatible = "rockchip,rk3188-usb-phy" },
+ 	{ .compatible = "rockchip,rk3288-usb-phy" },
+ 	{}
+ };
 -- 
-1.7.9.5
+2.6.2
