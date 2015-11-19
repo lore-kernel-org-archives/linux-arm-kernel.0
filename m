@@ -1,196 +1,175 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 19 Nov 2015 08:48:12 +0000
-Subject: [PATCH v8 2/4] irqchip: add platform device driver for mbigen
- device
-In-Reply-To: <1446798522-28000-3-git-send-email-majun258@huawei.com>
-References: <1446798522-28000-1-git-send-email-majun258@huawei.com>
- <1446798522-28000-3-git-send-email-majun258@huawei.com>
-Message-ID: <564D8CCC.1070707@arm.com>
+From: mtitinger@baylibre.com (Marc Titinger)
+Date: Thu, 19 Nov 2015 09:50:30 +0100
+Subject: [PATCH RFC 18/27] drivers: cpu-pd: Add PM Domain governor for CPUs
+In-Reply-To: <20151118184245.GA28755@red-moon>
+References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
+ <1447799871-56374-19-git-send-email-lina.iyer@linaro.org>
+ <20151118184245.GA28755@red-moon>
+Message-ID: <564D8D56.1080206@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/15 08:28, MaJun wrote:
-> From: Ma Jun <majun258@huawei.com>
-> 
-> Mbigen means Message Based Interrupt Generator(MBIGEN).
-> 
-> Its a kind of interrupt controller that collects
-> the interrupts from external devices and generate msi interrupt.
-> Mbigen is applied to reduce the number of wire connected interrupts.
-> 
-> As the peripherals increasing, the interrupts lines needed is
-> increasing much, especially on the Arm64 server SOC.
-> 
-> Therefore, the interrupt pin in GIC is not enough to cover so
-> many peripherals.
-> 
-> Mbigen is designed to fix this problem.
-> 
-> Mbigen chip locates in ITS or outside of ITS.
-> 
-> Mbigen chip hardware structure shows as below:
-> 
-> 		mbigen chip
-> |---------------------|-------------------|
-> mgn_node0	  mgn_node1		mgn_node2
->  |		 |-------|		|-------|------|
-> dev1		dev1    dev2		dev1   dev3   dev4
-> 
-> Each mbigen chip contains several mbigen nodes.
-> 
-> External devices can connect to mbigen node through wire connecting way.
-> 
-> Because a mbigen node only can support 128 interrupt maximum, depends
-> on the interrupt lines number of devices, a device can connects to one
-> more mbigen nodes.
-> 
-> Also, several different devices can connect to a same mbigen node.
-> 
-> When devices triggered interrupt,mbigen chip detects and collects
-> the interrupts and generates the MBI interrupts by writing the ITS
-> Translator register.
-> 
-> To simplify mbigen driver,I used a new conception--mbigen device.
-> Each mbigen device is initialized as a platform device.
-> 
-> Mbigen device presents the parts(register, pin definition etc.) in
-> mbigen chip corresponding to a peripheral device.
-> 
-> So from software view, the structure likes below
-> 
-> 	            mbigen chip
->      |---------------------|-----------------|
-> mbigen device1       mbigen device2  mbigen device3
->       |                   |                |
->      dev1                dev2             dev3
-> 
-> Signed-off-by: Ma Jun <majun258@huawei.com>
-> ---
->  drivers/irqchip/Kconfig      |    8 ++++
->  drivers/irqchip/Makefile     |    1 +
->  drivers/irqchip/irq-mbigen.c |   73 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 82 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/irqchip/irq-mbigen.c
-> 
-> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index 4d7294e..b205e15 100644
-> --- a/drivers/irqchip/Kconfig
-> +++ b/drivers/irqchip/Kconfig
-> @@ -27,6 +27,14 @@ config ARM_GIC_V3_ITS
->  	bool
->  	select PCI_MSI_IRQ_DOMAIN
->  
-> +config HISILICON_IRQ_MBIGEN
-> +	bool "Support mbigen interrupt controller"
-> +	default n
-> +	depends on ARM_GIC_V3 && ARM_GIC_V3_ITS && GENERIC_MSI_IRQ_DOMAIN
-> +	help
-> +	 Enable the mbigen interrupt controller used on
-> +	 Hisilicon platform.
-> +
->  config ARM_NVIC
->  	bool
->  	select IRQ_DOMAIN
-> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> index 177f78f..cd76b11 100644
-> --- a/drivers/irqchip/Makefile
-> +++ b/drivers/irqchip/Makefile
-> @@ -24,6 +24,7 @@ obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
->  obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
->  obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
->  obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o
-> +obj-$(CONFIG_HISILICON_IRQ_MBIGEN)	+= irq-mbigen.o
->  obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
->  obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
->  obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
-> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-> new file mode 100644
-> index 0000000..25e4000
-> --- /dev/null
-> +++ b/drivers/irqchip/irq-mbigen.c
-> @@ -0,0 +1,73 @@
-> +/*
-> + * Copyright (C) 2015 Hisilicon Limited, All Rights Reserved.
-> + * Author: Jun Ma <majun258@huawei.com>
-> + * Author: Yun Wu <wuyun.wu@huawei.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +
-> +/**
-> + * struct mbigen_device - holds the information of mbigen device.
-> + *
-> + * @pdev:		pointer to the platform device structure of mbigen chip.
-> + * @base:		mapped address of this mbigen chip.
-> + */
-> +struct mbigen_device {
-> +	struct platform_device	*pdev;
-> +	void __iomem		*base;
-> +};
-> +
-> +static int mbigen_device_probe(struct platform_device *pdev)
-> +{
-> +	struct mbigen_device *mgn_chip;
-> +
-> +	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
-> +	if (!mgn_chip)
-> +		return -ENOMEM;
-> +
-> +	mgn_chip->pdev = pdev;
-> +	mgn_chip->base = of_iomap(pdev->dev.of_node, 0);
-> +
+On 18/11/2015 19:42, Lorenzo Pieralisi wrote:
+> On Tue, Nov 17, 2015 at 03:37:42PM -0700, Lina Iyer wrote:
+>> A PM domain comprising of CPUs may be powered off when all the CPUs in
+>> the domain are powered down. Powering down a CPU domain is generally a
+>> expensive operation and therefore the power performance trade offs
+>> should be considered. The time between the last CPU powering down and
+>> the first CPU powering up in a domain, is the time available for the
+>> domain to sleep. Ideally, the sleep time of the domain should fulfill
+>> the residency requirement of the domains' idle state.
+>>
+>> To do this effectively, read the time before the wakeup of the cluster's
+>> CPUs and ensure that the domain's idle state sleep time guarantees the
+>> QoS requirements of each of the CPU, the PM QoS CPU_DMA_LATENCY and the
+>> state's residency.
+>
+> To me this information should be part of the CPUidle governor (it is
+> already there), we should not split the decision into multiple layers.
+>
+> The problem you are facing is that the CPUidle governor(s) do not take
+> cross cpus relationship into account, I do not think that adding another
+> decision layer in the power domain subsystem helps, you are doing that
+> just because adding it to the existing CPUidle governor(s) is invasive.
+>
+> Why can't we use the power domain work you put together to eg disable
+> idle states that share multiple cpus and make them "visible" only
+> when the power domain that encompass them is actually going down ?
+>
+> You could use the power domains information to detect states that
+> are shared between cpus.
+>
+> It is just an idea, what I am saying is that having another governor in
+> the power domain subsytem does not make much sense, you split the
+> decision in two layers while there is actually one, the existing
+> CPUidle governor and that's where the decision should be taken.
+>
+> Thoughts appreciated.
 
-If you're going to use the devm_* stuff for your allocations, you might
-as well use devm_ioremap_resource as a matter of consistency. And
-checking the return value is not superfluous.
+Maybe this is silly and not thought-through, but I wonder if the 
+responsibilities could be split or instance with an outer control loop 
+that has the heuristic to compute the next tick time, and the required 
+cpu-power needed during that time slot, and an inner control loop 
+(genpd) that has a per-domain QoS and can optimize power consumption.
 
-> +	platform_set_drvdata(pdev, mgn_chip);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id mbigen_of_match[] = {
-> +	{ .compatible = "hisilicon,mbigen-v2" },
-> +	{ /* END */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, mbigen_of_match);
-> +
-> +static struct platform_driver mbigen_platform_driver = {
-> +	.driver = {
-> +		.name		= "Hisilicon MBIGEN-V2",
-> +		.owner		= THIS_MODULE,
-> +		.of_match_table	= mbigen_of_match,
-> +	},
-> +	.probe			= mbigen_device_probe,
-> +};
-> +
-> +module_platform_driver(mbigen_platform_driver);
-> +
-> +MODULE_AUTHOR("Jun Ma <majun258@huawei.com>");
-> +MODULE_AUTHOR("Yun Wu <wuyun.wu@huawei.com>");
-> +MODULE_LICENSE("GPL");
-> +MODULE_DESCRIPTION("Hisilicon MBI Generator driver");
-> 
+Marc.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>
+> Lorenzo
+>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>> ---
+>>   drivers/base/power/cpu-pd.c | 83 ++++++++++++++++++++++++++++++++++++++++++++-
+>>   1 file changed, 82 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/base/power/cpu-pd.c b/drivers/base/power/cpu-pd.c
+>> index 617ce54..a00abc1 100644
+>> --- a/drivers/base/power/cpu-pd.c
+>> +++ b/drivers/base/power/cpu-pd.c
+>> @@ -21,6 +21,7 @@
+>>   #include <linux/pm_qos.h>
+>>   #include <linux/rculist.h>
+>>   #include <linux/slab.h>
+>> +#include <linux/tick.h>
+>>
+>>   #define CPU_PD_NAME_MAX 36
+>>
+>> @@ -66,6 +67,86 @@ static void get_cpus_in_domain(struct generic_pm_domain *genpd,
+>>   	}
+>>   }
+>>
+>> +static bool cpu_pd_down_ok(struct dev_pm_domain *pd)
+>> +{
+>> +	struct generic_pm_domain *genpd = pd_to_genpd(pd);
+>> +	struct cpu_pm_domain *cpu_pd = to_cpu_pd(genpd);
+>> +	int qos = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
+>> +	u64 sleep_ns = ~0;
+>> +	ktime_t earliest;
+>> +	int cpu;
+>> +	int i;
+>> +
+>> +	/* Reset the last set genpd state, default to index 0 */
+>> +	genpd->state_idx = 0;
+>> +
+>> +	/* We dont want to power down, if QoS is 0 */
+>> +	if (!qos)
+>> +		return false;
+>> +
+>> +	/*
+>> +	 * Find the sleep time for the cluster.
+>> +	 * The time between now and the first wake up of any CPU that
+>> +	 * are in this domain hierarchy is the time available for the
+>> +	 * domain to be idle.
+>> +	 */
+>> +	earliest.tv64 = KTIME_MAX;
+>> +	for_each_cpu_and(cpu, cpu_pd->cpus, cpu_online_mask) {
+>> +		struct device *cpu_dev = get_cpu_device(cpu);
+>> +		struct gpd_timing_data *td;
+>> +
+>> +		td = &dev_gpd_data(cpu_dev)->td;
+>> +
+>> +		if (earliest.tv64 < td->next_wakeup.tv64)
+>> +			earliest = td->next_wakeup;
+>> +	}
+>> +
+>> +	sleep_ns = ktime_to_ns(ktime_sub(earliest, ktime_get()));
+>> +	if (sleep_ns <= 0)
+>> +		return false;
+>> +
+>> +	/*
+>> +	 * Find the deepest sleep state that satisfies the residency
+>> +	 * requirement and the QoS constraint
+>> +	 */
+>> +	for (i = genpd->state_count - 1; i > 0; i--) {
+>> +		u64 state_sleep_ns;
+>> +
+>> +		state_sleep_ns = genpd->states[i].power_off_latency_ns +
+>> +			genpd->states[i].power_on_latency_ns +
+>> +			genpd->states[i].residency_ns;
+>> +
+>> +		/*
+>> +		 * If we cant sleep to save power in the state, move on
+>> +		 * to the next lower idle state.
+>> +		 */
+>> +		if (state_sleep_ns > sleep_ns)
+>> +		       continue;
+>> +
+>> +		/*
+>> +		 * We also dont want to sleep more than we should to
+>> +		 * gaurantee QoS.
+>> +		 */
+>> +		if (state_sleep_ns < (qos * NSEC_PER_USEC))
+>> +			break;
+>> +	}
+>> +
+>> +	if (i >= 0)
+>> +		genpd->state_idx = i;
+>> +
+>> +	return  (i >= 0) ? true : false;
+>> +}
+>> +
+>> +static bool cpu_stop_ok(struct device *dev)
+>> +{
+>> +	return true;
+>> +}
+>> +
+>> +struct dev_power_governor cpu_pd_gov = {
+>> +	.power_down_ok = cpu_pd_down_ok,
+>> +	.stop_ok = cpu_stop_ok,
+>> +};
+>> +
+>>   static int cpu_pd_power_off(struct generic_pm_domain *genpd)
+>>   {
+>>   	struct cpu_pm_domain *pd = to_cpu_pd(genpd);
+>> @@ -183,7 +264,7 @@ int of_register_cpu_pm_domain(struct device_node *dn,
+>>
+>>   	/* Register the CPU genpd */
+>>   	pr_debug("adding %s as CPU PM domain.\n", pd->genpd->name);
+>> -	ret = of_pm_genpd_init(dn, pd->genpd, &simple_qos_governor, false);
+>> +	ret = of_pm_genpd_init(dn, pd->genpd, &cpu_pd_gov, false);
+>>   	if (ret) {
+>>   		pr_err("Unable to initialize domain %s\n", dn->full_name);
+>>   		return ret;
+>> --
+>> 2.1.4
+>>
