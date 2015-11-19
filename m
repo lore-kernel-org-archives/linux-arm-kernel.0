@@ -1,130 +1,58 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Thu, 19 Nov 2015 18:05:09 -0500
-Subject: [PATCH v2 3/3] ARM64: dts: enable clock support for Broadcom NS2
-In-Reply-To: <1447974309-29566-1-git-send-email-jonmason@broadcom.com>
-References: <1447974309-29566-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <1447974309-29566-4-git-send-email-jonmason@broadcom.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Thu, 19 Nov 2015 18:15:09 -0500
+Subject: [PATH RESEND v2 03/10] tty: xuartps: Always enable transmitter in
+ start_tx
+In-Reply-To: <1447963344-16266-4-git-send-email-soren.brinkmann@xilinx.com>
+References: <1447963344-16266-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1447963344-16266-4-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <564E57FD.8080900@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree entries for clock support for Broadcom Northstar 2 SoC
+On 11/19/2015 03:02 PM, Soren Brinkmann wrote:
+> start_tx must start transmitting characters. Regardless of the state of
+> the circular buffer, always enable the transmitter hardware.
 
-Signed-off-by: Jon Mason <jonmason@broadcom.com>
----
- arch/arm64/boot/dts/broadcom/ns2.dtsi | 80 ++++++++++++++++++++++++++++++++++-
- 1 file changed, 79 insertions(+), 1 deletion(-)
+Why?
 
-diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-index 9610822..a510d3a 100644
---- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -31,6 +31,7 @@
-  */
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/bcm-ns2.h>
- 
- /memreserve/ 0x84b00000 0x00000008;
- 
-@@ -109,6 +110,33 @@
- 				     <&A57_3>;
- 	};
- 
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		osc: oscillator {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <25000000>;
-+		};
-+
-+		iprocmed: iprocmed {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clocks = <&genpll_scr BCM_NS2_GENPLL_SCR_SCR_CLK>;
-+			clock-div = <2>;
-+			clock-mult = <1>;
-+		};
-+
-+		iprocslow: iprocslow {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clocks = <&genpll_scr BCM_NS2_GENPLL_SCR_SCR_CLK>;
-+			clock-div = <4>;
-+			clock-mult = <1>;
-+		};
-+	};
-+
- 	soc: soc {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -156,6 +184,56 @@
- 			mmu-masters;
- 		};
- 
-+		lcpll_ddr: lcpll_ddr at 6501d058 {
-+			#clock-cells = <1>;
-+			compatible = "brcm,ns2-lcpll-ddr";
-+			reg = <0x6501d058 0x20>,
-+			      <0x6501c020 0x4>,
-+			      <0x6501d04c 0x4>;
-+			clocks = <&osc>;
-+			clock-output-names = "lcpll_ddr", "pcie_sata_usb",
-+					     "ddr", "ddr_ch2_unused",
-+					     "ddr_ch3_unused", "ddr_ch4_unused",
-+					     "ddr_ch5_unused";
-+		};
-+
-+		lcpll_ports: lcpll_ports at 6501d078 {
-+			#clock-cells = <1>;
-+			compatible = "brcm,ns2-lcpll-ports";
-+			reg = <0x6501d078 0x20>,
-+			      <0x6501c020 0x4>,
-+			      <0x6501d054 0x4>;
-+			clocks = <&osc>;
-+			clock-output-names = "lcpll_ports", "wan", "rgmii",
-+					     "ports_ch2_unused",
-+					     "ports_ch3_unused",
-+					     "ports_ch4_unused",
-+					     "ports_ch5_unused";
-+		};
-+
-+		genpll_scr: genpll_scr at 6501d098 {
-+			#clock-cells = <1>;
-+			compatible = "brcm,ns2-genpll-scr";
-+			reg = <0x6501d098 0x32>,
-+			      <0x6501c020 0x4>,
-+			      <0x6501d044 0x4>;
-+			clocks = <&osc>;
-+			clock-output-names = "genpll_scr", "scr", "fs",
-+					     "audio_ref", "scr_ch3_unused",
-+					     "scr_ch4_unused", "scr_ch5_unused";
-+		};
-+
-+		genpll_sw: genpll_sw at 6501d0c4 {
-+			#clock-cells = <1>;
-+			compatible = "brcm,ns2-genpll-sw";
-+			reg = <0x6501d0c4 0x32>,
-+			      <0x6501c020 0x4>,
-+			      <0x6501d044 0x4>;
-+			clocks = <&osc>;
-+			clock-output-names = "genpll_sw", "rpe", "250", "nic",
-+					     "chimp", "port", "sdio";
-+		};
-+
- 		crmu: crmu at 65024000 {
- 			compatible = "syscon";
- 			reg = <0x65024000 0x100>;
-@@ -204,7 +282,7 @@
- 			interrupts = <GIC_SPI 393 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clock-frequency = <23961600>;
-+			clocks = <&osc>;
- 			status = "disabled";
- 		};
- 
--- 
-1.9.1
+Does cdns_uart_stop_tx() actually stop the transmitter so that
+data is remains in the transmitter?
+
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+>  drivers/tty/serial/xilinx_uartps.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+> index 2c98c357d9a0..df6778d17949 100644
+> --- a/drivers/tty/serial/xilinx_uartps.c
+> +++ b/drivers/tty/serial/xilinx_uartps.c
+> @@ -512,9 +512,6 @@ static void cdns_uart_start_tx(struct uart_port *port)
+>  {
+>  	unsigned int status, numbytes = port->fifosize;
+>  
+> -	if (uart_circ_empty(&port->state->xmit) || uart_tx_stopped(port))
+> -		return;
+
+The test for tx stopped needs to remain; otherwise, transmission will
+restart even if the tty has been stopped (for example by userspace)
+or IXON software flow control.
+
+Regards,
+Peter Hurley
+
+> -
+>  	/*
+>  	 * Set the TX enable bit and clear the TX disable bit to enable the
+>  	 * transmitter.
+> @@ -524,6 +521,9 @@ static void cdns_uart_start_tx(struct uart_port *port)
+>  	status |= CDNS_UART_CR_TX_EN;
+>  	writel(status, port->membase + CDNS_UART_CR_OFFSET);
+>  
+> +	if (uart_circ_empty(&port->state->xmit) || uart_tx_stopped(port))
+> +		return;
+> +
+>  	while (numbytes-- && ((readl(port->membase + CDNS_UART_SR_OFFSET) &
+>  				CDNS_UART_SR_TXFULL)) != CDNS_UART_SR_TXFULL) {
+>  		/* Break if no more data available in the UART buffer */
+> 
