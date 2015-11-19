@@ -1,89 +1,55 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 19 Nov 2015 17:09:23 +0100
-Subject: [linux-sunxi] Re: [PATCH v3 3/3] ARM: dts: sun4i: gemei-g9:
- Enable sun4i audio codec support
-In-Reply-To: <1447354399.31635.10.camel@plaes.org>
-References: <1446832486-32319-1-git-send-email-plaes@plaes.org>
- <1446832486-32319-4-git-send-email-plaes@plaes.org>
- <CAGb2v66uG-0EgVR=5SS4Lk-y5mX9v3Z39xP+0f7u7BfYq-b1yw@mail.gmail.com>
- <1447354399.31635.10.camel@plaes.org>
-Message-ID: <20151119160923.GS32142@lukather>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 19 Nov 2015 17:11:54 +0100
+Subject: [PATCH 2/2] ARM: dts: imx6q: add Novena board
+In-Reply-To: <CAOMZO5C1oYge+TUKPYsgBRV75HVDwj42oAo27aaK-XqtHw8-7g@mail.gmail.com>
+References: <1447840120-8513-1-git-send-email-marex@denx.de>
+ <1447840120-8513-2-git-send-email-marex@denx.de>
+ <CAOMZO5C1oYge+TUKPYsgBRV75HVDwj42oAo27aaK-XqtHw8-7g@mail.gmail.com>
+Message-ID: <201511191711.54699.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wednesday, November 18, 2015 at 01:00:50 PM, Fabio Estevam wrote:
+> Hi Marek,
 
-On Thu, Nov 12, 2015 at 08:53:19PM +0200, Priit Laes wrote:
-> On Mon, 2015-11-09 at 11:59 +0800, Chen-Yu Tsai wrote:
-> > On Sat, Nov 7, 2015 at 1:54 AM, Priit Laes <plaes@plaes.org> wrote:
-> > > Gemei G9 has internal speakers and headphone jack. Audio switching
-> > > from internal speakers to headphones is automatically handled by
-> > > extra FT2012Q audio amplifier chip that works out of the box.
-> > 
-> > Nice that it works out of the box. The FEX file does mention:
-> > 
-> > audio_pa_ctrl???= port:PH15<1><default><default><0>
+Hi!
+
+> On Wed, Nov 18, 2015 at 7:48 AM, Marek Vasut <marex@denx.de> wrote:
+> > +++ b/arch/arm/boot/dts/imx6q-novena.dts
+> > @@ -0,0 +1,825 @@
+> > +/*
+> > + * Copyright 2014 Sutajio Ko-Usagi PTE LTD
+> > + * Copyright 2012 Freescale Semiconductor, Inc.
+> > + * Copyright 2011 Linaro Ltd.
+> > + *
+> > + * The code contained herein is licensed under the GNU General Public
+> > + * License. You may obtain a copy of the GNU General Public License
+> > + * Version 2 or later at the following locations:
+> > + *
+> > + * http://www.opensource.org/licenses/gpl-license.html
+> > + * http://www.gnu.org/copyleft/gpl.html
 > 
-> Nice catch.
+> Could you make this GPL/X11 dual-license?
+
+I'll talk to Sean about this, but I hope this is not a problem.
+
+> Take a look at arch/arm/boot/dts/imx6qdl-cubox-i.dtsi for a reference.
 > 
-> Setting it low mutes audio, and setting it back high unmutes.
-
-Then you just volunteered yourself to fix the FIXME in the driver ;)
-
-> > So either it is floating or pulled up by default? Since it works
-> > now I don't see any reason to block it. On the other hand once
-> > that binding is introduced it would be nice to add it for power
-> > management reasons.
+> > +&iomuxc {
+> > +       audmux {
+> > +               pinctrl_audmux_novena: audmuxgrp-novena {
+> > +                       fsl,pins = <
+> > +                               MX6QDL_PAD_CSI0_DAT7__AUD3_RXD 
+> > 0x80000000 +                              
+> > MX6QDL_PAD_CSI0_DAT4__AUD3_TXC  0x80000000 +                            
+> >   MX6QDL_PAD_CSI0_DAT5__AUD3_TXD  0x80000000 +                          
+> >     MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS 0x80000000
 > 
-> Should I just add comment about it or do something like this:
+> Please avoid these 0x80000000 throughout this file.
 > 
-> &codec {
-> ? status = "okay";
-> ? /*
-> ? ?* TODO: Add codec_ext_pwr_pin to turn off external audio AMP
-> ? ?&pio {
-> ? ? ?codec_ext_pwr_pin:?codec_ext_pwr_pin at 0?{
-> ? ? ? ?allwinner,pins = "PH15";
-> ? ? ? ?allwinner,function = "gpio_out";
-> ? ? ? ?allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> ? ? ? ?allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-> ? ? ?}
-> ? ?}
-> ? ?*/
-> }
+> We should better not rely on the IOMUX settings done in the bootloader.
 
-More like
+Fixed, thanks!
 
-&pio {
-	codec_ext_pwr_pin: codec_ext_pwr_pin at 0 {
-		allwinner,pins = "PH15";
-		allwinner,function = "gpio_out";
-		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-	};
-};
-
-&codec {
-	/* This pin is used to turn off the GPIO amp pin */
-	pinctrl-names = "default";
-	pinctrl-0 <&codec_ext_pwr_pin>;
-	status = "okay";
-};
-
-Of course, that's a temporary measure, and you should actually use
-that GPIO to enable / disable the Amplifier when you are playing
-sound. It shouldn't be that hard with ASoC.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151119/0b76ebe7/attachment.sig>
+Best regards,
+Marek Vasut
