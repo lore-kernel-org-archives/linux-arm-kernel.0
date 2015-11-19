@@ -1,54 +1,95 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 19 Nov 2015 14:53:53 +0000
-Subject: [PATCH v4 03/13] VFIO: platform: test forwarded state when selecting
- the IRQ handler
+Date: Thu, 19 Nov 2015 14:53:54 +0000
+Subject: [PATCH v4 04/13] VFIO: platform: single handler using function pointer
 In-Reply-To: <1447944843-17731-1-git-send-email-eric.auger@linaro.org>
 References: <1447944843-17731-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1447944843-17731-4-git-send-email-eric.auger@linaro.org>
+Message-ID: <1447944843-17731-5-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new forwarded flag in vfio_platform_irq.  In case the IRQ
-is forwarded, the VFIO platform IRQ handler does not need to
-disable the IRQ anymore.
+A single handler now is registered whatever the use case: automasked
+or not. A function pointer is set according to the wished behavior
+and the handler calls this function.
 
-When setting the IRQ handler we now also test the forwarded state. In
-case the IRQ is forwarded we select the vfio_irq_handler.
+The irq lock is taken/released in the root handler. eventfd_signal can
+be called in regions not allowed to sleep.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
 
-v2:
-- add a new forwarded flag and do not use irqd_irq_forwarded anymore
+v4: creation
 ---
- drivers/vfio/platform/vfio_platform_irq.c     | 3 ++-
- drivers/vfio/platform/vfio_platform_private.h | 1 +
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ drivers/vfio/platform/vfio_platform_irq.c     | 21 +++++++++++++++------
+ drivers/vfio/platform/vfio_platform_private.h |  1 +
+ 2 files changed, 16 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
-index ab7658a..d4462fd 100644
+index d4462fd..c58e0ad 100644
 --- a/drivers/vfio/platform/vfio_platform_irq.c
 +++ b/drivers/vfio/platform/vfio_platform_irq.c
-@@ -265,7 +265,8 @@ static int vfio_platform_set_irq_trigger(struct vfio_platform_device *vdev,
- 	struct vfio_platform_irq *irq = &vdev->irqs[index];
- 	irq_handler_t handler;
+@@ -148,11 +148,8 @@ static int vfio_platform_set_irq_unmask(struct vfio_platform_device *vdev,
+ static irqreturn_t vfio_automasked_irq_handler(int irq, void *dev_id)
+ {
+ 	struct vfio_platform_irq *irq_ctx = dev_id;
+-	unsigned long flags;
+ 	int ret = IRQ_NONE;
  
--	if (vdev->irqs[index].flags & VFIO_IRQ_INFO_AUTOMASKED)
-+	if (vdev->irqs[index].flags & VFIO_IRQ_INFO_AUTOMASKED &&
-+			!irq->forwarded)
- 		handler = vfio_automasked_irq_handler;
- 	else
- 		handler = vfio_irq_handler;
+-	spin_lock_irqsave(&irq_ctx->lock, flags);
+-
+ 	if (!irq_ctx->masked) {
+ 		ret = IRQ_HANDLED;
+ 
+@@ -161,8 +158,6 @@ static irqreturn_t vfio_automasked_irq_handler(int irq, void *dev_id)
+ 		irq_ctx->masked = true;
+ 	}
+ 
+-	spin_unlock_irqrestore(&irq_ctx->lock, flags);
+-
+ 	if (ret == IRQ_HANDLED)
+ 		eventfd_signal(irq_ctx->trigger, 1);
+ 
+@@ -178,6 +173,19 @@ static irqreturn_t vfio_irq_handler(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
++static irqreturn_t vfio_handler(int irq, void *dev_id)
++{
++	struct vfio_platform_irq *irq_ctx = dev_id;
++	unsigned long flags;
++	irqreturn_t ret;
++
++	spin_lock_irqsave(&irq_ctx->lock, flags);
++	ret = irq_ctx->handler(irq, dev_id);
++	spin_unlock_irqrestore(&irq_ctx->lock, flags);
++
++	return ret;
++}
++
+ static void vfio_platform_irq_bypass_stop(struct irq_bypass_producer *prod)
+ {
+ }
+@@ -230,9 +238,10 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+ 	}
+ 
+ 	irq->trigger = trigger;
++	irq->handler = handler;
+ 
+ 	irq_set_status_flags(irq->hwirq, IRQ_NOAUTOEN);
+-	ret = request_irq(irq->hwirq, handler, 0, irq->name, irq);
++	ret = request_irq(irq->hwirq, vfio_handler, 0, irq->name, irq);
+ 	if (ret) {
+ 		kfree(irq->name);
+ 		eventfd_ctx_put(trigger);
 diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-index 979c191..55e8043 100644
+index 55e8043..8a8c050 100644
 --- a/drivers/vfio/platform/vfio_platform_private.h
 +++ b/drivers/vfio/platform/vfio_platform_private.h
-@@ -39,6 +39,7 @@ struct vfio_platform_irq {
- 	struct virqfd		*unmask;
+@@ -40,6 +40,7 @@ struct vfio_platform_irq {
  	struct virqfd		*mask;
  	struct irq_bypass_producer producer;
-+	bool			forwarded;
+ 	bool			forwarded;
++	irqreturn_t (*handler)(int irq, void *dev_id);
  };
  
  struct vfio_platform_region {
