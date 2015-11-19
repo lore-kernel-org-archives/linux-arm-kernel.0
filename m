@@ -1,52 +1,32 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 19 Nov 2015 12:02:24 -0800
-Subject: [PATCH 2/2] ARM: dts: imx: ventana: Add SPI support for GW52xx
-Message-ID: <1447963344-21996-1-git-send-email-tharvey@gateworks.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 19 Nov 2015 12:05:38 -0800
+Subject: [PATCH] soc: Mediatek: Enable SCPSYS power domain driver by
+ default
+In-Reply-To: <7h4mgpdh6f.fsf@deeprootsystems.com>
+References: <1447411835-19035-1-git-send-email-eddie.huang@mediatek.com>
+ <7h4mgpdh6f.fsf@deeprootsystems.com>
+Message-ID: <CAMAWPa8ZcD30-06K3w1EewPMPA6LmU7bpOWbxi=VfsByyQT3Sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This addes support for SPI available on an off-board connector available on
-some models of the GW52xx.
+On Fri, Nov 13, 2015 at 7:59 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> Eddie Huang <eddie.huang@mediatek.com> writes:
+>
+>> If enable Mediatek 8173 SoC, it should also enable power domain
+>> driver. Otherwise access clk subsystem register will fail.
+>>
+>> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+>
+> Tested-by: Kevin Hilman <khilman@linaro.org>
+>
+> This gets the mt8173-evb booting again with arm-soc/for-next and
+> mainline for me.
+>
+> I'll let Matthias queue this up and send it with any other fixes for
+> v4.4-rc1.
 
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
----
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Matthias, this is still broken in arm-soc.  Curious if your planning
+on sending a fix?  If you prefer, with your ack, we can apply directly
+to arm-soc/fixes.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-index e4a1e72..7fc45a4 100644
---- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-@@ -158,6 +158,14 @@
- 	                  <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
- };
- 
-+&ecspi3 {
-+	fsl,spi-num-chipselects = <1>;
-+	cs-gpios = <&gpio4 24 GPIO_ACTIVE_HIGH>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi3>;
-+	status = "okay";
-+};
-+
- &fec {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet>;
-@@ -357,6 +365,15 @@
- 			>;
- 		};
- 
-+		pinctrl_ecspi3: escpi3grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT0__ECSPI3_SCLK	0x100b1
-+				MX6QDL_PAD_DISP0_DAT1__ECSPI3_MOSI	0x100b1
-+				MX6QDL_PAD_DISP0_DAT2__ECSPI3_MISO	0x100b1
-+				MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24	0x100b1
-+			>;
-+		};
-+
- 		pinctrl_enet: enetgrp {
- 			fsl,pins = <
- 				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
--- 
-1.9.1
+Kevin
