@@ -1,82 +1,193 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 19 Nov 2015 08:40:58 +0000
-Subject: A problem about interrupt when booting a captured kernel
-In-Reply-To: <564D4510.5000303@huawei.com>
-References: <5645B6D3.60305@huawei.com> <564A2DE4.4030702@arm.com>
- <564AA377.2020703@huawei.com> <20151117091613.10ce486f@arm.com>
- <564D4510.5000303@huawei.com>
-Message-ID: <564D8B1A.5010908@arm.com>
+Date: Thu, 19 Nov 2015 08:48:12 +0000
+Subject: [PATCH v8 2/4] irqchip: add platform device driver for mbigen
+ device
+In-Reply-To: <1446798522-28000-3-git-send-email-majun258@huawei.com>
+References: <1446798522-28000-1-git-send-email-majun258@huawei.com>
+ <1446798522-28000-3-git-send-email-majun258@huawei.com>
+Message-ID: <564D8CCC.1070707@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/11/15 03:42, Yang Yingliang wrote:
+On 06/11/15 08:28, MaJun wrote:
+> From: Ma Jun <majun258@huawei.com>
 > 
+> Mbigen means Message Based Interrupt Generator(MBIGEN).
 > 
-> On 2015/11/17 17:16, Marc Zyngier wrote:
->> On Tue, 17 Nov 2015 11:48:07 +0800
->> Yang Yingliang <yangyingliang@huawei.com> wrote:
->>
->>> Hi
->>>
->>> On 2015/11/17 3:26, Marc Zyngier wrote:
->>>> On 13/11/15 10:09, Yang Yingliang wrote:
->>>>> Hi, Marc
->>>>>
->>>>>
->>>>>        The kexec will boot a captured kernel while the kernel panic. But
->>>>> it boots failed if the kernel panic in handler function of PPI. The
->>>>> reason is that the PPI has not been 'eoi', other interrupts can not be
->>>>> handled when booting  the captured kernel.
->>>>>
->>>>>        The kexec will call irq_eoi to end the irqs that have
->>>>> IRQD_IRQ_INPROGRESS flag. But PPIs don't have this flag, so it won't be
->>>>> ended.
->>>>>
->>>>>       Three ways to solve this problem we can think :
->>>>>       1. Is there a way to reset gic like its_reset ?
->>>>>       2. Can we add some flag for calling irq_eoi ?
->>>>>       3. Just 'eoi' all PPIs without checking flags in kexec.
->>>>>
->>>>>        Please give some advice.
->>>>
->>>> Good timing. Please see:
->>>>
->>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/385383.html
->>>>
->>>> and let me know if that fixes things for you.
->>>
->>> I tried patch #1, deactivating interrupt can not fix the problem. But
->>> EOI the interrupt can.
->>
->> You have noticed that this patch is for ARM, not arm64, right?
+> Its a kind of interrupt controller that collects
+> the interrupts from external devices and generate msi interrupt.
+> Mbigen is applied to reduce the number of wire connected interrupts.
 > 
-> Yes, I noticed.
+> As the peripherals increasing, the interrupts lines needed is
+> increasing much, especially on the Arm64 server SOC.
 > 
->>
->>> I think the reason is GICC status is not cleared.
->>> So if it means, in hardware, we should clear the GICC status while
->>> deactivating the.
->>
->> Writing to the EOI register or writing to the ACTIVE register have the
->> exact same result as far as kexec is concerned (unless your GIC is not
->> compliant with the architecture - in which case I can't help you).
->>
->> Does applying the other patches help?
+> Therefore, the interrupt pin in GIC is not enough to cover so
+> many peripherals.
 > 
-> No, it doesn't help.
+> Mbigen is designed to fix this problem.
+> 
+> Mbigen chip locates in ITS or outside of ITS.
+> 
+> Mbigen chip hardware structure shows as below:
+> 
+> 		mbigen chip
+> |---------------------|-------------------|
+> mgn_node0	  mgn_node1		mgn_node2
+>  |		 |-------|		|-------|------|
+> dev1		dev1    dev2		dev1   dev3   dev4
+> 
+> Each mbigen chip contains several mbigen nodes.
+> 
+> External devices can connect to mbigen node through wire connecting way.
+> 
+> Because a mbigen node only can support 128 interrupt maximum, depends
+> on the interrupt lines number of devices, a device can connects to one
+> more mbigen nodes.
+> 
+> Also, several different devices can connect to a same mbigen node.
+> 
+> When devices triggered interrupt,mbigen chip detects and collects
+> the interrupts and generates the MBI interrupts by writing the ITS
+> Translator register.
+> 
+> To simplify mbigen driver,I used a new conception--mbigen device.
+> Each mbigen device is initialized as a platform device.
+> 
+> Mbigen device presents the parts(register, pin definition etc.) in
+> mbigen chip corresponding to a peripheral device.
+> 
+> So from software view, the structure likes below
+> 
+> 	            mbigen chip
+>      |---------------------|-----------------|
+> mbigen device1       mbigen device2  mbigen device3
+>       |                   |                |
+>      dev1                dev2             dev3
+> 
+> Signed-off-by: Ma Jun <majun258@huawei.com>
+> ---
+>  drivers/irqchip/Kconfig      |    8 ++++
+>  drivers/irqchip/Makefile     |    1 +
+>  drivers/irqchip/irq-mbigen.c |   73 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 82 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/irqchip/irq-mbigen.c
+> 
+> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> index 4d7294e..b205e15 100644
+> --- a/drivers/irqchip/Kconfig
+> +++ b/drivers/irqchip/Kconfig
+> @@ -27,6 +27,14 @@ config ARM_GIC_V3_ITS
+>  	bool
+>  	select PCI_MSI_IRQ_DOMAIN
+>  
+> +config HISILICON_IRQ_MBIGEN
+> +	bool "Support mbigen interrupt controller"
+> +	default n
+> +	depends on ARM_GIC_V3 && ARM_GIC_V3_ITS && GENERIC_MSI_IRQ_DOMAIN
+> +	help
+> +	 Enable the mbigen interrupt controller used on
+> +	 Hisilicon platform.
+> +
+>  config ARM_NVIC
+>  	bool
+>  	select IRQ_DOMAIN
+> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> index 177f78f..cd76b11 100644
+> --- a/drivers/irqchip/Makefile
+> +++ b/drivers/irqchip/Makefile
+> @@ -24,6 +24,7 @@ obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
+>  obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
+>  obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
+>  obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o
+> +obj-$(CONFIG_HISILICON_IRQ_MBIGEN)	+= irq-mbigen.o
+>  obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
+>  obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
+>  obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
+> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+> new file mode 100644
+> index 0000000..25e4000
+> --- /dev/null
+> +++ b/drivers/irqchip/irq-mbigen.c
+> @@ -0,0 +1,73 @@
+> +/*
+> + * Copyright (C) 2015 Hisilicon Limited, All Rights Reserved.
+> + * Author: Jun Ma <majun258@huawei.com>
+> + * Author: Yun Wu <wuyun.wu@huawei.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +
+> +/**
+> + * struct mbigen_device - holds the information of mbigen device.
+> + *
+> + * @pdev:		pointer to the platform device structure of mbigen chip.
+> + * @base:		mapped address of this mbigen chip.
+> + */
+> +struct mbigen_device {
+> +	struct platform_device	*pdev;
+> +	void __iomem		*base;
+> +};
+> +
+> +static int mbigen_device_probe(struct platform_device *pdev)
+> +{
+> +	struct mbigen_device *mgn_chip;
+> +
+> +	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
+> +	if (!mgn_chip)
+> +		return -ENOMEM;
+> +
+> +	mgn_chip->pdev = pdev;
+> +	mgn_chip->base = of_iomap(pdev->dev.of_node, 0);
+> +
 
-That's pretty annoying. It means that on your implementation, clearing
-the ACTIVE bit doesn't deactivate an interrupt. Great! This probably
-also break KVM's guest timer in 4.3.
+If you're going to use the devm_* stuff for your allocations, you might
+as well use devm_ioremap_resource as a matter of consistency. And
+checking the return value is not superfluous.
 
-Using EOI won't help either because you don't know whether to do a
-priority drop (which has to happen in reverse order w.r.t. the read of
-IAR) or a deactivate (and no matter how many flag you add, you still
-won't know).
-
-Can you please get in touch with your HW folks so that they can explain:
-1) why it doesn't work,
-2) if there is any workaround.
+> +	platform_set_drvdata(pdev, mgn_chip);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id mbigen_of_match[] = {
+> +	{ .compatible = "hisilicon,mbigen-v2" },
+> +	{ /* END */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, mbigen_of_match);
+> +
+> +static struct platform_driver mbigen_platform_driver = {
+> +	.driver = {
+> +		.name		= "Hisilicon MBIGEN-V2",
+> +		.owner		= THIS_MODULE,
+> +		.of_match_table	= mbigen_of_match,
+> +	},
+> +	.probe			= mbigen_device_probe,
+> +};
+> +
+> +module_platform_driver(mbigen_platform_driver);
+> +
+> +MODULE_AUTHOR("Jun Ma <majun258@huawei.com>");
+> +MODULE_AUTHOR("Yun Wu <wuyun.wu@huawei.com>");
+> +MODULE_LICENSE("GPL");
+> +MODULE_DESCRIPTION("Hisilicon MBI Generator driver");
+> 
 
 Thanks,
 
