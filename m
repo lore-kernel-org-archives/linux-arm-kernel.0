@@ -1,26 +1,29 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Thu, 19 Nov 2015 16:04:03 +0000
-Subject: [PATCH] ARM: xip: Move XIP linking to a separate file
-In-Reply-To: <alpine.LFD.2.20.1511191050080.22569@knanqh.ubzr>
-References: <1447943047-22427-1-git-send-email-chris.brandt@renesas.com>
- <alpine.LFD.2.20.1511191050080.22569@knanqh.ubzr>
-Message-ID: <HK2PR06MB0561F1A746E04D0A205B2DBB8A1B0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 19 Nov 2015 16:06:12 +0000
+Subject: [PATCH RFC 0/4] ARM: bcm2835: assign pins to sdhci pinctrl
+Message-ID: <1447949176-21926-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Nov 2015, Michal Marek wrote:
-> Why not have a vmlinux.lds.S and #include a vmlinux-xip.lds.S / 
-> vmlinux-nonxip.lds.S from there? That way, you do not clutter the
-> main Makefile and you can reuse the boilerplate of the linker script.
-> 
-> Michal
+This patch series fixes the pinctrl of the sdhci pins for all
+Raspberry Pis.
 
-On Thu, 19 Nov 2015, Nicolas Pitre wrote:
-> I agree with Michal's suggestion to do the selection locally with an
-> include.
+The pin configuration based on the proprietary DTS [1].
 
+[1] - https://www.raspberrypi.org/documentation/configuration/images/dt-blob.dts
 
-That's actually how I started out locally, but I thought if I tried submitting that, I'd get a bunch of "Eww, that's ugly".
-I'm happy to redo the patch and contain the dysfunctionalism of XIP to the ARM tree.
+Stefan Wahren (4):
+  ARM: bcm2835: remove sdhci pins from GPIO pinctrl
+  ARM: bcm2835: rename sdhci pin group
+  ARM: bcm2835: specify card detect pin for RPi B
+  ARM: bcm2835: assign pins to sdhci pinctrl
 
-Chris
+ arch/arm/boot/dts/bcm2835-rpi-a-plus.dts |    6 +++++-
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts |    6 +++++-
+ arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts |    6 +++++-
+ arch/arm/boot/dts/bcm2835-rpi-b.dts      |   11 ++++++++++-
+ arch/arm/boot/dts/bcm2835-rpi.dtsi       |    2 +-
+ 5 files changed, 26 insertions(+), 5 deletions(-)
+
+-- 
+1.7.9.5
