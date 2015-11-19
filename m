@@ -1,21 +1,87 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 18 Nov 2015 22:38:37 -0500 (EST)
-Subject: [PATCH] arm64: bpf: fix buffer pointer
-In-Reply-To: <1447836962-4086-1-git-send-email-zlim.lnx@gmail.com>
-References: <1447836962-4086-1-git-send-email-zlim.lnx@gmail.com>
-Message-ID: <20151118.223837.1209898089030584083.davem@davemloft.net>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Thu, 19 Nov 2015 11:35:27 +0800
+Subject: [PATCH v3 09/12] ARM: dts: rockchip: add rk3288 mipi_dsi nodes
+In-Reply-To: <1447904131-29328-1-git-send-email-zyw@rock-chips.com>
+References: <1447904131-29328-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <1447904131-29328-10-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zi Shen Lim <zlim.lnx@gmail.com>
-Date: Wed, 18 Nov 2015 00:56:02 -0800
+Add a mipi_dsi node, and also add mipi_dsi endpoints to vopb and vopl
+output port nodes.
 
-> During code review, I noticed we were passing a bad buffer pointer
-> to bpf_load_pointer helper function called by jitted code.
-> 
-> Point to the buffer allocated by JIT, so we don't silently corrupt
-> other parts of the stack.
-> 
-> Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
+Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+---
 
-Applied, thank you.
+Changes in v3: None
+Changes in v2: None
+
+ arch/arm/boot/dts/rk3288.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 6a79c9c..a5c5670 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -798,6 +798,10 @@
+ 				reg = <0>;
+ 				remote-endpoint = <&hdmi_in_vopb>;
+ 			};
++			vopb_out_mipi: endpoint at 1 {
++				reg = <1>;
++				remote-endpoint = <&mipi_in_vopb>;
++			};
+ 		};
+ 	};
+ 
+@@ -831,6 +835,10 @@
+ 				reg = <0>;
+ 				remote-endpoint = <&hdmi_in_vopl>;
+ 			};
++			vopl_out_mipi: endpoint at 1 {
++				reg = <1>;
++				remote-endpoint = <&mipi_in_vopl>;
++			};
+ 		};
+ 	};
+ 
+@@ -871,6 +879,37 @@
+ 		};
+ 	};
+ 
++	mipi_dsi: mipi at ff960000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "rockchip,rk3288-mipi-dsi", "snps,dw-mipi-dsi";
++		reg = <0xff960000 0x4000>;
++		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru SCLK_MIPI_24M>, <&cru PCLK_MIPI_DSI0>;
++		clock-names = "ref", "pclk";
++		rockchip,grf = <&grf>;
++		status = "disabled";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <1>;
++
++			mipi_in: port {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				mipi_in_vopb: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&vopb_out_mipi>;
++				};
++				mipi_in_vopl: endpoint at 1 {
++					reg = <1>;
++					remote-endpoint = <&vopl_out_mipi>;
++				};
++			};
++		};
++	};
++
+ 	gic: interrupt-controller at ffc01000 {
+ 		compatible = "arm,gic-400";
+ 		interrupt-controller;
+-- 
+2.6.3
