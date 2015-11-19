@@ -1,51 +1,35 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Thu, 19 Nov 2015 10:27:44 -0600
-Subject: [PATCH V2] ARM: socfpga: Add support for DENX MCV SoM and MCVEVK
- baseboard
-In-Reply-To: <1447921918-14486-1-git-send-email-marex@denx.de>
-References: <1447921918-14486-1-git-send-email-marex@denx.de>
-Message-ID: <CADhT+wfuMAdTuGoY1EqDqACkhabVV5Z0qZTLDd3rx_EdqhiKtA@mail.gmail.com>
+From: info@lategoodbye.de (Stefan Wahren)
+Date: Thu, 19 Nov 2015 17:31:01 +0100
+Subject: [PATCH V3 RFT] ARM: bcm2835: enable all bcm2835-relevant in
+ defconfig
+In-Reply-To: <1445969338-23977-1-git-send-email-stefan.wahren@i2se.com>
+References: <1445969338-23977-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <564DF945.6060205@lategoodbye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-On Thu, Nov 19, 2015 at 2:31 AM, Marek Vasut <marex@denx.de> wrote:
-> Add support for the DENX MCV SoM and MCVEVK baseboard. The SoM contains
-> eMMC, DRAM, Altera Cyclone V SoC. The baseboard contains CAN ports, UART
-> ports, STMPE811 touchscreen controller, USB OTG port, ethernet port and
-> a lot of IO pins.
+Am 27.10.2015 um 19:08 schrieb Stefan Wahren:
+> Rebuild bcm2835_defconfig using "make bcm2835_defconfig;
+> make savedefconfig", and enable manually the following features:
 >
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Vince Bridgers <vbridgers2013@gmail.com>
-> Cc: Alan Tull <atull@altera.com>
-> Cc: Thor Thayer <tthayer@altera.com>
-> Cc: Dinh Nguyen <dinguyen@altear.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> ---
->  arch/arm/boot/dts/Makefile                    |  1 +
->  arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi   | 33 ++++++++++
->  arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts | 94 +++++++++++++++++++++++++++
->  3 files changed, 128 insertions(+)
->  create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
->  create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
+> * all bcm2835-relevant drivers (MBOX, WDT, DMA, PWM, SND)
+> * enable regular stackprotector because CONFIG_CC_STACKPROTECTOR
+>    disappear
+> * enable some new dependencies in order to keep LED heartbeat
+>    ( CONFIG_NEW_LEDS, CONFIG_LEDS_CLASS, CONFIG_LEDS_TRIGGERS )
 >
-> V2: Sort the DT nodes alphabetically.
+> The following options were removed, because they are enabled implicit:
 >
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 7d3e495..8f322be 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -555,6 +555,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
->  dtb-$(CONFIG_ARCH_SOCFPGA) += \
->         socfpga_arria5_socdk.dtb \
->         socfpga_arria10_socdk_sdmmc.dtb \
-> +       socfpga_cyclone5_mcvevk.dtb \
->         socfpga_cyclone5_socdk.dtb \
->         socfpga_cyclone5_de0_sockit.dtb \
->         socfpga_cyclone5_sockit.dtb \
+> CONFIG_RD_BZIP2, CONFIG_RD_LZMA, CONFIG_RD_XZ, CONFIG_RD_LZO,
+> CONFIG_USB_DWC2_HOST, CONFIG_EXT4_FS, CONFIG_EXT4_FS_POSIX_ACL
+>
+> These options became obsolete:
+>
+> CONFIG_RESOURCE_COUNTERS, CONFIG_SCSI_MULTI_LUN
+>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 
-I've applied this to my tree.
+Any objections about this?
 
-Thanks,
-Dinh
+Regards
+Stefan
