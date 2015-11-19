@@ -1,59 +1,34 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 19 Nov 2015 12:05:46 +0100
-Subject: [PATCH 1/2] clk: samsung: Don't build ARMv8 clock drivers on ARMv7
-In-Reply-To: <CA+Ln22GTPFk6KpWZPDzLRBqO8B+iwwesQEzBwYikXnf0gr3Csg@mail.gmail.com>
-References: <1447637775-9887-1-git-send-email-k.kozlowski@samsung.com>
- <1447637775-9887-2-git-send-email-k.kozlowski@samsung.com>
- <CA+Ln22HAGwfPDqXBQatBraLd=DyGYF2WyV4wJ9RvGOc58puymQ@mail.gmail.com>
- <564D5552.4070806@samsung.com>
- <CA+Ln22GTPFk6KpWZPDzLRBqO8B+iwwesQEzBwYikXnf0gr3Csg@mail.gmail.com>
-Message-ID: <564DAD0A.3000007@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Nov 2015 12:25:45 +0100
+Subject: [PATCH] include: asm-generic: page.h: Remove useless
+ get_user_page and free_user_page
+In-Reply-To: <COL130-W7B5F0BB94C76AF6B12EA7B91C0@phx.gbl>
+References: <COL130-W7B5F0BB94C76AF6B12EA7B91C0@phx.gbl>
+Message-ID: <5663971.11WtULN11Y@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/11/15 10:16, Tomasz Figa wrote:
-> 2015-11-19 13:51 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
->> > On 19.11.2015 13:18, Tomasz Figa wrote:
->>> >> However, I don't think we can disable compilation of particular
->>> >> 64-bit SoCs, so maybe there isn't much sense in splitting their 
->>> >> clock drivers into separate symbols?
->> >
->> > To me it does not really matter. Indeed as you said one cannot 
->> > disable building of one particular Exynos SoCs.
->> >
->> > However we could still want not build some parts of such SoCs (like
->> > clock, pinctrl etc). I don't see much benefit for such case except
->> > when someone would like to drastically reduce the size of kernel 
->> > image (for whatever reasons he has.).
->
-> Can we really build a kernel that support selected Exynos SoC without
-> its clock driver? Actually I don't think we even allow deselecting
-> clock drivers currently, because they are not visible in menuconfig.
-> Unless there is a clear goal to separate ARCH level Kconfig symbol for
-> particular ARM64-based Exynos SoCs, I don't think it makes any sense
-> to keep the clock-related symbols separate.
+On Thursday 19 November 2015 03:40:25 Chen Gang wrote:
+> diff --git a/include/asm-generic/page.h b/include/asm-generic/page.h
+> index 37d1fe2..67cfb7d 100644
+> --- a/include/asm-generic/page.h
+> +++ b/include/asm-generic/page.h
+> @@ -24,9 +24,6 @@
+>  
+>  #ifndef __ASSEMBLY__
+>  
+> -#define get_user_page(vaddr)           __get_free_page(GFP_KERNEL)
+> -#define free_user_page(page, addr)     free_page(addr)
+> -
+>  #define clear_page(page)       memset((page), 0, PAGE_SIZE)
+>  #define copy_page(to,from)     memcpy((to), (from), PAGE_SIZE)
+>  
 > 
->> >
->> > On the other hand having separate symbols causes duplication and
->> > obfuscates a little the Kconfig/Makefile. I like keeping things 
->> > simple so one symbol for all ARM64 Exynos clocks sounds good.
->> >
->> > Sylwester preferred current approach. You and Pankaj seem to prefer
->> > one symbol-way.
->
-> Hmm, I read Sylwester's post as a reply to your original message and
-> not Pankaj's. Sylwester, could you clarify?
 
-OK, let's just use a common clk Kconfig symbol for Exynos ARM64.
+Looks good. I can take the asm-generic portion when you split it up, and
+I can also help you merge the remaining patches in case some of
+the arch maintainers fail to pick them up. I think all five of them
+are actively maintained though, so the patches should just go through
+the respective architecture trees.
 
-What I tried to say is that with addition of support for few more
-of those SoCs the kernel image size can easily grow by 1MB order,
-due to just clk drivers inclusion. Perhaps it's not a big issue
-with current hardware configuration.
-Maybe in long term we should think about splitting CMU drivers
-into a built-in critical clocks part and the rest in loadable
-modules.
-
--- 
-Thanks,
-Sylwester
+	Arnd
