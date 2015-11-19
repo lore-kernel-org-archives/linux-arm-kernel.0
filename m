@@ -1,67 +1,65 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Thu, 19 Nov 2015 16:30:59 +0100
-Subject: [PATCH v3 2/5] dt-bindings: soc: add document for rockchip
- reboot notifier driver
-In-Reply-To: <CANbgqASc1fyoV6FJ1g15P27_h0iA_F9h8aP304X8tRovrKrq5A@mail.gmail.com>
-References: <1447840044-19689-1-git-send-email-andy.yan@rock-chips.com>
- <1447840410-19794-1-git-send-email-andy.yan@rock-chips.com>
- <20151118225904.GA5429@rob-hp-laptop>
- <564D2331.8070503@rock-chips.com>
- <20151119125643.GE21862@ulmo.nvidia.com>
- <CANbgqASc1fyoV6FJ1g15P27_h0iA_F9h8aP304X8tRovrKrq5A@mail.gmail.com>
-Message-ID: <20151119153057.GA12486@ulmo.nvidia.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 19 Nov 2015 16:35:16 +0100
+Subject: [PATCH 04/19] clk: sunxi: Add TCON channel1 clock
+In-Reply-To: <CAGb2v65MUrBKA=pAC95evdiSBMaewRcnLUhBcqCbx_Pc6Jutnw@mail.gmail.com>
+References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1446214865-3972-5-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v650S8+8SNNBqx7u8k8wxHm2fSKdht=W3yA9Mh=rpU+hOA@mail.gmail.com>
+ <20151107000139.GP6114@lukather>
+ <CAGb2v65MUrBKA=pAC95evdiSBMaewRcnLUhBcqCbx_Pc6Jutnw@mail.gmail.com>
+Message-ID: <20151119153516.GP32142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2015 at 09:39:02PM +0800, Andy Yan wrote:
-> Hi Thierry:
-> 
-> 2015-11-19 20:56 GMT+08:00 Thierry Reding <treding@nvidia.com>:
-> 
-> > On Thu, Nov 19, 2015 at 09:17:37AM +0800, Andy Yan wrote:
-> > > Hi Rob:
-> > >
-> > > On 2015?11?19? 06:59, Rob Herring wrote:
-> > > >On Wed, Nov 18, 2015 at 05:53:30PM +0800, Andy Yan wrote:
-> > > >>Add devicetree binding document for rockchip reboot nofifier driver
-> > > >Just reading the subject this is way too specific to the Linux driver
-> > > >needs rather than a h/w description. Please don't create fake DT nodes
-> > > >just to bind to drivers. Whatever &pmu is is probably what should have
-> > > >the DT node. Let the driver for it create child devices if you need
-> > > >that.
-> > >
-> > >     This is note a fake DT nodes, we really need it to tell the driver
-> > >      which register to use to store the reboot mode. Because rockchip
-> > >      use different register file to store the reboot mode on different
-> > >      platform, on rk3066,rk3188, rk3288,it use  one of the PMU register,
-> > on
-> > >      the incoming RK3036, it use one of the GRF register, and it use
-> > one  of
-> > >      the PMUGRF register for arm64 platform rk3368. On the other hand,
-> > the
-> > >      PMU/GRF/PMUGRF register file are mapped as "syscon", then referenced
-> > >      by other DT nodes by phandle. So maybe let it as a separate DT node
-> > > here
-> > >      is better.
+On Mon, Nov 09, 2015 at 11:36:15AM +0800, Chen-Yu Tsai wrote:
+> >> > +       sclk1_parents[0] = sclk2_name;
+> >> > +       sclk1_parents[1] = sclk2d2_name;
+> >>
+> >> Is there any need to expose these 2 clocks via DT using of_clk_add_provider?
 > >
-> > In that case you should probably implement a reboot notifier in each of
-> > the drivers you list and depending on the generation of the SoC. You can
-> > easily parameterize this by matching on the compatible string.
+> > No, as far as I'm aware, there's no user external to this clock
+> > driver.
 > >
-> > Thierry
+> >> Note that these complex clock trees within a clock node breaks the
+> >> assigned-clock-parents mechanism, as you can no longer specify the output
+> >> clock's direct parents.
 > >
+> > There's no point of changing the parent either. Hardware blocks are
+> > always connected to the leaf clock (sclk1). We could also model it as
+> > an extra 1-bit divider, which would simplify a bit the logic though.
 > 
->  There is no rockchip specific driver for PMU/GRF/PMUGRF register file I
-> list above? they
->  use the generic driver ?syscon?
+> Probably not. You still have a gate to handle. It's just moving the
+> divider from 1 clock to the other. I think the current approach of
+> modeling it like the hardware is better.
 
-Well, just go and write specific drivers, then.
+Not really if you model it using sclk2 being a mux + gate, and sclk1
+being a divider + gate. It works great using the composite clocks.
 
-Thierry
+> About reparenting, what I meant was if sclk2 is not exposed through
+> of_clk_add_provider, then we can't do assigned-clocks stuff on it,
+> like setting a default parent or making each channel use a different
+> source pll.
+
+And we don't really want to. Using the divider allow us to simply set
+the rate of sclk1, and the mux / divider will do the rest. Since only
+sclk1 is exposed to the rest of the system, we do not really care
+about the rate of sclk2 anyway.
+
+> What I'm saying is if it is not expected to work with another core
+> binding, we should probably note it somewhere.
+
+Indeed.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151119/2dc1062b/attachment.sig>
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151119/a439163e/attachment.sig>
