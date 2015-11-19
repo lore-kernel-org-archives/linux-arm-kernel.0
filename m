@@ -1,62 +1,48 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 19 Nov 2015 17:34:42 +0100
-Subject: [PATCH V2] ARM: socfpga: Add support for DENX MCV SoM and MCVEVK
- baseboard
-In-Reply-To: <CADhT+wfuMAdTuGoY1EqDqACkhabVV5Z0qZTLDd3rx_EdqhiKtA@mail.gmail.com>
-References: <1447921918-14486-1-git-send-email-marex@denx.de>
- <CADhT+wfuMAdTuGoY1EqDqACkhabVV5Z0qZTLDd3rx_EdqhiKtA@mail.gmail.com>
-Message-ID: <201511191734.42990.marex@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 Nov 2015 17:35:14 +0100
+Subject: [PATCH] include: asm-generic: page.h: Remove useless
+ get_user_page and free_user_page
+In-Reply-To: <20151119161843.GA8644@n2100.arm.linux.org.uk>
+References: <COL130-W7B5F0BB94C76AF6B12EA7B91C0@phx.gbl>
+ <5663971.11WtULN11Y@wuerfel> <20151119161843.GA8644@n2100.arm.linux.org.uk>
+Message-ID: <4559060.7YuVHsgd4d@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 19, 2015 at 05:27:44 PM, Dinh Nguyen wrote:
-> Hi Marek,
-
-Hi!
-
-> On Thu, Nov 19, 2015 at 2:31 AM, Marek Vasut <marex@denx.de> wrote:
-> > Add support for the DENX MCV SoM and MCVEVK baseboard. The SoM contains
-> > eMMC, DRAM, Altera Cyclone V SoC. The baseboard contains CAN ports, UART
-> > ports, STMPE811 touchscreen controller, USB OTG port, ethernet port and
-> > a lot of IO pins.
+On Thursday 19 November 2015 16:18:43 Russell King - ARM Linux wrote:
+> On Thu, Nov 19, 2015 at 12:25:45PM +0100, Arnd Bergmann wrote:
+> > On Thursday 19 November 2015 03:40:25 Chen Gang wrote:
+> > > diff --git a/include/asm-generic/page.h b/include/asm-generic/page.h
+> > > index 37d1fe2..67cfb7d 100644
+> > > --- a/include/asm-generic/page.h
+> > > +++ b/include/asm-generic/page.h
+> > > @@ -24,9 +24,6 @@
+> > >  
+> > >  #ifndef __ASSEMBLY__
+> > >  
+> > > -#define get_user_page(vaddr)           __get_free_page(GFP_KERNEL)
+> > > -#define free_user_page(page, addr)     free_page(addr)
+> > > -
+> > >  #define clear_page(page)       memset((page), 0, PAGE_SIZE)
+> > >  #define copy_page(to,from)     memcpy((to), (from), PAGE_SIZE)
+> > >  
+> > > 
 > > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Vince Bridgers <vbridgers2013@gmail.com>
-> > Cc: Alan Tull <atull@altera.com>
-> > Cc: Thor Thayer <tthayer@altera.com>
-> > Cc: Dinh Nguyen <dinguyen@altear.com>
-> > Cc: Olof Johansson <olof@lixom.net>
-> > ---
-> > 
-> >  arch/arm/boot/dts/Makefile                    |  1 +
-> >  arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi   | 33 ++++++++++
-> >  arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts | 94
-> >  +++++++++++++++++++++++++++ 3 files changed, 128 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
-> >  create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-> > 
-> > V2: Sort the DT nodes alphabetically.
-> > 
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index 7d3e495..8f322be 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -555,6 +555,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
-> > 
-> >  dtb-$(CONFIG_ARCH_SOCFPGA) += \
-> >  
-> >         socfpga_arria5_socdk.dtb \
-> >         socfpga_arria10_socdk_sdmmc.dtb \
-> > 
-> > +       socfpga_cyclone5_mcvevk.dtb \
-> > 
-> >         socfpga_cyclone5_socdk.dtb \
-> >         socfpga_cyclone5_de0_sockit.dtb \
-> >         socfpga_cyclone5_sockit.dtb \
+> > Looks good. I can take the asm-generic portion when you split it up, and
+> > I can also help you merge the remaining patches in case some of
+> > the arch maintainers fail to pick them up. I think all five of them
+> > are actively maintained though, so the patches should just go through
+> > the respective architecture trees.
 > 
-> I've applied this to my tree.
+> Or we just ack the patch and have it go through one tree, which I think
+> is the most sensible.  I can't imagine that there would be any major
+> conflicts here, surely no one is constantly changing their asm/page.h ?
 
-Cool, thanks!
+Yes, good point, there is really very little potential for conflicts
+here. I've applied it into my asm-generic tree for now, but will
+revert it if we get regressions or NAKs.
 
-Best regards,
-Marek Vasut
+For some reason, the patch was whitespace broken, but I managed to
+extract it from the attachment.
+
+	Arnd
