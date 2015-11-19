@@ -1,70 +1,42 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 19 Nov 2015 10:15:58 -0600
-Subject: [PATCH] ARM: OMAP2: use correct timer function for AM43XX and
- TI81XX
-In-Reply-To: <6973517.kQfhdpsmVt@wuerfel>
-References: <4016134.4bReocePei@wuerfel> <87egfplka4.fsf@saruman.tx.rr.com>
- <6973517.kQfhdpsmVt@wuerfel>
-Message-ID: <87io4yezi9.fsf@saruman.tx.rr.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 19 Nov 2015 16:18:43 +0000
+Subject: [PATCH] include: asm-generic: page.h: Remove useless
+ get_user_page and free_user_page
+In-Reply-To: <5663971.11WtULN11Y@wuerfel>
+References: <COL130-W7B5F0BB94C76AF6B12EA7B91C0@phx.gbl>
+ <5663971.11WtULN11Y@wuerfel>
+Message-ID: <20151119161843.GA8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Nov 19, 2015 at 12:25:45PM +0100, Arnd Bergmann wrote:
+> On Thursday 19 November 2015 03:40:25 Chen Gang wrote:
+> > diff --git a/include/asm-generic/page.h b/include/asm-generic/page.h
+> > index 37d1fe2..67cfb7d 100644
+> > --- a/include/asm-generic/page.h
+> > +++ b/include/asm-generic/page.h
+> > @@ -24,9 +24,6 @@
+> >  
+> >  #ifndef __ASSEMBLY__
+> >  
+> > -#define get_user_page(vaddr)           __get_free_page(GFP_KERNEL)
+> > -#define free_user_page(page, addr)     free_page(addr)
+> > -
+> >  #define clear_page(page)       memset((page), 0, PAGE_SIZE)
+> >  #define copy_page(to,from)     memcpy((to), (from), PAGE_SIZE)
+> >  
+> > 
+> 
+> Looks good. I can take the asm-generic portion when you split it up, and
+> I can also help you merge the remaining patches in case some of
+> the arch maintainers fail to pick them up. I think all five of them
+> are actively maintained though, so the patches should just go through
+> the respective architecture trees.
 
-Hi,
-
-Arnd Bergmann <arnd@arndb.de> writes:
-> On Monday 16 November 2015 15:13:55 Felipe Balbi wrote:
->> Arnd Bergmann <arnd@arndb.de> writes:
->> > AM43XX and TI81XX use omap3_gptimer_timer_init(), but that is only
->> > built into the kernel for OMAP3 and AM33XX, otherwise we get:
->> >
->> > arch/arm/mach-omap2/built-in.o:(.arch.info.init+0x124): undefined reference to `omap3_gptimer_timer_init'
->> >
->> > This changes the Kconfig logic for building the function to
->> > match the callers. Consequently, we no longer need to build
->> > the omap3_secure_sync32k_timer_init and omap4_local_timer_init
->> > for the platforms that have been moved over to other functions.
->> >
->> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> 
->> no, AM43xx uses omap4_local_timer_init(), there's already a fix in
->> Tony's tree IIRC.
-> ...
->  
->> care to provide a defconfig which would cause a build error ?
->
-> My mistake, the code has changed several times and I adapted it to
-> the latest version each time, but the version I sent out is indeed
-> useless.
->
-> The only hunk that still makes sense is
->
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index b18ebbefae09..b7ab09cc5ca2 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -494,7 +494,7 @@ void __init omap_init_time(void)
->  		clocksource_probe();
->  }
->  
-> -#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM43XX)
-> +#if defined(CONFIG_ARCH_OMAP3)
->  void __init omap3_secure_sync32k_timer_init(void)
->  {
->  	__omap_sync32k_timer_init(12, "secure_32k_fck", "ti,timer-secure",
->
->
-> but that is harmless as it does not cause a build error, just a few extra
-> bytes for an unused function in a AM43XX-only configuration.
-
-I think that's still useful. Tony ?
+Or we just ack the patch and have it go through one tree, which I think
+is the most sensible.  I can't imagine that there would be any major
+conflicts here, surely no one is constantly changing their asm/page.h ?
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151119/2623755a/attachment.sig>
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
