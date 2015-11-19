@@ -1,69 +1,73 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 19 Nov 2015 16:06:16 +0000
-Subject: [PATCH RFC 4/4] ARM: bcm2835: assign pins to sdhci pinctrl
+Date: Thu, 19 Nov 2015 16:06:13 +0000
+Subject: [PATCH RFC 1/4] ARM: bcm2835: remove sdhci pins from GPIO pinctrl
 In-Reply-To: <1447949176-21926-1-git-send-email-stefan.wahren@i2se.com>
 References: <1447949176-21926-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1447949176-21926-5-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1447949176-21926-2-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Finally this patch assign all relevant pins to the sdhci pinctrl.
+Currently the pins alt3 (sdhci) are assigned to GPIO pinctrl.
+This is bad because a user could export it to sysfs and break
+sdhci. In order to avoid that remove those pins from GPIO pintrl.
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- arch/arm/boot/dts/bcm2835-rpi-a-plus.dts |    4 ++++
- arch/arm/boot/dts/bcm2835-rpi-b-plus.dts |    4 ++++
- arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts |    4 ++++
- arch/arm/boot/dts/bcm2835-rpi-b.dts      |    4 ++++
- 4 files changed, 16 insertions(+)
+ arch/arm/boot/dts/bcm2835-rpi-a-plus.dts |    2 +-
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts |    2 +-
+ arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts |    2 +-
+ arch/arm/boot/dts/bcm2835-rpi-b.dts      |    2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-index 50be11d..4d562d9 100644
+index b2bff43..50be11d 100644
 --- a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
 +++ b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-@@ -28,3 +28,7 @@
- 		brcm,function = <BCM2835_FSEL_ALT0>;
- 	};
+@@ -20,7 +20,7 @@
  };
-+
-+&sdhci {
-+	pinctrl-0 = <&sdhci_alt3>;
-+};
+ 
+ &gpio {
+-	pinctrl-0 = <&gpioout &alt0 &i2s_alt0 &alt3>;
++	pinctrl-0 = <&gpioout &alt0 &i2s_alt0>;
+ 
+ 	/* I2S interface */
+ 	i2s_alt0: i2s_alt0 {
 diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-index 43dd5ef..27a533a 100644
+index 668442b..43dd5ef 100644
 --- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
 +++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-@@ -28,3 +28,7 @@
- 		brcm,function = <BCM2835_FSEL_ALT0>;
- 	};
+@@ -20,7 +20,7 @@
  };
-+
-+&sdhci {
-+	pinctrl-0 = <&sdhci_alt3>;
-+};
+ 
+ &gpio {
+-	pinctrl-0 = <&gpioout &alt0 &i2s_alt0 &alt3>;
++	pinctrl-0 = <&gpioout &alt0 &i2s_alt0>;
+ 
+ 	/* I2S interface */
+ 	i2s_alt0: i2s_alt0 {
 diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-index e5a65a8..dcc1627 100644
+index eab8b591..e5a65a8 100644
 --- a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
 +++ b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-@@ -21,3 +21,7 @@
- 		brcm,function = <BCM2835_FSEL_ALT2>;
- 	};
+@@ -13,7 +13,7 @@
  };
-+
-+&sdhci {
-+	pinctrl-0 = <&sdhci_alt3>;
-+};
+ 
+ &gpio {
+-	pinctrl-0 = <&gpioout &alt0 &i2s_alt2 &alt3>;
++	pinctrl-0 = <&gpioout &alt0 &i2s_alt2>;
+ 
+ 	/* I2S interface */
+ 	i2s_alt2: i2s_alt2 {
 diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-index 1be2220..bdb9308 100644
+index ff6b2d1..e6cd93b 100644
 --- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
 +++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-@@ -20,3 +20,7 @@
- 		brcm,function = <BCM2835_FSEL_GPIO_IN>;
- 	};
+@@ -13,5 +13,5 @@
  };
-+
-+&sdhci {
-+	pinctrl-0 = <&sdhci_alt3 &sdhci_cd>;
-+};
+ 
+ &gpio {
+-	pinctrl-0 = <&gpioout &alt0 &alt3>;
++	pinctrl-0 = <&gpioout &alt0>;
+ };
 -- 
 1.7.9.5
