@@ -1,97 +1,46 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Thu, 19 Nov 2015 14:53:18 +0100
-Subject: [PATCH v9 1/2] arm-soc: Import initial tango4 device tree
-In-Reply-To: <yw1xio4zfcpc.fsf@unicorn.mansr.com>
-References: <564C94A5.4060301@sigmadesigns.com>
- <564C94FD.60607@sigmadesigns.com> <yw1xr3jnfg2s.fsf@unicorn.mansr.com>
- <564CA880.1030502@sigmadesigns.com> <yw1xmvubfekf.fsf@unicorn.mansr.com>
- <CAOesGMjCw_DYB3OktnQvthqBAQxqeH6F0bXR-KW_36Y9sDh+fg@mail.gmail.com>
- <yw1xio4zfcpc.fsf@unicorn.mansr.com>
-Message-ID: <564DD44E.4010804@sigmadesigns.com>
+From: nyushchenko@dev.rtsoft.ru (Nikita Yushchenko)
+Date: Thu, 19 Nov 2015 16:56:42 +0300
+Subject: imx6dl clock setup incorrectness
+Message-ID: <564DD51A.8040100@dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-M?ns Rullg?rd wrote:
+Hi
 
-> Olof Johansson wrote:
-> 
->> M?ns Rullg?rd wrote:
->>
->>> Marc Gonzalez wrote:
->>>
->>>> M?ns Rullg?rd wrote:
->>>>
->>>>> Marc Gonzalez wrote:
->>>>>
->>>>>> +           clkgen: clkgen at 10000 {
->>>>>> +                   compatible = "sigma,tango4-clkgen";
->>>>>> +                   reg = <0x10000 0x40>;
->>>>>> +                   clocks = <&xtal>;
->>>>>> +                   clock-output-names = "cpuclk", "sysclk";
->>>>>> +                   #clock-cells = <1>;
->>>>>> +           };
->>>>>
->>>>> Would you please consider using my clock driver that matches the actual
->>>>> hardware, supports all the clock outputs required for USB, SATA, etc,
->>>>> and works on tango3 as well?
->>>>
->>>> I was hoping to take baby steps to work up to a fully-functional port.
->>>> The first step (in my mind) is this submission: a minimal port which
->>>> only requires the two "main" clocks.
->>>>
->>>> The next step will add to the minimal port by supporting as many
->>>> peripherals as possible, as well as their required clocks.
->>>
->>> But the code already exists.  Why start over?
+While working with board with imx6s cpu, with kernel based on linux-imx
+imx_3.14.28_1.0.0_ga branch, I noticed this message in boot log:
 
-"La perfection est atteinte, non pas lorsqu'il n'y a plus rien ? ajouter,
-mais lorsqu'il n'y a plus rien ? retirer."
+> failed to set parent of clk gpu2d_core_sel to pll2_pfd1_594m
 
-For example, what is the point of not ignoring sysclk_premux, when the boot
-loader has always hard-coded "PLL1 drives sys_clk, PLL2 drives cd_clk".
 
-Having one clk driver for tango3, and another for tango4 allows you to
-submit your own tango3 clk driver, and I can then ignore all the insane
-tango3 clk legacy, and focus on the tango4 clean-ups. Would that work
-for you?
+I looked into it and found that:
 
-(BTW, are you aware that the clk maintainers will NAK your clk driver in
-its current form, based on the fact that they insist on a single node
-for the entire clkgen block?)
+- CCM_CBCMR register layout is different between imx6q/imx6d and
+imc6dl/imx6s (at least manuals state that)
 
->> M?ns, I don't understand your role in this. Can you clarify?
-> 
-> Oh, I'm just the guy who did all the work and then got screwed over by
-> Sigma.
+- clock setup in clk-imx6q.c (that is used both got imx6q/imx6d and
+imx6dl/imx6s) creates gpu2d_core_sel clock object as described in imx6q
+manual (i.e. using bits 18:19 of CCM_CBCMR register)
 
-Here's the sequence of events, to the best of my recollection.
+- however per imx6dl manual, these bits contain different field
+(mlb_sys_sel) on imx6dl/imx6s, and gpu2d_core sel is in bits 8:9
 
-In 2010, you hacked the Popcorn Hour C-200 (Tango3 SoC)
-In 2014-11, I mentioned on LAKML that I planned to upstream Sigma's kernel
-In 2014-12, you pushed your tango3 port to github (3.18 at the time IIRC)
-	https://github.com/mansr/linux-tangox
-In late 2015-02, you blogged about your work
-	http://hardwarebug.org/2015/02/26/popcorn-hour-revisited/
-I contacted you the next day, and you offered your services.
-You met management in late March.
-Then radio silence for several months.
-Sometime in July, I was told the deal had fallen apart :-(
+- imx6q has different clock selector, gpu3d_shader_clk_sel, in bits 8:9,
+and existing code unconditionally creates gpu3d_shader_clk_sel clock object
 
->> If you've already done a port, why haven't you contributed it
->> yourself?
-> 
-> Because it's not yet in a shape to be contributed, just like Marc's
-> isn't.
+- per manual, gpu3d_shader_clk_sel does not exist on imx6qdl/imx6s
 
-Are you saying the DT needs to be perfect on the first submission?
-Has this been true for other mach?
+- however gpu driver (which also is common between imx6q/imx6d and
+imc6dl/imx6s) does use gpu3d_shader_clk which is child of
+gpu3d_shader_clk_sel. Which means that it is not possible to simply
+change clock object creation code to match manuals.
 
->> Why are you driving Marc's work from the back seat like this instead
->> of submitting your own work?
-> 
-> I have submitted bits and pieces.  It's a slow process.
 
-Indeed. Especially when a maintainer NAKs a patch because one used
-'unsigned' instead of 'unsigned int'.
+I'm looking for advice how to fix this situation properly.
 
-Regards.
+
+Btw situation is the same in mainline kernel - clock setup code in
+mainline is moved to drivers/clk/imx/ but still has the same incorrectness.
+
+
+Nikita
