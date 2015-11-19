@@ -1,203 +1,64 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 19 Nov 2015 15:41:22 +0100
-Subject: [PATCH] ARM: socfpga: Add support for DENX MCV SoM and MCVEVK
- baseboard
-In-Reply-To: <20151119082246.GA3833@pengutronix.de>
-References: <1446420549-5572-1-git-send-email-marex@denx.de>
- <20151119082246.GA3833@pengutronix.de>
-Message-ID: <201511191541.22648.marex@denx.de>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Thu, 19 Nov 2015 14:41:41 +0000
+Subject: [PATCH v3 00/12] Add mipi dsi support for rk3288
+In-Reply-To: <1447904131-29328-1-git-send-email-zyw@rock-chips.com>
+References: <1447904131-29328-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <CACvgo53YOMpbz1TdVmRBPPz4dv=X+8FoEo0ZcfN5DwbDYi2ZzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 19, 2015 at 09:22:46 AM, Steffen Trumtrar wrote:
-> Hi!
+On 19 November 2015 at 03:35, Chris Zhong <zyw@rock-chips.com> wrote:
+> The rk3288 MIPI DSI is a Synopsys DesignWare MIPI DSI host controller
+> IP. This series adds support for a Synopsys DesignWare MIPI DSI host
+> controller DRM bridge driver and a rockchip MIPI DSI specific DRM
+> driver.
+>
+> This series also includes a DRM panel driver for BOE TV080WUM-NL0 panel.
+> This panel only use the MIPI DSI video mode.
+>
+> The MIPI DSI feature is tested on rk3288 evb board, backport them to
+> chrome os kernel v3.14, and it can display normally.
+>
+> This patchset is base on the patchset from Ying.liu at freescale.com.
+> <http://www.spinics.net/lists/dri-devel/msg77181.html>
+>
+>
+> Changes in v3:
+> move the dw_mipi_dsi.txt to Documentation/devicetree/bindings/display/bridge
+> move dw_mipi_dsi_rockchip.txt to bindings/display/rockchip/
+> move boe,tv080wum-nl0.txt to bindings/display/panel/
+>
+> Changes in v2:
+> add the mipi clk id in a single patch
+> As Thierry.Reding comment, add a documentation for this panel.
+>
+> Chris Zhong (10):
+>   clk: rockchip: add id for mipidsi sclk on rk3288
+>   clk: rockchip: add mipidsi clocks on rk3288
+>   drm/rockchip: return a true clock rate to adjusted_mode
+>   drm/bridge: Add Synopsys DesignWare MIPI DSI host controller driver
+Did you actually rewrite the patch from Liu Ying ?
+Out of curiosity what was the obstacle of this work getting merged ?
 
-Hi!
+>   drm: rockchip: Support Synopsys DesignWare MIPI DSI host controller
+>   Documentation: dt-bindings: Add bindings for rk3288 DW MIPI DSI driver
+>   ARM: dts: rockchip: add rk3288 mipi_dsi nodes
+>   drm/panel: simple: Add support for BOE TV080WUM-NL0
+>   drm/panel: simple: Add boe,tv080wum-nl0 simple panel device tree
+>     binding
+As the DT people will tell you - there is no BOE vendor in
+bindings/vendor-prefixes.txt.
 
-> On Mon, Nov 02, 2015 at 12:29:09AM +0100, Marek Vasut wrote:
-> > Add support for the DENX MCV SoM and MCVEVK baseboard. The SoM contains
-> > eMMC, DRAM, Altera Cyclone V SoC. The baseboard contains CAN ports, UART
-> > ports, STMPE811 touchscreen controller, USB OTG port, ethernet port and
-> > a lot of IO pins.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Vince Bridgers <vbridgers2013@gmail.com>
-> > Cc: Alan Tull <atull@altera.com>
-> > Cc: Thor Thayer <tthayer@altera.com>
-> > Cc: Dinh Nguyen <dinguyen@altear.com>
-> > Cc: Olof Johansson <olof@lixom.net>
-> > ---
-> > 
-> >  arch/arm/boot/dts/Makefile                    |  1 +
-> >  arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi   | 33 ++++++++++
-> >  arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts | 94
-> >  +++++++++++++++++++++++++++ 3 files changed, 128 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
-> >  create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-> > 
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index 7d3e495..8f322be 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -555,6 +555,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
-> > 
-> >  dtb-$(CONFIG_ARCH_SOCFPGA) += \
-> >  
-> >  	socfpga_arria5_socdk.dtb \
-> >  	socfpga_arria10_socdk_sdmmc.dtb \
-> > 
-> > +	socfpga_cyclone5_mcvevk.dtb \
-> > 
-> >  	socfpga_cyclone5_socdk.dtb \
-> >  	socfpga_cyclone5_de0_sockit.dtb \
-> >  	socfpga_cyclone5_sockit.dtb \
-> > 
-> > diff --git a/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
-> > b/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi new file mode 100644
-> > index 0000000..70dacf3
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
-> > @@ -0,0 +1,33 @@
-> > +/*
-> > + * Copyright (C) 2015 Marek Vasut <marex@denx.de>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License
-> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> > + */
-> > +
-> > +#include "socfpga_cyclone5.dtsi"
-> > +
-> > +/ {
-> > +	model = "DENX MCV";
-> > +	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-> > +
-> > +	memory {
-> > +		name = "memory";
-> > +		device_type = "memory";
-> > +		reg = <0x0 0x40000000>;	/* 1 GiB */
-> > +	};
-> > +};
-> > +
-> > +&mmc0 {	/* On-SoM eMMC */
-> > +	bus-width = <8>;
-> > +};
-> > diff --git a/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-> > b/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts new file mode 100644
-> > index 0000000..7cbe9b3
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-> > @@ -0,0 +1,94 @@
-> > +/*
-> > + * Copyright (C) 2015 Marek Vasut <marex@denx.de>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License
-> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> > + */
-> > +
-> > +#include "socfpga_cyclone5_mcv.dtsi"
-> > +
-> > +/ {
-> > +	model = "DENX MCV EVK";
-> > +	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-> > +
-> > +	aliases {
-> > +		ethernet0 = &gmac0;
-> > +		stmpe-i2c0 = &stmpe1;
-> > +	};
-> > +
-> > +	chosen {
-> > +		stdout-path = "serial0:115200n8";
-> > +	};
-> > +};
-> > +
-> > +&gpio0 {	/* GPIO  0 ... 28 */
-> > +	status = "okay";
-> > +};
-> > +
-> > +&gpio1 {	/* GPIO 29 ... 57 */
-> > +	status = "okay";
-> > +};
-> > +
-> > +&gpio2 {	/* GPIO 58..66 (HLGPI 0..13 at offset 13) */
-> > +	status = "okay";
-> > +};
-> > +
-> > +&can0 {
-> > +	status = "okay";
-> > +};
-> > +
-> > +&can1 {
-> > +	status = "okay";
-> > +};
-> > +
-> > +&i2c0 {
-> > +	status = "okay";
-> > +	speed-mode = <0>;
-> > +
-> > +	stmpe1: stmpe811 at 41 {
-> > +		compatible = "st,stmpe811";
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		reg = <0x41>;
-> > +		id = <0>;
-> > +		blocks = <0x5>;
-> > +		irq-gpio = <&portb 28 0x4>;	/* GPIO 57, trig. level HI */
-> > +
-> > +		stmpe_touchscreen {
-> > +			compatible = "st,stmpe-ts";
-> > +			reg = <0>;
-> > +			ts,sample-time = <4>;
-> > +			ts,mod-12b = <1>;
-> > +			ts,ref-sel = <0>;
-> > +			ts,adc-freq = <1>;
-> > +			ts,ave-ctrl = <1>;
-> > +			ts,touch-det-delay = <3>;
-> > +			ts,settling = <4>;
-> > +			ts,fraction-z = <7>;
-> > +			ts,i-drive = <1>;
-> > +		};
-> > +	};
-> > +};
-> > +
-> > +&gmac0 {
-> > +	phy-mode = "rgmii";
-> > +	status = "okay";
-> > +};
-> > +
-> > +&uart0 {
-> > +	status = "okay";
-> > +};
-> > +
-> > +&usb1 {
-> > +	status = "okay";
-> > +};
-> 
-> Could you please sort the nodes alphabetically? I guess the risk of merge
-> conflicts is pretty low as this seems to be a complete description of the
-> hardware, but I would still prefer it that way.
-> 
-> Otherwise:
-> 
-> 	Reviewed-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>   ARM: dts: rockchip: add support mipi panel tv080wum-nl0 for rk3288-evb
+>
+> Liu Ying (2):
+>   drm/dsi: Add a helper to get bits per pixel of MIPI DSI pixel format
+>   Documentation: dt-bindings: Add bindings for Synopsys DW MIPI DSI DRM
+>     bridge driver
+>
+>From the above 12 patches only ~6 reached this mailing list is that
+intentional ? Previously I've seen people CC dri-devel for their
+panel/bridge DT patches.
 
-Done and reposted, thanks for the review!
+Regards,
+Emil
