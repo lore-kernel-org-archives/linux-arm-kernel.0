@@ -1,37 +1,67 @@
 From: marex@denx.de (Marek Vasut)
-Date: Thu, 19 Nov 2015 17:00:09 +0100
-Subject: [PATCH] ARM: socfpga: Add support for DENX MCV SoM and MCVEVK
- baseboard
-In-Reply-To: <CADhT+weX7o5=pb0iyxPUAdjQ9DJi=qeAgFhSPojXRDYY3twbRg@mail.gmail.com>
-References: <1446420549-5572-1-git-send-email-marex@denx.de>
- <201511181050.30515.marex@denx.de>
- <CADhT+weX7o5=pb0iyxPUAdjQ9DJi=qeAgFhSPojXRDYY3twbRg@mail.gmail.com>
-Message-ID: <201511191700.09747.marex@denx.de>
+Date: Thu, 19 Nov 2015 17:03:28 +0100
+Subject: [PATCH 2/2] ARM: dts: imx6q: add Novena board
+In-Reply-To: <1447846576.3144.63.camel@pengutronix.de>
+References: <1447840120-8513-1-git-send-email-marex@denx.de>
+ <201511181232.42446.marex@denx.de> <1447846576.3144.63.camel@pengutronix.de>
+Message-ID: <201511191703.29104.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 19, 2015 at 04:57:01 PM, Dinh Nguyen wrote:
-> On Wed, Nov 18, 2015 at 3:50 AM, Marek Vasut <marex@denx.de> wrote:
-> > On Monday, November 02, 2015 at 12:29:09 AM, Marek Vasut wrote:
-> >> Add support for the DENX MCV SoM and MCVEVK baseboard. The SoM contains
-> >> eMMC, DRAM, Altera Cyclone V SoC. The baseboard contains CAN ports, UART
-> >> ports, STMPE811 touchscreen controller, USB OTG port, ethernet port and
-> >> a lot of IO pins.
-> >> 
-> >> Signed-off-by: Marek Vasut <marex@denx.de>
-> >> Cc: Vince Bridgers <vbridgers2013@gmail.com>
-> >> Cc: Alan Tull <atull@altera.com>
-> >> Cc: Thor Thayer <tthayer@altera.com>
-> >> Cc: Dinh Nguyen <dinguyen@altear.com>
+On Wednesday, November 18, 2015 at 12:36:16 PM, Lucas Stach wrote:
+> Am Mittwoch, den 18.11.2015, 12:32 +0100 schrieb Marek Vasut:
+> > On Wednesday, November 18, 2015 at 12:25:58 PM, Lucas Stach wrote:
+> > > Am Mittwoch, den 18.11.2015, 11:35 +0100 schrieb Marek Vasut:
+> > > > On Wednesday, November 18, 2015 at 11:10:12 AM, Lucas Stach wrote:
+> > > > > Hi Marek,
 > 
-> Please use dinguyen at opensource.altera.com in your V2.
-
-Uh, sorry, must've been a copy-paste mistake from some other patch.
-I already posted the V2, but if there's a need for V3, will keep that in mind.
-
-> >> Cc: Olof Johansson <olof@lixom.net>
+> [...]
 > 
-> Dinh
+> > > > [...]
+> > > > 
+> > > > > > +&ecspi3 {
+> > > > > > +	pinctrl-names = "default";
+> > > > > > +	pinctrl-0 = <&pinctrl_ecspi3_novena>;
+> > > > > > +	fsl,spi-num-chipselects = <3>;
+> > > > > > +	status = "okay";
+> > > > > > +
+> > > > > > +	spidev at 0 {
+> > > > > > +		compatible = "spidev";
+> > > > > 
+> > > > > This will explode on a new kernel. Specifying spidev without using
+> > > > > a more specific compatible will trigger a WARN_ON(), as it's
+> > > > > considered bad style.
+> > > > 
+> > > > Oh, looks like imx_v6_v7_defconfig didn't have SPIDEV active, which
+> > > > is why I didn't catch it during my last test, dang.
+> > > > 
+> > > > This SPI interface is routed into the FPGA, so what do you suggest I
+> > > > put in the compatible string? There is no other sensible driver for
+> > > > the peripheral, since the peripheral can be anything.
+> > > 
+> > > I'm not really the right person to ask for that, but I would guess that
+> > > inventing a "novena,fpga-spi" compatible or something like that and
+> > > adding it to the spidev driver would be the right thing to do.
+> > 
+> > So what's the rationale behind generic "spidev" being bad ? In my mind,
+> > it is much better to use generic driver and generic compatible prop
+> > "spidev" than to generate many one-off compatible props and have a
+> > driver with a list of all of those.
+> 
+> From the commit log:
+> 
+> "Since spidev is a detail of how Linux controls a device rather than a
+> description of the hardware in the system we should never have a node
+> described as "spidev" in DT, any SPI device could be a spidev so this is
+> just not a useful description."
+> 
+> If you want to know about the details you would have to discuss this
+> with Mark Brown.
+
+I see, thanks for the clarification. I think I will drop this spidev for
+now and add it once/if it's really needed. I think this might be much
+better than poluting the spidev driver with yet another compat string.
+What do you say ?
 
 Best regards,
 Marek Vasut
