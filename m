@@ -1,55 +1,70 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 19 Nov 2015 17:11:54 +0100
-Subject: [PATCH 2/2] ARM: dts: imx6q: add Novena board
-In-Reply-To: <CAOMZO5C1oYge+TUKPYsgBRV75HVDwj42oAo27aaK-XqtHw8-7g@mail.gmail.com>
-References: <1447840120-8513-1-git-send-email-marex@denx.de>
- <1447840120-8513-2-git-send-email-marex@denx.de>
- <CAOMZO5C1oYge+TUKPYsgBRV75HVDwj42oAo27aaK-XqtHw8-7g@mail.gmail.com>
-Message-ID: <201511191711.54699.marex@denx.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 19 Nov 2015 10:15:58 -0600
+Subject: [PATCH] ARM: OMAP2: use correct timer function for AM43XX and
+ TI81XX
+In-Reply-To: <6973517.kQfhdpsmVt@wuerfel>
+References: <4016134.4bReocePei@wuerfel> <87egfplka4.fsf@saruman.tx.rr.com>
+ <6973517.kQfhdpsmVt@wuerfel>
+Message-ID: <87io4yezi9.fsf@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 18, 2015 at 01:00:50 PM, Fabio Estevam wrote:
-> Hi Marek,
 
-Hi!
+Hi,
 
-> On Wed, Nov 18, 2015 at 7:48 AM, Marek Vasut <marex@denx.de> wrote:
-> > +++ b/arch/arm/boot/dts/imx6q-novena.dts
-> > @@ -0,0 +1,825 @@
-> > +/*
-> > + * Copyright 2014 Sutajio Ko-Usagi PTE LTD
-> > + * Copyright 2012 Freescale Semiconductor, Inc.
-> > + * Copyright 2011 Linaro Ltd.
-> > + *
-> > + * The code contained herein is licensed under the GNU General Public
-> > + * License. You may obtain a copy of the GNU General Public License
-> > + * Version 2 or later at the following locations:
-> > + *
-> > + * http://www.opensource.org/licenses/gpl-license.html
-> > + * http://www.gnu.org/copyleft/gpl.html
-> 
-> Could you make this GPL/X11 dual-license?
+Arnd Bergmann <arnd@arndb.de> writes:
+> On Monday 16 November 2015 15:13:55 Felipe Balbi wrote:
+>> Arnd Bergmann <arnd@arndb.de> writes:
+>> > AM43XX and TI81XX use omap3_gptimer_timer_init(), but that is only
+>> > built into the kernel for OMAP3 and AM33XX, otherwise we get:
+>> >
+>> > arch/arm/mach-omap2/built-in.o:(.arch.info.init+0x124): undefined reference to `omap3_gptimer_timer_init'
+>> >
+>> > This changes the Kconfig logic for building the function to
+>> > match the callers. Consequently, we no longer need to build
+>> > the omap3_secure_sync32k_timer_init and omap4_local_timer_init
+>> > for the platforms that have been moved over to other functions.
+>> >
+>> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> 
+>> no, AM43xx uses omap4_local_timer_init(), there's already a fix in
+>> Tony's tree IIRC.
+> ...
+>  
+>> care to provide a defconfig which would cause a build error ?
+>
+> My mistake, the code has changed several times and I adapted it to
+> the latest version each time, but the version I sent out is indeed
+> useless.
+>
+> The only hunk that still makes sense is
+>
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index b18ebbefae09..b7ab09cc5ca2 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -494,7 +494,7 @@ void __init omap_init_time(void)
+>  		clocksource_probe();
+>  }
+>  
+> -#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM43XX)
+> +#if defined(CONFIG_ARCH_OMAP3)
+>  void __init omap3_secure_sync32k_timer_init(void)
+>  {
+>  	__omap_sync32k_timer_init(12, "secure_32k_fck", "ti,timer-secure",
+>
+>
+> but that is harmless as it does not cause a build error, just a few extra
+> bytes for an unused function in a AM43XX-only configuration.
 
-I'll talk to Sean about this, but I hope this is not a problem.
+I think that's still useful. Tony ?
 
-> Take a look at arch/arm/boot/dts/imx6qdl-cubox-i.dtsi for a reference.
-> 
-> > +&iomuxc {
-> > +       audmux {
-> > +               pinctrl_audmux_novena: audmuxgrp-novena {
-> > +                       fsl,pins = <
-> > +                               MX6QDL_PAD_CSI0_DAT7__AUD3_RXD 
-> > 0x80000000 +                              
-> > MX6QDL_PAD_CSI0_DAT4__AUD3_TXC  0x80000000 +                            
-> >   MX6QDL_PAD_CSI0_DAT5__AUD3_TXD  0x80000000 +                          
-> >     MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS 0x80000000
-> 
-> Please avoid these 0x80000000 throughout this file.
-> 
-> We should better not rely on the IOMUX settings done in the bootloader.
-
-Fixed, thanks!
-
-Best regards,
-Marek Vasut
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151119/2623755a/attachment.sig>
