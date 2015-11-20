@@ -1,39 +1,53 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Thu, 19 Nov 2015 16:23:59 -0800
-Subject: [V2 PATCH] arm64: restore bogomips information in /proc/cpuinfo
-In-Reply-To: <20151119175906.GA10823@e104818-lin.cambridge.arm.com>
-References: <1447872535-31117-1-git-send-email-yang.shi@linaro.org>
- <20151119175906.GA10823@e104818-lin.cambridge.arm.com>
-Message-ID: <564E681F.102@linaro.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 19 Nov 2015 16:32:23 -0800
+Subject: [PATCH v3 4/8] phy: rockchip-usb: add compatible values for
+ rk3066a and rk3188
+In-Reply-To: <1447968149-10979-5-git-send-email-heiko@sntech.de>
+References: <1447968149-10979-1-git-send-email-heiko@sntech.de>
+ <1447968149-10979-5-git-send-email-heiko@sntech.de>
+Message-ID: <CAD=FV=V=5vP4a32Gonkv+vw7E+B=tP1VoWSfLA6YTh8knJZcfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2015 9:59 AM, Catalin Marinas wrote:
-> On Wed, Nov 18, 2015 at 10:48:55AM -0800, Yang Shi wrote:
->> As what Pavel Machek reported [1], some userspace applications depend on
->> bogomips showed by /proc/cpuinfo.
->>
->> Although there is much less legacy impact on aarch64 than arm, but it does
->> break libvirt.
->>
->> Basically, this patch reverts commit 326b16db9f69fd0d279be873c6c00f88c0a4aad5
->> ("arm64: delay: don't bother reporting bogomips in /proc/cpuinfo"), but with
->> some tweak due to context change.
->>
->> [1] https://lkml.org/lkml/2015/1/4/132
->>
->> Acked-by: Will Deacon <will.deacon@arm.com>
->> Cc: <stable@vger.kernel.org> #3.12+
->> Signed-off-by: Yang Shi <yang.shi@linaro.org>
->
-> Patch applied as a fix for stable, basically returning back to the
-> pre-3.12 behaviour. If there is a need for some more useful information
-> here, it can be done as an additional patch, though without cc: stable.
+Heiko,
 
-Thanks. This approach sounds safer to usersapce.
-
-Yang
-
+On Thu, Nov 19, 2015 at 1:22 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> We need custom handling for these two socs in the driver shortly,
+> so add the necessary compatible values to binding and driver.
 >
-> Thanks.
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt | 5 ++++-
+>  drivers/phy/phy-rockchip-usb.c                             | 2 ++
+>  2 files changed, 6 insertions(+), 1 deletion(-)
 >
+> diff --git a/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
+> index 826454a..9b37242 100644
+> --- a/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
+> @@ -1,7 +1,10 @@
+>  ROCKCHIP USB2 PHY
+>
+>  Required properties:
+> - - compatible: rockchip,rk3288-usb-phy
+> + - compatible: matching the soc type, one of
+> +     "rockchip,rk3066a-usb-phy"
+> +     "rockchip,rk3188-usb-phy"
+> +     "rockchip,rk3288-usb-phy"
+
+I can never quite keep it straight how this is supposed to work, but
+since previously only "rockchip,rk3288-usb-phy" was supported and now
+we have these new compatible strings, I would have expected the new
+strings to specify the old ones as fallback.  That would mean your
+choices would be:
+
+- "rockchip,rk3288-usb-phy" - A real rk3288
+- "rockchip,rk3188-usb-phy", "rockchip,rk3288-usb-phy" - A rk3188 with
+fallback to 3288 driver.
+- "rockchip,rk3066a-usb-phy", "rockchip,rk3288-usb-phy" - A rk3066a
+with fallback to 3288 driver.
+
+That means that if you land the dts changes without the driver changes
+that things still work OK.
+
+-Doug
