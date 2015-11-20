@@ -1,70 +1,38 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 20 Nov 2015 16:47:02 +0530
-Subject: [PATCH] PCI: keystone: fix crash with deferred probe
-Message-ID: <866b2f1544f9d55fa932aa9f9cb5e7d523a23d05.1448017883.git.nsekhar@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 20 Nov 2015 12:17:04 +0100
+Subject: [PATCH v3 8/9] ARM: sunxi_defconfig: Update MFD_AXP20X symbol
+ and enable MFD_AXP20X_RSB
+In-Reply-To: <1447691908-25456-9-git-send-email-wens@csie.org>
+References: <1447691908-25456-1-git-send-email-wens@csie.org>
+ <1447691908-25456-9-git-send-email-wens@csie.org>
+Message-ID: <20151120111704.GX32142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop __init annotations for functions called during
-probe of keystone PCIe host.
+On Tue, Nov 17, 2015 at 12:38:27AM +0800, Chen-Yu Tsai wrote:
+> axp20x support has been split into 2 parts, I2C and RSB interface
+> variants.
+> 
+> Update the MFD_AXP20X symbol for I2C support, and also enable
+> MFD_AXP20X_RSB to support RSB variants.
+> 
+> Keep MFD_AXP20X enabled for now, to ease migration for automated boot
+> farms while the patches are being merged. This should be removed in the
+> next release.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-This fixes kernel crashes seen because of init data
-reclamation if the driver defer probes because of
-phy unavailability.
+Applied, thanks!
+Maxime
 
-While at it, drop the useless __refdata annotation
-to driver structure. If its really needed, it should
-be added back with a comment explaining why.
-
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- drivers/pci/host/pci-keystone-dw.c | 2 +-
- drivers/pci/host/pci-keystone.c    | 6 +++---
- 2 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
-index ed34c9520a02..47ddbcce53ca 100644
---- a/drivers/pci/host/pci-keystone-dw.c
-+++ b/drivers/pci/host/pci-keystone-dw.c
-@@ -469,7 +469,7 @@ void ks_dw_pcie_initiate_link_train(struct keystone_pcie *ks_pcie)
-  * and call dw_pcie_v3_65_host_init() API to initialize the Keystone
-  * PCI host controller.
-  */
--int __init ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie,
-+int ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie,
- 				struct device_node *msi_intc_np)
- {
- 	struct pcie_port *pp = &ks_pcie->pp;
-diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
-index 0aa81bd3de12..593a58834c7d 100644
---- a/drivers/pci/host/pci-keystone.c
-+++ b/drivers/pci/host/pci-keystone.c
-@@ -291,7 +291,7 @@ static struct pcie_host_ops keystone_pcie_host_ops = {
- 	.scan_bus = ks_dw_pcie_v3_65_scan_bus,
- };
- 
--static int __init ks_add_pcie_port(struct keystone_pcie *ks_pcie,
-+static int ks_add_pcie_port(struct keystone_pcie *ks_pcie,
- 			 struct platform_device *pdev)
- {
- 	struct pcie_port *pp = &ks_pcie->pp;
-@@ -340,7 +340,7 @@ static int __exit ks_pcie_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int __init ks_pcie_probe(struct platform_device *pdev)
-+static int ks_pcie_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct keystone_pcie *ks_pcie;
-@@ -396,7 +396,7 @@ fail_clk:
- 	return ret;
- }
- 
--static struct platform_driver ks_pcie_driver __refdata = {
-+static struct platform_driver ks_pcie_driver = {
- 	.probe  = ks_pcie_probe,
- 	.remove = __exit_p(ks_pcie_remove),
- 	.driver = {
 -- 
-2.4.4.408.g16da57c
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/eb7c6e47/attachment.sig>
