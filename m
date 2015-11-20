@@ -1,133 +1,72 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Fri, 20 Nov 2015 10:47:09 +0530
-Subject: [PATCH v3 5/5] ARM: exynos: select POWER_RESET_SYSCON and
- POWER_RESET_SYSCON_POWEROFF
-In-Reply-To: <1447996629-18232-1-git-send-email-alim.akhtar@samsung.com>
-References: <1447996629-18232-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <1447996629-18232-6-git-send-email-alim.akhtar@samsung.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 20 Nov 2015 14:33:26 +0900
+Subject: [PATCH] extcon: palmas: add support for using VBUSDET output
+In-Reply-To: <1447351034-21150-1-git-send-email-balbi@ti.com>
+References: <1447350781-20649-1-git-send-email-balbi@ti.com>
+ <1447351034-21150-1-git-send-email-balbi@ti.com>
+Message-ID: <564EB0A6.4060407@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we switch to use generic syscon regmap based reset/poweroff
-driver for exynos SoC, lets select it from ARCH_EXYNOS instead of
-enabling it from various defconfigs. This also select POWER_RESET
-as SYSCON-{reset, poweroff} drivers depends on it.
+Hi Felipe,
 
-Also because of the above changes we don't need special handling
-for reboot/poweroff in exynos pmu driver. This patch also removes
-the same from exynos pmu driver to keep git bisect working.
+Looks good to me. But I have one comment.
 
-Note: This will break reboot/poweroff on boards with older dtbs
-with a newer kernel.
+On 2015? 11? 13? 02:57, Felipe Balbi wrote:
+> TPS659038 can remux its GPIO_1 as VBUSDET output,
+> which can be tied to a SoC GPIO and used as a VBUS
+> interrupt.
+> 
+> Beagle X15 uses that, in fact, and without it, I
+> could not get USB peripheral working with that
+> board.
+> 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  drivers/extcon/extcon-palmas.c | 22 ++++++++++++++++++++--
+>  1 file changed, 20 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/extcon/extcon-palmas.c b/drivers/extcon/extcon-palmas.c
+> index 93c30a885740..7985d092c069 100644
+> --- a/drivers/extcon/extcon-palmas.c
+> +++ b/drivers/extcon/extcon-palmas.c
+> @@ -296,10 +296,28 @@ static int palmas_usb_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	if (palmas_usb->enable_vbus_detection) {
+> +		int irq = platform_get_irq(pdev, 0);
+> +
+> +		if (irq > 0) {
+> +			/* remux GPIO_1 as VBUSDET */
+> +			status = palmas_update_bits(palmas, PALMAS_PU_PD_OD_BASE,
+> +					PALMAS_PRIMARY_SECONDARY_PAD1,
+> +					PALMAS_PRIMARY_SECONDARY_PAD1_GPIO_1_MASK,
+> +					(1 << 3));
 
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Acked-by: Moritz Fischer <moritz.fischer@ettus.com>
----
- arch/arm/mach-exynos/Kconfig |    3 +++
- arch/arm/mach-exynos/pmu.c   |   43 ------------------------------------------
- 2 files changed, 3 insertions(+), 43 deletions(-)
+PALMAS_PRIMARY_SECONDARY_PAD1_GPIO_1_SHIFT is appropriate instead of using '3'.
+Also, I don't recommend the over line 80. The everything else is good
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 3a10f1a8317a..d279edf9b10d 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -27,6 +27,9 @@ menuconfig ARCH_EXYNOS
- 	select SRAM
- 	select THERMAL
- 	select MFD_SYSCON
-+	select POWER_RESET
-+	select POWER_RESET_SYSCON
-+	select POWER_RESET_SYSCON_POWEROFF
- 	help
- 	  Support for SAMSUNG EXYNOS SoCs (EXYNOS4/5)
- 
-diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-index de68938ee6aa..393c04aa727e 100644
---- a/arch/arm/mach-exynos/pmu.c
-+++ b/arch/arm/mach-exynos/pmu.c
-@@ -14,9 +14,6 @@
- #include <linux/of_address.h>
- #include <linux/platform_device.h>
- #include <linux/delay.h>
--#include <linux/notifier.h>
--#include <linux/reboot.h>
--
- 
- #include "exynos-pmu.h"
- #include "regs-pmu.h"
-@@ -681,23 +678,6 @@ static unsigned int const exynos5420_list_disable_pmu_reg[] = {
- 	EXYNOS5420_CMU_RESET_FSYS_SYS_PWR_REG,
- };
- 
--static void exynos_power_off(void)
--{
--	unsigned int tmp;
--
--	pr_info("Power down.\n");
--	tmp = pmu_raw_readl(EXYNOS_PS_HOLD_CONTROL);
--	tmp ^= (1 << 8);
--	pmu_raw_writel(tmp, EXYNOS_PS_HOLD_CONTROL);
--
--	/* Wait a little so we don't give a false warning below */
--	mdelay(100);
--
--	pr_err("Power down failed, please power off system manually.\n");
--	while (1)
--		;
--}
--
- static void exynos5420_powerdown_conf(enum sys_powerdown mode)
- {
- 	u32 this_cluster;
-@@ -875,14 +855,6 @@ static void exynos5420_pmu_init(void)
- 	pr_info("EXYNOS5420 PMU initialized\n");
- }
- 
--static int pmu_restart_notify(struct notifier_block *this,
--		unsigned long code, void *unused)
--{
--	pmu_raw_writel(0x1, EXYNOS_SWRESET);
--
--	return NOTIFY_DONE;
--}
--
- static const struct exynos_pmu_data exynos3250_pmu_data = {
- 	.pmu_config	= exynos3250_pmu_config,
- 	.pmu_init	= exynos3250_pmu_init,
-@@ -940,20 +912,11 @@ static const struct of_device_id exynos_pmu_of_device_ids[] = {
- 	{ /*sentinel*/ },
- };
- 
--/*
-- * Exynos PMU restart notifier, handles restart functionality
-- */
--static struct notifier_block pmu_restart_handler = {
--	.notifier_call = pmu_restart_notify,
--	.priority = 128,
--};
--
- static int exynos_pmu_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *match;
- 	struct device *dev = &pdev->dev;
- 	struct resource *res;
--	int ret;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	pmu_base_addr = devm_ioremap_resource(dev, res);
-@@ -978,12 +941,6 @@ static int exynos_pmu_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, pmu_context);
- 
--	ret = register_restart_handler(&pmu_restart_handler);
--	if (ret)
--		dev_warn(dev, "can't register restart handler err=%d\n", ret);
--
--	pm_power_off = exynos_power_off;
--
- 	dev_dbg(dev, "Exynos PMU Driver probe done\n");
- 	return 0;
- }
--- 
-1.7.10.4
+
+> +			if (status < 0) {
+> +				dev_err(&pdev->dev, "can't remux GPIO1\n");
+> +				return status;
+> +			}
+> +
+> +			palmas_usb->vbus_irq = irq;
+> +		} else {
+> +			irq = regmap_irq_get_virq(palmas->irq_data,
+> +					PALMAS_VBUS_IRQ);
+> +			palmas_usb->vbus_irq = irq;
+> +		}
+> +
+>  		palmas_usb->vbus_otg_irq = regmap_irq_get_virq(palmas->irq_data,
+>  						       PALMAS_VBUS_OTG_IRQ);
+> -		palmas_usb->vbus_irq = regmap_irq_get_virq(palmas->irq_data,
+> -							   PALMAS_VBUS_IRQ);
+>  		status = devm_request_threaded_irq(palmas_usb->dev,
+>  				palmas_usb->vbus_irq, NULL,
+>  				palmas_vbus_irq_handler,
+> 
+
+Thanks,
+Chanwoo Choi
