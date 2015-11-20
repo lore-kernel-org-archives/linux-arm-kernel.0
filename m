@@ -1,36 +1,83 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 20 Nov 2015 10:59:32 -0800
-Subject: [PATCH] clk: st: avoid uninitialized variable use
-In-Reply-To: <3719029.IbREgssWiU@wuerfel>
-References: <3719029.IbREgssWiU@wuerfel>
-Message-ID: <20151120185932.GW32672@codeaurora.org>
+From: john.stultz@linaro.org (John Stultz)
+Date: Fri, 20 Nov 2015 11:09:21 -0800
+Subject: [PATCH v2] clocksource: arm_global_timer: fix suspend resume
+In-Reply-To: <564F67ED.9000905@ti.com>
+References: <1448027861-21472-1-git-send-email-grygorii.strashko@ti.com>
+ <564F570C.7030409@oracle.com> <564F67ED.9000905@ti.com>
+Message-ID: <CALAqxLVLQLaAq7fPwJnyOWP_dXV39Dh+QreecxSVY35wi=N0Og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12, Arnd Bergmann wrote:
-> quadfs_pll_fs660c32_round_rate prints a few structure members
-> that are never initialized, and also doesn't print the only one
-> it cares about. We get a gcc warning about the ones that
-> are printed:
-> 
-> clk/st/clkgen-fsyn.c:560:93: warning: 'params.sdiv' may be used uninitialized in this function
-> clk/st/clkgen-fsyn.c:560:93: warning: 'params.mdiv' may be used uninitialized in this function
-> clk/st/clkgen-fsyn.c:560:93: warning: 'params.pe' may be used uninitialized in this function
-> clk/st/clkgen-fsyn.c:560:93: warning: 'params.nsdiv' may be used uninitialized in this function
-> 
-> This changes the code to no longer print uninitialized data, and
-> for good measure it also prints the ndiv member that is being
-> set.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 5f7aa9071e93 ("clk: st: Support for QUADFS inside ClockGenB/C/D/E/F")
-> 
-> diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
-> index 576cd0354d48..ccb324d97160 100644
-> --- a/drivers/clk/st/clkgen-fsyn.c
+On Fri, Nov 20, 2015 at 10:35 AM, Grygorii Strashko
+<grygorii.strashko@ti.com> wrote:
+> Hi Santosh,
+>
+> On 11/20/2015 07:23 PM, santosh shilimkar wrote:
+>> + Thomas, Marc
+>>
+>> On 11/20/2015 5:57 AM, Grygorii Strashko wrote:
+>>> Now the System stall is observed on TI AM437x based board
+>>> (am437x-gp-evm) during resuming from System suspend when ARM Global
+>>> timer is selected as clocksource device - SysRq are working, but
+>>> nothing else. The reason of stall is that ARM Global timer loses its
+>>> contexts.
+>>>
+>>> The reason of stall is that ARM Global timer loses its contexts during
+>>> System suspend:
+>>>     GT_CONTROL.TIMER_ENABLE = 0 (unbanked)
+>>>     GT_COUNTERx = 0
+>>>
+>>> Hence, update ARM Global timer driver to reflect above behaviour
+>>> - re-enable ARM Global timer on resume GT_CONTROL.TIMER_ENABLE = 1
+>>> - ensure clocksource and clockevent devices have coresponding flags
+>>>    (CLOCK_SOURCE_SUSPEND_NONSTOP and CLOCK_EVT_FEAT_C3STOP) set
+>>>    depending on presence of "always-on" DT property.
+>>>
+>> Something which loses context in low power states can't be
+>> called "always-on"
+>
+> Sry, it's kinda new area for me and I could make mistakes.
+>
+> While working on this patch I've:
+>  - re-used implementation from ARM arch timer
+> commit 82a5619410d4c4df65c04272db198eca5a867c18
+> Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Date:   Tue Apr 8 10:04:32 2014 +0100
+>
+>     clocksource: arch_arm_timer: Fix age-old arch timer C3STOP detection issue
+>
+>
+> - and followed timekeeping.txt:
+> "Typically the clock source is a monotonic, atomic counter which will provide
+>  n bits which count from 0 to 2^(n-1) and then wraps around to 0 and start over.
+> It will ideally NEVER stop ticking as long as the system is running. It
+> may stop during system suspend."
+> ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>
+> And that exactly my use-case: I'd like to use ARM GT as clocksource
+> and with CPUIdle = n. But System suspend has to be allowed.
+>
+>
+>>
+>> Also if the clock-soucre can't tick in the low power states
+>> then that device shouldn't be used as a clock-source.
+>
+> Agree. clocksource can't (except with suspend). Have I missed something?
 
-Applied to clk-next
+I think the point Stantosh is making is that if the clocksource stops
+in suspend (which is allowed) you should not be setting
+CLOCK_SOURCE_SUSPEND_NONSTOP (which promises the clocksource doesn't
+stop in suspend, so it can be used for suspend timing as well).
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+The contradictory part in your patch is that you're also setting the
+clockevent logic as  CLOCK_EVT_FEAT_C3STOP, which flags that the
+clockevent hardware might stop in low-power idle states (ie: not
+suspend, but while the system is running).  Usually hardware that
+halts in low-power mode (like the apic on some x86 machines) is not
+also used for timekeeping (instead we use the hpet/acpi there).
+
+So its unlikely that the hardware both stays running through suspend,
+but also might halt in idle. That would be "unique".
+
+thanks
+-john
