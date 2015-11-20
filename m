@@ -1,34 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 20 Nov 2015 12:13:42 +0100
-Subject: [PATCH v3 6/9] ARM: dts: sun8i: Add simplefb node labels to
- reference at board level
-In-Reply-To: <1447691908-25456-7-git-send-email-wens@csie.org>
-References: <1447691908-25456-1-git-send-email-wens@csie.org>
- <1447691908-25456-7-git-send-email-wens@csie.org>
-Message-ID: <20151120111342.GW32142@lukather>
+From: mathias.nyman@intel.com (Mathias Nyman)
+Date: Fri, 20 Nov 2015 13:20:49 +0200
+Subject: [PATCH v12 0/3] Mediatek xHCI support
+In-Reply-To: <1447751921-26746-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1447751921-26746-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <564F0211.3090605@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 12:38:25AM +0800, Chen-Yu Tsai wrote:
-> Some boards, such as tablets, have regulators providing power to parts
-> of the display pipeline, like signal converters and LCD panels.
-> 
-> Add labels to the simplefb device nodes so that we can reference them
-> in the board dts files to add regulator supply properties.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On 17.11.2015 11:18, Chunfeng Yun wrote:
+>  From 577f68d9c0ca1531d5f9cae0dcbea2ba116c8551 Mon Sep 17 00:00:00 2001
+> From: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> Date: Tue, 17 Nov 2015 17:09:05 +0800
+> Subject: [PATCH v12 0/3] Mediatek xHCI support
+>
+> The patch supports MediaTek's xHCI controller.
+>
+> There are some differences from xHCI spec:
+> 1. The interval is specified in 250 * 8ns increments for Interrupt Moderation
+> Interval(IMODI) of the Interrupter Moderation(IMOD) register, it is 8 times as
+> much as that defined in xHCI spec.
+>
+> 2. For the value of TD Size in Normal TRB, MTK's xHCI controller defines a
+> number of packets that remain to be transferred for a TD after processing all
+> Max packets in all previous TRBs,that means don't include the current TRB's,
+> but in xHCI spec it includes the current ones.
+>
+> 3. To minimize the scheduling effort for synchronous endpoints in xHC, the MTK
+> architecture defines some extra SW scheduling parameters for HW. According to
+> these parameters provided by SW, the xHC can easily decide whether a
+> synchronous endpoint should be scheduled in a specific uFrame. The extra SW
+> scheduling parameters are put into reserved DWs in Slot and Endpoint Context.
+> And a bandwidth scheduler algorithm is added to support such feature.
+>
+> A usb3.0 phy driver is also added which used by mt65xx SoCs platform, it
+> supports two usb2.0 ports and one usb3.0 port.
+>
 
-Applied, thanks!
-Maxime
+Added to my tree, I'll send it forward to Greg shortly
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/33333a4c/attachment.sig>
+Fixed the documentation "wakeup_deb_p0" -> "wakeup_deb_p1" typo as well
+
+-Mathias  
