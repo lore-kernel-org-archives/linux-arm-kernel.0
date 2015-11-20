@@ -1,114 +1,155 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 20 Nov 2015 17:14:27 +0100
-Subject: [PATCH v4 1/6] ARM: shmobile: r8a7740 dtsi: Add L2
- cache-controller node
-In-Reply-To: <55C47E32.6070400@arm.com>
-References: <1438765090-823-1-git-send-email-geert+renesas@glider.be>
- <1438765090-823-2-git-send-email-geert+renesas@glider.be>
- <55C1D894.8070302@arm.com>
- <CAMuHMdXdEV+41mH338bDbazzqOErDLQkBUAj2+uVX4Wupn1ABQ@mail.gmail.com>
- <55C1EC3C.9000407@arm.com>
- <CAMuHMdVAOba0ofmoy8OH2DdY1m3XaD8iOXvXBE035=C4yK58VQ@mail.gmail.com>
- <55C47E32.6070400@arm.com>
-Message-ID: <CAMuHMdWv4iDxmyPCG26sTMZAnHd3AO7h8nTcxbPryW-d3zzjFw@mail.gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 20 Nov 2015 16:14:41 +0000
+Subject: [PATCH v9 5/6] target-arm: kvm - re-inject guest debug exceptions
+In-Reply-To: <1447345251-22625-6-git-send-email-alex.bennee@linaro.org>
+References: <1447345251-22625-1-git-send-email-alex.bennee@linaro.org>
+ <1447345251-22625-6-git-send-email-alex.bennee@linaro.org>
+Message-ID: <CAFEAcA9xXULtmcq7n353gZEyObUx+ZafsfNKUep8_CWNmLzdcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
-
-[reviving this old thread, now we're two merge windows further]
-
-On Fri, Aug 7, 2015 at 11:45 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> On 06/08/15 17:21, Geert Uytterhoeven wrote:
->> On Wed, Aug 5, 2015 at 12:58 PM, Sudeep Holla <sudeep.holla@arm.com>
->> wrote:
->>> On 05/08/15 11:44, Geert Uytterhoeven wrote:
->>>> On Wed, Aug 5, 2015 at 11:34 AM, Sudeep Holla <sudeep.holla@arm.com>
->>>> wrote:
+On 12 November 2015 at 16:20, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> From: Alex Benn?e <alex@bennee.com>
 >
+> If we can't find details for the debug exception in our debug state
+> then we can assume the exception is due to debugging inside the guest.
+> To inject the exception into the guest state we re-use the TCG exception
+> code (do_interupt).
+
+"do_interrupt".
+
 >
-> [..]
+> However while guest debugging is in effect we currently can't handle the
+> guest using single step which is heavily used by GDB.
+
+Can you expand this to be clearer about what the problem is here?
+Is this a thing fixed by this commit or a remaining issue after it?
+
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 >
->>>>> Any particular reason whey you need all this cache-* properties ? Is
->>>>
->>>> To describe the cache as good as possible.
->>>
->>> Why if you can probe it ? IMO DT is mostly useful to describe things
->>> that can't be probed/discovered using hardware.
->>>
->>>>> something broken on these SoCs ? We should be able to get most of these
->>>>> information from the SoC(reading some registers). It's good to avoid
->>>>> passing them via DT if they can be discovered from hardware.
->>>>
->>>> So we have all these documented properties in
->>>> Documentation/devicetree/bindings/arm/l2cc.txt, but they're not meant to
->>>> be used?
->>>
->>> No I didn't mean that, I just wanted to know if they can't be probed due
->>> to some hardware issue. It would avoid issues with wrong DTs especially
->>> if they are not so easy to upgrade.
->>
->> I think it works just fine without them.
+> ---
+> v5:
+>   - new for v5
+> ---
+>  target-arm/helper-a64.c | 12 ++++++++++--
+>  target-arm/kvm.c        | 27 +++++++++++++++++++--------
+>  2 files changed, 29 insertions(+), 10 deletions(-)
 >
-> Yes, in general if you specify a value in DT that can be probed, its
-> usually to override the probed value(useful if there is some h/w errata)...
+> diff --git a/target-arm/helper-a64.c b/target-arm/helper-a64.c
+> index deb8dbe..fc3ccdf 100644
+> --- a/target-arm/helper-a64.c
+> +++ b/target-arm/helper-a64.c
+> @@ -25,6 +25,7 @@
+>  #include "qemu/bitops.h"
+>  #include "internals.h"
+>  #include "qemu/crc32c.h"
+> +#include "sysemu/kvm.h"
+>  #include <zlib.h> /* For crc32 */
 >
->> Should I drop all cache-* properties marked optional in
->> Documentation/devicetree/bindings/arm/l2cc.txt?
->> That would be cache-size, cache-sets, cache-block-size, and
->> cache-line-size.
+>  /* C2.4.7 Multiply and divide */
+> @@ -469,7 +470,8 @@ void aarch64_cpu_do_interrupt(CPUState *cs)
+>                    new_el);
+>      if (qemu_loglevel_mask(CPU_LOG_INT)
+>          && !excp_is_internal(cs->exception_index)) {
+> -        qemu_log_mask(CPU_LOG_INT, "...with ESR 0x%" PRIx32 "\n",
+> +        qemu_log_mask(CPU_LOG_INT, "...with ESR %x/0x%" PRIx32 "\n",
+> +                      env->exception.syndrome >> ARM_EL_EC_SHIFT,
+>                        env->exception.syndrome);
+>      }
 >
-> ... however if you incorrect values by mistake, then it's problematic
-> even if h/w provides correct value.
+> @@ -535,6 +537,12 @@ void aarch64_cpu_do_interrupt(CPUState *cs)
+>      aarch64_restore_sp(env, new_el);
 >
->> What about the L1 cache? I know Linux uses none of the d-cache-*
->> and i-cache-* properties.
+>      env->pc = addr;
+> -    cs->interrupt_request |= CPU_INTERRUPT_EXITTB;
+> +
+> +    qemu_log_mask(CPU_LOG_INT, "...to EL%d PC 0x%" PRIx64 " PSTATE 0x%x\n",
+> +                  new_el, env->pc, pstate_read(env));
+> +
+> +    if (!kvm_enabled()) {
+> +        cs->interrupt_request |= CPU_INTERRUPT_EXITTB;
+> +    }
+>  }
+>  #endif
+> diff --git a/target-arm/kvm.c b/target-arm/kvm.c
+> index 1f57e92..4ac177a 100644
+> --- a/target-arm/kvm.c
+> +++ b/target-arm/kvm.c
+> @@ -529,9 +529,10 @@ static int kvm_handle_debug(CPUState *cs, struct kvm_run *run)
+>      struct kvm_debug_exit_arch *arch_info = &run->debug.arch;
+>      int hsr_ec = arch_info->hsr >> ARM_EL_EC_SHIFT;
+>      ARMCPU *cpu = ARM_CPU(cs);
+> +    CPUClass *cc = CPU_GET_CLASS(cs);
+>      CPUARMState *env = &cpu->env;
 >
-> Same there, IIRC PPC use them, but on ARM I think so far the need has
-> not arise.
+> -    /* Ensure PC is synchronised */
+> +    /* Ensure all state is synchronised */
+
+You might as well have just written the comment like that to start with :-)
+
+>      kvm_cpu_synchronize_state(cs);
 >
-> Just to re-iterate myself, I am not against adding them, but it's not
-> really needed. I just wanted to know if there was any h/w issue.
+>      switch (hsr_ec) {
+> @@ -539,7 +540,14 @@ static int kvm_handle_debug(CPUState *cs, struct kvm_run *run)
+>          if (cs->singlestep_enabled) {
+>              return true;
+>          } else {
+> -            error_report("Came out of SINGLE STEP when not enabled");
+> +            /*
+> +             * The kernel should have supressed the guests ability to
 
-AFAIK, there's nothing to be overridden. The cache seems to be configured in
-the exact same way with and without cache-size, cache-sets, cache-block-size,
-and cache-line-size.
+"suppressed". "guest's".
 
-With:
+> +             * single step at this point so something has gone wrong.
+> +             */
+> +            error_report("%s: guest single-step while debugging unsupported"
+> +                         " (%"PRIx64", %"PRIx32")\n",
+> +                         __func__, env->pc, arch_info->hsr);
+> +            return false;
 
-    L2C OF: override cache size: 262144 bytes (256KB)
-    L2C OF: override line size: 32 bytes
-    L2C OF: override way size: 32768 bytes (32KB)
-    L2C OF: override associativity: 8
-    L2C: DT/platform modifies aux control register: 0x02040000 -> 0x02440000
-    L2C: DT/platform tries to modify or specify cache size
-    L2C-310 erratum 769419 enabled
-    L2C-310 enabling early BRESP for Cortex-A9
-    L2C-310 full line of zeros enabled for Cortex-A9
-    L2C-310 dynamic clock gating enabled, standby mode enabled
-    L2C-310 cache controller enabled, 8 ways, 256 kB
-    L2C-310: CACHE_ID 0x410000c7, AUX_CTRL 0x46440001
+Why didn't we just write the error_report this way to start with?
 
-Without:
+>          }
+>          break;
+>      case EC_AA64_BKPT:
+> @@ -564,14 +572,17 @@ static int kvm_handle_debug(CPUState *cs, struct kvm_run *run)
+>      default:
+>          error_report("%s: unhandled debug exit (%"PRIx32", %"PRIx64")\n",
+>                       __func__, arch_info->hsr, env->pc);
+> +        return false;
 
-    L2C: DT/platform modifies aux control register: 0x02040000 -> 0x02440000
-    L2C-310 erratum 769419 enabled
-    L2C-310 enabling early BRESP for Cortex-A9
-    L2C-310 full line of zeros enabled for Cortex-A9
-    L2C-310 dynamic clock gating enabled, standby mode enabled
-    L2C-310 cache controller enabled, 8 ways, 256 kB
-    L2C-310: CACHE_ID 0x410000c7, AUX_CTRL 0x46440001
+Might as well put this "return false;" in the original code that
+adds the default case, rather than changing the control flow in this
+patch.
 
-Hence I'll drop cache-size, cache-sets, cache-block-size, and cache-line-size,
-for both unified L2 and L1 I/D caches.
+>      }
+>
+> -    /* If we don't handle this it could be it really is for the
+> -       guest to handle */
+> -    qemu_log_mask(LOG_UNIMP,
+> -                  "%s: re-injecting exception not yet implemented"
+> -                  " (0x%"PRIx32", %"PRIx64")\n",
+> -                  __func__, hsr_ec, env->pc);
+> +    /* If we are not handling the debug exception it must belong to
+> +     * the guest. Let's re-use the existing TCG interrupt code to set
+> +     * everything up properly
 
-Gr{oetje,eeting}s,
+Missing trailing ".".
 
-                        Geert
+> +     */
+> +    cs->exception_index = EXCP_BKPT;
+> +    env->exception.syndrome = arch_info->hsr;
+> +    env->exception.vaddress = arch_info->far;
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+You need to set env->exception.target_el to 1 as well.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> +    cc->do_interrupt(cs);
+>
+>      return false;
+>  }
+> --
+> 2.6.3
+>
+
+thanks
+-- PMM
