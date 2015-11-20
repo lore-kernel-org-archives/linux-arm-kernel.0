@@ -1,47 +1,31 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 20 Nov 2015 15:37:54 -0800
-Subject: [PATCH] nvmem: qfprom: Specify LE device endianness
-Message-ID: <1448062674-17969-1-git-send-email-sboyd@codeaurora.org>
+From: michal.morawiec@tieto.com (Michal Morawiec)
+Date: Sat, 21 Nov 2015 00:39:41 +0100
+Subject: [PATCH 1/1] soc: ti: knav_qmss_queue: Fix linking RAM setup for queue
+ managers
+Message-ID: <1448062781-6708-1-git-send-email-michal.1.morawiec.ext@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The qfprom is a little endian device, but so far we've been
-relying on the regmap mmio bus handling this for us without
-explicitly stating that fact. After commit 4a98da2164cf
-(regmap-mmio: Use native endianness for read/write, 2015-10-29),
-the regmap mmio bus will read/write with the __raw_*() IO
-accessors, instead of using the readl/writel() APIs that do
-proper byte swapping for little endian devices.
+Configure linking RAM for both queue managers also in case
+when only linking RAM 0 is specified in device tree.
 
-So if we're running on a big endian processor and haven't
-specified the endianness explicitly in the regmap config or in
-DT, we're going to switch from doing little endian byte swapping
-to big endian accesses without byte swapping, leading to some
-confusing results. Specify the endianness explicitly so that the
-regmap core properly byte swaps the accesses for us.
-
-Cc: Rajendra Nayak <rnayak@codeaurora.org>
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Tyler Baker <tyler.baker@linaro.org>
-Cc: Simon Arlott <simon@fire.lp0.eu>
-Cc: Mark Brown <broonie@kernel.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Michal Morawiec <michal.1.morawiec.ext@nokia.com>
 ---
- drivers/nvmem/qfprom.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/soc/ti/knav_qmss_queue.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/nvmem/qfprom.c b/drivers/nvmem/qfprom.c
-index afb67e7eeee4..3829e5fbf8c3 100644
---- a/drivers/nvmem/qfprom.c
-+++ b/drivers/nvmem/qfprom.c
-@@ -21,6 +21,7 @@ static struct regmap_config qfprom_regmap_config = {
- 	.reg_bits = 32,
- 	.val_bits = 8,
- 	.reg_stride = 1,
-+	.val_format_endian = REGMAP_ENDIAN_LITTLE,
- };
+diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
+index 6d8646d..a809c30 100644
+--- a/drivers/soc/ti/knav_qmss_queue.c
++++ b/drivers/soc/ti/knav_qmss_queue.c
+@@ -1173,7 +1173,7 @@ static int knav_queue_setup_link_ram(struct knav_device *kdev)
  
- static struct nvmem_config econfig = {
+ 		block++;
+ 		if (!block->size)
+-			return 0;
++			continue;
+ 
+ 		dev_dbg(kdev->dev, "linkram1: phys:%x, virt:%p, size:%x\n",
+ 			block->phys, block->virt, block->size);
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.4.6
