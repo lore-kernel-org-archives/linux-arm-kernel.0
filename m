@@ -1,89 +1,46 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Nov 2015 17:05:34 +0000
-Subject: [PATCH 1/2] arm64: mm: detect bad __create_mapping uses
-In-Reply-To: <CAPvkgC2NqfYrcAzsF=UwE9n3BGz74bYcNSGOaaCiwHP_YcnRWA@mail.gmail.com>
-References: <1448033724-13846-1-git-send-email-mark.rutland@arm.com>
- <CAPvkgC2NqfYrcAzsF=UwE9n3BGz74bYcNSGOaaCiwHP_YcnRWA@mail.gmail.com>
-Message-ID: <20151120170534.GE5536@leverpostej>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 20 Nov 2015 17:07:24 +0000
+Subject: [PATCH 11/13] xen/hvm/params: Add a new dilivery type for
+ event-channel in HVM_PARAM_CALLBACK_IRQ
+In-Reply-To: <1447754231-7772-12-git-send-email-shannon.zhao@linaro.org>
+References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
+ <1447754231-7772-12-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511201706070.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 04:13:28PM +0000, Steve Capper wrote:
-> On 20 November 2015 at 15:35, Mark Rutland <mark.rutland@arm.com> wrote:
-> > If a caller of __create_mapping provides a PA and VA which have
-> > different sub-page offsets, it is not clear which offset they expect to
-> > apply to the mapping, and is indicative of a bad caller.
-> >
-> > Disallow calls with differing sub-page offsets, and WARN when they are
-> > encountered, so that we can detect and fix such cases.
-> >
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > Cc: Catalin Marinas <caralin.marinas@arm.com>
-> > Cc: Laura Abbott <labbott@fedoraproject.org>
-> > Cc: Steve Capper <steve.capper@linaro.org>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/mm/mmu.c | 7 +++++++
-> >  1 file changed, 7 insertions(+)
-> >
-> > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> > index e3f563c..3b06afa 100644
-> > --- a/arch/arm64/mm/mmu.c
-> > +++ b/arch/arm64/mm/mmu.c
-> > @@ -300,6 +300,13 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
-> >  {
-> >         unsigned long addr, length, end, next;
-> >
-> > +       /*
-> > +        * If the virtual and physical address don't have the same offset
-> > +        * within a page, we cannot map the region as the caller expects.
-> > +        */
-> > +       if (WARN_ON((phys ^ virt) & ~PAGE_MASK))
-> > +               return;
-> > +
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> Do we want any subpage offsets in our virt and phys?
+> Add a new dilivery type:
 
-Yes.
+delivery
 
-For instance, when mapping EFI regions (which exist at 4K granularity)
-on a 64K page kernel, per [1]. The spec requires that any regions in the
-same 64K page can be mapped using the same attributes, so it's fine to
-map at 64K granularity.
-
-We already try to cater for this in __create_mapping where we fix up the
-base and size:
-
-	addr = virt & PAGE_MASK;
-	length = PAGE_ALIGN(size + (virt & ~PAGE_MASK));
-
-I will add a middle paragraph to the commit message:
-
-	In some cases, the region we wish to map may validly have a
-	sub-page offset in the physical and virtual adddresses. For
-	example, EFI runtime regions have 4K granularity, yet may be
-	mapped by a 64K page kernel. So long as the physical and virtual
-	offsets are the same, the region will be mapped at the expected
-	VAs.
-
-Does that sound OK?
-
-> If we have sub page bits in phys won't that start flipping on bits in
-> the page table entries?
-
-In all cases where we use phys, we either shift phys right by PAGE_SHIFT
-(in __populate_init_pte vi __phys_to_pfn) which clears those bits, or we
-first check it is sufficiently aligned for that level of table (and
-hence the low bits are all zero). Patch 2 fixes a bug related to the
-latter case.
-
-> What about something like:
-> if (WARN_ON((phys | virt) & ~PAGE_MASK))
-
-Per the above, that would break the EFI code in [1].
-
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386908.html
+> val[63:56] == 3: val[15:8] is flag: val[7:0] is a PPI.
+> To the flag, bit 0 stands the interrupt mode is edge(1) or level(0) and
+> bit 1 stands the interrupt polarity is active low(1) or high(0).
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  include/xen/interface/hvm/params.h | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
+> index a6c7991..550688a 100644
+> --- a/include/xen/interface/hvm/params.h
+> +++ b/include/xen/interface/hvm/params.h
+> @@ -34,6 +34,11 @@
+>   *                  Domain = val[47:32], Bus  = val[31:16],
+>   *                  DevFn  = val[15: 8], IntX = val[ 1: 0]
+>   * val[63:56] == 2: val[7:0] is a vector number.
+> + * val[63:56] == 3: val[15:8] is flag of event-channel interrupt:
+> + *                      bit 0: interrupt is edge(1) or level(0) triggered
+> + *                      bit 1: interrupt is active low(1) or high(0)
+> + *                  val[7:0] is PPI number used by event-channel.
+> + *                  This is only used by ARM/ARM64.
+>   * If val == 0 then CPU0 event-channel notifications are not delivered.
+>   */
+>  #define HVM_PARAM_CALLBACK_IRQ 0
+> -- 
+> 2.1.0
+> 
