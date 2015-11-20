@@ -1,101 +1,52 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 20 Nov 2015 22:42:14 +0200
-Subject: [PATCH v2] clocksource: arm_global_timer: fix suspend resume
-In-Reply-To: <CALAqxLVjKaRUYFTXkC2s_ViHTt=bpXyFCYkt9+AW-PSwYnOM8A@mail.gmail.com>
-References: <1448027861-21472-1-git-send-email-grygorii.strashko@ti.com>
- <564F570C.7030409@oracle.com> <564F67ED.9000905@ti.com>
- <CALAqxLVLQLaAq7fPwJnyOWP_dXV39Dh+QreecxSVY35wi=N0Og@mail.gmail.com>
- <564F7447.8000504@ti.com>
- <CALAqxLVjKaRUYFTXkC2s_ViHTt=bpXyFCYkt9+AW-PSwYnOM8A@mail.gmail.com>
-Message-ID: <564F85A6.9000605@ti.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 20 Nov 2015 12:45:02 -0800
+Subject: [RFC PATCH] restrict /dev/mem to idle io memory ranges
+In-Reply-To: <CAPcyv4hagUwc3AJuDHvBy+YR1Khv+5uUL0HZawO9R0r-EZLVHg@mail.gmail.com>
+References: <20151120173133.24259.97028.stgit@dwillia2-desk3.jf.intel.com>
+ <20151120201207.GH8644@n2100.arm.linux.org.uk>
+ <CAPcyv4hagUwc3AJuDHvBy+YR1Khv+5uUL0HZawO9R0r-EZLVHg@mail.gmail.com>
+Message-ID: <CAGXu5jJ_Q4LLoaw=MHBDQVH0QuOFDvzwK5hhVN94n4AHWhARZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2015 09:32 PM, John Stultz wrote:
-> On Fri, Nov 20, 2015 at 11:28 AM, Grygorii Strashko
-> <grygorii.strashko@ti.com> wrote:
->> On 11/20/2015 09:09 PM, John Stultz wrote:
->>> On Fri, Nov 20, 2015 at 10:35 AM, Grygorii Strashko
->>> <grygorii.strashko@ti.com> wrote:
->>>> Hi Santosh,
->>>>
->>>> On 11/20/2015 07:23 PM, santosh shilimkar wrote:
->>>>> + Thomas, Marc
->>>>>
->>>>> On 11/20/2015 5:57 AM, Grygorii Strashko wrote:
->>>>>> Now the System stall is observed on TI AM437x based board
->>>>>> (am437x-gp-evm) during resuming from System suspend when ARM Global
->>>>>> timer is selected as clocksource device - SysRq are working, but
->>>>>> nothing else. The reason of stall is that ARM Global timer loses its
->>>>>> contexts.
->>>>>>
->>>>>> The reason of stall is that ARM Global timer loses its contexts during
->>>>>> System suspend:
->>>>>>       GT_CONTROL.TIMER_ENABLE = 0 (unbanked)
->>>>>>       GT_COUNTERx = 0
->>>>>>
->>>>>> Hence, update ARM Global timer driver to reflect above behaviour
->>>>>> - re-enable ARM Global timer on resume GT_CONTROL.TIMER_ENABLE = 1
->>>>>> - ensure clocksource and clockevent devices have coresponding flags
->>>>>>      (CLOCK_SOURCE_SUSPEND_NONSTOP and CLOCK_EVT_FEAT_C3STOP) set
->>>>>>      depending on presence of "always-on" DT property.
->>>>>>
->>>>> Something which loses context in low power states can't be
->>>>> called "always-on"
->>>>
->>>> Sry, it's kinda new area for me and I could make mistakes.
->>>>
->>>> While working on this patch I've:
->>>>    - re-used implementation from ARM arch timer
->>>> commit 82a5619410d4c4df65c04272db198eca5a867c18
->>>> Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>>> Date:   Tue Apr 8 10:04:32 2014 +0100
->>>>
->>>>       clocksource: arch_arm_timer: Fix age-old arch timer C3STOP detection issue
->>>>
->>>>
->>>> - and followed timekeeping.txt:
->>>> "Typically the clock source is a monotonic, atomic counter which will provide
->>>>    n bits which count from 0 to 2^(n-1) and then wraps around to 0 and start over.
->>>> It will ideally NEVER stop ticking as long as the system is running. It
->>>> may stop during system suspend."
->>>> ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
->>>>
->>>> And that exactly my use-case: I'd like to use ARM GT as clocksource
->>>> and with CPUIdle = n. But System suspend has to be allowed.
->>>>
->>>>
->>>>>
->>>>> Also if the clock-soucre can't tick in the low power states
->>>>> then that device shouldn't be used as a clock-source.
->>>>
->>>> Agree. clocksource can't (except with suspend). Have I missed something?
->>>
->>> I think the point Stantosh is making is that if the clocksource stops
->>> in suspend (which is allowed) you should not be setting
->>> CLOCK_SOURCE_SUSPEND_NONSTOP (which promises the clocksource doesn't
->>> stop in suspend, so it can be used for suspend timing as well).
->>>
+On Fri, Nov 20, 2015 at 12:26 PM, Dan Williams <dan.j.williams@intel.com> wrote:
+> On Fri, Nov 20, 2015 at 12:12 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Fri, Nov 20, 2015 at 09:31:33AM -0800, Dan Williams wrote:
+>>> This effectively promotes IORESOURCE_BUSY to IORESOURCE_EXCLUSIVE
+>>> semantics by default.  If userspace really believes it is safe to access
+>>> the memory region it can also perform the extra step of disabling an
+>>> active driver.  This protects device address ranges with read side
+>>> effects and otherwise directs userspace to use the driver.
 >>
->> Ok. Thanks. I got it now. Adding CLOCK_SOURCE_SUSPEND_NONSTOP is mistake.
+>> I'm happy with this as long as we retain the option to disable this
+>> new behaviour.
 >>
->>> The contradictory part in your patch is that you're also setting the
->>> clockevent logic as  CLOCK_EVT_FEAT_C3STOP, which flags that the
->>> clockevent hardware might stop in low-power idle states (ie: not
->>> suspend, but while the system is running).  Usually hardware that
->>> halts in low-power mode (like the apic on some x86 machines) is not
->>> also used for timekeeping (instead we use the hpet/acpi there).
+>> The reason being, when developing a driver, it is _very_ useful to
+>> be able to poke around in the device's (and system memory) address
+>> spaces with tools like devmem2 to work out what's going on when
+>> things go wrong.
 >>
->> Sry, I've set CLOCK_EVT_FEAT_C3STOP if "always-on" = *false*
-> 
-> You might also consider renaming that value from always_on to
-> something more descriptive, given the subtlety of the different states
-> here. Maybe instead use a flag called halts_in_idle or something?
-> 
+>> To put it another way, I think it's a good idea to disable access to
+>> these regions on production systems, but for driver development, we
+>> want to retain the ability to poke around in physical address space
+>> in any way we so desire.
+>>
+>
+> Sounds ok to me, but I do think it's a good idea to default it to the
+> same value as STRICT_DEVMEM.  Perhaps:
+>
+> bool "Filter I/O access to /dev/mem" if EXPERT
+> default STRICT_DEVMEM
+>
+> When this in do we even need IORESOURCE_EXCLUSIVE?  It's barely used.
 
-I'd better just drop it for now hence I'm still not sure what is more reasonable
-continue with DT property or just add this flag always.
+Let's leave it for now to give us the debugging granularity Russell
+mentioned. If it turns out it's never used, we can drop it in the
+future.
+
+-Kees
 
 -- 
-regards,
--grygorii
+Kees Cook
+Chrome OS Security
