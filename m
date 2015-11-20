@@ -1,163 +1,53 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 20 Nov 2015 15:40:28 +0100
-Subject: [PATCH] ARM: dts: sun8i: Add Orange Pi PC support
-In-Reply-To: <1447825233-3325-1-git-send-email-wens@csie.org>
-References: <1447825233-3325-1-git-send-email-wens@csie.org>
-Message-ID: <564F30DC.7040708@redhat.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 20 Nov 2015 14:40:31 +0000
+Subject: [PATCH v11 3/5] arm: introduce CONFIG_PARAVIRT,
+ PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+In-Reply-To: <564F2FD0.6040905@codeaurora.org>
+References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
+ <1446737696-9749-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1511101411570.5676@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1511201430200.1107@kaball.uk.xensource.com>
+ <564F2FD0.6040905@codeaurora.org>
+Message-ID: <alpine.DEB.2.02.1511201439280.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 20 Nov 2015, Christopher Covington wrote:
+> Hi Stefano,
+> 
+> On 11/20/2015 09:31 AM, Stefano Stabellini wrote:
+> > On Tue, 10 Nov 2015, Stefano Stabellini wrote:
+> >> On Thu, 5 Nov 2015, Stefano Stabellini wrote:
+> >>> Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM.
+> >>>
+> >>> The only paravirt interface supported is pv_time_ops.steal_clock, so no
+> >>> runtime pvops patching needed.
+> >>>
+> >>> This allows us to make use of steal_account_process_tick for stolen
+> >>> ticks accounting.
+> >>>
+> >>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> >>> Acked-by: Christopher Covington <cov@codeaurora.org>
+> >>> Acked-by: Ian Campbell <ian.campbell@citrix.com>
+> >>> CC: linux at arm.linux.org.uk
+> >>> CC: will.deacon at arm.com
+> >>> CC: nico at linaro.org
+> >>> CC: marc.zyngier at arm.com
+> >>> CC: cov at codeaurora.org
+> >>> CC: arnd at arndb.de
+> >>> CC: olof at lixom.net
+> >>
+> >>
+> >> Russell,
+> >> are you OK with this patch?
+> > 
+> > Russell,
+> > 
+> > I am going to drop this patch and add a small #ifdef to
+> > arch/arm/xen/enlighten.c to be able to use this functionality on arm64.
+> > 
+> > If you change your mind let me know.
+> 
+> It appears to me as though he's not copied on this message.
 
-On 18-11-15 06:40, Chen-Yu Tsai wrote:
-> The Orange Pi PC is an SBC based on the Allwinner H3 SoC with a uSD slot,
-> 3 USB ports directly from the SoC, a 10/100M ethernet port using the
-> SoC's integrated PHY, USB OTG, HDMI, a TRRS headphone jack for stereo out
-> and composite out, a microphone, an IR receiver, a CSI connector, 2 LEDs,
-> a 3 pin UART header, and a 40-pin GPIO header.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-
-Thanks, I've added this to my sunxi-wip branch for now.
-
-Regards,
-
-Hans
-
-
-> ---
->
-> This is based on Jens' H3 patches and Hans' H3 USB patches.
-> USB works nicely on this board.
->
-> ---
->   arch/arm/boot/dts/Makefile                 |   1 +
->   arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 106 +++++++++++++++++++++++++++++
->   2 files changed, 107 insertions(+)
->   create mode 100644 arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 4e8026e85b79..0ef528a7d845 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -661,6 +661,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
->   	sun8i-a33-ippo-q8h-v1.2.dtb \
->   	sun8i-a33-q8-tablet.dtb \
->   	sun8i-a33-sinlinx-sina33.dtb \
-> +	sun8i-h3-orangepi-pc.dtb \
->   	sun8i-h3-orangepi-plus.dtb
->   dtb-$(CONFIG_MACH_SUN9I) += \
->   	sun9i-a80-optimus.dtb \
-> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-> new file mode 100644
-> index 000000000000..4b25dcc3fdd2
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-> @@ -0,0 +1,106 @@
-> +/*
-> + * Copyright (C) 2015 Chen-Yu Tsai <wens@csie.org>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "sun8i-h3.dtsi"
-> +#include "sunxi-common-regulators.dtsi"
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/pinctrl/sun4i-a10.h>
-> +
-> +/ {
-> +	model = "Xunlong Orange Pi PC";
-> +	compatible = "xunlong,orangepi-pc", "allwinner,sun8i-h3";
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +};
-> +
-> +&ehci1 {
-> +	status = "okay";
-> +};
-> +
-> +&ehci2 {
-> +	status = "okay";
-> +};
-> +
-> +&ehci3 {
-> +	status = "okay";
-> +};
-> +
-> +&mmc0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-> +	vmmc-supply = <&reg_vcc3v3>;
-> +	bus-width = <4>;
-> +	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
-> +	cd-inverted;
-> +	status = "okay";
-> +};
-> +
-> +&ohci1 {
-> +	status = "okay";
-> +};
-> +
-> +&ohci2 {
-> +	status = "okay";
-> +};
-> +
-> +&ohci3 {
-> +	status = "okay";
-> +};
-> +
-> +&uart0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart0_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&usbphy {
-> +	/* USB VBUS is always on */
-> +	status = "okay";
-> +};
->
+He was. He is now in To:.
