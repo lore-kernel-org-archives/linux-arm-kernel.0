@@ -1,45 +1,37 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 19 Nov 2015 16:03:58 -0800
-Subject: [PATCH RFC 18/27] drivers: cpu-pd: Add PM Domain governor for CPUs
-In-Reply-To: <1447799871-56374-19-git-send-email-lina.iyer@linaro.org> (Lina
- Iyer's message of "Tue, 17 Nov 2015 15:37:42 -0700")
-References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
- <1447799871-56374-19-git-send-email-lina.iyer@linaro.org>
-Message-ID: <7hbnapsfip.fsf@deeprootsystems.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 20 Nov 2015 09:12:39 +0900
+Subject: [PATCH v2 0/2] arm64: EXYNOS: Consolidate Exynos7 symbol
+Message-ID: <1447978361-18010-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lina Iyer <lina.iyer@linaro.org> writes:
+Hi,
 
-> A PM domain comprising of CPUs may be powered off when all the CPUs in
-> the domain are powered down. Powering down a CPU domain is generally a
-> expensive operation and therefore the power performance trade offs
-> should be considered. The time between the last CPU powering down and
-> the first CPU powering up in a domain, is the time available for the
-> domain to sleep. Ideally, the sleep time of the domain should fulfill
-> the residency requirement of the domains' idle state.
->
-> To do this effectively, read the time before the wakeup of the cluster's
-> CPUs and ensure that the domain's idle state sleep time guarantees the
-> QoS requirements of each of the CPU, the PM QoS CPU_DMA_LATENCY and the
-> state's residency.
->
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+We don't need ARCH_EXYNOS7 symbol because all ARMv8 platforms should
+fall under generic ARCH_EXYNOS. In the same time there is no sense
+in building clocks for these ARMv8 SoCs on ARMv7 builds. In future
+this will also influence PMU [1] driver.
 
-[...]
+Patch 2 *depends* on patch 1. Patch 1 received acks from Samsung clock
+folks so everything can go through Samsung-soc or ARM64 tree.
 
-> +static bool cpu_stop_ok(struct device *dev)
-> +{
-> +	return true;
-> +}
-> +
-> +struct dev_power_governor cpu_pd_gov = {
-> +	.power_down_ok = cpu_pd_down_ok,
-> +	.stop_ok = cpu_stop_ok,
-> +};
+Best regards,
+Krzysztof
 
-If stop_ok is unconditionally true, it should probably just be removed
-(IOW cpu_pd_gov->stop_ok == NULL), and that will avoid an unnecessary
-function call.
 
-Kevin
+[1] https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg48090.html
+
+
+Krzysztof Kozlowski (2):
+  clk: samsung: Don't build ARMv8 clock drivers on ARMv7
+  arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS
+
+ arch/arm64/Kconfig.platforms        | 11 ++---------
+ arch/arm64/boot/dts/exynos/Makefile |  2 +-
+ arch/arm64/configs/defconfig        |  2 +-
+ drivers/clk/samsung/Kconfig         |  6 ++++++
+ drivers/clk/samsung/Makefile        |  4 ++--
+ 5 files changed, 12 insertions(+), 13 deletions(-)
+
+-- 
+1.9.1
