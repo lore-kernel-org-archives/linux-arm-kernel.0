@@ -1,61 +1,36 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 20 Nov 2015 16:42:11 +0000
-Subject: [Xen-devel] [PATCH 07/13] ARM: Xen: Document UEFI support on
- Xen ARM virtual platforms
-In-Reply-To: <564B59F3.2060801@citrix.com>
-References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
- <1447754231-7772-8-git-send-email-shannon.zhao@linaro.org>
- <564B59F3.2060801@citrix.com>
-Message-ID: <alpine.DEB.2.02.1511201640550.1107@kaball.uk.xensource.com>
+From: yrdreddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
+Date: Fri, 20 Nov 2015 12:55:20 -0500
+Subject: [PATCH 0/3] pinmux support for Broadcom NSP SOC
+Message-ID: <1448042120-9212-1-git-send-email-yrdreddy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, David Vrabel wrote:
-> On 17/11/15 09:57, shannon.zhao at linaro.org wrote:
-> > From: Shannon Zhao <shannon.zhao@linaro.org>
-> > 
-> > Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
-> > scan this to get the UEFI information.
-> [...]
-> > --- a/Documentation/devicetree/bindings/arm/xen.txt
-> > +++ b/Documentation/devicetree/bindings/arm/xen.txt
-> > @@ -15,6 +15,24 @@ the following properties:
-> >  - interrupts: the interrupt used by Xen to inject event notifications.
-> >    A GIC node is also required.
-> >  
-> > +To support UEFI on Xen ARM virtual platforms, Xen pupulates the FDT "uefi" node
-> > +under /hypervisor with following parameters:
-> 
-> It's not really clear why this is under /hypervisor and why xen needs to
-> define its own nodes.
+This patchset contains the pinmux support for the Broadcom's
+Northstar Plus (NSP) SOC.
 
-There was a very long discussion about this, see http://marc.info/?l=xen-devel&m=144321258920213
+The first patch provides the documentation details and the
+second patch contains the driver details. The third patch
+contains the enable method.
 
+This patchset has been tested on NSP bcm958625HR board.
+This patchset is based on v4.4.0-rc1 and is available from github
+repo: https://github.com/Broadcom/cygnus-linux.git
+branch: nsp-pinmux-v1
 
-> The handling of the existing linux standard nodes can be made
-> Xen-specific by the presence of the /hypervisor/compatible == "xen" node
-> (or similar), right?
-> 
-> > +________________________________________________________________________________
-> > +Name                      | Size   | Description
-> > +================================================================================
-> > +xen,uefi-system-table     | 64-bit | Physical address of the UEFI System Table.
-> > +--------------------------------------------------------------------------------
-> > +xen,uefi-mmap-start       | 64-bit | Physical address of the UEFI memory map.
-> > +--------------------------------------------------------------------------------
-> 
-> I would probably say "Guest physical address..." just to be clear.
-> 
-> > +xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
-> > +                          |        | pointed to in previous entry.
-> > +--------------------------------------------------------------------------------
-> > +xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
-> > +                          |        | memory map.
-> > +--------------------------------------------------------------------------------
-> > +xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
-> > +--------------------------------------------------------------------------------
-> 
-> Need a reference to the mmap descriptor format here.
-> 
-> David
-> 
+Yendapally Reddy Dhananjaya Reddy (3):
+  pinctrl: Broadcom NSP pinctrl device tree bindings
+  pinctrl: nsp: add pinmux driver support for Broadcom NSP SoC
+  ARM: dts: enable pinctrl for Broadcom NSP
+
+ .../bindings/pinctrl/brcm,nsp-pinmux.txt           |  79 +++
+ arch/arm/boot/dts/bcm-nsp.dtsi                     |   7 +
+ arch/arm/boot/dts/bcm958625k.dts                   |   9 +
+ drivers/pinctrl/bcm/Kconfig                        |  13 +
+ drivers/pinctrl/bcm/Makefile                       |   1 +
+ drivers/pinctrl/bcm/pinctrl-nsp-mux.c              | 650 +++++++++++++++++++++
+ 6 files changed, 759 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,nsp-pinmux.txt
+ create mode 100644 drivers/pinctrl/bcm/pinctrl-nsp-mux.c
+
+-- 
+2.1.0
