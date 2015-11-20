@@ -1,30 +1,61 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 20 Nov 2015 17:18:46 +0100
-Subject: [PATCH 2/4] ARM: dts: sun4i: Enable onboard codec used on the
- iNet1 tablet
-In-Reply-To: <1448027233-750-2-git-send-email-hdegoede@redhat.com>
-References: <1448027233-750-1-git-send-email-hdegoede@redhat.com>
- <1448027233-750-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20151120161846.GE32142@lukather>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 20 Nov 2015 16:19:42 +0000
+Subject: [PATCH 03/13] arm/xen: Use xlated_setup_gnttab_pages to setup
+ grant table
+In-Reply-To: <1447754231-7772-4-git-send-email-shannon.zhao@linaro.org>
+References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
+ <1447754231-7772-4-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511201618530.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 02:47:11PM +0100, Hans de Goede wrote:
-> The iNet1 tablet uses the A10's integrated audio codec, enable it.
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Use xlated_setup_gnttab_pages to setup grant table. Then it doesn't rely
+> on DT or ACPI to pass the start address and size of grant table.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 
-Applied, thanks!
-Maxime
+It looks good. I'll wait for the final version of
+xlated_setup_gnttab_pages before acking it, but it is fine in principle.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/e6d3bd1d/attachment.sig>
+
+>  arch/arm/xen/enlighten.c | 10 +---------
+>  1 file changed, 1 insertion(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index eeeab07..7cb82f7 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -186,18 +186,10 @@ static int __init xen_guest_init(void)
+>  {
+>  	struct xen_add_to_physmap xatp;
+>  	struct shared_info *shared_info_page = NULL;
+> -	struct resource res;
+> -	phys_addr_t grant_frames;
+>  
+>  	if (!xen_domain())
+>  		return 0;
+>  
+> -	if (of_address_to_resource(xen_node, GRANT_TABLE_PHYSADDR, &res)) {
+> -		pr_err("Xen grant table base address not found\n");
+> -		return -ENODEV;
+> -	}
+> -	grant_frames = res.start;
+> -
+>  	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
+>  	if (!xen_events_irq) {
+>  		pr_err("Xen event channel interrupt not found\n");
+> @@ -232,7 +224,7 @@ static int __init xen_guest_init(void)
+>  	if (xen_vcpu_info == NULL)
+>  		return -ENOMEM;
+>  
+> -	if (gnttab_setup_auto_xlat_frames(grant_frames)) {
+> +	if (xlated_setup_gnttab_pages()) {
+>  		free_percpu(xen_vcpu_info);
+>  		return -ENOMEM;
+>  	}
+> -- 
+> 2.1.0
+> 
