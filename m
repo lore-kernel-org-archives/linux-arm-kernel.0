@@ -1,170 +1,90 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 20 Nov 2015 12:21:11 -0600
-Subject: [RFC PATCH] clocksource: ti-32k: convert to platform device
-In-Reply-To: <1448040129-23869-1-git-send-email-grygorii.strashko@ti.com>
-References: <1448040129-23869-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <87h9kgcz1k.fsf@saruman.tx.rr.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 20 Nov 2015 19:22:43 +0100
+Subject: [linux-sunxi] Re: [PATCH 4/7] touchscreen: pixcir_i2c: Add
+ support for wake and enable gpios
+In-Reply-To: <20151120172725.GA26895@dtor-ws>
+References: <1448018233-27824-1-git-send-email-hdegoede@redhat.com>
+ <1448018233-27824-5-git-send-email-hdegoede@redhat.com>
+ <20151120172725.GA26895@dtor-ws>
+Message-ID: <564F64F3.6070405@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
 Hi,
 
-Grygorii Strashko <grygorii.strashko@ti.com> writes:
-> Since system clocksource is finally selected by Clocksource core at
-> fs_initcall stage during boot there are no reasons to initialize
-> ti_32k_timer at early boot stages. Hence, ti_32k_timer can be
-> converted to use platform device/driver model and its PM can be
-> implemented using PM runtime which is common for OMAP devices.
+On 20-11-15 18:27, Dmitry Torokhov wrote:
+> On Fri, Nov 20, 2015 at 12:17:10PM +0100, Hans de Goede wrote:
+>> From: Sander Vermin <sander@vermin.nl>
+>>
+>> On some devices the wake and enable pins of the pixcir touchscreen
+>> controller are connected to gpios and these must be controlled by the
+>> driver for the device to operate properly.
+>>
+>> Signed-off-by: Sander Vermin <sander@vermin.nl>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>> Changes in v2 (Hans de Goede):
+>> -Split the changes for dealing with inverted / swapped axis out into a
+>>   separate patch
+>> -Remove a bunch of dev_info calls to make the driver less chatty
+>> -Use devm_gpiod_get_optional as these new gpios are optional
+>> -Only msleep after setting enable high if we have an enable pin
+>> ---
+>>   .../bindings/input/touchscreen/pixcir_i2c_ts.txt   |  2 +
+>>   drivers/input/touchscreen/pixcir_i2c_ts.c          | 46 ++++++++++++++++++++++
+>>   2 files changed, 48 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
+>> index 8eb240a..72ca5ec 100644
+>> --- a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
+>> +++ b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
+>> @@ -10,6 +10,8 @@ Required properties:
+>>
+>>   Optional properties:
+>>   - reset-gpio: GPIO connected to the RESET line of the chip
+>> +- enable-gpios: GPIO connected to the ENABLE line of the chip
+>> +- wake-gpios: GPIO connected to the WAKE line of the chip
+>>
+>>   Example:
+>>
+>> diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
+>> index 211408c..b75ef65 100644
+>> --- a/drivers/input/touchscreen/pixcir_i2c_ts.c
+>> +++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
+>> @@ -38,6 +38,8 @@ struct pixcir_i2c_ts_data {
+>>   	struct input_dev *input;
+>>   	struct gpio_desc *gpio_attb;
+>>   	struct gpio_desc *gpio_reset;
+>> +	struct gpio_desc *gpio_enable;
+>> +	struct gpio_desc *gpio_wake;
+>>   	const struct pixcir_i2c_chip_data *chip;
+>>   	int max_fingers;	/* Max fingers supported in this instance */
+>>   	bool running;
+>> @@ -208,6 +210,11 @@ static int pixcir_set_power_mode(struct pixcir_i2c_ts_data *ts,
+>>   	struct device *dev = &ts->client->dev;
+>>   	int ret;
+>>
+>> +	if (mode == PIXCIR_POWER_ACTIVE || mode == PIXCIR_POWER_IDLE) {
+>> +		if (!IS_ERR_OR_NULL(ts->gpio_wake))
+>> +			gpiod_set_value_cansleep(ts->gpio_wake, 1);
 >
-> Platform specific initialization code has to be disabled once as
-> ti_32k_timer is converted to platform device - otherwise OMAP platform
-> code will generate boot warnings.
+> I believe you error out in case when IS_ERR(ts->gpio_wake) is true, so I
+> wonder if we should simply use
 >
-> After this change, all counter_32k's platform code can be removed
-> once all OMAP boards will be converted to DT.
+> 		if (ts->gpio_wake)
+> 			gpiod_set_value_cansleep(ts->gpio_wake, 1);
 >
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
->  arch/arm/mach-omap2/timer.c        | 16 +++--------
->  drivers/clocksource/timer-ti-32k.c | 58 ++++++++++++++++++++++++++++++++------
->  2 files changed, 53 insertions(+), 21 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index b18ebbe..3bfde44 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -393,23 +393,15 @@ static const struct of_device_id omap_counter_match[] __initconst = {
->  static int __init __maybe_unused omap2_sync32k_clocksource_init(void)
->  {
->  	int ret;
-> -	struct device_node *np = NULL;
->  	struct omap_hwmod *oh;
->  	const char *oh_name = "counter_32k";
->  
->  	/*
-> -	 * If device-tree is present, then search the DT blob
-> -	 * to see if the 32kHz counter is supported.
-> +	 * If device-tree is present, then just exit -
-> +	 * 32kHz clocksource driver will handle it.
->  	 */
-> -	if (of_have_populated_dt()) {
-> -		np = omap_get_timer_dt(omap_counter_match, NULL);
-> -		if (!np)
-> -			return -ENODEV;
-> -
-> -		of_property_read_string_index(np, "ti,hwmods", 0, &oh_name);
-> -		if (!oh_name)
-> -			return -ENODEV;
-> -	}
-> +	if (of_have_populated_dt())
-> +		return 0;
->  
->  	/*
->  	 * First check hwmod data is available for sync32k counter
-> diff --git a/drivers/clocksource/timer-ti-32k.c b/drivers/clocksource/timer-ti-32k.c
-> index 8518d9d..e71496f 100644
-> --- a/drivers/clocksource/timer-ti-32k.c
-> +++ b/drivers/clocksource/timer-ti-32k.c
-> @@ -39,8 +39,11 @@
->  #include <linux/time.h>
->  #include <linux/sched_clock.h>
->  #include <linux/clocksource.h>
-> +#include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pm_runtime.h>
->  
->  /*
->   * 32KHz clocksource ... always available, on pretty most chips except
-> @@ -88,15 +91,28 @@ static u64 notrace omap_32k_read_sched_clock(void)
->  	return ti_32k_read_cycles(&ti_32k_timer.cs);
->  }
->  
-> -static void __init ti_32k_timer_init(struct device_node *np)
-> +static const struct of_device_id ti_32k_of_table[] = {
-> +	{ .compatible = "ti,omap-counter32k" },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, ti_32k_of_table);
-> +
-> +static int __init ti_32k_probe(struct platform_device *pdev)
->  {
-> +	struct device *dev = &pdev->dev;
-> +	struct resource *res;
->  	int ret;
->  
-> -	ti_32k_timer.base = of_iomap(np, 0);
-> -	if (!ti_32k_timer.base) {
-> -		pr_err("Can't ioremap 32k timer base\n");
-> -		return;
-> -	}
-> +	/* Static mapping, never released */
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	ti_32k_timer.base = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(ti_32k_timer.base))
-> +		return PTR_ERR(ti_32k_timer.base);
-> +
-> +	pm_runtime_enable(dev);
-> +	ret = pm_runtime_get_sync(dev);
-> +	if (ret < 0)
-> +		goto probe_err;
->  
->  	ti_32k_timer.counter = ti_32k_timer.base;
->  
-> @@ -116,11 +132,35 @@ static void __init ti_32k_timer_init(struct device_node *np)
->  	ret = clocksource_register_hz(&ti_32k_timer.cs, 32768);
->  	if (ret) {
->  		pr_err("32k_counter: can't register clocksource\n");
-> -		return;
-> +		goto probe_err;
->  	}
->  
->  	sched_clock_register(omap_32k_read_sched_clock, 32, 32768);
->  	pr_info("OMAP clocksource: 32k_counter at 32768 Hz\n");
-> +	return 0;
-> +
-> +probe_err:
-> +	pm_runtime_put_noidle(dev);
-> +	return ret;
-> +};
-> +
-> +static struct platform_driver ti_32k_driver __initdata = {
-> +	.probe		= ti_32k_probe,
-> +	.driver		= {
-> +		.name	= "ti_32k_timer",
-> +		.of_match_table = of_match_ptr(ti_32k_of_table),
-> +	}
-> +};
-> +
-> +static int __init ti_32k_init(void)
-> +{
-> +	return platform_driver_register(&ti_32k_driver);
->  }
-> -CLOCKSOURCE_OF_DECLARE(ti_32k_timer, "ti,omap-counter32k",
-> -		ti_32k_timer_init);
-> +
-> +subsys_initcall(ti_32k_init);
-> +
-> +MODULE_AUTHOR("Paul Mundt");
-> +MODULE_AUTHOR("Juha Yrj?l?");
-> +MODULE_DESCRIPTION("OMAP2 32k Timer");
-> +MODULE_ALIAS("platform:ti_32k_timer");
-> +MODULE_LICENSE("GPL v2");
+> here and elsewhere.
 
-this will break clksource_of_init(), right ? Eventually, we want that to
-be the only thing called by our .init_time method. I'll leave it to Tony
-to decide, but IMO this is not a good path forward for timers.
+Yes that will work fine, I believe Sander went with his version because that
+is what the existing gpio code (for the also optional reset pin) already does.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/2e72e8be/attachment.sig>
+So from a consistency pov it is better to keep this patch as is.
+
+> No need to resubmit, just let me know.
+
+Ok, either way is fine with me.
+
+Regards,
+
+Hans
