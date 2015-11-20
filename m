@@ -1,54 +1,83 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Nov 2015 20:15:56 +0000
-Subject: [PATCH] [PATCH] arm64: Boot failure on m400 with new cont PTEs
-In-Reply-To: <20151119112923.GA24570@leverpostej>
-References: <1447858999-26665-1-git-send-email-jeremy.linton@arm.com>
- <20151118152044.GD10644@leverpostej> <564CA29A.9050905@arm.com>
- <20151118162932.GA13355@leverpostej> <564CB1DA.4090304@arm.com>
- <20151118180434.GB13355@leverpostej> <564CD206.9040402@arm.com>
- <20151119112923.GA24570@leverpostej>
-Message-ID: <20151120201556.GE14942@leverpostej>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 20 Nov 2015 21:19:46 +0100
+Subject: [PATCH RESEND 1/8] arm: dts: berlin2q: add watchdog nodes
+In-Reply-To: <20151120113414.1aa1e48e@xhacker>
+References: <1447672194-483-1-git-send-email-jszhang@marvell.com>
+ <1447672194-483-2-git-send-email-jszhang@marvell.com>
+ <564E3549.2050700@gmail.com> <20151120113414.1aa1e48e@xhacker>
+Message-ID: <564F8062.8070609@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2015 at 11:31:34AM +0000, Mark Rutland wrote:
-> On Wed, Nov 18, 2015 at 01:31:18PM -0600, Jeremy Linton wrote:
-> > On 11/18/2015 12:04 PM, Mark Rutland wrote:
-> > 
-> > >You're racing against other parts of the CPU (the page table walker(s),
-> > >I-caches, etc). The flushing only minimises the window for a race, and
-> > >does not prevent the race from being possible.
-> > >
-> > >Given that the envelope is constantly pushing forward w.r.t. how
-> > >aggressive CPUs may be in this area, we need to fix the issue by
-> > >reasoning against what the architecture guarantees us.
-> > 	Its also not suppose to fault on speculative access, and to me that
-> > means page table walks/etc that are the result of speculative
-> > access.
+On 20.11.2015 04:34, Jisheng Zhang wrote:
+> On Thu, 19 Nov 2015 21:47:05 +0100
+> Sebastian Hesselbarth wrote:
+>> On 16.11.2015 12:09, Jisheng Zhang wrote:
+>>> The Marvell Berlin BG2Q has 3 watchdogs which are compatible with the
+>>> snps,dw-wdt driver sit in the sysmgr domain. This patch adds the
+>>> corresponding device tree nodes.
+>>>
+>>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+>>> ---
+>>>  arch/arm/boot/dts/berlin2q.dtsi | 24 ++++++++++++++++++++++++
+>>>  1 file changed, 24 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+>>> index a3ecde5..fac4315 100644
+>>> --- a/arch/arm/boot/dts/berlin2q.dtsi
+>>> +++ b/arch/arm/boot/dts/berlin2q.dtsi
+>>> @@ -483,6 +483,30 @@
+>>>  			ranges = <0 0xfc0000 0x10000>;
+>>>  			interrupt-parent = <&sic>;
+>>>  
+>>> +			wdt0: watchdog at 1000 {
+>>> +				compatible = "snps,dw-wdt";
+>>> +				reg = <0x1000 0x100>;
+>>> +				clocks = <&refclk>;
+>>> +				interrupts = <0>;
+>>> +				status = "disabled";  
+>>
+>> as the watchdogs are internal and cannot be clock gated
+>> at all, how about we remove the status = "disabled" and
+>> make them always available?
 > 
-> I was under the impression that TLB conflict abort could be delivered
-> for asynchronous events (e.g. speculative I-cache fetches rather than
-> for speculative execution of already fetched instructions).
+> there are two issues here:
 > 
-> Having looked at the ARM ARM, I appear to have been mistaken. As you
-> say, it appears that TLB conflict aborts are always delivered
-> synchronously.
+> 1. the dw-wdt can't support multiple variants now. I have rewrite the driver
+> with watchdog core supplied framework, but the patch isn't sent out and
+> may be need time to clean up and review.
 
-Having invesitgated further, while we may not encounter (synchronous)
-TLB conflict aborts, we may still encounter (asynchronous) issues from
-conflicting TLB entries.
+Ok.
 
-Per the ARM ARM, if the TLB contains multiple entries for the same
-address, the result of a translation may be some amalgamation of said
-entries (where the amalgamation could be an arbitrary function of all of
-said matching entries).
+> 2. not all dw-wdt devices are available and functional. This depends on
+> board design and configuration.
 
-Thus page table walks and *-cache fetches may use completely erroneous
-addresses and/or attributes, asynchronous to the instruction stream, and
-as a result of this may change the state of MMIO peripherals, trigger
-SError, etc.
+I understand that "board design and configuration" may hinder the wdt
+to issue a hard reset. But all others are able to issue a soft reset
+or just an interrupt, right?
 
-This is a much scarier proposition than the TLB conflict aborts.
+So, I still don't see why we should disable wdt nodes by default
+except for the driver issue above.
 
-Thanks,
-Mark.
+> So IMHO status=disabled and patch5-8 is necessary, what do you think?
+
+No. I'd agree to enable wdt0 by default and leave wdt[1,2] disabled
+because of the driver issue. Patches 5-8 only enable wdt0 anyway.
+
+As soon as the driver issue is resolved, we enable all wdt nodes
+unconditionally.
+
+Sebastian
+
+>> I have applied patches 1-4 with the status property removed.
+>> This also renders patches 5-8 useless.
+>>
+>> So, for now tentatively
+>>
+>> Appled to berlin/dt and berlin64/dt respectivly
+>>
+>> with status property removed.
+>>
+>> Sebastian
+>>
+> 
