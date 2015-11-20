@@ -1,44 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Nov 2015 21:00:29 +0100
-Subject: [RFC PATCH] restrict /dev/mem to idle io memory ranges
-In-Reply-To: <20151120173133.24259.97028.stgit@dwillia2-desk3.jf.intel.com>
-References: <20151120173133.24259.97028.stgit@dwillia2-desk3.jf.intel.com>
-Message-ID: <4325714.tYNkapC69P@wuerfel>
+From: tj@kernel.org (Tejun Heo)
+Date: Fri, 20 Nov 2015 15:03:00 -0500
+Subject: [PATCH RESEND v2] sata/mvebu: use #ifdef around suspend/resume
+ code
+In-Reply-To: <8025767.rG7ykO9yUZ@wuerfel>
+References: <8025767.rG7ykO9yUZ@wuerfel>
+Message-ID: <20151120200300.GA31848@mtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 November 2015 09:31:33 Dan Williams wrote:
-> This effectively promotes IORESOURCE_BUSY to IORESOURCE_EXCLUSIVE
-> semantics by default.  If userspace really believes it is safe to access
-> the memory region it can also perform the extra step of disabling an
-> active driver.  This protects device address ranges with read side
-> effects and otherwise directs userspace to use the driver.
+On Thu, Nov 19, 2015 at 03:16:30PM +0100, Arnd Bergmann wrote:
+> The newly added suspend/resume implementation for ahci_mvebu causes
+> a link error when CONFIG_PM_SLEEP is disabled:
 > 
-> Persistent memory presents a large "mistake surface" to /dev/mem as now
-> accidental writes can corrupt a filesystem.
+> ERROR: "ahci_platform_suspend_host" [drivers/ata/ahci_mvebu.ko] undefined!
+> ERROR: "ahci_platform_resume_host" [drivers/ata/ahci_mvebu.ko] undefined!
 > 
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: "H. Peter Anvin" <hpa@zytor.com>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+> This adds the same #ifdef here that exists in the ahci_platform driver
+> which defines the above functions.
 > 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: d6ecf1581488 ("ata: ahci_mvebu: add suspend/resume support")
+> Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-I like the idea.
+Applied to libata/for-4.4-fixes.
 
-Maybe split the change up into two patches, where the first one
-just does the trivial move of the Kconfig option, and the second
-one that changes behavior is small?
+Thanks.
 
-There is also a question of whether we actually need two options
-or if we can safely make the existing option stricter.
-
-	Arnd
+-- 
+tejun
