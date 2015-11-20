@@ -1,53 +1,62 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 19 Nov 2015 17:05:33 -0800
-Subject: [PATCH 26/29] ARM: shmobile: r8a7794: Use SoC specific binding for
- rcar-dmac nodes
+Date: Thu, 19 Nov 2015 17:05:27 -0800
+Subject: [PATCH 20/29] ARM: shmobile: r8a7794: Add DU node to device tree
 In-Reply-To: <cover.1447981420.git.horms+renesas@verge.net.au>
 References: <cover.1447981420.git.horms+renesas@verge.net.au>
-Message-ID: <0a3d058b8ae857d270a0d34081554192f3e2e566.1447981420.git.horms+renesas@verge.net.au>
+Message-ID: <46c4f13d04d729fa79f7df2dd1978f9fc0ee6d6a.1447981420.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new SoC specific binding for rcar-dmac and the generic
-binding as a fall-back in the r8a7794 device tree.
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-In general Renesas hardware is not documented to the extent where the
-relationship between IP blocks on different SoCs can be assumed although
-they may appear to operate the same way. Furthermore the documentation
-typically does not specify a version for individual IP blocks. For these
-reasons a convention of using the SoC name in place of a version and
-providing SoC-specific compat strings has been adopted.
+Add the DU device with a disabled state. Boards that want to enable the
+DU need to specify the output topology.
 
-Although not universally liked this convention is used in the bindings for
-most drivers for Renesas hardware. The purpose of this patch is to
-update the Renesas R-Car DMA Controller nodes to follow this convention.
-
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7794.dtsi | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 4075a0a3d5c1..57d188c2bf6d 100644
+index b70e4061d8b1..4075a0a3d5c1 100644
 --- a/arch/arm/boot/dts/r8a7794.dtsi
 +++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -221,7 +221,7 @@
+@@ -750,6 +750,34 @@
+ 		};
  	};
  
- 	dmac0: dma-controller at e6700000 {
--		compatible = "renesas,rcar-dmac";
-+		compatible = "renesas,dmac-r8a7794", "renesas,rcar-dmac";
- 		reg = <0 0xe6700000 0 0x20000>;
- 		interrupts = <0 197 IRQ_TYPE_LEVEL_HIGH
- 			      0 200 IRQ_TYPE_LEVEL_HIGH
-@@ -252,7 +252,7 @@
- 	};
- 
- 	dmac1: dma-controller@e6720000 {
--		compatible = "renesas,rcar-dmac";
-+		compatible = "renesas,dmac-r8a7794", "renesas,rcar-dmac";
- 		reg = <0 0xe6720000 0 0x20000>;
- 		interrupts = <0 220 IRQ_TYPE_LEVEL_HIGH
- 			      0 216 IRQ_TYPE_LEVEL_HIGH
++	du: display at feb00000 {
++		compatible = "renesas,du-r8a7794";
++		reg = <0 0xfeb00000 0 0x40000>;
++		reg-names = "du";
++		interrupts = <0 256 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 268 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp7_clks R8A7794_CLK_DU0>,
++			 <&mstp7_clks R8A7794_CLK_DU0>;
++		clock-names = "du.0", "du.1";
++		status = "disabled";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				du_out_rgb0: endpoint {
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				du_out_rgb1: endpoint {
++				};
++			};
++		};
++	};
++
+ 	clocks {
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
 -- 
 2.1.4
