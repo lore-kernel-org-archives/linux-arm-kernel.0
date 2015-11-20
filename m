@@ -1,30 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Nov 2015 13:12 +0100
-Subject: [PATCH, once again] regulator: core: avoid unused variable warning
-In-Reply-To: <20151120114127.GS31303@sirena.org.uk>
-References: <4219157.sstthfjICN@wuerfel> <20151120114127.GS31303@sirena.org.uk>
-Message-ID: <15541673.tdJ35xzzlG@wuerfel>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Fri, 20 Nov 2015 07:13:41 -0500
+Subject: [PATH RESEND v2 03/10] tty: xuartps: Always enable transmitter in
+ start_tx
+In-Reply-To: <1447963344-16266-4-git-send-email-soren.brinkmann@xilinx.com>
+References: <1447963344-16266-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1447963344-16266-4-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <564F0E75.5020100@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 November 2015 11:41:27 Mark Brown wrote:
-> On Fri, Nov 20, 2015 at 12:30:24PM +0100, Arnd Bergmann wrote:
+
+
+On 11/19/2015 03:02 PM, Soren Brinkmann wrote:
+> start_tx must start transmitting characters. Regardless of the state of
+> the circular buffer, always enable the transmitter hardware.
+
+Why?
+
+Does cdns_uart_stop_tx() actually stop the transmitter so that
+data remains in the transmitter?
+
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+>  drivers/tty/serial/xilinx_uartps.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> > The patch that introduced the warning is now in 4.4-rc1, and I think this
-> > patch is still the least ugly workaround we found.
+> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+> index 2c98c357d9a0..df6778d17949 100644
+> --- a/drivers/tty/serial/xilinx_uartps.c
+> +++ b/drivers/tty/serial/xilinx_uartps.c
+> @@ -512,9 +512,6 @@ static void cdns_uart_start_tx(struct uart_port *port)
+>  {
+>  	unsigned int status, numbytes = port->fifosize;
+>  
+> -	if (uart_circ_empty(&port->state->xmit) || uart_tx_stopped(port))
+> -		return;
+
+The test for tx stopped needs to remain; otherwise, transmission will
+restart even if the tty has been stopped (for example by userspace
+or IXON software flow control).
+
+Regards,
+Peter Hurley
+
+> -
+>  	/*
+>  	 * Set the TX enable bit and clear the TX disable bit to enable the
+>  	 * transmitter.
+> @@ -524,6 +521,9 @@ static void cdns_uart_start_tx(struct uart_port *port)
+>  	status |= CDNS_UART_CR_TX_EN;
+>  	writel(status, port->membase + CDNS_UART_CR_OFFSET);
+>  
+> +	if (uart_circ_empty(&port->state->xmit) || uart_tx_stopped(port))
+> +		return;
+> +
+>  	while (numbytes-- && ((readl(port->membase + CDNS_UART_SR_OFFSET) &
+>  				CDNS_UART_SR_TXFULL)) != CDNS_UART_SR_TXFULL) {
+>  		/* Break if no more data available in the UART buffer */
 > 
-> Can we please at least have a comment explaining that this is working
-> around lockdep limitations?
-
-Not sure which limitation you are referring to. Maybe you could just
-modify the changelog text as you like when applying the patch?
-
-The limitation we talked about in the previous thread was about the maximum
-of 8 nesting levels, but my patch here doesn't address that at all.
-
-I tried to capture the fact that mutex_lock_nested() intentionally
-doesn't evaluate its second argument when CONFIG_DEBUG_LOCK_ALLOC
-is not set, but that appears to be less of a limitation than a
-choice of the interface.
-
-	Arnd
