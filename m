@@ -1,77 +1,58 @@
-From: brian.starkey@arm.com (Brian Starkey)
-Date: Fri, 20 Nov 2015 14:20:26 +0000
-Subject: [PATCH] drivers: dma-coherent: use ioremap_wc() for DMA_MEMORY_MAP
-Message-ID: <1448029226-4914-1-git-send-email-brian.starkey@arm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 20 Nov 2015 14:58:37 +0000
+Subject: [PATCH v12 0/4] xen/arm64: CONFIG_PARAVIRT and stolen ticks accounting
+Message-ID: <alpine.DEB.2.02.1511201434520.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the DMA_MEMORY_MAP flag is used, memory which can be accessed
-directly should be returned, so use ioremap_wc() instead of ioremap().
-Also, ensure that the correct memset operation is used in
-dma_alloc_from_coherent() with respect to the region's flags.
+Hi all,
 
-This fixes the below alignment fault on arm64, caused by invalid use
-of memset() on Device memory.
+I dusted off this series from Jan 2014. Patch #2 and #3 still need an ack.
 
-   Unhandled fault: alignment fault (0x96000061) at 0xffffff8000380000
-   Internal error: : 96000061 [#1] PREEMPT SMP
-   Modules linked in: hdlcd(+) clk_scpi
-   CPU: 4 PID: 1355 Comm: systemd-udevd Not tainted 4.4.0-rc1+ #5
-   Hardware name: ARM Juno development board (r0) (DT)
-   task: ffffffc9763eee00 ti: ffffffc9758c4000 task.ti: ffffffc9758c4000
-   PC is at __efistub_memset+0x1ac/0x200
-   LR is at dma_alloc_from_coherent+0xb0/0x120
-   pc : [<ffffffc00030ff2c>] lr : [<ffffffc00042a918>] pstate: 400001c5
-   sp : ffffffc9758c79a0
-   x29: ffffffc9758c79a0 x28: ffffffc000635cd0
-   x27: 0000000000000124 x26: ffffffc000119ef4
-   x25: 0000000000010000 x24: 0000000000000140
-   x23: ffffffc07e9ac3a8 x22: ffffffc9758c7a58
-   x21: ffffffc9758c7a68 x20: 0000000000000004
-   x19: ffffffc07e9ac380 x18: 0000000000000001
-   x17: 0000007fae1bbba8 x16: ffffffc0001b2d1c
-   x15: ffffffffffffffff x14: 0ffffffffffffffe
-   x13: 0000000000000010 x12: ffffff800837ffff
-   x11: ffffff800837ffff x10: 0000000040000000
-   x9 : 0000000000000000 x8 : ffffff8000380000
-   x7 : 0000000000000000 x6 : 000000000000003f
-   x5 : 0000000000000040 x4 : 0000000000000000
-   x3 : 0000000000000004 x2 : 000000000000ffc0
-   x1 : 0000000000000000 x0 : ffffff8000380000
 
-Signed-off-by: Brian Starkey <brian.starkey@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
----
- drivers/base/dma-coherent.c |   10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+This patch series introduces stolen ticks accounting for Xen on ARM64.
+Stolen ticks are clocksource ticks that have been "stolen" from the cpu,
+typically because Linux is running in a virtual machine and the vcpu has
+been descheduled.  To account for these ticks we introduce
+CONFIG_PARAVIRT and pv_time_ops so that we can make use of:
 
-diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
-index 55b8398..45358d0 100644
---- a/drivers/base/dma-coherent.c
-+++ b/drivers/base/dma-coherent.c
-@@ -31,7 +31,10 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_add
- 	if (!size)
- 		goto out;
- 
--	mem_base = ioremap(phys_addr, size);
-+	if (flags & DMA_MEMORY_MAP)
-+		mem_base = ioremap_wc(phys_addr, size);
-+	else
-+		mem_base = ioremap(phys_addr, size);
- 	if (!mem_base)
- 		goto out;
- 
-@@ -181,7 +184,10 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
- 	 */
- 	*dma_handle = mem->device_base + (pageno << PAGE_SHIFT);
- 	*ret = mem->virt_base + (pageno << PAGE_SHIFT);
--	memset(*ret, 0, size);
-+	if (mem->flags & DMA_MEMORY_MAP)
-+		memset(*ret, 0, size);
-+	else
-+		memset_io(*ret, 0, size);
- 	spin_unlock_irqrestore(&mem->spinlock, flags);
- 
- 	return 1;
--- 
-1.7.9.5
+kernel/sched/cputime.c:steal_account_process_tick
+
+
+Changes in v12:
+- drop arm support
+- #ifdef CONFIG_PARAVIRT the depends on it
+- remove useless #include's
+
+Changes in v11:
+- add ifdef CONFIG_PARAVIRT to kernel/sched/cputime.c, because not all
+  architectures have an asm/paravirt.h header file to include
+- drop the removal of ifdef CONFIG_PARAVIRT from kernel/sched/core.c for
+  the same reason
+
+
+Stefano Stabellini (4):
+      xen: move xen_setup_runstate_info and get_runstate_snapshot to drivers/xen/time.c
+      missing include asm/paravirt.h in cputime.c
+      arm64: introduce CONFIG_PARAVIRT, PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+      xen/arm: account for stolen ticks
+
+ arch/arm/xen/enlighten.c          |   24 ++++++++++
+ arch/arm64/Kconfig                |   20 ++++++++
+ arch/arm64/include/asm/paravirt.h |   20 ++++++++
+ arch/arm64/kernel/Makefile        |    1 +
+ arch/arm64/kernel/paravirt.c      |   25 ++++++++++
+ arch/x86/xen/time.c               |   76 +------------------------------
+ drivers/xen/Makefile              |    2 +-
+ drivers/xen/time.c                |   91 +++++++++++++++++++++++++++++++++++++
+ include/xen/xen-ops.h             |    5 ++
+ kernel/sched/cputime.c            |    3 ++
+ 10 files changed, 191 insertions(+), 76 deletions(-)
+ create mode 100644 arch/arm64/include/asm/paravirt.h
+ create mode 100644 arch/arm64/kernel/paravirt.c
+ create mode 100644 drivers/xen/time.c
+
+
+Cheers,
+
+Stefano
