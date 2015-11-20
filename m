@@ -1,153 +1,142 @@
-From: van.freenix@gmail.com (Peng Fan)
-Date: Fri, 20 Nov 2015 14:24:17 +0800
-Subject: [RFC V3] iommu: arm-smmu: correct group reference count
-In-Reply-To: <20151117161745.GD30101@arm.com>
-References: <1447120586-17847-1-git-send-email-van.freenix@gmail.com>
- <20151117161745.GD30101@arm.com>
-Message-ID: <20151120062415.GA7242@linux-7smt.suse>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 20 Nov 2015 07:31:35 +0100
+Subject: [PATCH v2 04/12] arm64/efi: split off EFI init and runtime code
+ for reuse by 32-bit ARM
+In-Reply-To: <20151119223430.GB2577@codeblueprint.co.uk>
+References: <1447698757-8762-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1447698757-8762-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20151119223430.GB2577@codeblueprint.co.uk>
+Message-ID: <CAKv+Gu8X5RCb+yZhLhxFsWZX=Pcrv=44v5w=3Gynwws8ucSPsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Matt,
 
-On Tue, Nov 17, 2015 at 04:17:46PM +0000, Will Deacon wrote:
->On Tue, Nov 10, 2015 at 09:56:26AM +0800, Peng Fan wrote:
->> The basic flow for add a device:
->>  arm_smmu_add_device
->>         |->iommu_group_get_for_dev
->>             |->iommu_group_get
->>                      return group;  (1)
->>             |->ops->device_group : Init/increase reference count to/by 1.
->>             |->iommu_group_add_device : Increase reference count by 1.
->> 		     return group   (2)
->>         |->return 0;
->> 
->> Since we are adding one device, the flow is (2) and the group reference
->> count will be increased by 2. So, we need to add iommu_group_put at the
->> end of arm_smmu_add_device to decrease the count by 1.
->> 
->> Signed-off-by: Peng Fan <van.freenix@gmail.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> ---
->>  drivers/iommu/arm-smmu-v3.c | 7 ++++++-
->>  drivers/iommu/arm-smmu.c    | 2 ++
->>  2 files changed, 8 insertions(+), 1 deletion(-)
->> 
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 4e5118a..ac333ee 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -1825,8 +1825,10 @@ static int arm_smmu_add_device(struct device *dev)
->>  	pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid, &sid);
->>  	for (i = 0; i < smmu_group->num_sids; ++i) {
->>  		/* If we already know about this SID, then we're done */
->> -		if (smmu_group->sids[i] == sid)
->> +		if (smmu_group->sids[i] == sid) {
->> +			iommu_group_put(group);
->>  			return 0;
->> +		}
->>  	}
->>  
->>  	/* Check the SID is in range of the SMMU and our stream table */
->> @@ -1855,6 +1857,9 @@ static int arm_smmu_add_device(struct device *dev)
->>  	/* Add the new SID */
->>  	sids[smmu_group->num_sids - 1] = sid;
->>  	smmu_group->sids = sids;
+Thanks for taking a look. Note that this patch only moves code from
+one file to the other, and I am reluctant to fix bugs at the same
+time. Most of your comments deserve a followup however, so I will make
+sure this gets addressed at some point.
+
+
+On 19 November 2015 at 23:34, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> On Mon, 16 Nov, at 07:32:29PM, Ard Biesheuvel wrote:
 >> +
->> +	iommu_group_put(group);
+>> +     pr_info("EFI v%u.%.02u by %s\n",
+>> +             efi.systab->hdr.revision >> 16,
+>> +             efi.systab->hdr.revision & 0xffff, vendor);
 >> +
->>  	return 0;
+>> +     table_size = sizeof(efi_config_table_64_t) * efi.systab->nr_tables;
+>> +     config_tables = early_memremap(efi_to_phys(efi.systab->tables),
+>> +                                    table_size);
 >
->I still think this is wrong for the failure path. If we fail during
->add_device, then we want to put things back like they were, which is
->what the out_put_group label is for. That means dropping the refcount
->for the group *and* the refcount for the device. The nasty part is that
->we don't know if we were responsible for adding the device to the group,
->but it looks like we already assume that in ->remove_device.
-
-Thanks for your comments. I missed to handle the failure path.
-
+> You should probably check the return value of early_memremap().
 >
->The best bet is probably something like the diff below.
 
-Yeah.
+Indeed.
 
-I'll send a new version patch with your diff.
+>> +
+>> +     retval = efi_config_parse_tables(config_tables, efi.systab->nr_tables,
+>> +                                      sizeof(efi_config_table_64_t), NULL);
+>> +
+>> +     early_memunmap(config_tables, table_size);
+>> +out:
+>> +     early_memunmap(efi.systab,  sizeof(efi_system_table_t));
+>> +     return retval;
+>> +}
+>> +
+>> +/*
+>> + * Return true for RAM regions we want to permanently reserve.
+>> + */
+>> +static __init int is_reserve_region(efi_memory_desc_t *md)
+>> +{
+>> +     switch (md->type) {
+>> +     case EFI_LOADER_CODE:
+>> +     case EFI_LOADER_DATA:
+>> +     case EFI_BOOT_SERVICES_CODE:
+>> +     case EFI_BOOT_SERVICES_DATA:
+>> +     case EFI_CONVENTIONAL_MEMORY:
+>> +     case EFI_PERSISTENT_MEMORY:
+>> +             return 0;
+>> +     default:
+>> +             break;
+>> +     }
+>> +     return is_normal_ram(md);
+>> +}
+>> +
+>> +static __init void reserve_regions(void)
+>> +{
+>> +     efi_memory_desc_t *md;
+>> +     u64 paddr, npages, size;
+>> +
+>> +     if (efi_enabled(EFI_DBG))
+>> +             pr_info("Processing EFI memory map:\n");
+>> +
+>> +     for_each_efi_memory_desc(&memmap, md) {
+>> +             paddr = md->phys_addr;
+>> +             npages = md->num_pages;
+>> +
+>> +             if (efi_enabled(EFI_DBG)) {
+>> +                     char buf[64];
+>> +
+>> +                     pr_info("  0x%012llx-0x%012llx %s",
+>> +                             paddr, paddr + (npages << EFI_PAGE_SHIFT) - 1,
+>> +                             efi_md_typeattr_format(buf, sizeof(buf), md));
+>> +             }
+>> +
+>> +             memrange_efi_to_native(&paddr, &npages);
+>> +             size = npages << PAGE_SHIFT;
+>
+> The use of EFI_PAGE_SHIFT and PAGE_SHIFT seem to get mingled in this
+> code. What's the correct constant to use throughout, because it
+> doesn't look like PAGE_SHIFT == EFI_PAGE_SHIFT always?
+>
+
+No, this is correct (although confusing). npages has been converted to
+native page size, so PAGE_SHIFT is appropriate here
+
+>> +
+>> +             if (is_normal_ram(md))
+>> +                     early_init_dt_add_memory_arch(paddr, size);
+>> +
+>> +             if (is_reserve_region(md)) {
+>> +                     memblock_mark_nomap(paddr, size);
+>
+> Hmm.. I was going to point out the fact that you're not checking the
+> return value of memblock_mark_nomap() which can fail if you run out of
+> memory when resizing the memblock arrays, until I realised that you
+> haven't called memblock_allow_resize() yet. Oh well.
+>
+
+Hmm, right. I wasn't even aware that memblock could resize itself in
+the first place.
+
+>> +                     if (efi_enabled(EFI_DBG))
+>> +                             pr_cont("*");
+>> +             }
+>> +
+>> +             if (efi_enabled(EFI_DBG))
+>> +                     pr_cont("\n");
+>> +     }
+>> +
+>> +     set_bit(EFI_MEMMAP, &efi.flags);
+>> +}
+>> +
+>> +void __init efi_init(void)
+>> +{
+>> +     struct efi_fdt_params params;
+>> +
+>> +     /* Grab UEFI information placed in FDT by stub */
+>> +     if (!efi_get_fdt_params(&params))
+>> +             return;
+>> +
+>> +     efi_system_table = params.system_table;
+>> +
+>> +     memmap.phys_map = params.mmap;
+>> +     memmap.map = early_memremap(params.mmap, params.mmap_size);
+>
+> Better check the return value?
+
+Yep,
 
 Thanks,
-Peng.
-
->
->Thoughts?
->
->Will
->
->--->8
->
->diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->index 86480480895d..db03c2fb1319 100644
->--- a/drivers/iommu/arm-smmu-v3.c
->+++ b/drivers/iommu/arm-smmu-v3.c
->@@ -1804,13 +1804,13 @@ static int arm_smmu_add_device(struct device *dev)
-> 		smmu = arm_smmu_get_for_pci_dev(pdev);
-> 		if (!smmu) {
-> 			ret = -ENOENT;
->-			goto out_put_group;
->+			goto out_remove_dev;
-> 		}
-> 
-> 		smmu_group = kzalloc(sizeof(*smmu_group), GFP_KERNEL);
-> 		if (!smmu_group) {
-> 			ret = -ENOMEM;
->-			goto out_put_group;
->+			goto out_remove_dev;
-> 		}
-> 
-> 		smmu_group->ste.valid	= true;
->@@ -1826,20 +1826,20 @@ static int arm_smmu_add_device(struct device *dev)
-> 	for (i = 0; i < smmu_group->num_sids; ++i) {
-> 		/* If we already know about this SID, then we're done */
-> 		if (smmu_group->sids[i] == sid)
->-			return 0;
->+			goto out_put_group;
-> 	}
-> 
-> 	/* Check the SID is in range of the SMMU and our stream table */
-> 	if (!arm_smmu_sid_in_range(smmu, sid)) {
-> 		ret = -ERANGE;
->-		goto out_put_group;
->+		goto out_remove_dev;
-> 	}
-> 
-> 	/* Ensure l2 strtab is initialised */
-> 	if (smmu->features & ARM_SMMU_FEAT_2_LVL_STRTAB) {
-> 		ret = arm_smmu_init_l2_strtab(smmu, sid);
-> 		if (ret)
->-			goto out_put_group;
->+			goto out_remove_dev;
-> 	}
-> 
-> 	/* Resize the SID array for the group */
->@@ -1849,16 +1849,20 @@ static int arm_smmu_add_device(struct device *dev)
-> 	if (!sids) {
-> 		smmu_group->num_sids--;
-> 		ret = -ENOMEM;
->-		goto out_put_group;
->+		goto out_remove_dev;
-> 	}
-> 
-> 	/* Add the new SID */
-> 	sids[smmu_group->num_sids - 1] = sid;
-> 	smmu_group->sids = sids;
->-	return 0;
-> 
-> out_put_group:
-> 	iommu_group_put(group);
->+	return 0;
->+
->+out_remove_dev:
->+	iommu_group_remove_device(dev);
->+	iommu_group_put(group);
-> 	return ret;
-> }
-> 
+Ard.
