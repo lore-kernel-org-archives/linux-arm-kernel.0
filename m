@@ -1,140 +1,24 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 20 Nov 2015 12:12:38 +0100
-Subject: [PATCH v3 5/9] ARM: dts: sun8i: sinlinx-sina33: Add AXP223 PMIC
- device and regulator nodes
-In-Reply-To: <1447691908-25456-6-git-send-email-wens@csie.org>
+Date: Fri, 20 Nov 2015 12:13:42 +0100
+Subject: [PATCH v3 6/9] ARM: dts: sun8i: Add simplefb node labels to
+ reference at board level
+In-Reply-To: <1447691908-25456-7-git-send-email-wens@csie.org>
 References: <1447691908-25456-1-git-send-email-wens@csie.org>
- <1447691908-25456-6-git-send-email-wens@csie.org>
-Message-ID: <20151120111238.GV32142@lukather>
+ <1447691908-25456-7-git-send-email-wens@csie.org>
+Message-ID: <20151120111342.GW32142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Nov 17, 2015 at 12:38:24AM +0800, Chen-Yu Tsai wrote:
-> This board has a X-Powers AXP223 PMIC connected via RSB. Its regulators
-> provide power to various parts of the SoC and the board.
+On Tue, Nov 17, 2015 at 12:38:25AM +0800, Chen-Yu Tsai wrote:
+> Some boards, such as tablets, have regulators providing power to parts
+> of the display pipeline, like signal converters and LCD panels.
 > 
-> Also update the regulator supply phandles.
+> Add labels to the simplefb device nodes so that we can reference them
+> in the board dts files to add regulator supply properties.
 > 
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 79 +++++++++++++++++++++++++-
->  1 file changed, 76 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-> index 13ce68f06dd6..91a0fde47fdd 100644
-> --- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-> +++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-> @@ -68,7 +68,7 @@
->  };
->  
->  &lradc {
-> -	vref-supply = <&reg_vcc3v0>;
-> +	vref-supply = <&reg_dcdc1>;
->  	status = "okay";
->  
->  	button at 200 {
-> @@ -96,7 +96,7 @@
->  &mmc0 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_sina33>;
-> -	vmmc-supply = <&reg_vcc3v0>;
-> +	vmmc-supply = <&reg_dcdc1>;
->  	bus-width = <4>;
->  	cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
->  	cd-inverted;
-> @@ -106,7 +106,7 @@
->  &mmc2 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&mmc2_8bit_pins>;
-> -	vmmc-supply = <&reg_vcc3v0>;
-> +	vmmc-supply = <&reg_dcdc1>;
->  	bus-width = <8>;
->  	non-removable;
->  	status = "okay";
-> @@ -132,6 +132,79 @@
->  
->  &r_rsb {
->  	status = "okay";
-> +
-> +	axp22x: pmic at 3e3 {
-> +		compatible = "x-powers,axp223";
-> +		reg = <0x3e3>;
-> +		interrupt-parent = <&nmi_intc>;
-> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-> +		eldoin-supply = <&reg_dcdc1>;
-> +	};
-> +};
-> +
-> +#include "axp22x.dtsi"
-> +
-> +&reg_aldo1 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <3000000>;
-> +	regulator-max-microvolt = <3000000>;
-> +	regulator-name = "vcc-io";
-> +};
-> +
-> +&reg_aldo2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <2350000>;
-> +	regulator-max-microvolt = <2650000>;
-> +	regulator-name = "vdd-dll";
-> +};
-> +
-> +&reg_aldo3 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <2700000>;
-> +	regulator-max-microvolt = <3300000>;
-> +	regulator-name = "vcc-pll-avcc";
-> +};
-> +
-> +&reg_dc5ldo {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <900000>;
-> +	regulator-max-microvolt = <1400000>;
-> +	regulator-name = "vdd-cpus";
-> +};
-> +
-> +&reg_dcdc1 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <3000000>;
-> +	regulator-max-microvolt = <3000000>;
-> +	regulator-name = "vcc-3v0";
-> +};
-> +
-> +&reg_dcdc2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <900000>;
-> +	regulator-max-microvolt = <1400000>;
-> +	regulator-name = "vdd-sys";
-> +};
-> +
-> +&reg_dcdc3 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <900000>;
-> +	regulator-max-microvolt = <1400000>;
-> +	regulator-name = "vdd-cpu";
-> +};
-> +
-> +&reg_dcdc5 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1500000>;
-> +	regulator-max-microvolt = <1500000>;
-> +	regulator-name = "vcc-dram";
-> +};
-> +
-> +&reg_rtc_ldo {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <3000000>;
-> +	regulator-max-microvolt = <3000000>;
-> +	regulator-name = "vcc-rtc";
->  };
 
-Isn't this supposed to be in the AXP DTSI?
-
-Thanks!
+Applied, thanks!
 Maxime
 
 -- 
@@ -147,4 +31,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/61b6d47a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/33333a4c/attachment.sig>
