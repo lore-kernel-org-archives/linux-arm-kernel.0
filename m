@@ -1,49 +1,89 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Nov 2015 10:43 +0100
-Subject: [PATCH] drivers/built-in.o: In function `qcom_smp2p_intr':
-Message-ID: <47507465.yGmu2TCElj@wuerfel>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 20 Nov 2015 17:47:00 +0800
+Subject: [PATCH 1/2] arm64: dts: berlin4ct: add I2C nodes for BG4CT
+In-Reply-To: <1448012821-7413-1-git-send-email-jszhang@marvell.com>
+References: <1448012821-7413-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1448012821-7413-2-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added smp2p and smsm drivers cannot be loadable modules
-but depend on smem, which can be, and that causes a link error:
+The Marvell Berlin BG4CT SoC has 4 TWSI which are compatible with the
+Synopsys DesignWare I2C driver. Add the corresponding nodes.
 
-:(.text+0xa6e68): undefined reference to `qcom_smem_get'
-drivers/built-in.o: In function `qcom_smp2p_probe':
-:(.text+0xa7320): undefined reference to `qcom_smem_alloc'
-:(.text+0xa736c): undefined reference to `qcom_smem_get'
-drivers/built-in.o: In function `qcom_smsm_probe':
-:(.text+0xa7b34): undefined reference to `qcom_smem_get'
-
-This marks all the drivers as 'tristate' to make the Kconfig
-dependency resolution work properly.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: dbb04bd7122f ("soc: qcom: smp2p: Qualcomm Shared Memory Point to Point")
-Fixes: d7387fc6add4 ("soc: qcom: smsm: Add driver for Qualcomm SMSM")
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
-This showed up on arm allmodconfig with linux-next today, please apply or fold
-into the original patches.
+ arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 52 ++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
 
-diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
-index b57be7ab50b6..57b7145358e7 100644
---- a/drivers/soc/qcom/Kconfig
-+++ b/drivers/soc/qcom/Kconfig
-@@ -54,7 +54,7 @@ config QCOM_SMEM_STATE
- 	bool
+diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+index cca4c41..39d0676 100644
+--- a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
++++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+@@ -232,6 +232,32 @@
+ 				};
+ 			};
  
- config QCOM_SMP2P
--	bool "Qualcomm Shared Memory Point to Point support"
-+	tristate "Qualcomm Shared Memory Point to Point support"
- 	depends on QCOM_SMEM
- 	select QCOM_SMEM_STATE
- 	help
-@@ -62,7 +62,7 @@ config QCOM_SMP2P
- 	  protocol.
++			i2c0: i2c at 1400 {
++				compatible = "snps,designware-i2c";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0x1400 0x100>;
++				clocks = <&clk CLK_APBCORE>;
++				i2c-sda-hold-time-ns = <35>;
++				i2c-sda-falling-time-ns = <425>;
++				i2c-scl-falling-time-ns = <205>;
++				interrupts = <4>;
++				status = "disabled";
++			};
++
++			i2c1: i2c at 1800 {
++				compatible = "snps,designware-i2c";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0x1800 0x100>;
++				clocks = <&clk CLK_APBCORE>;
++				i2c-sda-hold-time-ns = <35>;
++				i2c-sda-falling-time-ns = <425>;
++				i2c-scl-falling-time-ns = <205>;
++				interrupts = <5>;
++				status = "disabled";
++			};
++
+ 			aic: interrupt-controller at 3800 {
+ 				compatible = "snps,dw-apb-ictl";
+ 				reg = <0x3800 0x30>;
+@@ -319,6 +345,32 @@
+ 				};
+ 			};
  
- config QCOM_SMSM
--	bool "Qualcomm Shared Memory State Machine"
-+	tristate "Qualcomm Shared Memory State Machine"
- 	depends on QCOM_SMEM
- 	select QCOM_SMEM_STATE
- 	help
++			i2c2: i2c at b000 {
++				compatible = "snps,designware-i2c";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0xb000 0x100>;
++				clocks = <&osc>;
++				i2c-sda-hold-time-ns = <140>;
++				i2c-sda-falling-time-ns = <500>;
++				i2c-scl-falling-time-ns = <220>;
++				interrupts = <6>;
++				status = "disabled";
++			};
++
++			i2c3: i2c at c000 {
++				compatible = "snps,designware-i2c";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0xc000 0x100>;
++				clocks = <&osc>;
++				i2c-sda-hold-time-ns = <140>;
++				i2c-sda-falling-time-ns = <500>;
++				i2c-scl-falling-time-ns = <220>;
++				interrupts = <7>;
++				status = "disabled";
++			};
++
+ 			uart0: uart at d000 {
+ 				compatible = "snps,dw-apb-uart";
+ 				reg = <0xd000 0x100>;
+-- 
+2.6.2
