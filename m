@@ -1,36 +1,49 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Fri, 20 Nov 2015 16:15:28 +0800
-Subject: [PATCH v4 02/13] clk: rockchip: add mipidsi clocks on rk3288
+Date: Fri, 20 Nov 2015 16:15:29 +0800
+Subject: [PATCH v4 03/13] drm/rockchip: return a true clock rate to
+ adjusted_mode
 In-Reply-To: <1448007339-10966-1-git-send-email-zyw@rock-chips.com>
 References: <1448007339-10966-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1448007339-10966-3-git-send-email-zyw@rock-chips.com>
+Message-ID: <1448007339-10966-4-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sclk_mipidsi_24m is the gating of mipi dsi phy.
+Since the mipi dsi driver need to use the clock of vop to make the
+calculation of Blanking. But sometimes the clock driver can not set a
+accurate clock_rate for vop, get it by clk_round_rate before mode_set,
+so we can get the true value.
 
 Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+
 ---
 
-Changes in v4: None
+Changes in v4:
+use clk_round_rate to check the clock rate in vop_crtc_mode_fixup
+
 Changes in v3: None
 Changes in v2: None
 
- drivers/clk/rockchip/clk-rk3288.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index 9040878..c7d7ebf 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -709,7 +709,7 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
- 	GATE(SCLK_LCDC_PWM1, "sclk_lcdc_pwm1", "xin24m", 0, RK3288_CLKGATE_CON(13), 11, GFLAGS),
- 	GATE(SCLK_PVTM_CORE, "sclk_pvtm_core", "xin24m", 0, RK3288_CLKGATE_CON(5), 9, GFLAGS),
- 	GATE(SCLK_PVTM_GPU, "sclk_pvtm_gpu", "xin24m", 0, RK3288_CLKGATE_CON(5), 10, GFLAGS),
--	GATE(0, "sclk_mipidsi_24m", "xin24m", 0, RK3288_CLKGATE_CON(5), 15, GFLAGS),
-+	GATE(SCLK_MIPI_24M, "sclk_mipidsi_24m", "xin24m", 0, RK3288_CLKGATE_CON(5), 15, GFLAGS),
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 5d8ae5e..eff545b 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -1136,9 +1136,14 @@ static bool vop_crtc_mode_fixup(struct drm_crtc *crtc,
+ 				const struct drm_display_mode *mode,
+ 				struct drm_display_mode *adjusted_mode)
+ {
++	struct vop *vop = to_vop(crtc);
++
+ 	if (adjusted_mode->htotal == 0 || adjusted_mode->vtotal == 0)
+ 		return false;
  
- 	/* sclk_gpu gates */
- 	GATE(ACLK_GPU, "aclk_gpu", "sclk_gpu", 0, RK3288_CLKGATE_CON(18), 0, GFLAGS),
++	adjusted_mode->clock =
++		clk_round_rate(vop->dclk, mode->clock * 1000) / 1000;
++
+ 	return true;
+ }
+ 
 -- 
 2.6.3
