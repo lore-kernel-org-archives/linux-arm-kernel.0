@@ -1,87 +1,62 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Fri, 20 Nov 2015 11:25:04 -0500
-Subject: [PATCH] xen/events: Always allocate legacy interrupts on PV guests
-Message-ID: <1448036704-18630-1-git-send-email-boris.ostrovsky@oracle.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Fri, 20 Nov 2015 09:28:35 -0700
+Subject: [PATCH RFC 16/27] ARM: cpuidle: Record the next wakeup event of
+ the CPU
+In-Reply-To: <7hwptdsgto.fsf@deeprootsystems.com>
+References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
+ <1447799871-56374-17-git-send-email-lina.iyer@linaro.org>
+ <7hwptdsgto.fsf@deeprootsystems.com>
+Message-ID: <20151120162835.GC30342@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit 8c058b0b9c34 ("x86/irq: Probe for PIC presence before
-allocating descs for legacy IRQs") early_irq_init() will no longer
-preallocate descriptors for legacy interrupts if PIC does not
-exist, which is the case for Xen PV guests.
+On Thu, Nov 19 2015 at 16:35 -0700, Kevin Hilman wrote:
+>Lina Iyer <lina.iyer@linaro.org> writes:
+>
+>> Reading the next wakeup of the CPU can only be realiably done only from
+>> that CPU. In the idle enter path record the next wake up of the CPU. The
+>> information is useful to determine the sleep time left for the CPU.
+>>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>> ---
+>>  drivers/cpuidle/cpuidle-arm.c | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+>> index 8e72a23..b3133ef 100644
+>> --- a/drivers/cpuidle/cpuidle-arm.c
+>> +++ b/drivers/cpuidle/cpuidle-arm.c
+>> @@ -18,9 +18,11 @@
+>>  #include <linux/kernel.h>
+>>  #include <linux/module.h>
+>>  #include <linux/of.h>
+>> +#include <linux/pm_domain.h>
+>>  #include <linux/pm_runtime.h>
+>>  #include <linux/slab.h>
+>>  #include <linux/rcupdate.h>
+>> +#include <linux/tick.h>
+>>
+>>  #include <asm/cpuidle.h>
+>>
+>> @@ -49,7 +51,9 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
+>>  	ret = cpu_pm_enter();
+>>  	if (!ret) {
+>>  		struct device *cpu_dev = get_cpu_device(dev->cpu);
+>> +		struct generic_pm_domain_data *gpd = dev_gpd_data(cpu_dev);
+>>
+>> +		gpd->td.next_wakeup = tick_nohz_get_next_wakeup();
+>>  		RCU_NONIDLE(pm_runtime_put_sync_suspend(cpu_dev));
+>
+>Maybe set this back to zero atomicaly, after wakeup?
+>
+>Checking for non-zero that might be another way for the domain goveror that there
+>haven't been any CPU wakeups since the CPUs have gone idle.
+>
+I set it to 0 below.
 
-Therefore we may need to allocate those descriptors ourselves.
+The reference counting by the GET_PUT tells the domain if a device is
+suspended. I see that as a redudant information. May be I am not getting
+your point.
 
-Signed-off-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Suggested-by: Thomas Gleixner <tglx@linutronix.de>
----
-
-v3: Add arm64 definition of nr_legacy_irqs()
-
- arch/arm/include/asm/irq.h       | 4 ++++
- arch/arm64/include/asm/irq.h     | 6 ++++++
- drivers/xen/events/events_base.c | 5 +++--
- 3 files changed, 13 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
-index be1d07d..b864f60 100644
---- a/arch/arm/include/asm/irq.h
-+++ b/arch/arm/include/asm/irq.h
-@@ -2,6 +2,10 @@
- #define __ASM_ARM_IRQ_H
- 
- #define NR_IRQS_LEGACY	16
-+static inline int nr_legacy_irqs(void)
-+{
-+	return NR_IRQS_LEGACY;
-+}
- 
- #ifndef CONFIG_SPARSE_IRQ
- #include <mach/irqs.h>
-diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-index 23eb450..24ba8d8 100644
---- a/arch/arm64/include/asm/irq.h
-+++ b/arch/arm64/include/asm/irq.h
-@@ -7,4 +7,10 @@ struct pt_regs;
- 
- extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
- 
-+#define NR_IRQS_LEGACY  0
-+static inline int nr_legacy_irqs(void)
-+{
-+	return NR_IRQS_LEGACY;
-+}
-+
- #endif
-diff --git a/drivers/xen/events/events_base.c b/drivers/xen/events/events_base.c
-index 849500e..524c221 100644
---- a/drivers/xen/events/events_base.c
-+++ b/drivers/xen/events/events_base.c
-@@ -39,6 +39,7 @@
- #include <asm/irq.h>
- #include <asm/idle.h>
- #include <asm/io_apic.h>
-+#include <asm/i8259.h>
- #include <asm/xen/pci.h>
- #endif
- #include <asm/sync_bitops.h>
-@@ -420,7 +421,7 @@ static int __must_check xen_allocate_irq_gsi(unsigned gsi)
- 		return xen_allocate_irq_dynamic();
- 
- 	/* Legacy IRQ descriptors are already allocated by the arch. */
--	if (gsi < NR_IRQS_LEGACY)
-+	if (gsi < nr_legacy_irqs())
- 		irq = gsi;
- 	else
- 		irq = irq_alloc_desc_at(gsi, -1);
-@@ -446,7 +447,7 @@ static void xen_free_irq(unsigned irq)
- 	kfree(info);
- 
- 	/* Legacy IRQ descriptors are managed by the arch. */
--	if (irq < NR_IRQS_LEGACY)
-+	if (irq < nr_legacy_irqs())
- 		return;
- 
- 	irq_free_desc(irq);
--- 
-2.1.0
+-- Lina
+>Kevin
