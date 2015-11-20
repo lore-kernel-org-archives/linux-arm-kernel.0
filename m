@@ -1,90 +1,364 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 19 Nov 2015 17:05:16 -0800
-Subject: [PATCH 09/29] ARM: shmobile: r8a7793: Add IPMMU nodes
+Date: Thu, 19 Nov 2015 17:05:18 -0800
+Subject: [PATCH 11/29] ARM: shmobile: henninger: remove board DT
 In-Reply-To: <cover.1447981420.git.horms+renesas@verge.net.au>
 References: <cover.1447981420.git.horms+renesas@verge.net.au>
-Message-ID: <098cb3a601e6a6afcf1d0c15bc939a57732242a4.1447981420.git.horms+renesas@verge.net.au>
+Message-ID: <2b06f1087062c516ac2851ce5038fdb035b19d4d.1447981420.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Add IPMMU nodes for the r8a7793 SoC. The IPMMU configuration for r8a7793
-is identical to r8a7791 and includes SY0, SY1, DS, MP, MX, RT and GP.
+The Henninger low cost board was never sold and so  had  no  users outside
+Renesas (and Cogent Embedded). Instead Renesas  has made the Porter  board
+which has mostly similar hardware. Now that the Porter board support is on
+par with Henninger, we can remove  the Henninger's device tree file.
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7793.dtsi | 59 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
+ arch/arm/boot/dts/Makefile              |   1 -
+ arch/arm/boot/dts/r8a7791-henninger.dts | 320 --------------------------------
+ 2 files changed, 321 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/r8a7791-henninger.dts
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index c4654047e684..fcafa87616fa 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -371,4 +371,63 @@
- 		};
- 	};
- 
-+	ipmmu_sy0: mmu at e6280000 {
-+		compatible = "renesas,ipmmu-vmsa";
-+		reg = <0 0xe6280000 0 0x1000>;
-+		interrupts = <0 223 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 224 IRQ_TYPE_LEVEL_HIGH>;
-+		#iommu-cells = <1>;
-+		status = "disabled";
-+	};
-+
-+	ipmmu_sy1: mmu at e6290000 {
-+		compatible = "renesas,ipmmu-vmsa";
-+		reg = <0 0xe6290000 0 0x1000>;
-+		interrupts = <0 225 IRQ_TYPE_LEVEL_HIGH>;
-+		#iommu-cells = <1>;
-+		status = "disabled";
-+	};
-+
-+	ipmmu_ds: mmu at e6740000 {
-+		compatible = "renesas,ipmmu-vmsa";
-+		reg = <0 0xe6740000 0 0x1000>;
-+		interrupts = <0 198 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 199 IRQ_TYPE_LEVEL_HIGH>;
-+		#iommu-cells = <1>;
-+		status = "disabled";
-+	};
-+
-+	ipmmu_mp: mmu at ec680000 {
-+		compatible = "renesas,ipmmu-vmsa";
-+		reg = <0 0xec680000 0 0x1000>;
-+		interrupts = <0 226 IRQ_TYPE_LEVEL_HIGH>;
-+		#iommu-cells = <1>;
-+		status = "disabled";
-+	};
-+
-+	ipmmu_mx: mmu at fe951000 {
-+		compatible = "renesas,ipmmu-vmsa";
-+		reg = <0 0xfe951000 0 0x1000>;
-+		interrupts = <0 222 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 221 IRQ_TYPE_LEVEL_HIGH>;
-+		#iommu-cells = <1>;
-+		status = "disabled";
-+	};
-+
-+	ipmmu_rt: mmu at ffc80000 {
-+		compatible = "renesas,ipmmu-vmsa";
-+		reg = <0 0xffc80000 0 0x1000>;
-+		interrupts = <0 307 IRQ_TYPE_LEVEL_HIGH>;
-+		#iommu-cells = <1>;
-+		status = "disabled";
-+	};
-+
-+	ipmmu_gp: mmu at e62a0000 {
-+		compatible = "renesas,ipmmu-vmsa";
-+		reg = <0 0xe62a0000 0 0x1000>;
-+		interrupts = <0 260 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 261 IRQ_TYPE_LEVEL_HIGH>;
-+		#iommu-cells = <1>;
-+		status = "disabled";
-+	};
- };
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d285d9816d9d..d3de3a447d72 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -530,7 +530,6 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
+ 	r8a7778-bockw.dtb \
+ 	r8a7779-marzen.dtb \
+ 	r8a7790-lager.dtb \
+-	r8a7791-henninger.dtb \
+ 	r8a7791-koelsch.dtb \
+ 	r8a7791-porter.dtb \
+ 	r8a7793-gose.dtb \
+diff --git a/arch/arm/boot/dts/r8a7791-henninger.dts b/arch/arm/boot/dts/r8a7791-henninger.dts
+deleted file mode 100644
+index 655d1804e5e9..000000000000
+--- a/arch/arm/boot/dts/r8a7791-henninger.dts
++++ /dev/null
+@@ -1,320 +0,0 @@
+-/*
+- * Device Tree Source for the Henninger board
+- *
+- * Copyright (C) 2014 Renesas Solutions Corp.
+- * Copyright (C) 2014 Cogent Embedded, Inc.
+- *
+- * This file is licensed under the terms of the GNU General Public License
+- * version 2.  This program is licensed "as is" without any warranty of any
+- * kind, whether express or implied.
+- */
+-
+-/dts-v1/;
+-#include "r8a7791.dtsi"
+-#include <dt-bindings/gpio/gpio.h>
+-
+-/ {
+-	model = "Henninger";
+-	compatible = "renesas,henninger", "renesas,r8a7791";
+-
+-	aliases {
+-		serial0 = &scif0;
+-	};
+-
+-	chosen {
+-		bootargs = "console=ttySC0,38400 ignore_loglevel rw root=/dev/nfs ip=dhcp";
+-		stdout-path = &scif0;
+-	};
+-
+-	memory at 40000000 {
+-		device_type = "memory";
+-		reg = <0 0x40000000 0 0x40000000>;
+-	};
+-
+-	memory at 200000000 {
+-		device_type = "memory";
+-		reg = <2 0x00000000 0 0x40000000>;
+-	};
+-
+-	vcc_sdhi0: regulator at 0 {
+-		compatible = "regulator-fixed";
+-
+-		regulator-name = "SDHI0 Vcc";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-		regulator-always-on;
+-	};
+-
+-	vccq_sdhi0: regulator at 1 {
+-		compatible = "regulator-gpio";
+-
+-		regulator-name = "SDHI0 VccQ";
+-		regulator-min-microvolt = <1800000>;
+-		regulator-max-microvolt = <3300000>;
+-
+-		gpios = <&gpio2 12 GPIO_ACTIVE_HIGH>;
+-		gpios-states = <1>;
+-		states = <3300000 1
+-			  1800000 0>;
+-	};
+-
+-	vcc_sdhi2: regulator at 2 {
+-		compatible = "regulator-fixed";
+-
+-		regulator-name = "SDHI2 Vcc";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-		regulator-always-on;
+-	};
+-
+-	vccq_sdhi2: regulator at 3 {
+-		compatible = "regulator-gpio";
+-
+-		regulator-name = "SDHI2 VccQ";
+-		regulator-min-microvolt = <1800000>;
+-		regulator-max-microvolt = <3300000>;
+-
+-		gpios = <&gpio2 26 GPIO_ACTIVE_HIGH>;
+-		gpios-states = <1>;
+-		states = <3300000 1
+-			  1800000 0>;
+-	};
+-};
+-
+-&extal_clk {
+-	clock-frequency = <20000000>;
+-};
+-
+-&pfc {
+-	scif0_pins: serial0 {
+-		renesas,groups = "scif0_data_d";
+-		renesas,function = "scif0";
+-	};
+-
+-	ether_pins: ether {
+-		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
+-		renesas,function = "eth";
+-	};
+-
+-	phy1_pins: phy1 {
+-		renesas,groups = "intc_irq0";
+-		renesas,function = "intc";
+-	};
+-
+-	sdhi0_pins: sd0 {
+-		renesas,groups = "sdhi0_data4", "sdhi0_ctrl";
+-		renesas,function = "sdhi0";
+-	};
+-
+-	sdhi2_pins: sd2 {
+-		renesas,groups = "sdhi2_data4", "sdhi2_ctrl";
+-		renesas,function = "sdhi2";
+-	};
+-
+-	i2c2_pins: i2c2 {
+-		renesas,groups = "i2c2";
+-		renesas,function = "i2c2";
+-	};
+-
+-	qspi_pins: spi0 {
+-		renesas,groups = "qspi_ctrl", "qspi_data4";
+-		renesas,function = "qspi";
+-	};
+-
+-	msiof0_pins: spi1 {
+-		renesas,groups = "msiof0_clk", "msiof0_sync", "msiof0_rx",
+-				 "msiof0_tx";
+-		renesas,function = "msiof0";
+-	};
+-
+-	usb0_pins: usb0 {
+-		renesas,groups = "usb0";
+-		renesas,function = "usb0";
+-	};
+-
+-	usb1_pins: usb1 {
+-		renesas,groups = "usb1";
+-		renesas,function = "usb1";
+-	};
+-
+-	vin0_pins: vin0 {
+-		renesas,groups = "vin0_data8", "vin0_clk";
+-		renesas,function = "vin0";
+-	};
+-
+-	can0_pins: can0 {
+-		renesas,groups = "can0_data";
+-		renesas,function = "can0";
+-	};
+-};
+-
+-&scif0 {
+-	pinctrl-0 = <&scif0_pins>;
+-	pinctrl-names = "default";
+-
+-	status = "okay";
+-};
+-
+-&ether {
+-	pinctrl-0 = <&ether_pins &phy1_pins>;
+-	pinctrl-names = "default";
+-
+-	phy-handle = <&phy1>;
+-	renesas,ether-link-active-low;
+-	status = "okay";
+-
+-	phy1: ethernet-phy at 1 {
+-		reg = <1>;
+-		interrupt-parent = <&irqc0>;
+-		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+-		micrel,led-mode = <1>;
+-	};
+-};
+-
+-&sata0 {
+-	status = "okay";
+-};
+-
+-&sdhi0 {
+-	pinctrl-0 = <&sdhi0_pins>;
+-	pinctrl-names = "default";
+-
+-	vmmc-supply = <&vcc_sdhi0>;
+-	vqmmc-supply = <&vccq_sdhi0>;
+-	cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
+-	wp-gpios = <&gpio6 7 GPIO_ACTIVE_HIGH>;
+-	status = "okay";
+-};
+-
+-&sdhi2 {
+-	pinctrl-0 = <&sdhi2_pins>;
+-	pinctrl-names = "default";
+-
+-	vmmc-supply = <&vcc_sdhi2>;
+-	vqmmc-supply = <&vccq_sdhi2>;
+-	cd-gpios = <&gpio6 22 GPIO_ACTIVE_LOW>;
+-	status = "okay";
+-};
+-
+-&i2c2 {
+-	pinctrl-0 = <&i2c2_pins>;
+-	pinctrl-names = "default";
+-
+-	status = "okay";
+-	clock-frequency = <400000>;
+-
+-	composite-in at 20 {
+-		compatible = "adi,adv7180";
+-		reg = <0x20>;
+-		remote = <&vin0>;
+-
+-		port {
+-			adv7180: endpoint {
+-				bus-width = <8>;
+-				remote-endpoint = <&vin0ep>;
+-			};
+-		};
+-	};
+-};
+-
+-&qspi {
+-	pinctrl-0 = <&qspi_pins>;
+-	pinctrl-names = "default";
+-
+-	status = "okay";
+-
+-	flash at 0 {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		compatible = "spansion,s25fl512s", "jedec,spi-nor";
+-		reg = <0>;
+-		spi-max-frequency = <30000000>;
+-		spi-tx-bus-width = <4>;
+-		spi-rx-bus-width = <4>;
+-		m25p,fast-read;
+-
+-		partition at 0 {
+-			label = "loader_prg";
+-			reg = <0x00000000 0x00040000>;
+-			read-only;
+-		};
+-		partition at 40000 {
+-			label = "user_prg";
+-			reg = <0x00040000 0x00400000>;
+-			read-only;
+-		};
+-		partition at 440000 {
+-			label = "flash_fs";
+-			reg = <0x00440000 0x03bc0000>;
+-		};
+-	};
+-};
+-
+-&msiof0 {
+-	pinctrl-0 = <&msiof0_pins>;
+-	pinctrl-names = "default";
+-
+-	status = "okay";
+-
+-	pmic at 0 {
+-		compatible = "renesas,r2a11302ft";
+-		reg = <0>;
+-		spi-max-frequency = <6000000>;
+-		spi-cpol;
+-		spi-cpha;
+-	};
+-};
+-
+-&pci0 {
+-	status = "okay";
+-	pinctrl-0 = <&usb0_pins>;
+-	pinctrl-names = "default";
+-};
+-
+-&pci1 {
+-	status = "okay";
+-	pinctrl-0 = <&usb1_pins>;
+-	pinctrl-names = "default";
+-};
+-
+-&hsusb {
+-	status = "okay";
+-	pinctrl-0 = <&usb0_pins>;
+-	pinctrl-names = "default";
+-	renesas,enable-gpio = <&gpio5 31 GPIO_ACTIVE_HIGH>;
+-};
+-
+-&usbphy {
+-	status = "okay";
+-};
+-
+-&pcie_bus_clk {
+-	status = "okay";
+-};
+-
+-&pciec {
+-	status = "okay";
+-};
+-
+-/* composite video input */
+-&vin0 {
+-	status = "okay";
+-	pinctrl-0 = <&vin0_pins>;
+-	pinctrl-names = "default";
+-
+-	port {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		vin0ep: endpoint {
+-			remote-endpoint = <&adv7180>;
+-			bus-width = <8>;
+-		};
+-	};
+-};
+-
+-&can0 {
+-	pinctrl-0 = <&can0_pins>;
+-	pinctrl-names = "default";
+-	status = "okay";
+-};
 -- 
 2.1.4
