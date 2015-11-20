@@ -1,103 +1,62 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 20 Nov 2015 22:06:59 +0100
-Subject: [PATCH v2 6/6] arm64: dts: berlin4ct: add pll and clock nodes
-In-Reply-To: <1448008952-1787-7-git-send-email-jszhang@marvell.com>
-References: <1448008952-1787-1-git-send-email-jszhang@marvell.com>
- <1448008952-1787-7-git-send-email-jszhang@marvell.com>
-Message-ID: <564F8B73.7070403@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 20 Nov 2015 22:07:16 +0100
+Subject: [PATCH 03/11] dt-bindings: clock: add NXP LPC32xx clock list for
+ consumers
+In-Reply-To: <564F5F2E.70607@mleia.com>
+References: <1447981511-29653-1-git-send-email-vz@mleia.com>
+ <4268221.QhjAE5RLYk@wuerfel> <564F5F2E.70607@mleia.com>
+Message-ID: <5570695.dzvsXZ7sfz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.11.2015 09:42, Jisheng Zhang wrote:
-> Add syspll, mempll, cpupll, gateclk and berlin-clk nodes.
+On Friday 20 November 2015 19:58:06 Vladimir Zapolskiy wrote:
+> On 20.11.2015 15:56, Arnd Bergmann wrote:
+> > On Friday 20 November 2015 03:05:03 Vladimir Zapolskiy wrote:
+> >> +
+> >> +/* LPC32XX System Control Block clocks */
+> >> +#define LPC32XX_CLK_RTC                0
+> >> +#define LPC32XX_CLK_DMA                1
+> >> +#define LPC32XX_CLK_MLC                2
+> >> +#define LPC32XX_CLK_SLC                3
+> >> +#define LPC32XX_CLK_LCD                4
+> >> +#define LPC32XX_CLK_MAC                5
+> >> +#define LPC32XX_CLK_SD         6
+> >> +#define LPC32XX_CLK_DDRAM      7
+> >> +#define LPC32XX_CLK_SSP0       8
+> >> +#define LPC32XX_CLK_SSP1       9
+> >> +#define LPC32XX_CLK_UART3      10
+> >> +#define LPC32XX_CLK_UART4      11
+> >> +#define LPC32XX_CLK_UART5      12
+> >> +#define LPC32XX_CLK_UART6      13
+> >> +#define LPC32XX_CLK_IRDA       14
+> >> +#define LPC32XX_CLK_I2C1       15
+> >>
+> > 
+> > Any chance we can avoid the include file? This is going to make it really
+> > hard to merge everything in one merge window with the dependencies between
+> > the driver, the bindings and the platform code.
 > 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 38 ++++++++++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
+> I see only one option to avoid this commit, namely squash it with the
+> CCF driver and merge it before making changes in DTS.
 > 
-> diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> index a4a1876..808a997 100644
-> --- a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> @@ -42,6 +42,7 @@
->   *     OTHER DEALINGS IN THE SOFTWARE.
->   */
->  
-> +#include <dt-bindings/clock/berlin4ct.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
->  
->  / {
-> @@ -135,6 +136,22 @@
->  			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
->  		};
->  
-> +		cpupll: cpupll {
-> +			compatible = "marvell,berlin-pll";
-> +			reg = <0x922000 0x14>, <0xea0710 4>;
-> +			#clock-cells = <0>;
-> +			clocks = <&osc>, <&clk CLK_CPUFASTREF>;
-> +			bypass-shift = /bits/ 8 <2>;
-> +		};
-> +
-> +		mempll: mempll {
-> +			compatible = "marvell,berlin-pll";
-> +			reg = <0x940034 0x14>, <0xea0710 4>;
+> However I suppose ARM trees won't be synced on clk tree, so probably it
+> won't simplify maintainer's work.
 
-Whenever you see overlapping/repeating reg ranges, e.g. <0xea0710 4>
-you can be sure you are not representing HW structure but driver
-structure here.
+I think the best way for this would then be to have one git branch that
+contains the binding header, and base the other patches on top of that
+branch, for both the changes going into the clk git and arm-soc.
 
-Please merge clocks/gates/plls to a single clock complex node
-and deal with the internals by using "simple-mfd" and "syscon" regmaps.
+That way, both have the commit we need, but we don't get duplicate
+commits when they are both merged into mainline.
 
-> +			#clock-cells = <0>;
-> +			clocks = <&osc>, <&clk CLK_MEMFASTREF>;
-> +			bypass-shift = /bits/ 8 <1>;
-> +		};
-> +
->  		apb at e80000 {
->  			compatible = "simple-bus";
->  			#address-cells = <1>;
-> @@ -225,6 +242,27 @@
->  			};
->  		};
->  
-> +		syspll: syspll {
-> +			compatible = "marvell,berlin-pll";
-> +			reg = <0xea0200 0x14>, <0xea0710 4>;
-> +			#clock-cells = <0>;
-> +			clocks = <&osc>;
-> +			bypass-shift = /bits/ 8 <0>;
-> +		};
-> +
-> +		gateclk: gateclk {
-> +			compatible = "marvell,berlin4ct-gateclk";
-> +			reg = <0xea0700 4>;
-> +			#clock-cells = <1>;
-> +		};
-> +
-> +		clk: clk {
-> +			compatible = "marvell,berlin4ct-clk";
-> +			reg = <0xea0720 0x144>;
-
-Looking at the reg ranges, I'd say that they are all clock related
-and pretty close to each other:
-
-gateclk: reg = <0xea0700 4>;
-bypass:  reg = <0xea0710 4>;
-clk:     reg = <0xea0720 0x144>;
-
-So, please just follow the OF/driver structure we already
-have for Berlin2.
-
-Sebastian
-
-> +			#clock-cells = <1>;
-> +			clocks = <&syspll>;
-> +		};
-> +
->  		soc_pinctrl: pin-controller at ea8000 {
->  			compatible = "marvell,berlin4ct-soc-pinctrl";
->  			reg = <0xea8000 0x14>;
+> > If there is a way to describe the clocks based on numbers from the
+> > data sheet instead of making up your own, that makes life much
+> > easier for us.
 > 
+> There are no any clock numbers in the datasheet, unfortunately.
+
+I was thinking that maybe there would be a logical numbering based
+on the register layout, e.g. a tuple of register index and bit position,
+but it seems that the mmio area is too irregular to make that easy.
+
+	Arnd
