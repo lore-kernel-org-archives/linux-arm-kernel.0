@@ -1,71 +1,71 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 20 Nov 2015 11:26:50 +0800
-Subject: [PATCH RESEND] arm64: berlin: add the pinctrl dependency for
- Marvell Berlin SoCs
-In-Reply-To: <564E28EF.7000506@gmail.com>
-References: <1447670170-7597-1-git-send-email-jszhang@marvell.com>
- <20151117134154.GJ6556@e104818-lin.cambridge.arm.com>
- <20151120005913.3f57a5e8@xhacker>	<564E28EF.7000506@gmail.com>
-Message-ID: <20151120112650.6349b422@xhacker>
+Date: Fri, 20 Nov 2015 11:34:14 +0800
+Subject: [PATCH RESEND 1/8] arm: dts: berlin2q: add watchdog nodes
+In-Reply-To: <564E3549.2050700@gmail.com>
+References: <1447672194-483-1-git-send-email-jszhang@marvell.com>
+ <1447672194-483-2-git-send-email-jszhang@marvell.com>
+ <564E3549.2050700@gmail.com>
+Message-ID: <20151120113414.1aa1e48e@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Nov 2015 20:54:23 +0100
+On Thu, 19 Nov 2015 21:47:05 +0100
 Sebastian Hesselbarth wrote:
 
-> On 19.11.2015 17:59, Jisheng Zhang wrote:
-> > On Tue, 17 Nov 2015 13:41:54 +0000
-> > Catalin Marinas wrote:
-> >   
-> >>>  this small patch is missed:
-> >>>  http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/378638.html
-> >>>  arch/arm64/Kconfig.platforms | 1 +
-> >>>  1 file changed, 1 insertion(+)
-> >>>
-> >>> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> >>> index 4043c35..905d308 100644
-> >>> --- a/arch/arm64/Kconfig.platforms
-> >>> +++ b/arch/arm64/Kconfig.platforms
-> >>> @@ -9,6 +9,7 @@ config ARCH_BERLIN
-> >>>  	bool "Marvell Berlin SoC Family"
-> >>>  	select ARCH_REQUIRE_GPIOLIB
-> >>>  	select DW_APB_ICTL
-> >>> +	select PINCTRL
-> >>>  	help
-> >>>  	  This enables support for Marvell Berlin SoC Family    
-> >>
-> >> Cc'ing arm-soc.
-> >>  
+> On 16.11.2015 12:09, Jisheng Zhang wrote:
+> > The Marvell Berlin BG2Q has 3 watchdogs which are compatible with the
+> > snps,dw-wdt driver sit in the sysmgr domain. This patch adds the
+> > corresponding device tree nodes.
 > > 
-> > when adding clk support for BG4CT, I found
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >  arch/arm/boot/dts/berlin2q.dtsi | 24 ++++++++++++++++++++++++
+> >  1 file changed, 24 insertions(+)
 > > 
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/378634.html
-> > and
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/378635.html
-> > 
-> > are also missed in v4.4-rc1.
-> > 
-> > I know you are very busy but I dunno what's wrong. Can you please check?  
+> > diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+> > index a3ecde5..fac4315 100644
+> > --- a/arch/arm/boot/dts/berlin2q.dtsi
+> > +++ b/arch/arm/boot/dts/berlin2q.dtsi
+> > @@ -483,6 +483,30 @@
+> >  			ranges = <0 0xfc0000 0x10000>;
+> >  			interrupt-parent = <&sic>;
+> >  
+> > +			wdt0: watchdog at 1000 {
+> > +				compatible = "snps,dw-wdt";
+> > +				reg = <0x1000 0x100>;
+> > +				clocks = <&refclk>;
+> > +				interrupts = <0>;
+> > +				status = "disabled";  
 > 
 > Jisheng,
 > 
-> there is nothing wrong. I applied the patches in question but didn't
-> make it to send another pull-request in time.
-> 
-> I have re-added both patches to berlin64/dt again that will be sent
-> for v4.4.
-> 
+> as the watchdogs are internal and cannot be clock gated
+> at all, how about we remove the status = "disabled" and
+> make them always available?
 
-Dear Sebastian,
+there are two issues here:
 
-I'm glad our berlin maintainer is back ;)
+1. the dw-wdt can't support multiple variants now. I have rewrite the driver
+with watchdog core supplied framework, but the patch isn't sent out and
+may be need time to clean up and review.
 
-In last two years, you helped Marvell Berlin SoC mainline progress a lot and
-gave lots of wonderful review comments and suggestions, I hope you can
-continue to help us even I know your are very busy :D
+2. not all dw-wdt devices are available and functional. This depends on
+board design and configuration.
 
-In next few days, I'll send out patches for BG4CT clk, dts for i2c, dw-apb timer
-dw-spi and BG4CT cpuidle. And maybe usb 2.0 support.
+So IMHO status=disabled and patch5-8 is necessary, what do you think?
 
-Thanks for your time,
+Thanks a lot for review,
 Jisheng
+
+> 
+> I have applied patches 1-4 with the status property removed.
+> This also renders patches 5-8 useless.
+> 
+> So, for now tentatively
+> 
+> Appled to berlin/dt and berlin64/dt respectivly
+> 
+> with status property removed.
+> 
+> Sebastian
+> 
