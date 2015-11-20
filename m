@@ -1,126 +1,74 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Fri, 20 Nov 2015 12:19:54 +0000
-Subject: [PATCH v3 00/12] Add mipi dsi support for rk3288
-In-Reply-To: <564EC575.90109@rock-chips.com>
-References: <1447904131-29328-1-git-send-email-zyw@rock-chips.com>
- <CACvgo53YOMpbz1TdVmRBPPz4dv=X+8FoEo0ZcfN5DwbDYi2ZzQ@mail.gmail.com>
- <564EC575.90109@rock-chips.com>
-Message-ID: <CACvgo52SDcRtkNuNSF6dsw_TXV5wrMmW4_ci_4uX63CJrcBg+w@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 20 Nov 2015 12:19:43 +0000
+Subject: [PATCH v11 4/5] arm64: introduce CONFIG_PARAVIRT,
+ PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+In-Reply-To: <20151117173557.GN30101@arm.com>
+References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
+ <1446737696-9749-4-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1511101410550.5676@kaball.uk.xensource.com>
+ <20151117172914.GL30101@arm.com> <564B652C.8060409@arm.com>
+ <20151117173557.GN30101@arm.com>
+Message-ID: <alpine.DEB.2.02.1511201212190.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 November 2015 at 07:02, Chris Zhong <zyw@rock-chips.com> wrote:
-> Hi Emil
->
-> On 11/19/2015 10:41 PM, Emil Velikov wrote:
->>
->> On 19 November 2015 at 03:35, Chris Zhong <zyw@rock-chips.com> wrote:
->>>
->>> The rk3288 MIPI DSI is a Synopsys DesignWare MIPI DSI host controller
->>> IP. This series adds support for a Synopsys DesignWare MIPI DSI host
->>> controller DRM bridge driver and a rockchip MIPI DSI specific DRM
->>> driver.
->>>
->>> This series also includes a DRM panel driver for BOE TV080WUM-NL0 panel.
->>> This panel only use the MIPI DSI video mode.
->>>
->>> The MIPI DSI feature is tested on rk3288 evb board, backport them to
->>> chrome os kernel v3.14, and it can display normally.
->>>
->>> This patchset is base on the patchset from Ying.liu at freescale.com.
->>> <http://www.spinics.net/lists/dri-devel/msg77181.html>
->>>
->>>
->>> Changes in v3:
->>> move the dw_mipi_dsi.txt to
->>> Documentation/devicetree/bindings/display/bridge
->>> move dw_mipi_dsi_rockchip.txt to bindings/display/rockchip/
->>> move boe,tv080wum-nl0.txt to bindings/display/panel/
->>>
->>> Changes in v2:
->>> add the mipi clk id in a single patch
->>> As Thierry.Reding comment, add a documentation for this panel.
->>>
->>> Chris Zhong (10):
->>>    clk: rockchip: add id for mipidsi sclk on rk3288
->>>    clk: rockchip: add mipidsi clocks on rk3288
->>>    drm/rockchip: return a true clock rate to adjusted_mode
->>>    drm/bridge: Add Synopsys DesignWare MIPI DSI host controller driver
->>
->> Did you actually rewrite the patch from Liu Ying ?
->
-> I modify the dw_mipi_dsi.c based on the patch from Liu Ying.
-If you base your work on top of (i.e. you rework) someone else's patch
-you should retain this authorship and signed-off-by line. This of
-course is not limited to the above patch but a general rule, afaik.
+On Tue, 17 Nov 2015, Will Deacon wrote:
+> On Tue, Nov 17, 2015 at 05:34:36PM +0000, Marc Zyngier wrote:
+> > On 17/11/15 17:29, Will Deacon wrote:
+> > > On Tue, Nov 10, 2015 at 02:11:38PM +0000, Stefano Stabellini wrote:
+> > >> On Thu, 5 Nov 2015, Stefano Stabellini wrote:
+> > >>> Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM64.
+> > >>> Necessary duplication of paravirt.h and paravirt.c with ARM.
+> > >>>
+> > >>> The only paravirt interface supported is pv_time_ops.steal_clock, so no
+> > >>> runtime pvops patching needed.
+> > >>>
+> > >>> This allows us to make use of steal_account_process_tick for stolen
+> > >>> ticks accounting.
+> > >>>
+> > >>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > >>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > >>
+> > >> Ping?
+> > >>
+> > >> Catalin, Will,
+> > >> are you happy with this change?
+> > > 
+> > > I'm happy if Marc's happy. Marc?
+> > 
+> > My Ack is already on the tin! ;-)
+> 
+> Ah yes, I only saw the cc line. In which case, I assume Stefano will
+> take this via the xen tree.
 
->>
->> Out of curiosity what was the obstacle of this work getting merged ?
->
-> There are different version dw controller, and it is too hard to merge them,
-> since most registers are different.
-Have you discussed this limitation with Liu ? Does your work handle
-both versions of the controller ? If so your commit message should say
-something about that. Here are some good sources on the whats and whys
-wrt writing good commit messages [1] [2]
+Unfortunately I am still missing Russell's ack on the arm patch (3/5).
 
-[1] http://who-t.blogspot.co.uk/2009/12/on-commit-messages.html
-[2] http://chris.beams.io/posts/git-commit/
+Would you be OK if I dropped stolen time support for arm, only keeping
+the arm64 part? The price to pay is two small ifdefs in arch/arm/xen/enlighten.c:
 
->>
->>
->>>    drm: rockchip: Support Synopsys DesignWare MIPI DSI host controller
->>>    Documentation: dt-bindings: Add bindings for rk3288 DW MIPI DSI driver
->>>    ARM: dts: rockchip: add rk3288 mipi_dsi nodes
->>>    drm/panel: simple: Add support for BOE TV080WUM-NL0
->>>    drm/panel: simple: Add boe,tv080wum-nl0 simple panel device tree
->>>      binding
->>
->> As the DT people will tell you - there is no BOE vendor in
->> bindings/vendor-prefixes.txt.
->
-> Yes, I have post a verdor patch in v2 series,
-> <https://patchwork.kernel.org/patch/7530791/>
-> Maybe I should add it back to series with
->
-> Acked-by: Rob Herring<robh@kernel.org>
->
-If a patch has been reviewed/acked that's great. Add the tag, but
-please do not drop patches until they are merged. In the latter case
-you can mention that your series depends on branch X from repo Y.
-
->>
->>>    ARM: dts: rockchip: add support mipi panel tv080wum-nl0 for rk3288-evb
->>>
->>> Liu Ying (2):
->>>    drm/dsi: Add a helper to get bits per pixel of MIPI DSI pixel format
->>>    Documentation: dt-bindings: Add bindings for Synopsys DW MIPI DSI DRM
->>>      bridge driver
->>>
->> >From the above 12 patches only ~6 reached this mailing list is that
->> intentional ? Previously I've seen people CC dri-devel for their
->> panel/bridge DT patches.
->
-> I use the patman to post the series, forgot to add you and Thierry to the
-> to-list.
-> I will fix in next version series. Thanks for your reply.
->
-No need to add me bth. Thierry on the other hand should be Cc'd on the
-patches where he's the maintainer.
-
-As the To/Cc list is already quite excessive - I'd suggest following
-the approach used by veterans in kernel development.
-
-I'm not a veteran kernel dev, but this is what I've noticed over the years:
- - Subsystem foo - mailing-list, maintainer(s), and optionally the top
-1-2 developers
- - Other subsystems - mailing-list and optionally the maintainer(s).
-
-Thus in the case of the panel driver you'll get - dri-devel, Thierry
-and optionally(?) devicetree
-For the DT binding for the panel driver - devicetree, Rob, dri-devel, Thierry.
-
-...I think you get the idea :-)
-
-Regards,
-Emil
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 15621b1..87e2fec 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -16,7 +16,9 @@
+ #include <asm/xen/hypercall.h>
+ #include <asm/arch_timer.h>
+ #include <asm/system_misc.h>
++#ifdef ARM64
+ #include <asm/paravirt.h>
++#endif
+ #include <linux/jump_label.h>
+ #include <linux/interrupt.h>
+ #include <linux/irqreturn.h>
+@@ -289,9 +291,10 @@ static int __init xen_guest_init(void)
+ 
+ 	register_cpu_notifier(&xen_cpu_notifier);
+ 
++#ifdef ARM64
+ 	pv_time_ops.steal_clock = xen_stolen_accounting;
+ 	static_key_slow_inc(&paravirt_steal_enabled);
+-
++#endif
+ 	return 0;
+ }
+ early_initcall(xen_guest_init);
