@@ -1,54 +1,52 @@
-From: brace77070@gmail.com (Don Brace)
-Date: Fri, 20 Nov 2015 10:09:50 -0600
-Subject: [PATCH] scsi: hpsa: select CONFIG_SCSI_SAS_ATTR
-In-Reply-To: <3970646.5sOyETUiWo@wuerfel>
-References: <3970646.5sOyETUiWo@wuerfel>
-Message-ID: <564F45CE.3060402@pmcs.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 20 Nov 2015 10:12:46 -0600
+Subject: [linux-sunxi] [PATCH] spi: dts: sun4i: Add support for
+ inter-word wait cycles using the SPI Wait Clock Register
+In-Reply-To: <CAGNoLaOOz2ACtS5iRUxjOknisMHm2Ow3OVsLkqpWuNU4J-9v-A@mail.gmail.com>
+References: <1447948422-4915-1-git-send-email-mweseloh42@gmail.com>
+ <1447948422-4915-2-git-send-email-mweseloh42@gmail.com>
+ <CAGRGNgWQLE5h03+4shLmqD6iW_p=L-i3ewdLb8ndWpxGHWh4rQ@mail.gmail.com>
+ <CAGNoLaNhD73N5_1_NbkvRFnwNqO5ehQBTyeCEgzFVgWCrJZmWQ@mail.gmail.com>
+ <CAGRGNgV0kOkye-Zu4WGQKgGim7N2HB9rAFJ3HNQS89Rr6_WexQ@mail.gmail.com>
+ <CAGNoLaOOz2ACtS5iRUxjOknisMHm2Ow3OVsLkqpWuNU4J-9v-A@mail.gmail.com>
+Message-ID: <20151120161246.GB21921@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Don Brace <don.brace@pmcs.com>
+On Fri, Nov 20, 2015 at 02:56:34PM +0100, Marcus Weseloh wrote:
+> Hi Julien,
+> 
+> 2015-11-20 11:12 GMT+01:00 Julian Calaby <julian.calaby@gmail.com>:
+> > Having magic numbers is kind-of a drivers' job.
 
-And...Thanks!
+I guess all my comments were already raised...
 
+> 
+> Yes, of course. What I meant was that I didn't feel comfortable to
+> include this magic number in driver code because I'm not 100% sure if
+> it is correct across all SPI configurations and SoCs that this driver
+> supports (A10 / A20).
 
-On 11/19/2015 04:04 PM, Arnd Bergmann wrote:
-> The hpsa driver recently started using the sas transport class, but it
-> does not ensure that the corresponding code is actually built, which
-> may lead to a link error:
->
-> drivers/built-in.o: In function `hpsa_free_sas_phy':
-> (.text+0x1ce874): undefined reference to `sas_port_delete_phy'
-> (.text+0x1ce87c): undefined reference to `sas_phy_free'
-> drivers/built-in.o: In function `hpsa_alloc_sas_port':
-> (.text+0x1ceb9c): undefined reference to `sas_port_alloc_num'
-> (.text+0x1ceba8): undefined reference to `sas_port_add'
-> drivers/built-in.o: In function `hpsa_init':
-> (.init.text+0x8838): undefined reference to `sas_attach_transport'
-> (.init.text+0x8868): undefined reference to `sas_release_transport
->
-> This adds 'select SCSI_SAS_ATTR' in the Kconfig entry, just like we do
-> for all other drivers using those functions.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: d04e62b9d63a ("hpsa: add in sas transport class")
-> ---
-> This showed up on the ARM randconfig builds today for the first time.
->
-> diff --git a/drivers/scsi/Kconfig b/drivers/scsi/Kconfig
-> index 04a720686516..64eed87d34a8 100644
-> --- a/drivers/scsi/Kconfig
-> +++ b/drivers/scsi/Kconfig
-> @@ -364,6 +364,7 @@ config SCSI_HPSA
->   	tristate "HP Smart Array SCSI driver"
->   	depends on PCI && SCSI
->   	select CHECK_SIGNATURE
-> +	select SCSI_SAS_ATTRS
->   	help
->   	  This driver supports HP Smart Array Controllers (circa 2009).
->   	  It is a SCSI alternative to the cciss driver, which is a block
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-scsi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+You could not subtract off 3 that way you meet the minimum time no 
+matter what. If other platforms are not setting this property, then I 
+would expect the behavior is unchanged. If they do want to set it, it is 
+their job to validate that it is correct. If it differs, the compatible 
+string can help with that.
+
+> > (and the wdelay should
+> > arguably be a core-spi thing, not a sunxi thing, but that's a separate
+> > discussion)
+> 
+> I've been thinking about that, but it seemed to big a change to
+> attempt with my limited kernel hacking experience.
+
+It is not any bigger. You just need to document it in the core binding. 
+It would still be read by the drivers using it.
+
+> Mark, do you think we should rather talk about adding support for
+> options like this delay to spi-core? Or would it be OK to add it to
+> the sun4i driver and possibly refactor later?
+> 
+> Cheers,
+> 
+>   Marcus
