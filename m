@@ -1,33 +1,97 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 20 Nov 2015 15:31:17 -0800
-Subject: [PATCH v2 2/5] arm64: dts: qcom: Make msm8916-mtp compatible string
- compliant
+Date: Fri, 20 Nov 2015 15:31:16 -0800
+Subject: [PATCH v2 1/5] devicetree: bindings: Document qcom board compatible
+ format
 In-Reply-To: <1448062280-15406-1-git-send-email-sboyd@codeaurora.org>
 References: <1448062280-15406-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1448062280-15406-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1448062280-15406-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This compatible string isn't compliant with the format for
-subtypes. Replace it with a compliant compatible type.
+Some qcom based bootloaders identify the dtb blob based on a set
+of device properties like SoC, platform, PMIC, and revisions of
+those components. In downstream kernels, these values are added
+to the different component dtsi files (i.e. pmic dtsi file, SoC
+dtsi file, board dtsi file, etc.) via qcom specific DT
+properties. The dtb files are parsed by a program called dtbTool
+that picks out these properties and creates a table of contents
+binary blob with the property information and some offsets into
+the concatenation of all the dtbs (termed a QCDT image).
+
+The suggestion is to do this via the board compatible string
+instead, because these qcom specific properties are never used by
+the kernel. Add a document describing the format of the
+compatible string that encodes all this information that's
+currently encoded in the qcom,{msm-id,board-id,pmic-id}
+properties in downstream devicetrees. Future bootloaders may be
+updated to look at the compatible field instead of looking for
+the table of contents image. For non-updateable bootloaders, a
+new dtbTool program will parse the compatible string and generate
+a QCDT image from it.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm64/boot/dts/qcom/msm8916-mtp.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/qcom.txt | 51 ++++++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/qcom.txt
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916-mtp.dts b/arch/arm64/boot/dts/qcom/msm8916-mtp.dts
-index fced77f0fd3a..b0a064d3806b 100644
---- a/arch/arm64/boot/dts/qcom/msm8916-mtp.dts
-+++ b/arch/arm64/boot/dts/qcom/msm8916-mtp.dts
-@@ -17,6 +17,6 @@
- 
- / {
- 	model = "Qualcomm Technologies, Inc. MSM 8916 MTP";
--	compatible = "qcom,msm8916-mtp", "qcom,msm8916-mtp-smb1360",
-+	compatible = "qcom,msm8916-mtp", "qcom,msm8916-mtp/1",
- 			"qcom,msm8916", "qcom,mtp";
- };
+diff --git a/Documentation/devicetree/bindings/arm/qcom.txt b/Documentation/devicetree/bindings/arm/qcom.txt
+new file mode 100644
+index 000000000000..3e24518c6678
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/qcom.txt
+@@ -0,0 +1,51 @@
++QCOM device tree bindings
++-------------------------
++
++Some qcom based bootloaders identify the dtb blob based on a set of
++device properties like SoC and platform and revisions of those components.
++To support this scheme, we encode this information into the board compatible
++string.
++
++Each board must specify a top-level board compatible string with the following
++format:
++
++	compatible = "qcom,<SoC>[-<soc_version>][-<foundry_id>]-<board>[/<subtype>][-<board_version>]"
++
++The 'SoC' and 'board' elements are required. All other elements are optional.
++
++The 'SoC' element must be one of the following strings:
++
++	apq8016
++	apq8074
++	apq8084
++	apq8096
++	msm8916
++	msm8974
++	msm8996
++
++The 'board' element must be one of the following strings:
++
++	cdp
++	liquid
++	dragonboard
++	mtp
++	sbc
++
++The 'soc_version' and 'board_version' elements take the form of v<Major>.<Minor>
++where the minor number may be omitted when it's zero, i.e.  v1.0 is the same
++as v1. If all versions of the 'board_version' elements match, then a
++wildcard '*' should be used, e.g. 'v*'.
++
++The 'foundry_id' and 'subtype' elements are one or more digits from 0 to 9.
++
++Examples:
++
++	"qcom,msm8916-v1-cdp-pm8916-v2.1"
++
++A CDP board with an msm8916 SoC, version 1 paired with a pm8916 PMIC of version
++2.1.
++
++	"qcom,apq8074-v2.0-2-dragonboard/1-v0.1"
++
++A dragonboard board v0.1 of subtype 1 with an apq8074 SoC version 2, made in
++foundry 2.
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
