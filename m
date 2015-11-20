@@ -1,38 +1,28 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 20 Nov 2015 12:17:04 +0100
-Subject: [PATCH v3 8/9] ARM: sunxi_defconfig: Update MFD_AXP20X symbol
- and enable MFD_AXP20X_RSB
-In-Reply-To: <1447691908-25456-9-git-send-email-wens@csie.org>
-References: <1447691908-25456-1-git-send-email-wens@csie.org>
- <1447691908-25456-9-git-send-email-wens@csie.org>
-Message-ID: <20151120111704.GX32142@lukather>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 20 Nov 2015 12:17:06 +0100
+Subject: [PATCH 0/7] Various touchscreens: Support axis inversion / swapping /
+ extra gpios
+Message-ID: <1448018233-27824-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 12:38:27AM +0800, Chen-Yu Tsai wrote:
-> axp20x support has been split into 2 parts, I2C and RSB interface
-> variants.
-> 
-> Update the MFD_AXP20X symbol for I2C support, and also enable
-> MFD_AXP20X_RSB to support RSB variants.
-> 
-> Keep MFD_AXP20X enabled for now, to ease migration for automated boot
-> farms while the patches are being merged. This should be removed in the
-> next release.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Hi Dimtry and Maxime,
 
-Applied, thanks!
-Maxime
+This patch-set extends the of_touchscreen.c helpers to (optionally) also
+deal with axis inversion / swapping, and patches a bunch of drivers to use
+this new functionality.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/eb7c6e47/attachment.sig>
+One of the modified drivers is the pixcir_i2c_ts driver. Sander Vermin
+has been helping me with getting this driver to work on a tablet I own.
+This patch-set includes a v2 of Sander's "Input: pixcir_i2c_ts: add wake
+and enable gpios" patch. v1 also included axis inversion / swapping support,
+which I've redone using the new helpers in a separate patch in this set.
+
+Dmitry can you pickup patches 1-5 please ?
+Maxime can you pickup patches 6-7 please ? Merging them seperately
+should not be an issue without patches 1-5 the touchscreen will not work
+but there will be no other breakage, so no regressions.
+
+Thanks & Regards,
+
+Hans
