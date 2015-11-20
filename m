@@ -1,80 +1,77 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 20 Nov 2015 09:27:25 -0800
-Subject: [PATCH 4/7] touchscreen: pixcir_i2c: Add support for wake and
- enable gpios
-In-Reply-To: <1448018233-27824-5-git-send-email-hdegoede@redhat.com>
-References: <1448018233-27824-1-git-send-email-hdegoede@redhat.com>
- <1448018233-27824-5-git-send-email-hdegoede@redhat.com>
-Message-ID: <20151120172725.GA26895@dtor-ws>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 20 Nov 2015 09:29:31 -0800
+Subject: [PATH RESEND v2 03/10] tty: xuartps: Always enable transmitter
+ in start_tx
+In-Reply-To: <564F5574.4070407@hurleysoftware.com>
+References: <1447963344-16266-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1447963344-16266-4-git-send-email-soren.brinkmann@xilinx.com>
+ <564F0E75.5020100@hurleysoftware.com>
+ <20151120152849.GU32017@xsjsorenbubuntu>
+ <564F4A95.3010303@hurleysoftware.com>
+ <20151120165804.GV32017@xsjsorenbubuntu>
+ <564F5574.4070407@hurleysoftware.com>
+Message-ID: <20151120172931.GX32017@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 12:17:10PM +0100, Hans de Goede wrote:
-> From: Sander Vermin <sander@vermin.nl>
+On Fri, 2015-11-20 at 12:16PM -0500, Peter Hurley wrote:
+> On 11/20/2015 11:58 AM, S?ren Brinkmann wrote:
+> > On Fri, 2015-11-20 at 11:30AM -0500, Peter Hurley wrote:
+> >> On 11/20/2015 10:28 AM, S?ren Brinkmann wrote:
+> >>> On Fri, 2015-11-20 at 07:13AM -0500, Peter Hurley wrote:
+> >>>> On 11/19/2015 03:02 PM, Soren Brinkmann wrote:
+> >>>>> start_tx must start transmitting characters. Regardless of the state of
+> >>>>> the circular buffer, always enable the transmitter hardware.
+> >>>>
+> >>>> Why?
+> >>>>
+> >>>> Does cdns_uart_stop_tx() actually stop the transmitter so that
+> >>>> data remains in the transmitter?
+> >>>
+> >>> Well, I saw my system freezing and the cause seemed to be that the UART
+> >>> receiver and/or transmitters were disabled while the system was trying
+> >>> to print. Hence, I started questioning all locations touching the
+> >>> transmitter/receiver enable. I read the docs in
+> >>> https://www.kernel.org/doc/Documentation/serial/driver, which simply
+> >>> says "Start transmitting characters." for start_tx(). Hence, I thought,
+> >>> this function is probably supposed to just do that and start the
+> >>> transmitter. I'll test whether this patch can be dropped.
+> >>
+> >> I don't think that patch would fix any freeze problems, but restarting
+> >> the transmitter even if the circ buffer is empty may be necessary to
+> >> push out remaining data when the port is restarted after being stopped.
+> >>
+> >> IOW, something like
+> >>
+> >> 	if (uart_tx_stopped(port))
+> >> 		return;
+> >>
+> >> 	....
+> >>
+> >>
+> >> 	if (uart_circ_empty(&port->state->xmit)
+> >> 		return;
+> > 
+> > Thanks! I'll change the patch accordingly.
+> > 
+> >>
+> >>
+> >> Below is a (work-in-progress) serial driver validation test for flow
+> >> control handling (it may need some tuning for slow line speeds).
+> >> Usual caveats apply. Takes ~40secs @ 115200.
+> > 
+> > I'll try to get that running on my system.
 > 
-> On some devices the wake and enable pins of the pixcir touchscreen
-> controller are connected to gpios and these must be controlled by the
-> driver for the device to operate properly.
+> The test below should pass too, but I know it won't because this xilinx
+> driver isn't handling x_char at all.
 > 
-> Signed-off-by: Sander Vermin <sander@vermin.nl>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Changes in v2 (Hans de Goede):
-> -Split the changes for dealing with inverted / swapped axis out into a
->  separate patch
-> -Remove a bunch of dev_info calls to make the driver less chatty
-> -Use devm_gpiod_get_optional as these new gpios are optional
-> -Only msleep after setting enable high if we have an enable pin
-> ---
->  .../bindings/input/touchscreen/pixcir_i2c_ts.txt   |  2 +
->  drivers/input/touchscreen/pixcir_i2c_ts.c          | 46 ++++++++++++++++++++++
->  2 files changed, 48 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
-> index 8eb240a..72ca5ec 100644
-> --- a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
-> @@ -10,6 +10,8 @@ Required properties:
->  
->  Optional properties:
->  - reset-gpio: GPIO connected to the RESET line of the chip
-> +- enable-gpios: GPIO connected to the ENABLE line of the chip
-> +- wake-gpios: GPIO connected to the WAKE line of the chip
->  
->  Example:
->  
-> diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
-> index 211408c..b75ef65 100644
-> --- a/drivers/input/touchscreen/pixcir_i2c_ts.c
-> +++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
-> @@ -38,6 +38,8 @@ struct pixcir_i2c_ts_data {
->  	struct input_dev *input;
->  	struct gpio_desc *gpio_attb;
->  	struct gpio_desc *gpio_reset;
-> +	struct gpio_desc *gpio_enable;
-> +	struct gpio_desc *gpio_wake;
->  	const struct pixcir_i2c_chip_data *chip;
->  	int max_fingers;	/* Max fingers supported in this instance */
->  	bool running;
-> @@ -208,6 +210,11 @@ static int pixcir_set_power_mode(struct pixcir_i2c_ts_data *ts,
->  	struct device *dev = &ts->client->dev;
->  	int ret;
->  
-> +	if (mode == PIXCIR_POWER_ACTIVE || mode == PIXCIR_POWER_IDLE) {
-> +		if (!IS_ERR_OR_NULL(ts->gpio_wake))
-> +			gpiod_set_value_cansleep(ts->gpio_wake, 1);
+> Aside: does this h/w have rts driver/cts receiver?
 
-I believe you error out in case when IS_ERR(ts->gpio_wake) is true, so I
-wonder if we should simply use
+I would have to look up the details. But, IIRC, the HW has all the
+modem/flow control signals. But on our SoCs those signals are only
+available when routing the UART through the FPGA part, which makes it a
+rather unlikely configuration since most platforms want the UART as a
+low level debug port that should not depend on any FPGA bistreams.
+Hence, I suspect it might just be a limitation of the driver.
 
-		if (ts->gpio_wake)
-			gpiod_set_value_cansleep(ts->gpio_wake, 1);
-
-here and elsewhere.
-
-No need to resubmit, just let me know.
-
-Thanks.
-
--- 
-Dmitry
+	S?ren
