@@ -1,65 +1,150 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Nov 2015 12:12:21 +0100
-Subject: [PATCH] ARM64: fix building without CONFIG_UID16
-Message-ID: <3891403.6hGat7eHq5@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 20 Nov 2015 12:12:38 +0100
+Subject: [PATCH v3 5/9] ARM: dts: sun8i: sinlinx-sina33: Add AXP223 PMIC
+ device and regulator nodes
+In-Reply-To: <1447691908-25456-6-git-send-email-wens@csie.org>
+References: <1447691908-25456-1-git-send-email-wens@csie.org>
+ <1447691908-25456-6-git-send-email-wens@csie.org>
+Message-ID: <20151120111238.GV32142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As reported by Michal Simek, building an ARM64 kernel with CONFIG_UID16
-disabled currently fails because the system call table still needs to
-reference the individual function entry points that are provided by
-kernel/sys_ni.c in this case, and the declarations are hidden inside
-of #ifdef CONFIG_UID16:
+Hi,
 
-arch/arm64/include/asm/unistd32.h:57:8: error: 'sys_lchown16' undeclared here (not in a function)
- __SYSCALL(__NR_lchown, sys_lchown16)
+On Tue, Nov 17, 2015 at 12:38:24AM +0800, Chen-Yu Tsai wrote:
+> This board has a X-Powers AXP223 PMIC connected via RSB. Its regulators
+> provide power to various parts of the SoC and the board.
+> 
+> Also update the regulator supply phandles.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 79 +++++++++++++++++++++++++-
+>  1 file changed, 76 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+> index 13ce68f06dd6..91a0fde47fdd 100644
+> --- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+> +++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+> @@ -68,7 +68,7 @@
+>  };
+>  
+>  &lradc {
+> -	vref-supply = <&reg_vcc3v0>;
+> +	vref-supply = <&reg_dcdc1>;
+>  	status = "okay";
+>  
+>  	button at 200 {
+> @@ -96,7 +96,7 @@
+>  &mmc0 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_sina33>;
+> -	vmmc-supply = <&reg_vcc3v0>;
+> +	vmmc-supply = <&reg_dcdc1>;
+>  	bus-width = <4>;
+>  	cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
+>  	cd-inverted;
+> @@ -106,7 +106,7 @@
+>  &mmc2 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&mmc2_8bit_pins>;
+> -	vmmc-supply = <&reg_vcc3v0>;
+> +	vmmc-supply = <&reg_dcdc1>;
+>  	bus-width = <8>;
+>  	non-removable;
+>  	status = "okay";
+> @@ -132,6 +132,79 @@
+>  
+>  &r_rsb {
+>  	status = "okay";
+> +
+> +	axp22x: pmic at 3e3 {
+> +		compatible = "x-powers,axp223";
+> +		reg = <0x3e3>;
+> +		interrupt-parent = <&nmi_intc>;
+> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> +		eldoin-supply = <&reg_dcdc1>;
+> +	};
+> +};
+> +
+> +#include "axp22x.dtsi"
+> +
+> +&reg_aldo1 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <3000000>;
+> +	regulator-max-microvolt = <3000000>;
+> +	regulator-name = "vcc-io";
+> +};
+> +
+> +&reg_aldo2 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <2350000>;
+> +	regulator-max-microvolt = <2650000>;
+> +	regulator-name = "vdd-dll";
+> +};
+> +
+> +&reg_aldo3 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <2700000>;
+> +	regulator-max-microvolt = <3300000>;
+> +	regulator-name = "vcc-pll-avcc";
+> +};
+> +
+> +&reg_dc5ldo {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <900000>;
+> +	regulator-max-microvolt = <1400000>;
+> +	regulator-name = "vdd-cpus";
+> +};
+> +
+> +&reg_dcdc1 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <3000000>;
+> +	regulator-max-microvolt = <3000000>;
+> +	regulator-name = "vcc-3v0";
+> +};
+> +
+> +&reg_dcdc2 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <900000>;
+> +	regulator-max-microvolt = <1400000>;
+> +	regulator-name = "vdd-sys";
+> +};
+> +
+> +&reg_dcdc3 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <900000>;
+> +	regulator-max-microvolt = <1400000>;
+> +	regulator-name = "vdd-cpu";
+> +};
+> +
+> +&reg_dcdc5 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1500000>;
+> +	regulator-max-microvolt = <1500000>;
+> +	regulator-name = "vcc-dram";
+> +};
+> +
+> +&reg_rtc_ldo {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <3000000>;
+> +	regulator-max-microvolt = <3000000>;
+> +	regulator-name = "vcc-rtc";
+>  };
 
-I believe this problem only exists on ARM64, because older architectures
-tend to not need declarations when their system call table is built
-in assembly code, while newer architectures tend to not need UID16
-support. ARM64 only uses these system calls for compatibility with
-32-bit ARM binaries.
+Isn't this supposed to be in the AXP DTSI?
 
-This changes the CONFIG_UID16 check into CONFIG_HAVE_UID16, which is
-set unconditionally on ARM64 with CONFIG_COMPAT, so we see the
-declarations whenever we need them, but otherwise the behavior is
-unchanged.
+Thanks!
+Maxime
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: stable at vger.kernel.org
-Fixes: af1839eb4bd4 ("Kconfig: clean up the long arch list for the UID16 config option")
----
-I would suggest merging this through the arm64 tree, as this is
-likely the only architecture that cares about it, and there is little
-risk of clashes with other patches in the global headers.
-
-The bug goes back to when arch/arm64 was introduced as far as I can
-tell, but I'm not sure if we care about stable backports or not.
-I've put stable on Cc anyway, let me know if anyone thinks we should not.
-
-diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
-index a156b82dd14c..c2b66a277e98 100644
---- a/include/linux/syscalls.h
-+++ b/include/linux/syscalls.h
-@@ -524,7 +524,7 @@ asmlinkage long sys_chown(const char __user *filename,
- asmlinkage long sys_lchown(const char __user *filename,
- 				uid_t user, gid_t group);
- asmlinkage long sys_fchown(unsigned int fd, uid_t user, gid_t group);
--#ifdef CONFIG_UID16
-+#ifdef CONFIG_HAVE_UID16
- asmlinkage long sys_chown16(const char __user *filename,
- 				old_uid_t user, old_gid_t group);
- asmlinkage long sys_lchown16(const char __user *filename,
-diff --git a/include/linux/types.h b/include/linux/types.h
-index 70d8500bddf1..70dd3dfde631 100644
---- a/include/linux/types.h
-+++ b/include/linux/types.h
-@@ -35,7 +35,7 @@ typedef __kernel_gid16_t        gid16_t;
- 
- typedef unsigned long		uintptr_t;
- 
--#ifdef CONFIG_UID16
-+#ifdef CONFIG_HAVE_UID16
- /* This is defined by include/asm-{arch}/posix_types.h */
- typedef __kernel_old_uid_t	old_uid_t;
- typedef __kernel_old_gid_t	old_gid_t;
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/61b6d47a/attachment.sig>
