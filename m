@@ -1,59 +1,110 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 20 Nov 2015 10:43:20 -0600
-Subject: [PATCH 01/10] dt-bindings: create arm/nxp folder and move
- LPC32xx SoC description to it
-In-Reply-To: <1447982925-30138-2-git-send-email-vz@mleia.com>
-References: <1447982925-30138-1-git-send-email-vz@mleia.com>
- <1447982925-30138-2-git-send-email-vz@mleia.com>
-Message-ID: <20151120164320.GA10936@rob-hp-laptop>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 21 Nov 2015 00:42:41 +0800
+Subject: [PATCH 1/4] ASoC: sun4i-codec: Add support for PA gpio pin
+In-Reply-To: <20151120163047.GF32142@lukather>
+References: <1448027233-750-1-git-send-email-hdegoede@redhat.com>
+ <20151120163047.GF32142@lukather>
+Message-ID: <CAGb2v66PPm+G=RfrLgNHNeVDed8BSuGaERKLgfsnzPpAzKcmsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 03:28:36AM +0200, Vladimir Zapolskiy wrote:
-> Create a separate folder for device tree bindings of NXP SoCs devices,
-> and move lpc32xx.txt to it.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> ---
->  Documentation/devicetree/bindings/arm/lpc32xx.txt     | 8 --------
->  Documentation/devicetree/bindings/arm/nxp/lpc32xx.txt | 8 ++++++++
+On Sat, Nov 21, 2015 at 12:30 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Fri, Nov 20, 2015 at 02:47:10PM +0100, Hans de Goede wrote:
+>> Add support for PA gpio pin for controlling an external amplifier as used
+>> on some Allwinner boards.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>  .../devicetree/bindings/sound/sun4i-codec.txt      |  3 +++
+>>  sound/soc/sunxi/sun4i-codec.c                      | 25 ++++++++++++++--------
+>>  2 files changed, 19 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/sound/sun4i-codec.txt b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
+>> index c92966b..974babe 100644
+>> --- a/Documentation/devicetree/bindings/sound/sun4i-codec.txt
+>> +++ b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
+>> @@ -14,6 +14,9 @@ Required properties:
+>>     - "apb": the parent APB clock for this controller
+>>     - "codec": the parent module clock
+>>
+>> +Optional properties:
+>> +- pa-gpios: gpio to enable external amplifier
+>
+> This is a custom property, it should be prefixed by the vendor name.
+>
+>> +
+>>  Example:
+>>  codec: codec at 01c22c00 {
+>>       #sound-dai-cells = <0>;
+>> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+>> index bcbf4da..2aca9cd 100644
+>> --- a/sound/soc/sunxi/sun4i-codec.c
+>> +++ b/sound/soc/sunxi/sun4i-codec.c
+>> @@ -27,6 +27,7 @@
+>>  #include <linux/of_address.h>
+>>  #include <linux/clk.h>
+>>  #include <linux/regmap.h>
+>> +#include <linux/gpio/consumer.h>
+>>
+>>  #include <sound/core.h>
+>>  #include <sound/pcm.h>
+>> @@ -101,16 +102,15 @@ struct sun4i_codec {
+>>       struct regmap   *regmap;
+>>       struct clk      *clk_apb;
+>>       struct clk      *clk_module;
+>> +     struct gpio_desc *gpio_pa;
+>>
+>>       struct snd_dmaengine_dai_dma_data       playback_dma_data;
+>>  };
+>>
+>>  static void sun4i_codec_start_playback(struct sun4i_codec *scodec)
+>>  {
+>> -     /*
+>> -      * FIXME: according to the BSP, we might need to drive a PA
+>> -      *        GPIO high here on some boards
+>> -      */
+>> +     if (scodec->gpio_pa)
+>> +             gpiod_set_value_cansleep(scodec->gpio_pa, 1);
+>>
+>>       /* Flush TX FIFO */
+>>       regmap_update_bits(scodec->regmap, SUN4I_CODEC_DAC_FIFOC,
+>> @@ -125,15 +125,13 @@ static void sun4i_codec_start_playback(struct sun4i_codec *scodec)
+>>
+>>  static void sun4i_codec_stop_playback(struct sun4i_codec *scodec)
+>>  {
+>> -     /*
+>> -      * FIXME: according to the BSP, we might need to drive a PA
+>> -      *        GPIO low here on some boards
+>> -      */
+>> -
+>>       /* Disable DAC DRQ */
+>>       regmap_update_bits(scodec->regmap, SUN4I_CODEC_DAC_FIFOC,
+>>                          BIT(SUN4I_CODEC_DAC_FIFOC_DAC_DRQ_EN),
+>>                          0);
+>> +
+>> +     if (scodec->gpio_pa)
+>> +             gpiod_set_value_cansleep(scodec->gpio_pa, 0);
+>
+> You should rather plug that into DAPM, using a speaker widget, and a
+> custom event function that will enable or disable the amplifier only
+> when this audio path is going to be used.
 
-This one is short, but use git-format-patch -M option in the future.
+Isn't an "amplifier" widget better suited?
 
-Acked-by: Rob Herring <robh@kernel.org>
+ChenYu
 
->  2 files changed, 8 insertions(+), 8 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/arm/lpc32xx.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/nxp/lpc32xx.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/lpc32xx.txt b/Documentation/devicetree/bindings/arm/lpc32xx.txt
-> deleted file mode 100644
-> index 56ec8dd..0000000
-> --- a/Documentation/devicetree/bindings/arm/lpc32xx.txt
-> +++ /dev/null
-> @@ -1,8 +0,0 @@
-> -NXP LPC32xx Platforms Device Tree Bindings
-> -------------------------------------------
-> -
-> -Boards with the NXP LPC32xx SoC shall have the following properties:
-> -
-> -Required root node property:
-> -
-> -compatible: must be "nxp,lpc3220", "nxp,lpc3230", "nxp,lpc3240" or "nxp,lpc3250"
-> diff --git a/Documentation/devicetree/bindings/arm/nxp/lpc32xx.txt b/Documentation/devicetree/bindings/arm/nxp/lpc32xx.txt
-> new file mode 100644
-> index 0000000..56ec8dd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/nxp/lpc32xx.txt
-> @@ -0,0 +1,8 @@
-> +NXP LPC32xx Platforms Device Tree Bindings
-> +------------------------------------------
-> +
-> +Boards with the NXP LPC32xx SoC shall have the following properties:
-> +
-> +Required root node property:
-> +
-> +compatible: must be "nxp,lpc3220", "nxp,lpc3230", "nxp,lpc3240" or "nxp,lpc3250"
-> -- 
-> 2.1.4
-> 
+> You can see such an example here:
+> http://lxr.free-electrons.com/source/sound/soc/jz4740/qi_lb60.c#L29
+>
+> That will require to modify a bit sun4i_codec_create_card as well in
+> order to add the new widgets (and routes) when the DT property is
+> found.
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
