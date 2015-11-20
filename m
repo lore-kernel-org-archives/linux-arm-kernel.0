@@ -1,79 +1,42 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 20 Nov 2015 14:15:57 +0000
-Subject: [PATCH v5 0/7] Xen wallclock on arm and arm64
-Message-ID: <alpine.DEB.2.02.1511201413050.1107@kaball.uk.xensource.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 20 Nov 2015 08:17:25 -0600
+Subject: [PATCH 1/4] spi: mediatek: update document devicetree bindings
+ to fix syntax error
+In-Reply-To: <1447986080-31410-1-git-send-email-leilk.liu@mediatek.com>
+References: <1447986080-31410-1-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <20151120141725.GA31912@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Fri, Nov 20, 2015 at 10:21:16AM +0800, Leilk Liu wrote:
+> This patch updates document devicetree bindings
+> to fix syntax error.
+> 
+> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
 
-this series introduces PV wallclock time support on arm and arm64.
+Acked-by: Rob Herring <robh@kernel.org>
 
-
-Changes in v5:
-- set interface_version to XENPF_INTERFACE_VERSION in an hypercall
-  wrapper
-- remove trailing whitespace
-- remove unhelpful printk
-
-
-Changes in v4:
-- simplify xen_read_wallclock
-- add a patch to support XENPF_settime64 on x86
-
-
-Changes in v3:
-- use ktime_get_ns instead of calling into the arch_timer functions
-  directly
-- read the wallclock from the late_initcall
-- s/%llu.%0u/%llu.%09u
-- in xen_pvclock_gtod_notify use the passed struct timekeeper pointer
-  rather than calling __current_kernel_time64
-- use the passed struct timekeeper pointer to get the system time too
-- drop introduce __current_kernel_time64
-
-
-Changes in v2:
-- introduce __current_kernel_time64
-- rename dom0_op to platform_op
-- introduce XENPF_settime64
-- extend pvclock_wall_clock with sec_hi
-- properly convert arch_timer ticker to nsec
-- use timespec64 interfaces
-- use sec_hi to get a 64-bit seconds value
-- use XENPF_settime64
-- rename dom0_op to platform_op
-
-
-Stefano Stabellini (7):
-      xen: rename dom0_op to platform_op
-      xen/arm: introduce HYPERVISOR_platform_op on arm and arm64
-      xen: introduce XENPF_settime64
-      arm: extend pvclock_wall_clock with sec_hi
-      xen/arm: introduce xen_read_wallclock
-      xen/arm: set the system time in Xen via the XENPF_settime64 hypercall
-      xen/x86: support XENPF_settime64
-
- arch/arm/include/asm/xen/hypercall.h |    7 ++++
- arch/arm/include/asm/xen/interface.h |    3 ++
- arch/arm/xen/enlighten.c             |   76 ++++++++++++++++++++++++++++++++++
- arch/arm/xen/hypercall.S             |    1 +
- arch/arm64/xen/hypercall.S           |    1 +
- arch/x86/include/asm/xen/hypercall.h |    6 +--
- arch/x86/xen/apic.c                  |    2 +-
- arch/x86/xen/enlighten.c             |    8 ++--
- arch/x86/xen/time.c                  |   35 ++++++++++++----
- drivers/xen/acpi.c                   |    2 +-
- drivers/xen/efi.c                    |   30 +++++++-------
- drivers/xen/pcpu.c                   |    8 ++--
- drivers/xen/xen-acpi-cpuhotplug.c    |    2 +-
- drivers/xen/xen-acpi-pad.c           |    4 +-
- drivers/xen/xen-acpi-processor.c     |    8 ++--
- drivers/xen/xenfs/xensyms.c          |    4 +-
- include/xen/interface/platform.h     |   18 ++++++--
- include/xen/interface/xen.h          |    2 +-
- 18 files changed, 168 insertions(+), 49 deletions(-)
-
-Cheers,
-
-Stefano
+> ---
+>  .../devicetree/bindings/spi/spi-mt65xx.txt         |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+> index ce363c923f..fba8334 100644
+> --- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+> +++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+> @@ -32,7 +32,7 @@ Optional properties:
+>  -cs-gpios: see spi-bus.txt, only required for MT8173.
+>  
+>  - mediatek,pad-select: specify which pins group(ck/mi/mo/cs) spi
+> -  controller used. This is a array, the element value should be 0~3,
+> +  controller used. This is an array, the element value should be 0~3,
+>    only required for MT8173.
+>      0: specify GPIO69,70,71,72 for spi pins.
+>      1: specify GPIO102,103,104,105 for spi pins.
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
