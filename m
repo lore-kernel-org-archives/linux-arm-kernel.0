@@ -1,43 +1,44 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Fri, 20 Nov 2015 09:12:19 -0800
-Subject: [PATCH v3 0/3] ARM: dts: add support for NS, NSP, and NS2 clocks
-In-Reply-To: <1448032640-27713-1-git-send-email-jonmason@broadcom.com>
-References: <1448032640-27713-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <564F5473.9020608@broadcom.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Fri, 20 Nov 2015 12:12:29 -0500
+Subject: [PATH RESEND v2 03/10] tty: xuartps: Always enable transmitter in
+ start_tx
+In-Reply-To: <20151120170525.GW32017@xsjsorenbubuntu>
+References: <1447963344-16266-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1447963344-16266-4-git-send-email-soren.brinkmann@xilinx.com>
+ <564F0E75.5020100@hurleysoftware.com>
+ <20151120170525.GW32017@xsjsorenbubuntu>
+Message-ID: <564F547D.4070808@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+On 11/20/2015 12:05 PM, S?ren Brinkmann wrote:
+> On Fri, 2015-11-20 at 07:13AM -0500, Peter Hurley wrote:
+>>
+>>
+>> On 11/19/2015 03:02 PM, Soren Brinkmann wrote:
+>>> start_tx must start transmitting characters. Regardless of the state of
+>>> the circular buffer, always enable the transmitter hardware.
+>>
+>> Why?
+>>
+>> Does cdns_uart_stop_tx() actually stop the transmitter so that
+>> data remains in the transmitter?
+> 
+> Fixing up the patch, I looked at this one. It might actually do that.
 
-On 11/20/2015 7:17 AM, Jon Mason wrote:
-> Changes in v3:
-> Tweaked the NSP entry names, per Ray Jui
->
-> Changes in v2:
-> Rebased off of outstanding NSP DT patches and tweaked the entry names
-> per Ray Jui
->
->
-> This patch series adds device tree support for the Broadcom Northstar,
-> Northstar Plus, and Northstar 2 clocks.
->
-> Last sent as an RFC (see https://lkml.org/lkml/2015/10/13/882) due to
-> the inability to merge because of the driver dependencies.  Those
-> necessary driver changes were merged into 4.4.  All comments have been
-> addressed and it is ready to be pulled in.
->
->
-> Jon Mason (3):
->    ARM: dts: enable clock support for BCM5301X
->    ARM: dts: enable clock support for Broadcom NSP
->    ARM64: dts: enable clock support for Broadcom NS2
->
->   arch/arm/boot/dts/bcm-nsp.dtsi        | 81 ++++++++++++++++++++++++------
->   arch/arm/boot/dts/bcm5301x.dtsi       | 92 +++++++++++++++++++++++++++--------
->   arch/arm64/boot/dts/broadcom/ns2.dtsi | 80 +++++++++++++++++++++++++++++-
->   3 files changed, 216 insertions(+), 37 deletions(-)
->
+Ok.
 
-This entire patch series looks good to me! Thanks!
+> Without having changed anything. The doc says: "The driver should
+> stop transmitting characters as soon as possible.". And the
+> implementation is really not draining any FIFO, but just disabling the
+> transmitter. I take your question as that this might not be this way?
+> Should stop_tx drain the FIFO first?
 
-Reviewed-by: Ray Jui <rjui@broadcom.com>
+No.
+
+Most h/w can't actually stop the transmitter (or not without losing
+data), so that's why the expectation is only for "as soon as possible".
+Stopping sooner is better.
+
+Regards,
+Peter Hurley
