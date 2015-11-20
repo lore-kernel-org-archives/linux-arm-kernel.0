@@ -1,80 +1,71 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 19 Nov 2015 17:05:25 -0800
-Subject: [PATCH 18/29] ARM: shmobile: gose: Add QSPI device to DT
+Date: Thu, 19 Nov 2015 17:05:30 -0800
+Subject: [PATCH 23/29] ARM: shmobile: r8a7790: Use SoC specific binding for
+ rcar-dmac nodes
 In-Reply-To: <cover.1447981420.git.horms+renesas@verge.net.au>
 References: <cover.1447981420.git.horms+renesas@verge.net.au>
-Message-ID: <6380d62a1b1ca498f2187c9702f1dec00ad527e0.1447981420.git.horms+renesas@verge.net.au>
+Message-ID: <4af0a6640cb536cd66ecff1bb7827c76d2475bd9.1447981420.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the QSPI controller in the gose device tree.
+Use the new SoC specific binding for rcar-dmac and the generic
+binding as a fall-back in the r8a7790 device tree.
 
-Based on similar work for the silk board by Vladimir Barinov and
-Sergei Shtylyov.
+In general Renesas hardware is not documented to the extent where the
+relationship between IP blocks on different SoCs can be assumed although
+they may appear to operate the same way. Furthermore the documentation
+typically does not specify a version for individual IP blocks. For these
+reasons a convention of using the SoC name in place of a version and
+providing SoC-specific compat strings has been adopted.
+
+Although not universally liked this convention is used in the bindings for
+most drivers for Renesas hardware. The purpose of this patch is to
+update the Renesas R-Car DMA Controller nodes to follow this convention.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7793-gose.dts | 43 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+ arch/arm/boot/dts/r8a7790.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index 1575ef759047..d842ce77b7c8 100644
---- a/arch/arm/boot/dts/r8a7793-gose.dts
-+++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -57,6 +57,11 @@
- 		renesas,groups = "intc_irq0";
- 		renesas,function = "intc";
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index b545fef3f7db..105bf9ae18cb 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -266,7 +266,7 @@
  	};
-+
-+	qspi_pins: spi0 {
-+		renesas,groups = "qspi_ctrl", "qspi_data4";
-+		renesas,function = "qspi";
-+	};
- };
  
- &ether {
-@@ -92,3 +97,41 @@
+ 	dmac0: dma-controller at e6700000 {
+-		compatible = "renesas,rcar-dmac";
++		compatible = "renesas,dmac-r8a7790", "renesas,rcar-dmac";
+ 		reg = <0 0xe6700000 0 0x20000>;
+ 		interrupts = <0 197 IRQ_TYPE_LEVEL_HIGH
+ 			      0 200 IRQ_TYPE_LEVEL_HIGH
+@@ -297,7 +297,7 @@
+ 	};
  
- 	status = "okay";
- };
-+
-+&qspi {
-+	pinctrl-0 = <&qspi_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+
-+	flash at 0 {
-+		compatible = "spansion,s25fl512s", "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <30000000>;
-+		spi-tx-bus-width = <4>;
-+		spi-rx-bus-width = <4>;
-+		spi-cpol;
-+		spi-cpha;
-+		m25p,fast-read;
-+
-+		partitions {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			partition at 0 {
-+				label = "loader";
-+				reg = <0x00000000 0x00040000>;
-+				read-only;
-+			};
-+			partition at 40000 {
-+				label = "user";
-+				reg = <0x00040000 0x00400000>;
-+				read-only;
-+			};
-+			partition at 440000 {
-+				label = "flash";
-+				reg = <0x00440000 0x03bc0000>;
-+			};
-+		};
-+	};
-+};
+ 	dmac1: dma-controller@e6720000 {
+-		compatible = "renesas,rcar-dmac";
++		compatible = "renesas,dmac-r8a7790", "renesas,rcar-dmac";
+ 		reg = <0 0xe6720000 0 0x20000>;
+ 		interrupts = <0 220 IRQ_TYPE_LEVEL_HIGH
+ 			      0 216 IRQ_TYPE_LEVEL_HIGH
+@@ -328,7 +328,7 @@
+ 	};
+ 
+ 	audma0: dma-controller@ec700000 {
+-		compatible = "renesas,rcar-dmac";
++		compatible = "renesas,dmac-r8a7790", "renesas,rcar-dmac";
+ 		reg = <0 0xec700000 0 0x10000>;
+ 		interrupts =	<0 346 IRQ_TYPE_LEVEL_HIGH
+ 				 0 320 IRQ_TYPE_LEVEL_HIGH
+@@ -357,7 +357,7 @@
+ 	};
+ 
+ 	audma1: dma-controller@ec720000 {
+-		compatible = "renesas,rcar-dmac";
++		compatible = "renesas,dmac-r8a7790", "renesas,rcar-dmac";
+ 		reg = <0 0xec720000 0 0x10000>;
+ 		interrupts =	<0 347 IRQ_TYPE_LEVEL_HIGH
+ 				 0 333 IRQ_TYPE_LEVEL_HIGH
 -- 
 2.1.4
