@@ -1,47 +1,22 @@
-From: haibo.chen@freescale.com (Haibo Chen)
-Date: Fri, 20 Nov 2015 23:48:14 +0800
-Subject: [PATCH v3 3/4] ARM: dts: imx7d.dtsi: add ADC support
-In-Reply-To: <1448034495-1759-1-git-send-email-haibo.chen@freescale.com>
-References: <1448034495-1759-1-git-send-email-haibo.chen@freescale.com>
-Message-ID: <1448034495-1759-4-git-send-email-haibo.chen@freescale.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Nov 2015 15:48:41 +0000
+Subject: [PATCH 1/2] arm64: mm: detect bad __create_mapping uses
+In-Reply-To: <1448033724-13846-1-git-send-email-mark.rutland@arm.com>
+References: <1448033724-13846-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20151120154840.GB5536@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add imx7d ADC support.
+On Fri, Nov 20, 2015 at 03:35:23PM +0000, Mark Rutland wrote:
 
-Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
----
- arch/arm/boot/dts/imx7d.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+> Cc: Catalin Marinas <caralin.marinas@arm.com>
+                       ~~~~~~~
 
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-index ebc053a..aa0624d 100644
---- a/arch/arm/boot/dts/imx7d.dtsi
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -583,6 +583,24 @@
- 			reg = <0x30400000 0x400000>;
- 			ranges;
- 
-+			adc1: adc at 30610000 {
-+				compatible = "fsl,imx7d-adc";
-+				reg = <0x30610000 0x10000>;
-+				interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_ADC_ROOT_CLK>;
-+				clock-names = "adc";
-+				status = "disabled";
-+			};
-+
-+			adc2: adc at 30620000 {
-+				compatible = "fsl,imx7d-adc";
-+				reg = <0x30620000 0x10000>;
-+				interrupts = <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_ADC_ROOT_CLK>;
-+				clock-names = "adc";
-+				status = "disabled";
-+			};
-+
- 			pwm1: pwm at 30660000 {
- 				compatible = "fsl,imx7d-pwm", "fsl,imx27-pwm";
- 				reg = <0x30660000 0x10000>;
--- 
-1.9.1
+Sorry Catalin, it looks like I typo'd your address when I sent this out.
+I've fixed my local commit so that won't happen again, and I'll try to
+pay more attention to where my fingers are going in future.
+
+Hopefully anyone replying will be able to fix that up...
+
+Thanks,
+Mark.
