@@ -1,425 +1,68 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Fri, 20 Nov 2015 12:16:36 -0500
-Subject: [PATH RESEND v2 03/10] tty: xuartps: Always enable transmitter in
- start_tx
-In-Reply-To: <20151120165804.GV32017@xsjsorenbubuntu>
-References: <1447963344-16266-1-git-send-email-soren.brinkmann@xilinx.com>
- <1447963344-16266-4-git-send-email-soren.brinkmann@xilinx.com>
- <564F0E75.5020100@hurleysoftware.com>
- <20151120152849.GU32017@xsjsorenbubuntu>
- <564F4A95.3010303@hurleysoftware.com>
- <20151120165804.GV32017@xsjsorenbubuntu>
-Message-ID: <564F5574.4070407@hurleysoftware.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 20 Nov 2015 17:20:25 +0000
+Subject: [PATCH 10/13] ARM64: ACPI: Check if it runs on Xen to enable or
+ disable ACPI
+In-Reply-To: <1447754231-7772-11-git-send-email-shannon.zhao@linaro.org>
+References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
+ <1447754231-7772-11-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511201717170.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2015 11:58 AM, S?ren Brinkmann wrote:
-> On Fri, 2015-11-20 at 11:30AM -0500, Peter Hurley wrote:
->> On 11/20/2015 10:28 AM, S?ren Brinkmann wrote:
->>> On Fri, 2015-11-20 at 07:13AM -0500, Peter Hurley wrote:
->>>> On 11/19/2015 03:02 PM, Soren Brinkmann wrote:
->>>>> start_tx must start transmitting characters. Regardless of the state of
->>>>> the circular buffer, always enable the transmitter hardware.
->>>>
->>>> Why?
->>>>
->>>> Does cdns_uart_stop_tx() actually stop the transmitter so that
->>>> data remains in the transmitter?
->>>
->>> Well, I saw my system freezing and the cause seemed to be that the UART
->>> receiver and/or transmitters were disabled while the system was trying
->>> to print. Hence, I started questioning all locations touching the
->>> transmitter/receiver enable. I read the docs in
->>> https://www.kernel.org/doc/Documentation/serial/driver, which simply
->>> says "Start transmitting characters." for start_tx(). Hence, I thought,
->>> this function is probably supposed to just do that and start the
->>> transmitter. I'll test whether this patch can be dropped.
->>
->> I don't think that patch would fix any freeze problems, but restarting
->> the transmitter even if the circ buffer is empty may be necessary to
->> push out remaining data when the port is restarted after being stopped.
->>
->> IOW, something like
->>
->> 	if (uart_tx_stopped(port))
->> 		return;
->>
->> 	....
->>
->>
->> 	if (uart_circ_empty(&port->state->xmit)
->> 		return;
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> Thanks! I'll change the patch accordingly.
+> When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
+> a /hypervisor node in DT. So check if it needs to enable ACPI.
 > 
->>
->>
->> Below is a (work-in-progress) serial driver validation test for flow
->> control handling (it may need some tuning for slow line speeds).
->> Usual caveats apply. Takes ~40secs @ 115200.
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/kernel/acpi.c | 12 ++++++++----
+>  1 file changed, 8 insertions(+), 4 deletions(-)
 > 
-> I'll try to get that running on my system.
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index 19de753..7b67426 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -62,10 +62,13 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
+>  {
+>  	/*
+>  	 * Return 1 as soon as we encounter a node at depth 1 that is
+> -	 * not the /chosen node.
+> +	 * not the /chosen node or to Xen initial domain that is not
+> +	 * either /chosen or /hypervisor node.
 
-The test below should pass too, but I know it won't because this xilinx
-driver isn't handling x_char at all.
+* not the /chosen node, or /hypervisor node when running on Xen.
 
-Aside: does this h/w have rts driver/cts receiver?
+>  	 */
+>  	if (depth == 1 && (strcmp(uname, "chosen") != 0))
+> -		return 1;
+> +		if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
+> +			return 1;
 
---- >% ---
---- /dev/null	2015-11-20 07:19:13.265468435 -0500
-+++ xchar.c	2015-11-20 11:55:26.210233102 -0500
-@@ -0,0 +1,354 @@
-+/*
-+ * x_char unit test for tty drivers
-+ *
-+ * Copyright (c) 2014 Peter Hurley
-+ *
-+ * Permission is hereby granted, free of charge, to any person obtaining a copy
-+ * of this software and associated documentation files (the "Software"), to deal
-+ * in the Software without restriction, including without limitation the rights
-+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-+ * copies of the Software, and to permit persons to whom the Software is
-+ * furnished to do so, subject to the following conditions:
-+ *
-+ * The above copyright notice and this permission notice shall be included in
-+ * all copies or substantial portions of the Software.
-+ *
-+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-+ * THE SOFTWARE.
-+ *
-+ * Build:  gcc -Wall [-DWAKE_TEST] -o xchar xchar.c
-+ *   The optional WAKE_TEST define includes tests for spurious write wakeups
-+ *   which should not be generated by sending x_char. As of kernel mainline
-+ *   v3.15, the write wakeup tests will generate false positive results.
-+ *   However, serial_core UART drivers should not generate spurious write
-+ *   wakeups when sending x_char, and should be tested on v3.16+ kernels.
-+ *
-+ * Use:
-+ *   1. Connect a null-modem cable between test tty and reflector tty.
-+ *
-+ *   2. Confirm the test tty and reflector tty are using the same line
-+ *      settings; eg., 115200n81.
-+ *
-+ *   3. Make sure both test and reflector serial ports are not in use;
-+ *      eg., `sudo lsof /dev/ttyS0`. getty will mess up the test :)
-+ *
-+ *   4. Start the reflector.
-+ *	   stty raw -echo -iexten < /dev/ttyS1
-+ *	   cat < /dev/ttyS1 > /dev/ttyS1
-+ *
-+ *   5. Start the test. For example,
-+ *         ./xchar /dev/ttyS0
-+ *
-+ *   6. Test terminates with EXIT_SUCCESS if tests pass. Otherwise, test
-+ *      terminates with EXIT_FAILURE and diagnostic message(s).
-+ *
-+ * Diagnostics:
-+ *     No output after 'Test xchar on /dev/ttyXXX'
-+ *					Check if tty is already in use
-+ *
-+ *     main: opening tty: Permission denied (code: 13)
-+ *					Check tty permissions or run as su
-+ *
-+ * Test results:
-+ *     PASSED				Test(s) passed
-+ *
-+ *     test1: broken x_char: not sent	No data was received from reflector,
-+ *     test2: broken x_char: not sent	x_char never sent
-+ *
-+ *     test1: broken x_char: n = XX, ch = XX
-+ *     test2: broken x_char: n = XX, ch = XX
-+ *					If n > 1, too much data was received
-+ *					from reflector; only START should
-+ *					be received. ch is the first char
-+ *					received from reflector.
-+ *
-+ *     test1: spurious write wakeup detected
-+ *     test2: spurious write wakeup detected
-+ *					Sending x_char caused a write wakeup
-+ *					(false positive on kernels <= 3.16)
-+ *					False positive if the tty driver does
-+ *					not declare ops->send_xchar().
-+ */
-+
-+#include <stdio.h>
-+#include <stdarg.h>
-+#include <errno.h>
-+#include <fcntl.h>
-+#include <unistd.h>
-+#include <string.h>
-+#include <stdlib.h>
-+#include <termios.h>
-+#include <limits.h>
-+#include <signal.h>
-+
-+#ifdef WAKE_TEST
-+#include <sys/epoll.h>
-+
-+int ep;
-+#endif
-+
-+#include "common.h"
-+
-+int tty;
-+struct termios *saved_termios;
-+struct termios orig_termios, termios;
-+static char pattern[] = ASCII_PRINTABLE;
-+static size_t pattern_length = sizeof(pattern) - 1;
-+
-+static void restore_termios(void)
-+{
-+	if (saved_termios) {
-+		int saved_errno = errno;
-+		if (tcsetattr(tty, TCSANOW, saved_termios) < 0)
-+			error_msg("tcsetattr");
-+		errno = saved_errno;
-+		saved_termios = NULL;
-+	}
-+}
-+
-+static void sig_handler(int sig)
-+{
-+	restore_termios();
-+	_exit(EXIT_FAILURE);
-+}
-+
-+#ifdef WAKE_TEST
-+static void setup_wake_test()
-+{
-+	struct epoll_event ev = { .data = { .fd = tty, },
-+				  .events = EPOLLOUT | EPOLLET,
-+	};
-+	int n;
-+
-+	/* setup epoll to detect write wakeup when sending the x_char */
-+	ep = epoll_create(1);
-+	if (ep < 0)
-+		error_exit("epoll_create");
-+	if (epoll_ctl(ep, EPOLL_CTL_ADD, tty, &ev) < 0)
-+		error_exit("epoll_ctl");
-+
-+	n = epoll_wait(ep, &ev, 1, 0);
-+	if (n < 0)
-+		error_exit("epoll_wait");
-+	if (n != 1 || ev.data.fd != tty || (~ev.events & EPOLLOUT))
-+		msg_exit("tty not ready for write??\n");
-+}
-+
-+static void wake_test()
-+{
-+	struct epoll_event ev;
-+	int n;
-+
-+	n = epoll_wait(ep, &ev, 1, 0);
-+	if (n < 0)
-+		error_exit("epoll_wait");
-+	if (n > 0)
-+		error_msg("spurious write wakeup detected\n");
-+
-+	close(ep);
-+}
-+#else
-+static void setup_wake_test() {}
-+static void wake_test() {}
-+#endif
-+
-+static void read_verify(size_t expected)
-+{
-+	size_t n = 0;
-+	char buf[8192];
-+
-+	do {
-+		ssize_t c;
-+
-+		c = read(tty, buf, sizeof(buf));
-+		if (c < 0)
-+			error_exit("read");
-+		if (c == 0)
-+			msg_exit("FAILED, i/o stalled\n");
-+
-+		check_pattern(buf, c, pattern, n, pattern_length);
-+
-+		n += c;
-+
-+	} while (n < expected);
-+
-+	if (n != expected)
-+		msg_exit("FAILED, read %zu (expected %zu)\n", n, expected);
-+}
-+
-+/**
-+ * test1 - send START, idle tty
-+ *
-+ * Send START x_char while tty is idle (ie., not currently outputting).
-+ * Uses edge-triggered epoll check to detect if write wakeup is
-+ * generated (sending x_char should not generate a local write wakeup).
-+ *
-+ * Expected: reflector returns 1 START char.
-+ *           no write wakeup detected
-+ */
-+static void test1(void)
-+{
-+	size_t n;
-+	char buf[MAX_INPUT];
-+
-+	setup_wake_test();
-+
-+	/* cause START x_char to be sent */
-+	if (tcflow(tty, TCION) < 0)
-+		error_exit("tcflow(TCION)");
-+
-+	/* read the reflected START char */
-+	n = read(tty, buf, sizeof(buf));
-+	if (n < 0)
-+		error_exit("waiting for START");
-+	if (n == 0)
-+		msg_exit("FAILED, broken x_char: not sent\n");
-+	if (n != 1 || buf[0] != termios.c_cc[VSTART])
-+		msg_exit("FAILED, broken x_char: n = %zu, ch = %hhx (expected = %hhx)\n",
-+			 n, buf[0], termios.c_cc[VSTART]);
-+
-+	/* check for spurious write wakeup -
-+	 * sending x_char should not cause a local write wakeup.
-+	 * Check driver start_tx() and tx int handler for bad logic
-+	 * which may perform a write wakeup.
-+	 */
-+	wake_test();
-+}
-+
-+/**
-+ * test2 - send START from write-stalled tty
-+ *
-+ * Test that sending x_char does not cause local output to restart.
-+ * Send data while tty output is disabled; this adds data to the tx ring
-+ * buffer. Send START x_char while tty output is still disabled.
-+ *
-+ * Expected: reflector returns 1 START char
-+ *           no write wakeup detected
-+ *           no other output is reflected, neither before nor after
-+ */
-+static void test2(void)
-+{
-+	size_t n, expected;
-+	char buf[8192];
-+
-+	/* turn off tty output */
-+	if (tcflow(tty, TCOOFF) < 0)
-+		error_exit("tcflow(TCOOFF)");
-+
-+	expected = pattern_length;
-+	n = write(tty, pattern, expected);
-+	if (n < 0)
-+		error_exit("write error");
-+	if (n != expected)
-+		msg_exit("bad write: wrote %zu (expected %zu)\n", n, expected);
-+
-+	n = read(tty, buf, sizeof(buf));
-+	if (n < 0)
-+		error_exit("read error");
-+	/* test if the tty wrote even though output is turned off */
-+	if (n > 0)
-+		msg_exit("FAILED, broken output flow control: received data after TCOOFF\n");
-+
-+	setup_wake_test();
-+
-+	/* cause START x_char to be sent */
-+	if (tcflow(tty, TCION) < 0)
-+		error_exit("tcflow(TCION)");
-+
-+	/* read the reflected START char */
-+	n = read(tty, buf, sizeof(buf));
-+	if (n < 0)
-+		error_exit("waiting for START");
-+	if (n == 0)
-+		msg_exit("FAILED, broken x_char: not sent\n");
-+	if (n != 1 || buf[0] != termios.c_cc[VSTART])
-+		msg_exit("FAILED, broken x_char: n = %zu, ch = %hhx (expected = %hhx)\n",
-+			 n, buf[0], termios.c_cc[VSTART]);
-+
-+	/* check for spurious write wakeup -
-+	 * sending x_char should not cause a local write wakeup.
-+	 * Check driver start_tx() and tx int handler for bad logic
-+	 * which may perform a write wakeup.
-+	 */
-+	wake_test();
-+
-+	/* restore tty output */
-+	if (tcflow(tty, TCOON) < 0)
-+		error_exit("tcflow(TCOON)");
-+
-+	/* verify the pattern is now received unmangled */
-+	read_verify(expected);
-+}
-+
-+static int test(char *fname)
-+{
-+	printf("Test xchar on %s\n", fname);
-+
-+	tty = open(fname, O_RDWR);
-+	if (tty < 0)
-+		error_exit("opening %s", fname);
-+
-+	if (tcgetattr(tty, &termios) < 0)
-+		error_exit("tcgetattr");
-+
-+	orig_termios = termios;
-+	saved_termios = &orig_termios;
-+
-+	termios.c_lflag &= ~(ICANON | ISIG | IEXTEN | ECHO);
-+	/* turn off IXON so the reflector doesn't trigger our flow control */
-+	termios.c_iflag &= ~IXON;
-+	termios.c_oflag &= ~OPOST;
-+	termios.c_cc[VMIN] = 0;
-+	termios.c_cc[VTIME] = 1;	/* 1/10th sec. */
-+
-+	if (tcsetattr(tty, TCSAFLUSH, &termios) < 0)
-+		error_exit("tcsetattr");
-+
-+	printf("begin test1\n");
-+	test1();
-+
-+	/* purge i/o buffers so next test starts with empty buffers */
-+	if (tcflush(tty, TCIOFLUSH) < 0)
-+		error_exit("tcflush() before test2\n");
-+
-+	printf("begin test2\n");
-+	test2();
-+
-+	return 0;
-+}
-+
-+static void usage(char *argv[]) {
-+	msg_exit("Usage: %s tty\n"
-+		 "\ttty   device filename (eg., /dev/ttyS0)\n",
-+		 argv[0]);
-+}
-+
-+int main(int argc, char* argv[])
-+{
-+	struct sigaction sa = { .sa_handler = sig_handler, .sa_flags = 0, };
-+
-+	setbuf(stdout, NULL);
-+
-+	if (argc < 2)
-+		usage(argv);
-+
-+	if (atexit(restore_termios) < 0)
-+		error_exit("atexit");
-+
-+	if (sigemptyset(&sa.sa_mask) < 0)
-+		error_exit("sigemptyset");
-+	if (sigaction(SIGINT, &sa, NULL) < 0)
-+		error_exit("sigaction(SIGINT)");
-+	if (sigaction(SIGTERM, &sa, NULL) < 0)
-+		error_exit("sigaction(SIGTERM)");
-+
-+	test(argv[1]);
-+
-+	printf("PASSED\n");
-+	return EXIT_SUCCESS;
-+}
+Please add { } around the inner if statement.
+
+
+>  	return 0;
+>  }
+>  
+> @@ -179,8 +182,9 @@ void __init acpi_boot_table_init(void)
+>  	/*
+>  	 * Enable ACPI instead of device tree unless
+>  	 * - ACPI has been disabled explicitly (acpi=off), or
+> -	 * - the device tree is not empty (it has more than just a /chosen node)
+> -	 *   and ACPI has not been force enabled (acpi=force)
+> +	 * - the device tree is not empty (it has more than just a /chosen node
+> +	 *   or to Xen initial domain it has more than a /chosen node and
+> +	 *   /hypervisor node) and ACPI has not been force enabled (acpi=force)
+
+the device tree is not empty (it has more than just a /chosen node, and
+an /hypervisor node when running on Xen
+
+
+>  	 */
+>  	if (param_acpi_off ||
+>  	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+> -- 
+> 2.1.0
+> 
