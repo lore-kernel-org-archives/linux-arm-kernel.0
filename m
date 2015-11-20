@@ -1,72 +1,57 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Fri, 20 Nov 2015 22:05:56 +0200
-Subject: [PATCH v2 8/8] arm: dts: lpc32xx: move USB controller subdevices
- into own device node
-In-Reply-To: <CAL_JsqJZ+fKe32gaKAJa+8KvaDkNJS0rWD+NQH7hkWxaahC4ag@mail.gmail.com>
-References: <1445117757-8073-1-git-send-email-vz@mleia.com>
- <1445117757-8073-9-git-send-email-vz@mleia.com>
- <CAL_JsqJZ+fKe32gaKAJa+8KvaDkNJS0rWD+NQH7hkWxaahC4ag@mail.gmail.com>
-Message-ID: <564F7D24.8040009@mleia.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 20 Nov 2015 12:07:08 -0800
+Subject: [RFC PATCH] restrict /dev/mem to idle io memory ranges
+In-Reply-To: <4325714.tYNkapC69P@wuerfel>
+References: <20151120173133.24259.97028.stgit@dwillia2-desk3.jf.intel.com>
+ <4325714.tYNkapC69P@wuerfel>
+Message-ID: <CAGXu5jJnk5PbrJFftheQSd2s=T1A5gnbnMzc7VgqTPNMd8Vw=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.11.2015 21:47, Rob Herring wrote:
-> On Sat, Oct 17, 2015 at 4:35 PM, Vladimir Zapolskiy <vz@mleia.com> wrote:
->> NXP LPC32xx SoC has one USB OTG controller, which is supposed to work
->> with an external phy (default is NXP ISP1301).
+On Fri, Nov 20, 2015 at 12:00 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 20 November 2015 09:31:33 Dan Williams wrote:
+>> This effectively promotes IORESOURCE_BUSY to IORESOURCE_EXCLUSIVE
+>> semantics by default.  If userspace really believes it is safe to access
+>> the memory region it can also perform the extra step of disabling an
+>> active driver.  This protects device address ranges with read side
+>> effects and otherwise directs userspace to use the driver.
 >>
->> Practically the USB controller contains 5 subdevices:
->> - host controller   0x3102 0000 -- 0x3102 00FF
->> - OTG controller    0x3102 0100 -- 0x3102 01FF
->> - device controller 0x3102 0200 -- 0x3102 02FF
->> - I2C controller    0x3102 0300 -- 0x3102 03FF
->> - clock controller  0x3102 0F00 -- 0x3102 0FFF
-> 
-> [...]
-> 
->> -               /*
->> -                * Enable either ohci or usbd (gadget)!
->> -                */
->> -               ohci: ohci at 31020000 {
->> -                       compatible = "nxp,ohci-nxp", "usb-ohci";
->> -                       reg = <0x31020000 0x300>;
->> -                       interrupts = <0x3b 0>;
->> -                       status = "disabled";
->> -               };
->> +               usb {
->> +                       #address-cells = <1>;
->> +                       #size-cells = <1>;
->> +                       compatible = "simple-bus";
->> +                       ranges = <0x0 0x31020000 0x00001000>;
+>> Persistent memory presents a large "mistake surface" to /dev/mem as now
+>> accidental writes can corrupt a filesystem.
 >>
->> -               usbd: usbd at 31020000 {
->> -                       compatible = "nxp,lpc3220-udc";
->> -                       reg = <0x31020000 0x300>;
->> -                       interrupts = <0x3d 0>, <0x3e 0>, <0x3c 0>, <0x3a 0>;
->> -                       status = "disabled";
->> +                       /*
->> +                        * Enable either ohci or usbd (gadget)!
->> +                        */
->> +                       ohci: ohci at 0 {
->> +                               compatible = "nxp,ohci-nxp", "usb-ohci";
->> +                               reg = <0x0 0x300>;
->> +                               interrupts = <0x3b 0>;
->> +                               status = "disabled";
->> +                       };
->> +
->> +                       usbd: usbd at 0 {
->> +                               compatible = "nxp,lpc3220-udc";
->> +                               reg = <0x0 0x300>;
-> 
-> Not a result of this change, but you are overlapping addresses. Please
-> don't do that. It causes problems adding device resources into the
-> resource tree (i.e. request_resource).
-> 
+>> Cc: Kees Cook <keescook@chromium.org>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+>> Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
+>> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Ingo Molnar <mingo@redhat.com>
+>> Cc: "H. Peter Anvin" <hpa@zytor.com>
+>> Cc: Andrew Morton <akpm@linux-foundation.org>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+>>
+>
+> I like the idea.
 
-As you noticed this is legacy code, it will be corrected after fixing
-USB host and device drivers, and this is in long term plans. USB changes
-require at least CCF and IRQ chip changes applied.
+Yes please! I was always surprised that IORESOURCE_BUSY was allowed
+under STRICT_DEVMEM.
 
---
-With best wishes,
-Vladimir
+> Maybe split the change up into two patches, where the first one
+> just does the trivial move of the Kconfig option, and the second
+> one that changes behavior is small?
+
+Agreed: consolidate the per-arch Kconfigs first.
+
+> There is also a question of whether we actually need two options
+> or if we can safely make the existing option stricter.
+
+Right -- what actually breaks if we add _BUSY to getting blocked?
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
