@@ -1,78 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Nov 2015 21:20:26 +0100
-Subject: [PATCH 09/11] clk: lpc32xx: add common clock framework driver
-In-Reply-To: <564F6172.3090509@mleia.com>
-References: <1447981511-29653-1-git-send-email-vz@mleia.com>
- <3762298.NKYXldtldq@wuerfel> <564F6172.3090509@mleia.com>
-Message-ID: <4933690.HhBPeGYMb3@wuerfel>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Fri, 20 Nov 2015 12:26:13 -0800
+Subject: [RFC PATCH] restrict /dev/mem to idle io memory ranges
+In-Reply-To: <20151120201207.GH8644@n2100.arm.linux.org.uk>
+References: <20151120173133.24259.97028.stgit@dwillia2-desk3.jf.intel.com>
+ <20151120201207.GH8644@n2100.arm.linux.org.uk>
+Message-ID: <CAPcyv4hagUwc3AJuDHvBy+YR1Khv+5uUL0HZawO9R0r-EZLVHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 November 2015 20:07:46 Vladimir Zapolskiy wrote:
-> On 20.11.2015 16:04, Arnd Bergmann wrote:
-> > On Friday 20 November 2015 03:05:09 Vladimir Zapolskiy wrote:
-> >> +
-> >> +struct clk_proto_t {
-> >> +       const char *name;
-> >> +       const u8 parents[LPC32XX_CLK_PARENTS_MAX];
-> >> +       u8 num_parents;
-> >> +       unsigned long flags;
-> >> +};
-> >> +
-> >> +#define CLK_PREFIX(LITERAL)            LPC32XX_CLK_ ## LITERAL
-> >> +#define NUMARGS(...)   (sizeof((int[]){__VA_ARGS__})/sizeof(int))
-> >> +
-> >> +#define LPC32XX_CLK_DEFINE(_idx, _name, _flags, ...)           \
-> >> +       [CLK_PREFIX(_idx)] = {                                  \
-> >> +               .name = #_name,                                 \
-> >> +               .flags = _flags,                                \
-> >> +               .parents = { __VA_ARGS__ },                     \
-> >> +               .num_parents = NUMARGS(__VA_ARGS__),            \
-> >> +        }
-> >> +
-> > 
-> > Try to not outsmart yourself with the macros. It's better to avoid
-> > string concatenation so it's possible to grep for uses of some
-> > constant.
-> > 
-> > I would probably not use a macro at all here and just open-code the
-> > entire table. If you ensure that '0' is not a valid parent, then
-> > you can leave out the .num_parents field and just look for the
-> > zero-termination.
-> 
-> Macros are here for simplicity, code size reduction and to avoid some
-> stupid mistakes like different number of .parents and .num_parents.
-> 
-> I believe macro unwrapping in this code will add another 1000 LoC and
-> will result in quite unreadable and less maintainable code.
+On Fri, Nov 20, 2015 at 12:12 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Nov 20, 2015 at 09:31:33AM -0800, Dan Williams wrote:
+>> This effectively promotes IORESOURCE_BUSY to IORESOURCE_EXCLUSIVE
+>> semantics by default.  If userspace really believes it is safe to access
+>> the memory region it can also perform the extra step of disabling an
+>> active driver.  This protects device address ranges with read side
+>> effects and otherwise directs userspace to use the driver.
+>
+> I'm happy with this as long as we retain the option to disable this
+> new behaviour.
+>
+> The reason being, when developing a driver, it is _very_ useful to
+> be able to poke around in the device's (and system memory) address
+> spaces with tools like devmem2 to work out what's going on when
+> things go wrong.
+>
+> To put it another way, I think it's a good idea to disable access to
+> these regions on production systems, but for driver development, we
+> want to retain the ability to poke around in physical address space
+> in any way we so desire.
+>
 
-I mean specifically the macro above:
+Sounds ok to me, but I do think it's a good idea to default it to the
+same value as STRICT_DEVMEM.  Perhaps:
 
-static const struct clk_proto_t clk_proto[LPC32XX_CLK_CCF_MAX] __initconst = {
-+       LPC32XX_CLK_DEFINE(XTAL, xtal, 0x0),
-+       LPC32XX_CLK_DEFINE(XTAL_32K, xtal_32k, 0x0),
-+
-+       LPC32XX_CLK_DEFINE(RTC, rtc, 0x0, LPC32XX_CLK_XTAL_32K),
-+       LPC32XX_CLK_DEFINE(OSC, osc, CLK_IGNORE_UNUSED, LPC32XX_CLK_XTAL),
-+       LPC32XX_CLK_DEFINE(SYS, sys, CLK_IGNORE_UNUSED,
-+               LPC32XX_CLK_OSC, LPC32XX_CLK_PLL397X),
-+       LPC32XX_CLK_DEFINE(PLL397X, pll_397x, CLK_IGNORE_UNUSED,
-+               LPC32XX_CLK_RTC),
+bool "Filter I/O access to /dev/mem" if EXPERT
+default STRICT_DEVMEM
 
-can become
-
-static const struct clk_proto_t clk_proto[] __initconst = {
-	[LPC32XX_CLK_XTAL]	= { "xtal" },
-	[LPC32XX_CLK_XTAL_32K]	= { "xtal_32k" },
-	[LPC32XX_CLK_RTC]	= { "rtc",
-			.parents = { LPC32XX_CLK_XTAL_32K, 0 } },
-	[LPC32XX_CLK_OSC]	= { "osc", CLK_IGNORE_UNUSED,
-			.parents = { LPC32XX_CLK_XTAL, 0 } },
-	[LPC32XX_CLK_SYS]	= { "sys", CLK_IGNORE_UNUSED,
-			.parents = { LPC32XX_CLK_OSC, LPC32XX_CLK_PLL397X, 0) },
-	[LPC32XX_CLK_PLL397X]	= { "pll_397x", CLK_IGNORE_UNUSED,
-			.parents = { LPC32XX_CLK_RTC, 0 },
-
-Not harder to read at all, not really longer, but easier to grep for.
-
-	Arnd
+When this in do we even need IORESOURCE_EXCLUSIVE?  It's barely used.
