@@ -1,69 +1,76 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Fri, 20 Nov 2015 15:11:50 +0000
-Subject: [PATCH v9 1/6] target-arm: kvm64 - introduce kvm_arm_init_debug()
-In-Reply-To: <CAFEAcA-u3ACj=99NkTRsEL=2KA6LETeAmEf+5Vo03gz0GMh5Zw@mail.gmail.com>
-References: <1447345251-22625-1-git-send-email-alex.bennee@linaro.org>
- <1447345251-22625-2-git-send-email-alex.bennee@linaro.org>
- <CAFEAcA-u3ACj=99NkTRsEL=2KA6LETeAmEf+5Vo03gz0GMh5Zw@mail.gmail.com>
-Message-ID: <CAFEAcA8bdjYaDiCParJt8jVe+720+tzh4CuKD2YGfHeo2UJNcQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Nov 2015 15:12:33 +0000
+Subject: [PATCHv2] arm64: efi: correctly map runtime regions
+Message-ID: <1448032353-8770-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 November 2015 at 15:05, Peter Maydell <peter.maydell@linaro.org> wrote:
-> On 12 November 2015 at 16:20, Alex Benn?e <alex.bennee@linaro.org> wrote:
->> As we haven't always had guest debug support we need to probe for it.
->> Additionally we don't do this in the start-up capability code so we
->> don't fall over on old kernels.
->>
->> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->> ---
->>  target-arm/kvm64.c | 18 ++++++++++++++++++
->>  1 file changed, 18 insertions(+)
->>
->> diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
->> index ceebfeb..d087794 100644
->> --- a/target-arm/kvm64.c
->> +++ b/target-arm/kvm64.c
->> @@ -25,6 +25,22 @@
->>  #include "internals.h"
->>  #include "hw/arm/arm.h"
->>
->> +static bool have_guest_debug;
->> +
->> +/**
->> + * kvm_arm_init_debug()
->> + * @cs: CPUState
->> + *
->> + * Check for guest debug capabilities.
->> + *
->> + */
->> +static void kvm_arm_init_debug(CPUState *cs)
->> +{
->> +    have_guest_debug = kvm_check_extension(cs->kvm_state,
->> +                                           KVM_CAP_SET_GUEST_DEBUG);
->> +    return;
->> +}
->> +
->>  static inline void set_feature(uint64_t *features, int feature)
->>  {
->>      *features |= 1ULL << feature;
->> @@ -121,6 +137,8 @@ int kvm_arch_init_vcpu(CPUState *cs)
->>      }
->>      cpu->mp_affinity = mpidr & ARM64_AFFINITY_MASK;
->>
->> +    kvm_arm_init_debug(cs);
->> +
->>      return kvm_arm_init_cpreg_list(cpu);
->>  }
->
-> I assume in practice the kernel guarantees that either all
-> CPUs have the SET_GUEST_DEBUG cap, or none do :-)
->
-> Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
+The kernel may use a page granularity of 4K, 16K, or 64K depending on
+configuration.
 
-...except I've just noticed that nothing else in this patchset
-ever reads the have_guest_debug bool we just set, so what is
-the purpose of this patch?
+When mapping EFI runtime regions, we use memrange_efi_to_native to round
+the physical base address of a region down to a kernel page boundary,
+and round the size up to a kernel page boundary, adding the residue left
+over from rounding down the physical base address. We do not round down
+the virtual base address.
 
-thanks
--- PMM
+In __create_mapping we account for the offset of the virtual base from a
+granule boundary, adding the residue to the size before rounding the
+base down to said granule boundary.
+
+Thus we account for the residue twice, and when the residue is non-zero
+will cause __create_mapping to map an additional page at the end of the
+region. Depending on the memory map, this page may be in a region we are
+not intended/permitted to map, or may clash with a different region that
+we which to map.
+
+As __create_mapping can cope with base addresses which are not page
+aligned, we can instead rely on it to map the region appropriately, and
+simplify efi_virtmap_init by removing the unnecessary code.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Leif Lindholm <leif.lindholm@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/efi.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index de46b50..25b82d8 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -225,7 +225,7 @@ static bool __init efi_virtmap_init(void)
+ 	efi_memory_desc_t *md;
+ 
+ 	for_each_efi_memory_desc(&memmap, md) {
+-		u64 paddr, npages, size;
++		u64 size;
+ 		pgprot_t prot;
+ 
+ 		if (!(md->attribute & EFI_MEMORY_RUNTIME))
+@@ -233,10 +233,7 @@ static bool __init efi_virtmap_init(void)
+ 		if (md->virt_addr == 0)
+ 			return false;
+ 
+-		paddr = md->phys_addr;
+-		npages = md->num_pages;
+-		memrange_efi_to_native(&paddr, &npages);
+-		size = npages << PAGE_SHIFT;
++		size = md->num_pages << EFI_PAGE_SHIFT;
+ 
+ 		pr_info("  EFI remap 0x%016llx => %p\n",
+ 			md->phys_addr, (void *)md->virt_addr);
+@@ -254,7 +251,8 @@ static bool __init efi_virtmap_init(void)
+ 		else
+ 			prot = PAGE_KERNEL;
+ 
+-		create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size, prot);
++		create_pgd_mapping(&efi_mm, md->phys_addr, md->virt_addr,
++				   size, prot);
+ 	}
+ 	return true;
+ }
+-- 
+1.9.1
