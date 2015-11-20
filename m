@@ -1,74 +1,168 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 20 Nov 2015 21:12:02 +0200
-Subject: [PATCH v2] clocksource: arm_global_timer: fix suspend resume
-In-Reply-To: <564F6BD0.3050804@oracle.com>
-References: <1448027861-21472-1-git-send-email-grygorii.strashko@ti.com>
- <564F570C.7030409@oracle.com> <564F67ED.9000905@ti.com>
- <564F6A92.7080006@arm.com> <564F6BD0.3050804@oracle.com>
-Message-ID: <564F7082.3020006@ti.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 20 Nov 2015 20:19:52 +0100
+Subject: [PATCH v2 4/7] touchscreen: pixcir_i2c: Add support for wake and
+ enable gpios
+In-Reply-To: <20151120185451.GC26895@dtor-ws>
+References: <1448025892-20899-1-git-send-email-hdegoede@redhat.com>
+ <1448025892-20899-5-git-send-email-hdegoede@redhat.com>
+ <20151120185451.GC26895@dtor-ws>
+Message-ID: <564F7258.3060601@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2015 08:52 PM, santosh shilimkar wrote:
-> On 11/20/2015 10:46 AM, Marc Zyngier wrote:
->> On 20/11/15 18:35, Grygorii Strashko wrote:
->>> Hi Santosh,
->>>
->>> On 11/20/2015 07:23 PM, santosh shilimkar wrote:
->>>> + Thomas, Marc
->>>>
->>>> On 11/20/2015 5:57 AM, Grygorii Strashko wrote:
->>>>> Now the System stall is observed on TI AM437x based board
->>>>> (am437x-gp-evm) during resuming from System suspend when ARM Global
->>>>> timer is selected as clocksource device - SysRq are working, but
->>>>> nothing else. The reason of stall is that ARM Global timer loses its
->>>>> contexts.
->>>>>
->>>>> The reason of stall is that ARM Global timer loses its contexts during
->>>>> System suspend:
->>>>>      GT_CONTROL.TIMER_ENABLE = 0 (unbanked)
->>>>>      GT_COUNTERx = 0
->>>>>
->>>>> Hence, update ARM Global timer driver to reflect above behaviour
->>>>> - re-enable ARM Global timer on resume GT_CONTROL.TIMER_ENABLE = 1
->>>>> - ensure clocksource and clockevent devices have coresponding flags
->>>>>     (CLOCK_SOURCE_SUSPEND_NONSTOP and CLOCK_EVT_FEAT_C3STOP) set
->>>>>     depending on presence of "always-on" DT property.
->>>>>
->>>> Something which loses context in low power states can't be
->>>> called "always-on"
->>>
->>> Sry, it's kinda new area for me and I could make mistakes.
->>>
->>> While working on this patch I've:
->>>   - re-used implementation from ARM arch timer
->>> commit 82a5619410d4c4df65c04272db198eca5a867c18
->>> Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>> Date:   Tue Apr 8 10:04:32 2014 +0100
->>>
->>>      clocksource: arch_arm_timer: Fix age-old arch timer C3STOP 
->>> detection issue
->>
->> [...]
->>
->> This patch has a very specific purpose: instructing the core code that
->> this timer will never stop ticking, ever. It is really targeted at
->> virtual machines, whose timer is backed by the host timer, even when the
->> VM is not running.
->>
->> Using it on actual hardware is may not be the best idea, specially in
->> the presence of PM.
->>
-> Exactly. Thanks for clarifying the commit Marc.
+Hi,
 
-Thanks for your comments, but could you clarify pls - 
-Can i use ARM GT for my use case CPUIDLE=n and SUSPEND=y,
-taking into account that System time can be corrected by RTC core
-during resume? (it will be used as clocksource only).
+On 20-11-15 19:54, Dmitry Torokhov wrote:
+> On Fri, Nov 20, 2015 at 02:24:49PM +0100, Hans de Goede wrote:
+>> From: Sander Vermin <sander@vermin.nl>
+>>
+>> On some devices the wake and enable pins of the pixcir touchscreen
+>> controller are connected to gpios and these must be controlled by the
+>> driver for the device to operate properly.
+>>
+>> Signed-off-by: Sander Vermin <sander@vermin.nl>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>> Changes in v2 (Hans de Goede):
+>> -Split the changes for dealing with inverted / swapped axis out into a
+>>   separate patch
+>> -Remove a bunch of dev_info calls to make the driver less chatty
+>> -Use devm_gpiod_get_optional as these new gpios are optional
+>> -Only msleep after setting enable high if we have an enable pin
+>> ---
+>>   .../bindings/input/touchscreen/pixcir_i2c_ts.txt   |  2 +
+>>   drivers/input/touchscreen/pixcir_i2c_ts.c          | 46 ++++++++++++++++++++++
+>>   2 files changed, 48 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
+>> index 8eb240a..72ca5ec 100644
+>> --- a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
+>> +++ b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
+>> @@ -10,6 +10,8 @@ Required properties:
+>>
+>>   Optional properties:
+>>   - reset-gpio: GPIO connected to the RESET line of the chip
+>> +- enable-gpios: GPIO connected to the ENABLE line of the chip
+>> +- wake-gpios: GPIO connected to the WAKE line of the chip
+>>
+>>   Example:
+>>
+>> diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
+>> index 211408c..b75ef65 100644
+>> --- a/drivers/input/touchscreen/pixcir_i2c_ts.c
+>> +++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
+>> @@ -38,6 +38,8 @@ struct pixcir_i2c_ts_data {
+>>   	struct input_dev *input;
+>>   	struct gpio_desc *gpio_attb;
+>>   	struct gpio_desc *gpio_reset;
+>> +	struct gpio_desc *gpio_enable;
+>> +	struct gpio_desc *gpio_wake;
+>>   	const struct pixcir_i2c_chip_data *chip;
+>>   	int max_fingers;	/* Max fingers supported in this instance */
+>>   	bool running;
+>> @@ -208,6 +210,11 @@ static int pixcir_set_power_mode(struct pixcir_i2c_ts_data *ts,
+>>   	struct device *dev = &ts->client->dev;
+>>   	int ret;
+>>
+>> +	if (mode == PIXCIR_POWER_ACTIVE || mode == PIXCIR_POWER_IDLE) {
+>> +		if (!IS_ERR_OR_NULL(ts->gpio_wake))
+>> +			gpiod_set_value_cansleep(ts->gpio_wake, 1);
+>> +	}
+>> +
+>>   	ret = i2c_smbus_read_byte_data(ts->client, PIXCIR_REG_POWER_MODE);
+>>   	if (ret < 0) {
+>>   		dev_err(dev, "%s: can't read reg 0x%x : %d\n",
+>> @@ -228,6 +235,11 @@ static int pixcir_set_power_mode(struct pixcir_i2c_ts_data *ts,
+>>   		return ret;
+>>   	}
+>>
+>> +	if (mode == PIXCIR_POWER_HALT) {
+>> +		if (!IS_ERR_OR_NULL(ts->gpio_wake))
+>> +			gpiod_set_value_cansleep(ts->gpio_wake, 0);
+>> +	}
+>> +
+>>   	return 0;
+>>   }
+>>
+>> @@ -302,6 +314,11 @@ static int pixcir_start(struct pixcir_i2c_ts_data *ts)
+>>   	struct device *dev = &ts->client->dev;
+>>   	int error;
+>>
+>> +	if (!IS_ERR_OR_NULL(ts->gpio_enable)) {
+>> +		gpiod_set_value_cansleep(ts->gpio_enable, 1);
+>> +		msleep(100);
+>> +	}
+>> +
+>>   	/* LEVEL_TOUCH interrupt with active low polarity */
+>>   	error = pixcir_set_int_mode(ts, PIXCIR_INT_LEVEL_TOUCH, 0);
+>>   	if (error) {
+>> @@ -343,6 +360,9 @@ static int pixcir_stop(struct pixcir_i2c_ts_data *ts)
+>>   	/* Wait till running ISR is complete */
+>>   	synchronize_irq(ts->client->irq);
+>>
+>> +	if (!IS_ERR_OR_NULL(ts->gpio_enable))
+>> +		gpiod_set_value_cansleep(ts->gpio_enable, 0);
+>> +
+>>   	return 0;
+>>   }
+>>
+>> @@ -534,6 +554,24 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
+>>   		return error;
+>>   	}
+>>
+>> +	tsdata->gpio_wake = devm_gpiod_get_optional(dev, "wake",
+>> +						    GPIOD_OUT_HIGH);
+>> +	if (IS_ERR(tsdata->gpio_wake)) {
+>> +		error = PTR_ERR(tsdata->gpio_wake);
+>> +		if (error != -EPROBE_DEFER)
+>> +			dev_err(dev, "Failed to get wake gpio: %d\n", error);
+>> +		return error;
+>> +	}
+>> +
+>> +	tsdata->gpio_enable = devm_gpiod_get_optional(dev, "enable",
+>> +						      GPIOD_OUT_HIGH);
+>> +	if (IS_ERR(tsdata->gpio_enable)) {
+>> +		error = PTR_ERR(tsdata->gpio_enable);
+>> +		if (error != -EPROBE_DEFER)
+>> +			dev_err(dev, "Failed to get enable gpio: %d\n", error);
+>> +		return error;
+>> +	}
+>> +
+>>   	error = devm_request_threaded_irq(dev, client->irq, NULL, pixcir_ts_isr,
+>>   					  IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+>>   					  client->name, tsdata);
+>> @@ -542,6 +580,14 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
+>>   		return error;
+>>   	}
+>>
+>> +	if (!IS_ERR_OR_NULL(tsdata->gpio_wake))
+>> +		gpiod_set_value_cansleep(tsdata->gpio_wake, 1);
+>> +
+>> +	if (!IS_ERR_OR_NULL(tsdata->gpio_enable)) {
+>> +		gpiod_set_value_cansleep(tsdata->gpio_enable, 1);
+>> +		msleep(100);
+>> +	}
+>
+> Actually, another question: why do we need this calls to activate wake
+> and enable gpios here if we request them as active?
 
-And would it be reasonable to resend new version if i will drop 
-all "always-on" related code?
+Hmm, interesting point. I will re-test with just the msleep there. For v2
+what do you want to do with the if tests, keep as "if (!IS_ERR_OR_NULL(...))"
+or change them to just "if (...)" ?
 
--- 
-regards,
--grygorii
+Regards,
+
+Hans
+
+
+>
+> Thanks.
+>
+>> +
+>>   	pixcir_reset(tsdata);
+>>
+>>   	/* Always be in IDLE mode to save power, device supports auto wake */
+>> --
+>> 2.5.0
+>>
+>
