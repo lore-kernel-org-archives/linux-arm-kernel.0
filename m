@@ -1,78 +1,32 @@
 From: leilk.liu@mediatek.com (Leilk Liu)
-Date: Fri, 20 Nov 2015 10:21:19 +0800
-Subject: [PATCH 4/4] spi: mediatek: revise mtk_spi_probe() failure flow
+Date: Fri, 20 Nov 2015 10:21:18 +0800
+Subject: [PATCH 3/4] spi: mediatek: remove needless pair of writel()/readl()
 In-Reply-To: <1447986080-31410-1-git-send-email-leilk.liu@mediatek.com>
 References: <1447986080-31410-1-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <1447986080-31410-4-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <1447986080-31410-3-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch revises failure flow while pm_runtime_enable().
+It's not need to re-read and re-write SPI_CMD_REG, so remove it.
 
 Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
 ---
- drivers/spi/spi-mt65xx.c |   15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+ drivers/spi/spi-mt65xx.c |    3 ---
+ 1 file changed, 3 deletions(-)
 
 diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
-index 6c1a96e..00a36da 100644
+index 7840067..6c1a96e 100644
 --- a/drivers/spi/spi-mt65xx.c
 +++ b/drivers/spi/spi-mt65xx.c
-@@ -607,7 +607,8 @@ static int mtk_spi_probe(struct platform_device *pdev)
- 	ret = clk_set_parent(mdata->sel_clk, mdata->parent_clk);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "failed to clk_set_parent (%d)\n", ret);
--		goto err_disable_clk;
-+		clk_disable_unprepare(mdata->spi_clk);
-+		goto err_put_master;
- 	}
+@@ -154,9 +154,6 @@ static int mtk_spi_prepare_message(struct spi_master *master,
+ 		reg_val |= SPI_CMD_CPOL;
+ 	else
+ 		reg_val &= ~SPI_CMD_CPOL;
+-	writel(reg_val, mdata->base + SPI_CMD_REG);
+-
+-	reg_val = readl(mdata->base + SPI_CMD_REG);
  
- 	clk_disable_unprepare(mdata->spi_clk);
-@@ -617,7 +618,7 @@ static int mtk_spi_probe(struct platform_device *pdev)
- 	ret = devm_spi_register_master(&pdev->dev, master);
- 	if (ret) {
- 		dev_err(&pdev->dev, "failed to register master (%d)\n", ret);
--		goto err_put_master;
-+		goto err_disable_runtime_pm;
- 	}
- 
- 	if (mdata->dev_comp->need_pad_sel) {
-@@ -626,14 +627,14 @@ static int mtk_spi_probe(struct platform_device *pdev)
- 				"pad_num does not match num_chipselect(%d != %d)\n",
- 				mdata->pad_num, master->num_chipselect);
- 			ret = -EINVAL;
--			goto err_put_master;
-+			goto err_disable_runtime_pm;
- 		}
- 
- 		if (!master->cs_gpios && master->num_chipselect > 1) {
- 			dev_err(&pdev->dev,
- 				"cs_gpios not specified and num_chipselect > 1\n");
- 			ret = -EINVAL;
--			goto err_put_master;
-+			goto err_disable_runtime_pm;
- 		}
- 
- 		if (master->cs_gpios) {
-@@ -644,7 +645,7 @@ static int mtk_spi_probe(struct platform_device *pdev)
- 				if (ret) {
- 					dev_err(&pdev->dev,
- 						"can't get CS GPIO %i\n", i);
--					goto err_put_master;
-+					goto err_disable_runtime_pm;
- 				}
- 			}
- 		}
-@@ -652,8 +653,8 @@ static int mtk_spi_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
--err_disable_clk:
--	clk_disable_unprepare(mdata->spi_clk);
-+err_disable_runtime_pm:
-+	pm_runtime_disable(&pdev->dev);
- err_put_master:
- 	spi_master_put(master);
- 
+ 	/* set the mlsbx and mlsbtx */
+ 	if (chip_config->tx_mlsb)
 -- 
 1.7.9.5
