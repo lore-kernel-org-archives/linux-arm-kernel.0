@@ -1,76 +1,38 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 20 Nov 2015 14:10:44 +0900
-Subject: [PATCH v6 8/9] ARM: EXYNOS: rearrange static and non-static
- functions of PMU driver
-In-Reply-To: <CAKDJKT5etUJFqZe1Xzhfnepu7VUWZptBr=DwvhX4gtNftE51Wg@mail.gmail.com>
-References: <1447740351-14246-1-git-send-email-pankaj.dubey@samsung.com>
- <1447740351-14246-9-git-send-email-pankaj.dubey@samsung.com>
- <CAKDJKT5etUJFqZe1Xzhfnepu7VUWZptBr=DwvhX4gtNftE51Wg@mail.gmail.com>
-Message-ID: <564EAB54.6020904@samsung.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Fri, 20 Nov 2015 10:47:04 +0530
+Subject: [PATCH v3 0/5] Switch to generic syscon regmap based drivers
+Message-ID: <1447996629-18232-1-git-send-email-alim.akhtar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.11.2015 13:46, Manish Badarkhe wrote:
-> On Tue, Nov 17, 2015 at 11:35 AM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
->> This patch moves exynos_sys_powerdown_conf function above all
->> static functions, to avoid confusion causing due to mixing of
->> static-nonstatic-static functions and to improve readability of this
->> driver.
->>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> Suggested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> ---
->>  arch/arm/mach-exynos/pmu.c | 34 +++++++++++++++++-----------------
->>  1 file changed, 17 insertions(+), 17 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
->> index 01cb649..a7741d4 100644
->> --- a/arch/arm/mach-exynos/pmu.c
->> +++ b/arch/arm/mach-exynos/pmu.c
->> @@ -39,23 +39,6 @@ u32 pmu_raw_readl(u32 offset)
->>         return readl_relaxed(pmu_base_addr + offset);
->>  }
->>
->> -static void exynos_power_off(void)
->> -{
->> -       unsigned int tmp;
->> -
->> -       pr_info("Power down.\n");
->> -       tmp = pmu_raw_readl(EXYNOS_PS_HOLD_CONTROL);
->> -       tmp ^= (1 << 8);
->> -       pmu_raw_writel(tmp, EXYNOS_PS_HOLD_CONTROL);
->> -
->> -       /* Wait a little so we don't give a false warning below */
->> -       mdelay(100);
->> -
->> -       pr_err("Power down failed, please power off system manually.\n");
->> -       while (1)
->> -               ;
->> -}
->> -
->>  void exynos_sys_powerdown_conf(enum sys_powerdown mode)
->>  {
->>         unsigned int i;
->> @@ -85,6 +68,23 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
->>         }
->>  }
->>
->> +static void exynos_power_off(void)
->> +{
->> +       unsigned int tmp;
->> +
->> +       pr_info("Power down.\n");
->> +       tmp = pmu_raw_readl(EXYNOS_PS_HOLD_CONTROL);
->> +       tmp ^= (1 << 8);
-> Can we have some define over here? to operate this bit.
-> 
+Now we have a nice way to reboot/poweroff system using a generic
+syscon regmap based drivers, this series moves exynos SoCs to
+make use of the same.
 
-1. This will be removed by syscon-reboot/poweroff patches [0].
-2. This patch is only rename/move. Fixing stuff should go to separate
-patches. But IMHO fixing is not needed because of 1.
+Changes since v2:
+* Merged patch 5 and 6 to keep git bisect happy
 
-[0] http://www.spinics.net/lists/devicetree/msg98858.html
+Changes since v1:
+* Added a comment about the register information
+* Droped defconfig changes as disscussed
+* Collected various Reviewed-by, Tested-by and Acked-by tags
+* Added SYSCON-{RESET, POWEROFF} to select from Kconfig
 
-Best regards,
-Krzysztof
+Alim Akhtar (5):
+  arm: dts: Add syscon-{reboot, poweroff} nodes for exynos3250 SoCs
+  arm: dts: Add syscon-{reboot, poweroff} nodes for exynos4
+  arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5
+  arm: dts: Add syscon-{reboot, poweroff} nodes for exynos5410 SoC
+  ARM: exynos: select POWER_RESET_SYSCON and
+    POWER_RESET_SYSCON_POWEROFF
+
+ arch/arm/boot/dts/exynos3250.dtsi |   14 ++++++++++++
+ arch/arm/boot/dts/exynos4.dtsi    |   14 ++++++++++++
+ arch/arm/boot/dts/exynos5.dtsi    |   14 ++++++++++++
+ arch/arm/boot/dts/exynos5410.dtsi |   14 ++++++++++++
+ arch/arm/mach-exynos/Kconfig      |    3 +++
+ arch/arm/mach-exynos/pmu.c        |   43 -------------------------------------
+ 6 files changed, 59 insertions(+), 43 deletions(-)
+
+-- 
+1.7.10.4
