@@ -1,122 +1,152 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 20 Nov 2015 14:22:04 +0000
-Subject: [PATCH v2 1/2] drm: Improve drm_of_component_probe() to correctly
- handle ports and remote ports.
+Date: Fri, 20 Nov 2015 14:22:05 +0000
+Subject: [PATCH v2 2/2] drm/rockchip: Convert the probe function to the
+ generic drm_of_component_probe()
 In-Reply-To: <1448029325-14602-1-git-send-email-Liviu.Dudau@arm.com>
 References: <1448029325-14602-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1448029325-14602-2-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1448029325-14602-3-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rockchip DRM driver cannot use the same compare_of() function to
-match ports and remote ports (aka encoders) as their OF sub-trees
-look different. Add a second compare function to be used when encoders
-are added to the component framework and patch the existing users of
-the function accordingly.
+Initial attempt to convert rockchip to drm_of_component_probe() missed the
+difference between ports and encoders when using the compare_of() function.
+Now that drm_of_component_probe() has been enhanced, let's try again the
+conversion.
 
 Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 ---
- drivers/gpu/drm/armada/armada_drv.c |  3 ++-
- drivers/gpu/drm/drm_of.c            | 19 ++++++++++++++-----
- drivers/gpu/drm/imx/imx-drm-core.c  |  3 ++-
- include/drm/drm_of.h                |  6 ++++--
- 4 files changed, 22 insertions(+), 9 deletions(-)
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 98 ++++++-----------------------
+ 1 file changed, 18 insertions(+), 80 deletions(-)
 
-diff --git a/drivers/gpu/drm/armada/armada_drv.c b/drivers/gpu/drm/armada/armada_drv.c
-index 77ab93d..3a2a929 100644
---- a/drivers/gpu/drm/armada/armada_drv.c
-+++ b/drivers/gpu/drm/armada/armada_drv.c
-@@ -274,7 +274,8 @@ static int armada_drm_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	int ret;
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index f22e1e1..574324e 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -19,6 +19,7 @@
+ #include <drm/drmP.h>
+ #include <drm/drm_crtc_helper.h>
+ #include <drm/drm_fb_helper.h>
++#include <drm/drm_of.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/module.h>
+@@ -411,36 +412,6 @@ int rockchip_drm_encoder_get_mux_id(struct device_node *node,
+ }
+ EXPORT_SYMBOL_GPL(rockchip_drm_encoder_get_mux_id);
  
--	ret = drm_of_component_probe(dev, compare_dev_name, &armada_master_ops);
-+	ret = drm_of_component_probe(dev, compare_dev_name, compare_dev_name,
-+				     &armada_master_ops);
- 	if (ret != -EINVAL)
- 		return ret;
- 
-diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
-index 493c05c..34589d3 100644
---- a/drivers/gpu/drm/drm_of.c
-+++ b/drivers/gpu/drm/drm_of.c
-@@ -77,7 +77,8 @@ EXPORT_SYMBOL(drm_of_find_possible_crtcs);
-  * Returns zero if successful, or one of the standard error codes if it fails.
-  */
- int drm_of_component_probe(struct device *dev,
--			   int (*compare_of)(struct device *, void *),
-+			   int (*compare_port)(struct device *, void *),
-+			   int (*compare_encoder)(struct device *, void *),
- 			   const struct component_master_ops *m_ops)
- {
- 	struct device_node *ep, *port, *remote;
-@@ -101,8 +102,12 @@ int drm_of_component_probe(struct device *dev,
- 			continue;
- 		}
- 
--		component_match_add(dev, &match, compare_of, port);
--		of_node_put(port);
-+		component_match_add(dev, &match, compare_port, port);
-+		/*
-+		 * component_match_add keeps a reference to the port
-+		 * variable, so we need to keep the reference count
-+		 * increment from of_parse_phandle()
-+		 */
- 	}
- 
- 	if (i == 0) {
-@@ -140,8 +145,12 @@ int drm_of_component_probe(struct device *dev,
- 				continue;
- 			}
- 
--			component_match_add(dev, &match, compare_of, remote);
+-static int compare_of(struct device *dev, void *data)
+-{
+-	struct device_node *np = data;
+-
+-	return dev->of_node == np;
+-}
+-
+-static void rockchip_add_endpoints(struct device *dev,
+-				   struct component_match **match,
+-				   struct device_node *port)
+-{
+-	struct device_node *ep, *remote;
+-
+-	for_each_child_of_node(port, ep) {
+-		remote = of_graph_get_remote_port_parent(ep);
+-		if (!remote || !of_device_is_available(remote)) {
 -			of_node_put(remote);
-+			component_match_add(dev, &match, compare_encoder, remote);
-+			/*
-+			 * component_match_add keeps a reference to the port
-+			 * variable, so we need to keep the reference count
-+			 * increment from of_graph_get_remote_port_parent()
-+			 */
- 		}
- 		of_node_put(port);
- 	}
-diff --git a/drivers/gpu/drm/imx/imx-drm-core.c b/drivers/gpu/drm/imx/imx-drm-core.c
-index 64f16ea..0d36410 100644
---- a/drivers/gpu/drm/imx/imx-drm-core.c
-+++ b/drivers/gpu/drm/imx/imx-drm-core.c
-@@ -531,7 +531,8 @@ static const struct component_master_ops imx_drm_ops = {
- 
- static int imx_drm_platform_probe(struct platform_device *pdev)
+-			continue;
+-		} else if (!of_device_is_available(remote->parent)) {
+-			dev_warn(dev, "parent device of %s is not available\n",
+-				 remote->full_name);
+-			of_node_put(remote);
+-			continue;
+-		}
+-
+-		component_match_add(dev, match, compare_of, remote);
+-		of_node_put(remote);
+-	}
+-}
+-
+ static int rockchip_drm_bind(struct device *dev)
  {
--	int ret = drm_of_component_probe(&pdev->dev, compare_of, &imx_drm_ops);
-+	int ret = drm_of_component_probe(&pdev->dev, compare_of, compare_of,
-+					 &imx_drm_ops);
+ 	struct drm_device *drm;
+@@ -481,63 +452,30 @@ static const struct component_master_ops rockchip_drm_ops = {
+ 	.unbind = rockchip_drm_unbind,
+ };
  
- 	if (!ret)
- 		ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
-diff --git a/include/drm/drm_of.h b/include/drm/drm_of.h
-index 8544665..1c29e42 100644
---- a/include/drm/drm_of.h
-+++ b/include/drm/drm_of.h
-@@ -10,7 +10,8 @@ struct device_node;
- extern uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
- 					   struct device_node *port);
- extern int drm_of_component_probe(struct device *dev,
--				  int (*compare_of)(struct device *, void *),
-+				  int (*compare_port)(struct device *, void *),
-+				  int (*compare_encoder)(struct device *, void *),
- 				  const struct component_master_ops *m_ops);
- #else
- static inline uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
-@@ -21,7 +22,8 @@ static inline uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
- 
- static inline int
- drm_of_component_probe(struct device *dev,
--		       int (*compare_of)(struct device *, void *),
-+		       int (*compare_port)(struct device *, void *),
-+		       int (*compare_encoder)(struct device *, void *),
- 		       const struct component_master_ops *m_ops)
+-static int rockchip_drm_platform_probe(struct platform_device *pdev)
++static int compare_port(struct device *dev, void *data)
  {
- 	return -EINVAL;
+-	struct device *dev = &pdev->dev;
+-	struct component_match *match = NULL;
+-	struct device_node *np = dev->of_node;
+-	struct device_node *port;
+-	int i;
++	struct device_node *np = data;
+ 
+-	if (!np)
+-		return -ENODEV;
+-	/*
+-	 * Bind the crtc ports first, so that
+-	 * drm_of_find_possible_crtcs called from encoder .bind callbacks
+-	 * works as expected.
+-	 */
+-	for (i = 0;; i++) {
+-		port = of_parse_phandle(np, "ports", i);
+-		if (!port)
+-			break;
+-
+-		if (!of_device_is_available(port->parent)) {
+-			of_node_put(port);
+-			continue;
+-		}
++	return dev->of_node == np->parent;
++}
+ 
+-		component_match_add(dev, &match, compare_of, port->parent);
+-		of_node_put(port);
+-	}
++static int compare_encoder(struct device *dev, void *data)
++{
++	struct device_node *np = data;
+ 
+-	if (i == 0) {
+-		dev_err(dev, "missing 'ports' property\n");
+-		return -ENODEV;
+-	}
++	return dev->of_node == np;
++}
+ 
+-	if (!match) {
+-		dev_err(dev, "No available vop found for display-subsystem.\n");
+-		return -ENODEV;
+-	}
+-	/*
+-	 * For each bound crtc, bind the encoders attached to its
+-	 * remote endpoint.
+-	 */
+-	for (i = 0;; i++) {
+-		port = of_parse_phandle(np, "ports", i);
+-		if (!port)
+-			break;
+-
+-		if (!of_device_is_available(port->parent)) {
+-			of_node_put(port);
+-			continue;
+-		}
++static int rockchip_drm_platform_probe(struct platform_device *pdev)
++{
++	int ret = drm_of_component_probe(&pdev->dev, compare_port,
++					 compare_encoder, &rockchip_drm_ops);
+ 
+-		rockchip_add_endpoints(dev, &match, port);
+-		of_node_put(port);
+-	}
++	/* keep compatibility with old code that was returning -ENODEV */
++	if (ret == -EINVAL)
++		return -ENODEV;
+ 
+-	return component_master_add_with_match(dev, &rockchip_drm_ops, match);
++	return ret;
+ }
+ 
+ static int rockchip_drm_platform_remove(struct platform_device *pdev)
 -- 
 2.6.2
