@@ -1,45 +1,126 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Fri, 20 Nov 2015 12:18:34 +0000
-Subject: [Xen-devel] [PATCH v4 2/7] xen/arm: introduce
- HYPERVISOR_platform_op on arm and arm64
-In-Reply-To: <alpine.DEB.2.02.1511201152030.1107@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1511121726370.526@kaball.uk.xensource.com>
- <1447349448-22610-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <5645E868.30706@citrix.com>
- <alpine.DEB.2.02.1511131757360.2653@kaball.uk.xensource.com>
- <1447666977.15629.9.camel@citrix.com>
- <alpine.DEB.2.02.1511201152030.1107@kaball.uk.xensource.com>
-Message-ID: <1448021914.5647.139.camel@citrix.com>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Fri, 20 Nov 2015 12:19:54 +0000
+Subject: [PATCH v3 00/12] Add mipi dsi support for rk3288
+In-Reply-To: <564EC575.90109@rock-chips.com>
+References: <1447904131-29328-1-git-send-email-zyw@rock-chips.com>
+ <CACvgo53YOMpbz1TdVmRBPPz4dv=X+8FoEo0ZcfN5DwbDYi2ZzQ@mail.gmail.com>
+ <564EC575.90109@rock-chips.com>
+Message-ID: <CACvgo52SDcRtkNuNSF6dsw_TXV5wrMmW4_ci_4uX63CJrcBg+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-11-20 at 11:58 +0000, Stefano Stabellini wrote:
-> On Mon, 16 Nov 2015, Ian Campbell wrote:
-> > On Fri, 2015-11-13 at 18:10 +0000, Stefano Stabellini wrote:
-> > > 
-> > > I agree with your point (I thought about it myself) but the current
-> > > assembly scheme for hypercalls doesn't work well with that. I would
-> > > have
-> > > to introduce, and maintain going forward, two special hypercall
-> > > implementations in assembly, one for arm and another for arm64, just
-> > > to
-> > > set interface_version. I don't think it is worth it; I prefer to have
-> > > to
-> > > maintain the explicit interface_version setting at the call sites
-> > > (that
-> > > today is just one).
-> > 
-> > You could give the bare assembly stub a different name (append _core or
-> > _raw or something) and make HYPERVISOR_platform_op a C wrapper for it
-> > which
-> > DTRT.
-> 
-> I had an idea. I just need to 
-> 
-> #define HYPERVISOR_platform_op_raw HYPERVISOR_platform_op
+On 20 November 2015 at 07:02, Chris Zhong <zyw@rock-chips.com> wrote:
+> Hi Emil
+>
+> On 11/19/2015 10:41 PM, Emil Velikov wrote:
+>>
+>> On 19 November 2015 at 03:35, Chris Zhong <zyw@rock-chips.com> wrote:
+>>>
+>>> The rk3288 MIPI DSI is a Synopsys DesignWare MIPI DSI host controller
+>>> IP. This series adds support for a Synopsys DesignWare MIPI DSI host
+>>> controller DRM bridge driver and a rockchip MIPI DSI specific DRM
+>>> driver.
+>>>
+>>> This series also includes a DRM panel driver for BOE TV080WUM-NL0 panel.
+>>> This panel only use the MIPI DSI video mode.
+>>>
+>>> The MIPI DSI feature is tested on rk3288 evb board, backport them to
+>>> chrome os kernel v3.14, and it can display normally.
+>>>
+>>> This patchset is base on the patchset from Ying.liu at freescale.com.
+>>> <http://www.spinics.net/lists/dri-devel/msg77181.html>
+>>>
+>>>
+>>> Changes in v3:
+>>> move the dw_mipi_dsi.txt to
+>>> Documentation/devicetree/bindings/display/bridge
+>>> move dw_mipi_dsi_rockchip.txt to bindings/display/rockchip/
+>>> move boe,tv080wum-nl0.txt to bindings/display/panel/
+>>>
+>>> Changes in v2:
+>>> add the mipi clk id in a single patch
+>>> As Thierry.Reding comment, add a documentation for this panel.
+>>>
+>>> Chris Zhong (10):
+>>>    clk: rockchip: add id for mipidsi sclk on rk3288
+>>>    clk: rockchip: add mipidsi clocks on rk3288
+>>>    drm/rockchip: return a true clock rate to adjusted_mode
+>>>    drm/bridge: Add Synopsys DesignWare MIPI DSI host controller driver
+>>
+>> Did you actually rewrite the patch from Liu Ying ?
+>
+> I modify the dw_mipi_dsi.c based on the patch from Liu Ying.
+If you base your work on top of (i.e. you rework) someone else's patch
+you should retain this authorship and signed-off-by line. This of
+course is not limited to the above patch but a general rule, afaik.
 
-The need for this #define is a bit unfortunate, but the alternatives (e.g.
-a suffix argument to the HYPERCALL*() macros or a RAWHYPERCALL variant)
-would seem to suck more, so I say go for it.
+>>
+>> Out of curiosity what was the obstacle of this work getting merged ?
+>
+> There are different version dw controller, and it is too hard to merge them,
+> since most registers are different.
+Have you discussed this limitation with Liu ? Does your work handle
+both versions of the controller ? If so your commit message should say
+something about that. Here are some good sources on the whats and whys
+wrt writing good commit messages [1] [2]
 
-Ian.
+[1] http://who-t.blogspot.co.uk/2009/12/on-commit-messages.html
+[2] http://chris.beams.io/posts/git-commit/
+
+>>
+>>
+>>>    drm: rockchip: Support Synopsys DesignWare MIPI DSI host controller
+>>>    Documentation: dt-bindings: Add bindings for rk3288 DW MIPI DSI driver
+>>>    ARM: dts: rockchip: add rk3288 mipi_dsi nodes
+>>>    drm/panel: simple: Add support for BOE TV080WUM-NL0
+>>>    drm/panel: simple: Add boe,tv080wum-nl0 simple panel device tree
+>>>      binding
+>>
+>> As the DT people will tell you - there is no BOE vendor in
+>> bindings/vendor-prefixes.txt.
+>
+> Yes, I have post a verdor patch in v2 series,
+> <https://patchwork.kernel.org/patch/7530791/>
+> Maybe I should add it back to series with
+>
+> Acked-by: Rob Herring<robh@kernel.org>
+>
+If a patch has been reviewed/acked that's great. Add the tag, but
+please do not drop patches until they are merged. In the latter case
+you can mention that your series depends on branch X from repo Y.
+
+>>
+>>>    ARM: dts: rockchip: add support mipi panel tv080wum-nl0 for rk3288-evb
+>>>
+>>> Liu Ying (2):
+>>>    drm/dsi: Add a helper to get bits per pixel of MIPI DSI pixel format
+>>>    Documentation: dt-bindings: Add bindings for Synopsys DW MIPI DSI DRM
+>>>      bridge driver
+>>>
+>> >From the above 12 patches only ~6 reached this mailing list is that
+>> intentional ? Previously I've seen people CC dri-devel for their
+>> panel/bridge DT patches.
+>
+> I use the patman to post the series, forgot to add you and Thierry to the
+> to-list.
+> I will fix in next version series. Thanks for your reply.
+>
+No need to add me bth. Thierry on the other hand should be Cc'd on the
+patches where he's the maintainer.
+
+As the To/Cc list is already quite excessive - I'd suggest following
+the approach used by veterans in kernel development.
+
+I'm not a veteran kernel dev, but this is what I've noticed over the years:
+ - Subsystem foo - mailing-list, maintainer(s), and optionally the top
+1-2 developers
+ - Other subsystems - mailing-list and optionally the maintainer(s).
+
+Thus in the case of the panel driver you'll get - dri-devel, Thierry
+and optionally(?) devicetree
+For the DT binding for the panel driver - devicetree, Rob, dri-devel, Thierry.
+
+...I think you get the idea :-)
+
+Regards,
+Emil
