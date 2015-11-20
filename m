@@ -1,62 +1,118 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 19 Nov 2015 17:05:27 -0800
-Subject: [PATCH 20/29] ARM: shmobile: r8a7794: Add DU node to device tree
-In-Reply-To: <cover.1447981420.git.horms+renesas@verge.net.au>
-References: <cover.1447981420.git.horms+renesas@verge.net.au>
-Message-ID: <46c4f13d04d729fa79f7df2dd1978f9fc0ee6d6a.1447981420.git.horms+renesas@verge.net.au>
+Date: Thu, 19 Nov 2015 17:05:49 -0800
+Subject: [PATCH 5/6] arm64: renesas: add Salvator-X board support
+In-Reply-To: <cover.1447980335.git.horms+renesas@verge.net.au>
+References: <cover.1447980335.git.horms+renesas@verge.net.au>
+Message-ID: <1950fab0789111de4ba3406c6e93dc57e345d32c.1447980335.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Add the DU device with a disabled state. Boards that want to enable the
-DU need to specify the output topology.
+Add initial board support for r8a7795 Salvator-X. At this point
+only DEBUG0 and DEBUG1 serial ports are supported.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794.dtsi | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ Documentation/devicetree/bindings/arm/shmobile.txt |  2 +
+ arch/arm64/boot/dts/renesas/Makefile               |  2 +
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 62 ++++++++++++++++++++++
+ 3 files changed, 66 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index b70e4061d8b1..4075a0a3d5c1 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -750,6 +750,34 @@
- 		};
- 	};
- 
-+	du: display at feb00000 {
-+		compatible = "renesas,du-r8a7794";
-+		reg = <0 0xfeb00000 0 0x40000>;
-+		reg-names = "du";
-+		interrupts = <0 256 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 268 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp7_clks R8A7794_CLK_DU0>,
-+			 <&mstp7_clks R8A7794_CLK_DU0>;
-+		clock-names = "du.0", "du.1";
-+		status = "disabled";
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index 6712ebbe5f49..678a8184da24 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -59,5 +59,7 @@ Boards:
+     compatible = "renesas,marzen", "renesas,r8a7779"
+   - Porter (M2-LCDP)
+     compatible = "renesas,porter", "renesas,r8a7791"
++  - Salvator-X
++    compatible = "renesas,salvator-x", "renesas,r8a7795";
+   - SILK (RTP0RC7794LCB00011S)
+     compatible = "renesas,silk", "renesas,r8a7794"
+diff --git a/arch/arm64/boot/dts/renesas/Makefile b/arch/arm64/boot/dts/renesas/Makefile
+index fec69f46d65b..9ce1890a650e 100644
+--- a/arch/arm64/boot/dts/renesas/Makefile
++++ b/arch/arm64/boot/dts/renesas/Makefile
+@@ -1,2 +1,4 @@
++dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-salvator-x.dtb
 +
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
+ always		:= $(dtb-y)
+ clean-files	:= *.dtb
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+new file mode 100644
+index 000000000000..a3db98384e53
+--- /dev/null
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+@@ -0,0 +1,62 @@
++/*
++ * Device Tree Source for the Salvator-X board
++ *
++ * Copyright (C) 2015 Renesas Electronics Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
-+			port at 0 {
-+				reg = <0>;
-+				du_out_rgb0: endpoint {
-+				};
-+			};
-+			port at 1 {
-+				reg = <1>;
-+				du_out_rgb1: endpoint {
-+				};
-+			};
-+		};
++/dts-v1/;
++#include "r8a7795.dtsi"
++
++/ {
++	model = "Renesas Salvator-X board based on r8a7795";
++	compatible = "renesas,salvator-x", "renesas,r8a7795";
++
++	aliases {
++		serial0 = &scif2;
++		serial1 = &scif1;
 +	};
 +
- 	clocks {
- 		#address-cells = <2>;
- 		#size-cells = <2>;
++	chosen {
++		bootargs = "ignore_loglevel";
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory at 48000000 {
++		device_type = "memory";
++		/* first 128MB is reserved for secure area. */
++		reg = <0x0 0x48000000 0x0 0x38000000>;
++	};
++};
++
++&extal_clk {
++	clock-frequency = <16666666>;
++};
++
++&pfc {
++	scif1_pins: scif1 {
++		renesas,groups = "scif1_data_a", "scif1_ctrl";
++		renesas,function = "scif1";
++	};
++	scif2_pins: scif2 {
++		renesas,groups = "scif2_data_a";
++		renesas,function = "scif2";
++	};
++};
++
++&scif1 {
++	pinctrl-0 = <&scif1_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
++
++&scif2 {
++	pinctrl-0 = <&scif2_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
 -- 
 2.1.4
