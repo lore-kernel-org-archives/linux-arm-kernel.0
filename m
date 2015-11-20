@@ -1,139 +1,87 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 20 Nov 2015 12:46:37 +0100
-Subject: [PATCH] ARM: sunxi: Re-enable SID driver in sunxi_defconfig
-In-Reply-To: <1447981788.1404.23.camel@silentcreek.de>
-References: <1447724578-4786-1-git-send-email-public_timo.s@silentcreek.de>
- <1447969715.1730.5.camel@silentcreek.de>
- <20151119234331.GT32142@lukather>
- <1447981788.1404.23.camel@silentcreek.de>
-Message-ID: <20151120114637.GB32142@lukather>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 20 Nov 2015 17:17:16 +0530
+Subject: [PATCH v3 1/3] mailbox: Add support for APM X-Gene platform
+ mailbox driver
+In-Reply-To: <b6f12c4d5f45205c356a61acd26aecff70b54e68.1447091626.git.dhdang@apm.com>
+References: <1429863912.2927.43.camel@x220>
+ <cover.1447091625.git.dhdang@apm.com>
+ <b6f12c4d5f45205c356a61acd26aecff70b54e68.1447091626.git.dhdang@apm.com>
+Message-ID: <CABb+yY2zHycEmsVvp8OFwpJ1PZgrEPpV-oOe56wgFJ=EE0nTcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 02:09:48AM +0100, Timo Sigurdsson wrote:
-> Hi Maxime,
-> 
-> Am Freitag, den 20.11.2015, 00:43 +0100 schrieb Maxime Ripard:
-> > Hi,
-> > 
-> > On Thu, Nov 19, 2015 at 10:48:35PM +0100, Timo Sigurdsson wrote:
-> > > Hi Maxime,
-> > > Hi Chen-Yu,
-> > > 
-> > > Am Dienstag, den 17.11.2015, 02:42 +0100 schrieb Timo Sigurdsson:
-> > > > Commit 3d0b16a66c8a ("nvmem: sunxi: Move the SID driver to the
-> nvmem
-> > > > framework") moved the the sunxi SID driver to a new framework, but
-> left
-> > > > sunxi_defconfig with the deprecated config symbol EEPROM_SUNXI_SID
-> > > > instead of the new symbold NVMEM_SUNXI_SID. Hence, re-enable the
-> driver
-> > > > in sunxi_defconfig.
-> > > > 
-> > > > While at it, clean up sunxi_defconfig by generating a fresh file
-> via
-> > > >   make sunxi_defconfig
-> > > >   make savedefconfig
-> > > > While this moves around a few lines and removes unnecessary
-> symbols,
-> > > > it doesn't introduce any functional changes.
-> > > > 
-> > > > Signed-off-by: Timo Sigurdsson <public_timo.s@silentcreek.de>
-> > > > 
-> > > > diff --git a/arch/arm/configs/sunxi_defconfig
-> b/arch/arm/configs/sunxi_defconfig
-> > > > index 3c36e16..904ea52 100644
-> > > > --- a/arch/arm/configs/sunxi_defconfig
-> > > > +++ b/arch/arm/configs/sunxi_defconfig
-> > > > @@ -11,14 +11,12 @@ CONFIG_SMP=y
-> > > >  CONFIG_NR_CPUS=8
-> > > >  CONFIG_AEABI=y
-> > > >  CONFIG_HIGHMEM=y
-> > > > -CONFIG_HIGHPTE=y
-> > > >  CONFIG_ARM_APPENDED_DTB=y
-> > > >  CONFIG_ARM_ATAG_DTB_COMPAT=y
-> > > >  CONFIG_CPU_FREQ=y
-> > > >  CONFIG_CPUFREQ_DT=y
-> > > >  CONFIG_VFP=y
-> > > >  CONFIG_NEON=y
-> > > > -CONFIG_PM=y
-> > > >  CONFIG_NET=y
-> > > >  CONFIG_PACKET=y
-> > > >  CONFIG_UNIX=y
-> > > > @@ -37,7 +35,6 @@ CONFIG_CAN_SUN4I=y
-> > > >  # CONFIG_WIRELESS is not set
-> > > >  CONFIG_DEVTMPFS=y
-> > > >  CONFIG_DEVTMPFS_MOUNT=y
-> > > > -CONFIG_EEPROM_SUNXI_SID=y
-> > > >  CONFIG_BLK_DEV_SD=y
-> > > >  CONFIG_ATA=y
-> > > >  CONFIG_AHCI_SUNXI=y
-> > > > @@ -63,11 +60,10 @@ CONFIG_STMMAC_ETH=y
-> > > >  # CONFIG_INPUT_MOUSEDEV is not set
-> > > >  # CONFIG_INPUT_KEYBOARD is not set
-> > > >  # CONFIG_INPUT_MOUSE is not set
-> > > > -CONFIG_INPUT_MISC=y
-> > > > -CONFIG_INPUT_AXP20X_PEK=y
-> > > >  CONFIG_INPUT_TOUCHSCREEN=y
-> > > > -CONFIG_KEYBOARD_SUN4I_LRADC=y
-> > > >  CONFIG_TOUCHSCREEN_SUN4I=y
-> > > > +CONFIG_INPUT_MISC=y
-> > > > +CONFIG_INPUT_AXP20X_PEK=y
-> > > >  CONFIG_SERIAL_8250=y
-> > > >  CONFIG_SERIAL_8250_CONSOLE=y
-> > > >  CONFIG_SERIAL_8250_NR_UARTS=8
-> > > > @@ -123,6 +119,8 @@ CONFIG_PWM=y
-> > > >  CONFIG_PWM_SUN4I=y
-> > > >  CONFIG_PHY_SUN4I_USB=y
-> > > >  CONFIG_PHY_SUN9I_USB=y
-> > > > +CONFIG_NVMEM=y
-> > > > +CONFIG_NVMEM_SUNXI_SID=y
-> > > >  CONFIG_EXT4_FS=y
-> > > >  CONFIG_VFAT_FS=y
-> > > >  CONFIG_TMPFS=y
-> > > 
-> > > Would you also prefer to see this patch split up into two patches
-> (one
-> > > for re-enabling the SID driver and one for the extra cleanup of
-> > > sunxi_defconfg) as I was asked to do for my other patch for
-> > > multi_v7_defconfig?
-> > 
-> > Yes, please do.
-> 
-> Ok.
-> 
-> > 
-> > Also why CONFIG_PM CONFIG_KEYBOARD_SUN4I_LRADC and CONFIG_HIGHPTE got
-> > removed ?
-> 
-> CONFIG_HIGHPTE defaults to yes since 4.4-rc1 in arch/arm/Kconfig, so we
-> don't need it in sunxi_defconfig anymore. CONFIG_PM is already selected
-> by CONFIG_ARCH_MULTI_V7, so also no need to set that explicitly.
-> 
-> What's interesting is CONFIG_KEYBOARD_SUN4I_LRADC, because that actually
-> does _NOT_ get enabled by sunxi_defconfig. I didn't notice earlier,
-> because before and after my patch, the resulting .config was identical.
-> 
-> The problem with CONFIG_KEYBOARD_SUN4I_LRADC is that keyboard support is
-> explicitly disabled in sunxi_defconfig which is why
-> CONFIG_KEYBOARD_SUN4I_LRADC is simply ignored.
-> So, we need to remove the line
-> # CONFIG_INPUT_KEYBOARD is not set
-> in order to actually have CONFIG_KEYBOARD_SUN4I_LRADC enabled.
-> 
-> I'll write another patch for it.
+On Mon, Nov 9, 2015 at 11:35 PM, Duc Dang <dhdang@apm.com> wrote:
+> X-Gene mailbox controller provides 8 mailbox channels, with
+> each channel has a dedicated interrupt line.
+>
+> [dhdang: rebase over 4.3-rc5, some minor changes to
+> address comment in v2 patch set]
+>
+Do you want this to go into git logs?
 
-Great, thanks!
-Maxime
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> Signed-off-by: Duc Dang <dhdang@apm.com>
+> ---
+here is the right place for any history. And it is good practice to
+specify whatever changes were made from last revision.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/1e4b7c10/attachment.sig>
+
+> +
+> +struct slimpro_mbox_chan {
+> +       struct device *dev;
+> +       struct mbox_chan *chan;
+> +       void __iomem *reg;
+> +       int id;
+>
+You don't seem to really need 'id'.
+
+
+> +
+> +static void mb_chan_enable_int(struct slimpro_mbox_chan *mb_chan, u32 mask)
+> +{
+> +       u32 val = readl(mb_chan->reg + REG_DB_STATMASK);
+> +
+> +       val &= ~mask;
+> +       writel(val, mb_chan->reg + REG_DB_STATMASK);
+> +}
+> +
+> +static void mb_chan_disable_int(struct slimpro_mbox_chan *mb_chan, u32 mask)
+> +{
+> +       u32 val = readl(mb_chan->reg + REG_DB_STATMASK);
+> +
+> +       val |= mask;
+> +       writel(val, mb_chan->reg + REG_DB_STATMASK);
+> +}
+> +
+These 2 functions are called just once. And do what other drivers
+usually inline. Wouldn't it be better to directly set & clear the bit
+when needed?
+
+> +static int slimpro_mbox_send_data(struct mbox_chan *chan, void *msg)
+> +{
+> +       struct slimpro_mbox_chan *mb_chan =
+> +                               (struct slimpro_mbox_chan *)chan->con_priv;
+> +
+You don't need to typecast a void pointer. Here and elsewhere.
+
+
+> +
+> +       /* Setup mailbox links */
+> +       for (i = 0; i < MBOX_CNT; i++) {
+> +               ctx->mc[i].irq = platform_get_irq(pdev, i);
+>
+You expect every platform to provide exactly 'MBOX_CNT' irqs and they
+must be different (because you don't 'SHARE' when you request).
+Usually developers relax either of the conditions.
+
+
+> +static struct platform_driver slimpro_mbox_driver = {
+> +       .probe  = slimpro_mbox_probe,
+> +       .remove = slimpro_mbox_remove,
+> +       .driver = {
+> +               .name = "xgene-slimpro-mbox",
+> +               .owner = THIS_MODULE,
+>
+No need to set .owner.
+
+Cheers.
