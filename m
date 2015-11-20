@@ -1,59 +1,52 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 20 Nov 2015 09:33:09 -0600
-Subject: [PATCH v2 1/7] dt-binding: Add ngpios property to GPIO
- controller node
-In-Reply-To: <1447905139-16002-2-git-send-email-pramodku@broadcom.com>
+Date: Fri, 20 Nov 2015 09:34:37 -0600
+Subject: [PATCH v2 6/7] Documentation: Rename gpio controller name from
+ cygnus to iproc
+In-Reply-To: <1447905139-16002-7-git-send-email-pramodku@broadcom.com>
 References: <1447905139-16002-1-git-send-email-pramodku@broadcom.com>
- <1447905139-16002-2-git-send-email-pramodku@broadcom.com>
-Message-ID: <20151120153309.GA4944@rob-hp-laptop>
+ <1447905139-16002-7-git-send-email-pramodku@broadcom.com>
+Message-ID: <20151120153437.GA7645@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2015 at 09:22:13AM +0530, Pramod Kumar wrote:
-> Add ngpios property to the gpio controller's DT node so that controller
-> driver extracts total number of in-use gpio lines from DT and removes
-> dependency on driver.
+On Thu, Nov 19, 2015 at 09:22:18AM +0530, Pramod Kumar wrote:
+> Renamed gpio controller's driver name from cygnus to iproc to make it
+> more generic so that all iProc based SoCs having the same gpio controller
+> could use this.
 > 
 > Signed-off-by: Pramod Kumar <pramodku@broadcom.com>
 > Reviewed-by: Ray Jui <rjui@broadcom.com>
 > Reviewed-by: Scott Branden <sbranden@broadcom.com>
 
-Acked-by: Rob Herring <robh@kernel.org>
+Where's my ack?
 
 > ---
->  Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt | 5 +++++
->  1 file changed, 5 insertions(+)
+>  .../bindings/pinctrl/{brcm,cygnus-gpio.txt => brcm,iproc-gpio.txt}    | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>  rename Documentation/devicetree/bindings/pinctrl/{brcm,cygnus-gpio.txt => brcm,iproc-gpio.txt} (97%)
 > 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
-> index 16589fb6..8b1e5d1 100644
+> diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt b/Documentation/devicetree/bindings/pinctrl/brcm,iproc-gpio.txt
+> similarity index 97%
+> rename from Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
+> rename to Documentation/devicetree/bindings/pinctrl/brcm,iproc-gpio.txt
+> index 8b1e5d1..e427792 100644
 > --- a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
-> @@ -10,6 +10,9 @@ Required properties:
->      Define the base and range of the I/O address space that contains the Cygnus
+> +++ b/Documentation/devicetree/bindings/pinctrl/brcm,iproc-gpio.txt
+> @@ -1,4 +1,4 @@
+> -Broadcom Cygnus GPIO/PINCONF Controller
+> +Broadcom iProc GPIO/PINCONF Controller
+>  
+>  Required properties:
+>  
+> @@ -7,7 +7,7 @@ Required properties:
+>      "brcm,cygnus-crmu-gpio" or "brcm,iproc-gpio"
+>  
+>  - reg:
+> -    Define the base and range of the I/O address space that contains the Cygnus
+> +    Define the base and range of the I/O address space that contains SoC
 >  GPIO/PINCONF controller registers
 >  
-> +- ngpios:
-> +    Total number of in-use slots in GPIO controller
-> +
->  - #gpio-cells:
->      Must be two. The first cell is the GPIO pin number (within the
->  controller's pin space) and the second cell is used for the following:
-> @@ -57,6 +60,7 @@ Example:
->  		compatible = "brcm,cygnus-ccm-gpio";
->  		reg = <0x1800a000 0x50>,
->  		      <0x0301d164 0x20>;
-> +		ngpios = <24>;
->  		#gpio-cells = <2>;
->  		gpio-controller;
->  		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-> @@ -78,6 +82,7 @@ Example:
->  	gpio_asiu: gpio at 180a5000 {
->  		compatible = "brcm,cygnus-asiu-gpio";
->  		reg = <0x180a5000 0x668>;
-> +		ngpios = <146>;
->  		#gpio-cells = <2>;
->  		gpio-controller;
->  		interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
+>  - ngpios:
 > -- 
 > 1.9.1
 > 
