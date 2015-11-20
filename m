@@ -1,51 +1,69 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Fri, 20 Nov 2015 03:28:36 +0200
-Subject: [PATCH 01/10] dt-bindings: create arm/nxp folder and move LPC32xx SoC
- description to it
+Date: Fri, 20 Nov 2015 03:28:37 +0200
+Subject: [PATCH 02/10] dt-bindings: nxp: add description of wakeup controller
+ on LPC32xx
 In-Reply-To: <1447982925-30138-1-git-send-email-vz@mleia.com>
 References: <1447982925-30138-1-git-send-email-vz@mleia.com>
-Message-ID: <1447982925-30138-2-git-send-email-vz@mleia.com>
+Message-ID: <1447982925-30138-3-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a separate folder for device tree bindings of NXP SoCs devices,
-and move lpc32xx.txt to it.
+NXP LPC32xx has three wakeup controllers of two types, this
+descriptions defines DT bindings of wakeup controllers connected to
+MIC, SIC1 and SIC2 interrupt controllers.
 
 Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
- Documentation/devicetree/bindings/arm/lpc32xx.txt     | 8 --------
- Documentation/devicetree/bindings/arm/nxp/lpc32xx.txt | 8 ++++++++
- 2 files changed, 8 insertions(+), 8 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/arm/lpc32xx.txt
- create mode 100644 Documentation/devicetree/bindings/arm/nxp/lpc32xx.txt
+ .../bindings/arm/nxp/nxp,lpc3220-wakeup.txt        | 41 ++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/nxp/nxp,lpc3220-wakeup.txt
 
-diff --git a/Documentation/devicetree/bindings/arm/lpc32xx.txt b/Documentation/devicetree/bindings/arm/lpc32xx.txt
-deleted file mode 100644
-index 56ec8dd..0000000
---- a/Documentation/devicetree/bindings/arm/lpc32xx.txt
-+++ /dev/null
-@@ -1,8 +0,0 @@
--NXP LPC32xx Platforms Device Tree Bindings
--------------------------------------------
--
--Boards with the NXP LPC32xx SoC shall have the following properties:
--
--Required root node property:
--
--compatible: must be "nxp,lpc3220", "nxp,lpc3230", "nxp,lpc3240" or "nxp,lpc3250"
-diff --git a/Documentation/devicetree/bindings/arm/nxp/lpc32xx.txt b/Documentation/devicetree/bindings/arm/nxp/lpc32xx.txt
+diff --git a/Documentation/devicetree/bindings/arm/nxp/nxp,lpc3220-wakeup.txt b/Documentation/devicetree/bindings/arm/nxp/nxp,lpc3220-wakeup.txt
 new file mode 100644
-index 0000000..56ec8dd
+index 0000000..803728f
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/nxp/lpc32xx.txt
-@@ -0,0 +1,8 @@
-+NXP LPC32xx Platforms Device Tree Bindings
-+------------------------------------------
++++ b/Documentation/devicetree/bindings/arm/nxp/nxp,lpc3220-wakeup.txt
+@@ -0,0 +1,41 @@
++NXP LPC32xx Wakeup Controller
 +
-+Boards with the NXP LPC32xx SoC shall have the following properties:
++Required properties:
++- compatible: should be "nxp,lpc3220-wakeup"
++- reg:  should contain wakeup controller registers location and length
++- #wakeup-cells: must be 2, the first cell describes wakeup source on
++  the controller, the second cell is a hardware interrupt number on IC.
 +
-+Required root node property:
++Examples:
 +
-+compatible: must be "nxp,lpc3220", "nxp,lpc3230", "nxp,lpc3240" or "nxp,lpc3250"
++	/* System Control Block */
++	scb {
++		compatible = "simple-bus";
++		ranges = <0x0 0x040004000 0x00001000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		wakeup_int: wakeup-controller at 20 {
++			compatible = "nxp,lpc3220-wakeup";
++			reg = <0x20 0x10>;
++			#wakeup-cells = <2>;
++		};
++
++		wakeup_pin: wakeup-controller at 30 {
++			compatible = "nxp,lpc3220-wakeup";
++			reg = <0x30 0x10>;
++			#wakeup-cells = <2>;
++		};
++	};
++
++	/* Main Interrupt Controller */
++	mic: interrupt-controller at 40008000 {
++		compatible = "nxp,lpc3220-mic";
++		reg = <0x40008000 0x4000>;
++		interrupt-controller;
++		interrupt-controller-name = "mic";
++		#interrupt-cells = <2>;
++
++		wakeup-sources = <&wakeup_int 7 29>,
++				 <&wakeup_int 25 27>;
++	};
 -- 
 2.1.4
