@@ -1,156 +1,77 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 20 Nov 2015 08:43:54 -0600
-Subject: [PATCH 4/7] touchscreen: pixcir_i2c: Add support for wake and
- enable gpios
-In-Reply-To: <1448018233-27824-5-git-send-email-hdegoede@redhat.com>
-References: <1448018233-27824-1-git-send-email-hdegoede@redhat.com>
- <1448018233-27824-5-git-send-email-hdegoede@redhat.com>
-Message-ID: <20151120144354.GA14394@rob-hp-laptop>
+From: brian.starkey@arm.com (Brian Starkey)
+Date: Fri, 20 Nov 2015 14:20:26 +0000
+Subject: [PATCH] drivers: dma-coherent: use ioremap_wc() for DMA_MEMORY_MAP
+Message-ID: <1448029226-4914-1-git-send-email-brian.starkey@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 12:17:10PM +0100, Hans de Goede wrote:
-> From: Sander Vermin <sander@vermin.nl>
-> 
-> On some devices the wake and enable pins of the pixcir touchscreen
-> controller are connected to gpios and these must be controlled by the
-> driver for the device to operate properly.
-> 
-> Signed-off-by: Sander Vermin <sander@vermin.nl>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Changes in v2 (Hans de Goede):
-> -Split the changes for dealing with inverted / swapped axis out into a
->  separate patch
-> -Remove a bunch of dev_info calls to make the driver less chatty
-> -Use devm_gpiod_get_optional as these new gpios are optional
-> -Only msleep after setting enable high if we have an enable pin
-> ---
->  .../bindings/input/touchscreen/pixcir_i2c_ts.txt   |  2 +
+When the DMA_MEMORY_MAP flag is used, memory which can be accessed
+directly should be returned, so use ioremap_wc() instead of ioremap().
+Also, ensure that the correct memset operation is used in
+dma_alloc_from_coherent() with respect to the region's flags.
 
-For the binding:
+This fixes the below alignment fault on arm64, caused by invalid use
+of memset() on Device memory.
 
-Acked-by: Rob Herring <robh@kernel.org>
+   Unhandled fault: alignment fault (0x96000061) at 0xffffff8000380000
+   Internal error: : 96000061 [#1] PREEMPT SMP
+   Modules linked in: hdlcd(+) clk_scpi
+   CPU: 4 PID: 1355 Comm: systemd-udevd Not tainted 4.4.0-rc1+ #5
+   Hardware name: ARM Juno development board (r0) (DT)
+   task: ffffffc9763eee00 ti: ffffffc9758c4000 task.ti: ffffffc9758c4000
+   PC is at __efistub_memset+0x1ac/0x200
+   LR is at dma_alloc_from_coherent+0xb0/0x120
+   pc : [<ffffffc00030ff2c>] lr : [<ffffffc00042a918>] pstate: 400001c5
+   sp : ffffffc9758c79a0
+   x29: ffffffc9758c79a0 x28: ffffffc000635cd0
+   x27: 0000000000000124 x26: ffffffc000119ef4
+   x25: 0000000000010000 x24: 0000000000000140
+   x23: ffffffc07e9ac3a8 x22: ffffffc9758c7a58
+   x21: ffffffc9758c7a68 x20: 0000000000000004
+   x19: ffffffc07e9ac380 x18: 0000000000000001
+   x17: 0000007fae1bbba8 x16: ffffffc0001b2d1c
+   x15: ffffffffffffffff x14: 0ffffffffffffffe
+   x13: 0000000000000010 x12: ffffff800837ffff
+   x11: ffffff800837ffff x10: 0000000040000000
+   x9 : 0000000000000000 x8 : ffffff8000380000
+   x7 : 0000000000000000 x6 : 000000000000003f
+   x5 : 0000000000000040 x4 : 0000000000000000
+   x3 : 0000000000000004 x2 : 000000000000ffc0
+   x1 : 0000000000000000 x0 : ffffff8000380000
 
->  drivers/input/touchscreen/pixcir_i2c_ts.c          | 46 ++++++++++++++++++++++
->  2 files changed, 48 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
-> index 8eb240a..72ca5ec 100644
-> --- a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
-> @@ -10,6 +10,8 @@ Required properties:
->  
->  Optional properties:
->  - reset-gpio: GPIO connected to the RESET line of the chip
-> +- enable-gpios: GPIO connected to the ENABLE line of the chip
-> +- wake-gpios: GPIO connected to the WAKE line of the chip
->  
->  Example:
->  
-> diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
-> index 211408c..b75ef65 100644
-> --- a/drivers/input/touchscreen/pixcir_i2c_ts.c
-> +++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
-> @@ -38,6 +38,8 @@ struct pixcir_i2c_ts_data {
->  	struct input_dev *input;
->  	struct gpio_desc *gpio_attb;
->  	struct gpio_desc *gpio_reset;
-> +	struct gpio_desc *gpio_enable;
-> +	struct gpio_desc *gpio_wake;
->  	const struct pixcir_i2c_chip_data *chip;
->  	int max_fingers;	/* Max fingers supported in this instance */
->  	bool running;
-> @@ -208,6 +210,11 @@ static int pixcir_set_power_mode(struct pixcir_i2c_ts_data *ts,
->  	struct device *dev = &ts->client->dev;
->  	int ret;
->  
-> +	if (mode == PIXCIR_POWER_ACTIVE || mode == PIXCIR_POWER_IDLE) {
-> +		if (!IS_ERR_OR_NULL(ts->gpio_wake))
-> +			gpiod_set_value_cansleep(ts->gpio_wake, 1);
-> +	}
-> +
->  	ret = i2c_smbus_read_byte_data(ts->client, PIXCIR_REG_POWER_MODE);
->  	if (ret < 0) {
->  		dev_err(dev, "%s: can't read reg 0x%x : %d\n",
-> @@ -228,6 +235,11 @@ static int pixcir_set_power_mode(struct pixcir_i2c_ts_data *ts,
->  		return ret;
->  	}
->  
-> +	if (mode == PIXCIR_POWER_HALT) {
-> +		if (!IS_ERR_OR_NULL(ts->gpio_wake))
-> +			gpiod_set_value_cansleep(ts->gpio_wake, 0);
-> +	}
-> +
->  	return 0;
->  }
->  
-> @@ -302,6 +314,11 @@ static int pixcir_start(struct pixcir_i2c_ts_data *ts)
->  	struct device *dev = &ts->client->dev;
->  	int error;
->  
-> +	if (!IS_ERR_OR_NULL(ts->gpio_enable)) {
-> +		gpiod_set_value_cansleep(ts->gpio_enable, 1);
-> +		msleep(100);
-> +	}
-> +
->  	/* LEVEL_TOUCH interrupt with active low polarity */
->  	error = pixcir_set_int_mode(ts, PIXCIR_INT_LEVEL_TOUCH, 0);
->  	if (error) {
-> @@ -343,6 +360,9 @@ static int pixcir_stop(struct pixcir_i2c_ts_data *ts)
->  	/* Wait till running ISR is complete */
->  	synchronize_irq(ts->client->irq);
->  
-> +	if (!IS_ERR_OR_NULL(ts->gpio_enable))
-> +		gpiod_set_value_cansleep(ts->gpio_enable, 0);
-> +
->  	return 0;
->  }
->  
-> @@ -534,6 +554,24 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
->  		return error;
->  	}
->  
-> +	tsdata->gpio_wake = devm_gpiod_get_optional(dev, "wake",
-> +						    GPIOD_OUT_HIGH);
-> +	if (IS_ERR(tsdata->gpio_wake)) {
-> +		error = PTR_ERR(tsdata->gpio_wake);
-> +		if (error != -EPROBE_DEFER)
-> +			dev_err(dev, "Failed to get wake gpio: %d\n", error);
-> +		return error;
-> +	}
-> +
-> +	tsdata->gpio_enable = devm_gpiod_get_optional(dev, "enable",
-> +						      GPIOD_OUT_HIGH);
-> +	if (IS_ERR(tsdata->gpio_enable)) {
-> +		error = PTR_ERR(tsdata->gpio_enable);
-> +		if (error != -EPROBE_DEFER)
-> +			dev_err(dev, "Failed to get enable gpio: %d\n", error);
-> +		return error;
-> +	}
-> +
->  	error = devm_request_threaded_irq(dev, client->irq, NULL, pixcir_ts_isr,
->  					  IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
->  					  client->name, tsdata);
-> @@ -542,6 +580,14 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
->  		return error;
->  	}
->  
-> +	if (!IS_ERR_OR_NULL(tsdata->gpio_wake))
-> +		gpiod_set_value_cansleep(tsdata->gpio_wake, 1);
-> +
-> +	if (!IS_ERR_OR_NULL(tsdata->gpio_enable)) {
-> +		gpiod_set_value_cansleep(tsdata->gpio_enable, 1);
-> +		msleep(100);
-> +	}
-> +
->  	pixcir_reset(tsdata);
->  
->  	/* Always be in IDLE mode to save power, device supports auto wake */
-> -- 
-> 2.5.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Signed-off-by: Brian Starkey <brian.starkey@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ drivers/base/dma-coherent.c |   10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+index 55b8398..45358d0 100644
+--- a/drivers/base/dma-coherent.c
++++ b/drivers/base/dma-coherent.c
+@@ -31,7 +31,10 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_add
+ 	if (!size)
+ 		goto out;
+ 
+-	mem_base = ioremap(phys_addr, size);
++	if (flags & DMA_MEMORY_MAP)
++		mem_base = ioremap_wc(phys_addr, size);
++	else
++		mem_base = ioremap(phys_addr, size);
+ 	if (!mem_base)
+ 		goto out;
+ 
+@@ -181,7 +184,10 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
+ 	 */
+ 	*dma_handle = mem->device_base + (pageno << PAGE_SHIFT);
+ 	*ret = mem->virt_base + (pageno << PAGE_SHIFT);
+-	memset(*ret, 0, size);
++	if (mem->flags & DMA_MEMORY_MAP)
++		memset(*ret, 0, size);
++	else
++		memset_io(*ret, 0, size);
+ 	spin_unlock_irqrestore(&mem->spinlock, flags);
+ 
+ 	return 1;
+-- 
+1.7.9.5
