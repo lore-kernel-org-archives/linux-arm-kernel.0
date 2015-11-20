@@ -1,77 +1,163 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 20 Nov 2015 09:29:31 -0800
-Subject: [PATH RESEND v2 03/10] tty: xuartps: Always enable transmitter
- in start_tx
-In-Reply-To: <564F5574.4070407@hurleysoftware.com>
-References: <1447963344-16266-1-git-send-email-soren.brinkmann@xilinx.com>
- <1447963344-16266-4-git-send-email-soren.brinkmann@xilinx.com>
- <564F0E75.5020100@hurleysoftware.com>
- <20151120152849.GU32017@xsjsorenbubuntu>
- <564F4A95.3010303@hurleysoftware.com>
- <20151120165804.GV32017@xsjsorenbubuntu>
- <564F5574.4070407@hurleysoftware.com>
-Message-ID: <20151120172931.GX32017@xsjsorenbubuntu>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 20 Nov 2015 17:30:59 +0000
+Subject: [PATCH 13/13] ARM: XEN: Move xen_early_init() before
+ efi_init()
+In-Reply-To: <1447754231-7772-14-git-send-email-shannon.zhao@linaro.org>
+References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
+ <1447754231-7772-14-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511201720550.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-11-20 at 12:16PM -0500, Peter Hurley wrote:
-> On 11/20/2015 11:58 AM, S?ren Brinkmann wrote:
-> > On Fri, 2015-11-20 at 11:30AM -0500, Peter Hurley wrote:
-> >> On 11/20/2015 10:28 AM, S?ren Brinkmann wrote:
-> >>> On Fri, 2015-11-20 at 07:13AM -0500, Peter Hurley wrote:
-> >>>> On 11/19/2015 03:02 PM, Soren Brinkmann wrote:
-> >>>>> start_tx must start transmitting characters. Regardless of the state of
-> >>>>> the circular buffer, always enable the transmitter hardware.
-> >>>>
-> >>>> Why?
-> >>>>
-> >>>> Does cdns_uart_stop_tx() actually stop the transmitter so that
-> >>>> data remains in the transmitter?
-> >>>
-> >>> Well, I saw my system freezing and the cause seemed to be that the UART
-> >>> receiver and/or transmitters were disabled while the system was trying
-> >>> to print. Hence, I started questioning all locations touching the
-> >>> transmitter/receiver enable. I read the docs in
-> >>> https://www.kernel.org/doc/Documentation/serial/driver, which simply
-> >>> says "Start transmitting characters." for start_tx(). Hence, I thought,
-> >>> this function is probably supposed to just do that and start the
-> >>> transmitter. I'll test whether this patch can be dropped.
-> >>
-> >> I don't think that patch would fix any freeze problems, but restarting
-> >> the transmitter even if the circ buffer is empty may be necessary to
-> >> push out remaining data when the port is restarted after being stopped.
-> >>
-> >> IOW, something like
-> >>
-> >> 	if (uart_tx_stopped(port))
-> >> 		return;
-> >>
-> >> 	....
-> >>
-> >>
-> >> 	if (uart_circ_empty(&port->state->xmit)
-> >> 		return;
-> > 
-> > Thanks! I'll change the patch accordingly.
-> > 
-> >>
-> >>
-> >> Below is a (work-in-progress) serial driver validation test for flow
-> >> control handling (it may need some tuning for slow line speeds).
-> >> Usual caveats apply. Takes ~40secs @ 115200.
-> > 
-> > I'll try to get that running on my system.
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> The test below should pass too, but I know it won't because this xilinx
-> driver isn't handling x_char at all.
+> Move xen_early_init() before efi_init(), then when calling efi_init()
+> could initialize Xen specific UEFI.
 > 
-> Aside: does this h/w have rts driver/cts receiver?
+> Check if it runs on Xen hypervisor through the flat dts.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm/xen/enlighten.c  | 62 ++++++++++++++++++++++++++++++++++++-----------
+>  arch/arm64/kernel/setup.c |  2 +-
+>  2 files changed, 49 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index b8e9db8..d4f884c 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/irqreturn.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> +#include <linux/of_fdt.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/of_address.h>
+>  #include <linux/cpuidle.h>
+> @@ -48,8 +49,6 @@ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS] __initdata;
+>  
+>  static __read_mostly unsigned int xen_events_irq;
+>  
+> -static __initdata struct device_node *xen_node;
+> -
+>  int xen_remap_domain_gfn_array(struct vm_area_struct *vma,
+>  			       unsigned long addr,
+>  			       xen_pfn_t *gfn, int nr,
+> @@ -142,6 +141,34 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> +struct xen_node_info {
+> +	const char *compat;
+> +	const char *prefix;
+> +	const char *version;
+> +	bool found;
+> +};
+> +
+> +static int __init fdt_find_xen_node(unsigned long node, const char *uname,
+> +				    int depth, void *data)
+> +{
+> +	struct xen_node_info *info = data;
+> +	const void *s = NULL;
+> +	int len;
+> +
+> +	if (depth != 1 || strcmp(uname, "hypervisor") != 0)
+> +		return 0;
+> +
+> +	if (of_flat_dt_is_compatible(node, info->compat))
+> +		info->found = true;
+> +
+> +	s = of_get_flat_dt_prop(node, "compatible", &len);
+> +	if (strlen(info->prefix) + 3  < len &&
+> +                        !strncmp(info->prefix, s, strlen(info->prefix)))
+> +                info->version = s + strlen(info->prefix);
+> +	return 0;
+> +}
+> +
+>  /*
+>   * see Documentation/devicetree/bindings/arm/xen.txt for the
+>   * documentation of the Xen Device Tree format.
+> @@ -149,26 +176,25 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
+>  #define GRANT_TABLE_PHYSADDR 0
+>  void __init xen_early_init(void)
+>  {
+> -	int len;
+> -	const char *s = NULL;
+> -	const char *version = NULL;
+> -	const char *xen_prefix = "xen,xen-";
+> +	struct xen_node_info info;
+> +
+> +	info.compat = "xen,xen";
+> +	info.prefix = "xen,xen-";
+> +	info.version = NULL;
+> +	info.found = false;
 
-I would have to look up the details. But, IIRC, the HW has all the
-modem/flow control signals. But on our SoCs those signals are only
-available when routing the UART through the FPGA part, which makes it a
-rather unlikely configuration since most platforms want the UART as a
-low level debug port that should not depend on any FPGA bistreams.
-Hence, I suspect it might just be a limitation of the driver.
+Can you initialize the fields directly when you define xen_node_info and
+make it static?
 
-	S?ren
+The rest looks good.
+
+
+> -	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
+> -	if (!xen_node) {
+> +	of_scan_flat_dt(fdt_find_xen_node, &info);
+> +	if (!info.found) {
+>  		pr_debug("No Xen support\n");
+>  		return;
+>  	}
+> -	s = of_get_property(xen_node, "compatible", &len);
+> -	if (strlen(xen_prefix) + 3  < len &&
+> -			!strncmp(xen_prefix, s, strlen(xen_prefix)))
+> -		version = s + strlen(xen_prefix);
+>
+> -	if (version == NULL) {
+> +
+> +	if (info.version == NULL) {
+>  		pr_debug("Xen version not found\n");
+>  		return;
+>  	}
+>  
+> -	pr_info("Xen %s support found\n", version);
+> +	pr_info("Xen %s support found\n", info.version);
+>  
+>  	xen_domain_type = XEN_HVM_DOMAIN;
+>  
+> @@ -204,6 +230,14 @@ static int __init xen_guest_init(void)
+>  		}
+>  		xen_events_irq = a.value & 0xff;
+>  	} else {
+> +		struct device_node *xen_node;
+> +
+> +		xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
+> +		if (!xen_node) {
+> +			pr_debug("No Xen support\n");
+> +			return -ENODEV;
+> +		}
+> +
+>  		xen_events_irq = irq_of_parse_and_map(xen_node, 0);
+>  		if (!xen_events_irq) {
+>  			pr_err("Xen event channel interrupt not found\n");
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 2322479..ee95593 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -428,6 +428,7 @@ void __init setup_arch(char **cmdline_p)
+>  	 */
+>  	local_async_enable();
+>  
+> +	xen_early_init();
+>  	efi_init();
+>  	arm64_memblock_init();
+>  
+> @@ -446,7 +447,6 @@ void __init setup_arch(char **cmdline_p)
+>  	} else {
+>  		psci_acpi_init();
+>  	}
+> -	xen_early_init();
+>  
+>  	cpu_read_bootcpu_ops();
+>  	smp_init_cpus();
+> -- 
+> 2.1.0
+> 
