@@ -1,31 +1,46 @@
-From: michal.morawiec@tieto.com (Michal Morawiec)
-Date: Sat, 21 Nov 2015 00:39:41 +0100
-Subject: [PATCH 1/1] soc: ti: knav_qmss_queue: Fix linking RAM setup for queue
- managers
-Message-ID: <1448062781-6708-1-git-send-email-michal.1.morawiec.ext@nokia.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 20 Nov 2015 15:43:06 -0800
+Subject: [PATCH] ASoC: qcom: Specify LE device endianness
+Message-ID: <1448062986-19535-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configure linking RAM for both queue managers also in case
-when only linking RAM 0 is specified in device tree.
+This is a little endian device, but so far we've been relying on
+the regmap mmio bus handling this for us without explicitly
+stating that fact. After commit 4a98da2164cf (regmap-mmio: Use
+native endianness for read/write, 2015-10-29), the regmap mmio
+bus will read/write with the __raw_*() IO accessors, instead of
+using the readl/writel() APIs that do proper byte swapping for
+little endian devices.
 
-Signed-off-by: Michal Morawiec <michal.1.morawiec.ext@nokia.com>
+So if we're running on a big endian processor and haven't
+specified the endianness explicitly in the regmap config or in
+DT, we're going to switch from doing little endian byte swapping
+to big endian accesses without byte swapping, leading to some
+confusing results. Specify the endianness explicitly so that the
+regmap core properly byte swaps the accesses for us.
+
+Cc: Kenneth Westfield <kwestfie@codeaurora.org>
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Tyler Baker <tyler.baker@linaro.org>
+Cc: Simon Arlott <simon@fire.lp0.eu>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/soc/ti/knav_qmss_queue.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ sound/soc/qcom/lpass-cpu.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
-index 6d8646d..a809c30 100644
---- a/drivers/soc/ti/knav_qmss_queue.c
-+++ b/drivers/soc/ti/knav_qmss_queue.c
-@@ -1173,7 +1173,7 @@ static int knav_queue_setup_link_ram(struct knav_device *kdev)
+diff --git a/sound/soc/qcom/lpass-cpu.c b/sound/soc/qcom/lpass-cpu.c
+index e5101e0d2d37..00b6c9d039cf 100644
+--- a/sound/soc/qcom/lpass-cpu.c
++++ b/sound/soc/qcom/lpass-cpu.c
+@@ -355,6 +355,7 @@ static struct regmap_config lpass_cpu_regmap_config = {
+ 	.readable_reg = lpass_cpu_regmap_readable,
+ 	.volatile_reg = lpass_cpu_regmap_volatile,
+ 	.cache_type = REGCACHE_FLAT,
++	.val_format_endian = REGMAP_ENDIAN_LITTLE,
+ };
  
- 		block++;
- 		if (!block->size)
--			return 0;
-+			continue;
- 
- 		dev_dbg(kdev->dev, "linkram1: phys:%x, virt:%p, size:%x\n",
- 			block->phys, block->virt, block->size);
+ int asoc_qcom_lpass_cpu_platform_probe(struct platform_device *pdev)
 -- 
-2.4.6
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
