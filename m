@@ -1,82 +1,110 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 20 Nov 2015 15:23:24 +0000
-Subject: [PATCH v9 1/6] target-arm: kvm64 - introduce kvm_arm_init_debug()
-In-Reply-To: <CAFEAcA8bdjYaDiCParJt8jVe+720+tzh4CuKD2YGfHeo2UJNcQ@mail.gmail.com>
-References: <1447345251-22625-1-git-send-email-alex.bennee@linaro.org>
- <1447345251-22625-2-git-send-email-alex.bennee@linaro.org>
- <CAFEAcA-u3ACj=99NkTRsEL=2KA6LETeAmEf+5Vo03gz0GMh5Zw@mail.gmail.com>
- <CAFEAcA8bdjYaDiCParJt8jVe+720+tzh4CuKD2YGfHeo2UJNcQ@mail.gmail.com>
-Message-ID: <877flcitjn.fsf@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 20 Nov 2015 09:23:36 -0600
+Subject: [PATCH 1/4] ASoC: sun4i-codec: Add support for PA gpio pin
+In-Reply-To: <1448027233-750-1-git-send-email-hdegoede@redhat.com>
+References: <1448027233-750-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20151120152336.GA1670@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Nov 20, 2015 at 02:47:10PM +0100, Hans de Goede wrote:
+> Add support for PA gpio pin for controlling an external amplifier as used
+> on some Allwinner boards.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Peter Maydell <peter.maydell@linaro.org> writes:
+Acked-by: Rob Herring <robh@kernel.org>
 
-> On 20 November 2015 at 15:05, Peter Maydell <peter.maydell@linaro.org> wrote:
->> On 12 November 2015 at 16:20, Alex Benn?e <alex.bennee@linaro.org> wrote:
->>> As we haven't always had guest debug support we need to probe for it.
->>> Additionally we don't do this in the start-up capability code so we
->>> don't fall over on old kernels.
->>>
->>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->>> ---
->>>  target-arm/kvm64.c | 18 ++++++++++++++++++
->>>  1 file changed, 18 insertions(+)
->>>
->>> diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
->>> index ceebfeb..d087794 100644
->>> --- a/target-arm/kvm64.c
->>> +++ b/target-arm/kvm64.c
->>> @@ -25,6 +25,22 @@
->>>  #include "internals.h"
->>>  #include "hw/arm/arm.h"
->>>
->>> +static bool have_guest_debug;
->>> +
->>> +/**
->>> + * kvm_arm_init_debug()
->>> + * @cs: CPUState
->>> + *
->>> + * Check for guest debug capabilities.
->>> + *
->>> + */
->>> +static void kvm_arm_init_debug(CPUState *cs)
->>> +{
->>> +    have_guest_debug = kvm_check_extension(cs->kvm_state,
->>> +                                           KVM_CAP_SET_GUEST_DEBUG);
->>> +    return;
->>> +}
->>> +
->>>  static inline void set_feature(uint64_t *features, int feature)
->>>  {
->>>      *features |= 1ULL << feature;
->>> @@ -121,6 +137,8 @@ int kvm_arch_init_vcpu(CPUState *cs)
->>>      }
->>>      cpu->mp_affinity = mpidr & ARM64_AFFINITY_MASK;
->>>
->>> +    kvm_arm_init_debug(cs);
->>> +
->>>      return kvm_arm_init_cpreg_list(cpu);
->>>  }
->>
->> I assume in practice the kernel guarantees that either all
->> CPUs have the SET_GUEST_DEBUG cap, or none do :-)
->>
->> Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
->
-> ...except I've just noticed that nothing else in this patchset
-> ever reads the have_guest_debug bool we just set, so what is
-> the purpose of this patch?
-
-Oops, maybe to point out my stupidity ;-)
-
-But yes the SET_GUEST_DEBUG cap is kernel wide.
-
->
-> thanks
-> -- PMM
-
-
--- 
-Alex Benn?e
+> ---
+>  .../devicetree/bindings/sound/sun4i-codec.txt      |  3 +++
+>  sound/soc/sunxi/sun4i-codec.c                      | 25 ++++++++++++++--------
+>  2 files changed, 19 insertions(+), 9 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/sun4i-codec.txt b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
+> index c92966b..974babe 100644
+> --- a/Documentation/devicetree/bindings/sound/sun4i-codec.txt
+> +++ b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
+> @@ -14,6 +14,9 @@ Required properties:
+>     - "apb": the parent APB clock for this controller
+>     - "codec": the parent module clock
+>  
+> +Optional properties:
+> +- pa-gpios: gpio to enable external amplifier
+> +
+>  Example:
+>  codec: codec at 01c22c00 {
+>  	#sound-dai-cells = <0>;
+> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+> index bcbf4da..2aca9cd 100644
+> --- a/sound/soc/sunxi/sun4i-codec.c
+> +++ b/sound/soc/sunxi/sun4i-codec.c
+> @@ -27,6 +27,7 @@
+>  #include <linux/of_address.h>
+>  #include <linux/clk.h>
+>  #include <linux/regmap.h>
+> +#include <linux/gpio/consumer.h>
+>  
+>  #include <sound/core.h>
+>  #include <sound/pcm.h>
+> @@ -101,16 +102,15 @@ struct sun4i_codec {
+>  	struct regmap	*regmap;
+>  	struct clk	*clk_apb;
+>  	struct clk	*clk_module;
+> +	struct gpio_desc *gpio_pa;
+>  
+>  	struct snd_dmaengine_dai_dma_data	playback_dma_data;
+>  };
+>  
+>  static void sun4i_codec_start_playback(struct sun4i_codec *scodec)
+>  {
+> -	/*
+> -	 * FIXME: according to the BSP, we might need to drive a PA
+> -	 *        GPIO high here on some boards
+> -	 */
+> +	if (scodec->gpio_pa)
+> +		gpiod_set_value_cansleep(scodec->gpio_pa, 1);
+>  
+>  	/* Flush TX FIFO */
+>  	regmap_update_bits(scodec->regmap, SUN4I_CODEC_DAC_FIFOC,
+> @@ -125,15 +125,13 @@ static void sun4i_codec_start_playback(struct sun4i_codec *scodec)
+>  
+>  static void sun4i_codec_stop_playback(struct sun4i_codec *scodec)
+>  {
+> -	/*
+> -	 * FIXME: according to the BSP, we might need to drive a PA
+> -	 *        GPIO low here on some boards
+> -	 */
+> -
+>  	/* Disable DAC DRQ */
+>  	regmap_update_bits(scodec->regmap, SUN4I_CODEC_DAC_FIFOC,
+>  			   BIT(SUN4I_CODEC_DAC_FIFOC_DAC_DRQ_EN),
+>  			   0);
+> +
+> +	if (scodec->gpio_pa)
+> +		gpiod_set_value_cansleep(scodec->gpio_pa, 0);
+>  }
+>  
+>  static int sun4i_codec_trigger(struct snd_pcm_substream *substream, int cmd,
+> @@ -633,6 +631,15 @@ static int sun4i_codec_probe(struct platform_device *pdev)
+>  		return -EINVAL;
+>  	}
+>  
+> +	scodec->gpio_pa = devm_gpiod_get_optional(&pdev->dev, "pa",
+> +						  GPIOD_OUT_HIGH);
+> +	if (IS_ERR(scodec->gpio_pa)) {
+> +		ret = PTR_ERR(scodec->gpio_pa);
+> +		if (ret != -EPROBE_DEFER)
+> +			dev_err(&pdev->dev, "Failed to get pa gpio: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+>  	/* DMA configuration for TX FIFO */
+>  	scodec->playback_dma_data.addr = res->start + SUN4I_CODEC_DAC_TXDATA;
+>  	scodec->playback_dma_data.maxburst = 4;
+> -- 
+> 2.5.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
