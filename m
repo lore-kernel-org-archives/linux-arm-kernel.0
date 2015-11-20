@@ -1,157 +1,74 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 20 Nov 2015 16:30:57 +0000
-Subject: [PATCH 05/13] Xen: ARM: Add support for mapping platform device
- mmio
-In-Reply-To: <1447754231-7772-6-git-send-email-shannon.zhao@linaro.org>
-References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
- <1447754231-7772-6-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511201628410.1107@kaball.uk.xensource.com>
+Date: Fri, 20 Nov 2015 16:33:11 +0000
+Subject: [PATCH v2] xen/events: Always allocate legacy interrupts on PV
+ guests
+In-Reply-To: <564F3F4D.9080005@oracle.com>
+References: <1447870445-17199-1-git-send-email-boris.ostrovsky@oracle.com>
+ <alpine.DEB.2.02.1511201117120.1107@kaball.uk.xensource.com>
+ <564F397A.8010203@oracle.com>
+ <alpine.DEB.2.02.1511201535550.1107@kaball.uk.xensource.com>
+ <564F3F4D.9080005@oracle.com>
+Message-ID: <alpine.DEB.2.02.1511201632390.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On Fri, 20 Nov 2015, Boris Ostrovsky wrote:
+> On 11/20/2015 10:36 AM, Stefano Stabellini wrote:
+> > On Fri, 20 Nov 2015, Boris Ostrovsky wrote:
+> > > On 11/20/2015 06:24 AM, Stefano Stabellini wrote:
+> > > > On Wed, 18 Nov 2015, Boris Ostrovsky wrote:
+> > > > > After commit 8c058b0b9c34 ("x86/irq: Probe for PIC presence before
+> > > > > allocating descs for legacy IRQs") early_irq_init() will no longer
+> > > > > preallocate descriptors for legacy interrupts if PIC does not
+> > > > > exist, which is the case for Xen PV guests.
+> > > > > 
+> > > > > Therefore we may need to allocate those descriptors ourselves.
+> > > > > 
+> > > > > Signed-off-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> > > > > Suggested-by: Thomas Gleixner <tglx@linutronix.de>
+> > > > You need to do this for arm64 too.
+> > > > 
+> > > > FYI you can download arm64 cross-compilers from
+> > > > https://releases.linaro.org/14.04/components/toolchain/binaries/
+> > > > then you can use them by exporting ARCH=arm64 and
+> > > > CROSS_COMPILE=/path/to/gcc-linaro-aarch64-linux-gnu-version/bin/aarch64-linux-gnu-
+> > > I did test on arm but didn't realize that arm64 uses different include
+> > > files.
+> > > 
+> > > Does arm64 not have any legacy interrupts?
+> > > 
+> > > BTW, I got this build error:
+> > > 
+> > >    STUBCPY drivers/firmware/efi/libstub/lib-sort.stub.o
+> > > 0000000000000000 R_AARCH64_ABS64   __efistub_sort
+> > > 0000000000000008 R_AARCH64_ABS64   .init__ksymtab_strings
+> > > drivers/firmware/efi/libstub/lib-sort.stub.o: absolute symbol references
+> > > not
+> > > allowed in the EFI stub
+> > > drivers/firmware/efi/libstub/Makefile:63: recipe for target
+> > > 'drivers/firmware/efi/libstub/lib-sort.stub.o' failed
+> > > make[4]: *** [drivers/firmware/efi/libstub/lib-sort.stub.o] Error 1
+> > > scripts/Makefile.build:403: recipe for target
+> > > 'drivers/firmware/efi/libstub'
+> > > failed
+> > > make[3]: *** [drivers/firmware/efi/libstub] Error 2
+> > > scripts/Makefile.build:403: recipe for target 'drivers/firmware/efi'
+> > > failed
+> > > make[2]: *** [drivers/firmware/efi] Error 2
+> > > scripts/Makefile.build:403: recipe for target 'drivers/firmware' failed
+> > > make[1]: *** [drivers/firmware] Error 2
+> > > Makefile:943: recipe for target 'drivers' failed
+> > > make: *** [drivers] Error 2
+> > > 
+> > > I worked around this by removing some of EFI config options but presumably
+> > > this needs to be properly fixed.
+> > Interesting. This build error could be something new. Could you please
+> > post your kernel config?
 > 
-> Add a bus_notifier for platform bus device in order to map the device
-> mmio regions when DOM0 booting with ACPI.
+> Attached.
 > 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  drivers/xen/Makefile   |   1 +
->  drivers/xen/platform.c | 104 +++++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 105 insertions(+)
->  create mode 100644 drivers/xen/platform.c
-> 
-> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
-> index e293bc5..2f867e7 100644
-> --- a/drivers/xen/Makefile
-> +++ b/drivers/xen/Makefile
-> @@ -11,6 +11,7 @@ CFLAGS_features.o			:= $(nostackp)
->  
->  CFLAGS_efi.o				+= -fshort-wchar
->  
-> +dom0-$(CONFIG_ARM64) += platform.o
->  dom0-$(CONFIG_PCI) += pci.o
->  dom0-$(CONFIG_USB_SUPPORT) += dbgp.o
->  dom0-$(CONFIG_XEN_ACPI) += acpi.o $(xen-pad-y)
-> diff --git a/drivers/xen/platform.c b/drivers/xen/platform.c
-> new file mode 100644
-> index 0000000..0f95e7f
-> --- /dev/null
-> +++ b/drivers/xen/platform.c
-> @@ -0,0 +1,104 @@
-> +/*
-> + * Copyright (c) 2015, Linaro Limited.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-> + * Place - Suite 330, Boston, MA 02111-1307 USA.
-> + *
-> + * Author: Shannon Zhao <shannon.zhao@linaro.org>
-> + */
-> +
-> +#include <linux/platform_device.h>
-> +#include <linux/acpi.h>
-> +#include <xen/xen.h>
-> +#include <xen/interface/memory.h>
-> +#include <asm/xen/hypervisor.h>
-> +#include <asm/xen/hypercall.h>
-> +
-> +static int xen_map_platform_device_mmio(struct platform_device *pdev)
-> +{
-> +	int i, rc = 0;
-> +
-> +	for (i = 0; i < pdev->num_resources; i++)
-> +	{
-> +		struct resource *r = &pdev->resource[i];
-> +
-> +		if (resource_type(r) == IORESOURCE_MEM)
-> +		{
-> +			int j;
-> +			int nr = DIV_ROUND_UP(resource_size(r), PAGE_SIZE);
-> +			xen_pfn_t *gpfns = kmalloc(sizeof(xen_pfn_t) * nr,
-> +						   GFP_KERNEL);
-> +			xen_ulong_t *idxs = kmalloc(sizeof(xen_ulong_t) * nr,
-> +						    GFP_KERNEL);
-> +			int *errs = kmalloc(sizeof(int) * nr, GFP_KERNEL);
+> This, BTW, is on a relatively old toolstack:
+> gcc version 4.8.2 20131014 (prerelease) (crosstool-NG
+> linaro-1.13.1-4.8-2013.10 - Linaro GCC 2013.10)
 
-please check for kmalloc returning NULL and return -ENOMEM
-
-
-> +			struct xen_add_to_physmap_range xatp;
-> +
-> +			for (j = 0; j < nr; j++) {
-> +				gpfns[j] = (r->start >> PAGE_SHIFT) + j;
-> +				idxs[j] = (r->start >> PAGE_SHIFT) + j;
-
-XEN_PFN_DOWN
-
-
-> +				errs[j] = 0;
-> +			}
-> +
-> +			xatp.domid = DOMID_SELF;
-> +			xatp.size = nr;
-> +			xatp.space = XENMAPSPACE_dev_mmio;
-> +
-> +			set_xen_guest_handle(xatp.gpfns, gpfns);
-> +			set_xen_guest_handle(xatp.idxs, idxs);
-> +			set_xen_guest_handle(xatp.errs, errs);
-> +
-> +			rc = HYPERVISOR_memory_op(XENMEM_add_to_physmap_range,
-> +						  &xatp);
-> +			kfree(gpfns);
-> +			kfree(idxs);
-> +			kfree(errs);
-> +			if (rc != 0)
-> +				return rc;
-> +		}
-> +	}
-> +
-> +	return rc;
-> +}
-> +
-> +static int xen_platform_notifier(struct notifier_block *nb,
-> +				 unsigned long action, void *data)
-> +{
-> +	struct platform_device *pdev = to_platform_device(data);
-> +	int r = 0;
-> +
-> +	if (!acpi_disabled && (action == BUS_NOTIFY_ADD_DEVICE))
-> +		r = xen_map_platform_device_mmio(pdev);
-> +
-> +	if (r)
-> +	{
-> +		dev_err(&pdev->dev, "Failed to add_to_physmap device (%s) mmio!\n",
-> +			pdev->name);
-> +		return NOTIFY_OK;
-> +	}
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +static struct notifier_block platform_device_nb = {
-> +	.notifier_call = xen_platform_notifier,
-> +};
-> +
-> +static int __init register_xen_platform_notifier(void)
-> +{
-> +	if (!xen_initial_domain())
-> +		return 0;
-> +
-> +	return bus_register_notifier(&platform_bus_type, &platform_device_nb);
-> +}
-> +
-> +arch_initcall(register_xen_platform_notifier);
-> -- 
-> 2.1.0
-> 
+Interesting. I cannot repro the error with Linaro GCC 4.9-2014.
