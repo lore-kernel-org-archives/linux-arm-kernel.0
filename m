@@ -1,34 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Nov 2015 13:28:02 +0100
-Subject: [PATCH, once again] regulator: core: avoid unused variable warning
-In-Reply-To: <20151120122400.GA1929@sirena.org.uk>
-References: <4219157.sstthfjICN@wuerfel> <15541673.tdJ35xzzlG@wuerfel>
- <20151120122400.GA1929@sirena.org.uk>
-Message-ID: <4611580.31jynMWjmL@wuerfel>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri, 20 Nov 2015 13:36:51 +0100
+Subject: [PATCH 0/6] ARM: shmobile: Use "arm,pl390" for GIC where appropriate
+Message-ID: <1448023017-21816-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 November 2015 12:24:00 Mark Brown wrote:
-> On Fri, Nov 20, 2015 at 01:12:00PM +0100, Arnd Bergmann wrote:
-> > On Friday 20 November 2015 11:41:27 Mark Brown wrote:
-> 
-> > > Can we please at least have a comment explaining that this is working
-> > > around lockdep limitations?
-> 
-> > Not sure which limitation you are referring to. Maybe you could just
-> > modify the changelog text as you like when applying the patch?
-> 
-> > I tried to capture the fact that mutex_lock_nested() intentionally
-> > doesn't evaluate its second argument when CONFIG_DEBUG_LOCK_ALLOC
-> > is not set, but that appears to be less of a limitation than a
-> > choice of the interface.
-> 
-> That's the limitation (or intereface choice or whatever) that I'm
-> talking about - the code looks like a function call so not evaulating
-> the second argument is surprising.  I'm looking for something in the
-> code rather than the changelog so it doesn't get cleaned up later.
-> 
+	Hi Simon, Magnus, Greg,
 
-Got it. Will send a new version soon.
+On several Renesas ARM SoCs, the GIC is described in DT as being a
+Cortex A9 GIC, while it's actually a PL390. This is not only stated in
+the documentation, but has been verified by reading the GICD_IIDR
+register.
 
-	Arnd
+This series
+  1. Corrects the DT compatible value to match reality,
+  2. Updates the board staging drivers to match the above.
+
+As both parts impact each other, I think it's best that all patches go
+in through Simon's ARM/SHMOBILE tree.
+
+Greg: can you please provide your ack for the last two patches?
+
+Thanks!
+
+Geert Uytterhoeven (6):
+  ARM: shmobile: r7s72100 dtsi: Use "arm,pl390" for GIC
+  ARM: shmobile: r8a7740 dtsi: Use "arm,pl390" for GIC
+  ARM: shmobile: emev2 dtsi: Use "arm,pl390" for GIC
+  ARM: shmobile: r8a7778 dtsi: Use "arm,pl390" for GIC
+  staging: board: kzm9d: Use "arm,pl390"
+  staging: board: armadillo800eva: Use "arm,pl390"
+
+ arch/arm/boot/dts/emev2.dtsi            | 2 +-
+ arch/arm/boot/dts/r7s72100.dtsi         | 2 +-
+ arch/arm/boot/dts/r8a7740.dtsi          | 2 +-
+ arch/arm/boot/dts/r8a7778.dtsi          | 2 +-
+ drivers/staging/board/armadillo800eva.c | 2 +-
+ drivers/staging/board/kzm9d.c           | 2 +-
+ 6 files changed, 6 insertions(+), 6 deletions(-)
+
+-- 
+1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
