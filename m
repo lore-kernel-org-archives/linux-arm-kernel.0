@@ -1,71 +1,106 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Fri, 20 Nov 2015 16:15:39 +0800
-Subject: [PATCH v4 13/13] ARM: dts: rockchip: add support mipi panel
- tv080wum-nl0 for rk3288-evb
-In-Reply-To: <1448007339-10966-1-git-send-email-zyw@rock-chips.com>
-References: <1448007339-10966-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1448007339-10966-14-git-send-email-zyw@rock-chips.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 20 Nov 2015 09:23:05 +0100
+Subject: [linux-sunxi] Re: [PATCH v3 3/3] ARM: dts: sun4i: gemei-g9:
+ Enable sun4i audio codec support
+In-Reply-To: <CAGb2v66Fp3oVWACNSkH9Z=D=RAwd4A3nHE2s5oQZBVhqtS9ZGg@mail.gmail.com>
+References: <1446832486-32319-1-git-send-email-plaes@plaes.org>
+ <1446832486-32319-4-git-send-email-plaes@plaes.org>
+ <CAGb2v66uG-0EgVR=5SS4Lk-y5mX9v3Z39xP+0f7u7BfYq-b1yw@mail.gmail.com>
+ <1447354399.31635.10.camel@plaes.org> <20151119160923.GS32142@lukather>
+ <CAGb2v66Fp3oVWACNSkH9Z=D=RAwd4A3nHE2s5oQZBVhqtS9ZGg@mail.gmail.com>
+Message-ID: <564ED869.8060807@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This tv080wum-nl0 panel is a mipi panel, it can use in MIPI_TX socket
-of rk3288 evb board.
+Hi,
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+On 20-11-15 03:56, Chen-Yu Tsai wrote:
+> On Fri, Nov 20, 2015 at 12:09 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> Hi,
+>>
+>> On Thu, Nov 12, 2015 at 08:53:19PM +0200, Priit Laes wrote:
+>>> On Mon, 2015-11-09 at 11:59 +0800, Chen-Yu Tsai wrote:
+>>>> On Sat, Nov 7, 2015 at 1:54 AM, Priit Laes <plaes@plaes.org> wrote:
+>>>>> Gemei G9 has internal speakers and headphone jack. Audio switching
+>>>>> from internal speakers to headphones is automatically handled by
+>>>>> extra FT2012Q audio amplifier chip that works out of the box.
+>>>>
+>>>> Nice that it works out of the box. The FEX file does mention:
+>>>>
+>>>> audio_pa_ctrl   = port:PH15<1><default><default><0>
+>>>
+>>> Nice catch.
+>>>
+>>> Setting it low mutes audio, and setting it back high unmutes.
+>>
+>> Then you just volunteered yourself to fix the FIXME in the driver ;)
+>>
+>
+> Hans seems to have a patch for this in his sunxi-wip branch.
+> I haven't looked at it though.
 
----
+Right, I needed support for the pa pin on one of my own tablets, and
+there things just did not work without it.
 
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+Note this patch is ready for upstream submission, I just did not get
+around to submitting it yet (I wrote it Tuesday evening).
 
- arch/arm/boot/dts/rk3288-evb.dtsi | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+Regards,
 
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index f6d2e78..d04878f 100644
---- a/arch/arm/boot/dts/rk3288-evb.dtsi
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -47,7 +47,7 @@
- 		reg = <0x0 0x80000000>;
- 	};
- 
--	backlight {
-+	backlight: backlight {
- 		compatible = "pwm-backlight";
- 		brightness-levels = <
- 			  0   1   2   3   4   5   6   7
-@@ -177,6 +177,21 @@
- 	status = "okay";
- };
- 
-+&mipi_dsi {
-+	status = "okay";
-+
-+	panel {
-+		compatible ="boe,tv080wum-nl0";
-+		reg = <0>;
-+
-+		enable-gpios = <&gpio7 3 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&lcd_en>;
-+		backlight = <&backlight>;
-+		status = "okay";
-+	};
-+};
-+
- &sdmmc {
- 	bus-width = <4>;
- 	cap-mmc-highspeed;
-@@ -247,6 +262,9 @@
- 		bl_en: bl-en {
- 			rockchip,pins = <7 2 RK_FUNC_GPIO &pcfg_pull_none>;
- 		};
-+		lcd_en: lcd-en {
-+			rockchip,pins = <7 3 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
- 	};
- 
- 	buttons {
--- 
-2.6.3
+Hans
+
+
+>
+> ChenYu
+>
+>>>> So either it is floating or pulled up by default? Since it works
+>>>> now I don't see any reason to block it. On the other hand once
+>>>> that binding is introduced it would be nice to add it for power
+>>>> management reasons.
+>>>
+>>> Should I just add comment about it or do something like this:
+>>>
+>>> &codec {
+>>>    status = "okay";
+>>>    /*
+>>>     * TODO: Add codec_ext_pwr_pin to turn off external audio AMP
+>>>     &pio {
+>>>       codec_ext_pwr_pin: codec_ext_pwr_pin at 0 {
+>>>         allwinner,pins = "PH15";
+>>>         allwinner,function = "gpio_out";
+>>>         allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>>>         allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+>>>       }
+>>>     }
+>>>     */
+>>> }
+>>
+>> More like
+>>
+>> &pio {
+>>          codec_ext_pwr_pin: codec_ext_pwr_pin at 0 {
+>>                  allwinner,pins = "PH15";
+>>                  allwinner,function = "gpio_out";
+>>                  allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>>                  allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+>>          };
+>> };
+>>
+>> &codec {
+>>          /* This pin is used to turn off the GPIO amp pin */
+>>          pinctrl-names = "default";
+>>          pinctrl-0 <&codec_ext_pwr_pin>;
+>>          status = "okay";
+>> };
+>>
+>> Of course, that's a temporary measure, and you should actually use
+>> that GPIO to enable / disable the Amplifier when you are playing
+>> sound. It shouldn't be that hard with ASoC.
+>>
+>> Maxime
+>>
+>> --
+>> Maxime Ripard, Free Electrons
+>> Embedded Linux, Kernel and Android engineering
+>> http://free-electrons.com
