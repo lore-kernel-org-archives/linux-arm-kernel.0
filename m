@@ -1,84 +1,239 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Fri, 20 Nov 2015 15:02:13 +0800
-Subject: [PATCH v3 00/12] Add mipi dsi support for rk3288
-In-Reply-To: <CACvgo53YOMpbz1TdVmRBPPz4dv=X+8FoEo0ZcfN5DwbDYi2ZzQ@mail.gmail.com>
-References: <1447904131-29328-1-git-send-email-zyw@rock-chips.com>
- <CACvgo53YOMpbz1TdVmRBPPz4dv=X+8FoEo0ZcfN5DwbDYi2ZzQ@mail.gmail.com>
-Message-ID: <564EC575.90109@rock-chips.com>
+From: mike.looijmans@topic.nl (Mike Looijmans)
+Date: Fri, 20 Nov 2015 08:25:27 +0100
+Subject: [PATCH v2] fpga: zynq-fpga: Enable pm_runtime (suspend, resume)
+In-Reply-To: <1447970832-774-1-git-send-email-moritz.fischer@ettus.com>
+References: <1447970832-774-1-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <564ECAE7.9060900@topic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emil
+?On 19-11-15 23:07, Moritz Fischer wrote:
+> Replaced constant clock_{enable,disable} calls with pm_runtime
+> hooks for suspend and resume to avoid constant clk_enable /
+> clk_disable.
+>
+> Acked-by: Alan Tull <atull@opensource.altera.com>
+> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> ---
+> Changes:
+>
+> v1:
+>    - Removed superfluous #ifdef CONFIG_PM as suggested by Michal
+>    - Changed commit message to include suspend / resume
+>    - Added Alan's Acked-by
+>
+>   drivers/fpga/zynq-fpga.c | 76 +++++++++++++++++++++++++++++++++++++-----------
+>   1 file changed, 59 insertions(+), 17 deletions(-)
+>
+> diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+> index c2fb412..3f5469d 100644
+> --- a/drivers/fpga/zynq-fpga.c
+> +++ b/drivers/fpga/zynq-fpga.c
+> @@ -28,6 +28,7 @@
+>   #include <linux/of_address.h>
+>   #include <linux/of_irq.h>
+>   #include <linux/pm.h>
+> +#include <linux/pm_runtime.h>
+>   #include <linux/regmap.h>
+>   #include <linux/string.h>
+>
+> @@ -184,8 +185,8 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+>
+>   	priv = mgr->priv;
+>
+> -	err = clk_enable(priv->clk);
+> -	if (err)
+> +	err = pm_runtime_get_sync(priv->dev);
+> +	if (err < 0)
+>   		return err;
+>
+>   	/* don't globally reset PL if we're doing partial reconfig */
+> @@ -271,12 +272,12 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+>   	ctrl = zynq_fpga_read(priv, MCTRL_OFFSET);
+>   	zynq_fpga_write(priv, MCTRL_OFFSET, (~MCTRL_PCAP_LPBK_MASK & ctrl));
+>
+> -	clk_disable(priv->clk);
+> +	pm_runtime_put(priv->dev);
+>
+>   	return 0;
+>
+>   out_err:
+> -	clk_disable(priv->clk);
+> +	pm_runtime_put(priv->dev);
+>
+>   	return err;
+>   }
+> @@ -301,9 +302,8 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+>
+>   	memcpy(kbuf, buf, count);
+>
+> -	/* enable clock */
+> -	err = clk_enable(priv->clk);
+> -	if (err)
+> +	err = pm_runtime_get_sync(priv->dev);
+> +	if (err < 0)
+>   		goto out_free;
+>
+>   	zynq_fpga_write(priv, INT_STS_OFFSET, IXR_ALL_MASK);
+> @@ -335,7 +335,7 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+>   		err = -EFAULT;
+>   	}
+>
+> -	clk_disable(priv->clk);
+> +	pm_runtime_put(priv->dev);
+>
+>   out_free:
+>   	dma_free_coherent(priv->dev, in_count, kbuf, dma_addr);
+> @@ -349,8 +349,8 @@ static int zynq_fpga_ops_write_complete(struct fpga_manager *mgr, u32 flags)
+>   	int err;
+>   	u32 intr_status;
+>
+> -	err = clk_enable(priv->clk);
+> -	if (err)
+> +	err = pm_runtime_get_sync(priv->dev);
+> +	if (err < 0)
+>   		return err;
+>
+>   	err = zynq_fpga_poll_timeout(priv, INT_STS_OFFSET, intr_status,
+> @@ -358,7 +358,7 @@ static int zynq_fpga_ops_write_complete(struct fpga_manager *mgr, u32 flags)
+>   				     INIT_POLL_DELAY,
+>   				     INIT_POLL_TIMEOUT);
+>
+> -	clk_disable(priv->clk);
+> +	pm_runtime_put(priv->dev);
+>
+>   	if (err)
+>   		return err;
+> @@ -385,12 +385,12 @@ static enum fpga_mgr_states zynq_fpga_ops_state(struct fpga_manager *mgr)
+>
+>   	priv = mgr->priv;
+>
+> -	err = clk_enable(priv->clk);
+> -	if (err)
+> +	err = pm_runtime_get_sync(priv->dev);
+> +	if (err < 0)
+>   		return FPGA_MGR_STATE_UNKNOWN;
+>
+>   	intr_status = zynq_fpga_read(priv, INT_STS_OFFSET);
+> -	clk_disable(priv->clk);
+> +	pm_runtime_put(priv->dev);
+>
+>   	if (intr_status & IXR_PCFG_DONE_MASK)
+>   		return FPGA_MGR_STATE_OPERATING;
+> @@ -457,19 +457,26 @@ static int zynq_fpga_probe(struct platform_device *pdev)
+>   		return err;
+>   	}
+>
+> +	pm_runtime_get_noresume(&pdev->dev);
+> +	pm_runtime_set_active(&pdev->dev);
+> +	pm_runtime_enable(&pdev->dev);
+> +
+>   	/* unlock the device */
+>   	zynq_fpga_write(priv, UNLOCK_OFFSET, UNLOCK_MASK);
+>
+> -	clk_disable(priv->clk);
+>
+>   	err = fpga_mgr_register(dev, "Xilinx Zynq FPGA Manager",
+>   				&zynq_fpga_ops, priv);
+>   	if (err) {
+>   		dev_err(dev, "unable to register FPGA manager");
+> -		clk_unprepare(priv->clk);
+> +		clk_disable_unprepare(priv->clk);
+> +		pm_runtime_put_noidle(&pdev->dev);
+> +		pm_runtime_disable(&pdev->dev);
+>   		return err;
+>   	}
+>
+> +	pm_runtime_put(&pdev->dev);
+> +
+>   	return 0;
+>   }
+>
+> @@ -483,11 +490,45 @@ static int zynq_fpga_remove(struct platform_device *pdev)
+>
+>   	fpga_mgr_unregister(&pdev->dev);
+>
+> -	clk_unprepare(priv->clk);
+> +	pm_runtime_get_sync(&pdev->dev);
+> +	clk_disable_unprepare(priv->clk);
+> +	pm_runtime_put_noidle(&pdev->dev);
+> +	pm_runtime_disable(&pdev->dev);
+>
+>   	return 0;
+>   }
+>
+> +static int __maybe_unused zynq_fpga_runtime_suspend(struct device *dev)
+> +{
+> +	struct zynq_fpga_priv *priv;
+> +	struct fpga_manager *mgr;
+> +
+> +	mgr = dev_get_drvdata(dev);
+> +	priv = mgr->priv;
+> +
+> +	clk_disable(priv->clk);
 
-On 11/19/2015 10:41 PM, Emil Velikov wrote:
-> On 19 November 2015 at 03:35, Chris Zhong <zyw@rock-chips.com> wrote:
->> The rk3288 MIPI DSI is a Synopsys DesignWare MIPI DSI host controller
->> IP. This series adds support for a Synopsys DesignWare MIPI DSI host
->> controller DRM bridge driver and a rockchip MIPI DSI specific DRM
->> driver.
->>
->> This series also includes a DRM panel driver for BOE TV080WUM-NL0 panel.
->> This panel only use the MIPI DSI video mode.
->>
->> The MIPI DSI feature is tested on rk3288 evb board, backport them to
->> chrome os kernel v3.14, and it can display normally.
->>
->> This patchset is base on the patchset from Ying.liu at freescale.com.
->> <http://www.spinics.net/lists/dri-devel/msg77181.html>
->>
->>
->> Changes in v3:
->> move the dw_mipi_dsi.txt to Documentation/devicetree/bindings/display/bridge
->> move dw_mipi_dsi_rockchip.txt to bindings/display/rockchip/
->> move boe,tv080wum-nl0.txt to bindings/display/panel/
->>
->> Changes in v2:
->> add the mipi clk id in a single patch
->> As Thierry.Reding comment, add a documentation for this panel.
->>
->> Chris Zhong (10):
->>    clk: rockchip: add id for mipidsi sclk on rk3288
->>    clk: rockchip: add mipidsi clocks on rk3288
->>    drm/rockchip: return a true clock rate to adjusted_mode
->>    drm/bridge: Add Synopsys DesignWare MIPI DSI host controller driver
-> Did you actually rewrite the patch from Liu Ying ?
-I modify the dw_mipi_dsi.c based on the patch from Liu Ying.
-> Out of curiosity what was the obstacle of this work getting merged ?
-There are different version dw controller, and it is too hard to merge them,
-since most registers are different.
->
->>    drm: rockchip: Support Synopsys DesignWare MIPI DSI host controller
->>    Documentation: dt-bindings: Add bindings for rk3288 DW MIPI DSI driver
->>    ARM: dts: rockchip: add rk3288 mipi_dsi nodes
->>    drm/panel: simple: Add support for BOE TV080WUM-NL0
->>    drm/panel: simple: Add boe,tv080wum-nl0 simple panel device tree
->>      binding
-> As the DT people will tell you - there is no BOE vendor in
-> bindings/vendor-prefixes.txt.
-Yes, I have post a verdor patch in v2 series,
-<https://patchwork.kernel.org/patch/7530791/>
-Maybe I should add it back to series with
+ From what I understand, this call is done in a sleepable context, so you can 
+use clk_disable_unprepare here (and its counterpart in resume). And remove the 
+prepare at probe time and unprepare at removal.
 
-Acked-by: Rob Herring<robh@kernel.org>
+Not all clocks can implement atomic enable/disable, for example I2C and SPI 
+controlled clocks only implement the prepare/unprepare routines.
 
->
->>    ARM: dts: rockchip: add support mipi panel tv080wum-nl0 for rk3288-evb
->>
->> Liu Ying (2):
->>    drm/dsi: Add a helper to get bits per pixel of MIPI DSI pixel format
->>    Documentation: dt-bindings: Add bindings for Synopsys DW MIPI DSI DRM
->>      bridge driver
->>
-> >From the above 12 patches only ~6 reached this mailing list is that
-> intentional ? Previously I've seen people CC dri-devel for their
-> panel/bridge DT patches.
-I use the patman to post the series, forgot to add you and Thierry to 
-the to-list.
-I will fix in next version series. Thanks for your reply.
+I guess the "clk" here will always be a SOC provided one, so it won't make any 
+difference for the Zynq, but someone is likely to some day copy/paste this 
+driver and use it for some externally connected FPGA instead.
 
+> +
+> +	return 0;
+> +}
+> +
+> +static int __maybe_unused zynq_fpga_runtime_resume(struct device *dev)
+> +{
+> +	struct zynq_fpga_priv *priv;
+> +	struct fpga_manager *mgr;
+> +
+> +	mgr = dev_get_drvdata(dev);
+> +	priv = mgr->priv;
+> +
+> +	clk_enable(priv->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct dev_pm_ops zynq_fpga_pm_ops = {
+> +	SET_RUNTIME_PM_OPS(zynq_fpga_runtime_suspend,
+> +			   zynq_fpga_runtime_resume, NULL)
+> +};
+> +
+>   #ifdef CONFIG_OF
+>   static const struct of_device_id zynq_fpga_of_match[] = {
+>   	{ .compatible = "xlnx,zynq-devcfg-1.0", },
+> @@ -503,6 +544,7 @@ static struct platform_driver zynq_fpga_driver = {
+>   	.driver = {
+>   		.name = "zynq_fpga_manager",
+>   		.of_match_table = of_match_ptr(zynq_fpga_of_match),
+> +		.pm = &zynq_fpga_pm_ops,
+>   	},
+>   };
 >
-> Regards,
-> Emil
 >
->
->
+
+
+
+Kind regards,
+
+Mike Looijmans
+System Expert
+
+TOPIC Embedded Products
+Eindhovenseweg 32-C, NL-5683 KH Best
+Postbus 440, NL-5680 AK Best
+Telefoon: +31 (0) 499 33 69 79
+Telefax: +31 (0) 499 33 69 70
+E-mail: mike.looijmans at topicproducts.com
+Website: www.topicproducts.com
+
+Please consider the environment before printing this e-mail
+
+Visit us at : Aerospace Electrical Systems Expo Europe which will be held from 17.11.2015 till 19.11.2015, Findorffstrasse 101 Bremen, Germany, Hall 5, stand number C65
+http://www.aesexpo.eu
