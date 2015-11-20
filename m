@@ -1,171 +1,116 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 20 Nov 2015 15:35:38 +0000
-Subject: [BISECTED] rcu_sched self-detected stall since 3.17
-Message-ID: <564F3DCA.1080907@arm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 20 Nov 2015 15:36:39 +0000
+Subject: [PATCH v2] xen/events: Always allocate legacy interrupts on PV
+ guests
+In-Reply-To: <564F397A.8010203@oracle.com>
+References: <1447870445-17199-1-git-send-email-boris.ostrovsky@oracle.com>
+ <alpine.DEB.2.02.1511201117120.1107@kaball.uk.xensource.com>
+ <564F397A.8010203@oracle.com>
+Message-ID: <alpine.DEB.2.02.1511201535550.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 20 Nov 2015, Boris Ostrovsky wrote:
+> On 11/20/2015 06:24 AM, Stefano Stabellini wrote:
+> > On Wed, 18 Nov 2015, Boris Ostrovsky wrote:
+> > > After commit 8c058b0b9c34 ("x86/irq: Probe for PIC presence before
+> > > allocating descs for legacy IRQs") early_irq_init() will no longer
+> > > preallocate descriptors for legacy interrupts if PIC does not
+> > > exist, which is the case for Xen PV guests.
+> > > 
+> > > Therefore we may need to allocate those descriptors ourselves.
+> > > 
+> > > Signed-off-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> > > Suggested-by: Thomas Gleixner <tglx@linutronix.de>
+> > You need to do this for arm64 too.
+> > 
+> > FYI you can download arm64 cross-compilers from
+> > https://releases.linaro.org/14.04/components/toolchain/binaries/
+> > then you can use them by exporting ARCH=arm64 and
+> > CROSS_COMPILE=/path/to/gcc-linaro-aarch64-linux-gnu-version/bin/aarch64-linux-gnu-
+> 
+> I did test on arm but didn't realize that arm64 uses different include files.
+> 
+> Does arm64 not have any legacy interrupts?
+> 
+> BTW, I got this build error:
+> 
+>   STUBCPY drivers/firmware/efi/libstub/lib-sort.stub.o
+> 0000000000000000 R_AARCH64_ABS64   __efistub_sort
+> 0000000000000008 R_AARCH64_ABS64   .init__ksymtab_strings
+> drivers/firmware/efi/libstub/lib-sort.stub.o: absolute symbol references not
+> allowed in the EFI stub
+> drivers/firmware/efi/libstub/Makefile:63: recipe for target
+> 'drivers/firmware/efi/libstub/lib-sort.stub.o' failed
+> make[4]: *** [drivers/firmware/efi/libstub/lib-sort.stub.o] Error 1
+> scripts/Makefile.build:403: recipe for target 'drivers/firmware/efi/libstub'
+> failed
+> make[3]: *** [drivers/firmware/efi/libstub] Error 2
+> scripts/Makefile.build:403: recipe for target 'drivers/firmware/efi' failed
+> make[2]: *** [drivers/firmware/efi] Error 2
+> scripts/Makefile.build:403: recipe for target 'drivers/firmware' failed
+> make[1]: *** [drivers/firmware] Error 2
+> Makefile:943: recipe for target 'drivers' failed
+> make: *** [drivers] Error 2
+> 
+> I worked around this by removing some of EFI config options but presumably
+> this needs to be properly fixed.
 
-I've been getting rcu_sched self-detected stall on one of our test
-environment with the following (or similar) log:
+Interesting. This build error could be something new. Could you please
+post your kernel config?
 
-Linux 4.3
 
-> INFO: rcu_sched self-detected stall on CPU
-> 	2: (2099 ticks this GP) idle=a73/140000000000001/0 softirq=277/283 fqs=2092 
-> 	 (t=2100 jiffies g=-197 c=-198 q=230)
-> Task dump for CPU 2:
-> paranoia        R running      0   423      1 0x00000003
-> [<c0016f20>] (unwind_backtrace) from [<c0012fd0>] (show_stack+0x10/0x14)
-> [<c0012fd0>] (show_stack) from [<c006c52c>] (rcu_dump_cpu_stacks+0xa4/0xc4)
-> [<c006c52c>] (rcu_dump_cpu_stacks) from [<c006f188>] (rcu_check_callbacks+0x2dc/0x81c)
-> [<c006f188>] (rcu_check_callbacks) from [<c0072278>] (update_process_times+0x38/0x64)
-> [<c0072278>] (update_process_times) from [<c007e7b8>] (tick_periodic+0xa8/0xb8)
-> [<c007e7b8>] (tick_periodic) from [<c007e904>] (tick_handle_periodic+0x28/0x88)
-> [<c007e904>] (tick_handle_periodic) from [<c0223074>] (arch_timer_handler_virt+0x28/0x30)
-> [<c0223074>] (arch_timer_handler_virt) from [<c0068008>] (handle_percpu_devid_irq+0x6c/0x84)
-> [<c0068008>] (handle_percpu_devid_irq) from [<c0064244>] (generic_handle_irq+0x24/0x34)
-> [<c0064244>] (generic_handle_irq) from [<c0064518>] (__handle_domain_irq+0x98/0xac)
-> [<c0064518>] (__handle_domain_irq) from [<c0009444>] (gic_handle_irq+0x54/0x90)
-> [<c0009444>] (gic_handle_irq) from [<c0013b14>] (__irq_svc+0x54/0x70)
-> Exception stack(0xdb007c60 to 0xdb007ca8)
-> 7c60: 00000000 00000000 00000000 00000001 dc3e9a20 00000000 00000000 00000001
-> 7c80: dc3e9a20 0000001b 00080000 0000000b ffffffff db007cb0 c00ac8f0 c00aa96c
-> 7ca0: 600d0113 ffffffff
-> [<c0013b14>] (__irq_svc) from [<c00aa96c>] (free_pages_prepare+0x18c/0x218)
-> [<c00aa96c>] (free_pages_prepare) from [<c00ac8f0>] (free_hot_cold_page+0x34/0x168)
-> [<c00ac8f0>] (free_hot_cold_page) from [<c00c996c>] (handle_mm_fault+0x7b8/0xe60)
-> [<c00c996c>] (handle_mm_fault) from [<c001c194>] (do_page_fault+0x12c/0x378)
-> [<c001c194>] (do_page_fault) from [<c00092dc>] (do_DataAbort+0x38/0xb4)
-> [<c00092dc>] (do_DataAbort) from [<c0013aa0>] (__dabt_svc+0x40/0x60)
-> Exception stack(0xdb007e68 to 0xdb007eb0)
-> 7e60:                   0001b2c8 00000d30 00000000 00000055 00000051 dbb04600
-> 7e80: 00000000 db007ec8 db8ea700 db8f3080 dba43240 0001b2c8 00000000 db007eb8
-> 7ea0: c012c178 c0174ce8 200d0113 ffffffff
-> [<c0013aa0>] (__dabt_svc) from [<c0174ce8>] (__clear_user_std+0x34/0x68)
-> [<c0174ce8>] (__clear_user_std) from [<c012c178>] (padzero+0x58/0x74)
-> [<c012c178>] (padzero) from [<c012cb4c>] (load_elf_binary+0x730/0x1250)
-> [<c012cb4c>] (load_elf_binary) from [<c00ecd6c>] (search_binary_handler+0xa0/0x23c)
-> [<c00ecd6c>] (search_binary_handler) from [<c00ed730>] (do_execveat_common+0x444/0x5d8)
-> [<c00ed730>] (do_execveat_common) from [<c00ed8e8>] (do_execve+0x24/0x2c)
-> [<c00ed8e8>] (do_execve) from [<c000f580>] (ret_fast_syscall+0x0/0x3c)
-
-(I put report for Linux 3.17 under [2])
-
-This rcu_sched self-detected stall is usually reproduced 2 or 3 times
-out of 10 runs, but sometimes even more runs go without issue.
-
-I bisected [1] it to commit
-
-commit 743162013d40ca612b4cb53d3a200dff2d9ab26e
-Author: NeilBrown <neilb@suse.de>
-Date:   Mon Jul 7 15:16:04 2014 +1000
-
-    sched: Remove proliferation of wait_on_bit() action functions
-
-The only change I noticed is from (mm/filemap.c)
-
-	io_schedule();
-	fatal_signal_pending(current)
-
-to (kernel/sched/wait.c)
-
-	signal_pending_state(current->state, current)
-	io_schedule();
-
-and if I apply following diff I don't see stalls anymore.
-
-diff --git a/kernel/sched/wait.c b/kernel/sched/wait.c
-index a104879..2d68cdb 100644
---- a/kernel/sched/wait.c
-+++ b/kernel/sched/wait.c
-@@ -514,9 +514,10 @@ EXPORT_SYMBOL(bit_wait);
-
- __sched int bit_wait_io(void *word)
- {
-+       io_schedule();
-+
-        if (signal_pending_state(current->state, current))
-                return 1;
--       io_schedule();
-        return 0;
- }
- EXPORT_SYMBOL(bit_wait_io);
-
-Any ideas why it might happen and why diff above helps?
-
-[1] Bisect log:
-
-I checked 4.[0-3] and 3.1[7-9] manually
-I have https://lkml.org/lkml/2015/8/26/649 for better report
-
-> git bisect start '--no-checkout'
-> # good: [19583ca584d6f574384e17fe7613dfaeadcdc4a6] Linux 3.16
-> git bisect good 19583ca584d6f574384e17fe7613dfaeadcdc4a6
-> # bad: [53ee983378ff23e8f3ff95ecf99dea7c6c221900] Merge tag 'staging-3.17-rc1' of git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/staging
-> git bisect bad 53ee983378ff23e8f3ff95ecf99dea7c6c221900
-> # good: [2042088cd67d0064d18c52c13c69af2499907bb1] staging: comedi: ni_labpc: tidy up labpc_ai_scan_mode()
-> git bisect good 2042088cd67d0064d18c52c13c69af2499907bb1
-> # bad: [98959948a7ba33cf8c708626e0d2a1456397e1c6] Merge branch 'sched-core-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip
-> git bisect bad 98959948a7ba33cf8c708626e0d2a1456397e1c6
-> # good: [c9b88e9581828bb8bba06c5e7ee8ed1761172b6e] Merge tag 'trace-3.17-2' of git://git.kernel.org/pub/scm/linux/kernel/git/rostedt/linux-trace
-> git bisect good c9b88e9581828bb8bba06c5e7ee8ed1761172b6e
-> # good: [5bda4f638f36ef4c4e3b1397b02affc3db94356e] Merge branch 'core-rcu-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip
-> git bisect good 5bda4f638f36ef4c4e3b1397b02affc3db94356e
-> # good: [2336ebc32676df5b794acfe0c980583ec6c05f34] Merge tag 'perf-core-for-mingo' of git://git.kernel.org/pub/scm/linux/kernel/git/jolsa/perf into perf/core
-> git bisect good 2336ebc32676df5b794acfe0c980583ec6c05f34
-> # good: [ef35ad26f8ff44d2c93e29952cdb336bda729d9d] Merge branch 'perf-core-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip
-> git bisect good ef35ad26f8ff44d2c93e29952cdb336bda729d9d
-> # good: [1c5d3eb3759013bc7ee4197aa0a9f245bdb6eb90] sched/numa: Simplify task_numa_compare()
-> git bisect good 1c5d3eb3759013bc7ee4197aa0a9f245bdb6eb90
-> # good: [6e76ea8a8209386c3cc7ee5594e6ea5d25525cf2] sched: Remove extra static_key*() function indirection
-> git bisect good 6e76ea8a8209386c3cc7ee5594e6ea5d25525cf2
-> # bad: [c1221321b7c25b53204447cff9949a6d5a7ddddc] sched: Allow wait_on_bit_action() functions to support a timeout
-> git bisect bad c1221321b7c25b53204447cff9949a6d5a7ddddc
-> # good: [e720fff6341fe4b95e5a93c939bd3c77fa55ced4] sched/numa: Revert "Use effective_load() to balance NUMA loads"
-> git bisect good e720fff6341fe4b95e5a93c939bd3c77fa55ced4
-> # bad: [743162013d40ca612b4cb53d3a200dff2d9ab26e] sched: Remove proliferation of wait_on_bit() action functions
-> git bisect bad 743162013d40ca612b4cb53d3a200dff2d9ab26e
-> # good: [d26fad5b38e1c4667d4f2604936e59c837caa54d] Merge tag 'v3.16-rc5' into sched/core, to refresh the branch before applying bigger tree-wide changes
-> git bisect good d26fad5b38e1c4667d4f2604936e59c837caa54d
-
-[2] rcu_sched self-detected stall under Linux 3.17
-
-> INFO: rcu_sched self-detected stall on CPU { 2}  (t=2100 jiffies g=-199 c=-200 q=172)
-> Task dump for CPU 2:
-> paranoia        R running      0   414      1 0x00000003
-> [<c0015394>] (unwind_backtrace) from [<c00117dc>] (show_stack+0x10/0x14)
-> [<c00117dc>] (show_stack) from [<c00602d0>] (rcu_dump_cpu_stacks+0xa4/0xc4)
-> [<c00602d0>] (rcu_dump_cpu_stacks) from [<c0062aec>] (rcu_check_callbacks+0x280/0x6f8)
-> [<c0062aec>] (rcu_check_callbacks) from [<c0065b9c>] (update_process_times+0x40/0x60)
-> [<c0065b9c>] (update_process_times) from [<c007169c>] (tick_periodic+0xa8/0xb8)
-> [<c007169c>] (tick_periodic) from [<c00717bc>] (tick_handle_periodic+0x28/0x88)
-> [<c00717bc>] (tick_handle_periodic) from [<c01fc414>] (arch_timer_handler_virt+0x28/0x30)
-> [<c01fc414>] (arch_timer_handler_virt) from [<c005d100>] (handle_percpu_devid_irq+0x6c/0x84)
-> [<c005d100>] (handle_percpu_devid_irq) from [<c0059658>] (generic_handle_irq+0x2c/0x3c)
-> [<c0059658>] (generic_handle_irq) from [<c000ee3c>] (handle_IRQ+0x7c/0x8c)
-> [<c000ee3c>] (handle_IRQ) from [<c00085f8>] (gic_handle_irq+0x40/0x5c)
-> [<c00085f8>] (gic_handle_irq) from [<c0012300>] (__irq_svc+0x40/0x54)
-> Exception stack(0xdb063c60 to 0xdb063ca8)
-> 3c60: 00000000 0001b000 dbbfc000 0000000b dbbfc000 0000000b dbbfc000 0001b000
-> 3c80: 0001b000 dbb2d6e0 0000001b db03c380 0000006c db063ca8 c00b935c c00b935c
-> 3ca0: a00d0113 ffffffff
-> [<c0012300>] (__irq_svc) from [<c00b935c>] (do_cow_fault.isra.97+0x1c/0x198)
-> [<c00b935c>] (do_cow_fault.isra.97) from [<c00b9804>] (handle_mm_fault+0x14c/0x900)
-> [<c00b9804>] (handle_mm_fault) from [<c001ae38>] (do_page_fault+0x120/0x3d8)
-> [<c001ae38>] (do_page_fault) from [<c00084c0>] (do_DataAbort+0x38/0x98)
-> [<c00084c0>] (do_DataAbort) from [<c0012298>] (__dabt_svc+0x38/0x60)
-> Exception stack(0xdb063e70 to 0xdb063eb8)
-> 3e60:                                     0001b2c8 00000d30 00000000 00000000
-> 3e80: db902a80 dbadc100 00000000 db063ec8 db062008 dbadc200 0001b2c8 0001b6cc
-> 3ea0: 00000000 db063eb8 c011689c c015a884 200d0013 ffffffff
-> [<c0012298>] (__dabt_svc) from [<c015a884>] (__clear_user_std+0x34/0x64)
-> [<c015a884>] (__clear_user_std) from [<c011689c>] (padzero+0x44/0x58)
-> [<c011689c>] (padzero) from [<c01182e8>] (load_elf_binary+0x778/0x138c)
-> [<c01182e8>] (load_elf_binary) from [<c00da960>] (search_binary_handler+0x98/0x1d8)
-> [<c00da960>] (search_binary_handler) from [<c00dbc2c>] (do_execve+0x35c/0x4bc)
-> [<c00dbc2c>] (do_execve) from [<c000e520>] (ret_fast_syscall+0x0/0x30)
-
-Thanks
-Vladimir
+> > > v2: Use nr_legacy_irqs() instead of NR_IRQS_LEGACY (needs definition for
+> > > ARM)
+> > > 
+> > >   arch/arm/include/asm/irq.h       | 4 ++++
+> > >   drivers/xen/events/events_base.c | 5 +++--
+> > >   2 files changed, 7 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
+> > > index be1d07d..b864f60 100644
+> > > --- a/arch/arm/include/asm/irq.h
+> > > +++ b/arch/arm/include/asm/irq.h
+> > > @@ -2,6 +2,10 @@
+> > >   #define __ASM_ARM_IRQ_H
+> > >     #define NR_IRQS_LEGACY	16
+> > > +static inline int nr_legacy_irqs(void)
+> > > +{
+> > > +	return NR_IRQS_LEGACY;
+> > > +}
+> > >     #ifndef CONFIG_SPARSE_IRQ
+> > >   #include <mach/irqs.h>
+> > > diff --git a/drivers/xen/events/events_base.c
+> > > b/drivers/xen/events/events_base.c
+> > > index 849500e..524c221 100644
+> > > --- a/drivers/xen/events/events_base.c
+> > > +++ b/drivers/xen/events/events_base.c
+> > > @@ -39,6 +39,7 @@
+> > >   #include <asm/irq.h>
+> > >   #include <asm/idle.h>
+> > >   #include <asm/io_apic.h>
+> > > +#include <asm/i8259.h>
+> > >   #include <asm/xen/pci.h>
+> > >   #endif
+> > >   #include <asm/sync_bitops.h>
+> > > @@ -420,7 +421,7 @@ static int __must_check xen_allocate_irq_gsi(unsigned
+> > > gsi)
+> > >   		return xen_allocate_irq_dynamic();
+> > >     	/* Legacy IRQ descriptors are already allocated by the arch.
+> > > */
+> > > -	if (gsi < NR_IRQS_LEGACY)
+> > > +	if (gsi < nr_legacy_irqs())
+> > >   		irq = gsi;
+> > >   	else
+> > >   		irq = irq_alloc_desc_at(gsi, -1);
+> > > @@ -446,7 +447,7 @@ static void xen_free_irq(unsigned irq)
+> > >   	kfree(info);
+> > >     	/* Legacy IRQ descriptors are managed by the arch. */
+> > > -	if (irq < NR_IRQS_LEGACY)
+> > > +	if (irq < nr_legacy_irqs())
+> > >   		return;
+> > >     	irq_free_desc(irq);
+> > > -- 
+> > > 2.1.0
+> > > 
+> 
