@@ -1,47 +1,61 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 20 Nov 2015 12:08:39 +0000
-Subject: Tango4 clkgen block
-In-Reply-To: <564EFB18.3050104@sigmadesigns.com> (Marc Gonzalez's message of
- "Fri, 20 Nov 2015 11:51:04 +0100")
-References: <564C94A5.4060301@sigmadesigns.com>
- <564C94FD.60607@sigmadesigns.com> <yw1xr3jnfg2s.fsf@unicorn.mansr.com>
- <564CA880.1030502@sigmadesigns.com>
- <yw1xmvubfekf.fsf@unicorn.mansr.com>
- <CAOesGMjCw_DYB3OktnQvthqBAQxqeH6F0bXR-KW_36Y9sDh+fg@mail.gmail.com>
- <yw1xio4zfcpc.fsf@unicorn.mansr.com>
- <564DD44E.4010804@sigmadesigns.com>
- <yw1x4mgif3sn.fsf@unicorn.mansr.com>
- <564EFB18.3050104@sigmadesigns.com>
-Message-ID: <yw1xbnaoeuuw.fsf@unicorn.mansr.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 20 Nov 2015 15:11:17 +0300
+Subject: [PATCH] ARM: shmobile: alt: Add pfc pins to DT
+In-Reply-To: <1447787440-11080-1-git-send-email-horms+renesas@verge.net.au>
+References: <1447787440-11080-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <564F0DE5.6040100@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+Hello.
 
-> M?ns Rullg?rd wrote:
->
->> Marc Gonzalez wrote:
->> 
->>> For example, what is the point of not ignoring sysclk_premux, when the boot
->>> loader has always hard-coded "PLL1 drives sys_clk, PLL2 drives cd_clk".
->> 
->> What if the boot loader changes?  Since we know the structure of the
->> clock tree, it's safer to check how it is actually configured.
->
-> In my opinion, this might be the problem.
->
-> You think you grok the clkgen block, based on
->
-> 1) buggy driver code written by Sigma
-> 2) obsolete and/or incorrect documentation (it mentions tango1 for crying out loud)
-> 3) limited testing on 8642 and 8759
+On 11/17/2015 10:10 PM, Simon Horman wrote:
 
-I also have documentation for SMP8654 that I found on some Chinese web
-site.  I've played around with most of the controls, and things behave
-as expected.  Where the Sigma code and documentation are ambiguous or
-disagree, I have tested what the hardware actually does for various
-values.
+> PFC is already enabled on the r8a7794.
+> This adds pins for devices already enabled in DT on
+> the r8a7794 based alt board.
+>
+> Based on work by Mitsuhiro Kimura and Hisashi Nakamura.
+>
+> Cc: Mitsuhiro Kimura <mitsuhiro.kimura.kc@renesas.com>
+> Cc: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>
+> ---
+> Tested
+> ---
+>   arch/arm/boot/dts/r8a7794-alt.dts | 17 +++++++++++++++++
+>   1 file changed, 17 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
+> index 928cfa641475..2e889991ce8f 100644
+> --- a/arch/arm/boot/dts/r8a7794-alt.dts
+> +++ b/arch/arm/boot/dts/r8a7794-alt.dts
+> @@ -39,6 +39,23 @@
+>   	clock-frequency = <20000000>;
+>   };
+>
+> +&pfc {
+> +	scif2_pins: serial2 {
+> +		renesas,groups = "scif2_data";
+> +		renesas,function = "scif2";
+> +	};
+> +
+> +	ether_pins: ether {
+> +		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
+> +		renesas,function = "eth";
+> +	};
+> +
+> +	ether_b_pins: ether {
+> +		renesas,groups = "eth_link_b", "eth_mdio_b", "eth_rmii_b";
+> +		renesas,function = "eth";
+> +	};
+> +};
+> +
+>   &cmt0 {
+>   	status = "okay";
+>   };
 
--- 
-M?ns Rullg?rd
-mans at mansr.com
+    Why add unreferenced pins? How have you tested this?
+
+MBR, Sergei
