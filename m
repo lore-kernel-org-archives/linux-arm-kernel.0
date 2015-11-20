@@ -1,41 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Nov 2015 10:32:44 +0100
-Subject: [PATCH] ASoC: pxa: remove incorrect do_div() call
-Message-ID: <7580645.enu4DmUPIv@wuerfel>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Fri, 20 Nov 2015 10:36:52 +0100
+Subject: [PATCH 3/3] leds/pwm: fix driver description and make license
+ match the header
+In-Reply-To: <20151119191737.GF22022@pengutronix.de>
+References: <1385412225-29740-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1385412225-29740-4-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20151119191737.GF22022@pengutronix.de>
+Message-ID: <564EE9B4.3010404@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new optimized do_div implementation (now in asm-generic/next) exposes a
-glitch in the brownstone audio driver by producing a compile-time warning:
+Hi Uwe,
 
-sound/soc/pxa/brownstone.c: In function 'brownstone_wm8994_hw_params':
-sound/soc/pxa/brownstone.c:67:85: warning: comparison of distinct pointer types lacks a cast
-sound/soc/pxa/brownstone.c:67:10125: warning: right shift count >= width of type [-Wshift-count-overflow]
-sound/soc/pxa/brownstone.c:67:10254: warning: passing argument 1 of '__div64_32' from incompatible pointer type [-Wincompatible-pointer-types]
+Applied, thanks.
 
-The driver just divides two plain integer values, so it should not
-use do_div to start with, but has apparently done so ever since the
-code was first merged. This replaces do_div with a simple division
-operator.
+Best Regards,
+Jacek Anaszewski
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-I think this one is harmless, so we only need it in 4.5 to avoid the warning,
-but not backported to earlier kernels.
-
-Found today on ARM allmodconfig
-
-diff --git a/sound/soc/pxa/brownstone.c b/sound/soc/pxa/brownstone.c
-index 6147e86e9b0f..416ea646c3b1 100644
---- a/sound/soc/pxa/brownstone.c
-+++ b/sound/soc/pxa/brownstone.c
-@@ -63,8 +63,7 @@ static int brownstone_wm8994_hw_params(struct snd_pcm_substream *substream,
- 		sysclk    = params_rate(params) * 512;
- 		sspa_mclk = params_rate(params) * 64;
- 	}
--	sspa_div = freq_out;
--	do_div(sspa_div, sspa_mclk);
-+	sspa_div = freq_out / sspa_mclk;
- 
- 	snd_soc_dai_set_sysclk(cpu_dai, MMP_SSPA_CLK_AUDIO, freq_out, 0);
- 	snd_soc_dai_set_pll(cpu_dai, MMP_SYSCLK, 0, freq_out, sysclk);
+On 11/19/2015 08:17 PM, Uwe Kleine-K?nig wrote:
+> Hello,
+>
+> while the other two patches in this thread are controversal, this one
+> shouldn't. It still sits in my branch with unapplied patches since
+> nearly two years, which is enormous considering it's such an easy patch.
+>
+> Best regards
+> Uwe
+>
+> On Mon, Nov 25, 2013 at 09:43:45PM +0100, Uwe Kleine-K?nig wrote:
+>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>> ---
+>>   drivers/leds/leds-pwm.c | 4 ++--
+>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
+>> index cdc3e4d..0796ca3 100644
+>> --- a/drivers/leds/leds-pwm.c
+>> +++ b/drivers/leds/leds-pwm.c
+>> @@ -239,6 +239,6 @@ static struct platform_driver led_pwm_driver = {
+>>   module_platform_driver(led_pwm_driver);
+>>
+>>   MODULE_AUTHOR("Luotao Fu <l.fu@pengutronix.de>");
+>> -MODULE_DESCRIPTION("PWM LED driver for PXA");
+>> -MODULE_LICENSE("GPL");
+>> +MODULE_DESCRIPTION("generic PWM LED driver");
+>> +MODULE_LICENSE("GPL v2");
+>>   MODULE_ALIAS("platform:leds-pwm");
+>> --
+>> 1.8.4.2
+>>
+>>
+>
