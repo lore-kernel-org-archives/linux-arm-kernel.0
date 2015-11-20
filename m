@@ -1,53 +1,39 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 20 Nov 2015 14:40:31 +0000
-Subject: [PATCH v11 3/5] arm: introduce CONFIG_PARAVIRT,
- PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-In-Reply-To: <564F2FD0.6040905@codeaurora.org>
-References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
- <1446737696-9749-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1511101411570.5676@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1511201430200.1107@kaball.uk.xensource.com>
- <564F2FD0.6040905@codeaurora.org>
-Message-ID: <alpine.DEB.2.02.1511201439280.1107@kaball.uk.xensource.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 20 Nov 2015 06:43:48 -0800
+Subject: [PATCH v2 1/3] serial: xuartps: Spliting the ISR into smaller
+ routines.
+In-Reply-To: <1448026478-22131-1-git-send-email-navam@xilinx.com>
+References: <1448026478-22131-1-git-send-email-navam@xilinx.com>
+Message-ID: <20151120144348.GS32017@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Nov 2015, Christopher Covington wrote:
-> Hi Stefano,
+On Fri, 2015-11-20 at 07:04PM +0530, Nava kishore Manne wrote:
+> Breaking the single big ISR that has both Rx and Tx
+> in a single function into smaller ones
 > 
-> On 11/20/2015 09:31 AM, Stefano Stabellini wrote:
-> > On Tue, 10 Nov 2015, Stefano Stabellini wrote:
-> >> On Thu, 5 Nov 2015, Stefano Stabellini wrote:
-> >>> Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM.
-> >>>
-> >>> The only paravirt interface supported is pv_time_ops.steal_clock, so no
-> >>> runtime pvops patching needed.
-> >>>
-> >>> This allows us to make use of steal_account_process_tick for stolen
-> >>> ticks accounting.
-> >>>
-> >>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> >>> Acked-by: Christopher Covington <cov@codeaurora.org>
-> >>> Acked-by: Ian Campbell <ian.campbell@citrix.com>
-> >>> CC: linux at arm.linux.org.uk
-> >>> CC: will.deacon at arm.com
-> >>> CC: nico at linaro.org
-> >>> CC: marc.zyngier at arm.com
-> >>> CC: cov at codeaurora.org
-> >>> CC: arnd at arndb.de
-> >>> CC: olof at lixom.net
-> >>
-> >>
-> >> Russell,
-> >> are you OK with this patch?
-> > 
-> > Russell,
-> > 
-> > I am going to drop this patch and add a small #ifdef to
-> > arch/arm/xen/enlighten.c to be able to use this functionality on arm64.
-> > 
-> > If you change your mind let me know.
+> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+> ---
+> Changes for v2:
+> 	--Splits up the ISR without any functional changes as suggested
+> 	by Peter Hurley
 > 
-> It appears to me as though he's not copied on this message.
+>  drivers/tty/serial/xilinx_uartps.c | 247 ++++++++++++++++++++-----------------
+>  1 file changed, 135 insertions(+), 112 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+> index 009e0db..2e1b0a8 100644
+> --- a/drivers/tty/serial/xilinx_uartps.c
+> +++ b/drivers/tty/serial/xilinx_uartps.c
+> @@ -172,6 +172,9 @@ struct cdns_uart {
+>  #define to_cdns_uart(_nb) container_of(_nb, struct cdns_uart, \
+>  		clk_rate_change_nb);
+>  
+> +static void cdns_uart_handle_tx(void *dev_id);
+> +static void cdns_uart_handle_rx(void *dev_id, unsigned int isrstatus);
 
-He was. He is now in To:.
+Can't you just move these functions here instead of adding prototypes
+here? Also, this is likely to conflict with
+https://lkml.org/lkml/2015/11/19/622
+
+	S?ren
