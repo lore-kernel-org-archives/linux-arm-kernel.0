@@ -1,60 +1,21 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 20 Nov 2015 12:17:11 +0100
-Subject: [PATCH 5/7] touchscreen: pixcir_ts: Add support for axis inversion /
- swapping
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Nov 2015 11:22:46 +0000
+Subject: [PATCH 0/7] Various touchscreens: Support axis inversion /
+ swapping / extra gpios
 In-Reply-To: <1448018233-27824-1-git-send-email-hdegoede@redhat.com>
 References: <1448018233-27824-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1448018233-27824-6-git-send-email-hdegoede@redhat.com>
+Message-ID: <20151120112245.GC8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for axis inversion / swapping using the new
-touchscreen_parse_properties and touchscreen_apply_prop_to_x_y
-functionality.
+On Fri, Nov 20, 2015 at 12:17:06PM +0100, Hans de Goede wrote:
+> This patch-set extends the of_touchscreen.c helpers to (optionally) also
+> deal with axis inversion / swapping, and patches a bunch of drivers to use
+> this new functionality.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/input/touchscreen/pixcir_i2c_ts.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+What's wrong with using tslib?  tslib supports axis transformations in
+userspace via a set of filters.
 
-diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
-index b75ef65..e310154 100644
---- a/drivers/input/touchscreen/pixcir_i2c_ts.c
-+++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
-@@ -41,13 +41,14 @@ struct pixcir_i2c_ts_data {
- 	struct gpio_desc *gpio_enable;
- 	struct gpio_desc *gpio_wake;
- 	const struct pixcir_i2c_chip_data *chip;
-+	struct touchscreen_properties prop;
- 	int max_fingers;	/* Max fingers supported in this instance */
- 	bool running;
- };
- 
- struct pixcir_touch {
--	int x;
--	int y;
-+	s16 x;
-+	s16 y;
- 	int id;
- };
- 
-@@ -100,6 +101,8 @@ static void pixcir_ts_parse(struct pixcir_i2c_ts_data *tsdata,
- 	for (i = 0; i < touch; i++) {
- 		report->touches[i].x = (bufptr[1] << 8) | bufptr[0];
- 		report->touches[i].y = (bufptr[3] << 8) | bufptr[2];
-+		touchscreen_apply_prop_to_x_y(&report->touches[i].x,
-+					      &report->touches[i].y);
- 
- 		if (chip->has_hw_ids) {
- 			report->touches[i].id = bufptr[4];
-@@ -515,7 +518,7 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
- 	} else {
- 		input_set_capability(input, EV_ABS, ABS_MT_POSITION_X);
- 		input_set_capability(input, EV_ABS, ABS_MT_POSITION_Y);
--		touchscreen_parse_properties(input, true, NULL);
-+		touchscreen_parse_properties(input, true, &tsdata->prop);
- 		if (!input_abs_get_max(input, ABS_MT_POSITION_X) ||
- 		    !input_abs_get_max(input, ABS_MT_POSITION_Y)) {
- 			dev_err(dev, "Touchscreen size is not specified\n");
 -- 
-2.5.0
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
