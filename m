@@ -1,20 +1,17 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Nov 2015 22:48:36 +0100
-Subject: [PATCH] fbdev: sm712fb: avoid unused function warnings
-Message-ID: <4240710.SWINpxTKzN@wuerfel>
+Date: Fri, 20 Nov 2015 22:59:14 +0100
+Subject: [PATCH] staging: ste_rmi4: avoid unused function warnings
+Message-ID: <4938658.kvPtQAFlP6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sm712fb framebuffer driver encloses the power-management
+The rmi4 touchscreen driver encloses the power-management
 functions in #ifdef CONFIG_PM, but the smtcfb_pci_suspend/resume
 functions are only really used when CONFIG_PM_SLEEP is also
 set, as a frequent gcc warning shows:
 
-fbdev/sm712fb.c:1549:12: warning: 'smtcfb_pci_suspend' defined but not used
-fbdev/sm712fb.c:1572:12: warning: 'smtcfb_pci_resume' defined but not used
-
-The driver also avoids using the SIMPLE_DEV_PM_OPS macro when
-CONFIG_PM is unset, which is redundant.
+ste_rmi4/synaptics_i2c_rmi4.c:1050:12: warning: 'synaptics_rmi4_suspend' defined but not used
+ste_rmi4/synaptics_i2c_rmi4.c:1084:12: warning: 'synaptics_rmi4_resume' defined but not used
 
 This changes the driver to remove the #ifdef and instead mark
 the functions as __maybe_unused, which is a nicer anyway, as it
@@ -23,58 +20,42 @@ and is harder to get wrong.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/drivers/video/fbdev/sm712fb.c b/drivers/video/fbdev/sm712fb.c
-index 629bfa2d2f51..86ae1d4556fc 100644
---- a/drivers/video/fbdev/sm712fb.c
-+++ b/drivers/video/fbdev/sm712fb.c
-@@ -28,9 +28,7 @@
- #include <linux/console.h>
- #include <linux/screen_info.h>
- 
--#ifdef CONFIG_PM
- #include <linux/pm.h>
--#endif
- 
- #include "sm712.h"
- 
-@@ -1545,8 +1543,7 @@ static void smtcfb_pci_remove(struct pci_dev *pdev)
- 	pci_disable_device(pdev);
- }
- 
--#ifdef CONFIG_PM
--static int smtcfb_pci_suspend(struct device *device)
-+static int __maybe_unused smtcfb_pci_suspend(struct device *device)
- {
- 	struct pci_dev *pdev = to_pci_dev(device);
- 	struct smtcfb_info *sfb;
-@@ -1569,7 +1566,7 @@ static int smtcfb_pci_suspend(struct device *device)
+diff --git a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
+index 824d460911ec..58ccafb97344 100644
+--- a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
++++ b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
+@@ -1039,7 +1039,6 @@ static int synaptics_rmi4_remove(struct i2c_client *client)
  	return 0;
  }
  
--static int smtcfb_pci_resume(struct device *device)
-+static int __maybe_unused smtcfb_pci_resume(struct device *device)
+-#ifdef CONFIG_PM
+ /**
+  * synaptics_rmi4_suspend() - suspend the touch screen controller
+  * @dev: pointer to device structure
+@@ -1047,7 +1046,7 @@ static int synaptics_rmi4_remove(struct i2c_client *client)
+  * This function is used to suspend the
+  * touch panel controller and returns integer
+  */
+-static int synaptics_rmi4_suspend(struct device *dev)
++static int __maybe_unused synaptics_rmi4_suspend(struct device *dev)
  {
- 	struct pci_dev *pdev = to_pci_dev(device);
- 	struct smtcfb_info *sfb;
-@@ -1610,20 +1607,13 @@ static int smtcfb_pci_resume(struct device *device)
+ 	/* Touch sleep mode */
+ 	int retval;
+@@ -1081,7 +1080,7 @@ static int synaptics_rmi4_suspend(struct device *dev)
+  * This function is used to resume the touch panel
+  * controller and returns integer.
+  */
+-static int synaptics_rmi4_resume(struct device *dev)
++static int __maybe_unused synaptics_rmi4_resume(struct device *dev)
+ {
+ 	int retval;
+ 	unsigned char intr_status;
+@@ -1112,8 +1111,6 @@ static int synaptics_rmi4_resume(struct device *dev)
+ 	return 0;
  }
  
- static SIMPLE_DEV_PM_OPS(sm7xx_pm_ops, smtcfb_pci_suspend, smtcfb_pci_resume);
--#define SM7XX_PM_OPS (&sm7xx_pm_ops)
+-#endif
 -
--#else  /* !CONFIG_PM */
--
--#define SM7XX_PM_OPS NULL
--
--#endif /* !CONFIG_PM */
+ static SIMPLE_DEV_PM_OPS(synaptics_rmi4_dev_pm_ops, synaptics_rmi4_suspend,
+ 			 synaptics_rmi4_resume);
  
- static struct pci_driver smtcfb_driver = {
- 	.name = "smtcfb",
- 	.id_table = smtcfb_pci_table,
- 	.probe = smtcfb_pci_probe,
- 	.remove = smtcfb_pci_remove,
--	.driver.pm  = SM7XX_PM_OPS,
-+	.driver.pm  = &sm7xx_pm_ops,
- };
- 
- static int __init sm712fb_init(void)
