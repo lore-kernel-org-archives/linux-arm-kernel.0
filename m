@@ -1,76 +1,47 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 20 Nov 2015 14:59:09 +0100
-Subject: [PATCH 3/4] ARM: dts: sun4i: Add backlight node to pov protab2 ips9
- tablet
+Date: Fri, 20 Nov 2015 14:59:10 +0100
+Subject: [PATCH 4/4] ARM: dts: sun5i: Add i2c axp152 pmic support for Auxtek
+ T004 boards
 In-Reply-To: <1448027950-14629-1-git-send-email-hdegoede@redhat.com>
 References: <1448027950-14629-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1448027950-14629-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1448027950-14629-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a node describing the lcd panel backlight on the pov protab2 ips9
-tablet.
+From: Michael van Slingerland <michael@deviousops.nl>
 
+Add a node describing the AXP152 pmic used on Auxtek T004 boards.
+
+Signed-off-by: Michael van Slingerland <michael@deviousops.nl>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts b/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
-index 0e5124f..1f92ec7 100644
---- a/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
-@@ -47,6 +47,7 @@
- #include <dt-bindings/input/input.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/pinctrl/sun4i-a10.h>
-+#include <dt-bindings/pwm/pwm.h>
- 
- / {
- 	model = "Point of View Protab2-IPS9";
-@@ -56,6 +57,16 @@
- 		serial0 = &uart0;
- 	};
- 
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&bl_en_pin_protab>;
-+		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
-+		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
-+		default-brightness-level = <8>;
-+		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
-+	};
-+
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
-@@ -145,6 +156,13 @@
+diff --git a/arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts b/arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts
+index 2b3511e..a790ec8 100644
+--- a/arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts
++++ b/arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts
+@@ -86,6 +86,20 @@
+ 	status = "okay";
  };
  
- &pio {
-+	bl_en_pin_protab: bl_en_pin at 0 {
-+		allwinner,pins = "PH7";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
- 	touchscreen_pins: touchscreen_pins at 0 {
- 		allwinner,pins = "PA5", "PB13";
- 		allwinner,function = "gpio_out";
-@@ -167,6 +185,12 @@
- 	};
- };
- 
-+&pwm {
++&i2c0 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm0_pins_a>;
++	pinctrl-0 = <&i2c0_pins_a>;
 +	status = "okay";
++
++	axp152: pmic at 30 {
++		compatible = "x-powers,axp152";
++		reg = <0x30>;
++		interrupts = <0>;
++		interrupt-controller;
++		#interrupt-cells = <1>;
++	};
 +};
 +
- &reg_dcdc2 {
- 	regulator-always-on;
- 	regulator-min-microvolt = <1000000>;
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_t004>;
 -- 
 2.5.0
