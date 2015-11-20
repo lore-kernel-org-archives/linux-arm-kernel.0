@@ -1,97 +1,141 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 20 Nov 2015 15:31:16 -0800
-Subject: [PATCH v2 1/5] devicetree: bindings: Document qcom board compatible
- format
+Date: Fri, 20 Nov 2015 15:31:20 -0800
+Subject: [PATCH v2 5/5] arm: dts: qcom: Add aliases for PMICs
 In-Reply-To: <1448062280-15406-1-git-send-email-sboyd@codeaurora.org>
 References: <1448062280-15406-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1448062280-15406-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1448062280-15406-6-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some qcom based bootloaders identify the dtb blob based on a set
-of device properties like SoC, platform, PMIC, and revisions of
-those components. In downstream kernels, these values are added
-to the different component dtsi files (i.e. pmic dtsi file, SoC
-dtsi file, board dtsi file, etc.) via qcom specific DT
-properties. The dtb files are parsed by a program called dtbTool
-that picks out these properties and creates a table of contents
-binary blob with the property information and some offsets into
-the concatenation of all the dtbs (termed a QCDT image).
-
-The suggestion is to do this via the board compatible string
-instead, because these qcom specific properties are never used by
-the kernel. Add a document describing the format of the
-compatible string that encodes all this information that's
-currently encoded in the qcom,{msm-id,board-id,pmic-id}
-properties in downstream devicetrees. Future bootloaders may be
-updated to look at the compatible field instead of looking for
-the table of contents image. For non-updateable bootloaders, a
-new dtbTool program will parse the compatible string and generate
-a QCDT image from it.
+Add an alias for the PMICs found on qcom based SoCs so that the
+newly updated dtbTool can find the PMIC compatible string and add
+the pmic-id element to the QCDT header.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- Documentation/devicetree/bindings/arm/qcom.txt | 51 ++++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/qcom.txt
+ arch/arm/boot/dts/qcom-apq8074-dragonboard.dts | 2 ++
+ arch/arm/boot/dts/qcom-apq8084-ifc6540.dts     | 1 +
+ arch/arm/boot/dts/qcom-apq8084-mtp.dts         | 1 +
+ arch/arm/boot/dts/qcom-pm8841.dtsi             | 8 ++++----
+ arch/arm/boot/dts/qcom-pm8941.dtsi             | 8 ++++----
+ arch/arm/boot/dts/qcom-pma8084.dtsi            | 8 ++++----
+ 6 files changed, 16 insertions(+), 12 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/qcom.txt b/Documentation/devicetree/bindings/arm/qcom.txt
-new file mode 100644
-index 000000000000..3e24518c6678
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/qcom.txt
-@@ -0,0 +1,51 @@
-+QCOM device tree bindings
-+-------------------------
-+
-+Some qcom based bootloaders identify the dtb blob based on a set of
-+device properties like SoC and platform and revisions of those components.
-+To support this scheme, we encode this information into the board compatible
-+string.
-+
-+Each board must specify a top-level board compatible string with the following
-+format:
-+
-+	compatible = "qcom,<SoC>[-<soc_version>][-<foundry_id>]-<board>[/<subtype>][-<board_version>]"
-+
-+The 'SoC' and 'board' elements are required. All other elements are optional.
-+
-+The 'SoC' element must be one of the following strings:
-+
-+	apq8016
-+	apq8074
-+	apq8084
-+	apq8096
-+	msm8916
-+	msm8974
-+	msm8996
-+
-+The 'board' element must be one of the following strings:
-+
-+	cdp
-+	liquid
-+	dragonboard
-+	mtp
-+	sbc
-+
-+The 'soc_version' and 'board_version' elements take the form of v<Major>.<Minor>
-+where the minor number may be omitted when it's zero, i.e.  v1.0 is the same
-+as v1. If all versions of the 'board_version' elements match, then a
-+wildcard '*' should be used, e.g. 'v*'.
-+
-+The 'foundry_id' and 'subtype' elements are one or more digits from 0 to 9.
-+
-+Examples:
-+
-+	"qcom,msm8916-v1-cdp-pm8916-v2.1"
-+
-+A CDP board with an msm8916 SoC, version 1 paired with a pm8916 PMIC of version
-+2.1.
-+
-+	"qcom,apq8074-v2.0-2-dragonboard/1-v0.1"
-+
-+A dragonboard board v0.1 of subtype 1 with an apq8074 SoC version 2, made in
-+foundry 2.
+diff --git a/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+index 835bdc71c5ba..c0e205315042 100644
+--- a/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
++++ b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
+@@ -8,6 +8,8 @@
+ 
+ 	aliases {
+ 		serial0 = &blsp1_uart2;
++		usid0 = &pm8941_0;
++		usid4 = &pm8841_0;
+ 	};
+ 
+ 	chosen {
+diff --git a/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts b/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
+index 32aaa9d45228..2052b84a77c6 100644
+--- a/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
++++ b/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
+@@ -7,6 +7,7 @@
+ 
+ 	aliases {
+ 		serial0 = &blsp2_uart2;
++		usid0 = &pma8084_0;
+ 	};
+ 
+ 	chosen {
+diff --git a/arch/arm/boot/dts/qcom-apq8084-mtp.dts b/arch/arm/boot/dts/qcom-apq8084-mtp.dts
+index 3016c7048d44..d174d15bcf70 100644
+--- a/arch/arm/boot/dts/qcom-apq8084-mtp.dts
++++ b/arch/arm/boot/dts/qcom-apq8084-mtp.dts
+@@ -7,6 +7,7 @@
+ 
+ 	aliases {
+ 		serial0 = &blsp2_uart2;
++		usid0 = &pma8084_0;
+ 	};
+ 
+ 	chosen {
+diff --git a/arch/arm/boot/dts/qcom-pm8841.dtsi b/arch/arm/boot/dts/qcom-pm8841.dtsi
+index 8f1a0b162017..523bee959f98 100644
+--- a/arch/arm/boot/dts/qcom-pm8841.dtsi
++++ b/arch/arm/boot/dts/qcom-pm8841.dtsi
+@@ -3,8 +3,8 @@
+ 
+ &spmi_bus {
+ 
+-	usid4: pm8841 at 4 {
+-		compatible = "qcom,spmi-pmic";
++	pm8841_0: pm8841 at 4 {
++		compatible = "qcom,pm8841", "qcom,spmi-pmic";
+ 		reg = <0x4 SPMI_USID>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -27,8 +27,8 @@
+ 		};
+ 	};
+ 
+-	usid5: pm8841 at 5 {
+-		compatible = "qcom,spmi-pmic";
++	pm8841_1: pm8841 at 5 {
++		compatible = "qcom,pm8841", "qcom,spmi-pmic";
+ 		reg = <0x5 SPMI_USID>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/qcom-pm8941.dtsi b/arch/arm/boot/dts/qcom-pm8941.dtsi
+index c19a48732b2d..12c1202ba2ca 100644
+--- a/arch/arm/boot/dts/qcom-pm8941.dtsi
++++ b/arch/arm/boot/dts/qcom-pm8941.dtsi
+@@ -4,8 +4,8 @@
+ 
+ &spmi_bus {
+ 
+-	usid0: pm8941 at 0 {
+-		compatible ="qcom,spmi-pmic";
++	pm8941_0: pm8941 at 0 {
++		compatible = "qcom,pm8941", "qcom,spmi-pmic";
+ 		reg = <0x0 SPMI_USID>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -153,8 +153,8 @@
+ 		};
+ 	};
+ 
+-	usid1: pm8941 at 1 {
+-		compatible = "qcom,spmi-pmic";
++	pm8941_1: pm8941 at 1 {
++		compatible = "qcom,pm8941", "qcom,spmi-pmic";
+ 		reg = <0x1 SPMI_USID>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/qcom-pma8084.dtsi b/arch/arm/boot/dts/qcom-pma8084.dtsi
+index 5e240ccc08b7..10b8f9e6d60b 100644
+--- a/arch/arm/boot/dts/qcom-pma8084.dtsi
++++ b/arch/arm/boot/dts/qcom-pma8084.dtsi
+@@ -4,8 +4,8 @@
+ 
+ &spmi_bus {
+ 
+-	usid0: pma8084 at 0 {
+-		compatible = "qcom,spmi-pmic";
++	pma8084_0: pma8084 at 0 {
++		compatible = "qcom,pma8084", "qcom,spmi-pmic";
+ 		reg = <0x0 SPMI_USID>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -101,8 +101,8 @@
+ 		};
+ 	};
+ 
+-	usid1: pma8084 at 1 {
+-		compatible = "qcom,spmi-pmic";
++	pma8084_1: pma8084 at 1 {
++		compatible = "qcom,pma8084", "qcom,spmi-pmic";
+ 		reg = <0x1 SPMI_USID>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
