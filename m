@@ -1,50 +1,44 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 20 Nov 2015 08:58:36 -0700
-Subject: [PATCH RFC 15/27] PM / Domains: Add next_wakeup to device's
- timing data
-In-Reply-To: <7h8u5ttywi.fsf@deeprootsystems.com>
-References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
- <1447799871-56374-16-git-send-email-lina.iyer@linaro.org>
- <7h8u5ttywi.fsf@deeprootsystems.com>
-Message-ID: <20151120155836.GB30342@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 20 Nov 2015 10:03:46 -0600
+Subject: [PATCH] spi: dts: sun4i: Add support for inter-word wait cycles
+ using the SPI Wait Clock Register
+In-Reply-To: <1447948422-4915-2-git-send-email-mweseloh42@gmail.com>
+References: <1447948422-4915-1-git-send-email-mweseloh42@gmail.com>
+ <1447948422-4915-2-git-send-email-mweseloh42@gmail.com>
+Message-ID: <20151120160346.GA21921@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19 2015 at 15:19 -0700, Kevin Hilman wrote:
->Lina Iyer <lina.iyer@linaro.org> writes:
->
->> Allow devices that know when their next wakeup event is, to record save
->> it as part of timing data. A genpd governor may use this data to
->> determine if suspending the domain is going to affect the QoS of its
->> devices.
->>
->> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->> ---
->>  include/linux/pm_domain.h | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
->> index f1329ea..9ac089d 100644
->> --- a/include/linux/pm_domain.h
->> +++ b/include/linux/pm_domain.h
->> @@ -16,6 +16,7 @@
->>  #include <linux/of.h>
->>  #include <linux/notifier.h>
->>  #include <linux/spinlock.h>
->> +#include <linux/ktime.h>
->>
->>  /* Defines used for the flags field in the struct generic_pm_domain */
->>  #define GENPD_FLAG_PM_CLK	(1U << 0) /* PM domain uses PM clk */
->> @@ -104,6 +105,7 @@ struct gpd_timing_data {
->>  	s64 effective_constraint_ns;
->>  	bool constraint_changed;
->>  	bool cached_stop_ok;
->> +	ktime_t next_wakeup;
->>  };
->
->The addition of a new field should be combined with the patch that uses
->it (e.g. PATCH 16/27)
->
-Okay. Will do.
+On Thu, Nov 19, 2015 at 04:53:42PM +0100, Marcus Weseloh wrote:
+> Adds support and documentation for a new slave device property
+> "sun4i,spi-wdelay" that allows to set the SPI Wait Clock Register per
+> device / transfer. The SPI hardware will wait the specified amount of
+> SPI clock periods (plus a constant 3 clock periods) before transmitting
+> the next word.
+> 
+> The constant additional 3 clock periods are not documented by the vendor
+> and have been determined by analyzing the generated waveforms across
+> many different transmission speeds.
+> 
+> Signed-off-by: Marcus Weseloh <mweseloh42@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/spi/spi-sun4i.txt | 11 +++++++++++
+>  drivers/spi/spi-sun4i.c                             |  7 +++++++
+>  2 files changed, 18 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/spi-sun4i.txt b/Documentation/devicetree/bindings/spi/spi-sun4i.txt
+> index de827f5..9c4d723 100644
+> --- a/Documentation/devicetree/bindings/spi/spi-sun4i.txt
+> +++ b/Documentation/devicetree/bindings/spi/spi-sun4i.txt
+> @@ -10,6 +10,10 @@ Required properties:
+>    - "mod": the parent module clock
+>  - clock-names: Must contain the clock names described just above
+>  
+> +Optional properties for slave devices:
+> +- sun4i,spi-wdelay : delay between transmission of words, specified in number
+> +  of SPI clock periods (actual delay is wdelay + 3 clock periods)
 
->Kevin
+Seems like a common property to me. For a common one, it should be the 
+actual delay and the driver needs to subtract the 3 clock periods here.
+
+Rob
