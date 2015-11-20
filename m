@@ -1,90 +1,171 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Fri, 20 Nov 2015 15:20:21 +0000
-Subject: [PATCH] ARM: tegra: Enable CPUFreq support for Tegra124
- Chromebooks
-In-Reply-To: <563A06B4.2070005@nvidia.com>
-References: <1433331821-9648-1-git-send-email-jonathanh@nvidia.com>
- <556EE8B0.2060205@nvidia.com> <55A3B848.2080205@nvidia.com>
- <CAAObsKA0N50gfPA9sMZfnM8N+N9Oo-YHMCDdF7JdWjpxXtFJbA@mail.gmail.com>
- <20150915081234.GA25970@ulmo.nvidia.com>
- <CAAObsKAuJz6KoexA2VHPxxVCZ9PbUAFWUx6tSOmdPYq50u_=-g@mail.gmail.com>
- <5639F728.6090808@nvidia.com> <5639F7EC.2000508@nvidia.com>
- <563A06B4.2070005@nvidia.com>
-Message-ID: <564F3A35.3070708@nvidia.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Fri, 20 Nov 2015 15:22:27 +0000
+Subject: [PATCH 03/21] arm64: KVM: Implement vgic-v2 save/restore
+In-Reply-To: <1447679519-17888-4-git-send-email-marc.zyngier@arm.com>
+References: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
+ <1447679519-17888-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20151120152215.GA24960@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Nov 16, 2015 at 01:11:41PM +0000, Marc Zyngier wrote:
+> Implement the vgic-v2 save restore as a direct translation of
+> the assembly code version.
 
-On 04/11/15 13:23, Jon Hunter wrote:
+Hi Marc,
+I have one comment below:
+
+Cheers,
+-- 
+Steve
+
+
 > 
-> On 04/11/15 12:19, Jon Hunter wrote:
->> Correcting Mikko's email ...
->>
->> On 04/11/15 12:16, Jon Hunter wrote:
->>>
->>> On 15/09/15 10:00, Tomeu Vizoso wrote:
->>>> On 15 September 2015 at 10:12, Thierry Reding <thierry.reding@gmail.com> wrote:
->>>>> On Thu, Sep 03, 2015 at 03:40:45PM +0200, Tomeu Vizoso wrote:
->>>>>> On 13 July 2015 at 15:08, Jon Hunter <jonathanh@nvidia.com> wrote:
->>>>>>> On 03/06/15 12:44, Jon Hunter wrote:
->>>>>>>> Adding LAKML. Jon
->>>>>>>>
->>>>>>>> On 03/06/15 12:43, Jon Hunter wrote:
->>>>>>>>> Add the device-tree DFLL clock node and CPU regulator phandle for
->>>>>>>>> tegra124 chromebooks to enable CPUFreq support on these boards.
->>>>>>
->>>>>> Ping.
->>>>>>
->>>>>> Thanks,
->>>>>
->>>>> Sorry that this has gone unnoticed for so long. I've applied it now to
->>>>> the for-4.4/dt branch.
->>>>>
->>>>> Tomeu, do you want me to add your Tested-by, Reviewed-by or Acked-by
->>>>> before I push this out?
->>>>
->>>> I haven't done proper tests, but I have tested for several weeks a
->>>> branch containing these changes on a nyan-big and have found no
->>>> issues.
->>>>
->>>> You can add my Reviewed-by though. Sorry for not having made this clear.
->>>
->>> I have noticed that system suspend to LP1 is not working on the nyan-big
->>> with linux-next and never exits suspend. It appears that this patch is
->>> the culprit. I tested cpufreq was changing the frequency as expected but
->>> I did not test suspend.
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/Makefile         |  1 +
+>  arch/arm64/kvm/hyp/Makefile     |  5 +++
+>  arch/arm64/kvm/hyp/hyp.h        |  3 ++
+>  arch/arm64/kvm/hyp/vgic-v2-sr.c | 85 +++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 94 insertions(+)
+>  create mode 100644 arch/arm64/kvm/hyp/Makefile
+>  create mode 100644 arch/arm64/kvm/hyp/vgic-v2-sr.c
 > 
-> By the way, LP2 works fine with this change, it is just when LP1 is
-> enabled (which is the default).
+> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+> index 1949fe5..d31e4e5 100644
+> --- a/arch/arm64/kvm/Makefile
+> +++ b/arch/arm64/kvm/Makefile
+> @@ -10,6 +10,7 @@ KVM=../../../virt/kvm
+>  ARM=../../../arch/arm/kvm
+>  
+>  obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
+> +obj-$(CONFIG_KVM_ARM_HOST) += hyp/
+>  
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/arm.o $(ARM)/mmu.o $(ARM)/mmio.o
+> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+> new file mode 100644
+> index 0000000..d8d5968
+> --- /dev/null
+> +++ b/arch/arm64/kvm/hyp/Makefile
+> @@ -0,0 +1,5 @@
+> +#
+> +# Makefile for Kernel-based Virtual Machine module, HYP part
+> +#
+> +
+> +obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+> index dac843e..78f25c4 100644
+> --- a/arch/arm64/kvm/hyp/hyp.h
+> +++ b/arch/arm64/kvm/hyp/hyp.h
+> @@ -27,5 +27,8 @@
+>  
+>  #define kern_hyp_va(v) (typeof(v))((unsigned long)v & HYP_PAGE_OFFSET_MASK)
+>  
+> +void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
+> +void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+> +
+>  #endif /* __ARM64_KVM_HYP_H__ */
+>  
+> diff --git a/arch/arm64/kvm/hyp/vgic-v2-sr.c b/arch/arm64/kvm/hyp/vgic-v2-sr.c
+> new file mode 100644
+> index 0000000..1382d2e
+> --- /dev/null
+> +++ b/arch/arm64/kvm/hyp/vgic-v2-sr.c
+> @@ -0,0 +1,85 @@
+> +/*
+> + * Copyright (C) 2012-2015 - ARM Ltd
+> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/compiler.h>
+> +#include <linux/irqchip/arm-gic.h>
+> +#include <linux/kvm_host.h>
+> +
+> +#include <asm/kvm_mmu.h>
+> +
+> +#include "hyp.h"
+> +
+> +/* vcpu is already in the HYP VA space */
+> +void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
+> +{
+> +	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+> +	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+> +	struct vgic_dist *vgic = &kvm->arch.vgic;
+> +	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
+> +	u32 __iomem *lr_base;
+> +	u32 eisr0, eisr1, elrsr0, elrsr1;
+> +	int i = 0, nr_lr;
+> +
+> +	if (!base)
+> +		return;
+> +
+> +	cpu_if->vgic_vmcr = readl_relaxed(base + GICH_VMCR);
+> +	cpu_if->vgic_misr = readl_relaxed(base + GICH_MISR);
+> +	eisr0  = readl_relaxed(base + GICH_EISR0);
+> +	eisr1  = readl_relaxed(base + GICH_EISR0);
 
-Quick update on this ... it appears that the cause of the lock-up is
-related to pll_x (default pll that clocks the cpu cluster before
-switching to the dfll). On the jetson-tk1 the pll_x is running at 696MHz
-where as on the nyan-big it is running at 2.1GHz. Although the pll is
-disabled when switching to dfll, having it configured for 2.1GHz on the
-nyan-big is causing a hang during suspend if the dfll is running at much
-lower frequencies (>1.5GHz) than the pll_x. So seems like the CPU
-voltage is too low for the pll_x, however, it should be disabled?!?
+Not sure what this would affect, but should the RHS be:
+"base + GICH_EISR1"?
 
-If I hack the cpufreq code to set the pll_x to 696MHz after switching to
-the dfll on the nyan-big then the problem goes away ...
-
-diff --git a/drivers/cpufreq/tegra124-cpufreq.c
-b/drivers/cpufreq/tegra124-cpufreq.c
-index 20bcceb58ccc..a87cef4071e8 100644
---- a/drivers/cpufreq/tegra124-cpufreq.c
-+++ b/drivers/cpufreq/tegra124-cpufreq.c
-@@ -53,6 +53,10 @@ static int tegra124_cpu_switch_to_dfll(struct
-tegra124_cpufreq_priv *priv)
-
-        clk_set_parent(priv->cpu_clk, priv->dfll_clk);
-
-+       ret = clk_set_rate(priv->pllx_clk, 696000000);
-+       if (ret)
-+               return ret;
-+
-        return 0;
-
-Need to figure out if the suspend code is touching the pll_x.
-
-Jon
+> +	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
+> +	elrsr1 = readl_relaxed(base + GICH_ELRSR1);
+> +#ifdef CONFIG_CPU_BIG_ENDIAN
+> +	cpu_if->vgic_eisr  = ((u64)eisr0 << 32) | eisr1;
+> +	cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
+> +#else
+> +	cpu_if->vgic_eisr  = ((u64)eisr1 << 32) | eisr0;
+> +	cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
+> +#endif
+> +	cpu_if->vgic_apr    = readl_relaxed(base + GICH_APR);
+> +
+> +	writel_relaxed(0, base + GICH_HCR);
+> +
+> +	lr_base = base + GICH_LR0;
+> +	nr_lr = vcpu->arch.vgic_cpu.nr_lr;
+> +	do {
+> +		cpu_if->vgic_lr[i++] = readl_relaxed(lr_base++);
+> +	} while (--nr_lr);
+> +}
+> +
+> +void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
+> +{
+> +	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+> +	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+> +	struct vgic_dist *vgic = &kvm->arch.vgic;
+> +	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
+> +	u32 __iomem *lr_base;
+> +	unsigned int i = 0, nr_lr;
+> +
+> +	if (!base)
+> +		return;
+> +
+> +	writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
+> +	writel_relaxed(cpu_if->vgic_vmcr, base + GICH_VMCR);
+> +	writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
+> +
+> +	lr_base = base + GICH_LR0;
+> +	nr_lr = vcpu->arch.vgic_cpu.nr_lr;
+> +	do {
+> +		writel_relaxed(cpu_if->vgic_lr[i++], lr_base++);
+> +	} while (--nr_lr);
+> +}
+> -- 
+> 2.1.4
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
