@@ -1,43 +1,70 @@
-From: mathias.nyman@intel.com (Mathias Nyman)
-Date: Fri, 20 Nov 2015 13:20:49 +0200
-Subject: [PATCH v12 0/3] Mediatek xHCI support
-In-Reply-To: <1447751921-26746-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1447751921-26746-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <564F0211.3090605@intel.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 20 Nov 2015 16:47:02 +0530
+Subject: [PATCH] PCI: keystone: fix crash with deferred probe
+Message-ID: <866b2f1544f9d55fa932aa9f9cb5e7d523a23d05.1448017883.git.nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.11.2015 11:18, Chunfeng Yun wrote:
->  From 577f68d9c0ca1531d5f9cae0dcbea2ba116c8551 Mon Sep 17 00:00:00 2001
-> From: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> Date: Tue, 17 Nov 2015 17:09:05 +0800
-> Subject: [PATCH v12 0/3] Mediatek xHCI support
->
-> The patch supports MediaTek's xHCI controller.
->
-> There are some differences from xHCI spec:
-> 1. The interval is specified in 250 * 8ns increments for Interrupt Moderation
-> Interval(IMODI) of the Interrupter Moderation(IMOD) register, it is 8 times as
-> much as that defined in xHCI spec.
->
-> 2. For the value of TD Size in Normal TRB, MTK's xHCI controller defines a
-> number of packets that remain to be transferred for a TD after processing all
-> Max packets in all previous TRBs,that means don't include the current TRB's,
-> but in xHCI spec it includes the current ones.
->
-> 3. To minimize the scheduling effort for synchronous endpoints in xHC, the MTK
-> architecture defines some extra SW scheduling parameters for HW. According to
-> these parameters provided by SW, the xHC can easily decide whether a
-> synchronous endpoint should be scheduled in a specific uFrame. The extra SW
-> scheduling parameters are put into reserved DWs in Slot and Endpoint Context.
-> And a bandwidth scheduler algorithm is added to support such feature.
->
-> A usb3.0 phy driver is also added which used by mt65xx SoCs platform, it
-> supports two usb2.0 ports and one usb3.0 port.
->
+Drop __init annotations for functions called during
+probe of keystone PCIe host.
 
-Added to my tree, I'll send it forward to Greg shortly
+This fixes kernel crashes seen because of init data
+reclamation if the driver defer probes because of
+phy unavailability.
 
-Fixed the documentation "wakeup_deb_p0" -> "wakeup_deb_p1" typo as well
+While at it, drop the useless __refdata annotation
+to driver structure. If its really needed, it should
+be added back with a comment explaining why.
 
--Mathias  
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ drivers/pci/host/pci-keystone-dw.c | 2 +-
+ drivers/pci/host/pci-keystone.c    | 6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
+index ed34c9520a02..47ddbcce53ca 100644
+--- a/drivers/pci/host/pci-keystone-dw.c
++++ b/drivers/pci/host/pci-keystone-dw.c
+@@ -469,7 +469,7 @@ void ks_dw_pcie_initiate_link_train(struct keystone_pcie *ks_pcie)
+  * and call dw_pcie_v3_65_host_init() API to initialize the Keystone
+  * PCI host controller.
+  */
+-int __init ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie,
++int ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie,
+ 				struct device_node *msi_intc_np)
+ {
+ 	struct pcie_port *pp = &ks_pcie->pp;
+diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+index 0aa81bd3de12..593a58834c7d 100644
+--- a/drivers/pci/host/pci-keystone.c
++++ b/drivers/pci/host/pci-keystone.c
+@@ -291,7 +291,7 @@ static struct pcie_host_ops keystone_pcie_host_ops = {
+ 	.scan_bus = ks_dw_pcie_v3_65_scan_bus,
+ };
+ 
+-static int __init ks_add_pcie_port(struct keystone_pcie *ks_pcie,
++static int ks_add_pcie_port(struct keystone_pcie *ks_pcie,
+ 			 struct platform_device *pdev)
+ {
+ 	struct pcie_port *pp = &ks_pcie->pp;
+@@ -340,7 +340,7 @@ static int __exit ks_pcie_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int __init ks_pcie_probe(struct platform_device *pdev)
++static int ks_pcie_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct keystone_pcie *ks_pcie;
+@@ -396,7 +396,7 @@ fail_clk:
+ 	return ret;
+ }
+ 
+-static struct platform_driver ks_pcie_driver __refdata = {
++static struct platform_driver ks_pcie_driver = {
+ 	.probe  = ks_pcie_probe,
+ 	.remove = __exit_p(ks_pcie_remove),
+ 	.driver = {
+-- 
+2.4.4.408.g16da57c
