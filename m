@@ -1,13 +1,35 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 20 Nov 2015 11:12:33 +0100
-Subject: [PATCH] [RESEND 2] SCSI: initio: remove duplicate module
- device table
-In-Reply-To: <5318263.D61echQrl2@wuerfel>
-References: <5318263.D61echQrl2@wuerfel>
-Message-ID: <20151120101233.GA24298@lst.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 20 Nov 2015 11:28:42 +0100
+Subject: [PATCH] mmc: fix mmc_{un,}register_pm_notifier prototypes
+Message-ID: <7826361.qqKATxLhCV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks fine,
+The mmc pm notifiers were recently reworked, but the new
+code produces a lot of warnings when CONFIG_PM_SLEEP is disabled:
 
-Reviewed-by: Christoph Hellwig <hch@lst.de>
+In file included from ../drivers/mmc/core/sdio_bus.c:27:0:
+drivers/mmc/core/core.h:97:13: warning: 'mmc_register_pm_notifier' defined but not used [-Wunused-function]
+
+The obvious solution is to add the 'inline' keyword at the
+function definition, as it should be for any function defined
+in a header file.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 0e40be7c20e0 ("mmc: core: Refactor code to register the MMC PM notifier")
+
+diff --git a/drivers/mmc/core/core.h b/drivers/mmc/core/core.h
+index bd00ac2cdc1b..0fa86a2afc26 100644
+--- a/drivers/mmc/core/core.h
++++ b/drivers/mmc/core/core.h
+@@ -94,8 +94,8 @@ int mmc_hs400_to_hs200(struct mmc_card *card);
+ void mmc_register_pm_notifier(struct mmc_host *host);
+ void mmc_unregister_pm_notifier(struct mmc_host *host);
+ #else
+-static void mmc_register_pm_notifier(struct mmc_host *host) { }
+-static void mmc_unregister_pm_notifier(struct mmc_host *host) { }
++static inline void mmc_register_pm_notifier(struct mmc_host *host) { }
++static inline void mmc_unregister_pm_notifier(struct mmc_host *host) { }
+ #endif
+ 
+ #endif
