@@ -1,256 +1,103 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Fri, 20 Nov 2015 03:05:06 +0200
-Subject: [PATCH 06/11] arm: dts: lpc32xx: add clock properties to device nodes
-In-Reply-To: <1447981511-29653-1-git-send-email-vz@mleia.com>
-References: <1447981511-29653-1-git-send-email-vz@mleia.com>
-Message-ID: <1447981511-29653-7-git-send-email-vz@mleia.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 19 Nov 2015 17:05:25 -0800
+Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.5
+Message-ID: <cover.1447981420.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change adds clock properties to all described peripheral devices,
-clock ids are taken from dt-bindings/clock/lpc32xx-clock.h
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Some existing drivers expect to get clock names, in those cases
-clock-names are added as well.
+Please consider these Renesas ARM based SoC DT updates for v4.5.
 
-Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
----
- arch/arm/boot/dts/lpc32xx.dtsi | 41 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
 
-diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
-index 65023c1..792468e 100644
---- a/arch/arm/boot/dts/lpc32xx.dtsi
-+++ b/arch/arm/boot/dts/lpc32xx.dtsi
-@@ -13,6 +13,8 @@
- 
- #include "skeleton.dtsi"
- 
-+#include <dt-bindings/clock/lpc32xx-clock.h>
-+
- / {
- 	compatible = "nxp,lpc3220";
- 	interrupt-parent = <&mic>;
-@@ -57,6 +59,7 @@
- 		slc: flash at 20020000 {
- 			compatible = "nxp,lpc3220-slc";
- 			reg = <0x20020000 0x1000>;
-+			clocks = <&clk LPC32XX_CLK_SLC>;
- 			status = "disabled";
- 		};
- 
-@@ -64,6 +67,7 @@
- 			compatible = "nxp,lpc3220-mlc";
- 			reg = <0x200a8000 0x11000>;
- 			interrupts = <11 0>;
-+			clocks = <&clk LPC32XX_CLK_MLC>;
- 			status = "disabled";
- 		};
- 
-@@ -71,6 +75,8 @@
- 			compatible = "arm,pl080", "arm,primecell";
- 			reg = <0x31000000 0x1000>;
- 			interrupts = <0x1c 0>;
-+			clocks = <&clk LPC32XX_CLK_DMA>;
-+			clock-names = "apb_pclk";
- 		};
- 
- 		usb {
-@@ -110,6 +116,8 @@
- 			compatible = "arm,pl110", "arm,primecell";
- 			reg = <0x31040000 0x1000>;
- 			interrupts = <0x0e 0>;
-+			clocks = <&clk LPC32XX_CLK_LCD>;
-+			clock-names = "apb_pclk";
- 			status = "disabled";
- 		};
- 
-@@ -117,11 +125,14 @@
- 			compatible = "nxp,lpc-eth";
- 			reg = <0x31060000 0x1000>;
- 			interrupts = <0x1d 0>;
-+			clocks = <&clk LPC32XX_CLK_MAC>;
- 		};
- 
- 		emc: memory-controller at 31080000 {
- 			compatible = "arm,pl175", "arm,primecell";
- 			reg = <0x31080000 0x1000>;
-+			clocks = <&clk LPC32XX_CLK_DDRAM>, <&clk LPC32XX_CLK_DDRAM>;
-+			clock-names = "mpmcclk", "apb_pclk";
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 
-@@ -142,6 +153,8 @@
- 				compatible = "arm,pl022", "arm,primecell";
- 				reg = <0x20084000 0x1000>;
- 				interrupts = <0x14 0>;
-+				clocks = <&clk LPC32XX_CLK_SSP0>;
-+				clock-names = "apb_pclk";
- 			};
- 
- 			spi1: spi at 20088000 {
-@@ -153,6 +166,8 @@
- 				compatible = "arm,pl022", "arm,primecell";
- 				reg = <0x2008c000 0x1000>;
- 				interrupts = <0x15 0>;
-+				clocks = <&clk LPC32XX_CLK_SSP1>;
-+				clock-names = "apb_pclk";
- 			};
- 
- 			spi2: spi at 20090000 {
-@@ -169,6 +184,8 @@
- 				compatible = "arm,pl18x", "arm,primecell";
- 				reg = <0x20098000 0x1000>;
- 				interrupts = <0x0f 0>, <0x0d 0>;
-+				clocks = <&clk LPC32XX_CLK_SD>;
-+				clock-names = "apb_pclk";
- 				status = "disabled";
- 			};
- 
-@@ -185,6 +202,7 @@
- 				interrupts = <9 0>;
- 				clock-frequency = <13000000>;
- 				reg-shift = <2>;
-+				clocks = <&clk LPC32XX_CLK_UART5>;
- 				status = "disabled";
- 			};
- 
-@@ -194,6 +212,7 @@
- 				interrupts = <7 0>;
- 				clock-frequency = <13000000>;
- 				reg-shift = <2>;
-+				clocks = <&clk LPC32XX_CLK_UART3>;
- 				status = "disabled";
- 			};
- 
-@@ -203,6 +222,7 @@
- 				interrupts = <8 0>;
- 				clock-frequency = <13000000>;
- 				reg-shift = <2>;
-+				clocks = <&clk LPC32XX_CLK_UART4>;
- 				status = "disabled";
- 			};
- 
-@@ -212,6 +232,7 @@
- 				interrupts = <10 0>;
- 				clock-frequency = <13000000>;
- 				reg-shift = <2>;
-+				clocks = <&clk LPC32XX_CLK_UART6>;
- 				status = "disabled";
- 			};
- 
-@@ -222,6 +243,7 @@
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				pnx,timeout = <0x64>;
-+				clocks = <&clk LPC32XX_CLK_I2C1>;
- 			};
- 
- 			i2c2: i2c at 400A8000 {
-@@ -231,6 +253,7 @@
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				pnx,timeout = <0x64>;
-+				clocks = <&clk LPC32XX_CLK_I2C2>;
- 			};
- 
- 			mpwm: mpwm at 400E8000 {
-@@ -302,6 +325,7 @@
- 				compatible = "nxp,lpc3220-rtc";
- 				reg = <0x40024000 0x1000>;
- 				interrupts = <0x34 0>;
-+				clocks = <&clk LPC32XX_CLK_RTC>;
- 			};
- 
- 			gpio: gpio at 40028000 {
-@@ -315,6 +339,8 @@
- 				compatible = "nxp,lpc3220-timer";
- 				reg = <0x4002C000 0x1000>;
- 				interrupts = <0x3 0>;
-+				clocks = <&clk LPC32XX_CLK_TIMER4>;
-+				clock-names = "timerclk";
- 				status = "disabled";
- 			};
- 
-@@ -322,17 +348,22 @@
- 				compatible = "nxp,lpc3220-timer";
- 				reg = <0x40030000 0x1000>;
- 				interrupts = <0x4 0>;
-+				clocks = <&clk LPC32XX_CLK_TIMER5>;
-+				clock-names = "timerclk";
- 				status = "disabled";
- 			};
- 
- 			watchdog: watchdog at 4003C000 {
- 				compatible = "nxp,pnx4008-wdt";
- 				reg = <0x4003C000 0x1000>;
-+				clocks = <&clk LPC32XX_CLK_WDOG>;
- 			};
- 
- 			timer0: timer at 40044000 {
- 				compatible = "nxp,lpc3220-timer";
- 				reg = <0x40044000 0x1000>;
-+				clocks = <&clk LPC32XX_CLK_TIMER0>;
-+				clock-names = "timerclk";
- 				interrupts = <0x10 0>;
- 			};
- 
-@@ -347,6 +378,7 @@
- 				compatible = "nxp,lpc3220-adc";
- 				reg = <0x40048000 0x1000>;
- 				interrupts = <0x27 0>;
-+				clocks = <&clk LPC32XX_CLK_ADC>;
- 				status = "disabled";
- 			};
- 
-@@ -354,6 +386,7 @@
- 				compatible = "nxp,lpc3220-tsc";
- 				reg = <0x40048000 0x1000>;
- 				interrupts = <0x27 0>;
-+				clocks = <&clk LPC32XX_CLK_ADC>;
- 				status = "disabled";
- 			};
- 
-@@ -361,6 +394,8 @@
- 				compatible = "nxp,lpc3220-timer";
- 				reg = <0x4004C000 0x1000>;
- 				interrupts = <0x11 0>;
-+				clocks = <&clk LPC32XX_CLK_TIMER1>;
-+				clock-names = "timerclk";
- 			};
- 
- 			key: key at 40050000 {
-@@ -374,18 +409,22 @@
- 				compatible = "nxp,lpc3220-timer";
- 				reg = <0x40058000 0x1000>;
- 				interrupts = <0x12 0>;
-+				clocks = <&clk LPC32XX_CLK_TIMER2>;
-+				clock-names = "timerclk";
- 				status = "disabled";
- 			};
- 
- 			pwm1: pwm at 4005C000 {
- 				compatible = "nxp,lpc3220-pwm";
- 				reg = <0x4005C000 0x4>;
-+				clocks = <&clk LPC32XX_CLK_PWM1>;
- 				status = "disabled";
- 			};
- 
- 			pwm2: pwm at 4005C004 {
- 				compatible = "nxp,lpc3220-pwm";
- 				reg = <0x4005C004 0x4>;
-+				clocks = <&clk LPC32XX_CLK_PWM2>;
- 				status = "disabled";
- 			};
- 
-@@ -393,6 +432,8 @@
- 				compatible = "nxp,lpc3220-timer";
- 				reg = <0x40060000 0x1000>;
- 				interrupts = <0x13 0>;
-+				clocks = <&clk LPC32XX_CLK_TIMER3>;
-+				clock-names = "timerclk";
- 				status = "disabled";
- 			};
- 		};
--- 
-2.1.4
+The following changes since commit 99f7445ea41c0187cd2e78bcb58cdd9e6c1756e5:
+
+  ARM: shmobile: porter: enable internal PCI and USB PHY (2015-10-13 10:00:12 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v4.5
+
+for you to fetch changes up to d537543b3948bc3bc9dede248fa455493e055457:
+
+  ARM: shmobile: alt: add VIN0, ADV7180 DT support (2015-11-18 09:10:38 -0800)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC DT Updates for v4.5
+
+* henninger: Remove as it is now replaced by silk
+* koelsch: Move SPI partitions to subnode
+* porter: Add CAN0 and HS-USB support
+* r8a7793/gose: Add QSPI, PFC support
+* r8a7793: Add GPIO, DMAC, theral, IPMMU support
+* r8a7794/alt: Add DU support
+* r8a7794: Disable all IPMMU nodes by default
+* r8a779[0134]: Use Use SoC specific binding for rcar-dmac
+* r8a779[01], r8a73a4, r8a7740, sh73a0: replace gpio-key, wakeup with
+  wakeup-source property
+* r8a779[14]: Correct "gpio-ranges" properties
+* r8a779[14]: Remove bogus imp_clk node
+* silk: Add SDHI1 support
+
+----------------------------------------------------------------
+Geert Uytterhoeven (3):
+      ARM: shmobile: r8a7794 dtsi: Remove bogus imp_clk node
+      ARM: shmobile: r8a7791 dtsi: Remove bogus imp_clk node
+      ARM: shmobile: koelsch: Move SPI FLASH partitions to subnode
+
+Laurent Pinchart (2):
+      ARM: shmobile: r8a7794: Add DU0 clock
+      ARM: shmobile: r8a7794: Add DU node to device tree
+
+Magnus Damm (4):
+      ARM: shmobile: r8a7794: Disable all IPMMU nodes by default
+      ARM: shmobile: r8a7793: Add IPMMU nodes
+      ARM: shmobile: r8a7794: alt: Enable VGA port
+      ARM: shmobile: r8a7793: Add GPIO nodes to device tree
+
+Sergei Shtylyov (6):
+      ARM: shmobile: porter: add HS-USB DT support
+      ARM: shmobile: silk: add SDHI1 DT support
+      ARM: shmobile: r8a7790: fix "gpio-ranges" props
+      ARM: shmobile: r8a7791: fix "gpio-ranges" props
+      ARM: shmobile: porter: add CAN0 DT support
+      ARM: shmobile: henninger: remove board DT
+
+Simon Horman (11):
+      ARM: shmobile: r8a7793: Add thermal device to DT
+      ARM: shmobile: r8a7793: Add PFC to DT
+      ARM: shmobile: gose: Configure PFC in DT
+      ARM: shmobile: r8a7793: Add DMAC devices to DT
+      ARM: shmobile: r8a7793: Add QSPI device to DT
+      ARM: shmobile: gose: Add QSPI device to DT
+      ARM: shmobile: r8a7790: Use SoC specific binding for rcar-dmac nodes
+      ARM: shmobile: r8a7791: Use SoC specific binding for rcar-dmac nodes
+      ARM: shmobile: r8a7793: Use SoC specific binding for rcar-dmac nodes
+      ARM: shmobile: r8a7794: Use SoC specific binding for rcar-dmac nodes
+      ARM: shmobile: alt: Add pfc pins to DT
+
+Sudeep Holla (1):
+      ARM: dts: shmobile/r8a7xxx: replace gpio-key, wakeup with wakeup-source property
+
+Ulrich Hecht (2):
+      ARM: shmobile: alt: add I2C1 DT support
+      ARM: shmobile: alt: add VIN0, ADV7180 DT support
+
+ arch/arm/boot/dts/Makefile                    |   1 -
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts         |   2 +-
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts |   2 +-
+ arch/arm/boot/dts/r8a7790-lager.dts           |   8 +-
+ arch/arm/boot/dts/r8a7790.dtsi                |  12 +-
+ arch/arm/boot/dts/r8a7791-henninger.dts       | 320 --------------------------
+ arch/arm/boot/dts/r8a7791-koelsch.dts         |  55 ++---
+ arch/arm/boot/dts/r8a7791-porter.dts          |  20 ++
+ arch/arm/boot/dts/r8a7791.dtsi                |  18 +-
+ arch/arm/boot/dts/r8a7793-gose.dts            |  74 ++++++
+ arch/arm/boot/dts/r8a7793.dtsi                | 294 +++++++++++++++++++++++
+ arch/arm/boot/dts/r8a7794-alt.dts             | 125 ++++++++++
+ arch/arm/boot/dts/r8a7794-silk.dts            |  40 ++++
+ arch/arm/boot/dts/r8a7794.dtsi                |  49 ++--
+ arch/arm/boot/dts/sh73a0-kzm9g.dts            |   2 +-
+ include/dt-bindings/clock/r8a7794-clock.h     |   1 +
+ 16 files changed, 637 insertions(+), 386 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/r8a7791-henninger.dts
