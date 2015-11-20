@@ -1,83 +1,78 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 20 Nov 2015 21:19:46 +0100
-Subject: [PATCH RESEND 1/8] arm: dts: berlin2q: add watchdog nodes
-In-Reply-To: <20151120113414.1aa1e48e@xhacker>
-References: <1447672194-483-1-git-send-email-jszhang@marvell.com>
- <1447672194-483-2-git-send-email-jszhang@marvell.com>
- <564E3549.2050700@gmail.com> <20151120113414.1aa1e48e@xhacker>
-Message-ID: <564F8062.8070609@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 20 Nov 2015 21:20:26 +0100
+Subject: [PATCH 09/11] clk: lpc32xx: add common clock framework driver
+In-Reply-To: <564F6172.3090509@mleia.com>
+References: <1447981511-29653-1-git-send-email-vz@mleia.com>
+ <3762298.NKYXldtldq@wuerfel> <564F6172.3090509@mleia.com>
+Message-ID: <4933690.HhBPeGYMb3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.11.2015 04:34, Jisheng Zhang wrote:
-> On Thu, 19 Nov 2015 21:47:05 +0100
-> Sebastian Hesselbarth wrote:
->> On 16.11.2015 12:09, Jisheng Zhang wrote:
->>> The Marvell Berlin BG2Q has 3 watchdogs which are compatible with the
->>> snps,dw-wdt driver sit in the sysmgr domain. This patch adds the
->>> corresponding device tree nodes.
->>>
->>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
->>> ---
->>>  arch/arm/boot/dts/berlin2q.dtsi | 24 ++++++++++++++++++++++++
->>>  1 file changed, 24 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
->>> index a3ecde5..fac4315 100644
->>> --- a/arch/arm/boot/dts/berlin2q.dtsi
->>> +++ b/arch/arm/boot/dts/berlin2q.dtsi
->>> @@ -483,6 +483,30 @@
->>>  			ranges = <0 0xfc0000 0x10000>;
->>>  			interrupt-parent = <&sic>;
->>>  
->>> +			wdt0: watchdog at 1000 {
->>> +				compatible = "snps,dw-wdt";
->>> +				reg = <0x1000 0x100>;
->>> +				clocks = <&refclk>;
->>> +				interrupts = <0>;
->>> +				status = "disabled";  
->>
->> as the watchdogs are internal and cannot be clock gated
->> at all, how about we remove the status = "disabled" and
->> make them always available?
+On Friday 20 November 2015 20:07:46 Vladimir Zapolskiy wrote:
+> On 20.11.2015 16:04, Arnd Bergmann wrote:
+> > On Friday 20 November 2015 03:05:09 Vladimir Zapolskiy wrote:
+> >> +
+> >> +struct clk_proto_t {
+> >> +       const char *name;
+> >> +       const u8 parents[LPC32XX_CLK_PARENTS_MAX];
+> >> +       u8 num_parents;
+> >> +       unsigned long flags;
+> >> +};
+> >> +
+> >> +#define CLK_PREFIX(LITERAL)            LPC32XX_CLK_ ## LITERAL
+> >> +#define NUMARGS(...)   (sizeof((int[]){__VA_ARGS__})/sizeof(int))
+> >> +
+> >> +#define LPC32XX_CLK_DEFINE(_idx, _name, _flags, ...)           \
+> >> +       [CLK_PREFIX(_idx)] = {                                  \
+> >> +               .name = #_name,                                 \
+> >> +               .flags = _flags,                                \
+> >> +               .parents = { __VA_ARGS__ },                     \
+> >> +               .num_parents = NUMARGS(__VA_ARGS__),            \
+> >> +        }
+> >> +
+> > 
+> > Try to not outsmart yourself with the macros. It's better to avoid
+> > string concatenation so it's possible to grep for uses of some
+> > constant.
+> > 
+> > I would probably not use a macro at all here and just open-code the
+> > entire table. If you ensure that '0' is not a valid parent, then
+> > you can leave out the .num_parents field and just look for the
+> > zero-termination.
 > 
-> there are two issues here:
+> Macros are here for simplicity, code size reduction and to avoid some
+> stupid mistakes like different number of .parents and .num_parents.
 > 
-> 1. the dw-wdt can't support multiple variants now. I have rewrite the driver
-> with watchdog core supplied framework, but the patch isn't sent out and
-> may be need time to clean up and review.
+> I believe macro unwrapping in this code will add another 1000 LoC and
+> will result in quite unreadable and less maintainable code.
 
-Ok.
+I mean specifically the macro above:
 
-> 2. not all dw-wdt devices are available and functional. This depends on
-> board design and configuration.
+static const struct clk_proto_t clk_proto[LPC32XX_CLK_CCF_MAX] __initconst = {
++       LPC32XX_CLK_DEFINE(XTAL, xtal, 0x0),
++       LPC32XX_CLK_DEFINE(XTAL_32K, xtal_32k, 0x0),
++
++       LPC32XX_CLK_DEFINE(RTC, rtc, 0x0, LPC32XX_CLK_XTAL_32K),
++       LPC32XX_CLK_DEFINE(OSC, osc, CLK_IGNORE_UNUSED, LPC32XX_CLK_XTAL),
++       LPC32XX_CLK_DEFINE(SYS, sys, CLK_IGNORE_UNUSED,
++               LPC32XX_CLK_OSC, LPC32XX_CLK_PLL397X),
++       LPC32XX_CLK_DEFINE(PLL397X, pll_397x, CLK_IGNORE_UNUSED,
++               LPC32XX_CLK_RTC),
 
-I understand that "board design and configuration" may hinder the wdt
-to issue a hard reset. But all others are able to issue a soft reset
-or just an interrupt, right?
+can become
 
-So, I still don't see why we should disable wdt nodes by default
-except for the driver issue above.
+static const struct clk_proto_t clk_proto[] __initconst = {
+	[LPC32XX_CLK_XTAL]	= { "xtal" },
+	[LPC32XX_CLK_XTAL_32K]	= { "xtal_32k" },
+	[LPC32XX_CLK_RTC]	= { "rtc",
+			.parents = { LPC32XX_CLK_XTAL_32K, 0 } },
+	[LPC32XX_CLK_OSC]	= { "osc", CLK_IGNORE_UNUSED,
+			.parents = { LPC32XX_CLK_XTAL, 0 } },
+	[LPC32XX_CLK_SYS]	= { "sys", CLK_IGNORE_UNUSED,
+			.parents = { LPC32XX_CLK_OSC, LPC32XX_CLK_PLL397X, 0) },
+	[LPC32XX_CLK_PLL397X]	= { "pll_397x", CLK_IGNORE_UNUSED,
+			.parents = { LPC32XX_CLK_RTC, 0 },
 
-> So IMHO status=disabled and patch5-8 is necessary, what do you think?
+Not harder to read at all, not really longer, but easier to grep for.
 
-No. I'd agree to enable wdt0 by default and leave wdt[1,2] disabled
-because of the driver issue. Patches 5-8 only enable wdt0 anyway.
-
-As soon as the driver issue is resolved, we enable all wdt nodes
-unconditionally.
-
-Sebastian
-
->> I have applied patches 1-4 with the status property removed.
->> This also renders patches 5-8 useless.
->>
->> So, for now tentatively
->>
->> Appled to berlin/dt and berlin64/dt respectivly
->>
->> with status property removed.
->>
->> Sebastian
->>
-> 
+	Arnd
