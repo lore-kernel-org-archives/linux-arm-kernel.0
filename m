@@ -1,76 +1,198 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Nov 2015 15:12:33 +0000
-Subject: [PATCHv2] arm64: efi: correctly map runtime regions
-Message-ID: <1448032353-8770-1-git-send-email-mark.rutland@arm.com>
+From: jonmason@broadcom.com (Jon Mason)
+Date: Fri, 20 Nov 2015 10:14:39 -0500
+Subject: [PATCH v2 2/3] ARM: dts: enable clock support for Broadcom NSP
+In-Reply-To: <564E5DD4.2070406@broadcom.com>
+References: <1447974309-29566-1-git-send-email-jonmason@broadcom.com>
+ <1447974309-29566-3-git-send-email-jonmason@broadcom.com>
+ <564E5DD4.2070406@broadcom.com>
+Message-ID: <20151120151439.GA12814@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel may use a page granularity of 4K, 16K, or 64K depending on
-configuration.
+On Thu, Nov 19, 2015 at 03:40:04PM -0800, Ray Jui wrote:
+> 
+> 
+> On 11/19/2015 3:05 PM, Jon Mason wrote:
+> >Replace current device tree dummy clocks with real clock support for
+> >Broadcom Northstar Plus SoC
+> >
+> >Signed-off-by: Jon Mason <jonmason@broadcom.com>
+> >---
+> >  arch/arm/boot/dts/bcm-nsp.dtsi | 77 +++++++++++++++++++++++++++++++++++-------
+> >  1 file changed, 64 insertions(+), 13 deletions(-)
+> >
+> >diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
+> >index b74438c..361c2a6 100644
+> >--- a/arch/arm/boot/dts/bcm-nsp.dtsi
+> >+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
+> >@@ -32,6 +32,7 @@
+> >
+> >  #include <dt-bindings/interrupt-controller/arm-gic.h>
+> >  #include <dt-bindings/interrupt-controller/irq.h>
+> >+#include <dt-bindings/clock/bcm-nsp.h>
+> >
+> >  #include "skeleton.dtsi"
+> >
+> >@@ -42,7 +43,7 @@
+> >
+> >  	mpcore {
+> >  		compatible = "simple-bus";
+> >-		ranges = <0x00000000 0x19020000 0x00003000>;
+> >+		ranges = <0x00000000 0x19000000 0x00023000>;
+> >  		#address-cells = <1>;
+> >  		#size-cells = <1>;
+> >
+> >@@ -58,16 +59,23 @@
+> >  			};
+> >  		};
+> >
+> >+		a9pll: arm_clk at 0000 {
+> >+			#clock-cells = <0>;
+> >+			compatible = "brcm,nsp-armpll";
+> >+			clocks = <&osc>;
+> >+			reg = <0x0000 0x1000>;
+> >+		};
+> >+
+> >  		timer at 0200 {
+> 
+> timer at 20200. Or is this addressed in another patch? I completely
+> lose track of these....
 
-When mapping EFI runtime regions, we use memrange_efi_to_native to round
-the physical base address of a region down to a kernel page boundary,
-and round the size up to a kernel page boundary, adding the residue left
-over from rounding down the physical base address. We do not round down
-the virtual base address.
+No, you are correct.  The names need to be updated as well with the
+new offsets.  New series to follow.
 
-In __create_mapping we account for the offset of the virtual base from a
-granule boundary, adding the residue to the size before rounding the
-base down to said granule boundary.
+Thanks,
+Jon
 
-Thus we account for the residue twice, and when the residue is non-zero
-will cause __create_mapping to map an additional page at the end of the
-region. Depending on the memory map, this page may be in a region we are
-not intended/permitted to map, or may clash with a different region that
-we which to map.
-
-As __create_mapping can cope with base addresses which are not page
-aligned, we can instead rely on it to map the region appropriately, and
-simplify efi_virtmap_init by removing the unnecessary code.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Leif Lindholm <leif.lindholm@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/efi.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index de46b50..25b82d8 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -225,7 +225,7 @@ static bool __init efi_virtmap_init(void)
- 	efi_memory_desc_t *md;
- 
- 	for_each_efi_memory_desc(&memmap, md) {
--		u64 paddr, npages, size;
-+		u64 size;
- 		pgprot_t prot;
- 
- 		if (!(md->attribute & EFI_MEMORY_RUNTIME))
-@@ -233,10 +233,7 @@ static bool __init efi_virtmap_init(void)
- 		if (md->virt_addr == 0)
- 			return false;
- 
--		paddr = md->phys_addr;
--		npages = md->num_pages;
--		memrange_efi_to_native(&paddr, &npages);
--		size = npages << PAGE_SHIFT;
-+		size = md->num_pages << EFI_PAGE_SHIFT;
- 
- 		pr_info("  EFI remap 0x%016llx => %p\n",
- 			md->phys_addr, (void *)md->virt_addr);
-@@ -254,7 +251,8 @@ static bool __init efi_virtmap_init(void)
- 		else
- 			prot = PAGE_KERNEL;
- 
--		create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size, prot);
-+		create_pgd_mapping(&efi_mm, md->phys_addr, md->virt_addr,
-+				   size, prot);
- 	}
- 	return true;
- }
--- 
-1.9.1
+> 
+> >  			compatible = "arm,cortex-a9-global-timer";
+> >-			reg = <0x0200 0x100>;
+> >+			reg = <0x20200 0x100>;
+> >  			interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
+> >  			clocks = <&periph_clk>;
+> >  		};
+> >
+> >  		twd-timer at 0600 {
+> 
+> twd-timer at 20600
+> 
+> >  			compatible = "arm,cortex-a9-twd-timer";
+> >-			reg = <0x0600 0x20>;
+> >+			reg = <0x20600 0x20>;
+> >  			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
+> >  						  IRQ_TYPE_LEVEL_HIGH)>;
+> >  			clocks = <&periph_clk>;
+> >@@ -75,7 +83,7 @@
+> >
+> >  		twd-watchdog at 0620 {
+> 
+> same here
+> 
+> >  			compatible = "arm,cortex-a9-twd-wdt";
+> >-			reg = <0x0620 0x20>;
+> >+			reg = <0x20620 0x20>;
+> >  			interrupts = <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
+> >  						  IRQ_TYPE_LEVEL_HIGH)>;
+> >  			clocks = <&periph_clk>;
+> >@@ -86,13 +94,13 @@
+> >  			#interrupt-cells = <3>;
+> >  			#address-cells = <0>;
+> >  			interrupt-controller;
+> >-			reg = <0x1000 0x1000>,
+> >-			      <0x0100 0x100>;
+> >+			reg = <0x21000 0x1000>,
+> >+			      <0x20100 0x100>;
+> >  		};
+> >
+> >  		L2: l2-cache {
+> >  			compatible = "arm,pl310-cache";
+> >-			reg = <0x2000 0x1000>;
+> >+			reg = <0x22000 0x1000>;
+> >  			cache-unified;
+> >  			cache-level = <2>;
+> >  		};
+> >@@ -103,10 +111,34 @@
+> >  		#size-cells = <1>;
+> >  		ranges;
+> >
+> >-		periph_clk: periph_clk {
+> >+		osc: oscillator {
+> >+			#clock-cells = <0>;
+> >  			compatible = "fixed-clock";
+> >+			clock-frequency = <25000000>;
+> >+		};
+> >+
+> >+		iprocmed: iprocmed {
+> >+			#clock-cells = <0>;
+> >+			compatible = "fixed-factor-clock";
+> >+			clocks = <&genpll BCM_NSP_GENPLL_IPROCFAST_CLK>;
+> >+			clock-div = <2>;
+> >+			clock-mult = <1>;
+> >+		};
+> >+
+> >+		iprocslow: iprocslow {
+> >+			#clock-cells = <0>;
+> >+			compatible = "fixed-factor-clock";
+> >+			clocks = <&genpll BCM_NSP_GENPLL_IPROCFAST_CLK>;
+> >+			clock-div = <4>;
+> >+			clock-mult = <1>;
+> >+		};
+> >+
+> >+		periph_clk: periph_clk {
+> >  			#clock-cells = <0>;
+> >-			clock-frequency = <500000000>;
+> >+			compatible = "fixed-factor-clock";
+> >+			clocks = <&a9pll>;
+> >+			clock-div = <2>;
+> >+			clock-mult = <1>;
+> >  		};
+> >  	};
+> >
+> >@@ -118,17 +150,17 @@
+> >
+> >  		uart0: serial at 0300 {
+> >  			compatible = "ns16550a";
+> >-			reg = <0x0300 0x100>;
+> >+			reg = <0x000300 0x100>;
+> >  			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+> >-			clock-frequency = <62499840>;
+> >+			clocks = <&osc>;
+> >  			status = "disabled";
+> >  		};
+> >
+> >  		uart1: serial at 0400 {
+> >  			compatible = "ns16550a";
+> >-			reg = <0x0400 0x100>;
+> >+			reg = <0x000400 0x100>;
+> >  			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+> >-			clock-frequency = <62499840>;
+> >+			clocks = <&osc>;
+> >  			status = "disabled";
+> >  		};
+> >
+> >@@ -226,5 +258,24 @@
+> >  			interrupts = <GIC_SPI 89 IRQ_TYPE_NONE>;
+> >  			clock-frequency = <100000>;
+> >  		};
+> >+
+> >+		lcpll0: lcpll0 at 3f100 {
+> >+			#clock-cells = <1>;
+> >+			compatible = "brcm,nsp-lcpll0";
+> >+			reg = <0x3f100 0x14>;
+> >+			clocks = <&osc>;
+> >+			clock-output-names = "lcpll0", "pcie_phy", "sdio",
+> >+					     "ddr_phy";
+> >+		};
+> >+
+> >+		genpll: genpll at 3f140 {
+> >+			#clock-cells = <1>;
+> >+			compatible = "brcm,nsp-genpll";
+> >+			reg = <0x3f140 0x24>;
+> >+			clocks = <&osc>;
+> >+			clock-output-names = "genpll", "phy", "ethernetclk",
+> >+					     "usbclk", "iprocfast", "sata1",
+> >+					     "sata2";
+> >+		};
+> >  	};
+> >  };
+> >
