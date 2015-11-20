@@ -1,53 +1,51 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 19 Nov 2015 17:05:32 -0800
-Subject: [PATCH 25/29] ARM: shmobile: r8a7793: Use SoC specific binding for
- rcar-dmac nodes
-In-Reply-To: <cover.1447981420.git.horms+renesas@verge.net.au>
-References: <cover.1447981420.git.horms+renesas@verge.net.au>
-Message-ID: <061c6c624b2f356a0d02b137ae4f46825ddd44d1.1447981420.git.horms+renesas@verge.net.au>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Fri, 20 Nov 2015 03:28:36 +0200
+Subject: [PATCH 01/10] dt-bindings: create arm/nxp folder and move LPC32xx SoC
+ description to it
+In-Reply-To: <1447982925-30138-1-git-send-email-vz@mleia.com>
+References: <1447982925-30138-1-git-send-email-vz@mleia.com>
+Message-ID: <1447982925-30138-2-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new SoC specific binding for rcar-dmac and the generic
-binding as a fall-back in the r8a7793 device tree.
+Create a separate folder for device tree bindings of NXP SoCs devices,
+and move lpc32xx.txt to it.
 
-In general Renesas hardware is not documented to the extent where the
-relationship between IP blocks on different SoCs can be assumed although
-they may appear to operate the same way. Furthermore the documentation
-typically does not specify a version for individual IP blocks. For these
-reasons a convention of using the SoC name in place of a version and
-providing SoC-specific compat strings has been adopted.
-
-Although not universally liked this convention is used in the bindings for
-most drivers for Renesas hardware. The purpose of this patch is to
-update the Renesas R-Car DMA Controller nodes to follow this convention.
-
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
- arch/arm/boot/dts/r8a7793.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/arm/lpc32xx.txt     | 8 --------
+ Documentation/devicetree/bindings/arm/nxp/lpc32xx.txt | 8 ++++++++
+ 2 files changed, 8 insertions(+), 8 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/lpc32xx.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/nxp/lpc32xx.txt
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index 36b6d4e67f34..2378df52aa32 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -237,7 +237,7 @@
- 	};
- 
- 	dmac0: dma-controller at e6700000 {
--		compatible = "renesas,rcar-dmac";
-+		compatible = "renesas,dmac-r8a7793", "renesas,rcar-dmac";
- 		reg = <0 0xe6700000 0 0x20000>;
- 		interrupts = <0 197 IRQ_TYPE_LEVEL_HIGH
- 			      0 200 IRQ_TYPE_LEVEL_HIGH
-@@ -268,7 +268,7 @@
- 	};
- 
- 	dmac1: dma-controller@e6720000 {
--		compatible = "renesas,rcar-dmac";
-+		compatible = "renesas,dmac-r8a7793", "renesas,rcar-dmac";
- 		reg = <0 0xe6720000 0 0x20000>;
- 		interrupts = <0 220 IRQ_TYPE_LEVEL_HIGH
- 			      0 216 IRQ_TYPE_LEVEL_HIGH
+diff --git a/Documentation/devicetree/bindings/arm/lpc32xx.txt b/Documentation/devicetree/bindings/arm/lpc32xx.txt
+deleted file mode 100644
+index 56ec8dd..0000000
+--- a/Documentation/devicetree/bindings/arm/lpc32xx.txt
++++ /dev/null
+@@ -1,8 +0,0 @@
+-NXP LPC32xx Platforms Device Tree Bindings
+-------------------------------------------
+-
+-Boards with the NXP LPC32xx SoC shall have the following properties:
+-
+-Required root node property:
+-
+-compatible: must be "nxp,lpc3220", "nxp,lpc3230", "nxp,lpc3240" or "nxp,lpc3250"
+diff --git a/Documentation/devicetree/bindings/arm/nxp/lpc32xx.txt b/Documentation/devicetree/bindings/arm/nxp/lpc32xx.txt
+new file mode 100644
+index 0000000..56ec8dd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/nxp/lpc32xx.txt
+@@ -0,0 +1,8 @@
++NXP LPC32xx Platforms Device Tree Bindings
++------------------------------------------
++
++Boards with the NXP LPC32xx SoC shall have the following properties:
++
++Required root node property:
++
++compatible: must be "nxp,lpc3220", "nxp,lpc3230", "nxp,lpc3240" or "nxp,lpc3250"
 -- 
 2.1.4
