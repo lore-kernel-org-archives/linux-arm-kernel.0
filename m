@@ -1,86 +1,90 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 20 Nov 2015 14:17:42 +0000
-Subject: [PATCH v5 5/7] xen/arm: introduce xen_read_wallclock
+Date: Fri, 20 Nov 2015 14:17:44 +0000
+Subject: [PATCH v5 7/7] xen/x86: support XENPF_settime64
 In-Reply-To: <alpine.DEB.2.02.1511201413050.1107@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1511201413050.1107@kaball.uk.xensource.com>
-Message-ID: <1448029064-22285-5-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1448029064-22285-7-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Read the wallclock from the shared info page at boot time.
+Try XENPF_settime64 first, if it is not available fall back to
+XENPF_settime32.
+
+No need to call __current_kernel_time() when all the info needed are
+already passed via the struct timekeeper * argument.
+
+Return NOTIFY_BAD in case of errors.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
-
+CC: konrad.wilk at oracle.com
+CC: david.vrabel at citrix.com
+CC: boris.ostrovsky at oracle.com
 ---
+ arch/x86/xen/time.c |   35 ++++++++++++++++++++++++++++-------
+ 1 file changed, 28 insertions(+), 7 deletions(-)
 
-Changes in v4:
-- simplify xen_read_wallclock
-
-Changes in v3:
-- use ktime_get_ns instead of calling into the arch_timer functions
-  directly
-- read the wallclock from the late_initcall
-
-Changes in v2:
-- properly convert arch_timer ticker to nsec
-- use timespec64 interfaces
-- use sec_hi to get a 64-bit seconds value
----
- arch/arm/xen/enlighten.c |   27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
-
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 2f57ba3..6ae4ef5 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -28,6 +28,7 @@
- #include <linux/cpufreq.h>
- #include <linux/cpu.h>
- #include <linux/console.h>
-+#include <linux/timekeeping.h>
+diff --git a/arch/x86/xen/time.c b/arch/x86/xen/time.c
+index 3bbd377..4b8af45 100644
+--- a/arch/x86/xen/time.c
++++ b/arch/x86/xen/time.c
+@@ -16,6 +16,7 @@
+ #include <linux/gfp.h>
+ #include <linux/slab.h>
+ #include <linux/pvclock_gtod.h>
++#include <linux/timekeeper_internal.h>
  
- #include <linux/mm.h>
+ #include <asm/pvclock.h>
+ #include <asm/xen/hypervisor.h>
+@@ -123,9 +124,13 @@ static int xen_pvclock_gtod_notify(struct notifier_block *nb,
+ 	static struct timespec next_sync;
  
-@@ -95,6 +96,27 @@ static unsigned long long xen_stolen_accounting(int cpu)
- 	return state.time[RUNSTATE_runnable] + state.time[RUNSTATE_offline];
- }
+ 	struct xen_platform_op op;
+-	struct timespec now;
++	struct timespec64 now;
++	struct timekeeper *tk = priv;
++	static bool settime64_supported = true;
++	int ret;
  
-+static void xen_read_wallclock(struct timespec64 *ts)
-+{
-+	u32 version;
-+	struct timespec64 now, ts_monotonic;
-+	struct shared_info *s = HYPERVISOR_shared_info;
-+	struct pvclock_wall_clock *wall_clock = &(s->wc);
-+
-+	/* get wallclock at system boot */
-+	do {
-+		version = wall_clock->version;
-+		rmb();		/* fetch version before time */
-+		now.tv_sec  = ((uint64_t)wall_clock->sec_hi << 32) | wall_clock->sec;
-+		now.tv_nsec = wall_clock->nsec;
-+		rmb();		/* fetch time before checking version */
-+	} while ((wall_clock->version & 1) || (version != wall_clock->version));
-+
-+	/* time since system boot */
-+	ktime_get_ts64(&ts_monotonic);
-+	*ts = timespec64_add(now, ts_monotonic);
-+}
-+
- static void xen_percpu_init(void)
- {
- 	struct vcpu_register_vcpu_info info;
-@@ -303,6 +325,11 @@ static int __init xen_pm_init(void)
+-	now = __current_kernel_time();
++	now.tv_sec = tk->xtime_sec;
++	now.tv_nsec = (long)(tk->tkr_mono.xtime_nsec >> tk->tkr_mono.shift);
  
- 	pm_power_off = xen_power_off;
- 	arm_pm_restart = xen_restart;
-+	if (!xen_initial_domain()) {
-+		struct timespec64 ts;
-+		xen_read_wallclock(&ts);
-+		do_settimeofday64(&ts);
+ 	/*
+ 	 * We only take the expensive HV call when the clock was set
+@@ -134,12 +139,28 @@ static int xen_pvclock_gtod_notify(struct notifier_block *nb,
+ 	if (!was_set && timespec_compare(&now, &next_sync) < 0)
+ 		return NOTIFY_OK;
+ 
+-	op.cmd = XENPF_settime32;
+-	op.u.settime32.secs = now.tv_sec;
+-	op.u.settime32.nsecs = now.tv_nsec;
+-	op.u.settime32.system_time = xen_clocksource_read();
++again:
++	if (settime64_supported) {
++		op.cmd = XENPF_settime64;
++		op.u.settime64.mbz = 0;
++		op.u.settime64.secs = now.tv_sec;
++		op.u.settime64.nsecs = now.tv_nsec;
++		op.u.settime64.system_time = xen_clocksource_read();
++	} else {
++		op.cmd = XENPF_settime32;
++		op.u.settime32.secs = now.tv_sec;
++		op.u.settime32.nsecs = now.tv_nsec;
++		op.u.settime32.system_time = xen_clocksource_read();
 +	}
++
++	ret = HYPERVISOR_platform_op(&op);
  
- 	return 0;
- }
+-	(void)HYPERVISOR_platform_op(&op);
++	if (ret == -ENOSYS && settime64_supported) {
++		settime64_supported = false;
++		goto again;
++	}
++	if (ret < 0)
++		return NOTIFY_BAD;
+ 
+ 	/*
+ 	 * Move the next drift compensation time 11 minutes
 -- 
 1.7.10.4
