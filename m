@@ -1,32 +1,32 @@
 From: leilk.liu@mediatek.com (Leilk Liu)
-Date: Fri, 20 Nov 2015 10:21:18 +0800
-Subject: [PATCH 3/4] spi: mediatek: remove needless pair of writel()/readl()
+Date: Fri, 20 Nov 2015 10:21:17 +0800
+Subject: [PATCH 2/4] spi: mediatek: remove unrequired description
 In-Reply-To: <1447986080-31410-1-git-send-email-leilk.liu@mediatek.com>
 References: <1447986080-31410-1-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <1447986080-31410-3-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <1447986080-31410-2-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's not need to re-read and re-write SPI_CMD_REG, so remove it.
+cs-gpios isn't required with patch "spi: mediatek: single
+device does not require cs_gpios", so modify the description.
 
 Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
 ---
- drivers/spi/spi-mt65xx.c |    3 ---
- 1 file changed, 3 deletions(-)
+ .../devicetree/bindings/spi/spi-mt65xx.txt         |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
-index 7840067..6c1a96e 100644
---- a/drivers/spi/spi-mt65xx.c
-+++ b/drivers/spi/spi-mt65xx.c
-@@ -154,9 +154,6 @@ static int mtk_spi_prepare_message(struct spi_master *master,
- 		reg_val |= SPI_CMD_CPOL;
- 	else
- 		reg_val &= ~SPI_CMD_CPOL;
--	writel(reg_val, mdata->base + SPI_CMD_REG);
--
--	reg_val = readl(mdata->base + SPI_CMD_REG);
+diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+index fba8334..60a183c 100644
+--- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
++++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+@@ -29,7 +29,7 @@ Required properties:
+   muxes clock, and "spi-clk" for the clock gate.
  
- 	/* set the mlsbx and mlsbtx */
- 	if (chip_config->tx_mlsb)
+ Optional properties:
+--cs-gpios: see spi-bus.txt, only required for MT8173.
++-cs-gpios: see spi-bus.txt.
+ 
+ - mediatek,pad-select: specify which pins group(ck/mi/mo/cs) spi
+   controller used. This is an array, the element value should be 0~3,
 -- 
 1.7.9.5
