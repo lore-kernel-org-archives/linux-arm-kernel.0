@@ -1,64 +1,32 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 20 Nov 2015 10:41:33 -0600
-Subject: [PATCH 02/11] dt-bindings: clock: add description of LPC32xx USB
- clock controller
-In-Reply-To: <1447981511-29653-3-git-send-email-vz@mleia.com>
-References: <1447981511-29653-1-git-send-email-vz@mleia.com>
- <1447981511-29653-3-git-send-email-vz@mleia.com>
-Message-ID: <20151120164133.GA9011@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 20 Nov 2015 17:41:36 +0100
+Subject: [PATCH] IB/iser: use sector_div instead of do_div
+Message-ID: <5922990.8IJpyksX8K@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 03:05:02AM +0200, Vladimir Zapolskiy wrote:
-> NXP LPC32xx USB controller has a subdevice, which controls USB AHB
-> slave, USB OTG, USB OHCI, USB device and I2C controller to USB phy
-> clocks, this change adds description of the clock controller, for more
-> details reference LPC32xx User's Manual, namely USB control, OTG clock
-> control and OTG clock status registers.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> ---
->  .../bindings/clock/nxp,lpc3220-usb-clk.txt         | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/nxp,lpc3220-usb-clk.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/nxp,lpc3220-usb-clk.txt b/Documentation/devicetree/bindings/clock/nxp,lpc3220-usb-clk.txt
-> new file mode 100644
-> index 0000000..67fba7f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/nxp,lpc3220-usb-clk.txt
-> @@ -0,0 +1,22 @@
-> +NXP LPC32xx USB Clock Controller
-> +
-> +Required properties:
-> +- compatible: should be "nxp,lpc3220-usb-clk"
-> +- reg:  should contain clock controller registers location and length
-> +- #clock-cells: must be 1, the cell holds id of a clock provided by the
-> +  USB clock controller
-> +
-> +Examples:
-> +
-> +	usb {
+do_div is the wrong way to divide a sector_t, as it is less
+efficient when sector_t is 32-bit wide. With the upcoming
+do_div optimizations, the kernel starts warning about this:
 
-I don't understand the full structure of USB blocks. Can you make the 
-example complete. All the blocks are a child of this node?
+drivers/infiniband/ulp/iser/iser_verbs.c:1296:4: note: in expansion of macro 'do_div'
+include/asm-generic/div64.h:224:22: warning: passing argument 1 of '__div64_32' from incompatible pointer type
 
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "simple-bus";
-> +		ranges = <0x0 0x31020000 0x00001000>;
-> +
-> +		usbclk: clock-controller at F00 {
-lower case                               ^
+This changes the code to use sector_div instead, which always
+produces optimal code.
 
-> +			compatible = "nxp,lpc3220-usb-clk";
-> +			reg = <0xF00 0x100>;
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-lower case
-
-> +			#clock-cells = <1>;
-> +		};
-> +	};
-> -- 
-> 2.1.4
-> 
+diff --git a/drivers/infiniband/ulp/iser/iser_verbs.c b/drivers/infiniband/ulp/iser/iser_verbs.c
+index a93070210109..42f4da620f2e 100644
+--- a/drivers/infiniband/ulp/iser/iser_verbs.c
++++ b/drivers/infiniband/ulp/iser/iser_verbs.c
+@@ -1293,7 +1293,7 @@ u8 iser_check_task_pi_status(struct iscsi_iser_task *iser_task,
+ 		if (mr_status.fail_status & IB_MR_CHECK_SIG_STATUS) {
+ 			sector_t sector_off = mr_status.sig_err.sig_err_offset;
+ 
+-			do_div(sector_off, sector_size + 8);
++			sector_div(sector_off, sector_size + 8);
+ 			*sector = scsi_get_lba(iser_task->sc) + sector_off;
+ 
+ 			pr_err("PI error found type %d at sector %llx "
