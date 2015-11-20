@@ -1,60 +1,34 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 19 Nov 2015 15:52:13 -0800
-Subject: [PATCH RFC 18/27] drivers: cpu-pd: Add PM Domain governor for CPUs
-In-Reply-To: <20151118184245.GA28755@red-moon> (Lorenzo Pieralisi's message of
- "Wed, 18 Nov 2015 18:42:45 +0000")
-References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
- <1447799871-56374-19-git-send-email-lina.iyer@linaro.org>
- <20151118184245.GA28755@red-moon>
-Message-ID: <7hk2pdsg2a.fsf@deeprootsystems.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 20 Nov 2015 09:01:35 +0900
+Subject: [PATCH v2] ARM: sunxi: Re-enable SID driver in multi_v7_defconfig
+In-Reply-To: <1447968823-2159-1-git-send-email-public_timo.s@silentcreek.de>
+References: <1447724947-4851-1-git-send-email-public_timo.s@silentcreek.de>
+ <1447968823-2159-1-git-send-email-public_timo.s@silentcreek.de>
+Message-ID: <564E62DF.5030407@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+On 20.11.2015 06:33, Timo Sigurdsson wrote:
+> Commit 3d0b16a66c8a ("nvmem: sunxi: Move the SID driver to the nvmem
+> framework") moved the the sunxi SID driver to a new framework, but left
+> multi_v7_defconfig with the deprecated config symbol EEPROM_SUNXI_SID
+> instead of the new symbol NVMEM_SUNXI_SID. Hence, re-enable the driver
+> in multi_v7_defconfig.
+> 
+> Signed-off-by: Timo Sigurdsson <public_timo.s@silentcreek.de>
+> ---
+> Changes in v2:
+> - Move the extra cleanup work for multi_v7_defconfig to a separate
+>   patch (to be submitted at a later point to avoid conflicts with
+>   another patch waiting to be merged)
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
 
-> On Tue, Nov 17, 2015 at 03:37:42PM -0700, Lina Iyer wrote:
->> A PM domain comprising of CPUs may be powered off when all the CPUs in
->> the domain are powered down. Powering down a CPU domain is generally a
->> expensive operation and therefore the power performance trade offs
->> should be considered. The time between the last CPU powering down and
->> the first CPU powering up in a domain, is the time available for the
->> domain to sleep. Ideally, the sleep time of the domain should fulfill
->> the residency requirement of the domains' idle state.
->> 
->> To do this effectively, read the time before the wakeup of the cluster's
->> CPUs and ensure that the domain's idle state sleep time guarantees the
->> QoS requirements of each of the CPU, the PM QoS CPU_DMA_LATENCY and the
->> state's residency.
->
-> To me this information should be part of the CPUidle governor (it is
-> already there), we should not split the decision into multiple layers.
->
-> The problem you are facing is that the CPUidle governor(s) do not take
-> cross cpus relationship into account, I do not think that adding another
-> decision layer in the power domain subsystem helps, you are doing that
-> just because adding it to the existing CPUidle governor(s) is invasive.
->
-> Why can't we use the power domain work you put together to eg disable
-> idle states that share multiple cpus and make them "visible" only
-> when the power domain that encompass them is actually going down ?
->
-> You could use the power domains information to detect states that
-> are shared between cpus.
->
-> It is just an idea, what I am saying is that having another governor in
-> the power domain subsytem does not make much sense, you split the
-> decision in two layers while there is actually one, the existing
-> CPUidle governor and that's where the decision should be taken.
+Fully satisfies my v1's comments:
 
-Hmm, considering "normal" devices in "normal" power domains, and
-following the same logic, the equivalent would be to say that the
-decision to gate the power domain belongs to the individual drivers
-in the domain instead of in the power domain layer.  I disagree.
+Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-IMO, there are different decision layers because there are different
-hardware layers.  Devices (including CPUs) are reponsible for handling
-device-local idle states, based on device-local conditions (e.g. local
-wakeups, timers, etc.)  and domains are responsible for handling
-decisions based on conditions of the whole domain.
-
-Kevin
+Best regards,
+Krzysztof
