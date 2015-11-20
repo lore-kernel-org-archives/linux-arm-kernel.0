@@ -1,60 +1,184 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Nov 2015 15:24:39 +0100
-Subject: [PATCH v3b] regulator: core: avoid unused variable warning
-Message-ID: <4083086.03MkICpY7S@wuerfel>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 20 Nov 2015 14:31:02 +0000
+Subject: [PATCH v11 3/5] arm: introduce CONFIG_PARAVIRT,
+ PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+In-Reply-To: <alpine.DEB.2.02.1511101411570.5676@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
+ <1446737696-9749-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1511101411570.5676@kaball.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1511201430200.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The second argument of the mutex_lock_nested() helper is only
-evaluated if CONFIG_DEBUG_LOCK_ALLOC is set. Otherwise we
-get this build warning for the new regulator_lock_supply
-function:
+On Tue, 10 Nov 2015, Stefano Stabellini wrote:
+> On Thu, 5 Nov 2015, Stefano Stabellini wrote:
+> > Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM.
+> > 
+> > The only paravirt interface supported is pv_time_ops.steal_clock, so no
+> > runtime pvops patching needed.
+> > 
+> > This allows us to make use of steal_account_process_tick for stolen
+> > ticks accounting.
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > Acked-by: Christopher Covington <cov@codeaurora.org>
+> > Acked-by: Ian Campbell <ian.campbell@citrix.com>
+> > CC: linux at arm.linux.org.uk
+> > CC: will.deacon at arm.com
+> > CC: nico at linaro.org
+> > CC: marc.zyngier at arm.com
+> > CC: cov at codeaurora.org
+> > CC: arnd at arndb.de
+> > CC: olof at lixom.net
+> 
+> 
+> Russell,
+> are you OK with this patch?
 
-drivers/regulator/core.c: In function 'regulator_lock_supply':
-drivers/regulator/core.c:142:6: warning: unused variable 'i' [-Wunused-variable]
+Russell,
 
-To avoid the warning, this restructures the code to make it
-both simpler and to move the 'i++' outside of the mutex_lock_nested
-call, where it is now always used and the variable is not
-flagged as unused.
+I am going to drop this patch and add a small #ifdef to
+arch/arm/xen/enlighten.c to be able to use this functionality on arm64.
 
-We had some discussion about changing mutex_lock_nested to an
-inline function, which would make the code do the right thing here,
-but in the end decided against it, in order to guarantee that
-mutex_lock_nested() does not introduced overhead without
-CONFIG_DEBUG_LOCK_ALLOC.
+If you change your mind let me know.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 9f01cd4a915 ("regulator: core: introduce function to lock regulators and its supplies")
-Link: http://permalink.gmane.org/gmane.linux.kernel/2068900
----
-This is a different approach I came up with now, feel free to
-pick either v3a or v3b of the patch, whichever seems more appropriate
-to you.
 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index 4cf1390784e5..c9bdca5f3b9b 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -138,18 +138,10 @@ static bool have_full_constraints(void)
-  */
- static void regulator_lock_supply(struct regulator_dev *rdev)
- {
--	struct regulator *supply;
--	int i = 0;
--
--	while (1) {
--		mutex_lock_nested(&rdev->mutex, i++);
--		supply = rdev->supply;
--
--		if (!rdev->supply)
--			return;
-+	int i;
- 
--		rdev = supply->rdev;
--	}
-+	for (i = 0; rdev->supply; rdev = rdev->supply->rdev, i++)
-+		mutex_lock_nested(&rdev->mutex, i);
- }
- 
- /**
+
+> 
+> 
+> > 
+> > Changes in v10:
+> > - replace "---help---" with "help"
+> > 
+> > Changes in v7:
+> > - ifdef CONFIG_PARAVIRT the content of paravirt.h.
+> > 
+> > Changes in v3:
+> > - improve commit description and Kconfig help text;
+> > - no need to initialize pv_time_ops;
+> > - add PARAVIRT_TIME_ACCOUNTING.
+> > ---
+> >  arch/arm/Kconfig                |   20 ++++++++++++++++++++
+> >  arch/arm/include/asm/paravirt.h |   20 ++++++++++++++++++++
+> >  arch/arm/kernel/Makefile        |    1 +
+> >  arch/arm/kernel/paravirt.c      |   25 +++++++++++++++++++++++++
+> >  4 files changed, 66 insertions(+)
+> >  create mode 100644 arch/arm/include/asm/paravirt.h
+> >  create mode 100644 arch/arm/kernel/paravirt.c
+> > 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index f1ed110..60be104 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1823,6 +1823,25 @@ config SWIOTLB
+> >  config IOMMU_HELPER
+> >  	def_bool SWIOTLB
+> >  
+> > +config PARAVIRT
+> > +	bool "Enable paravirtualization code"
+> > +	help
+> > +	  This changes the kernel so it can modify itself when it is run
+> > +	  under a hypervisor, potentially improving performance significantly
+> > +	  over full virtualization.
+> > +
+> > +config PARAVIRT_TIME_ACCOUNTING
+> > +	bool "Paravirtual steal time accounting"
+> > +	select PARAVIRT
+> > +	default n
+> > +	help
+> > +	  Select this option to enable fine granularity task steal time
+> > +	  accounting. Time spent executing other tasks in parallel with
+> > +	  the current vCPU is discounted from the vCPU power. To account for
+> > +	  that, there can be a small performance impact.
+> > +
+> > +	  If in doubt, say N here.
+> > +
+> >  config XEN_DOM0
+> >  	def_bool y
+> >  	depends on XEN
+> > @@ -1836,6 +1855,7 @@ config XEN
+> >  	select ARCH_DMA_ADDR_T_64BIT
+> >  	select ARM_PSCI
+> >  	select SWIOTLB_XEN
+> > +	select PARAVIRT
+> >  	help
+> >  	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
+> >  
+> > diff --git a/arch/arm/include/asm/paravirt.h b/arch/arm/include/asm/paravirt.h
+> > new file mode 100644
+> > index 0000000..8435ff59
+> > --- /dev/null
+> > +++ b/arch/arm/include/asm/paravirt.h
+> > @@ -0,0 +1,20 @@
+> > +#ifndef _ASM_ARM_PARAVIRT_H
+> > +#define _ASM_ARM_PARAVIRT_H
+> > +
+> > +#ifdef CONFIG_PARAVIRT
+> > +struct static_key;
+> > +extern struct static_key paravirt_steal_enabled;
+> > +extern struct static_key paravirt_steal_rq_enabled;
+> > +
+> > +struct pv_time_ops {
+> > +	unsigned long long (*steal_clock)(int cpu);
+> > +};
+> > +extern struct pv_time_ops pv_time_ops;
+> > +
+> > +static inline u64 paravirt_steal_clock(int cpu)
+> > +{
+> > +	return pv_time_ops.steal_clock(cpu);
+> > +}
+> > +#endif
+> > +
+> > +#endif
+> > diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> > index af9e59b..3e6e937 100644
+> > --- a/arch/arm/kernel/Makefile
+> > +++ b/arch/arm/kernel/Makefile
+> > @@ -81,6 +81,7 @@ obj-$(CONFIG_VDSO)		+= vdso.o
+> >  ifneq ($(CONFIG_ARCH_EBSA110),y)
+> >    obj-y		+= io.o
+> >  endif
+> > +obj-$(CONFIG_PARAVIRT)	+= paravirt.o
+> >  
+> >  head-y			:= head$(MMUEXT).o
+> >  obj-$(CONFIG_DEBUG_LL)	+= debug.o
+> > diff --git a/arch/arm/kernel/paravirt.c b/arch/arm/kernel/paravirt.c
+> > new file mode 100644
+> > index 0000000..53f371e
+> > --- /dev/null
+> > +++ b/arch/arm/kernel/paravirt.c
+> > @@ -0,0 +1,25 @@
+> > +/*
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + *
+> > + * Copyright (C) 2013 Citrix Systems
+> > + *
+> > + * Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > + */
+> > +
+> > +#include <linux/export.h>
+> > +#include <linux/jump_label.h>
+> > +#include <linux/types.h>
+> > +#include <asm/paravirt.h>
+> > +
+> > +struct static_key paravirt_steal_enabled;
+> > +struct static_key paravirt_steal_rq_enabled;
+> > +
+> > +struct pv_time_ops pv_time_ops;
+> > +EXPORT_SYMBOL_GPL(pv_time_ops);
+> > -- 
+> > 1.7.10.4
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
