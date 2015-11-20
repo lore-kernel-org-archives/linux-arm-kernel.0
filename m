@@ -1,45 +1,33 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 20 Nov 2015 08:20:13 -0600
-Subject: [PATCH 2/4] spi: mediatek: remove unrequired description
-In-Reply-To: <1447986080-31410-2-git-send-email-leilk.liu@mediatek.com>
-References: <1447986080-31410-1-git-send-email-leilk.liu@mediatek.com>
- <1447986080-31410-2-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <20151120142013.GA498@rob-hp-laptop>
+From: salil.mehta@huawei.com (Salil Mehta)
+Date: Fri, 20 Nov 2015 14:15:09 +0000
+Subject: [PATCH V2 net-next 1/5] net:hns: Add support of Hip06 SoC to
+ the Hislicon Network Subsystem
+In-Reply-To: <20151118.135250.2066223916643044258.davem@davemloft.net>
+References: <1447786347-147518-1-git-send-email-salil.mehta@huawei.com>	<1447786347-147518-2-git-send-email-salil.mehta@huawei.com>
+ <20151118.135250.2066223916643044258.davem@davemloft.net>
+Message-ID: <564F2AED.30906@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 10:21:17AM +0800, Leilk Liu wrote:
-> cs-gpios isn't required with patch "spi: mediatek: single
-> device does not require cs_gpios", so modify the description.
-> 
-> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
 
-This could use a better subject. Try to make subjects specific enough 
-they would only ever apply to the change.
+On 11/18/2015 6:52 PM, David Miller wrote:
+> From: Salil <salil.mehta@huawei.com>
+> Date: Wed, 18 Nov 2015 02:52:23 +0800
+>
+>> @@ -387,19 +409,23 @@ static void hns_rcb_ring_get_cfg(struct hnae_queue *q, int ring_type)
+>>   	struct rcb_common_cb *rcb_common;
+>>   	struct ring_pair_cb *ring_pair_cb;
+>>   	u32 buf_size;
+>> -	u16 desc_num;
+>> -	int irq_idx;
+>> +	u16 desc_num, mdnum_ppkt;
+>> +	int irq_idx, is_ver1;
+> Please use "bool" and true/false for boolean conditions like is_ver1.
+>
+> Please audit your entire submission for this problem.
+Thanks for your time and comments. As per your suggestions, I have 
+changed the data type of variable "is_ver" to "bool" where ever possible 
+in the PATCH V3 floated yesterday.
 
-Acked-by: Rob Herring <robh@kernel.org>
-
-> ---
->  .../devicetree/bindings/spi/spi-mt65xx.txt         |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-> index fba8334..60a183c 100644
-> --- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-> +++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-> @@ -29,7 +29,7 @@ Required properties:
->    muxes clock, and "spi-clk" for the clock gate.
->  
->  Optional properties:
-> --cs-gpios: see spi-bus.txt, only required for MT8173.
-> +-cs-gpios: see spi-bus.txt.
->  
->  - mediatek,pad-select: specify which pins group(ck/mi/mo/cs) spi
->    controller used. This is an array, the element value should be 0~3,
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Best Regards
+Salil
