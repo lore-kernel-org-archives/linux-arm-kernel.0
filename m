@@ -1,24 +1,58 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 20 Nov 2015 09:54:10 +0800
-Subject: [PATCH v2 2/3] ARM: sunxi: Really enable LRADC keys in
- sunxi_defconfig
-In-Reply-To: <1447983979-12751-2-git-send-email-public_timo.s@silentcreek.de>
+From: public_timo.s@silentcreek.de (Timo Sigurdsson)
+Date: Fri, 20 Nov 2015 02:55:17 +0100
+Subject: [PATCH v2 1/3] ARM: sunxi: Re-enable SID driver in sunxi_defconfig
+In-Reply-To: <1447983979-12751-1-git-send-email-public_timo.s@silentcreek.de>
 References: <1447724578-4786-1-git-send-email-public_timo.s@silentcreek.de>
  <1447983979-12751-1-git-send-email-public_timo.s@silentcreek.de>
- <1447983979-12751-2-git-send-email-public_timo.s@silentcreek.de>
-Message-ID: <CAGb2v67bpXhBhWVsHw0vv4N+_PXYfRY3y3WcRuQsqiw8jjn46g@mail.gmail.com>
+Message-ID: <1447984517.1404.30.camel@silentcreek.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 9:46 AM, Timo Sigurdsson
-<public_timo.s@silentcreek.de> wrote:
-> Commit be8becb81bdc ("ARM: sunxi_defconfig: Enable LRADC keys
-> (KEYBOARD_SUN4I_LRADC)") added CONFIG_KEYBOARD_SUN4I_LRADC=y to
-> sunxi_defconfig. However, it depends on CONFIG_KEYBOARD which is
-> explicitly disabled in sunxi_defconfig. Hence, the LRADC keys were
-> never actually enabled. Remove the line disabling CONFIG_KEYBOARD in
-> order to really enable KEYBOARD_SUN4I_LRADC.
->
-> Signed-off-by: Timo Sigurdsson <public_timo.s@silentcreek.de>
+Sorry, I probably shouldn't send patches at an hour I should rather be
+sleeping... As a result, I forgot to add the patch history.
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Here it is:
+
+Changes in v2:
+- Move the extra cleanup work for sunxi_defconfig to a separate patch
+- Add another patch to meet the dependencies of
+  CONFIG_KEYBOARD_SUN4I_LRADC and not have it removed while cleaning up
+
+
+Good night,
+
+Timo
+
+Am Freitag, den 20.11.2015, 02:46 +0100 schrieb Timo Sigurdsson:
+> Commit 3d0b16a66c8a ("nvmem: sunxi: Move the SID driver to the nvmem
+> framework") moved the the sunxi SID driver to a new framework, but left
+> sunxi_defconfig with the deprecated config symbol EEPROM_SUNXI_SID
+> instead of the new symbol NVMEM_SUNXI_SID. Hence, re-enable the driver
+> in sunxi_defconfig.
+> 
+> Signed-off-by: Timo Sigurdsson <public_timo.s@silentcreek.de>
+> ---
+>  arch/arm/configs/sunxi_defconfig | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+> index 3c36e16..0bbc2ee 100644
+> --- a/arch/arm/configs/sunxi_defconfig
+> +++ b/arch/arm/configs/sunxi_defconfig
+> @@ -37,7 +37,6 @@ CONFIG_CAN_SUN4I=y
+>  # CONFIG_WIRELESS is not set
+>  CONFIG_DEVTMPFS=y
+>  CONFIG_DEVTMPFS_MOUNT=y
+> -CONFIG_EEPROM_SUNXI_SID=y
+>  CONFIG_BLK_DEV_SD=y
+>  CONFIG_ATA=y
+>  CONFIG_AHCI_SUNXI=y
+> @@ -123,6 +122,8 @@ CONFIG_PWM=y
+>  CONFIG_PWM_SUN4I=y
+>  CONFIG_PHY_SUN4I_USB=y
+>  CONFIG_PHY_SUN9I_USB=y
+> +CONFIG_NVMEM=y
+> +CONFIG_NVMEM_SUNXI_SID=y
+>  CONFIG_EXT4_FS=y
+>  CONFIG_VFAT_FS=y
+>  CONFIG_TMPFS=y
