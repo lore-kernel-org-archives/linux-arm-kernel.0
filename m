@@ -1,94 +1,54 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 20 Nov 2015 16:07:26 +0000
-Subject: [PATCH 01/13] Xen : Hide UART used by Xen
-In-Reply-To: <1447754231-7772-2-git-send-email-shannon.zhao@linaro.org>
-References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
- <1447754231-7772-2-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511201541040.1107@kaball.uk.xensource.com>
+From: brace77070@gmail.com (Don Brace)
+Date: Fri, 20 Nov 2015 10:09:50 -0600
+Subject: [PATCH] scsi: hpsa: select CONFIG_SCSI_SAS_ATTR
+In-Reply-To: <3970646.5sOyETUiWo@wuerfel>
+References: <3970646.5sOyETUiWo@wuerfel>
+Message-ID: <564F45CE.3060402@pmcs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC'ing ACPI maintainers.
+Signed-off-by: Don Brace <don.brace@pmcs.com>
 
-Please use ./scripts/get_maintainer.pl to retrieve a list of maintainers
-to CC for each patch.
-
-
-On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> According to the STAO table, hide UART used by Xen from Dom0.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  drivers/acpi/bus.c | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
-> 
-> diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
-> index a212cef..e93806b 100644
-> --- a/drivers/acpi/bus.c
-> +++ b/drivers/acpi/bus.c
-> @@ -46,6 +46,7 @@ ACPI_MODULE_NAME("bus");
->  struct acpi_device *acpi_root;
->  struct proc_dir_entry *acpi_root_dir;
->  EXPORT_SYMBOL(acpi_root_dir);
-> +static u64 uart_addr;
-
-I would call this spcr_addr or spcr_uart_addr because there are many
-uarts on the system but only one spcr. It might make sense to initialize
-this to 0xffffffffffffffff rather than 0, which could actually be a
-correct uart address.
+And...Thanks!
 
 
->  #ifdef CONFIG_X86
->  #ifdef CONFIG_ACPI_CUSTOM_DSDT
-> @@ -93,6 +94,16 @@ acpi_status acpi_bus_get_status_handle(acpi_handle handle,
->  {
->  	acpi_status status;
+On 11/19/2015 04:04 PM, Arnd Bergmann wrote:
+> The hpsa driver recently started using the sas transport class, but it
+> does not ensure that the corresponding code is actually built, which
+> may lead to a link error:
 >
-> +	if (uart_addr) {
-> +		u64 addr;
-> +		status = acpi_evaluate_integer(handle, METHOD_NAME__ADR, NULL,
-> +					       &addr);
-> +		if (ACPI_SUCCESS(status) && (addr == uart_addr)) {
-> +			*sta = 0;
-> +			return AE_OK;
-> +		}
-> +	}
-> +
->  	status = acpi_evaluate_integer(handle, "_STA", NULL, sta);
->  	if (ACPI_SUCCESS(status))
->  		return AE_OK;
-> @@ -1069,6 +1080,7 @@ EXPORT_SYMBOL_GPL(acpi_kobj);
->  static int __init acpi_init(void)
->  {
->  	int result;
-> +	struct acpi_table_stao *stao_ptr;
->  
->  	if (acpi_disabled) {
->  		printk(KERN_INFO PREFIX "Interpreter disabled.\n");
-> @@ -1081,6 +1093,16 @@ static int __init acpi_init(void)
->  		acpi_kobj = NULL;
->  	}
->  
-> +	acpi_get_table(ACPI_SIG_STAO, 1,
-> +		       (struct acpi_table_header **)&stao_ptr);
-> +	if(stao_ptr->ignore_uart)
-> +	{
-
-Please follow the linux coding style. You can use
-./scripts/checkpatch.pl to check for coding style errors.
-
-
-> +		struct acpi_table_spcr *spcr_ptr;
-> +		acpi_get_table(ACPI_SIG_SPCR, 1,
-> +			       (struct acpi_table_header **)&spcr_ptr);
-> +		uart_addr = spcr_ptr->serial_port.address;
-> +	}
-> +
->  	init_acpi_device_notify();
->  	result = acpi_bus_init();
->  	if (result) {
-> -- 
-> 2.1.0
-> 
+> drivers/built-in.o: In function `hpsa_free_sas_phy':
+> (.text+0x1ce874): undefined reference to `sas_port_delete_phy'
+> (.text+0x1ce87c): undefined reference to `sas_phy_free'
+> drivers/built-in.o: In function `hpsa_alloc_sas_port':
+> (.text+0x1ceb9c): undefined reference to `sas_port_alloc_num'
+> (.text+0x1ceba8): undefined reference to `sas_port_add'
+> drivers/built-in.o: In function `hpsa_init':
+> (.init.text+0x8838): undefined reference to `sas_attach_transport'
+> (.init.text+0x8868): undefined reference to `sas_release_transport
+>
+> This adds 'select SCSI_SAS_ATTR' in the Kconfig entry, just like we do
+> for all other drivers using those functions.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: d04e62b9d63a ("hpsa: add in sas transport class")
+> ---
+> This showed up on the ARM randconfig builds today for the first time.
+>
+> diff --git a/drivers/scsi/Kconfig b/drivers/scsi/Kconfig
+> index 04a720686516..64eed87d34a8 100644
+> --- a/drivers/scsi/Kconfig
+> +++ b/drivers/scsi/Kconfig
+> @@ -364,6 +364,7 @@ config SCSI_HPSA
+>   	tristate "HP Smart Array SCSI driver"
+>   	depends on PCI && SCSI
+>   	select CHECK_SIGNATURE
+> +	select SCSI_SAS_ATTRS
+>   	help
+>   	  This driver supports HP Smart Array Controllers (circa 2009).
+>   	  It is a SCSI alternative to the cciss driver, which is a block
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-scsi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
