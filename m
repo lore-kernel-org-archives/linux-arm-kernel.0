@@ -1,33 +1,22 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 20 Nov 2015 15:38:47 +0100
-Subject: [PATCH] ARM: dts: sun8i-h3-orangepi-plus: Enable USB host
- controllers
-In-Reply-To: <564B51D7.7090500@gmail.com>
-References: <1447616777-24660-1-git-send-email-hdegoede@redhat.com>
- <1447616777-24660-5-git-send-email-hdegoede@redhat.com>
- <CAGb2v669Cu6+G=P8yH-g5KbOsWTHBgnYUYf2fGt+jKXbqVAKfQ@mail.gmail.com>
- <56498FA8.3050908@redhat.com> <564B51D7.7090500@gmail.com>
-Message-ID: <564F3077.7020104@redhat.com>
+Date: Fri, 20 Nov 2015 15:40:28 +0100
+Subject: [PATCH] ARM: dts: sun8i: Add Orange Pi PC support
+In-Reply-To: <1447825233-3325-1-git-send-email-wens@csie.org>
+References: <1447825233-3325-1-git-send-email-wens@csie.org>
+Message-ID: <564F30DC.7040708@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 17-11-15 17:12, Jens Kuske wrote:
-> Enable the 2 USB host controllers used on the Orange Pi Plus
-> and add the necessary regulators.
+On 18-11-15 06:40, Chen-Yu Tsai wrote:
+> The Orange Pi PC is an SBC based on the Allwinner H3 SoC with a uSD slot,
+> 3 USB ports directly from the SoC, a 10/100M ethernet port using the
+> SoC's integrated PHY, USB OTG, HDMI, a TRRS headphone jack for stereo out
+> and composite out, a microphone, an IR receiver, a CSI connector, 2 LEDs,
+> a 3 pin UART header, and a 40-pin GPIO header.
 >
-> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
-> ---
->
-> Hi Hans,
->
-> with these regulators USB works on the Orange Pi Plus too.
-> I don't know if adding the regulators in the dts is okay, since most
-> regulators are defined in the sunxi-common-regulators.dtsi, but
-> we use different pins.
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
 Thanks, I've added this to my sunxi-wip branch for now.
 
@@ -35,45 +24,95 @@ Regards,
 
 Hans
 
-p.s.
 
-Any progress on getting the "core" H3 kernel support upstream ?
-
-Given Arnd's remarks about how we should not hard-code the
-indices in the clk driver + the very KISS nature of the
-change to 1 parent-clk per gate setup I still believe
-that that one is best.
-
-Maxime ? Chen-Yu ? It would be really good to be able to
-move forward with this, how do you want to proceed ?
-
-
+> ---
 >
-> Jens
+> This is based on Jens' H3 patches and Hans' H3 USB patches.
+> USB works nicely on this board.
 >
+> ---
+>   arch/arm/boot/dts/Makefile                 |   1 +
+>   arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 106 +++++++++++++++++++++++++++++
+>   2 files changed, 107 insertions(+)
+>   create mode 100644 arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
 >
->   arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 44 ++++++++++++++++++++++++++++
->   1 file changed, 44 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-> index e67df59..1cb6c66 100644
-> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-> @@ -58,6 +58,35 @@
->   	chosen {
->   		stdout-path = "serial0:115200n8";
->   	};
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 4e8026e85b79..0ef528a7d845 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -661,6 +661,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+>   	sun8i-a33-ippo-q8h-v1.2.dtb \
+>   	sun8i-a33-q8-tablet.dtb \
+>   	sun8i-a33-sinlinx-sina33.dtb \
+> +	sun8i-h3-orangepi-pc.dtb \
+>   	sun8i-h3-orangepi-plus.dtb
+>   dtb-$(CONFIG_MACH_SUN9I) += \
+>   	sun9i-a80-optimus.dtb \
+> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+> new file mode 100644
+> index 000000000000..4b25dcc3fdd2
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+> @@ -0,0 +1,106 @@
+> +/*
+> + * Copyright (C) 2015 Chen-Yu Tsai <wens@csie.org>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
 > +
-> +	reg_usb3_vbus: usb3-vbus {
-> +		compatible = "regulator-fixed";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&usb3_vbus_pin_a>;
-> +		regulator-name = "usb3-vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		regulator-boot-on;
-> +		enable-active-high;
-> +		gpio = <&pio 6 11 GPIO_ACTIVE_HIGH>;
+> +/dts-v1/;
+> +#include "sun8i-h3.dtsi"
+> +#include "sunxi-common-regulators.dtsi"
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+> +
+> +/ {
+> +	model = "Xunlong Orange Pi PC";
+> +	compatible = "xunlong,orangepi-pc", "allwinner,sun8i-h3";
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
 > +	};
 > +};
 > +
@@ -81,42 +120,44 @@ move forward with this, how do you want to proceed ?
 > +	status = "okay";
 > +};
 > +
+> +&ehci2 {
+> +	status = "okay";
+> +};
+> +
 > +&ehci3 {
 > +	status = "okay";
 > +};
 > +
-> +&pio {
-> +	usb3_vbus_pin_a: usb3_vbus_pin at 0 {
-> +		allwinner,pins = "PG11";
-> +		allwinner,function = "gpio_out";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +	};
->   };
->
->   &mmc0 {
-> @@ -70,8 +99,23 @@
->   	status = "okay";
->   };
->
-> +&reg_usb1_vbus {
-> +	gpio = <&pio 6 13 GPIO_ACTIVE_HIGH>;
+> +&mmc0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	bus-width = <4>;
+> +	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
+> +	cd-inverted;
 > +	status = "okay";
 > +};
 > +
->   &uart0 {
->   	pinctrl-names = "default";
->   	pinctrl-0 = <&uart0_pins_a>;
->   	status = "okay";
->   };
+> +&ohci1 {
+> +	status = "okay";
+> +};
 > +
-> +&usb1_vbus_pin_a {
-> +	allwinner,pins = "PG13";
+> +&ohci2 {
+> +	status = "okay";
+> +};
+> +
+> +&ohci3 {
+> +	status = "okay";
+> +};
+> +
+> +&uart0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart0_pins_a>;
+> +	status = "okay";
 > +};
 > +
 > +&usbphy {
-> +	usb1_vbus-supply = <&reg_usb1_vbus>;
-> +	usb3_vbus-supply = <&reg_usb3_vbus>;
+> +	/* USB VBUS is always on */
 > +	status = "okay";
 > +};
 >
