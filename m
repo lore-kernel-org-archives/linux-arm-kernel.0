@@ -1,44 +1,81 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 20 Nov 2015 17:51:55 +0100
-Subject: [PATCH] watchdog: mtk_wdt: Use MODE_KEY when stopping the watchdog
-In-Reply-To: <564CA620.7080700@roeck-us.net>
-References: <1447814701-23504-1-git-send-email-drinkcat@chromium.org>
- <564CA620.7080700@roeck-us.net>
-Message-ID: <564F4FAB.8000703@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 20 Nov 2015 10:55:07 -0600
+Subject: [PATCH 02/10] dt-bindings: nxp: add description of wakeup
+ controller on LPC32xx
+In-Reply-To: <1447982925-30138-3-git-send-email-vz@mleia.com>
+References: <1447982925-30138-1-git-send-email-vz@mleia.com>
+ <1447982925-30138-3-git-send-email-vz@mleia.com>
+Message-ID: <20151120165507.GA12088@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Nov 20, 2015 at 03:28:37AM +0200, Vladimir Zapolskiy wrote:
+> NXP LPC32xx has three wakeup controllers of two types, this
+> descriptions defines DT bindings of wakeup controllers connected to
+> MIC, SIC1 and SIC2 interrupt controllers.
+> 
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> ---
+>  .../bindings/arm/nxp/nxp,lpc3220-wakeup.txt        | 41 ++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/nxp/nxp,lpc3220-wakeup.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/nxp/nxp,lpc3220-wakeup.txt b/Documentation/devicetree/bindings/arm/nxp/nxp,lpc3220-wakeup.txt
+> new file mode 100644
+> index 0000000..803728f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/nxp/nxp,lpc3220-wakeup.txt
+> @@ -0,0 +1,41 @@
+> +NXP LPC32xx Wakeup Controller
+> +
+> +Required properties:
+> +- compatible: should be "nxp,lpc3220-wakeup"
+> +- reg:  should contain wakeup controller registers location and length
+> +- #wakeup-cells: must be 2, the first cell describes wakeup source on
+> +  the controller, the second cell is a hardware interrupt number on IC.
 
+This probably needs to be done differently. For one, we already have a 
+common property "wakeup-source" with different meaning.
 
-On 18/11/15 17:24, Guenter Roeck wrote:
-> On 11/17/2015 06:45 PM, Nicolas Boichat wrote:
->> WDT_MODE value need to be or-ed with MODE_KEY when setting
->> watchdog mode. Add it to mtk_wdt_stop function, so that the
->> watchdog can be stopped (e.g. during suspend).
->>
->> Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
->
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Marc, Is there an example of using stacked irqdomain and mapping of irq 
+numbers to wakeup numbers?
 
-Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+Rob
 
->
->> ---
->>   drivers/watchdog/mtk_wdt.c | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/watchdog/mtk_wdt.c b/drivers/watchdog/mtk_wdt.c
->> index 6ad9df9..b751f43 100644
->> --- a/drivers/watchdog/mtk_wdt.c
->> +++ b/drivers/watchdog/mtk_wdt.c
->> @@ -123,6 +123,7 @@ static int mtk_wdt_stop(struct watchdog_device
->> *wdt_dev)
->>
->>       reg = readl(wdt_base + WDT_MODE);
->>       reg &= ~WDT_MODE_EN;
->> +    reg |= WDT_MODE_KEY;
->>       iowrite32(reg, wdt_base + WDT_MODE);
->>
->>       return 0;
->>
->
+> +
+> +Examples:
+> +
+> +	/* System Control Block */
+> +	scb {
+> +		compatible = "simple-bus";
+> +		ranges = <0x0 0x040004000 0x00001000>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		wakeup_int: wakeup-controller at 20 {
+> +			compatible = "nxp,lpc3220-wakeup";
+> +			reg = <0x20 0x10>;
+> +			#wakeup-cells = <2>;
+> +		};
+> +
+> +		wakeup_pin: wakeup-controller at 30 {
+> +			compatible = "nxp,lpc3220-wakeup";
+> +			reg = <0x30 0x10>;
+> +			#wakeup-cells = <2>;
+> +		};
+> +	};
+> +
+> +	/* Main Interrupt Controller */
+> +	mic: interrupt-controller at 40008000 {
+> +		compatible = "nxp,lpc3220-mic";
+> +		reg = <0x40008000 0x4000>;
+> +		interrupt-controller;
+> +		interrupt-controller-name = "mic";
+> +		#interrupt-cells = <2>;
+> +
+> +		wakeup-sources = <&wakeup_int 7 29>,
+> +				 <&wakeup_int 25 27>;
+> +	};
+> -- 
+> 2.1.4
+> 
