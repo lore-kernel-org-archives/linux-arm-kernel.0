@@ -1,163 +1,262 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 20 Nov 2015 17:30:59 +0000
-Subject: [PATCH 13/13] ARM: XEN: Move xen_early_init() before
- efi_init()
-In-Reply-To: <1447754231-7772-14-git-send-email-shannon.zhao@linaro.org>
-References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
- <1447754231-7772-14-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511201720550.1107@kaball.uk.xensource.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Fri, 20 Nov 2015 09:31:33 -0800
+Subject: [RFC PATCH] restrict /dev/mem to idle io memory ranges
+Message-ID: <20151120173133.24259.97028.stgit@dwillia2-desk3.jf.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Move xen_early_init() before efi_init(), then when calling efi_init()
-> could initialize Xen specific UEFI.
-> 
-> Check if it runs on Xen hypervisor through the flat dts.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm/xen/enlighten.c  | 62 ++++++++++++++++++++++++++++++++++++-----------
->  arch/arm64/kernel/setup.c |  2 +-
->  2 files changed, 49 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index b8e9db8..d4f884c 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -19,6 +19,7 @@
->  #include <linux/irqreturn.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/of_fdt.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_address.h>
->  #include <linux/cpuidle.h>
-> @@ -48,8 +49,6 @@ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS] __initdata;
->  
->  static __read_mostly unsigned int xen_events_irq;
->  
-> -static __initdata struct device_node *xen_node;
-> -
->  int xen_remap_domain_gfn_array(struct vm_area_struct *vma,
->  			       unsigned long addr,
->  			       xen_pfn_t *gfn, int nr,
-> @@ -142,6 +141,34 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
->  	return IRQ_HANDLED;
->  }
->  
-> +struct xen_node_info {
-> +	const char *compat;
-> +	const char *prefix;
-> +	const char *version;
-> +	bool found;
-> +};
-> +
-> +static int __init fdt_find_xen_node(unsigned long node, const char *uname,
-> +				    int depth, void *data)
-> +{
-> +	struct xen_node_info *info = data;
-> +	const void *s = NULL;
-> +	int len;
-> +
-> +	if (depth != 1 || strcmp(uname, "hypervisor") != 0)
-> +		return 0;
-> +
-> +	if (of_flat_dt_is_compatible(node, info->compat))
-> +		info->found = true;
-> +
-> +	s = of_get_flat_dt_prop(node, "compatible", &len);
-> +	if (strlen(info->prefix) + 3  < len &&
-> +                        !strncmp(info->prefix, s, strlen(info->prefix)))
-> +                info->version = s + strlen(info->prefix);
-> +	return 0;
-> +}
-> +
->  /*
->   * see Documentation/devicetree/bindings/arm/xen.txt for the
->   * documentation of the Xen Device Tree format.
-> @@ -149,26 +176,25 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
->  #define GRANT_TABLE_PHYSADDR 0
->  void __init xen_early_init(void)
->  {
-> -	int len;
-> -	const char *s = NULL;
-> -	const char *version = NULL;
-> -	const char *xen_prefix = "xen,xen-";
-> +	struct xen_node_info info;
-> +
-> +	info.compat = "xen,xen";
-> +	info.prefix = "xen,xen-";
-> +	info.version = NULL;
-> +	info.found = false;
+This effectively promotes IORESOURCE_BUSY to IORESOURCE_EXCLUSIVE
+semantics by default.  If userspace really believes it is safe to access
+the memory region it can also perform the extra step of disabling an
+active driver.  This protects device address ranges with read side
+effects and otherwise directs userspace to use the driver.
 
-Can you initialize the fields directly when you define xen_node_info and
-make it static?
+Persistent memory presents a large "mistake surface" to /dev/mem as now
+accidental writes can corrupt a filesystem.
 
-The rest looks good.
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
+Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+---
+ arch/arm/Kconfig.debug       |   14 --------------
+ arch/arm64/Kconfig.debug     |   14 --------------
+ arch/powerpc/Kconfig.debug   |   12 ------------
+ arch/s390/Kconfig.debug      |   12 ------------
+ arch/tile/Kconfig            |    3 ---
+ arch/unicore32/Kconfig.debug |   14 --------------
+ arch/x86/Kconfig.debug       |   17 -----------------
+ kernel/resource.c            |    3 +++
+ lib/Kconfig.debug            |   36 ++++++++++++++++++++++++++++++++++++
+ 9 files changed, 39 insertions(+), 86 deletions(-)
 
-
-> -	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
-> -	if (!xen_node) {
-> +	of_scan_flat_dt(fdt_find_xen_node, &info);
-> +	if (!info.found) {
->  		pr_debug("No Xen support\n");
->  		return;
->  	}
-> -	s = of_get_property(xen_node, "compatible", &len);
-> -	if (strlen(xen_prefix) + 3  < len &&
-> -			!strncmp(xen_prefix, s, strlen(xen_prefix)))
-> -		version = s + strlen(xen_prefix);
->
-> -	if (version == NULL) {
-> +
-> +	if (info.version == NULL) {
->  		pr_debug("Xen version not found\n");
->  		return;
->  	}
->  
-> -	pr_info("Xen %s support found\n", version);
-> +	pr_info("Xen %s support found\n", info.version);
->  
->  	xen_domain_type = XEN_HVM_DOMAIN;
->  
-> @@ -204,6 +230,14 @@ static int __init xen_guest_init(void)
->  		}
->  		xen_events_irq = a.value & 0xff;
->  	} else {
-> +		struct device_node *xen_node;
-> +
-> +		xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
-> +		if (!xen_node) {
-> +			pr_debug("No Xen support\n");
-> +			return -ENODEV;
-> +		}
-> +
->  		xen_events_irq = irq_of_parse_and_map(xen_node, 0);
->  		if (!xen_events_irq) {
->  			pr_err("Xen event channel interrupt not found\n");
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index 2322479..ee95593 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -428,6 +428,7 @@ void __init setup_arch(char **cmdline_p)
->  	 */
->  	local_async_enable();
->  
-> +	xen_early_init();
->  	efi_init();
->  	arm64_memblock_init();
->  
-> @@ -446,7 +447,6 @@ void __init setup_arch(char **cmdline_p)
->  	} else {
->  		psci_acpi_init();
->  	}
-> -	xen_early_init();
->  
->  	cpu_read_bootcpu_ops();
->  	smp_init_cpus();
-> -- 
-> 2.1.0
-> 
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 259c0ca9c99a..e356357d86bb 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -15,20 +15,6 @@ config ARM_PTDUMP
+ 	  kernel.
+ 	  If in doubt, say "N"
+ 
+-config STRICT_DEVMEM
+-	bool "Filter access to /dev/mem"
+-	depends on MMU
+-	---help---
+-	  If this option is disabled, you allow userspace (root) access to all
+-	  of memory, including kernel and userspace memory. Accidental
+-	  access to this is obviously disastrous, but specific access can
+-	  be used by people debugging the kernel.
+-
+-	  If this option is switched on, the /dev/mem file only allows
+-	  userspace access to memory mapped peripherals.
+-
+-          If in doubt, say Y.
+-
+ # RMK wants arm kernels compiled with frame pointers or stack unwinding.
+ # If you know what you are doing and are willing to live without stack
+ # traces, you can get a slightly smaller kernel by setting this option to
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+index 04fb73b973f1..e13c4bf84d9e 100644
+--- a/arch/arm64/Kconfig.debug
++++ b/arch/arm64/Kconfig.debug
+@@ -14,20 +14,6 @@ config ARM64_PTDUMP
+ 	  kernel.
+ 	  If in doubt, say "N"
+ 
+-config STRICT_DEVMEM
+-	bool "Filter access to /dev/mem"
+-	depends on MMU
+-	help
+-	  If this option is disabled, you allow userspace (root) access to all
+-	  of memory, including kernel and userspace memory. Accidental
+-	  access to this is obviously disastrous, but specific access can
+-	  be used by people debugging the kernel.
+-
+-	  If this option is switched on, the /dev/mem file only allows
+-	  userspace access to memory mapped peripherals.
+-
+-	  If in doubt, say Y.
+-
+ config PID_IN_CONTEXTIDR
+ 	bool "Write the current PID to the CONTEXTIDR register"
+ 	help
+diff --git a/arch/powerpc/Kconfig.debug b/arch/powerpc/Kconfig.debug
+index 3a510f4a6b68..a0e44a9c456f 100644
+--- a/arch/powerpc/Kconfig.debug
++++ b/arch/powerpc/Kconfig.debug
+@@ -335,18 +335,6 @@ config PPC_EARLY_DEBUG_CPM_ADDR
+ 	  platform probing is done, all platforms selected must
+ 	  share the same address.
+ 
+-config STRICT_DEVMEM
+-	def_bool y
+-	prompt "Filter access to /dev/mem"
+-	help
+-	  This option restricts access to /dev/mem.  If this option is
+-	  disabled, you allow userspace access to all memory, including
+-	  kernel and userspace memory. Accidental memory access is likely
+-	  to be disastrous.
+-	  Memory access is required for experts who want to debug the kernel.
+-
+-	  If you are unsure, say Y.
+-
+ config FAIL_IOMMU
+ 	bool "Fault-injection capability for IOMMU"
+ 	depends on FAULT_INJECTION
+diff --git a/arch/s390/Kconfig.debug b/arch/s390/Kconfig.debug
+index c56878e1245f..26c5d5beb4be 100644
+--- a/arch/s390/Kconfig.debug
++++ b/arch/s390/Kconfig.debug
+@@ -5,18 +5,6 @@ config TRACE_IRQFLAGS_SUPPORT
+ 
+ source "lib/Kconfig.debug"
+ 
+-config STRICT_DEVMEM
+-	def_bool y
+-	prompt "Filter access to /dev/mem"
+-	---help---
+-	  This option restricts access to /dev/mem.  If this option is
+-	  disabled, you allow userspace access to all memory, including
+-	  kernel and userspace memory. Accidental memory access is likely
+-	  to be disastrous.
+-	  Memory access is required for experts who want to debug the kernel.
+-
+-	  If you are unsure, say Y.
+-
+ config S390_PTDUMP
+ 	bool "Export kernel pagetable layout to userspace via debugfs"
+ 	depends on DEBUG_KERNEL
+diff --git a/arch/tile/Kconfig b/arch/tile/Kconfig
+index 106c21bd7f44..7b2d40db11fa 100644
+--- a/arch/tile/Kconfig
++++ b/arch/tile/Kconfig
+@@ -116,9 +116,6 @@ config ARCH_DISCONTIGMEM_DEFAULT
+ config TRACE_IRQFLAGS_SUPPORT
+ 	def_bool y
+ 
+-config STRICT_DEVMEM
+-	def_bool y
+-
+ # SMP is required for Tilera Linux.
+ config SMP
+ 	def_bool y
+diff --git a/arch/unicore32/Kconfig.debug b/arch/unicore32/Kconfig.debug
+index 1a3626239843..f075bbe1d46f 100644
+--- a/arch/unicore32/Kconfig.debug
++++ b/arch/unicore32/Kconfig.debug
+@@ -2,20 +2,6 @@ menu "Kernel hacking"
+ 
+ source "lib/Kconfig.debug"
+ 
+-config STRICT_DEVMEM
+-	bool "Filter access to /dev/mem"
+-	depends on MMU
+-	---help---
+-	  If this option is disabled, you allow userspace (root) access to all
+-	  of memory, including kernel and userspace memory. Accidental
+-	  access to this is obviously disastrous, but specific access can
+-	  be used by people debugging the kernel.
+-
+-	  If this option is switched on, the /dev/mem file only allows
+-	  userspace access to memory mapped peripherals.
+-
+-          If in doubt, say Y.
+-
+ config EARLY_PRINTK
+ 	def_bool DEBUG_OCD
+ 	help
+diff --git a/arch/x86/Kconfig.debug b/arch/x86/Kconfig.debug
+index 137dfa96aa14..1116452fcfc2 100644
+--- a/arch/x86/Kconfig.debug
++++ b/arch/x86/Kconfig.debug
+@@ -5,23 +5,6 @@ config TRACE_IRQFLAGS_SUPPORT
+ 
+ source "lib/Kconfig.debug"
+ 
+-config STRICT_DEVMEM
+-	bool "Filter access to /dev/mem"
+-	---help---
+-	  If this option is disabled, you allow userspace (root) access to all
+-	  of memory, including kernel and userspace memory. Accidental
+-	  access to this is obviously disastrous, but specific access can
+-	  be used by people debugging the kernel. Note that with PAT support
+-	  enabled, even in this case there are restrictions on /dev/mem
+-	  use due to the cache aliasing requirements.
+-
+-	  If this option is switched on, the /dev/mem file only allows
+-	  userspace access to PCI space and the BIOS code and data regions.
+-	  This is sufficient for dosemu and X and all common users of
+-	  /dev/mem.
+-
+-	  If in doubt, say Y.
+-
+ config X86_VERBOSE_BOOTUP
+ 	bool "Enable verbose x86 bootup info messages"
+ 	default y
+diff --git a/kernel/resource.c b/kernel/resource.c
+index f150dbbe6f62..03a8b09f68a8 100644
+--- a/kernel/resource.c
++++ b/kernel/resource.c
+@@ -1498,6 +1498,9 @@ int iomem_is_exclusive(u64 addr)
+ 			break;
+ 		if (p->end < addr)
+ 			continue;
++		if (IS_ENABLED(CONFIG_IO_STRICT_DEVMEM)
++				&& p->flags & IORESOURCE_BUSY)
++			break;
+ 		if (p->flags & IORESOURCE_BUSY &&
+ 		     p->flags & IORESOURCE_EXCLUSIVE) {
+ 			err = 1;
+diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+index 8c15b29d5adc..a188d7757e26 100644
+--- a/lib/Kconfig.debug
++++ b/lib/Kconfig.debug
+@@ -1853,3 +1853,39 @@ source "samples/Kconfig"
+ 
+ source "lib/Kconfig.kgdb"
+ 
++config STRICT_DEVMEM
++	bool "Filter access to /dev/mem"
++	depends on MMU
++	default y if TILE || PPC || S390
++	---help---
++	  If this option is disabled, you allow userspace (root) access to all
++	  of memory, including kernel and userspace memory. Accidental
++	  access to this is obviously disastrous, but specific access can
++	  be used by people debugging the kernel. Note that with PAT support
++	  enabled, even in this case there are restrictions on /dev/mem
++	  use due to the cache aliasing requirements.
++
++	  If this option is switched on, the /dev/mem file only allows
++	  userspace access to PCI space and the BIOS code and data regions.
++	  This is sufficient for dosemu and X and all common users of
++	  /dev/mem.
++
++	  If in doubt, say Y.
++
++config IO_STRICT_DEVMEM
++	bool "Filter I/O access to /dev/mem"
++	depends on STRICT_DEVMEM
++	---help---
++	  If this option is disabled, you allow userspace (root) access
++	  to all io memory regardless of whether a driver is actively
++	  using that range.  Accidental access to this is obviously
++	  disastrous, but specific access can be used by people
++	  debugging the kernel.
++
++	  If this option is switched on, the /dev/mem file only allows
++	  userspace access to *idle* io memory ranges (any non "System
++	  RAM" range listed in /proc/iomem).  This may break
++	  traditional users of /dev/mem if the driver using a given
++	  range cannot be disabled.
++
++	  If in doubt, say N.
