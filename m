@@ -1,127 +1,128 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 20 Nov 2015 16:42:31 +0800
-Subject: [PATCH v2 5/6] dt-bindings: add binding for marvell berlin4ct SoC
-In-Reply-To: <1448008952-1787-1-git-send-email-jszhang@marvell.com>
-References: <1448008952-1787-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1448008952-1787-6-git-send-email-jszhang@marvell.com>
+From: van.freenix@gmail.com (Freenix)
+Date: Fri, 20 Nov 2015 16:54:10 +0800
+Subject: [RFC V4] iommu: arm-smmu: correct group reference count
+Message-ID: <1448009650-10807-1-git-send-email-van.freenix@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a dt-binding include for Marvell berlin4ct clock IDs.
+The basic flow for add a device:
+ arm_smmu_add_device
+        |->iommu_group_get_for_dev
+            |->iommu_group_get
+                     return group;  (1)
+            |->ops->device_group : Init/increase reference count to/by 1.
+            |->iommu_group_add_device : Increase reference count by 1.
+		     return group   (2)
+        |->return 0;
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Since we are adding one device, the flow is (2) and the group reference
+count will be increased by 2. So, we need to add iommu_group_put at the
+end of arm_smmu_add_device to decrease the count by 1.
+
+Also take the failure path into consideration when fail to add a device.
+
+Signed-off-by: Peng Fan <van.freenix@gmail.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- .../bindings/clock/marvell,berlin4ct.txt           | 38 +++++++++++++++
- include/dt-bindings/clock/berlin4ct.h              | 56 ++++++++++++++++++++++
- 2 files changed, 94 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/marvell,berlin4ct.txt
- create mode 100644 include/dt-bindings/clock/berlin4ct.h
 
-diff --git a/Documentation/devicetree/bindings/clock/marvell,berlin4ct.txt b/Documentation/devicetree/bindings/clock/marvell,berlin4ct.txt
-new file mode 100644
-index 0000000..a489473
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/marvell,berlin4ct.txt
-@@ -0,0 +1,38 @@
-+* Marvell berlin4ct Clock Controllers
+V3 thread: https://lkml.org/lkml/2015/11/9/842
+Changes V4:
+ Follow Will's comments and code diff, add the failure path when failed
+ to add a device.
+
+V2 thread: https://lkml.org/lkml/2015/11/9/39
+Changes V3:
+ This patch version is wrong to fix the group reference issue.
+
+V1 thread: https://lkml.org/lkml/2015/11/3/304
+Changes V2:
+ I did not see the update about device_group when I worked out V1. So
+ redo the patch and refine commit msg and rebased to latest linus'
+ linux master tree.
+
+ drivers/iommu/arm-smmu-v3.c | 18 +++++++++++-------
+ drivers/iommu/arm-smmu.c    |  2 ++
+ 2 files changed, 13 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 4e5118a..42d30ef 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1804,13 +1804,13 @@ static int arm_smmu_add_device(struct device *dev)
+ 		smmu = arm_smmu_get_for_pci_dev(pdev);
+ 		if (!smmu) {
+ 			ret = -ENOENT;
+-			goto out_put_group;
++			goto out_remove_dev;
+ 		}
+ 
+ 		smmu_group = kzalloc(sizeof(*smmu_group), GFP_KERNEL);
+ 		if (!smmu_group) {
+ 			ret = -ENOMEM;
+-			goto out_put_group;
++			goto out_remove_dev;
+ 		}
+ 
+ 		smmu_group->ste.valid	= true;
+@@ -1826,20 +1826,20 @@ static int arm_smmu_add_device(struct device *dev)
+ 	for (i = 0; i < smmu_group->num_sids; ++i) {
+ 		/* If we already know about this SID, then we're done */
+ 		if (smmu_group->sids[i] == sid)
+-			return 0;
++			goto out_put_group;
+ 	}
+ 
+ 	/* Check the SID is in range of the SMMU and our stream table */
+ 	if (!arm_smmu_sid_in_range(smmu, sid)) {
+ 		ret = -ERANGE;
+-		goto out_put_group;
++		goto out_remove_dev;
+ 	}
+ 
+ 	/* Ensure l2 strtab is initialised */
+ 	if (smmu->features & ARM_SMMU_FEAT_2_LVL_STRTAB) {
+ 		ret = arm_smmu_init_l2_strtab(smmu, sid);
+ 		if (ret)
+-			goto out_put_group;
++			goto out_remove_dev;
+ 	}
+ 
+ 	/* Resize the SID array for the group */
+@@ -1849,16 +1849,20 @@ static int arm_smmu_add_device(struct device *dev)
+ 	if (!sids) {
+ 		smmu_group->num_sids--;
+ 		ret = -ENOMEM;
+-		goto out_put_group;
++		goto out_remove_dev;
+ 	}
+ 
+ 	/* Add the new SID */
+ 	sids[smmu_group->num_sids - 1] = sid;
+ 	smmu_group->sids = sids;
+-	return 0;
+ 
+ out_put_group:
+ 	iommu_group_put(group);
++	return 0;
 +
-+This binding uses the common clock binding[1].
++out_remove_dev:
++	iommu_group_remove_device(dev);
++	iommu_group_put(group);
+ 	return ret;
+ }
+ 
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 47dc7a7..af6afce 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1357,6 +1357,8 @@ static int arm_smmu_add_device(struct device *dev)
+ 	if (IS_ERR(group))
+ 		return PTR_ERR(group);
+ 
++	iommu_group_put(group);
 +
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+The berlin4ct clock subsystem generates and supplies clock to various
-+controllers within the berlin4ct SoC. The berlin4ct contains 3 clock controller
-+blocks: pll, gateclk, berlin-clk.
-+
-+Required Properties:
-+
-+- compatible: should be one of the following.
-+  - "marvell,berlin-pll" - pll compatible
-+  - "marvell,berlin4ct-clk" - berlin clk compatible
-+  - "marvell,berlin4ct-gateclk" - gateclk compatible
-+- reg: physical base address of the clock controller and length of memory mapped
-+  region. For pll, the second reg defines the bypass register base address and
-+  length of memory mapped region.
-+- #clock-cells: for pll should 0, for gateclk and berlin clk should be 1.
-+- #bypass-shift: the bypass bit in bypass register.
-+
-+Example:
-+
-+syspll: syspll {
-+	compatible = "marvell,berlin-pll";
-+	reg = <0xea0200 0x14>, <0xea0710 4>;
-+	#clock-cells = <0>;
-+	clocks = <&osc>;
-+	bypass-shift = /bits/ 8 <0>;
-+};
-+
-+clk: clk {
-+	compatible = "marvell,berlin4ct-clk";
-+	reg = <0xea0720 0x144>;
-+	#clock-cells = <1>;
-+	clocks = <&syspll>;
-+};
-diff --git a/include/dt-bindings/clock/berlin4ct.h b/include/dt-bindings/clock/berlin4ct.h
-new file mode 100644
-index 0000000..abd5873
---- /dev/null
-+++ b/include/dt-bindings/clock/berlin4ct.h
-@@ -0,0 +1,56 @@
-+/*
-+ * Berlin BG4CT clock tree IDs
-+ */
-+
-+/* GATE CLK */
-+#define GATECLK_TSPSYS		0
-+#define GATECLK_USB0CORE	1
-+#define GATECLK_ZSPSYS		2
-+#define GATECLK_SDIOSYS		3
-+#define GATECLK_ETHCORE		4
-+#define GATECLK_PCIE0SYS	5
-+#define GATECLK_SATA0CORE	6
-+#define GATECLK_NFCSYS		7
-+#define GATECLK_EMMCSYS		8
-+#define GATECLK_IHB0SYS		9
-+
-+/* BERLIN CLK */
-+#define CLK_CPUFASTREF		0
-+#define CLK_MEMFASTREF		1
-+#define CLK_CFG			2
-+#define CLK_PERIFSYS		3
-+#define CLK_HB			4
-+#define CLK_ATB			5
-+#define CLK_DECODER		6
-+#define CLK_DECODERM3		7
-+#define CLK_DECODERPCUBE	8
-+#define CLK_ENCODER		9
-+#define CLK_OVPCORE		10
-+#define CLK_GFX2DCORE		11
-+#define CLK_GFX3DCORE		12
-+#define CLK_GFX3DSH		13
-+#define CLK_GFX3DSYS		14
-+#define CLK_GFX2DSYS		15
-+#define CLK_AVIOSYS		16
-+#define CLK_VPPSYS		17
-+#define CLK_EDDC		18
-+#define CLK_AVIOBIU		19
-+#define CLK_ZSP			20
-+#define CLK_TSP			21
-+#define CLK_TSPREF		22
-+#define CLK_NDS			23
-+#define CLK_NOCS		24
-+#define CLK_APBCORE		25
-+#define CLK_EMMC		26
-+#define CLK_SD0			27
-+#define CLK_SD1			28
-+#define CLK_DLLMSTREF		29
-+#define CLK_GETHRGMII		30
-+#define CLK_GETHRGMIISYS	31
-+#define CLK_USIM0		32
-+#define CLK_PCIETEST		33
-+#define CLK_USB2TEST		34
-+#define CLK_USB3TEST		35
-+#define CLK_USB3CORE		36
-+#define CLK_NFCECC		37
-+#define CLK_BCM			38
+ 	return 0;
+ }
+ 
 -- 
 2.6.2
