@@ -1,243 +1,72 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Fri, 20 Nov 2015 21:49:11 +0200
-Subject: [linux-sunxi] [PATCH 2/5] phy-sun4i-usb: Add support for the
- host usb-phys found on the H3 SoC
-In-Reply-To: <1447616777-24660-2-git-send-email-hdegoede@redhat.com>
-References: <1447616777-24660-1-git-send-email-hdegoede@redhat.com>
- <1447616777-24660-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <1448048951.1560.5.camel@plaes.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Nov 2015 19:52:44 +0000
+Subject: [PATCH] [PATCH] arm64: Boot failure on m400 with new cont PTEs
+In-Reply-To: <20151119112923.GA24570@leverpostej>
+References: <1447858999-26665-1-git-send-email-jeremy.linton@arm.com>
+ <20151118152044.GD10644@leverpostej> <564CA29A.9050905@arm.com>
+ <20151118162932.GA13355@leverpostej> <564CB1DA.4090304@arm.com>
+ <20151118180434.GB13355@leverpostej> <564CD206.9040402@arm.com>
+ <20151119112923.GA24570@leverpostej>
+Message-ID: <20151120195243.GC14942@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2015-11-15 at 20:46 +0100, Hans de Goede wrote:
-> From: Reinder de Haan <patchesrdh@mveas.com>
+On Thu, Nov 19, 2015 at 11:31:34AM +0000, Mark Rutland wrote:
+> On Wed, Nov 18, 2015 at 01:31:18PM -0600, Jeremy Linton wrote:
+> > On 11/18/2015 12:04 PM, Mark Rutland wrote:
+> > 
+> > >You're racing against other parts of the CPU (the page table walker(s),
+> > >I-caches, etc). The flushing only minimises the window for a race, and
+> > >does not prevent the race from being possible.
+> > >
+> > >Given that the envelope is constantly pushing forward w.r.t. how
+> > >aggressive CPUs may be in this area, we need to fix the issue by
+> > >reasoning against what the architecture guarantees us.
+> > 	Its also not suppose to fault on speculative access, and to me that
+> > means page table walks/etc that are the result of speculative
+> > access.
 > 
-> Note this commit only adds support for phys 1-3, phy 0, the otg phy,
-> is
-> not yet (fully) supported after this commit.
-
-
-This patch seems to be causing following compile warning:
-
-In file included from include/linux/io.h:25:0,
-?????????????????from drivers/phy/phy-sun4i-usb.c:28:
-drivers/phy/phy-sun4i-usb.c: In function 'sun4i_usb_phy_write': ./arch/arm/include/asm/io.h:94:2: warning: 'phyctl' may be used uninitialized in this function [-Wmaybe-uni
-nitialized]
-? asm volatile("strb %1, %0"
-? ^
-drivers/phy/phy-sun4i-usb.c:172:8: note: 'phyctl' was declared here
-? void *phyctl;
-
+> I was under the impression that TLB conflict abort could be delivered
+> for asynchronous events (e.g. speculative I-cache fetches rather than
+> for speculative execution of already fetched instructions).
 > 
-> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> ?.../devicetree/bindings/phy/sun4i-usb-phy.txt??????|??1 +
-> ?drivers/phy/phy-sun4i-usb.c????????????????????????| 67
-> +++++++++++++++++-----
-> ?2 files changed, 53 insertions(+), 15 deletions(-)
+> Having looked at the ARM ARM, I appear to have been mistaken. As you
+> say, it appears that TLB conflict aborts are always delivered
+> synchronously.
 > 
-> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> index 0cebf74..95736d7 100644
-> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> @@ -9,6 +9,7 @@ Required properties:
-> ???* allwinner,sun7i-a20-usb-phy
-> ???* allwinner,sun8i-a23-usb-phy
-> ???* allwinner,sun8i-a33-usb-phy
-> +??* allwinner,sun8i-h3-usb-phy
-> ?- reg : a list of offset + length pairs
-> ?- reg-names :
-> ???* "phy_ctrl"
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-
-> usb.c
-> index b12964b..17f97ab 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -46,6 +46,9 @@
-> ?#define REG_PHYBIST			0x08
-> ?#define REG_PHYTUNE			0x0c
-> ?#define REG_PHYCTL_A33			0x10
-> +#define REG_PHY_UNK_H3			0x20
-> +
-> +#define REG_PMU_UNK_H3			0x10
-> ?
-> ?#define PHYCTL_DATA			BIT(7)
-> ?
-> @@ -79,7 +82,7 @@
-> ?#define PHY_DISCON_TH_SEL		0x2a
-> ?#define PHY_SQUELCH_DETECT		0x3c
-> ?
-> -#define MAX_PHYS			3
-> +#define MAX_PHYS			4
-> ?
-> ?/*
-> ? * Note do not raise the debounce time, we must report Vusb high
-> within 100ms
-> @@ -88,12 +91,19 @@
-> ?#define DEBOUNCE_TIME			msecs_to_jiffies(50)
-> ?#define POLL_TIME			msecs_to_jiffies(250)
-> ?
-> +enum sun4i_usb_phy_type {
-> +	sun4i_a10_phy,
-> +	sun8i_a33_phy,
-> +	sun8i_h3_phy
-> +};
-> +
-> ?struct sun4i_usb_phy_data {
-> +	struct device *dev;
-> ?	void __iomem *base;
-> ?	struct mutex mutex;
-> ?	int num_phys;
-> ?	u32 disc_thresh;
-> -	bool has_a33_phyctl;
-> +	enum sun4i_usb_phy_type type;
-> ?	struct sun4i_usb_phy {
-> ?		struct phy *phy;
-> ?		void __iomem *pmu;
-> @@ -164,12 +174,18 @@ static void sun4i_usb_phy_write(struct
-> sun4i_usb_phy *phy, u32 addr, u32 data,
-> ?
-> ?	mutex_lock(&phy_data->mutex);
-> ?
-> -	if (phy_data->has_a33_phyctl) {
-> +	switch (phy_data->type) {
-> +	case sun4i_a10_phy:
-> +		phyctl = phy_data->base + REG_PHYCTL_A10;
-> +		break;
-> +	case sun8i_a33_phy:
-> ?		phyctl = phy_data->base + REG_PHYCTL_A33;
-> ?		/* A33 needs us to set phyctl to 0 explicitly */
-> ?		writel(0, phyctl);
-> -	} else {
-> -		phyctl = phy_data->base + REG_PHYCTL_A10;
-> +		break;
-> +	case sun8i_h3_phy:
-> +		dev_err(phy_data->dev, "H3 usb_phy_write is not
-> supported\n");
-> +		break;
-> ?	}
-> ?
-> ?	for (i = 0; i < len; i++) {
-> @@ -230,6 +246,7 @@ static int sun4i_usb_phy_init(struct phy *_phy)
-> ?	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
-> ?	struct sun4i_usb_phy_data *data =
-> to_sun4i_usb_phy_data(phy);
-> ?	int ret;
-> +	u32 val;
-> ?
-> ?	ret = clk_prepare_enable(phy->clk);
-> ?	if (ret)
-> @@ -241,15 +258,26 @@ static int sun4i_usb_phy_init(struct phy *_phy)
-> ?		return ret;
-> ?	}
-> ?
-> -	/* Enable USB 45 Ohm resistor calibration */
-> -	if (phy->index == 0)
-> -		sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
-> +	if (data->type == sun8i_h3_phy) {
-> +		if (phy->index == 0) {
-> +			val = readl(data->base + REG_PHY_UNK_H3);
-> +			writel(val & ~1, data->base +
-> REG_PHY_UNK_H3);
-> +		}
-> +
-> +		val = readl(phy->pmu + REG_PMU_UNK_H3);
-> +		writel(val & ~2, phy->pmu + REG_PMU_UNK_H3);
-> +	} else {
-> +		/* Enable USB 45 Ohm resistor calibration */
-> +		if (phy->index == 0)
-> +			sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN,
-> 0x01, 1);
-> ?
-> -	/* Adjust PHY's magnitude and rate */
-> -	sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
-> +		/* Adjust PHY's magnitude and rate */
-> +		sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE,
-> 0x14, 5);
-> ?
-> -	/* Disconnect threshold adjustment */
-> -	sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL, data-
-> >disc_thresh, 2);
-> +		/* Disconnect threshold adjustment */
-> +		sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
-> +				????data->disc_thresh, 2);
-> +	}
-> ?
-> ?	sun4i_usb_phy_passby(phy, 1);
-> ?
-> @@ -522,11 +550,14 @@ static int sun4i_usb_phy_probe(struct
-> platform_device *pdev)
-> ?	mutex_init(&data->mutex);
-> ?	INIT_DELAYED_WORK(&data->detect,
-> sun4i_usb_phy0_id_vbus_det_scan);
-> ?	dev_set_drvdata(dev, data);
-> +	data->dev = dev;
-> ?
-> ?	if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-
-> phy") ||
-> ?	????of_device_is_compatible(np, "allwinner,sun8i-a23-usb-
-> phy") ||
-> ?	????of_device_is_compatible(np, "allwinner,sun8i-a33-usb-
-> phy"))
-> ?		data->num_phys = 2;
-> +	else if (of_device_is_compatible(np, "allwinner,sun8i-h3-
-> usb-phy"))
-> +		data->num_phys = 4;
-> ?	else
-> ?		data->num_phys = 3;
-> ?
-> @@ -538,13 +569,18 @@ static int sun4i_usb_phy_probe(struct
-> platform_device *pdev)
-> ?
-> ?	if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-
-> phy") ||
-> ?	????of_device_is_compatible(np, "allwinner,sun8i-a23-usb-
-> phy") ||
-> -	????of_device_is_compatible(np, "allwinner,sun8i-a33-usb-
-> phy"))
-> +	????of_device_is_compatible(np, "allwinner,sun8i-a33-usb-
-> phy") ||
-> +	????of_device_is_compatible(np, "allwinner,sun8i-h3-usb-
-> phy"))
-> ?		dedicated_clocks = true;
-> ?	else
-> ?		dedicated_clocks = false;
-> ?
-> ?	if (of_device_is_compatible(np, "allwinner,sun8i-a33-usb-
-> phy"))
-> -		data->has_a33_phyctl = true;
-> +		data->type = sun8i_a33_phy;
-> +	else if (of_device_is_compatible(np, "allwinner,sun8i-h3-
-> usb-phy"))
-> +		data->type = sun8i_h3_phy;
-> +	else
-> +		data->type = sun4i_a10_phy;
-> ?
-> ?	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-> "phy_ctrl");
-> ?	data->base = devm_ioremap_resource(dev, res);
-> @@ -620,7 +656,7 @@ static int sun4i_usb_phy_probe(struct
-> platform_device *pdev)
-> ?			return PTR_ERR(phy->reset);
-> ?		}
-> ?
-> -		if (i) { /* No pmu for usbc0 */
-> +		if (data->type == sun8i_h3_phy || i != 0) {
-> ?			snprintf(name, sizeof(name), "pmu%d", i);
-> ?			res = platform_get_resource_byname(pdev,
-> ?							IORESOURCE_M
-> EM, name);
-> @@ -696,6 +732,7 @@ static const struct of_device_id
-> sun4i_usb_phy_of_match[] = {
-> ?	{ .compatible = "allwinner,sun7i-a20-usb-phy" },
-> ?	{ .compatible = "allwinner,sun8i-a23-usb-phy" },
-> ?	{ .compatible = "allwinner,sun8i-a33-usb-phy" },
-> +	{ .compatible = "allwinner,sun8i-h3-usb-phy" },
-> ?	{ },
-> ?};
-> ?MODULE_DEVICE_TABLE(of, sun4i_usb_phy_of_match);
-> -- 
-> 2.5.0
-> 
+> > Which AFAIK, closes the window significantly. I would only
+> > really worry about interrupt activity, and updates to the memory
+> > containing the PTE's themselves. Either way the simple change
+> > (rather than rewriting the whole code path) is probably to flag the
+> > fault handler to simply resume from these kinds of faults during
+> > create_mapping_late().
+
+> > 	But that isn't what is happening here AFAIK, the faults are long
+> > after the PTE's have been updated, and are the result of failure to
+> > flush the TLB..
+
+> I think that if we need to do something more drastic to account for the
+> other issues above (e.g. by ensuring that we can never allocate
+> conflicting TLB entries in the first place), and that said strategy
+> would also fix this problem, that would be preferable, given that we're
+> going to have to do that eventually anyway.
+
+Having looked into this further, we also have the same issue with the
+kasan init code.
+
+I believe that the issue is restricted to one-off init code, as I don't
+think that we do anything at runtime which would be problematic. If
+anyone knows of a counter-example, please let me know!
+
+Given that, we can restrict the problem to an early UP environment, and
+it won't matter if therre's some large(ish) fixed cost associated with
+updating the kernel page tables. I think that we can avoid the issue
+entirely by modifying a copy of the kernel page tables, which we can
+later install via some idmap code (going via a reserved table to clear
+the TLBs).
+
+I'm working on patches to implement the above, which I'll try to get
+somewhere with next week.
+
+Thanks,
+Mark
