@@ -1,56 +1,30 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 20 Nov 2015 14:24:51 +0100
-Subject: [PATCH v2 6/7] ARM: dts: sun4i: Add touchscreen node to iNet1 tablet
-In-Reply-To: <1448025892-20899-1-git-send-email-hdegoede@redhat.com>
-References: <1448025892-20899-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1448025892-20899-7-git-send-email-hdegoede@redhat.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Fri, 20 Nov 2015 07:27:56 -0600
+Subject: [PATCH v2] soc: qcom: enable smsm/smp2p modular build
+In-Reply-To: <4169906.YsYnNqcaru@wuerfel>
+References: <4169906.YsYnNqcaru@wuerfel>
+Message-ID: <20151120132756.GA20599@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a node describing the touchscreen controller used on the iNet1 tablet.
+On Fri, Nov 20, 2015 at 11:32:21AM +0100, Arnd Bergmann wrote:
+> The newly added smp2p and smsm drivers cannot be loadable modules
+> but depend on smem, which can be, and that causes a link error:
+> 
+> drivers/built-in.o: In function `qcom_smp2p_intr':
+> :(.text+0xa6e68): undefined reference to `qcom_smem_get'
+> drivers/built-in.o: In function `qcom_smp2p_probe':
+> :(.text+0xa7320): undefined reference to `qcom_smem_alloc'
+> :(.text+0xa736c): undefined reference to `qcom_smem_get'
+> drivers/built-in.o: In function `qcom_smsm_probe':
+> :(.text+0xa7b34): undefined reference to `qcom_smem_get'
+> 
+> This marks all the drivers as 'tristate' to make the Kconfig
+> dependency resolution work properly.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun4i-a10-inet1.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+Nice catch.  I'll add this on top of those.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-inet1.dts b/arch/arm/boot/dts/sun4i-a10-inet1.dts
-index 487ce63..703d756 100644
---- a/arch/arm/boot/dts/sun4i-a10-inet1.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-inet1.dts
-@@ -104,6 +104,19 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c2_pins_a>;
- 	status = "okay";
-+
-+	ft5x: touchscreen at 38 {
-+		compatible = "edt,edt-ft5406";
-+		reg = <0x38>;
-+		interrupt-parent = <&pio>;
-+		interrupts = <7 21 IRQ_TYPE_EDGE_FALLING>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&touchscreen_wake_pin>;
-+		wake-gpios = <&pio 1 13 GPIO_ACTIVE_HIGH>; /* PB13 */
-+		touchscreen-size-x = <600>;
-+		touchscreen-size-y = <1024>;
-+		touchscreen-swapped-x-y;
-+	};
- };
- 
- &lradc {
-@@ -151,6 +164,13 @@
- };
- 
- &pio {
-+	touchscreen_wake_pin: touchscreen_wake_pin at 0 {
-+		allwinner,pins = "PB13";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
- 	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
- 		allwinner,pins = "PH4";
- 		allwinner,function = "gpio_in";
 -- 
-2.5.0
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
