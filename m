@@ -1,62 +1,66 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 20 Nov 2015 09:28:35 -0700
-Subject: [PATCH RFC 16/27] ARM: cpuidle: Record the next wakeup event of
- the CPU
-In-Reply-To: <7hwptdsgto.fsf@deeprootsystems.com>
-References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
- <1447799871-56374-17-git-send-email-lina.iyer@linaro.org>
- <7hwptdsgto.fsf@deeprootsystems.com>
-Message-ID: <20151120162835.GC30342@linaro.org>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Fri, 20 Nov 2015 08:21:58 -0800
+Subject: [PATCH] scsi: hpsa: select CONFIG_SCSI_SAS_ATTR
+In-Reply-To: <564F45CE.3060402@pmcs.com>
+References: <3970646.5sOyETUiWo@wuerfel> <564F45CE.3060402@pmcs.com>
+Message-ID: <1448036518.2168.6.camel@HansenPartnership.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19 2015 at 16:35 -0700, Kevin Hilman wrote:
->Lina Iyer <lina.iyer@linaro.org> writes:
->
->> Reading the next wakeup of the CPU can only be realiably done only from
->> that CPU. In the idle enter path record the next wake up of the CPU. The
->> information is useful to determine the sleep time left for the CPU.
->>
->> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->> ---
->>  drivers/cpuidle/cpuidle-arm.c | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
->> index 8e72a23..b3133ef 100644
->> --- a/drivers/cpuidle/cpuidle-arm.c
->> +++ b/drivers/cpuidle/cpuidle-arm.c
->> @@ -18,9 +18,11 @@
->>  #include <linux/kernel.h>
->>  #include <linux/module.h>
->>  #include <linux/of.h>
->> +#include <linux/pm_domain.h>
->>  #include <linux/pm_runtime.h>
->>  #include <linux/slab.h>
->>  #include <linux/rcupdate.h>
->> +#include <linux/tick.h>
->>
->>  #include <asm/cpuidle.h>
->>
->> @@ -49,7 +51,9 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
->>  	ret = cpu_pm_enter();
->>  	if (!ret) {
->>  		struct device *cpu_dev = get_cpu_device(dev->cpu);
->> +		struct generic_pm_domain_data *gpd = dev_gpd_data(cpu_dev);
->>
->> +		gpd->td.next_wakeup = tick_nohz_get_next_wakeup();
->>  		RCU_NONIDLE(pm_runtime_put_sync_suspend(cpu_dev));
->
->Maybe set this back to zero atomicaly, after wakeup?
->
->Checking for non-zero that might be another way for the domain goveror that there
->haven't been any CPU wakeups since the CPUs have gone idle.
->
-I set it to 0 below.
+On Fri, 2015-11-20 at 10:09 -0600, Don Brace wrote:
+> Signed-off-by: Don Brace <don.brace@pmcs.com>
 
-The reference counting by the GET_PUT tells the domain if a device is
-suspended. I see that as a redudant information. May be I am not getting
-your point.
+You mean acked-by ... it can only be signed-off-by if *you* resend the
+patch because signoffs track the patch transmission path.
 
--- Lina
->Kevin
+James
+
+> And...Thanks!
+> 
+> 
+> On 11/19/2015 04:04 PM, Arnd Bergmann wrote:
+> > The hpsa driver recently started using the sas transport class, but it
+> > does not ensure that the corresponding code is actually built, which
+> > may lead to a link error:
+> >
+> > drivers/built-in.o: In function `hpsa_free_sas_phy':
+> > (.text+0x1ce874): undefined reference to `sas_port_delete_phy'
+> > (.text+0x1ce87c): undefined reference to `sas_phy_free'
+> > drivers/built-in.o: In function `hpsa_alloc_sas_port':
+> > (.text+0x1ceb9c): undefined reference to `sas_port_alloc_num'
+> > (.text+0x1ceba8): undefined reference to `sas_port_add'
+> > drivers/built-in.o: In function `hpsa_init':
+> > (.init.text+0x8838): undefined reference to `sas_attach_transport'
+> > (.init.text+0x8868): undefined reference to `sas_release_transport
+> >
+> > This adds 'select SCSI_SAS_ATTR' in the Kconfig entry, just like we do
+> > for all other drivers using those functions.
+> >
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Fixes: d04e62b9d63a ("hpsa: add in sas transport class")
+> > ---
+> > This showed up on the ARM randconfig builds today for the first time.
+> >
+> > diff --git a/drivers/scsi/Kconfig b/drivers/scsi/Kconfig
+> > index 04a720686516..64eed87d34a8 100644
+> > --- a/drivers/scsi/Kconfig
+> > +++ b/drivers/scsi/Kconfig
+> > @@ -364,6 +364,7 @@ config SCSI_HPSA
+> >   	tristate "HP Smart Array SCSI driver"
+> >   	depends on PCI && SCSI
+> >   	select CHECK_SIGNATURE
+> > +	select SCSI_SAS_ATTRS
+> >   	help
+> >   	  This driver supports HP Smart Array Controllers (circa 2009).
+> >   	  It is a SCSI alternative to the cciss driver, which is a block
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-scsi" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-scsi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
