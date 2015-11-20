@@ -1,21 +1,96 @@
-From: martin.petersen@oracle.com (Martin K. Petersen)
-Date: Fri, 20 Nov 2015 11:38:30 -0500
-Subject: [PATCH v3] scsi: advansys needs ISA dma api for ISA support
-In-Reply-To: <4355540.BF55dNX7U7@wuerfel> (Arnd Bergmann's message of "Thu, 19
- Nov 2015 15:22:23 +0100")
-References: <4355540.BF55dNX7U7@wuerfel>
-Message-ID: <yq1ziy8mxrt.fsf@sermon.lab.mkp.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 20 Nov 2015 17:41:09 +0100
+Subject: [PATCH 3/4] ARM: dts: sun4i: Add backlight node to pov protab2
+ ips9 tablet
+In-Reply-To: <1448027950-14629-3-git-send-email-hdegoede@redhat.com>
+References: <1448027950-14629-1-git-send-email-hdegoede@redhat.com>
+ <1448027950-14629-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <20151120164109.GI32142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Arnd" == Arnd Bergmann <arnd@arndb.de> writes:
+On Fri, Nov 20, 2015 at 02:59:09PM +0100, Hans de Goede wrote:
+> Add a node describing the lcd panel backlight on the pov protab2 ips9
+> tablet.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Arnd> The advansys drvier uses the request_dma function that is used on
-Arnd> ISA machines for the internal DMA controller, which causes build
-Arnd> errors on platforms that have ISA slots but do not provide the ISA
-Arnd> DMA API:
+Fixed the conflict and applied. Thanks,
 
-Applied.
+Maxime
+
+> ---
+>  arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts b/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
+> index 0e5124f..1f92ec7 100644
+> --- a/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
+> +++ b/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
+> @@ -47,6 +47,7 @@
+>  #include <dt-bindings/input/input.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+>  #include <dt-bindings/pinctrl/sun4i-a10.h>
+> +#include <dt-bindings/pwm/pwm.h>
+>  
+>  / {
+>  	model = "Point of View Protab2-IPS9";
+> @@ -56,6 +57,16 @@
+>  		serial0 = &uart0;
+>  	};
+>  
+> +	backlight: backlight {
+> +		compatible = "pwm-backlight";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&bl_en_pin_protab>;
+> +		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
+> +		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
+> +		default-brightness-level = <8>;
+> +		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
+> +	};
+> +
+>  	chosen {
+>  		stdout-path = "serial0:115200n8";
+>  	};
+> @@ -145,6 +156,13 @@
+>  };
+>  
+>  &pio {
+> +	bl_en_pin_protab: bl_en_pin at 0 {
+> +		allwinner,pins = "PH7";
+> +		allwinner,function = "gpio_out";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +
+>  	touchscreen_pins: touchscreen_pins at 0 {
+>  		allwinner,pins = "PA5", "PB13";
+>  		allwinner,function = "gpio_out";
+> @@ -167,6 +185,12 @@
+>  	};
+>  };
+>  
+> +&pwm {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pwm0_pins_a>;
+> +	status = "okay";
+> +};
+> +
+>  &reg_dcdc2 {
+>  	regulator-always-on;
+>  	regulator-min-microvolt = <1000000>;
+> -- 
+> 2.5.0
+> 
 
 -- 
-Martin K. Petersen	Oracle Linux Engineering
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/838307c1/attachment-0001.sig>
