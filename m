@@ -1,110 +1,157 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 20 Nov 2015 17:30:47 +0100
-Subject: [PATCH 1/4] ASoC: sun4i-codec: Add support for PA gpio pin
-In-Reply-To: <1448027233-750-1-git-send-email-hdegoede@redhat.com>
-References: <1448027233-750-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20151120163047.GF32142@lukather>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 20 Nov 2015 16:30:57 +0000
+Subject: [PATCH 05/13] Xen: ARM: Add support for mapping platform device
+ mmio
+In-Reply-To: <1447754231-7772-6-git-send-email-shannon.zhao@linaro.org>
+References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
+ <1447754231-7772-6-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511201628410.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 02:47:10PM +0100, Hans de Goede wrote:
-> Add support for PA gpio pin for controlling an external amplifier as used
-> on some Allwinner boards.
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Add a bus_notifier for platform bus device in order to map the device
+> mmio regions when DOM0 booting with ACPI.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 > ---
->  .../devicetree/bindings/sound/sun4i-codec.txt      |  3 +++
->  sound/soc/sunxi/sun4i-codec.c                      | 25 ++++++++++++++--------
->  2 files changed, 19 insertions(+), 9 deletions(-)
+>  drivers/xen/Makefile   |   1 +
+>  drivers/xen/platform.c | 104 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 105 insertions(+)
+>  create mode 100644 drivers/xen/platform.c
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/sun4i-codec.txt b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-> index c92966b..974babe 100644
-> --- a/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-> +++ b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-> @@ -14,6 +14,9 @@ Required properties:
->     - "apb": the parent APB clock for this controller
->     - "codec": the parent module clock
+> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+> index e293bc5..2f867e7 100644
+> --- a/drivers/xen/Makefile
+> +++ b/drivers/xen/Makefile
+> @@ -11,6 +11,7 @@ CFLAGS_features.o			:= $(nostackp)
 >  
-> +Optional properties:
-> +- pa-gpios: gpio to enable external amplifier
-
-This is a custom property, it should be prefixed by the vendor name.
-
+>  CFLAGS_efi.o				+= -fshort-wchar
+>  
+> +dom0-$(CONFIG_ARM64) += platform.o
+>  dom0-$(CONFIG_PCI) += pci.o
+>  dom0-$(CONFIG_USB_SUPPORT) += dbgp.o
+>  dom0-$(CONFIG_XEN_ACPI) += acpi.o $(xen-pad-y)
+> diff --git a/drivers/xen/platform.c b/drivers/xen/platform.c
+> new file mode 100644
+> index 0000000..0f95e7f
+> --- /dev/null
+> +++ b/drivers/xen/platform.c
+> @@ -0,0 +1,104 @@
+> +/*
+> + * Copyright (c) 2015, Linaro Limited.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+> + * Place - Suite 330, Boston, MA 02111-1307 USA.
+> + *
+> + * Author: Shannon Zhao <shannon.zhao@linaro.org>
+> + */
 > +
->  Example:
->  codec: codec at 01c22c00 {
->  	#sound-dai-cells = <0>;
-> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-> index bcbf4da..2aca9cd 100644
-> --- a/sound/soc/sunxi/sun4i-codec.c
-> +++ b/sound/soc/sunxi/sun4i-codec.c
-> @@ -27,6 +27,7 @@
->  #include <linux/of_address.h>
->  #include <linux/clk.h>
->  #include <linux/regmap.h>
-> +#include <linux/gpio/consumer.h>
->  
->  #include <sound/core.h>
->  #include <sound/pcm.h>
-> @@ -101,16 +102,15 @@ struct sun4i_codec {
->  	struct regmap	*regmap;
->  	struct clk	*clk_apb;
->  	struct clk	*clk_module;
-> +	struct gpio_desc *gpio_pa;
->  
->  	struct snd_dmaengine_dai_dma_data	playback_dma_data;
->  };
->  
->  static void sun4i_codec_start_playback(struct sun4i_codec *scodec)
->  {
-> -	/*
-> -	 * FIXME: according to the BSP, we might need to drive a PA
-> -	 *        GPIO high here on some boards
-> -	 */
-> +	if (scodec->gpio_pa)
-> +		gpiod_set_value_cansleep(scodec->gpio_pa, 1);
->  
->  	/* Flush TX FIFO */
->  	regmap_update_bits(scodec->regmap, SUN4I_CODEC_DAC_FIFOC,
-> @@ -125,15 +125,13 @@ static void sun4i_codec_start_playback(struct sun4i_codec *scodec)
->  
->  static void sun4i_codec_stop_playback(struct sun4i_codec *scodec)
->  {
-> -	/*
-> -	 * FIXME: according to the BSP, we might need to drive a PA
-> -	 *        GPIO low here on some boards
-> -	 */
-> -
->  	/* Disable DAC DRQ */
->  	regmap_update_bits(scodec->regmap, SUN4I_CODEC_DAC_FIFOC,
->  			   BIT(SUN4I_CODEC_DAC_FIFOC_DAC_DRQ_EN),
->  			   0);
+> +#include <linux/platform_device.h>
+> +#include <linux/acpi.h>
+> +#include <xen/xen.h>
+> +#include <xen/interface/memory.h>
+> +#include <asm/xen/hypervisor.h>
+> +#include <asm/xen/hypercall.h>
 > +
-> +	if (scodec->gpio_pa)
-> +		gpiod_set_value_cansleep(scodec->gpio_pa, 0);
+> +static int xen_map_platform_device_mmio(struct platform_device *pdev)
+> +{
+> +	int i, rc = 0;
+> +
+> +	for (i = 0; i < pdev->num_resources; i++)
+> +	{
+> +		struct resource *r = &pdev->resource[i];
+> +
+> +		if (resource_type(r) == IORESOURCE_MEM)
+> +		{
+> +			int j;
+> +			int nr = DIV_ROUND_UP(resource_size(r), PAGE_SIZE);
+> +			xen_pfn_t *gpfns = kmalloc(sizeof(xen_pfn_t) * nr,
+> +						   GFP_KERNEL);
+> +			xen_ulong_t *idxs = kmalloc(sizeof(xen_ulong_t) * nr,
+> +						    GFP_KERNEL);
+> +			int *errs = kmalloc(sizeof(int) * nr, GFP_KERNEL);
 
-You should rather plug that into DAPM, using a speaker widget, and a
-custom event function that will enable or disable the amplifier only
-when this audio path is going to be used.
+please check for kmalloc returning NULL and return -ENOMEM
 
-You can see such an example here:
-http://lxr.free-electrons.com/source/sound/soc/jz4740/qi_lb60.c#L29
 
-That will require to modify a bit sun4i_codec_create_card as well in
-order to add the new widgets (and routes) when the DT property is
-found.
+> +			struct xen_add_to_physmap_range xatp;
+> +
+> +			for (j = 0; j < nr; j++) {
+> +				gpfns[j] = (r->start >> PAGE_SHIFT) + j;
+> +				idxs[j] = (r->start >> PAGE_SHIFT) + j;
 
-Thanks!
-Maxime
+XEN_PFN_DOWN
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/43700024/attachment.sig>
+
+> +				errs[j] = 0;
+> +			}
+> +
+> +			xatp.domid = DOMID_SELF;
+> +			xatp.size = nr;
+> +			xatp.space = XENMAPSPACE_dev_mmio;
+> +
+> +			set_xen_guest_handle(xatp.gpfns, gpfns);
+> +			set_xen_guest_handle(xatp.idxs, idxs);
+> +			set_xen_guest_handle(xatp.errs, errs);
+> +
+> +			rc = HYPERVISOR_memory_op(XENMEM_add_to_physmap_range,
+> +						  &xatp);
+> +			kfree(gpfns);
+> +			kfree(idxs);
+> +			kfree(errs);
+> +			if (rc != 0)
+> +				return rc;
+> +		}
+> +	}
+> +
+> +	return rc;
+> +}
+> +
+> +static int xen_platform_notifier(struct notifier_block *nb,
+> +				 unsigned long action, void *data)
+> +{
+> +	struct platform_device *pdev = to_platform_device(data);
+> +	int r = 0;
+> +
+> +	if (!acpi_disabled && (action == BUS_NOTIFY_ADD_DEVICE))
+> +		r = xen_map_platform_device_mmio(pdev);
+> +
+> +	if (r)
+> +	{
+> +		dev_err(&pdev->dev, "Failed to add_to_physmap device (%s) mmio!\n",
+> +			pdev->name);
+> +		return NOTIFY_OK;
+> +	}
+> +
+> +	return NOTIFY_DONE;
+> +}
+> +
+> +static struct notifier_block platform_device_nb = {
+> +	.notifier_call = xen_platform_notifier,
+> +};
+> +
+> +static int __init register_xen_platform_notifier(void)
+> +{
+> +	if (!xen_initial_domain())
+> +		return 0;
+> +
+> +	return bus_register_notifier(&platform_bus_type, &platform_device_nb);
+> +}
+> +
+> +arch_initcall(register_xen_platform_notifier);
+> -- 
+> 2.1.0
+> 
