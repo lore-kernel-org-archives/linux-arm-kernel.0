@@ -1,79 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Nov 2015 16:47:03 +0000
-Subject: [PATCH v11 3/5] arm: introduce CONFIG_PARAVIRT,
- PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-In-Reply-To: <alpine.DEB.2.02.1511201439280.1107@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
- <1446737696-9749-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1511101411570.5676@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1511201430200.1107@kaball.uk.xensource.com>
- <564F2FD0.6040905@codeaurora.org>
- <alpine.DEB.2.02.1511201439280.1107@kaball.uk.xensource.com>
-Message-ID: <20151120164702.GF8644@n2100.arm.linux.org.uk>
+From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
+Date: Fri, 20 Nov 2015 11:49:57 -0500
+Subject: [PATCH v2] xen/events: Always allocate legacy interrupts on PV
+ guests
+In-Reply-To: <alpine.DEB.2.02.1511201632390.1107@kaball.uk.xensource.com>
+References: <1447870445-17199-1-git-send-email-boris.ostrovsky@oracle.com>
+ <alpine.DEB.2.02.1511201117120.1107@kaball.uk.xensource.com>
+ <564F397A.8010203@oracle.com>
+ <alpine.DEB.2.02.1511201535550.1107@kaball.uk.xensource.com>
+ <564F3F4D.9080005@oracle.com>
+ <alpine.DEB.2.02.1511201632390.1107@kaball.uk.xensource.com>
+Message-ID: <564F4F35.40401@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 02:40:31PM +0000, Stefano Stabellini wrote:
-> On Fri, 20 Nov 2015, Christopher Covington wrote:
-> > Hi Stefano,
-> > 
-> > On 11/20/2015 09:31 AM, Stefano Stabellini wrote:
-> > > On Tue, 10 Nov 2015, Stefano Stabellini wrote:
-> > >> On Thu, 5 Nov 2015, Stefano Stabellini wrote:
-> > >>> Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM.
-> > >>>
-> > >>> The only paravirt interface supported is pv_time_ops.steal_clock, so no
-> > >>> runtime pvops patching needed.
-> > >>>
-> > >>> This allows us to make use of steal_account_process_tick for stolen
-> > >>> ticks accounting.
-> > >>>
-> > >>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > >>> Acked-by: Christopher Covington <cov@codeaurora.org>
-> > >>> Acked-by: Ian Campbell <ian.campbell@citrix.com>
-> > >>> CC: linux at arm.linux.org.uk
-> > >>> CC: will.deacon at arm.com
-> > >>> CC: nico at linaro.org
-> > >>> CC: marc.zyngier at arm.com
-> > >>> CC: cov at codeaurora.org
-> > >>> CC: arnd at arndb.de
-> > >>> CC: olof at lixom.net
-> > >>
-> > >>
-> > >> Russell,
-> > >> are you OK with this patch?
-> > > 
-> > > Russell,
-> > > 
-> > > I am going to drop this patch and add a small #ifdef to
-> > > arch/arm/xen/enlighten.c to be able to use this functionality on arm64.
-> > > 
-> > > If you change your mind let me know.
-> > 
-> > It appears to me as though he's not copied on this message.
-> 
-> He was. He is now in To:.
+On 11/20/2015 11:33 AM, Stefano Stabellini wrote:
+>>>
+>>>
+>>> BTW, I got this build error:
+>>>
+>>>     STUBCPY drivers/firmware/efi/libstub/lib-sort.stub.o
+>>> 0000000000000000 R_AARCH64_ABS64   __efistub_sort
+>>> 0000000000000008 R_AARCH64_ABS64   .init__ksymtab_strings
+>>> drivers/firmware/efi/libstub/lib-sort.stub.o: absolute symbol references
+>>> not
+>>> allowed in the EFI stub
+>>> drivers/firmware/efi/libstub/Makefile:63: recipe for target
+>>> 'drivers/firmware/efi/libstub/lib-sort.stub.o' failed
+>>> make[4]: *** [drivers/firmware/efi/libstub/lib-sort.stub.o] Error 1
+>>> scripts/Makefile.build:403: recipe for target
+>>> 'drivers/firmware/efi/libstub'
+>>> failed
+>>> make[3]: *** [drivers/firmware/efi/libstub] Error 2
+>>> scripts/Makefile.build:403: recipe for target 'drivers/firmware/efi'
+>>> failed
+>>> make[2]: *** [drivers/firmware/efi] Error 2
+>>> scripts/Makefile.build:403: recipe for target 'drivers/firmware' failed
+>>> make[1]: *** [drivers/firmware] Error 2
+>>> Makefile:943: recipe for target 'drivers' failed
+>>> make: *** [drivers] Error 2
+>>>
+>>> I worked around this by removing some of EFI config options but presumably
+>>> this needs to be properly fixed.
+>>> Interesting. This build error could be something new. Could you please
+>>> post your kernel config?
+>> Attached.
+>>
+>> This, BTW, is on a relatively old toolstack:
+>> gcc version 4.8.2 20131014 (prerelease) (crosstool-NG
+>> linaro-1.13.1-4.8-2013.10 - Linaro GCC 2013.10)
+> Interesting. I cannot repro the error with Linaro GCC 4.9-2014.
 
-I think the patch is fine.
+This does look like something toolstack-specific: I installed
+     gcc version 4.8.3 20140401 (prerelease) (crosstool-NG 
+linaro-1.13.1-4.8-2014.04 - Linaro GCC 4.8-2014.04)
+from the link you provided above and it built without problems.
 
-Sorry, but I no longer read every email that passes by due to the amount
-of email I now receive, and due to the nature of modern email clients with
-their stupid ideas about how to formulate the To: and Cc: headers for
-replies[*], I attach no significance to being mentioned in either the To:
-or Cc: headers.
-
-Overall, what this means is it's now difficult to attact my attention to
-any particular thread.  Sorry about that, I have no solution to this
-problem.
-
-
-* - modern mailers have started to preserve the To: and Cc: headers from
-the message being replied to, which means that if I'm mentioned in the
-To: header initially, my address stays in the To: header despite the
-discussion not being directed _at_ me.  Hence, deciding what to reply to
-based on where my address appears in the headers is meaningless with
-modern mail clients.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+-boris
