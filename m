@@ -1,156 +1,27 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 20 Nov 2015 10:54:51 -0800
-Subject: [PATCH v2 4/7] touchscreen: pixcir_i2c: Add support for wake and
- enable gpios
-In-Reply-To: <1448025892-20899-5-git-send-email-hdegoede@redhat.com>
-References: <1448025892-20899-1-git-send-email-hdegoede@redhat.com>
- <1448025892-20899-5-git-send-email-hdegoede@redhat.com>
-Message-ID: <20151120185451.GC26895@dtor-ws>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 20 Nov 2015 10:54:56 -0800
+Subject: [PATCH] clk: at91: Revert "keep slow clk enabled to prevent
+ system hang"
+In-Reply-To: <1447759593-20816-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1447759593-20816-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20151120185456.GV32672@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 02:24:49PM +0100, Hans de Goede wrote:
-> From: Sander Vermin <sander@vermin.nl>
+On 11/17, Alexandre Belloni wrote:
+> Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
+> hang") added a workaround for the slow clock as it is not properly handled
+> by its users.
 > 
-> On some devices the wake and enable pins of the pixcir touchscreen
-> controller are connected to gpios and these must be controlled by the
-> driver for the device to operate properly.
+> Now that the slow clock is taken properly by the drivers, this workaround
+> is not necessary anymore, revert it.
 > 
-> Signed-off-by: Sander Vermin <sander@vermin.nl>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Michael Turquette <mturquette@baylibre.com>
 > ---
-> Changes in v2 (Hans de Goede):
-> -Split the changes for dealing with inverted / swapped axis out into a
->  separate patch
-> -Remove a bunch of dev_info calls to make the driver less chatty
-> -Use devm_gpiod_get_optional as these new gpios are optional
-> -Only msleep after setting enable high if we have an enable pin
-> ---
->  .../bindings/input/touchscreen/pixcir_i2c_ts.txt   |  2 +
->  drivers/input/touchscreen/pixcir_i2c_ts.c          | 46 ++++++++++++++++++++++
->  2 files changed, 48 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
-> index 8eb240a..72ca5ec 100644
-> --- a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
-> @@ -10,6 +10,8 @@ Required properties:
->  
->  Optional properties:
->  - reset-gpio: GPIO connected to the RESET line of the chip
-> +- enable-gpios: GPIO connected to the ENABLE line of the chip
-> +- wake-gpios: GPIO connected to the WAKE line of the chip
->  
->  Example:
->  
-> diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
-> index 211408c..b75ef65 100644
-> --- a/drivers/input/touchscreen/pixcir_i2c_ts.c
-> +++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
-> @@ -38,6 +38,8 @@ struct pixcir_i2c_ts_data {
->  	struct input_dev *input;
->  	struct gpio_desc *gpio_attb;
->  	struct gpio_desc *gpio_reset;
-> +	struct gpio_desc *gpio_enable;
-> +	struct gpio_desc *gpio_wake;
->  	const struct pixcir_i2c_chip_data *chip;
->  	int max_fingers;	/* Max fingers supported in this instance */
->  	bool running;
-> @@ -208,6 +210,11 @@ static int pixcir_set_power_mode(struct pixcir_i2c_ts_data *ts,
->  	struct device *dev = &ts->client->dev;
->  	int ret;
->  
-> +	if (mode == PIXCIR_POWER_ACTIVE || mode == PIXCIR_POWER_IDLE) {
-> +		if (!IS_ERR_OR_NULL(ts->gpio_wake))
-> +			gpiod_set_value_cansleep(ts->gpio_wake, 1);
-> +	}
-> +
->  	ret = i2c_smbus_read_byte_data(ts->client, PIXCIR_REG_POWER_MODE);
->  	if (ret < 0) {
->  		dev_err(dev, "%s: can't read reg 0x%x : %d\n",
-> @@ -228,6 +235,11 @@ static int pixcir_set_power_mode(struct pixcir_i2c_ts_data *ts,
->  		return ret;
->  	}
->  
-> +	if (mode == PIXCIR_POWER_HALT) {
-> +		if (!IS_ERR_OR_NULL(ts->gpio_wake))
-> +			gpiod_set_value_cansleep(ts->gpio_wake, 0);
-> +	}
-> +
->  	return 0;
->  }
->  
-> @@ -302,6 +314,11 @@ static int pixcir_start(struct pixcir_i2c_ts_data *ts)
->  	struct device *dev = &ts->client->dev;
->  	int error;
->  
-> +	if (!IS_ERR_OR_NULL(ts->gpio_enable)) {
-> +		gpiod_set_value_cansleep(ts->gpio_enable, 1);
-> +		msleep(100);
-> +	}
-> +
->  	/* LEVEL_TOUCH interrupt with active low polarity */
->  	error = pixcir_set_int_mode(ts, PIXCIR_INT_LEVEL_TOUCH, 0);
->  	if (error) {
-> @@ -343,6 +360,9 @@ static int pixcir_stop(struct pixcir_i2c_ts_data *ts)
->  	/* Wait till running ISR is complete */
->  	synchronize_irq(ts->client->irq);
->  
-> +	if (!IS_ERR_OR_NULL(ts->gpio_enable))
-> +		gpiod_set_value_cansleep(ts->gpio_enable, 0);
-> +
->  	return 0;
->  }
->  
-> @@ -534,6 +554,24 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
->  		return error;
->  	}
->  
-> +	tsdata->gpio_wake = devm_gpiod_get_optional(dev, "wake",
-> +						    GPIOD_OUT_HIGH);
-> +	if (IS_ERR(tsdata->gpio_wake)) {
-> +		error = PTR_ERR(tsdata->gpio_wake);
-> +		if (error != -EPROBE_DEFER)
-> +			dev_err(dev, "Failed to get wake gpio: %d\n", error);
-> +		return error;
-> +	}
-> +
-> +	tsdata->gpio_enable = devm_gpiod_get_optional(dev, "enable",
-> +						      GPIOD_OUT_HIGH);
-> +	if (IS_ERR(tsdata->gpio_enable)) {
-> +		error = PTR_ERR(tsdata->gpio_enable);
-> +		if (error != -EPROBE_DEFER)
-> +			dev_err(dev, "Failed to get enable gpio: %d\n", error);
-> +		return error;
-> +	}
-> +
->  	error = devm_request_threaded_irq(dev, client->irq, NULL, pixcir_ts_isr,
->  					  IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
->  					  client->name, tsdata);
-> @@ -542,6 +580,14 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
->  		return error;
->  	}
->  
-> +	if (!IS_ERR_OR_NULL(tsdata->gpio_wake))
-> +		gpiod_set_value_cansleep(tsdata->gpio_wake, 1);
-> +
-> +	if (!IS_ERR_OR_NULL(tsdata->gpio_enable)) {
-> +		gpiod_set_value_cansleep(tsdata->gpio_enable, 1);
-> +		msleep(100);
-> +	}
 
-Actually, another question: why do we need this calls to activate wake
-and enable gpios here if we request them as active?
-
-Thanks.
-
-> +
->  	pixcir_reset(tsdata);
->  
->  	/* Always be in IDLE mode to save power, device supports auto wake */
-> -- 
-> 2.5.0
-> 
+Applied to clk-next
 
 -- 
-Dmitry
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
