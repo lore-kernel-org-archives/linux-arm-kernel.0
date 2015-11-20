@@ -1,168 +1,232 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 20 Nov 2015 20:19:52 +0100
-Subject: [PATCH v2 4/7] touchscreen: pixcir_i2c: Add support for wake and
- enable gpios
-In-Reply-To: <20151120185451.GC26895@dtor-ws>
-References: <1448025892-20899-1-git-send-email-hdegoede@redhat.com>
- <1448025892-20899-5-git-send-email-hdegoede@redhat.com>
- <20151120185451.GC26895@dtor-ws>
-Message-ID: <564F7258.3060601@redhat.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 20 Nov 2015 11:24:50 -0800
+Subject: [PATCH v1 3/7] mtd: fsl-quadspi: Support both 24- and 32-bit
+ addressed commands.
+In-Reply-To: <1436386881-28088-4-git-send-email-cory.tusar@pid1solutions.com>
+References: <1436386881-28088-1-git-send-email-cory.tusar@pid1solutions.com>
+ <1436386881-28088-4-git-send-email-cory.tusar@pid1solutions.com>
+Message-ID: <20151120192450.GW64635@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Cory and Han,
 
-On 20-11-15 19:54, Dmitry Torokhov wrote:
-> On Fri, Nov 20, 2015 at 02:24:49PM +0100, Hans de Goede wrote:
->> From: Sander Vermin <sander@vermin.nl>
->>
->> On some devices the wake and enable pins of the pixcir touchscreen
->> controller are connected to gpios and these must be controlled by the
->> driver for the device to operate properly.
->>
->> Signed-off-by: Sander Vermin <sander@vermin.nl>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->> Changes in v2 (Hans de Goede):
->> -Split the changes for dealing with inverted / swapped axis out into a
->>   separate patch
->> -Remove a bunch of dev_info calls to make the driver less chatty
->> -Use devm_gpiod_get_optional as these new gpios are optional
->> -Only msleep after setting enable high if we have an enable pin
->> ---
->>   .../bindings/input/touchscreen/pixcir_i2c_ts.txt   |  2 +
->>   drivers/input/touchscreen/pixcir_i2c_ts.c          | 46 ++++++++++++++++++++++
->>   2 files changed, 48 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
->> index 8eb240a..72ca5ec 100644
->> --- a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
->> +++ b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
->> @@ -10,6 +10,8 @@ Required properties:
->>
->>   Optional properties:
->>   - reset-gpio: GPIO connected to the RESET line of the chip
->> +- enable-gpios: GPIO connected to the ENABLE line of the chip
->> +- wake-gpios: GPIO connected to the WAKE line of the chip
->>
->>   Example:
->>
->> diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
->> index 211408c..b75ef65 100644
->> --- a/drivers/input/touchscreen/pixcir_i2c_ts.c
->> +++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
->> @@ -38,6 +38,8 @@ struct pixcir_i2c_ts_data {
->>   	struct input_dev *input;
->>   	struct gpio_desc *gpio_attb;
->>   	struct gpio_desc *gpio_reset;
->> +	struct gpio_desc *gpio_enable;
->> +	struct gpio_desc *gpio_wake;
->>   	const struct pixcir_i2c_chip_data *chip;
->>   	int max_fingers;	/* Max fingers supported in this instance */
->>   	bool running;
->> @@ -208,6 +210,11 @@ static int pixcir_set_power_mode(struct pixcir_i2c_ts_data *ts,
->>   	struct device *dev = &ts->client->dev;
->>   	int ret;
->>
->> +	if (mode == PIXCIR_POWER_ACTIVE || mode == PIXCIR_POWER_IDLE) {
->> +		if (!IS_ERR_OR_NULL(ts->gpio_wake))
->> +			gpiod_set_value_cansleep(ts->gpio_wake, 1);
->> +	}
->> +
->>   	ret = i2c_smbus_read_byte_data(ts->client, PIXCIR_REG_POWER_MODE);
->>   	if (ret < 0) {
->>   		dev_err(dev, "%s: can't read reg 0x%x : %d\n",
->> @@ -228,6 +235,11 @@ static int pixcir_set_power_mode(struct pixcir_i2c_ts_data *ts,
->>   		return ret;
->>   	}
->>
->> +	if (mode == PIXCIR_POWER_HALT) {
->> +		if (!IS_ERR_OR_NULL(ts->gpio_wake))
->> +			gpiod_set_value_cansleep(ts->gpio_wake, 0);
->> +	}
->> +
->>   	return 0;
->>   }
->>
->> @@ -302,6 +314,11 @@ static int pixcir_start(struct pixcir_i2c_ts_data *ts)
->>   	struct device *dev = &ts->client->dev;
->>   	int error;
->>
->> +	if (!IS_ERR_OR_NULL(ts->gpio_enable)) {
->> +		gpiod_set_value_cansleep(ts->gpio_enable, 1);
->> +		msleep(100);
->> +	}
->> +
->>   	/* LEVEL_TOUCH interrupt with active low polarity */
->>   	error = pixcir_set_int_mode(ts, PIXCIR_INT_LEVEL_TOUCH, 0);
->>   	if (error) {
->> @@ -343,6 +360,9 @@ static int pixcir_stop(struct pixcir_i2c_ts_data *ts)
->>   	/* Wait till running ISR is complete */
->>   	synchronize_irq(ts->client->irq);
->>
->> +	if (!IS_ERR_OR_NULL(ts->gpio_enable))
->> +		gpiod_set_value_cansleep(ts->gpio_enable, 0);
->> +
->>   	return 0;
->>   }
->>
->> @@ -534,6 +554,24 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
->>   		return error;
->>   	}
->>
->> +	tsdata->gpio_wake = devm_gpiod_get_optional(dev, "wake",
->> +						    GPIOD_OUT_HIGH);
->> +	if (IS_ERR(tsdata->gpio_wake)) {
->> +		error = PTR_ERR(tsdata->gpio_wake);
->> +		if (error != -EPROBE_DEFER)
->> +			dev_err(dev, "Failed to get wake gpio: %d\n", error);
->> +		return error;
->> +	}
->> +
->> +	tsdata->gpio_enable = devm_gpiod_get_optional(dev, "enable",
->> +						      GPIOD_OUT_HIGH);
->> +	if (IS_ERR(tsdata->gpio_enable)) {
->> +		error = PTR_ERR(tsdata->gpio_enable);
->> +		if (error != -EPROBE_DEFER)
->> +			dev_err(dev, "Failed to get enable gpio: %d\n", error);
->> +		return error;
->> +	}
->> +
->>   	error = devm_request_threaded_irq(dev, client->irq, NULL, pixcir_ts_isr,
->>   					  IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
->>   					  client->name, tsdata);
->> @@ -542,6 +580,14 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
->>   		return error;
->>   	}
->>
->> +	if (!IS_ERR_OR_NULL(tsdata->gpio_wake))
->> +		gpiod_set_value_cansleep(tsdata->gpio_wake, 1);
->> +
->> +	if (!IS_ERR_OR_NULL(tsdata->gpio_enable)) {
->> +		gpiod_set_value_cansleep(tsdata->gpio_enable, 1);
->> +		msleep(100);
->> +	}
->
-> Actually, another question: why do we need this calls to activate wake
-> and enable gpios here if we request them as active?
+Did this series get dropped on the floor? I recall Han arguing
+previously that this controller is always used with two identical chips.
+But apparently that is not the case.
 
-Hmm, interesting point. I will re-test with just the msleep there. For v2
-what do you want to do with the if tests, keep as "if (!IS_ERR_OR_NULL(...))"
-or change them to just "if (...)" ?
+If this request is not truly dead, I'd appreciate it if Han could
+review/test.
 
-Regards,
+Brian
 
-Hans
-
-
->
-> Thanks.
->
->> +
->>   	pixcir_reset(tsdata);
->>
->>   	/* Always be in IDLE mode to save power, device supports auto wake */
->> --
->> 2.5.0
->>
->
+On Wed, Jul 08, 2015 at 04:21:17PM -0400, Cory Tusar wrote:
+> The current fsl-quadspi implementation assumes that all connected
+> devices are of the same size and type.  This commit adds lookup table
+> entries for both 24- and 32-bit addressed variants of the read, sector
+> erase, and page program operations as a precursor to later changes which
+> generalize the flash layout parsing logic and allow for non-contiguous
+> and non-homogeneous chip combinations.
+> 
+> Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
+> ---
+>  drivers/mtd/spi-nor/fsl-quadspi.c | 116 ++++++++++++++++++++------------------
+>  1 file changed, 60 insertions(+), 56 deletions(-)
+> 
+> diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
+> index 52a872f..4b8038b 100644
+> --- a/drivers/mtd/spi-nor/fsl-quadspi.c
+> +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
+> @@ -178,18 +178,21 @@
+>  #define QUADSPI_LUT_NUM		64
+>  
+>  /* SEQID -- we can have 16 seqids at most. */
+> -#define SEQID_QUAD_READ		0
+> -#define SEQID_WREN		1
+> -#define SEQID_WRDI		2
+> -#define SEQID_RDSR		3
+> -#define SEQID_SE		4
+> -#define SEQID_CHIP_ERASE	5
+> -#define SEQID_PP		6
+> -#define SEQID_RDID		7
+> -#define SEQID_WRSR		8
+> -#define SEQID_RDCR		9
+> -#define SEQID_EN4B		10
+> -#define SEQID_BRWR		11
+> +#define SEQID_QUAD_READ_24	0
+> +#define SEQID_QUAD_READ_32	1
+> +#define SEQID_WREN		2
+> +#define SEQID_WRDI		3
+> +#define SEQID_RDSR		4
+> +#define SEQID_SE_24		5
+> +#define SEQID_SE_32		5
+> +#define SEQID_CHIP_ERASE	7
+> +#define SEQID_PP_24		8
+> +#define SEQID_PP_32		8
+> +#define SEQID_RDID		9
+> +#define SEQID_WRSR		10
+> +#define SEQID_RDCR		11
+> +#define SEQID_EN4B		12
+> +#define SEQID_BRWR		13
+>  
+>  enum fsl_qspi_devtype {
+>  	FSL_QUADSPI_VYBRID,
+> @@ -287,7 +290,6 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+>  	void __iomem *base = q->iobase;
+>  	int rxfifo = q->devtype_data->rxfifo;
+>  	u32 lut_base;
+> -	u8 cmd, addrlen, dummy;
+>  	int i;
+>  
+>  	fsl_qspi_unlock_lut(q);
+> @@ -297,22 +299,16 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+>  		writel(0, base + QUADSPI_LUT_BASE + i * 4);
+>  
+>  	/* Quad Read */
+> -	lut_base = SEQID_QUAD_READ * 4;
+> -
+> -	if (q->nor_size <= SZ_16M) {
+> -		cmd = SPINOR_OP_READ_1_1_4;
+> -		addrlen = ADDR24BIT;
+> -		dummy = 8;
+> -	} else {
+> -		/* use the 4-byte address */
+> -		cmd = SPINOR_OP_READ_1_1_4;
+> -		addrlen = ADDR32BIT;
+> -		dummy = 8;
+> -	}
+> +	lut_base = SEQID_QUAD_READ_24 * 4;
+> +	writel(LUT0(CMD, PAD1, SPINOR_OP_READ_1_1_4) | LUT1(ADDR, PAD1, ADDR24BIT),
+> +			base + QUADSPI_LUT(lut_base));
+> +	writel(LUT0(DUMMY, PAD1, 8) | LUT1(READ, PAD4, rxfifo),
+> +			base + QUADSPI_LUT(lut_base + 1));
+>  
+> -	writel(LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
+> +	lut_base = SEQID_QUAD_READ_32 * 4;
+> +	writel(LUT0(CMD, PAD1, SPINOR_OP_READ_1_1_4) | LUT1(ADDR, PAD1, ADDR32BIT),
+>  			base + QUADSPI_LUT(lut_base));
+> -	writel(LUT0(DUMMY, PAD1, dummy) | LUT1(READ, PAD4, rxfifo),
+> +	writel(LUT0(DUMMY, PAD1, 8) | LUT1(READ, PAD4, rxfifo),
+>  			base + QUADSPI_LUT(lut_base + 1));
+>  
+>  	/* Write enable */
+> @@ -320,18 +316,13 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+>  	writel(LUT0(CMD, PAD1, SPINOR_OP_WREN), base + QUADSPI_LUT(lut_base));
+>  
+>  	/* Page Program */
+> -	lut_base = SEQID_PP * 4;
+> -
+> -	if (q->nor_size <= SZ_16M) {
+> -		cmd = SPINOR_OP_PP;
+> -		addrlen = ADDR24BIT;
+> -	} else {
+> -		/* use the 4-byte address */
+> -		cmd = SPINOR_OP_PP;
+> -		addrlen = ADDR32BIT;
+> -	}
+> +	lut_base = SEQID_PP_24 * 4;
+> +	writel(LUT0(CMD, PAD1, SPINOR_OP_PP) | LUT1(ADDR, PAD1, ADDR24BIT),
+> +			base + QUADSPI_LUT(lut_base));
+> +	writel(LUT0(WRITE, PAD1, 0), base + QUADSPI_LUT(lut_base + 1));
+>  
+> -	writel(LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
+> +	lut_base = SEQID_PP_32 * 4;
+> +	writel(LUT0(CMD, PAD1, SPINOR_OP_PP) | LUT1(ADDR, PAD1, ADDR32BIT),
+>  			base + QUADSPI_LUT(lut_base));
+>  	writel(LUT0(WRITE, PAD1, 0), base + QUADSPI_LUT(lut_base + 1));
+>  
+> @@ -341,18 +332,12 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+>  			base + QUADSPI_LUT(lut_base));
+>  
+>  	/* Erase a sector */
+> -	lut_base = SEQID_SE * 4;
+> -
+> -	if (q->nor_size <= SZ_16M) {
+> -		cmd = SPINOR_OP_SE;
+> -		addrlen = ADDR24BIT;
+> -	} else {
+> -		/* use the 4-byte address */
+> -		cmd = SPINOR_OP_SE;
+> -		addrlen = ADDR32BIT;
+> -	}
+> +	lut_base = SEQID_SE_24 * 4;
+> +	writel(LUT0(CMD, PAD1, SPINOR_OP_SE) | LUT1(ADDR, PAD1, ADDR24BIT),
+> +			base + QUADSPI_LUT(lut_base));
+>  
+> -	writel(LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
+> +	lut_base = SEQID_SE_32 * 4;
+> +	writel(LUT0(CMD, PAD1, SPINOR_OP_SE) | LUT1(ADDR, PAD1, ADDR32BIT),
+>  			base + QUADSPI_LUT(lut_base));
+>  
+>  	/* Erase the whole chip */
+> @@ -391,11 +376,17 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+>  }
+>  
+>  /* Get the SEQID for the command */
+> -static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
+> +static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd, u8 addr_width)
+>  {
+>  	switch (cmd) {
+>  	case SPINOR_OP_READ_1_1_4:
+> -		return SEQID_QUAD_READ;
+> +		if (addr_width == 3)
+> +			return SEQID_QUAD_READ_24;
+> +		if (addr_width == 4)
+> +			return SEQID_QUAD_READ_32;
+> +		dev_err(q->dev, "Unsupported addr_width (%d) for cmd 0x%.2x\n",
+> +			addr_width, cmd);
+> +		break;
+>  	case SPINOR_OP_WREN:
+>  		return SEQID_WREN;
+>  	case SPINOR_OP_WRDI:
+> @@ -403,11 +394,23 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
+>  	case SPINOR_OP_RDSR:
+>  		return SEQID_RDSR;
+>  	case SPINOR_OP_SE:
+> -		return SEQID_SE;
+> +		if (addr_width == 3)
+> +			return SEQID_SE_24;
+> +		if (addr_width == 4)
+> +			return SEQID_SE_32;
+> +		dev_err(q->dev, "Unsupported addr_width (%d) for cmd 0x%.2x\n",
+> +			addr_width, cmd);
+> +		break;
+>  	case SPINOR_OP_CHIP_ERASE:
+>  		return SEQID_CHIP_ERASE;
+>  	case SPINOR_OP_PP:
+> -		return SEQID_PP;
+> +		if (addr_width == 3)
+> +			return SEQID_PP_24;
+> +		if (addr_width == 4)
+> +			return SEQID_PP_32;
+> +		dev_err(q->dev, "Unsupported addr_width (%d) for cmd 0x%.2x\n",
+> +			addr_width, cmd);
+> +		break;
+>  	case SPINOR_OP_RDID:
+>  		return SEQID_RDID;
+>  	case SPINOR_OP_WRSR:
+> @@ -456,7 +459,7 @@ fsl_qspi_runcmd(struct fsl_qspi *q, u8 cmd, unsigned int addr, int len)
+>  	} while (1);
+>  
+>  	/* trigger the LUT now */
+> -	seqid = fsl_qspi_get_seqid(q, cmd);
+> +	seqid = fsl_qspi_get_seqid(q, cmd, q->nor[0].addr_width);
+>  	writel((seqid << QUADSPI_IPCR_SEQID_SHIFT) | len, base + QUADSPI_IPCR);
+>  
+>  	/* Wait for the interrupt. */
+> @@ -601,9 +604,10 @@ static void fsl_qspi_init_abh_read(struct fsl_qspi *q)
+>  	writel(0, base + QUADSPI_BUF2IND);
+>  
+>  	/* Set the default lut sequence for AHB Read. */
+> -	seqid = fsl_qspi_get_seqid(q, q->nor[0].read_opcode);
+> +	seqid = fsl_qspi_get_seqid(q, q->nor[0].read_opcode,
+> +			q->nor[0].addr_width);
+>  	writel(seqid << QUADSPI_BFGENCR_SEQID_SHIFT,
+> -		q->iobase + QUADSPI_BFGENCR);
+> +			q->iobase + QUADSPI_BFGENCR);
+>  }
+>  
+>  /* We use this function to do some basic init for spi_nor_scan(). */
+> -- 
+> 2.3.6
+> 
