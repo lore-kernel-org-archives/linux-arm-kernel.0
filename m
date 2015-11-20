@@ -1,101 +1,44 @@
-From: balbi@ti.com (Felipe Balbi)
+From: robh@kernel.org (Rob Herring)
 Date: Fri, 20 Nov 2015 08:37:18 -0600
-Subject: [PATCH] extcon: palmas: add support for using VBUSDET output
-In-Reply-To: <564EB332.5090406@samsung.com>
-References: <1447350781-20649-1-git-send-email-balbi@ti.com>
- <1447351034-21150-1-git-send-email-balbi@ti.com>
- <564EB0A6.4060407@samsung.com> <564EB332.5090406@samsung.com>
-Message-ID: <87io4wenz5.fsf@saruman.tx.rr.com>
+Subject: [PATCH v2 5/6] dt-bindings: add binding for marvell berlin4ct SoC
+In-Reply-To: <1448008952-1787-6-git-send-email-jszhang@marvell.com>
+References: <1448008952-1787-1-git-send-email-jszhang@marvell.com>
+ <1448008952-1787-6-git-send-email-jszhang@marvell.com>
+Message-ID: <20151120143718.GA9883@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Nov 20, 2015 at 04:42:31PM +0800, Jisheng Zhang wrote:
+> This adds a dt-binding include for Marvell berlin4ct clock IDs.
+> 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 
-Hi Chanwoo,
+Acked-by: Rob Herring <robh@kernel.org>
 
-Chanwoo Choi <cw00.choi@samsung.com> writes:
-> Hi Felipe,
->
-> On 2015? 11? 20? 14:33, Chanwoo Choi wrote:
->> Hi Felipe,
->> 
->> Looks good to me. But I have one comment.
->> 
->> On 2015? 11? 13? 02:57, Felipe Balbi wrote:
->>> TPS659038 can remux its GPIO_1 as VBUSDET output,
->>> which can be tied to a SoC GPIO and used as a VBUS
->>> interrupt.
->>>
->>> Beagle X15 uses that, in fact, and without it, I
->>> could not get USB peripheral working with that
->>> board.
->>>
->>> Signed-off-by: Felipe Balbi <balbi@ti.com>
->>> ---
->>>  drivers/extcon/extcon-palmas.c | 22 ++++++++++++++++++++--
->>>  1 file changed, 20 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/extcon/extcon-palmas.c b/drivers/extcon/extcon-palmas.c
->>> index 93c30a885740..7985d092c069 100644
->>> --- a/drivers/extcon/extcon-palmas.c
->>> +++ b/drivers/extcon/extcon-palmas.c
->>> @@ -296,10 +296,28 @@ static int palmas_usb_probe(struct platform_device *pdev)
->>>  	}
->>>  
->>>  	if (palmas_usb->enable_vbus_detection) {
->>> +		int irq = platform_get_irq(pdev, 0);
->>> +
->>> +		if (irq > 0) {
->>> +			/* remux GPIO_1 as VBUSDET */
->>> +			status = palmas_update_bits(palmas, PALMAS_PU_PD_OD_BASE,
->>> +					PALMAS_PRIMARY_SECONDARY_PAD1,
->>> +					PALMAS_PRIMARY_SECONDARY_PAD1_GPIO_1_MASK,
->>> +					(1 << 3));
->> 
->> PALMAS_PRIMARY_SECONDARY_PAD1_GPIO_1_SHIFT is appropriate instead of
->> using '3'.
+One typo below though.
 
-good point :-)
+> +Required Properties:
+> +
+> +- compatible: should be one of the following.
+> +  - "marvell,berlin-pll" - pll compatible
+> +  - "marvell,berlin4ct-clk" - berlin clk compatible
+> +  - "marvell,berlin4ct-gateclk" - gateclk compatible
+> +- reg: physical base address of the clock controller and length of memory mapped
+> +  region. For pll, the second reg defines the bypass register base address and
+> +  length of memory mapped region.
+> +- #clock-cells: for pll should 0, for gateclk and berlin clk should be 1.
+> +- #bypass-shift: the bypass bit in bypass register.
+     ^
 
->>> +			if (status < 0) {
->>> +				dev_err(&pdev->dev, "can't remux GPIO1\n");
->>> +				return status;
->>> +			}
->>> +
->>> +			palmas_usb->vbus_irq = irq;
->>> +		} else {
->>> +			irq = regmap_irq_get_virq(palmas->irq_data,
->>> +					PALMAS_VBUS_IRQ);
->>> +			palmas_usb->vbus_irq = irq;
->>> +		}
->>> +
->>>  		palmas_usb->vbus_otg_irq = regmap_irq_get_virq(palmas->irq_data,
->>>  						       PALMAS_VBUS_OTG_IRQ);
->>> -		palmas_usb->vbus_irq = regmap_irq_get_virq(palmas->irq_data,
->>> -							   PALMAS_VBUS_IRQ);
->>>  		status = devm_request_threaded_irq(palmas_usb->dev,
->>>  				palmas_usb->vbus_irq, NULL,
->>>  				palmas_vbus_irq_handler,
->>>
->> 
->> Thanks,
->> Chanwoo Choi
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
->> 
->
-> If you are OK about following patch, I'll apply it on extcon branch.
+This should be dropped.
 
-that's perfect, thanks for fixing it :-)
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/181f39e7/attachment.sig>
+> +
+> +Example:
+> +
+> +syspll: syspll {
+> +	compatible = "marvell,berlin-pll";
+> +	reg = <0xea0200 0x14>, <0xea0710 4>;
+> +	#clock-cells = <0>;
+> +	clocks = <&osc>;
+> +	bypass-shift = /bits/ 8 <0>;
+> +};
