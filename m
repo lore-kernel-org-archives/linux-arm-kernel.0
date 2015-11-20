@@ -1,126 +1,143 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Fri, 20 Nov 2015 09:23:24 -0800
-Subject: [PATCH v2] clocksource: arm_global_timer: fix suspend resume
-In-Reply-To: <1448027861-21472-1-git-send-email-grygorii.strashko@ti.com>
-References: <1448027861-21472-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <564F570C.7030409@oracle.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 21 Nov 2015 01:24:24 +0800
+Subject: [PATCH v3 5/9] ARM: dts: sun8i: sinlinx-sina33: Add AXP223 PMIC
+ device and regulator nodes
+In-Reply-To: <20151120111238.GV32142@lukather>
+References: <1447691908-25456-1-git-send-email-wens@csie.org>
+ <1447691908-25456-6-git-send-email-wens@csie.org>
+ <20151120111238.GV32142@lukather>
+Message-ID: <CAGb2v67RxuQT4AffPbdW29yLMn7jjHgiqwXTGmgf8VgqT-fN9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Thomas, Marc
+On Fri, Nov 20, 2015 at 7:12 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Tue, Nov 17, 2015 at 12:38:24AM +0800, Chen-Yu Tsai wrote:
+>> This board has a X-Powers AXP223 PMIC connected via RSB. Its regulators
+>> provide power to various parts of the SoC and the board.
+>>
+>> Also update the regulator supply phandles.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 79 +++++++++++++++++++++++++-
+>>  1 file changed, 76 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+>> index 13ce68f06dd6..91a0fde47fdd 100644
+>> --- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+>> +++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+>> @@ -68,7 +68,7 @@
+>>  };
+>>
+>>  &lradc {
+>> -     vref-supply = <&reg_vcc3v0>;
+>> +     vref-supply = <&reg_dcdc1>;
+>>       status = "okay";
+>>
+>>       button at 200 {
+>> @@ -96,7 +96,7 @@
+>>  &mmc0 {
+>>       pinctrl-names = "default";
+>>       pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_sina33>;
+>> -     vmmc-supply = <&reg_vcc3v0>;
+>> +     vmmc-supply = <&reg_dcdc1>;
+>>       bus-width = <4>;
+>>       cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
+>>       cd-inverted;
+>> @@ -106,7 +106,7 @@
+>>  &mmc2 {
+>>       pinctrl-names = "default";
+>>       pinctrl-0 = <&mmc2_8bit_pins>;
+>> -     vmmc-supply = <&reg_vcc3v0>;
+>> +     vmmc-supply = <&reg_dcdc1>;
+>>       bus-width = <8>;
+>>       non-removable;
+>>       status = "okay";
+>> @@ -132,6 +132,79 @@
+>>
+>>  &r_rsb {
+>>       status = "okay";
+>> +
+>> +     axp22x: pmic at 3e3 {
+>> +             compatible = "x-powers,axp223";
+>> +             reg = <0x3e3>;
+>> +             interrupt-parent = <&nmi_intc>;
+>> +             interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+>> +             eldoin-supply = <&reg_dcdc1>;
+>> +     };
+>> +};
+>> +
+>> +#include "axp22x.dtsi"
+>> +
+>> +&reg_aldo1 {
+>> +     regulator-always-on;
+>> +     regulator-min-microvolt = <3000000>;
+>> +     regulator-max-microvolt = <3000000>;
+>> +     regulator-name = "vcc-io";
+>> +};
+>> +
+>> +&reg_aldo2 {
+>> +     regulator-always-on;
+>> +     regulator-min-microvolt = <2350000>;
+>> +     regulator-max-microvolt = <2650000>;
+>> +     regulator-name = "vdd-dll";
+>> +};
+>> +
+>> +&reg_aldo3 {
+>> +     regulator-always-on;
+>> +     regulator-min-microvolt = <2700000>;
+>> +     regulator-max-microvolt = <3300000>;
+>> +     regulator-name = "vcc-pll-avcc";
+>> +};
+>> +
+>> +&reg_dc5ldo {
+>> +     regulator-always-on;
+>> +     regulator-min-microvolt = <900000>;
+>> +     regulator-max-microvolt = <1400000>;
+>> +     regulator-name = "vdd-cpus";
+>> +};
+>> +
+>> +&reg_dcdc1 {
+>> +     regulator-always-on;
+>> +     regulator-min-microvolt = <3000000>;
+>> +     regulator-max-microvolt = <3000000>;
+>> +     regulator-name = "vcc-3v0";
+>> +};
+>> +
+>> +&reg_dcdc2 {
+>> +     regulator-always-on;
+>> +     regulator-min-microvolt = <900000>;
+>> +     regulator-max-microvolt = <1400000>;
+>> +     regulator-name = "vdd-sys";
+>> +};
+>> +
+>> +&reg_dcdc3 {
+>> +     regulator-always-on;
+>> +     regulator-min-microvolt = <900000>;
+>> +     regulator-max-microvolt = <1400000>;
+>> +     regulator-name = "vdd-cpu";
+>> +};
+>> +
+>> +&reg_dcdc5 {
+>> +     regulator-always-on;
+>> +     regulator-min-microvolt = <1500000>;
+>> +     regulator-max-microvolt = <1500000>;
+>> +     regulator-name = "vcc-dram";
+>> +};
+>> +
+>> +&reg_rtc_ldo {
+>> +     regulator-always-on;
+>> +     regulator-min-microvolt = <3000000>;
+>> +     regulator-max-microvolt = <3000000>;
+>> +     regulator-name = "vcc-rtc";
+>>  };
+>
+> Isn't this supposed to be in the AXP DTSI?
 
-On 11/20/2015 5:57 AM, Grygorii Strashko wrote:
-> Now the System stall is observed on TI AM437x based board
-> (am437x-gp-evm) during resuming from System suspend when ARM Global
-> timer is selected as clocksource device - SysRq are working, but
-> nothing else. The reason of stall is that ARM Global timer loses its
-> contexts.
->
-> The reason of stall is that ARM Global timer loses its contexts during
-> System suspend:
->     GT_CONTROL.TIMER_ENABLE = 0 (unbanked)
->     GT_COUNTERx = 0
->
-> Hence, update ARM Global timer driver to reflect above behaviour
-> - re-enable ARM Global timer on resume GT_CONTROL.TIMER_ENABLE = 1
-> - ensure clocksource and clockevent devices have coresponding flags
->    (CLOCK_SOURCE_SUSPEND_NONSTOP and CLOCK_EVT_FEAT_C3STOP) set
->    depending on presence of "always-on" DT property.
->
-Something which loses context in low power states can't be
-called "always-on"
+Are you referring to &reg_rtc_ldo? Yes, it should. I'll do a new version.
 
-Also if the clock-soucre can't tick in the low power states
-then that device shouldn't be used as a clock-source.
-
-> CC: Arnd Bergmann <arnd@arndb.de>
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
-> Changes in v2:
->   - suspend/resume simplified: nothing is stored any more and
->     ARM GT just re-enabled
-> Link on v1:
->   https://lkml.org/lkml/2015/11/13/456
->
->   drivers/clocksource/arm_global_timer.c | 16 ++++++++++++++++
->   1 file changed, 16 insertions(+)
->
-> diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
-> index a2cb6fa..867e546 100644
-> --- a/drivers/clocksource/arm_global_timer.c
-> +++ b/drivers/clocksource/arm_global_timer.c
-> @@ -51,6 +51,7 @@ static void __iomem *gt_base;
->   static unsigned long gt_clk_rate;
->   static int gt_ppi;
->   static struct clock_event_device __percpu *gt_evt;
-> +static bool gt_always_on;
->
->   /*
->    * To get the value from the Global Timer Counter register proceed as follows:
-> @@ -168,6 +169,9 @@ static int gt_clockevents_init(struct clock_event_device *clk)
->   {
->   	int cpu = smp_processor_id();
->
-> +	if (!gt_always_on)
-> +		clk->features |= CLOCK_EVT_FEAT_C3STOP;
-> +
->   	clk->name = "arm_global_timer";
->   	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
->   		CLOCK_EVT_FEAT_PERCPU;
-> @@ -195,12 +199,19 @@ static cycle_t gt_clocksource_read(struct clocksource *cs)
->   	return gt_counter_read();
->   }
->
-> +static void gt_resume(struct clocksource *cs)
-> +{
-> +	/* re-enable timer on resume */
-> +	writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
-> +}
-> +
->   static struct clocksource gt_clocksource = {
->   	.name	= "arm_global_timer",
->   	.rating	= 300,
->   	.read	= gt_clocksource_read,
->   	.mask	= CLOCKSOURCE_MASK(64),
->   	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
-> +	.resume = gt_resume,
->   };
->
->   #ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
-> @@ -218,6 +229,9 @@ static void __init gt_clocksource_init(void)
->   	/* enables timer on all the cores */
->   	writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
->
-> +	if (gt_always_on)
-> +		gt_clocksource.flags |= CLOCK_SOURCE_SUSPEND_NONSTOP;
-> +
->   #ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
->   	sched_clock_register(gt_sched_clock_read, 64, gt_clk_rate);
->   #endif
-> @@ -289,6 +303,8 @@ static void __init global_timer_of_register(struct device_node *np)
->   		goto out_clk;
->   	}
->
-> +	gt_always_on = of_property_read_bool(np, "always-on");
-> +
->   	err = request_percpu_irq(gt_ppi, gt_clockevent_interrupt,
->   				 "gt", gt_evt);
->   	if (err) {
->
-Am really confused with this patch. Because 'C3STOP' is a clock-event
-flag which we use for cases where we have back-up broadcast timer which
-continue to tick in low power states.
-
-If the ARM global timer is considered as that device which actually
-doesn't tick then we are doomed. Clocksource device must be *CONTINUOUS*
-and if it is not then its not a viable device to be used as clock-source.
-
-May be am missing the context but this whole patch doesn't make sense
-to me.
-
-Regards,
-Santosh
+Thanks
+ChenYu
