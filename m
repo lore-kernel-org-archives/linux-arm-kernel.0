@@ -1,106 +1,65 @@
-From: cwchoi00@gmail.com (Chanwoo Choi)
-Date: Sat, 21 Nov 2015 01:37:04 +0900
-Subject: [PATCH] extcon: palmas: add support for using VBUSDET output
-In-Reply-To: <CAGTfZH1LStzFc8O==n8trw232=nqyEmPhrXyE4bgM88oApPsWQ@mail.gmail.com>
-References: <1447350781-20649-1-git-send-email-balbi@ti.com>
- <1447351034-21150-1-git-send-email-balbi@ti.com>
- <564EB0A6.4060407@samsung.com> <564EB332.5090406@samsung.com>
- <87io4wenz5.fsf@saruman.tx.rr.com>
- <CAGTfZH1LStzFc8O==n8trw232=nqyEmPhrXyE4bgM88oApPsWQ@mail.gmail.com>
-Message-ID: <CAGTfZH37-CB9VdRSyS+7wOB50KXB7U2KVAuGU9_nvBX=7Ro22g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Nov 2015 16:35:44 +0000
+Subject: [arm:drm-etnaviv-devel 89/149]
+ drivers/staging/etnaviv/etnaviv_gem_submit.c:263:19: error: 'struct
+ drm_etnaviv_gem_submit_reloc' has no member named 'shift'
+In-Reply-To: <201511210020.MaDgPArI%fengguang.wu@intel.com>
+References: <201511210020.MaDgPArI%fengguang.wu@intel.com>
+Message-ID: <20151120163544.GE8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+It seems that my request to _not_ test individual commits in this
+branch are not being heeded...
 
-On Sat, Nov 21, 2015 at 12:05 AM, Chanwoo Choi <cwchoi00@gmail.com> wrote:
-> Hi Felipe,
->
-> On Fri, Nov 20, 2015 at 11:37 PM, Felipe Balbi <balbi@ti.com> wrote:
->>
->> Hi Chanwoo,
->>
->> Chanwoo Choi <cw00.choi@samsung.com> writes:
->>> Hi Felipe,
->>>
->>> On 2015? 11? 20? 14:33, Chanwoo Choi wrote:
->>>> Hi Felipe,
->>>>
->>>> Looks good to me. But I have one comment.
->>>>
->>>> On 2015? 11? 13? 02:57, Felipe Balbi wrote:
->>>>> TPS659038 can remux its GPIO_1 as VBUSDET output,
->>>>> which can be tied to a SoC GPIO and used as a VBUS
->>>>> interrupt.
->>>>>
->>>>> Beagle X15 uses that, in fact, and without it, I
->>>>> could not get USB peripheral working with that
->>>>> board.
->>>>>
->>>>> Signed-off-by: Felipe Balbi <balbi@ti.com>
->>>>> ---
->>>>>  drivers/extcon/extcon-palmas.c | 22 ++++++++++++++++++++--
->>>>>  1 file changed, 20 insertions(+), 2 deletions(-)
->>>>>
->>>>> diff --git a/drivers/extcon/extcon-palmas.c b/drivers/extcon/extcon-palmas.c
->>>>> index 93c30a885740..7985d092c069 100644
->>>>> --- a/drivers/extcon/extcon-palmas.c
->>>>> +++ b/drivers/extcon/extcon-palmas.c
->>>>> @@ -296,10 +296,28 @@ static int palmas_usb_probe(struct platform_device *pdev)
->>>>>     }
->>>>>
->>>>>     if (palmas_usb->enable_vbus_detection) {
->>>>> +           int irq = platform_get_irq(pdev, 0);
->>>>> +
->>>>> +           if (irq > 0) {
->>>>> +                   /* remux GPIO_1 as VBUSDET */
->>>>> +                   status = palmas_update_bits(palmas, PALMAS_PU_PD_OD_BASE,
->>>>> +                                   PALMAS_PRIMARY_SECONDARY_PAD1,
->>>>> +                                   PALMAS_PRIMARY_SECONDARY_PAD1_GPIO_1_MASK,
->>>>> +                                   (1 << 3));
->>>>
->>>> PALMAS_PRIMARY_SECONDARY_PAD1_GPIO_1_SHIFT is appropriate instead of
->>>> using '3'.
->>
->> good point :-)
->>
->>>>> +                   if (status < 0) {
->>>>> +                           dev_err(&pdev->dev, "can't remux GPIO1\n");
->>>>> +                           return status;
->>>>> +                   }
->>>>> +
->>>>> +                   palmas_usb->vbus_irq = irq;
->>>>> +           } else {
->>>>> +                   irq = regmap_irq_get_virq(palmas->irq_data,
->>>>> +                                   PALMAS_VBUS_IRQ);
->>>>> +                   palmas_usb->vbus_irq = irq;
->>>>> +           }
->>>>> +
->>>>>             palmas_usb->vbus_otg_irq = regmap_irq_get_virq(palmas->irq_data,
->>>>>                                                    PALMAS_VBUS_OTG_IRQ);
->>>>> -           palmas_usb->vbus_irq = regmap_irq_get_virq(palmas->irq_data,
->>>>> -                                                      PALMAS_VBUS_IRQ);
->>>>>             status = devm_request_threaded_irq(palmas_usb->dev,
->>>>>                             palmas_usb->vbus_irq, NULL,
->>>>>                             palmas_vbus_irq_handler,
->>>>>
->>>>
->>>> Thanks,
->>>> Chanwoo Choi
->>>> --
->>>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->>>> the body of a message to majordomo at vger.kernel.org
->>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>> Please read the FAQ at  http://www.tux.org/lkml/
->>>>
->>>
->>> If you are OK about following patch, I'll apply it on extcon branch.
->>
->> that's perfect, thanks for fixing it :-)
->
-> Applied it.
+On Sat, Nov 21, 2015 at 12:15:21AM +0800, kbuild test robot wrote:
+> tree:   http://repo.or.cz/linux-2.6/linux-2.6-arm.git drm-etnaviv-devel
+> head:   77c57a5498ebe5c85b4a71fbcf800a9140f9a697
+> commit: 11c90396fe41eb9d232018c47d89da4080c375d2 [89/149] staging: etnaviv: clean up public API
+> config: i386-randconfig-r0-201546 (attached as .config)
+> reproduce:
+>         git checkout 11c90396fe41eb9d232018c47d89da4080c375d2
+>         # save the attached .config to linux build tree
+>         make ARCH=i386 
+> 
+> Note: the arm/drm-etnaviv-devel HEAD a0252118653cb935f209bd8baf048195c77d3292 builds fine.
+>       It only hurts bisectibility.
+> 
+> All errors (new ones prefixed by >>):
+> 
+>    drivers/staging/etnaviv/etnaviv_gem_submit.c: In function 'submit_reloc':
+> >> drivers/staging/etnaviv/etnaviv_gem_submit.c:263:19: error: 'struct drm_etnaviv_gem_submit_reloc' has no member named 'shift'
+>       if (submit_reloc.shift || submit_reloc.or) {
+>                       ^
+> >> drivers/staging/etnaviv/etnaviv_gem_submit.c:263:41: error: 'struct drm_etnaviv_gem_submit_reloc' has no member named 'or'
+>       if (submit_reloc.shift || submit_reloc.or) {
+>                                             ^
+> 
+> vim +263 drivers/staging/etnaviv/etnaviv_gem_submit.c
+> 
+> b920a1d2 Christian Gmeiner 2014-09-27  257  				(off < last_offset)) {
+> b920a1d2 Christian Gmeiner 2014-09-27  258  			DRM_ERROR("invalid offset %u at reloc %u\n", off, i);
+> b920a1d2 Christian Gmeiner 2014-09-27  259  			return -EINVAL;
+> b920a1d2 Christian Gmeiner 2014-09-27  260  		}
+> b920a1d2 Christian Gmeiner 2014-09-27  261  
+> 80ddbc50 Russell King      2014-10-21  262  		/* Vivante hardware has no need for shifts or bitwise or-ing */
+> 80ddbc50 Russell King      2014-10-21 @263  		if (submit_reloc.shift || submit_reloc.or) {
+> 80ddbc50 Russell King      2014-10-21  264  			DRM_ERROR("invalid shift or bitwise or at reloc %u\n",
+> 80ddbc50 Russell King      2014-10-21  265  				  i);
+> 80ddbc50 Russell King      2014-10-21  266  			return -EINVAL;
+> 
+> :::::: The code at line 263 was first introduced by commit
+> :::::: 80ddbc5081a66ab9d3d494044ddbe3a7c94efbed staging: etnaviv: remove shifting and bitwise or-ing of GPU addresses
+> 
+> :::::: TO: Russell King <rmk+kernel@arm.linux.org.uk>
+> :::::: CC: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 
-Please ignore this reply about applies because I need to discuss about it.
 
-Thanks,
-Chanwoo Choi
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
