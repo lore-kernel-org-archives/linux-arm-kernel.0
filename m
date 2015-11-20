@@ -1,87 +1,117 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 20 Nov 2015 17:17:16 +0530
-Subject: [PATCH v3 1/3] mailbox: Add support for APM X-Gene platform
- mailbox driver
-In-Reply-To: <b6f12c4d5f45205c356a61acd26aecff70b54e68.1447091626.git.dhdang@apm.com>
-References: <1429863912.2927.43.camel@x220>
- <cover.1447091625.git.dhdang@apm.com>
- <b6f12c4d5f45205c356a61acd26aecff70b54e68.1447091626.git.dhdang@apm.com>
-Message-ID: <CABb+yY2zHycEmsVvp8OFwpJ1PZgrEPpV-oOe56wgFJ=EE0nTcg@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 20 Nov 2015 20:47:18 +0900
+Subject: [RFC] arm64: ftrace with regs for livepatch support
+Message-ID: <564F0846.5000001@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 9, 2015 at 11:35 PM, Duc Dang <dhdang@apm.com> wrote:
-> X-Gene mailbox controller provides 8 mailbox channels, with
-> each channel has a dedicated interrupt line.
->
-> [dhdang: rebase over 4.3-rc5, some minor changes to
-> address comment in v2 patch set]
->
-Do you want this to go into git logs?
+In this RFC, I'd like to describe and discuss some issues on adding ftrace/
+livepatch support on arm64 before actually submitting patches. In fact,
+porting livepatch is not a complicated task, but adding "ftrace with
+regs(CONFIG_DYNAMIC_FTRACE_WITH_REGS)" which livepatch heavily relies on
+is a matter.
+(There is another discussion about "arch-independent livepatch" in LKML.)
 
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> Signed-off-by: Duc Dang <dhdang@apm.com>
-> ---
-here is the right place for any history. And it is good practice to
-specify whatever changes were made from last revision.
+Under "ftrace with regs", a ftrace helper function (ftrace_regs_caller)
+will be called with cpu registers (struct pt_regs_t) at the beginning of
+a function if tracing is enabled on the function. Livepatch utilizes this
+argument to replace PC and jump back into a new (patched) function.
+(Please note that this feature will also be used for ftrace-based kprobes.)
 
+On arm64, there is no template for a function prologue, and "instruction
+scheduling" may mix it with a function body. So a helper function, which
+is inserted by gcc's "-pg" option, cannot (at least potentially) recognize
+correct values of registers because some may have already been overwritten
+at that point.
 
-> +
-> +struct slimpro_mbox_chan {
-> +       struct device *dev;
-> +       struct mbox_chan *chan;
-> +       void __iomem *reg;
-> +       int id;
->
-You don't seem to really need 'id'.
+Instead, X86 uses gcc's "-mfentry" option, which inserts "call _mcount" as
+the first instruction of a function, to implement "ftrace with regs".
+As this option is arch-specific, after discussions with toolchain folks,
+we are proposing a new arch-neutral option, "-fprolog-pad=N"[1].
+This option inserts N nop instructions before a function prologue so that
+any architecture can utilize it to replace nops with whatever instruction
+sequence they want later on when required.
+(I assume that nop is very cheap in terms of performance impact.)
 
+First, let me explain how we can implement "ftrace with regs", or more
+specifically, ftrace_make_call() and ftrace_make_nop() as well as how
+inserted instruction sequences look like. Implementing ftrace_regs_caller
+is quite straightforward, we don't have to care (at least, in this RFC).
 
-> +
-> +static void mb_chan_enable_int(struct slimpro_mbox_chan *mb_chan, u32 mask)
-> +{
-> +       u32 val = readl(mb_chan->reg + REG_DB_STATMASK);
-> +
-> +       val &= ~mask;
-> +       writel(val, mb_chan->reg + REG_DB_STATMASK);
-> +}
-> +
-> +static void mb_chan_disable_int(struct slimpro_mbox_chan *mb_chan, u32 mask)
-> +{
-> +       u32 val = readl(mb_chan->reg + REG_DB_STATMASK);
-> +
-> +       val |= mask;
-> +       writel(val, mb_chan->reg + REG_DB_STATMASK);
-> +}
-> +
-These 2 functions are called just once. And do what other drivers
-usually inline. Wouldn't it be better to directly set & clear the bit
-when needed?
+1) instruction sequence
+Unlike x86, we have to preserve link register(x30) explicitly on arm64 since
+a ftrace help function will be invoked before a function prologue. so we
+need a few, not one, instructions here. Two possible ways:
 
-> +static int slimpro_mbox_send_data(struct mbox_chan *chan, void *msg)
-> +{
-> +       struct slimpro_mbox_chan *mb_chan =
-> +                               (struct slimpro_mbox_chan *)chan->con_priv;
-> +
-You don't need to typecast a void pointer. Here and elsewhere.
+  (a) stp x29, x30, [sp, #-16]!
+      mov x29, sp
+      bl <mcount>
+      ldp x29, x30, [sp], #16
+      <function prologue>
+      ...
 
+  (b) mov x9, x30
+      bl <mcount>
+      mov x30, x9
+      <function prologue>
+      ...
 
-> +
-> +       /* Setup mailbox links */
-> +       for (i = 0; i < MBOX_CNT; i++) {
-> +               ctx->mc[i].irq = platform_get_irq(pdev, i);
->
-You expect every platform to provide exactly 'MBOX_CNT' irqs and they
-must be different (because you don't 'SHARE' when you request).
-Usually developers relax either of the conditions.
+(a) complies with a normal calling convention.
+(b) is Li Bin's idea in his old patch. While (b) can save some memory
+accesses by using a scratch register(x9 in this example), we have no way
+to recover an actual value for this register.
+
+       Q#1. Which approach should we take here?
 
 
-> +static struct platform_driver slimpro_mbox_driver = {
-> +       .probe  = slimpro_mbox_probe,
-> +       .remove = slimpro_mbox_remove,
-> +       .driver = {
-> +               .name = "xgene-slimpro-mbox",
-> +               .owner = THIS_MODULE,
->
-No need to set .owner.
+2) replacing an instruction sequence
+    (This issue is orthogonal to Q#1.)
 
-Cheers.
+Replacing can happen anytime, so we have to do it (without any locking) in
+such a safe way that any task either calls a helper or doesn't call it, but
+never runs in any intermediate state.
+
+Again here, two possible ways:
+
+   (a) initialize the code in the shape of (A') at boot time,
+             (B) -> (B') -> (A')
+       then switching to (A) or (A')
+   (b) take a few steps each time. For example,
+       to enable tracing,
+             (B) -> (B') -> (A') -> (A)
+       to disable tracing,
+             (A) -> (A') -> (B') -> (A)
+       Obviously, we need cache flushing/invalidation and barriers between.
+
+     (A)                                (A')
+         stp x29, x30, [sp, #-16]!           b 1f
+         mov x29, sp                         mov x29, sp
+         bl <_mcount>                        bl <_mcount>
+         ldp x29, x30, [sp], #16             ld x29, x30, [sp], #16
+                                          1:
+         <function prologue>
+         <function body>
+         ...
+
+     (B)                                (B')
+         nop                                 b 1f
+         nop                                 nop
+         nop                                 nop
+         nop                                 nop
+                                          1:
+         <function prologue>
+         <function body>
+         ...
+
+(a) is much simpler, but (b) has less performance penalty(?) when tracing
+is disabled. I'm afraid that I might simplify the issue too much.
+
+        Q#2. Which one is more preferable?
+
+
+[1] https://gcc.gnu.org/ml/gcc/2015-05/msg00267.html, and
+     https://gcc.gnu.org/ml/gcc/2015-10/msg00090.html
+
+
+Thanks,
+-Takahiro AKASHI
