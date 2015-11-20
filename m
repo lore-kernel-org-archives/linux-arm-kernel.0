@@ -1,105 +1,47 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 20 Nov 2015 11:58:18 +0000
-Subject: [Xen-devel] [PATCH v4 2/7] xen/arm: introduce
- HYPERVISOR_platform_op on arm and arm64
-In-Reply-To: <1447666977.15629.9.camel@citrix.com>
-References: <alpine.DEB.2.02.1511121726370.526@kaball.uk.xensource.com>
- <1447349448-22610-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <5645E868.30706@citrix.com>
- <alpine.DEB.2.02.1511131757360.2653@kaball.uk.xensource.com>
- <1447666977.15629.9.camel@citrix.com>
-Message-ID: <alpine.DEB.2.02.1511201152030.1107@kaball.uk.xensource.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Fri, 20 Nov 2015 12:08:39 +0000
+Subject: Tango4 clkgen block
+In-Reply-To: <564EFB18.3050104@sigmadesigns.com> (Marc Gonzalez's message of
+ "Fri, 20 Nov 2015 11:51:04 +0100")
+References: <564C94A5.4060301@sigmadesigns.com>
+ <564C94FD.60607@sigmadesigns.com> <yw1xr3jnfg2s.fsf@unicorn.mansr.com>
+ <564CA880.1030502@sigmadesigns.com>
+ <yw1xmvubfekf.fsf@unicorn.mansr.com>
+ <CAOesGMjCw_DYB3OktnQvthqBAQxqeH6F0bXR-KW_36Y9sDh+fg@mail.gmail.com>
+ <yw1xio4zfcpc.fsf@unicorn.mansr.com>
+ <564DD44E.4010804@sigmadesigns.com>
+ <yw1x4mgif3sn.fsf@unicorn.mansr.com>
+ <564EFB18.3050104@sigmadesigns.com>
+Message-ID: <yw1xbnaoeuuw.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Nov 2015, Ian Campbell wrote:
-> On Fri, 2015-11-13 at 18:10 +0000, Stefano Stabellini wrote:
-> > 
-> > I agree with your point (I thought about it myself) but the current
-> > assembly scheme for hypercalls doesn't work well with that. I would have
-> > to introduce, and maintain going forward, two special hypercall
-> > implementations in assembly, one for arm and another for arm64, just to
-> > set interface_version. I don't think it is worth it; I prefer to have to
-> > maintain the explicit interface_version setting at the call sites (that
-> > today is just one).
-> 
-> You could give the bare assembly stub a different name (append _core or
-> _raw or something) and make HYPERVISOR_platform_op a C wrapper for it which
-> DTRT.
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
 
-I had an idea. I just need to 
+> M?ns Rullg?rd wrote:
+>
+>> Marc Gonzalez wrote:
+>> 
+>>> For example, what is the point of not ignoring sysclk_premux, when the boot
+>>> loader has always hard-coded "PLL1 drives sys_clk, PLL2 drives cd_clk".
+>> 
+>> What if the boot loader changes?  Since we know the structure of the
+>> clock tree, it's safer to check how it is actually configured.
+>
+> In my opinion, this might be the problem.
+>
+> You think you grok the clkgen block, based on
+>
+> 1) buggy driver code written by Sigma
+> 2) obsolete and/or incorrect documentation (it mentions tango1 for crying out loud)
+> 3) limited testing on 8642 and 8759
 
-#define HYPERVISOR_platform_op_raw HYPERVISOR_platform_op
+I also have documentation for SMP8654 that I found on some Chinese web
+site.  I've played around with most of the controls, and things behave
+as expected.  Where the Sigma code and documentation are ambiguous or
+disagree, I have tested what the hardware actually does for various
+values.
 
-then the small wrapper can work:
-
-
-diff --git a/arch/arm/include/asm/xen/hypercall.h b/arch/arm/include/asm/xen/hypercall.h
-index c3e00d0..d769972 100644
---- a/arch/arm/include/asm/xen/hypercall.h
-+++ b/arch/arm/include/asm/xen/hypercall.h
-@@ -50,7 +50,12 @@ int HYPERVISOR_memory_op(unsigned int cmd, void *arg);
- int HYPERVISOR_physdev_op(int cmd, void *arg);
- int HYPERVISOR_vcpu_op(int cmd, int vcpuid, void *extra_args);
- int HYPERVISOR_tmem_op(void *arg);
--int HYPERVISOR_platform_op(void *arg);
-+int HYPERVISOR_platform_op_raw(void *arg);
-+static inline int HYPERVISOR_platform_op(struct xen_platform_op *op)
-+{
-+	op->interface_version = XENPF_INTERFACE_VERSION;
-+	return HYPERVISOR_platform_op_raw(op);
-+}
- int HYPERVISOR_multicall(struct multicall_entry *calls, uint32_t nr);
- 
- static inline int
-diff --git a/arch/arm/include/asm/xen/interface.h b/arch/arm/include/asm/xen/interface.h
-index 5b150d7..75d5968 100644
---- a/arch/arm/include/asm/xen/interface.h
-+++ b/arch/arm/include/asm/xen/interface.h
-@@ -27,6 +27,8 @@
- 		(hnd).p = val;				\
- 	} while (0)
- 
-+#define __HYPERVISOR_platform_op_raw __HYPERVISOR_platform_op
-+
- #ifndef __ASSEMBLY__
- /* Explicitly size integers that represent pfns in the interface with
-  * Xen so that we can have one ABI that works for 32 and 64 bit guests.
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index f964238..0f7be84 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -141,7 +141,6 @@ static int xen_pvclock_gtod_notify(struct notifier_block *nb,
- 	if (!was_set && timespec64_compare(&now, &next_sync) < 0)
- 		return NOTIFY_OK;
- 
--	op.interface_version = XENPF_INTERFACE_VERSION;
- 	op.cmd = XENPF_settime64;
- 	op.u.settime64.mbz = 0;
- 	op.u.settime64.secs = now.tv_sec;
-diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
-index d4539f4..9a36f4f 100644
---- a/arch/arm/xen/hypercall.S
-+++ b/arch/arm/xen/hypercall.S
-@@ -89,7 +89,7 @@ HYPERCALL2(memory_op);
- HYPERCALL2(physdev_op);
- HYPERCALL3(vcpu_op);
- HYPERCALL1(tmem_op);
--HYPERCALL1(platform_op);
-+HYPERCALL1(platform_op_raw);
- HYPERCALL2(multicall);
- 
- ENTRY(privcmd_call)
-diff --git a/arch/arm64/xen/hypercall.S b/arch/arm64/xen/hypercall.S
-index f7d5724..70df80e 100644
---- a/arch/arm64/xen/hypercall.S
-+++ b/arch/arm64/xen/hypercall.S
-@@ -80,7 +80,7 @@ HYPERCALL2(memory_op);
- HYPERCALL2(physdev_op);
- HYPERCALL3(vcpu_op);
- HYPERCALL1(tmem_op);
--HYPERCALL1(platform_op);
-+HYPERCALL1(platform_op_raw);
- HYPERCALL2(multicall);
- 
- ENTRY(privcmd_call)
+-- 
+M?ns Rullg?rd
+mans at mansr.com
