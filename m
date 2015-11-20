@@ -1,53 +1,27 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 19 Nov 2015 16:32:23 -0800
-Subject: [PATCH v3 4/8] phy: rockchip-usb: add compatible values for
- rk3066a and rk3188
-In-Reply-To: <1447968149-10979-5-git-send-email-heiko@sntech.de>
-References: <1447968149-10979-1-git-send-email-heiko@sntech.de>
- <1447968149-10979-5-git-send-email-heiko@sntech.de>
-Message-ID: <CAD=FV=V=5vP4a32Gonkv+vw7E+B=tP1VoWSfLA6YTh8knJZcfg@mail.gmail.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Fri, 20 Nov 2015 02:38:05 +0200
+Subject: [PATCH RESEND] pwm: ftm: fix clock enable/disable when using
+ PM
+In-Reply-To: <290ed017061ef41e1fe5c3fd5a523511@agner.ch>
+References: <1445142552-3530-1-git-send-email-stefan@agner.ch>
+ <290ed017061ef41e1fe5c3fd5a523511@agner.ch>
+Message-ID: <564E6B6D.80006@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+On 19.11.2015 04:04, Stefan Agner wrote:
+> Thierry,
+> 
+> I realized that this patch did not make it into 4.4-rc1, while others,
+> IMHO less important patches which have been posted later (e.g. sunxi
+> whitespace fixes) have made it! :-(
+> 
+> Anything wrong with that? Or am I on your spam list? Note that this is
+> already a RESEND :-)
 
-On Thu, Nov 19, 2015 at 1:22 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> We need custom handling for these two socs in the driver shortly,
-> so add the necessary compatible values to binding and driver.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt | 5 ++++-
->  drivers/phy/phy-rockchip-usb.c                             | 2 ++
->  2 files changed, 6 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
-> index 826454a..9b37242 100644
-> --- a/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
-> @@ -1,7 +1,10 @@
->  ROCKCHIP USB2 PHY
->
->  Required properties:
-> - - compatible: rockchip,rk3288-usb-phy
-> + - compatible: matching the soc type, one of
-> +     "rockchip,rk3066a-usb-phy"
-> +     "rockchip,rk3188-usb-phy"
-> +     "rockchip,rk3288-usb-phy"
+You are not alone with this problem, I have unreviewed changes in
+linux-pwm mailing list sent in 2014 :)
 
-I can never quite keep it straight how this is supposed to work, but
-since previously only "rockchip,rk3288-usb-phy" was supported and now
-we have these new compatible strings, I would have expected the new
-strings to specify the old ones as fallback.  That would mean your
-choices would be:
-
-- "rockchip,rk3288-usb-phy" - A real rk3288
-- "rockchip,rk3188-usb-phy", "rockchip,rk3288-usb-phy" - A rk3188 with
-fallback to 3288 driver.
-- "rockchip,rk3066a-usb-phy", "rockchip,rk3288-usb-phy" - A rk3066a
-with fallback to 3288 driver.
-
-That means that if you land the dts changes without the driver changes
-that things still work OK.
-
--Doug
+--
+With best wishes,
+Vladimir
