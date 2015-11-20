@@ -1,261 +1,100 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 20 Nov 2015 14:59:30 +0000
-Subject: [PATCH v12 1/4] xen: move xen_setup_runstate_info and
- get_runstate_snapshot to drivers/xen/time.c
-In-Reply-To: <alpine.DEB.2.02.1511201434520.1107@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1511201434520.1107@kaball.uk.xensource.com>
-Message-ID: <1448031573-23497-1-git-send-email-stefano.stabellini@eu.citrix.com>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Sat, 21 Nov 2015 00:05:06 +0900
+Subject: [PATCH] extcon: palmas: add support for using VBUSDET output
+In-Reply-To: <87io4wenz5.fsf@saruman.tx.rr.com>
+References: <1447350781-20649-1-git-send-email-balbi@ti.com>
+ <1447351034-21150-1-git-send-email-balbi@ti.com>
+ <564EB0A6.4060407@samsung.com> <564EB332.5090406@samsung.com>
+ <87io4wenz5.fsf@saruman.tx.rr.com>
+Message-ID: <CAGTfZH1LStzFc8O==n8trw232=nqyEmPhrXyE4bgM88oApPsWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Ian Campbell <ian.campbell@citrix.com>
-Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-CC: konrad.wilk at oracle.com
+Hi Felipe,
 
----
+On Fri, Nov 20, 2015 at 11:37 PM, Felipe Balbi <balbi@ti.com> wrote:
+>
+> Hi Chanwoo,
+>
+> Chanwoo Choi <cw00.choi@samsung.com> writes:
+>> Hi Felipe,
+>>
+>> On 2015? 11? 20? 14:33, Chanwoo Choi wrote:
+>>> Hi Felipe,
+>>>
+>>> Looks good to me. But I have one comment.
+>>>
+>>> On 2015? 11? 13? 02:57, Felipe Balbi wrote:
+>>>> TPS659038 can remux its GPIO_1 as VBUSDET output,
+>>>> which can be tied to a SoC GPIO and used as a VBUS
+>>>> interrupt.
+>>>>
+>>>> Beagle X15 uses that, in fact, and without it, I
+>>>> could not get USB peripheral working with that
+>>>> board.
+>>>>
+>>>> Signed-off-by: Felipe Balbi <balbi@ti.com>
+>>>> ---
+>>>>  drivers/extcon/extcon-palmas.c | 22 ++++++++++++++++++++--
+>>>>  1 file changed, 20 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/drivers/extcon/extcon-palmas.c b/drivers/extcon/extcon-palmas.c
+>>>> index 93c30a885740..7985d092c069 100644
+>>>> --- a/drivers/extcon/extcon-palmas.c
+>>>> +++ b/drivers/extcon/extcon-palmas.c
+>>>> @@ -296,10 +296,28 @@ static int palmas_usb_probe(struct platform_device *pdev)
+>>>>     }
+>>>>
+>>>>     if (palmas_usb->enable_vbus_detection) {
+>>>> +           int irq = platform_get_irq(pdev, 0);
+>>>> +
+>>>> +           if (irq > 0) {
+>>>> +                   /* remux GPIO_1 as VBUSDET */
+>>>> +                   status = palmas_update_bits(palmas, PALMAS_PU_PD_OD_BASE,
+>>>> +                                   PALMAS_PRIMARY_SECONDARY_PAD1,
+>>>> +                                   PALMAS_PRIMARY_SECONDARY_PAD1_GPIO_1_MASK,
+>>>> +                                   (1 << 3));
+>>>
+>>> PALMAS_PRIMARY_SECONDARY_PAD1_GPIO_1_SHIFT is appropriate instead of
+>>> using '3'.
+>
+> good point :-)
+>
+>>>> +                   if (status < 0) {
+>>>> +                           dev_err(&pdev->dev, "can't remux GPIO1\n");
+>>>> +                           return status;
+>>>> +                   }
+>>>> +
+>>>> +                   palmas_usb->vbus_irq = irq;
+>>>> +           } else {
+>>>> +                   irq = regmap_irq_get_virq(palmas->irq_data,
+>>>> +                                   PALMAS_VBUS_IRQ);
+>>>> +                   palmas_usb->vbus_irq = irq;
+>>>> +           }
+>>>> +
+>>>>             palmas_usb->vbus_otg_irq = regmap_irq_get_virq(palmas->irq_data,
+>>>>                                                    PALMAS_VBUS_OTG_IRQ);
+>>>> -           palmas_usb->vbus_irq = regmap_irq_get_virq(palmas->irq_data,
+>>>> -                                                      PALMAS_VBUS_IRQ);
+>>>>             status = devm_request_threaded_irq(palmas_usb->dev,
+>>>>                             palmas_usb->vbus_irq, NULL,
+>>>>                             palmas_vbus_irq_handler,
+>>>>
+>>>
+>>> Thanks,
+>>> Chanwoo Choi
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>> Please read the FAQ at  http://www.tux.org/lkml/
+>>>
+>>
+>> If you are OK about following patch, I'll apply it on extcon branch.
+>
+> that's perfect, thanks for fixing it :-)
 
-Changes in v10:
-- rebase
----
- arch/x86/xen/time.c   |   76 +----------------------------------------
- drivers/xen/Makefile  |    2 +-
- drivers/xen/time.c    |   91 +++++++++++++++++++++++++++++++++++++++++++++++++
- include/xen/xen-ops.h |    5 +++
- 4 files changed, 98 insertions(+), 76 deletions(-)
- create mode 100644 drivers/xen/time.c
+Applied it.
 
-diff --git a/arch/x86/xen/time.c b/arch/x86/xen/time.c
-index f1ba6a0..041d4cd 100644
---- a/arch/x86/xen/time.c
-+++ b/arch/x86/xen/time.c
-@@ -32,86 +32,12 @@
- #define TIMER_SLOP	100000
- #define NS_PER_TICK	(1000000000LL / HZ)
- 
--/* runstate info updated by Xen */
--static DEFINE_PER_CPU(struct vcpu_runstate_info, xen_runstate);
--
- /* snapshots of runstate info */
- static DEFINE_PER_CPU(struct vcpu_runstate_info, xen_runstate_snapshot);
- 
- /* unused ns of stolen time */
- static DEFINE_PER_CPU(u64, xen_residual_stolen);
- 
--/* return an consistent snapshot of 64-bit time/counter value */
--static u64 get64(const u64 *p)
--{
--	u64 ret;
--
--	if (BITS_PER_LONG < 64) {
--		u32 *p32 = (u32 *)p;
--		u32 h, l;
--
--		/*
--		 * Read high then low, and then make sure high is
--		 * still the same; this will only loop if low wraps
--		 * and carries into high.
--		 * XXX some clean way to make this endian-proof?
--		 */
--		do {
--			h = p32[1];
--			barrier();
--			l = p32[0];
--			barrier();
--		} while (p32[1] != h);
--
--		ret = (((u64)h) << 32) | l;
--	} else
--		ret = *p;
--
--	return ret;
--}
--
--/*
-- * Runstate accounting
-- */
--static void get_runstate_snapshot(struct vcpu_runstate_info *res)
--{
--	u64 state_time;
--	struct vcpu_runstate_info *state;
--
--	BUG_ON(preemptible());
--
--	state = this_cpu_ptr(&xen_runstate);
--
--	/*
--	 * The runstate info is always updated by the hypervisor on
--	 * the current CPU, so there's no need to use anything
--	 * stronger than a compiler barrier when fetching it.
--	 */
--	do {
--		state_time = get64(&state->state_entry_time);
--		barrier();
--		*res = *state;
--		barrier();
--	} while (get64(&state->state_entry_time) != state_time);
--}
--
--/* return true when a vcpu could run but has no real cpu to run on */
--bool xen_vcpu_stolen(int vcpu)
--{
--	return per_cpu(xen_runstate, vcpu).state == RUNSTATE_runnable;
--}
--
--void xen_setup_runstate_info(int cpu)
--{
--	struct vcpu_register_runstate_memory_area area;
--
--	area.addr.v = &per_cpu(xen_runstate, cpu);
--
--	if (HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area,
--			       cpu, &area))
--		BUG();
--}
--
- static void do_stolen_accounting(void)
- {
- 	struct vcpu_runstate_info state;
-@@ -119,7 +45,7 @@ static void do_stolen_accounting(void)
- 	s64 runnable, offline, stolen;
- 	cputime_t ticks;
- 
--	get_runstate_snapshot(&state);
-+	xen_get_runstate_snapshot(&state);
- 
- 	WARN_ON(state.state != RUNSTATE_running);
- 
-diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
-index aa8a7f7..9b7a35c 100644
---- a/drivers/xen/Makefile
-+++ b/drivers/xen/Makefile
-@@ -1,6 +1,6 @@
- obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
- obj-$(CONFIG_X86)			+= fallback.o
--obj-y	+= grant-table.o features.o balloon.o manage.o preempt.o
-+obj-y	+= grant-table.o features.o balloon.o manage.o preempt.o time.o
- obj-y	+= events/
- obj-y	+= xenbus/
- 
-diff --git a/drivers/xen/time.c b/drivers/xen/time.c
-new file mode 100644
-index 0000000..433fe24
---- /dev/null
-+++ b/drivers/xen/time.c
-@@ -0,0 +1,91 @@
-+/*
-+ * Xen stolen ticks accounting.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/kernel_stat.h>
-+#include <linux/math64.h>
-+#include <linux/gfp.h>
-+
-+#include <asm/xen/hypervisor.h>
-+#include <asm/xen/hypercall.h>
-+
-+#include <xen/events.h>
-+#include <xen/features.h>
-+#include <xen/interface/xen.h>
-+#include <xen/interface/vcpu.h>
-+#include <xen/xen-ops.h>
-+
-+/* runstate info updated by Xen */
-+static DEFINE_PER_CPU(struct vcpu_runstate_info, xen_runstate);
-+
-+/* return an consistent snapshot of 64-bit time/counter value */
-+static u64 get64(const u64 *p)
-+{
-+	u64 ret;
-+
-+	if (BITS_PER_LONG < 64) {
-+		u32 *p32 = (u32 *)p;
-+		u32 h, l;
-+
-+		/*
-+		 * Read high then low, and then make sure high is
-+		 * still the same; this will only loop if low wraps
-+		 * and carries into high.
-+		 * XXX some clean way to make this endian-proof?
-+		 */
-+		do {
-+			h = p32[1];
-+			barrier();
-+			l = p32[0];
-+			barrier();
-+		} while (p32[1] != h);
-+
-+		ret = (((u64)h) << 32) | l;
-+	} else
-+		ret = *p;
-+
-+	return ret;
-+}
-+
-+/*
-+ * Runstate accounting
-+ */
-+void xen_get_runstate_snapshot(struct vcpu_runstate_info *res)
-+{
-+	u64 state_time;
-+	struct vcpu_runstate_info *state;
-+
-+	BUG_ON(preemptible());
-+
-+	state = this_cpu_ptr(&xen_runstate);
-+
-+	/*
-+	 * The runstate info is always updated by the hypervisor on
-+	 * the current CPU, so there's no need to use anything
-+	 * stronger than a compiler barrier when fetching it.
-+	 */
-+	do {
-+		state_time = get64(&state->state_entry_time);
-+		barrier();
-+		*res = *state;
-+		barrier();
-+	} while (get64(&state->state_entry_time) != state_time);
-+}
-+
-+/* return true when a vcpu could run but has no real cpu to run on */
-+bool xen_vcpu_stolen(int vcpu)
-+{
-+	return per_cpu(xen_runstate, vcpu).state == RUNSTATE_runnable;
-+}
-+
-+void xen_setup_runstate_info(int cpu)
-+{
-+	struct vcpu_register_runstate_memory_area area;
-+
-+	area.addr.v = &per_cpu(xen_runstate, cpu);
-+
-+	if (HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area,
-+			       cpu, &area))
-+		BUG();
-+}
-+
-diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
-index e4e214a..86abe07 100644
---- a/include/xen/xen-ops.h
-+++ b/include/xen/xen-ops.h
-@@ -5,6 +5,7 @@
- #include <linux/notifier.h>
- #include <linux/efi.h>
- #include <asm/xen/interface.h>
-+#include <xen/interface/vcpu.h>
- 
- DECLARE_PER_CPU(struct vcpu_info *, xen_vcpu);
- 
-@@ -18,6 +19,10 @@ void xen_arch_suspend(void);
- void xen_resume_notifier_register(struct notifier_block *nb);
- void xen_resume_notifier_unregister(struct notifier_block *nb);
- 
-+bool xen_vcpu_stolen(int vcpu);
-+void xen_setup_runstate_info(int cpu);
-+void xen_get_runstate_snapshot(struct vcpu_runstate_info *res);
-+
- int xen_setup_shutdown_event(void);
- 
- extern unsigned long *xen_contiguous_bitmap;
--- 
-1.7.10.4
+Thanks,
+Chanwoo Choi
