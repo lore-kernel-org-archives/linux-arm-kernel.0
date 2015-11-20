@@ -1,118 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 19 Nov 2015 17:05:49 -0800
-Subject: [PATCH 5/6] arm64: renesas: add Salvator-X board support
+Date: Thu, 19 Nov 2015 17:05:50 -0800
+Subject: [PATCH 6/6] MAINTAINERS: Add entry for Renesas arm64 architecture
 In-Reply-To: <cover.1447980335.git.horms+renesas@verge.net.au>
 References: <cover.1447980335.git.horms+renesas@verge.net.au>
-Message-ID: <1950fab0789111de4ba3406c6e93dc57e345d32c.1447980335.git.horms+renesas@verge.net.au>
+Message-ID: <b138e11931f2fe25cf188ed62b54bc36f59a25ce.1447980335.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Initial Renesas arm64 architecture support will be for the R-Car H3,
+r8a7795, SoC and its Salvator-X board.
 
-Add initial board support for r8a7795 Salvator-X. At this point
-only DEBUG0 and DEBUG1 serial ports are supported.
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- Documentation/devicetree/bindings/arm/shmobile.txt |  2 +
- arch/arm64/boot/dts/renesas/Makefile               |  2 +
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 62 ++++++++++++++++++++++
- 3 files changed, 66 insertions(+)
- create mode 100644 arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+ MAINTAINERS | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index 6712ebbe5f49..678a8184da24 100644
---- a/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -59,5 +59,7 @@ Boards:
-     compatible = "renesas,marzen", "renesas,r8a7779"
-   - Porter (M2-LCDP)
-     compatible = "renesas,porter", "renesas,r8a7791"
-+  - Salvator-X
-+    compatible = "renesas,salvator-x", "renesas,r8a7795";
-   - SILK (RTP0RC7794LCB00011S)
-     compatible = "renesas,silk", "renesas,r8a7794"
-diff --git a/arch/arm64/boot/dts/renesas/Makefile b/arch/arm64/boot/dts/renesas/Makefile
-index fec69f46d65b..9ce1890a650e 100644
---- a/arch/arm64/boot/dts/renesas/Makefile
-+++ b/arch/arm64/boot/dts/renesas/Makefile
-@@ -1,2 +1,4 @@
-+dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-salvator-x.dtb
+diff --git a/MAINTAINERS b/MAINTAINERS
+index e9caa4b28828..2cf10697da29 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1420,6 +1420,15 @@ M:	Lennert Buytenhek <kernel@wantstofly.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ 
++ARM/RENESAS ARM64 ARCHITECTURE
++M:	Simon Horman <horms@verge.net.au>
++M:	Magnus Damm <magnus.damm@gmail.com>
++L:	linux-sh at vger.kernel.org
++Q:	http://patchwork.kernel.org/project/linux-sh/list/
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git next
++S:	Supported
++F:	arch/arm64/boot/dts/renesas/
 +
- always		:= $(dtb-y)
- clean-files	:= *.dtb
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-new file mode 100644
-index 000000000000..a3db98384e53
---- /dev/null
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -0,0 +1,62 @@
-+/*
-+ * Device Tree Source for the Salvator-X board
-+ *
-+ * Copyright (C) 2015 Renesas Electronics Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+#include "r8a7795.dtsi"
-+
-+/ {
-+	model = "Renesas Salvator-X board based on r8a7795";
-+	compatible = "renesas,salvator-x", "renesas,r8a7795";
-+
-+	aliases {
-+		serial0 = &scif2;
-+		serial1 = &scif1;
-+	};
-+
-+	chosen {
-+		bootargs = "ignore_loglevel";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 48000000 {
-+		device_type = "memory";
-+		/* first 128MB is reserved for secure area. */
-+		reg = <0x0 0x48000000 0x0 0x38000000>;
-+	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <16666666>;
-+};
-+
-+&pfc {
-+	scif1_pins: scif1 {
-+		renesas,groups = "scif1_data_a", "scif1_ctrl";
-+		renesas,function = "scif1";
-+	};
-+	scif2_pins: scif2 {
-+		renesas,groups = "scif2_data_a";
-+		renesas,function = "scif2";
-+	};
-+};
-+
-+&scif1 {
-+	pinctrl-0 = <&scif1_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
-+
-+&scif2 {
-+	pinctrl-0 = <&scif2_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
+ ARM/RISCPC ARCHITECTURE
+ M:	Russell King <linux@arm.linux.org.uk>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
 -- 
 2.1.4
