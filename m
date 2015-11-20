@@ -1,59 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Nov 2015 19:32:33 +0000
-Subject: [PATCHv2] arm64: efi: correctly map runtime regions
-In-Reply-To: <CAKv+Gu8XKpZFdRAGTz2FaptzARN+qDLhxgNQYz+_ypHT9TAOgg@mail.gmail.com>
-References: <1448032353-8770-1-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu8XKpZFdRAGTz2FaptzARN+qDLhxgNQYz+_ypHT9TAOgg@mail.gmail.com>
-Message-ID: <20151120193232.GB14942@leverpostej>
+From: salil.mehta@huawei.com (Salil Mehta)
+Date: Sat, 21 Nov 2015 03:49:12 +0800
+Subject: [PATCH V4 net-next 5/5] net:hns: Add the init code to disable Hip06
+ "Hardware VLAN assist"
+In-Reply-To: <1448048952-146714-1-git-send-email-salil.mehta@huawei.com>
+References: <1448048952-146714-1-git-send-email-salil.mehta@huawei.com>
+Message-ID: <1448048952-146714-6-git-send-email-salil.mehta@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 07:31:21PM +0100, Ard Biesheuvel wrote:
-> On 20 November 2015 at 16:12, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Thus we account for the residue twice, and when the residue is non-zero
-> > will cause __create_mapping to map an additional page at the end of the
-> > region. Depending on the memory map, this page may be in a region we are
-> > not intended/permitted to map, or may clash with a different region that
-> > we which to map.
-> >
-> 
-> wish
+This patch adds the initializzation code to disable the hardware
+vlan support for VLAN Tag stripping by default for now.
 
-Whoops; corrected locally.
+Proper support of "hardware VLAN assitance" feature would
+soon come in the next coming patches.
 
-> It is worth to note that, since the memory map is virtually always
-> sorted in ascending order (especially now that we sort it explicitly
-> in the stub), this is highly unlikely to cause trouble in practice,
-> since the additional page mapping is always at the top, and will be
-> corrected as it is overwritten by the subsequent entry.
+Signed-off-by: Salil Mehta <salil.mehta@huawei.com>
+---
 
-I agree that in the common case we are extremely likely to overwrite and
-correct an erroneous entry (especially given that's how I detected this
-in the first place).
+PATCH V4:
+- No change over the earlier patches
 
-I've added a note to that effect.
+PATCH V2/V3:
+- No change over the initial floated patch
 
-If there is no next entry, or it's start address is sufficiently far
-away, we won't fix up the erroneous entry. It seems either that case is
-unlikely, or the region happened to be safe to map regardless.
+PATCH V1:
+- Initial code to disable the hardware VLAN assist for now
+---
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c |    7 +++++++
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h |    1 +
+ 2 files changed, 8 insertions(+)
 
-> The page tables are not active at this stage, so there are no concerns
-> regarding break-before-make etc.
-
-Yup.
-
-> >         for_each_efi_memory_desc(&memmap, md) {
-> > -               u64 paddr, npages, size;
-> > +               u64 size;
-> 
-> I would have dropped 'size' entirely, and use the expression as the
-> function argument directly, but this is also fine by me.
-
-Sure; I've folded that in locally.
-
-> In either case:
-> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-Cheers!
-
-Mark.
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
+index b6bf292..544f323 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
+@@ -176,6 +176,11 @@ static void hns_ppe_cnt_clr_ce(struct hns_ppe_cb *ppe_cb)
+ 			 PPE_CNT_CLR_CE_B, 1);
+ }
+ 
++static void hns_ppe_set_vlan_strip(struct hns_ppe_cb *ppe_cb, int en)
++{
++	dsaf_write_dev(ppe_cb, PPEV2_VLAN_STRIP_EN_REG, en);
++}
++
+ /**
+  * hns_ppe_checksum_hw - set ppe checksum caculate
+  * @ppe_device: ppe device
+@@ -345,6 +350,8 @@ static void hns_ppe_init_hw(struct hns_ppe_cb *ppe_cb)
+ 	hns_ppe_cnt_clr_ce(ppe_cb);
+ 
+ 	if (!AE_IS_VER1(dsaf_dev->dsaf_ver)) {
++		hns_ppe_set_vlan_strip(ppe_cb, 0);
++
+ 		hns_ppe_set_rss_key(ppe_cb, rss_key);
+ 
+ 		for (i = 0; i < HNS_PPEV2_RSS_IND_TBL_SIZE; i++)
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
+index 98c163e..6c18ca9 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
+@@ -318,6 +318,7 @@
+ #define PPE_CFG_PARSE_TAG_REG			0x94
+ #define PPE_CFG_PRO_CHECK_EN_REG		0x98
+ #define PPEV2_CFG_TSO_EN_REG                    0xA0
++#define PPEV2_VLAN_STRIP_EN_REG                 0xAC
+ #define PPE_INTEN_REG				0x100
+ #define PPE_RINT_REG				0x104
+ #define PPE_INTSTS_REG				0x108
+-- 
+1.7.9.5
