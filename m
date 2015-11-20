@@ -1,42 +1,32 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 20 Nov 2015 08:17:25 -0600
-Subject: [PATCH 1/4] spi: mediatek: update document devicetree bindings
- to fix syntax error
-In-Reply-To: <1447986080-31410-1-git-send-email-leilk.liu@mediatek.com>
-References: <1447986080-31410-1-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <20151120141725.GA31912@rob-hp-laptop>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 20 Nov 2015 14:17:41 +0000
+Subject: [PATCH v5 4/7] arm: extend pvclock_wall_clock with sec_hi
+In-Reply-To: <alpine.DEB.2.02.1511201413050.1107@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1511201413050.1107@kaball.uk.xensource.com>
+Message-ID: <1448029064-22285-4-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 10:21:16AM +0800, Leilk Liu wrote:
-> This patch updates document devicetree bindings
-> to fix syntax error.
-> 
-> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+The hypervisor actually exposes an additional field to struct
+pvclock_wall_clock, with the high 32 bit seconds.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Reviewed-by: Julien Grall <julien.grall@citrix.com>
+---
+ arch/arm/include/asm/xen/interface.h |    1 +
+ 1 file changed, 1 insertion(+)
 
-> ---
->  .../devicetree/bindings/spi/spi-mt65xx.txt         |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-> index ce363c923f..fba8334 100644
-> --- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-> +++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-> @@ -32,7 +32,7 @@ Optional properties:
->  -cs-gpios: see spi-bus.txt, only required for MT8173.
->  
->  - mediatek,pad-select: specify which pins group(ck/mi/mo/cs) spi
-> -  controller used. This is a array, the element value should be 0~3,
-> +  controller used. This is an array, the element value should be 0~3,
->    only required for MT8173.
->      0: specify GPIO69,70,71,72 for spi pins.
->      1: specify GPIO102,103,104,105 for spi pins.
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/include/asm/xen/interface.h b/arch/arm/include/asm/xen/interface.h
+index 4dfd6d4..75d5968 100644
+--- a/arch/arm/include/asm/xen/interface.h
++++ b/arch/arm/include/asm/xen/interface.h
+@@ -78,6 +78,7 @@ struct pvclock_wall_clock {
+ 	u32   version;
+ 	u32   sec;
+ 	u32   nsec;
++	u32   sec_hi;
+ } __attribute__((__packed__));
+ #endif
+ 
+-- 
+1.7.10.4
