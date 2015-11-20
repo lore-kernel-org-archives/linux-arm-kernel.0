@@ -1,40 +1,69 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Fri, 20 Nov 2015 16:10:32 +0100
-Subject: [PATCH] clk: tegra: move _calc_dynamic_ram_rate out of #ifdef
-In-Reply-To: <4290741.p1jMzEOUEU@wuerfel>
-References: <4290741.p1jMzEOUEU@wuerfel>
-Message-ID: <20151120151031.GD3300@ulmo.nvidia.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 20 Nov 2015 15:11:50 +0000
+Subject: [PATCH v9 1/6] target-arm: kvm64 - introduce kvm_arm_init_debug()
+In-Reply-To: <CAFEAcA-u3ACj=99NkTRsEL=2KA6LETeAmEf+5Vo03gz0GMh5Zw@mail.gmail.com>
+References: <1447345251-22625-1-git-send-email-alex.bennee@linaro.org>
+ <1447345251-22625-2-git-send-email-alex.bennee@linaro.org>
+ <CAFEAcA-u3ACj=99NkTRsEL=2KA6LETeAmEf+5Vo03gz0GMh5Zw@mail.gmail.com>
+Message-ID: <CAFEAcA8bdjYaDiCParJt8jVe+720+tzh4CuKD2YGfHeo2UJNcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2015 at 11:32:33PM +0100, Arnd Bergmann wrote:
-> _calc_dynamic_ram_rate is defined inside an #ifdef but called
-> later in the same file outside of that #ifdef, which can cause a
-> build error:
-> 
-> drivers/clk/tegra/clk-pll.c: In function '_tegra_clk_register_pll':
-> drivers/clk/tegra/clk-pll.c:1541:29: error: '_calc_dynamic_ramp_rate' undeclared (first use in this function)
-> 
-> This moves both _calc_dynamic_ram_rate and _pll_fixed_mdiv in
-> front of the #ifdef to make all configurations compile again.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 44c8b9fa432c ("clk: tegra: pll: Fix _pll_ramp_calc_pll logic and _calc_dynamic_ramp_rate")
-> ----
-> The patch that caused it appears to be older, but I only ran into
-> the randconfig bug today for the first time. Apparently the commit
-> is only in linux-next at the moment, not in 4.4-rc1
+On 20 November 2015 at 15:05, Peter Maydell <peter.maydell@linaro.org> wrote:
+> On 12 November 2015 at 16:20, Alex Benn?e <alex.bennee@linaro.org> wrote:
+>> As we haven't always had guest debug support we need to probe for it.
+>> Additionally we don't do this in the start-up capability code so we
+>> don't fall over on old kernels.
+>>
+>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>> ---
+>>  target-arm/kvm64.c | 18 ++++++++++++++++++
+>>  1 file changed, 18 insertions(+)
+>>
+>> diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
+>> index ceebfeb..d087794 100644
+>> --- a/target-arm/kvm64.c
+>> +++ b/target-arm/kvm64.c
+>> @@ -25,6 +25,22 @@
+>>  #include "internals.h"
+>>  #include "hw/arm/arm.h"
+>>
+>> +static bool have_guest_debug;
+>> +
+>> +/**
+>> + * kvm_arm_init_debug()
+>> + * @cs: CPUState
+>> + *
+>> + * Check for guest debug capabilities.
+>> + *
+>> + */
+>> +static void kvm_arm_init_debug(CPUState *cs)
+>> +{
+>> +    have_guest_debug = kvm_check_extension(cs->kvm_state,
+>> +                                           KVM_CAP_SET_GUEST_DEBUG);
+>> +    return;
+>> +}
+>> +
+>>  static inline void set_feature(uint64_t *features, int feature)
+>>  {
+>>      *features |= 1ULL << feature;
+>> @@ -121,6 +137,8 @@ int kvm_arch_init_vcpu(CPUState *cs)
+>>      }
+>>      cpu->mp_affinity = mpidr & ARM64_AFFINITY_MASK;
+>>
+>> +    kvm_arm_init_debug(cs);
+>> +
+>>      return kvm_arm_init_cpreg_list(cpu);
+>>  }
+>
+> I assume in practice the kernel guarantees that either all
+> CPUs have the SET_GUEST_DEBUG cap, or none do :-)
+>
+> Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
 
-Hmm... this looks familiar, I thought I had included an equivalent patch
-in the clock tree. I'll go do some digging, but this looks exactly like
-what I had done at the time.
+...except I've just noticed that nothing else in this patchset
+ever reads the have_guest_debug bool we just set, so what is
+the purpose of this patch?
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/ef3499f5/attachment.sig>
+thanks
+-- PMM
