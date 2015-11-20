@@ -1,35 +1,17 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Nov 2015 11:28:42 +0100
-Subject: [PATCH] mmc: fix mmc_{un,}register_pm_notifier prototypes
-Message-ID: <7826361.qqKATxLhCV@wuerfel>
+Date: Fri, 20 Nov 2015 11:29:22 +0100
+Subject: [PATCH] drivers/built-in.o: In function `qcom_smp2p_intr':
+In-Reply-To: <47507465.yGmu2TCElj@wuerfel>
+References: <47507465.yGmu2TCElj@wuerfel>
+Message-ID: <5085227.03pGgTygZ1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mmc pm notifiers were recently reworked, but the new
-code produces a lot of warnings when CONFIG_PM_SLEEP is disabled:
+On Friday 20 November 2015 10:43:00 Arnd Bergmann wrote:
+> The newly added smp2p and smsm drivers cannot be loadable modules
+> but depend on smem, which can be, and that causes a link error:
+> 
 
-In file included from ../drivers/mmc/core/sdio_bus.c:27:0:
-drivers/mmc/core/core.h:97:13: warning: 'mmc_register_pm_notifier' defined but not used [-Wunused-function]
+Sorry, $SUBJECT is wrong, I'll resend.
 
-The obvious solution is to add the 'inline' keyword at the
-function definition, as it should be for any function defined
-in a header file.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 0e40be7c20e0 ("mmc: core: Refactor code to register the MMC PM notifier")
-
-diff --git a/drivers/mmc/core/core.h b/drivers/mmc/core/core.h
-index bd00ac2cdc1b..0fa86a2afc26 100644
---- a/drivers/mmc/core/core.h
-+++ b/drivers/mmc/core/core.h
-@@ -94,8 +94,8 @@ int mmc_hs400_to_hs200(struct mmc_card *card);
- void mmc_register_pm_notifier(struct mmc_host *host);
- void mmc_unregister_pm_notifier(struct mmc_host *host);
- #else
--static void mmc_register_pm_notifier(struct mmc_host *host) { }
--static void mmc_unregister_pm_notifier(struct mmc_host *host) { }
-+static inline void mmc_register_pm_notifier(struct mmc_host *host) { }
-+static inline void mmc_unregister_pm_notifier(struct mmc_host *host) { }
- #endif
- 
- #endif
+	Arnd
