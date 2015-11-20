@@ -1,34 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Nov 2015 18:26:07 +0100
-Subject: [PATCH] remoteproc: avoid stack overflow in debugfs file
-Message-ID: <10169860.4GdufNCNz1@wuerfel>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 20 Nov 2015 09:27:25 -0800
+Subject: [PATCH 4/7] touchscreen: pixcir_i2c: Add support for wake and
+ enable gpios
+In-Reply-To: <1448018233-27824-5-git-send-email-hdegoede@redhat.com>
+References: <1448018233-27824-1-git-send-email-hdegoede@redhat.com>
+ <1448018233-27824-5-git-send-email-hdegoede@redhat.com>
+Message-ID: <20151120172725.GA26895@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent gcc versions warn about reading from a negative offset of
-an on-stack array:
+On Fri, Nov 20, 2015 at 12:17:10PM +0100, Hans de Goede wrote:
+> From: Sander Vermin <sander@vermin.nl>
+> 
+> On some devices the wake and enable pins of the pixcir touchscreen
+> controller are connected to gpios and these must be controlled by the
+> driver for the device to operate properly.
+> 
+> Signed-off-by: Sander Vermin <sander@vermin.nl>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+> Changes in v2 (Hans de Goede):
+> -Split the changes for dealing with inverted / swapped axis out into a
+>  separate patch
+> -Remove a bunch of dev_info calls to make the driver less chatty
+> -Use devm_gpiod_get_optional as these new gpios are optional
+> -Only msleep after setting enable high if we have an enable pin
+> ---
+>  .../bindings/input/touchscreen/pixcir_i2c_ts.txt   |  2 +
+>  drivers/input/touchscreen/pixcir_i2c_ts.c          | 46 ++++++++++++++++++++++
+>  2 files changed, 48 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
+> index 8eb240a..72ca5ec 100644
+> --- a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
+> +++ b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
+> @@ -10,6 +10,8 @@ Required properties:
+>  
+>  Optional properties:
+>  - reset-gpio: GPIO connected to the RESET line of the chip
+> +- enable-gpios: GPIO connected to the ENABLE line of the chip
+> +- wake-gpios: GPIO connected to the WAKE line of the chip
+>  
+>  Example:
+>  
+> diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
+> index 211408c..b75ef65 100644
+> --- a/drivers/input/touchscreen/pixcir_i2c_ts.c
+> +++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
+> @@ -38,6 +38,8 @@ struct pixcir_i2c_ts_data {
+>  	struct input_dev *input;
+>  	struct gpio_desc *gpio_attb;
+>  	struct gpio_desc *gpio_reset;
+> +	struct gpio_desc *gpio_enable;
+> +	struct gpio_desc *gpio_wake;
+>  	const struct pixcir_i2c_chip_data *chip;
+>  	int max_fingers;	/* Max fingers supported in this instance */
+>  	bool running;
+> @@ -208,6 +210,11 @@ static int pixcir_set_power_mode(struct pixcir_i2c_ts_data *ts,
+>  	struct device *dev = &ts->client->dev;
+>  	int ret;
+>  
+> +	if (mode == PIXCIR_POWER_ACTIVE || mode == PIXCIR_POWER_IDLE) {
+> +		if (!IS_ERR_OR_NULL(ts->gpio_wake))
+> +			gpiod_set_value_cansleep(ts->gpio_wake, 1);
 
-drivers/remoteproc/remoteproc_debugfs.c: In function 'rproc_recovery_write':
-drivers/remoteproc/remoteproc_debugfs.c:167:9: warning: 'buf[4294967295u]' may be used uninitialized in this function [-Wmaybe-uninitialized]
+I believe you error out in case when IS_ERR(ts->gpio_wake) is true, so I
+wonder if we should simply use
 
-I don't see anything in sys_write() that prevents us from
-being called with a zero 'count' argument, so we should
-add an extra check in rproc_recovery_write() to prevent the
-access and avoid the warning.
+		if (ts->gpio_wake)
+			gpiod_set_value_cansleep(ts->gpio_wake, 1);
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 2e37abb89a2e ("remoteproc: create a 'recovery' debugfs entry")
+here and elsewhere.
 
-diff --git a/drivers/remoteproc/remoteproc_debugfs.c b/drivers/remoteproc/remoteproc_debugfs.c
-index 9d30809bb407..916af5096f57 100644
---- a/drivers/remoteproc/remoteproc_debugfs.c
-+++ b/drivers/remoteproc/remoteproc_debugfs.c
-@@ -156,7 +156,7 @@ rproc_recovery_write(struct file *filp, const char __user *user_buf,
- 	char buf[10];
- 	int ret;
- 
--	if (count > sizeof(buf))
-+	if (count < 1 || count > sizeof(buf))
- 		return count;
- 
- 	ret = copy_from_user(buf, user_buf, count);
+No need to resubmit, just let me know.
+
+Thanks.
+
+-- 
+Dmitry
