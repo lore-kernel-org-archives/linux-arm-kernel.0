@@ -1,98 +1,185 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 20 Nov 2015 17:07:17 +0300
-Subject: [PATCH V3 net-next 4/5] net:hns: Add support of ethtool TSO set
- option for Hip06 in HNS
-In-Reply-To: <1447966706-16219-5-git-send-email-salil.mehta@huawei.com>
-References: <1447966706-16219-1-git-send-email-salil.mehta@huawei.com>
- <1447966706-16219-5-git-send-email-salil.mehta@huawei.com>
-Message-ID: <564F2915.1090507@cogentembedded.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 20 Nov 2015 08:13:54 -0600
+Subject: [PATCH 1/4] dt-bindings: gpio: update desription of LPC32xx GPIO
+ controller
+In-Reply-To: <1447982995-30231-2-git-send-email-vz@mleia.com>
+References: <1447982995-30231-1-git-send-email-vz@mleia.com>
+ <1447982995-30231-2-git-send-email-vz@mleia.com>
+Message-ID: <20151120141354.GA25446@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2015 11:58 PM, Salil Mehta wrote:
-
-> From: Salil <salil.mehta@huawei.com>
->
-> This patch adds the support of ethtool TSO option to V1 patch,
-> meant to add support of Hip06 SoC to HNS
->
-> Signed-off-by: Salil Mehta <salil.mehta@huawei.com>
-> Signed-off-by: lisheng <lisheng011@huawei.com>
+On Fri, Nov 20, 2015 at 03:29:52AM +0200, Vladimir Zapolskiy wrote:
+> For the purpose of better description of NXP LPC32xx GPIO controller
+> hardware in device tree format, extend the existing description with
+> device tree subnodes, which represent 6 GPIO banks within the
+> controller.
+> 
+> Note, client interface to the GPIO controller is untouched.
+> 
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 > ---
->   drivers/net/ethernet/hisilicon/hns/hns_enet.c |   47 +++++++++++++++++++++++++
->   1 file changed, 47 insertions(+)
->
-> diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-> index 055e14c..a0763ab 100644
-> --- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-> +++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-> @@ -1386,6 +1386,51 @@ static int hns_nic_change_mtu(struct net_device *ndev, int new_mtu)
->   	return ret;
->   }
->
-> +static int hns_nic_set_features(struct net_device *netdev,
-> +				netdev_features_t features)
-> +{
-> +	struct hns_nic_priv *priv = netdev_priv(netdev);
-> +	struct hnae_handle *h = priv->ae_handle;
+>  .../devicetree/bindings/gpio/gpio_lpc32xx.txt      | 121 ++++++++++++++++++++-
+>  1 file changed, 120 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt b/Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt
+> index 4981936..d2da63c 100644
+> --- a/Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt
+> +++ b/Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt
+> @@ -15,7 +15,43 @@ Required properties:
+>     2) pin number
+>     3) optional parameters:
+>        - bit 0 specifies polarity (0 for normal, 1 for inverted)
+> -- reg: Index of the GPIO group
+> +- #address-cells: should be 2, which stands for GPIO bank id and
+> +  physical base address of this GPIO bank.
+
+Now you need special code to do address translation. I'd really think 
+twice about doing this.
+
+Why do you need the bank number?
+
+> +- #size-cells: should be 1, total size of GPIO bank registers.
 > +
-> +	switch (priv->enet_ver) {
-> +	case AE_VERSION_1:
-> +		if ((features & NETIF_F_TSO) || (features & NETIF_F_TSO6))
-
-		if ((features & (NETIF_F_TSO| NETIF_F_TSO6))
-
-> +			netdev_info(netdev, "enet v1 do not support tso!\n");
-> +	break;
-
-    The *break* should have the same indentation level as *if*.
-
-> +	default:
-> +		if ((features & NETIF_F_TSO) || (features & NETIF_F_TSO6)) {
-
-	if ((features & (NETIF_F_TSO| NETIF_F_TSO6))
-
-> +			priv->ops.fill_desc = fill_tso_desc;
-> +			priv->ops.maybe_stop_tx = hns_nic_maybe_stop_tso;
-> +			/* The chip only support 7*4096 */
-> +			netif_set_gso_max_size(netdev, 7 * 4096);
-> +			h->dev->ops->set_tso_stats(h, 1);
-> +		} else {
-> +			priv->ops.fill_desc = fill_v2_desc;
-> +			priv->ops.maybe_stop_tx = hns_nic_maybe_stop_tx;
-> +			h->dev->ops->set_tso_stats(h, 0);
-> +		}
-> +	break;
-
-    Same here.
-
-> +	}
-> +	netdev->features = features;
-> +	return 0;
-> +}
+> +The NXP LPC32xx SoC GPIO controller device node must contain a list
+> +of device nodes representing GPIO banks and their descriptions.
 > +
-> +static netdev_features_t hns_nic_fix_features(
-> +		struct net_device *netdev, netdev_features_t features)
-> +{
-> +	struct hns_nic_priv *priv = netdev_priv(netdev);
+> +The format of subnodes should follow the description below.
 > +
-> +	switch (priv->enet_ver) {
-> +	case AE_VERSION_1:
-> +		features &= ~(NETIF_F_TSO | NETIF_F_TSO6 |
-> +				NETIF_F_HW_VLAN_CTAG_FILTER);
-> +		break;
-> +	default:
-> +		break;
-> +	}
-
-    Here it's indented correctly.
-
-> +	return features;
-> +}
+> +Required properties:
+> +- reg: should contain 3 integer values:
+> +   1) GPIO bank id from 0 to 5,
+> +   2) physical base address of this GPIO bank,
+> +   3) total size of the GPIO bank registers.
 > +
->   /**
->    * nic_set_multicast_list - set mutl mac address
->    * @netdev: net device
-[...]
+> +Optional properties:
+> +- gpio-bank-name: human readable name of a GPIO bank,
+> +- gpio-no-output-state: property of P2 bank, which has special,
+> +  mapping of its control registers,
+> +- gpio-offset: property of P3/GPIO bank, offset of bits representing
+> +  GPIO lines in output and direction registers,
 
-MBR, Sergei
+Seems like nr-gpios should have been a mask instead...
+
+> +- gpios: number of GPIO lines per GPIO bank, if this property is
+> +  omitted, then gpio-input-mask must be present,
+
+"gpios" is already the property name for the client interface.
+
+> +- gpio-input-mask: should contain two bitmasks, the first bitmask is
+> +  the mapping of GPIO lines to input status register, the second
+> +  bitmask should be a subset of the first bitmask and it represents
+> +  input GPIO lines, which may serve as an interrupt source,
+> +  if gpio-input-mask roperty is omitted, gpios property should be
+> +  present,
+> +- interrupts: list of parent interrupts mapped to input GPIO lines,
+> +- interrupts-extended: list of parent interrupts mapped to input GPIO
+> +  lines, used if parent interrupts are provided by more than one
+> +  interrupt controller, this option is used by GPI bank,
+> +- interrupt-controller: indicates that GPIO bank may serve as an
+> +  interrupt controller,
+> +- #interrupt-cells: if interrupt-controller property is present,
+> +  it should be 2, interrupt id and its flags.
+>  
+>  Example:
+>  
+> @@ -24,6 +60,89 @@ Example:
+>  		reg = <0x40028000 0x1000>;
+>  		gpio-controller;
+>  		#gpio-cells = <3>; /* bank, pin, flags */
+
+Can't bank and pin be encoded into one cell as the gpio core binding 
+suggests.
+
+> +
+> +		ranges = <0 0x0 0x40028000 0x00001000>,
+> +			 <1 0x0 0x40028000 0x00001000>,
+> +			 <2 0x0 0x40028000 0x00001000>,
+> +			 <3 0x0 0x40028000 0x00001000>,
+> +			 <4 0x0 0x40028000 0x00001000>,
+> +			 <5 0x0 0x40028000 0x00001000>;
+> +		#address-cells = <2>;
+> +		#size-cells = <1>;
+> +
+> +		gpio_p0: gpio-controller at 0 {
+> +			reg = <0 0x40 0x1C>;
+> +			gpio-bank-name = "p0";
+> +			gpios = <8>;
+> +
+> +			interrupt-parent = <&sic2>;
+> +			interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
+> +		};
+> +
+> +		gpio_p1: gpio-controller at 1 {
+> +			reg = <1 0x60 0x1C>;
+> +			gpio-bank-name = "p1";
+> +			gpios = <24>;
+> +
+> +			interrupt-parent = <&sic2>;
+> +			interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
+> +		};
+> +
+> +		gpio_p2: gpio-controller at 2 {
+> +			reg = <2 0x10 0x18>;
+> +			gpio-bank-name = "p2";
+> +			gpios = <13>;
+> +			gpio-no-output-state;
+> +		};
+> +
+> +		gpio_gpio: gpio-controller at 3 {
+> +			reg = <3 0x00 0x1C>;
+
+This overlaps with bank 2.
+
+> +			gpio-bank-name = "gpio";
+> +			gpio-offset = <25>;
+> +			gpio-input-mask = <0x01007c00>, <0x01007c00>;
+> +
+> +			interrupt-parent = <&sic2>;
+> +			interrupts = <0 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <1 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <2 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <3 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <4 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <5 IRQ_TYPE_LEVEL_HIGH>;
+> +
+> +			interrupt-controller;
+> +			#interrupt-cells = <2>;
+> +		};
+> +
+> +		gpio_gpi: gpio-controller at 4 {
+> +			reg = <4 0x00 0x04>;
+> +			gpio-bank-name = "gpi";
+> +			gpio-input-only;
+> +			gpio-input-mask = <0x1aff83ff>, <0x100803ff>;
+> +
+> +			interrupts-extended =
+> +				<&sic2 22 IRQ_TYPE_LEVEL_HIGH>,
+> +				<&sic2 23 IRQ_TYPE_LEVEL_HIGH>,
+> +				<&sic2 24 IRQ_TYPE_LEVEL_HIGH>,
+> +				<&sic2 25 IRQ_TYPE_LEVEL_HIGH>,
+> +				<&sic2 26 IRQ_TYPE_LEVEL_HIGH>,
+> +				<&sic2 27 IRQ_TYPE_LEVEL_HIGH>,
+> +				<&sic2 28 IRQ_TYPE_LEVEL_HIGH>,
+> +				<&sic2 15 IRQ_TYPE_LEVEL_HIGH>,
+> +				<&sic2  9 IRQ_TYPE_LEVEL_HIGH>,
+> +				<&sic2 10 IRQ_TYPE_LEVEL_HIGH>,
+> +				<&sic2 11 IRQ_TYPE_LEVEL_HIGH>,
+> +				<&sic1  4 IRQ_TYPE_LEVEL_HIGH>;
+> +
+> +			interrupt-controller;
+> +			#interrupt-cells = <2>;
+> +		};
+> +
+> +		gpio_gpo: gpio-controller at 5 {
+> +			reg = <5 0x00 0x10>;
+> +			gpio-bank-name = "gpo";
+> +			gpios = <24>;
+> +			gpio-output-only;
+> +		};
+>  	};
+>  
+>  	leds {
+> -- 
+> 2.1.4
+> 
