@@ -1,341 +1,74 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 20 Nov 2015 20:11:53 +0100
-Subject: [PATCH] ARM: dts: sun7i: Add dts file for the lamobo-r1 board
-Message-ID: <1448046713-13579-1-git-send-email-hdegoede@redhat.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 20 Nov 2015 21:12:02 +0200
+Subject: [PATCH v2] clocksource: arm_global_timer: fix suspend resume
+In-Reply-To: <564F6BD0.3050804@oracle.com>
+References: <1448027861-21472-1-git-send-email-grygorii.strashko@ti.com>
+ <564F570C.7030409@oracle.com> <564F67ED.9000905@ti.com>
+ <564F6A92.7080006@arm.com> <564F6BD0.3050804@oracle.com>
+Message-ID: <564F7082.3020006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jelle de Jong <jelledejong@powercraft.nl>
+On 11/20/2015 08:52 PM, santosh shilimkar wrote:
+> On 11/20/2015 10:46 AM, Marc Zyngier wrote:
+>> On 20/11/15 18:35, Grygorii Strashko wrote:
+>>> Hi Santosh,
+>>>
+>>> On 11/20/2015 07:23 PM, santosh shilimkar wrote:
+>>>> + Thomas, Marc
+>>>>
+>>>> On 11/20/2015 5:57 AM, Grygorii Strashko wrote:
+>>>>> Now the System stall is observed on TI AM437x based board
+>>>>> (am437x-gp-evm) during resuming from System suspend when ARM Global
+>>>>> timer is selected as clocksource device - SysRq are working, but
+>>>>> nothing else. The reason of stall is that ARM Global timer loses its
+>>>>> contexts.
+>>>>>
+>>>>> The reason of stall is that ARM Global timer loses its contexts during
+>>>>> System suspend:
+>>>>>      GT_CONTROL.TIMER_ENABLE = 0 (unbanked)
+>>>>>      GT_COUNTERx = 0
+>>>>>
+>>>>> Hence, update ARM Global timer driver to reflect above behaviour
+>>>>> - re-enable ARM Global timer on resume GT_CONTROL.TIMER_ENABLE = 1
+>>>>> - ensure clocksource and clockevent devices have coresponding flags
+>>>>>     (CLOCK_SOURCE_SUSPEND_NONSTOP and CLOCK_EVT_FEAT_C3STOP) set
+>>>>>     depending on presence of "always-on" DT property.
+>>>>>
+>>>> Something which loses context in low power states can't be
+>>>> called "always-on"
+>>>
+>>> Sry, it's kinda new area for me and I could make mistakes.
+>>>
+>>> While working on this patch I've:
+>>>   - re-used implementation from ARM arch timer
+>>> commit 82a5619410d4c4df65c04272db198eca5a867c18
+>>> Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> Date:   Tue Apr 8 10:04:32 2014 +0100
+>>>
+>>>      clocksource: arch_arm_timer: Fix age-old arch timer C3STOP 
+>>> detection issue
+>>
+>> [...]
+>>
+>> This patch has a very specific purpose: instructing the core code that
+>> this timer will never stop ticking, ever. It is really targeted at
+>> virtual machines, whose timer is backed by the host timer, even when the
+>> VM is not running.
+>>
+>> Using it on actual hardware is may not be the best idea, specially in
+>> the presence of PM.
+>>
+> Exactly. Thanks for clarifying the commit Marc.
 
-The lamobo-r1 board, sometimes called the BPI-R1 but not labelled as such
-on the PCB, is meant as a A20 based router board. As such the board comes
-with a built-in switch chip giving it 5 gigabit ethernet boards, and it
-has a large empty area on the pcb with mounting holes which will fit a
-2.5 inch harddisk. To complete its networking features it has a
-Realtek RTL8192CU for WiFi 802.11 b/g/n.
+Thanks for your comments, but could you clarify pls - 
+Can i use ARM GT for my use case CPUIDLE=n and SUSPEND=y,
+taking into account that System time can be corrected by RTC core
+during resume? (it will be used as clocksource only).
 
-Signed-off-by: Jelle de Jong <jelledejong@powercraft.nl>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/Makefile                |   1 +
- arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts | 297 ++++++++++++++++++++++++++++++
- 2 files changed, 298 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
+And would it be reasonable to resend new version if i will drop 
+all "always-on" related code?
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 28b0403..7572c29 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -639,6 +639,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-hummingbird.dtb \
- 	sun7i-a20-i12-tvbox.dtb \
- 	sun7i-a20-icnova-swac.dtb \
-+	sun7i-a20-lamobo-r1.dtb \
- 	sun7i-a20-m3.dtb \
- 	sun7i-a20-mk808c.dtb \
- 	sun7i-a20-olimex-som-evb.dtb \
-diff --git a/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
-new file mode 100644
-index 0000000..975b0b2
---- /dev/null
-+++ b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
-@@ -0,0 +1,297 @@
-+/*
-+ * Copyright 2015 Jelle de Jong <jelledejong@powercraft.nl>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun7i-a20.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Lamobo R1";
-+	compatible = "lamobo,lamobo-r1", "allwinner,sun7i-a20";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart3;
-+		serial2 = &uart7;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pins_lamobo_r1>;
-+
-+		green {
-+			label = "lamobo_r1:green:usr";
-+			gpios = <&pio 7 24 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	reg_gmac_3v3: gmac-3v3 {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&gmac_power_pin_lamobo_r1>;
-+		regulator-name = "gmac-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <100000>;
-+		enable-active-high;
-+		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>; /* PH23 */
-+	};
-+};
-+
-+&ahci_pwr_pin_a {
-+	allwinner,pins = "PB3";
-+};
-+
-+&ahci {
-+	target-supply = <&reg_ahci_5v>;
-+	status = "okay";
-+};
-+
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc2>;
-+	operating-points = <
-+		/* kHz	  uV */
-+		960000	1400000
-+		912000	1400000
-+		864000	1350000
-+		720000	1250000
-+		528000	1150000
-+		312000	1100000
-+		144000	1050000
-+		>;
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&gmac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&gmac_pins_rgmii_a>;
-+	phy = <&phy1>;
-+	phy-mode = "rgmii";
-+	phy-supply = <&reg_gmac_3v3>;
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	axp209: pmic at 34 {
-+		reg = <0x34>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "okay";
-+};
-+
-+&ir0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ir0_rx_pins_a>;
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_lamobo_r1>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 10 GPIO_ACTIVE_HIGH>; /* PH10 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&otg_sram {
-+	status = "okay";
-+};
-+
-+&pio {
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PH4";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+
-+	mmc0_cd_pin_lamobo_r1: mmc0_cd_pin at 0 {
-+		allwinner,pins = "PH10";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+
-+	gmac_power_pin_lamobo_r1: gmac_power_pin at 0 {
-+		allwinner,pins = "PH23";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	led_pins_lamobo_r1: led_pins at 0 {
-+		allwinner,pins = "PH24";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+#include "axp209.dtsi"
-+
-+&reg_ahci_5v {
-+	gpio = <&pio 1 3 0>; /* PB3 */
-+	status = "okay";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-int-dll";
-+};
-+
-+&reg_ldo1 {
-+	regulator-name = "vdd-rtc";
-+};
-+
-+&reg_ldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "avcc";
-+};
-+
-+&reg_usb0_vbus {
-+	status = "okay";
-+};
-+
-+&reg_usb1_vbus {
-+	status = "okay";
-+};
-+
-+&reg_usb2_vbus {
-+	status = "okay";
-+};
-+
-+&spi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi0_pins_a>,
-+		    <&spi0_cs0_pins_a>,
-+		    <&spi0_cs1_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_pins_b>;
-+	status = "okay";
-+};
-+
-+&uart7 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart7_pins_a>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usb_power_supply {
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>;
-+	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
-+	usb0_vbus_power-supply = <&usb_power_supply>;
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_usb2_vbus>;
-+	status = "okay";
-+};
 -- 
-2.5.0
+regards,
+-grygorii
