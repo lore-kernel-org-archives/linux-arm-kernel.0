@@ -1,63 +1,152 @@
-From: andrew.cooper3@citrix.com (Andrew Cooper)
-Date: Fri, 20 Nov 2015 17:22:17 +0000
-Subject: [Xen-devel] [PATCH 11/13] xen/hvm/params: Add a new dilivery
- type for event-channel in HVM_PARAM_CALLBACK_IRQ
-In-Reply-To: <alpine.DEB.2.02.1511201706070.1107@kaball.uk.xensource.com>
-References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
- <1447754231-7772-12-git-send-email-shannon.zhao@linaro.org>
- <alpine.DEB.2.02.1511201706070.1107@kaball.uk.xensource.com>
-Message-ID: <564F56C9.8060007@citrix.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 20 Nov 2015 19:22:09 +0200
+Subject: [RFC PATCH] clocksource: ti-32k: convert to platform device
+Message-ID: <1448040129-23869-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/11/15 17:07, Stefano Stabellini wrote:
-> On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
->>
->> Add a new dilivery type:
-> delivery
->
->> val[63:56] == 3: val[15:8] is flag: val[7:0] is a PPI.
->> To the flag, bit 0 stands the interrupt mode is edge(1) or level(0) and
->> bit 1 stands the interrupt polarity is active low(1) or high(0).
->>
->> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> ---
->>  include/xen/interface/hvm/params.h | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
->> index a6c7991..550688a 100644
->> --- a/include/xen/interface/hvm/params.h
->> +++ b/include/xen/interface/hvm/params.h
->> @@ -34,6 +34,11 @@
->>   *                  Domain = val[47:32], Bus  = val[31:16],
->>   *                  DevFn  = val[15: 8], IntX = val[ 1: 0]
->>   * val[63:56] == 2: val[7:0] is a vector number.
->> + * val[63:56] == 3: val[15:8] is flag of event-channel interrupt:
->> + *                      bit 0: interrupt is edge(1) or level(0) triggered
->> + *                      bit 1: interrupt is active low(1) or high(0)
->> + *                  val[7:0] is PPI number used by event-channel.
->> + *                  This is only used by ARM/ARM64.
->>   * If val == 0 then CPU0 event-channel notifications are not delivered.
->>   */
->>  #define HVM_PARAM_CALLBACK_IRQ 0
+Since system clocksource is finally selected by Clocksource core at
+fs_initcall stage during boot there are no reasons to initialize
+ti_32k_timer at early boot stages. Hence, ti_32k_timer can be
+converted to use platform device/driver model and its PM can be
+implemented using PM runtime which is common for OMAP devices.
 
-Sadly NACK in this form.
+Platform specific initialization code has to be disabled once as
+ti_32k_timer is converted to platform device - otherwise OMAP platform
+code will generate boot warnings.
 
-This is not your fault, but this particular field has hidden ABI which
-the original submitter neglected to put into public API.
+After this change, all counter_32k's platform code can be removed
+once all OMAP boards will be converted to DT.
 
-Bits 63:56 of this field currently have a hidden ABI with:
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ arch/arm/mach-omap2/timer.c        | 16 +++--------
+ drivers/clocksource/timer-ti-32k.c | 58 ++++++++++++++++++++++++++++++++------
+ 2 files changed, 53 insertions(+), 21 deletions(-)
 
-xen/include/asm-x86/hvm/irq.h
-enum {
-    HVMIRQ_callback_none,
-    HVMIRQ_callback_gsi,
-    HVMIRQ_callback_pci_intx,
-    HVMIRQ_callback_vector
-} callback_via_type;
-
-I will submit a patch to fix this this properly.
-
-~Andrew
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index b18ebbe..3bfde44 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -393,23 +393,15 @@ static const struct of_device_id omap_counter_match[] __initconst = {
+ static int __init __maybe_unused omap2_sync32k_clocksource_init(void)
+ {
+ 	int ret;
+-	struct device_node *np = NULL;
+ 	struct omap_hwmod *oh;
+ 	const char *oh_name = "counter_32k";
+ 
+ 	/*
+-	 * If device-tree is present, then search the DT blob
+-	 * to see if the 32kHz counter is supported.
++	 * If device-tree is present, then just exit -
++	 * 32kHz clocksource driver will handle it.
+ 	 */
+-	if (of_have_populated_dt()) {
+-		np = omap_get_timer_dt(omap_counter_match, NULL);
+-		if (!np)
+-			return -ENODEV;
+-
+-		of_property_read_string_index(np, "ti,hwmods", 0, &oh_name);
+-		if (!oh_name)
+-			return -ENODEV;
+-	}
++	if (of_have_populated_dt())
++		return 0;
+ 
+ 	/*
+ 	 * First check hwmod data is available for sync32k counter
+diff --git a/drivers/clocksource/timer-ti-32k.c b/drivers/clocksource/timer-ti-32k.c
+index 8518d9d..e71496f 100644
+--- a/drivers/clocksource/timer-ti-32k.c
++++ b/drivers/clocksource/timer-ti-32k.c
+@@ -39,8 +39,11 @@
+ #include <linux/time.h>
+ #include <linux/sched_clock.h>
+ #include <linux/clocksource.h>
++#include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
+ 
+ /*
+  * 32KHz clocksource ... always available, on pretty most chips except
+@@ -88,15 +91,28 @@ static u64 notrace omap_32k_read_sched_clock(void)
+ 	return ti_32k_read_cycles(&ti_32k_timer.cs);
+ }
+ 
+-static void __init ti_32k_timer_init(struct device_node *np)
++static const struct of_device_id ti_32k_of_table[] = {
++	{ .compatible = "ti,omap-counter32k" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, ti_32k_of_table);
++
++static int __init ti_32k_probe(struct platform_device *pdev)
+ {
++	struct device *dev = &pdev->dev;
++	struct resource *res;
+ 	int ret;
+ 
+-	ti_32k_timer.base = of_iomap(np, 0);
+-	if (!ti_32k_timer.base) {
+-		pr_err("Can't ioremap 32k timer base\n");
+-		return;
+-	}
++	/* Static mapping, never released */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	ti_32k_timer.base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(ti_32k_timer.base))
++		return PTR_ERR(ti_32k_timer.base);
++
++	pm_runtime_enable(dev);
++	ret = pm_runtime_get_sync(dev);
++	if (ret < 0)
++		goto probe_err;
+ 
+ 	ti_32k_timer.counter = ti_32k_timer.base;
+ 
+@@ -116,11 +132,35 @@ static void __init ti_32k_timer_init(struct device_node *np)
+ 	ret = clocksource_register_hz(&ti_32k_timer.cs, 32768);
+ 	if (ret) {
+ 		pr_err("32k_counter: can't register clocksource\n");
+-		return;
++		goto probe_err;
+ 	}
+ 
+ 	sched_clock_register(omap_32k_read_sched_clock, 32, 32768);
+ 	pr_info("OMAP clocksource: 32k_counter@32768 Hz\n");
++	return 0;
++
++probe_err:
++	pm_runtime_put_noidle(dev);
++	return ret;
++};
++
++static struct platform_driver ti_32k_driver __initdata = {
++	.probe		= ti_32k_probe,
++	.driver		= {
++		.name	= "ti_32k_timer",
++		.of_match_table = of_match_ptr(ti_32k_of_table),
++	}
++};
++
++static int __init ti_32k_init(void)
++{
++	return platform_driver_register(&ti_32k_driver);
+ }
+-CLOCKSOURCE_OF_DECLARE(ti_32k_timer, "ti,omap-counter32k",
+-		ti_32k_timer_init);
++
++subsys_initcall(ti_32k_init);
++
++MODULE_AUTHOR("Paul Mundt");
++MODULE_AUTHOR("Juha Yrj?l?");
++MODULE_DESCRIPTION("OMAP2 32k Timer");
++MODULE_ALIAS("platform:ti_32k_timer");
++MODULE_LICENSE("GPL v2");
+-- 
+2.6.3
