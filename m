@@ -1,67 +1,37 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 20 Nov 2015 16:42:29 +0800
-Subject: [PATCH v2 3/6] clk: berlin: add common gateclk driver for newer SoCs
+Date: Fri, 20 Nov 2015 16:42:27 +0800
+Subject: [PATCH v2 1/6] clk: berlin: add common pll driver
 In-Reply-To: <1448008952-1787-1-git-send-email-jszhang@marvell.com>
 References: <1448008952-1787-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1448008952-1787-4-git-send-email-jszhang@marvell.com>
+Message-ID: <1448008952-1787-2-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add common gateclk driver for Marvell SoCs newer than BG2, BG2CD,
-BG2Q. berlin_gateclk_setup() is provided to setup and register such
-kind of clks.
+Add pll driver for Marvell SoCs newer than BG2, BG2CD, BG2Q.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- drivers/clk/berlin/Makefile |  2 +-
- drivers/clk/berlin/clk.h    | 12 ++++++++
- drivers/clk/berlin/gate.c   | 73 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 86 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/berlin/gate.c
+ drivers/clk/berlin/Makefile |   1 +
+ drivers/clk/berlin/pll.c    | 133 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 134 insertions(+)
+ create mode 100644 drivers/clk/berlin/pll.c
 
 diff --git a/drivers/clk/berlin/Makefile b/drivers/clk/berlin/Makefile
-index ee2e09d..fc92151 100644
+index 2a36ab7..eee42b0 100644
 --- a/drivers/clk/berlin/Makefile
 +++ b/drivers/clk/berlin/Makefile
-@@ -1,5 +1,5 @@
+@@ -1,4 +1,5 @@
  obj-y += berlin2-avpll.o berlin2-pll.o berlin2-div.o
--obj-y += pll.o clk.o
-+obj-y += pll.o clk.o gate.o
++obj-y += pll.o
  obj-$(CONFIG_MACH_BERLIN_BG2)	+= bg2.o
  obj-$(CONFIG_MACH_BERLIN_BG2CD)	+= bg2.o
  obj-$(CONFIG_MACH_BERLIN_BG2Q)	+= bg2q.o
-diff --git a/drivers/clk/berlin/clk.h b/drivers/clk/berlin/clk.h
-index 5e5680e..4d8af6c 100644
---- a/drivers/clk/berlin/clk.h
-+++ b/drivers/clk/berlin/clk.h
-@@ -25,9 +25,21 @@ struct clk_desc {
- 	unsigned long	flags;
- };
- 
-+struct gateclk_desc {
-+	const char	*name;
-+	const char	*parent_name;
-+	u8		bit_idx;
-+	unsigned long	flags;
-+};
-+
- void __init berlin_clk_setup(struct device_node *np,
- 			     const struct clk_desc *desc,
- 			     struct clk_onecell_data *clk_data,
- 			     int n);
- 
-+void __init berlin_gateclk_setup(struct device_node *np,
-+				 const struct gateclk_desc *descs,
-+				 struct clk_onecell_data *clk_data,
-+				 int n);
-+
- #endif
-diff --git a/drivers/clk/berlin/gate.c b/drivers/clk/berlin/gate.c
+diff --git a/drivers/clk/berlin/pll.c b/drivers/clk/berlin/pll.c
 new file mode 100644
-index 0000000..35200d2
+index 0000000..435445e
 --- /dev/null
-+++ b/drivers/clk/berlin/gate.c
-@@ -0,0 +1,73 @@
++++ b/drivers/clk/berlin/pll.c
+@@ -0,0 +1,133 @@
 +/*
 + * Copyright (c) 2015 Marvell Technology Group Ltd.
 + *
@@ -81,59 +51,119 @@ index 0000000..35200d2
 + */
 +
 +#include <linux/clk-provider.h>
++#include <linux/io.h>
 +#include <linux/of.h>
 +#include <linux/of_address.h>
 +#include <linux/slab.h>
-+#include <linux/spinlock_types.h>
 +
-+#include "clk.h"
++#define PLL_CTRL0	0x0
++#define PLL_CTRL1	0x4
++#define PLL_CTRL2	0x8
++#define PLL_CTRL3	0xC
++#define PLL_CTRL4	0x10
++#define PLL_STATUS	0x14
 +
-+static DEFINE_SPINLOCK(berlin_gateclk_lock);
++#define PLL_SOURCE_MAX	2
 +
-+void __init berlin_gateclk_setup(struct device_node *np,
-+				 const struct gateclk_desc *descs,
-+				 struct clk_onecell_data *clk_data,
-+				 int n)
++struct berlin_pll {
++	struct clk_hw	hw;
++	void __iomem	*ctrl;
++	void __iomem	*bypass;
++	u8		bypass_shift;
++};
++
++#define to_berlin_pll(hw)       container_of(hw, struct berlin_pll, hw)
++
++static unsigned long berlin_pll_recalc_rate(struct clk_hw *hw,
++					    unsigned long parent_rate)
 +{
-+	int i, ret;
-+	void __iomem *base;
-+	struct clk **clks;
++	u32 val, fbdiv, rfdiv, vcodivsel, bypass;
++	struct berlin_pll *pll = to_berlin_pll(hw);
 +
-+	clks = kcalloc(n, sizeof(struct clk *), GFP_KERNEL);
-+	if (!clks)
++	bypass = readl_relaxed(pll->bypass);
++	if (bypass & (1 << pll->bypass_shift))
++		return parent_rate;
++
++	val = readl_relaxed(pll->ctrl + PLL_CTRL0);
++	fbdiv = (val >> 12) & 0x1FF;
++	rfdiv = (val >> 3) & 0x1FF;
++	val = readl_relaxed(pll->ctrl + PLL_CTRL1);
++	vcodivsel = (val >> 9) & 0x7;
++	return parent_rate * fbdiv * 4 / rfdiv /
++		(1 << vcodivsel);
++}
++
++static u8 berlin_pll_get_parent(struct clk_hw *hw)
++{
++	struct berlin_pll *pll = to_berlin_pll(hw);
++	u32 bypass = readl_relaxed(pll->bypass);
++
++	return !!(bypass & (1 << pll->bypass_shift));
++}
++
++static const struct clk_ops berlin_pll_ops = {
++	.recalc_rate	= berlin_pll_recalc_rate,
++	.get_parent	= berlin_pll_get_parent,
++};
++
++static void __init berlin_pll_setup(struct device_node *np)
++{
++	struct clk_init_data init;
++	struct berlin_pll *pll;
++	const char *parent_names[PLL_SOURCE_MAX];
++	struct clk *clk;
++	int ret, num_parents;
++	u8 bypass_shift;
++
++	num_parents = of_clk_get_parent_count(np);
++	if (num_parents <= 0 || num_parents > PLL_SOURCE_MAX)
 +		return;
 +
-+	base = of_iomap(np, 0);
-+	if (WARN_ON(!base))
-+		goto err_iomap;
++	ret = of_property_read_u8(np, "bypass-shift", &bypass_shift);
++	if (ret)
++		return;
 +
-+	for (i = 0; i < n; i++) {
-+		struct clk *clk;
++	of_clk_parent_fill(np, parent_names, num_parents);
 +
-+		clk = clk_register_gate(NULL, descs[i].name,
-+				descs[i].parent_name,
-+				descs[i].flags, base,
-+				descs[i].bit_idx, 0,
-+				&berlin_gateclk_lock);
-+		if (WARN_ON(IS_ERR(clk)))
-+			goto err_clk_register;
-+		clks[i] = clk;
-+	}
++	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
++	if (!pll)
++		return;
 +
-+	clk_data->clks = clks;
-+	clk_data->clk_num = i;
++	pll->ctrl = of_iomap(np, 0);
++	if (WARN_ON(!pll->ctrl))
++		goto err_iomap_ctrl;
 +
-+	ret = of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
-+	if (WARN_ON(ret))
++	pll->bypass = of_iomap(np, 1);
++	if (WARN_ON(!pll->bypass))
++		goto err_iomap_bypass;
++
++	init.name = np->name;
++	init.flags = 0;
++	init.ops = &berlin_pll_ops;
++	init.parent_names = parent_names;
++	init.num_parents = num_parents;
++
++	pll->hw.init = &init;
++	pll->bypass_shift = bypass_shift;
++
++	clk = clk_register(NULL, &pll->hw);
++	if (WARN_ON(IS_ERR(clk)))
 +		goto err_clk_register;
++
++	ret = of_clk_add_provider(np, of_clk_src_simple_get, clk);
++	if (WARN_ON(ret))
++		goto err_clk_add;
 +	return;
 +
++err_clk_add:
++	clk_unregister(clk);
 +err_clk_register:
-+	for (i = 0; i < n; i++)
-+		clk_unregister(clks[i]);
-+	iounmap(base);
-+err_iomap:
-+	kfree(clks);
++	iounmap(pll->bypass);
++err_iomap_bypass:
++	iounmap(pll->ctrl);
++err_iomap_ctrl:
++	kfree(pll);
 +}
++CLK_OF_DECLARE(berlin_pll, "marvell,berlin-pll", berlin_pll_setup);
 -- 
 2.6.2
