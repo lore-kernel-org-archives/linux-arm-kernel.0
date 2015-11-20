@@ -1,61 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Nov 2015 22:59:14 +0100
-Subject: [PATCH] staging: ste_rmi4: avoid unused function warnings
-Message-ID: <4938658.kvPtQAFlP6@wuerfel>
+From: leoli@freescale.com (Li Yang)
+Date: Fri, 20 Nov 2015 15:45:50 -0600
+Subject: [PATCH v2] i2c: imx: make bus recovery through pinctrl optional
+Message-ID: <1448055950-21190-1-git-send-email-leoli@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rmi4 touchscreen driver encloses the power-management
-functions in #ifdef CONFIG_PM, but the smtcfb_pci_suspend/resume
-functions are only really used when CONFIG_PM_SLEEP is also
-set, as a frequent gcc warning shows:
+Since commit 1c4b6c3bcf30 ("i2c: imx: implement bus recovery") the driver
+starts to use gpio/pinctrl to do i2c bus recovery.  But pinctrl is not
+always available for platforms using this driver such as ls1021a and
+ls1043a, and the device tree binding also mentioned this gpio based
+recovery mechanism as optional.  The patch make it really optional that
+the probe function won't bailout when pinctrl is not available and it
+won't try to register recovery functions if pinctrl is NULL when the
+PINCTRL is not enabled at all.
 
-ste_rmi4/synaptics_i2c_rmi4.c:1050:12: warning: 'synaptics_rmi4_suspend' defined but not used
-ste_rmi4/synaptics_i2c_rmi4.c:1084:12: warning: 'synaptics_rmi4_resume' defined but not used
+Signed-off-by: Li Yang <leoli@freescale.com>
+Cc: Gao Pan <b54642@freescale.com>
+---
+v2: bailout on -ENOMEM and -EPROBE_DEFER
 
-This changes the driver to remove the #ifdef and instead mark
-the functions as __maybe_unused, which is a nicer anyway, as it
-provides build testing for all the code in all configurations
-and is harder to get wrong.
+ drivers/i2c/busses/i2c-imx.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
-index 824d460911ec..58ccafb97344 100644
---- a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
-+++ b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
-@@ -1039,7 +1039,6 @@ static int synaptics_rmi4_remove(struct i2c_client *client)
- 	return 0;
- }
+diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+index 9bb0b05..41289f8 100644
+--- a/drivers/i2c/busses/i2c-imx.c
++++ b/drivers/i2c/busses/i2c-imx.c
+@@ -1087,8 +1087,11 @@ static int i2c_imx_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
  
--#ifdef CONFIG_PM
- /**
-  * synaptics_rmi4_suspend() - suspend the touch screen controller
-  * @dev: pointer to device structure
-@@ -1047,7 +1046,7 @@ static int synaptics_rmi4_remove(struct i2c_client *client)
-  * This function is used to suspend the
-  * touch panel controller and returns integer
-  */
--static int synaptics_rmi4_suspend(struct device *dev)
-+static int __maybe_unused synaptics_rmi4_suspend(struct device *dev)
- {
- 	/* Touch sleep mode */
- 	int retval;
-@@ -1081,7 +1080,7 @@ static int synaptics_rmi4_suspend(struct device *dev)
-  * This function is used to resume the touch panel
-  * controller and returns integer.
-  */
--static int synaptics_rmi4_resume(struct device *dev)
-+static int __maybe_unused synaptics_rmi4_resume(struct device *dev)
- {
- 	int retval;
- 	unsigned char intr_status;
-@@ -1112,8 +1111,6 @@ static int synaptics_rmi4_resume(struct device *dev)
- 	return 0;
- }
++	/* optional bus recovery feature through pinctrl */
+ 	i2c_imx->pinctrl = devm_pinctrl_get(&pdev->dev);
+-	if (IS_ERR(i2c_imx->pinctrl)) {
++	/* bailout on -ENOMEM or -EPROBE_DEFER, continue for other errors */
++	if (PTR_ERR(i2c_imx->pinctrl) == -ENOMEM ||
++			PTR_ERR(i2c_imx->pinctrl) == -EPROBE_DEFER) {
+ 		ret = PTR_ERR(i2c_imx->pinctrl);
+ 		goto clk_disable;
+ 	}
+@@ -1126,7 +1129,10 @@ static int i2c_imx_probe(struct platform_device *pdev)
+ 		goto clk_disable;
+ 	}
  
--#endif
--
- static SIMPLE_DEV_PM_OPS(synaptics_rmi4_dev_pm_ops, synaptics_rmi4_suspend,
- 			 synaptics_rmi4_resume);
+-	i2c_imx_init_recovery_info(i2c_imx, pdev);
++	if (IS_ERR_OR_NULL(i2c_imx->pinctrl))
++		dev_info(&pdev->dev, "can't get pinctrl, bus recovery feature disabled\n");
++	else
++		i2c_imx_init_recovery_info(i2c_imx, pdev);
  
+ 	/* Set up platform driver data */
+ 	platform_set_drvdata(pdev, i2c_imx);
+-- 
+2.3.3
