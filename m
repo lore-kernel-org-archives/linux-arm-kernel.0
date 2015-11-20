@@ -1,24 +1,33 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 20 Nov 2015 10:54:56 -0800
-Subject: [PATCH] clk: at91: Revert "keep slow clk enabled to prevent
- system hang"
-In-Reply-To: <1447759593-20816-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1447759593-20816-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20151120185456.GV32672@codeaurora.org>
+Date: Fri, 20 Nov 2015 10:59:32 -0800
+Subject: [PATCH] clk: st: avoid uninitialized variable use
+In-Reply-To: <3719029.IbREgssWiU@wuerfel>
+References: <3719029.IbREgssWiU@wuerfel>
+Message-ID: <20151120185932.GW32672@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/17, Alexandre Belloni wrote:
-> Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
-> hang") added a workaround for the slow clock as it is not properly handled
-> by its users.
+On 11/12, Arnd Bergmann wrote:
+> quadfs_pll_fs660c32_round_rate prints a few structure members
+> that are never initialized, and also doesn't print the only one
+> it cares about. We get a gcc warning about the ones that
+> are printed:
 > 
-> Now that the slow clock is taken properly by the drivers, this workaround
-> is not necessary anymore, revert it.
+> clk/st/clkgen-fsyn.c:560:93: warning: 'params.sdiv' may be used uninitialized in this function
+> clk/st/clkgen-fsyn.c:560:93: warning: 'params.mdiv' may be used uninitialized in this function
+> clk/st/clkgen-fsyn.c:560:93: warning: 'params.pe' may be used uninitialized in this function
+> clk/st/clkgen-fsyn.c:560:93: warning: 'params.nsdiv' may be used uninitialized in this function
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Acked-by: Michael Turquette <mturquette@baylibre.com>
-> ---
+> This changes the code to no longer print uninitialized data, and
+> for good measure it also prints the ndiv member that is being
+> set.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 5f7aa9071e93 ("clk: st: Support for QUADFS inside ClockGenB/C/D/E/F")
+> 
+> diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
+> index 576cd0354d48..ccb324d97160 100644
+> --- a/drivers/clk/st/clkgen-fsyn.c
 
 Applied to clk-next
 
