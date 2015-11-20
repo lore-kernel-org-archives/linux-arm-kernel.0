@@ -1,33 +1,89 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 20 Nov 2015 09:05:26 -0800
-Subject: [PATH RESEND v2 03/10] tty: xuartps: Always enable transmitter
- in start_tx
-In-Reply-To: <564F0E75.5020100@hurleysoftware.com>
-References: <1447963344-16266-1-git-send-email-soren.brinkmann@xilinx.com>
- <1447963344-16266-4-git-send-email-soren.brinkmann@xilinx.com>
- <564F0E75.5020100@hurleysoftware.com>
-Message-ID: <20151120170525.GW32017@xsjsorenbubuntu>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Nov 2015 17:05:34 +0000
+Subject: [PATCH 1/2] arm64: mm: detect bad __create_mapping uses
+In-Reply-To: <CAPvkgC2NqfYrcAzsF=UwE9n3BGz74bYcNSGOaaCiwHP_YcnRWA@mail.gmail.com>
+References: <1448033724-13846-1-git-send-email-mark.rutland@arm.com>
+ <CAPvkgC2NqfYrcAzsF=UwE9n3BGz74bYcNSGOaaCiwHP_YcnRWA@mail.gmail.com>
+Message-ID: <20151120170534.GE5536@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-11-20 at 07:13AM -0500, Peter Hurley wrote:
+On Fri, Nov 20, 2015 at 04:13:28PM +0000, Steve Capper wrote:
+> On 20 November 2015 at 15:35, Mark Rutland <mark.rutland@arm.com> wrote:
+> > If a caller of __create_mapping provides a PA and VA which have
+> > different sub-page offsets, it is not clear which offset they expect to
+> > apply to the mapping, and is indicative of a bad caller.
+> >
+> > Disallow calls with differing sub-page offsets, and WARN when they are
+> > encountered, so that we can detect and fix such cases.
+> >
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > Cc: Catalin Marinas <caralin.marinas@arm.com>
+> > Cc: Laura Abbott <labbott@fedoraproject.org>
+> > Cc: Steve Capper <steve.capper@linaro.org>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm64/mm/mmu.c | 7 +++++++
+> >  1 file changed, 7 insertions(+)
+> >
+> > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> > index e3f563c..3b06afa 100644
+> > --- a/arch/arm64/mm/mmu.c
+> > +++ b/arch/arm64/mm/mmu.c
+> > @@ -300,6 +300,13 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+> >  {
+> >         unsigned long addr, length, end, next;
+> >
+> > +       /*
+> > +        * If the virtual and physical address don't have the same offset
+> > +        * within a page, we cannot map the region as the caller expects.
+> > +        */
+> > +       if (WARN_ON((phys ^ virt) & ~PAGE_MASK))
+> > +               return;
+> > +
 > 
-> 
-> On 11/19/2015 03:02 PM, Soren Brinkmann wrote:
-> > start_tx must start transmitting characters. Regardless of the state of
-> > the circular buffer, always enable the transmitter hardware.
-> 
-> Why?
-> 
-> Does cdns_uart_stop_tx() actually stop the transmitter so that
-> data remains in the transmitter?
+> Do we want any subpage offsets in our virt and phys?
 
-Fixing up the patch, I looked at this one. It might actually do that.
-Without having changed anything. The doc says: "The driver should
-stop transmitting characters as soon as possible.". And the
-implementation is really not draining any FIFO, but just disabling the
-transmitter. I take your question as that this might not be this way?
-Should stop_tx drain the FIFO first?
+Yes.
 
-	Thanks,
-	S?ren
+For instance, when mapping EFI regions (which exist at 4K granularity)
+on a 64K page kernel, per [1]. The spec requires that any regions in the
+same 64K page can be mapped using the same attributes, so it's fine to
+map at 64K granularity.
+
+We already try to cater for this in __create_mapping where we fix up the
+base and size:
+
+	addr = virt & PAGE_MASK;
+	length = PAGE_ALIGN(size + (virt & ~PAGE_MASK));
+
+I will add a middle paragraph to the commit message:
+
+	In some cases, the region we wish to map may validly have a
+	sub-page offset in the physical and virtual adddresses. For
+	example, EFI runtime regions have 4K granularity, yet may be
+	mapped by a 64K page kernel. So long as the physical and virtual
+	offsets are the same, the region will be mapped at the expected
+	VAs.
+
+Does that sound OK?
+
+> If we have sub page bits in phys won't that start flipping on bits in
+> the page table entries?
+
+In all cases where we use phys, we either shift phys right by PAGE_SHIFT
+(in __populate_init_pte vi __phys_to_pfn) which clears those bits, or we
+first check it is sufficiently aligned for that level of table (and
+hence the low bits are all zero). Patch 2 fixes a bug related to the
+latter case.
+
+> What about something like:
+> if (WARN_ON((phys | virt) & ~PAGE_MASK))
+
+Per the above, that would break the EFI code in [1].
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386908.html
