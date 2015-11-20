@@ -1,129 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Nov 2015 15:54:38 +0000
-Subject: [PATCH 03/21] arm64: KVM: Implement vgic-v2 save/restore
-In-Reply-To: <20151120152215.GA24960@linaro.org>
-References: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
- <1447679519-17888-4-git-send-email-marc.zyngier@arm.com>
- <20151120152215.GA24960@linaro.org>
-Message-ID: <564F423E.9050007@arm.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Fri, 20 Nov 2015 09:56:16 -0600
+Subject: [PATCH 4/4] Documentation: usb: dwc3: qcom: Add TCSR mux usage
+In-Reply-To: <877flcemip.fsf@saruman.tx.rr.com>
+References: <1448008509-8913-1-git-send-email-agross@codeaurora.org>
+ <1448008509-8913-5-git-send-email-agross@codeaurora.org>
+ <877flcemip.fsf@saruman.tx.rr.com>
+Message-ID: <20151120155616.GC8722@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
-
-On 20/11/15 15:22, Steve Capper wrote:
-> On Mon, Nov 16, 2015 at 01:11:41PM +0000, Marc Zyngier wrote:
->> > Implement the vgic-v2 save restore as a direct translation of
->> > the assembly code version.
-> Hi Marc,
-> I have one comment below:
+On Fri, Nov 20, 2015 at 09:08:46AM -0600, Felipe Balbi wrote:
 > 
-> Cheers,
-> -- Steve
->> > 
->> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> > ---
->> >  arch/arm64/kvm/Makefile         |  1 +
->> >  arch/arm64/kvm/hyp/Makefile     |  5 +++
->> >  arch/arm64/kvm/hyp/hyp.h        |  3 ++
->> >  arch/arm64/kvm/hyp/vgic-v2-sr.c | 85 +++++++++++++++++++++++++++++++++++++++++
->> >  4 files changed, 94 insertions(+)
->> >  create mode 100644 arch/arm64/kvm/hyp/Makefile
->> >  create mode 100644 arch/arm64/kvm/hyp/vgic-v2-sr.c
->> > 
->> > diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
->> > index 1949fe5..d31e4e5 100644
->> > --- a/arch/arm64/kvm/Makefile
->> > +++ b/arch/arm64/kvm/Makefile
->> > @@ -10,6 +10,7 @@ KVM=../../../virt/kvm
->> >  ARM=../../../arch/arm/kvm
->> >  
->> >  obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
->> > +obj-$(CONFIG_KVM_ARM_HOST) += hyp/
->> >  
->> >  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
->> >  kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/arm.o $(ARM)/mmu.o $(ARM)/mmio.o
->> > diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
->> > new file mode 100644
->> > index 0000000..d8d5968
->> > --- /dev/null
->> > +++ b/arch/arm64/kvm/hyp/Makefile
->> > @@ -0,0 +1,5 @@
->> > +#
->> > +# Makefile for Kernel-based Virtual Machine module, HYP part
->> > +#
->> > +
->> > +obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
->> > diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
->> > index dac843e..78f25c4 100644
->> > --- a/arch/arm64/kvm/hyp/hyp.h
->> > +++ b/arch/arm64/kvm/hyp/hyp.h
->> > @@ -27,5 +27,8 @@
->> >  
->> >  #define kern_hyp_va(v) (typeof(v))((unsigned long)v & HYP_PAGE_OFFSET_MASK)
->> >  
->> > +void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
->> > +void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
->> > +
->> >  #endif /* __ARM64_KVM_HYP_H__ */
->> >  
->> > diff --git a/arch/arm64/kvm/hyp/vgic-v2-sr.c b/arch/arm64/kvm/hyp/vgic-v2-sr.c
->> > new file mode 100644
->> > index 0000000..1382d2e
->> > --- /dev/null
->> > +++ b/arch/arm64/kvm/hyp/vgic-v2-sr.c
->> > @@ -0,0 +1,85 @@
->> > +/*
->> > + * Copyright (C) 2012-2015 - ARM Ltd
->> > + * Author: Marc Zyngier <marc.zyngier@arm.com>
->> > + *
->> > + * This program is free software; you can redistribute it and/or modify
->> > + * it under the terms of the GNU General Public License version 2 as
->> > + * published by the Free Software Foundation.
->> > + *
->> > + * This program is distributed in the hope that it will be useful,
->> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> > + * GNU General Public License for more details.
->> > + *
->> > + * You should have received a copy of the GNU General Public License
->> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> > + */
->> > +
->> > +#include <linux/compiler.h>
->> > +#include <linux/irqchip/arm-gic.h>
->> > +#include <linux/kvm_host.h>
->> > +
->> > +#include <asm/kvm_mmu.h>
->> > +
->> > +#include "hyp.h"
->> > +
->> > +/* vcpu is already in the HYP VA space */
->> > +void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
->> > +{
->> > +	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
->> > +	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
->> > +	struct vgic_dist *vgic = &kvm->arch.vgic;
->> > +	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
->> > +	u32 __iomem *lr_base;
->> > +	u32 eisr0, eisr1, elrsr0, elrsr1;
->> > +	int i = 0, nr_lr;
->> > +
->> > +	if (!base)
->> > +		return;
->> > +
->> > +	cpu_if->vgic_vmcr = readl_relaxed(base + GICH_VMCR);
->> > +	cpu_if->vgic_misr = readl_relaxed(base + GICH_MISR);
->> > +	eisr0  = readl_relaxed(base + GICH_EISR0);
->> > +	eisr1  = readl_relaxed(base + GICH_EISR0);
-> Not sure what this would affect, but should the RHS be:
-> "base + GICH_EISR1"?
+> Hi,
+> 
+> Andy Gross <agross@codeaurora.org> writes:
+> > This patch adds documentation for the optional syscon-tcsr property in the
+> > Qualcomm DWC3 node.  The syscon-tcsr specifies the register and bit used to
+> > configure the TCSR USB phy mux register.
+> >
+> > Signed-off-by: Andy Gross <agross@codeaurora.org>
+> > ---
+> >  Documentation/devicetree/bindings/usb/qcom,dwc3.txt | 11 +++++++++++
+> >  1 file changed, 11 insertions(+)
+> >
+> > diff --git a/Documentation/devicetree/bindings/usb/qcom,dwc3.txt b/Documentation/devicetree/bindings/usb/qcom,dwc3.txt
+> > index ca164e7..dfa222d 100644
+> > --- a/Documentation/devicetree/bindings/usb/qcom,dwc3.txt
+> > +++ b/Documentation/devicetree/bindings/usb/qcom,dwc3.txt
+> > @@ -8,6 +8,10 @@ Required properties:
+> >    "core"		Master/Core clock, have to be >= 125 MHz for SS
+> >  				operation and >= 60MHz for HS operation
+> >  
+> > +Optional properties:
+> > +- syscon-tcsr	Specifies TCSR handle, register offset, and bit position for
+> > +			configuring the phy mux setting.
+> 
+> oh, it's a PHY mux ? I don't think it should be part of any dwc3-* glue
+> layer then. By the time we reach dwc3, the mux should be properly
+> configured.
+> 
+> Kishon, any ideas ?
+> 
+> -- 
+> balbi
 
--ECOPYPASTE. We're just lucky that we only have 4 list registers, and
-thus never look past the first word.
+The only issue with putting it at the phy layer is that i'd have redundant
+syscon entries for each pair of phys, unless i group them somehow in dt.  The
+only other issue I can think of is that in the downstream kernels, they do this
+before messing with the configuration of the dwc3.  So long as the phys do their
+thing before the dwc3 (phys latched before config), we're ok.
 
-Thanks a lot for noticing this!
 
-	M.
+
 -- 
-Jazz is not dead. It just smells funny...
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
