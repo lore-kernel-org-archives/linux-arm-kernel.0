@@ -1,79 +1,118 @@
-From: pramodku@broadcom.com (Pramod Kumar)
-Date: Fri, 20 Nov 2015 17:03:56 +0000
-Subject: [PATCH v2 6/7] Documentation: Rename gpio controller name from
- cygnus to iproc
-In-Reply-To: <20151120153437.GA7645@rob-hp-laptop>
-References: <1447905139-16002-1-git-send-email-pramodku@broadcom.com>
- <1447905139-16002-7-git-send-email-pramodku@broadcom.com>
- <20151120153437.GA7645@rob-hp-laptop>
-Message-ID: <0C803592FC378B4E83922050AB46442A2ADA021F@SJEXCHMB10.corp.ad.broadcom.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 20 Nov 2015 17:04:36 +0000
+Subject: [PATCH 08/13] Xen: EFI: Parse DT parameters for Xen specific UEFI
+In-Reply-To: <1447754231-7772-9-git-send-email-shannon.zhao@linaro.org>
+References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
+ <1447754231-7772-9-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511201704170.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: 20 November 2015 21:05
-> To: Pramod Kumar
-> Cc: Pawel Moll; Mark Rutland; Ian Campbell; Kumar Gala; Ray Jui; Scott Branden;
-> Russell King; Linus Walleij; linux-gpio at vger.kernel.org; bcm-kernel-feedback-
-> list; Jason Uy; Masahiro Yamada; Thomas Gleixner; Laurent Pinchart;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; Jonas Gorski
-> Subject: Re: [PATCH v2 6/7] Documentation: Rename gpio controller name from
-> cygnus to iproc
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> On Thu, Nov 19, 2015 at 09:22:18AM +0530, Pramod Kumar wrote:
-> > Renamed gpio controller's driver name from cygnus to iproc to make it
-> > more generic so that all iProc based SoCs having the same gpio
-> > controller could use this.
-> >
-> > Signed-off-by: Pramod Kumar <pramodku@broadcom.com>
-> > Reviewed-by: Ray Jui <rjui@broadcom.com>
-> > Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> Add a new function to parse DT parameters for Xen specific UEFI just
+> like the way for normal UEFI. Then it could reuse the existing codes.
 > 
-> Where's my ack?
-
-Somehow it got missed. I'm sincerely apologetic for it. Will add it.  
-
-Regards,
-Pramod
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  drivers/firmware/efi/efi.c | 67 ++++++++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 62 insertions(+), 5 deletions(-)
 > 
-> > ---
-> >  .../bindings/pinctrl/{brcm,cygnus-gpio.txt => brcm,iproc-gpio.txt}    | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)  rename
-> > Documentation/devicetree/bindings/pinctrl/{brcm,cygnus-gpio.txt =>
-> > brcm,iproc-gpio.txt} (97%)
-> >
-> > diff --git
-> > a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
-> > b/Documentation/devicetree/bindings/pinctrl/brcm,iproc-gpio.txt
-> > similarity index 97%
-> > rename from
-> > Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
-> > rename to
-> > Documentation/devicetree/bindings/pinctrl/brcm,iproc-gpio.txt
-> > index 8b1e5d1..e427792 100644
-> > --- a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
-> > +++ b/Documentation/devicetree/bindings/pinctrl/brcm,iproc-gpio.txt
-> > @@ -1,4 +1,4 @@
-> > -Broadcom Cygnus GPIO/PINCONF Controller
-> > +Broadcom iProc GPIO/PINCONF Controller
-> >
-> >  Required properties:
-> >
-> > @@ -7,7 +7,7 @@ Required properties:
-> >      "brcm,cygnus-crmu-gpio" or "brcm,iproc-gpio"
-> >
-> >  - reg:
-> > -    Define the base and range of the I/O address space that contains the
-> Cygnus
-> > +    Define the base and range of the I/O address space that contains
-> > + SoC
-> >  GPIO/PINCONF controller registers
-> >
-> >  - ngpios:
-> > --
-> > 1.9.1
-> >
+> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+> index d6144e3..629bd06 100644
+> --- a/drivers/firmware/efi/efi.c
+> +++ b/drivers/firmware/efi/efi.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/of_fdt.h>
+>  #include <linux/io.h>
+>  #include <linux/platform_device.h>
+> +#include <xen/xen.h>
+>  
+>  struct efi __read_mostly efi = {
+>  	.mps        = EFI_INVALID_TABLE_ADDR,
+> @@ -488,12 +489,60 @@ static __initdata struct {
+>  	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
+>  };
+>  
+> +static __initdata struct {
+> +	const char name[32];
+> +	const char propname[32];
+> +	int offset;
+> +	int size;
+> +} xen_dt_params[] = {
+> +	UEFI_PARAM("System Table", "xen,uefi-system-table", system_table),
+> +	UEFI_PARAM("MemMap Address", "xen,uefi-mmap-start", mmap),
+> +	UEFI_PARAM("MemMap Size", "xen,uefi-mmap-size", mmap_size),
+> +	UEFI_PARAM("MemMap Desc. Size", "xen,uefi-mmap-desc-size", desc_size),
+> +	UEFI_PARAM("MemMap Desc. Version", "xen,uefi-mmap-desc-ver", desc_ver)
+> +};
+> +
+>  struct param_info {
+>  	int verbose;
+>  	int found;
+>  	void *params;
+>  };
+>  
+> +static int __init fdt_find_xen_uefi_params(unsigned long node,
+> +					   const char *uname, int depth,
+> +					   void *data)
+> +{
+> +	struct param_info *info = data;
+> +	const void *prop;
+> +	void *dest;
+> +	u64 val;
+> +	int i, len;
+> +
+> +	if (xen_initial_domain() && (depth != 2 || strcmp(uname, "uefi") != 0))
+> +		return 0;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(xen_dt_params); i++) {
+> +		prop = of_get_flat_dt_prop(node, xen_dt_params[i].propname,
+> +					   &len);
+> +		if (!prop)
+> +			return 0;
+> +		dest = info->params + xen_dt_params[i].offset;
+> +		info->found++;
+> +
+> +		val = of_read_number(prop, len / sizeof(u32));
+> +
+> +		if (dt_params[i].size == sizeof(u32))
+> +			*(u32 *)dest = val;
+> +		else
+> +			*(u64 *)dest = val;
+> +
+> +		if (info->verbose)
+> +			pr_info("  %s: 0x%0*llx\n", xen_dt_params[i].name,
+> +				xen_dt_params[i].size * 2, val);
+> +	}
+> +
+> +	return 1;
+> +}
+>  static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+>  				       int depth, void *data)
+>  {
+> @@ -538,12 +587,20 @@ int __init efi_get_fdt_params(struct efi_fdt_params *params, int verbose)
+>  	info.found = 0;
+>  	info.params = params;
+>  
+> -	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
+> -	if (!info.found)
+> +	if (xen_initial_domain())
+> +		ret = of_scan_flat_dt(fdt_find_xen_uefi_params, &info);
+> +	else
+> +		ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
+> +	if (!info.found) {
+>  		pr_info("UEFI not found.\n");
+> -	else if (!ret)
+> -		pr_err("Can't find '%s' in device tree!\n",
+> -		       dt_params[info.found].name);
+> +	} else if (!ret) {
+> +		if (xen_initial_domain())
+> +			pr_err("Can't find '%s' in device tree!\n",
+> +			       xen_dt_params[info.found].name);
+> +		else
+> +			pr_err("Can't find '%s' in device tree!\n",
+> +			       xen_dt_params[info.found].name);
+
+xen_dt_params is obviously wrong here
