@@ -1,81 +1,68 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 20 Nov 2015 14:59:33 +0000
-Subject: [PATCH v12 4/4] xen/arm: account for stolen ticks
+Date: Fri, 20 Nov 2015 14:59:31 +0000
+Subject: [PATCH v12 2/4] missing include asm/paravirt.h in cputime.c
 In-Reply-To: <alpine.DEB.2.02.1511201434520.1107@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1511201434520.1107@kaball.uk.xensource.com>
-Message-ID: <1448031573-23497-4-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1448031573-23497-2-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the runstate_memory_area with the hypervisor.
-Use pv_time_ops.steal_clock to account for stolen ticks.
+Add include asm/paravirt.h to cputime.c, as steal_account_process_tick
+calls paravirt_steal_clock, which is defined in asm/paravirt.h.
+
+The ifdef CONFIG_PARAVIRT is necessary because not all archs have an
+asm/paravirt.h to include.
+
+The reason why currently cputime.c compiles, even though include
+<asm/paravirt.h> is missing, is that on x86 asm/paravirt.h is included
+by one of the other headers included in kernel/sched/cputime.c:
+
+#include <kernel/sched/sched.h>
+#include <linux/spinlock.h>
+#include <linux/preempt.h>
+#include <asm/preempt.h>
+#include <linux/thread_info.h>
+#include <asm/thread_info.h>
+#include <asm/processor.h>
+#include <asm/msr.h>
+#include <asm/paravirt.h>
+
+On arm and arm64, where I am about to introduce asm/paravirt.h and
+stolen time support, without #include <asm/paravirt.h> in cputime.c, I
+would get an error.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+CC: mingo at redhat.com
+CC: peterz at infradead.org
 
 ---
 
 Changes in v12:
-- ifdef CONFIG_PARAVIRT the code that depends on it
-- remove useless #include's
+- add more info to the commit message
 
-Changes in v4:
-- don't use paravirt_steal_rq_enabled: we do not support retrieving
-stolen ticks for vcpus other than one we are running on.
-
-Changes in v3:
-- use BUG_ON and smp_processor_id.
+Changes in v11:
+- add ifdef CONFIG_PARAVIRT to cputime.c, because not all architectures
+  have an asm/paravirt.h header file to include
+- drop the removal of ifdef CONFIG_PARAVIRT from kernel/sched/core.c for
+  the same reason
 ---
- arch/arm/xen/enlighten.c |   24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ kernel/sched/cputime.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index fc7ea52..408211f 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -79,6 +79,23 @@ int xen_unmap_domain_gfn_range(struct vm_area_struct *vma,
- }
- EXPORT_SYMBOL_GPL(xen_unmap_domain_gfn_range);
- 
+diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c
+index 8cbc3db..c7a27c4 100644
+--- a/kernel/sched/cputime.c
++++ b/kernel/sched/cputime.c
+@@ -5,6 +5,9 @@
+ #include <linux/static_key.h>
+ #include <linux/context_tracking.h>
+ #include "sched.h"
 +#ifdef CONFIG_PARAVIRT
 +#include <asm/paravirt.h>
-+
-+static unsigned long long xen_stolen_accounting(int cpu)
-+{
-+	struct vcpu_runstate_info state;
-+
-+	BUG_ON(cpu != smp_processor_id());
-+
-+	xen_get_runstate_snapshot(&state);
-+
-+	WARN_ON(state.state != RUNSTATE_running);
-+
-+	return state.time[RUNSTATE_runnable] + state.time[RUNSTATE_offline];
-+}
 +#endif
-+
- static void xen_percpu_init(void)
- {
- 	struct vcpu_register_vcpu_info info;
-@@ -104,6 +121,8 @@ static void xen_percpu_init(void)
- 	BUG_ON(err);
- 	per_cpu(xen_vcpu, cpu) = vcpup;
  
-+	xen_setup_runstate_info(cpu);
-+
- after_register_vcpu_info:
- 	enable_percpu_irq(xen_events_irq, 0);
- 	put_cpu();
-@@ -271,6 +290,11 @@ static int __init xen_guest_init(void)
  
- 	register_cpu_notifier(&xen_cpu_notifier);
- 
-+#ifdef CONFIG_PARAVIRT
-+	pv_time_ops.steal_clock = xen_stolen_accounting;
-+	static_key_slow_inc(&paravirt_steal_enabled);
-+#endif
-+
- 	return 0;
- }
- early_initcall(xen_guest_init);
+ #ifdef CONFIG_IRQ_TIME_ACCOUNTING
 -- 
 1.7.10.4
