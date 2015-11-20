@@ -1,90 +1,71 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 20 Nov 2015 10:56:16 +0800
-Subject: [linux-sunxi] Re: [PATCH v3 3/3] ARM: dts: sun4i: gemei-g9:
- Enable sun4i audio codec support
-In-Reply-To: <20151119160923.GS32142@lukather>
-References: <1446832486-32319-1-git-send-email-plaes@plaes.org>
- <1446832486-32319-4-git-send-email-plaes@plaes.org>
- <CAGb2v66uG-0EgVR=5SS4Lk-y5mX9v3Z39xP+0f7u7BfYq-b1yw@mail.gmail.com>
- <1447354399.31635.10.camel@plaes.org> <20151119160923.GS32142@lukather>
-Message-ID: <CAGb2v66Fp3oVWACNSkH9Z=D=RAwd4A3nHE2s5oQZBVhqtS9ZGg@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 20 Nov 2015 11:26:50 +0800
+Subject: [PATCH RESEND] arm64: berlin: add the pinctrl dependency for
+ Marvell Berlin SoCs
+In-Reply-To: <564E28EF.7000506@gmail.com>
+References: <1447670170-7597-1-git-send-email-jszhang@marvell.com>
+ <20151117134154.GJ6556@e104818-lin.cambridge.arm.com>
+ <20151120005913.3f57a5e8@xhacker>	<564E28EF.7000506@gmail.com>
+Message-ID: <20151120112650.6349b422@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 12:09 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Thu, Nov 12, 2015 at 08:53:19PM +0200, Priit Laes wrote:
->> On Mon, 2015-11-09 at 11:59 +0800, Chen-Yu Tsai wrote:
->> > On Sat, Nov 7, 2015 at 1:54 AM, Priit Laes <plaes@plaes.org> wrote:
->> > > Gemei G9 has internal speakers and headphone jack. Audio switching
->> > > from internal speakers to headphones is automatically handled by
->> > > extra FT2012Q audio amplifier chip that works out of the box.
->> >
->> > Nice that it works out of the box. The FEX file does mention:
->> >
->> > audio_pa_ctrl   = port:PH15<1><default><default><0>
->>
->> Nice catch.
->>
->> Setting it low mutes audio, and setting it back high unmutes.
->
-> Then you just volunteered yourself to fix the FIXME in the driver ;)
->
+On Thu, 19 Nov 2015 20:54:23 +0100
+Sebastian Hesselbarth wrote:
 
-Hans seems to have a patch for this in his sunxi-wip branch.
-I haven't looked at it though.
+> On 19.11.2015 17:59, Jisheng Zhang wrote:
+> > On Tue, 17 Nov 2015 13:41:54 +0000
+> > Catalin Marinas wrote:
+> >   
+> >>>  this small patch is missed:
+> >>>  http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/378638.html
+> >>>  arch/arm64/Kconfig.platforms | 1 +
+> >>>  1 file changed, 1 insertion(+)
+> >>>
+> >>> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+> >>> index 4043c35..905d308 100644
+> >>> --- a/arch/arm64/Kconfig.platforms
+> >>> +++ b/arch/arm64/Kconfig.platforms
+> >>> @@ -9,6 +9,7 @@ config ARCH_BERLIN
+> >>>  	bool "Marvell Berlin SoC Family"
+> >>>  	select ARCH_REQUIRE_GPIOLIB
+> >>>  	select DW_APB_ICTL
+> >>> +	select PINCTRL
+> >>>  	help
+> >>>  	  This enables support for Marvell Berlin SoC Family    
+> >>
+> >> Cc'ing arm-soc.
+> >>  
+> > 
+> > when adding clk support for BG4CT, I found
+> > 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/378634.html
+> > and
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/378635.html
+> > 
+> > are also missed in v4.4-rc1.
+> > 
+> > I know you are very busy but I dunno what's wrong. Can you please check?  
+> 
+> Jisheng,
+> 
+> there is nothing wrong. I applied the patches in question but didn't
+> make it to send another pull-request in time.
+> 
+> I have re-added both patches to berlin64/dt again that will be sent
+> for v4.4.
+> 
 
-ChenYu
+Dear Sebastian,
 
->> > So either it is floating or pulled up by default? Since it works
->> > now I don't see any reason to block it. On the other hand once
->> > that binding is introduced it would be nice to add it for power
->> > management reasons.
->>
->> Should I just add comment about it or do something like this:
->>
->> &codec {
->>   status = "okay";
->>   /*
->>    * TODO: Add codec_ext_pwr_pin to turn off external audio AMP
->>    &pio {
->>      codec_ext_pwr_pin: codec_ext_pwr_pin at 0 {
->>        allwinner,pins = "PH15";
->>        allwinner,function = "gpio_out";
->>        allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->>        allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
->>      }
->>    }
->>    */
->> }
->
-> More like
->
-> &pio {
->         codec_ext_pwr_pin: codec_ext_pwr_pin at 0 {
->                 allwinner,pins = "PH15";
->                 allwinner,function = "gpio_out";
->                 allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->                 allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
->         };
-> };
->
-> &codec {
->         /* This pin is used to turn off the GPIO amp pin */
->         pinctrl-names = "default";
->         pinctrl-0 <&codec_ext_pwr_pin>;
->         status = "okay";
-> };
->
-> Of course, that's a temporary measure, and you should actually use
-> that GPIO to enable / disable the Amplifier when you are playing
-> sound. It shouldn't be that hard with ASoC.
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+I'm glad our berlin maintainer is back ;)
+
+In last two years, you helped Marvell Berlin SoC mainline progress a lot and
+gave lots of wonderful review comments and suggestions, I hope you can
+continue to help us even I know your are very busy :D
+
+In next few days, I'll send out patches for BG4CT clk, dts for i2c, dw-apb timer
+dw-spi and BG4CT cpuidle. And maybe usb 2.0 support.
+
+Thanks for your time,
+Jisheng
