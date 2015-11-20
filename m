@@ -1,110 +1,83 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 20 Nov 2015 09:46:21 +0900
-Subject: [PATCH v2 0/6] Switch to generic syscon regmap based drivers
-In-Reply-To: <CAGOxZ50b3cGXQSFL1uXt7O=CyBOaE=7WRQ-tSz8NUmWzBdhxoQ@mail.gmail.com>
-References: <1445333085-22837-1-git-send-email-alim.akhtar@samsung.com>
- <CAGOxZ50G-ttivhVjbozUisA0HXcFz7bvRUuPR67xR88TTCa_wQ@mail.gmail.com>
- <CAGOxZ51_JPy51htzD_M_=qaPVUexkVhoA2ANLS2-rpK3QDT=8A@mail.gmail.com>
- <1606098.olLAyTIhB3@dell2.five-lan.de> <56272C1C.8040007@samsung.com>
- <562765F3.9010306@osg.samsung.com>
- <CAGOxZ52-ia8uhgGg5CiU9TSYkfAsRD52zvLqq++Y-mr4uaFOpg@mail.gmail.com>
- <5627A75E.60509@osg.samsung.com>
- <CAGOxZ537QuzBP4tcG9qh-+iXK-Y=WwZGiJ1-cwtLqwRf0a+wVA@mail.gmail.com>
- <56282B2D.6000708@samsung.com>
- <CAGOxZ50b3cGXQSFL1uXt7O=CyBOaE=7WRQ-tSz8NUmWzBdhxoQ@mail.gmail.com>
-Message-ID: <564E6D5D.60607@samsung.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Fri, 20 Nov 2015 03:05:03 +0200
+Subject: [PATCH 03/11] dt-bindings: clock: add NXP LPC32xx clock list for
+ consumers
+In-Reply-To: <1447981511-29653-1-git-send-email-vz@mleia.com>
+References: <1447981511-29653-1-git-send-email-vz@mleia.com>
+Message-ID: <1447981511-29653-4-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.11.2015 03:06, Alim Akhtar wrote:
-> Hi Krzysztof/Ulf/Kukjin
-> 
-> On Thu, Oct 22, 2015 at 5:47 AM, Krzysztof Kozlowski
-> <k.kozlowski@samsung.com> wrote:
->> On 22.10.2015 00:01, Alim Akhtar wrote:
->>> On Wed, Oct 21, 2015 at 8:25 PM, Javier Martinez Canillas
->>> <javier@osg.samsung.com> wrote:
->>>> Hello Alim,
->>>>
->>>> On 10/21/2015 04:50 PM, Alim Akhtar wrote:
->>>>
->>>> [snip]
->>>>
->>>>>>
->>>>>> [0]:
->>>>>> From c9b250ee03bae338339b70693e906145c719f783 Mon Sep 17 00:00:00 2001
->>>>>> From: Javier Martinez Canillas <javier@osg.samsung.com>
->>>>>> Date: Wed, 21 Oct 2015 11:59:44 +0200
->>>>>> Subject: [RFT PATCH] mmc: pwrseq: Use highest priority for eMMC restart
->>>>>>  handler
->>>>>>
->>>>>> The pwrseq_emmc driver does a eMMC card reset before a system reboot to
->>>>>> allow broken or limited ROM boot-loaders, that don't have an eMMC reset
->>>>>> logic, to be able to read the second stage from the eMMC.
->>>>>>
->>>>>> But this has to be called before a system reboot handler and while most
->>>>>> of them use the priority 128, there are other restart handlers (such as
->>>>>> the syscon-reboot one) that use a higher priority. So, use the highest
->>>>>> priority to make sure that the eMMC hw is reset before a system reboot.
->>>>>>
->>>>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>>>>> ---
->>>>> Looks good.
->>>>> Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
->>>>>
->>>>
->>
->> +Cc Ulf,
->>
->> Javier,
->>
->> First of all, thanks Javier for digging into the issue. Actually I have
->> Odroid U3 but because of user-space limitations (which I need for other
->> work) I cannot test all of mainline patches there.
->>
->>
->>>> Thanks, should I post it as a proper patch or are adding it to your
->>>> series?
->>> Suggest you to post as a patch collecting {Tested, Reviewed}-by (easy
->>> for maintainers to pickup ) and probably CCing Ulf for his feedback.
->>>
->>>> I think the latter is more reasonable so with an ack from Ulf,
->>>> all patches can go through the linux-samsung tree.
->>>>
->>> yes, that is reasonable, as I said, let Krzysztof and Ulf take a call here.
->>
->> Javier, Alim, Ulf,
->>
->> I am not grabbing any more patches for v4.4 because I doubt that they
->> could be merged to arm-soc for this cycle. My last pull requests for
->> v4.4 is still pending...
->>
->> This means that I plan to pick up these series for v4.5, after closing
->> v4.4 merge window (unless Kukjin picks it also). Because of that, we
->> have plenty of time, so my idea is:
->> 1. Wait for some comments from Ulf on Javier's fix.
->> 2. If the fix goes into v4.4, then problem solved.
->> 3. If not and it get acked, then it can go with this set.
->> 4. If not and it get applied by Ulf for v4.5, then a tag from him would
->> be a nice way to solve dependency.
->>
->> Either way we don't have to hurry, I think.
->>
-> 
-> Is It the right time to get this series in?
-> Thanks!!
+The change adds a list of NXP LPC32xx clocks, which can be requested
+by clock consumers.
 
-I started applying it but stopped at #5. It should be squashed with #6
-to get rid of (not important) conflict between syscon reboot and
-existing Exynos restart handler:
+Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+---
+ include/dt-bindings/clock/lpc32xx-clock.h | 56 +++++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
+ create mode 100644 include/dt-bindings/clock/lpc32xx-clock.h
 
-syscon-poweroff syscon-poweroff: pm_power_off already claimed c001e52c
-exynos_power_off
-syscon-poweroff: probe of syscon-poweroff failed with error -16
-
-The conflict is not really an issue because of ordering of init calls
-the Exynos will register itself before syscon. Nevertheless splitting
-the patches does not really make sense... so please merge #5 with #6.
-
-Best regards,
-Krzysztof
+diff --git a/include/dt-bindings/clock/lpc32xx-clock.h b/include/dt-bindings/clock/lpc32xx-clock.h
+new file mode 100644
+index 0000000..6f4036a
+--- /dev/null
++++ b/include/dt-bindings/clock/lpc32xx-clock.h
+@@ -0,0 +1,56 @@
++/*
++ * Copyright (c) 2015 Vladimir Zapolskiy <vz@mleia.com>
++ *
++ * This code is released using a dual license strategy: BSD/GPL
++ * You can choose the licence that better fits your requirements.
++ *
++ * Released under the terms of 3-clause BSD License
++ * Released under the terms of GNU General Public License Version 2.0
++ *
++ */
++
++#ifndef __DT_BINDINGS_LPC32XX_CLOCK_H
++#define __DT_BINDINGS_LPC32XX_CLOCK_H
++
++/* LPC32XX System Control Block clocks */
++#define LPC32XX_CLK_RTC		0
++#define LPC32XX_CLK_DMA		1
++#define LPC32XX_CLK_MLC		2
++#define LPC32XX_CLK_SLC		3
++#define LPC32XX_CLK_LCD		4
++#define LPC32XX_CLK_MAC		5
++#define LPC32XX_CLK_SD		6
++#define LPC32XX_CLK_DDRAM	7
++#define LPC32XX_CLK_SSP0	8
++#define LPC32XX_CLK_SSP1	9
++#define LPC32XX_CLK_UART3	10
++#define LPC32XX_CLK_UART4	11
++#define LPC32XX_CLK_UART5	12
++#define LPC32XX_CLK_UART6	13
++#define LPC32XX_CLK_IRDA	14
++#define LPC32XX_CLK_I2C1	15
++#define LPC32XX_CLK_I2C2	16
++#define LPC32XX_CLK_TIMER0	17
++#define LPC32XX_CLK_TIMER1	18
++#define LPC32XX_CLK_TIMER2	19
++#define LPC32XX_CLK_TIMER3	20
++#define LPC32XX_CLK_TIMER4	21
++#define LPC32XX_CLK_TIMER5	22
++#define LPC32XX_CLK_WDOG	23
++#define LPC32XX_CLK_I2S0	24
++#define LPC32XX_CLK_I2S1	25
++#define LPC32XX_CLK_SPI1	26
++#define LPC32XX_CLK_SPI2	27
++#define LPC32XX_CLK_MCPWM	28
++#define LPC32XX_CLK_HSTIMER	29
++#define LPC32XX_CLK_KEY		30
++#define LPC32XX_CLK_PWM1	31
++#define LPC32XX_CLK_PWM2	32
++#define LPC32XX_CLK_ADC		33
++
++/* LPC32XX USB clocks */
++#define LPC32XX_USB_CLK_I2C	0
++#define LPC32XX_USB_CLK_DEVICE	1
++#define LPC32XX_USB_CLK_HOST	2
++
++#endif /* __DT_BINDINGS_LPC32XX_CLOCK_H */
+-- 
+2.1.4
