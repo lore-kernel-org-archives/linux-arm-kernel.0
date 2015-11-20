@@ -1,42 +1,65 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 20 Nov 2015 10:07:46 +0100
-Subject: [PATCH 2/2] ARM: dts: imx6q: add Novena board
-In-Reply-To: <564E8A3A.10606@kosagi.com>
-References: <1447840120-8513-1-git-send-email-marex@denx.de>
- <201511191711.54699.marex@denx.de> <564E8A3A.10606@kosagi.com>
-Message-ID: <201511201007.46615.marex@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 20 Nov 2015 12:12:21 +0100
+Subject: [PATCH] ARM64: fix building without CONFIG_UID16
+Message-ID: <3891403.6hGat7eHq5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, November 20, 2015 at 03:49:30 AM, Sean Cross wrote:
-> On 20/11/2015 12:11 AM, Marek Vasut wrote:
-> > On Wednesday, November 18, 2015 at 01:00:50 PM, Fabio Estevam wrote:
-> >> Hi Marek,
-> > 
-> > Hi!
-> > 
-> >> On Wed, Nov 18, 2015 at 7:48 AM, Marek Vasut <marex@denx.de> wrote:
-> >>> +++ b/arch/arm/boot/dts/imx6q-novena.dts
-> >>> @@ -0,0 +1,825 @@
-> >>> +/*
-> >>> + * Copyright 2014 Sutajio Ko-Usagi PTE LTD
-> >>> + * Copyright 2012 Freescale Semiconductor, Inc.
-> >>> + * Copyright 2011 Linaro Ltd.
-> >>> + *
-> >>> + * The code contained herein is licensed under the GNU General Public
-> >>> + * License. You may obtain a copy of the GNU General Public License
-> >>> + * Version 2 or later at the following locations:
-> >>> + *
-> >>> + * http://www.opensource.org/licenses/gpl-license.html
-> >>> + * http://www.gnu.org/copyleft/gpl.html
-> >> 
-> >> Could you make this GPL/X11 dual-license?
-> > 
-> > I'll talk to Sean about this, but I hope this is not a problem.
-> 
-> The licensing change to dual-license is fine by me.
+As reported by Michal Simek, building an ARM64 kernel with CONFIG_UID16
+disabled currently fails because the system call table still needs to
+reference the individual function entry points that are provided by
+kernel/sys_ni.c in this case, and the declarations are hidden inside
+of #ifdef CONFIG_UID16:
 
-Thanks!
+arch/arm64/include/asm/unistd32.h:57:8: error: 'sys_lchown16' undeclared here (not in a function)
+ __SYSCALL(__NR_lchown, sys_lchown16)
 
-Best regards,
-Marek Vasut
+I believe this problem only exists on ARM64, because older architectures
+tend to not need declarations when their system call table is built
+in assembly code, while newer architectures tend to not need UID16
+support. ARM64 only uses these system calls for compatibility with
+32-bit ARM binaries.
+
+This changes the CONFIG_UID16 check into CONFIG_HAVE_UID16, which is
+set unconditionally on ARM64 with CONFIG_COMPAT, so we see the
+declarations whenever we need them, but otherwise the behavior is
+unchanged.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: stable at vger.kernel.org
+Fixes: af1839eb4bd4 ("Kconfig: clean up the long arch list for the UID16 config option")
+---
+I would suggest merging this through the arm64 tree, as this is
+likely the only architecture that cares about it, and there is little
+risk of clashes with other patches in the global headers.
+
+The bug goes back to when arch/arm64 was introduced as far as I can
+tell, but I'm not sure if we care about stable backports or not.
+I've put stable on Cc anyway, let me know if anyone thinks we should not.
+
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index a156b82dd14c..c2b66a277e98 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -524,7 +524,7 @@ asmlinkage long sys_chown(const char __user *filename,
+ asmlinkage long sys_lchown(const char __user *filename,
+ 				uid_t user, gid_t group);
+ asmlinkage long sys_fchown(unsigned int fd, uid_t user, gid_t group);
+-#ifdef CONFIG_UID16
++#ifdef CONFIG_HAVE_UID16
+ asmlinkage long sys_chown16(const char __user *filename,
+ 				old_uid_t user, old_gid_t group);
+ asmlinkage long sys_lchown16(const char __user *filename,
+diff --git a/include/linux/types.h b/include/linux/types.h
+index 70d8500bddf1..70dd3dfde631 100644
+--- a/include/linux/types.h
++++ b/include/linux/types.h
+@@ -35,7 +35,7 @@ typedef __kernel_gid16_t        gid16_t;
+ 
+ typedef unsigned long		uintptr_t;
+ 
+-#ifdef CONFIG_UID16
++#ifdef CONFIG_HAVE_UID16
+ /* This is defined by include/asm-{arch}/posix_types.h */
+ typedef __kernel_old_uid_t	old_uid_t;
+ typedef __kernel_old_gid_t	old_gid_t;
