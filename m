@@ -1,55 +1,43 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Fri, 20 Nov 2015 19:04:38 +0530
-Subject: [PATCH v2 3/3] serial: xuartps: Do not enable parity error interrupt
-In-Reply-To: <1448026478-22131-1-git-send-email-navam@xilinx.com>
-References: <1448026478-22131-1-git-send-email-navam@xilinx.com>
-Message-ID: <1448026478-22131-3-git-send-email-navam@xilinx.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Fri, 20 Nov 2015 13:37:00 +0000
+Subject: [PATCH 2/5] arm64: cpufeature: Track unsigned fields
+In-Reply-To: <20151119184533.GB10823@e104818-lin.cambridge.arm.com>
+References: <1447866238-22970-1-git-send-email-suzuki.poulose@arm.com>
+ <1447866540-23207-1-git-send-email-suzuki.poulose@arm.com>
+ <1447866540-23207-2-git-send-email-suzuki.poulose@arm.com>
+ <564D56CA.60502@linaro.org> <564D9E61.8010802@arm.com>
+ <20151119184533.GB10823@e104818-lin.cambridge.arm.com>
+Message-ID: <564F21FC.1030306@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch makes changes not to enable parity error interrupt.
-With the current implementation, each parity error results in
-two distinct interrupts (almost always). The first one is normal
-parity error interrupt with no data in the fifo and the second one
-is a proper Rx interrupt with the received data in the fifo. By
-disabling parity error interrupt we still ensure handling of
-parity errors as for the Rx fifo interrupt the parity error still
-shows up in the interrupt status register. Considering the fact
-that the by default INPCK and IGNPAR are not set, this is the
-optimal implementation for parity error handling.
+On 19/11/15 18:45, Catalin Marinas wrote:
+> On Thu, Nov 19, 2015 at 10:03:13AM +0000, Suzuki K. Poulose wrote:
+>> On 19/11/15 04:57, AKASHI Takahiro wrote:
 
-Signed-off-by: Nava kishore Manne <navam@xilinx.com>
----
-Changes for v2:
-		--None
 
- drivers/tty/serial/xilinx_uartps.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+> a) A precise value (number of breakpoint registers) or a value from
+>     which you derive some precise value. You mentioned these above
+>
+> b) Fields defining the presence of a feature (1, 2, 3). These would
+>     always be positive since the absence of such feature would mean a
+>     value of 0
+>
+> c) Fields defining the absence of a feature by setting 0xf. These are
+>     usually fields that were initial RAZ and turned to -1. I don't expect
+>     such field be greater than 0, nor smaller than -1.
+>
+> So I think we can treat (a) and (b) as unsigned permanently.
 
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 4d71478..082e7f7 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -824,8 +824,18 @@ static int cdns_uart_startup(struct uart_port *port)
- 	writel(readl(port->membase + CDNS_UART_ISR_OFFSET),
- 			port->membase + CDNS_UART_ISR_OFFSET);
- 
--	/* Set the Interrupt Registers with desired interrupts */
--	writel(CDNS_UART_IXR_TXEMPTY | CDNS_UART_IXR_PARITY |
-+	/*
-+	 * Set the Interrupt Registers with desired interrupts. Do not
-+	 * enable parity error interrupt for the following reason:
-+	 * When parity error interrupt is enabled, each Rx parity error always
-+	 * results in 2 events. The first one being parity error interrupt
-+	 * and the second one with a proper Rx interrupt with the incoming data.
-+	 * Disabling parity error interrupt ensures better handling of parity
-+	 * error events. With this change, for a parity error case, we get a
-+	 * Rx interrupt with parity error set in ISR register and we still
-+	 * handle parity errors in the desired way.
-+	 */
-+	writel(CDNS_UART_IXR_TXEMPTY |
- 		CDNS_UART_IXR_FRAMING | CDNS_UART_IXR_OVERRUN |
- 		CDNS_UART_IXR_RXTRIG | CDNS_UART_IXR_TOUT,
- 		port->membase + CDNS_UART_IER_OFFSET);
--- 
-2.1.2
+Agreed.
+
+> We could treat (c) as unsigned as well with a value of 0xf though I'm not sure
+> how it matches your LOWER/HIGHER_SAFE definitions.
+
+I think we should treat (c) as signed, as we never know what could change,
+given that meaning of (0xf - implies unsupported) < meaning of (0 - supported).
+Treating them unsigned could break the LOWER/HIGHER_SAFE definitions and makes
+the safe value selection ugly.
+
+Cheers
+Suzuki
