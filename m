@@ -1,36 +1,29 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 20 Nov 2015 12:48:30 +0100
-Subject: [PATCH v2 3/3] ARM: sunxi: Clean up sunxi_defconfig
-In-Reply-To: <1447983979-12751-3-git-send-email-public_timo.s@silentcreek.de>
-References: <1447724578-4786-1-git-send-email-public_timo.s@silentcreek.de>
- <1447983979-12751-1-git-send-email-public_timo.s@silentcreek.de>
- <1447983979-12751-3-git-send-email-public_timo.s@silentcreek.de>
-Message-ID: <20151120114830.GC32142@lukather>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 20 Nov 2015 11:39:59 +0100
+Subject: [PATCH v3 0/3] mailbox: Add APM X-Gene platform mailbox driver
+In-Reply-To: <CADaLNDkjS+LstNcgKoLWHrMdgU9cmZ7vrCSp-du=FNoCTKFJ0w@mail.gmail.com>
+References: <1429863912.2927.43.camel@x220>
+ <cover.1447091625.git.dhdang@apm.com>
+ <CADaLNDkjS+LstNcgKoLWHrMdgU9cmZ7vrCSp-du=FNoCTKFJ0w@mail.gmail.com>
+Message-ID: <1448015999.6791.39.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 02:46:19AM +0100, Timo Sigurdsson wrote:
-> Clean up sunxi_defconfig by generating a fresh file via
->   make sunxi_defconfig
->   make savedefconfig
-> 
-> While this moves around a few lines and removes unnecessary symbols,
-> it doesn't introduce any functional changes. The resulting .config is
-> identical before and after this patch.
-> 
-> Signed-off-by: Timo Sigurdsson <public_timo.s@silentcreek.de>
+Hi Duc,
 
-Applied all 3 patches, thanks!
-Maxime
+On ma, 2015-11-16 at 11:22 -0800, Duc Dang wrote:
+> Hi Jassi, Paul,
+> 
+> Do you have any comment on this patch set?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/c0e4010d/attachment-0001.sig>
+Are you perhaps confusing me with another Paul?
+
+(I think I made a minor comment or two on this series about half a year
+ago. But I'm not the maintainer here and it's the maintainers verdict
+that you're probably interested in mostly. So it's not clear to me why
+you specifically ask for my comment.)
+
+Thanks,
+
+
+Paul Bolle
