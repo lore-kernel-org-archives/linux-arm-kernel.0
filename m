@@ -1,71 +1,57 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 20 Nov 2015 02:35:07 -0600
-Subject: [PATCH 2/4] usb: dwc3: qcom: Configure TCSR phy mux register
+Date: Fri, 20 Nov 2015 02:35:09 -0600
+Subject: [PATCH 4/4] Documentation: usb: dwc3: qcom: Add TCSR mux usage
 In-Reply-To: <1448008509-8913-1-git-send-email-agross@codeaurora.org>
 References: <1448008509-8913-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1448008509-8913-3-git-send-email-agross@codeaurora.org>
+Message-ID: <1448008509-8913-5-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds automatic configuration of the TCSR phy mux register based on
-the syscon-tcsr devicetree entry.  This configuration is optional, as some
-platforms may not require the mux selection.
+This patch adds documentation for the optional syscon-tcsr property in the
+Qualcomm DWC3 node.  The syscon-tcsr specifies the register and bit used to
+configure the TCSR USB phy mux register.
 
 Signed-off-by: Andy Gross <agross@codeaurora.org>
 ---
- drivers/usb/dwc3/dwc3-qcom.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ Documentation/devicetree/bindings/usb/qcom,dwc3.txt | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/drivers/usb/dwc3/dwc3-qcom.c b/drivers/usb/dwc3/dwc3-qcom.c
-index 0880260..fcf264c 100644
---- a/drivers/usb/dwc3/dwc3-qcom.c
-+++ b/drivers/usb/dwc3/dwc3-qcom.c
-@@ -17,6 +17,8 @@
- #include <linux/of.h>
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/regmap.h>
+diff --git a/Documentation/devicetree/bindings/usb/qcom,dwc3.txt b/Documentation/devicetree/bindings/usb/qcom,dwc3.txt
+index ca164e7..dfa222d 100644
+--- a/Documentation/devicetree/bindings/usb/qcom,dwc3.txt
++++ b/Documentation/devicetree/bindings/usb/qcom,dwc3.txt
+@@ -8,6 +8,10 @@ Required properties:
+   "core"		Master/Core clock, have to be >= 125 MHz for SS
+ 				operation and >= 60MHz for HS operation
  
- struct dwc3_qcom {
- 	struct device		*dev;
-@@ -30,6 +32,9 @@ static int dwc3_qcom_probe(struct platform_device *pdev)
- {
- 	struct device_node *node = pdev->dev.of_node;
- 	struct dwc3_qcom *qdwc;
-+	struct regmap *regmap;
-+	u32 mux_offset;
-+	u32 mux_bit;
- 	int ret;
- 
- 	qdwc = devm_kzalloc(&pdev->dev, sizeof(*qdwc), GFP_KERNEL);
-@@ -58,6 +63,26 @@ static int dwc3_qcom_probe(struct platform_device *pdev)
- 		qdwc->sleep_clk = NULL;
- 	}
- 
-+	/* look for tcsr and if present, provision it */
-+	regmap = syscon_regmap_lookup_by_phandle(node, "syscon-tcsr");
-+	if (!IS_ERR(regmap)) {
-+		if (of_property_read_u32_index(node, "syscon-tcsr", 1,
-+					       &mux_offset)) {
-+			dev_err(qdwc->dev, "missing USB TCSR mux offset\n");
-+			return -EINVAL;
-+		}
-+		if (of_property_read_u32_index(node, "syscon-tcsr", 2,
-+					       &mux_bit)) {
-+			dev_err(qdwc->dev, "missing USB TCSR mux bit\n");
-+			return -EINVAL;
-+		}
++Optional properties:
++- syscon-tcsr	Specifies TCSR handle, register offset, and bit position for
++			configuring the phy mux setting.
 +
-+		regmap_update_bits(regmap, mux_offset, BIT(mux_bit),
-+				   BIT(mux_bit));
-+	} else {
-+		dev_info(qdwc->dev, "missing syscon tcsr entry\n");
-+	}
+ Optional clocks:
+   "iface"		System bus AXI clock.  Not present on all platforms
+   "sleep"		Sleep clock, used when USB3 core goes into low
+@@ -22,6 +26,11 @@ Documentation/devicetree/bindings/phy/qcom,dwc3-usb-phy.txt
+ 
+ Example device nodes:
+ 
++		tcsr: syscon at 1a400000 {
++			compatible = "qcom,tcsr-ipq8064", "syscon";
++			reg = <0x1a400000 0x100>;
++		};
 +
- 	ret = clk_prepare_enable(qdwc->core_clk);
- 	if (ret) {
- 		dev_err(qdwc->dev, "failed to enable core clock\n");
+ 		hs_phy: phy at 100f8800 {
+ 			compatible = "qcom,dwc3-hs-usb-phy";
+ 			reg = <0x100f8800 0x30>;
+@@ -51,6 +60,8 @@ Example device nodes:
+ 
+ 			ranges;
+ 
++			syscon-tcsr = <&tcsr 0xb0 0x1>;
++
+ 			status = "ok";
+ 
+ 			dwc3 at 10000000 {
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
