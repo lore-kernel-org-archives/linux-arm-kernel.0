@@ -1,97 +1,72 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 20 Nov 2015 22:21:55 +0100
-Subject: [PATCH 1/2] arm64: dts: berlin4ct: add I2C nodes for BG4CT
-In-Reply-To: <1448012821-7413-2-git-send-email-jszhang@marvell.com>
-References: <1448012821-7413-1-git-send-email-jszhang@marvell.com>
- <1448012821-7413-2-git-send-email-jszhang@marvell.com>
-Message-ID: <564F8EF3.5010508@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 20 Nov 2015 22:47:41 +0100
+Subject: [PATCH] fbdev: auo_k190x: avoid unused function warnings
+Message-ID: <3917686.rD8ezhD468@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.11.2015 10:47, Jisheng Zhang wrote:
-> The Marvell Berlin BG4CT SoC has 4 TWSI which are compatible with the
-> Synopsys DesignWare I2C driver. Add the corresponding nodes.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 52 ++++++++++++++++++++++++++++++
->  1 file changed, 52 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> index cca4c41..39d0676 100644
-> --- a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> @@ -232,6 +232,32 @@
->  				};
->  			};
->  
-> +			i2c0: i2c at 1400 {
-> +				compatible = "snps,designware-i2c";
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				reg = <0x1400 0x100>;
-> +				clocks = <&clk CLK_APBCORE>;
+The auo_k190x framebuffer driver encloses the power-management
+functions in #ifdef CONFIG_PM, but the auok190x_suspend/resume
+functions are only really used when CONFIG_PM_SLEEP is also
+set, as a frequent gcc warning shows:
 
-This patch looks fine to me, except that clock node naming and
-clock indices may change. We should really postpone this series
-until we worked out clock.
+drivers/video/fbdev/auo_k190x.c:859:12: warning: 'auok190x_suspend' defined but not used
+drivers/video/fbdev/auo_k190x.c:899:12: warning: 'auok190x_resume' defined but not used
 
-Sebastian
+This changes the driver to remove the #ifdef and instead mark
+the functions as __maybe_unused, which is a nicer anyway, as it
+provides build testing for all the code in all configurations
+and is harder to get wrong.
 
-> +				i2c-sda-hold-time-ns = <35>;
-> +				i2c-sda-falling-time-ns = <425>;
-> +				i2c-scl-falling-time-ns = <205>;
-> +				interrupts = <4>;
-> +				status = "disabled";
-> +			};
-> +
-> +			i2c1: i2c at 1800 {
-> +				compatible = "snps,designware-i2c";
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				reg = <0x1800 0x100>;
-> +				clocks = <&clk CLK_APBCORE>;
-> +				i2c-sda-hold-time-ns = <35>;
-> +				i2c-sda-falling-time-ns = <425>;
-> +				i2c-scl-falling-time-ns = <205>;
-> +				interrupts = <5>;
-> +				status = "disabled";
-> +			};
-> +
->  			aic: interrupt-controller at 3800 {
->  				compatible = "snps,dw-apb-ictl";
->  				reg = <0x3800 0x30>;
-> @@ -319,6 +345,32 @@
->  				};
->  			};
->  
-> +			i2c2: i2c at b000 {
-> +				compatible = "snps,designware-i2c";
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				reg = <0xb000 0x100>;
-> +				clocks = <&osc>;
-> +				i2c-sda-hold-time-ns = <140>;
-> +				i2c-sda-falling-time-ns = <500>;
-> +				i2c-scl-falling-time-ns = <220>;
-> +				interrupts = <6>;
-> +				status = "disabled";
-> +			};
-> +
-> +			i2c3: i2c at c000 {
-> +				compatible = "snps,designware-i2c";
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				reg = <0xc000 0x100>;
-> +				clocks = <&osc>;
-> +				i2c-sda-hold-time-ns = <140>;
-> +				i2c-sda-falling-time-ns = <500>;
-> +				i2c-scl-falling-time-ns = <220>;
-> +				interrupts = <7>;
-> +				status = "disabled";
-> +			};
-> +
->  			uart0: uart at d000 {
->  				compatible = "snps,dw-apb-uart";
->  				reg = <0xd000 0x100>;
-> 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/video/fbdev/auo_k190x.c b/drivers/video/fbdev/auo_k190x.c
+index 8d2499d1cafb..9580374667ba 100644
+--- a/drivers/video/fbdev/auo_k190x.c
++++ b/drivers/video/fbdev/auo_k190x.c
+@@ -773,9 +773,7 @@ static void auok190x_recover(struct auok190xfb_par *par)
+ /*
+  * Power-management
+  */
+-
+-#ifdef CONFIG_PM
+-static int auok190x_runtime_suspend(struct device *dev)
++static int __maybe_unused auok190x_runtime_suspend(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct fb_info *info = platform_get_drvdata(pdev);
+@@ -822,7 +820,7 @@ finish:
+ 	return 0;
+ }
+ 
+-static int auok190x_runtime_resume(struct device *dev)
++static int __maybe_unused auok190x_runtime_resume(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct fb_info *info = platform_get_drvdata(pdev);
+@@ -856,7 +854,7 @@ static int auok190x_runtime_resume(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int auok190x_suspend(struct device *dev)
++static int __maybe_unused auok190x_suspend(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct fb_info *info = platform_get_drvdata(pdev);
+@@ -896,7 +894,7 @@ static int auok190x_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int auok190x_resume(struct device *dev)
++static int __maybe_unused auok190x_resume(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct fb_info *info = platform_get_drvdata(pdev);
+@@ -933,7 +931,6 @@ static int auok190x_resume(struct device *dev)
+ 
+ 	return 0;
+ }
+-#endif
+ 
+ const struct dev_pm_ops auok190x_pm = {
+ 	SET_RUNTIME_PM_OPS(auok190x_runtime_suspend, auok190x_runtime_resume,
