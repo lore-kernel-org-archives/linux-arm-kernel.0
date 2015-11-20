@@ -1,159 +1,415 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 20 Nov 2015 10:58:35 -0600
-Subject: [PATCH 03/10] dt-bindings: interrupt-controllers: add
- description of SIC1 and SIC2
-In-Reply-To: <1447982925-30138-4-git-send-email-vz@mleia.com>
-References: <1447982925-30138-1-git-send-email-vz@mleia.com>
- <1447982925-30138-4-git-send-email-vz@mleia.com>
-Message-ID: <20151120165835.GA17916@rob-hp-laptop>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 20 Nov 2015 17:59:00 +0100
+Subject: [PATCH] thermal: Add support for Sunxi THS on the Allwinner H3
+In-Reply-To: <20151118205147.GA19779@maud.lan>
+References: <20151118205147.GA19779@maud.lan>
+Message-ID: <20151120165900.GK32142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 03:28:38AM +0200, Vladimir Zapolskiy wrote:
-> NXP LPC32xx has three interrupt controllers, namely root Main
-> Interrupt Controller (MIC) and two supplementary Sub Interrupt
-> Controllers (SIC1 and SIC2), four interrupt outputs from SIC1 and SIC2
-> are connected to MIC.
+Hi!
+
+Thanks for your patch.
+
+On Wed, Nov 18, 2015 at 09:51:48PM +0100, Josef Gajdusek wrote:
+> This patch adds support for the Sunxi thermal sensor on the Allwinner H3.
+> Also adds declaration of the H3 THS clock to clk-sunxi.c ignoring the
+> dividers as they are not continuous (clk-divider.c cannot be used as it
+> does not support setting an enable bit).
+> Should be easily extendable for the A33/A83T/... as they have similar but
+> not completely identical sensors.
 > 
-> Also the change describes two additional optional properties:
-> * interrupt-controller-name - human readable name of an interrupt
->   controller,
-
-Why? compatible is human readable. If you don't like that, then put the 
-string in the driver.
-
-> * wakeup-sources - list of mappings between a hardware interrupt and
->   its correspondent wakeup source to exit CPU STOP mode.
-
-This needs further discussion as I mentioned.
-
-The rest looks fine.
-
-Rob
- 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> Signed-off-by: Josef Gajdusek <atx@atx.name>
 > ---
->  .../interrupt-controller/nxp,lpc3220-mic.txt       | 99 ++++++++++++++++------
->  1 file changed, 75 insertions(+), 24 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/nxp,lpc3220-mic.txt b/Documentation/devicetree/bindings/interrupt-controller/nxp,lpc3220-mic.txt
-> index 539adca..99e41ca 100644
-> --- a/Documentation/devicetree/bindings/interrupt-controller/nxp,lpc3220-mic.txt
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/nxp,lpc3220-mic.txt
-> @@ -1,38 +1,89 @@
-> -* NXP LPC32xx Main Interrupt Controller
-> -  (MIC, including SIC1 and SIC2 secondary controllers)
-> +* NXP LPC32xx MIC, SIC1 and SIC2 Interrupt Controllers
+>  Documentation/devicetree/bindings/clock/sunxi.txt  |   1 +
+>  .../devicetree/bindings/thermal/sunxi-ths.txt      |  24 ++
+>  arch/arm/boot/dts/sun8i-h3.dtsi                    |  27 +++
+>  drivers/clk/sunxi/clk-sunxi.c                      |  16 ++
+>  drivers/thermal/Kconfig                            |   7 +
+>  drivers/thermal/Makefile                           |   1 +
+>  drivers/thermal/sunxi_ths.c                        | 263 +++++++++++++++++++++
+>  7 files changed, 339 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/sunxi-ths.txt
+>  create mode 100644 drivers/thermal/sunxi_ths.c
+
+Like other have pointed out, this should be split in several patches.
+
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index 6293c65..637401a 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -604,6 +604,13 @@ static void sun7i_a20_get_out_factors(u32 *freq, u32 parent_rate,
+>  	*p = calcp;
+>  }
 >  
->  Required properties:
-> -- compatible: Should be "nxp,lpc3220-mic"
-> -- interrupt-controller: Identifies the node as an interrupt controller.
-> -- interrupt-parent: Empty for the interrupt controller itself
-> -- #interrupt-cells: The number of cells to define the interrupts. Should be 2.
-> -  The first cell is the IRQ number
-> -  The second cell is used to specify mode:
-> -      1 = low-to-high edge triggered
-> -      2 = high-to-low edge triggered
-> -      4 = active high level-sensitive
-> -      8 = active low level-sensitive
-> -      Default for internal sources should be set to 4 (active high).
-> -- reg: Should contain MIC registers location and length
-> +- compatible: "nxp,lpc3220-mic" or "nxp,lpc3220-sic".
-> +- reg: should contain IC registers location and length
-> +- interrupt-controller: identifies the node as an interrupt controller.
-> +- #interrupt-cells: the number of cells to define an interrupt, should be 2.
-> +  The first cell is the IRQ number, the second cell is used to specify
-> +  one of the supported modes:
-> +      IRQ_TYPE_EDGE_RISING = low-to-high edge triggered
-> +      IRQ_TYPE_EDGE_FALLING = high-to-low edge triggered
-> +      IRQ_TYPE_LEVEL_HIGH = active high level-sensitive
-> +      IRQ_TYPE_LEVEL_LOW = active low level-sensitive
-> +      Default for internal sources should be set to IRQ_TYPE_LEVEL_HIGH.
-> +
-> +Optional properties:
-> +- interrupt-parent: empty for MIC interrupt controller, link to parent
-> +  MIC interrupt controller for SIC1 and SIC2
-> +- interrupts: empty for MIC interrupt controller, cascaded MIC
-> +  hardware interrupts for SIC1 and SIC2
-> +- interrupt-controller-name: readable interrupt controller name
-> +- wakeup-sources: mapping of interrupts handled by the controller and
-> +  which may serve as a wakeup source.
+> +static void sun8i_h3_get_ths_factors(u32 *freq, u32 parent_rate,
+> +				      u8 *n, u8 *k, u8 *m, u8 *p)
+> +{
+> +	/* Ignore the dividers as they are not continuous */
+
+You'd rather use a divider table.
+
+> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+> index c463c89..0111d4d 100644
+> --- a/drivers/thermal/Kconfig
+> +++ b/drivers/thermal/Kconfig
+> @@ -365,6 +365,13 @@ config INTEL_PCH_THERMAL
+>  	  Thermal reporting device will provide temperature reading,
+>  	  programmable trip points and other information.
 >  
->  Examples:
-> -	/*
-> -	 * MIC
-> -	 */
+> +config SUNXI_THS
+> +	tristate "Sunxi THS driver"
+
+Allwinner H3 Thermal Sensor
+
+> +	depends on ARCH_SUNXI
+
+ARCH_SUN8I maybe ?
+
+> +	depends on OF
+> +	help
+> +	  Enable this to support thermal reporting on some newer Allwinner SoC.
 > +
-> +	/* LPC32xx MIC, SIC1 and SIC2 interrupt controllers */
->  	mic: interrupt-controller at 40008000 {
->  		compatible = "nxp,lpc3220-mic";
-> +		reg = <0x40008000 0x4000>;
-> +		interrupt-controller;
-> +		interrupt-controller-name = "mic";
-> +		#interrupt-cells = <2>;
+>  menu "Texas Instruments thermal drivers"
+>  depends on ARCH_HAS_BANDGAP || COMPILE_TEST
+>  source "drivers/thermal/ti-soc-thermal/Kconfig"
+> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
+> index cfae6a6..3a25e3c 100644
+> --- a/drivers/thermal/Makefile
+> +++ b/drivers/thermal/Makefile
+> @@ -48,3 +48,4 @@ obj-$(CONFIG_INTEL_PCH_THERMAL)	+= intel_pch_thermal.o
+>  obj-$(CONFIG_ST_THERMAL)	+= st/
+>  obj-$(CONFIG_TEGRA_SOCTHERM)	+= tegra_soctherm.o
+>  obj-$(CONFIG_HISI_THERMAL)     += hisi_thermal.o
+> +obj-$(CONFIG_SUNXI_THS)		+= sunxi_ths.o
+
+And call it sun8i_ths.
+
+> diff --git a/drivers/thermal/sunxi_ths.c b/drivers/thermal/sunxi_ths.c
+> new file mode 100644
+> index 0000000..650cd39
+> --- /dev/null
+> +++ b/drivers/thermal/sunxi_ths.c
+> @@ -0,0 +1,263 @@
+> +/*
+> + * Sunxi THS driver
+> + *
+> + * Copyright (C) 2015 Josef Gajdusek
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + *
+> + */
 > +
-> +		wakeup-sources = <&wakeup_int 7 29>,
-> +				 <&wakeup_int 25 27>;
-> +	};
+> +#include <linux/clk-provider.h>
+
+You don't need this header, it's meant for clock providers, as its
+name suggest. You're only using the consumer API.
+
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/irq.h>
+> +#include <linux/module.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/printk.h>
+> +#include <linux/reset.h>
+> +#include <linux/thermal.h>
 > +
-> +	sic1: interrupt-controller at 4000C000 {
-> +		compatible = "nxp,lpc3220-sic";
-> +		reg = <0x4000C000 0x4000>;
-> +		interrupt-controller;
-> +		interrupt-controller-name = "sic1";
-> +		#interrupt-cells = <2>;
+> +#define THS_H3_CTRL0			0x00
+> +#define THS_H3_CTRL1			0x04
+> +#define THS_H3_CDAT				0x14
+> +#define THS_H3_CTRL2			0x40
+> +#define THS_H3_INT_CTRL			0x44
+> +#define THS_H3_STAT				0x48
+> +#define THS_H3_ALARM_CTRL		0x50
+> +#define THS_H3_SHUTDOWN_CTRL	0x60
+> +#define THS_H3_FILTER			0x70
+> +#define THS_H3_CDATA			0x74
+> +#define THS_H3_DATA				0x80
 > +
-> +		interrupt-parent = <&mic>;
-> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>,
-> +			     <30 IRQ_TYPE_LEVEL_LOW>;
+> +#define THS_H3_CTRL0_SENSOR_ACQ0		0
 > +
-> +		wakeup-sources = <&wakeup_int 16 22>, <&wakeup_int 19 26>,
-> +				 <&wakeup_int 20 25>, <&wakeup_int 21 31>,
-> +				 <&wakeup_int 24 20>, <&wakeup_int 29 8>,
-> +				 <&wakeup_int 30 6>, <&wakeup_int 31 7>,
-> +				 <&wakeup_pin 25 4>;
-> +	};
+> +#define THS_H3_CTRL1_ADC_CALI_EN		17
+> +#define THS_H3_CTRL1_OP_BIAS			20
 > +
-> +	sic2: interrupt-controller at 40010000 {
-> +		compatible = "nxp,lpc3220-sic";
-> +		reg = <0x40010000 0x4000>;
->  		interrupt-controller;
-> -		interrupt-parent;
-> +		interrupt-controller-name = "sic2";
->  		#interrupt-cells = <2>;
-> -		reg = <0x40008000 0xC000>;
+> +#define THS_H3_CTRL2_SENSE_EN			0
+> +#define THS_H3_CTRL2_SENSOR_ACQ1		16
 > +
-> +		interrupt-parent = <&mic>;
-> +		interrupts = <1 IRQ_TYPE_LEVEL_LOW>,
-> +			     <31 IRQ_TYPE_LEVEL_LOW>;
+> +#define THS_H3_INT_CTRL_ALARM_INT_EN	0
+> +#define THS_H3_INT_CTRL_SHUT_INT_EN		4
+> +#define THS_H3_INT_CTRL_DATA_IRQ_EN		8
+> +#define THS_H3_INT_CTRL_THERMAL_PER		12
 > +
-> +		wakeup-sources = <&wakeup_int 0 0>, <&wakeup_int 1 1>,
-> +				 <&wakeup_int 2 2>, <&wakeup_int 3 3>,
-> +				 <&wakeup_int 4 4>, <&wakeup_int 5 5>,
-> +				 <&wakeup_int 6 8>, <&wakeup_pin 3 9>,
-> +				 <&wakeup_pin 4 10>, <&wakeup_pin 5 11>,
-> +				 <&wakeup_pin 6 6>, <&wakeup_pin 7 15>,
-> +				 <&wakeup_pin 8 20>, <&wakeup_pin 9 31>,
-> +				 <&wakeup_pin 10 22>, <&wakeup_pin 11 23>,
-> +				 <&wakeup_pin 12 24>, <&wakeup_pin 13 25>,
-> +				 <&wakeup_pin 14 26>, <&wakeup_pin 15 27>,
-> +				 <&wakeup_pin 16 27>, <&wakeup_pin 18 18>,
-> +				 <&wakeup_pin 23 7>, <&wakeup_pin 26 19>,
-> +				 <&wakeup_pin 30 12>;
->  	};
->  
-> -	/*
-> -	 * ADC
-> -	 */
-> +	/* ADC */
->  	adc at 40048000 {
->  		compatible = "nxp,lpc3220-adc";
->  		reg = <0x40048000 0x1000>;
-> -		interrupt-parent = <&mic>;
-> -		interrupts = <39 4>;
-> +		interrupt-parent = <&sic1>;
-> +		interrupts = <7 IRQ_TYPE_LEVEL_HIGH>;
->  	};
-> -- 
-> 2.1.4
-> 
+> +#define THS_H3_STAT_ALARM_INT_STS		0
+> +#define THS_H3_STAT_SHUT_INT_STS		4
+> +#define THS_H3_STAT_DATA_IRQ_STS		8
+> +#define THS_H3_STAT_ALARM_OFF_STS		12
+> +
+> +#define THS_H3_ALARM_CTRL_ALARM0_T_HYST		0
+> +#define THS_H3_ALARM_CTRL_ALARM0_T_HOT		16
+> +
+> +#define THS_H3_SHUTDOWN_CTRL_SHUT0_T_HOT	16
+
+Usually, the masks are defined here, not the offsets, so that we can
+use them directly in the code later, without risking to miss a BIT()
+call.
+
+> +
+> +#define THS_H3_FILTER_TYPE				0
+> +#define THS_H3_FILTER_EN				2
+> +
+> +struct sunxi_ths_data {
+> +	struct sunxi_ths_type *type;
+> +	struct reset_control *reset;
+> +	struct clk *clk;
+> +	struct clk *busclk;
+> +	void __iomem *regs;
+> +	void __iomem *calreg;
+> +	struct platform_device *pdev;
+> +	struct thermal_zone_device *tzd;
+> +	int irq;
+> +};
+> +
+> +struct sunxi_ths_type {
+> +	int (*init)(struct sunxi_ths_data *);
+> +	int (*get_temp)(struct sunxi_ths_data *, int *out);
+> +};
+
+What do you need that structure for? Can't you just call the functions
+directly?
+
+> +
+> +static int sunxi_ths_reg_to_temperature(int32_t reg, int divisor, int minus)
+> +{
+> +	return minus - (reg * 1000000) / divisor;
+> +}
+> +
+> +static int sunxi_ths_get_temp(void *_data, int *out)
+> +{
+> +	struct sunxi_ths_data *data = _data;
+> +
+> +	return data->type->get_temp(data, out);
+> +}
+> +
+> +static int sunxi_ths_h3_init(struct sunxi_ths_data *data)
+> +{
+> +	if (data->calreg)
+> +		writel(readl(data->calreg) & 0xfff, data->regs + THS_H3_CDATA);
+
+As pointed out by Chen-Yu, you should be using nvmem here.
+
+> +	/* Magical constants mostly taken from Allwinner 3.4 kernel.
+> +	 * Seem to work fine, though this could be configurable in DT/sysft
+> +	 */
+> +	writel(0xff << THS_H3_CTRL0_SENSOR_ACQ0,
+> +			data->regs + THS_H3_CTRL0);
+> +	writel((0x3f << THS_H3_CTRL2_SENSOR_ACQ1) | BIT(THS_H3_CTRL2_SENSE_EN),
+> +			data->regs + THS_H3_CTRL2);
+> +	writel((0x390 << THS_H3_INT_CTRL_THERMAL_PER) | BIT(THS_H3_INT_CTRL_DATA_IRQ_EN),
+> +			data->regs + THS_H3_INT_CTRL);
+> +	writel(BIT(THS_H3_FILTER_EN) | (0x2 << THS_H3_FILTER_TYPE),
+> +			data->regs + THS_H3_FILTER);
+
+Please define those values, even if they are not documented.
+
+> +	return 0;
+> +}
+> +
+> +static int sunxi_ths_h3_get_temp(struct sunxi_ths_data *data, int *out)
+> +{
+> +	*out = sunxi_ths_reg_to_temperature(readl(data->regs + THS_H3_DATA),
+> +			8253, 217000);
+> +	return 0;
+> +}
+> +
+> +static const struct thermal_zone_of_device_ops sunxi_ths_thermal_ops = {
+> +	.get_temp = sunxi_ths_get_temp,
+> +};
+> +
+> +static const struct sunxi_ths_type sunxi_ths_device_h3 = {
+> +	.init = sunxi_ths_h3_init,
+> +	.get_temp = sunxi_ths_h3_get_temp,
+> +};
+> +
+> +static const struct of_device_id sunxi_ths_id_table[] = {
+> +	{
+> +		.compatible = "allwinner,sun8i-h3-ths",
+> +		.data = &sunxi_ths_device_h3,
+> +	},
+> +	{
+> +		/* sentinel */
+> +	},
+> +};
+> +MODULE_DEVICE_TABLE(of, sunxi_ths_id_table);
+> +
+> +static int sunxi_ths_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	const struct of_device_id *match;
+> +	struct sunxi_ths_data *data;
+> +	struct resource *res;
+> +	int ret;
+> +
+> +	match = of_match_node(sunxi_ths_id_table, np);
+> +	if (!match)
+> +		return -ENXIO;
+
+It cannot fail, otherwise you wouldn't have probed in the first place.
+
+> +
+> +	data =
+> +		devm_kzalloc(&pdev->dev, sizeof(struct sunxi_ths_data), GFP_KERNEL);
+
+Why did you split this on an new line?
+
+> +	if (!data)
+> +		return -ENOMEM;
+> +
+> +	data->type = (struct sunxi_ths_type *) match->data;
+> +	data->pdev = pdev;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	data->regs = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(data->regs)) {
+> +		ret = PTR_ERR(data->regs);
+> +		dev_err(&pdev->dev, "failed to ioremap THS registers: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +	data->calreg = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(data->calreg))
+> +		data->calreg = NULL; /* No calibration register */
+
+Please use the nvmem framework here.
+
+> +	data->busclk = devm_clk_get(&pdev->dev, "ahb");
+> +	if (IS_ERR(data->busclk)) {
+> +		ret = PTR_ERR(data->busclk);
+> +		dev_err(&pdev->dev, "failed to get ahb clk: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	data->clk = devm_clk_get(&pdev->dev, "ths");
+> +	if (IS_ERR(data->clk)) {
+> +		ret = PTR_ERR(data->clk);
+> +		dev_err(&pdev->dev, "failed to get ths clk: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	data->reset = devm_reset_control_get_optional(&pdev->dev, "ahb");
+
+Are you sure it's optional? In which cases?
+
+> +	if (IS_ERR(data->reset)) {
+> +		ret = PTR_ERR(data->reset);
+> +		dev_err(&pdev->dev, "failed to get reset: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_prepare_enable(data->busclk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to enable bus clk: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_prepare_enable(data->clk);
+
+You probably don't need to enable the module clock all the time, but
+only when reading values. Is there a callback in the thermal subsystem
+that gets called when something start reading values? or can you sleep
+in get_temp?
+
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to enable ths clk: %d\n", ret);
+> +		goto err_disable_bus;
+> +	}
+> +
+> +	ret = reset_control_deassert(data->reset);
+
+If you're using an optional reset control, it will probably fail.
+
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "reset deassert failed: %d\n", ret);
+> +		goto err_disable_ths;
+> +	}
+> +
+> +	ret = data->type->init(data);
+> +	if (ret)
+> +		goto err_reset_assert;
+> +
+> +	data->tzd = thermal_zone_of_sensor_register(&pdev->dev, 0, data,
+> +									&sunxi_ths_thermal_ops);
+
+Your wrapping is weird here too, it should be aligned on the opening
+parenthesis.
+
+> +	if (IS_ERR(data->tzd)) {
+> +		ret = PTR_ERR(data->tzd);
+> +		dev_err(&pdev->dev, "failed to register thermal zone: %d\n",
+> +				ret);
+> +		goto err_reset_assert;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, data);
+> +	return 0;
+> +
+> +err_reset_assert:
+> +	reset_control_assert(data->reset);
+> +err_disable_ths:
+> +	clk_disable_unprepare(data->clk);
+> +err_disable_bus:
+> +	clk_disable_unprepare(data->busclk);
+> +	return ret;
+> +}
+> +
+> +static int sunxi_ths_remove(struct platform_device *pdev)
+> +{
+> +	struct sunxi_ths_data *data = platform_get_drvdata(pdev);
+> +
+> +	thermal_zone_of_sensor_unregister(&pdev->dev, data->tzd);
+> +	reset_control_assert(data->reset);
+> +	clk_disable_unprepare(data->clk);
+> +	clk_disable_unprepare(data->busclk);
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver sunxi_ths_driver = {
+> +	.probe = sunxi_ths_probe,
+> +	.remove = sunxi_ths_remove,
+> +	.driver = {
+> +		.name = "sunxi_ths",
+> +		.of_match_table = sunxi_ths_id_table,
+> +	},
+> +};
+> +
+> +module_platform_driver(sunxi_ths_driver);
+> +
+> +MODULE_AUTHOR("Josef Gajdusek <atx@atx.name>");
+> +MODULE_DESCRIPTION("Sunxi THS driver");
+> +MODULE_LICENSE("GPL v2");
+
+It looks fine otherwise, thanks!
+Maxime
+
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/36abe217/attachment-0001.sig>
