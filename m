@@ -1,14 +1,13 @@
 From: leilk.liu@mediatek.com (Leilk Liu)
-Date: Fri, 20 Nov 2015 10:21:17 +0800
-Subject: [PATCH 2/4] spi: mediatek: remove unrequired description
-In-Reply-To: <1447986080-31410-1-git-send-email-leilk.liu@mediatek.com>
-References: <1447986080-31410-1-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <1447986080-31410-2-git-send-email-leilk.liu@mediatek.com>
+Date: Fri, 20 Nov 2015 10:21:16 +0800
+Subject: [PATCH 1/4] spi: mediatek: update document devicetree bindings to fix
+ syntax error
+Message-ID: <1447986080-31410-1-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cs-gpios isn't required with patch "spi: mediatek: single
-device does not require cs_gpios", so modify the description.
+This patch updates document devicetree bindings
+to fix syntax error.
 
 Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
 ---
@@ -16,17 +15,17 @@ Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-index fba8334..60a183c 100644
+index ce363c923f..fba8334 100644
 --- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
 +++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-@@ -29,7 +29,7 @@ Required properties:
-   muxes clock, and "spi-clk" for the clock gate.
- 
- Optional properties:
---cs-gpios: see spi-bus.txt, only required for MT8173.
-+-cs-gpios: see spi-bus.txt.
+@@ -32,7 +32,7 @@ Optional properties:
+ -cs-gpios: see spi-bus.txt, only required for MT8173.
  
  - mediatek,pad-select: specify which pins group(ck/mi/mo/cs) spi
-   controller used. This is an array, the element value should be 0~3,
+-  controller used. This is a array, the element value should be 0~3,
++  controller used. This is an array, the element value should be 0~3,
+   only required for MT8173.
+     0: specify GPIO69,70,71,72 for spi pins.
+     1: specify GPIO102,103,104,105 for spi pins.
 -- 
 1.7.9.5
