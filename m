@@ -1,52 +1,67 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 20 Nov 2015 14:59:08 +0100
-Subject: [PATCH 2/4] ARM: dts: sun5i: Add backlight node to UTOO P66 tablet
-In-Reply-To: <1448027950-14629-1-git-send-email-hdegoede@redhat.com>
-References: <1448027950-14629-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1448027950-14629-2-git-send-email-hdegoede@redhat.com>
+Date: Fri, 20 Nov 2015 14:59:07 +0100
+Subject: [PATCH 1/4] ARM: dts: sun4i: Add backlight node to iNet1 tablet
+Message-ID: <1448027950-14629-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a node describing the lcd panel backlight on the UTOO P66 tablet.
+Add a node describing the lcd panel backlight on the iNet1 tablet.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun5i-a13-utoo-p66.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/sun4i-a10-inet1.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
-index eb793d5..5236c1e 100644
---- a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
-@@ -47,11 +47,21 @@
+diff --git a/arch/arm/boot/dts/sun4i-a10-inet1.dts b/arch/arm/boot/dts/sun4i-a10-inet1.dts
+index 703d756..df1be08 100644
+--- a/arch/arm/boot/dts/sun4i-a10-inet1.dts
++++ b/arch/arm/boot/dts/sun4i-a10-inet1.dts
+@@ -47,6 +47,7 @@
  #include <dt-bindings/input/input.h>
  #include <dt-bindings/interrupt-controller/irq.h>
  #include <dt-bindings/pinctrl/sun4i-a10.h>
 +#include <dt-bindings/pwm/pwm.h>
  
  / {
- 	model = "Utoo P66";
- 	compatible = "utoo,p66", "allwinner,sun5i-a13";
+ 	model = "iNet-1";
+@@ -56,6 +57,16 @@
+ 		serial0 = &uart0;
+ 	};
  
 +	backlight: backlight {
 +		compatible = "pwm-backlight";
++		pinctrl-names = "default";
++		pinctrl-0 = <&bl_en_pin_inet>;
 +		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
-+		/* Note levels of 10 / 20% result in backlight off */
-+		brightness-levels = <0 30 40 50 60 70 80 90 100>;
-+		default-brightness-level = <6>;
-+		/* TODO: backlight uses axp gpio1 as enable pin */
++		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
++		default-brightness-level = <8>;
++		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
 +	};
 +
- 	i2c_lcd: i2c at 0 {
- 		/* The lcd panel i2c interface is hooked up via gpios */
- 		compatible = "i2c-gpio";
-@@ -201,6 +211,12 @@
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
+ 	};
+@@ -164,6 +175,13 @@
+ };
+ 
+ &pio {
++	bl_en_pin_inet: bl_en_pin at 0 {
++		allwinner,pins = "PH7";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
+ 	touchscreen_wake_pin: touchscreen_wake_pin at 0 {
+ 		allwinner,pins = "PB13";
+ 		allwinner,function = "gpio_out";
+@@ -186,6 +204,12 @@
  	};
  };
  
 +&pwm {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm0_pins>;
++	pinctrl-0 = <&pwm0_pins_a>;
 +	status = "okay";
 +};
 +
