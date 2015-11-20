@@ -1,198 +1,322 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Fri, 20 Nov 2015 03:28:42 +0200
-Subject: [PATCH 07/10] arm: dts: lpc32xx: reparent SIC1 and SIC2 interrupts
- from MIC
+Date: Fri, 20 Nov 2015 03:28:43 +0200
+Subject: [PATCH 08/10] irqchip: add LPC32xx interrupt controller driver
 In-Reply-To: <1447982925-30138-1-git-send-email-vz@mleia.com>
 References: <1447982925-30138-1-git-send-email-vz@mleia.com>
-Message-ID: <1447982925-30138-8-git-send-email-vz@mleia.com>
+Message-ID: <1447982925-30138-9-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change adds separate device nodes for SIC1 and SIC2 interrupt
-controllers and reparents all defined SIC1 and SIC2 interrupt
-producers to the correspondent interrupt controller, this is needed to
-perform switching to a new LPC32xx MIC/SIC interrupt controller driver.
+The change adds improved support of NXP LPC32xx MIC, SIC1 and SIC2
+interrupt controllers.
 
-At the moment SIC1 and SIC2 are disabled by default, this has some
-excuses:
-* legacy LPC32xx interrupt controller driver is broken since commit
-  76ba59f8366f ("genirq: Add irq_domain-aware core IRQ handler"),
-  which requires a private interrupt handler, otherwise any SIC1
-  generated interrupt (mapped to MIC hwirq 0) breaks the kernel with
-  the message "unexpected IRQ trap at vector 00",
-* due to the problem described above restriction of access to
-  SIC1 interrupts may be even considered as helpful, now at least the
-  kernel can be successfully booted, but with some not hooked
-  peripherals (ADC/touchscreen, I2C, RTC and USB),
-* the change is transitional before switching to a new LPC32xx IC
-  driver.
+This is a list of new features in comparison to the legacy driver:
+* irq types are taken from device tree settings, no more need to
+  hardcode them,
+* old driver is based on irq_domain_add_legacy, which causes problems
+  with handling MIC hardware interrupt 0 produced by SIC1,
+* there is one driver for MIC, SIC1 and SIC2, no more need to handle
+  them separately, e.g. have two separate handlers for SIC1 and SIC2,
+* the driver does not have any dependencies on hardcoded register
+  offsets,
+* the driver is much simpler for comprehension and more maintainable,
+* SPARSE_IRQS option is supported.
+
+The change disables compilation of a legacy driver found at
+arch/arm/mach-lpc32xx/irq.c, the file will be removed in a separate
+commit.
 
 Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
- arch/arm/boot/dts/lpc32xx.dtsi | 86 +++++++++++++++++++++++++++++++++---------
- 1 file changed, 68 insertions(+), 18 deletions(-)
+ arch/arm/Kconfig                |   2 +
+ arch/arm/mach-lpc32xx/Makefile  |   2 +-
+ arch/arm/mach-lpc32xx/phy3250.c |   1 -
+ drivers/irqchip/Makefile        |   1 +
+ drivers/irqchip/irq-lpc32xx.c   | 227 ++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 231 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/irqchip/irq-lpc32xx.c
 
-diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
-index b2735dd..8dda6e7 100644
---- a/arch/arm/boot/dts/lpc32xx.dtsi
-+++ b/arch/arm/boot/dts/lpc32xx.dtsi
-@@ -92,7 +92,8 @@
- 			ohci: ohci at 0 {
- 				compatible = "nxp,ohci-nxp", "usb-ohci";
- 				reg = <0x0 0x300>;
--				interrupts = <59 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-parent = <&sic1>;
-+				interrupts = <27 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&usbclk LPC32XX_USB_CLK_HOST>;
- 				status = "disabled";
- 			};
-@@ -100,10 +101,11 @@
- 			usbd: usbd at 0 {
- 				compatible = "nxp,lpc3220-udc";
- 				reg = <0x0 0x300>;
--				interrupts = <61 IRQ_TYPE_LEVEL_HIGH>,
--					     <62 IRQ_TYPE_LEVEL_HIGH>,
--					     <60 IRQ_TYPE_LEVEL_HIGH>,
--					     <58 IRQ_TYPE_LEVEL_LOW>;
-+				interrupt-parent = <&sic1>;
-+				interrupts = <29 IRQ_TYPE_LEVEL_HIGH>,
-+					     <30 IRQ_TYPE_LEVEL_HIGH>,
-+					     <28 IRQ_TYPE_LEVEL_HIGH>,
-+					     <26 IRQ_TYPE_LEVEL_LOW>;
- 				clocks = <&usbclk LPC32XX_USB_CLK_DEVICE>;
- 				status = "disabled";
- 			};
-@@ -111,7 +113,8 @@
- 			i2cusb: i2c at 300 {
- 				compatible = "nxp,pnx-i2c";
- 				reg = <0x300 0x100>;
--				interrupts = <63 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-parent = <&sic1>;
-+				interrupts = <31 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&usbclk LPC32XX_USB_CLK_I2C>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-@@ -249,7 +252,8 @@
- 			i2c1: i2c at 400A0000 {
- 				compatible = "nxp,pnx-i2c";
- 				reg = <0x400A0000 0x100>;
--				interrupts = <51 IRQ_TYPE_LEVEL_LOW>;
-+				interrupt-parent = <&sic1>;
-+				interrupts = <19 IRQ_TYPE_LEVEL_LOW>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				pnx,timeout = <0x64>;
-@@ -259,7 +263,8 @@
- 			i2c2: i2c at 400A8000 {
- 				compatible = "nxp,pnx-i2c";
- 				reg = <0x400A8000 0x100>;
--				interrupts = <50 IRQ_TYPE_LEVEL_LOW>;
-+				interrupt-parent = <&sic1>;
-+				interrupts = <18 IRQ_TYPE_LEVEL_LOW>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				pnx,timeout = <0x64>;
-@@ -309,15 +314,9 @@
- 				};
- 			};
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5cc11f1..1f2c03f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -597,6 +597,8 @@ config ARCH_LPC32XX
+ 	select CPU_ARM926T
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_IDE
++	select MULTI_IRQ_HANDLER
++	select SPARSE_IRQ
+ 	select USE_OF
+ 	help
+ 	  Support for the NXP LPC32XX family of processors
+diff --git a/arch/arm/mach-lpc32xx/Makefile b/arch/arm/mach-lpc32xx/Makefile
+index b1023c0..2a28f645 100644
+--- a/arch/arm/mach-lpc32xx/Makefile
++++ b/arch/arm/mach-lpc32xx/Makefile
+@@ -2,6 +2,6 @@
+ # Makefile for the linux kernel.
+ #
  
--			/*
--			 * MIC Interrupt controller includes:
--			 *   MIC @40008000
--			 *   SIC1 @4000C000
--			 *   SIC2 @40010000
--			 */
- 			mic: interrupt-controller at 40008000 {
- 				compatible = "nxp,lpc3220-mic";
--				reg = <0x40008000 0xC000>;
-+				reg = <0x40008000 0x4000>;
- 				interrupt-controller;
- 				interrupt-controller-name = "mic";
- 				#interrupt-cells = <2>;
-@@ -326,6 +325,54 @@
- 						 <&wakeup_int 25 27>;
- 			};
- 
-+			sic1: interrupt-controller at 4000C000 {
-+				compatible = "nxp,lpc3220-sic";
-+				reg = <0x4000C000 0x4000>;
-+				interrupt-controller;
-+				interrupt-controller-name = "sic1";
-+				#interrupt-cells = <2>;
+-obj-y	:= irq.o common.o serial.o
++obj-y	:= common.o serial.o
+ obj-y	+= pm.o suspend.o wakeup.o
+ obj-y	+= phy3250.o
+diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
+index 60f3392..92e8574 100644
+--- a/arch/arm/mach-lpc32xx/phy3250.c
++++ b/arch/arm/mach-lpc32xx/phy3250.c
+@@ -259,7 +259,6 @@ static const char *const lpc32xx_dt_compat[] __initconst = {
+ DT_MACHINE_START(LPC32XX_DT, "LPC32XX SoC (Flattened Device Tree)")
+ 	.atag_offset	= 0x100,
+ 	.map_io		= lpc32xx_map_io,
+-	.init_irq	= lpc32xx_init_irq,
+ 	.init_machine	= lpc3250_machine_init,
+ 	.dt_compat	= lpc32xx_dt_compat,
+ 	.restart	= lpc23xx_restart,
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 177f78f..21008a6 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -4,6 +4,7 @@ obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2835.o
+ obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2836.o
+ obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
+ obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
++obj-$(CONFIG_ARCH_LPC32XX)		+= irq-lpc32xx.o
+ obj-$(CONFIG_ARCH_MMP)			+= irq-mmp.o
+ obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
+ obj-$(CONFIG_IRQ_MXS)			+= irq-mxs.o
+diff --git a/drivers/irqchip/irq-lpc32xx.c b/drivers/irqchip/irq-lpc32xx.c
+new file mode 100644
+index 0000000..fcf281b
+--- /dev/null
++++ b/drivers/irqchip/irq-lpc32xx.c
+@@ -0,0 +1,227 @@
++/*
++ * Copyright 2015 Vladimir Zapolskiy <vz@mleia.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
 +
-+				interrupt-parent = <&mic>;
-+				interrupts = <0 IRQ_TYPE_LEVEL_LOW>,
-+					     <30 IRQ_TYPE_LEVEL_LOW>;
++#define pr_fmt(fmt) "%s: " fmt, __func__
 +
-+				wakeup-sources = <&wakeup_int 16 22>, <&wakeup_int 19 26>,
-+						 <&wakeup_int 20 25>, <&wakeup_int 21 31>,
-+						 <&wakeup_int 24 20>, <&wakeup_int 29 8>,
-+						 <&wakeup_int 30 6>, <&wakeup_int 31 7>,
-+						 <&wakeup_pin 25 4>;
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/irqchip.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
++#include <linux/slab.h>
++#include <asm/exception.h>
 +
-+				status = "disabled";
-+			};
++#define LPC32XX_INTC_MASK		0x00
++#define LPC32XX_INTC_RAW		0x04
++#define LPC32XX_INTC_STAT		0x08
++#define LPC32XX_INTC_POL		0x0C
++#define LPC32XX_INTC_TYPE		0x10
++#define LPC32XX_INTC_FIQ		0x14
 +
-+			sic2: interrupt-controller at 40010000 {
-+				compatible = "nxp,lpc3220-sic";
-+				reg = <0x40010000 0x4000>;
-+				interrupt-controller;
-+				interrupt-controller-name = "sic2";
-+				#interrupt-cells = <2>;
++#define IRQS_PER_CONTROLLER		32
 +
-+				interrupt-parent = <&mic>;
-+				interrupts = <1 IRQ_TYPE_LEVEL_LOW>,
-+					     <31 IRQ_TYPE_LEVEL_LOW>;
++struct lpc32xx_irq_chip {
++	void __iomem *base;
++	struct irq_domain *domain;
++	struct irq_chip chip;
++};
 +
-+				wakeup-sources = <&wakeup_int 0 0>, <&wakeup_int 1 1>,
-+						 <&wakeup_int 2 2>, <&wakeup_int 3 3>,
-+						 <&wakeup_int 4 4>, <&wakeup_int 5 5>,
-+						 <&wakeup_int 6 8>, <&wakeup_pin 3 9>,
-+						 <&wakeup_pin 4 10>, <&wakeup_pin 5 11>,
-+						 <&wakeup_pin 6 6>, <&wakeup_pin 7 15>,
-+						 <&wakeup_pin 8 20>, <&wakeup_pin 9 31>,
-+						 <&wakeup_pin 10 22>, <&wakeup_pin 11 23>,
-+						 <&wakeup_pin 12 24>, <&wakeup_pin 13 25>,
-+						 <&wakeup_pin 14 26>, <&wakeup_pin 15 27>,
-+						 <&wakeup_pin 16 28>, <&wakeup_pin 18 18>,
-+						 <&wakeup_pin 23 7>, <&wakeup_pin 26 19>,
-+						 <&wakeup_pin 30 12>;
++static struct lpc32xx_irq_chip *lpc32xx_mic_data;
 +
-+				status = "disabled";
-+			};
++static inline u32 lpc32xx_ic_read(struct irq_domain *id, u32 reg)
++{
++	struct lpc32xx_irq_chip *ic = (struct lpc32xx_irq_chip *)id->host_data;
 +
- 			uart1: serial at 40014000 {
- 				compatible = "nxp,lpc3220-hsuart";
- 				reg = <0x40014000 0x1000>;
-@@ -350,7 +397,8 @@
- 			rtc: rtc at 40024000 {
- 				compatible = "nxp,lpc3220-rtc";
- 				reg = <0x40024000 0x1000>;
--				interrupts = <52 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-parent = <&sic1>;
-+				interrupts = <20 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clk LPC32XX_CLK_RTC>;
- 			};
- 
-@@ -403,7 +451,8 @@
- 			adc: adc at 40048000 {
- 				compatible = "nxp,lpc3220-adc";
- 				reg = <0x40048000 0x1000>;
--				interrupts = <39 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-parent = <&sic1>;
-+				interrupts = <7 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clk LPC32XX_CLK_ADC>;
- 				status = "disabled";
- 			};
-@@ -411,7 +460,8 @@
- 			tsc: tsc at 40048000 {
- 				compatible = "nxp,lpc3220-tsc";
- 				reg = <0x40048000 0x1000>;
--				interrupts = <39 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-parent = <&sic1>;
-+				interrupts = <7 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clk LPC32XX_CLK_ADC>;
- 				status = "disabled";
- 			};
++	return readl(ic->base + reg);
++}
++
++static inline void lpc32xx_ic_write(struct irq_domain *id, u32 reg, u32 val)
++{
++	struct lpc32xx_irq_chip *ic = (struct lpc32xx_irq_chip *)id->host_data;
++
++	writel(val, ic->base + reg);
++}
++
++static void lpc32xx_irq_mask(struct irq_data *d)
++{
++	u32 val, mask = BIT(d->hwirq);
++
++	val = lpc32xx_ic_read(d->domain, LPC32XX_INTC_MASK) & ~mask;
++	lpc32xx_ic_write(d->domain, LPC32XX_INTC_MASK, val);
++}
++
++static void lpc32xx_irq_unmask(struct irq_data *d)
++{
++	u32 val, mask = BIT(d->hwirq);
++
++	val = lpc32xx_ic_read(d->domain, LPC32XX_INTC_MASK) | mask;
++	lpc32xx_ic_write(d->domain, LPC32XX_INTC_MASK, val);
++}
++
++static void lpc32xx_irq_ack(struct irq_data *d)
++{
++	u32 mask = BIT(d->hwirq);
++
++	lpc32xx_ic_write(d->domain, LPC32XX_INTC_RAW, mask);
++}
++
++static int lpc32xx_irq_set_type(struct irq_data *d, unsigned int type)
++{
++	struct irq_domain *domain = d->domain;
++	u32 val, mask = BIT(d->hwirq);
++	bool high, edge;
++
++	switch (type) {
++	case IRQ_TYPE_EDGE_RISING:
++		edge = true;
++		high = true;
++		break;
++	case IRQ_TYPE_EDGE_FALLING:
++		edge = true;
++		high = false;
++		break;
++	case IRQ_TYPE_LEVEL_HIGH:
++		edge = false;
++		high = true;
++		break;
++	case IRQ_TYPE_LEVEL_LOW:
++		edge = false;
++		high = false;
++		break;
++	default:
++		pr_info("unsupported irq type %d\n", type);
++		return -EINVAL;
++	}
++
++	irqd_set_trigger_type(d, type);
++
++	val = lpc32xx_ic_read(domain, LPC32XX_INTC_POL);
++	if (high)
++		val |= mask;
++	else
++		val &= ~mask;
++	lpc32xx_ic_write(domain, LPC32XX_INTC_POL, val);
++
++	val = lpc32xx_ic_read(domain, LPC32XX_INTC_TYPE);
++	if (edge) {
++		val |= mask;
++		irq_set_handler_locked(d, handle_edge_irq);
++	} else {
++		val &= ~mask;
++		irq_set_handler_locked(d, handle_level_irq);
++	}
++	lpc32xx_ic_write(domain, LPC32XX_INTC_TYPE, val);
++
++	return 0;
++}
++
++static void __exception_irq_entry lpc32xx_handle_irq(struct pt_regs *regs)
++{
++	u32 hwirq;
++
++	do {
++		hwirq = lpc32xx_ic_read(lpc32xx_mic_data->domain,
++					LPC32XX_INTC_STAT);
++		if (hwirq)
++			handle_domain_irq(lpc32xx_mic_data->domain,
++					  ffs(hwirq) - 1, regs);
++	} while (hwirq);
++}
++
++static void lpc32xx_sic_handler(struct irq_desc *desc)
++{
++	struct lpc32xx_irq_chip *ic = irq_desc_get_handler_data(desc);
++	struct irq_domain *domain = ic->domain;
++	u32 hwirq;
++
++	do {
++		hwirq = lpc32xx_ic_read(domain, LPC32XX_INTC_STAT);
++		if (hwirq)
++			generic_handle_irq(irq_find_mapping(domain,
++							    ffs(hwirq) - 1));
++	} while (hwirq);
++}
++
++static int lpc32xx_irq_domain_map(struct irq_domain *id, unsigned int virq,
++				  irq_hw_number_t hw)
++{
++	struct lpc32xx_irq_chip *ic = (struct lpc32xx_irq_chip *)id->host_data;
++
++	irq_set_chip_and_handler(virq, &ic->chip, handle_level_irq);
++	irq_set_status_flags(virq, IRQ_LEVEL);
++	irq_set_noprobe(virq);
++
++	return 0;
++}
++
++static void lpc32xx_irq_domain_unmap(struct irq_domain *id, unsigned int virq)
++{
++	irq_set_chip_and_handler(virq, NULL, NULL);
++}
++
++static const struct irq_domain_ops lpc32xx_irq_domain_ops = {
++	.map    = lpc32xx_irq_domain_map,
++	.unmap	= lpc32xx_irq_domain_unmap,
++	.xlate  = irq_domain_xlate_twocell,
++};
++
++static int __init lpc32xx_of_ic_init(struct device_node *node,
++				     struct device_node *parent)
++{
++	int parent_irq, i;
++	struct lpc32xx_irq_chip *irqc;
++
++	irqc = kzalloc(sizeof(*irqc), GFP_KERNEL);
++	if (!irqc)
++		return -ENOMEM;
++
++	irqc->chip.irq_ack = lpc32xx_irq_ack;
++	irqc->chip.irq_mask = lpc32xx_irq_mask;
++	irqc->chip.irq_unmask = lpc32xx_irq_unmask;
++	irqc->chip.irq_set_type = lpc32xx_irq_set_type;
++	irqc->chip.name = of_get_property(node, "interrupt-controller-name",
++					  NULL);
++
++	irqc->base = of_iomap(node, 0);
++	if (!irqc->base) {
++		pr_err("%s: unable to map registers\n", node->full_name);
++		return -EINVAL;
++	}
++
++	irqc->domain = irq_domain_add_linear(node, IRQS_PER_CONTROLLER,
++					     &lpc32xx_irq_domain_ops, irqc);
++	if (!irqc->domain) {
++		pr_err("unable to add irq domain\n");
++		iounmap(irqc->base);
++		return -ENODEV;
++	}
++
++	for (i = 0; i < of_irq_count(node); i++) {
++		parent_irq = irq_of_parse_and_map(node, i);
++		if (parent_irq)
++			irq_set_chained_handler_and_data(parent_irq,
++						 lpc32xx_sic_handler, irqc);
++	}
++
++	if (of_device_is_compatible(node, "nxp,lpc3220-mic")) {
++		lpc32xx_mic_data = irqc;
++		set_handle_irq(lpc32xx_handle_irq);
++	}
++
++	lpc32xx_ic_write(irqc->domain, LPC32XX_INTC_MASK, 0x00);
++	lpc32xx_ic_write(irqc->domain, LPC32XX_INTC_POL, 0x00);
++	lpc32xx_ic_write(irqc->domain, LPC32XX_INTC_TYPE, 0x00);
++
++	return 0;
++}
++IRQCHIP_DECLARE(nxp_lpc32xx_mic, "nxp,lpc3220-mic", lpc32xx_of_ic_init);
++IRQCHIP_DECLARE(nxp_lpc32xx_sic, "nxp,lpc3220-sic", lpc32xx_of_ic_init);
 -- 
 2.1.4
