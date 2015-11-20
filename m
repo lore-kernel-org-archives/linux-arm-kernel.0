@@ -1,184 +1,67 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 20 Nov 2015 14:31:02 +0000
-Subject: [PATCH v11 3/5] arm: introduce CONFIG_PARAVIRT,
- PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-In-Reply-To: <alpine.DEB.2.02.1511101411570.5676@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
- <1446737696-9749-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1511101411570.5676@kaball.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1511201430200.1107@kaball.uk.xensource.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 20 Nov 2015 08:33:51 -0600
+Subject: [PATCH 4/4] Documentation: usb: dwc3: qcom: Add TCSR mux usage
+In-Reply-To: <1448008509-8913-5-git-send-email-agross@codeaurora.org>
+References: <1448008509-8913-1-git-send-email-agross@codeaurora.org>
+ <1448008509-8913-5-git-send-email-agross@codeaurora.org>
+Message-ID: <20151120143351.GA9240@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Nov 2015, Stefano Stabellini wrote:
-> On Thu, 5 Nov 2015, Stefano Stabellini wrote:
-> > Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM.
-> > 
-> > The only paravirt interface supported is pv_time_ops.steal_clock, so no
-> > runtime pvops patching needed.
-> > 
-> > This allows us to make use of steal_account_process_tick for stolen
-> > ticks accounting.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > Acked-by: Christopher Covington <cov@codeaurora.org>
-> > Acked-by: Ian Campbell <ian.campbell@citrix.com>
-> > CC: linux at arm.linux.org.uk
-> > CC: will.deacon at arm.com
-> > CC: nico at linaro.org
-> > CC: marc.zyngier at arm.com
-> > CC: cov at codeaurora.org
-> > CC: arnd at arndb.de
-> > CC: olof at lixom.net
+On Fri, Nov 20, 2015 at 02:35:09AM -0600, Andy Gross wrote:
+> This patch adds documentation for the optional syscon-tcsr property in the
+> Qualcomm DWC3 node.  The syscon-tcsr specifies the register and bit used to
+> configure the TCSR USB phy mux register.
 > 
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+> ---
+>  Documentation/devicetree/bindings/usb/qcom,dwc3.txt | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
 > 
-> Russell,
-> are you OK with this patch?
-
-Russell,
-
-I am going to drop this patch and add a small #ifdef to
-arch/arm/xen/enlighten.c to be able to use this functionality on arm64.
-
-If you change your mind let me know.
-
-
-
+> diff --git a/Documentation/devicetree/bindings/usb/qcom,dwc3.txt b/Documentation/devicetree/bindings/usb/qcom,dwc3.txt
+> index ca164e7..dfa222d 100644
+> --- a/Documentation/devicetree/bindings/usb/qcom,dwc3.txt
+> +++ b/Documentation/devicetree/bindings/usb/qcom,dwc3.txt
+> @@ -8,6 +8,10 @@ Required properties:
+>    "core"		Master/Core clock, have to be >= 125 MHz for SS
+>  				operation and >= 60MHz for HS operation
+>  
+> +Optional properties:
+> +- syscon-tcsr	Specifies TCSR handle, register offset, and bit position for
+> +			configuring the phy mux setting.
+> +
+>  Optional clocks:
+>    "iface"		System bus AXI clock.  Not present on all platforms
+>    "sleep"		Sleep clock, used when USB3 core goes into low
+> @@ -22,6 +26,11 @@ Documentation/devicetree/bindings/phy/qcom,dwc3-usb-phy.txt
+>  
+>  Example device nodes:
+>  
+> +		tcsr: syscon at 1a400000 {
+> +			compatible = "qcom,tcsr-ipq8064", "syscon";
+> +			reg = <0x1a400000 0x100>;
+> +		};
+> +
+>  		hs_phy: phy at 100f8800 {
+>  			compatible = "qcom,dwc3-hs-usb-phy";
+>  			reg = <0x100f8800 0x30>;
+> @@ -51,6 +60,8 @@ Example device nodes:
+>  
+>  			ranges;
+>  
+> +			syscon-tcsr = <&tcsr 0xb0 0x1>;
+> +
+>  			status = "ok";
+>  
+>  			dwc3 at 10000000 {
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
 > 
-> 
-> > 
-> > Changes in v10:
-> > - replace "---help---" with "help"
-> > 
-> > Changes in v7:
-> > - ifdef CONFIG_PARAVIRT the content of paravirt.h.
-> > 
-> > Changes in v3:
-> > - improve commit description and Kconfig help text;
-> > - no need to initialize pv_time_ops;
-> > - add PARAVIRT_TIME_ACCOUNTING.
-> > ---
-> >  arch/arm/Kconfig                |   20 ++++++++++++++++++++
-> >  arch/arm/include/asm/paravirt.h |   20 ++++++++++++++++++++
-> >  arch/arm/kernel/Makefile        |    1 +
-> >  arch/arm/kernel/paravirt.c      |   25 +++++++++++++++++++++++++
-> >  4 files changed, 66 insertions(+)
-> >  create mode 100644 arch/arm/include/asm/paravirt.h
-> >  create mode 100644 arch/arm/kernel/paravirt.c
-> > 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index f1ed110..60be104 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -1823,6 +1823,25 @@ config SWIOTLB
-> >  config IOMMU_HELPER
-> >  	def_bool SWIOTLB
-> >  
-> > +config PARAVIRT
-> > +	bool "Enable paravirtualization code"
-> > +	help
-> > +	  This changes the kernel so it can modify itself when it is run
-> > +	  under a hypervisor, potentially improving performance significantly
-> > +	  over full virtualization.
-> > +
-> > +config PARAVIRT_TIME_ACCOUNTING
-> > +	bool "Paravirtual steal time accounting"
-> > +	select PARAVIRT
-> > +	default n
-> > +	help
-> > +	  Select this option to enable fine granularity task steal time
-> > +	  accounting. Time spent executing other tasks in parallel with
-> > +	  the current vCPU is discounted from the vCPU power. To account for
-> > +	  that, there can be a small performance impact.
-> > +
-> > +	  If in doubt, say N here.
-> > +
-> >  config XEN_DOM0
-> >  	def_bool y
-> >  	depends on XEN
-> > @@ -1836,6 +1855,7 @@ config XEN
-> >  	select ARCH_DMA_ADDR_T_64BIT
-> >  	select ARM_PSCI
-> >  	select SWIOTLB_XEN
-> > +	select PARAVIRT
-> >  	help
-> >  	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
-> >  
-> > diff --git a/arch/arm/include/asm/paravirt.h b/arch/arm/include/asm/paravirt.h
-> > new file mode 100644
-> > index 0000000..8435ff59
-> > --- /dev/null
-> > +++ b/arch/arm/include/asm/paravirt.h
-> > @@ -0,0 +1,20 @@
-> > +#ifndef _ASM_ARM_PARAVIRT_H
-> > +#define _ASM_ARM_PARAVIRT_H
-> > +
-> > +#ifdef CONFIG_PARAVIRT
-> > +struct static_key;
-> > +extern struct static_key paravirt_steal_enabled;
-> > +extern struct static_key paravirt_steal_rq_enabled;
-> > +
-> > +struct pv_time_ops {
-> > +	unsigned long long (*steal_clock)(int cpu);
-> > +};
-> > +extern struct pv_time_ops pv_time_ops;
-> > +
-> > +static inline u64 paravirt_steal_clock(int cpu)
-> > +{
-> > +	return pv_time_ops.steal_clock(cpu);
-> > +}
-> > +#endif
-> > +
-> > +#endif
-> > diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> > index af9e59b..3e6e937 100644
-> > --- a/arch/arm/kernel/Makefile
-> > +++ b/arch/arm/kernel/Makefile
-> > @@ -81,6 +81,7 @@ obj-$(CONFIG_VDSO)		+= vdso.o
-> >  ifneq ($(CONFIG_ARCH_EBSA110),y)
-> >    obj-y		+= io.o
-> >  endif
-> > +obj-$(CONFIG_PARAVIRT)	+= paravirt.o
-> >  
-> >  head-y			:= head$(MMUEXT).o
-> >  obj-$(CONFIG_DEBUG_LL)	+= debug.o
-> > diff --git a/arch/arm/kernel/paravirt.c b/arch/arm/kernel/paravirt.c
-> > new file mode 100644
-> > index 0000000..53f371e
-> > --- /dev/null
-> > +++ b/arch/arm/kernel/paravirt.c
-> > @@ -0,0 +1,25 @@
-> > +/*
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * Copyright (C) 2013 Citrix Systems
-> > + *
-> > + * Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > + */
-> > +
-> > +#include <linux/export.h>
-> > +#include <linux/jump_label.h>
-> > +#include <linux/types.h>
-> > +#include <asm/paravirt.h>
-> > +
-> > +struct static_key paravirt_steal_enabled;
-> > +struct static_key paravirt_steal_rq_enabled;
-> > +
-> > +struct pv_time_ops pv_time_ops;
-> > +EXPORT_SYMBOL_GPL(pv_time_ops);
-> > -- 
-> > 1.7.10.4
-> > 
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
