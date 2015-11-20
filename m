@@ -1,32 +1,20 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Nov 2015 17:41:36 +0100
-Subject: [PATCH] IB/iser: use sector_div instead of do_div
-Message-ID: <5922990.8IJpyksX8K@wuerfel>
+From: martin.petersen@oracle.com (Martin K. Petersen)
+Date: Fri, 20 Nov 2015 11:42:36 -0500
+Subject: [PATCH] scsi: hpsa: select CONFIG_SCSI_SAS_ATTR
+In-Reply-To: <3970646.5sOyETUiWo@wuerfel> (Arnd Bergmann's message of "Thu, 19
+ Nov 2015 23:04:35 +0100")
+References: <3970646.5sOyETUiWo@wuerfel>
+Message-ID: <yq1r3jkmxkz.fsf@sermon.lab.mkp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-do_div is the wrong way to divide a sector_t, as it is less
-efficient when sector_t is 32-bit wide. With the upcoming
-do_div optimizations, the kernel starts warning about this:
+>>>>> "Arnd" == Arnd Bergmann <arnd@arndb.de> writes:
 
-drivers/infiniband/ulp/iser/iser_verbs.c:1296:4: note: in expansion of macro 'do_div'
-include/asm-generic/div64.h:224:22: warning: passing argument 1 of '__div64_32' from incompatible pointer type
+Arnd> The hpsa driver recently started using the sas transport class,
+Arnd> but it does not ensure that the corresponding code is actually
+Arnd> built, which may lead to a link error:
 
-This changes the code to use sector_div instead, which always
-produces optimal code.
+Applied.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/infiniband/ulp/iser/iser_verbs.c b/drivers/infiniband/ulp/iser/iser_verbs.c
-index a93070210109..42f4da620f2e 100644
---- a/drivers/infiniband/ulp/iser/iser_verbs.c
-+++ b/drivers/infiniband/ulp/iser/iser_verbs.c
-@@ -1293,7 +1293,7 @@ u8 iser_check_task_pi_status(struct iscsi_iser_task *iser_task,
- 		if (mr_status.fail_status & IB_MR_CHECK_SIG_STATUS) {
- 			sector_t sector_off = mr_status.sig_err.sig_err_offset;
- 
--			do_div(sector_off, sector_size + 8);
-+			sector_div(sector_off, sector_size + 8);
- 			*sector = scsi_get_lba(iser_task->sc) + sector_off;
- 
- 			pr_err("PI error found type %d at sector %llx "
+-- 
+Martin K. Petersen	Oracle Linux Engineering
