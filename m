@@ -1,90 +1,77 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 20 Nov 2015 09:12:41 +0900
-Subject: [PATCH v2 2/2] arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into
- ARCH_EXYNOS
+Date: Fri, 20 Nov 2015 09:12:40 +0900
+Subject: [PATCH v2 1/2] clk: samsung: Don't build ARMv8 clock drivers on ARMv7
 In-Reply-To: <1447978361-18010-1-git-send-email-k.kozlowski@samsung.com>
 References: <1447978361-18010-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1447978361-18010-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1447978361-18010-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARMv8 Exynos family SoCs in Linux kernel are currently:
- - Exynos5433 (controlled by ARCH_EXYNOS),
- - Exynos7 (controlled by ARCH_EXYNOS7).
+Currently the Exynos5433 (ARMv8 SoC) clock driver depends on ARCH_EXYNOS
+so it is built also on ARMv7. This does not bring any kind of benefit.
+There won't be a single kernel image for ARMv7 and ARMv8 SoCs (like
+multi_v7 for ARMv7).
 
-It duplicates Kconfig symbols unnecessarily, so consolidate them into
-one ARCH_EXYNOS. Future SoCs could fall also under the ARCH_EXYNOS
-symbol.
-
-The commit should not bring any visible functional change.
+Instead build clock drivers only for respective SoC's architecture.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-Reviewed-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Tested-by: Alim Akhtar <alim.akhtar@samsung.com>
-Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
+Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
 
 ---
 
 Changes since v1:
-1. Minor cleanups after Tomasz's comments.
-2. Added tags: Chanwoo's, Pankaj's, Alim's and Tomasz's.
+1. Use one Kconfig symbol for clocks of all ARM64 SoCs (after
+   discussion): EXYNOS_ARM64_COMMON_CLK.
+2. Minor cleanups after Tomasz's comments.
+3. Added tags: Chanwoo's, Sylwester's, Alim's and Tomasz's (the tags
+   were given for v1 but assuming that change from 1. is not major
+   enough to require re-tagging).
 ---
- arch/arm64/Kconfig.platforms        | 11 ++---------
- arch/arm64/boot/dts/exynos/Makefile |  2 +-
- arch/arm64/configs/defconfig        |  2 +-
- 3 files changed, 4 insertions(+), 11 deletions(-)
+ drivers/clk/samsung/Kconfig  | 6 ++++++
+ drivers/clk/samsung/Makefile | 4 ++--
+ 2 files changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 4043c35962cc..64f1116640bc 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -13,21 +13,14 @@ config ARCH_BERLIN
- 	  This enables support for Marvell Berlin SoC Family
+diff --git a/drivers/clk/samsung/Kconfig b/drivers/clk/samsung/Kconfig
+index 84196ecdaa12..3a2c032965e6 100644
+--- a/drivers/clk/samsung/Kconfig
++++ b/drivers/clk/samsung/Kconfig
+@@ -2,6 +2,7 @@ config COMMON_CLK_SAMSUNG
+ 	bool
+ 	select COMMON_CLK
  
- config ARCH_EXYNOS
--	bool
--	help
--	  This enables support for Samsung Exynos SoC family
--
--config ARCH_EXYNOS7
--	bool "ARMv8 based Samsung Exynos7"
--	select ARCH_EXYNOS
-+	bool "ARMv8 based Samsung Exynos SoC family"
++# ARM SoCs:
+ config S3C2410_COMMON_CLK
+ 	bool
  	select COMMON_CLK_SAMSUNG
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
- 	select HAVE_S3C_RTC if RTC_CLASS
- 	select PINCTRL
- 	select PINCTRL_EXYNOS
--
- 	help
--	  This enables support for Samsung Exynos7 SoC family
-+	  This enables support for ARMv8 based Samsung Exynos SoC family.
+@@ -24,3 +25,8 @@ config S3C2443_COMMON_CLK
+ 	bool
+ 	select COMMON_CLK_SAMSUNG
  
- config ARCH_LAYERSCAPE
- 	bool "ARMv8 based Freescale Layerscape SoC family"
-diff --git a/arch/arm64/boot/dts/exynos/Makefile b/arch/arm64/boot/dts/exynos/Makefile
-index 20310e5b6d6f..50c9b9383cfa 100644
---- a/arch/arm64/boot/dts/exynos/Makefile
-+++ b/arch/arm64/boot/dts/exynos/Makefile
-@@ -1,4 +1,4 @@
--dtb-$(CONFIG_ARCH_EXYNOS7) += exynos7-espresso.dtb
-+dtb-$(CONFIG_ARCH_EXYNOS) += exynos7-espresso.dtb
- 
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index bdd7aa358d2a..a396fa7c69a5 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -33,7 +33,7 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_IOSCHED_DEADLINE is not set
- CONFIG_ARCH_BCM_IPROC=y
- CONFIG_ARCH_BERLIN=y
--CONFIG_ARCH_EXYNOS7=y
-+CONFIG_ARCH_EXYNOS=y
- CONFIG_ARCH_LAYERSCAPE=y
- CONFIG_ARCH_HISI=y
- CONFIG_ARCH_MEDIATEK=y
++# ARM64 SoCs (e.g. Exynos5433, Exynos7):
++config EXYNOS_ARM64_COMMON_CLK
++	def_bool ARCH_EXYNOS
++	depends on ARM64 || COMPILE_TEST
++	select COMMON_CLK_SAMSUNG
+diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
+index 5f6833ea355d..fc367d4b2902 100644
+--- a/drivers/clk/samsung/Makefile
++++ b/drivers/clk/samsung/Makefile
+@@ -10,11 +10,11 @@ obj-$(CONFIG_SOC_EXYNOS5250)	+= clk-exynos5250.o
+ obj-$(CONFIG_SOC_EXYNOS5260)	+= clk-exynos5260.o
+ obj-$(CONFIG_SOC_EXYNOS5410)	+= clk-exynos5410.o
+ obj-$(CONFIG_SOC_EXYNOS5420)	+= clk-exynos5420.o
+-obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos5433.o
++obj-$(CONFIG_EXYNOS_ARM64_COMMON_CLK)	+= clk-exynos5433.o
+ obj-$(CONFIG_SOC_EXYNOS5440)	+= clk-exynos5440.o
+ obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-audss.o
+ obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-clkout.o
+-obj-$(CONFIG_ARCH_EXYNOS7)	+= clk-exynos7.o
++obj-$(CONFIG_EXYNOS_ARM64_COMMON_CLK)	+= clk-exynos7.o
+ obj-$(CONFIG_S3C2410_COMMON_CLK)+= clk-s3c2410.o
+ obj-$(CONFIG_S3C2410_COMMON_DCLK)+= clk-s3c2410-dclk.o
+ obj-$(CONFIG_S3C2412_COMMON_CLK)+= clk-s3c2412.o
 -- 
 1.9.1
