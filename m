@@ -1,39 +1,61 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 20 Nov 2015 12:17:20 +0100
-Subject: [PATCH v3 9/9] ARM: multi_v7_defconfig: Enable RSB and AXP20X
- related drivers as modules
-In-Reply-To: <1447691908-25456-10-git-send-email-wens@csie.org>
-References: <1447691908-25456-1-git-send-email-wens@csie.org>
- <1447691908-25456-10-git-send-email-wens@csie.org>
-Message-ID: <20151120111720.GY32142@lukather>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 20 Nov 2015 12:17:13 +0100
+Subject: [PATCH 7/7] ARM: dts: sun4i: Add touchscreen node to pov protab2-ips9
+ tablet
+In-Reply-To: <1448018233-27824-1-git-send-email-hdegoede@redhat.com>
+References: <1448018233-27824-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1448018233-27824-8-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 12:38:28AM +0800, Chen-Yu Tsai wrote:
-> axp20x support has been split into 2 parts, I2C and RSB interface
-> variants.
-> 
-> Update the MFD_AXP20X symbol for I2C support. Also enable SUNXI_RSB
-> MFD_AXP20X_RSB to support RSB variants. Build these drivers as
-> modules.
-> 
-> Keep MFD_AXP20X enabled for now, to ease migration for automated
-> boot farms while the patches are being merged. This should be
-> removed in the next release.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Add a node describing the touchscreen found on the pov protab2-ips9
+tablet.
 
-Applied, thanks!
-Maxime
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
+diff --git a/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts b/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
+index 82e69c3..0e5124f 100644
+--- a/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
++++ b/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
+@@ -93,6 +93,22 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c2_pins_a>;
+ 	status = "okay";
++
++	pixcir_ts at 5c {
++		pinctrl-names = "default";
++		pinctrl-0 = <&touchscreen_pins>;
++		compatible = "pixcir,pixcir_tangoc";
++		reg = <0x5c>;
++		interrupt-parent = <&pio>;
++		interrupts = <7 21 IRQ_TYPE_EDGE_FALLING>; /* EINT21 (PH21) */
++		attb-gpio = <&pio 7 21 GPIO_ACTIVE_HIGH>; /* PH21 */
++		enable-gpios = <&pio 0 5 GPIO_ACTIVE_LOW>;
++		wake-gpios = <&pio 1 13 GPIO_ACTIVE_LOW>;
++		touchscreen-size-x = <1024>;
++		touchscreen-size-y = <768>;
++		touchscreen-inverted-x;
++		touchscreen-inverted-y;
++	};
+ };
+ 
+ &lradc {
+@@ -129,6 +145,13 @@
+ };
+ 
+ &pio {
++	touchscreen_pins: touchscreen_pins at 0 {
++		allwinner,pins = "PA5", "PB13";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
+ 	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+ 		allwinner,pins = "PH4";
+ 		allwinner,function = "gpio_in";
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/07108e91/attachment.sig>
+2.5.0
