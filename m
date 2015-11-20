@@ -1,35 +1,55 @@
-From: mweseloh42@gmail.com (Marcus Weseloh)
-Date: Fri, 20 Nov 2015 09:45:48 +0100
-Subject: [linux-sunxi] [PATCH] spi: dts: sun4i: Add support for inter-word
- wait cycles using the SPI Wait Clock Register
-In-Reply-To: <CAGRGNgWQLE5h03+4shLmqD6iW_p=L-i3ewdLb8ndWpxGHWh4rQ@mail.gmail.com>
-References: <1447948422-4915-1-git-send-email-mweseloh42@gmail.com>
- <1447948422-4915-2-git-send-email-mweseloh42@gmail.com>
- <CAGRGNgWQLE5h03+4shLmqD6iW_p=L-i3ewdLb8ndWpxGHWh4rQ@mail.gmail.com>
-Message-ID: <CAGNoLaNhD73N5_1_NbkvRFnwNqO5ehQBTyeCEgzFVgWCrJZmWQ@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 20 Nov 2015 16:42:26 +0800
+Subject: [PATCH v2 0/6] Add Marvell berlin4ct clk support
+Message-ID: <1448008952-1787-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julian,
+Add berlin4ct clk driver. The berlin4ct SoC contains:
 
-2015-11-19 23:59 GMT+01:00 Julian Calaby <julian.calaby@gmail.com>:
-> Should you possibly hide the 3 clock periods from the user?
->
-> I.e. they set whatever they want for the wdelay, we set it to the
-> closest number we can that's greater or equal to what they ask for.
+two kinds of PLL: normal PLL and AVPLL. The normal PLL support is done.
+The AVPLL support is in TODO list.
 
-That's a good idea and much better than having to remember to subtract
-3 cycles from the desired wait time!
+two kinds of clk: normal clk and gate clk. The normal clk supports changing
+divider, selecting clock source, disabling/enabling etc. The gate clk only
+supports disabling/enabling. Both are supported in this series.
 
-But it would mean that this magic number becomes part of the driver
-code. I have found no official documentation that mentions those
-additional cycles. While I have checked many different transmission
-speeds using both CDR1 and CDR2 divider configurations, there is still
-the possibility that the behaviour changes with weird SPI module
-configurations... And I've only tested it on A20 hardware. So it would
-be great if somebody else with access to A10 hardware and an
-oscilloscope could check if we have a consistent 3 cycle overhead.
+Since v1:
+ - rebased on v4.4-rc1
+ - refactor out common code from clk-berlin4ct.c
+ - s/lock/berlin4ct_gateclk_lock
+ - drop WARN_ON for an allocation failure
+ - s/kzalloc/kcalloc
+ - add necessary handling in error code path, such as free memory, iounmap etc.
+ - initialize init.flags
+ - drop vcodiv_berlin[] array
 
-Cheers,
 
-   Marcus
+Jisheng Zhang (6):
+  clk: berlin: add common pll driver
+  clk: berlin: add common clk driver for newer SoCs
+  clk: berlin: add common gateclk driver for newer SoCs
+  clk: berlin: add clk support for berlin4ct
+  dt-bindings: add binding for marvell berlin4ct SoC
+  arm64: dts: berlin4ct: add pll and clock nodes
+
+ .../bindings/clock/marvell,berlin4ct.txt           |  38 ++++
+ arch/arm64/boot/dts/marvell/berlin4ct.dtsi         |  38 ++++
+ drivers/clk/berlin/Makefile                        |   1 +
+ drivers/clk/berlin/clk-berlin4ct.c                 |  97 ++++++++++
+ drivers/clk/berlin/clk.c                           | 203 +++++++++++++++++++++
+ drivers/clk/berlin/clk.h                           |  45 +++++
+ drivers/clk/berlin/gate.c                          |  73 ++++++++
+ drivers/clk/berlin/pll.c                           | 133 ++++++++++++++
+ include/dt-bindings/clock/berlin4ct.h              |  56 ++++++
+ 9 files changed, 684 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/marvell,berlin4ct.txt
+ create mode 100644 drivers/clk/berlin/clk-berlin4ct.c
+ create mode 100644 drivers/clk/berlin/clk.c
+ create mode 100644 drivers/clk/berlin/clk.h
+ create mode 100644 drivers/clk/berlin/gate.c
+ create mode 100644 drivers/clk/berlin/pll.c
+ create mode 100644 include/dt-bindings/clock/berlin4ct.h
+
+-- 
+2.6.2
