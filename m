@@ -1,146 +1,45 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Fri, 20 Nov 2015 22:15:09 +1000
-Subject: [PATCH] include: asm-generic: page.h: Remove useless
- get_user_page and free_user_page
-In-Reply-To: <COL130-W7B5F0BB94C76AF6B12EA7B91C0@phx.gbl>
-References: <COL130-W7B5F0BB94C76AF6B12EA7B91C0@phx.gbl>
-Message-ID: <564F0ECD.2050109@uclinux.org>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Fri, 20 Nov 2015 12:18:34 +0000
+Subject: [Xen-devel] [PATCH v4 2/7] xen/arm: introduce
+ HYPERVISOR_platform_op on arm and arm64
+In-Reply-To: <alpine.DEB.2.02.1511201152030.1107@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1511121726370.526@kaball.uk.xensource.com>
+ <1447349448-22610-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <5645E868.30706@citrix.com>
+ <alpine.DEB.2.02.1511131757360.2653@kaball.uk.xensource.com>
+ <1447666977.15629.9.camel@citrix.com>
+ <alpine.DEB.2.02.1511201152030.1107@kaball.uk.xensource.com>
+Message-ID: <1448021914.5647.139.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen,
+On Fri, 2015-11-20 at 11:58 +0000, Stefano Stabellini wrote:
+> On Mon, 16 Nov 2015, Ian Campbell wrote:
+> > On Fri, 2015-11-13 at 18:10 +0000, Stefano Stabellini wrote:
+> > > 
+> > > I agree with your point (I thought about it myself) but the current
+> > > assembly scheme for hypercalls doesn't work well with that. I would
+> > > have
+> > > to introduce, and maintain going forward, two special hypercall
+> > > implementations in assembly, one for arm and another for arm64, just
+> > > to
+> > > set interface_version. I don't think it is worth it; I prefer to have
+> > > to
+> > > maintain the explicit interface_version setting at the call sites
+> > > (that
+> > > today is just one).
+> > 
+> > You could give the bare assembly stub a different name (append _core or
+> > _raw or something) and make HYPERVISOR_platform_op a C wrapper for it
+> > which
+> > DTRT.
+> 
+> I had an idea. I just need to 
+> 
+> #define HYPERVISOR_platform_op_raw HYPERVISOR_platform_op
 
-On 19/11/15 05:40, Chen Gang wrote:
->>From ba7c00c4cb976109b6a35812ce9649aaeda81e2d Mon Sep 17 00:00:00 2001
-> From: Chen Gang <gang.chen.5i5j@gmail.com>
-> Date: Thu, 19 Nov 2015 03:24:42 +0800
-> Subject: [PATCH] include: asm-generic: page.h: Remove useless get_user_page and free_user_page
->
-> They are not symmetric with each other, neither are used in real world
-> (can not be found by grep command in source code root directory), so
-> remove them.
->
-> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
+The need for this #define is a bit unfortunate, but the alternatives (e.g.
+a suffix argument to the HYPERCALL*() macros or a RAWHYPERCALL variant)
+would seem to suck more, so I say go for it.
 
-Compile and run tested on m68k (MMU and noMMU) targets.
-No problems found. So for those parts:
-
-Acked-by: Greg Ungerer <gerg@uclinux.org>
-
-Regards
-Greg
-
-
-> ---
->   arch/arc/include/asm/page.h       | 3 ---
->   arch/arm/include/asm/page-nommu.h | 3 ---
->   arch/frv/include/asm/page.h       | 3 ---
->   arch/m68k/include/asm/page_mm.h   | 3 ---
->   arch/m68k/include/asm/page_no.h   | 3 ---
->   arch/openrisc/include/asm/page.h  | 3 ---
->   include/asm-generic/page.h        | 3 ---
->   7 files changed, 21 deletions(-)
->
-> diff --git a/arch/arc/include/asm/page.h b/arch/arc/include/asm/page.h
-> index 429957f..adf5cbb 100644
-> --- a/arch/arc/include/asm/page.h
-> +++ b/arch/arc/include/asm/page.h
-> @@ -13,9 +13,6 @@
->
->   #ifndef __ASSEMBLY__
->
-> -#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
-> -#define free_user_page(page, addr)	free_page(addr)
-> -
->   #define clear_page(paddr)		memset((paddr), 0, PAGE_SIZE)
->   #define copy_page(to, from)		memcpy((to), (from), PAGE_SIZE)
->
-> diff --git a/arch/arm/include/asm/page-nommu.h b/arch/arm/include/asm/page-nommu.h
-> index d1b162a..503f488 100644
-> --- a/arch/arm/include/asm/page-nommu.h
-> +++ b/arch/arm/include/asm/page-nommu.h
-> @@ -17,9 +17,6 @@
->   #define KTHREAD_SIZE PAGE_SIZE
->   #endif
->
-> -#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
-> -#define free_user_page(page, addr)	free_page(addr)
-> -
->   #define clear_page(page)	memset((page), 0, PAGE_SIZE)
->   #define copy_page(to,from)	memcpy((to), (from), PAGE_SIZE)
->
-> diff --git a/arch/frv/include/asm/page.h b/arch/frv/include/asm/page.h
-> index 8c97068..52ace96 100644
-> --- a/arch/frv/include/asm/page.h
-> +++ b/arch/frv/include/asm/page.h
-> @@ -8,9 +8,6 @@
->
->   #ifndef __ASSEMBLY__
->
-> -#define get_user_page(vaddr)			__get_free_page(GFP_KERNEL)
-> -#define free_user_page(page, addr)		free_page(addr)
-> -
->   #define clear_page(pgaddr)			memset((pgaddr), 0, PAGE_SIZE)
->   #define copy_page(to,from)			memcpy((to), (from), PAGE_SIZE)
->
-> diff --git a/arch/m68k/include/asm/page_mm.h b/arch/m68k/include/asm/page_mm.h
-> index 5029f73..e7a1946 100644
-> --- a/arch/m68k/include/asm/page_mm.h
-> +++ b/arch/m68k/include/asm/page_mm.h
-> @@ -6,9 +6,6 @@
->   #include <linux/compiler.h>
->   #include <asm/module.h>
->
-> -#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
-> -#define free_user_page(page, addr)	free_page(addr)
-> -
->   /*
->    * We don't need to check for alignment etc.
->    */
-> diff --git a/arch/m68k/include/asm/page_no.h b/arch/m68k/include/asm/page_no.h
-> index ef20916..fa7f32d 100644
-> --- a/arch/m68k/include/asm/page_no.h
-> +++ b/arch/m68k/include/asm/page_no.h
-> @@ -6,9 +6,6 @@
->   extern unsigned long memory_start;
->   extern unsigned long memory_end;
->
-> -#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
-> -#define free_user_page(page, addr)	free_page(addr)
-> -
->   #define clear_page(page)	memset((page), 0, PAGE_SIZE)
->   #define copy_page(to,from)	memcpy((to), (from), PAGE_SIZE)
->
-> diff --git a/arch/openrisc/include/asm/page.h b/arch/openrisc/include/asm/page.h
-> index 108906f..e613d36 100644
-> --- a/arch/openrisc/include/asm/page.h
-> +++ b/arch/openrisc/include/asm/page.h
-> @@ -40,9 +40,6 @@
->
->   #ifndef __ASSEMBLY__
->
-> -#define get_user_page(vaddr)            __get_free_page(GFP_KERNEL)
-> -#define free_user_page(page, addr)      free_page(addr)
-> -
->   #define clear_page(page)	memset((page), 0, PAGE_SIZE)
->   #define copy_page(to, from)	memcpy((to), (from), PAGE_SIZE)
->
-> diff --git a/include/asm-generic/page.h b/include/asm-generic/page.h
-> index 37d1fe2..67cfb7d 100644
-> --- a/include/asm-generic/page.h
-> +++ b/include/asm-generic/page.h
-> @@ -24,9 +24,6 @@
->
->   #ifndef __ASSEMBLY__
->
-> -#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
-> -#define free_user_page(page, addr)	free_page(addr)
-> -
->   #define clear_page(page)	memset((page), 0, PAGE_SIZE)
->   #define copy_page(to,from)	memcpy((to), (from), PAGE_SIZE)
->
-> --
-> 1.9.3
->
->   		 	   		
->
+Ian.
