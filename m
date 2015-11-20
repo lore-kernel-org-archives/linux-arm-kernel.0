@@ -1,65 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Nov 2015 16:35:44 +0000
-Subject: [arm:drm-etnaviv-devel 89/149]
- drivers/staging/etnaviv/etnaviv_gem_submit.c:263:19: error: 'struct
- drm_etnaviv_gem_submit_reloc' has no member named 'shift'
-In-Reply-To: <201511210020.MaDgPArI%fengguang.wu@intel.com>
-References: <201511210020.MaDgPArI%fengguang.wu@intel.com>
-Message-ID: <20151120163544.GE8644@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 20 Nov 2015 17:38:18 +0100
+Subject: [PATCH 1/4] ARM: dts: sun4i: Add backlight node to iNet1 tablet
+In-Reply-To: <1448027950-14629-1-git-send-email-hdegoede@redhat.com>
+References: <1448027950-14629-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20151120163818.GG32142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems that my request to _not_ test individual commits in this
-branch are not being heeded...
+On Fri, Nov 20, 2015 at 02:59:07PM +0100, Hans de Goede wrote:
+> Add a node describing the lcd panel backlight on the iNet1 tablet.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-On Sat, Nov 21, 2015 at 12:15:21AM +0800, kbuild test robot wrote:
-> tree:   http://repo.or.cz/linux-2.6/linux-2.6-arm.git drm-etnaviv-devel
-> head:   77c57a5498ebe5c85b4a71fbcf800a9140f9a697
-> commit: 11c90396fe41eb9d232018c47d89da4080c375d2 [89/149] staging: etnaviv: clean up public API
-> config: i386-randconfig-r0-201546 (attached as .config)
-> reproduce:
->         git checkout 11c90396fe41eb9d232018c47d89da4080c375d2
->         # save the attached .config to linux build tree
->         make ARCH=i386 
-> 
-> Note: the arm/drm-etnaviv-devel HEAD a0252118653cb935f209bd8baf048195c77d3292 builds fine.
->       It only hurts bisectibility.
-> 
-> All errors (new ones prefixed by >>):
-> 
->    drivers/staging/etnaviv/etnaviv_gem_submit.c: In function 'submit_reloc':
-> >> drivers/staging/etnaviv/etnaviv_gem_submit.c:263:19: error: 'struct drm_etnaviv_gem_submit_reloc' has no member named 'shift'
->       if (submit_reloc.shift || submit_reloc.or) {
->                       ^
-> >> drivers/staging/etnaviv/etnaviv_gem_submit.c:263:41: error: 'struct drm_etnaviv_gem_submit_reloc' has no member named 'or'
->       if (submit_reloc.shift || submit_reloc.or) {
->                                             ^
-> 
-> vim +263 drivers/staging/etnaviv/etnaviv_gem_submit.c
-> 
-> b920a1d2 Christian Gmeiner 2014-09-27  257  				(off < last_offset)) {
-> b920a1d2 Christian Gmeiner 2014-09-27  258  			DRM_ERROR("invalid offset %u at reloc %u\n", off, i);
-> b920a1d2 Christian Gmeiner 2014-09-27  259  			return -EINVAL;
-> b920a1d2 Christian Gmeiner 2014-09-27  260  		}
-> b920a1d2 Christian Gmeiner 2014-09-27  261  
-> 80ddbc50 Russell King      2014-10-21  262  		/* Vivante hardware has no need for shifts or bitwise or-ing */
-> 80ddbc50 Russell King      2014-10-21 @263  		if (submit_reloc.shift || submit_reloc.or) {
-> 80ddbc50 Russell King      2014-10-21  264  			DRM_ERROR("invalid shift or bitwise or at reloc %u\n",
-> 80ddbc50 Russell King      2014-10-21  265  				  i);
-> 80ddbc50 Russell King      2014-10-21  266  			return -EINVAL;
-> 
-> :::::: The code at line 263 was first introduced by commit
-> :::::: 80ddbc5081a66ab9d3d494044ddbe3a7c94efbed staging: etnaviv: remove shifting and bitwise or-ing of GPU addresses
-> 
-> :::::: TO: Russell King <rmk+kernel@arm.linux.org.uk>
-> :::::: CC: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Applied. This patch was not applying. Please either mention the
+dependency between your patch sets or base them on top of linus' rc's
+or my branches.
 
-
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/f2363890/attachment.sig>
