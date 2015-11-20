@@ -1,34 +1,42 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 20 Nov 2015 13:36:57 +0100
-Subject: [PATCH 6/6] staging: board: armadillo800eva: Use "arm,pl390"
+Date: Fri, 20 Nov 2015 13:36:53 +0100
+Subject: [PATCH 2/6] ARM: shmobile: r8a7740 dtsi: Use "arm,pl390" for GIC
 In-Reply-To: <1448023017-21816-1-git-send-email-geert+renesas@glider.be>
 References: <1448023017-21816-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1448023017-21816-7-git-send-email-geert+renesas@glider.be>
+Message-ID: <1448023017-21816-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Replace the "arm,cortex-a9-gic" compatible value for the GIC by
+"arm,pl390", as the documentation states it is a PL390.
+This has been confirmed by reading the GICD_IIDR register, which reports
+0x0000043b (PL390 = 0x00, ARM = 0x43b).
+
+This has no effect on runtime behavior, as currently the GIC driver
+treats both compatible values the same.
+
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
-Must be applied together with "ARM: shmobile: r8a7740 dtsi: Use
-"arm,pl390" for GIC"!
+You can read the GICD_IIDR register from Hermit using
 
-Greg: Can you please provide your ack? Thanks!
+    frob
+    peek 0xc2800008
 ---
- drivers/staging/board/armadillo800eva.c | 2 +-
+ arch/arm/boot/dts/r8a7740.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/board/armadillo800eva.c b/drivers/staging/board/armadillo800eva.c
-index 9c41652ee908b5e8..912c96b0536def7c 100644
---- a/drivers/staging/board/armadillo800eva.c
-+++ b/drivers/staging/board/armadillo800eva.c
-@@ -97,7 +97,7 @@ static const struct board_staging_dev armadillo800eva_devices[] __initconst = {
+diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+index 4d58cdc3a026b2a4..08846c72cf1a64a3 100644
+--- a/arch/arm/boot/dts/r8a7740.dtsi
++++ b/arch/arm/boot/dts/r8a7740.dtsi
+@@ -39,7 +39,7 @@
+ 	};
  
- static void __init armadillo800eva_init(void)
- {
--	board_staging_gic_setup_xlate("arm,cortex-a9-gic", 32);
-+	board_staging_gic_setup_xlate("arm,pl390", 32);
- 	board_staging_register_devices(armadillo800eva_devices,
- 				       ARRAY_SIZE(armadillo800eva_devices));
- }
+ 	gic: interrupt-controller at c2800000 {
+-		compatible = "arm,cortex-a9-gic";
++		compatible = "arm,pl390";
+ 		#interrupt-cells = <3>;
+ 		interrupt-controller;
+ 		reg = <0xc2800000 0x1000>,
 -- 
 1.9.1
