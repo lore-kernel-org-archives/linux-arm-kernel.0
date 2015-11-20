@@ -1,42 +1,38 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 20 Nov 2015 13:36:52 +0100
-Subject: [PATCH 1/6] ARM: shmobile: r7s72100 dtsi: Use "arm,pl390" for GIC
-In-Reply-To: <1448023017-21816-1-git-send-email-geert+renesas@glider.be>
-References: <1448023017-21816-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1448023017-21816-2-git-send-email-geert+renesas@glider.be>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 20 Nov 2015 13:49:55 +0100
+Subject: [linux-sunxi] [PATCH 1/5] clk: sunxi: Add support for the H3 usb
+ phy clocks
+In-Reply-To: <CAGb2v65x5z4Svn+PAmm1W6xZKxP0iFjCodeA0xbf0VLxx5qiWA@mail.gmail.com>
+References: <1447616777-24660-1-git-send-email-hdegoede@redhat.com>
+ <CAGb2v65x5z4Svn+PAmm1W6xZKxP0iFjCodeA0xbf0VLxx5qiWA@mail.gmail.com>
+Message-ID: <20151120124955.GD32142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the "arm,cortex-a9-gic" compatible value for the GIC by
-"arm,pl390", as the documentation states it is a PL390.
-This has been confirmed (thanks Chris, Wolfram!) by reading the
-GICD_IIDR register, which reports 0x0000043b (PL390 = 0x00, ARM =
-0x43b).
+On Mon, Nov 16, 2015 at 10:36:02AM +0800, Chen-Yu Tsai wrote:
+> On Mon, Nov 16, 2015 at 3:46 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> > From: Reinder de Haan <patchesrdh@mveas.com>
+> >
+> > The H3 has a usb-phy clk register which is similar to that of earlier
+> > SoCs, but with support for a larger number of phys. So we can simply add
+> > a new set of clk-data and a new compatible and be done with it.
+> >
+> > Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
+> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> 
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-This has no effect on runtime behavior, as currently the GIC driver
-treats both compatible values the same.
+Applied, thanks!
+Maxime
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-You can read the GICD_IIDR register from U-Boot using
-
-    md 0xe8201008 1
----
- arch/arm/boot/dts/r7s72100.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index 5f22d6dcdd141f9c..0c3b9e341ce7fd8e 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -329,7 +329,7 @@
- 	};
- 
- 	gic: interrupt-controller at e8201000 {
--		compatible = "arm,cortex-a9-gic";
-+		compatible = "arm,pl390";
- 		#interrupt-cells = <3>;
- 		#address-cells = <0>;
- 		interrupt-controller;
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/29c1c666/attachment.sig>
