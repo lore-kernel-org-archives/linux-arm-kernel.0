@@ -1,97 +1,72 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 19 Nov 2015 17:05:11 -0800
-Subject: [PATCH 04/29] ARM: shmobile: silk: add SDHI1 DT support
+Date: Thu, 19 Nov 2015 17:05:24 -0800
+Subject: [PATCH 17/29] ARM: shmobile: r8a7793: Add QSPI device to DT
 In-Reply-To: <cover.1447981420.git.horms+renesas@verge.net.au>
 References: <cover.1447981420.git.horms+renesas@verge.net.au>
-Message-ID: <761b11e141366743a5c179a0f94c237d0ba9667c.1447981420.git.horms+renesas@verge.net.au>
+Message-ID: <469352ad3c43e689c15cd396cbb750ee831ab63e.1447981420.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Instantiate the QSPI controller in the r8a7793 device tree.
 
-Define the SILK board dependent part of the SDHI1 (connected to micro-SD
-slot) device nodes along with the necessary voltage regulators.
+Based on similar work for the r8a7794 by Hisashi Nakamura and
+Sergei Shtylyov.
 
-Based on the original patch by Vladimir Barinov
-<vladimir.barinov@cogentembedded.com>.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794-silk.dts | 40 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ arch/arm/boot/dts/r8a7793.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
-index 48ff3e2958ae..a49942b626c8 100644
---- a/arch/arm/boot/dts/r8a7794-silk.dts
-+++ b/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -12,6 +12,7 @@
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index 187a82dc7d9f..aa9b64c14a09 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -18,6 +18,10 @@
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
  
- /dts-v1/;
- #include "r8a7794.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "SILK";
-@@ -39,6 +40,30 @@
- 		regulator-boot-on;
- 		regulator-always-on;
- 	};
-+
-+	vcc_sdhi1: regulator at 3 {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "SDHI1 Vcc";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpio = <&gpio4 26 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
++	aliases {
++		spi0 = &qspi;
 +	};
 +
-+	vccq_sdhi1: regulator at 4 {
-+		compatible = "regulator-gpio";
-+
-+		regulator-name = "SDHI1 VccQ";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpios = <&gpio4 29 GPIO_ACTIVE_HIGH>;
-+		gpios-states = <1>;
-+		states = <3300000 1
-+			  1800000 0>;
-+	};
- };
- 
- &extal_clk {
-@@ -71,6 +96,11 @@
- 		renesas,function = "mmc";
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -222,6 +226,20 @@
+ 		status = "disabled";
  	};
  
-+	sdhi1_pins: sd1 {
-+		renesas,groups = "sdhi1_data4", "sdhi1_ctrl";
-+		renesas,function = "sdhi1";
++	qspi: spi at e6b10000 {
++		compatible = "renesas,qspi-r8a7793", "renesas,qspi";
++		reg = <0 0xe6b10000 0 0x2c>;
++		interrupts = <0 184 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp9_clks R8A7793_CLK_QSPI_MOD>;
++		dmas = <&dmac0 0x17>, <&dmac0 0x18>;
++		dma-names = "tx", "rx";
++		power-domains = <&cpg_clocks>;
++		num-cs = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
 +	};
 +
- 	qspi_pins: spi0 {
- 		renesas,groups = "qspi_ctrl", "qspi_data4";
- 		renesas,function = "qspi";
-@@ -147,6 +177,16 @@
- 	status = "okay";
- };
+ 	clocks {
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
+@@ -463,6 +481,14 @@
+ 				"ipmmu_sgx", "vin2", "vin1", "vin0", "ether",
+ 				"sata1", "sata0";
+ 		};
++		mstp9_clks: mstp9_clks at e6150994 {
++			compatible = "renesas,r8a7793-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0 0xe6150994 0 4>, <0 0xe61509a4 0 4>;
++			clocks = <&cpg_clocks R8A7793_CLK_QSPI>;
++			#clock-cells = <1>;
++			clock-indices = <R8A7793_CLK_QSPI_MOD>;
++			clock-output-names = "qspi_mod";
++		};
+ 	};
  
-+&sdhi1 {
-+	pinctrl-0 = <&sdhi1_pins>;
-+	pinctrl-names = "default";
-+
-+	vmmc-supply = <&vcc_sdhi1>;
-+	vqmmc-supply = <&vccq_sdhi1>;
-+	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
- &qspi {
- 	pinctrl-0 = <&qspi_pins>;
- 	pinctrl-names = "default";
+ 	ipmmu_sy0: mmu at e6280000 {
 -- 
 2.1.4
