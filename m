@@ -1,81 +1,80 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 20 Nov 2015 10:55:07 -0600
-Subject: [PATCH 02/10] dt-bindings: nxp: add description of wakeup
- controller on LPC32xx
-In-Reply-To: <1447982925-30138-3-git-send-email-vz@mleia.com>
-References: <1447982925-30138-1-git-send-email-vz@mleia.com>
- <1447982925-30138-3-git-send-email-vz@mleia.com>
-Message-ID: <20151120165507.GA12088@rob-hp-laptop>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Sat, 21 Nov 2015 01:55:22 +0900
+Subject: [PATCH 2/2] arm: boot: beaglex15: pass correct interrupt
+In-Reply-To: <564F4D90.4050305@gmail.com>
+References: <1447350781-20649-1-git-send-email-balbi@ti.com>
+ <1447350781-20649-3-git-send-email-balbi@ti.com>
+ <564EB215.5080209@samsung.com> <564F4D90.4050305@gmail.com>
+Message-ID: <CAGTfZH3o_G91qDS6_9tYJHDDAbOWj90rBfCKvi0f-uL0L2PcTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 03:28:37AM +0200, Vladimir Zapolskiy wrote:
-> NXP LPC32xx has three wakeup controllers of two types, this
-> descriptions defines DT bindings of wakeup controllers connected to
-> MIC, SIC1 and SIC2 interrupt controllers.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> ---
->  .../bindings/arm/nxp/nxp,lpc3220-wakeup.txt        | 41 ++++++++++++++++++++++
->  1 file changed, 41 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/nxp/nxp,lpc3220-wakeup.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/nxp/nxp,lpc3220-wakeup.txt b/Documentation/devicetree/bindings/arm/nxp/nxp,lpc3220-wakeup.txt
-> new file mode 100644
-> index 0000000..803728f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/nxp/nxp,lpc3220-wakeup.txt
-> @@ -0,0 +1,41 @@
-> +NXP LPC32xx Wakeup Controller
-> +
-> +Required properties:
-> +- compatible: should be "nxp,lpc3220-wakeup"
-> +- reg:  should contain wakeup controller registers location and length
-> +- #wakeup-cells: must be 2, the first cell describes wakeup source on
-> +  the controller, the second cell is a hardware interrupt number on IC.
+Hi,
 
-This probably needs to be done differently. For one, we already have a 
-common property "wakeup-source" with different meaning.
+On Sat, Nov 21, 2015 at 1:42 AM, Chanwoo Choi <cwchoi00@gmail.com> wrote:
+> Hi,
+>
+> On 2015. 11. 20. ?? 2:39, Chanwoo Choi wrote:
+>> Hi,
+>>
+>> On 2015? 11? 13? 02:53, Felipe Balbi wrote:
+>>> According to latest schematics [1], GPIO_1/VBUSDET
+>>> on TPS659038 is tied to AM57x GPIO4_21. We can use
+>>> that as a VBUS interrupt, instead of relying on
+>>> PMIC's VBUS interrupts which don't seem to be firing
+>>> on x15 at all.
+>>>
+>>> A follow up patch will add support for using this
+>>> GPIO-based interrupt mechanism for notifying about
+>>> VBUS.
+>>>
+>>> [1] https://github.com/beagleboard/beagleboard-x15/blob/master/BeagleBoard-X15_RevA2.pdf
+>>>
+>>> Signed-off-by: Felipe Balbi <balbi@ti.com>
+>>> ---
+>>>  arch/arm/boot/dts/am57xx-beagle-x15.dts | 1 +
+>>>  1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+>>> index 6f3a1a7ec5f9..5e47162f7883 100644
+>>> --- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
+>>> +++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+>>> @@ -560,6 +560,7 @@
+>>>              extcon_usb2: tps659038_usb {
+>>>                      compatible = "ti,palmas-usb-vid";
+>>>                      ti,enable-vbus-detection;
+>>> +                    interrupts-extended = <&gpio4 21 IRQ_TYPE_EDGE_RISING>;
+>
+>                         vbus-gpio = <&gpio4 21>;
 
-Marc, Is there an example of using stacked irqdomain and mapping of irq 
-numbers to wakeup numbers?
+I'm sorry. I'm sending the missing email without writing completion.
 
-Rob
+I agree the Felipe's opinion. Just I think that we can use the
+following property
+instead of 'interrupt-extended'. Because I think 'vbus-gpio' is more
+readability than before. The following property mean the attribute of
+GPIO pin as VBUS.
+- vbus-gpio = <&gpio4 21>;
 
-> +
-> +Examples:
-> +
-> +	/* System Control Block */
-> +	scb {
-> +		compatible = "simple-bus";
-> +		ranges = <0x0 0x040004000 0x00001000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +
-> +		wakeup_int: wakeup-controller at 20 {
-> +			compatible = "nxp,lpc3220-wakeup";
-> +			reg = <0x20 0x10>;
-> +			#wakeup-cells = <2>;
-> +		};
-> +
-> +		wakeup_pin: wakeup-controller at 30 {
-> +			compatible = "nxp,lpc3220-wakeup";
-> +			reg = <0x30 0x10>;
-> +			#wakeup-cells = <2>;
-> +		};
-> +	};
-> +
-> +	/* Main Interrupt Controller */
-> +	mic: interrupt-controller at 40008000 {
-> +		compatible = "nxp,lpc3220-mic";
-> +		reg = <0x40008000 0x4000>;
-> +		interrupt-controller;
-> +		interrupt-controller-name = "mic";
-> +		#interrupt-cells = <2>;
-> +
-> +		wakeup-sources = <&wakeup_int 7 29>,
-> +				 <&wakeup_int 25 27>;
-> +	};
-> -- 
-> 2.1.4
-> 
+Thanks,
+Chanwoo Choi
+
+>
+>>>              };
+>>>
+>>>      };
+>>>
+>>
+>> I check the schematic file. The GPIO4_21 pin is connected as following:
+>> - GPIO_1/VBUSDET -> PMIC_VBUS_DET -> VBUS_DET -> AM5728 GPIO4_21 pin
+>>
+>> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>
+>> Thanks,
+>> Chanwoo Choi
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
+>>
