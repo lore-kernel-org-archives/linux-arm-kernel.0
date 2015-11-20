@@ -1,155 +1,60 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Fri, 20 Nov 2015 16:14:41 +0000
-Subject: [PATCH v9 5/6] target-arm: kvm - re-inject guest debug exceptions
-In-Reply-To: <1447345251-22625-6-git-send-email-alex.bennee@linaro.org>
-References: <1447345251-22625-1-git-send-email-alex.bennee@linaro.org>
- <1447345251-22625-6-git-send-email-alex.bennee@linaro.org>
-Message-ID: <CAFEAcA9xXULtmcq7n353gZEyObUx+ZafsfNKUep8_CWNmLzdcA@mail.gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sat, 21 Nov 2015 00:15:21 +0800
+Subject: [arm:drm-etnaviv-devel 89/149]
+ drivers/staging/etnaviv/etnaviv_gem_submit.c:263:19: error: 'struct
+ drm_etnaviv_gem_submit_reloc' has no member named 'shift'
+Message-ID: <201511210020.MaDgPArI%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 November 2015 at 16:20, Alex Benn?e <alex.bennee@linaro.org> wrote:
-> From: Alex Benn?e <alex@bennee.com>
->
-> If we can't find details for the debug exception in our debug state
-> then we can assume the exception is due to debugging inside the guest.
-> To inject the exception into the guest state we re-use the TCG exception
-> code (do_interupt).
+tree:   http://repo.or.cz/linux-2.6/linux-2.6-arm.git drm-etnaviv-devel
+head:   77c57a5498ebe5c85b4a71fbcf800a9140f9a697
+commit: 11c90396fe41eb9d232018c47d89da4080c375d2 [89/149] staging: etnaviv: clean up public API
+config: i386-randconfig-r0-201546 (attached as .config)
+reproduce:
+        git checkout 11c90396fe41eb9d232018c47d89da4080c375d2
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-"do_interrupt".
+Note: the arm/drm-etnaviv-devel HEAD a0252118653cb935f209bd8baf048195c77d3292 builds fine.
+      It only hurts bisectibility.
 
->
-> However while guest debugging is in effect we currently can't handle the
-> guest using single step which is heavily used by GDB.
+All errors (new ones prefixed by >>):
 
-Can you expand this to be clearer about what the problem is here?
-Is this a thing fixed by this commit or a remaining issue after it?
+   drivers/staging/etnaviv/etnaviv_gem_submit.c: In function 'submit_reloc':
+>> drivers/staging/etnaviv/etnaviv_gem_submit.c:263:19: error: 'struct drm_etnaviv_gem_submit_reloc' has no member named 'shift'
+      if (submit_reloc.shift || submit_reloc.or) {
+                      ^
+>> drivers/staging/etnaviv/etnaviv_gem_submit.c:263:41: error: 'struct drm_etnaviv_gem_submit_reloc' has no member named 'or'
+      if (submit_reloc.shift || submit_reloc.or) {
+                                            ^
 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->
-> ---
-> v5:
->   - new for v5
-> ---
->  target-arm/helper-a64.c | 12 ++++++++++--
->  target-arm/kvm.c        | 27 +++++++++++++++++++--------
->  2 files changed, 29 insertions(+), 10 deletions(-)
->
-> diff --git a/target-arm/helper-a64.c b/target-arm/helper-a64.c
-> index deb8dbe..fc3ccdf 100644
-> --- a/target-arm/helper-a64.c
-> +++ b/target-arm/helper-a64.c
-> @@ -25,6 +25,7 @@
->  #include "qemu/bitops.h"
->  #include "internals.h"
->  #include "qemu/crc32c.h"
-> +#include "sysemu/kvm.h"
->  #include <zlib.h> /* For crc32 */
->
->  /* C2.4.7 Multiply and divide */
-> @@ -469,7 +470,8 @@ void aarch64_cpu_do_interrupt(CPUState *cs)
->                    new_el);
->      if (qemu_loglevel_mask(CPU_LOG_INT)
->          && !excp_is_internal(cs->exception_index)) {
-> -        qemu_log_mask(CPU_LOG_INT, "...with ESR 0x%" PRIx32 "\n",
-> +        qemu_log_mask(CPU_LOG_INT, "...with ESR %x/0x%" PRIx32 "\n",
-> +                      env->exception.syndrome >> ARM_EL_EC_SHIFT,
->                        env->exception.syndrome);
->      }
->
-> @@ -535,6 +537,12 @@ void aarch64_cpu_do_interrupt(CPUState *cs)
->      aarch64_restore_sp(env, new_el);
->
->      env->pc = addr;
-> -    cs->interrupt_request |= CPU_INTERRUPT_EXITTB;
-> +
-> +    qemu_log_mask(CPU_LOG_INT, "...to EL%d PC 0x%" PRIx64 " PSTATE 0x%x\n",
-> +                  new_el, env->pc, pstate_read(env));
-> +
-> +    if (!kvm_enabled()) {
-> +        cs->interrupt_request |= CPU_INTERRUPT_EXITTB;
-> +    }
->  }
->  #endif
-> diff --git a/target-arm/kvm.c b/target-arm/kvm.c
-> index 1f57e92..4ac177a 100644
-> --- a/target-arm/kvm.c
-> +++ b/target-arm/kvm.c
-> @@ -529,9 +529,10 @@ static int kvm_handle_debug(CPUState *cs, struct kvm_run *run)
->      struct kvm_debug_exit_arch *arch_info = &run->debug.arch;
->      int hsr_ec = arch_info->hsr >> ARM_EL_EC_SHIFT;
->      ARMCPU *cpu = ARM_CPU(cs);
-> +    CPUClass *cc = CPU_GET_CLASS(cs);
->      CPUARMState *env = &cpu->env;
->
-> -    /* Ensure PC is synchronised */
-> +    /* Ensure all state is synchronised */
+vim +263 drivers/staging/etnaviv/etnaviv_gem_submit.c
 
-You might as well have just written the comment like that to start with :-)
+b920a1d2 Christian Gmeiner 2014-09-27  257  				(off < last_offset)) {
+b920a1d2 Christian Gmeiner 2014-09-27  258  			DRM_ERROR("invalid offset %u at reloc %u\n", off, i);
+b920a1d2 Christian Gmeiner 2014-09-27  259  			return -EINVAL;
+b920a1d2 Christian Gmeiner 2014-09-27  260  		}
+b920a1d2 Christian Gmeiner 2014-09-27  261  
+80ddbc50 Russell King      2014-10-21  262  		/* Vivante hardware has no need for shifts or bitwise or-ing */
+80ddbc50 Russell King      2014-10-21 @263  		if (submit_reloc.shift || submit_reloc.or) {
+80ddbc50 Russell King      2014-10-21  264  			DRM_ERROR("invalid shift or bitwise or at reloc %u\n",
+80ddbc50 Russell King      2014-10-21  265  				  i);
+80ddbc50 Russell King      2014-10-21  266  			return -EINVAL;
 
->      kvm_cpu_synchronize_state(cs);
->
->      switch (hsr_ec) {
-> @@ -539,7 +540,14 @@ static int kvm_handle_debug(CPUState *cs, struct kvm_run *run)
->          if (cs->singlestep_enabled) {
->              return true;
->          } else {
-> -            error_report("Came out of SINGLE STEP when not enabled");
-> +            /*
-> +             * The kernel should have supressed the guests ability to
+:::::: The code at line 263 was first introduced by commit
+:::::: 80ddbc5081a66ab9d3d494044ddbe3a7c94efbed staging: etnaviv: remove shifting and bitwise or-ing of GPU addresses
 
-"suppressed". "guest's".
+:::::: TO: Russell King <rmk+kernel@arm.linux.org.uk>
+:::::: CC: Russell King <rmk+kernel@arm.linux.org.uk>
 
-> +             * single step at this point so something has gone wrong.
-> +             */
-> +            error_report("%s: guest single-step while debugging unsupported"
-> +                         " (%"PRIx64", %"PRIx32")\n",
-> +                         __func__, env->pc, arch_info->hsr);
-> +            return false;
-
-Why didn't we just write the error_report this way to start with?
-
->          }
->          break;
->      case EC_AA64_BKPT:
-> @@ -564,14 +572,17 @@ static int kvm_handle_debug(CPUState *cs, struct kvm_run *run)
->      default:
->          error_report("%s: unhandled debug exit (%"PRIx32", %"PRIx64")\n",
->                       __func__, arch_info->hsr, env->pc);
-> +        return false;
-
-Might as well put this "return false;" in the original code that
-adds the default case, rather than changing the control flow in this
-patch.
-
->      }
->
-> -    /* If we don't handle this it could be it really is for the
-> -       guest to handle */
-> -    qemu_log_mask(LOG_UNIMP,
-> -                  "%s: re-injecting exception not yet implemented"
-> -                  " (0x%"PRIx32", %"PRIx64")\n",
-> -                  __func__, hsr_ec, env->pc);
-> +    /* If we are not handling the debug exception it must belong to
-> +     * the guest. Let's re-use the existing TCG interrupt code to set
-> +     * everything up properly
-
-Missing trailing ".".
-
-> +     */
-> +    cs->exception_index = EXCP_BKPT;
-> +    env->exception.syndrome = arch_info->hsr;
-> +    env->exception.vaddress = arch_info->far;
-
-You need to set env->exception.target_el to 1 as well.
-
-> +    cc->do_interrupt(cs);
->
->      return false;
->  }
-> --
-> 2.6.3
->
-
-thanks
--- PMM
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 22037 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151121/6d543153/attachment-0001.obj>
