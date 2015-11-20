@@ -1,51 +1,49 @@
-From: yrdreddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
-Date: Fri, 20 Nov 2015 12:58:29 -0500
-Subject: [PATCH 3/3] ARM: dts: enable pinctrl for Broadcom NSP
-Message-ID: <1448042309-46445-1-git-send-email-yrdreddy@broadcom.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Fri, 20 Nov 2015 20:01:00 +0200
+Subject: [PATCH 01/11] dt-bindings: clock: add description of LPC32xx
+ clock controller
+In-Reply-To: <3740707.LksPCoyRXC@wuerfel>
+References: <1447981511-29653-1-git-send-email-vz@mleia.com>
+ <1447981511-29653-2-git-send-email-vz@mleia.com> <3740707.LksPCoyRXC@wuerfel>
+Message-ID: <564F5FDC.2070001@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the pinctrl support for Broadcom NSP SoC
+Arnd,
 
-Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yrdreddy@broadcom.com>
----
- arch/arm/boot/dts/bcm-nsp.dtsi   | 7 +++++++
- arch/arm/boot/dts/bcm958625k.dts | 9 +++++++++
- 2 files changed, 16 insertions(+)
+On 20.11.2015 15:58, Arnd Bergmann wrote:
+> On Friday 20 November 2015 03:05:01 Vladimir Zapolskiy wrote:
+>> NXP LPC32xx SoC has a clocking and power control unit (CPC) as a part
+>> of system control block (SCB). CPC is supplied by two external
+>> oscillators and it manages core and most of peripheral
+>> clocks, the change adds description of DT bindings for clock
+>> controller found on LPC32xx SoC series.
+>>
+>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+>> ---
+>>  .../devicetree/bindings/clock/nxp,lpc3220-clk.txt  | 30 ++++++++++++++++++++++
+>>  1 file changed, 30 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/nxp,lpc3220-clk.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/nxp,lpc3220-clk.txt b/Documentation/devicetree/bindings/clock/nxp,lpc3220-clk.txt
+>> new file mode 100644
+>> index 0000000..20cbca3
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/nxp,lpc3220-clk.txt
+>> @@ -0,0 +1,30 @@
+>> +NXP LPC32xx Clock Controller
+>> +
+>> +Required properties:
+>> +- compatible: should be "nxp,lpc3220-clk"
+> 
+> Please use a specific model number without 'xx' wildcards. If you have
+> multiple chips that are mutually compatible, pick one as the base number
+> and then list the others as more specific instances, like
+> 
+> 	compatible = "nxp,lpc3250-clk", "nxp,lpc3220-clk";
 
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index b74438c..a16d743 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -226,5 +226,12 @@
- 			interrupts = <GIC_SPI 89 IRQ_TYPE_NONE>;
- 			clock-frequency = <100000>;
- 		};
-+
-+		pinctrl: pinctrl at 3f1c0 {
-+			compatible = "brcm,nsp-pinmux";
-+			reg = <0x3f1c0 0x04>,
-+			      <0x30028 0x04>,
-+			      <0x3f408 0x04>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/bcm958625k.dts b/arch/arm/boot/dts/bcm958625k.dts
-index b966955..e298450 100644
---- a/arch/arm/boot/dts/bcm958625k.dts
-+++ b/arch/arm/boot/dts/bcm958625k.dts
-@@ -105,3 +105,12 @@
- 		};
- 	};
- };
-+
-+&pinctrl {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&nand_sel>;
-+	nand_sel: nand_sel {
-+		function = "nand";
-+		groups = "nand_grp";
-+	};
-+};
--- 
-2.1.0
+Do you ask me to change a title? You may see that compatible property
+does not contain any wildcards?
+
+--
+Vladimir
