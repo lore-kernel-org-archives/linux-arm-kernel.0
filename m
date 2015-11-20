@@ -1,60 +1,146 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Fri, 20 Nov 2015 07:13:41 -0500
-Subject: [PATH RESEND v2 03/10] tty: xuartps: Always enable transmitter in
- start_tx
-In-Reply-To: <1447963344-16266-4-git-send-email-soren.brinkmann@xilinx.com>
-References: <1447963344-16266-1-git-send-email-soren.brinkmann@xilinx.com>
- <1447963344-16266-4-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <564F0E75.5020100@hurleysoftware.com>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Fri, 20 Nov 2015 22:15:09 +1000
+Subject: [PATCH] include: asm-generic: page.h: Remove useless
+ get_user_page and free_user_page
+In-Reply-To: <COL130-W7B5F0BB94C76AF6B12EA7B91C0@phx.gbl>
+References: <COL130-W7B5F0BB94C76AF6B12EA7B91C0@phx.gbl>
+Message-ID: <564F0ECD.2050109@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Chen,
+
+On 19/11/15 05:40, Chen Gang wrote:
+>>From ba7c00c4cb976109b6a35812ce9649aaeda81e2d Mon Sep 17 00:00:00 2001
+> From: Chen Gang <gang.chen.5i5j@gmail.com>
+> Date: Thu, 19 Nov 2015 03:24:42 +0800
+> Subject: [PATCH] include: asm-generic: page.h: Remove useless get_user_page and free_user_page
+>
+> They are not symmetric with each other, neither are used in real world
+> (can not be found by grep command in source code root directory), so
+> remove them.
+>
+> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
+
+Compile and run tested on m68k (MMU and noMMU) targets.
+No problems found. So for those parts:
+
+Acked-by: Greg Ungerer <gerg@uclinux.org>
+
+Regards
+Greg
 
 
-On 11/19/2015 03:02 PM, Soren Brinkmann wrote:
-> start_tx must start transmitting characters. Regardless of the state of
-> the circular buffer, always enable the transmitter hardware.
-
-Why?
-
-Does cdns_uart_stop_tx() actually stop the transmitter so that
-data remains in the transmitter?
-
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 > ---
->  drivers/tty/serial/xilinx_uartps.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-> index 2c98c357d9a0..df6778d17949 100644
-> --- a/drivers/tty/serial/xilinx_uartps.c
-> +++ b/drivers/tty/serial/xilinx_uartps.c
-> @@ -512,9 +512,6 @@ static void cdns_uart_start_tx(struct uart_port *port)
->  {
->  	unsigned int status, numbytes = port->fifosize;
->  
-> -	if (uart_circ_empty(&port->state->xmit) || uart_tx_stopped(port))
-> -		return;
-
-The test for tx stopped needs to remain; otherwise, transmission will
-restart even if the tty has been stopped (for example by userspace
-or IXON software flow control).
-
-Regards,
-Peter Hurley
-
+>   arch/arc/include/asm/page.h       | 3 ---
+>   arch/arm/include/asm/page-nommu.h | 3 ---
+>   arch/frv/include/asm/page.h       | 3 ---
+>   arch/m68k/include/asm/page_mm.h   | 3 ---
+>   arch/m68k/include/asm/page_no.h   | 3 ---
+>   arch/openrisc/include/asm/page.h  | 3 ---
+>   include/asm-generic/page.h        | 3 ---
+>   7 files changed, 21 deletions(-)
+>
+> diff --git a/arch/arc/include/asm/page.h b/arch/arc/include/asm/page.h
+> index 429957f..adf5cbb 100644
+> --- a/arch/arc/include/asm/page.h
+> +++ b/arch/arc/include/asm/page.h
+> @@ -13,9 +13,6 @@
+>
+>   #ifndef __ASSEMBLY__
+>
+> -#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
+> -#define free_user_page(page, addr)	free_page(addr)
 > -
->  	/*
->  	 * Set the TX enable bit and clear the TX disable bit to enable the
->  	 * transmitter.
-> @@ -524,6 +521,9 @@ static void cdns_uart_start_tx(struct uart_port *port)
->  	status |= CDNS_UART_CR_TX_EN;
->  	writel(status, port->membase + CDNS_UART_CR_OFFSET);
->  
-> +	if (uart_circ_empty(&port->state->xmit) || uart_tx_stopped(port))
-> +		return;
-> +
->  	while (numbytes-- && ((readl(port->membase + CDNS_UART_SR_OFFSET) &
->  				CDNS_UART_SR_TXFULL)) != CDNS_UART_SR_TXFULL) {
->  		/* Break if no more data available in the UART buffer */
-> 
+>   #define clear_page(paddr)		memset((paddr), 0, PAGE_SIZE)
+>   #define copy_page(to, from)		memcpy((to), (from), PAGE_SIZE)
+>
+> diff --git a/arch/arm/include/asm/page-nommu.h b/arch/arm/include/asm/page-nommu.h
+> index d1b162a..503f488 100644
+> --- a/arch/arm/include/asm/page-nommu.h
+> +++ b/arch/arm/include/asm/page-nommu.h
+> @@ -17,9 +17,6 @@
+>   #define KTHREAD_SIZE PAGE_SIZE
+>   #endif
+>
+> -#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
+> -#define free_user_page(page, addr)	free_page(addr)
+> -
+>   #define clear_page(page)	memset((page), 0, PAGE_SIZE)
+>   #define copy_page(to,from)	memcpy((to), (from), PAGE_SIZE)
+>
+> diff --git a/arch/frv/include/asm/page.h b/arch/frv/include/asm/page.h
+> index 8c97068..52ace96 100644
+> --- a/arch/frv/include/asm/page.h
+> +++ b/arch/frv/include/asm/page.h
+> @@ -8,9 +8,6 @@
+>
+>   #ifndef __ASSEMBLY__
+>
+> -#define get_user_page(vaddr)			__get_free_page(GFP_KERNEL)
+> -#define free_user_page(page, addr)		free_page(addr)
+> -
+>   #define clear_page(pgaddr)			memset((pgaddr), 0, PAGE_SIZE)
+>   #define copy_page(to,from)			memcpy((to), (from), PAGE_SIZE)
+>
+> diff --git a/arch/m68k/include/asm/page_mm.h b/arch/m68k/include/asm/page_mm.h
+> index 5029f73..e7a1946 100644
+> --- a/arch/m68k/include/asm/page_mm.h
+> +++ b/arch/m68k/include/asm/page_mm.h
+> @@ -6,9 +6,6 @@
+>   #include <linux/compiler.h>
+>   #include <asm/module.h>
+>
+> -#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
+> -#define free_user_page(page, addr)	free_page(addr)
+> -
+>   /*
+>    * We don't need to check for alignment etc.
+>    */
+> diff --git a/arch/m68k/include/asm/page_no.h b/arch/m68k/include/asm/page_no.h
+> index ef20916..fa7f32d 100644
+> --- a/arch/m68k/include/asm/page_no.h
+> +++ b/arch/m68k/include/asm/page_no.h
+> @@ -6,9 +6,6 @@
+>   extern unsigned long memory_start;
+>   extern unsigned long memory_end;
+>
+> -#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
+> -#define free_user_page(page, addr)	free_page(addr)
+> -
+>   #define clear_page(page)	memset((page), 0, PAGE_SIZE)
+>   #define copy_page(to,from)	memcpy((to), (from), PAGE_SIZE)
+>
+> diff --git a/arch/openrisc/include/asm/page.h b/arch/openrisc/include/asm/page.h
+> index 108906f..e613d36 100644
+> --- a/arch/openrisc/include/asm/page.h
+> +++ b/arch/openrisc/include/asm/page.h
+> @@ -40,9 +40,6 @@
+>
+>   #ifndef __ASSEMBLY__
+>
+> -#define get_user_page(vaddr)            __get_free_page(GFP_KERNEL)
+> -#define free_user_page(page, addr)      free_page(addr)
+> -
+>   #define clear_page(page)	memset((page), 0, PAGE_SIZE)
+>   #define copy_page(to, from)	memcpy((to), (from), PAGE_SIZE)
+>
+> diff --git a/include/asm-generic/page.h b/include/asm-generic/page.h
+> index 37d1fe2..67cfb7d 100644
+> --- a/include/asm-generic/page.h
+> +++ b/include/asm-generic/page.h
+> @@ -24,9 +24,6 @@
+>
+>   #ifndef __ASSEMBLY__
+>
+> -#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
+> -#define free_user_page(page, addr)	free_page(addr)
+> -
+>   #define clear_page(page)	memset((page), 0, PAGE_SIZE)
+>   #define copy_page(to,from)	memcpy((to), (from), PAGE_SIZE)
+>
+> --
+> 1.9.3
+>
+>   		 	   		
+>
