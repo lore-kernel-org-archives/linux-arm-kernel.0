@@ -1,72 +1,91 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 20 Nov 2015 23:52:22 +0800
-Subject: [arm:drm-etnaviv-devel 69/149]
- drivers/staging/etnaviv/etnaviv_gpu.c:1063:12: error:
- 'etnaviv_gpu_hw_resume' defined but not used
-Message-ID: <201511202321.dgWwfHFS%fengguang.wu@intel.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Fri, 20 Nov 2015 09:54:12 -0600
+Subject: [PATCH 2/4] usb: dwc3: qcom: Configure TCSR phy mux register
+In-Reply-To: <87a8q8emme.fsf@saruman.tx.rr.com>
+References: <1448008509-8913-1-git-send-email-agross@codeaurora.org>
+ <1448008509-8913-3-git-send-email-agross@codeaurora.org>
+ <87a8q8emme.fsf@saruman.tx.rr.com>
+Message-ID: <20151120155411.GB8722@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   http://repo.or.cz/linux-2.6/linux-2.6-arm.git drm-etnaviv-devel
-head:   77c57a5498ebe5c85b4a71fbcf800a9140f9a697
-commit: 6cfaea6c08d9d915ae44b70427db5f32a454e1ba [69/149] staging: etnaviv: add runtime PM support
-config: i386-randconfig-r0-201546 (attached as .config)
-reproduce:
-        git checkout 6cfaea6c08d9d915ae44b70427db5f32a454e1ba
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+On Fri, Nov 20, 2015 at 09:06:33AM -0600, Felipe Balbi wrote:
+> 
+> Hi,
+> 
+> Andy Gross <agross@codeaurora.org> writes:
+> > This patch adds automatic configuration of the TCSR phy mux register based on
+> > the syscon-tcsr devicetree entry.  This configuration is optional, as some
+> > platforms may not require the mux selection.
+> >
+> > Signed-off-by: Andy Gross <agross@codeaurora.org>
+> 
+> just when I find a way to make a generic dwc3-of-simple.c glue layer :-p
+> 
+> I can, certainly drop my patches but I need more details on the syscon
+> usage below.
+> 
+> > ---
+> >  drivers/usb/dwc3/dwc3-qcom.c | 25 +++++++++++++++++++++++++
+> >  1 file changed, 25 insertions(+)
+> >
+> > diff --git a/drivers/usb/dwc3/dwc3-qcom.c b/drivers/usb/dwc3/dwc3-qcom.c
+> > index 0880260..fcf264c 100644
+> > --- a/drivers/usb/dwc3/dwc3-qcom.c
+> > +++ b/drivers/usb/dwc3/dwc3-qcom.c
+> > @@ -17,6 +17,8 @@
+> >  #include <linux/of.h>
+> >  #include <linux/of_platform.h>
+> >  #include <linux/platform_device.h>
+> > +#include <linux/mfd/syscon.h>
+> > +#include <linux/regmap.h>
+> >  
+> >  struct dwc3_qcom {
+> >  	struct device		*dev;
+> > @@ -30,6 +32,9 @@ static int dwc3_qcom_probe(struct platform_device *pdev)
+> >  {
+> >  	struct device_node *node = pdev->dev.of_node;
+> >  	struct dwc3_qcom *qdwc;
+> > +	struct regmap *regmap;
+> > +	u32 mux_offset;
+> > +	u32 mux_bit;
+> >  	int ret;
+> >  
+> >  	qdwc = devm_kzalloc(&pdev->dev, sizeof(*qdwc), GFP_KERNEL);
+> > @@ -58,6 +63,26 @@ static int dwc3_qcom_probe(struct platform_device *pdev)
+> >  		qdwc->sleep_clk = NULL;
+> >  	}
+> >  
+> > +	/* look for tcsr and if present, provision it */
+> > +	regmap = syscon_regmap_lookup_by_phandle(node, "syscon-tcsr");
+> > +	if (!IS_ERR(regmap)) {
+> > +		if (of_property_read_u32_index(node, "syscon-tcsr", 1,
+> > +					       &mux_offset)) {
+> > +			dev_err(qdwc->dev, "missing USB TCSR mux offset\n");
+> > +			return -EINVAL;
+> > +		}
+> > +		if (of_property_read_u32_index(node, "syscon-tcsr", 2,
+> > +					       &mux_bit)) {
+> > +			dev_err(qdwc->dev, "missing USB TCSR mux bit\n");
+> > +			return -EINVAL;
+> > +		}
+> > +
+> > +		regmap_update_bits(regmap, mux_offset, BIT(mux_bit),
+> > +				   BIT(mux_bit));
+> 
+> what is tcsr and what does it ? It also seems to be optional, why's that ?
+> 
+> -- 
+> balbi
 
-Note: the arm/drm-etnaviv-devel HEAD a0252118653cb935f209bd8baf048195c77d3292 builds fine.
-      It only hurts bisectibility.
+The syscon is to set the mux selection for the phys.  Our hardware has a
+steering mux between hsic and dwc3 and setting this to 1 steers the phys to the
+right controller.
 
-All errors (new ones prefixed by >>):
+It is optional because not all platforms appear to have this stupidity.
 
-   drivers/staging/etnaviv/etnaviv_gpu.c: In function 'etnaviv_gpu_hw_resume':
-   drivers/staging/etnaviv/etnaviv_gpu.c:1079:5: error: 'struct etnaviv_gpu' has no member named 'switch_context'
-     gpu->switch_context = true;
-        ^
-   drivers/staging/etnaviv/etnaviv_gpu.c: At top level:
->> drivers/staging/etnaviv/etnaviv_gpu.c:1063:12: error: 'etnaviv_gpu_hw_resume' defined but not used [-Werror=unused-function]
-    static int etnaviv_gpu_hw_resume(struct etnaviv_gpu *gpu)
-               ^
-   cc1: all warnings being treated as errors
 
-vim +/etnaviv_gpu_hw_resume +1063 drivers/staging/etnaviv/etnaviv_gpu.c
-
-  1057			} while (1);
-  1058		}
-  1059	
-  1060		return etnaviv_gpu_clk_disable(gpu);
-  1061	}
-  1062	
-> 1063	static int etnaviv_gpu_hw_resume(struct etnaviv_gpu *gpu)
-  1064	{
-  1065		struct drm_device *drm = gpu->drm;
-  1066		uint32_t clock;
-  1067		int ret;
-  1068	
-  1069		ret = mutex_lock_killable(&drm->struct_mutex);
-  1070		if (ret)
-  1071			return ret;
-  1072	
-  1073		clock = VIVS_HI_CLOCK_CONTROL_DISABLE_DEBUG_REGISTERS |
-  1074			VIVS_HI_CLOCK_CONTROL_FSCALE_VAL(0x40);
-  1075	
-  1076		etnaviv_gpu_load_clock(gpu, clock);
-  1077		etnaviv_gpu_hw_init(gpu);
-  1078	
-> 1079		gpu->switch_context = true;
-  1080	
-  1081		mutex_unlock(&drm->struct_mutex);
-  1082	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 22037 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151120/e06f28e3/attachment-0001.obj>
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
