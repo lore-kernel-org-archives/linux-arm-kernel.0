@@ -1,159 +1,59 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 20 Nov 2015 11:32:14 -0800
-Subject: [PATCH v2 4/7] touchscreen: pixcir_i2c: Add support for wake and
- enable gpios
-In-Reply-To: <564F7258.3060601@redhat.com>
-References: <1448025892-20899-1-git-send-email-hdegoede@redhat.com>
- <1448025892-20899-5-git-send-email-hdegoede@redhat.com>
- <20151120185451.GC26895@dtor-ws> <564F7258.3060601@redhat.com>
-Message-ID: <20151120193214.GE26895@dtor-ws>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Nov 2015 19:32:33 +0000
+Subject: [PATCHv2] arm64: efi: correctly map runtime regions
+In-Reply-To: <CAKv+Gu8XKpZFdRAGTz2FaptzARN+qDLhxgNQYz+_ypHT9TAOgg@mail.gmail.com>
+References: <1448032353-8770-1-git-send-email-mark.rutland@arm.com>
+ <CAKv+Gu8XKpZFdRAGTz2FaptzARN+qDLhxgNQYz+_ypHT9TAOgg@mail.gmail.com>
+Message-ID: <20151120193232.GB14942@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 08:19:52PM +0100, Hans de Goede wrote:
-> Hi,
-> 
-> On 20-11-15 19:54, Dmitry Torokhov wrote:
-> >On Fri, Nov 20, 2015 at 02:24:49PM +0100, Hans de Goede wrote:
-> >>From: Sander Vermin <sander@vermin.nl>
-> >>
-> >>On some devices the wake and enable pins of the pixcir touchscreen
-> >>controller are connected to gpios and these must be controlled by the
-> >>driver for the device to operate properly.
-> >>
-> >>Signed-off-by: Sander Vermin <sander@vermin.nl>
-> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>---
-> >>Changes in v2 (Hans de Goede):
-> >>-Split the changes for dealing with inverted / swapped axis out into a
-> >>  separate patch
-> >>-Remove a bunch of dev_info calls to make the driver less chatty
-> >>-Use devm_gpiod_get_optional as these new gpios are optional
-> >>-Only msleep after setting enable high if we have an enable pin
-> >>---
-> >>  .../bindings/input/touchscreen/pixcir_i2c_ts.txt   |  2 +
-> >>  drivers/input/touchscreen/pixcir_i2c_ts.c          | 46 ++++++++++++++++++++++
-> >>  2 files changed, 48 insertions(+)
-> >>
-> >>diff --git a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
-> >>index 8eb240a..72ca5ec 100644
-> >>--- a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
-> >>+++ b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
-> >>@@ -10,6 +10,8 @@ Required properties:
-> >>
-> >>  Optional properties:
-> >>  - reset-gpio: GPIO connected to the RESET line of the chip
-> >>+- enable-gpios: GPIO connected to the ENABLE line of the chip
-> >>+- wake-gpios: GPIO connected to the WAKE line of the chip
-> >>
-> >>  Example:
-> >>
-> >>diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
-> >>index 211408c..b75ef65 100644
-> >>--- a/drivers/input/touchscreen/pixcir_i2c_ts.c
-> >>+++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
-> >>@@ -38,6 +38,8 @@ struct pixcir_i2c_ts_data {
-> >>  	struct input_dev *input;
-> >>  	struct gpio_desc *gpio_attb;
-> >>  	struct gpio_desc *gpio_reset;
-> >>+	struct gpio_desc *gpio_enable;
-> >>+	struct gpio_desc *gpio_wake;
-> >>  	const struct pixcir_i2c_chip_data *chip;
-> >>  	int max_fingers;	/* Max fingers supported in this instance */
-> >>  	bool running;
-> >>@@ -208,6 +210,11 @@ static int pixcir_set_power_mode(struct pixcir_i2c_ts_data *ts,
-> >>  	struct device *dev = &ts->client->dev;
-> >>  	int ret;
-> >>
-> >>+	if (mode == PIXCIR_POWER_ACTIVE || mode == PIXCIR_POWER_IDLE) {
-> >>+		if (!IS_ERR_OR_NULL(ts->gpio_wake))
-> >>+			gpiod_set_value_cansleep(ts->gpio_wake, 1);
-> >>+	}
-> >>+
-> >>  	ret = i2c_smbus_read_byte_data(ts->client, PIXCIR_REG_POWER_MODE);
-> >>  	if (ret < 0) {
-> >>  		dev_err(dev, "%s: can't read reg 0x%x : %d\n",
-> >>@@ -228,6 +235,11 @@ static int pixcir_set_power_mode(struct pixcir_i2c_ts_data *ts,
-> >>  		return ret;
-> >>  	}
-> >>
-> >>+	if (mode == PIXCIR_POWER_HALT) {
-> >>+		if (!IS_ERR_OR_NULL(ts->gpio_wake))
-> >>+			gpiod_set_value_cansleep(ts->gpio_wake, 0);
-> >>+	}
-> >>+
-> >>  	return 0;
-> >>  }
-> >>
-> >>@@ -302,6 +314,11 @@ static int pixcir_start(struct pixcir_i2c_ts_data *ts)
-> >>  	struct device *dev = &ts->client->dev;
-> >>  	int error;
-> >>
-> >>+	if (!IS_ERR_OR_NULL(ts->gpio_enable)) {
-> >>+		gpiod_set_value_cansleep(ts->gpio_enable, 1);
-> >>+		msleep(100);
-> >>+	}
-> >>+
-> >>  	/* LEVEL_TOUCH interrupt with active low polarity */
-> >>  	error = pixcir_set_int_mode(ts, PIXCIR_INT_LEVEL_TOUCH, 0);
-> >>  	if (error) {
-> >>@@ -343,6 +360,9 @@ static int pixcir_stop(struct pixcir_i2c_ts_data *ts)
-> >>  	/* Wait till running ISR is complete */
-> >>  	synchronize_irq(ts->client->irq);
-> >>
-> >>+	if (!IS_ERR_OR_NULL(ts->gpio_enable))
-> >>+		gpiod_set_value_cansleep(ts->gpio_enable, 0);
-> >>+
-> >>  	return 0;
-> >>  }
-> >>
-> >>@@ -534,6 +554,24 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
-> >>  		return error;
-> >>  	}
-> >>
-> >>+	tsdata->gpio_wake = devm_gpiod_get_optional(dev, "wake",
-> >>+						    GPIOD_OUT_HIGH);
-> >>+	if (IS_ERR(tsdata->gpio_wake)) {
-> >>+		error = PTR_ERR(tsdata->gpio_wake);
-> >>+		if (error != -EPROBE_DEFER)
-> >>+			dev_err(dev, "Failed to get wake gpio: %d\n", error);
-> >>+		return error;
-> >>+	}
-> >>+
-> >>+	tsdata->gpio_enable = devm_gpiod_get_optional(dev, "enable",
-> >>+						      GPIOD_OUT_HIGH);
-> >>+	if (IS_ERR(tsdata->gpio_enable)) {
-> >>+		error = PTR_ERR(tsdata->gpio_enable);
-> >>+		if (error != -EPROBE_DEFER)
-> >>+			dev_err(dev, "Failed to get enable gpio: %d\n", error);
-> >>+		return error;
-> >>+	}
-> >>+
-> >>  	error = devm_request_threaded_irq(dev, client->irq, NULL, pixcir_ts_isr,
-> >>  					  IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
-> >>  					  client->name, tsdata);
-> >>@@ -542,6 +580,14 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
-> >>  		return error;
-> >>  	}
-> >>
-> >>+	if (!IS_ERR_OR_NULL(tsdata->gpio_wake))
-> >>+		gpiod_set_value_cansleep(tsdata->gpio_wake, 1);
-> >>+
-> >>+	if (!IS_ERR_OR_NULL(tsdata->gpio_enable)) {
-> >>+		gpiod_set_value_cansleep(tsdata->gpio_enable, 1);
-> >>+		msleep(100);
-> >>+	}
+On Fri, Nov 20, 2015 at 07:31:21PM +0100, Ard Biesheuvel wrote:
+> On 20 November 2015 at 16:12, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Thus we account for the residue twice, and when the residue is non-zero
+> > will cause __create_mapping to map an additional page at the end of the
+> > region. Depending on the memory map, this page may be in a region we are
+> > not intended/permitted to map, or may clash with a different region that
+> > we which to map.
 > >
-> >Actually, another question: why do we need this calls to activate wake
-> >and enable gpios here if we request them as active?
 > 
-> Hmm, interesting point. I will re-test with just the msleep there. For v2
-> what do you want to do with the if tests, keep as "if (!IS_ERR_OR_NULL(...))"
-> or change them to just "if (...)" ?
+> wish
 
-Would prefer plain "if (gpio)" where makes sense.
+Whoops; corrected locally.
 
-Thanks!
+> It is worth to note that, since the memory map is virtually always
+> sorted in ascending order (especially now that we sort it explicitly
+> in the stub), this is highly unlikely to cause trouble in practice,
+> since the additional page mapping is always at the top, and will be
+> corrected as it is overwritten by the subsequent entry.
 
--- 
-Dmitry
+I agree that in the common case we are extremely likely to overwrite and
+correct an erroneous entry (especially given that's how I detected this
+in the first place).
+
+I've added a note to that effect.
+
+If there is no next entry, or it's start address is sufficiently far
+away, we won't fix up the erroneous entry. It seems either that case is
+unlikely, or the region happened to be safe to map regardless.
+
+> The page tables are not active at this stage, so there are no concerns
+> regarding break-before-make etc.
+
+Yup.
+
+> >         for_each_efi_memory_desc(&memmap, md) {
+> > -               u64 paddr, npages, size;
+> > +               u64 size;
+> 
+> I would have dropped 'size' entirely, and use the expression as the
+> function argument directly, but this is also fine by me.
+
+Sure; I've folded that in locally.
+
+> In either case:
+> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+Cheers!
+
+Mark.
