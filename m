@@ -1,48 +1,51 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 19 Nov 2015 17:05:08 -0800
-Subject: [PATCH 01/29] ARM: shmobile: porter: add HS-USB DT support
+Date: Thu, 19 Nov 2015 17:05:35 -0800
+Subject: [PATCH 28/29] ARM: shmobile: alt: add I2C1 DT support
 In-Reply-To: <cover.1447981420.git.horms+renesas@verge.net.au>
 References: <cover.1447981420.git.horms+renesas@verge.net.au>
-Message-ID: <c794f6a09a251e229b122082eff1f85b994d2bca.1447981420.git.horms+renesas@verge.net.au>
+Message-ID: <7f81bf72c67fbd225adfc0d5f6df0f674d08d757.1447981420.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-Enable HS-USB device  for the Porter board, defining the GPIO that the
-driver should check  when probing (which is the ID output from MAX3355
-OTG chip).
+Defines the board-dependent part of the I2C1 device.
 
-Note that there  will be pinctrl-related error messages if both internal
-PCI  and  HS-USB drivers are enabled but they should be just ignored.
-
-This patch is  analogous  to the commit 6f4f7156e0e6 ("ARM: shmobile:
-henninger: enable HS-USB") as there  are no differences between the
-boards in this respect.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-porter.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/r8a7794-alt.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
-index fe0f12fc02a1..9f9ffe322d17 100644
---- a/arch/arm/boot/dts/r8a7791-porter.dts
-+++ b/arch/arm/boot/dts/r8a7791-porter.dts
-@@ -269,6 +269,14 @@
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
+index e7c94554d847..88ed017495e9 100644
+--- a/arch/arm/boot/dts/r8a7794-alt.dts
++++ b/arch/arm/boot/dts/r8a7794-alt.dts
+@@ -115,6 +115,11 @@
+ 		renesas,groups = "eth_link_b", "eth_mdio_b", "eth_rmii_b";
+ 		renesas,function = "eth";
+ 	};
++
++	i2c1_pins: i2c1 {
++		renesas,groups = "i2c1";
++		renesas,function = "i2c1";
++	};
  };
  
-+&hsusb {
-+	pinctrl-0 = <&usb0_pins>;
+ &cmt0 {
+@@ -134,6 +139,14 @@
+ 	};
+ };
+ 
++&i2c1 {
++	pinctrl-0 = <&i2c1_pins>;
 +	pinctrl-names = "default";
 +
 +	status = "okay";
-+	renesas,enable-gpio = <&gpio5 31 GPIO_ACTIVE_HIGH>;
++	clock-frequency = <400000>;
 +};
 +
- &usbphy {
+ &scif2 {
  	status = "okay";
  };
 -- 
