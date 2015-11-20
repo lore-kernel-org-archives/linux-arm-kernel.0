@@ -1,83 +1,47 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 20 Nov 2015 11:24:02 +0000
-Subject: [PATCH v2] xen/events: Always allocate legacy interrupts on PV
- guests
-In-Reply-To: <1447870445-17199-1-git-send-email-boris.ostrovsky@oracle.com>
-References: <1447870445-17199-1-git-send-email-boris.ostrovsky@oracle.com>
-Message-ID: <alpine.DEB.2.02.1511201117120.1107@kaball.uk.xensource.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 20 Nov 2015 12:30:24 +0100
+Subject: [PATCH, once again] regulator: core: avoid unused variable warning
+Message-ID: <4219157.sstthfjICN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Nov 2015, Boris Ostrovsky wrote:
-> After commit 8c058b0b9c34 ("x86/irq: Probe for PIC presence before
-> allocating descs for legacy IRQs") early_irq_init() will no longer
-> preallocate descriptors for legacy interrupts if PIC does not
-> exist, which is the case for Xen PV guests.
-> 
-> Therefore we may need to allocate those descriptors ourselves.
-> 
-> Signed-off-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-> Suggested-by: Thomas Gleixner <tglx@linutronix.de>
+The second argument of the mutex_lock_nested() helper is only
+evaluated if CONFIG_DEBUG_LOCK_ALLOC is set. Otherwise we
+get this build warning for the new regulator_lock_supply
+function:
 
-You need to do this for arm64 too.
+drivers/regulator/core.c: In function 'regulator_lock_supply':
+drivers/regulator/core.c:142:6: warning: unused variable 'i' [-Wunused-variable]
 
-FYI you can download arm64 cross-compilers from
-https://releases.linaro.org/14.04/components/toolchain/binaries/
-then you can use them by exporting ARCH=arm64 and
-CROSS_COMPILE=/path/to/gcc-linaro-aarch64-linux-gnu-version/bin/aarch64-linux-gnu-
+To avoid the warning, this patch moves the postincrement outside
+of the call mutex_lock_nested(), which is enough to shut up
+gcc about it.
 
+We had some discussion about changing mutex_lock_nested to an
+inline function, which would make the code do the right thing here,
+but in the end decided against it, in order to guarantee that
+mutex_lock_nested() does not introduced overhead without
+CONFIG_DEBUG_LOCK_ALLOC.
 
-> v2: Use nr_legacy_irqs() instead of NR_IRQS_LEGACY (needs definition for ARM)
-> 
->  arch/arm/include/asm/irq.h       | 4 ++++
->  drivers/xen/events/events_base.c | 5 +++--
->  2 files changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
-> index be1d07d..b864f60 100644
-> --- a/arch/arm/include/asm/irq.h
-> +++ b/arch/arm/include/asm/irq.h
-> @@ -2,6 +2,10 @@
->  #define __ASM_ARM_IRQ_H
->  
->  #define NR_IRQS_LEGACY	16
-> +static inline int nr_legacy_irqs(void)
-> +{
-> +	return NR_IRQS_LEGACY;
-> +}
->  
->  #ifndef CONFIG_SPARSE_IRQ
->  #include <mach/irqs.h>
-> diff --git a/drivers/xen/events/events_base.c b/drivers/xen/events/events_base.c
-> index 849500e..524c221 100644
-> --- a/drivers/xen/events/events_base.c
-> +++ b/drivers/xen/events/events_base.c
-> @@ -39,6 +39,7 @@
->  #include <asm/irq.h>
->  #include <asm/idle.h>
->  #include <asm/io_apic.h>
-> +#include <asm/i8259.h>
->  #include <asm/xen/pci.h>
->  #endif
->  #include <asm/sync_bitops.h>
-> @@ -420,7 +421,7 @@ static int __must_check xen_allocate_irq_gsi(unsigned gsi)
->  		return xen_allocate_irq_dynamic();
->  
->  	/* Legacy IRQ descriptors are already allocated by the arch. */
-> -	if (gsi < NR_IRQS_LEGACY)
-> +	if (gsi < nr_legacy_irqs())
->  		irq = gsi;
->  	else
->  		irq = irq_alloc_desc_at(gsi, -1);
-> @@ -446,7 +447,7 @@ static void xen_free_irq(unsigned irq)
->  	kfree(info);
->  
->  	/* Legacy IRQ descriptors are managed by the arch. */
-> -	if (irq < NR_IRQS_LEGACY)
-> +	if (irq < nr_legacy_irqs())
->  		return;
->  
->  	irq_free_desc(irq);
-> -- 
-> 2.1.0
-> 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 9f01cd4a915 ("regulator: core: introduce function to lock regulators and its supplies")
+Link: http://permalink.gmane.org/gmane.linux.kernel/2068900
+---
+The patch that introduced the warning is now in 4.4-rc1, and I think this
+patch is still the least ugly workaround we found.
+
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index 4cf1390784e5..cf5371ee0be4 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -142,7 +142,9 @@ static void regulator_lock_supply(struct regulator_dev *rdev)
+ 	int i = 0;
+ 
+ 	while (1) {
+-		mutex_lock_nested(&rdev->mutex, i++);
++		mutex_lock_nested(&rdev->mutex, i);
++		i++;
++
+ 		supply = rdev->supply;
+ 
+ 		if (!rdev->supply)
