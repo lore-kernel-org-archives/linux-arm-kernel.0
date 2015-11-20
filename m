@@ -1,61 +1,60 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 20 Nov 2015 12:17:13 +0100
-Subject: [PATCH 7/7] ARM: dts: sun4i: Add touchscreen node to pov protab2-ips9
- tablet
+Date: Fri, 20 Nov 2015 12:17:11 +0100
+Subject: [PATCH 5/7] touchscreen: pixcir_ts: Add support for axis inversion /
+ swapping
 In-Reply-To: <1448018233-27824-1-git-send-email-hdegoede@redhat.com>
 References: <1448018233-27824-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1448018233-27824-8-git-send-email-hdegoede@redhat.com>
+Message-ID: <1448018233-27824-6-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a node describing the touchscreen found on the pov protab2-ips9
-tablet.
+Add support for axis inversion / swapping using the new
+touchscreen_parse_properties and touchscreen_apply_prop_to_x_y
+functionality.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ drivers/input/touchscreen/pixcir_i2c_ts.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts b/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
-index 82e69c3..0e5124f 100644
---- a/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
-@@ -93,6 +93,22 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c2_pins_a>;
- 	status = "okay";
-+
-+	pixcir_ts at 5c {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&touchscreen_pins>;
-+		compatible = "pixcir,pixcir_tangoc";
-+		reg = <0x5c>;
-+		interrupt-parent = <&pio>;
-+		interrupts = <7 21 IRQ_TYPE_EDGE_FALLING>; /* EINT21 (PH21) */
-+		attb-gpio = <&pio 7 21 GPIO_ACTIVE_HIGH>; /* PH21 */
-+		enable-gpios = <&pio 0 5 GPIO_ACTIVE_LOW>;
-+		wake-gpios = <&pio 1 13 GPIO_ACTIVE_LOW>;
-+		touchscreen-size-x = <1024>;
-+		touchscreen-size-y = <768>;
-+		touchscreen-inverted-x;
-+		touchscreen-inverted-y;
-+	};
+diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
+index b75ef65..e310154 100644
+--- a/drivers/input/touchscreen/pixcir_i2c_ts.c
++++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
+@@ -41,13 +41,14 @@ struct pixcir_i2c_ts_data {
+ 	struct gpio_desc *gpio_enable;
+ 	struct gpio_desc *gpio_wake;
+ 	const struct pixcir_i2c_chip_data *chip;
++	struct touchscreen_properties prop;
+ 	int max_fingers;	/* Max fingers supported in this instance */
+ 	bool running;
  };
  
- &lradc {
-@@ -129,6 +145,13 @@
+ struct pixcir_touch {
+-	int x;
+-	int y;
++	s16 x;
++	s16 y;
+ 	int id;
  };
  
- &pio {
-+	touchscreen_pins: touchscreen_pins at 0 {
-+		allwinner,pins = "PA5", "PB13";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
- 	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
- 		allwinner,pins = "PH4";
- 		allwinner,function = "gpio_in";
+@@ -100,6 +101,8 @@ static void pixcir_ts_parse(struct pixcir_i2c_ts_data *tsdata,
+ 	for (i = 0; i < touch; i++) {
+ 		report->touches[i].x = (bufptr[1] << 8) | bufptr[0];
+ 		report->touches[i].y = (bufptr[3] << 8) | bufptr[2];
++		touchscreen_apply_prop_to_x_y(&report->touches[i].x,
++					      &report->touches[i].y);
+ 
+ 		if (chip->has_hw_ids) {
+ 			report->touches[i].id = bufptr[4];
+@@ -515,7 +518,7 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
+ 	} else {
+ 		input_set_capability(input, EV_ABS, ABS_MT_POSITION_X);
+ 		input_set_capability(input, EV_ABS, ABS_MT_POSITION_Y);
+-		touchscreen_parse_properties(input, true, NULL);
++		touchscreen_parse_properties(input, true, &tsdata->prop);
+ 		if (!input_abs_get_max(input, ABS_MT_POSITION_X) ||
+ 		    !input_abs_get_max(input, ABS_MT_POSITION_Y)) {
+ 			dev_err(dev, "Touchscreen size is not specified\n");
 -- 
 2.5.0
