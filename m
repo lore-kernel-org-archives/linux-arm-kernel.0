@@ -1,49 +1,45 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Fri, 20 Nov 2015 20:01:00 +0200
-Subject: [PATCH 01/11] dt-bindings: clock: add description of LPC32xx
- clock controller
-In-Reply-To: <3740707.LksPCoyRXC@wuerfel>
-References: <1447981511-29653-1-git-send-email-vz@mleia.com>
- <1447981511-29653-2-git-send-email-vz@mleia.com> <3740707.LksPCoyRXC@wuerfel>
-Message-ID: <564F5FDC.2070001@mleia.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 20 Nov 2015 18:02:09 +0000
+Subject: [PATCH 03/10] dt-bindings: interrupt-controllers: add description
+ of SIC1 and SIC2
+In-Reply-To: <564F5DF8.7040908@mleia.com>
+References: <1447982925-30138-1-git-send-email-vz@mleia.com>
+ <1447982925-30138-4-git-send-email-vz@mleia.com>
+ <20151120165835.GA17916@rob-hp-laptop> <564F5DF8.7040908@mleia.com>
+Message-ID: <564F6021.7090000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
-
-On 20.11.2015 15:58, Arnd Bergmann wrote:
-> On Friday 20 November 2015 03:05:01 Vladimir Zapolskiy wrote:
->> NXP LPC32xx SoC has a clocking and power control unit (CPC) as a part
->> of system control block (SCB). CPC is supplied by two external
->> oscillators and it manages core and most of peripheral
->> clocks, the change adds description of DT bindings for clock
->> controller found on LPC32xx SoC series.
->>
->> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
->> ---
->>  .../devicetree/bindings/clock/nxp,lpc3220-clk.txt  | 30 ++++++++++++++++++++++
->>  1 file changed, 30 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/clock/nxp,lpc3220-clk.txt
->>
->> diff --git a/Documentation/devicetree/bindings/clock/nxp,lpc3220-clk.txt b/Documentation/devicetree/bindings/clock/nxp,lpc3220-clk.txt
->> new file mode 100644
->> index 0000000..20cbca3
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/nxp,lpc3220-clk.txt
->> @@ -0,0 +1,30 @@
->> +NXP LPC32xx Clock Controller
->> +
->> +Required properties:
->> +- compatible: should be "nxp,lpc3220-clk"
+On 20/11/15 17:52, Vladimir Zapolskiy wrote:
+> Hi Rob,
 > 
-> Please use a specific model number without 'xx' wildcards. If you have
-> multiple chips that are mutually compatible, pick one as the base number
-> and then list the others as more specific instances, like
+> On 20.11.2015 18:58, Rob Herring wrote:
+>> On Fri, Nov 20, 2015 at 03:28:38AM +0200, Vladimir Zapolskiy wrote:
+>>> NXP LPC32xx has three interrupt controllers, namely root Main
+>>> Interrupt Controller (MIC) and two supplementary Sub Interrupt
+>>> Controllers (SIC1 and SIC2), four interrupt outputs from SIC1 and SIC2
+>>> are connected to MIC.
+>>>
+>>> Also the change describes two additional optional properties:
+>>> * interrupt-controller-name - human readable name of an interrupt
+>>>   controller,
+>>
+>> Why? compatible is human readable. If you don't like that, then put the 
+>> string in the driver.
 > 
-> 	compatible = "nxp,lpc3250-clk", "nxp,lpc3220-clk";
+> in runtime I'd like to differentiate various IRQ chips by name. Here for
+> example I have one compatible "*-sic" and two actual IRQ chips SIC1 and
+> SIC2. If I read /proc/interrupts or /sys/kernel/debug/irq_domain_mapping
+> I would prefer to visualize interrupts from SIC1 and SIC2.
+> 
+> I understand that this property is not hardware specific, but there are
+> plenty of similar properties like "label" etc. Probably renaming of the
+> property may help?
 
-Do you ask me to change a title? You may see that compatible property
-does not contain any wildcards?
+You can always generate the name based on the probing order or the address.
 
---
-Vladimir
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
