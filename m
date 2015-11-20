@@ -1,29 +1,39 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 20 Nov 2015 09:22:37 +0900
-Subject: [PATCH v2 3/6] arm: dts: Add syscon-{reboot,
- poweroff} nodes for exynos5
-In-Reply-To: <1445333085-22837-4-git-send-email-alim.akhtar@samsung.com>
-References: <1445333085-22837-1-git-send-email-alim.akhtar@samsung.com>
- <1445333085-22837-4-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <564E67CD.3040807@samsung.com>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Thu, 19 Nov 2015 16:23:59 -0800
+Subject: [V2 PATCH] arm64: restore bogomips information in /proc/cpuinfo
+In-Reply-To: <20151119175906.GA10823@e104818-lin.cambridge.arm.com>
+References: <1447872535-31117-1-git-send-email-yang.shi@linaro.org>
+ <20151119175906.GA10823@e104818-lin.cambridge.arm.com>
+Message-ID: <564E681F.102@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.10.2015 18:24, Alim Akhtar wrote:
-> This patch adds syscon-{reboot, poweroff} nodes to allow the
-> generic syscon-{reboot, poweroff} driver to reset/poweroff exynos5 SoCs.
-> 
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> Reviewed-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Acked-by: Moritz Fischer <moritz.fischer@ettus.com>
-> ---
->  arch/arm/boot/dts/exynos5.dtsi |   14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
+On 11/19/2015 9:59 AM, Catalin Marinas wrote:
+> On Wed, Nov 18, 2015 at 10:48:55AM -0800, Yang Shi wrote:
+>> As what Pavel Machek reported [1], some userspace applications depend on
+>> bogomips showed by /proc/cpuinfo.
+>>
+>> Although there is much less legacy impact on aarch64 than arm, but it does
+>> break libvirt.
+>>
+>> Basically, this patch reverts commit 326b16db9f69fd0d279be873c6c00f88c0a4aad5
+>> ("arm64: delay: don't bother reporting bogomips in /proc/cpuinfo"), but with
+>> some tweak due to context change.
+>>
+>> [1] https://lkml.org/lkml/2015/1/4/132
+>>
+>> Acked-by: Will Deacon <will.deacon@arm.com>
+>> Cc: <stable@vger.kernel.org> #3.12+
+>> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+>
+> Patch applied as a fix for stable, basically returning back to the
+> pre-3.12 behaviour. If there is a need for some more useful information
+> here, it can be done as an additional patch, though without cc: stable.
 
+Thanks. This approach sounds safer to usersapce.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Yang
 
-Best regards,
-Krzysztof
+>
+> Thanks.
+>
