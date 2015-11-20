@@ -1,21 +1,25 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 20 Nov 2015 14:59:07 +0100
-Subject: [PATCH 1/4] ARM: dts: sun4i: Add backlight node to iNet1 tablet
-Message-ID: <1448027950-14629-1-git-send-email-hdegoede@redhat.com>
+Date: Fri, 20 Nov 2015 14:59:09 +0100
+Subject: [PATCH 3/4] ARM: dts: sun4i: Add backlight node to pov protab2 ips9
+ tablet
+In-Reply-To: <1448027950-14629-1-git-send-email-hdegoede@redhat.com>
+References: <1448027950-14629-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1448027950-14629-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a node describing the lcd panel backlight on the iNet1 tablet.
+Add a node describing the lcd panel backlight on the pov protab2 ips9
+tablet.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun4i-a10-inet1.dts | 24 ++++++++++++++++++++++++
+ arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts | 24 ++++++++++++++++++++++++
  1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-inet1.dts b/arch/arm/boot/dts/sun4i-a10-inet1.dts
-index 703d756..df1be08 100644
---- a/arch/arm/boot/dts/sun4i-a10-inet1.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-inet1.dts
+diff --git a/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts b/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
+index 0e5124f..1f92ec7 100644
+--- a/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
++++ b/arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
 @@ -47,6 +47,7 @@
  #include <dt-bindings/input/input.h>
  #include <dt-bindings/interrupt-controller/irq.h>
@@ -23,7 +27,7 @@ index 703d756..df1be08 100644
 +#include <dt-bindings/pwm/pwm.h>
  
  / {
- 	model = "iNet-1";
+ 	model = "Point of View Protab2-IPS9";
 @@ -56,6 +57,16 @@
  		serial0 = &uart0;
  	};
@@ -31,7 +35,7 @@ index 703d756..df1be08 100644
 +	backlight: backlight {
 +		compatible = "pwm-backlight";
 +		pinctrl-names = "default";
-+		pinctrl-0 = <&bl_en_pin_inet>;
++		pinctrl-0 = <&bl_en_pin_protab>;
 +		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
 +		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
 +		default-brightness-level = <8>;
@@ -41,21 +45,21 @@ index 703d756..df1be08 100644
  	chosen {
  		stdout-path = "serial0:115200n8";
  	};
-@@ -164,6 +175,13 @@
+@@ -145,6 +156,13 @@
  };
  
  &pio {
-+	bl_en_pin_inet: bl_en_pin at 0 {
++	bl_en_pin_protab: bl_en_pin at 0 {
 +		allwinner,pins = "PH7";
 +		allwinner,function = "gpio_out";
 +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 +	};
 +
- 	touchscreen_wake_pin: touchscreen_wake_pin at 0 {
- 		allwinner,pins = "PB13";
+ 	touchscreen_pins: touchscreen_pins at 0 {
+ 		allwinner,pins = "PA5", "PB13";
  		allwinner,function = "gpio_out";
-@@ -186,6 +204,12 @@
+@@ -167,6 +185,12 @@
  	};
  };
  
