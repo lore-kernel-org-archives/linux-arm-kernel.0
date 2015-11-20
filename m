@@ -1,65 +1,63 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 20 Nov 2015 21:50:08 +0300
-Subject: [PATCH] ARM: shmobile: alt: Add pfc pins to DT
-In-Reply-To: <20151120183451.GD29534@verge.net.au>
-References: <1447787440-11080-1-git-send-email-horms+renesas@verge.net.au>
- <564F0DE5.6040100@cogentembedded.com> <20151120183451.GD29534@verge.net.au>
-Message-ID: <564F6B60.60405@cogentembedded.com>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Fri, 20 Nov 2015 10:52:00 -0800
+Subject: [PATCH v2] clocksource: arm_global_timer: fix suspend resume
+In-Reply-To: <564F6A92.7080006@arm.com>
+References: <1448027861-21472-1-git-send-email-grygorii.strashko@ti.com>
+ <564F570C.7030409@oracle.com> <564F67ED.9000905@ti.com>
+ <564F6A92.7080006@arm.com>
+Message-ID: <564F6BD0.3050804@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2015 09:34 PM, Simon Horman wrote:
-
->>> PFC is already enabled on the r8a7794.
->>> This adds pins for devices already enabled in DT on
->>> the r8a7794 based alt board.
->>>
->>> Based on work by Mitsuhiro Kimura and Hisashi Nakamura.
->>>
->>> Cc: Mitsuhiro Kimura <mitsuhiro.kimura.kc@renesas.com>
->>> Cc: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
->>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>>
->>> ---
->>> Tested
->>> ---
->>>   arch/arm/boot/dts/r8a7794-alt.dts | 17 +++++++++++++++++
->>>   1 file changed, 17 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
->>> index 928cfa641475..2e889991ce8f 100644
->>> --- a/arch/arm/boot/dts/r8a7794-alt.dts
->>> +++ b/arch/arm/boot/dts/r8a7794-alt.dts
->>> @@ -39,6 +39,23 @@
->>>   	clock-frequency = <20000000>;
->>>   };
->>>
->>> +&pfc {
->>> +	scif2_pins: serial2 {
->>> +		renesas,groups = "scif2_data";
->>> +		renesas,function = "scif2";
->>> +	};
->>> +
->>> +	ether_pins: ether {
->>> +		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
->>> +		renesas,function = "eth";
->>> +	};
->>> +
->>> +	ether_b_pins: ether {
->>> +		renesas,groups = "eth_link_b", "eth_mdio_b", "eth_rmii_b";
->>> +		renesas,function = "eth";
->>> +	};
->>> +};
->>> +
->>>   &cmt0 {
->>>   	status = "okay";
->>>   };
+On 11/20/2015 10:46 AM, Marc Zyngier wrote:
+> On 20/11/15 18:35, Grygorii Strashko wrote:
+>> Hi Santosh,
 >>
->>     Why add unreferenced pins? How have you tested this?
+>> On 11/20/2015 07:23 PM, santosh shilimkar wrote:
+>>> + Thomas, Marc
+>>>
+>>> On 11/20/2015 5:57 AM, Grygorii Strashko wrote:
+>>>> Now the System stall is observed on TI AM437x based board
+>>>> (am437x-gp-evm) during resuming from System suspend when ARM Global
+>>>> timer is selected as clocksource device - SysRq are working, but
+>>>> nothing else. The reason of stall is that ARM Global timer loses its
+>>>> contexts.
+>>>>
+>>>> The reason of stall is that ARM Global timer loses its contexts during
+>>>> System suspend:
+>>>>      GT_CONTROL.TIMER_ENABLE = 0 (unbanked)
+>>>>      GT_COUNTERx = 0
+>>>>
+>>>> Hence, update ARM Global timer driver to reflect above behaviour
+>>>> - re-enable ARM Global timer on resume GT_CONTROL.TIMER_ENABLE = 1
+>>>> - ensure clocksource and clockevent devices have coresponding flags
+>>>>     (CLOCK_SOURCE_SUSPEND_NONSTOP and CLOCK_EVT_FEAT_C3STOP) set
+>>>>     depending on presence of "always-on" DT property.
+>>>>
+>>> Something which loses context in low power states can't be
+>>> called "always-on"
+>>
+>> Sry, it's kinda new area for me and I could make mistakes.
+>>
+>> While working on this patch I've:
+>>   - re-used implementation from ARM arch timer
+>> commit 82a5619410d4c4df65c04272db198eca5a867c18
+>> Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Date:   Tue Apr 8 10:04:32 2014 +0100
+>>
+>>      clocksource: arch_arm_timer: Fix age-old arch timer C3STOP detection issue
 >
-> Thanks for pointing out that oversight. I'll see about filling in the gaps.
+> [...]
+>
+> This patch has a very specific purpose: instructing the core code that
+> this timer will never stop ticking, ever. It is really targeted at
+> virtual machines, whose timer is backed by the host timer, even when the
+> VM is not running.
+>
+> Using it on actual hardware is may not be the best idea, specially in
+> the presence of PM.
+>
+Exactly. Thanks for clarifying the commit Marc.
 
-    Sorry for noticing this too late, only when you were pushing your branches 
-upstream...
-
-MBR, Sergei
+Regards,
+Santosh
