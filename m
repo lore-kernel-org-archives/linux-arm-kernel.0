@@ -1,39 +1,46 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Fri, 20 Nov 2015 15:47:38 -0800
-Subject: [PATCH 1/1] soc: ti: knav_qmss_queue: Fix linking RAM setup for
- queue managers
-In-Reply-To: <1448062781-6708-1-git-send-email-michal.1.morawiec.ext@nokia.com>
-References: <1448062781-6708-1-git-send-email-michal.1.morawiec.ext@nokia.com>
-Message-ID: <564FB11A.3020906@oracle.com>
+From: marex@denx.de (Marek Vasut)
+Date: Sat, 21 Nov 2015 01:08:17 +0100
+Subject: [PATCH 1/2] devicetree: bindings: Add vendor prefix for Kosagi
+In-Reply-To: <3800845.ZTMboujkVX@wuerfel>
+References: <1447840120-8513-1-git-send-email-marex@denx.de>
+ <201511202330.40050.marex@denx.de> <3800845.ZTMboujkVX@wuerfel>
+Message-ID: <201511210108.17484.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2015 3:39 PM, Michal Morawiec wrote:
-> Configure linking RAM for both queue managers also in case
-> when only linking RAM 0 is specified in device tree.
->
-why ?
+On Friday, November 20, 2015 at 11:46:02 PM, Arnd Bergmann wrote:
+> On Friday 20 November 2015 23:30:39 Marek Vasut wrote:
+> > On Friday, November 20, 2015 at 10:19:15 PM, Arnd Bergmann wrote:
+> > > On Wednesday 18 November 2015 10:48:39 Marek Vasut wrote:
+> > > > From: Sean Cross <xobs@kosagi.com>
+> > > > 
+> > > > Add a vendor prefix for Sutajio Ko-Usagi PTE Ltd., which goes by the
+> > > > more common name of Kosagi.
+> > > > 
+> > > > Signed-off-by: Sean Cross <xobs@kosagi.com>
+> > > > Cc: Rob Herring <robh@kernel.org>
+> > > > Cc: Shawn Guo <shawnguo@kernel.org>
+> > > > Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> > > 
+> > > Hi Marek,
+> > 
+> > Hi!
+> > 
+> > > you forgot to add your Signed-off-by line on both of these patches.
+> > 
+> > I should probably re-post the 2/2 anyway, but if you want to pick this
+> > 1/2 patch right away, please just add:
+> > 
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > 
+> > In case you want me to repost them, please let me know.
+> 
+> I wasn't planning to pick them up, I think they should go through the imx
+> tree, so just repost them as a series.
 
-> Signed-off-by: Michal Morawiec <michal.1.morawiec.ext@nokia.com>
-> ---
->   drivers/soc/ti/knav_qmss_queue.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
-> index 6d8646d..a809c30 100644
-> --- a/drivers/soc/ti/knav_qmss_queue.c
-> +++ b/drivers/soc/ti/knav_qmss_queue.c
-> @@ -1173,7 +1173,7 @@ static int knav_queue_setup_link_ram(struct knav_device *kdev)
->
->   		block++;
->   		if (!block->size)
-> -			return 0;
-> +			continue;
->
-You have to expand this a bit for me. Because you really don't
-want kernel code to run the configuration on hardware which doesn't
-exist. I mean device tree suppose to specify the linking RAM for both
-QMs unless and until there is a reason not too.
+Roger, will do.
 
-Regards,
-Santosh
+Thanks!
+
+Best regards,
+Marek Vasut
