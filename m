@@ -1,83 +1,68 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Sat, 21 Nov 2015 20:53:38 +0200
-Subject: [PATCH 03/11] dt-bindings: clock: add NXP LPC32xx clock list
- for consumers
-In-Reply-To: <5570695.dzvsXZ7sfz@wuerfel>
-References: <1447981511-29653-1-git-send-email-vz@mleia.com>
- <4268221.QhjAE5RLYk@wuerfel> <564F5F2E.70607@mleia.com>
- <5570695.dzvsXZ7sfz@wuerfel>
-Message-ID: <5650BDB2.9070403@mleia.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 21 Nov 2015 17:23:27 -0200
+Subject: imx6dl clock setup incorrectness
+In-Reply-To: <564DD51A.8040100@dev.rtsoft.ru>
+References: <564DD51A.8040100@dev.rtsoft.ru>
+Message-ID: <CAOMZO5DOwy1oDbNsEDmQ+a4EcCo7QOv0ZYsJ93gj=4oNUNqANA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Thu, Nov 19, 2015 at 11:56 AM, Nikita Yushchenko
+<nyushchenko@dev.rtsoft.ru> wrote:
+> Hi
+>
+> While working with board with imx6s cpu, with kernel based on linux-imx
+> imx_3.14.28_1.0.0_ga branch, I noticed this message in boot log:
+>
+>> failed to set parent of clk gpu2d_core_sel to pll2_pfd1_594m
+>
+>
+> I looked into it and found that:
+>
+> - CCM_CBCMR register layout is different between imx6q/imx6d and
+> imc6dl/imx6s (at least manuals state that)
+>
+> - clock setup in clk-imx6q.c (that is used both got imx6q/imx6d and
+> imx6dl/imx6s) creates gpu2d_core_sel clock object as described in imx6q
+> manual (i.e. using bits 18:19 of CCM_CBCMR register)
+>
+> - however per imx6dl manual, these bits contain different field
+> (mlb_sys_sel) on imx6dl/imx6s, and gpu2d_core sel is in bits 8:9
+>
+> - imx6q has different clock selector, gpu3d_shader_clk_sel, in bits 8:9,
+> and existing code unconditionally creates gpu3d_shader_clk_sel clock object
+>
+> - per manual, gpu3d_shader_clk_sel does not exist on imx6qdl/imx6s
+>
+> - however gpu driver (which also is common between imx6q/imx6d and
+> imc6dl/imx6s) does use gpu3d_shader_clk which is child of
+> gpu3d_shader_clk_sel. Which means that it is not possible to simply
+> change clock object creation code to match manuals.
+>
+>
+> I'm looking for advice how to fix this situation properly.
+>
+>
+> Btw situation is the same in mainline kernel - clock setup code in
+> mainline is moved to drivers/clk/imx/ but still has the same incorrectness.
 
-On 20.11.2015 23:07, Arnd Bergmann wrote:
-> On Friday 20 November 2015 19:58:06 Vladimir Zapolskiy wrote:
->> On 20.11.2015 15:56, Arnd Bergmann wrote:
->>> On Friday 20 November 2015 03:05:03 Vladimir Zapolskiy wrote:
->>>> +
->>>> +/* LPC32XX System Control Block clocks */
->>>> +#define LPC32XX_CLK_RTC                0
->>>> +#define LPC32XX_CLK_DMA                1
->>>> +#define LPC32XX_CLK_MLC                2
->>>> +#define LPC32XX_CLK_SLC                3
->>>> +#define LPC32XX_CLK_LCD                4
->>>> +#define LPC32XX_CLK_MAC                5
->>>> +#define LPC32XX_CLK_SD         6
->>>> +#define LPC32XX_CLK_DDRAM      7
->>>> +#define LPC32XX_CLK_SSP0       8
->>>> +#define LPC32XX_CLK_SSP1       9
->>>> +#define LPC32XX_CLK_UART3      10
->>>> +#define LPC32XX_CLK_UART4      11
->>>> +#define LPC32XX_CLK_UART5      12
->>>> +#define LPC32XX_CLK_UART6      13
->>>> +#define LPC32XX_CLK_IRDA       14
->>>> +#define LPC32XX_CLK_I2C1       15
->>>>
->>>
->>> Any chance we can avoid the include file? This is going to make it really
->>> hard to merge everything in one merge window with the dependencies between
->>> the driver, the bindings and the platform code.
->>
->> I see only one option to avoid this commit, namely squash it with the
->> CCF driver and merge it before making changes in DTS.
->>
->> However I suppose ARM trees won't be synced on clk tree, so probably it
->> won't simplify maintainer's work.
-> 
-> I think the best way for this would then be to have one git branch that
-> contains the binding header, and base the other patches on top of that
-> branch, for both the changes going into the clk git and arm-soc.
-> 
-> That way, both have the commit we need, but we don't get duplicate
-> commits when they are both merged into mainline.
+Isn't this handled by the following commit?
 
-I isolated the binding header, because in my opinion it may be reviewed
-(and hopefully accepted unchanged) separately from the CCF driver. If I
-am not mistaken, merging of two branches with an identical commit is
-seamless.
+commit 2e603ad98460fd0efab71e618d49a2ffc9aef67b
+Author: Dirk Behme <dirk.behme@de.bosch.com>
+Date:   Fri May 3 11:08:45 2013 +0200
 
-It is hard to predict, when the CCF driver gets into mainline, but the
-presence of the binding header in arm-soc tree will allow to avoid lots
-of conflicts and/or code rebases concerning lpc32xx.dtsi file.
+    ARM: i.MX6: clk: add i.MX6 DualLite differences
 
->>> If there is a way to describe the clocks based on numbers from the
->>> data sheet instead of making up your own, that makes life much
->>> easier for us.
->>
->> There are no any clock numbers in the datasheet, unfortunately.
-> 
-> I was thinking that maybe there would be a logical numbering based
-> on the register layout, e.g. a tuple of register index and bit position,
-> but it seems that the mmio area is too irregular to make that easy.
+    The CCM_CBCMR register (address 0x02C4018) has different meaning
+    between the i.MX6 Quad/Dual and the i.MX6 Solo/DualLite.
 
-Absolutely correct. Only if we consider registers, the clock controller
-registers are scattered in System Control Block, which also contains 3
-wakeup controllers, partially pinmux and DMA settings, "software
-interrupt" controller, fine tuned configurations of ARM core debugging
-mechanisms and so on.
+    Compared to the i.MX6 Quad/Dual, the CCM_CBCMR register in the
+    i.MX6 Solo/DualLite doesn't have a gpu3d_shader configuration and
+    moves the gpu2_core configuration at that place.
 
---
-With best wishes,
-Vladimir
+    Handle these i.MX6 Quad/Dual vs. i.MX6 Solo/DualLite clock differences
+    by using cpu_is_mx6dl().
+
+    Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+    Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
