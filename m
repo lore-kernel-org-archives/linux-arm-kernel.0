@@ -1,48 +1,74 @@
-From: chunfeng.yun@mediatek.com (chunfeng yun)
-Date: Sat, 21 Nov 2015 10:42:37 +0800
-Subject: [PATCH v12 0/3] Mediatek xHCI support
-In-Reply-To: <564F0211.3090605@intel.com>
-References: <1447751921-26746-1-git-send-email-chunfeng.yun@mediatek.com>
- <564F0211.3090605@intel.com>
-Message-ID: <1448073757.18917.14.camel@mhfsdcap03>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Fri, 20 Nov 2015 22:05:18 -0500
+Subject: [PATCH 1/1] soc: ti: knav_qmss_queue: Fix linking RAM setup for
+ queue managers
+In-Reply-To: <20151121020414.GB5701@michal-VirtualBox>
+References: <1448062781-6708-1-git-send-email-michal.1.morawiec.ext@nokia.com>
+ <564FB11A.3020906@oracle.com> <20151121020414.GB5701@michal-VirtualBox>
+Message-ID: <564FDF6E.9090605@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Fri, 2015-11-20 at 13:20 +0200, Mathias Nyman wrote:
-> On 17.11.2015 11:18, Chunfeng Yun wrote:
-> >  From 577f68d9c0ca1531d5f9cae0dcbea2ba116c8551 Mon Sep 17 00:00:00 2001
-> > From: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > Date: Tue, 17 Nov 2015 17:09:05 +0800
-> > Subject: [PATCH v12 0/3] Mediatek xHCI support
-> >
-> > The patch supports MediaTek's xHCI controller.
-> >
-> > There are some differences from xHCI spec:
-> > 1. The interval is specified in 250 * 8ns increments for Interrupt Moderation
-> > Interval(IMODI) of the Interrupter Moderation(IMOD) register, it is 8 times as
-> > much as that defined in xHCI spec.
-> >
-> > 2. For the value of TD Size in Normal TRB, MTK's xHCI controller defines a
-> > number of packets that remain to be transferred for a TD after processing all
-> > Max packets in all previous TRBs,that means don't include the current TRB's,
-> > but in xHCI spec it includes the current ones.
-> >
-> > 3. To minimize the scheduling effort for synchronous endpoints in xHC, the MTK
-> > architecture defines some extra SW scheduling parameters for HW. According to
-> > these parameters provided by SW, the xHC can easily decide whether a
-> > synchronous endpoint should be scheduled in a specific uFrame. The extra SW
-> > scheduling parameters are put into reserved DWs in Slot and Endpoint Context.
-> > And a bandwidth scheduler algorithm is added to support such feature.
-> >
-> > A usb3.0 phy driver is also added which used by mt65xx SoCs platform, it
-> > supports two usb2.0 ports and one usb3.0 port.
-> >
-> 
-> Added to my tree, I'll send it forward to Greg shortly
-> 
-> Fixed the documentation "wakeup_deb_p0" -> "wakeup_deb_p1" typo as well
-Thank you very much.
-> 
-> -Mathias  
-> 
+
+
+On 11/20/15 9:04 PM, Michal Morawiec wrote:
+> On Fri, Nov 20, 2015 at 03:47:38PM -0800, santosh shilimkar wrote:
+>> On 11/20/2015 3:39 PM, Michal Morawiec wrote:
+>>> Configure linking RAM for both queue managers also in case
+>>> when only linking RAM 0 is specified in device tree.
+>>>
+>> why ?
+> If both queue managers are used then both must be configured
+> with valid linking RAM configuration independent of the number
+> of linking RAMs used. If the configuration for the QM2 is
+> missing there will be a crash when it tries push/pop descriptors
+> from its queues. That's what I encountered once I removed
+> linking RAM 1 from the device tree since it was not needed.
+>
+>>> Signed-off-by: Michal Morawiec <michal.1.morawiec.ext@nokia.com>
+>>> ---
+>>>   drivers/soc/ti/knav_qmss_queue.c | 2 +-
+>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
+>>> index 6d8646d..a809c30 100644
+>>> --- a/drivers/soc/ti/knav_qmss_queue.c
+>>> +++ b/drivers/soc/ti/knav_qmss_queue.c
+>>> @@ -1173,7 +1173,7 @@ static int knav_queue_setup_link_ram(struct knav_device *kdev)
+>>>
+>>>   		block++;
+>>>   		if (!block->size)
+>>> -			return 0;
+>>> +			continue;
+>>>
+>> You have to expand this a bit for me. Because you really don't
+>> want kernel code to run the configuration on hardware which doesn't
+>> exist. I mean device tree suppose to specify the linking RAM for both
+>> QMs unless and until there is a reason not too.
+> If I understand the current handling in the driver correctly
+> the linking RAM(s) is/are used cooperatively by QMs (shared mode).
+> So every linking RAM specified in the device tree must be
+> configured exactly the same for both QMs (base addres and size).
+> If there is only one linking RAM specified then only this one
+> must be configured for both QMs.
+> For proper operation only one linking RAM is required and in most
+> cases this can be internal one as long as it is able to handle
+> the number of descriptors used in the system.
+> That was the case for me so I moved all regions so that they all
+> fit into one internal linking RAM and removed entry for external
+> linking RAM. Current driver code however skips configuration of
+> second queue manager if second linking RAM is not specified.
+>
+> Referring to the configuration of the missing hardware you
+> mentioned I don't think there is anything missing. It's just
+> one resource less used by the HW (QMs).
+>
+> I hope this explains the intention of my patch.
+>
+It does. Can you please update the patch change log with above
+description and I shall pick it up.
+
+Thanks for explaining the problem.
+
+Regards,
+Santosh
