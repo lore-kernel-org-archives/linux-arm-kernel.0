@@ -1,21 +1,36 @@
 From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sat, 21 Nov 2015 15:26:09 +0100
-Subject: [PATCH v3 1/3] ARM: dts: enable clock support for BCM5301X
-In-Reply-To: <1448032640-27713-2-git-send-email-jonmason@broadcom.com>
-References: <1448032640-27713-1-git-send-email-jonmason@broadcom.com>
- <1448032640-27713-2-git-send-email-jonmason@broadcom.com>
-Message-ID: <56507F01.8080807@hauke-m.de>
+Date: Sat, 21 Nov 2015 15:29:47 +0100
+Subject: [PATCH] ARM: BCM5310X: activate erratas needed for SoC
+Message-ID: <1448116187-22466-1-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2015 04:17 PM, Jon Mason wrote:
-> Replace current device tree dummy clocks with real clock support for
-> Broadcom Northstar SoCs.
-> 
-> Signed-off-by: Jon Mason <jonmason@broadcom.com>
-> ---
->  arch/arm/boot/dts/bcm5301x.dtsi | 92 +++++++++++++++++++++++++++++++----------
->  1 file changed, 71 insertions(+), 21 deletions(-)
-> 
+The BCM4708 I have, which is probably the first generation which got
+to the consumer market, is using a ARM Cortex-A9 rev r3p0 and a
+L2C-310 rev r3p2 L2 cache controller. There are 3 workarounds for known
+erratas in the Linux kernel which could be activated and will be in
+this patch. There are currently no workarounds which have to be
+activated for the L2C-310 rev r3p2 in Linux.
 
-Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+---
+ arch/arm/mach-bcm/Kconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 8c53c55..b8622e3 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -52,6 +52,10 @@ config ARCH_BCM_NSP
+ config ARCH_BCM_5301X
+ 	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
+ 	select ARCH_BCM_IPROC
++	select ARM_ERRATA_754322	
++	select ARM_ERRATA_775420
++	select ARM_ERRATA_764369 if SMP
++
+ 	help
+ 	  Support for Broadcom BCM470X and BCM5301X SoCs with ARM CPU cores.
+ 
+-- 
+2.6.2
