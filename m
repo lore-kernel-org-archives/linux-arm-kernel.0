@@ -1,37 +1,83 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sat, 21 Nov 2015 13:43:29 -0500
-Subject: [PATCH V5 2/3] dma: add Qualcomm Technologies HIDMA management
- driver
-In-Reply-To: <6159200.u9U0p8aIkU@wuerfel>
-References: <1447620855-4974-1-git-send-email-okaya@codeaurora.org>
- <1447620855-4974-3-git-send-email-okaya@codeaurora.org>
- <6159200.u9U0p8aIkU@wuerfel>
-Message-ID: <5650BB51.7090503@codeaurora.org>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Sat, 21 Nov 2015 20:53:38 +0200
+Subject: [PATCH 03/11] dt-bindings: clock: add NXP LPC32xx clock list
+ for consumers
+In-Reply-To: <5570695.dzvsXZ7sfz@wuerfel>
+References: <1447981511-29653-1-git-send-email-vz@mleia.com>
+ <4268221.QhjAE5RLYk@wuerfel> <564F5F2E.70607@mleia.com>
+ <5570695.dzvsXZ7sfz@wuerfel>
+Message-ID: <5650BDB2.9070403@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2015 10:58 AM, Arnd Bergmann wrote:
+Hi Arnd,
 
->>  .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  61 ++++
->>  drivers/dma/qcom/Kconfig                           |  10 +
->>  drivers/dma/qcom/Makefile                          |   1 +
->>  drivers/dma/qcom/hidma_mgmt.c                      | 306 +++++++++++++++++++++
->>  drivers/dma/qcom/hidma_mgmt.h                      |  38 +++
->>  drivers/dma/qcom/hidma_mgmt_sys.c                  | 231 ++++++++++++++++
+On 20.11.2015 23:07, Arnd Bergmann wrote:
+> On Friday 20 November 2015 19:58:06 Vladimir Zapolskiy wrote:
+>> On 20.11.2015 15:56, Arnd Bergmann wrote:
+>>> On Friday 20 November 2015 03:05:03 Vladimir Zapolskiy wrote:
+>>>> +
+>>>> +/* LPC32XX System Control Block clocks */
+>>>> +#define LPC32XX_CLK_RTC                0
+>>>> +#define LPC32XX_CLK_DMA                1
+>>>> +#define LPC32XX_CLK_MLC                2
+>>>> +#define LPC32XX_CLK_SLC                3
+>>>> +#define LPC32XX_CLK_LCD                4
+>>>> +#define LPC32XX_CLK_MAC                5
+>>>> +#define LPC32XX_CLK_SD         6
+>>>> +#define LPC32XX_CLK_DDRAM      7
+>>>> +#define LPC32XX_CLK_SSP0       8
+>>>> +#define LPC32XX_CLK_SSP1       9
+>>>> +#define LPC32XX_CLK_UART3      10
+>>>> +#define LPC32XX_CLK_UART4      11
+>>>> +#define LPC32XX_CLK_UART5      12
+>>>> +#define LPC32XX_CLK_UART6      13
+>>>> +#define LPC32XX_CLK_IRDA       14
+>>>> +#define LPC32XX_CLK_I2C1       15
+>>>>
+>>>
+>>> Any chance we can avoid the include file? This is going to make it really
+>>> hard to merge everything in one merge window with the dependencies between
+>>> the driver, the bindings and the platform code.
+>>
+>> I see only one option to avoid this commit, namely squash it with the
+>> CCF driver and merge it before making changes in DTS.
+>>
+>> However I suppose ARM trees won't be synced on clk tree, so probably it
+>> won't simplify maintainer's work.
 > 
-> Each sysfs file API you add needs a documentation in Documentation/ABI/.
+> I think the best way for this would then be to have one git branch that
+> contains the binding header, and base the other patches on top of that
+> branch, for both the changes going into the clk git and arm-soc.
 > 
-> 	Arnd
+> That way, both have the commit we need, but we don't get duplicate
+> commits when they are both merged into mainline.
+
+I isolated the binding header, because in my opinion it may be reviewed
+(and hopefully accepted unchanged) separately from the CCF driver. If I
+am not mistaken, merging of two branches with an identical commit is
+seamless.
+
+It is hard to predict, when the CCF driver gets into mainline, but the
+presence of the binding header in arm-soc tree will allow to avoid lots
+of conflicts and/or code rebases concerning lpc32xx.dtsi file.
+
+>>> If there is a way to describe the clocks based on numbers from the
+>>> data sheet instead of making up your own, that makes life much
+>>> easier for us.
+>>
+>> There are no any clock numbers in the datasheet, unfortunately.
 > 
+> I was thinking that maybe there would be a logical numbering based
+> on the register layout, e.g. a tuple of register index and bit position,
+> but it seems that the mmio area is too irregular to make that easy.
 
-I'm working on the sysfs documentation now.
+Absolutely correct. Only if we consider registers, the clock controller
+registers are scattered in System Control Block, which also contains 3
+wakeup controllers, partially pinmux and DMA settings, "software
+interrupt" controller, fine tuned configurations of ARM core debugging
+mechanisms and so on.
 
-Is there any other question regarding the patch series?
-
-If not, I'd like to have a reviewed-by after the next post if acceptable.
-
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
-Linux Foundation Collaborative Project
+--
+With best wishes,
+Vladimir
