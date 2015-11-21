@@ -1,93 +1,55 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 21 Nov 2015 13:39:49 +0000
-Subject: [PATCH 4/4] spi: mediatek: revise mtk_spi_probe() failure flow
-In-Reply-To: <1447986080-31410-4-git-send-email-leilk.liu@mediatek.com>
-References: <1447986080-31410-1-git-send-email-leilk.liu@mediatek.com>
- <1447986080-31410-4-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <20151121133949.GH26072@sirena.org.uk>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Sat, 21 Nov 2015 13:48:01 +0000
+Subject: [PATCH] nvmem: qfprom: Specify LE device endianness
+In-Reply-To: <1448062674-17969-1-git-send-email-sboyd@codeaurora.org>
+References: <1448062674-17969-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <56507611.8020008@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 10:21:19AM +0800, Leilk Liu wrote:
-> This patch revises failure flow while pm_runtime_enable().
+Hi Stephen,
 
-Why?  This also doesn't apply against current code, please check and
-resend.
+Thanks for the fix.
 
-> 
-> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+I will send it to Greg for next rc.
+
+--srini
+On 20/11/15 23:37, Stephen Boyd wrote:
+> The qfprom is a little endian device, but so far we've been
+> relying on the regmap mmio bus handling this for us without
+> explicitly stating that fact. After commit 4a98da2164cf
+> (regmap-mmio: Use native endianness for read/write, 2015-10-29),
+> the regmap mmio bus will read/write with the __raw_*() IO
+> accessors, instead of using the readl/writel() APIs that do
+> proper byte swapping for little endian devices.
+>
+> So if we're running on a big endian processor and haven't
+> specified the endianness explicitly in the regmap config or in
+> DT, we're going to switch from doing little endian byte swapping
+> to big endian accesses without byte swapping, leading to some
+> confusing results. Specify the endianness explicitly so that the
+> regmap core properly byte swaps the accesses for us.
+>
+> Cc: Rajendra Nayak <rnayak@codeaurora.org>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Tyler Baker <tyler.baker@linaro.org>
+> Cc: Simon Arlott <simon@fire.lp0.eu>
+> Cc: Mark Brown <broonie@kernel.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->  drivers/spi/spi-mt65xx.c |   15 ++++++++-------
->  1 file changed, 8 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
-> index 6c1a96e..00a36da 100644
-> --- a/drivers/spi/spi-mt65xx.c
-> +++ b/drivers/spi/spi-mt65xx.c
-> @@ -607,7 +607,8 @@ static int mtk_spi_probe(struct platform_device *pdev)
->  	ret = clk_set_parent(mdata->sel_clk, mdata->parent_clk);
->  	if (ret < 0) {
->  		dev_err(&pdev->dev, "failed to clk_set_parent (%d)\n", ret);
-> -		goto err_disable_clk;
-> +		clk_disable_unprepare(mdata->spi_clk);
-> +		goto err_put_master;
->  	}
->  
->  	clk_disable_unprepare(mdata->spi_clk);
-> @@ -617,7 +618,7 @@ static int mtk_spi_probe(struct platform_device *pdev)
->  	ret = devm_spi_register_master(&pdev->dev, master);
->  	if (ret) {
->  		dev_err(&pdev->dev, "failed to register master (%d)\n", ret);
-> -		goto err_put_master;
-> +		goto err_disable_runtime_pm;
->  	}
->  
->  	if (mdata->dev_comp->need_pad_sel) {
-> @@ -626,14 +627,14 @@ static int mtk_spi_probe(struct platform_device *pdev)
->  				"pad_num does not match num_chipselect(%d != %d)\n",
->  				mdata->pad_num, master->num_chipselect);
->  			ret = -EINVAL;
-> -			goto err_put_master;
-> +			goto err_disable_runtime_pm;
->  		}
->  
->  		if (!master->cs_gpios && master->num_chipselect > 1) {
->  			dev_err(&pdev->dev,
->  				"cs_gpios not specified and num_chipselect > 1\n");
->  			ret = -EINVAL;
-> -			goto err_put_master;
-> +			goto err_disable_runtime_pm;
->  		}
->  
->  		if (master->cs_gpios) {
-> @@ -644,7 +645,7 @@ static int mtk_spi_probe(struct platform_device *pdev)
->  				if (ret) {
->  					dev_err(&pdev->dev,
->  						"can't get CS GPIO %i\n", i);
-> -					goto err_put_master;
-> +					goto err_disable_runtime_pm;
->  				}
->  			}
->  		}
-> @@ -652,8 +653,8 @@ static int mtk_spi_probe(struct platform_device *pdev)
->  
->  	return 0;
->  
-> -err_disable_clk:
-> -	clk_disable_unprepare(mdata->spi_clk);
-> +err_disable_runtime_pm:
-> +	pm_runtime_disable(&pdev->dev);
->  err_put_master:
->  	spi_master_put(master);
->  
-> -- 
-> 1.7.9.5
-> 
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151121/ba01b195/attachment.sig>
+>   drivers/nvmem/qfprom.c | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/nvmem/qfprom.c b/drivers/nvmem/qfprom.c
+> index afb67e7eeee4..3829e5fbf8c3 100644
+> --- a/drivers/nvmem/qfprom.c
+> +++ b/drivers/nvmem/qfprom.c
+> @@ -21,6 +21,7 @@ static struct regmap_config qfprom_regmap_config = {
+>   	.reg_bits = 32,
+>   	.val_bits = 8,
+>   	.reg_stride = 1,
+> +	.val_format_endian = REGMAP_ENDIAN_LITTLE,
+>   };
+>
+>   static struct nvmem_config econfig = {
+>
