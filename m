@@ -1,83 +1,53 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Sat, 21 Nov 2015 15:18:45 -0600
-Subject: [PATCH V3 2/6] acpi: pci: Setup MSI domain for ACPI based pci
- devices
-In-Reply-To: <20151119120807.07ffd476@arm.com>
-References: <1445453249-32557-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1445453249-32557-3-git-send-email-Suravee.Suthikulpanit@amd.com>
- <20151119120807.07ffd476@arm.com>
-Message-ID: <5650DFB5.2010809@amd.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 21 Nov 2015 22:50:10 +0100
+Subject: [GIT PULL] drm/rockchip: fixes
+In-Reply-To: <56429253.6050107@rock-chips.com>
+References: <56429253.6050107@rock-chips.com>
+Message-ID: <3016892.vBtLqFySEY@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Mark,
+Am Mittwoch, 11. November 2015, 08:56:51 schrieb Mark yao:
+>       Here are some fixes for drm/rockchip:
+>          drm/rockchip can't work now, we need the patch
+>                  Revert "drm/rockchip: Convert the probe function to the 
+> generic drm_of_component_probe()"
+>          and other three fixes are also needed.
+> 
+>       I'd like you can land them.
+> 
+> The following changes since commit 
+> 816d2206f0f9953ca854e4ff1a2749a5cbd62715:
+> 
+>    Merge tag 'drm-intel-next-fixes-2015-11-06' of 
+> git://anongit.freedesktop.org/drm-intel into drm-next (2015-11-07 
+> 17:16:59 +1000)
+> 
+> are available in the git repository at:
+> 
+> 
+> https://github.com/markyzq/kernel-drm-rockchip.git drm-rockchip-2015-11-11
+> 
+> for you to fetch changes up to 55ac58b5d27a35b8caaa9bd07eb1d2899473130c:
+> 
+>    drm/rockchip: vop: fix window origin calculation (2015-11-11 08:36:18 
+> +0800)
+> 
+> ----------------------------------------------------------------
+> Dominik Behr (1):
+>        drm/rockchip: vop: fix window origin calculation
+> 
+> Heiko Stuebner (1):
+>        drm/rockchip: unset pgoff when mmap'ing gems
+> 
+> Mark Yao (1):
+>        Revert "drm/rockchip: Convert the probe function to the generic 
+> drm_of_component_probe()"
 
-On 11/19/15 06:08, Marc Zyngier wrote:
-> On Wed, 21 Oct 2015 11:47:25 -0700
-> Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> wrote:
->
-> Hi Suravee,
->
-> Sorry it took so long to get to this series. Comments below.
+Dave already applied this patch by himself, back before -rc1 was released,
+so I guess you should re-do you branch (and pull request) based on
+either 4.4-rc1 or Dave's drm-fixes branch.
 
-No worry.
 
->
->> This patch introduces pci_host_bridge_acpi_msi_domain(), which returns
->> the MSI domain of the specified PCI host bridge with DOMAIN_BUS_PCI_MSI
->> bus token. Then, it is assigned to pci device.
->>
->> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> ---
->>   drivers/pci/pci-acpi.c | 13 +++++++++++++
->>   drivers/pci/probe.c    |  2 ++
->>   include/linux/pci.h    |  7 +++++++
->>   3 files changed, 22 insertions(+)
->>
->> diff --git a/drivers/pci/pci-acpi.c b/drivers/pci/pci-acpi.c
->> index a32ba75..0e21ef4 100644
->> --- a/drivers/pci/pci-acpi.c
->> +++ b/drivers/pci/pci-acpi.c
->> @@ -9,7 +9,9 @@
->>
->>   #include <linux/delay.h>
->>   #include <linux/init.h>
->> +#include <linux/irqdomain.h>
->>   #include <linux/pci.h>
->> +#include <linux/msi.h>
->>   #include <linux/pci_hotplug.h>
->>   #include <linux/module.h>
->>   #include <linux/pci-aspm.h>
->> @@ -689,6 +691,17 @@ static struct acpi_bus_type acpi_pci_bus = {
->>   	.cleanup = pci_acpi_cleanup,
->>   };
->>
->> +struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus)
->> +{
->> +	struct irq_domain *dom = NULL;
->> +	struct fwnode_handle *fwnode = pci_msi_get_fwnode(&bus->dev);
->> +
->> +	if (fwnode)
->> +		dom = irq_find_matching_fwnode(fwnode,
->> +					       DOMAIN_BUS_PCI_MSI);
->> +	return dom;
->> +}
->> +
->
-> Given this, I really question the need for what you define in patch #1
-> to be standalone. It is only used by ACPI (DT has its own private
-> helpers), and it is so far unlikely that it will be of any use for
-> other firmware interfaces.
->
-> My suggestion is to get rid of pci_msi_get_fwnode() and move the
-> registration helper into this file. That'd be much simpler.
->
-> Thanks,
->
-> 	M.
->
-
-Ok, I'll take care of this. I assume the rest of the patches looks ok.
-
-Thanks,
-Suravee
+Heiko
