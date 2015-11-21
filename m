@@ -1,42 +1,81 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 21 Nov 2015 10:13:50 +0000
-Subject: [RFC/PATCH 2/3] recordmcount: Record locations of
- __aeabi_{u}idiv() calls on ARM
-In-Reply-To: <1448068997-26631-3-git-send-email-sboyd@codeaurora.org>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Sat, 21 Nov 2015 11:50:28 +0000
+Subject: [RFC/PATCH 3/3] ARM: Replace calls to __aeabi_{u}idiv with
+ udiv/sdiv instructions
+In-Reply-To: <1448068997-26631-4-git-send-email-sboyd@codeaurora.org> (Stephen
+ Boyd's message of "Fri, 20 Nov 2015 17:23:17 -0800")
 References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
- <1448068997-26631-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20151121101349.GI8644@n2100.arm.linux.org.uk>
+ <1448068997-26631-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <yw1xd1v3d117.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 05:23:16PM -0800, Stephen Boyd wrote:
-> @@ -452,14 +631,14 @@ static char const *
->  __has_rel_mcount(Elf_Shdr const *const relhdr,  /* is SHT_REL or SHT_RELA */
->  		 Elf_Shdr const *const shdr0,
->  		 char const *const shstrtab,
-> -		 char const *const fname)
-> +		 char const *const fname, const char *find)
->  {
->  	/* .sh_info depends on .sh_type == SHT_REL[,A] */
->  	Elf_Shdr const *const txthdr = &shdr0[w(relhdr->sh_info)];
->  	char const *const txtname = &shstrtab[w(txthdr->sh_name)];
->  
-> -	if (strcmp("__mcount_loc", txtname) == 0) {
-> -		fprintf(stderr, "warning: __mcount_loc already exists: %s\n",
-> +	if (strcmp(find, txtname) == 0) {
-> +		fprintf(stderr, "warning: %s already exists: %s\n", find,
+Stephen Boyd <sboyd@codeaurora.org> writes:
 
-Oh, it's this which has been spewing that silly
-	"warning: __mcount_loc already exists"
+> +static int module_patch_aeabi_uidiv(unsigned long loc, const Elf32_Sym *sym)
+> +{
+> +	extern char __aeabi_uidiv[], __aeabi_idiv[];
+> +	unsigned long udiv_addr = (unsigned long)__aeabi_uidiv;
+> +	unsigned long sdiv_addr = (unsigned long)__aeabi_idiv;
+> +	unsigned int udiv_insn, sdiv_insn, mask;
+> +
+> +	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
+> +		mask = HWCAP_IDIVT;
+> +		udiv_insn = __opcode_to_mem_thumb32(0xfbb0f0f1);
+> +		sdiv_insn = __opcode_to_mem_thumb32(0xfb90f0f1);
+> +	} else {
+> +		mask = HWCAP_IDIVA;
+> +		udiv_insn = __opcode_to_mem_arm(0xe730f110);
+> +		sdiv_insn = __opcode_to_mem_arm(0xe710f110);
+> +	}
+> +
+> +	if (elf_hwcap & mask) {
+> +		if (sym->st_value == udiv_addr) {
+> +			*(u32 *)loc = udiv_insn;
+> +			return 1;
+> +		} else if (sym->st_value == sdiv_addr) {
+> +			*(u32 *)loc = sdiv_insn;
+> +			return 1;
+> +		}
+> +	}
+> +
+> +	return 0;
+> +}
 
-message thousands of times in my nightly kernel builds (so much so, that
-I've had to filter the thing out of the logs.)  Given that this is soo
-noisy, I think first we need to get to the bottom of why this program is
-soo noisy before we try to make it more functional.
+[...]
 
-I had assumed that this message was produced by something in the
-toolchain, not something in the kernel.
+> +static void __init patch_aeabi_uidiv(void)
+> +{
+> +	extern unsigned long *__start_udiv_loc[], *__stop_udiv_loc[];
+> +	extern unsigned long *__start_idiv_loc[], *__stop_idiv_loc[];
+> +	unsigned long **p;
+> +	unsigned int udiv_insn, sdiv_insn, mask;
+> +
+> +	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
+> +		mask = HWCAP_IDIVT;
+> +		udiv_insn = __opcode_to_mem_thumb32(0xfbb0f0f1);
+> +		sdiv_insn = __opcode_to_mem_thumb32(0xfb90f0f1);
+> +	} else {
+> +		mask = HWCAP_IDIVA;
+> +		udiv_insn = __opcode_to_mem_arm(0xe730f110);
+> +		sdiv_insn = __opcode_to_mem_arm(0xe710f110);
+> +	}
+> +
+> +	if (elf_hwcap & mask) {
+> +		for (p = __start_udiv_loc; p < __stop_udiv_loc; p++) {
+> +			unsigned long *inst = *p;
+> +			*inst = udiv_insn;
+> +		}
+> +		for (p = __start_idiv_loc; p < __stop_idiv_loc; p++) {
+> +			unsigned long *inst = *p;
+> +			*inst = sdiv_insn;
+> +		}
+> +	}
+> +}
+
+These functions are rather similar.  Perhaps they could be combined
+somehow.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+M?ns Rullg?rd
+mans at mansr.com
