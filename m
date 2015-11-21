@@ -1,81 +1,90 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Sat, 21 Nov 2015 11:50:28 +0000
-Subject: [RFC/PATCH 3/3] ARM: Replace calls to __aeabi_{u}idiv with
- udiv/sdiv instructions
-In-Reply-To: <1448068997-26631-4-git-send-email-sboyd@codeaurora.org> (Stephen
- Boyd's message of "Fri, 20 Nov 2015 17:23:17 -0800")
-References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
- <1448068997-26631-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <yw1xd1v3d117.fsf@unicorn.mansr.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Sat, 21 Nov 2015 19:56:47 +0800
+Subject: [PATCH] ARM: tegra: Ensure entire dcache is flushed on entering
+ LP0/1
+In-Reply-To: <1447942787-31137-1-git-send-email-jonathanh@nvidia.com>
+References: <1447942787-31137-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <56505BFF.2010904@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Boyd <sboyd@codeaurora.org> writes:
+Hi Jon,
 
-> +static int module_patch_aeabi_uidiv(unsigned long loc, const Elf32_Sym *sym)
-> +{
-> +	extern char __aeabi_uidiv[], __aeabi_idiv[];
-> +	unsigned long udiv_addr = (unsigned long)__aeabi_uidiv;
-> +	unsigned long sdiv_addr = (unsigned long)__aeabi_idiv;
-> +	unsigned int udiv_insn, sdiv_insn, mask;
-> +
-> +	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
-> +		mask = HWCAP_IDIVT;
-> +		udiv_insn = __opcode_to_mem_thumb32(0xfbb0f0f1);
-> +		sdiv_insn = __opcode_to_mem_thumb32(0xfb90f0f1);
-> +	} else {
-> +		mask = HWCAP_IDIVA;
-> +		udiv_insn = __opcode_to_mem_arm(0xe730f110);
-> +		sdiv_insn = __opcode_to_mem_arm(0xe710f110);
-> +	}
-> +
-> +	if (elf_hwcap & mask) {
-> +		if (sym->st_value == udiv_addr) {
-> +			*(u32 *)loc = udiv_insn;
-> +			return 1;
-> +		} else if (sym->st_value == sdiv_addr) {
-> +			*(u32 *)loc = sdiv_insn;
-> +			return 1;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
+On 11/19/2015 10:19 PM, Jon Hunter wrote:
+> Tegra support several low-power (LPx) states, which are:
+> - LP0: CPU + Core voltage off and DRAM in self-refresh
+> - LP1: CPU voltage off and DRAM in self-refresh
+> - LP2: CPU voltage off
+>
+> When entering any of the above states the tegra_disable_clean_inv_dcache()
+> function is called to flush the dcache. The function
+> tegra_disable_clean_inv_dcache() will either flush the entire data cache or
+> up to the Level of Unification Inner Shareable (LoUIS) depending on the
+> value in r0. When tegra_disable_clean_inv_dcache() is called by
+> tegra20_sleep_core_finish() or tegra30_sleep_core_finish(), to enter LP0
+> and LP1 power state, the r0 register contains a physical memory address
+> which will not be equal to TEGRA_FLUSH_CACHE_ALL (1) and so the data cache
+> will be only flushed to the LoUIS. However, when
+> tegra_disable_clean_inv_dcache() called by tegra_sleep_cpu_finish() to
+> enter to LP2 power state, r0 is set to TEGRA_FLUSH_CACHE_ALL to flush the
+> entire dcache.
+>
+> Please note that tegra20_sleep_core_finish(), tegra30_sleep_core_finish()
+> and tegra_sleep_cpu_finish() are called by the boot CPU once all other CPUs
+> have been disabled and so it seems appropriate to flush the entire cache at
+> this stage.
+>
+> Therefore, ensure that r0 is set to TEGRA_FLUSH_CACHE_ALL when calling
+> tegra_disable_clean_inv_dcache() from tegra20_sleep_core_finish() and
+> tegra30_sleep_core_finish().
+>
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> ---
 
-[...]
+Thanks for the fix.
 
-> +static void __init patch_aeabi_uidiv(void)
-> +{
-> +	extern unsigned long *__start_udiv_loc[], *__stop_udiv_loc[];
-> +	extern unsigned long *__start_idiv_loc[], *__stop_idiv_loc[];
-> +	unsigned long **p;
-> +	unsigned int udiv_insn, sdiv_insn, mask;
-> +
-> +	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
-> +		mask = HWCAP_IDIVT;
-> +		udiv_insn = __opcode_to_mem_thumb32(0xfbb0f0f1);
-> +		sdiv_insn = __opcode_to_mem_thumb32(0xfb90f0f1);
-> +	} else {
-> +		mask = HWCAP_IDIVA;
-> +		udiv_insn = __opcode_to_mem_arm(0xe730f110);
-> +		sdiv_insn = __opcode_to_mem_arm(0xe710f110);
-> +	}
-> +
-> +	if (elf_hwcap & mask) {
-> +		for (p = __start_udiv_loc; p < __stop_udiv_loc; p++) {
-> +			unsigned long *inst = *p;
-> +			*inst = udiv_insn;
-> +		}
-> +		for (p = __start_idiv_loc; p < __stop_idiv_loc; p++) {
-> +			unsigned long *inst = *p;
-> +			*inst = sdiv_insn;
-> +		}
-> +	}
-> +}
+Reviewed-by: Joseph Lo <josephl@nvidia.com>
 
-These functions are rather similar.  Perhaps they could be combined
-somehow.
-
--- 
-M?ns Rullg?rd
-mans at mansr.com
+>
+> Please note that I have not encountered any problems without this change
+> so far, but I noticed this from reviewing the suspend sequence. I have
+> tested this on tegra20, tegra30, tegra114 and tegra124 and verified that
+> suspend/resume to LP1 is working fine.
+>
+>   arch/arm/mach-tegra/sleep-tegra20.S | 3 +++
+>   arch/arm/mach-tegra/sleep-tegra30.S | 3 +++
+>   2 files changed, 6 insertions(+)
+>
+> diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
+> index e6b684e14322..f5d19667484e 100644
+> --- a/arch/arm/mach-tegra/sleep-tegra20.S
+> +++ b/arch/arm/mach-tegra/sleep-tegra20.S
+> @@ -231,8 +231,11 @@ ENDPROC(tegra20_cpu_is_resettable_soon)
+>    * tegra20_tear_down_core in IRAM
+>    */
+>   ENTRY(tegra20_sleep_core_finish)
+> +	mov     r4, r0
+>   	/* Flush, disable the L1 data cache and exit SMP */
+> +	mov     r0, #TEGRA_FLUSH_CACHE_ALL
+>   	bl	tegra_disable_clean_inv_dcache
+> +	mov     r0, r4
+>
+>   	mov32	r3, tegra_shut_off_mmu
+>   	add	r3, r3, r0
+> diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
+> index 9a2f0b051e10..16e5ff03383c 100644
+> --- a/arch/arm/mach-tegra/sleep-tegra30.S
+> +++ b/arch/arm/mach-tegra/sleep-tegra30.S
+> @@ -242,8 +242,11 @@ ENDPROC(tegra30_cpu_shutdown)
+>    * tegra30_tear_down_core in IRAM
+>    */
+>   ENTRY(tegra30_sleep_core_finish)
+> +	mov	r4, r0
+>   	/* Flush, disable the L1 data cache and exit SMP */
+> +	mov	r0, #TEGRA_FLUSH_CACHE_ALL
+>   	bl	tegra_disable_clean_inv_dcache
+> +	mov	r0, r4
+>
+>   	/*
+>   	 * Preload all the address literals that are needed for the
+>
