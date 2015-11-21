@@ -1,37 +1,32 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 21 Nov 2015 21:14:11 +0100
-Subject: [RFC PATCH v1 2/2] dt-bindings: add document for Innosilicon HDMI
- on Rockchip platform
-In-Reply-To: <1447228052-4897-1-git-send-email-ykk@rock-chips.com>
-References: <1447227952-4787-1-git-send-email-ykk@rock-chips.com>
- <1447228052-4897-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1776316.RzHCH7Zejb@phil>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 21 Nov 2015 21:39:58 +0100
+Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
+References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <7199523.6J0A1gxY4q@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yakir,
+On Friday 20 November 2015 17:23:14 Stephen Boyd wrote:
+> This is a respin of a patch series from about a year ago[1]. I realized
+> that we already had most of the code in recordmcount to figure out
+> where we make calls to particular functions, so recording where
+> we make calls to the integer division functions should be easy enough
+> to add support for in the same codepaths. Looking back on the thread
+> it seems like Mans was thinking along the same lines, although it wasn't
+> obvious to me back then or even over the last few days when I wrote this.
 
-Am Mittwoch, 11. November 2015, 15:47:32 schrieb Yakir Yang:
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> ---
->  .../display/rockchip/inno_hdmi-rockchip.txt        | 50 ++++++++++++++++++++++
->  1 file changed, 50 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
-> new file mode 100644
-> index 0000000..1898408
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
-> @@ -0,0 +1,50 @@
-> +Rockchip specific extensions to the Innosilicon HDMI
-> +================================
-> +
-> +Required properties:
-> +- compatible:
-> +	"rockchip,rk3036-dw-hdmi";
+Shouldn't we start by allowing to build the kernel for -march=armv7ve
+on platforms that allow it? That would seem like a simpler change
+and likely generate better code for most people, except when you actually
+care about running the same binary kernel on older platforms.
 
-should be "rockchip,rk3036-inno-hdmi"; instead I guess
+I tried to get a complete list of CPU cores with idiv, lpae and
+virtualization support at some point, but I don't remember the
+details for all Qualcomm and Marvell cores any more, to create the
+complete configuration matrix. IIRC, all CPUs that support
+virtualization also do lpae (they have to) and all CPUs that
+do lpae also do idiv, but the opposite is not true.
 
-
-Heiko
+	Arnd
