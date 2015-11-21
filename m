@@ -1,75 +1,45 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sat, 21 Nov 2015 18:39:17 +0100
-Subject: [PATCH] VSOCK: constify vmci_transport_notify_ops structures
-Message-ID: <1448127557-22280-1-git-send-email-Julia.Lawall@lip6.fr>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 21 Nov 2015 19:04:47 +0100
+Subject: [PATCH 0/6] pinctrl: pxa: add pxa27x pin control support
+Message-ID: <1448129093-20722-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vmci_transport_notify_ops structures are never modified, so declare
-them as const.
+Hi Linus,
 
-Done with the help of Coccinelle.
+I've been working on this for some time now, it's time pxa archtecture gets a
+proper pin control support.
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+This serie provides support for pxa27x architecture, and paves the way to pxa2xx
+one. I've tested this on my pxa27x board, in both device-tree and non
+device-tree builds.
 
----
- net/vmw_vsock/vmci_transport.h               |    2 +-
- net/vmw_vsock/vmci_transport_notify.c        |    2 +-
- net/vmw_vsock/vmci_transport_notify.h        |    5 +++--
- net/vmw_vsock/vmci_transport_notify_qstate.c |    2 +-
- 4 files changed, 6 insertions(+), 5 deletions(-)
+It's time to have more eyes on this code, so let's begin the review.
 
-diff --git a/net/vmw_vsock/vmci_transport.h b/net/vmw_vsock/vmci_transport.h
-index 2ad46f3..1820e74 100644
---- a/net/vmw_vsock/vmci_transport.h
-+++ b/net/vmw_vsock/vmci_transport.h
-@@ -121,7 +121,7 @@ struct vmci_transport {
- 	u64 queue_pair_max_size;
- 	u32 detach_sub_id;
- 	union vmci_transport_notify notify;
--	struct vmci_transport_notify_ops *notify_ops;
-+	const struct vmci_transport_notify_ops *notify_ops;
- 	struct list_head elem;
- 	struct sock *sk;
- 	spinlock_t lock; /* protects sk. */
-diff --git a/net/vmw_vsock/vmci_transport_notify.c b/net/vmw_vsock/vmci_transport_notify.c
-index 9b7f207..fd8cf02 100644
---- a/net/vmw_vsock/vmci_transport_notify.c
-+++ b/net/vmw_vsock/vmci_transport_notify.c
-@@ -661,7 +661,7 @@ static void vmci_transport_notify_pkt_process_negotiate(struct sock *sk)
- }
- 
- /* Socket control packet based operations. */
--struct vmci_transport_notify_ops vmci_transport_notify_pkt_ops = {
-+const struct vmci_transport_notify_ops vmci_transport_notify_pkt_ops = {
- 	vmci_transport_notify_pkt_socket_init,
- 	vmci_transport_notify_pkt_socket_destruct,
- 	vmci_transport_notify_pkt_poll_in,
-diff --git a/net/vmw_vsock/vmci_transport_notify.h b/net/vmw_vsock/vmci_transport_notify.h
-index 7df7932..3c464d3 100644
---- a/net/vmw_vsock/vmci_transport_notify.h
-+++ b/net/vmw_vsock/vmci_transport_notify.h
-@@ -77,7 +77,8 @@ struct vmci_transport_notify_ops {
- 	void (*process_negotiate) (struct sock *sk);
- };
- 
--extern struct vmci_transport_notify_ops vmci_transport_notify_pkt_ops;
--extern struct vmci_transport_notify_ops vmci_transport_notify_pkt_q_state_ops;
-+extern const struct vmci_transport_notify_ops vmci_transport_notify_pkt_ops;
-+extern const
-+struct vmci_transport_notify_ops vmci_transport_notify_pkt_q_state_ops;
- 
- #endif /* __VMCI_TRANSPORT_NOTIFY_H__ */
-diff --git a/net/vmw_vsock/vmci_transport_notify_qstate.c b/net/vmw_vsock/vmci_transport_notify_qstate.c
-index dc9c792..21e591d 100644
---- a/net/vmw_vsock/vmci_transport_notify_qstate.c
-+++ b/net/vmw_vsock/vmci_transport_notify_qstate.c
-@@ -419,7 +419,7 @@ vmci_transport_notify_pkt_send_pre_enqueue(
- }
- 
- /* Socket always on control packet based operations. */
--struct vmci_transport_notify_ops vmci_transport_notify_pkt_q_state_ops = {
-+const struct vmci_transport_notify_ops vmci_transport_notify_pkt_q_state_ops = {
- 	vmci_transport_notify_pkt_socket_init,
- 	vmci_transport_notify_pkt_socket_destruct,
- 	vmci_transport_notify_pkt_poll_in,
+Cheers.
+
+Robert Jarzmik (6):
+  MAINTAINERS: add to pxa files pinctrl
+  pinctrl: pxa: pxa2xx: add pin control skeleton
+  pinctrl: pxa: pxa2xx: add pin muxing
+  pinctrl: pxa: pxa2xx: add pin configuration support
+  pinctrl: pxa: add pxa27x architecture
+  pinctrl: activate pxa architecture
+
+ MAINTAINERS                          |   1 +
+ drivers/pinctrl/Kconfig              |   1 +
+ drivers/pinctrl/Makefile             |   1 +
+ drivers/pinctrl/pxa/Kconfig          |  17 ++
+ drivers/pinctrl/pxa/Makefile         |   2 +
+ drivers/pinctrl/pxa/pinctrl-pxa27x.c | 566 +++++++++++++++++++++++++++++++++++
+ drivers/pinctrl/pxa/pinctrl-pxa2xx.c | 436 +++++++++++++++++++++++++++
+ drivers/pinctrl/pxa/pinctrl-pxa2xx.h |  92 ++++++
+ 8 files changed, 1116 insertions(+)
+ create mode 100644 drivers/pinctrl/pxa/Kconfig
+ create mode 100644 drivers/pinctrl/pxa/Makefile
+ create mode 100644 drivers/pinctrl/pxa/pinctrl-pxa27x.c
+ create mode 100644 drivers/pinctrl/pxa/pinctrl-pxa2xx.c
+ create mode 100644 drivers/pinctrl/pxa/pinctrl-pxa2xx.h
+
+-- 
+2.1.4
