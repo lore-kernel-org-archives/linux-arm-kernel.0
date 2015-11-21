@@ -1,36 +1,36 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sat, 21 Nov 2015 15:29:47 +0100
-Subject: [PATCH] ARM: BCM5310X: activate erratas needed for SoC
-Message-ID: <1448116187-22466-1-git-send-email-hauke@hauke-m.de>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 21 Nov 2015 17:41:47 +0100
+Subject: [PATCH v4 00/10] Better compatible for the rockchip thermal and
+ support RK3368 SoCs
+In-Reply-To: <20151112183119.GA5289@localhost.localdomain>
+References: <1447044542-30859-1-git-send-email-wxt@rock-chips.com>
+ <20151112182950.GB4361@localhost.localdomain>
+ <20151112183119.GA5289@localhost.localdomain>
+Message-ID: <1718129.opDY4sItVM@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BCM4708 I have, which is probably the first generation which got
-to the consumer market, is using a ARM Cortex-A9 rev r3p0 and a
-L2C-310 rev r3p2 L2 cache controller. There are 3 workarounds for known
-erratas in the Linux kernel which could be activated and will be in
-this patch. There are currently no workarounds which have to be
-activated for the L2C-310 rev r3p2 in Linux.
+Am Donnerstag, 12. November 2015, 10:31:20 schrieb Eduardo Valentin:
+> On Thu, Nov 12, 2015 at 10:29:52AM -0800, Eduardo Valentin wrote:
+> > On Mon, Nov 09, 2015 at 12:48:52PM +0800, Caesar Wang wrote:
+> > > Thank you all for providing inputs and comments on previous versions of
+> > > this patchset.
+> > > Especially thanks to the (Eduardo, Dmitry, Heiko,....).
+> > > 
+> > > This series patchs are working for RK3368 on Rockchip platform.
+> > 
+> > Do you have any results on existing support? Is the driver still in one
+> > piece for rk3288?
+> > 
+> > I am planing to send your series in next rc cycles. It won't appear in
+> > linux-next until merge window finishes.
+> 
+> To be more specific, only patches 1-7. DT bindings go via the right
+> machine tree.
 
-Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
----
- arch/arm/mach-bcm/Kconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+after seeing these 7 patches in your next-branch, I've now applied the 3
+dts patches to my dts64 branch for 4.5 as well.
 
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 8c53c55..b8622e3 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -52,6 +52,10 @@ config ARCH_BCM_NSP
- config ARCH_BCM_5301X
- 	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
- 	select ARCH_BCM_IPROC
-+	select ARM_ERRATA_754322	
-+	select ARM_ERRATA_775420
-+	select ARM_ERRATA_764369 if SMP
-+
- 	help
- 	  Support for Broadcom BCM470X and BCM5301X SoCs with ARM CPU cores.
- 
--- 
-2.6.2
+
+Thanks
+Heiko
