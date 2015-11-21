@@ -1,76 +1,35 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 20 Nov 2015 16:40:35 -0800
-Subject: [PATCH] ARM: shmobile: alt: Add pfc pins to DT
-In-Reply-To: <564F6B60.60405@cogentembedded.com>
-References: <1447787440-11080-1-git-send-email-horms+renesas@verge.net.au>
- <564F0DE5.6040100@cogentembedded.com>
- <20151120183451.GD29534@verge.net.au>
- <564F6B60.60405@cogentembedded.com>
-Message-ID: <20151121004035.GA24496@verge.net.au>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 20 Nov 2015 19:48:48 -0500 (EST)
+Subject: [PATCH] mtd: maps: kill DC21285 driver
+In-Reply-To: <1448058755-45834-1-git-send-email-computersforpeace@gmail.com>
+References: <1448058755-45834-1-git-send-email-computersforpeace@gmail.com>
+Message-ID: <alpine.LFD.2.20.1511201942420.22569@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 09:50:08PM +0300, Sergei Shtylyov wrote:
-> On 11/20/2015 09:34 PM, Simon Horman wrote:
+On Fri, 20 Nov 2015, Brian Norris wrote:
+
+> This driver wouldn't build for over 5 years, between commit:
 > 
-> >>>PFC is already enabled on the r8a7794.
-> >>>This adds pins for devices already enabled in DT on
-> >>>the r8a7794 based alt board.
-> >>>
-> >>>Based on work by Mitsuhiro Kimura and Hisashi Nakamura.
-> >>>
-> >>>Cc: Mitsuhiro Kimura <mitsuhiro.kimura.kc@renesas.com>
-> >>>Cc: Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>
-> >>>Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >>>
-> >>>---
-> >>>Tested
-> >>>---
-> >>>  arch/arm/boot/dts/r8a7794-alt.dts | 17 +++++++++++++++++
-> >>>  1 file changed, 17 insertions(+)
-> >>>
-> >>>diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
-> >>>index 928cfa641475..2e889991ce8f 100644
-> >>>--- a/arch/arm/boot/dts/r8a7794-alt.dts
-> >>>+++ b/arch/arm/boot/dts/r8a7794-alt.dts
-> >>>@@ -39,6 +39,23 @@
-> >>>  	clock-frequency = <20000000>;
-> >>>  };
-> >>>
-> >>>+&pfc {
-> >>>+	scif2_pins: serial2 {
-> >>>+		renesas,groups = "scif2_data";
-> >>>+		renesas,function = "scif2";
-> >>>+	};
-> >>>+
-> >>>+	ether_pins: ether {
-> >>>+		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
-> >>>+		renesas,function = "eth";
-> >>>+	};
-> >>>+
-> >>>+	ether_b_pins: ether {
-> >>>+		renesas,groups = "eth_link_b", "eth_mdio_b", "eth_rmii_b";
-> >>>+		renesas,function = "eth";
-> >>>+	};
-> >>>+};
-> >>>+
-> >>>  &cmt0 {
-> >>>  	status = "okay";
-> >>>  };
-> >>
-> >>    Why add unreferenced pins? How have you tested this?
-> >
-> >Thanks for pointing out that oversight. I'll see about filling in the gaps.
+>   bd31b85960a7 ("locking, ARM: Annotate low level hw locks as raw")
 > 
->    Sorry for noticing this too late, only when you were pushing your
-> branches upstream...
+> and
+> 
+>   e5babdf928e5 ("mtd: dc21285: use raw spinlock functions for nw_gpio_lock")
+> 
+> Also, it's unsafe to build into arbitrary kernels, as it might just
+> start probing around memory, whether or not there's a compatible flash
+> there. See comments here, last time someone tried to enable it:
+> 
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/347133.html
+> 
+> So, let's kill it. I bet no one will notice.
 
-No problem, thanks for noticing at all.
+Waow.  And I'm apparently the author.  Last time I had access to 
+hardware that could use it was in 2001.
 
-FYI:
+Now I suppose this depends if there are still people with Netwinders out 
+there, and if they're interested in having mainline running on it.
 
-It looks like things work well when using the scif2
-but not the ether pins. I suspect the latter is due to the lack
-of phy pin support both above and by inspection in the pfc driver.
 
-I will investigate further.
+Nicolas
