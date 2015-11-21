@@ -1,63 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 21 Nov 2015 22:00:16 +0100
-Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
- functions
-In-Reply-To: <5239BA2A-BCD9-4A8C-BC34-F48603137E08@mansr.com>
-References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
- <7199523.6J0A1gxY4q@wuerfel> <5239BA2A-BCD9-4A8C-BC34-F48603137E08@mansr.com>
-Message-ID: <6160413.CulAvzVaQj@wuerfel>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Sat, 21 Nov 2015 15:18:45 -0600
+Subject: [PATCH V3 2/6] acpi: pci: Setup MSI domain for ACPI based pci
+ devices
+In-Reply-To: <20151119120807.07ffd476@arm.com>
+References: <1445453249-32557-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1445453249-32557-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <20151119120807.07ffd476@arm.com>
+Message-ID: <5650DFB5.2010809@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 21 November 2015 20:45:38 M?ns Rullg?rd wrote:
-> On 21 November 2015 20:39:58 GMT+00:00, Arnd Bergmann <arnd@arndb.de> wrote:
-> >On Friday 20 November 2015 17:23:14 Stephen Boyd wrote:
-> >> This is a respin of a patch series from about a year ago[1]. I
-> >realized
-> >> that we already had most of the code in recordmcount to figure out
-> >> where we make calls to particular functions, so recording where
-> >> we make calls to the integer division functions should be easy enough
-> >> to add support for in the same codepaths. Looking back on the thread
-> >> it seems like Mans was thinking along the same lines, although it
-> >wasn't
-> >> obvious to me back then or even over the last few days when I wrote
-> >this.
-> >
-> >Shouldn't we start by allowing to build the kernel for -march=armv7ve
-> >on platforms that allow it? That would seem like a simpler change
-> >and likely generate better code for most people, except when you
-> >actually
-> >care about running the same binary kernel on older platforms.
-> >
-> >I tried to get a complete list of CPU cores with idiv, lpae and
-> >virtualization support at some point, but I don't remember the
-> >details for all Qualcomm and Marvell cores any more, to create the
-> >complete configuration matrix. IIRC, all CPUs that support
-> >virtualization also do lpae (they have to) and all CPUs that
-> >do lpae also do idiv, but the opposite is not true.
-> >
-> 
-> The ARM ARM says anything with virt has idiv, lpae doesn't matter.
+Hi Marc,
 
-Ok, and anything with virt also has lpae by definition. The question is
-whether we care about using idiv on cores that do not have lpae, or that
-have neither lpae nor virt.
+On 11/19/15 06:08, Marc Zyngier wrote:
+> On Wed, 21 Oct 2015 11:47:25 -0700
+> Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> wrote:
+>
+> Hi Suravee,
+>
+> Sorry it took so long to get to this series. Comments below.
 
-We have a related problem at the moment where we don't handle configuration
-of lpae correctly in Kconfig: you can simply turn that on for any
-ARMv7-only kernel, but it breaks running on Cortex-A8, Cortex-A9
-and at least some subset of PJ4/Scorpion/Krait (not sure which).
+No worry.
 
-If we add a way to configure idiv support, we should do it right and
-handle lpae correctly too. If we are lucky, each CPU we support
-either has both or neither, and then we just need one additional
-Kconfig option. We don't need another option for virt, because KVM
-support can be handled in a way that it doesn't break on cores with
-lpae but without virt (it requires lpae).
+>
+>> This patch introduces pci_host_bridge_acpi_msi_domain(), which returns
+>> the MSI domain of the specified PCI host bridge with DOMAIN_BUS_PCI_MSI
+>> bus token. Then, it is assigned to pci device.
+>>
+>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> ---
+>>   drivers/pci/pci-acpi.c | 13 +++++++++++++
+>>   drivers/pci/probe.c    |  2 ++
+>>   include/linux/pci.h    |  7 +++++++
+>>   3 files changed, 22 insertions(+)
+>>
+>> diff --git a/drivers/pci/pci-acpi.c b/drivers/pci/pci-acpi.c
+>> index a32ba75..0e21ef4 100644
+>> --- a/drivers/pci/pci-acpi.c
+>> +++ b/drivers/pci/pci-acpi.c
+>> @@ -9,7 +9,9 @@
+>>
+>>   #include <linux/delay.h>
+>>   #include <linux/init.h>
+>> +#include <linux/irqdomain.h>
+>>   #include <linux/pci.h>
+>> +#include <linux/msi.h>
+>>   #include <linux/pci_hotplug.h>
+>>   #include <linux/module.h>
+>>   #include <linux/pci-aspm.h>
+>> @@ -689,6 +691,17 @@ static struct acpi_bus_type acpi_pci_bus = {
+>>   	.cleanup = pci_acpi_cleanup,
+>>   };
+>>
+>> +struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus)
+>> +{
+>> +	struct irq_domain *dom = NULL;
+>> +	struct fwnode_handle *fwnode = pci_msi_get_fwnode(&bus->dev);
+>> +
+>> +	if (fwnode)
+>> +		dom = irq_find_matching_fwnode(fwnode,
+>> +					       DOMAIN_BUS_PCI_MSI);
+>> +	return dom;
+>> +}
+>> +
+>
+> Given this, I really question the need for what you define in patch #1
+> to be standalone. It is only used by ACPI (DT has its own private
+> helpers), and it is so far unlikely that it will be of any use for
+> other firmware interfaces.
+>
+> My suggestion is to get rid of pci_msi_get_fwnode() and move the
+> registration helper into this file. That'd be much simpler.
+>
+> Thanks,
+>
+> 	M.
+>
 
-> ARMv7-R also has idiv. I've no idea if anyone runs Linux on those though.
+Ok, I'll take care of this. I assume the rest of the patches looks ok.
 
-Not mainline at least. There were patches at some point, but they
-never got merged.
-
-	Arnd
+Thanks,
+Suravee
