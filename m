@@ -1,32 +1,29 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Sun, 22 Nov 2015 22:37:56 +0100
-Subject: [PATCH 00/13] mvneta Buffer Management and enhancements
-In-Reply-To: <12984648.7CKVgBs7pu@wuerfel>
+Date: Sun, 22 Nov 2015 22:55:03 +0100
+Subject: [PATCH 02/13] net: mvneta: enable IP checksum with jumbo frames
+ for Armada 38x on Port0
+In-Reply-To: <5578695.0ahxvoVWDX@wuerfel>
 References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
- <12984648.7CKVgBs7pu@wuerfel>
-Message-ID: <CAPv3WKfqpBgjERwU3VTPeM7NRkSzz=Ny13WhLvbT_yHfaG1nWw@mail.gmail.com>
+ <4040597.3hXVb3XDMS@wuerfel>
+ <CAPv3WKdOVf4kXHfrawgybggHggAEJ9wJh=8gyp_mEhWp2i=YFw@mail.gmail.com>
+ <5578695.0ahxvoVWDX@wuerfel>
+Message-ID: <CAPv3WKfW+V+dohsqcM7OLm3EBTqM9v-_96=Bkfu-BKoJV7Ss=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Arnd,
 
-2015-11-22 21:06 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
-> On Sunday 22 November 2015 08:53:46 Marcin Wojtas wrote:
->>
->> 3. Optimisations - concatenating TX descriptors' flush, basing on
->> xmit_more support and combined approach for finalizing egress processing.
->> Thanks to HR timer buffers can be released with small latency, which is
->> good for low transfer and small queues. Along with the timer, coalescing
->> irqs are used, whose threshold could be increased back to 15.
->>
->>
 >
-> If you are already reworking the TX path, it probably makes sense to
-> support BQL as well, see the Marvell skge and sky2 drivers for examples
-> using netdev_{tx_,}{sent,completed}_queue.
+> If the feature set depends on the port number, we should think about
+> the way it gets handled again, as this is probably better not described
+> as something that depends (just) on the SoC, but on the way it gets
+> integrated. Maybe we can introduce an additional property for the
+> checksums on jumbo frames and use that if present but fall back to
+> identifying by compatible string otherwise.
 >
 
-Good idea, I'll take a look.
+I think adding a property, taking also compatible strings will be the
+best solution.
 
 Best regards,
 Marcin
