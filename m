@@ -1,43 +1,41 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 22 Nov 2015 20:46:43 +0100
-Subject: [PATCH v3 5/9] ARM: dts: sun8i: sinlinx-sina33: Add AXP223 PMIC
- device and regulator nodes
-In-Reply-To: <CAGb2v67RxuQT4AffPbdW29yLMn7jjHgiqwXTGmgf8VgqT-fN9g@mail.gmail.com>
-References: <1447691908-25456-1-git-send-email-wens@csie.org>
- <1447691908-25456-6-git-send-email-wens@csie.org>
- <20151120111238.GV32142@lukather>
- <CAGb2v67RxuQT4AffPbdW29yLMn7jjHgiqwXTGmgf8VgqT-fN9g@mail.gmail.com>
-Message-ID: <20151122194643.GP32142@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 22 Nov 2015 19:47:05 +0000
+Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <6840047.0HF9qAEq6r@wuerfel>
+References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
+ <12750898.0A5czJmNqv@wuerfel>
+ <CAFEAcA-r_zi0-Q9=sT0YTQJ-HGYzLmoWNqtqN6ZV=01qOeCCMw@mail.gmail.com>
+ <6840047.0HF9qAEq6r@wuerfel>
+Message-ID: <20151122194704.GJ8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 21, 2015 at 01:24:24AM +0800, Chen-Yu Tsai wrote:
-> >> +&reg_rtc_ldo {
-> >> +     regulator-always-on;
-> >> +     regulator-min-microvolt = <3000000>;
-> >> +     regulator-max-microvolt = <3000000>;
-> >> +     regulator-name = "vcc-rtc";
-> >>  };
-> >
-> > Isn't this supposed to be in the AXP DTSI?
-> 
-> Are you referring to &reg_rtc_ldo?
+On Sun, Nov 22, 2015 at 08:25:27PM +0100, Arnd Bergmann wrote:
+> The question is really about Marvell Dove, MMP and Armada 370,
+> which are all based on PJ4 or PJ4B (CPU part : 0x581), so ARMv7-A
+> and report idivt support but idiva.
 
-Yep :)
+Well, it's pretty hard to test when binutils blocks your ability to
+write assembly using the instructions.
 
-> Yes, it should. I'll do a new version.
+root at cubox:~# gcc -O2 -o idiv idiv.c -Wa,-mcpu='cortex-a9+idiv' -marm
+/tmp/cc8WPQiB.s: Assembler messages:
+/tmp/cc8WPQiB.s:32: Error: selected processor does not support ARM mode `udiv ip,r5,r4'
+root at cubox:~# gcc -O2 -o idiv idiv.c -Wa,-mcpu='cortex-a9+idiv' -mthumb
+/tmp/ccRzgAlM.s: Assembler messages:
+/tmp/ccRzgAlM.s:36: Error: selected processor does not support Thumb mode `udiv r6,r5,r4'
+root at cubox:~# gcc -O2 -o idiv idiv.c -Wa,-mcpu='marvell-pj4+idiv' -mthumb
+/tmp/cc1JYyFD.s: Assembler messages:
+/tmp/cc1JYyFD.s:36: Error: selected processor does not support Thumb mode `udiv r6,r5,r4'
+root at cubox:~# gcc -O2 -o idiv idiv.c -Wa,-mcpu='marvell-pj4+idiv' -marm
+/tmp/ccEQbQpp.s: Assembler messages:
+/tmp/ccEQbQpp.s:32: Error: selected processor does not support ARM mode `udiv ip,r5,r4'
 
-Great, thanks!
-Maxime
+That's binutils 2.24 and gcc 4.8.4 as found on Ubuntu 14.04.  I'm
+sorry, but I don't have spare time to work out what the opcodes
+would be.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151122/6734c65a/attachment.sig>
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
