@@ -1,42 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 22 Nov 2015 20:03:26 +0000
-Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
- functions
-In-Reply-To: <4527012.vmieWOaE32@wuerfel>
-References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
- <6840047.0HF9qAEq6r@wuerfel>
- <20151122194704.GJ8644@n2100.arm.linux.org.uk>
- <4527012.vmieWOaE32@wuerfel>
-Message-ID: <20151122200326.GK8644@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 22 Nov 2015 21:06:34 +0100
+Subject: [PATCH 00/13] mvneta Buffer Management and enhancements
+In-Reply-To: <1448178839-3541-1-git-send-email-mw@semihalf.com>
+References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
+Message-ID: <12984648.7CKVgBs7pu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 22, 2015 at 08:58:08PM +0100, Arnd Bergmann wrote:
-> does it work with -mcpu=cortex-a15?  I've tried crosstool as versions
-> 2.23.52.20130913, 2.24.0.20141017 and 2.25.51.20150518, and they
-> all seem to behave as expected, failing with -mcpu=cortex-a9 and
-> marvell-pj4 but succeeding with -mcpu=cortex-a15 or marvell-pj4+idiv.
-
-Appears not:
-
-root at cubox:~# gcc -O2 -o idiv idiv.c -Wa,-mcpu='cortex-a15+idiv' -marm
-/tmp/ccSovg32.s: Assembler messages:
-/tmp/ccSovg32.s:32: Error: selected processor does not support ARM mode `udiv ip,r5,r4'
-root at cubox:~# gcc -O2 -o idiv idiv.c -Wa,-mcpu='cortex-a15+idiv' -mthumb
-/tmp/cchbT3EE.s: Assembler messages:
-/tmp/cchbT3EE.s:36: Error: selected processor does not support Thumb mode `udiv r6,r5,r4'
-
-Same without the +idiv.
-
-> I've also found some /proc/cpuinfo output to cross-reference SoCs
-> to their core names.
+On Sunday 22 November 2015 08:53:46 Marcin Wojtas wrote:
 > 
-> 		variant	part	revision	name		features
-> mmp2:		0	0x581	5		PJ4		idivt
-> dove:		0	0x581	5		PJ4		idivt
+> 3. Optimisations - concatenating TX descriptors' flush, basing on
+> xmit_more support and combined approach for finalizing egress processing.
+> Thanks to HR timer buffers can be released with small latency, which is
+> good for low transfer and small queues. Along with the timer, coalescing
+> irqs are used, whose threshold could be increased back to 15.
+> 
+> 
 
-Yes, that agrees with my dove.
+If you are already reworking the TX path, it probably makes sense to 
+support BQL as well, see the Marvell skge and sky2 drivers for examples
+using netdev_{tx_,}{sent,completed}_queue.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
