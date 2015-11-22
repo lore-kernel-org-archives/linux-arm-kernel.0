@@ -1,93 +1,29 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sun, 22 Nov 2015 11:35:53 +0000
-Subject: [PATCH V3 2/6] acpi: pci: Setup MSI domain for ACPI based pci
- devices
-In-Reply-To: <5650DFB5.2010809@amd.com>
-References: <1445453249-32557-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1445453249-32557-3-git-send-email-Suravee.Suthikulpanit@amd.com>
- <20151119120807.07ffd476@arm.com> <5650DFB5.2010809@amd.com>
-Message-ID: <20151122113553.4fd81185@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 22 Nov 2015 13:15:00 +0100
+Subject: [PATCH V4 07/26] coresight: moving PM runtime operations to core
+ framework
+In-Reply-To: <1447440317-1977-8-git-send-email-mathieu.poirier@linaro.org>
+References: <1447440317-1977-1-git-send-email-mathieu.poirier@linaro.org>
+ <1447440317-1977-8-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <CACRpkdb50speJbhRYO5=nNzeo4tY00eKmsJZnbz_wc35ng-0Cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 21 Nov 2015 15:18:45 -0600
-Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> wrote:
+On Fri, Nov 13, 2015 at 7:44 PM, Mathieu Poirier
+<mathieu.poirier@linaro.org> wrote:
 
-> Hi Marc,
-> 
-> On 11/19/15 06:08, Marc Zyngier wrote:
-> > On Wed, 21 Oct 2015 11:47:25 -0700
-> > Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> wrote:
-> >
-> > Hi Suravee,
-> >
-> > Sorry it took so long to get to this series. Comments below.
-> 
-> No worry.
-> 
-> >
-> >> This patch introduces pci_host_bridge_acpi_msi_domain(), which returns
-> >> the MSI domain of the specified PCI host bridge with DOMAIN_BUS_PCI_MSI
-> >> bus token. Then, it is assigned to pci device.
-> >>
-> >> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> >> ---
-> >>   drivers/pci/pci-acpi.c | 13 +++++++++++++
-> >>   drivers/pci/probe.c    |  2 ++
-> >>   include/linux/pci.h    |  7 +++++++
-> >>   3 files changed, 22 insertions(+)
-> >>
-> >> diff --git a/drivers/pci/pci-acpi.c b/drivers/pci/pci-acpi.c
-> >> index a32ba75..0e21ef4 100644
-> >> --- a/drivers/pci/pci-acpi.c
-> >> +++ b/drivers/pci/pci-acpi.c
-> >> @@ -9,7 +9,9 @@
-> >>
-> >>   #include <linux/delay.h>
-> >>   #include <linux/init.h>
-> >> +#include <linux/irqdomain.h>
-> >>   #include <linux/pci.h>
-> >> +#include <linux/msi.h>
-> >>   #include <linux/pci_hotplug.h>
-> >>   #include <linux/module.h>
-> >>   #include <linux/pci-aspm.h>
-> >> @@ -689,6 +691,17 @@ static struct acpi_bus_type acpi_pci_bus = {
-> >>   	.cleanup = pci_acpi_cleanup,
-> >>   };
-> >>
-> >> +struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus)
-> >> +{
-> >> +	struct irq_domain *dom = NULL;
-> >> +	struct fwnode_handle *fwnode = pci_msi_get_fwnode(&bus->dev);
-> >> +
-> >> +	if (fwnode)
-> >> +		dom = irq_find_matching_fwnode(fwnode,
-> >> +					       DOMAIN_BUS_PCI_MSI);
-> >> +	return dom;
-> >> +}
-> >> +
-> >
-> > Given this, I really question the need for what you define in patch #1
-> > to be standalone. It is only used by ACPI (DT has its own private
-> > helpers), and it is so far unlikely that it will be of any use for
-> > other firmware interfaces.
-> >
-> > My suggestion is to get rid of pci_msi_get_fwnode() and move the
-> > registration helper into this file. That'd be much simpler.
-> >
-> > Thanks,
-> >
-> > 	M.
-> >
-> 
-> Ok, I'll take care of this. I assume the rest of the patches looks ok.
+> Moving PM runtime operations in Coresight devices enable() and
+> disable() API to the framework core when a path is setup.  That
+> way the runtime core doesn't have to be involved everytime a
+> path is enabled.  It also avoids calling runtime PM operations
+> in IRQ context.
+>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-I still need to finish going through it (I have minor comments so far
-on some of the other patches), but I want to get the core ACPI stuff in
-shape before doing anything else.
+Looks reasonable. The PM runtime part of coresight is not very
+aggressive anyways, and I think the most important thing it does
+is assure it does not consume any power (clocks etc) when it's
+not in use.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+Linus Walleij
