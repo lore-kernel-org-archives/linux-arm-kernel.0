@@ -1,200 +1,105 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Sun, 22 Nov 2015 08:53:57 +0100
-Subject: [PATCH 11/13] ARM: mvebu: enable buffer manager support on Armada 38x
- boards
-In-Reply-To: <1448178839-3541-1-git-send-email-mw@semihalf.com>
-References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
-Message-ID: <1448178839-3541-12-git-send-email-mw@semihalf.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Sun, 22 Nov 2015 08:45:34 +0100
+Subject: [PATCH] [media] s5p-mfc: constify s5p_mfc_codec_ops structures
+Message-ID: <1448178334-8495-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since mvneta driver supports using hardware buffer management (BM), in
-order to use it, board files have to be adjusted accordingly. This commit
-enables BM on:
-* A385-DB-AP - each port has its own pool for long and common pool for
-short packets,
-* A388-DB - to each port unique 'short' and 'long' pools are mapped,
-* A388-GP - same as above.
+The s5p_mfc_codec_ops structures are never modified, so declare them as
+const.
 
-Moreover appropriate entry is added to 'soc' node ranges, as well as "okay"
-status for 'bm' and 'bm-bppi' (internal SRAM) nodes.
+Done with the help of Coccinelle.
 
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+
 ---
- arch/arm/boot/dts/armada-385-db-ap.dts | 20 +++++++++++++++++++-
- arch/arm/boot/dts/armada-388-db.dts    | 17 ++++++++++++++++-
- arch/arm/boot/dts/armada-388-gp.dts    | 17 ++++++++++++++++-
- 3 files changed, 51 insertions(+), 3 deletions(-)
+ drivers/media/platform/s5p-mfc/s5p_mfc_common.h |    2 +-
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    |    4 ++--
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.h    |    2 +-
+ drivers/media/platform/s5p-mfc/s5p_mfc_enc.c    |    4 ++--
+ drivers/media/platform/s5p-mfc/s5p_mfc_enc.h    |    2 +-
+ 5 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
-index acd5b15..5f9451b 100644
---- a/arch/arm/boot/dts/armada-385-db-ap.dts
-+++ b/arch/arm/boot/dts/armada-385-db-ap.dts
-@@ -61,7 +61,8 @@
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
- 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
- 			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
--			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
-+			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000
-+			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+index d1a3f9b..e90ad7e 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+@@ -653,7 +653,7 @@ struct s5p_mfc_ctx {
+ 		unsigned int bits;
+ 	} slice_size;
  
- 		internal-regs {
- 			spi1: spi at 10680 {
-@@ -138,12 +139,18 @@
- 				status = "okay";
- 				phy = <&phy2>;
- 				phy-mode = "sgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <1>;
-+				bm,pool-short = <3>;
- 			};
+-	struct s5p_mfc_codec_ops *c_ops;
++	const struct s5p_mfc_codec_ops *c_ops;
  
- 			ethernet at 34000 {
- 				status = "okay";
- 				phy = <&phy1>;
- 				phy-mode = "sgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <2>;
-+				bm,pool-short = <3>;
- 			};
+ 	struct v4l2_ctrl *ctrls[MFC_MAX_CTRLS];
+ 	struct v4l2_ctrl_handler ctrl_handler;
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+index 1c4998c..e741550 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+@@ -252,7 +252,7 @@ static int s5p_mfc_ctx_ready(struct s5p_mfc_ctx *ctx)
+ 	return 0;
+ }
  
- 			ethernet at 70000 {
-@@ -157,6 +164,13 @@
- 				status = "okay";
- 				phy = <&phy0>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <0>;
-+				bm,pool-short = <3>;
-+			};
-+
-+			bm at c8000 {
-+				status = "okay";
- 			};
+-static struct s5p_mfc_codec_ops decoder_codec_ops = {
++static const struct s5p_mfc_codec_ops decoder_codec_ops = {
+ 	.pre_seq_start		= NULL,
+ 	.post_seq_start		= NULL,
+ 	.pre_frame_start	= NULL,
+@@ -1104,7 +1104,7 @@ static struct vb2_ops s5p_mfc_dec_qops = {
+ 	.buf_queue		= s5p_mfc_buf_queue,
+ };
  
- 			nfc: flash at d0000 {
-@@ -178,6 +192,10 @@
- 			};
- 		};
+-struct s5p_mfc_codec_ops *get_dec_codec_ops(void)
++const struct s5p_mfc_codec_ops *get_dec_codec_ops(void)
+ {
+ 	return &decoder_codec_ops;
+ }
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.h b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.h
+index d06a7ca..886628b 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.h
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.h
+@@ -13,7 +13,7 @@
+ #ifndef S5P_MFC_DEC_H_
+ #define S5P_MFC_DEC_H_
  
-+		bm-bppi {
-+			status = "okay";
-+		};
-+
- 		pcie-controller {
- 			status = "okay";
+-struct s5p_mfc_codec_ops *get_dec_codec_ops(void);
++const struct s5p_mfc_codec_ops *get_dec_codec_ops(void);
+ struct vb2_ops *get_dec_queue_ops(void);
+ const struct v4l2_ioctl_ops *get_dec_v4l2_ioctl_ops(void);
+ struct s5p_mfc_fmt *get_dec_def_fmt(bool src);
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+index 115b7da..dec228f 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+@@ -936,7 +936,7 @@ static int enc_post_frame_start(struct s5p_mfc_ctx *ctx)
+ 	return 0;
+ }
  
-diff --git a/arch/arm/boot/dts/armada-388-db.dts b/arch/arm/boot/dts/armada-388-db.dts
-index ff47af5..ea93ed7 100644
---- a/arch/arm/boot/dts/armada-388-db.dts
-+++ b/arch/arm/boot/dts/armada-388-db.dts
-@@ -66,7 +66,8 @@
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
- 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
- 			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
--			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
-+			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000
-+			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
+-static struct s5p_mfc_codec_ops encoder_codec_ops = {
++static const struct s5p_mfc_codec_ops encoder_codec_ops = {
+ 	.pre_seq_start		= enc_pre_seq_start,
+ 	.post_seq_start		= enc_post_seq_start,
+ 	.pre_frame_start	= enc_pre_frame_start,
+@@ -2052,7 +2052,7 @@ static struct vb2_ops s5p_mfc_enc_qops = {
+ 	.buf_queue		= s5p_mfc_buf_queue,
+ };
  
- 		internal-regs {
- 			spi at 10600 {
-@@ -99,6 +100,9 @@
- 				status = "okay";
- 				phy = <&phy1>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <2>;
-+				bm,pool-short = <3>;
- 			};
+-struct s5p_mfc_codec_ops *get_enc_codec_ops(void)
++const struct s5p_mfc_codec_ops *get_enc_codec_ops(void)
+ {
+ 	return &encoder_codec_ops;
+ }
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.h b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.h
+index 5118d46..d0d42f8 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.h
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.h
+@@ -13,7 +13,7 @@
+ #ifndef S5P_MFC_ENC_H_
+ #define S5P_MFC_ENC_H_
  
- 			usb at 58000 {
-@@ -109,6 +113,9 @@
- 				status = "okay";
- 				phy = <&phy0>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <0>;
-+				bm,pool-short = <1>;
- 			};
- 
- 			mdio at 72004 {
-@@ -129,6 +136,10 @@
- 				status = "okay";
- 			};
- 
-+			bm at c8000 {
-+				status = "okay";
-+			};
-+
- 			flash at d0000 {
- 				status = "okay";
- 				num-cs = <1>;
-@@ -169,6 +180,10 @@
- 			};
- 		};
- 
-+		bm-bppi {
-+			status = "okay";
-+		};
-+
- 		pcie-controller {
- 			status = "okay";
- 			/*
-diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-index a633be3..0a3bd7f 100644
---- a/arch/arm/boot/dts/armada-388-gp.dts
-+++ b/arch/arm/boot/dts/armada-388-gp.dts
-@@ -60,7 +60,8 @@
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
- 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
- 			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
--			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
-+			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000
-+			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
- 
- 		internal-regs {
- 			spi at 10600 {
-@@ -133,6 +134,9 @@
- 				status = "okay";
- 				phy = <&phy1>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <2>;
-+				bm,pool-short = <3>;
- 			};
- 
- 			/* CON4 */
-@@ -152,6 +156,9 @@
- 				status = "okay";
- 				phy = <&phy0>;
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <0>;
-+				bm,pool-short = <1>;
- 			};
- 
- 
-@@ -186,6 +193,10 @@
- 				};
- 			};
- 
-+			bm at c8000 {
-+				status = "okay";
-+			};
-+
- 			sata at e0000 {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&sata2_pins>, <&sata3_pins>;
-@@ -240,6 +251,10 @@
- 			};
- 		};
- 
-+		bm-bppi {
-+			status = "okay";
-+		};
-+
- 		pcie-controller {
- 			status = "okay";
- 			/*
--- 
-1.8.3.1
+-struct s5p_mfc_codec_ops *get_enc_codec_ops(void);
++const struct s5p_mfc_codec_ops *get_enc_codec_ops(void);
+ struct vb2_ops *get_enc_queue_ops(void);
+ const struct v4l2_ioctl_ops *get_enc_v4l2_ioctl_ops(void);
+ struct s5p_mfc_fmt *get_enc_def_fmt(bool src);
