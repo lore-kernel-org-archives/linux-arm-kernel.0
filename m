@@ -1,38 +1,115 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Sun, 22 Nov 2015 08:53:48 +0100
-Subject: [PATCH 02/13] net: mvneta: enable IP checksum with jumbo frames for
- Armada 38x on Port0
+Date: Sun, 22 Nov 2015 08:53:50 +0100
+Subject: [PATCH 04/13] net: mvneta: enable suspend/resume support
 In-Reply-To: <1448178839-3541-1-git-send-email-mw@semihalf.com>
 References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
-Message-ID: <1448178839-3541-3-git-send-email-mw@semihalf.com>
+Message-ID: <1448178839-3541-5-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Ethernet controller found in the Armada 38x SoC's family support
-TCP/IP checksumming with frame sizes larger than 1600 bytes, however
-only on port 0.
-
-This commit enables this feature by using 'marvell,armada-xp-neta' in
-'ethernet at 70000' node.
+This commit introduces suspend/resume routines used for both in 'standby'
+and 'mem' modes. For the latter, in which registers' contents are lost,
+following steps are performed:
+* in suspend - update port statistics and, if interface is running,
+  detach netif, clean the queues, disable cpu notifier, shutdown
+  interface and reset port's link status;
+* in resume, for all interfaces, set default configuration of the port and
+  MBUS windows;
+* in resume, in case the interface is running, enable accepting packets in
+  legacy parser, power up the port, register cpu notifier and attach netif.
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-Cc: <stable@vger.kernel.org> # v3.18+
 ---
- arch/arm/boot/dts/armada-38x.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/ethernet/marvell/mvneta.c | 70 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 70 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index c6a0e9d..b7868b2 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -494,7 +494,7 @@
- 			};
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index d12b8c6..f079b13 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -3442,6 +3442,72 @@ static int mvneta_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
- 			eth0: ethernet at 70000 {
--				compatible = "marvell,armada-370-neta";
-+				compatible = "marvell,armada-xp-neta";
- 				reg = <0x70000 0x4000>;
- 				interrupts-extended = <&mpic 8>;
- 				clocks = <&gateclk 4>;
++#ifdef CONFIG_PM_SLEEP
++static int mvneta_suspend(struct platform_device *pdev, pm_message_t state)
++{
++	struct net_device *dev = platform_get_drvdata(pdev);
++	struct mvneta_port *pp = netdev_priv(dev);
++
++	mvneta_ethtool_update_stats(pp);
++
++	if (!netif_running(dev))
++		return 0;
++
++	netif_device_detach(dev);
++
++	mvneta_stop_dev(pp);
++	unregister_cpu_notifier(&pp->cpu_notifier);
++	mvneta_cleanup_rxqs(pp);
++	mvneta_cleanup_txqs(pp);
++
++	/* Reset link status */
++	pp->link = 0;
++	pp->duplex = -1;
++	pp->speed = 0;
++
++	return 0;
++}
++
++static int mvneta_resume(struct platform_device *pdev)
++{
++	const struct mbus_dram_target_info *dram_target_info;
++	struct net_device *dev = platform_get_drvdata(pdev);
++	struct mvneta_port *pp = netdev_priv(dev);
++	int ret;
++
++	mvneta_defaults_set(pp);
++	mvneta_port_power_up(pp, pp->phy_interface);
++
++	dram_target_info = mv_mbus_dram_info();
++	if (dram_target_info)
++		mvneta_conf_mbus_windows(pp, dram_target_info);
++
++	if (!netif_running(dev))
++		return 0;
++
++	ret = mvneta_setup_rxqs(pp);
++	if (ret) {
++		netdev_err(dev, "unable to setup rxqs after resume\n");
++		return ret;
++	}
++
++	ret = mvneta_setup_txqs(pp);
++	if (ret) {
++		netdev_err(dev, "unable to setup txqs after resume\n");
++		return ret;
++	}
++
++	mvneta_set_rx_mode(dev);
++	mvneta_percpu_elect(pp);
++	register_cpu_notifier(&pp->cpu_notifier);
++	mvneta_start_dev(pp);
++
++	netif_device_attach(dev);
++
++	return 0;
++}
++#endif /* CONFIG_PM_SLEEP */
++
+ static const struct of_device_id mvneta_match[] = {
+ 	{ .compatible = "marvell,armada-370-neta" },
+ 	{ .compatible = "marvell,armada-xp-neta" },
+@@ -3452,6 +3518,10 @@ MODULE_DEVICE_TABLE(of, mvneta_match);
+ static struct platform_driver mvneta_driver = {
+ 	.probe = mvneta_probe,
+ 	.remove = mvneta_remove,
++#ifdef CONFIG_PM_SLEEP
++	.suspend = mvneta_suspend,
++	.resume = mvneta_resume,
++#endif
+ 	.driver = {
+ 		.name = MVNETA_DRIVER_NAME,
+ 		.of_match_table = mvneta_match,
 -- 
 1.8.3.1
