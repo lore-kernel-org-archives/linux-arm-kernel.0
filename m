@@ -1,44 +1,61 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Sun, 22 Nov 2015 08:53:47 +0100
-Subject: [PATCH 01/13] net: mvneta: add configuration for MBUS windows access
- protection
+Date: Sun, 22 Nov 2015 08:53:58 +0100
+Subject: [PATCH 12/13] ARM: mvebu: add buffer manager nodes to armada-xp.dtsi
 In-Reply-To: <1448178839-3541-1-git-send-email-mw@semihalf.com>
 References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
-Message-ID: <1448178839-3541-2-git-send-email-mw@semihalf.com>
+Message-ID: <1448178839-3541-13-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds missing configuration of MBUS windows access protection
-in mvneta_conf_mbus_windows function - a dedicated variable for that
-purpose remained there unused since v3.8 initial mvneta support. Because
-of that the register contents were inherited from the bootloader.
+Armada XP network controller supports hardware buffer management (BM).
+Since it is now enabled in mvneta driver, appropriate nodes can be added
+to armada-xp.dtsi - for the actual common BM unit (bm at c0000) and its
+internal SRAM (bm-bppi), which is used for indirect access to buffer
+pointer ring residing in DRAM.
+
+Pools - ports mapping, bm-bppi entry in 'soc' node's ranges and optional
+parameters are supposed to be set in board files.
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-Cc: <stable@vger.kernel.org> # v3.8+
 ---
- drivers/net/ethernet/marvell/mvneta.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/armada-xp.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index e84c7f2..0f30aaa 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -62,6 +62,7 @@
- #define MVNETA_WIN_SIZE(w)                      (0x2204 + ((w) << 3))
- #define MVNETA_WIN_REMAP(w)                     (0x2280 + ((w) << 2))
- #define MVNETA_BASE_ADDR_ENABLE                 0x2290
-+#define MVNETA_ACCESS_PROTECT_ENABLE		0x2294
- #define MVNETA_PORT_CONFIG                      0x2400
- #define      MVNETA_UNI_PROMISC_MODE            BIT(0)
- #define      MVNETA_DEF_RXQ(q)                  ((q) << 1)
-@@ -3188,6 +3189,8 @@ static void mvneta_conf_mbus_windows(struct mvneta_port *pp,
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index be23196..bd45936 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -253,6 +253,14 @@
+ 				marvell,crypto-sram-size = <0x800>;
+ 			};
  
- 		win_enable &= ~(1 << i);
- 		win_protect |= 3 << (2 * i);
++			bm: bm at c0000 {
++				compatible = "marvell,armada-380-neta-bm";
++				reg = <0xc0000 0xac>;
++				clocks = <&gateclk 13>;
++				internal-mem = <&bm_bppi>;
++				status = "disabled";
++			};
 +
-+		mvreg_write(pp, MVNETA_ACCESS_PROTECT_ENABLE, win_protect);
- 	}
+ 			xor at f0900 {
+ 				compatible = "marvell,orion-xor";
+ 				reg = <0xF0900 0x100
+@@ -291,6 +299,16 @@
+ 			#size-cells = <1>;
+ 			ranges = <0 MBUS_ID(0x09, 0x05) 0 0x800>;
+ 		};
++
++		bm_bppi: bm-bppi {
++			compatible = "mmio-sram";
++			reg = <MBUS_ID(0x0c, 0x04) 0 0x100000>;
++			ranges = <0 MBUS_ID(0x0c, 0x04) 0 0x100000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&gateclk 13>;
++			status = "disabled";
++		};
+ 	};
  
- 	mvreg_write(pp, MVNETA_BASE_ADDR_ENABLE, win_enable);
+ 	clocks {
 -- 
 1.8.3.1
