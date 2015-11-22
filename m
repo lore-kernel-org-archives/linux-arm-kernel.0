@@ -1,29 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 22 Nov 2015 13:15:00 +0100
-Subject: [PATCH V4 07/26] coresight: moving PM runtime operations to core
- framework
-In-Reply-To: <1447440317-1977-8-git-send-email-mathieu.poirier@linaro.org>
-References: <1447440317-1977-1-git-send-email-mathieu.poirier@linaro.org>
- <1447440317-1977-8-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <CACRpkdb50speJbhRYO5=nNzeo4tY00eKmsJZnbz_wc35ng-0Cg@mail.gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Sun, 22 Nov 2015 13:29:29 +0000
+Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <12750898.0A5czJmNqv@wuerfel>
+References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
+ <yw1x4mgfc89z.fsf@unicorn.mansr.com> <4519802.lamVCN5F0B@wuerfel>
+ <12750898.0A5czJmNqv@wuerfel>
+Message-ID: <CAFEAcA-r_zi0-Q9=sT0YTQJ-HGYzLmoWNqtqN6ZV=01qOeCCMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 13, 2015 at 7:44 PM, Mathieu Poirier
-<mathieu.poirier@linaro.org> wrote:
+On 21 November 2015 at 23:21, Arnd Bergmann <arnd@arndb.de> wrote:
+> Regarding PJ4, it's still unclear whether that has the same
+> problem and it only reports idivt when it actually supports idiva,
+> or whether the lack of idiva support on PJ4 is instead the reason
+> why the ARM ARM was updated to have separate flags.
 
-> Moving PM runtime operations in Coresight devices enable() and
-> disable() API to the framework core when a path is setup.  That
-> way the runtime core doesn't have to be involved everytime a
-> path is enabled.  It also avoids calling runtime PM operations
-> in IRQ context.
->
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+SDIV/IDIV were originally introduced for R and M profile only
+and there the Thumb encodings of SDIV/IDIV are mandatory
+whereas the ARM ones are optional (and weren't initially
+defined at all). So if you're looking for CPUs with only the
+Thumb encodings I would try checking older R profile cores
+like the Cortex-R4.
 
-Looks reasonable. The PM runtime part of coresight is not very
-aggressive anyways, and I think the most important thing it does
-is assure it does not consume any power (clocks etc) when it's
-not in use.
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-
-Linus Walleij
+thanks
+-- PMM
