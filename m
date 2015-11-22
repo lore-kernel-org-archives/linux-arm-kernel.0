@@ -1,41 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 22 Nov 2015 19:47:05 +0000
-Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
- functions
-In-Reply-To: <6840047.0HF9qAEq6r@wuerfel>
-References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
- <12750898.0A5czJmNqv@wuerfel>
- <CAFEAcA-r_zi0-Q9=sT0YTQJ-HGYzLmoWNqtqN6ZV=01qOeCCMw@mail.gmail.com>
- <6840047.0HF9qAEq6r@wuerfel>
-Message-ID: <20151122194704.GJ8644@n2100.arm.linux.org.uk>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun, 22 Nov 2015 20:49:21 +0100
+Subject: [PATCH v3 4/8] phy: rockchip-usb: add compatible values for
+ rk3066a and rk3188
+In-Reply-To: <CAD=FV=V=5vP4a32Gonkv+vw7E+B=tP1VoWSfLA6YTh8knJZcfg@mail.gmail.com>
+References: <1447968149-10979-1-git-send-email-heiko@sntech.de>
+ <1447968149-10979-5-git-send-email-heiko@sntech.de>
+ <CAD=FV=V=5vP4a32Gonkv+vw7E+B=tP1VoWSfLA6YTh8knJZcfg@mail.gmail.com>
+Message-ID: <1586601.dy8rrhuEYg@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 22, 2015 at 08:25:27PM +0100, Arnd Bergmann wrote:
-> The question is really about Marvell Dove, MMP and Armada 370,
-> which are all based on PJ4 or PJ4B (CPU part : 0x581), so ARMv7-A
-> and report idivt support but idiva.
+Am Donnerstag, 19. November 2015, 16:32:23 schrieb Doug Anderson:
+> Heiko,
+> 
+> On Thu, Nov 19, 2015 at 1:22 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> > We need custom handling for these two socs in the driver shortly,
+> > so add the necessary compatible values to binding and driver.
+> >
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> >  Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt | 5 ++++-
+> >  drivers/phy/phy-rockchip-usb.c                             | 2 ++
+> >  2 files changed, 6 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt 
+b/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
+> > index 826454a..9b37242 100644
+> > --- a/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
+> > +++ b/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
+> > @@ -1,7 +1,10 @@
+> >  ROCKCHIP USB2 PHY
+> >
+> >  Required properties:
+> > - - compatible: rockchip,rk3288-usb-phy
+> > + - compatible: matching the soc type, one of
+> > +     "rockchip,rk3066a-usb-phy"
+> > +     "rockchip,rk3188-usb-phy"
+> > +     "rockchip,rk3288-usb-phy"
+> 
+> I can never quite keep it straight how this is supposed to work, but
+> since previously only "rockchip,rk3288-usb-phy" was supported and now
+> we have these new compatible strings, I would have expected the new
+> strings to specify the old ones as fallback.  That would mean your
+> choices would be:
+> 
+> - "rockchip,rk3288-usb-phy" - A real rk3288
+> - "rockchip,rk3188-usb-phy", "rockchip,rk3288-usb-phy" - A rk3188 with
+> fallback to 3288 driver.
+> - "rockchip,rk3066a-usb-phy", "rockchip,rk3288-usb-phy" - A rk3066a
+> with fallback to 3288 driver.
 
-Well, it's pretty hard to test when binutils blocks your ability to
-write assembly using the instructions.
+How this is supposed to be done also is sometimes confusing for me :-)
 
-root at cubox:~# gcc -O2 -o idiv idiv.c -Wa,-mcpu='cortex-a9+idiv' -marm
-/tmp/cc8WPQiB.s: Assembler messages:
-/tmp/cc8WPQiB.s:32: Error: selected processor does not support ARM mode `udiv ip,r5,r4'
-root at cubox:~# gcc -O2 -o idiv idiv.c -Wa,-mcpu='cortex-a9+idiv' -mthumb
-/tmp/ccRzgAlM.s: Assembler messages:
-/tmp/ccRzgAlM.s:36: Error: selected processor does not support Thumb mode `udiv r6,r5,r4'
-root at cubox:~# gcc -O2 -o idiv idiv.c -Wa,-mcpu='marvell-pj4+idiv' -mthumb
-/tmp/cc1JYyFD.s: Assembler messages:
-/tmp/cc1JYyFD.s:36: Error: selected processor does not support Thumb mode `udiv r6,r5,r4'
-root at cubox:~# gcc -O2 -o idiv idiv.c -Wa,-mcpu='marvell-pj4+idiv' -marm
-/tmp/ccEQbQpp.s: Assembler messages:
-/tmp/ccEQbQpp.s:32: Error: selected processor does not support ARM mode `udiv ip,r5,r4'
+But I don't think that specifying the "fallbacks" is part of the binding at 
+all, when the binding really is done in a soc-specific way.  For example 
+following the suggestion of the dt-maintainers at the time we're specifying 
+the uarts as
 
-That's binutils 2.24 and gcc 4.8.4 as found on Ubuntu 14.04.  I'm
-sorry, but I don't have spare time to work out what the opcodes
-would be.
+	compatible = "rockchip,rk3288-uart", "snps,dw-apb-uart"
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+as a measure to use a more-special driver if there is ever the need for it. 
+But here the "snps,dw-apb-uart" actually is a superset (a more generic 
+implementation), while in the usb-uart-case
+
+
+> That means that if you land the dts changes without the driver changes
+> that things still work OK.
+
+We already have the alternative for the usb-phys in the devicetree, but I 
+still don't think that this alternative is part of the binding itself :-)
+
+
+Heiko
