@@ -1,62 +1,103 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Sun, 22 Nov 2015 08:53:51 +0100
-Subject: [PATCH 05/13] net: mvneta: add xmit_more support
+Date: Sun, 22 Nov 2015 08:53:53 +0100
+Subject: [PATCH 07/13] bus: mvebu-mbus: provide api for obtaining IO and DRAM
+ window information
 In-Reply-To: <1448178839-3541-1-git-send-email-mw@semihalf.com>
 References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
-Message-ID: <1448178839-3541-6-git-send-email-mw@semihalf.com>
+Message-ID: <1448178839-3541-8-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Guinot <simon.guinot@sequanux.org>
+This commit enables finding appropriate mbus window and obtaining its
+target id and attribute for given physical address in two separate
+routines, both for IO and DRAM windows. This functionality
+is needed for Armada XP/38x Network Controller's Buffer Manager and
+PnC configuration.
 
-Basing on xmit_more flag of the skb, TX descriptors can be concatenated
-before flushing. This commit delay Tx descriptor flush if the queue is
-running and if there is more skb's to send.
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+[DRAM window information reference in LKv3.10]
+Signed-off-by: Evan Wang <xswang@marvell.com>
 ---
- drivers/net/ethernet/marvell/mvneta.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ drivers/bus/mvebu-mbus.c | 51 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mbus.h     |  3 +++
+ 2 files changed, 54 insertions(+)
 
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index f079b13..9c9e858 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -467,6 +467,7 @@ struct mvneta_tx_queue {
- 	 * descriptor ring
- 	 */
- 	int count;
-+	int pending;
- 	int tx_stop_threshold;
- 	int tx_wake_threshold;
- 
-@@ -751,8 +752,9 @@ static void mvneta_txq_pend_desc_add(struct mvneta_port *pp,
- 	/* Only 255 descriptors can be added at once ; Assume caller
- 	 * process TX desriptors in quanta less than 256
- 	 */
--	val = pend_desc;
-+	val = pend_desc + txq->pending;
- 	mvreg_write(pp, MVNETA_TXQ_UPDATE_REG(txq->id), val);
-+	txq->pending = 0;
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index c43c3d2..3d1c0c3 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -948,6 +948,57 @@ void mvebu_mbus_get_pcie_io_aperture(struct resource *res)
+ 	*res = mbus_state.pcie_io_aperture;
  }
  
- /* Get pointer to next TX descriptor to be processed (send) by HW */
-@@ -1857,11 +1859,14 @@ out:
- 		struct netdev_queue *nq = netdev_get_tx_queue(dev, txq_id);
- 
- 		txq->count += frags;
--		mvneta_txq_pend_desc_add(pp, txq, frags);
--
- 		if (txq->count >= txq->tx_stop_threshold)
- 			netif_tx_stop_queue(nq);
- 
-+		if (!skb->xmit_more || netif_xmit_stopped(nq))
-+			mvneta_txq_pend_desc_add(pp, txq, frags);
-+		else
-+			txq->pending += frags;
++int mvebu_mbus_get_dram_win_info(phys_addr_t phyaddr, u8 *target, u8 *attr)
++{
++	const struct mbus_dram_target_info *dram;
++	int i;
 +
- 		u64_stats_update_begin(&stats->syncp);
- 		stats->tx_packets++;
- 		stats->tx_bytes  += len;
++	/* Get dram info */
++	dram = mv_mbus_dram_info();
++	if (!dram) {
++		pr_err("missing DRAM information\n");
++		return -ENODEV;
++	}
++
++	/* Try to find matching DRAM window for phyaddr */
++	for (i = 0; i < dram->num_cs; i++) {
++		const struct mbus_dram_window *cs = dram->cs + i;
++
++		if (cs->base <= phyaddr && phyaddr <= (cs->base + cs->size)) {
++			*target = dram->mbus_dram_target_id;
++			*attr = cs->mbus_attr;
++			return 0;
++		}
++	}
++
++	pr_err("invalid dram address 0x%x\n", phyaddr);
++	return -EINVAL;
++}
++EXPORT_SYMBOL_GPL(mvebu_mbus_get_dram_win_info);
++
++int mvebu_mbus_get_io_win_info(phys_addr_t phyaddr, u32 *size, u8 *target,
++			       u8 *attr)
++{
++	int win;
++
++	for (win = 0; win < mbus_state.soc->num_wins; win++) {
++		u64 wbase;
++		int enabled;
++
++		mvebu_mbus_read_window(&mbus_state, win, &enabled, &wbase,
++				       size, target, attr, NULL);
++
++		if (!enabled)
++			continue;
++
++		if (wbase <= phyaddr && phyaddr <= wbase + *size)
++			return win;
++	}
++
++	return -EINVAL;
++}
++EXPORT_SYMBOL_GPL(mvebu_mbus_get_io_win_info);
++
+ static __init int mvebu_mbus_debugfs_init(void)
+ {
+ 	struct mvebu_mbus_state *s = &mbus_state;
+diff --git a/include/linux/mbus.h b/include/linux/mbus.h
+index 1f7bc63..ea34a86 100644
+--- a/include/linux/mbus.h
++++ b/include/linux/mbus.h
+@@ -69,6 +69,9 @@ static inline const struct mbus_dram_target_info *mv_mbus_dram_info_nooverlap(vo
+ int mvebu_mbus_save_cpu_target(u32 *store_addr);
+ void mvebu_mbus_get_pcie_mem_aperture(struct resource *res);
+ void mvebu_mbus_get_pcie_io_aperture(struct resource *res);
++int mvebu_mbus_get_dram_win_info(phys_addr_t phyaddr, u8 *target, u8 *attr);
++int mvebu_mbus_get_io_win_info(phys_addr_t phyaddr, u32 *size, u8 *target,
++			       u8 *attr);
+ int mvebu_mbus_add_window_remap_by_id(unsigned int target,
+ 				      unsigned int attribute,
+ 				      phys_addr_t base, size_t size,
 -- 
 1.8.3.1
