@@ -1,27 +1,46 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Sun, 22 Nov 2015 13:29:29 +0000
-Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
- functions
-In-Reply-To: <12750898.0A5czJmNqv@wuerfel>
-References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
- <yw1x4mgfc89z.fsf@unicorn.mansr.com> <4519802.lamVCN5F0B@wuerfel>
- <12750898.0A5czJmNqv@wuerfel>
-Message-ID: <CAFEAcA-r_zi0-Q9=sT0YTQJ-HGYzLmoWNqtqN6ZV=01qOeCCMw@mail.gmail.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Sun, 22 Nov 2015 21:31:17 +0800
+Subject: [RFC PATCH v1 0/2] Add basic HDCP function support for dw_hdmi driver
+Message-ID: <1448199077-10221-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 November 2015 at 23:21, Arnd Bergmann <arnd@arndb.de> wrote:
-> Regarding PJ4, it's still unclear whether that has the same
-> problem and it only reports idivt when it actually supports idiva,
-> or whether the lack of idiva support on PJ4 is instead the reason
-> why the ARM ARM was updated to have separate flags.
+Hi,
 
-SDIV/IDIV were originally introduced for R and M profile only
-and there the Thumb encodings of SDIV/IDIV are mandatory
-whereas the ARM ones are optional (and weren't initially
-defined at all). So if you're looking for CPUs with only the
-Thumb encodings I would try checking older R profile cores
-like the Cortex-R4.
+This series try to add the basic HDCP function support for bridge
+dw_hdmi driver. Beside this series also resend the patch from Sean
+Paul that try to introduce a common way for userspace to operate
+the HDCP function.
 
-thanks
--- PMM
+Userspace could chose to enable/disable the HDCP function throught
+the new standard properties "Content Protection", and driver would
+reflect the HDCP auth status to "Content Protection KSV" property.
+
+Beside this series also base on Vladimir Zapolskiy's patch that help
+to introduce DDC support for dw_hdmi driver.
+
+[Resend] Sean Pual: https://patchwork.kernel.org/patch/7279801
+[Rebased on] Vladimir Zapolskiy: https://patchwork.kernel.org/patch/7279801
+
+Thanks
+- Yakir
+
+
+
+Sean Paul (1):
+  drm: Add Content Protection properties to drm
+
+Yakir Yang (1):
+  drm: bridgw/dw_hdmi: add basic hdmi hdcp driver
+
+ drivers/gpu/drm/bridge/dw_hdmi.c | 355 ++++++++++++++++++++++++++++++++++++---
+ drivers/gpu/drm/bridge/dw_hdmi.h |  20 +++
+ drivers/gpu/drm/drm_crtc.c       |  21 +++
+ drivers/gpu/drm/drm_sysfs.c      |  46 +++++
+ include/drm/bridge/dw_hdmi.h     |  17 ++
+ include/drm/drm_crtc.h           |   3 +
+ include/uapi/drm/drm_mode.h      |   4 +
+ 7 files changed, 447 insertions(+), 19 deletions(-)
+
+-- 
+1.9.1
