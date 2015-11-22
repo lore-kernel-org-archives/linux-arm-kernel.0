@@ -1,109 +1,109 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 22 Nov 2015 14:45:53 -0600
-Subject: [PATCH 1/3] pinctrl: Broadcom NSP pinctrl device tree bindings
-In-Reply-To: <1448042191-1982-1-git-send-email-yrdreddy@broadcom.com>
-References: <1448042191-1982-1-git-send-email-yrdreddy@broadcom.com>
-Message-ID: <20151122204553.GA31160@rob-hp-laptop>
+Date: Sun, 22 Nov 2015 14:49:35 -0600
+Subject: [PATCH v2 1/5] devicetree: bindings: Document qcom board
+ compatible format
+In-Reply-To: <1448062280-15406-2-git-send-email-sboyd@codeaurora.org>
+References: <1448062280-15406-1-git-send-email-sboyd@codeaurora.org>
+ <1448062280-15406-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20151122204935.GA465@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 12:56:31PM -0500, Yendapally Reddy Dhananjaya Reddy wrote:
-> Device tree binding documentation for Broadcom NSP IOMUX driver
+On Fri, Nov 20, 2015 at 03:31:16PM -0800, Stephen Boyd wrote:
+> Some qcom based bootloaders identify the dtb blob based on a set
+> of device properties like SoC, platform, PMIC, and revisions of
+> those components. In downstream kernels, these values are added
+> to the different component dtsi files (i.e. pmic dtsi file, SoC
+> dtsi file, board dtsi file, etc.) via qcom specific DT
+> properties. The dtb files are parsed by a program called dtbTool
+> that picks out these properties and creates a table of contents
+> binary blob with the property information and some offsets into
+> the concatenation of all the dtbs (termed a QCDT image).
 > 
-> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yrdreddy@broadcom.com>
+> The suggestion is to do this via the board compatible string
+> instead, because these qcom specific properties are never used by
+> the kernel. Add a document describing the format of the
+> compatible string that encodes all this information that's
+> currently encoded in the qcom,{msm-id,board-id,pmic-id}
+> properties in downstream devicetrees. Future bootloaders may be
+> updated to look at the compatible field instead of looking for
+> the table of contents image. For non-updateable bootloaders, a
+> new dtbTool program will parse the compatible string and generate
+> a QCDT image from it.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+
+Much more reasonable now. I do find the '/' in it a bit strange though.
 
 Acked-by: Rob Herring <robh@kernel.org>
 
 > ---
->  .../bindings/pinctrl/brcm,nsp-pinmux.txt           | 79 ++++++++++++++++++++++
->  1 file changed, 79 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,nsp-pinmux.txt
+>  Documentation/devicetree/bindings/arm/qcom.txt | 51 ++++++++++++++++++++++++++
+>  1 file changed, 51 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/qcom.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,nsp-pinmux.txt b/Documentation/devicetree/bindings/pinctrl/brcm,nsp-pinmux.txt
+> diff --git a/Documentation/devicetree/bindings/arm/qcom.txt b/Documentation/devicetree/bindings/arm/qcom.txt
 > new file mode 100644
-> index 0000000..603564e
+> index 000000000000..3e24518c6678
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pinctrl/brcm,nsp-pinmux.txt
-> @@ -0,0 +1,79 @@
-> +Broadcom NSP (Northstar plus) IOMUX Controller
+> +++ b/Documentation/devicetree/bindings/arm/qcom.txt
+> @@ -0,0 +1,51 @@
+> +QCOM device tree bindings
+> +-------------------------
 > +
-> +The NSP IOMUX controller supports group based mux configuration. In
-> +addition, certain pins can be muxed to GPIO function individually.
+> +Some qcom based bootloaders identify the dtb blob based on a set of
+> +device properties like SoC and platform and revisions of those components.
+> +To support this scheme, we encode this information into the board compatible
+> +string.
 > +
-> +Required properties:
-> +- compatible:
-> +    Must be "brcm,nsp-pinmux"
+> +Each board must specify a top-level board compatible string with the following
+> +format:
 > +
-> +- reg:
-> +    Should contain the register physical address and length for each of
-> +    GPIO_CONTROL0, GP_AUX_SEL and IPROC_CONFIG IOMUX registers
+> +	compatible = "qcom,<SoC>[-<soc_version>][-<foundry_id>]-<board>[/<subtype>][-<board_version>]"
 > +
-> +Properties in subnodes:
-> +- function:
-> +    The mux function to select
+> +The 'SoC' and 'board' elements are required. All other elements are optional.
 > +
-> +- groups:
-> +    The list of groups to select with a given function
+> +The 'SoC' element must be one of the following strings:
 > +
-> +For more details, refer to
-> +Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+> +	apq8016
+> +	apq8074
+> +	apq8084
+> +	apq8096
+> +	msm8916
+> +	msm8974
+> +	msm8996
 > +
-> +For example:
+> +The 'board' element must be one of the following strings:
 > +
-> +	pinmux: pinmux at 1803f1c0 {
-> +		compatible = "brcm,nsp-pinmux";
-> +		reg = <0x1803f1c0 0x04>,
-> +		      <0x18030028 0x04>,
-> +		      <0x1803f408 0x04>;
+> +	cdp
+> +	liquid
+> +	dragonboard
+> +	mtp
+> +	sbc
 > +
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pwm &gpio_b &nand_sel>;
+> +The 'soc_version' and 'board_version' elements take the form of v<Major>.<Minor>
+> +where the minor number may be omitted when it's zero, i.e.  v1.0 is the same
+> +as v1. If all versions of the 'board_version' elements match, then a
+> +wildcard '*' should be used, e.g. 'v*'.
 > +
-> +		pwm: pwm {
-> +			function = "pwm";
-> +			groups = "pwm0_grp", "pwm1_grp";
-> +		};
+> +The 'foundry_id' and 'subtype' elements are one or more digits from 0 to 9.
 > +
-> +		gpio_b: gpio_b {
-> +			function = "gpio_b";
-> +			groups = "gpio_b_0_grp", "gpio_b_1_grp";
-> +		};
+> +Examples:
 > +
-> +		nand_sel: nand_sel {
-> +			function = "nand";
-> +			groups = "nand_grp";
-> +		};
-> +	};
+> +	"qcom,msm8916-v1-cdp-pm8916-v2.1"
 > +
-> +List of supported functions and groups in Northstar Plus:
+> +A CDP board with an msm8916 SoC, version 1 paired with a pm8916 PMIC of version
+> +2.1.
 > +
-> +"spi": "spi_grp"
+> +	"qcom,apq8074-v2.0-2-dragonboard/1-v0.1"
 > +
-> +"i2c": "i2c_grp"
-> +
-> +"mdio": "mdio_grp"
-> +
-> +"pwm": "pwm0_grp", "pwm1_grp", "pwm2_grp", "pwm3_grp"
-> +
-> +"gpio_b": "gpio_b_0_grp", "gpio_b_1_grp", "gpio_b_2_grp", "gpio_b_3_grp"
-> +
-> +"uart1": "uart1_grp"
-> +
-> +"uart2": "uart2_grp"
-> +
-> +"synce": "synce_grp"
-> +
-> +"sata_led_grps": "sata0_led_grp", "sata1_led_grp"
-> +
-> +"xtal_out": "xtal_out_grp"
-> +
-> +"sdio": "sdio_pwr_grp", "sdio_1p8v_grp"
-> +
-> +"switch_led": "switch_p05_led0_grp", "switch_p05_led1_grp"
-> +
-> +"nand": "nand_grp"
-> +
-> +"emmc": "emmc_grp"
+> +A dragonboard board v0.1 of subtype 1 with an apq8074 SoC version 2, made in
+> +foundry 2.
 > -- 
-> 2.1.0
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
 > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
