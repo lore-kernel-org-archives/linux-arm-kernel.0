@@ -1,29 +1,55 @@
-From: Yuval.Mintz@qlogic.com (Yuval Mintz)
-Date: Sun, 22 Nov 2015 09:30:30 +0000
-Subject: [PATCH V3 net-next 2/5] net:hns: Add Hip06 "RSS(Receive Side
- Scaling)" support to HNS Driver
-In-Reply-To: <1447966706-16219-3-git-send-email-salil.mehta@huawei.com>
-References: <1447966706-16219-1-git-send-email-salil.mehta@huawei.com>
- <1447966706-16219-3-git-send-email-salil.mehta@huawei.com>
-Message-ID: <CO2PR11MB0088B852596B9F86F7BDCF6F97180@CO2PR11MB0088.namprd11.prod.outlook.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 22 Nov 2015 12:41:34 +0300
+Subject: [PATCH 10/13] ARM: mvebu: add buffer manager nodes to
+ armada-38x.dtsi
+In-Reply-To: <1448178839-3541-11-git-send-email-mw@semihalf.com>
+References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
+ <1448178839-3541-11-git-send-email-mw@semihalf.com>
+Message-ID: <56518DCE.2010309@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->  static void hns_ppe_init_hw(struct hns_ppe_cb *ppe_cb)  {
-...
-> +	/* Set default RSS key and indrection table*/
-> +	const u32 rss_key[HNS_PPEV2_RSS_KEY_NUM] = {
-> +		0x6d5a56da, 0x255b0ec2,
-> +		0x4167253d, 0x43a38fb0,
-> +		0xd0ca2bcb, 0xae7b30b4,
-> +		0x77cb2da3, 0x8030f20c,
-> +		0x6a42b73b, 0xbeac01fa,
-> +	};
-> +
-> +	/* set default RSS key and remember it */
-> +	for (i = 0; i < HNS_PPEV2_RSS_KEY_NUM; i++)
-> +		ppe_cb->rss_key[i]  = rss_key[i];
-> 
+Hello.
 
-Is there any reason for the special default key?
-Why not use netdev_rss_key_fill()?
+On 11/22/2015 10:53 AM, Marcin Wojtas wrote:
+
+> Armada 38x network controller supports hardware buffer management (BM).
+> Since it is now enabled in mvneta driver, appropriate nodes can be added
+> to armada-38x.dtsi - for the actual common BM unit (bm at c8000) and its
+> internal SRAM (bm-bppi), which is used for indirect access to buffer
+> pointer ring residing in DRAM.
+>
+> Pools - ports mapping, bm-bppi entry in 'soc' node's ranges and optional
+> parameters are supposed to be set in board files.
+>
+> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+> ---
+>   arch/arm/boot/dts/armada-38x.dtsi | 18 ++++++++++++++++++
+>   1 file changed, 18 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> index b7868b2..b9f4ce2 100644
+> --- a/arch/arm/boot/dts/armada-38x.dtsi
+> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> @@ -539,6 +539,14 @@
+>   				status = "disabled";
+>   			};
+>
+> +			bm: bm at c8000 {
+
+    The ePAPR standard tells us to give generic names to the device nodes, 
+hence this should be named "buffer-manager" (?).
+
+[...]
+> @@ -617,6 +625,16 @@
+>   			#size-cells = <1>;
+>   			ranges = <0 MBUS_ID(0x09, 0x15) 0 0x800>;
+>   		};
+> +
+> +		bm_bppi: bm-bppi {
+
+    And this one "memory" (?).
+
+[...]
+
+MBR, Sergei
