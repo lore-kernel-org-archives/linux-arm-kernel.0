@@ -1,55 +1,73 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 22 Nov 2015 12:41:34 +0300
-Subject: [PATCH 10/13] ARM: mvebu: add buffer manager nodes to
- armada-38x.dtsi
-In-Reply-To: <1448178839-3541-11-git-send-email-mw@semihalf.com>
-References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
- <1448178839-3541-11-git-send-email-mw@semihalf.com>
-Message-ID: <56518DCE.2010309@cogentembedded.com>
+From: jitao.shi@mediatek.com (Jitao Shi)
+Date: Sun, 22 Nov 2015 18:01:10 +0800
+Subject: [PATCH v4 1/2] Documentation: bridge: Add documentation for ps8640 DT
+ properties
+Message-ID: <1448186471-10413-1-git-send-email-jitao.shi@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Add documentation for DT properties supported by
+ps8640 DSI-eDP converter.
 
-On 11/22/2015 10:53 AM, Marcin Wojtas wrote:
+Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+Changes since v3
+- add ps8640 support patchset and drop RFC
+---
+ .../devicetree/bindings/display/bridge/ps8640.txt  |   43 ++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/ps8640.txt
 
-> Armada 38x network controller supports hardware buffer management (BM).
-> Since it is now enabled in mvneta driver, appropriate nodes can be added
-> to armada-38x.dtsi - for the actual common BM unit (bm at c8000) and its
-> internal SRAM (bm-bppi), which is used for indirect access to buffer
-> pointer ring residing in DRAM.
->
-> Pools - ports mapping, bm-bppi entry in 'soc' node's ranges and optional
-> parameters are supposed to be set in board files.
->
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-> ---
->   arch/arm/boot/dts/armada-38x.dtsi | 18 ++++++++++++++++++
->   1 file changed, 18 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index b7868b2..b9f4ce2 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> @@ -539,6 +539,14 @@
->   				status = "disabled";
->   			};
->
-> +			bm: bm at c8000 {
-
-    The ePAPR standard tells us to give generic names to the device nodes, 
-hence this should be named "buffer-manager" (?).
-
-[...]
-> @@ -617,6 +625,16 @@
->   			#size-cells = <1>;
->   			ranges = <0 MBUS_ID(0x09, 0x15) 0 0x800>;
->   		};
-> +
-> +		bm_bppi: bm-bppi {
-
-    And this one "memory" (?).
-
-[...]
-
-MBR, Sergei
+diff --git a/Documentation/devicetree/bindings/display/bridge/ps8640.txt b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+new file mode 100644
+index 0000000..a3e0971
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+@@ -0,0 +1,43 @@
++ps8640-bridge bindings
++
++Required properties:
++	- compatible: "parade,ps8640"
++	- reg: first page address of the bridge.
++	- sleep-gpios: OF device-tree gpio specification for PD_ pin.
++	- reset-gpios: OF device-tree gpio specification for reset pin.
++	- mode-sel-gpios: OF device-tree gpio specification for mode-sel pin.
++	- vdd12-supply: OF device-tree regulator specification for 1.2V power.
++	- vdd33-supply: OF device-tree regulator specification for 3.3V power.
++	- ports: The device node can contain video interface port nodes per
++		 the video-interfaces bind[1]. For port at 0,set the reg = <0> as
++		 ps8640 dsi in and port at 1,set the reg = <1> as ps8640 eDP out.
++
++[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
++
++Example:
++	edp-bridge at 18 {
++		compatible = "parade,ps8640";
++		reg = <0x18>;
++		sleep-gpios = <&pio 116 GPIO_ACTIVE_HIGH>;
++		reset-gpios = <&pio 115 GPIO_ACTIVE_HIGH>;
++		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
++		vdd12-supply = <&ps8640_fixed_1v2>;
++		vdd33-supply = <&mt6397_vgp2_reg>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			port at 0 {
++				reg = <0>;
++				ps8640_in: endpoint {
++					remote-endpoint = <&dsi0_out>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				ps8640_out: endpoint {
++					remote-endpoint = <&panel_in>;
++				};
++			};
++		};
++	};
+-- 
+1.7.9.5
