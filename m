@@ -1,60 +1,86 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Sun, 22 Nov 2015 22:04:38 +0100
-Subject: [PATCH 02/13] net: mvneta: enable IP checksum with jumbo frames
- for Armada 38x on Port0
-In-Reply-To: <4040597.3hXVb3XDMS@wuerfel>
-References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
- <1448178839-3541-3-git-send-email-mw@semihalf.com>
- <4040597.3hXVb3XDMS@wuerfel>
-Message-ID: <CAPv3WKdOVf4kXHfrawgybggHggAEJ9wJh=8gyp_mEhWp2i=YFw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Sun, 22 Nov 2015 15:09:22 -0600
+Subject: [PATCH 1/4] dt-bindings: gpio: update desription of LPC32xx GPIO
+ controller
+In-Reply-To: <564F6617.6090104@mleia.com>
+References: <1447982995-30231-1-git-send-email-vz@mleia.com>
+ <1447982995-30231-2-git-send-email-vz@mleia.com>
+ <20151120141354.GA25446@rob-hp-laptop> <564F6617.6090104@mleia.com>
+Message-ID: <20151122210922.GA6853@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+On Fri, Nov 20, 2015 at 08:27:35PM +0200, Vladimir Zapolskiy wrote:
+> On 20.11.2015 16:13, Rob Herring wrote:
+> > On Fri, Nov 20, 2015 at 03:29:52AM +0200, Vladimir Zapolskiy wrote:
+> >> For the purpose of better description of NXP LPC32xx GPIO controller
+> >> hardware in device tree format, extend the existing description with
+> >> device tree subnodes, which represent 6 GPIO banks within the
+> >> controller.
+> >>
+> >> Note, client interface to the GPIO controller is untouched.
+> >>
+> >> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> >> ---
+> >>  .../devicetree/bindings/gpio/gpio_lpc32xx.txt      | 121 ++++++++++++++++++++-
+> >>  1 file changed, 120 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt b/Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt
+> >> index 4981936..d2da63c 100644
+> >> --- a/Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt
+> >> +++ b/Documentation/devicetree/bindings/gpio/gpio_lpc32xx.txt
+> >> @@ -15,7 +15,43 @@ Required properties:
+> >>     2) pin number
+> >>     3) optional parameters:
+> >>        - bit 0 specifies polarity (0 for normal, 1 for inverted)
+> >> -- reg: Index of the GPIO group
+> >> +- #address-cells: should be 2, which stands for GPIO bank id and
+> >> +  physical base address of this GPIO bank.
+> > 
+> > Now you need special code to do address translation. I'd really think 
+> > twice about doing this.
+> 
+> Correct, address translation code is needed here...
+> 
+> > Why do you need the bank number?
+> 
+> Only one reason -- backward compatibility in sense of referencing a GPIO
+> line on client's side. This API design is broken, I agree.
 
-2015-11-22 21:00 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
-> On Sunday 22 November 2015 08:53:48 Marcin Wojtas wrote:
->> The Ethernet controller found in the Armada 38x SoC's family support
->> TCP/IP checksumming with frame sizes larger than 1600 bytes, however
->> only on port 0.
->>
->> This commit enables this feature by using 'marvell,armada-xp-neta' in
->> 'ethernet at 70000' node.
->>
->> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
->> Cc: <stable@vger.kernel.org> # v3.18+
->> ---
->>  arch/arm/boot/dts/armada-38x.dtsi | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
->> index c6a0e9d..b7868b2 100644
->> --- a/arch/arm/boot/dts/armada-38x.dtsi
->> +++ b/arch/arm/boot/dts/armada-38x.dtsi
->> @@ -494,7 +494,7 @@
->>                         };
->>
->>                         eth0: ethernet at 70000 {
->> -                               compatible = "marvell,armada-370-neta";
->> +                               compatible = "marvell,armada-xp-neta";
->>                                 reg = <0x70000 0x4000>;
->>                                 interrupts-extended = <&mpic 8>;
->>                                 clocks = <&gateclk 4>;
->>
->
-> As it's clear that they are not 100% backwards compatible, please
-> add a SoC specific compatible string here as well, like
->
->         compatible = "marvell,armada-380-neta", "marvell,armada-xp-neta";
->
+What client exactly? Between the dtb and kernel or kernel and userspace 
+or ...?
 
-Wouldn't be one sufficient ("marvell,armada-380-neta")?
+> Honestly I would prefer to get rid of this "feature", new code allows to
+> reference on client's side either a parent GPIO controller device node,
+> or bank nodes, probably the improvement can be done in a few steps?
+> 
+>   - this change,
+>   - convert clients to reference a GPIO bank directly,
+>   - remove root GPIO controller (e.g. make it "simple-bus") and convert
+> GPIO banks to "gpio-controller"s.
+> 
+> Can an evolution like this happen?
 
-> Maybe also leave the 370 string in place.
->
+You generally don't want bindings to evolve.
 
-Now 370 string disables ip checksum for jumbo frames, so I don't think
-it's appropriate to keep it for port 0.
 
-Best regards,
-Marcin
+> >> +		gpio_p2: gpio-controller at 2 {
+> >> +			reg = <2 0x10 0x18>;
+> >> +			gpio-bank-name = "p2";
+> >> +			gpios = <13>;
+> >> +			gpio-no-output-state;
+> >> +		};
+> >> +
+> >> +		gpio_gpio: gpio-controller at 3 {
+> >> +			reg = <3 0x00 0x1C>;
+> > 
+> > This overlaps with bank 2.
+> 
+> Yes, it is. Thousand thanks to hardware designers.
+
+Then you might want to split these into 2 regions. The problem is 
+request_resource does not work with overlapping resources. Or just don't 
+do subnodes. If there is not a lot of variations in the subnode data, 
+then just leave that information in the kernel.
+
+Rob
