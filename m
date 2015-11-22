@@ -1,199 +1,93 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 22 Nov 2015 12:29:24 +0100
-Subject: [PATCH v2] phy-sun4i-usb: Add support for the host usb-phys found on
- the H3 SoC
-Message-ID: <1448191764-11454-1-git-send-email-hdegoede@redhat.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 22 Nov 2015 11:35:53 +0000
+Subject: [PATCH V3 2/6] acpi: pci: Setup MSI domain for ACPI based pci
+ devices
+In-Reply-To: <5650DFB5.2010809@amd.com>
+References: <1445453249-32557-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1445453249-32557-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <20151119120807.07ffd476@arm.com> <5650DFB5.2010809@amd.com>
+Message-ID: <20151122113553.4fd81185@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Reinder de Haan <patchesrdh@mveas.com>
+On Sat, 21 Nov 2015 15:18:45 -0600
+Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> wrote:
 
-Note this commit only adds support for phys 1-3, phy 0, the otg phy, is
-not yet (fully) supported after this commit.
+> Hi Marc,
+> 
+> On 11/19/15 06:08, Marc Zyngier wrote:
+> > On Wed, 21 Oct 2015 11:47:25 -0700
+> > Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> wrote:
+> >
+> > Hi Suravee,
+> >
+> > Sorry it took so long to get to this series. Comments below.
+> 
+> No worry.
+> 
+> >
+> >> This patch introduces pci_host_bridge_acpi_msi_domain(), which returns
+> >> the MSI domain of the specified PCI host bridge with DOMAIN_BUS_PCI_MSI
+> >> bus token. Then, it is assigned to pci device.
+> >>
+> >> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> >> ---
+> >>   drivers/pci/pci-acpi.c | 13 +++++++++++++
+> >>   drivers/pci/probe.c    |  2 ++
+> >>   include/linux/pci.h    |  7 +++++++
+> >>   3 files changed, 22 insertions(+)
+> >>
+> >> diff --git a/drivers/pci/pci-acpi.c b/drivers/pci/pci-acpi.c
+> >> index a32ba75..0e21ef4 100644
+> >> --- a/drivers/pci/pci-acpi.c
+> >> +++ b/drivers/pci/pci-acpi.c
+> >> @@ -9,7 +9,9 @@
+> >>
+> >>   #include <linux/delay.h>
+> >>   #include <linux/init.h>
+> >> +#include <linux/irqdomain.h>
+> >>   #include <linux/pci.h>
+> >> +#include <linux/msi.h>
+> >>   #include <linux/pci_hotplug.h>
+> >>   #include <linux/module.h>
+> >>   #include <linux/pci-aspm.h>
+> >> @@ -689,6 +691,17 @@ static struct acpi_bus_type acpi_pci_bus = {
+> >>   	.cleanup = pci_acpi_cleanup,
+> >>   };
+> >>
+> >> +struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus)
+> >> +{
+> >> +	struct irq_domain *dom = NULL;
+> >> +	struct fwnode_handle *fwnode = pci_msi_get_fwnode(&bus->dev);
+> >> +
+> >> +	if (fwnode)
+> >> +		dom = irq_find_matching_fwnode(fwnode,
+> >> +					       DOMAIN_BUS_PCI_MSI);
+> >> +	return dom;
+> >> +}
+> >> +
+> >
+> > Given this, I really question the need for what you define in patch #1
+> > to be standalone. It is only used by ACPI (DT has its own private
+> > helpers), and it is so far unlikely that it will be of any use for
+> > other firmware interfaces.
+> >
+> > My suggestion is to get rid of pci_msi_get_fwnode() and move the
+> > registration helper into this file. That'd be much simpler.
+> >
+> > Thanks,
+> >
+> > 	M.
+> >
+> 
+> Ok, I'll take care of this. I assume the rest of the patches looks ok.
 
-Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2:
--Change break; after dev_err() to return, as intended, fixing a compiler
- warning (the dev_err case should never be reached).
----
- .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  1 +
- drivers/phy/phy-sun4i-usb.c                        | 67 +++++++++++++++++-----
- 2 files changed, 53 insertions(+), 15 deletions(-)
+I still need to finish going through it (I have minor comments so far
+on some of the other patches), but I want to get the core ACPI stuff in
+shape before doing anything else.
 
-diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-index 0cebf74..95736d7 100644
---- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-@@ -9,6 +9,7 @@ Required properties:
-   * allwinner,sun7i-a20-usb-phy
-   * allwinner,sun8i-a23-usb-phy
-   * allwinner,sun8i-a33-usb-phy
-+  * allwinner,sun8i-h3-usb-phy
- - reg : a list of offset + length pairs
- - reg-names :
-   * "phy_ctrl"
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index b12964b..11bc9cd 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -46,6 +46,9 @@
- #define REG_PHYBIST			0x08
- #define REG_PHYTUNE			0x0c
- #define REG_PHYCTL_A33			0x10
-+#define REG_PHY_UNK_H3			0x20
-+
-+#define REG_PMU_UNK_H3			0x10
- 
- #define PHYCTL_DATA			BIT(7)
- 
-@@ -79,7 +82,7 @@
- #define PHY_DISCON_TH_SEL		0x2a
- #define PHY_SQUELCH_DETECT		0x3c
- 
--#define MAX_PHYS			3
-+#define MAX_PHYS			4
- 
- /*
-  * Note do not raise the debounce time, we must report Vusb high within 100ms
-@@ -88,12 +91,19 @@
- #define DEBOUNCE_TIME			msecs_to_jiffies(50)
- #define POLL_TIME			msecs_to_jiffies(250)
- 
-+enum sun4i_usb_phy_type {
-+	sun4i_a10_phy,
-+	sun8i_a33_phy,
-+	sun8i_h3_phy
-+};
-+
- struct sun4i_usb_phy_data {
-+	struct device *dev;
- 	void __iomem *base;
- 	struct mutex mutex;
- 	int num_phys;
- 	u32 disc_thresh;
--	bool has_a33_phyctl;
-+	enum sun4i_usb_phy_type type;
- 	struct sun4i_usb_phy {
- 		struct phy *phy;
- 		void __iomem *pmu;
-@@ -164,12 +174,18 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
- 
- 	mutex_lock(&phy_data->mutex);
- 
--	if (phy_data->has_a33_phyctl) {
-+	switch (phy_data->type) {
-+	case sun4i_a10_phy:
-+		phyctl = phy_data->base + REG_PHYCTL_A10;
-+		break;
-+	case sun8i_a33_phy:
- 		phyctl = phy_data->base + REG_PHYCTL_A33;
- 		/* A33 needs us to set phyctl to 0 explicitly */
- 		writel(0, phyctl);
--	} else {
--		phyctl = phy_data->base + REG_PHYCTL_A10;
-+		break;
-+	case sun8i_h3_phy:
-+		dev_err(phy_data->dev, "H3 usb_phy_write is not supported\n");
-+		return;
- 	}
- 
- 	for (i = 0; i < len; i++) {
-@@ -230,6 +246,7 @@ static int sun4i_usb_phy_init(struct phy *_phy)
- 	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
- 	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
- 	int ret;
-+	u32 val;
- 
- 	ret = clk_prepare_enable(phy->clk);
- 	if (ret)
-@@ -241,15 +258,26 @@ static int sun4i_usb_phy_init(struct phy *_phy)
- 		return ret;
- 	}
- 
--	/* Enable USB 45 Ohm resistor calibration */
--	if (phy->index == 0)
--		sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
-+	if (data->type == sun8i_h3_phy) {
-+		if (phy->index == 0) {
-+			val = readl(data->base + REG_PHY_UNK_H3);
-+			writel(val & ~1, data->base + REG_PHY_UNK_H3);
-+		}
-+
-+		val = readl(phy->pmu + REG_PMU_UNK_H3);
-+		writel(val & ~2, phy->pmu + REG_PMU_UNK_H3);
-+	} else {
-+		/* Enable USB 45 Ohm resistor calibration */
-+		if (phy->index == 0)
-+			sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
- 
--	/* Adjust PHY's magnitude and rate */
--	sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
-+		/* Adjust PHY's magnitude and rate */
-+		sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
- 
--	/* Disconnect threshold adjustment */
--	sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL, data->disc_thresh, 2);
-+		/* Disconnect threshold adjustment */
-+		sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
-+				    data->disc_thresh, 2);
-+	}
- 
- 	sun4i_usb_phy_passby(phy, 1);
- 
-@@ -522,11 +550,14 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 	mutex_init(&data->mutex);
- 	INIT_DELAYED_WORK(&data->detect, sun4i_usb_phy0_id_vbus_det_scan);
- 	dev_set_drvdata(dev, data);
-+	data->dev = dev;
- 
- 	if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy") ||
- 	    of_device_is_compatible(np, "allwinner,sun8i-a23-usb-phy") ||
- 	    of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
- 		data->num_phys = 2;
-+	else if (of_device_is_compatible(np, "allwinner,sun8i-h3-usb-phy"))
-+		data->num_phys = 4;
- 	else
- 		data->num_phys = 3;
- 
-@@ -538,13 +569,18 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 
- 	if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy") ||
- 	    of_device_is_compatible(np, "allwinner,sun8i-a23-usb-phy") ||
--	    of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
-+	    of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy") ||
-+	    of_device_is_compatible(np, "allwinner,sun8i-h3-usb-phy"))
- 		dedicated_clocks = true;
- 	else
- 		dedicated_clocks = false;
- 
- 	if (of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
--		data->has_a33_phyctl = true;
-+		data->type = sun8i_a33_phy;
-+	else if (of_device_is_compatible(np, "allwinner,sun8i-h3-usb-phy"))
-+		data->type = sun8i_h3_phy;
-+	else
-+		data->type = sun4i_a10_phy;
- 
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy_ctrl");
- 	data->base = devm_ioremap_resource(dev, res);
-@@ -620,7 +656,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 			return PTR_ERR(phy->reset);
- 		}
- 
--		if (i) { /* No pmu for usbc0 */
-+		if (data->type == sun8i_h3_phy || i != 0) {
- 			snprintf(name, sizeof(name), "pmu%d", i);
- 			res = platform_get_resource_byname(pdev,
- 							IORESOURCE_MEM, name);
-@@ -696,6 +732,7 @@ static const struct of_device_id sun4i_usb_phy_of_match[] = {
- 	{ .compatible = "allwinner,sun7i-a20-usb-phy" },
- 	{ .compatible = "allwinner,sun8i-a23-usb-phy" },
- 	{ .compatible = "allwinner,sun8i-a33-usb-phy" },
-+	{ .compatible = "allwinner,sun8i-h3-usb-phy" },
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, sun4i_usb_phy_of_match);
+Thanks,
+
+	M.
 -- 
-2.5.0
+Jazz is not dead. It just smells funny.
