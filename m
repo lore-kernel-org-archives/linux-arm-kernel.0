@@ -1,113 +1,839 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 22 Nov 2015 11:37:33 -0500
-Subject: [PATCH V6 1/3] dma: qcom_bam_dma: move to qcom directory
+Date: Sun, 22 Nov 2015 11:37:34 -0500
+Subject: [PATCH V6 2/3] dma: add Qualcomm Technologies HIDMA management driver
 In-Reply-To: <1448210257-4768-1-git-send-email-okaya@codeaurora.org>
 References: <1448210257-4768-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1448210257-4768-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <1448210257-4768-3-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Creating a QCOM directory for all QCOM DMA source files.
+The Qualcomm Technologies HIDMA device has been designed
+to support virtualization technology. The driver has been
+divided into two to follow the hardware design.
+
+1. HIDMA Management driver
+2. HIDMA Channel driver
+
+Each HIDMA HW consists of multiple channels. These channels
+share some set of common parameters. These parameters are
+initialized by the management driver during power up.
+Same management driver is used for monitoring the execution
+of the channels. Management driver can change the performance
+behavior dynamically such as bandwidth allocation and
+prioritization.
+
+The management driver is executed in hypervisor context and
+is the main management entity for all channels provided by
+the device.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/dma/Kconfig                            | 11 ++---------
- drivers/dma/Makefile                           |  2 +-
- drivers/dma/qcom/Kconfig                       |  9 +++++++++
- drivers/dma/qcom/Makefile                      |  1 +
- drivers/dma/{qcom_bam_dma.c => qcom/bam_dma.c} |  4 ++--
- 5 files changed, 15 insertions(+), 12 deletions(-)
- create mode 100644 drivers/dma/qcom/Kconfig
- create mode 100644 drivers/dma/qcom/Makefile
- rename drivers/dma/{qcom_bam_dma.c => qcom/bam_dma.c} (99%)
 
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index b458475..47b1b98 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -408,15 +408,6 @@ config PXA_DMA
- 	  16 to 32 channels for peripheral to memory or memory to memory
- 	  transfers.
- 
--config QCOM_BAM_DMA
--	tristate "QCOM BAM DMA support"
--	depends on ARCH_QCOM || (COMPILE_TEST && OF && ARM)
--	select DMA_ENGINE
--	select DMA_VIRTUAL_CHANNELS
--	---help---
--	  Enable support for the QCOM BAM DMA controller.  This controller
--	  provides DMA capabilities for a variety of on-chip devices.
--
- config SIRF_DMA
- 	tristate "CSR SiRFprimaII/SiRFmarco DMA support"
- 	depends on ARCH_SIRF
-@@ -527,6 +518,8 @@ config ZX_DMA
- # driver files
- source "drivers/dma/bestcomm/Kconfig"
- 
-+source "drivers/dma/qcom/Kconfig"
+v6
+------------
+* forgot to remove duplicate rc assignment.
+* add missing _iomem from sparse warning.
+---
+ .../ABI/testing/sysfs-platform-hidma-mgmt          |  97 +++++++
+ .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  61 +++++
+ drivers/dma/qcom/Kconfig                           |  10 +
+ drivers/dma/qcom/Makefile                          |   1 +
+ drivers/dma/qcom/hidma_mgmt.c                      | 305 +++++++++++++++++++++
+ drivers/dma/qcom/hidma_mgmt.h                      |  38 +++
+ drivers/dma/qcom/hidma_mgmt_sys.c                  | 231 ++++++++++++++++
+ 7 files changed, 743 insertions(+)
+ create mode 100644 Documentation/ABI/testing/sysfs-platform-hidma-mgmt
+ create mode 100644 Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+ create mode 100644 drivers/dma/qcom/hidma_mgmt.c
+ create mode 100644 drivers/dma/qcom/hidma_mgmt.h
+ create mode 100644 drivers/dma/qcom/hidma_mgmt_sys.c
+
+diff --git a/Documentation/ABI/testing/sysfs-platform-hidma-mgmt b/Documentation/ABI/testing/sysfs-platform-hidma-mgmt
+new file mode 100644
+index 0000000..f6f1ce1
+--- /dev/null
++++ b/Documentation/ABI/testing/sysfs-platform-hidma-mgmt
+@@ -0,0 +1,97 @@
++What:		/sys/devices/platform/hidma-mgmt*/channel*_priority
++		/sys/devices/platform/QCOM8060:*/channel*_priority
++Date:		Nov 2015
++KernelVersion:	4.4
++Contact:	"Sinan Kaya <okaya@cudeaurora.org>"
++Description:
++		Contains either 0 or 1 and indicates if the DMA channel is a
++		low priority (0) or high priority (1) channel.
 +
- source "drivers/dma/dw/Kconfig"
- 
- source "drivers/dma/hsu/Kconfig"
-diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
-index 7711a71..8dba90d 100644
---- a/drivers/dma/Makefile
-+++ b/drivers/dma/Makefile
-@@ -52,7 +52,6 @@ obj-$(CONFIG_PCH_DMA) += pch_dma.o
- obj-$(CONFIG_PL330_DMA) += pl330.o
- obj-$(CONFIG_PPC_BESTCOMM) += bestcomm/
- obj-$(CONFIG_PXA_DMA) += pxa_dma.o
--obj-$(CONFIG_QCOM_BAM_DMA) += qcom_bam_dma.o
- obj-$(CONFIG_RENESAS_DMA) += sh/
- obj-$(CONFIG_SIRF_DMA) += sirf-dma.o
- obj-$(CONFIG_STE_DMA40) += ste_dma40.o ste_dma40_ll.o
-@@ -66,4 +65,5 @@ obj-$(CONFIG_TI_EDMA) += edma.o
- obj-$(CONFIG_XGENE_DMA) += xgene-dma.o
- obj-$(CONFIG_ZX_DMA) += zx296702_dma.o
- 
-+obj-y += qcom/
- obj-y += xilinx/
++What:		/sys/devices/platform/hidma-mgmt*/channel*_weight
++		/sys/devices/platform/QCOM8060:*/channel*__weight
++Date:		Nov 2015
++KernelVersion:	4.4
++Contact:	"Sinan Kaya <okaya@cudeaurora.org>"
++Description:
++		Contains 0..15 and indicates the weight of the channel among
++		equal priority channels during round robin scheduling.
++
++What:		/sys/devices/platform/hidma-mgmt*/chreset_timeout_cycles
++		/sys/devices/platform/QCOM8060:*/chreset_timeout_cycles
++Date:		Nov 2015
++KernelVersion:	4.4
++Contact:	"Sinan Kaya <okaya@cudeaurora.org>"
++Description:
++		Contains the platform specific cycle value to wait after a
++		reset command is issued. If the value is chosen too short,
++		then the HW will issue a reset failure interrupt. The value
++		is platform specific and should not be changed without
++		consultance.
++
++What:		/sys/devices/platform/hidma-mgmt*/dma_channels
++		/sys/devices/platform/QCOM8060:*/dma_channels
++Date:		Nov 2015
++KernelVersion:	4.4
++Contact:	"Sinan Kaya <okaya@cudeaurora.org>"
++Description:
++		Contains the number of dma channels supported by one instance
++		of HIDMA hardware. The value may change from chip to chip.
++
++What:		/sys/devices/platform/hidma-mgmt*/hw_version_major
++		/sys/devices/platform/QCOM8060:*/hw_version_major
++Date:		Nov 2015
++KernelVersion:	4.4
++Contact:	"Sinan Kaya <okaya@cudeaurora.org>"
++Description:
++		Version number major for the hardware.
++
++What:		/sys/devices/platform/hidma-mgmt*/hw_version_minor
++		/sys/devices/platform/QCOM8060:*/hw_version_minor
++Date:		Nov 2015
++KernelVersion:	4.4
++Contact:	"Sinan Kaya <okaya@cudeaurora.org>"
++Description:
++		Version number minor for the hardware.
++
++What:		/sys/devices/platform/hidma-mgmt*/max_rd_xactions
++		/sys/devices/platform/QCOM8060:*/max_rd_xactions
++Date:		Nov 2015
++KernelVersion:	4.4
++Contact:	"Sinan Kaya <okaya@cudeaurora.org>"
++Description:
++		Contains a value between 0 and 31. Maximum number of
++		read transactions that can be issued back to back.
++		Choosing a higher number gives better performance but
++		can also cause performance reduction to other peripherals
++		sharing the same bus.
++
++What:		/sys/devices/platform/hidma-mgmt*/max_read_request
++		/sys/devices/platform/QCOM8060:*/max_read_request
++Date:		Nov 2015
++KernelVersion:	4.4
++Contact:	"Sinan Kaya <okaya@cudeaurora.org>"
++Description:
++		Size of each read request. The value needs to be a power
++		of two and can be between 128 and 1024.
++
++What:		/sys/devices/platform/hidma-mgmt*/max_wr_xactions
++		/sys/devices/platform/QCOM8060:*/max_wr_xactions
++Date:		Nov 2015
++KernelVersion:	4.4
++Contact:	"Sinan Kaya <okaya@cudeaurora.org>"
++Description:
++		Contains a value between 0 and 31. Maximum number of
++		write transactions that can be issued back to back.
++		Choosing a higher number gives better performance but
++		can also cause performance reduction to other peripherals
++		sharing the same bus.
++
++
++What:		/sys/devices/platform/hidma-mgmt*/max_write_request
++		/sys/devices/platform/QCOM8060:*/max_write_request
++Date:		Nov 2015
++KernelVersion:	4.4
++Contact:	"Sinan Kaya <okaya@cudeaurora.org>"
++Description:
++		Size of each write request. The value needs to be a power
++		of two and can be between 128 and 1024.
+diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+new file mode 100644
+index 0000000..eb053b9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+@@ -0,0 +1,61 @@
++Qualcomm Technologies HIDMA Management interface
++
++The Qualcomm Technologies HIDMA device has been designed
++to support virtualization technology. The driver has been
++divided into two to follow the hardware design. The management
++driver is executed in hypervisor context and is the main
++management entity for all channels provided by the device.
++
++Each HIDMA HW consists of multiple channels. These channels
++share some set of common parameters. These parameters are
++initialized by the management driver during power up.
++Same management driver is used for monitoring the execution
++of the channels. Management driver can change the performance
++behavior dynamically such as bandwidth allocation and
++prioritization.
++
++All channel devices get probed in the hypervisor
++context during power up. They show up as DMA engine
++DMA channels. Then, before starting the virtualization; each
++channel device is unbound from the hypervisor by VFIO
++and assign to the guest machine for control.
++
++This management driver will  be used by the system
++admin to monitor/reset the execution state of the DMA
++channels. This will be the management interface.
++
++
++Required properties:
++- compatible: "qcom,hidma-mgmt-1.0";
++- reg: Address range for DMA device
++- dma-channels: Number of channels supported by this DMA controller.
++- max-write-burst-bytes: Maximum write burst in bytes. A memcpy requested is
++  fragmented to multiples of this amount.
++- max-read-burst-bytes: Maximum read burst in bytes. A memcpy request is
++  fragmented to multiples of this amount.
++- max-write-transactions: Maximum write transactions to perform in a burst
++- max-read-transactions: Maximum read transactions to perform in a burst
++- channel-reset-timeout-cycles: Channel reset timeout in cycles for this SOC.
++- channel-priority: Priority of the channel.
++  Each dma channel share the same HW bandwidth with other dma channels.
++  If two requests reach to the HW at the same time from a low priority and
++  high priority channel, high priority channel will claim the bus.
++  0=low priority, 1=high priority
++- channel-weight: Round robin weight of the channel
++  Since there are only two priority levels supported, scheduling among
++  the equal priority channels is done via weights.
++
++Example:
++
++	hidma-mgmt at f9984000 = {
++		compatible = "qcom,hidma-mgmt-1.0";
++		reg = <0xf9984000 0x15000>;
++		dma-channels = 6;
++		max-write-burst-bytes = 1024;
++		max-read-burst-bytes = 1024;
++		max-write-transactions = 31;
++		max-read-transactions = 31;
++		channel-reset-timeout-cycles = 0x500;
++		channel-priority = < 1 1 0 0 0 0>;
++		channel-weight = < 1 13 10 3 4 5>;
++	};
 diff --git a/drivers/dma/qcom/Kconfig b/drivers/dma/qcom/Kconfig
-new file mode 100644
-index 0000000..17545df
---- /dev/null
+index 17545df..ebe5b8c 100644
+--- a/drivers/dma/qcom/Kconfig
 +++ b/drivers/dma/qcom/Kconfig
-@@ -0,0 +1,9 @@
-+config QCOM_BAM_DMA
-+	tristate "QCOM BAM DMA support"
-+	depends on ARCH_QCOM || (COMPILE_TEST && OF && ARM)
+@@ -7,3 +7,13 @@ config QCOM_BAM_DMA
+ 	  Enable support for the QCOM BAM DMA controller.  This controller
+ 	  provides DMA capabilities for a variety of on-chip devices.
+ 
++config QCOM_HIDMA_MGMT
++	tristate "Qualcomm Technologies HIDMA Management support"
 +	select DMA_ENGINE
-+	select DMA_VIRTUAL_CHANNELS
-+	---help---
-+	  Enable support for the QCOM BAM DMA controller.  This controller
-+	  provides DMA capabilities for a variety of on-chip devices.
-+
++	help
++	  Enable support for the Qualcomm Technologies HIDMA Management.
++	  Each DMA device requires one management interface driver
++	  for basic initialization before QCOM_HIDMA channel driver can
++	  start managing the channels. In a virtualized environment,
++	  the guest OS would run QCOM_HIDMA channel driver and the
++	  hypervisor would run the QCOM_HIDMA_MGMT management driver.
 diff --git a/drivers/dma/qcom/Makefile b/drivers/dma/qcom/Makefile
-new file mode 100644
-index 0000000..f612ae3
---- /dev/null
+index f612ae3..1a5a96d 100644
+--- a/drivers/dma/qcom/Makefile
 +++ b/drivers/dma/qcom/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_QCOM_BAM_DMA) += bam_dma.o
-diff --git a/drivers/dma/qcom_bam_dma.c b/drivers/dma/qcom/bam_dma.c
-similarity index 99%
-rename from drivers/dma/qcom_bam_dma.c
-rename to drivers/dma/qcom/bam_dma.c
-index 5a250cd..b6f053d 100644
---- a/drivers/dma/qcom_bam_dma.c
-+++ b/drivers/dma/qcom/bam_dma.c
-@@ -49,8 +49,8 @@
- #include <linux/clk.h>
- #include <linux/dmaengine.h>
- 
--#include "dmaengine.h"
--#include "virt-dma.h"
-+#include "../dmaengine.h"
-+#include "../virt-dma.h"
- 
- struct bam_desc_hw {
- 	u32 addr;		/* Buffer physical address */
+@@ -1 +1,2 @@
+ obj-$(CONFIG_QCOM_BAM_DMA) += bam_dma.o
++obj-$(CONFIG_QCOM_HIDMA_MGMT) += hidma_mgmt.o hidma_mgmt_sys.o
+diff --git a/drivers/dma/qcom/hidma_mgmt.c b/drivers/dma/qcom/hidma_mgmt.c
+new file mode 100644
+index 0000000..0101e0e
+--- /dev/null
++++ b/drivers/dma/qcom/hidma_mgmt.c
+@@ -0,0 +1,305 @@
++/*
++ * Qualcomm Technologies HIDMA DMA engine Management interface
++ *
++ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/dmaengine.h>
++#include <linux/acpi.h>
++#include <linux/of.h>
++#include <linux/property.h>
++#include <linux/interrupt.h>
++#include <linux/platform_device.h>
++#include <linux/module.h>
++#include <linux/uaccess.h>
++#include <linux/slab.h>
++#include <linux/pm_runtime.h>
++
++#include "hidma_mgmt.h"
++
++#define QOS_N_OFFSET			0x300
++#define CFG_OFFSET			0x400
++#define MAX_BUS_REQ_LEN_OFFSET		0x41C
++#define MAX_XACTIONS_OFFSET		0x420
++#define HW_VERSION_OFFSET		0x424
++#define CHRESET_TIMEOUT_OFFSET		0x418
++
++#define MAX_WR_XACTIONS_MASK		0x1F
++#define MAX_RD_XACTIONS_MASK		0x1F
++#define WEIGHT_MASK			0x7F
++#define MAX_BUS_REQ_LEN_MASK		0xFFFF
++#define CHRESET_TIMEOUUT_MASK		0xFFFFF
++
++#define MAX_WR_XACTIONS_BIT_POS	16
++#define MAX_BUS_WR_REQ_BIT_POS		16
++#define WRR_BIT_POS			8
++#define PRIORITY_BIT_POS		15
++
++#define AUTOSUSPEND_TIMEOUT		2000
++#define MAX_CHANNEL_WEIGHT		15
++
++int hidma_mgmt_setup(struct hidma_mgmt_dev *mgmtdev)
++{
++	unsigned int i;
++	u32 val;
++
++	if (!is_power_of_2(mgmtdev->max_write_request) ||
++		(mgmtdev->max_write_request < 128) ||
++		(mgmtdev->max_write_request > 1024)) {
++		dev_err(&mgmtdev->pdev->dev, "invalid write request %d\n",
++			mgmtdev->max_write_request);
++		return -EINVAL;
++	}
++
++	if (!is_power_of_2(mgmtdev->max_read_request) ||
++		(mgmtdev->max_read_request < 128) ||
++		(mgmtdev->max_read_request > 1024)) {
++		dev_err(&mgmtdev->pdev->dev, "invalid read request %d\n",
++			mgmtdev->max_read_request);
++		return  -EINVAL;
++	}
++
++	if (mgmtdev->max_wr_xactions > MAX_WR_XACTIONS_MASK) {
++		dev_err(&mgmtdev->pdev->dev,
++			"max_wr_xactions cannot be bigger than %d\n",
++			MAX_WR_XACTIONS_MASK);
++		return -EINVAL;
++	}
++
++	if (mgmtdev->max_rd_xactions > MAX_RD_XACTIONS_MASK) {
++		dev_err(&mgmtdev->pdev->dev,
++			"max_rd_xactions cannot be bigger than %d\n",
++			MAX_RD_XACTIONS_MASK);
++		return -EINVAL;
++	}
++
++	for (i = 0; i < mgmtdev->dma_channels; i++) {
++		if (mgmtdev->priority[i] > 1) {
++			dev_err(&mgmtdev->pdev->dev, "priority can be 0 or 1\n");
++			return -EINVAL;
++		}
++
++		if (mgmtdev->weight[i] > MAX_CHANNEL_WEIGHT) {
++			dev_err(&mgmtdev->pdev->dev,
++				"max value of weight can be %d.\n",
++				MAX_CHANNEL_WEIGHT);
++			return -EINVAL;
++		}
++
++		/* weight needs to be at least one */
++		if (mgmtdev->weight[i] == 0)
++			mgmtdev->weight[i] = 1;
++	}
++
++	pm_runtime_get_sync(&mgmtdev->pdev->dev);
++	val = readl(mgmtdev->virtaddr + MAX_BUS_REQ_LEN_OFFSET);
++	val &= ~(MAX_BUS_REQ_LEN_MASK << MAX_BUS_WR_REQ_BIT_POS);
++	val |= (mgmtdev->max_write_request << MAX_BUS_WR_REQ_BIT_POS);
++	val &= ~(MAX_BUS_REQ_LEN_MASK);
++	val |= (mgmtdev->max_read_request);
++	writel(val, mgmtdev->virtaddr + MAX_BUS_REQ_LEN_OFFSET);
++
++	val = readl(mgmtdev->virtaddr + MAX_XACTIONS_OFFSET);
++	val &= ~(MAX_WR_XACTIONS_MASK << MAX_WR_XACTIONS_BIT_POS);
++	val |= (mgmtdev->max_wr_xactions << MAX_WR_XACTIONS_BIT_POS);
++	val &= ~(MAX_RD_XACTIONS_MASK);
++	val |= (mgmtdev->max_rd_xactions);
++	writel(val, mgmtdev->virtaddr + MAX_XACTIONS_OFFSET);
++
++	mgmtdev->hw_version = readl(mgmtdev->virtaddr + HW_VERSION_OFFSET);
++	mgmtdev->hw_version_major = (mgmtdev->hw_version >> 28) & 0xF;
++	mgmtdev->hw_version_minor = (mgmtdev->hw_version >> 16) & 0xF;
++
++	for (i = 0; i < mgmtdev->dma_channels; i++) {
++		val = readl(mgmtdev->virtaddr + QOS_N_OFFSET + (4 * i));
++		val &= ~(1 << PRIORITY_BIT_POS);
++		val |= ((mgmtdev->priority[i] & 0x1) << PRIORITY_BIT_POS);
++		val &= ~(WEIGHT_MASK << WRR_BIT_POS);
++		val |= ((mgmtdev->weight[i] & WEIGHT_MASK) << WRR_BIT_POS);
++		writel(val, mgmtdev->virtaddr + QOS_N_OFFSET + (4 * i));
++	}
++
++	val = readl(mgmtdev->virtaddr + CHRESET_TIMEOUT_OFFSET);
++	val &= ~CHRESET_TIMEOUUT_MASK;
++	val |= (mgmtdev->chreset_timeout_cycles & CHRESET_TIMEOUUT_MASK);
++	writel(val, mgmtdev->virtaddr + CHRESET_TIMEOUT_OFFSET);
++
++	pm_runtime_mark_last_busy(&mgmtdev->pdev->dev);
++	pm_runtime_put_autosuspend(&mgmtdev->pdev->dev);
++	return 0;
++}
++EXPORT_SYMBOL_GPL(hidma_mgmt_setup);
++
++static int hidma_mgmt_probe(struct platform_device *pdev)
++{
++	struct hidma_mgmt_dev *mgmtdev;
++	struct resource *res;
++	void __iomem *virtaddr;
++	int irq;
++	int rc;
++	u32 val;
++
++	pm_runtime_set_autosuspend_delay(&pdev->dev, AUTOSUSPEND_TIMEOUT);
++	pm_runtime_use_autosuspend(&pdev->dev);
++	pm_runtime_set_active(&pdev->dev);
++	pm_runtime_enable(&pdev->dev);
++	pm_runtime_get_sync(&pdev->dev);
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	virtaddr = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(virtaddr)) {
++		rc = -ENOMEM;
++		goto out;
++	}
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		dev_err(&pdev->dev, "irq resources not found\n");
++		rc = irq;
++		goto out;
++	}
++
++	mgmtdev = devm_kzalloc(&pdev->dev, sizeof(*mgmtdev), GFP_KERNEL);
++	if (!mgmtdev) {
++		rc = -ENOMEM;
++		goto out;
++	}
++
++	mgmtdev->pdev = pdev;
++	mgmtdev->addrsize = resource_size(res);
++	mgmtdev->virtaddr = virtaddr;
++
++	rc = device_property_read_u32(&pdev->dev, "dma-channels",
++				&mgmtdev->dma_channels);
++	if (rc) {
++		dev_err(&pdev->dev, "number of channels missing\n");
++		goto out;
++	}
++
++	rc = device_property_read_u32(&pdev->dev,
++				"channel-reset-timeout-cycles",
++				&mgmtdev->chreset_timeout_cycles);
++	if (rc) {
++		dev_err(&pdev->dev, "channel reset timeout missing\n");
++		goto out;
++	}
++
++	rc = device_property_read_u32(&pdev->dev, "max-write-burst-bytes",
++				&mgmtdev->max_write_request);
++	if (rc) {
++		dev_err(&pdev->dev, "max-write-burst-bytes missing\n");
++		goto out;
++	}
++
++	rc = device_property_read_u32(&pdev->dev, "max-read-burst-bytes",
++				&mgmtdev->max_read_request);
++	if (rc) {
++		dev_err(&pdev->dev, "max-read-burst-bytes missing\n");
++		goto out;
++	}
++
++	rc = device_property_read_u32(&pdev->dev, "max-write-transactions",
++				&mgmtdev->max_wr_xactions);
++	if (rc) {
++		dev_err(&pdev->dev, "max-write-transactions missing\n");
++		goto out;
++	}
++
++	rc = device_property_read_u32(&pdev->dev, "max-read-transactions",
++				&mgmtdev->max_rd_xactions);
++	if (rc) {
++		dev_err(&pdev->dev, "max-read-transactions missing\n");
++		goto out;
++	}
++
++	mgmtdev->priority = devm_kcalloc(&pdev->dev,
++		mgmtdev->dma_channels, sizeof(*mgmtdev->priority), GFP_KERNEL);
++	if (!mgmtdev->priority) {
++		rc = -ENOMEM;
++		goto out;
++	}
++
++	mgmtdev->weight = devm_kcalloc(&pdev->dev,
++		mgmtdev->dma_channels, sizeof(*mgmtdev->weight), GFP_KERNEL);
++	if (!mgmtdev->weight) {
++		rc = -ENOMEM;
++		goto out;
++	}
++
++	rc = device_property_read_u32_array(&pdev->dev, "channel-priority",
++				mgmtdev->priority, mgmtdev->dma_channels);
++	if (rc) {
++		dev_err(&pdev->dev, "channel-priority missing\n");
++		goto out;
++	}
++
++	rc = device_property_read_u32_array(&pdev->dev, "channel-weight",
++				mgmtdev->weight, mgmtdev->dma_channels);
++	if (rc) {
++		dev_err(&pdev->dev, "channel-weight missing\n");
++		goto out;
++	}
++
++	rc = hidma_mgmt_setup(mgmtdev);
++	if (rc) {
++		dev_err(&pdev->dev, "setup failed\n");
++		goto out;
++	}
++
++	/* start the HW */
++	val = readl(mgmtdev->virtaddr + CFG_OFFSET);
++	val |= 1;
++	writel(val, mgmtdev->virtaddr + CFG_OFFSET);
++
++	rc = hidma_mgmt_init_sys(mgmtdev);
++	if (rc) {
++		dev_err(&pdev->dev, "sysfs setup failed\n");
++		goto out;
++	}
++
++	dev_info(&pdev->dev,
++		 "HW rev: %d.%d @ %pa with %d physical channels\n",
++		 mgmtdev->hw_version_major, mgmtdev->hw_version_minor,
++		 &res->start, mgmtdev->dma_channels);
++
++	platform_set_drvdata(pdev, mgmtdev);
++	pm_runtime_mark_last_busy(&pdev->dev);
++	pm_runtime_put_autosuspend(&pdev->dev);
++	return 0;
++out:
++	pm_runtime_disable(&pdev->dev);
++	pm_runtime_put_sync_suspend(&pdev->dev);
++	return rc;
++}
++
++#if IS_ENABLED(CONFIG_ACPI)
++static const struct acpi_device_id hidma_mgmt_acpi_ids[] = {
++	{"QCOM8060"},
++	{},
++};
++#endif
++
++static const struct of_device_id hidma_mgmt_match[] = {
++	{ .compatible = "qcom,hidma-mgmt-1.0", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, hidma_mgmt_match);
++
++static struct platform_driver hidma_mgmt_driver = {
++	.probe = hidma_mgmt_probe,
++	.driver = {
++		.name = "hidma-mgmt",
++		.of_match_table = hidma_mgmt_match,
++		.acpi_match_table = ACPI_PTR(hidma_mgmt_acpi_ids),
++	},
++};
++module_platform_driver(hidma_mgmt_driver);
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/dma/qcom/hidma_mgmt.h b/drivers/dma/qcom/hidma_mgmt.h
+new file mode 100644
+index 0000000..04340ff
+--- /dev/null
++++ b/drivers/dma/qcom/hidma_mgmt.h
+@@ -0,0 +1,38 @@
++/*
++ * Qualcomm Technologies HIDMA Management common header
++ *
++ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++struct hidma_mgmt_dev {
++	u8 hw_version_major;
++	u8 hw_version_minor;
++
++	u32 max_wr_xactions;
++	u32 max_rd_xactions;
++	u32 max_write_request;
++	u32 max_read_request;
++	u32 dma_channels;
++	u32 chreset_timeout_cycles;
++	u32 hw_version;
++	u32 *priority;
++	u32 *weight;
++
++	/* Hardware device constants */
++	void __iomem *virtaddr;
++	resource_size_t addrsize;
++
++	struct platform_device *pdev;
++};
++
++int hidma_mgmt_init_sys(struct hidma_mgmt_dev *dev);
++int hidma_mgmt_setup(struct hidma_mgmt_dev *mgmtdev);
+diff --git a/drivers/dma/qcom/hidma_mgmt_sys.c b/drivers/dma/qcom/hidma_mgmt_sys.c
+new file mode 100644
+index 0000000..70d324e
+--- /dev/null
++++ b/drivers/dma/qcom/hidma_mgmt_sys.c
+@@ -0,0 +1,231 @@
++/*
++ * Qualcomm Technologies HIDMA Management SYS interface
++ *
++ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/sysfs.h>
++#include <linux/platform_device.h>
++
++#include "hidma_mgmt.h"
++
++struct fileinfo {
++	char *name;
++	int mode;
++	int (*get)(struct hidma_mgmt_dev *mdev);
++	int (*set)(struct hidma_mgmt_dev *mdev, u64 val);
++};
++
++#define IMPLEMENT_GETSET(name)					\
++static int get_##name(struct hidma_mgmt_dev *mdev)		\
++{								\
++	return mdev->name;					\
++}								\
++static int set_##name(struct hidma_mgmt_dev *mdev, u64 val)	\
++{								\
++	u64 tmp;						\
++	int rc;							\
++								\
++	tmp = mdev->name;					\
++	mdev->name = val;					\
++	rc = hidma_mgmt_setup(mdev);				\
++	if (rc)							\
++		mdev->name = tmp;				\
++	return rc;						\
++}
++
++#define DECLARE_ATTRIBUTE(name, mode)				\
++	{#name, mode, get_##name, set_##name}
++
++IMPLEMENT_GETSET(hw_version_major)
++IMPLEMENT_GETSET(hw_version_minor)
++IMPLEMENT_GETSET(max_wr_xactions)
++IMPLEMENT_GETSET(max_rd_xactions)
++IMPLEMENT_GETSET(max_write_request)
++IMPLEMENT_GETSET(max_read_request)
++IMPLEMENT_GETSET(dma_channels)
++IMPLEMENT_GETSET(chreset_timeout_cycles)
++
++static int set_priority(struct hidma_mgmt_dev *mdev, unsigned int i, u64 val)
++{
++	u64 tmp;
++	int rc;
++
++	if (i > mdev->dma_channels)
++		return -EINVAL;
++
++	tmp = mdev->priority[i];
++	mdev->priority[i] = val;
++	rc = hidma_mgmt_setup(mdev);
++	if (rc)
++		mdev->priority[i] = tmp;
++	return rc;
++}
++
++static int set_weight(struct hidma_mgmt_dev *mdev, unsigned int i, u64 val)
++{
++	u64 tmp;
++	int rc;
++
++	if (i > mdev->dma_channels)
++		return -EINVAL;
++
++	tmp = mdev->weight[i];
++	mdev->weight[i] = val;
++	rc = hidma_mgmt_setup(mdev);
++	if (rc)
++		mdev->weight[i] = tmp;
++	return rc;
++}
++
++static struct fileinfo files[] = {
++	DECLARE_ATTRIBUTE(hw_version_major, S_IRUGO),
++	DECLARE_ATTRIBUTE(hw_version_minor, S_IRUGO),
++	DECLARE_ATTRIBUTE(dma_channels, S_IRUGO),
++	DECLARE_ATTRIBUTE(chreset_timeout_cycles, S_IRUGO),
++	DECLARE_ATTRIBUTE(max_wr_xactions, (S_IRUGO|S_IWUGO)),
++	DECLARE_ATTRIBUTE(max_rd_xactions, (S_IRUGO|S_IWUGO)),
++	DECLARE_ATTRIBUTE(max_write_request, (S_IRUGO|S_IWUGO)),
++	DECLARE_ATTRIBUTE(max_read_request, (S_IRUGO|S_IWUGO)),
++};
++
++static ssize_t show_values(struct device *dev, struct device_attribute *attr,
++				char *buf)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct hidma_mgmt_dev *mdev = platform_get_drvdata(pdev);
++	unsigned int i;
++
++	for (i = 0; i < ARRAY_SIZE(files); i++) {
++		if (strcmp(attr->attr.name, files[i].name) == 0) {
++			sprintf(buf, "%d\n", files[i].get(mdev));
++			goto done;
++		}
++	}
++
++	for (i = 0; i < mdev->dma_channels; i++) {
++		char name[30];
++
++		sprintf(name, "channel%d_priority", i);
++		if (strcmp(attr->attr.name, name) == 0) {
++			sprintf(buf, "%d\n", mdev->priority[i]);
++			goto done;
++		}
++
++		sprintf(name, "channel%d_weight", i);
++		if (strcmp(attr->attr.name, name) == 0) {
++			sprintf(buf, "%d\n", mdev->weight[i]);
++			goto done;
++		}
++	}
++
++done:
++	return strlen(buf);
++}
++
++static ssize_t set_values(struct device *dev, struct device_attribute *attr,
++				const char *buf, size_t count)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct hidma_mgmt_dev *mdev = platform_get_drvdata(pdev);
++	unsigned long tmp;
++	unsigned int i;
++	int rc;
++
++	rc = kstrtoul(buf, 0, &tmp);
++	if (rc)
++		return rc;
++
++	for (i = 0; i < ARRAY_SIZE(files); i++) {
++		if (strcmp(attr->attr.name, files[i].name) == 0) {
++			rc = files[i].set(mdev, tmp);
++			if (rc)
++				return rc;
++
++			goto done;
++		}
++	}
++
++	for (i = 0; i < mdev->dma_channels; i++) {
++		char name[30];
++
++		sprintf(name, "channel%d_priority", i);
++		if (strcmp(attr->attr.name, name) == 0) {
++			rc = set_priority(mdev, i, tmp);
++			if (rc)
++				return rc;
++			goto done;
++		}
++
++		sprintf(name, "channel%d_weight", i);
++		if (strcmp(attr->attr.name, name) == 0) {
++			rc = set_weight(mdev, i, tmp);
++			if (rc)
++				return rc;
++		}
++	}
++done:
++	return count;
++}
++
++static int create_sysfs_entry(struct hidma_mgmt_dev *dev, char *name, int mode)
++{
++	struct device_attribute *attrs;
++	char *name_copy;
++
++	attrs = devm_kmalloc(&dev->pdev->dev,
++			sizeof(struct device_attribute), GFP_KERNEL);
++	if (!attrs)
++		return -ENOMEM;
++
++	name_copy = devm_kstrdup(&dev->pdev->dev, name, GFP_KERNEL);
++	if (!name_copy)
++		return -ENOMEM;
++
++	attrs->attr.name = name_copy;
++	attrs->attr.mode = mode;
++	attrs->show      = show_values;
++	attrs->store     = set_values;
++	sysfs_attr_init(&attrs->attr);
++
++	return device_create_file(&dev->pdev->dev, attrs);
++}
++
++
++int hidma_mgmt_init_sys(struct hidma_mgmt_dev *dev)
++{
++	unsigned int i;
++	int rc;
++
++	for (i = 0; i < ARRAY_SIZE(files); i++) {
++		rc = create_sysfs_entry(dev, files[i].name, files[i].mode);
++		if (rc)
++			return rc;
++	}
++
++	for (i = 0; i < dev->dma_channels; i++) {
++		char name[30];
++
++		sprintf(name, "channel%d_priority", i);
++		rc = create_sysfs_entry(dev, name, (S_IRUGO|S_IWUGO));
++		if (rc)
++			return rc;
++
++		sprintf(name, "channel%d_weight", i);
++		rc = create_sysfs_entry(dev, name, (S_IRUGO|S_IWUGO));
++		if (rc)
++			return rc;
++	}
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(hidma_mgmt_init_sys);
 -- 
 Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
