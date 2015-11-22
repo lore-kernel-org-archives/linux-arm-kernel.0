@@ -1,50 +1,172 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Sat, 21 Nov 2015 18:59:25 -0800
-Subject: [PATCH LINUX v3 03/10] tty: xuartps: Don't consider circular buffer
- when enabling transmitter
+Date: Sat, 21 Nov 2015 18:59:32 -0800
+Subject: [PATCH LINUX v3 10/10] tty: xuartps: Cleanup: Reformat if-else
 In-Reply-To: <1448161172-19717-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1448161172-19717-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1448161172-19717-4-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1448161172-19717-11-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Restarting the transmitter even if the circ buffer is empty may be
-necessary to push out remaining data when the port is restarted after
-being stopped.
+Convert an if-else into the more common early return on error, reducing
+the indent level of the happy path.
 
-Cc: Peter Hurley <peter@hurleysoftware.com>
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
-v3:
- - changed this patch to not always enable the transmitter, but keep the
-   check for uart_tx_stopped() in place, as suggested by Peter, whose
-   explanation I also stole for the new commit message (thx)
----
- drivers/tty/serial/xilinx_uartps.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/tty/serial/xilinx_uartps.c | 124 ++++++++++++++++++-------------------
+ 1 file changed, 62 insertions(+), 62 deletions(-)
 
 diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 2c98c357d9a0..6a7cd4e057ae 100644
+index 3a1e508926c1..7d180a2db67e 100644
 --- a/drivers/tty/serial/xilinx_uartps.c
 +++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -512,7 +512,7 @@ static void cdns_uart_start_tx(struct uart_port *port)
- {
- 	unsigned int status, numbytes = port->fifosize;
+@@ -203,58 +203,55 @@ static void cdns_uart_handle_rx(struct uart_port *port, unsigned int isrstatus)
+ 	isrstatus &= port->read_status_mask;
+ 	isrstatus &= ~port->ignore_status_mask;
  
--	if (uart_circ_empty(&port->state->xmit) || uart_tx_stopped(port))
-+	if (uart_tx_stopped(port))
- 		return;
- 
- 	/*
-@@ -524,6 +524,9 @@ static void cdns_uart_start_tx(struct uart_port *port)
- 	status |= CDNS_UART_CR_TX_EN;
- 	writel(status, port->membase + CDNS_UART_CR_OFFSET);
- 
-+	if (uart_circ_empty(&port->state->xmit))
+-	if ((isrstatus & CDNS_UART_IXR_TOUT) ||
+-		(isrstatus & CDNS_UART_IXR_RXTRIG)) {
+-		/* Receive Timeout Interrupt */
+-		while (!(readl(port->membase + CDNS_UART_SR_OFFSET) &
+-					CDNS_UART_SR_RXEMPTY)) {
+-			u32 data;
+-			char status = TTY_NORMAL;
+-
+-			data = readl(port->membase + CDNS_UART_FIFO_OFFSET);
+-
+-			/* Non-NULL byte after BREAK is garbage (99%) */
+-			if (data && (port->read_status_mask &
+-						CDNS_UART_IXR_BRK)) {
+-				port->read_status_mask &= ~CDNS_UART_IXR_BRK;
+-				port->icount.brk++;
+-				if (uart_handle_break(port))
+-					continue;
+-			}
++	if (!(isrstatus & (CDNS_UART_IXR_TOUT | CDNS_UART_IXR_RXTRIG)))
 +		return;
 +
- 	while (numbytes-- && ((readl(port->membase + CDNS_UART_SR_OFFSET) &
- 				CDNS_UART_SR_TXFULL)) != CDNS_UART_SR_TXFULL) {
- 		/* Break if no more data available in the UART buffer */
++	while (!(readl(port->membase + CDNS_UART_SR_OFFSET) &
++				CDNS_UART_SR_RXEMPTY)) {
++		u32 data;
++		char status = TTY_NORMAL;
++
++		data = readl(port->membase + CDNS_UART_FIFO_OFFSET);
++
++		/* Non-NULL byte after BREAK is garbage (99%) */
++		if (data && (port->read_status_mask & CDNS_UART_IXR_BRK)) {
++			port->read_status_mask &= ~CDNS_UART_IXR_BRK;
++			port->icount.brk++;
++			if (uart_handle_break(port))
++				continue;
++		}
+ 
+ #ifdef SUPPORT_SYSRQ
+-			/*
+-			 * uart_handle_sysrq_char() doesn't work if
+-			 * spinlocked, for some reason
+-			 */
+-			 if (port->sysrq) {
+-				spin_unlock(&port->lock);
+-				if (uart_handle_sysrq_char(port,
+-							(unsigned char)data)) {
+-					spin_lock(&port->lock);
+-					continue;
+-				}
++		/*
++		 * uart_handle_sysrq_char() doesn't work if
++		 * spinlocked, for some reason
++		 */
++		 if (port->sysrq) {
++			spin_unlock(&port->lock);
++			if (uart_handle_sysrq_char(port, data)) {
+ 				spin_lock(&port->lock);
++				continue;
+ 			}
++			spin_lock(&port->lock);
++		}
+ #endif
+ 
+-			port->icount.rx++;
+-
+-			if (isrstatus & CDNS_UART_IXR_PARITY) {
+-				port->icount.parity++;
+-				status = TTY_PARITY;
+-			} else if (isrstatus & CDNS_UART_IXR_FRAMING) {
+-				port->icount.frame++;
+-				status = TTY_FRAME;
+-			} else if (isrstatus & CDNS_UART_IXR_OVERRUN) {
+-				port->icount.overrun++;
+-			}
++		port->icount.rx++;
+ 
+-			uart_insert_char(port, isrstatus, CDNS_UART_IXR_OVERRUN,
+-					 data, status);
++		if (isrstatus & CDNS_UART_IXR_PARITY) {
++			port->icount.parity++;
++			status = TTY_PARITY;
++		} else if (isrstatus & CDNS_UART_IXR_FRAMING) {
++			port->icount.frame++;
++			status = TTY_FRAME;
++		} else if (isrstatus & CDNS_UART_IXR_OVERRUN) {
++			port->icount.overrun++;
+ 		}
+-		tty_flip_buffer_push(&port->state->port);
++
++		uart_insert_char(port, isrstatus, CDNS_UART_IXR_OVERRUN,
++				 data, status);
+ 	}
++	tty_flip_buffer_push(&port->state->port);
+ }
+ 
+ /**
+@@ -1434,27 +1431,30 @@ static int cdns_uart_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "Cannot get uart_port structure\n");
+ 		rc = -ENODEV;
+ 		goto err_out_notif_unreg;
+-	} else {
+-		/* Register the port.
+-		 * This function also registers this device with the tty layer
+-		 * and triggers invocation of the config_port() entry point.
+-		 */
+-		port->mapbase = res->start;
+-		port->irq = irq;
+-		port->dev = &pdev->dev;
+-		port->uartclk = clk_get_rate(cdns_uart_data->uartclk);
+-		port->private_data = cdns_uart_data;
+-		cdns_uart_data->port = port;
+-		platform_set_drvdata(pdev, port);
+-		rc = uart_add_one_port(&cdns_uart_uart_driver, port);
+-		if (rc) {
+-			dev_err(&pdev->dev,
+-				"uart_add_one_port() failed; err=%i\n", rc);
+-			goto err_out_notif_unreg;
+-		}
+-		return 0;
+ 	}
+ 
++	/*
++	 * Register the port.
++	 * This function also registers this device with the tty layer
++	 * and triggers invocation of the config_port() entry point.
++	 */
++	port->mapbase = res->start;
++	port->irq = irq;
++	port->dev = &pdev->dev;
++	port->uartclk = clk_get_rate(cdns_uart_data->uartclk);
++	port->private_data = cdns_uart_data;
++	cdns_uart_data->port = port;
++	platform_set_drvdata(pdev, port);
++
++	rc = uart_add_one_port(&cdns_uart_uart_driver, port);
++	if (rc) {
++		dev_err(&pdev->dev,
++			"uart_add_one_port() failed; err=%i\n", rc);
++		goto err_out_notif_unreg;
++	}
++
++	return 0;
++
+ err_out_notif_unreg:
+ #ifdef CONFIG_COMMON_CLK
+ 	clk_notifier_unregister(cdns_uart_data->uartclk,
 -- 
 2.6.3.3.g9bb996a
