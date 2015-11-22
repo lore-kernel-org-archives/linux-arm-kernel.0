@@ -1,24 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 22 Nov 2015 21:06:34 +0100
-Subject: [PATCH 00/13] mvneta Buffer Management and enhancements
-In-Reply-To: <1448178839-3541-1-git-send-email-mw@semihalf.com>
-References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
-Message-ID: <12984648.7CKVgBs7pu@wuerfel>
+From: trini@konsulko.com (Tom Rini)
+Date: Sun, 22 Nov 2015 15:35:15 -0500
+Subject: [PATCH 1/2] dts: dra7: add spi alias for qspi
+In-Reply-To: <1447916462-1007-2-git-send-email-mugunthanvnm@ti.com>
+References: <1447916462-1007-1-git-send-email-mugunthanvnm@ti.com>
+ <1447916462-1007-2-git-send-email-mugunthanvnm@ti.com>
+Message-ID: <20151122203515.GJ9551@bill-the-cat>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 22 November 2015 08:53:46 Marcin Wojtas wrote:
-> 
-> 3. Optimisations - concatenating TX descriptors' flush, basing on
-> xmit_more support and combined approach for finalizing egress processing.
-> Thanks to HR timer buffers can be released with small latency, which is
-> good for low transfer and small queues. Along with the timer, coalescing
-> irqs are used, whose threshold could be increased back to 15.
-> 
-> 
+On Thu, Nov 19, 2015 at 12:31:01PM +0530, Mugunthan V N wrote:
 
-If you are already reworking the TX path, it probably makes sense to 
-support BQL as well, see the Marvell skge and sky2 drivers for examples
-using netdev_{tx_,}{sent,completed}_queue.
+> Set the alias for qspi to spi0
+> 
+> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
 
-	Arnd
+Reviewed-by: Tom Rini <trini@konsulko.com>
+
+-- 
+Tom
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151122/42a0730f/attachment.sig>
