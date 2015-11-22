@@ -1,84 +1,38 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sun, 22 Nov 2015 21:38:08 +0100
-Subject: [PATCH 08/11] clk: lpc18xx: add NXP specific common clock
- framework selection
-In-Reply-To: <1447981511-29653-9-git-send-email-vz@mleia.com>
-References: <1447981511-29653-1-git-send-email-vz@mleia.com>
- <1447981511-29653-9-git-send-email-vz@mleia.com>
-Message-ID: <CAGhQ9VzrGA3jZBKiZzDr=6pGUnbs0aHdKxsxwmkyMWMT+xYghg@mail.gmail.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Sun, 22 Nov 2015 20:39:54 +0000
+Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <3964884.0P2KA5fUaZ@wuerfel> (Arnd Bergmann's message of "Sun, 22
+ Nov 2015 21:37 +0100")
+References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
+ <4527012.vmieWOaE32@wuerfel>
+ <20151122200326.GK8644@n2100.arm.linux.org.uk>
+ <3964884.0P2KA5fUaZ@wuerfel>
+Message-ID: <yw1xa8q5bwf9.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+Arnd Bergmann <arnd@arndb.de> writes:
 
-On 20 November 2015 at 02:05, Vladimir Zapolskiy <vz@mleia.com> wrote:
-> The change adds COMMON_CLK_NXP configuration symbol and enables it for
-> NXP LPC18XX architecture, this is needed to reuse drivers/clk/nxp
-> folder for NXP common clock framework drivers other than LPC18XX one.
+> arnd at wuerfel:/tmp$ arm-linux-gnueabihf-gcc -Wall -O2 -mcpu=cortex-a15 idiv.c -c -o idiv-arm.o
+> arnd at wuerfel:/tmp$ objdump -dr idiv-arm.o   
 >
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> Cc: Joachim Eastwood <manabian@gmail.com>
-> ---
->  arch/arm/Kconfig     | 1 +
->  drivers/clk/Kconfig  | 5 +++++
->  drivers/clk/Makefile | 2 +-
->  3 files changed, 7 insertions(+), 1 deletion(-)
+> idiv-arm.o:     file format elf32-littlearm
 >
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 0365cbb..c318277 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -952,6 +952,7 @@ config ARCH_LPC18XX
->         select ARCH_HAS_RESET_CONTROLLER
->         select ARM_AMBA
->         select CLKSRC_LPC32XX
-> +       select COMMON_CLK
-
-COMMON_CLK is already selected by ARM_SINGLE_ARMV7M which ARCH_LPC18XX
-depends on so this hunk should not be necessary.
-
->         select PINCTRL
->         help
->           Support for NXP's LPC18xx Cortex-M3 and LPC43xx Cortex-M4
-> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-> index c3e3a02..7fc1eb9 100644
-> --- a/drivers/clk/Kconfig
-> +++ b/drivers/clk/Kconfig
-> @@ -175,6 +175,11 @@ config COMMON_CLK_PWM
->           Adapter driver so that any PWM output can be (mis)used as clock signal
->           at 50% duty cycle.
+> Disassembly of section .text:
 >
-> +config COMMON_CLK_NXP
-> +       def_bool COMMON_CLK && ARCH_LPC18XX
-> +       ---help---
-> +         Support for clock providers on NXP platforms.
-> +
->  config COMMON_CLK_PXA
->         def_bool COMMON_CLK && ARCH_PXA
->         ---help---
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index 820714c..15603c1 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -62,8 +62,8 @@ endif
->  obj-$(CONFIG_PLAT_ORION)               += mvebu/
->  obj-$(CONFIG_ARCH_MESON)               += meson/
->  obj-$(CONFIG_ARCH_MXS)                 += mxs/
-> -obj-$(CONFIG_ARCH_LPC18XX)             += nxp/
->  obj-$(CONFIG_MACH_PISTACHIO)           += pistachio/
-> +obj-$(CONFIG_COMMON_CLK_NXP)           += nxp/
->  obj-$(CONFIG_COMMON_CLK_PXA)           += pxa/
->  obj-$(CONFIG_COMMON_CLK_QCOM)          += qcom/
->  obj-$(CONFIG_ARCH_ROCKCHIP)            += rockchip/
-> --
+> 00000000 <udiv>:
+>    0:   fbb0 f0f1       udiv    r0, r0, r1
+>    4:   4770            bx      lr
+>    6:   bf00            nop
+>
+> 00000008 <sdiv>:
+>    8:   fb90 f0f1       sdiv    r0, r0, r1
+>    c:   4770            bx      lr
+>    e:   bf00            nop
 
-Other than the one comment above it looks good to me:
-Acked-by: Joachim Eastwood <manabian@gmail.com>
+Your compiler seems to default to thumb so you should add -marm.
 
-I'll try to find the time look through the other patches you have for
-lpc32xx. I also have a EA LPC3250 dev kit v2
-(http://embeddedartists.com/products/kits/lpc3250_kit_v2.php) in my
-collection.
-
-regards,
-Joachim Eastwood
+-- 
+M?ns Rullg?rd
+mans at mansr.com
