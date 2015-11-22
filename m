@@ -1,208 +1,141 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 22 Nov 2015 16:15:08 -0600
-Subject: [PATCH v2] phy-sun4i-usb: Add support for the host usb-phys
- found on the H3 SoC
-In-Reply-To: <1448191764-11454-1-git-send-email-hdegoede@redhat.com>
-References: <1448191764-11454-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20151122221508.GA14518@rob-hp-laptop>
+Date: Sun, 22 Nov 2015 16:19:50 -0600
+Subject: [PATCH v3] touchscreen: pixcir_i2c: Add support for wake and
+ enable gpios
+In-Reply-To: <1448207853-24256-1-git-send-email-hdegoede@redhat.com>
+References: <1448207853-24256-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20151122221950.GA16428@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 22, 2015 at 12:29:24PM +0100, Hans de Goede wrote:
-> From: Reinder de Haan <patchesrdh@mveas.com>
+On Sun, Nov 22, 2015 at 04:57:33PM +0100, Hans de Goede wrote:
+> From: Sander Vermin <sander@vermin.nl>
 > 
-> Note this commit only adds support for phys 1-3, phy 0, the otg phy, is
-> not yet (fully) supported after this commit.
+> On some devices the wake and enable pins of the pixcir touchscreen
+> controller are connected to gpios and these must be controlled by the
+> driver for the device to operate properly.
 > 
-> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
+> Signed-off-by: Sander Vermin <sander@vermin.nl>
 > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 > ---
-> Changes in v2:
-> -Change break; after dev_err() to return, as intended, fixing a compiler
->  warning (the dev_err case should never be reached).
+> Changes in v2 (Hans de Goede):
+> -Split the changes for dealing with inverted / swapped axis out into a
+>  separate patch
+> -Remove a bunch of dev_info calls to make the driver less chatty
+> -Use devm_gpiod_get_optional as these new gpios are optional
+> -Only msleep after setting enable high if we have an enable pin
+> Changes in v3 (Hans de Goede):
+> -Use "if (ts->gpio_foo)" instead of "if (!IS_ERR_OR_NULL(ts->foo))"
+> -No need to set gpio-s to 1 after requesting them with GPIOD_OUT_HIGH
 > ---
->  .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  1 +
+>  .../bindings/input/touchscreen/pixcir_i2c_ts.txt   |  2 ++
 
 For the binding:
 
 Acked-by: Rob Herring <robh@kernel.org>
 
->  drivers/phy/phy-sun4i-usb.c                        | 67 +++++++++++++++++-----
->  2 files changed, 53 insertions(+), 15 deletions(-)
+>  drivers/input/touchscreen/pixcir_i2c_ts.c          | 40 ++++++++++++++++++++++
+>  2 files changed, 42 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> index 0cebf74..95736d7 100644
-> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> @@ -9,6 +9,7 @@ Required properties:
->    * allwinner,sun7i-a20-usb-phy
->    * allwinner,sun8i-a23-usb-phy
->    * allwinner,sun8i-a33-usb-phy
-> +  * allwinner,sun8i-h3-usb-phy
->  - reg : a list of offset + length pairs
->  - reg-names :
->    * "phy_ctrl"
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index b12964b..11bc9cd 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -46,6 +46,9 @@
->  #define REG_PHYBIST			0x08
->  #define REG_PHYTUNE			0x0c
->  #define REG_PHYCTL_A33			0x10
-> +#define REG_PHY_UNK_H3			0x20
-> +
-> +#define REG_PMU_UNK_H3			0x10
+> diff --git a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
+> index 8eb240a..72ca5ec 100644
+> --- a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
+> +++ b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
+> @@ -10,6 +10,8 @@ Required properties:
 >  
->  #define PHYCTL_DATA			BIT(7)
+>  Optional properties:
+>  - reset-gpio: GPIO connected to the RESET line of the chip
+> +- enable-gpios: GPIO connected to the ENABLE line of the chip
+> +- wake-gpios: GPIO connected to the WAKE line of the chip
 >  
-> @@ -79,7 +82,7 @@
->  #define PHY_DISCON_TH_SEL		0x2a
->  #define PHY_SQUELCH_DETECT		0x3c
+>  Example:
 >  
-> -#define MAX_PHYS			3
-> +#define MAX_PHYS			4
->  
->  /*
->   * Note do not raise the debounce time, we must report Vusb high within 100ms
-> @@ -88,12 +91,19 @@
->  #define DEBOUNCE_TIME			msecs_to_jiffies(50)
->  #define POLL_TIME			msecs_to_jiffies(250)
->  
-> +enum sun4i_usb_phy_type {
-> +	sun4i_a10_phy,
-> +	sun8i_a33_phy,
-> +	sun8i_h3_phy
-> +};
-> +
->  struct sun4i_usb_phy_data {
-> +	struct device *dev;
->  	void __iomem *base;
->  	struct mutex mutex;
->  	int num_phys;
->  	u32 disc_thresh;
-> -	bool has_a33_phyctl;
-> +	enum sun4i_usb_phy_type type;
->  	struct sun4i_usb_phy {
->  		struct phy *phy;
->  		void __iomem *pmu;
-> @@ -164,12 +174,18 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
->  
->  	mutex_lock(&phy_data->mutex);
->  
-> -	if (phy_data->has_a33_phyctl) {
-> +	switch (phy_data->type) {
-> +	case sun4i_a10_phy:
-> +		phyctl = phy_data->base + REG_PHYCTL_A10;
-> +		break;
-> +	case sun8i_a33_phy:
->  		phyctl = phy_data->base + REG_PHYCTL_A33;
->  		/* A33 needs us to set phyctl to 0 explicitly */
->  		writel(0, phyctl);
-> -	} else {
-> -		phyctl = phy_data->base + REG_PHYCTL_A10;
-> +		break;
-> +	case sun8i_h3_phy:
-> +		dev_err(phy_data->dev, "H3 usb_phy_write is not supported\n");
-> +		return;
->  	}
->  
->  	for (i = 0; i < len; i++) {
-> @@ -230,6 +246,7 @@ static int sun4i_usb_phy_init(struct phy *_phy)
->  	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
->  	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+> diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
+> index 211408c..22a67c6 100644
+> --- a/drivers/input/touchscreen/pixcir_i2c_ts.c
+> +++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
+> @@ -38,6 +38,8 @@ struct pixcir_i2c_ts_data {
+>  	struct input_dev *input;
+>  	struct gpio_desc *gpio_attb;
+>  	struct gpio_desc *gpio_reset;
+> +	struct gpio_desc *gpio_enable;
+> +	struct gpio_desc *gpio_wake;
+>  	const struct pixcir_i2c_chip_data *chip;
+>  	int max_fingers;	/* Max fingers supported in this instance */
+>  	bool running;
+> @@ -208,6 +210,11 @@ static int pixcir_set_power_mode(struct pixcir_i2c_ts_data *ts,
+>  	struct device *dev = &ts->client->dev;
 >  	int ret;
-> +	u32 val;
 >  
->  	ret = clk_prepare_enable(phy->clk);
->  	if (ret)
-> @@ -241,15 +258,26 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+> +	if (mode == PIXCIR_POWER_ACTIVE || mode == PIXCIR_POWER_IDLE) {
+> +		if (ts->gpio_wake)
+> +			gpiod_set_value_cansleep(ts->gpio_wake, 1);
+> +	}
+> +
+>  	ret = i2c_smbus_read_byte_data(ts->client, PIXCIR_REG_POWER_MODE);
+>  	if (ret < 0) {
+>  		dev_err(dev, "%s: can't read reg 0x%x : %d\n",
+> @@ -228,6 +235,11 @@ static int pixcir_set_power_mode(struct pixcir_i2c_ts_data *ts,
 >  		return ret;
 >  	}
 >  
-> -	/* Enable USB 45 Ohm resistor calibration */
-> -	if (phy->index == 0)
-> -		sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
-> +	if (data->type == sun8i_h3_phy) {
-> +		if (phy->index == 0) {
-> +			val = readl(data->base + REG_PHY_UNK_H3);
-> +			writel(val & ~1, data->base + REG_PHY_UNK_H3);
-> +		}
-> +
-> +		val = readl(phy->pmu + REG_PMU_UNK_H3);
-> +		writel(val & ~2, phy->pmu + REG_PMU_UNK_H3);
-> +	} else {
-> +		/* Enable USB 45 Ohm resistor calibration */
-> +		if (phy->index == 0)
-> +			sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
->  
-> -	/* Adjust PHY's magnitude and rate */
-> -	sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
-> +		/* Adjust PHY's magnitude and rate */
-> +		sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
->  
-> -	/* Disconnect threshold adjustment */
-> -	sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL, data->disc_thresh, 2);
-> +		/* Disconnect threshold adjustment */
-> +		sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
-> +				    data->disc_thresh, 2);
+> +	if (mode == PIXCIR_POWER_HALT) {
+> +		if (ts->gpio_wake)
+> +			gpiod_set_value_cansleep(ts->gpio_wake, 0);
 > +	}
+> +
+>  	return 0;
+>  }
 >  
->  	sun4i_usb_phy_passby(phy, 1);
+> @@ -302,6 +314,11 @@ static int pixcir_start(struct pixcir_i2c_ts_data *ts)
+>  	struct device *dev = &ts->client->dev;
+>  	int error;
 >  
-> @@ -522,11 +550,14 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->  	mutex_init(&data->mutex);
->  	INIT_DELAYED_WORK(&data->detect, sun4i_usb_phy0_id_vbus_det_scan);
->  	dev_set_drvdata(dev, data);
-> +	data->dev = dev;
+> +	if (ts->gpio_enable) {
+> +		gpiod_set_value_cansleep(ts->gpio_enable, 1);
+> +		msleep(100);
+> +	}
+> +
+>  	/* LEVEL_TOUCH interrupt with active low polarity */
+>  	error = pixcir_set_int_mode(ts, PIXCIR_INT_LEVEL_TOUCH, 0);
+>  	if (error) {
+> @@ -343,6 +360,9 @@ static int pixcir_stop(struct pixcir_i2c_ts_data *ts)
+>  	/* Wait till running ISR is complete */
+>  	synchronize_irq(ts->client->irq);
 >  
->  	if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy") ||
->  	    of_device_is_compatible(np, "allwinner,sun8i-a23-usb-phy") ||
->  	    of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
->  		data->num_phys = 2;
-> +	else if (of_device_is_compatible(np, "allwinner,sun8i-h3-usb-phy"))
-> +		data->num_phys = 4;
->  	else
->  		data->num_phys = 3;
+> +	if (ts->gpio_enable)
+> +		gpiod_set_value_cansleep(ts->gpio_enable, 0);
+> +
+>  	return 0;
+>  }
 >  
-> @@ -538,13 +569,18 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+> @@ -534,6 +554,26 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
+>  		return error;
+>  	}
 >  
->  	if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy") ||
->  	    of_device_is_compatible(np, "allwinner,sun8i-a23-usb-phy") ||
-> -	    of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
-> +	    of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy") ||
-> +	    of_device_is_compatible(np, "allwinner,sun8i-h3-usb-phy"))
->  		dedicated_clocks = true;
->  	else
->  		dedicated_clocks = false;
->  
->  	if (of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
-> -		data->has_a33_phyctl = true;
-> +		data->type = sun8i_a33_phy;
-> +	else if (of_device_is_compatible(np, "allwinner,sun8i-h3-usb-phy"))
-> +		data->type = sun8i_h3_phy;
-> +	else
-> +		data->type = sun4i_a10_phy;
->  
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy_ctrl");
->  	data->base = devm_ioremap_resource(dev, res);
-> @@ -620,7 +656,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->  			return PTR_ERR(phy->reset);
->  		}
->  
-> -		if (i) { /* No pmu for usbc0 */
-> +		if (data->type == sun8i_h3_phy || i != 0) {
->  			snprintf(name, sizeof(name), "pmu%d", i);
->  			res = platform_get_resource_byname(pdev,
->  							IORESOURCE_MEM, name);
-> @@ -696,6 +732,7 @@ static const struct of_device_id sun4i_usb_phy_of_match[] = {
->  	{ .compatible = "allwinner,sun7i-a20-usb-phy" },
->  	{ .compatible = "allwinner,sun8i-a23-usb-phy" },
->  	{ .compatible = "allwinner,sun8i-a33-usb-phy" },
-> +	{ .compatible = "allwinner,sun8i-h3-usb-phy" },
->  	{ },
->  };
->  MODULE_DEVICE_TABLE(of, sun4i_usb_phy_of_match);
+> +	tsdata->gpio_wake = devm_gpiod_get_optional(dev, "wake",
+> +						    GPIOD_OUT_HIGH);
+> +	if (IS_ERR(tsdata->gpio_wake)) {
+> +		error = PTR_ERR(tsdata->gpio_wake);
+> +		if (error != -EPROBE_DEFER)
+> +			dev_err(dev, "Failed to get wake gpio: %d\n", error);
+> +		return error;
+> +	}
+> +
+> +	tsdata->gpio_enable = devm_gpiod_get_optional(dev, "enable",
+> +						      GPIOD_OUT_HIGH);
+> +	if (IS_ERR(tsdata->gpio_enable)) {
+> +		error = PTR_ERR(tsdata->gpio_enable);
+> +		if (error != -EPROBE_DEFER)
+> +			dev_err(dev, "Failed to get enable gpio: %d\n", error);
+> +		return error;
+> +	}
+> +  	if (tsdata->gpio_enable)
+> +		msleep(100);
+> +
+>  	error = devm_request_threaded_irq(dev, client->irq, NULL, pixcir_ts_isr,
+>  					  IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+>  					  client->name, tsdata);
 > -- 
 > 2.5.0
 > 
