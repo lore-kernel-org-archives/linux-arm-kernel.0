@@ -1,60 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 22 Nov 2015 22:18:54 +0100
-Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
- functions
-In-Reply-To: <yw1xa8q5bwf9.fsf@unicorn.mansr.com>
-References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
- <3964884.0P2KA5fUaZ@wuerfel> <yw1xa8q5bwf9.fsf@unicorn.mansr.com>
-Message-ID: <4087953.TJWxTSWgI0@wuerfel>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Sun, 22 Nov 2015 22:24:01 +0100
+Subject: [PATCH 07/13] bus: mvebu-mbus: provide api for obtaining IO and
+ DRAM window information
+In-Reply-To: <5746764.cNlI6PeatM@wuerfel>
+References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
+ <1448178839-3541-8-git-send-email-mw@semihalf.com>
+ <5746764.cNlI6PeatM@wuerfel>
+Message-ID: <CAPv3WKeUPT2VtbvBpchOntNpOpBrpazi4YUaL6+6Yu=NOROFbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 22 November 2015 20:39:54 M?ns Rullg?rd wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
-> 
-> > arnd at wuerfel:/tmp$ arm-linux-gnueabihf-gcc -Wall -O2 -mcpu=cortex-a15 idiv.c -c -o idiv-arm.o
-> > arnd at wuerfel:/tmp$ objdump -dr idiv-arm.o   
-> >
-> > idiv-arm.o:     file format elf32-littlearm
-> >
-> > Disassembly of section .text:
-> >
-> > 00000000 <udiv>:
-> >    0:   fbb0 f0f1       udiv    r0, r0, r1
-> >    4:   4770            bx      lr
-> >    6:   bf00            nop
-> >
-> > 00000008 <sdiv>:
-> >    8:   fb90 f0f1       sdiv    r0, r0, r1
-> >    c:   4770            bx      lr
-> >    e:   bf00            nop
-> 
-> Your compiler seems to default to thumb so you should add -marm.
-> 
+Arnd,
 
-Sorry about that.
+2015-11-22 21:02 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
+> On Sunday 22 November 2015 08:53:53 Marcin Wojtas wrote:
+>> This commit enables finding appropriate mbus window and obtaining its
+>> target id and attribute for given physical address in two separate
+>> routines, both for IO and DRAM windows. This functionality
+>> is needed for Armada XP/38x Network Controller's Buffer Manager and
+>> PnC configuration.
+>>
+>> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+>>
+>> [DRAM window information reference in LKv3.10]
+>> Signed-off-by: Evan Wang <xswang@marvell.com>
+>>
+>
+> It's too long ago to remember all the details, but I thought we
+> had designed this so the configuration can just be done by
+> describing it in DT. What am I missing?
+>
 
-	Arnd
+And those functions do not break this approach. They just enable
+finding and reading the settings of MBUS windows done during initial
+configuration. Please remember that mvebu-mbus driver fills the MBUS
+windows registers basing on DT, however it just configures access CPU
+- DRAM/perfipheral.
 
-arnd at wuerfel:/tmp$ arm-linux-gnueabihf-gcc -Wall -O2 -mcpu=cortex-a15 idiv.c -c -o idiv-arm.o -marm
-arnd at wuerfel:/tmp$ objdump -dr idiv-arm.o 
+In this particular case only physical adresses of buffers are known
+and we have to 'open windows' between BM <-> DRAM and NETA <-> BM
+internal memory. Hence instead of hardcoding size/target/attribute, we
+can take information stored in CPU DRAM/IO windows registers.
 
-idiv-arm.o:     file format elf32-littlearm
-
-
-Disassembly of section .text:
-
-00000000 <udiv>:
-   0:   e730f110        udiv    r0, r0, r1
-   4:   e12fff1e        bx      lr
-
-00000008 <sdiv>:
-   8:   e710f110        sdiv    r0, r0, r1
-   c:   e12fff1e        bx      lr
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: idiv-arm.o
-Type: application/x-object
-Size: 861 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151122/62e271ac/attachment.bin>
+Best regards,
+Marcin
