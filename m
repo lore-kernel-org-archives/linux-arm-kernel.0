@@ -1,110 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 22 Nov 2015 21:37 +0100
-Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
- functions
-In-Reply-To: <20151122200326.GK8644@n2100.arm.linux.org.uk>
-References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
- <4527012.vmieWOaE32@wuerfel> <20151122200326.GK8644@n2100.arm.linux.org.uk>
-Message-ID: <3964884.0P2KA5fUaZ@wuerfel>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sun, 22 Nov 2015 21:38:08 +0100
+Subject: [PATCH 08/11] clk: lpc18xx: add NXP specific common clock
+ framework selection
+In-Reply-To: <1447981511-29653-9-git-send-email-vz@mleia.com>
+References: <1447981511-29653-1-git-send-email-vz@mleia.com>
+ <1447981511-29653-9-git-send-email-vz@mleia.com>
+Message-ID: <CAGhQ9VzrGA3jZBKiZzDr=6pGUnbs0aHdKxsxwmkyMWMT+xYghg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 22 November 2015 20:03:26 Russell King - ARM Linux wrote:
-> On Sun, Nov 22, 2015 at 08:58:08PM +0100, Arnd Bergmann wrote:
-> > does it work with -mcpu=cortex-a15?  I've tried crosstool as versions
-> > 2.23.52.20130913, 2.24.0.20141017 and 2.25.51.20150518, and they
-> > all seem to behave as expected, failing with -mcpu=cortex-a9 and
-> > marvell-pj4 but succeeding with -mcpu=cortex-a15 or marvell-pj4+idiv.
-> 
-> Appears not:
-> 
-> root at cubox:~# gcc -O2 -o idiv idiv.c -Wa,-mcpu='cortex-a15+idiv' -marm
-> /tmp/ccSovg32.s: Assembler messages:
-> /tmp/ccSovg32.s:32: Error: selected processor does not support ARM mode `udiv ip,r5,r4'
-> root at cubox:~# gcc -O2 -o idiv idiv.c -Wa,-mcpu='cortex-a15+idiv' -mthumb
-> /tmp/cchbT3EE.s: Assembler messages:
-> /tmp/cchbT3EE.s:36: Error: selected processor does not support Thumb mode `udiv r6,r5,r4'
-> 
-> Same without the +idiv.
+Hi Vladimir,
 
-I've attached files with those instructions, maybe that helps.
+On 20 November 2015 at 02:05, Vladimir Zapolskiy <vz@mleia.com> wrote:
+> The change adds COMMON_CLK_NXP configuration symbol and enables it for
+> NXP LPC18XX architecture, this is needed to reuse drivers/clk/nxp
+> folder for NXP common clock framework drivers other than LPC18XX one.
+>
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> Cc: Joachim Eastwood <manabian@gmail.com>
+> ---
+>  arch/arm/Kconfig     | 1 +
+>  drivers/clk/Kconfig  | 5 +++++
+>  drivers/clk/Makefile | 2 +-
+>  3 files changed, 7 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 0365cbb..c318277 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -952,6 +952,7 @@ config ARCH_LPC18XX
+>         select ARCH_HAS_RESET_CONTROLLER
+>         select ARM_AMBA
+>         select CLKSRC_LPC32XX
+> +       select COMMON_CLK
 
-> > I've also found some /proc/cpuinfo output to cross-reference SoCs
-> > to their core names.
-> > 
-> > 		variant	part	revision	name		features
-> > mmp2:		0	0x581	5		PJ4		idivt
-> > dove:		0	0x581	5		PJ4		idivt
-> 
-> Yes, that agrees with my dove.
+COMMON_CLK is already selected by ARM_SINGLE_ARMV7M which ARCH_LPC18XX
+depends on so this hunk should not be necessary.
 
-ok.
+>         select PINCTRL
+>         help
+>           Support for NXP's LPC18xx Cortex-M3 and LPC43xx Cortex-M4
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index c3e3a02..7fc1eb9 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -175,6 +175,11 @@ config COMMON_CLK_PWM
+>           Adapter driver so that any PWM output can be (mis)used as clock signal
+>           at 50% duty cycle.
+>
+> +config COMMON_CLK_NXP
+> +       def_bool COMMON_CLK && ARCH_LPC18XX
+> +       ---help---
+> +         Support for clock providers on NXP platforms.
+> +
+>  config COMMON_CLK_PXA
+>         def_bool COMMON_CLK && ARCH_PXA
+>         ---help---
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 820714c..15603c1 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -62,8 +62,8 @@ endif
+>  obj-$(CONFIG_PLAT_ORION)               += mvebu/
+>  obj-$(CONFIG_ARCH_MESON)               += meson/
+>  obj-$(CONFIG_ARCH_MXS)                 += mxs/
+> -obj-$(CONFIG_ARCH_LPC18XX)             += nxp/
+>  obj-$(CONFIG_MACH_PISTACHIO)           += pistachio/
+> +obj-$(CONFIG_COMMON_CLK_NXP)           += nxp/
+>  obj-$(CONFIG_COMMON_CLK_PXA)           += pxa/
+>  obj-$(CONFIG_COMMON_CLK_QCOM)          += qcom/
+>  obj-$(CONFIG_ARCH_ROCKCHIP)            += rockchip/
+> --
 
-arnd at wuerfel:/tmp$ cat idiv.c 
-unsigned int udiv(unsigned int a, unsigned int b)
-{
-        return a / b;
-}
+Other than the one comment above it looks good to me:
+Acked-by: Joachim Eastwood <manabian@gmail.com>
 
-int sdiv(int a, int b)
-{
-        return a / b;
-}
-arnd at wuerfel:/tmp$ arm-linux-gnueabihf-gcc -Wall -O2 -mcpu=cortex-a15 idiv.c -c -o idiv-arm.o
-arnd at wuerfel:/tmp$ objdump -dr idiv-arm.o   
+I'll try to find the time look through the other patches you have for
+lpc32xx. I also have a EA LPC3250 dev kit v2
+(http://embeddedartists.com/products/kits/lpc3250_kit_v2.php) in my
+collection.
 
-idiv-arm.o:     file format elf32-littlearm
-
-
-Disassembly of section .text:
-
-00000000 <udiv>:
-   0:   fbb0 f0f1       udiv    r0, r0, r1
-   4:   4770            bx      lr
-   6:   bf00            nop
-
-00000008 <sdiv>:
-   8:   fb90 f0f1       sdiv    r0, r0, r1
-   c:   4770            bx      lr
-   e:   bf00            nop
-arnd at wuerfel:/tmp$ arm-linux-gnueabihf-gcc -Wall -O2 -mcpu=cortex-a15 idiv.c -c -o idiv-thumb.o -mthumb
-arnd at wuerfel:/tmp$ objdump -dr idiv-thumb.o 
-
-idiv-thumb.o:     file format elf32-littlearm
-
-
-Disassembly of section .text:
-
-00000000 <udiv>:
-   0:   fbb0 f0f1       udiv    r0, r0, r1
-   4:   4770            bx      lr
-   6:   bf00            nop
-
-00000008 <sdiv>:
-   8:   fb90 f0f1       sdiv    r0, r0, r1
-   c:   4770            bx      lr
-   e:   bf00            nop
-
-
-	Arnd
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: idiv-arm.o
-Type: application/x-object
-Size: 861 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151122/50ec74f8/attachment-0003.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: idiv-thumb.o
-Type: application/x-object
-Size: 861 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151122/50ec74f8/attachment-0004.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: idiv.c
-Type: text/x-csrc
-Size: 112 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151122/50ec74f8/attachment-0005.bin>
+regards,
+Joachim Eastwood
