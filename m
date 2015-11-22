@@ -1,77 +1,113 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 22 Nov 2015 11:37:32 -0500
-Subject: [PATCH V6 0/3] dma: add Qualcomm Technologies HIDMA driver
-Message-ID: <1448210257-4768-1-git-send-email-okaya@codeaurora.org>
+Date: Sun, 22 Nov 2015 11:37:33 -0500
+Subject: [PATCH V6 1/3] dma: qcom_bam_dma: move to qcom directory
+In-Reply-To: <1448210257-4768-1-git-send-email-okaya@codeaurora.org>
+References: <1448210257-4768-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1448210257-4768-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-been designed
-to support virtualization technology. The driver has been
-divided into two to follow the hardware design.
+Creating a QCOM directory for all QCOM DMA source files.
 
-1. HIDMA Management driver
-2. HIDMA Channel driver
-
-Each HIDMA HW consists of multiple channels. These channels
-share some set of common parameters. These parameters are
-initialized by the management driver during power up.
-Same management driver is used for monitoring the execution
-of the channels. Management driver can change the performance
-behavior dynamically such as bandwidth allocation and
-prioritization in the future.
-
-The management driver is executed in hypervisor context and
-is the main management entity for all channels provided by
-the device.
-
-Changes from V5: (https://lkml.org/lkml/2015/11/15/135)
-* none
-
-Changes from V5: (https://lkml.org/lkml/2015/11/15/136)
-* forgot to remove duplicate rc assignment.
-* add missing _iomem from sparse warning.
-* Add sysfs ABI documentation
-
-Changes from V5: (https://lkml.org/lkml/2015/11/15/137)
-* Remove pm lock in ISR as it is redundant caught in lockdep.
-* sparse warning for missing _iomem.
-* sparse warning for static required.
-
-Sinan Kaya (3):
-  dma: qcom_bam_dma: move to qcom directory
-  dma: add Qualcomm Technologies HIDMA management driver
-  dma: add Qualcomm Technologies HIDMA channel driver
-
- .../ABI/testing/sysfs-platform-hidma-mgmt          |  97 +++
- .../devicetree/bindings/dma/qcom_hidma.txt         |  18 +
- .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  61 ++
- drivers/dma/Kconfig                                |  11 +-
- drivers/dma/Makefile                               |   2 +-
- drivers/dma/qcom/Kconfig                           |  29 +
- drivers/dma/qcom/Makefile                          |   4 +
- drivers/dma/{qcom_bam_dma.c => qcom/bam_dma.c}     |   4 +-
- drivers/dma/qcom/hidma.c                           | 710 ++++++++++++++++
- drivers/dma/qcom/hidma.h                           | 157 ++++
- drivers/dma/qcom/hidma_dbg.c                       | 225 +++++
- drivers/dma/qcom/hidma_ll.c                        | 930 +++++++++++++++++++++
- drivers/dma/qcom/hidma_mgmt.c                      | 305 +++++++
- drivers/dma/qcom/hidma_mgmt.h                      |  38 +
- drivers/dma/qcom/hidma_mgmt_sys.c                  | 231 +++++
- 15 files changed, 2810 insertions(+), 12 deletions(-)
- create mode 100644 Documentation/ABI/testing/sysfs-platform-hidma-mgmt
- create mode 100644 Documentation/devicetree/bindings/dma/qcom_hidma.txt
- create mode 100644 Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/dma/Kconfig                            | 11 ++---------
+ drivers/dma/Makefile                           |  2 +-
+ drivers/dma/qcom/Kconfig                       |  9 +++++++++
+ drivers/dma/qcom/Makefile                      |  1 +
+ drivers/dma/{qcom_bam_dma.c => qcom/bam_dma.c} |  4 ++--
+ 5 files changed, 15 insertions(+), 12 deletions(-)
  create mode 100644 drivers/dma/qcom/Kconfig
  create mode 100644 drivers/dma/qcom/Makefile
  rename drivers/dma/{qcom_bam_dma.c => qcom/bam_dma.c} (99%)
- create mode 100644 drivers/dma/qcom/hidma.c
- create mode 100644 drivers/dma/qcom/hidma.h
- create mode 100644 drivers/dma/qcom/hidma_dbg.c
- create mode 100644 drivers/dma/qcom/hidma_ll.c
- create mode 100644 drivers/dma/qcom/hidma_mgmt.c
- create mode 100644 drivers/dma/qcom/hidma_mgmt.h
- create mode 100644 drivers/dma/qcom/hidma_mgmt_sys.c
 
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index b458475..47b1b98 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -408,15 +408,6 @@ config PXA_DMA
+ 	  16 to 32 channels for peripheral to memory or memory to memory
+ 	  transfers.
+ 
+-config QCOM_BAM_DMA
+-	tristate "QCOM BAM DMA support"
+-	depends on ARCH_QCOM || (COMPILE_TEST && OF && ARM)
+-	select DMA_ENGINE
+-	select DMA_VIRTUAL_CHANNELS
+-	---help---
+-	  Enable support for the QCOM BAM DMA controller.  This controller
+-	  provides DMA capabilities for a variety of on-chip devices.
+-
+ config SIRF_DMA
+ 	tristate "CSR SiRFprimaII/SiRFmarco DMA support"
+ 	depends on ARCH_SIRF
+@@ -527,6 +518,8 @@ config ZX_DMA
+ # driver files
+ source "drivers/dma/bestcomm/Kconfig"
+ 
++source "drivers/dma/qcom/Kconfig"
++
+ source "drivers/dma/dw/Kconfig"
+ 
+ source "drivers/dma/hsu/Kconfig"
+diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
+index 7711a71..8dba90d 100644
+--- a/drivers/dma/Makefile
++++ b/drivers/dma/Makefile
+@@ -52,7 +52,6 @@ obj-$(CONFIG_PCH_DMA) += pch_dma.o
+ obj-$(CONFIG_PL330_DMA) += pl330.o
+ obj-$(CONFIG_PPC_BESTCOMM) += bestcomm/
+ obj-$(CONFIG_PXA_DMA) += pxa_dma.o
+-obj-$(CONFIG_QCOM_BAM_DMA) += qcom_bam_dma.o
+ obj-$(CONFIG_RENESAS_DMA) += sh/
+ obj-$(CONFIG_SIRF_DMA) += sirf-dma.o
+ obj-$(CONFIG_STE_DMA40) += ste_dma40.o ste_dma40_ll.o
+@@ -66,4 +65,5 @@ obj-$(CONFIG_TI_EDMA) += edma.o
+ obj-$(CONFIG_XGENE_DMA) += xgene-dma.o
+ obj-$(CONFIG_ZX_DMA) += zx296702_dma.o
+ 
++obj-y += qcom/
+ obj-y += xilinx/
+diff --git a/drivers/dma/qcom/Kconfig b/drivers/dma/qcom/Kconfig
+new file mode 100644
+index 0000000..17545df
+--- /dev/null
++++ b/drivers/dma/qcom/Kconfig
+@@ -0,0 +1,9 @@
++config QCOM_BAM_DMA
++	tristate "QCOM BAM DMA support"
++	depends on ARCH_QCOM || (COMPILE_TEST && OF && ARM)
++	select DMA_ENGINE
++	select DMA_VIRTUAL_CHANNELS
++	---help---
++	  Enable support for the QCOM BAM DMA controller.  This controller
++	  provides DMA capabilities for a variety of on-chip devices.
++
+diff --git a/drivers/dma/qcom/Makefile b/drivers/dma/qcom/Makefile
+new file mode 100644
+index 0000000..f612ae3
+--- /dev/null
++++ b/drivers/dma/qcom/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_QCOM_BAM_DMA) += bam_dma.o
+diff --git a/drivers/dma/qcom_bam_dma.c b/drivers/dma/qcom/bam_dma.c
+similarity index 99%
+rename from drivers/dma/qcom_bam_dma.c
+rename to drivers/dma/qcom/bam_dma.c
+index 5a250cd..b6f053d 100644
+--- a/drivers/dma/qcom_bam_dma.c
++++ b/drivers/dma/qcom/bam_dma.c
+@@ -49,8 +49,8 @@
+ #include <linux/clk.h>
+ #include <linux/dmaengine.h>
+ 
+-#include "dmaengine.h"
+-#include "virt-dma.h"
++#include "../dmaengine.h"
++#include "../virt-dma.h"
+ 
+ struct bam_desc_hw {
+ 	u32 addr;		/* Buffer physical address */
 -- 
 Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
