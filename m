@@ -1,37 +1,60 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 22 Nov 2015 22:16:27 +0100
-Subject: [PATCH] fbdev: sm712fb: avoid unused function warnings
-In-Reply-To: <CAMuHMdXCAG0N1KgqVeLvfCM_JgJYpLQXp8zkJPKEiN4YW6jthQ@mail.gmail.com>
-References: <4240710.SWINpxTKzN@wuerfel>
- <CAMuHMdXCAG0N1KgqVeLvfCM_JgJYpLQXp8zkJPKEiN4YW6jthQ@mail.gmail.com>
-Message-ID: <3884293.N93RQ5y3N9@wuerfel>
+Date: Sun, 22 Nov 2015 22:18:54 +0100
+Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <yw1xa8q5bwf9.fsf@unicorn.mansr.com>
+References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
+ <3964884.0P2KA5fUaZ@wuerfel> <yw1xa8q5bwf9.fsf@unicorn.mansr.com>
+Message-ID: <4087953.TJWxTSWgI0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 22 November 2015 21:51:54 Geert Uytterhoeven wrote:
-> Hi Arnd,
+On Sunday 22 November 2015 20:39:54 M?ns Rullg?rd wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
 > 
-> On Fri, Nov 20, 2015 at 10:48 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > The sm712fb framebuffer driver encloses the power-management
-> > functions in #ifdef CONFIG_PM, but the smtcfb_pci_suspend/resume
-> > functions are only really used when CONFIG_PM_SLEEP is also
-> > set, as a frequent gcc warning shows:
+> > arnd at wuerfel:/tmp$ arm-linux-gnueabihf-gcc -Wall -O2 -mcpu=cortex-a15 idiv.c -c -o idiv-arm.o
+> > arnd at wuerfel:/tmp$ objdump -dr idiv-arm.o   
 > >
-> > fbdev/sm712fb.c:1549:12: warning: 'smtcfb_pci_suspend' defined but not used
-> > fbdev/sm712fb.c:1572:12: warning: 'smtcfb_pci_resume' defined but not used
+> > idiv-arm.o:     file format elf32-littlearm
 > >
-> > The driver also avoids using the SIMPLE_DEV_PM_OPS macro when
-> > CONFIG_PM is unset, which is redundant.
+> > Disassembly of section .text:
+> >
+> > 00000000 <udiv>:
+> >    0:   fbb0 f0f1       udiv    r0, r0, r1
+> >    4:   4770            bx      lr
+> >    6:   bf00            nop
+> >
+> > 00000008 <sdiv>:
+> >    8:   fb90 f0f1       sdiv    r0, r0, r1
+> >    c:   4770            bx      lr
+> >    e:   bf00            nop
 > 
-> Is it? AFAIK there's no dummy of SIMPLE_DEV_PM_OPS() for the !CONFIG_PM case
-> yet. May be a good idea to have, though.
+> Your compiler seems to default to thumb so you should add -marm.
+> 
 
-The idea of the macro seems to be that the assignment of the pointers
-is left out, but the structure is still there. We could fix that, but
-I'd rather try to fix the macro in a way that creates an unused
-reference to the functions, so we never need any #ifdef or __maybe_unused
-annotation. We could also come up with a way to remove the structure
-from the binary in that case, but I can't think of an obvious solution
-for that at the moment.
+Sorry about that.
 
 	Arnd
+
+arnd at wuerfel:/tmp$ arm-linux-gnueabihf-gcc -Wall -O2 -mcpu=cortex-a15 idiv.c -c -o idiv-arm.o -marm
+arnd at wuerfel:/tmp$ objdump -dr idiv-arm.o 
+
+idiv-arm.o:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <udiv>:
+   0:   e730f110        udiv    r0, r0, r1
+   4:   e12fff1e        bx      lr
+
+00000008 <sdiv>:
+   8:   e710f110        sdiv    r0, r0, r1
+   c:   e12fff1e        bx      lr
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: idiv-arm.o
+Type: application/x-object
+Size: 861 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151122/62e271ac/attachment.bin>
