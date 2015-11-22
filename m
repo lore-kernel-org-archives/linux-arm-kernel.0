@@ -1,100 +1,60 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 22 Nov 2015 21:51:54 +0100
-Subject: [PATCH] fbdev: sm712fb: avoid unused function warnings
-In-Reply-To: <4240710.SWINpxTKzN@wuerfel>
-References: <4240710.SWINpxTKzN@wuerfel>
-Message-ID: <CAMuHMdXCAG0N1KgqVeLvfCM_JgJYpLQXp8zkJPKEiN4YW6jthQ@mail.gmail.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Sun, 22 Nov 2015 22:04:38 +0100
+Subject: [PATCH 02/13] net: mvneta: enable IP checksum with jumbo frames
+ for Armada 38x on Port0
+In-Reply-To: <4040597.3hXVb3XDMS@wuerfel>
+References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
+ <1448178839-3541-3-git-send-email-mw@semihalf.com>
+ <4040597.3hXVb3XDMS@wuerfel>
+Message-ID: <CAPv3WKdOVf4kXHfrawgybggHggAEJ9wJh=8gyp_mEhWp2i=YFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Arnd,
 
-On Fri, Nov 20, 2015 at 10:48 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The sm712fb framebuffer driver encloses the power-management
-> functions in #ifdef CONFIG_PM, but the smtcfb_pci_suspend/resume
-> functions are only really used when CONFIG_PM_SLEEP is also
-> set, as a frequent gcc warning shows:
+2015-11-22 21:00 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
+> On Sunday 22 November 2015 08:53:48 Marcin Wojtas wrote:
+>> The Ethernet controller found in the Armada 38x SoC's family support
+>> TCP/IP checksumming with frame sizes larger than 1600 bytes, however
+>> only on port 0.
+>>
+>> This commit enables this feature by using 'marvell,armada-xp-neta' in
+>> 'ethernet at 70000' node.
+>>
+>> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+>> Cc: <stable@vger.kernel.org> # v3.18+
+>> ---
+>>  arch/arm/boot/dts/armada-38x.dtsi | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+>> index c6a0e9d..b7868b2 100644
+>> --- a/arch/arm/boot/dts/armada-38x.dtsi
+>> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+>> @@ -494,7 +494,7 @@
+>>                         };
+>>
+>>                         eth0: ethernet at 70000 {
+>> -                               compatible = "marvell,armada-370-neta";
+>> +                               compatible = "marvell,armada-xp-neta";
+>>                                 reg = <0x70000 0x4000>;
+>>                                 interrupts-extended = <&mpic 8>;
+>>                                 clocks = <&gateclk 4>;
+>>
 >
-> fbdev/sm712fb.c:1549:12: warning: 'smtcfb_pci_suspend' defined but not used
-> fbdev/sm712fb.c:1572:12: warning: 'smtcfb_pci_resume' defined but not used
+> As it's clear that they are not 100% backwards compatible, please
+> add a SoC specific compatible string here as well, like
 >
-> The driver also avoids using the SIMPLE_DEV_PM_OPS macro when
-> CONFIG_PM is unset, which is redundant.
+>         compatible = "marvell,armada-380-neta", "marvell,armada-xp-neta";
+>
 
-Is it? AFAIK there's no dummy of SIMPLE_DEV_PM_OPS() for the !CONFIG_PM case
-yet. May be a good idea to have, though.
+Wouldn't be one sufficient ("marvell,armada-380-neta")?
 
-> This changes the driver to remove the #ifdef and instead mark
-> the functions as __maybe_unused, which is a nicer anyway, as it
-> provides build testing for all the code in all configurations
-> and is harder to get wrong.
+> Maybe also leave the 370 string in place.
 >
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->
-> diff --git a/drivers/video/fbdev/sm712fb.c b/drivers/video/fbdev/sm712fb.c
-> index 629bfa2d2f51..86ae1d4556fc 100644
-> --- a/drivers/video/fbdev/sm712fb.c
-> +++ b/drivers/video/fbdev/sm712fb.c
-> @@ -28,9 +28,7 @@
->  #include <linux/console.h>
->  #include <linux/screen_info.h>
->
-> -#ifdef CONFIG_PM
->  #include <linux/pm.h>
-> -#endif
->
->  #include "sm712.h"
->
-> @@ -1545,8 +1543,7 @@ static void smtcfb_pci_remove(struct pci_dev *pdev)
->         pci_disable_device(pdev);
->  }
->
-> -#ifdef CONFIG_PM
-> -static int smtcfb_pci_suspend(struct device *device)
-> +static int __maybe_unused smtcfb_pci_suspend(struct device *device)
->  {
->         struct pci_dev *pdev = to_pci_dev(device);
->         struct smtcfb_info *sfb;
-> @@ -1569,7 +1566,7 @@ static int smtcfb_pci_suspend(struct device *device)
->         return 0;
->  }
->
-> -static int smtcfb_pci_resume(struct device *device)
-> +static int __maybe_unused smtcfb_pci_resume(struct device *device)
->  {
->         struct pci_dev *pdev = to_pci_dev(device);
->         struct smtcfb_info *sfb;
-> @@ -1610,20 +1607,13 @@ static int smtcfb_pci_resume(struct device *device)
->  }
->
->  static SIMPLE_DEV_PM_OPS(sm7xx_pm_ops, smtcfb_pci_suspend, smtcfb_pci_resume);
->
-> -#define SM7XX_PM_OPS (&sm7xx_pm_ops)
-> -
-> -#else  /* !CONFIG_PM */
-> -
-> -#define SM7XX_PM_OPS NULL
-> -
-> -#endif /* !CONFIG_PM */
->
->  static struct pci_driver smtcfb_driver = {
->         .name = "smtcfb",
->         .id_table = smtcfb_pci_table,
->         .probe = smtcfb_pci_probe,
->         .remove = smtcfb_pci_remove,
-> -       .driver.pm  = SM7XX_PM_OPS,
-> +       .driver.pm  = &sm7xx_pm_ops,
 
-Hence now there will always be a struct dev_pm_ops in the binary,
-which contains 23 pointers, i.e 92 or 184 bytes.
+Now 370 string disables ip checksum for jumbo frames, so I don't think
+it's appropriate to keep it for port 0.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards,
+Marcin
