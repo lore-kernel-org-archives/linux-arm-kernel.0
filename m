@@ -1,68 +1,65 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 23 Nov 2015 17:47:11 +0800
-Subject: [PATCH v2 4/5] dt-bindings: document sun8i_ths
-In-Reply-To: <20e229f191031b0b0bff96dee118d1f2d988d7b3.1448263428.git.atx@atx.name>
-References: <cover.1448263428.git.atx@atx.name>
- <20e229f191031b0b0bff96dee118d1f2d988d7b3.1448263428.git.atx@atx.name>
-Message-ID: <CAGb2v675YHYR=eNczrP8srPr5aYG+8eK9GPA7vevsxjsHEW1RA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Nov 2015 10:47:43 +0100
+Subject: [PATCH] ahci: don't use MSI when PCI is disabled
+Message-ID: <4754092.OYovO36g28@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2015 at 4:02 PM, Josef Gajdusek <atx@atx.name> wrote:
-> This patch adds the binding documentation for the sun8i_ths driver
->
-> Signed-off-by: Josef Gajdusek <atx@atx.name>
-> ---
->  .../devicetree/bindings/thermal/sun8i-ths.txt      | 31 ++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/thermal/sun8i-ths.txt
->
-> diff --git a/Documentation/devicetree/bindings/thermal/sun8i-ths.txt b/Documentation/devicetree/bindings/thermal/sun8i-ths.txt
-> new file mode 100644
-> index 0000000..67056bf
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/thermal/sun8i-ths.txt
-> @@ -0,0 +1,31 @@
-> +* sun8i THS
-> +
-> +Required properties:
-> +- compatible : "allwinner,sun8i-h3-ths"
-> +- reg : Address range of the thermal registers and location of the calibration
-> +        value
+The AHCI driver is used for some on-chip devices that do not
+use PCI for probing, and it can be built even when CONFIG_PCI
+is disabled, but that now results in a build failure:
 
-You are now using nvmem for the calibration data. You don't need the second
-entry.
+ata/libahci.c: In function 'ahci_host_activate_multi_irqs':
+ata/libahci.c:2475:4: error: invalid use of undefined type 'struct msix_entry'
+ata/libahci.c:2475:21: error: dereferencing pointer to incomplete type 'struct msix_entry'
 
-> +- resets : Must contain an entry for each entry in reset-names.
-> +           see ../reset/reset.txt for details
-> +- reset-names : Must include the name "ahb"
-> +- clocks : Must contain an entry for each entry in clock-names.
-> +- clock-names : Must contain "ahb" for the bus gate and "ths" for the THS
-> +  clock
-> +
-> +Optional properties:
-> +- nvmem-cells : Must contain an entry for each entry in nvmem-cell-names
-> +- nvmem-cell-names : Must contain "calibration" for the cell containing the
-> +  temperature calibration cell, if available
-> +
-> +Example:
-> +ths: ths at 01c25000 {
-> +       #thermal-sensor-cells = <0>;
-> +       compatible = "allwinner,sun8i-h3-ths";
-> +       reg = <0x01c25000 0x88>, <0x01c14234 0x4>;
+This adds an #ifdef so we use that code only if actual PCI MSI
+is available.
 
-Same here.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: d684a90d38e2 ("ahci: per-port msix support")
 
-ChenYu
-
-> +       interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
-> +       resets = <&bus_rst 136>;
-> +       reset-names = "ahb";
-> +       clocks = <&bus_gates 72>, <&ths_clk>;
-> +       clock-names = "ahb", "ths";
-> +       nvmem-cells = <&ths_calibration>;
-> +       nvmem-cell-names = "calibration";
-> +};
-> --
-> 2.4.10
->
+diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
+index 1b6c7cc415bf..54fe01d8145b 100644
+--- a/drivers/ata/libahci.c
++++ b/drivers/ata/libahci.c
+@@ -1796,7 +1796,8 @@ static void ahci_port_intr(struct ata_port *ap)
+ 	ahci_handle_port_interrupt(ap, port_mmio, status);
+ }
+ 
+-static irqreturn_t ahci_multi_irqs_intr_hard(int irq, void *dev_instance)
++static irqreturn_t __maybe_unused ahci_multi_irqs_intr_hard(int irq,
++							    void *dev_instance)
+ {
+ 	struct ata_port *ap = dev_instance;
+ 	void __iomem *port_mmio = ahci_port_base(ap);
+@@ -2454,6 +2455,7 @@ void ahci_set_em_messages(struct ahci_host_priv *hpriv,
+ }
+ EXPORT_SYMBOL_GPL(ahci_set_em_messages);
+ 
++#ifdef CONFIG_PCI_MSI
+ static int ahci_host_activate_multi_irqs(struct ata_host *host,
+ 					 struct scsi_host_template *sht)
+ {
+@@ -2492,6 +2494,7 @@ static int ahci_host_activate_multi_irqs(struct ata_host *host,
+ 
+ 	return ata_host_register(host, sht);
+ }
++#endif
+ 
+ /**
+  *	ahci_host_activate - start AHCI host, request IRQs and register it
+@@ -2510,9 +2513,12 @@ int ahci_host_activate(struct ata_host *host, struct scsi_host_template *sht)
+ 	int irq = hpriv->irq;
+ 	int rc;
+ 
++#ifdef CONFIG_PCI_MSI
+ 	if (hpriv->flags & (AHCI_HFLAG_MULTI_MSI | AHCI_HFLAG_MULTI_MSIX))
+ 		rc = ahci_host_activate_multi_irqs(host, sht);
+-	else if (hpriv->flags & AHCI_HFLAG_EDGE_IRQ)
++	else
++#endif
++	if (hpriv->flags & AHCI_HFLAG_EDGE_IRQ)
+ 		rc = ata_host_activate(host, irq, ahci_single_edge_irq_intr,
+ 				       IRQF_SHARED, sht);
+ 	else
