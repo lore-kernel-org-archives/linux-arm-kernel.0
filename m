@@ -1,41 +1,55 @@
-From: songjun.wu@atmel.com (Songjun Wu)
-Date: Mon, 23 Nov 2015 17:19:58 +0800
-Subject: [PATCH] ASoC: Atmel: ClassD: add GCK's parent clock in DT binding
-Message-ID: <1448270399-28728-1-git-send-email-songjun.wu@atmel.com>
+From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
+Date: Mon, 23 Nov 2015 11:28:57 +0200
+Subject: [PATCH v3 0/6] Qualcomm PCIe driver and designware fixes
+Message-ID: <cover.1448270813.git.stanimir.varbanov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set GCK's parent as audio clock.
+This patch set is continuation of previous v2 at [1]. This time I
+decided to drop the PHY driver needed by pcie driver for apq8084
+and send it separately soon (when sort out the need of separate phy
+driver).
 
-Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
----
+First two patches in the set are fixes in pcie designware driver
+found during testing the qcom pcie driver. The second patch can
+be treated as an RFC.
 
- .../devicetree/bindings/sound/atmel-classd.txt     |    6 ++++++
- 1 file changed, 6 insertions(+)
+Next two patches adds DT binding document and the driver itself.
 
-diff --git a/Documentation/devicetree/bindings/sound/atmel-classd.txt b/Documentation/devicetree/bindings/sound/atmel-classd.txt
-index 0018451..549e701 100644
---- a/Documentation/devicetree/bindings/sound/atmel-classd.txt
-+++ b/Documentation/devicetree/bindings/sound/atmel-classd.txt
-@@ -16,6 +16,10 @@ Required properties:
- 	Required elements: "pclk", "gclk" and "aclk".
- - clocks
- 	Please refer to clock-bindings.txt.
-+- assigned-clocks
-+	Should be <&classd_gclk>.
-+- assigned-clock-parents
-+	Should be <&audio_pll_pmc>.
- 
- Optional properties:
- - pinctrl-names, pinctrl-0
-@@ -43,6 +47,8 @@ classd: classd at fc048000 {
- 		dma-names = "tx";
- 		clocks = <&classd_clk>, <&classd_gclk>, <&audio_pll_pmc>;
- 		clock-names = "pclk", "gclk", "aclk";
-+		assigned-clocks = <&classd_gclk>;
-+		assigned-clock-parents = <&audio_pll_pmc>;
- 
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_classd_default>;
+The last two patches just adds relevant dt node for apq8064 and
+enable pcie usage on ifc6410 development board. The testing has been
+made on ifc6410 development board.
+
+Comments are welcome!
+
+Here is edited description:
+
+This patchset introduces a Qualcomm PCIe root complex driver for
+Snapdragon 805 (APQ8084) and Snapdragon 600 (APQ8064). The PCIe
+hardware use Designware IP core plus Qualcomm application
+specific hw wrappers.
+
+[1] https://lkml.org/lkml/2015/5/4/267
+
+Stanimir Varbanov (6):
+  PCI: designware: remove wrong io_base assignment
+  PCI: designware: add memory barrier after enabling region
+  DT: PCI: qcom: Document PCIe devicetree bindings
+  PCI: qcom: Add Qualcomm PCIe controller driver
+  ARM: dts: apq8064: add pcie devicetree node
+  ARM: dts: ifc6410: enable pcie dt node for this board
+
+ .../devicetree/bindings/pci/qcom,pcie.txt          |  231 ++++++++
+ MAINTAINERS                                        |    7 +
+ arch/arm/boot/dts/qcom-apq8064-ifc6410.dts         |   26 +
+ arch/arm/boot/dts/qcom-apq8064.dtsi                |   36 ++
+ drivers/pci/host/Kconfig                           |   10 +
+ drivers/pci/host/Makefile                          |    1 +
+ drivers/pci/host/pcie-designware.c                 |    6 +-
+ drivers/pci/host/pcie-qcom.c                       |  623 ++++++++++++++++++++
+ 8 files changed, 939 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/qcom,pcie.txt
+ create mode 100644 drivers/pci/host/pcie-qcom.c
+
 -- 
 1.7.9.5
