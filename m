@@ -1,109 +1,37 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Mon, 23 Nov 2015 10:13:29 -0800
-Subject: [PATCH v3 3/6] DT: PCI: qcom: Document PCIe devicetree bindings
-In-Reply-To: <8fd3e7d1662f37abe549127d179c315dff3210d8.1448270813.git.stanimir.varbanov@linaro.org>
-References: <cover.1448270813.git.stanimir.varbanov@linaro.org>
- <8fd3e7d1662f37abe549127d179c315dff3210d8.1448270813.git.stanimir.varbanov@linaro.org>
-Message-ID: <20151123181329.GN30882@usrtlx11787.corpusers.net>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Mon, 23 Nov 2015 10:17:03 -0800
+Subject: [PATCH] ARM: dts: keystone: k2l: fix kernel crash when
+ clk_ignore_unused is not in bootargs
+In-Reply-To: <1448297649-22122-1-git-send-email-m-karicheri2@ti.com>
+References: <1448297649-22122-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <5653581F.4060902@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 23 Nov 01:29 PST 2015, Stanimir Varbanov wrote:
-
-> From: Stanimir Varbanov <svarbanov@mm-sol.com>
-> 
-> Document Qualcomm PCIe driver devicetree bindings.
-> 
-> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
-> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
+On 11/23/2015 8:54 AM, Murali Karicheri wrote:
+> Currently kernel crash randomly when K2L EVM is booted without
+> clk_ignore_unused in the bootargs. This workaround is not needed
+> on other K2 devices such as K2HK and K2E and with this fix, we can
+> remove the workaround altogether. netcp driver on K2L uses linked
+> ram on OSR (On chip Static RAM) and requires the clock to this peripheral
+> enabled for proper functioning. This is the reason for the kernel crash.
+> So add the clock node to fix this issue.
+>
+> While at it, remove the workaround documentation as well.
+>
+> With the fix applied, clk_summary dump shows the clock to OSR enabled.
+>
+> cat /sys/kernel/debug/clk/clk_summary
+>   ------cut--------------
+>     tcp3d-1                   0            0   399360000          0 0
+>     tcp3d-0                   0            0   399360000          0 0
+>     osr                       1            1   399360000          0 0
+>     fftc-0                    0            0   399360000          0 0
+>   -----cut----------------
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 > ---
->  .../devicetree/bindings/pci/qcom,pcie.txt          |  231 ++++++++++++++++++++
->  1 file changed, 231 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/qcom,pcie.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/qcom,pcie.txt b/Documentation/devicetree/bindings/pci/qcom,pcie.txt
-> new file mode 100644
-> index 000000000000..d7640d45fa31
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/qcom,pcie.txt
-> @@ -0,0 +1,231 @@
-> +* Qualcomm PCI express root complex
-> +
-> +- compatible:
-> +	Usage: required
-> +	Value type: <stringlist>
-> +	Definition: Value shall include
-> +		    - "qcom,pcie-v0" for apq/ipq8064
-> +		    - "qcom,pcie-v1" for apq8084
-
-Do you know if we have the same v1 of this block in 8994?
-
-[..]
-> +- clock-names:
-> +	Usage: required
-> +	Value type: <stringlist>
-> +	Definition: Should contain the following entries
-> +		    * should be populated for v0 and v1
-> +		    	- "iface"      Configuration AHB clock
-> +
-> +		    * should be populated for v0
-> +		    	- "core"       Clocks the pcie hw block
-> +		    	- "phy"        Clocks the pcie PHY block
-> +
-> +		    * should be populated for v1
-> +			- "aux"        Auxiliary (AUX) clock
-> +		    	- "bus_master" Master AXI clock
-> +		    	- "bus_slave"  Slave AXI clock
-
-You have white spaces among your tabs here.
-
-[..]
-> +- <name>-supply:
-> +	Usage: required
-> +	Value type: <phandle>
-> +	Definition: List of phandles to the power supply regulator(s)
-> +		    * should be populated for v0 and v1
-> +			- "vdda"        core analog power supply
-> +
-> +		    * should be populated for v0
-> +			- "vdda_phy"    analog power supply for PHY
-> +			- "vdda_refclk" analog power supply for IC which generate
-> +					reference clock
-
-Exploding these into 3 different property descriptions would make it
-easier to read, and you can say "required for v0" for the latter
-two and simply "required" on the vdda.
-
-[..]
-> +- <name>-gpio:
-> +	Usage: optional
-> +	Value type: <prop-encoded-array>
-> +	Definition: List of phandle and gpio specifier pairs. Should contain
-> +		    - "perst"  PCIe endpoint reset signal line
-> +		    - "pewake" PCIe endpoint wake signal line
-
-This property should be pluralized, i.e. it's <name>-gpios.
-
-Are these identifiers coming from some data sheet? Or could we simply
-name them "reset" and "wakeup"?
-
-> +
-> +- pinctrl-0:
-> +	Usage: required
-> +	Value type: <phandle>
-> +	Definition: List of phandles pointing at a pin(s) configuration
-
-This is not required and as it's a property applicable to all devices we
-normally don't mention them.
-
-> +
-> +- pinctrl-names
-> +	Usage: required
-> +	Value type: <stringlist>
-> +	Definition: List of names of pinctrl-0 state
-> +
-
-dito
+Nice !!
+I will queue this up for fixes. Thanks.
 
 Regards,
-Bjorn
+Santosh
