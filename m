@@ -1,28 +1,62 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 24 Nov 2015 00:38:59 +0100
-Subject: [PATCH 0/4] Component helper updates
-In-Reply-To: <20151123160210.GR8644@n2100.arm.linux.org.uk>
-References: <20151123160210.GR8644@n2100.arm.linux.org.uk>
-Message-ID: <20151123233859.GC22339@lunn.ch>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 23 Nov 2015 17:47:20 -0600
+Subject: [PATCH v2 4/5] pinctrl: dt-binding: Extend meson documentation
+ with GPIO IRQs support
+In-Reply-To: <1448273816-11290-5-git-send-email-carlo@caione.org>
+References: <1448273816-11290-1-git-send-email-carlo@caione.org>
+ <1448273816-11290-5-git-send-email-carlo@caione.org>
+Message-ID: <20151123234720.GA879@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2015 at 04:02:11PM +0000, Russell King - ARM Linux wrote:
-> Greg,
+On Mon, Nov 23, 2015 at 11:16:55AM +0100, Carlo Caione wrote:
+> From: Carlo Caione <carlo@endlessm.com>
 > 
-> These four patches update the component helper by:
+> Extend the pinctrl binding documentation with the support for external
+> GPIO interrupts.
+> 
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
+> index 3f6a524..56743eb 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
+> @@ -3,6 +3,12 @@
+>  Required properties for the root node:
+>   - compatible: "amlogic,meson8-pinctrl" or "amlogic,meson8b-pinctrl"
+>   - reg: address and size of registers controlling irq functionality
+> + - reg-names: should be "irq"
 
-Hi Russell
+You don't really need names when there is only one. Otherwise:
 
-Is there any documentation for the component helper, in particular,
-when devm_ can be used?
+Acked-by: Rob Herring <robh@kernel.org>
 
-It seems like slaves should only do a component_add() in their probe
-function, and then do resource allocation using devm_* in the bind
-callback?
-
-It seems like a master device can however use devm_ in its probe
-function?
-
-Thanks
-	Andrew
+> + - interrupt-controller: marks the device node as an interrupt controller
+> + - #interrupt-cells: should be 2. The first cell is the GPIO number. The
+> +		     second cell is used to specify trigger type.
+> + - interrupts: specifies the GPIO IRQ numbers on the GIC (GPIO_IRQ#)
+> + - interrupt-parent: specifies the parent interrupt controller.
+>  
+>  === GPIO sub-nodes ===
+>  
+> @@ -46,7 +52,13 @@ pinctrl-bindings.txt
+>  
+>  	pinctrl: pinctrl at c1109880 {
+>  		compatible = "amlogic,meson8-pinctrl";
+> +		reg-names = "irq";
+>  		reg = <0xc1109880 0x10>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 64 1>, <0 65 1>, <0 66 1>, <0 67 1>,
+> +			     <0 68 1>, <0 69 1>, <0 70 1>, <0 71 1>;
+> +		interrupt-controller;
+> +		#interrupt-cells = <2>;
+>  		#address-cells = <1>;
+>  		#size-cells = <1>;
+>  		ranges;
+> -- 
+> 2.5.0
+> 
