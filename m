@@ -1,9 +1,9 @@
 From: juri.lelli@arm.com (Juri Lelli)
-Date: Mon, 23 Nov 2015 14:28:41 +0000
-Subject: [RFC PATCH 8/8] arm64: add sysfs cpu_capacity attribute
+Date: Mon, 23 Nov 2015 14:28:40 +0000
+Subject: [RFC PATCH 7/8] arm: add sysfs cpu_capacity attribute
 In-Reply-To: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
 References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
-Message-ID: <1448288921-30307-9-git-send-email-juri.lelli@arm.com>
+Message-ID: <1448288921-30307-8-git-send-email-juri.lelli@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,20 +16,17 @@ The new attribute shows up as:
 
  /sys/devices/system/cpu/cpu*/cpu_capacity
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Brown <broonie@linaro.org>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Juri Lelli <juri.lelli@arm.com>
 ---
- arch/arm64/kernel/topology.c | 68 ++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/topology.c | 68 ++++++++++++++++++++++++++++++++++++++++++++++
  1 file changed, 68 insertions(+)
 
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 4423cc5..5c9e477 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -35,6 +35,74 @@ static void set_capacity_scale(unsigned int cpu, unsigned long capacity)
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index ecbff03..a226761 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -52,6 +52,74 @@ static void set_capacity_scale(unsigned int cpu, unsigned long capacity)
  	per_cpu(cpu_scale, cpu) = capacity;
  }
  
@@ -101,8 +98,8 @@ index 4423cc5..5c9e477 100644
 +late_initcall(register_cpu_capacity_sysctl);
 +#endif
 +
- static u32 capacity_scale = SCHED_CAPACITY_SCALE;
- 
- static void __init parse_cpu_capacity(struct device_node *cpu_node, int cpu)
+ #ifdef CONFIG_OF
+ struct cpu_efficiency {
+ 	const char *compatible;
 -- 
 2.2.2
