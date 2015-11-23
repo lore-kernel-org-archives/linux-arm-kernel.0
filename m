@@ -1,193 +1,23 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 23 Nov 2015 10:40:45 +0530
-Subject: [PATCH v2] phy-sun4i-usb: Add support for the host usb-phys found
- on the H3 SoC
-In-Reply-To: <1448191764-11454-1-git-send-email-hdegoede@redhat.com>
-References: <1448191764-11454-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <56529FD5.5020305@ti.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 23 Nov 2015 13:13:18 +0800
+Subject: [PATCH V2] ARM: imx: add platform irq type setting in gpc
+In-Reply-To: <1445337859-19111-1-git-send-email-Anson.Huang@freescale.com>
+References: <1445337859-19111-1-git-send-email-Anson.Huang@freescale.com>
+Message-ID: <20151123051317.GF13744@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sunday 22 November 2015 04:59 PM, Hans de Goede wrote:
-> From: Reinder de Haan <patchesrdh@mveas.com>
+On Tue, Oct 20, 2015 at 06:44:19PM +0800, Anson Huang wrote:
+> From: Anson Huang <b20788@freescale.com>
 > 
-> Note this commit only adds support for phys 1-3, phy 0, the otg phy, is
-> not yet (fully) supported after this commit.
+> GPC irq domain is a child domain of GIC, now all of platform irqs
+> are inside GPC domain, during the module populate, all devices irq
+> should have correct type setting in GIC, however, there is no
+> .irq_set_type callback setting in GPC, so the irq_set_type will be
+> skipped and cause all irqs' type in /proc/interrupt are "edge" which
+> mismatch with irq type setting in dtb file. Since GPC has no irq
+> type setting, so just tell kernel to use irq_chip_set_type_parent.
 > 
-> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Changes in v2:
-> -Change break; after dev_err() to return, as intended, fixing a compiler
->  warning (the dev_err case should never be reached).
-> ---
->  .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  1 +
->  drivers/phy/phy-sun4i-usb.c                        | 67 +++++++++++++++++-----
->  2 files changed, 53 insertions(+), 15 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> index 0cebf74..95736d7 100644
-> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> @@ -9,6 +9,7 @@ Required properties:
->    * allwinner,sun7i-a20-usb-phy
->    * allwinner,sun8i-a23-usb-phy
->    * allwinner,sun8i-a33-usb-phy
-> +  * allwinner,sun8i-h3-usb-phy
->  - reg : a list of offset + length pairs
->  - reg-names :
->    * "phy_ctrl"
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index b12964b..11bc9cd 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -46,6 +46,9 @@
->  #define REG_PHYBIST			0x08
->  #define REG_PHYTUNE			0x0c
->  #define REG_PHYCTL_A33			0x10
-> +#define REG_PHY_UNK_H3			0x20
-> +
-> +#define REG_PMU_UNK_H3			0x10
->  
->  #define PHYCTL_DATA			BIT(7)
->  
-> @@ -79,7 +82,7 @@
->  #define PHY_DISCON_TH_SEL		0x2a
->  #define PHY_SQUELCH_DETECT		0x3c
->  
-> -#define MAX_PHYS			3
-> +#define MAX_PHYS			4
+> Signed-off-by: Anson Huang <Anson.Huang@freescale.com>
 
-Is it 4 only for h3-usb-phy or for others too? If so, can we add it in driver data?
->  
->  /*
->   * Note do not raise the debounce time, we must report Vusb high within 100ms
-> @@ -88,12 +91,19 @@
->  #define DEBOUNCE_TIME			msecs_to_jiffies(50)
->  #define POLL_TIME			msecs_to_jiffies(250)
->  
-> +enum sun4i_usb_phy_type {
-> +	sun4i_a10_phy,
-> +	sun8i_a33_phy,
-> +	sun8i_h3_phy
-> +};
-> +
->  struct sun4i_usb_phy_data {
-> +	struct device *dev;
->  	void __iomem *base;
->  	struct mutex mutex;
->  	int num_phys;
->  	u32 disc_thresh;
-> -	bool has_a33_phyctl;
-> +	enum sun4i_usb_phy_type type;
->  	struct sun4i_usb_phy {
->  		struct phy *phy;
->  		void __iomem *pmu;
-> @@ -164,12 +174,18 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
->  
->  	mutex_lock(&phy_data->mutex);
->  
-> -	if (phy_data->has_a33_phyctl) {
-> +	switch (phy_data->type) {
-> +	case sun4i_a10_phy:
-> +		phyctl = phy_data->base + REG_PHYCTL_A10;
-> +		break;
-> +	case sun8i_a33_phy:
->  		phyctl = phy_data->base + REG_PHYCTL_A33;
->  		/* A33 needs us to set phyctl to 0 explicitly */
->  		writel(0, phyctl);
-> -	} else {
-> -		phyctl = phy_data->base + REG_PHYCTL_A10;
-> +		break;
-> +	case sun8i_h3_phy:
-> +		dev_err(phy_data->dev, "H3 usb_phy_write is not supported\n");
-> +		return;
->  	}
->  
->  	for (i = 0; i < len; i++) {
-> @@ -230,6 +246,7 @@ static int sun4i_usb_phy_init(struct phy *_phy)
->  	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
->  	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
->  	int ret;
-> +	u32 val;
->  
->  	ret = clk_prepare_enable(phy->clk);
->  	if (ret)
-> @@ -241,15 +258,26 @@ static int sun4i_usb_phy_init(struct phy *_phy)
->  		return ret;
->  	}
->  
-> -	/* Enable USB 45 Ohm resistor calibration */
-> -	if (phy->index == 0)
-> -		sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
-> +	if (data->type == sun8i_h3_phy) {
-> +		if (phy->index == 0) {
-> +			val = readl(data->base + REG_PHY_UNK_H3);
-> +			writel(val & ~1, data->base + REG_PHY_UNK_H3);
-> +		}
-> +
-> +		val = readl(phy->pmu + REG_PMU_UNK_H3);
-> +		writel(val & ~2, phy->pmu + REG_PMU_UNK_H3);
-> +	} else {
-> +		/* Enable USB 45 Ohm resistor calibration */
-> +		if (phy->index == 0)
-> +			sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
->  
-> -	/* Adjust PHY's magnitude and rate */
-> -	sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
-> +		/* Adjust PHY's magnitude and rate */
-> +		sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
->  
-> -	/* Disconnect threshold adjustment */
-> -	sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL, data->disc_thresh, 2);
-> +		/* Disconnect threshold adjustment */
-> +		sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
-> +				    data->disc_thresh, 2);
-> +	}
->  
->  	sun4i_usb_phy_passby(phy, 1);
->  
-> @@ -522,11 +550,14 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->  	mutex_init(&data->mutex);
->  	INIT_DELAYED_WORK(&data->detect, sun4i_usb_phy0_id_vbus_det_scan);
->  	dev_set_drvdata(dev, data);
-> +	data->dev = dev;
->  
->  	if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy") ||
->  	    of_device_is_compatible(np, "allwinner,sun8i-a23-usb-phy") ||
->  	    of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
->  		data->num_phys = 2;
-> +	else if (of_device_is_compatible(np, "allwinner,sun8i-h3-usb-phy"))
-> +		data->num_phys = 4;
-
-this should come from driver data.
->  	else
->  		data->num_phys = 3;
->  
-> @@ -538,13 +569,18 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->  
->  	if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy") ||
->  	    of_device_is_compatible(np, "allwinner,sun8i-a23-usb-phy") ||
-> -	    of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
-> +	    of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy") ||
-> +	    of_device_is_compatible(np, "allwinner,sun8i-h3-usb-phy"))
->  		dedicated_clocks = true;
-
-same here.
->  	else
->  		dedicated_clocks = false;
->  
->  	if (of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
-> -		data->has_a33_phyctl = true;
-> +		data->type = sun8i_a33_phy;
-> +	else if (of_device_is_compatible(np, "allwinner,sun8i-h3-usb-phy"))
-> +		data->type = sun8i_h3_phy;
-> +	else
-> +		data->type = sun4i_a10_phy;
-
-this too can come from driver data.
-
-Thanks
-Kishon
+Applied, thanks.
