@@ -1,46 +1,40 @@
-From: dcashman@android.com (Daniel Cashman)
-Date: Mon, 23 Nov 2015 10:55:16 -0800
-Subject: [PATCH v3 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
-In-Reply-To: <20151123150459.GD4236@arm.com>
-References: <1447888808-31571-1-git-send-email-dcashman@android.com>
- <1447888808-31571-2-git-send-email-dcashman@android.com>
- <1447888808-31571-3-git-send-email-dcashman@android.com>
- <1447888808-31571-4-git-send-email-dcashman@android.com>
- <20151123150459.GD4236@arm.com>
-Message-ID: <56536114.1020305@android.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 23 Nov 2015 10:56:11 -0800
+Subject: [PATCH 1/2] arch: consolidate CONFIG_STRICT_DEVM in
+ lib/Kconfig.debug
+In-Reply-To: <CAPcyv4hDbi5KJ+tGJnEwQV5G=PM+ZRooQbgTNrYxyyVVPA3EwA@mail.gmail.com>
+References: <20151122035702.9313.52457.stgit@dwillia2-desk3.jf.intel.com>
+ <20151123081235.GA23661@gmail.com>
+ <CAPcyv4hDbi5KJ+tGJnEwQV5G=PM+ZRooQbgTNrYxyyVVPA3EwA@mail.gmail.com>
+Message-ID: <CAGXu5jLpm7iG17+ws2MfK7ZG9KEDaHWd5xxHSk7KHPyizYEm2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23/2015 07:04 AM, Will Deacon wrote:
-> On Wed, Nov 18, 2015 at 03:20:07PM -0800, Daniel Cashman wrote:
->> +config ARCH_MMAP_RND_BITS_MAX
->> +       default 20 if ARM64_64K_PAGES && ARCH_VA_BITS=39
->> +       default 24 if ARCH_VA_BITS=39
->> +       default 23 if ARM64_64K_PAGES && ARCH_VA_BITS=42
->> +       default 27 if ARCH_VA_BITS=42
->> +       default 29 if ARM64_64K_PAGES && ARCH_VA_BITS=48
->> +       default 33 if ARCH_VA_BITS=48
->> +       default 15 if ARM64_64K_PAGES
->> +       default 19
->> +
->> +config ARCH_MMAP_RND_COMPAT_BITS_MIN
->> +       default 7 if ARM64_64K_PAGES
->> +       default 11
-> 
-> FYI: we now support 16k pages too, so this might need updating. It would
-> be much nicer if this was somehow computed rather than have the results
-> all open-coded like this.
+On Mon, Nov 23, 2015 at 9:12 AM, Dan Williams <dan.j.williams@intel.com> wrote:
+> On Mon, Nov 23, 2015 at 12:12 AM, Ingo Molnar <mingo@kernel.org> wrote:
+>>
+>> * Dan Williams <dan.j.williams@intel.com> wrote:
+>>
+>>> Let all the archs that implement CONFIG_STRICT_DEVM use a common
+>>> definition in lib/Kconfig.debug.
+>>
+>> For the x86 bit:
+>>
+>> Acked-by: Ingo Molnar <mingo@kernel.org>
+>>
+>>> Note, the 'depends on !SPARC' is due to sparc not implementing
+>>> devmem_is_allowed().
+>>
+>> Maybe that should be converted into a helper Kconfig switch for architectures to
+>> opt in to /dev/mem restrictions?
+>
+> Sure, easy enough to add a ARCH_HAS_DEVMEM_IS_ALLOWED opt-in.
 
-Yes, I ideally wanted this to be calculated based on the different page
-options and VA_BITS (which itself has a similar stanza), but I don't
-know how to do that/if it is currently supported in Kconfig. This would
-be even more desirable with the addition of 16K_PAGES, as with this
-setup we have a combinatorial problem.
+Is there some hidden meaning about the difference between ARCH_HAS_...
+and HAVE_ARCH_... and HAVE_... ?
 
-We could move this logic into the code where min/max are initialized,
-but that would create its own mess, creating new Kconfig values to
-introduce it in an arch-agnostic way after patch-set v2 moved that to
-mm/mmap.c instread of arch/${arch}/mm/mmap.c Suggestions welcome.
+-Kees
 
-Thank You,
-Dan
+-- 
+Kees Cook
+Chrome OS Security
