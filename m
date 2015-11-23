@@ -1,35 +1,87 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 23 Nov 2015 13:12:52 +0100
-Subject: [GIT PULL] ARM: rockchip: devicetree fixes for 4.4
-Message-ID: <1896520.ssRYuZn5dZ@diego>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 23 Nov 2015 12:13:15 +0000
+Subject: [PATCH v3 11/62] arm/acpi: Introduce ARM Boot Architecture Flags
+ in FADT
+In-Reply-To: <1447753261-7552-12-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-12-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511231213080.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> The Power State Coordination Interface (PSCI) defines an API that
+> can be used to coordinate power control amongst the various supervisory
+> systems concurrently running on a device. ACPI support for this
+> technology would require the addition of two flags: PSCI_COMPLIANT and
+> PSCI_USE_HVC. When set, the former signals to the OS that the hardware
+> is PSCI compliant. The latter selects the appropriate conduit for PSCI
+> calls by toggling between Hypervisor Calls (HVC) and Secure Monitor
+> Calls (SMC).
+> 
+> An ARM Boot Architecture Flags structure to support new ARM hardware
+> was introduced in FADT in ACPI 5.1, add the code accordingly to
+> implement that in ACPICA core.
+> 
+> Since ACPI 5.1 doesn't support self defined PSCI function IDs,
+> which means that only PSCI 0.2+ is supported in ACPI.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 
-  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.4-rockchip-dts32-fixes1
-
-for you to fetch changes up to 784359b824bf2b095b257eefcd9615a3c48f2d8a:
-
-  ARM: dts: rockchip: Add OTP gpio pinctrl to rk3288 tsadc node (2015-11-19 05:50:42 +0100)
-
-----------------------------------------------------------------
-Two fixes to Rockchip devicetree files, disabling the mmc-tuning
-on the veyron-minnie board for now and adding the init state for
-the over-temperature-protection to prevent glitches making the
-system reboot sometimes.
-
-----------------------------------------------------------------
-Caesar Wang (1):
-      ARM: dts: rockchip: Add OTP gpio pinctrl to rk3288 tsadc node
-
-Heiko Stuebner (1):
-      ARM: dts: rockchip: temporarily remove emmc hs200 speed from rk3288 minnie
-
- arch/arm/boot/dts/rk3288-veyron-minnie.dts |  4 ++++
- arch/arm/boot/dts/rk3288.dtsi              | 10 ++++++++--
- 2 files changed, 12 insertions(+), 2 deletions(-)
+>  xen/include/acpi/actbl.h | 12 +++++++++---
+>  1 file changed, 9 insertions(+), 3 deletions(-)
+> 
+> diff --git a/xen/include/acpi/actbl.h b/xen/include/acpi/actbl.h
+> index 856945d..66e29c3 100644
+> --- a/xen/include/acpi/actbl.h
+> +++ b/xen/include/acpi/actbl.h
+> @@ -244,7 +244,8 @@ struct acpi_table_fadt {
+>  	u32 flags;		/* Miscellaneous flag bits (see below for individual flags) */
+>  	struct acpi_generic_address reset_register;	/* 64-bit address of the Reset register */
+>  	u8 reset_value;		/* Value to write to the reset_register port to reset the system */
+> -	u8 reserved4[3];	/* Reserved, must be zero */
+> +	u16 arm_boot_flags;     /* ARM-Specific Boot Flags (see below for individual flags) (ACPI 5.1) */
+> +	u8 minor_revision;      /* FADT Minor Revision (ACPI 5.1) */
+>  	u64 Xfacs;		/* 64-bit physical address of FACS */
+>  	u64 Xdsdt;		/* 64-bit physical address of DSDT */
+>  	struct acpi_generic_address xpm1a_event_block;	/* 64-bit Extended Power Mgt 1a Event Reg Blk address */
+> @@ -259,7 +260,7 @@ struct acpi_table_fadt {
+>  	struct acpi_generic_address sleep_status;	/* 64-bit Sleep Status register */
+>  };
+>  
+> -/* Masks for FADT Boot Architecture Flags (boot_flags) */
+> +/* Masks for FADT IA-PC Boot Architecture Flags (boot_flags) */
+>  
+>  #define ACPI_FADT_LEGACY_DEVICES    (1)  	/* 00: [V2] System has LPC or ISA bus devices */
+>  #define ACPI_FADT_8042              (1<<1)	/* 01: [V3] System has an 8042 controller on port 60/64 */
+> @@ -270,6 +271,11 @@ struct acpi_table_fadt {
+>  
+>  #define FADT2_REVISION_ID               3
+>  
+> +/* Masks for FADT ARM Boot Architecture Flags (arm_boot_flags) ACPI 5.1 */
+> +
+> +#define ACPI_FADT_PSCI_COMPLIANT    (1)        /* 00:  [V5+] PSCI 0.2+ is implemented */
+> +#define ACPI_FADT_PSCI_USE_HVC      (1<<1)     /* 01:  [V5+] HVC must be used instead of SMC as the PSCI conduit */
+> +
+>  /* Masks for FADT flags */
+>  
+>  #define ACPI_FADT_WBINVD            (1)	/* 00: [V1] The wbinvd instruction works properly */
+> @@ -345,7 +351,7 @@ enum acpi_prefered_pm_profiles {
+>   *     FADT V5  size: 0x10C
+>   */
+>  #define ACPI_FADT_V1_SIZE       (u32) (ACPI_FADT_OFFSET (flags) + 4)
+> -#define ACPI_FADT_V2_SIZE       (u32) (ACPI_FADT_OFFSET (reserved4[0]) + 3)
+> +#define ACPI_FADT_V2_SIZE       (u32) (ACPI_FADT_OFFSET (minor_revision) + 1)
+>  #define ACPI_FADT_V3_SIZE       (u32) (ACPI_FADT_OFFSET (sleep_control))
+>  #define ACPI_FADT_V5_SIZE       (u32) (sizeof (struct acpi_table_fadt))
+>  
+> -- 
+> 2.1.0
+> 
