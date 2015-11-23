@@ -1,226 +1,128 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 23 Nov 2015 16:54:44 +0800
-Subject: [PATCH v2 6/6] arm64: dts: berlin4ct: add pll and clock nodes
-In-Reply-To: <5652CEB2.9030902@gmail.com>
-References: <1448008952-1787-1-git-send-email-jszhang@marvell.com>
- <1448008952-1787-7-git-send-email-jszhang@marvell.com>
- <564F8B73.7070403@gmail.com>	<20151123152158.483aa6b5@xhacker>
- <5652CEB2.9030902@gmail.com>
-Message-ID: <20151123165444.740b457c@xhacker>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 23 Nov 2015 10:06:20 +0100
+Subject: [PATCH v3 00/13] UEFI boot and runtime services support for 32-bit ARM
+Message-ID: <1448269593-20758-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Nov 2015 09:30:42 +0100
-Sebastian Hesselbarth wrote:
+This series adds support for booting the 32-bit ARM kernel directly from
+UEFI firmware using a builtin UEFI stub. It mostly reuses refactored arm64
+code, and the differences (primarily the PE/COFF header and entry point and
+the efi_create_mapping() implementation) are split out into arm64 and ARM
+versions.
 
-> On 23.11.2015 08:21, Jisheng Zhang wrote:
-> > On Fri, 20 Nov 2015 22:06:59 +0100
-> > Sebastian Hesselbarth wrote:  
-> >> On 20.11.2015 09:42, Jisheng Zhang wrote:  
-> >>> Add syspll, mempll, cpupll, gateclk and berlin-clk nodes.
-> >>>
-> >>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> >>> ---  
-> [...]
-> >>> +		syspll: syspll {
-> >>> +			compatible = "marvell,berlin-pll";
-> >>> +			reg = <0xea0200 0x14>, <0xea0710 4>;
-> >>> +			#clock-cells = <0>;
-> >>> +			clocks = <&osc>;
-> >>> +			bypass-shift = /bits/ 8 <0>;
-> >>> +		};
-> >>> +
-> >>> +		gateclk: gateclk {
-> >>> +			compatible = "marvell,berlin4ct-gateclk";
-> >>> +			reg = <0xea0700 4>;
-> >>> +			#clock-cells = <1>;
-> >>> +		};
-> >>> +
-> >>> +		clk: clk {
-> >>> +			compatible = "marvell,berlin4ct-clk";
-> >>> +			reg = <0xea0720 0x144>;  
-> >>
-> >> Looking at the reg ranges, I'd say that they are all clock related
-> >> and pretty close to each other:
-> >>
-> >> gateclk: reg = <0xea0700 4>;
-> >> bypass:  reg = <0xea0710 4>;
-> >> clk:     reg = <0xea0720 0x144>;  
-> >
-> > Although these ranges sit close, but we should represent HW structure as you
-> > said.  
-> 
-> Then how do you argue that you have to share the gate clock register
-> with every PLL? The answer is quite simple: You are not separating by
-> HW either but existing SW API.
+Changes since v2:
+- Some issues pointed out by Russell and Matt that were not introduced by this
+  series but merely became apparent due to the code movement in patch #4 have
+  been addressed in a separate 2-piece series I sent out this morning. This v3
+  is rebased on top of those patches.
+- Added a patch (#9) that adds support for creating non-global mappings. This
+  addresses a concern raised by Russell in response to v2 where the use of
+  global mappings combined with a flawed context switch and TBL flush sequence
+  could result in memory corruption.
+- Rebased onto v4.4-rc2
 
-No, PLLs don't share register any more. You can find what all clock nodes will
-look like in:
+Changes since v1:
+- The primary difference between this version and the first one is that all
+  prerequisites have either been merged, dropped for now (early FDT handling)
+  or folded into this series (MEMBLOCK_NOMAP). IOW, this series can be applied
+  on top of v4.4-rc1 directly.
+- Dropped handling of UEFI permission bits. The reason is that the UEFIv2.5
+  approach (EFI_PROPERTIES_TABLE) is flawed, and will be replaced by something
+  better in the next version of the spec.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/387322.html
+Patch #1 adds support for the MEMBLOCK_NOMAP attribute to the generic memblock
+code. Its purpose is to annotate memory regions as normal memory even if they
+are removed from the kernel direct mapping.
 
-> 
-> If you would really want to just describe the HW, then you'd have to
-> have a single node for _all_ clocks that get controlled by 0xea0700/0x4,
-> feed some 32+ clocks into the node, and out again. Obviously, this
-> isn't what we want, right?
+Patch #2 implements MEMBLOCK_NOMAP support for arm64
 
-I represented the HW by "kind", for example, gateclks, common-clks, pllclk.
-And let common PLLs follow this rule as well:
+Patch #3 updates the EFI init code to remove UEFI reserved regions and regions
+used by runtime services from the kernel direct mapping
 
-one node for all common plls
+Patch #4 splits off most of arch/arm64/kernel/efi.c into arch agnostic files
+arm-init.c and arm-runtime.c under drivers/firmware/efi.
 
-reg <0x922000 0x14>, <0x940034 0x14>, <0xea0200 0x14>
+Patch #5 refactors the code split off in patch #1 to isolate the arm64 specific
+pieces, and change a couple of arm64-isms that ARM handles slightly differently.
 
-> 
-> So, the idea of berlin2 sysctrl nodes (and similar other SoCs) is: Some
-> SoCs just dump some functions into a bunch of registers with no
-> particular order. We'd never find a good representation for that in DT,
-> so we don't bother to try but let the driver implementation deal with
-> the mess. Using "simple-mfd" is a nice solution to scattered registers
-> please have a look at it and come up with a cleaner separation for bg4
-> clock.
-> 
-> > First of all, let me describe the clks/plls in BG4CT. BG4CT contains:
-> >
-> > two kinds of PLL: normal PLL and AVPLL. These PLLs are put with their users
-> > together. For example: mempll pll registers <0xf7940034, 0x14> is put together
-> > with mem controller registers. AVPLL control registers are put with AV devices.  
-> 
-> Why didn't you choose to have a memory-controller node that provides
-> mempll clock then? I am open to having multiple nodes providing clocks
-> but having a node for every clock in any subsystem is something I'll
-> not even think about.
+Patch #6 enables the generic early_ioremap and early_memremap implementations
+for ARM. It reuses the kmap fixmap region, which is not used that early anyway.
 
-OK. As you said, "SoCs just dump some functions into a bunch of registers with
-no particular order", BG4CT is now cleaner, all common-clks are put together,
-gate-clks are put together, pllclks are put together, only the common PLLs
-are dumped here and there. So how about representing the HW by "kind", one
-node for common plls, one node for gateclks, one node for common clks and 
-one node for pllclks?
+Patch #7 splits off the core functionality of create_mapping() into a new
+function __create_mapping() that we can reuse for mapping UEFI runtime regions.
 
-                pll: pll {
-                        compatible = "marvell,berlin4ct-pll";
-                        reg = <0x922000 0x14>, <0x940034 0x14>, <0xea0200 0x14>
-                        #clock-cells = <0>;
-                        clocks = <&osc>;
-                };
+Patch #8 factors out the early_alloc() routine so we can invoke __create_mapping
+using another (late) allocator.
 
-		pllclk: pllclk {
-                        compatible = "marvell,berlin4ct-pllclk";
-                        reg = <0xea0710 4>
-                        #clock-cells = <1>;
-		};
+Patch #9 adds support to __create_mapping() for creating non-global translation
+table entries. (new in v3)
 
-                gateclk: gateclk {
-                        compatible = "marvell,berlin4ct-gateclk";
-                        reg = <0xea0700 4>;
-                        #clock-cells = <1>;
-                };
+Patch #10 implements create_mapping_late() that uses a late allocator.
 
-                clk: clk {
-                        compatible = "marvell,berlin4ct-clk";
-                        reg = <0xea0720 0x144>;
-                        #clock-cells = <1>;
-                        clocks = <&pllclk SYSPLLCLK>;
-                };
+Patch #11 implements MEMBLOCK_NOMAP support for ARM
 
-thanks
+Patch #12 implements the UEFI support in the kernel proper to probe the UEFI
+memory map and map the runtime services.
 
-> 
-> > You can also check mempll, cpupll and syspll ranges:
-> >
-> > cpupll: <0x922000 0x14>
-> >
-> > mempll: <0x940034 0x14>
-> >
-> > syspll: <0xea0200 0x14>
-> >
-> >
-> > We have three normal PLLS: cpupll, mempll and syspll. All these three PLLs use
-> > 25MHZ osc as clocksource. These plls can be bypassed. when syspll is bypassed
-> > the 25MHZ osc is directly output to syspllclk. When mempll/cpupll is bypassed,
-> > its corresponding fastrefclk is directly output to ddrphyclk/cpuclk:
-> >
-> >
-> >         ---25MHZ osc----------|\
-> >             ________            | |-- syspllclk
-> >         ---| SYSPLL |---------|/
-> >
-> >
-> >
-> >         ---cpufastrefclk------|\
-> >             ________            | |-- cpuclk
-> >         ---| CPUPLL |---------|/
-> >
-> >
-> >         ---memfastrefclk------|\
-> >             ________            | |-- ddrphyclk
-> >         ---| MEMPLL |---------|/
-> >
-> > NOTE: the fastrefclk is the so called normal clk below.
-> >
-> >
-> >
-> > two kinds of clk: normal clk and gate clk. The normal clk supports changing
-> > divider, selecting clock source, disabling/enabling etc. The gate clk only
-> > supports disabling/enabling. normal clks use syspllclk as clocksource, while
-> > gate clks use perifsysclk as clocksource.
-> >
-> >
-> > So what's the representing HW structure in fact? Here is my proposal:
-> > 1. have mempll, cpupll and syspll node in dts  
-> 
-> No.
-> 
-> > 2. one gateclk node in dts for gateclks  
-> 
-> No.
-> 
-> > 3. one normalclk node in dts for normal clks  
-> 
-> No.
-> 
-> > 4. one ccf clock-mux for cpuclk, ddrphyclk and syspllclk.  
-> 
-> No.
-> 
-> > what do you think?  
-> 
-> I think that the current separation is not a good one. I am open for
-> suggestions but I am not accepting single PLL/clock nodes.
-> 
-> >  From another side, let's have a look at driver/clk/mvebu. As can be seen,
-> > different clks register are close each other, for example, gateclk and coreclk
-> > in arch/arm/boot/dts/armada-xp.dtsi.
-> >
-> > And drivers/clk/sunxi, arch/arm/boot/dts/sun7i-a20.dtsi, the pll4, pll12, gt_clk
-> > and ahb*, apb* etc...
-> >
-> > why these SoCs don't merge clocks/gates/plls to a single clock complex node?
-> > I think that's because they are representing real HW structure.  
-> 
-> These SoC (at least mvebu) didn't merge them into a single clock
-> complex node because nobody had a better idea or an impression of
-> the consequences. Looking back with the idea of syscon/simple-mfd
-> we probably would have chosen to separate differently.
-> 
-> >> So, please just follow the OF/driver structure we already
-> >> have for Berlin2.  
-> 
-> To repeat: "please just follow the OF/driver structure we already
-> have for Berlin2"
-> 
-> Sebastian
-> 
-> >>> +			#clock-cells = <1>;
-> >>> +			clocks = <&syspll>;
-> >>> +		};
-> >>> +
-> >>>   		soc_pinctrl: pin-controller at ea8000 {
-> >>>   			compatible = "marvell,berlin4ct-soc-pinctrl";
-> >>>   			reg = <0xea8000 0x14>;
-> >>>  
-> >>  
-> >  
-> 
+Patch #13 ties together all of the above, by implementing the UEFI stub, and
+introducing the Kconfig symbols that allow all of this to be built.
+
+Instructions how to build and run the 32-bit ARM UEFI firmware can be found here:
+https://wiki.linaro.org/LEG/UEFIforQEMU
+Ard Biesheuvel (12):
+  mm/memblock: add MEMBLOCK_NOMAP attribute to memblock memory table
+  arm64: only consider memblocks with NOMAP cleared for linear mapping
+  arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP
+  arm64/efi: split off EFI init and runtime code for reuse by 32-bit ARM
+  arm64/efi: refactor EFI init and runtime code for reuse by 32-bit ARM
+  ARM: add support for generic early_ioremap/early_memremap
+  ARM: split off core mapping logic from create_mapping
+  ARM: factor out allocation routine from __create_mapping()
+  ARM: add support for non-global kernel mappings
+  ARM: implement create_mapping_late() for EFI use
+  ARM: only consider memblocks with NOMAP cleared for linear mapping
+  ARM: wire up UEFI init and runtime support
+
+Roy Franz (1):
+  ARM: add UEFI stub support
+
+ arch/arm/Kconfig                          |  20 ++
+ arch/arm/boot/compressed/Makefile         |   4 +-
+ arch/arm/boot/compressed/efi-header.S     | 130 ++++++++
+ arch/arm/boot/compressed/head.S           |  54 +++-
+ arch/arm/boot/compressed/vmlinux.lds.S    |   7 +
+ arch/arm/include/asm/Kbuild               |   1 +
+ arch/arm/include/asm/efi.h                |  83 +++++
+ arch/arm/include/asm/fixmap.h             |  29 +-
+ arch/arm/include/asm/mach/map.h           |   2 +
+ arch/arm/include/asm/mmu_context.h        |   2 +-
+ arch/arm/kernel/Makefile                  |   1 +
+ arch/arm/kernel/efi.c                     |  38 +++
+ arch/arm/kernel/setup.c                   |  10 +-
+ arch/arm/mm/init.c                        |   5 +-
+ arch/arm/mm/ioremap.c                     |   9 +
+ arch/arm/mm/mmu.c                         | 128 +++++---
+ arch/arm64/include/asm/efi.h              |   9 +
+ arch/arm64/kernel/efi.c                   | 342 ++------------------
+ arch/arm64/mm/init.c                      |   2 +-
+ arch/arm64/mm/mmu.c                       |   2 +
+ drivers/firmware/efi/Makefile             |   4 +
+ drivers/firmware/efi/arm-init.c           | 209 ++++++++++++
+ drivers/firmware/efi/arm-runtime.c        | 135 ++++++++
+ drivers/firmware/efi/efi.c                |   2 +
+ drivers/firmware/efi/libstub/Makefile     |   9 +
+ drivers/firmware/efi/libstub/arm-stub.c   |   4 +-
+ drivers/firmware/efi/libstub/arm32-stub.c |  85 +++++
+ include/linux/memblock.h                  |   8 +
+ mm/memblock.c                             |  28 ++
+ 29 files changed, 990 insertions(+), 372 deletions(-)
+ create mode 100644 arch/arm/boot/compressed/efi-header.S
+ create mode 100644 arch/arm/include/asm/efi.h
+ create mode 100644 arch/arm/kernel/efi.c
+ create mode 100644 drivers/firmware/efi/arm-init.c
+ create mode 100644 drivers/firmware/efi/arm-runtime.c
+ create mode 100644 drivers/firmware/efi/libstub/arm32-stub.c
+
+-- 
+1.9.1
