@@ -1,27 +1,51 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 23 Nov 2015 15:25:33 +0300
-Subject: [PATCH 1/2] ARM: shmobile: alt: Correct scif2 pfc
-In-Reply-To: <1448263004-14548-2-git-send-email-horms+renesas@verge.net.au>
-References: <1448263004-14548-1-git-send-email-horms+renesas@verge.net.au>
- <1448263004-14548-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <565305BD.5070306@cogentembedded.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 23 Nov 2015 12:32:41 +0000
+Subject: [RFC/PATCH] arm: do not skip SMP init calls on SMP_ON_UP case
+In-Reply-To: <5653015C.4020405@dev.rtsoft.ru>
+References: <1448279946-19975-1-git-send-email-nyushchenko@dev.rtsoft.ru>
+ <20151123120317.GN8644@n2100.arm.linux.org.uk>
+ <5653015C.4020405@dev.rtsoft.ru>
+Message-ID: <56530769.4030403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 23/11/15 12:06, Nikita Yushchenko wrote:
+> 23.11.2015 15:03, Russell King - ARM Linux ?????:
+>> On Mon, Nov 23, 2015 at 02:59:06PM +0300, nyushchenko at dev.rtsoft.ru wrote:
+>>> From: Nikita Yushchenko <nyushchenko@dev.rtsoft.ru>
+>>>
+>>> While running an imx6s boasrd, I got following message in boot log:
+>>>
+>>> [    0.032414] CPU1: failed to boot: -38
+>>>
+>>> This looked strange: imx6s is singe-core and kernel perfectly knows
+>>> that. However, for some reason it tries to initialize CPU 1?
+>>>
+>>> I found this to be caused by
+>>> - CONFIG_SMP_ON_UP successfully detects that system is single core,
+>>> - this causes is_smp() to return false,
+>>> - this causes setup_arch() to skip smp_init_cpus() call,
+>>> - this skips board-specific code that sets cpu_possible mask.
+>>
+>> Right, so you should end up with the possible and present masks
+>> containing just one CPU, which should prevent the kernel trying to
+>> bring any secondary CPUs online.
+> 
+> Kernel that is running here still tries to init CPU 1 for some reason.
 
-On 11/23/2015 10:16 AM, Simon Horman wrote:
+I *guess* cpus node [1] in your dts has more than one cpu entry, could
+you check please?
 
-> 0c9400fab882 ("Merge branch 'heads/dt-for-v4.5' into next") introduced
-> pfc pins to the alt device tree but did not reference them. This patch
+[1] Documentation/devicetree/bindings/arm/cpus.txt
 
-    Merge introduced? I thought there was a concrete commit doing that...
+Vladimir
 
-> fixes scif2 pfc by adding references to the scif2 pins.
->
-> Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-[...]
-
-MBR, Sergei
+> 
+> Will try to check mainline (although not sure if that will be possible
+> on available custom hardware)
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
