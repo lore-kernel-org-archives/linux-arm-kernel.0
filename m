@@ -1,167 +1,145 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Mon, 23 Nov 2015 12:28:09 +0200
-Subject: [linux-sunxi] [PATCH v2 2/5] clk: sunxi: Add driver for the H3
- THS clock
-In-Reply-To: <077fddc9c8d41d4cf55b1dd1c7180c4adee0fce4.1448263428.git.atx@atx.name>
-References: <cover.1448263428.git.atx@atx.name>
- <077fddc9c8d41d4cf55b1dd1c7180c4adee0fce4.1448263428.git.atx@atx.name>
-Message-ID: <1448274489.27496.1.camel@plaes.org>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Mon, 23 Nov 2015 10:47:10 +0000
+Subject: [PATCH 05/21] arm64: KVM: Implement timer save/restore
+In-Reply-To: <1447679519-17888-6-git-send-email-marc.zyngier@arm.com>
+References: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
+ <1447679519-17888-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20151123104653.GA21198@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-11-23 at 09:02 +0100, Josef Gajdusek wrote:
-> This patch adds a driver for the THS clock which is present on the
-> Allwinner H3.
+On Mon, Nov 16, 2015 at 01:11:43PM +0000, Marc Zyngier wrote:
+> Implement the timer save restore as a direct translation of
+> the assembly code version.
+
+Hi Marc, some comments below.
+Cheers,
+-- 
+Steve
+
 > 
-> Signed-off-by: Josef Gajdusek <atx@atx.name>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
-> ?Documentation/devicetree/bindings/clock/sunxi.txt |??1 +
-> ?drivers/clk/sunxi/Makefile????????????????????????|??1 +
-> ?drivers/clk/sunxi/clk-h3-ths.c????????????????????| 98
-> +++++++++++++++++++++++
-> ?3 files changed, 100 insertions(+)
-> ?create mode 100644 drivers/clk/sunxi/clk-h3-ths.c
+>  arch/arm64/kvm/hyp/Makefile   |  1 +
+>  arch/arm64/kvm/hyp/hyp.h      |  3 ++
+>  arch/arm64/kvm/hyp/timer-sr.c | 68 +++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 72 insertions(+)
+>  create mode 100644 arch/arm64/kvm/hyp/timer-sr.c
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt
-> b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index 23e7bce..6d63b35 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -73,6 +73,7 @@ Required properties:
-> ?	"allwinner,sun8i-h3-usb-clk" - for usb gates + resets on H3
-> ?	"allwinner,sun9i-a80-usb-mod-clk" - for usb gates + resets
-> on A80
-> ?	"allwinner,sun9i-a80-usb-phy-clk" - for usb phy gates +
-> resets on A80
-> +	"allwinner,sun8i-h3-ths-clk" - for THS on H3
-> ?
-> ?Required properties for all clocks:
-> ?- reg : shall be the control register address for the clock.
-> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> index f520af6..1bf8e1c 100644
-> --- a/drivers/clk/sunxi/Makefile
-> +++ b/drivers/clk/sunxi/Makefile
-> @@ -8,6 +8,7 @@ obj-y += clk-a10-hosc.o
-> ?obj-y += clk-a10-mod1.o
-> ?obj-y += clk-a10-pll2.o
-> ?obj-y += clk-a20-gmac.o
-> +obj-y += clk-h3-ths.o
-> ?obj-y += clk-mod0.o
-> ?obj-y += clk-simple-gates.o
-> ?obj-y += clk-sun8i-bus-gates.o
-> diff --git a/drivers/clk/sunxi/clk-h3-ths.c b/drivers/clk/sunxi/clk-
-> h3-ths.c
+> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+> index d1e38ce..455dc0a 100644
+> --- a/arch/arm64/kvm/hyp/Makefile
+> +++ b/arch/arm64/kvm/hyp/Makefile
+> @@ -4,3 +4,4 @@
+>  
+>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
+> +obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
+> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+> index a31cb6e..86aa5a2 100644
+> --- a/arch/arm64/kvm/hyp/hyp.h
+> +++ b/arch/arm64/kvm/hyp/hyp.h
+> @@ -33,5 +33,8 @@ void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+>  void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+>  void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+>  
+> +void __timer_save_state(struct kvm_vcpu *vcpu);
+> +void __timer_restore_state(struct kvm_vcpu *vcpu);
+> +
+>  #endif /* __ARM64_KVM_HYP_H__ */
+>  
+> diff --git a/arch/arm64/kvm/hyp/timer-sr.c b/arch/arm64/kvm/hyp/timer-sr.c
 > new file mode 100644
-> index 0000000..663afc0
+> index 0000000..1a1d2ac
 > --- /dev/null
-> +++ b/drivers/clk/sunxi/clk-h3-ths.c
-> @@ -0,0 +1,98 @@
+> +++ b/arch/arm64/kvm/hyp/timer-sr.c
+> @@ -0,0 +1,68 @@
 > +/*
-> + * Sunxi THS clock driver
-
-This should be "Allwinner H3 THS clock driver"
-
+> + * Copyright (C) 2012-2015 - ARM Ltd
+> + * Author: Marc Zyngier <marc.zyngier@arm.com>
 > + *
-> + * Copyright (C) 2015 Josef Gajdusek
-> + *
-> + * This software is licensed under the terms of the GNU General
-> Public
-> + * License version 2, as published by the Free Software Foundation,
-> and
-> + * may be copied, distributed, and modified under those terms.
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
 > + *
 > + * This program is distributed in the hope that it will be useful,
 > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 > + * GNU General Public License for more details.
 > + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 > + */
 > +
-> +#include <linux/clk-provider.h>
-> +#include <linux/of_address.h>
-> +#include <linux/slab.h>
-> +#include <linux/spinlock.h>
+> +#include <linux/compiler.h>
+> +#include <linux/kvm_host.h>
 > +
-> +#define SUN8I_H3_THS_CLK_ENABLE				31
-> +#define SUN8I_H3_THS_CLK_DIVIDER_SHIFT		0
-> +#define SUN8I_H3_THS_CLK_DIVIDER_WIDTH		2
+> +#include <asm/kvm_mmu.h>
 > +
-> +static DEFINE_SPINLOCK(sun8i_h3_ths_clk_lock);
+> +#include "hyp.h"
 > +
-> +static const struct clk_div_table sun8i_h3_ths_clk_table[]
-> __initconst = {
-> +	{ .val = 0, .div = 1 },
-> +	{ .val = 1, .div = 2 },
-> +	{ .val = 2, .div = 4 },
-> +	{ .val = 3, .div = 6 },
-> +	{ } /* sentinel */
-> +};
-> +
-> +static void __init sun8i_h3_ths_clk_setup(struct device_node *node)
+> +/* vcpu is already in the HYP VA space */
+> +void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
 > +{
-> +	struct clk *clk;
-> +	struct clk_gate *gate;
-> +	struct clk_divider *div;
-> +	const char *parent;
-> +	const char *clk_name = node->name;
-> +	void __iomem *reg;
-> +	int err;
+> +	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
 > +
-> +	reg = of_io_request_and_map(node, 0,
-> of_node_full_name(node));
+> +	if (kvm->arch.timer.enabled) {
+> +		timer->cntv_ctl = read_sysreg(cntv_ctl_el0);
+
+The old assembler version ands this value with 3 before storing it.
+Are we not worried about the ISTATUS bit?
+
+> +		isb();
+> +		timer->cntv_cval = read_sysreg(cntv_cval_el0);
+> +	}
 > +
-> +	if (IS_ERR(reg))
-> +		return;
+> +	/* Disable the virtual timer */
+> +	write_sysreg(0, cntv_ctl_el0);
 > +
-> +	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-> +	if (!gate)
-> +		goto err_unmap;
+> +	/* Allow physical timer/counter access for the host */
+> +	write_sysreg(read_sysreg(cnthctl_el2) | 3, cnthctl_el2);
+
+nit: EL1PCTEN | EL1PCEN or something similar?
+
 > +
-> +	div = kzalloc(sizeof(*gate), GFP_KERNEL);
-> +	if (!div)
-> +		goto err_gate_free;
-> +
-> +	of_property_read_string(node, "clock-output-names",
-> &clk_name);
-> +	parent = of_clk_get_parent_name(node, 0);
-> +
-> +	gate->reg = reg;
-> +	gate->bit_idx = SUN8I_H3_THS_CLK_ENABLE;
-> +	gate->lock = &sun8i_h3_ths_clk_lock;
-> +
-> +	div->reg = reg;
-> +	div->shift = SUN8I_H3_THS_CLK_DIVIDER_SHIFT;
-> +	div->width = SUN8I_H3_THS_CLK_DIVIDER_WIDTH;
-> +	div->table = sun8i_h3_ths_clk_table;
-> +	div->lock = &sun8i_h3_ths_clk_lock;
-> +
-> +	clk = clk_register_composite(NULL, clk_name, &parent, 1,
-> +				?????NULL, NULL,
-> +				?????&div->hw, &clk_divider_ops,
-> +				?????&gate->hw, &clk_gate_ops,
-> +				?????CLK_SET_RATE_PARENT);
-> +
-> +	if (IS_ERR(clk))
-> +		goto err_div_free;
-> +
-> +	err = of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +	if (err)
-> +		goto err_unregister_clk;
-> +
-> +	return;
-> +
-> +err_unregister_clk:
-> +	clk_unregister(clk);
-> +err_gate_free:
-> +	kfree(gate);
-> +err_div_free:
-> +	kfree(div);
-> +err_unmap:
-> +	iounmap(reg);
+> +	/* Clear cntvoff for the host */
+> +	write_sysreg(0, cntvoff_el2);
 > +}
 > +
-> +CLK_OF_DECLARE(sun8i_h3_ths_clk, "allwinner,sun8i-h3-ths-clk",
-> +	???????sun8i_h3_ths_clk_setup);
+> +void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
+> +{
+> +	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> +	u64 val;
+> +
+> +	/*
+> +	 * Disallow physical timer access for the guest
+> +	 * Physical counter access is allowed
+> +	 */
+> +	val = read_sysreg(cnthctl_el2);
+> +	val &= ~(1 << 1);
+> +	val |= 1;
+
+Similar nit here about constants.
+
+> +	write_sysreg(val, cnthctl_el2);
+> +
+> +	if (kvm->arch.timer.enabled) {
+> +		write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
+> +		write_sysreg(timer->cntv_cval, cntv_cval_el0);
+> +		isb();
+> +		write_sysreg(timer->cntv_ctl, cntv_ctl_el0);
+
+In the assembler version we and cntv_ctl with 3 before writing to
+cntv_ctl_el0.
+
+> +	}
+> +}
 > -- 
-> 2.4.10
+> 2.1.4
 > 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
