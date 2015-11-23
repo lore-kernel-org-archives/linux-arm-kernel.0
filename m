@@ -1,71 +1,83 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Mon, 23 Nov 2015 10:44:22 -0600
-Subject: [PATCH] power: bq27xxx_battery: avoid unused function warnings
-In-Reply-To: <4421924.EN5kWY38Jp@wuerfel>
-References: <4421924.EN5kWY38Jp@wuerfel>
-Message-ID: <56534266.4060708@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 23 Nov 2015 22:18:26 +0530
+Subject: [PATCH] PCI: keystone: fix crash with deferred probe
+In-Reply-To: <20151123192717.4d4ddf06@xhacker>
+References: <866b2f1544f9d55fa932aa9f9cb5e7d523a23d05.1448017883.git.nsekhar@ti.com>
+ <20151123192209.38e2c101@xhacker> <20151123192717.4d4ddf06@xhacker>
+Message-ID: <5653435A.2040400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23/2015 07:42 AM, Arnd Bergmann wrote:
-> We can configure the bq27xxx_battery driver with neither the I2C
-> nor the platform driver backends, which leaves out all references
-> to some of the symbols, causing a couple of warnings in many
-> randconfig builds:
->
-> drivers/power/bq27xxx_battery.c:288:12: warning: 'bq27xxx_regs' defined but not used [-Wunused-variable]
-> drivers/power/bq27xxx_battery.c:994:12: warning: 'bq27xxx_powersupply_init' defined but not used [-Wunused-function]
-> drivers/power/bq27xxx_battery.c:1029:13: warning: 'bq27xxx_powersupply_unregister' defined but not used [-Wunused-function]
->
-> I first tried replacing the existing #ifdefs with if(IS_ENABLED()
-> statements, but that failed because the i2c framework does not
-> declare functions when they are left out of the kernel.
->
-> This just marks the unused functions as __maybe_unused, which is
-> a correct description here. A better fix would be to restructure
-> the driver into separate files and only build the common parts
-> if at least one of the two bus specific drivers is enabled, but
-> that requires much more work and testing on real hardware.
->
-> For the time being, my simpler change at least avoids the warnings.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->
-> diff --git a/drivers/power/bq27xxx_battery.c b/drivers/power/bq27xxx_battery.c
-> index 880233ce9343..6c3a447f378b 100644
-> --- a/drivers/power/bq27xxx_battery.c
-> +++ b/drivers/power/bq27xxx_battery.c
-> @@ -285,7 +285,7 @@ static u8 bq27421_regs[] = {
->   	0x18,	/* AP		*/
->   };
->
-> -static u8 *bq27xxx_regs[] = {
-> +static u8 *bq27xxx_regs[] __maybe_unused = {
->   	[BQ27000] = bq27000_regs,
->   	[BQ27010] = bq27010_regs,
->   	[BQ27500] = bq27500_regs,
-> @@ -991,7 +991,7 @@ static void bq27xxx_external_power_changed(struct power_supply *psy)
->   	schedule_delayed_work(&di->work, 0);
->   }
->
-> -static int bq27xxx_powersupply_init(struct bq27xxx_device_info *di,
-> +static int __maybe_unused bq27xxx_powersupply_init(struct bq27xxx_device_info *di,
->   				    const char *name)
->   {
->   	int ret;
-> @@ -1026,7 +1026,7 @@ static int bq27xxx_powersupply_init(struct bq27xxx_device_info *di,
->   	return 0;
->   }
->
-> -static void bq27xxx_powersupply_unregister(struct bq27xxx_device_info *di)
-> +static void __maybe_unused bq27xxx_powersupply_unregister(struct bq27xxx_device_info *di)
->   {
->   	/*
->   	 * power_supply_unregister call bq27xxx_battery_get_property which
->
+On Monday 23 November 2015 04:57 PM, Jisheng Zhang wrote:
+> On Mon, 23 Nov 2015 19:22:09 +0800
+> Jisheng Zhang <jszhang@marvell.com> wrote:
+> 
+>> Dear Sekhar,
+>>
+>> On Fri, 20 Nov 2015 16:47:02 +0530
+>> Sekhar Nori wrote:
+>>
+>>> Drop __init annotations for functions called during
+>>> probe of keystone PCIe host.
+>>>
+>>> This fixes kernel crashes seen because of init data
+>>> reclamation if the driver defer probes because of
+>>> phy unavailability.
+>>>
+>>> While at it, drop the useless __refdata annotation
+>>> to driver structure. If its really needed, it should
+>>> be added back with a comment explaining why.
+>>>
+>>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+>>> ---
+>>>  drivers/pci/host/pci-keystone-dw.c | 2 +-
+>>>  drivers/pci/host/pci-keystone.c    | 6 +++---
+>>>  2 files changed, 4 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
+>>> index ed34c9520a02..47ddbcce53ca 100644
+>>> --- a/drivers/pci/host/pci-keystone-dw.c
+>>> +++ b/drivers/pci/host/pci-keystone-dw.c
+>>> @@ -469,7 +469,7 @@ void ks_dw_pcie_initiate_link_train(struct keystone_pcie *ks_pcie)
+>>>   * and call dw_pcie_v3_65_host_init() API to initialize the Keystone
+>>>   * PCI host controller.
+>>>   */
+>>> -int __init ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie,
+>>> +int ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie,
+>>>  				struct device_node *msi_intc_np)  
+>>
+>> when trying to add berlin pcie support and came up one patch
+>>
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/384575.html
+>>
+>> when build testing, I also realized this issue, but keystone relies on
+> 
+> I mean ks_dw_pcie_host_init() calls hook_fault_code()
 
-The current organization of this driver has caused a lot of problems like this,
-it has been discussed that it should just be re-organized before. I went ahead
-and finally did this, I'll push the patch here in a bit, should take care of this and
-several other issues.
+Okay, at least in v4.4-rc2, it does not call it. ks_pcie_host_init()
+calls it. But your comment is valid. The driver needs more changes to
+support probe deferral.
+
+> 
+>> hook_fault_code() which is will be freed after boot, so your patch isn't
+>> completed.
+> 
+> And will introduce section mismatch warnings
+
+because the annotation on ks_pcie_host_init() is intact, I did not see
+any warnings.
+
+> 
+>>
+>> And from the keystone driver implementation, it seems assume the driver won't
+>> be defer probed.
+
+The reason I worked on this patch is because I am using an out-of-tree
+phy driver and that can be built as module and I did see ks_pcie_probe
+get deferred. But as you said, this driver is not ready for deferred
+probing even with this patch and so this patch should be discarded.
+
+Thanks for your review.
+
+Regards,
+Sekhar
