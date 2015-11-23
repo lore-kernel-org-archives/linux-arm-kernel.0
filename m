@@ -1,45 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Nov 2015 10:59:36 +0100
-Subject: [PATCH v3 1/6] PCI: designware: remove wrong io_base assignment
-In-Reply-To: <44d133d5ebd4f7b9e8b817aa8bae12f690e70000.1448270813.git.stanimir.varbanov@linaro.org>
-References: <cover.1448270813.git.stanimir.varbanov@linaro.org>
- <44d133d5ebd4f7b9e8b817aa8bae12f690e70000.1448270813.git.stanimir.varbanov@linaro.org>
-Message-ID: <6048361.Am0T3g77Bd@wuerfel>
+From: jitao.shi@mediatek.com (Jitao Shi)
+Date: Mon, 23 Nov 2015 17:59:52 +0800
+Subject: [PATCH v5 1/2] Documentation: bridge: Add documentation for ps8640 DT
+ properties
+Message-ID: <1448272793-27232-1-git-send-email-jitao.shi@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 November 2015 11:28:58 Stanimir Varbanov wrote:
-> The io_base is used to keep the cpu physical address parsed
-> from ranges dt property. After issue pci_remap_iospace the
-> io_base has been assigned with io->start, which is not correct
-> cause io->start is a PCI bus address.
-> 
-> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
-> ---
->  drivers/pci/host/pcie-designware.c |    1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 540f077c37ea..02a7452bdf23 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -440,7 +440,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  					 ret, pp->io);
->  				continue;
->  			}
-> -			pp->io_base = pp->io->start;
->  			break;
->  		case IORESOURCE_MEM:
->  			pp->mem = win->res;
+Add documentation for DT properties supported by
+ps8640 DSI-eDP converter.
 
-I was surprised to see such an obvious bug here, as we had spent a lot of
-time trying to get it right. However, it broke only recently and it's
-worth mentioning what commit did it, so
+Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+Changes since v4
+-no change
+---
+ .../devicetree/bindings/display/bridge/ps8640.txt  |   43 ++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/ps8640.txt
 
-Fixes: 0021d22b73d6 ("PCI: designware: Use of_pci_get_host_bridge_resources() to parse DT")
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-
-The bug is present in 4.4-rc1 and we should get your fix merged into 4.4
-as well, while all the other patches in your series are presumably for 4.5.
-
-	Arnd
+diff --git a/Documentation/devicetree/bindings/display/bridge/ps8640.txt b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+new file mode 100644
+index 0000000..a3e0971
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+@@ -0,0 +1,43 @@
++ps8640-bridge bindings
++
++Required properties:
++	- compatible: "parade,ps8640"
++	- reg: first page address of the bridge.
++	- sleep-gpios: OF device-tree gpio specification for PD_ pin.
++	- reset-gpios: OF device-tree gpio specification for reset pin.
++	- mode-sel-gpios: OF device-tree gpio specification for mode-sel pin.
++	- vdd12-supply: OF device-tree regulator specification for 1.2V power.
++	- vdd33-supply: OF device-tree regulator specification for 3.3V power.
++	- ports: The device node can contain video interface port nodes per
++		 the video-interfaces bind[1]. For port at 0,set the reg = <0> as
++		 ps8640 dsi in and port at 1,set the reg = <1> as ps8640 eDP out.
++
++[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
++
++Example:
++	edp-bridge at 18 {
++		compatible = "parade,ps8640";
++		reg = <0x18>;
++		sleep-gpios = <&pio 116 GPIO_ACTIVE_HIGH>;
++		reset-gpios = <&pio 115 GPIO_ACTIVE_HIGH>;
++		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
++		vdd12-supply = <&ps8640_fixed_1v2>;
++		vdd33-supply = <&mt6397_vgp2_reg>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			port at 0 {
++				reg = <0>;
++				ps8640_in: endpoint {
++					remote-endpoint = <&dsi0_out>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				ps8640_out: endpoint {
++					remote-endpoint = <&panel_in>;
++				};
++			};
++		};
++	};
+-- 
+1.7.9.5
