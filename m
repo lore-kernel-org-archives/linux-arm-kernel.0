@@ -1,33 +1,42 @@
 From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
-Date: Mon, 23 Nov 2015 11:28:58 +0200
-Subject: [PATCH v3 1/6] PCI: designware: remove wrong io_base assignment
+Date: Mon, 23 Nov 2015 11:28:59 +0200
+Subject: [PATCH v3 2/6] PCI: designware: add memory barrier after enabling
+ region
 In-Reply-To: <cover.1448270813.git.stanimir.varbanov@linaro.org>
 References: <cover.1448270813.git.stanimir.varbanov@linaro.org>
-Message-ID: <44d133d5ebd4f7b9e8b817aa8bae12f690e70000.1448270813.git.stanimir.varbanov@linaro.org>
+Message-ID: <d38a9c1a87c4e40ad6d17fcbe0fd41b33d7d2912.1448270813.git.stanimir.varbanov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The io_base is used to keep the cpu physical address parsed
-from ranges dt property. After issue pci_remap_iospace the
-io_base has been assigned with io->start, which is not correct
-cause io->start is a PCI bus address.
+Add 'write memory' barrier after enable region in PCIE_ATU_CR2
+register. The barrier is needed to ensure that the region enable
+request has been reached it's destination at time when we
+read/write to PCI configuration space.
+
+Without this barrier PCI device enumeration during kernel boot
+is not reliable, and reading configuration space for particular
+PCI device on the bus returns zero aka no device.
 
 Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
 ---
- drivers/pci/host/pcie-designware.c |    1 -
- 1 file changed, 1 deletion(-)
+ drivers/pci/host/pcie-designware.c |    5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 540f077c37ea..02a7452bdf23 100644
+index 02a7452bdf23..e15a2ae1583f 100644
 --- a/drivers/pci/host/pcie-designware.c
 +++ b/drivers/pci/host/pcie-designware.c
-@@ -440,7 +440,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 					 ret, pp->io);
- 				continue;
- 			}
--			pp->io_base = pp->io->start;
- 			break;
- 		case IORESOURCE_MEM:
- 			pp->mem = win->res;
+@@ -164,6 +164,11 @@ static void dw_pcie_prog_outbound_atu(struct pcie_port *pp, int index,
+ 	dw_pcie_writel_rc(pp, upper_32_bits(pci_addr), PCIE_ATU_UPPER_TARGET);
+ 	dw_pcie_writel_rc(pp, type, PCIE_ATU_CR1);
+ 	dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
++	/*
++	 * ensure that the ATU enable has been happaned before accessing
++	 * pci configuration/io spaces through dw_pcie_cfg_[read|write].
++	 */
++	smp_wmb();
+ }
+ 
+ static struct irq_chip dw_msi_irq_chip = {
 -- 
 1.7.9.5
