@@ -1,75 +1,108 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 23 Nov 2015 19:02:46 +0800
-Subject: [PATCH v3 4/6] PCI: qcom: Add Qualcomm PCIe controller driver
-In-Reply-To: <edbe363a31ad2a6c2eddc5441c2de44475551dcd.1448270813.git.stanimir.varbanov@linaro.org>
-Message-ID: <201511231928.HamSevrs%fengguang.wu@intel.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Mon, 23 Nov 2015 11:01:51 +0000
+Subject: [PATCH 1/2] arm64: mm: detect bad __create_mapping uses
+In-Reply-To: <20151120170534.GE5536@leverpostej>
+References: <1448033724-13846-1-git-send-email-mark.rutland@arm.com>
+ <CAPvkgC2NqfYrcAzsF=UwE9n3BGz74bYcNSGOaaCiwHP_YcnRWA@mail.gmail.com>
+ <20151120170534.GE5536@leverpostej>
+Message-ID: <CAPvkgC1LWj8aCwX8WnJbb7tsuwwiLt+0KxQsZRq6U4Ai1BnJxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stanimir,
+On 20 November 2015 at 17:05, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Nov 20, 2015 at 04:13:28PM +0000, Steve Capper wrote:
+>> On 20 November 2015 at 15:35, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > If a caller of __create_mapping provides a PA and VA which have
+>> > different sub-page offsets, it is not clear which offset they expect to
+>> > apply to the mapping, and is indicative of a bad caller.
+>> >
+>> > Disallow calls with differing sub-page offsets, and WARN when they are
+>> > encountered, so that we can detect and fix such cases.
+>> >
+>> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+>> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> > Cc: Catalin Marinas <caralin.marinas@arm.com>
+>> > Cc: Laura Abbott <labbott@fedoraproject.org>
+>> > Cc: Steve Capper <steve.capper@linaro.org>
+>> > Cc: Will Deacon <will.deacon@arm.com>
+>> > ---
+>> >  arch/arm64/mm/mmu.c | 7 +++++++
+>> >  1 file changed, 7 insertions(+)
+>> >
+>> > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>> > index e3f563c..3b06afa 100644
+>> > --- a/arch/arm64/mm/mmu.c
+>> > +++ b/arch/arm64/mm/mmu.c
+>> > @@ -300,6 +300,13 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+>> >  {
+>> >         unsigned long addr, length, end, next;
+>> >
+>> > +       /*
+>> > +        * If the virtual and physical address don't have the same offset
+>> > +        * within a page, we cannot map the region as the caller expects.
+>> > +        */
+>> > +       if (WARN_ON((phys ^ virt) & ~PAGE_MASK))
+>> > +               return;
+>> > +
+>>
+>> Do we want any subpage offsets in our virt and phys?
+>
+> Yes.
+>
+> For instance, when mapping EFI regions (which exist at 4K granularity)
+> on a 64K page kernel, per [1]. The spec requires that any regions in the
+> same 64K page can be mapped using the same attributes, so it's fine to
+> map at 64K granularity.
 
-[auto build test ERROR on: v4.4-rc2]
-[also build test ERROR on: next-20151123]
+Thanks Mark,
+I didn't know that was allowed, now I do :-).
+These two patches now make perfect sense.
 
-url:    https://github.com/0day-ci/linux/commits/Stanimir-Varbanov/Qualcomm-PCIe-driver-and-designware-fixes/20151123-173312
-config: i386-allmodconfig (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+>
+> We already try to cater for this in __create_mapping where we fix up the
+> base and size:
+>
+>         addr = virt & PAGE_MASK;
+>         length = PAGE_ALIGN(size + (virt & ~PAGE_MASK));
+>
+> I will add a middle paragraph to the commit message:
+>
+>         In some cases, the region we wish to map may validly have a
+>         sub-page offset in the physical and virtual adddresses. For
+>         example, EFI runtime regions have 4K granularity, yet may be
+>         mapped by a 64K page kernel. So long as the physical and virtual
+>         offsets are the same, the region will be mapped at the expected
+>         VAs.
+>
+> Does that sound OK?
 
-All errors (new ones prefixed by >>):
+s/adddresses/addresses/
+Otherwise that looks great, thanks.
 
-   drivers/pci/host/pcie-designware.c: In function 'dw_pcie_host_init':
->> drivers/pci/host/pcie-designware.c:559:7: error: implicit declaration of function 'pci_has_flag' [-Werror=implicit-function-declaration]
-     if (!pci_has_flag(PCI_PROBE_ONLY)) {
-          ^
->> drivers/pci/host/pcie-designware.c:559:20: error: 'PCI_PROBE_ONLY' undeclared (first use in this function)
-     if (!pci_has_flag(PCI_PROBE_ONLY)) {
-                       ^
-   drivers/pci/host/pcie-designware.c:559:20: note: each undeclared identifier is reported only once for each function it appears in
-   cc1: some warnings being treated as errors
+>
+>> If we have sub page bits in phys won't that start flipping on bits in
+>> the page table entries?
+>
+> In all cases where we use phys, we either shift phys right by PAGE_SHIFT
+> (in __populate_init_pte vi __phys_to_pfn) which clears those bits, or we
+> first check it is sufficiently aligned for that level of table (and
+> hence the low bits are all zero). Patch 2 fixes a bug related to the
+> latter case.
+>
+>> What about something like:
+>> if (WARN_ON((phys | virt) & ~PAGE_MASK))
+>
+> Per the above, that would break the EFI code in [1].
 
-vim +/pci_has_flag +559 drivers/pci/host/pcie-designware.c
+Agreed.
 
-cbce7900 Zhou Wang   2015-10-29  543  					    &dw_pcie_msi_chip);
-0815f957 Yijing Wang 2014-11-11  544  		dw_pcie_msi_chip.dev = pp->dev;
-cbce7900 Zhou Wang   2015-10-29  545  	} else
-cbce7900 Zhou Wang   2015-10-29  546  		bus = pci_scan_root_bus(pp->dev, pp->root_bus_nr, &dw_pcie_ops,
-cbce7900 Zhou Wang   2015-10-29  547  					pp, &res);
-cbce7900 Zhou Wang   2015-10-29  548  	if (!bus)
-cbce7900 Zhou Wang   2015-10-29  549  		return -ENOMEM;
-cbce7900 Zhou Wang   2015-10-29  550  
-cbce7900 Zhou Wang   2015-10-29  551  	if (pp->ops->scan_bus)
-cbce7900 Zhou Wang   2015-10-29  552  		pp->ops->scan_bus(pp);
-cbce7900 Zhou Wang   2015-10-29  553  
-cbce7900 Zhou Wang   2015-10-29  554  #ifdef CONFIG_ARM
-cbce7900 Zhou Wang   2015-10-29  555  	/* support old dtbs that incorrectly describe IRQs */
-cbce7900 Zhou Wang   2015-10-29  556  	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
-0815f957 Yijing Wang 2014-11-11  557  #endif
-0815f957 Yijing Wang 2014-11-11  558  
-cbce7900 Zhou Wang   2015-10-29 @559  	if (!pci_has_flag(PCI_PROBE_ONLY)) {
-cbce7900 Zhou Wang   2015-10-29  560  		pci_bus_size_bridges(bus);
-cbce7900 Zhou Wang   2015-10-29  561  		pci_bus_assign_resources(bus);
-4b1ced84 Jingoo Han  2013-07-31  562  
-cbce7900 Zhou Wang   2015-10-29  563  		list_for_each_entry(child, &bus->children, node)
-cbce7900 Zhou Wang   2015-10-29  564  			pcie_bus_configure_settings(child);
-cbce7900 Zhou Wang   2015-10-29  565  	}
-4b1ced84 Jingoo Han  2013-07-31  566  
-cbce7900 Zhou Wang   2015-10-29  567  	pci_bus_add_devices(bus);
+I was toying with suggesting we warn for any phys/virt bit set below
+bit #12 (i.e. anything smaller than 4K alignment), that would probably
+just increase complexity with little appreciable gain though.
 
-:::::: The code at line 559 was first introduced by commit
-:::::: cbce7900598c26a12652f8ca9c41c5b29034c38d PCI: designware: Make driver arch-agnostic
+For both patches (with the extra paragraph above added to the commit log):
+Reviewed-by: Steve Capper <steve.capper@linaro.org>
 
-:::::: TO: Zhou Wang <wangzhou1@hisilicon.com>
-:::::: CC: Bjorn Helgaas <bhelgaas@google.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 52602 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151123/1fe50844/attachment-0001.obj>
+Cheers,
+--
+Steve
