@@ -1,86 +1,71 @@
-From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
-Date: Mon, 23 Nov 2015 18:23:47 +0200
-Subject: [PATCH v3 1/6] PCI: designware: remove wrong io_base assignment
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E162C6F70@lhreml503-mbs>
-References: <cover.1448270813.git.stanimir.varbanov@linaro.org>
- <44d133d5ebd4f7b9e8b817aa8bae12f690e70000.1448270813.git.stanimir.varbanov@linaro.org>
- <6048361.Am0T3g77Bd@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E162C6F70@lhreml503-mbs>
-Message-ID: <56533D93.5000604@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Nov 2015 17:25:28 +0100
+Subject: [RFC] asm-generic: default BUG_ON(x) to "if(x) BUG()"
+Message-ID: <5868782.RxZY0W5S4d@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23/2015 12:27 PM, Gabriele Paoloni wrote:
-> Hi Stanimir, Many Thanks for this fix
-> 
->> -----Original Message-----
->> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
->> owner at vger.kernel.org] On Behalf Of Arnd Bergmann
->> Sent: 23 November 2015 10:00
->> To: Stanimir Varbanov
->> Cc: linux-arm-msm at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; devicetree at vger.kernel.org; linux-
->> pci at vger.kernel.org; Bjorn Helgaas; Srinivas Kandagatla; Rob Herring; Rob
->> Herring; Mark Rutland; Pawel Moll; Ian Campbell; Jingoo Han; Pratyush Anand;
->> Bjorn Andersson
->> Subject: Re: [PATCH v3 1/6] PCI: designware: remove wrong io_base assignment
->>
->> On Monday 23 November 2015 11:28:58 Stanimir Varbanov wrote:
->>> The io_base is used to keep the cpu physical address parsed
->>> from ranges dt property. After issue pci_remap_iospace the
->>> io_base has been assigned with io->start, which is not correct
->>> cause io->start is a PCI bus address.
->>>
->>> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
->>> ---
->>>  drivers/pci/host/pcie-designware.c |    1 -
->>>  1 file changed, 1 deletion(-)
->>>
->>> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-
->> designware.c
->>> index 540f077c37ea..02a7452bdf23 100644
->>> --- a/drivers/pci/host/pcie-designware.c
->>> +++ b/drivers/pci/host/pcie-designware.c
->>> @@ -440,7 +440,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
->>>  					 ret, pp->io);
->>>  				continue;
->>>  			}
->>> -			pp->io_base = pp->io->start;
->>>  			break;
->>>  		case IORESOURCE_MEM:
->>>  			pp->mem = win->res;
->>
->> I was surprised to see such an obvious bug here, as we had spent a lot of
->> time trying to get it right. However, it broke only recently and it's
->> worth mentioning what commit did it, so
-> 
-> Looking at 
-> "[PATCH v12 0/8] PCI: hisi: Add PCIe host support for HiSilicon SoC Hip05":
-> 
-> actually the bug came in as patch 3/6 of v11 patchset split
-> 
-> [...]
-> 
-> Change from v11:
-> - Split 3/6 in v11 to 3/8, 4/8, 5/8 in v12.
-> 
-> [...]
-> 
-> This was not present in v11...sorry about this.
-> 
-> Gab
-> 
->>
->> Fixes: 0021d22b73d6 ("PCI: designware: Use of_pci_get_host_bridge_resources()
->> to parse DT")
->> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+When CONFIG_BUG is disabled, BUG_ON() will only evaluate the condition,
+but will not actually stop the current thread. GCC warns about a couple
+of BUG_ON() users where this actually leads to further undefined
+behavior:
 
-I think the bug is introduced in:
+include/linux/ceph/osdmap.h: In function 'ceph_can_shift_osds':
+include/linux/ceph/osdmap.h:54:1: warning: control reaches end of non-void function
+fs/ext4/inode.c: In function 'ext4_map_blocks':
+fs/ext4/inode.c:548:5: warning: 'retval' may be used uninitialized in this function
+drivers/mfd/db8500-prcmu.c: In function 'prcmu_config_clkout':
+drivers/mfd/db8500-prcmu.c:762:10: warning: 'div_mask' may be used uninitialized in this function
+drivers/mfd/db8500-prcmu.c:769:13: warning: 'mask' may be used uninitialized in this function
+drivers/mfd/db8500-prcmu.c:757:7: warning: 'bits' may be used uninitialized in this function
+drivers/tty/serial/8250/8250_core.c: In function 'univ8250_release_irq':
+drivers/tty/serial/8250/8250_core.c:252:18: warning: 'i' may be used uninitialized in this function
+drivers/tty/serial/8250/8250_core.c:235:19: note: 'i' was declared here
 
-cbce7900598c ("PCI: designware: Make driver arch-agnostic")
+There is an obvious conflict of interest here: on the one hand, someone
+who disables CONFIG_BUG() will want the kernel to be as small as possible
+and doesn't care about printing error messages to a console that nobody
+looks at. On the other hand, running into a BUG_ON() condition means that
+something has gone wrong, and we probably want to also stop doing things
+that might cause data corruption.
 
-cause the io_base is correctly calculated in 0021d22b73d6, do you agree?
+This patch picks the second choice, and changes the NOP to BUG(), which
+normally stops the execution of the current thread in some form (endless
+loop or a trap). This follows the logic we applied in a4b5d580e078 ("bug:
+Make BUG() always stop the machine").
 
--- 
-regards,
-Stan
+For ARM multi_v7_defconfig, the size slightly increases:
+
+section		CONFIG_BUG=y	CONFIG_BUG=n	CONFIG_BUG=n+patch
+
+  .text            8320248   |     8180944   |     8207688
+  .rodata          3633720   |     3567144   |     3570648
+  __bug_table        32508   |         ---   |         ---
+  __modver             692   |        1584   |        2176
+  .init.text        558132   |      548300   |      550088
+  .exit.text         12380   |       12256   |       12380
+  .data            1016672   |     1016064   |     1016128
+  Total           14622556   |    14374510   |    14407326
+
+So instead of saving 1.70% of the total image size, we only save 1.48%
+by turning off CONFIG_BUG, but in return we can ensure that we don't run
+into cases of uninitialized variable or return code uses when something
+bad happens. Aside from that, we significantly reduce the number of
+warnings in randconfig builds, which makes it easier to fix the warnings
+about other problems.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/include/asm-generic/bug.h b/include/asm-generic/bug.h
+index 630dd2372238..58bd1f08c5c7 100644
+--- a/include/asm-generic/bug.h
++++ b/include/asm-generic/bug.h
+@@ -142,7 +142,7 @@ extern void warn_slowpath_null(const char *file, const int line);
+ #endif
+ 
+ #ifndef HAVE_ARCH_BUG_ON
+-#define BUG_ON(condition) do { if (condition) ; } while (0)
++#define BUG_ON(condition) do { if (condition) BUG(); } while (0)
+ #endif
+ 
+ #ifndef HAVE_ARCH_WARN_ON
