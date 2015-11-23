@@ -1,247 +1,226 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 23 Nov 2015 09:57:19 +0100
-Subject: [PATCH v4 5/6] ARM: dts: sunxi: Add Allwinner H3 DTSI
-In-Reply-To: <563614A3.6060805@gmail.com>
-References: <1445964626-6484-1-git-send-email-jenskuske@gmail.com>
- <1445964626-6484-6-git-send-email-jenskuske@gmail.com>
- <CAGb2v64NZMw0vNvVtepthUMox5TDy07gTBAWZqf8GAq6TrMpOg@mail.gmail.com>
- <563614A3.6060805@gmail.com>
-Message-ID: <20151123085719.GT32142@lukather>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 23 Nov 2015 16:54:44 +0800
+Subject: [PATCH v2 6/6] arm64: dts: berlin4ct: add pll and clock nodes
+In-Reply-To: <5652CEB2.9030902@gmail.com>
+References: <1448008952-1787-1-git-send-email-jszhang@marvell.com>
+ <1448008952-1787-7-git-send-email-jszhang@marvell.com>
+ <564F8B73.7070403@gmail.com>	<20151123152158.483aa6b5@xhacker>
+ <5652CEB2.9030902@gmail.com>
+Message-ID: <20151123165444.740b457c@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 23 Nov 2015 09:30:42 +0100
+Sebastian Hesselbarth wrote:
 
-On Sun, Nov 01, 2015 at 02:33:23PM +0100, Jens Kuske wrote:
-> >> +               bus_gates: clk at 01c20060 {
-> >> +                       #clock-cells = <1>;
-> >> +                       compatible = "allwinner,sun8i-h3-bus-gates-clk";
-> >> +                       reg = <0x01c20060 0x14>;
-> >> +                       clocks = <&ahb1>, <&ahb2>, <&apb1>, <&apb2>;
-> >> +                       clock-names = "ahb1", "ahb2", "apb1", "apb2";
-> >> +                       clock-indices = <5>, <6>, <8>,
-> >> +                                       <9>, <10>, <13>,
-> >> +                                       <14>, <17>, <18>,
-> >> +                                       <19>, <20>,
-> >> +                                       <21>, <23>,
-> >> +                                       <24>, <25>,
-> >> +                                       <26>, <27>,
-> >> +                                       <28>, <29>,
-> >> +                                       <30>, <31>, <32>,
-> >> +                                       <35>, <36>, <37>,
-> >> +                                       <40>, <41>, <43>,
-> >> +                                       <44>, <52>, <53>,
-> >> +                                       <54>, <64>,
-> >> +                                       <65>, <69>, <72>,
-> >> +                                       <76>, <77>, <78>,
-> >> +                                       <96>, <97>, <98>,
-> >> +                                       <112>, <113>,
-> >> +                                       <114>, <115>, <116>,
-> >> +                                       <128>, <135>;
-> >> +                       clock-output-names = "ahb1_ce", "ahb1_dma", "ahb1_mmc0",
-> >> +                                       "ahb1_mmc1", "ahb1_mmc2", "ahb1_nand",
-> >> +                                       "ahb1_sdram", "ahb2_gmac", "ahb1_ts",
-> >> +                                       "ahb1_hstimer", "ahb1_spi0",
-> >> +                                       "ahb1_spi1", "ahb1_otg",
-> >> +                                       "ahb1_otg_ehci0", "ahb1_ehic1",
-> > 
-> > ahb1_ehci1? Same for the following 3 lines.
-> I'll fix them...
-> > 
-> >> +                                       "ahb1_ehic2", "ahb1_ehic3",
-> >> +                                       "ahb1_otg_ohci0", "ahb2_ohic1",
-> >> +                                       "ahb2_ohic2", "ahb2_ohic3", "ahb1_ve",
-> >> +                                       "ahb1_lcd0", "ahb1_lcd1", "ahb1_deint",
-> >> +                                       "ahb1_csi", "ahb1_tve", "ahb1_hdmi",
-> >> +                                       "ahb1_de", "ahb1_gpu", "ahb1_msgbox",
-> >> +                                       "ahb1_spinlock", "apb1_codec",
-> >> +                                       "apb1_spdif", "apb1_pio", "apb1_ths",
-> >> +                                       "apb1_i2s0", "apb1_i2s1", "apb1_i2s2",
-> >> +                                       "apb2_i2c0", "apb2_i2c1", "apb2_i2c2",
-> >> +                                       "apb2_uart0", "apb2_uart1",
-> >> +                                       "apb2_uart2", "apb2_uart3", "apb2_scr",
-> >> +                                       "ahb1_ephy", "ahb1_dbg";
-> > 
-> > If it weren't for the last 2 clocks, we could cleanly split out apb1 and apb2
-> > gates. Having a separate AHB clock gate taking 2 addresses seems messy
-> > as well. :(
+> On 23.11.2015 08:21, Jisheng Zhang wrote:
+> > On Fri, 20 Nov 2015 22:06:59 +0100
+> > Sebastian Hesselbarth wrote:  
+> >> On 20.11.2015 09:42, Jisheng Zhang wrote:  
+> >>> Add syspll, mempll, cpupll, gateclk and berlin-clk nodes.
+> >>>
+> >>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> >>> ---  
+> [...]
+> >>> +		syspll: syspll {
+> >>> +			compatible = "marvell,berlin-pll";
+> >>> +			reg = <0xea0200 0x14>, <0xea0710 4>;
+> >>> +			#clock-cells = <0>;
+> >>> +			clocks = <&osc>;
+> >>> +			bypass-shift = /bits/ 8 <0>;
+> >>> +		};
+> >>> +
+> >>> +		gateclk: gateclk {
+> >>> +			compatible = "marvell,berlin4ct-gateclk";
+> >>> +			reg = <0xea0700 4>;
+> >>> +			#clock-cells = <1>;
+> >>> +		};
+> >>> +
+> >>> +		clk: clk {
+> >>> +			compatible = "marvell,berlin4ct-clk";
+> >>> +			reg = <0xea0720 0x144>;  
+> >>
+> >> Looking at the reg ranges, I'd say that they are all clock related
+> >> and pretty close to each other:
+> >>
+> >> gateclk: reg = <0xea0700 4>;
+> >> bypass:  reg = <0xea0710 4>;
+> >> clk:     reg = <0xea0720 0x144>;  
+> >
+> > Although these ranges sit close, but we should represent HW structure as you
+> > said.  
 > 
-> Well, maybe we still should do that, if we split the resets too at least
-> apb[12]  would line up again.
+> Then how do you argue that you have to share the gate clock register
+> with every PLL? The answer is quite simple: You are not separating by
+> HW either but existing SW API.
+
+No, PLLs don't share register any more. You can find what all clock nodes will
+look like in:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/387322.html
+
 > 
-> I don't know what to do with these bus things any more, all variants I
-> sent had issues somewhere...
+> If you would really want to just describe the HW, then you'd have to
+> have a single node for _all_ clocks that get controlled by 0xea0700/0x4,
+> feed some 32+ clocks into the node, and out again. Obviously, this
+> isn't what we want, right?
 
-AFAIK, Arnd had some objections, but he never got back to us when we
-explained how the hardware was laid out, so I don't know if they still
-apply.
+I represented the HW by "kind", for example, gateclks, common-clks, pllclk.
+And let common PLLs follow this rule as well:
 
-> >> +               };
-> >> +
-> >> +               mmc0_clk: clk at 01c20088 {
-> >> +                       #clock-cells = <1>;
-> >> +                       compatible = "allwinner,sun4i-a10-mmc-clk";
-> >> +                       reg = <0x01c20088 0x4>;
-> >> +                       clocks = <&osc24M>, <&pll6 0>, <&pll8 0>;
-> >> +                       clock-output-names = "mmc0",
-> >> +                                            "mmc0_output",
-> >> +                                            "mmc0_sample";
-> >> +               };
-> >> +
-> >> +               mmc1_clk: clk at 01c2008c {
-> >> +                       #clock-cells = <1>;
-> >> +                       compatible = "allwinner,sun4i-a10-mmc-clk";
-> >> +                       reg = <0x01c2008c 0x4>;
-> >> +                       clocks = <&osc24M>, <&pll6 0>, <&pll8 0>;
-> >> +                       clock-output-names = "mmc1",
-> >> +                                            "mmc1_output",
-> >> +                                            "mmc1_sample";
-> >> +               };
-> >> +
-> >> +               mmc2_clk: clk at 01c20090 {
-> >> +                       #clock-cells = <1>;
-> >> +                       compatible = "allwinner,sun4i-a10-mmc-clk";
-> >> +                       reg = <0x01c20090 0x4>;
-> >> +                       clocks = <&osc24M>, <&pll6 0>, <&pll8 0>;
-> >> +                       clock-output-names = "mmc2",
-> >> +                                            "mmc2_output",
-> >> +                                            "mmc2_sample";
-> >> +               };
-> >> +
-> >> +               mbus_clk: clk at 01c2015c {
-> >> +                       #clock-cells = <0>;
-> >> +                       compatible = "allwinner,sun8i-a23-mbus-clk";
-> >> +                       reg = <0x01c2015c 0x4>;
-> >> +                       clocks = <&osc24M>, <&pll6 1>, <&pll5>;
-> >> +                       clock-output-names = "mbus";
-> >> +               };
-> >> +       };
-> >> +
-> >> +       soc {
-> >> +               compatible = "simple-bus";
-> >> +               #address-cells = <1>;
-> >> +               #size-cells = <1>;
-> >> +               ranges;
-> >> +
-> >> +               dma: dma-controller at 01c02000 {
-> >> +                       compatible = "allwinner,sun8i-h3-dma";
-> >> +                       reg = <0x01c02000 0x1000>;
-> >> +                       interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
-> >> +                       clocks = <&bus_gates 6>;
-> >> +                       resets = <&bus_rst 6>;
-> >> +                       #dma-cells = <1>;
-> >> +               };
-> >> +
-> >> +               mmc0: mmc at 01c0f000 {
-> >> +                       compatible = "allwinner,sun5i-a13-mmc";
-> >> +                       reg = <0x01c0f000 0x1000>;
-> >> +                       clocks = <&bus_gates 8>,
-> >> +                                <&mmc0_clk 0>,
-> >> +                                <&mmc0_clk 1>,
-> >> +                                <&mmc0_clk 2>;
-> >> +                       clock-names = "ahb",
-> >> +                                     "mmc",
-> >> +                                     "output",
-> >> +                                     "sample";
-> >> +                       resets = <&bus_rst 8>;
-> >> +                       reset-names = "ahb";
-> >> +                       interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
-> >> +                       status = "disabled";
-> >> +                       #address-cells = <1>;
-> >> +                       #size-cells = <0>;
-> >> +               };
-> >> +
-> >> +               mmc1: mmc at 01c10000 {
-> >> +                       compatible = "allwinner,sun5i-a13-mmc";
-> >> +                       reg = <0x01c10000 0x1000>;
-> >> +                       clocks = <&bus_gates 9>,
-> >> +                                <&mmc1_clk 0>,
-> >> +                                <&mmc1_clk 1>,
-> >> +                                <&mmc1_clk 2>;
-> >> +                       clock-names = "ahb",
-> >> +                                     "mmc",
-> >> +                                     "output",
-> >> +                                     "sample";
-> >> +                       resets = <&bus_rst 9>;
-> >> +                       reset-names = "ahb";
-> >> +                       interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
-> >> +                       status = "disabled";
-> >> +                       #address-cells = <1>;
-> >> +                       #size-cells = <0>;
-> >> +               };
-> >> +
-> >> +               mmc2: mmc at 01c11000 {
-> >> +                       compatible = "allwinner,sun5i-a13-mmc";
-> >> +                       reg = <0x01c11000 0x1000>;
-> >> +                       clocks = <&bus_gates 10>,
-> >> +                                <&mmc2_clk 0>,
-> >> +                                <&mmc2_clk 1>,
-> >> +                                <&mmc2_clk 2>;
-> >> +                       clock-names = "ahb",
-> >> +                                     "mmc",
-> >> +                                     "output",
-> >> +                                     "sample";
-> >> +                       resets = <&bus_rst 10>;
-> >> +                       reset-names = "ahb";
-> >> +                       interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
-> >> +                       status = "disabled";
-> >> +                       #address-cells = <1>;
-> >> +                       #size-cells = <0>;
-> >> +               };
-> >> +
-> >> +               pio: pinctrl at 01c20800 {
-> >> +                       compatible = "allwinner,sun8i-h3-pinctrl";
-> >> +                       reg = <0x01c20800 0x400>;
-> >> +                       interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
-> >> +                                    <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-> >> +                       clocks = <&bus_gates 69>;
-> >> +                       gpio-controller;
-> >> +                       #gpio-cells = <3>;
-> >> +                       interrupt-controller;
-> >> +                       #interrupt-cells = <2>;
-> >> +
-> >> +                       uart0_pins_a: uart0 at 0 {
-> >> +                               allwinner,pins = "PA4", "PA5";
-> >> +                               allwinner,function = "uart0";
-> >> +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> >> +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> >> +                       };
-> >> +
-> >> +                       mmc0_pins_a: mmc0 at 0 {
-> >> +                               allwinner,pins = "PF0", "PF1", "PF2", "PF3",
-> >> +                                                "PF4", "PF5";
-> >> +                               allwinner,function = "mmc0";
-> >> +                               allwinner,drive = <SUN4I_PINCTRL_30_MA>;
-> >> +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> >> +                       };
-> >> +
-> >> +                       mmc0_cd_pin: mmc0_cd_pin at 0 {
-> >> +                               allwinner,pins = "PF6";
-> >> +                               allwinner,function = "gpio_in";
-> >> +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> >> +                               allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-> >> +                       };
-> > 
-> > This should be in the board DTS, unless this is the reference design,
-> > in which case you should name the label like "mmc0_cd_pin_reference_design".
-> > 
+one node for all common plls
+
+reg <0x922000 0x14>, <0x940034 0x14>, <0xea0200 0x14>
+
 > 
-> The datasheet mentions SDC0_DET function on PF6, so I thought this is
-> sort of fixed to this pin now. All designs I've seen use this pin.
+> So, the idea of berlin2 sysctrl nodes (and similar other SoCs) is: Some
+> SoCs just dump some functions into a bunch of registers with no
+> particular order. We'd never find a good representation for that in DT,
+> so we don't bother to try but let the driver implementation deal with
+> the mess. Using "simple-mfd" is a nice solution to scattered registers
+> please have a look at it and come up with a cleaner separation for bg4
+> clock.
+> 
+> > First of all, let me describe the clks/plls in BG4CT. BG4CT contains:
+> >
+> > two kinds of PLL: normal PLL and AVPLL. These PLLs are put with their users
+> > together. For example: mempll pll registers <0xf7940034, 0x14> is put together
+> > with mem controller registers. AVPLL control registers are put with AV devices.  
+> 
+> Why didn't you choose to have a memory-controller node that provides
+> mempll clock then? I am open to having multiple nodes providing clocks
+> but having a node for every clock in any subsystem is something I'll
+> not even think about.
 
-Why is it set as a gpio then if it is a separate function?
+OK. As you said, "SoCs just dump some functions into a bunch of registers with
+no particular order", BG4CT is now cleaner, all common-clks are put together,
+gate-clks are put together, pllclks are put together, only the common PLLs
+are dumped here and there. So how about representing the HW by "kind", one
+node for common plls, one node for gateclks, one node for common clks and 
+one node for pllclks?
 
-Thanks!
-Maxime
+                pll: pll {
+                        compatible = "marvell,berlin4ct-pll";
+                        reg = <0x922000 0x14>, <0x940034 0x14>, <0xea0200 0x14>
+                        #clock-cells = <0>;
+                        clocks = <&osc>;
+                };
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151123/d4e680a9/attachment-0001.sig>
+		pllclk: pllclk {
+                        compatible = "marvell,berlin4ct-pllclk";
+                        reg = <0xea0710 4>
+                        #clock-cells = <1>;
+		};
+
+                gateclk: gateclk {
+                        compatible = "marvell,berlin4ct-gateclk";
+                        reg = <0xea0700 4>;
+                        #clock-cells = <1>;
+                };
+
+                clk: clk {
+                        compatible = "marvell,berlin4ct-clk";
+                        reg = <0xea0720 0x144>;
+                        #clock-cells = <1>;
+                        clocks = <&pllclk SYSPLLCLK>;
+                };
+
+thanks
+
+> 
+> > You can also check mempll, cpupll and syspll ranges:
+> >
+> > cpupll: <0x922000 0x14>
+> >
+> > mempll: <0x940034 0x14>
+> >
+> > syspll: <0xea0200 0x14>
+> >
+> >
+> > We have three normal PLLS: cpupll, mempll and syspll. All these three PLLs use
+> > 25MHZ osc as clocksource. These plls can be bypassed. when syspll is bypassed
+> > the 25MHZ osc is directly output to syspllclk. When mempll/cpupll is bypassed,
+> > its corresponding fastrefclk is directly output to ddrphyclk/cpuclk:
+> >
+> >
+> >         ---25MHZ osc----------|\
+> >             ________            | |-- syspllclk
+> >         ---| SYSPLL |---------|/
+> >
+> >
+> >
+> >         ---cpufastrefclk------|\
+> >             ________            | |-- cpuclk
+> >         ---| CPUPLL |---------|/
+> >
+> >
+> >         ---memfastrefclk------|\
+> >             ________            | |-- ddrphyclk
+> >         ---| MEMPLL |---------|/
+> >
+> > NOTE: the fastrefclk is the so called normal clk below.
+> >
+> >
+> >
+> > two kinds of clk: normal clk and gate clk. The normal clk supports changing
+> > divider, selecting clock source, disabling/enabling etc. The gate clk only
+> > supports disabling/enabling. normal clks use syspllclk as clocksource, while
+> > gate clks use perifsysclk as clocksource.
+> >
+> >
+> > So what's the representing HW structure in fact? Here is my proposal:
+> > 1. have mempll, cpupll and syspll node in dts  
+> 
+> No.
+> 
+> > 2. one gateclk node in dts for gateclks  
+> 
+> No.
+> 
+> > 3. one normalclk node in dts for normal clks  
+> 
+> No.
+> 
+> > 4. one ccf clock-mux for cpuclk, ddrphyclk and syspllclk.  
+> 
+> No.
+> 
+> > what do you think?  
+> 
+> I think that the current separation is not a good one. I am open for
+> suggestions but I am not accepting single PLL/clock nodes.
+> 
+> >  From another side, let's have a look at driver/clk/mvebu. As can be seen,
+> > different clks register are close each other, for example, gateclk and coreclk
+> > in arch/arm/boot/dts/armada-xp.dtsi.
+> >
+> > And drivers/clk/sunxi, arch/arm/boot/dts/sun7i-a20.dtsi, the pll4, pll12, gt_clk
+> > and ahb*, apb* etc...
+> >
+> > why these SoCs don't merge clocks/gates/plls to a single clock complex node?
+> > I think that's because they are representing real HW structure.  
+> 
+> These SoC (at least mvebu) didn't merge them into a single clock
+> complex node because nobody had a better idea or an impression of
+> the consequences. Looking back with the idea of syscon/simple-mfd
+> we probably would have chosen to separate differently.
+> 
+> >> So, please just follow the OF/driver structure we already
+> >> have for Berlin2.  
+> 
+> To repeat: "please just follow the OF/driver structure we already
+> have for Berlin2"
+> 
+> Sebastian
+> 
+> >>> +			#clock-cells = <1>;
+> >>> +			clocks = <&syspll>;
+> >>> +		};
+> >>> +
+> >>>   		soc_pinctrl: pin-controller at ea8000 {
+> >>>   			compatible = "marvell,berlin4ct-soc-pinctrl";
+> >>>   			reg = <0xea8000 0x14>;
+> >>>  
+> >>  
+> >  
+> 
