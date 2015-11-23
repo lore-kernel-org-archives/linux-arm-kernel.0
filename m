@@ -1,30 +1,28 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 23 Nov 2015 20:53:22 +0100
-Subject: [PATCH 2/2] ARM: dts: sun7i: Enable audio codec on BananaPi
-In-Reply-To: <1448304618-3488-2-git-send-email-monnier@iro.umontreal.ca>
-References: <1448304618-3488-1-git-send-email-monnier@iro.umontreal.ca>
- <1448304618-3488-2-git-send-email-monnier@iro.umontreal.ca>
-Message-ID: <20151123195322.GY32142@lukather>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Mon, 23 Nov 2015 15:00:20 -0500
+Subject: [PATH RESEND v2 03/10] tty: xuartps: Always enable transmitter in
+ start_tx
+In-Reply-To: <5652BAD2.4090000@xilinx.com>
+References: <1447963344-16266-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1447963344-16266-4-git-send-email-soren.brinkmann@xilinx.com>
+ <564F0E75.5020100@hurleysoftware.com>
+ <20151120152849.GU32017@xsjsorenbubuntu>
+ <564F4A95.3010303@hurleysoftware.com>
+ <20151120165804.GV32017@xsjsorenbubuntu>
+ <564F5574.4070407@hurleysoftware.com> <5652BAD2.4090000@xilinx.com>
+Message-ID: <56537054.6090208@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2015 at 01:50:17PM -0500, Stefan Monnier wrote:
-> Enable the on-chip audio codec
-> 
-> Signed-off-by: Stefan Monnier <monnier@iro.umontreal.ca>
+Hi Michal,
 
-Applied both, thanks!
+On 11/23/2015 02:05 AM, Michal Simek wrote:
+> All these tests looks very interesting. Do you have any any
+> work-in-progress repo with other tests? It will be good to run all of
+> them to validate our drivers.
 
-Maxime
+I haven't upstreamed these yet, but I plan to do so soon, along with
+tty core, pty, n_tty i/o, termios, and torture tests and some basic tools.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151123/6e8a5ab4/attachment.sig>
+Regards,
+Peter Hurley
