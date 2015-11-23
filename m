@@ -1,52 +1,45 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Mon, 23 Nov 2015 15:45:45 +0100
-Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
- "/chosen/linux,atags" entry
-In-Reply-To: <20151122065146.GD26074@amd>
-References: <1436214373-12969-1-git-send-email-pali.rohar@gmail.com>
- <20150713131902.GH26485@atomide.com>
- <20151012201640.GQ23801@atomide.com> <201510122225.12786@pali>
- <20151012204509.GT23801@atomide.com> <20151013143746.GJ23104@pali>
- <20151105114041.GC27908@pali> <20151105161756.GG3078@atomide.com>
- <5643E716.9080204@gmail.com> <20151122065146.GD26074@amd>
-Message-ID: <20151123144545.GD24147@pali>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 23 Nov 2015 09:47:37 -0500 (EST)
+Subject: [PATCH] drivers/reset: appropriate __init annotation for const
+ data
+In-Reply-To: <1448276217.4008.22.camel@pengutronix.de>
+References: <alpine.LFD.2.20.1511212053530.22569@knanqh.ubzr>
+ <1448276217.4008.22.camel@pengutronix.de>
+Message-ID: <alpine.LFD.2.20.1511230943510.22569@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 22 November 2015 07:51:46 Pavel Machek wrote:
-> On Wed 2015-11-11 17:10:46, Frank Rowand wrote:
-> > Adding devicetree list.
-> > 
-> > Thread starts at
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/354459.html
-> > 
-> > On 11/5/2015 8:17 AM, Tony Lindgren wrote:
-> > > * Pali Roh?r <pali.rohar@gmail.com> [151105 03:41]:
-> > >> On Tuesday 13 October 2015 16:37:46 Pali Roh?r wrote:
-> > >>> On Monday 12 October 2015 13:45:09 Tony Lindgren wrote:
-> > >>>> * Pali Roh?r <pali.rohar@gmail.com> [151012 13:29]:
-> > >>>>> On Monday 12 October 2015 22:16:40 Tony Lindgren wrote:
-> > >>>>>>
-> > >>>>>> Pali, any news on posting an updated series with the comments
-> > >>>>>> addressed in this thread? It seems that we all pretty much agree
-> > >>>>>> what needs to be done.
-> > 
-> > I'm not real happy with the concept of patches 4 and 5 in this series.
-> > My concern is that those two patches are using the FDT as a transport
-> > mechanism for a binary blob (the atags object).
-> 
-> Umm. Ok. Do you have alternative proposal that works for everyone?
-> 
-> I mean. This discussion was going for quite a long time, and it would
-> be nice to have some solution... patch proposal... something.
-> 									Pavel
+On Mon, 23 Nov 2015, Philipp Zabel wrote:
 
-Yes, discussion is going for a long time! So should I spend time for
-adding documentation to my solution (this is last one thing which is
-missing)? Or my solution is wrong and somebody else will propose new?
-I do not want to spend time on something which will be rejected and
-discarded.
+> Hi Nicolas,
+> 
+> Am Samstag, den 21.11.2015, 20:56 -0500 schrieb Nicolas Pitre:
+> > Init data marked const should be annotated with __initconst for
+> > correctness and not __initdata.  This also fixes LTO builds that
+> > otherwise fail with section mismatch errors.
+> > 
+> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > 
+> > diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
+> > index 3d95c87160..9353b2dd15 100644
+> > --- a/drivers/reset/reset-sunxi.c
+> > +++ b/drivers/reset/reset-sunxi.c
+> > @@ -122,7 +122,7 @@ err_alloc:
+> >   * our system, before we can even think of using a regular device
+> >   * driver for it.
+> >   */
+> > -static const struct of_device_id sunxi_early_reset_dt_ids[] __initdata = {
+> > +static const struct of_device_id sunxi_early_reset_dt_ids[] __initconst = {
+> >  	{ .compatible = "allwinner,sun6i-a31-ahb1-reset", },
+> >  	{ /* sentinel */ },
+> >  };
+> 
+> Thank you for the patch, this change is already contained in the latest
+> pull request sent to the arm-soc maintainers.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+OK.  I initially posted it in July but it didn't show up in v4.2 nor in 
+v4.3. I concluded it fell into a crack.
+
+
+Nicolas
