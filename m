@@ -1,41 +1,62 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 23 Nov 2015 10:49:55 +0100
-Subject: [PATCH RESEND] pwm: ftm: fix clock enable/disable when using PM
-In-Reply-To: <564E6B6D.80006@mleia.com>
-References: <1445142552-3530-1-git-send-email-stefan@agner.ch>
- <290ed017061ef41e1fe5c3fd5a523511@agner.ch>
- <564E6B6D.80006@mleia.com>
-Message-ID: <20151123094955.GA31868@ulmo.nvidia.com>
+From: heiko.carstens@de.ibm.com (Heiko Carstens)
+Date: Mon, 23 Nov 2015 10:53:02 +0100
+Subject: [PATCH 1/2] arch: consolidate CONFIG_STRICT_DEVM in
+ lib/Kconfig.debug
+In-Reply-To: <20151122035702.9313.52457.stgit@dwillia2-desk3.jf.intel.com>
+References: <20151122035702.9313.52457.stgit@dwillia2-desk3.jf.intel.com>
+Message-ID: <20151123095302.GA4436@osiris>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 02:38:05AM +0200, Vladimir Zapolskiy wrote:
-> On 19.11.2015 04:04, Stefan Agner wrote:
-> > Thierry,
-> > 
-> > I realized that this patch did not make it into 4.4-rc1, while others,
-> > IMHO less important patches which have been posted later (e.g. sunxi
-> > whitespace fixes) have made it! :-(
-> > 
-> > Anything wrong with that? Or am I on your spam list? Note that this is
-> > already a RESEND :-)
+On Sat, Nov 21, 2015 at 07:57:02PM -0800, Dan Williams wrote:
+> Let all the archs that implement CONFIG_STRICT_DEVM use a common
+> definition in lib/Kconfig.debug.
 > 
-> You are not alone with this problem, I have unreviewed changes in
-> linux-pwm mailing list sent in 2014 :)
+> Note, the 'depends on !SPARC' is due to sparc not implementing
+> devmem_is_allowed().
+> 
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
+> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Ingo Molnar <mingo@redhat.com>
+> Cc: "H. Peter Anvin" <hpa@zytor.com>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: "David S. Miller" <davem@davemloft.net>
+> Suggested-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+> ---
+>  arch/arm/Kconfig.debug       |   14 --------------
+>  arch/arm64/Kconfig.debug     |   14 --------------
+>  arch/powerpc/Kconfig.debug   |   12 ------------
+>  arch/s390/Kconfig.debug      |   12 ------------
+>  arch/tile/Kconfig            |    3 ---
+>  arch/unicore32/Kconfig.debug |   14 --------------
+>  arch/x86/Kconfig.debug       |   17 -----------------
+>  lib/Kconfig.debug            |   19 +++++++++++++++++++
+>  8 files changed, 19 insertions(+), 86 deletions(-)
 
-Please either ping me or resend patches if I don't reply within a week
-or so. Chances are I've either not seen them or meant to reply but never
-got around to.
+For s390
 
-Also, the Linux kernel is a community-driven project, so I fully expect
-contributors to review each other's patches. Review isn't something that
-only maintainers need to do.
+Acked-by: Heiko Carstens <heiko.carstens@de.ibm.com>
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151123/14831a96/attachment.sig>
+> diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+> index 8c15b29d5adc..ad85145d0047 100644
+> --- a/lib/Kconfig.debug
+> +++ b/lib/Kconfig.debug
+> @@ -1853,3 +1853,22 @@ source "samples/Kconfig"
+> 
+>  source "lib/Kconfig.kgdb"
+> 
+> +config STRICT_DEVMEM
+> +	bool "Filter access to /dev/mem"
+> +	depends on MMU
+> +	depends on !SPARC
+> +	default y if TILE || PPC || S390
+
+I wouldn't mind if you would remove s390 from this list.
