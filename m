@@ -1,35 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Nov 2015 20:34:30 +0100
-Subject: [PATCH] ahci: don't use MSI when PCI is disabled
-In-Reply-To: <CAPcyv4gSjWZ7OPqp9fwtc9yGV9g5AKkkCLDnU-F71XsHBgYUQA@mail.gmail.com>
-References: <4754092.OYovO36g28@wuerfel>
- <CAPcyv4gSjWZ7OPqp9fwtc9yGV9g5AKkkCLDnU-F71XsHBgYUQA@mail.gmail.com>
-Message-ID: <6160865.VIglm5oKj3@wuerfel>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Mon, 23 Nov 2015 11:34:58 -0800
+Subject: [PATCH 1/2] arm64: bpf: add 'store immediate' instruction
+In-Reply-To: <CABg9mcsQxiK8ZJdVqULiU7M0i8aPcqmgkYaRwKeiCZNsmbNH1g@mail.gmail.com>
+References: <1447195301-16757-1-git-send-email-yang.shi@linaro.org>	<1447195301-16757-2-git-send-email-yang.shi@linaro.org>	<CABg9mct-_AF9+kvZ0OG_JTMHkfj+OEsR2vonrxF=yD-yA6ihQw@mail.gmail.com>	<20151111121256.GI9562@arm.com>	<20151111123955.GK9562@arm.com>	<5644E97B.6050203@linaro.org>
+ <CABg9mcsQxiK8ZJdVqULiU7M0i8aPcqmgkYaRwKeiCZNsmbNH1g@mail.gmail.com>
+Message-ID: <56536A62.4040103@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 November 2015 09:25:38 Dan Williams wrote:
-> 
-> If we had an "static inline ahci_irq_vector(int port)"  helper to
-> compile out the struct msix_entry de-reference would that be
-> sufficient?
+Hi folks,
 
-Yes, that is probably a nicer way to do it. We should then also do
-something like this:
+Any more comments on this patch (store immediate only)?
 
-@@ -2510,7 +2513,8 @@ int ahci_host_activate(struct ata_host *host, struct scsi_host_template *sht)
- 	int irq = hpriv->irq;
- 	int rc;
- 
--	if (hpriv->flags & (AHCI_HFLAG_MULTI_MSI | AHCI_HFLAG_MULTI_MSIX))
-+	if (IS_ENABLED(CONFIG_PCI_MSI) && \
-+	    hpriv->flags & (AHCI_HFLAG_MULTI_MSI | AHCI_HFLAG_MULTI_MSIX))
- 		rc = ahci_host_activate_multi_irqs(host, sht);
- 	else if (hpriv->flags & AHCI_HFLAG_EDGE_IRQ)
- 		rc = ata_host_activate(host, irq, ahci_single_edge_irq_intr,
+I need more time to add XADD (I'm supposed everyone agrees it is 
+equivalent to atomic_add). However, this one is irrelevant to XADD, so 
+we may be able to apply it first?
 
-which will let gcc leave out the entire ahci_host_activate_multi_irqs()
-function but still flag compile errors in it even if CONFIG_PCI is
-disabled.
+Thanks,
+Yang
 
-	Arnd
+
+On 11/12/2015 7:45 PM, Z Lim wrote:
+> On Thu, Nov 12, 2015 at 11:33 AM, Shi, Yang <yang.shi@linaro.org> wrote:
+>> On 11/11/2015 4:39 AM, Will Deacon wrote:
+>>>
+>>> Wait a second, we're both talking rubbish here :) The STR (immediate)
+>>> form is referring to the addressing mode, whereas this patch wants to
+>>> store an immediate value to memory, which does need moving to a register
+>>> first.
+>>
+>>
+>> Yes, the immediate means immediate offset for addressing index. Doesn't mean
+>> to store immediate to memory.
+>>
+>> I don't think any load-store architecture has store immediate instruction.
+>>
+>
+> Indeed. Sorry for the noise.
+>
+> Somehow Will caught a whiff of whatever I was smoking then :)
+>
