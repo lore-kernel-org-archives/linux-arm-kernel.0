@@ -1,28 +1,104 @@
-From: jlinton@redhat.com (Jeremy Linton)
-Date: Mon, 23 Nov 2015 08:48:40 -0600
-Subject: [PATCH] [PATCH] arm64: Boot failure on m400 with new cont PTEs
-In-Reply-To: <20151123134911.GB28293@leverpostej>
-References: <1447858999-26665-1-git-send-email-jeremy.linton@arm.com>
- <20151118152044.GD10644@leverpostej> <564CA29A.9050905@arm.com>
- <20151118162932.GA13355@leverpostej> <564CB1DA.4090304@arm.com>
- <20151118180434.GB13355@leverpostej> <564CD206.9040402@arm.com>
- <20151119112923.GA24570@leverpostej> <20151120195243.GC14942@leverpostej>
- <20151123121514.GB32300@e104818-lin.cambridge.arm.com>
- <20151123134911.GB28293@leverpostej>
-Message-ID: <56532748.4010508@redhat.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 23 Nov 2015 14:51:25 +0000
+Subject: [PATCH v3 15/62] ACPICA: ACPI 6.0: Add changes for MADT table.
+In-Reply-To: <1447753261-7552-16-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-16-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511231450150.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23/2015 07:49 AM, Mark Rutland wrote:
-> Jeremy, for reference, have you tried kasan on m400? Or DEBUG_RODATA?
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Bob Moore <robert.moore@intel.com>
+> 
+> ACPICA commit 02cbb41232bccf7a91967140cab95d5f48291f21
+> 
+> New subtable type. Some additions to existing subtables.
+> 
+> Link: https://github.com/acpica/acpica/commit/02cbb412
+> Signed-off-by: Bob Moore <robert.moore@intel.com>
+> Signed-off-by: Lv Zheng <lv.zheng@intel.com>
+> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> [Linux commit 0cff8dc0099f6d4f7431181918b37a472bcd1bbb]
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+
+These are the ACPI 6.0 changes. I am OK both with them being folded in
+the previous patch or kept separate.
+
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
 
-No, because the machine has a list of issues that keep it from booting a 
-mainline kernel in a functional state. Once those are cleared up I will 
-revisit this patch.
-
-The goal was to create a conceptually safe fix for the problem, which 
-isn't all this hypothetical stuff being discussed, but the fact that the 
-TLBs are not being flushed properly (with or without the CONT bit stuff) 
-resulting in a tlb conflict fault long after this code path has finished 
-executing.
+>  xen/include/acpi/actbl1.h | 22 ++++++++++++++++++----
+>  1 file changed, 18 insertions(+), 4 deletions(-)
+> 
+> diff --git a/xen/include/acpi/actbl1.h b/xen/include/acpi/actbl1.h
+> index 2fb2ad7..7dd6960 100644
+> --- a/xen/include/acpi/actbl1.h
+> +++ b/xen/include/acpi/actbl1.h
+> @@ -643,7 +643,8 @@ enum acpi_madt_type {
+>  	ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR = 12,
+>  	ACPI_MADT_TYPE_GENERIC_MSI_FRAME = 13,
+>  	ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR = 14,
+> -	ACPI_MADT_TYPE_RESERVED = 15    /* 15 and greater are reserved */
+> +	ACPI_MADT_TYPE_GENERIC_TRANSLATOR = 15,
+> +	ACPI_MADT_TYPE_RESERVED = 16    /* 16 and greater are reserved */
+>  };
+>  
+>  /*
+> @@ -764,7 +765,7 @@ struct acpi_madt_local_x2apic_nmi {
+>  	u8 reserved[3];
+>  };
+>  
+> -/* 11: Generic Interrupt (ACPI 5.0) */
+> +/* 11: Generic Interrupt (ACPI 5.0 + ACPI 6.0 changes) */
+>  
+>  struct acpi_madt_generic_interrupt {
+>  	struct acpi_subtable_header header;
+> @@ -781,6 +782,8 @@ struct acpi_madt_generic_interrupt {
+>  	u32 vgic_interrupt;
+>  	u64 gicr_base_address;
+>  	u64 arm_mpidr;
+> +	u8 efficiency_class;
+> +	u8 reserved2[3];
+>  };
+>  
+>  /* Masks for Flags field above */
+> @@ -789,7 +792,7 @@ struct acpi_madt_generic_interrupt {
+>  #define ACPI_MADT_PERFORMANCE_IRQ_MODE  (1<<1) /* 01: Performance Interrupt Mode */
+>  #define ACPI_MADT_VGIC_IRQ_MODE         (1<<2) /* 02: VGIC Maintenance Interrupt mode */
+>  
+> -/* 12: Generic Distributor (ACPI 5.0) */
+> +/* 12: Generic Distributor (ACPI 5.0 + ACPI 6.0 changes) */
+>  
+>  struct acpi_madt_generic_distributor {
+>  	struct acpi_subtable_header header;
+> @@ -797,7 +800,8 @@ struct acpi_madt_generic_distributor {
+>  	u32 gic_id;
+>  	u64 base_address;
+>  	u32 global_irq_base;
+> -	u32 reserved2;          /* reserved - must be zero */
+> +	u8 version;
+> +	u8 reserved2[3];          /* reserved - must be zero */
+>  };
+>  
+>  /* 13: GIC MSI Frame (ACPI 5.1) */
+> @@ -825,6 +829,16 @@ struct acpi_madt_generic_redistributor {
+>  	u32 length;
+>  };
+>  
+> +/* 15: Generic Translator (ACPI 6.0) */
+> +
+> +struct acpi_madt_generic_translator {
+> +	struct acpi_subtable_header header;
+> +	u16 reserved;           /* reserved - must be zero */
+> +	u32 translation_id;
+> +	u64 base_address;
+> +	u32 reserved2;
+> +};
+> +
+>  /*
+>   * Common flags fields for MADT subtables
+>   */
+> -- 
+> 2.1.0
+> 
