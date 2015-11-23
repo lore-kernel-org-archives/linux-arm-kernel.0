@@ -1,124 +1,176 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 24 Nov 2015 00:10:05 +0100
-Subject: [PATCH V3 5/5] ARM: dts: exynos4412: Rename OPP nodes as
- opp@<opp-hz>
-In-Reply-To: <2407684.GgMbGa6LFq@vostro.rjw.lan>
-References: <cover.1447209519.git.viresh.kumar@linaro.org>
- <af18ab62fc9c52e082380ce5989ea287304c9bde.1447209519.git.viresh.kumar@linaro.org>
- <2407684.GgMbGa6LFq@vostro.rjw.lan>
-Message-ID: <1527236.7CQ8yZPfHx@vostro.rjw.lan>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 23 Nov 2015 14:45:07 -0800
+Subject: [PATCH v2] pwm: ftm: fix clock enable/disable when using PM
+Message-ID: <1448318707-18011-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 24, 2015 12:04:00 AM Rafael J. Wysocki wrote:
-> On Wednesday, November 11, 2015 08:10:58 AM Viresh Kumar wrote:
-> > OPP bindings got updated to name OPP nodes this way, make changes
-> > according to that.
-> > 
-> > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > ---
-> >  arch/arm/boot/dts/exynos4412.dtsi | 28 ++++++++++++++--------------
-> >  1 file changed, 14 insertions(+), 14 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-> > index 294cfe40388d..40beede46e55 100644
-> > --- a/arch/arm/boot/dts/exynos4412.dtsi
-> > +++ b/arch/arm/boot/dts/exynos4412.dtsi
-> > @@ -64,73 +64,73 @@
-> >  		compatible = "operating-points-v2";
-> >  		opp-shared;
-> >  
-> > -		opp00 {
-> > +		opp at 200000000 {
-> >  			opp-hz = /bits/ 64 <200000000>;
-> >  			opp-microvolt = <900000>;
-> >  			clock-latency-ns = <200000>;
-> >  		};
-> > -		opp01 {
-> > +		opp at 300000000 {
-> >  			opp-hz = /bits/ 64 <300000000>;
-> >  			opp-microvolt = <900000>;
-> >  			clock-latency-ns = <200000>;
-> >  		};
-> > -		opp02 {
-> > +		opp at 400000000 {
-> >  			opp-hz = /bits/ 64 <400000000>;
-> >  			opp-microvolt = <925000>;
-> >  			clock-latency-ns = <200000>;
-> >  		};
-> > -		opp03 {
-> > +		opp at 500000000 {
-> >  			opp-hz = /bits/ 64 <500000000>;
-> >  			opp-microvolt = <950000>;
-> >  			clock-latency-ns = <200000>;
-> >  		};
-> > -		opp04 {
-> > +		opp at 600000000 {
-> >  			opp-hz = /bits/ 64 <600000000>;
-> >  			opp-microvolt = <975000>;
-> >  			clock-latency-ns = <200000>;
-> >  		};
-> > -		opp05 {
-> > +		opp at 700000000 {
-> >  			opp-hz = /bits/ 64 <700000000>;
-> >  			opp-microvolt = <987500>;
-> >  			clock-latency-ns = <200000>;
-> >  		};
-> > -		opp06 {
-> > +		opp at 800000000 {
-> >  			opp-hz = /bits/ 64 <800000000>;
-> >  			opp-microvolt = <1000000>;
-> >  			clock-latency-ns = <200000>;
-> >  			opp-suspend;
-> >  		};
-> > -		opp07 {
-> > +		opp at 900000000 {
-> >  			opp-hz = /bits/ 64 <900000000>;
-> >  			opp-microvolt = <1037500>;
-> >  			clock-latency-ns = <200000>;
-> >  		};
-> > -		opp08 {
-> > +		opp at 1000000000 {
-> >  			opp-hz = /bits/ 64 <1000000000>;
-> >  			opp-microvolt = <1087500>;
-> >  			clock-latency-ns = <200000>;
-> >  		};
-> > -		opp09 {
-> > +		opp at 1100000000 {
-> >  			opp-hz = /bits/ 64 <1100000000>;
-> >  			opp-microvolt = <1137500>;
-> >  			clock-latency-ns = <200000>;
-> >  		};
-> > -		opp10 {
-> > +		opp at 1200000000 {
-> >  			opp-hz = /bits/ 64 <1200000000>;
-> >  			opp-microvolt = <1187500>;
-> >  			clock-latency-ns = <200000>;
-> >  		};
-> > -		opp11 {
-> > +		opp at 1300000000 {
-> >  			opp-hz = /bits/ 64 <1300000000>;
-> >  			opp-microvolt = <1250000>;
-> >  			clock-latency-ns = <200000>;
-> >  		};
-> > -		opp12 {
-> > +		opp at 1400000000 {
-> >  			opp-hz = /bits/ 64 <1400000000>;
-> >  			opp-microvolt = <1287500>;
-> >  			clock-latency-ns = <200000>;
-> >  		};
-> > -		opp13 {
-> > +		opp at 1500000000 {
-> >  			opp-hz = /bits/ 64 <1500000000>;
-> >  			opp-microvolt = <1350000>;
-> >  			clock-latency-ns = <200000>;
-> > 
-> 
-> This one doesn't apply for me on top of the current Linus' tree, so please
-> update.
+A FTM PWM instance enables/disables three clocks: The bus clock, the
+counter clock and the PWM clock. The bus clock gets enabled on
+pwm_request, whereas the counter and PWM clocks will be enabled upon
+pwm_enable.
 
-Scratch that, my bad.  Sorry.
+The driver has three closesly related issues when enabling/disabling
+clocks during suspend/resume:
+- The three clocks are not treated differently in regards to the
+  individual PWM state enabled/requested. This can lead to clocks
+  getting disabled which have not been enabled in the first place
+  (a PWM channel which only has been requested going through
+  suspend/resume).
 
-Thanks,
-Rafael
+- When entering suspend, the current behavior relies on the
+  FTM_OUTMASK register: If a PWM output is unmasked, the driver
+  assumes the clocks are enabled. However, some PWM instances
+  have only 2 channels connected (e.g. Vybrid's FTM1). In that case,
+  the FTM_OUTMASK reads 0x3 if all channels are disabled, even if
+  the code wrote 0xff to it before. For those PWM instances, the
+  current approach to detect enabled PWM signals does not work.
+
+- A third issue applies to the bus clock only, which can get enabled
+  multiple times (once for each PWM channel of a PWM chip). This is
+  fine, however when entering suspend mode, the clock only gets
+  disabled once.
+
+This change introduces a different approach by relying on the enable
+and prepared counters of the clock framework and using the frameworks
+PWM signal states to address all three issues.
+
+Clocks get disabled during suspend and back enabled on resume
+regarding to the PWM channels individual state (requested/enabled).
+
+Since we do not count the clock enables in the driver, this change no
+longer clears the Status and Control registers Clock Source Selection
+(FTM_SC[CLKS]). However, since we disable the selected clock anyway,
+and we explicitly select the clock source on reenabling a PWM channel
+this approach should not make a difference in practice.
+
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+Hi Lee,
+
+I just found your new email address. Thierry and I already had some
+discussion about the patch here:
+http://thread.gmane.org/gmane.linux.pwm/2878
+
+Could you have a look at that patch?
+
+Changes since v1:
+- Use the pwm_is_enabled helper
+
+ drivers/pwm/pwm-fsl-ftm.c | 58 ++++++++++++++++++++---------------------------
+ 1 file changed, 25 insertions(+), 33 deletions(-)
+
+diff --git a/drivers/pwm/pwm-fsl-ftm.c b/drivers/pwm/pwm-fsl-ftm.c
+index f9dfc8b..7225ac6 100644
+--- a/drivers/pwm/pwm-fsl-ftm.c
++++ b/drivers/pwm/pwm-fsl-ftm.c
+@@ -80,7 +80,6 @@ struct fsl_pwm_chip {
+ 
+ 	struct mutex lock;
+ 
+-	unsigned int use_count;
+ 	unsigned int cnt_select;
+ 	unsigned int clk_ps;
+ 
+@@ -300,9 +299,6 @@ static int fsl_counter_clock_enable(struct fsl_pwm_chip *fpc)
+ {
+ 	int ret;
+ 
+-	if (fpc->use_count++ != 0)
+-		return 0;
+-
+ 	/* select counter clock source */
+ 	regmap_update_bits(fpc->regmap, FTM_SC, FTM_SC_CLK_MASK,
+ 			   FTM_SC_CLK(fpc->cnt_select));
+@@ -334,25 +330,6 @@ static int fsl_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	return ret;
+ }
+ 
+-static void fsl_counter_clock_disable(struct fsl_pwm_chip *fpc)
+-{
+-	/*
+-	 * already disabled, do nothing
+-	 */
+-	if (fpc->use_count == 0)
+-		return;
+-
+-	/* there are still users, so can't disable yet */
+-	if (--fpc->use_count > 0)
+-		return;
+-
+-	/* no users left, disable PWM counter clock */
+-	regmap_update_bits(fpc->regmap, FTM_SC, FTM_SC_CLK_MASK, 0);
+-
+-	clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_CNTEN]);
+-	clk_disable_unprepare(fpc->clk[fpc->cnt_select]);
+-}
+-
+ static void fsl_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
+ 	struct fsl_pwm_chip *fpc = to_fsl_chip(chip);
+@@ -362,7 +339,8 @@ static void fsl_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	regmap_update_bits(fpc->regmap, FTM_OUTMASK, BIT(pwm->hwpwm),
+ 			   BIT(pwm->hwpwm));
+ 
+-	fsl_counter_clock_disable(fpc);
++	clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_CNTEN]);
++	clk_disable_unprepare(fpc->clk[fpc->cnt_select]);
+ 
+ 	regmap_read(fpc->regmap, FTM_OUTMASK, &val);
+ 	if ((val & 0xFF) == 0xFF)
+@@ -492,17 +470,24 @@ static int fsl_pwm_remove(struct platform_device *pdev)
+ static int fsl_pwm_suspend(struct device *dev)
+ {
+ 	struct fsl_pwm_chip *fpc = dev_get_drvdata(dev);
+-	u32 val;
++	int i;
+ 
+ 	regcache_cache_only(fpc->regmap, true);
+ 	regcache_mark_dirty(fpc->regmap);
+ 
+-	/* read from cache */
+-	regmap_read(fpc->regmap, FTM_OUTMASK, &val);
+-	if ((val & 0xFF) != 0xFF) {
++	for (i = 0; i < fpc->chip.npwm; i++) {
++		struct pwm_device *pwm = &fpc->chip.pwms[i];
++
++		if (!test_bit(PWMF_REQUESTED, &pwm->flags))
++			continue;
++
++		clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_SYS]);
++
++		if (!pwm_is_enabled(pwm))
++			continue;
++
+ 		clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_CNTEN]);
+ 		clk_disable_unprepare(fpc->clk[fpc->cnt_select]);
+-		clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_SYS]);
+ 	}
+ 
+ 	return 0;
+@@ -511,12 +496,19 @@ static int fsl_pwm_suspend(struct device *dev)
+ static int fsl_pwm_resume(struct device *dev)
+ {
+ 	struct fsl_pwm_chip *fpc = dev_get_drvdata(dev);
+-	u32 val;
++	int i;
++
++	for (i = 0; i < fpc->chip.npwm; i++) {
++		struct pwm_device *pwm = &fpc->chip.pwms[i];
++
++		if (!test_bit(PWMF_REQUESTED, &pwm->flags))
++			continue;
+ 
+-	/* read from cache */
+-	regmap_read(fpc->regmap, FTM_OUTMASK, &val);
+-	if ((val & 0xFF) != 0xFF) {
+ 		clk_prepare_enable(fpc->clk[FSL_PWM_CLK_SYS]);
++
++		if (!pwm_is_enabled(pwm))
++			continue;
++
+ 		clk_prepare_enable(fpc->clk[fpc->cnt_select]);
+ 		clk_prepare_enable(fpc->clk[FSL_PWM_CLK_CNTEN]);
+ 	}
+-- 
+2.6.2
