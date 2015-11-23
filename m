@@ -1,30 +1,76 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 23 Nov 2015 13:29:38 +0000
-Subject: [PATCH v2 4/4] drivers: psci: replace psci firmware calls
-In-Reply-To: <1447236266-7491-5-git-send-email-jens.wiklander@linaro.org>
-References: <1447236266-7491-1-git-send-email-jens.wiklander@linaro.org>
- <1447236266-7491-5-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <20151123132938.GF2755@arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 23 Nov 2015 14:31:00 +0100
+Subject: [PATCH] ARM: imx6: pm: declare pm domain latency on power_state
+ struct.
+In-Reply-To: <1447858656-62464-1-git-send-email-lina.iyer@linaro.org>
+References: <1447799871-56374-6-git-send-email-lina.iyer@linaro.org>
+ <1447858656-62464-1-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1448285460.3689.13.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 11, 2015 at 11:04:26AM +0100, Jens Wiklander wrote:
-> Switch to use a generic interface for issuing SMC/HVC based on ARM SMC
-> Calling Convention. Removes now the now unused psci-call.S.
+Am Mittwoch, den 18.11.2015, 07:57 -0700 schrieb Lina Iyer:
+> From: Axel Haslam <ahaslam+renesas@baylibre.com>
 > 
-> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+> The generic_pm_domain structure uses an array of latencies to be able to
+> declare multiple intermediate states.
+> 
+> Declare a single "OFF" state with the default latencies So that the
+> power_off_latency_ns and power_on_latency_ns fields of generic_pm_domain
+> structure can be eventualy removed.
+> 
+> Signed-off-by: Axel Haslam <ahaslam+renesas@baylibre.com>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> [Lina: pm_genpd_init() argument change]
 > ---
->  arch/arm/kernel/Makefile      |  1 -
->  arch/arm/kernel/psci-call.S   | 31 -------------------------------
->  arch/arm64/kernel/Makefile    |  2 +-
->  arch/arm64/kernel/psci-call.S | 28 ----------------------------
->  drivers/firmware/psci.c       | 23 +++++++++++++++++++++--
->  5 files changed, 22 insertions(+), 63 deletions(-)
->  delete mode 100644 arch/arm/kernel/psci-call.S
->  delete mode 100644 arch/arm64/kernel/psci-call.S
+>  arch/arm/mach-imx/gpc.c | 14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+> index 8e7976a..b070e06 100644
+> --- a/arch/arm/mach-imx/gpc.c
+> +++ b/arch/arm/mach-imx/gpc.c
+> @@ -368,13 +368,23 @@ static struct generic_pm_domain imx6q_arm_domain = {
+>  	.name = "ARM",
+>  };
+>  
+> +static struct genpd_power_state imx6q_arm_domain_states[] = {
 
-Thanks for doing this:
+Those states are for the PU, not the ARM domain.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+> +	{
+> +		.name = "OFF",
+> +		.power_off_latency_ns = 25000,
+> +		.power_on_latency_ns = 2000000,
+> +	},
+> +};
+> +
+>  static struct pu_domain imx6q_pu_domain = {
+>  	.base = {
+>  		.name = "PU",
+>  		.power_off = imx6q_pm_pu_power_off,
+>  		.power_on = imx6q_pm_pu_power_on,
+> -		.power_off_latency_ns = 25000,
+> -		.power_on_latency_ns = 2000000,
+> +		.gov = NULL,
+> +		.status = GPD_STATE_POWER_OFF,
 
-Will
+The above 2 lines should not be needed. This is a static struct, so .gov
+will already be NULL. status is set by pm_genpd_init() and the above
+value is actively wrong.
+
+> +		.states = imx6q_arm_domain_states,
+> +		.state_count = ARRAY_SIZE(imx6q_arm_domain_states),
+>  	},
+>  };
+>  
+
+How urgent is this patch? I have a series to rework the GPC driver
+almost ready and I could fold this change in directly if it's okay for
+this to sit through a review of the rework.
+
+Regards,
+Lucas
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
