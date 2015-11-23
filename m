@@ -1,153 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 23 Nov 2015 13:28:56 +0000
-Subject: [PATCH v2 3/4] arm64: add implementation for arm-smccc
-In-Reply-To: <1447236266-7491-4-git-send-email-jens.wiklander@linaro.org>
-References: <1447236266-7491-1-git-send-email-jens.wiklander@linaro.org>
- <1447236266-7491-4-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <20151123132856.GE2755@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 23 Nov 2015 21:28:38 +0800
+Subject: VF610 broken by pinctrl: freescale: imx: allow mux_reg offset zero
+In-Reply-To: <20151115024409.GB2194@lunn.ch>
+References: <20151115024409.GB2194@lunn.ch>
+Message-ID: <20151123132838.GM13744@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 11, 2015 at 11:04:25AM +0100, Jens Wiklander wrote:
-> Adds implementation for arm-smccc and enables CONFIG_HAVE_SMCCC.
+Hi Andrew,
+
+On Sun, Nov 15, 2015 at 03:44:09AM +0100, Andrew Lunn wrote:
+> Hi Adrian
 > 
-> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
-> ---
->  arch/arm64/Kconfig              |  1 +
->  arch/arm64/kernel/Makefile      |  1 +
->  arch/arm64/kernel/asm-offsets.c |  3 +++
->  arch/arm64/kernel/smccc-call.S  | 43 +++++++++++++++++++++++++++++++++++++++++
->  arch/arm64/kernel/smccc.c       | 18 +++++++++++++++++
->  5 files changed, 66 insertions(+)
->  create mode 100644 arch/arm64/kernel/smccc-call.S
->  create mode 100644 arch/arm64/kernel/smccc.c
+> Your patch
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 07d1811..a7332ca 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -89,6 +89,7 @@ config ARM64
->  	select SPARSE_IRQ
->  	select SYSCTL_EXCEPTION_TRACE
->  	select HAVE_CONTEXT_TRACKING
-> +	select HAVE_ARM_SMCCC
->  	help
->  	  ARM 64-bit (AArch64) Linux support.
->  
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index 22dc9bc..c61d758 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -36,6 +36,7 @@ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
->  arm64-obj-$(CONFIG_PCI)			+= pci.o
->  arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
->  arm64-obj-$(CONFIG_ACPI)		+= acpi.o
-> +arm64-obj-$(CONFIG_HAVE_ARM_SMCCC)	+= smccc-call.o smccc.o
+> commit e7b37a522aa92da5f47106aa07b6c1fc58bfd922
+> Author: Adrian Alonso <aalonso@freescale.com>
+> Date:   Fri Sep 25 16:05:59 2015 -0500
+> 
+>     pinctrl: freescale: imx: allow mux_reg offset zero
+>     
+>     Allow mux_reg offset zero to be a valid pin_id, on imx7d
+>     mux_conf reg offset is zero for iomuxc-lspr controller
+> 
+> has broken VF610.
+> 
+> It looks like you partially reverted
+> 
+> commit 3dac1918a4912cea9375e76cb3916b751cef22db
+> Author: Stefan Agner <stefan@agner.ch>
+> Date:   Sat Sep 6 18:25:04 2014 +0200
+> 
+>     pinctrl: imx: detect uninitialized pins
+>     
+>     The pinctrl driver initialized the register offsets for the pins
+>     with 0. On Vybrid an offset of 0 is a valid offset for the pinctrl
+>     mux register. So far, this was solved using the ZERO_OFFSET_VALID
+>     flag which allowed offsets of 0. However, this does not allow to
+>     verify whether a pins struct imx_pmx_func was initialized or not.
+>     
+>     Use signed offset values for register offsets and initialize those
+>     with -1 in order to detect uninitialized offset values reliable.
+> 
+> and in the process you have broken VF610, which also uses offset 0.
+> 
+> What i don't yet understand is why you needed to make this change. If
+> VF610 can already use mux_reg, why cannot imx7d?
+> 
+> Anyway, it looks like -rc1 is going to be broken on VF610 for some
+> boards, because this pin is the Ethernet clock input/output. Please
+> can you get it fixed for -rc2?
 
-I think you can just stick these in arm64-obj-y, since that option will
-never be turned off.
+Can you please try the following change to see if it fixes your problem?
 
->  obj-y					+= $(arm64-obj-y) vdso/
->  obj-m					+= $(arm64-obj-m)
-> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> index 8d89cf8..cfa0885 100644
-> --- a/arch/arm64/kernel/asm-offsets.c
-> +++ b/arch/arm64/kernel/asm-offsets.c
-> @@ -28,6 +28,7 @@
->  #include <asm/suspend.h>
->  #include <asm/vdso_datapage.h>
->  #include <linux/kbuild.h>
-> +#include <linux/arm-smccc.h>
->  
->  int main(void)
->  {
-> @@ -161,5 +162,7 @@ int main(void)
->    DEFINE(SLEEP_SAVE_SP_PHYS,	offsetof(struct sleep_save_sp, save_ptr_stash_phys));
->    DEFINE(SLEEP_SAVE_SP_VIRT,	offsetof(struct sleep_save_sp, save_ptr_stash));
->  #endif
-> +  DEFINE(ARM_SMCCC_RES_X0_OFFS,	offsetof(struct arm_smccc_res, a0));
-> +  DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
->    return 0;
->  }
-> diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
-> new file mode 100644
-> index 0000000..ae0496f
-> --- /dev/null
-> +++ b/arch/arm64/kernel/smccc-call.S
-> @@ -0,0 +1,43 @@
-> +/*
-> + * Copyright (c) 2015, Linaro Limited
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License Version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +#include <linux/linkage.h>
-> +#include <asm/asm-offsets.h>
-> +
-> +	.macro SMCCC instr
-> +	.cfi_startproc
-> +	\instr	#0
-> +	ldr	x4, [sp]
-> +	stp	x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
-> +	stp	x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
-> +	ret
-> +	.cfi_endproc
-> +	.endm
-> +
-> +/*
-> + * void arm_smccc_smc(unsigned long a0, unsigned long a1, unsigned long a2,
-> + *		  unsigned long a3, unsigned long a4, unsigned long a5,
-> + *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
-> + */
-> +ENTRY(arm_smccc_smc)
-> +	SMCCC	smc
-> +ENDPROC(arm_smccc_smc)
-> +
-> +/*
-> + * void arm_smccc_hvc(unsigned long a0, unsigned long a1, unsigned long a2,
-> + *		  unsigned long a3, unsigned long a4, unsigned long a5,
-> + *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
-> + */
-> +ENTRY(arm_smccc_hvc)
-> +	SMCCC	hvc
-> +ENDPROC(arm_smccc_hvc)
-> diff --git a/arch/arm64/kernel/smccc.c b/arch/arm64/kernel/smccc.c
-> new file mode 100644
-> index 0000000..7941210
-> --- /dev/null
-> +++ b/arch/arm64/kernel/smccc.c
-> @@ -0,0 +1,18 @@
-> +/*
-> + * Copyright (c) 2015, Linaro Limited
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +#include <linux/export.h>
-> +#include <linux/arm-smccc.h>
-> +
-> +EXPORT_SYMBOL_GPL(arm_smccc_smc);
-> +EXPORT_SYMBOL_GPL(arm_smccc_hvc);
+Shawn
 
-You can just put these in arch/arm64/kernel/arm64ksyms.c, which is where
-the rest of the EXPORTs for asm symbols live.
-
-With those changes:
-
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+diff --git a/drivers/pinctrl/freescale/pinctrl-vf610.c b/drivers/pinctrl/freescale/pinctrl-vf610.c
+index 37a037543d29..587d1ff6210e 100644
+--- a/drivers/pinctrl/freescale/pinctrl-vf610.c
++++ b/drivers/pinctrl/freescale/pinctrl-vf610.c
+@@ -299,7 +299,7 @@ static const struct pinctrl_pin_desc vf610_pinctrl_pads[] = {
+ static struct imx_pinctrl_soc_info vf610_pinctrl_info = {
+        .pins = vf610_pinctrl_pads,
+        .npins = ARRAY_SIZE(vf610_pinctrl_pads),
+-       .flags = SHARE_MUX_CONF_REG,
++       .flags = SHARE_MUX_CONF_REG | ZERO_OFFSET_VALID,
+ };
+ 
+ static const struct of_device_id vf610_pinctrl_of_match[] = {
