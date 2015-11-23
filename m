@@ -1,42 +1,35 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 23 Nov 2015 19:34:03 +0100
-Subject: [PATCH] soc: Mediatek: Enable SCPSYS power domain driver by
- default
-In-Reply-To: <CAMAWPa8ZcD30-06K3w1EewPMPA6LmU7bpOWbxi=VfsByyQT3Sw@mail.gmail.com>
-References: <1447411835-19035-1-git-send-email-eddie.huang@mediatek.com>
- <7h4mgpdh6f.fsf@deeprootsystems.com>
- <CAMAWPa8ZcD30-06K3w1EewPMPA6LmU7bpOWbxi=VfsByyQT3Sw@mail.gmail.com>
-Message-ID: <56535C1B.1090804@gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 23 Nov 2015 11:33:02 -0700
+Subject: [RESEND PATCH V4 10/26] coresight: etm3x: set progbit to stop trace
+ collection
+In-Reply-To: <1448303598-11249-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1448303598-11249-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1448303598-11249-11-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+There is no need to use the event enable's "always false" event to
+stop trace collection.  For that purpose setting the programming bit
+(ETMCR:10) is enough.
 
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-etm3x.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-On 19/11/15 21:05, Kevin Hilman wrote:
-> On Fri, Nov 13, 2015 at 7:59 AM, Kevin Hilman <khilman@kernel.org> wrote:
->> Eddie Huang <eddie.huang@mediatek.com> writes:
->>
->>> If enable Mediatek 8173 SoC, it should also enable power domain
->>> driver. Otherwise access clk subsystem register will fail.
->>>
->>> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
->>
->> Tested-by: Kevin Hilman <khilman@linaro.org>
->>
->> This gets the mt8173-evb booting again with arm-soc/for-next and
->> mainline for me.
->>
->> I'll let Matthias queue this up and send it with any other fixes for
->> v4.4-rc1.
->
-> Matthias, this is still broken in arm-soc.  Curious if your planning
-> on sending a fix?  If you prefer, with your ack, we can apply directly
-> to arm-soc/fixes.
->
-
-Sorry for the delay. Please apply it directly.
-
-Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
-
-Thanks a lot,
-Matthias
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index 5a2be0590754..d1235711b576 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -422,9 +422,6 @@ static void etm_disable_hw(void *info)
+ 	CS_UNLOCK(drvdata->base);
+ 	etm_set_prog(drvdata);
+ 
+-	/* Program trace enable to low by using always false event */
+-	etm_writel(drvdata, ETM_HARD_WIRE_RES_A | ETM_EVENT_NOT_A, ETMTEEVR);
+-
+ 	/* Read back sequencer and counters for post trace analysis */
+ 	config->seq_curr_state = (etm_readl(drvdata, ETMSQR) & ETM_SQR_MASK);
+ 
+-- 
+1.9.1
