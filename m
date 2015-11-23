@@ -1,56 +1,26 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 23 Nov 2015 17:29:59 +0000
-Subject: [PATCH 3/5] arm64: debug: Treat the BRPs/WRPs as unsigned
-In-Reply-To: <1447866540-23207-3-git-send-email-suzuki.poulose@arm.com>
-References: <1447866238-22970-1-git-send-email-suzuki.poulose@arm.com>
- <1447866540-23207-1-git-send-email-suzuki.poulose@arm.com>
- <1447866540-23207-3-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20151123172958.GC1702@arm.com>
+Date: Mon, 23 Nov 2015 17:35:47 +0000
+Subject: [PATCH 0/2] arm64 efi fixes
+In-Reply-To: <1448264604-19411-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1448264604-19411-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20151123173547.GD1702@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2015 at 05:08:58PM +0000, Suzuki K. Poulose wrote:
-> IDAA64DFR0_EL1: BRPs and WRPs are unsigned values. Use
-> the appropriate helpers to extract those fields.
+On Mon, Nov 23, 2015 at 08:43:22AM +0100, Ard Biesheuvel wrote:
+> Two minor issues that were spotted by Matt Fleming and Russell King during
+> review of the UEFI for 32-bit ARM series. No point in delaying these fixes
+> until the whole series gets acked, so I am sending them out separately
+> beforehand.
 > 
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/include/asm/hw_breakpoint.h |    6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
+> Ard Biesheuvel (2):
+>   arm64/efi: deal with NULL return value of early_memremap()
+>   arm64: efi: fix initcall return values
 
-Once you've got the dependencies sorted out:
+These both look like straightforward fixes to me:
 
   Acked-by: Will Deacon <will.deacon@arm.com>
 
-Will
+I assume Catalin will pick them up. Do they need to go to -stable?
 
-> diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
-> index e54415e..9732908 100644
-> --- a/arch/arm64/include/asm/hw_breakpoint.h
-> +++ b/arch/arm64/include/asm/hw_breakpoint.h
-> @@ -138,16 +138,18 @@ extern struct pmu perf_ops_bp;
->  /* Determine number of BRP registers available. */
->  static inline int get_num_brps(void)
->  {
-> +	u64 dfr0 = read_system_reg(SYS_ID_AA64DFR0_EL1);
->  	return 1 +
-> -		cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
-> +		cpuid_feature_extract_unsigned_field(dfr0,
->  						ID_AA64DFR0_BRPS_SHIFT);
->  }
->  
->  /* Determine number of WRP registers available. */
->  static inline int get_num_wrps(void)
->  {
-> +	u64 dfr0 = read_system_reg(SYS_ID_AA64DFR0_EL1);
->  	return 1 +
-> -		cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
-> +		cpuid_feature_extract_unsigned_field(dfr0,
->  						ID_AA64DFR0_WRPS_SHIFT);
->  }
->  
-> -- 
-> 1.7.9.5
-> 
+Will
