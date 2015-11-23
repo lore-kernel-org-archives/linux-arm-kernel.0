@@ -1,124 +1,68 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 23 Nov 2015 14:59:52 +0000
-Subject: [PATCH v8 1/8] ARM: dt: Binding documentation for imx25 ADC/TSC
-In-Reply-To: <1447675269-8831-2-git-send-email-mpa@pengutronix.de>
-References: <1447675269-8831-1-git-send-email-mpa@pengutronix.de>
- <1447675269-8831-2-git-send-email-mpa@pengutronix.de>
-Message-ID: <20151123145952.GC31376@x1>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 23 Nov 2015 15:04:59 +0000
+Subject: [PATCH v3 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
+In-Reply-To: <1447888808-31571-4-git-send-email-dcashman@android.com>
+References: <1447888808-31571-1-git-send-email-dcashman@android.com>
+ <1447888808-31571-2-git-send-email-dcashman@android.com>
+ <1447888808-31571-3-git-send-email-dcashman@android.com>
+ <1447888808-31571-4-git-send-email-dcashman@android.com>
+Message-ID: <20151123150459.GD4236@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Nov 2015, Markus Pargmann wrote:
-
-> This documentation describes the devicetree bindings for the
-> ADC/Touchscreen unit of the i.MX25 SoC.
+On Wed, Nov 18, 2015 at 03:20:07PM -0800, Daniel Cashman wrote:
+> From: dcashman <dcashman@google.com>
 > 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> Acked-by: Jonathan Cameron <jic23@kernel.org>
+> arm64: arch_mmap_rnd() uses STACK_RND_MASK to generate the
+> random offset for the mmap base address.  This value represents a
+> compromise between increased ASLR effectiveness and avoiding
+> address-space fragmentation. Replace it with a Kconfig option, which
+> is sensibly bounded, so that platform developers may choose where to
+> place this compromise. Keep default values as new minimums.
+> 
+> Signed-off-by: Daniel Cashman <dcashman@google.com>
 > ---
+>  arch/arm64/Kconfig   | 23 +++++++++++++++++++++++
+>  arch/arm64/mm/mmap.c |  6 ++++--
+>  2 files changed, 27 insertions(+), 2 deletions(-)
 > 
-> Notes:
->     Changes in v6:
->      - Removed adc-ref property and replaced it with refp and refn for positive and
->        negative references. The properties are optional now as the default
->        behaviour is a positive internal reference voltage and ADC GND as negative
->        reference.
-> 
->  .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    | 46 ++++++++++++++++++++++
->  1 file changed, 46 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
-> new file mode 100644
-> index 000000000000..a857af0eb68c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
-> @@ -0,0 +1,46 @@
-> +Freescale mx25 ADC/TSC multifunction device
-
-Prefer "MX25" and "MultiFunction Device (MFD)"
-
-> +This device combines two general purpose conversion queues one used for general
-> +ADC and the other used for touchscreens.
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 9ac16a4..be38e4c 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -51,6 +51,8 @@ config ARM64
+>  	select HAVE_ARCH_JUMP_LABEL
+>  	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP
+>  	select HAVE_ARCH_KGDB
+> +	select HAVE_ARCH_MMAP_RND_BITS
+> +	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
+>  	select HAVE_ARCH_SECCOMP_FILTER
+>  	select HAVE_ARCH_TRACEHOOK
+>  	select HAVE_BPF_JIT
+> @@ -104,6 +106,27 @@ config ARCH_PHYS_ADDR_T_64BIT
+>  config MMU
+>  	def_bool y
+>  
+> +config ARCH_MMAP_RND_BITS_MIN
+> +       default 15 if ARM64_64K_PAGES
+> +       default 19
 > +
-> +Required properties:
-> + - compatible: Should be "fsl,imx25-tsadc".
-> + - reg: Memory range of the device.
-
-Not exactly.  More like start location and size.
-
-> + - interrupts: Interrupt for this device as described in
-> +   interrupts/interrupts.txt
-
-No such file.  In any case, I'd prefer:
-
-"(See: ../interrupt-controller/interrupts.txt)".
-
-> + - clocks: An 'ipg' clock defined as described in clocks/clock.txt
-
-Didn't you check any of what you've written?
-
-"(See: ../clock/clock-bindings.txt)"
-
-> + - interrupt-controller: This device is an interrupt controller. It controls
-> +   the interrupts of both conversion queues.
-> + - #interrupt-cells: Should be '<1>'.
-> + - #address-cells: Should be '<1>'.
-> + - #size-cells: Should be '<1>'.
-> + - ranges
-
-?
-
-Also, don't think think that this looks better/easier to read?
-
-> +Required properties:
-> + - compatible:		Should be "fsl,imx25-tsadc".
-> + - reg:			Memory range of the device.
-> + - interrupts:		Interrupt for this device as described in
-> +				interrupts/interrupts.txt
-> + - clocks:			An 'ipg' clock defined as described in clocks/clock.txt
-> + - interrupt-controller:	This device is an interrupt controller. It controls
-> +   				the interrupts of both conversion queues.
-> + - #interrupt-cells:		Should be '<1>'.
-> + - #address-cells:		Should be '<1>'.
-> + - #size-cells:		Should be '<1>'.
-
-[...]
-
-> +This device includes two conversion queues which can be added as subnodes.
-> +The first queue is for the touchscreen, the second for general purpose ADC.
+> +config ARCH_MMAP_RND_BITS_MAX
+> +       default 20 if ARM64_64K_PAGES && ARCH_VA_BITS=39
+> +       default 24 if ARCH_VA_BITS=39
+> +       default 23 if ARM64_64K_PAGES && ARCH_VA_BITS=42
+> +       default 27 if ARCH_VA_BITS=42
+> +       default 29 if ARM64_64K_PAGES && ARCH_VA_BITS=48
+> +       default 33 if ARCH_VA_BITS=48
+> +       default 15 if ARM64_64K_PAGES
+> +       default 19
 > +
-> +Example:
-> +	tscadc: tscadc at 50030000 {
-> +		compatible = "fsl,imx25-tsadc";
-> +		reg = <0x50030000 0xc>;
-> +		interrupts = <46>;
-> +		clocks = <&clks 119>;
-> +		clock-names = "ipg";
+> +config ARCH_MMAP_RND_COMPAT_BITS_MIN
+> +       default 7 if ARM64_64K_PAGES
+> +       default 11
 
-I don't think this is required, if you only have a single clock.
+FYI: we now support 16k pages too, so this might need updating. It would
+be much nicer if this was somehow computed rather than have the results
+all open-coded like this.
 
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		tsc: tcq at 50030400 {
-> +			compatible = "fsl,imx25-tcq";
-> +			reg = <0x50030400 0x60>;
-> +			...
-> +		};
-> +
-> +		adc: gcq at 50030800 {
-> +			compatible = "fsl,imx25-gcq";
-> +			reg = <0x50030800 0x60>;
-> +			...
-> +		};
-> +	};
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Will
