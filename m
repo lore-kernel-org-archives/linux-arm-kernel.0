@@ -1,71 +1,260 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Nov 2015 17:25:28 +0100
-Subject: [RFC] asm-generic: default BUG_ON(x) to "if(x) BUG()"
-Message-ID: <5868782.RxZY0W5S4d@wuerfel>
+From: jenskuske@gmail.com (Jens Kuske)
+Date: Mon, 23 Nov 2015 17:25:38 +0100
+Subject: [linux-sunxi] Re: [PATCH v4 5/6] ARM: dts: sunxi: Add Allwinner
+ H3 DTSI
+In-Reply-To: <5652EF87.50604@redhat.com>
+References: <1445964626-6484-1-git-send-email-jenskuske@gmail.com>
+ <1445964626-6484-6-git-send-email-jenskuske@gmail.com>
+ <CAGb2v64NZMw0vNvVtepthUMox5TDy07gTBAWZqf8GAq6TrMpOg@mail.gmail.com>
+ <563614A3.6060805@gmail.com> <20151123085719.GT32142@lukather>
+ <5652EF87.50604@redhat.com>
+Message-ID: <56533E02.6020807@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_BUG is disabled, BUG_ON() will only evaluate the condition,
-but will not actually stop the current thread. GCC warns about a couple
-of BUG_ON() users where this actually leads to further undefined
-behavior:
+On 23/11/15 11:50, Hans de Goede wrote:
+> HI,
+> 
+> On 23-11-15 09:57, Maxime Ripard wrote:
+>> Hi,
+>>
+>> On Sun, Nov 01, 2015 at 02:33:23PM +0100, Jens Kuske wrote:
+>>>>> +               bus_gates: clk at 01c20060 {
+>>>>> +                       #clock-cells = <1>;
+>>>>> +                       compatible = "allwinner,sun8i-h3-bus-gates-clk";
+>>>>> +                       reg = <0x01c20060 0x14>;
+>>>>> +                       clocks = <&ahb1>, <&ahb2>, <&apb1>, <&apb2>;
+>>>>> +                       clock-names = "ahb1", "ahb2", "apb1", "apb2";
+>>>>> +                       clock-indices = <5>, <6>, <8>,
+>>>>> +                                       <9>, <10>, <13>,
+>>>>> +                                       <14>, <17>, <18>,
+>>>>> +                                       <19>, <20>,
+>>>>> +                                       <21>, <23>,
+>>>>> +                                       <24>, <25>,
+>>>>> +                                       <26>, <27>,
+>>>>> +                                       <28>, <29>,
+>>>>> +                                       <30>, <31>, <32>,
+>>>>> +                                       <35>, <36>, <37>,
+>>>>> +                                       <40>, <41>, <43>,
+>>>>> +                                       <44>, <52>, <53>,
+>>>>> +                                       <54>, <64>,
+>>>>> +                                       <65>, <69>, <72>,
+>>>>> +                                       <76>, <77>, <78>,
+>>>>> +                                       <96>, <97>, <98>,
+>>>>> +                                       <112>, <113>,
+>>>>> +                                       <114>, <115>, <116>,
+>>>>> +                                       <128>, <135>;
+>>>>> +                       clock-output-names = "ahb1_ce", "ahb1_dma", "ahb1_mmc0",
+>>>>> +                                       "ahb1_mmc1", "ahb1_mmc2", "ahb1_nand",
+>>>>> +                                       "ahb1_sdram", "ahb2_gmac", "ahb1_ts",
+>>>>> +                                       "ahb1_hstimer", "ahb1_spi0",
+>>>>> +                                       "ahb1_spi1", "ahb1_otg",
+>>>>> +                                       "ahb1_otg_ehci0", "ahb1_ehic1",
+>>>>
+>>>> ahb1_ehci1? Same for the following 3 lines.
+>>> I'll fix them...
+>>>>
+>>>>> +                                       "ahb1_ehic2", "ahb1_ehic3",
+>>>>> +                                       "ahb1_otg_ohci0", "ahb2_ohic1",
+>>>>> +                                       "ahb2_ohic2", "ahb2_ohic3", "ahb1_ve",
+>>>>> +                                       "ahb1_lcd0", "ahb1_lcd1", "ahb1_deint",
+>>>>> +                                       "ahb1_csi", "ahb1_tve", "ahb1_hdmi",
+>>>>> +                                       "ahb1_de", "ahb1_gpu", "ahb1_msgbox",
+>>>>> +                                       "ahb1_spinlock", "apb1_codec",
+>>>>> +                                       "apb1_spdif", "apb1_pio", "apb1_ths",
+>>>>> +                                       "apb1_i2s0", "apb1_i2s1", "apb1_i2s2",
+>>>>> +                                       "apb2_i2c0", "apb2_i2c1", "apb2_i2c2",
+>>>>> +                                       "apb2_uart0", "apb2_uart1",
+>>>>> +                                       "apb2_uart2", "apb2_uart3", "apb2_scr",
+>>>>> +                                       "ahb1_ephy", "ahb1_dbg";
+>>>>
+>>>> If it weren't for the last 2 clocks, we could cleanly split out apb1 and apb2
+>>>> gates. Having a separate AHB clock gate taking 2 addresses seems messy
+>>>> as well. :(
+>>>
+>>> Well, maybe we still should do that, if we split the resets too at least
+>>> apb[12]  would line up again.
+>>>
+>>> I don't know what to do with these bus things any more, all variants I
+>>> sent had issues somewhere...
+>>
+>> AFAIK, Arnd had some objections, but he never got back to us when we
+>> explained how the hardware was laid out, so I don't know if they still
+>> apply.
+>>
+>>>>> +               };
+>>>>> +
+>>>>> +               mmc0_clk: clk at 01c20088 {
+>>>>> +                       #clock-cells = <1>;
+>>>>> +                       compatible = "allwinner,sun4i-a10-mmc-clk";
+>>>>> +                       reg = <0x01c20088 0x4>;
+>>>>> +                       clocks = <&osc24M>, <&pll6 0>, <&pll8 0>;
+>>>>> +                       clock-output-names = "mmc0",
+>>>>> +                                            "mmc0_output",
+>>>>> +                                            "mmc0_sample";
+>>>>> +               };
+>>>>> +
+>>>>> +               mmc1_clk: clk at 01c2008c {
+>>>>> +                       #clock-cells = <1>;
+>>>>> +                       compatible = "allwinner,sun4i-a10-mmc-clk";
+>>>>> +                       reg = <0x01c2008c 0x4>;
+>>>>> +                       clocks = <&osc24M>, <&pll6 0>, <&pll8 0>;
+>>>>> +                       clock-output-names = "mmc1",
+>>>>> +                                            "mmc1_output",
+>>>>> +                                            "mmc1_sample";
+>>>>> +               };
+>>>>> +
+>>>>> +               mmc2_clk: clk at 01c20090 {
+>>>>> +                       #clock-cells = <1>;
+>>>>> +                       compatible = "allwinner,sun4i-a10-mmc-clk";
+>>>>> +                       reg = <0x01c20090 0x4>;
+>>>>> +                       clocks = <&osc24M>, <&pll6 0>, <&pll8 0>;
+>>>>> +                       clock-output-names = "mmc2",
+>>>>> +                                            "mmc2_output",
+>>>>> +                                            "mmc2_sample";
+>>>>> +               };
+>>>>> +
+>>>>> +               mbus_clk: clk at 01c2015c {
+>>>>> +                       #clock-cells = <0>;
+>>>>> +                       compatible = "allwinner,sun8i-a23-mbus-clk";
+>>>>> +                       reg = <0x01c2015c 0x4>;
+>>>>> +                       clocks = <&osc24M>, <&pll6 1>, <&pll5>;
+>>>>> +                       clock-output-names = "mbus";
+>>>>> +               };
+>>>>> +       };
+>>>>> +
+>>>>> +       soc {
+>>>>> +               compatible = "simple-bus";
+>>>>> +               #address-cells = <1>;
+>>>>> +               #size-cells = <1>;
+>>>>> +               ranges;
+>>>>> +
+>>>>> +               dma: dma-controller at 01c02000 {
+>>>>> +                       compatible = "allwinner,sun8i-h3-dma";
+>>>>> +                       reg = <0x01c02000 0x1000>;
+>>>>> +                       interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
+>>>>> +                       clocks = <&bus_gates 6>;
+>>>>> +                       resets = <&bus_rst 6>;
+>>>>> +                       #dma-cells = <1>;
+>>>>> +               };
+>>>>> +
+>>>>> +               mmc0: mmc at 01c0f000 {
+>>>>> +                       compatible = "allwinner,sun5i-a13-mmc";
+>>>>> +                       reg = <0x01c0f000 0x1000>;
+>>>>> +                       clocks = <&bus_gates 8>,
+>>>>> +                                <&mmc0_clk 0>,
+>>>>> +                                <&mmc0_clk 1>,
+>>>>> +                                <&mmc0_clk 2>;
+>>>>> +                       clock-names = "ahb",
+>>>>> +                                     "mmc",
+>>>>> +                                     "output",
+>>>>> +                                     "sample";
+>>>>> +                       resets = <&bus_rst 8>;
+>>>>> +                       reset-names = "ahb";
+>>>>> +                       interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+>>>>> +                       status = "disabled";
+>>>>> +                       #address-cells = <1>;
+>>>>> +                       #size-cells = <0>;
+>>>>> +               };
+>>>>> +
+>>>>> +               mmc1: mmc at 01c10000 {
+>>>>> +                       compatible = "allwinner,sun5i-a13-mmc";
+>>>>> +                       reg = <0x01c10000 0x1000>;
+>>>>> +                       clocks = <&bus_gates 9>,
+>>>>> +                                <&mmc1_clk 0>,
+>>>>> +                                <&mmc1_clk 1>,
+>>>>> +                                <&mmc1_clk 2>;
+>>>>> +                       clock-names = "ahb",
+>>>>> +                                     "mmc",
+>>>>> +                                     "output",
+>>>>> +                                     "sample";
+>>>>> +                       resets = <&bus_rst 9>;
+>>>>> +                       reset-names = "ahb";
+>>>>> +                       interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+>>>>> +                       status = "disabled";
+>>>>> +                       #address-cells = <1>;
+>>>>> +                       #size-cells = <0>;
+>>>>> +               };
+>>>>> +
+>>>>> +               mmc2: mmc at 01c11000 {
+>>>>> +                       compatible = "allwinner,sun5i-a13-mmc";
+>>>>> +                       reg = <0x01c11000 0x1000>;
+>>>>> +                       clocks = <&bus_gates 10>,
+>>>>> +                                <&mmc2_clk 0>,
+>>>>> +                                <&mmc2_clk 1>,
+>>>>> +                                <&mmc2_clk 2>;
+>>>>> +                       clock-names = "ahb",
+>>>>> +                                     "mmc",
+>>>>> +                                     "output",
+>>>>> +                                     "sample";
+>>>>> +                       resets = <&bus_rst 10>;
+>>>>> +                       reset-names = "ahb";
+>>>>> +                       interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+>>>>> +                       status = "disabled";
+>>>>> +                       #address-cells = <1>;
+>>>>> +                       #size-cells = <0>;
+>>>>> +               };
+>>>>> +
+>>>>> +               pio: pinctrl at 01c20800 {
+>>>>> +                       compatible = "allwinner,sun8i-h3-pinctrl";
+>>>>> +                       reg = <0x01c20800 0x400>;
+>>>>> +                       interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
+>>>>> +                                    <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+>>>>> +                       clocks = <&bus_gates 69>;
+>>>>> +                       gpio-controller;
+>>>>> +                       #gpio-cells = <3>;
+>>>>> +                       interrupt-controller;
+>>>>> +                       #interrupt-cells = <2>;
+>>>>> +
+>>>>> +                       uart0_pins_a: uart0 at 0 {
+>>>>> +                               allwinner,pins = "PA4", "PA5";
+>>>>> +                               allwinner,function = "uart0";
+>>>>> +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>>>>> +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>>>>> +                       };
+>>>>> +
+>>>>> +                       mmc0_pins_a: mmc0 at 0 {
+>>>>> +                               allwinner,pins = "PF0", "PF1", "PF2", "PF3",
+>>>>> +                                                "PF4", "PF5";
+>>>>> +                               allwinner,function = "mmc0";
+>>>>> +                               allwinner,drive = <SUN4I_PINCTRL_30_MA>;
+>>>>> +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>>>>> +                       };
+>>>>> +
+>>>>> +                       mmc0_cd_pin: mmc0_cd_pin at 0 {
+>>>>> +                               allwinner,pins = "PF6";
+>>>>> +                               allwinner,function = "gpio_in";
+>>>>> +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>>>>> +                               allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+>>>>> +                       };
+>>>>
+>>>> This should be in the board DTS, unless this is the reference design,
+>>>> in which case you should name the label like "mmc0_cd_pin_reference_design".
+>>>>
+>>>
+>>> The datasheet mentions SDC0_DET function on PF6
+> 
+> Hmm, not in my version, I've "Allwinner_H3_Datasheet_V1.0.pdf" and there
+> PF6 only has generic input / output functionality.
 
-include/linux/ceph/osdmap.h: In function 'ceph_can_shift_osds':
-include/linux/ceph/osdmap.h:54:1: warning: control reaches end of non-void function
-fs/ext4/inode.c: In function 'ext4_map_blocks':
-fs/ext4/inode.c:548:5: warning: 'retval' may be used uninitialized in this function
-drivers/mfd/db8500-prcmu.c: In function 'prcmu_config_clkout':
-drivers/mfd/db8500-prcmu.c:762:10: warning: 'div_mask' may be used uninitialized in this function
-drivers/mfd/db8500-prcmu.c:769:13: warning: 'mask' may be used uninitialized in this function
-drivers/mfd/db8500-prcmu.c:757:7: warning: 'bits' may be used uninitialized in this function
-drivers/tty/serial/8250/8250_core.c: In function 'univ8250_release_irq':
-drivers/tty/serial/8250/8250_core.c:252:18: warning: 'i' may be used uninitialized in this function
-drivers/tty/serial/8250/8250_core.c:235:19: note: 'i' was declared here
+Hm, indeed, it isn't mentioned in the Port Controller documentation, but
+the table on page 76 (3.2. GPIO Multiplexing Functions) has it.
 
-There is an obvious conflict of interest here: on the one hand, someone
-who disables CONFIG_BUG() will want the kernel to be as small as possible
-and doesn't care about printing error messages to a console that nobody
-looks at. On the other hand, running into a BUG_ON() condition means that
-something has gone wrong, and we probably want to also stop doing things
-that might cause data corruption.
+> 
+>  >> so I thought this is
+>>> sort of fixed to this pin now. All designs I've seen use this pin.
+>>
+>> Why is it set as a gpio then if it is a separate function?
+> 
+> I guess because we do not support this in the mmc driver yet. Also on
+> older devices the mmc controller has build-in card-detection features
+> (using the data lines in that case) but we've never supported this since
+> none of the boards sofar have been using it.
+> 
+> For now we can just treat PF6 as a gpio, until someone figures out how
+> to do this inside the mmc driver.
 
-This patch picks the second choice, and changes the NOP to BUG(), which
-normally stops the execution of the current thread in some form (endless
-loop or a trap). This follows the logic we applied in a4b5d580e078 ("bug:
-Make BUG() always stop the machine").
+I could not find any documentation or reference how to use it, probably
+because it doesn't exist...
 
-For ARM multi_v7_defconfig, the size slightly increases:
-
-section		CONFIG_BUG=y	CONFIG_BUG=n	CONFIG_BUG=n+patch
-
-  .text            8320248   |     8180944   |     8207688
-  .rodata          3633720   |     3567144   |     3570648
-  __bug_table        32508   |         ---   |         ---
-  __modver             692   |        1584   |        2176
-  .init.text        558132   |      548300   |      550088
-  .exit.text         12380   |       12256   |       12380
-  .data            1016672   |     1016064   |     1016128
-  Total           14622556   |    14374510   |    14407326
-
-So instead of saving 1.70% of the total image size, we only save 1.48%
-by turning off CONFIG_BUG, but in return we can ensure that we don't run
-into cases of uninitialized variable or return code uses when something
-bad happens. Aside from that, we significantly reduce the number of
-warnings in randconfig builds, which makes it easier to fix the warnings
-about other problems.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/include/asm-generic/bug.h b/include/asm-generic/bug.h
-index 630dd2372238..58bd1f08c5c7 100644
---- a/include/asm-generic/bug.h
-+++ b/include/asm-generic/bug.h
-@@ -142,7 +142,7 @@ extern void warn_slowpath_null(const char *file, const int line);
- #endif
- 
- #ifndef HAVE_ARCH_BUG_ON
--#define BUG_ON(condition) do { if (condition) ; } while (0)
-+#define BUG_ON(condition) do { if (condition) BUG(); } while (0)
- #endif
- 
- #ifndef HAVE_ARCH_WARN_ON
+Jens
