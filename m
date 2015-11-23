@@ -1,82 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Nov 2015 14:54:34 +0100
-Subject: [PATCH] ARM: ixp4xx: fix read{b,w,l} return types
-Message-ID: <4362140.iyWOWZXsMe@wuerfel>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon, 23 Nov 2015 14:56:01 +0100
+Subject: [PATCH v5 3/4] ARM: shmobile: r8a7740: Migrate to generic l2c OF
+ initialization
+In-Reply-To: <1448286962-16897-1-git-send-email-geert+renesas@glider.be>
+References: <1448286962-16897-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1448286962-16897-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ixp4xx, the readl() function returns an 'unsigned long' output
-when indirect I/O is used. This is unlike any other platform, and
-it causes lots of harmless compiler warnings, such as:
+Migrate the generic r8a7740 platform from calling l2x0_of_init() to the
+generic l2c OF initialization.
 
-drivers/ata/libahci.c: In function 'ahci_show_host_version':
-drivers/ata/libahci.c:254:22: warning: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'long unsigned int' [-Wformat=]
-drivers/block/mtip32xx/mtip32xx.c: In function 'mtip_hw_read_registers':
-drivers/block/mtip32xx/mtip32xx.c:2602:31: warning: format '%X' expects argument of type 'unsigned int', but argument 3 has type 'long unsigned int' [-Wformat=]
-drivers/block/cciss.c: In function 'print_cfg_table':
-drivers/block/cciss.c:3845:25: warning: format '%d' expects argument of type 'int', but argument 4 has type 'long unsigned int' [-Wformat=]
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v5:
+  - No changes,
 
-This changes all six of the ixp4xx specific I/O read functions
-to return the same types that we have in the normal asm/io.h,
-to avoid the warnings.
+v4:
+  - This depends on commit eeedcea69e927857 ("ARM: 8395/1: l2c: Add
+    support for the "arm,shared-override" property"), which is queued
+    for 4.3 in arm/for-next,
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+v3:
+  - Use 0/~0 now DT supports "arm,shared-override",
 
-diff --git a/arch/arm/mach-ixp4xx/include/mach/io.h b/arch/arm/mach-ixp4xx/include/mach/io.h
-index b02439019963..7a0c13bf4269 100644
---- a/arch/arm/mach-ixp4xx/include/mach/io.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/io.h
-@@ -143,7 +143,7 @@ static inline void __indirect_writesl(volatile void __iomem *bus_addr,
- 		writel(*vaddr++, bus_addr);
+v2:
+  - Keep only {,~}L2C_AUX_CTRL_SHARED_OVERRIDE.
+---
+ arch/arm/mach-shmobile/setup-r8a7740.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index 0c8f80c5b04df34d..7b16c12e3f816f7f 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -110,10 +110,6 @@ static void __init r8a7740_generic_init(void)
+ {
+ 	r8a7740_meram_workaround();
+ 
+-#ifdef CONFIG_CACHE_L2X0
+-	/* Shared attribute override enable, 32K*8way */
+-	l2x0_init(IOMEM(0xf0002000), 0x00400000, 0xc20f0fff);
+-#endif
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
  }
  
--static inline unsigned char __indirect_readb(const volatile void __iomem *p)
-+static inline u8 __indirect_readb(const volatile void __iomem *p)
- {
- 	u32 addr = (u32)p;
- 	u32 n, byte_enables, data;
-@@ -166,7 +166,7 @@ static inline void __indirect_readsb(const volatile void __iomem *bus_addr,
- 		*vaddr++ = readb(bus_addr);
- }
+@@ -123,6 +119,8 @@ static const char *const r8a7740_boards_compat_dt[] __initconst = {
+ };
  
--static inline unsigned short __indirect_readw(const volatile void __iomem *p)
-+static inline u16 __indirect_readw(const volatile void __iomem *p)
- {
- 	u32 addr = (u32)p;
- 	u32 n, byte_enables, data;
-@@ -189,7 +189,7 @@ static inline void __indirect_readsw(const volatile void __iomem *bus_addr,
- 		*vaddr++ = readw(bus_addr);
- }
- 
--static inline unsigned long __indirect_readl(const volatile void __iomem *p)
-+static inline u32 __indirect_readl(const volatile void __iomem *p)
- {
- 	u32 addr = (__force u32)p;
- 	u32 data;
-@@ -350,7 +350,7 @@ static inline void insl(u32 io_addr, void *p, u32 count)
- 					((unsigned long)p <= (PIO_MASK + PIO_OFFSET)))
- 
- #define	ioread8(p)			ioread8(p)
--static inline unsigned int ioread8(const void __iomem *addr)
-+static inline u8 ioread8(const void __iomem *addr)
- {
- 	unsigned long port = (unsigned long __force)addr;
- 	if (__is_io_address(port))
-@@ -378,7 +378,7 @@ static inline void ioread8_rep(const void __iomem *addr, void *vaddr, u32 count)
- }
- 
- #define	ioread16(p)			ioread16(p)
--static inline unsigned int ioread16(const void __iomem *addr)
-+static inline u16 ioread16(const void __iomem *addr)
- {
- 	unsigned long port = (unsigned long __force)addr;
- 	if (__is_io_address(port))
-@@ -407,7 +407,7 @@ static inline void ioread16_rep(const void __iomem *addr, void *vaddr,
- }
- 
- #define	ioread32(p)			ioread32(p)
--static inline unsigned int ioread32(const void __iomem *addr)
-+static inline u32 ioread32(const void __iomem *addr)
- {
- 	unsigned long port = (unsigned long __force)addr;
- 	if (__is_io_address(port))
+ DT_MACHINE_START(R8A7740_DT, "Generic R8A7740 (Flattened Device Tree)")
++	.l2c_aux_val	= 0,
++	.l2c_aux_mask	= ~0,
+ 	.map_io		= r8a7740_map_io,
+ 	.init_early	= shmobile_init_delay,
+ 	.init_irq	= r8a7740_init_irq_of,
+-- 
+1.9.1
