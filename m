@@ -1,65 +1,64 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 23 Nov 2015 17:45:10 +0000
-Subject: [PATCH] arm64: dts: Add idle-states for Juno
-In-Reply-To: <20151026151709.GA16145@red-moon> (Lorenzo Pieralisi's message of
- "Mon, 26 Oct 2015 15:17:09 +0000")
-References: <1430402268.2868.20.camel@linaro.org>
- <9hheggnca1y.fsf@e105922-lin.cambridge.arm.com>
- <1445868751.2807.21.camel@linaro.org>
- <20151026151709.GA16145@red-moon>
-Message-ID: <9hh7fl8lie1.fsf@e105922-lin.cambridge.arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 23 Nov 2015 19:51:41 +0200
+Subject: [PATCH 13/18] [media] media-entity.h: rename entity.type to
+ entity.function
+In-Reply-To: <10e7edf1c85965d8ef8c6c5f527fd695a2660fc4.1441559233.git.mchehab@osg.samsung.com>
+References: <cover.1441559233.git.mchehab@osg.samsung.com>
+ <10e7edf1c85965d8ef8c6c5f527fd695a2660fc4.1441559233.git.mchehab@osg.samsung.com>
+Message-ID: <7197567.LfPs5Bvqpi@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+Hi Mauro,
 
-> On Mon, Oct 26, 2015 at 02:12:31PM +0000, Jon Medhurst (Tixy) wrote:
->> On Thu, 2015-10-22 at 14:22 +0100, Punit Agrawal wrote:
->> > "Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
->> > 
->> > > From: Jon Medhurst <tixy@linaro.org>
->> > >
->> > > Signed-off-by: Jon Medhurst <tixy@linaro.org>
->> > 
->> > Apologies for resurrecting an old thread.
->> > 
->> > Following the discussion on this thread, even though certain concerns
->> > were raised, there wasn't any objection to $SUBJECT being merged.
->> > 
->> > I don't see this patch in any tree; perhaps it's slipped through the
->> > cracks.
->> 
->> It did slip through the cracks. Lorenzo's last comment was "I am fine
->> with enabling the idle states, I need to review and test the idle states
->> DT data in the patch first though." and I didn't chase things up.
->> 
->> The patch will need refreshing to add idle for Juno r1. Which will then
->> probably resurrect the discussion about where the numbers come from for
->> residency times, and are the same ones for r0 valid on r1 (and r2?).
->> 
->> In an effort to forestall that I would say: does anyone actually care if
->> the values are optimal? Juno is a reference platform and powered off
->> mains, so tuning for the optimum power consumption is pretty pointless.
->> But because it _is_ used as a reference by people it should at least
->> have these features enabled, to serve as an example, and for test
->> coverage.
->
-> I agree with you here, let me check the entry/exit latencies again
-> to make sure they are reasonably set-up, it is 4.5 material anyway.
+Thank you for the patch.
 
-Hi Lorenzo,
+On Sunday 06 September 2015 14:30:56 Mauro Carvalho Chehab wrote:
+> Entities should have one or more functions. Calling it as a
+> type proofed to not be correct, as an entity could eventually
 
-Have you had a chance to sanity check the values we've got here? I
-didn't want to miss this merge window if possible.
+s/proofed/proved/
 
-Thanks,
-Punit
+> have more than one type.
+> 
+> So, rename the field as function.
 
->
-> Thanks,
-> Lorenzo
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+s/as/to/
+
+> Please notice that this patch doesn't extend support for
+> multiple function entities. Such change will happen when
+> we have real case drivers using it.
+> 
+> No functional changes.
+> 
+> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+
+[snip]
+
+> diff --git a/include/media/media-entity.h b/include/media/media-entity.h
+> index 8bdc10dcc5e7..10f7d5f0eb66 100644
+> --- a/include/media/media-entity.h
+> +++ b/include/media/media-entity.h
+> @@ -152,7 +152,8 @@ struct media_entity_operations {
+>   *
+>   * @graph_obj:	Embedded structure containing the media object common data.
+>   * @name:	Entity name.
+> - * @type:	Entity type, as defined at uapi/media.h (MEDIA_ENT_T_*)
+> + * @function:	Entity main function, as defined at uapi/media.h
+> + *		(MEDIA_ENT_F_*)
+
+I would squash this patch with "uapi/media.h: Rename entities types to 
+functions" as they essentially touch the same lines. If you want to keep them 
+separate I would use MEDIA_ENT_T_* here and rename it to MEDIA_ENT_F_* in 
+"uapi/media.h: Rename entities types to functions".
+
+>   * @revision:	Entity revision - OBSOLETE - should be removed soon.
+>   * @flags:	Entity flags, as defined at uapi/media.h (MEDIA_ENT_FL_*)
+>   * @group_id:	Entity group ID - OBSOLETE - should be removed soon.
+
+[snip]
+
+-- 
+Regards,
+
+Laurent Pinchart
