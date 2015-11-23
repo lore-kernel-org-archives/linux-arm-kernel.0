@@ -1,75 +1,110 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 23 Nov 2015 15:22:25 +0000
-Subject: [PATCH] ARM64: fix building without CONFIG_UID16
-In-Reply-To: <3891403.6hGat7eHq5@wuerfel>
-References: <3891403.6hGat7eHq5@wuerfel>
-Message-ID: <20151123152225.GE4236@arm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 23 Nov 2015 15:22:51 +0000
+Subject: [PATCH v3 19/62] arm/smpboot: Move dt specific code in smp to
+ seperate functions
+In-Reply-To: <1447753261-7552-20-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-20-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511231521160.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 12:12:21PM +0100, Arnd Bergmann wrote:
-> As reported by Michal Simek, building an ARM64 kernel with CONFIG_UID16
-> disabled currently fails because the system call table still needs to
-> reference the individual function entry points that are provided by
-> kernel/sys_ni.c in this case, and the declarations are hidden inside
-> of #ifdef CONFIG_UID16:
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Parth Dixit <parth.dixit@linaro.org>
 > 
-> arch/arm64/include/asm/unistd32.h:57:8: error: 'sys_lchown16' undeclared here (not in a function)
->  __SYSCALL(__NR_lchown, sys_lchown16)
+> Partition smp initialization functions into generic and dt specific
+> parts, this will be useful when introducing new functions for smp
+> initialization based on acpi.
 > 
-> I believe this problem only exists on ARM64, because older architectures
-> tend to not need declarations when their system call table is built
-> in assembly code, while newer architectures tend to not need UID16
-> support. ARM64 only uses these system calls for compatibility with
-> 32-bit ARM binaries.
-> 
-> This changes the CONFIG_UID16 check into CONFIG_HAVE_UID16, which is
-> set unconditionally on ARM64 with CONFIG_COMPAT, so we see the
-> declarations whenever we need them, but otherwise the behavior is
-> unchanged.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: stable at vger.kernel.org
-> Fixes: af1839eb4bd4 ("Kconfig: clean up the long arch list for the UID16 config option")
-> ---
-> I would suggest merging this through the arm64 tree, as this is
-> likely the only architecture that cares about it, and there is little
-> risk of clashes with other patches in the global headers.
-> 
-> The bug goes back to when arch/arm64 was introduced as far as I can
-> tell, but I'm not sure if we care about stable backports or not.
-> I've put stable on Cc anyway, let me know if anyone thinks we should not.
+> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-Catalin, can you pick this one up, please?
 
-Will
-
-> diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
-> index a156b82dd14c..c2b66a277e98 100644
-> --- a/include/linux/syscalls.h
-> +++ b/include/linux/syscalls.h
-> @@ -524,7 +524,7 @@ asmlinkage long sys_chown(const char __user *filename,
->  asmlinkage long sys_lchown(const char __user *filename,
->  				uid_t user, gid_t group);
->  asmlinkage long sys_fchown(unsigned int fd, uid_t user, gid_t group);
-> -#ifdef CONFIG_UID16
-> +#ifdef CONFIG_HAVE_UID16
->  asmlinkage long sys_chown16(const char __user *filename,
->  				old_uid_t user, old_gid_t group);
->  asmlinkage long sys_lchown16(const char __user *filename,
-> diff --git a/include/linux/types.h b/include/linux/types.h
-> index 70d8500bddf1..70dd3dfde631 100644
-> --- a/include/linux/types.h
-> +++ b/include/linux/types.h
-> @@ -35,7 +35,7 @@ typedef __kernel_gid16_t        gid16_t;
+>  xen/arch/arm/arm64/smpboot.c |  7 ++++++-
+>  xen/arch/arm/smpboot.c       | 29 ++++++++++++++++++-----------
+>  2 files changed, 24 insertions(+), 12 deletions(-)
+> 
+> diff --git a/xen/arch/arm/arm64/smpboot.c b/xen/arch/arm/arm64/smpboot.c
+> index 62e6abb..7928f69 100644
+> --- a/xen/arch/arm/arm64/smpboot.c
+> +++ b/xen/arch/arm/arm64/smpboot.c
+> @@ -70,7 +70,7 @@ int __init arch_smp_init(void)
+>      return 0;
+>  }
 >  
->  typedef unsigned long		uintptr_t;
+> -int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
+> +static int __init dt_arch_cpu_init(int cpu, struct dt_device_node *dn)
+>  {
+>      const char *enable_method;
 >  
-> -#ifdef CONFIG_UID16
-> +#ifdef CONFIG_HAVE_UID16
->  /* This is defined by include/asm-{arch}/posix_types.h */
->  typedef __kernel_old_uid_t	old_uid_t;
->  typedef __kernel_old_gid_t	old_gid_t;
+> @@ -94,6 +94,11 @@ int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
+>      return 0;
+>  }
+>  
+> +int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
+> +{
+> +    return dt_arch_cpu_init(cpu, dn);
+> +}
+> +
+>  int __init arch_cpu_up(int cpu)
+>  {
+>      if ( !smp_enable_ops[cpu].prepare_cpu )
+> diff --git a/xen/arch/arm/smpboot.c b/xen/arch/arm/smpboot.c
+> index a96cda2..d115228 100644
+> --- a/xen/arch/arm/smpboot.c
+> +++ b/xen/arch/arm/smpboot.c
+> @@ -92,7 +92,7 @@ smp_clear_cpu_maps (void)
+>   * MPIDR values related to logical cpus
+>   * Code base on Linux arch/arm/kernel/devtree.c
+>   */
+> -void __init smp_init_cpus(void)
+> +static void __init dt_smp_init_cpus(void)
+>  {
+>      register_t mpidr;
+>      struct dt_device_node *cpus = dt_find_node_by_path("/cpus");
+> @@ -106,16 +106,6 @@ void __init smp_init_cpus(void)
+>      bool_t bootcpu_valid = 0;
+>      int rc;
+>  
+> -    /* scan the DTB for a PSCI node and set a global variable */
+> -    psci_init();
+> -
+> -    if ( (rc = arch_smp_init()) < 0 )
+> -    {
+> -        printk(XENLOG_WARNING "SMP init failed (%d)\n"
+> -               "Using only 1 CPU\n", rc);
+> -        return;
+> -    }
+> -
+>      mpidr = boot_cpu_data.mpidr.bits & MPIDR_HWID_MASK;
+>  
+>      if ( !cpus )
+> @@ -243,6 +233,23 @@ void __init smp_init_cpus(void)
+>      }
+>  }
+>  
+> +void __init smp_init_cpus(void)
+> +{
+> +    int rc;
+> +
+> +    /* initialize PSCI and set a global variable */
+> +    psci_init();
+> +
+> +    if ( (rc = arch_smp_init()) < 0 )
+> +    {
+> +        printk(XENLOG_WARNING "SMP init failed (%d)\n"
+> +               "Using only 1 CPU\n", rc);
+> +        return;
+> +    }
+> +
+> +    dt_smp_init_cpus();
+> +}
+> +
+>  int __init
+>  smp_get_max_cpus (void)
+>  {
+> -- 
+> 2.1.0
 > 
