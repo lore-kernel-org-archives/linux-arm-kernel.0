@@ -1,73 +1,95 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Mon, 23 Nov 2015 09:25:38 -0800
-Subject: [PATCH] ahci: don't use MSI when PCI is disabled
-In-Reply-To: <4754092.OYovO36g28@wuerfel>
-References: <4754092.OYovO36g28@wuerfel>
-Message-ID: <CAPcyv4gSjWZ7OPqp9fwtc9yGV9g5AKkkCLDnU-F71XsHBgYUQA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 23 Nov 2015 17:29:20 +0000
+Subject: [PATCH 5/5] arm64: Ensure the secondary CPUs have safe ASIDBits
+ size
+In-Reply-To: <1447866540-23207-5-git-send-email-suzuki.poulose@arm.com>
+References: <1447866238-22970-1-git-send-email-suzuki.poulose@arm.com>
+ <1447866540-23207-1-git-send-email-suzuki.poulose@arm.com>
+ <1447866540-23207-5-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20151123172920.GB1702@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2015 at 1:47 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The AHCI driver is used for some on-chip devices that do not
-> use PCI for probing, and it can be built even when CONFIG_PCI
-> is disabled, but that now results in a build failure:
->
-> ata/libahci.c: In function 'ahci_host_activate_multi_irqs':
-> ata/libahci.c:2475:4: error: invalid use of undefined type 'struct msix_entry'
-> ata/libahci.c:2475:21: error: dereferencing pointer to incomplete type 'struct msix_entry'
->
-> This adds an #ifdef so we use that code only if actual PCI MSI
-> is available.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: d684a90d38e2 ("ahci: per-port msix support")
->
-> diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
-> index 1b6c7cc415bf..54fe01d8145b 100644
-> --- a/drivers/ata/libahci.c
-> +++ b/drivers/ata/libahci.c
-> @@ -1796,7 +1796,8 @@ static void ahci_port_intr(struct ata_port *ap)
->         ahci_handle_port_interrupt(ap, port_mmio, status);
->  }
->
-> -static irqreturn_t ahci_multi_irqs_intr_hard(int irq, void *dev_instance)
-> +static irqreturn_t __maybe_unused ahci_multi_irqs_intr_hard(int irq,
-> +                                                           void *dev_instance)
->  {
->         struct ata_port *ap = dev_instance;
->         void __iomem *port_mmio = ahci_port_base(ap);
-> @@ -2454,6 +2455,7 @@ void ahci_set_em_messages(struct ahci_host_priv *hpriv,
->  }
->  EXPORT_SYMBOL_GPL(ahci_set_em_messages);
->
-> +#ifdef CONFIG_PCI_MSI
->  static int ahci_host_activate_multi_irqs(struct ata_host *host,
->                                          struct scsi_host_template *sht)
->  {
-> @@ -2492,6 +2494,7 @@ static int ahci_host_activate_multi_irqs(struct ata_host *host,
->
->         return ata_host_register(host, sht);
->  }
-> +#endif
->
->  /**
->   *     ahci_host_activate - start AHCI host, request IRQs and register it
-> @@ -2510,9 +2513,12 @@ int ahci_host_activate(struct ata_host *host, struct scsi_host_template *sht)
->         int irq = hpriv->irq;
->         int rc;
->
-> +#ifdef CONFIG_PCI_MSI
->         if (hpriv->flags & (AHCI_HFLAG_MULTI_MSI | AHCI_HFLAG_MULTI_MSIX))
->                 rc = ahci_host_activate_multi_irqs(host, sht);
-> -       else if (hpriv->flags & AHCI_HFLAG_EDGE_IRQ)
-> +       else
-> +#endif
-> +       if (hpriv->flags & AHCI_HFLAG_EDGE_IRQ)
->                 rc = ata_host_activate(host, irq, ahci_single_edge_irq_intr,
->                                        IRQF_SHARED, sht);
->         else
->
+On Wed, Nov 18, 2015 at 05:09:00PM +0000, Suzuki K. Poulose wrote:
+> The ID_AA64MMFR0_EL1:ASIDBits determines the size of the mm context
+> id and is used in the early boot to make decisions. The value is
+> picked up from the Boot CPU and cannot be delayed until other CPUs
+> are up. If a secondary CPU has a smaller size than that of the Boot
+> CPU, things will break horribly and the usual SANITY check is not good
+> enough to prevent the system from crashing. Prevent this by failing CPUs with
+> ASID smaller than that of the boot CPU.
+> 
+> Also moves the fail_incapable_cpu() out of the CONFIG_HOTPLUG_CPU.
+> 
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/kernel/cpufeature.c |   81 +++++++++++++++++++++++++++++-----------
+>  1 file changed, 59 insertions(+), 22 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 5629f2c..769782a 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -293,6 +293,28 @@ static struct arm64_ftr_reg arm64_ftr_regs[] = {
+>  	ARM64_FTR_REG(SYS_CNTFRQ_EL0, ftr_generic32),
+>  };
+>  
+> +/*
+> + * Park the calling CPU which doesn't have the capability
+> + * as advertised by the system.
+> + */
+> +static void fail_incapable_cpu(void)
+> +{
+> +	int cpu = smp_processor_id();
+> +
+> +	pr_crit("CPU%d: will not boot\n", cpu);
 
-If we had an "static inline ahci_irq_vector(int port)"  helper to
-compile out the struct msix_entry de-reference would that be
-sufficient?
+This is less informative than the current message (whcih describes the
+missing capability).
+
+> +
+> +	/* Mark this CPU absent */
+> +	set_cpu_present(cpu, 0);
+> +
+> +	/* Check if we can park ourselves */
+> +	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
+> +		cpu_ops[cpu]->cpu_die(cpu);
+> +	asm(
+> +	"1:	wfe\n"
+> +	"	wfi\n"
+> +	"	b	1b");
+> +}
+> +
+>  static int search_cmp_ftr_reg(const void *id, const void *regp)
+>  {
+>  	return (int)(unsigned long)id - (int)((const struct arm64_ftr_reg *)regp)->sys_id;
+> @@ -459,6 +481,40 @@ static int check_update_ftr_reg(u32 sys_id, int cpu, u64 val, u64 boot)
+>  }
+>  
+>  /*
+> + * The asid_bits, which determine the width of the mm context
+> + * id, is based on the boot CPU value. If the new CPU doesn't
+> + * have an ASID >= boot CPU, we are in trouble. Fail this CPU.
+> + */
+> +static void check_cpu_asid_bits(int cpu,
+> +				struct cpuinfo_arm64 *info,
+> +				struct cpuinfo_arm64 *boot)
+> +{
+> +	u32 asid_boot = cpuid_feature_extract_unsigned_field(boot->reg_id_aa64mmfr0,
+> +							ID_AA64MMFR0_ASID_SHIFT);
+> +	u32 asid_cur = cpuid_feature_extract_unsigned_field(info->reg_id_aa64mmfr0,
+> +							ID_AA64MMFR0_ASID_SHIFT);
+> +	if (asid_cur < asid_boot) {
+> +		pr_crit("CPU%d: has incompatible ASIDBits: %u vs Boot CPU:%u\n",
+> +				cpu, asid_cur, asid_boot);
+> +		fail_incapable_cpu();
+> +	}
+
+Hmm. Whilst we want to ensure that secondary CPUs don't have a smaller
+ASID size than the boot CPU, can we actually guarantee that a smaller
+value for ID_AA64MMFR0.ASIDBits corresponds to fewer bits? We're
+probably better off assuming 8-bit ASIDs unless ASIDBits == 2 (which is
+what the ASID allocator does).
+
+Will
