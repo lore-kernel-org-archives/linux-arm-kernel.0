@@ -1,44 +1,88 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Nov 2015 16:32:33 +0100
-Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
- functions
-In-Reply-To: <56531F4F.9010100@codeaurora.org>
-References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
- <8472808.1HUuK2O5nn@wuerfel> <56531F4F.9010100@codeaurora.org>
-Message-ID: <105706554.vF12QZslMx@wuerfel>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 23 Nov 2015 15:40:19 +0000
+Subject: [PATCH v3 21/62] arm/gic-v2: Refactor gicv2_init into generic
+ and dt specific parts
+In-Reply-To: <1447753261-7552-22-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-22-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511231539400.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 November 2015 09:14:39 Christopher Covington wrote:
-> On 11/23/2015 03:15 AM, Arnd Bergmann wrote:
-> > On Sunday 22 November 2015 21:36:45 Nicolas Pitre wrote:
-> >> On Sun, 22 Nov 2015, Arnd Bergmann wrote:
-> > 
-> > Ok, thanks a lot! So the reporting in /proc/cpuinfo clearly matches
-> > the actual features, and we can just treat this as no LPAE / no IDIV
-> > for kernel compilation, as nobody ever seems to use THUMB2_KERNEL
-> > in practice.
-> > 
-> > PJ4-MP is like Cortex-A15/A7/A12/A17 and supports both IDIV and LPAE,
-> > which leaves the question whether Scorpion or Krait do the same as
-> > well, or whether they are outliers and need a special configuration.
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> LPAE is only supported in the Krait 450.
+> Refactor gic-v2 related functions into dt and generic parts. This will be
+> helpful when adding acpi support for gic.
 > 
-> http://www.anandtech.com/show/7537/qualcomms-snapdragon-805-25ghz-128bit-memory-interface-d3d11class-graphics-more
+> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  xen/arch/arm/gic-v2.c | 21 ++++++++++++++-------
+>  1 file changed, 14 insertions(+), 7 deletions(-)
 > 
-> I'm pretty sure idiv support came earlier, but I don't have the
-> specifics on hand.
+> diff --git a/xen/arch/arm/gic-v2.c b/xen/arch/arm/gic-v2.c
+> index 01e36b5..e31d38e 100644
+> --- a/xen/arch/arm/gic-v2.c
+> +++ b/xen/arch/arm/gic-v2.c
+> @@ -628,13 +628,12 @@ static bool_t gicv2_is_aliased(paddr_t cbase, paddr_t csize)
+>      return ((val_low & 0xfff0fff) == 0x0202043B && val_low == val_high);
+>  }
+>  
+> -static int __init gicv2_init(void)
+> +static paddr_t __initdata hbase, dbase, cbase, csize, vbase;
+> +
+> +static void __init dt_gicv2_init(void)
+>  {
+>      int res;
+> -    paddr_t hbase, dbase;
+> -    paddr_t cbase, csize;
+> -    paddr_t vbase, vsize;
+> -    uint32_t aliased_offset = 0;
+> +    paddr_t vsize;
+>      const struct dt_device_node *node = gicv2_info.node;
+>  
+>      res = dt_device_get_address(node, 0, &dbase, NULL);
+> @@ -680,6 +679,13 @@ static int __init gicv2_init(void)
+>      if ( csize != vsize )
+>          panic("GICv2: Sizes of GICC (%#"PRIpaddr") and GICV (%#"PRIpaddr") don't match\n",
+>                 csize, vsize);
+> +}
+> +
+> +static int __init gicv2_init(void)
+> +{
+> +    uint32_t aliased_offset = 0;
+> +
+> +    dt_gicv2_init();
+>  
+>      printk("GICv2 initialization:\n"
+>                "        gic_dist_addr=%"PRIpaddr"\n"
+> @@ -765,7 +771,8 @@ const static struct gic_hw_operations gicv2_ops = {
+>  };
+>  
+>  /* Set up the GIC */
+> -static int __init gicv2_preinit(struct dt_device_node *node, const void *data)
+> +static int __init dt_gicv2_preinit(struct dt_device_node *node,
+> +                                   const void *data)
+>  {
+>      gicv2_info.hw_version = GIC_V2;
+>      gicv2_info.node = node;
+> @@ -783,7 +790,7 @@ static const struct dt_device_match gicv2_dt_match[] __initconst =
+>  
+>  DT_DEVICE_START(gicv2, "GICv2", DEVICE_GIC)
+>          .dt_match = gicv2_dt_match,
+> -        .init = gicv2_preinit,
+> +        .init = dt_gicv2_preinit,
 
-I have seen that article, but didn't trust it as a canonical
-source of information here.
+Maybe it would make sense to call this gicv2_dt_preinit for consistency,
+nonetheless
 
-If you can confirm that it's right, that would mean that we
-don't support LPAE on mach-qcom, as the only SoC with Krait 450
-seems to be APQ8084, and mainline Linux doesn't run on that.
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-The ones we do support are MSM8x60 (Scorpion), MSM8960
-(Krait-without-number),and MSM7874 (Krait 400). Do those all
-support IDIV but not LPAE?
 
-	Arnd
+>  DT_DEVICE_END
+>  
+>  /*
+> -- 
+> 2.1.0
+> 
