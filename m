@@ -1,104 +1,58 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 23 Nov 2015 14:51:25 +0000
-Subject: [PATCH v3 15/62] ACPICA: ACPI 6.0: Add changes for MADT table.
-In-Reply-To: <1447753261-7552-16-git-send-email-shannon.zhao@linaro.org>
+Date: Mon, 23 Nov 2015 14:52:10 +0000
+Subject: [PATCH v3 16/62] ACPICA: ACPI 6.0: Add values for MADT GIC
+ version field
+In-Reply-To: <1447753261-7552-17-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-16-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511231450150.1107@kaball.uk.xensource.com>
+ <1447753261-7552-17-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511231452020.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> From: Bob Moore <robert.moore@intel.com>
+> From: Hanjun Guo <hanjun.guo@linaro.org>
 > 
-> ACPICA commit 02cbb41232bccf7a91967140cab95d5f48291f21
+> ACPICA commit 4b100dc43e8baee8c8b4891b23bc7ad03eba6a28
 > 
-> New subtable type. Some additions to existing subtables.
+> Support for the new version field in the generic distributor
+> subtable. Hanjun Guo <hanjun.guo@linaro.org>
 > 
-> Link: https://github.com/acpica/acpica/commit/02cbb412
+> Link: https://github.com/acpica/acpica/commit/4b100dc4
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 > Signed-off-by: Bob Moore <robert.moore@intel.com>
 > Signed-off-by: Lv Zheng <lv.zheng@intel.com>
 > Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> [Linux commit 0cff8dc0099f6d4f7431181918b37a472bcd1bbb]
+> [Linux commit a8bd0f07eb594df51845d33f272fb1952fec1a6f]
 > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-
-These are the ACPI 6.0 changes. I am OK both with them being folded in
-the previous patch or kept separate.
 
 Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
 
->  xen/include/acpi/actbl1.h | 22 ++++++++++++++++++----
->  1 file changed, 18 insertions(+), 4 deletions(-)
+>  xen/include/acpi/actbl1.h | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
 > 
 > diff --git a/xen/include/acpi/actbl1.h b/xen/include/acpi/actbl1.h
-> index 2fb2ad7..7dd6960 100644
+> index 7dd6960..cf31837 100644
 > --- a/xen/include/acpi/actbl1.h
 > +++ b/xen/include/acpi/actbl1.h
-> @@ -643,7 +643,8 @@ enum acpi_madt_type {
->  	ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR = 12,
->  	ACPI_MADT_TYPE_GENERIC_MSI_FRAME = 13,
->  	ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR = 14,
-> -	ACPI_MADT_TYPE_RESERVED = 15    /* 15 and greater are reserved */
-> +	ACPI_MADT_TYPE_GENERIC_TRANSLATOR = 15,
-> +	ACPI_MADT_TYPE_RESERVED = 16    /* 16 and greater are reserved */
+> @@ -804,6 +804,17 @@ struct acpi_madt_generic_distributor {
+>  	u8 reserved2[3];          /* reserved - must be zero */
 >  };
 >  
->  /*
-> @@ -764,7 +765,7 @@ struct acpi_madt_local_x2apic_nmi {
->  	u8 reserved[3];
->  };
->  
-> -/* 11: Generic Interrupt (ACPI 5.0) */
-> +/* 11: Generic Interrupt (ACPI 5.0 + ACPI 6.0 changes) */
->  
->  struct acpi_madt_generic_interrupt {
->  	struct acpi_subtable_header header;
-> @@ -781,6 +782,8 @@ struct acpi_madt_generic_interrupt {
->  	u32 vgic_interrupt;
->  	u64 gicr_base_address;
->  	u64 arm_mpidr;
-> +	u8 efficiency_class;
-> +	u8 reserved2[3];
->  };
->  
->  /* Masks for Flags field above */
-> @@ -789,7 +792,7 @@ struct acpi_madt_generic_interrupt {
->  #define ACPI_MADT_PERFORMANCE_IRQ_MODE  (1<<1) /* 01: Performance Interrupt Mode */
->  #define ACPI_MADT_VGIC_IRQ_MODE         (1<<2) /* 02: VGIC Maintenance Interrupt mode */
->  
-> -/* 12: Generic Distributor (ACPI 5.0) */
-> +/* 12: Generic Distributor (ACPI 5.0 + ACPI 6.0 changes) */
->  
->  struct acpi_madt_generic_distributor {
->  	struct acpi_subtable_header header;
-> @@ -797,7 +800,8 @@ struct acpi_madt_generic_distributor {
->  	u32 gic_id;
->  	u64 base_address;
->  	u32 global_irq_base;
-> -	u32 reserved2;          /* reserved - must be zero */
-> +	u8 version;
-> +	u8 reserved2[3];          /* reserved - must be zero */
->  };
->  
->  /* 13: GIC MSI Frame (ACPI 5.1) */
-> @@ -825,6 +829,16 @@ struct acpi_madt_generic_redistributor {
->  	u32 length;
->  };
->  
-> +/* 15: Generic Translator (ACPI 6.0) */
+> +/* Values for Version field above */
 > +
-> +struct acpi_madt_generic_translator {
-> +	struct acpi_subtable_header header;
-> +	u16 reserved;           /* reserved - must be zero */
-> +	u32 translation_id;
-> +	u64 base_address;
-> +	u32 reserved2;
+> +enum acpi_madt_gic_version {
+> +	ACPI_MADT_GIC_VERSION_NONE = 0,
+> +	ACPI_MADT_GIC_VERSION_V1 = 1,
+> +	ACPI_MADT_GIC_VERSION_V2 = 2,
+> +	ACPI_MADT_GIC_VERSION_V3 = 3,
+> +	ACPI_MADT_GIC_VERSION_V4 = 4,
+> +	ACPI_MADT_GIC_VERSION_RESERVED = 5      /* 5 and greater are reserved */
 > +};
 > +
->  /*
->   * Common flags fields for MADT subtables
->   */
+>  /* 13: GIC MSI Frame (ACPI 5.1) */
+>  
+>  struct acpi_madt_generic_msi_frame {
 > -- 
 > 2.1.0
 > 
