@@ -1,258 +1,344 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 Nov 2015 08:26:07 +0000
-Subject: [PATCH v2 6/7] platform-msi: Allow creation of a MSI-based stacked
- irq domain
-In-Reply-To: <1448267168-17360-1-git-send-email-marc.zyngier@arm.com>
-References: <1448267168-17360-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1448267168-17360-7-git-send-email-marc.zyngier@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 23 Nov 2015 09:28:00 +0100
+Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun7i: Add dts file for the
+ lamobo-r1 board
+In-Reply-To: <20151122195925.GR32142@lukather>
+References: <1448046713-13579-1-git-send-email-hdegoede@redhat.com>
+ <20151122195925.GR32142@lukather>
+Message-ID: <5652CE10.1020808@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We almost have all the needed bits requiredable to create a irq domain
-on top of a MSI domain.
+Hi,
 
-For this, we enable a few things:
-- the virq is stored in the msi_desc
-- device, msi_alloc_info and domain-specific data
-  are stored in the platform_priv_data structure
-- we introduce a new API for platform-msi:
+On 22-11-15 20:59, Maxime Ripard wrote:
+> Hi,
+>
+> On Fri, Nov 20, 2015 at 08:11:53PM +0100, Hans de Goede wrote:
+>> From: Jelle de Jong <jelledejong@powercraft.nl>
+>>
+>> The lamobo-r1 board, sometimes called the BPI-R1 but not labelled as such
+>> on the PCB, is meant as a A20 based router board. As such the board comes
+>> with a built-in switch chip giving it 5 gigabit ethernet boards, and it
+>> has a large empty area on the pcb with mounting holes which will fit a
+>> 2.5 inch harddisk. To complete its networking features it has a
+>> Realtek RTL8192CU for WiFi 802.11 b/g/n.
+>>
+>> Signed-off-by: Jelle de Jong <jelledejong@powercraft.nl>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   arch/arm/boot/dts/Makefile                |   1 +
+>>   arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts | 297 ++++++++++++++++++++++++++++++
+>>   2 files changed, 298 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 28b0403..7572c29 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -639,6 +639,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+>>   	sun7i-a20-hummingbird.dtb \
+>>   	sun7i-a20-i12-tvbox.dtb \
+>>   	sun7i-a20-icnova-swac.dtb \
+>> +	sun7i-a20-lamobo-r1.dtb \
+>>   	sun7i-a20-m3.dtb \
+>>   	sun7i-a20-mk808c.dtb \
+>>   	sun7i-a20-olimex-som-evb.dtb \
+>> diff --git a/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
+>> new file mode 100644
+>> index 0000000..975b0b2
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
+>> @@ -0,0 +1,297 @@
+>> +/*
+>> + * Copyright 2015 Jelle de Jong <jelledejong@powercraft.nl>
+>> + *
+>> + * This file is dual-licensed: you can use it either under the terms
+>> + * of the GPL or the X11 license, at your option. Note that this dual
+>> + * licensing only applies to this file, and not this project as a
+>> + * whole.
+>> + *
+>> + *  a) This file is free software; you can redistribute it and/or
+>> + *     modify it under the terms of the GNU General Public License as
+>> + *     published by the Free Software Foundation; either version 2 of the
+>> + *     License, or (at your option) any later version.
+>> + *
+>> + *     This file is distributed in the hope that it will be useful,
+>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + *     GNU General Public License for more details.
+>> + *
+>> + * Or, alternatively,
+>> + *
+>> + *  b) Permission is hereby granted, free of charge, to any person
+>> + *     obtaining a copy of this software and associated documentation
+>> + *     files (the "Software"), to deal in the Software without
+>> + *     restriction, including without limitation the rights to use,
+>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>> + *     sell copies of the Software, and to permit persons to whom the
+>> + *     Software is furnished to do so, subject to the following
+>> + *     conditions:
+>> + *
+>> + *     The above copyright notice and this permission notice shall be
+>> + *     included in all copies or substantial portions of the Software.
+>> + *
+>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>> + *     OTHER DEALINGS IN THE SOFTWARE.
+>> + */
+>> +
+>> +/dts-v1/;
+>> +#include "sun7i-a20.dtsi"
+>> +#include "sunxi-common-regulators.dtsi"
+>> +
+>> +#include <dt-bindings/gpio/gpio.h>
+>> +#include <dt-bindings/interrupt-controller/irq.h>
+>> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+>> +
+>> +/ {
+>> +	model = "Lamobo R1";
+>> +	compatible = "lamobo,lamobo-r1", "allwinner,sun7i-a20";
+>> +
+>> +	aliases {
+>> +		serial0 = &uart0;
+>> +		serial1 = &uart3;
+>> +		serial2 = &uart7;
+>> +	};
+>> +
+>> +	chosen {
+>> +		stdout-path = "serial0:115200n8";
+>> +	};
+>> +
+>> +	leds {
+>> +		compatible = "gpio-leds";
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&led_pins_lamobo_r1>;
+>> +
+>> +		green {
+>> +			label = "lamobo_r1:green:usr";
+>> +			gpios = <&pio 7 24 GPIO_ACTIVE_HIGH>;
+>> +		};
+>> +	};
+>> +
+>> +	reg_gmac_3v3: gmac-3v3 {
+>> +		compatible = "regulator-fixed";
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&gmac_power_pin_lamobo_r1>;
+>> +		regulator-name = "gmac-3v3";
+>> +		regulator-min-microvolt = <3300000>;
+>> +		regulator-max-microvolt = <3300000>;
+>> +		startup-delay-us = <100000>;
+>> +		enable-active-high;
+>> +		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>; /* PH23 */
+>> +	};
+>> +};
+>> +
+>> +&ahci_pwr_pin_a {
+>> +	allwinner,pins = "PB3";
+>> +};
+>> +
+>> +&ahci {
+>> +	target-supply = <&reg_ahci_5v>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&cpu0 {
+>> +	cpu-supply = <&reg_dcdc2>;
+>> +	operating-points = <
+>> +		/* kHz	  uV */
+>> +		960000	1400000
+>> +		912000	1400000
+>> +		864000	1350000
+>> +		720000	1250000
+>> +		528000	1150000
+>> +		312000	1100000
+>> +		144000	1050000
+>> +		>;
+>
+> Why are you using a custom set of OPPs here, the default ones were
+> unstable?
 
-  /* Create a MSI-based domain */
-  struct irq_domain *
-  platform_msi_create_device_domain(struct device *dev,
-                                    unsigned int nvec,
-                                    irq_write_msi_msg_t write_msi_msg,
-                                    const struct irq_domain_ops *ops,
-                                    void *host_data);
+The fex file uses non standard OPPs, just like
+the bananapi, so I've done in the same in the dts,
+thinking "better safe then sorry" we can try without
+the custom OPPs if you want and see how that works.
 
-  /* Allocate MSIs in an MSI domain */
-  int platform_msi_domain_alloc(struct irq_domain *domain,
-				unsigned int virq,
-				unsigned int nr_irqs);
+>> +};
+>> +
+>> +&ehci0 {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&ehci1 {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&gmac {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&gmac_pins_rgmii_a>;
+>> +	phy = <&phy1>;
+>> +	phy-mode = "rgmii";
+>> +	phy-supply = <&reg_gmac_3v3>;
+>> +	status = "okay";
+>> +
+>> +	phy1: ethernet-phy at 1 {
+>> +		reg = <1>;
+>> +	};
+>> +};
+>> +
+>> +&i2c0 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&i2c0_pins_a>;
+>> +	status = "okay";
+>> +
+>> +	axp209: pmic at 34 {
+>> +		reg = <0x34>;
+>> +		interrupt-parent = <&nmi_intc>;
+>> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+>> +	};
+>> +};
+>> +
+>> +&i2c2 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&i2c2_pins_a>;
+>> +	status = "okay";
+>> +};
+>
+> What is connected on i2c2?
 
-  /* Free MSIs from an MSI domain */
-  void platform_msi_domain_free(struct irq_domain *domain,
-				unsigned int virq,
-				unsigned int nvec);
+The Lamobo-R1 has a gpio header idententical to the one found
+on the Banana Pi, i2c2 is routed to pins there.
 
-  /* Obtain the host data passed to platform_msi_create_device_domain */
-  void *platform_msi_get_host_data(struct irq_domain *domain);
+> Is i2c1 used at all?
 
-platform_msi_create_device_domain() is a hybrid of irqdomain creation
-and interrupt allocation, creating a domain backed by the MSIs associated
-to a device. IRQs can then be allocated in that domain using
-platform_msi_domain_alloc().
+Not to my knowledge.
 
-This now allows a wired irq to MSI bridge to be created.
+ > Would it make sense to
+> add aliases for the i2c buses as well?
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/base/platform-msi.c | 130 +++++++++++++++++++++++++++++++++++++++++++-
- include/linux/msi.h         |  12 ++++
- 2 files changed, 140 insertions(+), 2 deletions(-)
+I do not think anything would use those aliases, if we do
+this we should probably do it for all boards which have in i2c
+bus routed to some header pins.
 
-diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
-index 44b8c0d..a203896 100644
---- a/drivers/base/platform-msi.c
-+++ b/drivers/base/platform-msi.c
-@@ -32,6 +32,9 @@
-  * and the callback to write the MSI message.
-  */
- struct platform_msi_priv_data {
-+	struct device		*dev;
-+	void 			*host_data;
-+	msi_alloc_info_t	arg;
- 	irq_write_msi_msg_t	write_msg;
- 	int			devid;
- };
-@@ -124,8 +127,9 @@ static void platform_msi_free_descs(struct device *dev, int base, int nvec)
- 	}
- }
- 
--static int platform_msi_alloc_descs(struct device *dev, int nvec,
--				    struct platform_msi_priv_data *data)
-+static int platform_msi_alloc_descs_with_irq(struct device *dev, int virq,
-+					     int nvec,
-+					     struct platform_msi_priv_data *data)
- 
- {
- 	struct msi_desc *desc;
-@@ -145,6 +149,7 @@ static int platform_msi_alloc_descs(struct device *dev, int nvec,
- 		desc->platform.msi_priv_data = data;
- 		desc->platform.msi_index = base + i;
- 		desc->nvec_used = 1;
-+		desc->irq = virq ? virq + i : 0;
- 
- 		list_add_tail(&desc->list, dev_to_msi_list(dev));
- 	}
-@@ -159,6 +164,13 @@ static int platform_msi_alloc_descs(struct device *dev, int nvec,
- 	return 0;
- }
- 
-+static int platform_msi_alloc_descs(struct device *dev, int nvec,
-+				    struct platform_msi_priv_data *data)
-+
-+{
-+	return platform_msi_alloc_descs_with_irq(dev, 0, nvec, data);
-+}
-+
- /**
-  * platform_msi_create_irq_domain - Create a platform MSI interrupt domain
-  * @fwnode:		Optional fwnode of the interrupt controller
-@@ -225,6 +237,7 @@ platform_msi_alloc_priv_data(struct device *dev, unsigned int nvec,
- 	}
- 
- 	datap->write_msg = write_msi_msg;
-+	datap->dev = dev;
- 
- 	return datap;
- }
-@@ -288,3 +301,116 @@ void platform_msi_domain_free_irqs(struct device *dev)
- 	msi_domain_free_irqs(dev->msi_domain, dev);
- 	platform_msi_free_descs(dev, 0, MAX_DEV_MSIS);
- }
-+
-+/**
-+ * platform_msi_get_host_data - Query the private data associated with
-+ *                              a platform-msi domain
-+ * @domain:	The platform-msi domain
-+ *
-+ * Returns the private data provided when calling
-+ * platform_msi_create_device_domain.
-+ */
-+void *platform_msi_get_host_data(struct irq_domain *domain)
-+{
-+	struct platform_msi_priv_data *data = domain->host_data;
-+	return data->host_data;
-+}
-+
-+/**
-+ * platform_msi_create_device_domain - Create a platform-msi domain
-+ *
-+ * @dev:		The device generating the MSIs
-+ * @nvec:		The number of MSIs that need to be allocated
-+ * @write_msi_msg:	Callback to write an interrupt message for @dev
-+ * @ops:		The hierarchy domain operations to use
-+ * @host_data:		Private data associated to this domain
-+ *
-+ * Returns an irqdomain for @nvec interrupts
-+ */
-+struct irq_domain *
-+platform_msi_create_device_domain(struct device *dev,
-+				  unsigned int nvec,
-+				  irq_write_msi_msg_t write_msi_msg,
-+				  const struct irq_domain_ops *ops,
-+				  void *host_data)
-+{
-+	struct platform_msi_priv_data *data;
-+	struct irq_domain *domain;
-+	int err;
-+
-+	data = platform_msi_alloc_priv_data(dev, nvec, write_msi_msg);
-+	if (IS_ERR(data))
-+		return NULL;
-+
-+	data->host_data = host_data;
-+	domain = irq_domain_create_hierarchy(dev->msi_domain, 0, nvec,
-+					     of_node_to_fwnode(dev->of_node),
-+					     ops, data);
-+	if (!domain)
-+		goto free_priv;
-+
-+	err = msi_domain_prepare_irqs(domain->parent, dev, nvec, &data->arg);
-+	if (err)
-+		goto free_domain;
-+
-+	return domain;
-+
-+free_domain:
-+	irq_domain_remove(domain);
-+free_priv:
-+	platform_msi_free_priv_data(data);
-+	return NULL;
-+}
-+
-+/**
-+ * platform_msi_domain_free - Free interrupts associated with a platform-msi
-+ *                            domain
-+ *
-+ * @domain:	The platform-msi domain
-+ * @virq:	The base irq from which to perform the free operation
-+ * @nvec:	How many interrupts to free from @virq
-+ */
-+void platform_msi_domain_free(struct irq_domain *domain, unsigned int virq,
-+			      unsigned int nvec)
-+{
-+	struct platform_msi_priv_data *data = domain->host_data;
-+	struct msi_desc *desc;
-+	for_each_msi_entry(desc, data->dev) {
-+		if (WARN_ON(!desc->irq || desc->nvec_used != 1))
-+			return;
-+		if (!(desc->irq >= virq && desc->irq < (virq + nvec)))
-+			continue;
-+
-+		irq_domain_free_irqs_common(domain, desc->irq, 1);
-+	}
-+}
-+
-+/**
-+ * platform_msi_domain_alloc - Allocate interrupts associated with
-+ *			       a platform-msi domain
-+ *
-+ * @domain:	The platform-msi domain
-+ * @virq:	The base irq from which to perform the allocate operation
-+ * @nvec:	How many interrupts to free from @virq
-+ *
-+ * Return 0 on success, or an error code on failure. Must be called
-+ * with irq_domain_mutex held (which can only be done as part of a
-+ * top-level interrupt allocation).
-+ */
-+int platform_msi_domain_alloc(struct irq_domain *domain, unsigned int virq,
-+			      unsigned int nr_irqs)
-+{
-+	struct platform_msi_priv_data *data = domain->host_data;
-+	int err;
-+
-+	err = platform_msi_alloc_descs_with_irq(data->dev, virq, nr_irqs, data);
-+	if (err)
-+		return err;
-+
-+	err = msi_domain_populate_irqs(domain->parent, data->dev,
-+				       virq, nr_irqs, &data->arg);
-+	if (err)
-+		platform_msi_domain_free(domain, virq, nr_irqs);
-+
-+	return err;
-+}
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index cee102b..1c6342a 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -174,6 +174,7 @@ struct msi_controller {
- #include <asm/msi.h>
- 
- struct irq_domain;
-+struct irq_domain_ops;
- struct irq_chip;
- struct device_node;
- struct fwnode_handle;
-@@ -285,6 +286,17 @@ int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
- 			    int nvec, msi_alloc_info_t *args);
- int msi_domain_populate_irqs(struct irq_domain *domain, struct device *dev,
- 			     int virq, int nvec, msi_alloc_info_t *args);
-+struct irq_domain *
-+platform_msi_create_device_domain(struct device *dev,
-+				  unsigned int nvec,
-+				  irq_write_msi_msg_t write_msi_msg,
-+				  const struct irq_domain_ops *ops,
-+				  void *host_data);
-+int platform_msi_domain_alloc(struct irq_domain *domain, unsigned int virq,
-+			      unsigned int nr_irqs);
-+void platform_msi_domain_free(struct irq_domain *domain, unsigned int virq,
-+			      unsigned int nvec);
-+void *platform_msi_get_host_data(struct irq_domain *domain);
- #endif /* CONFIG_GENERIC_MSI_IRQ_DOMAIN */
- 
- #ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
--- 
-2.1.4
+>> +&ir0 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&ir0_rx_pins_a>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&mmc0 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_lamobo_r1>;
+>> +	vmmc-supply = <&reg_vcc3v3>;
+>> +	bus-width = <4>;
+>> +	cd-gpios = <&pio 7 10 GPIO_ACTIVE_HIGH>; /* PH10 */
+>> +	cd-inverted;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&ohci0 {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&ohci1 {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&otg_sram {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&pio {
+>> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+>> +		allwinner,pins = "PH4";
+>> +		allwinner,function = "gpio_in";
+>> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+>> +	};
+>> +
+>> +	mmc0_cd_pin_lamobo_r1: mmc0_cd_pin at 0 {
+>> +		allwinner,pins = "PH10";
+>> +		allwinner,function = "gpio_in";
+>> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+>> +	};
+>> +
+>> +	gmac_power_pin_lamobo_r1: gmac_power_pin at 0 {
+>> +		allwinner,pins = "PH23";
+>> +		allwinner,function = "gpio_out";
+>> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>> +	};
+>> +
+>> +	led_pins_lamobo_r1: led_pins at 0 {
+>> +		allwinner,pins = "PH24";
+>> +		allwinner,function = "gpio_out";
+>> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>> +	};
+>> +};
+>> +
+>> +#include "axp209.dtsi"
+>> +
+>> +&reg_ahci_5v {
+>> +	gpio = <&pio 1 3 0>; /* PB3 */
+>> +	status = "okay";
+>> +};
+>> +
+>> +&reg_dcdc2 {
+>> +	regulator-always-on;
+>> +	regulator-min-microvolt = <1000000>;
+>> +	regulator-max-microvolt = <1400000>;
+>> +	regulator-name = "vdd-cpu";
+>> +};
+>> +
+>> +&reg_dcdc3 {
+>> +	regulator-always-on;
+>> +	regulator-min-microvolt = <1000000>;
+>> +	regulator-max-microvolt = <1400000>;
+>> +	regulator-name = "vdd-int-dll";
+>> +};
+>> +
+>> +&reg_ldo1 {
+>> +	regulator-name = "vdd-rtc";
+>> +};
+>> +
+>> +&reg_ldo2 {
+>> +	regulator-always-on;
+>> +	regulator-min-microvolt = <3000000>;
+>> +	regulator-max-microvolt = <3000000>;
+>> +	regulator-name = "avcc";
+>> +};
+>> +
+>> +&reg_usb0_vbus {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&reg_usb1_vbus {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&reg_usb2_vbus {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&spi0 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&spi0_pins_a>,
+>> +		    <&spi0_cs0_pins_a>,
+>> +		    <&spi0_cs1_pins_a>;
+>> +	status = "okay";
+>> +};
+>
+> I guess the same question about i2c also applies for SPI :)
+
+Answers are the same too :)
+
+Regards,
+
+Hans
