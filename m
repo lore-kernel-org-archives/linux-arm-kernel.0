@@ -1,29 +1,37 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Mon, 23 Nov 2015 09:12:22 -0800
-Subject: [PATCH 1/2] arch: consolidate CONFIG_STRICT_DEVM in
- lib/Kconfig.debug
-In-Reply-To: <20151123081235.GA23661@gmail.com>
-References: <20151122035702.9313.52457.stgit@dwillia2-desk3.jf.intel.com>
- <20151123081235.GA23661@gmail.com>
-Message-ID: <CAPcyv4hDbi5KJ+tGJnEwQV5G=PM+ZRooQbgTNrYxyyVVPA3EwA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 Nov 2015 17:22:03 +0000
+Subject: [RFC] asm-generic: default BUG_ON(x) to "if(x) BUG()"
+In-Reply-To: <4150271.zrLzq08T60@wuerfel>
+References: <5868782.RxZY0W5S4d@wuerfel> <20151123163359.GC768@1wt.eu>
+ <20151123163750.GT8644@n2100.arm.linux.org.uk>
+ <4150271.zrLzq08T60@wuerfel>
+Message-ID: <20151123172203.GU8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2015 at 12:12 AM, Ingo Molnar <mingo@kernel.org> wrote:
->
-> * Dan Williams <dan.j.williams@intel.com> wrote:
->
->> Let all the archs that implement CONFIG_STRICT_DEVM use a common
->> definition in lib/Kconfig.debug.
->
-> For the x86 bit:
->
-> Acked-by: Ingo Molnar <mingo@kernel.org>
->
->> Note, the 'depends on !SPARC' is due to sparc not implementing
->> devmem_is_allowed().
->
-> Maybe that should be converted into a helper Kconfig switch for architectures to
-> opt in to /dev/mem restrictions?
+On Mon, Nov 23, 2015 at 05:52:38PM +0100, Arnd Bergmann wrote:
+> On Monday 23 November 2015 16:37:50 Russell King - ARM Linux wrote:
+> > Does that not depend on the architectures BUG() implementation?  If an
+> > architecture implements it as a signalling illegal instruction and a
+> > lookup table, changing it to be a panic() would probably be more code.
+> 
+> Correct, overall, we are down to a 1.40% size reduction compared to
+> 1.70% without my patch and 1.49% with my version:
+> 
+> section     CONFIG_BUG=y    CONFIG_BUG=n    CONFIG_BUG=n+patch    panic("BUG!")
+> 
+>  .text            8320248   |     8180944   |     8207688	|  8221848
+>  .rodata          3633720   |     3567144   |     3570648	|  3567344
+>  __bug_table        32508   |         ---   |         ---	|      ---
+>  __modver             692   |        1584   |        2176	|     1384
+>  .init.text        558132   |      548300   |      550088	|   550592
+>  .exit.text         12380   |       12256   |       12380	|    12448
+>  .data            1016672   |     1016064   |     1016128	|  1016064
+>  Total           14622556   |    14374510   |    14407326	| 14417898
 
-Sure, easy enough to add a ARCH_HAS_DEVMEM_IS_ALLOWED opt-in.
+Are you including dropping the bug table in these stats?  See BUG_TABLE
+in include/asm-generic/vmlinux.lds.h.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
