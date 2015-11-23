@@ -1,53 +1,109 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 22 Nov 2015 21:36:45 -0500 (EST)
-Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
- functions
-In-Reply-To: <4527012.vmieWOaE32@wuerfel>
-References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
- <6840047.0HF9qAEq6r@wuerfel> <20151122194704.GJ8644@n2100.arm.linux.org.uk>
- <4527012.vmieWOaE32@wuerfel>
-Message-ID: <alpine.LFD.2.20.1511222111020.22569@knanqh.ubzr>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 23 Nov 2015 10:43:30 +0800
+Subject: [PATCH 1/2] arm64: dts: berlin4ct: add I2C nodes for BG4CT
+In-Reply-To: <564F8EF3.5010508@gmail.com>
+References: <1448012821-7413-1-git-send-email-jszhang@marvell.com>
+ <1448012821-7413-2-git-send-email-jszhang@marvell.com>
+ <564F8EF3.5010508@gmail.com>
+Message-ID: <20151123104330.6b9e649c@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 22 Nov 2015, Arnd Bergmann wrote:
+On Fri, 20 Nov 2015 22:21:55 +0100
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-> I've also found some /proc/cpuinfo output to cross-reference SoCs
-> to their core names.
+> On 20.11.2015 10:47, Jisheng Zhang wrote:
+> > The Marvell Berlin BG4CT SoC has 4 TWSI which are compatible with the
+> > Synopsys DesignWare I2C driver. Add the corresponding nodes.
+> > 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >  arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 52 ++++++++++++++++++++++++++++++
+> >  1 file changed, 52 insertions(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+> > index cca4c41..39d0676 100644
+> > --- a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+> > +++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+> > @@ -232,6 +232,32 @@
+> >  				};
+> >  			};
+> >  
+> > +			i2c0: i2c at 1400 {
+> > +				compatible = "snps,designware-i2c";
+> > +				#address-cells = <1>;
+> > +				#size-cells = <0>;
+> > +				reg = <0x1400 0x100>;
+> > +				clocks = <&clk CLK_APBCORE>;  
 > 
-> 		variant	part	revision	name		features
-> dove:		0	0x581	5		PJ4		idivt
+> This patch looks fine to me, except that clock node naming and
+> clock indices may change. We should really postpone this series
+> until we worked out clock.
 
-I just managed to boot my dusty Dove DB and ran a quick test programon 
-it. Its cpuinfo corresponds to the above.
+Indeed. This is just to sent out for review early, so that we can merge
+the i2c support once clk is ready.
 
-$ cat m.c
-#include <stdio.h>
-int mydiv(int, int);
-int main()
-{
-        printf("div test\n");
-        printf("%d\n", mydiv(12345678, 37));
-        return 0;
-}
-$ cat d.c
-int mydiv(int x, int y)
-{
-        return x/y;
-}
-$ gcc -o test m.c d.c
-$ ./test
-div test
-333666
-$ gcc -o test m.c d.c -march=armv7ve -mthumb
-$ ./test
-div test
-333666
-$ gcc -o test m.c d.c -march=armv7ve -marm
-$ ./test
-div test
-Illegal instruction (core dumped)
-$
+Thanks for review,
+Jisheng
 
-
-Nicolas
+> 
+> Sebastian
+> 
+> > +				i2c-sda-hold-time-ns = <35>;
+> > +				i2c-sda-falling-time-ns = <425>;
+> > +				i2c-scl-falling-time-ns = <205>;
+> > +				interrupts = <4>;
+> > +				status = "disabled";
+> > +			};
+> > +
+> > +			i2c1: i2c at 1800 {
+> > +				compatible = "snps,designware-i2c";
+> > +				#address-cells = <1>;
+> > +				#size-cells = <0>;
+> > +				reg = <0x1800 0x100>;
+> > +				clocks = <&clk CLK_APBCORE>;
+> > +				i2c-sda-hold-time-ns = <35>;
+> > +				i2c-sda-falling-time-ns = <425>;
+> > +				i2c-scl-falling-time-ns = <205>;
+> > +				interrupts = <5>;
+> > +				status = "disabled";
+> > +			};
+> > +
+> >  			aic: interrupt-controller at 3800 {
+> >  				compatible = "snps,dw-apb-ictl";
+> >  				reg = <0x3800 0x30>;
+> > @@ -319,6 +345,32 @@
+> >  				};
+> >  			};
+> >  
+> > +			i2c2: i2c at b000 {
+> > +				compatible = "snps,designware-i2c";
+> > +				#address-cells = <1>;
+> > +				#size-cells = <0>;
+> > +				reg = <0xb000 0x100>;
+> > +				clocks = <&osc>;
+> > +				i2c-sda-hold-time-ns = <140>;
+> > +				i2c-sda-falling-time-ns = <500>;
+> > +				i2c-scl-falling-time-ns = <220>;
+> > +				interrupts = <6>;
+> > +				status = "disabled";
+> > +			};
+> > +
+> > +			i2c3: i2c at c000 {
+> > +				compatible = "snps,designware-i2c";
+> > +				#address-cells = <1>;
+> > +				#size-cells = <0>;
+> > +				reg = <0xc000 0x100>;
+> > +				clocks = <&osc>;
+> > +				i2c-sda-hold-time-ns = <140>;
+> > +				i2c-sda-falling-time-ns = <500>;
+> > +				i2c-scl-falling-time-ns = <220>;
+> > +				interrupts = <7>;
+> > +				status = "disabled";
+> > +			};
+> > +
+> >  			uart0: uart at d000 {
+> >  				compatible = "snps,dw-apb-uart";
+> >  				reg = <0xd000 0x100>;
+> >   
+> 
