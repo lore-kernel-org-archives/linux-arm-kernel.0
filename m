@@ -1,53 +1,53 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 22 Nov 2015 21:31:35 -0500
-Subject: [PATCH V6 2/3] dma: add Qualcomm Technologies HIDMA management
- driver
-In-Reply-To: <CAHp75VdAdrbQv1EY+KDsoAbyGURxfr+3c5f=-w=OR4MhBoWDHA@mail.gmail.com>
-References: <1448210257-4768-1-git-send-email-okaya@codeaurora.org>
- <1448210257-4768-3-git-send-email-okaya@codeaurora.org>
- <CAHp75Vc72HLbNdPKXzm=RqsFZS1cmAVuH3Nd6yO+TJidLeuExg@mail.gmail.com>
- <565bdce834ba1cf4a73029b5c027856e.squirrel@www.codeaurora.org>
- <CAHp75VdAdrbQv1EY+KDsoAbyGURxfr+3c5f=-w=OR4MhBoWDHA@mail.gmail.com>
-Message-ID: <56527A87.80201@codeaurora.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sun, 22 Nov 2015 21:36:45 -0500 (EST)
+Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <4527012.vmieWOaE32@wuerfel>
+References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
+ <6840047.0HF9qAEq6r@wuerfel> <20151122194704.GJ8644@n2100.arm.linux.org.uk>
+ <4527012.vmieWOaE32@wuerfel>
+Message-ID: <alpine.LFD.2.20.1511222111020.22569@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>
->>> Can it be like
->>>
->>> /sys/?/DEVICExx/
->>>  channelYY/
->>>  attr1
->>>  attr2
->>>  ?
->>>
->>> ?
->>
->> I'll work on it. I didn't know that you are allowed to create subdirectories
->> in sysfs. I was just creating attributes to keep it simple. But, your
->> suggestion is cleaner.
->>
->>>
->>> I think it will be easier to handle in code and from user. (Similar
->>> way DMAEngine API does for slave DMA devices)
->>
->> Now, the good stuff. Can you clarify your comment? I didn't understand it.
-> 
-> I meant that DMAEngine uses
-> /sys/class/dma
->  dmaYchannelX/
->   attr1
->   attr2
->   ?
-> 
-> layout.
-> 
+On Sun, 22 Nov 2015, Arnd Bergmann wrote:
 
-I have posted v7 with this change.
+> I've also found some /proc/cpuinfo output to cross-reference SoCs
+> to their core names.
+> 
+> 		variant	part	revision	name		features
+> dove:		0	0x581	5		PJ4		idivt
+
+I just managed to boot my dusty Dove DB and ran a quick test programon 
+it. Its cpuinfo corresponds to the above.
+
+$ cat m.c
+#include <stdio.h>
+int mydiv(int, int);
+int main()
+{
+        printf("div test\n");
+        printf("%d\n", mydiv(12345678, 37));
+        return 0;
+}
+$ cat d.c
+int mydiv(int x, int y)
+{
+        return x/y;
+}
+$ gcc -o test m.c d.c
+$ ./test
+div test
+333666
+$ gcc -o test m.c d.c -march=armv7ve -mthumb
+$ ./test
+div test
+333666
+$ gcc -o test m.c d.c -march=armv7ve -marm
+$ ./test
+div test
+Illegal instruction (core dumped)
+$
 
 
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
-Linux Foundation Collaborative Project
+Nicolas
