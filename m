@@ -1,62 +1,52 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 23 Nov 2015 17:47:20 -0600
-Subject: [PATCH v2 4/5] pinctrl: dt-binding: Extend meson documentation
- with GPIO IRQs support
-In-Reply-To: <1448273816-11290-5-git-send-email-carlo@caione.org>
-References: <1448273816-11290-1-git-send-email-carlo@caione.org>
- <1448273816-11290-5-git-send-email-carlo@caione.org>
-Message-ID: <20151123234720.GA879@rob-hp-laptop>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Mon, 23 Nov 2015 23:48:12 +0000
+Subject: [PATCH 5/5] arm64: Ensure the secondary CPUs have safe ASIDBits
+ size
+In-Reply-To: <20151123172920.GB1702@arm.com>
+References: <1447866238-22970-1-git-send-email-suzuki.poulose@arm.com>
+ <1447866540-23207-1-git-send-email-suzuki.poulose@arm.com>
+ <1447866540-23207-5-git-send-email-suzuki.poulose@arm.com>
+ <20151123172920.GB1702@arm.com>
+Message-ID: <5653A5BC.4020209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2015 at 11:16:55AM +0100, Carlo Caione wrote:
-> From: Carlo Caione <carlo@endlessm.com>
-> 
-> Extend the pinctrl binding documentation with the support for external
-> GPIO interrupts.
-> 
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
-> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
-> ---
->  Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
-> index 3f6a524..56743eb 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
-> @@ -3,6 +3,12 @@
->  Required properties for the root node:
->   - compatible: "amlogic,meson8-pinctrl" or "amlogic,meson8b-pinctrl"
->   - reg: address and size of registers controlling irq functionality
-> + - reg-names: should be "irq"
+On 23/11/15 17:29, Will Deacon wrote:
+> On Wed, Nov 18, 2015 at 05:09:00PM +0000, Suzuki K. Poulose wrote:
+>> The ID_AA64MMFR0_EL1:ASIDBits determines the size of the mm context
+>> id and is used in the early boot to make decisions. The value is
+>> picked up from the Boot CPU and cannot be delayed until other CPUs
+>> are up. If a secondary CPU has a smaller size than that of the Boot
+>> CPU, things will break horribly and the usual SANITY check is not good
+>> enough to prevent the system from crashing. Prevent this by failing CPUs with
+>> ASID smaller than that of the boot CPU.
 
-You don't really need names when there is only one. Otherwise:
+...
 
-Acked-by: Rob Herring <robh@kernel.org>
+>> +	pr_crit("CPU%d: will not boot\n", cpu);
+>
+> This is less informative than the current message (whcih describes the
+> missing capability).
 
-> + - interrupt-controller: marks the device node as an interrupt controller
-> + - #interrupt-cells: should be 2. The first cell is the GPIO number. The
-> +		     second cell is used to specify trigger type.
-> + - interrupts: specifies the GPIO IRQ numbers on the GIC (GPIO_IRQ#)
-> + - interrupt-parent: specifies the parent interrupt controller.
->  
->  === GPIO sub-nodes ===
->  
-> @@ -46,7 +52,13 @@ pinctrl-bindings.txt
->  
->  	pinctrl: pinctrl at c1109880 {
->  		compatible = "amlogic,meson8-pinctrl";
-> +		reg-names = "irq";
->  		reg = <0xc1109880 0x10>;
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <0 64 1>, <0 65 1>, <0 66 1>, <0 67 1>,
-> +			     <0 68 1>, <0 69 1>, <0 70 1>, <0 71 1>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <2>;
->  		#address-cells = <1>;
->  		#size-cells = <1>;
->  		ranges;
-> -- 
-> 2.5.0
-> 
+The missing capability is printed by the caller (Patch 4/5) and see below
+for the new user.
+
+
+	ID_AA64MMFR0_ASID_SHIFT);
+>> +	if (asid_cur < asid_boot) {
+>> +		pr_crit("CPU%d: has incompatible ASIDBits: %u vs Boot CPU:%u\n",
+>> +				cpu, asid_cur, asid_boot);
+>> +		fail_incapable_cpu();
+>> +	}
+>
+> Hmm. Whilst we want to ensure that secondary CPUs don't have a smaller
+> ASID size than the boot CPU, can we actually guarantee that a smaller
+> value for ID_AA64MMFR0.ASIDBits corresponds to fewer bits? We're
+> probably better off assuming 8-bit ASIDs unless ASIDBits == 2 (which is
+> what the ASID allocator does).
+
+Right, I already have a reworked version, which does the same and moves it
+back to verify_local_cpu_capabilities(). I will send it tomorrow.
+
+Cheers
+Suzuki
