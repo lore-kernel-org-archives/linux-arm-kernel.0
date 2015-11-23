@@ -1,87 +1,193 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 23 Nov 2015 13:09:43 +0800
-Subject: [PATCH] bus: imx-weim: Fix deferred probing
-In-Reply-To: <5623FD68.4070801@gmail.com>
-References: <5623FD68.4070801@gmail.com>
-Message-ID: <20151123050943.GE13744@tiger>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 23 Nov 2015 10:40:45 +0530
+Subject: [PATCH v2] phy-sun4i-usb: Add support for the host usb-phys found
+ on the H3 SoC
+In-Reply-To: <1448191764-11454-1-git-send-email-hdegoede@redhat.com>
+References: <1448191764-11454-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <56529FD5.5020305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 18, 2015 at 10:13:28PM +0200, Heiner Kallweit wrote:
-> With CONFIG_DELAY_DEVICE_PROBES being set the weim driver
-> isn't loadad because module_platform_driver_probe is
-> incompatible with deferred probing.
+Hi,
 
-It seems that DELAY_DEVICE_PROBES did not make its way to mainline?
-
-Shawn
-
+On Sunday 22 November 2015 04:59 PM, Hans de Goede wrote:
+> From: Reinder de Haan <patchesrdh@mveas.com>
 > 
-> Fix this by using builtin_platform_driver instead.
-> Going with deferred probing also means we have to drop
-> the __init annotations.
+> Note this commit only adds support for phys 1-3, phy 0, the otg phy, is
+> not yet (fully) supported after this commit.
 > 
-> Successfully tested on a I.MX6-based system.
-> 
-> I send the patch to linux-arm-kernel as the kernel MAINTAINERS
-> file doesn't list a dedicated maintainer.
-> 
-> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 > ---
->  drivers/bus/imx-weim.c | 11 ++++++-----
->  1 file changed, 6 insertions(+), 5 deletions(-)
+> Changes in v2:
+> -Change break; after dev_err() to return, as intended, fixing a compiler
+>  warning (the dev_err case should never be reached).
+> ---
+>  .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  1 +
+>  drivers/phy/phy-sun4i-usb.c                        | 67 +++++++++++++++++-----
+>  2 files changed, 53 insertions(+), 15 deletions(-)
 > 
-> diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
-> index e98d15e..7c425d3 100644
-> --- a/drivers/bus/imx-weim.c
-> +++ b/drivers/bus/imx-weim.c
-> @@ -59,7 +59,7 @@ static const struct of_device_id weim_id_table[] = {
->  };
->  MODULE_DEVICE_TABLE(of, weim_id_table);
+> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> index 0cebf74..95736d7 100644
+> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> @@ -9,6 +9,7 @@ Required properties:
+>    * allwinner,sun7i-a20-usb-phy
+>    * allwinner,sun8i-a23-usb-phy
+>    * allwinner,sun8i-a33-usb-phy
+> +  * allwinner,sun8i-h3-usb-phy
+>  - reg : a list of offset + length pairs
+>  - reg-names :
+>    * "phy_ctrl"
+> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+> index b12964b..11bc9cd 100644
+> --- a/drivers/phy/phy-sun4i-usb.c
+> +++ b/drivers/phy/phy-sun4i-usb.c
+> @@ -46,6 +46,9 @@
+>  #define REG_PHYBIST			0x08
+>  #define REG_PHYTUNE			0x0c
+>  #define REG_PHYCTL_A33			0x10
+> +#define REG_PHY_UNK_H3			0x20
+> +
+> +#define REG_PMU_UNK_H3			0x10
 >  
-> -static int __init imx_weim_gpr_setup(struct platform_device *pdev)
-> +static int imx_weim_gpr_setup(struct platform_device *pdev)
->  {
->  	struct device_node *np = pdev->dev.of_node;
->  	struct property *prop;
-> @@ -109,7 +109,7 @@ err:
->  }
+>  #define PHYCTL_DATA			BIT(7)
 >  
->  /* Parse and set the timing for this device. */
-> -static int __init weim_timing_setup(struct device_node *np, void __iomem *base,
-> +static int weim_timing_setup(struct device_node *np, void __iomem *base,
->  				    const struct imx_weim_devtype *devtype)
->  {
->  	u32 cs_idx, value[devtype->cs_regs_count];
-> @@ -135,7 +135,7 @@ static int __init weim_timing_setup(struct device_node *np, void __iomem *base,
->  	return 0;
->  }
+> @@ -79,7 +82,7 @@
+>  #define PHY_DISCON_TH_SEL		0x2a
+>  #define PHY_SQUELCH_DETECT		0x3c
 >  
-> -static int __init weim_parse_dt(struct platform_device *pdev,
-> +static int weim_parse_dt(struct platform_device *pdev,
->  				void __iomem *base)
->  {
->  	const struct of_device_id *of_id = of_match_device(weim_id_table,
-> @@ -172,7 +172,7 @@ static int __init weim_parse_dt(struct platform_device *pdev,
->  	return ret;
->  }
+> -#define MAX_PHYS			3
+> +#define MAX_PHYS			4
+
+Is it 4 only for h3-usb-phy or for others too? If so, can we add it in driver data?
 >  
-> -static int __init weim_probe(struct platform_device *pdev)
-> +static int weim_probe(struct platform_device *pdev)
->  {
->  	struct resource *res;
->  	struct clk *clk;
-> @@ -209,8 +209,9 @@ static struct platform_driver weim_driver = {
->  		.name		= "imx-weim",
->  		.of_match_table	= weim_id_table,
->  	},
-> +	.probe = weim_probe,
->  };
-> -module_platform_driver_probe(weim_driver, weim_probe);
-> +builtin_platform_driver(weim_driver);
+>  /*
+>   * Note do not raise the debounce time, we must report Vusb high within 100ms
+> @@ -88,12 +91,19 @@
+>  #define DEBOUNCE_TIME			msecs_to_jiffies(50)
+>  #define POLL_TIME			msecs_to_jiffies(250)
 >  
->  MODULE_AUTHOR("Freescale Semiconductor Inc.");
->  MODULE_DESCRIPTION("i.MX EIM Controller Driver");
-> -- 
-> 2.6.1
-> 
+> +enum sun4i_usb_phy_type {
+> +	sun4i_a10_phy,
+> +	sun8i_a33_phy,
+> +	sun8i_h3_phy
+> +};
+> +
+>  struct sun4i_usb_phy_data {
+> +	struct device *dev;
+>  	void __iomem *base;
+>  	struct mutex mutex;
+>  	int num_phys;
+>  	u32 disc_thresh;
+> -	bool has_a33_phyctl;
+> +	enum sun4i_usb_phy_type type;
+>  	struct sun4i_usb_phy {
+>  		struct phy *phy;
+>  		void __iomem *pmu;
+> @@ -164,12 +174,18 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
+>  
+>  	mutex_lock(&phy_data->mutex);
+>  
+> -	if (phy_data->has_a33_phyctl) {
+> +	switch (phy_data->type) {
+> +	case sun4i_a10_phy:
+> +		phyctl = phy_data->base + REG_PHYCTL_A10;
+> +		break;
+> +	case sun8i_a33_phy:
+>  		phyctl = phy_data->base + REG_PHYCTL_A33;
+>  		/* A33 needs us to set phyctl to 0 explicitly */
+>  		writel(0, phyctl);
+> -	} else {
+> -		phyctl = phy_data->base + REG_PHYCTL_A10;
+> +		break;
+> +	case sun8i_h3_phy:
+> +		dev_err(phy_data->dev, "H3 usb_phy_write is not supported\n");
+> +		return;
+>  	}
+>  
+>  	for (i = 0; i < len; i++) {
+> @@ -230,6 +246,7 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+>  	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+>  	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+>  	int ret;
+> +	u32 val;
+>  
+>  	ret = clk_prepare_enable(phy->clk);
+>  	if (ret)
+> @@ -241,15 +258,26 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+>  		return ret;
+>  	}
+>  
+> -	/* Enable USB 45 Ohm resistor calibration */
+> -	if (phy->index == 0)
+> -		sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
+> +	if (data->type == sun8i_h3_phy) {
+> +		if (phy->index == 0) {
+> +			val = readl(data->base + REG_PHY_UNK_H3);
+> +			writel(val & ~1, data->base + REG_PHY_UNK_H3);
+> +		}
+> +
+> +		val = readl(phy->pmu + REG_PMU_UNK_H3);
+> +		writel(val & ~2, phy->pmu + REG_PMU_UNK_H3);
+> +	} else {
+> +		/* Enable USB 45 Ohm resistor calibration */
+> +		if (phy->index == 0)
+> +			sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
+>  
+> -	/* Adjust PHY's magnitude and rate */
+> -	sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
+> +		/* Adjust PHY's magnitude and rate */
+> +		sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
+>  
+> -	/* Disconnect threshold adjustment */
+> -	sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL, data->disc_thresh, 2);
+> +		/* Disconnect threshold adjustment */
+> +		sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
+> +				    data->disc_thresh, 2);
+> +	}
+>  
+>  	sun4i_usb_phy_passby(phy, 1);
+>  
+> @@ -522,11 +550,14 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>  	mutex_init(&data->mutex);
+>  	INIT_DELAYED_WORK(&data->detect, sun4i_usb_phy0_id_vbus_det_scan);
+>  	dev_set_drvdata(dev, data);
+> +	data->dev = dev;
+>  
+>  	if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy") ||
+>  	    of_device_is_compatible(np, "allwinner,sun8i-a23-usb-phy") ||
+>  	    of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
+>  		data->num_phys = 2;
+> +	else if (of_device_is_compatible(np, "allwinner,sun8i-h3-usb-phy"))
+> +		data->num_phys = 4;
+
+this should come from driver data.
+>  	else
+>  		data->num_phys = 3;
+>  
+> @@ -538,13 +569,18 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>  
+>  	if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy") ||
+>  	    of_device_is_compatible(np, "allwinner,sun8i-a23-usb-phy") ||
+> -	    of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
+> +	    of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy") ||
+> +	    of_device_is_compatible(np, "allwinner,sun8i-h3-usb-phy"))
+>  		dedicated_clocks = true;
+
+same here.
+>  	else
+>  		dedicated_clocks = false;
+>  
+>  	if (of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
+> -		data->has_a33_phyctl = true;
+> +		data->type = sun8i_a33_phy;
+> +	else if (of_device_is_compatible(np, "allwinner,sun8i-h3-usb-phy"))
+> +		data->type = sun8i_h3_phy;
+> +	else
+> +		data->type = sun4i_a10_phy;
+
+this too can come from driver data.
+
+Thanks
+Kishon
