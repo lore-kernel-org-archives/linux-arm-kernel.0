@@ -1,111 +1,139 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 23 Nov 2015 13:47:12 -0800
-Subject: [PATCH RESEND] pwm: ftm: fix clock enable/disable when using PM
-In-Reply-To: <ac544aefbcb6e609d4ea01f02441aa3e@agner.ch>
-References: <1445142552-3530-1-git-send-email-stefan@agner.ch>
- <290ed017061ef41e1fe5c3fd5a523511@agner.ch>
- <20151123094550.GA28740@ulmo.nvidia.com>
- <ac544aefbcb6e609d4ea01f02441aa3e@agner.ch>
-Message-ID: <702a8932e2fdd5c89fba04326cc732e8@agner.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Nov 2015 22:57:07 +0100
+Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <20151123213206.GG19156@codeaurora.org>
+References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
+ <133921941.Qfq59EaTOs@wuerfel> <20151123213206.GG19156@codeaurora.org>
+Message-ID: <6359949.bhCrxaQvmL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-11-23 13:40, Stefan Agner wrote:
-> Thanks Thierry for looking into that!
+On Monday 23 November 2015 13:32:06 Stephen Boyd wrote:
+> On 11/23, Arnd Bergmann wrote:
+> > On Monday 23 November 2015 12:38:47 Stephen Boyd wrote:
+> > > On 11/23, Arnd Bergmann wrote:
+> > > > On Monday 23 November 2015 09:14:39 Christopher Covington wrote:
+> > > > > On 11/23/2015 03:15 AM, Arnd Bergmann wrote:
+> > > > > LPAE is only supported in the Krait 450.
+> > > > > 
+> > > > > http://www.anandtech.com/show/7537/qualcomms-snapdragon-805-25ghz-128bit-memory-interface-d3d11class-graphics-more
+> > > > > 
+> > > > > I'm pretty sure idiv support came earlier, but I don't have the
+> > > > > specifics on hand.
+> > > > 
+> > > > I have seen that article, but didn't trust it as a canonical
+> > > > source of information here.
+> > > > 
+> > > > If you can confirm that it's right, that would mean that we
+> > > > don't support LPAE on mach-qcom, as the only SoC with Krait 450
+> > > > seems to be APQ8084, and mainline Linux doesn't run on that.
+> > > 
+> > > arch/arm/boot/dts/qcom-apq8084.dtsi exists in the mainline
+> > > kernel. We support more than what's in the Kconfig language
+> > > under mach-qcom.
+> > 
+> > Ok, cool. I'm sometimes confused by the model numbers, could you
+> > do a separate patch to update the Kconfig help text?
 > 
-> Added Li as recipient to start discussion.
+> What did you have in mind? I'm also confused by the model numbers
+> so I don't know how helpful I will be.
+> 
+> It would be nice to drop the ARCH_MSM* configs entirely. If we
+> could select the right timers from kconfig without using selects
+> then we could drop them. Or we could just select both types of
+> timers when building qcom platforms.
 
-Yeah, kind of remember now, Li is not with Freescale anymore, at least
-his address bounces:
+Ok, dropping the specific Kconfig entries is actually an awesome
+idea, as it completely solves the other problem as well, more on
+that below.
 
-The original message was received at Mon, 23 Nov 2015 14:50:20 -0700
-from az84f-il1-il2-vlan904.am.freescale.net [192.88.158.118]
+In that case, don't worry about listing all the models, once
+we stop listing a subset of them, the confusion is already
+reduced by the fact that one has to look at the .dts files
+so see which models we support, and I assume there will be
+additional ones coming in for at least a few more years (before
+you stop caring about 32-bit MSM and compatibles).
 
-   ----- The following addresses had permanent fatal errors -----
-<Li.Xiubo@freescale.com>
-    (reason: 550 5.1.1 <Li.Xiubo@freescale.com>... User unknown)
+Regarding the timers:
+HAVE_ARM_ARCH_TIMER is already user-selectable, so maybe something
+like
 
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index b251013eef0a..bad6343c34d5 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -324,8 +324,9 @@ config EM_TIMER_STI
+ 	  such as EMEV2 from former NEC Electronics.
+ 
+ config CLKSRC_QCOM
+-	bool "Qualcomm MSM timer" if COMPILE_TEST
++	bool "Qualcomm MSM timer" if ARCH_QCOM || COMPILE_TEST
+ 	depends on ARM
++	default ARCH_QCOM
+ 	select CLKSRC_OF
+ 	help
+ 	  This enables the clocksource and the per CPU clockevent driver for the
 
-I did not found a newer/updated email address.
+would make both of them equally configurable and not clutter up
+the Kconfig file when ARCH_QCOM is not selected. I've added
+Daniel Lezcano to Cc, he probably has an opinion on this too.
 
-I will send a v2 with the helper.
+> > > > The ones we do support are MSM8x60 (Scorpion), MSM8960
+> > > > (Krait-without-number),and MSM7874 (Krait 400). Do those all
+> > > > support IDIV but not LPAE?
+> > > > 
+> > > 
+> > > Krait supports IDIV for all versions. Scorpion doesn't support
+> > > IDIV or lpae. Here's the output of /proc/cpuinfo on that device. 
+> > > 
+> > > # cat /proc/cpuinfo
+> > > processor       : 0
+> > > model name      : ARMv7 Processor rev 2 (v7l)
+> > > BogoMIPS        : 13.50
+> > > Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpd32
+> > > CPU implementer : 0x51
+> > > CPU architecture: 7
+> > > CPU variant     : 0x0
+> > > CPU part        : 0x02d
+> > > CPU revision    : 2
+> > 
+> > Ok, that leaves just one missing puzzle piece: can you confirm that
+> > no supported Krait variant other than Krait 450 / apq8084 has LPAE?
+> > 
+> 
+> Right, apq8084 is the only SoC with a Krait CPU that supports
+> LPAE.
 
---
-Stefan
+Ok, thanks for the confirmation.
 
-> 
-> Some comments below:
-> 
-> On 2015-11-23 01:45, Thierry Reding wrote:
->> On Wed, Nov 18, 2015 at 06:04:12PM -0800, Stefan Agner wrote:
->>> Thierry,
->>>
->>> I realized that this patch did not make it into 4.4-rc1, while others,
->>> IMHO less important patches which have been posted later (e.g. sunxi
->>> whitespace fixes) have made it! :-(
->>
->> The reason why I merged them is because they are low-risk, whereas this
->> patch of yours changes existing behaviour, and hasn't received any
->> feedback from anyone. So the choice that I need to make is to either
->> trust the original author to have tested the driver and it was working,
->> or you to have verified that it is still working after the patch on all
->> setups that it used to work on. The first option obviously carries the
->> least risk, and that's the reason why the patch hasn't been merged.
->>
->>> Anything wrong with that? Or am I on your spam list? Note that this is
->>> already a RESEND :-)
->>
->> If you want to get this merged, you should try to get some feedback from
->> at least the original author. Xiubo Li and I extensively discussed this
->> back at the time when he submitted the driver and we came up with the
->> current code as the best approach to making sure that clocks are on and
->> off when they should be. So if it's not working for you, I'm fine taking
->> the patch if Xiubo or somebody else has had the chance to look at it and
->> review or test it. So a Reviewed-by or Tested-by tag will go a long way
->> to convince me that it's safe to apply.
-> 
-> In mainline, the driver is only used in Freescale Vybrid device trees. I
-> think most issues have been introduced with the patches adding suspend
-> support:
-> http://thread.gmane.org/gmane.linux.kernel/1806940
-> 
-> Not sure against what suspend/resume implementation Li created the
-> patches, so far there is no suspend/resume implementation for Vybrid
-> upstream. While working on Vybrid's low power mode LPSTOP3, I noticed
-> the issues....
->  
->> Also you enumerate all the various bits that are broken, and it would
->> seem to me that they could each be fixed individually rather than go and
->> implement something completely different which might have undesirable
->> side-effects. Such an approach would also make it more likely for me to
->> merge the patch because it would hopefully be more obvious what is being
->> fixed and that it's a correct fix.
-> 
-> There are different issues addressed by one solution: Using the clock
-> frameworks enable/disable counts... I looked through the code again, it
-> is really quite hard to split it up. I could create one patch which only
-> switches the PWM enable/disable part to clock framework counts, and
-> leave the suspend/resume part broken. Than, in a second patch fix the
-> suspend/resume part. But that sounds like the wrong approach to me
-> too...
-> 
-> I took inspiration from other PWM drivers, I think the suspend/resume
-> idea was from TI EHRPWM PWM driver. So this shouldn't be far off what
-> others are doing.
-> 
->>
->> It's not that I mind the rework, but I'd at least like for someone to
->> verify that it's all still working on existing setups. Now, I understand
->> that people can go missing, so if nobody were to give you a Reviewed-by
->> or Tested-by for a couple of weeks I'd even consider applying without,
->> but as it is, you didn't even Cc Xiubo on the patch, so he's likely
->> missed it entirely.
-> 
-> I have had Li in the initial email, don't know/remember why I removed
-> him from the list in RESEND...  Will keep him in the loop.
-> 
-> Just realized that there is now a helper function for
-> test_bit(PWMF_ENABLED,... Will send a v2 anyway then.
-> 
-> --
-> Stefan
+Summarizing what we've found, I think we can get away with just
+introducing two Kconfig symbols ARCH_MULTI_V7VE and CPU_V7VE.
+Most CPUs fall clearly into one category or the other, and then
+we can allow LPAE to be selected for V7VE-only build but not
+for plain V7, and we can unconditionally build the kernel with
+
+arch-$(CONFIG_CPU_32v7VE)  = -D__LINUX_ARM_ARCH__=7 $(call cc-option,-march=armv7ve,-march=armv7-a -mcpu=cortex-a15)
+
+This works perfectly for Cortex-A5, -A8, -A9, -A12, -A15, -A17, Brahma-B15,
+PJ4B-MP, Scorpion and Krait-450, which all clearly fall into one of
+the two other categories.
+
+The two exceptions that don't quite fit are still "good enough":
+
+- PJ4/PJ4B (not PJ4B-MP) has a different custom opcode for udiv and sdiv
+  in ARM mode. We don't support that with true multiplatform kernels
+  because those opcodes work nowhere else, though with your proposed
+  series we could easily do that for dynamic patching.
+
+- Krait (pre-450) won't run kernels with LPAE disabled, but if we only
+  have one global ARCH_QCOM option that can be enabled for both
+  ARCH_MULTI_V7VE and ARCH_MULTI_V7, we still win: a mach-qcom
+  kernel with only ARCH_MULTI_V7VE will use IDIV by default, and
+  give you the option to enable LPAE. If you pick LPAE, it will
+  still work fine on Krait-450 but not the older ones, and that is
+  a user error. If you enable ARCH_MULTI_V7 / CPU_V7, you get neither
+  LPAE nor IDIV, and the kernel will be able to run on both Scorpion
+  and Krait, as long as you have the right drivers too.
+
+	Arnd
