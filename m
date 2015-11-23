@@ -1,66 +1,37 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 23 Nov 2015 08:43:24 +0100
-Subject: [PATCH 2/2] arm64: efi: fix initcall return values
-In-Reply-To: <1448264604-19411-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1448264604-19411-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1448264604-19411-3-git-send-email-ard.biesheuvel@linaro.org>
+From: atx@atx.name (Josef Gajdusek)
+Date: Mon, 23 Nov 2015 09:02:48 +0100
+Subject: [PATCH v2 1/5] ARM: dts: sun8i: Add SID node
+In-Reply-To: <cover.1448263428.git.atx@atx.name>
+References: <cover.1448263428.git.atx@atx.name>
+Message-ID: <b897b1c8741c8a871163b84d01b480f99329536d.1448263428.git.atx@atx.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even though initcall return values are typically ignored, the
-prototype is to return 0 on success or a negative errno value on
-error. So fix the arm_enable_runtime_services() implementation to
-return 0 on conditions that are not in fact errors, and return a
-meaningful error code otherwise.
+Add a node describing the Security ID memory to the
+Allwinner H3 .dtsi file.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Josef Gajdusek <atx@atx.name>
 ---
- arch/arm64/kernel/efi.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/sun8i-h3.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 186b9e119d4a..3aeb576965c0 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -285,12 +285,12 @@ static int __init arm64_enable_runtime_services(void)
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index 0faa38a..58de718 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -359,6 +359,13 @@
+ 			#size-cells = <0>;
+ 		};
  
- 	if (!efi_enabled(EFI_BOOT)) {
- 		pr_info("EFI services will not be available.\n");
--		return -1;
-+		return 0;
- 	}
- 
- 	if (efi_runtime_disabled()) {
- 		pr_info("EFI runtime services will be disabled.\n");
--		return -1;
-+		return 0;
- 	}
- 
- 	pr_info("Remapping and enabling EFI services.\n");
-@@ -300,7 +300,7 @@ static int __init arm64_enable_runtime_services(void)
- 						   mapsize);
- 	if (!memmap.map) {
- 		pr_err("Failed to remap EFI memory map\n");
--		return -1;
-+		return -ENOMEM;
- 	}
- 	memmap.map_end = memmap.map + mapsize;
- 	efi.memmap = &memmap;
-@@ -309,13 +309,13 @@ static int __init arm64_enable_runtime_services(void)
- 						   sizeof(efi_system_table_t));
- 	if (!efi.systab) {
- 		pr_err("Failed to remap EFI System Table\n");
--		return -1;
-+		return -ENOMEM;
- 	}
- 	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
- 
- 	if (!efi_virtmap_init()) {
- 		pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
--		return -1;
-+		return -ENOMEM;
- 	}
- 
- 	/* Set up runtime services function pointers */
++		sid: eeprom at 01c14000 {
++			compatible = "allwinner,sun4i-a10-sid";
++			reg = <0x01c14000 0x400>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++		};
++
+ 		usbphy: phy at 01c19400 {
+ 			compatible = "allwinner,sun8i-h3-usb-phy";
+ 			reg = <0x01c19400 0x2c>,
 -- 
-1.9.1
+2.4.10
