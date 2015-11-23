@@ -1,141 +1,63 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 23 Nov 2015 11:52:07 +0000
-Subject: [Xen-devel] [PATCH v3 09/62] arm/acpi: Add basic ACPI
- initialization
-In-Reply-To: <1447753261-7552-10-git-send-email-shannon.zhao@linaro.org>
+Date: Mon, 23 Nov 2015 11:54:30 +0000
+Subject: [PATCH v3 10/62] arm/acpi: Move end_boot_allocator after
+ acpi_boot_table_init
+In-Reply-To: <1447753261-7552-11-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-10-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511231149570.1107@kaball.uk.xensource.com>
+ <1447753261-7552-11-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511231154050.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-
-> From: Parth Dixit <parth.dixit@linaro.org>
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> acpi_boot_table_init() will be called in start_xen to get the RSDP and
-> all the table pointers. With this patch, we can get ACPI boot-time
-> tables from firmware on ARM64.
-
-The patch looks good, only one comment below.
-
-
-> Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
+> If ACPI is initialized after the boot allocator has ended(the system
+> state is not early boot), assert happens in acpi_os_zalloc_memory and
+> acpi_boot_table_init will fail. So it needs to move end_boot_allocator
+> after acpi_boot_table_init.
+> 
 > Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  xen/arch/arm/acpi/Makefile |  1 +
->  xen/arch/arm/acpi/boot.c   | 62 ++++++++++++++++++++++++++++++++++++++++++++++
->  xen/arch/arm/setup.c       |  4 +++
->  3 files changed, 67 insertions(+)
->  create mode 100644 xen/arch/arm/acpi/boot.c
+
+This is the reason why you are calling acpi_boot_table_init before
+vm_init, correct?
+
+
+>  xen/arch/arm/setup.c | 6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
 > 
-> diff --git a/xen/arch/arm/acpi/Makefile b/xen/arch/arm/acpi/Makefile
-> index b5be22d..196c40a 100644
-> --- a/xen/arch/arm/acpi/Makefile
-> +++ b/xen/arch/arm/acpi/Makefile
-> @@ -1 +1,2 @@
->  obj-y += lib.o
-> +obj-y += boot.o
-> diff --git a/xen/arch/arm/acpi/boot.c b/xen/arch/arm/acpi/boot.c
-> new file mode 100644
-> index 0000000..ad51afc
-> --- /dev/null
-> +++ b/xen/arch/arm/acpi/boot.c
-> @@ -0,0 +1,62 @@
-> +/*
-> + *  ARM Specific Low-Level ACPI Boot Support
-> + *
-> + *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
-> + *  Copyright (C) 2001 Jun Nakajima <jun.nakajima@intel.com>
-> + *  Copyright (C) 2014, Naresh Bhat <naresh.bhat@linaro.org>
-> + *  Copyright (C) 2015, Shannon Zhao <shannon.zhao@linaro.org>
-> + *
-> + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> + *
-> + *  This program is free software; you can redistribute it and/or modify
-> + *  it under the terms of the GNU General Public License as published by
-> + *  the Free Software Foundation; either version 2 of the License, or
-> + *  (at your option) any later version.
-> + *
-> + *  This program is distributed in the hope that it will be useful,
-> + *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *  GNU General Public License for more details.
-> + *
-> + *  You should have received a copy of the GNU General Public License
-> + *  along with this program; if not, write to the Free Software
-> + *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> + *
-> + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> + */
-> +
-> +#include <xen/init.h>
-> +#include <xen/acpi.h>
-> +
-> +#include <asm/acpi.h>
-> +
-> +/*
-> + * acpi_boot_table_init() called from setup_arch(), always.
-> + *      1. find RSDP and get its address, and then find XSDT
-> + *      2. extract all tables and checksums them all
-> + *
-> + * return value: (currently ignored)
-> + *	0: success
-> + *	!0: failure
-> + *
-> + * We can parse ACPI boot-time tables such as FADT, MADT after
-> + * this function is called.
-> + */
-> +int __init acpi_boot_table_init(void)
-> +{
-> +    int error;
-> +
-> +    /* If acpi_disabled, bail out */
-> +    if ( acpi_disabled )
-> +        return 1;
-> +
-> +    /* Initialize the ACPI boot-time table parser. */
-> +    error = acpi_table_init();
-> +    if ( error )
-> +    {
-> +        disable_acpi();
-> +        return error;
-> +    }
-> +
-> +    return 0;
-> +}
 > diff --git a/xen/arch/arm/setup.c b/xen/arch/arm/setup.c
-> index 3b29904..768312f 100644
+> index 768312f..c15a09d 100644
 > --- a/xen/arch/arm/setup.c
 > +++ b/xen/arch/arm/setup.c
-> @@ -36,6 +36,7 @@
->  #include <xen/pfn.h>
->  #include <xen/vmap.h>
->  #include <xen/libfdt/libfdt.h>
-> +#include <xen/acpi.h>
->  #include <asm/page.h>
->  #include <asm/current.h>
->  #include <asm/setup.h>
-> @@ -753,6 +754,9 @@ void __init start_xen(unsigned long boot_phys_offset,
+> @@ -613,8 +613,6 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
+>         allocator. */
+>      init_xenheap_pages(pfn_to_paddr(xenheap_mfn_start),
+>                         pfn_to_paddr(boot_mfn_start));
+> -
+> -    end_boot_allocator();
+>  }
+>  #else /* CONFIG_ARM_64 */
+>  static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
+> @@ -682,8 +680,6 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 >  
->      setup_mm(fdt_paddr, fdt_size);
+>      setup_frametable_mappings(ram_start, ram_end);
+>      max_page = PFN_DOWN(ram_end);
+> -
+> -    end_boot_allocator();
+>  }
+>  #endif
 >  
-> +    /* Parse the ACPI tables for possible boot-time configuration */
-> +    acpi_boot_table_init();
-
-Are you sure that you need to call acpi_boot_table_init before vm_init?
-
-
+> @@ -757,6 +753,8 @@ void __init start_xen(unsigned long boot_phys_offset,
+>      /* Parse the ACPI tables for possible boot-time configuration */
+>      acpi_boot_table_init();
+>  
+> +    end_boot_allocator();
+> +
 >      vm_init();
 >      dt_unflatten_host_device_tree();
 >  
 > -- 
 > 2.1.0
-> 
-> 
-> _______________________________________________
-> Xen-devel mailing list
-> Xen-devel at lists.xen.org
-> http://lists.xen.org/xen-devel
 > 
