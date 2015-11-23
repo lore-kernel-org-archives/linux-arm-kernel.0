@@ -1,87 +1,60 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 23 Nov 2015 12:13:15 +0000
-Subject: [PATCH v3 11/62] arm/acpi: Introduce ARM Boot Architecture Flags
- in FADT
-In-Reply-To: <1447753261-7552-12-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-12-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511231213080.1107@kaball.uk.xensource.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 23 Nov 2015 12:15:15 +0000
+Subject: [PATCH] [PATCH] arm64: Boot failure on m400 with new cont PTEs
+In-Reply-To: <20151120195243.GC14942@leverpostej>
+References: <1447858999-26665-1-git-send-email-jeremy.linton@arm.com>
+ <20151118152044.GD10644@leverpostej> <564CA29A.9050905@arm.com>
+ <20151118162932.GA13355@leverpostej> <564CB1DA.4090304@arm.com>
+ <20151118180434.GB13355@leverpostej> <564CD206.9040402@arm.com>
+ <20151119112923.GA24570@leverpostej>
+ <20151120195243.GC14942@leverpostej>
+Message-ID: <20151123121514.GB32300@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On Fri, Nov 20, 2015 at 07:52:44PM +0000, Mark Rutland wrote:
+> On Thu, Nov 19, 2015 at 11:31:34AM +0000, Mark Rutland wrote:
+> > I think that if we need to do something more drastic to account for the
+> > other issues above (e.g. by ensuring that we can never allocate
+> > conflicting TLB entries in the first place), and that said strategy
+> > would also fix this problem, that would be preferable, given that we're
+> > going to have to do that eventually anyway.
 > 
-> The Power State Coordination Interface (PSCI) defines an API that
-> can be used to coordinate power control amongst the various supervisory
-> systems concurrently running on a device. ACPI support for this
-> technology would require the addition of two flags: PSCI_COMPLIANT and
-> PSCI_USE_HVC. When set, the former signals to the OS that the hardware
-> is PSCI compliant. The latter selects the appropriate conduit for PSCI
-> calls by toggling between Hypervisor Calls (HVC) and Secure Monitor
-> Calls (SMC).
-> 
-> An ARM Boot Architecture Flags structure to support new ARM hardware
-> was introduced in FADT in ACPI 5.1, add the code accordingly to
-> implement that in ACPICA core.
-> 
-> Since ACPI 5.1 doesn't support self defined PSCI function IDs,
-> which means that only PSCI 0.2+ is supported in ACPI.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> Having looked into this further, we also have the same issue with the
+> kasan init code.
 
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+I don't think the kasan_init() problem is that bad. We are preserving
+the same size mappings (PAGE_SIZE) and just changing the physical
+address they point at without a break-before-make (just a TTBR1 switch).
+I don't know how clear the ARM ARM is around this but at least so far we
+haven't hit any problems.
 
+The problem with the contiguous bit is that we switch from e.g. a 4KB
+mapping to a 64KB one and it's very likely that we would get a TLB
+conflict.
 
->  xen/include/acpi/actbl.h | 12 +++++++++---
->  1 file changed, 9 insertions(+), 3 deletions(-)
+With CONFIG_DEBUG_RODATA, we go from bigger block to a smaller one, so
+less chance of a TLB conflict but still present. I need to read the ARM
+ARM some more in this area (and maybe ask for clarification).
+
+> I believe that the issue is restricted to one-off init code, as I don't
+> think that we do anything at runtime which would be problematic. If
+> anyone knows of a counter-example, please let me know!
 > 
-> diff --git a/xen/include/acpi/actbl.h b/xen/include/acpi/actbl.h
-> index 856945d..66e29c3 100644
-> --- a/xen/include/acpi/actbl.h
-> +++ b/xen/include/acpi/actbl.h
-> @@ -244,7 +244,8 @@ struct acpi_table_fadt {
->  	u32 flags;		/* Miscellaneous flag bits (see below for individual flags) */
->  	struct acpi_generic_address reset_register;	/* 64-bit address of the Reset register */
->  	u8 reset_value;		/* Value to write to the reset_register port to reset the system */
-> -	u8 reserved4[3];	/* Reserved, must be zero */
-> +	u16 arm_boot_flags;     /* ARM-Specific Boot Flags (see below for individual flags) (ACPI 5.1) */
-> +	u8 minor_revision;      /* FADT Minor Revision (ACPI 5.1) */
->  	u64 Xfacs;		/* 64-bit physical address of FACS */
->  	u64 Xdsdt;		/* 64-bit physical address of DSDT */
->  	struct acpi_generic_address xpm1a_event_block;	/* 64-bit Extended Power Mgt 1a Event Reg Blk address */
-> @@ -259,7 +260,7 @@ struct acpi_table_fadt {
->  	struct acpi_generic_address sleep_status;	/* 64-bit Sleep Status register */
->  };
->  
-> -/* Masks for FADT Boot Architecture Flags (boot_flags) */
-> +/* Masks for FADT IA-PC Boot Architecture Flags (boot_flags) */
->  
->  #define ACPI_FADT_LEGACY_DEVICES    (1)  	/* 00: [V2] System has LPC or ISA bus devices */
->  #define ACPI_FADT_8042              (1<<1)	/* 01: [V3] System has an 8042 controller on port 60/64 */
-> @@ -270,6 +271,11 @@ struct acpi_table_fadt {
->  
->  #define FADT2_REVISION_ID               3
->  
-> +/* Masks for FADT ARM Boot Architecture Flags (arm_boot_flags) ACPI 5.1 */
-> +
-> +#define ACPI_FADT_PSCI_COMPLIANT    (1)        /* 00:  [V5+] PSCI 0.2+ is implemented */
-> +#define ACPI_FADT_PSCI_USE_HVC      (1<<1)     /* 01:  [V5+] HVC must be used instead of SMC as the PSCI conduit */
-> +
->  /* Masks for FADT flags */
->  
->  #define ACPI_FADT_WBINVD            (1)	/* 00: [V1] The wbinvd instruction works properly */
-> @@ -345,7 +351,7 @@ enum acpi_prefered_pm_profiles {
->   *     FADT V5  size: 0x10C
->   */
->  #define ACPI_FADT_V1_SIZE       (u32) (ACPI_FADT_OFFSET (flags) + 4)
-> -#define ACPI_FADT_V2_SIZE       (u32) (ACPI_FADT_OFFSET (reserved4[0]) + 3)
-> +#define ACPI_FADT_V2_SIZE       (u32) (ACPI_FADT_OFFSET (minor_revision) + 1)
->  #define ACPI_FADT_V3_SIZE       (u32) (ACPI_FADT_OFFSET (sleep_control))
->  #define ACPI_FADT_V5_SIZE       (u32) (sizeof (struct acpi_table_fadt))
->  
-> -- 
-> 2.1.0
+> Given that, we can restrict the problem to an early UP environment, and
+> it won't matter if therre's some large(ish) fixed cost associated with
+> updating the kernel page tables. I think that we can avoid the issue
+> entirely by modifying a copy of the kernel page tables, which we can
+> later install via some idmap code (going via a reserved table to clear
+> the TLBs).
 > 
+> I'm working on patches to implement the above, which I'll try to get
+> somewhere with next week.
+
+That's a complete fix indeed but it would require some more testing and
+I don't think it's feasible for 4.4-rc. In the meantime, I propose that
+we revert the contiguous PTE patches and push them again once we fix the
+TLB conflict problems.
+
+-- 
+Catalin
