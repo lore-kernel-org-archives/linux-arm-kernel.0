@@ -1,55 +1,33 @@
 From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
-Date: Mon, 23 Nov 2015 11:28:57 +0200
-Subject: [PATCH v3 0/6] Qualcomm PCIe driver and designware fixes
-Message-ID: <cover.1448270813.git.stanimir.varbanov@linaro.org>
+Date: Mon, 23 Nov 2015 11:28:58 +0200
+Subject: [PATCH v3 1/6] PCI: designware: remove wrong io_base assignment
+In-Reply-To: <cover.1448270813.git.stanimir.varbanov@linaro.org>
+References: <cover.1448270813.git.stanimir.varbanov@linaro.org>
+Message-ID: <44d133d5ebd4f7b9e8b817aa8bae12f690e70000.1448270813.git.stanimir.varbanov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set is continuation of previous v2 at [1]. This time I
-decided to drop the PHY driver needed by pcie driver for apq8084
-and send it separately soon (when sort out the need of separate phy
-driver).
+The io_base is used to keep the cpu physical address parsed
+from ranges dt property. After issue pci_remap_iospace the
+io_base has been assigned with io->start, which is not correct
+cause io->start is a PCI bus address.
 
-First two patches in the set are fixes in pcie designware driver
-found during testing the qcom pcie driver. The second patch can
-be treated as an RFC.
+Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
+---
+ drivers/pci/host/pcie-designware.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-Next two patches adds DT binding document and the driver itself.
-
-The last two patches just adds relevant dt node for apq8064 and
-enable pcie usage on ifc6410 development board. The testing has been
-made on ifc6410 development board.
-
-Comments are welcome!
-
-Here is edited description:
-
-This patchset introduces a Qualcomm PCIe root complex driver for
-Snapdragon 805 (APQ8084) and Snapdragon 600 (APQ8064). The PCIe
-hardware use Designware IP core plus Qualcomm application
-specific hw wrappers.
-
-[1] https://lkml.org/lkml/2015/5/4/267
-
-Stanimir Varbanov (6):
-  PCI: designware: remove wrong io_base assignment
-  PCI: designware: add memory barrier after enabling region
-  DT: PCI: qcom: Document PCIe devicetree bindings
-  PCI: qcom: Add Qualcomm PCIe controller driver
-  ARM: dts: apq8064: add pcie devicetree node
-  ARM: dts: ifc6410: enable pcie dt node for this board
-
- .../devicetree/bindings/pci/qcom,pcie.txt          |  231 ++++++++
- MAINTAINERS                                        |    7 +
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts         |   26 +
- arch/arm/boot/dts/qcom-apq8064.dtsi                |   36 ++
- drivers/pci/host/Kconfig                           |   10 +
- drivers/pci/host/Makefile                          |    1 +
- drivers/pci/host/pcie-designware.c                 |    6 +-
- drivers/pci/host/pcie-qcom.c                       |  623 ++++++++++++++++++++
- 8 files changed, 939 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/pci/qcom,pcie.txt
- create mode 100644 drivers/pci/host/pcie-qcom.c
-
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 540f077c37ea..02a7452bdf23 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -440,7 +440,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 					 ret, pp->io);
+ 				continue;
+ 			}
+-			pp->io_base = pp->io->start;
+ 			break;
+ 		case IORESOURCE_MEM:
+ 			pp->mem = win->res;
 -- 
 1.7.9.5
