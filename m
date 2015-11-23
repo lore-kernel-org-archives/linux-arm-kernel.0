@@ -1,60 +1,82 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 23 Nov 2015 12:15:15 +0000
-Subject: [PATCH] [PATCH] arm64: Boot failure on m400 with new cont PTEs
-In-Reply-To: <20151120195243.GC14942@leverpostej>
-References: <1447858999-26665-1-git-send-email-jeremy.linton@arm.com>
- <20151118152044.GD10644@leverpostej> <564CA29A.9050905@arm.com>
- <20151118162932.GA13355@leverpostej> <564CB1DA.4090304@arm.com>
- <20151118180434.GB13355@leverpostej> <564CD206.9040402@arm.com>
- <20151119112923.GA24570@leverpostej>
- <20151120195243.GC14942@leverpostej>
-Message-ID: <20151123121514.GB32300@e104818-lin.cambridge.arm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 23 Nov 2015 12:15:38 +0000
+Subject: [PATCH v3 12/62] ACPICA: ACPI 6.0: Add changes for FADT table
+In-Reply-To: <1447753261-7552-13-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-13-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511231214490.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 07:52:44PM +0000, Mark Rutland wrote:
-> On Thu, Nov 19, 2015 at 11:31:34AM +0000, Mark Rutland wrote:
-> > I think that if we need to do something more drastic to account for the
-> > other issues above (e.g. by ensuring that we can never allocate
-> > conflicting TLB entries in the first place), and that said strategy
-> > would also fix this problem, that would be preferable, given that we're
-> > going to have to do that eventually anyway.
+
+
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+
+> From: Bob Moore <robert.moore@intel.com>
 > 
-> Having looked into this further, we also have the same issue with the
-> kasan init code.
-
-I don't think the kasan_init() problem is that bad. We are preserving
-the same size mappings (PAGE_SIZE) and just changing the physical
-address they point at without a break-before-make (just a TTBR1 switch).
-I don't know how clear the ARM ARM is around this but at least so far we
-haven't hit any problems.
-
-The problem with the contiguous bit is that we switch from e.g. a 4KB
-mapping to a 64KB one and it's very likely that we would get a TLB
-conflict.
-
-With CONFIG_DEBUG_RODATA, we go from bigger block to a smaller one, so
-less chance of a TLB conflict but still present. I need to read the ARM
-ARM some more in this area (and maybe ask for clarification).
-
-> I believe that the issue is restricted to one-off init code, as I don't
-> think that we do anything at runtime which would be problematic. If
-> anyone knows of a counter-example, please let me know!
+> ACPICA commit 72b0b6741990f619f6aaa915302836b7cbb41ac4
 > 
-> Given that, we can restrict the problem to an early UP environment, and
-> it won't matter if therre's some large(ish) fixed cost associated with
-> updating the kernel page tables. I think that we can avoid the issue
-> entirely by modifying a copy of the kernel page tables, which we can
-> later install via some idmap code (going via a reserved table to clear
-> the TLBs).
+> One new 64-bit field at the end of the table.
+> FADT version is now 6.
 > 
-> I'm working on patches to implement the above, which I'll try to get
-> somewhere with next week.
+> Link: https://github.com/acpica/acpica/commit/72b0b674
+> Signed-off-by: Bob Moore <robert.moore@intel.com>
+> Signed-off-by: Lv Zheng <lv.zheng@intel.com>
+> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> [Linux commit aeb823bbacc2a3aaee29eda5875b58a049fa1f78]
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 
-That's a complete fix indeed but it would require some more testing and
-I don't think it's feasible for 4.4-rc. In the meantime, I propose that
-we revert the contiguous PTE patches and push them again once we fix the
-TLB conflict problems.
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
--- 
-Catalin
+
+>  xen/include/acpi/actbl.h | 17 ++++++++++-------
+>  1 file changed, 10 insertions(+), 7 deletions(-)
+> 
+> diff --git a/xen/include/acpi/actbl.h b/xen/include/acpi/actbl.h
+> index 66e29c3..3079176 100644
+> --- a/xen/include/acpi/actbl.h
+> +++ b/xen/include/acpi/actbl.h
+> @@ -258,6 +258,7 @@ struct acpi_table_fadt {
+>  	struct acpi_generic_address xgpe1_block;	/* 64-bit Extended General Purpose Event 1 Reg Blk address */
+>  	struct acpi_generic_address sleep_control;	/* 64-bit Sleep Control register */
+>  	struct acpi_generic_address sleep_status;	/* 64-bit Sleep Status register */
+> +	u64 hypervisor_id;      /* Hypervisor Vendor ID (ACPI 6.0) */
+>  };
+>  
+>  /* Masks for FADT IA-PC Boot Architecture Flags (boot_flags) */
+> @@ -315,7 +316,7 @@ enum acpi_prefered_pm_profiles {
+>  	PM_TABLET = 8
+>  };
+>  
+> -/* Values for sleep_status and sleep_control registers (V5 FADT) */
+> +/* Values for sleep_status and sleep_control registers (V5+ FADT) */
+>  
+>  #define ACPI_X_WAKE_STATUS          0x80
+>  #define ACPI_X_SLEEP_TYPE_MASK      0x1C
+> @@ -344,15 +345,17 @@ enum acpi_prefered_pm_profiles {
+>   * FADT is the bottom line as to what the version really is.
+>   *
+>   * For reference, the values below are as follows:
+> - *     FADT V1  size: 0x074
+> - *     FADT V2  size: 0x084
+> - *     FADT V3  size: 0x0F4
+> - *     FADT V4  size: 0x0F4
+> - *     FADT V5  size: 0x10C
+> + *     FADT V1 size: 0x074
+> + *     FADT V2 size: 0x084
+> + *     FADT V3 size: 0x0F4
+> + *     FADT V4 size: 0x0F4
+> + *     FADT V5 size: 0x10C
+> + *     FADT V6 size: 0x114
+>   */
+>  #define ACPI_FADT_V1_SIZE       (u32) (ACPI_FADT_OFFSET (flags) + 4)
+>  #define ACPI_FADT_V2_SIZE       (u32) (ACPI_FADT_OFFSET (minor_revision) + 1)
+>  #define ACPI_FADT_V3_SIZE       (u32) (ACPI_FADT_OFFSET (sleep_control))
+> -#define ACPI_FADT_V5_SIZE       (u32) (sizeof (struct acpi_table_fadt))
+> +#define ACPI_FADT_V5_SIZE       (u32) (ACPI_FADT_OFFSET (hypervisor_id))
+> +#define ACPI_FADT_V6_SIZE       (u32) (sizeof (struct acpi_table_fadt))
+>  
+>  #endif				/* __ACTBL_H__ */
+> -- 
+> 2.1.0
+> 
