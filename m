@@ -1,30 +1,95 @@
-From: iivanov.xz@gmail.com (Ivan T. Ivanov)
-Date: Mon, 23 Nov 2015 08:37:19 +0200
-Subject: [RFC/PATCH] pinctrl: qcom: Add generic ssbi and spmi GPIO/MPP
- bindings
-In-Reply-To: <1447808426-21834-1-git-send-email-sboyd@codeaurora.org>
-References: <1447808426-21834-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <30F64119-A5B2-45FA-ABA2-A7FB1A1D7952@gmail.com>
+From: hkallweit1@gmail.com (Heiner Kallweit)
+Date: Mon, 23 Nov 2015 07:41:41 +0100
+Subject: [PATCH] bus: imx-weim: Fix deferred probing
+In-Reply-To: <20151123050943.GE13744@tiger>
+References: <5623FD68.4070801@gmail.com> <20151123050943.GE13744@tiger>
+Message-ID: <5652B525.9090302@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On Nov 18, 2015, at 3:00 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+Am 23.11.2015 um 06:09 schrieb Shawn Guo:
+> On Sun, Oct 18, 2015 at 10:13:28PM +0200, Heiner Kallweit wrote:
+>> With CONFIG_DELAY_DEVICE_PROBES being set the weim driver
+>> isn't loadad because module_platform_driver_probe is
+>> incompatible with deferred probing.
 > 
-> The drivers don't really need to know which PMIC they're for, so
-> make a generic binding for them. This alleviates us from updating
-> the drivers every time a new PMIC comes out. It's still
-> recommended that we update the binding with new PMIC models and
-> always specify the specific model for the MPPs and gpios before
-> the generic compatible string in devicetree, but this at least
-> cuts down on adding more and more compatible strings to the
-> drivers until we actually need them.
+> It seems that DELAY_DEVICE_PROBES did not make its way to mainline?
 > 
-> Cc: <devicetree@vger.kernel.org>
-> Cc: "Ivan T. Ivanov" <iivanov@mm-sol.com>
-> Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Yes, seems like it broke quite a lot of systems and I found some
+discussions where Greg KH expressed his wish to have it removed again.
+The patch therefore isn't needed.
 
-Thanks.
+Heiner
 
-Acked-by: Ivan T. Ivanov <iivanov.xz@gmail.com>
+> Shawn
+> 
+>>
+>> Fix this by using builtin_platform_driver instead.
+>> Going with deferred probing also means we have to drop
+>> the __init annotations.
+>>
+>> Successfully tested on a I.MX6-based system.
+>>
+>> I send the patch to linux-arm-kernel as the kernel MAINTAINERS
+>> file doesn't list a dedicated maintainer.
+>>
+>> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+>> ---
+>>  drivers/bus/imx-weim.c | 11 ++++++-----
+>>  1 file changed, 6 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
+>> index e98d15e..7c425d3 100644
+>> --- a/drivers/bus/imx-weim.c
+>> +++ b/drivers/bus/imx-weim.c
+>> @@ -59,7 +59,7 @@ static const struct of_device_id weim_id_table[] = {
+>>  };
+>>  MODULE_DEVICE_TABLE(of, weim_id_table);
+>>  
+>> -static int __init imx_weim_gpr_setup(struct platform_device *pdev)
+>> +static int imx_weim_gpr_setup(struct platform_device *pdev)
+>>  {
+>>  	struct device_node *np = pdev->dev.of_node;
+>>  	struct property *prop;
+>> @@ -109,7 +109,7 @@ err:
+>>  }
+>>  
+>>  /* Parse and set the timing for this device. */
+>> -static int __init weim_timing_setup(struct device_node *np, void __iomem *base,
+>> +static int weim_timing_setup(struct device_node *np, void __iomem *base,
+>>  				    const struct imx_weim_devtype *devtype)
+>>  {
+>>  	u32 cs_idx, value[devtype->cs_regs_count];
+>> @@ -135,7 +135,7 @@ static int __init weim_timing_setup(struct device_node *np, void __iomem *base,
+>>  	return 0;
+>>  }
+>>  
+>> -static int __init weim_parse_dt(struct platform_device *pdev,
+>> +static int weim_parse_dt(struct platform_device *pdev,
+>>  				void __iomem *base)
+>>  {
+>>  	const struct of_device_id *of_id = of_match_device(weim_id_table,
+>> @@ -172,7 +172,7 @@ static int __init weim_parse_dt(struct platform_device *pdev,
+>>  	return ret;
+>>  }
+>>  
+>> -static int __init weim_probe(struct platform_device *pdev)
+>> +static int weim_probe(struct platform_device *pdev)
+>>  {
+>>  	struct resource *res;
+>>  	struct clk *clk;
+>> @@ -209,8 +209,9 @@ static struct platform_driver weim_driver = {
+>>  		.name		= "imx-weim",
+>>  		.of_match_table	= weim_id_table,
+>>  	},
+>> +	.probe = weim_probe,
+>>  };
+>> -module_platform_driver_probe(weim_driver, weim_probe);
+>> +builtin_platform_driver(weim_driver);
+>>  
+>>  MODULE_AUTHOR("Freescale Semiconductor Inc.");
+>>  MODULE_DESCRIPTION("i.MX EIM Controller Driver");
+>> -- 
+>> 2.6.1
+>>
+> 
