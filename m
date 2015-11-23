@@ -1,65 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Nov 2015 10:47:43 +0100
-Subject: [PATCH] ahci: don't use MSI when PCI is disabled
-Message-ID: <4754092.OYovO36g28@wuerfel>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 23 Nov 2015 10:49:55 +0100
+Subject: [PATCH RESEND] pwm: ftm: fix clock enable/disable when using PM
+In-Reply-To: <564E6B6D.80006@mleia.com>
+References: <1445142552-3530-1-git-send-email-stefan@agner.ch>
+ <290ed017061ef41e1fe5c3fd5a523511@agner.ch>
+ <564E6B6D.80006@mleia.com>
+Message-ID: <20151123094955.GA31868@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AHCI driver is used for some on-chip devices that do not
-use PCI for probing, and it can be built even when CONFIG_PCI
-is disabled, but that now results in a build failure:
+On Fri, Nov 20, 2015 at 02:38:05AM +0200, Vladimir Zapolskiy wrote:
+> On 19.11.2015 04:04, Stefan Agner wrote:
+> > Thierry,
+> > 
+> > I realized that this patch did not make it into 4.4-rc1, while others,
+> > IMHO less important patches which have been posted later (e.g. sunxi
+> > whitespace fixes) have made it! :-(
+> > 
+> > Anything wrong with that? Or am I on your spam list? Note that this is
+> > already a RESEND :-)
+> 
+> You are not alone with this problem, I have unreviewed changes in
+> linux-pwm mailing list sent in 2014 :)
 
-ata/libahci.c: In function 'ahci_host_activate_multi_irqs':
-ata/libahci.c:2475:4: error: invalid use of undefined type 'struct msix_entry'
-ata/libahci.c:2475:21: error: dereferencing pointer to incomplete type 'struct msix_entry'
+Please either ping me or resend patches if I don't reply within a week
+or so. Chances are I've either not seen them or meant to reply but never
+got around to.
 
-This adds an #ifdef so we use that code only if actual PCI MSI
-is available.
+Also, the Linux kernel is a community-driven project, so I fully expect
+contributors to review each other's patches. Review isn't something that
+only maintainers need to do.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: d684a90d38e2 ("ahci: per-port msix support")
-
-diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
-index 1b6c7cc415bf..54fe01d8145b 100644
---- a/drivers/ata/libahci.c
-+++ b/drivers/ata/libahci.c
-@@ -1796,7 +1796,8 @@ static void ahci_port_intr(struct ata_port *ap)
- 	ahci_handle_port_interrupt(ap, port_mmio, status);
- }
- 
--static irqreturn_t ahci_multi_irqs_intr_hard(int irq, void *dev_instance)
-+static irqreturn_t __maybe_unused ahci_multi_irqs_intr_hard(int irq,
-+							    void *dev_instance)
- {
- 	struct ata_port *ap = dev_instance;
- 	void __iomem *port_mmio = ahci_port_base(ap);
-@@ -2454,6 +2455,7 @@ void ahci_set_em_messages(struct ahci_host_priv *hpriv,
- }
- EXPORT_SYMBOL_GPL(ahci_set_em_messages);
- 
-+#ifdef CONFIG_PCI_MSI
- static int ahci_host_activate_multi_irqs(struct ata_host *host,
- 					 struct scsi_host_template *sht)
- {
-@@ -2492,6 +2494,7 @@ static int ahci_host_activate_multi_irqs(struct ata_host *host,
- 
- 	return ata_host_register(host, sht);
- }
-+#endif
- 
- /**
-  *	ahci_host_activate - start AHCI host, request IRQs and register it
-@@ -2510,9 +2513,12 @@ int ahci_host_activate(struct ata_host *host, struct scsi_host_template *sht)
- 	int irq = hpriv->irq;
- 	int rc;
- 
-+#ifdef CONFIG_PCI_MSI
- 	if (hpriv->flags & (AHCI_HFLAG_MULTI_MSI | AHCI_HFLAG_MULTI_MSIX))
- 		rc = ahci_host_activate_multi_irqs(host, sht);
--	else if (hpriv->flags & AHCI_HFLAG_EDGE_IRQ)
-+	else
-+#endif
-+	if (hpriv->flags & AHCI_HFLAG_EDGE_IRQ)
- 		rc = ata_host_activate(host, irq, ahci_single_edge_irq_intr,
- 				       IRQF_SHARED, sht);
- 	else
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151123/14831a96/attachment.sig>
