@@ -1,485 +1,768 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 23 Nov 2015 10:06:33 +0100
-Subject: [PATCH v3 13/13] ARM: add UEFI stub support
+Date: Mon, 23 Nov 2015 10:06:24 +0100
+Subject: [PATCH v3 04/13] arm64/efi: split off EFI init and runtime code for
+ reuse by 32-bit ARM
 In-Reply-To: <1448269593-20758-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1448269593-20758-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1448269593-20758-14-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1448269593-20758-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roy Franz <roy.franz@linaro.org>
+This splits off the early EFI init and runtime code that
+- discovers the EFI params and the memory map from the FDT, and installs
+  the memblocks and config tables.
+- prepares and installs the EFI page tables so that UEFI Runtime Services
+  can be invoked at the virtual address installed by the stub.
 
-This patch adds EFI stub support for the ARM Linux kernel.
+This will allow it to be reused for 32-bit ARM.
 
-The EFI stub operates similarly to the x86 and arm64 stubs: it is a
-shim between the EFI firmware and the normal zImage entry point, and
-sets up the environment that the zImage is expecting. This includes
-optionally loading the initrd and device tree from the system partition
-based on the kernel command line.
-
-Signed-off-by: Roy Franz <roy.franz@linaro.org>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/Kconfig                          |  19 +++
- arch/arm/boot/compressed/Makefile         |   4 +-
- arch/arm/boot/compressed/efi-header.S     | 130 ++++++++++++++++++++
- arch/arm/boot/compressed/head.S           |  54 +++++++-
- arch/arm/boot/compressed/vmlinux.lds.S    |   7 ++
- arch/arm/include/asm/efi.h                |  23 ++++
- drivers/firmware/efi/libstub/Makefile     |   9 ++
- drivers/firmware/efi/libstub/arm-stub.c   |   4 +-
- drivers/firmware/efi/libstub/arm32-stub.c |  85 +++++++++++++
- 9 files changed, 331 insertions(+), 4 deletions(-)
+ arch/arm64/kernel/efi.c            | 331 +-------------------
+ drivers/firmware/efi/Makefile      |   3 +
+ drivers/firmware/efi/arm-init.c    | 208 ++++++++++++
+ drivers/firmware/efi/arm-runtime.c | 156 +++++++++
+ 4 files changed, 368 insertions(+), 330 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 7e338228cc8d..0d84e04cfe48 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2041,6 +2041,25 @@ config AUTO_ZRELADDR
- 	  0xf8000000. This assumes the zImage being placed in the first 128MB
- 	  from start of memory.
- 
-+config EFI_STUB
-+	bool
-+
-+config EFI
-+	bool "UEFI runtime support"
-+	depends on OF && !CPU_BIG_ENDIAN && MMU && AUTO_ZRELADDR && !XIP_KERNEL
-+	select UCS2_STRING
-+	select EFI_PARAMS_FROM_FDT
-+	select EFI_STUB
-+	select EFI_ARMSTUB
-+	select EFI_RUNTIME_WRAPPERS
-+	---help---
-+	  This option provides support for runtime services provided
-+	  by UEFI firmware (such as non-volatile variables, realtime
-+	  clock, and platform reset). A UEFI stub is also provided to
-+	  allow the kernel to be booted as an EFI application. This
-+	  is only useful for kernels that may run on systems that have
-+	  UEFI firmware.
-+
- endmenu
- 
- menu "CPU Power Management"
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 3f9a9ebc77c3..4c23a68a0917 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -167,9 +167,11 @@ if [ $(words $(ZRELADDR)) -gt 1 -a "$(CONFIG_AUTO_ZRELADDR)" = "" ]; then \
- 	false; \
- fi
- 
-+efi-obj-$(CONFIG_EFI_STUB) := $(objtree)/drivers/firmware/efi/libstub/lib.a
-+
- $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
- 		$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) $(ashldi3) \
--		$(bswapsdi2) FORCE
-+		$(bswapsdi2) $(efi-obj-y) FORCE
- 	@$(check_for_multiple_zreladdr)
- 	$(call if_changed,ld)
- 	@$(check_for_bad_syms)
-diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
-new file mode 100644
-index 000000000000..9d5dc4fda3c1
---- /dev/null
-+++ b/arch/arm/boot/compressed/efi-header.S
-@@ -0,0 +1,130 @@
-+/*
-+ * Copyright (C) 2013-2015 Linaro Ltd
-+ * Authors: Roy Franz <roy.franz@linaro.org>
-+ *          Ard Biesheuvel <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+		.macro	__nop
-+#ifdef CONFIG_EFI_STUB
-+		@ This is almost but not quite a NOP, since it does clobber the
-+		@ condition flags. But it is the best we can do for EFI, since
-+		@ PE/COFF expects the magic string "MZ" at offset 0, while the
-+		@ ARM/Linux boot protocol expects an executable instruction
-+		@ there.
-+		.inst	'M' | ('Z' << 8) | (0x1310 << 16)   @ tstne r0, #0x4d000
-+#else
-+		mov	r0, r0
-+#endif
-+		.endm
-+
-+		.macro	__EFI_HEADER
-+#ifdef CONFIG_EFI_STUB
-+		b	__efi_start
-+
-+		.set	start_offset, __efi_start - start
-+		.org	start + 0x3c
-+		@
-+		@ The PE header can be anywhere in the file, but for
-+		@ simplicity we keep it together with the MSDOS header
-+		@ The offset to the PE/COFF header needs to be at offset
-+		@ 0x3C in the MSDOS header.
-+		@ The only 2 fields of the MSDOS header that are used are this
-+		@ PE/COFF offset, and the "MZ" bytes@offset 0x0.
-+		@
-+		.long	pe_header - start	@ Offset to the PE header.
-+
-+pe_header:
-+		.ascii	"PE\0\0"
-+
-+coff_header:
-+		.short	0x01c2			@ ARM or Thumb
-+		.short	2			@ nr_sections
-+		.long	0 			@ TimeDateStamp
-+		.long	0			@ PointerToSymbolTable
-+		.long	1			@ NumberOfSymbols
-+		.short	section_table - optional_header
-+						@ SizeOfOptionalHeader
-+		.short	0x306			@ Characteristics.
-+						@ IMAGE_FILE_32BIT_MACHINE |
-+						@ IMAGE_FILE_DEBUG_STRIPPED |
-+						@ IMAGE_FILE_EXECUTABLE_IMAGE |
-+						@ IMAGE_FILE_LINE_NUMS_STRIPPED
-+
-+optional_header:
-+		.short	0x10b			@ PE32 format
-+		.byte	0x02			@ MajorLinkerVersion
-+		.byte	0x14			@ MinorLinkerVersion
-+		.long	_end - __efi_start	@ SizeOfCode
-+		.long	0			@ SizeOfInitializedData
-+		.long	0			@ SizeOfUninitializedData
-+		.long	efi_stub_entry - start	@ AddressOfEntryPoint
-+		.long	start_offset		@ BaseOfCode
-+		.long	0			@ data
-+
-+extra_header_fields:
-+		.long	0			@ ImageBase
-+		.long	0x200			@ SectionAlignment
-+		.long	0x200			@ FileAlignment
-+		.short	0			@ MajorOperatingSystemVersion
-+		.short	0			@ MinorOperatingSystemVersion
-+		.short	0			@ MajorImageVersion
-+		.short	0			@ MinorImageVersion
-+		.short	0			@ MajorSubsystemVersion
-+		.short	0			@ MinorSubsystemVersion
-+		.long	0			@ Win32VersionValue
-+
-+		.long	_end - start		@ SizeOfImage
-+		.long	start_offset		@ SizeOfHeaders
-+		.long	0			@ CheckSum
-+		.short	0xa			@ Subsystem (EFI application)
-+		.short	0			@ DllCharacteristics
-+		.long	0			@ SizeOfStackReserve
-+		.long	0			@ SizeOfStackCommit
-+		.long	0			@ SizeOfHeapReserve
-+		.long	0			@ SizeOfHeapCommit
-+		.long	0			@ LoaderFlags
-+		.long	0x6			@ NumberOfRvaAndSizes
-+
-+		.quad	0			@ ExportTable
-+		.quad	0			@ ImportTable
-+		.quad	0			@ ResourceTable
-+		.quad	0			@ ExceptionTable
-+		.quad	0			@ CertificationTable
-+		.quad	0			@ BaseRelocationTable
-+
-+section_table:
-+		@
-+		@ The EFI application loader requires a relocation section
-+		@ because EFI applications must be relocatable. This is a
-+		@ dummy section as far as we are concerned.
-+		@
-+		.ascii	".reloc\0\0"
-+		.long	0			@ VirtualSize
-+		.long	0			@ VirtualAddress
-+		.long	0			@ SizeOfRawData
-+		.long	0			@ PointerToRawData
-+		.long	0			@ PointerToRelocations
-+		.long	0			@ PointerToLineNumbers
-+		.short	0			@ NumberOfRelocations
-+		.short	0			@ NumberOfLineNumbers
-+		.long	0x42100040		@ Characteristics
-+
-+		.ascii	".text\0\0\0"
-+		.long	_end - __efi_start	@ VirtualSize
-+		.long	__efi_start		@ VirtualAddress
-+		.long	_edata - __efi_start	@ SizeOfRawData
-+		.long	__efi_start		@ PointerToRawData
-+		.long	0			@ PointerToRelocations
-+		.long	0			@ PointerToLineNumbers
-+		.short	0			@ NumberOfRelocations
-+		.short	0			@ NumberOfLineNumbers
-+		.long	0xe0500020		@ Characteristics
-+
-+		.align	9
-+__efi_start:
-+#endif
-+		.endm
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 06e983f59980..af11c2f8f3b7 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -12,6 +12,8 @@
- #include <asm/assembler.h>
- #include <asm/v7m.h>
- 
-+#include "efi-header.S"
-+
-  AR_CLASS(	.arch	armv7-a	)
-  M_CLASS(	.arch	armv7-m	)
- 
-@@ -126,7 +128,7 @@
- start:
- 		.type	start,#function
- 		.rept	7
--		mov	r0, r0
-+		__nop
- 		.endr
-    ARM(		mov	r0, r0		)
-    ARM(		b	1f		)
-@@ -139,7 +141,8 @@ start:
- 		.word	0x04030201	@ endianness flag
- 
-  THUMB(		.thumb			)
--1:
-+1:		__EFI_HEADER
-+
-  ARM_BE8(	setend	be		)	@ go BE8 if compiled for BE8
-  AR_CLASS(	mrs	r9, cpsr	)
- #ifdef CONFIG_ARM_VIRT_EXT
-@@ -1353,6 +1356,53 @@ __enter_kernel:
- 
- reloc_code_end:
- 
-+#ifdef CONFIG_EFI_STUB
-+		.align	2
-+_start:		.long	start - .
-+
-+ENTRY(efi_stub_entry)
-+		@ allocate space on stack for passing current zImage address
-+		@ and for the EFI stub to return of new entry point of
-+		@ zImage, as EFI stub may copy the kernel. Pointer address
-+		@ is passed in r2. r0 and r1 are passed through from the
-+		@ EFI firmware to efi_entry
-+		adr	ip, _start
-+		ldr	r3, [ip]
-+		add	r3, r3, ip
-+		stmfd	sp!, {r3, lr}
-+		mov	r2, sp			@ pass zImage address in r2
-+		bl	efi_entry
-+
-+		@ Check for error return from EFI stub. r0 has FDT address
-+		@ or error code.
-+		cmn	r0, #1
-+		beq	efi_load_fail
-+
-+		@ Preserve return value of efi_entry() in r4
-+		mov	r4, r0
-+		bl	cache_clean_flush
-+		bl	cache_off
-+
-+		@ Set parameters for booting zImage according to boot protocol
-+		@ put FDT address in r2, it was returned by efi_entry()
-+		@ r1 is the machine type, and r0 needs to be 0
-+		mov	r0, #0
-+		mov	r1, #0xFFFFFFFF
-+		mov	r2, r4
-+
-+		@ Branch to (possibly) relocated zImage that is in [sp]
-+		ldr	lr, [sp]
-+		ldr	ip, =start_offset
-+		add	lr, lr, ip
-+		mov	pc, lr				@ no mode switch
-+
-+efi_load_fail:
-+		@ Return EFI_LOAD_ERROR to EFI firmware on error.
-+		ldr	r0, =0x80000001
-+		ldmfd	sp!, {ip, pc}
-+ENDPROC(efi_stub_entry)
-+#endif
-+
- 		.align
- 		.section ".stack", "aw", %nobits
- .L_user_stack:	.space	4096
-diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
-index 2b60b843ac5e..81c493156ce8 100644
---- a/arch/arm/boot/compressed/vmlinux.lds.S
-+++ b/arch/arm/boot/compressed/vmlinux.lds.S
-@@ -48,6 +48,13 @@ SECTIONS
-     *(.rodata)
-     *(.rodata.*)
-   }
-+  .data : {
-+    /*
-+     * The EFI stub always executes from RAM, and runs strictly before the
-+     * decompressor, so we can make an exception for its r/w data, and keep it
-+     */
-+    *(.data.efistub)
-+  }
-   .piggydata : {
-     *(.piggydata)
-   }
-diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
-index c91e330616ad..e0eea72deb87 100644
---- a/arch/arm/include/asm/efi.h
-+++ b/arch/arm/include/asm/efi.h
-@@ -57,4 +57,27 @@ void efi_virtmap_unload(void);
- #define efi_init()
- #endif /* CONFIG_EFI */
- 
-+/* arch specific definitions used by the stub code */
-+
-+#define efi_call_early(f, ...) sys_table_arg->boottime->f(__VA_ARGS__)
-+
-+/*
-+ * A reasonable upper bound for the uncompressed kernel size is 32 MBytes,
-+ * so we will reserve that amount of memory. We have no easy way to tell what
-+ * the actuall size of code + data the uncompressed kernel will use.
-+ * If this is insufficient, the decompressor will relocate itself out of the
-+ * way before performing the decompression.
-+ */
-+#define MAX_UNCOMP_KERNEL_SIZE	SZ_32M
-+
-+/*
-+ * The kernel zImage should preferably be located between 32 MB and 128 MB
-+ * from the base of DRAM. The min address leaves space for a maximal size
-+ * uncompressed image, and the max address is due to how the zImage decompressor
-+ * picks a destination address.
-+ */
-+#define ZIMAGE_OFFSET_LIMIT	SZ_128M
-+#define MIN_ZIMAGE_OFFSET	MAX_UNCOMP_KERNEL_SIZE
-+#define MAX_FDT_OFFSET		ZIMAGE_OFFSET_LIMIT
-+
- #endif /* _ASM_ARM_EFI_H */
-diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
-index 3c0467d3688c..8cf9ccbf42d5 100644
---- a/drivers/firmware/efi/libstub/Makefile
-+++ b/drivers/firmware/efi/libstub/Makefile
-@@ -34,6 +34,7 @@ $(obj)/lib-%.o: $(srctree)/lib/%.c FORCE
- lib-$(CONFIG_EFI_ARMSTUB)	+= arm-stub.o fdt.o string.o \
- 				   $(patsubst %.c,lib-%.o,$(arm-deps))
- 
-+lib-$(CONFIG_ARM)		+= arm32-stub.o
- lib-$(CONFIG_ARM64)		+= arm64-stub.o
- CFLAGS_arm64-stub.o 		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
- 
-@@ -67,3 +68,11 @@ quiet_cmd_stubcopy = STUBCPY $@
- 		     $(OBJDUMP) -r $@ | grep $(STUBCOPY_RELOC-y)	\
- 		     && (echo >&2 "$@: absolute symbol references not allowed in the EFI stub"; \
- 			 rm -f $@; /bin/false); else /bin/false; fi
-+
-+#
-+# ARM discards the .data section because it disallows r/w data in the
-+# decompressor. So move our .data to .data.efistub, which is preserved
-+# explicitly by the decompressor linker script.
-+#
-+STUBCOPY_FLAGS-$(CONFIG_ARM)	+= --rename-section .data=.data.efistub
-+STUBCOPY_RELOC-$(CONFIG_ARM)	:= R_ARM_ABS
-diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index 950c87f5d279..3397902e4040 100644
---- a/drivers/firmware/efi/libstub/arm-stub.c
-+++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -303,8 +303,10 @@ fail:
-  * The value chosen is the largest non-zero power of 2 suitable for this purpose
-  * both on 32-bit and 64-bit ARM CPUs, to maximize the likelihood that it can
-  * be mapped efficiently.
-+ * Since 32-bit ARM could potentially execute with a 1G/3G user/kernel split,
-+ * map everything below 1 GB.
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index d746d15c882f..bd3b2f5adf0c 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -11,323 +11,11 @@
+  *
   */
--#define EFI_RT_VIRTUAL_BASE	0x40000000
-+#define EFI_RT_VIRTUAL_BASE	SZ_512M
  
- static int cmp_mem_desc(const void *l, const void *r)
+-#include <linux/atomic.h>
+ #include <linux/dmi.h>
+ #include <linux/efi.h>
+-#include <linux/export.h>
+-#include <linux/memblock.h>
+-#include <linux/mm_types.h>
+-#include <linux/bootmem.h>
+-#include <linux/of.h>
+-#include <linux/of_fdt.h>
+-#include <linux/preempt.h>
+-#include <linux/rbtree.h>
+-#include <linux/rwsem.h>
+-#include <linux/sched.h>
+-#include <linux/slab.h>
+-#include <linux/spinlock.h>
++#include <linux/init.h>
+ 
+-#include <asm/cacheflush.h>
+ #include <asm/efi.h>
+-#include <asm/tlbflush.h>
+-#include <asm/mmu_context.h>
+-#include <asm/mmu.h>
+-#include <asm/pgtable.h>
+-
+-struct efi_memory_map memmap;
+-
+-static u64 efi_system_table;
+-
+-static pgd_t efi_pgd[PTRS_PER_PGD] __page_aligned_bss;
+-
+-static struct mm_struct efi_mm = {
+-	.mm_rb			= RB_ROOT,
+-	.pgd			= efi_pgd,
+-	.mm_users		= ATOMIC_INIT(2),
+-	.mm_count		= ATOMIC_INIT(1),
+-	.mmap_sem		= __RWSEM_INITIALIZER(efi_mm.mmap_sem),
+-	.page_table_lock	= __SPIN_LOCK_UNLOCKED(efi_mm.page_table_lock),
+-	.mmlist			= LIST_HEAD_INIT(efi_mm.mmlist),
+-};
+-
+-static int __init is_normal_ram(efi_memory_desc_t *md)
+-{
+-	if (md->attribute & EFI_MEMORY_WB)
+-		return 1;
+-	return 0;
+-}
+-
+-/*
+- * Translate a EFI virtual address into a physical address: this is necessary,
+- * as some data members of the EFI system table are virtually remapped after
+- * SetVirtualAddressMap() has been called.
+- */
+-static phys_addr_t efi_to_phys(unsigned long addr)
+-{
+-	efi_memory_desc_t *md;
+-
+-	for_each_efi_memory_desc(&memmap, md) {
+-		if (!(md->attribute & EFI_MEMORY_RUNTIME))
+-			continue;
+-		if (md->virt_addr == 0)
+-			/* no virtual mapping has been installed by the stub */
+-			break;
+-		if (md->virt_addr <= addr &&
+-		    (addr - md->virt_addr) < (md->num_pages << EFI_PAGE_SHIFT))
+-			return md->phys_addr + addr - md->virt_addr;
+-	}
+-	return addr;
+-}
+-
+-static int __init uefi_init(void)
+-{
+-	efi_char16_t *c16;
+-	void *config_tables;
+-	u64 table_size;
+-	char vendor[100] = "unknown";
+-	int i, retval;
+-
+-	efi.systab = early_memremap(efi_system_table,
+-				    sizeof(efi_system_table_t));
+-	if (efi.systab == NULL) {
+-		pr_warn("Unable to map EFI system table.\n");
+-		return -ENOMEM;
+-	}
+-
+-	set_bit(EFI_BOOT, &efi.flags);
+-	set_bit(EFI_64BIT, &efi.flags);
+-
+-	/*
+-	 * Verify the EFI Table
+-	 */
+-	if (efi.systab->hdr.signature != EFI_SYSTEM_TABLE_SIGNATURE) {
+-		pr_err("System table signature incorrect\n");
+-		retval = -EINVAL;
+-		goto out;
+-	}
+-	if ((efi.systab->hdr.revision >> 16) < 2)
+-		pr_warn("Warning: EFI system table version %d.%02d, expected 2.00 or greater\n",
+-			efi.systab->hdr.revision >> 16,
+-			efi.systab->hdr.revision & 0xffff);
+-
+-	/* Show what we know for posterity */
+-	c16 = early_memremap(efi_to_phys(efi.systab->fw_vendor),
+-			     sizeof(vendor) * sizeof(efi_char16_t));
+-	if (c16) {
+-		for (i = 0; i < (int) sizeof(vendor) - 1 && *c16; ++i)
+-			vendor[i] = c16[i];
+-		vendor[i] = '\0';
+-		early_memunmap(c16, sizeof(vendor) * sizeof(efi_char16_t));
+-	}
+-
+-	pr_info("EFI v%u.%.02u by %s\n",
+-		efi.systab->hdr.revision >> 16,
+-		efi.systab->hdr.revision & 0xffff, vendor);
+-
+-	table_size = sizeof(efi_config_table_64_t) * efi.systab->nr_tables;
+-	config_tables = early_memremap(efi_to_phys(efi.systab->tables),
+-				       table_size);
+-	if (config_tables == NULL) {
+-		pr_warn("Unable to map EFI config table array.\n");
+-		retval = -ENOMEM;
+-		goto out;
+-	}
+-	retval = efi_config_parse_tables(config_tables, efi.systab->nr_tables,
+-					 sizeof(efi_config_table_64_t), NULL);
+-
+-	early_memunmap(config_tables, table_size);
+-out:
+-	early_memunmap(efi.systab,  sizeof(efi_system_table_t));
+-	return retval;
+-}
+-
+-/*
+- * Return true for RAM regions we want to permanently reserve.
+- */
+-static __init int is_reserve_region(efi_memory_desc_t *md)
+-{
+-	switch (md->type) {
+-	case EFI_LOADER_CODE:
+-	case EFI_LOADER_DATA:
+-	case EFI_BOOT_SERVICES_CODE:
+-	case EFI_BOOT_SERVICES_DATA:
+-	case EFI_CONVENTIONAL_MEMORY:
+-	case EFI_PERSISTENT_MEMORY:
+-		return 0;
+-	default:
+-		break;
+-	}
+-	return is_normal_ram(md);
+-}
+-
+-static __init void reserve_regions(void)
+-{
+-	efi_memory_desc_t *md;
+-	u64 paddr, npages, size;
+-
+-	if (efi_enabled(EFI_DBG))
+-		pr_info("Processing EFI memory map:\n");
+-
+-	for_each_efi_memory_desc(&memmap, md) {
+-		paddr = md->phys_addr;
+-		npages = md->num_pages;
+-
+-		if (efi_enabled(EFI_DBG)) {
+-			char buf[64];
+-
+-			pr_info("  0x%012llx-0x%012llx %s",
+-				paddr, paddr + (npages << EFI_PAGE_SHIFT) - 1,
+-				efi_md_typeattr_format(buf, sizeof(buf), md));
+-		}
+-
+-		memrange_efi_to_native(&paddr, &npages);
+-		size = npages << PAGE_SHIFT;
+-
+-		if (is_normal_ram(md))
+-			early_init_dt_add_memory_arch(paddr, size);
+-
+-		if (is_reserve_region(md)) {
+-			memblock_mark_nomap(paddr, size);
+-			if (efi_enabled(EFI_DBG))
+-				pr_cont("*");
+-		}
+-
+-		if (efi_enabled(EFI_DBG))
+-			pr_cont("\n");
+-	}
+-
+-	set_bit(EFI_MEMMAP, &efi.flags);
+-}
+-
+-void __init efi_init(void)
+-{
+-	struct efi_fdt_params params;
+-
+-	/* Grab UEFI information placed in FDT by stub */
+-	if (!efi_get_fdt_params(&params))
+-		return;
+-
+-	efi_system_table = params.system_table;
+-
+-	memmap.phys_map = params.mmap;
+-	memmap.map = early_memremap(params.mmap, params.mmap_size);
+-	if (memmap.map == NULL) {
+-		/*
+-		* If we are booting via UEFI, the UEFI memory map is the only
+-		* description of memory we have, so there is little point in
+-		* proceeding if we cannot access it.
+-		*/
+-		panic("Unable to map EFI memory map.\n");
+-	}
+-	memmap.map_end = memmap.map + params.mmap_size;
+-	memmap.desc_size = params.desc_size;
+-	memmap.desc_version = params.desc_ver;
+-
+-	if (uefi_init() < 0)
+-		return;
+-
+-	reserve_regions();
+-	early_memunmap(memmap.map, params.mmap_size);
+-	memblock_mark_nomap(params.mmap & PAGE_MASK,
+-			    PAGE_ALIGN(params.mmap_size +
+-				       (params.mmap & ~PAGE_MASK)));
+-}
+-
+-static bool __init efi_virtmap_init(void)
+-{
+-	efi_memory_desc_t *md;
+-
+-	init_new_context(NULL, &efi_mm);
+-
+-	for_each_efi_memory_desc(&memmap, md) {
+-		u64 paddr, npages, size;
+-		pgprot_t prot;
+-
+-		if (!(md->attribute & EFI_MEMORY_RUNTIME))
+-			continue;
+-		if (md->virt_addr == 0)
+-			return false;
+-
+-		paddr = md->phys_addr;
+-		npages = md->num_pages;
+-		memrange_efi_to_native(&paddr, &npages);
+-		size = npages << PAGE_SHIFT;
+-
+-		pr_info("  EFI remap 0x%016llx => %p\n",
+-			md->phys_addr, (void *)md->virt_addr);
+-
+-		/*
+-		 * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
+-		 * executable, everything else can be mapped with the XN bits
+-		 * set.
+-		 */
+-		if (!is_normal_ram(md))
+-			prot = __pgprot(PROT_DEVICE_nGnRE);
+-		else if (md->type == EFI_RUNTIME_SERVICES_CODE ||
+-			 !PAGE_ALIGNED(md->phys_addr))
+-			prot = PAGE_KERNEL_EXEC;
+-		else
+-			prot = PAGE_KERNEL;
+-
+-		create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size,
+-				   __pgprot(pgprot_val(prot) | PTE_NG));
+-	}
+-	return true;
+-}
+-
+-/*
+- * Enable the UEFI Runtime Services if all prerequisites are in place, i.e.,
+- * non-early mapping of the UEFI system table and virtual mappings for all
+- * EFI_MEMORY_RUNTIME regions.
+- */
+-static int __init arm64_enable_runtime_services(void)
+-{
+-	u64 mapsize;
+-
+-	if (!efi_enabled(EFI_BOOT)) {
+-		pr_info("EFI services will not be available.\n");
+-		return 0;
+-	}
+-
+-	if (efi_runtime_disabled()) {
+-		pr_info("EFI runtime services will be disabled.\n");
+-		return 0;
+-	}
+-
+-	pr_info("Remapping and enabling EFI services.\n");
+-
+-	mapsize = memmap.map_end - memmap.map;
+-	memmap.map = (__force void *)ioremap_cache(memmap.phys_map,
+-						   mapsize);
+-	if (!memmap.map) {
+-		pr_err("Failed to remap EFI memory map\n");
+-		return -ENOMEM;
+-	}
+-	memmap.map_end = memmap.map + mapsize;
+-	efi.memmap = &memmap;
+-
+-	efi.systab = (__force void *)ioremap_cache(efi_system_table,
+-						   sizeof(efi_system_table_t));
+-	if (!efi.systab) {
+-		pr_err("Failed to remap EFI System Table\n");
+-		return -ENOMEM;
+-	}
+-	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
+-
+-	if (!efi_virtmap_init()) {
+-		pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
+-		return -ENOMEM;
+-	}
+-
+-	/* Set up runtime services function pointers */
+-	efi_native_runtime_setup();
+-	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+-
+-	efi.runtime_version = efi.systab->hdr.revision;
+-
+-	return 0;
+-}
+-early_initcall(arm64_enable_runtime_services);
+ 
+ static int __init arm64_dmi_init(void)
  {
-diff --git a/drivers/firmware/efi/libstub/arm32-stub.c b/drivers/firmware/efi/libstub/arm32-stub.c
+@@ -343,23 +31,6 @@ static int __init arm64_dmi_init(void)
+ }
+ core_initcall(arm64_dmi_init);
+ 
+-static void efi_set_pgd(struct mm_struct *mm)
+-{
+-	switch_mm(NULL, mm, NULL);
+-}
+-
+-void efi_virtmap_load(void)
+-{
+-	preempt_disable();
+-	efi_set_pgd(&efi_mm);
+-}
+-
+-void efi_virtmap_unload(void)
+-{
+-	efi_set_pgd(current->active_mm);
+-	preempt_enable();
+-}
+-
+ /*
+  * UpdateCapsule() depends on the system being shutdown via
+  * ResetSystem().
+diff --git a/drivers/firmware/efi/Makefile b/drivers/firmware/efi/Makefile
+index ec379a4164cc..f292917b00e7 100644
+--- a/drivers/firmware/efi/Makefile
++++ b/drivers/firmware/efi/Makefile
+@@ -18,3 +18,6 @@ obj-$(CONFIG_EFI_RUNTIME_MAP)		+= runtime-map.o
+ obj-$(CONFIG_EFI_RUNTIME_WRAPPERS)	+= runtime-wrappers.o
+ obj-$(CONFIG_EFI_STUB)			+= libstub/
+ obj-$(CONFIG_EFI_FAKE_MEMMAP)		+= fake_mem.o
++
++arm-obj-$(CONFIG_EFI)			:= arm-init.o arm-runtime.o
++obj-$(CONFIG_ARM64)			+= $(arm-obj-y)
+diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
 new file mode 100644
-index 000000000000..958075a72d72
+index 000000000000..ffdd76a51929
 --- /dev/null
-+++ b/drivers/firmware/efi/libstub/arm32-stub.c
-@@ -0,0 +1,85 @@
++++ b/drivers/firmware/efi/arm-init.c
+@@ -0,0 +1,208 @@
 +/*
-+ * Copyright (C) 2013 Linaro Ltd;  <roy.franz@linaro.org>
++ * Extensible Firmware Interface
++ *
++ * Based on Extensible Firmware Interface Specification version 2.4
++ *
++ * Copyright (C) 2013 - 2015 Linaro Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + *
 + */
++
 +#include <linux/efi.h>
++#include <linux/init.h>
++#include <linux/memblock.h>
++#include <linux/mm_types.h>
++#include <linux/of.h>
++#include <linux/of_fdt.h>
++
 +#include <asm/efi.h>
 +
-+efi_status_t handle_kernel_image(efi_system_table_t *sys_table,
-+				 unsigned long *image_addr,
-+				 unsigned long *image_size,
-+				 unsigned long *reserve_addr,
-+				 unsigned long *reserve_size,
-+				 unsigned long dram_base,
-+				 efi_loaded_image_t *image)
++struct efi_memory_map memmap;
++
++u64 efi_system_table;
++
++static int __init is_normal_ram(efi_memory_desc_t *md)
 +{
-+	unsigned long nr_pages;
-+	efi_status_t status;
-+	/* Use alloc_addr to tranlsate between types */
-+	efi_physical_addr_t alloc_addr;
++	if (md->attribute & EFI_MEMORY_WB)
++		return 1;
++	return 0;
++}
 +
-+	/*
-+	 * Verify that the DRAM base address is compatible with the ARM
-+	 * boot protocol, which determines the base of DRAM by masking
-+	 * off the low 27 bits of the address at which the zImage is
-+	 * loaded. These assumptions are made by the decompressor,
-+	 * before any memory map is available.
-+	 */
-+	dram_base = round_up(dram_base, SZ_128M);
++/*
++ * Translate a EFI virtual address into a physical address: this is necessary,
++ * as some data members of the EFI system table are virtually remapped after
++ * SetVirtualAddressMap() has been called.
++ */
++static phys_addr_t efi_to_phys(unsigned long addr)
++{
++	efi_memory_desc_t *md;
 +
-+	/*
-+	 * Reserve memory for the uncompressed kernel image. This is
-+	 * all that prevents any future allocations from conflicting
-+	 * with the kernel. Since we can't tell from the compressed
-+	 * image how much DRAM the kernel actually uses (due to BSS
-+	 * size uncertainty) we allocate the maximum possible size.
-+	 * Do this very early, as prints can cause memory allocations
-+	 * that may conflict with this.
-+	 */
-+	alloc_addr = dram_base;
-+	*reserve_size = MAX_UNCOMP_KERNEL_SIZE;
-+	nr_pages = round_up(*reserve_size, EFI_PAGE_SIZE) / EFI_PAGE_SIZE;
-+	status = sys_table->boottime->allocate_pages(EFI_ALLOCATE_ADDRESS,
-+						     EFI_LOADER_DATA,
-+						     nr_pages, &alloc_addr);
-+	if (status != EFI_SUCCESS) {
-+		*reserve_size = 0;
-+		pr_efi_err(sys_table, "Unable to allocate memory for uncompressed kernel.\n");
-+		return status;
++	for_each_efi_memory_desc(&memmap, md) {
++		if (!(md->attribute & EFI_MEMORY_RUNTIME))
++			continue;
++		if (md->virt_addr == 0)
++			/* no virtual mapping has been installed by the stub */
++			break;
++		if (md->virt_addr <= addr &&
++		    (addr - md->virt_addr) < (md->num_pages << EFI_PAGE_SHIFT))
++			return md->phys_addr + addr - md->virt_addr;
 +	}
-+	*reserve_addr = alloc_addr;
++	return addr;
++}
 +
-+	/*
-+	 * Relocate the zImage, if required. ARM doesn't have a
-+	 * preferred address, so we set it to 0, as we want to allocate
-+	 * as low in memory as possible.
-+	 */
-+	*image_size = image->image_size;
-+	status = efi_relocate_kernel(sys_table, image_addr, *image_size,
-+				     *image_size, 0, 0);
-+	if (status != EFI_SUCCESS) {
-+		pr_efi_err(sys_table, "Failed to relocate kernel.\n");
-+		efi_free(sys_table, *reserve_size, *reserve_addr);
-+		*reserve_size = 0;
-+		return status;
++static int __init uefi_init(void)
++{
++	efi_char16_t *c16;
++	void *config_tables;
++	u64 table_size;
++	char vendor[100] = "unknown";
++	int i, retval;
++
++	efi.systab = early_memremap(efi_system_table,
++				    sizeof(efi_system_table_t));
++	if (efi.systab == NULL) {
++		pr_warn("Unable to map EFI system table.\n");
++		return -ENOMEM;
 +	}
 +
++	set_bit(EFI_BOOT, &efi.flags);
++	set_bit(EFI_64BIT, &efi.flags);
++
 +	/*
-+	 * Check to see if we were able to allocate memory low enough
-+	 * in memory. The kernel determines the base of DRAM from the
-+	 * address at which the zImage is loaded.
++	 * Verify the EFI Table
 +	 */
-+	if (*image_addr + *image_size > dram_base + ZIMAGE_OFFSET_LIMIT) {
-+		pr_efi_err(sys_table, "Failed to relocate kernel, no low memory available.\n");
-+		efi_free(sys_table, *reserve_size, *reserve_addr);
-+		*reserve_size = 0;
-+		efi_free(sys_table, *image_size, *image_addr);
-+		*image_size = 0;
-+		return EFI_LOAD_ERROR;
++	if (efi.systab->hdr.signature != EFI_SYSTEM_TABLE_SIGNATURE) {
++		pr_err("System table signature incorrect\n");
++		retval = -EINVAL;
++		goto out;
 +	}
-+	return EFI_SUCCESS;
++	if ((efi.systab->hdr.revision >> 16) < 2)
++		pr_warn("Warning: EFI system table version %d.%02d, expected 2.00 or greater\n",
++			efi.systab->hdr.revision >> 16,
++			efi.systab->hdr.revision & 0xffff);
++
++	/* Show what we know for posterity */
++	c16 = early_memremap(efi_to_phys(efi.systab->fw_vendor),
++			     sizeof(vendor) * sizeof(efi_char16_t));
++	if (c16) {
++		for (i = 0; i < (int) sizeof(vendor) - 1 && *c16; ++i)
++			vendor[i] = c16[i];
++		vendor[i] = '\0';
++		early_memunmap(c16, sizeof(vendor) * sizeof(efi_char16_t));
++	}
++
++	pr_info("EFI v%u.%.02u by %s\n",
++		efi.systab->hdr.revision >> 16,
++		efi.systab->hdr.revision & 0xffff, vendor);
++
++	table_size = sizeof(efi_config_table_64_t) * efi.systab->nr_tables;
++	config_tables = early_memremap(efi_to_phys(efi.systab->tables),
++				       table_size);
++	if (config_tables == NULL) {
++		pr_warn("Unable to map EFI config table array.\n");
++		retval = -ENOMEM;
++		goto out;
++	}
++	retval = efi_config_parse_tables(config_tables, efi.systab->nr_tables,
++					 sizeof(efi_config_table_64_t), NULL);
++
++	early_memunmap(config_tables, table_size);
++out:
++	early_memunmap(efi.systab,  sizeof(efi_system_table_t));
++	return retval;
++}
++
++/*
++ * Return true for RAM regions we want to permanently reserve.
++ */
++static __init int is_reserve_region(efi_memory_desc_t *md)
++{
++	switch (md->type) {
++	case EFI_LOADER_CODE:
++	case EFI_LOADER_DATA:
++	case EFI_BOOT_SERVICES_CODE:
++	case EFI_BOOT_SERVICES_DATA:
++	case EFI_CONVENTIONAL_MEMORY:
++	case EFI_PERSISTENT_MEMORY:
++		return 0;
++	default:
++		break;
++	}
++	return is_normal_ram(md);
++}
++
++static __init void reserve_regions(void)
++{
++	efi_memory_desc_t *md;
++	u64 paddr, npages, size;
++
++	if (efi_enabled(EFI_DBG))
++		pr_info("Processing EFI memory map:\n");
++
++	for_each_efi_memory_desc(&memmap, md) {
++		paddr = md->phys_addr;
++		npages = md->num_pages;
++
++		if (efi_enabled(EFI_DBG)) {
++			char buf[64];
++
++			pr_info("  0x%012llx-0x%012llx %s",
++				paddr, paddr + (npages << EFI_PAGE_SHIFT) - 1,
++				efi_md_typeattr_format(buf, sizeof(buf), md));
++		}
++
++		memrange_efi_to_native(&paddr, &npages);
++		size = npages << PAGE_SHIFT;
++
++		if (is_normal_ram(md))
++			early_init_dt_add_memory_arch(paddr, size);
++
++		if (is_reserve_region(md)) {
++			memblock_mark_nomap(paddr, size);
++			if (efi_enabled(EFI_DBG))
++				pr_cont("*");
++		}
++
++		if (efi_enabled(EFI_DBG))
++			pr_cont("\n");
++	}
++
++	set_bit(EFI_MEMMAP, &efi.flags);
++}
++
++void __init efi_init(void)
++{
++	struct efi_fdt_params params;
++
++	/* Grab UEFI information placed in FDT by stub */
++	if (!efi_get_fdt_params(&params))
++		return;
++
++	efi_system_table = params.system_table;
++
++	memmap.phys_map = params.mmap;
++	memmap.map = early_memremap(params.mmap, params.mmap_size);
++	if (memmap.map == NULL) {
++		/*
++		* If we are booting via UEFI, the UEFI memory map is the only
++		* description of memory we have, so there is little point in
++		* proceeding if we cannot access it.
++		*/
++		panic("Unable to map EFI memory map.\n");
++	}
++	memmap.map_end = memmap.map + params.mmap_size;
++	memmap.desc_size = params.desc_size;
++	memmap.desc_version = params.desc_ver;
++
++	if (uefi_init() < 0)
++		return;
++
++	reserve_regions();
++	early_memunmap(memmap.map, params.mmap_size);
++	memblock_mark_nomap(params.mmap & PAGE_MASK,
++			    PAGE_ALIGN(params.mmap_size +
++				       (params.mmap & ~PAGE_MASK)));
++}
+diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+new file mode 100644
+index 000000000000..22b11752185e
+--- /dev/null
++++ b/drivers/firmware/efi/arm-runtime.c
+@@ -0,0 +1,156 @@
++/*
++ * Extensible Firmware Interface
++ *
++ * Based on Extensible Firmware Interface Specification version 2.4
++ *
++ * Copyright (C) 2013, 2014 Linaro Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <linux/efi.h>
++#include <linux/memblock.h>
++#include <linux/mm_types.h>
++#include <linux/preempt.h>
++#include <linux/rbtree.h>
++#include <linux/rwsem.h>
++#include <linux/sched.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++
++#include <asm/cacheflush.h>
++#include <asm/efi.h>
++#include <asm/tlbflush.h>
++#include <asm/mmu_context.h>
++#include <asm/mmu.h>
++#include <asm/pgtable.h>
++
++static pgd_t efi_pgd[PTRS_PER_PGD] __page_aligned_bss;
++
++extern u64 efi_system_table;
++
++static struct mm_struct efi_mm = {
++	.mm_rb			= RB_ROOT,
++	.pgd			= efi_pgd,
++	.mm_users		= ATOMIC_INIT(2),
++	.mm_count		= ATOMIC_INIT(1),
++	.mmap_sem		= __RWSEM_INITIALIZER(efi_mm.mmap_sem),
++	.page_table_lock	= __SPIN_LOCK_UNLOCKED(efi_mm.page_table_lock),
++	.mmlist			= LIST_HEAD_INIT(efi_mm.mmlist),
++};
++
++static bool __init efi_virtmap_init(void)
++{
++	efi_memory_desc_t *md;
++
++	init_new_context(NULL, &efi_mm);
++
++	for_each_efi_memory_desc(&memmap, md) {
++		u64 paddr, npages, size;
++		pgprot_t prot;
++
++		if (!(md->attribute & EFI_MEMORY_RUNTIME))
++			continue;
++		if (md->virt_addr == 0)
++			return false;
++
++		paddr = md->phys_addr;
++		npages = md->num_pages;
++		memrange_efi_to_native(&paddr, &npages);
++		size = npages << PAGE_SHIFT;
++
++		pr_info("  EFI remap 0x%016llx => %p\n",
++			md->phys_addr, (void *)md->virt_addr);
++
++		/*
++		 * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
++		 * executable, everything else can be mapped with the XN bits
++		 * set.
++		 */
++		if ((md->attribute & EFI_MEMORY_WB) == 0)
++			prot = __pgprot(PROT_DEVICE_nGnRE);
++		else if (md->type == EFI_RUNTIME_SERVICES_CODE ||
++			 !PAGE_ALIGNED(md->phys_addr))
++			prot = PAGE_KERNEL_EXEC;
++		else
++			prot = PAGE_KERNEL;
++
++		create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size,
++				   __pgprot(pgprot_val(prot) | PTE_NG));
++	}
++	return true;
++}
++
++/*
++ * Enable the UEFI Runtime Services if all prerequisites are in place, i.e.,
++ * non-early mapping of the UEFI system table and virtual mappings for all
++ * EFI_MEMORY_RUNTIME regions.
++ */
++static int __init arm64_enable_runtime_services(void)
++{
++	u64 mapsize;
++
++	if (!efi_enabled(EFI_BOOT)) {
++		pr_info("EFI services will not be available.\n");
++		return -1;
++	}
++
++	if (efi_runtime_disabled()) {
++		pr_info("EFI runtime services will be disabled.\n");
++		return -1;
++	}
++
++	pr_info("Remapping and enabling EFI services.\n");
++
++	mapsize = memmap.map_end - memmap.map;
++	memmap.map = (__force void *)ioremap_cache(memmap.phys_map,
++						   mapsize);
++	if (!memmap.map) {
++		pr_err("Failed to remap EFI memory map\n");
++		return -1;
++	}
++	memmap.map_end = memmap.map + mapsize;
++	efi.memmap = &memmap;
++
++	efi.systab = (__force void *)ioremap_cache(efi_system_table,
++						   sizeof(efi_system_table_t));
++	if (!efi.systab) {
++		pr_err("Failed to remap EFI System Table\n");
++		return -1;
++	}
++	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
++
++	if (!efi_virtmap_init()) {
++		pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
++		return -1;
++	}
++
++	/* Set up runtime services function pointers */
++	efi_native_runtime_setup();
++	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
++
++	efi.runtime_version = efi.systab->hdr.revision;
++
++	return 0;
++}
++early_initcall(arm64_enable_runtime_services);
++
++static void efi_set_pgd(struct mm_struct *mm)
++{
++	switch_mm(NULL, mm, NULL);
++}
++
++void efi_virtmap_load(void)
++{
++	preempt_disable();
++	efi_set_pgd(&efi_mm);
++}
++
++void efi_virtmap_unload(void)
++{
++	efi_set_pgd(current->active_mm);
++	preempt_enable();
 +}
 -- 
 1.9.1
