@@ -1,28 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Nov 2015 16:19:30 +0100
-Subject: [PATCH v4 2/5] mfd: syscon: add a DT property to set value width
-In-Reply-To: <1448291861-28543-3-git-send-email-damien.riegel@savoirfairelinux.com>
-References: <1448291861-28543-1-git-send-email-damien.riegel@savoirfairelinux.com>
- <1448291861-28543-3-git-send-email-damien.riegel@savoirfairelinux.com>
-Message-ID: <4954077.yFyHuebvEs@wuerfel>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 23 Nov 2015 16:21:19 +0100
+Subject: [PATCH] drivers/reset: appropriate __init annotation for const
+ data
+In-Reply-To: <alpine.LFD.2.20.1511230943510.22569@knanqh.ubzr>
+References: <alpine.LFD.2.20.1511212053530.22569@knanqh.ubzr>
+ <1448276217.4008.22.camel@pengutronix.de>
+ <alpine.LFD.2.20.1511230943510.22569@knanqh.ubzr>
+Message-ID: <1448292079.4008.50.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 November 2015 10:17:38 Damien Riegel wrote:
-> Currently syscon has a fixed configuration of 32 bits for register and
-> values widths. In some cases, it would be desirable to be able to
-> customize the value width.
-> 
-> For example, certain boards (like the ones manufactured by Technologic
-> Systems) have a FPGA that is memory-mapped, but its registers are only
-> 16-bit wide.
-> 
-> This patch adds an optional "bus-width" DT binding for syscon that
-> allows to change the width for the data bus (i.e. val_bits). If this
-> property is provided, it will also adjust the register stride to
-> bus-width / 8. If not provided, the default configuration is used.
-> 
-> Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
-> 
+Hi Nicolas,
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Am Montag, den 23.11.2015, 09:47 -0500 schrieb Nicolas Pitre:
+> On Mon, 23 Nov 2015, Philipp Zabel wrote:
+> 
+> > Hi Nicolas,
+> > 
+> > Am Samstag, den 21.11.2015, 20:56 -0500 schrieb Nicolas Pitre:
+> > > Init data marked const should be annotated with __initconst for
+> > > correctness and not __initdata.  This also fixes LTO builds that
+> > > otherwise fail with section mismatch errors.
+> > > 
+> > > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > 
+> > > diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
+> > > index 3d95c87160..9353b2dd15 100644
+> > > --- a/drivers/reset/reset-sunxi.c
+> > > +++ b/drivers/reset/reset-sunxi.c
+> > > @@ -122,7 +122,7 @@ err_alloc:
+> > >   * our system, before we can even think of using a regular device
+> > >   * driver for it.
+> > >   */
+> > > -static const struct of_device_id sunxi_early_reset_dt_ids[] __initdata = {
+> > > +static const struct of_device_id sunxi_early_reset_dt_ids[] __initconst = {
+> > >  	{ .compatible = "allwinner,sun6i-a31-ahb1-reset", },
+> > >  	{ /* sentinel */ },
+> > >  };
+> > 
+> > Thank you for the patch, this change is already contained in the latest
+> > pull request sent to the arm-soc maintainers.
+> 
+> OK.  I initially posted it in July but it didn't show up in v4.2 nor in 
+> v4.3. I concluded it fell into a crack.
+
+It did, I'm sorry. Please feel free to be more aggressive about
+reminding me when you think I might have dropped something on the floor.
+
+regards
+Philipp
