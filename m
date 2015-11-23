@@ -1,42 +1,24 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Mon, 23 Nov 2015 11:34:58 -0800
-Subject: [PATCH 1/2] arm64: bpf: add 'store immediate' instruction
-In-Reply-To: <CABg9mcsQxiK8ZJdVqULiU7M0i8aPcqmgkYaRwKeiCZNsmbNH1g@mail.gmail.com>
-References: <1447195301-16757-1-git-send-email-yang.shi@linaro.org>	<1447195301-16757-2-git-send-email-yang.shi@linaro.org>	<CABg9mct-_AF9+kvZ0OG_JTMHkfj+OEsR2vonrxF=yD-yA6ihQw@mail.gmail.com>	<20151111121256.GI9562@arm.com>	<20151111123955.GK9562@arm.com>	<5644E97B.6050203@linaro.org>
- <CABg9mcsQxiK8ZJdVqULiU7M0i8aPcqmgkYaRwKeiCZNsmbNH1g@mail.gmail.com>
-Message-ID: <56536A62.4040103@linaro.org>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Mon, 23 Nov 2015 11:49:40 -0800
+Subject: [PATCH] arm: dts: qcom: Add generic PMIC gpio/MPP compat strings
+In-Reply-To: <1448070586-2653-1-git-send-email-sboyd@codeaurora.org>
+References: <1448070586-2653-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20151123194940.GT30882@usrtlx11787.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi folks,
+On Fri 20 Nov 17:49 PST 2015, Stephen Boyd wrote:
 
-Any more comments on this patch (store immediate only)?
+> Add the generic compatible strings for the PMIC gpio and MPP
+> modules found on qcom based PMICs.
+> 
+> Cc: <devicetree@vger.kernel.org>
+> Cc: "Ivan T. Ivanov" <iivanov@mm-sol.com>
+> Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> Cc: Rob Herring <robh@kernel.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-I need more time to add XADD (I'm supposed everyone agrees it is 
-equivalent to atomic_add). However, this one is irrelevant to XADD, so 
-we may be able to apply it first?
+Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
-Thanks,
-Yang
-
-
-On 11/12/2015 7:45 PM, Z Lim wrote:
-> On Thu, Nov 12, 2015 at 11:33 AM, Shi, Yang <yang.shi@linaro.org> wrote:
->> On 11/11/2015 4:39 AM, Will Deacon wrote:
->>>
->>> Wait a second, we're both talking rubbish here :) The STR (immediate)
->>> form is referring to the addressing mode, whereas this patch wants to
->>> store an immediate value to memory, which does need moving to a register
->>> first.
->>
->>
->> Yes, the immediate means immediate offset for addressing index. Doesn't mean
->> to store immediate to memory.
->>
->> I don't think any load-store architecture has store immediate instruction.
->>
->
-> Indeed. Sorry for the noise.
->
-> Somehow Will caught a whiff of whatever I was smoking then :)
->
+Regards,
+Bjorn
