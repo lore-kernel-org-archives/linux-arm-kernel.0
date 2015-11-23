@@ -1,174 +1,201 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 23 Nov 2015 10:06:26 +0100
-Subject: [PATCH v3 06/13] ARM: add support for generic
- early_ioremap/early_memremap
+Date: Mon, 23 Nov 2015 10:06:32 +0100
+Subject: [PATCH v3 12/13] ARM: wire up UEFI init and runtime support
 In-Reply-To: <1448269593-20758-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1448269593-20758-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1448269593-20758-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1448269593-20758-13-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the generic early_ioremap implementation for ARM.
+This adds support to the kernel proper for booting via UEFI. It shares
+most of the code with arm64, so this patch mostly just wires it up for
+use with ARM.
 
-It uses the fixmap region reserved for kmap. Since early_ioremap
-is only supported before paging_init(), and kmap is only supported
-afterwards, this is guaranteed not to cause any clashes.
+Note that this does not include the EFI stub, it is added in a subsequent
+patch.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/Kconfig              |  1 +
- arch/arm/include/asm/Kbuild   |  1 +
- arch/arm/include/asm/fixmap.h | 29 +++++++++++++++++++-
- arch/arm/kernel/setup.c       |  7 +++--
- arch/arm/mm/ioremap.c         |  9 ++++++
- arch/arm/mm/mmu.c             |  2 +-
- 6 files changed, 45 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/efi.h         | 60 ++++++++++++++++++++
+ arch/arm/include/asm/mmu_context.h |  2 +-
+ arch/arm/kernel/Makefile           |  1 +
+ arch/arm/kernel/efi.c              | 38 +++++++++++++
+ arch/arm/kernel/setup.c            |  3 +
+ drivers/firmware/efi/Makefile      |  1 +
+ 6 files changed, 104 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 0365cbbc9179..7e338228cc8d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -20,6 +20,7 @@ config ARM
- 	select GENERIC_ALLOCATOR
- 	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
- 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
-+	select GENERIC_EARLY_IOREMAP
- 	select GENERIC_IDLE_POLL_SETUP
- 	select GENERIC_IRQ_PROBE
- 	select GENERIC_IRQ_SHOW
-diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
-index bd425302c97a..16da6380eb85 100644
---- a/arch/arm/include/asm/Kbuild
-+++ b/arch/arm/include/asm/Kbuild
-@@ -3,6 +3,7 @@
- generic-y += bitsperlong.h
- generic-y += cputime.h
- generic-y += current.h
-+generic-y += early_ioremap.h
- generic-y += emergency-restart.h
- generic-y += errno.h
- generic-y += exec.h
-diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 58cfe9f1a687..5c17d2dec777 100644
---- a/arch/arm/include/asm/fixmap.h
-+++ b/arch/arm/include/asm/fixmap.h
-@@ -19,20 +19,47 @@ enum fixed_addresses {
- 	FIX_TEXT_POKE0,
- 	FIX_TEXT_POKE1,
+diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
+new file mode 100644
+index 000000000000..c91e330616ad
+--- /dev/null
++++ b/arch/arm/include/asm/efi.h
+@@ -0,0 +1,60 @@
++/*
++ * Copyright (C) 2015 Linaro Ltd <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ASM_ARM_EFI_H
++#define __ASM_ARM_EFI_H
++
++#include <asm/cacheflush.h>
++#include <asm/cachetype.h>
++#include <asm/early_ioremap.h>
++#include <asm/fixmap.h>
++#include <asm/highmem.h>
++#include <asm/mach/map.h>
++#include <asm/mmu_context.h>
++#include <asm/pgtable.h>
++
++#ifdef CONFIG_EFI
++void efi_init(void);
++
++int efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md);
++
++#define efi_call_virt(f, ...)						\
++({									\
++	efi_##f##_t *__f;						\
++	efi_status_t __s;						\
++									\
++	efi_virtmap_load();						\
++	__f = efi.systab->runtime->f;					\
++	__s = __f(__VA_ARGS__);						\
++	efi_virtmap_unload();						\
++	__s;								\
++})
++
++#define __efi_call_virt(f, ...)						\
++({									\
++	efi_##f##_t *__f;						\
++									\
++	efi_virtmap_load();						\
++	__f = efi.systab->runtime->f;					\
++	__f(__VA_ARGS__);						\
++	efi_virtmap_unload();						\
++})
++
++static inline void efi_set_pgd(struct mm_struct *mm)
++{
++	check_and_switch_context(mm, NULL);
++}
++
++void efi_virtmap_load(void);
++void efi_virtmap_unload(void);
++
++#else
++#define efi_init()
++#endif /* CONFIG_EFI */
++
++#endif /* _ASM_ARM_EFI_H */
+diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
+index 9b32f76bb0dd..432ce8176498 100644
+--- a/arch/arm/include/asm/mmu_context.h
++++ b/arch/arm/include/asm/mmu_context.h
+@@ -26,7 +26,7 @@ void __check_vmalloc_seq(struct mm_struct *mm);
+ #ifdef CONFIG_CPU_HAS_ASID
  
--	__end_of_fixed_addresses
-+	__end_of_fixmap_region,
+ void check_and_switch_context(struct mm_struct *mm, struct task_struct *tsk);
+-#define init_new_context(tsk,mm)	({ atomic64_set(&mm->context.id, 0); 0; })
++#define init_new_context(tsk,mm)	({ atomic64_set(&(mm)->context.id, 0); 0; })
+ 
+ #ifdef CONFIG_ARM_ERRATA_798181
+ void a15_erratum_get_cpumask(int this_cpu, struct mm_struct *mm,
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index af9e59bf3831..c90f4a70d646 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -77,6 +77,7 @@ CFLAGS_pj4-cp0.o		:= -marm
+ AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+ obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
+ obj-$(CONFIG_VDSO)		+= vdso.o
++obj-$(CONFIG_EFI)		+= efi.o
+ 
+ ifneq ($(CONFIG_ARCH_EBSA110),y)
+   obj-y		+= io.o
+diff --git a/arch/arm/kernel/efi.c b/arch/arm/kernel/efi.c
+new file mode 100644
+index 000000000000..ff8a9d8acfac
+--- /dev/null
++++ b/arch/arm/kernel/efi.c
+@@ -0,0 +1,38 @@
++/*
++ * Copyright (C) 2015 Linaro Ltd <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/efi.h>
++#include <asm/efi.h>
++#include <asm/mach/map.h>
++#include <asm/mmu_context.h>
++
++int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
++{
++	struct map_desc desc = {
++		.virtual	= md->virt_addr,
++		.pfn		= __phys_to_pfn(md->phys_addr),
++		.length		= md->num_pages * EFI_PAGE_SIZE,
++	};
 +
 +	/*
-+	 * Share the kmap() region with early_ioremap(): this is guaranteed
-+	 * not to clash since early_ioremap() is only available before
-+	 * paging_init(), and kmap() only after.
++	 * Order is important here: memory regions may have all of the
++	 * bits below set (and usually do), so we check them in order of
++	 * preference.
 +	 */
-+#define NR_FIX_BTMAPS		32
-+#define FIX_BTMAPS_SLOTS	7
-+#define TOTAL_FIX_BTMAPS	(NR_FIX_BTMAPS * FIX_BTMAPS_SLOTS)
++	if (md->attribute & EFI_MEMORY_WB)
++		desc.type = MT_MEMORY_RWX;
++	else if (md->attribute & EFI_MEMORY_WT)
++		desc.type = MT_MEMORY_RWX_NONCACHED;
++	else if (md->attribute & EFI_MEMORY_WC)
++		desc.type = MT_DEVICE_WC;
++	else
++		desc.type = MT_DEVICE;
 +
-+	FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
-+	FIX_BTMAP_BEGIN = FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1,
-+	__end_of_early_ioremap_region
- };
- 
-+static const enum fixed_addresses __end_of_fixed_addresses =
-+	__end_of_fixmap_region > __end_of_early_ioremap_region ?
-+	__end_of_fixmap_region : __end_of_early_ioremap_region;
-+
- #define FIXMAP_PAGE_COMMON	(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
- 
- #define FIXMAP_PAGE_NORMAL	(FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
-+#define FIXMAP_PAGE_RO		(FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
- 
- /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
- #define FIXMAP_PAGE_IO		(FIXMAP_PAGE_COMMON | L_PTE_MT_DEV_SHARED | L_PTE_SHARED)
- #define FIXMAP_PAGE_NOCACHE	FIXMAP_PAGE_IO
- 
-+#define __early_set_fixmap	__set_fixmap
-+
-+#ifdef CONFIG_MMU
-+
- void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
- void __init early_fixmap_init(void);
- 
- #include <asm-generic/fixmap.h>
- 
-+#else
-+
-+static inline void early_fixmap_init(void) { }
-+
-+#endif
- #endif
++	create_mapping_late(mm, &desc, true);
++	return 0;
++}
 diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 20edd349d379..5df2bca57c42 100644
+index 5df2bca57c42..b341b1c3b2fa 100644
 --- a/arch/arm/kernel/setup.c
 +++ b/arch/arm/kernel/setup.c
-@@ -38,6 +38,7 @@
+@@ -7,6 +7,7 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
++#include <linux/efi.h>
+ #include <linux/export.h>
+ #include <linux/kernel.h>
+ #include <linux/stddef.h>
+@@ -37,6 +38,7 @@
+ #include <asm/cp15.h>
  #include <asm/cpu.h>
  #include <asm/cputype.h>
++#include <asm/efi.h>
  #include <asm/elf.h>
-+#include <asm/early_ioremap.h>
+ #include <asm/early_ioremap.h>
  #include <asm/fixmap.h>
- #include <asm/procinfo.h>
- #include <asm/psci.h>
-@@ -956,8 +957,8 @@ void __init setup_arch(char **cmdline_p)
- 	strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
- 	*cmdline_p = cmd_line;
- 
--	if (IS_ENABLED(CONFIG_FIX_EARLYCON_MEM))
--		early_fixmap_init();
-+	early_fixmap_init();
-+	early_ioremap_init();
- 
- 	parse_early_param();
- 
-@@ -968,6 +969,8 @@ void __init setup_arch(char **cmdline_p)
+@@ -966,6 +968,7 @@ void __init setup_arch(char **cmdline_p)
+ 	early_paging_init(mdesc);
+ #endif
+ 	setup_dma_zone(mdesc);
++	efi_init();
  	sanity_check_meminfo();
  	arm_memblock_init(mdesc);
  
-+	early_ioremap_reset();
-+
- 	paging_init(mdesc);
- 	request_standard_resources(mdesc);
+diff --git a/drivers/firmware/efi/Makefile b/drivers/firmware/efi/Makefile
+index f292917b00e7..62e654f255f4 100644
+--- a/drivers/firmware/efi/Makefile
++++ b/drivers/firmware/efi/Makefile
+@@ -20,4 +20,5 @@ obj-$(CONFIG_EFI_STUB)			+= libstub/
+ obj-$(CONFIG_EFI_FAKE_MEMMAP)		+= fake_mem.o
  
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index 0c81056c1dd7..66a978d05958 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -30,6 +30,7 @@
- #include <asm/cp15.h>
- #include <asm/cputype.h>
- #include <asm/cacheflush.h>
-+#include <asm/early_ioremap.h>
- #include <asm/mmu_context.h>
- #include <asm/pgalloc.h>
- #include <asm/tlbflush.h>
-@@ -469,3 +470,11 @@ int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
- }
- EXPORT_SYMBOL_GPL(pci_ioremap_io);
- #endif
-+
-+/*
-+ * Must be called after early_fixmap_init
-+ */
-+void __init early_ioremap_init(void)
-+{
-+	early_ioremap_setup();
-+}
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 4867f5daf82c..de19f90221e2 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -390,7 +390,7 @@ void __init early_fixmap_init(void)
- 	 * The early fixmap range spans multiple pmds, for which
- 	 * we are not prepared:
- 	 */
--	BUILD_BUG_ON((__fix_to_virt(__end_of_permanent_fixed_addresses) >> PMD_SHIFT)
-+	BUILD_BUG_ON((__fix_to_virt(__end_of_early_ioremap_region) >> PMD_SHIFT)
- 		     != FIXADDR_TOP >> PMD_SHIFT);
- 
- 	pmd = fixmap_pmd(FIXADDR_TOP);
+ arm-obj-$(CONFIG_EFI)			:= arm-init.o arm-runtime.o
++obj-$(CONFIG_ARM)			+= $(arm-obj-y)
+ obj-$(CONFIG_ARM64)			+= $(arm-obj-y)
 -- 
 1.9.1
