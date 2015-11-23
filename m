@@ -1,59 +1,68 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 23 Nov 2015 10:45:50 +0100
-Subject: [PATCH RESEND] pwm: ftm: fix clock enable/disable when using PM
-In-Reply-To: <290ed017061ef41e1fe5c3fd5a523511@agner.ch>
-References: <1445142552-3530-1-git-send-email-stefan@agner.ch>
- <290ed017061ef41e1fe5c3fd5a523511@agner.ch>
-Message-ID: <20151123094550.GA28740@ulmo.nvidia.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 23 Nov 2015 17:47:11 +0800
+Subject: [PATCH v2 4/5] dt-bindings: document sun8i_ths
+In-Reply-To: <20e229f191031b0b0bff96dee118d1f2d988d7b3.1448263428.git.atx@atx.name>
+References: <cover.1448263428.git.atx@atx.name>
+ <20e229f191031b0b0bff96dee118d1f2d988d7b3.1448263428.git.atx@atx.name>
+Message-ID: <CAGb2v675YHYR=eNczrP8srPr5aYG+8eK9GPA7vevsxjsHEW1RA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2015 at 06:04:12PM -0800, Stefan Agner wrote:
-> Thierry,
-> 
-> I realized that this patch did not make it into 4.4-rc1, while others,
-> IMHO less important patches which have been posted later (e.g. sunxi
-> whitespace fixes) have made it! :-(
+On Mon, Nov 23, 2015 at 4:02 PM, Josef Gajdusek <atx@atx.name> wrote:
+> This patch adds the binding documentation for the sun8i_ths driver
+>
+> Signed-off-by: Josef Gajdusek <atx@atx.name>
+> ---
+>  .../devicetree/bindings/thermal/sun8i-ths.txt      | 31 ++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/sun8i-ths.txt
+>
+> diff --git a/Documentation/devicetree/bindings/thermal/sun8i-ths.txt b/Documentation/devicetree/bindings/thermal/sun8i-ths.txt
+> new file mode 100644
+> index 0000000..67056bf
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/thermal/sun8i-ths.txt
+> @@ -0,0 +1,31 @@
+> +* sun8i THS
+> +
+> +Required properties:
+> +- compatible : "allwinner,sun8i-h3-ths"
+> +- reg : Address range of the thermal registers and location of the calibration
+> +        value
 
-The reason why I merged them is because they are low-risk, whereas this
-patch of yours changes existing behaviour, and hasn't received any
-feedback from anyone. So the choice that I need to make is to either
-trust the original author to have tested the driver and it was working,
-or you to have verified that it is still working after the patch on all
-setups that it used to work on. The first option obviously carries the
-least risk, and that's the reason why the patch hasn't been merged.
+You are now using nvmem for the calibration data. You don't need the second
+entry.
 
-> Anything wrong with that? Or am I on your spam list? Note that this is
-> already a RESEND :-)
+> +- resets : Must contain an entry for each entry in reset-names.
+> +           see ../reset/reset.txt for details
+> +- reset-names : Must include the name "ahb"
+> +- clocks : Must contain an entry for each entry in clock-names.
+> +- clock-names : Must contain "ahb" for the bus gate and "ths" for the THS
+> +  clock
+> +
+> +Optional properties:
+> +- nvmem-cells : Must contain an entry for each entry in nvmem-cell-names
+> +- nvmem-cell-names : Must contain "calibration" for the cell containing the
+> +  temperature calibration cell, if available
+> +
+> +Example:
+> +ths: ths at 01c25000 {
+> +       #thermal-sensor-cells = <0>;
+> +       compatible = "allwinner,sun8i-h3-ths";
+> +       reg = <0x01c25000 0x88>, <0x01c14234 0x4>;
 
-If you want to get this merged, you should try to get some feedback from
-at least the original author. Xiubo Li and I extensively discussed this
-back at the time when he submitted the driver and we came up with the
-current code as the best approach to making sure that clocks are on and
-off when they should be. So if it's not working for you, I'm fine taking
-the patch if Xiubo or somebody else has had the chance to look at it and
-review or test it. So a Reviewed-by or Tested-by tag will go a long way
-to convince me that it's safe to apply.
+Same here.
 
-Also you enumerate all the various bits that are broken, and it would
-seem to me that they could each be fixed individually rather than go and
-implement something completely different which might have undesirable
-side-effects. Such an approach would also make it more likely for me to
-merge the patch because it would hopefully be more obvious what is being
-fixed and that it's a correct fix.
+ChenYu
 
-It's not that I mind the rework, but I'd at least like for someone to
-verify that it's all still working on existing setups. Now, I understand
-that people can go missing, so if nobody were to give you a Reviewed-by
-or Tested-by for a couple of weeks I'd even consider applying without,
-but as it is, you didn't even Cc Xiubo on the patch, so he's likely
-missed it entirely.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151123/de71099e/attachment.sig>
+> +       interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
+> +       resets = <&bus_rst 136>;
+> +       reset-names = "ahb";
+> +       clocks = <&bus_gates 72>, <&ths_clk>;
+> +       clock-names = "ahb", "ths";
+> +       nvmem-cells = <&ths_calibration>;
+> +       nvmem-cell-names = "calibration";
+> +};
+> --
+> 2.4.10
+>
