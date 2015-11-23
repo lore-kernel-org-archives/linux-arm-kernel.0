@@ -1,22 +1,22 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 23 Nov 2015 13:26:20 +0000
-Subject: [PATCHv2 2/2] arm64: mm: allow sections for unaligned bases
-In-Reply-To: <1448285180-15389-1-git-send-email-mark.rutland@arm.com>
-References: <1448285180-15389-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1448285180-15389-2-git-send-email-mark.rutland@arm.com>
+Date: Mon, 23 Nov 2015 13:26:19 +0000
+Subject: [PATCHv2 1/2] arm64: mm: detect bad __create_mapping uses
+Message-ID: <1448285180-15389-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Callees of __create_mapping may decide to create section mappings if
-sufficient low bits of the physical and virtual addresses they were
-passed are zero. While __create_mapping rounds the virtual base address
-down, it does not similarly round the physical base address down, and
-hence non-zero bits in the physical address can prevent use of a section
-mapping, even where a whole next-level table would be used instead.
+If a caller of __create_mapping provides a PA and VA which have
+different sub-page offsets, it is not clear which offset they expect to
+apply to the mapping, and is indicative of a bad caller.
 
-Round down the physical base address in __create_mapping to enable all
-callees to always create section mappings when such a mapping is
-possible.
+In some cases, the region we wish to map may validly have a sub-page
+offset in the physical and virtual addresses. For example, EFI runtime
+regions have 4K granularity, yet may be mapped by a 64K page kernel. So
+long as the physical and virtual offsets are the same, the region will
+be mapped at the expected VAs.
+
+Disallow calls with differing sub-page offsets, and WARN when they are
+encountered, so that we can detect and fix such cases.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
@@ -25,24 +25,31 @@ Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/mm/mmu.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/mm/mmu.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 Since v1 [1]:
-* No changes to patch.
+* Describe why we permit sub-page offsets.
+* Fix Catalin's email address.
 * Add acks.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386931.html
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386930.html
 
 diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 2250d89..c22a717 100644
+index abb66f8..2250d89 100644
 --- a/arch/arm64/mm/mmu.c
 +++ b/arch/arm64/mm/mmu.c
-@@ -307,6 +307,7 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
- 	if (WARN_ON((phys ^ virt) & ~PAGE_MASK))
- 		return;
+@@ -300,6 +300,13 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+ {
+ 	unsigned long addr, length, end, next;
  
-+	phys &= PAGE_MASK;
++	/*
++	 * If the virtual and physical address don't have the same offset
++	 * within a page, we cannot map the region as the caller expects.
++	 */
++	if (WARN_ON((phys ^ virt) & ~PAGE_MASK))
++		return;
++
  	addr = virt & PAGE_MASK;
  	length = PAGE_ALIGN(size + (virt & ~PAGE_MASK));
  
