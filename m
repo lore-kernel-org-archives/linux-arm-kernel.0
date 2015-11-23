@@ -1,61 +1,86 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 23 Nov 2015 13:47:28 +0000
-Subject: [PATCH 2/3] drivers: pci: host-generic: claim bus resources on
- PROBE_ONLY set-ups
-In-Reply-To: <1447779838-15585-2-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1447779838-15585-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1447779838-15585-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20151123134727.GA4236@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 23 Nov 2015 13:49:12 +0000
+Subject: [PATCH] [PATCH] arm64: Boot failure on m400 with new cont PTEs
+In-Reply-To: <20151123121514.GB32300@e104818-lin.cambridge.arm.com>
+References: <1447858999-26665-1-git-send-email-jeremy.linton@arm.com>
+ <20151118152044.GD10644@leverpostej> <564CA29A.9050905@arm.com>
+ <20151118162932.GA13355@leverpostej> <564CB1DA.4090304@arm.com>
+ <20151118180434.GB13355@leverpostej> <564CD206.9040402@arm.com>
+ <20151119112923.GA24570@leverpostej>
+ <20151120195243.GC14942@leverpostej>
+ <20151123121514.GB32300@e104818-lin.cambridge.arm.com>
+Message-ID: <20151123134911.GB28293@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 05:03:57PM +0000, Lorenzo Pieralisi wrote:
-> The PCI host generic driver does not reassign bus resources on systems
-> that require the BARs set-up to be immutable (ie PROBE_ONLY) since
-> that would trigger system failures. Nonetheless, PCI bus resources
-> allocated to PCI bridge and devices must be claimed in order to be
-> validated and inserted in the kernel resource tree, but the current
-> driver omits the resources claiming and relies on arch specific kludges
-> to prevent probing failure (ie preventing resources enablement on
-> PROBE_ONLY systems).
+On Mon, Nov 23, 2015 at 12:15:15PM +0000, Catalin Marinas wrote:
+> On Fri, Nov 20, 2015 at 07:52:44PM +0000, Mark Rutland wrote:
+> > On Thu, Nov 19, 2015 at 11:31:34AM +0000, Mark Rutland wrote:
+> > > I think that if we need to do something more drastic to account for the
+> > > other issues above (e.g. by ensuring that we can never allocate
+> > > conflicting TLB entries in the first place), and that said strategy
+> > > would also fix this problem, that would be preferable, given that we're
+> > > going to have to do that eventually anyway.
+> > 
+> > Having looked into this further, we also have the same issue with the
+> > kasan init code.
 > 
-> This patch adds code to the PCI host generic driver that correctly
-> claims bus resources upon probe on systems that are required to
-> prevent reassignment after bus enumeration, so that the allocated
-> resources can be enabled successfully upon PCI device drivers probing,
-> without resorting to arch back-ends workarounds.
+> I don't think the kasan_init() problem is that bad. We are preserving
+> the same size mappings (PAGE_SIZE) and just changing the physical
+> address they point at without a break-before-make (just a TTBR1 switch).
+
+Per the ARM ARM, "CONSTRAINED UNPREDICTABLE behaviors due to caching of
+control or data values", the result of a translation could be "an
+amalgamation" of the values. I believe that we have to read
+"amalgamation" as "arbitrary function of" here.
+
+I don't think that we're safe because we only changed the output
+addresses of entries.
+
+> I don't know how clear the ARM ARM is around this but at least so far we
+> haven't hit any problems.
+
+I assume you're talking generally here, rather than specifically about
+kasan. I agree that we haven't spotted any issues so far.
+
+Given that kasan itself is new and requires a relatively new compiler,
+it may not yet have been tested on a platform where it would fail on.
+
+Jeremy, for reference, have you tried kasan on m400? Or DEBUG_RODATA?
+
+> The problem with the contiguous bit is that we switch from e.g. a 4KB
+> mapping to a 64KB one and it's very likely that we would get a TLB
+> conflict.
 > 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: David Daney <david.daney@cavium.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> ---
->  drivers/pci/host/pci-host-generic.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
+> With CONFIG_DEBUG_RODATA, we go from bigger block to a smaller one, so
+> less chance of a TLB conflict but still present. I need to read the ARM
+> ARM some more in this area (and maybe ask for clarification).
 
-Assuming patch one is accepted, then this looks fine to me:
+We should certainly try to get clarification here.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
-
-> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> index 5434c90..c62d13f 100644
-> --- a/drivers/pci/host/pci-host-generic.c
-> +++ b/drivers/pci/host/pci-host-generic.c
-> @@ -261,7 +261,10 @@ static int gen_pci_probe(struct platform_device *pdev)
->  
->  	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
->  
-> -	if (!pci_has_flag(PCI_PROBE_ONLY)) {
-> +
-> +	if (pci_has_flag(PCI_PROBE_ONLY)) {
-> +		pci_bus_claim_resources(bus);
-> +	} else {
->  		pci_bus_size_bridges(bus);
->  		pci_bus_assign_resources(bus);
->  
-> -- 
-> 2.5.1
+> > I believe that the issue is restricted to one-off init code, as I don't
+> > think that we do anything at runtime which would be problematic. If
+> > anyone knows of a counter-example, please let me know!
+> > 
+> > Given that, we can restrict the problem to an early UP environment, and
+> > it won't matter if therre's some large(ish) fixed cost associated with
+> > updating the kernel page tables. I think that we can avoid the issue
+> > entirely by modifying a copy of the kernel page tables, which we can
+> > later install via some idmap code (going via a reserved table to clear
+> > the TLBs).
+> > 
+> > I'm working on patches to implement the above, which I'll try to get
+> > somewhere with next week.
 > 
+> That's a complete fix indeed but it would require some more testing and
+> I don't think it's feasible for 4.4-rc. In the meantime, I propose that
+> we revert the contiguous PTE patches and push them again once we fix the
+> TLB conflict problems.
+
+I agree that this would be too late for v4.4-rc*.
+
+In the meantime, I guess that reverting the patches is the best thing to
+do given we're already at rc2.
+
+Thanks,
+Mark.
