@@ -1,84 +1,49 @@
-From: atx@atx.name (Josef Gajdusek)
-Date: Mon, 23 Nov 2015 09:02:52 +0100
-Subject: [PATCH v2 5/5] ARM: dts: sun8i: Add THS node to the H3 .dtsi
-In-Reply-To: <cover.1448263428.git.atx@atx.name>
-References: <cover.1448263428.git.atx@atx.name>
-Message-ID: <0fff612e26bf9cda9027a4175e16d25a0c2cc62c.1448263428.git.atx@atx.name>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 23 Nov 2015 09:06:40 +0100
+Subject: Build regressions/improvements in v4.4-rc2
+In-Reply-To: <1448265679-7272-1-git-send-email-geert@linux-m68k.org>
+References: <1448265679-7272-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <CAMuHMdVg9V3w4PNLUL2gY0P90Ftf188MKY=Z+9QwK2Bz_vN1mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds nodes for the THS driver and the THS clock to the Allwinner
-H3 .dtsi file.
+On Mon, Nov 23, 2015 at 9:01 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> JFYI, when comparing v4.4-rc2[1] to v4.4-rc1[3], the summaries are:
+>   - build errors: +11/-10
 
-Signed-off-by: Josef Gajdusek <atx@atx.name>
----
- arch/arm/boot/dts/sun8i-h3.dtsi | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+  + error: debugfs.c: undefined reference to `clk_round_rate':  =>
+.text+0x38b054), .text+0x38af08), .text+0x364fb0)
+  + error: debugfs.c: undefined reference to `clk_set_parent':  =>
+.text+0x16d5d0)
+  + error: debugfs.c: undefined reference to `clk_set_rate':  =>
+.text+0x1f2334), .text+0x1285e0), .text+0x392fbc), .text+0x128820),
+.text+0x3651a4), .text+0x394070), .text+0x167080), .text+0x3940fc),
+.text+0x38b0cc), .text+0x171ddc), .text+0x36526c), .text+0x297834),
+.text+0x128604)
+  + error: last.c: undefined reference to `clk_round_rate':  =>
+.text+0x71918), .text+0xd186c), .text+0x72ba0), .text+0x7e388),
+.text+0x7ae88), .text+0x79668)
+  + error: last.c: undefined reference to `clk_set_parent':  =>
+.text+0xd3f38), .text+0xccde8), .text+0xd3f58), .text+0xd79c8)
+  + error: last.c: undefined reference to `clk_set_rate':  =>
+.text+0xcdc5c), .text+0xdc494), .text+0xd19a0), .text+0x79678),
+.text+0xa7fd0), .text+0xd921c), .text+0xd3f64), .text+0x7ae98),
+.text+0x71928), .text+0xd92a4), .text+0x7e398), .text+0x72bb0),
+.text+0xd96b4), .text+0xdd2c4), .text+0xcae30)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 58de718..48500d4 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -77,6 +77,14 @@
- 		};
- 	};
- 
-+	thermal-zones {
-+		cpu_thermal: cpu_thermal {
-+			polling-delay-passive = <1000>;
-+			polling-delay = <5000>;
-+			thermal-sensors = <&ths 0>;
-+		};
-+	};
-+
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-@@ -236,6 +244,14 @@
- 					"ahb1_ephy", "ahb1_dbg";
- 		};
- 
-+		ths_clk: clk at 01c20074 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun8i-h3-ths-clk";
-+			reg = <0x01c20074 0x4>;
-+			clocks = <&osc24M>;
-+			clock-output-names = "ths";
-+		};
-+
- 		mmc0_clk: clk at 01c20088 {
- 			#clock-cells = <1>;
- 			compatible = "allwinner,sun4i-a10-mmc-clk";
-@@ -364,6 +380,10 @@
- 			reg = <0x01c14000 0x400>;
- 			#address-cells = <1>;
- 			#size-cells = <1>;
-+
-+			ths_calibration: calib at 234 {
-+				reg = <0x234 0x4>;
-+			};
- 		};
- 
- 		usbphy: phy at 01c19400 {
-@@ -529,6 +549,19 @@
- 			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 
-+		ths: ths at 01c25000 {
-+			#thermal-sensor-cells = <0>;
-+			compatible = "allwinner,sun8i-h3-ths";
-+			reg = <0x01c25000 0x88>;
-+			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-+			resets = <&bus_rst 104>;
-+			reset-names = "ahb";
-+			clocks = <&bus_gates 72>, <&ths_clk>;
-+			clock-names = "ahb", "ths";
-+			nvmem-cells = <&ths_calibration>;
-+			nvmem-cell-names = "calibration";
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28000 0x400>;
--- 
-2.4.10
+arm-randconfig
+
+> [1] http://kisskb.ellerman.id.au/kisskb/head/9622/ (256 out of 254 configs)
+> [3] http://kisskb.ellerman.id.au/kisskb/head/9597/ (255 out of 254 configs)
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
