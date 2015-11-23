@@ -1,54 +1,72 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 Nov 2015 08:26:04 +0000
-Subject: [PATCH v2 3/7] irqdomain: Make irq_domain_alloc_irqs_recursive
- available
+Date: Mon, 23 Nov 2015 08:26:05 +0000
+Subject: [PATCH v2 4/7] genirq/msi: Make the .prepare callback reusable
 In-Reply-To: <1448267168-17360-1-git-send-email-marc.zyngier@arm.com>
 References: <1448267168-17360-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1448267168-17360-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1448267168-17360-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are soon going to need the MSI layer to call into the domain
-allocators. Instead of open coding this, make the standard
-irq_domain_alloc_irqs_recursive function available to the MSI
-layer.
+The .prepare callbacks are so far only called from msi_domain_alloc_irqs.
+In order to reuse that code, split that code and create a
+msi_domain_prepare_irqs function that the existing code can call into.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/irqdomain.h | 3 +++
- kernel/irq/irqdomain.c    | 6 +++---
- 2 files changed, 6 insertions(+), 3 deletions(-)
+ include/linux/msi.h |  4 ++++
+ kernel/irq/msi.c    | 18 +++++++++++++++---
+ 2 files changed, 19 insertions(+), 3 deletions(-)
 
-diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index d5e5c5b..cf96c6a 100644
---- a/include/linux/irqdomain.h
-+++ b/include/linux/irqdomain.h
-@@ -367,6 +367,9 @@ static inline int irq_domain_alloc_irqs(struct irq_domain *domain,
- 	return __irq_domain_alloc_irqs(domain, -1, nr_irqs, node, arg, false);
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index f71a25e..1c0bb2c 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -279,6 +279,10 @@ struct irq_domain *platform_msi_create_irq_domain(struct fwnode_handle *fwnode,
+ int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int nvec,
+ 				   irq_write_msi_msg_t write_msi_msg);
+ void platform_msi_domain_free_irqs(struct device *dev);
++
++/* When an MSI domain is used as an intermediate domain */
++int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
++			    int nvec, msi_alloc_info_t *args);
+ #endif /* CONFIG_GENERIC_MSI_IRQ_DOMAIN */
+ 
+ #ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
+diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+index 6b0c0b7..9a85613 100644
+--- a/kernel/irq/msi.c
++++ b/kernel/irq/msi.c
+@@ -252,6 +252,20 @@ struct irq_domain *msi_create_irq_domain(struct fwnode_handle *fwnode,
+ 					   &msi_domain_ops, info);
  }
  
-+extern int irq_domain_alloc_irqs_recursive(struct irq_domain *domain,
-+					   unsigned int irq_base,
-+					   unsigned int nr_irqs, void *arg);
- extern int irq_domain_set_hwirq_and_chip(struct irq_domain *domain,
- 					 unsigned int virq,
- 					 irq_hw_number_t hwirq,
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 22aa961..1c9973e 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -1125,9 +1125,9 @@ static void irq_domain_free_irqs_recursive(struct irq_domain *domain,
- 	}
- }
++int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
++			    int nvec, msi_alloc_info_t *arg)
++{
++	struct msi_domain_info *info = domain->host_data;
++	struct msi_domain_ops *ops = info->ops;
++	int ret;
++
++	ret = ops->msi_check(domain, info, dev);
++	if (ret == 0)
++		ret = ops->msi_prepare(domain, dev, nvec, arg);
++
++	return ret;
++}
++
+ /**
+  * msi_domain_alloc_irqs - Allocate interrupts from a MSI interrupt domain
+  * @domain:	The domain to allocate from
+@@ -270,9 +284,7 @@ int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
+ 	struct msi_desc *desc;
+ 	int i, ret, virq = -1;
  
--static int irq_domain_alloc_irqs_recursive(struct irq_domain *domain,
--					   unsigned int irq_base,
--					   unsigned int nr_irqs, void *arg)
-+int irq_domain_alloc_irqs_recursive(struct irq_domain *domain,
-+				    unsigned int irq_base,
-+				    unsigned int nr_irqs, void *arg)
- {
- 	int ret = 0;
- 	struct irq_domain *parent = domain->parent;
+-	ret = ops->msi_check(domain, info, dev);
+-	if (ret == 0)
+-		ret = ops->msi_prepare(domain, dev, nvec, &arg);
++	ret = msi_domain_prepare_irqs(domain, dev, nvec, &arg);
+ 	if (ret)
+ 		return ret;
+ 
 -- 
 2.1.4
