@@ -1,212 +1,73 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 23 Nov 2015 11:33:10 -0700
-Subject: [RESEND PATCH V4 18/26] coresight: adding operation mode for
- sink->enable()
-In-Reply-To: <1448303598-11249-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1448303598-11249-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1448303598-11249-19-git-send-email-mathieu.poirier@linaro.org>
+From: rjui@broadcom.com (Ray Jui)
+Date: Mon, 23 Nov 2015 10:50:16 -0800
+Subject: [PATCH] ARM: dts: enable PCIe PHY support for Cygnus
+In-Reply-To: <1447870619-2828-2-git-send-email-rjui@broadcom.com>
+References: <1447870619-2828-1-git-send-email-rjui@broadcom.com>
+ <1447870619-2828-2-git-send-email-rjui@broadcom.com>
+Message-ID: <56535FE8.2010504@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding an operation mode to sink->enable() API in order
-to prevent simultaneous access from different callers.
+Any comment on this DT change to enable PCIe PHY support for Cygnus?
 
-TPIU and TMC won't be supplemented with the AUX area
-API immediately and as such ignore the new mode.
+Note the PHY driver has been accepted and is in v4.4.
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/hwtracing/coresight/coresight-etb10.c | 31 +++++++++++++++++++++------
- drivers/hwtracing/coresight/coresight-priv.h  |  2 +-
- drivers/hwtracing/coresight/coresight-tmc.c   |  2 +-
- drivers/hwtracing/coresight/coresight-tpiu.c  |  2 +-
- drivers/hwtracing/coresight/coresight.c       | 10 ++++-----
- include/linux/coresight.h                     |  2 +-
- 6 files changed, 33 insertions(+), 16 deletions(-)
+Thanks,
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 09e306361e4f..dc4d707b28aa 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -73,9 +73,9 @@
-  * @miscdev:	specifics to handle "/dev/xyz.etb" entry.
-  * @spinlock:	only one at a time pls.
-  * @reading:	synchronise user space access to etb buffer.
-+ * @mode:	this ETB is being used.
-  * @buf:	area of memory where ETB buffer content gets sent.
-  * @buffer_depth: size of @buf.
-- * @enable:	this ETB is being used.
-  * @trigger_cntr: amount of words to store after a trigger.
-  */
- struct etb_drvdata {
-@@ -86,9 +86,9 @@ struct etb_drvdata {
- 	struct miscdevice	miscdev;
- 	spinlock_t		spinlock;
- 	local_t			reading;
-+	local_t			mode;
- 	u8			*buf;
- 	u32			buffer_depth;
--	bool			enable;
- 	u32			trigger_cntr;
- };
- 
-@@ -133,18 +133,34 @@ static void etb_enable_hw(struct etb_drvdata *drvdata)
- 	CS_LOCK(drvdata->base);
- }
- 
--static int etb_enable(struct coresight_device *csdev)
-+static int etb_enable(struct coresight_device *csdev, u32 mode)
- {
--	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+	u32 val;
- 	unsigned long flags;
-+	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	val = local_cmpxchg(&drvdata->mode,
-+			    CS_MODE_DISABLED, mode);
-+	/*
-+	 * When accessing from Perf, a HW buffer can be handled
-+	 * by a single trace entity.  In sysFS mode many tracers
-+	 * can be logging to the same HW buffer.
-+	 */
-+	if (val == CS_MODE_PERF)
-+		return -EBUSY;
-+
-+	/* Nothing to do, the tracer is already enabled. */
-+	if (val == CS_MODE_SYSFS)
-+		goto out;
- 
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
- 	etb_enable_hw(drvdata);
--	drvdata->enable = true;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
-+out:
- 	dev_info(drvdata->dev, "ETB enabled\n");
- 	return 0;
-+
- }
- 
- static void etb_disable_hw(struct etb_drvdata *drvdata)
-@@ -243,9 +259,10 @@ static void etb_disable(struct coresight_device *csdev)
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
- 	etb_disable_hw(drvdata);
- 	etb_dump_hw(drvdata);
--	drvdata->enable = false;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
-+	local_set(&drvdata->mode, CS_MODE_DISABLED);
-+
- 	dev_info(drvdata->dev, "ETB disabled\n");
- }
- 
-@@ -263,7 +280,7 @@ static void etb_dump(struct etb_drvdata *drvdata)
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
--	if (drvdata->enable) {
-+	if (local_read(&drvdata->mode) == CS_MODE_SYSFS) {
- 		etb_disable_hw(drvdata);
- 		etb_dump_hw(drvdata);
- 		etb_enable_hw(drvdata);
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index 932f34a84d96..333eddaed339 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -62,7 +62,7 @@ static inline void CS_UNLOCK(void __iomem *addr)
- }
- 
- void coresight_disable_path(struct list_head *path);
--int coresight_enable_path(struct list_head *path);
-+int coresight_enable_path(struct list_head *path, u32 mode);
- struct coresight_device *coresight_get_sink(struct list_head *path);
- struct list_head *coresight_build_path(struct coresight_device *csdev);
- void coresight_release_path(struct list_head *path);
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 5e2a71767870..d7e83da7a621 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -265,7 +265,7 @@ static int tmc_enable(struct tmc_drvdata *drvdata, enum tmc_mode mode)
- 	return 0;
- }
- 
--static int tmc_enable_sink(struct coresight_device *csdev)
-+static int tmc_enable_sink(struct coresight_device *csdev, u32 mode)
- {
- 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-index e19b86e61c38..0a09135382f6 100644
---- a/drivers/hwtracing/coresight/coresight-tpiu.c
-+++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-@@ -70,7 +70,7 @@ static void tpiu_enable_hw(struct tpiu_drvdata *drvdata)
- 	CS_LOCK(drvdata->base);
- }
- 
--static int tpiu_enable(struct coresight_device *csdev)
-+static int tpiu_enable(struct coresight_device *csdev, u32 mode)
- {
- 	struct tpiu_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index 47a4e109f700..52311e77da9d 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -121,13 +121,13 @@ static int coresight_find_link_outport(struct coresight_device *csdev,
- 	return 0;
- }
- 
--static int coresight_enable_sink(struct coresight_device *csdev)
-+static int coresight_enable_sink(struct coresight_device *csdev, u32 mode)
- {
- 	int ret;
- 
- 	if (!csdev->enable) {
- 		if (sink_ops(csdev)->enable) {
--			ret = sink_ops(csdev)->enable(csdev);
-+			ret = sink_ops(csdev)->enable(csdev, mode);
- 			if (ret)
- 				return ret;
- 		}
-@@ -283,7 +283,7 @@ void coresight_disable_path(struct list_head *path)
- 	}
- }
- 
--int coresight_enable_path(struct list_head *path)
-+int coresight_enable_path(struct list_head *path, u32 mode)
- {
- 
- 	int ret = 0;
-@@ -296,7 +296,7 @@ int coresight_enable_path(struct list_head *path)
- 		switch (csdev->type) {
- 		case CORESIGHT_DEV_TYPE_SINK:
- 		case CORESIGHT_DEV_TYPE_LINKSINK:
--			ret = coresight_enable_sink(csdev);
-+			ret = coresight_enable_sink(csdev, mode);
- 			if (ret)
- 				goto err;
- 			break;
-@@ -454,7 +454,7 @@ int coresight_enable(struct coresight_device *csdev)
- 		goto out;
- 	}
- 
--	ret = coresight_enable_path(path);
-+	ret = coresight_enable_path(path, CS_MODE_SYSFS);
- 	if (ret)
- 		goto err_path;
- 
-diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-index f2148bc2bcfe..80b3465bd459 100644
---- a/include/linux/coresight.h
-+++ b/include/linux/coresight.h
-@@ -185,7 +185,7 @@ struct coresight_device {
-  * @disable:	disables the sink.
-  */
- struct coresight_ops_sink {
--	int (*enable)(struct coresight_device *csdev);
-+	int (*enable)(struct coresight_device *csdev, u32 mode);
- 	void (*disable)(struct coresight_device *csdev);
- };
- 
--- 
-1.9.1
+Ray
+
+On 11/18/2015 10:16 AM, Ray Jui wrote:
+> Enable PCIe PHY for both PCIe root complexes on Cygnus
+>
+> Signed-off-by: Ray Jui <rjui@broadcom.com>
+> ---
+>   arch/arm/boot/dts/bcm-cygnus.dtsi | 21 +++++++++++++++++++++
+>   1 file changed, 21 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
+> index 2778533..5df5300 100644
+> --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
+> +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
+> @@ -91,6 +91,21 @@
+>   		#address-cells = <1>;
+>   		#size-cells = <1>;
+>
+> +		pcie_phy: phy at 0301d0a0 {
+> +			compatible = "brcm,cygnus-pcie-phy";
+> +			reg = <0x0301d0a0 0x14>;
+> +
+> +			pcie0_phy: phy at 0 {
+> +				reg = <0>;
+> +				#phy-cells = <0>;
+> +			};
+> +
+> +			pcie1_phy: phy at 1 {
+> +				reg = <1>;
+> +				#phy-cells = <0>;
+> +			};
+> +		};
+> +
+>   		pinctrl: pinctrl at 0x0301d0c8 {
+>   			compatible = "brcm,cygnus-pinmux";
+>   			reg = <0x0301d0c8 0x30>,
+> @@ -161,6 +176,9 @@
+>   			ranges = <0x81000000 0 0	  0x28000000 0 0x00010000
+>   				  0x82000000 0 0x20000000 0x20000000 0 0x04000000>;
+>
+> +			phys = <&pcie0_phy>;
+> +			phy-names = "pcie-phy";
+> +
+>   			status = "disabled";
+>   		};
+>
+> @@ -182,6 +200,9 @@
+>   			ranges = <0x81000000 0 0	  0x48000000 0 0x00010000
+>   				  0x82000000 0 0x40000000 0x40000000 0 0x04000000>;
+>
+> +			phys = <&pcie1_phy>;
+> +			phy-names = "pcie-phy";
+> +
+>   			status = "disabled";
+>   		};
+>
+>
