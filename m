@@ -1,101 +1,95 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 23 Nov 2015 11:29:04 +0000
-Subject: [Xen-devel] [PATCH v3 06/62] acpi: Refactor acpi_os_map_memory
- to be architecturally independent
-In-Reply-To: <1447753261-7552-7-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-7-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511231128160.1107@kaball.uk.xensource.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 23 Nov 2015 12:29:15 +0100
+Subject: [linux-sunxi] Re: [PATCH v4 4/6] reset: sunxi: Add Allwinner H3
+ bus resets
+In-Reply-To: <CAGb2v665C-EM4t1h3rQ=hNR=1Z4J2mp7DRy_zM8-OkCXzZ03iw@mail.gmail.com>
+References: <1445964626-6484-1-git-send-email-jenskuske@gmail.com>
+ <1445964626-6484-5-git-send-email-jenskuske@gmail.com>
+ <13919923.o3Dj9msmoa@wuerfel> <20151104163014.GB6114@lukather>
+ <20151105074730.fd6a9d57a1f2c7933478c680@free.fr>
+ <CAGb2v665C-EM4t1h3rQ=hNR=1Z4J2mp7DRy_zM8-OkCXzZ03iw@mail.gmail.com>
+Message-ID: <20151123112915.GU32142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> Current acpi_os_map_memory is specific to x86. Refactor it to be
-> architecturally independent.
+Hi,
 
-I would say "Move it to an x86-specific location".
-
-
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
-
->  xen/arch/x86/acpi/lib.c | 16 ++++++++++++++++
->  xen/drivers/acpi/osl.c  | 12 +-----------
->  xen/include/xen/acpi.h  |  2 ++
->  3 files changed, 19 insertions(+), 11 deletions(-)
+On Mon, Nov 23, 2015 at 03:41:52PM +0800, Chen-Yu Tsai wrote:
+> On Thu, Nov 5, 2015 at 2:47 PM, Jean-Francois Moine <moinejf@free.fr> wrote:
+> > On Wed, 4 Nov 2015 08:30:14 -0800
+> > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> >
+> >> Hi Arnd,
+> >>
+> >> On Fri, Oct 30, 2015 at 09:27:03AM +0100, Arnd Bergmann wrote:
+> >> > On Tuesday 27 October 2015 17:50:24 Jens Kuske wrote:
+> >> > >
+> >> > > +static int sun8i_h3_bus_reset_xlate(struct reset_controller_dev *rcdev,
+> >> > > +                                   const struct of_phandle_args *reset_spec)
+> >> > > +{
+> >> > > +       unsigned int index = reset_spec->args[0];
+> >> > > +
+> >> > > +       if (index < 96)
+> >> > > +               return index;
+> >> > > +       else if (index < 128)
+> >> > > +               return index + 32;
+> >> > > +       else if (index < 160)
+> >> > > +               return index + 64;
+> >> > > +       else
+> >> > > +               return -EINVAL;
+> >> > > +}
+> >> > > +
+> >> > >
+> >> >
+> >> > This looks like you are doing something wrong and should either
+> >> > put the actual number into DT,
+> >>
+> >> This is the actual number, except that there's some useless registers
+> >> in between. Allwinner documents it like that:
+> >>
+> >> 0x0   Reset 0
+> >> 0x4   Reset 1
+> >> 0xc   Reset 2
+> >>
+> >> So we have to adjust the offset to account with the blank register in
+> >> between (0x8).
+> >>
+> >> > or use a two-cell representation, with the first cell indicating the
+> >> > block (0, 1 or 2), and the second cell the index.
+> >>
+> >> And the missing register is not a block either.
+> >>
+> >> That would also imply either changing the bindings of that driver (and
+> >> all the current DTS that are using it), or introducing a whole new
+> >> driver just to deal with some extraordinary offset calculation.
+> >
+> > In the H3, the holes are not used, but what would occur if these holes
+> > would be used for some other purpose in future SoCs? Double mapping?
 > 
-> diff --git a/xen/arch/x86/acpi/lib.c b/xen/arch/x86/acpi/lib.c
-> index cc15ea3..1e2e124 100644
-> --- a/xen/arch/x86/acpi/lib.c
-> +++ b/xen/arch/x86/acpi/lib.c
-> @@ -33,6 +33,22 @@ u8 __read_mostly acpi_disable_value;
->  u32 __read_mostly x86_acpiid_to_apicid[MAX_MADT_ENTRIES] =
->      {[0 ... MAX_MADT_ENTRIES - 1] = BAD_APICID };
->  
-> +void __iomem *
-> +arch_acpi_os_map_memory(acpi_physical_address phys, acpi_size size)
-> +{
-> +	if (system_state >= SYS_STATE_active) {
-> +		mfn_t mfn = _mfn(PFN_DOWN(phys));
-> +		unsigned int offs = phys & (PAGE_SIZE - 1);
-> +
-> +		/* The low first Mb is always mapped. */
-> +		if ( !((phys + size - 1) >> 20) )
-> +			return __va(phys);
-> +		return __vmap(&mfn, PFN_UP(offs + size), 1, 1,
-> +			      PAGE_HYPERVISOR_NOCACHE) + offs;
-> +	}
-> +	return __acpi_map_table(phys, size);
-> +}
-> +
->  /*
->   * Important Safety Note:  The fixed ACPI page numbers are *subtracted*
->   * from the fixed base.  That's why we start at FIX_ACPI_END and
-> diff --git a/xen/drivers/acpi/osl.c b/xen/drivers/acpi/osl.c
-> index db74a90..54fb0f0 100644
-> --- a/xen/drivers/acpi/osl.c
-> +++ b/xen/drivers/acpi/osl.c
-> @@ -88,17 +88,7 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
->  void __iomem *
->  acpi_os_map_memory(acpi_physical_address phys, acpi_size size)
->  {
-> -	if (system_state >= SYS_STATE_active) {
-> -		mfn_t mfn = _mfn(PFN_DOWN(phys));
-> -		unsigned int offs = phys & (PAGE_SIZE - 1);
-> -
-> -		/* The low first Mb is always mapped. */
-> -		if ( !((phys + size - 1) >> 20) )
-> -			return __va(phys);
-> -		return __vmap(&mfn, PFN_UP(offs + size), 1, 1,
-> -			      PAGE_HYPERVISOR_NOCACHE) + offs;
-> -	}
-> -	return __acpi_map_table(phys, size);
-> +	return arch_acpi_os_map_memory(phys, size);
->  }
->  
->  void acpi_os_unmap_memory(void __iomem * virt, acpi_size size)
-> diff --git a/xen/include/xen/acpi.h b/xen/include/xen/acpi.h
-> index 0f1077d..48d7810 100644
-> --- a/xen/include/xen/acpi.h
-> +++ b/xen/include/xen/acpi.h
-> @@ -54,6 +54,8 @@ typedef int (*acpi_table_handler) (struct acpi_table_header *table);
->  
->  typedef int (*acpi_table_entry_handler) (struct acpi_subtable_header *header, const unsigned long end);
->  
-> +void __iomem *
-> +arch_acpi_os_map_memory(acpi_physical_address phys, acpi_size size);
->  unsigned int acpi_get_processor_id (unsigned int cpu);
->  char * __acpi_map_table (paddr_t phys_addr, unsigned long size);
->  int acpi_boot_init (void);
-> -- 
-> 2.1.0
+> We'd have a different compatible string for it.
 > 
+> My suggestion for the resets is to just split them into 3 nodes: AHB
+> (since AHB1 and AHB2 devices are mixed together in the bunch), APB1,
+> and APB2 reset controls.
 > 
-> _______________________________________________
-> Xen-devel mailing list
-> Xen-devel at lists.xen.org
-> http://lists.xen.org/xen-devel
-> 
+> This follows what we have for existing SoCs, and gets rid of the unused
+> hole. We can use the existing "allwinner,sun6i-a31-clock-reset" and
+> "allwinner,sun6i-a31-ahb1-reset" compatibles.
+
+That seems a bit weird to have a single clock and split resets, but as
+long as they are not mixed, and you can compute easily the id from the
+datasheet, ok.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151123/0f5b4408/attachment.sig>
