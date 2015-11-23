@@ -1,52 +1,99 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 23 Nov 2015 23:48:12 +0000
-Subject: [PATCH 5/5] arm64: Ensure the secondary CPUs have safe ASIDBits
- size
-In-Reply-To: <20151123172920.GB1702@arm.com>
-References: <1447866238-22970-1-git-send-email-suzuki.poulose@arm.com>
- <1447866540-23207-1-git-send-email-suzuki.poulose@arm.com>
- <1447866540-23207-5-git-send-email-suzuki.poulose@arm.com>
- <20151123172920.GB1702@arm.com>
-Message-ID: <5653A5BC.4020209@arm.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 23 Nov 2015 15:57:45 -0800
+Subject: [PATCH 0/4] ARM: dts: vf610: relicense the device trees under
+ GPLv2/X11
+Message-ID: <1448323069-23208-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/11/15 17:29, Will Deacon wrote:
-> On Wed, Nov 18, 2015 at 05:09:00PM +0000, Suzuki K. Poulose wrote:
->> The ID_AA64MMFR0_EL1:ASIDBits determines the size of the mm context
->> id and is used in the early boot to make decisions. The value is
->> picked up from the Boot CPU and cannot be delayed until other CPUs
->> are up. If a secondary CPU has a smaller size than that of the Boot
->> CPU, things will break horribly and the usual SANITY check is not good
->> enough to prevent the system from crashing. Prevent this by failing CPUs with
->> ASID smaller than that of the boot CPU.
+The GPLv2 license makes it impractical for other software components
+licensed under another license to use our device trees. To fix this,
+and make our device tree usable by other software components, relicense
+them under a GPLv2/X11 dual-license.
 
-...
+In order to get this accepted, we *need* all contributors to the Vybrid
+device tree files to send an ack to the patches applying on a file they
+contributed on.
 
->> +	pr_crit("CPU%d: will not boot\n", cpu);
->
-> This is less informative than the current message (whcih describes the
-> missing capability).
+I think some Freescale email addresses are not valid anymore, can someone
+from Freescale make an ack on their behalf?
 
-The missing capability is printed by the caller (Patch 4/5) and see below
-for the new user.
+The needed Acked-by by device tree are:
 
+vf???.dtsi:
+  Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+  Chao Fu <B44548@freescale.com>
+  Cory Tusar <cory.tusar@pid1solutions.com>
+  Cosmin Stoica <cosminstefan.stoica@freescale.com>
+  Frank Li <Frank.Li@freescale.com>
+  Fugang Duan <B38611@freescale.com>
+  Huang Shijie <b32955@freescale.com>
+  Jingchang Lu <jingchang.lu@freescale.com>
+  Lucas Stach <l.stach@pengutronix.de>
+  Sanchayan Maity <maitysanchayan@gmail.com>
+  Shawn Guo <shawnguo@kernel.org>
+  Stephen Warren <swarren@wwwdotorg.org>
+  Xiubo Li <Li.Xiubo@freescale.com>
+  Yuan Yao <yao.yuan@freescale.com>
 
-	ID_AA64MMFR0_ASID_SHIFT);
->> +	if (asid_cur < asid_boot) {
->> +		pr_crit("CPU%d: has incompatible ASIDBits: %u vs Boot CPU:%u\n",
->> +				cpu, asid_cur, asid_boot);
->> +		fail_incapable_cpu();
->> +	}
->
-> Hmm. Whilst we want to ensure that secondary CPUs don't have a smaller
-> ASID size than the boot CPU, can we actually guarantee that a smaller
-> value for ID_AA64MMFR0.ASIDBits corresponds to fewer bits? We're
-> probably better off assuming 8-bit ASIDs unless ASIDBits == 2 (which is
-> what the ASID allocator does).
+vf610-colibri:
+  Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+  Cory Tusar <cory.tusar@pid1solutions.com>
+  Sanchayan Maity <maitysanchayan@gmail.com>
 
-Right, I already have a reworked version, which does the same and moves it
-back to verify_local_cpu_capabilities(). I will send it tomorrow.
+vf610-cosmic:
+  Cory Tusar <cory.tusar@pid1solutions.com>
+  Matt Porter <matt.porter@linaro.org>
+  Olof Johansson <olof@lixom.net>
+  Shawn Guo <shawnguo@kernel.org>
 
-Cheers
-Suzuki
+vf610-twr:
+  Bill Pringlemeir <bpringle@sympatico.ca>
+  Chao Fu <B44548@freescale.com>
+  Cory Tusar <cory.tusar@pid1solutions.com>
+  Cosmin Stoica <cosminstefan.stoica@freescale.com>
+  Fugang Duan <B38611@freescale.com>
+  Jingchang Lu <b35083@freescale.com>
+  Shawn Guo <shawnguo@kernel.org>
+  Xiubo Li <Li.Xiubo@freescale.com>
+
+CC: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+CC: Bill Pringlemeir <bpringle@sympatico.ca>
+CC: Chao Fu <B44548@freescale.com>
+CC: Cory Tusar <cory.tusar@pid1solutions.com>
+CC: Cosmin Stoica <cosminstefan.stoica@freescale.com>
+CC: Frank Li <Frank.Li@freescale.com>
+CC: Fugang Duan <B38611@freescale.com>
+CC: Huang Shijie <b32955@freescale.com>
+CC: Jingchang Lu <b35083@freescale.com>
+CC: Jingchang Lu <jingchang.lu@freescale.com>
+CC: Lucas Stach <l.stach@pengutronix.de>
+CC: Matt Porter <matt.porter@linaro.org>
+CC: Olof Johansson <olof@lixom.net>
+CC: Sanchayan Maity <maitysanchayan@gmail.com>
+CC: Shawn Guo <shawnguo@kernel.org>
+CC: Stephen Warren <swarren@wwwdotorg.org>
+CC: Xiubo Li <Li.Xiubo@freescale.com>
+CC: Yuan Yao <yao.yuan@freescale.com>
+
+Stefan Agner (4):
+  ARM: dts: vf610: relicense vf???.dtsi under GPLv2/X11
+  ARM: dts: vf610-colibri: relicense vf*colibri* under GPLv2/X11
+  ARM: dts: vf610-cosmic: relicense vf610-cosmic.dts under GPLv2/X11
+  ARM: dts: vf610-twr: relicense vf610-twr.dts under GPLv2/X11
+
+ arch/arm/boot/dts/vf-colibri-eval-v3.dtsi   | 40 ++++++++++++++++++++++++---
+ arch/arm/boot/dts/vf-colibri.dtsi           | 40 ++++++++++++++++++++++++---
+ arch/arm/boot/dts/vf500-colibri-eval-v3.dts | 40 ++++++++++++++++++++++++---
+ arch/arm/boot/dts/vf500-colibri.dtsi        | 40 ++++++++++++++++++++++++---
+ arch/arm/boot/dts/vf500.dtsi                | 40 ++++++++++++++++++++++++---
+ arch/arm/boot/dts/vf610-colibri-eval-v3.dts | 42 +++++++++++++++++++++++++----
+ arch/arm/boot/dts/vf610-colibri.dtsi        | 40 ++++++++++++++++++++++++---
+ arch/arm/boot/dts/vf610-cosmic.dts          | 40 ++++++++++++++++++++++++---
+ arch/arm/boot/dts/vf610-twr.dts             | 40 ++++++++++++++++++++++++---
+ arch/arm/boot/dts/vf610.dtsi                | 40 ++++++++++++++++++++++++---
+ arch/arm/boot/dts/vfxxx.dtsi                | 40 ++++++++++++++++++++++++---
+ 11 files changed, 397 insertions(+), 45 deletions(-)
+
+-- 
+2.6.2
