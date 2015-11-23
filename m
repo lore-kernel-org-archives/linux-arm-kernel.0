@@ -1,162 +1,86 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 Nov 2015 08:26:03 +0000
-Subject: [PATCH v2 2/7] platform-msi: Factor out allocation/free of private
- data
-In-Reply-To: <1448267168-17360-1-git-send-email-marc.zyngier@arm.com>
-References: <1448267168-17360-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1448267168-17360-3-git-send-email-marc.zyngier@arm.com>
+Date: Mon, 23 Nov 2015 08:26:01 +0000
+Subject: [PATCH v2 0/7] Adding core support for wire-MSI bridges
+Message-ID: <1448267168-17360-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we're going to have multiple paths to allocate/free the
-platform-msi private data, factor this out into separate
-utility functions.
+There seems to be a new class of interrupt controller out there whose
+sole purpose (apart from making everybody's life a nightmare) is to
+turn wired interrupts into MSIs (see [1] for a prime example of the
+what this actually is).
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/base/platform-msi.c | 94 +++++++++++++++++++++++++--------------------
- 1 file changed, 53 insertions(+), 41 deletions(-)
+Instead of considering that the MSIs allocated to a device are for the
+direct use of that device, we can turn this set of MSIs into a irq
+domain, and use this domain to back a stacked irqchip implemented by
+the device. When combined with a GICv3 and its ITS, we end-up with the
+following stack:
 
-diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
-index 6148c78..44b8c0d 100644
---- a/drivers/base/platform-msi.c
-+++ b/drivers/base/platform-msi.c
-@@ -189,21 +189,11 @@ struct irq_domain *platform_msi_create_irq_domain(struct fwnode_handle *fwnode,
- 	return domain;
- }
- 
--/**
-- * platform_msi_domain_alloc_irqs - Allocate MSI interrupts for @dev
-- * @dev:		The device for which to allocate interrupts
-- * @nvec:		The number of interrupts to allocate
-- * @write_msi_msg:	Callback to write an interrupt message for @dev
-- *
-- * Returns:
-- * Zero for success, or an error code in case of failure
-- */
--int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int nvec,
--				   irq_write_msi_msg_t write_msi_msg)
-+static struct platform_msi_priv_data *
-+platform_msi_alloc_priv_data(struct device *dev, unsigned int nvec,
-+			     irq_write_msi_msg_t write_msi_msg)
- {
--	struct platform_msi_priv_data *priv_data;
--	int err;
--
-+	struct platform_msi_priv_data *datap;
- 	/*
- 	 * Limit the number of interrupts to 256 per device. Should we
- 	 * need to bump this up, DEV_ID_SHIFT should be adjusted
-@@ -211,33 +201,62 @@ int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int nvec,
- 	 * capable devices).
- 	 */
- 	if (!dev->msi_domain || !write_msi_msg || !nvec || nvec > MAX_DEV_MSIS)
--		return -EINVAL;
-+		return ERR_PTR(-EINVAL);
- 
- 	if (dev->msi_domain->bus_token != DOMAIN_BUS_PLATFORM_MSI) {
- 		dev_err(dev, "Incompatible msi_domain, giving up\n");
--		return -EINVAL;
-+		return ERR_PTR(-EINVAL);
- 	}
- 
- 	/* Already had a helping of MSI? Greed... */
- 	if (!list_empty(dev_to_msi_list(dev)))
--		return -EBUSY;
-+		return ERR_PTR(-EBUSY);
-+
-+	datap = kzalloc(sizeof(*datap), GFP_KERNEL);
-+	if (!datap)
-+		return ERR_PTR(-ENOMEM);
-+
-+	datap->devid = ida_simple_get(&platform_msi_devid_ida,
-+				      0, 1 << DEV_ID_SHIFT, GFP_KERNEL);
-+	if (datap->devid < 0) {
-+		int err = datap->devid;
-+		kfree(datap);
-+		return ERR_PTR(err);
-+	}
- 
--	priv_data = kzalloc(sizeof(*priv_data), GFP_KERNEL);
--	if (!priv_data)
--		return -ENOMEM;
-+	datap->write_msg = write_msi_msg;
- 
--	priv_data->devid = ida_simple_get(&platform_msi_devid_ida,
--					  0, 1 << DEV_ID_SHIFT, GFP_KERNEL);
--	if (priv_data->devid < 0) {
--		err = priv_data->devid;
--		goto out_free_data;
--	}
-+	return datap;
-+}
-+
-+static void platform_msi_free_priv_data(struct platform_msi_priv_data *data)
-+{
-+	ida_simple_remove(&platform_msi_devid_ida, data->devid);
-+	kfree(data);
-+}
-+
-+/**
-+ * platform_msi_domain_alloc_irqs - Allocate MSI interrupts for @dev
-+ * @dev:		The device for which to allocate interrupts
-+ * @nvec:		The number of interrupts to allocate
-+ * @write_msi_msg:	Callback to write an interrupt message for @dev
-+ *
-+ * Returns:
-+ * Zero for success, or an error code in case of failure
-+ */
-+int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int nvec,
-+				   irq_write_msi_msg_t write_msi_msg)
-+{
-+	struct platform_msi_priv_data *priv_data;
-+	int err;
- 
--	priv_data->write_msg = write_msi_msg;
-+	priv_data = platform_msi_alloc_priv_data(dev, nvec, write_msi_msg);
-+	if (IS_ERR(priv_data))
-+		return PTR_ERR(priv_data);
- 
- 	err = platform_msi_alloc_descs(dev, nvec, priv_data);
- 	if (err)
--		goto out_free_id;
-+		goto out_free_priv_data;
- 
- 	err = msi_domain_alloc_irqs(dev->msi_domain, dev, nvec);
- 	if (err)
-@@ -247,10 +266,8 @@ int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int nvec,
- 
- out_free_desc:
- 	platform_msi_free_descs(dev, 0, nvec);
--out_free_id:
--	ida_simple_remove(&platform_msi_devid_ida, priv_data->devid);
--out_free_data:
--	kfree(priv_data);
-+out_free_priv_data:
-+	platform_msi_free_priv_data(priv_data);
- 
- 	return err;
- }
-@@ -261,16 +278,11 @@ out_free_data:
-  */
- void platform_msi_domain_free_irqs(struct device *dev)
- {
--	struct msi_desc *desc;
--
--	desc = first_msi_entry(dev);
--	if (desc) {
--		struct platform_msi_priv_data *data;
--
--		data = desc->platform.msi_priv_data;
-+	if (!list_empty(dev_to_msi_list(dev))) {
-+		struct msi_desc *desc;
- 
--		ida_simple_remove(&platform_msi_devid_ida, data->devid);
--		kfree(data);
-+		desc = first_msi_entry(dev);
-+		platform_msi_free_priv_data(desc->platform.msi_priv_data);
- 	}
- 
- 	msi_domain_free_irqs(dev->msi_domain, dev);
+              wire                MSI
+Client-device ----> Bridge-Device ----> Platform-MSI -> ITS -> GICv3
+
+where we have a 1:1 mapping between wired interrupts and MSIs.
+
+This requires some (slightly ugly) surgery in both the generic MSI and
+platform MSI layers, but the amount of code is actually relatively
+small (about +220 LoC so far).
+
+On top of that, we add a dummy driver for a such a bridge, hoping that
+this will give enough information to driver authors so that they can
+use this new feature. An even more stupid client driver is provided to
+show the interrupt stack allocation:
+
+     dummydev dummy-dev: Probing
+     dummydev dummy-dev: Allocated IRQ35
+     dummydev dummy-dev: Probing OK
+     dummydev dummy-dev: IRQ35 hwirq 5 domain msichip_domain_ops
+     dummydev dummy-dev: IRQ35 hwirq 0 domain msi_domain_ops
+     dummydev dummy-dev: IRQ35 hwirq 8192 domain its_domain_ops
+     dummydev dummy-dev: IRQ35 hwirq 8192 domain gic_irq_domain_ops
+
+Of course, it goes without saying that this last patch is not to be
+merged...
+
+While this does work, it is far from being perfect:
+
+- It relies on not declaring this bridge with IRQCHIP_DECLARE in order
+  to prevent the DT layer from allocating interrupts behind our back.
+
+- There are probe ordering issues between the bridge and the wired
+  interrupt device, leading to the use of -EPROBE_DEFER.
+
+The last two points could be addressed directly in the OF layer, as
+this is a generic device ordering issue (and people are already
+working on that).
+
+* From v1:
+  - Added the error handling that was completely absent from the original
+    prototype
+  - Allow interrupts to be freed
+  - Added API documentation
+  - Rebased on top of 4.4-rc1
+
+[1] https://lkml.org/lkml/2015/11/22/244
+
+Marc Zyngier (7):
+  platform-msi: Allow MSIs to be allocated in chunks
+  platform-msi: Factor out allocation/free of private data
+  irqdomain: Make irq_domain_alloc_irqs_recursive available
+  genirq/msi: Make the .prepare callback reusable
+  genirq/msi: Add msi_domain_populate_irqs
+  platform-msi: Allow creation of a MSI-based stacked irq domain
+  irqchip: [Example] dummy wired interrupt/MSI bridge driver
+
+ drivers/base/platform-msi.c   | 254 ++++++++++++++++++++++++++++++---------
+ drivers/irqchip/Kconfig       |   7 ++
+ drivers/irqchip/Makefile      |   1 +
+ drivers/irqchip/irq-msichip.c | 271 ++++++++++++++++++++++++++++++++++++++++++
+ include/linux/irqdomain.h     |   3 +
+ include/linux/msi.h           |  18 +++
+ kernel/irq/irqdomain.c        |   6 +-
+ kernel/irq/msi.c              |  58 ++++++++-
+ 8 files changed, 558 insertions(+), 60 deletions(-)
+ create mode 100644 drivers/irqchip/irq-msichip.c
+
 -- 
 2.1.4
