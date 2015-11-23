@@ -1,83 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 23 Nov 2015 15:51:32 +0000
+From: jlinton@redhat.com (Jeremy Linton)
+Date: Mon, 23 Nov 2015 10:02:02 -0600
 Subject: [PATCH] [PATCH] arm64: Boot failure on m400 with new cont PTEs
-In-Reply-To: <20151118162932.GA13355@leverpostej>
+In-Reply-To: <20151123155132.GC32300@e104818-lin.cambridge.arm.com>
 References: <1447858999-26665-1-git-send-email-jeremy.linton@arm.com>
  <20151118152044.GD10644@leverpostej> <564CA29A.9050905@arm.com>
  <20151118162932.GA13355@leverpostej>
-Message-ID: <20151123155132.GC32300@e104818-lin.cambridge.arm.com>
+ <20151123155132.GC32300@e104818-lin.cambridge.arm.com>
+Message-ID: <5653387A.2000101@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2015 at 04:29:32PM +0000, Mark Rutland wrote:
-> FWIW, Will had a patch [1] for detecting PTE level break-before-make
-> violations. I gave this a go on Juno with v4.4-rc1, and saw an issue in
-> the EFI virtmap code that I'm currently investigating.
-[...]
-> [1] https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/?h=aarch64/devel&id=372f39220ad35fa39a75419f2221ffeb6ffd78d3
+On 11/23/2015 09:51 AM, Catalin Marinas wrote:
+> Call trace:
+> [<ffffffc0000952b8>] __create_mapping.isra.5+0x360/0x530
+> [<ffffffc0000954ec>] fixup_init+0x64/0x80
+> [<ffffffc0000945a4>] free_initmem+0xc/0x38
+> [<ffffffc0005eb9f8>] kernel_init+0x20/0xe0
+> [<ffffffc000085c50>] ret_from_fork+0x10/0x40
+>
+> What I don't get is why we have fixup_init() even when
+> !CONFIG_DEBUG_RODATA. It probably breaks the initial mapping just to get
+> a non-executable init section. However, the other sections are left
+> executable when this config option is disabled. The patch below fixes
+> the warnings above:
 
-I thought about adding a check for when we change from contiguous to
-non-contiguous or vice-versa, on top of Will's patch:
+	Well the kernel permissions are a bit of a mess, and not at all 
+"secure" in their current state. But I guess the thought must have been 
+that turning off execute on the init sections was a good way to find 
+functions incorrectly marked _init(). Which is different from RO. 
+Frankly, I expect someone will push to cleanup the kernel permissions at 
+some point (I've got it on my "spare time todo, list"), but this will of 
+course make the create_mapping_late a lot more popular as I see it being 
+called during module load/unload.
+	Anyway, I've been saying the problem is create_mapping_late() all 
+along, as you notice there isn't any TLB flushes in fixup_init() and 
+that is the core of the problem, not all this other discussion.
 
---------------8<--------------------
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index defbfde43a43..70e02e3b1a78 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -240,6 +240,10 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
- 	if (WARN_ON((old & PTE_ATTRINDX_MASK) != (new & PTE_ATTRINDX_MASK)))
- 		goto pte_bad;
- 
-+	/* Changing contiguity may lead to a TLB conflict */
-+	if (WARN_ON((old & PTE_CONT) != (new & PTE_CONT)))
-+		goto pte_bad;
-+
- 	/* Change of OA is only an issue if one mapping is writable */
- 	if (!(old & new & PTE_RDONLY) &&
- 	    WARN_ON(pte_pfn(*ptep) != pte_pfn(pte)))
---------------8<--------------------
+> Jeremy, can you give this fixup_init() patch a try, see whether it makes
+> any difference (it's just a temporary hack which may prevent us from
+> reverting the PTE_CONT patches until we have a better solution).
 
-But it doesn't look nice afterwards. It's the fixup_init() trying to
-re-write the entries and we start changing the PTE_CONT bit:
-
-Call trace:
-[<ffffffc0000952b8>] __create_mapping.isra.5+0x360/0x530
-[<ffffffc0000954ec>] fixup_init+0x64/0x80
-[<ffffffc0000945a4>] free_initmem+0xc/0x38
-[<ffffffc0005eb9f8>] kernel_init+0x20/0xe0
-[<ffffffc000085c50>] ret_from_fork+0x10/0x40
-
-What I don't get is why we have fixup_init() even when
-!CONFIG_DEBUG_RODATA. It probably breaks the initial mapping just to get
-a non-executable init section. However, the other sections are left
-executable when this config option is disabled. The patch below fixes
-the warnings above:
-
---------------8<--------------------
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index abb66f84d4ac..e0f82e1a1c09 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -482,9 +482,11 @@ void mark_rodata_ro(void)
- 
- void fixup_init(void)
- {
-+#ifdef CONFIG_DEBUG_RODATA
- 	create_mapping_late(__pa(__init_begin), (unsigned long)__init_begin,
- 			(unsigned long)__init_end - (unsigned long)__init_begin,
- 			PAGE_KERNEL);
-+#endif
- }
- 
- /*
---------------8<--------------------
-
-Jeremy, can you give this fixup_init() patch a try, see whether it makes
-any difference (it's just a temporary hack which may prevent us from
-reverting the PTE_CONT patches until we have a better solution).
-
-Anyway, I think we should merge Will's patch since it's a handy debug
-tool.
-
--- 
-Catalin
+I will try it, but i'm pretty sure that fixes it too.
