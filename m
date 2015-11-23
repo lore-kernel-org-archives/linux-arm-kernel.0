@@ -1,53 +1,46 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 23 Nov 2015 13:38:37 +0100
-Subject: [PATCH v2 4/5] dt-bindings: document sun8i_ths
-In-Reply-To: <20e229f191031b0b0bff96dee118d1f2d988d7b3.1448263428.git.atx@atx.name>
-References: <cover.1448263428.git.atx@atx.name>
- <20e229f191031b0b0bff96dee118d1f2d988d7b3.1448263428.git.atx@atx.name>
-Message-ID: <20151123123837.GV32142@lukather>
+From: nyushchenko@dev.rtsoft.ru (Nikita Yushchenko)
+Date: Mon, 23 Nov 2015 15:42:02 +0300
+Subject: [RFC/PATCH] arm: do not skip SMP init calls on SMP_ON_UP case
+In-Reply-To: <56530769.4030403@arm.com>
+References: <1448279946-19975-1-git-send-email-nyushchenko@dev.rtsoft.ru>
+ <20151123120317.GN8644@n2100.arm.linux.org.uk>
+ <5653015C.4020405@dev.rtsoft.ru> <56530769.4030403@arm.com>
+Message-ID: <5653099A.7020604@dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Nov 23, 2015 at 09:02:51AM +0100, Josef Gajdusek wrote:
-> This patch adds the binding documentation for the sun8i_ths driver
+>>>> While running an imx6s boasrd, I got following message in boot log:
+>>>>
+>>>> [    0.032414] CPU1: failed to boot: -38
+>>>>
+>>>> This looked strange: imx6s is singe-core and kernel perfectly knows
+>>>> that. However, for some reason it tries to initialize CPU 1?
+>>>>
+>>>> I found this to be caused by
+>>>> - CONFIG_SMP_ON_UP successfully detects that system is single core,
+>>>> - this causes is_smp() to return false,
+>>>> - this causes setup_arch() to skip smp_init_cpus() call,
+>>>> - this skips board-specific code that sets cpu_possible mask.
+>>>
+>>> Right, so you should end up with the possible and present masks
+>>> containing just one CPU, which should prevent the kernel trying to
+>>> bring any secondary CPUs online.
+>>
+>> Kernel that is running here still tries to init CPU 1 for some reason.
 > 
-> Signed-off-by: Josef Gajdusek <atx@atx.name>
-> ---
->  .../devicetree/bindings/thermal/sun8i-ths.txt      | 31 ++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/thermal/sun8i-ths.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/thermal/sun8i-ths.txt b/Documentation/devicetree/bindings/thermal/sun8i-ths.txt
-> new file mode 100644
-> index 0000000..67056bf
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/thermal/sun8i-ths.txt
-> @@ -0,0 +1,31 @@
-> +* sun8i THS
-> +
-> +Required properties:
-> +- compatible : "allwinner,sun8i-h3-ths"
-> +- reg : Address range of the thermal registers and location of the calibration
-> +        value
-> +- resets : Must contain an entry for each entry in reset-names.
-> +           see ../reset/reset.txt for details
-> +- reset-names : Must include the name "ahb"
+> I *guess* cpus node [1] in your dts has more than one cpu entry, could
+> you check please?
 
-If you have a single reset line, you don't need reset-names.
+Indeed looks so:
 
-Thanks!
-Maxime
+# ls /proc/device-tree/cpus
+#address-cells  #size-cells  cpu at 0  cpu at 1  name
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151123/fc2cf61a/attachment.sig>
+But my custom device tree just includes imx6dl.dtsi
+
+So it is imx6dl.dtsi in linux-imx tree broken?..
+
+
+Still, if I apply change from the patch, issue diappears, since in this
+case imx_smp_init_cpus() gets called and initializes possible_cpu mask
+properly.
