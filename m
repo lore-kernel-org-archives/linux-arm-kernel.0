@@ -1,27 +1,75 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 23 Nov 2015 09:57:46 +0800
-Subject: [RESEND PATCH v2 1/2] ARM: imx6: set ahb-burst-config as 0 for USB
-In-Reply-To: <20151123005304.GA13744@tiger>
-References: <1443579437-845-1-git-send-email-peter.chen@freescale.com>
- <20151123005304.GA13744@tiger>
-Message-ID: <20151123015745.GA16321@shlinux2>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sun, 22 Nov 2015 21:28:22 -0500
+Subject: [PATCH V7 0/3] dma: add Qualcomm Technologies HIDMA driver
+Message-ID: <1448245707-27499-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2015 at 08:53:04AM +0800, Shawn Guo wrote:
-> On Wed, Sep 30, 2015 at 10:17:16AM +0800, Peter Chen wrote:
-> > After setting ahb burst configuration as 0, we can increase tx/rx
-> > burst size, it will improve the USB performance
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> 
-> Should I queue these patches for v4.4-rc as fixes or v4.5-rc1 as
-> improvement?
-> 
+The Qualcomm Technologies HIDMA device has been designed
+to support virtualization technology. The driver has been
+divided into two to follow the hardware design.
 
-Queue them for v4.5-rc1 please. 
+1. HIDMA Management driver
+2. HIDMA Channel driver
+
+Each HIDMA HW consists of multiple channels. These channels
+share some set of common parameters. These parameters are
+initialized by the management driver during power up.
+Same management driver is used for monitoring the execution
+of the channels. Management driver can change the performance
+behavior dynamically such as bandwidth allocation and
+prioritization in the future.
+
+The management driver is executed in hypervisor context and
+is the main management entity for all channels provided by
+the device.
+
+Changes from V6: (https://lkml.org/lkml/2015/11/22/111)
+* none
+
+Changes from V6: (https://lkml.org/lkml/2015/11/22/112)
+* remove extra _ in documentation
+* remove extra parenthesis in assignments
+* create subdirectories for channels in sysfs
+
+Changes from V6: (https://lkml.org/lkml/2015/11/22/113)
+* remove extra parenthesis
+
+Sinan Kaya (3):
+  dma: qcom_bam_dma: move to qcom directory
+  dma: add Qualcomm Technologies HIDMA management driver
+  dma: add Qualcomm Technologies HIDMA channel driver
+
+ .../ABI/testing/sysfs-platform-hidma-mgmt          |  97 +++
+ .../devicetree/bindings/dma/qcom_hidma.txt         |  18 +
+ .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  61 ++
+ drivers/dma/Kconfig                                |  11 +-
+ drivers/dma/Makefile                               |   2 +-
+ drivers/dma/qcom/Kconfig                           |  29 +
+ drivers/dma/qcom/Makefile                          |   4 +
+ drivers/dma/{qcom_bam_dma.c => qcom/bam_dma.c}     |   4 +-
+ drivers/dma/qcom/hidma.c                           | 706 ++++++++++++++++
+ drivers/dma/qcom/hidma.h                           | 157 ++++
+ drivers/dma/qcom/hidma_dbg.c                       | 217 +++++
+ drivers/dma/qcom/hidma_ll.c                        | 924 +++++++++++++++++++++
+ drivers/dma/qcom/hidma_mgmt.c                      | 308 +++++++
+ drivers/dma/qcom/hidma_mgmt.h                      |  39 +
+ drivers/dma/qcom/hidma_mgmt_sys.c                  | 299 +++++++
+ 15 files changed, 2864 insertions(+), 12 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-platform-hidma-mgmt
+ create mode 100644 Documentation/devicetree/bindings/dma/qcom_hidma.txt
+ create mode 100644 Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+ create mode 100644 drivers/dma/qcom/Kconfig
+ create mode 100644 drivers/dma/qcom/Makefile
+ rename drivers/dma/{qcom_bam_dma.c => qcom/bam_dma.c} (99%)
+ create mode 100644 drivers/dma/qcom/hidma.c
+ create mode 100644 drivers/dma/qcom/hidma.h
+ create mode 100644 drivers/dma/qcom/hidma_dbg.c
+ create mode 100644 drivers/dma/qcom/hidma_ll.c
+ create mode 100644 drivers/dma/qcom/hidma_mgmt.c
+ create mode 100644 drivers/dma/qcom/hidma_mgmt.h
+ create mode 100644 drivers/dma/qcom/hidma_mgmt_sys.c
 
 -- 
-
-Best Regards,
-Peter Chen
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
