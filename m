@@ -1,59 +1,99 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 23 Nov 2015 11:04:05 +0800
-Subject: [PATCH 2/3] ARM: dts: vf610: fix clock definition for SAI2
-In-Reply-To: <1445141122-14183-2-git-send-email-stefan@agner.ch>
-References: <1445141122-14183-1-git-send-email-stefan@agner.ch>
- <1445141122-14183-2-git-send-email-stefan@agner.ch>
-Message-ID: <20151123030405.GC13744@tiger>
+From: majun258@huawei.com (MaJun)
+Date: Mon, 23 Nov 2015 11:15:10 +0800
+Subject: [PATCH v9 1/4] dt-binding:Documents of the mbigen bindings
+In-Reply-To: <1448248513-39760-1-git-send-email-majun258@huawei.com>
+References: <1448248513-39760-1-git-send-email-majun258@huawei.com>
+Message-ID: <1448248513-39760-2-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 17, 2015 at 09:05:21PM -0700, Stefan Agner wrote:
-> So far, only the bus clock has been assigned, but in reality the
-> SAI IP has for clock inputs. The driver has been updated to
+From: Ma Jun <majun258@huawei.com>
 
-s/for/four
+Add the mbigen msi interrupt controller bindings document.
 
-Will fix it up when applying.
+This patch based on Mark Rutland's patch
+https://lkml.org/lkml/2015/7/23/558
 
-Shawn
+Signed-off-by: Ma Jun <majun258@huawei.com>
+---
+ Documentation/devicetree/bindings/arm/mbigen.txt |   69 ++++++++++++++++++++++
+ 1 files changed, 69 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mbigen.txt
 
-> make use of the additional clock inputs by c3ecef21c3f2 ("ASoC:
-> fsl_sai: add sai master mode support"). Due to a bug in the
-> clock tree, the audio clock has been enabled none the less by
-> the specified bus clock (see "ARM: imx: clk-vf610: fix SAI
-> clock tree"), which made master mode even without the proper
-> clock assigned working.
-> 
-> This patch completes the clock definition for SAI2. On Vybrid,
-> only two MCLK out of the four options are available (the first
-> being the bus clock itself). See chapter 8.10.1.2.3 of the
-> Vybrid Reference manual ("SAI transmitter and receiver options
-> for MCLK selection"). Note: The audio clocks are only required
-> in master mode.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  arch/arm/boot/dts/vfxxx.dtsi | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-> index 6865137..c2a4d1c 100644
-> --- a/arch/arm/boot/dts/vfxxx.dtsi
-> +++ b/arch/arm/boot/dts/vfxxx.dtsi
-> @@ -178,8 +178,10 @@
->  				compatible = "fsl,vf610-sai";
->  				reg = <0x40031000 0x1000>;
->  				interrupts = <86 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&clks VF610_CLK_SAI2>;
-> -				clock-names = "sai";
-> +				clocks = <&clks VF610_CLK_SAI2>,
-> +					<&clks VF610_CLK_SAI2_DIV>,
-> +					<&clks 0>, <&clks 0>;
-> +				clock-names = "bus", "mclk1", "mclk2", "mclk3";
->  				dma-names = "tx", "rx";
->  				dmas = <&edma0 0 21>,
->  					<&edma0 0 20>;
-> -- 
-> 2.6.1
-> 
+diff --git a/Documentation/devicetree/bindings/arm/mbigen.txt b/Documentation/devicetree/bindings/arm/mbigen.txt
+new file mode 100644
+index 0000000..8ae59a9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mbigen.txt
+@@ -0,0 +1,69 @@
++Hisilicon mbigen device tree bindings.
++=======================================
++
++Mbigen means: message based interrupt generator.
++
++MBI is kind of msi interrupt only used on Non-PCI devices.
++
++To reduce the wired interrupt number connected to GIC,
++Hisilicon designed mbigen to collect and generate interrupt.
++
++
++Non-pci devices can connect to mbigen and generate the
++interrupt by writing ITS register.
++
++The mbigen chip and devices connect to mbigen have the following properties:
++
++Mbigen main node required properties:
++-------------------------------------------
++- compatible: Should be "hisilicon,mbigen-v2"
++- reg: Specifies the base physical address and size of the Mbigen
++  registers.
++- interrupt controller: Identifies the node as an interrupt controller
++- msi-parent: This property has two cells.
++	The 1st cell specifies the ITS this device connected.
++	The 2nd cell specifies the device id.
++- num-msis:Specifies the total number of interrupt this device has.
++- #interrupt-cells : Specifies the number of cells needed to encode an
++  interrupt source. The value must be 2.
++
++  The 1st cell is global hardware pin number of the interrupt.
++	This value depends on the Soc design.
++
++  The 2nd cell is the interrupt trigger type.
++	The value of this cell should be:
++	1: rising edge triggered
++	or
++	4: high level triggered	
++
++Examples:
++
++ 	mbigen_device_gmac:intc {
++			compatible = "hisilicon,mbigen-v2";
++			reg = <0x0 0xc0080000 0x0 0x10000>;
++			interrupt-controller;
++			msi-parent = <&its_dsa 0x40b1c>;
++			num-msis = <9>;
++			#interrupt-cells = <2>;
++ 	};
++
++Devices connect to mbigen required properties:
++----------------------------------------------------
++-interrupt-parent: Specifies the mbigen device node which device connected.
++-interrupts:specifies the interrupt source.
++  The 1st cell is global hardware pin number of the interrupt.
++		This value depends on the Soc design.
++  The 2nd cell is the interrupt trigger type(rising edge triggered or high
++		level triggered)
++
++Examples:
++	gmac0: ethernet at c2080000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0 0xc2080000 0 0x20000>,
++		      <0 0xc0000000 0 0x1000>;
++		interrupt-parent  = <&mbigen_device_gmac>;
++		interrupts =	<656 1>,
++				<657 1>;
++	};
++
+-- 
+1.7.1
