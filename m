@@ -1,22 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Nov 2015 16:16:42 +0900
-Subject: [PATCH 0/2] ARM: shmobile: alt: Correct pfc
-Message-ID: <1448263004-14548-1-git-send-email-horms+renesas@verge.net.au>
+Date: Mon, 23 Nov 2015 16:16:43 +0900
+Subject: [PATCH 1/2] ARM: shmobile: alt: Correct scif2 pfc
+In-Reply-To: <1448263004-14548-1-git-send-email-horms+renesas@verge.net.au>
+References: <1448263004-14548-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1448263004-14548-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 0c9400fab882 ("Merge branch 'heads/dt-for-v4.5' into next") introduced
 pfc pins to the alt device tree but did not reference them. This patch
-set addresses that and other deficiencies in that patch.
+fixes scif2 pfc by adding references to the scif2 pins.
 
-Written and tested against renesas-next-20151118-v4.4-rc1
+Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7794-alt.dts | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Simon Horman (2):
-  ARM: shmobile: alt: Correct scif2 pfc
-  ARM: shmobile: alt: Correct ether pfc
-
- arch/arm/boot/dts/r8a7794-alt.dts | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
+index fd1cfcdd65ef..412eb7ad86db 100644
+--- a/arch/arm/boot/dts/r8a7794-alt.dts
++++ b/arch/arm/boot/dts/r8a7794-alt.dts
+@@ -182,5 +182,8 @@
+ };
+ 
+ &scif2 {
++	pinctrl-0 = <&scif2_pins>;
++	pinctrl-names = "default";
++
+ 	status = "okay";
+ };
 -- 
 2.1.4
