@@ -1,18 +1,71 @@
-From: jlinton@redhat.com (Jeremy Linton)
-Date: Mon, 23 Nov 2015 10:42:58 -0600
-Subject: [PATCH] [PATCH] arm64: Boot failure on m400 with new cont PTEs
-In-Reply-To: <565340C9.7010605@labbott.name>
-References: <1447858999-26665-1-git-send-email-jeremy.linton@arm.com>
- <20151118152044.GD10644@leverpostej> <564CA29A.9050905@arm.com>
- <20151118162932.GA13355@leverpostej>
- <20151123155132.GC32300@e104818-lin.cambridge.arm.com>
- <5653387A.2000101@redhat.com> <565340C9.7010605@labbott.name>
-Message-ID: <56534212.3000302@redhat.com>
+From: afd@ti.com (Andrew F. Davis)
+Date: Mon, 23 Nov 2015 10:44:22 -0600
+Subject: [PATCH] power: bq27xxx_battery: avoid unused function warnings
+In-Reply-To: <4421924.EN5kWY38Jp@wuerfel>
+References: <4421924.EN5kWY38Jp@wuerfel>
+Message-ID: <56534266.4060708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23/2015 10:37 AM, Laura Abbott wrote:
-> Which permissions still need to be cleaned up from your perspective?
+On 11/23/2015 07:42 AM, Arnd Bergmann wrote:
+> We can configure the bq27xxx_battery driver with neither the I2C
+> nor the platform driver backends, which leaves out all references
+> to some of the symbols, causing a couple of warnings in many
+> randconfig builds:
+>
+> drivers/power/bq27xxx_battery.c:288:12: warning: 'bq27xxx_regs' defined but not used [-Wunused-variable]
+> drivers/power/bq27xxx_battery.c:994:12: warning: 'bq27xxx_powersupply_init' defined but not used [-Wunused-function]
+> drivers/power/bq27xxx_battery.c:1029:13: warning: 'bq27xxx_powersupply_unregister' defined but not used [-Wunused-function]
+>
+> I first tried replacing the existing #ifdefs with if(IS_ENABLED()
+> statements, but that failed because the i2c framework does not
+> declare functions when they are left out of the kernel.
+>
+> This just marks the unused functions as __maybe_unused, which is
+> a correct description here. A better fix would be to restructure
+> the driver into separate files and only build the common parts
+> if at least one of the two bus specific drivers is enabled, but
+> that requires much more work and testing on real hardware.
+>
+> For the time being, my simpler change at least avoids the warnings.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>
+> diff --git a/drivers/power/bq27xxx_battery.c b/drivers/power/bq27xxx_battery.c
+> index 880233ce9343..6c3a447f378b 100644
+> --- a/drivers/power/bq27xxx_battery.c
+> +++ b/drivers/power/bq27xxx_battery.c
+> @@ -285,7 +285,7 @@ static u8 bq27421_regs[] = {
+>   	0x18,	/* AP		*/
+>   };
+>
+> -static u8 *bq27xxx_regs[] = {
+> +static u8 *bq27xxx_regs[] __maybe_unused = {
+>   	[BQ27000] = bq27000_regs,
+>   	[BQ27010] = bq27010_regs,
+>   	[BQ27500] = bq27500_regs,
+> @@ -991,7 +991,7 @@ static void bq27xxx_external_power_changed(struct power_supply *psy)
+>   	schedule_delayed_work(&di->work, 0);
+>   }
+>
+> -static int bq27xxx_powersupply_init(struct bq27xxx_device_info *di,
+> +static int __maybe_unused bq27xxx_powersupply_init(struct bq27xxx_device_info *di,
+>   				    const char *name)
+>   {
+>   	int ret;
+> @@ -1026,7 +1026,7 @@ static int bq27xxx_powersupply_init(struct bq27xxx_device_info *di,
+>   	return 0;
+>   }
+>
+> -static void bq27xxx_powersupply_unregister(struct bq27xxx_device_info *di)
+> +static void __maybe_unused bq27xxx_powersupply_unregister(struct bq27xxx_device_info *di)
+>   {
+>   	/*
+>   	 * power_supply_unregister call bq27xxx_battery_get_property which
+>
 
-IMHO, the vast majority of the linear map should not be 
-executable/read/write, which is what happens today.
+The current organization of this driver has caused a lot of problems like this,
+it has been discussed that it should just be re-organized before. I went ahead
+and finally did this, I'll push the patch here in a bit, should take care of this and
+several other issues.
