@@ -1,77 +1,109 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 23 Nov 2015 11:33:13 -0700
-Subject: [RESEND PATCH V4 21/26] coresight: introducing a global trace ID
- function
+Date: Mon, 23 Nov 2015 11:33:16 -0700
+Subject: [RESEND PATCH V4 24/26] perf tools: adding perf_session to
+ *info_prive_size()
 In-Reply-To: <1448303598-11249-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1448303598-11249-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1448303598-11249-22-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1448303598-11249-25-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TraceID values have to be unique for all tracers and
-consistent between drivers and user space.  As such
-introducing a central function to be used whenever a
-traceID value is required.
+On some architecture the size of the private header may
+be dependent on the number of tracers used in the session.  As
+such adding a "struct perf_session" parameter, which should
+contain all the required information.
 
-The patch also account for data traceIDs, which are usually
-I(N) + 1.
+Also adjusting the existing client of the interface to take
+the new parameter into account.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm3x.c |  7 ++-----
- include/linux/coresight-pmu.h                 | 12 ++++++++++++
- 2 files changed, 14 insertions(+), 5 deletions(-)
+ tools/perf/arch/x86/util/intel-bts.c | 4 +++-
+ tools/perf/arch/x86/util/intel-pt.c  | 4 +++-
+ tools/perf/util/auxtrace.c           | 7 ++++---
+ tools/perf/util/auxtrace.h           | 6 ++++--
+ 4 files changed, 14 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index c07b7d3eee86..ebd569986bd4 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -27,6 +27,7 @@
- #include <linux/cpu.h>
- #include <linux/of.h>
- #include <linux/coresight.h>
-+#include <linux/coresight-pmu.h>
- #include <linux/amba/bus.h>
- #include <linux/seq_file.h>
- #include <linux/uaccess.h>
-@@ -784,11 +785,7 @@ static void etm_init_arch_data(void *info)
+diff --git a/tools/perf/arch/x86/util/intel-bts.c b/tools/perf/arch/x86/util/intel-bts.c
+index 9b94ce520917..6efdc5e86d97 100644
+--- a/tools/perf/arch/x86/util/intel-bts.c
++++ b/tools/perf/arch/x86/util/intel-bts.c
+@@ -60,7 +60,9 @@ struct branch {
+ 	u64 misc;
+ };
  
- static void etm_init_trace_id(struct etm_drvdata *drvdata)
+-static size_t intel_bts_info_priv_size(struct auxtrace_record *itr __maybe_unused)
++static size_t
++intel_bts_info_priv_size(struct auxtrace_record *itr __maybe_unused,
++			 struct perf_session *session __maybe_unused)
  {
--	/*
--	 * A trace ID of value 0 is invalid, so let's start at some
--	 * random value that fits in 7 bits and go from there.
--	 */
--	drvdata->traceid = 0x10 + drvdata->cpu;
-+	drvdata->traceid = coresight_get_trace_id(drvdata->cpu);
+ 	return INTEL_BTS_AUXTRACE_PRIV_SIZE;
+ }
+diff --git a/tools/perf/arch/x86/util/intel-pt.c b/tools/perf/arch/x86/util/intel-pt.c
+index 2ca10d796c0b..1fd9a16f668c 100644
+--- a/tools/perf/arch/x86/util/intel-pt.c
++++ b/tools/perf/arch/x86/util/intel-pt.c
+@@ -273,7 +273,9 @@ intel_pt_pmu_default_config(struct perf_pmu *intel_pt_pmu)
+ 	return attr;
  }
  
- static int etm_probe(struct amba_device *adev, const struct amba_id *id)
-diff --git a/include/linux/coresight-pmu.h b/include/linux/coresight-pmu.h
-index 6c5386b23b10..7d410260661b 100644
---- a/include/linux/coresight-pmu.h
-+++ b/include/linux/coresight-pmu.h
-@@ -19,9 +19,21 @@
- #define _LINUX_CORESIGHT_PMU_H
+-static size_t intel_pt_info_priv_size(struct auxtrace_record *itr __maybe_unused)
++static size_t
++intel_pt_info_priv_size(struct auxtrace_record *itr __maybe_unused,
++			struct perf_session *session __maybe_unused)
+ {
+ 	return INTEL_PT_AUXTRACE_PRIV_SIZE;
+ }
+diff --git a/tools/perf/util/auxtrace.c b/tools/perf/util/auxtrace.c
+index a980e7c50ee0..430df9575dbe 100644
+--- a/tools/perf/util/auxtrace.c
++++ b/tools/perf/util/auxtrace.c
+@@ -478,10 +478,11 @@ void auxtrace_heap__pop(struct auxtrace_heap *heap)
+ 			 heap_array[last].ordinal);
+ }
  
- #define CORESIGHT_ETM_PMU_NAME "cs_etm"
-+#define CORESIGHT_ETM_PMU_SEED  0x10
+-size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr)
++size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr,
++				       struct perf_session *session)
+ {
+ 	if (itr)
+-		return itr->info_priv_size(itr);
++		return itr->info_priv_size(itr, session);
+ 	return 0;
+ }
  
- /* ETMv3.5/PTM's ETMCR config bit */
- #define ETM_OPT_CYCACC  12
- #define ETM_OPT_TS      28
+@@ -852,7 +853,7 @@ int perf_event__synthesize_auxtrace_info(struct auxtrace_record *itr,
+ 	int err;
  
-+static inline int coresight_get_trace_id(int cpu)
-+{
-+	/*
-+	 * A trace ID of value 0 is invalid, so let's start at some
-+	 * random value that fits in 7 bits and go from there.  Since
-+	 * the common convention is to have data trace IDs be I(N) + 1,
-+	 * set instruction trace IDs as a function of the CPU number.
-+	 */
-+	return (CORESIGHT_ETM_PMU_SEED + (cpu * 2));
-+}
-+
- #endif
+ 	pr_debug2("Synthesizing auxtrace information\n");
+-	priv_size = auxtrace_record__info_priv_size(itr);
++	priv_size = auxtrace_record__info_priv_size(itr, session);
+ 	ev = zalloc(sizeof(struct auxtrace_info_event) + priv_size);
+ 	if (!ev)
+ 		return -ENOMEM;
+diff --git a/tools/perf/util/auxtrace.h b/tools/perf/util/auxtrace.h
+index bf72b77a588a..d76177169484 100644
+--- a/tools/perf/util/auxtrace.h
++++ b/tools/perf/util/auxtrace.h
+@@ -289,7 +289,8 @@ struct auxtrace_record {
+ 	int (*recording_options)(struct auxtrace_record *itr,
+ 				 struct perf_evlist *evlist,
+ 				 struct record_opts *opts);
+-	size_t (*info_priv_size)(struct auxtrace_record *itr);
++	size_t (*info_priv_size)(struct auxtrace_record *itr,
++				 struct perf_session *session);
+ 	int (*info_fill)(struct auxtrace_record *itr,
+ 			 struct perf_session *session,
+ 			 struct auxtrace_info_event *auxtrace_info,
+@@ -425,7 +426,8 @@ int auxtrace_parse_snapshot_options(struct auxtrace_record *itr,
+ int auxtrace_record__options(struct auxtrace_record *itr,
+ 			     struct perf_evlist *evlist,
+ 			     struct record_opts *opts);
+-size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr);
++size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr,
++				       struct perf_session *session);
+ int auxtrace_record__info_fill(struct auxtrace_record *itr,
+ 			       struct perf_session *session,
+ 			       struct auxtrace_info_event *auxtrace_info,
 -- 
 1.9.1
