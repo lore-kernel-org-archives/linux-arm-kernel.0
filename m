@@ -1,69 +1,71 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Nov 2015 22:19:21 +0100
-Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
- functions
-In-Reply-To: <20151123203847.GB19156@codeaurora.org>
-References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
- <105706554.vF12QZslMx@wuerfel> <20151123203847.GB19156@codeaurora.org>
-Message-ID: <133921941.Qfq59EaTOs@wuerfel>
+Date: Mon, 23 Nov 2015 22:30:56 +0100
+Subject: [RFC] asm-generic: default BUG_ON(x) to "if(x) BUG()"
+In-Reply-To: <20151123211748.GA30660@x>
+References: <5868782.RxZY0W5S4d@wuerfel> <4102055.db40h1joXM@wuerfel>
+ <20151123211748.GA30660@x>
+Message-ID: <4745584.7EJGtZoN8U@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 November 2015 12:38:47 Stephen Boyd wrote:
-> On 11/23, Arnd Bergmann wrote:
-> > On Monday 23 November 2015 09:14:39 Christopher Covington wrote:
-> > > On 11/23/2015 03:15 AM, Arnd Bergmann wrote:
-> > > LPAE is only supported in the Krait 450.
+On Monday 23 November 2015 13:17:48 Josh Triplett wrote:
+> > not sure where I can find tinyconfig,
+> 
+> "make tinyconfig" in the standard kernel tree.  It turns on a few
+> options that make the kernel even smaller.
+
+I should learn how that works. We have way too many configuration
+files on ARM and it would be nice to use Kconfig fragments to
+simplify it a little for things like enabling LPAE or big-endian.
+The kernelci.org folks do that already, but it's not in mainline.
+
+FWIW, on tinyconfig, the __modver section remains at 1784 with or
+without my patch, and the size difference with my patch applied
+is down to 5412 bytes mostly in .text, around 0.50% of the total size.
+
+> > this is what I get for ARM allnoconfig
+> > (only totals, let me know if you need more details):
+> > 
+> > original:             961307
+> > patched:              969167 (+0.82%)
+> > CONFIG_BUG:           994695 (+3.36%)
+> 
+> "patched" here represents allnoconfig with your patch added, but with
+> CONFIG_BUG still turned off?
+
+Correct.
+
+> Doesn't seem too bad.  Rather large, but I think we ought to fix the
+> problem by 1) reducing the number of uses of BUG_ON in the kernel, and
+> 2) compiling out more bits of the kernel entirely, including their calls
+> to BUG_ON.  Eliminating a class of warnings that cause people grief when
+> trying to build and contribute to tiny kernels seems worth it, at least
+> for now.
+
+Ok
+
+> > > >  #ifndef HAVE_ARCH_BUG_ON
+> > > > -#define BUG_ON(condition) do { if (condition) ; } while (0)
+> > > > +#define BUG_ON(condition) do { if (condition) BUG(); } while (0)
 > > > 
-> > > http://www.anandtech.com/show/7537/qualcomms-snapdragon-805-25ghz-128bit-memory-interface-d3d11class-graphics-more
+> > > This makes BUG_ON in the !CONFIG_BUG case almost identical to the
+> > > CONFIG_BUG=y case, except for the use of unlikely(condition), which this
+> > > ought to do as well.
 > > > 
-> > > I'm pretty sure idiv support came earlier, but I don't have the
-> > > specifics on hand.
+> > > Given that, could you pull the definition *out* of the #ifdef/#else for
+> > > CONFIG_BUG entirely, and define it the same way in both cases?
 > > 
-> > I have seen that article, but didn't trust it as a canonical
-> > source of information here.
-> > 
-> > If you can confirm that it's right, that would mean that we
-> > don't support LPAE on mach-qcom, as the only SoC with Krait 450
-> > seems to be APQ8084, and mainline Linux doesn't run on that.
+> > Yes, I thought about that already and decided to keep the patch simple
+> > instead. I can do that of course once we get consensus on the general
+> > approach.
 > 
-> arch/arm/boot/dts/qcom-apq8084.dtsi exists in the mainline
-> kernel. We support more than what's in the Kconfig language
-> under mach-qcom.
-
-Ok, cool. I'm sometimes confused by the model numbers, could you
-do a separate patch to update the Kconfig help text?
-
-> And yes LPAE is supported by apq8084 (as is
-> IDIV). Here's the /proc/cpuinfo on that device.
-> # cat /proc/cpuinfo
-> processor       : 0
-> model name      : ARMv7 Processor rev 1 (v7l)
-> BogoMIPS        : 38.40
-> Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm
-
-Ok.
-
-> > The ones we do support are MSM8x60 (Scorpion), MSM8960
-> > (Krait-without-number),and MSM7874 (Krait 400). Do those all
-> > support IDIV but not LPAE?
-> > 
+> Looking at the thread, I think you have it at this point.
 > 
-> Krait supports IDIV for all versions. Scorpion doesn't support
-> IDIV or lpae. Here's the output of /proc/cpuinfo on that device. 
-> 
-> # cat /proc/cpuinfo
-> processor       : 0
-> model name      : ARMv7 Processor rev 2 (v7l)
-> BogoMIPS        : 13.50
-> Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpd32
-> CPU implementer : 0x51
-> CPU architecture: 7
-> CPU variant     : 0x0
-> CPU part        : 0x02d
-> CPU revision    : 2
+> And personally I value simplicity of the patched code over simplicity of
+> the patch. 
 
-Ok, that leaves just one missing puzzle piece: can you confirm that
-no supported Krait variant other than Krait 450 / apq8084 has LPAE?
+Ok, I'll prepare an updated version with that change.
 
-	Arnd 
+Thanks,
+
+	Arnd
