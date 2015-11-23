@@ -1,90 +1,60 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 23 Nov 2015 11:09:11 +0000
-Subject: [PATCHv3] arm64: efi: correctly map runtime regions
-Message-ID: <1448276951-13335-1-git-send-email-mark.rutland@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 23 Nov 2015 12:14:58 +0100
+Subject: [PATCH] ARM: tegra: Ensure entire dcache is flushed on entering
+ LP0/1
+In-Reply-To: <1447942787-31137-1-git-send-email-jonathanh@nvidia.com>
+References: <1447942787-31137-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <20151123111458.GF31868@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel may use a page granularity of 4K, 16K, or 64K depending on
-configuration.
+On Thu, Nov 19, 2015 at 02:19:47PM +0000, Jon Hunter wrote:
+> Tegra support several low-power (LPx) states, which are:
+> - LP0: CPU + Core voltage off and DRAM in self-refresh
+> - LP1: CPU voltage off and DRAM in self-refresh
+> - LP2: CPU voltage off
+> 
+> When entering any of the above states the tegra_disable_clean_inv_dcache()
+> function is called to flush the dcache. The function
+> tegra_disable_clean_inv_dcache() will either flush the entire data cache or
+> up to the Level of Unification Inner Shareable (LoUIS) depending on the
+> value in r0. When tegra_disable_clean_inv_dcache() is called by
+> tegra20_sleep_core_finish() or tegra30_sleep_core_finish(), to enter LP0
+> and LP1 power state, the r0 register contains a physical memory address
+> which will not be equal to TEGRA_FLUSH_CACHE_ALL (1) and so the data cache
+> will be only flushed to the LoUIS. However, when
+> tegra_disable_clean_inv_dcache() called by tegra_sleep_cpu_finish() to
+> enter to LP2 power state, r0 is set to TEGRA_FLUSH_CACHE_ALL to flush the
+> entire dcache.
+> 
+> Please note that tegra20_sleep_core_finish(), tegra30_sleep_core_finish()
+> and tegra_sleep_cpu_finish() are called by the boot CPU once all other CPUs
+> have been disabled and so it seems appropriate to flush the entire cache at
+> this stage.
+> 
+> Therefore, ensure that r0 is set to TEGRA_FLUSH_CACHE_ALL when calling
+> tegra_disable_clean_inv_dcache() from tegra20_sleep_core_finish() and
+> tegra30_sleep_core_finish().
+> 
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> ---
+> 
+> Please note that I have not encountered any problems without this change
+> so far, but I noticed this from reviewing the suspend sequence. I have
+> tested this on tegra20, tegra30, tegra114 and tegra124 and verified that
+> suspend/resume to LP1 is working fine.
+> 
+>  arch/arm/mach-tegra/sleep-tegra20.S | 3 +++
+>  arch/arm/mach-tegra/sleep-tegra30.S | 3 +++
+>  2 files changed, 6 insertions(+)
 
-When mapping EFI runtime regions, we use memrange_efi_to_native to round
-the physical base address of a region down to a kernel page boundary,
-and round the size up to a kernel page boundary, adding the residue left
-over from rounding down the physical base address. We do not round down
-the virtual base address.
+Applied, thanks.
 
-In __create_mapping we account for the offset of the virtual base from a
-granule boundary, adding the residue to the size before rounding the
-base down to said granule boundary.
-
-Thus we account for the residue twice, and when the residue is non-zero
-will cause __create_mapping to map an additional page at the end of the
-region. Depending on the memory map, this page may be in a region we are
-not intended/permitted to map, or may clash with a different region that
-we wish to map. In typical cases, mapping the next item in the memory
-map will overwrite the erroneously created entry, as we sort the memory
-map in the stub.
-
-As __create_mapping can cope with base addresses which are not page
-aligned, we can instead rely on it to map the region appropriately, and
-simplify efi_virtmap_init by removing the unnecessary code.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Leif Lindholm <leif.lindholm@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/efi.c | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
-
-Since v1 [1]:
-* Rely on create_pgd_mapping to handle alignment.
-Since v2 [2]:
-* Describe why this case is unlikely in practice.
-* Calculate size in create_pgd_mapping_call.
-* Rebase to v4.4-rc2, avoiding clash with [3].
-
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386536.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386908.html
-[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/385524.html
-
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index fc5508e..fe7cd1a 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -227,7 +227,6 @@ static bool __init efi_virtmap_init(void)
- 	init_new_context(NULL, &efi_mm);
- 
- 	for_each_efi_memory_desc(&memmap, md) {
--		u64 paddr, npages, size;
- 		pgprot_t prot;
- 
- 		if (!(md->attribute & EFI_MEMORY_RUNTIME))
-@@ -235,11 +234,6 @@ static bool __init efi_virtmap_init(void)
- 		if (md->virt_addr == 0)
- 			return false;
- 
--		paddr = md->phys_addr;
--		npages = md->num_pages;
--		memrange_efi_to_native(&paddr, &npages);
--		size = npages << PAGE_SHIFT;
--
- 		pr_info("  EFI remap 0x%016llx => %p\n",
- 			md->phys_addr, (void *)md->virt_addr);
- 
-@@ -256,7 +250,8 @@ static bool __init efi_virtmap_init(void)
- 		else
- 			prot = PAGE_KERNEL;
- 
--		create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size,
-+		create_pgd_mapping(&efi_mm, md->phys_addr, md->virt_addr,
-+				   md->num_pages << EFI_PAGE_SHIFT, 
- 				   __pgprot(pgprot_val(prot) | PTE_NG));
- 	}
- 	return true;
--- 
-1.9.1
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151123/24f4fe94/attachment.sig>
