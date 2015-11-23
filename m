@@ -1,50 +1,33 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Mon, 23 Nov 2015 15:36:28 +0100
-Subject: [PATCH] ARM: dts: rockchip: Add IR receiver to Radxa Rock 2 Square
-Message-ID: <1448289388-25762-1-git-send-email-sjoerd.simons@collabora.co.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 23 Nov 2015 15:37:33 +0100
+Subject: [PATCH] ARM: tegra: select USB_ULPI from EHCI rather than platform
+In-Reply-To: <8693901.Fc4bDK8zzK@wuerfel>
+References: <8693901.Fc4bDK8zzK@wuerfel>
+Message-ID: <20151123143733.GA2318@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the IR receiver as present on the Radxa Rock 2 Square
-board.
+On Mon, Nov 23, 2015 at 02:51:29PM +0100, Arnd Bergmann wrote:
+> For historic reasons, the tegra platform selects USB_ULPI from architecture
+> code, but that hasn't really made sense for a long time, as the only
+> user of that code is the Tegra EHCI driver that has its own Kconfig
+> symbol.
+> 
+> This removes the 'select' statements from mach-tegra and drivers/soc/tegra
+> and adds them with the device driver that actually needs them.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> Tegra maintainers, can you pick this up for 4.5? There is no real bug here,
+> but I found this when looking at something else in drivers/usb/phy.
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Applied, thanks.
 
----
-
- arch/arm/boot/dts/rk3288-rock2-square.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288-rock2-square.dts b/arch/arm/boot/dts/rk3288-rock2-square.dts
-index 0ef065d..1dada8c 100644
---- a/arch/arm/boot/dts/rk3288-rock2-square.dts
-+++ b/arch/arm/boot/dts/rk3288-rock2-square.dts
-@@ -49,6 +49,13 @@
- 		stdout-path = "serial2:115200n8";
- 	};
- 
-+	ir: ir-receiver {
-+		compatible = "gpio-ir-receiver";
-+		gpios = <&gpio8 1 GPIO_ACTIVE_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&ir_int>;
-+	};
-+
- 	sound {
- 		compatible = "simple-audio-card";
- 		simple-audio-card,name = "SPDIF";
-@@ -183,6 +190,12 @@
- };
- 
- &pinctrl {
-+	ir {
-+		ir_int: ir-int {
-+			rockchip,pins = <8 1 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+	};
-+
- 	pmic {
- 		pmic_int: pmic-int {
- 			rockchip,pins = <0 4 RK_FUNC_GPIO &pcfg_pull_up>;
--- 
-2.6.2
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151123/e0c2a08b/attachment.sig>
