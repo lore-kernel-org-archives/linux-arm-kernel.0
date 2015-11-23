@@ -1,49 +1,26 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Mon, 23 Nov 2015 10:38:12 +0100
-Subject: [RFC PATCH] restrict /dev/mem to idle io memory ranges
-In-Reply-To: <CAPcyv4hagUwc3AJuDHvBy+YR1Khv+5uUL0HZawO9R0r-EZLVHg@mail.gmail.com>
-References: <20151120173133.24259.97028.stgit@dwillia2-desk3.jf.intel.com>
- <20151120201207.GH8644@n2100.arm.linux.org.uk>
- <CAPcyv4hagUwc3AJuDHvBy+YR1Khv+5uUL0HZawO9R0r-EZLVHg@mail.gmail.com>
-Message-ID: <20151123093812.GA28212@gmail.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Mon, 23 Nov 2015 17:39:41 +0800
+Subject: [PATCH v2 2/2] drm/rockchip: Convert the probe function to the
+ generic drm_of_component_probe()
+In-Reply-To: <1448029325-14602-3-git-send-email-Liviu.Dudau@arm.com>
+References: <1448029325-14602-1-git-send-email-Liviu.Dudau@arm.com>
+ <1448029325-14602-3-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <5652DEDD.60603@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2015?11?20? 22:22, Liviu Dudau wrote:
+> Initial attempt to convert rockchip to drm_of_component_probe() missed the
+> difference between ports and encoders when using the compare_of() function.
+> Now that drm_of_component_probe() has been enhanced, let's try again the
+> conversion.
+>
+> Signed-off-by: Liviu Dudau<Liviu.Dudau@arm.com>
 
-* Dan Williams <dan.j.williams@intel.com> wrote:
+Looks good for me, and it works on popmetal board, so
+      Acked-by: Mark Yao <mark.yao@rock-chips.com>
 
-> On Fri, Nov 20, 2015 at 12:12 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Fri, Nov 20, 2015 at 09:31:33AM -0800, Dan Williams wrote:
-> >> This effectively promotes IORESOURCE_BUSY to IORESOURCE_EXCLUSIVE
-> >> semantics by default.  If userspace really believes it is safe to access
-> >> the memory region it can also perform the extra step of disabling an
-> >> active driver.  This protects device address ranges with read side
-> >> effects and otherwise directs userspace to use the driver.
-> >
-> > I'm happy with this as long as we retain the option to disable this
-> > new behaviour.
-> >
-> > The reason being, when developing a driver, it is _very_ useful to
-> > be able to poke around in the device's (and system memory) address
-> > spaces with tools like devmem2 to work out what's going on when
-> > things go wrong.
-> >
-> > To put it another way, I think it's a good idea to disable access to
-> > these regions on production systems, but for driver development, we
-> > want to retain the ability to poke around in physical address space
-> > in any way we so desire.
-> >
-> 
-> Sounds ok to me, but I do think it's a good idea to default it to the
-> same value as STRICT_DEVMEM.  Perhaps:
-> 
-> bool "Filter I/O access to /dev/mem" if EXPERT
-> default STRICT_DEVMEM
+Thanks.
 
-Agreed, STRICT_DEVMEM=y should grandfather in this new (and very sensible) 
-restriction.
-
-Thanks,
-
-	Ingo
+-- 
+?ark Yao
