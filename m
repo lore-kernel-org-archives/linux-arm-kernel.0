@@ -1,35 +1,40 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 23 Nov 2015 11:16:56 +0100
-Subject: [PATCH v2 5/5] ARM: meson: DTS: Enable GPIO IRQs
-In-Reply-To: <1448273816-11290-1-git-send-email-carlo@caione.org>
-References: <1448273816-11290-1-git-send-email-carlo@caione.org>
-Message-ID: <1448273816-11290-6-git-send-email-carlo@caione.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 23 Nov 2015 10:19:45 +0000
+Subject: [PATCH 1/2] arch: consolidate CONFIG_STRICT_DEVM in
+ lib/Kconfig.debug
+In-Reply-To: <20151122035702.9313.52457.stgit@dwillia2-desk3.jf.intel.com>
+References: <20151122035702.9313.52457.stgit@dwillia2-desk3.jf.intel.com>
+Message-ID: <20151123101944.GA32300@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+On Sat, Nov 21, 2015 at 07:57:02PM -0800, Dan Williams wrote:
+> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+> index 04fb73b973f1..e13c4bf84d9e 100644
+> --- a/arch/arm64/Kconfig.debug
+> +++ b/arch/arm64/Kconfig.debug
+> @@ -14,20 +14,6 @@ config ARM64_PTDUMP
+>  	  kernel.
+>  	  If in doubt, say "N"
+>  
+> -config STRICT_DEVMEM
+> -	bool "Filter access to /dev/mem"
+> -	depends on MMU
+> -	help
+> -	  If this option is disabled, you allow userspace (root) access to all
+> -	  of memory, including kernel and userspace memory. Accidental
+> -	  access to this is obviously disastrous, but specific access can
+> -	  be used by people debugging the kernel.
+> -
+> -	  If this option is switched on, the /dev/mem file only allows
+> -	  userspace access to memory mapped peripherals.
+> -
+> -	  If in doubt, say Y.
+> -
+>  config PID_IN_CONTEXTIDR
+>  	bool "Write the current PID to the CONTEXTIDR register"
+>  	help
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
----
- arch/arm/boot/dts/meson8b.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+For arm64:
 
-diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-index ee352bf..3c0ae45 100644
---- a/arch/arm/boot/dts/meson8b.dtsi
-+++ b/arch/arm/boot/dts/meson8b.dtsi
-@@ -152,6 +152,12 @@
- 		pinctrl: pinctrl at c1109880 {
- 			compatible = "amlogic,meson8b-pinctrl";
- 			reg = <0xc1109880 0x10>;
-+			reg-names = "irq";
-+			interrupt-parent = <&gic>;
-+			interrupts = <0 64 1>, <0 65 1>, <0 66 1>, <0 67 1>,
-+				     <0 68 1>, <0 69 1>, <0 70 1>, <0 71 1>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
--- 
-2.5.0
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
