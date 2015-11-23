@@ -1,44 +1,58 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 23 Nov 2015 10:47:10 -0800
-Subject: [PATCH v2] i2c: cadence: Move to sensible power management
-In-Reply-To: <CAKfKVtHHKcs1UAM4pb4Qbtn5TEOboZf1SrL4qFuFZYSCUundHw@mail.gmail.com>
-References: <1446017200-30373-1-git-send-email-shubhraj@xilinx.com>
- <20151028161810.GB6436@xsjsorenbubuntu>
- <CAKfKVtHbKrYK-JkQRWO3hEyOkGEW8q9zc6r90PNP8uEm3VXc4Q@mail.gmail.com>
- <CAKfKVtHHKcs1UAM4pb4Qbtn5TEOboZf1SrL4qFuFZYSCUundHw@mail.gmail.com>
-Message-ID: <20151123184710.GH32017@xsjsorenbubuntu>
+From: jlinton@redhat.com (Jeremy Linton)
+Date: Mon, 23 Nov 2015 12:46:05 -0600
+Subject: [PATCH] [PATCH] arm64: Boot failure on m400 with new cont PTEs
+In-Reply-To: <5653524B.40302@labbott.name>
+References: <1447858999-26665-1-git-send-email-jeremy.linton@arm.com>
+ <20151118152044.GD10644@leverpostej> <564CA29A.9050905@arm.com>
+ <20151118162932.GA13355@leverpostej>
+ <20151123155132.GC32300@e104818-lin.cambridge.arm.com>
+ <5653387A.2000101@redhat.com> <565340C9.7010605@labbott.name>
+ <56534212.3000302@redhat.com> <5653524B.40302@labbott.name>
+Message-ID: <56535EED.5040401@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2015-11-21 at 07:00PM +0530, Shubhrajyoti Datta wrote:
-> On Thu, Oct 29, 2015 at 8:27 PM, Shubhrajyoti Datta
-> <shubhrajyoti.datta@gmail.com> wrote:
-> > On Wed, Oct 28, 2015 at 9:48 PM, S?ren Brinkmann
-> > <soren.brinkmann@xilinx.com> wrote:
-> >> Hi Shubhrajyoti,
-> >>
-> >>
-> >> On Wed, 2015-10-28 at 12:56PM +0530, Shubhrajyoti Datta wrote:
-> >>> Currently the clocks are enabled at probe and disabled at remove.
-> >>> Which keeps the clocks enabled even if no transaction is going on.
-> >>> This patch enables the clocks at the start of transfer and disables
-> >>> after it.
-> >>>
-> >>> Also adapts to runtime pm.
-> >>> Remove xi2c->suspended and use pm runtime status instead.
-> >>>
-> >>> converts dev pm to const to silence a checkpatch warning.
-> >>>
-> >>> Signed-off-by: Shubhrajyoti Datta <shubhraj@xilinx.com>
-> >>
-> >> To me, this looks all good. Just one small concern below.
-> >
-> > Thanks for the review.
-> Soren ,
-> Do are you ok with the change or do you want me to resend without the
-> suspended flag change.
+On 11/23/2015 11:52 AM, Laura Abbott wrote:
+> On 11/23/15 8:42 AM, Jeremy Linton wrote:
+>> On 11/23/2015 10:37 AM, Laura Abbott wrote:
+>>> Which permissions still need to be cleaned up from your perspective?
+>>
+>> IMHO, the vast majority of the linear map should not be
+>> executable/read/write, which is what happens today.
+>>
+>
+> With CONFIG_DEBUG_RODATA on I'm not seeing any rwx regions
 
-I'm always for removing code that is not needed. If things are tested
-and well and work without throwing any warnings I'm OK with it.
+> 0xffffffc000000000-0xffffffc000080000         512K     RW NX SHD AF
+> CON     UXN MEM/NORMAL
+> 0xffffffc000080000-0xffffffc000082000           8K     RW NX SHD
+> AF            UXN MEM/NORMAL
+> 0xffffffc000082000-0xffffffc000090000          56K     ro x  SHD
+> AF            UXN MEM/NORMAL
+> 0xffffffc000090000-0xffffffc000200000        1472K     ro x  SHD AF
+> CON     UXN MEM/NORMAL
+> 0xffffffc000200000-0xffffffc000800000           6M     ro x  SHD
+> AF        BLK UXN MEM/NORMAL
+> 0xffffffc000800000-0xffffffc000980000        1536K     ro x  SHD AF
+> CON     UXN MEM/NORMAL
+> 0xffffffc000980000-0xffffffc000987000          28K     ro x  SHD
+> AF            UXN MEM/NORMAL
+> 0xffffffc000987000-0xffffffc000990000          36K     RW NX SHD
+> AF            UXN MEM/NORMAL
+> 0xffffffc000990000-0xffffffc000a00000         448K     RW NX SHD AF
+> CON     UXN MEM/NORMAL
+> 0xffffffc000a00000-0xffffffc000a10000          64K     RW NX SHD
+> AF            UXN MEM/NORMAL
+> 0xffffffc000a10000-0xffffffc000c00000        1984K     RW NX SHD AF
+> CON     UXN MEM/NORMAL
+> 0xffffffc000c00000-0xffffffc040000000        1012M     RW NX SHD
+> AF        BLK UXN MEM/NORMAL
+> 0xffffffc040000000-0xffffffc080000000           1G     RW NX SHD
+> AF        BLK UXN MEM/NORMAL
+>
+> are there other parts of the map you're seeing that aren't on my system?
 
-	S?ren
+
+Thats my mistake, I didn't remember seeing the NX set for the block 
+mappings with the RO case, the machine I just checked looks good too. 
+So, I you can ignore that little rant.
