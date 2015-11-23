@@ -1,156 +1,90 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 23 Nov 2015 15:37:08 -0600
-Subject: [PATCH v2 2/5] clk: sunxi: Add driver for the H3 THS clock
-In-Reply-To: <077fddc9c8d41d4cf55b1dd1c7180c4adee0fce4.1448263428.git.atx@atx.name>
-References: <cover.1448263428.git.atx@atx.name>
- <077fddc9c8d41d4cf55b1dd1c7180c4adee0fce4.1448263428.git.atx@atx.name>
-Message-ID: <20151123213708.GA12308@rob-hp-laptop>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 23 Nov 2015 13:40:43 -0800
+Subject: [PATCH RESEND] pwm: ftm: fix clock enable/disable when using PM
+In-Reply-To: <20151123094550.GA28740@ulmo.nvidia.com>
+References: <1445142552-3530-1-git-send-email-stefan@agner.ch>
+ <290ed017061ef41e1fe5c3fd5a523511@agner.ch>
+ <20151123094550.GA28740@ulmo.nvidia.com>
+Message-ID: <ac544aefbcb6e609d4ea01f02441aa3e@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2015 at 09:02:49AM +0100, Josef Gajdusek wrote:
-> This patch adds a driver for the THS clock which is present on the
-> Allwinner H3.
-> 
-> Signed-off-by: Josef Gajdusek <atx@atx.name>
+Thanks Thierry for looking into that!
 
-Acked-by: Rob Herring <robh@kernel.org>
+Added Li as recipient to start discussion.
 
-> ---
->  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
->  drivers/clk/sunxi/Makefile                        |  1 +
->  drivers/clk/sunxi/clk-h3-ths.c                    | 98 +++++++++++++++++++++++
->  3 files changed, 100 insertions(+)
->  create mode 100644 drivers/clk/sunxi/clk-h3-ths.c
+Some comments below:
+
+On 2015-11-23 01:45, Thierry Reding wrote:
+> On Wed, Nov 18, 2015 at 06:04:12PM -0800, Stefan Agner wrote:
+>> Thierry,
+>>
+>> I realized that this patch did not make it into 4.4-rc1, while others,
+>> IMHO less important patches which have been posted later (e.g. sunxi
+>> whitespace fixes) have made it! :-(
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index 23e7bce..6d63b35 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -73,6 +73,7 @@ Required properties:
->  	"allwinner,sun8i-h3-usb-clk" - for usb gates + resets on H3
->  	"allwinner,sun9i-a80-usb-mod-clk" - for usb gates + resets on A80
->  	"allwinner,sun9i-a80-usb-phy-clk" - for usb phy gates + resets on A80
-> +	"allwinner,sun8i-h3-ths-clk" - for THS on H3
->  
->  Required properties for all clocks:
->  - reg : shall be the control register address for the clock.
-> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> index f520af6..1bf8e1c 100644
-> --- a/drivers/clk/sunxi/Makefile
-> +++ b/drivers/clk/sunxi/Makefile
-> @@ -8,6 +8,7 @@ obj-y += clk-a10-hosc.o
->  obj-y += clk-a10-mod1.o
->  obj-y += clk-a10-pll2.o
->  obj-y += clk-a20-gmac.o
-> +obj-y += clk-h3-ths.o
->  obj-y += clk-mod0.o
->  obj-y += clk-simple-gates.o
->  obj-y += clk-sun8i-bus-gates.o
-> diff --git a/drivers/clk/sunxi/clk-h3-ths.c b/drivers/clk/sunxi/clk-h3-ths.c
-> new file mode 100644
-> index 0000000..663afc0
-> --- /dev/null
-> +++ b/drivers/clk/sunxi/clk-h3-ths.c
-> @@ -0,0 +1,98 @@
-> +/*
-> + * Sunxi THS clock driver
-> + *
-> + * Copyright (C) 2015 Josef Gajdusek
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/of_address.h>
-> +#include <linux/slab.h>
-> +#include <linux/spinlock.h>
-> +
-> +#define SUN8I_H3_THS_CLK_ENABLE				31
-> +#define SUN8I_H3_THS_CLK_DIVIDER_SHIFT		0
-> +#define SUN8I_H3_THS_CLK_DIVIDER_WIDTH		2
-> +
-> +static DEFINE_SPINLOCK(sun8i_h3_ths_clk_lock);
-> +
-> +static const struct clk_div_table sun8i_h3_ths_clk_table[] __initconst = {
-> +	{ .val = 0, .div = 1 },
-> +	{ .val = 1, .div = 2 },
-> +	{ .val = 2, .div = 4 },
-> +	{ .val = 3, .div = 6 },
-> +	{ } /* sentinel */
-> +};
-> +
-> +static void __init sun8i_h3_ths_clk_setup(struct device_node *node)
-> +{
-> +	struct clk *clk;
-> +	struct clk_gate *gate;
-> +	struct clk_divider *div;
-> +	const char *parent;
-> +	const char *clk_name = node->name;
-> +	void __iomem *reg;
-> +	int err;
-> +
-> +	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-> +
-> +	if (IS_ERR(reg))
-> +		return;
-> +
-> +	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-> +	if (!gate)
-> +		goto err_unmap;
-> +
-> +	div = kzalloc(sizeof(*gate), GFP_KERNEL);
-> +	if (!div)
-> +		goto err_gate_free;
-> +
-> +	of_property_read_string(node, "clock-output-names", &clk_name);
-> +	parent = of_clk_get_parent_name(node, 0);
-> +
-> +	gate->reg = reg;
-> +	gate->bit_idx = SUN8I_H3_THS_CLK_ENABLE;
-> +	gate->lock = &sun8i_h3_ths_clk_lock;
-> +
-> +	div->reg = reg;
-> +	div->shift = SUN8I_H3_THS_CLK_DIVIDER_SHIFT;
-> +	div->width = SUN8I_H3_THS_CLK_DIVIDER_WIDTH;
-> +	div->table = sun8i_h3_ths_clk_table;
-> +	div->lock = &sun8i_h3_ths_clk_lock;
-> +
-> +	clk = clk_register_composite(NULL, clk_name, &parent, 1,
-> +				     NULL, NULL,
-> +				     &div->hw, &clk_divider_ops,
-> +				     &gate->hw, &clk_gate_ops,
-> +				     CLK_SET_RATE_PARENT);
-> +
-> +	if (IS_ERR(clk))
-> +		goto err_div_free;
-> +
-> +	err = of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +	if (err)
-> +		goto err_unregister_clk;
-> +
-> +	return;
-> +
-> +err_unregister_clk:
-> +	clk_unregister(clk);
-> +err_gate_free:
-> +	kfree(gate);
-> +err_div_free:
-> +	kfree(div);
-> +err_unmap:
-> +	iounmap(reg);
-> +}
-> +
-> +CLK_OF_DECLARE(sun8i_h3_ths_clk, "allwinner,sun8i-h3-ths-clk",
-> +	       sun8i_h3_ths_clk_setup);
-> -- 
-> 2.4.10
+> The reason why I merged them is because they are low-risk, whereas this
+> patch of yours changes existing behaviour, and hasn't received any
+> feedback from anyone. So the choice that I need to make is to either
+> trust the original author to have tested the driver and it was working,
+> or you to have verified that it is still working after the patch on all
+> setups that it used to work on. The first option obviously carries the
+> least risk, and that's the reason why the patch hasn't been merged.
 > 
+>> Anything wrong with that? Or am I on your spam list? Note that this is
+>> already a RESEND :-)
+> 
+> If you want to get this merged, you should try to get some feedback from
+> at least the original author. Xiubo Li and I extensively discussed this
+> back at the time when he submitted the driver and we came up with the
+> current code as the best approach to making sure that clocks are on and
+> off when they should be. So if it's not working for you, I'm fine taking
+> the patch if Xiubo or somebody else has had the chance to look at it and
+> review or test it. So a Reviewed-by or Tested-by tag will go a long way
+> to convince me that it's safe to apply.
+
+In mainline, the driver is only used in Freescale Vybrid device trees. I
+think most issues have been introduced with the patches adding suspend
+support:
+http://thread.gmane.org/gmane.linux.kernel/1806940
+
+Not sure against what suspend/resume implementation Li created the
+patches, so far there is no suspend/resume implementation for Vybrid
+upstream. While working on Vybrid's low power mode LPSTOP3, I noticed
+the issues....
+ 
+> Also you enumerate all the various bits that are broken, and it would
+> seem to me that they could each be fixed individually rather than go and
+> implement something completely different which might have undesirable
+> side-effects. Such an approach would also make it more likely for me to
+> merge the patch because it would hopefully be more obvious what is being
+> fixed and that it's a correct fix.
+
+There are different issues addressed by one solution: Using the clock
+frameworks enable/disable counts... I looked through the code again, it
+is really quite hard to split it up. I could create one patch which only
+switches the PWM enable/disable part to clock framework counts, and
+leave the suspend/resume part broken. Than, in a second patch fix the
+suspend/resume part. But that sounds like the wrong approach to me
+too...
+
+I took inspiration from other PWM drivers, I think the suspend/resume
+idea was from TI EHRPWM PWM driver. So this shouldn't be far off what
+others are doing.
+
+> 
+> It's not that I mind the rework, but I'd at least like for someone to
+> verify that it's all still working on existing setups. Now, I understand
+> that people can go missing, so if nobody were to give you a Reviewed-by
+> or Tested-by for a couple of weeks I'd even consider applying without,
+> but as it is, you didn't even Cc Xiubo on the patch, so he's likely
+> missed it entirely.
+
+I have had Li in the initial email, don't know/remember why I removed
+him from the list in RESEND...  Will keep him in the loop.
+
+Just realized that there is now a helper function for
+test_bit(PWMF_ENABLED,... Will send a v2 anyway then.
+
+--
+Stefan
