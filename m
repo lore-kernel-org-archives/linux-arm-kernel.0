@@ -1,25 +1,254 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 22 Nov 2015 22:44:19 -0500 (EST)
-Subject: [PATCH] ARM: mach-orion5x: fix legacy get_irqnr_and_base
-Message-ID: <alpine.LFD.2.20.1511222240150.22569@knanqh.ubzr>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Mon, 23 Nov 2015 11:46:27 +0800
+Subject: [PATCH v2] phy: add phy-hi6220-usb
+In-Reply-To: <1447832123-27245-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1447832123-27245-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <1448250387-8447-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 5be9fc23cd ("ARM: orion5x: fix legacy orion5x IRQ numbers") shifted
-IRQ numbers by one but didn't update the get_irqnr_and_base macro
-accordingly.  This macro is involved when CONFIG_MULTI_IRQ_HANDLER
-is not defined.
+Support hi6220 use phy for HiKey board
 
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+---
+Rebase to  Linux 4.4-rc1
+ 
+ .../devicetree/bindings/phy/phy-hi6220-usb.txt     |  16 ++
+ drivers/phy/Kconfig                                |   9 ++
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-hi6220-usb.c                       | 168 +++++++++++++++++++++
+ 4 files changed, 194 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-hi6220-usb.txt
+ create mode 100644 drivers/phy/phy-hi6220-usb.c
 
-diff --git a/arch/arm/mach-orion5x/include/mach/entry-macro.S b/arch/arm/mach-orion5x/include/mach/entry-macro.S
-index 79eb502a1e..73919a36b5 100644
---- a/arch/arm/mach-orion5x/include/mach/entry-macro.S
-+++ b/arch/arm/mach-orion5x/include/mach/entry-macro.S
-@@ -21,5 +21,5 @@
- 	@ find cause bits that are unmasked
- 	ands	\irqstat, \irqstat, \tmp	@ clear Z flag if any
- 	clzne	\irqnr,	\irqstat		@ calc irqnr
--	rsbne	\irqnr, \irqnr, #31
-+	rsbne	\irqnr, \irqnr, #32
- 	.endm
+diff --git a/Documentation/devicetree/bindings/phy/phy-hi6220-usb.txt b/Documentation/devicetree/bindings/phy/phy-hi6220-usb.txt
+new file mode 100644
+index 000000000000..f17a56e2152f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/phy-hi6220-usb.txt
+@@ -0,0 +1,16 @@
++Hisilicon hi6220 usb PHY
++-----------------------
++
++Required properties:
++- compatible: should be "hisilicon,hi6220-usb-phy"
++- #phy-cells: must be 0
++- hisilicon,peripheral-syscon: phandle of syscon used to control phy.
++Refer to phy/phy-bindings.txt for the generic PHY binding properties
++
++Example:
++	usb_phy: usbphy {
++		compatible = "hisilicon,hi6220-usb-phy";
++		#phy-cells = <0>;
++		phy-supply = <&fixed_5v_hub>;
++		hisilicon,peripheral-syscon = <&sys_ctrl>;
++	};
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index 7eb5859dd035..e1090507f2cd 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -215,6 +215,15 @@ config PHY_MT65XX_USB3
+ 	  for mt65xx SoCs. it supports two usb2.0 ports and
+ 	  one usb3.0 port.
+ 
++config PHY_HI6220_USB
++	tristate "hi6220 USB PHY support"
++	select GENERIC_PHY
++	select MFD_SYSCON
++	help
++	  Enable this to support the HISILICON HI6220 USB PHY.
++
++	  To compile this driver as a module, choose M here.
++
+ config PHY_SUN4I_USB
+ 	tristate "Allwinner sunxi SoC USB PHY driver"
+ 	depends on ARCH_SUNXI && HAS_IOMEM && OF
+diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+index 075db1a81aa5..faccda1f237f 100644
+--- a/drivers/phy/Makefile
++++ b/drivers/phy/Makefile
+@@ -23,6 +23,7 @@ obj-$(CONFIG_TI_PIPE3)			+= phy-ti-pipe3.o
+ obj-$(CONFIG_TWL4030_USB)		+= phy-twl4030-usb.o
+ obj-$(CONFIG_PHY_EXYNOS5250_SATA)	+= phy-exynos5250-sata.o
+ obj-$(CONFIG_PHY_HIX5HD2_SATA)		+= phy-hix5hd2-sata.o
++obj-$(CONFIG_PHY_HI6220_USB)		+= phy-hi6220-usb.o
+ obj-$(CONFIG_PHY_MT65XX_USB3)		+= phy-mt65xx-usb3.o
+ obj-$(CONFIG_PHY_SUN4I_USB)		+= phy-sun4i-usb.o
+ obj-$(CONFIG_PHY_SUN9I_USB)		+= phy-sun9i-usb.o
+diff --git a/drivers/phy/phy-hi6220-usb.c b/drivers/phy/phy-hi6220-usb.c
+new file mode 100644
+index 000000000000..b2141cbd4cf6
+--- /dev/null
++++ b/drivers/phy/phy-hi6220-usb.c
+@@ -0,0 +1,168 @@
++/*
++ * Copyright (c) 2015 Linaro Ltd.
++ * Copyright (c) 2015 Hisilicon Limited.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/phy/phy.h>
++#include <linux/regmap.h>
++
++#define SC_PERIPH_CTRL4			0x00c
++
++#define CTRL4_PICO_SIDDQ		BIT(6)
++#define CTRL4_PICO_OGDISABLE		BIT(8)
++#define CTRL4_PICO_VBUSVLDEXT		BIT(10)
++#define CTRL4_PICO_VBUSVLDEXTSEL	BIT(11)
++#define CTRL4_OTG_PHY_SEL		BIT(21)
++
++#define SC_PERIPH_CTRL5			0x010
++
++#define CTRL5_USBOTG_RES_SEL		BIT(3)
++#define CTRL5_PICOPHY_ACAENB		BIT(4)
++#define CTRL5_PICOPHY_BC_MODE		BIT(5)
++#define CTRL5_PICOPHY_CHRGSEL		BIT(6)
++#define CTRL5_PICOPHY_VDATSRCEND	BIT(7)
++#define CTRL5_PICOPHY_VDATDETENB	BIT(8)
++#define CTRL5_PICOPHY_DCDENB		BIT(9)
++#define CTRL5_PICOPHY_IDDIG		BIT(10)
++
++#define SC_PERIPH_CTRL8			0x018
++#define SC_PERIPH_RSTEN0		0x300
++#define SC_PERIPH_RSTDIS0		0x304
++
++#define RST0_USBOTG_BUS			BIT(4)
++#define RST0_POR_PICOPHY		BIT(5)
++#define RST0_USBOTG			BIT(6)
++#define RST0_USBOTG_32K			BIT(7)
++
++#define EYE_PATTERN_PARA		0x7053348c
++
++struct hi6220_priv {
++	struct regmap *reg;
++	struct device *dev;
++};
++
++static void hi6220_phy_init(struct hi6220_priv *priv)
++{
++	struct regmap *reg = priv->reg;
++	u32 val, mask;
++
++	val = RST0_USBOTG_BUS | RST0_POR_PICOPHY |
++	      RST0_USBOTG | RST0_USBOTG_32K;
++	mask = val;
++	regmap_update_bits(reg, SC_PERIPH_RSTEN0, mask, val);
++	regmap_update_bits(reg, SC_PERIPH_RSTDIS0, mask, val);
++}
++
++static int hi6220_phy_setup(struct hi6220_priv *priv, bool on)
++{
++	struct regmap *reg = priv->reg;
++	u32 val, mask;
++	int ret;
++
++	if (on) {
++		val = CTRL5_USBOTG_RES_SEL | CTRL5_PICOPHY_ACAENB;
++		mask = val | CTRL5_PICOPHY_BC_MODE;
++		ret = regmap_update_bits(reg, SC_PERIPH_CTRL5, mask, val);
++		if (ret)
++			goto out;
++
++		val =  CTRL4_PICO_VBUSVLDEXT | CTRL4_PICO_VBUSVLDEXTSEL |
++		       CTRL4_OTG_PHY_SEL;
++		mask = val | CTRL4_PICO_SIDDQ | CTRL4_PICO_OGDISABLE;
++		ret = regmap_update_bits(reg, SC_PERIPH_CTRL4, mask, val);
++		if (ret)
++			goto out;
++
++		ret = regmap_write(reg, SC_PERIPH_CTRL8, EYE_PATTERN_PARA);
++		if (ret)
++			goto out;
++	} else {
++		val = CTRL4_PICO_SIDDQ;
++		mask = val;
++		ret = regmap_update_bits(reg, SC_PERIPH_CTRL4, mask, val);
++		if (ret)
++			goto out;
++	}
++
++	return 0;
++out:
++	dev_err(priv->dev, "failed to setup phy ret: %d\n", ret);
++	return ret;
++}
++
++static int hi6220_phy_start(struct phy *phy)
++{
++	struct hi6220_priv *priv = phy_get_drvdata(phy);
++
++	return hi6220_phy_setup(priv, true);
++}
++
++static int hi6220_phy_exit(struct phy *phy)
++{
++	struct hi6220_priv *priv = phy_get_drvdata(phy);
++
++	return hi6220_phy_setup(priv, false);
++}
++
++static struct phy_ops hi6220_phy_ops = {
++	.init		= hi6220_phy_start,
++	.exit		= hi6220_phy_exit,
++	.owner		= THIS_MODULE,
++};
++
++static int hi6220_phy_probe(struct platform_device *pdev)
++{
++	struct phy_provider *phy_provider;
++	struct device *dev = &pdev->dev;
++	struct phy *phy;
++	struct hi6220_priv *priv;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	priv->dev = dev;
++	priv->reg = syscon_regmap_lookup_by_phandle(dev->of_node,
++					"hisilicon,peripheral-syscon");
++	if (IS_ERR(priv->reg)) {
++		dev_err(dev, "no hisilicon,peripheral-syscon\n");
++		return PTR_ERR(priv->reg);
++	}
++
++	hi6220_phy_init(priv);
++
++	phy = devm_phy_create(dev, NULL, &hi6220_phy_ops);
++	if (IS_ERR(phy))
++		return PTR_ERR(phy);
++
++	phy_set_drvdata(phy, priv);
++	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
++	return PTR_ERR_OR_ZERO(phy_provider);
++}
++
++static const struct of_device_id hi6220_phy_of_match[] = {
++	{.compatible = "hisilicon,hi6220-usb-phy",},
++	{ },
++};
++MODULE_DEVICE_TABLE(of, hi6220_phy_of_match);
++
++static struct platform_driver hi6220_phy_driver = {
++	.probe	= hi6220_phy_probe,
++	.driver = {
++		.name	= "hi6220-usb-phy",
++		.of_match_table	= hi6220_phy_of_match,
++	}
++};
++module_platform_driver(hi6220_phy_driver);
++
++MODULE_DESCRIPTION("HISILICON HI6220 USB PHY driver");
++MODULE_ALIAS("platform:hi6220-usb-phy");
++MODULE_LICENSE("GPL");
+-- 
+1.9.1
