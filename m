@@ -1,149 +1,69 @@
-From: josh@joshtriplett.org (Josh Triplett)
-Date: Mon, 23 Nov 2015 13:17:48 -0800
-Subject: [RFC] asm-generic: default BUG_ON(x) to "if(x) BUG()"
-In-Reply-To: <4102055.db40h1joXM@wuerfel>
-References: <5868782.RxZY0W5S4d@wuerfel> <20151123201635.GB27783@x>
- <4102055.db40h1joXM@wuerfel>
-Message-ID: <20151123211748.GA30660@x>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Nov 2015 22:19:21 +0100
+Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <20151123203847.GB19156@codeaurora.org>
+References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
+ <105706554.vF12QZslMx@wuerfel> <20151123203847.GB19156@codeaurora.org>
+Message-ID: <133921941.Qfq59EaTOs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2015 at 09:58:22PM +0100, Arnd Bergmann wrote:
-> On Monday 23 November 2015 12:16:36 Josh Triplett wrote:
-> > Two comments inline below.
+On Monday 23 November 2015 12:38:47 Stephen Boyd wrote:
+> On 11/23, Arnd Bergmann wrote:
+> > On Monday 23 November 2015 09:14:39 Christopher Covington wrote:
+> > > On 11/23/2015 03:15 AM, Arnd Bergmann wrote:
+> > > LPAE is only supported in the Krait 450.
+> > > 
+> > > http://www.anandtech.com/show/7537/qualcomms-snapdragon-805-25ghz-128bit-memory-interface-d3d11class-graphics-more
+> > > 
+> > > I'm pretty sure idiv support came earlier, but I don't have the
+> > > specifics on hand.
 > > 
-> > On Mon, Nov 23, 2015 at 05:25:28PM +0100, Arnd Bergmann wrote:
-> > > When CONFIG_BUG is disabled, BUG_ON() will only evaluate the condition,
-> > > but will not actually stop the current thread. GCC warns about a couple
-> > > of BUG_ON() users where this actually leads to further undefined
-> > > behavior:
-> > > 
-> > > include/linux/ceph/osdmap.h: In function 'ceph_can_shift_osds':
-> > > include/linux/ceph/osdmap.h:54:1: warning: control reaches end of non-void function
-> > > fs/ext4/inode.c: In function 'ext4_map_blocks':
-> > > fs/ext4/inode.c:548:5: warning: 'retval' may be used uninitialized in this function
-> > > drivers/mfd/db8500-prcmu.c: In function 'prcmu_config_clkout':
-> > > drivers/mfd/db8500-prcmu.c:762:10: warning: 'div_mask' may be used uninitialized in this function
-> > > drivers/mfd/db8500-prcmu.c:769:13: warning: 'mask' may be used uninitialized in this function
-> > > drivers/mfd/db8500-prcmu.c:757:7: warning: 'bits' may be used uninitialized in this function
-> > > drivers/tty/serial/8250/8250_core.c: In function 'univ8250_release_irq':
-> > > drivers/tty/serial/8250/8250_core.c:252:18: warning: 'i' may be used uninitialized in this function
-> > > drivers/tty/serial/8250/8250_core.c:235:19: note: 'i' was declared here
+> > I have seen that article, but didn't trust it as a canonical
+> > source of information here.
 > > 
-> > Eliminating the spurious warnings seems like a good reason to do this.
+> > If you can confirm that it's right, that would mean that we
+> > don't support LPAE on mach-qcom, as the only SoC with Krait 450
+> > seems to be APQ8084, and mainline Linux doesn't run on that.
 > 
-> Yes, that's where I initially came from anyway. Note that they are
-> mostly not spurious, they warn about something actually going really
-> wrong here (undefined behavior) though only after we noticed that it was
-> already pretty wrong (BUG_ON).
+> arch/arm/boot/dts/qcom-apq8084.dtsi exists in the mainline
+> kernel. We support more than what's in the Kconfig language
+> under mach-qcom.
 
-I meant "spurious" in the sense that they shouldn't get fixed by
-changing the code near the warning.
+Ok, cool. I'm sometimes confused by the model numbers, could you
+do a separate patch to update the Kconfig help text?
 
-> > > There is an obvious conflict of interest here: on the one hand, someone
-> > > who disables CONFIG_BUG() will want the kernel to be as small as possible
-> > > and doesn't care about printing error messages to a console that nobody
-> > > looks at. On the other hand, running into a BUG_ON() condition means that
-> > > something has gone wrong, and we probably want to also stop doing things
-> > > that might cause data corruption.
+> And yes LPAE is supported by apq8084 (as is
+> IDIV). Here's the /proc/cpuinfo on that device.
+> # cat /proc/cpuinfo
+> processor       : 0
+> model name      : ARMv7 Processor rev 1 (v7l)
+> BogoMIPS        : 38.40
+> Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm
+
+Ok.
+
+> > The ones we do support are MSM8x60 (Scorpion), MSM8960
+> > (Krait-without-number),and MSM7874 (Krait 400). Do those all
+> > support IDIV but not LPAE?
 > > 
-> > Seems like you should adjust the Kconfig description for 'config BUG' in
-> > init/Kconfig to account for BUG/BUG_ON still stopping the machine.
 > 
-> Yes, probably a good idea.
+> Krait supports IDIV for all versions. Scorpion doesn't support
+> IDIV or lpae. Here's the output of /proc/cpuinfo on that device. 
 > 
-> > (For that matter, I can't help but wonder if we could then consolidate
-> > CONFIG_BUG and CONFIG_DEBUG_BUGVERBOSE, since we now only semantically
-> > change whether and how much we print.  However, that could happen in
-> > another patch.)
-> 
-> I think it still makes sense to keep them separate. With CONFIG_BUG=n,
-> we get no bug_table at all, while with CONFIG_BUGVERBOSE=n, we avoid
-> most of the data fields of the bug table but still try to print a
-> message tellung us that we hit a BUG().
+> # cat /proc/cpuinfo
+> processor       : 0
+> model name      : ARMv7 Processor rev 2 (v7l)
+> BogoMIPS        : 13.50
+> Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpd32
+> CPU implementer : 0x51
+> CPU architecture: 7
+> CPU variant     : 0x0
+> CPU part        : 0x02d
+> CPU revision    : 2
 
-I can't help but wonder what value the bug_table really has in the
-absence of BUGVERBOSE though.  But in any case, not something this patch
-should change.
+Ok, that leaves just one missing puzzle piece: can you confirm that
+no supported Krait variant other than Krait 450 / apq8084 has LPAE?
 
-> > > This patch picks the second choice, and changes the NOP to BUG(), which
-> > > normally stops the execution of the current thread in some form (endless
-> > > loop or a trap). This follows the logic we applied in a4b5d580e078 ("bug:
-> > > Make BUG() always stop the machine").
-> > > 
-> > > For ARM multi_v7_defconfig, the size slightly increases:
-> > > 
-> > > section		CONFIG_BUG=y	CONFIG_BUG=n	CONFIG_BUG=n+patch
-> > > 
-> > >   .text            8320248   |     8180944   |     8207688
-> > >   .rodata          3633720   |     3567144   |     3570648
-> > >   __bug_table        32508   |         ---   |         ---
-> > >   __modver             692   |        1584   |        2176
-> > >   .init.text        558132   |      548300   |      550088
-> > >   .exit.text         12380   |       12256   |       12380
-> > >   .data            1016672   |     1016064   |     1016128
-> > >   Total           14622556   |    14374510   |    14407326
-> > > 
-> > > So instead of saving 1.70% of the total image size, we only save 1.48%
-> > 
-> > Could you please include numbers for tinyconfig as well?  Percentages
-> > get larger when the numbers get smaller.
-> 
-> not sure where I can find tinyconfig,
-
-"make tinyconfig" in the standard kernel tree.  It turns on a few
-options that make the kernel even smaller.
-
-> this is what I get for ARM allnoconfig
-> (only totals, let me know if you need more details):
-> 
-> original:		961307
-> patched:		969167 (+0.82%)
-> CONFIG_BUG:		994695 (+3.36%)
-
-"patched" here represents allnoconfig with your patch added, but with
-CONFIG_BUG still turned off?
-
-Doesn't seem too bad.  Rather large, but I think we ought to fix the
-problem by 1) reducing the number of uses of BUG_ON in the kernel, and
-2) compiling out more bits of the kernel entirely, including their calls
-to BUG_ON.  Eliminating a class of warnings that cause people grief when
-trying to build and contribute to tiny kernels seems worth it, at least
-for now.
-
-> > > by turning off CONFIG_BUG, but in return we can ensure that we don't run
-> > > into cases of uninitialized variable or return code uses when something
-> > > bad happens. Aside from that, we significantly reduce the number of
-> > > warnings in randconfig builds, which makes it easier to fix the warnings
-> > > about other problems.
-> > > 
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > 
-> > > diff --git a/include/asm-generic/bug.h b/include/asm-generic/bug.h
-> > > index 630dd2372238..58bd1f08c5c7 100644
-> > > --- a/include/asm-generic/bug.h
-> > > +++ b/include/asm-generic/bug.h
-> > > @@ -142,7 +142,7 @@ extern void warn_slowpath_null(const char *file, const int line);
-> > >  #endif
-> > >  
-> > >  #ifndef HAVE_ARCH_BUG_ON
-> > > -#define BUG_ON(condition) do { if (condition) ; } while (0)
-> > > +#define BUG_ON(condition) do { if (condition) BUG(); } while (0)
-> > 
-> > This makes BUG_ON in the !CONFIG_BUG case almost identical to the
-> > CONFIG_BUG=y case, except for the use of unlikely(condition), which this
-> > ought to do as well.
-> > 
-> > Given that, could you pull the definition *out* of the #ifdef/#else for
-> > CONFIG_BUG entirely, and define it the same way in both cases?
-> 
-> Yes, I thought about that already and decided to keep the patch simple
-> instead. I can do that of course once we get consensus on the general
-> approach.
-
-Looking at the thread, I think you have it at this point.
-
-And personally I value simplicity of the patched code over simplicity of
-the patch. :)
-
-- Josh Triplett
+	Arnd 
