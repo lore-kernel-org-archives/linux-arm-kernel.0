@@ -1,24 +1,30 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Mon, 23 Nov 2015 11:49:40 -0800
-Subject: [PATCH] arm: dts: qcom: Add generic PMIC gpio/MPP compat strings
-In-Reply-To: <1448070586-2653-1-git-send-email-sboyd@codeaurora.org>
-References: <1448070586-2653-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20151123194940.GT30882@usrtlx11787.corpusers.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 23 Nov 2015 20:53:22 +0100
+Subject: [PATCH 2/2] ARM: dts: sun7i: Enable audio codec on BananaPi
+In-Reply-To: <1448304618-3488-2-git-send-email-monnier@iro.umontreal.ca>
+References: <1448304618-3488-1-git-send-email-monnier@iro.umontreal.ca>
+ <1448304618-3488-2-git-send-email-monnier@iro.umontreal.ca>
+Message-ID: <20151123195322.GY32142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 20 Nov 17:49 PST 2015, Stephen Boyd wrote:
-
-> Add the generic compatible strings for the PMIC gpio and MPP
-> modules found on qcom based PMICs.
+On Mon, Nov 23, 2015 at 01:50:17PM -0500, Stefan Monnier wrote:
+> Enable the on-chip audio codec
 > 
-> Cc: <devicetree@vger.kernel.org>
-> Cc: "Ivan T. Ivanov" <iivanov@mm-sol.com>
-> Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Cc: Rob Herring <robh@kernel.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Stefan Monnier <monnier@iro.umontreal.ca>
 
-Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Applied both, thanks!
 
-Regards,
-Bjorn
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151123/6e8a5ab4/attachment.sig>
