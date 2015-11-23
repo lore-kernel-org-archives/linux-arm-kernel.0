@@ -1,78 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 23 Nov 2015 14:39:00 +0000
-Subject: [PATCH] backlight: adp88x0: fix uninitialized variable use
-In-Reply-To: <3850346.cL1ocQLBvP@wuerfel>
-References: <3850346.cL1ocQLBvP@wuerfel>
-Message-ID: <20151123143900.GB31376@x1>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 23 Nov 2015 15:41:45 +0100
+Subject: [PATCH 1/2] dmaengine: at_xdmac: fix macro typo
+In-Reply-To: <1448284184-15171-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1448284184-15171-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <565325A9.6020604@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Nov 2015, Arnd Bergmann wrote:
+Le 23/11/2015 14:09, Ludovic Desroches a ?crit :
+> Fix typo in a macro which was not used until now. It explains why there
+> is no error at compilation time.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Fixes: e1f7c9eee707 "dmaengine: at_xdmac: creation of the atmel eXtended
+> DMA Controller driver"
+> Cc: stable at vger.kernel.org # 3.19 and later
 
-> gcc correctly warns about both the adp8860 and adp8870 backlight
-> drivers using an uninitialized variable in their error handling
-> path:
-> 
-> drivers/video/backlight/adp8870_bl.c: In function 'adp8870_bl_ambient_light_zone_store':
-> drivers/video/backlight/adp8870_bl.c:811:11: warning: 'reg_val' may be used uninitialized in this function
-> 
-> This changes the code to only write back the data if it was
-> correctly read to start with.
-> 
-> As a side-note, the drivers are mostly identical, so I think they
-> should really be merged into one file to avoid having to fix every
-> bug twice.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Applied, thanks.
-
-> diff --git a/drivers/video/backlight/adp8860_bl.c b/drivers/video/backlight/adp8860_bl.c
-> index 98ffe71e8af2..f0d4c0324580 100644
-> --- a/drivers/video/backlight/adp8860_bl.c
-> +++ b/drivers/video/backlight/adp8860_bl.c
-> @@ -621,10 +621,12 @@ static ssize_t adp8860_bl_ambient_light_zone_store(struct device *dev,
->  
->  		/* Set user supplied ambient light zone */
->  		mutex_lock(&data->lock);
-> -		adp8860_read(data->client, ADP8860_CFGR, &reg_val);
-> -		reg_val &= ~(CFGR_BLV_MASK << CFGR_BLV_SHIFT);
-> -		reg_val |= (val - 1) << CFGR_BLV_SHIFT;
-> -		adp8860_write(data->client, ADP8860_CFGR, reg_val);
-> +		ret = adp8860_read(data->client, ADP8860_CFGR, &reg_val);
-> +		if (!ret) {
-> +			reg_val &= ~(CFGR_BLV_MASK << CFGR_BLV_SHIFT);
-> +			reg_val |= (val - 1) << CFGR_BLV_SHIFT;
-> +			adp8860_write(data->client, ADP8860_CFGR, reg_val);
-> +		}
->  		mutex_unlock(&data->lock);
->  	}
->  
-> diff --git a/drivers/video/backlight/adp8870_bl.c b/drivers/video/backlight/adp8870_bl.c
-> index 9d738352d7d4..21acac90fd77 100644
-> --- a/drivers/video/backlight/adp8870_bl.c
-> +++ b/drivers/video/backlight/adp8870_bl.c
-> @@ -807,10 +807,12 @@ static ssize_t adp8870_bl_ambient_light_zone_store(struct device *dev,
->  
->  		/* Set user supplied ambient light zone */
->  		mutex_lock(&data->lock);
-> -		adp8870_read(data->client, ADP8870_CFGR, &reg_val);
-> -		reg_val &= ~(CFGR_BLV_MASK << CFGR_BLV_SHIFT);
-> -		reg_val |= (val - 1) << CFGR_BLV_SHIFT;
-> -		adp8870_write(data->client, ADP8870_CFGR, reg_val);
-> +		ret = adp8870_read(data->client, ADP8870_CFGR, &reg_val);
-> +		if (!ret) {
-> +			reg_val &= ~(CFGR_BLV_MASK << CFGR_BLV_SHIFT);
-> +			reg_val |= (val - 1) << CFGR_BLV_SHIFT;
-> +			adp8870_write(data->client, ADP8870_CFGR, reg_val);
-> +		}
->  		mutex_unlock(&data->lock);
->  	}
->  
+> ---
+>  drivers/dma/at_xdmac.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
+> diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+> index 7f039de..d09277f 100644
+> --- a/drivers/dma/at_xdmac.c
+> +++ b/drivers/dma/at_xdmac.c
+> @@ -156,7 +156,7 @@
+>  #define		AT_XDMAC_CC_WRIP	(0x1 << 23)	/* Write in Progress (read only) */
+>  #define			AT_XDMAC_CC_WRIP_DONE		(0x0 << 23)
+>  #define			AT_XDMAC_CC_WRIP_IN_PROGRESS	(0x1 << 23)
+> -#define		AT_XDMAC_CC_PERID(i)	(0x7f & (h) << 24)	/* Channel Peripheral Identifier */
+> +#define		AT_XDMAC_CC_PERID(i)	(0x7f & (i) << 24)	/* Channel Peripheral Identifier */
+>  #define AT_XDMAC_CDS_MSP	0x2C	/* Channel Data Stride Memory Set Pattern */
+>  #define AT_XDMAC_CSUS		0x30	/* Channel Source Microblock Stride */
+>  #define AT_XDMAC_CDUS		0x34	/* Channel Destination Microblock Stride */
+> 
+
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Nicolas Ferre
