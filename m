@@ -1,32 +1,65 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 23 Nov 2015 18:44:09 +0100
-Subject: [PATCH 0/2] arm64 efi fixes
-In-Reply-To: <20151123173547.GD1702@arm.com>
-References: <1448264604-19411-1-git-send-email-ard.biesheuvel@linaro.org>
- <20151123173547.GD1702@arm.com>
-Message-ID: <CAKv+Gu8Xq4D_hmk2=66pRcpWxM0jQG3VZmEL6VvvzooxVg_O8A@mail.gmail.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 23 Nov 2015 17:45:10 +0000
+Subject: [PATCH] arm64: dts: Add idle-states for Juno
+In-Reply-To: <20151026151709.GA16145@red-moon> (Lorenzo Pieralisi's message of
+ "Mon, 26 Oct 2015 15:17:09 +0000")
+References: <1430402268.2868.20.camel@linaro.org>
+ <9hheggnca1y.fsf@e105922-lin.cambridge.arm.com>
+ <1445868751.2807.21.camel@linaro.org>
+ <20151026151709.GA16145@red-moon>
+Message-ID: <9hh7fl8lie1.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 November 2015 at 18:35, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Nov 23, 2015 at 08:43:22AM +0100, Ard Biesheuvel wrote:
->> Two minor issues that were spotted by Matt Fleming and Russell King during
->> review of the UEFI for 32-bit ARM series. No point in delaying these fixes
->> until the whole series gets acked, so I am sending them out separately
->> beforehand.
->>
->> Ard Biesheuvel (2):
->>   arm64/efi: deal with NULL return value of early_memremap()
->>   arm64: efi: fix initcall return values
->
-> These both look like straightforward fixes to me:
->
->   Acked-by: Will Deacon <will.deacon@arm.com>
->
-> I assume Catalin will pick them up. Do they need to go to -stable?
->
+Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
 
-No, I don't see the point.
+> On Mon, Oct 26, 2015 at 02:12:31PM +0000, Jon Medhurst (Tixy) wrote:
+>> On Thu, 2015-10-22 at 14:22 +0100, Punit Agrawal wrote:
+>> > "Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
+>> > 
+>> > > From: Jon Medhurst <tixy@linaro.org>
+>> > >
+>> > > Signed-off-by: Jon Medhurst <tixy@linaro.org>
+>> > 
+>> > Apologies for resurrecting an old thread.
+>> > 
+>> > Following the discussion on this thread, even though certain concerns
+>> > were raised, there wasn't any objection to $SUBJECT being merged.
+>> > 
+>> > I don't see this patch in any tree; perhaps it's slipped through the
+>> > cracks.
+>> 
+>> It did slip through the cracks. Lorenzo's last comment was "I am fine
+>> with enabling the idle states, I need to review and test the idle states
+>> DT data in the patch first though." and I didn't chase things up.
+>> 
+>> The patch will need refreshing to add idle for Juno r1. Which will then
+>> probably resurrect the discussion about where the numbers come from for
+>> residency times, and are the same ones for r0 valid on r1 (and r2?).
+>> 
+>> In an effort to forestall that I would say: does anyone actually care if
+>> the values are optimal? Juno is a reference platform and powered off
+>> mains, so tuning for the optimum power consumption is pretty pointless.
+>> But because it _is_ used as a reference by people it should at least
+>> have these features enabled, to serve as an example, and for test
+>> coverage.
+>
+> I agree with you here, let me check the entry/exit latencies again
+> to make sure they are reasonably set-up, it is 4.5 material anyway.
+
+Hi Lorenzo,
+
+Have you had a chance to sanity check the values we've got here? I
+didn't want to miss this merge window if possible.
 
 Thanks,
-Ard.
+Punit
+
+>
+> Thanks,
+> Lorenzo
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
