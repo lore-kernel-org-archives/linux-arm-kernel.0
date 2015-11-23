@@ -1,110 +1,35 @@
-From: mehta.salil.lnk@gmail.com (Salil Mehta)
-Date: Mon, 23 Nov 2015 12:05:06 +0000
-Subject: [PATCH V3 net-next 4/5] net:hns: Add support of ethtool TSO set
- option for Hip06 in HNS
-In-Reply-To: <564F2915.1090507@cogentembedded.com>
-References: <1447966706-16219-1-git-send-email-salil.mehta@huawei.com>
- <1447966706-16219-5-git-send-email-salil.mehta@huawei.com>
- <564F2915.1090507@cogentembedded.com>
-Message-ID: <565300F2.7030308@gmail.com>
+From: nyushchenko@dev.rtsoft.ru (Nikita Yushchenko)
+Date: Mon, 23 Nov 2015 15:06:52 +0300
+Subject: [RFC/PATCH] arm: do not skip SMP init calls on SMP_ON_UP case
+In-Reply-To: <20151123120317.GN8644@n2100.arm.linux.org.uk>
+References: <1448279946-19975-1-git-send-email-nyushchenko@dev.rtsoft.ru>
+ <20151123120317.GN8644@n2100.arm.linux.org.uk>
+Message-ID: <5653015C.4020405@dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+23.11.2015 15:03, Russell King - ARM Linux ?????:
+> On Mon, Nov 23, 2015 at 02:59:06PM +0300, nyushchenko at dev.rtsoft.ru wrote:
+>> From: Nikita Yushchenko <nyushchenko@dev.rtsoft.ru>
+>>
+>> While running an imx6s boasrd, I got following message in boot log:
+>>
+>> [    0.032414] CPU1: failed to boot: -38
+>>
+>> This looked strange: imx6s is singe-core and kernel perfectly knows
+>> that. However, for some reason it tries to initialize CPU 1?
+>>
+>> I found this to be caused by
+>> - CONFIG_SMP_ON_UP successfully detects that system is single core,
+>> - this causes is_smp() to return false,
+>> - this causes setup_arch() to skip smp_init_cpus() call,
+>> - this skips board-specific code that sets cpu_possible mask.
+> 
+> Right, so you should end up with the possible and present masks
+> containing just one CPU, which should prevent the kernel trying to
+> bring any secondary CPUs online.
 
+Kernel that is running here still tries to init CPU 1 for some reason.
 
-On 20/11/15 14:07, Sergei Shtylyov wrote:
-> On 11/19/2015 11:58 PM, Salil Mehta wrote:
->
->> From: Salil <salil.mehta@huawei.com>
->>
->> This patch adds the support of ethtool TSO option to V1 patch,
->> meant to add support of Hip06 SoC to HNS
->>
->> Signed-off-by: Salil Mehta <salil.mehta@huawei.com>
->> Signed-off-by: lisheng <lisheng011@huawei.com>
->> ---
->>   drivers/net/ethernet/hisilicon/hns/hns_enet.c |   47 
->> +++++++++++++++++++++++++
->>   1 file changed, 47 insertions(+)
->>
->> diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c 
->> b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
->> index 055e14c..a0763ab 100644
->> --- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
->> +++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
->> @@ -1386,6 +1386,51 @@ static int hns_nic_change_mtu(struct 
->> net_device *ndev, int new_mtu)
->>       return ret;
->>   }
->>
->> +static int hns_nic_set_features(struct net_device *netdev,
->> +                netdev_features_t features)
->> +{
->> +    struct hns_nic_priv *priv = netdev_priv(netdev);
->> +    struct hnae_handle *h = priv->ae_handle;
->> +
->> +    switch (priv->enet_ver) {
->> +    case AE_VERSION_1:
->> +        if ((features & NETIF_F_TSO) || (features & NETIF_F_TSO6))
->
->         if ((features & (NETIF_F_TSO| NETIF_F_TSO6))
-Thanks. changed in V4 PATCH.
->
->> +            netdev_info(netdev, "enet v1 do not support tso!\n");
->> +    break;
->
->    The *break* should have the same indentation level as *if*.
-Thanks for pointing out. changed in V4 PATCH.
->
->> +    default:
->> +        if ((features & NETIF_F_TSO) || (features & NETIF_F_TSO6)) {
->
->     if ((features & (NETIF_F_TSO| NETIF_F_TSO6))
->
->> +            priv->ops.fill_desc = fill_tso_desc;
->> +            priv->ops.maybe_stop_tx = hns_nic_maybe_stop_tso;
->> +            /* The chip only support 7*4096 */
->> +            netif_set_gso_max_size(netdev, 7 * 4096);
->> +            h->dev->ops->set_tso_stats(h, 1);
->> +        } else {
->> +            priv->ops.fill_desc = fill_v2_desc;
->> +            priv->ops.maybe_stop_tx = hns_nic_maybe_stop_tx;
->> +            h->dev->ops->set_tso_stats(h, 0);
->> +        }
->> +    break;
->
->    Same here.
-Thanks for pointing out. changed in V4 PATCH.
->
->> +    }
->> +    netdev->features = features;
->> +    return 0;
->> +}
->> +
->> +static netdev_features_t hns_nic_fix_features(
->> +        struct net_device *netdev, netdev_features_t features)
->> +{
->> +    struct hns_nic_priv *priv = netdev_priv(netdev);
->> +
->> +    switch (priv->enet_ver) {
->> +    case AE_VERSION_1:
->> +        features &= ~(NETIF_F_TSO | NETIF_F_TSO6 |
->> +                NETIF_F_HW_VLAN_CTAG_FILTER);
->> +        break;
->> +    default:
->> +        break;
->> +    }
->
->    Here it's indented correctly.
-Got it, thanks!
->
->> +    return features;
->> +}
->> +
->>   /**
->>    * nic_set_multicast_list - set mutl mac address
->>    * @netdev: net device
-> [...]
->
-> MBR, Sergei
->
+Will try to check mainline (although not sure if that will be possible
+on available custom hardware)
