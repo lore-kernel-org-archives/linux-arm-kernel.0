@@ -1,37 +1,47 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sun, 22 Nov 2015 17:11:05 -0800
-Subject: [PATCH] mach-shmobile/setup-r8a7793.c: proper constness with
- __initconst
-In-Reply-To: <alpine.LFD.2.20.1511212036580.22569@knanqh.ubzr>
-References: <alpine.LFD.2.20.1511212036580.22569@knanqh.ubzr>
-Message-ID: <20151123011105.GF29534@verge.net.au>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Mon, 23 Nov 2015 09:26:04 +0800
+Subject: [RFC PATCH v1 2/2] dt-bindings: add document for Innosilicon HDMI
+ on Rockchip platform
+In-Reply-To: <1776316.RzHCH7Zejb@phil>
+References: <1447227952-4787-1-git-send-email-ykk@rock-chips.com>
+ <1447228052-4897-1-git-send-email-ykk@rock-chips.com>
+ <1776316.RzHCH7Zejb@phil>
+Message-ID: <56526B2C.8030202@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[CC: linux-sh]
+Hi Heiko,
 
-On Sat, Nov 21, 2015 at 08:41:07PM -0500, Nicolas Pitre wrote:
-> Both the pointer array and the pointed data have to be const when using
-> __initconst to be correct.  This also fixes LTO builds that otherwise
-> fail with section mismatch errors.
-> 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+On 11/22/2015 04:14 AM, Heiko Stuebner wrote:
+> Hi Yakir,
+>
+> Am Mittwoch, 11. November 2015, 15:47:32 schrieb Yakir Yang:
+>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+>> ---
+>>   .../display/rockchip/inno_hdmi-rockchip.txt        | 50 ++++++++++++++++++++++
+>>   1 file changed, 50 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
+>> new file mode 100644
+>> index 0000000..1898408
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
+>> @@ -0,0 +1,50 @@
+>> +Rockchip specific extensions to the Innosilicon HDMI
+>> +================================
+>> +
+>> +Required properties:
+>> +- compatible:
+>> +	"rockchip,rk3036-dw-hdmi";
+> should be "rockchip,rk3036-inno-hdmi"; instead I guess
 
-Thanks, I have queued this up as a fix for v4.4 with the following tag:
+Right, thanks
 
-Fixes: ec60d95b4fac ("ARM: shmobile: Basic r8a7793 SoC support")
+- Yakir
 
-> diff --git a/arch/arm/mach-shmobile/setup-r8a7793.c b/arch/arm/mach-shmobile/setup-r8a7793.c
-> index 1d2825cb7a..5fce87f7f2 100644
-> --- a/arch/arm/mach-shmobile/setup-r8a7793.c
-> +++ b/arch/arm/mach-shmobile/setup-r8a7793.c
-> @@ -19,7 +19,7 @@
->  #include "common.h"
->  #include "rcar-gen2.h"
->  
-> -static const char *r8a7793_boards_compat_dt[] __initconst = {
-> +static const char * const r8a7793_boards_compat_dt[] __initconst = {
->  	"renesas,r8a7793",
->  	NULL,
->  };
-> 
+>
+> Heiko
+>
+>
+>
