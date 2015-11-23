@@ -1,107 +1,61 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 23 Nov 2015 13:16:01 -0800
-Subject: [RFC/PATCH 2/3] recordmcount: Record locations of
- __aeabi_{u}idiv() calls on ARM
-In-Reply-To: <20151123210347.GW8644@n2100.arm.linux.org.uk>
+Date: Mon, 23 Nov 2015 13:16:53 -0800
+Subject: [RFC/PATCH 3/3] ARM: Replace calls to __aeabi_{u}idiv with
+ udiv/sdiv instructions
+In-Reply-To: <yw1x1tbgsag7.fsf@unicorn.mansr.com>
 References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
- <1448068997-26631-3-git-send-email-sboyd@codeaurora.org>
- <20151121101349.GI8644@n2100.arm.linux.org.uk>
- <20151123205335.GD19156@codeaurora.org>
- <20151123210347.GW8644@n2100.arm.linux.org.uk>
-Message-ID: <20151123211601.GE19156@codeaurora.org>
+ <1448068997-26631-4-git-send-email-sboyd@codeaurora.org>
+ <yw1xd1v3d117.fsf@unicorn.mansr.com>
+ <20151123204955.GC19156@codeaurora.org>
+ <yw1x1tbgsag7.fsf@unicorn.mansr.com>
+Message-ID: <20151123211653.GF19156@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23, Russell King - ARM Linux wrote:
-> On Mon, Nov 23, 2015 at 12:53:35PM -0800, Stephen Boyd wrote:
-> > On 11/21, Russell King - ARM Linux wrote:
-> > > On Fri, Nov 20, 2015 at 05:23:16PM -0800, Stephen Boyd wrote:
-> > > > @@ -452,14 +631,14 @@ static char const *
-> > > >  __has_rel_mcount(Elf_Shdr const *const relhdr,  /* is SHT_REL or SHT_RELA */
-> > > >  		 Elf_Shdr const *const shdr0,
-> > > >  		 char const *const shstrtab,
-> > > > -		 char const *const fname)
-> > > > +		 char const *const fname, const char *find)
-> > > >  {
-> > > >  	/* .sh_info depends on .sh_type == SHT_REL[,A] */
-> > > >  	Elf_Shdr const *const txthdr = &shdr0[w(relhdr->sh_info)];
-> > > >  	char const *const txtname = &shstrtab[w(txthdr->sh_name)];
-> > > >  
-> > > > -	if (strcmp("__mcount_loc", txtname) == 0) {
-> > > > -		fprintf(stderr, "warning: __mcount_loc already exists: %s\n",
-> > > > +	if (strcmp(find, txtname) == 0) {
-> > > > +		fprintf(stderr, "warning: %s already exists: %s\n", find,
-> > > 
-> > > Oh, it's this which has been spewing that silly
-> > > 	"warning: __mcount_loc already exists"
-> > > 
-> > > message thousands of times in my nightly kernel builds (so much so, that
-> > > I've had to filter the thing out of the logs.)  Given that this is soo
-> > > noisy, I think first we need to get to the bottom of why this program is
-> > > soo noisy before we try to make it more functional.
-> > > 
-> > 
-> > This comment in recordmcount.pl may tell us something.
-> > 
-> > 	#
-> > 	# Somehow the make process can execute this script on an
-> > 	# object twice. If it does, we would duplicate the mcount
-> > 	# section and it will cause the function tracer self test
-> > 	# to fail. Check if the mcount section exists, and if it does,
-> > 	# warn and exit.
-> > 	#
-> > 	print STDERR "ERROR: $mcount_section already in $inputfile\n" .
-> > 	    "\tThis may be an indication that your build is corrupted.\n" .
-> > 	    "\tDelete $inputfile and try again. If the same object file\n" .
-> > 	    "\tstill causes an issue, then disable CONFIG_DYNAMIC_FTRACE.\n";
-> > 	exit(-1);
-> > 
-> > I don't think there's much that can be done here besides making
-> > it silent unless there's some verbose build flag set (-v?), but
-> > it is interesting that you see it spew thousands of times. I've
-> > never seen the error printed, but perhaps I'm not building the
-> > kernel the same way you are. Care to share how you're building
-> > and seeing these error messages?
+On 11/23, M?ns Rullg?rd wrote:
+> Stephen Boyd <sboyd@codeaurora.org> writes:
 > 
-> All I get is this:
+> > On 11/21, M?ns Rullg?rd wrote:
+> >> 
+> >> These functions are rather similar.  Perhaps they could be combined
+> >> somehow.
+> >> 
+> >
+> > Yes. I have this patch on top, just haven't folded it in because
+> > it doesn't reduce the lines of code.
 > 
-> warning: __mcount_loc already exists: arch/arm/mm/mmap.o
-> 
-> Not the "ERROR: ... already in ..." that the above would give.
+> I don't see any reason to split it anyhow.  The end result isn't any
+> harder to understand than the intermediate.
 
-That's because I copied from the perl version of recordmcount.
-The C version of this tool doesn't have that nice comment.
+Yep.
 
 > 
-> Nothing special.  It's a seeded allyesconfig built with:
+> > ----8<----
+> > From: Stephen Boyd <sboyd@codeaurora.org>
+> > Subject: [PATCH] consolidate with module code
+> >
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > ---
+> >  arch/arm/include/asm/setup.h |  3 +++
+> >  arch/arm/kernel/module.c     | 16 +++++--------
+> >  arch/arm/kernel/setup.c      | 54 +++++++++++++++++++++++++++-----------------
+> >  3 files changed, 42 insertions(+), 31 deletions(-)
+> >
+> > diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
+> > index e0adb9f1bf94..3f251cdb94ef 100644
+> > --- a/arch/arm/include/asm/setup.h
+> > +++ b/arch/arm/include/asm/setup.h
+> > @@ -25,4 +25,7 @@ extern int arm_add_memory(u64 start, u64 size);
+> >  extern void early_print(const char *str, ...);
+> >  extern void dump_machine_table(void);
+> >
+> > +extern void patch_uidiv(void *addr, size_t size);
+> > +extern void patch_idiv(void *addr, size_t size);
 > 
-> $ make -k -j2 zImage modules dtbs LOADADDR=0x60008000 CONFIG_DEBUG_SECTION_MISMATCH=y O=/path/to/build/dir
-> 
-> The seed being:
-> 
-> CONFIG_MODULES=y
-> # CONFIG_LOCALVERSION_AUTO is not set
-> CONFIG_LOG_BUF_SHIFT=19
-> CONFIG_ZBOOT_ROM_TEXT=0x70000000
-> CONFIG_ZBOOT_ROM_BSS=0x61000000
-> CONFIG_CMDLINE="root=/dev/mmcblk0p1 rootdelay=2 ro"
-> CONFIG_ARCH_VEXPRESS=y
-> # Must not have XIP support enabled
-> CONFIG_XIP_KERNEL=n
-> # Our toolchain has no T2 support
-> CONFIG_THUMB2_KERNEL=n
-> # Disable samples - this needs linux/seccomp.h in our host environment
-> CONFIG_SAMPLES=n
-> # Disable debug info (stop the kernel getting too large)
-> CONFIG_DEBUG_INFO=n
-> # 30 Dec 2013: disable building wanxl firmware: we don't have as68k etc
-> CONFIG_WANXL_BUILD_FIRMWARE=n
-> # 14 Jan 2015: disable GCOV
-> CONFIG_GCOV_KERNEL=n
+> Why not call things sdiv and udiv like the actual instructions?
 > 
 
-Thanks. I don't see the prints on my system even with this config
-on top of allyesconfig. Odd.
+Sure. I'll fold this into v2.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
