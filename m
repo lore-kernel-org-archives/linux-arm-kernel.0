@@ -1,60 +1,44 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 23 Nov 2015 16:31:32 +0100
-Subject: [PATCH 1/3] dt-bindings: add multidomain support to i.MX GPC DT
- binding
-In-Reply-To: <1448291223-9938-2-git-send-email-l.stach@pengutronix.de>
-References: <1448291223-9938-1-git-send-email-l.stach@pengutronix.de>
- <1448291223-9938-2-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1448292692.4008.56.camel@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Nov 2015 16:32:33 +0100
+Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <56531F4F.9010100@codeaurora.org>
+References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
+ <8472808.1HUuK2O5nn@wuerfel> <56531F4F.9010100@codeaurora.org>
+Message-ID: <105706554.vF12QZslMx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 23.11.2015, 16:07 +0100 schrieb Lucas Stach:
-> This adds a new binding for the Freescale i.MX GPC block, which allows
-> to describe multiple power domains in a more natural way. The driver
-> will continue to support the old binding for existing DTBs, but new
-> features like the additional domains present on i.MX6SX will only be
-> usable with the new binding.
+On Monday 23 November 2015 09:14:39 Christopher Covington wrote:
+> On 11/23/2015 03:15 AM, Arnd Bergmann wrote:
+> > On Sunday 22 November 2015 21:36:45 Nicolas Pitre wrote:
+> >> On Sun, 22 Nov 2015, Arnd Bergmann wrote:
+> > 
+> > Ok, thanks a lot! So the reporting in /proc/cpuinfo clearly matches
+> > the actual features, and we can just treat this as no LPAE / no IDIV
+> > for kernel compilation, as nobody ever seems to use THUMB2_KERNEL
+> > in practice.
+> > 
+> > PJ4-MP is like Cortex-A15/A7/A12/A17 and supports both IDIV and LPAE,
+> > which leaves the question whether Scorpion or Krait do the same as
+> > well, or whether they are outliers and need a special configuration.
 > 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  .../devicetree/bindings/power/fsl,imx-gpc.txt      | 81 ++++++++++++++--------
->  1 file changed, 54 insertions(+), 27 deletions(-)
+> LPAE is only supported in the Krait 450.
 > 
-> diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-> index 65cc0345747d..0b777b623812 100644
-> --- a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-> +++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-> @@ -1,22 +1,41 @@
->  Freescale i.MX General Power Controller
->  =======================================
->  
-> -The i.MX6Q General Power Control (GPC) block contains DVFS load tracking
-> -counters and Power Gating Control (PGC) for the CPU and PU (GPU/VPU) power
-> -domains.
-> +The i.MX6 General Power Control (GPC) block contains DVFS load tracking
-> +counters and Power Gating Control (PGC).
->  
->  Required properties:
->  - compatible: Should be "fsl,imx6q-gpc" or "fsl,imx6sl-gpc"
->  - reg: should be register base and length as documented in the
->    datasheet
-> -- interrupts: Should contain GPC interrupt request 1
-> -- pu-supply: Link to the LDO regulator powering the PU power domain
-> -- clocks: Clock phandles to devices in the PU power domain that need
-> -	  to be enabled during domain power-up for reset propagation.
-> -- #power-domain-cells: Should be 1, see below:
-> +- interrupts: Should contain GPC interrupts
-> +- clocks: Must contain an entry for each entry in clock-names.
-> +  See Documentation/devicetree/bindings/clocks/clock-bindings.txt for details.
-> +- clock-names: Must include the following entries:
-> +  - ipg
+> http://www.anandtech.com/show/7537/qualcomms-snapdragon-805-25ghz-128bit-memory-interface-d3d11class-graphics-more
+> 
+> I'm pretty sure idiv support came earlier, but I don't have the
+> specifics on hand.
 
-As long as there is just a single clock input, shouldn't we just remove
-the clock-names property?
+I have seen that article, but didn't trust it as a canonical
+source of information here.
 
-Otherwise
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+If you can confirm that it's right, that would mean that we
+don't support LPAE on mach-qcom, as the only SoC with Krait 450
+seems to be APQ8084, and mainline Linux doesn't run on that.
 
-regards
-Philipp
+The ones we do support are MSM8x60 (Scorpion), MSM8960
+(Krait-without-number),and MSM7874 (Krait 400). Do those all
+support IDIV but not LPAE?
+
+	Arnd
