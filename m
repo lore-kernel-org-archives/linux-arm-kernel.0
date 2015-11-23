@@ -1,48 +1,332 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Nov 2015 16:02:11 +0000
-Subject: [PATCH 0/4] Component helper updates
-Message-ID: <20151123160210.GR8644@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Mon, 23 Nov 2015 16:02:48 +0000
+Subject: [PATCH 3/4] component: track components via array rather than list
+In-Reply-To: <20151123160210.GR8644@n2100.arm.linux.org.uk>
+References: <20151123160210.GR8644@n2100.arm.linux.org.uk>
+Message-ID: <E1a0tZo-0006Ed-50@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
+Since we now have an array which defines each component, maintain the
+components to be bound in the array rather than a separate list.  We
+also need duplicate tracking so we can eliminate multiple bind calls
+for the same component: we preserve the list-based component order in
+that the first match which adds the component determines its position.
 
-These four patches update the component helper by:
-* Removing the legacy matching code with the .add_components method
-  in the master's operation structure.  Nothing in -rc1 appears to be
-  using the legacy functions or method, according to my git greps.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/base/component.c | 154 ++++++++++++++++++++++++-----------------------
+ 1 file changed, 80 insertions(+), 74 deletions(-)
 
-* A slight code reorganisation which results in slightly easier to read
-  code.
-
-* Switch to tracking components via an array rather than a list, which
-  allows us to keep the matching and matched components together, and
-  more importantly allows us to reduce the amount of matching - with
-  this structure, we can incrementally add the component devices as
-  they become available, rather than re-running the list of matches
-  each time something changes.
-
-* Fix the lack of match release functionality, which Liviu Dudau
-  reminded me was missing.  This allows people who want to pass
-  device_node structures in to (correctly) retain the reference to the
-  node, and drop the node when the need to do matches is no longer
-  required.
-
-The first three patches have been well tested over the last year as I've
-had them in my tree that long.  I hadn't considered them important enough
-to send as they're only removing and cleaning up functionality.  However,
-with the need to fix something, it now makes sense to get them merged.
-
-The last patch has been tested with etnaviv DRM to prove that the match
-release works by unloading the module.  On unload, the release function
-is correctly called.
-
-This is intended for the next merge window.  Please apply.
-
- drivers/base/component.c  | 281 ++++++++++++++++++++++++----------------------
- include/linux/component.h |  33 ++++--
- 2 files changed, 167 insertions(+), 147 deletions(-)
-
+diff --git a/drivers/base/component.c b/drivers/base/component.c
+index cd70b68d9780..d99b06b341fb 100644
+--- a/drivers/base/component.c
++++ b/drivers/base/component.c
+@@ -18,18 +18,21 @@
+ #include <linux/mutex.h>
+ #include <linux/slab.h>
+ 
++struct component;
++
+ struct component_match {
+ 	size_t alloc;
+ 	size_t num;
+ 	struct {
+ 		void *data;
+ 		int (*fn)(struct device *, void *);
++		struct component *component;
++		bool duplicate;
+ 	} compare[0];
+ };
+ 
+ struct master {
+ 	struct list_head node;
+-	struct list_head components;
+ 	bool bound;
+ 
+ 	const struct component_master_ops *ops;
+@@ -39,7 +42,6 @@ struct master {
+ 
+ struct component {
+ 	struct list_head node;
+-	struct list_head master_node;
+ 	struct master *master;
+ 	bool bound;
+ 
+@@ -63,46 +65,20 @@ static struct master *__master_find(struct device *dev,
+ 	return NULL;
+ }
+ 
+-/* Attach an unattached component to a master. */
+-static void component_attach_master(struct master *master, struct component *c)
+-{
+-	c->master = master;
+-
+-	list_add_tail(&c->master_node, &master->components);
+-}
+-
+-/* Detach a component from a master. */
+-static void component_detach_master(struct master *master, struct component *c)
+-{
+-	list_del(&c->master_node);
+-
+-	c->master = NULL;
+-}
+-
+-/*
+- * Add a component to a master, finding the component via the compare
+- * function and compare data.  This is safe to call for duplicate matches
+- * and will not result in the same component being added multiple times.
+- */
+-static int component_master_add_child(struct master *master,
++static struct component *find_component(struct master *master,
+ 	int (*compare)(struct device *, void *), void *compare_data)
+ {
+ 	struct component *c;
+-	int ret = -ENXIO;
+ 
+ 	list_for_each_entry(c, &component_list, node) {
+ 		if (c->master && c->master != master)
+ 			continue;
+ 
+-		if (compare(c->dev, compare_data)) {
+-			if (!c->master)
+-				component_attach_master(master, c);
+-			ret = 0;
+-			break;
+-		}
++		if (compare(c->dev, compare_data))
++			return c;
+ 	}
+ 
+-	return ret;
++	return NULL;
+ }
+ 
+ static int find_components(struct master *master)
+@@ -116,26 +92,39 @@ static int find_components(struct master *master)
+ 	 * any components which are found to this master.
+ 	 */
+ 	for (i = 0; i < match->num; i++) {
+-		ret = component_master_add_child(master,
+-						 match->compare[i].fn,
+-						 match->compare[i].data);
+-		if (ret)
++		struct component *c;
++
++		dev_dbg(master->dev, "Looking for component %zu\n", i);
++
++		if (match->compare[i].component)
++			continue;
++
++		c = find_component(master, match->compare[i].fn,
++				   match->compare[i].data);
++		if (!c) {
++			ret = -ENXIO;
+ 			break;
++		}
++
++		dev_dbg(master->dev, "found component %s, duplicate %u\n", dev_name(c->dev), !!c->master);
++
++		/* Attach this component to the master */
++		match->compare[i].duplicate = !!c->master;
++		match->compare[i].component = c;
++		c->master = master;
+ 	}
+ 	return ret;
+ }
+ 
+-/* Detach all attached components from this master */
+-static void master_remove_components(struct master *master)
++/* Detach component from associated master */
++static void remove_component(struct master *master, struct component *c)
+ {
+-	while (!list_empty(&master->components)) {
+-		struct component *c = list_first_entry(&master->components,
+-					struct component, master_node);
+-
+-		WARN_ON(c->master != master);
++	size_t i;
+ 
+-		component_detach_master(master, c);
+-	}
++	/* Detach the component from this master. */
++	for (i = 0; i < master->match->num; i++)
++		if (master->match->compare[i].component == c)
++			master->match->compare[i].component = NULL;
+ }
+ 
+ /*
+@@ -150,37 +139,32 @@ static int try_to_bring_up_master(struct master *master,
+ {
+ 	int ret;
+ 
++	dev_dbg(master->dev, "trying to bring up master\n");
++
+ 	if (find_components(master)) {
+-		/* Failed to find all components */
+-		ret = 0;
+-		goto out;
++		dev_dbg(master->dev, "master has incomplete components\n");
++		return 0;
+ 	}
+ 
+ 	if (component && component->master != master) {
+-		ret = 0;
+-		goto out;
++		dev_dbg(master->dev, "master is not for this component (%s)\n",
++			dev_name(component->dev));
++		return 0;
+ 	}
+ 
+-	if (!devres_open_group(master->dev, NULL, GFP_KERNEL)) {
+-		ret = -ENOMEM;
+-		goto out;
+-	}
++	if (!devres_open_group(master->dev, NULL, GFP_KERNEL))
++		return -ENOMEM;
+ 
+ 	/* Found all components */
+ 	ret = master->ops->bind(master->dev);
+ 	if (ret < 0) {
+ 		devres_release_group(master->dev, NULL);
+ 		dev_info(master->dev, "master bind failed: %d\n", ret);
+-		goto out;
++		return ret;
+ 	}
+ 
+ 	master->bound = true;
+ 	return 1;
+-
+-out:
+-	master_remove_components(master);
+-
+-	return ret;
+ }
+ 
+ static int try_to_bring_up_masters(struct component *component)
+@@ -206,8 +190,6 @@ static void take_down_master(struct master *master)
+ 		devres_release_group(master->dev, NULL);
+ 		master->bound = false;
+ 	}
+-
+-	master_remove_components(master);
+ }
+ 
+ static size_t component_match_size(size_t num)
+@@ -265,6 +247,7 @@ void component_match_add(struct device *dev, struct component_match **matchptr,
+ 
+ 	match->compare[match->num].fn = compare;
+ 	match->compare[match->num].data = compare_data;
++	match->compare[match->num].component = NULL;
+ 	match->num++;
+ }
+ EXPORT_SYMBOL(component_match_add);
+@@ -288,7 +271,6 @@ int component_master_add_with_match(struct device *dev,
+ 	master->dev = dev;
+ 	master->ops = ops;
+ 	master->match = match;
+-	INIT_LIST_HEAD(&master->components);
+ 
+ 	/* Add to the list of available masters. */
+ 	mutex_lock(&component_mutex);
+@@ -311,13 +293,24 @@ void component_master_del(struct device *dev,
+ 	const struct component_master_ops *ops)
+ {
+ 	struct master *master;
++	int i;
+ 
+ 	mutex_lock(&component_mutex);
+ 	master = __master_find(dev, ops);
+ 	if (master) {
++		struct component_match *match = master->match;
++
+ 		take_down_master(master);
+ 
+ 		list_del(&master->node);
++
++		if (match) {
++			for (i = 0; i < match->num; i++) {
++				struct component *c = match->compare[i].component;
++				if (c)
++					c->master = NULL;
++			}
++		}
+ 		kfree(master);
+ 	}
+ 	mutex_unlock(&component_mutex);
+@@ -340,6 +333,7 @@ void component_unbind_all(struct device *master_dev, void *data)
+ {
+ 	struct master *master;
+ 	struct component *c;
++	size_t i;
+ 
+ 	WARN_ON(!mutex_is_locked(&component_mutex));
+ 
+@@ -347,8 +341,12 @@ void component_unbind_all(struct device *master_dev, void *data)
+ 	if (!master)
+ 		return;
+ 
+-	list_for_each_entry_reverse(c, &master->components, master_node)
+-		component_unbind(c, master, data);
++	/* Unbind components in reverse order */
++	for (i = master->match->num; i--; )
++		if (!master->match->compare[i].duplicate) {
++			c = master->match->compare[i].component;
++			component_unbind(c, master, data);
++		}
+ }
+ EXPORT_SYMBOL_GPL(component_unbind_all);
+ 
+@@ -408,6 +406,7 @@ int component_bind_all(struct device *master_dev, void *data)
+ {
+ 	struct master *master;
+ 	struct component *c;
++	size_t i;
+ 	int ret = 0;
+ 
+ 	WARN_ON(!mutex_is_locked(&component_mutex));
+@@ -416,16 +415,21 @@ int component_bind_all(struct device *master_dev, void *data)
+ 	if (!master)
+ 		return -EINVAL;
+ 
+-	list_for_each_entry(c, &master->components, master_node) {
+-		ret = component_bind(c, master, data);
+-		if (ret)
+-			break;
+-	}
++	/* Bind components in match order */
++	for (i = 0; i < master->match->num; i++)
++		if (!master->match->compare[i].duplicate) {
++			c = master->match->compare[i].component;
++			ret = component_bind(c, master, data);
++			if (ret)
++				break;
++		}
+ 
+ 	if (ret != 0) {
+-		list_for_each_entry_continue_reverse(c, &master->components,
+-						     master_node)
+-			component_unbind(c, master, data);
++		for (; i--; )
++			if (!master->match->compare[i].duplicate) {
++				c = master->match->compare[i].component;
++				component_unbind(c, master, data);
++			}
+ 	}
+ 
+ 	return ret;
+@@ -473,8 +477,10 @@ void component_del(struct device *dev, const struct component_ops *ops)
+ 			break;
+ 		}
+ 
+-	if (component && component->master)
++	if (component && component->master) {
+ 		take_down_master(component->master);
++		remove_component(component->master, component);
++	}
+ 
+ 	mutex_unlock(&component_mutex);
+ 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.1.0
