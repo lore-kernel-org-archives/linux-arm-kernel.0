@@ -1,92 +1,44 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 23 Nov 2015 11:33:08 -0700
-Subject: [RESEND PATCH V4 16/26] perf: changing pmu::setup_aux() parameter to
- include event
-In-Reply-To: <1448303598-11249-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1448303598-11249-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1448303598-11249-17-git-send-email-mathieu.poirier@linaro.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 23 Nov 2015 10:47:10 -0800
+Subject: [PATCH v2] i2c: cadence: Move to sensible power management
+In-Reply-To: <CAKfKVtHHKcs1UAM4pb4Qbtn5TEOboZf1SrL4qFuFZYSCUundHw@mail.gmail.com>
+References: <1446017200-30373-1-git-send-email-shubhraj@xilinx.com>
+ <20151028161810.GB6436@xsjsorenbubuntu>
+ <CAKfKVtHbKrYK-JkQRWO3hEyOkGEW8q9zc6r90PNP8uEm3VXc4Q@mail.gmail.com>
+ <CAKfKVtHHKcs1UAM4pb4Qbtn5TEOboZf1SrL4qFuFZYSCUundHw@mail.gmail.com>
+Message-ID: <20151123184710.GH32017@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For Coresight ETMv3/4 tracers the event carries information
-about trace modes such as user or kernel space tracing and
-whether tracing is allowed when operating in secure mode.
+On Sat, 2015-11-21 at 07:00PM +0530, Shubhrajyoti Datta wrote:
+> On Thu, Oct 29, 2015 at 8:27 PM, Shubhrajyoti Datta
+> <shubhrajyoti.datta@gmail.com> wrote:
+> > On Wed, Oct 28, 2015 at 9:48 PM, S?ren Brinkmann
+> > <soren.brinkmann@xilinx.com> wrote:
+> >> Hi Shubhrajyoti,
+> >>
+> >>
+> >> On Wed, 2015-10-28 at 12:56PM +0530, Shubhrajyoti Datta wrote:
+> >>> Currently the clocks are enabled at probe and disabled at remove.
+> >>> Which keeps the clocks enabled even if no transaction is going on.
+> >>> This patch enables the clocks at the start of transfer and disables
+> >>> after it.
+> >>>
+> >>> Also adapts to runtime pm.
+> >>> Remove xi2c->suspended and use pm runtime status instead.
+> >>>
+> >>> converts dev pm to const to silence a checkpatch warning.
+> >>>
+> >>> Signed-off-by: Shubhrajyoti Datta <shubhraj@xilinx.com>
+> >>
+> >> To me, this looks all good. Just one small concern below.
+> >
+> > Thanks for the review.
+> Soren ,
+> Do are you ok with the change or do you want me to resend without the
+> suspended flag change.
 
-Since this information is to be embedded in the private
-structure returned by setup_aux(),  changing the first
-parameter to be of type struct perf_event * so that all
-the necessary information can be conveyed.  Also changing
-current customer of the API to reflect the modification.
+I'm always for removing code that is not needed. If things are tested
+and well and work without throwing any warnings I'm OK with it.
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- arch/x86/kernel/cpu/perf_event_intel_bts.c | 4 +++-
- arch/x86/kernel/cpu/perf_event_intel_pt.c  | 5 +++--
- include/linux/perf_event.h                 | 2 +-
- kernel/events/ring_buffer.c                | 2 +-
- 4 files changed, 8 insertions(+), 5 deletions(-)
-
-diff --git a/arch/x86/kernel/cpu/perf_event_intel_bts.c b/arch/x86/kernel/cpu/perf_event_intel_bts.c
-index d1c0f254afbe..773600b2f313 100644
---- a/arch/x86/kernel/cpu/perf_event_intel_bts.c
-+++ b/arch/x86/kernel/cpu/perf_event_intel_bts.c
-@@ -68,10 +68,12 @@ static size_t buf_size(struct page *page)
- }
- 
- static void *
--bts_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool overwrite)
-+bts_buffer_setup_aux(struct perf_event *event, void **pages,
-+		     int nr_pages, bool overwrite)
- {
- 	struct bts_buffer *buf;
- 	struct page *page;
-+	int cpu = event->cpu;
- 	int node = (cpu == -1) ? cpu : cpu_to_node(cpu);
- 	unsigned long offset;
- 	size_t size = nr_pages << PAGE_SHIFT;
-diff --git a/arch/x86/kernel/cpu/perf_event_intel_pt.c b/arch/x86/kernel/cpu/perf_event_intel_pt.c
-index 42169283448b..f8b881210648 100644
---- a/arch/x86/kernel/cpu/perf_event_intel_pt.c
-+++ b/arch/x86/kernel/cpu/perf_event_intel_pt.c
-@@ -863,10 +863,11 @@ static int pt_buffer_init_topa(struct pt_buffer *buf, unsigned long nr_pages,
-  * Return:	Our private PT buffer structure.
-  */
- static void *
--pt_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool snapshot)
-+pt_buffer_setup_aux(struct perf_event *event, void **pages,
-+		    int nr_pages, bool snapshot)
- {
- 	struct pt_buffer *buf;
--	int node, ret;
-+	int node, ret, cpu = event->cpu;
- 
- 	if (!nr_pages)
- 		return NULL;
-diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-index 092a0e8a479a..0d9964b5ed4d 100644
---- a/include/linux/perf_event.h
-+++ b/include/linux/perf_event.h
-@@ -292,7 +292,7 @@ struct pmu {
- 	/*
- 	 * Set up pmu-private data structures for an AUX area
- 	 */
--	void *(*setup_aux)		(int cpu, void **pages,
-+	void *(*setup_aux)		(struct perf_event *event, void **pages,
- 					 int nr_pages, bool overwrite);
- 					/* optional */
- 
-diff --git a/kernel/events/ring_buffer.c b/kernel/events/ring_buffer.c
-index 182bc30899d5..87171b700c77 100644
---- a/kernel/events/ring_buffer.c
-+++ b/kernel/events/ring_buffer.c
-@@ -522,7 +522,7 @@ int rb_alloc_aux(struct ring_buffer *rb, struct perf_event *event,
- 			goto out;
- 	}
- 
--	rb->aux_priv = event->pmu->setup_aux(event->cpu, rb->aux_pages, nr_pages,
-+	rb->aux_priv = event->pmu->setup_aux(event, rb->aux_pages, nr_pages,
- 					     overwrite);
- 	if (!rb->aux_priv)
- 		goto out;
--- 
-1.9.1
+	S?ren
