@@ -1,25 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Nov 2015 23:12:40 +0100
-Subject: [PATCH] mtd: cfi: enforce valid geometry configuration
-In-Reply-To: <3747078.dk5V5gxuXa@wuerfel>
-References: <3747078.dk5V5gxuXa@wuerfel>
-Message-ID: <4492128.vrqmf1niG3@wuerfel>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Mon, 23 Nov 2015 14:15:09 -0800
+Subject: defconfig support for CPU_BIG_ENDIAN arm64 kernel
+In-Reply-To: <62603584.FYAH7ECFA0@wuerfel>
+References: <56538C12.4030506@broadcom.com> <62603584.FYAH7ECFA0@wuerfel>
+Message-ID: <56538FED.4090704@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 November 2015 14:39:33 Arnd Bergmann wrote:
-> MTD allows compile-time configuration of the possible CFI geometry
-> settings that are allowed by the kernel, but that includes a couple of
-> invalid configurations, where no bank width or no interleave setting
-> is allowed. These are then caught with a compile-time warning:
-> 
-> include/linux/mtd/cfi.h:76:2: warning: #warning No CONFIG_MTD_CFI_Ix selected. No NOR chip support can work.
-> include/linux/mtd/map.h:145:2: warning: #warning "No CONFIG_MTD_MAP_BANK_WIDTH_xx selected. No NOR chip support can work"
-> 
+Hi Arnd,
 
-I'm actually still getting the warnings for any file that includes <linux/mtd/map.h>
-while CONFIG_MTD is disabled. I have a fix now that I'm testing overnight
-and plan to post tomorrow, then we can decide whether it should be part of
-the same patch, or we should have two separate patches.
+On 15-11-23 02:04 PM, Arnd Bergmann wrote:
+> On Monday 23 November 2015 13:58:42 Scott Branden wrote:
+>> For arm64 platforms there is only a single defconfig upstreamed.  This
+>> builds for Little Endian ARM64 platforms.  So...what about Big Endian?
+>>
+>> It seems like we need another defconfig with CPU_BIG_ENDIAN to be
+>> enabled and built in the upstream kernel.  We need this deconfig to test
+>> that drivers compile in big endian mode and we have an upstream kernel
+>> image to run on these systems.
+>>
+>> I'm hoping the upstreamed kernel is already being built/tested with the
+>> arm64 big endian compiler.
+>>
+>> If not, perhaps the upstream solution is to continue to use the single
+>> defconfig we have today and start using scripts/kconfig/merge_config.sh
+>> to add the CPU_BIG_ENDIAN support to generate a big endian defconfig?
+>>
+>> Hopefully arm64 is already being compiled and tested for Big Endian and
+>> I'm missing something?
+>
+> kernelci.org uses Kconfig fragments to build big-endian kernels with
+> merge-config.sh
 
-	Arnd
+Glad its already tested!
+>
+> We should probably make it a little more straightforward to do this
+> with mainline kernels. 'make help' already shows 'kvmconfig', 'xenconfig'
+> and 'tinyconfig' targets for arm64 that use this. Any suggestions how we
+> should name and integrate big-endian builds?
+
+Yes, I would like this ability added to the standard arm64 make 
+configuration targets.
+
+To do this we would need to add a new configuration target
+"bigendianconfig"
+or
+"beconfig"  - Update current config to enable big endian support
+
+If we do that - Perhaps the other is necessary as well then?
+"littleendianconfig"
+or
+"leconfig"
+
+I propose the short format "beconfig" and "leconfig" be added.
+
+Thanks,
+Scott
+
+>
+> 	Arnd
+>
