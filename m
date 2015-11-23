@@ -1,176 +1,47 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 23 Nov 2015 14:45:07 -0800
-Subject: [PATCH v2] pwm: ftm: fix clock enable/disable when using PM
-Message-ID: <1448318707-18011-1-git-send-email-stefan@agner.ch>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 24 Nov 2015 00:21:37 +0100
+Subject: [PATCH v2] cpufreq: scpi: Depend on SCPI clk driver
+In-Reply-To: <20151118140504.GI7336@ubuntu>
+References: <1447854764-9865-1-git-send-email-punit.agrawal@arm.com>
+ <20151118140504.GI7336@ubuntu>
+Message-ID: <6612767.ybC73pWovO@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A FTM PWM instance enables/disables three clocks: The bus clock, the
-counter clock and the PWM clock. The bus clock gets enabled on
-pwm_request, whereas the counter and PWM clocks will be enabled upon
-pwm_enable.
+On Wednesday, November 18, 2015 07:35:04 PM Viresh Kumar wrote:
+> On 18-11-15, 13:52, Punit Agrawal wrote:
+> > The SCPI clk driver registers the virtual cpufreq device that kicks off
+> > initialisation of the SCPI cpufreq driver. Also, clk_get() will fail for
+> > the cpufreq driver if the scpi clk driver is missing.
+> > 
+> > Fix this by making the scpi cpufreq driver explicitly depend on the scpi
+> > clk driver.
+> > 
+> > Fixes: 8def31034d03 ("cpufreq: arm_big_little: add SCPI interface driver")
+> > Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> > Cc: Sudeep Holla <sudeep.holla@arm.com>
+> > Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> > ---
+> >  drivers/cpufreq/Kconfig.arm | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> > index 1582c1c..dadfdd4 100644
+> > --- a/drivers/cpufreq/Kconfig.arm
+> > +++ b/drivers/cpufreq/Kconfig.arm
+> > @@ -201,7 +201,7 @@ config ARM_SA1110_CPUFREQ
+> >  
+> >  config ARM_SCPI_CPUFREQ
+> >          tristate "SCPI based CPUfreq driver"
+> > -	depends on ARM_BIG_LITTLE_CPUFREQ && ARM_SCPI_PROTOCOL
+> > +	depends on ARM_BIG_LITTLE_CPUFREQ && ARM_SCPI_PROTOCOL && COMMON_CLK_SCPI
+> >          help
+> >  	  This adds the CPUfreq driver support for ARM big.LITTLE platforms
+> >  	  using SCPI protocol for CPU power management.
+> 
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-The driver has three closesly related issues when enabling/disabling
-clocks during suspend/resume:
-- The three clocks are not treated differently in regards to the
-  individual PWM state enabled/requested. This can lead to clocks
-  getting disabled which have not been enabled in the first place
-  (a PWM channel which only has been requested going through
-  suspend/resume).
+Applied, thanks!
 
-- When entering suspend, the current behavior relies on the
-  FTM_OUTMASK register: If a PWM output is unmasked, the driver
-  assumes the clocks are enabled. However, some PWM instances
-  have only 2 channels connected (e.g. Vybrid's FTM1). In that case,
-  the FTM_OUTMASK reads 0x3 if all channels are disabled, even if
-  the code wrote 0xff to it before. For those PWM instances, the
-  current approach to detect enabled PWM signals does not work.
-
-- A third issue applies to the bus clock only, which can get enabled
-  multiple times (once for each PWM channel of a PWM chip). This is
-  fine, however when entering suspend mode, the clock only gets
-  disabled once.
-
-This change introduces a different approach by relying on the enable
-and prepared counters of the clock framework and using the frameworks
-PWM signal states to address all three issues.
-
-Clocks get disabled during suspend and back enabled on resume
-regarding to the PWM channels individual state (requested/enabled).
-
-Since we do not count the clock enables in the driver, this change no
-longer clears the Status and Control registers Clock Source Selection
-(FTM_SC[CLKS]). However, since we disable the selected clock anyway,
-and we explicitly select the clock source on reenabling a PWM channel
-this approach should not make a difference in practice.
-
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-Hi Lee,
-
-I just found your new email address. Thierry and I already had some
-discussion about the patch here:
-http://thread.gmane.org/gmane.linux.pwm/2878
-
-Could you have a look at that patch?
-
-Changes since v1:
-- Use the pwm_is_enabled helper
-
- drivers/pwm/pwm-fsl-ftm.c | 58 ++++++++++++++++++++---------------------------
- 1 file changed, 25 insertions(+), 33 deletions(-)
-
-diff --git a/drivers/pwm/pwm-fsl-ftm.c b/drivers/pwm/pwm-fsl-ftm.c
-index f9dfc8b..7225ac6 100644
---- a/drivers/pwm/pwm-fsl-ftm.c
-+++ b/drivers/pwm/pwm-fsl-ftm.c
-@@ -80,7 +80,6 @@ struct fsl_pwm_chip {
- 
- 	struct mutex lock;
- 
--	unsigned int use_count;
- 	unsigned int cnt_select;
- 	unsigned int clk_ps;
- 
-@@ -300,9 +299,6 @@ static int fsl_counter_clock_enable(struct fsl_pwm_chip *fpc)
- {
- 	int ret;
- 
--	if (fpc->use_count++ != 0)
--		return 0;
--
- 	/* select counter clock source */
- 	regmap_update_bits(fpc->regmap, FTM_SC, FTM_SC_CLK_MASK,
- 			   FTM_SC_CLK(fpc->cnt_select));
-@@ -334,25 +330,6 @@ static int fsl_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
- 	return ret;
- }
- 
--static void fsl_counter_clock_disable(struct fsl_pwm_chip *fpc)
--{
--	/*
--	 * already disabled, do nothing
--	 */
--	if (fpc->use_count == 0)
--		return;
--
--	/* there are still users, so can't disable yet */
--	if (--fpc->use_count > 0)
--		return;
--
--	/* no users left, disable PWM counter clock */
--	regmap_update_bits(fpc->regmap, FTM_SC, FTM_SC_CLK_MASK, 0);
--
--	clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_CNTEN]);
--	clk_disable_unprepare(fpc->clk[fpc->cnt_select]);
--}
--
- static void fsl_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- {
- 	struct fsl_pwm_chip *fpc = to_fsl_chip(chip);
-@@ -362,7 +339,8 @@ static void fsl_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- 	regmap_update_bits(fpc->regmap, FTM_OUTMASK, BIT(pwm->hwpwm),
- 			   BIT(pwm->hwpwm));
- 
--	fsl_counter_clock_disable(fpc);
-+	clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_CNTEN]);
-+	clk_disable_unprepare(fpc->clk[fpc->cnt_select]);
- 
- 	regmap_read(fpc->regmap, FTM_OUTMASK, &val);
- 	if ((val & 0xFF) == 0xFF)
-@@ -492,17 +470,24 @@ static int fsl_pwm_remove(struct platform_device *pdev)
- static int fsl_pwm_suspend(struct device *dev)
- {
- 	struct fsl_pwm_chip *fpc = dev_get_drvdata(dev);
--	u32 val;
-+	int i;
- 
- 	regcache_cache_only(fpc->regmap, true);
- 	regcache_mark_dirty(fpc->regmap);
- 
--	/* read from cache */
--	regmap_read(fpc->regmap, FTM_OUTMASK, &val);
--	if ((val & 0xFF) != 0xFF) {
-+	for (i = 0; i < fpc->chip.npwm; i++) {
-+		struct pwm_device *pwm = &fpc->chip.pwms[i];
-+
-+		if (!test_bit(PWMF_REQUESTED, &pwm->flags))
-+			continue;
-+
-+		clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_SYS]);
-+
-+		if (!pwm_is_enabled(pwm))
-+			continue;
-+
- 		clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_CNTEN]);
- 		clk_disable_unprepare(fpc->clk[fpc->cnt_select]);
--		clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_SYS]);
- 	}
- 
- 	return 0;
-@@ -511,12 +496,19 @@ static int fsl_pwm_suspend(struct device *dev)
- static int fsl_pwm_resume(struct device *dev)
- {
- 	struct fsl_pwm_chip *fpc = dev_get_drvdata(dev);
--	u32 val;
-+	int i;
-+
-+	for (i = 0; i < fpc->chip.npwm; i++) {
-+		struct pwm_device *pwm = &fpc->chip.pwms[i];
-+
-+		if (!test_bit(PWMF_REQUESTED, &pwm->flags))
-+			continue;
- 
--	/* read from cache */
--	regmap_read(fpc->regmap, FTM_OUTMASK, &val);
--	if ((val & 0xFF) != 0xFF) {
- 		clk_prepare_enable(fpc->clk[FSL_PWM_CLK_SYS]);
-+
-+		if (!pwm_is_enabled(pwm))
-+			continue;
-+
- 		clk_prepare_enable(fpc->clk[fpc->cnt_select]);
- 		clk_prepare_enable(fpc->clk[FSL_PWM_CLK_CNTEN]);
- 	}
--- 
-2.6.2
+Rafael
