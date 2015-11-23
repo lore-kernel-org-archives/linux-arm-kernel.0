@@ -1,79 +1,129 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 23 Nov 2015 15:42:21 +0100
-Subject: [PATCH 2/2] dmaengine: at_xdmac: fix spurious flag status for
- mem2mem transfers
-In-Reply-To: <1448284184-15171-2-git-send-email-ludovic.desroches@atmel.com>
-References: <1448284184-15171-1-git-send-email-ludovic.desroches@atmel.com>
- <1448284184-15171-2-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <565325CD.30608@atmel.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 23 Nov 2015 14:43:04 +0000
+Subject: [PATCH v3 14/62] arm/acpi: Add Generic Interrupt and Distributor
+ struct
+In-Reply-To: <1447753261-7552-15-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-15-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511231442180.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 23/11/2015 14:09, Ludovic Desroches a ?crit :
-> When setting the channel configuration register, the perid field is not
-> set to 0 since it is useless for mem2mem transfers. Unfortunately, a
-> device has 0 as perid. It could cause spurious flags status because
-> the controller could mix some events from the two channels.
-> For that reason, use the highest perid value for mem2mem transfers since it
-> doesn't match the perid of other devices.
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-
-Indeed: thanks Ludovic:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-> ---
->  drivers/dma/at_xdmac.c | 18 +++++++++++++++---
->  1 file changed, 15 insertions(+), 3 deletions(-)
+> Add Generic Interrupt and Distributor (ACPI 5.0) structure.
+> Add new features for MADT introduced by ACPI 5.1.
+> Comment on the GIC ID field of the GIC structure which is replaced
+> by CPU Interface Number.
+> Add new fields: Redistributor Base Address, GICV, GICH, and MPIDR.
+> Add new structures for GIC MSI frame and GICR.
+> Add flag definition for GICC flags.
 > 
-> diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-> index d09277f..b90e62f 100644
-> --- a/drivers/dma/at_xdmac.c
-> +++ b/drivers/dma/at_xdmac.c
-> @@ -863,8 +863,12 @@ at_xdmac_interleaved_queue_desc(struct dma_chan *chan,
->  	 * access. Hopefully we can access DDR through both ports (at least on
->  	 * SAMA5D4x), so we can use the same interface for source and dest,
->  	 * that solves the fact we don't know the direction.
-> +	 * ERRATA: Even if useless for memory transfers, the PERID has to not
-> +	 * match the one of another channel. If not, it could lead to spurious
-> +	 * flag status.
->  	 */
-> -	u32			chan_cc = AT_XDMAC_CC_DIF(0)
-> +	u32			chan_cc = AT_XDMAC_CC_PERID(0x3f)
-> +					| AT_XDMAC_CC_DIF(0)
->  					| AT_XDMAC_CC_SIF(0)
->  					| AT_XDMAC_CC_MBSIZE_SIXTEEN
->  					| AT_XDMAC_CC_TYPE_MEM_TRAN;
-> @@ -1039,8 +1043,12 @@ at_xdmac_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
->  	 * access DDR through both ports (at least on SAMA5D4x), so we can use
->  	 * the same interface for source and dest, that solves the fact we
->  	 * don't know the direction.
-> +	 * ERRATA: Even if useless for memory transfers, the PERID has to not
-> +	 * match the one of another channel. If not, it could lead to spurious
-> +	 * flag status.
->  	 */
-> -	u32			chan_cc = AT_XDMAC_CC_DAM_INCREMENTED_AM
-> +	u32			chan_cc = AT_XDMAC_CC_PERID(0x3f)
-> +					| AT_XDMAC_CC_DAM_INCREMENTED_AM
->  					| AT_XDMAC_CC_SAM_INCREMENTED_AM
->  					| AT_XDMAC_CC_DIF(0)
->  					| AT_XDMAC_CC_SIF(0)
-> @@ -1140,8 +1148,12 @@ static struct at_xdmac_desc *at_xdmac_memset_create_desc(struct dma_chan *chan,
->  	 * access. Hopefully we can access DDR through both ports (at least on
->  	 * SAMA5D4x), so we can use the same interface for source and dest,
->  	 * that solves the fact we don't know the direction.
-> +	 * ERRATA: Even if useless for memory transfers, the PERID has to not
-> +	 * match the one of another channel. If not, it could lead to spurious
-> +	 * flag status.
->  	 */
-> -	u32			chan_cc = AT_XDMAC_CC_DAM_UBS_AM
-> +	u32			chan_cc = AT_XDMAC_CC_PERID(0x3f)
-> +					| AT_XDMAC_CC_DAM_UBS_AM
->  					| AT_XDMAC_CC_SAM_INCREMENTED_AM
->  					| AT_XDMAC_CC_DIF(0)
->  					| AT_XDMAC_CC_SIF(0)
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+
+Would it make sense to add the changes for ACPI 6.0 compatibility too?
+
+
+>  xen/include/acpi/actbl1.h | 69 +++++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 67 insertions(+), 2 deletions(-)
 > 
-
-
--- 
-Nicolas Ferre
+> diff --git a/xen/include/acpi/actbl1.h b/xen/include/acpi/actbl1.h
+> index 9311e3a..2fb2ad7 100644
+> --- a/xen/include/acpi/actbl1.h
+> +++ b/xen/include/acpi/actbl1.h
+> @@ -639,7 +639,11 @@ enum acpi_madt_type {
+>  	ACPI_MADT_TYPE_INTERRUPT_SOURCE = 8,
+>  	ACPI_MADT_TYPE_LOCAL_X2APIC = 9,
+>  	ACPI_MADT_TYPE_LOCAL_X2APIC_NMI = 10,
+> -	ACPI_MADT_TYPE_RESERVED = 11	/* 11 and greater are reserved */
+> +	ACPI_MADT_TYPE_GENERIC_INTERRUPT = 11,
+> +	ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR = 12,
+> +	ACPI_MADT_TYPE_GENERIC_MSI_FRAME = 13,
+> +	ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR = 14,
+> +	ACPI_MADT_TYPE_RESERVED = 15    /* 15 and greater are reserved */
+>  };
+>  
+>  /*
+> @@ -760,11 +764,72 @@ struct acpi_madt_local_x2apic_nmi {
+>  	u8 reserved[3];
+>  };
+>  
+> +/* 11: Generic Interrupt (ACPI 5.0) */
+> +
+> +struct acpi_madt_generic_interrupt {
+> +	struct acpi_subtable_header header;
+> +	u16 reserved;           /* reserved - must be zero */
+> +	u32 cpu_interface_number;
+> +	u32 uid;
+> +	u32 flags;
+> +	u32 parking_version;
+> +	u32 performance_interrupt;
+> +	u64 parked_address;
+> +	u64 base_address;
+> +	u64 gicv_base_address;
+> +	u64 gich_base_address;
+> +	u32 vgic_interrupt;
+> +	u64 gicr_base_address;
+> +	u64 arm_mpidr;
+> +};
+> +
+> +/* Masks for Flags field above */
+> +
+> +/* ACPI_MADT_ENABLED                    (1)      Processor is usable if set */
+> +#define ACPI_MADT_PERFORMANCE_IRQ_MODE  (1<<1) /* 01: Performance Interrupt Mode */
+> +#define ACPI_MADT_VGIC_IRQ_MODE         (1<<2) /* 02: VGIC Maintenance Interrupt mode */
+> +
+> +/* 12: Generic Distributor (ACPI 5.0) */
+> +
+> +struct acpi_madt_generic_distributor {
+> +	struct acpi_subtable_header header;
+> +	u16 reserved;           /* reserved - must be zero */
+> +	u32 gic_id;
+> +	u64 base_address;
+> +	u32 global_irq_base;
+> +	u32 reserved2;          /* reserved - must be zero */
+> +};
+> +
+> +/* 13: GIC MSI Frame (ACPI 5.1) */
+> +
+> +struct acpi_madt_generic_msi_frame {
+> +	struct acpi_subtable_header header;
+> +	u16 reserved;		/* reserved - must be zero */
+> +	u32 msi_frame_id;
+> +	u64 base_address;
+> +	u32 flags;
+> +	u16 spi_count;
+> +	u16 spi_base;
+> +};
+> +
+> +/* Masks for Flags field above */
+> +
+> +#define ACPI_MADT_OVERRIDE_SPI_VALUES   (1)
+> +
+> +/* 14: GIC Redistributor (ACPI 5.1) */
+> +
+> +struct acpi_madt_generic_redistributor {
+> +	struct acpi_subtable_header header;
+> +	u16 reserved;		/* reserved - must be zero */
+> +	u64 base_address;
+> +	u32 length;
+> +};
+> +
+>  /*
+>   * Common flags fields for MADT subtables
+>   */
+>  
+> -/* MADT Local APIC flags (lapic_flags) */
+> +/* MADT Local APIC flags */
+>  
+>  #define ACPI_MADT_ENABLED           (1)	/* 00: Processor is usable if set */
+>  
+> -- 
+> 2.1.0
+> 
