@@ -1,68 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 23 Nov 2015 15:04:59 +0000
-Subject: [PATCH v3 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
-In-Reply-To: <1447888808-31571-4-git-send-email-dcashman@android.com>
-References: <1447888808-31571-1-git-send-email-dcashman@android.com>
- <1447888808-31571-2-git-send-email-dcashman@android.com>
- <1447888808-31571-3-git-send-email-dcashman@android.com>
- <1447888808-31571-4-git-send-email-dcashman@android.com>
-Message-ID: <20151123150459.GD4236@arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 23 Nov 2015 16:07:03 +0100
+Subject: [PATCH 3/3] ARM: imx6: adopt DT to new GPC binding
+In-Reply-To: <1448291223-9938-1-git-send-email-l.stach@pengutronix.de>
+References: <1448291223-9938-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1448291223-9938-4-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2015 at 03:20:07PM -0800, Daniel Cashman wrote:
-> From: dcashman <dcashman@google.com>
-> 
-> arm64: arch_mmap_rnd() uses STACK_RND_MASK to generate the
-> random offset for the mmap base address.  This value represents a
-> compromise between increased ASLR effectiveness and avoiding
-> address-space fragmentation. Replace it with a Kconfig option, which
-> is sensibly bounded, so that platform developers may choose where to
-> place this compromise. Keep default values as new minimums.
-> 
-> Signed-off-by: Daniel Cashman <dcashman@google.com>
-> ---
->  arch/arm64/Kconfig   | 23 +++++++++++++++++++++++
->  arch/arm64/mm/mmap.c |  6 ++++--
->  2 files changed, 27 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 9ac16a4..be38e4c 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -51,6 +51,8 @@ config ARM64
->  	select HAVE_ARCH_JUMP_LABEL
->  	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP
->  	select HAVE_ARCH_KGDB
-> +	select HAVE_ARCH_MMAP_RND_BITS
-> +	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
->  	select HAVE_ARCH_SECCOMP_FILTER
->  	select HAVE_ARCH_TRACEHOOK
->  	select HAVE_BPF_JIT
-> @@ -104,6 +106,27 @@ config ARCH_PHYS_ADDR_T_64BIT
->  config MMU
->  	def_bool y
->  
-> +config ARCH_MMAP_RND_BITS_MIN
-> +       default 15 if ARM64_64K_PAGES
-> +       default 19
-> +
-> +config ARCH_MMAP_RND_BITS_MAX
-> +       default 20 if ARM64_64K_PAGES && ARCH_VA_BITS=39
-> +       default 24 if ARCH_VA_BITS=39
-> +       default 23 if ARM64_64K_PAGES && ARCH_VA_BITS=42
-> +       default 27 if ARCH_VA_BITS=42
-> +       default 29 if ARM64_64K_PAGES && ARCH_VA_BITS=48
-> +       default 33 if ARCH_VA_BITS=48
-> +       default 15 if ARM64_64K_PAGES
-> +       default 19
-> +
-> +config ARCH_MMAP_RND_COMPAT_BITS_MIN
-> +       default 7 if ARM64_64K_PAGES
-> +       default 11
+Adopt the i.MX6Q/DL DT to the new and more flexible GPC binding.
 
-FYI: we now support 16k pages too, so this might need updating. It would
-be much nicer if this was somehow computed rather than have the results
-all open-coded like this.
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6qdl.dtsi | 33 ++++++++++++++++++++++++---------
+ 1 file changed, 24 insertions(+), 9 deletions(-)
 
-Will
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 2b6cc8bf3c5c..0426a1cbf24e 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -402,7 +402,7 @@
+ 				clocks = <&clks IMX6QDL_CLK_VPU_AXI>,
+ 					 <&clks IMX6QDL_CLK_MMDC_CH0_AXI>;
+ 				clock-names = "per", "ahb";
+-				power-domains = <&gpc 1>;
++				power-domains = <&pd_pu>;
+ 				resets = <&src 1>;
+ 				iram = <&ocram>;
+ 			};
+@@ -765,14 +765,29 @@
+ 				interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>,
+ 					     <0 90 IRQ_TYPE_LEVEL_HIGH>;
+ 				interrupt-parent = <&intc>;
+-				pu-supply = <&reg_pu>;
+-				clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
+-					 <&clks IMX6QDL_CLK_GPU3D_SHADER>,
+-					 <&clks IMX6QDL_CLK_GPU2D_CORE>,
+-					 <&clks IMX6QDL_CLK_GPU2D_AXI>,
+-					 <&clks IMX6QDL_CLK_OPENVG_AXI>,
+-					 <&clks IMX6QDL_CLK_VPU_AXI>;
+-				#power-domain-cells = <1>;
++				clocks = <&clks IMX6QDL_CLK_IPG>;
++				clock-names = "ipg";
++
++				pgc {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					power-domain at 0 {
++						reg = <0>;
++						#power-domain-cells = <0>;
++					};
++					pd_pu: power-domain at 1 {
++						reg = <1>;
++						#power-domain-cells = <0>;
++						domain-supply = <&reg_pu>;
++						clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
++						         <&clks IMX6QDL_CLK_GPU3D_SHADER>,
++						         <&clks IMX6QDL_CLK_GPU2D_CORE>,
++						         <&clks IMX6QDL_CLK_GPU2D_AXI>,
++						         <&clks IMX6QDL_CLK_OPENVG_AXI>,
++						         <&clks IMX6QDL_CLK_VPU_AXI>;
++					};
++				};
+ 			};
+ 
+ 			gpr: iomuxc-gpr at 020e0000 {
+-- 
+2.6.2
