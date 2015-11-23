@@ -1,114 +1,84 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 Nov 2015 08:26:02 +0000
-Subject: [PATCH v2 1/7] platform-msi: Allow MSIs to be allocated in chunks
+Date: Mon, 23 Nov 2015 08:26:06 +0000
+Subject: [PATCH v2 5/7] genirq/msi: Add msi_domain_populate_irqs
 In-Reply-To: <1448267168-17360-1-git-send-email-marc.zyngier@arm.com>
 References: <1448267168-17360-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1448267168-17360-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1448267168-17360-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MSIs for a given device are normally all allocated in one go.
-Make sure the internal code can allocate them one at a time
-if required.
+To be able to allocate interrupts from the MSI layer down,
+add a new msi_domain_populate_irqs entry point.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/base/platform-msi.c | 32 ++++++++++++++++++++------------
- 1 file changed, 20 insertions(+), 12 deletions(-)
+ include/linux/msi.h |  2 ++
+ kernel/irq/msi.c    | 40 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 42 insertions(+)
 
-diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
-index 5df4575..6148c78 100644
---- a/drivers/base/platform-msi.c
-+++ b/drivers/base/platform-msi.c
-@@ -25,6 +25,7 @@
- #include <linux/slab.h>
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 1c0bb2c..cee102b 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -283,6 +283,8 @@ void platform_msi_domain_free_irqs(struct device *dev);
+ /* When an MSI domain is used as an intermediate domain */
+ int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
+ 			    int nvec, msi_alloc_info_t *args);
++int msi_domain_populate_irqs(struct irq_domain *domain, struct device *dev,
++			     int virq, int nvec, msi_alloc_info_t *args);
+ #endif /* CONFIG_GENERIC_MSI_IRQ_DOMAIN */
  
- #define DEV_ID_SHIFT	24
-+#define MAX_DEV_MSIS	(1 << (32 - DEV_ID_SHIFT))
- 
- /*
-  * Internal data structure containing a (made up, but unique) devid
-@@ -110,13 +111,16 @@ static void platform_msi_update_chip_ops(struct msi_domain_info *info)
- 		chip->irq_write_msi_msg = platform_msi_write_msg;
+ #ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
+diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+index 9a85613..15b249e 100644
+--- a/kernel/irq/msi.c
++++ b/kernel/irq/msi.c
+@@ -266,6 +266,46 @@ int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
+ 	return ret;
  }
  
--static void platform_msi_free_descs(struct device *dev)
-+static void platform_msi_free_descs(struct device *dev, int base, int nvec)
- {
- 	struct msi_desc *desc, *tmp;
- 
- 	list_for_each_entry_safe(desc, tmp, dev_to_msi_list(dev), list) {
--		list_del(&desc->list);
--		free_msi_entry(desc);
-+		if (desc->platform.msi_index >= base &&
-+		    desc->platform.msi_index < (base + nvec)) {
-+			list_del(&desc->list);
-+			free_msi_entry(desc);
-+		}
- 	}
- }
- 
-@@ -124,17 +128,22 @@ static int platform_msi_alloc_descs(struct device *dev, int nvec,
- 				    struct platform_msi_priv_data *data)
- 
- {
--	int i;
++int msi_domain_populate_irqs(struct irq_domain *domain, struct device *dev,
++			     int virq, int nvec, msi_alloc_info_t *arg)
++{
++	struct msi_domain_info *info = domain->host_data;
++	struct msi_domain_ops *ops = info->ops;
 +	struct msi_desc *desc;
-+	int i, base = 0;
- 
--	for (i = 0; i < nvec; i++) {
--		struct msi_desc *desc;
-+	if (!list_empty(dev_to_msi_list(dev))) {
-+		desc = list_last_entry(dev_to_msi_list(dev),
-+				       struct msi_desc, list);
-+		base = desc->platform.msi_index + 1;
++	int ret = 0;
++
++	for_each_msi_entry(desc, dev) {
++		/* Don't even try the multi-MSI brain damage. */
++		if (WARN_ON(!desc->irq || desc->nvec_used != 1)) {
++			ret = -EINVAL;
++			break;
++		}
++
++		if (!(desc->irq >= virq && desc->irq < (virq + nvec)))
++			continue;
++
++		ops->set_desc(arg, desc);
++		/* Assumes the domain mutex is held! */
++		ret = irq_domain_alloc_irqs_recursive(domain, virq, 1, arg);
++		if (ret)
++			break;
++
++		irq_set_msi_desc_off(virq, 0, desc);
 +	}
- 
-+	for (i = 0; i < nvec; i++) {
- 		desc = alloc_msi_entry(dev);
- 		if (!desc)
- 			break;
- 
- 		desc->platform.msi_priv_data = data;
--		desc->platform.msi_index = i;
-+		desc->platform.msi_index = base + i;
- 		desc->nvec_used = 1;
- 
- 		list_add_tail(&desc->list, dev_to_msi_list(dev));
-@@ -142,7 +151,7 @@ static int platform_msi_alloc_descs(struct device *dev, int nvec,
- 
- 	if (i != nvec) {
- 		/* Clean up the mess */
--		platform_msi_free_descs(dev);
-+		platform_msi_free_descs(dev, base, nvec);
- 
- 		return -ENOMEM;
- 	}
-@@ -201,8 +210,7 @@ int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int nvec,
- 	 * accordingly (which would impact the max number of MSI
- 	 * capable devices).
- 	 */
--	if (!dev->msi_domain || !write_msi_msg || !nvec ||
--	    nvec > (1 << (32 - DEV_ID_SHIFT)))
-+	if (!dev->msi_domain || !write_msi_msg || !nvec || nvec > MAX_DEV_MSIS)
- 		return -EINVAL;
- 
- 	if (dev->msi_domain->bus_token != DOMAIN_BUS_PLATFORM_MSI) {
-@@ -238,7 +246,7 @@ int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int nvec,
- 	return 0;
- 
- out_free_desc:
--	platform_msi_free_descs(dev);
-+	platform_msi_free_descs(dev, 0, nvec);
- out_free_id:
- 	ida_simple_remove(&platform_msi_devid_ida, priv_data->devid);
- out_free_data:
-@@ -266,5 +274,5 @@ void platform_msi_domain_free_irqs(struct device *dev)
- 	}
- 
- 	msi_domain_free_irqs(dev->msi_domain, dev);
--	platform_msi_free_descs(dev);
-+	platform_msi_free_descs(dev, 0, MAX_DEV_MSIS);
- }
++
++	if (ret) {
++		/* Mop up the damage */
++		for_each_msi_entry(desc, dev) {
++			if (!(desc->irq >= virq && desc->irq < (virq + nvec)))
++				continue;
++
++			irq_domain_free_irqs_common(domain, desc->irq, 1);
++		}
++	}
++
++	return ret;
++}
++
+ /**
+  * msi_domain_alloc_irqs - Allocate interrupts from a MSI interrupt domain
+  * @domain:	The domain to allocate from
 -- 
 2.1.4
