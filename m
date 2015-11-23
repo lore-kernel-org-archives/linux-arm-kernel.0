@@ -1,36 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Nov 2015 17:52:38 +0100
-Subject: [RFC] asm-generic: default BUG_ON(x) to "if(x) BUG()"
-In-Reply-To: <20151123163750.GT8644@n2100.arm.linux.org.uk>
-References: <5868782.RxZY0W5S4d@wuerfel> <20151123163359.GC768@1wt.eu>
- <20151123163750.GT8644@n2100.arm.linux.org.uk>
-Message-ID: <4150271.zrLzq08T60@wuerfel>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 23 Nov 2015 11:54:09 -0500
+Subject: [PATCH] ARM: dts: keystone: k2l: fix kernel crash when
+ clk_ignore_unused is not in bootargs
+Message-ID: <1448297649-22122-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 November 2015 16:37:50 Russell King - ARM Linux wrote:
-> On Mon, Nov 23, 2015 at 05:33:59PM +0100, Willy Tarreau wrote:
-> > I think you could do better by simply calling panic("BUG!") instead as
-> > BUG() does. It will avoid the printk() call and pushing the file/line
-> > number onto the stack. It will also probably not inflate the rodata this
-> > way.
-> 
-> Does that not depend on the architectures BUG() implementation?  If an
-> architecture implements it as a signalling illegal instruction and a
-> lookup table, changing it to be a panic() would probably be more code.
+Currently kernel crash randomly when K2L EVM is booted without
+clk_ignore_unused in the bootargs. This workaround is not needed
+on other K2 devices such as K2HK and K2E and with this fix, we can
+remove the workaround altogether. netcp driver on K2L uses linked
+ram on OSR (On chip Static RAM) and requires the clock to this peripheral
+enabled for proper functioning. This is the reason for the kernel crash.
+So add the clock node to fix this issue.
 
-Correct, overall, we are down to a 1.40% size reduction compared to
-1.70% without my patch and 1.49% with my version:
+While at it, remove the workaround documentation as well.
 
-section     CONFIG_BUG=y    CONFIG_BUG=n    CONFIG_BUG=n+patch    panic("BUG!")
+With the fix applied, clk_summary dump shows the clock to OSR enabled.
 
- .text            8320248   |     8180944   |     8207688	|  8221848
- .rodata          3633720   |     3567144   |     3570648	|  3567344
- __bug_table        32508   |         ---   |         ---	|      ---
- __modver             692   |        1584   |        2176	|     1384
- .init.text        558132   |      548300   |      550088	|   550592
- .exit.text         12380   |       12256   |       12380	|    12448
- .data            1016672   |     1016064   |     1016128	|  1016064
- Total           14622556   |    14374510   |    14407326	| 14417898
+cat /sys/kernel/debug/clk/clk_summary
+ ------cut--------------
+   tcp3d-1                   0            0   399360000          0 0
+   tcp3d-0                   0            0   399360000          0 0
+   osr                       1            1   399360000          0 0
+   fftc-0                    0            0   399360000          0 0
+ -----cut----------------
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ Applies to Linux 4.4-rc2
+ Documentation/arm/keystone/Overview.txt | 18 ------------------
+ arch/arm/boot/dts/k2l-netcp.dtsi        |  2 +-
+ 2 files changed, 1 insertion(+), 19 deletions(-)
 
-	Arnd
+diff --git a/Documentation/arm/keystone/Overview.txt b/Documentation/arm/keystone/Overview.txt
+index f17bc4c..400c0c2 100644
+--- a/Documentation/arm/keystone/Overview.txt
++++ b/Documentation/arm/keystone/Overview.txt
+@@ -49,24 +49,6 @@ specified through DTS. Following are the DTS used:-
+ The device tree documentation for the keystone machines are located at
+         Documentation/devicetree/bindings/arm/keystone/keystone.txt
+ 
+-Known issues & workaround
+--------------------------
+-
+-Some of the device drivers used on keystone are re-used from that from
+-DaVinci and other TI SoCs. These device drivers may use clock APIs directly.
+-Some of the keystone specific drivers such as netcp uses run time power
+-management API instead to enable clock. As this API has limitations on
+-keystone, following workaround is needed to boot Linux.
+-
+-   Add 'clk_ignore_unused' to the bootargs env variable in u-boot. Otherwise
+-   clock frameworks will try to disable clocks that are unused and disable
+-   the hardware. This is because netcp related power domain and clock
+-   domains are enabled in u-boot as run time power management API currently
+-   doesn't enable clocks for netcp due to a limitation. This workaround is
+-   expected to be removed in the future when proper API support becomes
+-   available. Until then, this work around is needed.
+-
+-
+ Document Author
+ ---------------
+ Murali Karicheri <m-karicheri2@ti.com>
+diff --git a/arch/arm/boot/dts/k2l-netcp.dtsi b/arch/arm/boot/dts/k2l-netcp.dtsi
+index 01aef23..5acbd0d 100644
+--- a/arch/arm/boot/dts/k2l-netcp.dtsi
++++ b/arch/arm/boot/dts/k2l-netcp.dtsi
+@@ -137,7 +137,7 @@ netcp: netcp at 26000000 {
+ 	/* NetCP address range */
+ 	ranges = <0 0x26000000 0x1000000>;
+ 
+-	clocks = <&papllclk>, <&clkcpgmac>, <&chipclk12>;
++	clocks = <&clkosr>, <&papllclk>, <&clkcpgmac>, <&chipclk12>;
+ 	dma-coherent;
+ 
+ 	ti,navigator-dmas = <&dma_gbe 0>,
+-- 
+1.9.1
