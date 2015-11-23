@@ -1,50 +1,83 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 23 Nov 2015 14:59:15 +0100
-Subject: [PATCH 2/4] mtd: nand: sunxi: add missing of_node_put
-In-Reply-To: <1447884254-26336-3-git-send-email-Julia.Lawall@lip6.fr>
-References: <1447884254-26336-1-git-send-email-Julia.Lawall@lip6.fr>
- <1447884254-26336-3-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <20151123145915.04ed6508@bbrezillon>
+From: michael.hennerich@analog.com (Michael Hennerich)
+Date: Mon, 23 Nov 2015 14:53:11 +0100
+Subject: [PATCH] backlight: adp88x0: fix uninitialized variable use
+In-Reply-To: <3850346.cL1ocQLBvP@wuerfel>
+References: <3850346.cL1ocQLBvP@wuerfel>
+Message-ID: <56531A47.5000508@analog.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Nov 2015 23:04:12 +0100
-Julia Lawall <Julia.Lawall@lip6.fr> wrote:
+On 11/23/2015 02:44 PM, Arnd Bergmann wrote:
+> gcc correctly warns about both the adp8860 and adp8870 backlight
+> drivers using an uninitialized variable in their error handling
+> path:
+>
+> drivers/video/backlight/adp8870_bl.c: In function 'adp8870_bl_ambient_light_zone_store':
+> drivers/video/backlight/adp8870_bl.c:811:11: warning: 'reg_val' may be used uninitialized in this function
+>
+> This changes the code to only write back the data if it was
+> correctly read to start with.
+>
+> As a side-note, the drivers are mostly identical, so I think they
+> should really be merged into one file to avoid having to fix every
+> bug twice.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> for_each_child_of_node performs an of_node_get on each iteration, so
-> a break out of the loop requires an of_node_put.
-> 
-> A simplified version of the semantic patch that fixes this problem is as
-> follows (http://coccinelle.lip6.fr):
-> 
-> // <smpl>
-> @@
-> expression root,e;
-> local idexpression child;
-> @@
-> 
->  for_each_child_of_node(root, child) {
->    ... when != of_node_put(child)
->        when != e = child
-> (
->    return child;
-> |
-> +  of_node_put(child);
-> ?  return ...;
-> )
->    ...
->  }
-> // </smpl>
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Acked-by: Michael Hennerich <michael.hennerich@analog.com>
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>
+> diff --git a/drivers/video/backlight/adp8860_bl.c b/drivers/video/backlight/adp8860_bl.c
+> index 98ffe71e8af2..f0d4c0324580 100644
+> --- a/drivers/video/backlight/adp8860_bl.c
+> +++ b/drivers/video/backlight/adp8860_bl.c
+> @@ -621,10 +621,12 @@ static ssize_t adp8860_bl_ambient_light_zone_store(struct device *dev,
+>
+>   		/* Set user supplied ambient light zone */
+>   		mutex_lock(&data->lock);
+> -		adp8860_read(data->client, ADP8860_CFGR, &reg_val);
+> -		reg_val &= ~(CFGR_BLV_MASK << CFGR_BLV_SHIFT);
+> -		reg_val |= (val - 1) << CFGR_BLV_SHIFT;
+> -		adp8860_write(data->client, ADP8860_CFGR, reg_val);
+> +		ret = adp8860_read(data->client, ADP8860_CFGR, &reg_val);
+> +		if (!ret) {
+> +			reg_val &= ~(CFGR_BLV_MASK << CFGR_BLV_SHIFT);
+> +			reg_val |= (val - 1) << CFGR_BLV_SHIFT;
+> +			adp8860_write(data->client, ADP8860_CFGR, reg_val);
+> +		}
+>   		mutex_unlock(&data->lock);
+>   	}
+>
+> diff --git a/drivers/video/backlight/adp8870_bl.c b/drivers/video/backlight/adp8870_bl.c
+> index 9d738352d7d4..21acac90fd77 100644
+> --- a/drivers/video/backlight/adp8870_bl.c
+> +++ b/drivers/video/backlight/adp8870_bl.c
+> @@ -807,10 +807,12 @@ static ssize_t adp8870_bl_ambient_light_zone_store(struct device *dev,
+>
+>   		/* Set user supplied ambient light zone */
+>   		mutex_lock(&data->lock);
+> -		adp8870_read(data->client, ADP8870_CFGR, &reg_val);
+> -		reg_val &= ~(CFGR_BLV_MASK << CFGR_BLV_SHIFT);
+> -		reg_val |= (val - 1) << CFGR_BLV_SHIFT;
+> -		adp8870_write(data->client, ADP8870_CFGR, reg_val);
+> +		ret = adp8870_read(data->client, ADP8870_CFGR, &reg_val);
+> +		if (!ret) {
+> +			reg_val &= ~(CFGR_BLV_MASK << CFGR_BLV_SHIFT);
+> +			reg_val |= (val - 1) << CFGR_BLV_SHIFT;
+> +			adp8870_write(data->client, ADP8870_CFGR, reg_val);
+> +		}
+>   		mutex_unlock(&data->lock);
+>   	}
+>
+>
 
-Thanks,
-
-Boris
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Greetings,
+Michael
+
+--
+Analog Devices GmbH      Wilhelm-Wagenfeld-Str. 6      80807 Muenchen
+Sitz der Gesellschaft: Muenchen; Registergericht: Muenchen HRB 40368;
+Geschaeftsfuehrer:Dr.Carsten Suckrow, Thomas Wessel, William A. Martin,
+Margaret Seif
