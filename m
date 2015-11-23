@@ -1,129 +1,52 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 23 Nov 2015 14:43:04 +0000
-Subject: [PATCH v3 14/62] arm/acpi: Add Generic Interrupt and Distributor
- struct
-In-Reply-To: <1447753261-7552-15-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-15-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511231442180.1107@kaball.uk.xensource.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Mon, 23 Nov 2015 15:45:45 +0100
+Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
+ "/chosen/linux,atags" entry
+In-Reply-To: <20151122065146.GD26074@amd>
+References: <1436214373-12969-1-git-send-email-pali.rohar@gmail.com>
+ <20150713131902.GH26485@atomide.com>
+ <20151012201640.GQ23801@atomide.com> <201510122225.12786@pali>
+ <20151012204509.GT23801@atomide.com> <20151013143746.GJ23104@pali>
+ <20151105114041.GC27908@pali> <20151105161756.GG3078@atomide.com>
+ <5643E716.9080204@gmail.com> <20151122065146.GD26074@amd>
+Message-ID: <20151123144545.GD24147@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On Sunday 22 November 2015 07:51:46 Pavel Machek wrote:
+> On Wed 2015-11-11 17:10:46, Frank Rowand wrote:
+> > Adding devicetree list.
+> > 
+> > Thread starts at
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/354459.html
+> > 
+> > On 11/5/2015 8:17 AM, Tony Lindgren wrote:
+> > > * Pali Roh?r <pali.rohar@gmail.com> [151105 03:41]:
+> > >> On Tuesday 13 October 2015 16:37:46 Pali Roh?r wrote:
+> > >>> On Monday 12 October 2015 13:45:09 Tony Lindgren wrote:
+> > >>>> * Pali Roh?r <pali.rohar@gmail.com> [151012 13:29]:
+> > >>>>> On Monday 12 October 2015 22:16:40 Tony Lindgren wrote:
+> > >>>>>>
+> > >>>>>> Pali, any news on posting an updated series with the comments
+> > >>>>>> addressed in this thread? It seems that we all pretty much agree
+> > >>>>>> what needs to be done.
+> > 
+> > I'm not real happy with the concept of patches 4 and 5 in this series.
+> > My concern is that those two patches are using the FDT as a transport
+> > mechanism for a binary blob (the atags object).
 > 
-> Add Generic Interrupt and Distributor (ACPI 5.0) structure.
-> Add new features for MADT introduced by ACPI 5.1.
-> Comment on the GIC ID field of the GIC structure which is replaced
-> by CPU Interface Number.
-> Add new fields: Redistributor Base Address, GICV, GICH, and MPIDR.
-> Add new structures for GIC MSI frame and GICR.
-> Add flag definition for GICC flags.
+> Umm. Ok. Do you have alternative proposal that works for everyone?
 > 
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> I mean. This discussion was going for quite a long time, and it would
+> be nice to have some solution... patch proposal... something.
+> 									Pavel
 
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Yes, discussion is going for a long time! So should I spend time for
+adding documentation to my solution (this is last one thing which is
+missing)? Or my solution is wrong and somebody else will propose new?
+I do not want to spend time on something which will be rejected and
+discarded.
 
-Would it make sense to add the changes for ACPI 6.0 compatibility too?
-
-
->  xen/include/acpi/actbl1.h | 69 +++++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 67 insertions(+), 2 deletions(-)
-> 
-> diff --git a/xen/include/acpi/actbl1.h b/xen/include/acpi/actbl1.h
-> index 9311e3a..2fb2ad7 100644
-> --- a/xen/include/acpi/actbl1.h
-> +++ b/xen/include/acpi/actbl1.h
-> @@ -639,7 +639,11 @@ enum acpi_madt_type {
->  	ACPI_MADT_TYPE_INTERRUPT_SOURCE = 8,
->  	ACPI_MADT_TYPE_LOCAL_X2APIC = 9,
->  	ACPI_MADT_TYPE_LOCAL_X2APIC_NMI = 10,
-> -	ACPI_MADT_TYPE_RESERVED = 11	/* 11 and greater are reserved */
-> +	ACPI_MADT_TYPE_GENERIC_INTERRUPT = 11,
-> +	ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR = 12,
-> +	ACPI_MADT_TYPE_GENERIC_MSI_FRAME = 13,
-> +	ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR = 14,
-> +	ACPI_MADT_TYPE_RESERVED = 15    /* 15 and greater are reserved */
->  };
->  
->  /*
-> @@ -760,11 +764,72 @@ struct acpi_madt_local_x2apic_nmi {
->  	u8 reserved[3];
->  };
->  
-> +/* 11: Generic Interrupt (ACPI 5.0) */
-> +
-> +struct acpi_madt_generic_interrupt {
-> +	struct acpi_subtable_header header;
-> +	u16 reserved;           /* reserved - must be zero */
-> +	u32 cpu_interface_number;
-> +	u32 uid;
-> +	u32 flags;
-> +	u32 parking_version;
-> +	u32 performance_interrupt;
-> +	u64 parked_address;
-> +	u64 base_address;
-> +	u64 gicv_base_address;
-> +	u64 gich_base_address;
-> +	u32 vgic_interrupt;
-> +	u64 gicr_base_address;
-> +	u64 arm_mpidr;
-> +};
-> +
-> +/* Masks for Flags field above */
-> +
-> +/* ACPI_MADT_ENABLED                    (1)      Processor is usable if set */
-> +#define ACPI_MADT_PERFORMANCE_IRQ_MODE  (1<<1) /* 01: Performance Interrupt Mode */
-> +#define ACPI_MADT_VGIC_IRQ_MODE         (1<<2) /* 02: VGIC Maintenance Interrupt mode */
-> +
-> +/* 12: Generic Distributor (ACPI 5.0) */
-> +
-> +struct acpi_madt_generic_distributor {
-> +	struct acpi_subtable_header header;
-> +	u16 reserved;           /* reserved - must be zero */
-> +	u32 gic_id;
-> +	u64 base_address;
-> +	u32 global_irq_base;
-> +	u32 reserved2;          /* reserved - must be zero */
-> +};
-> +
-> +/* 13: GIC MSI Frame (ACPI 5.1) */
-> +
-> +struct acpi_madt_generic_msi_frame {
-> +	struct acpi_subtable_header header;
-> +	u16 reserved;		/* reserved - must be zero */
-> +	u32 msi_frame_id;
-> +	u64 base_address;
-> +	u32 flags;
-> +	u16 spi_count;
-> +	u16 spi_base;
-> +};
-> +
-> +/* Masks for Flags field above */
-> +
-> +#define ACPI_MADT_OVERRIDE_SPI_VALUES   (1)
-> +
-> +/* 14: GIC Redistributor (ACPI 5.1) */
-> +
-> +struct acpi_madt_generic_redistributor {
-> +	struct acpi_subtable_header header;
-> +	u16 reserved;		/* reserved - must be zero */
-> +	u64 base_address;
-> +	u32 length;
-> +};
-> +
->  /*
->   * Common flags fields for MADT subtables
->   */
->  
-> -/* MADT Local APIC flags (lapic_flags) */
-> +/* MADT Local APIC flags */
->  
->  #define ACPI_MADT_ENABLED           (1)	/* 00: Processor is usable if set */
->  
-> -- 
-> 2.1.0
-> 
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
