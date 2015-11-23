@@ -1,48 +1,35 @@
-From: nyushchenko@dev.rtsoft.ru (Nikita Yushchenko)
-Date: Mon, 23 Nov 2015 15:47:34 +0300
-Subject: [RFC/PATCH] arm: do not skip SMP init calls on SMP_ON_UP case
-In-Reply-To: <5653099A.7020604@dev.rtsoft.ru>
-References: <1448279946-19975-1-git-send-email-nyushchenko@dev.rtsoft.ru>
- <20151123120317.GN8644@n2100.arm.linux.org.uk>
- <5653015C.4020405@dev.rtsoft.ru> <56530769.4030403@arm.com>
- <5653099A.7020604@dev.rtsoft.ru>
-Message-ID: <56530AE6.2060407@dev.rtsoft.ru>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Mon, 23 Nov 2015 21:01:49 +0800
+Subject: [PATCH] crypto: atmel: fix 64-bit warnings
+In-Reply-To: <4444008.DmhAgm3J77@wuerfel>
+References: <4444008.DmhAgm3J77@wuerfel>
+Message-ID: <20151123130149.GC7866@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> While running an imx6s boasrd, I got following message in boot log:
->>>>>
->>>>> [    0.032414] CPU1: failed to boot: -38
->>>>>
->>>>> This looked strange: imx6s is singe-core and kernel perfectly knows
->>>>> that. However, for some reason it tries to initialize CPU 1?
->>>>>
->>>>> I found this to be caused by
->>>>> - CONFIG_SMP_ON_UP successfully detects that system is single core,
->>>>> - this causes is_smp() to return false,
->>>>> - this causes setup_arch() to skip smp_init_cpus() call,
->>>>> - this skips board-specific code that sets cpu_possible mask.
->>>>
->>>> Right, so you should end up with the possible and present masks
->>>> containing just one CPU, which should prevent the kernel trying to
->>>> bring any secondary CPUs online.
->>>
->>> Kernel that is running here still tries to init CPU 1 for some reason.
->>
->> I *guess* cpus node [1] in your dts has more than one cpu entry, could
->> you check please?
+On Tue, Nov 17, 2015 at 10:22:06AM +0100, Arnd Bergmann wrote:
+> The atmel AES driver assumes that 'int' and 'size_t' are the same
+> type in multiple locations, which the compiler warns about when
+> building it for 64-bit systems:
 > 
-> Indeed looks so:
+> In file included from ../drivers/crypto/atmel-aes.c:17:0:
+> drivers/crypto/atmel-aes.c: In function 'atmel_aes_sg_copy':
+> include/linux/kernel.h:724:17: warning: comparison of distinct pointer types lacks a cast
+> drivers/crypto/atmel-aes.c:448:11: note: in expansion of macro 'min'
 > 
-> # ls /proc/device-tree/cpus
-> #address-cells  #size-cells  cpu at 0  cpu at 1  name
+> drivers/crypto/atmel-aes.c: In function 'atmel_aes_crypt_dma_stop':
+> include/linux/kern_levels.h:4:18: warning: format '%u' expects argument of type 'unsigned int', but argument 2 has type 'size_t {aka long unsigned int}' [-Wformat=]
 > 
-> But my custom device tree just includes imx6dl.dtsi
+> This changes the format strings to use the %z modifier when printing
+> a size_t, and makes sure that we use the correct size_t type where
+> needed. In case of sg_dma_len(), the type of the result depends
+> on CONFIG_NEED_SG_DMA_LENGTH, so we have to use min_t to get it to
+> work in all configurations.
 > 
-> So it is imx6dl.dtsi in linux-imx tree broken?..
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Just booted mainline...  unline linux-imx, it does not try to init cpu1.
-
-However, imx6dl.dtsi from mainline also has both cpu at 0 and cpu at 1
-
-So missing piece in linux-imx is elsewhere :(
+Patch applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
