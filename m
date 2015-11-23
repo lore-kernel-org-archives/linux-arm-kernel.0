@@ -1,101 +1,51 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Mon, 23 Nov 2015 11:35:42 +0300
-Subject: PING: [PATCH v9 0/4] Exynos SROMc configuration and Ethernet support
- for SMDK5410
-Message-ID: <00d601d125c9$f1231f00$d3695d00$@samsung.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 23 Nov 2015 09:40:55 +0100
+Subject: [PATCH 1/2] arm64: mm: detect bad __create_mapping uses
+In-Reply-To: <1448033724-13846-1-git-send-email-mark.rutland@arm.com>
+References: <1448033724-13846-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAKv+Gu_JuVUtD_-GrtO7fs=nW4PVNWv5A+mXkTqfc90szGRdhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello! So what's up? I see SROM driver suddenly removed from everywhere and no single word about it. What is the status?
+On 20 November 2015 at 16:35, Mark Rutland <mark.rutland@arm.com> wrote:
+> If a caller of __create_mapping provides a PA and VA which have
+> different sub-page offsets, it is not clear which offset they expect to
+> apply to the mapping, and is indicative of a bad caller.
+>
+> Disallow calls with differing sub-page offsets, and WARN when they are
+> encountered, so that we can detect and fix such cases.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Catalin Marinas <caralin.marinas@arm.com>
+> Cc: Laura Abbott <labbott@fedoraproject.org>
+> Cc: Steve Capper <steve.capper@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/mm/mmu.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-
-> -----Original Message-----
-> From: linux-samsung-soc-owner at vger.kernel.org [mailto:linux-samsung-soc-owner at vger.kernel.org]
-> On Behalf Of Pavel Fedin
-> Sent: Monday, November 16, 2015 10:43 AM
-> To: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-samsung-
-> soc at vger.kernel.org; linux-kernel at vger.kernel.org
-> Cc: Rob Herring; Pawel Moll; Mark Rutland; Ian Campbell; Kumar Gala; Kukjin Kim; Krzysztof
-> Kozlowski
-> Subject: [PATCH v9 0/4] Exynos SROMc configuration and Ethernet support for SMDK5410
-> 
-> This patch extends Exynos SROM controller driver with ability to configure
-> controller outputs and enables SMSC9115 Ethernet chip on SMDK5410 board,
-> which is connected via SROMc bank #3.
-> 
-> With this patchset, support for the whole existing SMDK range can be added.
-> Actually, only bank number is different.
-> 
-> This patchset also depends on Exynos 5410 pinctrl support, introduced by
-> patches 0003 and 0004 from this set:
-> [PATCH v4 0/5] ARM: EXYNOS: ODROID-XU DT and LEDs
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330862.html
-> 
-> Pinctrl support is necessary in order to correctly configure
-> multifunctional pins of the Exynos chip.
-> 
-> v8 => v9:
-> - Fixed node suffix in ethernet chip DT node (@3,0 instead of @3)
-> 
-> v7 => v8:
-> - More fixes to documentation
-> 
-> v6 => v7:
-> - Fixed stupid error in Tacc description in the documentation
-> 
-> v5 => v6:
-> - Even more improvements to the documentation, fixed some errors and typos.
-> - Separated adding bus ranges from generic SROMc support
-> - Some stuff renamed for even better code readability
-> - Stylistic cleanups in the DTS (everything in alphabetic order, use named
->   constant name for interrupt config byte)
-> 
-> v4 => v5:
-> - Some cosmetic changes in the dtsi ("compatible" goes first)
-> - Use correctly specified ranges for the SROMc node
-> - Reuse existing properties where possible ("reg" for bank# and
->   "reg-io-width" for data width)
-> - Separated page-mode property from timings array
-> - More improvements to the documentation
-> 
-> v3 => v4:
-> - Devices are now added as subnodes, with additional properties. This allows
->   to cleary specify dependency. If configuration fails, error will be reported
->   and child devices will not be probed.
-> - These additional properties now have "samsung,srom-XXX" format
-> - Fixed code style, now better understood.
-> 
-> v2 => v3:
-> - Fixed up SROMc region size in the device tree
-> - Reordered patches, documentation goes first now
-> 
-> v1 => v2:
-> - Fixed some typos and bad labels in device tree
-> - Improved documentation
-> 
-> Pavel Fedin (4):
->   Documentation: dt-bindings: Describe SROMc configuration
->   ARM: dts: Add SROMc to Exynos 5410
->   drivers: exynos-srom: Add support for bank configuration
->   ARM: dts: Add Ethernet chip to SMDK5410
-> 
->  .../bindings/arm/samsung/exynos-srom.txt           | 73 +++++++++++++++++++++-
->  arch/arm/boot/dts/exynos5410-smdk5410.dts          | 41 ++++++++++++
->  arch/arm/boot/dts/exynos5410.dtsi                  | 11 ++++
->  arch/arm/mach-exynos/Kconfig                       |  2 +-
->  drivers/soc/samsung/Kconfig                        |  2 +-
->  drivers/soc/samsung/exynos-srom.c                  | 61 +++++++++++++++++-
->  6 files changed, 184 insertions(+), 6 deletions(-)
-> 
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index e3f563c..3b06afa 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -300,6 +300,13 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+>  {
+>         unsigned long addr, length, end, next;
+>
+> +       /*
+> +        * If the virtual and physical address don't have the same offset
+> +        * within a page, we cannot map the region as the caller expects.
+> +        */
+> +       if (WARN_ON((phys ^ virt) & ~PAGE_MASK))
+> +               return;
+> +
+>         addr = virt & PAGE_MASK;
+>         length = PAGE_ALIGN(size + (virt & ~PAGE_MASK));
+>
 > --
-> 2.4.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 1.9.1
+>
