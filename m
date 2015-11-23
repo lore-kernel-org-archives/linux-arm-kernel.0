@@ -1,53 +1,31 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 23 Nov 2015 17:17:44 -0600
-Subject: [PATCH v3 3/6] DT: PCI: qcom: Document PCIe devicetree bindings
-In-Reply-To: <8fd3e7d1662f37abe549127d179c315dff3210d8.1448270813.git.stanimir.varbanov@linaro.org>
-References: <cover.1448270813.git.stanimir.varbanov@linaro.org>
- <8fd3e7d1662f37abe549127d179c315dff3210d8.1448270813.git.stanimir.varbanov@linaro.org>
-Message-ID: <20151123231744.GA14078@rob-hp-laptop>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 24 Nov 2015 00:20:14 +0100
+Subject: [PATCH v2 0/2] Improve drm_of_component_probe() and move rockchip
+ to use it
+In-Reply-To: <1448029325-14602-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1448029325-14602-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1737461.8xCM7oo5S1@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2015 at 11:29:00AM +0200, Stanimir Varbanov wrote:
-> From: Stanimir Varbanov <svarbanov@mm-sol.com>
+Am Freitag, 20. November 2015, 14:22:03 schrieb Liviu Dudau:
+> Hello,
 > 
-> Document Qualcomm PCIe driver devicetree bindings.
+> This is v2 of the patchset trying to make drm_of_component_probe() cope with
+> finding both local crtc ports and remote encoder ones. Heiko St?bner was
+> nice enough to test an earlier version that was patched following Russell's
+> suggestions on rk3288, but I haven't seen any reports from iMX or Armada
+> users.
 > 
-> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
-> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
-> ---
->  .../devicetree/bindings/pci/qcom,pcie.txt          |  231 ++++++++++++++++++++
->  1 file changed, 231 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/qcom,pcie.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/qcom,pcie.txt b/Documentation/devicetree/bindings/pci/qcom,pcie.txt
-> new file mode 100644
-> index 000000000000..d7640d45fa31
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/qcom,pcie.txt
-> @@ -0,0 +1,231 @@
-> +* Qualcomm PCI express root complex
-> +
-> +- compatible:
-> +	Usage: required
-> +	Value type: <stringlist>
-> +	Definition: Value shall include
-> +		    - "qcom,pcie-v0" for apq/ipq8064
-> +		    - "qcom,pcie-v1" for apq8084
+> Changelog:
+>  v2: Updated the drm_of_component_probe() comment to explain why the
+> reference count is not dropped. Fixed the compare_port() function for
+> rockchip as described by Russell.
 
-Use chip part numbers, not versions.
+Now works nicely on my rk3288-veyron-jerry again.
 
-Also, shouldn't you have the Designware compatible in addition.
+Tested-by: Heiko Stuebner <heiko@sntech.de>
 
-[...]
 
-> +
-> +- <name>-gpio:
-
-Use -gpios
-
-> +	Usage: optional
-> +	Value type: <prop-encoded-array>
-> +	Definition: List of phandle and gpio specifier pairs. Should contain
-> +		    - "perst"  PCIe endpoint reset signal line
-> +		    - "pewake" PCIe endpoint wake signal line
+Thanks
+Heiko
