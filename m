@@ -1,38 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Nov 2015 12:19:20 +0000
-Subject: [RFC/PATCH] arm: do not skip SMP init calls on SMP_ON_UP case
-In-Reply-To: <20151123121216.GO8644@n2100.arm.linux.org.uk>
-References: <1448279946-19975-1-git-send-email-nyushchenko@dev.rtsoft.ru>
- <20151123120317.GN8644@n2100.arm.linux.org.uk>
- <5653015C.4020405@dev.rtsoft.ru>
- <20151123121216.GO8644@n2100.arm.linux.org.uk>
-Message-ID: <20151123121920.GP8644@n2100.arm.linux.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 23 Nov 2015 15:21:42 +0300
+Subject: [PATCH 2/2] ARM: shmobile: alt: Correct ether pfc
+In-Reply-To: <1448263004-14548-3-git-send-email-horms+renesas@verge.net.au>
+References: <1448263004-14548-1-git-send-email-horms+renesas@verge.net.au>
+ <1448263004-14548-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <565304D6.1070801@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2015 at 12:12:16PM +0000, Russell King - ARM Linux wrote:
-> iMX6 is fairly well supported in mainline.  The only reason to use a
-> custom kernel is if you want to use some feature which mainline does
-> not support (or support very well) such as video decode, the full IPU
-> facilities, GPUs or CEC (sorry, I don't have an expansive list.)
-> 
-> The GPU problem for the GC320/GC880/GC2000 is fairly close to being
-> solved in a functional (but maybe not yet performant) manner.
+Hello.
 
-For reference, iMX6S in mainline behaves like this:
+On 11/23/2015 10:16 AM, Simon Horman wrote:
 
-Calibrating delay loop (skipped), value calculated using timer frequency.. 6.00 BogoMIPS (lpj=12000)
-pid_max: default: 32768 minimum: 301
-Mount-cache hash table entries: 1024 (order: 0, 4096 bytes)
-Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes)
-Initializing cgroup subsys net_cls
-CPU: Testing write buffer coherency: ok
-CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-Setting up static identity map for 0x100082c0 - 0x10008318
-Brought up 1 CPUs
-SMP: Total of 1 processors activated (6.00 BogoMIPS).
-CPU: All CPU(s) started in SVC mode.
+> 0c9400fab882 ("Merge branch 'heads/dt-for-v4.5' into next") introduced
+> pfc pins to the alt device tree but did not reference them. This patch
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+    Merge introduced?
+
+> fixes ether pfc by:
+>
+> * Referencing ether pins
+> * Adding and referencing phy1 pins
+> * Removing ether b pins. These are not used in the configuration
+>    of the alt board used for testing and their presence prevents
+>    ethernet from functioning correctly in that environment.
+>
+> Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+[...]
+
+MBR, Sergei
