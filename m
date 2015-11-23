@@ -1,82 +1,162 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 23 Nov 2015 16:17:13 +0800
-Subject: [PATCH 2/2] arm64: dts: berlin4ct: enable all i2c nodes for the
- STB board
-In-Reply-To: <5652CA62.50602@gmail.com>
-References: <1448012821-7413-1-git-send-email-jszhang@marvell.com>
- <1448012821-7413-3-git-send-email-jszhang@marvell.com>
- <564F8E64.7020606@gmail.com>	<20151123104958.09420cee@xhacker>
- <5652CA62.50602@gmail.com>
-Message-ID: <20151123161713.509b3294@xhacker>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 23 Nov 2015 08:26:03 +0000
+Subject: [PATCH v2 2/7] platform-msi: Factor out allocation/free of private
+ data
+In-Reply-To: <1448267168-17360-1-git-send-email-marc.zyngier@arm.com>
+References: <1448267168-17360-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1448267168-17360-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Nov 2015 09:12:18 +0100
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+As we're going to have multiple paths to allocate/free the
+platform-msi private data, factor this out into separate
+utility functions.
 
-> On 23.11.2015 03:49, Jisheng Zhang wrote:
-> > On Fri, 20 Nov 2015 22:19:32 +0100
-> > Sebastian Hesselbarth wrote:  
-> >> On 20.11.2015 10:47, Jisheng Zhang wrote:  
-> >>> Enable all i2c nodes for the Marvell berlin BG4CT STB board.
-> >>>
-> >>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> >>> ---
-> >>>   arch/arm64/boot/dts/marvell/berlin4ct-stb.dts | 50 +++++++++++++++++++++++++++
-> >>>   1 file changed, 50 insertions(+)
-> >>>
-> >>> diff --git a/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts b/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
-> >>> index 348c37e..9e8e2e0 100644
-> >>> --- a/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
-> >>> +++ b/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
-> >>> @@ -61,6 +61,56 @@
-> >>>   	};
-> >>>   };
-> >>>
-> >>> +&avio_pinctrl {
-> >>> +	twsi1_pmux: twsi1-pmux {
-> >>> +		groups = "TX_EDDC_SCL", "TX_EDDC_SDA";
-> >>> +		function = "tx_eddc";
-> >>> +	};  
-> >>
-> >> Please keep the pinmux sub-nodes in the SoC dtsi as long
-> >> as they are not strictly board specific, i.e. gpios.  
-> >
-> > Hmm, seems all boards configure this pin for EDDC usage, so it's fine
-> > to move to soc
-> >  
-> >>  
-> >>> +};
-> >>> +
-> >>> +&i2c0 {
-> >>> +	status = "okay";
-> >>> +	pinctrl-0 = <&twsi0_pmux>;
-> >>> +	pinctrl-names = "default";  
-> >>
-> >> If there is only one (or a default) pinctrl-0 option for i2c0,
-> >> you can also move it to the SoC dtsi.  
-> >
-> > Some board may not use i2c0, i2c2, i2c3 host and use the pin as gpio for other
-> > purpose. Considering the above twsi1_pmux usage, what's the better solution?
-> > move twsi1_pmux to soc's dtsi and leave i2c0, i2c2, i2c3 pinctrl in board dts?  
-> 
-> If some boards don't use i2cN, they do not enable the node in their
-> board dts. That is sufficient to not configure the pinmux as it will
-> only be set if a driver is loaded for that node.
-> 
-> If there is only one or two different pinmux settings for a specific
-> function _always_ move the pinmux setting into SoC dtsi. If there is
-> a well known default out of two or more possible settings, we may also
-> have that pinmux as a default in the i2c node and only overwrite it
-> when we have a board that uses a different setting.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/base/platform-msi.c | 94 +++++++++++++++++++++++++--------------------
+ 1 file changed, 53 insertions(+), 41 deletions(-)
 
-Got it. Thanks for the detailed explanations.
-
-> 
-> So, for i2c: Move all pinctrl/pinctrl-names properties to the SoC
-> dtsi.
-
-Will do in v2 when clk stuff is accepted.
-
-Thanks,
-Jisheng
+diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
+index 6148c78..44b8c0d 100644
+--- a/drivers/base/platform-msi.c
++++ b/drivers/base/platform-msi.c
+@@ -189,21 +189,11 @@ struct irq_domain *platform_msi_create_irq_domain(struct fwnode_handle *fwnode,
+ 	return domain;
+ }
+ 
+-/**
+- * platform_msi_domain_alloc_irqs - Allocate MSI interrupts for @dev
+- * @dev:		The device for which to allocate interrupts
+- * @nvec:		The number of interrupts to allocate
+- * @write_msi_msg:	Callback to write an interrupt message for @dev
+- *
+- * Returns:
+- * Zero for success, or an error code in case of failure
+- */
+-int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int nvec,
+-				   irq_write_msi_msg_t write_msi_msg)
++static struct platform_msi_priv_data *
++platform_msi_alloc_priv_data(struct device *dev, unsigned int nvec,
++			     irq_write_msi_msg_t write_msi_msg)
+ {
+-	struct platform_msi_priv_data *priv_data;
+-	int err;
+-
++	struct platform_msi_priv_data *datap;
+ 	/*
+ 	 * Limit the number of interrupts to 256 per device. Should we
+ 	 * need to bump this up, DEV_ID_SHIFT should be adjusted
+@@ -211,33 +201,62 @@ int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int nvec,
+ 	 * capable devices).
+ 	 */
+ 	if (!dev->msi_domain || !write_msi_msg || !nvec || nvec > MAX_DEV_MSIS)
+-		return -EINVAL;
++		return ERR_PTR(-EINVAL);
+ 
+ 	if (dev->msi_domain->bus_token != DOMAIN_BUS_PLATFORM_MSI) {
+ 		dev_err(dev, "Incompatible msi_domain, giving up\n");
+-		return -EINVAL;
++		return ERR_PTR(-EINVAL);
+ 	}
+ 
+ 	/* Already had a helping of MSI? Greed... */
+ 	if (!list_empty(dev_to_msi_list(dev)))
+-		return -EBUSY;
++		return ERR_PTR(-EBUSY);
++
++	datap = kzalloc(sizeof(*datap), GFP_KERNEL);
++	if (!datap)
++		return ERR_PTR(-ENOMEM);
++
++	datap->devid = ida_simple_get(&platform_msi_devid_ida,
++				      0, 1 << DEV_ID_SHIFT, GFP_KERNEL);
++	if (datap->devid < 0) {
++		int err = datap->devid;
++		kfree(datap);
++		return ERR_PTR(err);
++	}
+ 
+-	priv_data = kzalloc(sizeof(*priv_data), GFP_KERNEL);
+-	if (!priv_data)
+-		return -ENOMEM;
++	datap->write_msg = write_msi_msg;
+ 
+-	priv_data->devid = ida_simple_get(&platform_msi_devid_ida,
+-					  0, 1 << DEV_ID_SHIFT, GFP_KERNEL);
+-	if (priv_data->devid < 0) {
+-		err = priv_data->devid;
+-		goto out_free_data;
+-	}
++	return datap;
++}
++
++static void platform_msi_free_priv_data(struct platform_msi_priv_data *data)
++{
++	ida_simple_remove(&platform_msi_devid_ida, data->devid);
++	kfree(data);
++}
++
++/**
++ * platform_msi_domain_alloc_irqs - Allocate MSI interrupts for @dev
++ * @dev:		The device for which to allocate interrupts
++ * @nvec:		The number of interrupts to allocate
++ * @write_msi_msg:	Callback to write an interrupt message for @dev
++ *
++ * Returns:
++ * Zero for success, or an error code in case of failure
++ */
++int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int nvec,
++				   irq_write_msi_msg_t write_msi_msg)
++{
++	struct platform_msi_priv_data *priv_data;
++	int err;
+ 
+-	priv_data->write_msg = write_msi_msg;
++	priv_data = platform_msi_alloc_priv_data(dev, nvec, write_msi_msg);
++	if (IS_ERR(priv_data))
++		return PTR_ERR(priv_data);
+ 
+ 	err = platform_msi_alloc_descs(dev, nvec, priv_data);
+ 	if (err)
+-		goto out_free_id;
++		goto out_free_priv_data;
+ 
+ 	err = msi_domain_alloc_irqs(dev->msi_domain, dev, nvec);
+ 	if (err)
+@@ -247,10 +266,8 @@ int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int nvec,
+ 
+ out_free_desc:
+ 	platform_msi_free_descs(dev, 0, nvec);
+-out_free_id:
+-	ida_simple_remove(&platform_msi_devid_ida, priv_data->devid);
+-out_free_data:
+-	kfree(priv_data);
++out_free_priv_data:
++	platform_msi_free_priv_data(priv_data);
+ 
+ 	return err;
+ }
+@@ -261,16 +278,11 @@ out_free_data:
+  */
+ void platform_msi_domain_free_irqs(struct device *dev)
+ {
+-	struct msi_desc *desc;
+-
+-	desc = first_msi_entry(dev);
+-	if (desc) {
+-		struct platform_msi_priv_data *data;
+-
+-		data = desc->platform.msi_priv_data;
++	if (!list_empty(dev_to_msi_list(dev))) {
++		struct msi_desc *desc;
+ 
+-		ida_simple_remove(&platform_msi_devid_ida, data->devid);
+-		kfree(data);
++		desc = first_msi_entry(dev);
++		platform_msi_free_priv_data(desc->platform.msi_priv_data);
+ 	}
+ 
+ 	msi_domain_free_irqs(dev->msi_domain, dev);
+-- 
+2.1.4
