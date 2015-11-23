@@ -1,54 +1,26 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Nov 2015 16:16:44 +0900
-Subject: [PATCH 2/2] ARM: shmobile: alt: Correct ether pfc
-In-Reply-To: <1448263004-14548-1-git-send-email-horms+renesas@verge.net.au>
-References: <1448263004-14548-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1448263004-14548-3-git-send-email-horms+renesas@verge.net.au>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 23 Nov 2015 15:18:05 +0800
+Subject: [PATCH 1/3] rtc: sunxi: fix signedness issues
+In-Reply-To: <1447930210-27008-1-git-send-email-clabbe.montjoie@gmail.com>
+References: <1447930210-27008-1-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <CAGb2v66odj__GMWy8sgc0b5df5FR1V3p-EhL2f-QMM8krA3Oqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-0c9400fab882 ("Merge branch 'heads/dt-for-v4.5' into next") introduced
-pfc pins to the alt device tree but did not reference them. This patch
-fixes ether pfc by:
+On Thu, Nov 19, 2015 at 6:50 PM, LABBE Corentin
+<clabbe.montjoie@gmail.com> wrote:
+> The variable year must be set as unsigned since it is used with
+> sunxi_rtc_data_year{.min|.max} and as parameter of is_leap_year() which
+> wait for unsigned int.
+> Only tm_year is not unsigned, but it is long.
+> This patch fix also the format of printing of min/max. (must use %u since
+> they are unsigned)
+>
+> The parameter to of sunxi_rtc_setaie() must be set to uint since callers
+> give always uint data.
+>
+> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
 
-* Referencing ether pins
-* Adding and referencing phy1 pins
-* Removing ether b pins. These are not used in the configuration
-  of the alt board used for testing and their presence prevents
-  ethernet from functioning correctly in that environment.
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7794-alt.dts | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
-index 412eb7ad86db..7c72494f51b0 100644
---- a/arch/arm/boot/dts/r8a7794-alt.dts
-+++ b/arch/arm/boot/dts/r8a7794-alt.dts
-@@ -111,9 +111,9 @@
- 		renesas,function = "eth";
- 	};
- 
--	ether_b_pins: ether {
--		renesas,groups = "eth_link_b", "eth_mdio_b", "eth_rmii_b";
--		renesas,function = "eth";
-+	phy1_pins: phy1 {
-+		renesas,groups = "intc_irq8";
-+		renesas,function = "intc";
- 	};
- 
- 	i2c1_pins: i2c1 {
-@@ -132,6 +132,9 @@
- };
- 
- &ether {
-+	pinctrl-0 = <&ether_pins &phy1_pins>;
-+	pinctrl-names = "default";
-+
- 	phy-handle = <&phy1>;
- 	renesas,ether-link-active-low;
- 	status = "okay";
--- 
-2.1.4
+Would've preferred you not changing the whitespace on the dev_err line though.
