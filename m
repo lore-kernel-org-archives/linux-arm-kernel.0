@@ -1,98 +1,87 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 23 Nov 2015 12:59:53 +0800
-Subject: [PATCH RESEND 1/8] arm: dts: berlin2q: add watchdog nodes
-In-Reply-To: <564F8062.8070609@gmail.com>
-References: <1447672194-483-1-git-send-email-jszhang@marvell.com>
- <1447672194-483-2-git-send-email-jszhang@marvell.com>
- <564E3549.2050700@gmail.com>	<20151120113414.1aa1e48e@xhacker>
- <564F8062.8070609@gmail.com>
-Message-ID: <20151123125953.5c30a0ef@xhacker>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 23 Nov 2015 13:09:43 +0800
+Subject: [PATCH] bus: imx-weim: Fix deferred probing
+In-Reply-To: <5623FD68.4070801@gmail.com>
+References: <5623FD68.4070801@gmail.com>
+Message-ID: <20151123050943.GE13744@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Nov 2015 21:19:46 +0100
-Sebastian Hesselbarth wrote:
+On Sun, Oct 18, 2015 at 10:13:28PM +0200, Heiner Kallweit wrote:
+> With CONFIG_DELAY_DEVICE_PROBES being set the weim driver
+> isn't loadad because module_platform_driver_probe is
+> incompatible with deferred probing.
 
-> On 20.11.2015 04:34, Jisheng Zhang wrote:
-> > On Thu, 19 Nov 2015 21:47:05 +0100
-> > Sebastian Hesselbarth wrote:  
-> >> On 16.11.2015 12:09, Jisheng Zhang wrote:  
-> >>> The Marvell Berlin BG2Q has 3 watchdogs which are compatible with the
-> >>> snps,dw-wdt driver sit in the sysmgr domain. This patch adds the
-> >>> corresponding device tree nodes.
-> >>>
-> >>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> >>> ---
-> >>>  arch/arm/boot/dts/berlin2q.dtsi | 24 ++++++++++++++++++++++++
-> >>>  1 file changed, 24 insertions(+)
-> >>>
-> >>> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-> >>> index a3ecde5..fac4315 100644
-> >>> --- a/arch/arm/boot/dts/berlin2q.dtsi
-> >>> +++ b/arch/arm/boot/dts/berlin2q.dtsi
-> >>> @@ -483,6 +483,30 @@
-> >>>  			ranges = <0 0xfc0000 0x10000>;
-> >>>  			interrupt-parent = <&sic>;
-> >>>  
-> >>> +			wdt0: watchdog at 1000 {
-> >>> +				compatible = "snps,dw-wdt";
-> >>> +				reg = <0x1000 0x100>;
-> >>> +				clocks = <&refclk>;
-> >>> +				interrupts = <0>;
-> >>> +				status = "disabled";    
-> >>
-> >> as the watchdogs are internal and cannot be clock gated
-> >> at all, how about we remove the status = "disabled" and
-> >> make them always available?  
-> > 
-> > there are two issues here:
-> > 
-> > 1. the dw-wdt can't support multiple variants now. I have rewrite the driver
-> > with watchdog core supplied framework, but the patch isn't sent out and
-> > may be need time to clean up and review.  
-> 
-> Ok.
-> 
-> > 2. not all dw-wdt devices are available and functional. This depends on
-> > board design and configuration.  
-> 
-> I understand that "board design and configuration" may hinder the wdt
-> to issue a hard reset. But all others are able to issue a soft reset
-> or just an interrupt, right?
-> 
-> So, I still don't see why we should disable wdt nodes by default
-> except for the driver issue above.
-> 
-> > So IMHO status=disabled and patch5-8 is necessary, what do you think?  
-> 
-> No. I'd agree to enable wdt0 by default and leave wdt[1,2] disabled
-> because of the driver issue. Patches 5-8 only enable wdt0 anyway.
+It seems that DELAY_DEVICE_PROBES did not make its way to mainline?
 
-That's fine.
+Shawn
 
 > 
-> As soon as the driver issue is resolved, we enable all wdt nodes
-> unconditionally.
-
-I will submit patch for the wdt driver and hope it will be merged
-in v4.5.
-
-Thanks,
-Jisheng
-
+> Fix this by using builtin_platform_driver instead.
+> Going with deferred probing also means we have to drop
+> the __init annotations.
 > 
-> Sebastian
+> Successfully tested on a I.MX6-based system.
 > 
-> >> I have applied patches 1-4 with the status property removed.
-> >> This also renders patches 5-8 useless.
-> >>
-> >> So, for now tentatively
-> >>
-> >> Appled to berlin/dt and berlin64/dt respectivly
-> >>
-> >> with status property removed.
-> >>
-> >> Sebastian
-> >>  
-> >   
+> I send the patch to linux-arm-kernel as the kernel MAINTAINERS
+> file doesn't list a dedicated maintainer.
+> 
+> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+> ---
+>  drivers/bus/imx-weim.c | 11 ++++++-----
+>  1 file changed, 6 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
+> index e98d15e..7c425d3 100644
+> --- a/drivers/bus/imx-weim.c
+> +++ b/drivers/bus/imx-weim.c
+> @@ -59,7 +59,7 @@ static const struct of_device_id weim_id_table[] = {
+>  };
+>  MODULE_DEVICE_TABLE(of, weim_id_table);
+>  
+> -static int __init imx_weim_gpr_setup(struct platform_device *pdev)
+> +static int imx_weim_gpr_setup(struct platform_device *pdev)
+>  {
+>  	struct device_node *np = pdev->dev.of_node;
+>  	struct property *prop;
+> @@ -109,7 +109,7 @@ err:
+>  }
+>  
+>  /* Parse and set the timing for this device. */
+> -static int __init weim_timing_setup(struct device_node *np, void __iomem *base,
+> +static int weim_timing_setup(struct device_node *np, void __iomem *base,
+>  				    const struct imx_weim_devtype *devtype)
+>  {
+>  	u32 cs_idx, value[devtype->cs_regs_count];
+> @@ -135,7 +135,7 @@ static int __init weim_timing_setup(struct device_node *np, void __iomem *base,
+>  	return 0;
+>  }
+>  
+> -static int __init weim_parse_dt(struct platform_device *pdev,
+> +static int weim_parse_dt(struct platform_device *pdev,
+>  				void __iomem *base)
+>  {
+>  	const struct of_device_id *of_id = of_match_device(weim_id_table,
+> @@ -172,7 +172,7 @@ static int __init weim_parse_dt(struct platform_device *pdev,
+>  	return ret;
+>  }
+>  
+> -static int __init weim_probe(struct platform_device *pdev)
+> +static int weim_probe(struct platform_device *pdev)
+>  {
+>  	struct resource *res;
+>  	struct clk *clk;
+> @@ -209,8 +209,9 @@ static struct platform_driver weim_driver = {
+>  		.name		= "imx-weim",
+>  		.of_match_table	= weim_id_table,
+>  	},
+> +	.probe = weim_probe,
+>  };
+> -module_platform_driver_probe(weim_driver, weim_probe);
+> +builtin_platform_driver(weim_driver);
+>  
+>  MODULE_AUTHOR("Freescale Semiconductor Inc.");
+>  MODULE_DESCRIPTION("i.MX EIM Controller Driver");
+> -- 
+> 2.6.1
 > 
