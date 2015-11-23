@@ -1,55 +1,129 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 23 Nov 2015 10:06:23 +0100
-Subject: [PATCH v3 03/13] arm64/efi: mark UEFI reserved regions as
- MEMBLOCK_NOMAP
+Date: Mon, 23 Nov 2015 10:06:27 +0100
+Subject: [PATCH v3 07/13] ARM: split off core mapping logic from create_mapping
 In-Reply-To: <1448269593-20758-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1448269593-20758-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1448269593-20758-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1448269593-20758-8-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the EFI memory reservation logic to use memblock_mark_nomap()
-rather than memblock_reserve() to mark UEFI reserved regions as
-occupied. In addition to reserving them against allocations done by
-memblock, this will also prevent them from being covered by the linear
-mapping.
+In order to be able to reuse the core mapping logic of create_mapping
+for mapping the UEFI Runtime Services into a private set of page tables,
+split it off from create_mapping() into a separate function
+__create_mapping which we will wire up in a subsequent patch.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/efi.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/mm/mmu.c | 56 +++++++++++---------
+ 1 file changed, 31 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 3aeb576965c0..d746d15c882f 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -187,7 +187,7 @@ static __init void reserve_regions(void)
- 			early_init_dt_add_memory_arch(paddr, size);
- 
- 		if (is_reserve_region(md)) {
--			memblock_reserve(paddr, size);
-+			memblock_mark_nomap(paddr, size);
- 			if (efi_enabled(EFI_DBG))
- 				pr_cont("*");
- 		}
-@@ -209,8 +209,6 @@ void __init efi_init(void)
- 
- 	efi_system_table = params.system_table;
- 
--	memblock_reserve(params.mmap & PAGE_MASK,
--			 PAGE_ALIGN(params.mmap_size + (params.mmap & ~PAGE_MASK)));
- 	memmap.phys_map = params.mmap;
- 	memmap.map = early_memremap(params.mmap, params.mmap_size);
- 	if (memmap.map == NULL) {
-@@ -230,6 +228,9 @@ void __init efi_init(void)
- 
- 	reserve_regions();
- 	early_memunmap(memmap.map, params.mmap_size);
-+	memblock_mark_nomap(params.mmap & PAGE_MASK,
-+			    PAGE_ALIGN(params.mmap_size +
-+				       (params.mmap & ~PAGE_MASK)));
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index de19f90221e2..3100de92148b 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -818,7 +818,8 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
  }
  
- static bool __init efi_virtmap_init(void)
+ #ifndef CONFIG_ARM_LPAE
+-static void __init create_36bit_mapping(struct map_desc *md,
++static void __init create_36bit_mapping(struct mm_struct *mm,
++					struct map_desc *md,
+ 					const struct mem_type *type)
+ {
+ 	unsigned long addr, length, end;
+@@ -859,7 +860,7 @@ static void __init create_36bit_mapping(struct map_desc *md,
+ 	 */
+ 	phys |= (((md->pfn >> (32 - PAGE_SHIFT)) & 0xF) << 20);
+ 
+-	pgd = pgd_offset_k(addr);
++	pgd = pgd_offset(mm, addr);
+ 	end = addr + length;
+ 	do {
+ 		pud_t *pud = pud_offset(pgd, addr);
+@@ -876,33 +877,13 @@ static void __init create_36bit_mapping(struct map_desc *md,
+ }
+ #endif	/* !CONFIG_ARM_LPAE */
+ 
+-/*
+- * Create the page directory entries and any necessary
+- * page tables for the mapping specified by `md'.  We
+- * are able to cope here with varying sizes and address
+- * offsets, and we take full advantage of sections and
+- * supersections.
+- */
+-static void __init create_mapping(struct map_desc *md)
++static void __init __create_mapping(struct mm_struct *mm, struct map_desc *md)
+ {
+ 	unsigned long addr, length, end;
+ 	phys_addr_t phys;
+ 	const struct mem_type *type;
+ 	pgd_t *pgd;
+ 
+-	if (md->virtual != vectors_base() && md->virtual < TASK_SIZE) {
+-		pr_warn("BUG: not creating mapping for 0x%08llx@0x%08lx in user region\n",
+-			(long long)__pfn_to_phys((u64)md->pfn), md->virtual);
+-		return;
+-	}
+-
+-	if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
+-	    md->virtual >= PAGE_OFFSET && md->virtual < FIXADDR_START &&
+-	    (md->virtual < VMALLOC_START || md->virtual >= VMALLOC_END)) {
+-		pr_warn("BUG: mapping for 0x%08llx at 0x%08lx out of vmalloc space\n",
+-			(long long)__pfn_to_phys((u64)md->pfn), md->virtual);
+-	}
+-
+ 	type = &mem_types[md->type];
+ 
+ #ifndef CONFIG_ARM_LPAE
+@@ -910,7 +891,7 @@ static void __init create_mapping(struct map_desc *md)
+ 	 * Catch 36-bit addresses
+ 	 */
+ 	if (md->pfn >= 0x100000) {
+-		create_36bit_mapping(md, type);
++		create_36bit_mapping(mm, md, type);
+ 		return;
+ 	}
+ #endif
+@@ -925,7 +906,7 @@ static void __init create_mapping(struct map_desc *md)
+ 		return;
+ 	}
+ 
+-	pgd = pgd_offset_k(addr);
++	pgd = pgd_offset(mm, addr);
+ 	end = addr + length;
+ 	do {
+ 		unsigned long next = pgd_addr_end(addr, end);
+@@ -938,6 +919,31 @@ static void __init create_mapping(struct map_desc *md)
+ }
+ 
+ /*
++ * Create the page directory entries and any necessary
++ * page tables for the mapping specified by `md'.  We
++ * are able to cope here with varying sizes and address
++ * offsets, and we take full advantage of sections and
++ * supersections.
++ */
++static void __init create_mapping(struct map_desc *md)
++{
++	if (md->virtual != vectors_base() && md->virtual < TASK_SIZE) {
++		pr_warn("BUG: not creating mapping for 0x%08llx@0x%08lx in user region\n",
++			(long long)__pfn_to_phys((u64)md->pfn), md->virtual);
++		return;
++	}
++
++	if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
++	    md->virtual >= PAGE_OFFSET && md->virtual < FIXADDR_START &&
++	    (md->virtual < VMALLOC_START || md->virtual >= VMALLOC_END)) {
++		pr_warn("BUG: mapping for 0x%08llx at 0x%08lx out of vmalloc space\n",
++			(long long)__pfn_to_phys((u64)md->pfn), md->virtual);
++	}
++
++	__create_mapping(&init_mm, md);
++}
++
++/*
+  * Create the architecture specific mappings
+  */
+ void __init iotable_init(struct map_desc *io_desc, int nr)
 -- 
 1.9.1
