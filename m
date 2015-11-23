@@ -1,59 +1,64 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Mon, 23 Nov 2015 11:16:52 +0100
-Subject: [PATCH v2 1/5] of/irq: export of_irq_find_parent again
+Date: Mon, 23 Nov 2015 11:16:53 +0100
+Subject: [PATCH v2 2/5] irqdomain: introduce irq_of_phandle_args_to_fwspec
 In-Reply-To: <1448273816-11290-1-git-send-email-carlo@caione.org>
 References: <1448273816-11290-1-git-send-email-carlo@caione.org>
-Message-ID: <1448273816-11290-2-git-send-email-carlo@caione.org>
+Message-ID: <1448273816-11290-3-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Carlo Caione <carlo@endlessm.com>
 
-of_irq_find_parent was made static since it had no users outside of
-of_irq.c. Export it again since we are going to use it again.
+Export of_phandle_args_to_fwspec with a new compliant name.
 
 Signed-off-by: Carlo Caione <carlo@endlessm.com>
 ---
- drivers/of/irq.c       | 2 +-
- include/linux/of_irq.h | 6 ++++++
- 2 files changed, 7 insertions(+), 1 deletion(-)
+ include/linux/of_irq.h | 2 ++
+ kernel/irq/irqdomain.c | 5 +++--
+ 2 files changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-index 902b89b..45735d5 100644
---- a/drivers/of/irq.c
-+++ b/drivers/of/irq.c
-@@ -53,7 +53,7 @@ EXPORT_SYMBOL_GPL(irq_of_parse_and_map);
-  * Returns a pointer to the interrupt parent node, or NULL if the interrupt
-  * parent could not be determined.
-  */
--static struct device_node *of_irq_find_parent(struct device_node *child)
-+struct device_node *of_irq_find_parent(struct device_node *child)
- {
- 	struct device_node *p;
- 	const __be32 *parp;
 diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
-index 039f2ee..6f879c6 100644
+index 6f879c6..66bd92e 100644
 --- a/include/linux/of_irq.h
 +++ b/include/linux/of_irq.h
-@@ -94,6 +94,7 @@ static inline void of_msi_configure(struct device *dev, struct device_node *np)
-  */
- extern unsigned int irq_of_parse_and_map(struct device_node *node, int index);
- u32 of_msi_map_rid(struct device *dev, struct device_node *msi_np, u32 rid_in);
-+extern struct device_node *of_irq_find_parent(struct device_node *child);
- 
- #else /* !CONFIG_OF && !CONFIG_SPARC */
- static inline unsigned int irq_of_parse_and_map(struct device_node *dev,
-@@ -107,6 +108,11 @@ static inline u32 of_msi_map_rid(struct device *dev,
- {
- 	return rid_in;
+@@ -34,6 +34,8 @@ static inline int of_irq_parse_oldworld(struct device_node *device, int index,
+ extern int of_irq_parse_raw(const __be32 *addr, struct of_phandle_args *out_irq);
+ extern int of_irq_parse_one(struct device_node *device, int index,
+ 			  struct of_phandle_args *out_irq);
++extern void irq_of_phandle_args_to_fwspec(struct of_phandle_args *irq_data,
++					  struct irq_fwspec *fwspec);
+ extern unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data);
+ extern int of_irq_to_resource(struct device_node *dev, int index,
+ 			      struct resource *r);
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index 22aa961..b2ff223 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -554,7 +554,7 @@ static int irq_domain_translate(struct irq_domain *d,
+ 	return 0;
  }
-+
-+static inline void *of_irq_find_parent(struct device_node *child)
-+{
-+	return NULL;
-+}
- #endif /* !CONFIG_OF */
  
- #endif /* __OF_IRQ_H */
+-static void of_phandle_args_to_fwspec(struct of_phandle_args *irq_data,
++void irq_of_phandle_args_to_fwspec(struct of_phandle_args *irq_data,
+ 				      struct irq_fwspec *fwspec)
+ {
+ 	int i;
+@@ -565,6 +565,7 @@ static void of_phandle_args_to_fwspec(struct of_phandle_args *irq_data,
+ 	for (i = 0; i < irq_data->args_count; i++)
+ 		fwspec->param[i] = irq_data->args[i];
+ }
++EXPORT_SYMBOL_GPL(irq_of_phandle_args_to_fwspec);
+ 
+ unsigned int irq_create_fwspec_mapping(struct irq_fwspec *fwspec)
+ {
+@@ -618,7 +619,7 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
+ {
+ 	struct irq_fwspec fwspec;
+ 
+-	of_phandle_args_to_fwspec(irq_data, &fwspec);
++	irq_of_phandle_args_to_fwspec(irq_data, &fwspec);
+ 	return irq_create_fwspec_mapping(&fwspec);
+ }
+ EXPORT_SYMBOL_GPL(irq_create_of_mapping);
 -- 
 2.5.0
