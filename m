@@ -1,52 +1,98 @@
-From: fengguang.wu@intel.com (Fengguang Wu)
-Date: Mon, 23 Nov 2015 12:42:43 +0800
-Subject: [arm:drm-etnaviv-devel 3/149]
- drivers/staging/etnaviv/etnaviv_iommu.c:96:8: error: 'struct iommu_domain'
- has no member named 'priv'
-In-Reply-To: <20151116184106.GA8644@n2100.arm.linux.org.uk>
-References: <201511170205.1DddFiK9%fengguang.wu@intel.com>
- <20151116184106.GA8644@n2100.arm.linux.org.uk>
-Message-ID: <20151123044243.GB15973@wfg-t540p.sh.intel.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 23 Nov 2015 12:59:53 +0800
+Subject: [PATCH RESEND 1/8] arm: dts: berlin2q: add watchdog nodes
+In-Reply-To: <564F8062.8070609@gmail.com>
+References: <1447672194-483-1-git-send-email-jszhang@marvell.com>
+ <1447672194-483-2-git-send-email-jszhang@marvell.com>
+ <564E3549.2050700@gmail.com>	<20151120113414.1aa1e48e@xhacker>
+ <564F8062.8070609@gmail.com>
+Message-ID: <20151123125953.5c30a0ef@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 06:41:06PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Nov 17, 2015 at 02:30:06AM +0800, kbuild test robot wrote:
-> > tree:   http://repo.or.cz/linux-2.6/linux-2.6-arm.git drm-etnaviv-devel
-> > head:   77c57a5498ebe5c85b4a71fbcf800a9140f9a697
-> > commit: b920a1d21ac9c12ddb174daca7d99ab81d791ad6 [3/149] staging: etnaviv: add drm driver
-> > config: i386-randconfig-r0-201546 (attached as .config)
-> > reproduce:
-> >         git checkout b920a1d21ac9c12ddb174daca7d99ab81d791ad6
-> >         # save the attached .config to linux build tree
-> >         make ARCH=i386 
+On Fri, 20 Nov 2015 21:19:46 +0100
+Sebastian Hesselbarth wrote:
+
+> On 20.11.2015 04:34, Jisheng Zhang wrote:
+> > On Thu, 19 Nov 2015 21:47:05 +0100
+> > Sebastian Hesselbarth wrote:  
+> >> On 16.11.2015 12:09, Jisheng Zhang wrote:  
+> >>> The Marvell Berlin BG2Q has 3 watchdogs which are compatible with the
+> >>> snps,dw-wdt driver sit in the sysmgr domain. This patch adds the
+> >>> corresponding device tree nodes.
+> >>>
+> >>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> >>> ---
+> >>>  arch/arm/boot/dts/berlin2q.dtsi | 24 ++++++++++++++++++++++++
+> >>>  1 file changed, 24 insertions(+)
+> >>>
+> >>> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+> >>> index a3ecde5..fac4315 100644
+> >>> --- a/arch/arm/boot/dts/berlin2q.dtsi
+> >>> +++ b/arch/arm/boot/dts/berlin2q.dtsi
+> >>> @@ -483,6 +483,30 @@
+> >>>  			ranges = <0 0xfc0000 0x10000>;
+> >>>  			interrupt-parent = <&sic>;
+> >>>  
+> >>> +			wdt0: watchdog at 1000 {
+> >>> +				compatible = "snps,dw-wdt";
+> >>> +				reg = <0x1000 0x100>;
+> >>> +				clocks = <&refclk>;
+> >>> +				interrupts = <0>;
+> >>> +				status = "disabled";    
+> >>
+> >> as the watchdogs are internal and cannot be clock gated
+> >> at all, how about we remove the status = "disabled" and
+> >> make them always available?  
 > > 
-> > Note: the arm/drm-etnaviv-devel HEAD 77c57a5498ebe5c85b4a71fbcf800a9140f9a697 builds fine.
-> >       It only hurts bisectibility.
+> > there are two issues here:
+> > 
+> > 1. the dw-wdt can't support multiple variants now. I have rewrite the driver
+> > with watchdog core supplied framework, but the patch isn't sent out and
+> > may be need time to clean up and review.  
 > 
-> It's great that this is getting some testing, but it doesn't need to be
-> on a per-commit basis as this is a development branch for this driver.
-
-OK.
-
-> The failing commit is a consolidation commit of Christian's work which
-> has been forward-ported across different kernel versions (and will
-> remain so.)  So, each time I forward-port this branch, you're going
-> to hit the same error but with a different commit ID.
-
-FYI the robot will auto ignore already reported errors. So rebase
-won't trigger duplicate reports. Anyway I've disabled per-commit
-testing for this branch.
-
-> As it's someone elses work, I won't be merging a fix into the commit.
+> Ok.
 > 
-> The other point is that the branch as it stands will never be going into
-> the mainline kernel: when the driver does get merged, it will be as a
-> very small number of consolidated patches.
+> > 2. not all dw-wdt devices are available and functional. This depends on
+> > board design and configuration.  
 > 
-> It does make sense to build-test the branch head commit though.
+> I understand that "board design and configuration" may hinder the wdt
+> to issue a hard reset. But all others are able to issue a soft reset
+> or just an interrupt, right?
+> 
+> So, I still don't see why we should disable wdt nodes by default
+> except for the driver issue above.
+> 
+> > So IMHO status=disabled and patch5-8 is necessary, what do you think?  
+> 
+> No. I'd agree to enable wdt0 by default and leave wdt[1,2] disabled
+> because of the driver issue. Patches 5-8 only enable wdt0 anyway.
 
-OK.
+That's fine.
+
+> 
+> As soon as the driver issue is resolved, we enable all wdt nodes
+> unconditionally.
+
+I will submit patch for the wdt driver and hope it will be merged
+in v4.5.
 
 Thanks,
-Fengguang
+Jisheng
+
+> 
+> Sebastian
+> 
+> >> I have applied patches 1-4 with the status property removed.
+> >> This also renders patches 5-8 useless.
+> >>
+> >> So, for now tentatively
+> >>
+> >> Appled to berlin/dt and berlin64/dt respectivly
+> >>
+> >> with status property removed.
+> >>
+> >> Sebastian
+> >>  
+> >   
+> 
