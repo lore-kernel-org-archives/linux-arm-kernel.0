@@ -1,62 +1,45 @@
-From: heiko.carstens@de.ibm.com (Heiko Carstens)
-Date: Mon, 23 Nov 2015 10:53:02 +0100
-Subject: [PATCH 1/2] arch: consolidate CONFIG_STRICT_DEVM in
- lib/Kconfig.debug
-In-Reply-To: <20151122035702.9313.52457.stgit@dwillia2-desk3.jf.intel.com>
-References: <20151122035702.9313.52457.stgit@dwillia2-desk3.jf.intel.com>
-Message-ID: <20151123095302.GA4436@osiris>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Nov 2015 10:59:36 +0100
+Subject: [PATCH v3 1/6] PCI: designware: remove wrong io_base assignment
+In-Reply-To: <44d133d5ebd4f7b9e8b817aa8bae12f690e70000.1448270813.git.stanimir.varbanov@linaro.org>
+References: <cover.1448270813.git.stanimir.varbanov@linaro.org>
+ <44d133d5ebd4f7b9e8b817aa8bae12f690e70000.1448270813.git.stanimir.varbanov@linaro.org>
+Message-ID: <6048361.Am0T3g77Bd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 21, 2015 at 07:57:02PM -0800, Dan Williams wrote:
-> Let all the archs that implement CONFIG_STRICT_DEVM use a common
-> definition in lib/Kconfig.debug.
+On Monday 23 November 2015 11:28:58 Stanimir Varbanov wrote:
+> The io_base is used to keep the cpu physical address parsed
+> from ranges dt property. After issue pci_remap_iospace the
+> io_base has been assigned with io->start, which is not correct
+> cause io->start is a PCI bus address.
 > 
-> Note, the 'depends on !SPARC' is due to sparc not implementing
-> devmem_is_allowed().
-> 
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: "H. Peter Anvin" <hpa@zytor.com>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: "David S. Miller" <davem@davemloft.net>
-> Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
 > ---
->  arch/arm/Kconfig.debug       |   14 --------------
->  arch/arm64/Kconfig.debug     |   14 --------------
->  arch/powerpc/Kconfig.debug   |   12 ------------
->  arch/s390/Kconfig.debug      |   12 ------------
->  arch/tile/Kconfig            |    3 ---
->  arch/unicore32/Kconfig.debug |   14 --------------
->  arch/x86/Kconfig.debug       |   17 -----------------
->  lib/Kconfig.debug            |   19 +++++++++++++++++++
->  8 files changed, 19 insertions(+), 86 deletions(-)
-
-For s390
-
-Acked-by: Heiko Carstens <heiko.carstens@de.ibm.com>
-
-> diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
-> index 8c15b29d5adc..ad85145d0047 100644
-> --- a/lib/Kconfig.debug
-> +++ b/lib/Kconfig.debug
-> @@ -1853,3 +1853,22 @@ source "samples/Kconfig"
+>  drivers/pci/host/pcie-designware.c |    1 -
+>  1 file changed, 1 deletion(-)
 > 
->  source "lib/Kconfig.kgdb"
-> 
-> +config STRICT_DEVMEM
-> +	bool "Filter access to /dev/mem"
-> +	depends on MMU
-> +	depends on !SPARC
-> +	default y if TILE || PPC || S390
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index 540f077c37ea..02a7452bdf23 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -440,7 +440,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>  					 ret, pp->io);
+>  				continue;
+>  			}
+> -			pp->io_base = pp->io->start;
+>  			break;
+>  		case IORESOURCE_MEM:
+>  			pp->mem = win->res;
 
-I wouldn't mind if you would remove s390 from this list.
+I was surprised to see such an obvious bug here, as we had spent a lot of
+time trying to get it right. However, it broke only recently and it's
+worth mentioning what commit did it, so
+
+Fixes: 0021d22b73d6 ("PCI: designware: Use of_pci_get_host_bridge_resources() to parse DT")
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+
+The bug is present in 4.4-rc1 and we should get your fix merged into 4.4
+as well, while all the other patches in your series are presumably for 4.5.
+
+	Arnd
