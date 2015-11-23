@@ -1,70 +1,50 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 23 Nov 2015 14:56:00 +0100
-Subject: [PATCH v5 2/4] ARM: shmobile: sh73a0 dtsi: Add L2 cache-controller
- node
-In-Reply-To: <1448286962-16897-1-git-send-email-geert+renesas@glider.be>
-References: <1448286962-16897-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1448286962-16897-3-git-send-email-geert+renesas@glider.be>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 23 Nov 2015 14:59:15 +0100
+Subject: [PATCH 2/4] mtd: nand: sunxi: add missing of_node_put
+In-Reply-To: <1447884254-26336-3-git-send-email-Julia.Lawall@lip6.fr>
+References: <1447884254-26336-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1447884254-26336-3-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <20151123145915.04ed6508@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the missing L2 cache-controller node, and link the CPU nodes to it.
-This will allow migration to the generic l2c OF initialization.
+On Wed, 18 Nov 2015 23:04:12 +0100
+Julia Lawall <Julia.Lawall@lip6.fr> wrote:
 
-The L2 cache is an ARM L2C-310 (r3p1), of size 512 KiB (64 KiB x 8
-ways).
+> for_each_child_of_node performs an of_node_get on each iteration, so
+> a break out of the loop requires an of_node_put.
+> 
+> A simplified version of the semantic patch that fixes this problem is as
+> follows (http://coccinelle.lip6.fr):
+> 
+> // <smpl>
+> @@
+> expression root,e;
+> local idexpression child;
+> @@
+> 
+>  for_each_child_of_node(root, child) {
+>    ... when != of_node_put(child)
+>        when != e = child
+> (
+>    return child;
+> |
+> +  of_node_put(child);
+> ?  return ...;
+> )
+>    ...
+>  }
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v5:
-  - Drop optional cache-{size,sets,{block,line}-size} properties, as
-    this information is auto-detected,
-  - Integrate linking CPUs to L2 cache into this patch,
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-v4:
-  - New.
----
- arch/arm/boot/dts/sh73a0.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+Thanks,
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index cbc885e46c504f56..f90ef9c93d3df3aa 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -28,6 +28,7 @@
- 			reg = <0>;
- 			clock-frequency = <1196000000>;
- 			power-domains = <&pd_a2sl>;
-+			next-level-cache = <&L2>;
- 		};
- 		cpu at 1 {
- 			device_type = "cpu";
-@@ -35,6 +36,7 @@
- 			reg = <1>;
- 			clock-frequency = <1196000000>;
- 			power-domains = <&pd_a2sl>;
-+			next-level-cache = <&L2>;
- 		};
- 	};
- 
-@@ -53,6 +55,18 @@
- 		      <0xf0000100 0x100>;
- 	};
- 
-+	L2: cache-controller {
-+		compatible = "arm,pl310-cache";
-+		reg = <0xf0100000 0x1000>;
-+		interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>;
-+		power-domains = <&pd_a3sm>;
-+		arm,data-latency = <3 3 3>;
-+		arm,tag-latency = <2 2 2>;
-+		arm,shared-override;
-+		cache-unified;
-+		cache-level = <2>;
-+	};
-+
- 	sbsc2: memory-controller at fb400000 {
- 		compatible = "renesas,sbsc-sh73a0";
- 		reg = <0xfb400000 0x400>;
+Boris
+
 -- 
-1.9.1
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
