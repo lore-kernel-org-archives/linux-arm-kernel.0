@@ -1,58 +1,95 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 23 Nov 2015 14:56:01 +0100
-Subject: [PATCH v5 3/4] ARM: shmobile: r8a7740: Migrate to generic l2c OF
- initialization
-In-Reply-To: <1448286962-16897-1-git-send-email-geert+renesas@glider.be>
-References: <1448286962-16897-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1448286962-16897-4-git-send-email-geert+renesas@glider.be>
+Date: Mon, 23 Nov 2015 14:55:58 +0100
+Subject: [PATCH v5 0/4] ARM: shmobile: r8a7740/sh73a0 DT Cache Handling
+Message-ID: <1448286962-16897-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate the generic r8a7740 platform from calling l2x0_of_init() to the
-generic l2c OF initialization.
+	Hi Simon, Magnus,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v5:
-  - No changes,
+This patch series add minimal L1 and L2 cache descriptions to DT for
+r8a7740 and sh73a0, and migrates the shmobile DT-based generic r8a7740
+platform from calling l2x0_of_init() to the generic l2c OF
+initialization.
 
-v4:
-  - This depends on commit eeedcea69e927857 ("ARM: 8395/1: l2c: Add
-    support for the "arm,shared-override" property"), which is queued
-    for 4.3 in arm/for-next,
+Note that the conversion to the generic l2c OF initialization is not
+done yet for sh73a0, as this initializes the L2 cache earlier, breaking
+the (fragile) sh73a0 secondary CPU bringup code.
 
-v3:
-  - Use 0/~0 now DT supports "arm,shared-override",
+Also note that this conversion should be done on r8a7778, and r8a7779,
+too.
 
-v2:
-  - Keep only {,~}L2C_AUX_CTRL_SHARED_OVERRIDE.
----
- arch/arm/mach-shmobile/setup-r8a7740.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+Changes compared to v4 ("[PATCH v4 0/6] ARM: shmobile: r8a7740/sh73a0 DT
+Cache Handling",
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/340636.html):
+  - Drop optional cache-{size,sets,{block,line}-size} properties, as
+    this information is auto-detected (I verified this for both L1 and
+    L2 cache properties),
+  - Merge the L1 patches into the L2 patches, as the only part left from
+    the L1 patches was adding the links from CPU to L2 cache nodes.
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 0c8f80c5b04df34d..7b16c12e3f816f7f 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -110,10 +110,6 @@ static void __init r8a7740_generic_init(void)
- {
- 	r8a7740_meram_workaround();
- 
--#ifdef CONFIG_CACHE_L2X0
--	/* Shared attribute override enable, 32K*8way */
--	l2x0_init(IOMEM(0xf0002000), 0x00400000, 0xc20f0fff);
--#endif
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
-@@ -123,6 +119,8 @@ static const char *const r8a7740_boards_compat_dt[] __initconst = {
- };
- 
- DT_MACHINE_START(R8A7740_DT, "Generic R8A7740 (Flattened Device Tree)")
-+	.l2c_aux_val	= 0,
-+	.l2c_aux_mask	= ~0,
- 	.map_io		= r8a7740_map_io,
- 	.init_early	= shmobile_init_delay,
- 	.init_irq	= r8a7740_init_irq_of,
+Changes compared to v3 ("[PATCH v3 0/6] ARM: l2c / shmobile: r8a7740 :
+Shared Override",
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/340636.html):
+  - "l2c: Add support for the "arm,shared-override" property" was split
+    off into an independent patch, and is now queued for v4.3 in
+    arm/for-next,
+  - Dropped armadillo legacy migration, as it no longer exists,
+  - Added sh73a0 L1 and L2 DT cache description.
+
+Changes compared to v2 ("[PATCH v2 0/5] ARM: shmobile: r8a7740/armadillo:
+Migrate to generic l2c OF",
+http://www.spinics.net/lists/devicetree/msg68176.html):
+  - Add DT support for Shared Override,
+  - Setting Shared Override is done only if CMA is not available (as
+    Russell claims it's not needed if CMA is available),
+  - Use 0/~0 in machine_desc.l2c_aux_{val,mask}, as DT now supports
+    "arm,shared-override".
+
+Changes compared to v1:
+  - Fix interrupt reference in DT,
+  - Describe L2 better in DT,
+  - Keep only {,~}L2C_AUX_CTRL_SHARED_OVERRIDE in
+    machine_desc.l2c_aux_{val,mask}, as there's no DT property for
+    this.
+  - Add L1 cache to DT.
+
+Dependencies:
+  - This series applies to renesas-devel-20151123-v4.4-rc2,
+  - Patch 3 depends on patch 1,
+  - Patch 4 depends on patch 3.
+
+Given C code changesets depending on DT changesets in the same branch
+are frowned upon, you may want to postpone patches 3 and 4 to v4.6.
+Of course I'll sleep better if you just apply all 4 of them now ;-)
+
+I've been running this on r8a7740/armadillo and sh73a0/kzm9g for more
+than a year.
+
+Thanks for applying!
+
+Geert Uytterhoeven (4):
+  ARM: shmobile: r8a7740 dtsi: Add L2 cache-controller node
+  ARM: shmobile: sh73a0 dtsi: Add L2 cache-controller node
+  ARM: shmobile: r8a7740: Migrate to generic l2c OF initialization
+  ARM: shmobile: r8a7740: Remove mapping of L2 cache controller
+    registers
+
+ arch/arm/boot/dts/r8a7740.dtsi         | 13 +++++++++++++
+ arch/arm/boot/dts/sh73a0.dtsi          | 14 ++++++++++++++
+ arch/arm/mach-shmobile/setup-r8a7740.c | 18 ++----------------
+ 3 files changed, 29 insertions(+), 16 deletions(-)
+
 -- 
 1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
