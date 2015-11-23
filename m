@@ -1,38 +1,48 @@
 From: nyushchenko@dev.rtsoft.ru (Nikita Yushchenko)
-Date: Mon, 23 Nov 2015 15:46:00 +0300
+Date: Mon, 23 Nov 2015 15:47:34 +0300
 Subject: [RFC/PATCH] arm: do not skip SMP init calls on SMP_ON_UP case
-In-Reply-To: <20151123121920.GP8644@n2100.arm.linux.org.uk>
+In-Reply-To: <5653099A.7020604@dev.rtsoft.ru>
 References: <1448279946-19975-1-git-send-email-nyushchenko@dev.rtsoft.ru>
  <20151123120317.GN8644@n2100.arm.linux.org.uk>
- <5653015C.4020405@dev.rtsoft.ru>
- <20151123121216.GO8644@n2100.arm.linux.org.uk>
- <20151123121920.GP8644@n2100.arm.linux.org.uk>
-Message-ID: <56530A88.5010408@dev.rtsoft.ru>
+ <5653015C.4020405@dev.rtsoft.ru> <56530769.4030403@arm.com>
+ <5653099A.7020604@dev.rtsoft.ru>
+Message-ID: <56530AE6.2060407@dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-23.11.2015 15:19, Russell King - ARM Linux ?????:
-> On Mon, Nov 23, 2015 at 12:12:16PM +0000, Russell King - ARM Linux wrote:
->> iMX6 is fairly well supported in mainline.  The only reason to use a
->> custom kernel is if you want to use some feature which mainline does
->> not support (or support very well) such as video decode, the full IPU
->> facilities, GPUs or CEC (sorry, I don't have an expansive list.)
+>>>>> While running an imx6s boasrd, I got following message in boot log:
+>>>>>
+>>>>> [    0.032414] CPU1: failed to boot: -38
+>>>>>
+>>>>> This looked strange: imx6s is singe-core and kernel perfectly knows
+>>>>> that. However, for some reason it tries to initialize CPU 1?
+>>>>>
+>>>>> I found this to be caused by
+>>>>> - CONFIG_SMP_ON_UP successfully detects that system is single core,
+>>>>> - this causes is_smp() to return false,
+>>>>> - this causes setup_arch() to skip smp_init_cpus() call,
+>>>>> - this skips board-specific code that sets cpu_possible mask.
+>>>>
+>>>> Right, so you should end up with the possible and present masks
+>>>> containing just one CPU, which should prevent the kernel trying to
+>>>> bring any secondary CPUs online.
+>>>
+>>> Kernel that is running here still tries to init CPU 1 for some reason.
 >>
->> The GPU problem for the GC320/GC880/GC2000 is fairly close to being
->> solved in a functional (but maybe not yet performant) manner.
+>> I *guess* cpus node [1] in your dts has more than one cpu entry, could
+>> you check please?
 > 
-> For reference, iMX6S in mainline behaves like this:
+> Indeed looks so:
 > 
-> Calibrating delay loop (skipped), value calculated using timer frequency.. 6.00 BogoMIPS (lpj=12000)
-> pid_max: default: 32768 minimum: 301
-> Mount-cache hash table entries: 1024 (order: 0, 4096 bytes)
-> Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes)
-> Initializing cgroup subsys net_cls
-> CPU: Testing write buffer coherency: ok
-> CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-> Setting up static identity map for 0x100082c0 - 0x10008318
-> Brought up 1 CPUs
-> SMP: Total of 1 processors activated (6.00 BogoMIPS).
-> CPU: All CPU(s) started in SVC mode.
+> # ls /proc/device-tree/cpus
+> #address-cells  #size-cells  cpu at 0  cpu at 1  name
+> 
+> But my custom device tree just includes imx6dl.dtsi
+> 
+> So it is imx6dl.dtsi in linux-imx tree broken?..
 
-Indeed, somehow booted mainline and it does not try to initialize CPU 1.
+Just booted mainline...  unline linux-imx, it does not try to init cpu1.
+
+However, imx6dl.dtsi from mainline also has both cpu at 0 and cpu at 1
+
+So missing piece in linux-imx is elsewhere :(
