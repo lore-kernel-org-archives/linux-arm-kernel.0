@@ -1,99 +1,125 @@
 From: majun258@huawei.com (MaJun)
-Date: Mon, 23 Nov 2015 11:15:10 +0800
-Subject: [PATCH v9 1/4] dt-binding:Documents of the mbigen bindings
+Date: Mon, 23 Nov 2015 11:15:13 +0800
+Subject: [PATCH v9 4/4] irqchip:implement the mbigen irq chip operation
+ functions
 In-Reply-To: <1448248513-39760-1-git-send-email-majun258@huawei.com>
 References: <1448248513-39760-1-git-send-email-majun258@huawei.com>
-Message-ID: <1448248513-39760-2-git-send-email-majun258@huawei.com>
+Message-ID: <1448248513-39760-5-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ma Jun <majun258@huawei.com>
 
-Add the mbigen msi interrupt controller bindings document.
-
-This patch based on Mark Rutland's patch
-https://lkml.org/lkml/2015/7/23/558
+Add the interrupt controller chip operation functions of mbigen chip.
 
 Signed-off-by: Ma Jun <majun258@huawei.com>
 ---
- Documentation/devicetree/bindings/arm/mbigen.txt |   69 ++++++++++++++++++++++
- 1 files changed, 69 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/mbigen.txt
+ drivers/irqchip/irq-mbigen.c |   84 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 84 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/mbigen.txt b/Documentation/devicetree/bindings/arm/mbigen.txt
-new file mode 100644
-index 0000000..8ae59a9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mbigen.txt
-@@ -0,0 +1,69 @@
-+Hisilicon mbigen device tree bindings.
-+=======================================
+diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+index 81ae61f..540ad05 100644
+--- a/drivers/irqchip/irq-mbigen.c
++++ b/drivers/irqchip/irq-mbigen.c
+@@ -47,6 +47,20 @@
+ #define REG_MBIGEN_VEC_OFFSET		0x200
+ 
+ /**
++ * offset of clear register in mbigen node
++ * This register is used to clear the status
++ * of interrupt
++ */
++#define REG_MBIGEN_CLEAR_OFFSET		0xa000
 +
-+Mbigen means: message based interrupt generator.
++/**
++ * offset of interrupt type register
++ * This register is used to configure interrupt
++ * trigger type
++ */
++#define REG_MBIGEN_TYPE_OFFSET		0x0
 +
-+MBI is kind of msi interrupt only used on Non-PCI devices.
++/**
+  * struct mbigen_device - holds the information of mbigen device.
+  *
+  * @pdev:		pointer to the platform device structure of mbigen chip.
+@@ -69,8 +83,78 @@ static inline unsigned int get_mbigen_vec_reg(irq_hw_number_t hwirq)
+ 			+ REG_MBIGEN_VEC_OFFSET;
+ }
+ 
++static inline void get_mbigen_type_reg(irq_hw_number_t hwirq,
++					unsigned int *mask,
++					unsigned int *addr)
++{
++	unsigned int nid, pin, ofst;
 +
-+To reduce the wired interrupt number connected to GIC,
-+Hisilicon designed mbigen to collect and generate interrupt.
++	hwirq -= RESERVED_IRQ_PER_MBIGEN_CHIP;
++	nid = hwirq / IRQS_PER_MBIGEN_NODE + 1;
++	pin = hwirq % IRQS_PER_MBIGEN_NODE;
 +
++	*mask = 1 << (pin % 32);
++	
++	ofst = pin / 32 * 4;
++	*addr = ofst + nid * MBIGEN_NODE_OFFSET
++		+ REG_MBIGEN_TYPE_OFFSET;
++}
 +
-+Non-pci devices can connect to mbigen and generate the
-+interrupt by writing ITS register.
++static inline void get_mbigen_clear_reg(irq_hw_number_t hwirq,
++					unsigned int *mask,
++					unsigned int *addr)
++{
++	unsigned int ofst;
 +
-+The mbigen chip and devices connect to mbigen have the following properties:
++	hwirq -= RESERVED_IRQ_PER_MBIGEN_CHIP;
++	ofst = hwirq / 32 * 4;
 +
-+Mbigen main node required properties:
-+-------------------------------------------
-+- compatible: Should be "hisilicon,mbigen-v2"
-+- reg: Specifies the base physical address and size of the Mbigen
-+  registers.
-+- interrupt controller: Identifies the node as an interrupt controller
-+- msi-parent: This property has two cells.
-+	The 1st cell specifies the ITS this device connected.
-+	The 2nd cell specifies the device id.
-+- num-msis:Specifies the total number of interrupt this device has.
-+- #interrupt-cells : Specifies the number of cells needed to encode an
-+  interrupt source. The value must be 2.
++	*mask = 1 << (hwirq % 32);
++	*addr = ofst + REG_MBIGEN_CLEAR_OFFSET;
++}
 +
-+  The 1st cell is global hardware pin number of the interrupt.
-+	This value depends on the Soc design.
++static void mbigen_eoi_irq(struct irq_data *data)
++{
++	void __iomem *base = data->chip_data;
++	unsigned int mask, addr;
 +
-+  The 2nd cell is the interrupt trigger type.
-+	The value of this cell should be:
-+	1: rising edge triggered
-+	or
-+	4: high level triggered	
++	get_mbigen_clear_reg(data->hwirq, &mask, &addr);
 +
-+Examples:
++	writel_relaxed(mask, base + addr);
 +
-+ 	mbigen_device_gmac:intc {
-+			compatible = "hisilicon,mbigen-v2";
-+			reg = <0x0 0xc0080000 0x0 0x10000>;
-+			interrupt-controller;
-+			msi-parent = <&its_dsa 0x40b1c>;
-+			num-msis = <9>;
-+			#interrupt-cells = <2>;
-+ 	};
++	irq_chip_eoi_parent(data);
++}
 +
-+Devices connect to mbigen required properties:
-+----------------------------------------------------
-+-interrupt-parent: Specifies the mbigen device node which device connected.
-+-interrupts:specifies the interrupt source.
-+  The 1st cell is global hardware pin number of the interrupt.
-+		This value depends on the Soc design.
-+  The 2nd cell is the interrupt trigger type(rising edge triggered or high
-+		level triggered)
++static int mbigen_set_type(struct irq_data *data, unsigned int type)
++{
++	void __iomem *base = data->chip_data;
++	unsigned int mask, addr;
++	u32 val;
 +
-+Examples:
-+	gmac0: ethernet at c2080000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0 0xc2080000 0 0x20000>,
-+		      <0 0xc0000000 0 0x1000>;
-+		interrupt-parent  = <&mbigen_device_gmac>;
-+		interrupts =	<656 1>,
-+				<657 1>;
-+	};
++	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
++		return -EINVAL;
 +
++	get_mbigen_type_reg(data->hwirq, &mask, &addr);
++
++	val = readl_relaxed(base + addr);
++
++	if (type == IRQ_TYPE_LEVEL_HIGH)
++		val |= mask;
++	else
++		val &= ~mask;
++
++	writel_relaxed(val, base + addr);
++
++	return 0;
++}
++
+ static struct irq_chip mbigen_irq_chip = {
+ 	.name =			"mbigen-v2",
++	.irq_mask =		irq_chip_mask_parent,
++	.irq_unmask =		irq_chip_unmask_parent,
++	.irq_eoi =		mbigen_eoi_irq,
++	.irq_set_type =		mbigen_set_type,
++	.irq_set_affinity =	irq_chip_set_affinity_parent,
+ };
+ 
+ static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
 -- 
 1.7.1
