@@ -1,110 +1,46 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 23 Nov 2015 15:22:51 +0000
-Subject: [PATCH v3 19/62] arm/smpboot: Move dt specific code in smp to
- seperate functions
-In-Reply-To: <1447753261-7552-20-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-20-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511231521160.1107@kaball.uk.xensource.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 23 Nov 2015 15:24:36 +0000
+Subject: [PATCH] arm64: early_alloc: Fix check for allocation failure
+In-Reply-To: <1448041540-26229-1-git-send-email-suzuki.poulose@arm.com>
+References: <1448041540-26229-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20151123152436.GF4236@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> From: Parth Dixit <parth.dixit@linaro.org>
+On Fri, Nov 20, 2015 at 05:45:40PM +0000, Suzuki K. Poulose wrote:
+> In early_alloc we check if the memblock_alloc failed by checking
+> the virtual address of the result, which will never fail. This patch
+> fixes it to check the actual result for failure.
 > 
-> Partition smp initialization functions into generic and dt specific
-> parts, this will be useful when introducing new functions for smp
-> initialization based on acpi.
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/mm/mmu.c |    8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
 > 
-> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index e3f563c..e94c32b 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -64,8 +64,12 @@ EXPORT_SYMBOL(phys_mem_access_prot);
+>  
+>  static void __init *early_alloc(unsigned long sz)
+>  {
+> -	void *ptr = __va(memblock_alloc(sz, sz));
+> -	BUG_ON(!ptr);
+> +	phys_addr_t phys;
+> +	void *ptr;
+> +
+> +	phys = memblock_alloc(sz, sz);
+> +	BUG_ON(!phys);
+> +	ptr = __va(phys);
+>  	memset(ptr, 0, sz);
+>  	return ptr;
 
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Haha, oops! I guess we don't tend to see failures that early on, but the
+fix is correct:
 
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
->  xen/arch/arm/arm64/smpboot.c |  7 ++++++-
->  xen/arch/arm/smpboot.c       | 29 ++++++++++++++++++-----------
->  2 files changed, 24 insertions(+), 12 deletions(-)
-> 
-> diff --git a/xen/arch/arm/arm64/smpboot.c b/xen/arch/arm/arm64/smpboot.c
-> index 62e6abb..7928f69 100644
-> --- a/xen/arch/arm/arm64/smpboot.c
-> +++ b/xen/arch/arm/arm64/smpboot.c
-> @@ -70,7 +70,7 @@ int __init arch_smp_init(void)
->      return 0;
->  }
->  
-> -int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
-> +static int __init dt_arch_cpu_init(int cpu, struct dt_device_node *dn)
->  {
->      const char *enable_method;
->  
-> @@ -94,6 +94,11 @@ int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
->      return 0;
->  }
->  
-> +int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
-> +{
-> +    return dt_arch_cpu_init(cpu, dn);
-> +}
-> +
->  int __init arch_cpu_up(int cpu)
->  {
->      if ( !smp_enable_ops[cpu].prepare_cpu )
-> diff --git a/xen/arch/arm/smpboot.c b/xen/arch/arm/smpboot.c
-> index a96cda2..d115228 100644
-> --- a/xen/arch/arm/smpboot.c
-> +++ b/xen/arch/arm/smpboot.c
-> @@ -92,7 +92,7 @@ smp_clear_cpu_maps (void)
->   * MPIDR values related to logical cpus
->   * Code base on Linux arch/arm/kernel/devtree.c
->   */
-> -void __init smp_init_cpus(void)
-> +static void __init dt_smp_init_cpus(void)
->  {
->      register_t mpidr;
->      struct dt_device_node *cpus = dt_find_node_by_path("/cpus");
-> @@ -106,16 +106,6 @@ void __init smp_init_cpus(void)
->      bool_t bootcpu_valid = 0;
->      int rc;
->  
-> -    /* scan the DTB for a PSCI node and set a global variable */
-> -    psci_init();
-> -
-> -    if ( (rc = arch_smp_init()) < 0 )
-> -    {
-> -        printk(XENLOG_WARNING "SMP init failed (%d)\n"
-> -               "Using only 1 CPU\n", rc);
-> -        return;
-> -    }
-> -
->      mpidr = boot_cpu_data.mpidr.bits & MPIDR_HWID_MASK;
->  
->      if ( !cpus )
-> @@ -243,6 +233,23 @@ void __init smp_init_cpus(void)
->      }
->  }
->  
-> +void __init smp_init_cpus(void)
-> +{
-> +    int rc;
-> +
-> +    /* initialize PSCI and set a global variable */
-> +    psci_init();
-> +
-> +    if ( (rc = arch_smp_init()) < 0 )
-> +    {
-> +        printk(XENLOG_WARNING "SMP init failed (%d)\n"
-> +               "Using only 1 CPU\n", rc);
-> +        return;
-> +    }
-> +
-> +    dt_smp_init_cpus();
-> +}
-> +
->  int __init
->  smp_get_max_cpus (void)
->  {
-> -- 
-> 2.1.0
-> 
+Will
