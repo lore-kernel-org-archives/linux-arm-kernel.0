@@ -1,108 +1,90 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Mon, 23 Nov 2015 11:01:51 +0000
-Subject: [PATCH 1/2] arm64: mm: detect bad __create_mapping uses
-In-Reply-To: <20151120170534.GE5536@leverpostej>
-References: <1448033724-13846-1-git-send-email-mark.rutland@arm.com>
- <CAPvkgC2NqfYrcAzsF=UwE9n3BGz74bYcNSGOaaCiwHP_YcnRWA@mail.gmail.com>
- <20151120170534.GE5536@leverpostej>
-Message-ID: <CAPvkgC1LWj8aCwX8WnJbb7tsuwwiLt+0KxQsZRq6U4Ai1BnJxA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 23 Nov 2015 11:09:11 +0000
+Subject: [PATCHv3] arm64: efi: correctly map runtime regions
+Message-ID: <1448276951-13335-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 November 2015 at 17:05, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Nov 20, 2015 at 04:13:28PM +0000, Steve Capper wrote:
->> On 20 November 2015 at 15:35, Mark Rutland <mark.rutland@arm.com> wrote:
->> > If a caller of __create_mapping provides a PA and VA which have
->> > different sub-page offsets, it is not clear which offset they expect to
->> > apply to the mapping, and is indicative of a bad caller.
->> >
->> > Disallow calls with differing sub-page offsets, and WARN when they are
->> > encountered, so that we can detect and fix such cases.
->> >
->> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> > Cc: Catalin Marinas <caralin.marinas@arm.com>
->> > Cc: Laura Abbott <labbott@fedoraproject.org>
->> > Cc: Steve Capper <steve.capper@linaro.org>
->> > Cc: Will Deacon <will.deacon@arm.com>
->> > ---
->> >  arch/arm64/mm/mmu.c | 7 +++++++
->> >  1 file changed, 7 insertions(+)
->> >
->> > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> > index e3f563c..3b06afa 100644
->> > --- a/arch/arm64/mm/mmu.c
->> > +++ b/arch/arm64/mm/mmu.c
->> > @@ -300,6 +300,13 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
->> >  {
->> >         unsigned long addr, length, end, next;
->> >
->> > +       /*
->> > +        * If the virtual and physical address don't have the same offset
->> > +        * within a page, we cannot map the region as the caller expects.
->> > +        */
->> > +       if (WARN_ON((phys ^ virt) & ~PAGE_MASK))
->> > +               return;
->> > +
->>
->> Do we want any subpage offsets in our virt and phys?
->
-> Yes.
->
-> For instance, when mapping EFI regions (which exist at 4K granularity)
-> on a 64K page kernel, per [1]. The spec requires that any regions in the
-> same 64K page can be mapped using the same attributes, so it's fine to
-> map at 64K granularity.
+The kernel may use a page granularity of 4K, 16K, or 64K depending on
+configuration.
 
-Thanks Mark,
-I didn't know that was allowed, now I do :-).
-These two patches now make perfect sense.
+When mapping EFI runtime regions, we use memrange_efi_to_native to round
+the physical base address of a region down to a kernel page boundary,
+and round the size up to a kernel page boundary, adding the residue left
+over from rounding down the physical base address. We do not round down
+the virtual base address.
 
->
-> We already try to cater for this in __create_mapping where we fix up the
-> base and size:
->
->         addr = virt & PAGE_MASK;
->         length = PAGE_ALIGN(size + (virt & ~PAGE_MASK));
->
-> I will add a middle paragraph to the commit message:
->
->         In some cases, the region we wish to map may validly have a
->         sub-page offset in the physical and virtual adddresses. For
->         example, EFI runtime regions have 4K granularity, yet may be
->         mapped by a 64K page kernel. So long as the physical and virtual
->         offsets are the same, the region will be mapped at the expected
->         VAs.
->
-> Does that sound OK?
+In __create_mapping we account for the offset of the virtual base from a
+granule boundary, adding the residue to the size before rounding the
+base down to said granule boundary.
 
-s/adddresses/addresses/
-Otherwise that looks great, thanks.
+Thus we account for the residue twice, and when the residue is non-zero
+will cause __create_mapping to map an additional page at the end of the
+region. Depending on the memory map, this page may be in a region we are
+not intended/permitted to map, or may clash with a different region that
+we wish to map. In typical cases, mapping the next item in the memory
+map will overwrite the erroneously created entry, as we sort the memory
+map in the stub.
 
->
->> If we have sub page bits in phys won't that start flipping on bits in
->> the page table entries?
->
-> In all cases where we use phys, we either shift phys right by PAGE_SHIFT
-> (in __populate_init_pte vi __phys_to_pfn) which clears those bits, or we
-> first check it is sufficiently aligned for that level of table (and
-> hence the low bits are all zero). Patch 2 fixes a bug related to the
-> latter case.
->
->> What about something like:
->> if (WARN_ON((phys | virt) & ~PAGE_MASK))
->
-> Per the above, that would break the EFI code in [1].
+As __create_mapping can cope with base addresses which are not page
+aligned, we can instead rely on it to map the region appropriately, and
+simplify efi_virtmap_init by removing the unnecessary code.
 
-Agreed.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Leif Lindholm <leif.lindholm@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/efi.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-I was toying with suggesting we warn for any phys/virt bit set below
-bit #12 (i.e. anything smaller than 4K alignment), that would probably
-just increase complexity with little appreciable gain though.
+Since v1 [1]:
+* Rely on create_pgd_mapping to handle alignment.
+Since v2 [2]:
+* Describe why this case is unlikely in practice.
+* Calculate size in create_pgd_mapping_call.
+* Rebase to v4.4-rc2, avoiding clash with [3].
 
-For both patches (with the extra paragraph above added to the commit log):
-Reviewed-by: Steve Capper <steve.capper@linaro.org>
+Mark.
 
-Cheers,
---
-Steve
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386536.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386908.html
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/385524.html
+
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index fc5508e..fe7cd1a 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -227,7 +227,6 @@ static bool __init efi_virtmap_init(void)
+ 	init_new_context(NULL, &efi_mm);
+ 
+ 	for_each_efi_memory_desc(&memmap, md) {
+-		u64 paddr, npages, size;
+ 		pgprot_t prot;
+ 
+ 		if (!(md->attribute & EFI_MEMORY_RUNTIME))
+@@ -235,11 +234,6 @@ static bool __init efi_virtmap_init(void)
+ 		if (md->virt_addr == 0)
+ 			return false;
+ 
+-		paddr = md->phys_addr;
+-		npages = md->num_pages;
+-		memrange_efi_to_native(&paddr, &npages);
+-		size = npages << PAGE_SHIFT;
+-
+ 		pr_info("  EFI remap 0x%016llx => %p\n",
+ 			md->phys_addr, (void *)md->virt_addr);
+ 
+@@ -256,7 +250,8 @@ static bool __init efi_virtmap_init(void)
+ 		else
+ 			prot = PAGE_KERNEL;
+ 
+-		create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size,
++		create_pgd_mapping(&efi_mm, md->phys_addr, md->virt_addr,
++				   md->num_pages << EFI_PAGE_SHIFT, 
+ 				   __pgprot(pgprot_val(prot) | PTE_NG));
+ 	}
+ 	return true;
+-- 
+1.9.1
