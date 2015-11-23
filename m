@@ -1,95 +1,56 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 23 Nov 2015 14:55:58 +0100
-Subject: [PATCH v5 0/4] ARM: shmobile: r8a7740/sh73a0 DT Cache Handling
-Message-ID: <1448286962-16897-1-git-send-email-geert+renesas@glider.be>
+Date: Mon, 23 Nov 2015 14:56:02 +0100
+Subject: [PATCH v5 4/4] ARM: shmobile: r8a7740: Remove mapping of L2 cache
+ controller registers
+In-Reply-To: <1448286962-16897-1-git-send-email-geert+renesas@glider.be>
+References: <1448286962-16897-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1448286962-16897-5-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Simon, Magnus,
+Now all r8a7740-based platforms have been migrated to the generic l2c OF
+initialization, it's no longer needed to map the L2 cache controller
+registers from .map_io().
 
-This patch series add minimal L1 and L2 cache descriptions to DT for
-r8a7740 and sh73a0, and migrates the shmobile DT-based generic r8a7740
-platform from calling l2x0_of_init() to the generic l2c OF
-initialization.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v5:
+  - No changes,
 
-Note that the conversion to the generic l2c OF initialization is not
-done yet for sh73a0, as this initializes the L2 cache earlier, breaking
-the (fragile) sh73a0 secondary CPU bringup code.
+v4:
+  - No changes,
 
-Also note that this conversion should be done on r8a7778, and r8a7779,
-too.
+v3:
+  - No changes,
 
-Changes compared to v4 ("[PATCH v4 0/6] ARM: shmobile: r8a7740/sh73a0 DT
-Cache Handling",
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/340636.html):
-  - Drop optional cache-{size,sets,{block,line}-size} properties, as
-    this information is auto-detected (I verified this for both L1 and
-    L2 cache properties),
-  - Merge the L1 patches into the L2 patches, as the only part left from
-    the L1 patches was adding the links from CPU to L2 cache nodes.
+v2:
+  - No changes.
+---
+ arch/arm/mach-shmobile/setup-r8a7740.c | 12 ------------
+ 1 file changed, 12 deletions(-)
 
-Changes compared to v3 ("[PATCH v3 0/6] ARM: l2c / shmobile: r8a7740 :
-Shared Override",
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/340636.html):
-  - "l2c: Add support for the "arm,shared-override" property" was split
-    off into an independent patch, and is now queued for v4.3 in
-    arm/for-next,
-  - Dropped armadillo legacy migration, as it no longer exists,
-  - Added sh73a0 L1 and L2 DT cache description.
-
-Changes compared to v2 ("[PATCH v2 0/5] ARM: shmobile: r8a7740/armadillo:
-Migrate to generic l2c OF",
-http://www.spinics.net/lists/devicetree/msg68176.html):
-  - Add DT support for Shared Override,
-  - Setting Shared Override is done only if CMA is not available (as
-    Russell claims it's not needed if CMA is available),
-  - Use 0/~0 in machine_desc.l2c_aux_{val,mask}, as DT now supports
-    "arm,shared-override".
-
-Changes compared to v1:
-  - Fix interrupt reference in DT,
-  - Describe L2 better in DT,
-  - Keep only {,~}L2C_AUX_CTRL_SHARED_OVERRIDE in
-    machine_desc.l2c_aux_{val,mask}, as there's no DT property for
-    this.
-  - Add L1 cache to DT.
-
-Dependencies:
-  - This series applies to renesas-devel-20151123-v4.4-rc2,
-  - Patch 3 depends on patch 1,
-  - Patch 4 depends on patch 3.
-
-Given C code changesets depending on DT changesets in the same branch
-are frowned upon, you may want to postpone patches 3 and 4 to v4.6.
-Of course I'll sleep better if you just apply all 4 of them now ;-)
-
-I've been running this on r8a7740/armadillo and sh73a0/kzm9g for more
-than a year.
-
-Thanks for applying!
-
-Geert Uytterhoeven (4):
-  ARM: shmobile: r8a7740 dtsi: Add L2 cache-controller node
-  ARM: shmobile: sh73a0 dtsi: Add L2 cache-controller node
-  ARM: shmobile: r8a7740: Migrate to generic l2c OF initialization
-  ARM: shmobile: r8a7740: Remove mapping of L2 cache controller
-    registers
-
- arch/arm/boot/dts/r8a7740.dtsi         | 13 +++++++++++++
- arch/arm/boot/dts/sh73a0.dtsi          | 14 ++++++++++++++
- arch/arm/mach-shmobile/setup-r8a7740.c | 18 ++----------------
- 3 files changed, 29 insertions(+), 16 deletions(-)
-
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index 7b16c12e3f816f7f..496569f9d578b863 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -38,18 +38,6 @@ static struct map_desc r8a7740_io_desc[] __initdata = {
+ 		.length		= 160 << 20,
+ 		.type		= MT_DEVICE_NONSHARED
+ 	},
+-#ifdef CONFIG_CACHE_L2X0
+-	/*
+-	 * for l2x0_init()
+-	 * 0xf0100000-0xf0101000 -> 0xf0002000-0xf0003000
+-	 */
+-	{
+-		.virtual	= 0xf0002000,
+-		.pfn		= __phys_to_pfn(0xf0100000),
+-		.length		= PAGE_SIZE,
+-		.type		= MT_DEVICE_NONSHARED
+-	},
+-#endif
+ };
+ 
+ static void __init r8a7740_map_io(void)
 -- 
 1.9.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
