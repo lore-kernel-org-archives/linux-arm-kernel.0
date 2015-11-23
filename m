@@ -1,105 +1,89 @@
 From: juri.lelli@arm.com (Juri Lelli)
-Date: Mon, 23 Nov 2015 14:28:40 +0000
-Subject: [RFC PATCH 7/8] arm: add sysfs cpu_capacity attribute
-In-Reply-To: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
-References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
-Message-ID: <1448288921-30307-8-git-send-email-juri.lelli@arm.com>
+Date: Mon, 23 Nov 2015 14:28:33 +0000
+Subject: [RFC PATCH 0/8] CPUs capacity information for heterogeneous systems
+Message-ID: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a sysfs cpu_capacity attribute with which it is possible to read and
-write (thus over-writing default values) CPUs capacity. This might be
-useful in situation where there is no way to get proper default values
-at boot time.
+Hi all,
 
-The new attribute shows up as:
+ARM systems may be configured to have CPUs with different power/performance
+characteristics within the same chip. In this case, additional information has
+to be made available to the kernel (the scheduler in particular) for it to be
+aware of such differences and take decisions accordingly. This posting stems
+from the ongoing discussion about introducing a simple platform energy cost
+model to guide scheduling decisions (a.k.a Energy Aware Scheduling [1]), but
+also aims to be an independent track aimed to standardise the way we make the
+scheduler aware of heterogenous CPU systems. With these patches and in addition
+patches from [1] (that make the scheduler wakeup paths aware of heterogenous
+CPU systems) we enable the scheduler to have good default performance on such
+systems. In addition, we get a clearly defined way of providing the scheduler
+with needed information about CPU capacity on such systems.
 
- /sys/devices/system/cpu/cpu*/cpu_capacity
+CPU capacity is defined in this context as a number that provides the scheduler
+information about CPUs heterogeneity. Such heterogeneity can come from
+micro-architectural differences (e.g., ARM big.LITTLE systems) or maximum
+frequency at which CPUs can run (e.g., SMP systems with multiple frequency
+domains and different max frequencies). Heterogeneity in this context is about
+differing performance characteristics; in practice, the binding that we propose
+in this RFC tries to capture a first-order approximation of the relative
+performance of CPUs.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Juri Lelli <juri.lelli@arm.com>
----
- arch/arm/kernel/topology.c | 68 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 68 insertions(+)
+This RFC proposes a solution to the problem of how do we init CPUs original
+capacity. The way it works today, and for arm A15/A7 systems only, is that we
+rely on cpu_efficiency magic numbers from arch/arm/kernel/topology.c and the
+existence of clock-frequency dtb properties; having those values available, we
+then do some math to come up with capacities we know from measurement (e.g.,
+EAS energy model), e.g. for TC2 they are 430 for A7 and 1024 for A15.
+Currently, arm64 doesn't have such a feature at all.
 
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index ecbff03..a226761 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -52,6 +52,74 @@ static void set_capacity_scale(unsigned int cpu, unsigned long capacity)
- 	per_cpu(cpu_scale, cpu) = capacity;
- }
- 
-+#ifdef CONFIG_PROC_SYSCTL
-+#include <asm/cpu.h>
-+#include <linux/string.h>
-+static ssize_t show_cpu_capacity(struct device *dev,
-+				 struct device_attribute *attr,
-+				 char *buf)
-+{
-+	struct cpu *cpu = container_of(dev, struct cpu, dev);
-+	ssize_t rc;
-+	int cpunum = cpu->dev.id;
-+	unsigned long capacity = arch_scale_cpu_capacity(NULL, cpunum);
-+
-+	rc = sprintf(buf, "%lu\n", capacity);
-+
-+	return rc;
-+}
-+
-+static ssize_t store_cpu_capacity(struct device *dev,
-+				  struct device_attribute *attr,
-+				  const char *buf,
-+				  size_t count)
-+{
-+	struct cpu *cpu = container_of(dev, struct cpu, dev);
-+	int this_cpu = cpu->dev.id, i;
-+	unsigned long new_capacity;
-+	ssize_t ret;
-+
-+	if (count) {
-+		char *p = (char *) buf;
-+
-+		ret = kstrtoul(p, 0, &new_capacity);
-+		if (ret)
-+			return ret;
-+		if (new_capacity > SCHED_CAPACITY_SCALE)
-+			return -EINVAL;
-+
-+		for_each_cpu(i, &cpu_topology[this_cpu].core_sibling)
-+			set_capacity_scale(i, new_capacity);
-+	}
-+
-+	return count;
-+}
-+
-+static DEVICE_ATTR(cpu_capacity,
-+		   0644,
-+		   show_cpu_capacity,
-+		   store_cpu_capacity);
-+
-+static int register_cpu_capacity_sysctl(void)
-+{
-+	int i;
-+	struct device *cpu;
-+
-+	for_each_possible_cpu(i) {
-+		cpu = get_cpu_device(i);
-+		if (!cpu) {
-+			pr_err("%s: too early to get CPU%d device!\n",
-+			       __func__, i);
-+			continue;
-+		}
-+		device_create_file(cpu, &dev_attr_cpu_capacity);
-+	}
-+
-+	return 0;
-+}
-+late_initcall(register_cpu_capacity_sysctl);
-+#endif
-+
- #ifdef CONFIG_OF
- struct cpu_efficiency {
- 	const char *compatible;
+With this patchset we provide CPUs capacity information either from DT or from
+sysfs interface. Such information is standardized for both arm and arm64.
+
+Patches high level description:
+
+ o 01/08 cleans up how cpu_scale is initialized in arm
+ o 02/08 introduces documentation for the new optional DT binding
+ o [03-06]/08 add cpu-capacity attribute to TC2 and Juno DTs and provide
+   parsing of such information at boot time
+ o [07-08]/08 introduce sysfs attribute
+
+The patchset is based on top of tip/sched/core as of today.
+
+In case you would like to test this out, I pushed a branch here:
+
+ git://linux-arm.org/linux-jl.git upstream/default_caps_dt
+
+This branch contains additional patches, useful to better understand how CPU
+capacity information is actually used by the scheduler. Discussion regarding
+these additional patches will be started with a different posting in the
+future. We just didn't want to make discussion too broad, as we realize that
+this set can be controversial already on its own.
+
+Comments, concerns and rants are more than welcome!
+
+Best,
+
+- Juri
+
+Juri Lelli (8):
+  ARM: initialize cpu_scale to its default
+  Documentation: arm: define DT cpu capacity bindings
+  arm: parse cpu capacity from DT
+  arm, dts: add TC2 cpu capacity information
+  arm64: parse cpu capacity from DT
+  arm64, dts: add Juno cpu capacity information
+  arm: add sysfs cpu_capacity attribute
+  arm64: add sysfs cpu_capacity attribute
+
+ .../devicetree/bindings/arm/cpu-capacity.txt       | 227 +++++++++++++++++++++
+ Documentation/devicetree/bindings/arm/cpus.txt     |  17 ++
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |   6 +
+ arch/arm/kernel/topology.c                         | 122 ++++++++++-
+ arch/arm64/boot/dts/arm/juno.dts                   |   7 +
+ arch/arm64/kernel/topology.c                       | 114 +++++++++++
+ 6 files changed, 489 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/cpu-capacity.txt
+
 -- 
 2.2.2
