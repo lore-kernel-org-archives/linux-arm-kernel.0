@@ -1,221 +1,315 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 23 Nov 2015 15:18:01 +0000
-Subject: [PATCH v3 18/62] arm/acpi: Parse MADT to map logical cpu to
- MPIDR and get cpu_possible_map
-In-Reply-To: <1447753261-7552-19-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-19-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511231502470.1107@kaball.uk.xensource.com>
+From: damien.riegel@savoirfairelinux.com (Damien Riegel)
+Date: Mon, 23 Nov 2015 10:17:39 -0500
+Subject: [PATCH v4 3/5] watchdog: ts4800: add driver for TS-4800 watchdog
+In-Reply-To: <1448291861-28543-1-git-send-email-damien.riegel@savoirfairelinux.com>
+References: <1448291861-28543-1-git-send-email-damien.riegel@savoirfairelinux.com>
+Message-ID: <1448291861-28543-4-git-send-email-damien.riegel@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> From: Parth Dixit <parth.dixit@linaro.org>
-> 
-> MADT contains the information for MPIDR which is essential for SMP
-> initialization, parse the GIC cpu interface structures to get the MPIDR
-> value and map it to cpu_logical_map(), and add enabled cpu with valid
-> MPIDR into cpu_possible_map.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
-> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  xen/arch/arm/acpi/boot.c   | 121 +++++++++++++++++++++++++++++++++++++++++++++
->  xen/include/asm-arm/acpi.h |   2 +
->  xen/include/xen/acpi.h     |   4 ++
->  3 files changed, 127 insertions(+)
-> 
-> diff --git a/xen/arch/arm/acpi/boot.c b/xen/arch/arm/acpi/boot.c
-> index 0fabe7d..913d2a5 100644
-> --- a/xen/arch/arm/acpi/boot.c
-> +++ b/xen/arch/arm/acpi/boot.c
-> @@ -32,6 +32,127 @@
->  #include <xen/mm.h>
->  
->  #include <asm/acpi.h>
-> +#include <asm/smp.h>
-> +
-> +/* Processors with enabled flag and sane MPIDR */
-> +static int enabled_cpus;
+This watchdog is instantiated in a FPGA that is memory mapped. It is
+made of only one register, called the feed register. Writing to this
+register will re-arm the watchdog for a given time (and enable it if it
+was disable). It can be disabled by writing a special value into it.
 
-unsigned int
+It is part of a syscon block, and the watchdog register offset in this
+block varies from board to board. This offset is passed in the syscon
+property after the phandle to the syscon node.
 
+Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+---
+ .../devicetree/bindings/watchdog/ts4800-wdt.txt    |  25 +++
+ drivers/watchdog/Kconfig                           |  10 +
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/ts4800_wdt.c                      | 215 +++++++++++++++++++++
+ 4 files changed, 251 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt
+ create mode 100644 drivers/watchdog/ts4800_wdt.c
 
-> +/* Boot CPU is valid or not in MADT */
-> +static bool_t __initdata bootcpu_valid;
-> +
-> +/* total number of cpus in this system */
-> +static unsigned int __initdata total_cpus = 0;
-
-no need to explicitly initialize to 0
-
-
-> +/*
-> + * acpi_map_gic_cpu_interface - generates a logical cpu number
-> + * and map to MPIDR represented by GICC structure
-> + */
-> +static void __init
-> +acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
-> +{
-> +    int i;
-> +    u64 mpidr = processor->arm_mpidr & MPIDR_HWID_MASK;
-> +    bool enabled = !!(processor->flags & ACPI_MADT_ENABLED);
-
-bool_t
-
-
-> +    if (mpidr == MPIDR_INVALID) {
-> +        printk("Skip MADT cpu entry with invalid MPIDR\n");
-> +        return;
-> +    }
-
-I am not sure which coding style we are supposed to follow in this file.
-This is the Linux coding style, not the Xen coding style.
-
-
-> +    total_cpus++;
-> +    if (!enabled)
-> +        return;
-> +
-> +    if (enabled_cpus >=  NR_CPUS) {
-
-unnecessary space
-
-
-> +        printk("NR_CPUS limit of %d reached, Processor %d/0x%"PRIx64" ignored.\n",
-> +               NR_CPUS, total_cpus, mpidr);
-> +        return;
-> +    }
-> +
-> +    /* Check if GICC structure of boot CPU is available in the MADT */
-> +    if (cpu_logical_map(0) == mpidr) {
-> +        if (bootcpu_valid) {
-> +            printk("Firmware bug, duplicate CPU MPIDR: 0x%"PRIx64" in MADT\n",
-> +                   mpidr);
-> +            return;
-> +        }
-> +
-> +        bootcpu_valid = true;
-> +    }
-> +
-> +    /*
-> +     * Duplicate MPIDRs are a recipe for disaster. Scan
-> +     * all initialized entries and check for
-> +     * duplicates. If any is found just ignore the CPU.
-> +     */
-> +    for (i = 1; i < enabled_cpus; i++) {
-> +        if (cpu_logical_map(i) == mpidr) {
-> +            printk("Firmware bug, duplicate CPU MPIDR: 0x%"PRIx64" in MADT\n",
-> +                   mpidr);
-> +            return;
-> +        }
-> +    }
-
-I would merge this loop with the previous if statement and just add one
-cpu_logical_map(0) check to set bootcpu_valid.
-
-
-> +    if (!acpi_psci_present())
-> +        return;
-> +
-> +    /* CPU 0 was already initialized */
-> +    if (enabled_cpus) {
-> +        if (arch_cpu_init(enabled_cpus, NULL) < 0)
-> +            return;
-> +
-> +        /* map the logical cpu id to cpu MPIDR */
-> +        cpu_logical_map(enabled_cpus) = mpidr;
-> +    }
-> +
-> +    enabled_cpus++;
-> +}
-> +
-> +static int __init
-> +acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
-> +                             const unsigned long end)
-> +{
-> +    struct acpi_madt_generic_interrupt *processor;
-> +
-> +    processor = (struct acpi_madt_generic_interrupt *)header;
-
-struct acpi_madt_generic_interrupt *processor =
-		container_of(header, struct acpi_madt_generic_interrupt, header);
-
-
-> +    if (BAD_MADT_ENTRY(processor, end))
-> +        return -EINVAL;
-> +
-> +    acpi_table_print_madt_entry(header);
-> +    acpi_map_gic_cpu_interface(processor);
-> +    return 0;
-> +}
-> +
-> +/* Parse GIC cpu interface entries in MADT for SMP init */
-> +void __init acpi_smp_init_cpus(void)
-> +{
-> +    int count, i;
-> +
-> +    /*
-> +     * do a partial walk of MADT to determine how many CPUs
-> +     * we have including disabled CPUs, and get information
-> +     * we need for SMP init
-> +     */
-> +    count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
-> +                    acpi_parse_gic_cpu_interface, 0);
-> +
-> +    if (count <= 0) {
-> +        printk("Error parsing GIC CPU interface entry\n");
-> +        return;
-> +    }
-> +
-> +    if (!bootcpu_valid) {
-> +        printk("MADT missing boot CPU MPIDR, not enabling secondaries\n");
-> +        return;
-> +    }
-> +
-> +    for (i = 0; i < enabled_cpus; i++)
-> +        cpumask_set_cpu(i, &cpu_possible_map);
-> +
-> +    /* Make boot-up look pretty */
-> +    printk("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
-> +}
->  
->  static int __init acpi_parse_fadt(struct acpi_table_header *table)
->  {
-> diff --git a/xen/include/asm-arm/acpi.h b/xen/include/asm-arm/acpi.h
-> index 65f80b1..1efa29d 100644
-> --- a/xen/include/asm-arm/acpi.h
-> +++ b/xen/include/asm-arm/acpi.h
-> @@ -33,9 +33,11 @@ extern bool_t acpi_disabled;
->  #ifdef CONFIG_ACPI
->  bool_t __init acpi_psci_present(void);
->  bool_t __init acpi_psci_hvc_present(void);
-> +void __init acpi_smp_init_cpus(void);
->  #else
->  static inline bool_t acpi_psci_present(void) { return false; }
->  static inline bool_t acpi_psci_hvc_present(void) {return false; }
-> +static inline void acpi_smp_init_cpus(void) { }
->  #endif /* CONFIG_ACPI */
->  
->  /* Basic configuration for ACPI */
-> diff --git a/xen/include/xen/acpi.h b/xen/include/xen/acpi.h
-> index 48d7810..723ece8 100644
-> --- a/xen/include/xen/acpi.h
-> +++ b/xen/include/xen/acpi.h
-> @@ -39,6 +39,10 @@
->  #define ACPI_MADT_GET_POLARITY(inti)	ACPI_MADT_GET_(POLARITY, inti)
->  #define ACPI_MADT_GET_TRIGGER(inti)	ACPI_MADT_GET_(TRIGGER, inti)
->  
-> +#define BAD_MADT_ENTRY(entry, end) (                                        \
-> +                (!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
-> +                ((struct acpi_subtable_header *)entry)->length < sizeof(*entry))
-> +
->  #ifdef CONFIG_ACPI_BOOT
->  
->  enum acpi_interrupt_id {
-> -- 
-> 2.1.0
-> 
+diff --git a/Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt b/Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt
+new file mode 100644
+index 0000000..388c60f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt
+@@ -0,0 +1,25 @@
++Technologic Systems Watchdog
++
++Required properties:
++- compatible: must be "technologic,ts4800-wdt"
++- syscon: phandle / integer array that points to the syscon node which
++          describes the FPGA's syscon registers.
++          - phandle to FPGA's syscon
++          - offset to the watchdog register
++
++Optional property:
++- timeout-sec: contains the watchdog timeout in seconds.
++
++Example:
++
++syscon: syscon at b0010000 {
++	compatible = "syscon", "simple-mfd";
++	reg = <0xb0010000 0x3d>;
++	bus-width = <16>;
++
++	wdt at e {
++		compatible = "technologic,ts4800-wdt";
++		syscon = <&syscon 0xe>;
++		timeout-sec = <10>;
++	};
++}
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index 79e1aa1..2914594 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -426,6 +426,16 @@ config NUC900_WATCHDOG
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called nuc900_wdt.
+ 
++config TS4800_WATCHDOG
++	tristate "TS-4800 Watchdog"
++	depends on OF
++	select WATCHDOG_CORE
++	select MFD_SYSCON
++	help
++	  Technologic Systems TS-4800 has watchdog timer implemented in
++	  an external FPGA. Say Y here if you want to support for the
++	  watchdog timer on TS-4800 board.
++
+ config TS72XX_WATCHDOG
+ 	tristate "TS-72XX SBC Watchdog"
+ 	depends on MACH_TS72XX
+diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+index 0c616e3..3863ce0 100644
+--- a/drivers/watchdog/Makefile
++++ b/drivers/watchdog/Makefile
+@@ -53,6 +53,7 @@ obj-$(CONFIG_RN5T618_WATCHDOG) += rn5t618_wdt.o
+ obj-$(CONFIG_COH901327_WATCHDOG) += coh901327_wdt.o
+ obj-$(CONFIG_STMP3XXX_RTC_WATCHDOG) += stmp3xxx_rtc_wdt.o
+ obj-$(CONFIG_NUC900_WATCHDOG) += nuc900_wdt.o
++obj-$(CONFIG_TS4800_WATCHDOG) += ts4800_wdt.o
+ obj-$(CONFIG_TS72XX_WATCHDOG) += ts72xx_wdt.o
+ obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
+ obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
+diff --git a/drivers/watchdog/ts4800_wdt.c b/drivers/watchdog/ts4800_wdt.c
+new file mode 100644
+index 0000000..268c2a9
+--- /dev/null
++++ b/drivers/watchdog/ts4800_wdt.c
+@@ -0,0 +1,215 @@
++/*
++ * Watchdog driver for TS-4800 based boards
++ *
++ * Copyright (c) 2015 - Savoir-faire Linux
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/kernel.h>
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/watchdog.h>
++
++static bool nowayout = WATCHDOG_NOWAYOUT;
++module_param(nowayout, bool, 0);
++MODULE_PARM_DESC(nowayout,
++	"Watchdog cannot be stopped once started (default="
++	__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
++
++/* possible feed values */
++#define TS4800_WDT_FEED_2S       0x1
++#define TS4800_WDT_FEED_10S      0x2
++#define TS4800_WDT_DISABLE       0x3
++
++struct ts4800_wdt {
++	struct watchdog_device  wdd;
++	struct regmap           *regmap;
++	u32                     feed_offset;
++	u32                     feed_val;
++};
++
++/*
++ * TS-4800 supports the following timeout values:
++ *
++ *   value desc
++ *   ---------------------
++ *     0    feed for 338ms
++ *     1    feed for 2.706s
++ *     2    feed for 10.824s
++ *     3    disable watchdog
++ *
++ * Keep the regmap/timeout map ordered by timeout
++ */
++static const struct {
++	const int timeout;
++	const int regval;
++} ts4800_wdt_map[] = {
++	{ 2,  TS4800_WDT_FEED_2S },
++	{ 10, TS4800_WDT_FEED_10S },
++};
++
++#define MAX_TIMEOUT_INDEX       (ARRAY_SIZE(ts4800_wdt_map) - 1)
++
++static void ts4800_write_feed(struct ts4800_wdt *wdt, u32 val)
++{
++	regmap_write(wdt->regmap, wdt->feed_offset, val);
++}
++
++static int ts4800_wdt_start(struct watchdog_device *wdd)
++{
++	struct ts4800_wdt *wdt = watchdog_get_drvdata(wdd);
++
++	ts4800_write_feed(wdt, wdt->feed_val);
++	return 0;
++}
++
++static int ts4800_wdt_stop(struct watchdog_device *wdd)
++{
++	struct ts4800_wdt *wdt = watchdog_get_drvdata(wdd);
++
++	ts4800_write_feed(wdt, TS4800_WDT_DISABLE);
++	return 0;
++}
++
++static int ts4800_wdt_set_timeout(struct watchdog_device *wdd,
++				  unsigned int timeout)
++{
++	struct ts4800_wdt *wdt = watchdog_get_drvdata(wdd);
++	int i;
++
++	for (i = 0; i <= MAX_TIMEOUT_INDEX; i++) {
++		if (ts4800_wdt_map[i].timeout >= timeout)
++			break;
++	}
++
++	wdd->timeout = ts4800_wdt_map[i].timeout;
++	wdt->feed_val = ts4800_wdt_map[i].regval;
++
++	return 0;
++}
++
++static const struct watchdog_ops ts4800_wdt_ops = {
++	.owner = THIS_MODULE,
++	.start = ts4800_wdt_start,
++	.stop = ts4800_wdt_stop,
++	.set_timeout = ts4800_wdt_set_timeout,
++};
++
++static const struct watchdog_info ts4800_wdt_info = {
++	.options = WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE | WDIOF_KEEPALIVEPING,
++	.identity = "TS-4800 Watchdog",
++};
++
++static int ts4800_wdt_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct device_node *syscon_np;
++	struct watchdog_device *wdd;
++	struct ts4800_wdt *wdt;
++	u32 reg;
++	int ret;
++
++	syscon_np = of_parse_phandle(np, "syscon", 0);
++	if (!syscon_np) {
++		dev_err(&pdev->dev, "no syscon property\n");
++		return -ENODEV;
++	}
++
++	ret = of_property_read_u32_index(np, "syscon", 1, &reg);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "no offset in syscon\n");
++		return ret;
++	}
++
++	/* allocate memory for watchdog struct */
++	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
++	if (!wdt)
++		return -ENOMEM;
++
++	/* set regmap and offset to know where to write */
++	wdt->feed_offset = reg;
++	wdt->regmap = syscon_node_to_regmap(syscon_np);
++	if (IS_ERR(wdt->regmap)) {
++		dev_err(&pdev->dev, "cannot get parent's regmap\n");
++		return PTR_ERR(wdt->regmap);
++	}
++
++	/* Initialize struct watchdog_device */
++	wdd = &wdt->wdd;
++	wdd->parent = &pdev->dev;
++	wdd->info = &ts4800_wdt_info;
++	wdd->ops = &ts4800_wdt_ops;
++	wdd->min_timeout = ts4800_wdt_map[0].timeout;
++	wdd->max_timeout = ts4800_wdt_map[MAX_TIMEOUT_INDEX].timeout;
++
++	watchdog_set_drvdata(wdd, wdt);
++	watchdog_set_nowayout(wdd, nowayout);
++	watchdog_init_timeout(wdd, 0, &pdev->dev);
++
++	/*
++	 * As this watchdog supports only a few values, ts4800_wdt_set_timeout
++	 * must be called to initialize timeout and feed_val with valid values.
++	 * Default to maximum timeout if none, or an invalid one, is provided in
++	 * device tree.
++	 */
++	if (!wdd->timeout)
++		wdd->timeout = wdd->max_timeout;
++	ts4800_wdt_set_timeout(wdd, wdd->timeout);
++
++	/*
++	 * The feed register is write-only, so it is not possible to determine
++	 * watchdog's state. Disable it to be in a known state.
++	 */
++	ts4800_wdt_stop(wdd);
++
++	ret = watchdog_register_device(wdd);
++	if (ret) {
++		dev_err(&pdev->dev,
++			"failed to register watchdog device\n");
++		return ret;
++	}
++
++	platform_set_drvdata(pdev, wdt);
++
++	dev_info(&pdev->dev,
++		 "initialized (timeout = %d sec, nowayout = %d)\n",
++		 wdd->timeout, nowayout);
++
++	return 0;
++}
++
++static int ts4800_wdt_remove(struct platform_device *pdev)
++{
++	struct ts4800_wdt *wdt = platform_get_drvdata(pdev);
++
++	watchdog_unregister_device(&wdt->wdd);
++
++	return 0;
++}
++
++static const struct of_device_id ts4800_wdt_of_match[] = {
++	{ .compatible = "technologic,ts4800-wdt", },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, ts4800_wdt_of_match);
++
++static struct platform_driver ts4800_wdt_driver = {
++	.probe		= ts4800_wdt_probe,
++	.remove		= ts4800_wdt_remove,
++	.driver		= {
++		.name	= "ts4800_wdt",
++		.of_match_table = ts4800_wdt_of_match,
++	},
++};
++
++module_platform_driver(ts4800_wdt_driver);
++
++MODULE_AUTHOR("Damien Riegel <damien.riegel@savoirfairelinux.com>");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:ts4800_wdt");
+-- 
+2.5.0
