@@ -1,62 +1,120 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Mon, 23 Nov 2015 14:15:09 -0800
-Subject: defconfig support for CPU_BIG_ENDIAN arm64 kernel
-In-Reply-To: <62603584.FYAH7ECFA0@wuerfel>
-References: <56538C12.4030506@broadcom.com> <62603584.FYAH7ECFA0@wuerfel>
-Message-ID: <56538FED.4090704@broadcom.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 24 Nov 2015 00:04 +0100
+Subject: [PATCH V3 5/5] ARM: dts: exynos4412: Rename OPP nodes as
+ opp@<opp-hz>
+In-Reply-To: <af18ab62fc9c52e082380ce5989ea287304c9bde.1447209519.git.viresh.kumar@linaro.org>
+References: <cover.1447209519.git.viresh.kumar@linaro.org>
+ <af18ab62fc9c52e082380ce5989ea287304c9bde.1447209519.git.viresh.kumar@linaro.org>
+Message-ID: <2407684.GgMbGa6LFq@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Wednesday, November 11, 2015 08:10:58 AM Viresh Kumar wrote:
+> OPP bindings got updated to name OPP nodes this way, make changes
+> according to that.
+> 
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  arch/arm/boot/dts/exynos4412.dtsi | 28 ++++++++++++++--------------
+>  1 file changed, 14 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+> index 294cfe40388d..40beede46e55 100644
+> --- a/arch/arm/boot/dts/exynos4412.dtsi
+> +++ b/arch/arm/boot/dts/exynos4412.dtsi
+> @@ -64,73 +64,73 @@
+>  		compatible = "operating-points-v2";
+>  		opp-shared;
+>  
+> -		opp00 {
+> +		opp at 200000000 {
+>  			opp-hz = /bits/ 64 <200000000>;
+>  			opp-microvolt = <900000>;
+>  			clock-latency-ns = <200000>;
+>  		};
+> -		opp01 {
+> +		opp at 300000000 {
+>  			opp-hz = /bits/ 64 <300000000>;
+>  			opp-microvolt = <900000>;
+>  			clock-latency-ns = <200000>;
+>  		};
+> -		opp02 {
+> +		opp at 400000000 {
+>  			opp-hz = /bits/ 64 <400000000>;
+>  			opp-microvolt = <925000>;
+>  			clock-latency-ns = <200000>;
+>  		};
+> -		opp03 {
+> +		opp at 500000000 {
+>  			opp-hz = /bits/ 64 <500000000>;
+>  			opp-microvolt = <950000>;
+>  			clock-latency-ns = <200000>;
+>  		};
+> -		opp04 {
+> +		opp at 600000000 {
+>  			opp-hz = /bits/ 64 <600000000>;
+>  			opp-microvolt = <975000>;
+>  			clock-latency-ns = <200000>;
+>  		};
+> -		opp05 {
+> +		opp at 700000000 {
+>  			opp-hz = /bits/ 64 <700000000>;
+>  			opp-microvolt = <987500>;
+>  			clock-latency-ns = <200000>;
+>  		};
+> -		opp06 {
+> +		opp at 800000000 {
+>  			opp-hz = /bits/ 64 <800000000>;
+>  			opp-microvolt = <1000000>;
+>  			clock-latency-ns = <200000>;
+>  			opp-suspend;
+>  		};
+> -		opp07 {
+> +		opp at 900000000 {
+>  			opp-hz = /bits/ 64 <900000000>;
+>  			opp-microvolt = <1037500>;
+>  			clock-latency-ns = <200000>;
+>  		};
+> -		opp08 {
+> +		opp at 1000000000 {
+>  			opp-hz = /bits/ 64 <1000000000>;
+>  			opp-microvolt = <1087500>;
+>  			clock-latency-ns = <200000>;
+>  		};
+> -		opp09 {
+> +		opp at 1100000000 {
+>  			opp-hz = /bits/ 64 <1100000000>;
+>  			opp-microvolt = <1137500>;
+>  			clock-latency-ns = <200000>;
+>  		};
+> -		opp10 {
+> +		opp at 1200000000 {
+>  			opp-hz = /bits/ 64 <1200000000>;
+>  			opp-microvolt = <1187500>;
+>  			clock-latency-ns = <200000>;
+>  		};
+> -		opp11 {
+> +		opp at 1300000000 {
+>  			opp-hz = /bits/ 64 <1300000000>;
+>  			opp-microvolt = <1250000>;
+>  			clock-latency-ns = <200000>;
+>  		};
+> -		opp12 {
+> +		opp at 1400000000 {
+>  			opp-hz = /bits/ 64 <1400000000>;
+>  			opp-microvolt = <1287500>;
+>  			clock-latency-ns = <200000>;
+>  		};
+> -		opp13 {
+> +		opp at 1500000000 {
+>  			opp-hz = /bits/ 64 <1500000000>;
+>  			opp-microvolt = <1350000>;
+>  			clock-latency-ns = <200000>;
+> 
 
-On 15-11-23 02:04 PM, Arnd Bergmann wrote:
-> On Monday 23 November 2015 13:58:42 Scott Branden wrote:
->> For arm64 platforms there is only a single defconfig upstreamed.  This
->> builds for Little Endian ARM64 platforms.  So...what about Big Endian?
->>
->> It seems like we need another defconfig with CPU_BIG_ENDIAN to be
->> enabled and built in the upstream kernel.  We need this deconfig to test
->> that drivers compile in big endian mode and we have an upstream kernel
->> image to run on these systems.
->>
->> I'm hoping the upstreamed kernel is already being built/tested with the
->> arm64 big endian compiler.
->>
->> If not, perhaps the upstream solution is to continue to use the single
->> defconfig we have today and start using scripts/kconfig/merge_config.sh
->> to add the CPU_BIG_ENDIAN support to generate a big endian defconfig?
->>
->> Hopefully arm64 is already being compiled and tested for Big Endian and
->> I'm missing something?
->
-> kernelci.org uses Kconfig fragments to build big-endian kernels with
-> merge-config.sh
-
-Glad its already tested!
->
-> We should probably make it a little more straightforward to do this
-> with mainline kernels. 'make help' already shows 'kvmconfig', 'xenconfig'
-> and 'tinyconfig' targets for arm64 that use this. Any suggestions how we
-> should name and integrate big-endian builds?
-
-Yes, I would like this ability added to the standard arm64 make 
-configuration targets.
-
-To do this we would need to add a new configuration target
-"bigendianconfig"
-or
-"beconfig"  - Update current config to enable big endian support
-
-If we do that - Perhaps the other is necessary as well then?
-"littleendianconfig"
-or
-"leconfig"
-
-I propose the short format "beconfig" and "leconfig" be added.
+This one doesn't apply for me on top of the current Linus' tree, so please
+update.
 
 Thanks,
-Scott
-
->
-> 	Arnd
->
+Rafael
