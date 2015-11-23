@@ -1,36 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Nov 2015 14:39:33 +0100
-Subject: [PATCH] mtd: cfi: enforce valid geometry configuration
-Message-ID: <3747078.dk5V5gxuXa@wuerfel>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 23 Nov 2015 14:42:33 +0100
+Subject: [PATCH] ARM: imx6: pm: declare pm domain latency on power_state
+ struct.
+In-Reply-To: <1448285460.3689.13.camel@pengutronix.de>
+References: <1447799871-56374-6-git-send-email-lina.iyer@linaro.org>
+ <1447858656-62464-1-git-send-email-lina.iyer@linaro.org>
+ <1448285460.3689.13.camel@pengutronix.de>
+Message-ID: <1448286153.3689.15.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MTD allows compile-time configuration of the possible CFI geometry
-settings that are allowed by the kernel, but that includes a couple of
-invalid configurations, where no bank width or no interleave setting
-is allowed. These are then caught with a compile-time warning:
+Am Montag, den 23.11.2015, 14:31 +0100 schrieb Lucas Stach:
+> Am Mittwoch, den 18.11.2015, 07:57 -0700 schrieb Lina Iyer:
+> > From: Axel Haslam <ahaslam+renesas@baylibre.com>
+> > 
+> > The generic_pm_domain structure uses an array of latencies to be able to
+> > declare multiple intermediate states.
+> > 
+> > Declare a single "OFF" state with the default latencies So that the
+> > power_off_latency_ns and power_on_latency_ns fields of generic_pm_domain
+> > structure can be eventualy removed.
+> > 
+> > Signed-off-by: Axel Haslam <ahaslam+renesas@baylibre.com>
+> > Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> > [Lina: pm_genpd_init() argument change]
+> > ---
+> >  arch/arm/mach-imx/gpc.c | 14 ++++++++++++--
+> >  1 file changed, 12 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+> > index 8e7976a..b070e06 100644
+> > --- a/arch/arm/mach-imx/gpc.c
+> > +++ b/arch/arm/mach-imx/gpc.c
+> > @@ -368,13 +368,23 @@ static struct generic_pm_domain imx6q_arm_domain = {
+> >  	.name = "ARM",
+> >  };
+> >  
+> > +static struct genpd_power_state imx6q_arm_domain_states[] = {
+> 
+> Those states are for the PU, not the ARM domain.
+> 
+> > +	{
+> > +		.name = "OFF",
+> > +		.power_off_latency_ns = 25000,
+> > +		.power_on_latency_ns = 2000000,
+> > +	},
+> > +};
+> > +
+> >  static struct pu_domain imx6q_pu_domain = {
+> >  	.base = {
+> >  		.name = "PU",
+> >  		.power_off = imx6q_pm_pu_power_off,
+> >  		.power_on = imx6q_pm_pu_power_on,
+> > -		.power_off_latency_ns = 25000,
+> > -		.power_on_latency_ns = 2000000,
+> > +		.gov = NULL,
+> > +		.status = GPD_STATE_POWER_OFF,
+> 
+> The above 2 lines should not be needed. This is a static struct, so .gov
+> will already be NULL. status is set by pm_genpd_init() and the above
+> value is actively wrong.
+> 
+> > +		.states = imx6q_arm_domain_states,
+> > +		.state_count = ARRAY_SIZE(imx6q_arm_domain_states),
+> >  	},
+> >  };
+> >  
+> 
+> How urgent is this patch? I have a series to rework the GPC driver
+> almost ready and I could fold this change in directly if it's okay for
+> this to sit through a review of the rework.
 
-include/linux/mtd/cfi.h:76:2: warning: #warning No CONFIG_MTD_CFI_Ix selected. No NOR chip support can work.
-include/linux/mtd/map.h:145:2: warning: #warning "No CONFIG_MTD_MAP_BANK_WIDTH_xx selected. No NOR chip support can work"
+And I just noticed this depends on changes that are not already in
+v4.4-rc. Why is this sent as a single patch and not as part of the
+series adding multiple state support to genpd?
 
-This is a bit annoying for randconfig tests, and can be avoided if
-we change the Kconfig logic to always select the simplest configuration
-when no other one is enabled.
+Regards,
+Lucas
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/mtd/chips/Kconfig b/drivers/mtd/chips/Kconfig
-index 63b6b536b044..741ec69e0b46 100644
---- a/drivers/mtd/chips/Kconfig
-+++ b/drivers/mtd/chips/Kconfig
-@@ -69,6 +69,10 @@ endchoice
- config MTD_CFI_GEOMETRY
- 	bool "Specific CFI Flash geometry selection"
- 	depends on MTD_CFI_ADV_OPTIONS
-+	select MTD_MAP_BANK_WIDTH_1 if  !(MTD_MAP_BANK_WIDTH_2 || \
-+		 MTD_MAP_BANK_WIDTH_4  || MTD_MAP_BANK_WIDTH_8 || \
-+		 MTD_MAP_BANK_WIDTH_16 || MTD_MAP_BANK_WIDTH_32)
-+	select MTD_CFI_I1 if !(MTD_CFI_I2 || MTD_CFI_I4 || MTD_CFI_I8)
- 	help
- 	  This option does not affect the code directly, but will enable
- 	  some other configuration options which would allow you to reduce
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
