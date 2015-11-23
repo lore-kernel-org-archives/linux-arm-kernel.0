@@ -1,100 +1,50 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 23 Nov 2015 19:27:17 +0800
-Subject: [PATCH] PCI: keystone: fix crash with deferred probe
-In-Reply-To: <20151123192209.38e2c101@xhacker>
-References: <866b2f1544f9d55fa932aa9f9cb5e7d523a23d05.1448017883.git.nsekhar@ti.com>
- <20151123192209.38e2c101@xhacker>
-Message-ID: <20151123192717.4d4ddf06@xhacker>
+From: JBeulich@suse.com (Jan Beulich)
+Date: Mon, 23 Nov 2015 04:35:50 -0700
+Subject: [PATCH v3 05/62] acpi: Don't do traditional BIOS table
+ scan for ARM64
+In-Reply-To: <alpine.DEB.2.02.1511231120320.1107@kaball.uk.xensource.com>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-6-git-send-email-shannon.zhao@linaro.org>
+ <alpine.DEB.2.02.1511231120320.1107@kaball.uk.xensource.com>
+Message-ID: <5653082602000078000B7C28@prv-mh.provo.novell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Nov 2015 19:22:09 +0800
-Jisheng Zhang <jszhang@marvell.com> wrote:
+>>> On 23.11.15 at 12:24, <stefano.stabellini@eu.citrix.com> wrote:
+> On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>> 
+>> With the addition of ARM64 that does not have a traditional BIOS to
+>> scan, add a #ifdef option for x86 to do the traditional BIOS scanning
+>> for tables.
+>> 
+>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> ---
+>>  xen/drivers/acpi/osl.c | 2 ++
+>>  1 file changed, 2 insertions(+)
+>> 
+>> diff --git a/xen/drivers/acpi/osl.c b/xen/drivers/acpi/osl.c
+>> index ce15470..db74a90 100644
+>> --- a/xen/drivers/acpi/osl.c
+>> +++ b/xen/drivers/acpi/osl.c
+>> @@ -78,7 +78,9 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
+>>  	} else {
+>>  		acpi_physical_address pa = 0;
+>>  
+>> +		#ifdef CONFIG_X86
+>>  		acpi_find_root_pointer(&pa);
+>> +		#endif
+>>  		return pa;
+>>  	}
+> 
+> I think it might be best to error out earlier if acpi and !efi_enabled
+> on arm and arm64.  If we do that we'll never enter this "else".
+> 
+> If acpi_find_root_pointer doesn't build on arm, we should move it to an
+> x86 specific location, such as xen/arch/x86/efi.
 
-> Dear Sekhar,
-> 
-> On Fri, 20 Nov 2015 16:47:02 +0530
-> Sekhar Nori wrote:
-> 
-> > Drop __init annotations for functions called during
-> > probe of keystone PCIe host.
-> > 
-> > This fixes kernel crashes seen because of init data
-> > reclamation if the driver defer probes because of
-> > phy unavailability.
-> > 
-> > While at it, drop the useless __refdata annotation
-> > to driver structure. If its really needed, it should
-> > be added back with a comment explaining why.
-> > 
-> > Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> > ---
-> >  drivers/pci/host/pci-keystone-dw.c | 2 +-
-> >  drivers/pci/host/pci-keystone.c    | 6 +++---
-> >  2 files changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
-> > index ed34c9520a02..47ddbcce53ca 100644
-> > --- a/drivers/pci/host/pci-keystone-dw.c
-> > +++ b/drivers/pci/host/pci-keystone-dw.c
-> > @@ -469,7 +469,7 @@ void ks_dw_pcie_initiate_link_train(struct keystone_pcie *ks_pcie)
-> >   * and call dw_pcie_v3_65_host_init() API to initialize the Keystone
-> >   * PCI host controller.
-> >   */
-> > -int __init ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie,
-> > +int ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie,
-> >  				struct device_node *msi_intc_np)  
-> 
-> when trying to add berlin pcie support and came up one patch
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/384575.html
-> 
-> when build testing, I also realized this issue, but keystone relies on
+No, definitely not (or if anything, then xen/arch/x86/acpi/). Instead
+the function itself should be stubbed out to do nothing on ARM. (And
+of course also the #ifdef placement is rather odd).
 
-I mean ks_dw_pcie_host_init() calls hook_fault_code()
-
-> hook_fault_code() which is will be freed after boot, so your patch isn't
-> completed.
-
-And will introduce section mismatch warnings
-
-> 
-> And from the keystone driver implementation, it seems assume the driver won't
-> be defer probed.
-> 
-> Thanks
-> 
-> >  {
-> >  	struct pcie_port *pp = &ks_pcie->pp;
-> > diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
-> > index 0aa81bd3de12..593a58834c7d 100644
-> > --- a/drivers/pci/host/pci-keystone.c
-> > +++ b/drivers/pci/host/pci-keystone.c
-> > @@ -291,7 +291,7 @@ static struct pcie_host_ops keystone_pcie_host_ops = {
-> >  	.scan_bus = ks_dw_pcie_v3_65_scan_bus,
-> >  };
-> >  
-> > -static int __init ks_add_pcie_port(struct keystone_pcie *ks_pcie,
-> > +static int ks_add_pcie_port(struct keystone_pcie *ks_pcie,
-> >  			 struct platform_device *pdev)
-> >  {
-> >  	struct pcie_port *pp = &ks_pcie->pp;
-> > @@ -340,7 +340,7 @@ static int __exit ks_pcie_remove(struct platform_device *pdev)
-> >  	return 0;
-> >  }
-> >  
-> > -static int __init ks_pcie_probe(struct platform_device *pdev)
-> > +static int ks_pcie_probe(struct platform_device *pdev)
-> >  {
-> >  	struct device *dev = &pdev->dev;
-> >  	struct keystone_pcie *ks_pcie;
-> > @@ -396,7 +396,7 @@ fail_clk:
-> >  	return ret;
-> >  }
-> >  
-> > -static struct platform_driver ks_pcie_driver __refdata = {
-> > +static struct platform_driver ks_pcie_driver = {
-> >  	.probe  = ks_pcie_probe,
-> >  	.remove = __exit_p(ks_pcie_remove),
-> >  	.driver = {  
-> 
+Jan
