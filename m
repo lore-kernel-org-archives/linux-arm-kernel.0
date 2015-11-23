@@ -1,37 +1,34 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Mon, 23 Nov 2015 10:17:03 -0800
-Subject: [PATCH] ARM: dts: keystone: k2l: fix kernel crash when
- clk_ignore_unused is not in bootargs
-In-Reply-To: <1448297649-22122-1-git-send-email-m-karicheri2@ti.com>
-References: <1448297649-22122-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <5653581F.4060902@oracle.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Mon, 23 Nov 2015 19:17:59 +0100
+Subject: [PATCH 0/3] LPC4337 CIAA-NXP DTS changes
+In-Reply-To: <565309F3.1040306@vanguardiasur.com.ar>
+References: <1448282225-2635-1-git-send-email-ariel@vanguardiasur.com.ar>
+ <565309F3.1040306@vanguardiasur.com.ar>
+Message-ID: <CAGhQ9Vz-fpqKBtaHY5bDZqXEMrpat=UWz4KofGBWMNdNVWw4Cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23/2015 8:54 AM, Murali Karicheri wrote:
-> Currently kernel crash randomly when K2L EVM is booted without
-> clk_ignore_unused in the bootargs. This workaround is not needed
-> on other K2 devices such as K2HK and K2E and with this fix, we can
-> remove the workaround altogether. netcp driver on K2L uses linked
-> ram on OSR (On chip Static RAM) and requires the clock to this peripheral
-> enabled for proper functioning. This is the reason for the kernel crash.
-> So add the clock node to fix this issue.
->
-> While at it, remove the workaround documentation as well.
->
-> With the fix applied, clk_summary dump shows the clock to OSR enabled.
->
-> cat /sys/kernel/debug/clk/clk_summary
->   ------cut--------------
->     tcp3d-1                   0            0   399360000          0 0
->     tcp3d-0                   0            0   399360000          0 0
->     osr                       1            1   399360000          0 0
->     fftc-0                    0            0   399360000          0 0
->   -----cut----------------
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> ---
-Nice !!
-I will queue this up for fixes. Thanks.
+Hi Ariel,
 
-Regards,
-Santosh
+On 23 November 2015 at 13:43, Ariel D'Alessandro
+<ariel@vanguardiasur.com.ar> wrote:
+> (+Cc Joachim)
+>
+> El 23/11/15 a las 09:37, Ariel D'Alessandro escribi?:
+>> Hi,
+>>
+>> This patch set includes some DTS changes for LPC4337 CIAA-NXP board.
+>> It is based on tag next-20151120 of the linux-next repository. It has
+>> been successfully tested on a LPC4337 CIAA-NXP Board.
+>>
+>> Ariel D'Alessandro (3):
+>>   ARM: dts: lpc4337-ciaa: enable EEPROM memory
+>>   ARM: dts: lpc4337-ciaa: enable SCT-PWM
+>>   ARM: dts: lpc4337-ciaa: add i2c0 and devices
+
+If you want me to pick up the patches please put me in the To field so
+they end up in my inbox.
+
+
+regards,
+Joachim Eastwood
