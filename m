@@ -1,76 +1,53 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 23 Nov 2015 14:31:00 +0100
-Subject: [PATCH] ARM: imx6: pm: declare pm domain latency on power_state
- struct.
-In-Reply-To: <1447858656-62464-1-git-send-email-lina.iyer@linaro.org>
-References: <1447799871-56374-6-git-send-email-lina.iyer@linaro.org>
- <1447858656-62464-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1448285460.3689.13.camel@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Nov 2015 14:33:39 +0100
+Subject: [PATCH] md: avoid warning for 32-bit sector_t
+Message-ID: <65226011.NWtA6TWNA3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 18.11.2015, 07:57 -0700 schrieb Lina Iyer:
-> From: Axel Haslam <ahaslam+renesas@baylibre.com>
-> 
-> The generic_pm_domain structure uses an array of latencies to be able to
-> declare multiple intermediate states.
-> 
-> Declare a single "OFF" state with the default latencies So that the
-> power_off_latency_ns and power_on_latency_ns fields of generic_pm_domain
-> structure can be eventualy removed.
-> 
-> Signed-off-by: Axel Haslam <ahaslam+renesas@baylibre.com>
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> [Lina: pm_genpd_init() argument change]
-> ---
->  arch/arm/mach-imx/gpc.c | 14 ++++++++++++--
->  1 file changed, 12 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-> index 8e7976a..b070e06 100644
-> --- a/arch/arm/mach-imx/gpc.c
-> +++ b/arch/arm/mach-imx/gpc.c
-> @@ -368,13 +368,23 @@ static struct generic_pm_domain imx6q_arm_domain = {
->  	.name = "ARM",
->  };
->  
-> +static struct genpd_power_state imx6q_arm_domain_states[] = {
+When CONFIG_LBDAF is not set, sector_t is only 32-bits wide, which
+means we cannot have devices with more than 2TB, and the code that
+is trying to handle compatibility support for large devices in
+md version 0.90 is meaningless but also causes a compile-time warning:
 
-Those states are for the PU, not the ARM domain.
+drivers/md/md.c: In function 'super_90_load':
+drivers/md/md.c:1029:19: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+drivers/md/md.c: In function 'super_90_rdev_size_change':
+drivers/md/md.c:1323:17: warning: large integer implicitly truncated to unsigned type [-Woverflow]
 
-> +	{
-> +		.name = "OFF",
-> +		.power_off_latency_ns = 25000,
-> +		.power_on_latency_ns = 2000000,
-> +	},
-> +};
-> +
->  static struct pu_domain imx6q_pu_domain = {
->  	.base = {
->  		.name = "PU",
->  		.power_off = imx6q_pm_pu_power_off,
->  		.power_on = imx6q_pm_pu_power_on,
-> -		.power_off_latency_ns = 25000,
-> -		.power_on_latency_ns = 2000000,
-> +		.gov = NULL,
-> +		.status = GPD_STATE_POWER_OFF,
+This adds a check for CONFIG_LBDAF to avoid even getting into this
+code path, and also adds an explicit cast to let the compiler know
+it doesn't have to warn about the truncation.
 
-The above 2 lines should not be needed. This is a static struct, so .gov
-will already be NULL. status is set by pm_genpd_init() and the above
-value is actively wrong.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+Noticed on ARM randconfig builds with recent gcc versions.
 
-> +		.states = imx6q_arm_domain_states,
-> +		.state_count = ARRAY_SIZE(imx6q_arm_domain_states),
->  	},
->  };
->  
-
-How urgent is this patch? I have a series to rework the GPC driver
-almost ready and I could fold this change in directly if it's okay for
-this to sit through a review of the rework.
-
-Regards,
-Lucas
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+diff --git a/drivers/md/md.c b/drivers/md/md.c
+index 0b48c5d7c489..ee9a7ab44f32 100644
+--- a/drivers/md/md.c
++++ b/drivers/md/md.c
+@@ -1025,8 +1025,9 @@ static int super_90_load(struct md_rdev *rdev, struct md_rdev *refdev, int minor
+ 	 * (not needed for Linear and RAID0 as metadata doesn't
+ 	 * record this size)
+ 	 */
+-	if (rdev->sectors >= (2ULL << 32) && sb->level >= 1)
+-		rdev->sectors = (2ULL << 32) - 2;
++	if (IS_ENABLED(CONFIG_LBDAF) && (u64)rdev->sectors >= (2ULL << 32) &&
++	    sb->level >= 1)
++		rdev->sectors = (sector_t)(2ULL << 32) - 2;
+ 
+ 	if (rdev->sectors < ((sector_t)sb->size) * 2 && sb->level >= 1)
+ 		/* "this cannot possibly happen" ... */
+@@ -1319,8 +1320,9 @@ super_90_rdev_size_change(struct md_rdev *rdev, sector_t num_sectors)
+ 	/* Limit to 4TB as metadata cannot record more than that.
+ 	 * 4TB == 2^32 KB, or 2*2^32 sectors.
+ 	 */
+-	if (num_sectors >= (2ULL << 32) && rdev->mddev->level >= 1)
+-		num_sectors = (2ULL << 32) - 2;
++	if (IS_ENABLED(CONFIG_LBDAF) && (u64)num_sectors >= (2ULL << 32) &&
++	    rdev->mddev->level >= 1)
++		num_sectors = (sector_t)(2ULL << 32) - 2;
+ 	md_super_write(rdev->mddev, rdev, rdev->sb_start, rdev->sb_size,
+ 		       rdev->sb_page);
+ 	md_super_wait(rdev->mddev);
