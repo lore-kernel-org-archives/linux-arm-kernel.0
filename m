@@ -1,57 +1,153 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 23 Nov 2015 13:26:19 +0000
-Subject: [PATCHv2 1/2] arm64: mm: detect bad __create_mapping uses
-Message-ID: <1448285180-15389-1-git-send-email-mark.rutland@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 23 Nov 2015 13:28:56 +0000
+Subject: [PATCH v2 3/4] arm64: add implementation for arm-smccc
+In-Reply-To: <1447236266-7491-4-git-send-email-jens.wiklander@linaro.org>
+References: <1447236266-7491-1-git-send-email-jens.wiklander@linaro.org>
+ <1447236266-7491-4-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <20151123132856.GE2755@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a caller of __create_mapping provides a PA and VA which have
-different sub-page offsets, it is not clear which offset they expect to
-apply to the mapping, and is indicative of a bad caller.
+On Wed, Nov 11, 2015 at 11:04:25AM +0100, Jens Wiklander wrote:
+> Adds implementation for arm-smccc and enables CONFIG_HAVE_SMCCC.
+> 
+> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+> ---
+>  arch/arm64/Kconfig              |  1 +
+>  arch/arm64/kernel/Makefile      |  1 +
+>  arch/arm64/kernel/asm-offsets.c |  3 +++
+>  arch/arm64/kernel/smccc-call.S  | 43 +++++++++++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/smccc.c       | 18 +++++++++++++++++
+>  5 files changed, 66 insertions(+)
+>  create mode 100644 arch/arm64/kernel/smccc-call.S
+>  create mode 100644 arch/arm64/kernel/smccc.c
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 07d1811..a7332ca 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -89,6 +89,7 @@ config ARM64
+>  	select SPARSE_IRQ
+>  	select SYSCTL_EXCEPTION_TRACE
+>  	select HAVE_CONTEXT_TRACKING
+> +	select HAVE_ARM_SMCCC
+>  	help
+>  	  ARM 64-bit (AArch64) Linux support.
+>  
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 22dc9bc..c61d758 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -36,6 +36,7 @@ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
+>  arm64-obj-$(CONFIG_PCI)			+= pci.o
+>  arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+>  arm64-obj-$(CONFIG_ACPI)		+= acpi.o
+> +arm64-obj-$(CONFIG_HAVE_ARM_SMCCC)	+= smccc-call.o smccc.o
 
-In some cases, the region we wish to map may validly have a sub-page
-offset in the physical and virtual addresses. For example, EFI runtime
-regions have 4K granularity, yet may be mapped by a 64K page kernel. So
-long as the physical and virtual offsets are the same, the region will
-be mapped at the expected VAs.
+I think you can just stick these in arm64-obj-y, since that option will
+never be turned off.
 
-Disallow calls with differing sub-page offsets, and WARN when they are
-encountered, so that we can detect and fix such cases.
+>  obj-y					+= $(arm64-obj-y) vdso/
+>  obj-m					+= $(arm64-obj-m)
+> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+> index 8d89cf8..cfa0885 100644
+> --- a/arch/arm64/kernel/asm-offsets.c
+> +++ b/arch/arm64/kernel/asm-offsets.c
+> @@ -28,6 +28,7 @@
+>  #include <asm/suspend.h>
+>  #include <asm/vdso_datapage.h>
+>  #include <linux/kbuild.h>
+> +#include <linux/arm-smccc.h>
+>  
+>  int main(void)
+>  {
+> @@ -161,5 +162,7 @@ int main(void)
+>    DEFINE(SLEEP_SAVE_SP_PHYS,	offsetof(struct sleep_save_sp, save_ptr_stash_phys));
+>    DEFINE(SLEEP_SAVE_SP_VIRT,	offsetof(struct sleep_save_sp, save_ptr_stash));
+>  #endif
+> +  DEFINE(ARM_SMCCC_RES_X0_OFFS,	offsetof(struct arm_smccc_res, a0));
+> +  DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
+>    return 0;
+>  }
+> diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
+> new file mode 100644
+> index 0000000..ae0496f
+> --- /dev/null
+> +++ b/arch/arm64/kernel/smccc-call.S
+> @@ -0,0 +1,43 @@
+> +/*
+> + * Copyright (c) 2015, Linaro Limited
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License Version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +#include <linux/linkage.h>
+> +#include <asm/asm-offsets.h>
+> +
+> +	.macro SMCCC instr
+> +	.cfi_startproc
+> +	\instr	#0
+> +	ldr	x4, [sp]
+> +	stp	x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
+> +	stp	x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
+> +	ret
+> +	.cfi_endproc
+> +	.endm
+> +
+> +/*
+> + * void arm_smccc_smc(unsigned long a0, unsigned long a1, unsigned long a2,
+> + *		  unsigned long a3, unsigned long a4, unsigned long a5,
+> + *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
+> + */
+> +ENTRY(arm_smccc_smc)
+> +	SMCCC	smc
+> +ENDPROC(arm_smccc_smc)
+> +
+> +/*
+> + * void arm_smccc_hvc(unsigned long a0, unsigned long a1, unsigned long a2,
+> + *		  unsigned long a3, unsigned long a4, unsigned long a5,
+> + *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
+> + */
+> +ENTRY(arm_smccc_hvc)
+> +	SMCCC	hvc
+> +ENDPROC(arm_smccc_hvc)
+> diff --git a/arch/arm64/kernel/smccc.c b/arch/arm64/kernel/smccc.c
+> new file mode 100644
+> index 0000000..7941210
+> --- /dev/null
+> +++ b/arch/arm64/kernel/smccc.c
+> @@ -0,0 +1,18 @@
+> +/*
+> + * Copyright (c) 2015, Linaro Limited
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +#include <linux/export.h>
+> +#include <linux/arm-smccc.h>
+> +
+> +EXPORT_SYMBOL_GPL(arm_smccc_smc);
+> +EXPORT_SYMBOL_GPL(arm_smccc_hvc);
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reviewed-by: Steve Capper <steve.capper@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Laura Abbott <labbott@fedoraproject.org>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/mmu.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+You can just put these in arch/arm64/kernel/arm64ksyms.c, which is where
+the rest of the EXPORTs for asm symbols live.
 
-Since v1 [1]:
-* Describe why we permit sub-page offsets.
-* Fix Catalin's email address.
-* Add acks.
+With those changes:
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386930.html
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index abb66f8..2250d89 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -300,6 +300,13 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
- {
- 	unsigned long addr, length, end, next;
- 
-+	/*
-+	 * If the virtual and physical address don't have the same offset
-+	 * within a page, we cannot map the region as the caller expects.
-+	 */
-+	if (WARN_ON((phys ^ virt) & ~PAGE_MASK))
-+		return;
-+
- 	addr = virt & PAGE_MASK;
- 	length = PAGE_ALIGN(size + (virt & ~PAGE_MASK));
- 
--- 
-1.9.1
+Will
