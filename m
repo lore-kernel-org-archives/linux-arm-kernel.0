@@ -1,70 +1,124 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 23 Nov 2015 14:56:17 +0000
-Subject: [PATCH v3 17/62] arm/acpi: Print GIC information when MADT is
- parsed
-In-Reply-To: <1447753261-7552-18-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-18-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511231454580.1107@kaball.uk.xensource.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 23 Nov 2015 14:59:52 +0000
+Subject: [PATCH v8 1/8] ARM: dt: Binding documentation for imx25 ADC/TSC
+In-Reply-To: <1447675269-8831-2-git-send-email-mpa@pengutronix.de>
+References: <1447675269-8831-1-git-send-email-mpa@pengutronix.de>
+ <1447675269-8831-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <20151123145952.GC31376@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> From: Naresh Bhat <naresh.bhat@linaro.org>
+On Mon, 16 Nov 2015, Markus Pargmann wrote:
+
+> This documentation describes the devicetree bindings for the
+> ADC/Touchscreen unit of the i.MX25 SoC.
 > 
-> When MADT is parsed, print GIC information to make the boot
-> log look pretty.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Acked-by: Jonathan Cameron <jic23@kernel.org>
 > ---
->  xen/drivers/acpi/tables.c | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
 > 
-> diff --git a/xen/drivers/acpi/tables.c b/xen/drivers/acpi/tables.c
-> index 60c4ab1..6573175 100644
-> --- a/xen/drivers/acpi/tables.c
-> +++ b/xen/drivers/acpi/tables.c
-> @@ -189,6 +189,30 @@ void __init acpi_table_print_madt_entry(struct acpi_subtable_header *header)
->  		}
->  		break;
->  
-> +	case ACPI_MADT_TYPE_GENERIC_INTERRUPT:
-> +		{
-> +			struct acpi_madt_generic_interrupt *p =
-> +				(struct acpi_madt_generic_interrupt *)header;
-> +			printk(KERN_INFO PREFIX
-> +			       "GICC (acpi_id[0x%04x] address[%llx] MPIDR[0x%llx] %s)\n",
-> +			       p->uid, (long long unsigned int)p->base_address,
-> +			       (long long unsigned int)p->arm_mpidr,
-> +			       (p->flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
-
-PRIx64?
-
-
-> +		}
-> +		break;
-> +
-> +	case ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR:
-> +		{
-> +			struct acpi_madt_generic_distributor *p =
-> +				(struct acpi_madt_generic_distributor *)header;
-> +			printk(KERN_INFO PREFIX
-> +			       "GIC Distributor (gic_id[0x%04x] address[%llx] gsi_base[%d])\n",
-> +			       p->gic_id, (long long unsigned int)p->base_address,
-> +			       p->global_irq_base);
-
-ditto
-
-
-> +		}
-> +		break;
-> +
->  	default:
->  		printk(KERN_WARNING PREFIX
->  		       "Found unsupported MADT entry (type = %#x)\n",
-> -- 
-> 2.1.0
+> Notes:
+>     Changes in v6:
+>      - Removed adc-ref property and replaced it with refp and refn for positive and
+>        negative references. The properties are optional now as the default
+>        behaviour is a positive internal reference voltage and ADC GND as negative
+>        reference.
 > 
+>  .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    | 46 ++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+> new file mode 100644
+> index 000000000000..a857af0eb68c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+> @@ -0,0 +1,46 @@
+> +Freescale mx25 ADC/TSC multifunction device
+
+Prefer "MX25" and "MultiFunction Device (MFD)"
+
+> +This device combines two general purpose conversion queues one used for general
+> +ADC and the other used for touchscreens.
+> +
+> +Required properties:
+> + - compatible: Should be "fsl,imx25-tsadc".
+> + - reg: Memory range of the device.
+
+Not exactly.  More like start location and size.
+
+> + - interrupts: Interrupt for this device as described in
+> +   interrupts/interrupts.txt
+
+No such file.  In any case, I'd prefer:
+
+"(See: ../interrupt-controller/interrupts.txt)".
+
+> + - clocks: An 'ipg' clock defined as described in clocks/clock.txt
+
+Didn't you check any of what you've written?
+
+"(See: ../clock/clock-bindings.txt)"
+
+> + - interrupt-controller: This device is an interrupt controller. It controls
+> +   the interrupts of both conversion queues.
+> + - #interrupt-cells: Should be '<1>'.
+> + - #address-cells: Should be '<1>'.
+> + - #size-cells: Should be '<1>'.
+> + - ranges
+
+?
+
+Also, don't think think that this looks better/easier to read?
+
+> +Required properties:
+> + - compatible:		Should be "fsl,imx25-tsadc".
+> + - reg:			Memory range of the device.
+> + - interrupts:		Interrupt for this device as described in
+> +				interrupts/interrupts.txt
+> + - clocks:			An 'ipg' clock defined as described in clocks/clock.txt
+> + - interrupt-controller:	This device is an interrupt controller. It controls
+> +   				the interrupts of both conversion queues.
+> + - #interrupt-cells:		Should be '<1>'.
+> + - #address-cells:		Should be '<1>'.
+> + - #size-cells:		Should be '<1>'.
+
+[...]
+
+> +This device includes two conversion queues which can be added as subnodes.
+> +The first queue is for the touchscreen, the second for general purpose ADC.
+> +
+> +Example:
+> +	tscadc: tscadc at 50030000 {
+> +		compatible = "fsl,imx25-tsadc";
+> +		reg = <0x50030000 0xc>;
+> +		interrupts = <46>;
+> +		clocks = <&clks 119>;
+> +		clock-names = "ipg";
+
+I don't think this is required, if you only have a single clock.
+
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		tsc: tcq at 50030400 {
+> +			compatible = "fsl,imx25-tcq";
+> +			reg = <0x50030400 0x60>;
+> +			...
+> +		};
+> +
+> +		adc: gcq at 50030800 {
+> +			compatible = "fsl,imx25-gcq";
+> +			reg = <0x50030800 0x60>;
+> +			...
+> +		};
+> +	};
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
