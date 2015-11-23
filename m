@@ -1,124 +1,96 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Mon, 23 Nov 2015 12:04:52 -0800
-Subject: [PATCH] drivers: net: xgene: fix: ifconfig up/down crash
-Message-ID: <1448309092-21550-1-git-send-email-isubramanian@apm.com>
+From: josh@joshtriplett.org (Josh Triplett)
+Date: Mon, 23 Nov 2015 12:16:36 -0800
+Subject: [RFC] asm-generic: default BUG_ON(x) to "if(x) BUG()"
+In-Reply-To: <5868782.RxZY0W5S4d@wuerfel>
+References: <5868782.RxZY0W5S4d@wuerfel>
+Message-ID: <20151123201635.GB27783@x>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixing kernel crash when doing ifconfig down and up in a loop,
+Two comments inline below.
 
-[ 124.028237] Call trace:
-[ 124.030670] [<ffffffc000367ce0>] memcpy+0x20/0x180
-[ 124.035436] [<ffffffc00053c250>] skb_clone+0x3c/0xa8
-[ 124.040374] [<ffffffc00053ffa4>] __skb_tstamp_tx+0xc0/0x118
-[ 124.045918] [<ffffffc00054000c>] skb_tstamp_tx+0x10/0x1c
-[ 124.051203] [<ffffffc00049bc84>] xgene_enet_start_xmit+0x2e4/0x33c
-[ 124.057352] [<ffffffc00054fc20>] dev_hard_start_xmit+0x2e8/0x400
-[ 124.063327] [<ffffffc00056cb14>] sch_direct_xmit+0x90/0x1d4
-[ 124.068870] [<ffffffc000550100>] __dev_queue_xmit+0x28c/0x498
-[ 124.074585] [<ffffffc00055031c>] dev_queue_xmit_sk+0x10/0x1c
-[ 124.080216] [<ffffffc0005c3f14>] ip_finish_output2+0x3d0/0x438
-[ 124.086017] [<ffffffc0005c5794>] ip_finish_output+0x198/0x1ac
-[ 124.091732] [<ffffffc0005c61d4>] ip_output+0xec/0x164
-[ 124.096755] [<ffffffc0005c5910>] ip_local_out_sk+0x38/0x48
-[ 124.102211] [<ffffffc0005c5d84>] ip_queue_xmit+0x288/0x330
-[ 124.107668] [<ffffffc0005da8bc>] tcp_transmit_skb+0x908/0x964
-[ 124.113383] [<ffffffc0005dc0d4>] tcp_send_ack+0x128/0x138
-[ 124.118753] [<ffffffc0005d1580>] __tcp_ack_snd_check+0x5c/0x94
-[ 124.124555] [<ffffffc0005d7a0c>] tcp_rcv_established+0x554/0x68c
-[ 124.130530] [<ffffffc0005df0d4>] tcp_v4_do_rcv+0xa4/0x37c
-[ 124.135900] [<ffffffc000539430>] release_sock+0xb4/0x150
-[ 124.141184] [<ffffffc0005cdf88>] tcp_recvmsg+0x448/0x9e0
-[ 124.146468] [<ffffffc0005f2f3c>] inet_recvmsg+0xa0/0xc0
-[ 124.151666] [<ffffffc000533660>] sock_recvmsg+0x10/0x1c
-[ 124.156863] [<ffffffc0005370d4>] SyS_recvfrom+0xa4/0xf8
-[ 124.162061] Code: f2400c84 540001c0 cb040042 36000064 (38401423)
-[ 124.168133] ---[ end trace 7ab2550372e8a65b ]---
+On Mon, Nov 23, 2015 at 05:25:28PM +0100, Arnd Bergmann wrote:
+> When CONFIG_BUG is disabled, BUG_ON() will only evaluate the condition,
+> but will not actually stop the current thread. GCC warns about a couple
+> of BUG_ON() users where this actually leads to further undefined
+> behavior:
+> 
+> include/linux/ceph/osdmap.h: In function 'ceph_can_shift_osds':
+> include/linux/ceph/osdmap.h:54:1: warning: control reaches end of non-void function
+> fs/ext4/inode.c: In function 'ext4_map_blocks':
+> fs/ext4/inode.c:548:5: warning: 'retval' may be used uninitialized in this function
+> drivers/mfd/db8500-prcmu.c: In function 'prcmu_config_clkout':
+> drivers/mfd/db8500-prcmu.c:762:10: warning: 'div_mask' may be used uninitialized in this function
+> drivers/mfd/db8500-prcmu.c:769:13: warning: 'mask' may be used uninitialized in this function
+> drivers/mfd/db8500-prcmu.c:757:7: warning: 'bits' may be used uninitialized in this function
+> drivers/tty/serial/8250/8250_core.c: In function 'univ8250_release_irq':
+> drivers/tty/serial/8250/8250_core.c:252:18: warning: 'i' may be used uninitialized in this function
+> drivers/tty/serial/8250/8250_core.c:235:19: note: 'i' was declared here
 
-The fix was to reorder napi_enable, napi_disable, request_irq and
-free_irq calls, move register_netdev after dma_coerce_mask_and_coherent.
+Eliminating the spurious warnings seems like a good reason to do this.
 
-Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-Tested-by: Khuong Dinh <kdinh@apm.com>
----
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 29 +++++++++++++-----------
- 1 file changed, 16 insertions(+), 13 deletions(-)
+> There is an obvious conflict of interest here: on the one hand, someone
+> who disables CONFIG_BUG() will want the kernel to be as small as possible
+> and doesn't care about printing error messages to a console that nobody
+> looks at. On the other hand, running into a BUG_ON() condition means that
+> something has gone wrong, and we probably want to also stop doing things
+> that might cause data corruption.
 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-index 991412c..1adfe70 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-@@ -688,10 +688,10 @@ static int xgene_enet_open(struct net_device *ndev)
- 	mac_ops->tx_enable(pdata);
- 	mac_ops->rx_enable(pdata);
- 
-+	xgene_enet_napi_enable(pdata);
- 	ret = xgene_enet_register_irq(ndev);
- 	if (ret)
- 		return ret;
--	xgene_enet_napi_enable(pdata);
- 
- 	if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII)
- 		phy_start(pdata->phy_dev);
-@@ -715,13 +715,13 @@ static int xgene_enet_close(struct net_device *ndev)
- 	else
- 		cancel_delayed_work_sync(&pdata->link_work);
- 
--	xgene_enet_napi_disable(pdata);
--	xgene_enet_free_irq(ndev);
--	xgene_enet_process_ring(pdata->rx_ring, -1);
--
- 	mac_ops->tx_disable(pdata);
- 	mac_ops->rx_disable(pdata);
- 
-+	xgene_enet_free_irq(ndev);
-+	xgene_enet_napi_disable(pdata);
-+	xgene_enet_process_ring(pdata->rx_ring, -1);
-+
- 	return 0;
- }
- 
-@@ -1474,15 +1474,15 @@ static int xgene_enet_probe(struct platform_device *pdev)
- 	}
- 	ndev->hw_features = ndev->features;
- 
--	ret = register_netdev(ndev);
-+	ret = dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(64));
- 	if (ret) {
--		netdev_err(ndev, "Failed to register netdev\n");
-+		netdev_err(ndev, "No usable DMA configuration\n");
- 		goto err;
- 	}
- 
--	ret = dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(64));
-+	ret = register_netdev(ndev);
- 	if (ret) {
--		netdev_err(ndev, "No usable DMA configuration\n");
-+		netdev_err(ndev, "Failed to register netdev\n");
- 		goto err;
- 	}
- 
-@@ -1490,14 +1490,17 @@ static int xgene_enet_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err;
- 
--	xgene_enet_napi_add(pdata);
- 	mac_ops = pdata->mac_ops;
--	if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII)
-+	if (pdata->phy_mode == PHY_INTERFACE_MODE_RGMII) {
- 		ret = xgene_enet_mdio_config(pdata);
--	else
-+		if (ret)
-+			goto err;
-+	} else {
- 		INIT_DELAYED_WORK(&pdata->link_work, mac_ops->link_state);
-+	}
- 
--	return ret;
-+	xgene_enet_napi_add(pdata);
-+	return 0;
- err:
- 	unregister_netdev(ndev);
- 	free_netdev(ndev);
--- 
-1.9.1
+Seems like you should adjust the Kconfig description for 'config BUG' in
+init/Kconfig to account for BUG/BUG_ON still stopping the machine.
+
+(For that matter, I can't help but wonder if we could then consolidate
+CONFIG_BUG and CONFIG_DEBUG_BUGVERBOSE, since we now only semantically
+change whether and how much we print.  However, that could happen in
+another patch.)
+
+> This patch picks the second choice, and changes the NOP to BUG(), which
+> normally stops the execution of the current thread in some form (endless
+> loop or a trap). This follows the logic we applied in a4b5d580e078 ("bug:
+> Make BUG() always stop the machine").
+> 
+> For ARM multi_v7_defconfig, the size slightly increases:
+> 
+> section		CONFIG_BUG=y	CONFIG_BUG=n	CONFIG_BUG=n+patch
+> 
+>   .text            8320248   |     8180944   |     8207688
+>   .rodata          3633720   |     3567144   |     3570648
+>   __bug_table        32508   |         ---   |         ---
+>   __modver             692   |        1584   |        2176
+>   .init.text        558132   |      548300   |      550088
+>   .exit.text         12380   |       12256   |       12380
+>   .data            1016672   |     1016064   |     1016128
+>   Total           14622556   |    14374510   |    14407326
+> 
+> So instead of saving 1.70% of the total image size, we only save 1.48%
+
+Could you please include numbers for tinyconfig as well?  Percentages
+get larger when the numbers get smaller.
+
+> by turning off CONFIG_BUG, but in return we can ensure that we don't run
+> into cases of uninitialized variable or return code uses when something
+> bad happens. Aside from that, we significantly reduce the number of
+> warnings in randconfig builds, which makes it easier to fix the warnings
+> about other problems.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> diff --git a/include/asm-generic/bug.h b/include/asm-generic/bug.h
+> index 630dd2372238..58bd1f08c5c7 100644
+> --- a/include/asm-generic/bug.h
+> +++ b/include/asm-generic/bug.h
+> @@ -142,7 +142,7 @@ extern void warn_slowpath_null(const char *file, const int line);
+>  #endif
+>  
+>  #ifndef HAVE_ARCH_BUG_ON
+> -#define BUG_ON(condition) do { if (condition) ; } while (0)
+> +#define BUG_ON(condition) do { if (condition) BUG(); } while (0)
+
+This makes BUG_ON in the !CONFIG_BUG case almost identical to the
+CONFIG_BUG=y case, except for the use of unlikely(condition), which this
+ought to do as well.
+
+Given that, could you pull the definition *out* of the #ifdef/#else for
+CONFIG_BUG entirely, and define it the same way in both cases?
+
+- Josh Triplett
