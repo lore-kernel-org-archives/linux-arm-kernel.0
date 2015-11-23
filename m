@@ -1,82 +1,134 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 23 Nov 2015 12:15:38 +0000
-Subject: [PATCH v3 12/62] ACPICA: ACPI 6.0: Add changes for FADT table
-In-Reply-To: <1447753261-7552-13-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-13-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511231214490.1107@kaball.uk.xensource.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Mon, 23 Nov 2015 12:16:52 +0000
+Subject: [PATCH 1/2] arm64: mm: detect bad __create_mapping uses
+In-Reply-To: <20151123112151.GA28293@leverpostej>
+References: <1448033724-13846-1-git-send-email-mark.rutland@arm.com>
+ <CAPvkgC2NqfYrcAzsF=UwE9n3BGz74bYcNSGOaaCiwHP_YcnRWA@mail.gmail.com>
+ <20151120170534.GE5536@leverpostej>
+ <CAPvkgC1LWj8aCwX8WnJbb7tsuwwiLt+0KxQsZRq6U4Ai1BnJxA@mail.gmail.com>
+ <20151123112151.GA28293@leverpostej>
+Message-ID: <CAPvkgC0-x=Vs=t__3GgN24ENJ2OYsLSsf9vwTzeiUsD6MC55FA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 23 November 2015 at 11:21, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Nov 23, 2015 at 11:01:51AM +0000, Steve Capper wrote:
+>> On 20 November 2015 at 17:05, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > On Fri, Nov 20, 2015 at 04:13:28PM +0000, Steve Capper wrote:
+>> >> On 20 November 2015 at 15:35, Mark Rutland <mark.rutland@arm.com> wrote:
+>> >> > If a caller of __create_mapping provides a PA and VA which have
+>> >> > different sub-page offsets, it is not clear which offset they expect to
+>> >> > apply to the mapping, and is indicative of a bad caller.
+>> >> >
+>> >> > Disallow calls with differing sub-page offsets, and WARN when they are
+>> >> > encountered, so that we can detect and fix such cases.
+>> >> >
+>> >> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+>> >> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> >> > Cc: Catalin Marinas <caralin.marinas@arm.com>
+>> >> > Cc: Laura Abbott <labbott@fedoraproject.org>
+>> >> > Cc: Steve Capper <steve.capper@linaro.org>
+>> >> > Cc: Will Deacon <will.deacon@arm.com>
+>> >> > ---
+>> >> >  arch/arm64/mm/mmu.c | 7 +++++++
+>> >> >  1 file changed, 7 insertions(+)
+>> >> >
+>> >> > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>> >> > index e3f563c..3b06afa 100644
+>> >> > --- a/arch/arm64/mm/mmu.c
+>> >> > +++ b/arch/arm64/mm/mmu.c
+>> >> > @@ -300,6 +300,13 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+>> >> >  {
+>> >> >         unsigned long addr, length, end, next;
+>> >> >
+>> >> > +       /*
+>> >> > +        * If the virtual and physical address don't have the same offset
+>> >> > +        * within a page, we cannot map the region as the caller expects.
+>> >> > +        */
+>> >> > +       if (WARN_ON((phys ^ virt) & ~PAGE_MASK))
+>> >> > +               return;
+>> >> > +
+>> >>
+>> >> Do we want any subpage offsets in our virt and phys?
+>> >
+>> > Yes.
+>> >
+>> > For instance, when mapping EFI regions (which exist at 4K granularity)
+>> > on a 64K page kernel, per [1]. The spec requires that any regions in the
+>> > same 64K page can be mapped using the same attributes, so it's fine to
+>> > map at 64K granularity.
+>>
+>> Thanks Mark,
+>> I didn't know that was allowed, now I do :-).
+>> These two patches now make perfect sense.
+>>
+>> >
+>> > We already try to cater for this in __create_mapping where we fix up the
+>> > base and size:
+>> >
+>> >         addr = virt & PAGE_MASK;
+>> >         length = PAGE_ALIGN(size + (virt & ~PAGE_MASK));
+>> >
+>> > I will add a middle paragraph to the commit message:
+>> >
+>> >         In some cases, the region we wish to map may validly have a
+>> >         sub-page offset in the physical and virtual adddresses. For
+>> >         example, EFI runtime regions have 4K granularity, yet may be
+>> >         mapped by a 64K page kernel. So long as the physical and virtual
+>> >         offsets are the same, the region will be mapped at the expected
+>> >         VAs.
+>> >
+>> > Does that sound OK?
+>>
+>> s/adddresses/addresses/
+>> Otherwise that looks great, thanks.
+>
+> Good spot. Fixed.
+>
+>> >> If we have sub page bits in phys won't that start flipping on bits in
+>> >> the page table entries?
+>> >
+>> > In all cases where we use phys, we either shift phys right by PAGE_SHIFT
+>> > (in __populate_init_pte vi __phys_to_pfn) which clears those bits, or we
+>> > first check it is sufficiently aligned for that level of table (and
+>> > hence the low bits are all zero). Patch 2 fixes a bug related to the
+>> > latter case.
+>> >
+>> >> What about something like:
+>> >> if (WARN_ON((phys | virt) & ~PAGE_MASK))
+>> >
+>> > Per the above, that would break the EFI code in [1].
+>>
+>> Agreed.
+>>
+>> I was toying with suggesting we warn for any phys/virt bit set below
+>> bit #12 (i.e. anything smaller than 4K alignment), that would probably
+>> just increase complexity with little appreciable gain though.
+>
+> I'm not sure either way, to be honest. We might want to use it in an
+> ioremap-like manner to map small objects.
+>
+> For instance, we use create_mapping to map the DTB in fixmap_remap_fdt,
+> and the DTB itself is only guaranteed to be 8-byte aligned. However,
+> fixmap_remap_fdt has to handle the sub-page offset explicitly either
+> way, either adding it to the fixmap slot's virtual address or
+> subtracting it from the physical base when it makes the call.
 
+Thanks I see. Yes, as you have it is best.
 
-On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+>
+>> For both patches (with the extra paragraph above added to the commit log):
+>> Reviewed-by: Steve Capper <steve.capper@linaro.org>
+>
+> I take it you mean with the paragraph added to this patch, not to both
+> patches?
 
-> From: Bob Moore <robert.moore@intel.com>
-> 
-> ACPICA commit 72b0b6741990f619f6aaa915302836b7cbb41ac4
-> 
-> One new 64-bit field at the end of the table.
-> FADT version is now 6.
-> 
-> Link: https://github.com/acpica/acpica/commit/72b0b674
-> Signed-off-by: Bob Moore <robert.moore@intel.com>
-> Signed-off-by: Lv Zheng <lv.zheng@intel.com>
-> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> [Linux commit aeb823bbacc2a3aaee29eda5875b58a049fa1f78]
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Yes please to this one, thanks.
 
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Cheers,
+-- 
+Steve
 
-
->  xen/include/acpi/actbl.h | 17 ++++++++++-------
->  1 file changed, 10 insertions(+), 7 deletions(-)
-> 
-> diff --git a/xen/include/acpi/actbl.h b/xen/include/acpi/actbl.h
-> index 66e29c3..3079176 100644
-> --- a/xen/include/acpi/actbl.h
-> +++ b/xen/include/acpi/actbl.h
-> @@ -258,6 +258,7 @@ struct acpi_table_fadt {
->  	struct acpi_generic_address xgpe1_block;	/* 64-bit Extended General Purpose Event 1 Reg Blk address */
->  	struct acpi_generic_address sleep_control;	/* 64-bit Sleep Control register */
->  	struct acpi_generic_address sleep_status;	/* 64-bit Sleep Status register */
-> +	u64 hypervisor_id;      /* Hypervisor Vendor ID (ACPI 6.0) */
->  };
->  
->  /* Masks for FADT IA-PC Boot Architecture Flags (boot_flags) */
-> @@ -315,7 +316,7 @@ enum acpi_prefered_pm_profiles {
->  	PM_TABLET = 8
->  };
->  
-> -/* Values for sleep_status and sleep_control registers (V5 FADT) */
-> +/* Values for sleep_status and sleep_control registers (V5+ FADT) */
->  
->  #define ACPI_X_WAKE_STATUS          0x80
->  #define ACPI_X_SLEEP_TYPE_MASK      0x1C
-> @@ -344,15 +345,17 @@ enum acpi_prefered_pm_profiles {
->   * FADT is the bottom line as to what the version really is.
->   *
->   * For reference, the values below are as follows:
-> - *     FADT V1  size: 0x074
-> - *     FADT V2  size: 0x084
-> - *     FADT V3  size: 0x0F4
-> - *     FADT V4  size: 0x0F4
-> - *     FADT V5  size: 0x10C
-> + *     FADT V1 size: 0x074
-> + *     FADT V2 size: 0x084
-> + *     FADT V3 size: 0x0F4
-> + *     FADT V4 size: 0x0F4
-> + *     FADT V5 size: 0x10C
-> + *     FADT V6 size: 0x114
->   */
->  #define ACPI_FADT_V1_SIZE       (u32) (ACPI_FADT_OFFSET (flags) + 4)
->  #define ACPI_FADT_V2_SIZE       (u32) (ACPI_FADT_OFFSET (minor_revision) + 1)
->  #define ACPI_FADT_V3_SIZE       (u32) (ACPI_FADT_OFFSET (sleep_control))
-> -#define ACPI_FADT_V5_SIZE       (u32) (sizeof (struct acpi_table_fadt))
-> +#define ACPI_FADT_V5_SIZE       (u32) (ACPI_FADT_OFFSET (hypervisor_id))
-> +#define ACPI_FADT_V6_SIZE       (u32) (sizeof (struct acpi_table_fadt))
->  
->  #endif				/* __ACTBL_H__ */
-> -- 
-> 2.1.0
-> 
+>
+> Thanks,
+> Mark.
