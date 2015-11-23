@@ -1,37 +1,46 @@
-From: ssantosh@kernel.org (Santosh Shilimkar)
-Date: Mon, 23 Nov 2015 10:54:53 -0800
-Subject: [GIT PULL] Keystone fixes for 4.4-rcx
-Message-ID: <1448304893-6103-1-git-send-email-ssantosh@kernel.org>
+From: dcashman@android.com (Daniel Cashman)
+Date: Mon, 23 Nov 2015 10:55:16 -0800
+Subject: [PATCH v3 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
+In-Reply-To: <20151123150459.GD4236@arm.com>
+References: <1447888808-31571-1-git-send-email-dcashman@android.com>
+ <1447888808-31571-2-git-send-email-dcashman@android.com>
+ <1447888808-31571-3-git-send-email-dcashman@android.com>
+ <1447888808-31571-4-git-send-email-dcashman@android.com>
+ <20151123150459.GD4236@arm.com>
+Message-ID: <56536114.1020305@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 1ec218373b8ebda821aec00bb156a9c94fad9cd4:
+On 11/23/2015 07:04 AM, Will Deacon wrote:
+> On Wed, Nov 18, 2015 at 03:20:07PM -0800, Daniel Cashman wrote:
+>> +config ARCH_MMAP_RND_BITS_MAX
+>> +       default 20 if ARM64_64K_PAGES && ARCH_VA_BITS=39
+>> +       default 24 if ARCH_VA_BITS=39
+>> +       default 23 if ARM64_64K_PAGES && ARCH_VA_BITS=42
+>> +       default 27 if ARCH_VA_BITS=42
+>> +       default 29 if ARM64_64K_PAGES && ARCH_VA_BITS=48
+>> +       default 33 if ARCH_VA_BITS=48
+>> +       default 15 if ARM64_64K_PAGES
+>> +       default 19
+>> +
+>> +config ARCH_MMAP_RND_COMPAT_BITS_MIN
+>> +       default 7 if ARM64_64K_PAGES
+>> +       default 11
+> 
+> FYI: we now support 16k pages too, so this might need updating. It would
+> be much nicer if this was somehow computed rather than have the results
+> all open-coded like this.
 
-  Linux 4.4-rc2 (2015-11-22 16:45:59 -0800)
+Yes, I ideally wanted this to be calculated based on the different page
+options and VA_BITS (which itself has a similar stanza), but I don't
+know how to do that/if it is currently supported in Kconfig. This would
+be even more desirable with the addition of 16K_PAGES, as with this
+setup we have a combinatorial problem.
 
-are available in the git repository at:
+We could move this logic into the code where min/max are initialized,
+but that would create its own mess, creating new Kconfig values to
+introduce it in an arch-agnostic way after patch-set v2 moved that to
+mm/mmap.c instread of arch/${arch}/mm/mmap.c Suggestions welcome.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-fixes-for-4.4
-
-for you to fetch changes up to 17e846aa390d89adae053d9d2ba8acb286b64af7:
-
-  ARM: dts: keystone: k2l: fix kernel crash when clk_ignore_unused is not in bootargs (2015-11-23 10:36:27 -0800)
-
-----------------------------------------------------------------
-Few Keystone fixes for 4.4-rcx
-	- Fix the optional PDSP firmware loading
-	- Fix linking RAM setup for QMs
-	- Fix crash with clk_ignore_unused
-
-----------------------------------------------------------------
-Michal Morawiec (1):
-      soc: ti: knav_qmss_queue: Fix linking RAM setup for queue managers
-
-Murali Karicheri (2):
-      soc: ti: use request_firmware_direct() as acc firmware is optional
-      ARM: dts: keystone: k2l: fix kernel crash when clk_ignore_unused is not in bootargs
-
- Documentation/arm/keystone/Overview.txt | 18 ------------------
- arch/arm/boot/dts/k2l-netcp.dtsi        |  2 +-
- drivers/soc/ti/knav_qmss_queue.c        |  8 ++++----
- 3 files changed, 5 insertions(+), 23 deletions(-)
+Thank You,
+Dan
