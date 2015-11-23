@@ -1,71 +1,174 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 23 Nov 2015 10:06:30 +0100
-Subject: [PATCH v3 10/13] ARM: implement create_mapping_late() for EFI use
+Date: Mon, 23 Nov 2015 10:06:26 +0100
+Subject: [PATCH v3 06/13] ARM: add support for generic
+ early_ioremap/early_memremap
 In-Reply-To: <1448269593-20758-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1448269593-20758-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1448269593-20758-11-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1448269593-20758-7-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This implements create_mapping_late(), which we will use to populate
-the UEFI Runtime Services page tables.
+This enables the generic early_ioremap implementation for ARM.
+
+It uses the fixmap region reserved for kmap. Since early_ioremap
+is only supported before paging_init(), and kmap is only supported
+afterwards, this is guaranteed not to cause any clashes.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/include/asm/mach/map.h |  2 ++
- arch/arm/mm/mmu.c               | 20 ++++++++++++++++++++
- 2 files changed, 22 insertions(+)
+ arch/arm/Kconfig              |  1 +
+ arch/arm/include/asm/Kbuild   |  1 +
+ arch/arm/include/asm/fixmap.h | 29 +++++++++++++++++++-
+ arch/arm/kernel/setup.c       |  7 +++--
+ arch/arm/mm/ioremap.c         |  9 ++++++
+ arch/arm/mm/mmu.c             |  2 +-
+ 6 files changed, 45 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
-index f98c7f32c9c8..9b7c328fb207 100644
---- a/arch/arm/include/asm/mach/map.h
-+++ b/arch/arm/include/asm/mach/map.h
-@@ -42,6 +42,8 @@ enum {
- extern void iotable_init(struct map_desc *, int);
- extern void vm_reserve_area_early(unsigned long addr, unsigned long size,
- 				  void *caller);
-+extern void create_mapping_late(struct mm_struct *mm, struct map_desc *md,
-+				bool ng);
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 0365cbbc9179..7e338228cc8d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -20,6 +20,7 @@ config ARM
+ 	select GENERIC_ALLOCATOR
+ 	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
+ 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
++	select GENERIC_EARLY_IOREMAP
+ 	select GENERIC_IDLE_POLL_SETUP
+ 	select GENERIC_IRQ_PROBE
+ 	select GENERIC_IRQ_SHOW
+diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+index bd425302c97a..16da6380eb85 100644
+--- a/arch/arm/include/asm/Kbuild
++++ b/arch/arm/include/asm/Kbuild
+@@ -3,6 +3,7 @@
+ generic-y += bitsperlong.h
+ generic-y += cputime.h
+ generic-y += current.h
++generic-y += early_ioremap.h
+ generic-y += emergency-restart.h
+ generic-y += errno.h
+ generic-y += exec.h
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index 58cfe9f1a687..5c17d2dec777 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -19,20 +19,47 @@ enum fixed_addresses {
+ 	FIX_TEXT_POKE0,
+ 	FIX_TEXT_POKE1,
  
- #ifdef CONFIG_DEBUG_LL
- extern void debug_ll_addr(unsigned long *paddr, unsigned long *vaddr);
+-	__end_of_fixed_addresses
++	__end_of_fixmap_region,
++
++	/*
++	 * Share the kmap() region with early_ioremap(): this is guaranteed
++	 * not to clash since early_ioremap() is only available before
++	 * paging_init(), and kmap() only after.
++	 */
++#define NR_FIX_BTMAPS		32
++#define FIX_BTMAPS_SLOTS	7
++#define TOTAL_FIX_BTMAPS	(NR_FIX_BTMAPS * FIX_BTMAPS_SLOTS)
++
++	FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
++	FIX_BTMAP_BEGIN = FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1,
++	__end_of_early_ioremap_region
+ };
+ 
++static const enum fixed_addresses __end_of_fixed_addresses =
++	__end_of_fixmap_region > __end_of_early_ioremap_region ?
++	__end_of_fixmap_region : __end_of_early_ioremap_region;
++
+ #define FIXMAP_PAGE_COMMON	(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
+ 
+ #define FIXMAP_PAGE_NORMAL	(FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
++#define FIXMAP_PAGE_RO		(FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
+ 
+ /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
+ #define FIXMAP_PAGE_IO		(FIXMAP_PAGE_COMMON | L_PTE_MT_DEV_SHARED | L_PTE_SHARED)
+ #define FIXMAP_PAGE_NOCACHE	FIXMAP_PAGE_IO
+ 
++#define __early_set_fixmap	__set_fixmap
++
++#ifdef CONFIG_MMU
++
+ void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
+ void __init early_fixmap_init(void);
+ 
+ #include <asm-generic/fixmap.h>
+ 
++#else
++
++static inline void early_fixmap_init(void) { }
++
++#endif
+ #endif
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 20edd349d379..5df2bca57c42 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -38,6 +38,7 @@
+ #include <asm/cpu.h>
+ #include <asm/cputype.h>
+ #include <asm/elf.h>
++#include <asm/early_ioremap.h>
+ #include <asm/fixmap.h>
+ #include <asm/procinfo.h>
+ #include <asm/psci.h>
+@@ -956,8 +957,8 @@ void __init setup_arch(char **cmdline_p)
+ 	strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
+ 	*cmdline_p = cmd_line;
+ 
+-	if (IS_ENABLED(CONFIG_FIX_EARLYCON_MEM))
+-		early_fixmap_init();
++	early_fixmap_init();
++	early_ioremap_init();
+ 
+ 	parse_early_param();
+ 
+@@ -968,6 +969,8 @@ void __init setup_arch(char **cmdline_p)
+ 	sanity_check_meminfo();
+ 	arm_memblock_init(mdesc);
+ 
++	early_ioremap_reset();
++
+ 	paging_init(mdesc);
+ 	request_standard_resources(mdesc);
+ 
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index 0c81056c1dd7..66a978d05958 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -30,6 +30,7 @@
+ #include <asm/cp15.h>
+ #include <asm/cputype.h>
+ #include <asm/cacheflush.h>
++#include <asm/early_ioremap.h>
+ #include <asm/mmu_context.h>
+ #include <asm/pgalloc.h>
+ #include <asm/tlbflush.h>
+@@ -469,3 +470,11 @@ int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
+ }
+ EXPORT_SYMBOL_GPL(pci_ioremap_io);
+ #endif
++
++/*
++ * Must be called after early_fixmap_init
++ */
++void __init early_ioremap_init(void)
++{
++	early_ioremap_setup();
++}
 diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 2d9f628a7fe8..8c69830e791a 100644
+index 4867f5daf82c..de19f90221e2 100644
 --- a/arch/arm/mm/mmu.c
 +++ b/arch/arm/mm/mmu.c
-@@ -724,6 +724,14 @@ static void __init *early_alloc(unsigned long sz)
- 	return early_alloc_aligned(sz, sz);
- }
+@@ -390,7 +390,7 @@ void __init early_fixmap_init(void)
+ 	 * The early fixmap range spans multiple pmds, for which
+ 	 * we are not prepared:
+ 	 */
+-	BUILD_BUG_ON((__fix_to_virt(__end_of_permanent_fixed_addresses) >> PMD_SHIFT)
++	BUILD_BUG_ON((__fix_to_virt(__end_of_early_ioremap_region) >> PMD_SHIFT)
+ 		     != FIXADDR_TOP >> PMD_SHIFT);
  
-+static void *__init late_alloc(unsigned long sz)
-+{
-+	void *ptr = (void *)__get_free_pages(PGALLOC_GFP, get_order(sz));
-+
-+	BUG_ON(!ptr);
-+	return ptr;
-+}
-+
- static pte_t * __init pte_alloc(pmd_t *pmd, unsigned long addr,
- 				unsigned long prot,
- 				void *(*alloc)(unsigned long sz))
-@@ -960,6 +968,18 @@ static void __init create_mapping(struct map_desc *md)
- 	__create_mapping(&init_mm, md, early_alloc, false);
- }
- 
-+void __init create_mapping_late(struct mm_struct *mm, struct map_desc *md,
-+				bool ng)
-+{
-+#ifdef CONFIG_ARM_LPAE
-+	pud_t *pud = pud_alloc(mm, pgd_offset(mm, md->virtual), md->virtual);
-+	if (WARN_ON(!pud))
-+		return;
-+	pmd_alloc(mm, pud, 0);
-+#endif
-+	__create_mapping(mm, md, late_alloc, ng);
-+}
-+
- /*
-  * Create the architecture specific mappings
-  */
+ 	pmd = fixmap_pmd(FIXADDR_TOP);
 -- 
 1.9.1
