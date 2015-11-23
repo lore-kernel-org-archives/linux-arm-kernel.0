@@ -1,92 +1,95 @@
 From: juri.lelli@arm.com (Juri Lelli)
-Date: Mon, 23 Nov 2015 14:28:39 +0000
-Subject: [RFC PATCH 6/8] arm64, dts: add Juno cpu capacity information
+Date: Mon, 23 Nov 2015 14:28:38 +0000
+Subject: [RFC PATCH 5/8] arm64: parse cpu capacity from DT
 In-Reply-To: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
 References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
-Message-ID: <1448288921-30307-7-git-send-email-juri.lelli@arm.com>
+Message-ID: <1448288921-30307-6-git-send-email-juri.lelli@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Juno cpu capacity bindings information.
+With the introduction of cpu capacity bindings, CPU capacities can now be
+extracted from DT. Add parsing of such information at boot time. Also,
+store such information using per CPU variables, as we do for arm.
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+Cc: Mark Brown <broonie@linaro.org>
 Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Jon Medhurst <tixy@linaro.org>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: devicetree at vger.kernel.org
 Signed-off-by: Juri Lelli <juri.lelli@arm.com>
 ---
- arch/arm64/boot/dts/arm/juno.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/kernel/topology.c | 46 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-index d7cbdd4..06f6d2b 100644
---- a/arch/arm64/boot/dts/arm/juno.dts
-+++ b/arch/arm64/boot/dts/arm/juno.dts
-@@ -33,6 +33,7 @@
- 	cpus {
- 		#address-cells = <2>;
- 		#size-cells = <0>;
-+		capacity-scale = <1024>;
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index 694f6de..4423cc5 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -23,6 +23,45 @@
+ #include <asm/cputype.h>
+ #include <asm/topology.h>
  
- 		A57_0: cpu at 0 {
- 			compatible = "arm,cortex-a57","arm,armv8";
-@@ -40,6 +41,7 @@
- 			device_type = "cpu";
- 			enable-method = "psci";
- 			next-level-cache = <&A57_L2>;
-+			capacity = <1024>;
- 		};
++static DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
++
++unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
++{
++	return per_cpu(cpu_scale, cpu);
++}
++
++static void set_capacity_scale(unsigned int cpu, unsigned long capacity)
++{
++	per_cpu(cpu_scale, cpu) = capacity;
++}
++
++static u32 capacity_scale = SCHED_CAPACITY_SCALE;
++
++static void __init parse_cpu_capacity(struct device_node *cpu_node, int cpu)
++{
++	int ret;
++	u32 cpu_capacity;
++
++	ret = of_property_read_u32(cpu_node,
++				   "capacity",
++				   &cpu_capacity);
++	if (!ret) {
++		u64 capacity;
++
++		/*
++		 * Enforce capacity <= capacity-scale.
++		 */
++		cpu_capacity = cpu_capacity <= capacity_scale ? cpu_capacity :
++			capacity_scale;
++		capacity = (cpu_capacity << SCHED_CAPACITY_SHIFT) /
++			capacity_scale;
++
++		set_capacity_scale(cpu, capacity);
++		pr_info("CPU%d: DT cpu_capacity %lu\n",
++			cpu, arch_scale_cpu_capacity(NULL, cpu));
++	}
++}
++
+ static int __init get_cpu_for_node(struct device_node *node)
+ {
+ 	struct device_node *cpu_node;
+@@ -34,6 +73,7 @@ static int __init get_cpu_for_node(struct device_node *node)
  
- 		A57_1: cpu at 1 {
-@@ -48,6 +50,7 @@
- 			device_type = "cpu";
- 			enable-method = "psci";
- 			next-level-cache = <&A57_L2>;
-+			capacity = <1024>;
- 		};
+ 	for_each_possible_cpu(cpu) {
+ 		if (of_get_cpu_node(cpu, NULL) == cpu_node) {
++			parse_cpu_capacity(cpu_node, cpu);
+ 			of_node_put(cpu_node);
+ 			return cpu;
+ 		}
+@@ -173,6 +213,12 @@ static int __init parse_dt_topology(void)
+ 		return 0;
+ 	}
  
- 		A53_0: cpu at 100 {
-@@ -56,6 +59,7 @@
- 			device_type = "cpu";
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
-+			capacity = <447>;
- 		};
- 
- 		A53_1: cpu at 101 {
-@@ -64,6 +68,7 @@
- 			device_type = "cpu";
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
-+			capacity = <447>;
- 		};
- 
- 		A53_2: cpu at 102 {
-@@ -72,6 +77,7 @@
- 			device_type = "cpu";
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
-+			capacity = <447>;
- 		};
- 
- 		A53_3: cpu at 103 {
-@@ -80,6 +86,7 @@
- 			device_type = "cpu";
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
-+			capacity = <447>;
- 		};
- 
- 		A57_L2: l2-cache0 {
++	if (!of_property_read_u32(cn, "capacity-scale", &capacity_scale))
++		pr_info("DT cpus capacity-scale %u\n", capacity_scale);
++	else
++		pr_debug("DT cpus capacity-scale not found: assuming %u\n",
++			capacity_scale);
++
+ 	/*
+ 	 * When topology is provided cpu-map is essentially a root
+ 	 * cluster with restricted subnodes.
 -- 
 2.2.2
