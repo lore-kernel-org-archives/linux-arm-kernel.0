@@ -1,70 +1,23 @@
-From: majun258@huawei.com (MaJun)
-Date: Mon, 23 Nov 2015 11:15:09 +0800
-Subject: [PATCH v9 0/4] irqchip:support mbigen interrupt controller
-Message-ID: <1448248513-39760-1-git-send-email-majun258@huawei.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 23 Nov 2015 11:37:37 +0800
+Subject: [PATCH] ARM: dts: vfxxx: Fix erroneous property in esdhc0 node
+In-Reply-To: <4f43a337677572fbf2b2c8e27152db426e024f7a.1445146992.git.maitysanchayan@gmail.com>
+References: <4f43a337677572fbf2b2c8e27152db426e024f7a.1445146992.git.maitysanchayan@gmail.com>
+Message-ID: <20151123033735.GD13744@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ma Jun <majun258@huawei.com>
+On Sun, Oct 18, 2015 at 11:18:48AM +0530, Sanchayan Maity wrote:
+> Something seems to have gone wrong during the merging of the device
+> tree changes with the following patch
+> 
+> "ARM: dts: add property for maximum ADC clock frequencies"
+> 
+> The property "fsl,adck-max-frequency" instead of being applied for
+> the ADC1 node got applied to the esdhc0 node. This patch fixes it.
+> 
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 
-This patch set adds the driver of mbigen and binding document for Hisilicon
-Mbigen chips.
+Oops, sorry.  Applied it.
 
-Compared with previous version, this version changed much.
-
-Because during the time between V3 and V4 of my patch, there are two
-related patches were committed by Mr.Marc Zyngier and Mr. Mark Rutland.
-
-First, Mr. Marc Zyngier changed MSI frame and added supporting for
-platform MSI.
-
-https://lkml.org/lkml/2015/7/28/552
-
-Second, Mr.Mark Rutland changed Generic PCI MSI + IOMMU topology bindings
-
-https://lkml.org/lkml/2015/7/23/558 
-
-After V5 patch posted, Mr.Marc Zyngier posted a new patch set
-"Adding core support for wire-MSI bridges"
-
-https://lkml.org/lkml/2015/10/15/545
-
-So, mbigen v6 patch is based on this new patch even though this patch is
-still under review.
-
-Changes in v9:
---- Fixed typo problem (dts)
---- Removed superfluous data structures
---- Changed clear register offset
-Changes in v8:
---- Fixed some tiny bugs.
-Changes in v7:
---- Fixed the build test error when applied patch v6 3/4
-Changes in v6:
---- Re-based mbigen driver on kernel 4.3.0-rc5 and Marc's new patch
---- Change the mbigen chip node definition(dts).
---- Change the interrupt cells definition(dts).
-Changes in v5:
---- Split mbigen driver patch into 2 smaller patches.
---- Change mbigen chip and mbigen device initialzing sequence.
---- Initializing mbigen device instead of mbigen chip as interrupt controller
---- Remove mbigen node from driver to make this driver more easily read.
---- Change the mbigen chip node definition(dts).
---- Change the interrupt cells definition(dts).
-Changes in v4:
---- Re-based mbigen driver on kernel 4.2.0-rc2 and Marc's patch
---- Changed the binding document based on Mark's patch.
-
-Ma Jun (4):
-  dt-binding:Documents of the mbigen bindings
-  irqchip: add platform device driver for mbigen device
-  irqchip:create irq domain for each mbigen device
-  irqchip:implement the mbigen irq chip operation functions
-
- Documentation/devicetree/bindings/arm/mbigen.txt |   69 ++++++
- drivers/irqchip/Kconfig                          |    8 +
- drivers/irqchip/Makefile                         |    1 +
- drivers/irqchip/irq-mbigen.c                     |  281 ++++++++++++++++++++++
- 4 files changed, 359 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/mbigen.txt
- create mode 100644 drivers/irqchip/irq-mbigen.c
+Shawn
