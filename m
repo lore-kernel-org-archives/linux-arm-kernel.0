@@ -1,64 +1,235 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 23 Nov 2015 12:53:35 -0800
-Subject: [RFC/PATCH 2/3] recordmcount: Record locations of
- __aeabi_{u}idiv() calls on ARM
-In-Reply-To: <20151121101349.GI8644@n2100.arm.linux.org.uk>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Mon, 23 Nov 2015 20:54:48 +0000
+Subject: [RFC/PATCH 3/3] ARM: Replace calls to __aeabi_{u}idiv with
+ udiv/sdiv instructions
+In-Reply-To: <20151123204955.GC19156@codeaurora.org> (Stephen Boyd's message
+ of "Mon, 23 Nov 2015 12:49:55 -0800")
 References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
- <1448068997-26631-3-git-send-email-sboyd@codeaurora.org>
- <20151121101349.GI8644@n2100.arm.linux.org.uk>
-Message-ID: <20151123205335.GD19156@codeaurora.org>
+ <1448068997-26631-4-git-send-email-sboyd@codeaurora.org>
+ <yw1xd1v3d117.fsf@unicorn.mansr.com>
+ <20151123204955.GC19156@codeaurora.org>
+Message-ID: <yw1x1tbgsag7.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21, Russell King - ARM Linux wrote:
-> On Fri, Nov 20, 2015 at 05:23:16PM -0800, Stephen Boyd wrote:
-> > @@ -452,14 +631,14 @@ static char const *
-> >  __has_rel_mcount(Elf_Shdr const *const relhdr,  /* is SHT_REL or SHT_RELA */
-> >  		 Elf_Shdr const *const shdr0,
-> >  		 char const *const shstrtab,
-> > -		 char const *const fname)
-> > +		 char const *const fname, const char *find)
-> >  {
-> >  	/* .sh_info depends on .sh_type == SHT_REL[,A] */
-> >  	Elf_Shdr const *const txthdr = &shdr0[w(relhdr->sh_info)];
-> >  	char const *const txtname = &shstrtab[w(txthdr->sh_name)];
-> >  
-> > -	if (strcmp("__mcount_loc", txtname) == 0) {
-> > -		fprintf(stderr, "warning: __mcount_loc already exists: %s\n",
-> > +	if (strcmp(find, txtname) == 0) {
-> > +		fprintf(stderr, "warning: %s already exists: %s\n", find,
-> 
-> Oh, it's this which has been spewing that silly
-> 	"warning: __mcount_loc already exists"
-> 
-> message thousands of times in my nightly kernel builds (so much so, that
-> I've had to filter the thing out of the logs.)  Given that this is soo
-> noisy, I think first we need to get to the bottom of why this program is
-> soo noisy before we try to make it more functional.
-> 
+Stephen Boyd <sboyd@codeaurora.org> writes:
 
-This comment in recordmcount.pl may tell us something.
+> On 11/21, M?ns Rullg?rd wrote:
+>> Stephen Boyd <sboyd@codeaurora.org> writes:
+>> 
+>> > +static int module_patch_aeabi_uidiv(unsigned long loc, const Elf32_Sym *sym)
+>> > +{
+>> > +	extern char __aeabi_uidiv[], __aeabi_idiv[];
+>> > +	unsigned long udiv_addr = (unsigned long)__aeabi_uidiv;
+>> > +	unsigned long sdiv_addr = (unsigned long)__aeabi_idiv;
+>> > +	unsigned int udiv_insn, sdiv_insn, mask;
+>> > +
+>> > +	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
+>> > +		mask = HWCAP_IDIVT;
+>> > +		udiv_insn = __opcode_to_mem_thumb32(0xfbb0f0f1);
+>> > +		sdiv_insn = __opcode_to_mem_thumb32(0xfb90f0f1);
+>> > +	} else {
+>> > +		mask = HWCAP_IDIVA;
+>> > +		udiv_insn = __opcode_to_mem_arm(0xe730f110);
+>> > +		sdiv_insn = __opcode_to_mem_arm(0xe710f110);
+>> > +	}
+>> > +
+>> > +	if (elf_hwcap & mask) {
+>> > +		if (sym->st_value == udiv_addr) {
+>> > +			*(u32 *)loc = udiv_insn;
+>> > +			return 1;
+>> > +		} else if (sym->st_value == sdiv_addr) {
+>> > +			*(u32 *)loc = sdiv_insn;
+>> > +			return 1;
+>> > +		}
+>> > +	}
+>> > +
+>> > +	return 0;
+>> > +}
+>> 
+>> [...]
+>> 
+>> > +static void __init patch_aeabi_uidiv(void)
+>> > +{
+>> > +	extern unsigned long *__start_udiv_loc[], *__stop_udiv_loc[];
+>> > +	extern unsigned long *__start_idiv_loc[], *__stop_idiv_loc[];
+>> > +	unsigned long **p;
+>> > +	unsigned int udiv_insn, sdiv_insn, mask;
+>> > +
+>> > +	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
+>> > +		mask = HWCAP_IDIVT;
+>> > +		udiv_insn = __opcode_to_mem_thumb32(0xfbb0f0f1);
+>> > +		sdiv_insn = __opcode_to_mem_thumb32(0xfb90f0f1);
+>> > +	} else {
+>> > +		mask = HWCAP_IDIVA;
+>> > +		udiv_insn = __opcode_to_mem_arm(0xe730f110);
+>> > +		sdiv_insn = __opcode_to_mem_arm(0xe710f110);
+>> > +	}
+>> > +
+>> > +	if (elf_hwcap & mask) {
+>> > +		for (p = __start_udiv_loc; p < __stop_udiv_loc; p++) {
+>> > +			unsigned long *inst = *p;
+>> > +			*inst = udiv_insn;
+>> > +		}
+>> > +		for (p = __start_idiv_loc; p < __stop_idiv_loc; p++) {
+>> > +			unsigned long *inst = *p;
+>> > +			*inst = sdiv_insn;
+>> > +		}
+>> > +	}
+>> > +}
+>> 
+>> These functions are rather similar.  Perhaps they could be combined
+>> somehow.
+>> 
+>
+> Yes. I have this patch on top, just haven't folded it in because
+> it doesn't reduce the lines of code.
 
-	#
-	# Somehow the make process can execute this script on an
-	# object twice. If it does, we would duplicate the mcount
-	# section and it will cause the function tracer self test
-	# to fail. Check if the mcount section exists, and if it does,
-	# warn and exit.
-	#
-	print STDERR "ERROR: $mcount_section already in $inputfile\n" .
-	    "\tThis may be an indication that your build is corrupted.\n" .
-	    "\tDelete $inputfile and try again. If the same object file\n" .
-	    "\tstill causes an issue, then disable CONFIG_DYNAMIC_FTRACE.\n";
-	exit(-1);
+I don't see any reason to split it anyhow.  The end result isn't any
+harder to understand than the intermediate.
 
-I don't think there's much that can be done here besides making
-it silent unless there's some verbose build flag set (-v?), but
-it is interesting that you see it spew thousands of times. I've
-never seen the error printed, but perhaps I'm not building the
-kernel the same way you are. Care to share how you're building
-and seeing these error messages?
+> ----8<----
+> From: Stephen Boyd <sboyd@codeaurora.org>
+> Subject: [PATCH] consolidate with module code
+>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm/include/asm/setup.h |  3 +++
+>  arch/arm/kernel/module.c     | 16 +++++--------
+>  arch/arm/kernel/setup.c      | 54 +++++++++++++++++++++++++++-----------------
+>  3 files changed, 42 insertions(+), 31 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
+> index e0adb9f1bf94..3f251cdb94ef 100644
+> --- a/arch/arm/include/asm/setup.h
+> +++ b/arch/arm/include/asm/setup.h
+> @@ -25,4 +25,7 @@ extern int arm_add_memory(u64 start, u64 size);
+>  extern void early_print(const char *str, ...);
+>  extern void dump_machine_table(void);
+>
+> +extern void patch_uidiv(void *addr, size_t size);
+> +extern void patch_idiv(void *addr, size_t size);
+
+Why not call things sdiv and udiv like the actual instructions?
+
+>  #endif
+> diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+> index 064e6ae60e08..684a68f1085b 100644
+> --- a/arch/arm/kernel/module.c
+> +++ b/arch/arm/kernel/module.c
+> @@ -22,6 +22,7 @@
+>
+>  #include <asm/hwcap.h>
+>  #include <asm/pgtable.h>
+> +#include <asm/setup.h>
+>  #include <asm/sections.h>
+>  #include <asm/smp_plat.h>
+>  #include <asm/unwind.h>
+> @@ -58,24 +59,19 @@ static int module_patch_aeabi_uidiv(unsigned long loc, const Elf32_Sym *sym)
+>  	extern char __aeabi_uidiv[], __aeabi_idiv[];
+>  	unsigned long udiv_addr = (unsigned long)__aeabi_uidiv;
+>  	unsigned long sdiv_addr = (unsigned long)__aeabi_idiv;
+> -	unsigned int udiv_insn, sdiv_insn, mask;
+> +	unsigned int mask;
+>
+> -	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
+> +	if (IS_ENABLED(CONFIG_THUMB2_KERNEL))
+>  		mask = HWCAP_IDIVT;
+> -		udiv_insn = __opcode_to_mem_thumb32(0xfbb0f0f1);
+> -		sdiv_insn = __opcode_to_mem_thumb32(0xfb90f0f1);
+> -	} else {
+> +	else
+>  		mask = HWCAP_IDIVA;
+> -		udiv_insn = __opcode_to_mem_arm(0xe730f110);
+> -		sdiv_insn = __opcode_to_mem_arm(0xe710f110);
+> -	}
+>
+>  	if (elf_hwcap & mask) {
+>  		if (sym->st_value == udiv_addr) {
+> -			*(u32 *)loc = udiv_insn;
+> +			patch_uidiv(&loc, sizeof(loc));
+>  			return 1;
+>  		} else if (sym->st_value == sdiv_addr) {
+> -			*(u32 *)loc = sdiv_insn;
+> +			patch_idiv(&loc, sizeof(loc));
+>  			return 1;
+>  		}
+>  	}
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index d2a3d165dcae..cb86012c47d1 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -376,33 +376,45 @@ void __init early_print(const char *str, ...)
+>  }
+>
+>  #ifdef CONFIG_ARM_PATCH_UIDIV
+> +static void __init_or_module patch(u32 **addr, size_t count, u32 insn)
+> +{
+> +	for (; count != 0; count -= 4)
+> +		**addr++ = insn;
+> +}
+> +
+> +void __init_or_module patch_uidiv(void *addr, size_t size)
+> +{
+> +	if (IS_ENABLED(CONFIG_THUMB2_KERNEL))
+> +		patch(addr, size, __opcode_to_mem_thumb32(0xfbb0f0f1));
+> +	else
+> +		patch(addr, size, __opcode_to_mem_arm(0xe730f110));
+> +
+> +}
+> +
+> +void __init_or_module patch_idiv(void *addr, size_t size)
+> +{
+> +	if (IS_ENABLED(CONFIG_THUMB2_KERNEL))
+> +		patch(addr, size, __opcode_to_mem_thumb32(0xfb90f0f1));
+> +	else
+> +		patch(addr, size, __opcode_to_mem_arm(0xe710f110));
+> +}
+> +
+>  static void __init patch_aeabi_uidiv(void)
+>  {
+> -	extern unsigned long *__start_udiv_loc[], *__stop_udiv_loc[];
+> -	extern unsigned long *__start_idiv_loc[], *__stop_idiv_loc[];
+> -	unsigned long **p;
+> -	unsigned int udiv_insn, sdiv_insn, mask;
+> +	extern char __start_udiv_loc[], __stop_udiv_loc[];
+> +	extern char __start_idiv_loc[], __stop_idiv_loc[];
+> +	unsigned int mask;
+>
+> -	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
+> +	if (IS_ENABLED(CONFIG_THUMB2_KERNEL))
+>  		mask = HWCAP_IDIVT;
+> -		udiv_insn = __opcode_to_mem_thumb32(0xfbb0f0f1);
+> -		sdiv_insn = __opcode_to_mem_thumb32(0xfb90f0f1);
+> -	} else {
+> +	else
+>  		mask = HWCAP_IDIVA;
+> -		udiv_insn = __opcode_to_mem_arm(0xe730f110);
+> -		sdiv_insn = __opcode_to_mem_arm(0xe710f110);
+> -	}
+>
+> -	if (elf_hwcap & mask) {
+> -		for (p = __start_udiv_loc; p < __stop_udiv_loc; p++) {
+> -			unsigned long *inst = *p;
+> -			*inst = udiv_insn;
+> -		}
+> -		for (p = __start_idiv_loc; p < __stop_idiv_loc; p++) {
+> -			unsigned long *inst = *p;
+> -			*inst = sdiv_insn;
+> -		}
+> -	}
+> +	if (!(elf_hwcap & mask))
+> +		return;
+> +
+> +	patch_uidiv(__start_udiv_loc, __stop_udiv_loc - __start_udiv_loc);
+> +	patch_idiv(__start_idiv_loc, __stop_idiv_loc - __start_idiv_loc);
+>  }
+>  #else
+>  static void __init patch_aeabi_uidiv(void) { }
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+M?ns Rullg?rd
+mans at mansr.com
