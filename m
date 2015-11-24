@@ -1,164 +1,74 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 24 Nov 2015 18:27:09 +0800
-Subject: [PATCH v3 4/5] ARM: dts: sun9i: Add A80 PRCM clocks and reset
- control nodes
-In-Reply-To: <1448357536-26613-5-git-send-email-wens@csie.org>
-References: <1448357536-26613-1-git-send-email-wens@csie.org>
- <1448357536-26613-5-git-send-email-wens@csie.org>
-Message-ID: <20151124182709.7671f12f@xhacker>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Tue, 24 Nov 2015 08:32:08 -0200
+Subject: [PATCH 13/18] [media] media-entity.h: rename entity.type to
+ entity.function
+In-Reply-To: <7197567.LfPs5Bvqpi@avalon>
+References: <cover.1441559233.git.mchehab@osg.samsung.com>
+ <10e7edf1c85965d8ef8c6c5f527fd695a2660fc4.1441559233.git.mchehab@osg.samsung.com>
+ <7197567.LfPs5Bvqpi@avalon>
+Message-ID: <20151124083208.590bebbb@recife.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Sebastian
+Em Mon, 23 Nov 2015 19:51:41 +0200
+Laurent Pinchart <laurent.pinchart@ideasonboard.com> escreveu:
 
-On Tue, 24 Nov 2015 17:32:15 +0800
-Chen-Yu Tsai wrote:
-
-> This adds the supported PRCM clocks and reset controls to the A80 dtsi.
-> The DAUDIO module clocks are not supported yet.
+> Hi Mauro,
 > 
-> Also update clock and reset phandles for r_uart.
+> Thank you for the patch.
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  arch/arm/boot/dts/sun9i-a80.dtsi | 79 +++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 78 insertions(+), 1 deletion(-)
+> On Sunday 06 September 2015 14:30:56 Mauro Carvalho Chehab wrote:
+> > Entities should have one or more functions. Calling it as a
+> > type proofed to not be correct, as an entity could eventually
 > 
-> diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-> index 1118bf5cc4fb..a4ce348c0831 100644
-> --- a/arch/arm/boot/dts/sun9i-a80.dtsi
-> +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-> @@ -164,6 +164,14 @@
->  					     "usb_phy2", "usb_hsic_12M";
->  		};
->  
-> +		pll3: clk at 06000008 {
-> +			/* placeholder until implemented */
-> +			#clock-cells = <0>;
-> +			compatible = "fixed-clock";
-> +			clock-rate = <0>;
-> +			clock-output-names = "pll3";
-> +		};
-> +
->  		pll4: clk at 0600000c {
->  			#clock-cells = <0>;
->  			compatible = "allwinner,sun9i-a80-pll4-clk";
-> @@ -350,6 +358,68 @@
->  					"apb1_uart2", "apb1_uart3",
->  					"apb1_uart4", "apb1_uart5";
->  		};
-> +
-> +		cpus_clk: clk at 08001410 {
-> +			compatible = "allwinner,sun9i-a80-cpus-clk";
-> +			reg = <0x08001410 0x4>;
-> +			#clock-cells = <0>;
-> +			clocks = <&osc32k>, <&osc24M>, <&pll4>, <&pll3>;
-> +			clock-output-names = "cpus";
-> +		};
-> +
-> +		ahbs: ahbs_clk {
-> +			compatible = "fixed-factor-clock";
-> +			#clock-cells = <0>;
-> +			clock-div = <1>;
-> +			clock-mult = <1>;
-> +			clocks = <&cpus_clk>;
-> +			clock-output-names = "ahbs";
-> +		};
+> s/proofed/proved/
+> 
+> > have more than one type.
+> > 
+> > So, rename the field as function.
+> 
+> s/as/to/
+> 
+> > Please notice that this patch doesn't extend support for
+> > multiple function entities. Such change will happen when
+> > we have real case drivers using it.
+> > 
+> > No functional changes.
+> > 
+> > Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+> 
+> [snip]
+> 
+> > diff --git a/include/media/media-entity.h b/include/media/media-entity.h
+> > index 8bdc10dcc5e7..10f7d5f0eb66 100644
+> > --- a/include/media/media-entity.h
+> > +++ b/include/media/media-entity.h
+> > @@ -152,7 +152,8 @@ struct media_entity_operations {
+> >   *
+> >   * @graph_obj:	Embedded structure containing the media object common data.
+> >   * @name:	Entity name.
+> > - * @type:	Entity type, as defined at uapi/media.h (MEDIA_ENT_T_*)
+> > + * @function:	Entity main function, as defined at uapi/media.h
+> > + *		(MEDIA_ENT_F_*)
+> 
+> I would squash this patch with "uapi/media.h: Rename entities types to 
+> functions" as they essentially touch the same lines. 
 
-Dear Sebastian and all,
+They touch at the same lines, but the rationale is different. Keeping
+it separate is, IMHO, better, as one logical change per patch is preferred.
 
-I just want to take the sunxi clk support in mainline for example.
+> If you want to keep them 
+> separate I would use MEDIA_ENT_T_* here and rename it to MEDIA_ENT_F_* in 
+> "uapi/media.h: Rename entities types to functions".
 
-I'm not sure I understand correctly, it seems to me that some maintainers draw a
-line: "having a node for every clock" is a no, no[1]. But here we saw one node for
-cpus_clk and apbs below. And <0x08001410 0x4>; <0x0800141c 0x4>; shows they
-are close each other, so should we merge them into a single clock complex node
-then use mfd, regmap in clk driver?
+IMHO, that would be confusing, as this patch would be incomplete, and
+the other one would be renaming from MEDIA_ENT_T_* to MEDIA_ENT_F_*
+due to a reason that it is on a different patch.
 
-But IMHO, sunxi dts nodes really represent real HW, so I still can't understand
-why we could not have each node for cpus_clk and apbs. Can you please kindly
-teach me?
-
-Another question: is "Not having a node for every clock" a rule, Would you
-please confirm? if yes, I'll strictly follow this rule.
-
-[1]http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/387335.html
-
-Thank you very much,
-Jisheng
-
-
-> +
-> +		apbs: clk at 0800141c {
-> +			compatible = "allwinner,sun8i-a23-apb0-clk";
-> +			reg = <0x0800141c 0x4>;
-> +			#clock-cells = <0>;
-> +			clocks = <&ahbs>;
-> +			clock-output-names = "apbs";
-> +		};
-> +
-> +		apbs_gates: clk at 08001428 {
-> +			compatible = "allwinner,sun9i-a80-apbs-gates-clk";
-> +			reg = <0x08001428 0x4>;
-> +			#clock-cells = <1>;
-> +			clocks = <&apbs>;
-> +			clock-indices = <0>, <1>,
-> +					<2>, <3>,
-> +					<4>, <5>,
-> +					<6>, <7>,
-> +					<12>, <13>,
-> +					<16>, <17>,
-> +					<18>, <20>;
-> +			clock-output-names = "apbs_pio", "apbs_ir",
-> +					"apbs_timer", "apbs_rsb",
-> +					"apbs_uart", "apbs_1wire",
-> +					"apbs_i2c0", "apbs_i2c1",
-> +					"apbs_ps2_0", "apbs_ps2_1",
-> +					"apbs_dma", "apbs_i2s0",
-> +					"apbs_i2s1", "apbs_twd";
-> +		};
-
-This is for gate clocks, so we have a node for gateclks. gateclks are merged
-into one node.
-
-> +
-> +		r_1wire_clk: clk at 08001450 {
-> +			reg = <0x08001450 0x4>;
-> +			#clock-cells = <0>;
-> +			compatible = "allwinner,sun4i-a10-mod0-clk";
-> +			clocks = <&osc32k>, <&osc24M>;
-> +			clock-output-names = "r_1wire";
-> +		};
-> +
-> +		r_ir_clk: clk at 08001454 {
-> +			reg = <0x08001454 0x4>;
-> +			#clock-cells = <0>;
-> +			compatible = "allwinner,sun4i-a10-mod0-clk";
-> +			clocks = <&osc32k>, <&osc24M>;
-> +			clock-output-names = "r_ir";
-> +		};
->  	};
->  
->  	soc {
-> @@ -764,13 +834,20 @@
->  			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
->  		};
->  
-> +		apbs_rst: reset at 080014b0 {
-> +			reg = <0x080014b0 0x4>;
-> +			compatible = "allwinner,sun6i-a31-clock-reset";
-> +			#reset-cells = <1>;
-> +		};
-> +
->  		r_uart: serial at 08002800 {
->  			compatible = "snps,dw-apb-uart";
->  			reg = <0x08002800 0x400>;
->  			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
->  			reg-shift = <2>;
->  			reg-io-width = <4>;
-> -			clocks = <&osc24M>;
-> +			clocks = <&apbs_gates 4>;
-> +			resets = <&apbs_rst 4>;
->  			status = "disabled";
->  		};
->  	};
+> 
+> >   * @revision:	Entity revision - OBSOLETE - should be removed soon.
+> >   * @flags:	Entity flags, as defined at uapi/media.h (MEDIA_ENT_FL_*)
+> >   * @group_id:	Entity group ID - OBSOLETE - should be removed soon.
+> 
+> [snip]
+> 
