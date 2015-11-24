@@ -1,134 +1,68 @@
-From: uri.mashiach@compulab.co.il (Uri Mashiach)
-Date: Tue, 24 Nov 2015 16:02:12 +0200
-Subject: [PATCH v2 5/6] ARM: OMAP2+: dts: cm-t335: add support for network
- device
-In-Reply-To: <1448373733-5839-1-git-send-email-uri.mashiach@compulab.co.il>
-References: <1445948100-16446-1-git-send-email-uri.mashiach@compulab.co.il>
- <1448373733-5839-1-git-send-email-uri.mashiach@compulab.co.il>
-Message-ID: <1448373733-5839-6-git-send-email-uri.mashiach@compulab.co.il>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Tue, 24 Nov 2015 14:03:27 +0000
+Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <20151124140047.GC8644@n2100.arm.linux.org.uk> (Russell King's
+ message of "Tue, 24 Nov 2015 14:00:47 +0000")
+References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
+ <20151124001306.GI19156@codeaurora.org>
+ <20151124085349.GQ19156@codeaurora.org> <4485320.CGMJdfZLya@wuerfel>
+ <20151124104225.GA8644@n2100.arm.linux.org.uk>
+ <yw1xsi3vr42t.fsf@unicorn.mansr.com>
+ <20151124122308.GB8644@n2100.arm.linux.org.uk>
+ <yw1xk2p7r371.fsf@unicorn.mansr.com>
+ <20151124140047.GC8644@n2100.arm.linux.org.uk>
+Message-ID: <yw1xfuzvqyts.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ilya Ledvich <ilya@compulab.co.il>
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-Add pinmux configurations for RGMII1 based CPSW Ethernet pins and
-MDIO pins:
- - default configuration required for module in active state,
- - sleep configuration required for module in inactive state.
-Add mac node with single slave device. Add nodes for davinci_mdio and
-cpsw_emac0.
+> On Tue, Nov 24, 2015 at 12:29:06PM +0000, M?ns Rullg?rd wrote:
+>> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+>> 
+>> > On Tue, Nov 24, 2015 at 12:10:02PM +0000, M?ns Rullg?rd wrote:
+>> >> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+>> >> 
+>> >> > On Tue, Nov 24, 2015 at 11:38:53AM +0100, Arnd Bergmann wrote:
+>> >> >> I suggested using -mcpu=cortex-a15 because there are old gcc versions
+>> >> >> that don't know about -march=armv7ve or -march=armv7-a+idiv yet, but
+>> >> >> that do understand -mcpu=cortex-a15.
+>> >> >
+>> >> > That's not all.  The bigger problem is that there are toolchains out
+>> >> > there which accept these options, but do _not_ support IDIV in either
+>> >> > ARM or Thumb mode.  I'm afraid that makes it impossible to add this
+>> >> > feature to the mainline kernel in this form: we need to run a test
+>> >> > build to check that -march=armv7ve or what-not really does work
+>> >> > through both GCC and GAS.
+>> >> 
+>> >> If the compiler accepts the option but doesn't actually emit any div
+>> >> instructions, is there any real harm?
+>> >
+>> > That's not what I've found.  I've found that asking the assembler
+>> > to accept idiv instructions appears to be ignored, which is something
+>> > completely different.
+>> >
+>> > Further to this, what it comes down to is the stupid idea that the
+>> > compiler should embed .arch / .cpu in the assembly output, which has
+>> > the effect of overriding the command line arguments given to it via
+>> > -Wa.  So, giving -Wa,-mcpu=cortex-a15 is a total no-op, because the
+>> > first thing in the assembly output is:
+>> >
+>> > 	.arch armv7-a
+>> >
+>> > which kills off any attempt to set the assembly level ISA from the
+>> > command line.
+>> 
+>> Oh, you mean the compiler knows about the instructions but the assembler
+>> doesn't or isn't passed the right options.  It's infuriating when that
+>> happens.
+>
+> No, that isn't what I meant.
 
-Signed-off-by: Ilya Ledvich <ilya@compulab.co.il>
-Signed-off-by: Uri Mashiach <uri.mashiach@compulab.co.il>
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
----
-v1 -> v2: integrate AM33XX_IOPAD macro in pinmux definitions
+Then what do you mean?  The compiler either emits the instructions or it
+doesn't.  If it doesn't, what the assembler accepts is irrelevant.
 
- arch/arm/boot/dts/am335x-cm-t335.dts | 85 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 85 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am335x-cm-t335.dts b/arch/arm/boot/dts/am335x-cm-t335.dts
-index 0a20256..9be0bfe 100644
---- a/arch/arm/boot/dts/am335x-cm-t335.dts
-+++ b/arch/arm/boot/dts/am335x-cm-t335.dts
-@@ -114,6 +114,71 @@
- 		>;
- 	};
- 
-+	cpsw_default: cpsw_default {
-+		pinctrl-single,pins = <
-+			/* Slave 1 */
-+			/* mii1_tx_en.rgmii1_tctl */
-+			AM33XX_IOPAD(0x914, PIN_OUTPUT_PULLDOWN | MUX_MODE2)
-+			/* mii1_rxdv.rgmii1_rctl */
-+			AM33XX_IOPAD(0x918, PIN_INPUT_PULLDOWN | MUX_MODE2)
-+			/* mii1_txd3.rgmii1_td3 */
-+			AM33XX_IOPAD(0x91c, PIN_OUTPUT_PULLDOWN | MUX_MODE2)
-+			/* mii1_txd2.rgmii1_td2 */
-+			AM33XX_IOPAD(0x920, PIN_OUTPUT_PULLDOWN | MUX_MODE2)
-+			/* mii1_txd1.rgmii1_td1 */
-+			AM33XX_IOPAD(0x924, PIN_OUTPUT_PULLDOWN | MUX_MODE2)
-+			/* mii1_txd0.rgmii1_td0 */
-+			AM33XX_IOPAD(0x928, PIN_OUTPUT_PULLDOWN | MUX_MODE2)
-+			/* mii1_txclk.rgmii1_tclk */
-+			AM33XX_IOPAD(0x92c, PIN_OUTPUT_PULLDOWN | MUX_MODE2)
-+			/* mii1_rxclk.rgmii1_rclk */
-+			AM33XX_IOPAD(0x930, PIN_INPUT_PULLDOWN | MUX_MODE2)
-+			/* mii1_rxd3.rgmii1_rd3 */
-+			AM33XX_IOPAD(0x934, PIN_INPUT_PULLDOWN | MUX_MODE2)
-+			/* mii1_rxd2.rgmii1_rd2 */
-+			AM33XX_IOPAD(0x938, PIN_INPUT_PULLDOWN | MUX_MODE2)
-+			/* mii1_rxd1.rgmii1_rd1 */
-+			AM33XX_IOPAD(0x93c, PIN_INPUT_PULLDOWN | MUX_MODE2)
-+			/* mii1_rxd0.rgmii1_rd0 */
-+			AM33XX_IOPAD(0x940, PIN_INPUT_PULLDOWN | MUX_MODE2)
-+		>;
-+	};
-+
-+	cpsw_sleep: cpsw_sleep {
-+		pinctrl-single,pins = <
-+			/* Slave 1 reset value */
-+			AM33XX_IOPAD(0x914, PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			AM33XX_IOPAD(0x918, PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			AM33XX_IOPAD(0x91c, PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			AM33XX_IOPAD(0x920, PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			AM33XX_IOPAD(0x924, PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			AM33XX_IOPAD(0x928, PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			AM33XX_IOPAD(0x92c, PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			AM33XX_IOPAD(0x930, PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			AM33XX_IOPAD(0x934, PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			AM33XX_IOPAD(0x938, PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			AM33XX_IOPAD(0x93c, PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			AM33XX_IOPAD(0x940, PIN_INPUT_PULLDOWN | MUX_MODE7)
-+		>;
-+	};
-+
-+	davinci_mdio_default: davinci_mdio_default {
-+		pinctrl-single,pins = <
-+			/* mdio_data.mdio_data */
-+			AM33XX_IOPAD(0x948, PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)
-+			/* mdio_clk.mdio_clk */
-+			AM33XX_IOPAD(0x94c, PIN_OUTPUT_PULLUP | MUX_MODE0)
-+		>;
-+	};
-+
-+	davinci_mdio_sleep: davinci_mdio_sleep {
-+		pinctrl-single,pins = <
-+			/* MDIO reset value */
-+			AM33XX_IOPAD(0x948, PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			AM33XX_IOPAD(0x94c, PIN_INPUT_PULLDOWN | MUX_MODE7)
-+		>;
-+	};
-+
- 	mmc1_pins: pinmux_mmc1_pins {
- 		pinctrl-single,pins = <
- 			/* mmc0_dat3.mmc0_dat3 */
-@@ -229,6 +294,26 @@
- 	status = "okay";
- };
- 
-+&mac {
-+	pinctrl-names = "default", "sleep";
-+	pinctrl-0 = <&cpsw_default>;
-+	pinctrl-1 = <&cpsw_sleep>;
-+	slaves = <1>;
-+	status = "okay";
-+};
-+
-+&davinci_mdio {
-+	pinctrl-names = "default", "sleep";
-+	pinctrl-0 = <&davinci_mdio_default>;
-+	pinctrl-1 = <&davinci_mdio_sleep>;
-+	status = "okay";
-+};
-+
-+&cpsw_emac0 {
-+	phy_id = <&davinci_mdio>, <0>;
-+	phy-mode = "rgmii-txid";
-+};
-+
- &mmc1 {
- 	status = "okay";
- 	vmmc-supply = <&vmmc_fixed>;
 -- 
-2.5.0
+M?ns Rullg?rd
+mans at mansr.com
