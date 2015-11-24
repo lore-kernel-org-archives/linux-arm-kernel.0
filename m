@@ -1,75 +1,45 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 24 Nov 2015 14:47:40 +0100
-Subject: [PATCH 1/3] i2c: at91: add setting HOLD field of TWIHS_CWGR via DT
-Message-ID: <1448372862-11912-1-git-send-email-ludovic.desroches@atmel.com>
+Date: Tue, 24 Nov 2015 14:47:41 +0100
+Subject: [PATCH 2/3] i2c: at91: add DT property "atmel,
+ twd-hold-cycles" to binding
+In-Reply-To: <1448372862-11912-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1448372862-11912-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1448372862-11912-2-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wenyou Yang <wenyou.yang@atmel.com>
 
-Add the HOLD field management. Some i2c devices need a longer data hold
-time than the one given in the i2c bus specification. Since this value
-depends on the i2c device connected to the bus, add a DT property to
-configure it: "atmel,twd-hold-cycles".
+Add a DT property "atmel,twd-hold-cycles" to specify the HOLD
+filed of TWIHS_CWGR register to increase the TWD hold time.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
- drivers/i2c/busses/i2c-at91.c | 14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/i2c/i2c-at91.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index 10835d1..b3595ea 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -64,6 +64,7 @@
- #define	AT91_TWI_IADR		0x000c	/* Internal Address Register */
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-at91.txt b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
+index 6e81dc1..c81a0cb 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-at91.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
+@@ -17,6 +17,9 @@ Optional properties:
+ - dma-names: should contain "tx" and "rx".
+ - atmel,fifo-size: maximum number of data the RX and TX FIFOs can store for FIFO
+   capable I2C controllers.
++- atmel,twd-hold-cycles: number of cycles for TWD hold time whose value is
++  determinated by (atmel,twd-hold-cycles + 3) x t_peripheral_clock,
++  maximum value is 0x1f.
+ - Child nodes conforming to i2c bus binding
  
- #define	AT91_TWI_CWGR		0x0010	/* Clock Waveform Generator Reg */
-+#define	AT91_TWI_CWGR_HOLD(x)	(((x) & 0x1f) << 24)
+ Examples :
+@@ -29,6 +32,7 @@ i2c0: i2c at fff84000 {
+ 	#size-cells = <0>;
+ 	clocks = <&twi0_clk>;
+ 	clock-frequency = <400000>;
++	atmel,twd-hold-cycles = <2>;
  
- #define	AT91_TWI_SR		0x0020	/* Status Register */
- #define	AT91_TWI_TXCOMP		BIT(0)	/* Transmission Complete */
-@@ -185,7 +186,8 @@ static void at91_init_twi_bus(struct at91_twi_dev *dev)
-  * Calculate symmetric clock as stated in datasheet:
-  * twi_clk = F_MAIN / (2 * (cdiv * (1 << ckdiv) + offset))
-  */
--static void at91_calc_twi_clock(struct at91_twi_dev *dev, int twi_clk)
-+static void at91_calc_twi_clock(struct at91_twi_dev *dev,
-+				int twi_clk, u32 twd_hold)
- {
- 	int ckdiv, cdiv, div;
- 	struct at91_twi_pdata *pdata = dev->pdata;
-@@ -204,7 +206,9 @@ static void at91_calc_twi_clock(struct at91_twi_dev *dev, int twi_clk)
- 		cdiv = 255;
- 	}
- 
--	dev->twi_cwgr_reg = (ckdiv << 16) | (cdiv << 8) | cdiv;
-+	dev->twi_cwgr_reg = (ckdiv << 16) | (cdiv << 8) | cdiv
-+			    | AT91_TWI_CWGR_HOLD(twd_hold);
-+
- 	dev_dbg(dev->dev, "cdiv %d ckdiv %d\n", cdiv, ckdiv);
- }
- 
-@@ -994,6 +998,7 @@ static int at91_twi_probe(struct platform_device *pdev)
- 	int rc;
- 	u32 phy_addr;
- 	u32 bus_clk_rate;
-+	u32 twd_hold_cycles = 0;
- 
- 	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
- 	if (!dev)
-@@ -1050,7 +1055,10 @@ static int at91_twi_probe(struct platform_device *pdev)
- 	if (rc)
- 		bus_clk_rate = DEFAULT_TWI_CLK_HZ;
- 
--	at91_calc_twi_clock(dev, bus_clk_rate);
-+	of_property_read_u32(dev->dev->of_node, "atmel,twd-hold-cycles",
-+			     &twd_hold_cycles);
-+
-+	at91_calc_twi_clock(dev, bus_clk_rate, twd_hold_cycles);
- 	at91_init_twi_bus(dev);
- 
- 	snprintf(dev->adapter.name, sizeof(dev->adapter.name), "AT91");
+ 	24c512 at 50 {
+ 		compatible = "24c512";
 -- 
 2.5.0
