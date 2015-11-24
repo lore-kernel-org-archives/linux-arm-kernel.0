@@ -1,25 +1,33 @@
-From: sagig@dev.mellanox.co.il (Sagi Grimberg)
-Date: Tue, 24 Nov 2015 14:50:36 +0200
-Subject: [PATCH] scsi: use sector_div instead of do_div
-In-Reply-To: <24882658.08y4bWL6tn@wuerfel>
-References: <24882658.08y4bWL6tn@wuerfel>
-Message-ID: <56545D1C.6070509@dev.mellanox.co.il>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 24 Nov 2015 13:04:26 +0000
+Subject: [PATCH 4/4] spi: mediatek: revise mtk_spi_probe() failure flow
+In-Reply-To: <1448332404.27169.4.camel@mhfsdcap03>
+References: <1447986080-31410-1-git-send-email-leilk.liu@mediatek.com>
+ <1447986080-31410-4-git-send-email-leilk.liu@mediatek.com>
+ <20151121133949.GH26072@sirena.org.uk>
+ <1448332404.27169.4.camel@mhfsdcap03>
+Message-ID: <20151124130426.GL1929@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 24, 2015 at 10:33:24AM +0800, lei liu wrote:
+> On Sat, 2015-11-21 at 13:39 +0000, Mark Brown wrote:
+> > On Fri, Nov 20, 2015 at 10:21:19AM +0800, Leilk Liu wrote:
 
+> > > This patch revises failure flow while pm_runtime_enable().
 
-On 20/11/2015 18:38, Arnd Bergmann wrote:
-> do_div is the wrong way to divide a sector_t, as it is less
-> efficient when sector_t is 32-bit wide. With the upcoming
-> do_div optimizations, the kernel starts warning about this:
->
-> drivers/scsi/scsi_debug.c: In function 'dif_store':
-> include/asm-generic/div64.h:207:28: warning: comparison of distinct pointer types lacks a cast
->
-> This changes the code to use sector_div instead, which always
-> produces optimal code.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Why?  This also doesn't apply against current code, please check and
+> > resend.
 
-Reviewed-by: Sagi Grimberg <sagig@mellanox.com>
+> I don't know. I can git am this patch to spi/for-next. I will resend it,
+> please help to apply it again, thanks.
+
+If you don't know why we should make this change then we may as well
+just not make it?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151124/269831a6/attachment.sig>
