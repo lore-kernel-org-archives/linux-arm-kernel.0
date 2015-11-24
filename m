@@ -1,28 +1,57 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 Nov 2015 16:43:57 +0100
-Subject: [PATCH 0/3] KVM: arm/arm64: Fix some more timer related issues
-Message-ID: <1448379840-17516-1-git-send-email-christoffer.dall@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 24 Nov 2015 15:51:14 +0000
+Subject: [PATCH 1/3] KVM: arm/arm64: Fix preemptible timer active state
+ crazyness
+In-Reply-To: <1448379840-17516-2-git-send-email-christoffer.dall@linaro.org>
+References: <1448379840-17516-1-git-send-email-christoffer.dall@linaro.org>
+ <1448379840-17516-2-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <20151124155114.2dcd18fb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This little series addresses some problems we've been observing with the
-arch timer.  First, we were fiddling with a PPI timer interrupt outside
-of a preemptible section, which is bad for obvious reasons.  Second, we
-were clearing the physical active state when we shouldn't.  Third, we
-can simplify the vgic code by just considering the LR state instead of
-the GIC physical state on guest return.
+On Tue, 24 Nov 2015 16:43:58 +0100
+Christoffer Dall <christoffer.dall@linaro.org> wrote:
 
-Christoffer Dall (3):
-  KVM: arm/arm64: Fix preemptible timer active state crazyness
-  KVM: arm/arm64: arch_timer: Preserve physical dist. active state on
-    LR.active
-  KVM: arm/arm64: vgic: Trust the LR state for HW IRQs
+> We were setting the physical active state on the GIC distributor in a
+> preemptible section, which could cause us to set the active state on
+> different physical CPU from the one we were actually going to run on,
+> hacoc ensues.
+> 
+> Since we are no longer descheduling/scheduling soft timers in the
+> flush/sync timer functions, simply moving the timer flush into a
+> non-preemptible section.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm/kvm/arm.c | 7 +------
+>  1 file changed, 1 insertion(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index eab83b2..e06fd29 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -564,17 +564,12 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  			vcpu_sleep(vcpu);
+>  
+>  		/*
+> -		 * Disarming the background timer must be done in a
+> -		 * preemptible context, as this call may sleep.
+> -		 */
+> -		kvm_timer_flush_hwstate(vcpu);
+> -
+> -		/*
+>  		 * Preparing the interrupts to be injected also
+>  		 * involves poking the GIC, which must be done in a
+>  		 * non-preemptible context.
+>  		 */
+>  		preempt_disable();
+> +		kvm_timer_flush_hwstate(vcpu);
+>  		kvm_vgic_flush_hwstate(vcpu);
+>  
+>  		local_irq_disable();
 
- arch/arm/kvm/arm.c        |  7 +------
- include/kvm/arm_vgic.h    |  2 +-
- virt/kvm/arm/arch_timer.c | 28 +++++++++++++++----------
- virt/kvm/arm/vgic.c       | 53 ++++++++++++++++++++++++-----------------------
- 4 files changed, 46 insertions(+), 44 deletions(-)
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
+	M.
 -- 
-2.1.2.330.g565301e.dirty
+Jazz is not dead. It just smells funny.
