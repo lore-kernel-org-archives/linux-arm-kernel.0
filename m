@@ -1,41 +1,58 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 24 Nov 2015 17:57:26 +0530
-Subject: [PATCH] spi: davinci: fix spurious i/o error
-In-Reply-To: <108883742c4b44d338ea0816abeeb2901a2afcd5.1448361028.git.nsekhar@ti.com>
-References: <108883742c4b44d338ea0816abeeb2901a2afcd5.1448361028.git.nsekhar@ti.com>
-Message-ID: <565457AE.3050309@ti.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Tue, 24 Nov 2015 12:29:06 +0000
+Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <20151124122308.GB8644@n2100.arm.linux.org.uk> (Russell King's
+ message of "Tue, 24 Nov 2015 12:23:08 +0000")
+References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
+ <20151124001306.GI19156@codeaurora.org>
+ <20151124085349.GQ19156@codeaurora.org> <4485320.CGMJdfZLya@wuerfel>
+ <20151124104225.GA8644@n2100.arm.linux.org.uk>
+ <yw1xsi3vr42t.fsf@unicorn.mansr.com>
+ <20151124122308.GB8644@n2100.arm.linux.org.uk>
+Message-ID: <yw1xk2p7r371.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 November 2015 04:04 PM, Sekhar Nori wrote:
-> davinci_spi_bufs() uses wait_for_completion_interruptible()
-> without bothering to handle -ERESTARTSYS. Due to this,
-> sometime, it returns prematurely when a signal is received.
-> Since the return value is never checked, userspace eventually
-> receives a spurious -EIO.
-> 
-> To fix this, use un-interruptible wait_for_completion_timeout().
-> 
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> ---
->  drivers/spi/spi-davinci.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
-> index 7d3af3eacf57..38026aa1afd7 100644
-> --- a/drivers/spi/spi-davinci.c
-> +++ b/drivers/spi/spi-davinci.c
-> @@ -703,7 +703,10 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
->  
->  	/* Wait for the transfer to complete */
->  	if (spicfg->io_type != SPI_IO_TYPE_POLL) {
-> -		wait_for_completion_interruptible(&(dspi->done));
-> +		if (wait_for_completion_timeout(&dspi->done, HZ) == 0) {
-> +			dev_err(&spi->dev, "spi transfer timeout\n");
-> +			return -ETIMEDOUT;
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-Grygorii pointed out offline that this does not recover correctly in DMA
-case. I will fix and send a v2.
+> On Tue, Nov 24, 2015 at 12:10:02PM +0000, M?ns Rullg?rd wrote:
+>> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+>> 
+>> > On Tue, Nov 24, 2015 at 11:38:53AM +0100, Arnd Bergmann wrote:
+>> >> I suggested using -mcpu=cortex-a15 because there are old gcc versions
+>> >> that don't know about -march=armv7ve or -march=armv7-a+idiv yet, but
+>> >> that do understand -mcpu=cortex-a15.
+>> >
+>> > That's not all.  The bigger problem is that there are toolchains out
+>> > there which accept these options, but do _not_ support IDIV in either
+>> > ARM or Thumb mode.  I'm afraid that makes it impossible to add this
+>> > feature to the mainline kernel in this form: we need to run a test
+>> > build to check that -march=armv7ve or what-not really does work
+>> > through both GCC and GAS.
+>> 
+>> If the compiler accepts the option but doesn't actually emit any div
+>> instructions, is there any real harm?
+>
+> That's not what I've found.  I've found that asking the assembler
+> to accept idiv instructions appears to be ignored, which is something
+> completely different.
+>
+> Further to this, what it comes down to is the stupid idea that the
+> compiler should embed .arch / .cpu in the assembly output, which has
+> the effect of overriding the command line arguments given to it via
+> -Wa.  So, giving -Wa,-mcpu=cortex-a15 is a total no-op, because the
+> first thing in the assembly output is:
+>
+> 	.arch armv7-a
+>
+> which kills off any attempt to set the assembly level ISA from the
+> command line.
 
-Thanks,
-Sekhar
+Oh, you mean the compiler knows about the instructions but the assembler
+doesn't or isn't passed the right options.  It's infuriating when that
+happens.
+
+-- 
+M?ns Rullg?rd
+mans at mansr.com
