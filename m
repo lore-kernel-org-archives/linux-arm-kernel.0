@@ -1,21 +1,23 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 Nov 2015 17:59:08 +0100
-Subject: [PATCH 0/2] arm64: KVM: Fixes for 4.4-rc2
-In-Reply-To: <1447669698-15939-1-git-send-email-marc.zyngier@arm.com>
-References: <1447669698-15939-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20151124165908.GA18855@cbox>
+Date: Tue, 24 Nov 2015 18:18:32 +0100
+Subject: [PATCH] arm64: kvm: avoid %p in __kvm_hyp_panic
+In-Reply-To: <1447682151-5827-1-git-send-email-mark.rutland@arm.com>
+References: <1447682151-5827-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20151124171832.GB18855@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 10:28:16AM +0000, Marc Zyngier wrote:
-> Here's a couple of fixes for KVM/arm64:
+On Mon, Nov 16, 2015 at 01:55:51PM +0000, Mark Rutland wrote:
+> Currently __kvm_hyp_panic uses %p for values which are not pointers,
+> such as the ESR value. This can confusingly lead to "(null)" being
+> printed for the value.
 > 
-> - The first one addresses a misinterpretation of the architecture
->   spec, leading to the mishandling of I/O accesses generated from an
->   AArch32 guest using banked registers.
+> Use %x instead, and only use %p for host pointers.
 > 
-> - The second one is a workaround for a Cortex-A57 erratum.
-> 
-Thanks, applied with cosmetic fixes and cc'ed to stable.
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+
+Thanks, applied.
 
 -Christoffer
