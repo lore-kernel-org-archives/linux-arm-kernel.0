@@ -1,90 +1,63 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 24 Nov 2015 23:09:11 +0800
-Subject: [PATCH v4 2/6] mfd: axp20x: Split the driver into core and i2c
- bits
-In-Reply-To: <CAHp75VdGAAh56dJRh=ETJLJGFguuw+6mNSfRQ7Br7tAjeZv+3w@mail.gmail.com>
-References: <1448336916-31212-1-git-send-email-wens@csie.org>
- <1448336916-31212-3-git-send-email-wens@csie.org>
- <CAHp75VesF5M6nJf6eaBO+Dg6nC3gj=rzL9YnQFAysQ4NFgOMHg@mail.gmail.com>
- <CAGb2v65EH8sP_ONASZ5gWZXi1D0GqiJvT=X0ieYWehnfqM1Z=A@mail.gmail.com>
- <CAHp75VdGAAh56dJRh=ETJLJGFguuw+6mNSfRQ7Br7tAjeZv+3w@mail.gmail.com>
-Message-ID: <CAGb2v6592Yvh0=Q3=fgzj8AdRb37D4mRj0vnyJ3gXqGFBv2saw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 24 Nov 2015 16:17:15 +0100
+Subject: [PATCH 1/2] mmc: sdhci: set bus voltage before enabling bus power
+In-Reply-To: <20151124140831.GC2228@odux.rfo.atmel.com>
+References: <1446825570-30029-2-git-send-email-ludovic.desroches@atmel.com>
+ <20151109132305.GC15706@odux.rfo.atmel.com>
+ <CAPDyKFrTTEnSFNvmx3e__Ap9gOGpA2-bz+yrq7ibz0wXGSWCXA@mail.gmail.com>
+ <20151109144030.GD15706@odux.rfo.atmel.com>
+ <CAPDyKFquZ+_Rf07gX+i-=_bzSa7KJ5+xQ8N21kK2mvfMGdVQMw@mail.gmail.com>
+ <20151109163026.GE15706@odux.rfo.atmel.com>
+ <20151124092341.GA2228@odux.rfo.atmel.com>
+ <CAPDyKFp4U5vG_UswnLe1L2Vq1VwdkptThSdzhPYoP+hhGFTaQA@mail.gmail.com>
+ <20151124131213.GB2228@odux.rfo.atmel.com>
+ <CAPDyKFqr1=EytbC0hUyCk4Lb8GWJx0=Xg+ZmDoPJFp5L7G2nrQ@mail.gmail.com>
+ <20151124140831.GC2228@odux.rfo.atmel.com>
+Message-ID: <CAPDyKFoCVOF1dPGMXH0ui8MWRLgn=c2aFWckQ3+H_NFVxpmnGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 8:35 PM, Andy Shevchenko
-<andy.shevchenko@gmail.com> wrote:
-> On Tue, Nov 24, 2015 at 1:28 PM, Chen-Yu Tsai <wens@csie.org> wrote:
->> Hi,
+[...]
+
+>> > This one to not write an invalid voltage in the power control register
+>> > even if we have an external regulator for vmmc.
+>> >
 >>
->> On Tue, Nov 24, 2015 at 5:37 PM, Andy Shevchenko
->> <andy.shevchenko@gmail.com> wrote:
->>> On Tue, Nov 24, 2015 at 5:48 AM, Chen-Yu Tsai <wens@csie.org> wrote:
->>>> The axp20x driver assumes the device is i2c based. This is not the
->>>> case with later chips, which use a proprietary 2 wire serial bus
->>>> by Allwinner called "Reduced Serial Bus".
->>>>
->>>> This patch follows the example of mfd/wm831x and splits it into
->>>> an interface independent core, and an i2c specific glue layer.
->>>> MFD_AXP20X and the new MFD_AXP20X_I2C are changed to tristate
->>>> symbols, allowing the driver to be built as modules.
->>>>
->>>> Included but unused header files are removed as well.
->
-> So?
->
->>>> +       if (dev->of_node) {
->>>
->>> What about
->>>
->>> if (?of_node) {
->>>       const struct of_device_id *id;
->>> ?
->>> } else if ACPI_COMPANION(?) {
->
-> This should be has_acpi_companion().
-
-I don't think the "else if" is necessary. There's only 2 possible ways
-the device gets probed, either device tree or ACPI.
-
->>>       const struct acpi_device_id *id;
->>> ?
->>> } else {
->>>  return -ENODEV;
->>> }
+>> As I stated earlier, according to the SDHCI spec in the section for
+>> the Power Control Register. Bit 0 needs to be set when communicating
+>> with the card as it will for
+>> example enable the clock.
 >>
->> I really don't want to change code that I'm just moving around.
->> Same goes for the other comments about this patch. I can do another
->> patch on top of this to fix the style issues if it really bothers
->> people.
 >
-> Fair enough.
-> My comments mostly about unnecessity of second parameter in the functions.
+> I am okay with bit 0. I don't want to change this part, it will be done
+> later in sdhci_set_power(). My concern is only about bit 3-1, I want to
+> go through the switch statement.
+
+For those variants that have a VMMC and don't care about the other
+bits (1->3), it means executing code that isn't needed.
+
+Instead, as I have been telling people several times by now, let's
+convert the "sdhci core" into a library, so each variant can pick and
+do what suite them best.
+
 >
-> So,  you already did some clean up in this patch (above), what about
-> to do another? I also prefer separate patch *before* you do a split.
-
-Sure. I'll do a patch or 2 before the split. Would you mind if I add your
-Suggested-by tag?
-
-
-Regards
-ChenYu
-
->>>> +       axp20x = devm_kzalloc(&i2c->dev, sizeof(*axp20x), GFP_KERNEL);
->>>> +       if (!axp20x)
->>>> +               return -ENOMEM;
->>>> +
->>>> +       ret = axp20x_i2c_match_device(axp20x, &i2c->dev);
->>>> +       if (ret)
->>>> +               return ret;
->>>> +
->>>> +       axp20x->dev = &i2c->dev;
->>>> +       axp20x->irq = i2c->irq;
->>>
->>> If you move _match_device() here you will be able to drop away struct
->>> device * parameter.
+>> I suspect if I apply your patch several sdhci variants would break,
+>> don't you think?
 >
-> --
-> With Best Regards,
-> Andy Shevchenko
+> I wouldn't sign it with my blood but I don't think so. It seems they
+> don't care about the SD bus Voltage since they work with an unsupported
+> voltage.
+
+You may very well be right, that it doesn't break anything. But in
+this case I really don't want to take the risk.
+
+As stated above, the proper solution would be that sdhci_set_power()
+should be split up in smaller pieces, where each piece may become a
+library function. Each host variant can then decide what to use.
+
+Future wise, that would mean when changing a library function, it will
+affect the subset of the sdhci variants that actually use it and not
+*all* sdhci variants. Moreover it will lead to optimized code.
+
+Kind regards
+Uffe
