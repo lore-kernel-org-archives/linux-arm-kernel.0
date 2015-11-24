@@ -1,47 +1,35 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 24 Nov 2015 10:05:40 -0800
-Subject: [PATCH v9 2/2] arm-soc: Add support for tango4 platforms
-In-Reply-To: <564EF013.4030809@sigmadesigns.com> (Marc Gonzalez's message of
- "Fri, 20 Nov 2015 11:04:03 +0100")
-References: <564C94A5.4060301@sigmadesigns.com>
- <564C9558.4020100@sigmadesigns.com>
- <7hwptdu5vv.fsf@deeprootsystems.com>
- <564EF013.4030809@sigmadesigns.com>
-Message-ID: <7hegffp91n.fsf@deeprootsystems.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 24 Nov 2015 19:08:09 +0100
+Subject: [PATCH] ARM: mediatek: DT: Move reset controller constants into
+ common location
+In-Reply-To: <1448019764-31723-1-git-send-email-p.zabel@pengutronix.de>
+References: <1448019764-31723-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <5654A789.7070704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
 
-> On 19/11/2015 20:49, Kevin Hilman wrote:
+
+On 20/11/15 12:42, Philipp Zabel wrote:
+> By popular vote, the DT binding includes for reset controllers are located
+> in include/dt-bindings/reset/. Move the mediatek reset constants in there,
+> too, to avoid confusion.
 >
->> Marc Gonzalez wrote:
->> 
->>> +static void tango_l2c_write(unsigned long val, unsigned int reg)
->>> +{
->>> +	pr_debug("%s: reg=0x%x val=0x%lx\n", __func__, reg, val);
->> 
->> leftover debugging aid?
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+>   .../bindings/arm/mediatek/mediatek,infracfg.txt    |  2 +-
+>   .../bindings/arm/mediatek/mediatek,pericfg.txt     |  2 +-
+>   arch/arm/boot/dts/mt8135.dtsi                      |  2 +-
+>   arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  2 +-
+>   .../dt-bindings/reset-controller/mt8135-resets.h   | 64 ----------------------
+>   .../dt-bindings/reset-controller/mt8173-resets.h   | 63 ---------------------
+>   include/dt-bindings/reset/mt8135-resets.h          | 64 ++++++++++++++++++++++
+>   include/dt-bindings/reset/mt8173-resets.h          | 63 +++++++++++++++++++++
+>   8 files changed, 131 insertions(+), 131 deletions(-)
+>   delete mode 100644 include/dt-bindings/reset-controller/mt8135-resets.h
+>   delete mode 100644 include/dt-bindings/reset-controller/mt8173-resets.h
+>   create mode 100644 include/dt-bindings/reset/mt8135-resets.h
+>   create mode 100644 include/dt-bindings/reset/mt8173-resets.h
 >
-> I'll remove it.
->
-> (For my education, we're not supposed to use any pr_debug calls?)
 
-pr_debug() are fine to leave if you want them, but I assumed it was just
-a leftover as it didn't seem generally useful.
-
->>> +ENTRY(tango_smc)
->>> +	push	{lr}
->>> +	mov	ip, r1
->>> +	dsb	/* This barrier is probably unnecessary */
->> 
->> Then remove it?
->
-> This was discussed in v8. It's probably cargo cult from OMAP,
-> but the performance hit is negligible, and I don't have time
-> to properly analyze the code path. I just wanted to add the
-> comment in case someone copied my code.
-
-Sure,
-
-Kevin
+Applied, thanks.
