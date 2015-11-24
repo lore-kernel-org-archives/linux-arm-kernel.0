@@ -1,34 +1,31 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 24 Nov 2015 10:34:13 -0800
-Subject: [PATCH] dmaengine: bcm2835-dma: Convert to use DMA pool
-In-Reply-To: <1447672143-14201-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1447672143-14201-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <87poyztffe.fsf@eliezer.anholt.net>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Tue, 24 Nov 2015 19:36:17 +0100
+Subject: [PULL 0/8] KVM/ARM Fixes for v4.4-rc3
+In-Reply-To: <1448386536-30118-1-git-send-email-christoffer.dall@linaro.org>
+References: <1448386536-30118-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <5654AE21.50106@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Ujfalusi <peter.ujfalusi@ti.com> writes:
 
-> f93178291712 dmaengine: bcm2835-dma: Fix memory leak when stopping a
-> 	     running transfer
->
-> Fixed the memleak, but introduced another issue: the terminate_all callback
-> might be called with interrupts disabled and the dma_free_coherent() is
-> not allowed to be called when IRQs are disabled.
-> Convert the driver to use dma_pool_* for managing the list of control
-> blocks for the transfer.
->
-> Fixes: f93178291712 ("dmaengine: bcm2835-dma: Fix memory leak when stopping a running transfer")
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 
-It sounds like you got positive testing feedback.  Using the DMA pool
-for our bcm2835_dma_cbs makes sense to me, too.
+On 24/11/2015 18:35, Christoffer Dall wrote:
+> Hi Paolo,
+> 
+> Here's a set of fixes for KVM/ARM for v4.4-rc3 based on v4.4-rc2, because the
+> errata fixes don't apply on v4.4-rc1.  Let me know if you can pull this anyhow.
 
-Reviewed-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151124/938864d8/attachment.sig>
+Sure, pulled.
+
+Paolo
+
+> Thanks,
+> -Christoffer
+> 
+> The following changes since commit 1ec218373b8ebda821aec00bb156a9c94fad9cd4:
+> 
+>   Linux 4.4-rc2 (2015-11-22 16:45:59 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v4.4-rc3
