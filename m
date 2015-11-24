@@ -1,145 +1,59 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 24 Nov 2015 11:26:07 +0800
-Subject: [PATCH] ARM: dts: vf6xx: Cosmic+: M4(nommu) initial support
-In-Reply-To: <1445795456-6698-1-git-send-email-afzal.mohd.ma@gmail.com>
-References: <1445795456-6698-1-git-send-email-afzal.mohd.ma@gmail.com>
-Message-ID: <20151124032607.GD11999@tiger>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Tue, 24 Nov 2015 11:39:44 +0800
+Subject: [PATCH v3 05/62] acpi: Don't do traditional BIOS table scan for
+ ARM64
+In-Reply-To: <5653082602000078000B7C28@prv-mh.provo.novell.com>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-6-git-send-email-shannon.zhao@linaro.org>
+ <alpine.DEB.2.02.1511231120320.1107@kaball.uk.xensource.com>
+ <5653082602000078000B7C28@prv-mh.provo.novell.com>
+Message-ID: <5653DC00.6010607@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 25, 2015 at 11:20:56PM +0530, Afzal Mohammed wrote:
-> Minimal Cortex-M4 device tree to boot Linux to shell. M4 is booted via
-> Cortex-A5 running Linux using Stefan Agner's <stefan@agner.ch> "m4boot"
-> utility.
-> 
-> Signed-off-by: Afzal Mohammed <afzal.mohd.ma@gmail.com>
 
-Stefan,
 
-Are you okay with this patch?
+On 2015/11/23 19:35, Jan Beulich wrote:
+>>>> On 23.11.15 at 12:24, <stefano.stabellini@eu.citrix.com> wrote:
+>> On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+>>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>>
+>>> With the addition of ARM64 that does not have a traditional BIOS to
+>>> scan, add a #ifdef option for x86 to do the traditional BIOS scanning
+>>> for tables.
+>>>
+>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>>> ---
+>>>  xen/drivers/acpi/osl.c | 2 ++
+>>>  1 file changed, 2 insertions(+)
+>>>
+>>> diff --git a/xen/drivers/acpi/osl.c b/xen/drivers/acpi/osl.c
+>>> index ce15470..db74a90 100644
+>>> --- a/xen/drivers/acpi/osl.c
+>>> +++ b/xen/drivers/acpi/osl.c
+>>> @@ -78,7 +78,9 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
+>>>  	} else {
+>>>  		acpi_physical_address pa = 0;
+>>>  
+>>> +		#ifdef CONFIG_X86
+>>>  		acpi_find_root_pointer(&pa);
+>>> +		#endif
+>>>  		return pa;
+>>>  	}
+>>
+>> I think it might be best to error out earlier if acpi and !efi_enabled
+>> on arm and arm64.  If we do that we'll never enter this "else".
+>>
+>> If acpi_find_root_pointer doesn't build on arm, we should move it to an
+>> x86 specific location, such as xen/arch/x86/efi.
+> 
+> No, definitely not (or if anything, then xen/arch/x86/acpi/). Instead
+> the function itself should be stubbed out to do nothing on ARM. (And
+> of course also the #ifdef placement is rather odd).
+> 
+How about adding a new CONFIG_ACPI_LEGACY_TABLES_LOOKUP like Linux
+kernel for x86?
 
-Shawn
-
-> ---
->  arch/arm/boot/dts/Makefile           |  1 +
->  arch/arm/boot/dts/vf610m4-cosmic.dts | 90 ++++++++++++++++++++++++++++++++++++
->  2 files changed, 91 insertions(+)
->  create mode 100644 arch/arm/boot/dts/vf610m4-cosmic.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index bb8fa023d574..06a1a7a1d104 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -347,6 +347,7 @@ dtb-$(CONFIG_SOC_VF610) += \
->  	vf610-colibri-eval-v3.dtb \
->  	vf610m4-colibri.dtb \
->  	vf610-cosmic.dtb \
-> +	vf610m4-cosmic.dtb \
->  	vf610-twr.dtb
->  dtb-$(CONFIG_ARCH_MXS) += \
->  	imx23-evk.dtb \
-> diff --git a/arch/arm/boot/dts/vf610m4-cosmic.dts b/arch/arm/boot/dts/vf610m4-cosmic.dts
-> new file mode 100644
-> index 000000000000..8944a2d2054c
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/vf610m4-cosmic.dts
-> @@ -0,0 +1,90 @@
-> +/*
-> + * Device tree for Cosmic+ VF6xx Cortex-M4 support
-> + *
-> + * Copyright (C) 2015
-> + *
-> + * Based on vf610m4 Colibri
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "vf610m4.dtsi"
-> +
-> +/ {
-> +	model = "VF610 Cortex-M4";
-> +	compatible = "fsl,vf610m4";
-> +};
-> +
-> +&gpio0 {
-> +	status = "disabled";
-> +};
-> +
-> +&gpio1 {
-> +	status = "disabled";
-> +};
-> +
-> +&gpio2 {
-> +	status = "disabled";
-> +};
-> +
-> +&gpio3 {
-> +	status = "disabled";
-> +};
-> +
-> +&gpio4 {
-> +	status = "disabled";
-> +};
-> +
-> +&uart3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart3>;
-> +	status = "okay";
-> +};
-> +
-> +&iomuxc {
-> +	vf610-cosmic {
-> +		pinctrl_uart3: uart3grp {
-> +			fsl,pins = <
-> +				VF610_PAD_PTA20__UART3_TX		0x21a2
-> +				VF610_PAD_PTA21__UART3_RX		0x21a1
-> +			>;
-> +		};
-> +	};
-> +};
-> -- 
-> 2.5.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Thanks,
+-- 
+Shannon
