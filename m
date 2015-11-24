@@ -1,68 +1,62 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 24 Nov 2015 14:57:09 +0100
-Subject: [PATCH] PCI: imx6:don't sleep in atomic context
-In-Reply-To: <FDC088D3B5555644AE135ED28A7ABDE98636E07B@EU-MBX-02.mgc.mentorg.com>
-References: <1447066080-5859-1-git-send-email-sanjeev_sharma@mentor.com>
- <4800389.dqcmlJY3HC@wuerfel> <1447148110.3142.6.camel@pengutronix.de>
- <6415545.xzR4A6SaUL@wuerfel>
- <FDC088D3B5555644AE135ED28A7ABDE98636E07B@EU-MBX-02.mgc.mentorg.com>
-Message-ID: <1448373429.3689.34.camel@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 24 Nov 2015 14:00:47 +0000
+Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <yw1xk2p7r371.fsf@unicorn.mansr.com>
+References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
+ <20151124001306.GI19156@codeaurora.org>
+ <20151124085349.GQ19156@codeaurora.org>
+ <4485320.CGMJdfZLya@wuerfel>
+ <20151124104225.GA8644@n2100.arm.linux.org.uk>
+ <yw1xsi3vr42t.fsf@unicorn.mansr.com>
+ <20151124122308.GB8644@n2100.arm.linux.org.uk>
+ <yw1xk2p7r371.fsf@unicorn.mansr.com>
+Message-ID: <20151124140047.GC8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 16.11.2015, 09:36 +0000 schrieb Sharma, Sanjeev:
-> On Tuesday 10 November 2015 10:35:10 Lucas Stach wrote:
-> > Am Dienstag, den 10.11.2015, 10:28 +0100 schrieb Arnd Bergmann:
-> > > On Tuesday 10 November 2015 09:41:18 Lucas Stach wrote:
-> > > > > diff --git a/drivers/pci/host/pci-imx6.c 
-> > > > > b/drivers/pci/host/pci-imx6.c index 233a196..9769b13 100644
-> > > > > --- a/drivers/pci/host/pci-imx6.c
-> > > > > +++ b/drivers/pci/host/pci-imx6.c
-> > > > > @@ -499,7 +499,7 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
-> > > > >                * Wait a little bit, then re-check if the link finished
-> > > > >                * the training.
-> > > > >                */
-> > > > > -             usleep_range(1000, 2000);
-> > > > > +             mdelay(1000);
-> > > > 
-> > > > A mdelay(1000) is a whole different timescale than a usleep(1000). 
-> > > > If this patch works for you with mdelay(1) or maybe mdelay(2) I 
-> > > > would be fine with it.
-> > > 
-> > > mdelay(1) is still a really long time to block the CPU for, on 
-> > > potentially every config space access.
-> > > 
-> > > Everybody else just returns the link status here, which seems to be 
-> > > the better alternative. If you need to delay the startup, better 
-> > > have a msleep(1) loop in the initial probe function where you are 
-> > > allowed to sleep.
-> > > 
-> > Yes, it's somewhere on my TODO list to rework the link-up handling 
-> > here, but as there are quite a few timing and ordering implications in 
-> > that code, this needs a good thought and a good deal of testing. So 
-> > I'm inclined to ACK the current patch to get rid of the obvious bug 
-> > and sort things out properly in a follow on patchset.
+On Tue, Nov 24, 2015 at 12:29:06PM +0000, M?ns Rullg?rd wrote:
+> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 > 
-> Maybe use that patch with some modifications then:
+> > On Tue, Nov 24, 2015 at 12:10:02PM +0000, M?ns Rullg?rd wrote:
+> >> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+> >> 
+> >> > On Tue, Nov 24, 2015 at 11:38:53AM +0100, Arnd Bergmann wrote:
+> >> >> I suggested using -mcpu=cortex-a15 because there are old gcc versions
+> >> >> that don't know about -march=armv7ve or -march=armv7-a+idiv yet, but
+> >> >> that do understand -mcpu=cortex-a15.
+> >> >
+> >> > That's not all.  The bigger problem is that there are toolchains out
+> >> > there which accept these options, but do _not_ support IDIV in either
+> >> > ARM or Thumb mode.  I'm afraid that makes it impossible to add this
+> >> > feature to the mainline kernel in this form: we need to run a test
+> >> > build to check that -march=armv7ve or what-not really does work
+> >> > through both GCC and GAS.
+> >> 
+> >> If the compiler accepts the option but doesn't actually emit any div
+> >> instructions, is there any real harm?
+> >
+> > That's not what I've found.  I've found that asking the assembler
+> > to accept idiv instructions appears to be ignored, which is something
+> > completely different.
+> >
+> > Further to this, what it comes down to is the stupid idea that the
+> > compiler should embed .arch / .cpu in the assembly output, which has
+> > the effect of overriding the command line arguments given to it via
+> > -Wa.  So, giving -Wa,-mcpu=cortex-a15 is a total no-op, because the
+> > first thing in the assembly output is:
+> >
+> > 	.arch armv7-a
+> >
+> > which kills off any attempt to set the assembly level ISA from the
+> > command line.
 > 
-> * add a comment to explain that this is currently called from possibly
->   atomic context through pci_config_{read,write} and that the link
->   state handling never belonged here.
-> 
-> * instead of looping five times for up to 2ms each, loop 100 times
->   around a udelay(20) to hopefully be done earlier. I was going to
->   suggest using time_before(timeout, jiffies) as the condition to
->   wait for, but that doesn't work if called with interrupts disabled.
-> 
-> 	Arnd
-> Shall I go ahead by changing only current patch to mdelay(1). I will also
-> Incorporate comment  #1 given by Arnd above. 
+> Oh, you mean the compiler knows about the instructions but the assembler
+> doesn't or isn't passed the right options.  It's infuriating when that
+> happens.
 
-Yes, please go ahead. Smaller delay loops make sense, but please ensure
-that the total timeouts stay the same.
+No, that isn't what I meant.
 
-Regards,
-Lucas
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
