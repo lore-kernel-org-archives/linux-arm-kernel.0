@@ -1,30 +1,35 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Mon, 23 Nov 2015 21:55:03 -0800
-Subject: [PATCH] MAINTAINERS: Add rules for Qualcomm dts files
-Message-ID: <1448344503-32403-1-git-send-email-bjorn.andersson@sonymobile.com>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Tue, 24 Nov 2015 13:58:13 +0800
+Subject: [PATCH v5 0/6] MT8173 IOMMU SUPPORT
+In-Reply-To: <20151023092636.GX27420@8bytes.org>
+References: <1444357388-30257-1-git-send-email-yong.wu@mediatek.com>
+ <20151014125620.GQ27420@8bytes.org> <1445488802.27202.67.camel@mhfsdcap03>
+ <20151023092636.GX27420@8bytes.org>
+Message-ID: <1448344693.13079.6.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the get_maintainer script pick up the proper maintainers for the
-Qualcomm dts files.
+On Fri, 2015-10-23 at 11:26 +0200, Joerg Roedel wrote:
+> On Thu, Oct 22, 2015 at 12:40:02PM +0800, Yong Wu wrote:
+> >      But the mtk-iommu depend on the drivers/memory/mtk-smi.c(mtk-iommu
+> > has called a function of the mtk-smi).
+> >      So if there is dependence here, How should we do to merge them?
+> 
+> I can surely merge mtk-smi too, if it gets proper Reviewed-by and
+> Acked-by tags from the maintainer(s).
+> 
+> 
+> 	Joerg
+> 
+Hi Joerg,
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
----
- MAINTAINERS | 2 ++
- 1 file changed, 2 insertions(+)
+   About the driver/memory/, We don't know who is his maintainer.
+MAINTAINERS file don't have drivers/memory maintainer.
+>From the history in drivers/memory/ it looks like most of the
+drivers land with an ack from the architecture maintainer.
+And Matthias Brugger is our "ARM/Mediatek SoC support" maintainer.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index bcf40fdc8178..a11764c15b62 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1406,6 +1406,8 @@ M:	David Brown <davidb@codeaurora.org>
- L:	linux-arm-msm at vger.kernel.org
- L:	linux-soc at vger.kernel.org
- S:	Maintained
-+F:	arch/arm/boot/dts/qcom-*.dts
-+F:	arch/arm/boot/dts/qcom-*.dtsi
- F:	arch/arm/mach-qcom/
- F:	drivers/soc/qcom/
- F:	drivers/tty/serial/msm_serial.h
--- 
-2.4.2
+Then do you mean that we need Matthias's ACK or whom others?
+
+By the way, I will send the next version after Robin reposting
+Short-descriptor. maybe in next week. 
