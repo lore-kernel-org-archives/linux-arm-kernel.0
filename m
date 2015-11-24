@@ -1,237 +1,178 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Tue, 24 Nov 2015 18:19:22 +0100
-Subject: [PATCH v10 1/2] arm-soc: Import initial tango4 device tree
-In-Reply-To: <56549B3A.8010703@sigmadesigns.com>
-References: <56549B3A.8010703@sigmadesigns.com>
-Message-ID: <56549C1A.8010109@sigmadesigns.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 24 Nov 2015 17:48:58 +0000
+Subject: [PATCH] arm64: mm: Prevent the initial page table setup from creating
+ larger blocks
+Message-ID: <1448387338-27851-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This device tree was tested on a Sigma Designs SMP8758 Vantage-1172
-development board.
+While the ARM ARM is not entirely clear, over the years we have assumed
+that we can split a large block entry (pmd/pud) into smaller blocks
+pointing to the same physical address with little risk of a TLB
+conflict. However, remapping a smaller blocks range as a large one (e.g.
+from page to sections or to contiguous pages) implies a high risk of TLB
+conflict. Excessive TLB flushing would make the window smaller but it
+would not remove the issue.
 
-Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+This patch prevents the larger block mappings at all levels _if_ the
+existing pud/pmd entry is present _and_ not already a block mapping.
+Contiguous ptes are rejected if any of the entries in the range are
+non-empty and non-contiguous.
+
+In addition, TLB flushing is added for the cases where an existing block
+entry is changed.
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Reported-by: Jeremy Linton <jeremy.linton@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm/boot/dts/Makefile                |   2 +
- arch/arm/boot/dts/tango4-common.dtsi      | 121 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/tango4-smp8758.dtsi     |  31 ++++++++
- arch/arm/boot/dts/tango4-vantage-1172.dts |  29 +++++++
- 4 files changed, 183 insertions(+)
- create mode 100644 arch/arm/boot/dts/tango4-common.dtsi
- create mode 100644 arch/arm/boot/dts/tango4-smp8758.dtsi
- create mode 100644 arch/arm/boot/dts/tango4-vantage-1172.dts
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 246473a244f6..2499295051d5 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -605,6 +605,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb \
- 	sun9i-a80-cubieboard4.dtb
-+dtb-$(CONFIG_ARCH_TANGOX) += \
-+	tango4-vantage-1172.dtb
- dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += \
- 	tegra20-harmony.dtb \
- 	tegra20-iris-512.dtb \
-diff --git a/arch/arm/boot/dts/tango4-common.dtsi b/arch/arm/boot/dts/tango4-common.dtsi
-new file mode 100644
-index 000000000000..2a49aeea137f
---- /dev/null
-+++ b/arch/arm/boot/dts/tango4-common.dtsi
-@@ -0,0 +1,121 @@
-+/*
-+ * Based on Mans Rullgard's Tango3 DT
-+ * https://github.com/mansr/linux-tangox
-+ */
+Hi,
+
+We know the page table setup in Linux is currently broken (with or
+without contiguous PTEs support, though this makes it more visible). The
+architects imply that the risk of TLB conflict is *much* smaller when
+going from large to smaller blocks, to the point that it may even be
+stated thus in the ARM ARM. In the meantime, this patch is aimed to get
+the kernel workin on the old assumption for the 4.4 kernel (potentially
+backporting it to earlier kernels for the pud/pmd mappings) until Mark R
+has a proper fix for 4.5.
+
+Thanks.
+
+ arch/arm64/mm/mmu.c | 65 ++++++++++++++++++++++++++---------------------------
+ 1 file changed, 32 insertions(+), 33 deletions(-)
+
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index e379fe9f764c..cddd3536ff64 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -126,6 +126,19 @@ static void split_pmd(pmd_t *pmd, pte_t *pte)
+ 	} while (pte++, i++, i < PTRS_PER_PTE);
+ }
+ 
++static bool __pte_range_none_or_cont(pte_t *pte)
++{
++	int i;
 +
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
++	for (i = 0; i < CONT_PTES; i++) {
++		if (!pte_none(*pte) && !pte_cont(*pte))
++			return false;
++		pte++;
++	}
 +
-+/ {
-+	interrupt-parent = <&gic>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
++	return true;
++}
 +
-+	scu: scu at 20000000 {
-+		compatible = "arm,cortex-a9-scu";
-+		reg = <0x20000000 0x100>;
-+	};
+ /*
+  * Given a PTE with the CONT bit set, determine where the CONT range
+  * starts, and clear the entire range of PTE CONT bits.
+@@ -150,14 +163,20 @@ static void __populate_init_pte(pte_t *pte, unsigned long addr,
+ 				pgprot_t prot)
+ {
+ 	unsigned long pfn = __phys_to_pfn(phys);
++	bool flush = false;
+ 
+ 	do {
++		if (!pte_none(*pte))
++			flush = true;
+ 		/* clear all the bits except the pfn, then apply the prot */
+ 		set_pte(pte, pfn_pte(pfn, prot));
+ 		pte++;
+ 		pfn++;
+ 		addr += PAGE_SIZE;
+ 	} while (addr != end);
 +
-+	gic: interrupt-controller at 20001000 {
-+		compatible = "arm,cortex-a9-gic";
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		reg = <0x20001000 0x1000>, <0x20000100 0x0100>;
-+	};
-+
-+	periphclk: periphclk {
-+		compatible = "fixed-factor-clock";
-+		clocks = <&clkgen 0>;
-+		clock-mult = <1>;
-+		clock-div  = <2>;
-+		#clock-cells = <0>;
-+	};
-+
-+	twd-timer at 20000600 {
-+		compatible = "arm,cortex-a9-twd-timer";
-+		reg = <0x20000600 0x10>;
-+		interrupts = <GIC_PPI 13 0xf04>;
-+		clocks = <&periphclk>;
-+		always-on;
-+	};
-+
-+	l2cc: l2-cache-controller at 20100000 {
-+		compatible = "arm,pl310-cache";
-+		reg = <0x20100000 0x1000>;
-+		cache-level = <2>;
-+		cache-unified;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		interrupt-parent = <&irq0>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		xtal: xtal {
-+			compatible = "fixed-clock";
-+			clock-frequency = <27000000>;
-+			#clock-cells = <0>;
-+		};
-+
-+		clkgen: clkgen at 10000 {
-+			compatible = "sigma,tango4-clkgen";
-+			reg = <0x10000 0x40>;
-+			clocks = <&xtal>;
-+			clock-output-names = "cpuclk", "sysclk";
-+			#clock-cells = <1>;
-+		};
-+
-+		tick-counter at 10048 {
-+			compatible = "sigma,tick-counter";
-+			reg = <0x10048 0x4>;
-+			clocks = <&xtal>;
-+		};
-+
-+		uart: serial at 10700 {
-+			compatible = "ralink,rt2880-uart";
-+			reg = <0x10700 0x30>;
-+			interrupts = <1 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <7372800>;
-+			reg-shift = <2>;
-+		};
-+
-+		eth0: ethernet at 26000 {
-+			compatible = "sigma,smp8734-ethernet";
-+			reg = <0x26000 0x800>;
-+			interrupts = <38 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clkgen 1>;
-+		};
-+
-+		intc: interrupt-controller at 6e000 {
-+			compatible = "sigma,smp8642-intc";
-+			reg = <0x6e000 0x400>;
-+			ranges = <0 0x6e000 0x400>;
-+			interrupt-parent = <&gic>;
-+			interrupt-controller;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			irq0: irq0 at 000 {
-+				reg = <0x000 0x100>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			irq1: irq1 at 100 {
-+				reg = <0x100 0x100>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			irq2: irq2 at 300 {
-+				reg = <0x300 0x100>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/tango4-smp8758.dtsi b/arch/arm/boot/dts/tango4-smp8758.dtsi
-new file mode 100644
-index 000000000000..7ed88ee629fb
---- /dev/null
-+++ b/arch/arm/boot/dts/tango4-smp8758.dtsi
-@@ -0,0 +1,31 @@
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "sigma,tango4-smp";
-+
-+		cpu0: cpu at 0 {
-+			compatible = "arm,cortex-a9";
-+			next-level-cache = <&l2cc>;
-+			device_type = "cpu";
-+			reg = <0>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			compatible = "arm,cortex-a9";
-+			next-level-cache = <&l2cc>;
-+			device_type = "cpu";
-+			reg = <1>;
-+		};
-+	};
-+
-+	pmu {
-+		compatible = "arm,cortex-a9-pmu";
-+		interrupt-affinity = <&cpu0>, <&cpu1>;
-+		interrupts =
-+			<GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-+			<GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/tango4-vantage-1172.dts b/arch/arm/boot/dts/tango4-vantage-1172.dts
-new file mode 100644
-index 000000000000..fcfac8231e7a
---- /dev/null
-+++ b/arch/arm/boot/dts/tango4-vantage-1172.dts
-@@ -0,0 +1,29 @@
-+/dts-v1/;
-+
-+#include "tango4-smp8758.dtsi"
-+#include "tango4-common.dtsi"
-+
-+/ {
-+	model = "Sigma Designs SMP8758 Vantage-1172 Rev E1";
-+	compatible = "sigma,vantage-1172", "sigma,smp8758", "sigma,tango4";
-+
-+	memory at 80000000 {
-+		device_type = "memory";
-+		reg = <0x80000000 0x80000000>; /* 2 GB */
-+	};
-+};
-+
-+&eth0 {
-+	phy-connection-type = "rgmii";
-+	phy-handle = <&eth0_phy>;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	/* Atheros AR8035 */
-+	eth0_phy: ethernet-phy at 4 {
-+		compatible = "ethernet-phy-id004d.d072",
-+			     "ethernet-phy-ieee802.3-c22";
-+		interrupts = <37 IRQ_TYPE_EDGE_RISING>;
-+		reg = <4>;
-+	};
-+};
--- 
-2.4.5
++	if (flush)
++		flush_tlb_all();
+ }
+ 
+ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+@@ -180,7 +199,8 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 	pte = pte_offset_kernel(pmd, addr);
+ 	do {
+ 		next = min(end, (addr + CONT_SIZE) & CONT_MASK);
+-		if (((addr | next | phys) & ~CONT_MASK) == 0) {
++		if (((addr | next | phys) & ~CONT_MASK) == 0 &&
++		    __pte_range_none_or_cont(pte)) {
+ 			/* a block of CONT_PTES  */
+ 			__populate_init_pte(pte, addr, next, phys,
+ 					    __pgprot(pgprot_val(prot) | PTE_CONT));
+@@ -192,8 +212,9 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 			 * ranges, then update the portion of the range we
+ 			 * are interrested in.
+ 			 */
+-			 clear_cont_pte_range(pte, addr);
+-			 __populate_init_pte(pte, addr, next, phys, prot);
++			if (pte_cont(*pte))
++				clear_cont_pte_range(pte, addr);
++			__populate_init_pte(pte, addr, next, phys, prot);
+ 		}
+ 
+ 		pte += (next - addr) >> PAGE_SHIFT;
+@@ -241,24 +262,15 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+ 
+ 	pmd = pmd_offset(pud, addr);
+ 	do {
++		pmd_t old_pmd = *pmd;
+ 		next = pmd_addr_end(addr, end);
+ 		/* try section mapping first */
+-		if (((addr | next | phys) & ~SECTION_MASK) == 0) {
+-			pmd_t old_pmd =*pmd;
++		if (((addr | next | phys) & ~SECTION_MASK) == 0 &&
++		    (pmd_none(old_pmd) || pmd_sect(old_pmd))) {
+ 			set_pmd(pmd, __pmd(phys |
+ 					   pgprot_val(mk_sect_prot(prot))));
+-			/*
+-			 * Check for previous table entries created during
+-			 * boot (__create_page_tables) and flush them.
+-			 */
+-			if (!pmd_none(old_pmd)) {
++			if (!pmd_none(old_pmd))
+ 				flush_tlb_all();
+-				if (pmd_table(old_pmd)) {
+-					phys_addr_t table = __pa(pte_offset_map(&old_pmd, 0));
+-					if (!WARN_ON_ONCE(slab_is_available()))
+-						memblock_free(table, PAGE_SIZE);
+-				}
+-			}
+ 		} else {
+ 			alloc_init_pte(pmd, addr, next, phys, prot, alloc);
+ 		}
+@@ -294,31 +306,18 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+ 
+ 	pud = pud_offset(pgd, addr);
+ 	do {
++		pud_t old_pud = *pud;
+ 		next = pud_addr_end(addr, end);
+ 
+ 		/*
+ 		 * For 4K granule only, attempt to put down a 1GB block
+ 		 */
+-		if (use_1G_block(addr, next, phys)) {
+-			pud_t old_pud = *pud;
++		if (use_1G_block(addr, next, phys) &&
++		    (pud_none(old_pud) || pud_sect(old_pud))) {
+ 			set_pud(pud, __pud(phys |
+ 					   pgprot_val(mk_sect_prot(prot))));
+-
+-			/*
+-			 * If we have an old value for a pud, it will
+-			 * be pointing to a pmd table that we no longer
+-			 * need (from swapper_pg_dir).
+-			 *
+-			 * Look up the old pmd table and free it.
+-			 */
+-			if (!pud_none(old_pud)) {
++			if (!pud_none(old_pud))
+ 				flush_tlb_all();
+-				if (pud_table(old_pud)) {
+-					phys_addr_t table = __pa(pmd_offset(&old_pud, 0));
+-					if (!WARN_ON_ONCE(slab_is_available()))
+-						memblock_free(table, PAGE_SIZE);
+-				}
+-			}
+ 		} else {
+ 			alloc_init_pmd(mm, pud, addr, next, phys, prot, alloc);
+ 		}
