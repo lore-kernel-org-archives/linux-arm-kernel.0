@@ -1,48 +1,92 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 24 Nov 2015 14:25:21 -0800
-Subject: [PATCH v2 2/2] restrict /dev/mem to idle io memory ranges
-In-Reply-To: <20151124000604.26360.56945.stgit@dwillia2-desk3.jf.intel.com>
-References: <20151124000553.26360.57819.stgit@dwillia2-desk3.jf.intel.com>
- <20151124000604.26360.56945.stgit@dwillia2-desk3.jf.intel.com>
-Message-ID: <20151124142521.e6d23e44a8b2c24c044c2dec@linux-foundation.org>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Tue, 24 Nov 2015 14:26:42 -0800
+Subject: [PATCH] arm64/pci: Add quirks for Cavium Thunder PCI bridges.
+In-Reply-To: <20151124215200.GF17377@localhost>
+References: <1442966996-13419-1-git-send-email-ddaney.cavm@gmail.com>
+ <20151124215200.GF17377@localhost>
+Message-ID: <5654E422.5070604@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Nov 2015 16:06:04 -0800 Dan Williams <dan.j.williams@intel.com> wrote:
+On 11/24/2015 01:52 PM, Bjorn Helgaas wrote:
+> Hi David,
+>
+> On Tue, Sep 22, 2015 at 05:09:56PM -0700, David Daney wrote:
+>> From: David Daney <david.daney@cavium.com>
+>>
+>> The Cavium ThunderX SoC needs a PCI quirk for its on-chip bridges.
+>> Since it is arm64, create a new quirks.c file there to contain arm64
+>> related quirks.  Add the ThunderX bridge quirk, gated by a new config
+>> variable, so that it can be disabled for kernels that aren't expected
+>> to be used on ThunderX.
+>
+> Is this still needed?
 
-> This effectively promotes IORESOURCE_BUSY to IORESOURCE_EXCLUSIVE
-> semantics by default.  If userspace really believes it is safe to access
-> the memory region it can also perform the extra step of disabling an
-> active driver.  This protects device address ranges with read side
-> effects and otherwise directs userspace to use the driver.
+No.
 
-I don't think I'm sufficiently understanding what this is all needed
-for, sorry.  A better changelog would help: what's wrong with the
-current code, how you propose it be changed, how the kernel's
-externally-visible behaviour is altered, etc.
+The EA patch set that you merged to 4.4 supersedes this.
 
-Please pay particular attention to the back-compatibility issues which
-will be encountered when people enable these options.
+> I've seen some follow-up Cavium stuff, but
+> nothing further on this one.  If we still need it, we should figure
+> out who should take it.  It's all under arch/arm64, so ordinarily I
+> would leave it up to the arm64 guys.
+>
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>> ---
+>>   arch/arm64/Kconfig         | 11 +++++++++++
+>>   arch/arm64/kernel/Makefile |  2 +-
+>>   arch/arm64/kernel/quirks.c | 36 ++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 48 insertions(+), 1 deletion(-)
+>>   create mode 100644 arch/arm64/kernel/quirks.c
+>
+>> +#ifdef CONFIG_CAVIUM_THUNDER_PCI_QUIRKS
+>> +static void thunder_bridge_fixup(struct pci_dev *dev)
+>> +{
+>> +	/*
+>> +	 * This bridge is broken in that it doesn't have correct
+>> +	 * resource ranges for the buses behind it.
+>> +	 *
+>> +	 * The upstream bus resources are a close enough approximation
+>> +	 * to what is needed, that they can be used instead.  Copy
+>> +	 * upstream root bus resources so that resource claiming for
+>> +	 * downstream devices can be done.
+>> +	 */
+>> +	int resno;
+>> +	struct pci_bus *bus = dev->subordinate;
+>> +
+>> +	for (resno = 0; resno < PCI_BRIDGE_RESOURCE_NUM; resno++) {
+>> +		bus->resource[resno] =
+>> +			pci_bus_resource_n(bus->parent,
+>> +					   PCI_BRIDGE_RESOURCE_NUM + resno);
+>
+> I am curious about this.  Is this a standard PCI-PCI bridge,
 
-Perhaps when all that material is described, I'll understand why the
-heck we're doing this with a build-time switch rather than a runtime
-one...
+Yes it is PCI-PCI
 
-> Persistent memory presents a large "mistake surface" to /dev/mem as now
-> accidental writes can corrupt a filesystem.
+> or is it
+> a host bridge.  If the former, I guess it must be broken in some way
+> that keeps the usual bridge window reading code from working?
+>
+> Copying the upstream bus resources to the downstream bus might sort of
+> work sometimes, but seems fragile in general.  If the bridge has any
+> peers, it seems like we're headed for a conflict between the peer's
+> resources and anything downstream of the bridge.
 
-Is that the motivation?  root can come in and accidentally alter
-persistent memory contents?  If so, 
+The problem is that all the downstream devices require 64-bit 
+non-prefetchable addressing, which cannot be satisfied with the bridge 
+provisioning code.  EA allows this to be described.
 
-- why do we care?  There are all sorts of ways in which root can muck
-  up the persistent memory, starting with dd(1).  What's special about
-  /dev/mem?
+In any event the patch is not needed now that the EA code is in place.
 
-- why is the patch mucking with access to PCI and BIOS space?  Is the
-  persistent memory even mappable in those regions?  Or is the concern
-  that userspace can access control registers associated with the
-  persistent memory?  What is the problem scenario?
-
-
-IOW, a very good description of the problem-being-solved would help out
-a lot here...
+>
+>> +	}
+>> +}
+>> +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_CAVIUM, 0xa002, thunder_bridge_fixup);
+>> +#endif /* CONFIG_CAVIUM_THUNDER_PCI_QUIRKS */
+>> --
+>> 1.9.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
