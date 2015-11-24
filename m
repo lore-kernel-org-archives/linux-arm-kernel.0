@@ -1,18 +1,22 @@
 From: uri.mashiach@compulab.co.il (Uri Mashiach)
-Date: Tue, 24 Nov 2015 16:02:09 +0200
-Subject: [PATCH v2 2/6] ARM: OMAP2+: dts: cm-t335: add basic support for I2C
+Date: Tue, 24 Nov 2015 16:02:12 +0200
+Subject: [PATCH v2 5/6] ARM: OMAP2+: dts: cm-t335: add support for network
+ device
 In-Reply-To: <1448373733-5839-1-git-send-email-uri.mashiach@compulab.co.il>
 References: <1445948100-16446-1-git-send-email-uri.mashiach@compulab.co.il>
  <1448373733-5839-1-git-send-email-uri.mashiach@compulab.co.il>
-Message-ID: <1448373733-5839-3-git-send-email-uri.mashiach@compulab.co.il>
+Message-ID: <1448373733-5839-6-git-send-email-uri.mashiach@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ilya Ledvich <ilya@compulab.co.il>
 
-Add pinmux configuration for I2C0 and I2C1 pins.
-Add description for I2C0 bus, set clock frequency to 400kHz.
-Add child nodes for 24c02 EEPROM and em3027 RTC on I2C0 bus.
+Add pinmux configurations for RGMII1 based CPSW Ethernet pins and
+MDIO pins:
+ - default configuration required for module in active state,
+ - sleep configuration required for module in inactive state.
+Add mac node with single slave device. Add nodes for davinci_mdio and
+cpsw_emac0.
 
 Signed-off-by: Ilya Ledvich <ilya@compulab.co.il>
 Signed-off-by: Uri Mashiach <uri.mashiach@compulab.co.il>
@@ -20,60 +24,111 @@ Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 ---
 v1 -> v2: integrate AM33XX_IOPAD macro in pinmux definitions
 
- arch/arm/boot/dts/am335x-cm-t335.dts | 37 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ arch/arm/boot/dts/am335x-cm-t335.dts | 85 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 85 insertions(+)
 
 diff --git a/arch/arm/boot/dts/am335x-cm-t335.dts b/arch/arm/boot/dts/am335x-cm-t335.dts
-index 719658e..02b6679 100644
+index 0a20256..9be0bfe 100644
 --- a/arch/arm/boot/dts/am335x-cm-t335.dts
 +++ b/arch/arm/boot/dts/am335x-cm-t335.dts
-@@ -37,6 +37,24 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <>;
+@@ -114,6 +114,71 @@
+ 		>;
+ 	};
  
-+	i2c0_pins: pinmux_i2c0_pins {
++	cpsw_default: cpsw_default {
 +		pinctrl-single,pins = <
-+			/* i2c0_sda.i2c0_sda */
-+			AM33XX_IOPAD(0x988, PIN_INPUT_PULLUP | MUX_MODE0)
-+			/* i2c0_scl.i2c0_scl */
-+			AM33XX_IOPAD(0x98c, PIN_INPUT_PULLUP | MUX_MODE0)
++			/* Slave 1 */
++			/* mii1_tx_en.rgmii1_tctl */
++			AM33XX_IOPAD(0x914, PIN_OUTPUT_PULLDOWN | MUX_MODE2)
++			/* mii1_rxdv.rgmii1_rctl */
++			AM33XX_IOPAD(0x918, PIN_INPUT_PULLDOWN | MUX_MODE2)
++			/* mii1_txd3.rgmii1_td3 */
++			AM33XX_IOPAD(0x91c, PIN_OUTPUT_PULLDOWN | MUX_MODE2)
++			/* mii1_txd2.rgmii1_td2 */
++			AM33XX_IOPAD(0x920, PIN_OUTPUT_PULLDOWN | MUX_MODE2)
++			/* mii1_txd1.rgmii1_td1 */
++			AM33XX_IOPAD(0x924, PIN_OUTPUT_PULLDOWN | MUX_MODE2)
++			/* mii1_txd0.rgmii1_td0 */
++			AM33XX_IOPAD(0x928, PIN_OUTPUT_PULLDOWN | MUX_MODE2)
++			/* mii1_txclk.rgmii1_tclk */
++			AM33XX_IOPAD(0x92c, PIN_OUTPUT_PULLDOWN | MUX_MODE2)
++			/* mii1_rxclk.rgmii1_rclk */
++			AM33XX_IOPAD(0x930, PIN_INPUT_PULLDOWN | MUX_MODE2)
++			/* mii1_rxd3.rgmii1_rd3 */
++			AM33XX_IOPAD(0x934, PIN_INPUT_PULLDOWN | MUX_MODE2)
++			/* mii1_rxd2.rgmii1_rd2 */
++			AM33XX_IOPAD(0x938, PIN_INPUT_PULLDOWN | MUX_MODE2)
++			/* mii1_rxd1.rgmii1_rd1 */
++			AM33XX_IOPAD(0x93c, PIN_INPUT_PULLDOWN | MUX_MODE2)
++			/* mii1_rxd0.rgmii1_rd0 */
++			AM33XX_IOPAD(0x940, PIN_INPUT_PULLDOWN | MUX_MODE2)
 +		>;
 +	};
 +
-+	i2c1_pins: pinmux_i2c1_pins {
++	cpsw_sleep: cpsw_sleep {
 +		pinctrl-single,pins = <
-+			/* uart0_ctsn.i2c1_sda */
-+			AM33XX_IOPAD(0x968, PIN_INPUT_PULLUP | MUX_MODE2)
-+			/* uart0_rtsn.i2c1_scl */
-+			AM33XX_IOPAD(0x96c, PIN_INPUT_PULLUP | MUX_MODE2)
++			/* Slave 1 reset value */
++			AM33XX_IOPAD(0x914, PIN_INPUT_PULLDOWN | MUX_MODE7)
++			AM33XX_IOPAD(0x918, PIN_INPUT_PULLDOWN | MUX_MODE7)
++			AM33XX_IOPAD(0x91c, PIN_INPUT_PULLDOWN | MUX_MODE7)
++			AM33XX_IOPAD(0x920, PIN_INPUT_PULLDOWN | MUX_MODE7)
++			AM33XX_IOPAD(0x924, PIN_INPUT_PULLDOWN | MUX_MODE7)
++			AM33XX_IOPAD(0x928, PIN_INPUT_PULLDOWN | MUX_MODE7)
++			AM33XX_IOPAD(0x92c, PIN_INPUT_PULLDOWN | MUX_MODE7)
++			AM33XX_IOPAD(0x930, PIN_INPUT_PULLDOWN | MUX_MODE7)
++			AM33XX_IOPAD(0x934, PIN_INPUT_PULLDOWN | MUX_MODE7)
++			AM33XX_IOPAD(0x938, PIN_INPUT_PULLDOWN | MUX_MODE7)
++			AM33XX_IOPAD(0x93c, PIN_INPUT_PULLDOWN | MUX_MODE7)
++			AM33XX_IOPAD(0x940, PIN_INPUT_PULLDOWN | MUX_MODE7)
 +		>;
 +	};
 +
- 	gpio_led_pins: pinmux_gpio_led_pins {
++	davinci_mdio_default: davinci_mdio_default {
++		pinctrl-single,pins = <
++			/* mdio_data.mdio_data */
++			AM33XX_IOPAD(0x948, PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)
++			/* mdio_clk.mdio_clk */
++			AM33XX_IOPAD(0x94c, PIN_OUTPUT_PULLUP | MUX_MODE0)
++		>;
++	};
++
++	davinci_mdio_sleep: davinci_mdio_sleep {
++		pinctrl-single,pins = <
++			/* MDIO reset value */
++			AM33XX_IOPAD(0x948, PIN_INPUT_PULLDOWN | MUX_MODE7)
++			AM33XX_IOPAD(0x94c, PIN_INPUT_PULLDOWN | MUX_MODE7)
++		>;
++	};
++
+ 	mmc1_pins: pinmux_mmc1_pins {
  		pinctrl-single,pins = <
- 			/* gpmc_csn3.gpio2_0 */
-@@ -61,3 +79,22 @@
+ 			/* mmc0_dat3.mmc0_dat3 */
+@@ -229,6 +294,26 @@
  	status = "okay";
  };
  
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins>;
-+
++&mac {
++	pinctrl-names = "default", "sleep";
++	pinctrl-0 = <&cpsw_default>;
++	pinctrl-1 = <&cpsw_sleep>;
++	slaves = <1>;
 +	status = "okay";
-+	clock-frequency = <400000>;
-+	/* CM-T335 board EEPROM */
-+	eeprom: 24c02 at 50 {
-+		compatible = "atmel,24c02";
-+		reg = <0x50>;
-+		pagesize = <16>;
-+	};
-+	/* Real Time Clock */
-+	ext_rtc: em3027 at 56 {
-+		compatible = "emmicro,em3027";
-+		reg = <0x56>;
-+	};
 +};
 +
++&davinci_mdio {
++	pinctrl-names = "default", "sleep";
++	pinctrl-0 = <&davinci_mdio_default>;
++	pinctrl-1 = <&davinci_mdio_sleep>;
++	status = "okay";
++};
++
++&cpsw_emac0 {
++	phy_id = <&davinci_mdio>, <0>;
++	phy-mode = "rgmii-txid";
++};
++
+ &mmc1 {
+ 	status = "okay";
+ 	vmmc-supply = <&vmmc_fixed>;
 -- 
 2.5.0
