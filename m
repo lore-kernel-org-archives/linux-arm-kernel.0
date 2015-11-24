@@ -1,138 +1,65 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 24 Nov 2015 11:48:36 +0800
-Subject: [PATCH v4 6/6] ARM: dts: sun8i: q8-common: Add AXP223 PMIC device and
- regulator nodes
-In-Reply-To: <1448336916-31212-1-git-send-email-wens@csie.org>
-References: <1448336916-31212-1-git-send-email-wens@csie.org>
-Message-ID: <1448336916-31212-7-git-send-email-wens@csie.org>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Tue, 24 Nov 2015 11:50:32 +0800
+Subject: [PATCH 13/13] ARM: XEN: Move xen_early_init() before efi_init()
+In-Reply-To: <alpine.DEB.2.02.1511201720550.1107@kaball.uk.xensource.com>
+References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
+ <1447754231-7772-14-git-send-email-shannon.zhao@linaro.org>
+ <alpine.DEB.2.02.1511201720550.1107@kaball.uk.xensource.com>
+Message-ID: <5653DE88.9070003@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A23/A33 Q8 tablets have an X-Powers AXP223 PMIC connected via RSB. Its
-regulators provide power to various parts of the SoC and the board.
 
-Also add lcd regulator supply for simplefb and update the existing
-vmmc-supply for mmc0.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-q8-common.dtsi | 86 +++++++++++++++++++++++++++++++++-
- 1 file changed, 84 insertions(+), 2 deletions(-)
+On 2015/11/21 1:30, Stefano Stabellini wrote:
+>> +struct xen_node_info {
+>> > +	const char *compat;
+>> > +	const char *prefix;
+>> > +	const char *version;
+>> > +	bool found;
+>> > +};
+>> > +
+>> > +static int __init fdt_find_xen_node(unsigned long node, const char *uname,
+>> > +				    int depth, void *data)
+>> > +{
+>> > +	struct xen_node_info *info = data;
+>> > +	const void *s = NULL;
+>> > +	int len;
+>> > +
+>> > +	if (depth != 1 || strcmp(uname, "hypervisor") != 0)
+>> > +		return 0;
+>> > +
+>> > +	if (of_flat_dt_is_compatible(node, info->compat))
+>> > +		info->found = true;
+>> > +
+>> > +	s = of_get_flat_dt_prop(node, "compatible", &len);
+>> > +	if (strlen(info->prefix) + 3  < len &&
+>> > +                        !strncmp(info->prefix, s, strlen(info->prefix)))
+>> > +                info->version = s + strlen(info->prefix);
+>> > +	return 0;
+>> > +}
+>> > +
+>> >  /*
+>> >   * see Documentation/devicetree/bindings/arm/xen.txt for the
+>> >   * documentation of the Xen Device Tree format.
+>> > @@ -149,26 +176,25 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
+>> >  #define GRANT_TABLE_PHYSADDR 0
+>> >  void __init xen_early_init(void)
+>> >  {
+>> > -	int len;
+>> > -	const char *s = NULL;
+>> > -	const char *version = NULL;
+>> > -	const char *xen_prefix = "xen,xen-";
+>> > +	struct xen_node_info info;
+>> > +
+>> > +	info.compat = "xen,xen";
+>> > +	info.prefix = "xen,xen-";
+>> > +	info.version = NULL;
+>> > +	info.found = false;
+> Can you initialize the fields directly when you define xen_node_info and
+> make it static?
+Sure.
 
-diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-index 1a69231d2da5..01ab47b32d8d 100644
---- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
-+++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-@@ -56,7 +56,6 @@
- 		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
- 		default-brightness-level = <8>;
- 		enable-gpios = <&pio 7 6 GPIO_ACTIVE_HIGH>; /* PH6 */
--		/* backlight is powered by AXP223 DC1SW */
- 	};
- 
- 	chosen {
-@@ -67,7 +66,7 @@
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_q8>;
--	vmmc-supply = <&reg_vcc3v0>;
-+	vmmc-supply = <&reg_dcdc1>;
- 	bus-width = <4>;
- 	cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
- 	cd-inverted;
-@@ -92,6 +91,85 @@
- 
- &r_rsb {
- 	status = "okay";
-+
-+	axp22x: pmic at 3e3 {
-+		compatible = "x-powers,axp223";
-+		reg = <0x3e3>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		eldoin-supply = <&reg_dcdc1>;
-+	};
-+};
-+
-+#include "axp22x.dtsi"
-+
-+&reg_aldo1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-io";
-+};
-+
-+&reg_aldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2350000>;
-+	regulator-max-microvolt = <2650000>;
-+	regulator-name = "vdd-dll";
-+};
-+
-+&reg_aldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2700000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-pll-avcc";
-+};
-+
-+&reg_dc1sw {
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-lcd";
-+};
-+
-+&reg_dc5ldo {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpus";
-+};
-+
-+&reg_dcdc1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-3v0";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-sys";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc5 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1500000>;
-+	regulator-max-microvolt = <1500000>;
-+	regulator-name = "vcc-dram";
-+};
-+
-+&reg_rtc_ldo {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-rtc";
- };
- 
- &r_uart {
-@@ -99,3 +177,7 @@
- 	pinctrl-0 = <&r_uart_pins_a>;
- 	status = "okay";
- };
-+
-+&simplefb_lcd {
-+	vcc-lcd-supply = <&reg_dc1sw>;
-+};
+Thanks,
 -- 
-2.6.2
+Shannon
