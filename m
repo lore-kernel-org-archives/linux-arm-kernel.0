@@ -1,107 +1,169 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 24 Nov 2015 17:38:51 +0000
-Subject: [PATCH 1/4] bus: uniphier-system-bus: add UniPhier System Bus
- Controller driver
-In-Reply-To: <CAK7LNAR_6qwVK9fNEAX-L_v1Z5cdGMU33bP75Rdtu5bdmid-3Q@mail.gmail.com>
-References: <1448357962-12259-1-git-send-email-yamada.masahiro@socionext.com>
- <1448357962-12259-2-git-send-email-yamada.masahiro@socionext.com>
- <20151124115053.GB4108@leverpostej>
- <CAK7LNAR_6qwVK9fNEAX-L_v1Z5cdGMU33bP75Rdtu5bdmid-3Q@mail.gmail.com>
-Message-ID: <20151124173850.GC8468@leverpostej>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 24 Nov 2015 17:40:26 +0000
+Subject: [PATCH 11/21] arm64: KVM: Implement the core world switch
+In-Reply-To: <87poyze26t.fsf@linaro.org>
+References: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
+ <1447679519-17888-12-git-send-email-marc.zyngier@arm.com>
+ <87poyze26t.fsf@linaro.org>
+Message-ID: <20151124174026.0dfcc7ea@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 24 Nov 2015 17:29:14 +0000
+Alex Benn?e <alex.bennee@linaro.org> wrote:
 
-> >> +UniPhier System Bus Controller
-> >> +------------------------------
-> >> +
-> >> +The UniPhier System Bus Controller is a hardware block with registers that
-> >> +controls the System Bus accessing; how each bank is mapped onto the parent bus,
-> >> +various timing parameters of the bus access, etc.
-> >> +
-> >> +Required properties for System Bus Controller:
-> >> +- compatible: should be "socionext,uniphier-system-bus-controller".
-> >> +- reg: offsets and lengths of the register sets for the device.  It should
-> >> +  contain 2 regions: base & control register, misc register, in this order.
+> 
+> Marc Zyngier <marc.zyngier@arm.com> writes:
+> 
+> > Implement the core of the world switch in C. Not everything is there
+> > yet, and there is nothing to re-enter the world switch either.
 > >
-> > The example also has a system-bus phandle.
-> 
-> Actually, I was wondering which is better to describe the relation between
-> the bus and the controller,  phandle or compatible string..
-
-To describe relationships between nodes, use phandles.
-
-Compatible strings alone cannot define relationships -- you cannot
-encode how multiple instances are related.
-
-> > Is the "misc register" part of the bus controller, or is it a shared
-> > system controller?
-> 
-> It is a part of the bus controller, but used for another purpose.
-> (i.e. partly this is syscon.  I know this is strange, but it is
-> what the hardware developers designed.)
-
-Ok. What else is going to need to use this in future?
-
-> > Assuming that the controller and bus are 1-1 related, make this a single
-> > node. e.g.
+> > But this already outlines the code structure well enough.
 > >
-> > system-bus {
-> >         compatible = "socionext,uniphier-system-bus";
-> >         reg = <0x58c00000 0x400>, <0x59800000 0x2000>;
-> >         #address-cells = <2>;
-> >         #size-cells = <1>;
-> >         ranges = <1 0x00000000 0x42000000 0x02000000>,
-> >                  <5 0x00000000 0x48000000 0x01000000>;
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  arch/arm64/kvm/hyp/Makefile |   1 +
+> >  arch/arm64/kvm/hyp/switch.c | 134 ++++++++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 135 insertions(+)
+> >  create mode 100644 arch/arm64/kvm/hyp/switch.c
 > >
-> >         ...
-> >         child nodes here
-> >         ...
-> >
-> > };
+> > diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+> > index 1e1ff06..9c11b0f 100644
+> > --- a/arch/arm64/kvm/hyp/Makefile
+> > +++ b/arch/arm64/kvm/hyp/Makefile
+> > @@ -8,3 +8,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
+> >  obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
+> >  obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
+> >  obj-$(CONFIG_KVM_ARM_HOST) += entry.o
+> > +obj-$(CONFIG_KVM_ARM_HOST) += switch.o
+> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> > new file mode 100644
+> > index 0000000..a3af81a
+> > --- /dev/null
+> > +++ b/arch/arm64/kvm/hyp/switch.c
+> > @@ -0,0 +1,134 @@
+> > +/*
+> > + * Copyright (C) 2015 - ARM Ltd
+> > + * Author: Marc Zyngier <marc.zyngier@arm.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + *
+> > + * You should have received a copy of the GNU General Public License
+> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> > + */
+> > +
+> > +#include "hyp.h"
+> > +
+> > +static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+> > +{
+> > +	u64 val;
+> > +
+> > +	/*
+> > +	 * We are about to set CPTR_EL2.TFP to trap all floating point
+> > +	 * register accesses to EL2, however, the ARM ARM clearly states that
+> > +	 * traps are only taken to EL2 if the operation would not otherwise
+> > +	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
+> > +	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
+> > +	 */
+> > +	val = vcpu->arch.hcr_el2;
+> > +	if (val & HCR_RW) {
+> > +		write_sysreg(1 << 30, fpexc32_el2);
+> > +		isb();
+> > +	}
+> > +	write_sysreg(val, hcr_el2);
+> > +	write_sysreg(1 << 15, hstr_el2);
+> > +	write_sysreg(CPTR_EL2_TTA | CPTR_EL2_TFP, cptr_el2);
+> > +	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
+> > +}
+> > +
+> > +static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+> > +{
+> > +	write_sysreg(HCR_RW, hcr_el2);
+> > +	write_sysreg(0, hstr_el2);
+> > +	write_sysreg(read_sysreg(mdcr_el2) & MDCR_EL2_HPMN_MASK, mdcr_el2);
+> > +	write_sysreg(0, cptr_el2);
+> > +}
+> > +
+> > +static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
+> > +{
+> > +	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+> > +	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+> > +}
+> > +
+> > +static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
+> > +{
+> > +	write_sysreg(0, vttbr_el2);
+> > +}
+> > +
+> > +static hyp_alternate_select(__vgic_call_save_state,
+> > +			    __vgic_v2_save_state, __vgic_v3_save_state,
+> > +			    ARM64_HAS_SYSREG_GIC_CPUIF);
+> > +
+> > +static hyp_alternate_select(__vgic_call_restore_state,
+> > +			    __vgic_v2_restore_state, __vgic_v3_restore_state,
+> > +			    ARM64_HAS_SYSREG_GIC_CPUIF);
+> > +
+> > +static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
+> > +{
+> > +	__vgic_call_save_state()(vcpu);
+> > +	write_sysreg(read_sysreg(hcr_el2) & ~HCR_INT_OVERRIDE, hcr_el2);
+> > +}
+> > +
+> > +static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+> > +{
+> > +	u64 val;
+> > +
+> > +	val = read_sysreg(hcr_el2);
+> > +	val |= 	HCR_INT_OVERRIDE;
+> > +	val |= vcpu->arch.irq_lines;
+> > +	write_sysreg(val, hcr_el2);
+> > +
+> > +	__vgic_call_restore_state()(vcpu);
+> > +}
+> > +
+> > +int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+> > +{
+> > +	struct kvm_cpu_context *host_ctxt;
+> > +	struct kvm_cpu_context *guest_ctxt;
+> > +	u64 exit_code;
+> > +
+> > +	vcpu = kern_hyp_va(vcpu);
+> > +	write_sysreg(vcpu, tpidr_el2);
+> > +
+> > +	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+> > +	guest_ctxt = &vcpu->arch.ctxt;
+> > +
+> > +	__sysreg_save_state(host_ctxt);
+> > +	__debug_cond_save_state(vcpu, &vcpu->arch.host_debug_state, host_ctxt);
+> > +
+> > +	__activate_traps(vcpu);
+> > +	__activate_vm(vcpu);
+> > +
+> > +	__vgic_restore_state(vcpu);
+> > +	__timer_restore_state(vcpu);
+> > +
+> > +	/*
+> > +	 * We must restore the 32-bit state before the sysregs, thanks
+> > +	 * to Cortex-A57 erratum #852523.
+> > +	 */
+> > +	__sysreg32_restore_state(vcpu);
+> > +	__sysreg_restore_state(guest_ctxt);
+> > +	__debug_restore_state(vcpu, &vcpu->arch.vcpu_debug_state,
+> > guest_ctxt);
 > 
-> Hmm, make sense.  But, I prefer to reflect the hardware structure.
-> 
-> The range of System Bus is <0x40000000 0x10000000>.
-> 
-> The register of the System Bus Controller is
-> <0x58c00000 0x400>  (and <0x59800000 0x2000>)
-> 
-> 
-> The bus and its controller is different.
+> Did you right this before guest debug was merged? Now
+> vcpu.debug_ptr/VCPU_DEBUG_PTR selects which set of debug registers we
+> are going to use before entering the guest.
 
-So? We always describe the programming interface (i.e. the slave
-interface of the device that responds to the CPU).
+I probably just overlooked that bit. Thanks for noticing it!
 
-There's no need for separate nodes. It only makes the driver more
-complicated.
-
-> >> +static int uniphier_sbc_probe(struct platform_device *pdev)
-> >> +{
-> >> +     struct device *dev = &pdev->dev;
-> >> +     struct uniphier_sbc_priv *priv;
-> >> +     struct resource *regs;
-> >> +     struct device_node *bus_np;
-> >> +     int child_addrc, addrc, sizec, bank;
-> >> +     u64 child_addr, addr, size;
-> >> +     const __be32 *ranges;
-> >> +     int rlen, rone, ret;
-> >> +
-> >> +     bus_np = of_find_compatible_node(NULL, NULL,
-> >> +                                      "socionext,uniphier-system-bus");
-> >
-> > This is broken if you ever have multiple instances.
-> >
-> > Either use a single node, or if there is a more complex relationship
-> > between busses and their controllers, describe that explicitly with
-> > phandles.
-> 
-> 
-> Probably, I will stick to phandle in v2.
-
-I would prefer a single node unless there's some other complication
-regarding the relationship of the controller and the bus itself.
-
-Thanks,
-Mark.
+	M.
+-- 
+Jazz is not dead. It just smells funny.
