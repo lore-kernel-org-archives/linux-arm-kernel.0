@@ -1,28 +1,60 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 24 Nov 2015 08:44:38 +0100
-Subject: [LINUX PATCH] iio: xadc: fix for extended name remains same issue
-In-Reply-To: <1448345847-15051-1-git-send-email-ranjit.waghmode@xilinx.com>
-References: <1448345847-15051-1-git-send-email-ranjit.waghmode@xilinx.com>
-Message-ID: <56541566.80604@metafoo.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 24 Nov 2015 08:53:07 +0100
+Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
+In-Reply-To: <1448345169.2421.20.camel@mtksdaap41>
+References: <1447835066-10482-1-git-send-email-s.hauer@pengutronix.de>
+ <1447835066-10482-3-git-send-email-s.hauer@pengutronix.de>
+ <1448345169.2421.20.camel@mtksdaap41>
+Message-ID: <20151124075307.GZ11966@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/24/2015 07:17 AM, Ranjit Waghmode wrote:
-> If we read channel details based on the device tree entry; channel?s scan_index
-> and channel?s address were overwritten by scan_index and address of channel
-> based on device tree. But extended name were remaining same because of which
-> sysfs entry names were continuous.
-
-I don't understand this part. Those channels don't have a extended name,
-they are always NULL. Those are added as part of this patch as well, but the
-patch description makes it sound like it is a fix for a existing issue.
-
-
+On Tue, Nov 24, 2015 at 02:06:09PM +0800, dawei chien wrote:
+> Hi Sascha,
 > 
-> So this patch takes care of the above issue by updating 'channels' structure
-> inside xadc_parse_dt() function with the help of 'xadc_channels' structure
-> so that every channel's parameters will be updated properly. Also for the
-> sake of simplicity this patch updates default values for extend_name.
+> > +static int mtk_thermal_get_calibration_data(struct device *dev, struct mtk_thermal *mt)
+> > +{
+> > +	struct nvmem_cell *cell;
+> > +	u32 *buf;
+> > +	size_t len;
+> > +	int i, ret;
+> > +	/* Start with default values */
+> > +	mt->adc_ge = 512;
+> > +	for (i = 0; i < MT8173_NUM_SENSORS; i++)
+> > +		mt->vts[i] = 260;
+> > +	mt->degc_cali = 40;
+> > +	mt->o_slope = 0;
+> > +
+> > +	cell = nvmem_cell_get(dev, "calibration-data");
+> > +	if (IS_ERR(cell)) {
+> > +		if (PTR_ERR(cell) == -EPROBE_DEFER)
+> > +			return PTR_ERR(cell);
+> > +		return 0;
+> > +	}
+> > +
+> > +	buf = (u32 *)nvmem_cell_read(cell, &len);
+> > +
+> > +	nvmem_cell_put(cell);
+> > +
+> > +	if (IS_ERR(buf))
+> > +		return PTR_ERR(buf);
+> > +
+> > +	if (len < 3 * sizeof(u32)) {
+> > +		dev_warn(dev, "invalid calibration data\n");
+> > +		ret = -EINVAL;
+> > +		goto out;
+> > +	}
+> 
+> ret would not be assigned if the length of calibration data is correct.
+> Otherwise,
 
-We can't really do that, that would break existing applications. And to be
-honest I don't think regular channels should have a extended name.
+gcc does a increasingly bad job when it comes to warn about
+uninitialized variables :(
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
