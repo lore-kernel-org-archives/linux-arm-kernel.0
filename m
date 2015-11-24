@@ -1,60 +1,54 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 24 Nov 2015 17:48:28 +0530
-Subject: PCIe regression with DRA7xx in 4.4-rc1
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E162C92FB@lhreml503-mbs>
-References: <56545183.8000507@ti.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E162C92FB@lhreml503-mbs>
-Message-ID: <56545594.9070100@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 24 Nov 2015 12:23:08 +0000
+Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <yw1xsi3vr42t.fsf@unicorn.mansr.com>
+References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
+ <20151124001306.GI19156@codeaurora.org>
+ <20151124085349.GQ19156@codeaurora.org>
+ <4485320.CGMJdfZLya@wuerfel>
+ <20151124104225.GA8644@n2100.arm.linux.org.uk>
+ <yw1xsi3vr42t.fsf@unicorn.mansr.com>
+Message-ID: <20151124122308.GB8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Nov 24, 2015 at 12:10:02PM +0000, M?ns Rullg?rd wrote:
+> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+> 
+> > On Tue, Nov 24, 2015 at 11:38:53AM +0100, Arnd Bergmann wrote:
+> >> I suggested using -mcpu=cortex-a15 because there are old gcc versions
+> >> that don't know about -march=armv7ve or -march=armv7-a+idiv yet, but
+> >> that do understand -mcpu=cortex-a15.
+> >
+> > That's not all.  The bigger problem is that there are toolchains out
+> > there which accept these options, but do _not_ support IDIV in either
+> > ARM or Thumb mode.  I'm afraid that makes it impossible to add this
+> > feature to the mainline kernel in this form: we need to run a test
+> > build to check that -march=armv7ve or what-not really does work
+> > through both GCC and GAS.
+> 
+> If the compiler accepts the option but doesn't actually emit any div
+> instructions, is there any real harm?
 
-On Tuesday 24 November 2015 05:38 PM, Gabriele Paoloni wrote:
-> Hi Kishon
-> 
->> -----Original Message-----
->> From: Kishon Vijay Abraham I [mailto:kishon at ti.com]
->> Sent: 24 November 2015 12:01
->> To: linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
->> omap at vger.kernel.org; james.morse at arm.com; gabriel.fernandez at st.com;
->> Minghuan.Lian at freescale.com; Wangzhou (B); Gabriele Paoloni; arnd at arndb.de;
->> bhelgaas at google.com; pratyush.anand at gmail.com; Nori, Sekhar;
->> jingoohan1 at gmail.com; linux-arm-kernel at lists.infradead.org
->> Subject: PCIe regression with DRA7xx in 4.4-rc1
->>
->> Hi,
->>
->> I'm seeing a regression with <d1b9cf31252e905ad563b9e863fd4470f6c3dd1c>("PCI:
->> designware: Make driver arch-agnostic").
->>
->> Logs using a SATA PCIe card [1]. The PCIe card enumerates fine but after that
->> I
->> observe "ata3.00: qc timeout (cmd 0xec), ata3.00: failed to IDENTIFY (I/O
->> error, err_mask=0x4)"
->>
-> 
-> May this be related to the bug flagged in:
-> 
-> [PATCH] PCI: designware: remove wrong io_base assignment
-> 
-> [...]
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 540f077c37ea..02a7452bdf23 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -440,7 +440,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  					 ret, pp->io);
->  				continue;
->  			}
-> -			pp->io_base = pp->io->start;
->  			break;
->  		case IORESOURCE_MEM:
->  			pp->mem = win->res;
-> 
+That's not what I've found.  I've found that asking the assembler
+to accept idiv instructions appears to be ignored, which is something
+completely different.
 
+Further to this, what it comes down to is the stupid idea that the
+compiler should embed .arch / .cpu in the assembly output, which has
+the effect of overriding the command line arguments given to it via
+-Wa.  So, giving -Wa,-mcpu=cortex-a15 is a total no-op, because the
+first thing in the assembly output is:
 
-yes, this indeed solved the bug.
+	.arch armv7-a
 
-Thanks
-Kishon
+which kills off any attempt to set the assembly level ISA from the
+command line.
+
+It does appear after all that Ubuntu 14.04 does support sdiv/idiv with
+-mcpu=cortex-a15, but there is no -march=armv7ve.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
