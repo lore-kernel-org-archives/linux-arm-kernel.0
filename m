@@ -1,30 +1,90 @@
-From: nyushchenko@dev.rtsoft.ru (Nikita Yushchenko)
-Date: Tue, 24 Nov 2015 18:05:37 +0300
-Subject: [RFC/PATCH] arm: do not skip SMP init calls on SMP_ON_UP case
-In-Reply-To: <5654799E.5080903@dev.rtsoft.ru>
-References: <1448279946-19975-1-git-send-email-nyushchenko@dev.rtsoft.ru>
- <20151123120317.GN8644@n2100.arm.linux.org.uk>
- <5653015C.4020405@dev.rtsoft.ru> <56530769.4030403@arm.com>
- <5653099A.7020604@dev.rtsoft.ru> <56530AE6.2060407@dev.rtsoft.ru>
- <20151123130424.GQ8644@n2100.arm.linux.org.uk>
- <5654799E.5080903@dev.rtsoft.ru>
-Message-ID: <56547CC1.6000009@dev.rtsoft.ru>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 24 Nov 2015 23:09:11 +0800
+Subject: [PATCH v4 2/6] mfd: axp20x: Split the driver into core and i2c
+ bits
+In-Reply-To: <CAHp75VdGAAh56dJRh=ETJLJGFguuw+6mNSfRQ7Br7tAjeZv+3w@mail.gmail.com>
+References: <1448336916-31212-1-git-send-email-wens@csie.org>
+ <1448336916-31212-3-git-send-email-wens@csie.org>
+ <CAHp75VesF5M6nJf6eaBO+Dg6nC3gj=rzL9YnQFAysQ4NFgOMHg@mail.gmail.com>
+ <CAGb2v65EH8sP_ONASZ5gWZXi1D0GqiJvT=X0ieYWehnfqM1Z=A@mail.gmail.com>
+ <CAHp75VdGAAh56dJRh=ETJLJGFguuw+6mNSfRQ7Br7tAjeZv+3w@mail.gmail.com>
+Message-ID: <CAGb2v6592Yvh0=Q3=fgzj8AdRb37D4mRj0vnyJ3gXqGFBv2saw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I'm still trying to understand what is going on, and my printk()s show
-> that this is not entirely true.
-> 
-> When smp_init() is entered on mainline om imx6s, cpu_possible_mask and
-> cpu_present_mask both contain two cpus. These get initialized in
-> arm_dt_init_cpu_maps() and stay unmodified since then.
-> 
-> But cpu_online() returns 1 for cpu0 and 0 from cpu1 - thus it is
-> cpu_online() check, not possible_mask or present_mask, that prevents
-> cpu1 initialization attempt.
+On Tue, Nov 24, 2015 at 8:35 PM, Andy Shevchenko
+<andy.shevchenko@gmail.com> wrote:
+> On Tue, Nov 24, 2015 at 1:28 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+>> Hi,
+>>
+>> On Tue, Nov 24, 2015 at 5:37 PM, Andy Shevchenko
+>> <andy.shevchenko@gmail.com> wrote:
+>>> On Tue, Nov 24, 2015 at 5:48 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+>>>> The axp20x driver assumes the device is i2c based. This is not the
+>>>> case with later chips, which use a proprietary 2 wire serial bus
+>>>> by Allwinner called "Reduced Serial Bus".
+>>>>
+>>>> This patch follows the example of mfd/wm831x and splits it into
+>>>> an interface independent core, and an i2c specific glue layer.
+>>>> MFD_AXP20X and the new MFD_AXP20X_I2C are changed to tristate
+>>>> symbols, allowing the driver to be built as modules.
+>>>>
+>>>> Included but unused header files are removed as well.
+>
+> So?
+>
+>>>> +       if (dev->of_node) {
+>>>
+>>> What about
+>>>
+>>> if (?of_node) {
+>>>       const struct of_device_id *id;
+>>> ?
+>>> } else if ACPI_COMPANION(?) {
+>
+> This should be has_acpi_companion().
 
-Sorry was too quick to type.
+I don't think the "else if" is necessary. There's only 2 possible ways
+the device gets probed, either device tree or ACPI.
 
-cpu_online(0) is true and cpu_online(1) is false.
-It is natural, since cpu0 is already running.
-Thus cpu_up(1) is entered!
+>>>       const struct acpi_device_id *id;
+>>> ?
+>>> } else {
+>>>  return -ENODEV;
+>>> }
+>>
+>> I really don't want to change code that I'm just moving around.
+>> Same goes for the other comments about this patch. I can do another
+>> patch on top of this to fix the style issues if it really bothers
+>> people.
+>
+> Fair enough.
+> My comments mostly about unnecessity of second parameter in the functions.
+>
+> So,  you already did some clean up in this patch (above), what about
+> to do another? I also prefer separate patch *before* you do a split.
+
+Sure. I'll do a patch or 2 before the split. Would you mind if I add your
+Suggested-by tag?
+
+
+Regards
+ChenYu
+
+>>>> +       axp20x = devm_kzalloc(&i2c->dev, sizeof(*axp20x), GFP_KERNEL);
+>>>> +       if (!axp20x)
+>>>> +               return -ENOMEM;
+>>>> +
+>>>> +       ret = axp20x_i2c_match_device(axp20x, &i2c->dev);
+>>>> +       if (ret)
+>>>> +               return ret;
+>>>> +
+>>>> +       axp20x->dev = &i2c->dev;
+>>>> +       axp20x->irq = i2c->irq;
+>>>
+>>> If you move _match_device() here you will be able to drop away struct
+>>> device * parameter.
+>
+> --
+> With Best Regards,
+> Andy Shevchenko
