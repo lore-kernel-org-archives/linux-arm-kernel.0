@@ -1,92 +1,190 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 24 Nov 2015 11:48:30 +0800
-Subject: [PATCH v4 0/6]  mfd: axp20x: Add support for RSB based AXP223
-Message-ID: <1448336916-31212-1-git-send-email-wens@csie.org>
+Date: Tue, 24 Nov 2015 11:48:33 +0800
+Subject: [PATCH v4 3/6] mfd: axp20x: Add support for RSB based AXP223 PMIC
+In-Reply-To: <1448336916-31212-1-git-send-email-wens@csie.org>
+References: <1448336916-31212-1-git-send-email-wens@csie.org>
+Message-ID: <1448336916-31212-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
+It is functionally identical to AXP221; only the regulator default
+voltage/status and the external host interface are different.
 
-This is v4 of the AXP223 PMIC series.
-
-Changes since v3:
-
-  - Removed settings for axp223 reg_rtc_ldo from board dts files that
-    are already in axp22x.dtsi. The name is kept.
-
-  - Dropped simplefb label and defconfig patches, as they are merged.
-
-Changes since v2:
-
-  - s/It's/Its/ for the commit messages of patches 5 and 7
-
-  - Add Rob's Acked-by for patch 1
-
-Changes since v1:
-
-  - Dropped NMI interrupt controller dts patch (Merged)
-
-  - Change MFD_AXP20X to represent the axp20x core, and drop MFD_AXP20X_CORE
-  
-  - Keep the axp20x core bits named axp20x.c
-
-  - Add patch 7 to add AXP223 to sun8i-q8-common.dtsi
-
-  - Add patch 8 & 9 to update defconfigs
-
-  - Make axp20x drivers tristate and buildable as modules
-
-  - Drop "_sunxi" substring from identifiers in axp20x-rsb driver
-
-
-This series adds support for the Reduced Serial Bus based AXP223 PMIC.
-The AXP223 is functionally identical to the AXP221, which we already
-support. Only some default values for the regulators are different.
-The defaults fit their recommended application, paired with different
-SoCs.
-
-Patch 1 adds AXP223 to the list of supported chips in the DT binding.
-
-Patch 2 splits the axp20x mfd driver into 2 parts, a core library, and
-an I2C driver.
-
-Patch 3 adds an RSB based driver for the AXP223.
-
-Patch 4 adds support for the AXP223 regulators
-
-Patch 5 enables the AXP223 PMIC and its regulators for the Sinlinx
-SinA33.
-
-Patch 6 enables the AXP223 PMIC and its regulators for A23/A33 based
-Q8 devices.
-
-
-Regards
-ChenYu
-
-
-Chen-Yu Tsai (6):
-  mfd: axp20x: Add AXP223 to list of supported PMICs in DT bindings
-  mfd: axp20x: Split the driver into core and i2c bits
-  mfd: axp20x: Add support for RSB based AXP223 PMIC
-  regulator: axp20x: Support new AXP223 PMIC
-  ARM: dts: sun8i: sinlinx-sina33: Add AXP223 PMIC device and regulator
-    nodes
-  ARM: dts: sun8i: q8-common: Add AXP223 PMIC device and regulator nodes
-
- Documentation/devicetree/bindings/mfd/axp20x.txt |   7 +-
- arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts   |  79 +++++++++++++-
- arch/arm/boot/dts/sun8i-q8-common.dtsi           |  86 ++++++++++++++-
- drivers/mfd/Kconfig                              |  25 ++++-
- drivers/mfd/Makefile                             |   2 +
- drivers/mfd/axp20x-i2c.c                         | 127 +++++++++++++++++++++++
- drivers/mfd/axp20x-rsb.c                         |  93 +++++++++++++++++
- drivers/mfd/axp20x.c                             | 110 +++-----------------
- drivers/regulator/axp20x-regulator.c             |   3 +
- include/linux/mfd/axp20x.h                       |  34 +++++-
- 10 files changed, 458 insertions(+), 108 deletions(-)
- create mode 100644 drivers/mfd/axp20x-i2c.c
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/mfd/Kconfig        | 11 ++++++
+ drivers/mfd/Makefile       |  1 +
+ drivers/mfd/axp20x-rsb.c   | 93 ++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/mfd/axp20x.c       |  2 +
+ include/linux/mfd/axp20x.h |  1 +
+ 5 files changed, 108 insertions(+)
  create mode 100644 drivers/mfd/axp20x-rsb.c
 
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 804cd3dcce32..13c565103e96 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -107,6 +107,17 @@ config MFD_AXP20X_I2C
+ 	  components like regulators or the PEK (Power Enable Key) under the
+ 	  corresponding menus.
+ 
++config MFD_AXP20X_RSB
++	tristate "X-Powers AXP series PMICs with RSB"
++	select MFD_AXP20X
++	depends on SUNXI_RSB
++	help
++	  If you say Y here you get support for the X-Powers AXP series power
++	  management ICs (PMICs) controlled with RSB.
++	  This driver include only the core APIs. You have to select individual
++	  components like regulators or the PEK (Power Enable Key) under the
++	  corresponding menus.
++
+ config MFD_CROS_EC
+ 	tristate "ChromeOS Embedded Controller"
+ 	select MFD_CORE
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index a6913007d667..caea6637d5e8 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -108,6 +108,7 @@ obj-$(CONFIG_MFD_DA9052_SPI)	+= da9052-spi.o
+ obj-$(CONFIG_MFD_DA9052_I2C)	+= da9052-i2c.o
+ obj-$(CONFIG_MFD_AXP20X)	+= axp20x.o
+ obj-$(CONFIG_MFD_AXP20X_I2C)	+= axp20x-i2c.o
++obj-$(CONFIG_MFD_AXP20X_RSB)	+= axp20x-rsb.o
+ 
+ obj-$(CONFIG_MFD_LP3943)	+= lp3943.o
+ obj-$(CONFIG_MFD_LP8788)	+= lp8788.o lp8788-irq.o
+diff --git a/drivers/mfd/axp20x-rsb.c b/drivers/mfd/axp20x-rsb.c
+new file mode 100644
+index 000000000000..3ea0d5db37d0
+--- /dev/null
++++ b/drivers/mfd/axp20x-rsb.c
+@@ -0,0 +1,93 @@
++/*
++ * axp20x-rsb.c - RSB driver for the X-Powers' Power Management ICs
++ *
++ * AXP20x typically comprises an adaptive USB-Compatible PWM charger, BUCK DC-DC
++ * converters, LDOs, multiple 12-bit ADCs of voltage, current and temperature
++ * as well as configurable GPIOs.
++ *
++ * This driver supports the RSB variants.
++ *
++ * Author: Chen-Yu Tsai <wens@csie.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/acpi.h>
++#include <linux/err.h>
++#include <linux/module.h>
++#include <linux/mfd/axp20x.h>
++#include <linux/of_device.h>
++#include <linux/regmap.h>
++#include <linux/slab.h>
++#include <linux/sunxi-rsb.h>
++
++static const struct of_device_id axp20x_rsb_of_match[] = {
++	{ .compatible = "x-powers,axp223", .data = (void *) AXP223_ID },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, axp20x_rsb_of_match);
++
++static int axp20x_rsb_match_device(struct axp20x_dev *axp20x,
++					 struct device *dev)
++{
++	const struct of_device_id *of_id;
++
++	of_id = of_match_device(axp20x_rsb_of_match, dev);
++	if (!of_id) {
++		dev_err(dev, "Unable to match OF ID\n");
++		return -ENODEV;
++	}
++	axp20x->variant = (long) of_id->data;
++
++	return axp20x_match_device(axp20x, dev);
++}
++
++static int axp20x_rsb_probe(struct sunxi_rsb_device *rdev)
++{
++	struct axp20x_dev *axp20x;
++	int ret;
++
++	axp20x = devm_kzalloc(&rdev->dev, sizeof(*axp20x), GFP_KERNEL);
++	if (!axp20x)
++		return -ENOMEM;
++
++	ret = axp20x_rsb_match_device(axp20x, &rdev->dev);
++	if (ret)
++		return ret;
++
++	axp20x->dev = &rdev->dev;
++	axp20x->irq = rdev->irq;
++	sunxi_rsb_device_set_drvdata(rdev, axp20x);
++
++	axp20x->regmap = devm_regmap_init_sunxi_rsb(rdev, axp20x->regmap_cfg);
++	if (IS_ERR(axp20x->regmap)) {
++		ret = PTR_ERR(axp20x->regmap);
++		dev_err(&rdev->dev, "regmap init failed: %d\n", ret);
++		return ret;
++	}
++
++	return axp20x_device_probe(axp20x);
++}
++
++static int axp20x_rsb_remove(struct sunxi_rsb_device *rdev)
++{
++	struct axp20x_dev *axp20x = sunxi_rsb_device_get_drvdata(rdev);
++
++	return axp20x_device_remove(axp20x);
++}
++
++static struct sunxi_rsb_driver axp20x_rsb_driver = {
++	.driver = {
++		.name	= "axp20x-rsb",
++		.of_match_table	= of_match_ptr(axp20x_rsb_of_match),
++	},
++	.probe	= axp20x_rsb_probe,
++	.remove	= axp20x_rsb_remove,
++};
++module_sunxi_rsb_driver(axp20x_rsb_driver);
++
++MODULE_DESCRIPTION("PMIC MFD sunXi RSB driver for AXP20X");
++MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index 01f139856bf1..8057000da9d6 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -32,6 +32,7 @@ static const char * const axp20x_model_names[] = {
+ 	"AXP202",
+ 	"AXP209",
+ 	"AXP221",
++	"AXP223",
+ 	"AXP288",
+ };
+ 
+@@ -595,6 +596,7 @@ int axp20x_match_device(struct axp20x_dev *axp20x, struct device *dev)
+ 		axp20x->regmap_irq_chip = &axp20x_regmap_irq_chip;
+ 		break;
+ 	case AXP221_ID:
++	case AXP223_ID:
+ 		axp20x->nr_cells = ARRAY_SIZE(axp22x_cells);
+ 		axp20x->cells = axp22x_cells;
+ 		axp20x->regmap_cfg = &axp22x_regmap_config;
+diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+index 908f97f6e2d7..fef8dea18e66 100644
+--- a/include/linux/mfd/axp20x.h
++++ b/include/linux/mfd/axp20x.h
+@@ -18,6 +18,7 @@ enum {
+ 	AXP202_ID,
+ 	AXP209_ID,
+ 	AXP221_ID,
++	AXP223_ID,
+ 	AXP288_ID,
+ 	NR_AXP20X_VARIANTS,
+ };
 -- 
 2.6.2
