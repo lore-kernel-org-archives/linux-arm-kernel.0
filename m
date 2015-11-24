@@ -1,49 +1,91 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 23 Nov 2015 18:32:15 -0800
-Subject: [PATCH v4 3/5] watchdog: ts4800: add driver for TS-4800 watchdog
-In-Reply-To: <1448291861-28543-4-git-send-email-damien.riegel@savoirfairelinux.com>
-References: <1448291861-28543-1-git-send-email-damien.riegel@savoirfairelinux.com>
- <1448291861-28543-4-git-send-email-damien.riegel@savoirfairelinux.com>
-Message-ID: <5653CC2F.8080608@roeck-us.net>
+From: leilk.liu@mediatek.com (lei liu)
+Date: Tue, 24 Nov 2015 10:33:24 +0800
+Subject: [PATCH 4/4] spi: mediatek: revise mtk_spi_probe() failure flow
+In-Reply-To: <20151121133949.GH26072@sirena.org.uk>
+References: <1447986080-31410-1-git-send-email-leilk.liu@mediatek.com>
+ <1447986080-31410-4-git-send-email-leilk.liu@mediatek.com>
+ <20151121133949.GH26072@sirena.org.uk>
+Message-ID: <1448332404.27169.4.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Damien,
+On Sat, 2015-11-21 at 13:39 +0000, Mark Brown wrote:
+> On Fri, Nov 20, 2015 at 10:21:19AM +0800, Leilk Liu wrote:
+> > This patch revises failure flow while pm_runtime_enable().
+> 
+> Why?  This also doesn't apply against current code, please check and
+> resend.
 
-On 11/23/2015 07:17 AM, Damien Riegel wrote:
-> This watchdog is instantiated in a FPGA that is memory mapped. It is
-> made of only one register, called the feed register. Writing to this
-> register will re-arm the watchdog for a given time (and enable it if it
-> was disable). It can be disabled by writing a special value into it.
->
-> It is part of a syscon block, and the watchdog register offset in this
-> block varies from board to board. This offset is passed in the syscon
-> property after the phandle to the syscon node.
->
-> Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
-> ---
+I don't know. I can git am this patch to spi/for-next. I will resend it,
+please help to apply it again, thanks.
 
-[ ... ]
-
-> +
-> +static int ts4800_wdt_set_timeout(struct watchdog_device *wdd,
-> +				  unsigned int timeout)
-> +{
-> +	struct ts4800_wdt *wdt = watchdog_get_drvdata(wdd);
-> +	int i;
-> +
-> +	for (i = 0; i <= MAX_TIMEOUT_INDEX; i++) {
-> +		if (ts4800_wdt_map[i].timeout >= timeout)
-> +			break;
-> +	}
-
-If the loop does not break, i will have a value of MAX_TIMEOUT_INDEX + 1,
-or 2, pointing after the end of the table. That should never happen,
-but still ...
-
-I preferred the earlier version, where you had an extra function.
-Only my suggestion was to have that function return MAX_TIMEOUT_INDEX
-instead of an error. Alternatively, the check above needs to be
-"i < MAX_TIMEOUT_INDEX".
-
-Guenter
+> > 
+> > Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+> > ---
+> >  drivers/spi/spi-mt65xx.c |   15 ++++++++-------
+> >  1 file changed, 8 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
+> > index 6c1a96e..00a36da 100644
+> > --- a/drivers/spi/spi-mt65xx.c
+> > +++ b/drivers/spi/spi-mt65xx.c
+> > @@ -607,7 +607,8 @@ static int mtk_spi_probe(struct platform_device *pdev)
+> >  	ret = clk_set_parent(mdata->sel_clk, mdata->parent_clk);
+> >  	if (ret < 0) {
+> >  		dev_err(&pdev->dev, "failed to clk_set_parent (%d)\n", ret);
+> > -		goto err_disable_clk;
+> > +		clk_disable_unprepare(mdata->spi_clk);
+> > +		goto err_put_master;
+> >  	}
+> >  
+> >  	clk_disable_unprepare(mdata->spi_clk);
+> > @@ -617,7 +618,7 @@ static int mtk_spi_probe(struct platform_device *pdev)
+> >  	ret = devm_spi_register_master(&pdev->dev, master);
+> >  	if (ret) {
+> >  		dev_err(&pdev->dev, "failed to register master (%d)\n", ret);
+> > -		goto err_put_master;
+> > +		goto err_disable_runtime_pm;
+> >  	}
+> >  
+> >  	if (mdata->dev_comp->need_pad_sel) {
+> > @@ -626,14 +627,14 @@ static int mtk_spi_probe(struct platform_device *pdev)
+> >  				"pad_num does not match num_chipselect(%d != %d)\n",
+> >  				mdata->pad_num, master->num_chipselect);
+> >  			ret = -EINVAL;
+> > -			goto err_put_master;
+> > +			goto err_disable_runtime_pm;
+> >  		}
+> >  
+> >  		if (!master->cs_gpios && master->num_chipselect > 1) {
+> >  			dev_err(&pdev->dev,
+> >  				"cs_gpios not specified and num_chipselect > 1\n");
+> >  			ret = -EINVAL;
+> > -			goto err_put_master;
+> > +			goto err_disable_runtime_pm;
+> >  		}
+> >  
+> >  		if (master->cs_gpios) {
+> > @@ -644,7 +645,7 @@ static int mtk_spi_probe(struct platform_device *pdev)
+> >  				if (ret) {
+> >  					dev_err(&pdev->dev,
+> >  						"can't get CS GPIO %i\n", i);
+> > -					goto err_put_master;
+> > +					goto err_disable_runtime_pm;
+> >  				}
+> >  			}
+> >  		}
+> > @@ -652,8 +653,8 @@ static int mtk_spi_probe(struct platform_device *pdev)
+> >  
+> >  	return 0;
+> >  
+> > -err_disable_clk:
+> > -	clk_disable_unprepare(mdata->spi_clk);
+> > +err_disable_runtime_pm:
+> > +	pm_runtime_disable(&pdev->dev);
+> >  err_put_master:
+> >  	spi_master_put(master);
+> >  
+> > -- 
+> > 1.7.9.5
+> > 
+> > 
