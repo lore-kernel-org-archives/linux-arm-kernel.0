@@ -1,20 +1,62 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Nov 2015 13:05:23 +0000
-Subject: [PATCH v2] spi: mediatek: revise mtk_spi_probe() failure flow
-In-Reply-To: <1448332712-29039-1-git-send-email-leilk.liu@mediatek.com>
-References: <1448332712-29039-1-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <20151124130523.GM1929@sirena.org.uk>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 24 Nov 2015 18:29:38 +0530
+Subject: PCIe regression with DRA7xx in 4.4-rc1
+In-Reply-To: <20151124201411.33463709@xhacker>
+References: <56545183.8000507@ti.com> <20151124201411.33463709@xhacker>
+Message-ID: <56545F3A.6060808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 10:38:32AM +0800, Leilk Liu wrote:
-> This patch revises failure flow while pm_runtime_enable().
+Hi,
 
-This still doesn't explain what the purpose of this change is.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151124/235219c6/attachment.sig>
+On Tuesday 24 November 2015 05:44 PM, Jisheng Zhang wrote:
+> 
+> 
+> On Tue, 24 Nov 2015 17:31:07 +0530
+> Kishon Vijay Abraham I wrote:
+> 
+>> Hi,
+>>
+>> I'm seeing a regression with <d1b9cf31252e905ad563b9e863fd4470f6c3dd1c>("PCI:
+>> designware: Make driver arch-agnostic").
+>>
+>> Logs using a SATA PCIe card [1]. The PCIe card enumerates fine but after that I
+>> observe "ata3.00: qc timeout (cmd 0xec), ata3.00: failed to IDENTIFY (I/O
+>> error, err_mask=0x4)"
+>>
+>> Logs using a Ethenet PCIe card [2]. Again here the PCIe card enumerates fine
+>> but when I give ifconfig up, it fails.
+>>
+>> If I just revert commit <d1b9cf31252e905ad563b9e863fd4470f6c3dd1c>, the PCIe
+>> cards starts to work fine again
+> 
+> FYI, maybe the patch can fix the regression.
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/387362.html
+
+yes, it fixed.
+
+Thanks
+Kishon
+
+> 
+>>
+>> Logs using a SATA PCIe card [3]. Here the KINGSTON SSD gets detected fine.
+>> Logs using a Ethernet PCIe card [4]. I'm able to do ping tests now.
+>>
+>> Actually I'm not able to find any obvious problems with the patch and the irq
+>> number and the memory resource also looks fine. Any idea what could be the problem?
+>>
+>> [1] -> http://pastebin.ubuntu.com/13491456/
+>> [2] -> http://pastebin.ubuntu.com/13491526/
+>>
+>> [3] -> http://pastebin.ubuntu.com/13491658/
+>> [4] -> http://pastebin.ubuntu.com/13491593/
+>>
+>> Thanks
+>> Kishon
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
