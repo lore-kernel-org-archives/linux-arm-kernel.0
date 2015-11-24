@@ -1,169 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 24 Nov 2015 17:40:26 +0000
-Subject: [PATCH 11/21] arm64: KVM: Implement the core world switch
-In-Reply-To: <87poyze26t.fsf@linaro.org>
-References: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
- <1447679519-17888-12-git-send-email-marc.zyngier@arm.com>
- <87poyze26t.fsf@linaro.org>
-Message-ID: <20151124174026.0dfcc7ea@arm.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Tue, 24 Nov 2015 18:15:38 +0100
+Subject: [PATCH v10 0/2] Sigma Designs Tango4 port
+Message-ID: <56549B3A.8010703@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Nov 2015 17:29:14 +0000
-Alex Benn?e <alex.bennee@linaro.org> wrote:
+One more time. (We're gonna celebrate)
 
-> 
-> Marc Zyngier <marc.zyngier@arm.com> writes:
-> 
-> > Implement the core of the world switch in C. Not everything is there
-> > yet, and there is nothing to re-enter the world switch either.
-> >
-> > But this already outlines the code structure well enough.
-> >
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  arch/arm64/kvm/hyp/Makefile |   1 +
-> >  arch/arm64/kvm/hyp/switch.c | 134 ++++++++++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 135 insertions(+)
-> >  create mode 100644 arch/arm64/kvm/hyp/switch.c
-> >
-> > diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-> > index 1e1ff06..9c11b0f 100644
-> > --- a/arch/arm64/kvm/hyp/Makefile
-> > +++ b/arch/arm64/kvm/hyp/Makefile
-> > @@ -8,3 +8,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
-> >  obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
-> >  obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
-> >  obj-$(CONFIG_KVM_ARM_HOST) += entry.o
-> > +obj-$(CONFIG_KVM_ARM_HOST) += switch.o
-> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> > new file mode 100644
-> > index 0000000..a3af81a
-> > --- /dev/null
-> > +++ b/arch/arm64/kvm/hyp/switch.c
-> > @@ -0,0 +1,134 @@
-> > +/*
-> > + * Copyright (C) 2015 - ARM Ltd
-> > + * Author: Marc Zyngier <marc.zyngier@arm.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License
-> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> > + */
-> > +
-> > +#include "hyp.h"
-> > +
-> > +static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
-> > +{
-> > +	u64 val;
-> > +
-> > +	/*
-> > +	 * We are about to set CPTR_EL2.TFP to trap all floating point
-> > +	 * register accesses to EL2, however, the ARM ARM clearly states that
-> > +	 * traps are only taken to EL2 if the operation would not otherwise
-> > +	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
-> > +	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
-> > +	 */
-> > +	val = vcpu->arch.hcr_el2;
-> > +	if (val & HCR_RW) {
-> > +		write_sysreg(1 << 30, fpexc32_el2);
-> > +		isb();
-> > +	}
-> > +	write_sysreg(val, hcr_el2);
-> > +	write_sysreg(1 << 15, hstr_el2);
-> > +	write_sysreg(CPTR_EL2_TTA | CPTR_EL2_TFP, cptr_el2);
-> > +	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
-> > +}
-> > +
-> > +static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
-> > +{
-> > +	write_sysreg(HCR_RW, hcr_el2);
-> > +	write_sysreg(0, hstr_el2);
-> > +	write_sysreg(read_sysreg(mdcr_el2) & MDCR_EL2_HPMN_MASK, mdcr_el2);
-> > +	write_sysreg(0, cptr_el2);
-> > +}
-> > +
-> > +static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
-> > +{
-> > +	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
-> > +	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-> > +}
-> > +
-> > +static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
-> > +{
-> > +	write_sysreg(0, vttbr_el2);
-> > +}
-> > +
-> > +static hyp_alternate_select(__vgic_call_save_state,
-> > +			    __vgic_v2_save_state, __vgic_v3_save_state,
-> > +			    ARM64_HAS_SYSREG_GIC_CPUIF);
-> > +
-> > +static hyp_alternate_select(__vgic_call_restore_state,
-> > +			    __vgic_v2_restore_state, __vgic_v3_restore_state,
-> > +			    ARM64_HAS_SYSREG_GIC_CPUIF);
-> > +
-> > +static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
-> > +{
-> > +	__vgic_call_save_state()(vcpu);
-> > +	write_sysreg(read_sysreg(hcr_el2) & ~HCR_INT_OVERRIDE, hcr_el2);
-> > +}
-> > +
-> > +static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
-> > +{
-> > +	u64 val;
-> > +
-> > +	val = read_sysreg(hcr_el2);
-> > +	val |= 	HCR_INT_OVERRIDE;
-> > +	val |= vcpu->arch.irq_lines;
-> > +	write_sysreg(val, hcr_el2);
-> > +
-> > +	__vgic_call_restore_state()(vcpu);
-> > +}
-> > +
-> > +int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
-> > +{
-> > +	struct kvm_cpu_context *host_ctxt;
-> > +	struct kvm_cpu_context *guest_ctxt;
-> > +	u64 exit_code;
-> > +
-> > +	vcpu = kern_hyp_va(vcpu);
-> > +	write_sysreg(vcpu, tpidr_el2);
-> > +
-> > +	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-> > +	guest_ctxt = &vcpu->arch.ctxt;
-> > +
-> > +	__sysreg_save_state(host_ctxt);
-> > +	__debug_cond_save_state(vcpu, &vcpu->arch.host_debug_state, host_ctxt);
-> > +
-> > +	__activate_traps(vcpu);
-> > +	__activate_vm(vcpu);
-> > +
-> > +	__vgic_restore_state(vcpu);
-> > +	__timer_restore_state(vcpu);
-> > +
-> > +	/*
-> > +	 * We must restore the 32-bit state before the sysregs, thanks
-> > +	 * to Cortex-A57 erratum #852523.
-> > +	 */
-> > +	__sysreg32_restore_state(vcpu);
-> > +	__sysreg_restore_state(guest_ctxt);
-> > +	__debug_restore_state(vcpu, &vcpu->arch.vcpu_debug_state,
-> > guest_ctxt);
-> 
-> Did you right this before guest debug was merged? Now
-> vcpu.debug_ptr/VCPU_DEBUG_PTR selects which set of debug registers we
-> are going to use before entering the guest.
+Changes planned for a future patch series:
+Have clkgen driver export CD2/2 (for USB) and CD6/2 (for SDIO)
 
-I probably just overlooked that bit. Thanks for noticing it!
+Changes since v9:
+Rename mach-tangox to mach-tango and ARCH_TANGOX to ARCH_TANGO (??)
+=> Should I instead define ARCH_TANGO4 and later define ARCH_TANGO5?
+Add entry in MAINTAINERS
+Delete pr_debug() call
+=> mach code is not supposed to use this function?
 
-	M.
+Marc Gonzalez (2):
+  arm-soc: Import initial tango4 device tree
+  arm-soc: Add support for tango4 platforms
+
+ MAINTAINERS                               |   7 ++
+ arch/arm/Kconfig                          |   2 +
+ arch/arm/Makefile                         |   1 +
+ arch/arm/boot/dts/Makefile                |   2 +
+ arch/arm/boot/dts/tango4-common.dtsi      | 121 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/tango4-smp8758.dtsi     |  31 ++++++++
+ arch/arm/boot/dts/tango4-vantage-1172.dts |  29 +++++++
+ arch/arm/mach-tango/Kconfig               |  12 +++
+ arch/arm/mach-tango/Makefile              |   2 +
+ arch/arm/mach-tango/setup.c               |  31 ++++++++
+ arch/arm/mach-tango/smc.S                 |   9 +++
+ arch/arm/mach-tango/smc.h                 |   5 ++
+ 12 files changed, 252 insertions(+)
+ create mode 100644 arch/arm/boot/dts/tango4-common.dtsi
+ create mode 100644 arch/arm/boot/dts/tango4-smp8758.dtsi
+ create mode 100644 arch/arm/boot/dts/tango4-vantage-1172.dts
+ create mode 100644 arch/arm/mach-tango/Kconfig
+ create mode 100644 arch/arm/mach-tango/Makefile
+ create mode 100644 arch/arm/mach-tango/setup.c
+ create mode 100644 arch/arm/mach-tango/smc.S
+ create mode 100644 arch/arm/mach-tango/smc.h
+
 -- 
-Jazz is not dead. It just smells funny.
+2.4.5
