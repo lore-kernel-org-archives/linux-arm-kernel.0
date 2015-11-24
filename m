@@ -1,135 +1,41 @@
-From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Tue, 24 Nov 2015 13:26:19 +0100
-Subject: [PATCH RESEND] arm: fix the return value of find_first{_zero}_bit
-Message-ID: <1448367991-12734-1-git-send-email-clabbe.montjoie@gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 24 Nov 2015 17:57:26 +0530
+Subject: [PATCH] spi: davinci: fix spurious i/o error
+In-Reply-To: <108883742c4b44d338ea0816abeeb2901a2afcd5.1448361028.git.nsekhar@ti.com>
+References: <108883742c4b44d338ea0816abeeb2901a2afcd5.1448361028.git.nsekhar@ti.com>
+Message-ID: <565457AE.3050309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building linux with W=1 on arm give me this warning;
-In file included from ../include/linux/nodemask.h:92:0,
-                 from ../include/linux/mmzone.h:16,
-                 from ../include/linux/gfp.h:5,
-                 from ../include/linux/kmod.h:22,
-                 from ../include/linux/module.h:13,
-                 from net/netfilter/xt_nat.mod.c:1:
-../include/linux/bitmap.h: In function 'bitmap_empty':
-../include/linux/bitmap.h:287:36: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
-  return find_first_bit(src, nbits) == nbits;
+On Tuesday 24 November 2015 04:04 PM, Sekhar Nori wrote:
+> davinci_spi_bufs() uses wait_for_completion_interruptible()
+> without bothering to handle -ERESTARTSYS. Due to this,
+> sometime, it returns prematurely when a signal is received.
+> Since the return value is never checked, userspace eventually
+> receives a spurious -EIO.
+> 
+> To fix this, use un-interruptible wait_for_completion_timeout().
+> 
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> ---
+>  drivers/spi/spi-davinci.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
+> index 7d3af3eacf57..38026aa1afd7 100644
+> --- a/drivers/spi/spi-davinci.c
+> +++ b/drivers/spi/spi-davinci.c
+> @@ -703,7 +703,10 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
+>  
+>  	/* Wait for the transfer to complete */
+>  	if (spicfg->io_type != SPI_IO_TYPE_POLL) {
+> -		wait_for_completion_interruptible(&(dspi->done));
+> +		if (wait_for_completion_timeout(&dspi->done, HZ) == 0) {
+> +			dev_err(&spi->dev, "spi transfer timeout\n");
+> +			return -ETIMEDOUT;
 
-../include/linux/bitmap.h: In function 'bitmap_full':
-../include/linux/bitmap.h:295:41: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
-  return find_first_zero_bit(src, nbits) == nbits;
+Grygorii pointed out offline that this does not recover correctly in DMA
+case. I will fix and send a v2.
 
-The problem is that find_first{_zero}_bit() return type is unsigned long on
-majority of arch.
-
-Since find_first{_zero}_bit cannot return negative value, unsigned long is
-the best return type.
-
-After some read, it seems that find_next_bit_[lb]e/_find_next_zero_bit_[lb]e
-are also incorectly set as return int.
-
-This patch fix the return type of all thoses functions.
-
-Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
----
- arch/arm/include/asm/bitops.h | 22 +++++++++++-----------
- arch/arm/lib/findbit.S        |  8 ++++----
- 2 files changed, 15 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
-index e943e6c..868414b 100644
---- a/arch/arm/include/asm/bitops.h
-+++ b/arch/arm/include/asm/bitops.h
-@@ -159,18 +159,18 @@ extern int _test_and_change_bit(int nr, volatile unsigned long * p);
- /*
-  * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
-  */
--extern int _find_first_zero_bit_le(const void * p, unsigned size);
--extern int _find_next_zero_bit_le(const void * p, int size, int offset);
--extern int _find_first_bit_le(const unsigned long *p, unsigned size);
--extern int _find_next_bit_le(const unsigned long *p, int size, int offset);
-+extern unsigned long _find_first_zero_bit_le(const void *p, unsigned size);
-+extern unsigned long _find_next_zero_bit_le(const void *p, int size, int offset);
-+extern unsigned long _find_first_bit_le(const unsigned long *p, unsigned size);
-+extern unsigned long _find_next_bit_le(const unsigned long *p, int size, int offset);
- 
- /*
-  * Big endian assembly bitops.  nr = 0 -> byte 3 bit 0.
-  */
--extern int _find_first_zero_bit_be(const void * p, unsigned size);
--extern int _find_next_zero_bit_be(const void * p, int size, int offset);
--extern int _find_first_bit_be(const unsigned long *p, unsigned size);
--extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
-+extern unsigned long _find_first_zero_bit_be(const void *p, unsigned size);
-+extern unsigned long _find_next_zero_bit_be(const void *p, int size, int offset);
-+extern unsigned long _find_first_bit_be(const unsigned long *p, unsigned size);
-+extern unsigned long _find_next_bit_be(const unsigned long *p, int size, int offset);
- 
- #ifndef CONFIG_SMP
- /*
-@@ -317,19 +317,19 @@ static inline unsigned long __ffs(unsigned long x)
- 
- #ifdef __ARMEB__
- 
--static inline int find_first_zero_bit_le(const void *p, unsigned size)
-+static inline unsigned long find_first_zero_bit_le(const void *p, unsigned size)
- {
- 	return _find_first_zero_bit_le(p, size);
- }
- #define find_first_zero_bit_le find_first_zero_bit_le
- 
--static inline int find_next_zero_bit_le(const void *p, int size, int offset)
-+static inline unsigned long find_next_zero_bit_le(const void *p, int size, int offset)
- {
- 	return _find_next_zero_bit_le(p, size, offset);
- }
- #define find_next_zero_bit_le find_next_zero_bit_le
- 
--static inline int find_next_bit_le(const void *p, int size, int offset)
-+static inline unsigned long find_next_bit_le(const void *p, int size, int offset)
- {
- 	return _find_next_bit_le(p, size, offset);
- }
-diff --git a/arch/arm/lib/findbit.S b/arch/arm/lib/findbit.S
-index 7848780..b4f6aec 100644
---- a/arch/arm/lib/findbit.S
-+++ b/arch/arm/lib/findbit.S
-@@ -19,7 +19,7 @@
- 
- /*
-  * Purpose  : Find a 'zero' bit
-- * Prototype: int find_first_zero_bit(void *addr, unsigned int maxbit);
-+ * Prototype: unsigned long find_first_zero_bit(void *addr, unsigned int maxbit);
-  */
- ENTRY(_find_first_zero_bit_le)
- 		teq	r1, #0	
-@@ -40,7 +40,7 @@ ENDPROC(_find_first_zero_bit_le)
- 
- /*
-  * Purpose  : Find next 'zero' bit
-- * Prototype: int find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
-+ * Prototype: unsigned long find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
-  */
- ENTRY(_find_next_zero_bit_le)
- 		teq	r1, #0
-@@ -60,7 +60,7 @@ ENDPROC(_find_next_zero_bit_le)
- 
- /*
-  * Purpose  : Find a 'one' bit
-- * Prototype: int find_first_bit(const unsigned long *addr, unsigned int maxbit);
-+ * Prototype: unsigned long find_first_bit(const unsigned long *addr, unsigned int maxbit);
-  */
- ENTRY(_find_first_bit_le)
- 		teq	r1, #0	
-@@ -81,7 +81,7 @@ ENDPROC(_find_first_bit_le)
- 
- /*
-  * Purpose  : Find next 'one' bit
-- * Prototype: int find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
-+ * Prototype: unsigned long find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
-  */
- ENTRY(_find_next_bit_le)
- 		teq	r1, #0
--- 
-2.4.10
+Thanks,
+Sekhar
