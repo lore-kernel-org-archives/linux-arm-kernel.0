@@ -1,132 +1,61 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 24 Nov 2015 17:32:15 +0800
-Subject: [PATCH v3 4/5] ARM: dts: sun9i: Add A80 PRCM clocks and reset control
- nodes
-In-Reply-To: <1448357536-26613-1-git-send-email-wens@csie.org>
-References: <1448357536-26613-1-git-send-email-wens@csie.org>
-Message-ID: <1448357536-26613-5-git-send-email-wens@csie.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 24 Nov 2015 10:32:02 +0100
+Subject: [linux-sunxi] Re: [PATCH v2 1/5] ARM: dts: sun8i: Add SID node
+In-Reply-To: <a7d4e538-db64-476d-b5de-5222419229a2@googlegroups.com>
+References: <cover.1448263428.git.atx@atx.name>
+ <b897b1c8741c8a871163b84d01b480f99329536d.1448263428.git.atx@atx.name>
+ <20151123124356.GW32142@lukather>
+ <a7d4e538-db64-476d-b5de-5222419229a2@googlegroups.com>
+Message-ID: <20151124093202.GL32142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the supported PRCM clocks and reset controls to the A80 dtsi.
-The DAUDIO module clocks are not supported yet.
+On Mon, Nov 23, 2015 at 10:51:15PM -0800, Sugar Wu wrote:
+> On Monday, November 23, 2015 at 8:43:59 PM UTC+8, Maxime Ripard wrote:
+> >
+> > Hi, 
+> >
+> > On Mon, Nov 23, 2015 at 09:02:48AM +0100, Josef Gajdusek wrote: 
+> > > Add a node describing the Security ID memory to the 
+> > > Allwinner H3 .dtsi file. 
+> > > 
+> > > Signed-off-by: Josef Gajdusek <a...@atx.name <javascript:>> 
+> > > --- 
+> > >  arch/arm/boot/dts/sun8i-h3.dtsi | 7 +++++++ 
+> > >  1 file changed, 7 insertions(+) 
+> > > 
+> > > diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi 
+> > b/arch/arm/boot/dts/sun8i-h3.dtsi 
+> > > index 0faa38a..58de718 100644 
+> > > --- a/arch/arm/boot/dts/sun8i-h3.dtsi 
+> > > +++ b/arch/arm/boot/dts/sun8i-h3.dtsi 
+> > > @@ -359,6 +359,13 @@ 
+> > >                          #size-cells = <0>; 
+> > >                  }; 
+> > >   
+> > > +                sid: eeprom at 01c14000 { 
+> > > +                        compatible = "allwinner,sun4i-a10-sid"; 
+> > > +                        reg = <0x01c14000 0x400>; 
+> >
+> > The datasheet says it's 256 bytes wide, while the size here is of 1kB, 
+> > is it intentional? 
+> 
+> SID memory map is 0x01c14000 ~ 0x01c143FF, include 2048bits efuse space.
+> H3 efuse space is SID_SRAM, its range is  0x01c14200 ~ +0x100.
 
-Also update clock and reset phandles for r_uart.
+Interesting, what is below the 0x200 registers?
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun9i-a80.dtsi | 79 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 78 insertions(+), 1 deletion(-)
+Thanks!
+Maxime
 
-diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index 1118bf5cc4fb..a4ce348c0831 100644
---- a/arch/arm/boot/dts/sun9i-a80.dtsi
-+++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -164,6 +164,14 @@
- 					     "usb_phy2", "usb_hsic_12M";
- 		};
- 
-+		pll3: clk at 06000008 {
-+			/* placeholder until implemented */
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-rate = <0>;
-+			clock-output-names = "pll3";
-+		};
-+
- 		pll4: clk at 0600000c {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun9i-a80-pll4-clk";
-@@ -350,6 +358,68 @@
- 					"apb1_uart2", "apb1_uart3",
- 					"apb1_uart4", "apb1_uart5";
- 		};
-+
-+		cpus_clk: clk at 08001410 {
-+			compatible = "allwinner,sun9i-a80-cpus-clk";
-+			reg = <0x08001410 0x4>;
-+			#clock-cells = <0>;
-+			clocks = <&osc32k>, <&osc24M>, <&pll4>, <&pll3>;
-+			clock-output-names = "cpus";
-+		};
-+
-+		ahbs: ahbs_clk {
-+			compatible = "fixed-factor-clock";
-+			#clock-cells = <0>;
-+			clock-div = <1>;
-+			clock-mult = <1>;
-+			clocks = <&cpus_clk>;
-+			clock-output-names = "ahbs";
-+		};
-+
-+		apbs: clk at 0800141c {
-+			compatible = "allwinner,sun8i-a23-apb0-clk";
-+			reg = <0x0800141c 0x4>;
-+			#clock-cells = <0>;
-+			clocks = <&ahbs>;
-+			clock-output-names = "apbs";
-+		};
-+
-+		apbs_gates: clk at 08001428 {
-+			compatible = "allwinner,sun9i-a80-apbs-gates-clk";
-+			reg = <0x08001428 0x4>;
-+			#clock-cells = <1>;
-+			clocks = <&apbs>;
-+			clock-indices = <0>, <1>,
-+					<2>, <3>,
-+					<4>, <5>,
-+					<6>, <7>,
-+					<12>, <13>,
-+					<16>, <17>,
-+					<18>, <20>;
-+			clock-output-names = "apbs_pio", "apbs_ir",
-+					"apbs_timer", "apbs_rsb",
-+					"apbs_uart", "apbs_1wire",
-+					"apbs_i2c0", "apbs_i2c1",
-+					"apbs_ps2_0", "apbs_ps2_1",
-+					"apbs_dma", "apbs_i2s0",
-+					"apbs_i2s1", "apbs_twd";
-+		};
-+
-+		r_1wire_clk: clk at 08001450 {
-+			reg = <0x08001450 0x4>;
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-mod0-clk";
-+			clocks = <&osc32k>, <&osc24M>;
-+			clock-output-names = "r_1wire";
-+		};
-+
-+		r_ir_clk: clk at 08001454 {
-+			reg = <0x08001454 0x4>;
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-mod0-clk";
-+			clocks = <&osc32k>, <&osc24M>;
-+			clock-output-names = "r_ir";
-+		};
- 	};
- 
- 	soc {
-@@ -764,13 +834,20 @@
- 			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 
-+		apbs_rst: reset at 080014b0 {
-+			reg = <0x080014b0 0x4>;
-+			compatible = "allwinner,sun6i-a31-clock-reset";
-+			#reset-cells = <1>;
-+		};
-+
- 		r_uart: serial at 08002800 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x08002800 0x400>;
- 			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc24M>;
-+			clocks = <&apbs_gates 4>;
-+			resets = <&apbs_rst 4>;
- 			status = "disabled";
- 		};
- 	};
 -- 
-2.6.2
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151124/9323b0c9/attachment.sig>
