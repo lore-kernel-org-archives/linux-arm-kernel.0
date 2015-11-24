@@ -1,57 +1,107 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 24 Nov 2015 15:51:14 +0000
-Subject: [PATCH 1/3] KVM: arm/arm64: Fix preemptible timer active state
- crazyness
-In-Reply-To: <1448379840-17516-2-git-send-email-christoffer.dall@linaro.org>
-References: <1448379840-17516-1-git-send-email-christoffer.dall@linaro.org>
- <1448379840-17516-2-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <20151124155114.2dcd18fb@arm.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 24 Nov 2015 16:06:41 +0000
+Subject: [PATCH v3] Documentation: dt: Add bindings for Secure-only devices
+Message-ID: <1448381201-10729-1-git-send-email-peter.maydell@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Nov 2015 16:43:58 +0100
-Christoffer Dall <christoffer.dall@linaro.org> wrote:
+The existing device tree bindings assume that we are only trying to
+describe a single address space with a device tree (for ARM, either
+the Normal or the Secure world). Some uses for device tree need to
+describe both Normal and Secure worlds in a single device tree. Add
+documentation of how to do this, by adding extra properties which
+describe when a device appears differently in the two worlds or when
+it only appears in one of them.
 
-> We were setting the physical active state on the GIC distributor in a
-> preemptible section, which could cause us to set the active state on
-> different physical CPU from the one we were actually going to run on,
-> hacoc ensues.
-> 
-> Since we are no longer descheduling/scheduling soft timers in the
-> flush/sync timer functions, simply moving the timer flush into a
-> non-preemptible section.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm/kvm/arm.c | 7 +------
->  1 file changed, 1 insertion(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index eab83b2..e06fd29 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -564,17 +564,12 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  			vcpu_sleep(vcpu);
->  
->  		/*
-> -		 * Disarming the background timer must be done in a
-> -		 * preemptible context, as this call may sleep.
-> -		 */
-> -		kvm_timer_flush_hwstate(vcpu);
-> -
-> -		/*
->  		 * Preparing the interrupts to be injected also
->  		 * involves poking the GIC, which must be done in a
->  		 * non-preemptible context.
->  		 */
->  		preempt_disable();
-> +		kvm_timer_flush_hwstate(vcpu);
->  		kvm_vgic_flush_hwstate(vcpu);
->  
->  		local_irq_disable();
+The binding describes the general principles for adding new
+properties describing the secure world, but for now we only need a
+single new property, "secure-status", which can be used to annotate
+devices to indicate that they are only visible in one of the two
+worlds.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+The primary expected use of this binding is for a virtual machine
+like QEMU to describe the VM layout to a TrustZone aware firmware
+(which would then use the secure-only devices itself, and pass the DT
+on to a kernel running in the non-secure world, which ignores the
+secure-only devices and uses the rest).
 
-	M.
+Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
+---
+This binding doesn't affect the kernel itself, but the kernel
+Documentation/ tree is the de-facto current place where all DT
+bindings are documented, so Grant suggested this was the right
+place to send a doc patch.
+
+Changes v1->v2:
+ * list all the status/secure-status combinations explicitly
+ * use /* */ comment syntax, not //
+Changes v2->v3:
+ * use secure-foo rather than secure-reg as the example when
+   explaining how the prefixing works
+ * say how prefixing a vendor,foo property name works
+
+ Documentation/devicetree/bindings/arm/secure.txt | 53 ++++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/secure.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/secure.txt b/Documentation/devicetree/bindings/arm/secure.txt
+new file mode 100644
+index 0000000..e31303f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/secure.txt
+@@ -0,0 +1,53 @@
++* ARM Secure world bindings
++
++ARM CPUs with TrustZone support have two distinct address spaces,
++"Normal" and "Secure". Most devicetree consumers (including the Linux
++kernel) are not TrustZone aware and run entirely in either the Normal
++world or the Secure world. However some devicetree consumers are
++TrustZone aware and need to be able to determine whether devices are
++visible only in the Secure address space, only in the Normal address
++space, or visible in both. (One example of that situation would be a
++virtual machine which boots Secure firmware and wants to tell the
++firmware about the layout of the machine via devicetree.)
++
++The general principle of the naming scheme for Secure world bindings
++is that any property that needs a different value in the Secure world
++can be supported by prefixing the property name with "secure-". So for
++instance "secure-foo" would override "foo". For property names with
++a vendor prefix, the Secure variant of "vendor,foo" would be
++"vendor,secure-foo". If there is no "secure-" property then the Secure
++world value is the same as specified for the Normal world by the
++non-prefixed property. However, only the properties listed below may
++validly have "secure-" versions; this list will be enlarged on a
++case-by-case basis.
++
++Defining the bindings in this way means that a device tree which has
++been annotated to indicate the presence of Secure-only devices can
++still be processed unmodified by existing Non-secure software (and in
++particular by the kernel).
++
++Note that it is still valid for bindings intended for purely Secure
++world consumers (like kernels that run entirely in Secure) to simply
++describe the view of Secure world using the standard bindings. These
++secure- bindings only need to be used where both the Secure and Normal
++world views need to be described in a single device tree.
++
++Valid Secure world properties:
++
++- secure-status : specifies whether the device is present and usable
++  in the secure world. The combination of this with "status" allows
++  the various possible combinations of device visibility to be
++  specified. If "secure-status" is not specified it defaults to the
++  same value as "status"; if "status" is not specified either then
++  both default to "okay". This means the following combinations are
++  possible:
++
++   /* Neither specified: default to visible in both S and NS */
++   secure-status = "okay";                          /* visible in both */
++   status = "okay";                                 /* visible in both */
++   status = "okay"; secure-status = "okay";         /* visible in both */
++   secure-status = "disabled";                      /* NS-only */
++   status = "okay"; secure-status = "disabled";     /* NS-only */
++   status = "disabled"; secure-status = "okay";     /* S-only */
++   status = "disabled";                             /* disabled in both */
++   status = "disabled"; secure-status = "disabled"; /* disabled in both */
 -- 
-Jazz is not dead. It just smells funny.
+1.9.1
