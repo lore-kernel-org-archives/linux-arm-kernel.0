@@ -1,26 +1,57 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 Nov 2015 18:20:37 +0100
-Subject: [PATCH] arm64: kvm: report original PAR_EL1 upon panic
-In-Reply-To: <1447682309-5875-1-git-send-email-mark.rutland@arm.com>
-References: <1447682309-5875-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20151124172037.GC18855@cbox>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 24 Nov 2015 17:22:14 +0000
+Subject: [PATCH v4 2/5] mfd: syscon: add a DT property to set value width
+In-Reply-To: <20151124162439.GC4616@localhost>
+References: <1448291861-28543-1-git-send-email-damien.riegel@savoirfairelinux.com>
+ <1448291861-28543-3-git-send-email-damien.riegel@savoirfairelinux.com>
+ <20151124082036.GE807@x1> <20151124162439.GC4616@localhost>
+Message-ID: <20151124172214.GJ12874@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 01:58:29PM +0000, Mark Rutland wrote:
-> If we call __kvm_hyp_panic while a guest context is active, we call
-> __restore_sysregs before acquiring the system register values for the
-> panic, in the process throwing away the PAR_EL1 value at the point of
-> the panic.
-> 
-> This patch modifies __kvm_hyp_panic to stash the PAR_EL1 value prior to
-> restoring host register values, enabling us to report the original
-> values at the point of the panic.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+On Tue, 24 Nov 2015, Damien Riegel wrote:
 
-Thanks, applied.
+> On Tue, Nov 24, 2015 at 08:20:36AM +0000, Lee Jones wrote:
+> > On Mon, 23 Nov 2015, Damien Riegel wrote:
+> > 
+> > > Currently syscon has a fixed configuration of 32 bits for register and
+> > > values widths. In some cases, it would be desirable to be able to
+> > > customize the value width.
+> > > 
+> > > For example, certain boards (like the ones manufactured by Technologic
+> > > Systems) have a FPGA that is memory-mapped, but its registers are only
+> > > 16-bit wide.
+> > > 
+> > > This patch adds an optional "bus-width" DT binding for syscon that
+> > > allows to change the width for the data bus (i.e. val_bits). If this
+> > > property is provided, it will also adjust the register stride to
+> > > bus-width / 8. If not provided, the default configuration is used.
+> > > 
+> > > Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+> > > ---
+> > >  Documentation/devicetree/bindings/mfd/syscon.txt |  3 +++
+> > >  drivers/mfd/syscon.c                             | 13 +++++++++++++
+> > >  2 files changed, 16 insertions(+)
+> > 
+> > Works for me.
+> > 
+> > For my own reference:
+> >   Acked-by: Lee Jones <lee.jones@linaro.org>
+> 
+> This pachset requires a new version to fix something in the watchdog,
+> I will add your Ack in the v5.
+> 
+> > 
+> > How would you like this set to be handled?
+> > 
+> 
+> Not sure what you mean. Actually, I don't know how it works for such
+> patchset with changes across multiple subsystems. What are the options?
 
--Christoffer
+I'm happy to handle it, I just need Acks from the other Maintainers.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
