@@ -1,92 +1,67 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 24 Nov 2015 14:39:47 +0800
-Subject: [PATCH] clk: imx: add 'is_prepared' clk_ops callback for pllv3 clk
-In-Reply-To: <1446487569-20757-1-git-send-email-b51503@freescale.com>
-References: <1446487569-20757-1-git-send-email-b51503@freescale.com>
-Message-ID: <20151124063947.GL11999@tiger>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 24 Nov 2015 14:42:26 +0800
+Subject: [PATCH v2 1/5] ARM: dts: sun8i: Add SID node
+In-Reply-To: <20151124063808.GB32142@lukather>
+References: <cover.1448263428.git.atx@atx.name>
+ <b897b1c8741c8a871163b84d01b480f99329536d.1448263428.git.atx@atx.name>
+ <20151123124356.GW32142@lukather>
+ <CAGb2v65qfaTdQqXHD=-FHz1M1sHCTro97QETZUH=vA2BbRS+7A@mail.gmail.com>
+ <20151124063808.GB32142@lukather>
+Message-ID: <CAGb2v67aS+2vM8CLB=4ynFOvb14t+kiWjJvAa60U2nq22S8ZEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 03, 2015 at 02:06:09AM +0800, Bai Ping wrote:
-> Add 'is_prepared' callback function for pllv3 type clk to make sure when
-> the system is bootup, the unused clk is in a known state to match the
-> prepare count info.
-> 
-> Signed-off-by: Bai Ping <b51503@freescale.com>
+On Tue, Nov 24, 2015 at 2:38 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Nov 24, 2015 at 11:13:13AM +0800, Chen-Yu Tsai wrote:
+>> Hi,
+>>
+>> On Mon, Nov 23, 2015 at 8:43 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > Hi,
+>> >
+>> > On Mon, Nov 23, 2015 at 09:02:48AM +0100, Josef Gajdusek wrote:
+>> >> Add a node describing the Security ID memory to the
+>> >> Allwinner H3 .dtsi file.
+>> >>
+>> >> Signed-off-by: Josef Gajdusek <atx@atx.name>
+>> >> ---
+>> >>  arch/arm/boot/dts/sun8i-h3.dtsi | 7 +++++++
+>> >>  1 file changed, 7 insertions(+)
+>> >>
+>> >> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> >> index 0faa38a..58de718 100644
+>> >> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+>> >> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> >> @@ -359,6 +359,13 @@
+>> >>                       #size-cells = <0>;
+>> >>               };
+>> >>
+>> >> +             sid: eeprom at 01c14000 {
+>> >> +                     compatible = "allwinner,sun4i-a10-sid";
+>> >> +                     reg = <0x01c14000 0x400>;
+>> >
+>> > The datasheet says it's 256 bytes wide, while the size here is of 1kB,
+>> > is it intentional?
+>>
+>> My H3 datasheet (v1.1) says its 1 kB wide.
+>
+> Is it? in the Security ID section, it is said to be 2kb == 256B wide.
 
-Please resend the patch with following clk maintainers and list on copy.
-Also remember to add Lucas' Reviewed-by: tag.
+Right. I was looking at the memory map. Maybe it's sparsely mapped?
+I guess we'll know soon.
 
-COMMON CLK FRAMEWORK
-M:      Michael Turquette <mturquette@baylibre.com>
-M:      Stephen Boyd <sboyd@codeaurora.org>
-L:      linux-clk at vger.kernel.org
+ChenYu
 
-Shawn
-
-> ---
->  drivers/clk/imx/clk-pllv3.c | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
-> index 6addf8f..c05c43d 100644
-> --- a/drivers/clk/imx/clk-pllv3.c
-> +++ b/drivers/clk/imx/clk-pllv3.c
-> @@ -97,6 +97,16 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
->  	writel_relaxed(val, pll->base);
->  }
->  
-> +static int clk_pllv3_is_prepared(struct clk_hw *hw)
-> +{
-> +	struct clk_pllv3 *pll = to_clk_pllv3(hw);
-> +
-> +	if (readl_relaxed(pll->base) & BM_PLL_LOCK)
-> +		return 1;
-> +
-> +	return 0;
-> +}
-> +
->  static unsigned long clk_pllv3_recalc_rate(struct clk_hw *hw,
->  					   unsigned long parent_rate)
->  {
-> @@ -139,6 +149,7 @@ static int clk_pllv3_set_rate(struct clk_hw *hw, unsigned long rate,
->  static const struct clk_ops clk_pllv3_ops = {
->  	.prepare	= clk_pllv3_prepare,
->  	.unprepare	= clk_pllv3_unprepare,
-> +	.is_prepared	= clk_pllv3_is_prepared,
->  	.recalc_rate	= clk_pllv3_recalc_rate,
->  	.round_rate	= clk_pllv3_round_rate,
->  	.set_rate	= clk_pllv3_set_rate,
-> @@ -193,6 +204,7 @@ static int clk_pllv3_sys_set_rate(struct clk_hw *hw, unsigned long rate,
->  static const struct clk_ops clk_pllv3_sys_ops = {
->  	.prepare	= clk_pllv3_prepare,
->  	.unprepare	= clk_pllv3_unprepare,
-> +	.is_prepared	= clk_pllv3_is_prepared,
->  	.recalc_rate	= clk_pllv3_sys_recalc_rate,
->  	.round_rate	= clk_pllv3_sys_round_rate,
->  	.set_rate	= clk_pllv3_sys_set_rate,
-> @@ -265,6 +277,7 @@ static int clk_pllv3_av_set_rate(struct clk_hw *hw, unsigned long rate,
->  static const struct clk_ops clk_pllv3_av_ops = {
->  	.prepare	= clk_pllv3_prepare,
->  	.unprepare	= clk_pllv3_unprepare,
-> +	.is_prepared	= clk_pllv3_is_prepared,
->  	.recalc_rate	= clk_pllv3_av_recalc_rate,
->  	.round_rate	= clk_pllv3_av_round_rate,
->  	.set_rate	= clk_pllv3_av_set_rate,
-> @@ -279,6 +292,7 @@ static unsigned long clk_pllv3_enet_recalc_rate(struct clk_hw *hw,
->  static const struct clk_ops clk_pllv3_enet_ops = {
->  	.prepare	= clk_pllv3_prepare,
->  	.unprepare	= clk_pllv3_unprepare,
-> +	.is_prepared	= clk_pllv3_is_prepared,
->  	.recalc_rate	= clk_pllv3_enet_recalc_rate,
->  };
->  
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+>> It'd be nice if Allwinner actually listed the "usable" E-fuse
+>> offsets and widths, instead of having us dig through the SDK code.
+>
+> Yep.
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
