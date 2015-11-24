@@ -1,87 +1,65 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 24 Nov 2015 14:55:34 +0100
-Subject: [PATCH] PCI: imx6: Fix reset-gpio to work with active low GPIO
-In-Reply-To: <1447687147-19436-1-git-send-email-ynezz@true.cz>
-References: <1447687147-19436-1-git-send-email-ynezz@true.cz>
-Message-ID: <1448373334.3689.33.camel@pengutronix.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 24 Nov 2015 14:56:21 +0100
+Subject: [PATCH 1/2] mmc: sdhci: set bus voltage before enabling bus power
+In-Reply-To: <20151124131213.GB2228@odux.rfo.atmel.com>
+References: <1446825570-30029-1-git-send-email-ludovic.desroches@atmel.com>
+ <1446825570-30029-2-git-send-email-ludovic.desroches@atmel.com>
+ <20151109132305.GC15706@odux.rfo.atmel.com>
+ <CAPDyKFrTTEnSFNvmx3e__Ap9gOGpA2-bz+yrq7ibz0wXGSWCXA@mail.gmail.com>
+ <20151109144030.GD15706@odux.rfo.atmel.com>
+ <CAPDyKFquZ+_Rf07gX+i-=_bzSa7KJ5+xQ8N21kK2mvfMGdVQMw@mail.gmail.com>
+ <20151109163026.GE15706@odux.rfo.atmel.com>
+ <20151124092341.GA2228@odux.rfo.atmel.com>
+ <CAPDyKFp4U5vG_UswnLe1L2Vq1VwdkptThSdzhPYoP+hhGFTaQA@mail.gmail.com>
+ <20151124131213.GB2228@odux.rfo.atmel.com>
+Message-ID: <CAPDyKFqr1=EytbC0hUyCk4Lb8GWJx0=Xg+ZmDoPJFp5L7G2nrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Petr,
+On 24 November 2015 at 14:12, Ludovic Desroches
+<ludovic.desroches@atmel.com> wrote:
+> On Tue, Nov 24, 2015 at 12:01:53PM +0100, Ulf Hansson wrote:
+>> On 24 November 2015 at 10:23, Ludovic Desroches
+>> <ludovic.desroches@atmel.com> wrote:
+>> > Hi Ulf,
+>> >
+>> > On Mon, Nov 09, 2015 at 05:30:26PM +0100, Ludovic Desroches wrote:
+>> >> On Mon, Nov 09, 2015 at 05:00:46PM +0100, Ulf Hansson wrote:
+>> >
+>> > [...]
+>> >
+>> >> > Now, this discussion was interesting, but I forgot what problem you
+>> >> > actually where trying to solve? :-)
+>> >>
+>> >> There is this discussion because of two things:
+>> >> - Fixing something I consider as a bug: when I have a VMMC, only
+>> >>   setting/clearing bit 0. Our controller strictly obeys to the spec and
+>> >>   check the 'SD Bus Voltage Select' field. Since we put a reserved value
+>> >>   (000), the Power On is not performed.
+>> >> - I was trying to get help to understand what is this 'SD Bus Voltage'.
+>> >>   For our controller and sdhci_set_power(), it seems to stand for VMMC.
+>> >>   For me, everything concerning bus voltage is related to VQMMC, so I was
+>> >>   disappointed.
+>> >
+>> > Do you plan to take the patch for VMMC? If yes, I will send a new patch
+>> > for the device tree (I'll only add vmmc, not vqmmc as discussed); if
+>> > not, forget these two patches.
+>> >
+>>
+>> Which patch do you refer to for "VMMC"?
+>>
+>
+> This one to not write an invalid voltage in the power control register
+> even if we have an external regulator for vmmc.
+>
 
-sorry for the delay in reviewing this.
+As I stated earlier, according to the SDHCI spec in the section for
+the Power Control Register. Bit 0 needs to be set when communicating
+with the card as it will for
+example enable the clock.
 
-Am Montag, den 16.11.2015, 16:19 +0100 schrieb Petr ?tetiar:
-> It's currently not possible to use reset-gpio on board where the GPIO is
-> active low as the code incorrectly assumes, that reset-gpio will be
-> always active high.
-> 
-I see the need for this change, but I'm not completely happy with the
-implementation.
+I suspect if I apply your patch several sdhci variants would break,
+don't you think?
 
-> In my case the broken behavior was observed on Toradex Apalis SoM with
-> Ixora base board.
-> 
-> Signed-off-by: Petr ?tetiar <ynezz@true.cz>
-> ---
->  drivers/pci/host/pci-imx6.c |   15 +++++++++++----
->  1 file changed, 11 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index fdb9536..cd7ed71 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
-> @@ -293,9 +293,11 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
->  
->  	/* Some boards don't have PCIe reset GPIO. */
->  	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
-> -		gpio_set_value(imx6_pcie->reset_gpio, 0);
-> +		struct gpio_desc *gd = gpio_to_desc(imx6_pcie->reset_gpio);
-> +
-> +		gpiod_set_value(gd, 0);
->  		msleep(100);
-> -		gpio_set_value(imx6_pcie->reset_gpio, 1);
-> +		gpiod_set_value(gd, 1);
->  	}
->  	return 0;
->  
-> @@ -559,6 +561,8 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
->  	struct pcie_port *pp;
->  	struct device_node *np = pdev->dev.of_node;
->  	struct resource *dbi_base;
-> +	enum of_gpio_flags of_flags;
-> +	int flags = GPIOF_OUT_INIT_LOW;
->  	int ret;
->  
->  	imx6_pcie = devm_kzalloc(&pdev->dev, sizeof(*imx6_pcie), GFP_KERNEL);
-> @@ -578,10 +582,13 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
->  		return PTR_ERR(pp->dbi_base);
->  
->  	/* Fetch GPIOs */
-> -	imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
-> +	imx6_pcie->reset_gpio = of_get_named_gpio_flags(np, "reset-gpio", 0,
-> +	
-
-Rather than adding all this complexity to this function, this should
-really be switched over to the descriptor based GPIO interface as a
-whole. So the above should become a single call to
-"devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_LOW)" and the dependent
-code changed accordingly.
-
-Regards,
-Lucas
-
-> 						&of_flags);
->  	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
-> +		if (of_flags & OF_GPIO_ACTIVE_LOW)
-> +			flags |= GPIOF_ACTIVE_LOW;
->  		ret = devm_gpio_request_one(&pdev->dev, imx6_pcie->reset_gpio,
-> -					    GPIOF_OUT_INIT_LOW, "PCIe reset");
-> +					    flags, "PCIe reset");
->  		if (ret) {
->  			dev_err(&pdev->dev, "unable to get reset gpio\n");
->  			return ret;
-
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Kind regards
+Uffe
