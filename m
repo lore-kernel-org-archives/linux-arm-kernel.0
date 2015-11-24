@@ -1,37 +1,46 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 24 Nov 2015 10:19:11 -0800
-Subject: [PATCH v3 1/4] watchdog: meson: Enable meson SoC specific data
-In-Reply-To: <CAOQ7t2bmNNTPxgZy4uZQF_u4yH2nxfMR_FqpKM0GavoUS9rRkA@mail.gmail.com>
-References: <1446985137-25498-1-git-send-email-carlo@caione.org>
- <1446985137-25498-2-git-send-email-carlo@caione.org>
- <5640B5BF.9040909@roeck-us.net>
- <CAOQ7t2bmNNTPxgZy4uZQF_u4yH2nxfMR_FqpKM0GavoUS9rRkA@mail.gmail.com>
-Message-ID: <20151124181911.GA12289@roeck-us.net>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 24 Nov 2015 10:20:57 -0800
+Subject: [PATCH] soc: Mediatek: Enable SCPSYS power domain driver by
+ default
+In-Reply-To: <56535C1B.1090804@gmail.com> (Matthias Brugger's message of "Mon,
+ 23 Nov 2015 19:34:03 +0100")
+References: <1447411835-19035-1-git-send-email-eddie.huang@mediatek.com>
+ <7h4mgpdh6f.fsf@deeprootsystems.com>
+ <CAMAWPa8ZcD30-06K3w1EewPMPA6LmU7bpOWbxi=VfsByyQT3Sw@mail.gmail.com>
+ <56535C1B.1090804@gmail.com>
+Message-ID: <7h4mgbp8c6.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 11, 2015 at 09:54:04AM +0100, Carlo Caione wrote:
-> On Mon, Nov 9, 2015 at 4:03 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> > On 11/08/2015 04:18 AM, Carlo Caione wrote:
-> >>
-> >> From: Carlo Caione <carlo@endlessm.com>
-> >>
-> >> With this patch we refactor the driver code to enable watchdog support
-> >> for all platforms based on Amlogic meson SoCs.
-> >> The new default timeout is also now chosen considering the maximum
-> >> timeout allowed by the SoC.
-> >>
-> >> Signed-off-by: Carlo Caione <carlo@endlessm.com>
-> >
-> >
-> > Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> 
-> Wim,
-> any (N)ACK on this?
-> 
-Carlo,
+Matthias Brugger <matthias.bgg@gmail.com> writes:
 
-Unless I missed it, we still don't have an Ack from a devicetree
-maintainer for the devicetree changes.
+> On 19/11/15 21:05, Kevin Hilman wrote:
+>> On Fri, Nov 13, 2015 at 7:59 AM, Kevin Hilman <khilman@kernel.org> wrote:
+>>> Eddie Huang <eddie.huang@mediatek.com> writes:
+>>>
+>>>> If enable Mediatek 8173 SoC, it should also enable power domain
+>>>> driver. Otherwise access clk subsystem register will fail.
+>>>>
+>>>> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+>>>
+>>> Tested-by: Kevin Hilman <khilman@linaro.org>
+>>>
+>>> This gets the mt8173-evb booting again with arm-soc/for-next and
+>>> mainline for me.
+>>>
+>>> I'll let Matthias queue this up and send it with any other fixes for
+>>> v4.4-rc1.
+>>
+>> Matthias, this is still broken in arm-soc.  Curious if your planning
+>> on sending a fix?  If you prefer, with your ack, we can apply directly
+>> to arm-soc/fixes.
+>>
+>
+> Sorry for the delay. Please apply it directly.
+>
+> Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+>
 
-Guenter
+Thanks, applied to arm-soc/fixes.
+
+Kevin
