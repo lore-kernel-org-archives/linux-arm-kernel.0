@@ -1,67 +1,61 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 24 Nov 2015 14:42:26 +0800
-Subject: [PATCH v2 1/5] ARM: dts: sun8i: Add SID node
-In-Reply-To: <20151124063808.GB32142@lukather>
-References: <cover.1448263428.git.atx@atx.name>
- <b897b1c8741c8a871163b84d01b480f99329536d.1448263428.git.atx@atx.name>
- <20151123124356.GW32142@lukather>
- <CAGb2v65qfaTdQqXHD=-FHz1M1sHCTro97QETZUH=vA2BbRS+7A@mail.gmail.com>
- <20151124063808.GB32142@lukather>
-Message-ID: <CAGb2v67aS+2vM8CLB=4ynFOvb14t+kiWjJvAa60U2nq22S8ZEw@mail.gmail.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Tue, 24 Nov 2015 14:49:36 +0800
+Subject: [PATCH v7 0/6] Build and support rk3036 SoC platform
+In-Reply-To: <1518219.zj9d8yfxJz@diego>
+References: <1446708840-12038-1-git-send-email-zhengxing@rock-chips.com>
+ <1518219.zj9d8yfxJz@diego>
+Message-ID: <56540880.6010601@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 2:38 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Nov 24, 2015 at 11:13:13AM +0800, Chen-Yu Tsai wrote:
+OK, Thanks Heiko. :-)
+
+On 2015?11?24? 08:03, Heiko St?bner wrote:
+> Hi Xing Zheng,
+>
+> Am Donnerstag, 5. November 2015, 15:33:54 schrieb Xing Zheng:
 >> Hi,
->>
->> On Mon, Nov 23, 2015 at 8:43 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > Hi,
->> >
->> > On Mon, Nov 23, 2015 at 09:02:48AM +0100, Josef Gajdusek wrote:
->> >> Add a node describing the Security ID memory to the
->> >> Allwinner H3 .dtsi file.
->> >>
->> >> Signed-off-by: Josef Gajdusek <atx@atx.name>
->> >> ---
->> >>  arch/arm/boot/dts/sun8i-h3.dtsi | 7 +++++++
->> >>  1 file changed, 7 insertions(+)
->> >>
->> >> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
->> >> index 0faa38a..58de718 100644
->> >> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
->> >> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
->> >> @@ -359,6 +359,13 @@
->> >>                       #size-cells = <0>;
->> >>               };
->> >>
->> >> +             sid: eeprom at 01c14000 {
->> >> +                     compatible = "allwinner,sun4i-a10-sid";
->> >> +                     reg = <0x01c14000 0x400>;
->> >
->> > The datasheet says it's 256 bytes wide, while the size here is of 1kB,
->> > is it intentional?
->>
->> My H3 datasheet (v1.1) says its 1 kB wide.
+>>    We need to support rk3036 soc platform via upstream, there are
+>> some primary parts for the initial release of minimum system: dts,
+>> clk-pll, smp, and clock tree for rk3036, and additional, we can use
+>> these startup and run to init processs.
+> [...]
 >
-> Is it? in the Security ID section, it is said to be 2kb == 256B wide.
-
-Right. I was looking at the memory map. Maybe it's sparsely mapped?
-I guess we'll know soon.
-
-ChenYu
-
->> It'd be nice if Allwinner actually listed the "usable" E-fuse
->> offsets and widths, instead of having us dig through the SDK code.
+> after talking with Mike and agreeing that I'm again taking the regular
+> clock patches to them, I've applied all of this to appropriate branches.
+> I did some cosmetics, as explained below.
 >
-> Yep.
 >
-> Thanks!
-> Maxime
+>> Xing Zheng (6):
+>>    dt-bindings: add documentation of rk3036 clock controller
+>>    clk: rockchip: add dt-binding header for rk3036
+>>    clk: rockchip: add new pll-type for rk3036 and similar socs
+> - wrapped some overly long lines, otherwise this is similar to what
+>    Stephen already took for the rk3066-pll-type.
 >
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+>
+>>    clk: rockchip: add clock controller for rk3036
+>>    ARM: dts: rockchip: add core rk3036 dts
+> - split off the evb into a separate patch
+> - reordered some nodes (please order by the address (the @xxxxxxxx)
+> - reordered some properties
+> - fixed the gic cpu masks
+>
+>
+>>    ARM: dts: enable smp for rk3036
+> folded into the core dtsi addition
+>
+>
+> Please take a final look at [0] to make sure I didn't mess up anything.
+>
+>
+> Thanks
+> Heiko
+>
+>
+> [0]
+> https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/log/?h=v4.5-clk/next
+> https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/log/?h=v4.5-armsoc/dts32
+>
+>
+>
