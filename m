@@ -1,35 +1,69 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Tue, 24 Nov 2015 13:58:13 +0800
-Subject: [PATCH v5 0/6] MT8173 IOMMU SUPPORT
-In-Reply-To: <20151023092636.GX27420@8bytes.org>
-References: <1444357388-30257-1-git-send-email-yong.wu@mediatek.com>
- <20151014125620.GQ27420@8bytes.org> <1445488802.27202.67.camel@mhfsdcap03>
- <20151023092636.GX27420@8bytes.org>
-Message-ID: <1448344693.13079.6.camel@mhfsdcap03>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 24 Nov 2015 15:00:45 +0900
+Subject: [PATCH] pinctrl: uniphier: rework UniPhier pinctrl entries in Kconfig
+Message-ID: <1448344846-28726-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-10-23 at 11:26 +0200, Joerg Roedel wrote:
-> On Thu, Oct 22, 2015 at 12:40:02PM +0800, Yong Wu wrote:
-> >      But the mtk-iommu depend on the drivers/memory/mtk-smi.c(mtk-iommu
-> > has called a function of the mtk-smi).
-> >      So if there is dependence here, How should we do to merge them?
-> 
-> I can surely merge mtk-smi too, if it gets proper Reviewed-by and
-> Acked-by tags from the maintainer(s).
-> 
-> 
-> 	Joerg
-> 
-Hi Joerg,
+There is a plan to support more pinctrl drivers for this SoC family.
+Move the driver entries into a sub menu by using "menuconfig".
+Also, add the missing dependency "depends on OF && MFD_SYSCON".
 
-   About the driver/memory/, We don't know who is his maintainer.
-MAINTAINERS file don't have drivers/memory maintainer.
->From the history in drivers/memory/ it looks like most of the
-drivers land with an ack from the architecture maintainer.
-And Matthias Brugger is our "ARM/Mediatek SoC support" maintainer.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Then do you mean that we need Matthias's ACK or whom others?
+ drivers/pinctrl/uniphier/Kconfig | 23 +++++++++++++----------
+ 1 file changed, 13 insertions(+), 10 deletions(-)
 
-By the way, I will send the next version after Robin reposting
-Short-descriptor. maybe in next week. 
+diff --git a/drivers/pinctrl/uniphier/Kconfig b/drivers/pinctrl/uniphier/Kconfig
+index ad90707..7abd614 100644
+--- a/drivers/pinctrl/uniphier/Kconfig
++++ b/drivers/pinctrl/uniphier/Kconfig
+@@ -1,32 +1,35 @@
+-if ARCH_UNIPHIER
+-
+-config PINCTRL_UNIPHIER
+-	bool
++menuconfig PINCTRL_UNIPHIER
++	bool "UniPhier SoC pinctrl drivers"
++	depends on ARCH_UNIPHIER
++	depends on OF && MFD_SYSCON
++	default y
+ 	select PINMUX
+ 	select GENERIC_PINCONF
+ 
++if PINCTRL_UNIPHIER
++
+ config PINCTRL_UNIPHIER_PH1_LD4
+ 	tristate "UniPhier PH1-LD4 SoC pinctrl driver"
+-	select PINCTRL_UNIPHIER
++	default y
+ 
+ config PINCTRL_UNIPHIER_PH1_PRO4
+ 	tristate "UniPhier PH1-Pro4 SoC pinctrl driver"
+-	select PINCTRL_UNIPHIER
++	default y
+ 
+ config PINCTRL_UNIPHIER_PH1_SLD8
+ 	tristate "UniPhier PH1-sLD8 SoC pinctrl driver"
+-	select PINCTRL_UNIPHIER
++	default y
+ 
+ config PINCTRL_UNIPHIER_PH1_PRO5
+ 	tristate "UniPhier PH1-Pro5 SoC pinctrl driver"
+-	select PINCTRL_UNIPHIER
++	default y
+ 
+ config PINCTRL_UNIPHIER_PROXSTREAM2
+ 	tristate "UniPhier ProXstream2 SoC pinctrl driver"
+-	select PINCTRL_UNIPHIER
++	default y
+ 
+ config PINCTRL_UNIPHIER_PH1_LD6B
+ 	tristate "UniPhier PH1-LD6b SoC pinctrl driver"
+-	select PINCTRL_UNIPHIER
++	default y
+ 
+ endif
+-- 
+1.9.1
