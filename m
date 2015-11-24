@@ -1,35 +1,23 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 24 Nov 2015 19:08:09 +0100
-Subject: [PATCH] ARM: mediatek: DT: Move reset controller constants into
- common location
-In-Reply-To: <1448019764-31723-1-git-send-email-p.zabel@pengutronix.de>
-References: <1448019764-31723-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <5654A789.7070704@gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 24 Nov 2015 10:08:28 -0800
+Subject: [PATCH v5 3/5] watchdog: ts4800: add driver for TS-4800 watchdog
+In-Reply-To: <1448388053-30661-4-git-send-email-damien.riegel@savoirfairelinux.com>
+References: <1448388053-30661-1-git-send-email-damien.riegel@savoirfairelinux.com>
+ <1448388053-30661-4-git-send-email-damien.riegel@savoirfairelinux.com>
+Message-ID: <20151124180828.GA11719@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 24, 2015 at 01:00:51PM -0500, Damien Riegel wrote:
+> This watchdog is instantiated in a FPGA that is memory mapped. It is
+> made of only one register, called the feed register. Writing to this
+> register will re-arm the watchdog for a given time (and enable it if it
+> was disable). It can be disabled by writing a special value into it.
+> 
+> It is part of a syscon block, and the watchdog register offset in this
+> block varies from board to board. This offset is passed in the syscon
+> property after the phandle to the syscon node.
+> 
+> Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
 
-
-On 20/11/15 12:42, Philipp Zabel wrote:
-> By popular vote, the DT binding includes for reset controllers are located
-> in include/dt-bindings/reset/. Move the mediatek reset constants in there,
-> too, to avoid confusion.
->
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
->   .../bindings/arm/mediatek/mediatek,infracfg.txt    |  2 +-
->   .../bindings/arm/mediatek/mediatek,pericfg.txt     |  2 +-
->   arch/arm/boot/dts/mt8135.dtsi                      |  2 +-
->   arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  2 +-
->   .../dt-bindings/reset-controller/mt8135-resets.h   | 64 ----------------------
->   .../dt-bindings/reset-controller/mt8173-resets.h   | 63 ---------------------
->   include/dt-bindings/reset/mt8135-resets.h          | 64 ++++++++++++++++++++++
->   include/dt-bindings/reset/mt8173-resets.h          | 63 +++++++++++++++++++++
->   8 files changed, 131 insertions(+), 131 deletions(-)
->   delete mode 100644 include/dt-bindings/reset-controller/mt8135-resets.h
->   delete mode 100644 include/dt-bindings/reset-controller/mt8173-resets.h
->   create mode 100644 include/dt-bindings/reset/mt8135-resets.h
->   create mode 100644 include/dt-bindings/reset/mt8173-resets.h
->
-
-Applied, thanks.
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
