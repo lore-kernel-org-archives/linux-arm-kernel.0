@@ -1,50 +1,41 @@
 From: JBeulich@suse.com (Jan Beulich)
-Date: Tue, 24 Nov 2015 00:20:21 -0700
-Subject: [PATCH v3 05/62] acpi: Don't do traditional BIOS table
- scan for ARM64
-In-Reply-To: <5653DC00.6010607@huawei.com>
+Date: Tue, 24 Nov 2015 00:22:24 -0700
+Subject: [PATCH v3 25/62] acpi/table: Introduce acpi_get_entry to
+ get specified entry
+In-Reply-To: <5653D4A7.2090204@huawei.com>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-6-git-send-email-shannon.zhao@linaro.org>
- <alpine.DEB.2.02.1511231120320.1107@kaball.uk.xensource.com>
- <5653082602000078000B7C28@prv-mh.provo.novell.com>
- <5653DC00.6010607@huawei.com>
-Message-ID: <56541DC502000078000B82F2@prv-mh.provo.novell.com>
+ <1447753261-7552-26-git-send-email-shannon.zhao@linaro.org>
+ <5653541E02000078000B8079@prv-mh.provo.novell.com>
+ <5653D4A7.2090204@huawei.com>
+Message-ID: <56541E4002000078000B8304@prv-mh.provo.novell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> On 24.11.15 at 04:39, <zhaoshenglong@huawei.com> wrote:
-> On 2015/11/23 19:35, Jan Beulich wrote:
->>>>> On 23.11.15 at 12:24, <stefano.stabellini@eu.citrix.com> wrote:
->>> On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
->>>> --- a/xen/drivers/acpi/osl.c
->>>> +++ b/xen/drivers/acpi/osl.c
->>>> @@ -78,7 +78,9 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
->>>>  	} else {
->>>>  		acpi_physical_address pa = 0;
->>>>  
->>>> +		#ifdef CONFIG_X86
->>>>  		acpi_find_root_pointer(&pa);
->>>> +		#endif
->>>>  		return pa;
->>>>  	}
->>>
->>> I think it might be best to error out earlier if acpi and !efi_enabled
->>> on arm and arm64.  If we do that we'll never enter this "else".
->>>
->>> If acpi_find_root_pointer doesn't build on arm, we should move it to an
->>> x86 specific location, such as xen/arch/x86/efi.
+>>> On 24.11.15 at 04:08, <zhaoshenglong@huawei.com> wrote:
+> On 2015/11/24 0:59, Jan Beulich wrote:
+>>>>> On 17.11.15 at 10:40, <shannon.zhao@linaro.org> wrote:
+>>> +	if ( !table_header )
+>>> +	{
+>>> +		printk("Table header not present\n");
+>>> +		return NULL;
+>>> +	}
+>>> +
+>>> +	table_end = (unsigned long)table_header + table_header->length;
 >> 
->> No, definitely not (or if anything, then xen/arch/x86/acpi/). Instead
->> the function itself should be stubbed out to do nothing on ARM. (And
->> of course also the #ifdef placement is rather odd).
+>> So here you use ->length, ...
 >> 
-> How about adding a new CONFIG_ACPI_LEGACY_TABLES_LOOKUP like Linux
-> kernel for x86?
+>>> +	/* Parse all entries looking for a match. */
+>>> +	entry = (struct acpi_subtable_header *)
+>>> +	    ((unsigned long)table_header + table_size);
+>> 
+>> ... but here table_size. Why?
+>> 
+> Here it just skips the main table size at the beginning. Then it could
+> point to the start of sub-table.
+> For example, to MADT table, the table_size is sizeof(struct
+> acpi_table_madt).
 
-Unless you know of an architecture other than x86 potentially
-needing this, I think this would go too far. Plus the suggested name
-would imply "old style" lookup only, whereas per-arch customization
-also allows for other "modern" (or simply "alternative") mechanisms
-to be used.
+Well, but for one then the parameter name is kind of wrong, and
+second - is it really reasonable for the caller to tell the function?
 
 Jan
