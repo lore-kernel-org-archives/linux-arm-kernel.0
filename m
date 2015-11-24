@@ -1,34 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Nov 2015 11:42:09 +0100
-Subject: [PATCH] Kbuild: disable 'maybe-uninitialized' warning for
- CONFIG_PROFILE_ALL_BRANCHES
-In-Reply-To: <565439FB.6050800@suse.com>
-References: <3799453.oCg1CdOrtm@wuerfel> <565439FB.6050800@suse.com>
-Message-ID: <20825812.L9y0yMCgts@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 24 Nov 2015 10:42:26 +0000
+Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <4485320.CGMJdfZLya@wuerfel>
+References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
+ <20151124001306.GI19156@codeaurora.org>
+ <20151124085349.GQ19156@codeaurora.org>
+ <4485320.CGMJdfZLya@wuerfel>
+Message-ID: <20151124104225.GA8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 November 2015 11:20:43 Michal Marek wrote:
-> > diff --git a/Makefile b/Makefile
-> > index 5e01a416c6e4..f8b921658f29 100644
-> > --- a/Makefile
-> > +++ b/Makefile
-> > @@ -626,7 +626,11 @@ KBUILD_CFLAGS    += $(call cc-option,-fno-delete-null-pointer-checks,)
-> >  ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
-> >  KBUILD_CFLAGS        += -Os $(call cc-disable-warning,maybe-uninitialized,)
-> >  else
-> > -KBUILD_CFLAGS        += -O2
-> > +ifdef CONFIG_PROFILE_ALL_BRANCHES
-> > +KBUILD_CFLAGS        += -O2 $(call cc-disable-warning,maybe-uninitialized,)
-> > +else
-> > +KBUILD_CFLAGS   += -O2
-> > +endif
-> 
-> Does it only happen with -O2? Normally, we would add it outside the
-> ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE.
-> 
+On Tue, Nov 24, 2015 at 11:38:53AM +0100, Arnd Bergmann wrote:
+> I suggested using -mcpu=cortex-a15 because there are old gcc versions
+> that don't know about -march=armv7ve or -march=armv7-a+idiv yet, but
+> that do understand -mcpu=cortex-a15.
 
-We already disable the warning for -Os builds based on a patch we merged
-a while ago. It seems easier to add it to the block we already have.
+That's not all.  The bigger problem is that there are toolchains out
+there which accept these options, but do _not_ support IDIV in either
+ARM or Thumb mode.  I'm afraid that makes it impossible to add this
+feature to the mainline kernel in this form: we need to run a test
+build to check that -march=armv7ve or what-not really does work
+through both GCC and GAS.
 
-	Arnd
+Given that Ubuntu 14.04 LTS suffers with this, it's something that
+must be resolved.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
