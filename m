@@ -1,36 +1,129 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Nov 2015 23:13:09 +0100
-Subject: [PATCH] ARM: qcom: select ARM_CPU_SUSPEND for power management
-Message-ID: <5497046.7sx8fEMiNf@wuerfel>
+From: geoff@infradead.org (Geoff Levand)
+Date: Tue, 24 Nov 2015 22:25:33 +0000
+Subject: [PATCH v12 00/16] arm64 kexec kernel patches v12
+Message-ID: <cover.1448403503.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The qcom spm driver uses cpu_resume_arm(), which is not included
-in the kernel in all configurations:
+Hi All,
 
-drivers/built-in.o: In function `qcom_cpu_spc':
-:(.text+0xbc022): undefined reference to `cpu_suspend'
-drivers/built-in.o: In function `qcom_cpuidle_init':
-:(.init.text+0x610c): undefined reference to `cpu_resume_arm'
+This series adds the core support for kexec re-boot and kdump on ARM64.  This
+version of the series combines Takahiro's kdump patches with my kexec patches.
 
-This adds a 'select' Kconfig statement to ensure it's always
-enabled.
+Changes since v11:
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-This has been broken for a while but not even shown up in many thousands of
-randconfig builds until today. Please queue it up for 4.5 unless you think
-it should really go into 4.4 as well.
+o No changes, rebase to v4.4-rc2.
 
-diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
-index 3c6e3893b76c..461b387d03cc 100644
---- a/drivers/soc/qcom/Kconfig
-+++ b/drivers/soc/qcom/Kconfig
-@@ -13,6 +13,7 @@ config QCOM_GSBI
- config QCOM_PM
- 	bool "Qualcomm Power Management"
- 	depends on ARCH_QCOM && !ARM64
-+	select ARM_CPU_SUSPEND
- 	select QCOM_SCM
- 	help
- 	  QCOM Platform specific power driver to manage cores and L2 low power
+Changes since v10:
+
+o Move the flush of the new image from arm64_relocate_new_kernel to machine_kexec.
+o Pass values to arm64_relocate_new_kernel in registers, not in global variables.
+o Fixups to setting the sctlr_el1 and sctlr_el2 flags.
+
+To load a second stage kernel and execute a kexec re-boot or to work with kdump
+on ARM64 systems a series of patches to kexec-tools [2], which have not yet been
+merged upstream, are needed.
+
+I have tested kexec with the ARM Foundation model, and Takahiro has reported
+that kdump is working on the 96boards HiKey developer board.  Kexec on EFI
+systems works correctly.  More ACPI + kexec testing is needed.
+
+Patch 1 here moves the macros from proc-macros.S to asm/assembler.h so that the
+dcache_line_size macro it defines can be uesd by kexec's relocate kernel
+routine.
+
+Patches 2 & 3 rework the ARM64 hcall mechanism to give the CPU reset routines
+the ability to switch exception levels from EL1 to EL2 for kernels that were
+entered in EL2.
+
+Patch 4 allows KVM to handle a CPU reset.
+
+Patches 5 - 7 add back the ARM64 CPU reset support that was recently removed
+from the kernel.
+
+Patches 8 - 10 add kexec support.
+
+Patches 11-16 add kdump support.
+
+Please consider all patches for inclusion.
+
+[1]  https://git.kernel.org/cgit/linux/kernel/git/geoff/linux-kexec.git
+[2]  https://git.kernel.org/cgit/linux/kernel/git/geoff/kexec-tools.git
+
+-Geoff
+
+The following changes since commit 1ec218373b8ebda821aec00bb156a9c94fad9cd4:
+
+  Linux 4.4-rc2 (2015-11-22 16:45:59 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/geoff/linux-kexec.git kexec-v12
+
+for you to fetch changes up to 83db66df70fc1f7cd4da8b580d264b9320991cf0:
+
+  arm64: kdump: relax BUG_ON() if more than one cpus are still active (2015-11-24 13:59:27 -0800)
+
+----------------------------------------------------------------
+AKASHI Takahiro (7):
+      arm64: kvm: allows kvm cpu hotplug
+      arm64: kdump: reserve memory for crash dump kernel
+      arm64: kdump: implement machine_crash_shutdown()
+      arm64: kdump: add kdump support
+      arm64: kdump: update a kernel doc
+      arm64: kdump: enable kdump in the arm64 defconfig
+      arm64: kdump: relax BUG_ON() if more than one cpus are still active
+
+Geoff Levand (9):
+      arm64: Fold proc-macros.S into assembler.h
+      arm64: Convert hcalls to use HVC immediate value
+      arm64: Add new hcall HVC_CALL_FUNC
+      arm64: Add back cpu_reset routines
+      Revert "arm64: mm: remove unused cpu_set_idmap_tcr_t0sz function"
+      Revert "arm64: remove dead code"
+      arm64/kexec: Add core kexec support
+      arm64/kexec: Add pr_devel output
+      arm64/kexec: Enable kexec in the arm64 defconfig
+
+ Documentation/kdump/kdump.txt        |  32 ++++-
+ arch/arm/include/asm/kvm_host.h      |  10 +-
+ arch/arm/include/asm/kvm_mmu.h       |   1 +
+ arch/arm/kvm/arm.c                   |  79 ++++++-----
+ arch/arm/kvm/mmu.c                   |   5 +
+ arch/arm64/Kconfig                   |  22 ++++
+ arch/arm64/configs/defconfig         |   2 +
+ arch/arm64/include/asm/assembler.h   |  48 ++++++-
+ arch/arm64/include/asm/kexec.h       |  80 +++++++++++
+ arch/arm64/include/asm/kvm_host.h    |  16 ++-
+ arch/arm64/include/asm/kvm_mmu.h     |   1 +
+ arch/arm64/include/asm/mmu.h         |   1 +
+ arch/arm64/include/asm/mmu_context.h |  35 +++--
+ arch/arm64/include/asm/virt.h        |  49 +++++++
+ arch/arm64/kernel/Makefile           |   3 +
+ arch/arm64/kernel/cpu-reset.S        |  84 ++++++++++++
+ arch/arm64/kernel/cpu-reset.h        |  22 ++++
+ arch/arm64/kernel/crash_dump.c       |  71 ++++++++++
+ arch/arm64/kernel/hyp-stub.S         |  43 ++++--
+ arch/arm64/kernel/machine_kexec.c    | 248 +++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/relocate_kernel.S  | 131 ++++++++++++++++++
+ arch/arm64/kernel/setup.c            |   7 +-
+ arch/arm64/kernel/smp.c              |  16 ++-
+ arch/arm64/kvm/hyp-init.S            |  34 ++++-
+ arch/arm64/kvm/hyp.S                 |  44 +++++--
+ arch/arm64/mm/cache.S                |   2 -
+ arch/arm64/mm/init.c                 |  83 ++++++++++++
+ arch/arm64/mm/mmu.c                  |  11 ++
+ arch/arm64/mm/proc-macros.S          |  64 ---------
+ arch/arm64/mm/proc.S                 |   3 -
+ include/uapi/linux/kexec.h           |   1 +
+ 31 files changed, 1097 insertions(+), 151 deletions(-)
+ create mode 100644 arch/arm64/include/asm/kexec.h
+ create mode 100644 arch/arm64/kernel/cpu-reset.S
+ create mode 100644 arch/arm64/kernel/cpu-reset.h
+ create mode 100644 arch/arm64/kernel/crash_dump.c
+ create mode 100644 arch/arm64/kernel/machine_kexec.c
+ create mode 100644 arch/arm64/kernel/relocate_kernel.S
+ delete mode 100644 arch/arm64/mm/proc-macros.S
+
+-- 
+2.5.0
