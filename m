@@ -1,8 +1,8 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 23 Nov 2015 16:01:31 -0800
-Subject: [PATCH 3/4] ARM: dts: vf610-cosmic: relicense vf610-cosmic.dts under
+Date: Mon, 23 Nov 2015 16:01:42 -0800
+Subject: [PATCH 4/4] ARM: dts: vf610-twr: relicense vf610-twr.dts under
  GPLv2/X11
-Message-ID: <1448323291-23505-1-git-send-email-stefan@agner.ch>
+Message-ID: <1448323302-23563-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,24 +13,28 @@ The consensus is that a GPL/X11 dual-license should allow all necessary
 uses, so relicense the vf610-twr.dts file to this combination.
 
 CCs were acquired using (updated some email addresses):
-git shortlog -sne --no-merges arch/arm/boot/dts/vf610-cosmic.dts
+git shortlog -sne --no-merges arch/arm/boot/dts/vf610-twr.dts
 
+CC: Bill Pringlemeir <bpringle@sympatico.ca>
+CC: Chao Fu <B44548@freescale.com>
 CC: Cory Tusar <cory.tusar@pid1solutions.com>
-CC: Matt Porter <matt.porter@linaro.org>
-CC: Olof Johansson <olof@lixom.net>
+CC: Cosmin Stoica <cosminstefan.stoica@freescale.com>
+CC: Fugang Duan <B38611@freescale.com>
+CC: Jingchang Lu <b35083@freescale.com>
 CC: Shawn Guo <shawnguo@kernel.org>
+CC: Xiubo Li <Li.Xiubo@freescale.com>
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/vf610-cosmic.dts | 40 ++++++++++++++++++++++++++++++++++----
+ arch/arm/boot/dts/vf610-twr.dts | 40 ++++++++++++++++++++++++++++++++++++----
  1 file changed, 36 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/vf610-cosmic.dts b/arch/arm/boot/dts/vf610-cosmic.dts
-index 5447f25..d0559c1 100644
---- a/arch/arm/boot/dts/vf610-cosmic.dts
-+++ b/arch/arm/boot/dts/vf610-cosmic.dts
-@@ -2,10 +2,42 @@
+diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
+index 5438ee4..ce937b9 100644
+--- a/arch/arm/boot/dts/vf610-twr.dts
++++ b/arch/arm/boot/dts/vf610-twr.dts
+@@ -1,10 +1,42 @@
+ /*
   * Copyright 2013 Freescale Semiconductor, Inc.
-  * Copyright 2013 Linaro Limited
   *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
