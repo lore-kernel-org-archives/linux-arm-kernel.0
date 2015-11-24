@@ -1,75 +1,27 @@
-From: b51503@freescale.com (Bai Ping)
-Date: Wed, 25 Nov 2015 00:06:53 +0800
-Subject: [PATCH Resend] clk: imx: add 'is_prepared' clk_ops callback for pllv3
- clk
-Message-ID: <1448381213-24349-1-git-send-email-b51503@freescale.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 24 Nov 2015 09:04:33 +0100
+Subject: [PATCH] [PATCH] arm64: Boot failure on m400 with new cont PTEs
+In-Reply-To: <56534212.3000302@redhat.com>
+References: <1447858999-26665-1-git-send-email-jeremy.linton@arm.com>
+ <20151118152044.GD10644@leverpostej> <564CA29A.9050905@arm.com>
+ <20151118162932.GA13355@leverpostej>
+ <20151123155132.GC32300@e104818-lin.cambridge.arm.com>
+ <5653387A.2000101@redhat.com> <565340C9.7010605@labbott.name>
+ <56534212.3000302@redhat.com>
+Message-ID: <CAKv+Gu8zDVreg4FmxE+069n-RGT7j4mfWN7LcH9vcgw9HTE62w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add 'is_prepared' callback function for pllv3 type clk to make sure when
-the system is bootup, the unused clk is in a known state to match the
-prepare count info.
+On 23 November 2015 at 17:42, Jeremy Linton <jlinton@redhat.com> wrote:
+> On 11/23/2015 10:37 AM, Laura Abbott wrote:
+>>
+>> Which permissions still need to be cleaned up from your perspective?
+>
+>
+> IMHO, the vast majority of the linear map should not be
+> executable/read/write, which is what happens today.
+>
 
-Signed-off-by: Bai Ping <b51503@freescale.com>
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
----
--resend, add clk maintainers.
-
- drivers/clk/imx/clk-pllv3.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
-
-diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
-index 6addf8f..c05c43d 100644
---- a/drivers/clk/imx/clk-pllv3.c
-+++ b/drivers/clk/imx/clk-pllv3.c
-@@ -97,6 +97,16 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
- 	writel_relaxed(val, pll->base);
- }
- 
-+static int clk_pllv3_is_prepared(struct clk_hw *hw)
-+{
-+	struct clk_pllv3 *pll = to_clk_pllv3(hw);
-+
-+	if (readl_relaxed(pll->base) & BM_PLL_LOCK)
-+		return 1;
-+
-+	return 0;
-+}
-+
- static unsigned long clk_pllv3_recalc_rate(struct clk_hw *hw,
- 					   unsigned long parent_rate)
- {
-@@ -139,6 +149,7 @@ static int clk_pllv3_set_rate(struct clk_hw *hw, unsigned long rate,
- static const struct clk_ops clk_pllv3_ops = {
- 	.prepare	= clk_pllv3_prepare,
- 	.unprepare	= clk_pllv3_unprepare,
-+	.is_prepared	= clk_pllv3_is_prepared,
- 	.recalc_rate	= clk_pllv3_recalc_rate,
- 	.round_rate	= clk_pllv3_round_rate,
- 	.set_rate	= clk_pllv3_set_rate,
-@@ -193,6 +204,7 @@ static int clk_pllv3_sys_set_rate(struct clk_hw *hw, unsigned long rate,
- static const struct clk_ops clk_pllv3_sys_ops = {
- 	.prepare	= clk_pllv3_prepare,
- 	.unprepare	= clk_pllv3_unprepare,
-+	.is_prepared	= clk_pllv3_is_prepared,
- 	.recalc_rate	= clk_pllv3_sys_recalc_rate,
- 	.round_rate	= clk_pllv3_sys_round_rate,
- 	.set_rate	= clk_pllv3_sys_set_rate,
-@@ -265,6 +277,7 @@ static int clk_pllv3_av_set_rate(struct clk_hw *hw, unsigned long rate,
- static const struct clk_ops clk_pllv3_av_ops = {
- 	.prepare	= clk_pllv3_prepare,
- 	.unprepare	= clk_pllv3_unprepare,
-+	.is_prepared	= clk_pllv3_is_prepared,
- 	.recalc_rate	= clk_pllv3_av_recalc_rate,
- 	.round_rate	= clk_pllv3_av_round_rate,
- 	.set_rate	= clk_pllv3_av_set_rate,
-@@ -279,6 +292,7 @@ static unsigned long clk_pllv3_enet_recalc_rate(struct clk_hw *hw,
- static const struct clk_ops clk_pllv3_enet_ops = {
- 	.prepare	= clk_pllv3_prepare,
- 	.unprepare	= clk_pllv3_unprepare,
-+	.is_prepared	= clk_pllv3_is_prepared,
- 	.recalc_rate	= clk_pllv3_enet_recalc_rate,
- };
- 
--- 
-1.9.1
+IMHO, this should not be hidden under DEBUG_RODATA (which some people
+may mistake for a debug option, while others may assume it affects
+rodata only) since the kernel stacks are executable without it.
