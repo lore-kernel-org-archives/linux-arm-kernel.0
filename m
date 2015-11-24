@@ -1,71 +1,114 @@
-From: damien.riegel@savoirfairelinux.com (Damien Riegel)
-Date: Mon, 23 Nov 2015 21:55:45 -0500
-Subject: [PATCH v4 3/5] watchdog: ts4800: add driver for TS-4800 watchdog
-In-Reply-To: <5653CC2F.8080608@roeck-us.net>
-References: <1448291861-28543-1-git-send-email-damien.riegel@savoirfairelinux.com>
- <1448291861-28543-4-git-send-email-damien.riegel@savoirfairelinux.com>
- <5653CC2F.8080608@roeck-us.net>
-Message-ID: <20151124025544.GA5743@localhost>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 24 Nov 2015 12:02:46 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.5
+In-Reply-To: <cover.1447981420.git.horms+renesas@verge.net.au>
+References: <cover.1447981420.git.horms+renesas@verge.net.au>
+Message-ID: <20151124030246.GL21853@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2015 at 06:32:15PM -0800, Guenter Roeck wrote:
-> Hi Damien,
+On Thu, Nov 19, 2015 at 05:05:25PM -0800, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> On 11/23/2015 07:17 AM, Damien Riegel wrote:
-> >This watchdog is instantiated in a FPGA that is memory mapped. It is
-> >made of only one register, called the feed register. Writing to this
-> >register will re-arm the watchdog for a given time (and enable it if it
-> >was disable). It can be disabled by writing a special value into it.
-> >
-> >It is part of a syscon block, and the watchdog register offset in this
-> >block varies from board to board. This offset is passed in the syscon
-> >property after the phandle to the syscon node.
-> >
-> >Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
-> >---
+> Please consider these Renesas ARM based SoC DT updates for v4.5.
 > 
-> [ ... ]
 > 
-> >+
-> >+static int ts4800_wdt_set_timeout(struct watchdog_device *wdd,
-> >+				  unsigned int timeout)
-> >+{
-> >+	struct ts4800_wdt *wdt = watchdog_get_drvdata(wdd);
-> >+	int i;
-> >+
-> >+	for (i = 0; i <= MAX_TIMEOUT_INDEX; i++) {
-> >+		if (ts4800_wdt_map[i].timeout >= timeout)
-> >+			break;
-> >+	}
+> The following changes since commit 99f7445ea41c0187cd2e78bcb58cdd9e6c1756e5:
 > 
-> If the loop does not break, i will have a value of MAX_TIMEOUT_INDEX + 1,
-> or 2, pointing after the end of the table. That should never happen,
-> but still ...
-
-That should never happen, but indeed it's not very elegant. I will
-change that.
-
+>   ARM: shmobile: porter: enable internal PCI and USB PHY (2015-10-13 10:00:12 +0900)
 > 
-> I preferred the earlier version, where you had an extra function.
+> are available in the git repository at:
 
-As I have to set both wdd->timeout and wdt->feed_val, I found it easier
-and shorter to iterate directly in the set_timeout function.
+The above is commit is the head of the last pull request I sent for
+Renesas DT updates for v4.4, taged as renesas-dt2-for-v4.4. Someohow it
+was not rebased on top of v4.4-rc1 although that was my intention.
 
-> Only my suggestion was to have that function return MAX_TIMEOUT_INDEX
-> instead of an error. Alternatively, the check above needs to be
-> "i < MAX_TIMEOUT_INDEX".
+I don't think it should make any difference but if you would like me to
+rebase and repost please let me know.
 
-That would be a strange stop condition. Would this construct be ok for
-you:
-
-	for (i = 0; i < ARRAY_SIZE(ts4800_wdt_map; i++) {
-		if (ts4800_wdt_map[i].timeout >= timeout)
-			break;
-	}
-
-	if (i >= ARRAY_SIZE(ts4800_wdt_map)
-		i = MAX_TIMEOUT_INDEX;
-
-Thanks,
-Damien
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v4.5
+> 
+> for you to fetch changes up to d537543b3948bc3bc9dede248fa455493e055457:
+> 
+>   ARM: shmobile: alt: add VIN0, ADV7180 DT support (2015-11-18 09:10:38 -0800)
+> 
+> ----------------------------------------------------------------
+> Renesas ARM Based SoC DT Updates for v4.5
+> 
+> * henninger: Remove as it is now replaced by silk
+> * koelsch: Move SPI partitions to subnode
+> * porter: Add CAN0 and HS-USB support
+> * r8a7793/gose: Add QSPI, PFC support
+> * r8a7793: Add GPIO, DMAC, theral, IPMMU support
+> * r8a7794/alt: Add DU support
+> * r8a7794: Disable all IPMMU nodes by default
+> * r8a779[0134]: Use Use SoC specific binding for rcar-dmac
+> * r8a779[01], r8a73a4, r8a7740, sh73a0: replace gpio-key, wakeup with
+>   wakeup-source property
+> * r8a779[14]: Correct "gpio-ranges" properties
+> * r8a779[14]: Remove bogus imp_clk node
+> * silk: Add SDHI1 support
+> 
+> ----------------------------------------------------------------
+> Geert Uytterhoeven (3):
+>       ARM: shmobile: r8a7794 dtsi: Remove bogus imp_clk node
+>       ARM: shmobile: r8a7791 dtsi: Remove bogus imp_clk node
+>       ARM: shmobile: koelsch: Move SPI FLASH partitions to subnode
+> 
+> Laurent Pinchart (2):
+>       ARM: shmobile: r8a7794: Add DU0 clock
+>       ARM: shmobile: r8a7794: Add DU node to device tree
+> 
+> Magnus Damm (4):
+>       ARM: shmobile: r8a7794: Disable all IPMMU nodes by default
+>       ARM: shmobile: r8a7793: Add IPMMU nodes
+>       ARM: shmobile: r8a7794: alt: Enable VGA port
+>       ARM: shmobile: r8a7793: Add GPIO nodes to device tree
+> 
+> Sergei Shtylyov (6):
+>       ARM: shmobile: porter: add HS-USB DT support
+>       ARM: shmobile: silk: add SDHI1 DT support
+>       ARM: shmobile: r8a7790: fix "gpio-ranges" props
+>       ARM: shmobile: r8a7791: fix "gpio-ranges" props
+>       ARM: shmobile: porter: add CAN0 DT support
+>       ARM: shmobile: henninger: remove board DT
+> 
+> Simon Horman (11):
+>       ARM: shmobile: r8a7793: Add thermal device to DT
+>       ARM: shmobile: r8a7793: Add PFC to DT
+>       ARM: shmobile: gose: Configure PFC in DT
+>       ARM: shmobile: r8a7793: Add DMAC devices to DT
+>       ARM: shmobile: r8a7793: Add QSPI device to DT
+>       ARM: shmobile: gose: Add QSPI device to DT
+>       ARM: shmobile: r8a7790: Use SoC specific binding for rcar-dmac nodes
+>       ARM: shmobile: r8a7791: Use SoC specific binding for rcar-dmac nodes
+>       ARM: shmobile: r8a7793: Use SoC specific binding for rcar-dmac nodes
+>       ARM: shmobile: r8a7794: Use SoC specific binding for rcar-dmac nodes
+>       ARM: shmobile: alt: Add pfc pins to DT
+> 
+> Sudeep Holla (1):
+>       ARM: dts: shmobile/r8a7xxx: replace gpio-key, wakeup with wakeup-source property
+> 
+> Ulrich Hecht (2):
+>       ARM: shmobile: alt: add I2C1 DT support
+>       ARM: shmobile: alt: add VIN0, ADV7180 DT support
+> 
+>  arch/arm/boot/dts/Makefile                    |   1 -
+>  arch/arm/boot/dts/r8a73a4-ape6evm.dts         |   2 +-
+>  arch/arm/boot/dts/r8a7740-armadillo800eva.dts |   2 +-
+>  arch/arm/boot/dts/r8a7790-lager.dts           |   8 +-
+>  arch/arm/boot/dts/r8a7790.dtsi                |  12 +-
+>  arch/arm/boot/dts/r8a7791-henninger.dts       | 320 --------------------------
+>  arch/arm/boot/dts/r8a7791-koelsch.dts         |  55 ++---
+>  arch/arm/boot/dts/r8a7791-porter.dts          |  20 ++
+>  arch/arm/boot/dts/r8a7791.dtsi                |  18 +-
+>  arch/arm/boot/dts/r8a7793-gose.dts            |  74 ++++++
+>  arch/arm/boot/dts/r8a7793.dtsi                | 294 +++++++++++++++++++++++
+>  arch/arm/boot/dts/r8a7794-alt.dts             | 125 ++++++++++
+>  arch/arm/boot/dts/r8a7794-silk.dts            |  40 ++++
+>  arch/arm/boot/dts/r8a7794.dtsi                |  49 ++--
+>  arch/arm/boot/dts/sh73a0-kzm9g.dts            |   2 +-
+>  include/dt-bindings/clock/r8a7794-clock.h     |   1 +
+>  16 files changed, 637 insertions(+), 386 deletions(-)
+>  delete mode 100644 arch/arm/boot/dts/r8a7791-henninger.dts
+> 
