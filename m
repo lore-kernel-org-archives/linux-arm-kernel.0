@@ -1,47 +1,54 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 24 Nov 2015 12:01:53 +0100
-Subject: [PATCH 1/2] mmc: sdhci: set bus voltage before enabling bus power
-In-Reply-To: <20151124092341.GA2228@odux.rfo.atmel.com>
-References: <1446825570-30029-1-git-send-email-ludovic.desroches@atmel.com>
- <1446825570-30029-2-git-send-email-ludovic.desroches@atmel.com>
- <20151109132305.GC15706@odux.rfo.atmel.com>
- <CAPDyKFrTTEnSFNvmx3e__Ap9gOGpA2-bz+yrq7ibz0wXGSWCXA@mail.gmail.com>
- <20151109144030.GD15706@odux.rfo.atmel.com>
- <CAPDyKFquZ+_Rf07gX+i-=_bzSa7KJ5+xQ8N21kK2mvfMGdVQMw@mail.gmail.com>
- <20151109163026.GE15706@odux.rfo.atmel.com>
- <20151124092341.GA2228@odux.rfo.atmel.com>
-Message-ID: <CAPDyKFp4U5vG_UswnLe1L2Vq1VwdkptThSdzhPYoP+hhGFTaQA@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 24 Nov 2015 12:04:55 +0100
+Subject: [PATCH V2 2/2] ARM: dts: imx6q: add Novena board
+In-Reply-To: <1448270124.3689.2.camel@pengutronix.de>
+References: <1447840120-8513-2-git-send-email-marex@denx.de>
+ <1448052365-4987-1-git-send-email-marex@denx.de>
+ <1448270124.3689.2.camel@pengutronix.de>
+Message-ID: <201511241204.55621.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 November 2015 at 10:23, Ludovic Desroches
-<ludovic.desroches@atmel.com> wrote:
-> Hi Ulf,
->
-> On Mon, Nov 09, 2015 at 05:30:26PM +0100, Ludovic Desroches wrote:
->> On Mon, Nov 09, 2015 at 05:00:46PM +0100, Ulf Hansson wrote:
->
-> [...]
->
->> > Now, this discussion was interesting, but I forgot what problem you
->> > actually where trying to solve? :-)
->>
->> There is this discussion because of two things:
->> - Fixing something I consider as a bug: when I have a VMMC, only
->>   setting/clearing bit 0. Our controller strictly obeys to the spec and
->>   check the 'SD Bus Voltage Select' field. Since we put a reserved value
->>   (000), the Power On is not performed.
->> - I was trying to get help to understand what is this 'SD Bus Voltage'.
->>   For our controller and sdhci_set_power(), it seems to stand for VMMC.
->>   For me, everything concerning bus voltage is related to VQMMC, so I was
->>   disappointed.
->
-> Do you plan to take the patch for VMMC? If yes, I will send a new patch
-> for the device tree (I'll only add vmmc, not vqmmc as discussed); if
-> not, forget these two patches.
->
+On Monday, November 23, 2015 at 10:15:24 AM, Lucas Stach wrote:
+> Am Freitag, den 20.11.2015, 21:46 +0100 schrieb Marek Vasut:
+> > From: Sean Cross <xobs@kosagi.com>
+> > 
+> > Novena is an open-hardware laptop/desktop/bare board.
+> > 
+> > See http://www.kosagi.com/w/index.php?title=Novena_Main_Page
+> > 
+> > Signed-off-by: Sean Cross <xobs@kosagi.com>
+> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> > Cc: Lucas Stach <l.stach@pengutronix.de>
+> > Cc: Sean Cross <xobs@kosagi.com>
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > ---
+> > 
+> >  arch/arm/boot/dts/Makefile         |   1 +
+> >  arch/arm/boot/dts/imx6q-novena.dts | 856
+> >  +++++++++++++++++++++++++++++++++++++ 2 files changed, 857
+> >  insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/imx6q-novena.dts
+> > 
+> > V2: Fix the PCIe regulator, make it always on
+> > 
+> >     Fix the polarity of SD2 WP and CD lines, make them active low.
+> >     Drop the simple-bus for regulators, put them in /soc instead.
+> 
+> Huh? No. The fixed and GPIO controlled regulators are certainly not part
+> of the SoC. They are board level components and belong into the same DT
+> hierarchy level as the sound codec and leds.
 
-Which patch do you refer to for "VMMC"?
+Huh? When I did that with 4.4rc1, the regulators were not detected, but with
+4.4rc2 they are. Must've been some instability at that point of development
+cycle. I will test this some more and then send a V3.
 
-Kind regards
-Uffe
+Thanks for the help :)
+
+> Otherwise looks good now.
+> 
+> Regards,
+> Lucas
+
+Best regards,
+Marek Vasut
