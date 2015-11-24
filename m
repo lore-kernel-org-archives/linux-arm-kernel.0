@@ -1,55 +1,49 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 24 Nov 2015 11:54:42 +0000
-Subject: [Xen-devel] [PATCH v3 26/62] arm/gic-v2: Add ACPI boot support
- for GICv2
-In-Reply-To: <1447753261-7552-27-git-send-email-shannon.zhao@linaro.org>
+Date: Tue, 24 Nov 2015 12:00:15 +0000
+Subject: [Xen-devel] [PATCH v3 27/62] arm/gic-v3: Add ACPI boot support
+ for GICv3
+In-Reply-To: <1447753261-7552-28-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-27-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511241138500.1107@kaball.uk.xensource.com>
+ <1447753261-7552-28-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511241157370.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> From: Parth Dixit <parth.dixit@linaro.org>
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> ACPI on Xen hypervisor uses MADT table for proper GIC initialization.
-> First get the GIC version from GIC Distributor. Then parse GIC related
-> subtables, collect CPU interface and distributor addresses and call
-> driver initialization function (which is hardware abstraction agnostic).
-> In a similar way, FDT initialize GICv2.
+> Like GICv2, ACPI on Xen hypervisor uses MADT table for proper GICv3
+> initialization. Parse GIC distributor subtable, redistributor subtable
+> and interrupt subtable.
 > 
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
-> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 > ---
->  xen/arch/arm/gic-v2.c | 122 +++++++++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 121 insertions(+), 1 deletion(-)
+>  xen/arch/arm/gic-v3.c | 182 +++++++++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 181 insertions(+), 1 deletion(-)
 > 
-> diff --git a/xen/arch/arm/gic-v2.c b/xen/arch/arm/gic-v2.c
-> index e31d38e..9a9fcd5 100644
-> --- a/xen/arch/arm/gic-v2.c
-> +++ b/xen/arch/arm/gic-v2.c
-> @@ -29,6 +29,8 @@
->  #include <xen/device_tree.h>
->  #include <xen/libfdt/libfdt.h>
+> diff --git a/xen/arch/arm/gic-v3.c b/xen/arch/arm/gic-v3.c
+> index bd13010..fa732d7 100644
+> --- a/xen/arch/arm/gic-v3.c
+> +++ b/xen/arch/arm/gic-v3.c
+> @@ -34,6 +34,8 @@
 >  #include <xen/sizes.h>
+>  #include <xen/libfdt/libfdt.h>
+>  #include <xen/sort.h>
 > +#include <xen/acpi.h>
 > +#include <acpi/actables.h>
 >  #include <asm/p2m.h>
 >  #include <asm/domain.h>
->  #include <asm/platform.h>
-> @@ -36,6 +38,7 @@
->  
 >  #include <asm/io.h>
+> @@ -41,6 +43,7 @@
 >  #include <asm/gic.h>
+>  #include <asm/gic_v3_defs.h>
+>  #include <asm/cpufeature.h>
 > +#include <asm/acpi.h>
 >  
->  /*
->   * LR register definitions are GIC v2 specific.
-> @@ -681,11 +684,113 @@ static void __init dt_gicv2_init(void)
->                 csize, vsize);
+>  /* Global state */
+>  static struct {
+> @@ -1242,6 +1245,164 @@ static void __init dt_gicv3_init(void)
+>      }
 >  }
 >  
 > +#ifdef CONFIG_ACPI
@@ -57,32 +51,28 @@ On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
 > +gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
 > +                        const unsigned long end)
 > +{
-> +    static int cpu_base_assigned = 0;
+> +    static bool cpu_base_assigned = false;
 > +    struct acpi_madt_generic_interrupt *processor;
 > +
 > +    processor = (struct acpi_madt_generic_interrupt *)header;
-
-Use container_of to cast
-
-
+> +
 > +    if ( BAD_MADT_ENTRY(processor, end) )
 > +        return -EINVAL;
 > +
 > +    /* Read from APIC table and fill up the GIC variables */
-> +    if ( cpu_base_assigned == 0 )
+> +    if ( !cpu_base_assigned )
 > +    {
 > +        cbase = processor->base_address;
 > +        csize = SZ_8K;
-> +        hbase = processor->gich_base_address;
 > +        vbase = processor->gicv_base_address;
-> +        gicv2_info.maintenance_irq = processor->vgic_interrupt;
+> +        gicv3_info.maintenance_irq = processor->vgic_interrupt;
 > +
 > +        if( processor->flags & ACPI_MADT_VGIC_IRQ_MODE )
-> +            irq_set_type(gicv2_info.maintenance_irq, ACPI_IRQ_TYPE_EDGE_BOTH);
+> +            irq_set_type(gicv3_info.maintenance_irq, ACPI_IRQ_TYPE_EDGE_BOTH);
 > +        else
-> +            irq_set_type(gicv2_info.maintenance_irq, ACPI_IRQ_TYPE_LEVEL_MASK);
+> +            irq_set_type(gicv3_info.maintenance_irq, ACPI_IRQ_TYPE_LEVEL_MASK);
 > +
-> +	cpu_base_assigned = 1;
+> +	cpu_base_assigned = true;
 
 coding style
 
@@ -91,11 +81,10 @@ coding style
 > +    else
 > +    {
 > +        if ( cbase != processor->base_address
-> +             || hbase != processor->gich_base_address
 > +             || vbase != processor->gicv_base_address
-> +             || gicv2_info.maintenance_irq != processor->vgic_interrupt )
+> +             || gicv3_info.maintenance_irq != processor->vgic_interrupt )
 > +        {
-> +	    printk("GICv2: GICC entries are not same in MADT table\n");
+> +	    printk("GICv3: GICC entries are not same in MADT table\n");
 > +	    return -EINVAL;
 
 coding style
@@ -114,12 +103,7 @@ coding style
 > +    struct acpi_madt_generic_distributor *dist;
 > +
 > +    dist = (struct acpi_madt_generic_distributor *)header;
-
-Same here.
-
-It looks OK aside from these few things.
-
-
+> +
 > +    if ( BAD_MADT_ENTRY(dist, end) )
 > +        return -EINVAL;
 > +
@@ -127,12 +111,25 @@ It looks OK aside from these few things.
 > +
 > +    return 0;
 > +}
-> +
-> +static void __init acpi_gicv2_init(void)
+> +static int __init
+> +gic_acpi_get_madt_redistributor_num(struct acpi_subtable_header *header,
+> +                                    const unsigned long end)
 > +{
-> +    acpi_status status;
+> +    return 0;
+
+I think you should at least add a comment here to explain why we just
+return 0 in this case
+
+
+> +}
+> +
+> +static void __init acpi_gicv3_init(void)
+> +{
 > +    struct acpi_table_header *table;
-> +    int count;
+> +    struct rdist_region *rdist_regs;
+> +    acpi_status status;
+> +    int count, i;
+> +    uint32_t reg;
 > +
 > +    status = acpi_get_table(ACPI_SIG_MADT, 0, &table);
 > +
@@ -140,15 +137,8 @@ It looks OK aside from these few things.
 > +    {
 > +        const char *msg = acpi_format_exception(status);
 > +
-> +        panic("GICv2: Failed to get MADT table, %s", msg);
+> +        panic("GICv3: Failed to get MADT table, %s", msg);
 > +    }
-> +
-> +    /* Collect CPU base addresses */
-> +    count = acpi_parse_entries(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
-> +                               gic_acpi_parse_madt_cpu, table,
-> +                               ACPI_MADT_TYPE_GENERIC_INTERRUPT, 0);
-> +    if ( count <= 0 )
-> +        panic("GICv2: No valid GICC entries exists");
 > +
 > +    /*
 > +     * Find distributor base address. We expect one distributor entry since
@@ -157,47 +147,127 @@ It looks OK aside from these few things.
 > +    count = acpi_parse_entries(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
 > +                               gic_acpi_parse_madt_distributor, table,
 > +                               ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
+> +
 > +    if ( count <= 0 )
-> +        panic("GICv2: No valid GICD entries exists");
+> +        panic("GICv3: No valid GICD entries exists");
+> +
+> +    if ( (dbase & ~PAGE_MASK) )
+> +        panic("GICv3: Found unaligned distributor address %"PRIpaddr"",
+> +              dbase);
+> +
+> +    gicv3.map_dbase = ioremap_nocache(dbase, SZ_64K);
+> +    if ( !gicv3.map_dbase )
+> +        panic("GICv3: Failed to ioremap for GIC distributor\n");
+> +
+> +    reg = readl_relaxed(GICD + GICD_PIDR2) & GIC_PIDR2_ARCH_MASK;
+> +    if ( reg != GIC_PIDR2_ARCH_GICv3 )
+> +         panic("GICv3: no distributor detected\n");
+
+I think these should be moved to a common init function
+
+
+> +    /* Get number of redistributor */
+> +    count = acpi_parse_entries(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
+> +                               gic_acpi_get_madt_redistributor_num, table,
+> +                               ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR, 0);
+> +    if ( count <= 0 )
+> +        panic("GICv3: No valid GICR entries exists");
+> +
+> +    gicv3.rdist_count = count;
+> +
+> +    if ( gicv3.rdist_count > MAX_RDIST_COUNT )
+> +        panic("GICv3: Number of redistributor regions is more than"
+> +              "%d (Increase MAX_RDIST_COUNT!!)\n", MAX_RDIST_COUNT);
+> +
+> +    rdist_regs = xzalloc_array(struct rdist_region, gicv3.rdist_count);
+> +    if ( !rdist_regs )
+> +        panic("GICv3: Failed to allocate memory for rdist regions\n");
+> +
+> +    for ( i = 0; i < gicv3.rdist_count; i++ )
+> +    {
+> +        struct acpi_subtable_header *subtable;
+> +        struct acpi_madt_generic_redistributor *gic_rdist;
+> +
+> +        subtable = acpi_get_entry(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
+> +                                  table, ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
+> +                                  i);
+> +        if ( !subtable )
+> +            panic("GICv3: Can't get GICR entry");
+> +
+> +	gic_rdist = (struct acpi_madt_generic_redistributor *)subtable;
+
+coding style
+
+
+> +        rdist_regs[i].base = gic_rdist->base_address;
+> +        rdist_regs[i].size = gic_rdist->length;
+> +    }
+> +
+> +    /* The vGIC code requires the region to be sorted */
+> +    sort(rdist_regs, gicv3.rdist_count, sizeof(*rdist_regs), cmp_rdist, NULL);
+> +
+> +    gicv3.rdist_regions= rdist_regs;
+> +
+> +    /* Collect CPU base addresses */
+> +    count = acpi_parse_entries(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
+> +                               gic_acpi_parse_madt_cpu, table,
+> +                               ACPI_MADT_TYPE_GENERIC_INTERRUPT, 0);
+> +    if ( count <= 0 )
+> +        panic("GICv3: No valid GICC entries exists");
+> +
+> +    gicv3.rdist_stride = 0;
 > +}
 > +#else
-> +static void __init acpi_gicv2_init(void)
+> +static void __init acpi_gicv3_init(void)
 > +{
 > +/* Should never reach here */
 > +}
 > +#endif
 > +
->  static int __init gicv2_init(void)
+>  /* Set up the GIC */
+>  static int __init gicv3_init(void)
 >  {
->      uint32_t aliased_offset = 0;
+> @@ -1253,7 +1414,10 @@ static int __init gicv3_init(void)
+>          return -ENODEV;
+>      }
 >  
-> -    dt_gicv2_init();
+> -    dt_gicv3_init();
 > +    if( acpi_disabled )
-> +        dt_gicv2_init();
+> +        dt_gicv3_init();
 > +    else
-> +        acpi_gicv2_init();
+> +        acpi_gicv3_init();
 >  
->      printk("GICv2 initialization:\n"
->                "        gic_dist_addr=%"PRIpaddr"\n"
-> @@ -793,6 +898,21 @@ DT_DEVICE_START(gicv2, "GICv2", DEVICE_GIC)
->          .init = dt_gicv2_preinit,
+>      for ( i = 0; i < gicv3.rdist_count; i++ )
+>      {
+> @@ -1345,6 +1509,22 @@ DT_DEVICE_START(gicv3, "GICv3", DEVICE_GIC)
+>          .init = dt_gicv3_preinit,
 >  DT_DEVICE_END
 >  
 > +#ifdef CONFIG_ACPI
 > +/* Set up the GIC */
-> +static int __init acpi_gicv2_preinit(const void *data)
+> +static int __init acpi_gicv3_preinit(const void *data)
 > +{
-> +    gicv2_info.hw_version = GIC_V2;
-> +    register_gic_ops(&gicv2_ops);
+> +    gicv3_info.hw_version = GIC_V3;
+> +    register_gic_ops(&gicv3_ops);
 > +
 > +    return 0;
 > +}
 > +
-> +ACPI_DEVICE_START(agicv2, "GICv2", DEVICE_GIC)
-> +        .class_type = GIC_V2,
-> +        .init = acpi_gicv2_preinit,
+> +ACPI_DEVICE_START(agicv3, "GICv3", DEVICE_GIC)
+> +        .class_type = GIC_V3,
+> +        .init = acpi_gicv3_preinit,
 > +ACPI_DEVICE_END
 > +#endif
+> +
 >  /*
 >   * Local variables:
 >   * mode: C
+> -- 
+> 2.1.0
+> 
+> 
+> _______________________________________________
+> Xen-devel mailing list
+> Xen-devel at lists.xen.org
+> http://lists.xen.org/xen-devel
+> 
