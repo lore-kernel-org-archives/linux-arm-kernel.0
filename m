@@ -1,61 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 24 Nov 2015 10:32:02 +0100
-Subject: [linux-sunxi] Re: [PATCH v2 1/5] ARM: dts: sun8i: Add SID node
-In-Reply-To: <a7d4e538-db64-476d-b5de-5222419229a2@googlegroups.com>
-References: <cover.1448263428.git.atx@atx.name>
- <b897b1c8741c8a871163b84d01b480f99329536d.1448263428.git.atx@atx.name>
- <20151123124356.GW32142@lukather>
- <a7d4e538-db64-476d-b5de-5222419229a2@googlegroups.com>
-Message-ID: <20151124093202.GL32142@lukather>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 24 Nov 2015 10:34:30 +0100
+Subject: [PATCH 1/4] ARM: dts: vf610: relicense vf???.dtsi under GPLv2/X11
+In-Reply-To: <1448323069-23208-2-git-send-email-stefan@agner.ch>
+References: <1448323069-23208-1-git-send-email-stefan@agner.ch>
+ <1448323069-23208-2-git-send-email-stefan@agner.ch>
+Message-ID: <1448357670.3689.26.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2015 at 10:51:15PM -0800, Sugar Wu wrote:
-> On Monday, November 23, 2015 at 8:43:59 PM UTC+8, Maxime Ripard wrote:
-> >
-> > Hi, 
-> >
-> > On Mon, Nov 23, 2015 at 09:02:48AM +0100, Josef Gajdusek wrote: 
-> > > Add a node describing the Security ID memory to the 
-> > > Allwinner H3 .dtsi file. 
-> > > 
-> > > Signed-off-by: Josef Gajdusek <a...@atx.name <javascript:>> 
-> > > --- 
-> > >  arch/arm/boot/dts/sun8i-h3.dtsi | 7 +++++++ 
-> > >  1 file changed, 7 insertions(+) 
-> > > 
-> > > diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi 
-> > b/arch/arm/boot/dts/sun8i-h3.dtsi 
-> > > index 0faa38a..58de718 100644 
-> > > --- a/arch/arm/boot/dts/sun8i-h3.dtsi 
-> > > +++ b/arch/arm/boot/dts/sun8i-h3.dtsi 
-> > > @@ -359,6 +359,13 @@ 
-> > >                          #size-cells = <0>; 
-> > >                  }; 
-> > >   
-> > > +                sid: eeprom at 01c14000 { 
-> > > +                        compatible = "allwinner,sun4i-a10-sid"; 
-> > > +                        reg = <0x01c14000 0x400>; 
-> >
-> > The datasheet says it's 256 bytes wide, while the size here is of 1kB, 
-> > is it intentional? 
+Am Montag, den 23.11.2015, 15:57 -0800 schrieb Stefan Agner:
+> GPLv2-only devicetrees make reuse difficult for software components
+> licensed under a different license.
 > 
-> SID memory map is 0x01c14000 ~ 0x01c143FF, include 2048bits efuse space.
-> H3 efuse space is SID_SRAM, its range is  0x01c14200 ~ +0x100.
+> The consensus is that a GPL/X11 dual-license should allow all necessary
+> uses, so relicense the vfxxx.dtsi, vf500.dtsi and vf610.dtsi files to
+> this combination.
+> 
+> CCs were acquired using (updated some email addresses):
+> git shortlog -sne --no-merges arch/arm/boot/dts/vf???.dtsi
+> 
+> CC: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+> CC: Chao Fu <B44548@freescale.com>
+> CC: Cory Tusar <cory.tusar@pid1solutions.com>
+> CC: Cosmin Stoica <cosminstefan.stoica@freescale.com>
+> CC: Frank Li <Frank.Li@freescale.com>
+> CC: Fugang Duan <B38611@freescale.com>
+> CC: Huang Shijie <b32955@freescale.com>
+> CC: Jingchang Lu <jingchang.lu@freescale.com>
+> CC: Lucas Stach <l.stach@pengutronix.de>
 
-Interesting, what is below the 0x200 registers?
+Acked-by: Lucas Stach <l.stach@pengutronix.de>
 
-Thanks!
-Maxime
+> CC: Sanchayan Maity <maitysanchayan@gmail.com>
+> CC: Shawn Guo <shawnguo@kernel.org>
+> CC: Stephen Warren <swarren@wwwdotorg.org>
+> CC: Xiubo Li <Li.Xiubo@freescale.com>
+> CC: Yuan Yao <yao.yuan@freescale.com>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151124/9323b0c9/attachment.sig>
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
