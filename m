@@ -1,43 +1,42 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 24 Nov 2015 10:34:30 +0100
-Subject: [PATCH 1/4] ARM: dts: vf610: relicense vf???.dtsi under GPLv2/X11
-In-Reply-To: <1448323069-23208-2-git-send-email-stefan@agner.ch>
-References: <1448323069-23208-1-git-send-email-stefan@agner.ch>
- <1448323069-23208-2-git-send-email-stefan@agner.ch>
-Message-ID: <1448357670.3689.26.camel@pengutronix.de>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 24 Nov 2015 11:37:01 +0200
+Subject: [PATCH v2 2/4] clk: ti816x: Add missing dmtimer clkdev entries
+In-Reply-To: <56461006.5080309@baylibre.com>
+References: <56461006.5080309@baylibre.com>
+Message-ID: <56542FBD.8090404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 23.11.2015, 15:57 -0800 schrieb Stefan Agner:
-> GPLv2-only devicetrees make reuse difficult for software components
-> licensed under a different license.
-> 
-> The consensus is that a GPL/X11 dual-license should allow all necessary
-> uses, so relicense the vfxxx.dtsi, vf500.dtsi and vf610.dtsi files to
-> this combination.
-> 
-> CCs were acquired using (updated some email addresses):
-> git shortlog -sne --no-merges arch/arm/boot/dts/vf???.dtsi
-> 
-> CC: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
-> CC: Chao Fu <B44548@freescale.com>
-> CC: Cory Tusar <cory.tusar@pid1solutions.com>
-> CC: Cosmin Stoica <cosminstefan.stoica@freescale.com>
-> CC: Frank Li <Frank.Li@freescale.com>
-> CC: Fugang Duan <B38611@freescale.com>
-> CC: Huang Shijie <b32955@freescale.com>
-> CC: Jingchang Lu <jingchang.lu@freescale.com>
-> CC: Lucas Stach <l.stach@pengutronix.de>
+On 11/13/2015 06:29 PM, Neil Armstrong wrote:
+> Add missing clkdev dmtimer related entries for dm816x.
+> 32Khz and ext sources were missing.
+>
+> Cc: Brian Hutchinson <b.hutchman@gmail.com>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Acked-by: Lucas Stach <l.stach@pengutronix.de>
+Your own sign-off should be at the top of the list, fixed this locally 
+myself.
 
-> CC: Sanchayan Maity <maitysanchayan@gmail.com>
-> CC: Shawn Guo <shawnguo@kernel.org>
-> CC: Stephen Warren <swarren@wwwdotorg.org>
-> CC: Xiubo Li <Li.Xiubo@freescale.com>
-> CC: Yuan Yao <yao.yuan@freescale.com>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+Queued for 4.4-rc-fixes, thanks.
 
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+-Tero
+
+> ---
+>   drivers/clk/ti/clk-816x.c | 2 ++
+>   1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/clk/ti/clk-816x.c b/drivers/clk/ti/clk-816x.c
+> index 1dfad0c..2a5d84f 100644
+> --- a/drivers/clk/ti/clk-816x.c
+> +++ b/drivers/clk/ti/clk-816x.c
+> @@ -20,6 +20,8 @@ static struct ti_dt_clk dm816x_clks[] = {
+>   	DT_CLK(NULL, "sys_clkin", "sys_clkin_ck"),
+>   	DT_CLK(NULL, "timer_sys_ck", "sys_clkin_ck"),
+>   	DT_CLK(NULL, "sys_32k_ck", "sys_32k_ck"),
+> +	DT_CLK(NULL, "timer_32k_ck", "sysclk18_ck"),
+> +	DT_CLK(NULL, "timer_ext_ck", "tclkin_ck"),
+>   	DT_CLK(NULL, "mpu_ck", "mpu_ck"),
+>   	DT_CLK(NULL, "timer1_fck", "timer1_fck"),
+>   	DT_CLK(NULL, "timer2_fck", "timer2_fck"),
+>
