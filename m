@@ -1,54 +1,135 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Nov 2015 12:23:08 +0000
-Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
- functions
-In-Reply-To: <yw1xsi3vr42t.fsf@unicorn.mansr.com>
-References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
- <20151124001306.GI19156@codeaurora.org>
- <20151124085349.GQ19156@codeaurora.org>
- <4485320.CGMJdfZLya@wuerfel>
- <20151124104225.GA8644@n2100.arm.linux.org.uk>
- <yw1xsi3vr42t.fsf@unicorn.mansr.com>
-Message-ID: <20151124122308.GB8644@n2100.arm.linux.org.uk>
+From: clabbe.montjoie@gmail.com (LABBE Corentin)
+Date: Tue, 24 Nov 2015 13:26:19 +0100
+Subject: [PATCH RESEND] arm: fix the return value of find_first{_zero}_bit
+Message-ID: <1448367991-12734-1-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 12:10:02PM +0000, M?ns Rullg?rd wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> 
-> > On Tue, Nov 24, 2015 at 11:38:53AM +0100, Arnd Bergmann wrote:
-> >> I suggested using -mcpu=cortex-a15 because there are old gcc versions
-> >> that don't know about -march=armv7ve or -march=armv7-a+idiv yet, but
-> >> that do understand -mcpu=cortex-a15.
-> >
-> > That's not all.  The bigger problem is that there are toolchains out
-> > there which accept these options, but do _not_ support IDIV in either
-> > ARM or Thumb mode.  I'm afraid that makes it impossible to add this
-> > feature to the mainline kernel in this form: we need to run a test
-> > build to check that -march=armv7ve or what-not really does work
-> > through both GCC and GAS.
-> 
-> If the compiler accepts the option but doesn't actually emit any div
-> instructions, is there any real harm?
+Building linux with W=1 on arm give me this warning;
+In file included from ../include/linux/nodemask.h:92:0,
+                 from ../include/linux/mmzone.h:16,
+                 from ../include/linux/gfp.h:5,
+                 from ../include/linux/kmod.h:22,
+                 from ../include/linux/module.h:13,
+                 from net/netfilter/xt_nat.mod.c:1:
+../include/linux/bitmap.h: In function 'bitmap_empty':
+../include/linux/bitmap.h:287:36: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
+  return find_first_bit(src, nbits) == nbits;
 
-That's not what I've found.  I've found that asking the assembler
-to accept idiv instructions appears to be ignored, which is something
-completely different.
+../include/linux/bitmap.h: In function 'bitmap_full':
+../include/linux/bitmap.h:295:41: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
+  return find_first_zero_bit(src, nbits) == nbits;
 
-Further to this, what it comes down to is the stupid idea that the
-compiler should embed .arch / .cpu in the assembly output, which has
-the effect of overriding the command line arguments given to it via
--Wa.  So, giving -Wa,-mcpu=cortex-a15 is a total no-op, because the
-first thing in the assembly output is:
+The problem is that find_first{_zero}_bit() return type is unsigned long on
+majority of arch.
 
-	.arch armv7-a
+Since find_first{_zero}_bit cannot return negative value, unsigned long is
+the best return type.
 
-which kills off any attempt to set the assembly level ISA from the
-command line.
+After some read, it seems that find_next_bit_[lb]e/_find_next_zero_bit_[lb]e
+are also incorectly set as return int.
 
-It does appear after all that Ubuntu 14.04 does support sdiv/idiv with
--mcpu=cortex-a15, but there is no -march=armv7ve.
+This patch fix the return type of all thoses functions.
 
+Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+---
+ arch/arm/include/asm/bitops.h | 22 +++++++++++-----------
+ arch/arm/lib/findbit.S        |  8 ++++----
+ 2 files changed, 15 insertions(+), 15 deletions(-)
+
+diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
+index e943e6c..868414b 100644
+--- a/arch/arm/include/asm/bitops.h
++++ b/arch/arm/include/asm/bitops.h
+@@ -159,18 +159,18 @@ extern int _test_and_change_bit(int nr, volatile unsigned long * p);
+ /*
+  * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
+  */
+-extern int _find_first_zero_bit_le(const void * p, unsigned size);
+-extern int _find_next_zero_bit_le(const void * p, int size, int offset);
+-extern int _find_first_bit_le(const unsigned long *p, unsigned size);
+-extern int _find_next_bit_le(const unsigned long *p, int size, int offset);
++extern unsigned long _find_first_zero_bit_le(const void *p, unsigned size);
++extern unsigned long _find_next_zero_bit_le(const void *p, int size, int offset);
++extern unsigned long _find_first_bit_le(const unsigned long *p, unsigned size);
++extern unsigned long _find_next_bit_le(const unsigned long *p, int size, int offset);
+ 
+ /*
+  * Big endian assembly bitops.  nr = 0 -> byte 3 bit 0.
+  */
+-extern int _find_first_zero_bit_be(const void * p, unsigned size);
+-extern int _find_next_zero_bit_be(const void * p, int size, int offset);
+-extern int _find_first_bit_be(const unsigned long *p, unsigned size);
+-extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
++extern unsigned long _find_first_zero_bit_be(const void *p, unsigned size);
++extern unsigned long _find_next_zero_bit_be(const void *p, int size, int offset);
++extern unsigned long _find_first_bit_be(const unsigned long *p, unsigned size);
++extern unsigned long _find_next_bit_be(const unsigned long *p, int size, int offset);
+ 
+ #ifndef CONFIG_SMP
+ /*
+@@ -317,19 +317,19 @@ static inline unsigned long __ffs(unsigned long x)
+ 
+ #ifdef __ARMEB__
+ 
+-static inline int find_first_zero_bit_le(const void *p, unsigned size)
++static inline unsigned long find_first_zero_bit_le(const void *p, unsigned size)
+ {
+ 	return _find_first_zero_bit_le(p, size);
+ }
+ #define find_first_zero_bit_le find_first_zero_bit_le
+ 
+-static inline int find_next_zero_bit_le(const void *p, int size, int offset)
++static inline unsigned long find_next_zero_bit_le(const void *p, int size, int offset)
+ {
+ 	return _find_next_zero_bit_le(p, size, offset);
+ }
+ #define find_next_zero_bit_le find_next_zero_bit_le
+ 
+-static inline int find_next_bit_le(const void *p, int size, int offset)
++static inline unsigned long find_next_bit_le(const void *p, int size, int offset)
+ {
+ 	return _find_next_bit_le(p, size, offset);
+ }
+diff --git a/arch/arm/lib/findbit.S b/arch/arm/lib/findbit.S
+index 7848780..b4f6aec 100644
+--- a/arch/arm/lib/findbit.S
++++ b/arch/arm/lib/findbit.S
+@@ -19,7 +19,7 @@
+ 
+ /*
+  * Purpose  : Find a 'zero' bit
+- * Prototype: int find_first_zero_bit(void *addr, unsigned int maxbit);
++ * Prototype: unsigned long find_first_zero_bit(void *addr, unsigned int maxbit);
+  */
+ ENTRY(_find_first_zero_bit_le)
+ 		teq	r1, #0	
+@@ -40,7 +40,7 @@ ENDPROC(_find_first_zero_bit_le)
+ 
+ /*
+  * Purpose  : Find next 'zero' bit
+- * Prototype: int find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
++ * Prototype: unsigned long find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
+  */
+ ENTRY(_find_next_zero_bit_le)
+ 		teq	r1, #0
+@@ -60,7 +60,7 @@ ENDPROC(_find_next_zero_bit_le)
+ 
+ /*
+  * Purpose  : Find a 'one' bit
+- * Prototype: int find_first_bit(const unsigned long *addr, unsigned int maxbit);
++ * Prototype: unsigned long find_first_bit(const unsigned long *addr, unsigned int maxbit);
+  */
+ ENTRY(_find_first_bit_le)
+ 		teq	r1, #0	
+@@ -81,7 +81,7 @@ ENDPROC(_find_first_bit_le)
+ 
+ /*
+  * Purpose  : Find next 'one' bit
+- * Prototype: int find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
++ * Prototype: unsigned long find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
+  */
+ ENTRY(_find_next_bit_le)
+ 		teq	r1, #0
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.4.10
