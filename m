@@ -1,133 +1,51 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 24 Nov 2015 11:48:35 +0800
-Subject: [PATCH v4 5/6] ARM: dts: sun8i: sinlinx-sina33: Add AXP223 PMIC
- device and regulator nodes
+Date: Tue, 24 Nov 2015 11:48:31 +0800
+Subject: [PATCH v4 1/6] mfd: axp20x: Add AXP223 to list of supported PMICs in
+ DT bindings
 In-Reply-To: <1448336916-31212-1-git-send-email-wens@csie.org>
 References: <1448336916-31212-1-git-send-email-wens@csie.org>
-Message-ID: <1448336916-31212-6-git-send-email-wens@csie.org>
+Message-ID: <1448336916-31212-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This board has a X-Powers AXP223 PMIC connected via RSB. Its regulators
-provide power to various parts of the SoC and the board.
-
-Also update the regulator supply phandles.
+The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
+It is functionally identical to AXP221; only the regulator default
+voltage/status and the external host interface are different.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 79 +++++++++++++++++++++++++-
- 1 file changed, 76 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-index 13ce68f06dd6..91a0fde47fdd 100644
---- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-+++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-@@ -68,7 +68,7 @@
- };
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index a474359dd206..fd39fa54571b 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -5,11 +5,12 @@ axp152 (X-Powers)
+ axp202 (X-Powers)
+ axp209 (X-Powers)
+ axp221 (X-Powers)
++axp223 (X-Powers)
  
- &lradc {
--	vref-supply = <&reg_vcc3v0>;
-+	vref-supply = <&reg_dcdc1>;
- 	status = "okay";
+ Required properties:
+ - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
+-	      "x-powers,axp221"
+-- reg: The I2C slave address for the AXP chip
++	      "x-powers,axp221", "x-powers,axp223"
++- reg: The I2C slave address or RSB hardware address for the AXP chip
+ - interrupt-parent: The parent interrupt controller
+ - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
+ - interrupt-controller: The PMIC has its own internal IRQs
+@@ -51,7 +52,7 @@ LDO3		: LDO		: ldo3in-supply
+ LDO4		: LDO		: ldo24in-supply	: shared supply
+ LDO5		: LDO		: ldo5in-supply
  
- 	button at 200 {
-@@ -96,7 +96,7 @@
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_sina33>;
--	vmmc-supply = <&reg_vcc3v0>;
-+	vmmc-supply = <&reg_dcdc1>;
- 	bus-width = <4>;
- 	cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
- 	cd-inverted;
-@@ -106,7 +106,7 @@
- &mmc2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc2_8bit_pins>;
--	vmmc-supply = <&reg_vcc3v0>;
-+	vmmc-supply = <&reg_dcdc1>;
- 	bus-width = <8>;
- 	non-removable;
- 	status = "okay";
-@@ -132,6 +132,79 @@
+-AXP221 regulators, type, and corresponding input supply names:
++AXP221/AXP223 regulators, type, and corresponding input supply names:
  
- &r_rsb {
- 	status = "okay";
-+
-+	axp22x: pmic at 3e3 {
-+		compatible = "x-powers,axp223";
-+		reg = <0x3e3>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		eldoin-supply = <&reg_dcdc1>;
-+	};
-+};
-+
-+#include "axp22x.dtsi"
-+
-+&reg_aldo1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-io";
-+};
-+
-+&reg_aldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2350000>;
-+	regulator-max-microvolt = <2650000>;
-+	regulator-name = "vdd-dll";
-+};
-+
-+&reg_aldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2700000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-pll-avcc";
-+};
-+
-+&reg_dc5ldo {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpus";
-+};
-+
-+&reg_dcdc1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-3v0";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-sys";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc5 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1500000>;
-+	regulator-max-microvolt = <1500000>;
-+	regulator-name = "vcc-dram";
-+};
-+
-+&reg_rtc_ldo {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-rtc";
- };
- 
- &uart0 {
+ Regulator	  Type		  Supply Name		  Notes
+ ---------	  ----		  -----------		  -----
 -- 
 2.6.2
