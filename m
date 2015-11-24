@@ -1,50 +1,59 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 24 Nov 2015 09:27:57 +0100
-Subject: [PATCH 1/2] arch: consolidate CONFIG_STRICT_DEVM in
- lib/Kconfig.debug
-In-Reply-To: <CAGXu5jLpm7iG17+ws2MfK7ZG9KEDaHWd5xxHSk7KHPyizYEm2A@mail.gmail.com>
-References: <20151122035702.9313.52457.stgit@dwillia2-desk3.jf.intel.com>
- <20151123081235.GA23661@gmail.com>
- <CAPcyv4hDbi5KJ+tGJnEwQV5G=PM+ZRooQbgTNrYxyyVVPA3EwA@mail.gmail.com>
- <CAGXu5jLpm7iG17+ws2MfK7ZG9KEDaHWd5xxHSk7KHPyizYEm2A@mail.gmail.com>
-Message-ID: <20151124082757.GB23624@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 24 Nov 2015 08:28:01 +0000
+Subject: [PATCH v2 3/5] pinctrl: meson: enable GPIO IRQs
+In-Reply-To: <1448273816-11290-4-git-send-email-carlo@caione.org>
+References: <1448273816-11290-1-git-send-email-carlo@caione.org>
+ <1448273816-11290-4-git-send-email-carlo@caione.org>
+Message-ID: <20151124082801.09139a93@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 23 Nov 2015 11:16:54 +0100
+Carlo Caione <carlo@caione.org> wrote:
 
-* Kees Cook <keescook@chromium.org> wrote:
-
-> On Mon, Nov 23, 2015 at 9:12 AM, Dan Williams <dan.j.williams@intel.com> wrote:
-> > On Mon, Nov 23, 2015 at 12:12 AM, Ingo Molnar <mingo@kernel.org> wrote:
-> >>
-> >> * Dan Williams <dan.j.williams@intel.com> wrote:
-> >>
-> >>> Let all the archs that implement CONFIG_STRICT_DEVM use a common
-> >>> definition in lib/Kconfig.debug.
-> >>
-> >> For the x86 bit:
-> >>
-> >> Acked-by: Ingo Molnar <mingo@kernel.org>
-> >>
-> >>> Note, the 'depends on !SPARC' is due to sparc not implementing
-> >>> devmem_is_allowed().
-> >>
-> >> Maybe that should be converted into a helper Kconfig switch for architectures to
-> >> opt in to /dev/mem restrictions?
-> >
-> > Sure, easy enough to add a ARCH_HAS_DEVMEM_IS_ALLOWED opt-in.
+> From: Carlo Caione <carlo@endlessm.com>
 > 
-> Is there some hidden meaning about the difference between ARCH_HAS_...
-> and HAVE_ARCH_... and HAVE_... ?
+> On Meson8 and Meson8b SoCs there are 8 independent filtered GPIO
+> interrupt modules that can be programmed to use any of the GPIOs in the
+> chip as an interrupt source.
+> 
+> For each GPIO IRQ we have:
+> 
+> GPIOs --> [mux]--> [polarity]--> [filter]--> [edge select]--> GIC
+> 
+> The eight GPIO interrupts respond to mask/unmask/clear/etc.. just like
+> any other interrupt in the chip. The difference for the GPIO interrupts
+> is that they can be filtered and conditioned.
+> 
+> This patch adds support for the external GPIOs interrupts and enables
+> them for Meson8 and Meson8b SoCs.
+> 
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+> 
+> ---
 
-There's also the double underscore variants such as __HAVE_ARCH_STRNCASECMP! ;-)
+[...]
 
-It's all just nonsensical historic muck: because no-one ever was confronted with 
-the messy global picture.
+> +	for (i = 0; i < pc->num_gic_irqs; i++) {
+> +		struct of_phandle_args oirq;
+> +
+> +		of_irq_parse_one(node, i, &oirq);
+> +		irq_of_phandle_args_to_fwspec(&oirq, &pc->gic_irqs[i]);
+> +
+> +		pc->irq_map[i] = IRQ_FREE;
+> +	}
 
-Today you can run Documentation/features/list-arch.sh and wonder at the zoo of 
-options ;-)
+The whole thing feels weird. Why do you need to keep a set of fwspecs?
+All you need is a range of interrupts that would be conveniently
+represented by a bitmap (assuming your interrupts space is a mostly
+contiguous range).
+
+Overall, this patch is quite hard to review. Can you please split the
+GPIO management from the irqchip side?
 
 Thanks,
 
-	Ingo
+	M.
+-- 
+Jazz is not dead. It just smells funny.
