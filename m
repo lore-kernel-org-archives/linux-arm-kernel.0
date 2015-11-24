@@ -1,35 +1,31 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 24 Nov 2015 15:17:23 +0100
-Subject: [PATCH] net: dsa: include gpio consumer header file
-In-Reply-To: <6383467.TZ5s6u4A6T@wuerfel>
-References: <6383467.TZ5s6u4A6T@wuerfel>
-Message-ID: <20151124141723.GA26341@lunn.ch>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Tue, 24 Nov 2015 23:22:17 +0900
+Subject: [PATCH v6 1/6] arm64: ftrace: modify a stack frame in a safe way
+In-Reply-To: <1447828989-4980-2-git-send-email-takahiro.akashi@linaro.org>
+References: <1447828989-4980-1-git-send-email-takahiro.akashi@linaro.org>
+ <1447828989-4980-2-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <FA6B3A9B-BE88-40B6-9334-1D5E13F12E91@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 12:34:49PM +0100, Arnd Bergmann wrote:
-> After the introduction of the switch gpio reset API, I'm getting
-> build errors in configurations that disable CONFIG_GPIOLIB:
+On Nov 18, 2015, at 3:43 PM, AKASHI Takahiro wrote:
+> Function graph tracer modifies a return address (LR) in a stack frame by
+> calling ftrace_prepare_return() in a traced function's function prologue.
+> The current code does this modification before preserving an original
+> address at ftrace_push_return_trace() and there is always a small window
+> of inconsistency when an interrupt occurs.
 > 
-> net/dsa/dsa.c:783:16: error: implicit declaration of function 'gpio_to_desc' [-Werror=implicit-function-declaration]
-> 
-> The reason is that linux/gpio/consumer.h is not automatically
-> included without gpiolib support. This adds an explicit #include
-> statement to make it compile in all configurations. The reset
-> functionality will not work without gpiolib, which is what you
-> get when disabling the feature.
-> 
-> As far as I can tell, gpiolib is supported on all architectures
-> on which you can have DSA at the moment.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: cc30c16344fc ("net: dsa: Add support for a switch reset gpio")
+> This doesn't matter, as far as an interrupt stack is introduced, because
+> stack tracer won't be invoked in an interrupt context. But it would be
+> better to proactively minimize such a window by moving the LR modification
+> after ftrace_push_return_trace().
 
-Hi Arnd
+There are two statements in my mind: 1)IRQ stack will be introduced on ARM64
+in the future and 2)This change makes subtle variance compared to ARM and x86.
+I'm not sure about this patch from those perspectives.
 
-Thanks for this. I had something similar in my github overnight so
-that 0-day would build test it.
+However, I have no objection to the change. I will piggyback on other folks
+regarding this patch :)
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
-
-Andrew
+Best Regards
+Jungseok Lee
