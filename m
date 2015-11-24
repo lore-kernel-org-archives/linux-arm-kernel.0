@@ -1,49 +1,59 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 Nov 2015 16:43:58 +0100
-Subject: [PATCH 1/3] KVM: arm/arm64: Fix preemptible timer active state
- crazyness
+Date: Tue, 24 Nov 2015 16:44:00 +0100
+Subject: [PATCH 3/3] KVM: arm/arm64: vgic: Trust the LR state for HW IRQs
 In-Reply-To: <1448379840-17516-1-git-send-email-christoffer.dall@linaro.org>
 References: <1448379840-17516-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1448379840-17516-2-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1448379840-17516-4-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We were setting the physical active state on the GIC distributor in a
-preemptible section, which could cause us to set the active state on
-different physical CPU from the one we were actually going to run on,
-hacoc ensues.
+We were probing the physial distributor state for the active state of a
+HW virtual IRQ, because we had seen evidence that the LR state was not
+cleared when the guest deactivated a virtual interrupted.
 
-Since we are no longer descheduling/scheduling soft timers in the
-flush/sync timer functions, simply moving the timer flush into a
-non-preemptible section.
+However, this issue turned out to be a software bug in the GIC, which
+was solved by: 84aab5e68c2a5e1e18d81ae8308c3ce25d501b29
+(KVM: arm/arm64: arch_timer: Preserve physical dist. active
+state on LR.active, 2015-11-24)
+
+Therefore, get rid of the complexities and just look at the LR.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/arm.c | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+ virt/kvm/arm/vgic.c | 16 ++--------------
+ 1 file changed, 2 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index eab83b2..e06fd29 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -564,17 +564,12 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 			vcpu_sleep(vcpu);
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 9002f0d..55cd7e3 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1420,25 +1420,13 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+ static bool vgic_sync_hwirq(struct kvm_vcpu *vcpu, int lr, struct vgic_lr vlr)
+ {
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+-	struct irq_phys_map *map;
+-	bool phys_active;
+ 	bool level_pending;
+-	int ret;
  
- 		/*
--		 * Disarming the background timer must be done in a
--		 * preemptible context, as this call may sleep.
--		 */
--		kvm_timer_flush_hwstate(vcpu);
+ 	if (!(vlr.state & LR_HW))
+ 		return false;
+ 
+-	map = vgic_irq_map_search(vcpu, vlr.irq);
+-	BUG_ON(!map);
 -
--		/*
- 		 * Preparing the interrupts to be injected also
- 		 * involves poking the GIC, which must be done in a
- 		 * non-preemptible context.
- 		 */
- 		preempt_disable();
-+		kvm_timer_flush_hwstate(vcpu);
- 		kvm_vgic_flush_hwstate(vcpu);
+-	ret = irq_get_irqchip_state(map->irq,
+-				    IRQCHIP_STATE_ACTIVE,
+-				    &phys_active);
+-
+-	WARN_ON(ret);
+-
+-	if (phys_active)
+-		return 0;
++	if (vlr.state & LR_STATE_ACTIVE)
++		return false;
  
- 		local_irq_disable();
+ 	spin_lock(&dist->lock);
+ 	level_pending = process_queued_irq(vcpu, lr, vlr);
 -- 
 2.1.2.330.g565301e.dirty
