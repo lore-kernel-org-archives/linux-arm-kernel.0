@@ -1,46 +1,71 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 24 Nov 2015 10:20:57 -0800
-Subject: [PATCH] soc: Mediatek: Enable SCPSYS power domain driver by
- default
-In-Reply-To: <56535C1B.1090804@gmail.com> (Matthias Brugger's message of "Mon,
- 23 Nov 2015 19:34:03 +0100")
-References: <1447411835-19035-1-git-send-email-eddie.huang@mediatek.com>
- <7h4mgpdh6f.fsf@deeprootsystems.com>
- <CAMAWPa8ZcD30-06K3w1EewPMPA6LmU7bpOWbxi=VfsByyQT3Sw@mail.gmail.com>
- <56535C1B.1090804@gmail.com>
-Message-ID: <7h4mgbp8c6.fsf@deeprootsystems.com>
+Date: Tue, 24 Nov 2015 10:29:19 -0800
+Subject: [PATCH RFC 16/27] ARM: cpuidle: Record the next wakeup event of
+ the CPU
+In-Reply-To: <20151120162835.GC30342@linaro.org> (Lina Iyer's message of "Fri,
+ 20 Nov 2015 09:28:35 -0700")
+References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
+ <1447799871-56374-17-git-send-email-lina.iyer@linaro.org>
+ <7hwptdsgto.fsf@deeprootsystems.com>
+ <20151120162835.GC30342@linaro.org>
+Message-ID: <7hr3jfntds.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matthias Brugger <matthias.bgg@gmail.com> writes:
+Lina Iyer <lina.iyer@linaro.org> writes:
 
-> On 19/11/15 21:05, Kevin Hilman wrote:
->> On Fri, Nov 13, 2015 at 7:59 AM, Kevin Hilman <khilman@kernel.org> wrote:
->>> Eddie Huang <eddie.huang@mediatek.com> writes:
->>>
->>>> If enable Mediatek 8173 SoC, it should also enable power domain
->>>> driver. Otherwise access clk subsystem register will fail.
->>>>
->>>> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
->>>
->>> Tested-by: Kevin Hilman <khilman@linaro.org>
->>>
->>> This gets the mt8173-evb booting again with arm-soc/for-next and
->>> mainline for me.
->>>
->>> I'll let Matthias queue this up and send it with any other fixes for
->>> v4.4-rc1.
+> On Thu, Nov 19 2015 at 16:35 -0700, Kevin Hilman wrote:
+>>Lina Iyer <lina.iyer@linaro.org> writes:
 >>
->> Matthias, this is still broken in arm-soc.  Curious if your planning
->> on sending a fix?  If you prefer, with your ack, we can apply directly
->> to arm-soc/fixes.
+>>> Reading the next wakeup of the CPU can only be realiably done only from
+>>> that CPU. In the idle enter path record the next wake up of the CPU. The
+>>> information is useful to determine the sleep time left for the CPU.
+>>>
+>>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>>> ---
+>>>  drivers/cpuidle/cpuidle-arm.c | 5 +++++
+>>>  1 file changed, 5 insertions(+)
+>>>
+>>> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+>>> index 8e72a23..b3133ef 100644
+>>> --- a/drivers/cpuidle/cpuidle-arm.c
+>>> +++ b/drivers/cpuidle/cpuidle-arm.c
+>>> @@ -18,9 +18,11 @@
+>>>  #include <linux/kernel.h>
+>>>  #include <linux/module.h>
+>>>  #include <linux/of.h>
+>>> +#include <linux/pm_domain.h>
+>>>  #include <linux/pm_runtime.h>
+>>>  #include <linux/slab.h>
+>>>  #include <linux/rcupdate.h>
+>>> +#include <linux/tick.h>
+>>>
+>>>  #include <asm/cpuidle.h>
+>>>
+>>> @@ -49,7 +51,9 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
+>>>  	ret = cpu_pm_enter();
+>>>  	if (!ret) {
+>>>  		struct device *cpu_dev = get_cpu_device(dev->cpu);
+>>> +		struct generic_pm_domain_data *gpd = dev_gpd_data(cpu_dev);
+>>>
+>>> +		gpd->td.next_wakeup = tick_nohz_get_next_wakeup();
+>>>  		RCU_NONIDLE(pm_runtime_put_sync_suspend(cpu_dev));
 >>
->
-> Sorry for the delay. Please apply it directly.
->
-> Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
->
+>>Maybe set this back to zero atomicaly, after wakeup?
+>>
+>>Checking for non-zero that might be another way for the domain goveror that there
+>>haven't been any CPU wakeups since the CPUs have gone idle.
+>>
+> I set it to 0 below.
 
-Thanks, applied to arm-soc/fixes.
+Oops, you're right.  Not sure how I missed that.
+
+> The reference counting by the GET_PUT tells the domain if a device is
+> suspended. I see that as a redudant information. May be I am not getting
+> your point.
+
+It's redundant, but may be helpful in detecting races.  e.g. domain is
+being powered off and CPU wakes up and sets this zero, but runtime PM
+layers haven't been called yet so dev->power->usage_count is still zero.
 
 Kevin
