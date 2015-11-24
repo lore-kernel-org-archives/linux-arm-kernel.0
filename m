@@ -1,147 +1,147 @@
 From: uri.mashiach@compulab.co.il (Uri Mashiach)
-Date: Tue, 24 Nov 2015 16:02:10 +0200
-Subject: [PATCH v2 3/6] ARM: OMAP2+: dts: cm-t335: add support for NAND flash
+Date: Tue, 24 Nov 2015 16:02:08 +0200
+Subject: [PATCH v2 1/6] ARM: OMAP2+: dts: cm-t335: add initial support
 In-Reply-To: <1448373733-5839-1-git-send-email-uri.mashiach@compulab.co.il>
 References: <1445948100-16446-1-git-send-email-uri.mashiach@compulab.co.il>
  <1448373733-5839-1-git-send-email-uri.mashiach@compulab.co.il>
-Message-ID: <1448373733-5839-4-git-send-email-uri.mashiach@compulab.co.il>
+Message-ID: <1448373733-5839-2-git-send-email-uri.mashiach@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ilya Ledvich <ilya@compulab.co.il>
 
-Add pinmux configuration for NAND specific GPMC pins.
-Add description for GPMC controller. Add child node for NAND flash
-including CM-T335 specific partition table to GPMC node.
-Enable error-location module (ELM).
+Add basic support for CompuLab cm-t335 module based on AM335X SoC.
 
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+CM-T335 is a tiny computer-on-module (CoM) / system-on-module (SoM)
+The module is built around the Texas Instruments Sitara AM3352/4
+system-on-chip.
+
+The CPU is supplemented with up-to 512MB DDR3 and up-to 1GB of on-board
+NAND storage, WiFi connected to SPI, Bluetooth, Analog audio, Gigabit
+Ethernet, CAN bus.
+
+Current patch adds support:
+UART0 and GPIO LED
+
+Detailed description can be found at the module site:
+http://www.compulab.co.il/products/computer-on-modules/cm-t335/
+
 Signed-off-by: Ilya Ledvich <ilya@compulab.co.il>
+[uri.mashiach at compulab.co.il: the default RAM amount reduced to
+128MB to support also the minimal module configuration]
 Signed-off-by: Uri Mashiach <uri.mashiach@compulab.co.il>
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 ---
 v1 -> v2: integrate AM33XX_IOPAD macro in pinmux definitions
 
- arch/arm/boot/dts/am335x-cm-t335.dts | 106 +++++++++++++++++++++++++++++++++++
- 1 file changed, 106 insertions(+)
+ .../devicetree/bindings/arm/omap/omap.txt          |  3 ++
+ arch/arm/boot/dts/Makefile                         |  7 +--
+ arch/arm/boot/dts/am335x-cm-t335.dts               | 63 ++++++++++++++++++++++
+ 3 files changed, 70 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/boot/dts/am335x-cm-t335.dts
 
-diff --git a/arch/arm/boot/dts/am335x-cm-t335.dts b/arch/arm/boot/dts/am335x-cm-t335.dts
-index 02b6679..431b6dd 100644
---- a/arch/arm/boot/dts/am335x-cm-t335.dts
-+++ b/arch/arm/boot/dts/am335x-cm-t335.dts
-@@ -62,6 +62,41 @@
- 		>;
- 	};
+diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+index 9f4e513..2154f97 100644
+--- a/Documentation/devicetree/bindings/arm/omap/omap.txt
++++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+@@ -138,6 +138,9 @@ Boards:
+ - AM335X phyBOARD-WEGA: Single Board Computer dev kit
+   compatible = "phytec,am335x-wega", "phytec,am335x-phycore-som", "ti,am33xx"
  
-+	nandflash_pins: pinmux_nandflash_pins {
-+		pinctrl-single,pins = <
-+			/* gpmc_ad0.gpmc_ad0 */
-+			AM33XX_IOPAD(0x800, PIN_INPUT_PULLUP | MUX_MODE0)
-+			/* gpmc_ad1.gpmc_ad1 */
-+			AM33XX_IOPAD(0x804, PIN_INPUT_PULLUP | MUX_MODE0)
-+			/* gpmc_ad2.gpmc_ad2 */
-+			AM33XX_IOPAD(0x808, PIN_INPUT_PULLUP | MUX_MODE0)
-+			/* gpmc_ad3.gpmc_ad3 */
-+			AM33XX_IOPAD(0x80c, PIN_INPUT_PULLUP | MUX_MODE0)
-+			/* gpmc_ad4.gpmc_ad4 */
-+			AM33XX_IOPAD(0x810, PIN_INPUT_PULLUP | MUX_MODE0)
-+			/* gpmc_ad5.gpmc_ad5 */
-+			AM33XX_IOPAD(0x814, PIN_INPUT_PULLUP | MUX_MODE0)
-+			/* gpmc_ad6.gpmc_ad6 */
-+			AM33XX_IOPAD(0x818, PIN_INPUT_PULLUP | MUX_MODE0)
-+			/* gpmc_ad7.gpmc_ad7 */
-+			AM33XX_IOPAD(0x81c, PIN_INPUT_PULLUP | MUX_MODE0)
-+			/* gpmc_wait0.gpmc_wait0 */
-+			AM33XX_IOPAD(0x870, PIN_INPUT_PULLUP | MUX_MODE0)
-+			/* gpmc_wpn.gpio0_30 */
-+			AM33XX_IOPAD(0x874, PIN_INPUT_PULLUP | MUX_MODE7)
-+			/* gpmc_csn0.gpmc_csn0  */
-+			AM33XX_IOPAD(0x87c, PIN_OUTPUT | MUX_MODE0)
-+			/* gpmc_advn_ale.gpmc_advn_ale */
-+			AM33XX_IOPAD(0x890, PIN_OUTPUT | MUX_MODE0)
-+			/* gpmc_oen_ren.gpmc_oen_ren */
-+			AM33XX_IOPAD(0x894, PIN_OUTPUT | MUX_MODE0)
-+			/* gpmc_wen.gpmc_wen */
-+			AM33XX_IOPAD(0x898, PIN_OUTPUT | MUX_MODE0)
-+			/* gpmc_ben0_cle.gpmc_ben0_cle */
-+			AM33XX_IOPAD(0x89c, PIN_OUTPUT | MUX_MODE0)
-+		>;
++- AM335X CM-T335 : System On Module, built around the Sitara AM3352/4
++  compatible = "compulab,cm-t335", "ti,am33xx"
++
+ - OMAP5 EVM : Evaluation Module
+   compatible = "ti,omap5-evm", "ti,omap5"
+ 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index bb8fa02..0e011dc 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -446,13 +446,14 @@ dtb-$(CONFIG_SOC_AM33XX) += \
+ 	am335x-base0033.dtb \
+ 	am335x-bone.dtb \
+ 	am335x-boneblack.dtb \
+-	am335x-sl50.dtb \
++	am335x-chiliboard.dtb \
++	am335x-cm-t335.dtb \
+ 	am335x-evm.dtb \
+ 	am335x-evmsk.dtb \
++	am335x-lxm.dtb \
+ 	am335x-nano.dtb \
+ 	am335x-pepper.dtb \
+-	am335x-lxm.dtb \
+-	am335x-chiliboard.dtb \
++	am335x-sl50.dtb \
+ 	am335x-wega-rdk.dtb
+ dtb-$(CONFIG_ARCH_OMAP4) += \
+ 	omap4-duovero-parlor.dtb \
+diff --git a/arch/arm/boot/dts/am335x-cm-t335.dts b/arch/arm/boot/dts/am335x-cm-t335.dts
+new file mode 100644
+index 0000000..719658e
+--- /dev/null
++++ b/arch/arm/boot/dts/am335x-cm-t335.dts
+@@ -0,0 +1,63 @@
++/*
++ * am335x-cm-t335.dts - Device Tree file for Compulab CM-T335
++ *
++ * Copyright (C) 2014 - 2015 CompuLab Ltd. - http://www.compulab.co.il/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/dts-v1/;
++
++#include "am33xx.dtsi"
++
++/ {
++	model = "CompuLab CM-T335";
++	compatible = "compulab,cm-t335", "ti,am33xx";
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x8000000>;	/* 128 MB */
 +	};
 +
- 	uart0_pins: pinmux_uart0_pins {
- 		pinctrl-single,pins = <
- 			/* uart0_rxd.uart0_rxd */
-@@ -98,3 +133,74 @@
- 	};
- };
- 
-+&gpmc {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&nandflash_pins>;
-+	ranges = <0 0 0x08000000 0x10000000>;	/* CS0: NAND */
-+	nand at 0,0 {
-+		reg = <0 0 0>; /* CS0, offset 0 */
-+		ti,nand-ecc-opt = "bch8";
-+		ti,elm-id = <&elm>;
-+		nand-bus-width = <8>;
-+		gpmc,device-width = <1>;
-+		gpmc,sync-clk-ps = <0>;
-+		gpmc,cs-on-ns = <0>;
-+		gpmc,cs-rd-off-ns = <44>;
-+		gpmc,cs-wr-off-ns = <44>;
-+		gpmc,adv-on-ns = <6>;
-+		gpmc,adv-rd-off-ns = <34>;
-+		gpmc,adv-wr-off-ns = <44>;
-+		gpmc,we-on-ns = <0>;
-+		gpmc,we-off-ns = <40>;
-+		gpmc,oe-on-ns = <0>;
-+		gpmc,oe-off-ns = <54>;
-+		gpmc,access-ns = <64>;
-+		gpmc,rd-cycle-ns = <82>;
-+		gpmc,wr-cycle-ns = <82>;
-+		gpmc,wait-on-read = "true";
-+		gpmc,wait-on-write = "true";
-+		gpmc,bus-turnaround-ns = <0>;
-+		gpmc,cycle2cycle-delay-ns = <0>;
-+		gpmc,clk-activation-ns = <0>;
-+		gpmc,wait-monitoring-ns = <0>;
-+		gpmc,wr-access-ns = <40>;
-+		gpmc,wr-data-mux-bus-ns = <0>;
-+		/* MTD partition table */
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		partition at 0 {
-+			label = "spl";
-+			reg = <0x00000000 0x00200000>;
-+		};
-+		partition at 1 {
-+			label = "uboot";
-+			reg = <0x00200000 0x00100000>;
-+		};
-+		partition at 2 {
-+			label = "uboot environment";
-+			reg = <0x00300000 0x00100000>;
-+		};
-+		partition at 3 {
-+			label = "dtb";
-+			reg = <0x00400000 0x00100000>;
-+		};
-+		partition at 4 {
-+			label = "splash";
-+			reg = <0x00500000 0x00400000>;
-+		};
-+		partition at 5 {
-+			label = "linux";
-+			reg = <0x00900000 0x00600000>;
-+		};
-+		partition at 6 {
-+			label = "rootfs";
-+			reg = <0x00F00000 0>;
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&gpio_led_pins>;
++		led at 0 {
++			label = "cm_t335:green";
++			gpios = <&gpio2 0 GPIO_ACTIVE_LOW>;	/* gpio2_0 */
++			linux,default-trigger = "heartbeat";
 +		};
 +	};
 +};
 +
-+&elm {
++&am33xx_pinmux {
++	pinctrl-names = "default";
++	pinctrl-0 = <>;
++
++	gpio_led_pins: pinmux_gpio_led_pins {
++		pinctrl-single,pins = <
++			/* gpmc_csn3.gpio2_0 */
++			AM33XX_IOPAD(0x888, PIN_OUTPUT | MUX_MODE7)
++		>;
++	};
++
++	uart0_pins: pinmux_uart0_pins {
++		pinctrl-single,pins = <
++			/* uart0_rxd.uart0_rxd */
++			AM33XX_IOPAD(0x970, PIN_INPUT_PULLUP | MUX_MODE0)
++			/* uart0_txd.uart0_txd */
++			AM33XX_IOPAD(0x974, PIN_OUTPUT_PULLDOWN | MUX_MODE0)
++		>;
++	};
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins>;
++
 +	status = "okay";
 +};
 +
