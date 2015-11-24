@@ -1,55 +1,110 @@
-From: shubhrajyoti.datta@gmail.com (Shubhrajyoti Datta)
-Date: Tue, 24 Nov 2015 09:58:32 +0530
-Subject: [PATCH v2] i2c: cadence: Move to sensible power management
-In-Reply-To: <20151123184710.GH32017@xsjsorenbubuntu>
-References: <1446017200-30373-1-git-send-email-shubhraj@xilinx.com>
- <20151028161810.GB6436@xsjsorenbubuntu>
- <CAKfKVtHbKrYK-JkQRWO3hEyOkGEW8q9zc6r90PNP8uEm3VXc4Q@mail.gmail.com>
- <CAKfKVtHHKcs1UAM4pb4Qbtn5TEOboZf1SrL4qFuFZYSCUundHw@mail.gmail.com>
- <20151123184710.GH32017@xsjsorenbubuntu>
-Message-ID: <CAKfKVtHbzEAWL8OedkxY2bfC+oR_DHejS3Lx5F_t0mKCs21i2g@mail.gmail.com>
+From: prem.mallappa@broadcom.com (Prem (Premachandra) Mallappa)
+Date: Tue, 24 Nov 2015 05:30:37 +0000
+Subject: [PATCH] IOMMU: arm-smmu-v3: Use STE.S1STALLD only when supported
+In-Reply-To: <20151117174636.GO30101@arm.com>
+References: <1447663700-13309-1-git-send-email-pmallapp@broadcom.com>
+ <20151117174636.GO30101@arm.com>
+Message-ID: <CC0BC9CB4553B146B290EC1D4DC5C359010924D5@SJEXCHMB15.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 12:17 AM, S?ren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
-> On Sat, 2015-11-21 at 07:00PM +0530, Shubhrajyoti Datta wrote:
->> On Thu, Oct 29, 2015 at 8:27 PM, Shubhrajyoti Datta
->> <shubhrajyoti.datta@gmail.com> wrote:
->> > On Wed, Oct 28, 2015 at 9:48 PM, S?ren Brinkmann
->> > <soren.brinkmann@xilinx.com> wrote:
->> >> Hi Shubhrajyoti,
->> >>
->> >>
->> >> On Wed, 2015-10-28 at 12:56PM +0530, Shubhrajyoti Datta wrote:
->> >>> Currently the clocks are enabled at probe and disabled at remove.
->> >>> Which keeps the clocks enabled even if no transaction is going on.
->> >>> This patch enables the clocks at the start of transfer and disables
->> >>> after it.
->> >>>
->> >>> Also adapts to runtime pm.
->> >>> Remove xi2c->suspended and use pm runtime status instead.
->> >>>
->> >>> converts dev pm to const to silence a checkpatch warning.
->> >>>
->> >>> Signed-off-by: Shubhrajyoti Datta <shubhraj@xilinx.com>
->> >>
->> >> To me, this looks all good. Just one small concern below.
->> >
->> > Thanks for the review.
->> Soren ,
->> Do are you ok with the change or do you want me to resend without the
->> suspended flag change.
->
-> I'm always for removing code that is not needed. If things are tested
-> and well and work without throwing any warnings I'm OK with it.
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: 17 November 2015 11:17 PM
+> To: Prem (Premachandra) Mallappa
+> Cc: iommu at lists.linux-foundation.org; linux-arm-kernel at lists.infradead.org;
+> Jayachandran Chandrashekaran Nair
+> Subject: Re: [PATCH] IOMMU: arm-smmu-v3: Use STE.S1STALLD only when
+> supported
+> 
+> Hi Prem,
+> 
+> Thanks for the patch. Just a few minor comments...
+> 
+> On Mon, Nov 16, 2015 at 02:18:20PM +0530, pmallapp at broadcom.com
+> wrote:
+> > From: Prem Mallappa <pmallapp@broadcom.com>
+> >
+> > Also fix the STALLD check.
+> 
+> Can you extend the commit message please to explain that it is ILLEGAL to
+> set STE.S1STALLD to 1 if stage 1 is enabled and either the stall or terminate
+> models are not supported?
+> 
+> > Signed-off-by: Prem Mallappa <pmallapp@broadcom.com>
+> > ---
+> >  drivers/iommu/arm-smmu-v3.c | 16 +++++++++++++---
+> >  1 file changed, 13 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-
+> v3.c
+> > index ed409cb..804671c 100644
+> > --- a/drivers/iommu/arm-smmu-v3.c
+> > +++ b/drivers/iommu/arm-smmu-v3.c
+> > @@ -38,7 +38,9 @@
+> >  #define IDR0_ST_LVL_SHIFT		27
+> >  #define IDR0_ST_LVL_MASK		0x3
+> >  #define IDR0_ST_LVL_2LVL		(1 << IDR0_ST_LVL_SHIFT)
+> > -#define IDR0_STALL_MODEL		(3 << 24)
+> > +#define IDR0_STALL_SHIFT		24
+> 
+> To keep the style consistent, can you also add IDR0_STALL_MASK please...
+> 
+> > +#define IDR0_STALL_MODEL_STALL		0x0
+> > +#define IDR0_STALL_MODEL_FORCE		0x2
+> 
+> ... and shift these guys left by IDR0_STALL_SHIFT?
+> 
+> >
+> >  #define IDR0_TTENDIAN_SHIFT		21
+> >  #define IDR0_TTENDIAN_MASK		0x3
+> >  #define IDR0_TTENDIAN_LE		(2 << IDR0_TTENDIAN_SHIFT)
+> > @@ -1051,12 +1053,14 @@ static void arm_smmu_write_strtab_ent(struct
+> arm_smmu_device *smmu, u32 sid,
+> >  			 STRTAB_STE_1_S1C_CACHE_WBRA
+> >  			 << STRTAB_STE_1_S1COR_SHIFT |
+> >  			 STRTAB_STE_1_S1C_SH_ISH <<
+> STRTAB_STE_1_S1CSH_SHIFT |
+> > -			 STRTAB_STE_1_S1STALLD |
+> >  #ifdef CONFIG_PCI_ATS
+> >  			 STRTAB_STE_1_EATS_TRANS <<
+> STRTAB_STE_1_EATS_SHIFT |  #endif
+> >  			 STRTAB_STE_1_STRW_NSEL1 <<
+> STRTAB_STE_1_STRW_SHIFT);
+> >
+> > +		if (smmu->features & ARM_SMMU_FEAT_STALLS)
+> > +			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
+> > +
+> >  		val |= (ste->s1_cfg->cdptr_dma &
+> STRTAB_STE_0_S1CTXPTR_MASK
+> >  		        << STRTAB_STE_0_S1CTXPTR_SHIFT) |
+> >  			STRTAB_STE_0_CFG_S1_TRANS;
+> > @@ -2483,8 +2487,14 @@ static int arm_smmu_device_probe(struct
+> arm_smmu_device *smmu)
+> >  		dev_warn(smmu->dev, "IDR0.COHACC overridden by dma-
+> coherent property (%s)\n",
+> >  			 coherent ? "true" : "false");
+> >
+> > -	if (reg & IDR0_STALL_MODEL)
+> > +	switch ((reg >> IDR0_STALL_SHIFT) & 0x3) {
+> 
+> Then structure this more like the TTENDIAN code:
+> 
+>   switch (reg & IDR0_STALL_MASK << IDR0_STALL_SHIFT) {
+> 
+> > +	case IDR0_STALL_MODEL_STALL:
+> > +	case IDR0_STALL_MODEL_FORCE:
+> >  		smmu->features |= ARM_SMMU_FEAT_STALLS;
+> > +		break;
+> > +	default:
+> > +		break;
+> > +	}
+> 
+> I think you can drop the default case, or does GCC complain?
+> 
+> Will
 
-It should be also having a suspended book-keeping in the driver is not
-needed the pm does that for us.
 
-I will spilt the patch and resend.
+Thanks for comments, I was on holiday, I'll send updated patch along with 2 more soon.
 
-Thanks,
-
->
->         S?ren
+/Prem
