@@ -1,64 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Nov 2015 14:45:16 +0100
-Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
- functions
-In-Reply-To: <yw1xoaejr3u6.fsf@unicorn.mansr.com>
-References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
- <3811106.btnGdZynet@wuerfel> <yw1xoaejr3u6.fsf@unicorn.mansr.com>
-Message-ID: <2604538.XjBEKvm9od@wuerfel>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 24 Nov 2015 14:47:40 +0100
+Subject: [PATCH 1/3] i2c: at91: add setting HOLD field of TWIHS_CWGR via DT
+Message-ID: <1448372862-11912-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 November 2015 12:15:13 M?ns Rullg?rd wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
-> > On Monday 23 November 2015 15:13:52 Stephen Boyd wrote:
-> >> On 11/23, Arnd Bergmann wrote:
-> >> > On Monday 23 November 2015 13:32:06 Stephen Boyd wrote:
-> >> > diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> >> > index b251013eef0a..bad6343c34d5 100644
-> >> Do you have the information on these custom opcodes? I can work
-> >> that into the patches assuming the MIDR is different.
-> >
-> > Thomas Petazzoni said this in a private mail:
-> >
-> > | According to the datasheet, the PJ4B has integer signed and unsigned
-> > | divide, similar to the sdiv and udiv ARM instructions. But the way to
-> > | access it is by doing a MRC instruction.
-> > |
-> > |    MRC<cond> p6, 1, Rd , CRn , CRm, 4
-> > |
-> > |for PJ4B is the same as:
-> > |
-> > |    SDIV Rd , Rn, Rm
-> > |
-> > | on ARM cores.
-> > |
-> > |And:
-> > |
-> > |    MRC<cond> p6, 1, Rd , CRn , CRm, 0
-> > |
-> > |for PJ4B is the same as:
-> > |
-> > |    UDIV Rd , Rn, Rm
-> > |
-> > |on ARM cores.
-> > |
-> > |This is documented in the "Extended instructions" section of the
-> > |PJ4B datasheet.
-> >
-> > I assume what he meant was that this is true for both PJ4 and PJ4B
-> > but not for PJ4B-MP, which has the normal udiv/sdiv instructions.
-> >
-> > IOW, anything with CPU implementer 0x56 part 0x581 should use those,
-> > while part 0x584 can use the sdiv/udiv that it reports correctly.
-> 
-> Or we could simply ignore those and they'd be no worse off than they are
-> now.
+From: Wenyou Yang <wenyou.yang@atmel.com>
 
-Well, if we add all the infrastructure to do dynamic patching, we
-might as well use it here, that is a very little extra effort.
+Add the HOLD field management. Some i2c devices need a longer data hold
+time than the one given in the i2c bus specification. Since this value
+depends on the i2c device connected to the bus, add a DT property to
+configure it: "atmel,twd-hold-cycles".
 
-I'm not convinced that the dynamic patching for idiv is actually needed
-but I'm not objecting either, and Stephen has done the work already.
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/i2c/busses/i2c-at91.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
-	Arnd
+diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+index 10835d1..b3595ea 100644
+--- a/drivers/i2c/busses/i2c-at91.c
++++ b/drivers/i2c/busses/i2c-at91.c
+@@ -64,6 +64,7 @@
+ #define	AT91_TWI_IADR		0x000c	/* Internal Address Register */
+ 
+ #define	AT91_TWI_CWGR		0x0010	/* Clock Waveform Generator Reg */
++#define	AT91_TWI_CWGR_HOLD(x)	(((x) & 0x1f) << 24)
+ 
+ #define	AT91_TWI_SR		0x0020	/* Status Register */
+ #define	AT91_TWI_TXCOMP		BIT(0)	/* Transmission Complete */
+@@ -185,7 +186,8 @@ static void at91_init_twi_bus(struct at91_twi_dev *dev)
+  * Calculate symmetric clock as stated in datasheet:
+  * twi_clk = F_MAIN / (2 * (cdiv * (1 << ckdiv) + offset))
+  */
+-static void at91_calc_twi_clock(struct at91_twi_dev *dev, int twi_clk)
++static void at91_calc_twi_clock(struct at91_twi_dev *dev,
++				int twi_clk, u32 twd_hold)
+ {
+ 	int ckdiv, cdiv, div;
+ 	struct at91_twi_pdata *pdata = dev->pdata;
+@@ -204,7 +206,9 @@ static void at91_calc_twi_clock(struct at91_twi_dev *dev, int twi_clk)
+ 		cdiv = 255;
+ 	}
+ 
+-	dev->twi_cwgr_reg = (ckdiv << 16) | (cdiv << 8) | cdiv;
++	dev->twi_cwgr_reg = (ckdiv << 16) | (cdiv << 8) | cdiv
++			    | AT91_TWI_CWGR_HOLD(twd_hold);
++
+ 	dev_dbg(dev->dev, "cdiv %d ckdiv %d\n", cdiv, ckdiv);
+ }
+ 
+@@ -994,6 +998,7 @@ static int at91_twi_probe(struct platform_device *pdev)
+ 	int rc;
+ 	u32 phy_addr;
+ 	u32 bus_clk_rate;
++	u32 twd_hold_cycles = 0;
+ 
+ 	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
+ 	if (!dev)
+@@ -1050,7 +1055,10 @@ static int at91_twi_probe(struct platform_device *pdev)
+ 	if (rc)
+ 		bus_clk_rate = DEFAULT_TWI_CLK_HZ;
+ 
+-	at91_calc_twi_clock(dev, bus_clk_rate);
++	of_property_read_u32(dev->dev->of_node, "atmel,twd-hold-cycles",
++			     &twd_hold_cycles);
++
++	at91_calc_twi_clock(dev, bus_clk_rate, twd_hold_cycles);
+ 	at91_init_twi_bus(dev);
+ 
+ 	snprintf(dev->adapter.name, sizeof(dev->adapter.name), "AT91");
+-- 
+2.5.0
