@@ -1,86 +1,40 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Mon, 23 Nov 2015 16:06:04 -0800
-Subject: [PATCH v2 2/2] restrict /dev/mem to idle io memory ranges
-In-Reply-To: <20151124000553.26360.57819.stgit@dwillia2-desk3.jf.intel.com>
-References: <20151124000553.26360.57819.stgit@dwillia2-desk3.jf.intel.com>
-Message-ID: <20151124000604.26360.56945.stgit@dwillia2-desk3.jf.intel.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 23 Nov 2015 16:13:06 -0800
+Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
+ functions
+In-Reply-To: <6359949.bhCrxaQvmL@wuerfel>
+References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
+ <133921941.Qfq59EaTOs@wuerfel>
+ <20151123213206.GG19156@codeaurora.org>
+ <6359949.bhCrxaQvmL@wuerfel>
+Message-ID: <20151124001306.GI19156@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This effectively promotes IORESOURCE_BUSY to IORESOURCE_EXCLUSIVE
-semantics by default.  If userspace really believes it is safe to access
-the memory region it can also perform the extra step of disabling an
-active driver.  This protects device address ranges with read side
-effects and otherwise directs userspace to use the driver.
+On 11/23, Arnd Bergmann wrote:
+> 
+> Ok, thanks for the confirmation.
+> 
+> Summarizing what we've found, I think we can get away with just
+> introducing two Kconfig symbols ARCH_MULTI_V7VE and CPU_V7VE.
+> Most CPUs fall clearly into one category or the other, and then
+> we can allow LPAE to be selected for V7VE-only build but not
+> for plain V7, and we can unconditionally build the kernel with
+> 
+> arch-$(CONFIG_CPU_32v7VE)  = -D__LINUX_ARM_ARCH__=7 $(call cc-option,-march=armv7ve,-march=armv7-a -mcpu=cortex-a15)
+> 
 
-Persistent memory presents a large "mistake surface" to /dev/mem as now
-accidental writes can corrupt a filesystem.
+This causes compiler spew for me:
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Acked-by: Kees Cook <keescook@chromium.org>
-Acked-by: Ingo Molnar <mingo@redhat.com>
-Signed-off-by: Dan Williams <dan.j.williams@intel.com>
----
- kernel/resource.c |   11 +++++++++--
- lib/Kconfig.debug |   23 ++++++++++++++++++++---
- 2 files changed, 29 insertions(+), 5 deletions(-)
+  warning: switch -mcpu=cortex-a15 conflicts with -march=armv7-a switch
 
-diff --git a/kernel/resource.c b/kernel/resource.c
-index f150dbbe6f62..09c0597840b0 100644
---- a/kernel/resource.c
-+++ b/kernel/resource.c
-@@ -1498,8 +1498,15 @@ int iomem_is_exclusive(u64 addr)
- 			break;
- 		if (p->end < addr)
- 			continue;
--		if (p->flags & IORESOURCE_BUSY &&
--		     p->flags & IORESOURCE_EXCLUSIVE) {
-+		/*
-+		 * A resource is exclusive if IORESOURCE_EXCLUSIVE is set
-+		 * or CONFIG_IO_STRICT_DEVMEM is enabled and the
-+		 * resource is busy.
-+		 */
-+		if ((p->flags & IORESOURCE_BUSY) == 0)
-+			continue;
-+		if (IS_ENABLED(CONFIG_IO_STRICT_DEVMEM)
-+				|| p->flags & IORESOURCE_EXCLUSIVE) {
- 			err = 1;
- 			break;
- 		}
-diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
-index 289dfcbc14eb..073496dea848 100644
---- a/lib/Kconfig.debug
-+++ b/lib/Kconfig.debug
-@@ -1869,9 +1869,26 @@ config STRICT_DEVMEM
- 	  enabled, even in this case there are restrictions on /dev/mem
- 	  use due to the cache aliasing requirements.
- 
-+	  If this option is switched on, and IO_STRICT_DEVMEM=n, the /dev/mem
-+	  file only allows userspace access to PCI space and the BIOS code and
-+	  data regions.  This is sufficient for dosemu and X and all common
-+	  users of /dev/mem.
-+
-+	  If in doubt, say Y.
-+
-+config IO_STRICT_DEVMEM
-+	bool "Filter I/O access to /dev/mem"
-+	depends on STRICT_DEVMEM
-+	default STRICT_DEVMEM
-+	---help---
-+	  If this option is disabled, you allow userspace (root) access to all
-+	  io-memory regardless of whether a driver is actively using that
-+	  range.  Accidental access to this is obviously disastrous, but
-+	  specific access can be used by people debugging kernel drivers.
-+
- 	  If this option is switched on, the /dev/mem file only allows
--	  userspace access to PCI space and the BIOS code and data regions.
--	  This is sufficient for dosemu and X and all common users of
--	  /dev/mem.
-+	  userspace access to *idle* io-memory ranges (see /proc/iomem) This
-+	  may break traditional users of /dev/mem (dosemu, legacy X, etc...)
-+	  if the driver using a given range cannot be disabled.
- 
- 	  If in doubt, say Y.
+Removing -march=armv7-a from there makes it quiet.
+
+Also, it's sort of feels wrong to have -mcpu in a place where
+we're exclusively doing -march. Perhaps the fallback should be
+bog standard -march=armv7-a? (or the fallback for that one
+"-march=armv5t -Wa$(comma)-march=armv7-a")?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
