@@ -1,147 +1,50 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 24 Nov 2015 11:18:01 +0000
-Subject: [Xen-devel] [PATCH v3 24/62] arm: Introduce a generic way to
- use a device from acpi
-In-Reply-To: <1447753261-7552-25-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-25-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511241110360.1107@kaball.uk.xensource.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 24 Nov 2015 12:19:21 +0100
+Subject: [PATCH v2] clk: imx25: Remove osc clock from driver
+In-Reply-To: <20151124035349.GE11999@tiger>
+References: <1445839848-28323-1-git-send-email-mpa@pengutronix.de>
+ <20151124035349.GE11999@tiger>
+Message-ID: <2985109.TyRxRSpDc1@adelgunde>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> From: Parth Dixit <parth.dixit@linaro.org>
+Hi Shawn,
+
+On Tuesday 24 November 2015 11:53:49 Shawn Guo wrote:
+> On Mon, Oct 26, 2015 at 07:10:48AM +0100, Markus Pargmann wrote:
+> > The 'osc' clock is already initialized by the fixed clock defined in
+> > imx25.dtsi. The imx25 clock driver tries to add this clock for a second
+> > time and fails with -EEXIST:
+> > 	i.MX clk 1: register failed with -17
+> > 
+> > As the clock is already properly setup in DT with a different driver, we
+> > can completely remove the handling in the imx25 clock driver.
+> > 
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 > 
-> Add generic way to use device from acpi similar to the way it is
-> supported in device tree.
+> Markus,
 > 
-> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  xen/arch/arm/device.c        | 19 +++++++++++++++++++
->  xen/arch/arm/xen.lds.S       |  7 +++++++
->  xen/include/asm-arm/device.h | 30 ++++++++++++++++++++++++++++++
->  3 files changed, 56 insertions(+)
-> 
-> diff --git a/xen/arch/arm/device.c b/xen/arch/arm/device.c
-> index 0b53f6a..5494de0 100644
-> --- a/xen/arch/arm/device.c
-> +++ b/xen/arch/arm/device.c
-> @@ -22,6 +22,7 @@
->  #include <xen/lib.h>
->  
->  extern const struct device_desc _sdevice[], _edevice[];
-> +extern const struct acpi_device_desc _asdevice[], _aedevice[];
->  
->  int __init device_init(struct dt_device_node *dev, enum device_class class,
->                         const void *data)
-> @@ -50,6 +51,24 @@ int __init device_init(struct dt_device_node *dev, enum device_class class,
->      return -EBADF;
->  }
->  
-> +int __init acpi_device_init(enum device_class class, const void *data, int class_type)
-> +{
-> +    const struct acpi_device_desc *desc;
-> +
-> +    for ( desc = _asdevice; desc != _aedevice; desc++ )
-> +    {
-> +        if ( ( desc->class != class ) && ( desc->class_type != class_type ) )
-> +            continue;
+> Please resend the patch with clock maintainers and list on copy.  If you
+> think it's a non-critical fix, I will queue it for v4.5-rc1.  Otherwise,
+> you ask clock maintainers to send it for v4.4-rc inclusion.
 
-Shouldn't this be
+I just resent this patch (and rebased it). This is a non-critical fix and
+4.5-rc1 is fine.
 
-  if ( ( desc->class != class ) || ( desc->class_type != class_type ) )
+Best Regards,
 
-?
+Markus
 
-> +
-> +        ASSERT(desc->init != NULL);
-> +
-> +        return desc->init(data);
-> +    }
-> +
-> +    return -EBADF;
-> +}
-> +
->  enum device_class device_get_class(const struct dt_device_node *dev)
->  {
->      const struct device_desc *desc;
-> diff --git a/xen/arch/arm/xen.lds.S b/xen/arch/arm/xen.lds.S
-> index 0488f37..60802f6 100644
-> --- a/xen/arch/arm/xen.lds.S
-> +++ b/xen/arch/arm/xen.lds.S
-> @@ -100,6 +100,13 @@ SECTIONS
->        _edevice = .;
->    } :text
->  
-> +  . = ALIGN(8);
-> +  .adev.info : {
-> +      _asdevice = .;
-> +      *(.adev.info)
-> +      _aedevice = .;
-> +  } :text
-> +
->    . = ALIGN(PAGE_SIZE);             /* Init code and data */
->    __init_begin = .;
->    .init.text : {
-> diff --git a/xen/include/asm-arm/device.h b/xen/include/asm-arm/device.h
-> index 5d0a4cd..085f221 100644
-> --- a/xen/include/asm-arm/device.h
-> +++ b/xen/include/asm-arm/device.h
-> @@ -50,6 +50,27 @@ struct device_desc {
->      int (*init)(struct dt_device_node *dev, const void *data);
->  };
->  
-> +struct acpi_device_desc {
-> +    /* Device name */
-> +    const char *name;
-> +    /* Device class */
-> +    enum device_class class;
-> +    /* type of device supported by the driver */
-> +    const int class_type;
-> +    /* Device initialization */
-> +    int (*init)(const void *data);
-> +};
-> +
-> +/**
-> + *  acpi_device_init - Initialize a device
-> + *  @class: class of the device (serial, network...)
-> + *  @data: specific data for initializing the device
-> + *
-> + *  Return 0 on success.
-> + */
-> +int __init acpi_device_init(enum device_class class,
-> +                            const void *data, int class_type);
-> +
->  /**
->   *  device_init - Initialize a device
->   *  @dev: device to initialize
-> @@ -78,6 +99,15 @@ __section(".dev.info") = {                                          \
->  #define DT_DEVICE_END                                               \
->  };
->  
-> +#define ACPI_DEVICE_START(_name, _namestr, _class)                    \
-> +static const struct acpi_device_desc __dev_desc_##_name __used           \
-> +__attribute__((__section__(".adev.info"))) = {                       \
-
-why __attribute__?
-
-
-> +    .name = _namestr,                                               \
-> +    .class = _class,                                                \
-> +
-> +#define ACPI_DEVICE_END                                               \
-> +};
-> +
->  #endif /* __ASM_ARM_DEVICE_H */
->  
->  /*
-> -- 
-> 2.1.0
-> 
-> 
-> _______________________________________________
-> Xen-devel mailing list
-> Xen-devel at lists.xen.org
-> http://lists.xen.org/xen-devel
-> 
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151124/7043dca7/attachment.sig>
