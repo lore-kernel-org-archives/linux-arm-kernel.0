@@ -1,41 +1,29 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue, 24 Nov 2015 17:47:17 +0100
-Subject: [PATCH 00/13] mvneta Buffer Management and enhancements
-In-Reply-To: <20151124.112253.2276973557484332376.davem@davemloft.net>
-References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
- <20151124.112253.2276973557484332376.davem@davemloft.net>
-Message-ID: <CAPv3WKc+NA58=sxXe-YhUZvE9ca0q=ZC5L9WZOvAevuWZhAnYw@mail.gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 24 Nov 2015 08:52:06 -0800
+Subject: suspicious RCU usage on 4.4-rc2 ARM platform
+In-Reply-To: <20151124162750.GE20439@e106622-lin>
+References: <20151124162750.GE20439@e106622-lin>
+Message-ID: <20151124165206.GQ26643@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On Tue, Nov 24, 2015 at 04:27:50PM +0000, Juri Lelli wrote:
+> Hi Paul,
+> 
+> I'm hitting these splats while running simple hotplug tests on an ARM
+> TC2 platform. The following seems to cure it, but I don't think it never
+> made it to mainline:
+> 
+>  https://lkml.org/lkml/2015/5/12/892 
+> 
+> Any reason why?
 
-Thanks for the remark. I will do the split and re-submit.
+If I remember correctly, it could result in failures on some ARM
+processors.  The problem was that this patch assumes that the CPU
+caches remain active throughout, when in fact they can be disabled at an
+inconvenient time.  As I understand it, this can result in other updates
+to that cache line being lost when the CPU is powered off.
 
-Best regards,
-Marcin
+RMK would know more.
 
-2015-11-24 17:22 GMT+01:00 David Miller <davem@davemloft.net>:
->
-> This patch series has a lot of problems.
->
-> The worst one is that you are mixing bug fixes and new
-> features/cleanups.
->
-> You cannot do that.
->
-> You _especially_ can't do that if you expect some of this stuff
-> to be submitted to -stable too.
->
-> Therefore you _must_ extract out the bug fixes, and submit those
-> against 'net'.  And you must then wait for 'net' to be merged
-> into 'net-next' before submitting the new feature patches.
->
-> Furthermore, you should explicitly show what tree you are targetting
-> your patches at, in your Subject lines.  In the form:
->
->         Subject: [PATCH $(TREE) N/M]
->
-> Where $(TREE) is either 'net' or 'net-next'.
->
-> THanks.
+							Thanx, Paul
