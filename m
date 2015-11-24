@@ -1,68 +1,66 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 24 Nov 2015 13:14:16 +0000
-Subject: [RESEND v4 0/6] remoteproc: Add driver for STMicroelectronics
- platforms
-Message-ID: <1448370862-19120-1-git-send-email-lee.jones@linaro.org>
+Date: Tue, 24 Nov 2015 13:14:17 +0000
+Subject: [RESEND v4 1/6] remoteproc: dt: Provide bindings for ST's Remote
+ Processor Controller driver
+In-Reply-To: <1448370862-19120-1-git-send-email-lee.jones@linaro.org>
+References: <1448370862-19120-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1448370862-19120-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ST's platforms often have multiple co-processors (usually ST40s or ST231s)
-on-board.  This provides the Linux-side infrastructure to flash and boot
-them successfully.
-
-This set has been tested on an STiH410-B2120.
-
-v3 => v4:
- Suggested-by: Suman Anna <s-anna@ti.com>
- - Move to using 'reserved-memory' API
-   - New 'reserved-memory' nodes
-   - Remove memory locations from RemoteProc's DT node's reg properties
-   - Remove C code obtaining/allocating DMA memory
- - Re-order .start() and .stop() ops
- - Add protection around Reset API in error path
- - Explicitly set .has_iommu to false
-
-v2 => v3:
- - Generify syscon property (st,syscfg-boot => st,syscfg)
- - Rename IP in DT bindings doc (Remote Processor => Co-Processor)
- - Remove superfluous 'clock-names' property
- - Remove superfluous 'reg-names' property
- - Populate MAINTAINERS
- - Clean-up DTS formatting
- - Use strings in debugfs to control procs ('1|0' => 'start|stop')
- - Align copyright statement with MODULE() macros
- - Rename driver data structure ('st_rproc' => 'ddata')
- - Addition of a full error path in .start()
-
-v1 => v2:
- - Remove Linux implementation specific comment from binding document
- - Force debugfs '0' to shutdown co-processor - rather than !1
- - Supply more detailed commit message
- - Propagate errors back from .stop()
- - Review GPL wording
- - Supply original author's SoBs
-
-Lee Jones (6):
-  remoteproc: dt: Provide bindings for ST's Remote Processor Controller
-    driver
-  remoteproc: debugfs: Add ability to boot remote processor using
-    debugfs
-  remoteproc: Supply controller driver for ST's Remote Processors
-  MAINTAINERS: Add ST's Remote Processor Driver to ARM/STI ARCHITECTURE
-  ARM: STiH407: Add nodes for RemoteProc
-  ARM: STiH407: Move over to using the 'reserved-memory' API for
-    obtaining DMA memory
-
- .../devicetree/bindings/remoteproc/st-rproc.txt    |  41 +++
- MAINTAINERS                                        |   1 +
- arch/arm/boot/dts/stih407-family.dtsi              |  70 +++++
- drivers/remoteproc/Kconfig                         |   9 +
- drivers/remoteproc/Makefile                        |   1 +
- drivers/remoteproc/remoteproc_debugfs.c            |  34 +++
- drivers/remoteproc/st_remoteproc.c                 | 297 +++++++++++++++++++++
- 7 files changed, 453 insertions(+)
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ .../devicetree/bindings/remoteproc/st-rproc.txt    | 41 ++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/remoteproc/st-rproc.txt
- create mode 100644 drivers/remoteproc/st_remoteproc.c
 
+diff --git a/Documentation/devicetree/bindings/remoteproc/st-rproc.txt b/Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+new file mode 100644
+index 0000000..1031bcd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+@@ -0,0 +1,41 @@
++STMicroelectronics Co-Processor Bindings
++----------------------------------------
++
++This binding provides support for adjunct processors found on ST SoCs.
++
++Co-processors can be controlled from the bootloader or the primary OS. If
++the bootloader starts a co-processor, the primary OS must detect its state
++and act accordingly.
++
++Required properties:
++- compatible		Should be one of:
++				"st,st231-rproc"
++				"st,st40-rproc"
++- memory-region		Reserved memory (See: ../reserved-memory/reserved-memory.txt)
++- resets		Reset lines (See: ../reset/reset.txt)
++- reset-names		Must be "sw_reset" and "pwr_reset"
++- clocks		Clock for co-processor (See: ../clock/clock-bindings.txt)
++- clock-frequency	Clock frequency to set co-processor at if the bootloader
++			hasn't already done so
++- st,syscfg		System configuration register which holds the boot vector
++			for the co-processor
++				1st cell: Phandle to syscon block
++				2nd cell: Boot vector register offset
++
++Example:
++
++	audio_reserved: rproc at 42000000 {
++		compatible = "shared-dma-pool";
++		reg = <0x42000000 0x01000000>;
++		no-map;
++	};
++
++	st231-audio {
++		compatible	= "st,st231-rproc";
++		memory-region	= <&audio_reserved>;
++		resets		= <&softreset STIH407_ST231_AUD_SOFTRESET>;
++		reset-names	= "sw_reset";
++		clocks		= <&clk_s_c0_flexgen CLK_ST231_AUD_0>;
++		clock-frequency	= <600000000>;
++		st,syscfg	= <&syscfg_core 0x228>;
++	};
 -- 
 1.9.1
