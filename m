@@ -1,147 +1,39 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Tue, 24 Nov 2015 22:25:33 +0000
-Subject: [PATCH v12 05/16] arm64: Add back cpu_reset routines
+Date: Tue, 24 Nov 2015 22:25:34 +0000
+Subject: [PATCH v12 16/16] arm64: kdump: relax BUG_ON() if more than one cpus
+ are still active
 In-Reply-To: <cover.1448403503.git.geoff@infradead.org>
 References: <cover.1448403503.git.geoff@infradead.org>
-Message-ID: <3279584774ba40f088b79f4df864d69a5b57b516.1448403503.git.geoff@infradead.org>
+Message-ID: <83db66df70fc1f7cd4da8b580d264b9320991cf0.1448403503.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 68234df4ea7939f98431aa81113fbdce10c4a84b (arm64: kill flush_cache_all())
-removed the global arm64 routines cpu_reset() and cpu_soft_restart() needed by
-the arm64 kexec and kdump support.  Add simplified versions of those two
-routines back with some changes needed for kexec in the new files cpu_reset.S,
-and cpu_reset.h.
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-When a CPU is reset it needs to be put into the exception level it had
-when it entered the kernel. Update cpu_reset() to accept an argument
-which signals if the reset address needs to be entered at EL1 or EL2.
-
-Signed-off-by: Geoff Levand <geoff@infradead.org>
+We should try best in case of kdump.
+So even if not all secondary cpus have shut down, we do kdump anyway.
 ---
- arch/arm64/kernel/cpu-reset.S | 84 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/cpu-reset.h | 22 ++++++++++++
- 2 files changed, 106 insertions(+)
- create mode 100644 arch/arm64/kernel/cpu-reset.S
- create mode 100644 arch/arm64/kernel/cpu-reset.h
+ arch/arm64/kernel/machine_kexec.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
-new file mode 100644
-index 0000000..0423f27
---- /dev/null
-+++ b/arch/arm64/kernel/cpu-reset.S
-@@ -0,0 +1,84 @@
-+/*
-+ * cpu reset routines
-+ *
-+ * Copyright (C) 2001 Deep Blue Solutions Ltd.
-+ * Copyright (C) 2012 ARM Ltd.
-+ * Copyright (C) 2015 Huawei Futurewei Technologies.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <asm/virt.h>
-+
-+#define SCTLR_ELx_I	(1 << 12)
-+#define SCTLR_ELx_SA	(1 << 3)
-+#define SCTLR_ELx_C	(1 << 2)
-+#define SCTLR_ELx_A	(1 << 1)
-+#define SCTLR_ELx_M	1
-+#define SCTLR_ELx_FLAGS	(SCTLR_ELx_M | SCTLR_ELx_A | SCTLR_ELx_C |	\
-+			 SCTLR_ELx_SA | SCTLR_ELx_I)
-+
-+.text
-+.pushsection    .idmap.text, "ax"
-+
-+.align 5
-+
-+/*
-+ * cpu_soft_restart(cpu_reset, el2_switch, entry, arg0, arg1) - Perform a cpu
-+ * soft reset.
-+ *
-+ * @cpu_reset: Physical address of the cpu_reset routine.
-+ * @el2_switch: Flag to indicate a swich to EL2 is needed, passed to cpu_reset.
-+ * @entry: Location to jump to for soft reset, passed to cpu_reset.
-+ * arg0: First argument passed to @entry.
-+ * arg1: Second argument passed to @entry.
-+ */
-+
-+ENTRY(cpu_soft_restart)
-+	mov	x18, x0				// cpu_reset
-+	mov	x0, x1				// el2_switch
-+	mov	x1, x2				// entry
-+	mov	x2, x3				// arg0
-+	mov	x3, x4				// arg1
-+	ret	x18
-+ENDPROC(cpu_soft_restart)
-+
-+/*
-+ * cpu_reset(el2_switch, entry, arg0, arg1) - Helper for cpu_soft_restart.
-+ *
-+ * @el2_switch: Flag to indicate a swich to EL2 is needed.
-+ * @entry: Location to jump to for soft reset.
-+ * arg0: First argument passed to @entry.
-+ * arg1: Second argument passed to @entry.
-+ *
-+ * Put the CPU into the same state as it would be if it had been reset, and
-+ * branch to what would be the reset vector. It must be executed with the
-+ * flat identity mapping.
-+ */
-+
-+ENTRY(cpu_reset)
-+	/* Clear sctlr_el1 flags. */
-+	mrs	x12, sctlr_el1
-+	ldr	x13, =SCTLR_ELx_FLAGS
-+	bic	x12, x12, x13
-+	msr	sctlr_el1, x12
-+	isb
-+
-+	cbz	x0, 1f				// el2_switch?
-+
-+	mov	x0, x1				// entry
-+	mov	x1, x2				// arg0
-+	mov	x2, x3				// arg1
-+	hvc	#HVC_CALL_FUNC			// no return
-+
-+1:	mov	x18, x1				// entry
-+	mov	x0, x2				// arg0
-+	mov	x1, x3				// arg1
-+	ret	x18
-+ENDPROC(cpu_reset)
-+
-+.popsection
-diff --git a/arch/arm64/kernel/cpu-reset.h b/arch/arm64/kernel/cpu-reset.h
-new file mode 100644
-index 0000000..79816b6
---- /dev/null
-+++ b/arch/arm64/kernel/cpu-reset.h
-@@ -0,0 +1,22 @@
-+/*
-+ * cpu reset routines
-+ *
-+ * Copyright (C) 2015 Huawei Futurewei Technologies.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#if !defined(_ARM64_CPU_RESET_H)
-+#define _ARM64_CPU_RESET_H
-+
-+#include <asm/virt.h>
-+
-+void __attribute__((noreturn)) cpu_reset(unsigned long el2_switch,
-+	unsigned long entry, unsigned long arg0, unsigned long arg1);
-+void __attribute__((noreturn)) cpu_soft_restart(phys_addr_t cpu_reset,
-+	unsigned long el2_switch, unsigned long entry, unsigned long arg0,
-+	unsigned long arg1);
-+
-+#endif
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index d2d7e90..482aae7 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -148,7 +148,13 @@ void machine_kexec(struct kimage *kimage)
+ 	phys_addr_t reboot_code_buffer_phys;
+ 	void *reboot_code_buffer;
+ 
+-	BUG_ON(num_online_cpus() > 1);
++	if (num_online_cpus() > 1) {
++		if (in_crash_kexec)
++			pr_warn("kdump might fail because %d cpus are still online\n",
++					num_online_cpus());
++		else
++			BUG();
++	}
+ 
+ 	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
+ 	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
 -- 
 2.5.0
