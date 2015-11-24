@@ -1,92 +1,206 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Tue, 24 Nov 2015 22:25:34 +0000
-Subject: [PATCH v12 14/16] arm64: kdump: update a kernel doc
+Subject: [PATCH v12 13/16] arm64: kdump: add kdump support
 In-Reply-To: <cover.1448403503.git.geoff@infradead.org>
 References: <cover.1448403503.git.geoff@infradead.org>
-Message-ID: <3c9bfb1df9bba481b753d8d630e4e3d45f986f04.1448403503.git.geoff@infradead.org>
+Message-ID: <8b02b030a4a081816f35e49b210b41d9f6e2d961.1448403503.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-This patch adds arch specific descriptions about kdump usage on arm64
-to kdump.txt.
+On crash dump kernel, all the information about primary kernel's core
+image is available in elf core header specified by "elfcorehdr=" boot
+parameter. reserve_elfcorehdr() will set aside the region to avoid any
+corruption by crash dump kernel.
+
+Crash dump kernel will access the system memory of primary kernel via
+copy_oldmem_page(), which reads one page by ioremap'ing it since it does
+not reside in linear mapping on crash dump kernel.
+Please note that we should add "mem=X[MG]" boot parameter to limit the
+memory size and avoid the following assertion at ioremap():
+	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
+		return NULL;
+when accessing any pages beyond the usable memories of crash dump kernel.
+
+We also need our own elfcorehdr_read() here since the weak definition of
+elfcorehdr_read() utilizes copy_oldmem_page() and will hit the assertion
+above on arm64.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- Documentation/kdump/kdump.txt | 32 +++++++++++++++++++++++++++++++-
- 1 file changed, 31 insertions(+), 1 deletion(-)
+ arch/arm64/Kconfig             | 12 +++++++
+ arch/arm64/kernel/Makefile     |  1 +
+ arch/arm64/kernel/crash_dump.c | 71 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/init.c           | 29 +++++++++++++++++
+ 4 files changed, 113 insertions(+)
+ create mode 100644 arch/arm64/kernel/crash_dump.c
 
-diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-index bc4bd5a..7d3fad0 100644
---- a/Documentation/kdump/kdump.txt
-+++ b/Documentation/kdump/kdump.txt
-@@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
- a remote system.
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index c23fd77..4bac7dc 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -545,6 +545,18 @@ config KEXEC
+ 	  but it is independent of the system firmware.   And like a reboot
+ 	  you can start any kernel with it, not just Linux.
  
- Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
--s390x and arm architectures.
-+s390x, arm and arm64 architectures.
- 
- When the system kernel boots, it reserves a small section of memory for
- the dump-capture kernel. This ensures that ongoing Direct Memory Access
-@@ -249,6 +249,29 @@ Dump-capture kernel config options (Arch Dependent, arm)
- 
-     AUTO_ZRELADDR=y
- 
-+Dump-capture kernel config options (Arch Dependent, arm64)
-+----------------------------------------------------------
++config CRASH_DUMP
++	bool "Build kdump crash kernel"
++	help
++	  Generate crash dump after being started by kexec. This should
++	  be normally only set in special crash dump kernels which are
++	  loaded in the main kernel with kexec-tools into a specially
++	  reserved region and then later executed after a crash by
++	  kdump/kexec. The crash dump kernel must be compiled to a
++	  memory address not used by the main kernel.
 +
-+1) Disable symmetric multi-processing support under "Processor type and
-+   features":
++	  For more details see Documentation/kdump/kdump.txt
 +
-+   CONFIG_SMP=n
-+
-+   (If CONFIG_SMP=y, then specify maxcpus=1 on the kernel command line
-+   when loading the dump-capture kernel, see section "Load the Dump-capture
-+   Kernel".)
-+
-+2) The maximum memory size on the dump-capture kernel must be limited by
-+   specifying:
-+
-+   mem=X[MG]
-+
-+   where X should be less than or equal to the size in "crashkernel="
-+   boot parameter. Kexec-tools will automatically add this.
-+
-+3) Currently, kvm will not be enabled on the dump-capture kernel even
-+   if it is configured.
-+
- Extended crashkernel syntax
- ===========================
+ config XEN_DOM0
+ 	def_bool y
+ 	depends on XEN
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index f68420d..a08b054 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -43,6 +43,7 @@ arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+ arm64-obj-$(CONFIG_ACPI)		+= acpi.o
+ arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
+ 					   cpu-reset.o
++arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
  
-@@ -312,6 +335,8 @@ Boot into System Kernel
-    any space below the alignment point may be overwritten by the dump-capture kernel,
-    which means it is possible that the vmcore is not that precise as expected.
- 
-+   On arm64, use "crashkernel=Y[@X]".  Note that the start address of
-+   the kernel, X if explicitly specified, must be aligned to 2MiB (0x200000).
- 
- Load the Dump-capture Kernel
- ============================
-@@ -334,6 +359,8 @@ For s390x:
- 	- Use image or bzImage
- For arm:
- 	- Use zImage
-+For arm64:
-+	- Use vmlinux
- 
- If you are using a uncompressed vmlinux image then use following command
- to load dump-capture kernel.
-@@ -377,6 +404,9 @@ For s390x:
- For arm:
- 	"1 maxcpus=1 reset_devices"
- 
-+For arm64:
-+	"1 mem=X[MG] maxcpus=1 reset_devices"
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
+new file mode 100644
+index 0000000..3d86c0a
+--- /dev/null
++++ b/arch/arm64/kernel/crash_dump.c
+@@ -0,0 +1,71 @@
++/*
++ * Routines for doing kexec-based kdump
++ *
++ * Copyright (C) 2014 Linaro Limited
++ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
- Notes on loading the dump-capture kernel:
++#include <linux/crash_dump.h>
++#include <linux/errno.h>
++#include <linux/io.h>
++#include <linux/memblock.h>
++#include <linux/uaccess.h>
++#include <asm/memory.h>
++
++/**
++ * copy_oldmem_page() - copy one page from old kernel memory
++ * @pfn: page frame number to be copied
++ * @buf: buffer where the copied page is placed
++ * @csize: number of bytes to copy
++ * @offset: offset in bytes into the page
++ * @userbuf: if set, @buf is in a user address space
++ *
++ * This function copies one page from old kernel memory into buffer pointed by
++ * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
++ * copied or negative error in case of failure.
++ */
++ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
++			 size_t csize, unsigned long offset,
++			 int userbuf)
++{
++	void *vaddr;
++
++	if (!csize)
++		return 0;
++
++	vaddr = ioremap_cache(pfn << PAGE_SHIFT, PAGE_SIZE);
++	if (!vaddr)
++		return -ENOMEM;
++
++	if (userbuf) {
++		if (copy_to_user(buf, vaddr + offset, csize)) {
++			iounmap(vaddr);
++			return -EFAULT;
++		}
++	} else {
++		memcpy(buf, vaddr + offset, csize);
++	}
++
++	iounmap(vaddr);
++
++	return csize;
++}
++
++/**
++ * elfcorehdr_read - read from ELF core header
++ * @buf: buffer where the data is placed
++ * @csize: number of bytes to read
++ * @ppos: address in the memory
++ *
++ * This function reads @count bytes from elf core header which exists
++ * on crash dump kernel's memory.
++ */
++ssize_t elfcorehdr_read(char *buf, size_t count, u64 *ppos)
++{
++	memcpy(buf, phys_to_virt((phys_addr_t)*ppos), count);
++	return count;
++}
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 24f0a1c..52a1469 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -35,6 +35,7 @@
+ #include <linux/efi.h>
+ #include <linux/swiotlb.h>
+ #include <linux/kexec.h>
++#include <linux/crash_dump.h>
  
- * By default, the ELF headers are stored in ELF64 format to support
+ #include <asm/fixmap.h>
+ #include <asm/memory.h>
+@@ -116,6 +117,31 @@ static void __init reserve_crashkernel(void)
+ }
+ #endif /* CONFIG_KEXEC */
+ 
++#ifdef CONFIG_CRASH_DUMP
++/*
++ * reserve_elfcorehdr() - reserves memory for elf core header
++ *
++ * This function reserves elf core header given in "elfcorehdr=" kernel
++ * command line parameter. This region contains all the information about
++ * primary kernel's core image and is used by a dump capture kernel to
++ * access the system memory on primary kernel.
++ */
++static void __init reserve_elfcorehdr(void)
++{
++	if (!elfcorehdr_size)
++		return;
++
++	if (memblock_is_region_reserved(elfcorehdr_addr, elfcorehdr_size)) {
++		pr_warn("elfcorehdr is overlapped\n");
++		return;
++	}
++
++	memblock_reserve(elfcorehdr_addr, elfcorehdr_size);
++
++	pr_info("Reserving %lldKB of memory at %lldMB for elfcorehdr\n",
++		elfcorehdr_size >> 10, elfcorehdr_addr >> 20);
++}
++#endif /* CONFIG_CRASH_DUMP */
+ /*
+  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
+  * currently assumes that for memory starting above 4G, 32-bit devices will
+@@ -224,6 +250,9 @@ void __init arm64_memblock_init(void)
+ #ifdef CONFIG_KEXEC
+ 	reserve_crashkernel();
+ #endif
++#ifdef CONFIG_CRASH_DUMP
++	reserve_elfcorehdr();
++#endif
+ 
+ 	early_init_fdt_scan_reserved_mem();
+ 
 -- 
 2.5.0
