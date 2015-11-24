@@ -1,16 +1,32 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 24 Nov 2015 16:44:03 +0800
-Subject: [PATCH 0/3] ARM: dts: imx: ventana LVDS fixes
-In-Reply-To: <1446849632-20333-1-git-send-email-tharvey@gateworks.com>
-References: <1446849632-20333-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <20151124084403.GQ11999@tiger>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 24 Nov 2015 09:45:31 +0100
+Subject: [PATCH v2 5/5] ARM: dts: sun8i: Add THS node to the H3 .dtsi
+In-Reply-To: <0fff612e26bf9cda9027a4175e16d25a0c2cc62c.1448263428.git.atx@atx.name>
+References: <cover.1448263428.git.atx@atx.name>
+ <0fff612e26bf9cda9027a4175e16d25a0c2cc62c.1448263428.git.atx@atx.name>
+Message-ID: <20151124084531.GK32142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 02:40:29PM -0800, Tim Harvey wrote:
-> Tim Harvey (3):
->   ARM: dts: imx: ventana: set GW54xx PMIC swbst regulator as always-on
->   ARM: dts: imx: ventana: fix GW53xx/GW54xx lvds channel
->   ARM: dts: imx: ventana: Allow HDMI and LVDS to work simultaneously
+On Mon, Nov 23, 2015 at 09:02:52AM +0100, Josef Gajdusek wrote:
+> +		ths: ths at 01c25000 {
+> +			#thermal-sensor-cells = <0>;
+> +			compatible = "allwinner,sun8i-h3-ths";
+> +			reg = <0x01c25000 0x88>;
 
-Applied all, thanks.
+The datasheet says the size is 0x400, any particular reason to have a
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151124/72523515/attachment.sig>
