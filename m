@@ -1,13 +1,14 @@
 From: nikita@compulab.co.il (Nikita Kiryanov)
-Date: Tue, 24 Nov 2015 15:19:03 +0200
-Subject: [PATCH 02/14] ARM: am437x: cm-t43: dts: add support for module eeprom
+Date: Tue, 24 Nov 2015 15:19:05 +0200
+Subject: [PATCH 04/14] ARM: am437x: cm-t43: dts: add spi-flash support
 In-Reply-To: <1448371155-17307-1-git-send-email-nikita@compulab.co.il>
 References: <1448371155-17307-1-git-send-email-nikita@compulab.co.il>
-Message-ID: <1448371155-17307-3-git-send-email-nikita@compulab.co.il>
+Message-ID: <1448371155-17307-5-git-send-email-nikita@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CM-T43 has an on-board EEPROM on i2c bus 0. Add it to the device tree.
+CM-T43 has an on-board 2MB SPI-flash which stores U-Boot and the U-Boot
+environment. Add it to the device tree.
 
 Signed-off-by: Nikita Kiryanov <nikita@compulab.co.il>
 Cc: Tony Lindgren <tony@atomide.com>
@@ -15,25 +16,67 @@ Cc: Igor Grinberg <grinberg@compulab.co.il>
 Cc: Dmitry Lifshitz <lifshitz@compulab.co.il>
 Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
 ---
- arch/arm/boot/dts/am437x-cm-t43.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/am437x-cm-t43.dts | 41 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
 diff --git a/arch/arm/boot/dts/am437x-cm-t43.dts b/arch/arm/boot/dts/am437x-cm-t43.dts
-index 69887c4..a4cd2b8 100644
+index 7ef3971..0761383 100644
 --- a/arch/arm/boot/dts/am437x-cm-t43.dts
 +++ b/arch/arm/boot/dts/am437x-cm-t43.dts
-@@ -51,6 +51,12 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c0_pins>;
- 	clock-frequency = <100000>;
+@@ -44,6 +44,16 @@
+ 			AM4372_IOPAD(0x98c, PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)  /* i2c0_scl.i2c0_scl */
+ 		>;
+ 	};
 +
-+	eeprom_module: at24 at 50 {
-+		compatible = "atmel,24c02";
-+		reg = <0x50>;
-+		pagesize = <16>;
++	spi0_pins: pinmux_spi0_pins {
++		pinctrl-single,pins = <
++			AM4372_IOPAD(0x950, PIN_INPUT | MUX_MODE0) /* spi0_sclk.spi0_sclk */
++			AM4372_IOPAD(0x954, PIN_INPUT | MUX_MODE0) /* spi0_d0.spi0_d0 */
++			AM4372_IOPAD(0x958, PIN_OUTPUT | MUX_MODE0) /* spi0_d1.spi0_d1 */
++			AM4372_IOPAD(0x95C, PIN_OUTPUT | MUX_MODE0) /* spi0_cs0.spi0_cs0 */
++		>;
 +	};
++
  };
  
- &gpio0 {
+ &i2c0 {
+@@ -146,6 +156,37 @@
+ 	status = "okay";
+ };
+ 
++&spi0 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi0_pins>;
++	dmas = <&edma 16
++		&edma 17>;
++	dma-names = "tx0", "rx0";
++
++	flash: w25q64cvzpig at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "jedec,spi-nor";
++		reg = <0>;
++		spi-max-frequency = <20000000>;
++		partition at 0 {
++			label = "uboot";
++			reg = <0x0 0xc0000>;
++		};
++
++		partition at c0000 {
++			label = "uboot environment";
++			reg = <0xc0000 0x40000>;
++		};
++
++		partition at 100000 {
++			label = "reserved";
++			reg = <0x100000 0x100000>;
++		};
++	};
++};
++
+ &uart0 {
+ 	status = "okay";
+ };
 -- 
 1.9.1
