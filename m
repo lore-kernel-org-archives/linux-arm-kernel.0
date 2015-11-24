@@ -1,103 +1,52 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Tue, 24 Nov 2015 09:36:28 -0500
-Subject: [PATCH] xen/events: Always allocate legacy interrupts on PV guests
-In-Reply-To: <alpine.DEB.2.02.1511201634500.1107@kaball.uk.xensource.com>
-References: <1448036704-18630-1-git-send-email-boris.ostrovsky@oracle.com>
- <alpine.DEB.2.02.1511201634500.1107@kaball.uk.xensource.com>
-Message-ID: <565475EC.40804@oracle.com>
+From: nyushchenko@dev.rtsoft.ru (Nikita Yushchenko)
+Date: Tue, 24 Nov 2015 17:52:14 +0300
+Subject: [RFC/PATCH] arm: do not skip SMP init calls on SMP_ON_UP case
+In-Reply-To: <20151123130424.GQ8644@n2100.arm.linux.org.uk>
+References: <1448279946-19975-1-git-send-email-nyushchenko@dev.rtsoft.ru>
+ <20151123120317.GN8644@n2100.arm.linux.org.uk>
+ <5653015C.4020405@dev.rtsoft.ru> <56530769.4030403@arm.com>
+ <5653099A.7020604@dev.rtsoft.ru> <56530AE6.2060407@dev.rtsoft.ru>
+ <20151123130424.GQ8644@n2100.arm.linux.org.uk>
+Message-ID: <5654799E.5080903@dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 11/20/2015 11:35 AM, Stefano Stabellini wrote:
-> On Fri, 20 Nov 2015, Boris Ostrovsky wrote:
->> After commit 8c058b0b9c34 ("x86/irq: Probe for PIC presence before
->> allocating descs for legacy IRQs") early_irq_init() will no longer
->> preallocate descriptors for legacy interrupts if PIC does not
->> exist, which is the case for Xen PV guests.
+>> Just booted mainline...  unline linux-imx, it does not try to init cpu1.
 >>
->> Therefore we may need to allocate those descriptors ourselves.
+>> However, imx6dl.dtsi from mainline also has both cpu at 0 and cpu at 1
 >>
->> Signed-off-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
->> Suggested-by: Thomas Gleixner <tglx@linutronix.de>
-> Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+>> So missing piece in linux-imx is elsewhere :(
+> 
+> It works as you mentioned - and it relies upon the code you tried to
+> modify.
+> 
+> The early boot code detects that the boot CPU is not SMP capable, so
+> through SMP_ON_UP, it "turns off" SMP support by fixing up the code
+> and making is_smp() return false.
+> 
+> This prevents smp_init_cpus() being called, which in turn prevents
+> imx_smp_init_cpus() executing, which prevents the CPU possible mask
+> including any CPU but the boot CPU.
+> 
+> As only the boot CPU is possible, this prevents the SMP code trying
+> to bring any secondary CPUs online.
 
-I realized that I neglected to add ARM64 maintainers here. Adding them now.
+I'm still trying to understand what is going on, and my printk()s show
+that this is not entirely true.
 
-(And this also need an ACK/NACK from Russell)
+When smp_init() is entered on mainline om imx6s, cpu_possible_mask and
+cpu_present_mask both contain two cpus. These get initialized in
+arm_dt_init_cpu_maps() and stay unmodified since then.
 
--boris
+But cpu_online() returns 1 for cpu0 and 0 from cpu1 - thus it is
+cpu_online() check, not possible_mask or present_mask, that prevents
+cpu1 initialization attempt.
 
->
->
->> v3: Add arm64 definition of nr_legacy_irqs()
->>
->>   arch/arm/include/asm/irq.h       | 4 ++++
->>   arch/arm64/include/asm/irq.h     | 6 ++++++
->>   drivers/xen/events/events_base.c | 5 +++--
->>   3 files changed, 13 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
->> index be1d07d..b864f60 100644
->> --- a/arch/arm/include/asm/irq.h
->> +++ b/arch/arm/include/asm/irq.h
->> @@ -2,6 +2,10 @@
->>   #define __ASM_ARM_IRQ_H
->>   
->>   #define NR_IRQS_LEGACY	16
->> +static inline int nr_legacy_irqs(void)
->> +{
->> +	return NR_IRQS_LEGACY;
->> +}
->>   
->>   #ifndef CONFIG_SPARSE_IRQ
->>   #include <mach/irqs.h>
->> diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
->> index 23eb450..24ba8d8 100644
->> --- a/arch/arm64/include/asm/irq.h
->> +++ b/arch/arm64/include/asm/irq.h
->> @@ -7,4 +7,10 @@ struct pt_regs;
->>   
->>   extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
->>   
->> +#define NR_IRQS_LEGACY  0
->> +static inline int nr_legacy_irqs(void)
->> +{
->> +	return NR_IRQS_LEGACY;
->> +}
->> +
->>   #endif
->> diff --git a/drivers/xen/events/events_base.c b/drivers/xen/events/events_base.c
->> index 849500e..524c221 100644
->> --- a/drivers/xen/events/events_base.c
->> +++ b/drivers/xen/events/events_base.c
->> @@ -39,6 +39,7 @@
->>   #include <asm/irq.h>
->>   #include <asm/idle.h>
->>   #include <asm/io_apic.h>
->> +#include <asm/i8259.h>
->>   #include <asm/xen/pci.h>
->>   #endif
->>   #include <asm/sync_bitops.h>
->> @@ -420,7 +421,7 @@ static int __must_check xen_allocate_irq_gsi(unsigned gsi)
->>   		return xen_allocate_irq_dynamic();
->>   
->>   	/* Legacy IRQ descriptors are already allocated by the arch. */
->> -	if (gsi < NR_IRQS_LEGACY)
->> +	if (gsi < nr_legacy_irqs())
->>   		irq = gsi;
->>   	else
->>   		irq = irq_alloc_desc_at(gsi, -1);
->> @@ -446,7 +447,7 @@ static void xen_free_irq(unsigned irq)
->>   	kfree(info);
->>   
->>   	/* Legacy IRQ descriptors are managed by the arch. */
->> -	if (irq < NR_IRQS_LEGACY)
->> +	if (irq < nr_legacy_irqs())
->>   		return;
->>   
->>   	irq_free_desc(irq);
->> -- 
->> 2.1.0
->>
+Not sure I understand logic behind this. With the current code,
+resulting cpu_possible_mask depends on CONFIG_SMP_ON_UP:
+- if it is set, cpu_possible_mask contains (0 1), as initialized in
+arm_dt_init_cpu_maps()
+- if it is not set, cpu_possible_mask contains (0), since
+imx_smp_init_cpus() removes 1 from there.
+
+This does not seem to be intended difference.
