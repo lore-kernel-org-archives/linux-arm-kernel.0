@@ -1,139 +1,203 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 24 Nov 2015 11:50:54 +0000
-Subject: [PATCH 1/4] bus: uniphier-system-bus: add UniPhier System Bus
- Controller driver
-In-Reply-To: <1448357962-12259-2-git-send-email-yamada.masahiro@socionext.com>
-References: <1448357962-12259-1-git-send-email-yamada.masahiro@socionext.com>
- <1448357962-12259-2-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20151124115053.GB4108@leverpostej>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 24 Nov 2015 11:54:42 +0000
+Subject: [Xen-devel] [PATCH v3 26/62] arm/gic-v2: Add ACPI boot support
+ for GICv2
+In-Reply-To: <1447753261-7552-27-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-27-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511241138500.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 06:39:19PM +0900, Masahiro Yamada wrote:
-> The UniPhier System Bus is an external bus where on-board devices are
-> connected to the UniPhier SoC.  This driver parses the "ranges"
-> property of the System Bus and set up the registers of the System Bus
-> Controller for the correct bus routing.
-
-Could you elaborate on why you need to do that?
-
-What needs to be configured specifically?
-
-[...]
-
-> +The UniPhier System Bus is an external bus where on-board devices are connected
-> +to the UniPhier SoC.  It it a simple parallel bus with address, data, and some
-> +control signals.  It supports up to 8 banks (chip selects).
-> +
-> +Required properties for System Bus:
-> +- compatible: should be "socionext,uniphier-system-bus", "simple-bus".
-
-If the kernel has to perform setup of the bus, then it is not a
-"simple-bus".
-
-Configure the bus, then probe children. Don't use simple-bus jsut to get
-probing.
-
-> +- #address-cells: should be equal to or grater than 2.  The first cell is the
-
-s/grater/greater/
-
-> +  bank number (chip select).  The rest is the base address within the bank that
-> +  should be mapped onto the parent bus (usually AMBA).
-> +
-> +Optional properties for System Bus:
-> +- #size-cells: should be the same as that of the parent bus, if exists.  The
-> +  value of the parent bus is assumed, if not specified.
-
-This should be just as required as #address-cells, for consistency.
-
-> +
-> +
-> +UniPhier System Bus Controller
-> +------------------------------
-> +
-> +The UniPhier System Bus Controller is a hardware block with registers that
-> +controls the System Bus accessing; how each bank is mapped onto the parent bus,
-> +various timing parameters of the bus access, etc.
-> +
-> +Required properties for System Bus Controller:
-> +- compatible: should be "socionext,uniphier-system-bus-controller".
-> +- reg: offsets and lengths of the register sets for the device.  It should
-> +  contain 2 regions: base & control register, misc register, in this order.
-
-The example also has a system-bus phandle.
-
-Is the "misc register" part of the bus controller, or is it a shared
-system controller?
-
-> +Example
-> +-------
-> +	system_bus: system-bus {
-> +		compatible = "socionext,uniphier-system-bus", "simple-bus";
-> +		#address-cells = <2>;
-> +		#size-cells = <1>;
-> +		ranges = <1 0x00000000 0x42000000 0x02000000
-> +			  5 0x00000000 0x48000000 0x01000000>;
-> +
-> +		eth: ethernet at 1,01f00000 {
-> +			compatible = "smsc,lan9115";
-> +			reg = <1 0x01f00000 0x1000>;
-> +			phy-mode = "mii";
-> +			reg-io-width = <4>;
-> +		};
-> +
-> +		serial: uart at 5,00200000 {
-> +			compatible = "ns16550a";
-> +			reg = <5 0x00200000 0x20>;
-> +			clock-frequency = <12288000>;
-> +			reg-shift = <1>;
-> +		};
-> +	};
-> +
-> +	system-bus-controller at 58c00000 {
-> +		compatible = "socionext,uniphier-system-bus-controller";
-> +		reg = <0x58c00000 0x400>, <0x59800000 0x2000>;
-> +		system-bus = <&system_bus>;
-> +	};
-
-Assuming that the controller and bus are 1-1 related, make this a single
-node. e.g.
-
-system-bus {
-	compatible = "socionext,uniphier-system-bus";
-	reg = <0x58c00000 0x400>, <0x59800000 0x2000>;
-	#address-cells = <2>;
-	#size-cells = <1>;
-	ranges = <1 0x00000000 0x42000000 0x02000000>,
-		 <5 0x00000000 0x48000000 0x01000000>;
-
-	...
-	child nodes here
-	...
-
-};
-
-[...]
-
-> +static int uniphier_sbc_probe(struct platform_device *pdev)
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Parth Dixit <parth.dixit@linaro.org>
+> 
+> ACPI on Xen hypervisor uses MADT table for proper GIC initialization.
+> First get the GIC version from GIC Distributor. Then parse GIC related
+> subtables, collect CPU interface and distributor addresses and call
+> driver initialization function (which is hardware abstraction agnostic).
+> In a similar way, FDT initialize GICv2.
+> 
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
+> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  xen/arch/arm/gic-v2.c | 122 +++++++++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 121 insertions(+), 1 deletion(-)
+> 
+> diff --git a/xen/arch/arm/gic-v2.c b/xen/arch/arm/gic-v2.c
+> index e31d38e..9a9fcd5 100644
+> --- a/xen/arch/arm/gic-v2.c
+> +++ b/xen/arch/arm/gic-v2.c
+> @@ -29,6 +29,8 @@
+>  #include <xen/device_tree.h>
+>  #include <xen/libfdt/libfdt.h>
+>  #include <xen/sizes.h>
+> +#include <xen/acpi.h>
+> +#include <acpi/actables.h>
+>  #include <asm/p2m.h>
+>  #include <asm/domain.h>
+>  #include <asm/platform.h>
+> @@ -36,6 +38,7 @@
+>  
+>  #include <asm/io.h>
+>  #include <asm/gic.h>
+> +#include <asm/acpi.h>
+>  
+>  /*
+>   * LR register definitions are GIC v2 specific.
+> @@ -681,11 +684,113 @@ static void __init dt_gicv2_init(void)
+>                 csize, vsize);
+>  }
+>  
+> +#ifdef CONFIG_ACPI
+> +static int __init
+> +gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
+> +                        const unsigned long end)
 > +{
-> +	struct device *dev = &pdev->dev;
-> +	struct uniphier_sbc_priv *priv;
-> +	struct resource *regs;
-> +	struct device_node *bus_np;
-> +	int child_addrc, addrc, sizec, bank;
-> +	u64 child_addr, addr, size;
-> +	const __be32 *ranges;
-> +	int rlen, rone, ret;
+> +    static int cpu_base_assigned = 0;
+> +    struct acpi_madt_generic_interrupt *processor;
 > +
-> +	bus_np = of_find_compatible_node(NULL, NULL,
-> +					 "socionext,uniphier-system-bus");
+> +    processor = (struct acpi_madt_generic_interrupt *)header;
 
-This is broken if you ever have multiple instances.
+Use container_of to cast
 
-Either use a single node, or if there is a more complex relationship
-between busses and their controllers, describe that explicitly with
-phandles.
 
-Thanks,
-Mark.
+> +    if ( BAD_MADT_ENTRY(processor, end) )
+> +        return -EINVAL;
+> +
+> +    /* Read from APIC table and fill up the GIC variables */
+> +    if ( cpu_base_assigned == 0 )
+> +    {
+> +        cbase = processor->base_address;
+> +        csize = SZ_8K;
+> +        hbase = processor->gich_base_address;
+> +        vbase = processor->gicv_base_address;
+> +        gicv2_info.maintenance_irq = processor->vgic_interrupt;
+> +
+> +        if( processor->flags & ACPI_MADT_VGIC_IRQ_MODE )
+> +            irq_set_type(gicv2_info.maintenance_irq, ACPI_IRQ_TYPE_EDGE_BOTH);
+> +        else
+> +            irq_set_type(gicv2_info.maintenance_irq, ACPI_IRQ_TYPE_LEVEL_MASK);
+> +
+> +	cpu_base_assigned = 1;
+
+coding style
+
+
+> +    }
+> +    else
+> +    {
+> +        if ( cbase != processor->base_address
+> +             || hbase != processor->gich_base_address
+> +             || vbase != processor->gicv_base_address
+> +             || gicv2_info.maintenance_irq != processor->vgic_interrupt )
+> +        {
+> +	    printk("GICv2: GICC entries are not same in MADT table\n");
+> +	    return -EINVAL;
+
+coding style
+
+
+> +        }
+> +    }
+> +
+> +    return 0;
+> +}
+> +
+> +static int __init
+> +gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
+> +                                const unsigned long end)
+> +{
+> +    struct acpi_madt_generic_distributor *dist;
+> +
+> +    dist = (struct acpi_madt_generic_distributor *)header;
+
+Same here.
+
+It looks OK aside from these few things.
+
+
+> +    if ( BAD_MADT_ENTRY(dist, end) )
+> +        return -EINVAL;
+> +
+> +    dbase = dist->base_address;
+> +
+> +    return 0;
+> +}
+> +
+> +static void __init acpi_gicv2_init(void)
+> +{
+> +    acpi_status status;
+> +    struct acpi_table_header *table;
+> +    int count;
+> +
+> +    status = acpi_get_table(ACPI_SIG_MADT, 0, &table);
+> +
+> +    if ( ACPI_FAILURE(status) )
+> +    {
+> +        const char *msg = acpi_format_exception(status);
+> +
+> +        panic("GICv2: Failed to get MADT table, %s", msg);
+> +    }
+> +
+> +    /* Collect CPU base addresses */
+> +    count = acpi_parse_entries(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
+> +                               gic_acpi_parse_madt_cpu, table,
+> +                               ACPI_MADT_TYPE_GENERIC_INTERRUPT, 0);
+> +    if ( count <= 0 )
+> +        panic("GICv2: No valid GICC entries exists");
+> +
+> +    /*
+> +     * Find distributor base address. We expect one distributor entry since
+> +     * ACPI 5.0 spec neither support multi-GIC instances nor GIC cascade.
+> +     */
+> +    count = acpi_parse_entries(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
+> +                               gic_acpi_parse_madt_distributor, table,
+> +                               ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
+> +    if ( count <= 0 )
+> +        panic("GICv2: No valid GICD entries exists");
+> +}
+> +#else
+> +static void __init acpi_gicv2_init(void)
+> +{
+> +/* Should never reach here */
+> +}
+> +#endif
+> +
+>  static int __init gicv2_init(void)
+>  {
+>      uint32_t aliased_offset = 0;
+>  
+> -    dt_gicv2_init();
+> +    if( acpi_disabled )
+> +        dt_gicv2_init();
+> +    else
+> +        acpi_gicv2_init();
+>  
+>      printk("GICv2 initialization:\n"
+>                "        gic_dist_addr=%"PRIpaddr"\n"
+> @@ -793,6 +898,21 @@ DT_DEVICE_START(gicv2, "GICv2", DEVICE_GIC)
+>          .init = dt_gicv2_preinit,
+>  DT_DEVICE_END
+>  
+> +#ifdef CONFIG_ACPI
+> +/* Set up the GIC */
+> +static int __init acpi_gicv2_preinit(const void *data)
+> +{
+> +    gicv2_info.hw_version = GIC_V2;
+> +    register_gic_ops(&gicv2_ops);
+> +
+> +    return 0;
+> +}
+> +
+> +ACPI_DEVICE_START(agicv2, "GICv2", DEVICE_GIC)
+> +        .class_type = GIC_V2,
+> +        .init = acpi_gicv2_preinit,
+> +ACPI_DEVICE_END
+> +#endif
+>  /*
+>   * Local variables:
+>   * mode: C
