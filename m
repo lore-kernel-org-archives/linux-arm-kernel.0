@@ -1,47 +1,56 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 24 Nov 2015 14:20:05 +0800
-Subject: [PATCH v2] ARM: imx_v6_v7_defconfig: Select HDMI audio support
-In-Reply-To: <1447687238-11559-1-git-send-email-fabio.estevam@freescale.com>
-References: <1447687238-11559-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20151124062004.GJ11999@tiger>
+Date: Tue, 24 Nov 2015 14:24:06 +0800
+Subject: [PATCH v2] [media] move media platform data to
+ linux/platform_data/media
+In-Reply-To: <592e25aa9ecb358f48f844195252368b950059b6.1447759269.git.mchehab@osg.samsung.com>
+References: <592e25aa9ecb358f48f844195252368b950059b6.1447759269.git.mchehab@osg.samsung.com>
+Message-ID: <20151124062405.GK11999@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 01:20:38PM -0200, Fabio Estevam wrote:
-> Select CONFIG_DRM_DW_HDMI_AHB_AUDIO so that we have HDMI audio
-> supported by default.
+On Tue, Nov 17, 2015 at 09:21:13AM -0200, Mauro Carvalho Chehab wrote:
+> Now that media has its own subdirectory inside platform_data,
+> let's move the headers that are already there to such subdir.
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - Select the driver as module instead of built-in
+> After moving those files, the references were adjusted using this
+> script:
+> 
+>     MAIN_DIR="linux/platform_data/"
+>     PREV_DIR="linux/platform_data/"
+>     DIRS="media/"
+> 
+>     echo "Checking affected files" >&2
+>     for i in $DIRS; do
+> 	for j in $(find include/$MAIN_DIR/$i -type f -name '*.h'); do
+> 		 n=`basename $j`
+> 		git grep -l $n
+> 	done
+>     done|sort|uniq >files && (
+> 	echo "Handling files..." >&2;
+> 	echo "for i in \$(cat files|grep -v Documentation); do cat \$i | \\";
+> 	(
+> 		cd include/$MAIN_DIR;
+> 		for j in $DIRS; do
+> 			for i in $(ls $j); do
+> 				echo "perl -ne 's,(include [\\\"\\<])$PREV_DIR($i)([\\\"\\>]),\1$MAIN_DIR$j\2\3,; print \$_' |\\";
+> 			done;
+> 		done;
+> 		echo "cat > a && mv a \$i; done";
+> 	);
+> 	echo "Handling documentation..." >&2;
+> 	echo "for i in MAINTAINERS \$(cat files); do cat \$i | \\";
+> 	(
+> 		cd include/$MAIN_DIR;
+> 		for j in $DIRS; do
+> 			for i in $(ls $j); do
+> 				echo "  perl -ne 's,include/$PREV_DIR($i)\b,include/$MAIN_DIR$j\1,; print \$_' |\\";
+> 			done;
+> 		done;
+> 		echo "cat > a && mv a \$i; done"
+> 	);
+>     ) >script && . ./script
+> 
+> Suggested-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 
-I've applied a previous version.  Should I replace it with this one?
-
-Shawn 
-
-> 
->  arch/arm/configs/imx_v6_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-> index 4187f69..f5ca938 100644
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -224,6 +224,7 @@ CONFIG_SOC_CAMERA_OV2640=y
->  CONFIG_IMX_IPUV3_CORE=y
->  CONFIG_DRM=y
->  CONFIG_DRM_PANEL_SIMPLE=y
-> +CONFIG_DRM_DW_HDMI_AHB_AUDIO=m
->  CONFIG_DRM_IMX=y
->  CONFIG_DRM_IMX_FB_HELPER=y
->  CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Acked-by: Shawn Guo <shawnguo@kernel.org>
