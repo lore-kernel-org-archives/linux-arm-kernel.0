@@ -1,109 +1,210 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 24 Nov 2015 18:39:20 +0900
-Subject: [PATCH 2/4] ARM: dts: uniphier: add better-matching compatible string
- to extbus nodes
-In-Reply-To: <1448357962-12259-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1448357962-12259-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1448357962-12259-3-git-send-email-yamada.masahiro@socionext.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 24 Nov 2015 11:38:34 +0200
+Subject: [PATCH v4 3/6] mfd: axp20x: Add support for RSB based AXP223 PMIC
+In-Reply-To: <1448336916-31212-4-git-send-email-wens@csie.org>
+References: <1448336916-31212-1-git-send-email-wens@csie.org>
+ <1448336916-31212-4-git-send-email-wens@csie.org>
+Message-ID: <CAHp75VeGgPRAUoV0YQ=6pSh6-n0b-T4FVss6B1QH7aKvPbQtug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is needed to use the UniPhier System Controller driver.
+On Tue, Nov 24, 2015 at 5:48 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
+> It is functionally identical to AXP221; only the regulator default
+> voltage/status and the external host interface are different.
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  drivers/mfd/Kconfig        | 11 ++++++
+>  drivers/mfd/Makefile       |  1 +
+>  drivers/mfd/axp20x-rsb.c   | 93 ++++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/mfd/axp20x.c       |  2 +
+>  include/linux/mfd/axp20x.h |  1 +
+>  5 files changed, 108 insertions(+)
+>  create mode 100644 drivers/mfd/axp20x-rsb.c
+>
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 804cd3dcce32..13c565103e96 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -107,6 +107,17 @@ config MFD_AXP20X_I2C
+>           components like regulators or the PEK (Power Enable Key) under the
+>           corresponding menus.
+>
+> +config MFD_AXP20X_RSB
+> +       tristate "X-Powers AXP series PMICs with RSB"
+> +       select MFD_AXP20X
+> +       depends on SUNXI_RSB
+> +       help
+> +         If you say Y here you get support for the X-Powers AXP series power
+> +         management ICs (PMICs) controlled with RSB.
+> +         This driver include only the core APIs. You have to select individual
+> +         components like regulators or the PEK (Power Enable Key) under the
+> +         corresponding menus.
+> +
+>  config MFD_CROS_EC
+>         tristate "ChromeOS Embedded Controller"
+>         select MFD_CORE
+> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> index a6913007d667..caea6637d5e8 100644
+> --- a/drivers/mfd/Makefile
+> +++ b/drivers/mfd/Makefile
+> @@ -108,6 +108,7 @@ obj-$(CONFIG_MFD_DA9052_SPI)        += da9052-spi.o
+>  obj-$(CONFIG_MFD_DA9052_I2C)   += da9052-i2c.o
+>  obj-$(CONFIG_MFD_AXP20X)       += axp20x.o
+>  obj-$(CONFIG_MFD_AXP20X_I2C)   += axp20x-i2c.o
+> +obj-$(CONFIG_MFD_AXP20X_RSB)   += axp20x-rsb.o
+>
+>  obj-$(CONFIG_MFD_LP3943)       += lp3943.o
+>  obj-$(CONFIG_MFD_LP8788)       += lp8788.o lp8788-irq.o
+> diff --git a/drivers/mfd/axp20x-rsb.c b/drivers/mfd/axp20x-rsb.c
+> new file mode 100644
+> index 000000000000..3ea0d5db37d0
+> --- /dev/null
+> +++ b/drivers/mfd/axp20x-rsb.c
+> @@ -0,0 +1,93 @@
+> +/*
+> + * axp20x-rsb.c - RSB driver for the X-Powers' Power Management ICs
+> + *
+> + * AXP20x typically comprises an adaptive USB-Compatible PWM charger, BUCK DC-DC
+> + * converters, LDOs, multiple 12-bit ADCs of voltage, current and temperature
+> + * as well as configurable GPIOs.
+> + *
+> + * This driver supports the RSB variants.
+> + *
+> + * Author: Chen-Yu Tsai <wens@csie.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/acpi.h>
+> +#include <linux/err.h>
+> +#include <linux/module.h>
+> +#include <linux/mfd/axp20x.h>
+> +#include <linux/of_device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/slab.h>
+> +#include <linux/sunxi-rsb.h>
+> +
+> +static const struct of_device_id axp20x_rsb_of_match[] = {
+> +       { .compatible = "x-powers,axp223", .data = (void *) AXP223_ID },
+> +       { },
+> +};
+> +MODULE_DEVICE_TABLE(of, axp20x_rsb_of_match);
+> +
+> +static int axp20x_rsb_match_device(struct axp20x_dev *axp20x,
+> +                                        struct device *dev)
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Same idea, drop away second parameter.
 
- arch/arm/boot/dts/uniphier-ph1-ld4.dtsi     | 3 ++-
- arch/arm/boot/dts/uniphier-ph1-pro4.dtsi    | 3 ++-
- arch/arm/boot/dts/uniphier-ph1-pro5.dtsi    | 3 ++-
- arch/arm/boot/dts/uniphier-ph1-sld3.dtsi    | 3 ++-
- arch/arm/boot/dts/uniphier-ph1-sld8.dtsi    | 3 ++-
- arch/arm/boot/dts/uniphier-proxstream2.dtsi | 3 ++-
- 6 files changed, 12 insertions(+), 6 deletions(-)
+> +{
+> +       const struct of_device_id *of_id;
+> +
+> +       of_id = of_match_device(axp20x_rsb_of_match, dev);
+> +       if (!of_id) {
+> +               dev_err(dev, "Unable to match OF ID\n");
+> +               return -ENODEV;
+> +       }
+> +       axp20x->variant = (long) of_id->data;
 
-diff --git a/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi b/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
-index af49381..c2913fe 100644
---- a/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
-@@ -87,7 +87,8 @@
- 		interrupt-parent = <&intc>;
- 
- 		extbus: extbus {
--			compatible = "simple-bus";
-+			compatible = "socionext,uniphier-system-bus",
-+				     "simple-bus";
- 			#address-cells = <2>;
- 			#size-cells = <1>;
- 		};
-diff --git a/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi b/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
-index 254642f..d110df7 100644
---- a/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
-@@ -95,7 +95,8 @@
- 		interrupt-parent = <&intc>;
- 
- 		extbus: extbus {
--			compatible = "simple-bus";
-+			compatible = "socionext,uniphier-system-bus",
-+				     "simple-bus";
- 			#address-cells = <2>;
- 			#size-cells = <1>;
- 		};
-diff --git a/arch/arm/boot/dts/uniphier-ph1-pro5.dtsi b/arch/arm/boot/dts/uniphier-ph1-pro5.dtsi
-index 11eb762..0f1db60 100644
---- a/arch/arm/boot/dts/uniphier-ph1-pro5.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ph1-pro5.dtsi
-@@ -95,7 +95,8 @@
- 		interrupt-parent = <&intc>;
- 
- 		extbus: extbus {
--			compatible = "simple-bus";
-+			compatible = "socionext,uniphier-system-bus",
-+				     "simple-bus";
- 			#address-cells = <2>;
- 			#size-cells = <1>;
- 		};
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld3.dtsi b/arch/arm/boot/dts/uniphier-ph1-sld3.dtsi
-index 691a17d..888bb2e 100644
---- a/arch/arm/boot/dts/uniphier-ph1-sld3.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld3.dtsi
-@@ -95,7 +95,8 @@
- 		interrupt-parent = <&intc>;
- 
- 		extbus: extbus {
--			compatible = "simple-bus";
-+			compatible = "socionext,uniphier-system-bus",
-+				     "simple-bus";
- 			#address-cells = <2>;
- 			#size-cells = <1>;
- 		};
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi b/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
-index e88559b..b10c4bd 100644
---- a/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
-@@ -87,7 +87,8 @@
- 		interrupt-parent = <&intc>;
- 
- 		extbus: extbus {
--			compatible = "simple-bus";
-+			compatible = "socionext,uniphier-system-bus",
-+				     "simple-bus";
- 			#address-cells = <2>;
- 			#size-cells = <1>;
- 		};
-diff --git a/arch/arm/boot/dts/uniphier-proxstream2.dtsi b/arch/arm/boot/dts/uniphier-proxstream2.dtsi
-index 259f1a9..9186f8c9 100644
---- a/arch/arm/boot/dts/uniphier-proxstream2.dtsi
-+++ b/arch/arm/boot/dts/uniphier-proxstream2.dtsi
-@@ -109,7 +109,8 @@
- 		interrupt-parent = <&intc>;
- 
- 		extbus: extbus {
--			compatible = "simple-bus";
-+			compatible = "socionext,uniphier-system-bus",
-+				     "simple-bus";
- 			#address-cells = <2>;
- 			#size-cells = <1>;
- 		};
+Extra space.
+
+> +
+> +       return axp20x_match_device(axp20x, dev);
+> +}
+> +
+> +static int axp20x_rsb_probe(struct sunxi_rsb_device *rdev)
+> +{
+> +       struct axp20x_dev *axp20x;
+> +       int ret;
+> +
+> +       axp20x = devm_kzalloc(&rdev->dev, sizeof(*axp20x), GFP_KERNEL);
+> +       if (!axp20x)
+> +               return -ENOMEM;
+> +
+> +       ret = axp20x_rsb_match_device(axp20x, &rdev->dev);
+> +       if (ret)
+> +               return ret;
+> +
+> +       axp20x->dev = &rdev->dev;
+> +       axp20x->irq = rdev->irq;
+> +       sunxi_rsb_device_set_drvdata(rdev, axp20x);
+> +
+> +       axp20x->regmap = devm_regmap_init_sunxi_rsb(rdev, axp20x->regmap_cfg);
+> +       if (IS_ERR(axp20x->regmap)) {
+> +               ret = PTR_ERR(axp20x->regmap);
+> +               dev_err(&rdev->dev, "regmap init failed: %d\n", ret);
+> +               return ret;
+> +       }
+> +
+> +       return axp20x_device_probe(axp20x);
+> +}
+> +
+> +static int axp20x_rsb_remove(struct sunxi_rsb_device *rdev)
+> +{
+> +       struct axp20x_dev *axp20x = sunxi_rsb_device_get_drvdata(rdev);
+> +
+> +       return axp20x_device_remove(axp20x);
+> +}
+> +
+> +static struct sunxi_rsb_driver axp20x_rsb_driver = {
+> +       .driver = {
+> +               .name   = "axp20x-rsb",
+> +               .of_match_table = of_match_ptr(axp20x_rsb_of_match),
+> +       },
+> +       .probe  = axp20x_rsb_probe,
+> +       .remove = axp20x_rsb_remove,
+> +};
+> +module_sunxi_rsb_driver(axp20x_rsb_driver);
+> +
+> +MODULE_DESCRIPTION("PMIC MFD sunXi RSB driver for AXP20X");
+> +MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
+> +MODULE_LICENSE("GPL v2");
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 01f139856bf1..8057000da9d6 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -32,6 +32,7 @@ static const char * const axp20x_model_names[] = {
+>         "AXP202",
+>         "AXP209",
+>         "AXP221",
+> +       "AXP223",
+>         "AXP288",
+>  };
+>
+> @@ -595,6 +596,7 @@ int axp20x_match_device(struct axp20x_dev *axp20x, struct device *dev)
+>                 axp20x->regmap_irq_chip = &axp20x_regmap_irq_chip;
+>                 break;
+>         case AXP221_ID:
+> +       case AXP223_ID:
+>                 axp20x->nr_cells = ARRAY_SIZE(axp22x_cells);
+>                 axp20x->cells = axp22x_cells;
+>                 axp20x->regmap_cfg = &axp22x_regmap_config;
+> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+> index 908f97f6e2d7..fef8dea18e66 100644
+> --- a/include/linux/mfd/axp20x.h
+> +++ b/include/linux/mfd/axp20x.h
+> @@ -18,6 +18,7 @@ enum {
+>         AXP202_ID,
+>         AXP209_ID,
+>         AXP221_ID,
+> +       AXP223_ID,
+>         AXP288_ID,
+>         NR_AXP20X_VARIANTS,
+>  };
+> --
+> 2.6.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+
+
+
 -- 
-1.9.1
+With Best Regards,
+Andy Shevchenko
