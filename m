@@ -1,146 +1,98 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 Nov 2015 18:35:33 +0100
-Subject: [PULL 5/8] KVM: arm/arm64: arch_timer: Preserve physical dist. active
- state on LR.active
+Date: Tue, 24 Nov 2015 18:35:29 +0100
+Subject: [PULL 1/8] ARM/arm64: KVM: test properly for a PTE's uncachedness
 In-Reply-To: <1448386536-30118-1-git-send-email-christoffer.dall@linaro.org>
 References: <1448386536-30118-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1448386536-30118-6-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1448386536-30118-2-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We were incorrectly removing the active state from the physical
-distributor on the timer interrupt when the timer output level was
-deasserted.  We shouldn't be doing this without considering the virtual
-interrupt's active state, because the architecture requires that when an
-LR has the HW bit set and the pending or active bits set, then the
-physical interrupt must also have the corresponding bits set.
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-This addresses an issue where we have been observing an inconsistency
-between the LR state and the physical distributor state where the LR
-state was active and the physical distributor was not active, which
-shouldn't happen.
+The open coded tests for checking whether a PTE maps a page as
+uncached use a flawed '(pte_val(xxx) & CONST) != CONST' pattern,
+which is not guaranteed to work since the type of a mapping is
+not a set of mutually exclusive bits
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+For HYP mappings, the type is an index into the MAIR table (i.e, the
+index itself does not contain any information whatsoever about the
+type of the mapping), and for stage-2 mappings it is a bit field where
+normal memory and device types are defined as follows:
+
+    #define MT_S2_NORMAL            0xf
+    #define MT_S2_DEVICE_nGnRE      0x1
+
+I.e., masking *and* comparing with the latter matches on the former,
+and we have been getting lucky merely because the S2 device mappings
+also have the PTE_UXN bit set, or we would misidentify memory mappings
+as device mappings.
+
+Since the unmap_range() code path (which contains one instance of the
+flawed test) is used both for HYP mappings and stage-2 mappings, and
+considering the difference between the two, it is non-trivial to fix
+this by rewriting the tests in place, as it would involve passing
+down the type of mapping through all the functions.
+
+However, since HYP mappings and stage-2 mappings both deal with host
+physical addresses, we can simply check whether the mapping is backed
+by memory that is managed by the host kernel, and only perform the
+D-cache maintenance if this is the case.
+
+Cc: stable at vger.kernel.org
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: Pavel Fedin <p.fedin@samsung.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- include/kvm/arm_vgic.h    |  2 +-
- virt/kvm/arm/arch_timer.c | 28 +++++++++++++++++-----------
- virt/kvm/arm/vgic.c       | 34 ++++++++++++++++++++++------------
- 3 files changed, 40 insertions(+), 24 deletions(-)
+ arch/arm/kvm/mmu.c | 15 +++++++--------
+ 1 file changed, 7 insertions(+), 8 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 9c747cb..d2f4147 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -342,10 +342,10 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
- 			       struct irq_phys_map *map, bool level);
- void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
--int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
- struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
- 					   int virt_irq, int irq);
- int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
-+bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
- 
- #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
- #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 21a0ab2..69bca18 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -221,17 +221,23 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
- 	kvm_timer_update_state(vcpu);
- 
- 	/*
--	 * If we enter the guest with the virtual input level to the VGIC
--	 * asserted, then we have already told the VGIC what we need to, and
--	 * we don't need to exit from the guest until the guest deactivates
--	 * the already injected interrupt, so therefore we should set the
--	 * hardware active state to prevent unnecessary exits from the guest.
--	 *
--	 * Conversely, if the virtual input level is deasserted, then always
--	 * clear the hardware active state to ensure that hardware interrupts
--	 * from the timer triggers a guest exit.
--	 */
--	if (timer->irq.level)
-+	* If we enter the guest with the virtual input level to the VGIC
-+	* asserted, then we have already told the VGIC what we need to, and
-+	* we don't need to exit from the guest until the guest deactivates
-+	* the already injected interrupt, so therefore we should set the
-+	* hardware active state to prevent unnecessary exits from the guest.
-+	*
-+	* Also, if we enter the guest with the virtual timer interrupt active,
-+	* then it must be active on the physical distributor, because we set
-+	* the HW bit and the guest must be able to deactivate the virtual and
-+	* physical interrupt at the same time.
-+	*
-+	* Conversely, if the virtual input level is deasserted and the virtual
-+	* interrupt is not active, then always clear the hardware active state
-+	* to ensure that hardware interrupts from the timer triggers a guest
-+	* exit.
-+	*/
-+	if (timer->irq.level || kvm_vgic_map_is_active(vcpu, timer->map))
- 		phys_active = true;
- 	else
- 		phys_active = false;
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 5335383..97e2c08 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1096,6 +1096,27 @@ static void vgic_retire_lr(int lr_nr, struct kvm_vcpu *vcpu)
- 	vgic_set_lr(vcpu, lr_nr, vlr);
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 6984342..7dace90 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -98,6 +98,11 @@ static void kvm_flush_dcache_pud(pud_t pud)
+ 	__kvm_flush_dcache_pud(pud);
  }
  
-+static bool dist_active_irq(struct kvm_vcpu *vcpu)
++static bool kvm_is_device_pfn(unsigned long pfn)
 +{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+
-+	return test_bit(vcpu->vcpu_id, dist->irq_active_on_cpu);
++	return !pfn_valid(pfn);
 +}
 +
-+bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, struct irq_phys_map *map)
-+{
-+	int i;
-+
-+	for (i = 0; i < vcpu->arch.vgic_cpu.nr_lr; i++) {
-+		struct vgic_lr vlr = vgic_get_lr(vcpu, i);
-+
-+		if (vlr.irq == map->virt_irq && vlr.state & LR_STATE_ACTIVE)
-+			return true;
-+	}
-+
-+	return dist_active_irq(vcpu);
-+}
-+
- /*
-  * An interrupt may have been disabled after being made pending on the
-  * CPU interface (the classic case is a timer running while we're
-@@ -1248,7 +1269,7 @@ static void __kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
- 	 * may have been serviced from another vcpu. In all cases,
- 	 * move along.
- 	 */
--	if (!kvm_vgic_vcpu_pending_irq(vcpu) && !kvm_vgic_vcpu_active_irq(vcpu))
-+	if (!kvm_vgic_vcpu_pending_irq(vcpu) && !dist_active_irq(vcpu))
- 		goto epilog;
+ /**
+  * stage2_dissolve_pmd() - clear and flush huge PMD entry
+  * @kvm:	pointer to kvm structure.
+@@ -213,7 +218,7 @@ static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
+ 			kvm_tlb_flush_vmid_ipa(kvm, addr);
  
- 	/* SGIs */
-@@ -1479,17 +1500,6 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
- 	return test_bit(vcpu->vcpu_id, dist->irq_pending_on_cpu);
+ 			/* No need to invalidate the cache for device mappings */
+-			if ((pte_val(old_pte) & PAGE_S2_DEVICE) != PAGE_S2_DEVICE)
++			if (!kvm_is_device_pfn(__phys_to_pfn(addr)))
+ 				kvm_flush_dcache_pte(old_pte);
+ 
+ 			put_page(virt_to_page(pte));
+@@ -305,8 +310,7 @@ static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
+ 
+ 	pte = pte_offset_kernel(pmd, addr);
+ 	do {
+-		if (!pte_none(*pte) &&
+-		    (pte_val(*pte) & PAGE_S2_DEVICE) != PAGE_S2_DEVICE)
++		if (!pte_none(*pte) && !kvm_is_device_pfn(__phys_to_pfn(addr)))
+ 			kvm_flush_dcache_pte(*pte);
+ 	} while (pte++, addr += PAGE_SIZE, addr != end);
+ }
+@@ -1037,11 +1041,6 @@ static bool kvm_is_write_fault(struct kvm_vcpu *vcpu)
+ 	return kvm_vcpu_dabt_iswrite(vcpu);
  }
  
--int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu)
+-static bool kvm_is_device_pfn(unsigned long pfn)
 -{
--	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
--
--	if (!irqchip_in_kernel(vcpu->kvm))
--		return 0;
--
--	return test_bit(vcpu->vcpu_id, dist->irq_active_on_cpu);
+-	return !pfn_valid(pfn);
 -}
 -
--
- void vgic_kick_vcpus(struct kvm *kvm)
- {
- 	struct kvm_vcpu *vcpu;
+ /**
+  * stage2_wp_ptes - write protect PMD range
+  * @pmd:	pointer to pmd entry
 -- 
 2.1.2.330.g565301e.dirty
