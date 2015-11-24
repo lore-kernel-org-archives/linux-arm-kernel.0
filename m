@@ -1,92 +1,70 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 24 Nov 2015 14:26:42 -0800
-Subject: [PATCH] arm64/pci: Add quirks for Cavium Thunder PCI bridges.
-In-Reply-To: <20151124215200.GF17377@localhost>
-References: <1442966996-13419-1-git-send-email-ddaney.cavm@gmail.com>
- <20151124215200.GF17377@localhost>
-Message-ID: <5654E422.5070604@caviumnetworks.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Tue, 24 Nov 2015 22:25:33 +0000
+Subject: [PATCH v12 06/16] Revert "arm64: mm: remove unused
+ cpu_set_idmap_tcr_t0sz function"
+In-Reply-To: <cover.1448403503.git.geoff@infradead.org>
+References: <cover.1448403503.git.geoff@infradead.org>
+Message-ID: <c96d0042da75c6d40c7cd8c6f09a520caf3bbbff.1448403503.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/24/2015 01:52 PM, Bjorn Helgaas wrote:
-> Hi David,
->
-> On Tue, Sep 22, 2015 at 05:09:56PM -0700, David Daney wrote:
->> From: David Daney <david.daney@cavium.com>
->>
->> The Cavium ThunderX SoC needs a PCI quirk for its on-chip bridges.
->> Since it is arm64, create a new quirks.c file there to contain arm64
->> related quirks.  Add the ThunderX bridge quirk, gated by a new config
->> variable, so that it can be disabled for kernels that aren't expected
->> to be used on ThunderX.
->
-> Is this still needed?
+This reverts commit c51e97d89e526368eb697f87cd4d391b9e19f369.
 
-No.
+Add back the cpu_set_idmap_tcr_t0sz function needed by setup_mmu_for_reboot.
+---
+ arch/arm64/include/asm/mmu_context.h | 35 +++++++++++++++++++++++------------
+ 1 file changed, 23 insertions(+), 12 deletions(-)
 
-The EA patch set that you merged to 4.4 supersedes this.
-
-> I've seen some follow-up Cavium stuff, but
-> nothing further on this one.  If we still need it, we should figure
-> out who should take it.  It's all under arch/arm64, so ordinarily I
-> would leave it up to the arm64 guys.
->
->> Signed-off-by: David Daney <david.daney@cavium.com>
->> ---
->>   arch/arm64/Kconfig         | 11 +++++++++++
->>   arch/arm64/kernel/Makefile |  2 +-
->>   arch/arm64/kernel/quirks.c | 36 ++++++++++++++++++++++++++++++++++++
->>   3 files changed, 48 insertions(+), 1 deletion(-)
->>   create mode 100644 arch/arm64/kernel/quirks.c
->
->> +#ifdef CONFIG_CAVIUM_THUNDER_PCI_QUIRKS
->> +static void thunder_bridge_fixup(struct pci_dev *dev)
->> +{
->> +	/*
->> +	 * This bridge is broken in that it doesn't have correct
->> +	 * resource ranges for the buses behind it.
->> +	 *
->> +	 * The upstream bus resources are a close enough approximation
->> +	 * to what is needed, that they can be used instead.  Copy
->> +	 * upstream root bus resources so that resource claiming for
->> +	 * downstream devices can be done.
->> +	 */
->> +	int resno;
->> +	struct pci_bus *bus = dev->subordinate;
->> +
->> +	for (resno = 0; resno < PCI_BRIDGE_RESOURCE_NUM; resno++) {
->> +		bus->resource[resno] =
->> +			pci_bus_resource_n(bus->parent,
->> +					   PCI_BRIDGE_RESOURCE_NUM + resno);
->
-> I am curious about this.  Is this a standard PCI-PCI bridge,
-
-Yes it is PCI-PCI
-
-> or is it
-> a host bridge.  If the former, I guess it must be broken in some way
-> that keeps the usual bridge window reading code from working?
->
-> Copying the upstream bus resources to the downstream bus might sort of
-> work sometimes, but seems fragile in general.  If the bridge has any
-> peers, it seems like we're headed for a conflict between the peer's
-> resources and anything downstream of the bridge.
-
-The problem is that all the downstream devices require 64-bit 
-non-prefetchable addressing, which cannot be satisfied with the bridge 
-provisioning code.  EA allows this to be described.
-
-In any event the patch is not needed now that the EA code is in place.
-
->
->> +	}
->> +}
->> +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_CAVIUM, 0xa002, thunder_bridge_fixup);
->> +#endif /* CONFIG_CAVIUM_THUNDER_PCI_QUIRKS */
->> --
->> 1.9.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+index 2416578..7567030 100644
+--- a/arch/arm64/include/asm/mmu_context.h
++++ b/arch/arm64/include/asm/mmu_context.h
+@@ -70,23 +70,34 @@ static inline bool __cpu_uses_extended_idmap(void)
+ 		unlikely(idmap_t0sz != TCR_T0SZ(VA_BITS)));
+ }
+ 
++static inline void __cpu_set_tcr_t0sz(u64 t0sz)
++{
++	unsigned long tcr;
++
++	if (__cpu_uses_extended_idmap())
++		asm volatile (
++		"	mrs	%0, tcr_el1	;"
++		"	bfi	%0, %1, %2, %3	;"
++		"	msr	tcr_el1, %0	;"
++		"	isb"
++		: "=&r" (tcr)
++		: "r"(t0sz), "I"(TCR_T0SZ_OFFSET), "I"(TCR_TxSZ_WIDTH));
++}
++
++/*
++ * Set TCR.T0SZ to the value appropriate for activating the identity map.
++ */
++static inline void cpu_set_idmap_tcr_t0sz(void)
++{
++	__cpu_set_tcr_t0sz(idmap_t0sz);
++}
++
+ /*
+  * Set TCR.T0SZ to its default value (based on VA_BITS)
+  */
+ static inline void cpu_set_default_tcr_t0sz(void)
+ {
+-	unsigned long tcr;
+-
+-	if (!__cpu_uses_extended_idmap())
+-		return;
+-
+-	asm volatile (
+-	"	mrs	%0, tcr_el1	;"
+-	"	bfi	%0, %1, %2, %3	;"
+-	"	msr	tcr_el1, %0	;"
+-	"	isb"
+-	: "=&r" (tcr)
+-	: "r"(TCR_T0SZ(VA_BITS)), "I"(TCR_T0SZ_OFFSET), "I"(TCR_TxSZ_WIDTH));
++	__cpu_set_tcr_t0sz(TCR_T0SZ(VA_BITS));
+ }
+ 
+ /*
+-- 
+2.5.0
