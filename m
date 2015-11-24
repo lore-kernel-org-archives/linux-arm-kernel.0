@@ -1,60 +1,53 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 Nov 2015 18:35:34 +0100
-Subject: [PULL 6/8] KVM: arm/arm64: vgic: Trust the LR state for HW IRQs
+Date: Tue, 24 Nov 2015 18:35:36 +0100
+Subject: [PULL 8/8] arm64: kvm: report original PAR_EL1 upon panic
 In-Reply-To: <1448386536-30118-1-git-send-email-christoffer.dall@linaro.org>
 References: <1448386536-30118-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1448386536-30118-7-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1448386536-30118-9-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We were probing the physial distributor state for the active state of a
-HW virtual IRQ, because we had seen evidence that the LR state was not
-cleared when the guest deactivated a virtual interrupted.
+From: Mark Rutland <mark.rutland@arm.com>
 
-However, this issue turned out to be a software bug in the GIC, which
-was solved by: 84aab5e68c2a5e1e18d81ae8308c3ce25d501b29
-(KVM: arm/arm64: arch_timer: Preserve physical dist. active
-state on LR.active, 2015-11-24)
+If we call __kvm_hyp_panic while a guest context is active, we call
+__restore_sysregs before acquiring the system register values for the
+panic, in the process throwing away the PAR_EL1 value at the point of
+the panic.
 
-Therefore, get rid of the complexities and just look at the LR.
+This patch modifies __kvm_hyp_panic to stash the PAR_EL1 value prior to
+restoring host register values, enabling us to report the original
+values at the point of the panic.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic.c | 16 ++--------------
- 1 file changed, 2 insertions(+), 14 deletions(-)
+ arch/arm64/kvm/hyp.S | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 97e2c08..65461f8 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1417,25 +1417,13 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- static bool vgic_sync_hwirq(struct kvm_vcpu *vcpu, int lr, struct vgic_lr vlr)
- {
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
--	struct irq_phys_map *map;
--	bool phys_active;
- 	bool level_pending;
--	int ret;
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index ce70817..86c2898 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -864,6 +864,10 @@ ENTRY(__kvm_flush_vm_context)
+ ENDPROC(__kvm_flush_vm_context)
  
- 	if (!(vlr.state & LR_HW))
- 		return false;
+ __kvm_hyp_panic:
++	// Stash PAR_EL1 before corrupting it in __restore_sysregs
++	mrs	x0, par_el1
++	push	x0, xzr
++
+ 	// Guess the context by looking at VTTBR:
+ 	// If zero, then we're already a host.
+ 	// Otherwise restore a minimal host context before panicing.
+@@ -898,7 +902,7 @@ __kvm_hyp_panic:
+ 	mrs	x3, esr_el2
+ 	mrs	x4, far_el2
+ 	mrs	x5, hpfar_el2
+-	mrs	x6, par_el1
++	pop	x6, xzr		// active context PAR_EL1
+ 	mrs	x7, tpidr_el2
  
--	map = vgic_irq_map_search(vcpu, vlr.irq);
--	BUG_ON(!map);
--
--	ret = irq_get_irqchip_state(map->irq,
--				    IRQCHIP_STATE_ACTIVE,
--				    &phys_active);
--
--	WARN_ON(ret);
--
--	if (phys_active)
--		return 0;
-+	if (vlr.state & LR_STATE_ACTIVE)
-+		return false;
- 
- 	spin_lock(&dist->lock);
- 	level_pending = process_queued_irq(vcpu, lr, vlr);
+ 	mov	lr, #(PSR_F_BIT | PSR_I_BIT | PSR_A_BIT | PSR_D_BIT |\
 -- 
 2.1.2.330.g565301e.dirty
