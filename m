@@ -1,14 +1,14 @@
 From: nikita@compulab.co.il (Nikita Kiryanov)
-Date: Tue, 24 Nov 2015 15:19:05 +0200
-Subject: [PATCH 04/14] ARM: am437x: cm-t43: dts: add spi-flash support
+Date: Tue, 24 Nov 2015 15:19:15 +0200
+Subject: [PATCH 14/14] ARM: am437x: cm-t43: dts: add lcd support
 In-Reply-To: <1448371155-17307-1-git-send-email-nikita@compulab.co.il>
 References: <1448371155-17307-1-git-send-email-nikita@compulab.co.il>
-Message-ID: <1448371155-17307-5-git-send-email-nikita@compulab.co.il>
+Message-ID: <1448371155-17307-15-git-send-email-nikita@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CM-T43 has an on-board 2MB SPI-flash which stores U-Boot and the U-Boot
-environment. Add it to the device tree.
+Add the necessary dss configuration to drive the startek lcd on CompuLab
+sbc-t43 single board computer.
 
 Signed-off-by: Nikita Kiryanov <nikita@compulab.co.il>
 Cc: Tony Lindgren <tony@atomide.com>
@@ -16,67 +16,102 @@ Cc: Igor Grinberg <grinberg@compulab.co.il>
 Cc: Dmitry Lifshitz <lifshitz@compulab.co.il>
 Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
 ---
- arch/arm/boot/dts/am437x-cm-t43.dts | 41 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+ arch/arm/boot/dts/am437x-sbc-t43.dts | 65 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 65 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am437x-cm-t43.dts b/arch/arm/boot/dts/am437x-cm-t43.dts
-index 7ef3971..0761383 100644
---- a/arch/arm/boot/dts/am437x-cm-t43.dts
-+++ b/arch/arm/boot/dts/am437x-cm-t43.dts
-@@ -44,6 +44,16 @@
- 			AM4372_IOPAD(0x98c, PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)  /* i2c0_scl.i2c0_scl */
+diff --git a/arch/arm/boot/dts/am437x-sbc-t43.dts b/arch/arm/boot/dts/am437x-sbc-t43.dts
+index b2c42d9..0758094 100644
+--- a/arch/arm/boot/dts/am437x-sbc-t43.dts
++++ b/arch/arm/boot/dts/am437x-sbc-t43.dts
+@@ -12,6 +12,10 @@
+ / {
+ 	model = "CompuLab CM-T43 on SB-SOM-T43";
+ 	compatible = "compulab,am437x-sbc-t43","compulab,am437x-cm-t43","ti,am4372","ti,am43";
++
++	aliases {
++		display0 = &lcd0;
++	};
+ };
+ 
+ &am43xx_pinmux {
+@@ -28,6 +32,41 @@
  		>;
  	};
-+
-+	spi0_pins: pinmux_spi0_pins {
+ 
++	dss_pinctrl_default: dss_pinctrl_default {
 +		pinctrl-single,pins = <
-+			AM4372_IOPAD(0x950, PIN_INPUT | MUX_MODE0) /* spi0_sclk.spi0_sclk */
-+			AM4372_IOPAD(0x954, PIN_INPUT | MUX_MODE0) /* spi0_d0.spi0_d0 */
-+			AM4372_IOPAD(0x958, PIN_OUTPUT | MUX_MODE0) /* spi0_d1.spi0_d1 */
-+			AM4372_IOPAD(0x95C, PIN_OUTPUT | MUX_MODE0) /* spi0_cs0.spi0_cs0 */
++			AM4372_IOPAD(0x9b0, PIN_OUTPUT_PULLUP | MUX_MODE2) /* cam0 hd -> DSS DATA 23 */
++			AM4372_IOPAD(0x9b4, PIN_OUTPUT_PULLUP | MUX_MODE2)
++			AM4372_IOPAD(0x9b8, PIN_OUTPUT_PULLUP | MUX_MODE2)
++			AM4372_IOPAD(0x9bc, PIN_OUTPUT_PULLUP | MUX_MODE2)
++			AM4372_IOPAD(0x9c0, PIN_OUTPUT_PULLUP | MUX_MODE2)
++			AM4372_IOPAD(0x9c4, PIN_OUTPUT_PULLUP | MUX_MODE2)
++			AM4372_IOPAD(0x9c8, PIN_OUTPUT_PULLUP | MUX_MODE2)
++			AM4372_IOPAD(0x9cc, PIN_OUTPUT_PULLUP | MUX_MODE2) /* cam1 data 9 -> DSS DATA 16 */
++
++			AM4372_IOPAD(0x8a0, PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS DATA 0 */
++			AM4372_IOPAD(0x8a4, PIN_OUTPUT_PULLUP | MUX_MODE0)
++			AM4372_IOPAD(0x8a8, PIN_OUTPUT_PULLUP | MUX_MODE0)
++			AM4372_IOPAD(0x8ac, PIN_OUTPUT_PULLUP | MUX_MODE0)
++			AM4372_IOPAD(0x8b0, PIN_OUTPUT_PULLUP | MUX_MODE0)
++			AM4372_IOPAD(0x8b4, PIN_OUTPUT_PULLUP | MUX_MODE0)
++			AM4372_IOPAD(0x8b8, PIN_OUTPUT_PULLUP | MUX_MODE0)
++			AM4372_IOPAD(0x8bc, PIN_OUTPUT_PULLUP | MUX_MODE0)
++			AM4372_IOPAD(0x8c0, PIN_OUTPUT_PULLUP | MUX_MODE0)
++			AM4372_IOPAD(0x8c4, PIN_OUTPUT_PULLUP | MUX_MODE0)
++			AM4372_IOPAD(0x8c8, PIN_OUTPUT_PULLUP | MUX_MODE0)
++			AM4372_IOPAD(0x8cc, PIN_OUTPUT_PULLUP | MUX_MODE0)
++			AM4372_IOPAD(0x8d0, PIN_OUTPUT_PULLUP | MUX_MODE0)
++			AM4372_IOPAD(0x8d4, PIN_OUTPUT_PULLUP | MUX_MODE0)
++			AM4372_IOPAD(0x8d8, PIN_OUTPUT_PULLUP | MUX_MODE0)
++			AM4372_IOPAD(0x8dc, PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS DATA 15 */
++			AM4372_IOPAD(0x8e0, PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS VSYNC */
++			AM4372_IOPAD(0x8e4, PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS HSYNC */
++			AM4372_IOPAD(0x8e8, PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS PCLK */
++			AM4372_IOPAD(0x8ec, PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS AC BIAS EN */
++			AM4372_IOPAD(0xa20, PIN_OUTPUT_PULLUP | MUX_MODE7)
 +		>;
 +	};
 +
+ 	uart0_pins_default: uart0_pins_default {
+ 		pinctrl-single,pins = <
+ 			AM4372_IOPAD(0x968, DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE0)
+@@ -99,6 +138,20 @@
+ 	wp-gpios = <&gpio0 7 GPIO_ACTIVE_HIGH>;
  };
  
- &i2c0 {
-@@ -146,6 +156,37 @@
- 	status = "okay";
- };
- 
-+&spi0 {
-+	status = "okay";
++&dss {
++	status = "ok";
++
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&spi0_pins>;
-+	dmas = <&edma 16
-+		&edma 17>;
-+	dma-names = "tx0", "rx0";
++	pinctrl-0 = <&dss_pinctrl_default>;
 +
-+	flash: w25q64cvzpig at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <20000000>;
-+		partition at 0 {
-+			label = "uboot";
-+			reg = <0x0 0xc0000>;
-+		};
-+
-+		partition at c0000 {
-+			label = "uboot environment";
-+			reg = <0xc0000 0x40000>;
-+		};
-+
-+		partition at 100000 {
-+			label = "reserved";
-+			reg = <0x100000 0x100000>;
++	port {
++		dpi_lcd_out: endpoint at 0 {
++			remote-endpoint = <&lcd_in>;
++			data-lines = <24>;
 +		};
 +	};
 +};
 +
  &uart0 {
- 	status = "okay";
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_default>;
+@@ -114,3 +167,15 @@
+ 	pinctrl-0 = <&usb2_phy2_default>;
  };
+ 
++&lcd0 {
++	enable-gpios = <&pca9555 14 GPIO_ACTIVE_HIGH
++			&gpio4 28 GPIO_ACTIVE_HIGH>;
++
++	port {
++		lcd_in: endpoint {
++			remote-endpoint = <&dpi_lcd_out>;
++			data-lines = <24>;
++		};
++	};
++};
++
 -- 
 1.9.1
