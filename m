@@ -1,60 +1,51 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 24 Nov 2015 08:53:07 +0100
-Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
-In-Reply-To: <1448345169.2421.20.camel@mtksdaap41>
-References: <1447835066-10482-1-git-send-email-s.hauer@pengutronix.de>
- <1447835066-10482-3-git-send-email-s.hauer@pengutronix.de>
- <1448345169.2421.20.camel@mtksdaap41>
-Message-ID: <20151124075307.GZ11966@pengutronix.de>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Tue, 24 Nov 2015 15:48:56 +0800
+Subject: [PATCH v3 25/62] acpi/table: Introduce acpi_get_entry to get
+ specified entry
+In-Reply-To: <56541E4002000078000B8304@prv-mh.provo.novell.com>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-26-git-send-email-shannon.zhao@linaro.org>
+ <5653541E02000078000B8079@prv-mh.provo.novell.com>
+ <5653D4A7.2090204@huawei.com>
+ <56541E4002000078000B8304@prv-mh.provo.novell.com>
+Message-ID: <56541668.9090201@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 02:06:09PM +0800, dawei chien wrote:
-> Hi Sascha,
+
+
+On 2015/11/24 15:22, Jan Beulich wrote:
+>>>> On 24.11.15 at 04:08, <zhaoshenglong@huawei.com> wrote:
+>> On 2015/11/24 0:59, Jan Beulich wrote:
+>>>>>> On 17.11.15 at 10:40, <shannon.zhao@linaro.org> wrote:
+>>>> +	if ( !table_header )
+>>>> +	{
+>>>> +		printk("Table header not present\n");
+>>>> +		return NULL;
+>>>> +	}
+>>>> +
+>>>> +	table_end = (unsigned long)table_header + table_header->length;
+>>>
+>>> So here you use ->length, ...
+>>>
+>>>> +	/* Parse all entries looking for a match. */
+>>>> +	entry = (struct acpi_subtable_header *)
+>>>> +	    ((unsigned long)table_header + table_size);
+>>>
+>>> ... but here table_size. Why?
+>>>
+>> Here it just skips the main table size at the beginning. Then it could
+>> point to the start of sub-table.
+>> For example, to MADT table, the table_size is sizeof(struct
+>> acpi_table_madt).
 > 
-> > +static int mtk_thermal_get_calibration_data(struct device *dev, struct mtk_thermal *mt)
-> > +{
-> > +	struct nvmem_cell *cell;
-> > +	u32 *buf;
-> > +	size_t len;
-> > +	int i, ret;
-> > +	/* Start with default values */
-> > +	mt->adc_ge = 512;
-> > +	for (i = 0; i < MT8173_NUM_SENSORS; i++)
-> > +		mt->vts[i] = 260;
-> > +	mt->degc_cali = 40;
-> > +	mt->o_slope = 0;
-> > +
-> > +	cell = nvmem_cell_get(dev, "calibration-data");
-> > +	if (IS_ERR(cell)) {
-> > +		if (PTR_ERR(cell) == -EPROBE_DEFER)
-> > +			return PTR_ERR(cell);
-> > +		return 0;
-> > +	}
-> > +
-> > +	buf = (u32 *)nvmem_cell_read(cell, &len);
-> > +
-> > +	nvmem_cell_put(cell);
-> > +
-> > +	if (IS_ERR(buf))
-> > +		return PTR_ERR(buf);
-> > +
-> > +	if (len < 3 * sizeof(u32)) {
-> > +		dev_warn(dev, "invalid calibration data\n");
-> > +		ret = -EINVAL;
-> > +		goto out;
-> > +	}
-> 
-> ret would not be assigned if the length of calibration data is correct.
-> Otherwise,
+> Well, but for one then the parameter name is kind of wrong, and
+> second - is it really reasonable for the caller to tell the function?
+>  
+I think the caller knows which table it wants to parse and could
+calculate the size. But within this function, there is no clue to get
+the main table size.
 
-gcc does a increasingly bad job when it comes to warn about
-uninitialized variables :(
-
-Sascha
-
+Thanks,
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Shannon
