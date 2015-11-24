@@ -1,31 +1,43 @@
-From: mkarthi3@visteon.com (Mutharaju, Prasanna (P.))
-Date: Tue, 24 Nov 2015 07:38:12 +0000
-Subject: [PATCH] ARM: MM: Simplify using vma_pages function
-Message-ID: <20151124073805.GA23513@jci-VirtualBox>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 24 Nov 2015 09:38:23 +0200
+Subject: [PATCH v4 0/3] ARM: OMAP2+ McASP(3) support for DRA7xx family
+In-Reply-To: <20151112180027.GP3218@atomide.com>
+References: <1447313579-23873-1-git-send-email-peter.ujfalusi@ti.com>
+ <20151112180027.GP3218@atomide.com>
+Message-ID: <565413EF.2040003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Prasanna Karthik <mkarthi3@visteon.com>
+Tony,
 
-Use vma_pages function on vma object instead of explicit computation.
+On 11/12/2015 08:00 PM, Tony Lindgren wrote:
+> * Peter Ujfalusi <peter.ujfalusi@ti.com> [151111 23:33]:
+>> Hi Tony,
+>>
+>> Changes since v3:
+>> - rebased on mainline's HEAD
+>> - Added Tested-by from Felipe
+>> - Added Acked-by from Paul for the hwmod patches
+>>
+>> Changes since v2:
+>> - DTS patch added which is needed because of the clock handling changes
+>>
+>> Felip Balbi reported that linux-next is broken right now since the DTS part of
+>> the earlier series has been applied, but we do not have the mcasp hwmod in the
+>> kernel:
+>> ...
+>> [    0.181029] platform 48468000.mcasp: Cannot lookup hwmod 'mcasp3'
+>> ...
+>> [    6.121072] davinci-mcasp 48468000.mcasp: _od_fail_runtime_resume: FIXME: missing hwmod/omap_dev info
+>> [    6.130790] ------------[ cut here ]------------
+>> [    6.135643] WARNING: CPU: 0 PID: 244 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x220/0x34c()
+>> [    6.145576] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4_PER2_P3 (Read): Data Access in User mode during Functional access
+> 
+> 
+> Thanks applying all three into omap-for-v4.4/fixes.
 
-Signed-off-by: Prasanna Karthik <mkarthi3@visteon.com>
----
- arch/arm/mm/dma-mapping.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Do you know when these patches are going to be merged to mainline? 4.4-rc2 is
+out, but it does not include them.
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index ad4eb2d..513e213 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -694,7 +694,7 @@ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
- {
- 	int ret = -ENXIO;
- #ifdef CONFIG_MMU
--	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
-+	unsigned long nr_vma_pages = vma_pages(vma);
- 	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
- 	unsigned long pfn = dma_to_pfn(dev, dma_addr);
- 	unsigned long off = vma->vm_pgoff;
 -- 
-1.9.1
+P?ter
