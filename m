@@ -1,63 +1,48 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 24 Nov 2015 11:08:23 +0800
-Subject: [PATCH v3 25/62] acpi/table: Introduce acpi_get_entry to get
- specified entry
-In-Reply-To: <5653541E02000078000B8079@prv-mh.provo.novell.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-26-git-send-email-shannon.zhao@linaro.org>
- <5653541E02000078000B8079@prv-mh.provo.novell.com>
-Message-ID: <5653D4A7.2090204@huawei.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 24 Nov 2015 11:13:13 +0800
+Subject: [PATCH v2 1/5] ARM: dts: sun8i: Add SID node
+In-Reply-To: <20151123124356.GW32142@lukather>
+References: <cover.1448263428.git.atx@atx.name>
+ <b897b1c8741c8a871163b84d01b480f99329536d.1448263428.git.atx@atx.name>
+ <20151123124356.GW32142@lukather>
+Message-ID: <CAGb2v65qfaTdQqXHD=-FHz1M1sHCTro97QETZUH=vA2BbRS+7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Mon, Nov 23, 2015 at 8:43 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Mon, Nov 23, 2015 at 09:02:48AM +0100, Josef Gajdusek wrote:
+>> Add a node describing the Security ID memory to the
+>> Allwinner H3 .dtsi file.
+>>
+>> Signed-off-by: Josef Gajdusek <atx@atx.name>
+>> ---
+>>  arch/arm/boot/dts/sun8i-h3.dtsi | 7 +++++++
+>>  1 file changed, 7 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> index 0faa38a..58de718 100644
+>> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+>> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> @@ -359,6 +359,13 @@
+>>                       #size-cells = <0>;
+>>               };
+>>
+>> +             sid: eeprom at 01c14000 {
+>> +                     compatible = "allwinner,sun4i-a10-sid";
+>> +                     reg = <0x01c14000 0x400>;
+>
+> The datasheet says it's 256 bytes wide, while the size here is of 1kB,
+> is it intentional?
 
-On 2015/11/24 0:59, Jan Beulich wrote:
->>>> On 17.11.15 at 10:40, <shannon.zhao@linaro.org> wrote:
->> --- a/xen/drivers/acpi/tables.c
->> +++ b/xen/drivers/acpi/tables.c
->> @@ -221,6 +221,51 @@ void __init acpi_table_print_madt_entry(struct acpi_subtable_header *header)
->>  	}
->>  }
->>  
->> +struct acpi_subtable_header * __init
->> +acpi_get_entry(char *id, unsigned long table_size,
->> +	       struct acpi_table_header *table_header, int entry_id,
->> +	       unsigned int entry_index)
->> +{
->> +	struct acpi_subtable_header *entry;
->> +	unsigned int count = 0;
->> +	unsigned long table_end;
->> +
->> +	if ( !table_size )
-> 
-> Linux coding style please in this file.
-> 
-Sure.
+My H3 datasheet (v1.1) says its 1 kB wide.
 
->> +		return NULL;
->> +
->> +	if ( !table_header )
->> +	{
->> +		printk("Table header not present\n");
->> +		return NULL;
->> +	}
->> +
->> +	table_end = (unsigned long)table_header + table_header->length;
-> 
-> So here you use ->length, ...
-> 
->> +	/* Parse all entries looking for a match. */
->> +	entry = (struct acpi_subtable_header *)
->> +	    ((unsigned long)table_header + table_size);
-> 
-> ... but here table_size. Why?
-> 
-Here it just skips the main table size at the beginning. Then it could
-point to the start of sub-table.
-For example, to MADT table, the table_size is sizeof(struct
-acpi_table_madt).
+It'd be nice if Allwinner actually listed the "usable" E-fuse offsets
+and widths, instead of having us dig through the SDK code.
 
-Thanks,
--- 
-Shannon
+Regards
+ChenYu
