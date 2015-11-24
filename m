@@ -1,71 +1,34 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 24 Nov 2015 10:29:19 -0800
-Subject: [PATCH RFC 16/27] ARM: cpuidle: Record the next wakeup event of
- the CPU
-In-Reply-To: <20151120162835.GC30342@linaro.org> (Lina Iyer's message of "Fri,
- 20 Nov 2015 09:28:35 -0700")
-References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
- <1447799871-56374-17-git-send-email-lina.iyer@linaro.org>
- <7hwptdsgto.fsf@deeprootsystems.com>
- <20151120162835.GC30342@linaro.org>
-Message-ID: <7hr3jfntds.fsf@deeprootsystems.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 24 Nov 2015 10:34:13 -0800
+Subject: [PATCH] dmaengine: bcm2835-dma: Convert to use DMA pool
+In-Reply-To: <1447672143-14201-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1447672143-14201-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <87poyztffe.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lina Iyer <lina.iyer@linaro.org> writes:
+Peter Ujfalusi <peter.ujfalusi@ti.com> writes:
 
-> On Thu, Nov 19 2015 at 16:35 -0700, Kevin Hilman wrote:
->>Lina Iyer <lina.iyer@linaro.org> writes:
->>
->>> Reading the next wakeup of the CPU can only be realiably done only from
->>> that CPU. In the idle enter path record the next wake up of the CPU. The
->>> information is useful to determine the sleep time left for the CPU.
->>>
->>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->>> ---
->>>  drivers/cpuidle/cpuidle-arm.c | 5 +++++
->>>  1 file changed, 5 insertions(+)
->>>
->>> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
->>> index 8e72a23..b3133ef 100644
->>> --- a/drivers/cpuidle/cpuidle-arm.c
->>> +++ b/drivers/cpuidle/cpuidle-arm.c
->>> @@ -18,9 +18,11 @@
->>>  #include <linux/kernel.h>
->>>  #include <linux/module.h>
->>>  #include <linux/of.h>
->>> +#include <linux/pm_domain.h>
->>>  #include <linux/pm_runtime.h>
->>>  #include <linux/slab.h>
->>>  #include <linux/rcupdate.h>
->>> +#include <linux/tick.h>
->>>
->>>  #include <asm/cpuidle.h>
->>>
->>> @@ -49,7 +51,9 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
->>>  	ret = cpu_pm_enter();
->>>  	if (!ret) {
->>>  		struct device *cpu_dev = get_cpu_device(dev->cpu);
->>> +		struct generic_pm_domain_data *gpd = dev_gpd_data(cpu_dev);
->>>
->>> +		gpd->td.next_wakeup = tick_nohz_get_next_wakeup();
->>>  		RCU_NONIDLE(pm_runtime_put_sync_suspend(cpu_dev));
->>
->>Maybe set this back to zero atomicaly, after wakeup?
->>
->>Checking for non-zero that might be another way for the domain goveror that there
->>haven't been any CPU wakeups since the CPUs have gone idle.
->>
-> I set it to 0 below.
+> f93178291712 dmaengine: bcm2835-dma: Fix memory leak when stopping a
+> 	     running transfer
+>
+> Fixed the memleak, but introduced another issue: the terminate_all callback
+> might be called with interrupts disabled and the dma_free_coherent() is
+> not allowed to be called when IRQs are disabled.
+> Convert the driver to use dma_pool_* for managing the list of control
+> blocks for the transfer.
+>
+> Fixes: f93178291712 ("dmaengine: bcm2835-dma: Fix memory leak when stopping a running transfer")
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 
-Oops, you're right.  Not sure how I missed that.
+It sounds like you got positive testing feedback.  Using the DMA pool
+for our bcm2835_dma_cbs makes sense to me, too.
 
-> The reference counting by the GET_PUT tells the domain if a device is
-> suspended. I see that as a redudant information. May be I am not getting
-> your point.
-
-It's redundant, but may be helpful in detecting races.  e.g. domain is
-being powered off and CPU wakes up and sets this zero, but runtime PM
-layers haven't been called yet so dev->power->usage_count is still zero.
-
-Kevin
+Reviewed-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151124/938864d8/attachment.sig>
