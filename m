@@ -1,39 +1,50 @@
-From: bpringle@sympatico.ca (Bill Pringlemeir)
-Date: Tue, 24 Nov 2015 09:28:30 -0500
-Subject: [PATCH 4/4] ARM: dts: vf610-twr: relicense vf610-twr.dts under
- GPLv2/X11
-In-Reply-To: <1448323302-23563-1-git-send-email-stefan@agner.ch> (Stefan
- Agner's message of "Mon, 23 Nov 2015 16:01:42 -0800")
-References: <1448323302-23563-1-git-send-email-stefan@agner.ch>
-Message-ID: <87io4rv5dd.fsf@sympatico.ca>
+From: javi.merino@arm.com (Javi Merino)
+Date: Tue, 24 Nov 2015 14:38:45 +0000
+Subject: [PATCH] thermal: fix thermal_zone_bind_cooling_device prototype
+In-Reply-To: <5439003.qQElgLSp5g@wuerfel>
+References: <5439003.qQElgLSp5g@wuerfel>
+Message-ID: <20151124143844.GA17897@e104805>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 Nov 2015, stefan at agner.ch wrote:
+On Tue, Nov 17, 2015 at 05:48:52PM +0100, Arnd Bergmann wrote:
+> When the prototype for thermal_zone_bind_cooling_device
+> changed, the static inline wrapper function was left alone,
+> which in theory can cause build warnings:
+> 
+> I have seen this error in the past:
+> drivers/thermal/db8500_thermal.c: In function 'db8500_cdev_bind':
+> drivers/thermal/db8500_thermal.c:78:9: error: too many arguments to function 'thermal_zone_bind_cooling_device'
+>    ret = thermal_zone_bind_cooling_device(thermal, i, cdev,
+> 
+> while this one no longer shows up, there is no doubt that
+> the prototype is still wrong, so let's just fix it anyway.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 6cd9e9f629f1 ("thermal: of: fix cooling device weights in device tree")
 
-> GPLv2-only devicetrees make reuse difficult for software components
-> licensed under a different license.
->
-> The consensus is that a GPL/X11 dual-license should allow all
-> necessary uses, so relicense the vf610-twr.dts file to this
-> combination.
->
-> CCs were acquired using (updated some email addresses):
-> git shortlog -sne --no-merges arch/arm/boot/dts/vf610-twr.dts
->
-> CC: Bill Pringlemeir <bpringle@sympatico.ca>
+Yes, we forgot to fix the case for !THERMAL
 
-Acked-by: Bill Pringlemeir <bpringle@sympatico.ca>
+Reviewed-by: Javi Merino <javi.merino@arm.com>
 
-> CC: Chao Fu <B44548@freescale.com>
-> CC: Cory Tusar <cory.tusar@pid1solutions.com>
-> CC: Cosmin Stoica <cosminstefan.stoica@freescale.com>
-> CC: Fugang Duan <B38611@freescale.com>
-> CC: Jingchang Lu <b35083@freescale.com>
-> CC: Shawn Guo <shawnguo@kernel.org>
-> CC: Xiubo Li <Li.Xiubo@freescale.com>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
-> arch/arm/boot/dts/vf610-twr.dts | 40
-> ++++++++++++++++++++++++++++++++++++---- 1 file changed, 36
-> insertions(+), 4 deletions(-)
+> diff --git a/include/linux/thermal.h b/include/linux/thermal.h
+> index 4014a59828fc..613c29bd6baf 100644
+> --- a/include/linux/thermal.h
+> +++ b/include/linux/thermal.h
+> @@ -438,7 +438,8 @@ static inline void thermal_zone_device_unregister(
+>  static inline int thermal_zone_bind_cooling_device(
+>  	struct thermal_zone_device *tz, int trip,
+>  	struct thermal_cooling_device *cdev,
+> -	unsigned long upper, unsigned long lower)
+> +	unsigned long upper, unsigned long lower,
+> +	unsigned int weight)
+>  { return -ENODEV; }
+>  static inline int thermal_zone_unbind_cooling_device(
+>  	struct thermal_zone_device *tz, int trip,
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
