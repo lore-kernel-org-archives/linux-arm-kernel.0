@@ -1,74 +1,147 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 24 Nov 2015 12:17:58 +0100
-Subject: [PATCH v2 resend] clk: imx25: Remove osc clock from driver
-Message-ID: <1448363878-14551-1-git-send-email-mpa@pengutronix.de>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 24 Nov 2015 11:18:01 +0000
+Subject: [Xen-devel] [PATCH v3 24/62] arm: Introduce a generic way to
+ use a device from acpi
+In-Reply-To: <1447753261-7552-25-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-25-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511241110360.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 'osc' clock is already initialized by the fixed clock defined in
-imx25.dtsi. The imx25 clock driver tries to add this clock for a second
-time and fails with -EEXIST:
-	i.MX clk 1: register failed with -17
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Parth Dixit <parth.dixit@linaro.org>
+> 
+> Add generic way to use device from acpi similar to the way it is
+> supported in device tree.
+> 
+> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  xen/arch/arm/device.c        | 19 +++++++++++++++++++
+>  xen/arch/arm/xen.lds.S       |  7 +++++++
+>  xen/include/asm-arm/device.h | 30 ++++++++++++++++++++++++++++++
+>  3 files changed, 56 insertions(+)
+> 
+> diff --git a/xen/arch/arm/device.c b/xen/arch/arm/device.c
+> index 0b53f6a..5494de0 100644
+> --- a/xen/arch/arm/device.c
+> +++ b/xen/arch/arm/device.c
+> @@ -22,6 +22,7 @@
+>  #include <xen/lib.h>
+>  
+>  extern const struct device_desc _sdevice[], _edevice[];
+> +extern const struct acpi_device_desc _asdevice[], _aedevice[];
+>  
+>  int __init device_init(struct dt_device_node *dev, enum device_class class,
+>                         const void *data)
+> @@ -50,6 +51,24 @@ int __init device_init(struct dt_device_node *dev, enum device_class class,
+>      return -EBADF;
+>  }
+>  
+> +int __init acpi_device_init(enum device_class class, const void *data, int class_type)
+> +{
+> +    const struct acpi_device_desc *desc;
+> +
+> +    for ( desc = _asdevice; desc != _aedevice; desc++ )
+> +    {
+> +        if ( ( desc->class != class ) && ( desc->class_type != class_type ) )
+> +            continue;
 
-As the clock is already properly setup in DT with a different driver, we
-can completely remove the handling in the imx25 clock driver.
+Shouldn't this be
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
----
+  if ( ( desc->class != class ) || ( desc->class_type != class_type ) )
 
-This is not a critical bugfix. It will just remove a warning for trying to add
-this clock twice.
+?
 
-Best Regards,
+> +
+> +        ASSERT(desc->init != NULL);
+> +
+> +        return desc->init(data);
+> +    }
+> +
+> +    return -EBADF;
+> +}
+> +
+>  enum device_class device_get_class(const struct dt_device_node *dev)
+>  {
+>      const struct device_desc *desc;
+> diff --git a/xen/arch/arm/xen.lds.S b/xen/arch/arm/xen.lds.S
+> index 0488f37..60802f6 100644
+> --- a/xen/arch/arm/xen.lds.S
+> +++ b/xen/arch/arm/xen.lds.S
+> @@ -100,6 +100,13 @@ SECTIONS
+>        _edevice = .;
+>    } :text
+>  
+> +  . = ALIGN(8);
+> +  .adev.info : {
+> +      _asdevice = .;
+> +      *(.adev.info)
+> +      _aedevice = .;
+> +  } :text
+> +
+>    . = ALIGN(PAGE_SIZE);             /* Init code and data */
+>    __init_begin = .;
+>    .init.text : {
+> diff --git a/xen/include/asm-arm/device.h b/xen/include/asm-arm/device.h
+> index 5d0a4cd..085f221 100644
+> --- a/xen/include/asm-arm/device.h
+> +++ b/xen/include/asm-arm/device.h
+> @@ -50,6 +50,27 @@ struct device_desc {
+>      int (*init)(struct dt_device_node *dev, const void *data);
+>  };
+>  
+> +struct acpi_device_desc {
+> +    /* Device name */
+> +    const char *name;
+> +    /* Device class */
+> +    enum device_class class;
+> +    /* type of device supported by the driver */
+> +    const int class_type;
+> +    /* Device initialization */
+> +    int (*init)(const void *data);
+> +};
+> +
+> +/**
+> + *  acpi_device_init - Initialize a device
+> + *  @class: class of the device (serial, network...)
+> + *  @data: specific data for initializing the device
+> + *
+> + *  Return 0 on success.
+> + */
+> +int __init acpi_device_init(enum device_class class,
+> +                            const void *data, int class_type);
+> +
+>  /**
+>   *  device_init - Initialize a device
+>   *  @dev: device to initialize
+> @@ -78,6 +99,15 @@ __section(".dev.info") = {                                          \
+>  #define DT_DEVICE_END                                               \
+>  };
+>  
+> +#define ACPI_DEVICE_START(_name, _namestr, _class)                    \
+> +static const struct acpi_device_desc __dev_desc_##_name __used           \
+> +__attribute__((__section__(".adev.info"))) = {                       \
 
-Markus
+why __attribute__?
 
- drivers/clk/imx/clk-imx25.c | 18 ++----------------
- 1 file changed, 2 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/clk/imx/clk-imx25.c b/drivers/clk/imx/clk-imx25.c
-index c4c141cab444..23686f756b5e 100644
---- a/drivers/clk/imx/clk-imx25.c
-+++ b/drivers/clk/imx/clk-imx25.c
-@@ -96,13 +96,11 @@ static struct clk ** const uart_clks[] __initconst = {
- 	NULL
- };
- 
--static int __init __mx25_clocks_init(unsigned long osc_rate,
--				     void __iomem *ccm_base)
-+static int __init __mx25_clocks_init(void __iomem *ccm_base)
- {
- 	BUG_ON(!ccm_base);
- 
- 	clk[dummy] = imx_clk_fixed("dummy", 0);
--	clk[osc] = imx_clk_fixed("osc", osc_rate);
- 	clk[mpll] = imx_clk_pllv1(IMX_PLLV1_IMX25, "mpll", "osc", ccm(CCM_MPCTL));
- 	clk[upll] = imx_clk_pllv1(IMX_PLLV1_IMX25, "upll", "osc", ccm(CCM_UPCTL));
- 	clk[mpll_cpu_3_4] = imx_clk_fixed_factor("mpll_cpu_3_4", "mpll", 3, 4);
-@@ -250,22 +248,10 @@ static int __init __mx25_clocks_init(unsigned long osc_rate,
- 
- static void __init mx25_clocks_init_dt(struct device_node *np)
- {
--	struct device_node *refnp;
--	unsigned long osc_rate = 24000000;
- 	void __iomem *ccm;
- 
--	/* retrieve the freqency of fixed clocks from device tree */
--	for_each_compatible_node(refnp, NULL, "fixed-clock") {
--		u32 rate;
--		if (of_property_read_u32(refnp, "clock-frequency", &rate))
--			continue;
--
--		if (of_device_is_compatible(refnp, "fsl,imx-osc"))
--			osc_rate = rate;
--	}
--
- 	ccm = of_iomap(np, 0);
--	__mx25_clocks_init(osc_rate, ccm);
-+	__mx25_clocks_init(ccm);
- 
- 	clk_data.clks = clk;
- 	clk_data.clk_num = ARRAY_SIZE(clk);
--- 
-2.6.2
+> +    .name = _namestr,                                               \
+> +    .class = _class,                                                \
+> +
+> +#define ACPI_DEVICE_END                                               \
+> +};
+> +
+>  #endif /* __ASM_ARM_DEVICE_H */
+>  
+>  /*
+> -- 
+> 2.1.0
+> 
+> 
+> _______________________________________________
+> Xen-devel mailing list
+> Xen-devel at lists.xen.org
+> http://lists.xen.org/xen-devel
+> 
