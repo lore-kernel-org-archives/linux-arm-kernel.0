@@ -1,43 +1,28 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 24 Nov 2015 09:38:23 +0200
-Subject: [PATCH v4 0/3] ARM: OMAP2+ McASP(3) support for DRA7xx family
-In-Reply-To: <20151112180027.GP3218@atomide.com>
-References: <1447313579-23873-1-git-send-email-peter.ujfalusi@ti.com>
- <20151112180027.GP3218@atomide.com>
-Message-ID: <565413EF.2040003@ti.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 24 Nov 2015 08:44:38 +0100
+Subject: [LINUX PATCH] iio: xadc: fix for extended name remains same issue
+In-Reply-To: <1448345847-15051-1-git-send-email-ranjit.waghmode@xilinx.com>
+References: <1448345847-15051-1-git-send-email-ranjit.waghmode@xilinx.com>
+Message-ID: <56541566.80604@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+On 11/24/2015 07:17 AM, Ranjit Waghmode wrote:
+> If we read channel details based on the device tree entry; channel?s scan_index
+> and channel?s address were overwritten by scan_index and address of channel
+> based on device tree. But extended name were remaining same because of which
+> sysfs entry names were continuous.
 
-On 11/12/2015 08:00 PM, Tony Lindgren wrote:
-> * Peter Ujfalusi <peter.ujfalusi@ti.com> [151111 23:33]:
->> Hi Tony,
->>
->> Changes since v3:
->> - rebased on mainline's HEAD
->> - Added Tested-by from Felipe
->> - Added Acked-by from Paul for the hwmod patches
->>
->> Changes since v2:
->> - DTS patch added which is needed because of the clock handling changes
->>
->> Felip Balbi reported that linux-next is broken right now since the DTS part of
->> the earlier series has been applied, but we do not have the mcasp hwmod in the
->> kernel:
->> ...
->> [    0.181029] platform 48468000.mcasp: Cannot lookup hwmod 'mcasp3'
->> ...
->> [    6.121072] davinci-mcasp 48468000.mcasp: _od_fail_runtime_resume: FIXME: missing hwmod/omap_dev info
->> [    6.130790] ------------[ cut here ]------------
->> [    6.135643] WARNING: CPU: 0 PID: 244 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x220/0x34c()
->> [    6.145576] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4_PER2_P3 (Read): Data Access in User mode during Functional access
+I don't understand this part. Those channels don't have a extended name,
+they are always NULL. Those are added as part of this patch as well, but the
+patch description makes it sound like it is a fix for a existing issue.
+
+
 > 
-> 
-> Thanks applying all three into omap-for-v4.4/fixes.
+> So this patch takes care of the above issue by updating 'channels' structure
+> inside xadc_parse_dt() function with the help of 'xadc_channels' structure
+> so that every channel's parameters will be updated properly. Also for the
+> sake of simplicity this patch updates default values for extend_name.
 
-Do you know when these patches are going to be merged to mainline? 4.4-rc2 is
-out, but it does not include them.
-
--- 
-P?ter
+We can't really do that, that would break existing applications. And to be
+honest I don't think regular channels should have a extended name.
