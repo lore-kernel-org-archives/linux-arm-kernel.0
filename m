@@ -1,46 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Nov 2015 23:09:02 +0100
-Subject: [PATCH] mtd: cfi: don't warn about broken geometry for !CONFIG_MTD
-In-Reply-To: <4492128.vrqmf1niG3@wuerfel>
-References: <3747078.dk5V5gxuXa@wuerfel> <4492128.vrqmf1niG3@wuerfel>
-Message-ID: <7025557.qur2fOT79A@wuerfel>
+Date: Tue, 24 Nov 2015 23:13:09 +0100
+Subject: [PATCH] ARM: qcom: select ARM_CPU_SUSPEND for power management
+Message-ID: <5497046.7sx8fEMiNf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The linux/mtd/map.h header file is included by a couple of
-platform specific files that are built even when CONFIG_MTD
-is disabled, and we always get
+The qcom spm driver uses cpu_resume_arm(), which is not included
+in the kernel in all configurations:
 
- warning "No CONFIG_MTD_MAP_BANK_WIDTH_xx selected. No NOR chip support can work"
+drivers/built-in.o: In function `qcom_cpu_spc':
+:(.text+0xbc022): undefined reference to `cpu_suspend'
+drivers/built-in.o: In function `qcom_cpuidle_init':
+:(.init.text+0x610c): undefined reference to `cpu_resume_arm'
 
-in that case. This adds an #ifdef around the pointless warning,
-as everything is really fine when we don't build the drivers
-anyway.
+This adds a 'select' Kconfig statement to ensure it's always
+enabled.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
-> I'm actually still getting the warnings for any file that includes <linux/mtd/map.h>
-> while CONFIG_MTD is disabled. I have a fix now that I'm testing overnight
-> and plan to post tomorrow, then we can decide whether it should be part of
-> the same patch, or we should have two separate patches.
+This has been broken for a while but not even shown up in many thousands of
+randconfig builds until today. Please queue it up for 4.5 unless you think
+it should really go into 4.4 as well.
 
-The patch fixes the remaining warnings I see on ARM randconfigs in this file,
-and I think it makes sense to keep it as a separate patch, as these are really
-distinct problems even thought the symptom is the same.
-
-Please apply both.
-
-diff --git a/include/linux/mtd/map.h b/include/linux/mtd/map.h
-index 366cf77953b5..58f3ba709ade 100644
---- a/include/linux/mtd/map.h
-+++ b/include/linux/mtd/map.h
-@@ -142,7 +142,9 @@
- #endif
- 
- #ifndef map_bankwidth
-+#ifdef CONFIG_MTD
- #warning "No CONFIG_MTD_MAP_BANK_WIDTH_xx selected. No NOR chip support can work"
-+#endif
- static inline int map_bankwidth(void *map)
- {
- 	BUG();
+diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
+index 3c6e3893b76c..461b387d03cc 100644
+--- a/drivers/soc/qcom/Kconfig
++++ b/drivers/soc/qcom/Kconfig
+@@ -13,6 +13,7 @@ config QCOM_GSBI
+ config QCOM_PM
+ 	bool "Qualcomm Power Management"
+ 	depends on ARCH_QCOM && !ARM64
++	select ARM_CPU_SUSPEND
+ 	select QCOM_SCM
+ 	help
+ 	  QCOM Platform specific power driver to manage cores and L2 low power
