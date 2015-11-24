@@ -1,37 +1,117 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 24 Nov 2015 15:39:48 -0800
-Subject: [PATCHv2 0/2] Support for set_memory_* outside of module space
-In-Reply-To: <1447207057-11323-1-git-send-email-labbott@fedoraproject.org>
-References: <1447207057-11323-1-git-send-email-labbott@fedoraproject.org>
-Message-ID: <5654F544.1060208@redhat.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 24 Nov 2015 17:43:19 -0600
+Subject: [PATCH] ARM: keystone: dts: add PCI serdes driver bindings
+In-Reply-To: <1444919230-30932-1-git-send-email-w-kwok2@ti.com>
+References: <1444919230-30932-1-git-send-email-w-kwok2@ti.com>
+Message-ID: <20151124234319.GG17377@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2015 05:57 PM, Laura Abbott wrote:
-> Hi,
->
-> This is v2 of the series to allow set_memory_* to work on kernel memory
-> for security and other use cases. Should have addressed most comments
-> although another look might be necessary for the contiguous bit.
->
-> Thanks,
-> Laura
->
-> Laura Abbott (2):
->    arm64: Get existing page protections in split_pmd
->    arm64: Allow changing of attributes outside of modules
->
->   arch/arm64/Kconfig       |  12 ++++
->   arch/arm64/mm/mm.h       |   3 +
->   arch/arm64/mm/mmu.c      |  12 ++--
->   arch/arm64/mm/pageattr.c | 174 +++++++++++++++++++++++++++++++++++++++++------
->   4 files changed, 174 insertions(+), 27 deletions(-)
->
+Hi WingMan, 
 
-Given what seems to have popped up via
-https://lkml.kernel.org/r/<1448387338-27851-1-git-send-email-catalin.marinas@arm.com>
-I'm going to hold off on this until the issues there are worked out.
-Once that is fixed up this work can be picked up again.
+On Thu, Oct 15, 2015 at 10:27:10AM -0400, WingMan Kwok wrote:
+> This patch adds the required PCI serdes bindings whcih can then be
+> enabled by setting the corresponding statuses to "ok" in order to
+> configure and start the PCI serdes.
+> 
+> This patch depends on the updates to the Keystone PCIe host driver
+> and common serdes driver patch series that is submitted separately.
+> 
+> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
 
-Thanks,
-Laura
+Is there a reason to separate the binding update from the PCIe host
+driver update?  It would make sense to me to have them in the same
+patch to make it easier to keep them consistent.
+
+Bjorn
+
+> ---
+>  arch/arm/boot/dts/k2e.dtsi      |   21 +++++++++++++++++++++
+>  arch/arm/boot/dts/keystone.dtsi |   21 +++++++++++++++++++++
+>  2 files changed, 42 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
+> index 675fb8e..3b36575 100644
+> --- a/arch/arm/boot/dts/k2e.dtsi
+> +++ b/arch/arm/boot/dts/k2e.dtsi
+> @@ -86,6 +86,16 @@
+>  			gpio,syscon-dev = <&devctrl 0x240>;
+>  		};
+>  
+> +		pcie1_phy: pciephy at 2326000 {
+> +			#phy-cells = <0>;
+> +			compatible = "ti,keystone-serdes-pcie";
+> +			reg = <0x02326000 0x4000>;
+> +			reg-names = "serdes";
+> +			link-rate-kbps = <5000000>;
+> +			num-lanes = <2>;
+> +			status = "disabled";
+> +		};
+> +
+>  		pcie1: pcie at 21020000 {
+>  			compatible = "ti,keystone-pcie","snps,dw-pcie";
+>  			clocks = <&clkpcie1>;
+> @@ -130,6 +140,17 @@
+>  					<GIC_SPI 375 IRQ_TYPE_EDGE_RISING>,
+>  					<GIC_SPI 376 IRQ_TYPE_EDGE_RISING>;
+>  			};
+> +
+> +			/* PCIE phy */
+> +			serdeses {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				serdes at 0 {
+> +					reg = <0>;
+> +					phys = <&pcie1_phy>;
+> +				};
+> +			};
+> +
+>  		};
+>  
+>  		mdio: mdio at 24200f00 {
+> diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+> index 72816d6..6566cc4 100644
+> --- a/arch/arm/boot/dts/keystone.dtsi
+> +++ b/arch/arm/boot/dts/keystone.dtsi
+> @@ -275,6 +275,16 @@
+>  			ti,syscon-dev = <&devctrl 0x2a0>;
+>  		};
+>  
+> +		pcie0_phy: pciephy at 2320000 {
+> +			#phy-cells = <0>;
+> +			compatible = "ti,keystone-serdes-pcie";
+> +			reg = <0x02320000 0x4000>;
+> +			reg-names = "serdes";
+> +			link-rate-kbps = <5000000>;
+> +			num-lanes = <2>;
+> +			status = "disabled";
+> +		};
+> +
+>  		pcie0: pcie at 21800000 {
+>  			compatible = "ti,keystone-pcie", "snps,dw-pcie";
+>  			clocks = <&clkpcie>;
+> @@ -319,6 +329,17 @@
+>  					<GIC_SPI 28 IRQ_TYPE_EDGE_RISING>,
+>  					<GIC_SPI 29 IRQ_TYPE_EDGE_RISING>;
+>  			};
+> +
+> +			/* PCIE phy */
+> +			serdeses {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				serdes at 0 {
+> +					reg = <0>;
+> +					phys = <&pcie0_phy>;
+> +				};
+> +			};
+> +
+>  		};
+>  	};
+>  };
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
