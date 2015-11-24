@@ -1,64 +1,77 @@
 From: damien.riegel@savoirfairelinux.com (Damien Riegel)
-Date: Tue, 24 Nov 2015 13:00:48 -0500
-Subject: [PATCH v5 0/5] Add board support for TS-4800
-Message-ID: <1448388053-30661-1-git-send-email-damien.riegel@savoirfairelinux.com>
+Date: Tue, 24 Nov 2015 13:00:50 -0500
+Subject: [PATCH v5 2/5] mfd: syscon: add a DT property to set value width
+In-Reply-To: <1448388053-30661-1-git-send-email-damien.riegel@savoirfairelinux.com>
+References: <1448388053-30661-1-git-send-email-damien.riegel@savoirfairelinux.com>
+Message-ID: <1448388053-30661-3-git-send-email-damien.riegel@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch serie adds support for TS-4800 board. This board,                                                                              
-manufactured by Technologic Systems, is based on an IMX515.
+Currently syscon has a fixed configuration of 32 bits for register and
+values widths. In some cases, it would be desirable to be able to
+customize the value width.
 
-The first stage bootloader, called TS-BOOTROM, enables the watchdog,
-so a watchdog driver is required to prevent board from rebooting.
+For example, certain boards (like the ones manufactured by Technologic
+Systems) have a FPGA that is memory-mapped, but its registers are only
+16-bit wide.
 
-The current device tree is minimal but it allows to get a shell on the
-board.
+This patch adds an optional "bus-width" DT binding for syscon that
+allows to change the width for the data bus (i.e. val_bits). If this
+property is provided, it will also adjust the register stride to
+bus-width / 8. If not provided, the default configuration is used.
 
-Changes in v5:
- - watchdog: changed iteration stop condition in set_timeout to be less
-   error prone
+Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+---
+ Documentation/devicetree/bindings/mfd/syscon.txt |  3 +++
+ drivers/mfd/syscon.c                             | 13 +++++++++++++
+ 2 files changed, 16 insertions(+)
 
-Changes in v4:
- - syscon: rewrite DT property reading to be clearer
- - watchdog: made fixes suggested by Guenter (now uses
-   watchdog_init_timeout, u32 instead of u16, fixed error checking in
-   probe, cleaned set_timeout)
-
-Changes in v3:
- - Rebased on v4.3
- - Changed vendor prefix from "ts" to "technologic"
- - Added a DT option to generic syscon driver to allow regmap configuration
- - Dropped custom mfd driver, use generic syscon driver instead.
-
-Changes in v2:
- - Added a mfd driver to handle syscon registers
- - The watchdog driver now uses the regmap (created by the mfd driver)
-   to access the feed register
- - Remove watchdog's dependency on SOC_IMX51
-
-Damien Riegel (5):
-  of: add vendor prefix for Technologic Systems
-  mfd: syscon: add a DT property to set value width
-  watchdog: ts4800: add driver for TS-4800 watchdog
-  ARM: imx_v6_v7_defconfig: add TS-4800 watchdog
-  ARM: dts: TS-4800: add basic device tree
-
- .../devicetree/bindings/arm/technologic.txt        |   6 +
- Documentation/devicetree/bindings/mfd/syscon.txt   |   3 +
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- .../devicetree/bindings/watchdog/ts4800-wdt.txt    |  25 +++
- arch/arm/boot/dts/Makefile                         |   3 +-
- arch/arm/boot/dts/imx51-ts4800.dts                 | 190 ++++++++++++++++++
- arch/arm/configs/imx_v6_v7_defconfig               |   1 +
- drivers/mfd/syscon.c                               |  13 ++
- drivers/watchdog/Kconfig                           |  10 +
- drivers/watchdog/Makefile                          |   1 +
- drivers/watchdog/ts4800_wdt.c                      | 215 +++++++++++++++++++++
- 11 files changed, 467 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/arm/technologic.txt
- create mode 100644 Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt
- create mode 100644 arch/arm/boot/dts/imx51-ts4800.dts
- create mode 100644 drivers/watchdog/ts4800_wdt.c
-
+diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
+index fe8150b..4c9d187 100644
+--- a/Documentation/devicetree/bindings/mfd/syscon.txt
++++ b/Documentation/devicetree/bindings/mfd/syscon.txt
+@@ -13,6 +13,9 @@ Required properties:
+ - compatible: Should contain "syscon".
+ - reg: the register region can be accessed from syscon
+ 
++Optional property:
++- bus-width: width of the data bus. Can be <8>, <16>, <32>, or <64>.
++
+ Examples:
+ gpr: iomuxc-gpr at 020e0000 {
+ 	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
+diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
+index 176bf0f..5a93d80 100644
+--- a/drivers/mfd/syscon.c
++++ b/drivers/mfd/syscon.c
+@@ -47,6 +47,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
+ 	struct syscon *syscon;
+ 	struct regmap *regmap;
+ 	void __iomem *base;
++	u32 bus_width;
+ 	int ret;
+ 	struct regmap_config syscon_config = syscon_regmap_config;
+ 
+@@ -69,6 +70,18 @@ static struct syscon *of_syscon_register(struct device_node *np)
+ 	 else if (of_property_read_bool(np, "little-endian"))
+ 		syscon_config.val_format_endian = REGMAP_ENDIAN_LITTLE;
+ 
++	/*
++	 * search for bus-width property in DT. If it is not provided, default
++	 * to 32-bit. regmap_init_mmio will return an error if syscon_config's
++	 * values are invalid so there is no need to check them here.
++	 */
++	ret = of_property_read_u32(np, "bus-width", &bus_width);
++	if (ret)
++		bus_width = 32;
++
++	syscon_config.val_bits = bus_width;
++	syscon_config.reg_stride = syscon_config.val_bits / 8;
++
+ 	regmap = regmap_init_mmio(NULL, base, &syscon_config);
+ 	if (IS_ERR(regmap)) {
+ 		pr_err("regmap init failed\n");
 -- 
 2.5.0
