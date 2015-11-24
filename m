@@ -1,38 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 24 Nov 2015 07:25:13 -0200
-Subject: [PATCH v2] ARM: imx_v6_v7_defconfig: Select HDMI audio support
-In-Reply-To: <20151124062004.GJ11999@tiger>
-References: <1447687238-11559-1-git-send-email-fabio.estevam@freescale.com>
- <20151124062004.GJ11999@tiger>
-Message-ID: <CAOMZO5AwYny8OZCohCP0Zcc+pxyLawwJ=tUJrqsu8ORHSG6u-A@mail.gmail.com>
+From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
+Date: Tue, 24 Nov 2015 11:25:35 +0200
+Subject: [PATCH v3 1/6] PCI: designware: remove wrong io_base assignment
+In-Reply-To: <6899049.45pKpnsxmL@wuerfel>
+References: <cover.1448270813.git.stanimir.varbanov@linaro.org>
+ <EE11001F9E5DDD47B7634E2F8A612F2E162C6F70@lhreml503-mbs>
+ <56533D93.5000604@linaro.org> <6899049.45pKpnsxmL@wuerfel>
+Message-ID: <56542D0F.1020502@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 4:20 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Mon, Nov 16, 2015 at 01:20:38PM -0200, Fabio Estevam wrote:
->> Select CONFIG_DRM_DW_HDMI_AHB_AUDIO so that we have HDMI audio
->> supported by default.
+On 11/23/2015 06:40 PM, Arnd Bergmann wrote:
+> On Monday 23 November 2015 18:23:47 Stanimir Varbanov wrote:
+>>>>
+>>>> Fixes: 0021d22b73d6 ("PCI: designware: Use of_pci_get_host_bridge_resources()
+>>>> to parse DT")
+>>>> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 >>
->> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
->> ---
->> Changes since v1:
->> - Select the driver as module instead of built-in
->
-> I've applied a previous version.  Should I replace it with this one?
+>> I think the bug is introduced in:
+>>
+>> cbce7900598c ("PCI: designware: Make driver arch-agnostic")
+>>
+>> cause the io_base is correctly calculated in 0021d22b73d6, do you agree?
+> 
+> 
+> I think cbce7900598c just slightly changes the io_base value, but
+> it's still referring to a bus address, not a cpu address, both before
+> and after the patch.
+> 
+> 0021d22b73d6 hower seems to remove the correct 'pp->io_base = range.cpu_addr;'
+> and replaces it with 'pp->io_base = pp->io->start;', so it's now in
+> the wrong address space.
+> 
+> 	Arnd
+> 
 
-Yes, please.
+OK, I will resend this as separate patch, and will drop it from this series.
 
-The latest version uses module instead of built-in.
-
-Selecting the driver as module is better as it will not impact current
-users. For example: currently on a mx6qsabresd when we do 'aplay
-file.wav' it will play through the wm8962 card.
-
-If the HDMI audio driver is selected as built-in, then 'aplay
-file.wav' will play through the HDMI audio port, which may confuse the
-end user.
-
-If we select the HDMI audio driver as module then we keep the original
-behaviour.
-
-Thanks
+-- 
+regards,
+Stan
