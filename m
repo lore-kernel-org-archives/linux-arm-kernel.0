@@ -1,70 +1,31 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 24 Nov 2015 17:53:43 +0000
-Subject: [PATCH] arm64: dts: Add idle-states for Juno
-In-Reply-To: <9hh7fl8lie1.fsf@e105922-lin.cambridge.arm.com>
-References: <1430402268.2868.20.camel@linaro.org>
- <9hheggnca1y.fsf@e105922-lin.cambridge.arm.com>
- <1445868751.2807.21.camel@linaro.org>
- <20151026151709.GA16145@red-moon>
- <9hh7fl8lie1.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <20151124175343.GA13156@red-moon>
+From: damien.riegel@savoirfairelinux.com (Damien Riegel)
+Date: Tue, 24 Nov 2015 13:00:52 -0500
+Subject: [PATCH v5 4/5] ARM: imx_v6_v7_defconfig: add TS-4800 watchdog
+In-Reply-To: <1448388053-30661-1-git-send-email-damien.riegel@savoirfairelinux.com>
+References: <1448388053-30661-1-git-send-email-damien.riegel@savoirfairelinux.com>
+Message-ID: <1448388053-30661-5-git-send-email-damien.riegel@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2015 at 05:45:10PM +0000, Punit Agrawal wrote:
-> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
-> 
-> > On Mon, Oct 26, 2015 at 02:12:31PM +0000, Jon Medhurst (Tixy) wrote:
-> >> On Thu, 2015-10-22 at 14:22 +0100, Punit Agrawal wrote:
-> >> > "Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
-> >> > 
-> >> > > From: Jon Medhurst <tixy@linaro.org>
-> >> > >
-> >> > > Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> >> > 
-> >> > Apologies for resurrecting an old thread.
-> >> > 
-> >> > Following the discussion on this thread, even though certain concerns
-> >> > were raised, there wasn't any objection to $SUBJECT being merged.
-> >> > 
-> >> > I don't see this patch in any tree; perhaps it's slipped through the
-> >> > cracks.
-> >> 
-> >> It did slip through the cracks. Lorenzo's last comment was "I am fine
-> >> with enabling the idle states, I need to review and test the idle states
-> >> DT data in the patch first though." and I didn't chase things up.
-> >> 
-> >> The patch will need refreshing to add idle for Juno r1. Which will then
-> >> probably resurrect the discussion about where the numbers come from for
-> >> residency times, and are the same ones for r0 valid on r1 (and r2?).
-> >> 
-> >> In an effort to forestall that I would say: does anyone actually care if
-> >> the values are optimal? Juno is a reference platform and powered off
-> >> mains, so tuning for the optimum power consumption is pretty pointless.
-> >> But because it _is_ used as a reference by people it should at least
-> >> have these features enabled, to serve as an example, and for test
-> >> coverage.
-> >
-> > I agree with you here, let me check the entry/exit latencies again
-> > to make sure they are reasonably set-up, it is 4.5 material anyway.
-> 
-> Hi Lorenzo,
-> 
-> Have you had a chance to sanity check the values we've got here? I
-> didn't want to miss this merge window if possible.
+The TS-4800, based on an IMX.515, needs its watchdog support in order to
+work.
 
-Yes and they need updating. This data is really really FW dependent,
-that's the reason why I still think that these values should be provided
-by FW and not shoved into the kernel. Anyway, here we go (I assume the
-worst case and that's the only safe option I can see):
+Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-- the entry-latency should be set to 300us for _both_ idle states
-- the exit-latency should be set to 1.2ms for _both_ idle states
-
-The min-residency values looks reasonable, a tad optimistic (but again
-that's workload and FW dependent so either we settle for the worst
-possible case or we do not merge this at all).
-
-With the changes above:
-
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 79194c6..8968166 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -195,6 +195,7 @@ CONFIG_THERMAL=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_IMX_THERMAL=y
+ CONFIG_WATCHDOG=y
++CONFIG_TS4800_WATCHDOG=y
+ CONFIG_IMX2_WDT=y
+ CONFIG_MFD_DA9052_I2C=y
+ CONFIG_MFD_MC13XXX_SPI=y
+-- 
+2.5.0
