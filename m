@@ -1,62 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Nov 2015 14:00:47 +0000
-Subject: [RFC/PATCH 0/3] ARM: Use udiv/sdiv for __aeabi_{u}idiv library
- functions
-In-Reply-To: <yw1xk2p7r371.fsf@unicorn.mansr.com>
-References: <1448068997-26631-1-git-send-email-sboyd@codeaurora.org>
- <20151124001306.GI19156@codeaurora.org>
- <20151124085349.GQ19156@codeaurora.org>
- <4485320.CGMJdfZLya@wuerfel>
- <20151124104225.GA8644@n2100.arm.linux.org.uk>
- <yw1xsi3vr42t.fsf@unicorn.mansr.com>
- <20151124122308.GB8644@n2100.arm.linux.org.uk>
- <yw1xk2p7r371.fsf@unicorn.mansr.com>
-Message-ID: <20151124140047.GC8644@n2100.arm.linux.org.uk>
+From: uri.mashiach@compulab.co.il (Uri Mashiach)
+Date: Tue, 24 Nov 2015 16:02:07 +0200
+Subject: [PATCH v2 0/6] ARM: OMAP2+: dts: cm-t335: initial support
+In-Reply-To: <1445948100-16446-1-git-send-email-uri.mashiach@compulab.co.il>
+References: <1445948100-16446-1-git-send-email-uri.mashiach@compulab.co.il>
+Message-ID: <1448373733-5839-1-git-send-email-uri.mashiach@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 12:29:06PM +0000, M?ns Rullg?rd wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> 
-> > On Tue, Nov 24, 2015 at 12:10:02PM +0000, M?ns Rullg?rd wrote:
-> >> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> >> 
-> >> > On Tue, Nov 24, 2015 at 11:38:53AM +0100, Arnd Bergmann wrote:
-> >> >> I suggested using -mcpu=cortex-a15 because there are old gcc versions
-> >> >> that don't know about -march=armv7ve or -march=armv7-a+idiv yet, but
-> >> >> that do understand -mcpu=cortex-a15.
-> >> >
-> >> > That's not all.  The bigger problem is that there are toolchains out
-> >> > there which accept these options, but do _not_ support IDIV in either
-> >> > ARM or Thumb mode.  I'm afraid that makes it impossible to add this
-> >> > feature to the mainline kernel in this form: we need to run a test
-> >> > build to check that -march=armv7ve or what-not really does work
-> >> > through both GCC and GAS.
-> >> 
-> >> If the compiler accepts the option but doesn't actually emit any div
-> >> instructions, is there any real harm?
-> >
-> > That's not what I've found.  I've found that asking the assembler
-> > to accept idiv instructions appears to be ignored, which is something
-> > completely different.
-> >
-> > Further to this, what it comes down to is the stupid idea that the
-> > compiler should embed .arch / .cpu in the assembly output, which has
-> > the effect of overriding the command line arguments given to it via
-> > -Wa.  So, giving -Wa,-mcpu=cortex-a15 is a total no-op, because the
-> > first thing in the assembly output is:
-> >
-> > 	.arch armv7-a
-> >
-> > which kills off any attempt to set the assembly level ISA from the
-> > command line.
-> 
-> Oh, you mean the compiler knows about the instructions but the assembler
-> doesn't or isn't passed the right options.  It's infuriating when that
-> happens.
+Add basic support for CompuLab cm-t335 module based on AM335X SoC.
 
-No, that isn't what I meant.
+CM-T335 is a tiny computer-on-module (CoM) / system-on-module (SoM)
+The module is built around the Texas Instruments Sitara AM3352/4
+system-on-chip.
+
+The CPU is supplemented with up-to 512MB DDR3 and up-to 1GB of on-board
+NAND storage, WiFi connected to SPI, Bluetooth, Analog audio, Gigabit
+Ethernet, CAN bus.
+
+[v1 -> v2: integrate AM33XX_IOPAD macro in pinmux definitions ]
+Ilya Ledvich (6):
+  ARM: OMAP2+: dts: cm-t335: add initial support
+  ARM: OMAP2+: dts: cm-t335: add basic support for I2C
+  ARM: OMAP2+: dts: cm-t335: add support for NAND flash
+  ARM: OMAP2+: dts: cm-t335: add support for MMC
+  ARM: OMAP2+: dts: cm-t335: add support for network device
+  ARM: OMAP2+: dts: cm-t335: add support for PWM backlight
+
+ .../devicetree/bindings/arm/omap/omap.txt          |   3 +
+ arch/arm/boot/dts/Makefile                         |   7 +-
+ arch/arm/boot/dts/am335x-cm-t335.dts               | 348 +++++++++++++++++++++
+ 3 files changed, 355 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/boot/dts/am335x-cm-t335.dts
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.5.0
