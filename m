@@ -1,59 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 24 Nov 2015 08:28:01 +0000
-Subject: [PATCH v2 3/5] pinctrl: meson: enable GPIO IRQs
-In-Reply-To: <1448273816-11290-4-git-send-email-carlo@caione.org>
-References: <1448273816-11290-1-git-send-email-carlo@caione.org>
- <1448273816-11290-4-git-send-email-carlo@caione.org>
-Message-ID: <20151124082801.09139a93@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 24 Nov 2015 16:38:40 +0800
+Subject: [PATCH] ARM: DTS: LS1021A: add SATA node to DTS
+In-Reply-To: <1447124798-34952-1-git-send-email-Yuantian.Tang@freescale.com>
+References: <1447124798-34952-1-git-send-email-Yuantian.Tang@freescale.com>
+Message-ID: <20151124083840.GP11999@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Nov 2015 11:16:54 +0100
-Carlo Caione <carlo@caione.org> wrote:
-
-> From: Carlo Caione <carlo@endlessm.com>
+On Tue, Nov 10, 2015 at 11:06:38AM +0800, Yuantian.Tang at freescale.com wrote:
+> From: Tang Yuantian <Yuantian.Tang@freescale.com>
 > 
-> On Meson8 and Meson8b SoCs there are 8 independent filtered GPIO
-> interrupt modules that can be programmed to use any of the GPIOs in the
-> chip as an interrupt source.
+> Added SATA node to LS1021A DTS to support SATA function.
 > 
-> For each GPIO IRQ we have:
-> 
-> GPIOs --> [mux]--> [polarity]--> [filter]--> [edge select]--> GIC
-> 
-> The eight GPIO interrupts respond to mask/unmask/clear/etc.. just like
-> any other interrupt in the chip. The difference for the GPIO interrupts
-> is that they can be filtered and conditioned.
-> 
-> This patch adds support for the external GPIOs interrupts and enables
-> them for Meson8 and Meson8b SoCs.
-> 
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
-> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
-> 
+> Signed-off-by: Tang Yuantian <Yuantian.Tang@freescale.com>
 > ---
+>  arch/arm/boot/dts/ls1021a.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> index 973a496..89e2af3 100644
+> --- a/arch/arm/boot/dts/ls1021a.dtsi
+> +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> @@ -142,6 +142,16 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		sata: sata at 3200000 {
+> +			compatible = "fsl,ls1021a-ahci";
+> +			reg = <0x0 0x3200000 0x0 0x10000>,
+> +			      <0x0 0x20220520 0x0 0x4>;
+> +			interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&platform_clk 1>;
+> +			reg-names = "ahci", "sata-ecc";
 
-[...]
+Please put 'reg-names' right after 'reg'.
 
-> +	for (i = 0; i < pc->num_gic_irqs; i++) {
-> +		struct of_phandle_args oirq;
+Shawn
+
+> +			dma-coherent;
+> +		};
 > +
-> +		of_irq_parse_one(node, i, &oirq);
-> +		irq_of_phandle_args_to_fwspec(&oirq, &pc->gic_irqs[i]);
-> +
-> +		pc->irq_map[i] = IRQ_FREE;
-> +	}
-
-The whole thing feels weird. Why do you need to keep a set of fwspecs?
-All you need is a range of interrupts that would be conveniently
-represented by a bitmap (assuming your interrupts space is a mostly
-contiguous range).
-
-Overall, this patch is quite hard to review. Can you please split the
-GPIO management from the irqchip side?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+>  		scfg: scfg at 1570000 {
+>  			compatible = "fsl,ls1021a-scfg", "syscon";
+>  			reg = <0x0 0x1570000 0x0 0x10000>;
+> -- 
+> 2.1.0.27.g96db324
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
