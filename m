@@ -1,42 +1,64 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 24 Nov 2015 11:37:01 +0200
-Subject: [PATCH v2 2/4] clk: ti816x: Add missing dmtimer clkdev entries
-In-Reply-To: <56461006.5080309@baylibre.com>
-References: <56461006.5080309@baylibre.com>
-Message-ID: <56542FBD.8090404@ti.com>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Tue, 24 Nov 2015 10:34:38 +0100
+Subject: [PATCH v4 3/3] arm64/efi: isolate EFI stub from the kernel proper
+In-Reply-To: <1444330924-17830-4-git-send-email-ard.biesheuvel@linaro.org>
+References: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1444330924-17830-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20151124093438.GA31343@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/13/2015 06:29 PM, Neil Armstrong wrote:
-> Add missing clkdev dmtimer related entries for dm816x.
-> 32Khz and ext sources were missing.
->
-> Cc: Brian Hutchinson <b.hutchman@gmail.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+Ard,
 
-Your own sign-off should be at the top of the list, fixed this locally 
-myself.
+On 08.10.15 20:02:04, Ard Biesheuvel wrote:
+> +quiet_cmd_stubcopy = STUBCPY $@
+> +      cmd_stubcopy = if $(OBJCOPY) $(STUBCOPY_FLAGS-y) $< $@; then	\
+> +		     $(OBJDUMP) -r $@ | grep $(STUBCOPY_RELOC-y)	\
+> +		     && (echo >&2 "$@: absolute symbol references not allowed in the EFI stub"; \
+> +			 rm -f $@; /bin/false); else /bin/false; fi
 
-Queued for 4.4-rc-fixes, thanks.
+This one is causing some more build errors for my setup. Any hint how
+to fix that?
 
--Tero
+Thanks,
 
-> ---
->   drivers/clk/ti/clk-816x.c | 2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/drivers/clk/ti/clk-816x.c b/drivers/clk/ti/clk-816x.c
-> index 1dfad0c..2a5d84f 100644
-> --- a/drivers/clk/ti/clk-816x.c
-> +++ b/drivers/clk/ti/clk-816x.c
-> @@ -20,6 +20,8 @@ static struct ti_dt_clk dm816x_clks[] = {
->   	DT_CLK(NULL, "sys_clkin", "sys_clkin_ck"),
->   	DT_CLK(NULL, "timer_sys_ck", "sys_clkin_ck"),
->   	DT_CLK(NULL, "sys_32k_ck", "sys_32k_ck"),
-> +	DT_CLK(NULL, "timer_32k_ck", "sysclk18_ck"),
-> +	DT_CLK(NULL, "timer_ext_ck", "tclkin_ck"),
->   	DT_CLK(NULL, "mpu_ck", "mpu_ck"),
->   	DT_CLK(NULL, "timer1_fck", "timer1_fck"),
->   	DT_CLK(NULL, "timer2_fck", "timer2_fck"),
->
+-Robert
+
+
+  STUBCPY drivers/firmware/efi/libstub/arm-stub.stub.o
+0000000000000006 R_AARCH64_ABS32   .debug_abbrev
+000000000000000c R_AARCH64_ABS32   .debug_str+0x0000000000000890
+0000000000000011 R_AARCH64_ABS32   .debug_str+0x0000000000004ecd
+0000000000000015 R_AARCH64_ABS32   .debug_str+0x0000000000000bb1
+0000000000000019 R_AARCH64_ABS64   .init.text
+0000000000000021 R_AARCH64_ABS64   .init.text+0x00000000000008cc
+0000000000000029 R_AARCH64_ABS32   .debug_line
+0000000000000030 R_AARCH64_ABS32   .debug_str+0x00000000000000eb
+0000000000000047 R_AARCH64_ABS32   .debug_str+0x0000000000003ca8
+0000000000000059 R_AARCH64_ABS32   .debug_str+0x0000000000004798
+0000000000000060 R_AARCH64_ABS32   .debug_str+0x0000000000005008
+...
+000000000000a4bb R_AARCH64_ABS32   .debug_str+0x0000000000004a75
+000000000000a4da R_AARCH64_ABS32   .debug_str+0x00000000000029ee
+000000000000a4f7 R_AARCH64_ABS32   .debug_str+0x0000000000001d95
+000000000000a519 R_AARCH64_ABS32   .debug_str+0x0000000000000773
+0000000000000006 R_AARCH64_ABS32   .debug_info
+0000000000000010 R_AARCH64_ABS64   .init.text
+0000000000000623 R_AARCH64_ABS64   .init.text
+0000000000000014 R_AARCH64_ABS32   .debug_frame
+0000000000000018 R_AARCH64_ABS64   .init.text
+000000000000002c R_AARCH64_ABS32   .debug_frame
+0000000000000030 R_AARCH64_ABS64   .init.text+0x0000000000000018
+0000000000000074 R_AARCH64_ABS32   .debug_frame
+0000000000000078 R_AARCH64_ABS64   .init.text+0x0000000000000140
+000000000000009c R_AARCH64_ABS32   .debug_frame
+00000000000000a0 R_AARCH64_ABS64   .init.text+0x0000000000000158
+00000000000000c4 R_AARCH64_ABS32   .debug_frame
+00000000000000c8 R_AARCH64_ABS64   .init.text+0x0000000000000170
+000000000000012c R_AARCH64_ABS32   .debug_frame
+0000000000000130 R_AARCH64_ABS64   .init.text+0x0000000000000390
+0000000000000154 R_AARCH64_ABS32   .debug_frame
+0000000000000158 R_AARCH64_ABS64   .init.text+0x00000000000003b0
+00000000000001a4 R_AARCH64_ABS32   .debug_frame
+00000000000001a8 R_AARCH64_ABS64   .init.text+0x0000000000000780
+drivers/firmware/efi/libstub/arm-stub.stub.o: absolute symbol references not allowed in the EFI stub
