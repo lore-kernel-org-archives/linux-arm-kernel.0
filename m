@@ -1,50 +1,40 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 Nov 2015 18:35:32 +0100
-Subject: [PULL 4/8] KVM: arm/arm64: Fix preemptible timer active state
- crazyness
+Date: Tue, 24 Nov 2015 18:35:35 +0100
+Subject: [PULL 7/8] arm64: kvm: avoid %p in __kvm_hyp_panic
 In-Reply-To: <1448386536-30118-1-git-send-email-christoffer.dall@linaro.org>
 References: <1448386536-30118-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1448386536-30118-5-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1448386536-30118-8-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We were setting the physical active state on the GIC distributor in a
-preemptible section, which could cause us to set the active state on
-different physical CPU from the one we were actually going to run on,
-hacoc ensues.
+From: Mark Rutland <mark.rutland@arm.com>
 
-Since we are no longer descheduling/scheduling soft timers in the
-flush/sync timer functions, simply moving the timer flush into a
-non-preemptible section.
+Currently __kvm_hyp_panic uses %p for values which are not pointers,
+such as the ESR value. This can confusingly lead to "(null)" being
+printed for the value.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Use %x instead, and only use %p for host pointers.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/arm.c | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+ arch/arm64/kvm/hyp.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index eab83b2..e06fd29 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -564,17 +564,12 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 			vcpu_sleep(vcpu);
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index ff2e038..ce70817 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -914,7 +914,7 @@ __kvm_hyp_panic:
+ ENDPROC(__kvm_hyp_panic)
  
- 		/*
--		 * Disarming the background timer must be done in a
--		 * preemptible context, as this call may sleep.
--		 */
--		kvm_timer_flush_hwstate(vcpu);
--
--		/*
- 		 * Preparing the interrupts to be injected also
- 		 * involves poking the GIC, which must be done in a
- 		 * non-preemptible context.
- 		 */
- 		preempt_disable();
-+		kvm_timer_flush_hwstate(vcpu);
- 		kvm_vgic_flush_hwstate(vcpu);
+ __hyp_panic_str:
+-	.ascii	"HYP panic:\nPS:%08x PC:%p ESR:%p\nFAR:%p HPFAR:%p PAR:%p\nVCPU:%p\n\0"
++	.ascii	"HYP panic:\nPS:%08x PC:%016x ESR:%08x\nFAR:%016x HPFAR:%016x PAR:%016x\nVCPU:%p\n\0"
  
- 		local_irq_disable();
+ 	.align	2
+ 
 -- 
 2.1.2.330.g565301e.dirty
