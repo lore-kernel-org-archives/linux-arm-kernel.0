@@ -1,195 +1,130 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Tue, 24 Nov 2015 22:25:34 +0000
-Subject: [PATCH v12 12/16] arm64: kdump: implement machine_crash_shutdown()
+Subject: [PATCH v12 11/16] arm64: kdump: reserve memory for crash dump kernel
 In-Reply-To: <cover.1448403503.git.geoff@infradead.org>
 References: <cover.1448403503.git.geoff@infradead.org>
-Message-ID: <9ae67f7515c66bfd747486c8dc1c1772913a8d46.1448403503.git.geoff@infradead.org>
+Message-ID: <bc962621bd537244b54fc35627a456ab40bc6d26.1448403503.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-kdump calls machine_crash_shutdown() to shut down non-boot cpus and
-save registers' status in per-cpu ELF notes before starting the crash
-dump kernel. See kernel_kexec().
+On primary kernel, the memory region used by crash dump kernel must be
+specified by "crashkernel=" boot parameter. reserve_crashkernel()
+will allocate and reserve the region for later use.
 
-ipi_cpu_stop() is a bit modified and used to support this behavior.
+User space tools will be able to find the region marked as "Crash kernel"
+in /proc/iomem.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/include/asm/kexec.h    | 34 +++++++++++++++++++++++++++++++++-
- arch/arm64/kernel/machine_kexec.c | 31 +++++++++++++++++++++++++++++--
- arch/arm64/kernel/smp.c           | 16 ++++++++++++++--
- 3 files changed, 76 insertions(+), 5 deletions(-)
+ arch/arm64/kernel/setup.c |  7 +++++-
+ arch/arm64/mm/init.c      | 54 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 60 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
-index 46d63cd..555a955 100644
---- a/arch/arm64/include/asm/kexec.h
-+++ b/arch/arm64/include/asm/kexec.h
-@@ -30,6 +30,8 @@
- 
- #if !defined(__ASSEMBLY__)
- 
-+extern bool in_crash_kexec;
-+
- /**
-  * crash_setup_regs() - save registers for the panic kernel
-  *
-@@ -40,7 +42,37 @@
- static inline void crash_setup_regs(struct pt_regs *newregs,
- 				    struct pt_regs *oldregs)
- {
--	/* Empty routine needed to avoid build errors. */
-+	if (oldregs) {
-+		memcpy(newregs, oldregs, sizeof(*newregs));
-+	} else {
-+		__asm__ __volatile__ (
-+			"stp	 x0,   x1, [%3, #16 *  0]\n"
-+			"stp	 x2,   x3, [%3, #16 *  1]\n"
-+			"stp	 x4,   x5, [%3, #16 *  2]\n"
-+			"stp	 x6,   x7, [%3, #16 *  3]\n"
-+			"stp	 x8,   x9, [%3, #16 *  4]\n"
-+			"stp	x10,  x11, [%3, #16 *  5]\n"
-+			"stp	x12,  x13, [%3, #16 *  6]\n"
-+			"stp	x14,  x15, [%3, #16 *  7]\n"
-+			"stp	x16,  x17, [%3, #16 *  8]\n"
-+			"stp	x18,  x19, [%3, #16 *  9]\n"
-+			"stp	x20,  x21, [%3, #16 * 10]\n"
-+			"stp	x22,  x23, [%3, #16 * 11]\n"
-+			"stp	x24,  x25, [%3, #16 * 12]\n"
-+			"stp	x26,  x27, [%3, #16 * 13]\n"
-+			"stp	x28,  x29, [%3, #16 * 14]\n"
-+			"str	x30,	   [%3, #16 * 15]\n"
-+			"mov	%0, sp\n"
-+			"adr	%1, 1f\n"
-+			"mrs	%2, spsr_el1\n"
-+		"1:"
-+			: "=r" (newregs->sp),
-+			  "=r" (newregs->pc),
-+			  "=r" (newregs->pstate)
-+			: "r"  (&newregs->regs)
-+			: "memory"
-+		);
-+	}
- }
- 
- #endif /* !defined(__ASSEMBLY__) */
-diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-index da28a26..d2d7e90 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -9,6 +9,7 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/kernel.h>
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 8119479..f9fffc9 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -31,7 +31,6 @@
+ #include <linux/screen_info.h>
+ #include <linux/init.h>
  #include <linux/kexec.h>
- #include <linux/of_fdt.h>
- #include <linux/slab.h>
-@@ -23,6 +24,7 @@
- extern const unsigned char arm64_relocate_new_kernel[];
- extern const unsigned long arm64_relocate_new_kernel_size;
- 
-+bool in_crash_kexec;
- static unsigned long kimage_start;
- 
- /**
-@@ -203,13 +205,38 @@ void machine_kexec(struct kimage *kimage)
- 	 */
- 
- 	cpu_soft_restart(virt_to_phys(cpu_reset),
--		is_hyp_mode_available(),
-+		in_crash_kexec ? 0 : is_hyp_mode_available(),
- 		reboot_code_buffer_phys, kimage->head, kimage_start);
- 
- 	BUG(); /* Should never get here. */
+-#include <linux/crash_dump.h>
+ #include <linux/root_dev.h>
+ #include <linux/cpu.h>
+ #include <linux/interrupt.h>
+@@ -221,6 +220,12 @@ static void __init request_standard_resources(void)
+ 		    kernel_data.end <= res->end)
+ 			request_resource(res, &kernel_data);
+ 	}
++
++#ifdef CONFIG_KEXEC
++	/* User space tools will find "Crash kernel" region in /proc/iomem. */
++	if (crashk_res.end)
++		insert_resource(&iomem_resource, &crashk_res);
++#endif
  }
  
-+/**
-+ * machine_crash_shutdown - shutdown non-boot cpus and save registers
-+ */
- void machine_crash_shutdown(struct pt_regs *regs)
- {
--	/* Empty routine needed to avoid build errors. */
-+	struct pt_regs dummy_regs;
-+	int cpu;
-+
-+	local_irq_disable();
-+
-+	in_crash_kexec = true;
-+
-+	/*
-+	 * clear and initialize the per-cpu info. This is necessary
-+	 * because, otherwise, slots for offline cpus would never be
-+	 * filled up. See smp_send_stop().
-+	 */
-+	memset(&dummy_regs, 0, sizeof(dummy_regs));
-+	for_each_possible_cpu(cpu)
-+		crash_save_cpu(&dummy_regs, cpu);
-+
-+	/* shutdown non-boot cpus */
-+	smp_send_stop();
-+
-+	/* for boot cpu */
-+	crash_save_cpu(regs, smp_processor_id());
-+
-+	pr_info("Starting crashdump kernel...\n");
- }
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index b1adc51..15aabef 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -37,6 +37,7 @@
- #include <linux/completion.h>
- #include <linux/of.h>
- #include <linux/irq_work.h>
+ #ifdef CONFIG_BLK_DEV_INITRD
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 17bf39a..24f0a1c 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -34,6 +34,7 @@
+ #include <linux/dma-contiguous.h>
+ #include <linux/efi.h>
+ #include <linux/swiotlb.h>
 +#include <linux/kexec.h>
  
- #include <asm/alternative.h>
- #include <asm/atomic.h>
-@@ -54,6 +55,8 @@
- #include <asm/ptrace.h>
- #include <asm/virt.h>
+ #include <asm/fixmap.h>
+ #include <asm/memory.h>
+@@ -66,6 +67,55 @@ static int __init early_initrd(char *p)
+ early_param("initrd", early_initrd);
+ #endif
  
-+#include "cpu-reset.h"
++#ifdef CONFIG_KEXEC
++/*
++ * reserve_crashkernel() - reserves memory for crash kernel
++ *
++ * This function reserves memory area given in "crashkernel=" kernel command
++ * line parameter. The memory reserved is used by dump capture kernel when
++ * primary kernel is crashing.
++ */
++static void __init reserve_crashkernel(void)
++{
++	unsigned long long crash_size = 0, crash_base = 0;
++	int ret;
 +
- #define CREATE_TRACE_POINTS
- #include <trace/events/ipi.h>
- 
-@@ -683,8 +686,12 @@ static DEFINE_RAW_SPINLOCK(stop_lock);
- /*
-  * ipi_cpu_stop - handle IPI from smp_send_stop()
-  */
--static void ipi_cpu_stop(unsigned int cpu)
-+static void ipi_cpu_stop(unsigned int cpu, struct pt_regs *regs)
- {
-+#ifdef CONFIG_KEXEC
-+	/* printing messages may slow down the shutdown. */
-+	if (!in_crash_kexec)
-+#endif
- 	if (system_state == SYSTEM_BOOTING ||
- 	    system_state == SYSTEM_RUNNING) {
- 		raw_spin_lock(&stop_lock);
-@@ -697,6 +704,11 @@ static void ipi_cpu_stop(unsigned int cpu)
- 
- 	local_irq_disable();
- 
-+#ifdef CONFIG_KEXEC
-+	if (in_crash_kexec)
-+		crash_save_cpu(regs, cpu);
++	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
++				&crash_size, &crash_base);
++	if (ret)
++		return;
++
++	if (crash_base == 0) {
++		crash_base = memblock_alloc(crash_size, 1 << 21);
++		if (crash_base == 0) {
++			pr_warn("Unable to allocate crashkernel (size:%llx)\n",
++				crash_size);
++			return;
++		}
++	} else {
++		/* User specifies base address explicitly. */
++		if (!memblock_is_region_memory(crash_base, crash_size) ||
++			memblock_is_region_reserved(crash_base, crash_size)) {
++			pr_warn("crashkernel has wrong address or size\n");
++			return;
++		}
++
++		if (crash_base & ((1 << 21) - 1)) {
++			pr_warn("crashkernel base address is not 2MB aligned\n");
++			return;
++		}
++
++		memblock_reserve(crash_base, crash_size);
++	}
++
++	pr_info("Reserving %lldMB of memory@%lldMB for crashkernel\n",
++		crash_size >> 20, crash_base >> 20);
++
++	crashk_res.start = crash_base;
++	crashk_res.end = crash_base + crash_size - 1;
++}
 +#endif /* CONFIG_KEXEC */
 +
- 	while (1)
- 		cpu_relax();
- }
-@@ -727,7 +739,7 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ /*
+  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
+  * currently assumes that for memory starting above 4G, 32-bit devices will
+@@ -171,6 +221,10 @@ void __init arm64_memblock_init(void)
+ 		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
+ #endif
  
- 	case IPI_CPU_STOP:
- 		irq_enter();
--		ipi_cpu_stop(cpu);
-+		ipi_cpu_stop(cpu, regs);
- 		irq_exit();
- 		break;
++#ifdef CONFIG_KEXEC
++	reserve_crashkernel();
++#endif
++
+ 	early_init_fdt_scan_reserved_mem();
  
+ 	/* 4GB maximum for 32-bit only capable devices */
 -- 
 2.5.0
