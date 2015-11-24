@@ -1,27 +1,36 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 24 Nov 2015 20:31:51 +0900
-Subject: [PATCH] dt-bindings: ARM: add arm,cortex-a72 compatible string
-Message-ID: <1448364711-31275-1-git-send-email-yamada.masahiro@socionext.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 24 Nov 2015 12:34:49 +0100
+Subject: [PATCH] net: dsa: include gpio consumer header file
+Message-ID: <6383467.TZ5s6u4A6T@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+After the introduction of the switch gpio reset API, I'm getting
+build errors in configurations that disable CONFIG_GPIOLIB:
 
- Documentation/devicetree/bindings/arm/cpus.txt | 1 +
- 1 file changed, 1 insertion(+)
+net/dsa/dsa.c:783:16: error: implicit declaration of function 'gpio_to_desc' [-Werror=implicit-function-declaration]
 
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index 3a07a87..58e240d 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -157,6 +157,7 @@ nodes to be present and contain the properties described below.
- 			    "arm,cortex-a17"
- 			    "arm,cortex-a53"
- 			    "arm,cortex-a57"
-+			    "arm,cortex-a72"
- 			    "arm,cortex-m0"
- 			    "arm,cortex-m0+"
- 			    "arm,cortex-m1"
--- 
-1.9.1
+The reason is that linux/gpio/consumer.h is not automatically
+included without gpiolib support. This adds an explicit #include
+statement to make it compile in all configurations. The reset
+functionality will not work without gpiolib, which is what you
+get when disabling the feature.
+
+As far as I can tell, gpiolib is supported on all architectures
+on which you can have DSA at the moment.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: cc30c16344fc ("net: dsa: Add support for a switch reset gpio")
+
+diff --git a/net/dsa/dsa.c b/net/dsa/dsa.c
+index 0b5565f923cc..b7448c8490ac 100644
+--- a/net/dsa/dsa.c
++++ b/net/dsa/dsa.c
+@@ -24,6 +24,7 @@
+ #include <linux/of_gpio.h>
+ #include <linux/sysfs.h>
+ #include <linux/phy_fixed.h>
++#include <linux/gpio/consumer.h>
+ #include "dsa_priv.h"
+ 
+ char dsa_driver_version[] = "0.1";
