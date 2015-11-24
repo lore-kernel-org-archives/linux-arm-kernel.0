@@ -1,130 +1,48 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Tue, 24 Nov 2015 22:25:34 +0000
-Subject: [PATCH v12 11/16] arm64: kdump: reserve memory for crash dump kernel
-In-Reply-To: <cover.1448403503.git.geoff@infradead.org>
-References: <cover.1448403503.git.geoff@infradead.org>
-Message-ID: <bc962621bd537244b54fc35627a456ab40bc6d26.1448403503.git.geoff@infradead.org>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 24 Nov 2015 14:25:21 -0800
+Subject: [PATCH v2 2/2] restrict /dev/mem to idle io memory ranges
+In-Reply-To: <20151124000604.26360.56945.stgit@dwillia2-desk3.jf.intel.com>
+References: <20151124000553.26360.57819.stgit@dwillia2-desk3.jf.intel.com>
+ <20151124000604.26360.56945.stgit@dwillia2-desk3.jf.intel.com>
+Message-ID: <20151124142521.e6d23e44a8b2c24c044c2dec@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+On Mon, 23 Nov 2015 16:06:04 -0800 Dan Williams <dan.j.williams@intel.com> wrote:
 
-On primary kernel, the memory region used by crash dump kernel must be
-specified by "crashkernel=" boot parameter. reserve_crashkernel()
-will allocate and reserve the region for later use.
+> This effectively promotes IORESOURCE_BUSY to IORESOURCE_EXCLUSIVE
+> semantics by default.  If userspace really believes it is safe to access
+> the memory region it can also perform the extra step of disabling an
+> active driver.  This protects device address ranges with read side
+> effects and otherwise directs userspace to use the driver.
 
-User space tools will be able to find the region marked as "Crash kernel"
-in /proc/iomem.
+I don't think I'm sufficiently understanding what this is all needed
+for, sorry.  A better changelog would help: what's wrong with the
+current code, how you propose it be changed, how the kernel's
+externally-visible behaviour is altered, etc.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/kernel/setup.c |  7 +++++-
- arch/arm64/mm/init.c      | 54 +++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 60 insertions(+), 1 deletion(-)
+Please pay particular attention to the back-compatibility issues which
+will be encountered when people enable these options.
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 8119479..f9fffc9 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -31,7 +31,6 @@
- #include <linux/screen_info.h>
- #include <linux/init.h>
- #include <linux/kexec.h>
--#include <linux/crash_dump.h>
- #include <linux/root_dev.h>
- #include <linux/cpu.h>
- #include <linux/interrupt.h>
-@@ -221,6 +220,12 @@ static void __init request_standard_resources(void)
- 		    kernel_data.end <= res->end)
- 			request_resource(res, &kernel_data);
- 	}
-+
-+#ifdef CONFIG_KEXEC
-+	/* User space tools will find "Crash kernel" region in /proc/iomem. */
-+	if (crashk_res.end)
-+		insert_resource(&iomem_resource, &crashk_res);
-+#endif
- }
- 
- #ifdef CONFIG_BLK_DEV_INITRD
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 17bf39a..24f0a1c 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -34,6 +34,7 @@
- #include <linux/dma-contiguous.h>
- #include <linux/efi.h>
- #include <linux/swiotlb.h>
-+#include <linux/kexec.h>
- 
- #include <asm/fixmap.h>
- #include <asm/memory.h>
-@@ -66,6 +67,55 @@ static int __init early_initrd(char *p)
- early_param("initrd", early_initrd);
- #endif
- 
-+#ifdef CONFIG_KEXEC
-+/*
-+ * reserve_crashkernel() - reserves memory for crash kernel
-+ *
-+ * This function reserves memory area given in "crashkernel=" kernel command
-+ * line parameter. The memory reserved is used by dump capture kernel when
-+ * primary kernel is crashing.
-+ */
-+static void __init reserve_crashkernel(void)
-+{
-+	unsigned long long crash_size = 0, crash_base = 0;
-+	int ret;
-+
-+	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
-+				&crash_size, &crash_base);
-+	if (ret)
-+		return;
-+
-+	if (crash_base == 0) {
-+		crash_base = memblock_alloc(crash_size, 1 << 21);
-+		if (crash_base == 0) {
-+			pr_warn("Unable to allocate crashkernel (size:%llx)\n",
-+				crash_size);
-+			return;
-+		}
-+	} else {
-+		/* User specifies base address explicitly. */
-+		if (!memblock_is_region_memory(crash_base, crash_size) ||
-+			memblock_is_region_reserved(crash_base, crash_size)) {
-+			pr_warn("crashkernel has wrong address or size\n");
-+			return;
-+		}
-+
-+		if (crash_base & ((1 << 21) - 1)) {
-+			pr_warn("crashkernel base address is not 2MB aligned\n");
-+			return;
-+		}
-+
-+		memblock_reserve(crash_base, crash_size);
-+	}
-+
-+	pr_info("Reserving %lldMB of memory@%lldMB for crashkernel\n",
-+		crash_size >> 20, crash_base >> 20);
-+
-+	crashk_res.start = crash_base;
-+	crashk_res.end = crash_base + crash_size - 1;
-+}
-+#endif /* CONFIG_KEXEC */
-+
- /*
-  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
-  * currently assumes that for memory starting above 4G, 32-bit devices will
-@@ -171,6 +221,10 @@ void __init arm64_memblock_init(void)
- 		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
- #endif
- 
-+#ifdef CONFIG_KEXEC
-+	reserve_crashkernel();
-+#endif
-+
- 	early_init_fdt_scan_reserved_mem();
- 
- 	/* 4GB maximum for 32-bit only capable devices */
--- 
-2.5.0
+Perhaps when all that material is described, I'll understand why the
+heck we're doing this with a build-time switch rather than a runtime
+one...
+
+> Persistent memory presents a large "mistake surface" to /dev/mem as now
+> accidental writes can corrupt a filesystem.
+
+Is that the motivation?  root can come in and accidentally alter
+persistent memory contents?  If so, 
+
+- why do we care?  There are all sorts of ways in which root can muck
+  up the persistent memory, starting with dd(1).  What's special about
+  /dev/mem?
+
+- why is the patch mucking with access to PCI and BIOS space?  Is the
+  persistent memory even mappable in those regions?  Or is the concern
+  that userspace can access control registers associated with the
+  persistent memory?  What is the problem scenario?
+
+
+IOW, a very good description of the problem-being-solved would help out
+a lot here...
