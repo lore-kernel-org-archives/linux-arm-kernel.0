@@ -1,67 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 24 Nov 2015 16:13:25 +0000
-Subject: [PATCH 3/3] KVM: arm/arm64: vgic: Trust the LR state for HW IRQs
-In-Reply-To: <1448379840-17516-4-git-send-email-christoffer.dall@linaro.org>
-References: <1448379840-17516-1-git-send-email-christoffer.dall@linaro.org>
- <1448379840-17516-4-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <20151124161325.77b91d7d@arm.com>
+From: peda@lysator.liu.se (Peter Rosin)
+Date: Tue, 24 Nov 2015 17:14:15 +0100
+Subject: SAMA5D3x: I2C, USART1 and DMA.
+Message-ID: <56548CD7.4010705@lysator.liu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Nov 2015 16:44:00 +0100
-Christoffer Dall <christoffer.dall@linaro.org> wrote:
+Hi!
 
-> We were probing the physial distributor state for the active state of a
-> HW virtual IRQ, because we had seen evidence that the LR state was not
-> cleared when the guest deactivated a virtual interrupted.
-> 
-> However, this issue turned out to be a software bug in the GIC, which
-> was solved by: 84aab5e68c2a5e1e18d81ae8308c3ce25d501b29
-> (KVM: arm/arm64: arch_timer: Preserve physical dist. active
-> state on LR.active, 2015-11-24)
-> 
-> Therefore, get rid of the complexities and just look at the LR.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/vgic.c | 16 ++--------------
->  1 file changed, 2 insertions(+), 14 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 9002f0d..55cd7e3 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1420,25 +1420,13 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
->  static bool vgic_sync_hwirq(struct kvm_vcpu *vcpu, int lr, struct vgic_lr vlr)
->  {
->  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> -	struct irq_phys_map *map;
-> -	bool phys_active;
->  	bool level_pending;
-> -	int ret;
->  
->  	if (!(vlr.state & LR_HW))
->  		return false;
->  
-> -	map = vgic_irq_map_search(vcpu, vlr.irq);
-> -	BUG_ON(!map);
-> -
-> -	ret = irq_get_irqchip_state(map->irq,
-> -				    IRQCHIP_STATE_ACTIVE,
-> -				    &phys_active);
-> -
-> -	WARN_ON(ret);
-> -
-> -	if (phys_active)
-> -		return 0;
-> +	if (vlr.state & LR_STATE_ACTIVE)
-> +		return false;
->  
->  	spin_lock(&dist->lock);
->  	level_pending = process_queued_irq(vcpu, lr, vlr);
+I have a board similar to the atmel sama5d31ek with some devices
+on the i2c0 bus and an async serial line on usart1 that communicates
+with a baudrate of 125000. The usart is mostly receiving.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+In a divine moment, our designers failed to add handshaking signals
+for the usart, and now we have trouble with the occational lost interrupt
+and hence lost data (at least that is my current understanding of
+what is going on).
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+The lost data is clearly tied to i2c traffic, and specifically to i2c writes.
+i2c reads seems to go by unnoticed by usart1. Of course, other stuff
+may also cause trouble, but if I test by temporarily switching off the
+i2c writes a BIG part of the problem is gone. But the i2c writes also
+have a reason to be there of course, so that is not a long term
+solution...
+
+What immediately springs to mind is to reduce the number of interrupts
+needed on the usart by enabling DMA. DMA is apparently disabled by
+arch/arm/boot/dts/sama5d3xmb.dtsi with this:
+
+            usart1: serial at f0020000 {
+                dmas = <0>, <0>;    /*  Do not use DMA for usart1 */
+
+However, cutting out the "dmas" line does not improve things. So, how
+do I enable DMA on usart1? And why is it not enabled in the first place?
+I mean, who would not want to use DMA for these things?
+
+Any thoughts on why i2c writes stomps usart1 reception interrupts is
+also welcome.
+
+Cheers,
+Peter
