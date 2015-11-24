@@ -1,25 +1,31 @@
-From: JBeulich@suse.com (Jan Beulich)
-Date: Tue, 24 Nov 2015 00:35:07 -0700
-Subject: [PATCH v3 57/62] hvm/params: Add a new dilivery type for
- event-channel in HVM_PARAM_CALLBACK_IRQ
-In-Reply-To: <1447753261-7552-58-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-58-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <5654213B02000078000B832D@prv-mh.provo.novell.com>
+From: mkarthi3@visteon.com (Mutharaju, Prasanna (P.))
+Date: Tue, 24 Nov 2015 07:38:12 +0000
+Subject: [PATCH] ARM: MM: Simplify using vma_pages function
+Message-ID: <20151124073805.GA23513@jci-VirtualBox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> On 17.11.15 at 10:40, <shannon.zhao@linaro.org> wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Add a new dilivery type:
-> val[63:56] == 3: val[15:8] is flag: val[7:0] is a PPI.
-> To the flag, bit 0 stands the interrupt mode is edge(1) or level(0) and
-> bit 1 stands the interrupt polarity is active low(1) or high(0).
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+From: Prasanna Karthik <mkarthi3@visteon.com>
 
-Please sync up with Andrew's cleaning up of the modified comment;
-I definitely will want that to go in first.
+Use vma_pages function on vma object instead of explicit computation.
 
-Jan
+Signed-off-by: Prasanna Karthik <mkarthi3@visteon.com>
+---
+ arch/arm/mm/dma-mapping.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index ad4eb2d..513e213 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -694,7 +694,7 @@ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+ {
+ 	int ret = -ENXIO;
+ #ifdef CONFIG_MMU
+-	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
++	unsigned long nr_vma_pages = vma_pages(vma);
+ 	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+ 	unsigned long pfn = dma_to_pfn(dev, dma_addr);
+ 	unsigned long off = vma->vm_pgoff;
+-- 
+1.9.1
