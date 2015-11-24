@@ -1,34 +1,43 @@
 From: b51503@freescale.com (Bai Ping)
-Date: Tue, 24 Nov 2015 18:25:15 +0800
-Subject: [PATCH 2/3] ARM: dts: imx: modify the clocks used by cpufreq driver
+Date: Tue, 24 Nov 2015 18:25:16 +0800
+Subject: [PATCH 3/3] ARM: imx: enable cpufreq device on i.mx7d
 In-Reply-To: <1448360716-1741-1-git-send-email-b51503@freescale.com>
 References: <1448360716-1741-1-git-send-email-b51503@freescale.com>
-Message-ID: <1448360716-1741-2-git-send-email-b51503@freescale.com>
+Message-ID: <1448360716-1741-3-git-send-email-b51503@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As on i.MX7D, we using a virtual arm clk for CPU frequency
-scaling, so correct the clocks info used by the cpufreq driver.
+Add a cpufreq-dt device on i.MX7D, using the
+generic cpufreq-dt for CPU frequency scaling.
 
 Signed-off-by: Bai Ping <b51503@freescale.com>
 ---
- arch/arm/boot/dts/imx7d.dtsi | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ arch/arm/mach-imx/mach-imx7d.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-index ebc053a..489604a 100644
---- a/arch/arm/boot/dts/imx7d.dtsi
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -85,9 +85,7 @@
- 				792000	975000
- 			>;
- 			clock-latency = <61036>; /* two CLK32 periods */
--			clocks = <&clks IMX7D_ARM_A7_ROOT_CLK>, <&clks IMX7D_ARM_A7_ROOT_SRC>,
--				 <&clks IMX7D_PLL_ARM_MAIN_CLK>, <&clks IMX7D_PLL_SYS_MAIN_CLK>;
--			clock-names = "arm", "arm_root_src", "pll_arm", "pll_sys_main";
-+			clocks = <&clks IMX7D_CLK_ARM>;
- 		};
+diff --git a/arch/arm/mach-imx/mach-imx7d.c b/arch/arm/mach-imx/mach-imx7d.c
+index b450f52..5a27f20 100644
+--- a/arch/arm/mach-imx/mach-imx7d.c
++++ b/arch/arm/mach-imx/mach-imx7d.c
+@@ -105,6 +105,11 @@ static void __init imx7d_init_irq(void)
+ 	irqchip_init();
+ }
  
- 		cpu1: cpu at 1 {
++static void __init imx7d_init_late(void)
++{
++	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
++}
++
+ static const char *const imx7d_dt_compat[] __initconst = {
+ 	"fsl,imx7d",
+ 	NULL,
+@@ -112,6 +117,7 @@ static const char *const imx7d_dt_compat[] __initconst = {
+ 
+ DT_MACHINE_START(IMX7D, "Freescale i.MX7 Dual (Device Tree)")
+ 	.init_irq	= imx7d_init_irq,
++	.init_late	= imx7d_init_late,
+ 	.init_machine	= imx7d_init_machine,
+ 	.dt_compat	= imx7d_dt_compat,
+ MACHINE_END
 -- 
 1.9.1
