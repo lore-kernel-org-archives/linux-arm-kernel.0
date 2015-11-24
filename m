@@ -1,65 +1,55 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 24 Nov 2015 11:50:32 +0800
-Subject: [PATCH 13/13] ARM: XEN: Move xen_early_init() before efi_init()
-In-Reply-To: <alpine.DEB.2.02.1511201720550.1107@kaball.uk.xensource.com>
-References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
- <1447754231-7772-14-git-send-email-shannon.zhao@linaro.org>
- <alpine.DEB.2.02.1511201720550.1107@kaball.uk.xensource.com>
-Message-ID: <5653DE88.9070003@huawei.com>
+From: shubhrajyoti.datta@gmail.com (Shubhrajyoti Datta)
+Date: Tue, 24 Nov 2015 09:58:32 +0530
+Subject: [PATCH v2] i2c: cadence: Move to sensible power management
+In-Reply-To: <20151123184710.GH32017@xsjsorenbubuntu>
+References: <1446017200-30373-1-git-send-email-shubhraj@xilinx.com>
+ <20151028161810.GB6436@xsjsorenbubuntu>
+ <CAKfKVtHbKrYK-JkQRWO3hEyOkGEW8q9zc6r90PNP8uEm3VXc4Q@mail.gmail.com>
+ <CAKfKVtHHKcs1UAM4pb4Qbtn5TEOboZf1SrL4qFuFZYSCUundHw@mail.gmail.com>
+ <20151123184710.GH32017@xsjsorenbubuntu>
+Message-ID: <CAKfKVtHbzEAWL8OedkxY2bfC+oR_DHejS3Lx5F_t0mKCs21i2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 24, 2015 at 12:17 AM, S?ren Brinkmann
+<soren.brinkmann@xilinx.com> wrote:
+> On Sat, 2015-11-21 at 07:00PM +0530, Shubhrajyoti Datta wrote:
+>> On Thu, Oct 29, 2015 at 8:27 PM, Shubhrajyoti Datta
+>> <shubhrajyoti.datta@gmail.com> wrote:
+>> > On Wed, Oct 28, 2015 at 9:48 PM, S?ren Brinkmann
+>> > <soren.brinkmann@xilinx.com> wrote:
+>> >> Hi Shubhrajyoti,
+>> >>
+>> >>
+>> >> On Wed, 2015-10-28 at 12:56PM +0530, Shubhrajyoti Datta wrote:
+>> >>> Currently the clocks are enabled at probe and disabled at remove.
+>> >>> Which keeps the clocks enabled even if no transaction is going on.
+>> >>> This patch enables the clocks at the start of transfer and disables
+>> >>> after it.
+>> >>>
+>> >>> Also adapts to runtime pm.
+>> >>> Remove xi2c->suspended and use pm runtime status instead.
+>> >>>
+>> >>> converts dev pm to const to silence a checkpatch warning.
+>> >>>
+>> >>> Signed-off-by: Shubhrajyoti Datta <shubhraj@xilinx.com>
+>> >>
+>> >> To me, this looks all good. Just one small concern below.
+>> >
+>> > Thanks for the review.
+>> Soren ,
+>> Do are you ok with the change or do you want me to resend without the
+>> suspended flag change.
+>
+> I'm always for removing code that is not needed. If things are tested
+> and well and work without throwing any warnings I'm OK with it.
 
+It should be also having a suspended book-keeping in the driver is not
+needed the pm does that for us.
 
-On 2015/11/21 1:30, Stefano Stabellini wrote:
->> +struct xen_node_info {
->> > +	const char *compat;
->> > +	const char *prefix;
->> > +	const char *version;
->> > +	bool found;
->> > +};
->> > +
->> > +static int __init fdt_find_xen_node(unsigned long node, const char *uname,
->> > +				    int depth, void *data)
->> > +{
->> > +	struct xen_node_info *info = data;
->> > +	const void *s = NULL;
->> > +	int len;
->> > +
->> > +	if (depth != 1 || strcmp(uname, "hypervisor") != 0)
->> > +		return 0;
->> > +
->> > +	if (of_flat_dt_is_compatible(node, info->compat))
->> > +		info->found = true;
->> > +
->> > +	s = of_get_flat_dt_prop(node, "compatible", &len);
->> > +	if (strlen(info->prefix) + 3  < len &&
->> > +                        !strncmp(info->prefix, s, strlen(info->prefix)))
->> > +                info->version = s + strlen(info->prefix);
->> > +	return 0;
->> > +}
->> > +
->> >  /*
->> >   * see Documentation/devicetree/bindings/arm/xen.txt for the
->> >   * documentation of the Xen Device Tree format.
->> > @@ -149,26 +176,25 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
->> >  #define GRANT_TABLE_PHYSADDR 0
->> >  void __init xen_early_init(void)
->> >  {
->> > -	int len;
->> > -	const char *s = NULL;
->> > -	const char *version = NULL;
->> > -	const char *xen_prefix = "xen,xen-";
->> > +	struct xen_node_info info;
->> > +
->> > +	info.compat = "xen,xen";
->> > +	info.prefix = "xen,xen-";
->> > +	info.version = NULL;
->> > +	info.found = false;
-> Can you initialize the fields directly when you define xen_node_info and
-> make it static?
-Sure.
+I will spilt the patch and resend.
 
 Thanks,
--- 
-Shannon
+
+>
+>         S?ren
