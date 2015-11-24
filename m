@@ -1,83 +1,37 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 24 Nov 2015 19:12:42 +0100
-Subject: [PATCH v2] spi: mediatek: revise mtk_spi_probe() failure flow
-In-Reply-To: <1448332712-29039-1-git-send-email-leilk.liu@mediatek.com>
-References: <1448332712-29039-1-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <5654A89A.3090202@gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 24 Nov 2015 10:19:11 -0800
+Subject: [PATCH v3 1/4] watchdog: meson: Enable meson SoC specific data
+In-Reply-To: <CAOQ7t2bmNNTPxgZy4uZQF_u4yH2nxfMR_FqpKM0GavoUS9rRkA@mail.gmail.com>
+References: <1446985137-25498-1-git-send-email-carlo@caione.org>
+ <1446985137-25498-2-git-send-email-carlo@caione.org>
+ <5640B5BF.9040909@roeck-us.net>
+ <CAOQ7t2bmNNTPxgZy4uZQF_u4yH2nxfMR_FqpKM0GavoUS9rRkA@mail.gmail.com>
+Message-ID: <20151124181911.GA12289@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Nov 11, 2015 at 09:54:04AM +0100, Carlo Caione wrote:
+> On Mon, Nov 9, 2015 at 4:03 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> > On 11/08/2015 04:18 AM, Carlo Caione wrote:
+> >>
+> >> From: Carlo Caione <carlo@endlessm.com>
+> >>
+> >> With this patch we refactor the driver code to enable watchdog support
+> >> for all platforms based on Amlogic meson SoCs.
+> >> The new default timeout is also now chosen considering the maximum
+> >> timeout allowed by the SoC.
+> >>
+> >> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> >
+> >
+> > Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> 
+> Wim,
+> any (N)ACK on this?
+> 
+Carlo,
 
+Unless I missed it, we still don't have an Ack from a devicetree
+maintainer for the devicetree changes.
 
-On 24/11/15 03:38, Leilk Liu wrote:
-> This patch revises failure flow while pm_runtime_enable().
-
-Please write a proper commit message explaining what this patch does.
-
->
-> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
-> ---
->   drivers/spi/spi-mt65xx.c |   15 ++++++++-------
->   1 file changed, 8 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
-> index 6c1a96e..00a36da 100644
-> --- a/drivers/spi/spi-mt65xx.c
-> +++ b/drivers/spi/spi-mt65xx.c
-> @@ -607,7 +607,8 @@ static int mtk_spi_probe(struct platform_device *pdev)
->   	ret = clk_set_parent(mdata->sel_clk, mdata->parent_clk);
->   	if (ret < 0) {
->   		dev_err(&pdev->dev, "failed to clk_set_parent (%d)\n", ret);
-> -		goto err_disable_clk;
-> +		clk_disable_unprepare(mdata->spi_clk);
-> +		goto err_put_master;
->   	}
->
->   	clk_disable_unprepare(mdata->spi_clk);
-> @@ -617,7 +618,7 @@ static int mtk_spi_probe(struct platform_device *pdev)
->   	ret = devm_spi_register_master(&pdev->dev, master);
->   	if (ret) {
->   		dev_err(&pdev->dev, "failed to register master (%d)\n", ret);
-> -		goto err_put_master;
-> +		goto err_disable_runtime_pm;
->   	}
->
->   	if (mdata->dev_comp->need_pad_sel) {
-> @@ -626,14 +627,14 @@ static int mtk_spi_probe(struct platform_device *pdev)
->   				"pad_num does not match num_chipselect(%d != %d)\n",
->   				mdata->pad_num, master->num_chipselect);
->   			ret = -EINVAL;
-> -			goto err_put_master;
-> +			goto err_disable_runtime_pm;
->   		}
->
->   		if (!master->cs_gpios && master->num_chipselect > 1) {
->   			dev_err(&pdev->dev,
->   				"cs_gpios not specified and num_chipselect > 1\n");
->   			ret = -EINVAL;
-> -			goto err_put_master;
-> +			goto err_disable_runtime_pm;
->   		}
->
->   		if (master->cs_gpios) {
-> @@ -644,7 +645,7 @@ static int mtk_spi_probe(struct platform_device *pdev)
->   				if (ret) {
->   					dev_err(&pdev->dev,
->   						"can't get CS GPIO %i\n", i);
-> -					goto err_put_master;
-> +					goto err_disable_runtime_pm;
->   				}
->   			}
->   		}
-> @@ -652,8 +653,8 @@ static int mtk_spi_probe(struct platform_device *pdev)
->
->   	return 0;
->
-> -err_disable_clk:
-> -	clk_disable_unprepare(mdata->spi_clk);
-> +err_disable_runtime_pm:
-> +	pm_runtime_disable(&pdev->dev);
->   err_put_master:
->   	spi_master_put(master);
->
->
+Guenter
