@@ -1,69 +1,39 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 24 Nov 2015 15:00:45 +0900
-Subject: [PATCH] pinctrl: uniphier: rework UniPhier pinctrl entries in Kconfig
-Message-ID: <1448344846-28726-1-git-send-email-yamada.masahiro@socionext.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 24 Nov 2015 14:01:58 +0800
+Subject: [PATCH 1/4] ARM: dts: vf610: relicense vf???.dtsi under GPLv2/X11
+In-Reply-To: <1448323069-23208-2-git-send-email-stefan@agner.ch>
+References: <1448323069-23208-1-git-send-email-stefan@agner.ch>
+ <1448323069-23208-2-git-send-email-stefan@agner.ch>
+Message-ID: <20151124060158.GG11999@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a plan to support more pinctrl drivers for this SoC family.
-Move the driver entries into a sub menu by using "menuconfig".
-Also, add the missing dependency "depends on OF && MFD_SYSCON".
+On Mon, Nov 23, 2015 at 03:57:46PM -0800, Stefan Agner wrote:
+> GPLv2-only devicetrees make reuse difficult for software components
+> licensed under a different license.
+> 
+> The consensus is that a GPL/X11 dual-license should allow all necessary
+> uses, so relicense the vfxxx.dtsi, vf500.dtsi and vf610.dtsi files to
+> this combination.
+> 
+> CCs were acquired using (updated some email addresses):
+> git shortlog -sne --no-merges arch/arm/boot/dts/vf???.dtsi
+> 
+> CC: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+> CC: Chao Fu <B44548@freescale.com>
+> CC: Cory Tusar <cory.tusar@pid1solutions.com>
+> CC: Cosmin Stoica <cosminstefan.stoica@freescale.com>
+> CC: Frank Li <Frank.Li@freescale.com>
+> CC: Fugang Duan <B38611@freescale.com>
+> CC: Huang Shijie <b32955@freescale.com>
+> CC: Jingchang Lu <jingchang.lu@freescale.com>
+> CC: Lucas Stach <l.stach@pengutronix.de>
+> CC: Sanchayan Maity <maitysanchayan@gmail.com>
+> CC: Shawn Guo <shawnguo@kernel.org>
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Acked-by: Shawn Guo <shawnguo@kernel.org>
 
- drivers/pinctrl/uniphier/Kconfig | 23 +++++++++++++----------
- 1 file changed, 13 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/pinctrl/uniphier/Kconfig b/drivers/pinctrl/uniphier/Kconfig
-index ad90707..7abd614 100644
---- a/drivers/pinctrl/uniphier/Kconfig
-+++ b/drivers/pinctrl/uniphier/Kconfig
-@@ -1,32 +1,35 @@
--if ARCH_UNIPHIER
--
--config PINCTRL_UNIPHIER
--	bool
-+menuconfig PINCTRL_UNIPHIER
-+	bool "UniPhier SoC pinctrl drivers"
-+	depends on ARCH_UNIPHIER
-+	depends on OF && MFD_SYSCON
-+	default y
- 	select PINMUX
- 	select GENERIC_PINCONF
- 
-+if PINCTRL_UNIPHIER
-+
- config PINCTRL_UNIPHIER_PH1_LD4
- 	tristate "UniPhier PH1-LD4 SoC pinctrl driver"
--	select PINCTRL_UNIPHIER
-+	default y
- 
- config PINCTRL_UNIPHIER_PH1_PRO4
- 	tristate "UniPhier PH1-Pro4 SoC pinctrl driver"
--	select PINCTRL_UNIPHIER
-+	default y
- 
- config PINCTRL_UNIPHIER_PH1_SLD8
- 	tristate "UniPhier PH1-sLD8 SoC pinctrl driver"
--	select PINCTRL_UNIPHIER
-+	default y
- 
- config PINCTRL_UNIPHIER_PH1_PRO5
- 	tristate "UniPhier PH1-Pro5 SoC pinctrl driver"
--	select PINCTRL_UNIPHIER
-+	default y
- 
- config PINCTRL_UNIPHIER_PROXSTREAM2
- 	tristate "UniPhier ProXstream2 SoC pinctrl driver"
--	select PINCTRL_UNIPHIER
-+	default y
- 
- config PINCTRL_UNIPHIER_PH1_LD6B
- 	tristate "UniPhier PH1-LD6b SoC pinctrl driver"
--	select PINCTRL_UNIPHIER
-+	default y
- 
- endif
--- 
-1.9.1
+> CC: Stephen Warren <swarren@wwwdotorg.org>
+> CC: Xiubo Li <Li.Xiubo@freescale.com>
+> CC: Yuan Yao <yao.yuan@freescale.com>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
