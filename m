@@ -1,42 +1,38 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 24 Nov 2015 10:23:41 +0100
-Subject: [PATCH 1/2] mmc: sdhci: set bus voltage before enabling bus power
-In-Reply-To: <20151109163026.GE15706@odux.rfo.atmel.com>
-References: <1446825570-30029-1-git-send-email-ludovic.desroches@atmel.com>
- <1446825570-30029-2-git-send-email-ludovic.desroches@atmel.com>
- <20151109132305.GC15706@odux.rfo.atmel.com>
- <CAPDyKFrTTEnSFNvmx3e__Ap9gOGpA2-bz+yrq7ibz0wXGSWCXA@mail.gmail.com>
- <20151109144030.GD15706@odux.rfo.atmel.com>
- <CAPDyKFquZ+_Rf07gX+i-=_bzSa7KJ5+xQ8N21kK2mvfMGdVQMw@mail.gmail.com>
- <20151109163026.GE15706@odux.rfo.atmel.com>
-Message-ID: <20151124092341.GA2228@odux.rfo.atmel.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 24 Nov 2015 07:25:13 -0200
+Subject: [PATCH v2] ARM: imx_v6_v7_defconfig: Select HDMI audio support
+In-Reply-To: <20151124062004.GJ11999@tiger>
+References: <1447687238-11559-1-git-send-email-fabio.estevam@freescale.com>
+ <20151124062004.GJ11999@tiger>
+Message-ID: <CAOMZO5AwYny8OZCohCP0Zcc+pxyLawwJ=tUJrqsu8ORHSG6u-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On Tue, Nov 24, 2015 at 4:20 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Mon, Nov 16, 2015 at 01:20:38PM -0200, Fabio Estevam wrote:
+>> Select CONFIG_DRM_DW_HDMI_AHB_AUDIO so that we have HDMI audio
+>> supported by default.
+>>
+>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>> ---
+>> Changes since v1:
+>> - Select the driver as module instead of built-in
+>
+> I've applied a previous version.  Should I replace it with this one?
 
-On Mon, Nov 09, 2015 at 05:30:26PM +0100, Ludovic Desroches wrote:
-> On Mon, Nov 09, 2015 at 05:00:46PM +0100, Ulf Hansson wrote:
+Yes, please.
 
-[...]
+The latest version uses module instead of built-in.
 
-> > Now, this discussion was interesting, but I forgot what problem you
-> > actually where trying to solve? :-)
-> 
-> There is this discussion because of two things:
-> - Fixing something I consider as a bug: when I have a VMMC, only
->   setting/clearing bit 0. Our controller strictly obeys to the spec and
->   check the 'SD Bus Voltage Select' field. Since we put a reserved value
->   (000), the Power On is not performed.
-> - I was trying to get help to understand what is this 'SD Bus Voltage'.
->   For our controller and sdhci_set_power(), it seems to stand for VMMC.
->   For me, everything concerning bus voltage is related to VQMMC, so I was
->   disappointed.
+Selecting the driver as module is better as it will not impact current
+users. For example: currently on a mx6qsabresd when we do 'aplay
+file.wav' it will play through the wm8962 card.
 
-Do you plan to take the patch for VMMC? If yes, I will send a new patch
-for the device tree (I'll only add vmmc, not vqmmc as discussed); if
-not, forget these two patches.
+If the HDMI audio driver is selected as built-in, then 'aplay
+file.wav' will play through the HDMI audio port, which may confuse the
+end user.
 
-Regards
+If we select the HDMI audio driver as module then we keep the original
+behaviour.
 
-Ludovic
+Thanks
