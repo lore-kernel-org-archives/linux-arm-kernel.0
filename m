@@ -1,62 +1,54 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 24 Nov 2015 18:29:38 +0530
-Subject: PCIe regression with DRA7xx in 4.4-rc1
-In-Reply-To: <20151124201411.33463709@xhacker>
-References: <56545183.8000507@ti.com> <20151124201411.33463709@xhacker>
-Message-ID: <56545F3A.6060808@ti.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 24 Nov 2015 14:12:13 +0100
+Subject: [PATCH 1/2] mmc: sdhci: set bus voltage before enabling bus power
+In-Reply-To: <CAPDyKFp4U5vG_UswnLe1L2Vq1VwdkptThSdzhPYoP+hhGFTaQA@mail.gmail.com>
+References: <1446825570-30029-1-git-send-email-ludovic.desroches@atmel.com>
+ <1446825570-30029-2-git-send-email-ludovic.desroches@atmel.com>
+ <20151109132305.GC15706@odux.rfo.atmel.com>
+ <CAPDyKFrTTEnSFNvmx3e__Ap9gOGpA2-bz+yrq7ibz0wXGSWCXA@mail.gmail.com>
+ <20151109144030.GD15706@odux.rfo.atmel.com>
+ <CAPDyKFquZ+_Rf07gX+i-=_bzSa7KJ5+xQ8N21kK2mvfMGdVQMw@mail.gmail.com>
+ <20151109163026.GE15706@odux.rfo.atmel.com>
+ <20151124092341.GA2228@odux.rfo.atmel.com>
+ <CAPDyKFp4U5vG_UswnLe1L2Vq1VwdkptThSdzhPYoP+hhGFTaQA@mail.gmail.com>
+Message-ID: <20151124131213.GB2228@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Nov 24, 2015 at 12:01:53PM +0100, Ulf Hansson wrote:
+> On 24 November 2015 at 10:23, Ludovic Desroches
+> <ludovic.desroches@atmel.com> wrote:
+> > Hi Ulf,
+> >
+> > On Mon, Nov 09, 2015 at 05:30:26PM +0100, Ludovic Desroches wrote:
+> >> On Mon, Nov 09, 2015 at 05:00:46PM +0100, Ulf Hansson wrote:
+> >
+> > [...]
+> >
+> >> > Now, this discussion was interesting, but I forgot what problem you
+> >> > actually where trying to solve? :-)
+> >>
+> >> There is this discussion because of two things:
+> >> - Fixing something I consider as a bug: when I have a VMMC, only
+> >>   setting/clearing bit 0. Our controller strictly obeys to the spec and
+> >>   check the 'SD Bus Voltage Select' field. Since we put a reserved value
+> >>   (000), the Power On is not performed.
+> >> - I was trying to get help to understand what is this 'SD Bus Voltage'.
+> >>   For our controller and sdhci_set_power(), it seems to stand for VMMC.
+> >>   For me, everything concerning bus voltage is related to VQMMC, so I was
+> >>   disappointed.
+> >
+> > Do you plan to take the patch for VMMC? If yes, I will send a new patch
+> > for the device tree (I'll only add vmmc, not vqmmc as discussed); if
+> > not, forget these two patches.
+> >
+> 
+> Which patch do you refer to for "VMMC"?
+> 
 
-On Tuesday 24 November 2015 05:44 PM, Jisheng Zhang wrote:
-> 
-> 
-> On Tue, 24 Nov 2015 17:31:07 +0530
-> Kishon Vijay Abraham I wrote:
-> 
->> Hi,
->>
->> I'm seeing a regression with <d1b9cf31252e905ad563b9e863fd4470f6c3dd1c>("PCI:
->> designware: Make driver arch-agnostic").
->>
->> Logs using a SATA PCIe card [1]. The PCIe card enumerates fine but after that I
->> observe "ata3.00: qc timeout (cmd 0xec), ata3.00: failed to IDENTIFY (I/O
->> error, err_mask=0x4)"
->>
->> Logs using a Ethenet PCIe card [2]. Again here the PCIe card enumerates fine
->> but when I give ifconfig up, it fails.
->>
->> If I just revert commit <d1b9cf31252e905ad563b9e863fd4470f6c3dd1c>, the PCIe
->> cards starts to work fine again
-> 
-> FYI, maybe the patch can fix the regression.
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/387362.html
+This one to not write an invalid voltage in the power control register
+even if we have an external regulator for vmmc.
 
-yes, it fixed.
+Regards
 
-Thanks
-Kishon
-
-> 
->>
->> Logs using a SATA PCIe card [3]. Here the KINGSTON SSD gets detected fine.
->> Logs using a Ethernet PCIe card [4]. I'm able to do ping tests now.
->>
->> Actually I'm not able to find any obvious problems with the patch and the irq
->> number and the memory resource also looks fine. Any idea what could be the problem?
->>
->> [1] -> http://pastebin.ubuntu.com/13491456/
->> [2] -> http://pastebin.ubuntu.com/13491526/
->>
->> [3] -> http://pastebin.ubuntu.com/13491658/
->> [4] -> http://pastebin.ubuntu.com/13491593/
->>
->> Thanks
->> Kishon
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Ludovic
