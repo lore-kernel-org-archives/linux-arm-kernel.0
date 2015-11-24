@@ -1,36 +1,38 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 24 Nov 2015 17:31:07 +0530
-Subject: PCIe regression with DRA7xx in 4.4-rc1
-Message-ID: <56545183.8000507@ti.com>
+From: mmarek@suse.com (Michal Marek)
+Date: Tue, 24 Nov 2015 13:07:22 +0100
+Subject: [PATCH] Kbuild: disable 'maybe-uninitialized' warning for
+ CONFIG_PROFILE_ALL_BRANCHES
+In-Reply-To: <20825812.L9y0yMCgts@wuerfel>
+References: <3799453.oCg1CdOrtm@wuerfel> <565439FB.6050800@suse.com>
+ <20825812.L9y0yMCgts@wuerfel>
+Message-ID: <565452FA.6010603@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2015-11-24 11:42, Arnd Bergmann wrote:
+> On Tuesday 24 November 2015 11:20:43 Michal Marek wrote:
+>>> diff --git a/Makefile b/Makefile
+>>> index 5e01a416c6e4..f8b921658f29 100644
+>>> --- a/Makefile
+>>> +++ b/Makefile
+>>> @@ -626,7 +626,11 @@ KBUILD_CFLAGS    += $(call cc-option,-fno-delete-null-pointer-checks,)
+>>>  ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
+>>>  KBUILD_CFLAGS        += -Os $(call cc-disable-warning,maybe-uninitialized,)
+>>>  else
+>>> -KBUILD_CFLAGS        += -O2
+>>> +ifdef CONFIG_PROFILE_ALL_BRANCHES
+>>> +KBUILD_CFLAGS        += -O2 $(call cc-disable-warning,maybe-uninitialized,)
+>>> +else
+>>> +KBUILD_CFLAGS   += -O2
+>>> +endif
+>>
+>> Does it only happen with -O2? Normally, we would add it outside the
+>> ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE.
+>>
+> 
+> We already disable the warning for -Os builds based on a patch we merged
+> a while ago. It seems easier to add it to the block we already have.
 
-I'm seeing a regression with <d1b9cf31252e905ad563b9e863fd4470f6c3dd1c>("PCI:
-designware: Make driver arch-agnostic").
+I'm blind, sorry.
 
-Logs using a SATA PCIe card [1]. The PCIe card enumerates fine but after that I
-observe "ata3.00: qc timeout (cmd 0xec), ata3.00: failed to IDENTIFY (I/O
-error, err_mask=0x4)"
-
-Logs using a Ethenet PCIe card [2]. Again here the PCIe card enumerates fine
-but when I give ifconfig up, it fails.
-
-If I just revert commit <d1b9cf31252e905ad563b9e863fd4470f6c3dd1c>, the PCIe
-cards starts to work fine again
-
-Logs using a SATA PCIe card [3]. Here the KINGSTON SSD gets detected fine.
-Logs using a Ethernet PCIe card [4]. I'm able to do ping tests now.
-
-Actually I'm not able to find any obvious problems with the patch and the irq
-number and the memory resource also looks fine. Any idea what could be the problem?
-
-[1] -> http://pastebin.ubuntu.com/13491456/
-[2] -> http://pastebin.ubuntu.com/13491526/
-
-[3] -> http://pastebin.ubuntu.com/13491658/
-[4] -> http://pastebin.ubuntu.com/13491593/
-
-Thanks
-Kishon
+Michal
