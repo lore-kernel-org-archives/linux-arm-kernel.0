@@ -1,51 +1,31 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 24 Nov 2015 15:48:56 +0800
-Subject: [PATCH v3 25/62] acpi/table: Introduce acpi_get_entry to get
- specified entry
-In-Reply-To: <56541E4002000078000B8304@prv-mh.provo.novell.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-26-git-send-email-shannon.zhao@linaro.org>
- <5653541E02000078000B8079@prv-mh.provo.novell.com>
- <5653D4A7.2090204@huawei.com>
- <56541E4002000078000B8304@prv-mh.provo.novell.com>
-Message-ID: <56541668.9090201@huawei.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 24 Nov 2015 08:38:16 +0100
+Subject: [PATCH v2 7/7] ARM: dts: sun4i: Add touchscreen node to pov
+ protab2-ips9 tablet
+In-Reply-To: <1448025892-20899-8-git-send-email-hdegoede@redhat.com>
+References: <1448025892-20899-1-git-send-email-hdegoede@redhat.com>
+ <1448025892-20899-8-git-send-email-hdegoede@redhat.com>
+Message-ID: <20151124073816.GG32142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2015/11/24 15:22, Jan Beulich wrote:
->>>> On 24.11.15 at 04:08, <zhaoshenglong@huawei.com> wrote:
->> On 2015/11/24 0:59, Jan Beulich wrote:
->>>>>> On 17.11.15 at 10:40, <shannon.zhao@linaro.org> wrote:
->>>> +	if ( !table_header )
->>>> +	{
->>>> +		printk("Table header not present\n");
->>>> +		return NULL;
->>>> +	}
->>>> +
->>>> +	table_end = (unsigned long)table_header + table_header->length;
->>>
->>> So here you use ->length, ...
->>>
->>>> +	/* Parse all entries looking for a match. */
->>>> +	entry = (struct acpi_subtable_header *)
->>>> +	    ((unsigned long)table_header + table_size);
->>>
->>> ... but here table_size. Why?
->>>
->> Here it just skips the main table size at the beginning. Then it could
->> point to the start of sub-table.
->> For example, to MADT table, the table_size is sizeof(struct
->> acpi_table_madt).
+On Fri, Nov 20, 2015 at 02:24:52PM +0100, Hans de Goede wrote:
+> Add a node describing the touchscreen found on the pov protab2-ips9
+> tablet.
 > 
-> Well, but for one then the parameter name is kind of wrong, and
-> second - is it really reasonable for the caller to tell the function?
->  
-I think the caller knows which table it wants to parse and could
-calculate the size. But within this function, there is no clue to get
-the main table size.
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Thanks,
+Applied 6 and 7, thanks!
+Maxime
+
 -- 
-Shannon
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151124/6f2dac37/attachment-0001.sig>
