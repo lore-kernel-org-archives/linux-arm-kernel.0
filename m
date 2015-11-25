@@ -1,40 +1,82 @@
-From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
-Date: Wed, 25 Nov 2015 09:22:55 -0300
-Subject: [PATCH 0/3] LPC4337 CIAA-NXP DTS changes
-In-Reply-To: <CAGhQ9Vz-fpqKBtaHY5bDZqXEMrpat=UWz4KofGBWMNdNVWw4Cg@mail.gmail.com>
-References: <1448282225-2635-1-git-send-email-ariel@vanguardiasur.com.ar>
- <565309F3.1040306@vanguardiasur.com.ar>
- <CAGhQ9Vz-fpqKBtaHY5bDZqXEMrpat=UWz4KofGBWMNdNVWw4Cg@mail.gmail.com>
-Message-ID: <5655A81F.9000302@vanguardiasur.com.ar>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 25 Nov 2015 20:24:49 +0800
+Subject: [PATCH 1/1] arm64: dts: add all hi6220 i2c nodes
+In-Reply-To: <1448444942-5780-1-git-send-email-kong.kongxinwei@hisilicon.com>
+References: <1448444942-5780-1-git-send-email-kong.kongxinwei@hisilicon.com>
+Message-ID: <20151125122449.GH11999@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joachim,
-
-El 23/11/15 a las 15:17, Joachim Eastwood escribi?:
-> Hi Ariel,
+On Wed, Nov 25, 2015 at 05:49:02PM +0800, Xinwei Kong wrote:
+> This patch adds all I2C nodes for the Hi6220 SoC. This hi6220 Soc
+> use this I2C IP of Synopsys Designware for HiKey board.
 > 
-> On 23 November 2015 at 13:43, Ariel D'Alessandro
-> <ariel@vanguardiasur.com.ar> wrote:
->> (+Cc Joachim)
->>
->> El 23/11/15 a las 09:37, Ariel D'Alessandro escribi?:
->>> Hi,
->>>
->>> This patch set includes some DTS changes for LPC4337 CIAA-NXP board.
->>> It is based on tag next-20151120 of the linux-next repository. It has
->>> been successfully tested on a LPC4337 CIAA-NXP Board.
->>>
->>> Ariel D'Alessandro (3):
->>>   ARM: dts: lpc4337-ciaa: enable EEPROM memory
->>>   ARM: dts: lpc4337-ciaa: enable SCT-PWM
->>>   ARM: dts: lpc4337-ciaa: add i2c0 and devices
+> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+> Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
+> ---
+>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 37 +++++++++++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
 > 
-> If you want me to pick up the patches please put me in the To field so
-> they end up in my inbox.
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> index 82d2488..6b591a9 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> @@ -208,5 +208,42 @@
+>  			clock-names = "uartclk", "apb_pclk";
+>  			status = "disabled";
+>  		};
+> +
+> +		i2c0: i2c at f7100000 {
+> +			compatible = "snps,designware-i2c";
+> +			reg = <0x0 0xf7100000 0x0 0x1000>;
+> +			interrupts = <0 44 4>;
+> +			clocks = <&sys_ctrl HI6220_I2C0_CLK>;
+> +			clock-names = "clk_i2c0";
+> +			i2c-sda-hold-time-ns = <300>;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&i2c0_pmx_func &i2c0_cfg_func>;
+> +			status = "ok";
 
-OK, I'm resending with you in the To field.
+Shouldn't it be set "disabled" in <soc>.dtsi and let <board>.dts enable
+it per board design?
 
--- 
-Ariel D'Alessandro, VanguardiaSur
-www.vanguardiasur.com.ar
+Shawn
+
+> +		};
+> +
+> +		i2c1: i2c at f7101000 {
+> +			compatible = "snps,designware-i2c";
+> +			reg = <0x0 0xf7101000 0x0 0x1000>;
+> +			interrupts = <0 45 4>;
+> +			clocks = <&sys_ctrl HI6220_I2C1_CLK>;
+> +			clock-names = "clk_i2c1";
+> +			i2c-sda-hold-time-ns = <300>;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&i2c1_pmx_func &i2c1_cfg_func>;
+> +			status = "ok";
+> +		};
+> +
+> +		i2c2: i2c at f7102000 {
+> +			compatible = "snps,designware-i2c";
+> +			reg = <0x0 0xf7102000 0x0 0x1000>;
+> +			interrupts = <0 46 4>;
+> +			clocks = <&sys_ctrl HI6220_I2C2_CLK>;
+> +			clock-names = "clk_i2c2";
+> +			i2c-sda-hold-time-ns = <300>;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&i2c2_pmx_func &i2c2_cfg_func>;
+> +			status = "ok";
+> +		};
+> +
+>  	};
+>  };
+> -- 
+> 1.9.1
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
