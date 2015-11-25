@@ -1,46 +1,50 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 25 Nov 2015 15:41:19 -0600
-Subject: [PATCH 15/18] ARM: am57xx: sbc-am57x: dts: add GPIO extender
- support
-In-Reply-To: <1448433590-1399-16-git-send-email-lifshitz@compulab.co.il>
-References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
- <1448433590-1399-16-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <56562AFF.1070802@ti.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Wed, 25 Nov 2015 22:44:28 +0100
+Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
+ "/chosen/linux, atags" entry
+In-Reply-To: <3245119.krc4KB3uae@wuerfel>
+References: <20150713131902.GH26485@atomide.com>
+ <20151125210310.GT2517@atomide.com> <3245119.krc4KB3uae@wuerfel>
+Message-ID: <201511252244.28797@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2015 12:39 AM, Dmitry Lifshitz wrote:
-> Add PCA9555 GPIO extender support (over I2C5 bus).
-
-I think you meant to say "GPIO expander" in commit message and
-$subject perhaps?
-
+On Wednesday 25 November 2015 22:29:53 Arnd Bergmann wrote:
+> On Wednesday 25 November 2015 13:03:10 Tony Lindgren wrote:
+> > * Arnd Bergmann <arnd@arndb.de> [151125 11:50]:
+> > > On Wednesday 25 November 2015 10:16:44 Tony Lindgren wrote:
+> > > > At least I don't have better solutions in mind.
+> > > 
+> > > I would be happier if we could restrict this as much as possible
+> > > to the boards that need it, as an opt-in. That way it doesn't
+> > > become an ABI for people that don't already rely in this
+> > > information. How about adding a check the code adds the
+> > > linux,atags property to do it only for a whitelist of board
+> > > numbers?
+> > 
+> > Or populate /proc/atags only for the ones that need it from machine
+> > specific init_early?
 > 
-> Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
-> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
-> ---
->  arch/arm/boot/dts/am57xx-sbc-am57x.dts | 7 +++++++
->  1 file changed, 7 insertions(+)
+> That would also address my main concern about /proc/atags, but still
+> leave the atags in /proc/device-tree/chosen/linux,atags, and it would
+> be bad if someone who currently uses /proc/atags changes their code
+> to use the other file instead of finding a proper solution.
 > 
-> diff --git a/arch/arm/boot/dts/am57xx-sbc-am57x.dts b/arch/arm/boot/dts/am57xx-sbc-am57x.dts
-> index 7b65efb..8b7c0b5 100644
-> --- a/arch/arm/boot/dts/am57xx-sbc-am57x.dts
-> +++ b/arch/arm/boot/dts/am57xx-sbc-am57x.dts
-> @@ -90,4 +90,11 @@
->  		reg = <0x50>;
->  		pagesize = <16>;
->  	};
-> +
-> +	pca9555: pca9555 at 20 {
-> +		compatible = "nxp,pca9555";
-> +		reg = <0x20>;
-> +		gpio-controller;
-> +		#gpio-cells = <2>;
-> +	};
->  };
-> 
+> 	Arnd
 
+Arnd, my question about proper solution reminds... Proprietary 
+bootloader which cannot be replaced (e.g. it is signed or do unknown 
+magic) provides information to booted kernel via custom specific ATAGs 
+fields. How userspace could properly read those custom information from 
+bootloader?
 
 -- 
-Regards,
-Nishanth Menon
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151125/c65762fd/attachment.sig>
