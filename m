@@ -1,35 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Nov 2015 13:51:50 +0100
-Subject: [PATCH 3/3] ARM: qcom: Drop ARCH_MSM* configs
-In-Reply-To: <5655A94B.3030304@linaro.org>
-References: <1448413710-8101-1-git-send-email-sboyd@codeaurora.org>
- <1448413710-8101-4-git-send-email-sboyd@codeaurora.org>
- <5655A94B.3030304@linaro.org>
-Message-ID: <3990433.OKhWpPeunI@wuerfel>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 25 Nov 2015 13:55:27 +0100
+Subject: [PATCH 2/2] ARM: dts: exynos4210: MDMA1 device belongs to LCD0 power
+ domain
+In-Reply-To: <1448456127-31842-1-git-send-email-m.szyprowski@samsung.com>
+References: <1448456127-31842-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1448456127-31842-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 November 2015 13:27:55 Daniel Lezcano wrote:
-> 
-> What about:
-> 
-> textofs-$(CONFIG_ARCH_MSM8X60) := 0x00208000
-> textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
-> 
-> in arch/arm/Makefile
+On Exynos 4210 MDMA1 device belongs to LCD0 power domain, so add proper
+power-domains property. On Exynos 4x12, it belongs to TOP power domain,
+which is always enabled, thus require no assignment in exynos4x12.dtsi.
 
-Good point, we need to do something about these still.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ arch/arm/boot/dts/exynos4210.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-> and
-> 
-> CONFIG_ARCH_MSM8X60=y
-> CONFIG_ARCH_MSM8960=y
-> CONFIG_ARCH_MSM8974=y
-> 
-> in arch/arm/configs/qcom_defconfig and multi_v7_defconfig
-> 
-> ?
-
-These should be removed, but they are harmless.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index b7474cf2..aac0f17 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -271,6 +271,10 @@
+ 		     <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>;
+ };
+ 
++&mdma1 {
++	power-domains = <&pd_lcd0>;
++};
++
+ &pmu_system_controller {
+ 	clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
+ 			"clkout4", "clkout8", "clkout9";
+-- 
+1.9.2
