@@ -1,58 +1,31 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 25 Nov 2015 11:21:14 -0800
-Subject: [PATCH 1/7] clk: mmp: stop using platform headers
-In-Reply-To: <1448465875-435039-2-git-send-email-arnd@arndb.de>
-References: <1448465875-435039-1-git-send-email-arnd@arndb.de>
- <1448465875-435039-2-git-send-email-arnd@arndb.de>
-Message-ID: <20151125192114.GB11298@codeaurora.org>
+From: damien.riegel@savoirfairelinux.com (Damien Riegel)
+Date: Wed, 25 Nov 2015 14:25:05 -0500
+Subject: [PATCH v6 4/6] ARM: imx_v6_v7_defconfig: add TS-4800 watchdog
+In-Reply-To: <1448479507-1951-1-git-send-email-damien.riegel@savoirfairelinux.com>
+References: <1448479507-1951-1-git-send-email-damien.riegel@savoirfairelinux.com>
+Message-ID: <1448479507-1951-5-git-send-email-damien.riegel@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25, Arnd Bergmann wrote:
-> diff --git a/drivers/clk/mmp/clk-mmp2.c b/drivers/clk/mmp/clk-mmp2.c
-> index 09d2832fbd78..38931dbd1eff 100644
-> --- a/drivers/clk/mmp/clk-mmp2.c
-> +++ b/drivers/clk/mmp/clk-mmp2.c
-> @@ -9,6 +9,7 @@
->   * warranty of any kind, whether express or implied.
->   */
->  
-> +#include <linux/clk.h>
+The TS-4800, based on an IMX.515, needs its watchdog support in order to
+work.
 
-Why are we adding this include? I don't see any clk consumer API
-usage being added.
+Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
->  #include <linux/module.h>
->  #include <linux/kernel.h>
->  #include <linux/spinlock.h>
-> diff --git a/drivers/clk/mmp/clk-pxa168.c b/drivers/clk/mmp/clk-pxa168.c
-> index 93e967c0f972..0dd83fb950c9 100644
-> --- a/drivers/clk/mmp/clk-pxa168.c
-> +++ b/drivers/clk/mmp/clk-pxa168.c
-> @@ -9,6 +9,7 @@
->   * warranty of any kind, whether express or implied.
->   */
->  
-> +#include <linux/clk.h>
-
-Ditto.
-
-> diff --git a/drivers/clk/mmp/clk-pxa910.c b/drivers/clk/mmp/clk-pxa910.c
-> index 993abcdb32cc..e1d2ce22cdf1 100644
-> --- a/drivers/clk/mmp/clk-pxa910.c
-> +++ b/drivers/clk/mmp/clk-pxa910.c
-> @@ -9,6 +9,7 @@
->   * warranty of any kind, whether express or implied.
->   */
->  
-> +#include <linux/clk.h>
-
-Ditto.
-
->  #include <linux/module.h>
->  #include <linux/kernel.h>
->  #include <linux/spinlock.h>
-
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 79194c6..8968166 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -195,6 +195,7 @@ CONFIG_THERMAL=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_IMX_THERMAL=y
+ CONFIG_WATCHDOG=y
++CONFIG_TS4800_WATCHDOG=y
+ CONFIG_IMX2_WDT=y
+ CONFIG_MFD_DA9052_I2C=y
+ CONFIG_MFD_MC13XXX_SPI=y
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.5.0
