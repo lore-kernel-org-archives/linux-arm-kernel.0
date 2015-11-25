@@ -1,42 +1,63 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 25 Nov 2015 12:02:59 +0100
-Subject: [PATCH] ARM: MM: Simplify using vma_pages function
-In-Reply-To: <20151124073805.GA23513@jci-VirtualBox>
-References: <20151124073805.GA23513@jci-VirtualBox>
-Message-ID: <56559563.9060305@samsung.com>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Wed, 25 Nov 2015 12:04:17 +0100
+Subject: [PATCH v3 0/4] ARM SMC Calling Convention interface
+Message-ID: <1448449461-5043-1-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-On 2015-11-24 08:38, Mutharaju, Prasanna (P.) wrote:
-> From: Prasanna Karthik <mkarthi3@visteon.com>
->
-> Use vma_pages function on vma object instead of explicit computation.
->
-> Signed-off-by: Prasanna Karthik <mkarthi3@visteon.com>
+This patch set is based on the Generic TEE subsystem v6 patchset
+(https://lwn.net/Articles/662495/) sent out a few weeks ago. By isolating
+the ARM SMC Calling Convention patches that are useful for other purposes
+than to support the Generic TEE subsystem some complexity is removed from
+that patch set.
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+This patch set adds a common interface to do an SMC or HVC following ARM
+SMC Calling Convention. The interface is implemented for both the arm and
+arm64 architectures and updates the PSCI driver to use this interface
+instead for firmware communication.
 
-> ---
->   arch/arm/mm/dma-mapping.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index ad4eb2d..513e213 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -694,7 +694,7 @@ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
->   {
->   	int ret = -ENXIO;
->   #ifdef CONFIG_MMU
-> -	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
-> +	unsigned long nr_vma_pages = vma_pages(vma);
->   	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
->   	unsigned long pfn = dma_to_pfn(dev, dma_addr);
->   	unsigned long off = vma->vm_pgoff;
+v3:
+* Moved the export of arm_smccc_{smc,hvc} to armksyms.c for both arm and arm64
+* arm: add implementation for arm-smccc
+  Reviewed-by: Lars Persson <lars.persson@axis.com>
+* arm64: add implementation for arm-smccc
+  drivers: psci: replace psci firmware calls
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-Best regards
+v2:
+* Added unwinding support in the assembly functions
+
+Thanks,
+Jens
+
+Jens Wiklander (4):
+  arm/arm64: add arm-smccc
+  arm: add implementation for arm-smccc
+  arm64: add implementation for arm-smccc
+  drivers: psci: replace psci firmware calls
+
+ arch/arm/Kconfig                |  1 +
+ arch/arm/kernel/Makefile        |  3 +-
+ arch/arm/kernel/armksyms.c      |  6 +++
+ arch/arm/kernel/psci-call.S     | 31 -------------
+ arch/arm/kernel/smccc-call.S    | 50 +++++++++++++++++++++
+ arch/arm64/Kconfig              |  1 +
+ arch/arm64/kernel/Makefile      |  4 +-
+ arch/arm64/kernel/arm64ksyms.c  |  5 +++
+ arch/arm64/kernel/asm-offsets.c |  3 ++
+ arch/arm64/kernel/psci-call.S   | 28 ------------
+ arch/arm64/kernel/smccc-call.S  | 43 ++++++++++++++++++
+ drivers/firmware/psci.c         | 23 +++++++++-
+ include/linux/arm-smccc.h       | 98 +++++++++++++++++++++++++++++++++++++++++
+ init/Kconfig                    |  3 ++
+ 14 files changed, 235 insertions(+), 64 deletions(-)
+ delete mode 100644 arch/arm/kernel/psci-call.S
+ create mode 100644 arch/arm/kernel/smccc-call.S
+ delete mode 100644 arch/arm64/kernel/psci-call.S
+ create mode 100644 arch/arm64/kernel/smccc-call.S
+ create mode 100644 include/linux/arm-smccc.h
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+1.9.1
