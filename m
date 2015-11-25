@@ -1,36 +1,59 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 25 Nov 2015 11:12:01 -0800
-Subject: [PATCH RFC 17/27] drivers: cpu-pd: Record CPUs that are part of
- the domain
-In-Reply-To: <20151125141338.GH30342@linaro.org>
-References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
- <1447799871-56374-18-git-send-email-lina.iyer@linaro.org>
- <20151124210043.GD25963@codeaurora.org> <20151125141338.GH30342@linaro.org>
-Message-ID: <56560801.8000908@codeaurora.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 25 Nov 2015 20:16:00 +0100
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <20151125183728.GO8644@n2100.arm.linux.org.uk>
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+ <20151125160937.GJ14338@lunn.ch>
+ <20151125183728.GO8644@n2100.arm.linux.org.uk>
+Message-ID: <20151125191600.GM11384@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/15 06:13, Lina Iyer wrote:
-> On Tue, Nov 24 2015 at 14:00 -0700, Stephen Boyd wrote:
->> On 11/17, Lina Iyer wrote:
->>> diff --git a/drivers/base/power/cpu-pd.c b/drivers/base/power/cpu-pd.c
->>> index 9758b8d..617ce54 100644
->>> --- a/drivers/base/power/cpu-pd.c
->>> +++ b/drivers/base/power/cpu-pd.c
->>> @@ -18,6 +18,7 @@
->>>  #include <linux/device.h>
->>>  #include <linux/pm_runtime.h>
->>>  #include <linux/platform_device.h>
->>> +#include <linux/pm_qos.h>
->>
->> What's this added for?
->>
-> pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
-> Getting the PM QoS for the CPUs.
->
+> It feels today like I'm the only one working on improving Dove support,
+> and so it's going to take a _long_ time to move things forward - it's
+> likely to take years.  I have many demands on my time and I have to
+> divide it up between the various aspects.
 
-Ok. That function call is not added in this patch though.
+Hi Russell
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+The problem from our side is the apparent lack of progress. We get so
+very few patches we wounder why we should keep it around. If there was
+even a steady trick of patches, we would feel better about keeping it.
+
+So looking at this list, could you maybe post the following, if they
+don't have dependencies. Going from only the subject, most look simple
+and should not be too much effort to get mainlined.
+
+> orion clock build fix
+> ARM: dove: more clock cleanups
+> ARM: dove: cubox: add DT booting support
+
+> ARM: dove: move hwmon initialisation into PMU driver
+
+> ARM: l2c: tauros2: fix OF-enabled non-DT boot
+> ARM: mvebu: allow mvebu/dove to be enabled
+
+> ARM: cubox: fix flash type
+> ARM: dove: remove cubox_extclk device
+> ARM: dove: clock improvements
+> ARM: dove: fix dove clock support to recalculate the actual rates
+> ARM: dove: cleanup dove clock support
+> ARM: dove: fix clock name
+> ARM: dove: no need for empty clock enable/disable methods
+> ARM: dove: remove unused clock declarations
+> ARM: dove: fix 'addr' types in dove clock.c
+> HWMON: dove: fix use if S_IRWXUGO in dove hwmon driver
+> HWMON: move dove hwmon module to drivers/hwmon and add MODULE_ALIAS
+> HWMON: dove: fix mask writes
+> HWMON: dove: move current_mode and warning_flag into dovetemp_data
+> HWMON: dove: push dovetemp_data down into functions
+> HWMON: dove: move timer to dovetherm_data structure
+> HWMON: dove: add driver private data
+> HWMON: dove: use module_platform_driver in dove hwmon driver
+> HWMON: dove: fix monitoring printks
+> Revert "Allow ioremap_nocache on PJ4 processor that is in Dove."
+> ARM: dove: convert legacy dove to PMU support
+> dt-bindings: add Marvell PMU documentation
+> of: Add vendor prefix for Vivante Corporation
+
+  Andrew
