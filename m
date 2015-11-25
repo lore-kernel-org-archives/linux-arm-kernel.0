@@ -1,120 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 25 Nov 2015 15:18:22 +0100
-Subject: [PATCH v3 1/5] clk: sunxi: Add CLK_OF_DECLARE support for
- sun8i-a23-apb0-clk driver
-In-Reply-To: <1448357536-26613-2-git-send-email-wens@csie.org>
-References: <1448357536-26613-1-git-send-email-wens@csie.org>
- <1448357536-26613-2-git-send-email-wens@csie.org>
-Message-ID: <20151125141822.GM32142@lukather>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 25 Nov 2015 06:20:58 -0800
+Subject: [PATCH v3 1/4] watchdog: meson: Enable meson SoC specific data
+In-Reply-To: <CAOQ7t2ZY8BMMSN5F-9GewZSfUewa-0jA5tufe9NCkLZObjrdWg@mail.gmail.com>
+References: <1446985137-25498-1-git-send-email-carlo@caione.org>
+ <1446985137-25498-2-git-send-email-carlo@caione.org>
+ <5640B5BF.9040909@roeck-us.net>
+ <CAOQ7t2bmNNTPxgZy4uZQF_u4yH2nxfMR_FqpKM0GavoUS9rRkA@mail.gmail.com>
+ <20151124181911.GA12289@roeck-us.net>
+ <CAOQ7t2ZY8BMMSN5F-9GewZSfUewa-0jA5tufe9NCkLZObjrdWg@mail.gmail.com>
+Message-ID: <5655C3CA.5000407@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 05:32:12PM +0800, Chen-Yu Tsai wrote:
-> The APBS clock on sun9i is the same as the APB0 clock on sun8i. With
-> sun9i we are supporting the PRCM clocks by using CLK_OF_DECLARE,
-> instead of through a PRCM mfd device and subdevices for each clock
-> and reset control. As such we need a CLK_OF_DECLARE version of
-> the sun8i-a23-apb0-clk driver.
-> 
-> Also, build it for all Allwinner/sunxi platforms, and not just for
-> configurations with MFD_SUN6I_PRCM enabled.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  drivers/clk/sunxi/Makefile         |  4 ++--
->  drivers/clk/sunxi/clk-sun8i-apb0.c | 43 ++++++++++++++++++++++++++++++++++++++
->  2 files changed, 45 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> index cb4c299214ce..121333ce34ea 100644
-> --- a/drivers/clk/sunxi/Makefile
-> +++ b/drivers/clk/sunxi/Makefile
-> @@ -10,11 +10,11 @@ obj-y += clk-a10-pll2.o
->  obj-y += clk-a20-gmac.o
->  obj-y += clk-mod0.o
->  obj-y += clk-simple-gates.o
-> +obj-y += clk-sun8i-apb0.o
->  obj-y += clk-sun8i-mbus.o
->  obj-y += clk-sun9i-core.o
->  obj-y += clk-sun9i-mmc.o
->  obj-y += clk-usb.o
->  
->  obj-$(CONFIG_MFD_SUN6I_PRCM) += \
-> -	clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o \
-> -	clk-sun8i-apb0.o
-> +	clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o
+On 11/25/2015 01:25 AM, Carlo Caione wrote:
+> On Tue, Nov 24, 2015 at 7:19 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+>> On Wed, Nov 11, 2015 at 09:54:04AM +0100, Carlo Caione wrote:
+>>> On Mon, Nov 9, 2015 at 4:03 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+>>>> On 11/08/2015 04:18 AM, Carlo Caione wrote:
+>>>>>
+>>>>> From: Carlo Caione <carlo@endlessm.com>
+>>>>>
+>>>>> With this patch we refactor the driver code to enable watchdog support
+>>>>> for all platforms based on Amlogic meson SoCs.
+>>>>> The new default timeout is also now chosen considering the maximum
+>>>>> timeout allowed by the SoC.
+>>>>>
+>>>>> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+>>>>
+>>>>
+>>>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+>>>
+>>> Wim,
+>>> any (N)ACK on this?
+>>>
+>> Carlo,
+>>
+>> Unless I missed it, we still don't have an Ack from a devicetree
+>> maintainer for the devicetree changes.
+>
+> I'm the maintainer for the Meson platform and since the changes are
+> trivial I'm going to merge them after the driver is taken in the
+> watchdog tree.
+>
 
-I'd really prefer not to build a driver that is used only on a few
-SoCs if the support for these SoCs are not even enabled.
+Ok. I'll add patches 1 and 2 from the series to my -next tree and send
+them to Wim with my next pull request.
 
-> diff --git a/drivers/clk/sunxi/clk-sun8i-apb0.c b/drivers/clk/sunxi/clk-sun8i-apb0.c
-> index 7ae5d2c2cde1..11b2f2fde245 100644
-> --- a/drivers/clk/sunxi/clk-sun8i-apb0.c
-> +++ b/drivers/clk/sunxi/clk-sun8i-apb0.c
-> @@ -17,8 +17,51 @@
->  #include <linux/clk-provider.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/of_address.h>
->  #include <linux/platform_device.h>
->  
-> +static void sun8i_a23_apb0_setup(struct device_node *node)
-> +{
-> +	const char *clk_name = node->name;
-> +	const char *clk_parent;
-> +	void __iomem *reg;
-> +	struct resource res;
-> +	struct clk *clk;
-> +	int ret;
-> +
-> +	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-> +	if (IS_ERR(reg))
-> +		return;
-> +
-> +	clk_parent = of_clk_get_parent_name(node, 0);
-> +	if (!clk_parent)
-> +		goto err_unmap;
-> +
-> +	of_property_read_string(node, "clock-output-names", &clk_name);
-> +
-> +	/* The A23 APB0 clock is a standard 2 bit wide divider clock */
-> +	clk = clk_register_divider(NULL, clk_name, clk_parent, 0, reg,
-> +				   0, 2, CLK_DIVIDER_POWER_OF_TWO, NULL);
-> +	if (IS_ERR(clk))
-> +		goto err_unmap;
-> +
-> +	ret = of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +	if (ret)
-> +		goto err_unregister;
-> +
-> +	return;
-> +
-> +err_unregister:
-> +	clk_unregister_divider(clk);
-> +
-> +err_unmap:
-> +	iounmap(reg);
-> +	of_address_to_resource(node, 0, &res);
-> +	release_mem_region(res.start, resource_size(&res));
-> +}
-> +CLK_OF_DECLARE(sun8i_a23_apb0, "allwinner,sun8i-a23-apb0-clk",
-> +	       sun8i_a23_apb0_setup);
-
-So, beside the memory request / mapping, everything else is
-duplicated? Can't you just create a common function and call it from
-both?
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151125/fa85ba80/attachment-0001.sig>
+Guenter
