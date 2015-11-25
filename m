@@ -1,5 +1,5 @@
 From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 25 Nov 2015 06:27:05 +0000
+Date: Wed, 25 Nov 2015 06:27:30 +0000
 Subject: [PATCH v6 00/12] arm64: renesas: add sound support
 In-Reply-To: <20151125002752.GH20596@verge.net.au>
 References: <87egg3k5g6.wl%kuninori.morimoto.gx@renesas.com>
@@ -11,7 +11,7 @@ References: <87egg3k5g6.wl%kuninori.morimoto.gx@renesas.com>
  <20151124023025.GA21853@verge.net.au>
  <87k2p7yjbl.wl%kuninori.morimoto.gx@renesas.com>
  <20151125002752.GH20596@verge.net.au>
-Message-ID: <877fl68uqh.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <87610q8upv.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
