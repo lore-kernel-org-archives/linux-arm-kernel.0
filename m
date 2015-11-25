@@ -1,22 +1,19 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 25 Nov 2015 11:49:57 +0800
-Subject: [PATCH v2 resend] clk: imx25: Remove osc clock from driver
-In-Reply-To: <1448363878-14551-1-git-send-email-mpa@pengutronix.de>
-References: <1448363878-14551-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20151125034957.GE11999@tiger>
+Date: Wed, 25 Nov 2015 11:51:03 +0800
+Subject: [PATCH Resend] clk: imx: add 'is_prepared' clk_ops callback for
+ pllv3 clk
+In-Reply-To: <1448381213-24349-1-git-send-email-b51503@freescale.com>
+References: <1448381213-24349-1-git-send-email-b51503@freescale.com>
+Message-ID: <20151125035103.GF11999@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 12:17:58PM +0100, Markus Pargmann wrote:
-> The 'osc' clock is already initialized by the fixed clock defined in
-> imx25.dtsi. The imx25 clock driver tries to add this clock for a second
-> time and fails with -EEXIST:
-> 	i.MX clk 1: register failed with -17
+On Wed, Nov 25, 2015 at 12:06:53AM +0800, Bai Ping wrote:
+> Add 'is_prepared' callback function for pllv3 type clk to make sure when
+> the system is bootup, the unused clk is in a known state to match the
+> prepare count info.
 > 
-> As the clock is already properly setup in DT with a different driver, we
-> can completely remove the handling in the imx25 clock driver.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Signed-off-by: Bai Ping <b51503@freescale.com>
 > Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
 Applied, thanks.
