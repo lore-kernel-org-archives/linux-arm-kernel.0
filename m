@@ -1,36 +1,38 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 25 Nov 2015 06:39:48 +0000
-Subject: [PATCH 12/12] arm64: defconfig: add Renesas sound and AK4613 support
-In-Reply-To: <8737vu8ucv.wl%kuninori.morimoto.gx@renesas.com>
-References: <8737vu8ucv.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <87lh9m7fkt.wl%kuninori.morimoto.gx@renesas.com>
+From: lifshitz@compulab.co.il (Dmitry Lifshitz)
+Date: Wed, 25 Nov 2015 08:39:49 +0200
+Subject: [PATCH 17/18] ARM: am57xx: compulab-sb-som: dts: add HDMI connector
+In-Reply-To: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
+References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1448433590-1399-18-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add HDMI connector node without a valid input endpoint.
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+CompuLab SB-SOM is a carrier board, hence the endpoint
+should be added in the board DT with a valid HDMI output.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 ---
- arch/arm64/configs/defconfig | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/compulab-sb-som.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index f97d740..2b0a9dc 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -152,6 +152,11 @@ CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_LOGO=y
- # CONFIG_LOGO_LINUX_MONO is not set
- # CONFIG_LOGO_LINUX_VGA16 is not set
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+CONFIG_SND_SOC=y
-+CONFIG_SND_SOC_RCAR=y
-+CONFIG_SND_SOC_AK4613=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_HCD_PLATFORM=y
+diff --git a/arch/arm/boot/dts/compulab-sb-som.dtsi b/arch/arm/boot/dts/compulab-sb-som.dtsi
+index 402a143..93d7e23 100644
+--- a/arch/arm/boot/dts/compulab-sb-som.dtsi
++++ b/arch/arm/boot/dts/compulab-sb-som.dtsi
+@@ -39,4 +39,11 @@
+ 			pixelclk-active = <1>;
+ 		};
+ 	};
++
++	hdmi_conn: connector at 0 {
++		compatible = "hdmi-connector";
++		label = "hdmi";
++
++		type = "a";
++	};
+ };
 -- 
 1.9.1
