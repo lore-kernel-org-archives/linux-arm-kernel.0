@@ -1,162 +1,180 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Nov 2015 17:06:53 +0100
-Subject: [PATCH 08/10] ARM: s3c64xx: use common debug-ll implementation
+Date: Wed, 25 Nov 2015 17:06:52 +0100
+Subject: [PATCH 07/10] ARM: s3c64xx: use new adc/touchscreen driver
 In-Reply-To: <1448467615-447097-1-git-send-email-arnd@arndb.de>
 References: <1448467615-447097-1-git-send-email-arnd@arndb.de>
-Message-ID: <1448467615-447097-9-git-send-email-arnd@arndb.de>
+Message-ID: <1448467615-447097-8-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The uart on s3c64xx is essentially the same as on s3c24xx,
-so we can share a single assembler file. However, the addresses
-are different, and we need to add the respective Kconfig magic
-to get the right addresses.
+The old ADC and touchscreen drivers are not compatible with
+multiplatform support, but we can use the exynos-adc driver
+as a replacement.
+
+This changes the common device creation functions for s3c64xx
+(but not s3c24xx for now) to use the new driver. To do this,
+we have to pass the interrupt resources in the opposite order
+and pass the platform data in the adc device node.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/Kconfig.debug                           | 19 +++++++++++-
- arch/arm/mach-s3c64xx/include/mach/debug-macro.S | 38 ------------------------
- 2 files changed, 18 insertions(+), 39 deletions(-)
- delete mode 100644 arch/arm/mach-s3c64xx/include/mach/debug-macro.S
+ arch/arm/mach-s3c64xx/mach-mini6410.c             |  3 +--
+ arch/arm/mach-s3c64xx/mach-real6410.c             |  3 +--
+ arch/arm/mach-s3c64xx/mach-smartq.c               |  3 +--
+ arch/arm/mach-s3c64xx/mach-smdk6410.c             |  3 +--
+ arch/arm/plat-samsung/devs.c                      | 22 +++++-----------------
+ include/linux/platform_data/touchscreen-s3c2410.h |  1 +
+ 6 files changed, 10 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 259c0ca9c99a..17ca2b5f8be7 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -857,6 +857,7 @@ choice
- 		depends on PLAT_SAMSUNG
- 		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
- 		select DEBUG_S3C24XX_UART if ARCH_S3C24XX
-+		select DEBUG_S3C64XX_UART if ARCH_S3C64XX
- 		select DEBUG_S5PV210_UART if ARCH_S5PV210
- 		bool "Use Samsung S3C UART 0 for low-level debug"
- 		help
-@@ -868,6 +869,7 @@ choice
- 		depends on PLAT_SAMSUNG
- 		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
- 		select DEBUG_S3C24XX_UART if ARCH_S3C24XX
-+		select DEBUG_S3C64XX_UART if ARCH_S3C64XX
- 		select DEBUG_S5PV210_UART if ARCH_S5PV210
- 		bool "Use Samsung S3C UART 1 for low-level debug"
- 		help
-@@ -879,6 +881,7 @@ choice
- 		depends on PLAT_SAMSUNG
- 		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
- 		select DEBUG_S3C24XX_UART if ARCH_S3C24XX
-+		select DEBUG_S3C64XX_UART if ARCH_S3C64XX
- 		select DEBUG_S5PV210_UART if ARCH_S5PV210
- 		bool "Use Samsung S3C UART 2 for low-level debug"
- 		help
-@@ -889,6 +892,7 @@ choice
- 	config DEBUG_S3C_UART3
- 		depends on PLAT_SAMSUNG && (ARCH_EXYNOS || ARCH_S5PV210)
- 		select DEBUG_EXYNOS_UART if ARCH_EXYNOS
-+		select DEBUG_S3C64XX_UART if ARCH_S3C64XX
- 		select DEBUG_S5PV210_UART if ARCH_S5PV210
- 		bool "Use Samsung S3C UART 3 for low-level debug"
- 		help
-@@ -1253,6 +1257,9 @@ config DEBUG_S3C2410_UART
- config DEBUG_S3C24XX_UART
- 	bool
+diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
+index 3ce5842ed51b..ae999fb3fe6d 100644
+--- a/arch/arm/mach-s3c64xx/mach-mini6410.c
++++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
+@@ -234,7 +234,6 @@ static struct platform_device *mini6410_devices[] __initdata = {
+ 	&s3c_device_fb,
+ 	&mini6410_lcd_powerdev,
+ 	&s3c_device_adc,
+-	&s3c_device_ts,
+ };
  
-+config DEBUG_S3C64XX_UART
-+	bool
-+
- config DEBUG_S5PV210_UART
- 	bool
+ static void __init mini6410_map_io(void)
+@@ -333,7 +332,7 @@ static void __init mini6410_machine_init(void)
+ 	s3c_nand_set_platdata(&mini6410_nand_info);
+ 	s3c_fb_set_platdata(&mini6410_lcd_pdata[features.lcd_index]);
+ 	s3c_sdhci1_set_platdata(&mini6410_hsmmc1_pdata);
+-	s3c24xx_ts_set_platdata(NULL);
++	s3c64xx_ts_set_platdata(NULL);
  
-@@ -1338,7 +1345,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA0
- 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA1
- 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA4
--	default "debug/s3c24xx.S" if DEBUG_S3C24XX_UART
-+	default "debug/s3c24xx.S" if DEBUG_S3C24XX_UART || DEBUG_S3C64XX_UART
- 	default "debug/s5pv210.S" if DEBUG_S5PV210_UART
- 	default "debug/sirf.S" if DEBUG_SIRFSOC_UART
- 	default "debug/sti.S" if DEBUG_STI_UART
-@@ -1416,6 +1423,10 @@ config DEBUG_UART_PHYS
- 				DEBUG_S3C2410_UART2)
- 	default 0x78000000 if DEBUG_CNS3XXX
- 	default 0x7c0003f8 if FOOTBRIDGE
-+	default 0x7f005000 if DEBUG_S3C64XX_UART && DEBUG_S3C_UART0
-+	default 0x7f005400 if DEBUG_S3C64XX_UART && DEBUG_S3C_UART1
-+	default 0x7f005800 if DEBUG_S3C64XX_UART && DEBUG_S3C_UART2
-+	default 0x7f005c00 if DEBUG_S3C64XX_UART && DEBUG_S3C_UART3
- 	default 0x80010000 if DEBUG_ASM9260_UART
- 	default 0x80070000 if DEBUG_IMX23_UART
- 	default 0x80074000 if DEBUG_IMX28_UART
-@@ -1474,6 +1485,7 @@ config DEBUG_UART_PHYS
- 		DEBUG_RCAR_GEN2_SCIF0 || DEBUG_RCAR_GEN2_SCIF2 || \
- 		DEBUG_RMOBILE_SCIFA0 || DEBUG_RMOBILE_SCIFA1 || \
- 		DEBUG_RMOBILE_SCIFA4 || DEBUG_S3C24XX_UART || \
-+		DEBUG_S3C64XX_UART || \
- 		DEBUG_UART_BCM63XX || DEBUG_ASM9260_UART || \
- 		DEBUG_SIRFSOC_UART || DEBUG_DIGICOLOR_UA0 || \
- 		DEBUG_AT91_UART
-@@ -1499,8 +1511,12 @@ config DEBUG_UART_VIRT
- 	default 0xf4090000 if ARCH_LPC32XX
- 	default 0xf4200000 if ARCH_GEMINI
- 	default 0xf7000000 if DEBUG_SUN9I_UART0
-+	default 0xf7000000 if DEBUG_S3C64XX_UART && DEBUG_S3C_UART0
- 	default 0xf7000000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART0 || \
- 				DEBUG_S3C2410_UART0)
-+	default 0xf7000400 if DEBUG_S3C64XX_UART && DEBUG_S3C_UART1
-+	default 0xf7000800 if DEBUG_S3C64XX_UART && DEBUG_S3C_UART2
-+	default 0xf7000c00 if DEBUG_S3C64XX_UART && DEBUG_S3C_UART3
- 	default 0xf7004000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART1 || \
- 				DEBUG_S3C2410_UART1)
- 	default 0xf7008000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART2 || \
-@@ -1566,6 +1582,7 @@ config DEBUG_UART_VIRT
- 		DEBUG_UART_8250 || DEBUG_UART_PL01X || DEBUG_MESON_UARTAO || \
- 		DEBUG_NETX_UART || \
- 		DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART || \
-+		DEBUG_S3C64XX_UART || \
- 		DEBUG_UART_BCM63XX || DEBUG_ASM9260_UART || \
- 		DEBUG_SIRFSOC_UART || DEBUG_DIGICOLOR_UA0
+ 	/* configure nCS1 width to 16 bits */
  
-diff --git a/arch/arm/mach-s3c64xx/include/mach/debug-macro.S b/arch/arm/mach-s3c64xx/include/mach/debug-macro.S
-deleted file mode 100644
-index c9b95325b672..000000000000
---- a/arch/arm/mach-s3c64xx/include/mach/debug-macro.S
-+++ /dev/null
-@@ -1,38 +0,0 @@
--/* arch/arm/mach-s3c6400/include/mach/debug-macro.S
-- *
-- * Copyright 2008 Openmoko, Inc.
-- * Copyright 2008 Simtec Electronics
-- *	http://armlinux.simtec.co.uk/
-- *	Ben Dooks <ben@simtec.co.uk>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
+diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
+index ca6548a1ed3b..4e240ffa7ac7 100644
+--- a/arch/arm/mach-s3c64xx/mach-real6410.c
++++ b/arch/arm/mach-s3c64xx/mach-real6410.c
+@@ -203,7 +203,6 @@ static struct platform_device *real6410_devices[] __initdata = {
+ 	&s3c_device_fb,
+ 	&s3c_device_nand,
+ 	&s3c_device_adc,
+-	&s3c_device_ts,
+ 	&s3c_device_ohci,
+ };
+ 
+@@ -302,7 +301,7 @@ static void __init real6410_machine_init(void)
+ 
+ 	s3c_fb_set_platdata(&real6410_lcd_pdata[features.lcd_index]);
+ 	s3c_nand_set_platdata(&real6410_nand_info);
+-	s3c24xx_ts_set_platdata(NULL);
++	s3c64xx_ts_set_platdata(NULL);
+ 
+ 	/* configure nCS1 width to 16 bits */
+ 
+diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
+index 96784e7f894a..936a63fc68d5 100644
+--- a/arch/arm/mach-s3c64xx/mach-smartq.c
++++ b/arch/arm/mach-s3c64xx/mach-smartq.c
+@@ -253,7 +253,6 @@ static struct platform_device *smartq_devices[] __initdata = {
+ 	&s3c_device_ohci,
+ 	&s3c_device_rtc,
+ 	&samsung_device_pwm,
+-	&s3c_device_ts,
+ 	&s3c_device_usb_hsotg,
+ 	&s3c64xx_device_iis0,
+ 	&smartq_backlight_device,
+@@ -400,7 +399,7 @@ void __init smartq_machine_init(void)
+ 	s3c_hwmon_set_platdata(&smartq_hwmon_pdata);
+ 	s3c_sdhci1_set_platdata(&smartq_internal_hsmmc_pdata);
+ 	s3c_sdhci2_set_platdata(&smartq_internal_hsmmc_pdata);
+-	s3c24xx_ts_set_platdata(&smartq_touchscreen_pdata);
++	s3c64xx_ts_set_platdata(&smartq_touchscreen_pdata);
+ 
+ 	i2c_register_board_info(0, smartq_i2c_devs,
+ 				ARRAY_SIZE(smartq_i2c_devs));
+diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+index 34d31bd48954..8a894ee3ee76 100644
+--- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
++++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+@@ -290,7 +290,6 @@ static struct platform_device *smdk6410_devices[] __initdata = {
+ 	&s3c_device_adc,
+ 	&s3c_device_cfcon,
+ 	&s3c_device_rtc,
+-	&s3c_device_ts,
+ 	&s3c_device_wdt,
+ };
+ 
+@@ -669,7 +668,7 @@ static void __init smdk6410_machine_init(void)
+ 
+ 	samsung_keypad_set_platdata(&smdk6410_keypad_data);
+ 
+-	s3c24xx_ts_set_platdata(NULL);
++	s3c64xx_ts_set_platdata(NULL);
+ 
+ 	/* configure nCS1 width to 16 bits */
+ 
+diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+index f39938fa9ef6..b53d4ff3befb 100644
+--- a/arch/arm/plat-samsung/devs.c
++++ b/arch/arm/plat-samsung/devs.c
+@@ -119,12 +119,12 @@ struct platform_device s3c_device_adc = {
+ #if defined(CONFIG_SAMSUNG_DEV_ADC)
+ static struct resource s3c_adc_resource[] = {
+ 	[0] = DEFINE_RES_MEM(SAMSUNG_PA_ADC, SZ_256),
+-	[1] = DEFINE_RES_IRQ(IRQ_TC),
+-	[2] = DEFINE_RES_IRQ(IRQ_ADC),
++	[1] = DEFINE_RES_IRQ(IRQ_ADC),
++	[2] = DEFINE_RES_IRQ(IRQ_TC),
+ };
+ 
+ struct platform_device s3c_device_adc = {
+-	.name		= "samsung-adc",
++	.name		= "exynos-adc",
+ 	.id		= -1,
+ 	.num_resources	= ARRAY_SIZE(s3c_adc_resource),
+ 	.resource	= s3c_adc_resource,
+@@ -956,31 +956,19 @@ void __init s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *hard_s3c2410ts_
+ #endif /* CONFIG_PLAT_S3C24XX */
+ 
+ #ifdef CONFIG_SAMSUNG_DEV_TS
+-static struct resource s3c_ts_resource[] = {
+-	[0] = DEFINE_RES_MEM(SAMSUNG_PA_ADC, SZ_256),
+-	[1] = DEFINE_RES_IRQ(IRQ_TC),
+-};
 -
--/* pull in the relevant register and map files. */
+ static struct s3c2410_ts_mach_info default_ts_data __initdata = {
+ 	.delay			= 10000,
+ 	.presc			= 49,
+ 	.oversampling_shift	= 2,
+ };
+ 
+-struct platform_device s3c_device_ts = {
+-	.name		= "s3c64xx-ts",
+-	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(s3c_ts_resource),
+-	.resource	= s3c_ts_resource,
+-};
 -
--#include <linux/serial_s3c.h>
--#include <mach/map.h>
--
--	/* note, for the boot process to work we have to keep the UART
--	 * virtual address aligned to an 1MiB boundary for the L1
--	 * mapping the head code makes. We keep the UART virtual address
--	 * aligned and add in the offset when we load the value here.
--	 */
--
--	.macro addruart, rp, rv, tmp
--		ldr	\rp, = S3C_PA_UART
--		ldr	\rv, = (S3C_VA_UART + S3C_PA_UART & 0xfffff)
--#if CONFIG_DEBUG_S3C_UART != 0
--		add	\rp, \rp, #(0x400 * CONFIG_DEBUG_S3C_UART)
--		add	\rv, \rv, #(0x400 * CONFIG_DEBUG_S3C_UART)
--#endif
--	.endm
--
--/* include the reset of the code which will do the work, we're only
-- * compiling for a single cpu processor type so the default of s3c2440
-- * will be fine with us.
-- */
--
--#include <debug/samsung.S>
+-void __init s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *pd)
++void __init s3c64xx_ts_set_platdata(struct s3c2410_ts_mach_info *pd)
+ {
+ 	if (!pd)
+ 		pd = &default_ts_data;
+ 
+ 	s3c_set_platdata(pd, sizeof(struct s3c2410_ts_mach_info),
+-			 &s3c_device_ts);
++			 &s3c_device_adc);
+ }
+ #endif /* CONFIG_SAMSUNG_DEV_TS */
+ 
+diff --git a/include/linux/platform_data/touchscreen-s3c2410.h b/include/linux/platform_data/touchscreen-s3c2410.h
+index 58dc7c5ae63b..71eccaa9835d 100644
+--- a/include/linux/platform_data/touchscreen-s3c2410.h
++++ b/include/linux/platform_data/touchscreen-s3c2410.h
+@@ -17,6 +17,7 @@ struct s3c2410_ts_mach_info {
+ };
+ 
+ extern void s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *);
++extern void s3c64xx_ts_set_platdata(struct s3c2410_ts_mach_info *);
+ 
+ /* defined by architecture to configure gpio */
+ extern void s3c24xx_ts_cfg_gpio(struct platform_device *dev);
 -- 
 2.1.0.rc2
