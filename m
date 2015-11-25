@@ -1,98 +1,365 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 25 Nov 2015 10:33:38 +0000
-Subject: [RFC PATCH 07/10] ARM: mps2: add low-level debug support
+Date: Wed, 25 Nov 2015 10:33:40 +0000
+Subject: [RFC PATCH 09/10] ARM: dts: introduce MPS2 AN385/AN386
 In-Reply-To: <1448447621-17900-1-git-send-email-vladimir.murzin@arm.com>
 References: <1448447621-17900-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1448447621-17900-8-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1448447621-17900-10-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add low-level debug support for MPS2, so that earlyprintk can be enabled
-for debugging early boot issues.
+Application Notes 385 and 386 shares the same memory map and features
+except the CPU is used. AN385 is supplied with Cortex-M3 CPU and AN386
+is supplied with Cortex-M4.
 
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/Kconfig.debug        |   12 +++++++++++-
- arch/arm/include/debug/mps2.S |   27 +++++++++++++++++++++++++++
- 2 files changed, 38 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/include/debug/mps2.S
+ arch/arm/boot/dts/Makefile       |    1 +
+ arch/arm/boot/dts/mps2-an385.dts |   90 +++++++++++++++
+ arch/arm/boot/dts/mps2.dtsi      |  227 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 318 insertions(+)
+ create mode 100644 arch/arm/boot/dts/mps2-an385.dts
+ create mode 100644 arch/arm/boot/dts/mps2.dtsi
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 259c0ca..cfbf09a 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -479,6 +479,13 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on MMP UART3.
- 
-+	config DEBUG_MPS2_UART
-+		bool "Kernel low-level debugging message via MPS2 UART0"
-+		depends on ARCH_MPS2
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on MPS2 based platforms.
-+
- 	config DEBUG_QCOM_UARTDM
- 		bool "Kernel low-level debugging messages via QCOM UARTDM"
- 		depends on ARCH_QCOM
-@@ -1350,6 +1357,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
- 	default "debug/bcm63xx.S" if DEBUG_UART_BCM63XX
- 	default "debug/digicolor.S" if DEBUG_DIGICOLOR_UA0
-+	default "debug/mps2.S" if DEBUG_MPS2_UART
- 	default "mach/debug-macro.S"
- 
- # Compatibility options for PL01x
-@@ -1403,6 +1411,7 @@ config DEBUG_UART_PHYS
- 	default 0x20068000 if DEBUG_RK29_UART2 || DEBUG_RK3X_UART3
- 	default 0x20201000 if DEBUG_BCM2835
- 	default 0x3e000000 if DEBUG_BCM_KONA_UART
-+	default 0x40004000 if DEBUG_MPS2_UART
- 	default 0x4000e400 if DEBUG_LL_UART_EFM32
- 	default 0x40081000 if DEBUG_LPC18XX_UART0
- 	default 0x40090000 if ARCH_LPC32XX
-@@ -1476,7 +1485,8 @@ config DEBUG_UART_PHYS
- 		DEBUG_RMOBILE_SCIFA4 || DEBUG_S3C24XX_UART || \
- 		DEBUG_UART_BCM63XX || DEBUG_ASM9260_UART || \
- 		DEBUG_SIRFSOC_UART || DEBUG_DIGICOLOR_UA0 || \
--		DEBUG_AT91_UART
-+		DEBUG_AT91_UART || \
-+		DEBUG_MPS2_UART
- 
- config DEBUG_UART_VIRT
- 	hex "Virtual base address of debug UART"
-diff --git a/arch/arm/include/debug/mps2.S b/arch/arm/include/debug/mps2.S
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 30bbc37..4ef3720 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -237,6 +237,7 @@ dtb-$(CONFIG_ARCH_MMP) += \
+ dtb-$(CONFIG_MACH_MESON8B) += \
+ 	meson8b-mxq.dtb \
+ 	meson8b-odroidc1.dtb
++dtb-$(CONFIG_ARCH_MPS2) += mps2-an385.dtb
+ dtb-$(CONFIG_ARCH_MOXART) += \
+ 	moxart-uc7112lx.dtb
+ dtb-$(CONFIG_SOC_IMX1) += \
+diff --git a/arch/arm/boot/dts/mps2-an385.dts b/arch/arm/boot/dts/mps2-an385.dts
 new file mode 100644
-index 0000000..0ced0ce
+index 0000000..ddb03d3
 --- /dev/null
-+++ b/arch/arm/include/debug/mps2.S
-@@ -0,0 +1,27 @@
++++ b/arch/arm/boot/dts/mps2-an385.dts
+@@ -0,0 +1,90 @@
 +/*
 + * Copyright (C) 2015 ARM Limited
 + *
 + * Author: Vladimir Murzin <vladimir.murzin@arm.com>
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
 + *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+	.macro	addruart, rp, tmp1, tmp2
-+	ldr	\rp, =CONFIG_DEBUG_UART_PHYS
-+	.endm
++/dts-v1/;
 +
-+	.macro	senduart, rd, rx
-+	strb	\rd, [\rx]		@ Data Register
-+	.endm
++#include "mps2.dtsi"
 +
-+	.macro	busyuart, rd, rx
-+1001:	ldrb	\rd, [\rx, #0x4]	@ State Register
-+	tst	\rd, #1			@ busy
-+	bne	1001b			@ wait until transmit done
-+	.endm
++/ {
++	model = "ARM MPS2 Application Note 385/386";
++	compatible = "arm,mps2";
 +
-+	.macro	waituart,rd,rx
-+	.endm
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		bootargs = "init=/sbin/init earlycon";
++		stdout-path = "serial0:9600n8";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x21000000 0x1000000>;
++	};
++
++	ethernet at 40200000 {
++		compatible = "smsc,lan9220", "smsc,lan9115";
++		reg = <0x40200000 0x10000>;
++		interrupts = <13>;
++		interrupt-parent = <&nvic>;
++		smsc,irq-active-high;
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&timer0 {
++	status = "okay";
++};
++
++&timer1 {
++	status = "okay";
++};
++
++&wdt {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/mps2.dtsi b/arch/arm/boot/dts/mps2.dtsi
+new file mode 100644
+index 0000000..5d2c539
+--- /dev/null
++++ b/arch/arm/boot/dts/mps2.dtsi
+@@ -0,0 +1,227 @@
++/*
++ * Copyright (C) 2015 ARM Limited
++ *
++ * Author: Vladimir Murzin <vladimir.murzin@arm.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "armv7-m.dtsi"
++
++/ {
++	oscclk0: clk-osc0 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <50000000>;
++	};
++
++	oscclk1: clk-osc1 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24576000>;
++	};
++
++	oscclk2: clk-osc2 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <25000000>;
++	};
++
++	cfgclk: clk-cfg {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <5000000>;
++	};
++
++	spicfgclk: clk-spicfg {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <75000000>;
++	};
++
++	sysclk: clk-sys {
++		compatible = "fixed-factor-clock";
++		clocks = <&oscclk0>;
++		#clock-cells = <0>;
++		clock-div = <2>;
++		clock-mult = <1>;
++	};
++
++	audmclk: clk-audm {
++		compatible = "fixed-factor-clock";
++		clocks = <&oscclk1>;
++		#clock-cells = <0>;
++		clock-div = <2>;
++		clock-mult = <1>;
++	};
++
++	audsclk: clk-auds {
++		compatible = "fixed-factor-clock";
++		clocks = <&oscclk1>;
++		#clock-cells = <0>;
++		clock-div = <8>;
++		clock-mult = <1>;
++	};
++
++	spiclcd: clk-cpiclcd {
++		compatible = "fixed-factor-clock";
++		clocks = <&oscclk0>;
++		#clock-cells = <0>;
++		clock-div = <2>;
++		clock-mult = <1>;
++	};
++
++	spicon: clk-spicon {
++		compatible = "fixed-factor-clock";
++		clocks = <&oscclk0>;
++		#clock-cells = <0>;
++		clock-div = <2>;
++		clock-mult = <1>;
++	};
++
++	i2cclcd: clk-i2cclcd {
++		compatible = "fixed-factor-clock";
++		clocks = <&oscclk0>;
++		#clock-cells = <0>;
++		clock-div = <2>;
++		clock-mult = <1>;
++	};
++
++	i2caud: clk-i2caud {
++		compatible = "fixed-factor-clock";
++		clocks = <&oscclk0>;
++		#clock-cells = <0>;
++		clock-div = <2>;
++		clock-mult = <1>;
++	};
++
++	soc {
++		compatible = "simple-bus";
++		ranges;
++
++		apb {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x40000000 0x10000>;
++
++			timer0: mps2-timer0 at 0 {
++				compatible = "arm,mps2-timer";
++				reg = <0x0 0x1000>;
++				interrupts = <8>;
++				clocks = <&sysclk>;
++				status = "disabled";
++			};
++
++			timer1: mps2-timer1 at 1000 {
++				compatible = "arm,mps2-timer";
++				reg = <0x1000 0x1000>;
++				interrupts = <9>;
++				clocks = <&sysclk>;
++				status = "disabled";
++			};
++
++			timer2: dual-timer at 2000 {
++				compatible = "arm,sp804";
++				reg = <0x2000 0x1000>;
++				clocks = <&sysclk>;
++				interrupts = <10>;
++				status = "disabled";
++			};
++
++
++			uart0: serial at 4000 {
++				compatible = "arm,mps2-uart";
++				reg = <0x4000 0x1000>;
++				interrupts = <0 1 12>;
++				clocks = <&sysclk>;
++				status = "disabled";
++			};
++
++			uart1: serial at 5000 {
++				compatible = "arm,mps2-uart";
++				reg = <0x5000 0x1000>;
++				interrupts = <2 3 12>;
++				clocks = <&sysclk>;
++				status = "disabled";
++			};
++
++			uart2: serial at 6000 {
++				compatible = "arm,mps2-uart";
++				reg = <0x6000 0x1000>;
++				interrupts = <4 5 12>;
++				clocks = <&sysclk>;
++				status = "disabled";
++			};
++
++			wdt: watchdog at 8000 {
++				compatible = "arm,sp805", "arm,primecell";
++				arm,primecell-periphid = <0x00141805>;
++				reg = <0x8000 0x1000>;
++				interrupts = <0>;
++				clocks = <&sysclk>;
++				clock-names = "apb_pclk";
++				status = "disabled";
++			};
++		};
++
++		fpgaio {
++			compatible = "syscon", "simple-mfd";
++			reg = <0x40028000 0x10>;
++
++			led at 0 {
++				compatible = "register-bit-led";
++				offset = <0x0>;
++				mask = <0x01>;
++				label = "userled:0";
++				linux,default-trigger = "heartbeat";
++				default-state = "on";
++			};
++
++			led at 1 {
++				compatible = "register-bit-led";
++				offset = <0x0>;
++				mask = <0x02>;
++				label = "userled:1";
++				linux,default-trigger = "usr";
++				default-state = "off";
++			};
++		};
++	};
++};
 -- 
 1.7.9.5
