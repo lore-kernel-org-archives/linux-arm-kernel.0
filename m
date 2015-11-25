@@ -1,165 +1,78 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 25 Nov 2015 17:41:25 +0800
-Subject: [PATCH v2] pwm: berlin: Add PM support
-Message-ID: <1448444485-4857-1-git-send-email-jszhang@marvell.com>
+From: leilk.liu@mediatek.com (Leilk Liu)
+Date: Wed, 25 Nov 2015 17:50:38 +0800
+Subject: [PATCH v3] spi: mediatek: revise mtk_spi_probe() failure flow
+Message-ID: <1448445038-10570-1-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds S2R support for berlin pwm driver.
+mtk_spi_probe() calls pm_runtime_enable(), after
+pm_runtime_enable() is called, it should call
+pm_runtime_disable() in the failure flow.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
 ---
-Since v1:
- - implement .request and .free hooks, allocate/free the channel in
-   berlin_pwm_request/berlin_pwm_free. Then use pwm_get_chip_data in
-   suspend/resume implementation.
- - s/int/unsigned int
- - check return value of clk_prepare_enable
- - remoev BERLIN_PWM_PM_OPS macro
- drivers/pwm/pwm-berlin.c | 90 +++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 89 insertions(+), 1 deletion(-)
+ drivers/spi/spi-mt65xx.c |   15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/pwm/pwm-berlin.c b/drivers/pwm/pwm-berlin.c
-index 6510812..a66b9ff 100644
---- a/drivers/pwm/pwm-berlin.c
-+++ b/drivers/pwm/pwm-berlin.c
-@@ -16,6 +16,7 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/pwm.h>
-+#include <linux/slab.h>
+diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
+index 6c1a96e..00a36da 100644
+--- a/drivers/spi/spi-mt65xx.c
++++ b/drivers/spi/spi-mt65xx.c
+@@ -607,7 +607,8 @@ static int mtk_spi_probe(struct platform_device *pdev)
+ 	ret = clk_set_parent(mdata->sel_clk, mdata->parent_clk);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "failed to clk_set_parent (%d)\n", ret);
+-		goto err_disable_clk;
++		clk_disable_unprepare(mdata->spi_clk);
++		goto err_put_master;
+ 	}
  
- #define BERLIN_PWM_EN			0x0
- #define  BERLIN_PWM_ENABLE		BIT(0)
-@@ -27,6 +28,15 @@
- #define BERLIN_PWM_TCNT			0xc
- #define  BERLIN_PWM_MAX_TCNT		65535
+ 	clk_disable_unprepare(mdata->spi_clk);
+@@ -617,7 +618,7 @@ static int mtk_spi_probe(struct platform_device *pdev)
+ 	ret = devm_spi_register_master(&pdev->dev, master);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "failed to register master (%d)\n", ret);
+-		goto err_put_master;
++		goto err_disable_runtime_pm;
+ 	}
  
-+#define NUM_PWM_CHANNEL			4	/* berlin PWM channels */
-+
-+struct berlin_pwm_channel {
-+	u32	enable;
-+	u32	ctrl;
-+	u32	duty;
-+	u32	tcnt;
-+};
-+
- struct berlin_pwm_chip {
- 	struct pwm_chip chip;
- 	struct clk *clk;
-@@ -55,6 +65,28 @@ static inline void berlin_pwm_writel(struct berlin_pwm_chip *chip,
- 	writel_relaxed(value, chip->base + channel * 0x10 + offset);
- }
+ 	if (mdata->dev_comp->need_pad_sel) {
+@@ -626,14 +627,14 @@ static int mtk_spi_probe(struct platform_device *pdev)
+ 				"pad_num does not match num_chipselect(%d != %d)\n",
+ 				mdata->pad_num, master->num_chipselect);
+ 			ret = -EINVAL;
+-			goto err_put_master;
++			goto err_disable_runtime_pm;
+ 		}
  
-+static int berlin_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm_dev)
-+{
-+	struct berlin_pwm_channel *chan;
-+
-+	if (pwm_dev->hwpwm >= NUM_PWM_CHANNEL)
-+		return -EINVAL;
-+
-+	chan = kzalloc(sizeof(*chan), GFP_KERNEL);
-+	if (!chan)
-+		return -ENOMEM;
-+
-+	return pwm_set_chip_data(pwm_dev, chan);
-+}
-+
-+static void berlin_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm_dev)
-+{
-+	struct berlin_pwm_channel *chan = pwm_get_chip_data(pwm_dev);
-+
-+	kfree(chan);
-+	pwm_set_chip_data(pwm_dev, NULL);
-+}
-+
- static int berlin_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm_dev,
- 			     int duty_ns, int period_ns)
- {
-@@ -137,6 +169,8 @@ static void berlin_pwm_disable(struct pwm_chip *chip,
- }
+ 		if (!master->cs_gpios && master->num_chipselect > 1) {
+ 			dev_err(&pdev->dev,
+ 				"cs_gpios not specified and num_chipselect > 1\n");
+ 			ret = -EINVAL;
+-			goto err_put_master;
++			goto err_disable_runtime_pm;
+ 		}
  
- static const struct pwm_ops berlin_pwm_ops = {
-+	.request = berlin_pwm_request,
-+	.free = berlin_pwm_free,
- 	.config = berlin_pwm_config,
- 	.set_polarity = berlin_pwm_set_polarity,
- 	.enable = berlin_pwm_enable,
-@@ -176,7 +210,7 @@ static int berlin_pwm_probe(struct platform_device *pdev)
- 	pwm->chip.dev = &pdev->dev;
- 	pwm->chip.ops = &berlin_pwm_ops;
- 	pwm->chip.base = -1;
--	pwm->chip.npwm = 4;
-+	pwm->chip.npwm = NUM_PWM_CHANNEL;
- 	pwm->chip.can_sleep = true;
- 	pwm->chip.of_xlate = of_pwm_xlate_with_flags;
- 	pwm->chip.of_pwm_n_cells = 3;
-@@ -204,12 +238,66 @@ static int berlin_pwm_remove(struct platform_device *pdev)
- 	return ret;
- }
+ 		if (master->cs_gpios) {
+@@ -644,7 +645,7 @@ static int mtk_spi_probe(struct platform_device *pdev)
+ 				if (ret) {
+ 					dev_err(&pdev->dev,
+ 						"can't get CS GPIO %i\n", i);
+-					goto err_put_master;
++					goto err_disable_runtime_pm;
+ 				}
+ 			}
+ 		}
+@@ -652,8 +653,8 @@ static int mtk_spi_probe(struct platform_device *pdev)
  
-+#ifdef CONFIG_PM_SLEEP
-+static int berlin_pwm_suspend(struct device *dev)
-+{
-+	unsigned int i;
-+	struct berlin_pwm_chip *pwm = dev_get_drvdata(dev);
-+
-+	for (i = 0; i < pwm->chip.npwm; i++) {
-+		struct pwm_device *pwm_dev = &pwm->chip.pwms[i];
-+		struct berlin_pwm_channel *chan = pwm_get_chip_data(pwm_dev);
-+
-+		if (!chan)
-+			continue;
-+
-+		chan->enable = berlin_pwm_readl(pwm, i, BERLIN_PWM_ENABLE);
-+		chan->ctrl = berlin_pwm_readl(pwm, i, BERLIN_PWM_CONTROL);
-+		chan->duty = berlin_pwm_readl(pwm, i, BERLIN_PWM_DUTY);
-+		chan->tcnt = berlin_pwm_readl(pwm, i, BERLIN_PWM_TCNT);
-+	}
-+	clk_disable_unprepare(pwm->clk);
-+
-+	return 0;
-+}
-+
-+static int berlin_pwm_resume(struct device *dev)
-+{
-+	int ret;
-+	unsigned int i;
-+	struct berlin_pwm_chip *pwm = dev_get_drvdata(dev);
-+
-+	ret = clk_prepare_enable(pwm->clk);
-+	if (ret)
-+		return ret;
-+
-+	for (i = 0; i < pwm->chip.npwm; i++) {
-+		struct pwm_device *pwm_dev = &pwm->chip.pwms[i];
-+		struct berlin_pwm_channel *chan = pwm_get_chip_data(pwm_dev);
-+
-+		if (!chan)
-+			continue;
-+
-+		berlin_pwm_writel(pwm, i, chan->ctrl, BERLIN_PWM_CONTROL);
-+		berlin_pwm_writel(pwm, i, chan->duty, BERLIN_PWM_DUTY);
-+		berlin_pwm_writel(pwm, i, chan->tcnt, BERLIN_PWM_TCNT);
-+		berlin_pwm_writel(pwm, i, chan->enable, BERLIN_PWM_ENABLE);
-+	}
-+
-+	return 0;
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(berlin_pwm_pm_ops, berlin_pwm_suspend,
-+			 berlin_pwm_resume);
-+
- static struct platform_driver berlin_pwm_driver = {
- 	.probe = berlin_pwm_probe,
- 	.remove = berlin_pwm_remove,
- 	.driver = {
- 		.name = "berlin-pwm",
- 		.of_match_table = berlin_pwm_match,
-+		.pm = &berlin_pwm_pm_ops,
- 	},
- };
- module_platform_driver(berlin_pwm_driver);
+ 	return 0;
+ 
+-err_disable_clk:
+-	clk_disable_unprepare(mdata->spi_clk);
++err_disable_runtime_pm:
++	pm_runtime_disable(&pdev->dev);
+ err_put_master:
+ 	spi_master_put(master);
+ 
 -- 
-2.6.2
+1.7.9.5
