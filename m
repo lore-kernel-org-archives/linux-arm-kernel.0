@@ -1,141 +1,72 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 25 Nov 2015 14:27:36 -0800
-Subject: [PATCH 1/2] ARM: dts: qcom: Remove size elements from pmic reg
- properties
-In-Reply-To: <1448490457-9799-1-git-send-email-sboyd@codeaurora.org>
-References: <1448490457-9799-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1448490457-9799-2-git-send-email-sboyd@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 25 Nov 2015 14:37:04 -0800
+Subject: [GIT PULL] omap fixes against v4.4-rc2
+Message-ID: <20151125223704.GV2517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The #size-cells for the pmics are 0, but we specify a size in the
-reg property so that MPP and GPIO modules can figure out how many
-pins there are. Now that we've done that by counting irqs, we can
-remove the size elements in the reg properties and be DT
-compliant.
+The following changes since commit 1ec218373b8ebda821aec00bb156a9c94fad9cd4:
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/boot/dts/qcom-pm8841.dtsi |  4 ++--
- arch/arm/boot/dts/qcom-pm8941.dtsi | 22 +++++++++++-----------
- 2 files changed, 13 insertions(+), 13 deletions(-)
+  Linux 4.4-rc2 (2015-11-22 16:45:59 -0800)
 
-diff --git a/arch/arm/boot/dts/qcom-pm8841.dtsi b/arch/arm/boot/dts/qcom-pm8841.dtsi
-index 9f357f68713c..0512f645922e 100644
---- a/arch/arm/boot/dts/qcom-pm8841.dtsi
-+++ b/arch/arm/boot/dts/qcom-pm8841.dtsi
-@@ -11,7 +11,7 @@
- 
- 		pm8841_mpps: mpps at a000 {
- 			compatible = "qcom,pm8841-mpp", "qcom,spmi-mpp";
--			reg = <0xa000 0x400>;
-+			reg = <0xa000>;
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupts = <4 0xa0 0 IRQ_TYPE_NONE>,
-@@ -22,7 +22,7 @@
- 
- 		temp-alarm at 2400 {
- 			compatible = "qcom,spmi-temp-alarm";
--			reg = <0x2400 0x100>;
-+			reg = <0x2400>;
- 			interrupts = <4 0x24 0 IRQ_TYPE_EDGE_RISING>;
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/qcom-pm8941.dtsi b/arch/arm/boot/dts/qcom-pm8941.dtsi
-index 64622bd251d1..3960b96273ec 100644
---- a/arch/arm/boot/dts/qcom-pm8941.dtsi
-+++ b/arch/arm/boot/dts/qcom-pm8941.dtsi
-@@ -12,15 +12,15 @@
- 
- 		rtc at 6000 {
- 			compatible = "qcom,pm8941-rtc";
--			reg = <0x6000 0x100>,
--			      <0x6100 0x100>;
-+			reg = <0x6000>,
-+			      <0x6100>;
- 			reg-names = "rtc", "alarm";
- 			interrupts = <0x0 0x61 0x1 IRQ_TYPE_EDGE_RISING>;
- 		};
- 
- 		pwrkey at 800 {
- 			compatible = "qcom,pm8941-pwrkey";
--			reg = <0x800 0x100>;
-+			reg = <0x800>;
- 			interrupts = <0x0 0x8 0 IRQ_TYPE_EDGE_BOTH>;
- 			debounce = <15625>;
- 			bias-pull-up;
-@@ -28,7 +28,7 @@
- 
- 		charger at 1000 {
- 			compatible = "qcom,pm8941-charger";
--			reg = <0x1000 0x700>;
-+			reg = <0x1000>;
- 			interrupts = <0x0 0x10 7 IRQ_TYPE_EDGE_BOTH>,
- 				     <0x0 0x10 5 IRQ_TYPE_EDGE_BOTH>,
- 				     <0x0 0x10 4 IRQ_TYPE_EDGE_BOTH>,
-@@ -49,7 +49,7 @@
- 
- 		pm8941_gpios: gpios at c000 {
- 			compatible = "qcom,pm8941-gpio", "qcom,spmi-gpio";
--			reg = <0xc000 0x2400>;
-+			reg = <0xc000>;
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupts = <0 0xc0 0 IRQ_TYPE_NONE>,
-@@ -92,7 +92,7 @@
- 
- 		pm8941_mpps: mpps at a000 {
- 			compatible = "qcom,pm8941-mpp", "qcom,spmi-mpp";
--			reg = <0xa000 0x800>;
-+			reg = <0xa000>;
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupts = <0 0xa0 0 IRQ_TYPE_NONE>,
-@@ -107,7 +107,7 @@
- 
- 		pm8941_temp: temp-alarm at 2400 {
- 			compatible = "qcom,spmi-temp-alarm";
--			reg = <0x2400 0x100>;
-+			reg = <0x2400>;
- 			interrupts = <0 0x24 0 IRQ_TYPE_EDGE_RISING>;
- 			io-channels = <&pm8941_vadc VADC_DIE_TEMP>;
- 			io-channel-names = "thermal";
-@@ -116,7 +116,7 @@
- 
- 		pm8941_vadc: vadc at 3100 {
- 			compatible = "qcom,spmi-vadc";
--			reg = <0x3100 0x100>;
-+			reg = <0x3100>;
- 			interrupts = <0x0 0x31 0x0 IRQ_TYPE_EDGE_RISING>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -141,14 +141,14 @@
- 
- 		pm8941_iadc: iadc at 3600 {
- 			compatible = "qcom,pm8941-iadc", "qcom,spmi-iadc";
--			reg = <0x3600 0x100>;
-+			reg = <0x3600>;
- 			interrupts = <0x0 0x36 0x0 IRQ_TYPE_EDGE_RISING>;
- 			qcom,external-resistor-micro-ohms = <10000>;
- 		};
- 
- 		coincell at 2800 {
- 			compatible = "qcom,pm8941-coincell";
--			reg = <0x2800 0x100>;
-+			reg = <0x2800>;
- 			status = "disabled";
- 		};
- 	};
-@@ -161,7 +161,7 @@
- 
- 		wled at d800 {
- 			compatible = "qcom,pm8941-wled";
--			reg = <0xd800 0x100>;
-+			reg = <0xd800>;
- 			label = "backlight";
- 
- 			qcom,cs-out;
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.4/fixes-rc2
+
+for you to fetch changes up to 918af9f941af9995fcaa7ef1eb67c433a492e2b3:
+
+  ARM: OMAP4+: SMP: use lockless clkdm/pwrdm api in omap4_boot_secondary (2015-11-25 11:03:20 -0800)
+
+----------------------------------------------------------------
+Fixes for omaps for v4.4-rc cycle:
+
+- A series of audio changes for dra7 that missed the merge window but turned
+  out to be necessary to fix a boot time imprecise external abort error and to
+  getaudio working
+
+- Fix l4 related boot time errors for dm81xx
+
+- Use lockless cldm/pwrdm api in omap4_boot_secondary
+
+- Remove t410 custom abort handler that is no longer needed and may
+  hide other critical errors
+
+- Mark cpuidle tracepoints as _rcuidle
+
+- Fix module alias for omap-ocp2scp
+
+----------------------------------------------------------------
+Axel Lin (1):
+      bus: omap-ocp2scp: Fix module alias
+
+Grygorii Strashko (1):
+      ARM: OMAP4+: SMP: use lockless clkdm/pwrdm api in omap4_boot_secondary
+
+Jisheng Zhang (1):
+      ARM: OMAP2+: PM: Denote the cpuidle tracepoints as _rcuidle()
+
+Lucas Stach (1):
+      ARM: OMAP2+: remove custom abort handler for t410
+
+Neil Armstrong (1):
+      arm: omap2+: add missing HWMOD_NO_IDLEST in 81xx hwmod data
+
+Peter Ujfalusi (3):
+      ARM: dts: dra7: Fix McASP3 node regarding to clocks
+      ARM: OMAP2+: hwmod: Add hwmod flag for HWMOD_OPT_CLKS_NEEDED
+      ARM: OMAP: DRA7: hwmod: Add data for McASP3
+
+Tony Lindgren (2):
+      Merge branch 'x15-audio-fixes' into omap-for-v4.4/fixes
+      Merge branch '81xx' into omap-for-v4.4/fixes
+
+ arch/arm/boot/dts/dra7.dtsi                |  4 +-
+ arch/arm/mach-omap2/omap-smp.c             |  6 +--
+ arch/arm/mach-omap2/omap_hwmod.c           | 66 ++++++++++++++++--------------
+ arch/arm/mach-omap2/omap_hwmod.h           |  3 ++
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c  | 56 +++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_81xx_data.c |  3 ++
+ arch/arm/mach-omap2/pdata-quirks.c         | 29 -------------
+ arch/arm/mach-omap2/pm34xx.c               |  4 +-
+ drivers/bus/omap-ocp2scp.c                 |  2 +-
+ 9 files changed, 106 insertions(+), 67 deletions(-)
