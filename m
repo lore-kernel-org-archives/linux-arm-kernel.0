@@ -1,70 +1,55 @@
-From: dcashman@android.com (Daniel Cashman)
-Date: Wed, 25 Nov 2015 11:32:53 -0800
-Subject: [PATCH v3 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
-In-Reply-To: <1448425601.3762.9.camel@ellerman.id.au>
-References: <1447888808-31571-1-git-send-email-dcashman@android.com>
- <1447888808-31571-2-git-send-email-dcashman@android.com>
- <1447888808-31571-3-git-send-email-dcashman@android.com>
- <1447888808-31571-4-git-send-email-dcashman@android.com>
- <20151123150459.GD4236@arm.com> <56536114.1020305@android.com>
- <1448425601.3762.9.camel@ellerman.id.au>
-Message-ID: <56560CE5.3020202@android.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 25 Nov 2015 11:33:26 -0800
+Subject: [PATCH 2/3] ARM: bcm2835: add rpi power domain driver
+In-Reply-To: <20151124210249.GA4270@omega>
+References: <1447956490-22930-1-git-send-email-alex.aring@gmail.com>
+ <1447956490-22930-3-git-send-email-alex.aring@gmail.com>
+ <CAPDyKFqiGe+E6WRELduZJoKwFRkgnFxBvPjEa3jX04EAC3vXrA@mail.gmail.com>
+ <20151124210249.GA4270@omega>
+Message-ID: <8737vt27sp.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/24/2015 08:26 PM, Michael Ellerman wrote:
-> On Mon, 2015-11-23 at 10:55 -0800, Daniel Cashman wrote:
->> On 11/23/2015 07:04 AM, Will Deacon wrote:
->>> On Wed, Nov 18, 2015 at 03:20:07PM -0800, Daniel Cashman wrote:
->>>> +config ARCH_MMAP_RND_BITS_MAX
->>>> +       default 20 if ARM64_64K_PAGES && ARCH_VA_BITS=39
->>>> +       default 24 if ARCH_VA_BITS=39
->>>> +       default 23 if ARM64_64K_PAGES && ARCH_VA_BITS=42
->>>> +       default 27 if ARCH_VA_BITS=42
->>>> +       default 29 if ARM64_64K_PAGES && ARCH_VA_BITS=48
->>>> +       default 33 if ARCH_VA_BITS=48
->>>> +       default 15 if ARM64_64K_PAGES
->>>> +       default 19
->>>> +
->>>> +config ARCH_MMAP_RND_COMPAT_BITS_MIN
->>>> +       default 7 if ARM64_64K_PAGES
->>>> +       default 11
->>>
->>> FYI: we now support 16k pages too, so this might need updating. It would
->>> be much nicer if this was somehow computed rather than have the results
->>> all open-coded like this.
->>
->> Yes, I ideally wanted this to be calculated based on the different page
->> options and VA_BITS (which itself has a similar stanza), but I don't
->> know how to do that/if it is currently supported in Kconfig. This would
->> be even more desirable with the addition of 16K_PAGES, as with this
->> setup we have a combinatorial problem.
->>
->> We could move this logic into the code where min/max are initialized,
->> but that would create its own mess, creating new Kconfig values to
->> introduce it in an arch-agnostic way after patch-set v2 moved that to
->> mm/mmap.c instead of arch/${arch}/mm/mmap.c Suggestions welcome.
-> 
-> 
-> Could we instead change the meaning of the mmap_rnd_bits value to be the number
-> of address space bits that may be randomised?
-> 
-> ie. 40 would mean "please randomise in a 1T range", which with PAGE_SIZE=4K
-> gives you 28 random bits. etc.
-> 
-> That would make the value independent of PAGE_SIZE, and only depend on the size
-> of the address space.
-> 
-> It would also mean the values userspace sets and sees don't need to change if the
-> kernel PAGE_SIZE changes. (which probably doesn't happen often but still)
+Alexander Aring <alex.aring@gmail.com> writes:
 
-This is an intriguing idea. It might actually be more meaningful to a
-sysadmin when weighing how high they're willing to go, since it makes
-the relation to the address space overall more apparent.  Though the
-cost would be more obvious, the benefit would become less-so, as the
-amount of entropy used, and thus expected brute-force requirements would
-be hidden.  I'll defer to Andrew Morton, as the maintainer, to make this
-decision as I think both approaches are valid.
+> Hi,
+>
+> On Tue, Nov 24, 2015 at 09:44:59PM +0100, Ulf Hansson wrote:
+>> [...]
+>> 
+>> > diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+>> > index 8c53c55..20479d7 100644
+>> > --- a/arch/arm/mach-bcm/Kconfig
+>> > +++ b/arch/arm/mach-bcm/Kconfig
+>> > @@ -134,6 +134,16 @@ config ARCH_BCM2835
+>> >           This enables support for the Broadcom BCM2835 SoC. This SoC is
+>> >           used in the Raspberry Pi and Roku 2 devices.
+>> >
+>> > +config RASPBERRYPI_POWER
+>> 
+>> You don't need a new Kconfig option I think. If you fold in the below
+>> "select" under ARCH_BCM2835, that should work as well, right?
+>> 
+>> select PM_GENERIC_DOMAINS if (RASPBERRYPI_FIRMWARE && PM && OF)
+>> 
+>
+> I think this depends on what the maintainers like to have here.
+>
+> The raspberrypi firmware isn't BCM2835 specific, when some SoC which is
+> BCM2835 and enabled the RASPBERRYPI_FIRMWARE (for what reason ever) it will
+> enable also the power domain driver for the RPi.
+>
+> When some BCM2835 enable it, then it will do nothing because the
+> devicetree entries should not match then.
 
-Thank You,
-Dan
+As far as I'm concerned, using the firmware is a stopgap to get other
+drivers working, until we can get a native power domain driver written.
+I think it makes sense for this code to be under its own menu entry, so
+it can be flipped back off when we get the real thing in place.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151125/5a5f0a62/attachment.sig>
