@@ -1,35 +1,19 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 25 Nov 2015 14:25:10 -0600
-Subject: [PATCH v6 1/6] of: add vendor prefix for Technologic Systems
-In-Reply-To: <1448479507-1951-2-git-send-email-damien.riegel@savoirfairelinux.com>
-References: <1448479507-1951-1-git-send-email-damien.riegel@savoirfairelinux.com>
- <1448479507-1951-2-git-send-email-damien.riegel@savoirfairelinux.com>
-Message-ID: <20151125202510.GA9765@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 25 Nov 2015 21:28:43 +0100
+Subject: [PATCH v2] ARM: davinci: fix a problematic usage of WARN()
+In-Reply-To: <201511260435.1AHQOCP1%fengguang.wu@intel.com>
+References: <201511260435.1AHQOCP1%fengguang.wu@intel.com>
+Message-ID: <19146462.9tlorCPL8k@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 02:25:02PM -0500, Damien Riegel wrote:
-> Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-
-Acked-by: Rob Herring <robh@kernel.org>
-
-> ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
+On Thursday 26 November 2015 04:21:09 kbuild test robot wrote:
+>    386          aemif = clk_get(&dm355evm_dm9000.dev, "aemif");
+>  > 387          if (!WARN(IS_ERR(aemif)), "unable to get AEMIF clock\n"))
+>    388                  clk_prepare_enable(aemif);
+>    389  
 > 
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 82d2ac9..d3a206d 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -215,6 +215,7 @@ stericsson	ST-Ericsson
->  synology	Synology, Inc.
->  tbs	TBS Technologies
->  tcl	Toby Churchill Ltd.
-> +technologic	Technologic Systems
->  thine	THine Electronics, Inc.
->  ti	Texas Instruments
->  tlm	Trusted Logic Mobility
-> -- 
-> 2.5.0
-> 
+
+That is an extra ')' after aemif.
+
+	Arnd
