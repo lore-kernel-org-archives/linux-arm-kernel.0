@@ -1,80 +1,76 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 24 Nov 2015 16:06:00 -0800
-Subject: [PATCH RESEND v2 0/4] SMP support for Broadcom NSP
-In-Reply-To: <1446839371-22601-1-git-send-email-kapilh@broadcom.com>
-References: <1446839371-22601-1-git-send-email-kapilh@broadcom.com>
-Message-ID: <5654FB68.60007@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 24 Nov 2015 18:07:27 -0600
+Subject: [RESEND v4 1/6] remoteproc: dt: Provide bindings for ST's Remote
+ Processor Controller driver
+In-Reply-To: <1448370862-19120-2-git-send-email-lee.jones@linaro.org>
+References: <1448370862-19120-1-git-send-email-lee.jones@linaro.org>
+ <1448370862-19120-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <20151125000727.GA26709@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/15 11:49, Kapil Hali wrote:
-> This is the second iteration in the series.
-> 
-> Changes in v2:
-> Removed the pen_holding method of SMP bringup for NSP SoC and
-> replaced it with simple wakeup of secondary core using ARM IPI.
-> 
-> 
-> This series adds SMP support for Broadcom's Northstar Plus SoC.
-> 
-> There are similar SMP enablement methods for many ARMv7 bsed SoCs.
-> BCM NSP SoC, has a typical such mechanism - after power-on, the
-> secondary core is held in a standby state, primary core provides a
-> startup address for the secondary core and wakes it up. Booting of
-> the secondary core is serialized using pen_release global variable.
-> 
-> The startup address is programmed at a special register location
-> which is defined in the device tree using a "secondary-boot-reg"
-> property in a node whose "enable-method" property matches.
-> 
-> The first patch adds cpu-enable-method in the device tree bindings
-> documentation. It also updates ARM CPU device tree documentation
-> with Broadcom Northstar Plus CPU details.
-> 
-> The second patch adds SMP support to the BCM NSP device tree file.
-> 
-> The third patch, enables SMP on BCM NSP. It also consolidates
-> common SMP handling between BCM NSP and BCM Kona.
-> 
-> The final patch, enables SMP on BCM 4708 and this patch is pulled
-> in from Jon Mason's patch from the mailing list.
-> 
-> This patch series is constructed based on Linux v4.3-rc2.
-> 
-> The source code is available at GITHUB:
-> https://github.com/Broadcom/cygnus-linux/tree/nsp-smp-v1
+On Tue, Nov 24, 2015 at 01:14:17PM +0000, Lee Jones wrote:
+> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  .../devicetree/bindings/remoteproc/st-rproc.txt    | 41 ++++++++++++++++++++++
 
-Kapil, were there additional changes requested for this patch series to
-be applied? The secondary-boot-reg property should probably be made part
-of the CPU node, even though you are strictly following the existing
-Kona SMP binding here (which was partially wrong on that subject).
+Acked-by: Rob Herring <robh@kernel.org>
 
-Could you resubmit these patches if there is anything that needs
-changing? Thanks!
-
+>  1 file changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/remoteproc/st-rproc.txt
 > 
-> Jon Mason (1):
->   ARM: BCM: Add SMP support for Broadcom 4708
+> diff --git a/Documentation/devicetree/bindings/remoteproc/st-rproc.txt b/Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+> new file mode 100644
+> index 0000000..1031bcd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/remoteproc/st-rproc.txt
+> @@ -0,0 +1,41 @@
+> +STMicroelectronics Co-Processor Bindings
+> +----------------------------------------
+> +
+> +This binding provides support for adjunct processors found on ST SoCs.
+> +
+> +Co-processors can be controlled from the bootloader or the primary OS. If
+> +the bootloader starts a co-processor, the primary OS must detect its state
+> +and act accordingly.
+> +
+> +Required properties:
+> +- compatible		Should be one of:
+> +				"st,st231-rproc"
+> +				"st,st40-rproc"
+> +- memory-region		Reserved memory (See: ../reserved-memory/reserved-memory.txt)
+> +- resets		Reset lines (See: ../reset/reset.txt)
+> +- reset-names		Must be "sw_reset" and "pwr_reset"
+> +- clocks		Clock for co-processor (See: ../clock/clock-bindings.txt)
+> +- clock-frequency	Clock frequency to set co-processor at if the bootloader
+> +			hasn't already done so
+> +- st,syscfg		System configuration register which holds the boot vector
+> +			for the co-processor
+> +				1st cell: Phandle to syscon block
+> +				2nd cell: Boot vector register offset
+> +
+> +Example:
+> +
+> +	audio_reserved: rproc at 42000000 {
+> +		compatible = "shared-dma-pool";
+> +		reg = <0x42000000 0x01000000>;
+> +		no-map;
+> +	};
+> +
+> +	st231-audio {
+> +		compatible	= "st,st231-rproc";
+> +		memory-region	= <&audio_reserved>;
+> +		resets		= <&softreset STIH407_ST231_AUD_SOFTRESET>;
+> +		reset-names	= "sw_reset";
+> +		clocks		= <&clk_s_c0_flexgen CLK_ST231_AUD_0>;
+> +		clock-frequency	= <600000000>;
+> +		st,syscfg	= <&syscfg_core 0x228>;
+> +	};
+> -- 
+> 1.9.1
 > 
-> Kapil Hali (3):
->   dt-bindings: add SMP enable-method for Broadcom NSP
->   ARM: dts: add SMP support for Broadcom NSP
->   ARM: BCM: Add SMP support for Broadcom NSP
-> 
->  .../bindings/arm/bcm/brcm,nsp-cpu-method.txt       | 36 +++++++++
->  Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
->  arch/arm/boot/dts/bcm-nsp.dtsi                     | 33 ++++++---
->  arch/arm/boot/dts/bcm4708.dtsi                     |  2 +
->  arch/arm/mach-bcm/Kconfig                          |  3 +
->  arch/arm/mach-bcm/Makefile                         | 11 ++-
->  arch/arm/mach-bcm/bcm_nsp.h                        | 19 +++++
->  arch/arm/mach-bcm/{kona_smp.c => platsmp.c}        | 85 +++++++++++++++++++---
->  8 files changed, 167 insertions(+), 23 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
->  create mode 100644 arch/arm/mach-bcm/bcm_nsp.h
->  rename arch/arm/mach-bcm/{kona_smp.c => platsmp.c} (75%)
-> 
-
-
--- 
-Florian
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
