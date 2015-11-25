@@ -1,32 +1,26 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Wed, 25 Nov 2015 08:17:36 -0800
-Subject: KASAN failures in X-Gene ethernet driver in v4.4-rc2
-In-Reply-To: <20151125155753.GE12434@leverpostej>
-References: <20151125155753.GE12434@leverpostej>
-Message-ID: <1448468256.24696.5.camel@edumazet-glaptop2.roam.corp.google.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 25 Nov 2015 16:31:14 +0000
+Subject: [PATCH 00/10] ARM: s3c64xx multiplatform
+In-Reply-To: <1448467615-447097-1-git-send-email-arnd@arndb.de>
+References: <1448467615-447097-1-git-send-email-arnd@arndb.de>
+Message-ID: <20151125163114.GV1929@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-11-25 at 15:59 +0000, Mark Rutland wrote:
-> xgene_enet_start_xmit
+On Wed, Nov 25, 2015 at 05:06:45PM +0100, Arnd Bergmann wrote:
+> I've posted the series before and we got a few people to test it
+> the last time, though I think the touchscreen portion is still
+> untested.
+> 
+> I'd really like to get this merged for 4.5 and would put it into
+> a next/multiplatform branch unless there are any objections
+> or concerns.
 
-Please try following trivial fix
-
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-index 1adfe7036843..9147a0107c44 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-@@ -450,12 +450,12 @@ static netdev_tx_t xgene_enet_start_xmit(struct sk_buff *skb,
- 		return NETDEV_TX_OK;
- 	}
- 
--	pdata->ring_ops->wr_cmd(tx_ring, count);
- 	skb_tx_timestamp(skb);
- 
- 	pdata->stats.tx_packets++;
- 	pdata->stats.tx_bytes += skb->len;
- 
-+	pdata->ring_ops->wr_cmd(tx_ring, count);
- 	return NETDEV_TX_OK;
- }
- 
+Is this a series with interdependencies or just a set of separate fixes?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151125/e2a64086/attachment.sig>
