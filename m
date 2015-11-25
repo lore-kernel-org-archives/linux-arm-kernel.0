@@ -1,86 +1,32 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 25 Nov 2015 14:51:06 +0000
-Subject: [RFC PATCH 02/10] clockevents/drivers: add MPS2 Timer driver
-In-Reply-To: <5655BA34.9040207@linaro.org>
-References: <1448447621-17900-1-git-send-email-vladimir.murzin@arm.com>
- <1448447621-17900-3-git-send-email-vladimir.murzin@arm.com>
- <5655BA34.9040207@linaro.org>
-Message-ID: <5655CADA.1010803@arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 25 Nov 2015 09:54:05 -0500 (EST)
+Subject: [PATCH] ARM: mach-orion5x: fix legacy get_irqnr_and_base
+In-Reply-To: <20151125144545.GA6520@io.lakedaemon.net>
+References: <alpine.LFD.2.20.1511222240150.22569@knanqh.ubzr>
+ <20151125144545.GA6520@io.lakedaemon.net>
+Message-ID: <alpine.LFD.2.20.1511250948470.22569@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Wed, 25 Nov 2015, Jason Cooper wrote:
 
-Thanks for you review, I agree on all concerns raised and address them
-in the next version. Just some points to confirm below (I left only
-relevant parts).
-
->> +static irqreturn_t mps2_timer_interrupt(int irq, void *dev_id)
->> +{
->> +    struct clockevent_mps2 *ce = dev_id;
->> +    u32 status = readl(ce->reg + TIMER_INT);
->> +
->> +    if (!status)
->> +        return IRQ_NONE;
+> On Sun, Nov 22, 2015 at 10:44:19PM -0500, Nicolas Pitre wrote:
+> > Commit 5be9fc23cd ("ARM: orion5x: fix legacy orion5x IRQ numbers") shifted
+> > IRQ numbers by one but didn't update the get_irqnr_and_base macro
+> > accordingly.  This macro is involved when CONFIG_MULTI_IRQ_HANDLER
+> > is not defined.
+> > 
+> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
 > 
-> Why that could happen ? Add a comment.
-> 
+> Applied to mvebu/fixes with minor tweak to the subject line and Cc's to
+> stable back to v4.2.
 
-Sort of defensive programming, I never seen it happens, but just in case
-of spurious interrupts... Do you prefer to get rid of this check or
+Note that the patch this provides a fix for was introduced in v4.2, but 
+it itself was marked for stable. So if commit 5be9fc23cd was backported 
+back to v3.18 then this patch should also be backported to the same 
+stable versions.
 
-    /* spurious interrupt? */
-    if (!status)
-        return IRQ_NONE;
+Same thing for the Dove variant.
 
-would be fine to you?
 
->> +}
->> +
->> +static void __init mps2_timer_init(struct device_node *np)
->> +{
->> +    static int clksrc;
->> +
->> +    if (!clksrc && !mps2_clocksource_init(np))
->> +        clksrc = 1;
->> +    else
->> +        mps2_clockevents_init(np);
-> 
-> That assumes the clocksource is defined before the clockevents in the
-> DT. If it is not the case, the mps2_clocksource_init will fail (and spit
-> errors) and mps2_clockevents_init() won't be called.
-> 
-
-Does following (stolen from efm32) look better to you?
-
-static void __init mps2_timer_init(struct device_node *np)
-{
-	static int has_clocksource, has_clockevent;
-	int ret;
-
-	if (!has_clocksource) {
-		ret = mps2_clocksource_init(np);
-		if (!ret) {
-			has_clocksource = 1;
-			return;
-		}
-	}
-
-	if (!has_clockevent) {
-		ret = mps2_clockevent_init(np);
-		if (!ret) {
-			has_clockevent = 1;
-			return;
-		}
-	}
-}
-
-Thanks
-Vladimir
-
->> +}
->> +
->> +CLOCKSOURCE_OF_DECLARE(mps2_timer, "arm,mps2-timer", mps2_timer_init);
->>
-> 
-> 
+Nicolas
