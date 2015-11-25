@@ -1,138 +1,71 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 25 Nov 2015 19:35:32 +0100
-Subject: [PATCH 04/13] net: mvneta: enable suspend/resume support
-In-Reply-To: <1448178839-3541-5-git-send-email-mw@semihalf.com> (Marcin
- Wojtas's message of "Sun, 22 Nov 2015 08:53:50 +0100")
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 25 Nov 2015 10:34:30 -0800
+Subject: [PATCH 00/13] mvneta Buffer Management and enhancements
+In-Reply-To: <1448178839-3541-1-git-send-email-mw@semihalf.com>
 References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
- <1448178839-3541-5-git-send-email-mw@semihalf.com>
-Message-ID: <87k2p67wqz.fsf@free-electrons.com>
+Message-ID: <5655FF36.20202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
- 
- On dim., nov. 22 2015, Marcin Wojtas <mw@semihalf.com> wrote:
+On 21/11/15 23:53, Marcin Wojtas wrote:
+> 
+> 4. Buffer manager (BM) support with two preparatory commits. As it is a
+> separate block, common for all network ports, a new driver is introduced,
+> which configures it and exposes API to the main network driver. It is
+> throughly described in binding documentation and commit log. Please note,
+> that enabling per-port BM usage is done using phandle and the data passed
+> in mvneta_bm_probe. It is designed for usage of on-demand device probe
+> and dev_set/get_drvdata, however it's awaiting merge to linux-next.
+> Therefore, deferring probe is not used - if something goes wrong (same
+> in case of errors during changing MTU or suspend/resume cycle) mvneta
+> driver falls back to software buffer management and works in a regular way.
 
-> This commit introduces suspend/resume routines used for both in 'standby'
-> and 'mem' modes. For the latter, in which registers' contents are lost,
-> following steps are performed:
-> * in suspend - update port statistics and, if interface is running,
->   detach netif, clean the queues, disable cpu notifier, shutdown
->   interface and reset port's link status;
-> * in resume, for all interfaces, set default configuration of the port and
->   MBUS windows;
-> * in resume, in case the interface is running, enable accepting packets in
->   legacy parser, power up the port, register cpu notifier and attach
-> netif.
+Looking at your patches, it was not entirely clear to me how the buffer
+manager on these Marvell SoCs work, but other networking products have
+something similar, like Broadcom's Cable Modem SoCs (BCM33xx) FPM, and
+maybe Freescale's FMAN/DPAA seems to do something similar.
 
-I don't have the hardware to use suspend to RAM on Armada XP but at
-least in standby the network continue to work on wakeup.
+Does the buffer manager allocation work by giving you a reference/token
+to a buffer as opposed to its address? If that is the case, it would be
+good to design support for such hardware in a way that it can be used by
+more drivers.
 
->
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-> ---
->  drivers/net/ethernet/marvell/mvneta.c | 70 +++++++++++++++++++++++++++++++++++
->  1 file changed, 70 insertions(+)
->
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index d12b8c6..f079b13 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> @@ -3442,6 +3442,72 @@ static int mvneta_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_PM_SLEEP
-> +static int mvneta_suspend(struct platform_device *pdev, pm_message_t state)
-> +{
-> +	struct net_device *dev = platform_get_drvdata(pdev);
-> +	struct mvneta_port *pp = netdev_priv(dev);
-> +
-> +	mvneta_ethtool_update_stats(pp);
-> +
-> +	if (!netif_running(dev))
-> +		return 0;
-> +
-> +	netif_device_detach(dev);
-> +
-> +	mvneta_stop_dev(pp);
-> +	unregister_cpu_notifier(&pp->cpu_notifier);
-> +	mvneta_cleanup_rxqs(pp);
-> +	mvneta_cleanup_txqs(pp);
-> +
-> +	/* Reset link status */
-> +	pp->link = 0;
-> +	pp->duplex = -1;
-> +	pp->speed = 0;
-> +
+Eric Dumazet suggested a while ago to me that you could get abstract
+such allocation using hardware-assisted buffer allocation by either
+introducing a new mm zone (instead of ZONE_NORMAL/DMA/HIGHMEM etc.), or
+using a different NUMA node id, such that SKB allocation and freeing
+helpers could deal with the specifics, and your networking stack and
+driver would be mostly unaware of the buffer manager underlying
+implementation. The purpose would be to get a 'struct page' reference to
+your buffer pool allocation object, so it becomes mostly transparent to
+other areas of the kernel, and you could further specialize everything
+that needs to be based on this node id or zone.
 
-Would it be possible to add a kind of mvneta_port_power_down(pp,
-pp->phy_interface) here ? It would allow to save power in standby mode
-too.
+Finally, these hardware-assisted allocation schemes typically work very
+well when there is a forwarding/routing workload involved, because you
+can easily steal packets and SKBs from the network stack, but that does
+not necessarily play nicely with host-terminated/initiated traffic which
+wants to have good feedback on what's happening at the NIC level
+(queueing, buffering, etc.).
 
-> +	return 0;
-> +}
-> +
-> +static int mvneta_resume(struct platform_device *pdev)
-> +{
-> +	const struct mbus_dram_target_info *dram_target_info;
-> +	struct net_device *dev = platform_get_drvdata(pdev);
-> +	struct mvneta_port *pp = netdev_priv(dev);
-> +	int ret;
-> +
-> +	mvneta_defaults_set(pp);
-> +	mvneta_port_power_up(pp, pp->phy_interface);
-> +
-> +	dram_target_info = mv_mbus_dram_info();
-> +	if (dram_target_info)
-> +		mvneta_conf_mbus_windows(pp, dram_target_info);
-> +
-> +	if (!netif_running(dev))
-> +		return 0;
-> +
-> +	ret = mvneta_setup_rxqs(pp);
-> +	if (ret) {
-> +		netdev_err(dev, "unable to setup rxqs after resume\n");
-> +		return ret;
-> +	}
-> +
-> +	ret = mvneta_setup_txqs(pp);
-> +	if (ret) {
-> +		netdev_err(dev, "unable to setup txqs after resume\n");
-> +		return ret;
-> +	}
-> +
-> +	mvneta_set_rx_mode(dev);
-> +	mvneta_percpu_elect(pp);
-> +	register_cpu_notifier(&pp->cpu_notifier);
-> +	mvneta_start_dev(pp);
-> +
-> +	netif_device_attach(dev);
-> +
-> +	return 0;
-> +}
-> +#endif /* CONFIG_PM_SLEEP */
-> +
->  static const struct of_device_id mvneta_match[] = {
->  	{ .compatible = "marvell,armada-370-neta" },
->  	{ .compatible = "marvell,armada-xp-neta" },
-> @@ -3452,6 +3518,10 @@ MODULE_DEVICE_TABLE(of, mvneta_match);
->  static struct platform_driver mvneta_driver = {
->  	.probe = mvneta_probe,
->  	.remove = mvneta_remove,
-> +#ifdef CONFIG_PM_SLEEP
-> +	.suspend = mvneta_suspend,
-> +	.resume = mvneta_resume,
-> +#endif
->  	.driver = {
->  		.name = MVNETA_DRIVER_NAME,
->  		.of_match_table = mvneta_match,
-> -- 
-> 1.8.3.1
->
+> 
+> Known issues:
+> - problems with obtaining all mapped buffers from internal SRAM, when
+> destroying the buffer pointer pool
+> - problems with unmapping chunk of SRAM during driver removal
+> Above do not have an impact on the operation, as they are called during
+> driver removal or in error path.
 
+Humm, what is the reason for using the on-chip SRAM here, is it because
+that's the only storage location the Buffer Manager can allocate from,
+or is it because it is presumably faster or with constant access times
+than DRAM? Would be nice to explain a bit more in details how the buffer
+manager works and its interfacing with the network controllers.
+
+Can I use the buffer manager with other peripherals as well? Like if I
+wanted to do zero-copy or hardware-assisted memcpy DMA, would that be a
+suitable scheme?
+
+Thanks!
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Florian
