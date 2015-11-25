@@ -1,74 +1,53 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 25 Nov 2015 14:56:10 +0100
-Subject: [PATCH 1/2] drivers: amba: properly handle devices with power
- domains
-In-Reply-To: <5655B8F6.1070104@samsung.com>
-References: <1448456127-31842-1-git-send-email-m.szyprowski@samsung.com>
- <1448456289-31960-1-git-send-email-m.szyprowski@samsung.com>
- <20151125132458.GL8644@n2100.arm.linux.org.uk>
- <5655B8F6.1070104@samsung.com>
-Message-ID: <CAPDyKFqTqPijF+Lbq0+a-Gv8CyaAr13JvZPjUN1-GNL5i3-mAw@mail.gmail.com>
+From: jon.nettleton@gmail.com (Jon Nettleton)
+Date: Wed, 25 Nov 2015 15:06:04 +0100
+Subject: [PATCH] ARM: avoid SMP DT initialisation on UP-only capable
+ systems
+In-Reply-To: <20151125125634.GK8644@n2100.arm.linux.org.uk>
+References: <E1a1XXS-00060O-GS@rmk-PC.arm.linux.org.uk>
+ <20151125113538.GB12434@leverpostej>
+ <20151125114908.GI8644@n2100.arm.linux.org.uk>
+ <1448455831.3689.55.camel@pengutronix.de>
+ <20151125125634.GK8644@n2100.arm.linux.org.uk>
+Message-ID: <CALHpu34Big-4CKbLvS4pyf8=t_Gkw7=_p83FU24s2AJyJMAiug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 November 2015 at 14:34, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> Hello,
+On Wed, Nov 25, 2015 at 1:56 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Nov 25, 2015 at 01:50:31PM +0100, Lucas Stach wrote:
+>> What we do in barebox is to look into the SCU to find out how many CPU
+>> cores are actually present and fix up the DT passed to the kernel
+>> accordingly by deleting any superfluous CPU nodes. This satisfies both
+>> the need to keep the required DT source files to a minimum, while also
+>> providing correct information to the kernel.
 >
-> On 2015-11-25 14:24, Russell King - ARM Linux wrote:
->>
->> On Wed, Nov 25, 2015 at 01:58:09PM +0100, Marek Szyprowski wrote:
->>>
->>> To read pid/cid registers, the probed device need to be properly turned
->>> on.
->>> When it is inside a power domain, the bus code should ensure that the
->>> given power domain is enabled before trying to access device's registers.
->>>
->>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>> ---
->>>   drivers/amba/bus.c | 7 +++++++
->>>   1 file changed, 7 insertions(+)
->>>
->>> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
->>> index f009936..25715cb 100644
->>> --- a/drivers/amba/bus.c
->>> +++ b/drivers/amba/bus.c
->>> @@ -373,6 +373,12 @@ int amba_device_add(struct amba_device *dev, struct
->>> resource *parent)
->>>                 goto err_release;
->>>         }
->>>   +     ret = dev_pm_domain_attach(&dev->dev, true);
->>> +       if (ret) {
->>> +               iounmap(tmp);
->>> +               goto err_release;
->>> +       }
->>> +
->>
->> NAK.  If dev_pm_domain_attach() returns an error, even -EPROBE_DEFER,
->> the result will be a missing device that has no way to be recovered.
->> This is too fragile.
-
-I agree with Russell here, this isn't going to work.
-
+> ... which is a function of the boot loader, but not all boot loaders
+> do this.  So, if we're using u-boot, what option do we have?
 >
+> I've never been able to successfully build and boot uboot myself (it
+> always fails one way or another with my toolchains - if I get it to
+> link, it silently fails on the hardware, but if someone else builds
+> it for me from exactly the same source, it works fine) so count me
+> out of fixing uboot in this regard.
 >
-> Then how the problem of accessing registers in turned-off device should be
-> solved?
+> Note that it's not that the kernel doesn't work, it's just that people
+> are complaining that they see warnings from the kernel during their
+> boot.  So, unless we're going to start providing iMX6S and iMX6D
+> specific DT blobs (which will double the number of .dtb files we end
+> up with on iMX6), I think we're stuck with users complaining about
+> this.
 
-The long term solution has been discussed [1], please have a look and
-feel free to hack on it if you like. If not, I will sooner or later
-find time to pick up the work I have started, but can't give you any
-promises when ready.
+I have been looking into doing some of this cleanup in u-boot
+recently.  More and more this seems like a hack because the
+device-tree descriptions belong to the kernel.  If the bootloader
+isn't generating them it seems counter intuitive that it should be
+responsible for altering them so the kernel doesn't complain about
+incorrect hardware configuration.  It seems as though device-tree
+could benefit from some logic definitions that could load device-tree
+snippets or overlays depending on the hardware that is probed.
 
->
-> Is ignoring dev_pm_domain_attach() return value a solution for you?
+Or in the case of SR hardware we just generate 24 device tree files
+and push this probing back into each bootloader  implementation to
+detect and load accordingly.
 
-That's probably better than nothing, but I wonder if it in practice
-will have any effect? It requires the PM domain to be initialized (and
-having a DT provider for it) before you register the AMBA device, is
-that so in your case?
-
-Kind regards
-Uffe
-
-[1]
-http://comments.gmane.org/gmane.linux.kernel.mmc/32587
+-Jon
