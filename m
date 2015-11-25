@@ -1,10 +1,10 @@
 From: cory.tusar@pid1solutions.com (Cory Tusar)
-Date: Wed, 25 Nov 2015 00:41:22 -0500
-Subject: [PATCH 3/4] ARM: dts: vf610-cosmic: relicense vf610-cosmic.dts
- under GPLv2/X11
-In-Reply-To: <1448323291-23505-1-git-send-email-stefan@agner.ch>
-References: <1448323291-23505-1-git-send-email-stefan@agner.ch>
-Message-ID: <56554A02.8080202@pid1solutions.com>
+Date: Wed, 25 Nov 2015 00:42:49 -0500
+Subject: [PATCH 4/4] ARM: dts: vf610-twr: relicense vf610-twr.dts under
+ GPLv2/X11
+In-Reply-To: <1448323302-23563-1-git-send-email-stefan@agner.ch>
+References: <1448323302-23563-1-git-send-email-stefan@agner.ch>
+Message-ID: <56554A59.1010306@pid1solutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,15 +19,19 @@ On 11/23/2015 07:01 PM, Stefan Agner wrote:
 > uses, so relicense the vf610-twr.dts file to this combination.
 > 
 > CCs were acquired using (updated some email addresses):
-> git shortlog -sne --no-merges arch/arm/boot/dts/vf610-cosmic.dts
+> git shortlog -sne --no-merges arch/arm/boot/dts/vf610-twr.dts
 > 
+> CC: Bill Pringlemeir <bpringle@sympatico.ca>
+> CC: Chao Fu <B44548@freescale.com>
 > CC: Cory Tusar <cory.tusar@pid1solutions.com>
 
 Acked-by: Cory Tusar <cory.tusar@pid1solutions.com>
 
-> CC: Matt Porter <matt.porter@linaro.org>
-> CC: Olof Johansson <olof@lixom.net>
+> CC: Cosmin Stoica <cosminstefan.stoica@freescale.com>
+> CC: Fugang Duan <B38611@freescale.com>
+> CC: Jingchang Lu <b35083@freescale.com>
 > CC: Shawn Guo <shawnguo@kernel.org>
+> CC: Xiubo Li <Li.Xiubo@freescale.com>
 > Signed-off-by: Stefan Agner <stefan@agner.ch>
 
 
@@ -45,7 +49,7 @@ PID 1 Solutions, Inc.
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v2
 
-iEYEARECAAYFAlZVSgIACgkQHT1tsfGwHJ8+WgCgpIksiDYnrAinLzsEv11cl5Ez
-Hb4An1Bm9qpykikhgs+BDjuNiDp7KDC/
-=8817
+iEYEARECAAYFAlZVSlkACgkQHT1tsfGwHJ8KNwCfZ447EX1WDTNHtozjnAMJH9SP
+y8wAoJDqarHEEUSSYvRQzEln0R6aaNMK
+=tTfg
 -----END PGP SIGNATURE-----
