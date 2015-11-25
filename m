@@ -1,63 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Nov 2015 18:45:57 +0000
-Subject: Building an uImage with appended DTB
-In-Reply-To: <CACxGe6t0RD-z=duiP+=sbWm_JY7_OjjTmBL7jLZRRuLBSMan6g@mail.gmail.com>
-References: <5655DED0.5000601@free.fr>
- <CACxGe6t0RD-z=duiP+=sbWm_JY7_OjjTmBL7jLZRRuLBSMan6g@mail.gmail.com>
-Message-ID: <20151125184556.GP8644@n2100.arm.linux.org.uk>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Wed, 25 Nov 2015 10:54:08 -0800
+Subject: [PATCH v2 2/2] restrict /dev/mem to idle io memory ranges
+In-Reply-To: <CAPcyv4jtWocaoocfzvpHgR=0mg0GPo7-nBrzkARQpTz6=oAupg@mail.gmail.com>
+References: <20151124000553.26360.57819.stgit@dwillia2-desk3.jf.intel.com>
+ <20151124000604.26360.56945.stgit@dwillia2-desk3.jf.intel.com>
+ <20151124142521.e6d23e44a8b2c24c044c2dec@linux-foundation.org>
+ <CAPcyv4ijWns879DytqUa+=r5hzQ1qzmB83VV6Z16kQNtmHUtbA@mail.gmail.com>
+ <20151124164711.0cb9ecdbba2fc729273f3240@linux-foundation.org>
+ <CAPcyv4jtWocaoocfzvpHgR=0mg0GPo7-nBrzkARQpTz6=oAupg@mail.gmail.com>
+Message-ID: <CAPcyv4ieSjx=ROm2t6ABXmgP-YEOq7MZFCMoyiMU02x49BXN9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 04:38:35PM +0000, Grant Likely wrote:
-> On Wed, Nov 25, 2015 at 4:16 PM, Mason <slash.tmp@free.fr> wrote:
-> > Hello,
-> >
-> > Per Russell's advice (IIRC) I have a script to generate a uImage
-> > of a kernel with an appended DTB:
-> >
-> > export LOADADDR=0x80008000
-> > MAKE="make -j2 ARCH=arm"
-> > $MAKE dtbs zImage && \
-> > cat arch/arm/boot/zImage arch/arm/boot/dts/tango4-vantage-1172.dtb >zImage.tmp && \
-> > mv zImage.tmp arch/arm/boot/zImage && \
-> > $MAKE uImage
-> >
-> > Russell's version uses an explicit mkimage instead of "MAKE uImage"
-> > perhaps in part to get around the following limitation:
-> >
-> > if there is nothing to be done, cat+mv will update arch/arm/boot/zImage
-> > thus the uImage will be rebuilt even when it's not necessary.
-> >
-> > Doesn't the top-level Makefile support a target to build a uImage
-> > with appended DTB?
-> >
-> > (I suppose someone has submitted a patch for that. Was it perhaps
-> > never merged? Or did I just miss the feature?)
-> 
-> I don't remember what happened there. That was a long time ago. I
-> think it got nacked, but cannot remember the reason.
+On Tue, Nov 24, 2015 at 5:28 PM, Dan Williams <dan.j.williams@intel.com> wrote:
+> On Tue, Nov 24, 2015 at 4:47 PM, Andrew Morton
+> <akpm@linux-foundation.org> wrote:
+>> On Tue, 24 Nov 2015 16:34:19 -0800 Dan Williams <dan.j.williams@intel.com> wrote:
+>>
+>>> > IOW, a very good description of the problem-being-solved would help out
+>>> > a lot here...
+>>>
+>>> I'll fold the eventual result of this discussion into the changelog if
+>>> I can convince you it's worth moving forward.
+>>
+>> I'm easily convinced ;) Please let's get all the info into the right
+>> place, make sure it answers the thus-far-asked questions (at least) and
+>> we'll take it from there.
+>>
+>> And please do have a think about switching as much as possible over to
+>> runtime-configurability.  Because "please echo foo > /proc" is a heck
+>> of a lot nicer than "please reboot with iomem=" which is a heck of a lot
+>> nicer than "please ask vendor for a new kernel".
+>
+> Actually, we already have runtime configuration.  For example, if you
+> want to muck with pmem via /dev/mem, just do this first:
+>
+>     echo namespace0.0 > /sys/bus/nd/drivers/nd_pmem/unbind
 
-It got nacked because we don't want these special boot loader specific
-formats in the kernel, and it's getting beyond a joke.  It was a mistake
-to merge the uImage target in the first place IMHO.
+Here's the summary of the thread that I will add to the changelog:
 
-Previous to uboot, boot loaders were perfectly happy with zImage.  Today,
-all boot loaders are perfectly happy with a zImage - it's only the old
-legacy uboot versions that insist on uImage now.  There's now even less
-of a reason to think about merging some uImage based DT munging than there
-was several years ago.
+---
 
-Just do it in an external script, like I do here for platforms where it's
-necessary.  Absolutely no need to hack around in the kernel with special
-crap, like passing environment variables to make (which, you need a script
-for anyway, because its laborious to have to keep on typing them.)
+In general if a device driver is busily using a memory region it
+already informs other parts of the kernel to not touch it via
+request_mem_region().  /dev/mem should honor the same safety
+restriction by default.  Debugging a device driver from userspace
+becomes more
+difficult with this enabled.  Any application using /dev/mem or mmap
+of sysfs pci resources will now need to perform the extra step of
+either:
 
-If you're writing a build script so you don't have to remember lots of
-environment variables for the kernel, you might as well write the build
-script to do the mkimage step for you.
+1/ Disabling the driver, for example:
 
-So having it in the kernel is totally pointless and insane.
+  echo <device id> > /dev/bus/<parent bus>/drivers/<driver name>/unbind
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2/ Rebooting with "iomem=relaxed" on the command line
+
+3/ Recompiling with CONFIG_IO_STRICT_DEVMEM=n
+
+Traditional users of /dev/mem like dosemu are unaffected because the
+first 1MB of memory is not subject to the IO_STRICT_DEVMEM
+restriction.
+Legacy X configurations use /dev/mem to talk to graphics hardware, but
+that functionality has since moved to kernel graphics drivers.
