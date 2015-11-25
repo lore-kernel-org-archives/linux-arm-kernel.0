@@ -1,21 +1,21 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 24 Nov 2015 16:11:03 -0800
-Subject: [PATCH v2 2/7] dts: define ngpios property in gpio controller's
- node
-In-Reply-To: <1447905139-16002-3-git-send-email-pramodku@broadcom.com>
-References: <1447905139-16002-1-git-send-email-pramodku@broadcom.com>
- <1447905139-16002-3-git-send-email-pramodku@broadcom.com>
-Message-ID: <5654FC97.5040302@gmail.com>
+Date: Tue, 24 Nov 2015 16:12:37 -0800
+Subject: [PATCH] Enable PCIe PHY support in Cygnus
+In-Reply-To: <1447870619-2828-1-git-send-email-rjui@broadcom.com>
+References: <1447870619-2828-1-git-send-email-rjui@broadcom.com>
+Message-ID: <5654FCF5.40406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/11/15 19:52, Pramod Kumar wrote:
-> Add ngpios property in cygnus ASIU, CCM and CRMU gpio controller's node
+On 18/11/15 10:16, Ray Jui wrote:
+> This patch enales PCIe PHY in device tree for Broadcom Cygnus based platforms
 > 
-> Signed-off-by: Pramod Kumar <pramodku@broadcom.com>
-> Reviewed-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> This patch is developed based on v4.4-rc1 and available here:
+> https://github.com/Broadcom/cygnus-linux/tree/cygnus-pcie-phy-dt-v1
+> 
+> Ray Jui (1):
+>   ARM: dts: enable PCIe PHY support for Cygnus
 
-Applied to devicetree/next with a more specific subject, thanks!
+Applied to devicetree/next with Scott's Acked-by, thanks!
 -- 
 Florian
