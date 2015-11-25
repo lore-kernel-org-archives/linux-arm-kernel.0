@@ -1,46 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 25 Nov 2015 15:55:16 +0100
-Subject: Strange message from Kirkwood pinctrl driver
-In-Reply-To: <20151125144645.GE11384@lunn.ch>
-References: <CACRpkdah4w-=qHS+q_=Ab-RiJyvbCKY-Rp5Ya0x+F=3DL2iuBA@mail.gmail.com>
- <20151125144645.GE11384@lunn.ch>
-Message-ID: <CACRpkdbi=iCV1B=u60mNqRWhcgAcs33J-DeB-C=r+2v1eLPbpQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 25 Nov 2015 14:55:52 +0000
+Subject: [PATCH] ARM: mach-orion5x: fix legacy get_irqnr_and_base
+In-Reply-To: <alpine.LFD.2.20.1511250948470.22569@knanqh.ubzr>
+References: <alpine.LFD.2.20.1511222240150.22569@knanqh.ubzr>
+ <20151125144545.GA6520@io.lakedaemon.net>
+ <alpine.LFD.2.20.1511250948470.22569@knanqh.ubzr>
+Message-ID: <20151125145552.GB6520@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 3:46 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Wed, Nov 25, 2015 at 11:27:46AM +0100, Linus Walleij wrote:
->> Hi Sebastian,
->>
->> trying to use the Kirkwood pinctrl driver with compatible =
->> "marvell,88f6192-pinctrl";
->> on a Pogoplug series 4 yields the following message when instantiating
->> the driver:
->>
->> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 36
->> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 37
->> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 38
->> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 39
->> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 40
->
-> Hi Linus
->
-> Humm, interesting. I don't remember it doing that before. I will look
-> into this in the next couple of days.
+On Wed, Nov 25, 2015 at 09:54:05AM -0500, Nicolas Pitre wrote:
+> On Wed, 25 Nov 2015, Jason Cooper wrote:
+> 
+> > On Sun, Nov 22, 2015 at 10:44:19PM -0500, Nicolas Pitre wrote:
+> > > Commit 5be9fc23cd ("ARM: orion5x: fix legacy orion5x IRQ numbers") shifted
+> > > IRQ numbers by one but didn't update the get_irqnr_and_base macro
+> > > accordingly.  This macro is involved when CONFIG_MULTI_IRQ_HANDLER
+> > > is not defined.
+> > > 
+> > > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > 
+> > Applied to mvebu/fixes with minor tweak to the subject line and Cc's to
+> > stable back to v4.2.
+> 
+> Note that the patch this provides a fix for was introduced in v4.2, but 
+> it itself was marked for stable. So if commit 5be9fc23cd was backported 
+> back to v3.18 then this patch should also be backported to the same 
+> stable versions.
+> 
+> Same thing for the Dove variant.
 
-There are only few devices using it: it is declared in
-kirkwood-6192.dtsi and that is just used by:
+Crap.  Nice catch.  I'll update *before* pushing.  :)
 
-kirkwood-blackarmor-nas220.dts
-kirkwood-laplug.dts
-kirkwood-rd88f6192.dts
-... and my new device tree
+thx,
 
-Interestingly, kirkwood-ns2[lite|mini].dts specifies it's compatible
-with "marvell,kirkwood-88f6192" but instead includes
-kirkwood-ns2-common.dtsi which includes
-kirkwood-6281.dtsi. I haven't wrapped my head around that
-one, I suspect it's a bug.
-
-Yours,
-Linus Walleij
+Jason.
