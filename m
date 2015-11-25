@@ -1,72 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 25 Nov 2015 14:37:04 -0800
-Subject: [GIT PULL] omap fixes against v4.4-rc2
-Message-ID: <20151125223704.GV2517@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 25 Nov 2015 23:40:07 +0100
+Subject: [PATCH v2 1/3] ARM: qcom: Make an option for qcom clocksource
+ platforms
+In-Reply-To: <5656349D.70103@codeaurora.org>
+References: <1448485478-21699-1-git-send-email-sboyd@codeaurora.org>
+ <6140735.DAZiajTbh1@wuerfel> <5656349D.70103@codeaurora.org>
+Message-ID: <3228474.gifZbHXqvC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 1ec218373b8ebda821aec00bb156a9c94fad9cd4:
+On Wednesday 25 November 2015 14:22:21 Stephen Boyd wrote:
+> 
+> >
+> > Is there any common way to classify these, e.g. calling them
+> > 'pre-2013 models' or 'Snapdragon S4' as a way to identify them?
+> 
+> I was thinking I could leave it as ARCH_MSM_8X60 because that covers the
+> 6 and the 9, but that doesn't make me feel great. I have no idea what
+> Snapdragon S4 is, and that didn't exist when 8660 was first released.
+> pre-2013 models seems alright. Or perhaps ARCH_QCOM_PRE_8974?
+> 
+> Internally (and sort of leaked externally now) we called MSM8960 and its
+> variants A-family, and the generation after B-family, so perhaps
+> ARCH_QCOM_A_FAMILY would be appropriate? The problem there is no end
+> user knows about this distinction.
 
-  Linux 4.4-rc2 (2015-11-22 16:45:59 -0800)
+I think using internal code names like ARCH_QCOM_A_FAMILY here is fine,
+a lot of other platforms do similar things. Regarding end users,
+it's probably enough to explain the distinction in the help text,
+something like:
 
-are available in the git repository at:
+	The A-family includes all Snapdragon S1/S2/S3/S4 chips before 2013,
+	up to the MSM8x60 and APQ8064 models.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.4/fixes-rc2
+	The B-family includes all Snapdragon 2xx/4xx/6xx/8xx models starting
+	in 2013 with the MSM8x74.
 
-for you to fetch changes up to 918af9f941af9995fcaa7ef1eb67c433a492e2b3:
+https://en.wikipedia.org/wiki/List_of_Qualcomm_Snapdragon_device has
+a good overview that translates the marketing names into the model
+numbers but it doesn't have internal code names, so I'm not sure where the
+APQ8064 fits it, as it was marketed as both the "S4 Pro" and the "600",
+depending on the revision.
 
-  ARM: OMAP4+: SMP: use lockless clkdm/pwrdm api in omap4_boot_secondary (2015-11-25 11:03:20 -0800)
-
-----------------------------------------------------------------
-Fixes for omaps for v4.4-rc cycle:
-
-- A series of audio changes for dra7 that missed the merge window but turned
-  out to be necessary to fix a boot time imprecise external abort error and to
-  getaudio working
-
-- Fix l4 related boot time errors for dm81xx
-
-- Use lockless cldm/pwrdm api in omap4_boot_secondary
-
-- Remove t410 custom abort handler that is no longer needed and may
-  hide other critical errors
-
-- Mark cpuidle tracepoints as _rcuidle
-
-- Fix module alias for omap-ocp2scp
-
-----------------------------------------------------------------
-Axel Lin (1):
-      bus: omap-ocp2scp: Fix module alias
-
-Grygorii Strashko (1):
-      ARM: OMAP4+: SMP: use lockless clkdm/pwrdm api in omap4_boot_secondary
-
-Jisheng Zhang (1):
-      ARM: OMAP2+: PM: Denote the cpuidle tracepoints as _rcuidle()
-
-Lucas Stach (1):
-      ARM: OMAP2+: remove custom abort handler for t410
-
-Neil Armstrong (1):
-      arm: omap2+: add missing HWMOD_NO_IDLEST in 81xx hwmod data
-
-Peter Ujfalusi (3):
-      ARM: dts: dra7: Fix McASP3 node regarding to clocks
-      ARM: OMAP2+: hwmod: Add hwmod flag for HWMOD_OPT_CLKS_NEEDED
-      ARM: OMAP: DRA7: hwmod: Add data for McASP3
-
-Tony Lindgren (2):
-      Merge branch 'x15-audio-fixes' into omap-for-v4.4/fixes
-      Merge branch '81xx' into omap-for-v4.4/fixes
-
- arch/arm/boot/dts/dra7.dtsi                |  4 +-
- arch/arm/mach-omap2/omap-smp.c             |  6 +--
- arch/arm/mach-omap2/omap_hwmod.c           | 66 ++++++++++++++++--------------
- arch/arm/mach-omap2/omap_hwmod.h           |  3 ++
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c  | 56 +++++++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c |  3 ++
- arch/arm/mach-omap2/pdata-quirks.c         | 29 -------------
- arch/arm/mach-omap2/pm34xx.c               |  4 +-
- drivers/bus/omap-ocp2scp.c                 |  2 +-
- 9 files changed, 106 insertions(+), 67 deletions(-)
+	Arnd
