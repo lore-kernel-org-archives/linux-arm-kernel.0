@@ -1,60 +1,108 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 25 Nov 2015 13:37:53 +0100
-Subject: [PATCH 1/3] clocksource: defbool CLKSRC_QCOM=y on ARCH_QCOM and
- make it visible
-In-Reply-To: <3550727.W9y7mWx54D@wuerfel>
-References: <1448413710-8101-1-git-send-email-sboyd@codeaurora.org>
- <1448413710-8101-2-git-send-email-sboyd@codeaurora.org>
- <56558929.6090403@linaro.org> <3550727.W9y7mWx54D@wuerfel>
-Message-ID: <5655ABA1.6030206@linaro.org>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 25 Nov 2015 07:49:29 -0500
+Subject: [PATCH] arm64: Support VDSO remapping
+Message-ID: <1448455781-26660-1-git-send-email-cov@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2015 11:17 AM, Arnd Bergmann wrote:
-> On Wednesday 25 November 2015 11:10:49 Daniel Lezcano wrote:
->> On 11/25/2015 02:08 AM, Stephen Boyd wrote:
->>> We want to remove the ARCH_MSM* configs in mach-qcom/Kconfig
->>> because they are mostly proxy configs for selecting the right
->>> clocksource driver. Therefore, make CLKSRC_QCOM default to the
->>> value of ARCH_QCOM, but also make it visible if ARCH_QCOM=y so
->>> that we can turn it off when we don't want it.
->>
->> I have been removing the ARCH dependencies in the Kconfig file.
->>
->> Why do you have to turn it off manually ?
->
-> The background is that this is used only on some of the older
-> MSM SoCs, while the newer ones use the arch timer.
->
-> We decided to remove the SoC-specific top-level options from
-> mach-msm as they are becoming rather meaningless these days
-> and just a burden to maintain at the rate that new variants
-> get released, so being able to turn off this driver helps make
-> the kernel slightly smaller if you are building a kernel for
-> only the more recent models.
+Some applications such as Checkpoint/Restore In Userspace (CRIU) remap and
+unmap the VDSO. Add support for this to the AArch64 kernel by copying in
+the PowerPC code with slight modifications.
 
-Ok, thanks for the clarification.
+Signed-off-by: Christopher Covington <cov@codeaurora.org>
+---
+ arch/arm64/include/asm/Kbuild          |  1 -
+ arch/arm64/include/asm/mm-arch-hooks.h | 28 ++++++++++++++++++++++++++++
+ arch/arm64/include/asm/mmu_context.h   | 23 ++++++++++++++++++++++-
+ 3 files changed, 50 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/include/asm/mm-arch-hooks.h
 
-I don't really like this approach even if it is correct because it 
-breaks the current approach I am trying to make consistent across the 
-drivers.
-
-I would like to have the COMPILE_TEST option available for all the 
-drivers and move this option under the menu config. This patch will 
-prevent to do this code factoring.
-
-On the other side, this option is supposed to have a slightly smaller 
-kernel when it is not used. But when does it happen ? When 
-ARCH_MSM8X60=n and ARCH_MSM8960=n. With this patchset, I don't see the 
-ability to turn these SoCs off as the options are removed. So the 
-associated code is not removed, right ?
-
-So why allow to turn off the timer but disallow that for the entire SoC ?
-
-
+diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+index 70fd9ff..b112a39 100644
+--- a/arch/arm64/include/asm/Kbuild
++++ b/arch/arm64/include/asm/Kbuild
+@@ -25,7 +25,6 @@ generic-y += kvm_para.h
+ generic-y += local.h
+ generic-y += local64.h
+ generic-y += mcs_spinlock.h
+-generic-y += mm-arch-hooks.h
+ generic-y += mman.h
+ generic-y += msgbuf.h
+ generic-y += msi.h
+diff --git a/arch/arm64/include/asm/mm-arch-hooks.h b/arch/arm64/include/asm/mm-arch-hooks.h
+new file mode 100644
+index 0000000..e6923fb
+--- /dev/null
++++ b/arch/arm64/include/asm/mm-arch-hooks.h
+@@ -0,0 +1,28 @@
++/*
++ * Architecture specific mm hooks
++ *
++ * Copyright (C) 2015, IBM Corporation
++ * Author: Laurent Dufour <ldufour@linux.vnet.ibm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ASM_MM_ARCH_HOOKS_H
++#define __ASM_MM_ARCH_HOOKS_H
++
++static inline void arch_remap(struct mm_struct *mm,
++			      unsigned long old_start, unsigned long old_end,
++			      unsigned long new_start, unsigned long new_end)
++{
++	/*
++	 * mremap() doesn't allow moving multiple vmas so we can limit the
++	 * check to old_start == vdso_base.
++	 */
++	if ((void *)old_start == mm->context.vdso)
++		mm->context.vdso = (void *)new_start;
++}
++#define arch_remap arch_remap
++
++#endif /* __ASM_MM_ARCH_HOOKS_H */
+diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+index 2416578..9fe0773 100644
+--- a/arch/arm64/include/asm/mmu_context.h
++++ b/arch/arm64/include/asm/mmu_context.h
+@@ -24,7 +24,6 @@
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/proc-fns.h>
+-#include <asm-generic/mm_hooks.h>
+ #include <asm/cputype.h>
+ #include <asm/pgtable.h>
+ 
+@@ -147,4 +146,26 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
+ #define deactivate_mm(tsk,mm)	do { } while (0)
+ #define activate_mm(prev,next)	switch_mm(prev, next, NULL)
+ 
++static inline void arch_dup_mmap(struct mm_struct *oldmm,
++				      struct mm_struct *mm)
++{
++}
++
++static inline void arch_exit_mmap(struct mm_struct *mm)
++{
++}
++
++static inline void arch_unmap(struct mm_struct *mm,
++			      struct vm_area_struct *vma,
++			      unsigned long start, unsigned long end)
++{
++	if ((void *)start <= mm->context.vdso && mm->context.vdso < (void *)end)
++		mm->context.vdso = NULL;
++}
++
++static inline void arch_bprm_mm_init(struct mm_struct *mm,
++				     struct vm_area_struct *vma)
++{
++}
++
+ #endif
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
