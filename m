@@ -1,189 +1,180 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Nov 2015 17:06:47 +0100
-Subject: [PATCH 02/10] ASoC: samsung/smartq: use dynamic registration
+Date: Wed, 25 Nov 2015 17:06:54 +0100
+Subject: [PATCH 09/10] ARM: s3c64xx: multiplatform support
 In-Reply-To: <1448467615-447097-1-git-send-email-arnd@arndb.de>
 References: <1448467615-447097-1-git-send-email-arnd@arndb.de>
-Message-ID: <1448467615-447097-3-git-send-email-arnd@arndb.de>
+Message-ID: <1448467615-447097-10-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As a prerequisite for moving s3c64xx into multiplatform configurations,
-we need to change the smartq audio driver to stop using hardcoded
-gpio numbers from the header file, and instead pass the gpio data
-through platform_data.
-
-In order to do that, we also move the code to use module_platform_driver
-and register the platform device using platform_device_register_simple
-and register the gpios through the gpiod API.
+After all preparation work is done, we can finally move the Kconfig
+option for s3c64xx into ARCH_MULTIPLATFORM. This implies allowing
+SAMSUNG_ATAGS for multiplatform again, but now disallowing the
+ADC driver below it, as that still has dependencies on header files.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Mark Brown <broonie@kernel.org>
 ---
- arch/arm/mach-s3c64xx/mach-smartq.c | 13 +++++++
- sound/soc/samsung/smartq_wm8987.c   | 77 +++++++++++++------------------------
- 2 files changed, 40 insertions(+), 50 deletions(-)
+ arch/arm/Kconfig                    | 27 ---------------------------
+ arch/arm/configs/multi_v7_defconfig |  3 +++
+ arch/arm/configs/s3c6400_defconfig  |  2 ++
+ arch/arm/mach-s3c64xx/Kconfig       | 22 +++++++++++++++++++++-
+ arch/arm/mach-s3c64xx/Makefile      |  3 +++
+ arch/arm/plat-samsung/Kconfig       |  2 +-
+ arch/arm/plat-samsung/Makefile      |  3 ++-
+ 7 files changed, 32 insertions(+), 30 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
-index acdfb5fac40f..96784e7f894a 100644
---- a/arch/arm/mach-s3c64xx/mach-smartq.c
-+++ b/arch/arm/mach-s3c64xx/mach-smartq.c
-@@ -12,6 +12,7 @@
- #include <linux/delay.h>
- #include <linux/fb.h>
- #include <linux/gpio.h>
-+#include <linux/gpio/machine.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/pwm.h>
-@@ -383,6 +384,15 @@ void __init smartq_map_io(void)
- 	smartq_lcd_mode_set();
- }
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1ec6a153d8e5..f08306499a82 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -626,33 +626,6 @@ config ARCH_S3C24XX
+ 	  (<http://www.simtec.co.uk/products/EB110ITX/>), the IPAQ 1940 or the
+ 	  Samsung SMDK2410 development board (and derivatives).
  
-+static struct gpiod_lookup_table smartq_audio_gpios = {
-+	.dev_id = "smartq-audio",
-+	.table = {
-+		GPIO_LOOKUP("GPL", 12, "headphone detect", 0),
-+		GPIO_LOOKUP("GPK", 12, "amplifiers shutdown", 0),
-+		{ },
-+	},
-+};
+-config ARCH_S3C64XX
+-	bool "Samsung S3C64XX"
+-	select ARCH_REQUIRE_GPIOLIB
+-	select ARM_AMBA
+-	select ARM_VIC
+-	select ATAGS
+-	select CLKDEV_LOOKUP
+-	select CLKSRC_SAMSUNG_PWM
+-	select COMMON_CLK_SAMSUNG
+-	select CPU_V6K
+-	select GENERIC_CLOCKEVENTS
+-	select GPIO_SAMSUNG
+-	select HAVE_S3C2410_I2C if I2C
+-	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+-	select HAVE_TCM
+-	select NO_IOPORT_MAP
+-	select PLAT_SAMSUNG
+-	select PM_GENERIC_DOMAINS if PM
+-	select S3C_DEV_NAND
+-	select S3C_GPIO_TRACK
+-	select SAMSUNG_ATAGS
+-	select SAMSUNG_WAKEMASK
+-	select SAMSUNG_WDT_RESET
+-	select SPARSE_IRQ
+-	help
+-	  Samsung S3C64XX series based systems
+-
+ config ARCH_DAVINCI
+ 	bool "TI DaVinci"
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index c8953e102a7c..44f0f2a8124d 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -11,6 +11,9 @@ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_CMDLINE_PARTITION=y
++CONFIG_ARCH_MULTI_V7=y
++# CONFIG_ARCH_MULTI_V5 is not set
++# CONFIG_ARCH_MULTI_V4 is not set
+ CONFIG_ARCH_VIRT=y
+ CONFIG_ARCH_ALPINE=y
+ CONFIG_ARCH_MVEBU=y
+diff --git a/arch/arm/configs/s3c6400_defconfig b/arch/arm/configs/s3c6400_defconfig
+index e2f9fa5bb54b..e0f66936ae02 100644
+--- a/arch/arm/configs/s3c6400_defconfig
++++ b/arch/arm/configs/s3c6400_defconfig
+@@ -5,6 +5,8 @@ CONFIG_KALLSYMS_ALL=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
++CONFIG_ARCH_MULTI_V6=y
++# CONFIG_ARCH_MULTI_V7 is not set
+ CONFIG_ARCH_S3C64XX=y
+ CONFIG_S3C_BOOT_ERROR_RESET=y
+ CONFIG_MACH_SMDK6400=y
+diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+index 28c7097e8506..caf71a99389e 100644
+--- a/arch/arm/mach-s3c64xx/Kconfig
++++ b/arch/arm/mach-s3c64xx/Kconfig
+@@ -2,6 +2,27 @@
+ #	Simtec Electronics, Ben Dooks <ben@simtec.co.uk>
+ #
+ # Licensed under GPLv2
++menuconfig ARCH_S3C64XX
++	bool "Samsung S3C64XX" if ARCH_MULTI_V6
++	select ARCH_REQUIRE_GPIOLIB
++	select ARM_AMBA
++	select ARM_VIC
++	select ATAGS
++	select CLKSRC_SAMSUNG_PWM
++	select COMMON_CLK_SAMSUNG
++	select GPIO_SAMSUNG
++	select HAVE_S3C2410_I2C if I2C
++	select HAVE_S3C2410_WATCHDOG if WATCHDOG
++	select HAVE_TCM
++	select PLAT_SAMSUNG
++	select PM_GENERIC_DOMAINS if PM
++	select S3C_DEV_NAND
++	select S3C_GPIO_TRACK
++	select SAMSUNG_ATAGS
++	select SAMSUNG_WAKEMASK if PM
++	select SAMSUNG_WDT_RESET
++	help
++	  Samsung S3C64XX series based systems
+ 
+ if ARCH_S3C64XX
+ 
+@@ -310,7 +331,6 @@ config MACH_S3C64XX_DT
+ 	select CPU_S3C6410
+ 	select PINCTRL
+ 	select PINCTRL_S3C64XX
+-	select USE_OF
+ 	help
+ 	  Machine support for Samsung S3C6400/S3C6410 machines with Device Tree
+ 	  enabled.
+diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
+index bb233f342f31..04cdcd40e23c 100644
+--- a/arch/arm/mach-s3c64xx/Makefile
++++ b/arch/arm/mach-s3c64xx/Makefile
+@@ -5,6 +5,9 @@
+ #
+ # Licensed under GPLv2
+ 
++ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include -I$(srctree)/arch/arm/plat-samsung/include
++asflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include -I$(srctree)/arch/arm/plat-samsung/include
 +
- void __init smartq_machine_init(void)
- {
- 	s3c_i2c0_set_platdata(NULL);
-@@ -402,4 +412,7 @@ void __init smartq_machine_init(void)
+ # Core
  
- 	pwm_add_table(smartq_pwm_lookup, ARRAY_SIZE(smartq_pwm_lookup));
- 	platform_add_devices(smartq_devices, ARRAY_SIZE(smartq_devices));
-+
-+	gpiod_add_lookup_table(&smartq_audio_gpios);
-+	platform_device_register_simple("smartq-audio", -1, NULL, 0);
- }
-diff --git a/sound/soc/samsung/smartq_wm8987.c b/sound/soc/samsung/smartq_wm8987.c
-index a0fe37fbed9f..c6769b16eb19 100644
---- a/sound/soc/samsung/smartq_wm8987.c
-+++ b/sound/soc/samsung/smartq_wm8987.c
-@@ -13,15 +13,12 @@
-  *
-  */
+ obj-y				+= common.o
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 83697414bfa0..aa78c72fcecd 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -39,7 +39,6 @@ config S3C_LOWLEVEL_UART_PORT
  
--#include <linux/gpio.h>
-+#include <linux/gpio/consumer.h>
- #include <linux/module.h>
+ config SAMSUNG_ATAGS
+ 	def_bool n
+-	depends on !ARCH_MULTIPLATFORM
+ 	depends on ATAGS
+ 	help
+ 	   This option enables ATAGS based boot support code for
+@@ -70,6 +69,7 @@ config S3C_GPIO_TRACK
  
- #include <sound/soc.h>
- #include <sound/jack.h>
+ config S3C_ADC
+ 	bool "ADC common driver support"
++	depends on !ARCH_MULTIPLATFORM
+ 	help
+ 	  Core support for the ADC block found in the Samsung SoC systems
+ 	  for drivers such as the touchscreen and hwmon to use to share
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index aeb19e3288b9..be172efec15c 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -4,7 +4,8 @@
+ #
+ # Licensed under GPLv2
  
--#include <mach/gpio-samsung.h>
--#include <asm/mach-types.h>
--
- #include "i2s.h"
- #include "../codecs/wm8750.h"
+-ccflags-$(CONFIG_ARCH_MULTI_V7) += -I$(srctree)/$(src)/include
++ccflags-$(CONFIG_ARCH_S3C64XX) := -I$(srctree)/arch/arm/mach-s3c64xx/include
++ccflags-$(CONFIG_ARCH_MULTIPLATFORM) += -I$(srctree)/$(src)/include
  
-@@ -96,7 +93,7 @@ static struct snd_soc_jack_pin smartq_jack_pins[] = {
+ # Objects we always build independent of SoC choice
  
- static struct snd_soc_jack_gpio smartq_jack_gpios[] = {
- 	{
--		.gpio		= S3C64XX_GPL(12),
-+		.gpio		= -1,
- 		.name		= "headphone detect",
- 		.report		= SND_JACK_HEADPHONE,
- 		.debounce_time	= 200,
-@@ -113,7 +110,9 @@ static int smartq_speaker_event(struct snd_soc_dapm_widget *w,
- 				struct snd_kcontrol *k,
- 				int event)
- {
--	gpio_set_value(S3C64XX_GPK(12), SND_SOC_DAPM_EVENT_OFF(event));
-+	struct gpio_desc *gpio = snd_soc_card_get_drvdata(&snd_soc_smartq);
-+
-+	gpiod_set_value(gpio, SND_SOC_DAPM_EVENT_OFF(event));
- 
- 	return 0;
- }
-@@ -199,62 +198,40 @@ static struct snd_soc_card snd_soc_smartq = {
- 	.num_controls = ARRAY_SIZE(wm8987_smartq_controls),
- };
- 
--static struct platform_device *smartq_snd_device;
--
--static int __init smartq_init(void)
-+static int smartq_probe(struct platform_device *pdev)
- {
-+	struct gpio_desc *gpio;
- 	int ret;
- 
--	if (!machine_is_smartq7() && !machine_is_smartq5()) {
--		pr_info("Only SmartQ is supported by this ASoC driver\n");
--		return -ENODEV;
--	}
--
--	smartq_snd_device = platform_device_alloc("soc-audio", -1);
--	if (!smartq_snd_device)
--		return -ENOMEM;
--
--	platform_set_drvdata(smartq_snd_device, &snd_soc_smartq);
--
--	ret = platform_device_add(smartq_snd_device);
--	if (ret) {
--		platform_device_put(smartq_snd_device);
--		return ret;
--	}
-+	platform_set_drvdata(pdev, &snd_soc_smartq);
- 
- 	/* Initialise GPIOs used by amplifiers */
--	ret = gpio_request(S3C64XX_GPK(12), "amplifiers shutdown");
--	if (ret) {
--		dev_err(&smartq_snd_device->dev, "Failed to register GPK12\n");
--		goto err_unregister_device;
-+	gpio = devm_gpiod_get(&pdev->dev, "amplifiers shutdown",
-+			      GPIOD_OUT_HIGH);
-+	if (IS_ERR(gpio)) {
-+		dev_err(&pdev->dev, "Failed to register GPK12\n");
-+		ret = PTR_ERR(gpio);
-+		goto out;
- 	}
-+	snd_soc_card_set_drvdata(&snd_soc_smartq, gpio);
- 
--	/* Disable amplifiers */
--	ret = gpio_direction_output(S3C64XX_GPK(12), 1);
--	if (ret) {
--		dev_err(&smartq_snd_device->dev, "Failed to configure GPK12\n");
--		goto err_free_gpio_amp_shut;
--	}
--
--	return 0;
--
--err_free_gpio_amp_shut:
--	gpio_free(S3C64XX_GPK(12));
--err_unregister_device:
--	platform_device_unregister(smartq_snd_device);
-+	ret = devm_snd_soc_register_card(&pdev->dev, &snd_soc_smartq);
-+	if (ret)
-+		dev_err(&pdev->dev, "Failed to register card\n");
- 
-+out:
- 	return ret;
- }
- 
--static void __exit smartq_exit(void)
--{
--	gpio_free(S3C64XX_GPK(12));
--
--	platform_device_unregister(smartq_snd_device);
--}
-+static struct platform_driver smartq_driver = {
-+	.driver = {
-+		.name = "smartq-audio",
-+		.owner = THIS_MODULE,
-+	},
-+	.probe = smartq_probe,
-+};
- 
--module_init(smartq_init);
--module_exit(smartq_exit);
-+module_platform_driver(smartq_driver);
- 
- /* Module information */
- MODULE_AUTHOR("Maurus Cuelenaere <mcuelenaere@gmail.com>");
 -- 
 2.1.0.rc2
