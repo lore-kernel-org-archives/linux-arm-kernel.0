@@ -1,41 +1,43 @@
-From: peda@lysator.liu.se (Peter Rosin)
-Date: Wed, 25 Nov 2015 12:55:33 +0100
-Subject: SAMA5D3x: I2C, USART1 and DMA.
-In-Reply-To: <20151124165334.GA29813@finsecur.com>
-References: <56548CD7.4010705@lysator.liu.se>
- <20151124164424.GA28794@finsecur.com> <20151124165334.GA29813@finsecur.com>
-Message-ID: <5655A1B5.6060307@lysator.liu.se>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 Nov 2015 12:00:13 +0000
+Subject: [PATCH] arm64: restore bogomips information in /proc/cpuinfo
+In-Reply-To: <56554AE9.5070901@jonmasters.org>
+References: <1447870505-19319-1-git-send-email-yang.shi@linaro.org>
+ <56554AE9.5070901@jonmasters.org>
+Message-ID: <20151125120013.GJ8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylvain,
-
-On 2015-11-24 17:53, Sylvain Rochet wrote:
-> On Tue, Nov 24, 2015 at 05:44:24PM +0100, Sylvain Rochet wrote:
->> On Tue, Nov 24, 2015 at 05:14:15PM +0100, Peter Rosin wrote:
->>> However, cutting out the "dmas" line does not improve things. So, how
->>> do I enable DMA on usart1?
->>
->> You are probably running out of available DMA channels on the DMAC0. 
->> There is 8 channels available per DMAC and this is quite a scarce 
->> resource.
->>
->> See "DMA Channels Definition" tables from the SAMA5D3 datasheet. I hope 
->> you balanced well the peripherals you are using in your design on the 
->> two DMAC to prevent running out of DMA channels.
+On Wed, Nov 25, 2015 at 12:45:13AM -0500, Jon Masters wrote:
+> On 11/18/15, 1:15 PM, Yang Shi wrote:
 > 
-> I forgot to add that you need to explicitely enable DMA on usart as 
-> explained in the Documentation/devicetree/bindings/serial/atmel-usart.txt
-> documentation, this way: 
+> >As what Pavel Machek reported [1], some userspace applications depend on
+> >bogomips showed by /proc/cpuinfo.
+> >
+> >Although there is much less legacy impact on aarch64 than arm, but it does
+> >break libvirt.
+> >
+> >Basically, this patch reverts commit 326b16db9f69fd0d279be873c6c00f88c0a4aad5
+> >("arm64: delay: don't bother reporting bogomips in /proc/cpuinfo"), but with
+> >some tweak due to context change.
 > 
-> usart0: serial at f001c000 {
->         ...
->         atmel,use-dma-rx;
->         atmel,use-dma-tx;
->         ...
-> }
+> On a total tangent, it would be ideal to (eventually) have something
+> reported in /proc/cpuinfo or dmesg during boot that does "accurately" map
+> back to the underlying core frequency (as opposed to the generic timer
+> frequency).
 
-Got it working, not dropped data yet... Thanks for the pointers!
+Absolutely not.  You need to read the discussion that we had with Linus
+when someone reported that ARMs /proc/cpuinfo no longer reported it.
 
-Cheers,
-Peter
+Linus says that Bogomips reports the calibration value for udelay(),
+period.  Whether that's a software loop, or a hardware timer is neither
+here nor there.  It's nothing to do with the CPU clock rate.
+
+So, if your timer runs slowly, but your CPU is at the top end, a report
+of 6 Bogomips is (as far as Linus is concerned) absolutely correct, and
+we have no business at all as kernel developers coming up with some fake
+or real value to make it report as the CPU clock rate.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
