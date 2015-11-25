@@ -1,73 +1,110 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Wed, 25 Nov 2015 12:05:49 -0800
-Subject: [RFC PATCH] PCI/pci-host-generic: Add support for Cavium Thunder
- fixed BARs.
-In-Reply-To: <2789794.TBZL2yW2b6@wuerfel>
-References: <1443488184-12633-1-git-send-email-ddaney.cavm@gmail.com>
- <20151125170652.GC1380@localhost> <2789794.TBZL2yW2b6@wuerfel>
-Message-ID: <5656149D.50704@caviumnetworks.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 25 Nov 2015 14:05:59 -0600
+Subject: [PATCH 11/18] ARM: am57xx: sbc-am57x: dts: add basic board support
+In-Reply-To: <1448433590-1399-12-git-send-email-lifshitz@compulab.co.il>
+References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
+ <1448433590-1399-12-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <20151125200559.GE30473@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2015 11:52 AM, Arnd Bergmann wrote:
-> On Wednesday 25 November 2015 11:06:52 Bjorn Helgaas wrote:
->>
->> On Mon, Sep 28, 2015 at 05:56:24PM -0700, David Daney wrote:
->>> From: David Daney <david.daney@cavium.com>
->>>
->>> Early versions of the Cavium Thunder CN88XX processor are missing
->>> Enhanced Allocation (EA) capabilities for the fixed BAR addresses used
->>> by the on-SoC hardware blocks.
->>>
->>> Add config access functions that synthesize the missing EA
->>> capabilities for versions that are missing that information.  Since
->>> this is a little hacky, gate the inclusion of the code with a new
->>> Kconfig variable.
->>>
->>> Signed-off-by: David Daney <david.daney@cavium.com>
->>
->> What about this one?  Do we still need it?  This version looks like it
->> still has some debug code and it feels like a lot of hard-coding of
->> config offsets; it'd be nice if it could be more table-driven.  But
->> maybe this isn't needed anymore anyway.
->
-> I still think it doesn't belong into the generic driver. We have the
-> abstraction for drivers based on the compatible string to handle
-> nonstandard PCI host bridges, and the generic driver should really
-> just handle the generic code.
+On Wed, Nov 25, 2015 at 08:39:43AM +0200, Dmitry Lifshitz wrote:
+> SBC-AM57x is a single board computer designed for industrial and
+> embedded applications. It is based on the Texas Instruments Sitara AM57x
+> system-on-chip family. SBC-AM57x is implemented with the CL-SOM-AM57x
+> computer-on-module providing most of the functions, and SB-SOM-AM57x
+> carrier board providing additional peripheral functions and connectors.
+> 
+> https://www.compulab.co.il/products/sbcs/sbc-am57x-ti-am5728-am5718-single-board-computer/
+> 
+> https://www.compulab.co.il/products/computer-on-modules/cl-som-am57x-ti-am5728-am5718-system-on-module/
+> 
+> Add basic board support, including UART3, used as a serial console.
+> 
+> Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
+> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 
-Somebody should make a decision about this point.
+Acked-by: Rob Herring <robh@kernel.org>
 
-Here is what happens:
-
-  1) A driver for non-generic PCI host bridge is submitted.
-
-  2) Comments are received stating that it is just another PCI host 
-bridge and please use pci-host-generic instead.
-
-  3) Patches to pci-host-generic are submitted.
-
-  4) Comments are received stating that pci-host-generic is for generic 
-things only, and please create a device specific driver.
-
-  5) goto 1
-
-
->
-> It's easy enough to split out the common parts if we want to reuse
-> some of this, or to move them into drivers/pci/*.c for others to
-> reuse too.
->
-
-If we do that, do you want "pci-host-cam-generic" and 
-"pci-host-ecam-generic" split out too?
-
-They are two completely different things crammed into the single 
-pci-host-generic driver source file.  Or is there some set of config 
-access methods that are sufficiently generic that they can stay?
-
-David Daney
-
-
-> 	Arnd
->
+> ---
+>  .../devicetree/bindings/arm/omap/omap.txt          |  3 ++
+>  arch/arm/boot/dts/Makefile                         |  1 +
+>  arch/arm/boot/dts/am57xx-sbc-am57x.dts             | 36 ++++++++++++++++++++++
+>  3 files changed, 40 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/am57xx-sbc-am57x.dts
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> index dd53c90..42cdad1 100644
+> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
+> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> @@ -159,6 +159,9 @@ Boards:
+>  - AM57XX CL-SOM-AM57x
+>    compatible = "compulab,cl-som-am57x", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7"
+>  
+> +- AM57XX SBC-AM57x
+> +  compatible = "compulab,sbc-am57x", "compulab,cl-som-am57x", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7"
+> +
+>  - DRA742 EVM:  Software Development Board for DRA742
+>    compatible = "ti,dra7-evm", "ti,dra742", "ti,dra74", "ti,dra7"
+>  
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 803a020..4c73ab9 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -479,6 +479,7 @@ dtb-$(CONFIG_SOC_OMAP5) += \
+>  dtb-$(CONFIG_SOC_DRA7XX) += \
+>  	am57xx-beagle-x15.dtb \
+>  	am57xx-cl-som-am57x.dtb \
+> +	am57xx-sbc-am57x.dtb \
+>  	dra7-evm.dtb \
+>  	dra72-evm.dtb
+>  dtb-$(CONFIG_ARCH_ORION5X) += \
+> diff --git a/arch/arm/boot/dts/am57xx-sbc-am57x.dts b/arch/arm/boot/dts/am57xx-sbc-am57x.dts
+> new file mode 100644
+> index 0000000..804ad72
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/am57xx-sbc-am57x.dts
+> @@ -0,0 +1,36 @@
+> +/*
+> + * Support for CompuLab SBC-AM57x single board computer
+> + *
+> + * Copyright (C) 2015 CompuLab Ltd. - http://www.compulab.co.il/
+> + * Author: Dmitry Lifshitz <lifshitz@compulab.co.il>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License version 2 as published by
+> + * the Free Software Foundation.
+> + */
+> +
+> +#include "am57xx-cl-som-am57x.dts"
+> +#include "compulab-sb-som.dtsi"
+> +
+> +/ {
+> +	model = "CompuLab CL-SOM-AM57x on SB-SOM-AM57x";
+> +	compatible = "compulab,sbc-am57x", "compulab,cl-som-am57x", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7";
+> +};
+> +
+> +&dra7_pmx_core {
+> +	uart3_pins_default: uart3_pins_default {
+> +		pinctrl-single,pins = <
+> +			DRA7XX_CORE_IOPAD(0x37f8, PIN_INPUT_SLEW | MUX_MODE2)	/* uart2_ctsn.uart3_rxd */
+> +			DRA7XX_CORE_IOPAD(0x37fc, PIN_INPUT_SLEW | MUX_MODE1)	/* uart2_rtsn.uart3_txd */
+> +		>;
+> +	};
+> +};
+> +
+> +&uart3 {
+> +	status = "okay";
+> +	interrupts-extended = <&crossbar_mpu GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
+> +			      <&dra7_pmx_core 0x3f8>;
+> +
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart3_pins_default>;
+> +};
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
