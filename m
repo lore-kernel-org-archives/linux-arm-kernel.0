@@ -1,63 +1,36 @@
-From: shugelinux@gmail.com (Shuge)
-Date: Wed, 25 Nov 2015 09:22:56 +0800
-Subject: [linux-sunxi] Re: [PATCH v2 1/5] ARM: dts: sun8i: Add SID node
-In-Reply-To: <20151124093202.GL32142@lukather>
-References: <cover.1448263428.git.atx@atx.name>
- <b897b1c8741c8a871163b84d01b480f99329536d.1448263428.git.atx@atx.name>
- <20151123124356.GW32142@lukather>
- <a7d4e538-db64-476d-b5de-5222419229a2@googlegroups.com>
- <20151124093202.GL32142@lukather>
-Message-ID: <56550D70.6060109@gmail.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Tue, 24 Nov 2015 17:28:54 -0800
+Subject: [PATCH v2 2/2] restrict /dev/mem to idle io memory ranges
+In-Reply-To: <20151124164711.0cb9ecdbba2fc729273f3240@linux-foundation.org>
+References: <20151124000553.26360.57819.stgit@dwillia2-desk3.jf.intel.com>
+ <20151124000604.26360.56945.stgit@dwillia2-desk3.jf.intel.com>
+ <20151124142521.e6d23e44a8b2c24c044c2dec@linux-foundation.org>
+ <CAPcyv4ijWns879DytqUa+=r5hzQ1qzmB83VV6Z16kQNtmHUtbA@mail.gmail.com>
+ <20151124164711.0cb9ecdbba2fc729273f3240@linux-foundation.org>
+Message-ID: <CAPcyv4jtWocaoocfzvpHgR=0mg0GPo7-nBrzkARQpTz6=oAupg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 23, 2015 at 17:32 UTC+8, Maxime Ripard wrote:
-> On Mon, Nov 23, 2015 at 10:51:15PM -0800, Sugar Wu wrote:
->> On Monday, November 23, 2015 at 8:43:59 PM UTC+8, Maxime Ripard wrote:
->>>
->>> Hi, 
->>>
->>> On Mon, Nov 23, 2015 at 09:02:48AM +0100, Josef Gajdusek wrote: 
->>>> Add a node describing the Security ID memory to the 
->>>> Allwinner H3 .dtsi file. 
->>>>
->>>> Signed-off-by: Josef Gajdusek <a...@atx.name <javascript:>> 
->>>> --- 
->>>>  arch/arm/boot/dts/sun8i-h3.dtsi | 7 +++++++ 
->>>>  1 file changed, 7 insertions(+) 
->>>>
->>>> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi 
->>> b/arch/arm/boot/dts/sun8i-h3.dtsi 
->>>> index 0faa38a..58de718 100644 
->>>> --- a/arch/arm/boot/dts/sun8i-h3.dtsi 
->>>> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi 
->>>> @@ -359,6 +359,13 @@ 
->>>>                          #size-cells = <0>; 
->>>>                  }; 
->>>>   
->>>> +                sid: eeprom at 01c14000 { 
->>>> +                        compatible = "allwinner,sun4i-a10-sid"; 
->>>> +                        reg = <0x01c14000 0x400>; 
->>>
->>> The datasheet says it's 256 bytes wide, while the size here is of 1kB, 
->>> is it intentional? 
+On Tue, Nov 24, 2015 at 4:47 PM, Andrew Morton
+<akpm@linux-foundation.org> wrote:
+> On Tue, 24 Nov 2015 16:34:19 -0800 Dan Williams <dan.j.williams@intel.com> wrote:
+>
+>> > IOW, a very good description of the problem-being-solved would help out
+>> > a lot here...
 >>
->> SID memory map is 0x01c14000 ~ 0x01c143FF, include 2048bits efuse space.
->> H3 efuse space is SID_SRAM, its range is  0x01c14200 ~ +0x100.
-> 
-> Interesting, what is below the 0x200 registers?
+>> I'll fold the eventual result of this discussion into the changelog if
+>> I can convince you it's worth moving forward.
 >
-Some control register about SID.
-offset: 0x40  SID Program/Read Control Register
-offset: 0x50  SID Program Key Value Register
-offset: 0x60  SID Read Key Value Register
-offset: 0x70  \
-offset: 0x80  SJTAG Attribute 0 Register
-offset: 0x84  SJTAG Attribute 1 Register
-offset: 0x88  SJTAG Select Register
-offset: 0x90  SID Program Ctrol register for burned timing
+> I'm easily convinced ;) Please let's get all the info into the right
+> place, make sure it answers the thus-far-asked questions (at least) and
+> we'll take it from there.
+>
+> And please do have a think about switching as much as possible over to
+> runtime-configurability.  Because "please echo foo > /proc" is a heck
+> of a lot nicer than "please reboot with iomem=" which is a heck of a lot
+> nicer than "please ask vendor for a new kernel".
 
->
-> Thanks!
-> Maxime
-> 
+Actually, we already have runtime configuration.  For example, if you
+want to muck with pmem via /dev/mem, just do this first:
+
+    echo namespace0.0 > /sys/bus/nd/drivers/nd_pmem/unbind
