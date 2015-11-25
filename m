@@ -1,49 +1,70 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 25 Nov 2015 06:20:58 -0800
-Subject: [PATCH v3 1/4] watchdog: meson: Enable meson SoC specific data
-In-Reply-To: <CAOQ7t2ZY8BMMSN5F-9GewZSfUewa-0jA5tufe9NCkLZObjrdWg@mail.gmail.com>
-References: <1446985137-25498-1-git-send-email-carlo@caione.org>
- <1446985137-25498-2-git-send-email-carlo@caione.org>
- <5640B5BF.9040909@roeck-us.net>
- <CAOQ7t2bmNNTPxgZy4uZQF_u4yH2nxfMR_FqpKM0GavoUS9rRkA@mail.gmail.com>
- <20151124181911.GA12289@roeck-us.net>
- <CAOQ7t2ZY8BMMSN5F-9GewZSfUewa-0jA5tufe9NCkLZObjrdWg@mail.gmail.com>
-Message-ID: <5655C3CA.5000407@roeck-us.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 25 Nov 2015 15:39:54 +0100
+Subject: [PATCH 1/2] ARM: mvebu: update v5 defconfig
+In-Reply-To: <1448461036-16724-1-git-send-email-linus.walleij@linaro.org>
+References: <1448461036-16724-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20151125143954.GD11384@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2015 01:25 AM, Carlo Caione wrote:
-> On Tue, Nov 24, 2015 at 7:19 PM, Guenter Roeck <linux@roeck-us.net> wrote:
->> On Wed, Nov 11, 2015 at 09:54:04AM +0100, Carlo Caione wrote:
->>> On Mon, Nov 9, 2015 at 4:03 PM, Guenter Roeck <linux@roeck-us.net> wrote:
->>>> On 11/08/2015 04:18 AM, Carlo Caione wrote:
->>>>>
->>>>> From: Carlo Caione <carlo@endlessm.com>
->>>>>
->>>>> With this patch we refactor the driver code to enable watchdog support
->>>>> for all platforms based on Amlogic meson SoCs.
->>>>> The new default timeout is also now chosen considering the maximum
->>>>> timeout allowed by the SoC.
->>>>>
->>>>> Signed-off-by: Carlo Caione <carlo@endlessm.com>
->>>>
->>>>
->>>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
->>>
->>> Wim,
->>> any (N)ACK on this?
->>>
->> Carlo,
->>
->> Unless I missed it, we still don't have an Ack from a devicetree
->> maintainer for the devicetree changes.
->
-> I'm the maintainer for the Meson platform and since the changes are
-> trivial I'm going to merge them after the driver is taken in the
-> watchdog tree.
->
+On Wed, Nov 25, 2015 at 03:17:16PM +0100, Linus Walleij wrote:
+> This just regenerates the v5 mvebu defconfig with the latest
+> defaults so as to avoid too much fuzz when applying patches to
+> it.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  arch/arm/configs/mvebu_v5_defconfig | 12 ++----------
+>  1 file changed, 2 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
+> index 824de499237b..519c72725798 100644
+> --- a/arch/arm/configs/mvebu_v5_defconfig
+> +++ b/arch/arm/configs/mvebu_v5_defconfig
+> @@ -12,7 +12,6 @@ CONFIG_MODULE_UNLOAD=y
+>  # CONFIG_ARCH_MULTI_V7 is not set
+>  CONFIG_ARCH_MVEBU=y
+>  CONFIG_MACH_KIRKWOOD=y
+> -CONFIG_MACH_NETXBIG=y
+>  # CONFIG_CPU_FEROCEON_OLD_ID is not set
+>  CONFIG_PCI_MVEBU=y
+>  CONFIG_PREEMPT=y
+> @@ -66,8 +65,6 @@ CONFIG_ATA=y
+>  CONFIG_SATA_AHCI=y
+>  CONFIG_SATA_MV=y
+>  CONFIG_NETDEVICES=y
+> -CONFIG_NET_DSA_MV88E6123_61_65=y
+> -CONFIG_NET_DSA_MV88E6171=y
 
-Ok. I'll add patches 1 and 2 from the series to my -next tree and send
-them to Wim with my next pull request.
+This is interesting. I guess because of switchdev.
 
-Guenter
+>  CONFIG_MV643XX_ETH=y
+>  CONFIG_R8169=y
+>  CONFIG_MARVELL_PHY=y
+> @@ -91,7 +88,6 @@ CONFIG_I2C_MV64XXX=y
+>  CONFIG_SPI=y
+>  CONFIG_SPI_ORION=y
+>  CONFIG_GPIO_SYSFS=y
+> -CONFIG_POWER_SUPPLY=y
+>  CONFIG_POWER_RESET=y
+>  CONFIG_POWER_RESET_GPIO=y
+>  CONFIG_POWER_RESET_QNAP=y
+> @@ -103,16 +99,15 @@ CONFIG_SENSORS_LM85=y
+>  CONFIG_THERMAL=y
+>  CONFIG_WATCHDOG=y
+>  CONFIG_ORION_WATCHDOG=y
+> +CONFIG_REGULATOR=y
+> +CONFIG_REGULATOR_FIXED_VOLTAGE=y
+>  CONFIG_FB=y
+>  CONFIG_SOUND=y
+>  CONFIG_SND=y
+>  CONFIG_SND_SOC=y
+>  CONFIG_SND_KIRKWOOD_SOC=y
+> -CONFIG_SND_KIRKWOOD_SOC_T5325=y
+
+Humm
+
+I think i will be sending a follow-up patch to re-enable these things.
+Add the missing dependencies.
+
+  Andrew
