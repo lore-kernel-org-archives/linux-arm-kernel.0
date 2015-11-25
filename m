@@ -1,108 +1,48 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 25 Nov 2015 15:21:27 +0000
-Subject: [RFC PATCH 02/10] clockevents/drivers: add MPS2 Timer driver
-In-Reply-To: <5655CF58.6030507@linaro.org>
-References: <1448447621-17900-1-git-send-email-vladimir.murzin@arm.com>
- <1448447621-17900-3-git-send-email-vladimir.murzin@arm.com>
- <5655BA34.9040207@linaro.org> <5655CADA.1010803@arm.com>
- <5655CF58.6030507@linaro.org>
-Message-ID: <5655D1F7.2030202@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 25 Nov 2015 16:37:51 +0100
+Subject: [PATCH 3/7] ARM: mohawk: allow building with MMU disabled
+In-Reply-To: <1448465875-435039-1-git-send-email-arnd@arndb.de>
+References: <1448465875-435039-1-git-send-email-arnd@arndb.de>
+Message-ID: <1448465875-435039-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/11/15 15:10, Daniel Lezcano wrote:
-> On 11/25/2015 03:51 PM, Vladimir Murzin wrote:
->> Hi Daniel,
->>
->> Thanks for you review, I agree on all concerns raised and address them
->> in the next version. Just some points to confirm below (I left only
->> relevant parts).
->>
->>>> +static irqreturn_t mps2_timer_interrupt(int irq, void *dev_id)
->>>> +{
->>>> +    struct clockevent_mps2 *ce = dev_id;
->>>> +    u32 status = readl(ce->reg + TIMER_INT);
->>>> +
->>>> +    if (!status)
->>>> +        return IRQ_NONE;
->>>
->>> Why that could happen ? Add a comment.
->>>
->>
->> Sort of defensive programming, I never seen it happens, but just in case
->> of spurious interrupts... Do you prefer to get rid of this check or
->>
->>      /* spurious interrupt? */
->>      if (!status)
->>          return IRQ_NONE;
->>
->> would be fine to you?
-> 
-> Yes, that would be fine, but if it does never happen, we don't really
-> need this check. If you prefer to make sure there isn't a spurious
-> interrupt and considering it shouldn't happen, a pr_info trace may help
-> to spot this misbehavior.
-> 
+It is in principle possible to build an MMP kernel for
+the mohawk CPU with the MMU code disabled, except for one
+simple build error:
 
-Good, I'll put pr_warn("spurious interrupt\n") then.
+proc-mohawk.S:345: Error: invalid operands (*UND* and *UND* sections) for `|'
+proc-mohawk.S:345: Error: invalid operands (*ABS* and *UND* sections) for `|'
+proc-mohawk.S:345: Error: invalid operands (*UND* and *UND* sections) for `|'
+proc-mohawk.S:345: Error: invalid operands (*UND* and *UND* sections) for `|'
+proc-mohawk.S:345: Error: undefined symbol L_PTE_USER used as an immediate value
 
->>>> +}
->>>> +
->>>> +static void __init mps2_timer_init(struct device_node *np)
->>>> +{
->>>> +    static int clksrc;
->>>> +
->>>> +    if (!clksrc && !mps2_clocksource_init(np))
->>>> +        clksrc = 1;
->>>> +    else
->>>> +        mps2_clockevents_init(np);
->>>
->>> That assumes the clocksource is defined before the clockevents in the
->>> DT. If it is not the case, the mps2_clocksource_init will fail (and spit
->>> errors) and mps2_clockevents_init() won't be called.
->>>
->>
->> Does following (stolen from efm32) look better to you?
->>
->> static void __init mps2_timer_init(struct device_node *np)
->> {
->>     static int has_clocksource, has_clockevent;
->>     int ret;
->>
->>     if (!has_clocksource) {
->>         ret = mps2_clocksource_init(np);
->>         if (!ret) {
->>             has_clocksource = 1;
->>             return;
->>         }
->>     }
->>
->>     if (!has_clockevent) {
->>         ret = mps2_clockevent_init(np);
->>         if (!ret) {
->>             has_clockevent = 1;
->>             return;
->>         }
->>     }
->> }
-> 
-> Yes.
-> 
-> I don't like to have a "CLOCKSOURCE_OF_DECLARE" to initialize a
-> clockevent but I can't blame you, this is what is done in the other
-> drivers.
+This patch changes the proc-mohawk code to do the same as the
+other CPUs and not try to actually do anything for the
+cpu_mohawk_set_pte_ext function, which won't be used anyway.
 
-Thanks for your time!
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mm/proc-mohawk.S | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Vladimir
-
-> 
->>>> +}
->>>> +
->>>> +CLOCKSOURCE_OF_DECLARE(mps2_timer, "arm,mps2-timer", mps2_timer_init);
->>>>
->>>
->>>
->>
-> 
-> 
+diff --git a/arch/arm/mm/proc-mohawk.S b/arch/arm/mm/proc-mohawk.S
+index d65edf717bf7..6f07d2ef4ff2 100644
+--- a/arch/arm/mm/proc-mohawk.S
++++ b/arch/arm/mm/proc-mohawk.S
+@@ -342,11 +342,13 @@ ENTRY(cpu_mohawk_switch_mm)
+  */
+ 	.align	5
+ ENTRY(cpu_mohawk_set_pte_ext)
++#ifdef CONFIG_MMU
+ 	armv3_set_pte_ext
+ 	mov	r0, r0
+ 	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
+ 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
+ 	ret	lr
++#endif
+ 
+ .globl	cpu_mohawk_suspend_size
+ .equ	cpu_mohawk_suspend_size, 4 * 6
+-- 
+2.1.0.rc2
