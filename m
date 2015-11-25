@@ -1,76 +1,55 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 25 Nov 2015 09:41:42 +0100
-Subject: [PATCH] ARM: shmobile: r8a7779: Add L2 cache-controller node
-In-Reply-To: <1448416683-1411-1-git-send-email-horms+renesas@verge.net.au>
-References: <1448416683-1411-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVTdPocWCnzE8v-O_rpNJR=0mO23jeG8ejYzL0REtQb+g@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 25 Nov 2015 17:44:26 +0900
+Subject: [PATCH v6 00/12] arm64: renesas: add sound support
+In-Reply-To: <87610q8upv.wl%kuninori.morimoto.gx@renesas.com>
+References: <87egg3k5g6.wl%kuninori.morimoto.gx@renesas.com>
+ <20151109012943.GF4832@verge.net.au>
+ <CAMuHMdXBQNCibJU4EDuFZX0zRzUZfC_4KTyXFNVLL81a51Q4RA@mail.gmail.com>
+ <20151109090139.GM4832@verge.net.au>
+ <CAMuHMdWv1Ae1JTDyN2JkuHC1Fmfw25gtmmUkSMUitrUQnv82Ug@mail.gmail.com>
+ <20151110001111.GB1040@verge.net.au>
+ <20151124023025.GA21853@verge.net.au>
+ <87k2p7yjbl.wl%kuninori.morimoto.gx@renesas.com>
+ <20151125002752.GH20596@verge.net.au>
+ <87610q8upv.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20151125084422.GA11664@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Wed, Nov 25, 2015 at 06:27:30AM +0000, Kuninori Morimoto wrote:
+> 
+> Hi Simon
+> Cc Geert
+> 
+> > > I would like to check latest version.
+> > > Which branch/tag can I check ?
+> > 
+> > If you want to check for apply-time and compile-time dependencies use
+> > the latest renesas-devel tag in my renesas tree.
+> > 
+> > If you want to check run-time you may need to pull in some dependencies,
+> > especially the cpg-mssr-v6 branch of Geert's renesas-drivers tree.  A
+> > sledge-hammer approach would be to pull in the latest renesas-drivers tag
+> > of that tree.
+> > 
+> > In any case I'll need to know what run-time dependencies, other than
+> > cpg-mssr, are missing from renesas-next and/or renesas-devel so we can
+> > sensibly decide what to queue up.
+> 
+> Recent renesas-drivers sound has many conflicts, and sound
+> has strange behavior. I had tried it before and noticed.
+> I'm not sure latest one, but it has conflict log.
+> I'm using a littile older kernel, because of above reason.
 
-On Wed, Nov 25, 2015 at 2:58 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Add the missing L2 cache-controller node, and link the CPU nodes to it.
->
-> The L2 cache is an ARM L2C-310 (r3p2), of size 1 MB (64 KiB x 16 ways).
->
-> Based on work for the r8a7740 by Geert Uytterhoeven.
->
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+:(
 
-Thanks for your patch!
+> Anyway, I tried below, and I could get sound.
+> (Limited sound only, because we are lacking CS2000 driver)
+> 
+> 	> git checkout renesas-devel-20151123-v4.4-rc2
+> 	> git merge geert/topic/cpg-mssr-v6
+>         > git am -3 ${PATCH-SET}
+> 
+> I will send ${PATCH-SET} soon
 
-> ---
->  arch/arm/boot/dts/r8a7779.dtsi | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-> index 6afa909865b5..f27fa2db16ee 100644
-> --- a/arch/arm/boot/dts/r8a7779.dtsi
-> +++ b/arch/arm/boot/dts/r8a7779.dtsi
-
-> @@ -63,6 +67,17 @@
->                       <0xf0000100 0x100>;
->         };
->
-> +       L2: cache-controller {
-> +               compatible = "arm,pl310-cache";
-> +               reg = <0xf0100000 0x1000>;
-> +               interrupts = <0 122 IRQ_TYPE_LEVEL_HIGH>;
-
-40?
-
-Comparing to other devices, you have to subtract 32 from 0x5a, not
-add 32?
-
-> +               arm,data-latency = <3 3 3>;
-> +               arm,tag-latency = <2 2 2>;
-
-Table 9.5 says 2 resp. 1 instead of 3 resp. 2?
-
-However:
-
-"The TAG and data RAM latency can be set in the reg1_tag_ram_control and
- reg1_data_ram_control registers. However, since values to be set are
- hardware-dependent, the default values should not be modified."
-
-Perhaps we should just omit these values?
-
-> +               arm,shared-override;
-> +               cache-unified;
-> +               cache-level = <2>;
-> +       };
-> +
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>From my POV this is a good result.
