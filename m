@@ -1,19 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Nov 2015 21:28:43 +0100
-Subject: [PATCH v2] ARM: davinci: fix a problematic usage of WARN()
-In-Reply-To: <201511260435.1AHQOCP1%fengguang.wu@intel.com>
-References: <201511260435.1AHQOCP1%fengguang.wu@intel.com>
-Message-ID: <19146462.9tlorCPL8k@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 25 Nov 2015 14:29:56 -0600
+Subject: [PATCH v6 3/6] watchdog: ts4800: add driver for TS-4800 watchdog
+In-Reply-To: <1448479507-1951-4-git-send-email-damien.riegel@savoirfairelinux.com>
+References: <1448479507-1951-1-git-send-email-damien.riegel@savoirfairelinux.com>
+ <1448479507-1951-4-git-send-email-damien.riegel@savoirfairelinux.com>
+Message-ID: <20151125202956.GA10228@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 26 November 2015 04:21:09 kbuild test robot wrote:
->    386          aemif = clk_get(&dm355evm_dm9000.dev, "aemif");
->  > 387          if (!WARN(IS_ERR(aemif)), "unable to get AEMIF clock\n"))
->    388                  clk_prepare_enable(aemif);
->    389  
+On Wed, Nov 25, 2015 at 02:25:04PM -0500, Damien Riegel wrote:
+> This watchdog is instantiated in a FPGA that is memory mapped. It is
+> made of only one register, called the feed register. Writing to this
+> register will re-arm the watchdog for a given time (and enable it if it
+> was disable). It can be disabled by writing a special value into it.
 > 
+> It is part of a syscon block, and the watchdog register offset in this
+> block varies from board to board. This offset is passed in the syscon
+> property after the phandle to the syscon node.
+> 
+> Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+>  .../devicetree/bindings/watchdog/ts4800-wdt.txt    |  25 +++
+>  drivers/watchdog/Kconfig                           |  10 +
+>  drivers/watchdog/Makefile                          |   1 +
+>  drivers/watchdog/ts4800_wdt.c                      | 215 +++++++++++++++++++++
+>  4 files changed, 251 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt
+>  create mode 100644 drivers/watchdog/ts4800_wdt.c
+> 
+> diff --git a/Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt b/Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt
+> new file mode 100644
+> index 0000000..388c60f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt
+> @@ -0,0 +1,25 @@
+> +Technologic Systems Watchdog
+> +
+> +Required properties:
+> +- compatible: must be "technologic,ts4800-wdt"
+> +- syscon: phandle / integer array that points to the syscon node which
+> +          describes the FPGA's syscon registers.
+> +          - phandle to FPGA's syscon
+> +          - offset to the watchdog register
+> +
+> +Optional property:
+> +- timeout-sec: contains the watchdog timeout in seconds.
+> +
+> +Example:
+> +
+> +syscon: syscon at b0010000 {
+> +	compatible = "syscon", "simple-mfd";
+> +	reg = <0xb0010000 0x3d>;
+> +	bus-width = <16>;
+> +
+> +	wdt at e {
+> +		compatible = "technologic,ts4800-wdt";
+> +		syscon = <&syscon 0xe>;
 
-That is an extra ')' after aemif.
+If this is single register only for the watchdog, why do you need 
+syscon? You can just use reg.
 
-	Arnd
+Rob
