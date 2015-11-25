@@ -1,64 +1,91 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 25 Nov 2015 09:27:56 +0900
-Subject: [PATCH v6 00/12] arm64: renesas: add sound support
-In-Reply-To: <87k2p7yjbl.wl%kuninori.morimoto.gx@renesas.com>
-References: <87egg3k5g6.wl%kuninori.morimoto.gx@renesas.com>
- <20151109012943.GF4832@verge.net.au>
- <CAMuHMdXBQNCibJU4EDuFZX0zRzUZfC_4KTyXFNVLL81a51Q4RA@mail.gmail.com>
- <20151109090139.GM4832@verge.net.au>
- <CAMuHMdWv1Ae1JTDyN2JkuHC1Fmfw25gtmmUkSMUitrUQnv82Ug@mail.gmail.com>
- <20151110001111.GB1040@verge.net.au>
- <20151124023025.GA21853@verge.net.au>
- <87k2p7yjbl.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20151125002752.GH20596@verge.net.au>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Tue, 24 Nov 2015 16:34:19 -0800
+Subject: [PATCH v2 2/2] restrict /dev/mem to idle io memory ranges
+In-Reply-To: <20151124142521.e6d23e44a8b2c24c044c2dec@linux-foundation.org>
+References: <20151124000553.26360.57819.stgit@dwillia2-desk3.jf.intel.com>
+ <20151124000604.26360.56945.stgit@dwillia2-desk3.jf.intel.com>
+ <20151124142521.e6d23e44a8b2c24c044c2dec@linux-foundation.org>
+Message-ID: <CAPcyv4ijWns879DytqUa+=r5hzQ1qzmB83VV6Z16kQNtmHUtbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 07:04:34AM +0000, Kuninori Morimoto wrote:
-> 
-> Hi Simon
-> 
-> > > On Mon, Nov 09, 2015 at 10:07:20AM +0100, Geert Uytterhoeven wrote:
-> > > > Hi Simon,
-> > > > 
-> > > > On Mon, Nov 9, 2015 at 10:01 AM, Simon Horman <horms@verge.net.au> wrote:
-> > > > > On Mon, Nov 09, 2015 at 09:08:08AM +0100, Geert Uytterhoeven wrote:
-> > > > >> On Mon, Nov 9, 2015 at 2:29 AM, Simon Horman <horms@verge.net.au> wrote:
-> > > > >> >>       arm64: renesas: salvator-x: Sound SSI PIO support
-> > > > >> >
-> > > > >> > The above patch seemed to have some fuzz. Please check that
-> > > > >> > I resolved that correctly.
-> > > > >>
-> > > > >> The ak4613 node is now a child node of scif2 instead of i2c2, which is
-> > > > >> definitely not correct.
-> > > > >>
-> > > > >> "git diff topic/r8a7795-sound-v5..topic/r8a7795-sound-v6" will show you.
-> > > > >
-> > > > > Thanks, that is a bit of a disaster. Sorry about that.
-> > > > >
-> > > > > I have tried to fix the problem and re-pushed topic/r8a7795-sound-v6.
-> > > > > The head commit is now:
-> > > > >
-> > > > > 03a185979391 ("arm64: defconfig: add Renesas sound and AK4613 support")
-> > > > 
-> > > > Thanks, looks much better now.
-> > > 
-> > > Thanks for checking.
-> > 
-> > I am wondering if it is appropriate to queue up this series for v4.5.
-> > Could you let me know what your thoughts on that are?
-> 
-> I would like to check latest version.
-> Which branch/tag can I check ?
+On Tue, Nov 24, 2015 at 2:25 PM, Andrew Morton
+<akpm@linux-foundation.org> wrote:
+> On Mon, 23 Nov 2015 16:06:04 -0800 Dan Williams <dan.j.williams@intel.com> wrote:
+>
+>> This effectively promotes IORESOURCE_BUSY to IORESOURCE_EXCLUSIVE
+>> semantics by default.  If userspace really believes it is safe to access
+>> the memory region it can also perform the extra step of disabling an
+>> active driver.  This protects device address ranges with read side
+>> effects and otherwise directs userspace to use the driver.
+>
+> I don't think I'm sufficiently understanding what this is all needed
+> for, sorry.  A better changelog would help: what's wrong with the
+> current code, how you propose it be changed, how the kernel's
+> externally-visible behaviour is altered, etc.
+>
 
-If you want to check for apply-time and compile-time dependencies use
-the latest renesas-devel tag in my renesas tree.
+I should have duplicated the Kconfig description for IO_STRICT_DEVMEM
+in the changelog, but the justification is simply that if the kernel
+has a driver busily using a memory range, userspace needs to assert it
+knows it is safe to access that range by disabling the driver.  This
+makes the kernel safer by default.
 
-If you want to check run-time you may need to pull in some dependencies,
-especially the cpg-mssr-v6 branch of Geert's renesas-drivers tree.  A
-sledge-hammer approach would be to pull in the latest renesas-drivers tag
-of that tree.
+> Please pay particular attention to the back-compatibility issues which
+> will be encountered when people enable these options.
 
-In any case I'll need to know what run-time dependencies, other than
-cpg-mssr, are missing from renesas-next and/or renesas-devel so we can
-sensibly decide what to queue up.
+It certainly diminishes debug capabilities, mmap of sysfs pci
+resources will also fail while a driver is active.  The only general
+purpose application I know that uses /dev/mem is dosemu.  It should
+continue to work fine as x86 "devmem_is_allowed()" permits access from
+0-to-1MB by default.  The other stated user of /dev/mem legacy X
+drivers.  With the prevalence of kernel modesetting in graphics
+drivers I don't know how much of a concern this is anymore.
+
+> Perhaps when all that material is described, I'll understand why the
+> heck we're doing this with a build-time switch rather than a runtime
+> one...
+
+We have the "iomem=" kernel parameter.  I think it makes sense to have
+that setting be configurable at runtime to augment this build time
+decision.
+
+>> Persistent memory presents a large "mistake surface" to /dev/mem as now
+>> accidental writes can corrupt a filesystem.
+>
+> Is that the motivation?  root can come in and accidentally alter
+> persistent memory contents?  If so,
+>
+> - why do we care?  There are all sorts of ways in which root can muck
+>   up the persistent memory, starting with dd(1).  What's special about
+>   /dev/mem?
+
+dd through /dev/pmem and the driver will do all the proper flushing
+and syncing to make the writes durable on media.  /dev/mem knows none
+of those semantics.  /dev/pmem as a block device responds to O_EXCL
+and prevents other attempts to open the device.
+
+> - why is the patch mucking with access to PCI and BIOS space?  Is the
+>   persistent memory even mappable in those regions?  Or is the concern
+>   that userspace can access control registers associated with the
+>   persistent memory?  What is the problem scenario?
+
+It seems to me that letting /dev/mem do arbitrary access to any region
+of memory is a dangerous capability for a production environment.
+Drivers assume that request_mem_region() tells other parts of the
+kernel to not touch their memory.  Having the option to extend that
+protection to /dev/mem by default seemed a reasonable idea.
+
+Of course, all of this assumes that you think it is worthwhile to have
+some protections and safety measures even for root.
+
+> IOW, a very good description of the problem-being-solved would help out
+> a lot here...
+
+I'll fold the eventual result of this discussion into the changelog if
+I can convince you it's worth moving forward.
+
+I also have the option of just tagging the pmem regions as
+IORESOURCE_EXCLUSIVE, but I decided against that because I think our
+current definition of STRICT_DEVMEM leaves a big hole if the goal is
+"/dev/mem access is safe by default".
