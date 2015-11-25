@@ -1,35 +1,70 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Wed, 25 Nov 2015 13:31:16 +0100
-Subject: [PATCH] ARM: ixp4xx: fix read{b,w,l} return types
-In-Reply-To: <4577677.sEiIMqkHSM@wuerfel> (Arnd Bergmann's message of "Fri, 20
- Nov 2015 23:20:28 +0100")
-References: <4577677.sEiIMqkHSM@wuerfel>
-Message-ID: <m3h9kaz2ej.fsf@t19.piap.pl>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 25 Nov 2015 13:31:14 +0100
+Subject: [PATCH v8 2/2] arm64: dts: mt8173: Add nor flash node
+In-Reply-To: <1448449042.24527.0.camel@mtksdaap41>
+References: <1447817403-16631-1-git-send-email-bayi.cheng@mediatek.com>
+ <1447817403-16631-3-git-send-email-bayi.cheng@mediatek.com>
+ <56559274.1090900@gmail.com> <1448449042.24527.0.camel@mtksdaap41>
+Message-ID: <5655AA12.4070903@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
 
-> On ixp4xx, the readl() function returns an 'unsigned long' output
-> when indirect I/O is used. This is unlike any other platform, and
-> it causes lots of harmless compiler warnings, such as:
+
+On 25/11/15 11:57, Yingjoe Chen wrote:
+> On Wed, 2015-11-25 at 11:50 +0100, Matthias Brugger wrote:
+>>
+>> On 18/11/15 04:30, Bayi Cheng wrote:
+>>> Add Mediatek nor flash node
+>>>
+>>> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
+>>> Acked-by: Brian Norris <computersforpeace@gmail.com>
+>>> ---
+>>>    arch/arm64/boot/dts/mediatek/mt8173.dtsi | 18 +++++++++++++++++-
+>>>    1 file changed, 17 insertions(+), 1 deletion(-)
+>>>
+>>
+>> Applied to v4.5-next/dts
+>>
+>> Thanks.
+>> Matthias
+>>
+>>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>>> index 4dd5f93..7988656 100644
+>>> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>>> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>>> @@ -387,7 +387,23 @@
+>>>    			status = "disabled";
+>>>    		};
+>>>
+>>> -		i2c3: i2c at 11010000 {
+>>> +		nor_flash: spi at 1100d000 {
+>>> +			compatible = "mediatek,mt8173-nor";
+>>> +			reg = <0 0x1100d000 0 0xe0>;
+>>> +			clocks = <&pericfg CLK_PERI_SPI>,
+>>> +				 <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
+>>> +			clock-names = "spi", "sf";
+>>> +			#address-cells = <1>;
+>>> +			#size-cells = <0>;
+>>> +			status = "disabled";
+>>> +
+>>> +			flash at 0 {
+>>> +				compatible = "jedec,spi-nor";
+>>> +				reg = <0>;
+>>> +			};
+>>> +		};
+>>> +
+>>> +		i2c3: i2c3 at 11010000 {
 >
-> drivers/ata/libahci.c: In function 'ahci_show_host_version':
-> drivers/ata/libahci.c:254:22: warning: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'long unsigned int' [-Wformat=]
-> drivers/block/mtip32xx/mtip32xx.c: In function 'mtip_hw_read_registers':
-> drivers/block/mtip32xx/mtip32xx.c:2602:31: warning: format '%X' expects argument of type 'unsigned int', but argument 3 has type 'long unsigned int' [-Wformat=]
-> drivers/block/cciss.c: In function 'print_cfg_table':
-> drivers/block/cciss.c:3845:25: warning: format '%d' expects argument of type 'int', but argument 4 has type 'long unsigned int' [-Wformat=]
+> Hi Matthias,
 >
-> This changes all six of the ixp4xx specific I/O read functions
-> to return the same types that we have in the normal asm/io.h,
-> to avoid the warnings.
+> Just notice this one. Please make sure this line should be
+>
+> i2c3: i2c at 11010000 {
+>
+> instead of
+>
+> i2c3: i2c3 at 11010000 {
+>
 
-Thanks for fixing this.
-
-Acked-by: Krzysztof Halasa <khalasa@piap.pl>
--- 
-Krzysztof Halasa
-
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+Fixed, thanks for catching this.
