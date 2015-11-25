@@ -1,38 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Nov 2015 21:30:41 +0100
-Subject: [PATCH 3/3] ARM: qcom: Drop ARCH_MSM* configs
-In-Reply-To: <20151125193447.GD11298@codeaurora.org>
-References: <1448413710-8101-1-git-send-email-sboyd@codeaurora.org>
- <3990433.OKhWpPeunI@wuerfel> <20151125193447.GD11298@codeaurora.org>
-Message-ID: <5774027.3ZvxSC0ub5@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 25 Nov 2015 14:32:53 -0600
+Subject: [PATCH v6 2/6] mfd: syscon: add a DT property to set value width
+In-Reply-To: <1448479507-1951-3-git-send-email-damien.riegel@savoirfairelinux.com>
+References: <1448479507-1951-1-git-send-email-damien.riegel@savoirfairelinux.com>
+ <1448479507-1951-3-git-send-email-damien.riegel@savoirfairelinux.com>
+Message-ID: <20151125203253.GA13437@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 November 2015 11:34:47 Stephen Boyd wrote:
-> On 11/25, Arnd Bergmann wrote:
-> > On Wednesday 25 November 2015 13:27:55 Daniel Lezcano wrote:
-> > > 
-> > > What about:
-> > > 
-> > > textofs-$(CONFIG_ARCH_MSM8X60) := 0x00208000
-> > > textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
-> > > 
-> > > in arch/arm/Makefile
-> > 
-> > Good point, we need to do something about these still.
-> > 
+On Wed, Nov 25, 2015 at 02:25:03PM -0500, Damien Riegel wrote:
+> Currently syscon has a fixed configuration of 32 bits for register and
+> values widths. In some cases, it would be desirable to be able to
+> customize the value width.
 > 
-> Yeah good catch! My brain must be shutting down due to the
-> holiday coming up.
+> For example, certain boards (like the ones manufactured by Technologic
+> Systems) have a FPGA that is memory-mapped, but its registers are only
+> 16-bit wide.
 > 
-> The nice thing is that CLKSRC_QCOM and this text offset stuff are
-> always used on the same SoCs, so we should be able to make one
-> config in mach-qcom/Kconfig that selects the qcom clksrc driver
-> and adjusts the text offset. So is the suggestion to move
-> CLKSRC_QCOM to mach-qcom/Kconfig, or to make a new config that
-> selects it?
+> This patch adds an optional "bus-width" DT binding for syscon that
+> allows to change the width for the data bus (i.e. val_bits). If this
+> property is provided, it will also adjust the register stride to
+> bus-width / 8. If not provided, the default configuration is used.
 
-I was thinking of a new option that selects it, which I think is
-more in line with what Daniel wants.
+See the 8250 UART bindings. This problem is already solved and has 
+standard bindings for it.
 
-	Arnd
+Rob
+
+> 
+> Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/mfd/syscon.txt |  3 +++
+>  drivers/mfd/syscon.c                             | 13 +++++++++++++
+>  2 files changed, 16 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
+> index fe8150b..4c9d187 100644
+> --- a/Documentation/devicetree/bindings/mfd/syscon.txt
+> +++ b/Documentation/devicetree/bindings/mfd/syscon.txt
+> @@ -13,6 +13,9 @@ Required properties:
+>  - compatible: Should contain "syscon".
+>  - reg: the register region can be accessed from syscon
+>  
+> +Optional property:
+> +- bus-width: width of the data bus. Can be <8>, <16>, <32>, or <64>.
+> +
+>  Examples:
+>  gpr: iomuxc-gpr at 020e0000 {
+>  	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
+> diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
+> index 176bf0f..5a93d80 100644
+> --- a/drivers/mfd/syscon.c
+> +++ b/drivers/mfd/syscon.c
+> @@ -47,6 +47,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
+>  	struct syscon *syscon;
+>  	struct regmap *regmap;
+>  	void __iomem *base;
+> +	u32 bus_width;
+>  	int ret;
+>  	struct regmap_config syscon_config = syscon_regmap_config;
+>  
+> @@ -69,6 +70,18 @@ static struct syscon *of_syscon_register(struct device_node *np)
+>  	 else if (of_property_read_bool(np, "little-endian"))
+>  		syscon_config.val_format_endian = REGMAP_ENDIAN_LITTLE;
+>  
+> +	/*
+> +	 * search for bus-width property in DT. If it is not provided, default
+> +	 * to 32-bit. regmap_init_mmio will return an error if syscon_config's
+> +	 * values are invalid so there is no need to check them here.
+> +	 */
+> +	ret = of_property_read_u32(np, "bus-width", &bus_width);
+> +	if (ret)
+> +		bus_width = 32;
+> +
+> +	syscon_config.val_bits = bus_width;
+> +	syscon_config.reg_stride = syscon_config.val_bits / 8;
+> +
+>  	regmap = regmap_init_mmio(NULL, base, &syscon_config);
+>  	if (IS_ERR(regmap)) {
+>  		pr_err("regmap init failed\n");
+> -- 
+> 2.5.0
+> 
