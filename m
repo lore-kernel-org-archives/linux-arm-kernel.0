@@ -1,65 +1,57 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 25 Nov 2015 10:43:02 +0000
-Subject: [PATCH] ARM: avoid SMP DT initialisation on UP-only capable systems
-Message-ID: <E1a1XXS-00060O-GS@rmk-PC.arm.linux.org.uk>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 25 Nov 2015 11:50:28 +0100
+Subject: [PATCH v8 2/2] arm64: dts: mt8173: Add nor flash node
+In-Reply-To: <1447817403-16631-3-git-send-email-bayi.cheng@mediatek.com>
+References: <1447817403-16631-1-git-send-email-bayi.cheng@mediatek.com>
+ <1447817403-16631-3-git-send-email-bayi.cheng@mediatek.com>
+Message-ID: <56559274.1090900@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm_dt_init_cpu_maps() initialises the CPU possible map even when the
-boot CPU indicates that it is not SMP capable.  This can happen with
-SoCs where the SoC may have a single UP-only CPU, or may have a pair of
-SMP CPUs - and this is the only difference.
 
-One solution is to increase the number of DT files by forcing peopl to
-properly describe the hardware: this means all the iMX6DL DT files need
-to be duplicated for iMX6S and a whole raft of updates to boot loaders
-and the like.
 
-Another solution is to decide that it is inappropriate to initialise the
-cpu_possible map with anything but the boot CPU on non-SMP capable
-systems.  This is implemented by this patch.
+On 18/11/15 04:30, Bayi Cheng wrote:
+> Add Mediatek nor flash node
+>
+> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
+> Acked-by: Brian Norris <computersforpeace@gmail.com>
+> ---
+>   arch/arm64/boot/dts/mediatek/mt8173.dtsi | 18 +++++++++++++++++-
+>   1 file changed, 17 insertions(+), 1 deletion(-)
+>
 
-The situation currently may provoke a warning on earlier kernels,
-printed during SMP bringup where we attempt to bring CPU1 online inspite
-of CPU0 being a UP-only CPU, and this only failing due to the lack of
-SMP operations.
+Applied to v4.5-next/dts
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/kernel/devtree.c | 21 ++++++++++++---------
- 1 file changed, 12 insertions(+), 9 deletions(-)
+Thanks.
+Matthias
 
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index 65addcbf5b30..bd72ce91d7a2 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -170,15 +170,18 @@ void __init arm_dt_init_cpu_maps(void)
- 		return;
- 	}
- 
--	/*
--	 * Since the boot CPU node contains proper data, and all nodes have
--	 * a reg property, the DT CPU list can be considered valid and the
--	 * logical map created in smp_setup_processor_id() can be overridden
--	 */
--	for (i = 0; i < cpuidx; i++) {
--		set_cpu_possible(i, true);
--		cpu_logical_map(i) = tmp_map[i];
--		pr_debug("cpu logical map 0x%x\n", cpu_logical_map(i));
-+	if (is_smp()) {
-+		/*
-+		 * Since the boot CPU node contains proper data, and all
-+		 * nodes have a reg property, the DT CPU list can be
-+		 * considered valid and the logical map created in
-+		 * smp_setup_processor_id() can be overridden
-+		 */
-+		for (i = 0; i < cpuidx; i++) {
-+			set_cpu_possible(i, true);
-+			cpu_logical_map(i) = tmp_map[i];
-+			pr_debug("cpu logical map 0x%x\n", cpu_logical_map(i));
-+		}
- 	}
- }
- 
--- 
-2.1.0
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index 4dd5f93..7988656 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -387,7 +387,23 @@
+>   			status = "disabled";
+>   		};
+>
+> -		i2c3: i2c at 11010000 {
+> +		nor_flash: spi at 1100d000 {
+> +			compatible = "mediatek,mt8173-nor";
+> +			reg = <0 0x1100d000 0 0xe0>;
+> +			clocks = <&pericfg CLK_PERI_SPI>,
+> +				 <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
+> +			clock-names = "spi", "sf";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "disabled";
+> +
+> +			flash at 0 {
+> +				compatible = "jedec,spi-nor";
+> +				reg = <0>;
+> +			};
+> +		};
+> +
+> +		i2c3: i2c3 at 11010000 {
+>   			compatible = "mediatek,mt8173-i2c";
+>   			reg = <0 0x11010000 0 0x70>,
+>   			      <0 0x11000280 0 0x80>;
+>
