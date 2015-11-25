@@ -1,56 +1,91 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Wed, 25 Nov 2015 23:00:59 +0100
-Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
- "/chosen/linux, atags" entry
-In-Reply-To: <17689711.DsQsCiDFAN@wuerfel>
-References: <20150713131902.GH26485@atomide.com> <201511252244.28797@pali>
- <17689711.DsQsCiDFAN@wuerfel>
-Message-ID: <201511252300.59976@pali>
+From: damien.riegel@savoirfairelinux.com (Damien Riegel)
+Date: Wed, 25 Nov 2015 17:02:39 -0500
+Subject: [PATCH v6 2/6] mfd: syscon: add a DT property to set value width
+In-Reply-To: <20151125203253.GA13437@rob-hp-laptop>
+References: <1448479507-1951-1-git-send-email-damien.riegel@savoirfairelinux.com>
+ <1448479507-1951-3-git-send-email-damien.riegel@savoirfairelinux.com>
+ <20151125203253.GA13437@rob-hp-laptop>
+Message-ID: <20151125220239.GB3627@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 November 2015 22:51:00 Arnd Bergmann wrote:
-> On Wednesday 25 November 2015 22:44:28 Pali Roh?r wrote:
-> > Arnd, my question about proper solution reminds... Proprietary
-> > bootloader which cannot be replaced (e.g. it is signed or do
-> > unknown magic) provides information to booted kernel via custom
-> > specific ATAGs fields. How userspace could properly read those
-> > custom information from bootloader?
+On Wed, Nov 25, 2015 at 02:32:53PM -0600, Rob Herring wrote:
+> On Wed, Nov 25, 2015 at 02:25:03PM -0500, Damien Riegel wrote:
+> > Currently syscon has a fixed configuration of 32 bits for register and
+> > values widths. In some cases, it would be desirable to be able to
+> > customize the value width.
+> > 
+> > For example, certain boards (like the ones manufactured by Technologic
+> > Systems) have a FPGA that is memory-mapped, but its registers are only
+> > 16-bit wide.
+> > 
+> > This patch adds an optional "bus-width" DT binding for syscon that
+> > allows to change the width for the data bus (i.e. val_bits). If this
+> > property is provided, it will also adjust the register stride to
+> > bus-width / 8. If not provided, the default configuration is used.
 > 
-> The typical solution for nonstandard bootloaders is to have a boot
-> wrapper like the one from
-> https://github.com/zonque/pxa-impedance-matcher that translates
-> whatever information we have at the bootloader level into DT
-> properties.
+> See the 8250 UART bindings. This problem is already solved and has 
+> standard bindings for it.
+
+Okay, I'll change bus-width to reg-io-width. Are you also suggesting to
+use reg-shift to parametrize reg_stride?
+
+> Rob
 > 
-
-Ok. So there is no better solution. With some hacks we can use U-Boot as 
-3rd stage bootloader. But this is not useful for debugging or 
-developing...
-
-Ideal "wrapper" solution would be to compile wrapper and linux zImage 
-and then glue them together to one binary. Something like internal linux 
-uncompress code which translate atags to dt.
-
-> As I understand, the reason we are not doing that here is that we
-> also have proprietary user space that we can't fix to look in a
-> different place, i.e. the interface is between the bootloader and
-> some user binary, not bootloader to kernel.
-> 
-
-Yes, proprietary/closed applications are problems which we cannot fix 
-(without rewriting them).
-
-New applications could use new "proper" interface. But without that 
-interface we cannot do that.
-
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151125/e61df3a0/attachment.sig>
+> > 
+> > Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > Acked-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  Documentation/devicetree/bindings/mfd/syscon.txt |  3 +++
+> >  drivers/mfd/syscon.c                             | 13 +++++++++++++
+> >  2 files changed, 16 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
+> > index fe8150b..4c9d187 100644
+> > --- a/Documentation/devicetree/bindings/mfd/syscon.txt
+> > +++ b/Documentation/devicetree/bindings/mfd/syscon.txt
+> > @@ -13,6 +13,9 @@ Required properties:
+> >  - compatible: Should contain "syscon".
+> >  - reg: the register region can be accessed from syscon
+> >  
+> > +Optional property:
+> > +- bus-width: width of the data bus. Can be <8>, <16>, <32>, or <64>.
+> > +
+> >  Examples:
+> >  gpr: iomuxc-gpr at 020e0000 {
+> >  	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
+> > diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
+> > index 176bf0f..5a93d80 100644
+> > --- a/drivers/mfd/syscon.c
+> > +++ b/drivers/mfd/syscon.c
+> > @@ -47,6 +47,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
+> >  	struct syscon *syscon;
+> >  	struct regmap *regmap;
+> >  	void __iomem *base;
+> > +	u32 bus_width;
+> >  	int ret;
+> >  	struct regmap_config syscon_config = syscon_regmap_config;
+> >  
+> > @@ -69,6 +70,18 @@ static struct syscon *of_syscon_register(struct device_node *np)
+> >  	 else if (of_property_read_bool(np, "little-endian"))
+> >  		syscon_config.val_format_endian = REGMAP_ENDIAN_LITTLE;
+> >  
+> > +	/*
+> > +	 * search for bus-width property in DT. If it is not provided, default
+> > +	 * to 32-bit. regmap_init_mmio will return an error if syscon_config's
+> > +	 * values are invalid so there is no need to check them here.
+> > +	 */
+> > +	ret = of_property_read_u32(np, "bus-width", &bus_width);
+> > +	if (ret)
+> > +		bus_width = 32;
+> > +
+> > +	syscon_config.val_bits = bus_width;
+> > +	syscon_config.reg_stride = syscon_config.val_bits / 8;
+> > +
+> >  	regmap = regmap_init_mmio(NULL, base, &syscon_config);
+> >  	if (IS_ERR(regmap)) {
+> >  		pr_err("regmap init failed\n");
+> > -- 
+> > 2.5.0
+> > 
