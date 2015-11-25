@@ -1,103 +1,46 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 25 Nov 2015 16:10:16 +0100
-Subject: [RFC PATCH 02/10] clockevents/drivers: add MPS2 Timer driver
-In-Reply-To: <5655CADA.1010803@arm.com>
-References: <1448447621-17900-1-git-send-email-vladimir.murzin@arm.com>
- <1448447621-17900-3-git-send-email-vladimir.murzin@arm.com>
- <5655BA34.9040207@linaro.org> <5655CADA.1010803@arm.com>
-Message-ID: <5655CF58.6030507@linaro.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 25 Nov 2015 10:16:02 -0500 (EST)
+Subject: [PATCH] arm64: restore bogomips information in /proc/cpuinfo
+In-Reply-To: <56554AE9.5070901@jonmasters.org>
+References: <1447870505-19319-1-git-send-email-yang.shi@linaro.org>
+ <56554AE9.5070901@jonmasters.org>
+Message-ID: <alpine.LFD.2.20.1511250958370.22569@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2015 03:51 PM, Vladimir Murzin wrote:
-> Hi Daniel,
->
-> Thanks for you review, I agree on all concerns raised and address them
-> in the next version. Just some points to confirm below (I left only
-> relevant parts).
->
->>> +static irqreturn_t mps2_timer_interrupt(int irq, void *dev_id)
->>> +{
->>> +    struct clockevent_mps2 *ce = dev_id;
->>> +    u32 status = readl(ce->reg + TIMER_INT);
->>> +
->>> +    if (!status)
->>> +        return IRQ_NONE;
->>
->> Why that could happen ? Add a comment.
->>
->
-> Sort of defensive programming, I never seen it happens, but just in case
-> of spurious interrupts... Do you prefer to get rid of this check or
->
->      /* spurious interrupt? */
->      if (!status)
->          return IRQ_NONE;
->
-> would be fine to you?
+On Wed, 25 Nov 2015, Jon Masters wrote:
 
-Yes, that would be fine, but if it does never happen, we don't really 
-need this check. If you prefer to make sure there isn't a spurious 
-interrupt and considering it shouldn't happen, a pr_info trace may help 
-to spot this misbehavior.
+> On 11/18/15, 1:15 PM, Yang Shi wrote:
+> 
+> > As what Pavel Machek reported [1], some userspace applications depend on
+> > bogomips showed by /proc/cpuinfo.
+> >
+> > Although there is much less legacy impact on aarch64 than arm, but it does
+> > break libvirt.
+> >
+> > Basically, this patch reverts commit
+> > 326b16db9f69fd0d279be873c6c00f88c0a4aad5
+> > ("arm64: delay: don't bother reporting bogomips in /proc/cpuinfo"), but with
+> > some tweak due to context change.
+> 
+> On a total tangent, it would be ideal to (eventually) have something reported
+> in /proc/cpuinfo or dmesg during boot that does "accurately" map back to the
+> underlying core frequency (as opposed to the generic timer frequency). I have
+> seen almost countless silly situations in the industry (external to my own
+> organization) in which someone has taken a $VENDOR_X reference system that
+> they're not supposed to run benchmarks on, and they've done it anyway. But
+> usually on some silicon that's clocked multiples under what production would
+> be. Then silly rumors about performance get around because nobody can do
+> simple arithmetic and notice that they ought to have at least divided by some
+> factor.
 
->>> +}
->>> +
->>> +static void __init mps2_timer_init(struct device_node *np)
->>> +{
->>> +    static int clksrc;
->>> +
->>> +    if (!clksrc && !mps2_clocksource_init(np))
->>> +        clksrc = 1;
->>> +    else
->>> +        mps2_clockevents_init(np);
->>
->> That assumes the clocksource is defined before the clockevents in the
->> DT. If it is not the case, the mps2_clocksource_init will fail (and spit
->> errors) and mps2_clockevents_init() won't be called.
->>
->
-> Does following (stolen from efm32) look better to you?
->
-> static void __init mps2_timer_init(struct device_node *np)
-> {
-> 	static int has_clocksource, has_clockevent;
-> 	int ret;
->
-> 	if (!has_clocksource) {
-> 		ret = mps2_clocksource_init(np);
-> 		if (!ret) {
-> 			has_clocksource = 1;
-> 			return;
-> 		}
-> 	}
->
-> 	if (!has_clockevent) {
-> 		ret = mps2_clockevent_init(np);
-> 		if (!ret) {
-> 			has_clockevent = 1;
-> 			return;
-> 		}
-> 	}
-> }
+Be my guest my friend.
 
-Yes.
-
-I don't like to have a "CLOCKSOURCE_OF_DECLARE" to initialize a 
-clockevent but I can't blame you, this is what is done in the other drivers.
-
->>> +}
->>> +
->>> +CLOCKSOURCE_OF_DECLARE(mps2_timer, "arm,mps2-timer", mps2_timer_init);
->>>
->>
->>
->
+According to the common wisdom, the bogomips reporting is completely 
+senseless at this point and no one should expect anything useful from 
+it. Therefore I attempted to rehabilitate some meaning into it given 
+that we just can't get rid of it either and it continues to cause 
+dammage. You certainly saw where that has led me.
 
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Nicolas
