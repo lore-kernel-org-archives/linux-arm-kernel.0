@@ -1,13 +1,13 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 25 Nov 2015 17:45:40 +0000
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 Nov 2015 18:06:08 +0000
 Subject: [question] kernel build fails with O0 gcc optimization flag
 In-Reply-To: <20151125171229.GA8415@yury-N73SV>
 References: <20151125171229.GA8415@yury-N73SV>
-Message-ID: <5655F3C4.2070503@arm.com>
+Message-ID: <20151125180606.GM8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/11/15 17:12, Yury Norov wrote:
+On Wed, Nov 25, 2015 at 08:12:29PM +0300, Yury Norov wrote:
 > Hi all.
 > 
 > I changed optimization from O2 to O0 in Makefile:
@@ -16,20 +16,9 @@ On 25/11/15 17:12, Yury Norov wrote:
 >         611 else
 >         612 KBUILD_CFLAGS   += -O2 <-- here
 >         613 endif
-> 
-> And broke the build. O1 looks fine.
-> 
-> I tried Ubuntu and Cavium GCC:
->         gcc version 5.2.1 20151010 (Ubuntu 5.2.1-22ubuntu1) 
->         gcc version 5.2.0 (Cavium Development Version) 
-> 
-> Kernel is v4.3, defconfig, ARCH=arm64.
-> 
-> What am I doing wrong?
 
-Related -00 question has been recently discussed in [1]
+-O0 is not supported, sorry.
 
-[1] http://www.spinics.net/lists/arm-kernel/msg435802.html
-
-Cheers
-Vladimir
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
