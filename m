@@ -1,77 +1,46 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 25 Nov 2015 18:32:52 +0100
-Subject: [PATCH v3 3/5] clk: sunxi: Add sun9i A80 cpus (cpu special)
- clock support
-In-Reply-To: <1448357536-26613-4-git-send-email-wens@csie.org>
-References: <1448357536-26613-1-git-send-email-wens@csie.org>
- <1448357536-26613-4-git-send-email-wens@csie.org>
-Message-ID: <20151125173252.GN32142@lukather>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 25 Nov 2015 18:34:20 +0100
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <20151125160937.GJ14338@lunn.ch> (Andrew Lunn's message of "Wed,
+ 25 Nov 2015 17:09:37 +0100")
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+ <20151125160937.GJ14338@lunn.ch>
+Message-ID: <87wpt67zkz.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Andrew,
+ 
+ On mer., nov. 25 2015, Andrew Lunn <andrew@lunn.ch> wrote:
 
-On Tue, Nov 24, 2015 at 05:32:14PM +0800, Chen-Yu Tsai wrote:
-> The "cpus" clock is the clock for the embedded processor in the A80.
-> It is also part of the PRCM clock tree. This clock includes a pre-
-> divider on one of its inputs. For now we are using a custom clock
-> driver for it. In the future we may want to develop a generalized
-> driver for these types of clocks, which also includes the AHB clock
-> driver on sun[5678]i.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> 
-> Hi Maxime,
-> 
-> I'll do the factors clock refactoring mentioned during the discussion
-> around v2 later on.
+> On Wed, Nov 25, 2015 at 04:49:12PM +0100, Arnd Bergmann wrote:
+>> I've posted these before and now gotten around to a rebase and
+>> want to include them in the arm-soc next/multiplatform branch for
+>> 4.5.
+>> 
+>> Originally the plan for these platforms was to convert all of
+>> them to DT and use only mach-mvebu. That has not happened,
+>> so I would do it this way instead so we can at least have
+>> them in a single kernel.
+>> 
+>> Let me know if there are any concerns or objections.
+>
+> Maybe we should just remove mv78xx0? It has been at least two years
+> since we have heard of anybody using it, outside of Debians now
+> replaced build system. And its IRQ handling is broken apparently.
 
-I have no idea what you are talking about :)
+Actually I was about to remove it last year but an mv78200 user came
+with a bug fix on the gpio driver used by this platform:
+http://marc.info/?l=linux-arm-kernel&m=140639461108781&w=2
 
-> 
-> ---
->  Documentation/devicetree/bindings/clock/sunxi.txt |   1 +
->  drivers/clk/sunxi/Makefile                        |   1 +
->  drivers/clk/sunxi/clk-sun9i-cpus.c                | 240 ++++++++++++++++++++++
->  3 files changed, 242 insertions(+)
->  create mode 100644 drivers/clk/sunxi/clk-sun9i-cpus.c
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index b6859ed6913f..153ac72869e8 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -27,6 +27,7 @@ Required properties:
->  	"allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
->  	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
->  	"allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
-> +	"allwinner,sun9i-a80-cpus-clk" - for the CPUS on A80
->  	"allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
->  	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
->  	"allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
-> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> index 121333ce34ea..07d914c3f6d1 100644
-> --- a/drivers/clk/sunxi/Makefile
-> +++ b/drivers/clk/sunxi/Makefile
-> @@ -13,6 +13,7 @@ obj-y += clk-simple-gates.o
->  obj-y += clk-sun8i-apb0.o
->  obj-y += clk-sun8i-mbus.o
->  obj-y += clk-sun9i-core.o
-> +obj-y += clk-sun9i-cpus.o
+While he seemed interseted to use a mainline kernel we don't have any
+news for one year:
+http://marc.info/?l=linux-arm-kernel&m=141391779222342&w=2
 
-Same thing here, if it's only used in the A80, just compile it when
-ARCH_SUN9I is compiled.
-
-Maxime
+Gregory
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
 http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151125/a7280ddd/attachment.sig>
