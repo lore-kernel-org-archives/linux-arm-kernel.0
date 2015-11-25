@@ -1,76 +1,35 @@
-From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
-Date: Wed, 25 Nov 2015 09:28:48 -0300
-Subject: [PATCH 3/3] ARM: dts: lpc4337-ciaa: add i2c0 and devices
-In-Reply-To: <1448282225-2635-4-git-send-email-ariel@vanguardiasur.com.ar>
-References: <1448282225-2635-1-git-send-email-ariel@vanguardiasur.com.ar>
- <1448282225-2635-4-git-send-email-ariel@vanguardiasur.com.ar>
-Message-ID: <5655A980.9000605@vanguardiasur.com.ar>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Wed, 25 Nov 2015 13:31:16 +0100
+Subject: [PATCH] ARM: ixp4xx: fix read{b,w,l} return types
+In-Reply-To: <4577677.sEiIMqkHSM@wuerfel> (Arnd Bergmann's message of "Fri, 20
+ Nov 2015 23:20:28 +0100")
+References: <4577677.sEiIMqkHSM@wuerfel>
+Message-ID: <m3h9kaz2ej.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(+To: Joachim)
+Arnd Bergmann <arnd@arndb.de> writes:
 
-El 23/11/15 a las 09:37, Ariel D'Alessandro escribi?:
-> Add I2C0 and two I2C EEPROM devices on the CIAA-NXP board:
-> 
-> * 24AA1025 EEPROM, 1Mbit: it is accessed as two 512Kbit EEPROMs.
-> * 24AA025E48 EEPROM, 2kbit.
-> 
-> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
-> ---
->  arch/arm/boot/dts/lpc4337-ciaa.dts | 30 ++++++++++++++++++++++++++++++
->  1 file changed, 30 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/lpc4337-ciaa.dts b/arch/arm/boot/dts/lpc4337-ciaa.dts
-> index 1a23589..d81047a 100644
-> --- a/arch/arm/boot/dts/lpc4337-ciaa.dts
-> +++ b/arch/arm/boot/dts/lpc4337-ciaa.dts
-> @@ -99,6 +99,14 @@
->  		};
->  	};
->  
-> +	i2c0_pins: i2c0-pins {
-> +		i2c0_pins_cfg {
-> +			pins = "i2c0_scl", "i2c0_sda";
-> +			function = "i2c0";
-> +			input-enable;
-> +		};
-> +	};
-> +
->  	ssp_pins: ssp-pins {
->  		ssp1_cs {
->  			pins = "p6_7";
-> @@ -163,6 +171,28 @@
->  	clock-frequency = <50000000>;
->  };
->  
-> +&i2c0 {
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c0_pins>;
-> +	clock-frequency = <400000>;
-> +
-> +	eeprom at 50 {
-> +		compatible = "microchip,24c512";
-> +		reg = <0x50>;
-> +	};
-> +
-> +	eeprom at 51 {
-> +		compatible = "microchip,24c02";
-> +		reg = <0x51>;
-> +	};
-> +
-> +	eeprom at 54 {
-> +		compatible = "microchip,24c512";
-> +		reg = <0x54>;
-> +	};
-> +};
-> +
->  &mac {
->  	status = "okay";
->  	phy-mode = "rmii";
-> 
+> On ixp4xx, the readl() function returns an 'unsigned long' output
+> when indirect I/O is used. This is unlike any other platform, and
+> it causes lots of harmless compiler warnings, such as:
+>
+> drivers/ata/libahci.c: In function 'ahci_show_host_version':
+> drivers/ata/libahci.c:254:22: warning: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'long unsigned int' [-Wformat=]
+> drivers/block/mtip32xx/mtip32xx.c: In function 'mtip_hw_read_registers':
+> drivers/block/mtip32xx/mtip32xx.c:2602:31: warning: format '%X' expects argument of type 'unsigned int', but argument 3 has type 'long unsigned int' [-Wformat=]
+> drivers/block/cciss.c: In function 'print_cfg_table':
+> drivers/block/cciss.c:3845:25: warning: format '%d' expects argument of type 'int', but argument 4 has type 'long unsigned int' [-Wformat=]
+>
+> This changes all six of the ixp4xx specific I/O read functions
+> to return the same types that we have in the normal asm/io.h,
+> to avoid the warnings.
 
+Thanks for fixing this.
+
+Acked-by: Krzysztof Halasa <khalasa@piap.pl>
 -- 
-Ariel D'Alessandro, VanguardiaSur
-www.vanguardiasur.com.ar
+Krzysztof Halasa
+
+Industrial Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
