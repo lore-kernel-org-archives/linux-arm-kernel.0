@@ -1,43 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Nov 2015 12:00:13 +0000
-Subject: [PATCH] arm64: restore bogomips information in /proc/cpuinfo
-In-Reply-To: <56554AE9.5070901@jonmasters.org>
-References: <1447870505-19319-1-git-send-email-yang.shi@linaro.org>
- <56554AE9.5070901@jonmasters.org>
-Message-ID: <20151125120013.GJ8644@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 25 Nov 2015 12:05:12 +0000
+Subject: [PATCHv2 0/2] Support for set_memory_* outside of module space
+In-Reply-To: <5654F544.1060208@redhat.com>
+References: <1447207057-11323-1-git-send-email-labbott@fedoraproject.org>
+ <5654F544.1060208@redhat.com>
+Message-ID: <20151125120511.GB27359@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 12:45:13AM -0500, Jon Masters wrote:
-> On 11/18/15, 1:15 PM, Yang Shi wrote:
-> 
-> >As what Pavel Machek reported [1], some userspace applications depend on
-> >bogomips showed by /proc/cpuinfo.
+On Tue, Nov 24, 2015 at 03:39:48PM -0800, Laura Abbott wrote:
+> On 11/10/2015 05:57 PM, Laura Abbott wrote:
+> >Hi,
 > >
-> >Although there is much less legacy impact on aarch64 than arm, but it does
-> >break libvirt.
+> >This is v2 of the series to allow set_memory_* to work on kernel memory
+> >for security and other use cases. Should have addressed most comments
+> >although another look might be necessary for the contiguous bit.
 > >
-> >Basically, this patch reverts commit 326b16db9f69fd0d279be873c6c00f88c0a4aad5
-> >("arm64: delay: don't bother reporting bogomips in /proc/cpuinfo"), but with
-> >some tweak due to context change.
+> >Thanks,
+> >Laura
+> >
+> >Laura Abbott (2):
+> >   arm64: Get existing page protections in split_pmd
+> >   arm64: Allow changing of attributes outside of modules
+> >
+> >  arch/arm64/Kconfig       |  12 ++++
+> >  arch/arm64/mm/mm.h       |   3 +
+> >  arch/arm64/mm/mmu.c      |  12 ++--
+> >  arch/arm64/mm/pageattr.c | 174 +++++++++++++++++++++++++++++++++++++++++------
+> >  4 files changed, 174 insertions(+), 27 deletions(-)
+> >
 > 
-> On a total tangent, it would be ideal to (eventually) have something
-> reported in /proc/cpuinfo or dmesg during boot that does "accurately" map
-> back to the underlying core frequency (as opposed to the generic timer
-> frequency).
+> Given what seems to have popped up via
+> https://lkml.kernel.org/r/<1448387338-27851-1-git-send-email-catalin.marinas@arm.com>
+> I'm going to hold off on this until the issues there are worked out.
+> Once that is fixed up this work can be picked up again.
 
-Absolutely not.  You need to read the discussion that we had with Linus
-when someone reported that ARMs /proc/cpuinfo no longer reported it.
+Thanks, Laura, and sorry for the disruption.
 
-Linus says that Bogomips reports the calibration value for udelay(),
-period.  Whether that's a software loop, or a hardware timer is neither
-here nor there.  It's nothing to do with the CPU clock rate.
-
-So, if your timer runs slowly, but your CPU is at the top end, a report
-of 6 Bogomips is (as far as Linus is concerned) absolutely correct, and
-we have no business at all as kernel developers coming up with some fake
-or real value to make it report as the CPU clock rate.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Will
