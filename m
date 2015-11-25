@@ -1,34 +1,53 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 25 Nov 2015 03:10:34 +0100
-Subject: VF610 broken by pinctrl: freescale: imx: allow mux_reg offset zero
-In-Reply-To: <20151123132838.GM13744@tiger>
-References: <20151115024409.GB2194@lunn.ch>
- <20151123132838.GM13744@tiger>
-Message-ID: <20151125021034.GB11384@lunn.ch>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 24 Nov 2015 20:35:46 -0600
+Subject: [PATCH 1/3] dt-bindings: add multidomain support to i.MX GPC DT
+ binding
+In-Reply-To: <1448291223-9938-2-git-send-email-l.stach@pengutronix.de>
+References: <1448291223-9938-1-git-send-email-l.stach@pengutronix.de>
+ <1448291223-9938-2-git-send-email-l.stach@pengutronix.de>
+Message-ID: <20151125023546.GA2326@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Can you please try the following change to see if it fixes your problem?
+On Mon, Nov 23, 2015 at 04:07:01PM +0100, Lucas Stach wrote:
+> This adds a new binding for the Freescale i.MX GPC block, which allows
+> to describe multiple power domains in a more natural way. The driver
+> will continue to support the old binding for existing DTBs, but new
+> features like the additional domains present on i.MX6SX will only be
+> usable with the new binding.
 > 
-> Shawn
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  .../devicetree/bindings/power/fsl,imx-gpc.txt      | 81 ++++++++++++++--------
+>  1 file changed, 54 insertions(+), 27 deletions(-)
 > 
-> diff --git a/drivers/pinctrl/freescale/pinctrl-vf610.c b/drivers/pinctrl/freescale/pinctrl-vf610.c
-> index 37a037543d29..587d1ff6210e 100644
-> --- a/drivers/pinctrl/freescale/pinctrl-vf610.c
-> +++ b/drivers/pinctrl/freescale/pinctrl-vf610.c
-> @@ -299,7 +299,7 @@ static const struct pinctrl_pin_desc vf610_pinctrl_pads[] = {
->  static struct imx_pinctrl_soc_info vf610_pinctrl_info = {
->         .pins = vf610_pinctrl_pads,
->         .npins = ARRAY_SIZE(vf610_pinctrl_pads),
-> -       .flags = SHARE_MUX_CONF_REG,
-> +       .flags = SHARE_MUX_CONF_REG | ZERO_OFFSET_VALID,
->  };
+> diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+> index 65cc0345747d..0b777b623812 100644
+> --- a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+> +++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+> @@ -1,22 +1,41 @@
+>  Freescale i.MX General Power Controller
+>  =======================================
 >  
->  static const struct of_device_id vf610_pinctrl_of_match[] = {
+> -The i.MX6Q General Power Control (GPC) block contains DVFS load tracking
+> -counters and Power Gating Control (PGC) for the CPU and PU (GPU/VPU) power
+> -domains.
+> +The i.MX6 General Power Control (GPC) block contains DVFS load tracking
+> +counters and Power Gating Control (PGC).
+>  
+>  Required properties:
+>  - compatible: Should be "fsl,imx6q-gpc" or "fsl,imx6sl-gpc"
+>  - reg: should be register base and length as documented in the
+>    datasheet
+> -- interrupts: Should contain GPC interrupt request 1
+> -- pu-supply: Link to the LDO regulator powering the PU power domain
+> -- clocks: Clock phandles to devices in the PU power domain that need
+> -	  to be enabled during domain power-up for reset propagation.
+> -- #power-domain-cells: Should be 1, see below:
+> +- interrupts: Should contain GPC interrupts
 
-Hi Shawn
+How many and order?
 
-I tested it, and it does work.
+The rest looks fine.
 
-Thanks
-	Andrew
+Rob
