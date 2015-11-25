@@ -1,69 +1,136 @@
-From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
-Date: Wed, 25 Nov 2015 18:35:05 +0800
-Subject: [PATCH 1/1] arm64: dts: add all hi6220 i2c nodes
-In-Reply-To: <1448444942-5780-1-git-send-email-kong.kongxinwei@hisilicon.com>
-References: <1448444942-5780-1-git-send-email-kong.kongxinwei@hisilicon.com>
-Message-ID: <56558ED9.2010802@hisilicon.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 25 Nov 2015 10:33:41 +0000
+Subject: [RFC PATCH 10/10] ARM: dts: introduce MPS2 AN399/AN400
+In-Reply-To: <1448447621-17900-1-git-send-email-vladimir.murzin@arm.com>
+References: <1448447621-17900-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1448447621-17900-11-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+to linux-i2c at vger.kernel.org
+Application Notes 399 and 400 shares the same memory map and
+features. Both are shipped with Cortex-M7 and have the same  peripheral
+as AN385/AN386, but with different location of PSRAM and Ethernet
+controller.
 
-On 2015/11/25 17:49, Xinwei Kong wrote:
-> This patch adds all I2C nodes for the Hi6220 SoC. This hi6220 Soc
-> use this I2C IP of Synopsys Designware for HiKey board.
-> 
-> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-> Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
-> ---
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 37 +++++++++++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> index 82d2488..6b591a9 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> @@ -208,5 +208,42 @@
->  			clock-names = "uartclk", "apb_pclk";
->  			status = "disabled";
->  		};
-> +
-> +		i2c0: i2c at f7100000 {
-> +			compatible = "snps,designware-i2c";
-> +			reg = <0x0 0xf7100000 0x0 0x1000>;
-> +			interrupts = <0 44 4>;
-> +			clocks = <&sys_ctrl HI6220_I2C0_CLK>;
-> +			clock-names = "clk_i2c0";
-> +			i2c-sda-hold-time-ns = <300>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c0_pmx_func &i2c0_cfg_func>;
-> +			status = "ok";
-> +		};
-> +
-> +		i2c1: i2c at f7101000 {
-> +			compatible = "snps,designware-i2c";
-> +			reg = <0x0 0xf7101000 0x0 0x1000>;
-> +			interrupts = <0 45 4>;
-> +			clocks = <&sys_ctrl HI6220_I2C1_CLK>;
-> +			clock-names = "clk_i2c1";
-> +			i2c-sda-hold-time-ns = <300>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c1_pmx_func &i2c1_cfg_func>;
-> +			status = "ok";
-> +		};
-> +
-> +		i2c2: i2c at f7102000 {
-> +			compatible = "snps,designware-i2c";
-> +			reg = <0x0 0xf7102000 0x0 0x1000>;
-> +			interrupts = <0 46 4>;
-> +			clocks = <&sys_ctrl HI6220_I2C2_CLK>;
-> +			clock-names = "clk_i2c2";
-> +			i2c-sda-hold-time-ns = <300>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c2_pmx_func &i2c2_cfg_func>;
-> +			status = "ok";
-> +		};
-> +
->  	};
->  };
-> 
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ arch/arm/boot/dts/Makefile       |    4 +-
+ arch/arm/boot/dts/mps2-an399.dts |   92 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 95 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/mps2-an399.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 4ef3720..6603a1f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -237,7 +237,9 @@ dtb-$(CONFIG_ARCH_MMP) += \
+ dtb-$(CONFIG_MACH_MESON8B) += \
+ 	meson8b-mxq.dtb \
+ 	meson8b-odroidc1.dtb
+-dtb-$(CONFIG_ARCH_MPS2) += mps2-an385.dtb
++dtb-$(CONFIG_ARCH_MPS2) += \
++	mps2-an385.dtb \
++	mps2-an399.dtb
+ dtb-$(CONFIG_ARCH_MOXART) += \
+ 	moxart-uc7112lx.dtb
+ dtb-$(CONFIG_SOC_IMX1) += \
+diff --git a/arch/arm/boot/dts/mps2-an399.dts b/arch/arm/boot/dts/mps2-an399.dts
+new file mode 100644
+index 0000000..e591d75
+--- /dev/null
++++ b/arch/arm/boot/dts/mps2-an399.dts
+@@ -0,0 +1,92 @@
++/*
++ * Copyright (C) 2015 ARM Limited
++ *
++ * Author: Vladimir Murzin <vladimir.murzin@arm.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "mps2.dtsi"
++
++/ {
++	model = "ARM MPS2 Application Note 399/400";
++	compatible = "arm,mps2";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		bootargs = "rdinit=/sbin/init earlycon";
++		stdout-path = "serial0:9600n8";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x60000000 0x1000000>;
++	};
++
++
++	ethernet at a0000000 {
++		compatible = "smsc,lan9220", "smsc,lan9115";
++		reg = <0xa0000000 0x10000>;
++		interrupts = <13>;
++		interrupt-parent = <&nvic>;
++		smsc,irq-active-high;
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
++
++
++&timer0 {
++	status = "okay";
++};
++
++&timer1 {
++	status = "okay";
++};
++
++&wdt {
++	status = "okay";
++};
+-- 
+1.7.9.5
