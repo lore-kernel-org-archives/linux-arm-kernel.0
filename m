@@ -1,113 +1,32 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 25 Nov 2015 23:41:23 +0800
-Subject: [PATCH] clocksource/drivers/dw_apb_timer: Fix apbt_readl return types
-Message-ID: <1448466083-5182-1-git-send-email-jszhang@marvell.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 25 Nov 2015 15:45:51 +0000
+Subject: [PATCH] ARM: mach-orion5x: fix legacy get_irqnr_and_base
+In-Reply-To: <alpine.LFD.2.20.1511251027210.22569@knanqh.ubzr>
+References: <alpine.LFD.2.20.1511222240150.22569@knanqh.ubzr>
+ <20151125144545.GA6520@io.lakedaemon.net>
+ <alpine.LFD.2.20.1511250948470.22569@knanqh.ubzr>
+ <20151125145552.GB6520@io.lakedaemon.net>
+ <alpine.LFD.2.20.1511251027210.22569@knanqh.ubzr>
+Message-ID: <20151125154551.GD6520@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Marvell BG4CT platform, we observed the __apbt_read_clocksource()
-return wrong value: Let's assume the APBTMR_N_CURRENT_VALUE value is
-0xf0000000, we got 0xffffffff0fffffff, but it should be 0xfffffff.
+On Wed, Nov 25, 2015 at 10:38:03AM -0500, Nicolas Pitre wrote:
+...
+> BTW, mv78xx0 is still broken wrt this IRQ #0 usage.  Is it possible that 
+> no one uses it?  It is a weird not-completely-SMP architecture that 
+> lacks cache coherency support between CPU cores. To fully use both 
+> cores, we'd need to have two independent Linux instances with memory 
+> partitioning and this was never implemented. I'm unaware of any product 
+> using Linux on that SOC either.  My own mv78xx0 dev board took the way 
+> of the recycling facility a while ago given the lack of interest.
+> 
+> Should we "fix" it by removing it outright?
 
-This issue should be common on all 64bit platforms. We fix the issue
-by letting aptb_readl() return u32. apbt_writel() is also updated
-to write u32 val rather than unsigned long.
+The only users I know of were Debian.  They had their ARM build servers
+running on some.  They have since been upgraded thanks to kind
+donations.  :-)
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- drivers/clocksource/dw_apb_timer.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+thx,
 
-diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
-index c76c750..3a6d9db 100644
---- a/drivers/clocksource/dw_apb_timer.c
-+++ b/drivers/clocksource/dw_apb_timer.c
-@@ -49,12 +49,12 @@ clocksource_to_dw_apb_clocksource(struct clocksource *cs)
- 	return container_of(cs, struct dw_apb_clocksource, cs);
- }
- 
--static unsigned long apbt_readl(struct dw_apb_timer *timer, unsigned long offs)
-+static u32 apbt_readl(struct dw_apb_timer *timer, unsigned long offs)
- {
- 	return readl(timer->base + offs);
- }
- 
--static void apbt_writel(struct dw_apb_timer *timer, unsigned long val,
-+static void apbt_writel(struct dw_apb_timer *timer, u32 val,
- 		 unsigned long offs)
- {
- 	writel(val, timer->base + offs);
-@@ -62,7 +62,7 @@ static void apbt_writel(struct dw_apb_timer *timer, unsigned long val,
- 
- static void apbt_disable_int(struct dw_apb_timer *timer)
- {
--	unsigned long ctrl = apbt_readl(timer, APBTMR_N_CONTROL);
-+	u32 ctrl = apbt_readl(timer, APBTMR_N_CONTROL);
- 
- 	ctrl |= APBTMR_CONTROL_INT;
- 	apbt_writel(timer, ctrl, APBTMR_N_CONTROL);
-@@ -103,7 +103,7 @@ static irqreturn_t dw_apb_clockevent_irq(int irq, void *data)
- 
- static void apbt_enable_int(struct dw_apb_timer *timer)
- {
--	unsigned long ctrl = apbt_readl(timer, APBTMR_N_CONTROL);
-+	u32 ctrl = apbt_readl(timer, APBTMR_N_CONTROL);
- 	/* clear pending intr */
- 	apbt_readl(timer, APBTMR_N_EOI);
- 	ctrl &= ~APBTMR_CONTROL_INT;
-@@ -113,7 +113,7 @@ static void apbt_enable_int(struct dw_apb_timer *timer)
- static int apbt_shutdown(struct clock_event_device *evt)
- {
- 	struct dw_apb_clock_event_device *dw_ced = ced_to_dw_apb_ced(evt);
--	unsigned long ctrl;
-+	u32 ctrl;
- 
- 	pr_debug("%s CPU %d state=shutdown\n", __func__,
- 		 cpumask_first(evt->cpumask));
-@@ -127,7 +127,7 @@ static int apbt_shutdown(struct clock_event_device *evt)
- static int apbt_set_oneshot(struct clock_event_device *evt)
- {
- 	struct dw_apb_clock_event_device *dw_ced = ced_to_dw_apb_ced(evt);
--	unsigned long ctrl;
-+	u32 ctrl;
- 
- 	pr_debug("%s CPU %d state=oneshot\n", __func__,
- 		 cpumask_first(evt->cpumask));
-@@ -160,7 +160,7 @@ static int apbt_set_periodic(struct clock_event_device *evt)
- {
- 	struct dw_apb_clock_event_device *dw_ced = ced_to_dw_apb_ced(evt);
- 	unsigned long period = DIV_ROUND_UP(dw_ced->timer.freq, HZ);
--	unsigned long ctrl;
-+	u32 ctrl;
- 
- 	pr_debug("%s CPU %d state=periodic\n", __func__,
- 		 cpumask_first(evt->cpumask));
-@@ -196,7 +196,7 @@ static int apbt_resume(struct clock_event_device *evt)
- static int apbt_next_event(unsigned long delta,
- 			   struct clock_event_device *evt)
- {
--	unsigned long ctrl;
-+	u32 ctrl;
- 	struct dw_apb_clock_event_device *dw_ced = ced_to_dw_apb_ced(evt);
- 
- 	/* Disable timer */
-@@ -323,7 +323,7 @@ void dw_apb_clocksource_start(struct dw_apb_clocksource *dw_cs)
- 	 * start count down from 0xffff_ffff. this is done by toggling the
- 	 * enable bit then load initial load count to ~0.
- 	 */
--	unsigned long ctrl = apbt_readl(&dw_cs->timer, APBTMR_N_CONTROL);
-+	u32 ctrl = apbt_readl(&dw_cs->timer, APBTMR_N_CONTROL);
- 
- 	ctrl &= ~APBTMR_CONTROL_ENABLE;
- 	apbt_writel(&dw_cs->timer, ctrl, APBTMR_N_CONTROL);
-@@ -338,7 +338,7 @@ void dw_apb_clocksource_start(struct dw_apb_clocksource *dw_cs)
- 
- static cycle_t __apbt_read_clocksource(struct clocksource *cs)
- {
--	unsigned long current_count;
-+	u32 current_count;
- 	struct dw_apb_clocksource *dw_cs =
- 		clocksource_to_dw_apb_clocksource(cs);
- 
--- 
-2.6.2
+Jason.
