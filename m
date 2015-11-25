@@ -1,70 +1,108 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 25 Nov 2015 16:16:27 +0100
-Subject: [PATCH] pwm: berlin: Add PM support
-In-Reply-To: <20151125163019.64e80799@xhacker>
-References: <1448343785-1540-1-git-send-email-jszhang@marvell.com>
- <20151124162306.GC32623@ulmo.nvidia.com>
- <20151125163019.64e80799@xhacker>
-Message-ID: <20151125151627.GB31492@ulmo.nvidia.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 25 Nov 2015 15:21:27 +0000
+Subject: [RFC PATCH 02/10] clockevents/drivers: add MPS2 Timer driver
+In-Reply-To: <5655CF58.6030507@linaro.org>
+References: <1448447621-17900-1-git-send-email-vladimir.murzin@arm.com>
+ <1448447621-17900-3-git-send-email-vladimir.murzin@arm.com>
+ <5655BA34.9040207@linaro.org> <5655CADA.1010803@arm.com>
+ <5655CF58.6030507@linaro.org>
+Message-ID: <5655D1F7.2030202@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 04:30:19PM +0800, Jisheng Zhang wrote:
-> On Tue, 24 Nov 2015 17:23:06 +0100 Thierry Reding wrote:
-> > On Tue, Nov 24, 2015 at 01:43:05PM +0800, Jisheng Zhang wrote:
-> > > This patch adds S2R support for berlin pwm driver.
-> > > 
-> > > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > > ---
-> > >  drivers/pwm/pwm-berlin.c | 57 +++++++++++++++++++++++++++++++++++++++++++++++-
-> > >  1 file changed, 56 insertions(+), 1 deletion(-)
-[...]
-> > > +	for (i = 0; i < pwm->chip.npwm; i++) {
-> > > +		struct berlin_pwm_context *ctx = &pwm->ctx[i];
-> > > +
-> > > +		berlin_pwm_writel(pwm, i, ctx->ctrl, BERLIN_PWM_CONTROL);
-> > > +		berlin_pwm_writel(pwm, i, ctx->duty, BERLIN_PWM_DUTY);
-> > > +		berlin_pwm_writel(pwm, i, ctx->tcnt, BERLIN_PWM_TCNT);
-> > > +		berlin_pwm_writel(pwm, i, ctx->enable, BERLIN_PWM_ENABLE);
-> > > +	}
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +
-> > > +static SIMPLE_DEV_PM_OPS(berlin_pwm_pm_ops, berlin_pwm_suspend,
-> > > +			 berlin_pwm_resume);
-> > > +#define BERLIN_PWM_PM_OPS	(&berlin_pwm_pm_ops)
-> > > +#else
-> > > +#define BERLIN_PWM_PM_OPS	NULL
-> > > +#endif  
-> > 
-> > This is a weird way of writing this. I think a more typical way would be
-> > to have the #ifdef contain only the implementation and then define the
-> > dev_pm_ops variable unconditonally, so you don't need a separate macro
-> > for it.
-> > 
+On 25/11/15 15:10, Daniel Lezcano wrote:
+> On 11/25/2015 03:51 PM, Vladimir Murzin wrote:
+>> Hi Daniel,
+>>
+>> Thanks for you review, I agree on all concerns raised and address them
+>> in the next version. Just some points to confirm below (I left only
+>> relevant parts).
+>>
+>>>> +static irqreturn_t mps2_timer_interrupt(int irq, void *dev_id)
+>>>> +{
+>>>> +    struct clockevent_mps2 *ce = dev_id;
+>>>> +    u32 status = readl(ce->reg + TIMER_INT);
+>>>> +
+>>>> +    if (!status)
+>>>> +        return IRQ_NONE;
+>>>
+>>> Why that could happen ? Add a comment.
+>>>
+>>
+>> Sort of defensive programming, I never seen it happens, but just in case
+>> of spurious interrupts... Do you prefer to get rid of this check or
+>>
+>>      /* spurious interrupt? */
+>>      if (!status)
+>>          return IRQ_NONE;
+>>
+>> would be fine to you?
 > 
-> The reason why I introduced one more macro is: struct dev_pm_ops contains
-> 23 pointers now, if there's no BERLIN_PWM_PM_OPS macro, there will be always a
-> dev_pm_ops even if PM_SLEEP isn't enabled. I dunno whether there's any
-> elegant solution for this case.
+> Yes, that would be fine, but if it does never happen, we don't really
+> need this check. If you prefer to make sure there isn't a spurious
+> interrupt and considering it shouldn't happen, a pr_info trace may help
+> to spot this misbehavior.
+> 
 
-I wouldn't bother. PM_SLEEP is in almost all cases going to be enabled.
-If it isn't enabled it's likely going to be in test builds, at which
-point nobody will care about the extra 23 pointers.
+Good, I'll put pr_warn("spurious interrupt\n") then.
 
-> How about define SIMPLE_DEV_PM_OPS as NULL if PM_SLEEP isn't enabled?
+>>>> +}
+>>>> +
+>>>> +static void __init mps2_timer_init(struct device_node *np)
+>>>> +{
+>>>> +    static int clksrc;
+>>>> +
+>>>> +    if (!clksrc && !mps2_clocksource_init(np))
+>>>> +        clksrc = 1;
+>>>> +    else
+>>>> +        mps2_clockevents_init(np);
+>>>
+>>> That assumes the clocksource is defined before the clockevents in the
+>>> DT. If it is not the case, the mps2_clocksource_init will fail (and spit
+>>> errors) and mps2_clockevents_init() won't be called.
+>>>
+>>
+>> Does following (stolen from efm32) look better to you?
+>>
+>> static void __init mps2_timer_init(struct device_node *np)
+>> {
+>>     static int has_clocksource, has_clockevent;
+>>     int ret;
+>>
+>>     if (!has_clocksource) {
+>>         ret = mps2_clocksource_init(np);
+>>         if (!ret) {
+>>             has_clocksource = 1;
+>>             return;
+>>         }
+>>     }
+>>
+>>     if (!has_clockevent) {
+>>         ret = mps2_clockevent_init(np);
+>>         if (!ret) {
+>>             has_clockevent = 1;
+>>             return;
+>>         }
+>>     }
+>> }
+> 
+> Yes.
+> 
+> I don't like to have a "CLOCKSOURCE_OF_DECLARE" to initialize a
+> clockevent but I can't blame you, this is what is done in the other
+> drivers.
 
-That won't work, "static NULL;" wouldn't be valid syntax. Like I said,
-if you go through the trouble of implementing suspend/resume, you're
-almost certainly going to want to enable it, so just define it
-unconditionally.
+Thanks for your time!
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151125/1c85baa1/attachment-0001.sig>
+Vladimir
+
+> 
+>>>> +}
+>>>> +
+>>>> +CLOCKSOURCE_OF_DECLARE(mps2_timer, "arm,mps2-timer", mps2_timer_init);
+>>>>
+>>>
+>>>
+>>
+> 
+> 
