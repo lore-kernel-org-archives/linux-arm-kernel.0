@@ -1,65 +1,27 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 25 Nov 2015 09:48:35 +0100
-Subject: [PATCH v6 00/12] arm64: renesas: add sound support
-In-Reply-To: <877fl68uqh.wl%kuninori.morimoto.gx@renesas.com>
-References: <87egg3k5g6.wl%kuninori.morimoto.gx@renesas.com>
- <20151109012943.GF4832@verge.net.au>
- <CAMuHMdXBQNCibJU4EDuFZX0zRzUZfC_4KTyXFNVLL81a51Q4RA@mail.gmail.com>
- <20151109090139.GM4832@verge.net.au>
- <CAMuHMdWv1Ae1JTDyN2JkuHC1Fmfw25gtmmUkSMUitrUQnv82Ug@mail.gmail.com>
- <20151110001111.GB1040@verge.net.au>
- <20151124023025.GA21853@verge.net.au>
- <87k2p7yjbl.wl%kuninori.morimoto.gx@renesas.com>
- <20151125002752.GH20596@verge.net.au>
- <877fl68uqh.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <CAMuHMdV7FZmSU8oK0N_BCAWj5Li_y3NBUeMyCW=5Gu7j1e7T6w@mail.gmail.com>
+From: amittomer25@gmail.com (Amit Tomer)
+Date: Wed, 25 Nov 2015 14:23:29 +0530
+Subject: [PATCH v9] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+ PCIe Host Controller
+In-Reply-To: <20151125075018.68e97010@arm.com>
+References: <1447911323-12567-1-git-send-email-bharatku@xilinx.com>
+ <20151124173556.18aff6b5@arm.com>
+ <8520D5D51A55D047800579B0941471982586607F@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20151125075018.68e97010@arm.com>
+Message-ID: <CABHD4K9PH-1tpwmxmPSBK3dW04G3XMfNtPFqtWFb7gnThe=uNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Morimoto-san, Simon,
+Sorry to intervene but just trying to learn from your comments.
 
-On Wed, Nov 25, 2015 at 7:27 AM, Kuninori Morimoto
-<kuninori.morimoto.gx@renesas.com> wrote:
->> > I would like to check latest version.
->> > Which branch/tag can I check ?
->>
->> If you want to check for apply-time and compile-time dependencies use
->> the latest renesas-devel tag in my renesas tree.
->>
->> If you want to check run-time you may need to pull in some dependencies,
->> especially the cpg-mssr-v6 branch of Geert's renesas-drivers tree.  A
->> sledge-hammer approach would be to pull in the latest renesas-drivers tag
->> of that tree.
->>
->> In any case I'll need to know what run-time dependencies, other than
->> cpg-mssr, are missing from renesas-next and/or renesas-devel so we can
->> sensibly decide what to queue up.
+ > You have plenty, and that's the whole of your device space. *All of it*. So
+>   just take the base address of your PCIe controller, and be done with
+>   it.
 
-This is about DT, which is independent from code? ;-)
+but isn't few of PCIe controller's registers itself are mapped
+here(base address). So, how can we use this address for MSI?
 
-> Recent renesas-drivers sound has many conflicts, and sound
-> has strange behavior. I had tried it before and noticed.
-> I'm not sure latest one, but it has conflict log.
-> I'm using a littile older kernel, because of above reason.
+Or you said from base address of PCIe controller, find an offset that
+can be used as MSI address?
 
-You mean the conflict when merging vsp1-kms-20151112~4?
-As that branch is based on a very old renesas-drivers release, I made
-sure that merging it doesn't impact any sound driver. I.e. I reverted
-all changes not related to rcar-du and vsp1.
-
-You can verify using git diff 38f5d0b6..1f9e8ee5
-
-> Anyway, I tried below, and I could get sound.
-
-Good, thanks for checking!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks
+Amit.
