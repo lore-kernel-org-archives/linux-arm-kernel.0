@@ -1,62 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 25 Nov 2015 11:27:46 +0100
-Subject: Strange message from Kirkwood pinctrl driver
-Message-ID: <CACRpkdah4w-=qHS+q_=Ab-RiJyvbCKY-Rp5Ya0x+F=3DL2iuBA@mail.gmail.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Wed, 25 Nov 2015 11:32:33 +0100
+Subject: [PATCH v10 2/2] arm-soc: Add support for tango4 platforms
+In-Reply-To: <5654A0F3.40404@sigmadesigns.com>
+References: <56549B3A.8010703@sigmadesigns.com>
+ <5654A0F3.40404@sigmadesigns.com>
+Message-ID: <56558E41.7050301@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+On 24/11/2015 18:40, Marc Gonzalez wrote:
 
-trying to use the Kirkwood pinctrl driver with compatible =
-"marvell,88f6192-pinctrl";
-on a Pogoplug series 4 yields the following message when instantiating
-the driver:
+> +config ARCH_TANGO
+> +	bool "Sigma Designs Tango4 (SMP87xx)" if ARCH_MULTI_V7
+> +	# Cortex-A9 MPCore r3p0, PL310 r3p2
+> +	select ARCH_HAS_HOLES_MEMORYMODEL
+> +	select ARM_ERRATA_754322
+> +	select ARM_ERRATA_764369 if SMP
+> +	select ARM_ERRATA_775420
+> +	select ARM_GIC
+> +	select CLKSRC_TANGO_XTAL
+> +	select GENERIC_IRQ_CHIP
 
-kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 36
-kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 37
-kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 38
-kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 39
-kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 40
-kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 41
-kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 42
-kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 43
-kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 44
-kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 45
-kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 46
-kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 47
-kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 48
-kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 49
-kirkwood-pinctrl f1010000.pin-controller: registered pinctrl driver
+Instead of GENERIC_IRQ_CHIP, I should select TANGO_IRQCHIP
+(to be defined in drivers/irqchip/Kconfig)
 
-It looks harmless but seems like a bug and make me uncertain.
-
-The following naive patch fixes it:
-
-diff --git a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
-b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
-index 0f07dc554a1d..6c7c2c8819b8 100644
---- a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
-@@ -411,7 +411,7 @@ static struct mvebu_pinctrl_soc_info mv88f6190_info = {
-        .controls = mv88f619x_mpp_controls,
-        .ncontrols = ARRAY_SIZE(mv88f619x_mpp_controls),
-        .modes = mv88f6xxx_mpp_modes,
--       .nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes),
-+       .nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes) - 14,
-        .gpioranges = mv88f619x_gpio_ranges,
-        .ngpioranges = ARRAY_SIZE(mv88f619x_gpio_ranges),
- };
-@@ -421,7 +421,7 @@ static struct mvebu_pinctrl_soc_info mv88f6192_info = {
-        .controls = mv88f619x_mpp_controls,
-        .ncontrols = ARRAY_SIZE(mv88f619x_mpp_controls),
-        .modes = mv88f6xxx_mpp_modes,
--       .nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes),
-+       .nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes) - 14,
-        .gpioranges = mv88f619x_gpio_ranges,
-        .ngpioranges = ARRAY_SIZE(mv88f619x_gpio_ranges),
- };
-
-What is the proper way to fix this?
-
-Yours,
-Linus Walleij
+TANGO_IRQCHIP itself will select IRQ_DOMAIN and GENERIC_IRQ_CHIP.
