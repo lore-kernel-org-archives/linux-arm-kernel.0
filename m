@@ -1,96 +1,48 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 25 Nov 2015 10:33:31 +0000
-Subject: [RFC PATCH 00/10] Support for Cortex-M Prototyping System
-Message-ID: <1448447621-17900-1-git-send-email-vladimir.murzin@arm.com>
+Date: Wed, 25 Nov 2015 10:33:34 +0000
+Subject: [RFC PATCH 03/10] dt-bindings: document the MPS2 UART bindings
+In-Reply-To: <1448447621-17900-1-git-send-email-vladimir.murzin@arm.com>
+References: <1448447621-17900-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1448447621-17900-4-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This adds documentation of device tree bindings for the
+UART found on ARM MPS2 platform
 
-This patch series provide the basic support for running ucLinux on V2M-MPS2
-platform.
-
-With these patches applied ucLinux can be run on both HW and FVP models
-with Cortex-M3/M4/M7 configurations.
-
-Board description:
-
-http://infocenter.arm.com/help/topic/com.arm.doc.100112_0100_03_en/arm_versatile_express_cortex_m_prototyping_system_(v2m_mps2)_technical_reference_manual_100112_0100_03_en.pdf
-
-Application notes (cover Cortex-M3/M4/M7):
-
-http://infocenter.arm.com/help/topic/com.arm.doc.dai0385a/DAI0385A_cortex_m3_on_v2m_mps2.pdf
-http://infocenter.arm.com/help/topic/com.arm.doc.dai0386a/DAI0386A_cortex_m4_on_v2m_mps2.pdf
-http://infocenter.arm.com/help/topic/com.arm.doc.dai0399a/DAI0399A_cortex_m7_on_v2m_mps2.pdf
-http://infocenter.arm.com/help/topic/com.arm.doc.dai0400a/DAI0400A_cortex_m7_on_v2m_mps2.pdf
-
-Cortex-M System Design Kit (referenced as CMDK from documents above):
-
-http://infocenter.arm.com/help/topic/com.arm.doc.ddi0479c/DDI0479C_cortex_m_system_design_kit_r1p0_trm.pdf
-
-I'd be happy to hear any feedback/comments on this series!
-
-Remain questions:
-
- - Application notes 399/400 have PSRAM located at address different to what
-   we have for AN385/AN386, so I'm wondering what is the best practice to handle
-   CONFIG_DRAM_BASE? Different defconfig or there is better place?
-
- - I'm not sure about naming of dts files: Application Notes (mps2-an*) vs Cortex-M (mps2-cm*);
-   any preference?
-
-P.S.
-
-This series is against 4.4-rc1.
-
-Thanks!
-
-Vladimir Murzin (10):
-  dt-bindings: document the MPS2 timer bindings
-  clockevents/drivers: add MPS2 Timer driver
-  dt-bindings: document the MPS2 UART bindings
-  serial: mps2-uart: add MPS2 UART driver
-  serial: mps2-uart: add support for early console
-  ARM: mps2: introduce MPS2 platform
-  ARM: mps2: add low-level debug support
-  ARM: configs: add MPS2 defconfig
-  ARM: dts: introduce MPS2 AN385/AN386
-  ARM: dts: introduce MPS2 AN399/AN400
-
- .../devicetree/bindings/serial/arm,mps2-uart.txt   |   22 +
- .../devicetree/bindings/timer/arm,mps2-timer.txt   |   28 +
- arch/arm/Kconfig                                   |    8 +
- arch/arm/Kconfig.debug                             |   12 +-
- arch/arm/Makefile                                  |    1 +
- arch/arm/boot/dts/Makefile                         |    3 +
- arch/arm/boot/dts/mps2-an385.dts                   |   90 +++
- arch/arm/boot/dts/mps2-an399.dts                   |   92 +++
- arch/arm/boot/dts/mps2.dtsi                        |  227 +++++++
- arch/arm/configs/mps2_defconfig                    |  112 ++++
- arch/arm/include/debug/mps2.S                      |   27 +
- arch/arm/mach-mps2/Makefile                        |    1 +
- arch/arm/mach-mps2/Makefile.boot                   |    3 +
- arch/arm/mach-mps2/dtmachine.c                     |   21 +
- drivers/clocksource/Kconfig                        |    5 +
- drivers/clocksource/Makefile                       |    1 +
- drivers/clocksource/mps2-timer.c                   |  280 +++++++++
- drivers/tty/serial/Kconfig                         |   13 +
- drivers/tty/serial/Makefile                        |    1 +
- drivers/tty/serial/mps2-uart.c                     |  626 ++++++++++++++++++++
- include/uapi/linux/serial_core.h                   |    3 +
- 21 files changed, 1575 insertions(+), 1 deletion(-)
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ .../devicetree/bindings/serial/arm,mps2-uart.txt   |   22 ++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/serial/arm,mps2-uart.txt
- create mode 100644 Documentation/devicetree/bindings/timer/arm,mps2-timer.txt
- create mode 100644 arch/arm/boot/dts/mps2-an385.dts
- create mode 100644 arch/arm/boot/dts/mps2-an399.dts
- create mode 100644 arch/arm/boot/dts/mps2.dtsi
- create mode 100644 arch/arm/configs/mps2_defconfig
- create mode 100644 arch/arm/include/debug/mps2.S
- create mode 100644 arch/arm/mach-mps2/Makefile
- create mode 100644 arch/arm/mach-mps2/Makefile.boot
- create mode 100644 arch/arm/mach-mps2/dtmachine.c
- create mode 100644 drivers/clocksource/mps2-timer.c
- create mode 100644 drivers/tty/serial/mps2-uart.c
 
+diff --git a/Documentation/devicetree/bindings/serial/arm,mps2-uart.txt b/Documentation/devicetree/bindings/serial/arm,mps2-uart.txt
+new file mode 100644
+index 0000000..b3f7cb1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/serial/arm,mps2-uart.txt
+@@ -0,0 +1,22 @@
++ARM MPS2 UART
++
++Required properties:
++- compatible	: Should be "arm,mps2-uart"
++- reg		: Address and length of the register set
++- interrupts	: Reference to the UART RX, TX and overrun interrupts
++
++Required clocking property:
++- clocks	: The input clock of the UART
++
++
++Examples:
++
++uart0: serial at 40004000 {
++	compatible = "arm,mps2-uart";
++	reg = <0x40004000 0x1000>;
++	interrupts = <0 1 12>;
++	clocks = <&sysclk>;
++};
++
++
++
 -- 
 1.7.9.5
