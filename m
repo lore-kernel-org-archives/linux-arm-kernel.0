@@ -1,37 +1,48 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 25 Nov 2015 10:51:31 -0500 (EST)
-Subject: [PATCH] ARM: mach-orion5x: fix legacy get_irqnr_and_base
-In-Reply-To: <20151125154551.GD6520@io.lakedaemon.net>
-References: <alpine.LFD.2.20.1511222240150.22569@knanqh.ubzr>
- <20151125144545.GA6520@io.lakedaemon.net>
- <alpine.LFD.2.20.1511250948470.22569@knanqh.ubzr>
- <20151125145552.GB6520@io.lakedaemon.net>
- <alpine.LFD.2.20.1511251027210.22569@knanqh.ubzr>
- <20151125154551.GD6520@io.lakedaemon.net>
-Message-ID: <alpine.LFD.2.20.1511251047110.22569@knanqh.ubzr>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 25 Nov 2015 23:48:33 +0800
+Subject: [PATCH v3 1/2] clocksource/drivers/dw_apb_timer: Inline apbt_readl
+ and apbt_writel
+In-Reply-To: <1448466514-5298-1-git-send-email-jszhang@marvell.com>
+References: <1448466514-5298-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1448466514-5298-2-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Nov 2015, Jason Cooper wrote:
+It seems gcc can automatically inline apbt_writel() for us, but
+apbt_real isn't inlined. This patch makes them inline to get a trivial
+performance improvement: the time __apbt_read_clocksource() spends on
+Marvell BG4CT platform:
 
-> On Wed, Nov 25, 2015 at 10:38:03AM -0500, Nicolas Pitre wrote:
-> ...
-> > BTW, mv78xx0 is still broken wrt this IRQ #0 usage.  Is it possible that 
-> > no one uses it?  It is a weird not-completely-SMP architecture that 
-> > lacks cache coherency support between CPU cores. To fully use both 
-> > cores, we'd need to have two independent Linux instances with memory 
-> > partitioning and this was never implemented. I'm unaware of any product 
-> > using Linux on that SOC either.  My own mv78xx0 dev board took the way 
-> > of the recycling facility a while ago given the lack of interest.
-> > 
-> > Should we "fix" it by removing it outright?
-> 
-> The only users I know of were Debian.  They had their ARM build servers
-> running on some.  They have since been upgraded thanks to kind
-> donations.  :-)
+ before the patch 1275240ns on average
+ after the patch 1263240ns on average
 
-I can tell you that those mv78xx0 build servers were also donations. The 
-same type of board I retired from my desk.
+so we get 1% performance improvement.
 
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/clocksource/dw_apb_timer.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Nicolas
+diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
+index 3a6d9db..114696b 100644
+--- a/drivers/clocksource/dw_apb_timer.c
++++ b/drivers/clocksource/dw_apb_timer.c
+@@ -49,13 +49,13 @@ clocksource_to_dw_apb_clocksource(struct clocksource *cs)
+ 	return container_of(cs, struct dw_apb_clocksource, cs);
+ }
+ 
+-static u32 apbt_readl(struct dw_apb_timer *timer, unsigned long offs)
++static inline u32 apbt_readl(struct dw_apb_timer *timer, unsigned long offs)
+ {
+ 	return readl(timer->base + offs);
+ }
+ 
+-static void apbt_writel(struct dw_apb_timer *timer, u32 val,
+-		 unsigned long offs)
++static inline void apbt_writel(struct dw_apb_timer *timer, u32 val,
++			unsigned long offs)
+ {
+ 	writel(val, timer->base + offs);
+ }
+-- 
+2.6.2
