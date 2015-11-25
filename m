@@ -1,166 +1,367 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Nov 2015 17:32:21 +0100
-Subject: [PATCH 08/10] ARM: no longer make CPU targets visible separately
+Date: Wed, 25 Nov 2015 17:32:22 +0100
+Subject: [PATCH 09/10] ARM: realview: make all header files local
 In-Reply-To: <1448469143-447355-1-git-send-email-arnd@arndb.de>
 References: <1448469143-447355-1-git-send-email-arnd@arndb.de>
-Message-ID: <1448469143-447355-9-git-send-email-arnd@arndb.de>
+Message-ID: <1448469143-447355-10-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that realview and integrator always select the correct CPU
-type themselves based on the core tiles, there is no need to
-still have them user-visible in arch/arm/mm/Kconfig. The
-ARM925T symbol has been selected by the only user for many
-years, so that can be removed along with the realview and
-integrator specific ones.
-
-This also solves randconfig build problems on realview.
+Nothing includes these files any more, so we can simply move them
+from arch/arm/mach-realview/include/mach/ to arch/arm/mach-realview.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm/mm/Kconfig | 30 +++++++++++++++---------------
- 1 file changed, 15 insertions(+), 15 deletions(-)
+ arch/arm/mach-realview/{include/mach => }/board-eb.h     |  2 +-
+ arch/arm/mach-realview/{include/mach => }/board-pb1176.h |  2 +-
+ arch/arm/mach-realview/{include/mach => }/board-pb11mp.h |  2 +-
+ arch/arm/mach-realview/{include/mach => }/board-pba8.h   |  2 +-
+ arch/arm/mach-realview/{include/mach => }/board-pbx.h    |  2 +-
+ arch/arm/mach-realview/core.c                            |  7 +++----
+ arch/arm/mach-realview/{include/mach => }/hardware.h     |  0
+ arch/arm/mach-realview/{include/mach => }/irqs-eb.h      |  0
+ arch/arm/mach-realview/{include/mach => }/irqs-pb1176.h  |  0
+ arch/arm/mach-realview/{include/mach => }/irqs-pb11mp.h  |  0
+ arch/arm/mach-realview/{include/mach => }/irqs-pba8.h    |  0
+ arch/arm/mach-realview/{include/mach => }/irqs-pbx.h     |  0
+ arch/arm/mach-realview/{include/mach => }/irqs.h         | 10 +++++-----
+ arch/arm/mach-realview/{include/mach => }/platform.h     |  0
+ arch/arm/mach-realview/platsmp.c                         |  8 ++++----
+ arch/arm/mach-realview/realview_eb.c                     |  6 +++---
+ arch/arm/mach-realview/realview_pb1176.c                 |  6 +++---
+ arch/arm/mach-realview/realview_pb11mp.c                 |  6 +++---
+ arch/arm/mach-realview/realview_pba8.c                   |  6 +++---
+ arch/arm/mach-realview/realview_pbx.c                    |  6 +++---
+ arch/arm/mach-realview/{include/mach => }/uncompress.h   | 12 ++++++------
+ 21 files changed, 38 insertions(+), 39 deletions(-)
+ rename arch/arm/mach-realview/{include/mach => }/board-eb.h (99%)
+ rename arch/arm/mach-realview/{include/mach => }/board-pb1176.h (99%)
+ rename arch/arm/mach-realview/{include/mach => }/board-pb11mp.h (99%)
+ rename arch/arm/mach-realview/{include/mach => }/board-pba8.h (99%)
+ rename arch/arm/mach-realview/{include/mach => }/board-pbx.h (99%)
+ rename arch/arm/mach-realview/{include/mach => }/hardware.h (100%)
+ rename arch/arm/mach-realview/{include/mach => }/irqs-eb.h (100%)
+ rename arch/arm/mach-realview/{include/mach => }/irqs-pb1176.h (100%)
+ rename arch/arm/mach-realview/{include/mach => }/irqs-pb11mp.h (100%)
+ rename arch/arm/mach-realview/{include/mach => }/irqs-pba8.h (100%)
+ rename arch/arm/mach-realview/{include/mach => }/irqs-pbx.h (100%)
+ rename arch/arm/mach-realview/{include/mach => }/irqs.h (88%)
+ rename arch/arm/mach-realview/{include/mach => }/platform.h (100%)
+ rename arch/arm/mach-realview/{include/mach => }/uncompress.h (91%)
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 76f65f2d59b1..549f6d3aec5b 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -21,7 +21,7 @@ config CPU_ARM7TDMI
+diff --git a/arch/arm/mach-realview/include/mach/board-eb.h b/arch/arm/mach-realview/board-eb.h
+similarity index 99%
+rename from arch/arm/mach-realview/include/mach/board-eb.h
+rename to arch/arm/mach-realview/board-eb.h
+index a301e61a5554..ac9c98f9a971 100644
+--- a/arch/arm/mach-realview/include/mach/board-eb.h
++++ b/arch/arm/mach-realview/board-eb.h
+@@ -21,7 +21,7 @@
+ #ifndef __ASM_ARCH_BOARD_EB_H
+ #define __ASM_ARCH_BOARD_EB_H
  
- # ARM720T
- config CPU_ARM720T
--	bool "Support ARM720T processor" if (ARCH_MULTI_V4T && ARCH_INTEGRATOR)
-+	bool
- 	select CPU_32v4T
- 	select CPU_ABRT_LV4T
- 	select CPU_CACHE_V4
-@@ -39,7 +39,7 @@ config CPU_ARM720T
+-#include <mach/platform.h>
++#include "platform.h"
  
- # ARM740T
- config CPU_ARM740T
--	bool "Support ARM740T processor" if (ARCH_MULTI_V4T && ARCH_INTEGRATOR)
-+	bool
- 	depends on !MMU
- 	select CPU_32v4T
- 	select CPU_ABRT_LV4T
-@@ -71,7 +71,7 @@ config CPU_ARM9TDMI
+ /*
+  * RealView EB + ARM11MPCore peripheral addresses
+diff --git a/arch/arm/mach-realview/include/mach/board-pb1176.h b/arch/arm/mach-realview/board-pb1176.h
+similarity index 99%
+rename from arch/arm/mach-realview/include/mach/board-pb1176.h
+rename to arch/arm/mach-realview/board-pb1176.h
+index 2a15fef94730..836433dc789c 100644
+--- a/arch/arm/mach-realview/include/mach/board-pb1176.h
++++ b/arch/arm/mach-realview/board-pb1176.h
+@@ -21,7 +21,7 @@
+ #ifndef __ASM_ARCH_BOARD_PB1176_H
+ #define __ASM_ARCH_BOARD_PB1176_H
  
- # ARM920T
- config CPU_ARM920T
--	bool "Support ARM920T processor" if (ARCH_MULTI_V4T && ARCH_INTEGRATOR)
-+	bool
- 	select CPU_32v4T
- 	select CPU_ABRT_EV4T
- 	select CPU_CACHE_V4WT
-@@ -89,7 +89,7 @@ config CPU_ARM920T
+-#include <mach/platform.h>
++#include "platform.h"
  
- # ARM922T
- config CPU_ARM922T
--	bool "Support ARM922T processor" if (ARCH_MULTI_V4T && ARCH_INTEGRATOR)
-+	bool
- 	select CPU_32v4T
- 	select CPU_ABRT_EV4T
- 	select CPU_CACHE_V4WT
-@@ -108,7 +108,7 @@ config CPU_ARM922T
+ /*
+  * Peripheral addresses
+diff --git a/arch/arm/mach-realview/include/mach/board-pb11mp.h b/arch/arm/mach-realview/board-pb11mp.h
+similarity index 99%
+rename from arch/arm/mach-realview/include/mach/board-pb11mp.h
+rename to arch/arm/mach-realview/board-pb11mp.h
+index aa2d4e02ea2c..e3a758b147ab 100644
+--- a/arch/arm/mach-realview/include/mach/board-pb11mp.h
++++ b/arch/arm/mach-realview/board-pb11mp.h
+@@ -21,7 +21,7 @@
+ #ifndef __ASM_ARCH_BOARD_PB11MP_H
+ #define __ASM_ARCH_BOARD_PB11MP_H
  
- # ARM925T
- config CPU_ARM925T
-- 	bool "Support ARM925T processor" if ARCH_OMAP1
-+	bool
- 	select CPU_32v4T
- 	select CPU_ABRT_EV4T
- 	select CPU_CACHE_V4WT
-@@ -127,7 +127,7 @@ config CPU_ARM925T
+-#include <mach/platform.h>
++#include "platform.h"
  
- # ARM926T
- config CPU_ARM926T
--	bool "Support ARM926T processor" if (!ARCH_MULTIPLATFORM || ARCH_MULTI_V5) && (ARCH_INTEGRATOR || MACH_REALVIEW_EB)
-+	bool
- 	select CPU_32v5
- 	select CPU_ABRT_EV5TJ
- 	select CPU_CACHE_VIVT
-@@ -163,7 +163,7 @@ config CPU_FA526
+ /*
+  * Peripheral addresses
+diff --git a/arch/arm/mach-realview/include/mach/board-pba8.h b/arch/arm/mach-realview/board-pba8.h
+similarity index 99%
+rename from arch/arm/mach-realview/include/mach/board-pba8.h
+rename to arch/arm/mach-realview/board-pba8.h
+index 4dfc67a4f45f..84232fe942d2 100644
+--- a/arch/arm/mach-realview/include/mach/board-pba8.h
++++ b/arch/arm/mach-realview/board-pba8.h
+@@ -21,7 +21,7 @@
+ #ifndef __ASM_ARCH_BOARD_PBA8_H
+ #define __ASM_ARCH_BOARD_PBA8_H
  
- # ARM940T
- config CPU_ARM940T
--	bool "Support ARM940T processor" if (ARCH_MULTI_V4T && ARCH_INTEGRATOR)
-+	bool
- 	depends on !MMU
- 	select CPU_32v4T
- 	select CPU_ABRT_NOMMU
-@@ -181,7 +181,7 @@ config CPU_ARM940T
+-#include <mach/platform.h>
++#include "platform.h"
  
- # ARM946E-S
- config CPU_ARM946E
--	bool "Support ARM946E-S processor" if (ARCH_MULTI_V5 && ARCH_INTEGRATOR)
-+	bool
- 	depends on !MMU
- 	select CPU_32v5
- 	select CPU_ABRT_NOMMU
-@@ -198,7 +198,7 @@ config CPU_ARM946E
+ /*
+  * Peripheral addresses
+diff --git a/arch/arm/mach-realview/include/mach/board-pbx.h b/arch/arm/mach-realview/board-pbx.h
+similarity index 99%
+rename from arch/arm/mach-realview/include/mach/board-pbx.h
+rename to arch/arm/mach-realview/board-pbx.h
+index 848bfff6d8f1..3dab54fa9e97 100644
+--- a/arch/arm/mach-realview/include/mach/board-pbx.h
++++ b/arch/arm/mach-realview/board-pbx.h
+@@ -20,7 +20,7 @@
+ #ifndef __ASM_ARCH_BOARD_PBX_H
+ #define __ASM_ARCH_BOARD_PBX_H
  
- # ARM1020 - needs validating
- config CPU_ARM1020
--	bool "Support ARM1020T (rev 0) processor" if (ARCH_MULTI_V5 && ARCH_INTEGRATOR)
-+	bool
- 	select CPU_32v5
- 	select CPU_ABRT_EV4T
- 	select CPU_CACHE_V4WT
-@@ -216,7 +216,7 @@ config CPU_ARM1020
+-#include <mach/platform.h>
++#include "platform.h"
  
- # ARM1020E - needs validating
- config CPU_ARM1020E
--	bool "Support ARM1020E processor" if (ARCH_MULTI_V5 && ARCH_INTEGRATOR)
-+	bool
- 	depends on n
- 	select CPU_32v5
- 	select CPU_ABRT_EV4T
-@@ -229,7 +229,7 @@ config CPU_ARM1020E
+ /*
+  * Peripheral addresses
+diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
+index 44575edc44b1..7cd543b1eace 100644
+--- a/arch/arm/mach-realview/core.c
++++ b/arch/arm/mach-realview/core.c
+@@ -36,8 +36,7 @@
+ #include <linux/memblock.h>
  
- # ARM1022E
- config CPU_ARM1022
--	bool "Support ARM1022E processor" if (ARCH_MULTI_V5 && ARCH_INTEGRATOR)
-+	bool
- 	select CPU_32v5
- 	select CPU_ABRT_EV4T
- 	select CPU_CACHE_VIVT
-@@ -247,7 +247,7 @@ config CPU_ARM1022
+ #include <clocksource/timer-sp804.h>
+-
+-#include <mach/hardware.h>
++#include "hardware.h"
+ #include <asm/irq.h>
+ #include <asm/mach-types.h>
+ #include <asm/hardware/icst.h>
+@@ -46,8 +45,8 @@
+ #include <asm/mach/irq.h>
+ #include <asm/mach/map.h>
  
- # ARM1026EJ-S
- config CPU_ARM1026
--	bool "Support ARM1026EJ-S processor" if (ARCH_MULTI_V5 && ARCH_INTEGRATOR)
-+	bool
- 	select CPU_32v5
- 	select CPU_ABRT_EV5T # But need Jazelle, but EV5TJ ignores bit 10
- 	select CPU_CACHE_VIVT
-@@ -358,7 +358,7 @@ config CPU_PJ4B
+-#include <mach/platform.h>
+-#include <mach/irqs.h>
++#include "platform.h"
++#include "irqs.h"
  
- # ARMv6
- config CPU_V6
--	bool "Support ARM V6 processor" if (!ARCH_MULTIPLATFORM || ARCH_MULTI_V6) && (ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX)
-+	bool
- 	select CPU_32v6
- 	select CPU_ABRT_EV6
- 	select CPU_CACHE_V6
-@@ -371,7 +371,7 @@ config CPU_V6
+ #include <plat/sched_clock.h>
  
- # ARMv6k
- config CPU_V6K
--	bool "Support ARM V6K processor" if (!ARCH_MULTIPLATFORM || ARCH_MULTI_V6) && (ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX)
-+	bool
- 	select CPU_32v6
- 	select CPU_32v6K
- 	select CPU_ABRT_EV6
-@@ -385,7 +385,7 @@ config CPU_V6K
+diff --git a/arch/arm/mach-realview/include/mach/hardware.h b/arch/arm/mach-realview/hardware.h
+similarity index 100%
+rename from arch/arm/mach-realview/include/mach/hardware.h
+rename to arch/arm/mach-realview/hardware.h
+diff --git a/arch/arm/mach-realview/include/mach/irqs-eb.h b/arch/arm/mach-realview/irqs-eb.h
+similarity index 100%
+rename from arch/arm/mach-realview/include/mach/irqs-eb.h
+rename to arch/arm/mach-realview/irqs-eb.h
+diff --git a/arch/arm/mach-realview/include/mach/irqs-pb1176.h b/arch/arm/mach-realview/irqs-pb1176.h
+similarity index 100%
+rename from arch/arm/mach-realview/include/mach/irqs-pb1176.h
+rename to arch/arm/mach-realview/irqs-pb1176.h
+diff --git a/arch/arm/mach-realview/include/mach/irqs-pb11mp.h b/arch/arm/mach-realview/irqs-pb11mp.h
+similarity index 100%
+rename from arch/arm/mach-realview/include/mach/irqs-pb11mp.h
+rename to arch/arm/mach-realview/irqs-pb11mp.h
+diff --git a/arch/arm/mach-realview/include/mach/irqs-pba8.h b/arch/arm/mach-realview/irqs-pba8.h
+similarity index 100%
+rename from arch/arm/mach-realview/include/mach/irqs-pba8.h
+rename to arch/arm/mach-realview/irqs-pba8.h
+diff --git a/arch/arm/mach-realview/include/mach/irqs-pbx.h b/arch/arm/mach-realview/irqs-pbx.h
+similarity index 100%
+rename from arch/arm/mach-realview/include/mach/irqs-pbx.h
+rename to arch/arm/mach-realview/irqs-pbx.h
+diff --git a/arch/arm/mach-realview/include/mach/irqs.h b/arch/arm/mach-realview/irqs.h
+similarity index 88%
+rename from arch/arm/mach-realview/include/mach/irqs.h
+rename to arch/arm/mach-realview/irqs.h
+index 78854f2fa323..1bd8a9a00337 100644
+--- a/arch/arm/mach-realview/include/mach/irqs.h
++++ b/arch/arm/mach-realview/irqs.h
+@@ -22,11 +22,11 @@
+ #ifndef __ASM_ARCH_IRQS_H
+ #define __ASM_ARCH_IRQS_H
  
- # ARMv7
- config CPU_V7
--	bool "Support ARM V7 processor" if (!ARCH_MULTIPLATFORM || ARCH_MULTI_V7) && (ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX)
-+	bool
- 	select CPU_32v6K
- 	select CPU_32v7
- 	select CPU_ABRT_EV7
+-#include <mach/irqs-eb.h>
+-#include <mach/irqs-pb11mp.h>
+-#include <mach/irqs-pb1176.h>
+-#include <mach/irqs-pba8.h>
+-#include <mach/irqs-pbx.h>
++#include "irqs-eb.h"
++#include "irqs-pb11mp.h"
++#include "irqs-pb1176.h"
++#include "irqs-pba8.h"
++#include "irqs-pbx.h"
+ 
+ #define IRQ_LOCALTIMER		29
+ #define IRQ_LOCALWDOG		30
+diff --git a/arch/arm/mach-realview/include/mach/platform.h b/arch/arm/mach-realview/platform.h
+similarity index 100%
+rename from arch/arm/mach-realview/include/mach/platform.h
+rename to arch/arm/mach-realview/platform.h
+diff --git a/arch/arm/mach-realview/platsmp.c b/arch/arm/mach-realview/platsmp.c
+index 98e3052b7933..a2331b36ccce 100644
+--- a/arch/arm/mach-realview/platsmp.c
++++ b/arch/arm/mach-realview/platsmp.c
+@@ -13,13 +13,13 @@
+ #include <linux/smp.h>
+ #include <linux/io.h>
+ 
+-#include <mach/hardware.h>
++#include "hardware.h"
+ #include <asm/mach-types.h>
+ #include <asm/smp_scu.h>
+ 
+-#include <mach/board-eb.h>
+-#include <mach/board-pb11mp.h>
+-#include <mach/board-pbx.h>
++#include "board-eb.h"
++#include "board-pb11mp.h"
++#include "board-pbx.h"
+ 
+ #include <plat/platsmp.h>
+ 
+diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
+index 4d29535abeba..8059fee79974 100644
+--- a/arch/arm/mach-realview/realview_eb.c
++++ b/arch/arm/mach-realview/realview_eb.c
+@@ -31,7 +31,7 @@
+ #include <linux/platform_data/clk-realview.h>
+ #include <linux/reboot.h>
+ 
+-#include <mach/hardware.h>
++#include "hardware.h"
+ #include <asm/irq.h>
+ #include <asm/mach-types.h>
+ #include <asm/pgtable.h>
+@@ -43,8 +43,8 @@
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+ 
+-#include <mach/board-eb.h>
+-#include <mach/irqs.h>
++#include "board-eb.h"
++#include "irqs.h"
+ 
+ #include "core.h"
+ 
+diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
+index ce92c1823494..e5fd1ce9051f 100644
+--- a/arch/arm/mach-realview/realview_pb1176.c
++++ b/arch/arm/mach-realview/realview_pb1176.c
+@@ -34,7 +34,7 @@
+ #include <linux/reboot.h>
+ #include <linux/memblock.h>
+ 
+-#include <mach/hardware.h>
++#include "hardware.h"
+ #include <asm/irq.h>
+ #include <asm/mach-types.h>
+ #include <asm/pgtable.h>
+@@ -45,8 +45,8 @@
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+ 
+-#include <mach/board-pb1176.h>
+-#include <mach/irqs.h>
++#include "board-pb1176.h"
++#include "irqs.h"
+ 
+ #include "core.h"
+ 
+diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
+index f9817bb5d8fa..10b16961f7e1 100644
+--- a/arch/arm/mach-realview/realview_pb11mp.c
++++ b/arch/arm/mach-realview/realview_pb11mp.c
+@@ -31,7 +31,7 @@
+ #include <linux/platform_data/clk-realview.h>
+ #include <linux/reboot.h>
+ 
+-#include <mach/hardware.h>
++#include "hardware.h"
+ #include <asm/irq.h>
+ #include <asm/mach-types.h>
+ #include <asm/pgtable.h>
+@@ -43,8 +43,8 @@
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+ 
+-#include <mach/board-pb11mp.h>
+-#include <mach/irqs.h>
++#include "board-pb11mp.h"
++#include "irqs.h"
+ 
+ #include "core.h"
+ 
+diff --git a/arch/arm/mach-realview/realview_pba8.c b/arch/arm/mach-realview/realview_pba8.c
+index b3549a637ff0..263e37391445 100644
+--- a/arch/arm/mach-realview/realview_pba8.c
++++ b/arch/arm/mach-realview/realview_pba8.c
+@@ -39,9 +39,9 @@
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+ 
+-#include <mach/hardware.h>
+-#include <mach/board-pba8.h>
+-#include <mach/irqs.h>
++#include "hardware.h"
++#include "board-pba8.h"
++#include "irqs.h"
+ 
+ #include "core.h"
+ 
+diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
+index f26e1e09f29e..810b15410bf2 100644
+--- a/arch/arm/mach-realview/realview_pbx.c
++++ b/arch/arm/mach-realview/realview_pbx.c
+@@ -41,9 +41,9 @@
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+ 
+-#include <mach/hardware.h>
+-#include <mach/board-pbx.h>
+-#include <mach/irqs.h>
++#include "hardware.h"
++#include "board-pbx.h"
++#include "irqs.h"
+ 
+ #include "core.h"
+ 
+diff --git a/arch/arm/mach-realview/include/mach/uncompress.h b/arch/arm/mach-realview/uncompress.h
+similarity index 91%
+rename from arch/arm/mach-realview/include/mach/uncompress.h
+rename to arch/arm/mach-realview/uncompress.h
+index cfa30d21783b..f8ac3e723628 100644
+--- a/arch/arm/mach-realview/include/mach/uncompress.h
++++ b/arch/arm/mach-realview/uncompress.h
+@@ -17,14 +17,14 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
+-#include <mach/hardware.h>
++#include "hardware.h"
+ #include <asm/mach-types.h>
+ 
+-#include <mach/board-eb.h>
+-#include <mach/board-pb11mp.h>
+-#include <mach/board-pb1176.h>
+-#include <mach/board-pba8.h>
+-#include <mach/board-pbx.h>
++#include "board-eb.h"
++#include "board-pb11mp.h"
++#include "board-pb1176.h"
++#include "board-pba8.h"
++#include "board-pbx.h"
+ 
+ #define AMBA_UART_DR(base)	(*(volatile unsigned char *)((base) + 0x00))
+ #define AMBA_UART_LCRH(base)	(*(volatile unsigned char *)((base) + 0x2c))
 -- 
 2.1.0.rc2
