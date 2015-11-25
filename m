@@ -1,44 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Nov 2015 21:11:28 +0100
-Subject: [PATCH 7/7] ARM: mmp: move into ARCH_MULTIPLATFORM
-In-Reply-To: <20151125192709.GC11298@codeaurora.org>
-References: <1448465875-435039-1-git-send-email-arnd@arndb.de>
- <1448465875-435039-8-git-send-email-arnd@arndb.de>
- <20151125192709.GC11298@codeaurora.org>
-Message-ID: <3103786.X1psj6MdNt@wuerfel>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 25 Nov 2015 21:14:34 +0100
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+Message-ID: <20151125201434.GA25635@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 November 2015 11:27:09 Stephen Boyd wrote:
-> On 11/25, Arnd Bergmann wrote:
-> > diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
-> > index fdbfadf00c84..4773fe1d8b3f 100644
-> > --- a/arch/arm/mach-mmp/Kconfig
-> > +++ b/arch/arm/mach-mmp/Kconfig
-> > @@ -1,9 +1,24 @@
-> > +menuconfig ARCH_MMP
-> > +     bool "Marvell PXA168/910/MMP2"
-> > +     depends on ARCH_MULTI_V5 || ARCH_MULTI_V7
-> > +     select ARCH_REQUIRE_GPIOLIB
-> > +     select GENERIC_ALLOCATOR
-> > +     select GENERIC_CLOCKEVENTS
+On Wed, Nov 25, 2015 at 04:49:12PM +0100, Arnd Bergmann wrote:
+> I've posted these before and now gotten around to a rebase and
+> want to include them in the arm-soc next/multiplatform branch for
+> 4.5.
 > 
-> ARCH_MULTIPLATFORM already selects this.
-
-Ok, I'll remove it.
-
-> > -
-> > -#define UART1_BASE   (APB_PHYS_BASE + 0x36000)
-> > -#define UART2_BASE   (APB_PHYS_BASE + 0x17000)
-> > -#define UART3_BASE   (APB_PHYS_BASE + 0x18000)
-> > -
-> > -volatile unsigned long *UART;
+> Originally the plan for these platforms was to convert all of
+> them to DT and use only mach-mvebu. That has not happened,
+> so I would do it this way instead so we can at least have
+> them in a single kernel.
 > 
-> Doesn't this file need to be ported over to
-> arch/arm/include/debug/?
+> Let me know if there are any concerns or objections.
 
-The multiplatform based platforms all use the DEBUG_LL based uncompress
-output, which doesn't require the header but is a little more limited
-otherwise.
+Hi Arnd
 
-	Arnd
+I took a brief look at them.
+
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+
+	  Andrew
