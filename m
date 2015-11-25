@@ -1,86 +1,67 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 25 Nov 2015 14:32:53 -0600
-Subject: [PATCH v6 2/6] mfd: syscon: add a DT property to set value width
-In-Reply-To: <1448479507-1951-3-git-send-email-damien.riegel@savoirfairelinux.com>
-References: <1448479507-1951-1-git-send-email-damien.riegel@savoirfairelinux.com>
- <1448479507-1951-3-git-send-email-damien.riegel@savoirfairelinux.com>
-Message-ID: <20151125203253.GA13437@rob-hp-laptop>
+From: dcashman@android.com (Daniel Cashman)
+Date: Wed, 25 Nov 2015 12:39:13 -0800
+Subject: [PATCH v3 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
+In-Reply-To: <20151125120601.GC3109@e104818-lin.cambridge.arm.com>
+References: <1447888808-31571-1-git-send-email-dcashman@android.com>
+ <1447888808-31571-2-git-send-email-dcashman@android.com>
+ <1447888808-31571-3-git-send-email-dcashman@android.com>
+ <1447888808-31571-4-git-send-email-dcashman@android.com>
+ <20151123150459.GD4236@arm.com> <56536114.1020305@android.com>
+ <20151125120601.GC3109@e104818-lin.cambridge.arm.com>
+Message-ID: <56561C71.30602@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 02:25:03PM -0500, Damien Riegel wrote:
-> Currently syscon has a fixed configuration of 32 bits for register and
-> values widths. In some cases, it would be desirable to be able to
-> customize the value width.
+On 11/25/2015 04:06 AM, Catalin Marinas wrote:
+> On Mon, Nov 23, 2015 at 10:55:16AM -0800, Daniel Cashman wrote:
+>> On 11/23/2015 07:04 AM, Will Deacon wrote:
+>>> On Wed, Nov 18, 2015 at 03:20:07PM -0800, Daniel Cashman wrote:
+>>>> +config ARCH_MMAP_RND_BITS_MAX
+>>>> +       default 20 if ARM64_64K_PAGES && ARCH_VA_BITS=39
 > 
-> For example, certain boards (like the ones manufactured by Technologic
-> Systems) have a FPGA that is memory-mapped, but its registers are only
-> 16-bit wide.
+> Where is ARCH_VA_BITS defined? We only have options like
+> ARM64_VA_BITS_39.
 > 
-> This patch adds an optional "bus-width" DT binding for syscon that
-> allows to change the width for the data bus (i.e. val_bits). If this
-> property is provided, it will also adjust the register stride to
-> bus-width / 8. If not provided, the default configuration is used.
+> BTW, we no longer allow the 64K pages and 39-bit VA combination.
 
-See the 8250 UART bindings. This problem is already solved and has 
-standard bindings for it.
+It is not, and should have been ARM64_VA_BITS.  This stanza was meant to
+mimic the one for ARM64_VA_BITS.  Thank you for pointing this, and the
+39-bit combination out.
 
-Rob
+>>>> +       default 24 if ARCH_VA_BITS=39
+>>>> +       default 23 if ARM64_64K_PAGES && ARCH_VA_BITS=42
+>>>> +       default 27 if ARCH_VA_BITS=42
+>>>> +       default 29 if ARM64_64K_PAGES && ARCH_VA_BITS=48
+>>>> +       default 33 if ARCH_VA_BITS=48
+>>>> +       default 15 if ARM64_64K_PAGES
+>>>> +       default 19
+>>>> +
+>>>> +config ARCH_MMAP_RND_COMPAT_BITS_MIN
+>>>> +       default 7 if ARM64_64K_PAGES
+>>>> +       default 11
+>>>
+>>> FYI: we now support 16k pages too, so this might need updating. It would
+>>> be much nicer if this was somehow computed rather than have the results
+>>> all open-coded like this.
+>>
+>> Yes, I ideally wanted this to be calculated based on the different page
+>> options and VA_BITS (which itself has a similar stanza), but I don't
+>> know how to do that/if it is currently supported in Kconfig. This would
+>> be even more desirable with the addition of 16K_PAGES, as with this
+>> setup we have a combinatorial problem.
+> 
+> For KASan, we ended up calculating KASAN_SHADOW_OFFSET in
+> arch/arm64/Makefile. What would the formula be for the above
+> ARCH_MMAP_RND_BITS_MAX?
 
-> 
-> Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  Documentation/devicetree/bindings/mfd/syscon.txt |  3 +++
->  drivers/mfd/syscon.c                             | 13 +++++++++++++
->  2 files changed, 16 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
-> index fe8150b..4c9d187 100644
-> --- a/Documentation/devicetree/bindings/mfd/syscon.txt
-> +++ b/Documentation/devicetree/bindings/mfd/syscon.txt
-> @@ -13,6 +13,9 @@ Required properties:
->  - compatible: Should contain "syscon".
->  - reg: the register region can be accessed from syscon
->  
-> +Optional property:
-> +- bus-width: width of the data bus. Can be <8>, <16>, <32>, or <64>.
-> +
->  Examples:
->  gpr: iomuxc-gpr at 020e0000 {
->  	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
-> diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-> index 176bf0f..5a93d80 100644
-> --- a/drivers/mfd/syscon.c
-> +++ b/drivers/mfd/syscon.c
-> @@ -47,6 +47,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
->  	struct syscon *syscon;
->  	struct regmap *regmap;
->  	void __iomem *base;
-> +	u32 bus_width;
->  	int ret;
->  	struct regmap_config syscon_config = syscon_regmap_config;
->  
-> @@ -69,6 +70,18 @@ static struct syscon *of_syscon_register(struct device_node *np)
->  	 else if (of_property_read_bool(np, "little-endian"))
->  		syscon_config.val_format_endian = REGMAP_ENDIAN_LITTLE;
->  
-> +	/*
-> +	 * search for bus-width property in DT. If it is not provided, default
-> +	 * to 32-bit. regmap_init_mmio will return an error if syscon_config's
-> +	 * values are invalid so there is no need to check them here.
-> +	 */
-> +	ret = of_property_read_u32(np, "bus-width", &bus_width);
-> +	if (ret)
-> +		bus_width = 32;
-> +
-> +	syscon_config.val_bits = bus_width;
-> +	syscon_config.reg_stride = syscon_config.val_bits / 8;
-> +
->  	regmap = regmap_init_mmio(NULL, base, &syscon_config);
->  	if (IS_ERR(regmap)) {
->  		pr_err("regmap init failed\n");
-> -- 
-> 2.5.0
-> 
+The general formula I used ended up being:
+_max = floor(log(TASK_SIZE)) - log(PAGE_SIZE) - 3
+
+which in the case of arm64 ended up being VA_BITS - PAGE_SHIFT - 3.
+Aside: following this would actually put COMPAT_BITS_MAX at 17 for 4k
+pages, rather than 16, but I left it at 16 to mirror what was put in
+arch/arm/Kconfig.
+
+
+Thank You,
+Dan
