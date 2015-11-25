@@ -1,180 +1,215 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Nov 2015 17:06:52 +0100
-Subject: [PATCH 07/10] ARM: s3c64xx: use new adc/touchscreen driver
+Date: Wed, 25 Nov 2015 17:06:55 +0100
+Subject: [PATCH 10/10] ARM: s3c64xx: allow building without board support
 In-Reply-To: <1448467615-447097-1-git-send-email-arnd@arndb.de>
 References: <1448467615-447097-1-git-send-email-arnd@arndb.de>
-Message-ID: <1448467615-447097-8-git-send-email-arnd@arndb.de>
+Message-ID: <1448467615-447097-11-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The old ADC and touchscreen drivers are not compatible with
-multiplatform support, but we can use the exynos-adc driver
-as a replacement.
+Most of the code for the s3c64xx platform is only used when booting
+with ATAGS based board files, but not when using device-tree.
 
-This changes the common device creation functions for s3c64xx
-(but not s3c24xx for now) to use the new driver. To do this,
-we have to pass the interrupt resources in the opposite order
-and pass the platform data in the adc device node.
+This tries to identify all the s3c64xx specific code that is
+unneeded when CONFIG_ATAGS is not set, so we can build a smaller
+DT-only kernel if configured that way.
+
+All board support is still left intact but now depends on the
+CONFIG_ATAGS symbol that users may intentionally disable.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-s3c64xx/mach-mini6410.c             |  3 +--
- arch/arm/mach-s3c64xx/mach-real6410.c             |  3 +--
- arch/arm/mach-s3c64xx/mach-smartq.c               |  3 +--
- arch/arm/mach-s3c64xx/mach-smdk6410.c             |  3 +--
- arch/arm/plat-samsung/devs.c                      | 22 +++++-----------------
- include/linux/platform_data/touchscreen-s3c2410.h |  1 +
- 6 files changed, 10 insertions(+), 25 deletions(-)
+ arch/arm/mach-s3c64xx/Kconfig                     | 19 ++++++++++++++-----
+ arch/arm/mach-s3c64xx/Makefile                    | 21 ++++++++++++---------
+ arch/arm/mach-s3c64xx/include/mach/gpio-samsung.h |  3 +++
+ arch/arm/plat-samsung/pm.c                        |  4 ----
+ 4 files changed, 29 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
-index 3ce5842ed51b..ae999fb3fe6d 100644
---- a/arch/arm/mach-s3c64xx/mach-mini6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
-@@ -234,7 +234,6 @@ static struct platform_device *mini6410_devices[] __initdata = {
- 	&s3c_device_fb,
- 	&mini6410_lcd_powerdev,
- 	&s3c_device_adc,
--	&s3c_device_ts,
- };
+diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
+index caf71a99389e..7c0c420c3016 100644
+--- a/arch/arm/mach-s3c64xx/Kconfig
++++ b/arch/arm/mach-s3c64xx/Kconfig
+@@ -7,18 +7,17 @@ menuconfig ARCH_S3C64XX
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_AMBA
+ 	select ARM_VIC
+-	select ATAGS
+ 	select CLKSRC_SAMSUNG_PWM
+ 	select COMMON_CLK_SAMSUNG
+-	select GPIO_SAMSUNG
++	select GPIO_SAMSUNG if ATAGS
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+ 	select HAVE_TCM
+ 	select PLAT_SAMSUNG
+ 	select PM_GENERIC_DOMAINS if PM
+-	select S3C_DEV_NAND
+-	select S3C_GPIO_TRACK
+-	select SAMSUNG_ATAGS
++	select S3C_DEV_NAND if ATAGS
++	select S3C_GPIO_TRACK if ATAGS
++	select SAMSUNG_ATAGS if ATAGS
+ 	select SAMSUNG_WAKEMASK if PM
+ 	select SAMSUNG_WDT_RESET
+ 	help
+@@ -111,6 +110,7 @@ config S3C64XX_SETUP_USB_PHY
  
- static void __init mini6410_map_io(void)
-@@ -333,7 +332,7 @@ static void __init mini6410_machine_init(void)
- 	s3c_nand_set_platdata(&mini6410_nand_info);
- 	s3c_fb_set_platdata(&mini6410_lcd_pdata[features.lcd_index]);
- 	s3c_sdhci1_set_platdata(&mini6410_hsmmc1_pdata);
--	s3c24xx_ts_set_platdata(NULL);
-+	s3c64xx_ts_set_platdata(NULL);
+ config MACH_SMDK6400
+        bool "SMDK6400"
++	depends on ATAGS
+ 	select CPU_S3C6400
+ 	select S3C64XX_SETUP_SDHCI
+ 	select S3C_DEV_HSMMC1
+@@ -121,6 +121,7 @@ config MACH_SMDK6400
  
- 	/* configure nCS1 width to 16 bits */
+ config MACH_ANW6410
+ 	bool "A&W6410"
++	depends on ATAGS
+ 	select CPU_S3C6410
+ 	select S3C64XX_SETUP_FB_24BPP
+ 	select S3C_DEV_FB
+@@ -129,6 +130,7 @@ config MACH_ANW6410
  
-diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
-index ca6548a1ed3b..4e240ffa7ac7 100644
---- a/arch/arm/mach-s3c64xx/mach-real6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-real6410.c
-@@ -203,7 +203,6 @@ static struct platform_device *real6410_devices[] __initdata = {
- 	&s3c_device_fb,
- 	&s3c_device_nand,
- 	&s3c_device_adc,
--	&s3c_device_ts,
- 	&s3c_device_ohci,
- };
+ config MACH_MINI6410
+ 	bool "MINI6410"
++	depends on ATAGS
+ 	select CPU_S3C6410
+ 	select S3C64XX_SETUP_FB_24BPP
+ 	select S3C64XX_SETUP_SDHCI
+@@ -144,6 +146,7 @@ config MACH_MINI6410
  
-@@ -302,7 +301,7 @@ static void __init real6410_machine_init(void)
+ config MACH_REAL6410
+ 	bool "REAL6410"
++	depends on ATAGS
+ 	select CPU_S3C6410
+ 	select S3C64XX_SETUP_FB_24BPP
+ 	select S3C64XX_SETUP_SDHCI
+@@ -159,6 +162,7 @@ config MACH_REAL6410
  
- 	s3c_fb_set_platdata(&real6410_lcd_pdata[features.lcd_index]);
- 	s3c_nand_set_platdata(&real6410_nand_info);
--	s3c24xx_ts_set_platdata(NULL);
-+	s3c64xx_ts_set_platdata(NULL);
+ config MACH_SMDK6410
+ 	bool "SMDK6410"
++	depends on ATAGS
+ 	select CPU_S3C6410
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+ 	select S3C64XX_SETUP_FB_24BPP
+@@ -246,6 +250,7 @@ config SMDK6410_WM1192_EV1
  
- 	/* configure nCS1 width to 16 bits */
+ config MACH_NCP
+ 	bool "NCP"
++	depends on ATAGS
+ 	select CPU_S3C6410
+ 	select S3C64XX_SETUP_I2C1
+ 	select S3C_DEV_HSMMC1
+@@ -255,6 +260,7 @@ config MACH_NCP
  
-diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
-index 96784e7f894a..936a63fc68d5 100644
---- a/arch/arm/mach-s3c64xx/mach-smartq.c
-+++ b/arch/arm/mach-s3c64xx/mach-smartq.c
-@@ -253,7 +253,6 @@ static struct platform_device *smartq_devices[] __initdata = {
- 	&s3c_device_ohci,
- 	&s3c_device_rtc,
- 	&samsung_device_pwm,
--	&s3c_device_ts,
- 	&s3c_device_usb_hsotg,
- 	&s3c64xx_device_iis0,
- 	&smartq_backlight_device,
-@@ -400,7 +399,7 @@ void __init smartq_machine_init(void)
- 	s3c_hwmon_set_platdata(&smartq_hwmon_pdata);
- 	s3c_sdhci1_set_platdata(&smartq_internal_hsmmc_pdata);
- 	s3c_sdhci2_set_platdata(&smartq_internal_hsmmc_pdata);
--	s3c24xx_ts_set_platdata(&smartq_touchscreen_pdata);
-+	s3c64xx_ts_set_platdata(&smartq_touchscreen_pdata);
+ config MACH_HMT
+ 	bool "Airgoo HMT"
++	depends on ATAGS
+ 	select CPU_S3C6410
+ 	select S3C64XX_SETUP_FB_24BPP
+ 	select S3C_DEV_FB
+@@ -286,18 +292,21 @@ config MACH_SMARTQ
  
- 	i2c_register_board_info(0, smartq_i2c_devs,
- 				ARRAY_SIZE(smartq_i2c_devs));
-diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-index 34d31bd48954..8a894ee3ee76 100644
---- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-@@ -290,7 +290,6 @@ static struct platform_device *smdk6410_devices[] __initdata = {
- 	&s3c_device_adc,
- 	&s3c_device_cfcon,
- 	&s3c_device_rtc,
--	&s3c_device_ts,
- 	&s3c_device_wdt,
- };
+ config MACH_SMARTQ5
+ 	bool "SmartQ 5"
++	depends on ATAGS
+ 	select MACH_SMARTQ
+ 	help
+ 	    Machine support for the SmartQ 5
  
-@@ -669,7 +668,7 @@ static void __init smdk6410_machine_init(void)
+ config MACH_SMARTQ7
+ 	bool "SmartQ 7"
++	depends on ATAGS
+ 	select MACH_SMARTQ
+ 	help
+ 	    Machine support for the SmartQ 7
  
- 	samsung_keypad_set_platdata(&smdk6410_keypad_data);
+ config MACH_WLF_CRAGG_6410
+ 	bool "Wolfson Cragganmore 6410"
++	depends on ATAGS
+ 	depends on I2C=y
+ 	select CPU_S3C6410
+ 	select LEDS_GPIO_REGISTER
+diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
+index 04cdcd40e23c..256cd5b40c60 100644
+--- a/arch/arm/mach-s3c64xx/Makefile
++++ b/arch/arm/mach-s3c64xx/Makefile
+@@ -8,20 +8,21 @@
+ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include -I$(srctree)/arch/arm/plat-samsung/include
+ asflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include -I$(srctree)/arch/arm/plat-samsung/include
  
--	s3c24xx_ts_set_platdata(NULL);
-+	s3c64xx_ts_set_platdata(NULL);
+-# Core
++# PM
  
- 	/* configure nCS1 width to 16 bits */
+-obj-y				+= common.o
++obj-$(CONFIG_PM)		+= pm.o
++obj-$(CONFIG_PM_SLEEP)		+= sleep.o
++obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
  
-diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-index f39938fa9ef6..b53d4ff3befb 100644
---- a/arch/arm/plat-samsung/devs.c
-+++ b/arch/arm/plat-samsung/devs.c
-@@ -119,12 +119,12 @@ struct platform_device s3c_device_adc = {
- #if defined(CONFIG_SAMSUNG_DEV_ADC)
- static struct resource s3c_adc_resource[] = {
- 	[0] = DEFINE_RES_MEM(SAMSUNG_PA_ADC, SZ_256),
--	[1] = DEFINE_RES_IRQ(IRQ_TC),
--	[2] = DEFINE_RES_IRQ(IRQ_ADC),
-+	[1] = DEFINE_RES_IRQ(IRQ_ADC),
-+	[2] = DEFINE_RES_IRQ(IRQ_TC),
- };
+-# Core support
++ifdef CONFIG_SAMSUNG_ATAGS
  
- struct platform_device s3c_device_adc = {
--	.name		= "samsung-adc",
-+	.name		= "exynos-adc",
- 	.id		= -1,
- 	.num_resources	= ARRAY_SIZE(s3c_adc_resource),
- 	.resource	= s3c_adc_resource,
-@@ -956,31 +956,19 @@ void __init s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *hard_s3c2410ts_
- #endif /* CONFIG_PLAT_S3C24XX */
+-obj-$(CONFIG_CPU_S3C6400)	+= s3c6400.o
+-obj-$(CONFIG_CPU_S3C6410)	+= s3c6410.o
++obj-$(CONFIG_PM_SLEEP)          += irq-pm.o
  
- #ifdef CONFIG_SAMSUNG_DEV_TS
--static struct resource s3c_ts_resource[] = {
--	[0] = DEFINE_RES_MEM(SAMSUNG_PA_ADC, SZ_256),
--	[1] = DEFINE_RES_IRQ(IRQ_TC),
--};
--
- static struct s3c2410_ts_mach_info default_ts_data __initdata = {
- 	.delay			= 10000,
- 	.presc			= 49,
- 	.oversampling_shift	= 2,
- };
+-# PM
++# Core
  
--struct platform_device s3c_device_ts = {
--	.name		= "s3c64xx-ts",
--	.id		= -1,
--	.num_resources	= ARRAY_SIZE(s3c_ts_resource),
--	.resource	= s3c_ts_resource,
--};
--
--void __init s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *pd)
-+void __init s3c64xx_ts_set_platdata(struct s3c2410_ts_mach_info *pd)
- {
- 	if (!pd)
- 		pd = &default_ts_data;
+-obj-$(CONFIG_PM)		+= pm.o
+-obj-$(CONFIG_PM_SLEEP)		+= irq-pm.o sleep.o
+-obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
++obj-y				+= common.o
++obj-$(CONFIG_CPU_S3C6400)	+= s3c6400.o
++obj-$(CONFIG_CPU_S3C6410)	+= s3c6410.o
  
- 	s3c_set_platdata(pd, sizeof(struct s3c2410_ts_mach_info),
--			 &s3c_device_ts);
-+			 &s3c_device_adc);
- }
- #endif /* CONFIG_SAMSUNG_DEV_TS */
+ # DMA support
  
-diff --git a/include/linux/platform_data/touchscreen-s3c2410.h b/include/linux/platform_data/touchscreen-s3c2410.h
-index 58dc7c5ae63b..71eccaa9835d 100644
---- a/include/linux/platform_data/touchscreen-s3c2410.h
-+++ b/include/linux/platform_data/touchscreen-s3c2410.h
-@@ -17,6 +17,7 @@ struct s3c2410_ts_mach_info {
- };
+@@ -58,4 +59,6 @@ obj-$(CONFIG_MACH_SMARTQ7)		+= mach-smartq7.o
+ obj-$(CONFIG_MACH_SMDK6400)		+= mach-smdk6400.o
+ obj-$(CONFIG_MACH_SMDK6410)		+= mach-smdk6410.o
+ obj-$(CONFIG_MACH_WLF_CRAGG_6410)	+= mach-crag6410.o mach-crag6410-module.o
++endif
++
+ obj-$(CONFIG_MACH_S3C64XX_DT)		+= mach-s3c64xx-dt.o
+diff --git a/arch/arm/mach-s3c64xx/include/mach/gpio-samsung.h b/arch/arm/mach-s3c64xx/include/mach/gpio-samsung.h
+index 9c81fac3b2d5..1d3636512e33 100644
+--- a/arch/arm/mach-s3c64xx/include/mach/gpio-samsung.h
++++ b/arch/arm/mach-s3c64xx/include/mach/gpio-samsung.h
+@@ -14,6 +14,8 @@
+ #ifndef GPIO_SAMSUNG_S3C64XX_H
+ #define GPIO_SAMSUNG_S3C64XX_H
  
- extern void s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *);
-+extern void s3c64xx_ts_set_platdata(struct s3c2410_ts_mach_info *);
++#ifdef CONFIG_GPIO_SAMSUNG
++
+ /* GPIO bank sizes */
+ #define S3C64XX_GPIO_A_NR	(8)
+ #define S3C64XX_GPIO_B_NR	(7)
+@@ -90,5 +92,6 @@ enum s3c_gpio_number {
+ /* define the number of gpios we need to the one after the GPQ() range */
+ #define GPIO_BOARD_START (S3C64XX_GPQ(S3C64XX_GPIO_Q_NR) + 1)
  
- /* defined by architecture to configure gpio */
- extern void s3c24xx_ts_cfg_gpio(struct platform_device *dev);
++#endif /* GPIO_SAMSUNG */
+ #endif /* GPIO_SAMSUNG_S3C64XX_H */
+ 
+diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
+index 82777c649774..d7803b434732 100644
+--- a/arch/arm/plat-samsung/pm.c
++++ b/arch/arm/plat-samsung/pm.c
+@@ -23,14 +23,10 @@
+ #include <asm/cacheflush.h>
+ #include <asm/suspend.h>
+ 
+-#ifdef CONFIG_SAMSUNG_ATAGS
+ #include <mach/map.h>
+-#ifndef CONFIG_ARCH_EXYNOS
+ #include <mach/regs-clock.h>
+ #include <mach/regs-irq.h>
+-#endif
+ #include <mach/irqs.h>
+-#endif
+ 
+ #include <asm/irq.h>
+ 
 -- 
 2.1.0.rc2
