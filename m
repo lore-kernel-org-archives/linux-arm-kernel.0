@@ -1,56 +1,125 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 25 Nov 2015 16:58:52 -0600
-Subject: [PATCH] arm64: mm: Prevent the initial page table setup from
- creating larger blocks
-In-Reply-To: <1448387338-27851-1-git-send-email-catalin.marinas@arm.com>
-References: <1448387338-27851-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <56563D2C.7050807@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 25 Nov 2015 17:03:00 -0600
+Subject: [PATCH 01/14] ARM: am437x: cm-t43: dts: add basic support for
+ sbc-t43
+In-Reply-To: <1448371155-17307-2-git-send-email-nikita@compulab.co.il>
+References: <1448371155-17307-1-git-send-email-nikita@compulab.co.il>
+ <1448371155-17307-2-git-send-email-nikita@compulab.co.il>
+Message-ID: <20151125230300.GA23057@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/24/2015 11:48 AM, Catalin Marinas wrote:
-> This patch prevents the larger block mappings at all levels _if_ the
-> existing pud/pmd entry is present _and_ not already a block mapping.
-> Contiguous ptes are rejected if any of the entries in the range are
-> non-empty and non-contiguous.
->
-> In addition, TLB flushing is added for the cases where an existing block
-> entry is changed.
+On Tue, Nov 24, 2015 at 03:19:02PM +0200, Nikita Kiryanov wrote:
+> Add basic support for SBC-T43: a CM-T43 based single board computer.
+> CM-T43 is an AM437x based System-on-Module designed to serve as a building
+> block in embedded applications. SBC-T43 is composed of CM-T43 module on
+> top of the SB-SOM-T43 baseboard.
+> Basic support includes UART, GPIO, and I2C.
+> 
+> Signed-off-by: Nikita Kiryanov <nikita@compulab.co.il>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Igor Grinberg <grinberg@compulab.co.il>
+> Cc: Dmitry Lifshitz <lifshitz@compulab.co.il>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
 
-Ok, it seems to boot fairly reliably on the m400/ACPI, over a few dozen 
-reboots yesterday and today. So, for that:
+Some minor nits below, otherwise:
 
-Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+Acked-by: Rob Herring <robh@kernel.org>
 
-That said, it basically disables the CONT ranges for the main kernel 
-text section.
+> ---
+>  .../devicetree/bindings/arm/omap/omap.txt          |  6 ++
+>  arch/arm/boot/dts/Makefile                         |  6 +-
+>  arch/arm/boot/dts/am437x-cm-t43.dts                | 90 ++++++++++++++++++++++
+>  arch/arm/boot/dts/am437x-sbc-t43.dts               | 57 ++++++++++++++
+>  4 files changed, 157 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/am437x-cm-t43.dts
+>  create mode 100644 arch/arm/boot/dts/am437x-sbc-t43.dts
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> index 9f4e513..da84372 100644
+> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
+> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> @@ -141,6 +141,12 @@ Boards:
+>  - OMAP5 EVM : Evaluation Module
+>    compatible = "ti,omap5-evm", "ti,omap5"
+>  
+> +- AM437x CM-T43
+> +  compatible = "compulab,am437x-cm-t43", "ti,am4372", "ti,am43"
+> +
+> +- AM437x SBC-T43
+> +  compatible = "compulab,am437x-sbc-t43","compulab,am437x-cm-t43","ti,am4372","ti,am43"
+                                            ^
+spaces
 
-With this patch:
+> +
+>  - AM43x EPOS EVM
+>    compatible = "ti,am43x-epos-evm", "ti,am4372", "ti,am43"
+>  
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 30bbc37..dc3b9af 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -478,9 +478,11 @@ dtb-$(CONFIG_ARCH_OMAP4) += \
+>  	omap4-var-stk-om44.dtb
+>  dtb-$(CONFIG_SOC_AM43XX) += \
+>  	am43x-epos-evm.dtb \
+> -	am437x-sk-evm.dtb \
+> +	am437x-cm-t43.dtb \
+> +	am437x-gp-evm.dtb \
+>  	am437x-idk-evm.dtb \
+> -	am437x-gp-evm.dtb
+> +	am437x-sbc-t43.dtb \
+> +	am437x-sk-evm.dtb
+>  dtb-$(CONFIG_SOC_OMAP5) += \
+>  	omap5-cm-t54.dtb \
+>  	omap5-igep0050.dtb \
+> diff --git a/arch/arm/boot/dts/am437x-cm-t43.dts b/arch/arm/boot/dts/am437x-cm-t43.dts
+> new file mode 100644
+> index 0000000..69887c4
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/am437x-cm-t43.dts
+> @@ -0,0 +1,90 @@
+> +/*
+> + * Copyright (C) 2015 CompuLab, Ltd. - http://www.compulab.co.il/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include <dt-bindings/pinctrl/am43xx.h>
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include "am4372.dtsi"
+> +
+> +/ {
+> +	model = "CompuLab CM-T43";
+> +	compatible = "compulab,am437x-cm-t43","ti,am4372","ti,am43";
+                                              ^
+space
 
-0xfffffe0000000000-0xfffffe0000090000 (paddr=0x4000000000)        576K 
-    RW NX SHD AF            UXN MEM/NORMAL
-0xfffffe0000090000-0xfffffe0000c50000 (paddr=0x4000090000)      12032K 
-    ro x  SHD AF            UXN MEM/NORMAL
-0xfffffe0000c50000-0xfffffe0001600000 (paddr=0x4000c50000)       9920K 
-    RW NX SHD AF            UXN MEM/NORMAL
-0xfffffe0001600000-0xfffffe0020000000 (paddr=0x4001600000)        490M 
-    RW NX SHD AF    CON     UXN MEM/NORMAL
-0xfffffe0020000000-0xfffffe1000000000 (paddr=0x4020000000)      65024M 
-    RW NX SHD AF        BLK UXN MEM/NORMAL
+[...]
 
-without:
+> diff --git a/arch/arm/boot/dts/am437x-sbc-t43.dts b/arch/arm/boot/dts/am437x-sbc-t43.dts
+> new file mode 100644
+> index 0000000..f3cd76b
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/am437x-sbc-t43.dts
+> @@ -0,0 +1,57 @@
+> +/*
+> + * Copyright (C) 2015 CompuLab, Ltd. - http://www.compulab.co.il/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include "am437x-cm-t43.dts"
+> +
+> +/ {
+> +	model = "CompuLab CM-T43 on SB-SOM-T43";
+> +	compatible = "compulab,am437x-sbc-t43","compulab,am437x-cm-t43","ti,am4372","ti,am43";
 
-0xfffffe0000000000-0xfffffe0000090000 (paddr=0x4000000000)        576K 
-    RW NX SHD AF            UXN MEM/NORMAL
-0xfffffe0000090000-0xfffffe0000200000 (paddr=0x4000090000)       1472K 
-    ro x  SHD AF            UXN MEM/NORMAL
-0xfffffe0000200000-0xfffffe0000c00000 (paddr=0x4000200000)         10M 
-    ro x  SHD AF    CON     UXN MEM/NORMAL
-0xfffffe0000c00000-0xfffffe0000c50000 (paddr=0x4000c00000)        320K 
-    ro x  SHD AF            UXN MEM/NORMAL
-0xfffffe0000c50000-0xfffffe0000e00000 (paddr=0x4000c50000)       1728K 
-    RW NX SHD AF            UXN MEM/NORMAL
-0xfffffe0000e00000-0xfffffe0020000000 (paddr=0x4000e00000)        498M 
-    RW NX SHD AF    CON     UXN MEM/NORMAL
-0xfffffe0020000000-0xfffffe1000000000 (paddr=0x4020000000)      65024M 
-    RW NX SHD AF        BLK UXN MEM/NORMAL
+spaces
