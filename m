@@ -1,71 +1,55 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 25 Nov 2015 11:27:09 -0800
-Subject: [PATCH 7/7] ARM: mmp: move into ARCH_MULTIPLATFORM
-In-Reply-To: <1448465875-435039-8-git-send-email-arnd@arndb.de>
-References: <1448465875-435039-1-git-send-email-arnd@arndb.de>
- <1448465875-435039-8-git-send-email-arnd@arndb.de>
-Message-ID: <20151125192709.GC11298@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 Nov 2015 19:29:24 +0000
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <20151125191600.GM11384@lunn.ch>
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+ <20151125160937.GJ14338@lunn.ch>
+ <20151125183728.GO8644@n2100.arm.linux.org.uk>
+ <20151125191600.GM11384@lunn.ch>
+Message-ID: <20151125192924.GQ8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25, Arnd Bergmann wrote:
-> diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
-> index fdbfadf00c84..4773fe1d8b3f 100644
-> --- a/arch/arm/mach-mmp/Kconfig
-> +++ b/arch/arm/mach-mmp/Kconfig
-> @@ -1,9 +1,24 @@
-> +menuconfig ARCH_MMP
-> +	bool "Marvell PXA168/910/MMP2"
-> +	depends on ARCH_MULTI_V5 || ARCH_MULTI_V7
-> +	select ARCH_REQUIRE_GPIOLIB
-> +	select GENERIC_ALLOCATOR
-> +	select GENERIC_CLOCKEVENTS
+On Wed, Nov 25, 2015 at 08:16:00PM +0100, Andrew Lunn wrote:
+> > It feels today like I'm the only one working on improving Dove support,
+> > and so it's going to take a _long_ time to move things forward - it's
+> > likely to take years.  I have many demands on my time and I have to
+> > divide it up between the various aspects.
+> 
+> Hi Russell
+> 
+> The problem from our side is the apparent lack of progress. We get so
+> very few patches we wounder why we should keep it around. If there was
+> even a steady trick of patches, we would feel better about keeping it.
 
-ARCH_MULTIPLATFORM already selects this.
+You may think there's lack of progress, but I can tell you that there's
+lots of progress on etnaviv right now.  Since 1st November, I've
+authored 100 MESA patches, 81 of those merged into Christians repository.
+I've also been sorting out issues with the kernel side driver, which
+now supports cross-GPU synchronisation, necessary for iMX6, and a
+necessary step towards getting the kernel driver merged into mainline.
 
-> +	select GPIO_PXA
-> +	select PINCTRL
-> +	select PLAT_PXA
-> +	help
-> +	  Support for Marvell's PXA168/PXA910(MMP) and MMP2 processor line.
-> diff --git a/arch/arm/mach-mmp/include/mach/uncompress.h b/arch/arm/mach-mmp/include/mach/uncompress.h
-> deleted file mode 100644
-> index 8890fa8fa771..000000000000
-> --- a/arch/arm/mach-mmp/include/mach/uncompress.h
-> +++ /dev/null
-> @@ -1,45 +0,0 @@
-> -/*
-> - * arch/arm/mach-mmp/include/mach/uncompress.h
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - */
-> -
-> -#include <linux/serial_reg.h>
-> -#include <mach/addr-map.h>
-> -#include <asm/mach-types.h>
-> -
-> -#define UART1_BASE	(APB_PHYS_BASE + 0x36000)
-> -#define UART2_BASE	(APB_PHYS_BASE + 0x17000)
-> -#define UART3_BASE	(APB_PHYS_BASE + 0x18000)
-> -
-> -volatile unsigned long *UART;
+As I already explained, there is only one of me.  I can only do so much,
+and I tend to focus on one part of the broad problem to the exclusion of
+other parts - I find chopping and changing all the time to be a much
+less efficient way of working.
 
-Doesn't this file need to be ported over to
-arch/arm/include/debug/?
+Others may be able to do a little bit here, a little bit there, but I'm
+not like that, sorry.
 
-> -
-> -static inline void putc(char c)
-> -{
-> -	/* UART enabled? */
-> -	if (!(UART[UART_IER] & UART_IER_UUE))
-> -		return;
-> -
-> -	while (!(UART[UART_LSR] & UART_LSR_THRE))
-> -		barrier();
-> -
+I won't be able to even start thinking about looking at this stuff until
+next week - Arnd wants me to look at some patches he's sent out today,
+which I might be able to do tomorrow afternoon at the very earliest,
+and I'm probably not around on Friday.
+
+See - I'm only one person, I don't have time to be able to progress
+lots of non-paying work at a fast rate.
+
+You'll have to wait, just like I've had to wait to get my own patches
+for other stuff in, just like I have to wait for progress in other
+projects.  Sorry, but waiting and patience is all part of open source
+development, especially when it relies upon volunteer effort.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
