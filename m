@@ -1,65 +1,41 @@
-From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
-Date: Wed, 25 Nov 2015 17:49:02 +0800
-Subject: [PATCH 1/1] arm64: dts: add all hi6220 i2c nodes
-Message-ID: <1448444942-5780-1-git-send-email-kong.kongxinwei@hisilicon.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 25 Nov 2015 09:56:14 +0000
+Subject: [PATCH v9] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+ PCIe Host Controller
+In-Reply-To: <CABHD4K9PH-1tpwmxmPSBK3dW04G3XMfNtPFqtWFb7gnThe=uNQ@mail.gmail.com>
+References: <1447911323-12567-1-git-send-email-bharatku@xilinx.com>
+ <20151124173556.18aff6b5@arm.com>
+ <8520D5D51A55D047800579B0941471982586607F@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20151125075018.68e97010@arm.com>
+ <CABHD4K9PH-1tpwmxmPSBK3dW04G3XMfNtPFqtWFb7gnThe=uNQ@mail.gmail.com>
+Message-ID: <20151125095614.523cd8b7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds all I2C nodes for the Hi6220 SoC. This hi6220 Soc
-use this I2C IP of Synopsys Designware for HiKey board.
+On Wed, 25 Nov 2015 14:23:29 +0530
+Amit Tomer <amittomer25@gmail.com> wrote:
 
-Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
----
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 37 +++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+> Sorry to intervene but just trying to learn from your comments.
+> 
+>  > You have plenty, and that's the whole of your device space. *All of it*. So
+> >   just take the base address of your PCIe controller, and be done with
+> >   it.
+> 
+> but isn't few of PCIe controller's registers itself are mapped
+> here(base address). So, how can we use this address for MSI?
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 82d2488..6b591a9 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -208,5 +208,42 @@
- 			clock-names = "uartclk", "apb_pclk";
- 			status = "disabled";
- 		};
-+
-+		i2c0: i2c at f7100000 {
-+			compatible = "snps,designware-i2c";
-+			reg = <0x0 0xf7100000 0x0 0x1000>;
-+			interrupts = <0 44 4>;
-+			clocks = <&sys_ctrl HI6220_I2C0_CLK>;
-+			clock-names = "clk_i2c0";
-+			i2c-sda-hold-time-ns = <300>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pmx_func &i2c0_cfg_func>;
-+			status = "ok";
-+		};
-+
-+		i2c1: i2c at f7101000 {
-+			compatible = "snps,designware-i2c";
-+			reg = <0x0 0xf7101000 0x0 0x1000>;
-+			interrupts = <0 45 4>;
-+			clocks = <&sys_ctrl HI6220_I2C1_CLK>;
-+			clock-names = "clk_i2c1";
-+			i2c-sda-hold-time-ns = <300>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c1_pmx_func &i2c1_cfg_func>;
-+			status = "ok";
-+		};
-+
-+		i2c2: i2c at f7102000 {
-+			compatible = "snps,designware-i2c";
-+			reg = <0x0 0xf7102000 0x0 0x1000>;
-+			interrupts = <0 46 4>;
-+			clocks = <&sys_ctrl HI6220_I2C2_CLK>;
-+			clock-names = "clk_i2c2";
-+			i2c-sda-hold-time-ns = <300>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c2_pmx_func &i2c2_cfg_func>;
-+			status = "ok";
-+		};
-+
- 	};
- };
+You can, because the PCIe controller never writes to itself. If it
+writes to that base address, then it *is* the MSI doorbell and the
+bridge will hopefully do the right thing.
+
+> Or you said from base address of PCIe controller, find an offset that
+> can be used as MSI address?
+
+That works as well. Given the description of the HW we've been given,
+any address will do, as long as it is behind the PCIe RC.
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny.
