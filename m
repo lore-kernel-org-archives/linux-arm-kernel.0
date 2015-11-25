@@ -1,55 +1,70 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 25 Nov 2015 10:16:44 -0800
-Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
- "/chosen/linux,atags" entry
-In-Reply-To: <20151123144545.GD24147@pali>
-References: <20150713131902.GH26485@atomide.com>
- <20151012201640.GQ23801@atomide.com> <201510122225.12786@pali>
- <20151012204509.GT23801@atomide.com> <20151013143746.GJ23104@pali>
- <20151105114041.GC27908@pali> <20151105161756.GG3078@atomide.com>
- <5643E716.9080204@gmail.com> <20151122065146.GD26074@amd>
- <20151123144545.GD24147@pali>
-Message-ID: <20151125181644.GI2517@atomide.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 25 Nov 2015 19:19:08 +0100
+Subject: [PATCH 01/13] net: mvneta: add configuration for MBUS windows
+ access protection
+In-Reply-To: <1448178839-3541-2-git-send-email-mw@semihalf.com> (Marcin
+ Wojtas's message of "Sun, 22 Nov 2015 08:53:47 +0100")
+References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
+ <1448178839-3541-2-git-send-email-mw@semihalf.com>
+Message-ID: <87si3u7xib.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pali Roh?r <pali.rohar@gmail.com> [151123 06:46]:
-> On Sunday 22 November 2015 07:51:46 Pavel Machek wrote:
-> > On Wed 2015-11-11 17:10:46, Frank Rowand wrote:
-> > > Adding devicetree list.
-> > > 
-> > > Thread starts at
-> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/354459.html
-> > > 
-> > > On 11/5/2015 8:17 AM, Tony Lindgren wrote:
-> > > > * Pali Roh?r <pali.rohar@gmail.com> [151105 03:41]:
-> > > >> On Tuesday 13 October 2015 16:37:46 Pali Roh?r wrote:
-> > > >>> On Monday 12 October 2015 13:45:09 Tony Lindgren wrote:
-> > > >>>> * Pali Roh?r <pali.rohar@gmail.com> [151012 13:29]:
-> > > >>>>> On Monday 12 October 2015 22:16:40 Tony Lindgren wrote:
-> > > >>>>>>
-> > > >>>>>> Pali, any news on posting an updated series with the comments
-> > > >>>>>> addressed in this thread? It seems that we all pretty much agree
-> > > >>>>>> what needs to be done.
-> > > 
-> > > I'm not real happy with the concept of patches 4 and 5 in this series.
-> > > My concern is that those two patches are using the FDT as a transport
-> > > mechanism for a binary blob (the atags object).
-> > 
-> > Umm. Ok. Do you have alternative proposal that works for everyone?
-> > 
-> > I mean. This discussion was going for quite a long time, and it would
-> > be nice to have some solution... patch proposal... something.
-> > 									Pavel
-> 
-> Yes, discussion is going for a long time! So should I spend time for
-> adding documentation to my solution (this is last one thing which is
-> missing)? Or my solution is wrong and somebody else will propose new?
-> I do not want to spend time on something which will be rejected and
-> discarded.
+Hi Marcin,
+ 
+ On dim., nov. 22 2015, Marcin Wojtas <mw@semihalf.com> wrote:
 
-At least I don't have better solutions in mind.
+> This commit adds missing configuration of MBUS windows access protection
+> in mvneta_conf_mbus_windows function - a dedicated variable for that
+> purpose remained there unused since v3.8 initial mvneta support. Because
+> of that the register contents were inherited from the bootloader.
 
-Regards,
+It looks OK for me and at least after applying the driver continues
+working :)
 
-Tony
+I guess you find it when you tested suspend to ram.
+
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Thanks,
+
+Gregory
+
+
+>
+> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+> Cc: <stable@vger.kernel.org> # v3.8+
+> ---
+>  drivers/net/ethernet/marvell/mvneta.c | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> index e84c7f2..0f30aaa 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> @@ -62,6 +62,7 @@
+>  #define MVNETA_WIN_SIZE(w)                      (0x2204 + ((w) << 3))
+>  #define MVNETA_WIN_REMAP(w)                     (0x2280 + ((w) << 2))
+>  #define MVNETA_BASE_ADDR_ENABLE                 0x2290
+> +#define MVNETA_ACCESS_PROTECT_ENABLE		0x2294
+>  #define MVNETA_PORT_CONFIG                      0x2400
+>  #define      MVNETA_UNI_PROMISC_MODE            BIT(0)
+>  #define      MVNETA_DEF_RXQ(q)                  ((q) << 1)
+> @@ -3188,6 +3189,8 @@ static void mvneta_conf_mbus_windows(struct mvneta_port *pp,
+>  
+>  		win_enable &= ~(1 << i);
+>  		win_protect |= 3 << (2 * i);
+> +
+> +		mvreg_write(pp, MVNETA_ACCESS_PROTECT_ENABLE, win_protect);
+>  	}
+>  
+>  	mvreg_write(pp, MVNETA_BASE_ADDR_ENABLE, win_enable);
+> -- 
+> 1.8.3.1
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
