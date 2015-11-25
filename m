@@ -1,40 +1,99 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 26 Nov 2015 00:01:51 +0800
-Subject: [PATCH v4 0/2] clocksource/drivers/dw_apb_timer: improve performance
- a bit
-Message-ID: <1448467313-5626-1-git-send-email-jszhang@marvell.com>
+Date: Thu, 26 Nov 2015 00:01:53 +0800
+Subject: [PATCH v4 2/2] clocksource/drivers/dw_apb_timer: Use
+ {readl|writel}_relaxed in critical path
+In-Reply-To: <1448467313-5626-1-git-send-email-jszhang@marvell.com>
+References: <1448467313-5626-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1448467313-5626-3-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These two patches try to improve the dw_apb_timer clocksource/clockevent
-performance.
+It's safe to use the relaxed version. From another side, the relaxed io
+accessor macros are available on all architectures now, so we can use
+the relaxed versions to get a trivial system performance improvement,
+we measured time the following functions spent on Marvell BG4CT:
 
-These patches depend on the apbt_readl return value fix patch:
+4096 rounds of __apbt_read_clocksource() call:
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/388250.html
+before the patch: 1263240ns on average
+after the patch: 1250080ns on average
+improved by 1%
 
-since v3:
- - fix commit msg: we measured 4096 rounds of function call. So add this
-   information into commit msg to avoid confusion.
+4096 rounds of apbt_eoi() call:
 
-since v2:
- - only use relaxed version in critical path
- - inline apbt_readl/apbt_writel
- - add some performance numbers
+before the patch: 1290960ns on average
+after the patch: 1248240ns on average
 
-since v1:
- - correct the wrong sentence in commit msg about writel performance on
-   CA9 with outer L2 cache. Thank Arnd for pointing out this in another
-   thread.
+4096 rounds of apbt_next_event() call:
 
+before the patch: 3333660ns on average
+after the patch: 1322040ns on average
 
-Jisheng Zhang (2):
-  clocksource/drivers/dw_apb_timer: Inline apbt_readl and apbt_writel
-  clocksource/drivers/dw_apb_timer: Use {readl|writel}_relaxed in
-    critical path
+improved by 60%!
 
- drivers/clocksource/dw_apb_timer.c | 30 +++++++++++++++++++++---------
- 1 file changed, 21 insertions(+), 9 deletions(-)
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/clocksource/dw_apb_timer.c | 24 ++++++++++++++++++------
+ 1 file changed, 18 insertions(+), 6 deletions(-)
 
+diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
+index 114696b..6334526 100644
+--- a/drivers/clocksource/dw_apb_timer.c
++++ b/drivers/clocksource/dw_apb_timer.c
+@@ -60,6 +60,17 @@ static inline void apbt_writel(struct dw_apb_timer *timer, u32 val,
+ 	writel(val, timer->base + offs);
+ }
+ 
++static inline u32 apbt_readl_relaxed(struct dw_apb_timer *timer, unsigned long offs)
++{
++	return readl_relaxed(timer->base + offs);
++}
++
++static inline void apbt_writel_relaxed(struct dw_apb_timer *timer, u32 val,
++			unsigned long offs)
++{
++	writel_relaxed(val, timer->base + offs);
++}
++
+ static void apbt_disable_int(struct dw_apb_timer *timer)
+ {
+ 	u32 ctrl = apbt_readl(timer, APBTMR_N_CONTROL);
+@@ -81,7 +92,7 @@ void dw_apb_clockevent_pause(struct dw_apb_clock_event_device *dw_ced)
+ 
+ static void apbt_eoi(struct dw_apb_timer *timer)
+ {
+-	apbt_readl(timer, APBTMR_N_EOI);
++	apbt_readl_relaxed(timer, APBTMR_N_EOI);
+ }
+ 
+ static irqreturn_t dw_apb_clockevent_irq(int irq, void *data)
+@@ -200,13 +211,13 @@ static int apbt_next_event(unsigned long delta,
+ 	struct dw_apb_clock_event_device *dw_ced = ced_to_dw_apb_ced(evt);
+ 
+ 	/* Disable timer */
+-	ctrl = apbt_readl(&dw_ced->timer, APBTMR_N_CONTROL);
++	ctrl = apbt_readl_relaxed(&dw_ced->timer, APBTMR_N_CONTROL);
+ 	ctrl &= ~APBTMR_CONTROL_ENABLE;
+-	apbt_writel(&dw_ced->timer, ctrl, APBTMR_N_CONTROL);
++	apbt_writel_relaxed(&dw_ced->timer, ctrl, APBTMR_N_CONTROL);
+ 	/* write new count */
+-	apbt_writel(&dw_ced->timer, delta, APBTMR_N_LOAD_COUNT);
++	apbt_writel_relaxed(&dw_ced->timer, delta, APBTMR_N_LOAD_COUNT);
+ 	ctrl |= APBTMR_CONTROL_ENABLE;
+-	apbt_writel(&dw_ced->timer, ctrl, APBTMR_N_CONTROL);
++	apbt_writel_relaxed(&dw_ced->timer, ctrl, APBTMR_N_CONTROL);
+ 
+ 	return 0;
+ }
+@@ -342,7 +353,8 @@ static cycle_t __apbt_read_clocksource(struct clocksource *cs)
+ 	struct dw_apb_clocksource *dw_cs =
+ 		clocksource_to_dw_apb_clocksource(cs);
+ 
+-	current_count = apbt_readl(&dw_cs->timer, APBTMR_N_CURRENT_VALUE);
++	current_count = apbt_readl_relaxed(&dw_cs->timer,
++					APBTMR_N_CURRENT_VALUE);
+ 
+ 	return (cycle_t)~current_count;
+ }
 -- 
 2.6.2
