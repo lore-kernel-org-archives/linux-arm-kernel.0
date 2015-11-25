@@ -1,113 +1,159 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed, 25 Nov 2015 15:59:37 +0800
-Subject: [PATCH 5/5] thermal: rockchip: Support the RK3399 SoCs in thermal
- driver
-In-Reply-To: <1448438377-29203-1-git-send-email-wxt@rock-chips.com>
-References: <1448438377-29203-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1448438377-29203-6-git-send-email-wxt@rock-chips.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 25 Nov 2015 08:23:20 +0000
+Subject: [PATCH 05/21] arm64: KVM: Implement timer save/restore
+In-Reply-To: <20151123104653.GA21198@linaro.org>
+References: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
+ <1447679519-17888-6-git-send-email-marc.zyngier@arm.com>
+ <20151123104653.GA21198@linaro.org>
+Message-ID: <20151125082320.35489d99@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RK3399 SoCs have two Temperature Sensors, channel 0 is for CPU.
-channel 1 is for GPU.
+On Mon, 23 Nov 2015 10:47:10 +0000
+Steve Capper <steve.capper@linaro.org> wrote:
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Hi Steve,
 
----
+> On Mon, Nov 16, 2015 at 01:11:43PM +0000, Marc Zyngier wrote:
+> > Implement the timer save restore as a direct translation of
+> > the assembly code version.  
+> 
+> Hi Marc, some comments below.
+> Cheers,
+> -- 
+> Steve
+> 
+> > 
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  arch/arm64/kvm/hyp/Makefile   |  1 +
+> >  arch/arm64/kvm/hyp/hyp.h      |  3 ++
+> >  arch/arm64/kvm/hyp/timer-sr.c | 68
+> > +++++++++++++++++++++++++++++++++++++++++++ 3 files changed, 72
+> > insertions(+) create mode 100644 arch/arm64/kvm/hyp/timer-sr.c
+> > 
+> > diff --git a/arch/arm64/kvm/hyp/Makefile
+> > b/arch/arm64/kvm/hyp/Makefile index d1e38ce..455dc0a 100644
+> > --- a/arch/arm64/kvm/hyp/Makefile
+> > +++ b/arch/arm64/kvm/hyp/Makefile
+> > @@ -4,3 +4,4 @@
+> >  
+> >  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+> >  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
+> > +obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
+> > diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+> > index a31cb6e..86aa5a2 100644
+> > --- a/arch/arm64/kvm/hyp/hyp.h
+> > +++ b/arch/arm64/kvm/hyp/hyp.h
+> > @@ -33,5 +33,8 @@ void __vgic_v2_restore_state(struct kvm_vcpu
+> > *vcpu); void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+> >  void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+> >  
+> > +void __timer_save_state(struct kvm_vcpu *vcpu);
+> > +void __timer_restore_state(struct kvm_vcpu *vcpu);
+> > +
+> >  #endif /* __ARM64_KVM_HYP_H__ */
+> >  
+> > diff --git a/arch/arm64/kvm/hyp/timer-sr.c
+> > b/arch/arm64/kvm/hyp/timer-sr.c new file mode 100644
+> > index 0000000..1a1d2ac
+> > --- /dev/null
+> > +++ b/arch/arm64/kvm/hyp/timer-sr.c
+> > @@ -0,0 +1,68 @@
+> > +/*
+> > + * Copyright (C) 2012-2015 - ARM Ltd
+> > + * Author: Marc Zyngier <marc.zyngier@arm.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > modify
+> > + * it under the terms of the GNU General Public License version 2
+> > as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + *
+> > + * You should have received a copy of the GNU General Public
+> > License
+> > + * along with this program.  If not, see
+> > <http://www.gnu.org/licenses/>.
+> > + */
+> > +
+> > +#include <linux/compiler.h>
+> > +#include <linux/kvm_host.h>
+> > +
+> > +#include <asm/kvm_mmu.h>
+> > +
+> > +#include "hyp.h"
+> > +
+> > +/* vcpu is already in the HYP VA space */
+> > +void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
+> > +{
+> > +	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+> > +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> > +
+> > +	if (kvm->arch.timer.enabled) {
+> > +		timer->cntv_ctl = read_sysreg(cntv_ctl_el0);  
+> 
+> The old assembler version ands this value with 3 before storing it.
+> Are we not worried about the ISTATUS bit?
 
- drivers/thermal/rockchip_thermal.c | 66 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
+Not really. It could even be useful to find out about it, to be
+honest.
 
-diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-index c5079f9..f863956 100644
---- a/drivers/thermal/rockchip_thermal.c
-+++ b/drivers/thermal/rockchip_thermal.c
-@@ -291,6 +291,44 @@ static const struct tsadc_table v3_code_table[] = {
- 	{TSADCV3_DATA_MASK, 125000},
- };
- 
-+static const struct tsadc_table v4_code_table[] = {
-+	{TSADCV3_DATA_MASK, -40000},
-+	{431, -40000},
-+	{426, -35000},
-+	{421, -30000},
-+	{415, -25000},
-+	{410, -20000},
-+	{405, -15000},
-+	{399, -10000},
-+	{394, -5000},
-+	{389, 0},
-+	{383, 5000},
-+	{378, 10000},
-+	{373, 15000},
-+	{367, 20000},
-+	{362, 25000},
-+	{357, 30000},
-+	{351, 35000},
-+	{346, 40000},
-+	{340, 45000},
-+	{335, 50000},
-+	{330, 55000},
-+	{324, 60000},
-+	{319, 65000},
-+	{313, 70000},
-+	{308, 75000},
-+	{302, 80000},
-+	{297, 85000},
-+	{291, 90000},
-+	{286, 95000},
-+	{281, 100000},
-+	{275, 105000},
-+	{270, 110000},
-+	{264, 115000},
-+	{259, 120000},
-+	{253, 125000},
-+};
-+
- static u32 rk_tsadcv2_temp_to_code(struct chip_tsadc_table table,
- 				   int temp)
- {
-@@ -554,6 +592,30 @@ static const struct rockchip_tsadc_chip rk3368_tsadc_data = {
- 	},
- };
- 
-+static const struct rockchip_tsadc_chip rk3399_tsadc_data = {
-+	.chn_id[SENSOR_CPU] = 0, /* cpu sensor is channel 0 */
-+	.chn_id[SENSOR_GPU] = 1, /* gpu sensor is channel 1 */
-+	.chn_num = 2, /* two channels for tsadc */
-+
-+	.tshut_mode = TSHUT_MODE_GPIO, /* default TSHUT via GPIO give PMIC */
-+	.tshut_polarity = TSHUT_LOW_ACTIVE, /* default TSHUT LOW ACTIVE */
-+	.tshut_temp = 95000,
-+
-+	.initialize = rk_tsadcv2_initialize,
-+	.irq_ack = rk_tsadcv2_irq_ack,
-+	.control = rk_tsadcv2_control,
-+	.get_temp = rk_tsadcv2_get_temp,
-+	.set_tshut_temp = rk_tsadcv2_tshut_temp,
-+	.set_tshut_mode = rk_tsadcv2_tshut_mode,
-+
-+	.table = {
-+		.id = v4_code_table,
-+		.length = ARRAY_SIZE(v4_code_table),
-+		.data_mask = TSADCV3_DATA_MASK,
-+		.mode = ADC_DECREMENT,
-+	},
-+};
-+
- static const struct of_device_id of_rockchip_thermal_match[] = {
- 	{
- 		.compatible = "rockchip,rk3228-tsadc",
-@@ -567,6 +629,10 @@ static const struct of_device_id of_rockchip_thermal_match[] = {
- 		.compatible = "rockchip,rk3368-tsadc",
- 		.data = (void *)&rk3368_tsadc_data,
- 	},
-+	{
-+		.compatible = "rockchip,rk3399-tsadc",
-+		.data = (void *)&rk3399_tsadc_data,
-+	},
- 	{ /* end */ },
- };
- MODULE_DEVICE_TABLE(of, of_rockchip_thermal_match);
+> 
+> > +		isb();
+> > +		timer->cntv_cval = read_sysreg(cntv_cval_el0);
+> > +	}
+> > +
+> > +	/* Disable the virtual timer */
+> > +	write_sysreg(0, cntv_ctl_el0);
+> > +
+> > +	/* Allow physical timer/counter access for the host */
+> > +	write_sysreg(read_sysreg(cnthctl_el2) | 3, cnthctl_el2);  
+> 
+> nit: EL1PCTEN | EL1PCEN or something similar?
+
+Sure.
+
+> > +
+> > +	/* Clear cntvoff for the host */
+> > +	write_sysreg(0, cntvoff_el2);
+> > +}
+> > +
+> > +void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
+> > +{
+> > +	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+> > +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> > +	u64 val;
+> > +
+> > +	/*
+> > +	 * Disallow physical timer access for the guest
+> > +	 * Physical counter access is allowed
+> > +	 */
+> > +	val = read_sysreg(cnthctl_el2);
+> > +	val &= ~(1 << 1);
+> > +	val |= 1;  
+> 
+> Similar nit here about constants.
+> 
+> > +	write_sysreg(val, cnthctl_el2);
+> > +
+> > +	if (kvm->arch.timer.enabled) {
+> > +		write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
+> > +		write_sysreg(timer->cntv_cval, cntv_cval_el0);
+> > +		isb();
+> > +		write_sysreg(timer->cntv_ctl, cntv_ctl_el0);  
+> 
+> In the assembler version we and cntv_ctl with 3 before writing to
+> cntv_ctl_el0.
+
+ISTATUS is RO, so masking it was a bit useless.
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny.
