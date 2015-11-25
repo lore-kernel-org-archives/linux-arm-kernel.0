@@ -1,44 +1,70 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 25 Nov 2015 13:32:01 -0600
-Subject: [PATCH] ARM/PCI: move align_resource function pointer into
- pci_host_bridge structure
-In-Reply-To: <1447204345-143793-1-git-send-email-gabriele.paoloni@huawei.com>
-References: <1447204345-143793-1-git-send-email-gabriele.paoloni@huawei.com>
-Message-ID: <20151125193201.GE8869@localhost>
+From: dcashman@android.com (Daniel Cashman)
+Date: Wed, 25 Nov 2015 11:32:53 -0800
+Subject: [PATCH v3 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
+In-Reply-To: <1448425601.3762.9.camel@ellerman.id.au>
+References: <1447888808-31571-1-git-send-email-dcashman@android.com>
+ <1447888808-31571-2-git-send-email-dcashman@android.com>
+ <1447888808-31571-3-git-send-email-dcashman@android.com>
+ <1447888808-31571-4-git-send-email-dcashman@android.com>
+ <20151123150459.GD4236@arm.com> <56536114.1020305@android.com>
+ <1448425601.3762.9.camel@ellerman.id.au>
+Message-ID: <56560CE5.3020202@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 11, 2015 at 09:12:25AM +0800, Gabriele Paoloni wrote:
-> From: gabpao01 <gabriele.paoloni@huawei.com>
+On 11/24/2015 08:26 PM, Michael Ellerman wrote:
+> On Mon, 2015-11-23 at 10:55 -0800, Daniel Cashman wrote:
+>> On 11/23/2015 07:04 AM, Will Deacon wrote:
+>>> On Wed, Nov 18, 2015 at 03:20:07PM -0800, Daniel Cashman wrote:
+>>>> +config ARCH_MMAP_RND_BITS_MAX
+>>>> +       default 20 if ARM64_64K_PAGES && ARCH_VA_BITS=39
+>>>> +       default 24 if ARCH_VA_BITS=39
+>>>> +       default 23 if ARM64_64K_PAGES && ARCH_VA_BITS=42
+>>>> +       default 27 if ARCH_VA_BITS=42
+>>>> +       default 29 if ARM64_64K_PAGES && ARCH_VA_BITS=48
+>>>> +       default 33 if ARCH_VA_BITS=48
+>>>> +       default 15 if ARM64_64K_PAGES
+>>>> +       default 19
+>>>> +
+>>>> +config ARCH_MMAP_RND_COMPAT_BITS_MIN
+>>>> +       default 7 if ARM64_64K_PAGES
+>>>> +       default 11
+>>>
+>>> FYI: we now support 16k pages too, so this might need updating. It would
+>>> be much nicer if this was somehow computed rather than have the results
+>>> all open-coded like this.
+>>
+>> Yes, I ideally wanted this to be calculated based on the different page
+>> options and VA_BITS (which itself has a similar stanza), but I don't
+>> know how to do that/if it is currently supported in Kconfig. This would
+>> be even more desirable with the addition of 16K_PAGES, as with this
+>> setup we have a combinatorial problem.
+>>
+>> We could move this logic into the code where min/max are initialized,
+>> but that would create its own mess, creating new Kconfig values to
+>> introduce it in an arch-agnostic way after patch-set v2 moved that to
+>> mm/mmap.c instead of arch/${arch}/mm/mmap.c Suggestions welcome.
 > 
-> commit b3a72384fe29 ("ARM/PCI: Replace
-> pci_sys_data->align_resource with global function pointer") has
-> introduced a global function pointer that makes the ARM specific
-> code not portable and broken in case any platform have a two
-> different HW IPs for the PCIe host bridge controller.
-> This patch moves align_resource function pointer into
-> pci_host_bridge structure so that the code is now suitable to be
-> reworked as we want to get rid of hw_pci structure (the host bridge
-> drivers can just set the align function pointer in the
-> pci_host_bridge structure) and there is no more broken code for a
-> SoC with two HW IPs.
 > 
-> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+> Could we instead change the meaning of the mmap_rnd_bits value to be the number
+> of address space bits that may be randomised?
+> 
+> ie. 40 would mean "please randomise in a 1T range", which with PAGE_SIZE=4K
+> gives you 28 random bits. etc.
+> 
+> That would make the value independent of PAGE_SIZE, and only depend on the size
+> of the address space.
+> 
+> It would also mean the values userspace sets and sees don't need to change if the
+> kernel PAGE_SIZE changes. (which probably doesn't happen often but still)
 
-This looks good to me.  I merged b3a72384fe29 so maybe it would make
-sense for me to merge this follow-up as well.  I put it on my
-for-linus branch for v4.4.
+This is an intriguing idea. It might actually be more meaningful to a
+sysadmin when weighing how high they're willing to go, since it makes
+the relation to the address space overall more apparent.  Though the
+cost would be more obvious, the benefit would become less-so, as the
+amount of entropy used, and thus expected brute-force requirements would
+be hidden.  I'll defer to Andrew Morton, as the maintainer, to make this
+decision as I think both approaches are valid.
 
-If you'd rather merge it via an ARM tree, here's my ack:
-
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-
-If you want me to merge it, an ARM ack would be nice.  If you want to
-merge it, let me know and I'll drop it from my tree.
-
-> +	/* Resource alignement requirements     */
-
-s/alignement/alignment/
-
-> +	resource_size_t (*align_resource)(struct pci_dev *dev,
-> ...
+Thank You,
+Dan
