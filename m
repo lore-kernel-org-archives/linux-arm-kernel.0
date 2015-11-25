@@ -1,78 +1,65 @@
-From: leilk.liu@mediatek.com (Leilk Liu)
-Date: Wed, 25 Nov 2015 17:50:38 +0800
-Subject: [PATCH v3] spi: mediatek: revise mtk_spi_probe() failure flow
-Message-ID: <1448445038-10570-1-git-send-email-leilk.liu@mediatek.com>
+From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
+Date: Wed, 25 Nov 2015 17:49:02 +0800
+Subject: [PATCH 1/1] arm64: dts: add all hi6220 i2c nodes
+Message-ID: <1448444942-5780-1-git-send-email-kong.kongxinwei@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mtk_spi_probe() calls pm_runtime_enable(), after
-pm_runtime_enable() is called, it should call
-pm_runtime_disable() in the failure flow.
+This patch adds all I2C nodes for the Hi6220 SoC. This hi6220 Soc
+use this I2C IP of Synopsys Designware for HiKey board.
 
-Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
 ---
- drivers/spi/spi-mt65xx.c |   15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 37 +++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
-index 6c1a96e..00a36da 100644
---- a/drivers/spi/spi-mt65xx.c
-+++ b/drivers/spi/spi-mt65xx.c
-@@ -607,7 +607,8 @@ static int mtk_spi_probe(struct platform_device *pdev)
- 	ret = clk_set_parent(mdata->sel_clk, mdata->parent_clk);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "failed to clk_set_parent (%d)\n", ret);
--		goto err_disable_clk;
-+		clk_disable_unprepare(mdata->spi_clk);
-+		goto err_put_master;
- 	}
- 
- 	clk_disable_unprepare(mdata->spi_clk);
-@@ -617,7 +618,7 @@ static int mtk_spi_probe(struct platform_device *pdev)
- 	ret = devm_spi_register_master(&pdev->dev, master);
- 	if (ret) {
- 		dev_err(&pdev->dev, "failed to register master (%d)\n", ret);
--		goto err_put_master;
-+		goto err_disable_runtime_pm;
- 	}
- 
- 	if (mdata->dev_comp->need_pad_sel) {
-@@ -626,14 +627,14 @@ static int mtk_spi_probe(struct platform_device *pdev)
- 				"pad_num does not match num_chipselect(%d != %d)\n",
- 				mdata->pad_num, master->num_chipselect);
- 			ret = -EINVAL;
--			goto err_put_master;
-+			goto err_disable_runtime_pm;
- 		}
- 
- 		if (!master->cs_gpios && master->num_chipselect > 1) {
- 			dev_err(&pdev->dev,
- 				"cs_gpios not specified and num_chipselect > 1\n");
- 			ret = -EINVAL;
--			goto err_put_master;
-+			goto err_disable_runtime_pm;
- 		}
- 
- 		if (master->cs_gpios) {
-@@ -644,7 +645,7 @@ static int mtk_spi_probe(struct platform_device *pdev)
- 				if (ret) {
- 					dev_err(&pdev->dev,
- 						"can't get CS GPIO %i\n", i);
--					goto err_put_master;
-+					goto err_disable_runtime_pm;
- 				}
- 			}
- 		}
-@@ -652,8 +653,8 @@ static int mtk_spi_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
--err_disable_clk:
--	clk_disable_unprepare(mdata->spi_clk);
-+err_disable_runtime_pm:
-+	pm_runtime_disable(&pdev->dev);
- err_put_master:
- 	spi_master_put(master);
- 
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index 82d2488..6b591a9 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -208,5 +208,42 @@
+ 			clock-names = "uartclk", "apb_pclk";
+ 			status = "disabled";
+ 		};
++
++		i2c0: i2c at f7100000 {
++			compatible = "snps,designware-i2c";
++			reg = <0x0 0xf7100000 0x0 0x1000>;
++			interrupts = <0 44 4>;
++			clocks = <&sys_ctrl HI6220_I2C0_CLK>;
++			clock-names = "clk_i2c0";
++			i2c-sda-hold-time-ns = <300>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pmx_func &i2c0_cfg_func>;
++			status = "ok";
++		};
++
++		i2c1: i2c at f7101000 {
++			compatible = "snps,designware-i2c";
++			reg = <0x0 0xf7101000 0x0 0x1000>;
++			interrupts = <0 45 4>;
++			clocks = <&sys_ctrl HI6220_I2C1_CLK>;
++			clock-names = "clk_i2c1";
++			i2c-sda-hold-time-ns = <300>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c1_pmx_func &i2c1_cfg_func>;
++			status = "ok";
++		};
++
++		i2c2: i2c at f7102000 {
++			compatible = "snps,designware-i2c";
++			reg = <0x0 0xf7102000 0x0 0x1000>;
++			interrupts = <0 46 4>;
++			clocks = <&sys_ctrl HI6220_I2C2_CLK>;
++			clock-names = "clk_i2c2";
++			i2c-sda-hold-time-ns = <300>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c2_pmx_func &i2c2_cfg_func>;
++			status = "ok";
++		};
++
+ 	};
+ };
 -- 
-1.7.9.5
+1.9.1
