@@ -1,52 +1,83 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 25 Nov 2015 11:34:47 -0800
-Subject: [PATCH 3/3] ARM: qcom: Drop ARCH_MSM* configs
-In-Reply-To: <3990433.OKhWpPeunI@wuerfel>
-References: <1448413710-8101-1-git-send-email-sboyd@codeaurora.org>
- <1448413710-8101-4-git-send-email-sboyd@codeaurora.org>
- <5655A94B.3030304@linaro.org> <3990433.OKhWpPeunI@wuerfel>
-Message-ID: <20151125193447.GD11298@codeaurora.org>
+From: dcashman@android.com (Daniel Cashman)
+Date: Wed, 25 Nov 2015 11:36:42 -0800
+Subject: [PATCH v3 1/4] mm: mmap: Add new /proc tunable for mmap_base ASLR.
+In-Reply-To: <1448426400.3762.11.camel@ellerman.id.au>
+References: <1447888808-31571-1-git-send-email-dcashman@android.com>
+ <1447888808-31571-2-git-send-email-dcashman@android.com>
+ <1448426400.3762.11.camel@ellerman.id.au>
+Message-ID: <56560DCA.7050009@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25, Arnd Bergmann wrote:
-> On Wednesday 25 November 2015 13:27:55 Daniel Lezcano wrote:
-> > 
-> > What about:
-> > 
-> > textofs-$(CONFIG_ARCH_MSM8X60) := 0x00208000
-> > textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
-> > 
-> > in arch/arm/Makefile
+On 11/24/2015 08:40 PM, Michael Ellerman wrote:
+> On Wed, 2015-11-18 at 15:20 -0800, Daniel Cashman wrote:
 > 
-> Good point, we need to do something about these still.
+>> From: dcashman <dcashman@google.com>
+>>
+>> ASLR currently only uses 8 bits to generate the random offset for the
+>> mmap base address on 32 bit architectures. This value was chosen to
+>> prevent a poorly chosen value from dividing the address space in such
+>> a way as to prevent large allocations. This may not be an issue on all
+>> platforms. Allow the specification of a minimum number of bits so that
+>> platforms desiring greater ASLR protection may determine where to place
+>> the trade-off.
 > 
-
-Yeah good catch! My brain must be shutting down due to the
-holiday coming up.
-
-The nice thing is that CLKSRC_QCOM and this text offset stuff are
-always used on the same SoCs, so we should be able to make one
-config in mach-qcom/Kconfig that selects the qcom clksrc driver
-and adjusts the text offset. So is the suggestion to move
-CLKSRC_QCOM to mach-qcom/Kconfig, or to make a new config that
-selects it?
-
-> > and
-> > 
-> > CONFIG_ARCH_MSM8X60=y
-> > CONFIG_ARCH_MSM8960=y
-> > CONFIG_ARCH_MSM8974=y
-> > 
-> > in arch/arm/configs/qcom_defconfig and multi_v7_defconfig
-> > 
-> > ?
+> ...
 > 
-> These should be removed, but they are harmless.
+>> diff --git a/arch/Kconfig b/arch/Kconfig
+>> index 4e949e5..141823f 100644
+>> --- a/arch/Kconfig
+>> +++ b/arch/Kconfig
+>> @@ -511,6 +511,70 @@ config ARCH_HAS_ELF_RANDOMIZE
+>>  	  - arch_mmap_rnd()
+>>  	  - arch_randomize_brk()
+>>  
+>> +config HAVE_ARCH_MMAP_RND_BITS
+>> +	bool
+>> +	help
+>> +	  An arch should select this symbol if it supports setting a variable
+>> +	  number of bits for use in establishing the base address for mmap
+>> +	  allocations and provides values for both:
+>> +	  - ARCH_MMAP_RND_BITS_MIN
+>> +	  - ARCH_MMAP_RND_BITS_MAX
+>> +
+>> +config ARCH_MMAP_RND_BITS_MIN
+>> +	int
+>> +
+>> +config ARCH_MMAP_RND_BITS_MAX
+>> +	int
+>> +
+>> +config ARCH_MMAP_RND_BITS_DEFAULT
+>> +	int
+>> +
+>> +config ARCH_MMAP_RND_BITS
+>> +	int "Number of bits to use for ASLR of mmap base address" if EXPERT
+>> +	range ARCH_MMAP_RND_BITS_MIN ARCH_MMAP_RND_BITS_MAX
+>> +	default ARCH_MMAP_RND_BITS_DEFAULT if ARCH_MMAP_RND_BITS_DEFAULT
+> 
+> Here you support a default which is separate from the minimum.
+> 
+>> +	default ARCH_MMAP_RND_BITS_MIN
+>> +	depends on HAVE_ARCH_MMAP_RND_BITS
+> 
+> ...
+>> +
+>> +config ARCH_MMAP_RND_COMPAT_BITS
+>> +	int "Number of bits to use for ASLR of mmap base address for compatible applications" if EXPERT
+>> +	range ARCH_MMAP_RND_COMPAT_BITS_MIN ARCH_MMAP_RND_COMPAT_BITS_MAX
+>> +	default ARCH_MMAP_RND_COMPAT_BITS_MIN
+> 
+> But here you don't.
+> 
+> Just forgot?
 
-Yes I was planning to let those fall out of some defconfig update
-patch later on.
+Yes.  Good catch.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> I'd like to have a default which is separate from the minimum. That way we can
+> have a default which is reasonably large, but allow it to be lowered easily if
+> anything breaks.
+
+Will add it, along w/the documentation cleanup and other changes.
+
+Thank You,
+Dan
