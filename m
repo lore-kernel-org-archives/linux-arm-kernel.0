@@ -1,53 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Nov 2015 22:26:01 +0100
-Subject: [PATCH 1/7] clk: mmp: stop using platform headers
-In-Reply-To: <20151125192114.GB11298@codeaurora.org>
-References: <1448465875-435039-1-git-send-email-arnd@arndb.de>
- <1448465875-435039-2-git-send-email-arnd@arndb.de>
- <20151125192114.GB11298@codeaurora.org>
-Message-ID: <3508030.Q62gfHvXvx@wuerfel>
+Date: Wed, 25 Nov 2015 22:29:53 +0100
+Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
+ "/chosen/linux, atags" entry
+In-Reply-To: <20151125210310.GT2517@atomide.com>
+References: <20150713131902.GH26485@atomide.com> <17134653.86P3dFyQKK@wuerfel>
+ <20151125210310.GT2517@atomide.com>
+Message-ID: <3245119.krc4KB3uae@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 November 2015 11:21:14 Stephen Boyd wrote:
-> On 11/25, Arnd Bergmann wrote:
-> > diff --git a/drivers/clk/mmp/clk-mmp2.c b/drivers/clk/mmp/clk-mmp2.c
-> > index 09d2832fbd78..38931dbd1eff 100644
-> > --- a/drivers/clk/mmp/clk-mmp2.c
-> > +++ b/drivers/clk/mmp/clk-mmp2.c
-> > @@ -9,6 +9,7 @@
-> >   * warranty of any kind, whether express or implied.
-> >   */
-> >  
-> > +#include <linux/clk.h>
+On Wednesday 25 November 2015 13:03:10 Tony Lindgren wrote:
+> * Arnd Bergmann <arnd@arndb.de> [151125 11:50]:
+> > On Wednesday 25 November 2015 10:16:44 Tony Lindgren wrote:
+> > > At least I don't have better solutions in mind.
+> > 
+> > I would be happier if we could restrict this as much as possible to the
+> > boards that need it, as an opt-in. That way it doesn't become an ABI
+> > for people that don't already rely in this information. How about
+> > adding a check the code adds the linux,atags property to do it
+> > only for a whitelist of board numbers?
 > 
-> Why are we adding this include? I don't see any clk consumer API
-> usage being added.
+> Or populate /proc/atags only for the ones that need it from machine
+> specific init_early?
 
-Without these #includes, I get a build error:
-
-drivers/clk/mmp/clk-mmp2.c: In function 'mmp2_clk_init':
-drivers/clk/mmp/clk-mmp2.c:192:2: error: implicit declaration of function 'clk_set_rate' [-Werror=implicit-function-declaration]
-  clk_set_rate(clk, 14745600);
-  ^
-drivers/clk/mmp/clk-mmp2.c:251:2: error: implicit declaration of function 'clk_set_parent' [-Werror=implicit-function-declaration]
-  clk_set_parent(clk, vctcxo);
-  ^
-drivers/clk/mmp/clk-pxa168.c: In function 'pxa168_clk_init':
-drivers/clk/mmp/clk-pxa168.c:161:2: error: implicit declaration of function 'clk_set_rate' [-Werror=implicit-function-declaration]
-  clk_set_rate(uart_pll, 14745600);
-  ^
-drivers/clk/mmp/clk-pxa168.c:204:2: error: implicit declaration of function 'clk_set_parent' [-Werror=implicit-function-declaration]
-  clk_set_parent(clk, uart_pll);
-  ^
-drivers/clk/mmp/clk-pxa910.c: In function 'pxa910_clk_init':
-drivers/clk/mmp/clk-pxa910.c:166:2: error: implicit declaration of function 'clk_set_rate' [-Werror=implicit-function-declaration]
-  clk_set_rate(uart_pll, 14745600);
-  ^
-drivers/clk/mmp/clk-pxa910.c:209:2: error: implicit declaration of function 'clk_set_parent' [-Werror=implicit-function-declaration]
-  clk_set_parent(clk, uart_pll);
-  ^
-
-Is there anything I need to change here?
+That would also address my main concern about /proc/atags, but still
+leave the atags in /proc/device-tree/chosen/linux,atags, and it would
+be bad if someone who currently uses /proc/atags changes their code
+to use the other file instead of finding a proper solution.
 
 	Arnd
