@@ -1,142 +1,170 @@
 From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed, 25 Nov 2015 12:04:18 +0100
-Subject: [PATCH v3 1/4] arm/arm64: add arm-smccc
+Date: Wed, 25 Nov 2015 12:04:21 +0100
+Subject: [PATCH v3 4/4] drivers: psci: replace psci firmware calls
 In-Reply-To: <1448449461-5043-1-git-send-email-jens.wiklander@linaro.org>
 References: <1448449461-5043-1-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <1448449461-5043-2-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <1448449461-5043-5-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds helpers to do SMC and HVC based on ARM SMC Calling Convention.
-CONFIG_HAVE_ARM_SMCCC is enabled for architectures that may support the
-SMC or HVC instruction. It's the responsibility of the caller to know if
-the SMC instruction is supported by the platform.
-
-This patch doesn't provide an implementation of the declared functions.
-Later patches will bring in implementations and set
-CONFIG_HAVE_ARM_SMCCC for ARM and ARM64 respectively.
+Switch to use a generic interface for issuing SMC/HVC based on ARM SMC
+Calling Convention. Removes now the now unused psci-call.S.
 
 Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+Acked-by: Will Deacon <will.deacon@arm.com>
 ---
- include/linux/arm-smccc.h | 98 +++++++++++++++++++++++++++++++++++++++++++++++
- init/Kconfig              |  3 ++
- 2 files changed, 101 insertions(+)
- create mode 100644 include/linux/arm-smccc.h
+ arch/arm/kernel/Makefile      |  1 -
+ arch/arm/kernel/psci-call.S   | 31 -------------------------------
+ arch/arm64/kernel/Makefile    |  2 +-
+ arch/arm64/kernel/psci-call.S | 28 ----------------------------
+ drivers/firmware/psci.c       | 23 +++++++++++++++++++++--
+ 5 files changed, 22 insertions(+), 63 deletions(-)
+ delete mode 100644 arch/arm/kernel/psci-call.S
+ delete mode 100644 arch/arm64/kernel/psci-call.S
 
-diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-new file mode 100644
-index 0000000..dea68a9
---- /dev/null
-+++ b/include/linux/arm-smccc.h
-@@ -0,0 +1,98 @@
-+/*
-+ * Copyright (c) 2015, Linaro Limited
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+#ifndef __LINUX_ARM_SMCCC_H
-+#define __LINUX_ARM_SMCCC_H
-+
-+#include <linux/types.h>
-+#include <linux/linkage.h>
-+
-+/*
-+ * This file provides common defines for ARM SMC Calling Convention as
-+ * specified in
-+ * http://infocenter.arm.com/help/topic/com.arm.doc.den0028a/index.html
-+ */
-+
-+#define ARM_SMCCC_SMC_32		(0 << 30)
-+#define ARM_SMCCC_SMC_64		(1 << 30)
-+#define ARM_SMCCC_FAST_CALL		(1 << 31)
-+#define ARM_SMCCC_STD_CALL		(0 << 31)
-+
-+#define ARM_SMCCC_OWNER_MASK		0x3F
-+#define ARM_SMCCC_OWNER_SHIFT		24
-+
-+#define ARM_SMCCC_FUNC_MASK		0xFFFF
-+
-+#define ARM_SMCCC_IS_FAST_CALL(smc_val)	((smc_val) & ARM_SMCCC_FAST_CALL)
-+#define ARM_SMCCC_IS_64(smc_val)	((smc_val) & ARM_SMCCC_SMC_64)
-+#define ARM_SMCCC_FUNC_NUM(smc_val)	((smc_val) & ARM_SMCCC_FUNC_MASK)
-+#define ARM_SMCCC_OWNER_NUM(smc_val) \
-+	(((smc_val) >> ARM_SMCCC_OWNER_SHIFT) & ARM_SMCCC_OWNER_MASK)
-+
-+#define ARM_SMCCC_CALL_VAL(type, calling_convention, owner, func_num) \
-+	((type) | (calling_convention) | \
-+	(((owner) & ARM_SMCCC_OWNER_MASK) << ARM_SMCCC_OWNER_SHIFT) | \
-+	((func_num) & ARM_SMCCC_FUNC_MASK))
-+
-+#define ARM_SMCCC_OWNER_ARCH		0
-+#define ARM_SMCCC_OWNER_CPU		1
-+#define ARM_SMCCC_OWNER_SIP		2
-+#define ARM_SMCCC_OWNER_OEM		3
-+#define ARM_SMCCC_OWNER_STANDARD	4
-+#define ARM_SMCCC_OWNER_TRUSTED_APP	48
-+#define ARM_SMCCC_OWNER_TRUSTED_APP_END	49
-+#define ARM_SMCCC_OWNER_TRUSTED_OS	50
-+#define ARM_SMCCC_OWNER_TRUSTED_OS_END	63
-+
-+/**
-+ * struct arm_smccc_res - Result from SMC/HVC call
-+ * @a0-a3 result values from registers 0 to 3
-+ */
-+struct arm_smccc_res {
-+	unsigned long a0;
-+	unsigned long a1;
-+	unsigned long a2;
-+	unsigned long a3;
-+};
-+
-+/**
-+ * arm_smccc_smc() - make SMC calls
-+ * @a0-a7: arguments passed in registers 0 to 7
-+ * @res: result values from registers 0 to 3
-+ *
-+ * This function is used to make SMC calls following SMC Calling Convention.
-+ * The content of the supplied param are copied to registers 0 to 7 prior
-+ * to the SMC instruction. The return values are updated with the content
-+ * from register 0 to 3 on return from the SMC instruction.
-+ */
-+asmlinkage void arm_smccc_smc(unsigned long a0, unsigned long a1,
-+			unsigned long a2, unsigned long a3, unsigned long a4,
-+			unsigned long a5, unsigned long a6, unsigned long a7,
-+			struct arm_smccc_res *res);
-+
-+/**
-+ * arm_smccc_hvc() - make HVC calls
-+ * @a0-a7: arguments passed in registers 0 to 7
-+ * @res: result values from registers 0 to 3
-+ *
-+ * This function is used to make HVC calls following SMC Calling
-+ * Convention.  The content of the supplied param are copied to registers 0
-+ * to 7 prior to the HVC instruction. The return values are updated with
-+ * the content from register 0 to 3 on return from the HVC instruction.
-+ */
-+asmlinkage void arm_smccc_hvc(unsigned long a0, unsigned long a1,
-+			unsigned long a2, unsigned long a3, unsigned long a4,
-+			unsigned long a5, unsigned long a6, unsigned long a7,
-+			struct arm_smccc_res *res);
-+
-+#endif /*__LINUX_ARM_SMCCC_H*/
-diff --git a/init/Kconfig b/init/Kconfig
-index c24b6f7..8d5a7b0 100644
---- a/init/Kconfig
-+++ b/init/Kconfig
-@@ -2061,3 +2061,6 @@ config ASN1
- 	  functions to call on what tags.
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index d2d0042..80856de 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -88,7 +88,6 @@ obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
  
- source "kernel/Kconfig.locks"
+ obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
+ ifeq ($(CONFIG_ARM_PSCI),y)
+-obj-y				+= psci-call.o
+ obj-$(CONFIG_SMP)		+= psci_smp.o
+ endif
+ 
+diff --git a/arch/arm/kernel/psci-call.S b/arch/arm/kernel/psci-call.S
+deleted file mode 100644
+index a78e9e1..0000000
+--- a/arch/arm/kernel/psci-call.S
++++ /dev/null
+@@ -1,31 +0,0 @@
+-/*
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * Copyright (C) 2015 ARM Limited
+- *
+- * Author: Mark Rutland <mark.rutland@arm.com>
+- */
+-
+-#include <linux/linkage.h>
+-
+-#include <asm/opcodes-sec.h>
+-#include <asm/opcodes-virt.h>
+-
+-/* int __invoke_psci_fn_hvc(u32 function_id, u32 arg0, u32 arg1, u32 arg2) */
+-ENTRY(__invoke_psci_fn_hvc)
+-	__HVC(0)
+-	bx	lr
+-ENDPROC(__invoke_psci_fn_hvc)
+-
+-/* int __invoke_psci_fn_smc(u32 function_id, u32 arg0, u32 arg1, u32 arg2) */
+-ENTRY(__invoke_psci_fn_smc)
+-	__SMC(0)
+-	bx	lr
+-ENDPROC(__invoke_psci_fn_smc)
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 16d24a4..02893fa 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -15,7 +15,7 @@ CFLAGS_REMOVE_return_address.o = -pg
+ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
+ 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
+ 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
+-			   hyp-stub.o psci.o psci-call.o cpu_ops.o insn.o	\
++			   hyp-stub.o psci.o cpu_ops.o insn.o	\
+ 			   return_address.o cpuinfo.o cpu_errata.o		\
+ 			   cpufeature.o alternative.o cacheinfo.o		\
+ 			   smp.o smp_spin_table.o topology.o smccc-call.o
+diff --git a/arch/arm64/kernel/psci-call.S b/arch/arm64/kernel/psci-call.S
+deleted file mode 100644
+index cf83e61..0000000
+--- a/arch/arm64/kernel/psci-call.S
++++ /dev/null
+@@ -1,28 +0,0 @@
+-/*
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * Copyright (C) 2015 ARM Limited
+- *
+- * Author: Will Deacon <will.deacon@arm.com>
+- */
+-
+-#include <linux/linkage.h>
+-
+-/* int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1, u64 arg2) */
+-ENTRY(__invoke_psci_fn_hvc)
+-	hvc	#0
+-	ret
+-ENDPROC(__invoke_psci_fn_hvc)
+-
+-/* int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1, u64 arg2) */
+-ENTRY(__invoke_psci_fn_smc)
+-	smc	#0
+-	ret
+-ENDPROC(__invoke_psci_fn_smc)
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 42700f0..9c55d11 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -19,6 +19,7 @@
+ #include <linux/pm.h>
+ #include <linux/printk.h>
+ #include <linux/psci.h>
++#include <linux/arm-smccc.h>
+ #include <linux/reboot.h>
+ 
+ #include <uapi/linux/psci.h>
+@@ -56,8 +57,6 @@ struct psci_operations psci_ops;
+ 
+ typedef unsigned long (psci_fn)(unsigned long, unsigned long,
+ 				unsigned long, unsigned long);
+-asmlinkage psci_fn __invoke_psci_fn_hvc;
+-asmlinkage psci_fn __invoke_psci_fn_smc;
+ static psci_fn *invoke_psci_fn;
+ 
+ enum psci_function {
+@@ -70,6 +69,26 @@ enum psci_function {
+ 
+ static u32 psci_function_id[PSCI_FN_MAX];
+ 
++static unsigned long __invoke_psci_fn_hvc(unsigned long function_id,
++			unsigned long arg0, unsigned long arg1,
++			unsigned long arg2)
++{
++	struct arm_smccc_res res;
 +
-+config HAVE_ARM_SMCCC
-+	bool
++	arm_smccc_hvc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
++	return res.a0;
++}
++
++static unsigned long __invoke_psci_fn_smc(unsigned long function_id,
++			unsigned long arg0, unsigned long arg1,
++			unsigned long arg2)
++{
++	struct arm_smccc_res res;
++
++	arm_smccc_smc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
++	return res.a0;
++}
++
+ static int psci_to_linux_errno(int errno)
+ {
+ 	switch (errno) {
 -- 
 1.9.1
