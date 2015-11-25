@@ -1,97 +1,56 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 25 Nov 2015 16:57:34 -0600
-Subject: [PATCH 12/14] ARM: sb-som: dts: introduce SB-SOM baseboard
-In-Reply-To: <1448371155-17307-13-git-send-email-nikita@compulab.co.il>
-References: <1448371155-17307-1-git-send-email-nikita@compulab.co.il>
- <1448371155-17307-13-git-send-email-nikita@compulab.co.il>
-Message-ID: <20151125225734.GA17604@rob-hp-laptop>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Wed, 25 Nov 2015 16:58:52 -0600
+Subject: [PATCH] arm64: mm: Prevent the initial page table setup from
+ creating larger blocks
+In-Reply-To: <1448387338-27851-1-git-send-email-catalin.marinas@arm.com>
+References: <1448387338-27851-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <56563D2C.7050807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 03:19:13PM +0200, Nikita Kiryanov wrote:
-> CompuLab SB-SOM baseboard is a carrier board for multiple arm-based SoMs.
-> It currently supports (with minor adjustments to assembly) CM-T43, CM-T54,
-> and CM-QS600 modules. It is a building block in the SBC-T43 single board
-> computer, which consists of cm-t43 on top of sb-som-t43.
-> 
-> Signed-off-by: Nikita Kiryanov <nikita@compulab.co.il>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Igor Grinberg <grinberg@compulab.co.il>
-> Cc: Dmitry Lifshitz <lifshitz@compulab.co.il>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> ---
->  .../devicetree/bindings/arm/compulab-boards.txt    |  5 +++
->  .../bindings/display/panel/startek,startek-kd050c  |  4 +++
+On 11/24/2015 11:48 AM, Catalin Marinas wrote:
+> This patch prevents the larger block mappings at all levels _if_ the
+> existing pud/pmd entry is present _and_ not already a block mapping.
+> Contiguous ptes are rejected if any of the entries in the range are
+> non-empty and non-contiguous.
+>
+> In addition, TLB flushing is added for the cases where an existing block
+> entry is changed.
 
-.txt please.
+Ok, it seems to boot fairly reliably on the m400/ACPI, over a few dozen 
+reboots yesterday and today. So, for that:
 
->  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->  arch/arm/boot/dts/compulab-sb-som.dtsi             | 42 ++++++++++++++++++++++
->  4 files changed, 52 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/compulab-boards.txt
->  create mode 100644 Documentation/devicetree/bindings/display/panel/startek,startek-kd050c
->  create mode 100644 arch/arm/boot/dts/compulab-sb-som.dtsi
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/compulab-boards.txt b/Documentation/devicetree/bindings/arm/compulab-boards.txt
-> new file mode 100644
-> index 0000000..3e742a5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/compulab-boards.txt
-> @@ -0,0 +1,5 @@
-> +CompuLab SB-SOM is a multi-module baseboard capable of carrying CM-T43, CM-T54,
-> +and QS-600 modules with minor modifications to the SB-SOM assembly.
+Tested-by: Jeremy Linton <jeremy.linton@arm.com>
 
-All these modules have compatible strings?
+That said, it basically disables the CONT ranges for the main kernel 
+text section.
 
-> +
-> +Required root node properties:
-> +    - compatible = should be "compulab,sb-som"
-> diff --git a/Documentation/devicetree/bindings/display/panel/startek,startek-kd050c b/Documentation/devicetree/bindings/display/panel/startek,startek-kd050c
-> new file mode 100644
-> index 0000000..70cd8d1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/panel/startek,startek-kd050c
-> @@ -0,0 +1,4 @@
-> +Startek Electronic Technology Co. KD050C 5.0" WVGA TFT LCD panel
-> +
-> +Required properties:
-> +- compatible: should be "startek,startek-kd050c"
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 55df1d4..409b134 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -218,6 +218,7 @@ sony	Sony Corporation
->  spansion	Spansion Inc.
->  sprd	Spreadtrum Communications Inc.
->  st	STMicroelectronics
-> +startek	Startek
->  ste	ST-Ericsson
->  stericsson	ST-Ericsson
->  synology	Synology, Inc.
-> diff --git a/arch/arm/boot/dts/compulab-sb-som.dtsi b/arch/arm/boot/dts/compulab-sb-som.dtsi
-> new file mode 100644
-> index 0000000..402a143
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/compulab-sb-som.dtsi
-> @@ -0,0 +1,42 @@
-> +/*
-> + * Copyright (C) 2015 CompuLab, Ltd. - http://www.compulab.co.il/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +/ {
-> +	model = "CompuLab SB-SOM";
-> +	compatible = "compulab,sb-som";
+With this patch:
 
-I would expect this to have a more specific.
+0xfffffe0000000000-0xfffffe0000090000 (paddr=0x4000000000)        576K 
+    RW NX SHD AF            UXN MEM/NORMAL
+0xfffffe0000090000-0xfffffe0000c50000 (paddr=0x4000090000)      12032K 
+    ro x  SHD AF            UXN MEM/NORMAL
+0xfffffe0000c50000-0xfffffe0001600000 (paddr=0x4000c50000)       9920K 
+    RW NX SHD AF            UXN MEM/NORMAL
+0xfffffe0001600000-0xfffffe0020000000 (paddr=0x4001600000)        490M 
+    RW NX SHD AF    CON     UXN MEM/NORMAL
+0xfffffe0020000000-0xfffffe1000000000 (paddr=0x4020000000)      65024M 
+    RW NX SHD AF        BLK UXN MEM/NORMAL
 
-> +	lcd0: display {
-> +		compatible = "startek,startek-kd050c", "panel-dpi";
-> +		label = "lcd";
+without:
 
-This isn't documented, nor do I think it is needed.
-
-Rob
+0xfffffe0000000000-0xfffffe0000090000 (paddr=0x4000000000)        576K 
+    RW NX SHD AF            UXN MEM/NORMAL
+0xfffffe0000090000-0xfffffe0000200000 (paddr=0x4000090000)       1472K 
+    ro x  SHD AF            UXN MEM/NORMAL
+0xfffffe0000200000-0xfffffe0000c00000 (paddr=0x4000200000)         10M 
+    ro x  SHD AF    CON     UXN MEM/NORMAL
+0xfffffe0000c00000-0xfffffe0000c50000 (paddr=0x4000c00000)        320K 
+    ro x  SHD AF            UXN MEM/NORMAL
+0xfffffe0000c50000-0xfffffe0000e00000 (paddr=0x4000c50000)       1728K 
+    RW NX SHD AF            UXN MEM/NORMAL
+0xfffffe0000e00000-0xfffffe0020000000 (paddr=0x4000e00000)        498M 
+    RW NX SHD AF    CON     UXN MEM/NORMAL
+0xfffffe0020000000-0xfffffe1000000000 (paddr=0x4020000000)      65024M 
+    RW NX SHD AF        BLK UXN MEM/NORMAL
