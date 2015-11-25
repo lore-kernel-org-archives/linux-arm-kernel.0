@@ -1,28 +1,17 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Wed, 25 Nov 2015 15:06:40 -0600
-Subject: [PATCH] ARM: qcom: select ARM_CPU_SUSPEND for power management
-In-Reply-To: <5497046.7sx8fEMiNf@wuerfel>
-References: <5497046.7sx8fEMiNf@wuerfel>
-Message-ID: <20151125210640.GA5643@Agamemnon.attlocal.net>
+Date: Wed, 25 Nov 2015 15:24:09 -0600
+Subject: [PATCH] ARM: dts: qcom: msm8974: Add i2c8 node
+In-Reply-To: <1448344474-32311-1-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1448344474-32311-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <20151125212409.GB5643@Agamemnon.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 11:13:09PM +0100, Arnd Bergmann wrote:
-> The qcom spm driver uses cpu_resume_arm(), which is not included
-> in the kernel in all configurations:
-> 
-> drivers/built-in.o: In function `qcom_cpu_spc':
-> :(.text+0xbc022): undefined reference to `cpu_suspend'
-> drivers/built-in.o: In function `qcom_cpuidle_init':
-> :(.init.text+0x610c): undefined reference to `cpu_resume_arm'
-> 
-> This adds a 'select' Kconfig statement to ensure it's always
-> enabled.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On Mon, Nov 23, 2015 at 09:54:34PM -0800, Bjorn Andersson wrote:
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 > ---
-> This has been broken for a while but not even shown up in many thousands of
-> randconfig builds until today. Please queue it up for 4.5 unless you think
-> it should really go into 4.4 as well.
+>  arch/arm/boot/dts/qcom-msm8974.dtsi | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
 
-Thanks Arnd.  I'll add this to my list for the pull request.
+Looks fine to me.   I'll queue it up.
