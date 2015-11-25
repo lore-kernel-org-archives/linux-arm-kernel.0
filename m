@@ -1,31 +1,97 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Nov 2015 23:49:28 +0100
-Subject: [GIT PULL] omap fixes against v4.4-rc2
-In-Reply-To: <20151125223704.GV2517@atomide.com>
-References: <20151125223704.GV2517@atomide.com>
-Message-ID: <15820949.xv0lSuANaf@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 25 Nov 2015 16:57:34 -0600
+Subject: [PATCH 12/14] ARM: sb-som: dts: introduce SB-SOM baseboard
+In-Reply-To: <1448371155-17307-13-git-send-email-nikita@compulab.co.il>
+References: <1448371155-17307-1-git-send-email-nikita@compulab.co.il>
+ <1448371155-17307-13-git-send-email-nikita@compulab.co.il>
+Message-ID: <20151125225734.GA17604@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 November 2015 14:37:04 Tony Lindgren wrote:
-> Fixes for omaps for v4.4-rc cycle:
+On Tue, Nov 24, 2015 at 03:19:13PM +0200, Nikita Kiryanov wrote:
+> CompuLab SB-SOM baseboard is a carrier board for multiple arm-based SoMs.
+> It currently supports (with minor adjustments to assembly) CM-T43, CM-T54,
+> and CM-QS600 modules. It is a building block in the SBC-T43 single board
+> computer, which consists of cm-t43 on top of sb-som-t43.
 > 
-> - A series of audio changes for dra7 that missed the merge window but turned
->   out to be necessary to fix a boot time imprecise external abort error and to
->   getaudio working
-> 
-> - Fix l4 related boot time errors for dm81xx
-> 
-> - Use lockless cldm/pwrdm api in omap4_boot_secondary
-> 
-> - Remove t410 custom abort handler that is no longer needed and may
->   hide other critical errors
-> 
-> - Mark cpuidle tracepoints as _rcuidle
-> 
-> - Fix module alias for omap-ocp2scp
-> 
+> Signed-off-by: Nikita Kiryanov <nikita@compulab.co.il>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Igor Grinberg <grinberg@compulab.co.il>
+> Cc: Dmitry Lifshitz <lifshitz@compulab.co.il>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> ---
+>  .../devicetree/bindings/arm/compulab-boards.txt    |  5 +++
+>  .../bindings/display/panel/startek,startek-kd050c  |  4 +++
 
-Merged into fixes, thanks!
+.txt please.
 
-	Arnd
+>  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+>  arch/arm/boot/dts/compulab-sb-som.dtsi             | 42 ++++++++++++++++++++++
+>  4 files changed, 52 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/compulab-boards.txt
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/startek,startek-kd050c
+>  create mode 100644 arch/arm/boot/dts/compulab-sb-som.dtsi
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/compulab-boards.txt b/Documentation/devicetree/bindings/arm/compulab-boards.txt
+> new file mode 100644
+> index 0000000..3e742a5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/compulab-boards.txt
+> @@ -0,0 +1,5 @@
+> +CompuLab SB-SOM is a multi-module baseboard capable of carrying CM-T43, CM-T54,
+> +and QS-600 modules with minor modifications to the SB-SOM assembly.
+
+All these modules have compatible strings?
+
+> +
+> +Required root node properties:
+> +    - compatible = should be "compulab,sb-som"
+> diff --git a/Documentation/devicetree/bindings/display/panel/startek,startek-kd050c b/Documentation/devicetree/bindings/display/panel/startek,startek-kd050c
+> new file mode 100644
+> index 0000000..70cd8d1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/panel/startek,startek-kd050c
+> @@ -0,0 +1,4 @@
+> +Startek Electronic Technology Co. KD050C 5.0" WVGA TFT LCD panel
+> +
+> +Required properties:
+> +- compatible: should be "startek,startek-kd050c"
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 55df1d4..409b134 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -218,6 +218,7 @@ sony	Sony Corporation
+>  spansion	Spansion Inc.
+>  sprd	Spreadtrum Communications Inc.
+>  st	STMicroelectronics
+> +startek	Startek
+>  ste	ST-Ericsson
+>  stericsson	ST-Ericsson
+>  synology	Synology, Inc.
+> diff --git a/arch/arm/boot/dts/compulab-sb-som.dtsi b/arch/arm/boot/dts/compulab-sb-som.dtsi
+> new file mode 100644
+> index 0000000..402a143
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/compulab-sb-som.dtsi
+> @@ -0,0 +1,42 @@
+> +/*
+> + * Copyright (C) 2015 CompuLab, Ltd. - http://www.compulab.co.il/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/ {
+> +	model = "CompuLab SB-SOM";
+> +	compatible = "compulab,sb-som";
+
+I would expect this to have a more specific.
+
+> +	lcd0: display {
+> +		compatible = "startek,startek-kd050c", "panel-dpi";
+> +		label = "lcd";
+
+This isn't documented, nor do I think it is needed.
+
+Rob
