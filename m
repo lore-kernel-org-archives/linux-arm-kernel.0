@@ -1,43 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Nov 2015 13:24:58 +0000
-Subject: [PATCH 1/2] drivers: amba: properly handle devices with power
- domains
-In-Reply-To: <1448456289-31960-1-git-send-email-m.szyprowski@samsung.com>
-References: <1448456127-31842-1-git-send-email-m.szyprowski@samsung.com>
- <1448456289-31960-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20151125132458.GL8644@n2100.arm.linux.org.uk>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 25 Nov 2015 21:25:17 +0800
+Subject: [GIT PULL] ARM: imx: fixes for 4.4
+Message-ID: <20151125132517.GI11999@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 01:58:09PM +0100, Marek Szyprowski wrote:
-> To read pid/cid registers, the probed device need to be properly turned on.
-> When it is inside a power domain, the bus code should ensure that the
-> given power domain is enabled before trying to access device's registers.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/amba/bus.c | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-> index f009936..25715cb 100644
-> --- a/drivers/amba/bus.c
-> +++ b/drivers/amba/bus.c
-> @@ -373,6 +373,12 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
->  		goto err_release;
->  	}
->  
-> +	ret = dev_pm_domain_attach(&dev->dev, true);
-> +	if (ret) {
-> +		iounmap(tmp);
-> +		goto err_release;
-> +	}
-> +
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
 
-NAK.  If dev_pm_domain_attach() returns an error, even -EPROBE_DEFER,
-the result will be a missing device that has no way to be recovered.
-This is too fragile.
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.4
+
+for you to fetch changes up to 897ed0ca5979f103b8de3c09bcca2ae4860eb5a5:
+
+  ARM: dts: vfxxx: Fix dspi[01] spi-num-chipselects. (2015-11-24 17:38:42 +0800)
+
+----------------------------------------------------------------
+The i.MX fixes for 4.4:
+- Add missing .irq_set_type for i.MX GPC irq_chip.  It fixes an issue
+  that device IRQ type setting doesn't match the one specified in device
+  tree, since stacked IRQ domain is adopted in GPC driver.
+- Fix the wrong spi-num-chipselects settings for Vybrid DSPI devices.
+- Fix a merge error in Vybrid dts regarding to ADC device property
+  fsl,adck-max-frequency
+
+----------------------------------------------------------------
+Anson Huang (1):
+      ARM: imx: add platform irq type setting in gpc
+
+Cory Tusar (1):
+      ARM: dts: vfxxx: Fix dspi[01] spi-num-chipselects.
+
+Sanchayan Maity (1):
+      ARM: dts: vfxxx: Fix erroneous property in esdhc0 node
+
+ arch/arm/boot/dts/vfxxx.dtsi | 8 ++++----
+ arch/arm/mach-imx/gpc.c      | 1 +
+ 2 files changed, 5 insertions(+), 4 deletions(-)
