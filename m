@@ -1,56 +1,77 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Wed, 25 Nov 2015 09:32:14 -0800
-Subject: [PATCH] arm64: restore bogomips information in /proc/cpuinfo
-In-Reply-To: <alpine.LFD.2.20.1511250958370.22569@knanqh.ubzr>
-References: <1447870505-19319-1-git-send-email-yang.shi@linaro.org>
- <56554AE9.5070901@jonmasters.org>
- <alpine.LFD.2.20.1511250958370.22569@knanqh.ubzr>
-Message-ID: <5655F09E.1060004@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 25 Nov 2015 18:32:52 +0100
+Subject: [PATCH v3 3/5] clk: sunxi: Add sun9i A80 cpus (cpu special)
+ clock support
+In-Reply-To: <1448357536-26613-4-git-send-email-wens@csie.org>
+References: <1448357536-26613-1-git-send-email-wens@csie.org>
+ <1448357536-26613-4-git-send-email-wens@csie.org>
+Message-ID: <20151125173252.GN32142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/2015 7:16 AM, Nicolas Pitre wrote:
-> On Wed, 25 Nov 2015, Jon Masters wrote:
->
->> On 11/18/15, 1:15 PM, Yang Shi wrote:
->>
->>> As what Pavel Machek reported [1], some userspace applications depend on
->>> bogomips showed by /proc/cpuinfo.
->>>
->>> Although there is much less legacy impact on aarch64 than arm, but it does
->>> break libvirt.
->>>
->>> Basically, this patch reverts commit
->>> 326b16db9f69fd0d279be873c6c00f88c0a4aad5
->>> ("arm64: delay: don't bother reporting bogomips in /proc/cpuinfo"), but with
->>> some tweak due to context change.
->>
->> On a total tangent, it would be ideal to (eventually) have something reported
->> in /proc/cpuinfo or dmesg during boot that does "accurately" map back to the
->> underlying core frequency (as opposed to the generic timer frequency). I have
->> seen almost countless silly situations in the industry (external to my own
->> organization) in which someone has taken a $VENDOR_X reference system that
->> they're not supposed to run benchmarks on, and they've done it anyway. But
->> usually on some silicon that's clocked multiples under what production would
->> be. Then silly rumors about performance get around because nobody can do
->> simple arithmetic and notice that they ought to have at least divided by some
->> factor.
->
-> Be my guest my friend.
->
-> According to the common wisdom, the bogomips reporting is completely
-> senseless at this point and no one should expect anything useful from
-> it. Therefore I attempted to rehabilitate some meaning into it given
-> that we just can't get rid of it either and it continues to cause
-> dammage. You certainly saw where that has led me.
+Hi,
 
-Or we may create a new one, i.e. "cpu MHz" like x86? Then we keep both 
-in cpuinfo so that the userspace could adopt it gradually?
+On Tue, Nov 24, 2015 at 05:32:14PM +0800, Chen-Yu Tsai wrote:
+> The "cpus" clock is the clock for the embedded processor in the A80.
+> It is also part of the PRCM clock tree. This clock includes a pre-
+> divider on one of its inputs. For now we are using a custom clock
+> driver for it. In the future we may want to develop a generalized
+> driver for these types of clocks, which also includes the AHB clock
+> driver on sun[5678]i.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> 
+> Hi Maxime,
+> 
+> I'll do the factors clock refactoring mentioned during the discussion
+> around v2 later on.
 
-Thanks,
-Yang
+I have no idea what you are talking about :)
 
->
->
-> Nicolas
->
+> 
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi.txt |   1 +
+>  drivers/clk/sunxi/Makefile                        |   1 +
+>  drivers/clk/sunxi/clk-sun9i-cpus.c                | 240 ++++++++++++++++++++++
+>  3 files changed, 242 insertions(+)
+>  create mode 100644 drivers/clk/sunxi/clk-sun9i-cpus.c
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index b6859ed6913f..153ac72869e8 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -27,6 +27,7 @@ Required properties:
+>  	"allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
+>  	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
+>  	"allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
+> +	"allwinner,sun9i-a80-cpus-clk" - for the CPUS on A80
+>  	"allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
+>  	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+>  	"allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
+> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+> index 121333ce34ea..07d914c3f6d1 100644
+> --- a/drivers/clk/sunxi/Makefile
+> +++ b/drivers/clk/sunxi/Makefile
+> @@ -13,6 +13,7 @@ obj-y += clk-simple-gates.o
+>  obj-y += clk-sun8i-apb0.o
+>  obj-y += clk-sun8i-mbus.o
+>  obj-y += clk-sun9i-core.o
+> +obj-y += clk-sun9i-cpus.o
+
+Same thing here, if it's only used in the A80, just compile it when
+ARCH_SUN9I is compiled.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151125/a7280ddd/attachment.sig>
