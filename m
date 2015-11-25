@@ -1,47 +1,263 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 25 Nov 2015 13:32:22 -0800
-Subject: [PATCH 1/7] clk: mmp: stop using platform headers
-In-Reply-To: <3508030.Q62gfHvXvx@wuerfel>
-References: <1448465875-435039-1-git-send-email-arnd@arndb.de>
- <1448465875-435039-2-git-send-email-arnd@arndb.de>
- <20151125192114.GB11298@codeaurora.org>
- <3508030.Q62gfHvXvx@wuerfel>
-Message-ID: <20151125213222.GF11298@codeaurora.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 25 Nov 2015 15:36:18 -0600
+Subject: [PATCH 01/18] ARM: am57xx: cl-som-am57x: dts: add basic module
+ support
+In-Reply-To: <1448433590-1399-2-git-send-email-lifshitz@compulab.co.il>
+References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
+ <1448433590-1399-2-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <565629D2.2010401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25, Arnd Bergmann wrote:
-> On Wednesday 25 November 2015 11:21:14 Stephen Boyd wrote:
-> > On 11/25, Arnd Bergmann wrote:
-> > > diff --git a/drivers/clk/mmp/clk-mmp2.c b/drivers/clk/mmp/clk-mmp2.c
-> > > index 09d2832fbd78..38931dbd1eff 100644
-> > > --- a/drivers/clk/mmp/clk-mmp2.c
-> > > +++ b/drivers/clk/mmp/clk-mmp2.c
-> > > @@ -9,6 +9,7 @@
-> > >   * warranty of any kind, whether express or implied.
-> > >   */
-> > >  
-> > > +#include <linux/clk.h>
-> > 
-> > Why are we adding this include? I don't see any clk consumer API
-> > usage being added.
-> 
-> drivers/clk/mmp/clk-pxa910.c: In function 'pxa910_clk_init':
-> drivers/clk/mmp/clk-pxa910.c:166:2: error: implicit declaration of function 'clk_set_rate' [-Werror=implicit-function-declaration]
->   clk_set_rate(uart_pll, 14745600);
->   ^
-> drivers/clk/mmp/clk-pxa910.c:209:2: error: implicit declaration of function 'clk_set_parent' [-Werror=implicit-function-declaration]
->   clk_set_parent(clk, uart_pll);
->   ^
-> 
-> Is there anything I need to change here?
-> 
+On 11/25/2015 12:39 AM, Dmitry Lifshitz wrote:
+[...]
 
-Hmph. I seems this broke when we removed the clk.h include from
-clk-provider.h, but nobody has noticed for months. Can you make a
-different commit to add the header? Otherwise we're sneaking in
-that include to get this file to compile again.
+> diff --git a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+> new file mode 100644
+> index 0000000..b11d7da
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+[...]
+
+> +/ {
+> +	model = "CompuLab CL-SOM-AM57x";
+> +	compatible = "compulab,cl-som-am57x", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7";
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x80000000 0x20000000>; /* 512 MB - minimal configuration */
+
+I think if you like to enable LPAE, the format might look a little
+different..
+
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&leds_pins_default>;
+> +
+> +		led at 0 {
+> +			label = "cl-som-am57x:green";
+> +			gpios = <&gpio2 5 GPIO_ACTIVE_HIGH>;
+> +			linux,default-trigger = "heartbeat";
+> +			default-state = "off";
+> +		};
+> +	};
+> +};
+> +
+> +&dra7_pmx_core {
+> +	leds_pins_default: leds_pins_default {
+> +		pinctrl-single,pins = <
+> +			DRA7XX_CORE_IOPAD(0x347c, PIN_OUTPUT | MUX_MODE14)	/* gpmc_a15.gpio2_5 */
+> +		>;
+> +	};
+> +
+> +	i2c1_pins_default: i2c1_pins_default {
+> +		pinctrl-single,pins = <
+> +			DRA7XX_CORE_IOPAD(0x3800, PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c1_sda.sda */
+> +			DRA7XX_CORE_IOPAD(0x3804, PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c1_scl.scl */
+> +		>;
+> +	};
+> +
+> +	tps659038_pins_default: tps659038_pins_default {
+> +		pinctrl-single,pins = <
+> +			DRA7XX_CORE_IOPAD(0x3818, PIN_INPUT_PULLUP | MUX_MODE14) /* wakeup0.gpio1_0 */
+> +		>;
+> +	};
+
+Generic comment: As per requirements of the SoC -> all pinctrl must be
+done in bootloader. this was a recommendation that came in too late
+for TI platforms that got introduced in upstream, but that cleanup
+should eventually take place as well.
+
+> +};
+> +
+> +&i2c1 {
+> +	status = "okay";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c1_pins_default>;
+> +	clock-frequency = <400000>;
+> +
+> +	tps659038: tps659038 at 58 {
+> +		compatible = "ti,tps659038";
+> +		reg = <0x58>;
+> +		interrupt-parent = <&gpio1>;
+> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+
+Also See: https://patchwork.kernel.org/patch/7596541/ ->
+Documentation/devicetree/bindings/i2c/i2c.txt -> since you seem to
+have a PMIC with power button, you might be able to get wakeup source
+also there.
+
+> +
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&tps659038_pins_default>;
+> +
+> +		#interrupt-cells = <2>;
+> +		interrupt-controller;
+> +
+> +		ti,system-power-controller;
+
+Assuming powerhold signal and BOOT0,1 is proper here, else poweroff
+will never work.
+
+> +
+> +		tps659038_pmic {
+> +			compatible = "ti,tps659038-pmic";
+> +
+> +			regulators {
+> +				smps12_reg: smps12 {
+> +					/* VDD_MPU */
+> +					regulator-name = "smps12";
+> +					regulator-min-microvolt = < 850000>;
+> +					regulator-max-microvolt = <1250000>;
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
+> +
+> +				smps3_reg: smps3 {
+> +					/* VDD_DDR */
+> +					regulator-name = "smps3";
+> +					regulator-min-microvolt = <1500000>;
+> +					regulator-max-microvolt = <1500000>;
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
+> +
+> +				smps45_reg: smps45 {
+> +					/* VDD_DSPEVE */
+> +					regulator-name = "smps45";
+> +					regulator-min-microvolt = < 850000>;
+> +					regulator-max-microvolt = <1160000>;
+
+1.25v if you want to support OPP_HIGH. as per latest data sheet.
+
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
+> +
+> +				smps6_reg: smps6 {
+> +					/* VDD_GPU */
+> +					regulator-name = "smps6";
+> +					regulator-min-microvolt = < 850000>;
+> +					regulator-max-microvolt = <1160000>;
+
+1.25v if you want to support OPP_HIGH. as per latest data sheet.
+
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
+> +
+> +				smps7_reg: smps7 {
+> +					/* VDD_CORE */
+> +					regulator-name = "smps7";
+> +					regulator-min-microvolt = < 850000>;
+> +					regulator-max-microvolt = <1160000>;
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
+> +
+> +				smps8_reg: smps8 {
+> +					/* VDD_IVA */
+> +					regulator-name = "smps8";
+> +					regulator-min-microvolt = < 850000>;
+> +					regulator-max-microvolt = <1160000>;
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
+> +
+> +				smps9_reg: smps9 {
+> +					/* PMIC_3V3 */
+> +					regulator-name = "smps9";
+> +					regulator-min-microvolt = <3300000>;
+> +					regulator-max-microvolt = <3300000>;
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
+> +
+> +
+> +				ldo1_reg: ldo1 {
+> +					/* VDD_SD / VDDSHV8  */
+> +					regulator-name = "ldo1";
+> +					regulator-min-microvolt = <1800000>;
+> +					regulator-max-microvolt = <3300000>;
+
+for eventual UHS mode support, it is recommended to keep VDD_SD
+separate from VDDSHV8. many of TI evms also suffer from this issue :(
+
+> +					regulator-boot-on;
+> +					regulator-always-on;
+> +				};
+> +
+> +				ldo2_reg: ldo2 {
+> +					/* VDD_1V8 */
+> +					regulator-name = "ldo2";
+> +					regulator-min-microvolt = <1800000>;
+> +					regulator-max-microvolt = <1800000>;
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
+> +
+> +				ldo3_reg: ldo3 {
+> +					/* VDDA_1V8_PHYA */
+> +					regulator-name = "ldo3";
+> +					regulator-min-microvolt = <1800000>;
+> +					regulator-max-microvolt = <1800000>;
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
+> +
+> +				ldo4_reg: ldo4 {
+> +					/* VDDA_1V8_PHYB */
+> +					regulator-name = "ldo4";
+> +					regulator-min-microvolt = <1800000>;
+> +					regulator-max-microvolt = <1800000>;
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
+
+Happy to see this is already split up. you might want to document
+which PHYs are supplied by PHYA/B in comments for future reference
+instead of having to dig through schematics to figure that out..
+
+> +
+> +				ldo9_reg: ldo9 {
+> +					/* VDD_RTC */
+> +					regulator-name = "ldo9";
+> +					regulator-min-microvolt = <1050000>;
+> +					regulator-max-microvolt = <1050000>;
+> +					regulator-always-on;
+> +					regulator-boot-on;
+as per data sheet:
+"VD_RTC can optionally be tied to VD_CORE and operate at the VD_CORE
+AVS voltages."
+
+I assume that is not the case here.
+
+> +				};
+> +
+> +				ldoln_reg: ldoln {
+> +					/* VDDA_1V8_PLL */
+> +					regulator-name = "ldoln";
+> +					regulator-min-microvolt = <1800000>;
+> +					regulator-max-microvolt = <1800000>;
+> +					regulator-always-on;
+> +					regulator-boot-on;
+> +				};
+> +
+> +				ldousb_reg: ldousb {
+> +					/* VDDA_3V_USB: VDDA_USBHS33 */
+> +					regulator-name = "ldousb";
+> +					regulator-min-microvolt = <3300000>;
+> +					regulator-max-microvolt = <3300000>;
+> +					regulator-boot-on;
+
+All SoC VDDAs must be always-on.
+
+[...]
+
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards,
+Nishanth Menon
