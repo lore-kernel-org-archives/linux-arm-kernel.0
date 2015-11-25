@@ -1,72 +1,77 @@
-From: Mingkai.Hu@freescale.com (Hu Vincent)
-Date: Wed, 25 Nov 2015 05:01:10 +0000
-Subject: [PATCH] dts/ls2080a: Update PCIe compatible
-In-Reply-To: <20151124202203.GA32297@rob-hp-laptop>
-References: <1448345075-6801-1-git-send-email-Mingkai.Hu@freescale.com>
- <20151124202203.GA32297@rob-hp-laptop>
-Message-ID: <BN3PR0301MB1249CD4A615CCD7308FB067184050@BN3PR0301MB1249.namprd03.prod.outlook.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Wed, 25 Nov 2015 10:54:04 +0530
+Subject: [PATCH] clocksource: arm_global_timer: Allow DT to specify already
+ reset timer counter
+Message-ID: <1448429044-10395-1-git-send-email-jaswinder.singh@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The GT counter is common to every core in a cluster. There is a usecase
+when Linux is spawned by a 'master' firmware/OS running on some core of
+the same cluster and the GT is used by the both.
+ Linux, upon boot, resetting the GT counter is obviously fatal to the
+other OS. So provide a way for DT to tell Linux if it's running in that
+'slave' mode and must not reset the counter.
 
+Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+---
+ Documentation/devicetree/bindings/arm/global_timer.txt |  6 ++++++
+ drivers/clocksource/arm_global_timer.c                 | 12 +++++++++---
+ 2 files changed, 15 insertions(+), 3 deletions(-)
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: Wednesday, November 25, 2015 4:22 AM
-> To: Hu Mingkai-B21284
-> Cc: arm at kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; Li Yang-Leo-R58472; Lian Minghuan-B31939
-> Subject: Re: [PATCH] dts/ls2080a: Update PCIe compatible
-> 
-> On Tue, Nov 24, 2015 at 02:04:35PM +0800, Mingkai Hu wrote:
-> > From: Minghuan Lian <Minghuan.Lian@freescale.com>
-> >
-> > The patch adds LS2085a to PCIe compatible to fix the compatibility
-> > issue when using firmware with LS2085a compatible property.
-> >
-> > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> > Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
-> > ---
-> >  Documentation/devicetree/bindings/pci/layerscape-pci.txt |  1 +
-> >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi           | 12
-> ++++++++----
-> >  2 files changed, 9 insertions(+), 4 deletions(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> > b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> > index e376785..4600007 100644
-> > --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> > +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> > @@ -15,6 +15,7 @@ Required properties:
-> >  - compatible: should contain the platform identifier such as:
-> >          "fsl,ls1021a-pcie", "snps,dw-pcie"
-> >          "fsl,ls2080a-pcie", "snps,dw-pcie"
-> > +        "fsl,ls2085a-pcie", "snps,dw-pcie"
-> >  - reg: base addresses and lengths of the PCIe controller
-> >  - interrupts: A list of interrupt outputs of the controller. Must
-> contain an
-> >    entry for each entry in the interrupt-names property.
-> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> > b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> > index e81cd48..3821bb1 100644
-> > --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> > @@ -383,7 +383,8 @@
-> >  		};
-> >
-> >  		pcie at 3400000 {
-> > -			compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
-> > +			compatible = "fsl,ls2080a-pcie", "fsl,ls2085a-pcie",
-> > +				     "snps,dw-pcie";
-> 
-> This doesn't match the doc as to what are valid combinations. The order
-> here seems backwards too. ls2085a is older?
-> 
-
-Yes, ls2085a was released earlier. You mean the older one comes first? Like:
-
-compatible = "fsl,ls2085a-pcie", "fsl,ls2080a-pcie",
-		 "snps,dw-pcie";
-
-Thanks,
-Mingkai
+diff --git a/Documentation/devicetree/bindings/arm/global_timer.txt b/Documentation/devicetree/bindings/arm/global_timer.txt
+index bdae3a8..bb897a9 100644
+--- a/Documentation/devicetree/bindings/arm/global_timer.txt
++++ b/Documentation/devicetree/bindings/arm/global_timer.txt
+@@ -17,6 +17,12 @@
+ 
+ - clocks : Should be phandle to a clock.
+ 
++
++** Optional properties:
++
++- arm,gt_no_reset : Firmware/bootloader already initialized the
++	global timer-counter and expects it to be not reset again.
++
+ Example:
+ 
+ 	timer at 2c000600 {
+diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+index a2cb6fa..952bab6 100644
+--- a/drivers/clocksource/arm_global_timer.c
++++ b/drivers/clocksource/arm_global_timer.c
+@@ -51,6 +51,7 @@ static void __iomem *gt_base;
+ static unsigned long gt_clk_rate;
+ static int gt_ppi;
+ static struct clock_event_device __percpu *gt_evt;
++static bool gt_reset_counter;
+ 
+ /*
+  * To get the value from the Global Timer Counter register proceed as follows:
+@@ -212,9 +213,11 @@ static u64 notrace gt_sched_clock_read(void)
+ 
+ static void __init gt_clocksource_init(void)
+ {
+-	writel(0, gt_base + GT_CONTROL);
+-	writel(0, gt_base + GT_COUNTER0);
+-	writel(0, gt_base + GT_COUNTER1);
++	if (gt_reset_counter) {
++		writel(0, gt_base + GT_CONTROL);
++		writel(0, gt_base + GT_COUNTER0);
++		writel(0, gt_base + GT_COUNTER1);
++	}
+ 	/* enables timer on all the cores */
+ 	writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
+ 
+@@ -303,6 +306,9 @@ static void __init global_timer_of_register(struct device_node *np)
+ 		goto out_irq;
+ 	}
+ 
++	/* See if we are told we can't reset the global timer counter */
++	gt_reset_counter = !of_property_read_bool(np, "arm,gt_no_reset");
++
+ 	/* Immediately configure the timer on the boot CPU */
+ 	gt_clocksource_init();
+ 	gt_clockevents_init(this_cpu_ptr(gt_evt));
+-- 
+1.9.1
