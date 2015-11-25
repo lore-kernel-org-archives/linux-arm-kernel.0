@@ -1,410 +1,232 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Nov 2015 17:06:51 +0100
-Subject: [PATCH 06/10] iio: exynos-adc: add experimental touchscreen support
+Date: Wed, 25 Nov 2015 17:06:49 +0100
+Subject: [PATCH 04/10] ARM: s3c64xx: prepare initcalls for multiplatform
 In-Reply-To: <1448467615-447097-1-git-send-email-arnd@arndb.de>
 References: <1448467615-447097-1-git-send-email-arnd@arndb.de>
-Message-ID: <1448467615-447097-7-git-send-email-arnd@arndb.de>
+Message-ID: <1448467615-447097-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the touchscreen on Samsung s3c64xx.
-The driver is completely untested but shows roughly how
-it could be done, following the example of the at91 driver.
+In a multiplatform kernel, each initcall is run regardless
+of the platform it is meant for, so it must not attempt to
+access SoC-specific registers.
 
-compared to the old plat-samsung/adc driver, there is
-no support for prioritizing ts over other clients, nor
-for oversampling. From my reading of the code, the
-priorities didn't actually have any effect at all, but
-the oversampling might be needed.
-
-Verifying this driver is the main issue that is currently
-holding up multiplatform support for s3c64xx, so any help
-in testing is very much appreciated.
-
-The current version uses the IS_REACHABLE() that is
-going to be introduced in the linux-media tree, please
-comment this out for testing.
+This adds 'if (soc_is_s3c64xx)' to all initcalls that are
+specific to the s3c64xx platform, to prevent them from breaking
+other platforms once we can build them into a combined kernel.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 ---
- .../devicetree/bindings/arm/samsung/exynos-adc.txt |   3 +
- drivers/iio/adc/exynos_adc.c                       | 224 ++++++++++++++++++++-
- 2 files changed, 220 insertions(+), 7 deletions(-)
+ arch/arm/mach-s3c64xx/common.c               |  4 ++--
+ arch/arm/mach-s3c64xx/cpuidle.c              |  5 ++++-
+ arch/arm/mach-s3c64xx/irq-pm.c               |  2 +-
+ arch/arm/mach-s3c64xx/mach-crag6410-module.c |  4 ++++
+ arch/arm/mach-s3c64xx/pl080.c                |  4 ++++
+ arch/arm/mach-s3c64xx/pm.c                   |  4 ++++
+ arch/arm/mach-s3c64xx/s3c6400.c              |  2 +-
+ arch/arm/mach-s3c64xx/s3c6410.c              |  2 +-
+ arch/arm/plat-samsung/gpio-samsung.c         | 11 +++++------
+ arch/arm/plat-samsung/init.c                 |  5 +++++
+ 10 files changed, 31 insertions(+), 12 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
-index f46ca9a316a2..ccaaec6014bd 100644
---- a/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
-+++ b/Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
-@@ -47,6 +47,9 @@ Required properties:
- 
- - samsung,syscon-phandle Contains the PMU system controller node
- 			(To access the ADC_PHY register on Exynos5250/5420/5800/3250)
-+Optional properties:
-+- has-touchscreen:	If present, indicates that a touchscreen is
-+			connected an usable.
- 
- Note: child nodes can be added for auto probing from device tree.
- 
-diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
-index 3a2dbb3b4926..d11cd604562c 100644
---- a/drivers/iio/adc/exynos_adc.c
-+++ b/drivers/iio/adc/exynos_adc.c
-@@ -35,6 +35,7 @@
- #include <linux/regulator/consumer.h>
- #include <linux/of_platform.h>
- #include <linux/err.h>
-+#include <linux/input.h>
- 
- #include <linux/iio/iio.h>
- #include <linux/iio/machine.h>
-@@ -42,12 +43,18 @@
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
- 
-+#include <linux/platform_data/touchscreen-s3c2410.h>
-+
- /* S3C/EXYNOS4412/5250 ADC_V1 registers definitions */
- #define ADC_V1_CON(x)		((x) + 0x00)
-+#define ADC_V1_TSC(x)		((x) + 0x04)
- #define ADC_V1_DLY(x)		((x) + 0x08)
- #define ADC_V1_DATX(x)		((x) + 0x0C)
-+#define ADC_V1_DATY(x)		((x) + 0x10)
-+#define ADC_V1_UPDN(x)		((x) + 0x14)
- #define ADC_V1_INTCLR(x)	((x) + 0x18)
- #define ADC_V1_MUX(x)		((x) + 0x1c)
-+#define ADC_V1_CLRINTPNDNUP(x)	((x) + 0x20)
- 
- /* S3C2410 ADC registers definitions */
- #define ADC_S3C2410_MUX(x)	((x) + 0x18)
-@@ -71,6 +78,30 @@
- #define ADC_S3C2410_DATX_MASK	0x3FF
- #define ADC_S3C2416_CON_RES_SEL	(1u << 3)
- 
-+/* touch screen always uses channel 0 */
-+#define ADC_S3C2410_MUX_TS	0
-+
-+/* ADCTSC Register Bits */
-+#define ADC_S3C2443_TSC_UD_SEN		(1u << 8)
-+#define ADC_S3C2410_TSC_YM_SEN		(1u << 7)
-+#define ADC_S3C2410_TSC_YP_SEN		(1u << 6)
-+#define ADC_S3C2410_TSC_XM_SEN		(1u << 5)
-+#define ADC_S3C2410_TSC_XP_SEN		(1u << 4)
-+#define ADC_S3C2410_TSC_PULL_UP_DISABLE	(1u << 3)
-+#define ADC_S3C2410_TSC_AUTO_PST	(1u << 2)
-+#define ADC_S3C2410_TSC_XY_PST(x)	(((x) & 0x3) << 0)
-+
-+#define ADC_TSC_WAIT4INT (ADC_S3C2410_TSC_YM_SEN | \
-+			 ADC_S3C2410_TSC_YP_SEN | \
-+			 ADC_S3C2410_TSC_XP_SEN | \
-+			 ADC_S3C2410_TSC_XY_PST(3))
-+
-+#define ADC_TSC_AUTOPST	(ADC_S3C2410_TSC_YM_SEN | \
-+			 ADC_S3C2410_TSC_YP_SEN | \
-+			 ADC_S3C2410_TSC_XP_SEN | \
-+			 ADC_S3C2410_TSC_AUTO_PST | \
-+			 ADC_S3C2410_TSC_XY_PST(0))
-+
- /* Bit definitions for ADC_V2 */
- #define ADC_V2_CON1_SOFT_RESET	(1u << 2)
- 
-@@ -88,7 +119,9 @@
- /* Bit definitions common for ADC_V1 and ADC_V2 */
- #define ADC_CON_EN_START	(1u << 0)
- #define ADC_CON_EN_START_MASK	(0x3 << 0)
-+#define ADC_DATX_PRESSED	(1u << 15)
- #define ADC_DATX_MASK		0xFFF
-+#define ADC_DATY_MASK		0xFFF
- 
- #define EXYNOS_ADC_TIMEOUT	(msecs_to_jiffies(100))
- 
-@@ -98,17 +131,24 @@
- struct exynos_adc {
- 	struct exynos_adc_data	*data;
- 	struct device		*dev;
-+	struct input_dev	*input;
- 	void __iomem		*regs;
- 	struct regmap		*pmu_map;
- 	struct clk		*clk;
- 	struct clk		*sclk;
- 	unsigned int		irq;
-+	unsigned int		tsirq;
-+	unsigned int		delay;
- 	struct regulator	*vdd;
- 
- 	struct completion	completion;
- 
- 	u32			value;
- 	unsigned int            version;
-+
-+	bool			read_ts;
-+	u32			ts_x;
-+	u32			ts_y;
- };
- 
- struct exynos_adc_data {
-@@ -197,6 +237,9 @@ static void exynos_adc_v1_init_hw(struct exynos_adc *info)
- 	/* Enable 12-bit ADC resolution */
- 	con1 |= ADC_V1_CON_RES;
- 	writel(con1, ADC_V1_CON(info->regs));
-+
-+	/* set touchscreen delay */
-+	writel(info->delay, ADC_V1_DLY(info->regs));
- }
- 
- static void exynos_adc_v1_exit_hw(struct exynos_adc *info)
-@@ -480,8 +523,8 @@ static int exynos_read_raw(struct iio_dev *indio_dev,
- 	if (info->data->start_conv)
- 		info->data->start_conv(info, chan->address);
- 
--	timeout = wait_for_completion_timeout
--			(&info->completion, EXYNOS_ADC_TIMEOUT);
-+	timeout = wait_for_completion_timeout(&info->completion,
-+					      EXYNOS_ADC_TIMEOUT);
- 	if (timeout == 0) {
- 		dev_warn(&indio_dev->dev, "Conversion timed out! Resetting\n");
- 		if (info->data->init_hw)
-@@ -498,13 +541,55 @@ static int exynos_read_raw(struct iio_dev *indio_dev,
- 	return ret;
- }
- 
-+static int exynos_read_s3c64xx_ts(struct iio_dev *indio_dev, int *x, int *y)
-+{
-+	struct exynos_adc *info = iio_priv(indio_dev);
-+	unsigned long timeout;
-+	int ret;
-+
-+	mutex_lock(&indio_dev->mlock);
-+	info->read_ts = true;
-+
-+	reinit_completion(&info->completion);
-+
-+	writel(ADC_S3C2410_TSC_PULL_UP_DISABLE | ADC_TSC_AUTOPST,
-+	       ADC_V1_TSC(info->regs));
-+
-+	/* Select the ts channel to be used and Trigger conversion */
-+	info->data->start_conv(info, ADC_S3C2410_MUX_TS);
-+
-+	timeout = wait_for_completion_timeout(&info->completion,
-+					      EXYNOS_ADC_TIMEOUT);
-+	if (timeout == 0) {
-+		dev_warn(&indio_dev->dev, "Conversion timed out! Resetting\n");
-+		if (info->data->init_hw)
-+			info->data->init_hw(info);
-+		ret = -ETIMEDOUT;
-+	} else {
-+		*x = info->ts_x;
-+		*y = info->ts_y;
-+		ret = 0;
-+	}
-+
-+	info->read_ts = false;
-+	mutex_unlock(&indio_dev->mlock);
-+
-+	return ret;
-+}
-+
- static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
+diff --git a/arch/arm/mach-s3c64xx/common.c b/arch/arm/mach-s3c64xx/common.c
+index ddb30b8434c5..3dea4a4ef165 100644
+--- a/arch/arm/mach-s3c64xx/common.c
++++ b/arch/arm/mach-s3c64xx/common.c
+@@ -208,7 +208,7 @@ void __init s3c64xx_init_io(struct map_desc *mach_desc, int size)
+ static __init int s3c64xx_dev_init(void)
  {
- 	struct exynos_adc *info = (struct exynos_adc *)dev_id;
- 	u32 mask = info->data->mask;
+ 	/* Not applicable when using DT. */
+-	if (of_have_populated_dt())
++	if (of_have_populated_dt() || !soc_is_s3c64xx())
+ 		return 0;
  
- 	/* Read value */
--	info->value = readl(ADC_V1_DATX(info->regs)) & mask;
-+	if (info->read_ts) {
-+		info->ts_x = readl(ADC_V1_DATX(info->regs));
-+		info->ts_y = readl(ADC_V1_DATY(info->regs));
-+		writel(ADC_TSC_WAIT4INT | ADC_S3C2443_TSC_UD_SEN, ADC_V1_TSC(info->regs));
-+	} else {
-+		info->value = readl(ADC_V1_DATX(info->regs)) & mask;
-+	}
- 
- 	/* clear irq */
- 	if (info->data->clear_irq)
-@@ -515,6 +600,46 @@ static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
-+/*
-+ * Here we (ab)use a threaded interrupt handler to stay running
-+ * for as long as the touchscreen remains pressed, we report
-+ * a new event with the latest data and then sleep until the
-+ * next timer tick. This mirrors the behavior of the old
-+ * driver, with much less code.
-+ */
-+static irqreturn_t exynos_ts_isr(int irq, void *dev_id)
-+{
-+	struct exynos_adc *info = dev_id;
-+	struct iio_dev *dev = dev_get_drvdata(info->dev);
-+	u32 x, y;
-+	bool pressed;
-+	int ret;
-+
-+	while (info->input->users) {
-+		ret = exynos_read_s3c64xx_ts(dev, &x, &y);
-+		if (ret == -ETIMEDOUT)
-+			break;
-+
-+		pressed = x & y & ADC_DATX_PRESSED;
-+		if (!pressed) {
-+			input_report_key(info->input, BTN_TOUCH, 0);
-+			input_sync(info->input);
-+			break;
-+		}
-+
-+		input_report_abs(info->input, ABS_X, x & ADC_DATX_MASK);
-+		input_report_abs(info->input, ABS_Y, y & ADC_DATY_MASK);
-+		input_report_key(info->input, BTN_TOUCH, 1);
-+		input_sync(info->input);
-+
-+		msleep(1);
-+	};
-+
-+	writel(0, ADC_V1_CLRINTPNDNUP(info->regs));
-+
-+	return IRQ_HANDLED;
-+}
-+
- static int exynos_adc_reg_access(struct iio_dev *indio_dev,
- 			      unsigned reg, unsigned writeval,
- 			      unsigned *readval)
-@@ -566,18 +691,72 @@ static int exynos_adc_remove_devices(struct device *dev, void *c)
- 	return 0;
- }
- 
-+static int exynos_adc_ts_open(struct input_dev *dev)
-+{
-+	struct exynos_adc *info = input_get_drvdata(dev);
-+
-+	enable_irq(info->tsirq);
-+
-+	return 0;
-+}
-+
-+static void exynos_adc_ts_close(struct input_dev *dev)
-+{
-+	struct exynos_adc *info = input_get_drvdata(dev);
-+
-+	disable_irq(info->tsirq);
-+}
-+
-+static int exynos_adc_ts_init(struct exynos_adc *info)
-+{
-+	int ret;
-+
-+	if (info->tsirq <= 0)
-+		return -ENODEV;
-+
-+	info->input = input_allocate_device();
-+	if (!info->input)
-+		return -ENOMEM;
-+
-+	info->input->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
-+	info->input->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
-+
-+	input_set_abs_params(info->input, ABS_X, 0, 0x3FF, 0, 0);
-+	input_set_abs_params(info->input, ABS_Y, 0, 0x3FF, 0, 0);
-+
-+	info->input->name = "S3C24xx TouchScreen";
-+	info->input->id.bustype = BUS_HOST;
-+	info->input->open = exynos_adc_ts_open;
-+	info->input->close = exynos_adc_ts_close;
-+
-+	input_set_drvdata(info->input, info);
-+
-+	ret = input_register_device(info->input);
-+	if (ret) {
-+		input_free_device(info->input);
-+		return ret;
-+	}
-+
-+	disable_irq(info->tsirq);
-+	ret = request_threaded_irq(info->tsirq, NULL, exynos_ts_isr,
-+				   0, "touchscreen", info);
-+	if (ret)
-+		input_unregister_device(info->input);
-+
-+	return ret;
-+}
-+
- static int exynos_adc_probe(struct platform_device *pdev)
- {
- 	struct exynos_adc *info = NULL;
- 	struct device_node *np = pdev->dev.of_node;
-+	struct s3c2410_ts_mach_info *pdata = dev_get_platdata(&pdev->dev);
- 	struct iio_dev *indio_dev = NULL;
- 	struct resource	*mem;
-+	bool has_ts = false;
- 	int ret = -ENODEV;
+ 	subsys_system_register(&s3c64xx_subsys, NULL);
+@@ -413,7 +413,7 @@ static int __init s3c64xx_init_irq_eint(void)
  	int irq;
  
--	if (!np)
--		return ret;
+ 	/* On DT-enabled systems EINTs are handled by pinctrl-s3c64xx driver. */
+-	if (of_have_populated_dt())
++	if (of_have_populated_dt() || !soc_is_s3c64xx())
+ 		return -ENODEV;
+ 
+ 	for (irq = IRQ_EINT(0); irq <= IRQ_EINT(27); irq++) {
+diff --git a/arch/arm/mach-s3c64xx/cpuidle.c b/arch/arm/mach-s3c64xx/cpuidle.c
+index 93aa8cb70195..5322db51150e 100644
+--- a/arch/arm/mach-s3c64xx/cpuidle.c
++++ b/arch/arm/mach-s3c64xx/cpuidle.c
+@@ -18,6 +18,7 @@
+ 
+ #include <asm/cpuidle.h>
+ 
++#include <plat/cpu.h>
+ #include <mach/map.h>
+ 
+ #include "regs-sys.h"
+@@ -57,6 +58,8 @@ static struct cpuidle_driver s3c64xx_cpuidle_driver = {
+ 
+ static int __init s3c64xx_init_cpuidle(void)
+ {
+-	return cpuidle_register(&s3c64xx_cpuidle_driver, NULL);
++	if (soc_is_s3c64xx())
++		return cpuidle_register(&s3c64xx_cpuidle_driver, NULL);
++	return 0;
+ }
+ device_initcall(s3c64xx_init_cpuidle);
+diff --git a/arch/arm/mach-s3c64xx/irq-pm.c b/arch/arm/mach-s3c64xx/irq-pm.c
+index ae4ea7601f60..0bbf1faaee42 100644
+--- a/arch/arm/mach-s3c64xx/irq-pm.c
++++ b/arch/arm/mach-s3c64xx/irq-pm.c
+@@ -113,7 +113,7 @@ static struct syscore_ops s3c64xx_irq_syscore_ops = {
+ static __init int s3c64xx_syscore_init(void)
+ {
+ 	/* Appropriate drivers (pinctrl, uart) handle this when using DT. */
+-	if (of_have_populated_dt())
++	if (of_have_populated_dt() || !soc_is_s3c64xx())
+ 		return 0;
+ 
+ 	register_syscore_ops(&s3c64xx_irq_syscore_ops);
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+index 9c00d83f7151..be21f06e6b3f 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+@@ -29,6 +29,7 @@
+ 
+ #include <linux/platform_data/spi-s3c64xx.h>
+ 
++#include <plat/cpu.h>
+ #include "crag6410.h"
+ 
+ static struct s3c64xx_spi_csinfo wm0010_spi_csinfo = {
+@@ -399,6 +400,9 @@ static struct i2c_driver wlf_gf_module_driver = {
+ 
+ static int __init wlf_gf_module_register(void)
+ {
++	if (!soc_is_s3c64xx())
++		return 0;
++
+ 	return i2c_add_driver(&wlf_gf_module_driver);
+ }
+ device_initcall(wlf_gf_module_register);
+diff --git a/arch/arm/mach-s3c64xx/pl080.c b/arch/arm/mach-s3c64xx/pl080.c
+index 901a984bddc2..89c5a62830a7 100644
+--- a/arch/arm/mach-s3c64xx/pl080.c
++++ b/arch/arm/mach-s3c64xx/pl080.c
+@@ -14,6 +14,7 @@
+ #include <linux/amba/pl08x.h>
+ #include <linux/of.h>
+ 
++#include <plat/cpu.h>
+ #include <mach/irqs.h>
+ #include <mach/map.h>
+ 
+@@ -230,6 +231,9 @@ static AMBA_AHB_DEVICE(s3c64xx_dma1, "dma-pl080s.1", 0,
+ 
+ static int __init s3c64xx_pl080_init(void)
+ {
++	if (!soc_is_s3c64xx())
++		return 0;
++
+ 	/* Set all DMA configuration to be DMA, not SDMA */
+ 	writel(0xffffff, S3C64XX_SDMA_SEL);
+ 
+diff --git a/arch/arm/mach-s3c64xx/pm.c b/arch/arm/mach-s3c64xx/pm.c
+index 75b14e756383..59d91b83b03d 100644
+--- a/arch/arm/mach-s3c64xx/pm.c
++++ b/arch/arm/mach-s3c64xx/pm.c
+@@ -22,6 +22,7 @@
+ #include <mach/map.h>
+ #include <mach/irqs.h>
+ 
++#include <plat/cpu.h>
+ #include <plat/devs.h>
+ #include <plat/pm.h>
+ #include <plat/wakeup-mask.h>
+@@ -332,6 +333,9 @@ int __init s3c64xx_pm_init(void)
+ 
+ static __init int s3c64xx_pm_initcall(void)
+ {
++	if (!soc_is_s3c64xx())
++		return 0;
++
+ 	pm_cpu_prep = s3c64xx_pm_prepare;
+ 	pm_cpu_sleep = s3c64xx_cpu_suspend;
+ 
+diff --git a/arch/arm/mach-s3c64xx/s3c6400.c b/arch/arm/mach-s3c64xx/s3c6400.c
+index 33273abef669..5ea82accc773 100644
+--- a/arch/arm/mach-s3c64xx/s3c6400.c
++++ b/arch/arm/mach-s3c64xx/s3c6400.c
+@@ -81,7 +81,7 @@ static struct device s3c6400_dev = {
+ static int __init s3c6400_core_init(void)
+ {
+ 	/* Not applicable when using DT. */
+-	if (of_have_populated_dt())
++	if (of_have_populated_dt() || soc_is_s3c64xx())
+ 		return 0;
+ 
+ 	return subsys_system_register(&s3c6400_subsys, NULL);
+diff --git a/arch/arm/mach-s3c64xx/s3c6410.c b/arch/arm/mach-s3c64xx/s3c6410.c
+index eadc48dee0e4..92bb927c4478 100644
+--- a/arch/arm/mach-s3c64xx/s3c6410.c
++++ b/arch/arm/mach-s3c64xx/s3c6410.c
+@@ -84,7 +84,7 @@ static struct device s3c6410_dev = {
+ static int __init s3c6410_core_init(void)
+ {
+ 	/* Not applicable when using DT. */
+-	if (of_have_populated_dt())
++	if (of_have_populated_dt() || !soc_is_s3c64xx())
+ 		return 0;
+ 
+ 	return subsys_system_register(&s3c6410_subsys, NULL);
+diff --git a/arch/arm/plat-samsung/gpio-samsung.c b/arch/arm/plat-samsung/gpio-samsung.c
+index 7c288ba4dc87..37faa8eab78f 100644
+--- a/arch/arm/plat-samsung/gpio-samsung.c
++++ b/arch/arm/plat-samsung/gpio-samsung.c
+@@ -1176,14 +1176,16 @@ static __init int samsung_gpiolib_init(void)
+ 	 * interfaces. For legacy (non-DT) platforms this driver is used.
+ 	 */
+ 	if (of_have_populated_dt())
+-		return -ENODEV;
 -
- 	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(struct exynos_adc));
- 	if (!indio_dev) {
- 		dev_err(&pdev->dev, "failed allocating iio device\n");
-@@ -613,8 +792,14 @@ static int exynos_adc_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "no irq resource?\n");
- 		return irq;
+-	samsung_gpiolib_set_cfg(samsung_gpio_cfgs, ARRAY_SIZE(samsung_gpio_cfgs));
++		return 0;
+ 
+ 	if (soc_is_s3c24xx()) {
++		samsung_gpiolib_set_cfg(samsung_gpio_cfgs,
++				ARRAY_SIZE(samsung_gpio_cfgs));
+ 		s3c24xx_gpiolib_add_chips(s3c24xx_gpios,
+ 				ARRAY_SIZE(s3c24xx_gpios), S3C24XX_VA_GPIO);
+ 	} else if (soc_is_s3c64xx()) {
++		samsung_gpiolib_set_cfg(samsung_gpio_cfgs,
++				ARRAY_SIZE(samsung_gpio_cfgs));
+ 		samsung_gpiolib_add_2bit_chips(s3c64xx_gpios_2bit,
+ 				ARRAY_SIZE(s3c64xx_gpios_2bit),
+ 				S3C64XX_VA_GPIO + 0xE0, 0x20);
+@@ -1192,9 +1194,6 @@ static __init int samsung_gpiolib_init(void)
+ 				S3C64XX_VA_GPIO);
+ 		samsung_gpiolib_add_4bit2_chips(s3c64xx_gpios_4bit2,
+ 				ARRAY_SIZE(s3c64xx_gpios_4bit2));
+-	} else {
+-		WARN(1, "Unknown SoC in gpio-samsung, no GPIOs added\n");
+-		return -ENODEV;
  	}
--
- 	info->irq = irq;
-+
-+	irq = platform_get_irq(pdev, 1);
-+	if (irq == -EPROBE_DEFER)
-+		return irq;
-+
-+	info->tsirq = irq;
-+
- 	info->dev = &pdev->dev;
  
- 	init_completion(&info->completion);
-@@ -680,6 +865,22 @@ static int exynos_adc_probe(struct platform_device *pdev)
- 	if (info->data->init_hw)
- 		info->data->init_hw(info);
+ 	return 0;
+diff --git a/arch/arm/plat-samsung/init.c b/arch/arm/plat-samsung/init.c
+index 11fbbc26e49f..3776f7e752f0 100644
+--- a/arch/arm/plat-samsung/init.c
++++ b/arch/arm/plat-samsung/init.c
+@@ -152,6 +152,11 @@ static int __init s3c_arch_init(void)
+ {
+ 	int ret;
  
-+	/* leave out any TS related code if unreachable */
-+	if (IS_REACHABLE(CONFIG_INPUT)) {
-+		has_ts = of_property_read_bool(pdev->dev.of_node,
-+					       "has-touchscreen") || pdata;
-+	}
++	/* init is only needed for ATAGS based platforms */
++	if (!IS_ENABLED(CONFIG_ATAGS) ||
++	    (!soc_is_s3c24xx() && !soc_is_s3c64xx()))
++		return 0;
 +
-+	if (pdata)
-+		info->delay = pdata->delay;
-+	else
-+		info->delay = 10000;
-+
-+	if (has_ts)
-+		ret = exynos_adc_ts_init(info);
-+	if (ret)
-+		goto err_iio;
-+
- 	ret = of_platform_populate(np, exynos_adc_match, NULL, &indio_dev->dev);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "failed adding child nodes\n");
-@@ -691,6 +892,11 @@ static int exynos_adc_probe(struct platform_device *pdev)
- err_of_populate:
- 	device_for_each_child(&indio_dev->dev, NULL,
- 				exynos_adc_remove_devices);
-+	if (has_ts) {
-+		input_unregister_device(info->input);
-+		free_irq(info->tsirq, info);
-+	}
-+err_iio:
- 	iio_device_unregister(indio_dev);
- err_irq:
- 	free_irq(info->irq, info);
-@@ -710,6 +916,10 @@ static int exynos_adc_remove(struct platform_device *pdev)
- 	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
- 	struct exynos_adc *info = iio_priv(indio_dev);
+ 	// do the correct init for cpu
  
-+	if (IS_REACHABLE(CONFIG_INPUT)) {
-+		free_irq(info->tsirq, info);
-+		input_unregister_device(info->input);
-+	}
- 	device_for_each_child(&indio_dev->dev, NULL,
- 				exynos_adc_remove_devices);
- 	iio_device_unregister(indio_dev);
+ 	if (cpu == NULL) {
 -- 
 2.1.0.rc2
