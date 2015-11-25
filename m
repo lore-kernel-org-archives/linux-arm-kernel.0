@@ -1,58 +1,48 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 25 Nov 2015 19:25:02 +0100
-Subject: [PATCH 03/13] net: mvneta: fix bit assignment in
- MVNETA_RXQ_CONFIG_REG
-In-Reply-To: <1448178839-3541-4-git-send-email-mw@semihalf.com> (Marcin
- Wojtas's message of "Sun, 22 Nov 2015 08:53:49 +0100")
-References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
- <1448178839-3541-4-git-send-email-mw@semihalf.com>
-Message-ID: <87oaei7x8h.fsf@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 25 Nov 2015 10:26:57 -0800
+Subject: [PATCH v4 0/3] ARM: OMAP2+ McASP(3) support for DRA7xx family
+In-Reply-To: <565413EF.2040003@ti.com>
+References: <1447313579-23873-1-git-send-email-peter.ujfalusi@ti.com>
+ <20151112180027.GP3218@atomide.com> <565413EF.2040003@ti.com>
+Message-ID: <20151125182657.GK2517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
- 
- On dim., nov. 22 2015, Marcin Wojtas <mw@semihalf.com> wrote:
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [151123 23:39]:
+> Tony,
+> 
+> On 11/12/2015 08:00 PM, Tony Lindgren wrote:
+> > * Peter Ujfalusi <peter.ujfalusi@ti.com> [151111 23:33]:
+> >> Hi Tony,
+> >>
+> >> Changes since v3:
+> >> - rebased on mainline's HEAD
+> >> - Added Tested-by from Felipe
+> >> - Added Acked-by from Paul for the hwmod patches
+> >>
+> >> Changes since v2:
+> >> - DTS patch added which is needed because of the clock handling changes
+> >>
+> >> Felip Balbi reported that linux-next is broken right now since the DTS part of
+> >> the earlier series has been applied, but we do not have the mcasp hwmod in the
+> >> kernel:
+> >> ...
+> >> [    0.181029] platform 48468000.mcasp: Cannot lookup hwmod 'mcasp3'
+> >> ...
+> >> [    6.121072] davinci-mcasp 48468000.mcasp: _od_fail_runtime_resume: FIXME: missing hwmod/omap_dev info
+> >> [    6.130790] ------------[ cut here ]------------
+> >> [    6.135643] WARNING: CPU: 0 PID: 244 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x220/0x34c()
+> >> [    6.145576] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4_PER2_P3 (Read): Data Access in User mode during Functional access
+> > 
+> > 
+> > Thanks applying all three into omap-for-v4.4/fixes.
+> 
+> Do you know when these patches are going to be merged to mainline? 4.4-rc2 is
+> out, but it does not include them.
 
-> MVNETA_RXQ_HW_BUF_ALLOC bit which controls enabling hardware buffer
-> allocation was mistakenly set as BIT(1). This commit fixes the
-> assignment.
+Sorry for the delays, hoping to send out the fixes today or Friday after
+scanning emails one more time for more fixes.
 
-I confirm it from the datasheet I got:
+Regards,
 
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Thanks,
-
-Gregory
-
-
->
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-> Cc: <stable@vger.kernel.org> # v3.8+
-> ---
->  drivers/net/ethernet/marvell/mvneta.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index 0f30aaa..d12b8c6 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> @@ -36,7 +36,7 @@
->  
->  /* Registers */
->  #define MVNETA_RXQ_CONFIG_REG(q)                (0x1400 + ((q) << 2))
-> -#define      MVNETA_RXQ_HW_BUF_ALLOC            BIT(1)
-> +#define      MVNETA_RXQ_HW_BUF_ALLOC            BIT(0)
->  #define      MVNETA_RXQ_PKT_OFFSET_ALL_MASK     (0xf    << 8)
->  #define      MVNETA_RXQ_PKT_OFFSET_MASK(offs)   ((offs) << 8)
->  #define MVNETA_RXQ_THRESHOLD_REG(q)             (0x14c0 + ((q) << 2))
-> -- 
-> 1.8.3.1
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Tony
