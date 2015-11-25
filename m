@@ -1,55 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Nov 2015 19:29:24 +0000
-Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
-In-Reply-To: <20151125191600.GM11384@lunn.ch>
-References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
- <20151125160937.GJ14338@lunn.ch>
- <20151125183728.GO8644@n2100.arm.linux.org.uk>
- <20151125191600.GM11384@lunn.ch>
-Message-ID: <20151125192924.GQ8644@n2100.arm.linux.org.uk>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 25 Nov 2015 13:32:01 -0600
+Subject: [PATCH] ARM/PCI: move align_resource function pointer into
+ pci_host_bridge structure
+In-Reply-To: <1447204345-143793-1-git-send-email-gabriele.paoloni@huawei.com>
+References: <1447204345-143793-1-git-send-email-gabriele.paoloni@huawei.com>
+Message-ID: <20151125193201.GE8869@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 08:16:00PM +0100, Andrew Lunn wrote:
-> > It feels today like I'm the only one working on improving Dove support,
-> > and so it's going to take a _long_ time to move things forward - it's
-> > likely to take years.  I have many demands on my time and I have to
-> > divide it up between the various aspects.
+On Wed, Nov 11, 2015 at 09:12:25AM +0800, Gabriele Paoloni wrote:
+> From: gabpao01 <gabriele.paoloni@huawei.com>
 > 
-> Hi Russell
+> commit b3a72384fe29 ("ARM/PCI: Replace
+> pci_sys_data->align_resource with global function pointer") has
+> introduced a global function pointer that makes the ARM specific
+> code not portable and broken in case any platform have a two
+> different HW IPs for the PCIe host bridge controller.
+> This patch moves align_resource function pointer into
+> pci_host_bridge structure so that the code is now suitable to be
+> reworked as we want to get rid of hw_pci structure (the host bridge
+> drivers can just set the align function pointer in the
+> pci_host_bridge structure) and there is no more broken code for a
+> SoC with two HW IPs.
 > 
-> The problem from our side is the apparent lack of progress. We get so
-> very few patches we wounder why we should keep it around. If there was
-> even a steady trick of patches, we would feel better about keeping it.
+> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
 
-You may think there's lack of progress, but I can tell you that there's
-lots of progress on etnaviv right now.  Since 1st November, I've
-authored 100 MESA patches, 81 of those merged into Christians repository.
-I've also been sorting out issues with the kernel side driver, which
-now supports cross-GPU synchronisation, necessary for iMX6, and a
-necessary step towards getting the kernel driver merged into mainline.
+This looks good to me.  I merged b3a72384fe29 so maybe it would make
+sense for me to merge this follow-up as well.  I put it on my
+for-linus branch for v4.4.
 
-As I already explained, there is only one of me.  I can only do so much,
-and I tend to focus on one part of the broad problem to the exclusion of
-other parts - I find chopping and changing all the time to be a much
-less efficient way of working.
+If you'd rather merge it via an ARM tree, here's my ack:
 
-Others may be able to do a little bit here, a little bit there, but I'm
-not like that, sorry.
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
-I won't be able to even start thinking about looking at this stuff until
-next week - Arnd wants me to look at some patches he's sent out today,
-which I might be able to do tomorrow afternoon at the very earliest,
-and I'm probably not around on Friday.
+If you want me to merge it, an ARM ack would be nice.  If you want to
+merge it, let me know and I'll drop it from my tree.
 
-See - I'm only one person, I don't have time to be able to progress
-lots of non-paying work at a fast rate.
+> +	/* Resource alignement requirements     */
 
-You'll have to wait, just like I've had to wait to get my own patches
-for other stuff in, just like I have to wait for progress in other
-projects.  Sorry, but waiting and patience is all part of open source
-development, especially when it relies upon volunteer effort.
+s/alignement/alignment/
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> +	resource_size_t (*align_resource)(struct pci_dev *dev,
+> ...
