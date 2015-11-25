@@ -1,52 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 25 Nov 2015 12:06:01 +0000
-Subject: [PATCH v3 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
-In-Reply-To: <56536114.1020305@android.com>
-References: <1447888808-31571-1-git-send-email-dcashman@android.com>
- <1447888808-31571-2-git-send-email-dcashman@android.com>
- <1447888808-31571-3-git-send-email-dcashman@android.com>
- <1447888808-31571-4-git-send-email-dcashman@android.com>
- <20151123150459.GD4236@arm.com> <56536114.1020305@android.com>
-Message-ID: <20151125120601.GC3109@e104818-lin.cambridge.arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 25 Nov 2015 09:11:23 -0300
+Subject: [PATCH] ARM: dts: Remove unneeded GPIO include in exynos4412-odroidu3
+Message-ID: <1448453483-3338-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2015 at 10:55:16AM -0800, Daniel Cashman wrote:
-> On 11/23/2015 07:04 AM, Will Deacon wrote:
-> > On Wed, Nov 18, 2015 at 03:20:07PM -0800, Daniel Cashman wrote:
-> >> +config ARCH_MMAP_RND_BITS_MAX
-> >> +       default 20 if ARM64_64K_PAGES && ARCH_VA_BITS=39
+The <dt-bindings/gpio/gpio.h> header is already included in the
+exynos4412-odroid-common DTSI so there's no need to do it again
+in the DTS file.
 
-Where is ARCH_VA_BITS defined? We only have options like
-ARM64_VA_BITS_39.
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-BTW, we no longer allow the 64K pages and 39-bit VA combination.
+---
 
-> >> +       default 24 if ARCH_VA_BITS=39
-> >> +       default 23 if ARM64_64K_PAGES && ARCH_VA_BITS=42
-> >> +       default 27 if ARCH_VA_BITS=42
-> >> +       default 29 if ARM64_64K_PAGES && ARCH_VA_BITS=48
-> >> +       default 33 if ARCH_VA_BITS=48
-> >> +       default 15 if ARM64_64K_PAGES
-> >> +       default 19
-> >> +
-> >> +config ARCH_MMAP_RND_COMPAT_BITS_MIN
-> >> +       default 7 if ARM64_64K_PAGES
-> >> +       default 11
-> > 
-> > FYI: we now support 16k pages too, so this might need updating. It would
-> > be much nicer if this was somehow computed rather than have the results
-> > all open-coded like this.
-> 
-> Yes, I ideally wanted this to be calculated based on the different page
-> options and VA_BITS (which itself has a similar stanza), but I don't
-> know how to do that/if it is currently supported in Kconfig. This would
-> be even more desirable with the addition of 16K_PAGES, as with this
-> setup we have a combinatorial problem.
+ arch/arm/boot/dts/exynos4412-odroidu3.dts | 1 -
+ 1 file changed, 1 deletion(-)
 
-For KASan, we ended up calculating KASAN_SHADOW_OFFSET in
-arch/arm64/Makefile. What would the formula be for the above
-ARCH_MMAP_RND_BITS_MAX?
-
+diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+index 646ff0bd001a..dd89f7b37c9f 100644
+--- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
++++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+@@ -13,7 +13,6 @@
+ 
+ /dts-v1/;
+ #include "exynos4412-odroid-common.dtsi"
+-#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	model = "Hardkernel ODROID-U3 board based on Exynos4412";
 -- 
-Catalin
+2.4.3
