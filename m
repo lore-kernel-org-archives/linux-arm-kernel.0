@@ -1,62 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 25 Nov 2015 18:08:45 +0000
-Subject: [PATCH] arm64: mm: Prevent the initial page table setup from
- creating larger blocks
-In-Reply-To: <5655E274.80103@arm.com>
-References: <1448387338-27851-1-git-send-email-catalin.marinas@arm.com>
- <5655E274.80103@arm.com>
-Message-ID: <20151125180843.GG3109@e104818-lin.cambridge.arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 25 Nov 2015 13:09:09 -0500 (EST)
+Subject: [PATCH] arm64: restore bogomips information in /proc/cpuinfo
+In-Reply-To: <5655F09E.1060004@linaro.org>
+References: <1447870505-19319-1-git-send-email-yang.shi@linaro.org>
+ <56554AE9.5070901@jonmasters.org>
+ <alpine.LFD.2.20.1511250958370.22569@knanqh.ubzr>
+ <5655F09E.1060004@linaro.org>
+Message-ID: <alpine.LFD.2.20.1511251303220.22569@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 10:31:48AM -0600, Jeremy Linton wrote:
-> On 11/24/2015 11:48 AM, Catalin Marinas wrote:
-> >While the ARM ARM is not entirely clear, over the years we have assumed
-> >that we can split a large block entry (pmd/pud) into smaller blocks
-> >pointing to the same physical address with little risk of a TLB
-> >conflict. However, remapping a smaller blocks range as a large one (e.g.
-> >from page to sections or to contiguous pages) implies a high risk of TLB
-> >conflict. Excessive TLB flushing would make the window smaller but it
-> >would not remove the issue.
+On Wed, 25 Nov 2015, Shi, Yang wrote:
+
+> On 11/25/2015 7:16 AM, Nicolas Pitre wrote:
+> > On Wed, 25 Nov 2015, Jon Masters wrote:
+> >
+> > > On 11/18/15, 1:15 PM, Yang Shi wrote:
+> > >
+> > > > As what Pavel Machek reported [1], some userspace applications depend on
+> > > > bogomips showed by /proc/cpuinfo.
+> > > >
+> > > > Although there is much less legacy impact on aarch64 than arm, but it
+> > > > does
+> > > > break libvirt.
+> > > >
+> > > > Basically, this patch reverts commit
+> > > > 326b16db9f69fd0d279be873c6c00f88c0a4aad5
+> > > > ("arm64: delay: don't bother reporting bogomips in /proc/cpuinfo"), but
+> > > > with
+> > > > some tweak due to context change.
+> > >
+> > > On a total tangent, it would be ideal to (eventually) have something
+> > > reported
+> > > in /proc/cpuinfo or dmesg during boot that does "accurately" map back to
+> > > the
+> > > underlying core frequency (as opposed to the generic timer frequency). I
+> > > have
+> > > seen almost countless silly situations in the industry (external to my own
+> > > organization) in which someone has taken a $VENDOR_X reference system that
+> > > they're not supposed to run benchmarks on, and they've done it anyway. But
+> > > usually on some silicon that's clocked multiples under what production
+> > > would
+> > > be. Then silly rumors about performance get around because nobody can do
+> > > simple arithmetic and notice that they ought to have at least divided by
+> > > some
+> > > factor.
+> >
+> > Be my guest my friend.
+> >
+> > According to the common wisdom, the bogomips reporting is completely
+> > senseless at this point and no one should expect anything useful from
+> > it. Therefore I attempted to rehabilitate some meaning into it given
+> > that we just can't get rid of it either and it continues to cause
+> > dammage. You certainly saw where that has led me.
 > 
-> 	Is a requirement of this assumption, that the kernel isn't running on a
-> VM'ed host with small page mappings? AKA the hypervisor is providing smaller
-> page sizes than guest linear mapping?
+> Or we may create a new one, i.e. "cpu MHz" like x86? Then we keep both in
+> cpuinfo so that the userspace could adopt it gradually?
 
-The assumption is not even endorsed by the ARM ARM, so it can probably
-be further messed by stage 2.
+The problem is that CPU MHz is not known/discoverable on all platforms.  
+The initial spirit behind bogomips was close to CPU clock with rough 
+precision that could be determined at run time.
 
-> 	Because I can understand the idea that the CPU won't walk PTEs for entries
-> it has a larger translation for, but my understanding of how the TLB's are
-> fragmented when the host has a smaller page size means that its potentially
-> possible to have multiple TLB entries for different parts of a single
-> cont/block range....
+But CPU MHz, when available, has the merit of not being open to 
+interpretation.
 
-Another random assumption is that the TLB entry for a full VA->PA
-translation covers the minimum block size between stage 1 and stage 2
-(so even smaller block sizes are allowed). We risk a TLB conflict if we
-switch from a smaller to a bigger block TLB entry, so under this
-assumption I don't see it happening.
 
-Anyway, too many assumptions. The proper fix is break-before-make (when
-possible, though not for the kernel linear mapping) or switch to a
-temporary TTBR but that's not feasible for 4.4. In the meantime, we have
-two options:
-
-1. Avoid creating contiguous PTEs since they have shown such TLB
-   conflict behaviour (it doesn't mean it's only this to blame)
-
-2. Add a TLB flush in __populate_init_pte() and hope that we will reduce
-   the potential TLB conflict window (as we do for pmd/pud)
-
-Point 2 is not really a fix and it requires more testing on different
-platforms. With this patch, I tried a partial solution for point 1. If
-we deem this unsafe, I would rather revert the page table setup to what
-we had before 4.4 and re-enable the feature in 4.5 together with the
-complete fix. AFAICT, we haven't seen any failures prior to 4.4 in this
-area (though they could as well be silent). Unfortunately, this means
-reverting some of your patches (not all though and the good thing is
-that you can merge them again in 4.5 ;)).
-
--- 
-Catalin
+Nicolas
