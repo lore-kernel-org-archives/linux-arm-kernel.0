@@ -1,38 +1,22 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Wed, 25 Nov 2015 20:13:23 +0800
-Subject: [PATCH] pinctrl: update document for pinconf_generic_parse_dt_config
-Message-ID: <1448453603-38980-1-git-send-email-yingjoe.chen@mediatek.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 25 Nov 2015 12:14:50 +0000
+Subject: [PATCH] arm64: early_alloc: Fix check for allocation failure
+In-Reply-To: <1448041540-26229-1-git-send-email-suzuki.poulose@arm.com>
+References: <1448041540-26229-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20151125121450.GD3109@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The returned configs from pinconf_generic_parse_dt_config() is
-duplicated from original. Make it clear it must be freed when no
-longer necessary.
+On Fri, Nov 20, 2015 at 05:45:40PM +0000, Suzuki K. Poulose wrote:
+> In early_alloc we check if the memblock_alloc failed by checking
+> the virtual address of the result, which will never fail. This patch
+> fixes it to check the actual result for failure.
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 
-Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
----
-It seems memleak in pinctrl-mtk-common.c[1] is not alone. After a quick
-glance I notice similar issues in drivers/pinctrl/pinctrl-at91-pio4.c and
-drivers/pinctrl/nomadik/pinctrl-abx500.c.
+Applied. Thanks.
 
-I think it make sense to update document to make it clear it should be freed.
-
-[1] http://lists.infradead.org/pipermail/linux-mediatek/2015-November/002967.html
----
- drivers/pinctrl/pinconf-generic.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/pinctrl/pinconf-generic.c b/drivers/pinctrl/pinconf-generic.c
-index 099a344..79e6159 100644
---- a/drivers/pinctrl/pinconf-generic.c
-+++ b/drivers/pinctrl/pinconf-generic.c
-@@ -220,6 +220,7 @@ static void parse_dt_cfg(struct device_node *np,
-  * parse the config properties into generic pinconfig values.
-  * @np: node containing the pinconfig properties
-  * @configs: array with nconfigs entries containing the generic pinconf values
-+ *           must be freed when no longer necessary.
-  * @nconfigs: umber of configurations
-  */
- int pinconf_generic_parse_dt_config(struct device_node *np,
 -- 
-1.9.1
+Catalin
