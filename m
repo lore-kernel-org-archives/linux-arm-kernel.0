@@ -1,28 +1,38 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 25 Nov 2015 09:12:59 -0300
-Subject: [PATCH] ARM: exynos_defconfig: Enable NFSv4 client
-In-Reply-To: <1448424815-30192-1-git-send-email-k.kozlowski@samsung.com>
-References: <1448424815-30192-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <5655A5CB.6060106@osg.samsung.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Wed, 25 Nov 2015 20:13:23 +0800
+Subject: [PATCH] pinctrl: update document for pinconf_generic_parse_dt_config
+Message-ID: <1448453603-38980-1-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+The returned configs from pinconf_generic_parse_dt_config() is
+duplicated from original. Make it clear it must be freed when no
+longer necessary.
 
-On 11/25/2015 01:13 AM, Krzysztof Kozlowski wrote:
-> NFS client is already enabled (NFS_FS) and by default it enables clients
-> for version 2 and 3. Enable explicitly the version 4 client to utilize
-> the newer protocol.
-> 
-> The NFS client is especially useful for testing kernel in automated
-> environments (network boot with network file system).
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+---
+It seems memleak in pinctrl-mtk-common.c[1] is not alone. After a quick
+glance I notice similar issues in drivers/pinctrl/pinctrl-at91-pio4.c and
+drivers/pinctrl/nomadik/pinctrl-abx500.c.
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+I think it make sense to update document to make it clear it should be freed.
 
-Best regards,
---- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+[1] http://lists.infradead.org/pipermail/linux-mediatek/2015-November/002967.html
+---
+ drivers/pinctrl/pinconf-generic.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/pinctrl/pinconf-generic.c b/drivers/pinctrl/pinconf-generic.c
+index 099a344..79e6159 100644
+--- a/drivers/pinctrl/pinconf-generic.c
++++ b/drivers/pinctrl/pinconf-generic.c
+@@ -220,6 +220,7 @@ static void parse_dt_cfg(struct device_node *np,
+  * parse the config properties into generic pinconfig values.
+  * @np: node containing the pinconfig properties
+  * @configs: array with nconfigs entries containing the generic pinconf values
++ *           must be freed when no longer necessary.
+  * @nconfigs: umber of configurations
+  */
+ int pinconf_generic_parse_dt_config(struct device_node *np,
+-- 
+1.9.1
