@@ -1,46 +1,52 @@
-From: geliangtang@163.com (Geliang Tang)
-Date: Wed, 25 Nov 2015 21:12:19 +0800
-Subject: [PATCH 6/7] ARM: davinci: fix a problematic usage of WARN()
-In-Reply-To: <86c73f180d3054c1bf17bdac8c89026209167c9b.1448456395.git.geliangtang@163.com>
-References: <86c73f180d3054c1bf17bdac8c89026209167c9b.1448456395.git.geliangtang@163.com>
-Message-ID: <06d69890c56bd84a831a1dccee26e34b4988a241.1448456395.git.geliangtang@163.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 25 Nov 2015 14:34:46 +0100
+Subject: [PATCH 1/2] drivers: amba: properly handle devices with power
+ domains
+In-Reply-To: <20151125132458.GL8644@n2100.arm.linux.org.uk>
+References: <1448456127-31842-1-git-send-email-m.szyprowski@samsung.com>
+ <1448456289-31960-1-git-send-email-m.szyprowski@samsung.com>
+ <20151125132458.GL8644@n2100.arm.linux.org.uk>
+Message-ID: <5655B8F6.1070104@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WARN() takes a condition and a format string. The condition was
-omitted. So I added it.
+Hello,
 
-Signed-off-by: Geliang Tang <geliangtang@163.com>
----
- arch/arm/mach-davinci/board-dm355-evm.c     | 2 +-
- arch/arm/mach-davinci/board-dm355-leopard.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+On 2015-11-25 14:24, Russell King - ARM Linux wrote:
+> On Wed, Nov 25, 2015 at 01:58:09PM +0100, Marek Szyprowski wrote:
+>> To read pid/cid registers, the probed device need to be properly turned on.
+>> When it is inside a power domain, the bus code should ensure that the
+>> given power domain is enabled before trying to access device's registers.
+>>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>>   drivers/amba/bus.c | 7 +++++++
+>>   1 file changed, 7 insertions(+)
+>>
+>> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+>> index f009936..25715cb 100644
+>> --- a/drivers/amba/bus.c
+>> +++ b/drivers/amba/bus.c
+>> @@ -373,6 +373,12 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
+>>   		goto err_release;
+>>   	}
+>>   
+>> +	ret = dev_pm_domain_attach(&dev->dev, true);
+>> +	if (ret) {
+>> +		iounmap(tmp);
+>> +		goto err_release;
+>> +	}
+>> +
+> NAK.  If dev_pm_domain_attach() returns an error, even -EPROBE_DEFER,
+> the result will be a missing device that has no way to be recovered.
+> This is too fragile.
 
-diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
-index c71dd99..e47f24c 100644
---- a/arch/arm/mach-davinci/board-dm355-evm.c
-+++ b/arch/arm/mach-davinci/board-dm355-evm.c
-@@ -385,7 +385,7 @@ static __init void dm355_evm_init(void)
- 
- 	aemif = clk_get(&dm355evm_dm9000.dev, "aemif");
- 	if (IS_ERR(aemif))
--		WARN("%s: unable to get AEMIF clock\n", __func__);
-+		WARN(1, "%s: unable to get AEMIF clock\n", __func__);
- 	else
- 		clk_prepare_enable(aemif);
- 
-diff --git a/arch/arm/mach-davinci/board-dm355-leopard.c b/arch/arm/mach-davinci/board-dm355-leopard.c
-index 680a7a2..83b625c 100644
---- a/arch/arm/mach-davinci/board-dm355-leopard.c
-+++ b/arch/arm/mach-davinci/board-dm355-leopard.c
-@@ -243,7 +243,7 @@ static __init void dm355_leopard_init(void)
- 
- 	aemif = clk_get(&dm355leopard_dm9000.dev, "aemif");
- 	if (IS_ERR(aemif))
--		WARN("%s: unable to get AEMIF clock\n", __func__);
-+		WARN(1, "%s: unable to get AEMIF clock\n", __func__);
- 	else
- 		clk_prepare_enable(aemif);
- 
+Then how the problem of accessing registers in turned-off device should 
+be solved?
+
+Is ignoring dev_pm_domain_attach() return value a solution for you?
+
+Best regards
 -- 
-2.5.0
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
