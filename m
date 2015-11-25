@@ -1,35 +1,32 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 25 Nov 2015 17:16:16 +0100
-Subject: Building an uImage with appended DTB
-Message-ID: <5655DED0.5000601@free.fr>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Wed, 25 Nov 2015 08:17:36 -0800
+Subject: KASAN failures in X-Gene ethernet driver in v4.4-rc2
+In-Reply-To: <20151125155753.GE12434@leverpostej>
+References: <20151125155753.GE12434@leverpostej>
+Message-ID: <1448468256.24696.5.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, 2015-11-25 at 15:59 +0000, Mark Rutland wrote:
+> xgene_enet_start_xmit
 
-Per Russell's advice (IIRC) I have a script to generate a uImage
-of a kernel with an appended DTB:
+Please try following trivial fix
 
-export LOADADDR=0x80008000
-MAKE="make -j2 ARCH=arm"
-$MAKE dtbs zImage && \
-cat arch/arm/boot/zImage arch/arm/boot/dts/tango4-vantage-1172.dtb >zImage.tmp && \
-mv zImage.tmp arch/arm/boot/zImage && \
-$MAKE uImage
-
-Russell's version uses an explicit mkimage instead of "MAKE uImage"
-perhaps in part to get around the following limitation:
-
-if there is nothing to be done, cat+mv will update arch/arm/boot/zImage
-thus the uImage will be rebuilt even when it's not necessary.
-
-Doesn't the top-level Makefile support a target to build a uImage
-with appended DTB?
-
-(I suppose someone has submitted a patch for that. Was it perhaps
-never merged? Or did I just miss the feature?)
-
-Something like this:
-https://patchwork.kernel.org/patch/1133461/
-
-Regards.
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+index 1adfe7036843..9147a0107c44 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+@@ -450,12 +450,12 @@ static netdev_tx_t xgene_enet_start_xmit(struct sk_buff *skb,
+ 		return NETDEV_TX_OK;
+ 	}
+ 
+-	pdata->ring_ops->wr_cmd(tx_ring, count);
+ 	skb_tx_timestamp(skb);
+ 
+ 	pdata->stats.tx_packets++;
+ 	pdata->stats.tx_bytes += skb->len;
+ 
++	pdata->ring_ops->wr_cmd(tx_ring, count);
+ 	return NETDEV_TX_OK;
+ }
+ 
