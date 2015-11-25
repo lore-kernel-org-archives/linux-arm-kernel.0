@@ -1,32 +1,28 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 25 Nov 2015 09:11:23 -0300
-Subject: [PATCH] ARM: dts: Remove unneeded GPIO include in exynos4412-odroidu3
-Message-ID: <1448453483-3338-1-git-send-email-javier@osg.samsung.com>
+Date: Wed, 25 Nov 2015 09:12:59 -0300
+Subject: [PATCH] ARM: exynos_defconfig: Enable NFSv4 client
+In-Reply-To: <1448424815-30192-1-git-send-email-k.kozlowski@samsung.com>
+References: <1448424815-30192-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <5655A5CB.6060106@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The <dt-bindings/gpio/gpio.h> header is already included in the
-exynos4412-odroid-common DTSI so there's no need to do it again
-in the DTS file.
+Hello Krzysztof,
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+On 11/25/2015 01:13 AM, Krzysztof Kozlowski wrote:
+> NFS client is already enabled (NFS_FS) and by default it enables clients
+> for version 2 and 3. Enable explicitly the version 4 client to utilize
+> the newer protocol.
+> 
+> The NFS client is especially useful for testing kernel in automated
+> environments (network boot with network file system).
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
----
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
- arch/arm/boot/dts/exynos4412-odroidu3.dts | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-index 646ff0bd001a..dd89f7b37c9f 100644
---- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
-+++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-@@ -13,7 +13,6 @@
- 
- /dts-v1/;
- #include "exynos4412-odroid-common.dtsi"
--#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "Hardkernel ODROID-U3 board based on Exynos4412";
--- 
-2.4.3
+Best regards,
+--- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
