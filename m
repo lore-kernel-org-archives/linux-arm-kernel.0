@@ -1,51 +1,155 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 25 Nov 2015 18:08:04 +0100
-Subject: [PATCH net-next 3/3] net: mvneta: Add naive RSS support
-In-Reply-To: <20151125175522.0e8dd8b8@free-electrons.com> (Thomas Petazzoni's
- message of "Wed, 25 Nov 2015 17:55:22 +0100")
-References: <1448463243-21057-1-git-send-email-gregory.clement@free-electrons.com>
- <1448463243-21057-4-git-send-email-gregory.clement@free-electrons.com>
- <20151125175522.0e8dd8b8@free-electrons.com>
-Message-ID: <871tbe9fd7.fsf@free-electrons.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 25 Nov 2015 20:12:29 +0300
+Subject: [question] kernel build fails with O0 gcc optimization flag
+Message-ID: <20151125171229.GA8415@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On mer., nov. 25 2015, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+Hi all.
 
-> Gregory,
->
-> On Wed, 25 Nov 2015 15:54:03 +0100, Gregory CLEMENT wrote:
->
->>  	pp->rxq_def = rxq_def;
->>  
->> +	pp->indir[0] = rxq_def;
->
-> So now we have the RX queue in both pp->rxq_def and pp->indir[0] ? Is
-> this really useful ?
+I changed optimization from O2 to O0 in Makefile:
+        609 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
+        610 KBUILD_CFLAGS   += -Os $(call cc-disable-warning,maybe-uninitialized,)
+        611 else
+        612 KBUILD_CFLAGS   += -O2 <-- here
+        613 endif
 
-Currently pp->rxq_def and pp->indir are the same but only because there
-is one entry in the indirection table. When the 256 entries will be used
-then there won't be the same. But we will still need the rxq_def as the
-mvneta IP need a reference to a default RX queue even for example for
-MVNETA_PORT_CONFIG_DEFL_VALUE.
+And broke the build. O1 looks fine.
 
->
-> Also, if the RX queue becomes a per-port definition, why do you keep
-> the global rxq_def variable ?
+I tried Ubuntu and Cavium GCC:
+        gcc version 5.2.1 20151010 (Ubuntu 5.2.1-22ubuntu1) 
+        gcc version 5.2.0 (Cavium Development Version) 
 
-The global rxq_def variable is used for the module parameter. Even if
-we can change it latter, it is still good to be able to set the default
-value, however the parameter is set at module level not at port level,
-that why we still need this variable.
+Kernel is v4.3, defconfig, ARCH=arm64.
 
-Thanks,
+What am I doing wrong?
 
-Gregory
+BR,
+Yury.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+[...]
+  CC      arch/arm64/kernel/debug-monitors.o
+In file included from include/linux/ioport.h:12:0,
+                 from include/linux/device.h:16,
+                 from include/linux/node.h:17,
+                 from include/linux/cpu.h:16,
+                 from arch/arm64/kernel/debug-monitors.c:21:
+In function ?__percpu_add?,
+    inlined from ?enable_debug_monitors? at arch/arm64/kernel/debug-monitors.c:91:6:
+include/linux/compiler.h:492:38: error: call to ?__compiletime_assert_97? declared with attribute error: BUILD_BUG failed
+  _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+                                      ^
+include/linux/compiler.h:475:4: note: in definition of macro ?__compiletime_assert? prefix ## suffix();    \
+    ^
+include/linux/compiler.h:492:2: note: in expansion of macro ?_compiletime_assert?
+  _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+  ^
+include/linux/bug.h:50:37: note: in expansion of macro ?compiletime_assert?
+ #define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
+                                     ^
+include/linux/bug.h:84:21: note: in expansion of macro ?BUILD_BUG_ON_MSG?
+ #define BUILD_BUG() BUILD_BUG_ON_MSG(1, "BUILD_BUG failed")
+                     ^
+./arch/arm64/include/asm/percpu.h:91:3: note: in expansion of macro ?BUILD_BUG?
+   BUILD_BUG();      \
+   ^
+./arch/arm64/include/asm/percpu.h:97:1: note: in expansion of macro ?PERCPU_OP?
+ PERCPU_OP(add, add)
+ ^
+In function ?__percpu_add?,
+    inlined from ?enable_debug_monitors? at arch/arm64/kernel/debug-monitors.c:95:6:
+include/linux/compiler.h:492:38: error: call to ?__compiletime_assert_97? declared with attribute error: BUILD_BUG failed
+  _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+                                      ^
+include/linux/compiler.h:475:4: note: in definition of macro ?__compiletime_assert?
+    prefix ## suffix();    \
+    ^
+include/linux/compiler.h:492:2: note: in expansion of macro ?_compiletime_assert?
+  _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+  ^
+include/linux/bug.h:50:37: note: in expansion of macro ?compiletime_assert?
+ #define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
+                                     ^
+include/linux/bug.h:84:21: note: in expansion of macro ?BUILD_BUG_ON_MSG?
+ #define BUILD_BUG() BUILD_BUG_ON_MSG(1, "BUILD_BUG failed")
+                     ^
+./arch/arm64/include/asm/percpu.h:91:3: note: in expansion of macro ?BUILD_BUG?
+   BUILD_BUG();      \
+   ^
+./arch/arm64/include/asm/percpu.h:97:1: note: in expansion of macro ?PERCPU_OP?
+ PERCPU_OP(add, add)
+ ^
+In function ?__percpu_add?,
+    inlined from ?disable_debug_monitors? at arch/arm64/kernel/debug-monitors.c:111:6:
+include/linux/compiler.h:492:38: error: call to ?__compiletime_assert_97? declared with attribute error: BUILD_BUG failed
+  _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+                                      ^
+include/linux/compiler.h:475:4: note: in definition of macro ?__compiletime_assert?
+    prefix ## suffix();    \
+    ^
+include/linux/compiler.h:492:2: note: in expansion of macro ?_compiletime_assert?
+  _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+  ^
+include/linux/bug.h:50:37: note: in expansion of macro ?compiletime_assert?
+ #define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
+                                     ^
+include/linux/bug.h:84:21: note: in expansion of macro ?BUILD_BUG_ON_MSG?
+ #define BUILD_BUG() BUILD_BUG_ON_MSG(1, "BUILD_BUG failed")
+                     ^
+./arch/arm64/include/asm/percpu.h:91:3: note: in expansion of macro ?BUILD_BUG?
+   BUILD_BUG();      \
+   ^
+./arch/arm64/include/asm/percpu.h:97:1: note: in expansion of macro ?PERCPU_OP?
+ PERCPU_OP(add, add)
+ ^
+In function ?__percpu_add?,
+    inlined from ?disable_debug_monitors? at arch/arm64/kernel/debug-monitors.c:115:6:
+include/linux/compiler.h:492:38: error: call to ?__compiletime_assert_97? declared with attribute error: BUILD_BUG failed
+  _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+                                      ^
+include/linux/compiler.h:475:4: note: in definition of macro ?__compiletime_assert?
+    prefix ## suffix();    \
+    ^
+include/linux/compiler.h:492:2: note: in expansion of macro ?_compiletime_assert?
+  _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+  ^
+include/linux/bug.h:50:37: note: in expansion of macro ?compiletime_assert?
+ #define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
+                                     ^
+include/linux/bug.h:84:21: note: in expansion of macro ?BUILD_BUG_ON_MSG?
+ #define BUILD_BUG() BUILD_BUG_ON_MSG(1, "BUILD_BUG failed")
+                     ^
+./arch/arm64/include/asm/percpu.h:91:3: note: in expansion of macro ?BUILD_BUG?
+   BUILD_BUG();      \
+   ^
+./arch/arm64/include/asm/percpu.h:97:1: note: in expansion of macro ?PERCPU_OP?
+ PERCPU_OP(add, add)
+ ^
+In function ?__list_add_rcu?,
+    inlined from ?list_add_rcu? at include/linux/rculist.h:80:2,
+    inlined from ?register_break_hook?@arch/arm64/kernel/debug-monitors.c:279:2:
+include/linux/compiler.h:492:38: error: call to ?__compiletime_assert_54? declared with attribute error: Need native word sized stores/loads for atomicity.
+  _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+                                      ^
+include/linux/compiler.h:475:4: note: in definition of macro ?__compiletime_assert?
+    prefix ## suffix();    \
+    ^
+include/linux/compiler.h:492:2: note: in expansion of macro ?_compiletime_assert?
+  _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+  ^
+include/linux/compiler.h:495:2: note: in expansion of macro ?compiletime_assert?
+  compiletime_assert(__native_word(t),    \
+  ^
+./arch/arm64/include/asm/barrier.h:44:2: note: in expansion of macro ?compiletime_assert_atomic_type?
+  compiletime_assert_atomic_type(*p);    \
+  ^
+include/linux/rcupdate.h:677:34: note: in expansion of macro ?smp_store_release?
+ #define rcu_assign_pointer(p, v) smp_store_release(&p, RCU_INITIALIZER(v))
+                                  ^
+include/linux/rculist.h:54:2: note: in expansion of macro ?rcu_assign_pointer?
+  rcu_assign_pointer(list_next_rcu(prev), new);
+  ^
+scripts/Makefile.build:258: recipe for target 'arch/arm64/kernel/debug-monitors.o' failed
+make[1]: *** [arch/arm64/kernel/debug-monitors.o] Error 1
+Makefile:941: recipe for target 'arch/arm64/kernel' failed
+make: *** [arch/arm64/kernel] Error 2
