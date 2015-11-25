@@ -1,66 +1,42 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Wed, 25 Nov 2015 18:57:22 +0800
-Subject: [PATCH v8 2/2] arm64: dts: mt8173: Add nor flash node
-In-Reply-To: <56559274.1090900@gmail.com>
-References: <1447817403-16631-1-git-send-email-bayi.cheng@mediatek.com>
- <1447817403-16631-3-git-send-email-bayi.cheng@mediatek.com>
- <56559274.1090900@gmail.com>
-Message-ID: <1448449042.24527.0.camel@mtksdaap41>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 25 Nov 2015 12:02:59 +0100
+Subject: [PATCH] ARM: MM: Simplify using vma_pages function
+In-Reply-To: <20151124073805.GA23513@jci-VirtualBox>
+References: <20151124073805.GA23513@jci-VirtualBox>
+Message-ID: <56559563.9060305@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-11-25 at 11:50 +0100, Matthias Brugger wrote:
-> 
-> On 18/11/15 04:30, Bayi Cheng wrote:
-> > Add Mediatek nor flash node
-> >
-> > Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
-> > Acked-by: Brian Norris <computersforpeace@gmail.com>
-> > ---
-> >   arch/arm64/boot/dts/mediatek/mt8173.dtsi | 18 +++++++++++++++++-
-> >   1 file changed, 17 insertions(+), 1 deletion(-)
-> >
-> 
-> Applied to v4.5-next/dts
-> 
-> Thanks.
-> Matthias
-> 
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > index 4dd5f93..7988656 100644
-> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > @@ -387,7 +387,23 @@
-> >   			status = "disabled";
-> >   		};
-> >
-> > -		i2c3: i2c at 11010000 {
-> > +		nor_flash: spi at 1100d000 {
-> > +			compatible = "mediatek,mt8173-nor";
-> > +			reg = <0 0x1100d000 0 0xe0>;
-> > +			clocks = <&pericfg CLK_PERI_SPI>,
-> > +				 <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
-> > +			clock-names = "spi", "sf";
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			status = "disabled";
-> > +
-> > +			flash at 0 {
-> > +				compatible = "jedec,spi-nor";
-> > +				reg = <0>;
-> > +			};
-> > +		};
-> > +
-> > +		i2c3: i2c3 at 11010000 {
+Hello,
 
-Hi Matthias,
+On 2015-11-24 08:38, Mutharaju, Prasanna (P.) wrote:
+> From: Prasanna Karthik <mkarthi3@visteon.com>
+>
+> Use vma_pages function on vma object instead of explicit computation.
+>
+> Signed-off-by: Prasanna Karthik <mkarthi3@visteon.com>
 
-Just notice this one. Please make sure this line should be
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-i2c3: i2c at 11010000 {
+> ---
+>   arch/arm/mm/dma-mapping.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index ad4eb2d..513e213 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -694,7 +694,7 @@ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+>   {
+>   	int ret = -ENXIO;
+>   #ifdef CONFIG_MMU
+> -	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
+> +	unsigned long nr_vma_pages = vma_pages(vma);
+>   	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+>   	unsigned long pfn = dma_to_pfn(dev, dma_addr);
+>   	unsigned long off = vma->vm_pgoff;
 
-instead of
-
-i2c3: i2c3 at 11010000 {
-
-Joe.C
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
