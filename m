@@ -1,85 +1,72 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 25 Nov 2015 10:33:37 +0000
-Subject: [RFC PATCH 06/10] ARM: mps2: introduce MPS2 platform
+Date: Wed, 25 Nov 2015 10:33:38 +0000
+Subject: [RFC PATCH 07/10] ARM: mps2: add low-level debug support
 In-Reply-To: <1448447621-17900-1-git-send-email-vladimir.murzin@arm.com>
 References: <1448447621-17900-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1448447621-17900-7-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1448447621-17900-8-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cortex-M Prototyping System (or V2M-MPS2) is designed for
-prototyping and evaluation Cortex-M family of processors including the
-latest Cortex-M7.
-
-It comes with a range of useful peripherals including 8MB single cycle
-SRAM, 16MB PSRAM, Ethernet, QSVGA touch screen panel, 4bit RGB VGA
-connector, Audio, SPI and GPIO.
+Add low-level debug support for MPS2, so that earlyprintk can be enabled
+for debugging early boot issues.
 
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/Kconfig                 |    8 ++++++++
- arch/arm/Makefile                |    1 +
- arch/arm/mach-mps2/Makefile      |    1 +
- arch/arm/mach-mps2/Makefile.boot |    3 +++
- arch/arm/mach-mps2/dtmachine.c   |   21 +++++++++++++++++++++
- 5 files changed, 34 insertions(+)
- create mode 100644 arch/arm/mach-mps2/Makefile
- create mode 100644 arch/arm/mach-mps2/Makefile.boot
- create mode 100644 arch/arm/mach-mps2/dtmachine.c
+ arch/arm/Kconfig.debug        |   12 +++++++++++-
+ arch/arm/include/debug/mps2.S |   27 +++++++++++++++++++++++++++
+ 2 files changed, 38 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/include/debug/mps2.S
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 0365cbb..28db2b2 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -967,6 +967,14 @@ config ARCH_STM32
- 	help
- 	  Support for STMicroelectronics STM32 processors.
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 259c0ca..cfbf09a 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -479,6 +479,13 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on MMP UART3.
  
-+config ARCH_MPS2
-+	bool "ARM MPS2 paltform"
-+	depends on ARM_SINGLE_ARMV7M
-+	select ARM_AMBA
-+	select CLKSRC_MPS2
-+	help
-+	  Support for ARM MPS2 Cortex-M platform.
++	config DEBUG_MPS2_UART
++		bool "Kernel low-level debugging message via MPS2 UART0"
++		depends on ARCH_MPS2
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on MPS2 based platforms.
 +
- # Definitions to make life easier
- config ARCH_ACORN
- 	bool
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 2c2b28e..dbe06fd 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -183,6 +183,7 @@ machine-$(CONFIG_ARCH_LPC18XX)		+= lpc18xx
- machine-$(CONFIG_ARCH_LPC32XX)		+= lpc32xx
- machine-$(CONFIG_ARCH_MESON)		+= meson
- machine-$(CONFIG_ARCH_MMP)		+= mmp
-+machine-$(CONFIG_ARCH_MPS2)		+= mps2
- machine-$(CONFIG_ARCH_MOXART)		+= moxart
- machine-$(CONFIG_ARCH_MV78XX0)		+= mv78xx0
- machine-$(CONFIG_ARCH_MVEBU)		+= mvebu
-diff --git a/arch/arm/mach-mps2/Makefile b/arch/arm/mach-mps2/Makefile
+ 	config DEBUG_QCOM_UARTDM
+ 		bool "Kernel low-level debugging messages via QCOM UARTDM"
+ 		depends on ARCH_QCOM
+@@ -1350,6 +1357,7 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
+ 	default "debug/bcm63xx.S" if DEBUG_UART_BCM63XX
+ 	default "debug/digicolor.S" if DEBUG_DIGICOLOR_UA0
++	default "debug/mps2.S" if DEBUG_MPS2_UART
+ 	default "mach/debug-macro.S"
+ 
+ # Compatibility options for PL01x
+@@ -1403,6 +1411,7 @@ config DEBUG_UART_PHYS
+ 	default 0x20068000 if DEBUG_RK29_UART2 || DEBUG_RK3X_UART3
+ 	default 0x20201000 if DEBUG_BCM2835
+ 	default 0x3e000000 if DEBUG_BCM_KONA_UART
++	default 0x40004000 if DEBUG_MPS2_UART
+ 	default 0x4000e400 if DEBUG_LL_UART_EFM32
+ 	default 0x40081000 if DEBUG_LPC18XX_UART0
+ 	default 0x40090000 if ARCH_LPC32XX
+@@ -1476,7 +1485,8 @@ config DEBUG_UART_PHYS
+ 		DEBUG_RMOBILE_SCIFA4 || DEBUG_S3C24XX_UART || \
+ 		DEBUG_UART_BCM63XX || DEBUG_ASM9260_UART || \
+ 		DEBUG_SIRFSOC_UART || DEBUG_DIGICOLOR_UA0 || \
+-		DEBUG_AT91_UART
++		DEBUG_AT91_UART || \
++		DEBUG_MPS2_UART
+ 
+ config DEBUG_UART_VIRT
+ 	hex "Virtual base address of debug UART"
+diff --git a/arch/arm/include/debug/mps2.S b/arch/arm/include/debug/mps2.S
 new file mode 100644
-index 0000000..3a74af7
+index 0000000..0ced0ce
 --- /dev/null
-+++ b/arch/arm/mach-mps2/Makefile
-@@ -0,0 +1 @@
-+obj-y += dtmachine.o
-diff --git a/arch/arm/mach-mps2/Makefile.boot b/arch/arm/mach-mps2/Makefile.boot
-new file mode 100644
-index 0000000..eacfc3f
---- /dev/null
-+++ b/arch/arm/mach-mps2/Makefile.boot
-@@ -0,0 +1,3 @@
-+# Empty file waiting for deletion once Makefile.boot isn't needed any more.
-+# Patch waits for application at
-+# http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7889/1 .
-diff --git a/arch/arm/mach-mps2/dtmachine.c b/arch/arm/mach-mps2/dtmachine.c
-new file mode 100644
-index 0000000..e7ad9c2
---- /dev/null
-+++ b/arch/arm/mach-mps2/dtmachine.c
-@@ -0,0 +1,21 @@
++++ b/arch/arm/include/debug/mps2.S
+@@ -0,0 +1,27 @@
 +/*
 + * Copyright (C) 2015 ARM Limited
 + *
@@ -91,15 +78,21 @@ index 0000000..e7ad9c2
 + *
 + */
 +
-+#include <asm/mach/arch.h>
++	.macro	addruart, rp, tmp1, tmp2
++	ldr	\rp, =CONFIG_DEBUG_UART_PHYS
++	.endm
 +
-+static const char *const mps2_compat[] __initconst = {
-+	"arm,mps2",
-+	NULL
-+};
++	.macro	senduart, rd, rx
++	strb	\rd, [\rx]		@ Data Register
++	.endm
 +
-+DT_MACHINE_START(MPS2DT, "MPS2 (Device Tree Support)")
-+	.dt_compat = mps2_compat,
-+MACHINE_END
++	.macro	busyuart, rd, rx
++1001:	ldrb	\rd, [\rx, #0x4]	@ State Register
++	tst	\rd, #1			@ busy
++	bne	1001b			@ wait until transmit done
++	.endm
++
++	.macro	waituart,rd,rx
++	.endm
 -- 
 1.7.9.5
