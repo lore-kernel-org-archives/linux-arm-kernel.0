@@ -1,29 +1,43 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 25 Nov 2015 17:55:22 +0100
-Subject: [PATCH net-next 3/3] net: mvneta: Add naive RSS support
-In-Reply-To: <1448463243-21057-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1448463243-21057-1-git-send-email-gregory.clement@free-electrons.com>
- <1448463243-21057-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20151125175522.0e8dd8b8@free-electrons.com>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Wed, 25 Nov 2015 09:02:10 -0800
+Subject: [PATCH net] drivers: net: xgene: fix possible use after free
+In-Reply-To: <20151125163402.GA29094@leverpostej>
+References: <20151125155753.GE12434@leverpostej>
+ <1448468256.24696.5.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20151125163402.GA29094@leverpostej>
+Message-ID: <1448470930.24696.10.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gregory,
+From: Eric Dumazet <edumazet@google.com>
 
-On Wed, 25 Nov 2015 15:54:03 +0100, Gregory CLEMENT wrote:
+Once TX has been enabled on a NIC, it is illegal to access skb,
+as this skb might have been freed by another cpu, from TX completion
+handler.
 
->  	pp->rxq_def = rxq_def;
->  
-> +	pp->indir[0] = rxq_def;
+Signed-off-by: Eric Dumazet <edumazet@google.com>
+Reported-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Iyappan Subramanian <isubramanian@apm.com>
+---
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-So now we have the RX queue in both pp->rxq_def and pp->indir[0] ? Is
-this really useful ?
-
-Also, if the RX queue becomes a per-port definition, why do you keep
-the global rxq_def variable ?
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+index 1adfe7036843..9147a0107c44 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+@@ -450,12 +450,12 @@ static netdev_tx_t xgene_enet_start_xmit(struct sk_buff *skb,
+ 		return NETDEV_TX_OK;
+ 	}
+ 
+-	pdata->ring_ops->wr_cmd(tx_ring, count);
+ 	skb_tx_timestamp(skb);
+ 
+ 	pdata->stats.tx_packets++;
+ 	pdata->stats.tx_bytes += skb->len;
+ 
++	pdata->ring_ops->wr_cmd(tx_ring, count);
+ 	return NETDEV_TX_OK;
+ }
+ 
