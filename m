@@ -1,37 +1,42 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 25 Nov 2015 14:55:52 +0000
-Subject: [PATCH] ARM: mach-orion5x: fix legacy get_irqnr_and_base
-In-Reply-To: <alpine.LFD.2.20.1511250948470.22569@knanqh.ubzr>
-References: <alpine.LFD.2.20.1511222240150.22569@knanqh.ubzr>
- <20151125144545.GA6520@io.lakedaemon.net>
- <alpine.LFD.2.20.1511250948470.22569@knanqh.ubzr>
-Message-ID: <20151125145552.GB6520@io.lakedaemon.net>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 25 Nov 2015 15:56:51 +0100
+Subject: [PATCH 3/5] dt-bindings: rockchip-thermal: Support the
+ RK3228/RK3399 SoCs compatible
+In-Reply-To: <1448438377-29203-4-git-send-email-wxt@rock-chips.com>
+References: <1448438377-29203-1-git-send-email-wxt@rock-chips.com>
+ <1448438377-29203-4-git-send-email-wxt@rock-chips.com>
+Message-ID: <11146001.lIrLtFf7Xg@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 09:54:05AM -0500, Nicolas Pitre wrote:
-> On Wed, 25 Nov 2015, Jason Cooper wrote:
+Am Mittwoch, 25. November 2015, 15:59:35 schrieb Caesar Wang:
+> This patchset attempts to new compatible for thermal founding
+> on RK3228/RK3399 SoCs.
 > 
-> > On Sun, Nov 22, 2015 at 10:44:19PM -0500, Nicolas Pitre wrote:
-> > > Commit 5be9fc23cd ("ARM: orion5x: fix legacy orion5x IRQ numbers") shifted
-> > > IRQ numbers by one but didn't update the get_irqnr_and_base macro
-> > > accordingly.  This macro is involved when CONFIG_MULTI_IRQ_HANDLER
-> > > is not defined.
-> > > 
-> > > Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> > 
-> > Applied to mvebu/fixes with minor tweak to the subject line and Cc's to
-> > stable back to v4.2.
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> ---
 > 
-> Note that the patch this provides a fix for was introduced in v4.2, but 
-> it itself was marked for stable. So if commit 5be9fc23cd was backported 
-> back to v3.18 then this patch should also be backported to the same 
-> stable versions.
+>  Documentation/devicetree/bindings/thermal/rockchip-thermal.txt | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> Same thing for the Dove variant.
+> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt index
+> 0dfa60d..af5f802 100644
+> --- a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> @@ -2,8 +2,10 @@
+> 
+>  Required properties:
+>  - compatible : should be "rockchip,<name>-tsadc"
+> +   "rockchip,rk3228-tsadc": found on RK3228 SoCs
+>     "rockchip,rk3288-tsadc": found on RK3288 SoCs
+>     "rockchip,rk3368-tsadc": found on RK3368 SoCs
+> +   "rockchip,rk3368-tsadc": found on RK3399 SoCs
 
-Crap.  Nice catch.  I'll update *before* pushing.  :)
+copy'n'paste error, should proably be 
+ "rockchip,rk3399-tsadc": found on RK3399 SoCs
 
-thx,
-
-Jason.
+>  - reg : physical base address of the controller and length of memory mapped
+> region.
+>  - interrupts : The interrupt number to the cpu. The interrupt specifier
+> format
