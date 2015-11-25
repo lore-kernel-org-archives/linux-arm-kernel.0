@@ -1,67 +1,62 @@
-From: damien.riegel@savoirfairelinux.com (Damien Riegel)
-Date: Wed, 25 Nov 2015 15:54:42 -0500
-Subject: [PATCH v6 3/6] watchdog: ts4800: add driver for TS-4800 watchdog
-In-Reply-To: <20151125202956.GA10228@rob-hp-laptop>
-References: <1448479507-1951-1-git-send-email-damien.riegel@savoirfairelinux.com>
- <1448479507-1951-4-git-send-email-damien.riegel@savoirfairelinux.com>
- <20151125202956.GA10228@rob-hp-laptop>
-Message-ID: <20151125205442.GA3627@localhost>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 25 Nov 2015 13:03:10 -0800
+Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
+ "/chosen/linux,atags" entry
+In-Reply-To: <17134653.86P3dFyQKK@wuerfel>
+References: <20150713131902.GH26485@atomide.com> <20151123144545.GD24147@pali>
+ <20151125181644.GI2517@atomide.com> <17134653.86P3dFyQKK@wuerfel>
+Message-ID: <20151125210310.GT2517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 02:29:56PM -0600, Rob Herring wrote:
-> On Wed, Nov 25, 2015 at 02:25:04PM -0500, Damien Riegel wrote:
-> > This watchdog is instantiated in a FPGA that is memory mapped. It is
-> > made of only one register, called the feed register. Writing to this
-> > register will re-arm the watchdog for a given time (and enable it if it
-> > was disable). It can be disabled by writing a special value into it.
+* Arnd Bergmann <arnd@arndb.de> [151125 11:50]:
+> On Wednesday 25 November 2015 10:16:44 Tony Lindgren wrote:
+> > * Pali Roh?r <pali.rohar@gmail.com> [151123 06:46]:
+> > > On Sunday 22 November 2015 07:51:46 Pavel Machek wrote:
+> > > > On Wed 2015-11-11 17:10:46, Frank Rowand wrote:
+> > > > > Adding devicetree list.
+> > > > > 
+> > > > > Thread starts at
+> > > > > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/354459.html
+> > > > > 
+> > > > > On 11/5/2015 8:17 AM, Tony Lindgren wrote:
+> > > > > > * Pali Roh?r <pali.rohar@gmail.com> [151105 03:41]:
+> > > > > >> On Tuesday 13 October 2015 16:37:46 Pali Roh?r wrote:
+> > > > > >>> On Monday 12 October 2015 13:45:09 Tony Lindgren wrote:
+> > > > > >>>> * Pali Roh?r <pali.rohar@gmail.com> [151012 13:29]:
+> > > > > >>>>> On Monday 12 October 2015 22:16:40 Tony Lindgren wrote:
+> > > > > >>>>>>
+> > > > > >>>>>> Pali, any news on posting an updated series with the comments
+> > > > > >>>>>> addressed in this thread? It seems that we all pretty much agree
+> > > > > >>>>>> what needs to be done.
+> > > > > 
+> > > > > I'm not real happy with the concept of patches 4 and 5 in this series.
+> > > > > My concern is that those two patches are using the FDT as a transport
+> > > > > mechanism for a binary blob (the atags object).
+> > > > 
+> > > > Umm. Ok. Do you have alternative proposal that works for everyone?
+> > > > 
+> > > > I mean. This discussion was going for quite a long time, and it would
+> > > > be nice to have some solution... patch proposal... something.
+> > > >                                                                     Pavel
+> > > 
+> > > Yes, discussion is going for a long time! So should I spend time for
+> > > adding documentation to my solution (this is last one thing which is
+> > > missing)? Or my solution is wrong and somebody else will propose new?
+> > > I do not want to spend time on something which will be rejected and
+> > > discarded.
 > > 
-> > It is part of a syscon block, and the watchdog register offset in this
-> > block varies from board to board. This offset is passed in the syscon
-> > property after the phandle to the syscon node.
-> > 
-> > Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
-> > Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> > ---
-> >  .../devicetree/bindings/watchdog/ts4800-wdt.txt    |  25 +++
-> >  drivers/watchdog/Kconfig                           |  10 +
-> >  drivers/watchdog/Makefile                          |   1 +
-> >  drivers/watchdog/ts4800_wdt.c                      | 215 +++++++++++++++++++++
-> >  4 files changed, 251 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt
-> >  create mode 100644 drivers/watchdog/ts4800_wdt.c
-> > 
-> > diff --git a/Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt b/Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt
-> > new file mode 100644
-> > index 0000000..388c60f
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt
-> > @@ -0,0 +1,25 @@
-> > +Technologic Systems Watchdog
-> > +
-> > +Required properties:
-> > +- compatible: must be "technologic,ts4800-wdt"
-> > +- syscon: phandle / integer array that points to the syscon node which
-> > +          describes the FPGA's syscon registers.
-> > +          - phandle to FPGA's syscon
-> > +          - offset to the watchdog register
-> > +
-> > +Optional property:
-> > +- timeout-sec: contains the watchdog timeout in seconds.
-> > +
-> > +Example:
-> > +
-> > +syscon: syscon at b0010000 {
-> > +	compatible = "syscon", "simple-mfd";
-> > +	reg = <0xb0010000 0x3d>;
-> > +	bus-width = <16>;
-> > +
-> > +	wdt at e {
-> > +		compatible = "technologic,ts4800-wdt";
-> > +		syscon = <&syscon 0xe>;
+> > At least I don't have better solutions in mind.
 > 
-> If this is single register only for the watchdog, why do you need 
-> syscon? You can just use reg.
+> I would be happier if we could restrict this as much as possible to the
+> boards that need it, as an opt-in. That way it doesn't become an ABI
+> for people that don't already rely in this information. How about
+> adding a check the code adds the linux,atags property to do it
+> only for a whitelist of board numbers?
 
-Because this is a single 16-bit register dedicated to the watchdog in a
-60-register syscon.
+Or populate /proc/atags only for the ones that need it from machine
+specific init_early?
+
+Regards,
+
+Tony
