@@ -1,191 +1,46 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Wed, 25 Nov 2015 16:28:05 +0300
-Subject: [PATCH v3 15/16] KVM: arm64: implement MSI injection in ITS
- emulation
-In-Reply-To: <1444229726-31559-16-git-send-email-andre.przywara@arm.com>
-References: <1444229726-31559-1-git-send-email-andre.przywara@arm.com>
- <1444229726-31559-16-git-send-email-andre.przywara@arm.com>
-Message-ID: <011c01d12785$1e808d90$5b81a8b0$@samsung.com>
+From: geliangtang@163.com (Geliang Tang)
+Date: Wed, 25 Nov 2015 21:12:19 +0800
+Subject: [PATCH 6/7] ARM: davinci: fix a problematic usage of WARN()
+In-Reply-To: <86c73f180d3054c1bf17bdac8c89026209167c9b.1448456395.git.geliangtang@163.com>
+References: <86c73f180d3054c1bf17bdac8c89026209167c9b.1448456395.git.geliangtang@163.com>
+Message-ID: <06d69890c56bd84a831a1dccee26e34b4988a241.1448456395.git.geliangtang@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+WARN() takes a condition and a format string. The condition was
+omitted. So I added it.
 
- I have discovered one more issue, and it is major one. It gets triggered by VFIO. See inline.
+Signed-off-by: Geliang Tang <geliangtang@163.com>
+---
+ arch/arm/mach-davinci/board-dm355-evm.c     | 2 +-
+ arch/arm/mach-davinci/board-dm355-leopard.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
- P.S. What is the overall current status? Long time has passed since the last email...
-
-> -----Original Message-----
-> From: kvm-owner at vger.kernel.org [mailto:kvm-owner at vger.kernel.org] On Behalf Of Andre Przywara
-> Sent: Wednesday, October 07, 2015 5:55 PM
-> To: marc.zyngier at arm.com; christoffer.dall at linaro.org
-> Cc: eric.auger at linaro.org; p.fedin at samsung.com; kvmarm at lists.cs.columbia.edu; linux-arm-
-> kernel at lists.infradead.org; kvm at vger.kernel.org
-> Subject: [PATCH v3 15/16] KVM: arm64: implement MSI injection in ITS emulation
-> 
-> When userland wants to inject a MSI into the guest, we have to use
-> our data structures to find the LPI number and the VCPU to receive
-> the interrupt.
-> Use the wrapper functions to iterate the linked lists and find the
-> proper Interrupt Translation Table Entry. Then set the pending bit
-> in this ITTE to be later picked up by the LR handling code. Kick
-> the VCPU which is meant to handle this interrupt.
-> We provide a VGIC emulation model specific routine for the actual
-> MSI injection. The wrapper functions return an error for models not
-> (yet) implementing MSIs (like the GICv2 emulation).
-> We also provide the handler for the ITS "INT" command, which allows a
-> guest to trigger an MSI via the ITS command queue.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Changelog v2..v3:
-> - proper checking for unmapped collections
-> 
->  include/kvm/arm_vgic.h      |  1 +
->  virt/kvm/arm/its-emul.c     | 65 +++++++++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/its-emul.h     |  2 ++
->  virt/kvm/arm/vgic-v3-emul.c |  1 +
->  4 files changed, 69 insertions(+)
-> 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 4ea023c..7911059 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -149,6 +149,7 @@ struct vgic_vm_ops {
->  	int	(*map_resources)(struct kvm *, const struct vgic_params *);
->  	bool	(*queue_lpis)(struct kvm_vcpu *);
->  	void	(*unqueue_lpi)(struct kvm_vcpu *, int irq);
-> +	int	(*inject_msi)(struct kvm *, struct kvm_msi *);
->  };
-> 
->  struct vgic_io_device {
-> diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
-> index 642effb..cd8526a 100644
-> --- a/virt/kvm/arm/its-emul.c
-> +++ b/virt/kvm/arm/its-emul.c
-> @@ -333,6 +333,55 @@ static bool handle_mmio_gits_idregs(struct kvm_vcpu *vcpu,
->  }
-> 
->  /*
-> + * Translates an incoming MSI request into the redistributor (=VCPU) and
-> + * the associated LPI number. Sets the LPI pending bit and also marks the
-> + * VCPU as having a pending interrupt.
-> + */
-> +int vits_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
-> +{
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	struct vgic_its *its = &dist->its;
-> +	struct its_itte *itte;
-> +	int cpuid;
-> +	bool inject = false;
-> +	int ret = 0;
-> +
-> +	if (!vgic_has_its(kvm))
-> +		return -ENODEV;
-> +
-> +	if (!(msi->flags & KVM_MSI_VALID_DEVID))
-> +		return -EINVAL;
-> +
-> +	spin_lock(&its->lock);
-> +
-> +	if (!its->enabled || !dist->lpis_enabled) {
-> +		ret = -EAGAIN;
-> +		goto out_unlock;
-> +	}
-> +
-> +	itte = find_itte(kvm, msi->devid, msi->data);
-> +	/* Triggering an unmapped IRQ gets silently dropped. */
-> +	if (!itte || !its_is_collection_mapped(itte->collection))
-> +		goto out_unlock;
-> +
-> +	cpuid = itte->collection->target_addr;
-> +	__set_bit(cpuid, itte->pending);
-> +	inject = itte->enabled;
-> +
-> +out_unlock:
-> +	spin_unlock(&its->lock);
-> +
-> +	if (inject) {
-> +		spin_lock(&dist->lock);
-
- At this point there can be a deadlock, because dist->lock is taken from within many places in KVM. If we are forwarding VFIO IRQ
-using IRQFDs, then irqfd_wakeup() will directly call kvm_set_msi(), which ends up here. But, interrupts from VFIO devices can happen
-at any moments, including those when dist->lock is taken by KVM status update code.
- Currently i added a simple workaround by disabling MSI fast path for KVM_ARM_HOST, but i believe it's not good solution. But can we
-do it better?
- OTOH, i know, direct IRQ forwarding is on the way.
-
-> +		__set_bit(cpuid, dist->irq_pending_on_cpu);
-> +		spin_unlock(&dist->lock);
-> +		kvm_vcpu_kick(kvm_get_vcpu(kvm, cpuid));
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +/*
->   * Find all enabled and pending LPIs and queue them into the list
->   * registers.
->   * The dist lock is held by the caller.
-> @@ -812,6 +861,19 @@ static int vits_cmd_handle_movall(struct kvm *kvm, u64 *its_cmd)
->  	return 0;
->  }
-> 
-> +/* The INT command injects the LPI associated with that DevID/EvID pair. */
-> +static int vits_cmd_handle_int(struct kvm *kvm, u64 *its_cmd)
-> +{
-> +	struct kvm_msi msi = {
-> +		.data = its_cmd_get_id(its_cmd),
-> +		.devid = its_cmd_get_deviceid(its_cmd),
-> +		.flags = KVM_MSI_VALID_DEVID,
-> +	};
-> +
-> +	vits_inject_msi(kvm, &msi);
-> +	return 0;
-> +}
-> +
->  /*
->   * This function is called with both the ITS and the distributor lock dropped,
->   * so the actual command handlers must take the respective locks when needed.
-> @@ -846,6 +908,9 @@ static int vits_handle_command(struct kvm_vcpu *vcpu, u64 *its_cmd)
->  	case GITS_CMD_MOVALL:
->  		ret = vits_cmd_handle_movall(vcpu->kvm, its_cmd);
->  		break;
-> +	case GITS_CMD_INT:
-> +		ret = vits_cmd_handle_int(vcpu->kvm, its_cmd);
-> +		break;
->  	case GITS_CMD_INV:
->  		ret = vits_cmd_handle_inv(vcpu->kvm, its_cmd);
->  		break;
-> diff --git a/virt/kvm/arm/its-emul.h b/virt/kvm/arm/its-emul.h
-> index 830524a..95e56a7 100644
-> --- a/virt/kvm/arm/its-emul.h
-> +++ b/virt/kvm/arm/its-emul.h
-> @@ -36,6 +36,8 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu);
->  int vits_init(struct kvm *kvm);
->  void vits_destroy(struct kvm *kvm);
-> 
-> +int vits_inject_msi(struct kvm *kvm, struct kvm_msi *msi);
-> +
->  bool vits_queue_lpis(struct kvm_vcpu *vcpu);
->  void vits_unqueue_lpi(struct kvm_vcpu *vcpu, int irq);
-> 
-> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
-> index f482e34..90f3628 100644
-> --- a/virt/kvm/arm/vgic-v3-emul.c
-> +++ b/virt/kvm/arm/vgic-v3-emul.c
-> @@ -944,6 +944,7 @@ void vgic_v3_init_emulation(struct kvm *kvm)
->  	dist->vm_ops.init_model = vgic_v3_init_model;
->  	dist->vm_ops.destroy_model = vgic_v3_destroy_model;
->  	dist->vm_ops.map_resources = vgic_v3_map_resources;
-> +	dist->vm_ops.inject_msi = vits_inject_msi;
->  	dist->vm_ops.queue_lpis = vits_queue_lpis;
->  	dist->vm_ops.unqueue_lpi = vits_unqueue_lpi;
-> 
-> --
-> 2.5.1
-
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
+index c71dd99..e47f24c 100644
+--- a/arch/arm/mach-davinci/board-dm355-evm.c
++++ b/arch/arm/mach-davinci/board-dm355-evm.c
+@@ -385,7 +385,7 @@ static __init void dm355_evm_init(void)
+ 
+ 	aemif = clk_get(&dm355evm_dm9000.dev, "aemif");
+ 	if (IS_ERR(aemif))
+-		WARN("%s: unable to get AEMIF clock\n", __func__);
++		WARN(1, "%s: unable to get AEMIF clock\n", __func__);
+ 	else
+ 		clk_prepare_enable(aemif);
+ 
+diff --git a/arch/arm/mach-davinci/board-dm355-leopard.c b/arch/arm/mach-davinci/board-dm355-leopard.c
+index 680a7a2..83b625c 100644
+--- a/arch/arm/mach-davinci/board-dm355-leopard.c
++++ b/arch/arm/mach-davinci/board-dm355-leopard.c
+@@ -243,7 +243,7 @@ static __init void dm355_leopard_init(void)
+ 
+ 	aemif = clk_get(&dm355leopard_dm9000.dev, "aemif");
+ 	if (IS_ERR(aemif))
+-		WARN("%s: unable to get AEMIF clock\n", __func__);
++		WARN(1, "%s: unable to get AEMIF clock\n", __func__);
+ 	else
+ 		clk_prepare_enable(aemif);
+ 
+-- 
+2.5.0
