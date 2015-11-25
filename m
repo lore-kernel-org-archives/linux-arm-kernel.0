@@ -1,38 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 25 Nov 2015 12:16:28 +0000
-Subject: [PATCH] ARM64: fix building without CONFIG_UID16
-In-Reply-To: <3891403.6hGat7eHq5@wuerfel>
-References: <3891403.6hGat7eHq5@wuerfel>
-Message-ID: <20151125121628.GE3109@e104818-lin.cambridge.arm.com>
+From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
+Date: Wed, 25 Nov 2015 09:22:55 -0300
+Subject: [PATCH 0/3] LPC4337 CIAA-NXP DTS changes
+In-Reply-To: <CAGhQ9Vz-fpqKBtaHY5bDZqXEMrpat=UWz4KofGBWMNdNVWw4Cg@mail.gmail.com>
+References: <1448282225-2635-1-git-send-email-ariel@vanguardiasur.com.ar>
+ <565309F3.1040306@vanguardiasur.com.ar>
+ <CAGhQ9Vz-fpqKBtaHY5bDZqXEMrpat=UWz4KofGBWMNdNVWw4Cg@mail.gmail.com>
+Message-ID: <5655A81F.9000302@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 12:12:21PM +0100, Arnd Bergmann wrote:
-> As reported by Michal Simek, building an ARM64 kernel with CONFIG_UID16
-> disabled currently fails because the system call table still needs to
-> reference the individual function entry points that are provided by
-> kernel/sys_ni.c in this case, and the declarations are hidden inside
-> of #ifdef CONFIG_UID16:
-> 
-> arch/arm64/include/asm/unistd32.h:57:8: error: 'sys_lchown16' undeclared here (not in a function)
->  __SYSCALL(__NR_lchown, sys_lchown16)
-> 
-> I believe this problem only exists on ARM64, because older architectures
-> tend to not need declarations when their system call table is built
-> in assembly code, while newer architectures tend to not need UID16
-> support. ARM64 only uses these system calls for compatibility with
-> 32-bit ARM binaries.
-> 
-> This changes the CONFIG_UID16 check into CONFIG_HAVE_UID16, which is
-> set unconditionally on ARM64 with CONFIG_COMPAT, so we see the
-> declarations whenever we need them, but otherwise the behavior is
-> unchanged.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: stable at vger.kernel.org
-> Fixes: af1839eb4bd4 ("Kconfig: clean up the long arch list for the UID16 config option")
+Joachim,
 
-Applied. Thank.
+El 23/11/15 a las 15:17, Joachim Eastwood escribi?:
+> Hi Ariel,
+> 
+> On 23 November 2015 at 13:43, Ariel D'Alessandro
+> <ariel@vanguardiasur.com.ar> wrote:
+>> (+Cc Joachim)
+>>
+>> El 23/11/15 a las 09:37, Ariel D'Alessandro escribi?:
+>>> Hi,
+>>>
+>>> This patch set includes some DTS changes for LPC4337 CIAA-NXP board.
+>>> It is based on tag next-20151120 of the linux-next repository. It has
+>>> been successfully tested on a LPC4337 CIAA-NXP Board.
+>>>
+>>> Ariel D'Alessandro (3):
+>>>   ARM: dts: lpc4337-ciaa: enable EEPROM memory
+>>>   ARM: dts: lpc4337-ciaa: enable SCT-PWM
+>>>   ARM: dts: lpc4337-ciaa: add i2c0 and devices
+> 
+> If you want me to pick up the patches please put me in the To field so
+> they end up in my inbox.
+
+OK, I'm resending with you in the To field.
 
 -- 
-Catalin
+Ariel D'Alessandro, VanguardiaSur
+www.vanguardiasur.com.ar
