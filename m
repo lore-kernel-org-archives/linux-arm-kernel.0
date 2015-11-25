@@ -1,68 +1,27 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 25 Nov 2015 13:09:09 -0500 (EST)
-Subject: [PATCH] arm64: restore bogomips information in /proc/cpuinfo
-In-Reply-To: <5655F09E.1060004@linaro.org>
-References: <1447870505-19319-1-git-send-email-yang.shi@linaro.org>
- <56554AE9.5070901@jonmasters.org>
- <alpine.LFD.2.20.1511250958370.22569@knanqh.ubzr>
- <5655F09E.1060004@linaro.org>
-Message-ID: <alpine.LFD.2.20.1511251303220.22569@knanqh.ubzr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 Nov 2015 18:09:53 +0000
+Subject: [PATCH 1/2] drivers: amba: properly handle devices with power
+ domains
+In-Reply-To: <CAPDyKFqTqPijF+Lbq0+a-Gv8CyaAr13JvZPjUN1-GNL5i3-mAw@mail.gmail.com>
+References: <1448456127-31842-1-git-send-email-m.szyprowski@samsung.com>
+ <1448456289-31960-1-git-send-email-m.szyprowski@samsung.com>
+ <20151125132458.GL8644@n2100.arm.linux.org.uk>
+ <5655B8F6.1070104@samsung.com>
+ <CAPDyKFqTqPijF+Lbq0+a-Gv8CyaAr13JvZPjUN1-GNL5i3-mAw@mail.gmail.com>
+Message-ID: <20151125180953.GN8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Nov 2015, Shi, Yang wrote:
-
-> On 11/25/2015 7:16 AM, Nicolas Pitre wrote:
-> > On Wed, 25 Nov 2015, Jon Masters wrote:
-> >
-> > > On 11/18/15, 1:15 PM, Yang Shi wrote:
-> > >
-> > > > As what Pavel Machek reported [1], some userspace applications depend on
-> > > > bogomips showed by /proc/cpuinfo.
-> > > >
-> > > > Although there is much less legacy impact on aarch64 than arm, but it
-> > > > does
-> > > > break libvirt.
-> > > >
-> > > > Basically, this patch reverts commit
-> > > > 326b16db9f69fd0d279be873c6c00f88c0a4aad5
-> > > > ("arm64: delay: don't bother reporting bogomips in /proc/cpuinfo"), but
-> > > > with
-> > > > some tweak due to context change.
-> > >
-> > > On a total tangent, it would be ideal to (eventually) have something
-> > > reported
-> > > in /proc/cpuinfo or dmesg during boot that does "accurately" map back to
-> > > the
-> > > underlying core frequency (as opposed to the generic timer frequency). I
-> > > have
-> > > seen almost countless silly situations in the industry (external to my own
-> > > organization) in which someone has taken a $VENDOR_X reference system that
-> > > they're not supposed to run benchmarks on, and they've done it anyway. But
-> > > usually on some silicon that's clocked multiples under what production
-> > > would
-> > > be. Then silly rumors about performance get around because nobody can do
-> > > simple arithmetic and notice that they ought to have at least divided by
-> > > some
-> > > factor.
-> >
-> > Be my guest my friend.
-> >
-> > According to the common wisdom, the bogomips reporting is completely
-> > senseless at this point and no one should expect anything useful from
-> > it. Therefore I attempted to rehabilitate some meaning into it given
-> > that we just can't get rid of it either and it continues to cause
-> > dammage. You certainly saw where that has led me.
+On Wed, Nov 25, 2015 at 02:56:10PM +0100, Ulf Hansson wrote:
+> On 25 November 2015 at 14:34, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > Is ignoring dev_pm_domain_attach() return value a solution for you?
 > 
-> Or we may create a new one, i.e. "cpu MHz" like x86? Then we keep both in
-> cpuinfo so that the userspace could adopt it gradually?
+> That's probably better than nothing, but I wonder if it in practice
+> will have any effect?
 
-The problem is that CPU MHz is not known/discoverable on all platforms.  
-The initial spirit behind bogomips was close to CPU clock with rough 
-precision that could be determined at run time.
+If the PM domain is down, then trying to tread the ID is likely to oops
+the kernel.
 
-But CPU MHz, when available, has the merit of not being open to 
-interpretation.
-
-
-Nicolas
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
