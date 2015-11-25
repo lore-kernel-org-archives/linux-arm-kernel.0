@@ -1,36 +1,73 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 25 Nov 2015 23:54:06 +0000
-Subject: [PATCH] ASoC: rcar: remove unused variable
-In-Reply-To: <4083363.2bJPz8BMy4@wuerfel>
-References: <4929159.b95vLdVRYU@wuerfel>
- <878u5m8ut0.wl%kuninori.morimoto.gx@renesas.com>
- <4083363.2bJPz8BMy4@wuerfel>
-Message-ID: <87ziy1d4j8.wl%kuninori.morimoto.gx@renesas.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 26 Nov 2015 08:54:31 +0900
+Subject: [PATCH v6 00/12] arm64: renesas: add sound support
+In-Reply-To: <CAMuHMdV7FZmSU8oK0N_BCAWj5Li_y3NBUeMyCW=5Gu7j1e7T6w@mail.gmail.com>
+References: <20151109012943.GF4832@verge.net.au>
+ <CAMuHMdXBQNCibJU4EDuFZX0zRzUZfC_4KTyXFNVLL81a51Q4RA@mail.gmail.com>
+ <20151109090139.GM4832@verge.net.au>
+ <CAMuHMdWv1Ae1JTDyN2JkuHC1Fmfw25gtmmUkSMUitrUQnv82Ug@mail.gmail.com>
+ <20151110001111.GB1040@verge.net.au>
+ <20151124023025.GA21853@verge.net.au>
+ <87k2p7yjbl.wl%kuninori.morimoto.gx@renesas.com>
+ <20151125002752.GH20596@verge.net.au>
+ <877fl68uqh.wl%kuninori.morimoto.gx@renesas.com>
+ <CAMuHMdV7FZmSU8oK0N_BCAWj5Li_y3NBUeMyCW=5Gu7j1e7T6w@mail.gmail.com>
+Message-ID: <20151125235430.GA7668@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Mark, Arnd
-
-> > /opt/home/morimoto/WORK/linux/sound/soc/sh/rcar/core.c: In function '__rsnd_kctrl_new':
-> > /opt/home/morimoto/WORK/linux/sound/soc/sh/rcar/core.c:807:18: error: 'soc_card' undeclared (first use in this function)
-> >    .index  = rtd - soc_card->rtd,
-> >                   ^
-> > /opt/home/morimoto/WORK/linux/sound/soc/sh/rcar/core.c:807:18: note: each undeclared identifier is reported only once for each function it appears in
-> > make[6]: *** [sound/soc/sh/rcar/core.o] ??? 1
-> > make[6]: *** ??????????????....
-> > make[5]: *** [sound/soc/sh/rcar] ??? 2
-> > make[4]: *** [sound/soc/sh] ??? 2
-> > 
-> > This __rsnd_kctrl_new() is using "soc_card"...
+On Wed, Nov 25, 2015 at 09:48:35AM +0100, Geert Uytterhoeven wrote:
+> Hi Morimoto-san, Simon,
 > 
-> It looks like the commit that removed the user of that variable is in the
-> "topic/pcm-list" branch instead of "topic/rcar".
+> On Wed, Nov 25, 2015 at 7:27 AM, Kuninori Morimoto
+> <kuninori.morimoto.gx@renesas.com> wrote:
+> >> > I would like to check latest version.
+> >> > Which branch/tag can I check ?
+> >>
+> >> If you want to check for apply-time and compile-time dependencies use
+> >> the latest renesas-devel tag in my renesas tree.
+> >>
+> >> If you want to check run-time you may need to pull in some dependencies,
+> >> especially the cpg-mssr-v6 branch of Geert's renesas-drivers tree.  A
+> >> sledge-hammer approach would be to pull in the latest renesas-drivers tag
+> >> of that tree.
+> >>
+> >> In any case I'll need to know what run-time dependencies, other than
+> >> cpg-mssr, are missing from renesas-next and/or renesas-devel so we can
+> >> sensibly decide what to queue up.
+> 
+> This is about DT, which is independent from code? ;-)
 
-Mark
+Yes, I agree.
 
-It is possible to remove this patch from topic/rcar,
-and, apply it to topic/pcm-list ?
+But I would at least like to get a handle on what the dependencies are.
+To make sure the bindings are on track. And to make sure there is some
+way to test the code.
 
-ccae40fa973f5b0eec5d5ad27e81c5a2b95f7b7c
-(" ASoC: rcar: remove unused variable")
+> > Recent renesas-drivers sound has many conflicts, and sound
+> > has strange behavior. I had tried it before and noticed.
+> > I'm not sure latest one, but it has conflict log.
+> > I'm using a littile older kernel, because of above reason.
+> 
+> You mean the conflict when merging vsp1-kms-20151112~4?
+> As that branch is based on a very old renesas-drivers release, I made
+> sure that merging it doesn't impact any sound driver. I.e. I reverted
+> all changes not related to rcar-du and vsp1.
+> 
+> You can verify using git diff 38f5d0b6..1f9e8ee5
+> 
+> > Anyway, I tried below, and I could get sound.
+> 
+> Good, thanks for checking!
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
