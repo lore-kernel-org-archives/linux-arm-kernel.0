@@ -1,174 +1,66 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 25 Nov 2015 16:11:06 -0600
-Subject: [PATCH v3 2/2] phy-sun4i-usb: Add support for the host usb-phys
- found on the H3 SoC
-In-Reply-To: <1448470202-3628-2-git-send-email-hdegoede@redhat.com>
-References: <1448470202-3628-1-git-send-email-hdegoede@redhat.com>
- <1448470202-3628-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20151125221046.GA25917@rob-hp-laptop>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 25 Nov 2015 14:22:21 -0800
+Subject: [PATCH v2 1/3] ARM: qcom: Make an option for qcom clocksource
+ platforms
+In-Reply-To: <6140735.DAZiajTbh1@wuerfel>
+References: <1448485478-21699-1-git-send-email-sboyd@codeaurora.org>
+ <1448485478-21699-2-git-send-email-sboyd@codeaurora.org>
+ <6140735.DAZiajTbh1@wuerfel>
+Message-ID: <5656349D.70103@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 05:50:02PM +0100, Hans de Goede wrote:
-> From: Reinder de Haan <patchesrdh@mveas.com>
-> 
-> Note this commit only adds support for phys 1-3, phy 0, the otg phy, is
-> not yet (fully) supported after this commit.
+On 11/25/15 14:08, Arnd Bergmann wrote:
+> On Wednesday 25 November 2015 13:04:36 Stephen Boyd wrote:
+>> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+>> index 2c2b28ee4811..999d523ac09f 100644
+>> --- a/arch/arm/Makefile
+>> +++ b/arch/arm/Makefile
+>> @@ -148,8 +148,7 @@ textofs-$(CONFIG_PM_H1940)      := 0x00108000
+>>  ifeq ($(CONFIG_ARCH_SA1100),y)
+>>  textofs-$(CONFIG_SA1111) := 0x00208000
+>>  endif
+>> -textofs-$(CONFIG_ARCH_MSM8X60) := 0x00208000
+>> -textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
+>> +textofs-$(CONFIG_HAVE_CLKSRC_QCOM) := 0x00208000
+>>  textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
+>>  
+>>  # Machine directory name.  This list is sorted alphanumerically
+>> diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
+>> index 2256cd1e25d1..35a03967d9c2 100644
+>> --- a/arch/arm/mach-qcom/Kconfig
+>> +++ b/arch/arm/mach-qcom/Kconfig
+>> @@ -10,6 +10,14 @@ menuconfig ARCH_QCOM
+>>  
+>>  if ARCH_QCOM
+>>  
+>> +config HAVE_CLKSRC_QCOM
+>> +       bool "Support platforms with qcom clocksource"
+>> +       default y
+>> +       select CLKSRC_QCOM
+>> +       help
+>> +         Select this option if you want to support platforms
+>> +         with the qcom clocksource such as MSM8660 and MSM8960.
+> Hmm, if we use the option for two things, I think it could use
+> a different identifier and title, as it seems counterintuitive
+> to make the text offset based on the clocksource driver.
 
-Shouldn't the OTG phy have a different compatible string?
+Ok.
 
-> 
-> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Changes in v2:
-> -Change break; after dev_err() to return, as intended, fixing a compiler
->  warning (the dev_err case should never be reached)
-> Changes in v3:
-> -Use of_match_node to get model specific config data
-> ---
->  .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  1 +
->  drivers/phy/phy-sun4i-usb.c                        | 46 +++++++++++++++++-----
->  2 files changed, 38 insertions(+), 9 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> index 0cebf74..95736d7 100644
-> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> @@ -9,6 +9,7 @@ Required properties:
->    * allwinner,sun7i-a20-usb-phy
->    * allwinner,sun8i-a23-usb-phy
->    * allwinner,sun8i-a33-usb-phy
-> +  * allwinner,sun8i-h3-usb-phy
->  - reg : a list of offset + length pairs
->  - reg-names :
->    * "phy_ctrl"
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index 1d8f85d..2aed482 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -46,6 +46,9 @@
->  #define REG_PHYBIST			0x08
->  #define REG_PHYTUNE			0x0c
->  #define REG_PHYCTL_A33			0x10
-> +#define REG_PHY_UNK_H3			0x20
-> +
-> +#define REG_PMU_UNK_H3			0x10
->  
->  #define PHYCTL_DATA			BIT(7)
->  
-> @@ -79,7 +82,7 @@
->  #define PHY_DISCON_TH_SEL		0x2a
->  #define PHY_SQUELCH_DETECT		0x3c
->  
-> -#define MAX_PHYS			3
-> +#define MAX_PHYS			4
->  
->  /*
->   * Note do not raise the debounce time, we must report Vusb high within 100ms
-> @@ -91,6 +94,7 @@
->  enum sun4i_usb_phy_type {
->  	sun4i_a10_phy,
->  	sun8i_a33_phy,
-> +	sun8i_h3_phy,
->  };
->  
->  struct sun4i_usb_phy_cfg {
-> @@ -101,6 +105,7 @@ struct sun4i_usb_phy_cfg {
->  };
->  
->  struct sun4i_usb_phy_data {
-> +	struct device *dev;
->  	void __iomem *base;
->  	const struct sun4i_usb_phy_cfg *cfg;
->  	struct mutex mutex;
-> @@ -183,6 +188,9 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
->  		/* A33 needs us to set phyctl to 0 explicitly */
->  		writel(0, phyctl);
->  		break;
-> +	case sun8i_h3_phy:
-> +		dev_err(phy_data->dev, "H3 usb_phy_write is not supported\n");
-> +		return;
->  	}
->  
->  	for (i = 0; i < len; i++) {
-> @@ -243,6 +251,7 @@ static int sun4i_usb_phy_init(struct phy *_phy)
->  	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
->  	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
->  	int ret;
-> +	u32 val;
->  
->  	ret = clk_prepare_enable(phy->clk);
->  	if (ret)
-> @@ -254,16 +263,26 @@ static int sun4i_usb_phy_init(struct phy *_phy)
->  		return ret;
->  	}
->  
-> -	/* Enable USB 45 Ohm resistor calibration */
-> -	if (phy->index == 0)
-> -		sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
-> +	if (data->cfg->type == sun8i_h3_phy) {
-> +		if (phy->index == 0) {
-> +			val = readl(data->base + REG_PHY_UNK_H3);
-> +			writel(val & ~1, data->base + REG_PHY_UNK_H3);
-> +		}
->  
-> -	/* Adjust PHY's magnitude and rate */
-> -	sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
-> +		val = readl(phy->pmu + REG_PMU_UNK_H3);
-> +		writel(val & ~2, phy->pmu + REG_PMU_UNK_H3);
-> +	} else {
-> +		/* Enable USB 45 Ohm resistor calibration */
-> +		if (phy->index == 0)
-> +			sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
->  
-> -	/* Disconnect threshold adjustment */
-> -	sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
-> -			    data->cfg->disc_thresh, 2);
-> +		/* Adjust PHY's magnitude and rate */
-> +		sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
-> +
-> +		/* Disconnect threshold adjustment */
-> +		sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
-> +				    data->cfg->disc_thresh, 2);
-> +	}
->  
->  	sun4i_usb_phy_passby(phy, 1);
->  
-> @@ -555,6 +574,13 @@ static const struct sun4i_usb_phy_cfg sun8i_a33_cfg = {
->  	.dedicated_clocks = true,
->  };
->  
-> +static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
-> +	.num_phys = 4,
-> +	.disc_thresh = 3,
-> +	.type = sun8i_h3_phy,
-> +	.dedicated_clocks = true,
-> +};
-> +
->  static const struct of_device_id sun4i_usb_phy_of_match[] = {
->  	{ .compatible = "allwinner,sun4i-a10-usb-phy", .data = &sun4i_a10_cfg },
->  	{ .compatible = "allwinner,sun5i-a13-usb-phy", .data = &sun5i_a13_cfg },
-> @@ -562,6 +588,7 @@ static const struct of_device_id sun4i_usb_phy_of_match[] = {
->  	{ .compatible = "allwinner,sun7i-a20-usb-phy", .data = &sun7i_a20_cfg },
->  	{ .compatible = "allwinner,sun8i-a23-usb-phy", .data = &sun8i_a23_cfg },
->  	{ .compatible = "allwinner,sun8i-a33-usb-phy", .data = &sun8i_a33_cfg },
-> +	{ .compatible = "allwinner,sun8i-h3-usb-phy", .data = &sun8i_h3_cfg },
->  	{ },
->  };
->  MODULE_DEVICE_TABLE(of, sun4i_usb_phy_of_match);
-> @@ -595,6 +622,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->  	mutex_init(&data->mutex);
->  	INIT_DELAYED_WORK(&data->detect, sun4i_usb_phy0_id_vbus_det_scan);
->  	dev_set_drvdata(dev, data);
-> +	data->dev = dev;
->  	data->cfg = match->data;
->  
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy_ctrl");
-> -- 
-> 2.5.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> Is there any common way to classify these, e.g. calling them
+> 'pre-2013 models' or 'Snapdragon S4' as a way to identify them?
+
+I was thinking I could leave it as ARCH_MSM_8X60 because that covers the
+6 and the 9, but that doesn't make me feel great. I have no idea what
+Snapdragon S4 is, and that didn't exist when 8660 was first released.
+pre-2013 models seems alright. Or perhaps ARCH_QCOM_PRE_8974?
+
+Internally (and sort of leaked externally now) we called MSM8960 and its
+variants A-family, and the generation after B-family, so perhaps
+ARCH_QCOM_A_FAMILY would be appropriate? The problem there is no end
+user knows about this distinction.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
