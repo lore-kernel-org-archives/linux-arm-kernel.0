@@ -1,38 +1,56 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 25 Nov 2015 15:59:24 -0600
-Subject: [PATCH v6 5/6] of: documentation: add bindings documentation for
- TS-4800
-In-Reply-To: <1448479507-1951-6-git-send-email-damien.riegel@savoirfairelinux.com>
-References: <1448479507-1951-1-git-send-email-damien.riegel@savoirfairelinux.com>
- <1448479507-1951-6-git-send-email-damien.riegel@savoirfairelinux.com>
-Message-ID: <20151125215924.GA14649@rob-hp-laptop>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Wed, 25 Nov 2015 23:00:59 +0100
+Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
+ "/chosen/linux, atags" entry
+In-Reply-To: <17689711.DsQsCiDFAN@wuerfel>
+References: <20150713131902.GH26485@atomide.com> <201511252244.28797@pali>
+ <17689711.DsQsCiDFAN@wuerfel>
+Message-ID: <201511252300.59976@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 02:25:06PM -0500, Damien Riegel wrote:
-> This adds the documentation for the TS-4800 by Technologic Systems.
+On Wednesday 25 November 2015 22:51:00 Arnd Bergmann wrote:
+> On Wednesday 25 November 2015 22:44:28 Pali Roh?r wrote:
+> > Arnd, my question about proper solution reminds... Proprietary
+> > bootloader which cannot be replaced (e.g. it is signed or do
+> > unknown magic) provides information to booted kernel via custom
+> > specific ATAGs fields. How userspace could properly read those
+> > custom information from bootloader?
 > 
-> Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+> The typical solution for nonstandard bootloaders is to have a boot
+> wrapper like the one from
+> https://github.com/zonque/pxa-impedance-matcher that translates
+> whatever information we have at the bootloader level into DT
+> properties.
+> 
 
-Acked-by: Rob Herring <robh@kernel.org>
+Ok. So there is no better solution. With some hacks we can use U-Boot as 
+3rd stage bootloader. But this is not useful for debugging or 
+developing...
 
-> ---
->  Documentation/devicetree/bindings/arm/technologic.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/technologic.txt
+Ideal "wrapper" solution would be to compile wrapper and linux zImage 
+and then glue them together to one binary. Something like internal linux 
+uncompress code which translate atags to dt.
+
+> As I understand, the reason we are not doing that here is that we
+> also have proprietary user space that we can't fix to look in a
+> different place, i.e. the interface is between the bootloader and
+> some user binary, not bootloader to kernel.
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/technologic.txt b/Documentation/devicetree/bindings/arm/technologic.txt
-> new file mode 100644
-> index 0000000..8422988
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/technologic.txt
-> @@ -0,0 +1,6 @@
-> +Technologic Systems Platforms Device Tree Bindings
-> +--------------------------------------------------
-> +
-> +TS-4800 board
-> +Required root node properties:
-> +	- compatible = "technologic,imx51-ts4800", "fsl,imx51";
-> -- 
-> 2.5.0
-> 
+
+Yes, proprietary/closed applications are problems which we cannot fix 
+(without rewriting them).
+
+New applications could use new "proper" interface. But without that 
+interface we cannot do that.
+
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151125/e61df3a0/attachment.sig>
