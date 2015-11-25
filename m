@@ -1,48 +1,138 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 25 Nov 2015 10:26:57 -0800
-Subject: [PATCH v4 0/3] ARM: OMAP2+ McASP(3) support for DRA7xx family
-In-Reply-To: <565413EF.2040003@ti.com>
-References: <1447313579-23873-1-git-send-email-peter.ujfalusi@ti.com>
- <20151112180027.GP3218@atomide.com> <565413EF.2040003@ti.com>
-Message-ID: <20151125182657.GK2517@atomide.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 25 Nov 2015 19:35:32 +0100
+Subject: [PATCH 04/13] net: mvneta: enable suspend/resume support
+In-Reply-To: <1448178839-3541-5-git-send-email-mw@semihalf.com> (Marcin
+ Wojtas's message of "Sun, 22 Nov 2015 08:53:50 +0100")
+References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
+ <1448178839-3541-5-git-send-email-mw@semihalf.com>
+Message-ID: <87k2p67wqz.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [151123 23:39]:
-> Tony,
-> 
-> On 11/12/2015 08:00 PM, Tony Lindgren wrote:
-> > * Peter Ujfalusi <peter.ujfalusi@ti.com> [151111 23:33]:
-> >> Hi Tony,
-> >>
-> >> Changes since v3:
-> >> - rebased on mainline's HEAD
-> >> - Added Tested-by from Felipe
-> >> - Added Acked-by from Paul for the hwmod patches
-> >>
-> >> Changes since v2:
-> >> - DTS patch added which is needed because of the clock handling changes
-> >>
-> >> Felip Balbi reported that linux-next is broken right now since the DTS part of
-> >> the earlier series has been applied, but we do not have the mcasp hwmod in the
-> >> kernel:
-> >> ...
-> >> [    0.181029] platform 48468000.mcasp: Cannot lookup hwmod 'mcasp3'
-> >> ...
-> >> [    6.121072] davinci-mcasp 48468000.mcasp: _od_fail_runtime_resume: FIXME: missing hwmod/omap_dev info
-> >> [    6.130790] ------------[ cut here ]------------
-> >> [    6.135643] WARNING: CPU: 0 PID: 244 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x220/0x34c()
-> >> [    6.145576] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4_PER2_P3 (Read): Data Access in User mode during Functional access
-> > 
-> > 
-> > Thanks applying all three into omap-for-v4.4/fixes.
-> 
-> Do you know when these patches are going to be merged to mainline? 4.4-rc2 is
-> out, but it does not include them.
+Hi Marcin,
+ 
+ On dim., nov. 22 2015, Marcin Wojtas <mw@semihalf.com> wrote:
 
-Sorry for the delays, hoping to send out the fixes today or Friday after
-scanning emails one more time for more fixes.
+> This commit introduces suspend/resume routines used for both in 'standby'
+> and 'mem' modes. For the latter, in which registers' contents are lost,
+> following steps are performed:
+> * in suspend - update port statistics and, if interface is running,
+>   detach netif, clean the queues, disable cpu notifier, shutdown
+>   interface and reset port's link status;
+> * in resume, for all interfaces, set default configuration of the port and
+>   MBUS windows;
+> * in resume, in case the interface is running, enable accepting packets in
+>   legacy parser, power up the port, register cpu notifier and attach
+> netif.
 
-Regards,
+I don't have the hardware to use suspend to RAM on Armada XP but at
+least in standby the network continue to work on wakeup.
 
-Tony
+>
+> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+> ---
+>  drivers/net/ethernet/marvell/mvneta.c | 70 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 70 insertions(+)
+>
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> index d12b8c6..f079b13 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> @@ -3442,6 +3442,72 @@ static int mvneta_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_PM_SLEEP
+> +static int mvneta_suspend(struct platform_device *pdev, pm_message_t state)
+> +{
+> +	struct net_device *dev = platform_get_drvdata(pdev);
+> +	struct mvneta_port *pp = netdev_priv(dev);
+> +
+> +	mvneta_ethtool_update_stats(pp);
+> +
+> +	if (!netif_running(dev))
+> +		return 0;
+> +
+> +	netif_device_detach(dev);
+> +
+> +	mvneta_stop_dev(pp);
+> +	unregister_cpu_notifier(&pp->cpu_notifier);
+> +	mvneta_cleanup_rxqs(pp);
+> +	mvneta_cleanup_txqs(pp);
+> +
+> +	/* Reset link status */
+> +	pp->link = 0;
+> +	pp->duplex = -1;
+> +	pp->speed = 0;
+> +
+
+Would it be possible to add a kind of mvneta_port_power_down(pp,
+pp->phy_interface) here ? It would allow to save power in standby mode
+too.
+
+> +	return 0;
+> +}
+> +
+> +static int mvneta_resume(struct platform_device *pdev)
+> +{
+> +	const struct mbus_dram_target_info *dram_target_info;
+> +	struct net_device *dev = platform_get_drvdata(pdev);
+> +	struct mvneta_port *pp = netdev_priv(dev);
+> +	int ret;
+> +
+> +	mvneta_defaults_set(pp);
+> +	mvneta_port_power_up(pp, pp->phy_interface);
+> +
+> +	dram_target_info = mv_mbus_dram_info();
+> +	if (dram_target_info)
+> +		mvneta_conf_mbus_windows(pp, dram_target_info);
+> +
+> +	if (!netif_running(dev))
+> +		return 0;
+> +
+> +	ret = mvneta_setup_rxqs(pp);
+> +	if (ret) {
+> +		netdev_err(dev, "unable to setup rxqs after resume\n");
+> +		return ret;
+> +	}
+> +
+> +	ret = mvneta_setup_txqs(pp);
+> +	if (ret) {
+> +		netdev_err(dev, "unable to setup txqs after resume\n");
+> +		return ret;
+> +	}
+> +
+> +	mvneta_set_rx_mode(dev);
+> +	mvneta_percpu_elect(pp);
+> +	register_cpu_notifier(&pp->cpu_notifier);
+> +	mvneta_start_dev(pp);
+> +
+> +	netif_device_attach(dev);
+> +
+> +	return 0;
+> +}
+> +#endif /* CONFIG_PM_SLEEP */
+> +
+>  static const struct of_device_id mvneta_match[] = {
+>  	{ .compatible = "marvell,armada-370-neta" },
+>  	{ .compatible = "marvell,armada-xp-neta" },
+> @@ -3452,6 +3518,10 @@ MODULE_DEVICE_TABLE(of, mvneta_match);
+>  static struct platform_driver mvneta_driver = {
+>  	.probe = mvneta_probe,
+>  	.remove = mvneta_remove,
+> +#ifdef CONFIG_PM_SLEEP
+> +	.suspend = mvneta_suspend,
+> +	.resume = mvneta_resume,
+> +#endif
+>  	.driver = {
+>  		.name = MVNETA_DRIVER_NAME,
+>  		.of_match_table = mvneta_match,
+> -- 
+> 1.8.3.1
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
