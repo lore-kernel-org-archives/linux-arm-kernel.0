@@ -1,99 +1,76 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 26 Nov 2015 00:01:53 +0800
-Subject: [PATCH v4 2/2] clocksource/drivers/dw_apb_timer: Use
- {readl|writel}_relaxed in critical path
-In-Reply-To: <1448467313-5626-1-git-send-email-jszhang@marvell.com>
-References: <1448467313-5626-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1448467313-5626-3-git-send-email-jszhang@marvell.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 25 Nov 2015 17:06:45 +0100
+Subject: [PATCH 00/10] ARM: s3c64xx multiplatform
+Message-ID: <1448467615-447097-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's safe to use the relaxed version. From another side, the relaxed io
-accessor macros are available on all architectures now, so we can use
-the relaxed versions to get a trivial system performance improvement,
-we measured time the following functions spent on Marvell BG4CT:
+I've posted the series before and we got a few people to test it
+the last time, though I think the touchscreen portion is still
+untested.
 
-4096 rounds of __apbt_read_clocksource() call:
+I'd really like to get this merged for 4.5 and would put it into
+a next/multiplatform branch unless there are any objections
+or concerns.
 
-before the patch: 1263240ns on average
-after the patch: 1250080ns on average
-improved by 1%
+Arnd Bergmann (10):
+  Input: s3c2410_ts: fix S3C_ADC dependency
+  ASoC: samsung/smartq: use dynamic registration
+  gpio: samsung: move gpio-samsung driver back to platform code
+  ARM: s3c64xx: prepare initcalls for multiplatform
+  ARM: s3c64xx: enable sparse IRQ support
+  iio: exynos-adc: add experimental touchscreen support
+  ARM: s3c64xx: use new adc/touchscreen driver
+  ARM: s3c64xx: use common debug-ll implementation
+  ARM: s3c64xx: multiplatform support
+  ARM: s3c64xx: allow building without board support
 
-4096 rounds of apbt_eoi() call:
+ .../devicetree/bindings/arm/samsung/exynos-adc.txt |   3 +
+ arch/arm/Kconfig                                   |  26 ---
+ arch/arm/Kconfig.debug                             |  19 +-
+ arch/arm/configs/multi_v7_defconfig                |   3 +
+ arch/arm/configs/s3c6400_defconfig                 |   2 +
+ arch/arm/mach-s3c64xx/Kconfig                      |  31 ++-
+ arch/arm/mach-s3c64xx/Makefile                     |  24 ++-
+ arch/arm/mach-s3c64xx/common.c                     |   5 +-
+ arch/arm/mach-s3c64xx/cpuidle.c                    |   5 +-
+ arch/arm/mach-s3c64xx/dev-uart.c                   |   1 +
+ arch/arm/mach-s3c64xx/include/mach/debug-macro.S   |  38 ----
+ arch/arm/mach-s3c64xx/include/mach/gpio-samsung.h  |   3 +
+ arch/arm/mach-s3c64xx/include/mach/irqs.h          |  20 +-
+ arch/arm/mach-s3c64xx/include/mach/pm-core.h       |   1 +
+ arch/arm/mach-s3c64xx/irq-pm.c                     |   2 +-
+ arch/arm/mach-s3c64xx/mach-anw6410.c               |   3 +-
+ arch/arm/mach-s3c64xx/mach-crag6410-module.c       |   6 +
+ arch/arm/mach-s3c64xx/mach-crag6410.c              |   2 +
+ arch/arm/mach-s3c64xx/mach-hmt.c                   |   2 +
+ arch/arm/mach-s3c64xx/mach-mini6410.c              |   5 +-
+ arch/arm/mach-s3c64xx/mach-ncp.c                   |   2 +
+ arch/arm/mach-s3c64xx/mach-real6410.c              |   6 +-
+ arch/arm/mach-s3c64xx/mach-smartq.c                |  16 +-
+ arch/arm/mach-s3c64xx/mach-smartq5.c               |   2 +
+ arch/arm/mach-s3c64xx/mach-smartq7.c               |   2 +
+ arch/arm/mach-s3c64xx/mach-smdk6400.c              |   3 +-
+ arch/arm/mach-s3c64xx/mach-smdk6410.c              |   6 +-
+ arch/arm/mach-s3c64xx/pl080.c                      |   4 +
+ arch/arm/mach-s3c64xx/pm.c                         |   4 +
+ arch/arm/mach-s3c64xx/s3c6400.c                    |   2 +-
+ arch/arm/mach-s3c64xx/s3c6410.c                    |   2 +-
+ arch/arm/plat-samsung/Kconfig                      |   5 +-
+ arch/arm/plat-samsung/Makefile                     |   5 +-
+ arch/arm/plat-samsung/devs.c                       |  22 +-
+ .../gpio => arch/arm/plat-samsung}/gpio-samsung.c  |  12 +-
+ arch/arm/plat-samsung/init.c                       |   5 +
+ arch/arm/plat-samsung/pm.c                         |   4 -
+ drivers/gpio/Kconfig                               |   7 -
+ drivers/gpio/Makefile                              |   1 -
+ drivers/iio/adc/exynos_adc.c                       | 224 ++++++++++++++++++++-
+ drivers/input/touchscreen/Kconfig                  |   2 +-
+ include/linux/platform_data/touchscreen-s3c2410.h  |   1 +
+ sound/soc/samsung/smartq_wm8987.c                  |  77 +++----
+ 43 files changed, 410 insertions(+), 205 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/debug-macro.S
+ rename {drivers/gpio => arch/arm/plat-samsung}/gpio-samsung.c (99%)
 
-before the patch: 1290960ns on average
-after the patch: 1248240ns on average
-
-4096 rounds of apbt_next_event() call:
-
-before the patch: 3333660ns on average
-after the patch: 1322040ns on average
-
-improved by 60%!
-
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- drivers/clocksource/dw_apb_timer.c | 24 ++++++++++++++++++------
- 1 file changed, 18 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
-index 114696b..6334526 100644
---- a/drivers/clocksource/dw_apb_timer.c
-+++ b/drivers/clocksource/dw_apb_timer.c
-@@ -60,6 +60,17 @@ static inline void apbt_writel(struct dw_apb_timer *timer, u32 val,
- 	writel(val, timer->base + offs);
- }
- 
-+static inline u32 apbt_readl_relaxed(struct dw_apb_timer *timer, unsigned long offs)
-+{
-+	return readl_relaxed(timer->base + offs);
-+}
-+
-+static inline void apbt_writel_relaxed(struct dw_apb_timer *timer, u32 val,
-+			unsigned long offs)
-+{
-+	writel_relaxed(val, timer->base + offs);
-+}
-+
- static void apbt_disable_int(struct dw_apb_timer *timer)
- {
- 	u32 ctrl = apbt_readl(timer, APBTMR_N_CONTROL);
-@@ -81,7 +92,7 @@ void dw_apb_clockevent_pause(struct dw_apb_clock_event_device *dw_ced)
- 
- static void apbt_eoi(struct dw_apb_timer *timer)
- {
--	apbt_readl(timer, APBTMR_N_EOI);
-+	apbt_readl_relaxed(timer, APBTMR_N_EOI);
- }
- 
- static irqreturn_t dw_apb_clockevent_irq(int irq, void *data)
-@@ -200,13 +211,13 @@ static int apbt_next_event(unsigned long delta,
- 	struct dw_apb_clock_event_device *dw_ced = ced_to_dw_apb_ced(evt);
- 
- 	/* Disable timer */
--	ctrl = apbt_readl(&dw_ced->timer, APBTMR_N_CONTROL);
-+	ctrl = apbt_readl_relaxed(&dw_ced->timer, APBTMR_N_CONTROL);
- 	ctrl &= ~APBTMR_CONTROL_ENABLE;
--	apbt_writel(&dw_ced->timer, ctrl, APBTMR_N_CONTROL);
-+	apbt_writel_relaxed(&dw_ced->timer, ctrl, APBTMR_N_CONTROL);
- 	/* write new count */
--	apbt_writel(&dw_ced->timer, delta, APBTMR_N_LOAD_COUNT);
-+	apbt_writel_relaxed(&dw_ced->timer, delta, APBTMR_N_LOAD_COUNT);
- 	ctrl |= APBTMR_CONTROL_ENABLE;
--	apbt_writel(&dw_ced->timer, ctrl, APBTMR_N_CONTROL);
-+	apbt_writel_relaxed(&dw_ced->timer, ctrl, APBTMR_N_CONTROL);
- 
- 	return 0;
- }
-@@ -342,7 +353,8 @@ static cycle_t __apbt_read_clocksource(struct clocksource *cs)
- 	struct dw_apb_clocksource *dw_cs =
- 		clocksource_to_dw_apb_clocksource(cs);
- 
--	current_count = apbt_readl(&dw_cs->timer, APBTMR_N_CURRENT_VALUE);
-+	current_count = apbt_readl_relaxed(&dw_cs->timer,
-+					APBTMR_N_CURRENT_VALUE);
- 
- 	return (cycle_t)~current_count;
- }
 -- 
-2.6.2
+2.1.0.rc2
