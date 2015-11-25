@@ -1,77 +1,71 @@
-From: damien.riegel@savoirfairelinux.com (Damien Riegel)
-Date: Wed, 25 Nov 2015 14:25:03 -0500
-Subject: [PATCH v6 2/6] mfd: syscon: add a DT property to set value width
-In-Reply-To: <1448479507-1951-1-git-send-email-damien.riegel@savoirfairelinux.com>
-References: <1448479507-1951-1-git-send-email-damien.riegel@savoirfairelinux.com>
-Message-ID: <1448479507-1951-3-git-send-email-damien.riegel@savoirfairelinux.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 25 Nov 2015 11:27:09 -0800
+Subject: [PATCH 7/7] ARM: mmp: move into ARCH_MULTIPLATFORM
+In-Reply-To: <1448465875-435039-8-git-send-email-arnd@arndb.de>
+References: <1448465875-435039-1-git-send-email-arnd@arndb.de>
+ <1448465875-435039-8-git-send-email-arnd@arndb.de>
+Message-ID: <20151125192709.GC11298@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently syscon has a fixed configuration of 32 bits for register and
-values widths. In some cases, it would be desirable to be able to
-customize the value width.
+On 11/25, Arnd Bergmann wrote:
+> diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
+> index fdbfadf00c84..4773fe1d8b3f 100644
+> --- a/arch/arm/mach-mmp/Kconfig
+> +++ b/arch/arm/mach-mmp/Kconfig
+> @@ -1,9 +1,24 @@
+> +menuconfig ARCH_MMP
+> +	bool "Marvell PXA168/910/MMP2"
+> +	depends on ARCH_MULTI_V5 || ARCH_MULTI_V7
+> +	select ARCH_REQUIRE_GPIOLIB
+> +	select GENERIC_ALLOCATOR
+> +	select GENERIC_CLOCKEVENTS
 
-For example, certain boards (like the ones manufactured by Technologic
-Systems) have a FPGA that is memory-mapped, but its registers are only
-16-bit wide.
+ARCH_MULTIPLATFORM already selects this.
 
-This patch adds an optional "bus-width" DT binding for syscon that
-allows to change the width for the data bus (i.e. val_bits). If this
-property is provided, it will also adjust the register stride to
-bus-width / 8. If not provided, the default configuration is used.
+> +	select GPIO_PXA
+> +	select PINCTRL
+> +	select PLAT_PXA
+> +	help
+> +	  Support for Marvell's PXA168/PXA910(MMP) and MMP2 processor line.
+> diff --git a/arch/arm/mach-mmp/include/mach/uncompress.h b/arch/arm/mach-mmp/include/mach/uncompress.h
+> deleted file mode 100644
+> index 8890fa8fa771..000000000000
+> --- a/arch/arm/mach-mmp/include/mach/uncompress.h
+> +++ /dev/null
+> @@ -1,45 +0,0 @@
+> -/*
+> - * arch/arm/mach-mmp/include/mach/uncompress.h
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - */
+> -
+> -#include <linux/serial_reg.h>
+> -#include <mach/addr-map.h>
+> -#include <asm/mach-types.h>
+> -
+> -#define UART1_BASE	(APB_PHYS_BASE + 0x36000)
+> -#define UART2_BASE	(APB_PHYS_BASE + 0x17000)
+> -#define UART3_BASE	(APB_PHYS_BASE + 0x18000)
+> -
+> -volatile unsigned long *UART;
 
-Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Lee Jones <lee.jones@linaro.org>
----
- Documentation/devicetree/bindings/mfd/syscon.txt |  3 +++
- drivers/mfd/syscon.c                             | 13 +++++++++++++
- 2 files changed, 16 insertions(+)
+Doesn't this file need to be ported over to
+arch/arm/include/debug/?
 
-diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
-index fe8150b..4c9d187 100644
---- a/Documentation/devicetree/bindings/mfd/syscon.txt
-+++ b/Documentation/devicetree/bindings/mfd/syscon.txt
-@@ -13,6 +13,9 @@ Required properties:
- - compatible: Should contain "syscon".
- - reg: the register region can be accessed from syscon
- 
-+Optional property:
-+- bus-width: width of the data bus. Can be <8>, <16>, <32>, or <64>.
-+
- Examples:
- gpr: iomuxc-gpr at 020e0000 {
- 	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
-diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-index 176bf0f..5a93d80 100644
---- a/drivers/mfd/syscon.c
-+++ b/drivers/mfd/syscon.c
-@@ -47,6 +47,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
- 	struct syscon *syscon;
- 	struct regmap *regmap;
- 	void __iomem *base;
-+	u32 bus_width;
- 	int ret;
- 	struct regmap_config syscon_config = syscon_regmap_config;
- 
-@@ -69,6 +70,18 @@ static struct syscon *of_syscon_register(struct device_node *np)
- 	 else if (of_property_read_bool(np, "little-endian"))
- 		syscon_config.val_format_endian = REGMAP_ENDIAN_LITTLE;
- 
-+	/*
-+	 * search for bus-width property in DT. If it is not provided, default
-+	 * to 32-bit. regmap_init_mmio will return an error if syscon_config's
-+	 * values are invalid so there is no need to check them here.
-+	 */
-+	ret = of_property_read_u32(np, "bus-width", &bus_width);
-+	if (ret)
-+		bus_width = 32;
-+
-+	syscon_config.val_bits = bus_width;
-+	syscon_config.reg_stride = syscon_config.val_bits / 8;
-+
- 	regmap = regmap_init_mmio(NULL, base, &syscon_config);
- 	if (IS_ERR(regmap)) {
- 		pr_err("regmap init failed\n");
+> -
+> -static inline void putc(char c)
+> -{
+> -	/* UART enabled? */
+> -	if (!(UART[UART_IER] & UART_IER_UUE))
+> -		return;
+> -
+> -	while (!(UART[UART_LSR] & UART_LSR_THRE))
+> -		barrier();
+> -
+
 -- 
-2.5.0
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
