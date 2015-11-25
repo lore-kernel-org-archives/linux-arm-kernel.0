@@ -1,91 +1,69 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Tue, 24 Nov 2015 16:34:19 -0800
-Subject: [PATCH v2 2/2] restrict /dev/mem to idle io memory ranges
-In-Reply-To: <20151124142521.e6d23e44a8b2c24c044c2dec@linux-foundation.org>
-References: <20151124000553.26360.57819.stgit@dwillia2-desk3.jf.intel.com>
- <20151124000604.26360.56945.stgit@dwillia2-desk3.jf.intel.com>
- <20151124142521.e6d23e44a8b2c24c044c2dec@linux-foundation.org>
-Message-ID: <CAPcyv4ijWns879DytqUa+=r5hzQ1qzmB83VV6Z16kQNtmHUtbA@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 24 Nov 2015 16:39:07 -0800
+Subject: [PATCH v3 0/4] Allow customizable random offset to mmap_base
+ address.
+In-Reply-To: <1447888808-31571-1-git-send-email-dcashman@android.com>
+References: <1447888808-31571-1-git-send-email-dcashman@android.com>
+Message-ID: <20151124163907.1a406b79458b1bb0d3519684@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 2:25 PM, Andrew Morton
-<akpm@linux-foundation.org> wrote:
-> On Mon, 23 Nov 2015 16:06:04 -0800 Dan Williams <dan.j.williams@intel.com> wrote:
->
->> This effectively promotes IORESOURCE_BUSY to IORESOURCE_EXCLUSIVE
->> semantics by default.  If userspace really believes it is safe to access
->> the memory region it can also perform the extra step of disabling an
->> active driver.  This protects device address ranges with read side
->> effects and otherwise directs userspace to use the driver.
->
-> I don't think I'm sufficiently understanding what this is all needed
-> for, sorry.  A better changelog would help: what's wrong with the
-> current code, how you propose it be changed, how the kernel's
-> externally-visible behaviour is altered, etc.
->
+On Wed, 18 Nov 2015 15:20:04 -0800 Daniel Cashman <dcashman@android.com> wrote:
 
-I should have duplicated the Kconfig description for IO_STRICT_DEVMEM
-in the changelog, but the justification is simply that if the kernel
-has a driver busily using a memory range, userspace needs to assert it
-knows it is safe to access that range by disabling the driver.  This
-makes the kernel safer by default.
+> Address Space Layout Randomization (ASLR) provides a barrier to
+> exploitation of user-space processes in the presence of security
+> vulnerabilities by making it more difficult to find desired code/data
+> which could help an attack.  This is done by adding a random offset to the
+> location of regions in the process address space, with a greater range of
+> potential offset values corresponding to better protection/a larger
+> search-space for brute force, but also to greater potential for
+> fragmentation.
+> 
+> The offset added to the mmap_base address, which provides the basis for
+> the majority of the mappings for a process, is set once on process exec in
+> arch_pick_mmap_layout() and is done via hard-coded per-arch values, which
+> reflect, hopefully, the best compromise for all systems.  The trade-off
+> between increased entropy in the offset value generation and the
+> corresponding increased variability in address space fragmentation is not
+> absolute, however, and some platforms may tolerate higher amounts of
+> entropy.  This patch introduces both new Kconfig values and a sysctl
+> interface which may be used to change the amount of entropy used for
+> offset generation on a system.
+> 
+> The direct motivation for this change was in response to the
+> libstagefright vulnerabilities that affected Android, specifically to
+> information provided by Google's project zero at:
+> 
+> http://googleprojectzero.blogspot.com/2015/09/stagefrightened.html
+> 
+> The attack presented therein, by Google's project zero, specifically
+> targeted the limited randomness used to generate the offset added to the
+> mmap_base address in order to craft a brute-force-based attack. 
+> Concretely, the attack was against the mediaserver process, which was
+> limited to respawning every 5 seconds, on an arm device.  The hard-coded 8
+> bits used resulted in an average expected success rate of defeating the
+> mmap ASLR after just over 10 minutes (128 tries at 5 seconds a piece). 
+> With this patch, and an accompanying increase in the entropy value to 16
+> bits, the same attack would take an average expected time of over 45 hours
+> (32768 tries), which makes it both less feasible and more likely to be
+> noticed.
+> 
+> The introduced Kconfig and sysctl options are limited by per-arch minimum
+> and maximum values, the minimum of which was chosen to match the current
+> hard-coded value and the maximum of which was chosen so as to give the
+> greatest flexibility without generating an invalid mmap_base address,
+> generally a 3-4 bits less than the number of bits in the user-space
+> accessible virtual address space.
+> 
+> When decided whether or not to change the default value, a system
+> developer should consider that mmap_base address could be placed anywhere
+> up to 2^(value) bits away from the non-randomized location, which would
+> introduce variable-sized areas above and below the mmap_base address such
+> that the maximum vm_area_struct size may be reduced, preventing very large
+> allocations. 
 
-> Please pay particular attention to the back-compatibility issues which
-> will be encountered when people enable these options.
+Nice, thanks.
 
-It certainly diminishes debug capabilities, mmap of sysfs pci
-resources will also fail while a driver is active.  The only general
-purpose application I know that uses /dev/mem is dosemu.  It should
-continue to work fine as x86 "devmem_is_allowed()" permits access from
-0-to-1MB by default.  The other stated user of /dev/mem legacy X
-drivers.  With the prevalence of kernel modesetting in graphics
-drivers I don't know how much of a concern this is anymore.
-
-> Perhaps when all that material is described, I'll understand why the
-> heck we're doing this with a build-time switch rather than a runtime
-> one...
-
-We have the "iomem=" kernel parameter.  I think it makes sense to have
-that setting be configurable at runtime to augment this build time
-decision.
-
->> Persistent memory presents a large "mistake surface" to /dev/mem as now
->> accidental writes can corrupt a filesystem.
->
-> Is that the motivation?  root can come in and accidentally alter
-> persistent memory contents?  If so,
->
-> - why do we care?  There are all sorts of ways in which root can muck
->   up the persistent memory, starting with dd(1).  What's special about
->   /dev/mem?
-
-dd through /dev/pmem and the driver will do all the proper flushing
-and syncing to make the writes durable on media.  /dev/mem knows none
-of those semantics.  /dev/pmem as a block device responds to O_EXCL
-and prevents other attempts to open the device.
-
-> - why is the patch mucking with access to PCI and BIOS space?  Is the
->   persistent memory even mappable in those regions?  Or is the concern
->   that userspace can access control registers associated with the
->   persistent memory?  What is the problem scenario?
-
-It seems to me that letting /dev/mem do arbitrary access to any region
-of memory is a dangerous capability for a production environment.
-Drivers assume that request_mem_region() tells other parts of the
-kernel to not touch their memory.  Having the option to extend that
-protection to /dev/mem by default seemed a reasonable idea.
-
-Of course, all of this assumes that you think it is worthwhile to have
-some protections and safety measures even for root.
-
-> IOW, a very good description of the problem-being-solved would help out
-> a lot here...
-
-I'll fold the eventual result of this discussion into the changelog if
-I can convince you it's worth moving forward.
-
-I also have the option of just tagging the pmem regions as
-IORESOURCE_EXCLUSIVE, but I decided against that because I think our
-current definition of STRICT_DEVMEM leaves a big hole if the goal is
-"/dev/mem access is safe by default".
+mips, powerpc and s390 also implement arch_mmap_rnd().  Are there any
+special considerations here, or it just a matter of maintainers wiring
+it up and testing it?
