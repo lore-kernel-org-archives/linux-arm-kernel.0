@@ -1,41 +1,256 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 25 Nov 2015 09:56:14 +0000
-Subject: [PATCH v9] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
- PCIe Host Controller
-In-Reply-To: <CABHD4K9PH-1tpwmxmPSBK3dW04G3XMfNtPFqtWFb7gnThe=uNQ@mail.gmail.com>
-References: <1447911323-12567-1-git-send-email-bharatku@xilinx.com>
- <20151124173556.18aff6b5@arm.com>
- <8520D5D51A55D047800579B0941471982586607F@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20151125075018.68e97010@arm.com>
- <CABHD4K9PH-1tpwmxmPSBK3dW04G3XMfNtPFqtWFb7gnThe=uNQ@mail.gmail.com>
-Message-ID: <20151125095614.523cd8b7@arm.com>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Wed, 25 Nov 2015 09:59:17 +0000
+Subject: [PATCH v4] dmaengine: fsl-edma: add PM suspend/resume support
+In-Reply-To: <1446203038-5323-1-git-send-email-yao.yuan@freescale.com>
+References: <1446203038-5323-1-git-send-email-yao.yuan@freescale.com>
+Message-ID: <BY2PR03MB141BC31A59EE6D69B5EA33E83050@BY2PR03MB141.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Nov 2015 14:23:29 +0530
-Amit Tomer <amittomer25@gmail.com> wrote:
+Hi vinod,
 
-> Sorry to intervene but just trying to learn from your comments.
+Thanks for your review.
+I have updated the patch as your comments before.
+And then send the v4.
+Do you have any comments for it?
+
+Thanks.
+
+Best Regards,
+Yuan Yao
+
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
+> On Behalf Of Yuan Yao
+> Sent: Friday, October 30, 2015 7:04 PM
+> To: vinod.koul at intel.com; stefan at agner.ch; arnd at arndb.de
+> Cc: dmaengine at vger.kernel.org; dan.j.williams at intel.com; linux-
+> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: [PATCH v4] dmaengine: fsl-edma: add PM suspend/resume support
 > 
->  > You have plenty, and that's the whole of your device space. *All of it*. So
-> >   just take the base address of your PCIe controller, and be done with
-> >   it.
+> This add power management suspend/resume support for the fsl-edma driver.
 > 
-> but isn't few of PCIe controller's registers itself are mapped
-> here(base address). So, how can we use this address for MSI?
-
-You can, because the PCIe controller never writes to itself. If it
-writes to that base address, then it *is* the MSI doorbell and the
-bridge will hopefully do the right thing.
-
-> Or you said from base address of PCIe controller, find an offset that
-> can be used as MSI address?
-
-That works as well. Given the description of the HW we've been given,
-any address will do, as long as it is behind the PCIe RC.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+> eDMA acted as a basic function used by others. What it needs to do is the two
+> steps below to support power management.
+> 
+> In fsl_edma_suspend_late:
+> Check whether the DMA chan is idle, if it is not idle disable DMA request.
+> 
+> In fsl_edma_resume_early:
+> Enable the eDMA and wait for being used.
+> 
+> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+> ---
+> Changes in v4:
+> - Add comments for why use suspend_late and resume_early; Changes in v3:
+> - Force terminate the active channels in suspend if the channel
+>   is not idle.
+> Changes in v2: None
+> ---
+>  drivers/dma/fsl-edma.c | 85
+> ++++++++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 82 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c index
+> 915eec3..be2e62b 100644
+> --- a/drivers/dma/fsl-edma.c
+> +++ b/drivers/dma/fsl-edma.c
+> @@ -116,6 +116,10 @@
+>  				BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) | \
+>  				BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) | \
+>  				BIT(DMA_SLAVE_BUSWIDTH_8_BYTES)
+> +enum fsl_edma_pm_state {
+> +	RUNNING = 0,
+> +	SUSPENDED,
+> +};
+> 
+>  struct fsl_edma_hw_tcd {
+>  	__le32	saddr;
+> @@ -147,6 +151,9 @@ struct fsl_edma_slave_config {  struct fsl_edma_chan {
+>  	struct virt_dma_chan		vchan;
+>  	enum dma_status			status;
+> +	enum fsl_edma_pm_state		pm_state;
+> +	bool				idle;
+> +	u32				slave_id;
+>  	struct fsl_edma_engine		*edma;
+>  	struct fsl_edma_desc		*edesc;
+>  	struct fsl_edma_slave_config	fsc;
+> @@ -298,6 +305,7 @@ static int fsl_edma_terminate_all(struct dma_chan
+> *chan)
+>  	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
+>  	fsl_edma_disable_request(fsl_chan);
+>  	fsl_chan->edesc = NULL;
+> +	fsl_chan->idle = true;
+>  	vchan_get_all_descriptors(&fsl_chan->vchan, &head);
+>  	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+>  	vchan_dma_desc_free_list(&fsl_chan->vchan, &head); @@ -313,6
+> +321,7 @@ static int fsl_edma_pause(struct dma_chan *chan)
+>  	if (fsl_chan->edesc) {
+>  		fsl_edma_disable_request(fsl_chan);
+>  		fsl_chan->status = DMA_PAUSED;
+> +		fsl_chan->idle = true;
+>  	}
+>  	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+>  	return 0;
+> @@ -327,6 +336,7 @@ static int fsl_edma_resume(struct dma_chan *chan)
+>  	if (fsl_chan->edesc) {
+>  		fsl_edma_enable_request(fsl_chan);
+>  		fsl_chan->status = DMA_IN_PROGRESS;
+> +		fsl_chan->idle = false;
+>  	}
+>  	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+>  	return 0;
+> @@ -648,6 +658,7 @@ static void fsl_edma_xfer_desc(struct fsl_edma_chan
+> *fsl_chan)
+>  	fsl_edma_set_tcd_regs(fsl_chan, fsl_chan->edesc->tcd[0].vtcd);
+>  	fsl_edma_enable_request(fsl_chan);
+>  	fsl_chan->status = DMA_IN_PROGRESS;
+> +	fsl_chan->idle = false;
+>  }
+> 
+>  static irqreturn_t fsl_edma_tx_handler(int irq, void *dev_id) @@ -676,6
+> +687,7 @@ static irqreturn_t fsl_edma_tx_handler(int irq, void *dev_id)
+>  				vchan_cookie_complete(&fsl_chan->edesc-
+> >vdesc);
+>  				fsl_chan->edesc = NULL;
+>  				fsl_chan->status = DMA_COMPLETE;
+> +				fsl_chan->idle = true;
+>  			} else {
+>  				vchan_cyclic_callback(&fsl_chan->edesc-
+> >vdesc);
+>  			}
+> @@ -704,6 +716,7 @@ static irqreturn_t fsl_edma_err_handler(int irq, void
+> *dev_id)
+>  			edma_writeb(fsl_edma, EDMA_CERR_CERR(ch),
+>  				fsl_edma->membase + EDMA_CERR);
+>  			fsl_edma->chans[ch].status = DMA_ERROR;
+> +			fsl_edma->chans[ch].idle = true;
+>  		}
+>  	}
+>  	return IRQ_HANDLED;
+> @@ -724,6 +737,12 @@ static void fsl_edma_issue_pending(struct dma_chan
+> *chan)
+> 
+>  	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
+> 
+> +	if (unlikely(fsl_chan->pm_state != RUNNING)) {
+> +		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+> +		/* cannot submit due to suspend */
+> +		return;
+> +	}
+> +
+>  	if (vchan_issue_pending(&fsl_chan->vchan) && !fsl_chan->edesc)
+>  		fsl_edma_xfer_desc(fsl_chan);
+> 
+> @@ -735,6 +754,7 @@ static struct dma_chan *fsl_edma_xlate(struct
+> of_phandle_args *dma_spec,  {
+>  	struct fsl_edma_engine *fsl_edma = ofdma->of_dma_data;
+>  	struct dma_chan *chan, *_chan;
+> +	struct fsl_edma_chan *fsl_chan;
+>  	unsigned long chans_per_mux = fsl_edma->n_chans / DMAMUX_NR;
+> 
+>  	if (dma_spec->args_count != 2)
+> @@ -748,8 +768,10 @@ static struct dma_chan *fsl_edma_xlate(struct
+> of_phandle_args *dma_spec,
+>  			chan = dma_get_slave_channel(chan);
+>  			if (chan) {
+>  				chan->device->privatecnt++;
+> -				fsl_edma_chan_mux(to_fsl_edma_chan(chan),
+> -					dma_spec->args[1], true);
+> +				fsl_chan = to_fsl_edma_chan(chan);
+> +				fsl_chan->slave_id = dma_spec->args[1];
+> +				fsl_edma_chan_mux(fsl_chan, fsl_chan-
+> >slave_id,
+> +						true);
+>  				mutex_unlock(&fsl_edma->fsl_edma_mutex);
+>  				return chan;
+>  			}
+> @@ -888,7 +910,9 @@ static int fsl_edma_probe(struct platform_device *pdev)
+>  		struct fsl_edma_chan *fsl_chan = &fsl_edma->chans[i];
+> 
+>  		fsl_chan->edma = fsl_edma;
+> -
+> +		fsl_chan->pm_state = RUNNING;
+> +		fsl_chan->slave_id = 0;
+> +		fsl_chan->idle = true;
+>  		fsl_chan->vchan.desc_free = fsl_edma_free_desc;
+>  		vchan_init(&fsl_chan->vchan, &fsl_edma->dma_dev);
+> 
+> @@ -959,6 +983,60 @@ static int fsl_edma_remove(struct platform_device
+> *pdev)
+>  	return 0;
+>  }
+> 
+> +static int fsl_edma_suspend_late(struct device *dev) {
+> +	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
+> +	struct fsl_edma_chan *fsl_chan;
+> +	unsigned long flags;
+> +	int i;
+> +
+> +	for (i = 0; i < fsl_edma->n_chans; i++) {
+> +		fsl_chan = &fsl_edma->chans[i];
+> +		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
+> +		/* Make sure chan is idle or will force disable. */
+> +		if (unlikely(!fsl_chan->idle)) {
+> +			dev_warn(dev, "WARN: There is non-idle channel.");
+> +			fsl_edma_disable_request(fsl_chan);
+> +			fsl_edma_chan_mux(fsl_chan, 0, false);
+> +		}
+> +
+> +		fsl_chan->pm_state = SUSPENDED;
+> +		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int fsl_edma_resume_early(struct device *dev) {
+> +	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
+> +	struct fsl_edma_chan *fsl_chan;
+> +	int i;
+> +
+> +	for (i = 0; i < fsl_edma->n_chans; i++) {
+> +		fsl_chan = &fsl_edma->chans[i];
+> +		fsl_chan->pm_state = RUNNING;
+> +		edma_writew(fsl_edma, 0x0, fsl_edma->membase +
+> EDMA_TCD_CSR(i));
+> +		if (fsl_chan->slave_id != 0)
+> +			fsl_edma_chan_mux(fsl_chan, fsl_chan->slave_id,
+> true);
+> +	}
+> +
+> +	edma_writel(fsl_edma, EDMA_CR_ERGA | EDMA_CR_ERCA,
+> +			fsl_edma->membase + EDMA_CR);
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+> + * eDMA provides the service to others, so it should be suspend late
+> + * and resume early. When eDMA suspend, all of the clients should stop
+> + * the DMA data transmission and let the channel idle.
+> + */
+> +static const struct dev_pm_ops fsl_edma_pm_ops = {
+> +	.suspend_late   = fsl_edma_suspend_late,
+> +	.resume_early   = fsl_edma_resume_early,
+> +};
+> +
+>  static const struct of_device_id fsl_edma_dt_ids[] = {
+>  	{ .compatible = "fsl,vf610-edma", },
+>  	{ /* sentinel */ }
+> @@ -969,6 +1047,7 @@ static struct platform_driver fsl_edma_driver = {
+>  	.driver		= {
+>  		.name	= "fsl-edma",
+>  		.of_match_table = fsl_edma_dt_ids,
+> +		.pm     = &fsl_edma_pm_ops,
+>  	},
+>  	.probe          = fsl_edma_probe,
+>  	.remove		= fsl_edma_remove,
+> --
+> 2.1.0.27.g96db324
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
