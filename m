@@ -1,57 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Nov 2015 09:36:16 +0100
-Subject: [PATCH] ASoC: rcar: remove unused variable
-In-Reply-To: <878u5m8ut0.wl%kuninori.morimoto.gx@renesas.com>
-References: <4929159.b95vLdVRYU@wuerfel>
- <878u5m8ut0.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <4083363.2bJPz8BMy4@wuerfel>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 25 Nov 2015 09:41:42 +0100
+Subject: [PATCH] ARM: shmobile: r8a7779: Add L2 cache-controller node
+In-Reply-To: <1448416683-1411-1-git-send-email-horms+renesas@verge.net.au>
+References: <1448416683-1411-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVTdPocWCnzE8v-O_rpNJR=0mO23jeG8ejYzL0REtQb+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 November 2015 06:25:36 Kuninori Morimoto wrote:
-> 
-> Hi Arnd, Mark
-> 
-> > After a recent cleanup, the soc_card variable became unused
-> > and now produces a warning:
-> > 
-> > soc/sh/rcar/core.c: In function '__rsnd_kctrl_new':
-> > soc/sh/rcar/core.c:801:23: warning: unused variable 'soc_card' [-Wunused-variable]
-> > 
-> > This removes the variable.
-> > 
-> > Fixes: 1a497983a5ae ("ASoC: Change the PCM runtime array to a list")
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > 
-> > diff --git a/sound/soc/sh/rcar/core.c b/sound/soc/sh/rcar/core.c
-> > index c6685f14b9cb..90b244c1f526 100644
-> > --- a/sound/soc/sh/rcar/core.c
-> > +++ b/sound/soc/sh/rcar/core.c
-> > @@ -798,7 +798,6 @@ static int __rsnd_kctrl_new(struct rsnd_mod *mod,
-> >  			    void (*update)(struct rsnd_dai_stream *io,
-> >  					   struct rsnd_mod *mod))
-> >  {
-> > -	struct snd_soc_card *soc_card = rtd->card;
-> >  	struct snd_card *card = rtd->card->snd_card;
-> >  	struct snd_kcontrol *kctrl;
-> >  	struct snd_kcontrol_new knew = {
-> 
-> It seems this patch was accepted to topic/rcar branch,
-> but I got compile error
-> 
-> /opt/home/morimoto/WORK/linux/sound/soc/sh/rcar/core.c: In function '__rsnd_kctrl_new':
-> /opt/home/morimoto/WORK/linux/sound/soc/sh/rcar/core.c:807:18: error: 'soc_card' undeclared (first use in this function)
->    .index  = rtd - soc_card->rtd,
->                   ^
-> /opt/home/morimoto/WORK/linux/sound/soc/sh/rcar/core.c:807:18: note: each undeclared identifier is reported only once for each function it appears in
-> make[6]: *** [sound/soc/sh/rcar/core.o] ??? 1
-> make[6]: *** ??????????????....
-> make[5]: *** [sound/soc/sh/rcar] ??? 2
-> make[4]: *** [sound/soc/sh] ??? 2
-> 
-> This __rsnd_kctrl_new() is using "soc_card"...
+Hi Simon,
 
-It looks like the commit that removed the user of that variable is in the
-"topic/pcm-list" branch instead of "topic/rcar".
+On Wed, Nov 25, 2015 at 2:58 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Add the missing L2 cache-controller node, and link the CPU nodes to it.
+>
+> The L2 cache is an ARM L2C-310 (r3p2), of size 1 MB (64 KiB x 16 ways).
+>
+> Based on work for the r8a7740 by Geert Uytterhoeven.
+>
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-	Arnd
+Thanks for your patch!
+
+> ---
+>  arch/arm/boot/dts/r8a7779.dtsi | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+> index 6afa909865b5..f27fa2db16ee 100644
+> --- a/arch/arm/boot/dts/r8a7779.dtsi
+> +++ b/arch/arm/boot/dts/r8a7779.dtsi
+
+> @@ -63,6 +67,17 @@
+>                       <0xf0000100 0x100>;
+>         };
+>
+> +       L2: cache-controller {
+> +               compatible = "arm,pl310-cache";
+> +               reg = <0xf0100000 0x1000>;
+> +               interrupts = <0 122 IRQ_TYPE_LEVEL_HIGH>;
+
+40?
+
+Comparing to other devices, you have to subtract 32 from 0x5a, not
+add 32?
+
+> +               arm,data-latency = <3 3 3>;
+> +               arm,tag-latency = <2 2 2>;
+
+Table 9.5 says 2 resp. 1 instead of 3 resp. 2?
+
+However:
+
+"The TAG and data RAM latency can be set in the reg1_tag_ram_control and
+ reg1_data_ram_control registers. However, since values to be set are
+ hardware-dependent, the default values should not be modified."
+
+Perhaps we should just omit these values?
+
+> +               arm,shared-override;
+> +               cache-unified;
+> +               cache-level = <2>;
+> +       };
+> +
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
