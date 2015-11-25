@@ -1,63 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Nov 2015 13:49:52 +0100
-Subject: [PATCH 1/3] clocksource: defbool CLKSRC_QCOM=y on ARCH_QCOM and
- make it visible
-In-Reply-To: <5655ABA1.6030206@linaro.org>
-References: <1448413710-8101-1-git-send-email-sboyd@codeaurora.org>
- <3550727.W9y7mWx54D@wuerfel> <5655ABA1.6030206@linaro.org>
-Message-ID: <2558718.Gz71lz6d4y@wuerfel>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 25 Nov 2015 13:50:31 +0100
+Subject: [PATCH] ARM: avoid SMP DT initialisation on UP-only capable
+ systems
+In-Reply-To: <20151125114908.GI8644@n2100.arm.linux.org.uk>
+References: <E1a1XXS-00060O-GS@rmk-PC.arm.linux.org.uk>
+ <20151125113538.GB12434@leverpostej>
+ <20151125114908.GI8644@n2100.arm.linux.org.uk>
+Message-ID: <1448455831.3689.55.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 November 2015 13:37:53 Daniel Lezcano wrote:
-> On 11/25/2015 11:17 AM, Arnd Bergmann wrote:
-> > On Wednesday 25 November 2015 11:10:49 Daniel Lezcano wrote:
-> >> On 11/25/2015 02:08 AM, Stephen Boyd wrote:
-> >>> We want to remove the ARCH_MSM* configs in mach-qcom/Kconfig
-> >>> because they are mostly proxy configs for selecting the right
-> >>> clocksource driver. Therefore, make CLKSRC_QCOM default to the
-> >>> value of ARCH_QCOM, but also make it visible if ARCH_QCOM=y so
-> >>> that we can turn it off when we don't want it.
-> >>
-> >> I have been removing the ARCH dependencies in the Kconfig file.
-> >>
-> >> Why do you have to turn it off manually ?
-> >
-> > The background is that this is used only on some of the older
-> > MSM SoCs, while the newer ones use the arch timer.
-> >
-> > We decided to remove the SoC-specific top-level options from
-> > mach-msm as they are becoming rather meaningless these days
-> > and just a burden to maintain at the rate that new variants
-> > get released, so being able to turn off this driver helps make
-> > the kernel slightly smaller if you are building a kernel for
-> > only the more recent models.
+Am Mittwoch, den 25.11.2015, 11:49 +0000 schrieb Russell King - ARM
+Linux:
+> On Wed, Nov 25, 2015 at 11:35:38AM +0000, Mark Rutland wrote:
+> > On Wed, Nov 25, 2015 at 10:43:02AM +0000, Russell King wrote:
+> > > arm_dt_init_cpu_maps() initialises the CPU possible map even when the
+> > > boot CPU indicates that it is not SMP capable.  This can happen with
+> > > SoCs where the SoC may have a single UP-only CPU, or may have a pair of
+> > > SMP CPUs - and this is the only difference.
+> > > 
+> > > One solution is to increase the number of DT files by forcing peopl to
+> > > properly describe the hardware: this means all the iMX6DL DT files need
+> > > to be duplicated for iMX6S and a whole raft of updates to boot loaders
+> > > and the like.
+> > >
+> > > Another solution is to decide that it is inappropriate to initialise the
+> > > cpu_possible map with anything but the boot CPU on non-SMP capable
+> > > systems.  This is implemented by this patch.
+> > > 
+> > > The situation currently may provoke a warning on earlier kernels,
+> > > printed during SMP bringup where we attempt to bring CPU1 online inspite
+> > > of CPU0 being a UP-only CPU, and this only failing due to the lack of
+> > > SMP operations.
+> > 
+> > I think that even if we work around this, we should have a warning
+> > regarding the erroneous DT.
+> > 
+> > There are plenty of other things people may get wrong in their DT that
+> > we may or may not be able to detect and/or workaround. We should
+> > generally discourage relying on fixups and encourage people to do the
+> > right thing.
 > 
-> Ok, thanks for the clarification.
+> Well, this is the problem with a static description of the hardware -
+> it very quickly becomes unmanagable when you have lots of different
+> combinations.  For the SR platforms, there are already the base vs
+> pro Hummingboard, Cubox-i, Hummingboard edge, Hummingboard Edge,
+> Hummingboard Gate, each the choice of iMX6S, DL, D, Q or more uSOMs.
+> To cover these "properly" we're going to need 24 DT files rather
+> than 12 if we're going to require the CPUs entries to correctly
+> describe the hardware.
 > 
-> I don't really like this approach even if it is correct because it 
-> breaks the current approach I am trying to make consistent across the 
-> drivers.
+> Given that CPUs are discoverable from the hardware, this is getting
+> to be insane.  Yes, there's cases where we need the CPUs described
+> in hardware, but to require the description for all platforms even
+> where CPUs are discoverable is IMHO insane.
 > 
-> I would like to have the COMPILE_TEST option available for all the 
-> drivers and move this option under the menu config. This patch will 
-> prevent to do this code factoring.
-
-How about moving the option to arch/arm/mach-qcom/Kconfig then?
-
-We could have a user-selectable "allow use of qcom clocksource"
-option there, which would then select the driver.
-
-> On the other side, this option is supposed to have a slightly smaller 
-> kernel when it is not used. But when does it happen ? When 
-> ARCH_MSM8X60=n and ARCH_MSM8960=n. With this patchset, I don't see the 
-> ability to turn these SoCs off as the options are removed. So the 
-> associated code is not removed, right ?
+> I think we need a better solution for this, rather than telling people
+> their DT files need to fully describe the hardware, and at the same
+> time, be correct.
 > 
-> So why allow to turn off the timer but disallow that for the entire SoC ?
+What we do in barebox is to look into the SCU to find out how many CPU
+cores are actually present and fix up the DT passed to the kernel
+accordingly by deleting any superfluous CPU nodes. This satisfies both
+the need to keep the required DT source files to a minimum, while also
+providing correct information to the kernel.
 
-The timer is the only code that is controlled by those two options at
-the moment, all the other differences between SoCs are already handled
-by enabling the respective device drivers.
-
-	Arnd
+Regards,
+Lucas
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
