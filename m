@@ -1,30 +1,52 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Nov 2015 22:51 +0100
-Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
- "/chosen/linux, atags" entry
-In-Reply-To: <201511252244.28797@pali>
-References: <20150713131902.GH26485@atomide.com> <3245119.krc4KB3uae@wuerfel>
- <201511252244.28797@pali>
-Message-ID: <17689711.DsQsCiDFAN@wuerfel>
+Date: Wed, 25 Nov 2015 22:57:33 +0100
+Subject: [PATCH 1/7] clk: mmp: stop using platform headers
+In-Reply-To: <20151125213222.GF11298@codeaurora.org>
+References: <1448465875-435039-1-git-send-email-arnd@arndb.de>
+ <3508030.Q62gfHvXvx@wuerfel> <20151125213222.GF11298@codeaurora.org>
+Message-ID: <3842139.m8b6S96gUd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 November 2015 22:44:28 Pali Roh?r wrote:
+On Wednesday 25 November 2015 13:32:22 Stephen Boyd wrote:
+> On 11/25, Arnd Bergmann wrote:
+> > On Wednesday 25 November 2015 11:21:14 Stephen Boyd wrote:
+> > > On 11/25, Arnd Bergmann wrote:
+> > > > diff --git a/drivers/clk/mmp/clk-mmp2.c b/drivers/clk/mmp/clk-mmp2.c
+> > > > index 09d2832fbd78..38931dbd1eff 100644
+> > > > --- a/drivers/clk/mmp/clk-mmp2.c
+> > > > +++ b/drivers/clk/mmp/clk-mmp2.c
+> > > > @@ -9,6 +9,7 @@
+> > > >   * warranty of any kind, whether express or implied.
+> > > >   */
+> > > >  
+> > > > +#include <linux/clk.h>
+> > > 
+> > > Why are we adding this include? I don't see any clk consumer API
+> > > usage being added.
+> > 
+> > drivers/clk/mmp/clk-pxa910.c: In function 'pxa910_clk_init':
+> > drivers/clk/mmp/clk-pxa910.c:166:2: error: implicit declaration of function 'clk_set_rate' [-Werror=implicit-function-declaration]
+> >   clk_set_rate(uart_pll, 14745600);
+> >   ^
+> > drivers/clk/mmp/clk-pxa910.c:209:2: error: implicit declaration of function 'clk_set_parent' [-Werror=implicit-function-declaration]
+> >   clk_set_parent(clk, uart_pll);
+> >   ^
+> > 
+> > Is there anything I need to change here?
+> > 
 > 
-> Arnd, my question about proper solution reminds... Proprietary 
-> bootloader which cannot be replaced (e.g. it is signed or do unknown 
-> magic) provides information to booted kernel via custom specific ATAGs 
-> fields. How userspace could properly read those custom information from 
-> bootloader?
+> Hmph. I seems this broke when we removed the clk.h include from
+> clk-provider.h, but nobody has noticed for months. Can you make a
+> different commit to add the header? Otherwise we're sneaking in
+> that include to get this file to compile again.
 
-The typical solution for nonstandard bootloaders is to have a boot wrapper
-like the one from https://github.com/zonque/pxa-impedance-matcher that
-translates whatever information we have at the bootloader level into
-DT properties.
+Ok, I hadn't noticed at all that it was broken in mainline already,
+as the three mmp defconfigs do not use drivers/clk/ at all but instead
+rely on arch/arm/mach-mmp/clock*.c instead, which has a separate
+implementation.
 
-As I understand, the reason we are not doing that here is that we also
-have proprietary user space that we can't fix to look in a different
-place, i.e. the interface is between the bootloader and some user
-binary, not bootloader to kernel.
+With the move to multiplatform, the choice goes away and we use the
+common clock implementation unconditionally.
 
 	Arnd
