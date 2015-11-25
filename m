@@ -1,42 +1,28 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 25 Nov 2015 13:04:38 -0800
-Subject: [PATCH v2 3/3] ARM: qcom: Drop ARCH_MSM* configs
-In-Reply-To: <1448485478-21699-1-git-send-email-sboyd@codeaurora.org>
-References: <1448485478-21699-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1448485478-21699-4-git-send-email-sboyd@codeaurora.org>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 25 Nov 2015 15:06:40 -0600
+Subject: [PATCH] ARM: qcom: select ARM_CPU_SUSPEND for power management
+In-Reply-To: <5497046.7sx8fEMiNf@wuerfel>
+References: <5497046.7sx8fEMiNf@wuerfel>
+Message-ID: <20151125210640.GA5643@Agamemnon.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop these configs now that we select the clocksources we need
-via the defconfig.
+On Tue, Nov 24, 2015 at 11:13:09PM +0100, Arnd Bergmann wrote:
+> The qcom spm driver uses cpu_resume_arm(), which is not included
+> in the kernel in all configurations:
+> 
+> drivers/built-in.o: In function `qcom_cpu_spc':
+> :(.text+0xbc022): undefined reference to `cpu_suspend'
+> drivers/built-in.o: In function `qcom_cpuidle_init':
+> :(.init.text+0x610c): undefined reference to `cpu_resume_arm'
+> 
+> This adds a 'select' Kconfig statement to ensure it's always
+> enabled.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> This has been broken for a while but not even shown up in many thousands of
+> randconfig builds until today. Please queue it up for 4.5 unless you think
+> it should really go into 4.4 as well.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/mach-qcom/Kconfig | 12 ------------
- 1 file changed, 12 deletions(-)
-
-diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
-index 35a03967d9c2..0945056e3cdf 100644
---- a/arch/arm/mach-qcom/Kconfig
-+++ b/arch/arm/mach-qcom/Kconfig
-@@ -18,16 +18,4 @@ config HAVE_CLKSRC_QCOM
- 	  Select this option if you want to support platforms
- 	  with the qcom clocksource such as MSM8660 and MSM8960.
- 
--config ARCH_MSM8X60
--	bool "Enable support for MSM8X60"
--	select CLKSRC_QCOM
--
--config ARCH_MSM8960
--	bool "Enable support for MSM8960"
--	select CLKSRC_QCOM
--
--config ARCH_MSM8974
--	bool "Enable support for MSM8974"
--	select HAVE_ARM_ARCH_TIMER
--
- endif
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks Arnd.  I'll add this to my list for the pull request.
