@@ -1,52 +1,83 @@
-From: geliangtang@163.com (Geliang Tang)
-Date: Wed, 25 Nov 2015 22:13:13 +0800
-Subject: [PATCH v2] ARM: davinci: fix a problematic usage of WARN()
-In-Reply-To: <12268783.CeI9Q9YHFN@wuerfel>
-Message-ID: <50fd45fb78403b66381569a8c9ada6b17433e2d9.1448460525.git.geliangtang@163.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 25 Nov 2015 15:17:16 +0100
+Subject: [PATCH 1/2] ARM: mvebu: update v5 defconfig
+Message-ID: <1448461036-16724-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WARN() takes a condition and a format string. The condition was
-omitted. So I added it.
+This just regenerates the v5 mvebu defconfig with the latest
+defaults so as to avoid too much fuzz when applying patches to
+it.
 
-Signed-off-by: Geliang Tang <geliangtang@163.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-Changes in v2:
- - remove __func__ in WARN()
----
- arch/arm/mach-davinci/board-dm355-evm.c     | 4 +---
- arch/arm/mach-davinci/board-dm355-leopard.c | 4 +---
- 2 files changed, 2 insertions(+), 6 deletions(-)
+ arch/arm/configs/mvebu_v5_defconfig | 12 ++----------
+ 1 file changed, 2 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
-index c71dd99..3c79796 100644
---- a/arch/arm/mach-davinci/board-dm355-evm.c
-+++ b/arch/arm/mach-davinci/board-dm355-evm.c
-@@ -384,9 +384,7 @@ static __init void dm355_evm_init(void)
- 	dm355evm_dm9000_rsrc[2].start = gpio_to_irq(1);
- 
- 	aemif = clk_get(&dm355evm_dm9000.dev, "aemif");
--	if (IS_ERR(aemif))
--		WARN("%s: unable to get AEMIF clock\n", __func__);
--	else
-+	if (!WARN(IS_ERR(aemif)), "unable to get AEMIF clock\n"))
- 		clk_prepare_enable(aemif);
- 
- 	platform_add_devices(davinci_evm_devices,
-diff --git a/arch/arm/mach-davinci/board-dm355-leopard.c b/arch/arm/mach-davinci/board-dm355-leopard.c
-index 680a7a2..627ba89 100644
---- a/arch/arm/mach-davinci/board-dm355-leopard.c
-+++ b/arch/arm/mach-davinci/board-dm355-leopard.c
-@@ -242,9 +242,7 @@ static __init void dm355_leopard_init(void)
- 	dm355leopard_dm9000_rsrc[2].start = gpio_to_irq(9);
- 
- 	aemif = clk_get(&dm355leopard_dm9000.dev, "aemif");
--	if (IS_ERR(aemif))
--		WARN("%s: unable to get AEMIF clock\n", __func__);
--	else
-+	if (!WARN(IS_ERR(aemif)), "unable to get AEMIF clock\n"))
- 		clk_prepare_enable(aemif);
- 
- 	platform_add_devices(davinci_leopard_devices,
+diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
+index 824de499237b..519c72725798 100644
+--- a/arch/arm/configs/mvebu_v5_defconfig
++++ b/arch/arm/configs/mvebu_v5_defconfig
+@@ -12,7 +12,6 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_ARCH_MULTI_V7 is not set
+ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_KIRKWOOD=y
+-CONFIG_MACH_NETXBIG=y
+ # CONFIG_CPU_FEROCEON_OLD_ID is not set
+ CONFIG_PCI_MVEBU=y
+ CONFIG_PREEMPT=y
+@@ -66,8 +65,6 @@ CONFIG_ATA=y
+ CONFIG_SATA_AHCI=y
+ CONFIG_SATA_MV=y
+ CONFIG_NETDEVICES=y
+-CONFIG_NET_DSA_MV88E6123_61_65=y
+-CONFIG_NET_DSA_MV88E6171=y
+ CONFIG_MV643XX_ETH=y
+ CONFIG_R8169=y
+ CONFIG_MARVELL_PHY=y
+@@ -91,7 +88,6 @@ CONFIG_I2C_MV64XXX=y
+ CONFIG_SPI=y
+ CONFIG_SPI_ORION=y
+ CONFIG_GPIO_SYSFS=y
+-CONFIG_POWER_SUPPLY=y
+ CONFIG_POWER_RESET=y
+ CONFIG_POWER_RESET_GPIO=y
+ CONFIG_POWER_RESET_QNAP=y
+@@ -103,16 +99,15 @@ CONFIG_SENSORS_LM85=y
+ CONFIG_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_ORION_WATCHDOG=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_FB=y
+ CONFIG_SOUND=y
+ CONFIG_SND=y
+ CONFIG_SND_SOC=y
+ CONFIG_SND_KIRKWOOD_SOC=y
+-CONFIG_SND_KIRKWOOD_SOC_T5325=y
+ CONFIG_SND_SOC_ALC5623=y
+ CONFIG_SND_SIMPLE_CARD=y
+-CONFIG_REGULATOR=y
+-CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_HID_DRAGONRISE=y
+ CONFIG_HID_GYRATION=y
+ CONFIG_HID_TWINHAN=y
+@@ -159,8 +154,6 @@ CONFIG_STAGING=y
+ CONFIG_FB_XGI=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+-# CONFIG_EXT3_FS_XATTR is not set
+-CONFIG_EXT4_FS=y
+ CONFIG_ISO9660_FS=m
+ CONFIG_JOLIET=y
+ CONFIG_UDF_FS=m
+@@ -186,7 +179,6 @@ CONFIG_DEBUG_KERNEL=y
+ CONFIG_DEBUG_USER=y
+ CONFIG_CRYPTO_CBC=m
+ CONFIG_CRYPTO_PCBC=m
+-# CONFIG_CRYPTO_ANSI_CPRNG is not set
+ CONFIG_CRYPTO_DEV_MV_CESA=y
+ CONFIG_CRC_CCITT=y
+ CONFIG_LIBCRC32C=y
 -- 
-2.5.0
+2.4.3
