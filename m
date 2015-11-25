@@ -1,43 +1,34 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 24 Nov 2015 18:07:20 -0800
-Subject: [PATCH 1/3] clocksource: defbool CLKSRC_QCOM=y on ARCH_QCOM and
- make it visible
-In-Reply-To: <1448413710-8101-2-git-send-email-sboyd@codeaurora.org>
-References: <1448413710-8101-1-git-send-email-sboyd@codeaurora.org>
- <1448413710-8101-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <565517D8.5000705@codeaurora.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 25 Nov 2015 03:10:34 +0100
+Subject: VF610 broken by pinctrl: freescale: imx: allow mux_reg offset zero
+In-Reply-To: <20151123132838.GM13744@tiger>
+References: <20151115024409.GB2194@lunn.ch>
+ <20151123132838.GM13744@tiger>
+Message-ID: <20151125021034.GB11384@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/24/15 17:08, Stephen Boyd wrote:
-> We want to remove the ARCH_MSM* configs in mach-qcom/Kconfig
-> because they are mostly proxy configs for selecting the right
-> clocksource driver. Therefore, make CLKSRC_QCOM default to the
-> value of ARCH_QCOM, but also make it visible if ARCH_QCOM=y so
-> that we can turn it off when we don't want it.
->
-> Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/clocksource/Kconfig | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index b423785d6afc..7a5ffaa3e490 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -279,9 +279,10 @@ config EM_TIMER_STI
->  	  such as EMEV2 from former NEC Electronics.
+> Can you please try the following change to see if it fixes your problem?
+> 
+> Shawn
+> 
+> diff --git a/drivers/pinctrl/freescale/pinctrl-vf610.c b/drivers/pinctrl/freescale/pinctrl-vf610.c
+> index 37a037543d29..587d1ff6210e 100644
+> --- a/drivers/pinctrl/freescale/pinctrl-vf610.c
+> +++ b/drivers/pinctrl/freescale/pinctrl-vf610.c
+> @@ -299,7 +299,7 @@ static const struct pinctrl_pin_desc vf610_pinctrl_pads[] = {
+>  static struct imx_pinctrl_soc_info vf610_pinctrl_info = {
+>         .pins = vf610_pinctrl_pads,
+>         .npins = ARRAY_SIZE(vf610_pinctrl_pads),
+> -       .flags = SHARE_MUX_CONF_REG,
+> +       .flags = SHARE_MUX_CONF_REG | ZERO_OFFSET_VALID,
+>  };
 >  
->  config CLKSRC_QCOM
-> -	bool "Qualcomm MSM timer" if COMPILE_TEST
-> +	bool "Qualcomm MSM timer" if ARCH_QCOM || COMPILE_TEST
->  	depends on ARM
->  	select CLKSRC_OF
-> +	defbool ARCH_QCOM
+>  static const struct of_device_id vf610_pinctrl_of_match[] = {
 
-Urgh. This should be def_bool
+Hi Shawn
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I tested it, and it does work.
+
+Thanks
+	Andrew
