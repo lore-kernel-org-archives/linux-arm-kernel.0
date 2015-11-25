@@ -1,57 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Nov 2015 21:09:15 +0100
-Subject: [RFC PATCH] PCI/pci-host-generic: Add support for Cavium Thunder
- fixed BARs.
-In-Reply-To: <5656149D.50704@caviumnetworks.com>
-References: <1443488184-12633-1-git-send-email-ddaney.cavm@gmail.com>
- <2789794.TBZL2yW2b6@wuerfel> <5656149D.50704@caviumnetworks.com>
-Message-ID: <2971730.8fz1SdakMA@wuerfel>
+Date: Wed, 25 Nov 2015 21:11:28 +0100
+Subject: [PATCH 7/7] ARM: mmp: move into ARCH_MULTIPLATFORM
+In-Reply-To: <20151125192709.GC11298@codeaurora.org>
+References: <1448465875-435039-1-git-send-email-arnd@arndb.de>
+ <1448465875-435039-8-git-send-email-arnd@arndb.de>
+ <20151125192709.GC11298@codeaurora.org>
+Message-ID: <3103786.X1psj6MdNt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 November 2015 12:05:49 David Daney wrote:
+On Wednesday 25 November 2015 11:27:09 Stephen Boyd wrote:
+> On 11/25, Arnd Bergmann wrote:
+> > diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
+> > index fdbfadf00c84..4773fe1d8b3f 100644
+> > --- a/arch/arm/mach-mmp/Kconfig
+> > +++ b/arch/arm/mach-mmp/Kconfig
+> > @@ -1,9 +1,24 @@
+> > +menuconfig ARCH_MMP
+> > +     bool "Marvell PXA168/910/MMP2"
+> > +     depends on ARCH_MULTI_V5 || ARCH_MULTI_V7
+> > +     select ARCH_REQUIRE_GPIOLIB
+> > +     select GENERIC_ALLOCATOR
+> > +     select GENERIC_CLOCKEVENTS
 > 
-> Somebody should make a decision about this point.
-> 
-> Here is what happens:
-> 
->   1) A driver for non-generic PCI host bridge is submitted.
-> 
->   2) Comments are received stating that it is just another PCI host 
-> bridge and please use pci-host-generic instead.
-> 
->   3) Patches to pci-host-generic are submitted.
-> 
->   4) Comments are received stating that pci-host-generic is for generic 
-> things only, and please create a device specific driver.
-> 
->   5) goto 1
+> ARCH_MULTIPLATFORM already selects this.
 
-I'm pretty sure the comments were along the lines of 
+Ok, I'll remove it.
 
-1) a driver was submitted stating that it was for an SBSA-compliant
-   platform
-
-2) The reply was that you don't need a driver for that and just use
-   the generic driver, as that is the point of SBSA
-
-3) it turns out the hardware is nonstandard after all and so it needs
-   its own driver.
-
-> > It's easy enough to split out the common parts if we want to reuse
-> > some of this, or to move them into drivers/pci/*.c for others to
-> > reuse too.
-> >
+> > -
+> > -#define UART1_BASE   (APB_PHYS_BASE + 0x36000)
+> > -#define UART2_BASE   (APB_PHYS_BASE + 0x17000)
+> > -#define UART3_BASE   (APB_PHYS_BASE + 0x18000)
+> > -
+> > -volatile unsigned long *UART;
 > 
-> If we do that, do you want "pci-host-cam-generic" and 
-> "pci-host-ecam-generic" split out too?
-> 
-> They are two completely different things crammed into the single 
-> pci-host-generic driver source file.  Or is there some set of config 
-> access methods that are sufficiently generic that they can stay?
+> Doesn't this file need to be ported over to
+> arch/arm/include/debug/?
 
-Those two are part of the PCI standard, they are obviously generic
-because any mmconfig compliant host bridge will work with one or the
-other.
+The multiplatform based platforms all use the DEBUG_LL based uncompress
+output, which doesn't require the header but is a little more limited
+otherwise.
 
 	Arnd
