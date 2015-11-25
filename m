@@ -1,23 +1,29 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 25 Nov 2015 14:45:45 +0000
-Subject: [PATCH] ARM: mach-orion5x: fix legacy get_irqnr_and_base
-In-Reply-To: <alpine.LFD.2.20.1511222240150.22569@knanqh.ubzr>
-References: <alpine.LFD.2.20.1511222240150.22569@knanqh.ubzr>
-Message-ID: <20151125144545.GA6520@io.lakedaemon.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 25 Nov 2015 15:46:45 +0100
+Subject: Strange message from Kirkwood pinctrl driver
+In-Reply-To: <CACRpkdah4w-=qHS+q_=Ab-RiJyvbCKY-Rp5Ya0x+F=3DL2iuBA@mail.gmail.com>
+References: <CACRpkdah4w-=qHS+q_=Ab-RiJyvbCKY-Rp5Ya0x+F=3DL2iuBA@mail.gmail.com>
+Message-ID: <20151125144645.GE11384@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 22, 2015 at 10:44:19PM -0500, Nicolas Pitre wrote:
-> Commit 5be9fc23cd ("ARM: orion5x: fix legacy orion5x IRQ numbers") shifted
-> IRQ numbers by one but didn't update the get_irqnr_and_base macro
-> accordingly.  This macro is involved when CONFIG_MULTI_IRQ_HANDLER
-> is not defined.
+On Wed, Nov 25, 2015 at 11:27:46AM +0100, Linus Walleij wrote:
+> Hi Sebastian,
 > 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> trying to use the Kirkwood pinctrl driver with compatible =
+> "marvell,88f6192-pinctrl";
+> on a Pogoplug series 4 yields the following message when instantiating
+> the driver:
+> 
+> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 36
+> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 37
+> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 38
+> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 39
+> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 40
 
-Applied to mvebu/fixes with minor tweak to the subject line and Cc's to
-stable back to v4.2.
+Hi Linus
 
-thx,
+Humm, interesting. I don't remember it doing that before. I will look
+into this in the next couple of days.
 
-Jason.
+     Andrew
