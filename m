@@ -1,43 +1,62 @@
-From: b51503@freescale.com (Bai Ping)
-Date: Tue, 24 Nov 2015 18:25:16 +0800
-Subject: [PATCH 3/3] ARM: imx: enable cpufreq device on i.mx7d
-In-Reply-To: <1448360716-1741-1-git-send-email-b51503@freescale.com>
-References: <1448360716-1741-1-git-send-email-b51503@freescale.com>
-Message-ID: <1448360716-1741-3-git-send-email-b51503@freescale.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 25 Nov 2015 11:27:46 +0100
+Subject: Strange message from Kirkwood pinctrl driver
+Message-ID: <CACRpkdah4w-=qHS+q_=Ab-RiJyvbCKY-Rp5Ya0x+F=3DL2iuBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a cpufreq-dt device on i.MX7D, using the
-generic cpufreq-dt for CPU frequency scaling.
+Hi Sebastian,
 
-Signed-off-by: Bai Ping <b51503@freescale.com>
----
- arch/arm/mach-imx/mach-imx7d.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+trying to use the Kirkwood pinctrl driver with compatible =
+"marvell,88f6192-pinctrl";
+on a Pogoplug series 4 yields the following message when instantiating
+the driver:
 
-diff --git a/arch/arm/mach-imx/mach-imx7d.c b/arch/arm/mach-imx/mach-imx7d.c
-index b450f52..5a27f20 100644
---- a/arch/arm/mach-imx/mach-imx7d.c
-+++ b/arch/arm/mach-imx/mach-imx7d.c
-@@ -105,6 +105,11 @@ static void __init imx7d_init_irq(void)
- 	irqchip_init();
- }
- 
-+static void __init imx7d_init_late(void)
-+{
-+	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-+}
-+
- static const char *const imx7d_dt_compat[] __initconst = {
- 	"fsl,imx7d",
- 	NULL,
-@@ -112,6 +117,7 @@ static const char *const imx7d_dt_compat[] __initconst = {
- 
- DT_MACHINE_START(IMX7D, "Freescale i.MX7 Dual (Device Tree)")
- 	.init_irq	= imx7d_init_irq,
-+	.init_late	= imx7d_init_late,
- 	.init_machine	= imx7d_init_machine,
- 	.dt_compat	= imx7d_dt_compat,
- MACHINE_END
--- 
-1.9.1
+kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 36
+kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 37
+kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 38
+kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 39
+kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 40
+kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 41
+kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 42
+kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 43
+kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 44
+kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 45
+kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 46
+kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 47
+kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 48
+kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 49
+kirkwood-pinctrl f1010000.pin-controller: registered pinctrl driver
+
+It looks harmless but seems like a bug and make me uncertain.
+
+The following naive patch fixes it:
+
+diff --git a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
+b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
+index 0f07dc554a1d..6c7c2c8819b8 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
++++ b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
+@@ -411,7 +411,7 @@ static struct mvebu_pinctrl_soc_info mv88f6190_info = {
+        .controls = mv88f619x_mpp_controls,
+        .ncontrols = ARRAY_SIZE(mv88f619x_mpp_controls),
+        .modes = mv88f6xxx_mpp_modes,
+-       .nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes),
++       .nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes) - 14,
+        .gpioranges = mv88f619x_gpio_ranges,
+        .ngpioranges = ARRAY_SIZE(mv88f619x_gpio_ranges),
+ };
+@@ -421,7 +421,7 @@ static struct mvebu_pinctrl_soc_info mv88f6192_info = {
+        .controls = mv88f619x_mpp_controls,
+        .ncontrols = ARRAY_SIZE(mv88f619x_mpp_controls),
+        .modes = mv88f6xxx_mpp_modes,
+-       .nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes),
++       .nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes) - 14,
+        .gpioranges = mv88f619x_gpio_ranges,
+        .ngpioranges = ARRAY_SIZE(mv88f619x_gpio_ranges),
+ };
+
+What is the proper way to fix this?
+
+Yours,
+Linus Walleij
