@@ -1,23 +1,17 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 25 Nov 2015 10:59:52 +0800
-Subject: [PATCH 1/2] ARM: dts: imx: ventana: add PWM nodes for Ventana
- boards
-In-Reply-To: <1447963323-21919-1-git-send-email-tharvey@gateworks.com>
-References: <1447963323-21919-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <20151125025952.GC11999@tiger>
+Date: Wed, 25 Nov 2015 11:07:43 +0800
+Subject: [PATCH] mach-imx/mach-imx6ul.c: proper constness with __initconst
+In-Reply-To: <alpine.LFD.2.20.1511212024220.22569@knanqh.ubzr>
+References: <alpine.LFD.2.20.1511212024220.22569@knanqh.ubzr>
+Message-ID: <20151125030743.GD11999@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2015 at 12:02:03PM -0800, Tim Harvey wrote:
-> Ventana boards have an off-board connector with signals that can be pinmuxed
-> as either GPIO or PWM. This patch adds pwm device-tree nodes in the disabled
-> state which the bootloader can decide to enable based on bootloader config.
+On Sat, Nov 21, 2015 at 08:35:31PM -0500, Nicolas Pitre wrote:
+> Both the pointer array and the pointed data have to be const when using
+> __initconst to be correct.  This also fixes LTO builds that otherwise 
+> fail with section mismatch errors.
 > 
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
 
-Tim,
-
-Please use my kernel.org rather than linaro.org mail address in the
-future.  The MAINTAINERS file had been updated for a few release cycles.
-
-Shawn
+Applied, thanks.
