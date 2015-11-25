@@ -1,45 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Nov 2015 23:40:07 +0100
-Subject: [PATCH v2 1/3] ARM: qcom: Make an option for qcom clocksource
- platforms
-In-Reply-To: <5656349D.70103@codeaurora.org>
-References: <1448485478-21699-1-git-send-email-sboyd@codeaurora.org>
- <6140735.DAZiajTbh1@wuerfel> <5656349D.70103@codeaurora.org>
-Message-ID: <3228474.gifZbHXqvC@wuerfel>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 25 Nov 2015 23:41:49 +0100
+Subject: Building an uImage with appended DTB
+In-Reply-To: <20151125184556.GP8644@n2100.arm.linux.org.uk>
+References: <5655DED0.5000601@free.fr>
+ <CACxGe6t0RD-z=duiP+=sbWm_JY7_OjjTmBL7jLZRRuLBSMan6g@mail.gmail.com>
+ <20151125184556.GP8644@n2100.arm.linux.org.uk>
+Message-ID: <5656392D.8030904@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 November 2015 14:22:21 Stephen Boyd wrote:
+On 25/11/2015 19:45, Russell King - ARM Linux wrote:
+> On Wed, Nov 25, 2015 at 04:38:35PM +0000, Grant Likely wrote:
+>> On Wed, Nov 25, 2015 at 4:16 PM, Mason wrote:
+>>> Hello,
+>>>
+>>> Per Russell's advice (IIRC) I have a script to generate a uImage
+>>> of a kernel with an appended DTB:
+>>>
+>>> export LOADADDR=0x80008000
+>>> MAKE="make -j2 ARCH=arm"
+>>> $MAKE dtbs zImage && \
+>>> cat arch/arm/boot/zImage arch/arm/boot/dts/tango4-vantage-1172.dtb >zImage.tmp && \
+>>> mv zImage.tmp arch/arm/boot/zImage && \
+>>> $MAKE uImage
+>>>
+>>> Russell's version uses an explicit mkimage instead of "MAKE uImage"
+>>> perhaps in part to get around the following limitation:
+>>>
+>>> if there is nothing to be done, cat+mv will update arch/arm/boot/zImage
+>>> thus the uImage will be rebuilt even when it's not necessary.
+>>>
+>>> Doesn't the top-level Makefile support a target to build a uImage
+>>> with appended DTB?
+>>>
+>>> (I suppose someone has submitted a patch for that. Was it perhaps
+>>> never merged? Or did I just miss the feature?)
+>>
+>> I don't remember what happened there. That was a long time ago. I
+>> think it got nacked, but cannot remember the reason.
 > 
-> >
-> > Is there any common way to classify these, e.g. calling them
-> > 'pre-2013 models' or 'Snapdragon S4' as a way to identify them?
+> It got nacked because we don't want these special boot loader specific
+> formats in the kernel, and it's getting beyond a joke.  It was a mistake
+> to merge the uImage target in the first place IMHO.
 > 
-> I was thinking I could leave it as ARCH_MSM_8X60 because that covers the
-> 6 and the 9, but that doesn't make me feel great. I have no idea what
-> Snapdragon S4 is, and that didn't exist when 8660 was first released.
-> pre-2013 models seems alright. Or perhaps ARCH_QCOM_PRE_8974?
+> Previous to uboot, boot loaders were perfectly happy with zImage.  Today,
+> all boot loaders are perfectly happy with a zImage - it's only the old
+> legacy uboot versions that insist on uImage now.  There's now even less
+> of a reason to think about merging some uImage based DT munging than there
+> was several years ago.
+
+Actually, I'm using a fairly recent version of U-Boot (2014.04)
+IIUC, bootz should do the trick... But I'm not finding much doc
+about it... <confused>
+
+If I pass U-Boot a zImage, where should I load it, and how does
+U-Boot know where to relocate it? (LOADADDR?)
+And why is LOADADDR 0x80008000 and not 0x80000000 (the start
+of the RAM)?
+
+Misc links for my own reference:
+https://patchwork.ozlabs.org/patch/146848/
+https://stackoverflow.com/questions/22322304/image-vs-zimage-vs-uimage
+https://unix.stackexchange.com/questions/122526/how-to-convert-a-zimage-into-uimage-for-booting-with-u-boot
+http://lists.denx.de/pipermail/u-boot/2015-March/208551.html
+http://www.denx.de/wiki/DULG/Manual
+
+> Just do it in an external script, like I do here for platforms where it's
+> necessary.  Absolutely no need to hack around in the kernel with special
+> crap, like passing environment variables to make (which, you need a script
+> for anyway, because its laborious to have to keep on typing them.)
+
+How do you prevent your script from rebuilding the uImage every
+time it is invoked?
+
+> If you're writing a build script so you don't have to remember lots of
+> environment variables for the kernel, you might as well write the build
+> script to do the mkimage step for you.
 > 
-> Internally (and sort of leaked externally now) we called MSM8960 and its
-> variants A-family, and the generation after B-family, so perhaps
-> ARCH_QCOM_A_FAMILY would be appropriate? The problem there is no end
-> user knows about this distinction.
+> So having it in the kernel is totally pointless and insane.
 
-I think using internal code names like ARCH_QCOM_A_FAMILY here is fine,
-a lot of other platforms do similar things. Regarding end users,
-it's probably enough to explain the distinction in the help text,
-something like:
+I understand.
 
-	The A-family includes all Snapdragon S1/S2/S3/S4 chips before 2013,
-	up to the MSM8x60 and APQ8064 models.
-
-	The B-family includes all Snapdragon 2xx/4xx/6xx/8xx models starting
-	in 2013 with the MSM8x74.
-
-https://en.wikipedia.org/wiki/List_of_Qualcomm_Snapdragon_device has
-a good overview that translates the marketing names into the model
-numbers but it doesn't have internal code names, so I'm not sure where the
-APQ8064 fits it, as it was marketed as both the "S4 Pro" and the "600",
-depending on the revision.
-
-	Arnd
+Regards.
