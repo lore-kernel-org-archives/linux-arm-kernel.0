@@ -1,124 +1,36 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 25 Nov 2015 17:48:25 -0600
-Subject: [RESEND PATCH v3] dt-bindings: Consolidate SRAM bindings from
- all vendors
-In-Reply-To: <1447893769-17088-1-git-send-email-k.kozlowski@samsung.com>
-References: <1447893769-17088-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20151125234825.GA17558@rob-hp-laptop>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Wed, 25 Nov 2015 23:54:06 +0000
+Subject: [PATCH] ASoC: rcar: remove unused variable
+In-Reply-To: <4083363.2bJPz8BMy4@wuerfel>
+References: <4929159.b95vLdVRYU@wuerfel>
+ <878u5m8ut0.wl%kuninori.morimoto.gx@renesas.com>
+ <4083363.2bJPz8BMy4@wuerfel>
+Message-ID: <87ziy1d4j8.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2015 at 09:42:49AM +0900, Krzysztof Kozlowski wrote:
-> SRAM bindings for various SoCs, using the mmio-sram genalloc
-> API, are spread over different places - per SoC vendor. Since all of
-> these are quite similar (they depend on mmio-sram) move them to a common
-> place.
-> 
-> Suggested-by: Rob Herring <robh+dt@kernel.org>
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Heiko Stuebner <heiko@sntech.de>
 
-Applied, thanks. I said I would apply for 4.4, but it is not really 
-urgent, so I've just applied it for 4.5.
+Hi Mark, Arnd
 
-Rob
+> > /opt/home/morimoto/WORK/linux/sound/soc/sh/rcar/core.c: In function '__rsnd_kctrl_new':
+> > /opt/home/morimoto/WORK/linux/sound/soc/sh/rcar/core.c:807:18: error: 'soc_card' undeclared (first use in this function)
+> >    .index  = rtd - soc_card->rtd,
+> >                   ^
+> > /opt/home/morimoto/WORK/linux/sound/soc/sh/rcar/core.c:807:18: note: each undeclared identifier is reported only once for each function it appears in
+> > make[6]: *** [sound/soc/sh/rcar/core.o] ??? 1
+> > make[6]: *** ??????????????....
+> > make[5]: *** [sound/soc/sh/rcar] ??? 2
+> > make[4]: *** [sound/soc/sh] ??? 2
+> > 
+> > This __rsnd_kctrl_new() is using "soc_card"...
+> 
+> It looks like the commit that removed the user of that variable is in the
+> "topic/pcm-list" branch instead of "topic/rcar".
 
-> 
-> ---
-> 
-> Changes since v2:
-> 1. Update paths to sram.txt.
-> 
-> Changes since v1:
-> 1. New patch. Extended suggestion from Rob.
-> ---
->  Documentation/devicetree/bindings/arm/arm,scpi.txt                      | 2 +-
->  .../bindings/{arm/rockchip/pmu-sram.txt => sram/rockchip-pmu-sram.txt}  | 0
->  .../bindings/{arm/rockchip/smp-sram.txt => sram/rockchip-smp-sram.txt}  | 2 +-
->  .../bindings/{arm/exynos/smp-sysram.txt => sram/samsung-sram.txt}       | 2 +-
->  Documentation/devicetree/bindings/{misc => sram}/sram.txt               | 0
->  .../devicetree/bindings/{soc/sunxi/sram.txt => sram/sunxi-sram.txt}     | 2 +-
->  6 files changed, 4 insertions(+), 4 deletions(-)
->  rename Documentation/devicetree/bindings/{arm/rockchip/pmu-sram.txt => sram/rockchip-pmu-sram.txt} (100%)
->  rename Documentation/devicetree/bindings/{arm/rockchip/smp-sram.txt => sram/rockchip-smp-sram.txt} (92%)
->  rename Documentation/devicetree/bindings/{arm/exynos/smp-sysram.txt => sram/samsung-sram.txt} (95%)
->  rename Documentation/devicetree/bindings/{misc => sram}/sram.txt (100%)
->  rename Documentation/devicetree/bindings/{soc/sunxi/sram.txt => sram/sunxi-sram.txt} (97%)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-> index 86302de67c2c..313dabdc14f9 100644
-> --- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
-> +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-> @@ -63,7 +63,7 @@ Required properties:
->  - compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno
->  
->  The rest of the properties should follow the generic mmio-sram description
-> -found in ../../misc/sysram.txt
-> +found in ../../sram/sram.txt
->  
->  Each sub-node represents the reserved area for SCPI.
->  
-> diff --git a/Documentation/devicetree/bindings/arm/rockchip/pmu-sram.txt b/Documentation/devicetree/bindings/sram/rockchip-pmu-sram.txt
-> similarity index 100%
-> rename from Documentation/devicetree/bindings/arm/rockchip/pmu-sram.txt
-> rename to Documentation/devicetree/bindings/sram/rockchip-pmu-sram.txt
-> diff --git a/Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt b/Documentation/devicetree/bindings/sram/rockchip-smp-sram.txt
-> similarity index 92%
-> rename from Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
-> rename to Documentation/devicetree/bindings/sram/rockchip-smp-sram.txt
-> index d9416fb8db6f..800701ecffca 100644
-> --- a/Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
-> +++ b/Documentation/devicetree/bindings/sram/rockchip-smp-sram.txt
-> @@ -12,7 +12,7 @@ Required sub-node properties:
->  - compatible : should be "rockchip,rk3066-smp-sram"
->  
->  The rest of the properties should follow the generic mmio-sram discription
-> -found in ../../misc/sram.txt
-> +found in Documentation/devicetree/bindings/sram/sram.txt
->  
->  Example:
->  
-> diff --git a/Documentation/devicetree/bindings/arm/exynos/smp-sysram.txt b/Documentation/devicetree/bindings/sram/samsung-sram.txt
-> similarity index 95%
-> rename from Documentation/devicetree/bindings/arm/exynos/smp-sysram.txt
-> rename to Documentation/devicetree/bindings/sram/samsung-sram.txt
-> index 4a0a4f70a0ce..6bc474b2b885 100644
-> --- a/Documentation/devicetree/bindings/arm/exynos/smp-sysram.txt
-> +++ b/Documentation/devicetree/bindings/sram/samsung-sram.txt
-> @@ -15,7 +15,7 @@ Required sub-node properties:
->  		"samsung,exynos4210-sysram-ns" : for Non-secure SYSRAM
->  
->  The rest of the properties should follow the generic mmio-sram discription
-> -found in ../../misc/sysram.txt
-> +found in Documentation/devicetree/bindings/sram/sram.txt
->  
->  Example:
->  
-> diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/sram/sram.txt
-> similarity index 100%
-> rename from Documentation/devicetree/bindings/misc/sram.txt
-> rename to Documentation/devicetree/bindings/sram/sram.txt
-> diff --git a/Documentation/devicetree/bindings/soc/sunxi/sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-> similarity index 97%
-> rename from Documentation/devicetree/bindings/soc/sunxi/sram.txt
-> rename to Documentation/devicetree/bindings/sram/sunxi-sram.txt
-> index 067698112f5f..8d5665468fe7 100644
-> --- a/Documentation/devicetree/bindings/soc/sunxi/sram.txt
-> +++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-> @@ -16,7 +16,7 @@ SRAM nodes
->  ----------
->  
->  Each SRAM is described using the mmio-sram bindings documented in
-> -Documentation/devicetree/bindings/misc/sram.txt
-> +Documentation/devicetree/bindings/sram/sram.txt
->  
->  Each SRAM will have SRAM sections that are going to be handled by the
->  SRAM controller as subnodes. These sections are represented following
-> -- 
-> 1.9.1
-> 
+Mark
+
+It is possible to remove this patch from topic/rcar,
+and, apply it to topic/pcm-list ?
+
+ccae40fa973f5b0eec5d5ad27e81c5a2b95f7b7c
+(" ASoC: rcar: remove unused variable")
