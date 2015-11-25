@@ -1,42 +1,39 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 25 Nov 2015 23:50:49 +0800
-Subject: [PATCH v3 0/2] clocksource/drivers/dw_apb_timer: improve
- performance a bit
-In-Reply-To: <1448466514-5298-1-git-send-email-jszhang@marvell.com>
-References: <1448466514-5298-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20151125235049.1d742846@xhacker>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 25 Nov 2015 10:58:03 -0500 (EST)
+Subject: [PATCH] ARM: mach-orion5x: fix legacy get_irqnr_and_base
+In-Reply-To: <20151125154313.GL11384@lunn.ch>
+References: <alpine.LFD.2.20.1511222240150.22569@knanqh.ubzr>
+ <20151125144545.GA6520@io.lakedaemon.net>
+ <alpine.LFD.2.20.1511250948470.22569@knanqh.ubzr>
+ <20151125145552.GB6520@io.lakedaemon.net>
+ <alpine.LFD.2.20.1511251027210.22569@knanqh.ubzr>
+ <20151125154313.GL11384@lunn.ch>
+Message-ID: <alpine.LFD.2.20.1511251051490.22569@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Nov 2015 23:48:32 +0800
-Jisheng Zhang wrote:
+On Wed, 25 Nov 2015, Andrew Lunn wrote:
 
-> These two patches try to improve the dw_apb_timer clocksource/clockevent
-> performance.
+> > BTW, mv78xx0 is still broken wrt this IRQ #0 usage.  Is it possible that 
+> > no one uses it?  It is a weird not-completely-SMP architecture that 
+> > lacks cache coherency support between CPU cores. To fully use both 
+> > cores, we'd need to have two independent Linux instances with memory 
+> > partitioning and this was never implemented. I'm unaware of any product 
+> > using Linux on that SOC either.  My own mv78xx0 dev board took the way 
+> > of the recycling facility a while ago given the lack of interest.
+> > 
+> > Should we "fix" it by removing it outright?
+> 
+> I think it was at the Edinburgh kernel summit/ELCE i met somebody
+> still using it. If i remember correctly, Linux on one core, and
+> something else on the other. That was two years ago. I've not heard
+> anything since.
 
-These patches depends on the apbt_readl return value fix patch:
+Any chance that somebody would still be interested in running latest 
+mainline on it?
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/388250.html
+The alternative is to remove it and see if someone complains. Bringing 
+it back would be just one git revert away.
 
-thanks,
-Jisheng
 
-> 
-> since v2:
->  - only use relaxed version in critical path
->  - inline apbt_readl/apbt_writel
->  - add some performance numbers
-> 
-> since v1:
->  - correct the wrong sentence in commit msg about writel performance on
->    CA9 with outer L2 cache. Thank Arnd for pointing out this in another
->    thread.
-> 
-> Jisheng Zhang (2):
->   clocksource/drivers/dw_apb_timer: Inline apbt_readl and apbt_writel
->   clocksource/drivers/dw_apb_timer: Use {readl|writel}_relaxed in
->     critical path
-> 
->  drivers/clocksource/dw_apb_timer.c | 30 +++++++++++++++++++++---------
->  1 file changed, 21 insertions(+), 9 deletions(-)
-> 
+Nicolas
