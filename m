@@ -1,46 +1,57 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 25 Nov 2015 10:16:02 -0500 (EST)
-Subject: [PATCH] arm64: restore bogomips information in /proc/cpuinfo
-In-Reply-To: <56554AE9.5070901@jonmasters.org>
-References: <1447870505-19319-1-git-send-email-yang.shi@linaro.org>
- <56554AE9.5070901@jonmasters.org>
-Message-ID: <alpine.LFD.2.20.1511250958370.22569@knanqh.ubzr>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Wed, 25 Nov 2015 16:24:05 +0100
+Subject: Strange message from Kirkwood pinctrl driver
+In-Reply-To: <CACRpkdbi=iCV1B=u60mNqRWhcgAcs33J-DeB-C=r+2v1eLPbpQ@mail.gmail.com>
+References: <CACRpkdah4w-=qHS+q_=Ab-RiJyvbCKY-Rp5Ya0x+F=3DL2iuBA@mail.gmail.com>
+ <20151125144645.GE11384@lunn.ch>
+ <CACRpkdbi=iCV1B=u60mNqRWhcgAcs33J-DeB-C=r+2v1eLPbpQ@mail.gmail.com>
+Message-ID: <20151125152405.GG4665@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Nov 2015, Jon Masters wrote:
-
-> On 11/18/15, 1:15 PM, Yang Shi wrote:
-> 
-> > As what Pavel Machek reported [1], some userspace applications depend on
-> > bogomips showed by /proc/cpuinfo.
+On Wed, Nov 25, 2015 at 03:55:16PM +0100, Linus Walleij wrote:
+> On Wed, Nov 25, 2015 at 3:46 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> > On Wed, Nov 25, 2015 at 11:27:46AM +0100, Linus Walleij wrote:
+> >> Hi Sebastian,
+> >>
+> >> trying to use the Kirkwood pinctrl driver with compatible =
+> >> "marvell,88f6192-pinctrl";
+> >> on a Pogoplug series 4 yields the following message when instantiating
+> >> the driver:
+> >>
+> >> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 36
+> >> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 37
+> >> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 38
+> >> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 39
+> >> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 40
 > >
-> > Although there is much less legacy impact on aarch64 than arm, but it does
-> > break libvirt.
+> > Hi Linus
 > >
-> > Basically, this patch reverts commit
-> > 326b16db9f69fd0d279be873c6c00f88c0a4aad5
-> > ("arm64: delay: don't bother reporting bogomips in /proc/cpuinfo"), but with
-> > some tweak due to context change.
+> > Humm, interesting. I don't remember it doing that before. I will look
+> > into this in the next couple of days.
 > 
-> On a total tangent, it would be ideal to (eventually) have something reported
-> in /proc/cpuinfo or dmesg during boot that does "accurately" map back to the
-> underlying core frequency (as opposed to the generic timer frequency). I have
-> seen almost countless silly situations in the industry (external to my own
-> organization) in which someone has taken a $VENDOR_X reference system that
-> they're not supposed to run benchmarks on, and they've done it anyway. But
-> usually on some silicon that's clocked multiples under what production would
-> be. Then silly rumors about performance get around because nobody can do
-> simple arithmetic and notice that they ought to have at least divided by some
-> factor.
+> There are only few devices using it: it is declared in
+> kirkwood-6192.dtsi and that is just used by:
+> 
+> kirkwood-blackarmor-nas220.dts
+> kirkwood-laplug.dts
+> kirkwood-rd88f6192.dts
+> ... and my new device tree
+> 
+> Interestingly, kirkwood-ns2[lite|mini].dts specifies it's compatible
+> with "marvell,kirkwood-88f6192" but instead includes
+> kirkwood-ns2-common.dtsi which includes
+> kirkwood-6281.dtsi. I haven't wrapped my head around that
+> one, I suspect it's a bug.
 
-Be my guest my friend.
+Don't wrap your head too much about that :) It is indeed a bug and it
+explains why I didn't see this messages before.
 
-According to the common wisdom, the bogomips reporting is completely 
-senseless at this point and no one should expect anything useful from 
-it. Therefore I attempted to rehabilitate some meaning into it given 
-that we just can't get rid of it either and it continues to cause 
-dammage. You certainly saw where that has led me.
-
-
-Nicolas
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151125/308145f4/attachment.sig>
