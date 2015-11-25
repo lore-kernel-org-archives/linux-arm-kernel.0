@@ -1,55 +1,67 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 25 Nov 2015 17:44:26 +0900
-Subject: [PATCH v6 00/12] arm64: renesas: add sound support
-In-Reply-To: <87610q8upv.wl%kuninori.morimoto.gx@renesas.com>
-References: <87egg3k5g6.wl%kuninori.morimoto.gx@renesas.com>
- <20151109012943.GF4832@verge.net.au>
- <CAMuHMdXBQNCibJU4EDuFZX0zRzUZfC_4KTyXFNVLL81a51Q4RA@mail.gmail.com>
- <20151109090139.GM4832@verge.net.au>
- <CAMuHMdWv1Ae1JTDyN2JkuHC1Fmfw25gtmmUkSMUitrUQnv82Ug@mail.gmail.com>
- <20151110001111.GB1040@verge.net.au>
- <20151124023025.GA21853@verge.net.au>
- <87k2p7yjbl.wl%kuninori.morimoto.gx@renesas.com>
- <20151125002752.GH20596@verge.net.au>
- <87610q8upv.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20151125084422.GA11664@verge.net.au>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 25 Nov 2015 09:45:20 +0100
+Subject: [PATCH v5 0/4] ARM: shmobile: r8a7740/sh73a0 DT Cache Handling
+In-Reply-To: <20151125015048.GN20596@verge.net.au>
+References: <1448286962-16897-1-git-send-email-geert+renesas@glider.be>
+ <20151125015048.GN20596@verge.net.au>
+Message-ID: <CAMuHMdXeb-hWhAXFtKDpnc_nuBgzi7usxPOmKY9kNmwM4A+54w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 06:27:30AM +0000, Kuninori Morimoto wrote:
-> 
-> Hi Simon
-> Cc Geert
-> 
-> > > I would like to check latest version.
-> > > Which branch/tag can I check ?
-> > 
-> > If you want to check for apply-time and compile-time dependencies use
-> > the latest renesas-devel tag in my renesas tree.
-> > 
-> > If you want to check run-time you may need to pull in some dependencies,
-> > especially the cpg-mssr-v6 branch of Geert's renesas-drivers tree.  A
-> > sledge-hammer approach would be to pull in the latest renesas-drivers tag
-> > of that tree.
-> > 
-> > In any case I'll need to know what run-time dependencies, other than
-> > cpg-mssr, are missing from renesas-next and/or renesas-devel so we can
-> > sensibly decide what to queue up.
-> 
-> Recent renesas-drivers sound has many conflicts, and sound
-> has strange behavior. I had tried it before and noticed.
-> I'm not sure latest one, but it has conflict log.
-> I'm using a littile older kernel, because of above reason.
+Hi Simon,
 
-:(
+On Wed, Nov 25, 2015 at 2:50 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Nov 23, 2015 at 02:55:58PM +0100, Geert Uytterhoeven wrote:
+>> This patch series add minimal L1 and L2 cache descriptions to DT for
+>> r8a7740 and sh73a0, and migrates the shmobile DT-based generic r8a7740
+>> platform from calling l2x0_of_init() to the generic l2c OF
+>> initialization.
+>>
+>> Note that the conversion to the generic l2c OF initialization is not
+>> done yet for sh73a0, as this initializes the L2 cache earlier, breaking
+>> the (fragile) sh73a0 secondary CPU bringup code.
+>>
+>> Also note that this conversion should be done on r8a7778, and r8a7779,
+>> too.
+>
+> Based on your work I have prepared a DT patch for the r8a7779.
 
-> Anyway, I tried below, and I could get sound.
-> (Limited sound only, because we are lacking CS2000 driver)
-> 
-> 	> git checkout renesas-devel-20151123-v4.4-rc2
-> 	> git merge geert/topic/cpg-mssr-v6
->         > git am -3 ${PATCH-SET}
-> 
-> I will send ${PATCH-SET} soon
+Thanks for following up.
 
->From my POV this is a good result.
+> I don't think that a C patch is necessary, please correct me if I am wrong.
+
+Yes you do!
+Without machine_desc.l2x_aux_{val,mask}, the information in DT is not used.
+Cfr. arch/arm/mach-shmobile/setup-r8a7740.c
+
+> Regarding the r8a7778: My reading of the documentation is that although a
+> pl310 L2 cache controller is present it is not available for use as there
+> is no L2 cache memory present. For this reason I do not think any patches
+> are required for the r8a7798.
+
+I agree after consulting the datasheet.
+
+>> Dependencies:
+>>   - This series applies to renesas-devel-20151123-v4.4-rc2,
+>>   - Patch 3 depends on patch 1,
+>>   - Patch 4 depends on patch 3.
+>>
+>> Given C code changesets depending on DT changesets in the same branch
+>> are frowned upon, you may want to postpone patches 3 and 4 to v4.6.
+>> Of course I'll sleep better if you just apply all 4 of them now ;-)
+>
+> I have queued up the DT changes for v4.5.
+> And tentatively queued up the C changes for v4.6.
+
+Thank you!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
