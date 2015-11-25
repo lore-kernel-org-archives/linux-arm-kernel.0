@@ -1,62 +1,86 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed, 25 Nov 2015 17:03:13 +0800
-Subject: [PATCH] ASoC: rockchip: Fix incorrect VDW value for 24 bit
-In-Reply-To: <1448441651-444-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1448441651-444-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <56557951.7070401@rock-chips.com>
+From: leilk.liu@mediatek.com (lei liu)
+Date: Wed, 25 Nov 2015 17:14:50 +0800
+Subject: [PATCH v2] spi: mediatek: revise mtk_spi_probe() failure flow
+In-Reply-To: <5654A89A.3090202@gmail.com>
+References: <1448332712-29039-1-git-send-email-leilk.liu@mediatek.com>
+ <5654A89A.3090202@gmail.com>
+Message-ID: <1448442890.27169.5.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 2015-11-24 at 19:12 +0100, Matthias Brugger wrote:
+> 
+> On 24/11/15 03:38, Leilk Liu wrote:
+> > This patch revises failure flow while pm_runtime_enable().
+> 
+> Please write a proper commit message explaining what this patch does.
+> 
+OK, thanks!
 
-? 2015?11?25? 16:54, Sjoerd Simons ??:
-> Correct valid data word register value for 24 bit data width. The
-> bit value should be 10 (aka 0x2), not 0x10.
->
-> This fixes playback of 24 bit audio.
->
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
->
-> ---
->
->   sound/soc/rockchip/rockchip_spdif.h | 6 +++---
->   1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/sound/soc/rockchip/rockchip_spdif.h b/sound/soc/rockchip/rockchip_spdif.h
-> index 07f86a2..921b409 100644
-> --- a/sound/soc/rockchip/rockchip_spdif.h
-> +++ b/sound/soc/rockchip/rockchip_spdif.h
-> @@ -28,9 +28,9 @@
->   #define SPDIF_CFGR_VDW(x)	(x << SPDIF_CFGR_VDW_SHIFT)
->   #define SDPIF_CFGR_VDW_MASK	(0xf << SPDIF_CFGR_VDW_SHIFT)
->   
-> -#define SPDIF_CFGR_VDW_16	SPDIF_CFGR_VDW(0x00)
-> -#define SPDIF_CFGR_VDW_20	SPDIF_CFGR_VDW(0x01)
-> -#define SPDIF_CFGR_VDW_24	SPDIF_CFGR_VDW(0x10)
-> +#define SPDIF_CFGR_VDW_16	SPDIF_CFGR_VDW(0x0)
-> +#define SPDIF_CFGR_VDW_20	SPDIF_CFGR_VDW(0x1)
-> +#define SPDIF_CFGR_VDW_24	SPDIF_CFGR_VDW(0x2)
-
-Yep,
- From the TRM says: (RK3288/RK3368...)
-
-VDW
-Valid data width
-00: 16bit
-01: 20bit
-10: 24bit
-11: reserved
-....
-
-So feel free add my tag:
-
-Reviewed-by: Caesar Wang <wxt@rock-chips.com>
-
-
->   
->   /*
->    * DMACR
-
-
--- 
-caesar wang | software engineer | wxt at rock-chip.com
+> >
+> > Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+> > ---
+> >   drivers/spi/spi-mt65xx.c |   15 ++++++++-------
+> >   1 file changed, 8 insertions(+), 7 deletions(-)
+> >
+> > diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
+> > index 6c1a96e..00a36da 100644
+> > --- a/drivers/spi/spi-mt65xx.c
+> > +++ b/drivers/spi/spi-mt65xx.c
+> > @@ -607,7 +607,8 @@ static int mtk_spi_probe(struct platform_device *pdev)
+> >   	ret = clk_set_parent(mdata->sel_clk, mdata->parent_clk);
+> >   	if (ret < 0) {
+> >   		dev_err(&pdev->dev, "failed to clk_set_parent (%d)\n", ret);
+> > -		goto err_disable_clk;
+> > +		clk_disable_unprepare(mdata->spi_clk);
+> > +		goto err_put_master;
+> >   	}
+> >
+> >   	clk_disable_unprepare(mdata->spi_clk);
+> > @@ -617,7 +618,7 @@ static int mtk_spi_probe(struct platform_device *pdev)
+> >   	ret = devm_spi_register_master(&pdev->dev, master);
+> >   	if (ret) {
+> >   		dev_err(&pdev->dev, "failed to register master (%d)\n", ret);
+> > -		goto err_put_master;
+> > +		goto err_disable_runtime_pm;
+> >   	}
+> >
+> >   	if (mdata->dev_comp->need_pad_sel) {
+> > @@ -626,14 +627,14 @@ static int mtk_spi_probe(struct platform_device *pdev)
+> >   				"pad_num does not match num_chipselect(%d != %d)\n",
+> >   				mdata->pad_num, master->num_chipselect);
+> >   			ret = -EINVAL;
+> > -			goto err_put_master;
+> > +			goto err_disable_runtime_pm;
+> >   		}
+> >
+> >   		if (!master->cs_gpios && master->num_chipselect > 1) {
+> >   			dev_err(&pdev->dev,
+> >   				"cs_gpios not specified and num_chipselect > 1\n");
+> >   			ret = -EINVAL;
+> > -			goto err_put_master;
+> > +			goto err_disable_runtime_pm;
+> >   		}
+> >
+> >   		if (master->cs_gpios) {
+> > @@ -644,7 +645,7 @@ static int mtk_spi_probe(struct platform_device *pdev)
+> >   				if (ret) {
+> >   					dev_err(&pdev->dev,
+> >   						"can't get CS GPIO %i\n", i);
+> > -					goto err_put_master;
+> > +					goto err_disable_runtime_pm;
+> >   				}
+> >   			}
+> >   		}
+> > @@ -652,8 +653,8 @@ static int mtk_spi_probe(struct platform_device *pdev)
+> >
+> >   	return 0;
+> >
+> > -err_disable_clk:
+> > -	clk_disable_unprepare(mdata->spi_clk);
+> > +err_disable_runtime_pm:
+> > +	pm_runtime_disable(&pdev->dev);
+> >   err_put_master:
+> >   	spi_master_put(master);
+> >
+> >
