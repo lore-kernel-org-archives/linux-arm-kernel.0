@@ -1,50 +1,49 @@
 From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 25 Nov 2015 06:25:36 +0000
-Subject: [PATCH] ASoC: rcar: remove unused variable
-In-Reply-To: <4929159.b95vLdVRYU@wuerfel>
-References: <4929159.b95vLdVRYU@wuerfel>
-Message-ID: <878u5m8ut0.wl%kuninori.morimoto.gx@renesas.com>
+Date: Wed, 25 Nov 2015 06:27:05 +0000
+Subject: [PATCH v6 00/12] arm64: renesas: add sound support
+In-Reply-To: <20151125002752.GH20596@verge.net.au>
+References: <87egg3k5g6.wl%kuninori.morimoto.gx@renesas.com>
+ <20151109012943.GF4832@verge.net.au>
+ <CAMuHMdXBQNCibJU4EDuFZX0zRzUZfC_4KTyXFNVLL81a51Q4RA@mail.gmail.com>
+ <20151109090139.GM4832@verge.net.au>
+ <CAMuHMdWv1Ae1JTDyN2JkuHC1Fmfw25gtmmUkSMUitrUQnv82Ug@mail.gmail.com>
+ <20151110001111.GB1040@verge.net.au>
+ <20151124023025.GA21853@verge.net.au>
+ <87k2p7yjbl.wl%kuninori.morimoto.gx@renesas.com>
+ <20151125002752.GH20596@verge.net.au>
+Message-ID: <877fl68uqh.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi Arnd, Mark
+Hi Simon
+Cc Geert
 
-> After a recent cleanup, the soc_card variable became unused
-> and now produces a warning:
+> > I would like to check latest version.
+> > Which branch/tag can I check ?
 > 
-> soc/sh/rcar/core.c: In function '__rsnd_kctrl_new':
-> soc/sh/rcar/core.c:801:23: warning: unused variable 'soc_card' [-Wunused-variable]
+> If you want to check for apply-time and compile-time dependencies use
+> the latest renesas-devel tag in my renesas tree.
 > 
-> This removes the variable.
+> If you want to check run-time you may need to pull in some dependencies,
+> especially the cpg-mssr-v6 branch of Geert's renesas-drivers tree.  A
+> sledge-hammer approach would be to pull in the latest renesas-drivers tag
+> of that tree.
 > 
-> Fixes: 1a497983a5ae ("ASoC: Change the PCM runtime array to a list")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/sound/soc/sh/rcar/core.c b/sound/soc/sh/rcar/core.c
-> index c6685f14b9cb..90b244c1f526 100644
-> --- a/sound/soc/sh/rcar/core.c
-> +++ b/sound/soc/sh/rcar/core.c
-> @@ -798,7 +798,6 @@ static int __rsnd_kctrl_new(struct rsnd_mod *mod,
->  			    void (*update)(struct rsnd_dai_stream *io,
->  					   struct rsnd_mod *mod))
->  {
-> -	struct snd_soc_card *soc_card = rtd->card;
->  	struct snd_card *card = rtd->card->snd_card;
->  	struct snd_kcontrol *kctrl;
->  	struct snd_kcontrol_new knew = {
+> In any case I'll need to know what run-time dependencies, other than
+> cpg-mssr, are missing from renesas-next and/or renesas-devel so we can
+> sensibly decide what to queue up.
 
-It seems this patch was accepted to topic/rcar branch,
-but I got compile error
+Recent renesas-drivers sound has many conflicts, and sound
+has strange behavior. I had tried it before and noticed.
+I'm not sure latest one, but it has conflict log.
+I'm using a littile older kernel, because of above reason.
 
-/opt/home/morimoto/WORK/linux/sound/soc/sh/rcar/core.c: In function '__rsnd_kctrl_new':
-/opt/home/morimoto/WORK/linux/sound/soc/sh/rcar/core.c:807:18: error: 'soc_card' undeclared (first use in this function)
-   .index  = rtd - soc_card->rtd,
-                  ^
-/opt/home/morimoto/WORK/linux/sound/soc/sh/rcar/core.c:807:18: note: each undeclared identifier is reported only once for each function it appears in
-make[6]: *** [sound/soc/sh/rcar/core.o] ??? 1
-make[6]: *** ??????????????....
-make[5]: *** [sound/soc/sh/rcar] ??? 2
-make[4]: *** [sound/soc/sh] ??? 2
+Anyway, I tried below, and I could get sound.
+(Limited sound only, because we are lacking CS2000 driver)
 
-This __rsnd_kctrl_new() is using "soc_card"...
+	> git checkout renesas-devel-20151123-v4.4-rc2
+	> git merge geert/topic/cpg-mssr-v6
+        > git am -3 ${PATCH-SET}
+
+I will send ${PATCH-SET} soon
