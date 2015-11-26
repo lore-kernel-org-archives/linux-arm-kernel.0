@@ -1,38 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 26 Nov 2015 18:17:36 +0000
-Subject: [PATCHv2 1/2] arm64: mm: detect bad __create_mapping uses
-In-Reply-To: <1448285180-15389-1-git-send-email-mark.rutland@arm.com>
-References: <1448285180-15389-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20151126181736.GU3109@e104818-lin.cambridge.arm.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Thu, 26 Nov 2015 18:22:27 +0000
+Subject: [Xen-devel] [PATCH] xen/events: Always allocate legacy interrupts
+ on PV guests
+In-Reply-To: <1448036704-18630-1-git-send-email-boris.ostrovsky@oracle.com>
+References: <1448036704-18630-1-git-send-email-boris.ostrovsky@oracle.com>
+Message-ID: <56574DE3.2040808@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2015 at 01:26:19PM +0000, Mark Rutland wrote:
-> If a caller of __create_mapping provides a PA and VA which have
-> different sub-page offsets, it is not clear which offset they expect to
-> apply to the mapping, and is indicative of a bad caller.
+On 20/11/15 16:25, Boris Ostrovsky wrote:
+> After commit 8c058b0b9c34 ("x86/irq: Probe for PIC presence before
+> allocating descs for legacy IRQs") early_irq_init() will no longer
+> preallocate descriptors for legacy interrupts if PIC does not
+> exist, which is the case for Xen PV guests.
 > 
-> In some cases, the region we wish to map may validly have a sub-page
-> offset in the physical and virtual addresses. For example, EFI runtime
-> regions have 4K granularity, yet may be mapped by a 64K page kernel. So
-> long as the physical and virtual offsets are the same, the region will
-> be mapped at the expected VAs.
-> 
-> Disallow calls with differing sub-page offsets, and WARN when they are
-> encountered, so that we can detect and fix such cases.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Reviewed-by: Steve Capper <steve.capper@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Laura Abbott <labbott@fedoraproject.org>
-> Cc: Will Deacon <will.deacon@arm.com>
+> Therefore we may need to allocate those descriptors ourselves.
 
-On both patches:
+Applied to for-linus-4.4, thanks.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> --- a/arch/arm64/include/asm/irq.h
+> +++ b/arch/arm64/include/asm/irq.h
+> @@ -7,4 +7,10 @@ struct pt_regs;
+>  
+>  extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
+>  
+> +#define NR_IRQS_LEGACY  0
 
-Since they don't look urgent, I'll leave them to Will for 4.5.
+I dropped this unnecessary #define.
 
--- 
-Catalin
+David
