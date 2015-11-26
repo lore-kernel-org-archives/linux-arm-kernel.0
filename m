@@ -1,41 +1,59 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 26 Nov 2015 17:41:31 +0100
-Subject: [PATCH] mmc: sdhci-of-at91: controller is suspended too early
-Message-ID: <1448556091-502-1-git-send-email-ludovic.desroches@atmel.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 26 Nov 2015 16:50:09 +0000
+Subject: [Xen-devel] [PATCH v3 37/62] arm/acpi: Define a enum for reserved
+ tables
+In-Reply-To: <1447753261-7552-38-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-38-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511261649080.8984@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When calling sdhci_add_host(), the controller is already suspended. It
-causes to read 0 in registers.
-Increment the device's usage counter before calling sdhci_add_host(),
-decrement it after and put it in suspend if it is possible.
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> It needs to copy and change the contents of some ACPI and EFI tables for
+> Dom0. Here define a enum for those tables.
+> 
+> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  xen/include/asm-arm/acpi.h | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/xen/include/asm-arm/acpi.h b/xen/include/asm-arm/acpi.h
+> index 214fc4e..f159d51 100644
+> --- a/xen/include/asm-arm/acpi.h
+> +++ b/xen/include/asm-arm/acpi.h
+> @@ -30,6 +30,18 @@
+>  
+>  extern bool_t acpi_disabled;
+>  
+> +/* Tables marked as reserved in efi table */
+> +typedef enum {
+> +    TBL_FADT,
+> +    TBL_MADT,
+> +    TBL_STAO,
+> +    TBL_XSDT,
+> +    TBL_RSDP,
+> +    TBL_EFIT,
+> +    TBL_MMAP,
+> +    TBL_MMAX,
+> +} EFI_MEM_RES;
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Fixes: "mmc: sdhci-of-at91: add PM support"
----
- drivers/mmc/host/sdhci-of-at91.c | 3 +++
- 1 file changed, 3 insertions(+)
+Given that in later patches you are using the enum as integer, you
+should initialize each value explicitly.
 
-diff --git a/drivers/mmc/host/sdhci-of-at91.c b/drivers/mmc/host/sdhci-of-at91.c
-index 81ab9db..7e7d8f0 100644
---- a/drivers/mmc/host/sdhci-of-at91.c
-+++ b/drivers/mmc/host/sdhci-of-at91.c
-@@ -200,6 +200,7 @@ static int sdhci_at91_probe(struct platform_device *pdev)
- 
- 	sdhci_get_of_property(pdev);
- 
-+	pm_runtime_get_noresume(&pdev->dev);
- 	pm_runtime_set_active(&pdev->dev);
- 	pm_runtime_enable(&pdev->dev);
- 	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
-@@ -209,6 +210,8 @@ static int sdhci_at91_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto pm_runtime_disable;
- 
-+	pm_runtime_put_autosuspend(&pdev->dev);
-+
- 	return 0;
- 
- pm_runtime_disable:
--- 
-2.5.0
+
+>  #ifdef CONFIG_ACPI
+>  bool_t __init acpi_psci_present(void);
+>  bool_t __init acpi_psci_hvc_present(void);
+> -- 
+> 2.1.0
+> 
+> 
+> _______________________________________________
+> Xen-devel mailing list
+> Xen-devel at lists.xen.org
+> http://lists.xen.org/xen-devel
+> 
