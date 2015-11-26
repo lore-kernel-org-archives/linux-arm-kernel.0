@@ -1,34 +1,70 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 27 Nov 2015 02:50:59 +0800
-Subject: [PATCH v6 3/6] watchdog: ts4800: add driver for TS-4800 watchdog
-In-Reply-To: <1448479507-1951-4-git-send-email-damien.riegel@savoirfairelinux.com>
-Message-ID: <201511270217.599Myf2h%fengguang.wu@intel.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Thu, 26 Nov 2015 20:04:43 +0100
+Subject: [PATCH net-next 0/3] mvneta: Introduce RSS support
+In-Reply-To: <1448463243-21057-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1448463243-21057-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <CAPv3WKczNwtm+dRn=ph4M4gSkTpdu7-5maw8ndJo8jCw8Cumkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Damien,
+Hi Gregory,
 
-[auto build test WARNING on shawnguo/for-next]
-[also build test WARNING on v4.4-rc2 next-20151126]
+You can add:
+Tested-by: Marcin Wojtas <mw@semihalf.com>
 
-url:    https://github.com/0day-ci/linux/commits/Damien-Riegel/of-add-vendor-prefix-for-Technologic-Systems/20151126-033639
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git for-next
-config: um-allyesconfig (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=um 
+I checked different queues, the traffic passed through, and the irqs
+came to proper CPU's. FYI, in my setup with A388-GP as a bridge, after
+attaching two ports to different CPU's there was an increase of
+~50kpps (almost 9%) for 64B packets.
 
-All warnings (new ones prefixed by >>):
+Best regards,
+Marcin
 
-warning: (ST_IRQCHIP && HIP04_ETH && STMMAC_PLATFORM && DWMAC_IPQ806X && DWMAC_LPC18XX && DWMAC_ROCKCHIP && DWMAC_SOCFPGA && DWMAC_STI && TI_CPSW && PINCTRL_ROCKCHIP && PINCTRL_DOVE && POWER_RESET_KEYSTONE && POWER_RESET_SYSCON && POWER_RESET_SYSCON_POWEROFF && S3C2410_WATCHDOG && TS4800_WATCHDOG && VIDEO_OMAP3 && VIDEO_S5P_FIMC && RTC_DRV_AT91SAM9 && LPC18XX_DMAMUX && VIDEO_OMAP4 && HWSPINLOCK_QCOM && ATMEL_ST && QCOM_GSBI) selects MFD_SYSCON which has unmet direct dependencies (HAS_IOMEM)
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 17129 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151127/203f3e6d/attachment-0001.obj>
+2015-11-25 15:54 GMT+01:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
+> Hi,
+>
+> this series is the first step add RSS support on mvneta.
+>
+> It will allow associating an ethernet interface to a given CPU through
+> RSS by using "ethtool -X ethX weight". Indeed, currently I only enable
+> one entry in the RSS lookup table. Even if it is not really RSS, it
+> allows to get back the irq affinity feature we lost by using the
+> percpu interrupt.
+>
+> Compared to the RFC series I added a missing patch for the series, I
+> rebased onto v4.4-rc1 and I fixed the mvneta_config_rss. Marcin
+> pointed that making the interrupt should be done on all the CPUs.
+>
+> Th first patch make the default queue associate to each port and no
+> more a global variable.
+>
+> The second patch really associates the RX queues with the CPUs instead
+> of masking the percpu interrupts for doing it. All the RX queues are
+> enabled and are statically associated with the CPUs by using a modulo
+> of the number of present CPUs. But at this stage only one RX queue
+> will receive the stream.
+>
+> I also choose to associate all the TX queues on the same CPU that the
+> one associated to the RX queue. It allows to contain all the
+> interrupts on the same CPU. I think that an improvement on this side
+> would be the support of the XPS.
+>
+> The last patch introduces a first level of RSS support through the
+> ethtool functions. As explained in the introduction there is only one
+> entry in the RSS lookup table which permits at the end to associate an
+> mvneta port to a CPU through the RX queues because the mapping is
+> static.
+>
+> Thanks,
+>
+> Gregory CLEMENT (3):
+>   net: mvneta: Make the default queue related for each port
+>   net: mvneta: Associate RX queues with each CPU
+>   net: mvneta: Add naive RSS support
+>
+>  drivers/net/ethernet/marvell/mvneta.c | 298 +++++++++++++++++++++++++++++-----
+>  1 file changed, 253 insertions(+), 45 deletions(-)
+>
+> --
+> 2.5.0
+>
