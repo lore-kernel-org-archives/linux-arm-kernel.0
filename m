@@ -1,76 +1,55 @@
-From: aryabinin@virtuozzo.com (Andrey Ryabinin)
-Date: Thu, 26 Nov 2015 15:22:41 +0300
-Subject: [PATCH v7 0/4] KASAN for arm64
-In-Reply-To: <20151126121007.GC32343@leverpostej>
-References: <1444665180-301-1-git-send-email-ryabinin.a.a@gmail.com>
- <20151013083432.GG6320@e104818-lin.cambridge.arm.com>
- <5649BAFD.6030005@arm.com> <5649F783.40109@gmail.com>
- <564B40A7.1000206@arm.com> <564B4BFC.1020905@virtuozzo.com>
- <20151126121007.GC32343@leverpostej>
-Message-ID: <5656F991.8090108@virtuozzo.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 26 Nov 2015 20:20:38 +0800
+Subject: [PATCH v2] clockevents/drivers/arm_global_timer: Use writel_relaxed
+ in gt_compare_set
+Message-ID: <1448540438-7028-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/2015 03:10 PM, Mark Rutland wrote:
-> Hi Catalin,
-> 
-> Can you pick up Andrey's patch below for v4.4, until we have a better
-> solution?
-> 
+Use the relaxed version to improve performance. we measured time of
+4096 rounds of gt_compare_set() spent on Marvell BG2Q:
 
-FYI, better solution is almost ready, I'm going to send it today.
-However, I don't know for sure whether it works or not :)
-I'm not able to test as I don't have any setup working with 16k pages.
+before the patch: 3690648ns on average
+after the patch: 1083023ns on average
 
-> I stumbled across this myself and was about to post a similar patch.
-> 
-> FWIW:
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> 
-> Thanks,
-> Mark.
-> 
-> On Tue, Nov 17, 2015 at 06:47:08PM +0300, Andrey Ryabinin wrote:
->> We should either add proper Kconfig dependency for now, or just make it work.
->>
->>
->> From: Andrey Ryabinin <aryabinin@virtuozzo.com>
->> Subject: [PATCH] arm64: KASAN depends on !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
->>
->> On KASAN + 16K_PAGES + 48BIT_VA
->>  arch/arm64/mm/kasan_init.c: In function ?kasan_early_init?:
->>  include/linux/compiler.h:484:38: error: call to ?__compiletime_assert_95? declared with attribute error: BUILD_BUG_ON failed: !IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE)
->>     _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
->>
->> Currently KASAN will not work on 16K_PAGES and 48BIT_VA, so
->> forbid such configuration to avoid above build failure.
->>
->> Reported-by: Suzuki K. Poulose <Suzuki.Poulose@arm.com>
->> Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
->> ---
->>  arch/arm64/Kconfig | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 9ac16a4..bf7de69 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -49,7 +49,7 @@ config ARM64
->>  	select HAVE_ARCH_AUDITSYSCALL
->>  	select HAVE_ARCH_BITREVERSE
->>  	select HAVE_ARCH_JUMP_LABEL
->> -	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP
->> +	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP && !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
->>  	select HAVE_ARCH_KGDB
->>  	select HAVE_ARCH_SECCOMP_FILTER
->>  	select HAVE_ARCH_TRACEHOOK
->> -- 
->> 2.4.10
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
+improved by 70%!
+
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ since v1:
+ - only use relaxed io in gt_compare_set(), this function is the
+   remaining hot code path.
+ - Add performance numbers in commit msg.
+
+ drivers/clocksource/arm_global_timer.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+index a2cb6fa..f99be6b 100644
+--- a/drivers/clocksource/arm_global_timer.c
++++ b/drivers/clocksource/arm_global_timer.c
+@@ -99,17 +99,17 @@ static void gt_compare_set(unsigned long delta, int periodic)
+ 
+ 	counter += delta;
+ 	ctrl = GT_CONTROL_TIMER_ENABLE;
+-	writel(ctrl, gt_base + GT_CONTROL);
+-	writel(lower_32_bits(counter), gt_base + GT_COMP0);
+-	writel(upper_32_bits(counter), gt_base + GT_COMP1);
++	writel_relaxed(ctrl, gt_base + GT_CONTROL);
++	writel_relaxed(lower_32_bits(counter), gt_base + GT_COMP0);
++	writel_relaxed(upper_32_bits(counter), gt_base + GT_COMP1);
+ 
+ 	if (periodic) {
+-		writel(delta, gt_base + GT_AUTO_INC);
++		writel_relaxed(delta, gt_base + GT_AUTO_INC);
+ 		ctrl |= GT_CONTROL_AUTO_INC;
+ 	}
+ 
+ 	ctrl |= GT_CONTROL_COMP_ENABLE | GT_CONTROL_IRQ_ENABLE;
+-	writel(ctrl, gt_base + GT_CONTROL);
++	writel_relaxed(ctrl, gt_base + GT_CONTROL);
+ }
+ 
+ static int gt_clockevent_shutdown(struct clock_event_device *evt)
+-- 
+2.6.2
