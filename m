@@ -1,29 +1,92 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Thu, 26 Nov 2015 23:12:38 +0200
-Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
- "/chosen/linux,atags" entry
-In-Reply-To: <20151126203930.GW2517@atomide.com>
-References: <20150713131902.GH26485@atomide.com> <20151123144545.GD24147@pali>
- <20151125181644.GI2517@atomide.com> <17134653.86P3dFyQKK@wuerfel>
- <20151125210310.GT2517@atomide.com> <56568849.5080103@gmail.com>
- <20151126090739.GD14190@pali> <20151126203930.GW2517@atomide.com>
-Message-ID: <565775C6.8070500@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 26 Nov 2015 22:17:41 +0100
+Subject: [PATCH v2] mmc: core: fix __mmc_switch timeout caused by preempt
+In-Reply-To: <1448541369-23086-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1448541369-23086-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <CAPDyKFoDARsM=oNp+HJYdxjLT06UsLePHQbjQ6FKbOWShgUoQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 26 November 2015 at 13:36, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> there is a time window between __mmc_send_status() and time_afer(),
+> on some eMMC chip, the timeout_ms is only 10ms, if this thread was
+> scheduled out during this period, then, even card has already changes
+> to transfer state by the result of CMD13, this part of code also treat
+> it to timeout error.
+> So, need calculate timeout first, then call __mmc_send_status(), if
+> already timeout and card still in programing state, then treat it to
+> the real timeout error.
+>
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> ---
+>  drivers/mmc/core/mmc_ops.c | 23 +++++++++++++++--------
+>  1 file changed, 15 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
+> index 1f44426..eba5295 100644
+> --- a/drivers/mmc/core/mmc_ops.c
+> +++ b/drivers/mmc/core/mmc_ops.c
+> @@ -489,6 +489,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>         unsigned long timeout;
+>         u32 status = 0;
+>         bool use_r1b_resp = use_busy_signal;
+> +       bool expired;
+>
+>         mmc_retune_hold(host);
+>
+> @@ -545,9 +546,23 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>         timeout = jiffies + msecs_to_jiffies(timeout_ms);
+>         do {
+>                 if (send_status) {
+> +                       /*
+> +                        * Timeout if the device never leaves the program state.
+> +                        * Due to the possibility of being preempted after
+> +                        * sending the status command, check the expiration
+> +                        * time first.
+> +                        */
+> +                       expired = time_after(jiffies, timeout);
+>                         err = __mmc_send_status(card, &status, ignore_crc);
+>                         if (err)
+>                                 goto out;
+> +                       if (expired &&
+> +                           R1_CURRENT_STATE(status) == R1_STATE_PRG) {
+> +                               pr_err("%s: Card stuck in programming state! %s\n",
+> +                                      mmc_hostname(host), __func__);
+> +                               err = -ETIMEDOUT;
+> +                               goto out;
+> +                       }
 
+This "if" actually means we will start verifying the card state, even
+when "MMC_CAP_WAIT_WHILE_BUSY && use_r1b_resp". I don't think we need
+or should.
 
-On 26.11.2015 22:39, Tony Lindgren wrote:
+Instead let's move this code at its original place below. That also
+means you indeed need to assign an initial value for "expired" to
+"false" in the beginning of the function.
 
-> Just to explore options.. How about make a minimal device driver that
-> just loads the atags blob from /lib/firmware and then shows it in
-> /proc/atags? Of course some checking on the atags should be done by
-> the driver..
+Apologize for not spotting this change in behaviour in v1.
+
+>                 }
+>                 if ((host->caps & MMC_CAP_WAIT_WHILE_BUSY) && use_r1b_resp)
+>                         break;
+> @@ -563,14 +578,6 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>                         mmc_delay(timeout_ms);
+>                         goto out;
+>                 }
+> -
+> -               /* Timeout if the device never leaves the program state. */
+> -               if (time_after(jiffies, timeout)) {
+> -                       pr_err("%s: Card stuck in programming state! %s\n",
+> -                               mmc_hostname(host), __func__);
+> -                       err = -ETIMEDOUT;
+> -                       goto out;
+> -               }
+>         } while (R1_CURRENT_STATE(status) == R1_STATE_PRG);
+>
+>         err = mmc_switch_status_error(host, status);
+> --
+> 1.8.1.1.dirty
 >
 
-What is the chance for such a driver to be accepted upstream? As IIRC 
-the current situation is because similar driver was rejected. Might be 
-wrong as well, it was about 2-3 years ago.
-
-Regards,
-Ivo
+Kind regards
+Uffe
