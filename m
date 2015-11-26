@@ -1,53 +1,39 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 26 Nov 2015 16:04:56 +0000
-Subject: [PATCH v3 38/62] arm/acpi: Add placeholder for efi and acpi load
- address
-In-Reply-To: <564C6763.6050107@citrix.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-39-git-send-email-shannon.zhao@linaro.org>
- <564B1666.4060008@citrix.com> <564B2152.9000904@huawei.com>
- <564B3845.4060801@citrix.com> <564BEA22.1040909@huawei.com>
- <564C6763.6050107@citrix.com>
-Message-ID: <alpine.DEB.2.02.1511261604080.8984@kaball.uk.xensource.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 26 Nov 2015 16:06:48 +0000
+Subject: [PATCH] arm64: mm: Prevent the initial page table setup from
+ creating larger blocks
+In-Reply-To: <56563D2C.7050807@arm.com>
+References: <1448387338-27851-1-git-send-email-catalin.marinas@arm.com>
+ <56563D2C.7050807@arm.com>
+Message-ID: <20151126160648.GL3109@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Nov 2015, Julien Grall wrote:
-> On 18/11/15 03:01, Shannon Zhao wrote:
-> > "All above tables will be mapped to Dom0 non-RAM space. Since when
-> > booting through ACPI it doesn't need the grant table region(see below
-> > section 3), it could use this region to store the tables or use the same
-> > way to find one memory region to store them."
-> > 
-> > Firstly, as Jan suggested, these tables should not be in RAM space, so
-> > we drop the previous way that copying these tables to Dom0 RAM.
-> > Then I suggested map these tables to the space after the Dom0 RAM space,
-> > but this not right because Dom0 RAM region might be at the edge of
-> > physical RAM space and there might be device MMIO regions.
-> > Then you suggest it could map these tables to the region which is used
-> > for grant table(or the region found by the same way) while it's not used
-> > when it boots with ACPI. These regions are not used by Xen and will not
-> > be used by Dom0 either currently. But as you say, it will be wrong if
-> > Dom0 memory is not 1:1 mapped.
+On Wed, Nov 25, 2015 at 04:58:52PM -0600, Jeremy Linton wrote:
+> On 11/24/2015 11:48 AM, Catalin Marinas wrote:
+> >This patch prevents the larger block mappings at all levels _if_ the
+> >existing pud/pmd entry is present _and_ not already a block mapping.
+> >Contiguous ptes are rejected if any of the entries in the range are
+> >non-empty and non-contiguous.
+> >
+> >In addition, TLB flushing is added for the cases where an existing block
+> >entry is changed.
 > 
-> Will you remember in 6 months why you wrote the code like that?
+> Ok, it seems to boot fairly reliably on the m400/ACPI, over a few dozen
+> reboots yesterday and today. So, for that:
 > 
-> My point on the previous mail is you don't describe what you did,
-> neither in the code nor in the commit message.
+> Tested-by: Jeremy Linton <jeremy.linton@arm.com>
 > 
-> Most of the place in the code are trying to avoid the assumption that
-> DOM0 is using direct mapped. If not, we always have a comment/commit
-> message explaining why we are doing like that and the implication (see
-> the grant table example [1]).
-> 
-> > So how about below idea:
-> > We still copy these tables to Dom0 RAM space but when we create
-> > EFI_MMAP_TABLE, we remove the space occupied by these tables from the
-> > EfiConventionalMemory descriptor.
-> 
-> As you don't need the grant table region, why don't you re-use it fopr
-> your tables? It may also be possible that we have some space just after
-> for the EFI table.
+> That said, it basically disables the CONT ranges for the main kernel text
+> section.
 
-I think that the current approach is good, please just extend the
-in-code comment in patch #40.
+Thanks for testing. However, I made the decision to revert commit
+348a65cdcbbf ("arm64: Mark kernel page ranges contiguous") temporarily
+until 4.5. While I see your point that other cases pte->pmd->pud could
+be equally broken, we haven't had reports about them so far. Mark is
+close to finishing a proper fix for the page table manipulation and
+we'll re-apply your commit once that's done. I kept the other patches in
+the original series, so it's only the last one that needs merging.
+
+-- 
+Catalin
