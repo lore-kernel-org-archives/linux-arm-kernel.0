@@ -1,30 +1,69 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 26 Nov 2015 14:50:17 +0000
-Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
-In-Reply-To: <2599604.DOXSjCBiRn@wuerfel>
-References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
- <87wpt67zkz.fsf@free-electrons.com>
- <20151125174454.GN14338@lunn.ch> <2599604.DOXSjCBiRn@wuerfel>
-Message-ID: <20151126145017.GE6520@io.lakedaemon.net>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 26 Nov 2015 08:04:35 -0700
+Subject: [PATCH 1/2] drivers: amba: properly handle devices with power
+ domains
+In-Reply-To: <CAPDyKFqQ_BuvtVnrsEdZCpXVKcDW9rAxteK1DOvHNqN7TN4sLw@mail.gmail.com>
+References: <1448456127-31842-1-git-send-email-m.szyprowski@samsung.com>
+ <1448456289-31960-1-git-send-email-m.szyprowski@samsung.com>
+ <20151125132458.GL8644@n2100.arm.linux.org.uk>
+ <5655B8F6.1070104@samsung.com>
+ <CAPDyKFqTqPijF+Lbq0+a-Gv8CyaAr13JvZPjUN1-GNL5i3-mAw@mail.gmail.com>
+ <20151125180953.GN8644@n2100.arm.linux.org.uk>
+ <5656C527.8040804@samsung.com>
+ <CAPDyKFqQ_BuvtVnrsEdZCpXVKcDW9rAxteK1DOvHNqN7TN4sLw@mail.gmail.com>
+Message-ID: <CANLsYkynahvfiiEqgbQ34iRBf+_ZCXH2WjkugmZaAc4ExDFH6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 08:58:28PM +0100, Arnd Bergmann wrote:
-> On Wednesday 25 November 2015 18:44:54 Andrew Lunn wrote:
-> > > While he seemed interseted to use a mainline kernel we don't have any
-> > > news for one year:
-> > > http://marc.info/?l=linux-arm-kernel&m=141391779222342&w=2
-> > 
-> > Maybe time for an email ping?
-> > 
-> 
-> I think the same discussed was what stopped my series on the last
-> two attempts. If there are no objections to things that I'm doing,
-> I'd suggest we just merge the multiplatform patches that we want
-> for orion5x and dove anyway and then decide about removing mv78xx0 ;-)
+On 26 November 2015 at 03:24, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 26 November 2015 at 09:39, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>> Hello,
+>>
+>> On 2015-11-25 19:09, Russell King - ARM Linux wrote:
+>>>
+>>> On Wed, Nov 25, 2015 at 02:56:10PM +0100, Ulf Hansson wrote:
+>>>>
+>>>> On 25 November 2015 at 14:34, Marek Szyprowski <m.szyprowski@samsung.com>
+>>>> wrote:
+>>>>>
+>>>>> Is ignoring dev_pm_domain_attach() return value a solution for you?
+>>>>
+>>>> That's probably better than nothing, but I wonder if it in practice
+>>>> will have any effect?
+>>>
+>>> If the PM domain is down, then trying to tread the ID is likely to oops
+>>> the kernel.
+>>
+>>
+>> In my case kernel simply hangs (no single message, even when earlyprintk is
+>> enabled)
+>> instead of oopsing, that's why I've submitted this patch.
+>>
+>
+> Okay.
+>
+> I suggest we go ahead and try that approach (ignoring the return
+> value). It's "quick fix", but the easiest way forward to solve the
+> problem.
+>
+> My only concern is if such change impacts the boot time. We should do
+> some tests to see if the change is negligible, if not we should
+> probably think of something else (like keeping the PM domain powered
+> until late_init).
+>
+> Russell, what do you think?
 
-Agreed.
+That's the approach I took for coresight on Juno - simply initialise
+the power domain very early on and keep it on for things like amba
+probing to be successful.  When the boot process is done unused genPDs
+are switched off automatically.  That way we don't need to add extra
+code to amba.
 
-thx,
-
-Jason.
+>
+> Kind regards
+> Uffe
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
