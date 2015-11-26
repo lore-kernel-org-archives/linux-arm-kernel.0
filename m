@@ -1,60 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Nov 2015 10:59:45 +0000
-Subject: [PATCH 1/2] drivers: amba: properly handle devices with power
- domains
-In-Reply-To: <CAPDyKFqQ_BuvtVnrsEdZCpXVKcDW9rAxteK1DOvHNqN7TN4sLw@mail.gmail.com>
-References: <1448456127-31842-1-git-send-email-m.szyprowski@samsung.com>
- <1448456289-31960-1-git-send-email-m.szyprowski@samsung.com>
- <20151125132458.GL8644@n2100.arm.linux.org.uk>
- <5655B8F6.1070104@samsung.com>
- <CAPDyKFqTqPijF+Lbq0+a-Gv8CyaAr13JvZPjUN1-GNL5i3-mAw@mail.gmail.com>
- <20151125180953.GN8644@n2100.arm.linux.org.uk>
- <5656C527.8040804@samsung.com>
- <CAPDyKFqQ_BuvtVnrsEdZCpXVKcDW9rAxteK1DOvHNqN7TN4sLw@mail.gmail.com>
-Message-ID: <20151126105945.GZ8644@n2100.arm.linux.org.uk>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Thu, 26 Nov 2015 12:08:55 +0100
+Subject: [PATCH v2 2/2] restrict /dev/mem to idle io memory ranges
+In-Reply-To: <CAPcyv4ijWns879DytqUa+=r5hzQ1qzmB83VV6Z16kQNtmHUtbA@mail.gmail.com>
+References: <20151124000553.26360.57819.stgit@dwillia2-desk3.jf.intel.com>
+ <20151124000604.26360.56945.stgit@dwillia2-desk3.jf.intel.com>
+ <20151124142521.e6d23e44a8b2c24c044c2dec@linux-foundation.org>
+ <CAPcyv4ijWns879DytqUa+=r5hzQ1qzmB83VV6Z16kQNtmHUtbA@mail.gmail.com>
+Message-ID: <20151126110855.GA32226@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2015 at 11:24:50AM +0100, Ulf Hansson wrote:
-> On 26 November 2015 at 09:39, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> > Hello,
-> >
-> > On 2015-11-25 19:09, Russell King - ARM Linux wrote:
-> >>
-> >> On Wed, Nov 25, 2015 at 02:56:10PM +0100, Ulf Hansson wrote:
-> >>>
-> >>> On 25 November 2015 at 14:34, Marek Szyprowski <m.szyprowski@samsung.com>
-> >>> wrote:
-> >>>>
-> >>>> Is ignoring dev_pm_domain_attach() return value a solution for you?
-> >>>
-> >>> That's probably better than nothing, but I wonder if it in practice
-> >>> will have any effect?
-> >>
-> >> If the PM domain is down, then trying to tread the ID is likely to oops
-> >> the kernel.
-> >
-> >
-> > In my case kernel simply hangs (no single message, even when earlyprintk is
-> > enabled)
-> > instead of oopsing, that's why I've submitted this patch.
-> >
-> 
-> Okay.
-> 
-> I suggest we go ahead and try that approach (ignoring the return
-> value). It's "quick fix", but the easiest way forward to solve the
-> problem.
-> 
-> My only concern is if such change impacts the boot time. We should do
-> some tests to see if the change is negligible, if not we should
-> probably think of something else (like keeping the PM domain powered
-> until late_init).
-> 
-> Russell, what do you think?
 
-I thought someone had a patch to read the ID during the match callback?
+* Dan Williams <dan.j.williams@intel.com> wrote:
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> > - why is the patch mucking with access to PCI and BIOS space?  Is the
+> >   persistent memory even mappable in those regions?  Or is the concern
+> >   that userspace can access control registers associated with the
+> >   persistent memory?  What is the problem scenario?
+> 
+> It seems to me that letting /dev/mem do arbitrary access to any region
+> of memory is a dangerous capability for a production environment.
+
+So basically the original motivation years ago was to disable /dev/mem altogether: 
+it used to be a wide open roothole if anything with write access to it (such as 
+old Xorg) is exploited, plus it's a favorite and convenient tool for stealth 
+access to system areas of memory in cases where the attacker already has root. 
+
+(this is relevant as even being root might not give easy access to system mmio 
+areas if things like being able to load modules is restricted even for room, and 
+if the system has readonly storage and a few other things configured.)
+
+But we couldn't disable /dev/mem completely due to Xorg and dosemu legacies - so 
+we came up with this restriction feature that limits its scope.
+
+Any additional steps that limit the scope of access under the STRICT_DEVMEM option 
+(which is really a misnomer: it should be RESTRICT_DEVMEM instead) are welcome 
+from a generic Linux distro POV.
+
+Thanks,
+
+	Ingo
