@@ -1,43 +1,53 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 26 Nov 2015 22:16:52 +0000
-Subject: [PATCH] ARM: l2c: tauros2: fix OF-enabled non-DT boot
-Message-ID: <E1a24qS-0004Vj-RI@rmk-PC.arm.linux.org.uk>
+Date: Thu, 26 Nov 2015 22:23:21 +0000
+Subject: [PATCH 1/3] dt-bindings: add Marvell core PLL and clock divider PMU
+ documentation
+Message-ID: <E1a24wj-0004iw-Rf@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add documentation for the Marvell clock divider driver, which is used
+to source clocks for the AXI bus, video decoder, GPU and LCD blocks.
+
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mm/cache-tauros2.c | 17 ++++++++---------
- 1 file changed, 8 insertions(+), 9 deletions(-)
+ .../bindings/clock/dove-divider-clock.txt          | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/dove-divider-clock.txt
 
-diff --git a/arch/arm/mm/cache-tauros2.c b/arch/arm/mm/cache-tauros2.c
-index 1e373d268c04..95eb524ce556 100644
---- a/arch/arm/mm/cache-tauros2.c
-+++ b/arch/arm/mm/cache-tauros2.c
-@@ -287,16 +287,15 @@ void __init tauros2_init(unsigned int features)
- 	node = of_find_matching_node(NULL, tauros2_ids);
- 	if (!node) {
- 		pr_info("Not found marvell,tauros2-cache, disable it\n");
--		return;
-+	} else {
-+		ret = of_property_read_u32(node, "marvell,tauros2-cache-features", &f);
-+		if (ret) {
-+			pr_info("Not found marvell,tauros-cache-features property, "
-+				"disable extra features\n");
-+			features = 0;
-+		} else
-+			features = f;
- 	}
--
--	ret = of_property_read_u32(node, "marvell,tauros2-cache-features", &f);
--	if (ret) {
--		pr_info("Not found marvell,tauros-cache-features property, "
--			"disable extra features\n");
--		features = 0;
--	} else
--		features = f;
- #endif
- 	tauros2_internal_init(features);
- }
+diff --git a/Documentation/devicetree/bindings/clock/dove-divider-clock.txt b/Documentation/devicetree/bindings/clock/dove-divider-clock.txt
+new file mode 100644
+index 000000000000..0c602de279e5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/dove-divider-clock.txt
+@@ -0,0 +1,28 @@
++PLl divider based Dove clocks
++
++Marvell Dove has a 2GHz PLL, which feeds into a set of dividers to provide
++high speed clocks for a number of peripherals.  These dividers are part of
++the PMU, and thus this node should be a child of the PMU node.
++
++The following clocks are provided:
++
++ID	Clock
++-------------
++0	AXI bus clock
++1	GPU clock
++2	VMeta clock
++3	LCD clock
++
++Required properties:
++- compatible : shall be "marvell,dove-divider-clock"
++- reg : shall be the register address of the Core PLL and Clock Divider
++   Control 0 register.  This will cover that register, as well as the
++   Core PLL and Clock Divider Control 1 register.  Thus, it will have
++   a size of 8.
++- #clock-cells : from common clock binding; shall be set to 1
++
++divider_clk: core-clock at 0064 {
++	compatible = "marvell,dove-divider-clock";
++	reg = <0x0064 0x8>;
++	#clock-cells = <1>;
++};
 -- 
 2.1.0
