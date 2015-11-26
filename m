@@ -1,84 +1,92 @@
-From: salil.mehta@huawei.com (Salil Mehta)
-Date: Thu, 26 Nov 2015 07:44:25 +0000
-Subject: [PATCH V3 net-next 1/5] net:hns: Add support of Hip06 SoC to
- the Hislicon Network Subsystem
-In-Reply-To: <CO2PR11MB0088145308CE8BF0C504C9C497180@CO2PR11MB0088.namprd11.prod.outlook.com>
-References: <1447966706-16219-1-git-send-email-salil.mehta@huawei.com>
- <1447966706-16219-2-git-send-email-salil.mehta@huawei.com>
- <CO2PR11MB0088145308CE8BF0C504C9C497180@CO2PR11MB0088.namprd11.prod.outlook.com>
-Message-ID: <5656B859.7010106@huawei.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Thu, 26 Nov 2015 15:50:14 +0800
+Subject: [PATCH v5 0/11] Add mipi dsi support for rk3288
+Message-ID: <1448524225-5489-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The rk3288 MIPI DSI is a Synopsys DesignWare MIPI DSI host controller
+IP. This series adds support for a Synopsys DesignWare MIPI DSI host
+controller DRM bridge driver and a rockchip MIPI DSI specific DRM
+driver.
 
-On 11/22/2015 9:19 AM, Yuval Mintz wrote:
->> +void hns_rcbv2_int_ctrl_hw(struct hnae_queue *q, u32 flag, u32 mask)
->> +{
->> +	u32 int_mask_en = !!mask;
->> +
->> +	if (flag & RCB_INT_FLAG_TX)
->> +		dsaf_write_dev(q, RCB_RING_INTMSK_TXWL_REG,
->> int_mask_en);
->> +
->> +	if (flag & RCB_INT_FLAG_RX)
->> +		dsaf_write_dev(q, RCB_RING_INTMSK_RXWL_REG,
->> int_mask_en);
->> +}
->> +
->> +void hns_rcbv2_int_clr_hw(struct hnae_queue *q, u32 flag)
->> +{
->> +	u32 clr = 1;
->> +
->> +	if (flag & RCB_INT_FLAG_TX)
->> +		dsaf_write_dev(q, RCBV2_TX_RING_INT_STS_REG, clr);
->> +
->> +	if (flag & RCB_INT_FLAG_RX)
->> +		dsaf_write_dev(q, RCBV2_RX_RING_INT_STS_REG, clr);
->> +}
->> +
-> Why do you need the int_mask_en, clr variables? Why not directly use values?
-'clr' variable can be avoided and is kind of redundant as it always 
-holds the
-same value. This chnage is now part of latest floated PATCH V5.
+This series also includes a DRM panel driver for BOE TV080WUM-NL0 panel.
+This panel only use the MIPI DSI video mode.
 
-Purpose of the mask is coming from the previous/legacy
-SoC Hip05 where operation is done on the basis of RX or TX direction.
-This mask does not seem very useful for now but we would like to take
-this change in future, if there is not any API's using this kind of 
-interface.
--Salil
->
->> +static void fill_v2_desc(struct hnae_ring *ring, void *priv,
-> ....
->> +	hnae_set_field(bn_pid, 0x7, 0, buf_num - 1);
-> Magic values?
-Changed to macro in PATCH V5. Thanks!
--Salil
->
->> +int hns_nic_net_xmit_hw(struct net_device *ndev,
->> +			struct sk_buff *skb,
->> +			struct hns_nic_ring_data *ring_data)
->> +{
->> -	/* If everything has gone correctly network should be the
->> +	/**
->> +	 * If everything has gone correctly network should be the
->>   	 * data section of the packet and will be the end of the header.
->>   	 * If not then it probably represents the end of the last recognized
->>   	 * header.
-> What happened to the network style comments?
-Fixed this in PATCH V5. Thanks !!
--Salil
->
->>   static int hns_nic_poll_rx_skb(struct hns_nic_ring_data *ring_data,
->>   			       struct sk_buff **out_skb, int *out_bnum)
->> +	/**
->> +	 * we will be copying header into skb->data in
->> +	 * pskb_may_pull so it is in our interest to prefetch
->> +	 * it now to avoid a possible cache miss
->> +	 */
->> +	prefetchw(skb->data);
->> +
-> Likewise
-Fixed this in PATCH V5. Thanks !!
--Salil
->
+The MIPI DSI feature is tested on rk3288 evb board, backport them to
+chrome os kernel v3.14, and it can display normally.
+
+This patchset is base on the patchset from Ying.liu at freescale.com.
+<http://www.spinics.net/lists/dri-devel/msg77181.html>
+
+Changes in v5:
+- change the mipidsi clk to SCLK_MIPIDSI_24M
+- modify the mipidsi clk name to SCLK_MIPIDSI_24M
+Adviced by Thierry
+- use hyphens instead of underscore
+- use encoder in drm_bridge
+- reformatting the dptdin table
+- use readx_poll_timeout to check register
+- use msleep to wait
+- add a comment to explain how to program phy
+- change the program code to symbolic names
+- check this for validity of find_panel and clk_prepare_enable
+- eliminate the configuration clock
+- some optimization for coding style
+- modify the clk name to SCLK_MIPIDSI_24M
+- add a blank line befor lcd_en
+
+Changes in v4:
+- use clk_round_rate to check the clock rate in vop_crtc_mode_fixup
+- remove the cfg clk
+- remove gpr property from example, since it is noused now.
+- add the description about ports
+- eliminate some warnning
+
+Changes in v3:
+- move the dw_mipi_dsi.txt to Documentation/devicetree/bindings/display/bridge
+- move dw_mipi_dsi_rockchip.txt to bindings/display/rockchip/
+
+Changes in v2:
+- add the mipi clk id in a single patch
+
+Chris Zhong (9):
+  clk: rockchip: add id for mipidsi sclk on rk3288
+  clk: rockchip: add mipidsi clocks on rk3288
+  drm/rockchip: return a true clock rate to adjusted_mode
+  drm: bridge: allow some funcs to be optional
+  drm/bridge: Add Synopsys DesignWare MIPI DSI host controller driver
+  drm: rockchip: Support Synopsys DesignWare MIPI DSI host controller
+  Documentation: dt-bindings: Add bindings for rk3288 DW MIPI DSI driver
+  ARM: dts: rockchip: add rk3288 mipi_dsi nodes
+  ARM: dts: rockchip: add support mipi panel tv080wum-nl0 for rk3288-evb
+
+Liu Ying (2):
+  drm/dsi: Add a helper to get bits per pixel of MIPI DSI pixel format
+  Documentation: dt-bindings: Add bindings for DW MIPI DSI
+
+ .../bindings/display/bridge/dw_mipi_dsi.txt        |   74 ++
+ .../display/rockchip/dw_mipi_dsi_rockchip.txt      |   56 +
+ arch/arm/boot/dts/rk3288-evb.dtsi                  |   20 +-
+ arch/arm/boot/dts/rk3288.dtsi                      |   39 +
+ drivers/clk/rockchip/clk-rk3288.c                  |    2 +-
+ drivers/gpu/drm/bridge/Kconfig                     |   10 +
+ drivers/gpu/drm/bridge/Makefile                    |    1 +
+ drivers/gpu/drm/bridge/dw-mipi-dsi.c               | 1084 ++++++++++++++++++++
+ drivers/gpu/drm/drm_bridge.c                       |    6 +-
+ drivers/gpu/drm/rockchip/Kconfig                   |   10 +
+ drivers/gpu/drm/rockchip/Makefile                  |    1 +
+ drivers/gpu/drm/rockchip/dw_mipi_dsi_rockchip.c    |  249 +++++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |    8 +
+ include/drm/bridge/dw_mipi_dsi.h                   |   28 +
+ include/drm/drm_mipi_dsi.h                         |   14 +
+ include/dt-bindings/clock/rk3288-cru.h             |    1 +
+ 16 files changed, 1599 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/dw_mipi_dsi.txt
+ create mode 100644 Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
+ create mode 100644 drivers/gpu/drm/bridge/dw-mipi-dsi.c
+ create mode 100644 drivers/gpu/drm/rockchip/dw_mipi_dsi_rockchip.c
+ create mode 100644 include/drm/bridge/dw_mipi_dsi.h
+
+-- 
+2.6.3
