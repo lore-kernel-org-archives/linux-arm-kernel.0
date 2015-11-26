@@ -1,46 +1,28 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 26 Nov 2015 18:10:06 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Nov 2015 17:14:40 +0000
 Subject: ARCH_MULTIPLATFORM + ARM_APPENDED_DTB + custom boot-loader
-In-Reply-To: <565738F7.1060204@free.fr>
+In-Reply-To: <56573CEE.10101@free.fr>
 References: <565738F7.1060204@free.fr>
-Message-ID: <56573CEE.10101@free.fr>
+ <56573CEE.10101@free.fr>
+Message-ID: <20151126171440.GD8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/11/2015 17:53, Mason wrote:
+On Thu, Nov 26, 2015 at 06:10:06PM +0100, Mason wrote:
+> Question: can a DT be appended to an Image, or does it have to be
+> appended to a zImage?
 
-> I'm using an ARCH_MULTIPLATFORM kernel with an appended DTB.
-> I make a uImage out of this zImage+DTB.
-> On my board, U-Boot passes control to Linux, which boots correctly.
-> 
-> But when I replace U-Boot with a custom boot-loader, Linux tries
-> to boot some kind of "Generic DT based system" rather than the DT
-> I appended.
-> 
-> In fact, my setup code is:
-> 
-> static const char *const tango_dt_compat[] = { "sigma,tango4", NULL };
-> DT_MACHINE_START(TANGO_DT, "Sigma Tango DT")
-> 	.dt_compat	= tango_dt_compat,
-> 	.l2c_aux_mask	= ~0,
-> 	.l2c_write_sec	= tango_l2c_write,
-> MACHINE_END
-> 
-> 
-> When I boot with U-Boot, in the early stage, the kernel prints
-> [    0.000000] Machine model: Sigma Designs SMP8758 Vantage-1172 Rev E1
-> (that's my model property)
-> 
-> But when I boot with the custom boot-loader, it just prints
-> [    0.000000] Machine: Sigma Tango DT
-> (and fails quickly since there are no clocks)
+The code to deal with it is part of the zImage.
 
-I was working off incorrect assumptions.
-The custom boot-loader was given an Image (not a uImage) and the DT
-was probably not appended to the Image.
+> Can a zImage be uncompressed or compressed with a null compressor?
 
-Question: can a DT be appended to an Image, or does it have to be
-appended to a zImage? Can a zImage be uncompressed or compressed
-with a null compressor?
+Why?
 
-Regards.
+The format of both Image and zImage are mostly identical - you should
+be able to use either with a boot loader wanting a binary image -
+provided things are setup how the kernel wants.  However, as you
+need the appended DT support, you must use zImage.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
