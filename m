@@ -1,37 +1,36 @@
 From: biao.huang@mediatek.com (Biao Huang)
-Date: Thu, 26 Nov 2015 16:44:27 +0800
-Subject: [PATCH 0/5] pinctrl: mediatek: add pinctrl/GPIO/EINT driver for
- mt2701
-Message-ID: <1448527472-20651-1-git-send-email-biao.huang@mediatek.com>
+Date: Thu, 26 Nov 2015 16:44:29 +0800
+Subject: [PATCH 2/5] dt-bindings: mediatek: Modify pinctrl bindings for mt2701
+In-Reply-To: <1448527472-20651-1-git-send-email-biao.huang@mediatek.com>
+References: <1448527472-20651-1-git-send-email-biao.huang@mediatek.com>
+Message-ID: <1448527472-20651-3-git-send-email-biao.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MT2701 pinctrl/eint are similar to mt8127, mt8135 and mt8173,
-add support for mt2701 using mediatek common pinctrl driver.
+Signed-off-by: Biao Huang <biao.huang@mediatek.com>
+---
+ .../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt |    9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-Biao Huang (4):
-  dt-bindings: mediatek: Modify pinctrl bindings for mt2701
-  pinctrl: dt bindings: Add pinfunc header file for mt2701
-  pinctrl: mediatek: Add Pinctrl/GPIO/EINT driver for mt2701
-  arm: dts: Add pinctrl/GPIO/EINT node for mt2701
-
-Erin Lo (1):
-  ARM: mediatek: Add MT2701 config options for mediatek SoCs.
-
- .../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt |    9 +-
- arch/arm/boot/dts/mt2701-pinfunc.h                 |  713 ++++++
- arch/arm/boot/dts/mt2701.dtsi                      |   19 +
- arch/arm/mach-mediatek/Kconfig                     |    4 +
- drivers/pinctrl/mediatek/Kconfig                   |    6 +
- drivers/pinctrl/mediatek/Makefile                  |    1 +
- drivers/pinctrl/mediatek/pinctrl-mt2701.c          |  571 +++++
- drivers/pinctrl/mediatek/pinctrl-mtk-common.c      |    7 +
- drivers/pinctrl/mediatek/pinctrl-mtk-common.h      |    3 +
- drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h      | 2323 ++++++++++++++++++++
- 10 files changed, 3652 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/boot/dts/mt2701-pinfunc.h
- create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt2701.c
- create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h
-
+diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
+index 0480bc3..ca6a27a 100644
+--- a/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
++++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
+@@ -4,10 +4,11 @@ The Mediatek's Pin controller is used to control SoC pins.
+ 
+ Required properties:
+ - compatible: value should be one of the following.
+-    (a) "mediatek,mt8135-pinctrl", compatible with mt8135 pinctrl.
+-    (b) "mediatek,mt8173-pinctrl", compatible with mt8173 pinctrl.
+-    (c) "mediatek,mt6397-pinctrl", compatible with mt6397 pinctrl.
+-    (d) "mediatek,mt8127-pinctrl", compatible with mt8127 pinctrl.
++    (a) "mediatek,mt2701-pinctrl", compatible with mt2701 pinctrl.
++    (b) "mediatek,mt6397-pinctrl", compatible with mt6397 pinctrl.
++    (c) "mediatek,mt8135-pinctrl", compatible with mt8135 pinctrl.
++    (d) "mediatek,mt8173-pinctrl", compatible with mt8173 pinctrl.
++    (e) "mediatek,mt8127-pinctrl", compatible with mt8127 pinctrl.
+ - pins-are-numbered: Specify the subnodes are using numbered pinmux to
+   specify pins.
+ - gpio-controller : Marks the device node as a gpio controller.
 -- 
 1.7.9.5
