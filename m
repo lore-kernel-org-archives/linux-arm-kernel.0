@@ -1,38 +1,50 @@
-From: brad@heeltoe.com (Brad Parker)
-Date: Thu, 26 Nov 2015 18:26:38 -0500
-Subject: armv7 + lpae broken in 4.1.12+ ?
-Message-ID: <5657952E.906@heeltoe.com>
+From: dcashman@google.com (Daniel Cashman)
+Date: Thu, 26 Nov 2015 15:30:51 -0800
+Subject: next-20151126 build: 3 failures 15 warnings (next-20151126)
+In-Reply-To: <20151126151053.GK3109@e104818-lin.cambridge.arm.com>
+References: <E1a1sVV-00079q-My@optimist> <20151126113213.GC1929@sirena.org.uk>
+ <20151126151053.GK3109@e104818-lin.cambridge.arm.com>
+Message-ID: <CAJQetW5o4oMtqZ=2fqjwrNesw+0WZ==trF6AhAxGKgQvX39Vhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I was recently building a 4.1.12 kernel for a generic V7 platform with 
-LPAE.   I could not get it to boot and then discovered two things:
+I think the proper course here is to make the use conditional,
+assuming that there will never be a 32-bit application running if
+CONFIG_COMPAT is not enabled.  Thank you Mark for catching this, and
+Catalin for your suggestions.  I've just posted patch-set v4, which
+addresses some of Catalin's remarks and this breakage; I'd have no
+objection to removing v3 from next, especially in light of this.
 
-- the early printk code in tty/serial call ioremap very early and it 
-fails because there's no heap
-- the code in proc-v7-3level.S/cpu_v7_set_pte_ext doesn't work
+Thank You,
+Dan
 
-The printk issue is no big deal.  The pte issue is more important.
+On Thu, Nov 26, 2015 at 7:10 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Thu, Nov 26, 2015 at 11:32:13AM +0000, Mark Brown wrote:
+>> Today's -next fails to build an arm64 allnoconfig due to:
+>>
+>> >     arm64-allnoconfig
+>> > ../arch/arm64/mm/mmap.c:55:49: error: 'mmap_rnd_compat_bits' undeclared (first use in this function)
+>>
+>> which was introduced by a combination of 8f62c06c279a3 (mm: mmap: add
+>> new /proc tunable for mmap_base ASLR) and 9411708692954 (arm64: mm:
+>> support ARCH_MMAP_RND_BITS).  These add an unconditional use of
+>> mmap_rnd_compat_bits which is only defined in linux/mmap.h if
+>> HAVE_ARCH_MMAP_RND_COMPAT_BITS is selected but that is only enabled for
+>> arm64 if COMPAT is enabled.  Either the select needs to be unconditional
+>> or the use needs to be.
+>
+> There are other problems with these patches for arm64, I already replied
+> here:
+>
+> http://lkml.kernel.org/g/20151125120601.GC3109 at e104818-lin.cambridge.arm.com
+>
+> So I don't think they should be in -next.
+>
+> --
+> Catalin
 
-I found that the pte entries were garbage, which really confused me.  I 
-finally discovered that the code in proc-v7-3level.S expects data in r0, 
-r2 & r3, but in fact it comes in on r0, r1 & r2.
 
-My guess is that this is some vestige of the change made to 
-cpu_v7_switch_mm() some time ago to make the PA a 64 bit value (hence 
-using r0,r1).  But this change was not made to cpu_v7_set_pte_ext, so it 
-writes garbage.
 
-lol.  I guess I'm the only one who turns on LPAE for v7 cpu's...
-
-The simple fix is to add "mov r3, r2; mov r2,r1" at the begining of 
-cpu_v7_set_pte_ext(), but that's a hack (but it does solve the problem 
-and the kernel boots).
-
-I suspect the "right thing" is to make the prototype for 
-cpu_v7_set_pte_ext() in proc-fns.h use a phys_addr_t but I have not 
-tried that yet.
-
-Can someone confirm that what I am seeing is correct?
-
--brad
+-- 
+Dan Cashman
