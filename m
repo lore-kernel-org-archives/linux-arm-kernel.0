@@ -1,129 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Nov 2015 13:49:39 +0000
-Subject: [PATCH 1/2] arm64: mm: keep reserved ASIDs in sync with mm after
- multiple rollovers
-Message-ID: <1448545780-1550-1-git-send-email-will.deacon@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 26 Nov 2015 13:52:54 +0000
+Subject: Preprocessor arithmetic in dtsi files (base + offset)
+In-Reply-To: <56570620.3070106@free.fr>
+References: <56570620.3070106@free.fr>
+Message-ID: <20151126135254.GD32343@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Under some unusual context-switching patterns, it is possible to end up
-with multiple threads from the same mm running concurrently with
-different ASIDs:
+On Thu, Nov 26, 2015 at 02:16:16PM +0100, Mason wrote:
+> Hello,
+> 
+> In the device tree for my ARM platform, I have several nodes with
+> addresses within the SCU block:
+> 
+> 	scu: scu at 20000000 {
+> 		compatible = "arm,cortex-a9-scu";
+> 		reg = <0x20000000 0x100>;
+> 
+> 	gic: interrupt-controller at 20001000 {
+> 		compatible = "arm,cortex-a9-gic";
+> 		reg = <0x20001000 0x1000>, <0x20000100 0x0100>;
+> 
+> 	twd-timer at 20000600 {
+> 		compatible = "arm,cortex-a9-twd-timer";
+> 		reg = <0x20000600 0x10>;
+> 
+> Can I use preprocessor arithmetic to abstract the base address,
+> as would be done in C?
+> 
+> #define SCU_BASE 0x20000000
+> 
+> 	scu: scu at XXX {
+> 		compatible = "arm,cortex-a9-scu";
+> 		reg = <SCU_BASE 0x100>;
+> 	
+> 	gic: interrupt-controller at XXX {
+> 		compatible = "arm,cortex-a9-gic";
+> 		reg = <SCU_BASE+0x1000 0x1000>, <SCU_BASE+0x100 0x0100>;
 
-1. CPU x schedules task t with mm p containing ASID a and generation g
-   This task doesn't block and the CPU doesn't context switch.
-   So:
-     * per_cpu(active_asid, x) = {g,a}
-     * p->context.id = {g,a}
+The pre-processor would only do substitution, not arithmetic. So the '+'
+would flow all the way to DTC.
 
-2. Some other CPU generates an ASID rollover. The global generation is
-   now (g + 1). CPU x is still running t, with no context switch and
-   so per_cpu(reserved_asid, x) = {g,a}
+DTC does have some basic integer expression support (see [1]), but it
+looks like it can only work at the cell level, so generally it needs to
+be avoided (in case #address-cells >1, for example).
 
-3. CPU y schedules task t', which shares mm p with t. The generation
-   mismatches, so we take the slowpath and hit the reserved ASID from
-   CPU x. p is then updated so that p->context.id = {g + 1,a}
+So generally I think that such arithmetic should be avoided.
 
-4. CPU y schedules some other task u, which has an mm != p.
+> 	twd-timer at XXX {
+> 		compatible = "arm,cortex-a9-twd-timer";
+> 		reg = <SCU_BASE+0x600 0x10>;
+> 
+> Are the @XXX important? Can they be removed altogether?
 
-5. Some other CPU generates *another* CPU rollover. The global
-   generation is now (g + 2). CPU x is still running t, with no context
-   switch and so per_cpu(reserved_asid, x) = {g,a}.
+The bit after the @ is called the unit-address.
 
-6. CPU y once again schedules task t', but now *fails* to hit the
-   reserved ASID from CPU x because of the generation mismatch. This
-   results in a new ASID being allocated, despite the fact that t is
-   still running on CPU x with the same mm.
+It's meant to be there (matching the base address of the first reg
+entry) to disambiguate nodes and make it simple to figure out where a
+node lives in the physical address space.
 
-Consequently, TLBIs (e.g. as a result of CoW) will not be synchronised
-between the two threads.
+They should stay.
 
-This patch fixes the problem by updating all of the matching reserved
-ASIDs when we hit on the slowpath (i.e. in step 3 above). This keeps
-the reserved ASIDs in-sync with the mm and avoids the problem.
+Thanks,
+Mark.
 
-Reported-by: Tony Thompson <anthony.thompson@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/context.c | 38 ++++++++++++++++++++++++++------------
- 1 file changed, 26 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index f636a2639f03..e87f53ff5f58 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -76,13 +76,28 @@ static void flush_context(unsigned int cpu)
- 		__flush_icache_all();
- }
- 
--static int is_reserved_asid(u64 asid)
-+static bool check_update_reserved_asid(u64 asid, u64 newasid)
- {
- 	int cpu;
--	for_each_possible_cpu(cpu)
--		if (per_cpu(reserved_asids, cpu) == asid)
--			return 1;
--	return 0;
-+	bool hit = false;
-+
-+	/*
-+	 * Iterate over the set of reserved ASIDs looking for a match.
-+	 * If we find one, then we can update our mm to use newasid
-+	 * (i.e. the same ASID in the current generation) but we can't
-+	 * exit the loop early, since we need to ensure that all copies
-+	 * of the old ASID are updated to reflect the mm. Failure to do
-+	 * so could result in us missing the reserved ASID in a future
-+	 * generation.
-+	 */
-+	for_each_possible_cpu(cpu) {
-+		if (per_cpu(reserved_asids, cpu) == asid) {
-+			hit = true;
-+			per_cpu(reserved_asids, cpu) = newasid;
-+		}
-+	}
-+
-+	return hit;
- }
- 
- static u64 new_context(struct mm_struct *mm, unsigned int cpu)
-@@ -92,12 +107,14 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
- 	u64 generation = atomic64_read(&asid_generation);
- 
- 	if (asid != 0) {
-+		u64 newasid = generation | (asid & ~ASID_MASK);
-+
- 		/*
- 		 * If our current ASID was active during a rollover, we
- 		 * can continue to use it and this was just a false alarm.
- 		 */
--		if (is_reserved_asid(asid))
--			return generation | (asid & ~ASID_MASK);
-+		if (check_update_reserved_asid(asid, newasid))
-+			return newasid;
- 
- 		/*
- 		 * We had a valid ASID in a previous life, so try to re-use
-@@ -105,7 +122,7 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
- 		 */
- 		asid &= ~ASID_MASK;
- 		if (!__test_and_set_bit(asid, asid_map))
--			goto bump_gen;
-+			return newasid;
- 	}
- 
- 	/*
-@@ -129,10 +146,7 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
- set_asid:
- 	__set_bit(asid, asid_map);
- 	cur_idx = asid;
--
--bump_gen:
--	asid |= generation;
--	return asid;
-+	return asid | generation;
- }
- 
- void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
--- 
-2.1.4
+[1] https://git.kernel.org/cgit/linux/kernel/git/jdl/dtc.git/commit/?id=5f0c3b2d6235dec65fff1628a97f45e21680b36d
