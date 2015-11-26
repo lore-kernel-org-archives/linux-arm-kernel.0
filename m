@@ -1,92 +1,64 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Thu, 26 Nov 2015 15:50:24 +0800
-Subject: [PATCH v5 10/11] ARM: dts: rockchip: add rk3288 mipi_dsi nodes
-In-Reply-To: <1448524225-5489-1-git-send-email-zyw@rock-chips.com>
-References: <1448524225-5489-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1448524225-5489-11-git-send-email-zyw@rock-chips.com>
+From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
+Date: Thu, 26 Nov 2015 15:57:03 +0800
+Subject: [PATCH v2] arm64: dts: add all hi6220 i2c nodes
+Message-ID: <1448524623-10320-1-git-send-email-kong.kongxinwei@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a mipi_dsi node, and also add mipi_dsi endpoints to vopb and vopl
-output port nodes.
+This patch adds all I2C nodes for the Hi6220 SoC. This hi6220 Soc
+use this I2C IP of Synopsys Designware for HiKey board.
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-
+Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
 ---
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 37 +++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-Changes in v5:
-- modify the clk name to SCLK_MIPIDSI_24M
-
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
-
- arch/arm/boot/dts/rk3288.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 6a79c9c..c48891e 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -798,6 +798,10 @@
- 				reg = <0>;
- 				remote-endpoint = <&hdmi_in_vopb>;
- 			};
-+			vopb_out_mipi: endpoint at 1 {
-+				reg = <1>;
-+				remote-endpoint = <&mipi_in_vopb>;
-+			};
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index 82d2488..85d4a8b 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -208,5 +208,42 @@
+ 			clock-names = "uartclk", "apb_pclk";
+ 			status = "disabled";
  		};
- 	};
- 
-@@ -831,6 +835,10 @@
- 				reg = <0>;
- 				remote-endpoint = <&hdmi_in_vopl>;
- 			};
-+			vopl_out_mipi: endpoint at 1 {
-+				reg = <1>;
-+				remote-endpoint = <&mipi_in_vopl>;
-+			};
- 		};
- 	};
- 
-@@ -871,6 +879,37 @@
- 		};
- 	};
- 
-+	mipi_dsi: mipi at ff960000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "rockchip,rk3288-mipi-dsi", "snps,dw-mipi-dsi";
-+		reg = <0xff960000 0x4000>;
-+		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_MIPIDSI_24M>, <&cru PCLK_MIPI_DSI0>;
-+		clock-names = "ref", "pclk";
-+		rockchip,grf = <&grf>;
-+		status = "disabled";
 +
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+
-+			mipi_in: port {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				mipi_in_vopb: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&vopb_out_mipi>;
-+				};
-+				mipi_in_vopl: endpoint at 1 {
-+					reg = <1>;
-+					remote-endpoint = <&vopl_out_mipi>;
-+				};
-+			};
++		i2c0: i2c at f7100000 {
++			compatible = "snps,designware-i2c";
++			reg = <0x0 0xf7100000 0x0 0x1000>;
++			interrupts = <0 44 4>;
++			clocks = <&sys_ctrl HI6220_I2C0_CLK>;
++			clock-names = "clk_i2c0";
++			i2c-sda-hold-time-ns = <300>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pmx_func &i2c0_cfg_func>;
++			status = "disabled";
 +		};
-+	};
 +
- 	gic: interrupt-controller at ffc01000 {
- 		compatible = "arm,gic-400";
- 		interrupt-controller;
++		i2c1: i2c at f7101000 {
++			compatible = "snps,designware-i2c";
++			reg = <0x0 0xf7101000 0x0 0x1000>;
++			interrupts = <0 45 4>;
++			clocks = <&sys_ctrl HI6220_I2C1_CLK>;
++			clock-names = "clk_i2c1";
++			i2c-sda-hold-time-ns = <300>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c1_pmx_func &i2c1_cfg_func>;
++			status = "disabled";
++		};
++
++		i2c2: i2c at f7102000 {
++			compatible = "snps,designware-i2c";
++			reg = <0x0 0xf7102000 0x0 0x1000>;
++			interrupts = <0 46 4>;
++			clocks = <&sys_ctrl HI6220_I2C2_CLK>;
++			clock-names = "clk_i2c2";
++			i2c-sda-hold-time-ns = <300>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c2_pmx_func &i2c2_cfg_func>;
++			status = "disabled";
++		};
++
+ 	};
+ };
 -- 
-2.6.3
+1.9.1
