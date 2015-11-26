@@ -1,145 +1,133 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 26 Nov 2015 14:33:06 +0100
-Subject: Strange message from Kirkwood pinctrl driver
-In-Reply-To: <CACRpkdah4w-=qHS+q_=Ab-RiJyvbCKY-Rp5Ya0x+F=3DL2iuBA@mail.gmail.com>
-References: <CACRpkdah4w-=qHS+q_=Ab-RiJyvbCKY-Rp5Ya0x+F=3DL2iuBA@mail.gmail.com>
-Message-ID: <56570A12.3070300@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Nov 2015 13:49:40 +0000
+Subject: [PATCH 2/2] ARM: mm: keep reserved ASIDs in sync with mm after
+ multiple rollovers
+In-Reply-To: <1448545780-1550-1-git-send-email-will.deacon@arm.com>
+References: <1448545780-1550-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1448545780-1550-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.11.2015 11:27, Linus Walleij wrote:
-> trying to use the Kirkwood pinctrl driver with compatible =
-> "marvell,88f6192-pinctrl";
-> on a Pogoplug series 4 yields the following message when instantiating
-> the driver:
->
-> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 36
-> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 37
-> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 38
-> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 39
-> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 40
-> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 41
-> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 42
-> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 43
-> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 44
-> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 45
-> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 46
-> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 47
-> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 48
-> kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 49
-> kirkwood-pinctrl f1010000.pin-controller: registered pinctrl driver
->
-> It looks harmless but seems like a bug and make me uncertain.
->
-> The following naive patch fixes it:
->
-> diff --git a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
-> b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
-> index 0f07dc554a1d..6c7c2c8819b8 100644
-> --- a/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
-> +++ b/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
-> @@ -411,7 +411,7 @@ static struct mvebu_pinctrl_soc_info mv88f6190_info = {
->          .controls = mv88f619x_mpp_controls,
->          .ncontrols = ARRAY_SIZE(mv88f619x_mpp_controls),
->          .modes = mv88f6xxx_mpp_modes,
-> -       .nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes),
-> +       .nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes) - 14,
->          .gpioranges = mv88f619x_gpio_ranges,
->          .ngpioranges = ARRAY_SIZE(mv88f619x_gpio_ranges),
->   };
-> @@ -421,7 +421,7 @@ static struct mvebu_pinctrl_soc_info mv88f6192_info = {
->          .controls = mv88f619x_mpp_controls,
->          .ncontrols = ARRAY_SIZE(mv88f619x_mpp_controls),
->          .modes = mv88f6xxx_mpp_modes,
-> -       .nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes),
-> +       .nmodes = ARRAY_SIZE(mv88f6xxx_mpp_modes) - 14,
->          .gpioranges = mv88f619x_gpio_ranges,
->          .ngpioranges = ARRAY_SIZE(mv88f619x_gpio_ranges),
->   };
->
-> What is the proper way to fix this?
+Under some unusual context-switching patterns, it is possible to end up
+with multiple threads from the same mm running concurrently with
+different ASIDs:
 
-Linus,
+1. CPU x schedules task t with mm p containing ASID a and generation g
+   This task doesn't block and the CPU doesn't context switch.
+   So:
+     * per_cpu(active_asid, x) = {g,a}
+     * p->context.id = {g,a}
 
-I had a quick look at the pinctrl driver.
+2. Some other CPU generates an ASID rollover. The global generation is
+   now (g + 1). CPU x is still running t, with no context switch and
+   so per_cpu(reserved_asid, x) = {g,a}
 
-mv88f6xxx_mpp_modes contains mpp modes 0-49 plus corresponding
-functions for all Kirkwood SoCs, some SoCs only have a subset
-of that.
+3. CPU y schedules task t', which shares mm p with t. The generation
+   mismatches, so we take the slowpath and hit the reserved ASID from
+   CPU x. p is then updated so that p->context.id = {g + 1,a}
 
-Looking at
+4. CPU y schedules some other task u, which has an mm != p.
 
-static struct mvebu_mpp_ctrl mv88f619x_mpp_controls[] = {
-	MPP_FUNC_CTRL(0, 35, NULL, kirkwood_mpp_ctrl),
-};
+5. Some other CPU generates *another* CPU rollover. The global
+   generation is now (g + 2). CPU x is still running t, with no context
+   switch and so per_cpu(reserved_asid, x) = {g,a}.
 
-Kirkwood 619x only provides mpp0-35.
+6. CPU y once again schedules task t', but now *fails* to hit the
+   reserved ASID from CPU x because of the generation mismatch. This
+   results in a new ASID being allocated, despite the fact that t is
+   still running on CPU x with the same mm.
 
-Now in pinctrl-mvebu.c, we loop over the controls and
-collect the number of available groups. For kirkwood
-there are no groups with more than one single mpp pin
-like Dove has.
+Consequently, TLBIs (e.g. as a result of CoW) will not be synchronised
+between the two threads.
 
-/* count controls and create names for mvebu generic
-    register controls; also does sanity checks */
-pctl->num_groups = 0;
-pctl->desc.npins = 0;
-for (n = 0; n < soc->ncontrols; n++) {
-	struct mvebu_mpp_ctrl *ctrl = &soc->controls[n];
+This patch fixes the problem by updating all of the matching reserved
+ASIDs when we hit on the slowpath (i.e. in step 3 above). This keeps
+the reserved ASIDs in-sync with the mm and avoids the problem.
 
-	...
+Cc: <stable@vger.kernel.org>
+Reported-by: Tony Thompson <anthony.thompson@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mm/context.c | 39 ++++++++++++++++++++++++++-------------
+ 1 file changed, 26 insertions(+), 13 deletions(-)
 
-	/*
-	 * We allow to pass controls with NULL name that we treat
-	 * as a range of one-pin groups with generic mvebu register
-	 * controls.
-	 */
-	if (!ctrl->name) {
-		pctl->num_groups += ctrl->npins;
-		...
-	} else {
-		pctl->num_groups += 1;
-	}
-}
-
-After the loop pctl->num_groups is 36, i.e. mpp0 to mpp35.
-
-A little later, we do:
-
-/* assign mpp modes to groups */
-for (n = 0; n < soc->nmodes; n++) {
-	struct mvebu_mpp_mode *mode = &soc->modes[n];
-	struct mvebu_pinctrl_group *grp =
-		mvebu_pinctrl_find_group_by_pid(pctl, mode->pid);
-	unsigned num_settings;
-
-	if (!grp) {
-		dev_warn(&pdev->dev, "unknown pinctrl group %d\n",
-			mode->pid);
-		continue;
-	}
-
-	...
-}
-
-Which is looping over all modes (0-49) passed to the pinctrl-mvebu
-core driver. As said earlier, we pass one control with range from
-0-35 that gets translated to 36 groups (pctl->num_groups).
-mvebu_find_group_by_pid() will try to find the corresponding group
-for a given pin number by checking pctl->num_groups.
-
-That obviously fails for modes 36-49 and will issue that annoying
-warning.
-
-IMHO, the correct fix will be to make the last loop above run from
-0 to min(pctl->num_groups, soc->nmodes) instead of soc->nmodes.
-
-We could also limit pctl->num_groups to soc->nmodes earlier and let
-the loop run from 0 to pctl->num_groups.
-
-I am very short on time, but if nobody else jumps in earlier, I can
-stich a patch within a week or so.
-
-Thanks for reporting the issue,
-
-Sebastian
+diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
+index 845769e41332..0930884ff1ac 100644
+--- a/arch/arm/mm/context.c
++++ b/arch/arm/mm/context.c
+@@ -165,13 +165,28 @@ static void flush_context(unsigned int cpu)
+ 		__flush_icache_all();
+ }
+ 
+-static int is_reserved_asid(u64 asid)
++static bool check_update_reserved_asid(u64 asid, u64 newasid)
+ {
+ 	int cpu;
+-	for_each_possible_cpu(cpu)
+-		if (per_cpu(reserved_asids, cpu) == asid)
+-			return 1;
+-	return 0;
++	bool hit = false;
++
++	/*
++	 * Iterate over the set of reserved ASIDs looking for a match.
++	 * If we find one, then we can update our mm to use newasid
++	 * (i.e. the same ASID in the current generation) but we can't
++	 * exit the loop early, since we need to ensure that all copies
++	 * of the old ASID are updated to reflect the mm. Failure to do
++	 * so could result in us missing the reserved ASID in a future
++	 * generation.
++	 */
++	for_each_possible_cpu(cpu) {
++		if (per_cpu(reserved_asids, cpu) == asid) {
++			hit = true;
++			per_cpu(reserved_asids, cpu) = newasid;
++		}
++	}
++
++	return hit;
+ }
+ 
+ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
+@@ -181,12 +196,14 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
+ 	u64 generation = atomic64_read(&asid_generation);
+ 
+ 	if (asid != 0) {
++		u64 newasid = generation | (asid & ~ASID_MASK);
++
+ 		/*
+ 		 * If our current ASID was active during a rollover, we
+ 		 * can continue to use it and this was just a false alarm.
+ 		 */
+-		if (is_reserved_asid(asid))
+-			return generation | (asid & ~ASID_MASK);
++		if (check_update_reserved_asid(asid, newasid))
++			return newasid;
+ 
+ 		/*
+ 		 * We had a valid ASID in a previous life, so try to re-use
+@@ -194,7 +211,7 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
+ 		 */
+ 		asid &= ~ASID_MASK;
+ 		if (!__test_and_set_bit(asid, asid_map))
+-			goto bump_gen;
++			return newasid;
+ 	}
+ 
+ 	/*
+@@ -216,11 +233,7 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
+ 
+ 	__set_bit(asid, asid_map);
+ 	cur_idx = asid;
+-
+-bump_gen:
+-	asid |= generation;
+-	cpumask_clear(mm_cpumask(mm));
+-	return asid;
++	return asid | generation;
+ }
+ 
+ void check_and_switch_context(struct mm_struct *mm, struct task_struct *tsk)
+-- 
+2.1.4
