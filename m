@@ -1,34 +1,24 @@
-From: salil.mehta@huawei.com (Salil Mehta)
-Date: Thu, 26 Nov 2015 07:31:07 +0000
-Subject: [PATCH V3 net-next 2/5] net:hns: Add Hip06 "RSS(Receive Side
- Scaling)" support to HNS Driver
-In-Reply-To: <CO2PR11MB0088B852596B9F86F7BDCF6F97180@CO2PR11MB0088.namprd11.prod.outlook.com>
-References: <1447966706-16219-1-git-send-email-salil.mehta@huawei.com>
- <1447966706-16219-3-git-send-email-salil.mehta@huawei.com>
- <CO2PR11MB0088B852596B9F86F7BDCF6F97180@CO2PR11MB0088.namprd11.prod.outlook.com>
-Message-ID: <5656B53B.3080205@huawei.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 26 Nov 2015 16:35:07 +0900
+Subject: [PATCH] ARM: dts: exynos4210: Add power domain to G2D device
+In-Reply-To: <1448456127-31842-2-git-send-email-m.szyprowski@samsung.com>
+References: <1448456127-31842-1-git-send-email-m.szyprowski@samsung.com>
+ <1448456127-31842-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <5656B62B.4090304@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 25.11.2015 21:55, Marek Szyprowski wrote:
+> G2D device and it's SYSMMU belongs to LCD0 power domain on Exynos 4210,
+> so add missing power-domains property to G2D device node (G2D's SYSMMU is
+> already bound to LCD0 power domain).
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4210.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
 
-On 11/22/2015 9:30 AM, Yuval Mintz wrote:
->>   static void hns_ppe_init_hw(struct hns_ppe_cb *ppe_cb)  {
-> ...
->> +	/* Set default RSS key and indrection table*/
->> +	const u32 rss_key[HNS_PPEV2_RSS_KEY_NUM] = {
->> +		0x6d5a56da, 0x255b0ec2,
->> +		0x4167253d, 0x43a38fb0,
->> +		0xd0ca2bcb, 0xae7b30b4,
->> +		0x77cb2da3, 0x8030f20c,
->> +		0x6a42b73b, 0xbeac01fa,
->> +	};
->> +
->> +	/* set default RSS key and remember it */
->> +	for (i = 0; i < HNS_PPEV2_RSS_KEY_NUM; i++)
->> +		ppe_cb->rss_key[i]  = rss_key[i];
->>
-> Is there any reason for the special default key?
-> Why not use netdev_rss_key_fill()?
-Thanks for pointing out this. I have incorported this change in latest 
-PATCH V5
->
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
