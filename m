@@ -1,29 +1,34 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 26 Nov 2015 10:00:55 +0100
-Subject: [PATCH] ARM: shmobile: r8a7793: remove deprecated
- #gpio-range-cells
-In-Reply-To: <1448511980-12173-1-git-send-email-horms+renesas@verge.net.au>
-References: <1448511980-12173-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20151126090055.GA1531@katana>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 26 Nov 2015 11:05:13 +0200
+Subject: [PATCH] remoteproc: report error if resource table doesn't exist
+In-Reply-To: <1440810499-24327-1-git-send-email-stefan@agner.ch>
+References: <1440810499-24327-1-git-send-email-stefan@agner.ch>
+Message-ID: <CAK=WgbYLDTNjbq=Qn7wFqN44PTM7yqAVjDZycEq4Eri5C5unGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2015 at 01:26:20PM +0900, Simon Horman wrote:
-> Commit a1bc260bb5f5d9 ("gpio: clean up gpio-ranges documentation")
-> declares the above property deprecated. That was more than 2 years ago.
-> Remove it, so it doesn't get copied around needlessly.
-> 
-> Based on similar work for the r8a7791 and r8a7794 by Wolfram Sang.
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Hi Stefan,
 
-Reported-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+On Sat, Aug 29, 2015 at 4:08 AM, Stefan Agner <stefan@agner.ch> wrote:
+> Currently, if the resource table is completely missing in the
+> firmware, powering up the remoteproc fails silently. Add a message
+> indicating that the resource table is missing in the firmware.
+>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151126/1cb8678b/attachment.sig>
+Applied to remoteproc-next, thanks.
+
+> This also opens up a more general question: Is it mandatory to have
+> a resource table in the firmware?
+
+The implementation we have today does require it, but that's just
+because this is what we had to support so far.
+
+> Theoretically a remoteproc could
+> also work completely independent, all what would be used from the
+> remoteproc framework is the loading and starting capabilities...
+
+Sure. Feel free to add support for your hardware as needed.
+
+Thanks,
+Ohad.
