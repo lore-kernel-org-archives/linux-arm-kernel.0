@@ -1,197 +1,189 @@
-From: aryabinin@virtuozzo.com (Andrey Ryabinin)
-Date: Thu, 26 Nov 2015 18:47:36 +0300
-Subject: [PATCH RFT] arm64: kasan: Make KASAN work with 16K pages + 48 bit
- VA
-In-Reply-To: <20151126144859.GE32343@leverpostej>
-References: <1448543686-31869-1-git-send-email-aryabinin@virtuozzo.com>
- <20151126144859.GE32343@leverpostej>
-Message-ID: <56572998.9070102@virtuozzo.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 26 Nov 2015 15:49:26 +0000
+Subject: [PATCH] arm64: calculate the various pages number to show
+In-Reply-To: <56571FBC.2020300@huawei.com>
+References: <1448458872-39897-1-git-send-email-zhongjiang@huawei.com>
+ <20151125150448.GD12434@leverpostej> <56571FBC.2020300@huawei.com>
+Message-ID: <20151126154926.GG32343@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 11/26/2015 05:48 PM, Mark Rutland wrote:
-> Hi,
+On Thu, Nov 26, 2015 at 11:05:32PM +0800, zhong jiang wrote:
+> On 2015/11/25 23:04, Mark Rutland wrote:
+> > On Wed, Nov 25, 2015 at 09:41:12PM +0800, zhongjiang wrote:
+> >> This patch add the interface to show the number of 4KB or 64KB page,
+> >> aims to statistics the number of different types of pages.
+> > 
+> > What is this useful for? Why do we want it?
+> > 
+> > What does it account for, just the swapper?
+> > 
 > 
-> On Thu, Nov 26, 2015 at 04:14:46PM +0300, Andrey Ryabinin wrote:
->> Currently kasan assumes that shadow memory covers one or more entire PGDs.
->> That's not true for 16K pages + 48bit VA space, where PGDIR_SIZE is bigger
->> than the whole shadow memory.
->>
->> This patch tries to fix that case.
->> clear_page_tables() is a new replacement of clear_pgs(). Instead of always
->> clearing pgds it clears top level page table entries that entirely belongs
->> to shadow memory.
->> In addition to 'tmp_pg_dir' we now have 'tmp_pud' which is used to store
->> puds that now might be cleared by clear_page_tables.
->>
->> Reported-by: Suzuki K. Poulose <Suzuki.Poulose@arm.com>
->> Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
->> ---
->>
->>  *** THIS is not tested with 16k pages ***
->>
->>  arch/arm64/mm/kasan_init.c | 87 ++++++++++++++++++++++++++++++++++++++++------
->>  1 file changed, 76 insertions(+), 11 deletions(-)
->>
->> diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
->> index cf038c7..ea9f92a 100644
->> --- a/arch/arm64/mm/kasan_init.c
->> +++ b/arch/arm64/mm/kasan_init.c
->> @@ -22,6 +22,7 @@
->>  #include <asm/tlbflush.h>
->>  
->>  static pgd_t tmp_pg_dir[PTRS_PER_PGD] __initdata __aligned(PGD_SIZE);
->> +static pud_t tmp_pud[PAGE_SIZE/sizeof(pud_t)] __initdata __aligned(PAGE_SIZE);
->>  
->>  static void __init kasan_early_pte_populate(pmd_t *pmd, unsigned long addr,
->>  					unsigned long end)
->> @@ -92,20 +93,84 @@ asmlinkage void __init kasan_early_init(void)
->>  {
->>  	BUILD_BUG_ON(KASAN_SHADOW_OFFSET != KASAN_SHADOW_END - (1UL << 61));
->>  	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_START, PGDIR_SIZE));
->> -	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE));
->> +	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_END, PUD_SIZE));
+> The patch is wirtten when I was in backport set_memory_ro. It can be used to
+> detect whether there is a large page spliting and merging. large page will
+> significantly reduce the TLB miss, and improve the system performance.
+
+Ok, but typically the user isn't going to be able to do much with this
+information. It feels more like something that should be in the page
+table dump code (where we can calculate the values as we walk the
+tables).
+
+What is it intended to account for?
+
+The entire swapper?
+
+Just the linear mapping?
+
+> >> Signed-off-by: zhongjiang <zhongjiang@huawei.com>
+> >> ---
+> >>  arch/arm64/include/asm/pgtable-types.h |   24 ++++++++++++++++++++++++
+> >>  arch/arm64/mm/mmu.c                    |   28 ++++++++++++++++++++++++++++
+> >>  arch/arm64/mm/pageattr.c               |   31 +++++++++++++++++++++++++++++++
+> >>  3 files changed, 83 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/include/asm/pgtable-types.h b/arch/arm64/include/asm/pgtable-types.h
+> >> index 2b1bd7e..aa52546 100644
+> >> --- a/arch/arm64/include/asm/pgtable-types.h
+> >> +++ b/arch/arm64/include/asm/pgtable-types.h
+> >> @@ -86,6 +86,30 @@ typedef pteval_t pgprot_t;
+> >>  
+> >>  #endif /* STRICT_MM_TYPECHECKS */
+> >>  
+> >> +struct seq_file;
+> >> +extern void arch_report_meminfo(struct seq_file *m);
+> >> +
+> >> +enum pg_level {
+> >> +	PG_LEVEL_NONE,
+> >> +#ifdef CONFIG_ARM64_4K_PAGES
+> >> +	PG_LEVEL_4K,
+> >> +	PG_LEVEL_2M,
+> >> +	PG_LEVEL_1G,
+> >> +#else
+> >> +	PG_LEVEL_64K,
+> >> +	PG_LEVEL_512M,
+> >> +#endif
+> >> +	PG_LEVEL_NUM
+> >> +};
+> > 
+> > This doesn't account for 16K pages, and it means each call site has to
+> > handle the various page sizes directly.
+> > 
+> > It would be better to simply count PTE/PMD/PUD/PGD, then handle the size
+> > conversion at the end when logging.
+> > 
 > 
-> We also assume that even in the shared PUD case, the shadow region falls
-> within the same PGD entry, or we would need more than a single tmp_pud.
+> yes, now I only consider the 4kb and 64kb. if the patch is approved ,I will
+> improve it.
+> each call site need two different varialbes to statistics, aiming to distinguish
+> diffent pages. I think it will no more simple.
+
+I don't follow.
+
+Rather than having:
+
+	#if defined(CONFIG_ARM64_4K_PAGES)
+		update_page_count(PG_LEVEL_4K, i);
+	#else if defined(CONFIG_ARM64_16K_PAGES)
+		update_page_count(PG_LEVEL_16K, i);
+	#else if defined(CONFIG_ARM64_64K_PAGES)
+		update_page_count(PG_LEVEL_64K, i);
+	#else
+	#error PAGE SIZE UNKNOWN
+	#endif
+
+You'd have:
+
+	update_page_count(PG_LEVEL_PTE, i)
+
+The latter is clearly simpler.
+
+See the end of this email for what the other end would look like.
+
+> >> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+> >> index 7a5ff11..c1888b9 100644
+> >> --- a/arch/arm64/mm/pageattr.c
+> >> +++ b/arch/arm64/mm/pageattr.c
+> >> @@ -15,12 +15,43 @@
+> >>  #include <linux/module.h>
+> >>  #include <linux/sched.h>
+> >>  
+> >> +#include <linux/seq_file.h>
+> >>  #include <asm/pgalloc.h>
+> >>  #include <asm/pgtable.h>
+> >>  #include <asm/tlbflush.h>
+> >>  
+> >>  #include "mm.h"
+> >>  
+> >> +static unsigned long direct_pages_count[PG_LEVEL_NUM];
+> > 
+> > This doesn't match reality by the time we start executing the kernel,
+> > given we created page tables in head.S.
+
+As I mentioned here, I don't think that the account is correct, but it
+depends on what you're trying to account for.
+
+> >> +void update_page_count(int level, unsigned long pages)
+> >> +{
+> >> +	direct_pages_count[level] += pages;
+> >> +}
+> >> +
+> >> +void split_page_count(int level)
+> >> +{
+> >> +	direct_pages_count[level]--;
+> >> +	direct_pages_count[level-1] += PTRS_PER_PTE;
+> >> +}
+> >> +
+> >> +void arch_report_meminfo(struct seq_file *m)
+> >> +{
+> >> +#ifdef CONFIG_ARM64_4K_PAGES
+> >> +	seq_printf(m, "DirectMap4k:     %8lu kB\n",
+> >> +			direct_pages_count[PG_LEVEL_4K] << 2);
+> >> +	seq_printf(m, "DirectMap2M:     %8lu kB\n",
+> >> +			direct_pages_count[PG_LEVEL_2M] << 11);
+> >> +	seq_printf(m, "DirectMap1G:     %8lu kB\n",
+> >> +			direct_pages_count[PG_LEVEL_1G] << 20);
+> >> +#else
+> >> +	seq_printf(m, "DirectMap64k:     %8lu kB\n",
+> >> +			direct_pages_count[PG_LEVEL_64K] << 6);
+> >> +	seq_printf(m, "DirectMap512M:     %8lu kB\n",
+> >> +			direct_pages_count[PG_LEVEL_512M] << 19);
+> >> +#endif
+> >> +}
+> > 
+> > You could dynamuically determine the sizes here for each field, and not
+> > have to have #ifdefs.> 
 > 
-> It would be good to test for that.
-> 
+> I don't understand what you mean. I think it can be more readable and operability.
 
-Something like this:
+Assuming you use PGLEVEL_{PTE,PMD,PUD,PGD}, you can have this work for
+any size of page and number of levels using something like:
 
-	#define KASAN_SHADOW_SIZE (KASAN_SHADOW_END - KASAN_SHADOW_START)
+void arch_report_meminfo(struct seq_file *m)
+{
+	seq_printf(m, "DirectMap%dk:     %8lu kB\n",
+		   PAGE_SIZE / SZ_1K,
+		   direct_pages_count[PG_LEVEL_PTE] * PAGE_SIZE / SZ_1K);
 
-	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_END, PGD_SIZE)
-			 && !((PGDIR_SIZE > KASAN_SHADOW_SIZE)
-				 && IS_ALIGNED(KASAN_SHADOW_END, PUD_SIZE)));
+#if CONFIG_PGTABLE_LEVELS > 2
+	seq_printf(m, "DirectMap%dM:     %8lu kB\n",
+		   PMD_SIZE / SZ_1M,
+		   direct_pages_count[PG_LEVEL_PMD] * PUD_SIZE / SZ_1K);
 
+#endif
 
+#if CONFIG_PGTABLE_LEVELS > 3
+	seq_printf(m, "DirectMap%dG:     %8lu kB\n",
+		   PUD_SIZE / SZ_1G,
+		   direct_pages_count[PG_LEVEL_PUD] * PUD_SIZE / SZ_1K);
 
->> +static void __init clear_puds(pgd_t *pgd, unsigned long addr, unsigned long end)
->> +{
->> +	pud_t *pud;
->> +	unsigned long next;
->> +
->> +	pud = pud_offset(pgd, addr);
->> +
->> +	do {
->> +		next = pud_addr_end(addr, end);
->> +		if (IS_ALIGNED(addr, PUD_SIZE) && end - addr >= PUD_SIZE)
->> +			pud_clear(pud);
-> 
-> I think this can just be:
-> 
-> 		if (next - addr == PUD_SIZE)
-> 			pud_clear(pud);
-> 
-> Given that next can at most be PUD_SIZE from addr, and if so we knwo
-> addr is aligned.
-> 
+#endif
+}
 
-Right.
+I think that's far more readable and maintainable.
 
->> +
->> +		if (!pud_none(*pud))
->> +			clear_pmds(pud, addr, next);
-> 
-> I don't understand this. The KASAN shadow region is PUD_SIZE aligned at
-> either end, so KASAN should never own a partial pud entry like this.
-> 
-> Regardless, were this case to occur, surely we'd be clearing pmd entries
-> in the active page tables? We didn't copy anything at the pmd level.
-> 
-> That doesn't seem right.
-> 
+The above may not cover all cases; I'm not sure if you can have a huge
+PGD entry in some configuration. If we can, it should be easy to fix up
+for.
 
-Just take a look at p?d_clear() macroses, under CONFIG_PGTABLE_LEVELS=2 for example.
-pgd_clear() and pud_clear() is nops, and pmd_clear() is actually clears pgd.
-
-I could replace p?d_clear() with set_p?d(p?d, __p?d(0)).
-In that case going down to pmds is not needed, set_p?d() macro will do it for us.
-
-
-...
-
->> +static void copy_pagetables(void)
->> +{
->> +	pgd_t *pgd = tmp_pg_dir + pgd_index(KASAN_SHADOW_START);
->> +
->> +	memcpy(tmp_pg_dir, swapper_pg_dir, sizeof(tmp_pg_dir));
->> +
->>  	/*
->> -	 * Remove references to kasan page tables from
->> -	 * swapper_pg_dir. pgd_clear() can't be used
->> -	 * here because it's nop on 2,3-level pagetable setups
->> +	 * If kasan shadow shares PGD with other mappings,
->> +	 * clear_page_tables() will clear puds instead of pgd,
->> +	 * so we need temporary pud table to keep early shadow mapped.
->>  	 */
->> -	for (; start < end; start += PGDIR_SIZE)
->> -		set_pgd(pgd_offset_k(start), __pgd(0));
->> +	if (PGDIR_SIZE > KASAN_SHADOW_END - KASAN_SHADOW_START) {
->> +		pud_t *pud;
->> +		pmd_t *pmd;
->> +		pte_t *pte;
->> +
->> +		memcpy(tmp_pud, pgd_page_vaddr(*pgd), sizeof(tmp_pud));
->> +
->> +		pgd_populate(&init_mm, pgd, tmp_pud);
->> +		pud = pud_offset(pgd, KASAN_SHADOW_START);
->> +		pmd = pmd_offset(pud, KASAN_SHADOW_START);
->> +		pud_populate(&init_mm, pud, pmd);
->> +		pte = pte_offset_kernel(pmd, KASAN_SHADOW_START);
->> +		pmd_populate_kernel(&init_mm, pmd, pte);
-> 
-> I don't understand why we need to do anything below the pud level here.
-> We only copy down to the pud level, and we already initialised the
-> shared ptes and pmds earlier.
-> 
-> Regardless of this patch, we currently initialise the shared tables
-> repeatedly, which is redundant after the first time we initialise them.
-> We could improve that.
-> 
-
-Sure, just pgd_populate() will work here, because this code is only for 16K+48-bit,
-which has 4-level pagetables.
-But it wouldn't work if 16k+48-bit would have > 4-level.
-Because pgd_populate() in nop in such case, so we need to go down to actually set 'tmp_pud'
-
-I just tried to avoid assumptions about number of pagetables levels in that code.
-
-
-
-
->> +	}
->>  }
->>  
->>  static void __init cpu_set_ttbr1(unsigned long ttbr1)
->> @@ -123,16 +188,16 @@ void __init kasan_init(void)
->>  
->>  	/*
->>  	 * We are going to perform proper setup of shadow memory.
->> -	 * At first we should unmap early shadow (clear_pgds() call bellow).
->> +	 * At first we should unmap early shadow (clear_page_tables()).
->>  	 * However, instrumented code couldn't execute without shadow memory.
->>  	 * tmp_pg_dir used to keep early shadow mapped until full shadow
->>  	 * setup will be finished.
->>  	 */
->> -	memcpy(tmp_pg_dir, swapper_pg_dir, sizeof(tmp_pg_dir));
->> +	copy_pagetables();
->>  	cpu_set_ttbr1(__pa(tmp_pg_dir));
->>  	flush_tlb_all();
-> 
-> As a heads-up, I will shortly have patches altering the swap of TTBR1,
-> as it risks conflicting TLB entries and misses barriers.
-> 
-> Otherwise, we need a dsb(ishst) between the memcpy and writing to the
-> TTBR to ensure that the tables are visible to the MMU.
-> 
-
-Thanks.
-
-> Thanks,
-> Mark.
-> 
+Thanks,
+Mark.
