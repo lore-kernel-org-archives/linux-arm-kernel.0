@@ -1,35 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Nov 2015 01:28:59 +0000
-Subject: [PATCH v2 2/2] ARM: Replace calls to __aeabi_{u}idiv with
- udiv/sdiv instructions
-In-Reply-To: <yw1x4mg9posf.fsf@unicorn.mansr.com>
-References: <1448488264-23400-1-git-send-email-sboyd@codeaurora.org>
- <1448488264-23400-3-git-send-email-sboyd@codeaurora.org>
- <alpine.LFD.2.20.1511251733570.22569@knanqh.ubzr>
- <yw1x8u5lpqqz.fsf@unicorn.mansr.com>
- <alpine.LFD.2.20.1511251931050.22569@knanqh.ubzr>
- <yw1x4mg9posf.fsf@unicorn.mansr.com>
-Message-ID: <20151126012859.GX8644@n2100.arm.linux.org.uk>
+From: yangbo.lu@freescale.com (Lu Y.B.)
+Date: Thu, 26 Nov 2015 02:05:26 +0000
+Subject: [PATCH] ARM64: dts: ls2080a: fix eSDHC endianness
+In-Reply-To: <1446788617-35736-1-git-send-email-yangbo.lu@freescale.com>
+References: <1446788617-35736-1-git-send-email-yangbo.lu@freescale.com>
+Message-ID: <BLUPR0301MB20651CC0B0AE8BF9BF11FDABF2040@BLUPR0301MB2065.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2015 at 12:50:08AM +0000, M?ns Rullg?rd wrote:
-> If not calling the function saves an I-cache miss, the benefit can be
-> substantial.  No, I have no proof of this being a problem, but it's
-> something that could happen.
+Any comments?
+Thanks.
 
-That's a simplistic view of modern CPUs.
 
-As I've already said, modern CPUs which have branch prediction, but
-they also have speculative instruction fetching and speculative data
-prefetching - which the CPUs which have idiv support will have.
+- Yangbo Lu
 
-With such features, the branch predictor is able to learn that the
-branch will be taken, and because of the speculative instruction
-fetching, it can bring the cache line in so that it has the
-instructions it needs with minimal or, if working correctly,
-without stalling the CPU pipeline.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> -----Original Message-----
+> From: Yangbo Lu [mailto:yangbo.lu at freescale.com]
+> Sent: Friday, November 06, 2015 1:44 PM
+> To: linux-arm-kernel at lists.infradead.org; Catalin Marinas
+> Cc: Lu Yangbo-B47093
+> Subject: [PATCH] ARM64: dts: ls2080a: fix eSDHC endianness
+> 
+> Add the "little-endian" property to fix the issue that eSDHC is not
+> working and dumping out "mmc0: Controller never released inhibit bit(s)."
+> error messages constantly.
+> 
+> Fixes: 5461597f6ce0 ("dts/ls2080a: Update DTSI to add support of various
+> peripherals")
+> Signed-off-by: Yangbo Lu <yangbo.lu@freescale.com>
+> ---
+>  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> index e81cd48..ed45e25 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> @@ -269,6 +269,7 @@
+>  			clock-frequency = <0>;	/* Updated by bootloader */
+>  			voltage-ranges = <1800 1800 3300 3300>;
+>  			sdhci,auto-cmd12;
+> +			little-endian;
+>  			bus-width = <4>;
+>  		};
+> 
+> --
+> 2.1.0.27.g96db324
