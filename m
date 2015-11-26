@@ -1,191 +1,99 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 26 Nov 2015 00:32:45 -0500 (EST)
-Subject: [PATCH v2 2/2] ARM: Replace calls to __aeabi_{u}idiv with
- udiv/sdiv instructions
-In-Reply-To: <yw1xziy1o62j.fsf@unicorn.mansr.com>
-References: <1448488264-23400-1-git-send-email-sboyd@codeaurora.org>
- <1448488264-23400-3-git-send-email-sboyd@codeaurora.org>
- <alpine.LFD.2.20.1511251733570.22569@knanqh.ubzr>
- <yw1x8u5lpqqz.fsf@unicorn.mansr.com>
- <alpine.LFD.2.20.1511251931050.22569@knanqh.ubzr>
- <yw1x4mg9posf.fsf@unicorn.mansr.com>
- <20151126012859.GX8644@n2100.arm.linux.org.uk>
- <yw1xziy1o62j.fsf@unicorn.mansr.com>
-Message-ID: <alpine.LFD.2.20.1511252259090.22569@knanqh.ubzr>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Thu, 26 Nov 2015 11:23:58 +0530
+Subject: arm64: dts: qcom: Add apq8096 dragonboard dts skeletons
+Message-ID: <1448517238-32338-1-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Nov 2015, M?ns Rullg?rd wrote:
+Add new dtsi and dts files for the apq8096 dragonboards with just
+a serial device used as debug console
 
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> 
-> > On Thu, Nov 26, 2015 at 12:50:08AM +0000, M?ns Rullg?rd wrote:
-> >> If not calling the function saves an I-cache miss, the benefit can be
-> >> substantial.  No, I have no proof of this being a problem, but it's
-> >> something that could happen.
-> >
-> > That's a simplistic view of modern CPUs.
-> >
-> > As I've already said, modern CPUs which have branch prediction, but
-> > they also have speculative instruction fetching and speculative data
-> > prefetching - which the CPUs which have idiv support will have.
-> >
-> > With such features, the branch predictor is able to learn that the
-> > branch will be taken, and because of the speculative instruction
-> > fetching, it can bring the cache line in so that it has the
-> > instructions it needs with minimal or, if working correctly,
-> > without stalling the CPU pipeline.
-> 
-> It doesn't matter how many fancy features the CPU has.  Executing more
-> branches and using more cache lines puts additional pressure on those
-> resources, reducing overall performance.  Besides, the performance
-> counters readily show that the prediction is nothing near as perfect as
-> you seem to believe.
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+---
+Patch applies on top of Stephens' patches to add msm8996 dtsi
+https://lkml.org/lkml/2015/11/17/955
 
-OK... Let's try to come up with actual numbers.
+ arch/arm64/boot/dts/qcom/Makefile                 |  2 +-
+ arch/arm64/boot/dts/qcom/apq8096-dragonboard.dts  | 21 ++++++++++++++++
+ arch/arm64/boot/dts/qcom/apq8096-dragonboard.dtsi | 30 +++++++++++++++++++++++
+ 3 files changed, 52 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/boot/dts/qcom/apq8096-dragonboard.dts
+ create mode 100644 arch/arm64/boot/dts/qcom/apq8096-dragonboard.dtsi
 
-We know that letting gcc emit idiv by itself is the ultimate solution. 
-And it is free of maintenance on our side besides passing the 
-appropriate argument to gcc of course. So this is worth doing.
-
-For the case where you have a set of target machines in your kernel that 
-may or may not have idiv, then the first step should be to patch 
-__aeabi_uidiv and __aeabi_idiv.  This is a pretty small and simple 
-change that might turn out to be more than good enough. It is necessary 
-anyway as the full patching solution does not cover all cases.
-
-Then, IMHO, it would be a good idea to get performance numbers to 
-compare that first step and the full patching solution. Of course the 
-full patching will yield better performance. It has to. But if the 
-difference is not significant enough, then it might not be worth 
-introducing the implied complexity into mainline.  And it is not because 
-the approach is bad. In fact I think this is a very cool hack. But it 
-comes with a cost in maintenance and that cost has to be justified.
-
-Just to have an idea, I produced the attached micro benchmark. I tested 
-on a TC2 forced to a single Cortex-A15 core and I got those results:
-
-Testing INLINE_DIV ...
-
-real    0m7.182s
-user    0m7.170s
-sys     0m0.000s
-
-Testing PATCHED_DIV ...
-
-real    0m7.181s
-user    0m7.170s
-sys     0m0.000s
-
-Testing OUTOFLINE_DIV ...
-
-real    0m7.181s
-user    0m7.170s
-sys     0m0.005s
-
-Testing LIBGCC_DIV ...
-
-real    0m18.659s
-user    0m18.635s
-sys     0m0.000s
-
-As you can see, whether the div is inline or out-of-line, whether 
-arguments are moved into r0-r1 or not, makes no difference at all on a 
-Cortex-A15.
-
-Now forcing it onto a Cortex-A7 core:
-
-Testing INLINE_DIV ...
-
-real    0m8.917s
-user    0m8.895s
-sys     0m0.005s
-
-Testing PATCHED_DIV ...
-
-real    0m11.666s
-user    0m11.645s
-sys     0m0.000s
-
-Testing OUTOFLINE_DIV ...
-
-real    0m13.065s
-user    0m13.025s
-sys     0m0.000s
-
-Testing LIBGCC_DIV ...
-
-real    0m51.815s
-user    0m51.750s
-sys     0m0.005s
-
-So on A cortex-A7 the various overheads become visible. How significant 
-is it in practice with normal kernel usage? I don't know.
-
-
-Nicolas
--------------- next part --------------
-#!/bin/sh
-set -e
-for test in INLINE_DIV PATCHED_DIV OUTOFLINE_DIV LIBGCC_DIV; do
-  gcc -o divtest_$test divtest.S -D$test
-  echo "Testing $test ..."
-  time ./divtest_$test
-  echo
-  rm -f divtest_$test
-done
-
--------------- next part --------------
-	.arm
-	.arch_extension idiv
-
-	.globl main
-main:
-
-	stmfd	sp!, {r4, r5, lr}
-
-	mov	r4, #17
-1:	mov	r5, #1
-
-2:
-#if defined(INLINE_DIV)
-
-	udiv	r0, r4, r5
-
-#elif defined(OUTOFLINE_DIV)
-
-	mov	r0, r4
-	mov	r1, r5
-	bl	my_div
-
-#elif defined(PATCHED_DIV)
-
-	mov	r0, r4
-	mov	r1, r5
-	udiv	r0, r0, r1
-
-#elif defined(LIBGCC_DIV)
-
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_uidiv
-
-#else
-#error "define INLINE_DIV, OUTOFLINE_DIV or LIBGCC_DIV"
-#endif
-
-	add	r5, r5, #1
-	cmp	r4, r5
-	bhs	2b
-	adds	r4, r4, r4, lsl #1
-	bpl	1b
-
-	mov	r0, #0
-	ldmfd	sp!, {r4, r5, pc}
-
-	.space 1024
-
-my_div:
-
-	udiv	r0, r0, r1
-	bx	lr
+diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
+index fa1f661..bd992ef 100644
+--- a/arch/arm64/boot/dts/qcom/Makefile
++++ b/arch/arm64/boot/dts/qcom/Makefile
+@@ -1,5 +1,5 @@
+ dtb-$(CONFIG_ARCH_QCOM)	+= apq8016-sbc.dtb msm8916-mtp.dtb
+-dtb-$(CONFIG_ARCH_QCOM)	+= msm8996-mtp.dtb
++dtb-$(CONFIG_ARCH_QCOM)	+= msm8996-mtp.dtb apq8096-dragonboard.dtb
+ 
+ always		:= $(dtb-y)
+ subdir-y	:= $(dts-dirs)
+diff --git a/arch/arm64/boot/dts/qcom/apq8096-dragonboard.dts b/arch/arm64/boot/dts/qcom/apq8096-dragonboard.dts
+new file mode 100644
+index 0000000..65f4a6a
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/apq8096-dragonboard.dts
+@@ -0,0 +1,21 @@
++/*
++ * Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/dts-v1/;
++
++#include "apq8096-dragonboard.dtsi"
++
++/ {
++	model = "Qualcomm Technologies, Inc. APQ 8096 DragonBoard";
++	compatible = "qcom,apq8096-dragonboard";
++};
+diff --git a/arch/arm64/boot/dts/qcom/apq8096-dragonboard.dtsi b/arch/arm64/boot/dts/qcom/apq8096-dragonboard.dtsi
+new file mode 100644
+index 0000000..9bab5c0
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/apq8096-dragonboard.dtsi
+@@ -0,0 +1,30 @@
++/*
++ * Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include "msm8996.dtsi"
++
++/ {
++	aliases {
++		serial0 = &blsp2_uart1;
++	};
++
++	chosen {
++		stdout-path = "serial0";
++	};
++
++	soc {
++		serial at 75b0000 {
++			status = "okay";
++		};
++	};
++};
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
