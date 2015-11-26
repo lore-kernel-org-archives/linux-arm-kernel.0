@@ -1,54 +1,50 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 26 Nov 2015 17:07:18 +0100
-Subject: [PATCH v2] mmc: sdhci at91: add PM support
-In-Reply-To: <CAPDyKFoAwmkw0D8QbA4UV3uhhNS7hmfOiRv3ZUhMp8uoxzWnrw@mail.gmail.com>
-References: <1447151810-21864-1-git-send-email-ludovic.desroches@atmel.com>
- <CAPDyKFoAwmkw0D8QbA4UV3uhhNS7hmfOiRv3ZUhMp8uoxzWnrw@mail.gmail.com>
-Message-ID: <20151126160718.GE8908@odux.rfo.atmel.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Thu, 26 Nov 2015 17:09:55 +0100
+Subject: [linux-meson] Re: [PATCH v2 3/5] pinctrl: meson: enable GPIO IRQs
+In-Reply-To: <CAOQ7t2ZUAefL2xuEzAwoQWi3tpu7N7y6krMv1UUzaBT4BYZv4A@mail.gmail.com>
+References: <1448273816-11290-1-git-send-email-carlo@caione.org>
+ <1448273816-11290-4-git-send-email-carlo@caione.org>
+ <20151124082801.09139a93@arm.com>
+ <CAOQ7t2ZUAefL2xuEzAwoQWi3tpu7N7y6krMv1UUzaBT4BYZv4A@mail.gmail.com>
+Message-ID: <CAOQ7t2YAseprbT29uQX-aKJcEm-b-Dy=jBW8a+Z2kWDyQskNeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 10, 2015 at 12:12:30PM +0100, Ulf Hansson wrote:
-> On 10 November 2015 at 11:36, Ludovic Desroches
-> <ludovic.desroches@atmel.com> wrote:
-> > Add runtime PM support and use runtime_force_suspend|resume() for system
-> > PM.
-> >
+On Tue, Nov 24, 2015 at 10:04 AM, Carlo Caione <carlo@caione.org> wrote:
+> On Tue, Nov 24, 2015 at 9:28 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-[...]
+>> [...]
+>>
+>>> +     for (i = 0; i < pc->num_gic_irqs; i++) {
+>>> +             struct of_phandle_args oirq;
+>>> +
+>>> +             of_irq_parse_one(node, i, &oirq);
+>>> +             irq_of_phandle_args_to_fwspec(&oirq, &pc->gic_irqs[i]);
+>>> +
+>>> +             pc->irq_map[i] = IRQ_FREE;
+>>> +     }
+>>
+>> The whole thing feels weird. Why do you need to keep a set of fwspecs?
+>
+> We only have 8 IRQs on the GIC side that we can use for the GPIOs. The
+> set of fwspec is used to track these IRQs.
+> At probe time we read from the DTS how many and which IRQs are
+> reserved on the GIC for the GPIOs. Every time a GPIO IRQ is installed,
+> we use one of these IRQ lines.
+>
+>> All you need is a range of interrupts that would be conveniently
+>> represented by a bitmap (assuming your interrupts space is a mostly
+>> contiguous range).
+>
+> I could do that but it feels to me like we end up hiding from the DTS
+> some information that naturally should be in there: a pinctrl device
+> that is using 8 interrupt lines of its interrupt controller. IMO this
+> is not a special case that requires some special treatment.
 
-> >  static int sdhci_at91_probe(struct platform_device *pdev)
-> >  {
-> >         const struct of_device_id       *match;
-> > @@ -148,6 +206,11 @@ static int sdhci_at91_probe(struct platform_device *pdev)
-> >         if (ret)
-> >                 goto clocks_disable_unprepare;
-> >
-> > +       pm_runtime_set_active(&pdev->dev);
-> > +       pm_runtime_enable(&pdev->dev);
-> > +       pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
-> > +       pm_runtime_use_autosuspend(&pdev->dev);
-> 
-> Move these four runtime PM calls above sdhci_add_host(), as after that
-> point the host is used and thus runtime PM operations starts.
+Marc,
+What's your opinion on this? So I can start cooking v3
 
-Sadly I have discovered a bit late it is not working when doing this
-because the controller has been suspended before doing the
-sdhci_add_host().
+Thanks,
 
-What is the right way to fix it? Calling pm_runtime_get_noresume()
-before sdhci_add_host() and calling pm_runtime_put_autosuspend() after?
-
-> 
-> > +
-> >         return 0;
-> >
-> >  clocks_disable_unprepare:
-> > @@ -165,6 +228,7 @@ static int sdhci_at91_remove(struct platform_device *pdev)
-> >         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> >         struct sdhci_at91_priv  *priv = pltfm_host->priv;
-> >
-
-Regards
-
-Ludovic
+-- 
+Carlo Caione
