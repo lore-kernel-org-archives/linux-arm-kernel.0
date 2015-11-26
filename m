@@ -1,80 +1,53 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 26 Nov 2015 17:23:15 +0100
-Subject: Preprocessor arithmetic in dtsi files (base + offset)
-In-Reply-To: <56571ACC.9080306@free.fr>
-References: <56570620.3070106@free.fr>
- <20151126135957.GC8644@n2100.arm.linux.org.uk>
- <56571ACC.9080306@free.fr>
-Message-ID: <CAMuHMdX9JRRURMxmNFcKOkzeO1B5Nmnk+XnOpgcLsPbiG4CfSA@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 26 Nov 2015 17:24:40 +0100
+Subject: [PATCH v2] mmc: sdhci at91: add PM support
+In-Reply-To: <20151126160718.GE8908@odux.rfo.atmel.com>
+References: <1447151810-21864-1-git-send-email-ludovic.desroches@atmel.com>
+ <CAPDyKFoAwmkw0D8QbA4UV3uhhNS7hmfOiRv3ZUhMp8uoxzWnrw@mail.gmail.com>
+ <20151126160718.GE8908@odux.rfo.atmel.com>
+Message-ID: <CAPDyKFpShib_OsB6HB7_5PNEkkMpWq6+LwaD0-AH=QqhzpOB3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2015 at 3:44 PM, Mason <slash.tmp@free.fr> wrote:
-> On 26/11/2015 14:59, Russell King - ARM Linux wrote:
->> On Thu, Nov 26, 2015 at 02:16:16PM +0100, Mason wrote:
->>> #define SCU_BASE 0x20000000
->>>
->>>      scu: scu at XXX {
->>>              compatible = "arm,cortex-a9-scu";
->>>              reg = <SCU_BASE 0x100>;
->>>
->>>      gic: interrupt-controller at XXX {
->>>              compatible = "arm,cortex-a9-gic";
->>>              reg = <SCU_BASE+0x1000 0x1000>, <SCU_BASE+0x100 0x0100>;
+On 26 November 2015 at 17:07, Ludovic Desroches
+<ludovic.desroches@atmel.com> wrote:
+> On Tue, Nov 10, 2015 at 12:12:30PM +0100, Ulf Hansson wrote:
+>> On 10 November 2015 at 11:36, Ludovic Desroches
+>> <ludovic.desroches@atmel.com> wrote:
+>> > Add runtime PM support and use runtime_force_suspend|resume() for system
+>> > PM.
+>> >
+>
+> [...]
+>
+>> >  static int sdhci_at91_probe(struct platform_device *pdev)
+>> >  {
+>> >         const struct of_device_id       *match;
+>> > @@ -148,6 +206,11 @@ static int sdhci_at91_probe(struct platform_device *pdev)
+>> >         if (ret)
+>> >                 goto clocks_disable_unprepare;
+>> >
+>> > +       pm_runtime_set_active(&pdev->dev);
+>> > +       pm_runtime_enable(&pdev->dev);
+>> > +       pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
+>> > +       pm_runtime_use_autosuspend(&pdev->dev);
 >>
->> You don't get preprocessor arithmetic here.  What you get is this passed
->> to DTC:
->>
->>               reg = <0x20000000+0x1000 0x1000>...
->>
->> The only time the preprocessor does arithmetic is when it needs to
->> evaluate an expression, eg, in an #if statement.
+>> Move these four runtime PM calls above sdhci_add_host(), as after that
+>> point the host is used and thus runtime PM operations starts.
 >
-> Doh! Brain malfunction. No arithmetic indeed.
-> Working with the preprocessor would have to involve token-pasting.
+> Sadly I have discovered a bit late it is not working when doing this
+> because the controller has been suspended before doing the
+> sdhci_add_host().
 >
-> #define SCU_BASE(OFFSET)        2000##OFFSET
-> #define SCU_BASEX(OFFSET)       0x2000##OFFSET
->
->         gic: interrupt-controller at SCU_BASE(1000) {
->                 reg = <SCU_BASEX(1000) 0x1000>, <SCU_BASEX(0100) 0x0100>;
->         };
->
-> My very own abomination!
+> What is the right way to fix it? Calling pm_runtime_get_noresume()
 
-Yeah! ;-)
+I would do that before pm_runtime_enable().
 
-I guess this would work, too?
+> before sdhci_add_host() and calling pm_runtime_put_autosuspend() after?
 
-scu_container at 20000000 {
-        compatible = "simple-bus";
+Yes. Sorry for not spotting this before.
 
-        ranges = <0x0 0x20000000 0x10000>;
-        #address-cells = <1>;
-        #size-cells = <1>;
+[...]
 
-        scu: scu at 0 {
-                compatible = "arm,cortex-a9-scu";
-                reg = <0x0000 0x100>;
-
-        gic: interrupt-controller at 1000 {
-                compatible = "arm,cortex-a9-gic";
-                reg = <0x1000 0x1000>, <0x0100 0x0100>;
-
-        twd-timer at 0600 {
-                compatible = "arm,cortex-a9-twd-timer";
-                reg = <0x0600 0x10>;
-};
-
-No more explicit arithmetic needed, just substitue "20000000".
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Kind regards
+Uffe
