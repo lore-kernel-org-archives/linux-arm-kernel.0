@@ -1,39 +1,54 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 26 Nov 2015 16:06:48 +0000
-Subject: [PATCH] arm64: mm: Prevent the initial page table setup from
- creating larger blocks
-In-Reply-To: <56563D2C.7050807@arm.com>
-References: <1448387338-27851-1-git-send-email-catalin.marinas@arm.com>
- <56563D2C.7050807@arm.com>
-Message-ID: <20151126160648.GL3109@e104818-lin.cambridge.arm.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 26 Nov 2015 17:07:18 +0100
+Subject: [PATCH v2] mmc: sdhci at91: add PM support
+In-Reply-To: <CAPDyKFoAwmkw0D8QbA4UV3uhhNS7hmfOiRv3ZUhMp8uoxzWnrw@mail.gmail.com>
+References: <1447151810-21864-1-git-send-email-ludovic.desroches@atmel.com>
+ <CAPDyKFoAwmkw0D8QbA4UV3uhhNS7hmfOiRv3ZUhMp8uoxzWnrw@mail.gmail.com>
+Message-ID: <20151126160718.GE8908@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 04:58:52PM -0600, Jeremy Linton wrote:
-> On 11/24/2015 11:48 AM, Catalin Marinas wrote:
-> >This patch prevents the larger block mappings at all levels _if_ the
-> >existing pud/pmd entry is present _and_ not already a block mapping.
-> >Contiguous ptes are rejected if any of the entries in the range are
-> >non-empty and non-contiguous.
+On Tue, Nov 10, 2015 at 12:12:30PM +0100, Ulf Hansson wrote:
+> On 10 November 2015 at 11:36, Ludovic Desroches
+> <ludovic.desroches@atmel.com> wrote:
+> > Add runtime PM support and use runtime_force_suspend|resume() for system
+> > PM.
 > >
-> >In addition, TLB flushing is added for the cases where an existing block
-> >entry is changed.
-> 
-> Ok, it seems to boot fairly reliably on the m400/ACPI, over a few dozen
-> reboots yesterday and today. So, for that:
-> 
-> Tested-by: Jeremy Linton <jeremy.linton@arm.com>
-> 
-> That said, it basically disables the CONT ranges for the main kernel text
-> section.
 
-Thanks for testing. However, I made the decision to revert commit
-348a65cdcbbf ("arm64: Mark kernel page ranges contiguous") temporarily
-until 4.5. While I see your point that other cases pte->pmd->pud could
-be equally broken, we haven't had reports about them so far. Mark is
-close to finishing a proper fix for the page table manipulation and
-we'll re-apply your commit once that's done. I kept the other patches in
-the original series, so it's only the last one that needs merging.
+[...]
 
--- 
-Catalin
+> >  static int sdhci_at91_probe(struct platform_device *pdev)
+> >  {
+> >         const struct of_device_id       *match;
+> > @@ -148,6 +206,11 @@ static int sdhci_at91_probe(struct platform_device *pdev)
+> >         if (ret)
+> >                 goto clocks_disable_unprepare;
+> >
+> > +       pm_runtime_set_active(&pdev->dev);
+> > +       pm_runtime_enable(&pdev->dev);
+> > +       pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
+> > +       pm_runtime_use_autosuspend(&pdev->dev);
+> 
+> Move these four runtime PM calls above sdhci_add_host(), as after that
+> point the host is used and thus runtime PM operations starts.
+
+Sadly I have discovered a bit late it is not working when doing this
+because the controller has been suspended before doing the
+sdhci_add_host().
+
+What is the right way to fix it? Calling pm_runtime_get_noresume()
+before sdhci_add_host() and calling pm_runtime_put_autosuspend() after?
+
+> 
+> > +
+> >         return 0;
+> >
+> >  clocks_disable_unprepare:
+> > @@ -165,6 +228,7 @@ static int sdhci_at91_remove(struct platform_device *pdev)
+> >         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> >         struct sdhci_at91_priv  *priv = pltfm_host->priv;
+> >
+
+Regards
+
+Ludovic
