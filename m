@@ -1,101 +1,63 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 26 Nov 2015 12:56:08 +0100
-Subject: [PATCH] mmc: core: fix __mmc_switch timeout caused by preempt
-In-Reply-To: <1448506309-18163-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1448506309-18163-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <CAPDyKFqWnZV6qaXb-mwXW-V=m0bJbi5+unJxPSTpkdT=coXZ3A@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 26 Nov 2015 11:59:59 +0000
+Subject: [PATCH v4 1/6] ARM: shmobile: r8a7740 dtsi: Add L2
+ cache-controller node
+In-Reply-To: <CAMuHMdWv4iDxmyPCG26sTMZAnHd3AO7h8nTcxbPryW-d3zzjFw@mail.gmail.com>
+References: <1438765090-823-1-git-send-email-geert+renesas@glider.be>
+ <1438765090-823-2-git-send-email-geert+renesas@glider.be>
+ <55C1D894.8070302@arm.com>
+ <CAMuHMdXdEV+41mH338bDbazzqOErDLQkBUAj2+uVX4Wupn1ABQ@mail.gmail.com>
+ <55C1EC3C.9000407@arm.com>
+ <CAMuHMdVAOba0ofmoy8OH2DdY1m3XaD8iOXvXBE035=C4yK58VQ@mail.gmail.com>
+ <55C47E32.6070400@arm.com>
+ <CAMuHMdWv4iDxmyPCG26sTMZAnHd3AO7h8nTcxbPryW-d3zzjFw@mail.gmail.com>
+Message-ID: <5656F43F.9050501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 November 2015 at 03:51, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> there is a time window between __mmc_send_status() and time_afer(),
-> on some eMMC chip, the timeout_ms is only 10ms, if this thread was
-> scheduled out during this period, then, even card has already changes
-> to transfer state by the result of CMD13, this part of code also treat
-> it to timeout error.
-> So, need calculate timeout first, then call __mmc_send_status(), if
-> already timeout and card still in programing state, then treat it to
-> the real timeout error.
->
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> ---
->  drivers/mmc/core/mmc_ops.c | 23 ++++++++++++++---------
->  1 file changed, 14 insertions(+), 9 deletions(-)
->
-> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
-> index 1f44426..0add634 100644
-> --- a/drivers/mmc/core/mmc_ops.c
-> +++ b/drivers/mmc/core/mmc_ops.c
-> @@ -489,6 +489,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->         unsigned long timeout;
->         u32 status = 0;
->         bool use_r1b_resp = use_busy_signal;
-> +       bool expired = false;
 
-No need to assign an initial value.
 
->
->         mmc_retune_hold(host);
->
-> @@ -544,10 +545,22 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->         /* Must check status to be sure of no errors. */
->         timeout = jiffies + msecs_to_jiffies(timeout_ms);
->         do {
-> +               /* Timeout if the device never leaves the program state.
-
-Please start mutli-row comment with an empty line.
-
-> +                * must check it firstly to avoid problem caused by preempt.
-
-Please rephrase this to:
-
-Due to the possibility of being preempted after sending the status
-command, check the expiration time first.
-
-> +                */
-> +               expired = time_after(jiffies, timeout);
-
-I think we can move this inside the below "if (send_status) {"
-.. but of course before sending the status command.
-
-> +
->                 if (send_status) {
->                         err = __mmc_send_status(card, &status, ignore_crc);
-> -                       if (err)
-> +                       if (err) {
->                                 goto out;
-> +                       } else if (expired &&
-
-You may use a new "if" statement instead of an "else if", due to the
-above "goto out".
-
-> +                                  R1_CURRENT_STATE(status) == R1_STATE_PRG) {
-> +                               pr_err("%s: Card stuck in programming state! %s\n",
-> +                                      mmc_hostname(host), __func__);
-> +                               err = -ETIMEDOUT;
-> +                               goto out;
-> +                       }
->                 }
->                 if ((host->caps & MMC_CAP_WAIT_WHILE_BUSY) && use_r1b_resp)
->                         break;
-> @@ -563,14 +576,6 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->                         mmc_delay(timeout_ms);
->                         goto out;
->                 }
-> -
-> -               /* Timeout if the device never leaves the program state. */
-> -               if (time_after(jiffies, timeout)) {
-> -                       pr_err("%s: Card stuck in programming state! %s\n",
-> -                               mmc_hostname(host), __func__);
-> -                       err = -ETIMEDOUT;
-> -                       goto out;
-> -               }
->         } while (R1_CURRENT_STATE(status) == R1_STATE_PRG);
->
->         err = mmc_switch_status_error(host, status);
-> --
-> 1.8.1.1.dirty
+On 20/11/15 16:14, Geert Uytterhoeven wrote:
+> Hi Sudeep,
 >
 
-Kind regards
-Uffe
+[...]
+
+> AFAIK, there's nothing to be overridden. The cache seems to be configured in
+> the exact same way with and without cache-size, cache-sets, cache-block-size,
+> and cache-line-size.
+>
+> With:
+>
+>      L2C OF: override cache size: 262144 bytes (256KB)
+>      L2C OF: override line size: 32 bytes
+>      L2C OF: override way size: 32768 bytes (32KB)
+>      L2C OF: override associativity: 8
+>      L2C: DT/platform modifies aux control register: 0x02040000 -> 0x02440000
+>      L2C: DT/platform tries to modify or specify cache size
+>      L2C-310 erratum 769419 enabled
+>      L2C-310 enabling early BRESP for Cortex-A9
+>      L2C-310 full line of zeros enabled for Cortex-A9
+>      L2C-310 dynamic clock gating enabled, standby mode enabled
+>      L2C-310 cache controller enabled, 8 ways, 256 kB
+>      L2C-310: CACHE_ID 0x410000c7, AUX_CTRL 0x46440001
+>
+> Without:
+>
+>      L2C: DT/platform modifies aux control register: 0x02040000 -> 0x02440000
+>      L2C-310 erratum 769419 enabled
+>      L2C-310 enabling early BRESP for Cortex-A9
+>      L2C-310 full line of zeros enabled for Cortex-A9
+>      L2C-310 dynamic clock gating enabled, standby mode enabled
+>      L2C-310 cache controller enabled, 8 ways, 256 kB
+>      L2C-310: CACHE_ID 0x410000c7, AUX_CTRL 0x46440001
+>
+> Hence I'll drop cache-size, cache-sets, cache-block-size, and cache-line-size,
+> for both unified L2 and L1 I/D caches.
+>
+
+Sorry for the delay, was on vacation. Looks fine for me.
+
+-- 
+Regards,
+Sudeep
