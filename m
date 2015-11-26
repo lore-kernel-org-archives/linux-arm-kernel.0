@@ -1,93 +1,76 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 26 Nov 2015 12:20:03 +0000
-Subject: [PATCH v3 30/62] arm/irq: Add helper function for setting
- interrupt type
-In-Reply-To: <1447753261-7552-31-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-31-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511261218260.1107@kaball.uk.xensource.com>
+From: aryabinin@virtuozzo.com (Andrey Ryabinin)
+Date: Thu, 26 Nov 2015 15:22:41 +0300
+Subject: [PATCH v7 0/4] KASAN for arm64
+In-Reply-To: <20151126121007.GC32343@leverpostej>
+References: <1444665180-301-1-git-send-email-ryabinin.a.a@gmail.com>
+ <20151013083432.GG6320@e104818-lin.cambridge.arm.com>
+ <5649BAFD.6030005@arm.com> <5649F783.40109@gmail.com>
+ <564B40A7.1000206@arm.com> <564B4BFC.1020905@virtuozzo.com>
+ <20151126121007.GC32343@leverpostej>
+Message-ID: <5656F991.8090108@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> From: Parth Dixit <parth.dixit@linaro.org>
+On 11/26/2015 03:10 PM, Mark Rutland wrote:
+> Hi Catalin,
 > 
-> Add a helper function to set edge/level type information for an
-> interrupt.
+> Can you pick up Andrey's patch below for v4.4, until we have a better
+> solution?
 > 
-> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  xen/arch/arm/irq.c        | 22 +++++++++++++++-------
->  xen/include/asm-arm/irq.h |  2 ++
->  2 files changed, 17 insertions(+), 7 deletions(-)
+
+FYI, better solution is almost ready, I'm going to send it today.
+However, I don't know for sure whether it works or not :)
+I'm not able to test as I don't have any setup working with 16k pages.
+
+> I stumbled across this myself and was about to post a similar patch.
 > 
-> diff --git a/xen/arch/arm/irq.c b/xen/arch/arm/irq.c
-> index 1f38605..90b6e58 100644
-> --- a/xen/arch/arm/irq.c
-> +++ b/xen/arch/arm/irq.c
-> @@ -655,6 +655,19 @@ unlock:
->      return ret;
->  }
->  
-> +int irq_set_type(unsigned int irq, unsigned int type)
-> +{
-> +    int res;
-> +
-> +    /* Setup the IRQ type */
-> +    if ( irq < NR_LOCAL_IRQS )
-> +        res = irq_local_set_type(irq, type);
-> +    else
-> +        res = irq_set_spi_type(irq, type);
-> +
-> +    return res;
-> +}
-> +
->  int platform_get_irq(const struct dt_device_node *device, int index)
->  {
->      struct dt_irq dt_irq;
-> @@ -668,14 +681,9 @@ int platform_get_irq(const struct dt_device_node *device, int index)
->      irq = dt_irq.irq;
->      type = dt_irq.type;
->  
-> -    /* Setup the IRQ type */
-> -    if ( irq < NR_LOCAL_IRQS )
-> -        res = irq_local_set_type(irq, type);
-> -    else
-> -        res = irq_set_spi_type(irq, type);
-> -
-> +    res = irq_set_type(irq, type);
->      if ( res )
-> -            return -1;
-> +        return -1;
-
-I would just as well do:
-
-if ( irq_set_type(irq, type) )
-    return -1;
-
-and remove res.
-
-In any case:
-
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
-
->      return irq;
->  }
-> diff --git a/xen/include/asm-arm/irq.h b/xen/include/asm-arm/irq.h
-> index f33c331..493773c 100644
-> --- a/xen/include/asm-arm/irq.h
-> +++ b/xen/include/asm-arm/irq.h
-> @@ -52,6 +52,8 @@ void arch_move_irqs(struct vcpu *v);
->  /* Set IRQ type for an SPI */
->  int irq_set_spi_type(unsigned int spi, unsigned int type);
->  
-> +int irq_set_type(unsigned int irq, unsigned int type);
-> +
->  int platform_get_irq(const struct dt_device_node *device, int index);
->  
->  void irq_set_affinity(struct irq_desc *desc, const cpumask_t *cpu_mask);
-> -- 
-> 2.1.0
+> FWIW:
 > 
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> Thanks,
+> Mark.
+> 
+> On Tue, Nov 17, 2015 at 06:47:08PM +0300, Andrey Ryabinin wrote:
+>> We should either add proper Kconfig dependency for now, or just make it work.
+>>
+>>
+>> From: Andrey Ryabinin <aryabinin@virtuozzo.com>
+>> Subject: [PATCH] arm64: KASAN depends on !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+>>
+>> On KASAN + 16K_PAGES + 48BIT_VA
+>>  arch/arm64/mm/kasan_init.c: In function ?kasan_early_init?:
+>>  include/linux/compiler.h:484:38: error: call to ?__compiletime_assert_95? declared with attribute error: BUILD_BUG_ON failed: !IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE)
+>>     _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+>>
+>> Currently KASAN will not work on 16K_PAGES and 48BIT_VA, so
+>> forbid such configuration to avoid above build failure.
+>>
+>> Reported-by: Suzuki K. Poulose <Suzuki.Poulose@arm.com>
+>> Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+>> ---
+>>  arch/arm64/Kconfig | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 9ac16a4..bf7de69 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -49,7 +49,7 @@ config ARM64
+>>  	select HAVE_ARCH_AUDITSYSCALL
+>>  	select HAVE_ARCH_BITREVERSE
+>>  	select HAVE_ARCH_JUMP_LABEL
+>> -	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP
+>> +	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP && !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+>>  	select HAVE_ARCH_KGDB
+>>  	select HAVE_ARCH_SECCOMP_FILTER
+>>  	select HAVE_ARCH_TRACEHOOK
+>> -- 
+>> 2.4.10
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
