@@ -1,31 +1,33 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Thu, 26 Nov 2015 14:01:26 +0530
-Subject: [PATCH] ARM: dts: dra72-evm: Mark uart1 rxd as wakeup capable
-Message-ID: <1448526686-3998-1-git-send-email-vigneshr@ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 26 Nov 2015 09:39:03 +0100
+Subject: [PATCH 1/2] drivers: amba: properly handle devices with power
+ domains
+In-Reply-To: <20151125180953.GN8644@n2100.arm.linux.org.uk>
+References: <1448456127-31842-1-git-send-email-m.szyprowski@samsung.com>
+ <1448456289-31960-1-git-send-email-m.szyprowski@samsung.com>
+ <20151125132458.GL8644@n2100.arm.linux.org.uk> <5655B8F6.1070104@samsung.com>
+ <CAPDyKFqTqPijF+Lbq0+a-Gv8CyaAr13JvZPjUN1-GNL5i3-mAw@mail.gmail.com>
+ <20151125180953.GN8644@n2100.arm.linux.org.uk>
+Message-ID: <5656C527.8040804@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uart1 rxd  is wakeup capable on DRA72 EVM. Hence, mark rxd line as
-wakeup capable. This is similar to commit 66b0436977e2c ("ARM: dts:
-dra7-evm: Mark uart1 rxd as wakeup capable") for DRA74 EVM.
+Hello,
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- arch/arm/boot/dts/dra72-evm.dts | 2 ++
- 1 file changed, 2 insertions(+)
+On 2015-11-25 19:09, Russell King - ARM Linux wrote:
+> On Wed, Nov 25, 2015 at 02:56:10PM +0100, Ulf Hansson wrote:
+>> On 25 November 2015 at 14:34, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>>> Is ignoring dev_pm_domain_attach() return value a solution for you?
+>> That's probably better than nothing, but I wonder if it in practice
+>> will have any effect?
+> If the PM domain is down, then trying to tread the ID is likely to oops
+> the kernel.
 
-diff --git a/arch/arm/boot/dts/dra72-evm.dts b/arch/arm/boot/dts/dra72-evm.dts
-index d6104d5f0c01..8bf36b0b3c33 100644
---- a/arch/arm/boot/dts/dra72-evm.dts
-+++ b/arch/arm/boot/dts/dra72-evm.dts
-@@ -478,6 +478,8 @@
- 
- &uart1 {
- 	status = "okay";
-+	interrupts-extended = <&crossbar_mpu GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
-+			      <&dra7_pmx_core 0x3e0>;
- };
- 
- &elm {
+In my case kernel simply hangs (no single message, even when earlyprintk 
+is enabled)
+instead of oopsing, that's why I've submitted this patch.
+
+Best regards
 -- 
-2.6.3
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
