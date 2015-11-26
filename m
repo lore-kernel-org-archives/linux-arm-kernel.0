@@ -1,178 +1,171 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 26 Nov 2015 13:49:49 +0100
-Subject: [PATCH v2 3/4] ARM: amba: Move reading of periphid to amba_match()
-In-Reply-To: <1448542190-19498-1-git-send-email-m.szyprowski@samsung.com>
-References: <1448542190-19498-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1448542190-19498-4-git-send-email-m.szyprowski@samsung.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 26 Nov 2015 12:54:21 +0000
+Subject: [Xen-devel] [PATCH v3 32/62] arm/acpi: Parse GTDT to initialize
+ timer
+In-Reply-To: <1447753261-7552-33-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-33-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511261247480.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Parth Dixit <parth.dixit@linaro.org>
+> 
+> Parse GTDT (Generic Timer Descriptor Table) to initialize timer. Using
+> the information presented by GTDT to initialize the arch timer (not
+> memory-mapped).
+> 
+> Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
+> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  xen/arch/arm/time.c | 73 +++++++++++++++++++++++++++++++++++++++++++++--------
+>  1 file changed, 62 insertions(+), 11 deletions(-)
+> 
+> diff --git a/xen/arch/arm/time.c b/xen/arch/arm/time.c
+> index 5ded30c..adbfc2a 100644
+> --- a/xen/arch/arm/time.c
+> +++ b/xen/arch/arm/time.c
+> @@ -29,6 +29,7 @@
+>  #include <xen/time.h>
+>  #include <xen/sched.h>
+>  #include <xen/event.h>
+> +#include <xen/acpi.h>
+>  #include <asm/system.h>
+>  #include <asm/time.h>
+>  #include <asm/gic.h>
+> @@ -65,8 +66,45 @@ unsigned int timer_get_irq(enum timer_ppi ppi)
+>  
+>  static __initdata struct dt_device_node *timer;
+>  
+> +#ifdef CONFIG_ACPI
+> +/* Initialize per-processor generic timer */
+> +static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+> +{
+> +    unsigned int irq_type;
+> +    struct acpi_table_gtdt *gtdt;
+> +
+> +    gtdt = container_of(table, struct acpi_table_gtdt, header);
+> +
+> +    /* Initialize all the generic timer IRQ variable from GTDT table */
+> +    irq_type = acpi_get_irq_type(gtdt->non_secure_el1_flags);
+> +    irq_set_type(gtdt->non_secure_el1_interrupt, irq_type);
+> +    timer_irq[TIMER_PHYS_NONSECURE_PPI] = gtdt->non_secure_el1_interrupt;
+> +
+> +    irq_type = acpi_get_irq_type(gtdt->secure_el1_flags);
+> +    irq_set_type(gtdt->secure_el1_interrupt, irq_type);
+> +    timer_irq[TIMER_PHYS_SECURE_PPI] = gtdt->secure_el1_interrupt;
+> +
+> +    irq_type = acpi_get_irq_type(gtdt->virtual_timer_flags);
+> +    irq_set_type(gtdt->virtual_timer_interrupt, irq_type);
+> +    timer_irq[TIMER_VIRT_PPI] = gtdt->virtual_timer_interrupt;
+> +
+> +    irq_type = acpi_get_irq_type(gtdt->non_secure_el2_flags);
+> +    irq_set_type(gtdt->non_secure_el2_interrupt, irq_type);
+> +    timer_irq[TIMER_HYP_PPI] = gtdt->non_secure_el2_interrupt;
+> +
+> +    return 0;
+> +}
+> +
+> +void __init acpi_preinit_xen_time(void)
 
-Reading the periphid when the Primecell device is registered means that
-the apb pclk must be available by then or the device won't be registered
-at all.
+static?
 
-By reading the periphid in amba_match() we can return -EPROBE_DEFER if
-the apb pclk isn't there yet and the device will be retried later.
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- drivers/amba/bus.c | 88 ++++++++++++++++++++++++++++--------------------------
- 1 file changed, 46 insertions(+), 42 deletions(-)
+> +{
+> +	acpi_table_parse(ACPI_SIG_GTDT, arch_timer_acpi_init);
+> +}
+> +#else
+> +static inline void acpi_preinit_xen_time(void) { }
+> +#endif
+> +
+>  /* Set up the timer on the boot CPU (early init function) */
+> -void __init preinit_xen_time(void)
+> +static void __init dt_preinit_xen_time(void)
+>  {
+>      static const struct dt_device_match timer_ids[] __initconst =
+>      {
+> @@ -74,7 +112,6 @@ void __init preinit_xen_time(void)
+>          { /* sentinel */ },
+>      };
+>      int res;
+> -    u32 rate;
+>  
+>      timer = dt_find_matching_node(NULL, timer_ids);
+>      if ( !timer )
+> @@ -86,8 +123,19 @@ void __init preinit_xen_time(void)
+>      if ( res )
+>          panic("Timer: Cannot initialize platform timer");
 
-diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index f009936..72ebf9b 100644
---- a/drivers/amba/bus.c
-+++ b/drivers/amba/bus.c
-@@ -24,6 +24,8 @@
- 
- #define to_amba_driver(d)	container_of(d, struct amba_driver, drv)
- 
-+static int read_periphid(struct amba_device *d, unsigned int *periphid);
-+
- static const struct amba_id *
- amba_lookup(const struct amba_id *table, struct amba_device *dev)
- {
-@@ -43,11 +45,22 @@ static int amba_match(struct device *dev, struct device_driver *drv)
- {
- 	struct amba_device *pcdev = to_amba_device(dev);
- 	struct amba_driver *pcdrv = to_amba_driver(drv);
-+	int ret;
- 
- 	/* When driver_override is set, only bind to the matching driver */
- 	if (pcdev->driver_override)
- 		return !strcmp(pcdev->driver_override, drv->name);
- 
-+	if (!pcdev->periphid) {
-+		ret = read_periphid(pcdev, &pcdev->periphid);
-+		if (ret) {
-+			if (ret != -EPROBE_DEFER)
-+				dev_err(dev, "Failed to read periphid: %d",
-+					ret);
-+			return ret;
-+		}
-+	}
-+
- 	return amba_lookup(pcdrv->id_table, pcdev) != NULL;
- }
- 
-@@ -336,44 +349,22 @@ static void amba_device_release(struct device *dev)
- 	kfree(d);
- }
- 
--/**
-- *	amba_device_add - add a previously allocated AMBA device structure
-- *	@dev: AMBA device allocated by amba_device_alloc
-- *	@parent: resource parent for this devices resources
-- *
-- *	Claim the resource, and read the device cell ID if not already
-- *	initialized.  Register the AMBA device with the Linux device
-- *	manager.
-- */
--int amba_device_add(struct amba_device *dev, struct resource *parent)
-+static int read_periphid(struct amba_device *d, unsigned int *periphid)
- {
- 	u32 size;
- 	void __iomem *tmp;
--	int i, ret;
--
--	WARN_ON(dev->irq[0] == (unsigned int)-1);
--	WARN_ON(dev->irq[1] == (unsigned int)-1);
--
--	ret = request_resource(parent, &dev->res);
--	if (ret)
--		goto err_out;
--
--	/* Hard-coded primecell ID instead of plug-n-play */
--	if (dev->periphid != 0)
--		goto skip_probe;
-+	int i, ret = 0;
- 
- 	/*
- 	 * Dynamically calculate the size of the resource
- 	 * and use this for iomap
- 	 */
--	size = resource_size(&dev->res);
--	tmp = ioremap(dev->res.start, size);
--	if (!tmp) {
--		ret = -ENOMEM;
--		goto err_release;
--	}
-+	size = resource_size(&d->res);
-+	tmp = ioremap(d->res.start, size);
-+	if (!tmp)
-+		return -ENOMEM;
- 
--	ret = amba_get_enable_pclk(dev);
-+	ret = amba_get_enable_pclk(d);
- 	if (ret == 0) {
- 		u32 pid, cid;
- 
-@@ -388,37 +379,50 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
- 			cid |= (readl(tmp + size - 0x10 + 4 * i) & 255) <<
- 				(i * 8);
- 
--		amba_put_disable_pclk(dev);
-+		amba_put_disable_pclk(d);
- 
- 		if (cid == AMBA_CID || cid == CORESIGHT_CID)
--			dev->periphid = pid;
-+			*periphid = pid;
- 
--		if (!dev->periphid)
-+		if (!*periphid)
- 			ret = -ENODEV;
- 	}
- 
- 	iounmap(tmp);
- 
-+	return ret;
-+}
-+
-+/**
-+ *	amba_device_add - add a previously allocated AMBA device structure
-+ *	@dev: AMBA device allocated by amba_device_alloc
-+ *	@parent: resource parent for this devices resources
-+ *
-+ *	Claim the resource, and register the AMBA device with the Linux device
-+ *	manager.
-+ */
-+int amba_device_add(struct amba_device *dev, struct resource *parent)
-+{
-+	int ret;
-+
-+	WARN_ON(dev->irq[0] == (unsigned int)-1);
-+	WARN_ON(dev->irq[1] == (unsigned int)-1);
-+
-+	ret = request_resource(parent, &dev->res);
- 	if (ret)
--		goto err_release;
-+		return ret;
- 
-- skip_probe:
- 	ret = device_add(&dev->dev);
- 	if (ret)
--		goto err_release;
-+		return ret;
- 
- 	if (dev->irq[0])
- 		ret = device_create_file(&dev->dev, &dev_attr_irq0);
- 	if (ret == 0 && dev->irq[1])
- 		ret = device_create_file(&dev->dev, &dev_attr_irq1);
--	if (ret == 0)
--		return ret;
--
--	device_unregister(&dev->dev);
-+	if (ret)
-+		device_unregister(&dev->dev);
- 
-- err_release:
--	release_resource(&dev->res);
-- err_out:
- 	return ret;
- }
- EXPORT_SYMBOL_GPL(amba_device_add);
--- 
-1.9.2
+Don't we want to call platform_init_time on ARM too? It doesn't look
+like something DT specific. I guess we should move the call to the
+generic init function?
+
+
+> -    res = dt_property_read_u32(timer, "clock-frequency", &rate);
+> -    if ( res )
+
+I think we should keep the clock-frequency DT read in
+dt_preinit_xen_time.
+
+
+> +}
+> +
+> +void __init preinit_xen_time(void)
+> +{
+> +    u32 rate;
+> +
+> +    /* Initialize all the generic timers presented in GTDT */
+> +    if ( acpi_disabled )
+> +        dt_preinit_xen_time();
+> +    else
+> +        acpi_preinit_xen_time();
+> +
+> +    if( acpi_disabled && dt_property_read_u32(timer, "clock-frequency", &rate) )
+>      {
+>          cpu_khz = rate / 1000;
+>          timer_dt_clock_frequency = rate;
+
+I don't think we want to read a DT property from a generic
+initialization function.
+
+
+> @@ -104,14 +152,17 @@ int __init init_xen_time(void)
+>      int res;
+>      unsigned int i;
+>  
+> -    /* Retrieve all IRQs for the timer */
+> -    for ( i = TIMER_PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++ )
+> +    if( acpi_disabled )
+>      {
+> -        res = platform_get_irq(timer, i);
+> -
+> -        if ( res < 0 )
+> -            panic("Timer: Unable to retrieve IRQ %u from the device tree", i);
+> -        timer_irq[i] = res;
+> +        /* Retrieve all IRQs for the timer */
+> +        for ( i = TIMER_PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++ )
+> +        {
+> +            res = platform_get_irq(timer, i);
+> +
+> +            if ( res < 0 )
+> +                panic("Timer: Unable to retrieve IRQ %u from the device tree", i);
+> +            timer_irq[i] = res;
+> +        }
+>      }
+
+Can't be just move this into the DT specific init function?
+
+
+>  
+>      /* Check that this CPU supports the Generic Timer interface */
+> -- 
+> 2.1.0
+> 
+> 
+> _______________________________________________
+> Xen-devel mailing list
+> Xen-devel at lists.xen.org
+> http://lists.xen.org/xen-devel
+> 
