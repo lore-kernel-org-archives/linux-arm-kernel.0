@@ -1,22 +1,34 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 26 Nov 2015 14:58:47 +0100
-Subject: [PATCH v5 02/11] clk: rockchip: add mipidsi clocks on rk3288
-In-Reply-To: <1448524225-5489-3-git-send-email-zyw@rock-chips.com>
-References: <1448524225-5489-1-git-send-email-zyw@rock-chips.com>
- <1448524225-5489-3-git-send-email-zyw@rock-chips.com>
-Message-ID: <1887650.g9M52OYF2h@diego>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Nov 2015 13:59:57 +0000
+Subject: Preprocessor arithmetic in dtsi files (base + offset)
+In-Reply-To: <56570620.3070106@free.fr>
+References: <56570620.3070106@free.fr>
+Message-ID: <20151126135957.GC8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
-
-Am Donnerstag, 26. November 2015, 15:50:16 schrieb Chris Zhong:
-> sclk_mipidsi_24m is the gating of mipi dsi phy.
+On Thu, Nov 26, 2015 at 02:16:16PM +0100, Mason wrote:
+> #define SCU_BASE 0x20000000
 > 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> 	scu: scu at XXX {
+> 		compatible = "arm,cortex-a9-scu";
+> 		reg = <SCU_BASE 0x100>;
+> 	
+> 	gic: interrupt-controller at XXX {
+> 		compatible = "arm,cortex-a9-gic";
+> 		reg = <SCU_BASE+0x1000 0x1000>, <SCU_BASE+0x100 0x0100>;
 
-applied this to my clock branch for 4.5
+You don't get preprocessor arithmetic here.  What you get is this passed
+to DTC:
 
+		reg = <0x20000000+0x1000 0x1000>...
 
-Heiko
+The only time the preprocessor does arithmetic is when it needs to
+evaluate an expression, eg, in an #if statement.
+
+The @XXX are part of the requirements from ePAPR, and are required to
+be conformant with the spec.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
