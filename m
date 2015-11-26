@@ -1,33 +1,125 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 26 Nov 2015 18:34:12 +0100
-Subject: ARCH_MULTIPLATFORM + ARM_APPENDED_DTB + custom boot-loader
-In-Reply-To: <20151126171440.GD8644@n2100.arm.linux.org.uk>
-References: <565738F7.1060204@free.fr> <56573CEE.10101@free.fr>
- <20151126171440.GD8644@n2100.arm.linux.org.uk>
-Message-ID: <56574294.1070100@free.fr>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 26 Nov 2015 17:32:47 +0000
+Subject: [PATCH v3 09/10] PM / Hibernate: Publish pages restored in-place to
+ arch code
+In-Reply-To: <1448559168-8363-1-git-send-email-james.morse@arm.com>
+References: <1448559168-8363-1-git-send-email-james.morse@arm.com>
+Message-ID: <1448559168-8363-10-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/11/2015 18:14, Russell King - ARM Linux wrote:
+Some architectures require code written to memory as if it were data to be
+'cleaned' from any data caches before the processor can fetch them as new
+instructions.
 
-> On Thu, Nov 26, 2015 at 06:10:06PM +0100, Mason wrote:
->
->> Question: can a DT be appended to an Image, or does it have to be
->> appended to a zImage?
-> 
-> The code to deal with it is part of the zImage.
-> 
->> Can a zImage be uncompressed or compressed with a null compressor?
-> 
-> Why?
+During resume from hibernate, the snapshot code copies some pages directly,
+meaning these architectures do not get a chance to perform their cache
+maintenance. Create a new list of pages that were restored in place, so
+that the arch code can perform this maintenance when necessary.
 
-To minimize the time required to boot on a slow emulator? :-)
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+ include/linux/suspend.h |  1 +
+ kernel/power/snapshot.c | 42 ++++++++++++++++++++++++++++--------------
+ 2 files changed, 29 insertions(+), 14 deletions(-)
 
-> The format of both Image and zImage are mostly identical - you should
-> be able to use either with a boot loader wanting a binary image -
-> provided things are setup how the kernel wants.  However, as you
-> need the appended DT support, you must use zImage.
-
-Thanks. LZ4 is the fastest decompressor, right?
-
-Regards.
+diff --git a/include/linux/suspend.h b/include/linux/suspend.h
+index 8b6ec7ef0854..b17cf6081bca 100644
+--- a/include/linux/suspend.h
++++ b/include/linux/suspend.h
+@@ -384,6 +384,7 @@ extern bool system_entering_hibernation(void);
+ extern bool hibernation_available(void);
+ asmlinkage int swsusp_save(void);
+ extern struct pbe *restore_pblist;
++extern struct pbe *restored_inplace_pblist;
+ #else /* CONFIG_HIBERNATION */
+ static inline void register_nosave_region(unsigned long b, unsigned long e) {}
+ static inline void register_nosave_region_late(unsigned long b, unsigned long e) {}
+diff --git a/kernel/power/snapshot.c b/kernel/power/snapshot.c
+index 3a970604308f..f251f5af49fb 100644
+--- a/kernel/power/snapshot.c
++++ b/kernel/power/snapshot.c
+@@ -74,6 +74,11 @@ void __init hibernate_image_size_init(void)
+  */
+ struct pbe *restore_pblist;
+ 
++/* List of PBEs that were restored in place. modified-harvard architectures
++ * need to 'clean' these pages before they can be executed.
++ */
++struct pbe *restored_inplace_pblist;
++
+ /* Pointer to an auxiliary buffer (1 page) */
+ static void *buffer;
+ 
+@@ -1359,6 +1364,7 @@ out:
+ 	nr_copy_pages = 0;
+ 	nr_meta_pages = 0;
+ 	restore_pblist = NULL;
++	restored_inplace_pblist = NULL;
+ 	buffer = NULL;
+ 	alloc_normal = 0;
+ 	alloc_highmem = 0;
+@@ -2072,6 +2078,7 @@ load_header(struct swsusp_info *info)
+ 	int error;
+ 
+ 	restore_pblist = NULL;
++	restored_inplace_pblist = NULL;
+ 	error = check_header(info);
+ 	if (!error) {
+ 		nr_copy_pages = info->image_pages;
+@@ -2427,25 +2434,31 @@ static void *get_buffer(struct memory_bitmap *bm, struct chain_allocator *ca)
+ 	if (PageHighMem(page))
+ 		return get_highmem_page_buffer(page, ca);
+ 
+-	if (swsusp_page_is_forbidden(page) && swsusp_page_is_free(page))
+-		/* We have allocated the "original" page frame and we can
+-		 * use it directly to store the loaded page.
+-		 */
+-		return page_address(page);
+-
+-	/* The "original" page frame has not been allocated and we have to
+-	 * use a "safe" page frame to store the loaded page.
+-	 */
+ 	pbe = chain_alloc(ca, sizeof(struct pbe));
+ 	if (!pbe) {
+ 		swsusp_free();
+ 		return ERR_PTR(-ENOMEM);
+ 	}
+-	pbe->orig_address = page_address(page);
+-	pbe->address = safe_pages_list;
+-	safe_pages_list = safe_pages_list->next;
+-	pbe->next = restore_pblist;
+-	restore_pblist = pbe;
++
++	if (swsusp_page_is_forbidden(page) && swsusp_page_is_free(page)) {
++		/* We have allocated the "original" page frame and we can
++		 * use it directly to store the loaded page.
++		 */
++		pbe->orig_address = NULL;
++		pbe->address = page_address(page);
++		pbe->next = restored_inplace_pblist;
++		restored_inplace_pblist = pbe;
++	} else {
++		/* The "original" page frame has not been allocated and we
++		 * have to use a "safe" page frame to store the loaded page.
++		 */
++		pbe->orig_address = page_address(page);
++		pbe->address = safe_pages_list;
++		safe_pages_list = safe_pages_list->next;
++		pbe->next = restore_pblist;
++		restore_pblist = pbe;
++	}
++
+ 	return pbe->address;
+ }
+ 
+@@ -2513,6 +2526,7 @@ int snapshot_write_next(struct snapshot_handle *handle)
+ 			chain_init(&ca, GFP_ATOMIC, PG_SAFE);
+ 			memory_bm_position_reset(&orig_bm);
+ 			restore_pblist = NULL;
++			restored_inplace_pblist = NULL;
+ 			handle->buffer = get_buffer(&orig_bm, &ca);
+ 			handle->sync_read = 0;
+ 			if (IS_ERR(handle->buffer))
+-- 
+2.6.2
