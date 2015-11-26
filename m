@@ -1,53 +1,44 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 26 Nov 2015 13:49:46 +0100
-Subject: [PATCH v2 0/4] Exynos4210: fix power domain for MDMA1 device
-Message-ID: <1448542190-19498-1-git-send-email-m.szyprowski@samsung.com>
+Date: Thu, 26 Nov 2015 13:49:50 +0100
+Subject: [PATCH v2 4/4] ARM: amba: Properly handle devices with power domains
+In-Reply-To: <1448542190-19498-1-git-send-email-m.szyprowski@samsung.com>
+References: <1448542190-19498-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1448542190-19498-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset fixes mysterious boot hang on Exynos 4210 SoCs, when IOMMU
-is enabled. There is no direct dependency between IOMMU devices and
-MDMA1. However enabling IOMMU changes the device probe order, what
-results in LCD0 power domain being turned off for some time. During that
-time the registration of MDMA1 device happens, what results in system
-hangs, because the common bus code tries to read PID/CID registers from
-turned-off device.
+To read pid/cid registers, the probed device need to be properly turned on.
+When it is inside a power domain, the bus code should ensure that the
+given power domain is enabled before trying to access device's registers.
 
-The main change from v1 is reusing patches, which move PID/CIR reading
-from amba_device_add() to amba_match() and adding power domain support
-there. This way -EPROBE_DEFER error code can be handled properly.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ drivers/amba/bus.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Best regards
-Marek Szyprowski
-Samsung R&D Institute Poland
-
-Changelog:
-v2:
-- added 2 patches from 'On-demand device probing' thread
-  (https://lkml.org/lkml/2015/9/29/189), which move PID/CIR reading
-  from amba_device_add() to amba_match()
-- moved dev_pm_domain_attach() to amba_match(), which is allowed to
-  return -EPROBE_DEFER
-
-v1: http://www.spinics.net/lists/arm-kernel/msg463185.html
-- initial version
-
-
-Patch summary:
-
-Marek Szyprowski (2):
-  ARM: dts: exynos4210: MDMA1 device belongs to LCD0 power domain
-  ARM: amba: Properly handle devices with power domains
-
-Tomeu Vizoso (2):
-  driver core: handle -EPROBE_DEFER from bus_type.match()
-  ARM: amba: Move reading of periphid to amba_match()
-
- arch/arm/boot/dts/exynos4210.dtsi |  4 ++
- drivers/amba/bus.c                | 94 ++++++++++++++++++++++-----------------
- drivers/base/dd.c                 | 24 +++++++++-
- include/linux/device.h            |  2 +-
- 4 files changed, 79 insertions(+), 45 deletions(-)
-
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index 72ebf9b..4fc1976 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -364,6 +364,10 @@ static int read_periphid(struct amba_device *d, unsigned int *periphid)
+ 	if (!tmp)
+ 		return -ENOMEM;
+ 
++	ret = dev_pm_domain_attach(&d->dev, true);
++	if (ret == -EPROBE_DEFER)
++		goto err_unmap;
++
+ 	ret = amba_get_enable_pclk(d);
+ 	if (ret == 0) {
+ 		u32 pid, cid;
+@@ -388,6 +392,8 @@ static int read_periphid(struct amba_device *d, unsigned int *periphid)
+ 			ret = -ENODEV;
+ 	}
+ 
++	dev_pm_domain_detach(&d->dev, true);
++err_unmap:
+ 	iounmap(tmp);
+ 
+ 	return ret;
 -- 
 1.9.2
