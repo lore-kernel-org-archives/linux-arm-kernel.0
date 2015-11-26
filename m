@@ -1,129 +1,74 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 26 Nov 2015 12:33:41 +0000
-Subject: [Xen-devel] [PATCH v3 31/62] arm/acpi: Add a helper function to
- get interrupt type
-In-Reply-To: <1447753261-7552-32-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-32-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511261229320.1107@kaball.uk.xensource.com>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Thu, 26 Nov 2015 20:36:09 +0800
+Subject: [PATCH v2] mmc: core: fix __mmc_switch timeout caused by preempt
+Message-ID: <1448541369-23086-1-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Add a helper funtion to get the type of interrupts in ACPI table.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  xen/arch/arm/acpi/lib.c    | 27 +++++++++++++++++++++++++++
->  xen/include/asm-arm/acpi.h | 39 +++++++++++++++++++++++++++++++++++++++
->  2 files changed, 66 insertions(+)
-> 
-> diff --git a/xen/arch/arm/acpi/lib.c b/xen/arch/arm/acpi/lib.c
-> index d8b7635..47f4c6a 100644
-> --- a/xen/arch/arm/acpi/lib.c
-> +++ b/xen/arch/arm/acpi/lib.c
-> @@ -43,3 +43,30 @@ bool_t __init acpi_psci_hvc_present(void)
->  {
->      return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_USE_HVC;
->  }
-> +
-> +unsigned int acpi_get_irq_type(u32 flags)
-> +{
-> +    int trigger, polarity;
-> +
-> +    trigger = (flags & ACPI_GTDT_INTERRUPT_MODE) ? ACPI_EDGE_SENSITIVE
+there is a time window between __mmc_send_status() and time_afer(),
+on some eMMC chip, the timeout_ms is only 10ms, if this thread was
+scheduled out during this period, then, even card has already changes
+to transfer state by the result of CMD13, this part of code also treat
+it to timeout error.
+So, need calculate timeout first, then call __mmc_send_status(), if
+already timeout and card still in programing state, then treat it to
+the real timeout error.
 
-                         ^ GTDT? This is not specific to the GTDT table, right?
+Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+---
+ drivers/mmc/core/mmc_ops.c | 23 +++++++++++++++--------
+ 1 file changed, 15 insertions(+), 8 deletions(-)
 
-
-> +               : ACPI_LEVEL_SENSITIVE;
-> +
-> +    polarity = (flags & ACPI_GTDT_INTERRUPT_POLARITY) ? ACPI_ACTIVE_LOW
-
-same here
-
-
-> +                : ACPI_ACTIVE_HIGH;
-> +
-> +    switch (polarity) {
-> +    case ACPI_ACTIVE_LOW:
-> +        return trigger == ACPI_EDGE_SENSITIVE ?
-> +            ACPI_IRQ_TYPE_EDGE_FALLING :
-> +            ACPI_IRQ_TYPE_LEVEL_LOW;
-> +    case ACPI_ACTIVE_HIGH:
-> +        return trigger == ACPI_EDGE_SENSITIVE ?
-> +            ACPI_IRQ_TYPE_EDGE_RISING :
-> +            ACPI_IRQ_TYPE_LEVEL_HIGH;
-> +    case ACPI_ACTIVE_BOTH:
-> +        if (trigger == ACPI_EDGE_SENSITIVE)
-> +            return ACPI_IRQ_TYPE_EDGE_BOTH;
-> +    default:
-> +        return ACPI_IRQ_TYPE_NONE;
-> +    }
-> +}
-> diff --git a/xen/include/asm-arm/acpi.h b/xen/include/asm-arm/acpi.h
-> index 714e596..214fc4e 100644
-> --- a/xen/include/asm-arm/acpi.h
-> +++ b/xen/include/asm-arm/acpi.h
-> @@ -34,10 +34,12 @@ extern bool_t acpi_disabled;
->  bool_t __init acpi_psci_present(void);
->  bool_t __init acpi_psci_hvc_present(void);
->  void __init acpi_smp_init_cpus(void);
-> +unsigned int acpi_get_irq_type(u32 flags);
->  #else
->  static inline bool_t acpi_psci_present(void) { return false; }
->  static inline bool_t acpi_psci_hvc_present(void) {return false; }
->  static inline void acpi_smp_init_cpus(void) { }
-> +static inline unsigned int acpi_get_irq_type(u32 flags) { return 0; }
->  #endif /* CONFIG_ACPI */
->  
->  /* Basic configuration for ACPI */
-> @@ -48,4 +50,41 @@ static inline void disable_acpi(void)
->  
->  #define ACPI_GTDT_INTR_MASK ( ACPI_GTDT_INTERRUPT_MODE | ACPI_GTDT_INTERRUPT_POLARITY )
->  
-> +/* Triggering */
-> +
-> +#define ACPI_LEVEL_SENSITIVE            (u8) 0x00
-> +#define ACPI_EDGE_SENSITIVE             (u8) 0x01
-> +
-> +/* Polarity */
-> +
-> +#define ACPI_ACTIVE_HIGH                (u8) 0x00
-> +#define ACPI_ACTIVE_LOW                 (u8) 0x01
-> +#define ACPI_ACTIVE_BOTH                (u8) 0x02
-> +
-> +/**
-> + * IRQ line type.
-> + *
-> + * ACPI_IRQ_TYPE_NONE            - default, unspecified type
-> + * ACPI_IRQ_TYPE_EDGE_RISING     - rising edge triggered
-> + * ACPI_IRQ_TYPE_EDGE_FALLING    - falling edge triggered
-> + * ACPI_IRQ_TYPE_EDGE_BOTH       - rising and falling edge triggered
-> + * ACPI_IRQ_TYPE_LEVEL_HIGH      - high level triggered
-> + * ACPI_IRQ_TYPE_LEVEL_LOW       - low level triggered
-> + * ACPI_IRQ_TYPE_LEVEL_MASK      - Mask to filter out the level bits
-> + * ACPI_IRQ_TYPE_SENSE_MASK      - Mask for all the above bits
-> + * ACPI_IRQ_TYPE_INVALID         - Use to initialize the type
-> + */
-> +#define ACPI_IRQ_TYPE_NONE           0x00000000
-> +#define ACPI_IRQ_TYPE_EDGE_RISING    0x00000001
-> +#define ACPI_IRQ_TYPE_EDGE_FALLING   0x00000002
-> +#define ACPI_IRQ_TYPE_EDGE_BOTH                           \
-> +    (ACPI_IRQ_TYPE_EDGE_FALLING | ACPI_IRQ_TYPE_EDGE_RISING)
-> +#define ACPI_IRQ_TYPE_LEVEL_HIGH     0x00000004
-> +#define ACPI_IRQ_TYPE_LEVEL_LOW      0x00000008
-> +#define ACPI_IRQ_TYPE_LEVEL_MASK                          \
-> +    (ACPI_IRQ_TYPE_LEVEL_LOW | ACPI_IRQ_TYPE_LEVEL_HIGH)
-> +#define ACPI_IRQ_TYPE_SENSE_MASK     0x0000000f
-> +
-> +#define ACPI_IRQ_TYPE_INVALID        0x00000010
-
-Given that these are actually physical irq properties, they don't really
-depend on ACPI or DT, in fact I believe these are taken from the device
-tree definitions and renamed.
-
-Instead of duplicating the irq types, I would make the device tree irq
-types generic.
+diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
+index 1f44426..eba5295 100644
+--- a/drivers/mmc/core/mmc_ops.c
++++ b/drivers/mmc/core/mmc_ops.c
+@@ -489,6 +489,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+ 	unsigned long timeout;
+ 	u32 status = 0;
+ 	bool use_r1b_resp = use_busy_signal;
++	bool expired;
+ 
+ 	mmc_retune_hold(host);
+ 
+@@ -545,9 +546,23 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+ 	timeout = jiffies + msecs_to_jiffies(timeout_ms);
+ 	do {
+ 		if (send_status) {
++			/*
++			 * Timeout if the device never leaves the program state.
++			 * Due to the possibility of being preempted after
++			 * sending the status command, check the expiration
++			 * time first.
++			 */
++			expired = time_after(jiffies, timeout);
+ 			err = __mmc_send_status(card, &status, ignore_crc);
+ 			if (err)
+ 				goto out;
++			if (expired &&
++			    R1_CURRENT_STATE(status) == R1_STATE_PRG) {
++				pr_err("%s: Card stuck in programming state! %s\n",
++				       mmc_hostname(host), __func__);
++				err = -ETIMEDOUT;
++				goto out;
++			}
+ 		}
+ 		if ((host->caps & MMC_CAP_WAIT_WHILE_BUSY) && use_r1b_resp)
+ 			break;
+@@ -563,14 +578,6 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+ 			mmc_delay(timeout_ms);
+ 			goto out;
+ 		}
+-
+-		/* Timeout if the device never leaves the program state. */
+-		if (time_after(jiffies, timeout)) {
+-			pr_err("%s: Card stuck in programming state! %s\n",
+-				mmc_hostname(host), __func__);
+-			err = -ETIMEDOUT;
+-			goto out;
+-		}
+ 	} while (R1_CURRENT_STATE(status) == R1_STATE_PRG);
+ 
+ 	err = mmc_switch_status_error(host, status);
+-- 
+1.8.1.1.dirty
