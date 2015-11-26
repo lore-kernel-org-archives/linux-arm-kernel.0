@@ -1,49 +1,133 @@
-From: schwidefsky@de.ibm.com (Martin Schwidefsky)
-Date: Thu, 26 Nov 2015 16:11:29 +0100
-Subject: [PATCH v3 0/4] Allow customizable random offset to mmap_base
- address.
-In-Reply-To: <565606DD.2090502@android.com>
-References: <1447888808-31571-1-git-send-email-dcashman@android.com>
- <20151124163907.1a406b79458b1bb0d3519684@linux-foundation.org>
- <565606DD.2090502@android.com>
-Message-ID: <20151126161129.59024450@mschwide>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 26 Nov 2015 15:22:32 +0000
+Subject: [PATCH v3 34/62] pl011: Refactor pl011 driver to dt and common
+ initialization parts
+In-Reply-To: <1447753261-7552-35-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-35-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511261522250.8984@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Nov 2015 11:07:09 -0800
-Daniel Cashman <dcashman@android.com> wrote:
-
-> On 11/24/2015 04:39 PM, Andrew Morton wrote:
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> > mips, powerpc and s390 also implement arch_mmap_rnd().  Are there any
-> > special considerations here, or it just a matter of maintainers wiring
-> > it up and testing it?
+> Refactor pl011 driver to dt and common initialization parts. This will
+> be useful later when acpi specific uart initialization function is
+> introduced.
 > 
-> I had not yet looked at those at all, as I had no way to do even a
-> rudimentary "does it boot" test and opted to post v3 first.  Upon first
-> glance, it should just be a matter of wiring it up:
+> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+
+
+>  xen/drivers/char/pl011.c | 64 ++++++++++++++++++++++++++++--------------------
+>  1 file changed, 38 insertions(+), 26 deletions(-)
 > 
-> Mips is divided into 12/16 bits for 32/64 bit (assume baseline 4k page)
-> w/COMPAT kconfig,  powerpc is 11/18 w/COMPAT, s390 is 11/11 w/COMPAT.
-> s390 is a bit strange as COMPAT is for a 31-bit address space, although
-> is_32bit_task() is used to determine which mask to use, and the mask
-> itself for 64-bit only introduces 11 bits of entropy, but while still
-> affecting larger chunks of the address space (mask is 0x3ff80, resulting
-> in an effective 0x7ff shift of PAGE_SIZE + 7 bits).
-
-s390 uses a mmap randomization of 11 bits but applies it to different
-bits dependent if the task is a compat task or not. From the machine
-perspective we would like to always use the randomization bits for
-normal, non-compat tasks. But as the 2GB address space for compat tasks
-is really limited the randomization is applied in bits 2^12..2^22 for
-compat tasks vs 2^19..2^29 for normal tasks at the cost of performance.
-This has to do with the cache aliasing on z13.
-
-By the way we will replace is_32bit_task with() is_compat_task(), I have
-a patch from Heiko pending for that.
-
--- 
-blue skies,
-   Martin.
-
-"Reality continues to ruin my life." - Calvin.
+> diff --git a/xen/drivers/char/pl011.c b/xen/drivers/char/pl011.c
+> index 67e6df5..16abaa5 100644
+> --- a/xen/drivers/char/pl011.c
+> +++ b/xen/drivers/char/pl011.c
+> @@ -226,12 +226,42 @@ static struct uart_driver __read_mostly pl011_driver = {
+>      .vuart_info   = pl011_vuart,
+>  };
+>  
+> +static int __init pl011_uart_init(int irq, u64 addr, u64 size)
+> +{
+> +    struct pl011 *uart;
+> +
+> +    uart = &pl011_com;
+> +    uart->irq       = irq;
+> +    uart->clock_hz  = 0x16e3600;
+> +    uart->baud      = BAUD_AUTO;
+> +    uart->data_bits = 8;
+> +    uart->parity    = PARITY_NONE;
+> +    uart->stop_bits = 1;
+> +
+> +    uart->regs = ioremap_nocache(addr, size);
+> +    if ( !uart->regs )
+> +    {
+> +        printk("pl011: Unable to map the UART memory\n");
+> +        return -ENOMEM;
+> +    }
+> +
+> +    uart->vuart.base_addr = addr;
+> +    uart->vuart.size = size;
+> +    uart->vuart.data_off = DR;
+> +    uart->vuart.status_off = FR;
+> +    uart->vuart.status = 0;
+> +
+> +    /* Register with generic serial driver. */
+> +    serial_register_uart(SERHND_DTUART, &pl011_driver, uart);
+> +
+> +    return 0;
+> +}
+> +
+>  /* TODO: Parse UART config from the command line */
+> -static int __init pl011_uart_init(struct dt_device_node *dev,
+> -                                  const void *data)
+> +static int __init dt_pl011_uart_init(struct dt_device_node *dev,
+> +                                     const void *data)
+>  {
+>      const char *config = data;
+> -    struct pl011 *uart;
+>      int res;
+>      u64 addr, size;
+>  
+> @@ -240,14 +270,6 @@ static int __init pl011_uart_init(struct dt_device_node *dev,
+>          printk("WARNING: UART configuration is not supported\n");
+>      }
+>  
+> -    uart = &pl011_com;
+> -
+> -    uart->clock_hz  = 0x16e3600;
+> -    uart->baud      = BAUD_AUTO;
+> -    uart->data_bits = 8;
+> -    uart->parity    = PARITY_NONE;
+> -    uart->stop_bits = 1;
+> -
+>      res = dt_device_get_address(dev, 0, &addr, &size);
+>      if ( res )
+>      {
+> @@ -262,24 +284,14 @@ static int __init pl011_uart_init(struct dt_device_node *dev,
+>          printk("pl011: Unable to retrieve the IRQ\n");
+>          return -EINVAL;
+>      }
+> -    uart->irq = res;
+>  
+> -    uart->regs = ioremap_nocache(addr, size);
+> -    if ( !uart->regs )
+> +    res = pl011_uart_init(res, addr, size);
+> +    if ( res < 0 )
+>      {
+> -        printk("pl011: Unable to map the UART memory\n");
+> -        return -ENOMEM;
+> +        printk("pl011: Unable to initialize\n");
+> +        return res;
+>      }
+>  
+> -    uart->vuart.base_addr = addr;
+> -    uart->vuart.size = size;
+> -    uart->vuart.data_off = DR;
+> -    uart->vuart.status_off = FR;
+> -    uart->vuart.status = 0;
+> -
+> -    /* Register with generic serial driver. */
+> -    serial_register_uart(SERHND_DTUART, &pl011_driver, uart);
+> -
+>      dt_device_set_used_by(dev, DOMID_XEN);
+>  
+>      return 0;
+> @@ -293,7 +305,7 @@ static const struct dt_device_match pl011_dt_match[] __initconst =
+>  
+>  DT_DEVICE_START(pl011, "PL011 UART", DEVICE_SERIAL)
+>          .dt_match = pl011_dt_match,
+> -        .init = pl011_uart_init,
+> +        .init = dt_pl011_uart_init,
+>  DT_DEVICE_END
+>  
+>  /*
+> -- 
+> 2.1.0
+> 
