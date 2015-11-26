@@ -1,73 +1,69 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 26 Nov 2015 12:46:31 +0900
-Subject: [PATCH v5 0/4] ARM: shmobile: r8a7740/sh73a0 DT Cache Handling
-In-Reply-To: <CAMuHMdXeb-hWhAXFtKDpnc_nuBgzi7usxPOmKY9kNmwM4A+54w@mail.gmail.com>
-References: <1448286962-16897-1-git-send-email-geert+renesas@glider.be>
- <20151125015048.GN20596@verge.net.au>
- <CAMuHMdXeb-hWhAXFtKDpnc_nuBgzi7usxPOmKY9kNmwM4A+54w@mail.gmail.com>
-Message-ID: <20151126034628.GA1198@verge.net.au>
+Date: Thu, 26 Nov 2015 13:09:06 +0900
+Subject: [PATCH] ARM: shmobile: r8a7779: Add L2 cache-controller node
+In-Reply-To: <CAMuHMdVTdPocWCnzE8v-O_rpNJR=0mO23jeG8ejYzL0REtQb+g@mail.gmail.com>
+References: <1448416683-1411-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdVTdPocWCnzE8v-O_rpNJR=0mO23jeG8ejYzL0REtQb+g@mail.gmail.com>
+Message-ID: <20151126040905.GB1198@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 09:45:20AM +0100, Geert Uytterhoeven wrote:
+On Wed, Nov 25, 2015 at 09:41:42AM +0100, Geert Uytterhoeven wrote:
 > Hi Simon,
 > 
-> On Wed, Nov 25, 2015 at 2:50 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Mon, Nov 23, 2015 at 02:55:58PM +0100, Geert Uytterhoeven wrote:
-> >> This patch series add minimal L1 and L2 cache descriptions to DT for
-> >> r8a7740 and sh73a0, and migrates the shmobile DT-based generic r8a7740
-> >> platform from calling l2x0_of_init() to the generic l2c OF
-> >> initialization.
-> >>
-> >> Note that the conversion to the generic l2c OF initialization is not
-> >> done yet for sh73a0, as this initializes the L2 cache earlier, breaking
-> >> the (fragile) sh73a0 secondary CPU bringup code.
-> >>
-> >> Also note that this conversion should be done on r8a7778, and r8a7779,
-> >> too.
+> On Wed, Nov 25, 2015 at 2:58 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > Add the missing L2 cache-controller node, and link the CPU nodes to it.
 > >
-> > Based on your work I have prepared a DT patch for the r8a7779.
-> 
-> Thanks for following up.
-> 
-> > I don't think that a C patch is necessary, please correct me if I am wrong.
-> 
-> Yes you do!
-> Without machine_desc.l2x_aux_{val,mask}, the information in DT is not used.
-> Cfr. arch/arm/mach-shmobile/setup-r8a7740.c
-
-Thanks, I see "ARM: shmobile: r8a7740: Migrate to generic l2c OF
-initialization" with new eyes.
-
-> > Regarding the r8a7778: My reading of the documentation is that although a
-> > pl310 L2 cache controller is present it is not available for use as there
-> > is no L2 cache memory present. For this reason I do not think any patches
-> > are required for the r8a7798.
-> 
-> I agree after consulting the datasheet.
-> 
-> >> Dependencies:
-> >>   - This series applies to renesas-devel-20151123-v4.4-rc2,
-> >>   - Patch 3 depends on patch 1,
-> >>   - Patch 4 depends on patch 3.
-> >>
-> >> Given C code changesets depending on DT changesets in the same branch
-> >> are frowned upon, you may want to postpone patches 3 and 4 to v4.6.
-> >> Of course I'll sleep better if you just apply all 4 of them now ;-)
+> > The L2 cache is an ARM L2C-310 (r3p2), of size 1 MB (64 KiB x 16 ways).
 > >
-> > I have queued up the DT changes for v4.5.
-> > And tentatively queued up the C changes for v4.6.
+> > Based on work for the r8a7740 by Geert Uytterhoeven.
+> >
+> > Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> Thank you!
+> Thanks for your patch!
 > 
-> Gr{oetje,eeting}s,
+> > ---
+> >  arch/arm/boot/dts/r8a7779.dtsi | 15 +++++++++++++++
+> >  1 file changed, 15 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+> > index 6afa909865b5..f27fa2db16ee 100644
+> > --- a/arch/arm/boot/dts/r8a7779.dtsi
+> > +++ b/arch/arm/boot/dts/r8a7779.dtsi
 > 
->                         Geert
+> > @@ -63,6 +67,17 @@
+> >                       <0xf0000100 0x100>;
+> >         };
+> >
+> > +       L2: cache-controller {
+> > +               compatible = "arm,pl310-cache";
+> > +               reg = <0xf0100000 0x1000>;
+> > +               interrupts = <0 122 IRQ_TYPE_LEVEL_HIGH>;
 > 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 40?
 > 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+> Comparing to other devices, you have to subtract 32 from 0x5a, not
+> add 32?
+
+Thanks for pointing that out. I will update this to 0x5a - 32 = 58
+
+> > +               arm,data-latency = <3 3 3>;
+> > +               arm,tag-latency = <2 2 2>;
 > 
+> Table 9.5 says 2 resp. 1 instead of 3 resp. 2?
+
+Thanks.
+
+> However:
+> 
+> "The TAG and data RAM latency can be set in the reg1_tag_ram_control and
+>  reg1_data_ram_control registers. However, since values to be set are
+>  hardware-dependent, the default values should not be modified."
+> 
+> Perhaps we should just omit these values?
+
+I see also see remarks regarding the values not being configurable
+for the r8a7740 (section 2.7.1) and sh73a0 (section 6.10.1) so perhaps we
+should remove the values from the dts files of those SoCs too?
