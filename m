@@ -1,49 +1,33 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 26 Nov 2015 17:32:46 +0000
-Subject: [PATCH v3 08/10] arm64: Promote KERNEL_START/KERNEL_END definitions
- to a header file
-In-Reply-To: <1448559168-8363-1-git-send-email-james.morse@arm.com>
-References: <1448559168-8363-1-git-send-email-james.morse@arm.com>
-Message-ID: <1448559168-8363-9-git-send-email-james.morse@arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 26 Nov 2015 18:34:12 +0100
+Subject: ARCH_MULTIPLATFORM + ARM_APPENDED_DTB + custom boot-loader
+In-Reply-To: <20151126171440.GD8644@n2100.arm.linux.org.uk>
+References: <565738F7.1060204@free.fr> <56573CEE.10101@free.fr>
+ <20151126171440.GD8644@n2100.arm.linux.org.uk>
+Message-ID: <56574294.1070100@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KERNEL_START and KERNEL_END are useful outside head.S, move them to a
-header file.
+On 26/11/2015 18:14, Russell King - ARM Linux wrote:
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/include/asm/memory.h | 3 +++
- arch/arm64/kernel/head.S        | 3 ---
- 2 files changed, 3 insertions(+), 3 deletions(-)
+> On Thu, Nov 26, 2015 at 06:10:06PM +0100, Mason wrote:
+>
+>> Question: can a DT be appended to an Image, or does it have to be
+>> appended to a zImage?
+> 
+> The code to deal with it is part of the zImage.
+> 
+>> Can a zImage be uncompressed or compressed with a null compressor?
+> 
+> Why?
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 853953cd1f08..5773a6629f10 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -70,6 +70,9 @@
- 
- #define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
- 
-+#define KERNEL_START      _text
-+#define KERNEL_END        _end
-+
- /*
-  * Physical vs virtual RAM address space conversion.  These are
-  * private definitions which should NOT be used outside memory.h
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 7cec62a76f50..c58ede3398db 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -48,9 +48,6 @@
- #error TEXT_OFFSET must be less than 2MB
- #endif
- 
--#define KERNEL_START	_text
--#define KERNEL_END	_end
--
- /*
-  * Kernel startup entry point.
-  * ---------------------------
--- 
-2.6.2
+To minimize the time required to boot on a slow emulator? :-)
+
+> The format of both Image and zImage are mostly identical - you should
+> be able to use either with a boot loader wanting a binary image -
+> provided things are setup how the kernel wants.  However, as you
+> need the appended DT support, you must use zImage.
+
+Thanks. LZ4 is the fastest decompressor, right?
+
+Regards.
