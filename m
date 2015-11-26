@@ -1,58 +1,81 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 26 Nov 2015 17:32:21 +0100
-Subject: [PATCH v2] mmc: sdhci at91: add PM support
-In-Reply-To: <CAPDyKFpShib_OsB6HB7_5PNEkkMpWq6+LwaD0-AH=QqhzpOB3A@mail.gmail.com>
-References: <1447151810-21864-1-git-send-email-ludovic.desroches@atmel.com>
- <CAPDyKFoAwmkw0D8QbA4UV3uhhNS7hmfOiRv3ZUhMp8uoxzWnrw@mail.gmail.com>
- <20151126160718.GE8908@odux.rfo.atmel.com>
- <CAPDyKFpShib_OsB6HB7_5PNEkkMpWq6+LwaD0-AH=QqhzpOB3A@mail.gmail.com>
-Message-ID: <20151126163221.GH8908@odux.rfo.atmel.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Thu, 26 Nov 2015 17:45:40 +0100
+Subject: [PATCH 06/13] net: mvneta: enable mixed egress processing using
+ HR timer
+In-Reply-To: <1448178839-3541-7-git-send-email-mw@semihalf.com>
+References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
+ <1448178839-3541-7-git-send-email-mw@semihalf.com>
+Message-ID: <20151126164540.GH4665@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2015 at 05:24:40PM +0100, Ulf Hansson wrote:
-> On 26 November 2015 at 17:07, Ludovic Desroches
-> <ludovic.desroches@atmel.com> wrote:
-> > On Tue, Nov 10, 2015 at 12:12:30PM +0100, Ulf Hansson wrote:
-> >> On 10 November 2015 at 11:36, Ludovic Desroches
-> >> <ludovic.desroches@atmel.com> wrote:
-> >> > Add runtime PM support and use runtime_force_suspend|resume() for system
-> >> > PM.
-> >> >
-> >
-> > [...]
-> >
-> >> >  static int sdhci_at91_probe(struct platform_device *pdev)
-> >> >  {
-> >> >         const struct of_device_id       *match;
-> >> > @@ -148,6 +206,11 @@ static int sdhci_at91_probe(struct platform_device *pdev)
-> >> >         if (ret)
-> >> >                 goto clocks_disable_unprepare;
-> >> >
-> >> > +       pm_runtime_set_active(&pdev->dev);
-> >> > +       pm_runtime_enable(&pdev->dev);
-> >> > +       pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
-> >> > +       pm_runtime_use_autosuspend(&pdev->dev);
-> >>
-> >> Move these four runtime PM calls above sdhci_add_host(), as after that
-> >> point the host is used and thus runtime PM operations starts.
-> >
-> > Sadly I have discovered a bit late it is not working when doing this
-> > because the controller has been suspended before doing the
-> > sdhci_add_host().
-> >
-> > What is the right way to fix it? Calling pm_runtime_get_noresume()
+Hi Marcin,
+
+On Sun, Nov 22, 2015 at 08:53:52AM +0100, Marcin Wojtas wrote:
+> Mixed approach allows using higher interrupt threshold (increased back to
+> 15 packets), useful in high throughput. In case of small amount of data
+> or very short TX queues HR timer ensures releasing buffers with small
+> latency.
 > 
-> I would do that before pm_runtime_enable().
+> Along with existing tx_done processing by coalescing interrupts this
+> commit enables triggering HR timer each time the packets are sent.
+> Time threshold can also be configured, using ethtool.
 > 
-> > before sdhci_add_host() and calling pm_runtime_put_autosuspend() after?
+> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> ---
+>  drivers/net/ethernet/marvell/mvneta.c | 89 +++++++++++++++++++++++++++++++++--
+>  1 file changed, 85 insertions(+), 4 deletions(-)
 > 
-> Yes. Sorry for not spotting this before.
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> index 9c9e858..f5acaf6 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> @@ -21,6 +21,8 @@
+>  #include <linux/module.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/if_vlan.h>
+> +#include <linux/hrtimer.h>
+> +#include <linux/ktime.h>
 
-No problem, I am faulty too, it was not so trivial!
+ktime.h is already included by hrtimer.h.
 
-I am sending the fix. Thanks
+>  #include <net/ip.h>
+>  #include <net/ipv6.h>
+>  #include <linux/io.h>
+> @@ -226,7 +228,8 @@
+>  /* Various constants */
+>  
+>  /* Coalescing */
+> -#define MVNETA_TXDONE_COAL_PKTS		1
+> +#define MVNETA_TXDONE_COAL_PKTS		15
+> +#define MVNETA_TXDONE_COAL_USEC		100
 
-Regards
+Maybe we should keep the default configuration and let the user choose
+to enable (or not) this feature ?
 
-Ludovic
+>  #define MVNETA_RX_COAL_PKTS		32
+>  #define MVNETA_RX_COAL_USEC		100
+>  
+> @@ -356,6 +359,11 @@ struct mvneta_port {
+>  	struct net_device *dev;
+>  	struct notifier_block cpu_notifier;
+>  
+> +	/* Egress finalization */
+> +	struct tasklet_struct tx_done_tasklet;
+> +	struct hrtimer tx_done_timer;
+> +	bool timer_scheduled;
+
+I think we could use hrtimer_is_queued() instead of introducing a new
+variable.
+
+[...]
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151126/87426bb2/attachment.sig>
