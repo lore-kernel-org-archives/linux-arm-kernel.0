@@ -1,61 +1,35 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Thu, 26 Nov 2015 09:20:48 +0800
-Subject: [PATCH v8 2/2] arm64: dts: mt8173: Add nor flash node
-In-Reply-To: <1447817403-16631-3-git-send-email-bayi.cheng@mediatek.com>
-References: <1447817403-16631-1-git-send-email-bayi.cheng@mediatek.com>
- <1447817403-16631-3-git-send-email-bayi.cheng@mediatek.com>
-Message-ID: <CAGS+omBVfc=BPLoobOJSDPnbv97PnGsRxUTF1gbXEz4DeufbmQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Nov 2015 01:28:59 +0000
+Subject: [PATCH v2 2/2] ARM: Replace calls to __aeabi_{u}idiv with
+ udiv/sdiv instructions
+In-Reply-To: <yw1x4mg9posf.fsf@unicorn.mansr.com>
+References: <1448488264-23400-1-git-send-email-sboyd@codeaurora.org>
+ <1448488264-23400-3-git-send-email-sboyd@codeaurora.org>
+ <alpine.LFD.2.20.1511251733570.22569@knanqh.ubzr>
+ <yw1x8u5lpqqz.fsf@unicorn.mansr.com>
+ <alpine.LFD.2.20.1511251931050.22569@knanqh.ubzr>
+ <yw1x4mg9posf.fsf@unicorn.mansr.com>
+Message-ID: <20151126012859.GX8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bayi, Matthias,
+On Thu, Nov 26, 2015 at 12:50:08AM +0000, M?ns Rullg?rd wrote:
+> If not calling the function saves an I-cache miss, the benefit can be
+> substantial.  No, I have no proof of this being a problem, but it's
+> something that could happen.
 
-Sorry for the late review, one comment below...
+That's a simplistic view of modern CPUs.
 
-On Wed, Nov 18, 2015 at 11:30 AM, Bayi Cheng <bayi.cheng@mediatek.com> wrote:
-> Add Mediatek nor flash node
->
-> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
-> Acked-by: Brian Norris <computersforpeace@gmail.com>
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 18 +++++++++++++++++-
->  1 file changed, 17 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index 4dd5f93..7988656 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -387,7 +387,23 @@
->                         status = "disabled";
->                 };
->
-> -               i2c3: i2c at 11010000 {
-> +               nor_flash: spi at 1100d000 {
-> +                       compatible = "mediatek,mt8173-nor";
-> +                       reg = <0 0x1100d000 0 0xe0>;
-> +                       clocks = <&pericfg CLK_PERI_SPI>,
-> +                                <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
-> +                       clock-names = "spi", "sf";
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       status = "disabled";
-> +
-> +                       flash at 0 {
-> +                               compatible = "jedec,spi-nor";
-> +                               reg = <0>;
-> +                       };
+As I've already said, modern CPUs which have branch prediction, but
+they also have speculative instruction fetching and speculative data
+prefetching - which the CPUs which have idiv support will have.
 
-I think this flash at 0 node represents the flash device present on the
-board and should therefore be moved to the board-specific .dts.
+With such features, the branch predictor is able to learn that the
+branch will be taken, and because of the speculative instruction
+fetching, it can bring the cache line in so that it has the
+instructions it needs with minimal or, if working correctly,
+without stalling the CPU pipeline.
 
--Dan
-
-> +               };
-> +
-> +               i2c3: i2c3 at 11010000 {
->                         compatible = "mediatek,mt8173-i2c";
->                         reg = <0 0x11010000 0 0x70>,
->                               <0 0x11000280 0 0x80>;
-> --
-> 1.8.1.1.dirty
->
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
