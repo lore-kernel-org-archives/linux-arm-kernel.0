@@ -1,29 +1,49 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 26 Nov 2015 18:45:10 -0200
-Subject: mx28: bad unlock balance detected
-In-Reply-To: <CAOMZO5B+j5s69JeeYPnpwn2e_doCA+ARzBSGAcGoJGEJ3=u3BA@mail.gmail.com>
-References: <CAOMZO5B+j5s69JeeYPnpwn2e_doCA+ARzBSGAcGoJGEJ3=u3BA@mail.gmail.com>
-Message-ID: <CAOMZO5D_ZANC30EJYpmpSenZwyx7-M=HC2nFoya_YBD1CS84+Q@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 26 Nov 2015 21:52:44 +0100
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.4 (#1)
+Message-ID: <87bnag8ov7.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2015 at 2:18 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi,
->
-> Running linux-next 20151126 on a mx28evk leads to the following bug:
->
-> sgtl5000 0-000a: sgtl5000 revision 0x11
-> sgtl5000 0-000a: Using internal LDO instead of VDDD
->
-> =====================================
-> [ BUG: bad unlock balance detected! ]
-> 4.4.0-rc2-next-20151126-00001-g44eb6b2 #156 Not tainted
-> -------------------------------------
-> kworker/u2:0/6 is trying to release lock (&rdev->mutex) at:
-> [<c02e7858>] regulator_get_voltage+0x30/0x44
-> but there are no more locks to release!
+Hi,
 
-This warning started appearing in linux-next 20151123 according to these logs:
-http://arm-soc.lixom.net/bootlogs/next/next-20151123/wandboard-arm-imx_v6_v7_defconfig.html
+Here is the first pull request for fixes for mvebu for v4.4.
 
-Haven't run git bisect yet.
+Gregory
+
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.4-1
+
+for you to fetch changes up to 4d2ec7e206ae03a51dfbdedc120ce88d403ec926:
+
+  ARM: orion5x: Fix legacy get_irqnr_and_base (2015-11-25 15:01:00 +0000)
+
+----------------------------------------------------------------
+mvebu fixes for 4.4 (part 1)
+
+- Fix QNAP TS219 power-off in dts
+- Fix legacy get_irqnr_and_base for dove and orion5x
+
+----------------------------------------------------------------
+Helmut Klein (1):
+      ARM: dts: Kirkwood: Fix QNAP TS219 power-off
+
+Nicolas Pitre (2):
+      ARM: dove: Fix legacy get_irqnr_and_base
+      ARM: orion5x: Fix legacy get_irqnr_and_base
+
+ arch/arm/boot/dts/kirkwood-ts219.dtsi            | 2 +-
+ arch/arm/mach-dove/include/mach/entry-macro.S    | 4 ++--
+ arch/arm/mach-orion5x/include/mach/entry-macro.S | 2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
