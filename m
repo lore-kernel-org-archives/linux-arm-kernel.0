@@ -1,33 +1,33 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 26 Nov 2015 14:07:23 +0000
-Subject: [patch] cpufreq: scpi-cpufreq: signedness bug in
- scpi_get_dvfs_info()
-In-Reply-To: <562A090A.5000703@arm.com>
-References: <20151022195208.GB24439@mwanda>
-	<562A090A.5000703@arm.com>
-Message-ID: <CAPKp9uZNHU-msMq7NMhOcaueEkc=bQhctovLjU4iGAN_Si4g0Q@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 26 Nov 2015 14:23:37 +0000
+Subject: [PATCH v2 10/11] PM / Hibernate: clean cached pages on
+ architectures that require it
+In-Reply-To: <1445966960-31724-11-git-send-email-james.morse@arm.com>
+References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
+ <1445966960-31724-11-git-send-email-james.morse@arm.com>
+Message-ID: <565715E9.4080805@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+On 27/10/15 17:29, James Morse wrote:
+> Some architectures require code written to memory as if it were data to be
+> 'cleaned' from any data caches so that the processor can fetch them as new
+> instructions.
+> 
+> During resume from hibernate, the snapshot code copies some pages directly,
+> meaning these architectures do not get a chance to perform their cache
+> maintenance. Add a call to flush_icache_range(), which is provided by
+> architectures that require it, to perform the maintenance.
+> 
+> This mirrors the kernel's behaviour when loading kernel modules and when
+> mapping executable pages to user space.
 
-On Fri, Oct 23, 2015 at 11:16 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 22/10/15 20:52, Dan Carpenter wrote:
->>
->> The "domain" variable needs to be signed for the error handling to
->> work.
->>
->> Fixes: 8def31034d03 ('cpufreq: arm_big_little: add SCPI interface
->> driver') Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
->>
->
-> Thanks for the fix
-> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
->
+While trying to benchmark the impact of this patch on 32bit ARM, I've
+discovered the fix is in the wrong place! do_copy_page() isn't used on
+the resume path for the pages restored 'in place'.
 
-Can you pick this up for your next -rc fixes ?
+I will produce another version of the series - hopefully later today.
 
-Regards,
-Sudeep
+
+
+James
