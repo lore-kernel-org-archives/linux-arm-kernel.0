@@ -1,92 +1,58 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 26 Nov 2015 22:17:41 +0100
-Subject: [PATCH v2] mmc: core: fix __mmc_switch timeout caused by preempt
-In-Reply-To: <1448541369-23086-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1448541369-23086-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <CAPDyKFoDARsM=oNp+HJYdxjLT06UsLePHQbjQ6FKbOWShgUoQA@mail.gmail.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 26 Nov 2015 22:16:58 +0000
+Subject: [PATCH] ARM: l2c: tauros2: use descriptive definitions for
+ register bits
+Message-ID: <E1a24qY-0004Vp-1G@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 November 2015 at 13:36, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> there is a time window between __mmc_send_status() and time_afer(),
-> on some eMMC chip, the timeout_ms is only 10ms, if this thread was
-> scheduled out during this period, then, even card has already changes
-> to transfer state by the result of CMD13, this part of code also treat
-> it to timeout error.
-> So, need calculate timeout first, then call __mmc_send_status(), if
-> already timeout and card still in programing state, then treat it to
-> the real timeout error.
->
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> ---
->  drivers/mmc/core/mmc_ops.c | 23 +++++++++++++++--------
->  1 file changed, 15 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
-> index 1f44426..eba5295 100644
-> --- a/drivers/mmc/core/mmc_ops.c
-> +++ b/drivers/mmc/core/mmc_ops.c
-> @@ -489,6 +489,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->         unsigned long timeout;
->         u32 status = 0;
->         bool use_r1b_resp = use_busy_signal;
-> +       bool expired;
->
->         mmc_retune_hold(host);
->
-> @@ -545,9 +546,23 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->         timeout = jiffies + msecs_to_jiffies(timeout_ms);
->         do {
->                 if (send_status) {
-> +                       /*
-> +                        * Timeout if the device never leaves the program state.
-> +                        * Due to the possibility of being preempted after
-> +                        * sending the status command, check the expiration
-> +                        * time first.
-> +                        */
-> +                       expired = time_after(jiffies, timeout);
->                         err = __mmc_send_status(card, &status, ignore_crc);
->                         if (err)
->                                 goto out;
-> +                       if (expired &&
-> +                           R1_CURRENT_STATE(status) == R1_STATE_PRG) {
-> +                               pr_err("%s: Card stuck in programming state! %s\n",
-> +                                      mmc_hostname(host), __func__);
-> +                               err = -ETIMEDOUT;
-> +                               goto out;
-> +                       }
+Use descriptive definitions for the Tauros2 register bits, and while
+we're here, clean up the "Tauros2: %s line fill burt8." message.
 
-This "if" actually means we will start verifying the card state, even
-when "MMC_CAP_WAIT_WHILE_BUSY && use_r1b_resp". I don't think we need
-or should.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mm/cache-tauros2.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
 
-Instead let's move this code at its original place below. That also
-means you indeed need to assign an initial value for "expired" to
-"false" in the beginning of the function.
-
-Apologize for not spotting this change in behaviour in v1.
-
->                 }
->                 if ((host->caps & MMC_CAP_WAIT_WHILE_BUSY) && use_r1b_resp)
->                         break;
-> @@ -563,14 +578,6 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->                         mmc_delay(timeout_ms);
->                         goto out;
->                 }
-> -
-> -               /* Timeout if the device never leaves the program state. */
-> -               if (time_after(jiffies, timeout)) {
-> -                       pr_err("%s: Card stuck in programming state! %s\n",
-> -                               mmc_hostname(host), __func__);
-> -                       err = -ETIMEDOUT;
-> -                       goto out;
-> -               }
->         } while (R1_CURRENT_STATE(status) == R1_STATE_PRG);
->
->         err = mmc_switch_status_error(host, status);
-> --
-> 1.8.1.1.dirty
->
-
-Kind regards
-Uffe
+diff --git a/arch/arm/mm/cache-tauros2.c b/arch/arm/mm/cache-tauros2.c
+index 95eb524ce556..88255bea65e4 100644
+--- a/arch/arm/mm/cache-tauros2.c
++++ b/arch/arm/mm/cache-tauros2.c
+@@ -22,6 +22,11 @@
+ #include <asm/cputype.h>
+ #include <asm/hardware/cache-tauros2.h>
+ 
++/* CP15 PJ4 Control configuration register */
++#define CCR_L2C_PREFETCH_DISABLE	BIT(24)
++#define CCR_L2C_ECC_ENABLE		BIT(23)
++#define CCR_L2C_WAY7_4_DISABLE		BIT(21)
++#define CCR_L2C_BURST8_ENABLE		BIT(20)
+ 
+ /*
+  * When Tauros2 is used on a CPU that supports the v7 hierarchical
+@@ -182,18 +187,18 @@ static void enable_extra_feature(unsigned int features)
+ 	u = read_extra_features();
+ 
+ 	if (features & CACHE_TAUROS2_PREFETCH_ON)
+-		u &= ~0x01000000;
++		u &= ~CCR_L2C_PREFETCH_DISABLE;
+ 	else
+-		u |= 0x01000000;
++		u |= CCR_L2C_PREFETCH_DISABLE;
+ 	pr_info("Tauros2: %s L2 prefetch.\n",
+ 			(features & CACHE_TAUROS2_PREFETCH_ON)
+ 			? "Enabling" : "Disabling");
+ 
+ 	if (features & CACHE_TAUROS2_LINEFILL_BURST8)
+-		u |= 0x00100000;
++		u |= CCR_L2C_BURST8_ENABLE;
+ 	else
+-		u &= ~0x00100000;
+-	pr_info("Tauros2: %s line fill burt8.\n",
++		u &= ~CCR_L2C_BURST8_ENABLE;
++	pr_info("Tauros2: %s burst8 line fill.\n",
+ 			(features & CACHE_TAUROS2_LINEFILL_BURST8)
+ 			? "Enabling" : "Disabling");
+ 
+-- 
+2.1.0
