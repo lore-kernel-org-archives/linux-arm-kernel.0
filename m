@@ -1,25 +1,45 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 26 Nov 2015 10:14:02 +0200
-Subject: [PATCH] remoteproc: avoid stack overflow in debugfs file
-In-Reply-To: <10169860.4GdufNCNz1@wuerfel>
-References: <10169860.4GdufNCNz1@wuerfel>
-Message-ID: <CAK=WgbYafpVNBoCtsOBfuMn9OqBW_RP9=2Px8q-homVXLGQUpw@mail.gmail.com>
+From: salil.mehta@huawei.com (Salil Mehta)
+Date: Thu, 26 Nov 2015 08:19:26 +0000
+Subject: [PATCH V3 net-next 3/5] net:hns: Add Hip06 "TSO(TCP Segment
+ Offload)" support HNS Driver
+In-Reply-To: <CO2PR11MB00885067453FB6462178765497180@CO2PR11MB0088.namprd11.prod.outlook.com>
+References: <1447966706-16219-1-git-send-email-salil.mehta@huawei.com>
+ <1447966706-16219-4-git-send-email-salil.mehta@huawei.com>
+ <CO2PR11MB00885067453FB6462178765497180@CO2PR11MB0088.namprd11.prod.outlook.com>
+Message-ID: <5656C08E.2010105@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 7:26 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Recent gcc versions warn about reading from a negative offset of
-> an on-stack array:
->
-> drivers/remoteproc/remoteproc_debugfs.c: In function 'rproc_recovery_write':
-> drivers/remoteproc/remoteproc_debugfs.c:167:9: warning: 'buf[4294967295u]' may be used uninitialized in this function [-Wmaybe-uninitialized]
->
-> I don't see anything in sys_write() that prevents us from
-> being called with a zero 'count' argument, so we should
-> add an extra check in rproc_recovery_write() to prevent the
-> access and avoid the warning.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 2e37abb89a2e ("remoteproc: create a 'recovery' debugfs entry")
 
-Applied to remoteproc-fixes, thanks.
+On 11/22/2015 8:49 AM, Yuval Mintz wrote:
+>> +static void hns_ae_set_tso_stats(struct hnae_handle *handle, int
+>> +enable) {
+>> +	struct hns_ppe_cb *ppe_cb = hns_get_ppe_cb(handle);
+>> +
+>> +	hns_ppe_set_tso_enable(ppe_cb, enable); }
+> Style issues?
+I could not see the code style issue menioned above in earlier submitted 
+patch. Looks like I am misssing something here!
+
++static void hns_ae_set_tso_stats(struct hnae_handle *handle, int enable)
++{
++	struct hns_ppe_cb *ppe_cb = hns_get_ppe_cb(handle);
++
++	hns_ppe_set_tso_enable(ppe_cb, enable);
++}
++
+
+>
+>> +void hns_ppe_set_tso_enable(struct hns_ppe_cb *ppe_cb, u32 value) {
+>> +	dsaf_set_dev_bit(ppe_cb, PPEV2_CFG_TSO_EN_REG, 0, !!value); }
+>> +
+> Likewise
+Same in above case. Hope I am not missing anything.
+
+  #include "hns_dsaf_ppe.h"
+  
++void hns_ppe_set_tso_enable(struct hns_ppe_cb *ppe_cb, u32 value)
++{
++	dsaf_set_dev_bit(ppe_cb, PPEV2_CFG_TSO_EN_REG, 0, !!value);
++}
++
