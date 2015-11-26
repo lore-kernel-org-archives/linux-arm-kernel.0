@@ -1,216 +1,69 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 26 Nov 2015 13:03:10 +0100
-Subject: [linux-sunxi] Re: [PATCH v3 2/2] phy-sun4i-usb: Add support for
- the host usb-phys found on the H3 SoC
-In-Reply-To: <20151125221046.GA25917@rob-hp-laptop>
-References: <1448470202-3628-1-git-send-email-hdegoede@redhat.com>
- <1448470202-3628-2-git-send-email-hdegoede@redhat.com>
- <20151125221046.GA25917@rob-hp-laptop>
-Message-ID: <5656F4FE.1000209@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 26 Nov 2015 12:10:08 +0000
+Subject: [PATCH v7 0/4] KASAN for arm64
+In-Reply-To: <564B4BFC.1020905@virtuozzo.com>
+References: <1444665180-301-1-git-send-email-ryabinin.a.a@gmail.com>
+ <20151013083432.GG6320@e104818-lin.cambridge.arm.com>
+ <5649BAFD.6030005@arm.com> <5649F783.40109@gmail.com>
+ <564B40A7.1000206@arm.com> <564B4BFC.1020905@virtuozzo.com>
+Message-ID: <20151126121007.GC32343@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Catalin,
 
-On 25-11-15 23:11, Rob Herring wrote:
-> On Wed, Nov 25, 2015 at 05:50:02PM +0100, Hans de Goede wrote:
->> From: Reinder de Haan <patchesrdh@mveas.com>
->>
->> Note this commit only adds support for phys 1-3, phy 0, the otg phy, is
->> not yet (fully) supported after this commit.
->
-> Shouldn't the OTG phy have a different compatible string?
+Can you pick up Andrey's patch below for v4.4, until we have a better
+solution?
 
-All 4 phy's are part of one hardware block and they
-share some registers, so for sunxi we've always had
-one devicetree node describing all usb-phys which
-then instantiates multiple phys. E.G. for the A10 we
-use:
+I stumbled across this myself and was about to post a similar patch.
 
-                 usbphy: phy at 01c13400 {
-                         #phy-cells = <1>;
-                         compatible = "allwinner,sun4i-a10-usb-phy";
-			...
-		};
+FWIW:
 
-                 usb_otg: usb at 01c13000 {
-			...
-			phys = <&usbphy 0>;
-			...
-		};
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-                 ehci0: usb at 01c14000 {
-			...
-			phys = <&usbphy 1>;
-			...
-		};
+Thanks,
+Mark.
 
-		...
-
-On the H3 some aspects of the phys have changed, but they still part
-of a single hardware block and sharing registers, so we are modelling
-them the same way in devicetree and thus they share a single compatible.
-
-Regards,
-
-Hans
-
-
-
-		
->
->>
->> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->> Changes in v2:
->> -Change break; after dev_err() to return, as intended, fixing a compiler
->>   warning (the dev_err case should never be reached)
->> Changes in v3:
->> -Use of_match_node to get model specific config data
->> ---
->>   .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  1 +
->>   drivers/phy/phy-sun4i-usb.c                        | 46 +++++++++++++++++-----
->>   2 files changed, 38 insertions(+), 9 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
->> index 0cebf74..95736d7 100644
->> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
->> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
->> @@ -9,6 +9,7 @@ Required properties:
->>     * allwinner,sun7i-a20-usb-phy
->>     * allwinner,sun8i-a23-usb-phy
->>     * allwinner,sun8i-a33-usb-phy
->> +  * allwinner,sun8i-h3-usb-phy
->>   - reg : a list of offset + length pairs
->>   - reg-names :
->>     * "phy_ctrl"
->> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
->> index 1d8f85d..2aed482 100644
->> --- a/drivers/phy/phy-sun4i-usb.c
->> +++ b/drivers/phy/phy-sun4i-usb.c
->> @@ -46,6 +46,9 @@
->>   #define REG_PHYBIST			0x08
->>   #define REG_PHYTUNE			0x0c
->>   #define REG_PHYCTL_A33			0x10
->> +#define REG_PHY_UNK_H3			0x20
->> +
->> +#define REG_PMU_UNK_H3			0x10
->>
->>   #define PHYCTL_DATA			BIT(7)
->>
->> @@ -79,7 +82,7 @@
->>   #define PHY_DISCON_TH_SEL		0x2a
->>   #define PHY_SQUELCH_DETECT		0x3c
->>
->> -#define MAX_PHYS			3
->> +#define MAX_PHYS			4
->>
->>   /*
->>    * Note do not raise the debounce time, we must report Vusb high within 100ms
->> @@ -91,6 +94,7 @@
->>   enum sun4i_usb_phy_type {
->>   	sun4i_a10_phy,
->>   	sun8i_a33_phy,
->> +	sun8i_h3_phy,
->>   };
->>
->>   struct sun4i_usb_phy_cfg {
->> @@ -101,6 +105,7 @@ struct sun4i_usb_phy_cfg {
->>   };
->>
->>   struct sun4i_usb_phy_data {
->> +	struct device *dev;
->>   	void __iomem *base;
->>   	const struct sun4i_usb_phy_cfg *cfg;
->>   	struct mutex mutex;
->> @@ -183,6 +188,9 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
->>   		/* A33 needs us to set phyctl to 0 explicitly */
->>   		writel(0, phyctl);
->>   		break;
->> +	case sun8i_h3_phy:
->> +		dev_err(phy_data->dev, "H3 usb_phy_write is not supported\n");
->> +		return;
->>   	}
->>
->>   	for (i = 0; i < len; i++) {
->> @@ -243,6 +251,7 @@ static int sun4i_usb_phy_init(struct phy *_phy)
->>   	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
->>   	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
->>   	int ret;
->> +	u32 val;
->>
->>   	ret = clk_prepare_enable(phy->clk);
->>   	if (ret)
->> @@ -254,16 +263,26 @@ static int sun4i_usb_phy_init(struct phy *_phy)
->>   		return ret;
->>   	}
->>
->> -	/* Enable USB 45 Ohm resistor calibration */
->> -	if (phy->index == 0)
->> -		sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
->> +	if (data->cfg->type == sun8i_h3_phy) {
->> +		if (phy->index == 0) {
->> +			val = readl(data->base + REG_PHY_UNK_H3);
->> +			writel(val & ~1, data->base + REG_PHY_UNK_H3);
->> +		}
->>
->> -	/* Adjust PHY's magnitude and rate */
->> -	sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
->> +		val = readl(phy->pmu + REG_PMU_UNK_H3);
->> +		writel(val & ~2, phy->pmu + REG_PMU_UNK_H3);
->> +	} else {
->> +		/* Enable USB 45 Ohm resistor calibration */
->> +		if (phy->index == 0)
->> +			sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
->>
->> -	/* Disconnect threshold adjustment */
->> -	sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
->> -			    data->cfg->disc_thresh, 2);
->> +		/* Adjust PHY's magnitude and rate */
->> +		sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
->> +
->> +		/* Disconnect threshold adjustment */
->> +		sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
->> +				    data->cfg->disc_thresh, 2);
->> +	}
->>
->>   	sun4i_usb_phy_passby(phy, 1);
->>
->> @@ -555,6 +574,13 @@ static const struct sun4i_usb_phy_cfg sun8i_a33_cfg = {
->>   	.dedicated_clocks = true,
->>   };
->>
->> +static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
->> +	.num_phys = 4,
->> +	.disc_thresh = 3,
->> +	.type = sun8i_h3_phy,
->> +	.dedicated_clocks = true,
->> +};
->> +
->>   static const struct of_device_id sun4i_usb_phy_of_match[] = {
->>   	{ .compatible = "allwinner,sun4i-a10-usb-phy", .data = &sun4i_a10_cfg },
->>   	{ .compatible = "allwinner,sun5i-a13-usb-phy", .data = &sun5i_a13_cfg },
->> @@ -562,6 +588,7 @@ static const struct of_device_id sun4i_usb_phy_of_match[] = {
->>   	{ .compatible = "allwinner,sun7i-a20-usb-phy", .data = &sun7i_a20_cfg },
->>   	{ .compatible = "allwinner,sun8i-a23-usb-phy", .data = &sun8i_a23_cfg },
->>   	{ .compatible = "allwinner,sun8i-a33-usb-phy", .data = &sun8i_a33_cfg },
->> +	{ .compatible = "allwinner,sun8i-h3-usb-phy", .data = &sun8i_h3_cfg },
->>   	{ },
->>   };
->>   MODULE_DEVICE_TABLE(of, sun4i_usb_phy_of_match);
->> @@ -595,6 +622,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->>   	mutex_init(&data->mutex);
->>   	INIT_DELAYED_WORK(&data->detect, sun4i_usb_phy0_id_vbus_det_scan);
->>   	dev_set_drvdata(dev, data);
->> +	data->dev = dev;
->>   	data->cfg = match->data;
->>
->>   	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy_ctrl");
->> --
->> 2.5.0
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+On Tue, Nov 17, 2015 at 06:47:08PM +0300, Andrey Ryabinin wrote:
+> We should either add proper Kconfig dependency for now, or just make it work.
+> 
+> 
+> From: Andrey Ryabinin <aryabinin@virtuozzo.com>
+> Subject: [PATCH] arm64: KASAN depends on !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+> 
+> On KASAN + 16K_PAGES + 48BIT_VA
+>  arch/arm64/mm/kasan_init.c: In function ?kasan_early_init?:
+>  include/linux/compiler.h:484:38: error: call to ?__compiletime_assert_95? declared with attribute error: BUILD_BUG_ON failed: !IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE)
+>     _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+> 
+> Currently KASAN will not work on 16K_PAGES and 48BIT_VA, so
+> forbid such configuration to avoid above build failure.
+> 
+> Reported-by: Suzuki K. Poulose <Suzuki.Poulose@arm.com>
+> Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+> ---
+>  arch/arm64/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 9ac16a4..bf7de69 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -49,7 +49,7 @@ config ARM64
+>  	select HAVE_ARCH_AUDITSYSCALL
+>  	select HAVE_ARCH_BITREVERSE
+>  	select HAVE_ARCH_JUMP_LABEL
+> -	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP
+> +	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP && !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+>  	select HAVE_ARCH_KGDB
+>  	select HAVE_ARCH_SECCOMP_FILTER
+>  	select HAVE_ARCH_TRACEHOOK
+> -- 
+> 2.4.10
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
