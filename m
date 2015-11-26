@@ -1,40 +1,60 @@
-From: linux-kernel-dev@beckhoff.com (linux-kernel-dev at beckhoff.com)
-Date: Thu, 26 Nov 2015 11:59:15 +0100
-Subject: [PATCH] ARM: dts: imx53: fix EIM_D27/29 pad UART2 configuration
-Message-ID: <1448535555-17130-1-git-send-email-linux-kernel-dev@beckhoff.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Nov 2015 10:59:45 +0000
+Subject: [PATCH 1/2] drivers: amba: properly handle devices with power
+ domains
+In-Reply-To: <CAPDyKFqQ_BuvtVnrsEdZCpXVKcDW9rAxteK1DOvHNqN7TN4sLw@mail.gmail.com>
+References: <1448456127-31842-1-git-send-email-m.szyprowski@samsung.com>
+ <1448456289-31960-1-git-send-email-m.szyprowski@samsung.com>
+ <20151125132458.GL8644@n2100.arm.linux.org.uk>
+ <5655B8F6.1070104@samsung.com>
+ <CAPDyKFqTqPijF+Lbq0+a-Gv8CyaAr13JvZPjUN1-GNL5i3-mAw@mail.gmail.com>
+ <20151125180953.GN8644@n2100.arm.linux.org.uk>
+ <5656C527.8040804@samsung.com>
+ <CAPDyKFqQ_BuvtVnrsEdZCpXVKcDW9rAxteK1DOvHNqN7TN4sLw@mail.gmail.com>
+Message-ID: <20151126105945.GZ8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrick Br?nn <p.bruenn@beckhoff.com>
+On Thu, Nov 26, 2015 at 11:24:50AM +0100, Ulf Hansson wrote:
+> On 26 November 2015 at 09:39, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > Hello,
+> >
+> > On 2015-11-25 19:09, Russell King - ARM Linux wrote:
+> >>
+> >> On Wed, Nov 25, 2015 at 02:56:10PM +0100, Ulf Hansson wrote:
+> >>>
+> >>> On 25 November 2015 at 14:34, Marek Szyprowski <m.szyprowski@samsung.com>
+> >>> wrote:
+> >>>>
+> >>>> Is ignoring dev_pm_domain_attach() return value a solution for you?
+> >>>
+> >>> That's probably better than nothing, but I wonder if it in practice
+> >>> will have any effect?
+> >>
+> >> If the PM domain is down, then trying to tread the ID is likely to oops
+> >> the kernel.
+> >
+> >
+> > In my case kernel simply hangs (no single message, even when earlyprintk is
+> > enabled)
+> > instead of oopsing, that's why I've submitted this patch.
+> >
+> 
+> Okay.
+> 
+> I suggest we go ahead and try that approach (ignoring the return
+> value). It's "quick fix", but the easiest way forward to solve the
+> problem.
+> 
+> My only concern is if such change impacts the boot time. We should do
+> some tests to see if the change is negligible, if not we should
+> probably think of something else (like keeping the PM domain powered
+> until late_init).
+> 
+> Russell, what do you think?
 
-MX53_PAD_EIM_D27__UART2_RXD_MUX and MX53_PAD_EIM_D29__UART2_RTS input_val must be configured as 0 instead of 1 to have UART2 muxed on EIM pins working
+I thought someone had a patch to read the ID during the match callback?
 
-Signed-off-by: Patrick Br?nn <p.bruenn@beckhoff.com>
----
- arch/arm/boot/dts/imx53-pinfunc.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx53-pinfunc.h b/arch/arm/boot/dts/imx53-pinfunc.h
-index aec406b..a4c973d 100644
---- a/arch/arm/boot/dts/imx53-pinfunc.h
-+++ b/arch/arm/boot/dts/imx53-pinfunc.h
-@@ -532,7 +532,7 @@
- #define MX53_PAD_EIM_D26__IPU_DISP1_DAT_22			0x144 0x48c 0x000 0x7 0x0
- #define MX53_PAD_EIM_D27__EMI_WEIM_D_27				0x148 0x490 0x000 0x0 0x0
- #define MX53_PAD_EIM_D27__GPIO3_27				0x148 0x490 0x000 0x1 0x0
--#define MX53_PAD_EIM_D27__UART2_RXD_MUX				0x148 0x490 0x880 0x2 0x1
-+#define MX53_PAD_EIM_D27__UART2_RXD_MUX				0x148 0x490 0x880 0x2 0x0
- #define MX53_PAD_EIM_D27__FIRI_TXD				0x148 0x490 0x000 0x3 0x0
- #define MX53_PAD_EIM_D27__IPU_CSI0_D_0				0x148 0x490 0x000 0x4 0x0
- #define MX53_PAD_EIM_D27__IPU_DI1_PIN13				0x148 0x490 0x000 0x5 0x0
-@@ -548,7 +548,7 @@
- #define MX53_PAD_EIM_D28__IPU_DI0_PIN13				0x14c 0x494 0x000 0x7 0x0
- #define MX53_PAD_EIM_D29__EMI_WEIM_D_29				0x150 0x498 0x000 0x0 0x0
- #define MX53_PAD_EIM_D29__GPIO3_29				0x150 0x498 0x000 0x1 0x0
--#define MX53_PAD_EIM_D29__UART2_RTS				0x150 0x498 0x87c 0x2 0x1
-+#define MX53_PAD_EIM_D29__UART2_RTS				0x150 0x498 0x87c 0x2 0x0
- #define MX53_PAD_EIM_D29__IPU_DISPB0_SER_RS			0x150 0x498 0x000 0x3 0x0
- #define MX53_PAD_EIM_D29__CSPI_SS0				0x150 0x498 0x78c 0x4 0x2
- #define MX53_PAD_EIM_D29__IPU_DI1_PIN15				0x150 0x498 0x000 0x5 0x0
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
