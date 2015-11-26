@@ -1,49 +1,29 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 26 Nov 2015 21:52:44 +0100
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.4 (#1)
-Message-ID: <87bnag8ov7.fsf@free-electrons.com>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Thu, 26 Nov 2015 23:12:38 +0200
+Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
+ "/chosen/linux,atags" entry
+In-Reply-To: <20151126203930.GW2517@atomide.com>
+References: <20150713131902.GH26485@atomide.com> <20151123144545.GD24147@pali>
+ <20151125181644.GI2517@atomide.com> <17134653.86P3dFyQKK@wuerfel>
+ <20151125210310.GT2517@atomide.com> <56568849.5080103@gmail.com>
+ <20151126090739.GD14190@pali> <20151126203930.GW2517@atomide.com>
+Message-ID: <565775C6.8070500@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-Here is the first pull request for fixes for mvebu for v4.4.
 
-Gregory
+On 26.11.2015 22:39, Tony Lindgren wrote:
 
-The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+> Just to explore options.. How about make a minimal device driver that
+> just loads the atags blob from /lib/firmware and then shows it in
+> /proc/atags? Of course some checking on the atags should be done by
+> the driver..
+>
 
-  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+What is the chance for such a driver to be accepted upstream? As IIRC 
+the current situation is because similar driver was rejected. Might be 
+wrong as well, it was about 2-3 years ago.
 
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.4-1
-
-for you to fetch changes up to 4d2ec7e206ae03a51dfbdedc120ce88d403ec926:
-
-  ARM: orion5x: Fix legacy get_irqnr_and_base (2015-11-25 15:01:00 +0000)
-
-----------------------------------------------------------------
-mvebu fixes for 4.4 (part 1)
-
-- Fix QNAP TS219 power-off in dts
-- Fix legacy get_irqnr_and_base for dove and orion5x
-
-----------------------------------------------------------------
-Helmut Klein (1):
-      ARM: dts: Kirkwood: Fix QNAP TS219 power-off
-
-Nicolas Pitre (2):
-      ARM: dove: Fix legacy get_irqnr_and_base
-      ARM: orion5x: Fix legacy get_irqnr_and_base
-
- arch/arm/boot/dts/kirkwood-ts219.dtsi            | 2 +-
- arch/arm/mach-dove/include/mach/entry-macro.S    | 4 ++--
- arch/arm/mach-orion5x/include/mach/entry-macro.S | 2 +-
- 3 files changed, 4 insertions(+), 4 deletions(-)
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+Ivo
