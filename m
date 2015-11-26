@@ -1,45 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 26 Nov 2015 12:39:30 -0800
-Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
- "/chosen/linux,atags" entry
-In-Reply-To: <20151126090739.GD14190@pali>
-References: <20150713131902.GH26485@atomide.com> <20151123144545.GD24147@pali>
- <20151125181644.GI2517@atomide.com> <17134653.86P3dFyQKK@wuerfel>
- <20151125210310.GT2517@atomide.com> <56568849.5080103@gmail.com>
- <20151126090739.GD14190@pali>
-Message-ID: <20151126203930.GW2517@atomide.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 26 Nov 2015 18:45:10 -0200
+Subject: mx28: bad unlock balance detected
+In-Reply-To: <CAOMZO5B+j5s69JeeYPnpwn2e_doCA+ARzBSGAcGoJGEJ3=u3BA@mail.gmail.com>
+References: <CAOMZO5B+j5s69JeeYPnpwn2e_doCA+ARzBSGAcGoJGEJ3=u3BA@mail.gmail.com>
+Message-ID: <CAOMZO5D_ZANC30EJYpmpSenZwyx7-M=HC2nFoya_YBD1CS84+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pali Roh?r <pali.rohar@gmail.com> [151126 01:08]:
-> On Wednesday 25 November 2015 20:19:21 Frank Rowand wrote:
-> > > Or populate /proc/atags only for the ones that need it from machine
-> > > specific init_early?
-> > 
-> > This is circling back to the first comment from Russell King where
-> > he suggested a legacy file for the N900 which calls save_atags():
-> > 
-> >     Are the ATAGs at a fixed address on the N900?  Can that be handled in
-> >     some kind of legacy file for the N900 which calls save_atags() on it, so
-> >     we don't end up introducing yet more stuff that we have to maintain into
-> >     the distant future?  If not, what about copying a known working atag
-> >     structure into a legacy file for the N900?
-> > 
-> > It seems to me that patches 1, 2, 4, and 5 could be replaced by this
-> > approach.
-> 
-> Hi Frank, in this case I will ask my question again: It is possible to
-> read atags from that legacy file. And if yes how? I was not thinking
-> about this approach because somebody in past wrote that this is not
-> possible...
+On Thu, Nov 26, 2015 at 2:18 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi,
+>
+> Running linux-next 20151126 on a mx28evk leads to the following bug:
+>
+> sgtl5000 0-000a: sgtl5000 revision 0x11
+> sgtl5000 0-000a: Using internal LDO instead of VDDD
+>
+> =====================================
+> [ BUG: bad unlock balance detected! ]
+> 4.4.0-rc2-next-20151126-00001-g44eb6b2 #156 Not tainted
+> -------------------------------------
+> kworker/u2:0/6 is trying to release lock (&rdev->mutex) at:
+> [<c02e7858>] regulator_get_voltage+0x30/0x44
+> but there are no more locks to release!
 
-Just to explore options.. How about make a minimal device driver that
-just loads the atags blob from /lib/firmware and then shows it in
-/proc/atags? Of course some checking on the atags should be done by
-the driver..
+This warning started appearing in linux-next 20151123 according to these logs:
+http://arm-soc.lixom.net/bootlogs/next/next-20151123/wandboard-arm-imx_v6_v7_defconfig.html
 
-That would work as long as the kernel no longer needs it.
-
-Regards,
-
-Tony
+Haven't run git bisect yet.
