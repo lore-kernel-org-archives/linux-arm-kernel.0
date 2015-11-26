@@ -1,67 +1,53 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 26 Nov 2015 16:02:01 +0000
+Date: Thu, 26 Nov 2015 16:04:56 +0000
 Subject: [PATCH v3 38/62] arm/acpi: Add placeholder for efi and acpi load
  address
-In-Reply-To: <564B2152.9000904@huawei.com>
+In-Reply-To: <564C6763.6050107@citrix.com>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
  <1447753261-7552-39-git-send-email-shannon.zhao@linaro.org>
  <564B1666.4060008@citrix.com> <564B2152.9000904@huawei.com>
-Message-ID: <alpine.DEB.2.02.1511261558270.8984@kaball.uk.xensource.com>
+ <564B3845.4060801@citrix.com> <564BEA22.1040909@huawei.com>
+ <564C6763.6050107@citrix.com>
+Message-ID: <alpine.DEB.2.02.1511261604080.8984@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, Shannon Zhao wrote:
-> On 2015/11/17 19:58, Julien Grall wrote:
-> > Hi Shannon,
+On Wed, 18 Nov 2015, Julien Grall wrote:
+> On 18/11/15 03:01, Shannon Zhao wrote:
+> > "All above tables will be mapped to Dom0 non-RAM space. Since when
+> > booting through ACPI it doesn't need the grant table region(see below
+> > section 3), it could use this region to store the tables or use the same
+> > way to find one memory region to store them."
 > > 
-> > On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
-> >> From: Shannon Zhao <shannon.zhao@linaro.org>
-> >>
-> >> EFI table, memory description table and some of acpi tables will be
-> >> placed after DOM0 memory space. Add placeholder for the starting address
-> >> for loading in DOM0 and the size of new added tables. Also add a
-> >> placeholder to store the new created tables.
-> >>
-> >> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
-> >> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> >> ---
-> >>  xen/include/asm-arm/domain.h | 5 +++++
-> >>  1 file changed, 5 insertions(+)
-> >>
-> >> diff --git a/xen/include/asm-arm/domain.h b/xen/include/asm-arm/domain.h
-> >> index 1e61f30..91272e5 100644
-> >> --- a/xen/include/asm-arm/domain.h
-> >> +++ b/xen/include/asm-arm/domain.h
-> >> @@ -125,6 +125,11 @@ struct arch_domain
-> >>      } vuart;
-> >>  
-> >>      unsigned int evtchn_irq;
-> >> +#ifdef CONFIG_ACPI
-> >> +    void *efi_acpi_table;
-> >> +    paddr_t efi_acpi_gpa;
-> >> +    paddr_t efi_acpi_len;
-> >> +#endif
-> > 
-> > Why do you need this in the arch_domain? AFAICT those 3 variables should
-> > only be used while building DOM0, so a better place would be in struct
-> > kernel_info (see xen/arch/arm/kernel.h).
-> > 
+> > Firstly, as Jan suggested, these tables should not be in RAM space, so
+> > we drop the previous way that copying these tables to Dom0 RAM.
+> > Then I suggested map these tables to the space after the Dom0 RAM space,
+> > but this not right because Dom0 RAM region might be at the edge of
+> > physical RAM space and there might be device MMIO regions.
+> > Then you suggest it could map these tables to the region which is used
+> > for grant table(or the region found by the same way) while it's not used
+> > when it boots with ACPI. These regions are not used by Xen and will not
+> > be used by Dom0 either currently. But as you say, it will be wrong if
+> > Dom0 memory is not 1:1 mapped.
 > 
-> Since I use efi_acpi_table to store the allocated pages pointer which
-> are used to store newly created ACPI and EFI tables.
-> See [PATCH v3 40/62]:
-> +    order = get_order_from_bytes(d->arch.efi_acpi_len);
-> +    d->arch.efi_acpi_table = alloc_xenheap_pages(order, 0);
+> Will you remember in 6 months why you wrote the code like that?
 > 
-> And it free these pages when destroying this domain:
-> +#ifdef CONFIG_ACPI
-> +    free_xenheap_pages(d->arch.efi_acpi_table,
-> +                       get_order_from_bytes(d->arch.efi_acpi_len));
-> +#endif
+> My point on the previous mail is you don't describe what you did,
+> neither in the code nor in the commit message.
 > 
-> efi_acpi_gpa might not need.
+> Most of the place in the code are trying to avoid the assumption that
+> DOM0 is using direct mapped. If not, we always have a comment/commit
+> message explaining why we are doing like that and the implication (see
+> the grant table example [1]).
+> 
+> > So how about below idea:
+> > We still copy these tables to Dom0 RAM space but when we create
+> > EFI_MMAP_TABLE, we remove the space occupied by these tables from the
+> > EfiConventionalMemory descriptor.
+> 
+> As you don't need the grant table region, why don't you re-use it fopr
+> your tables? It may also be possible that we have some space just after
+> for the EFI table.
 
-If you need to free the memory at domain destruction, it could make
-sense to store the pointer in struct arch_domain, even if it only
-happens for dom0. However you could come up with a single struct and add
-a pointer to it in arch_domain to limit the per-domain overhead.
+I think that the current approach is good, please just extend the
+in-code comment in patch #40.
