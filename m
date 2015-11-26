@@ -1,69 +1,127 @@
-From: mark.rutland@arm.com (Mark Rutland)
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
 Date: Thu, 26 Nov 2015 12:10:08 +0000
-Subject: [PATCH v7 0/4] KASAN for arm64
-In-Reply-To: <564B4BFC.1020905@virtuozzo.com>
-References: <1444665180-301-1-git-send-email-ryabinin.a.a@gmail.com>
- <20151013083432.GG6320@e104818-lin.cambridge.arm.com>
- <5649BAFD.6030005@arm.com> <5649F783.40109@gmail.com>
- <564B40A7.1000206@arm.com> <564B4BFC.1020905@virtuozzo.com>
-Message-ID: <20151126121007.GC32343@leverpostej>
+Subject: [PATCH v3 28/62] arm/gic: Add ACPI support for GIC preinit
+In-Reply-To: <1447753261-7552-29-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-29-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511261209220.1107@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-Can you pick up Andrey's patch below for v4.4, until we have a better
-solution?
-
-I stumbled across this myself and was about to post a similar patch.
-
-FWIW:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
-On Tue, Nov 17, 2015 at 06:47:08PM +0300, Andrey Ryabinin wrote:
-> We should either add proper Kconfig dependency for now, or just make it work.
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
+> Since ACPI 6.0 defines that GIC Distributor Structure contains the GIC
+> version filed, it could get GIC version from that. According to the
+> version, call different preinit functions.
 > 
-> From: Andrey Ryabinin <aryabinin@virtuozzo.com>
-> Subject: [PATCH] arm64: KASAN depends on !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
-> 
-> On KASAN + 16K_PAGES + 48BIT_VA
->  arch/arm64/mm/kasan_init.c: In function ?kasan_early_init?:
->  include/linux/compiler.h:484:38: error: call to ?__compiletime_assert_95? declared with attribute error: BUILD_BUG_ON failed: !IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE)
->     _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
-> 
-> Currently KASAN will not work on 16K_PAGES and 48BIT_VA, so
-> forbid such configuration to avoid above build failure.
-> 
-> Reported-by: Suzuki K. Poulose <Suzuki.Poulose@arm.com>
-> Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 > ---
->  arch/arm64/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  xen/arch/arm/gic.c | 55 ++++++++++++++++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 51 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 9ac16a4..bf7de69 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -49,7 +49,7 @@ config ARM64
->  	select HAVE_ARCH_AUDITSYSCALL
->  	select HAVE_ARCH_BITREVERSE
->  	select HAVE_ARCH_JUMP_LABEL
-> -	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP
-> +	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP && !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
->  	select HAVE_ARCH_KGDB
->  	select HAVE_ARCH_SECCOMP_FILTER
->  	select HAVE_ARCH_TRACEHOOK
+> diff --git a/xen/arch/arm/gic.c b/xen/arch/arm/gic.c
+> index 1e1e5ba..ac82588 100644
+> --- a/xen/arch/arm/gic.c
+> +++ b/xen/arch/arm/gic.c
+> @@ -27,6 +27,7 @@
+>  #include <xen/softirq.h>
+>  #include <xen/list.h>
+>  #include <xen/device_tree.h>
+> +#include <xen/acpi.h>
+>  #include <asm/p2m.h>
+>  #include <asm/domain.h>
+>  #include <asm/platform.h>
+> @@ -34,6 +35,7 @@
+>  #include <asm/io.h>
+>  #include <asm/gic.h>
+>  #include <asm/vgic.h>
+> +#include <asm/acpi.h>
+>  
+>  static void gic_restore_pending_irqs(struct vcpu *v);
+>  
+> @@ -228,10 +230,7 @@ int gic_irq_xlate(const u32 *intspec, unsigned int intsize,
+>      return 0;
+>  }
+>  
+> -/* Find the interrupt controller and set up the callback to translate
+> - * device tree IRQ.
+> - */
+> -void __init gic_preinit(void)
+> +void __init dt_gic_preinit(void)
+>  {
+>      int rc;
+>      struct dt_device_node *node;
+> @@ -261,6 +260,54 @@ void __init gic_preinit(void)
+>      dt_device_set_used_by(node, DOMID_XEN);
+>  }
+>  
+> +#ifdef CONFIG_ACPI
+> +static void __init acpi_gic_preinit(void)
+> +{
+> +    int rc = 0;
+> +    acpi_status status;
+> +    struct acpi_table_header *table;
+> +    struct acpi_subtable_header * subtable;
+> +    struct acpi_madt_generic_distributor *dist;
+> +
+> +    status = acpi_get_table(ACPI_SIG_MADT, 0, &table);
+> +    if ( ACPI_FAILURE(status) )
+> +    {
+> +        const char *msg = acpi_format_exception(status);
+> +
+> +        panic("Failed to get MADT table, %s", msg);
+> +    }
+> +
+> +    subtable = acpi_get_entry(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
+> +                              table, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
+> +    if ( !subtable )
+> +        panic("No valid GICD entries exists");
+> +
+> +    dist = (struct acpi_madt_generic_distributor *)subtable;
+> +
+> +    if ( dist->version == ACPI_MADT_GIC_VERSION_V2 )
+> +        rc = acpi_device_init(DEVICE_GIC, NULL, GIC_V2);
+> +    else if ( dist->version == ACPI_MADT_GIC_VERSION_V3 )
+> +        rc = acpi_device_init(DEVICE_GIC, NULL, GIC_V3);
+
+I agree with your suggestion and Julien's previous comment. Something like:
+
+ACPI_DEVICE_START(agicv2, "GICv2", DEVICE_GIC)
+        .class_type = ACPI_MADT_GIC_VERSION_V2,
+        .init = acpi_gicv2_preinit,
+ACPI_DEVICE_END
+
+would be better.
+
+
+> +    else
+> +        panic("Wrong GIC version or unsupported GIC");
+> +    if ( rc )
+> +        panic("Unable to find compatible GIC in the ACPI table");
+> +}
+> +#else
+> +static void __init acpi_gic_preinit(void) {}
+> +#endif
+> +
+> +/* Find the interrupt controller and set up the callback to translate
+> + * device tree IRQ.
+> + */
+> +void __init gic_preinit(void)
+> +{
+> +    if( acpi_disabled )
+
+coding style
+
+
+> +        dt_gic_preinit();
+> +    else
+> +        acpi_gic_preinit();
+> +}
+> +
+>  /* Set up the GIC */
+>  void __init gic_init(void)
+>  {
 > -- 
-> 2.4.10
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 2.1.0
 > 
