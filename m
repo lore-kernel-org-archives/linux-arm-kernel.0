@@ -1,64 +1,25 @@
-From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
-Date: Thu, 26 Nov 2015 15:57:03 +0800
-Subject: [PATCH v2] arm64: dts: add all hi6220 i2c nodes
-Message-ID: <1448524623-10320-1-git-send-email-kong.kongxinwei@hisilicon.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 26 Nov 2015 10:14:02 +0200
+Subject: [PATCH] remoteproc: avoid stack overflow in debugfs file
+In-Reply-To: <10169860.4GdufNCNz1@wuerfel>
+References: <10169860.4GdufNCNz1@wuerfel>
+Message-ID: <CAK=WgbYafpVNBoCtsOBfuMn9OqBW_RP9=2Px8q-homVXLGQUpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds all I2C nodes for the Hi6220 SoC. This hi6220 Soc
-use this I2C IP of Synopsys Designware for HiKey board.
+On Fri, Nov 20, 2015 at 7:26 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> Recent gcc versions warn about reading from a negative offset of
+> an on-stack array:
+>
+> drivers/remoteproc/remoteproc_debugfs.c: In function 'rproc_recovery_write':
+> drivers/remoteproc/remoteproc_debugfs.c:167:9: warning: 'buf[4294967295u]' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>
+> I don't see anything in sys_write() that prevents us from
+> being called with a zero 'count' argument, so we should
+> add an extra check in rproc_recovery_write() to prevent the
+> access and avoid the warning.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 2e37abb89a2e ("remoteproc: create a 'recovery' debugfs entry")
 
-Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
----
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 37 +++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 82d2488..85d4a8b 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -208,5 +208,42 @@
- 			clock-names = "uartclk", "apb_pclk";
- 			status = "disabled";
- 		};
-+
-+		i2c0: i2c at f7100000 {
-+			compatible = "snps,designware-i2c";
-+			reg = <0x0 0xf7100000 0x0 0x1000>;
-+			interrupts = <0 44 4>;
-+			clocks = <&sys_ctrl HI6220_I2C0_CLK>;
-+			clock-names = "clk_i2c0";
-+			i2c-sda-hold-time-ns = <300>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pmx_func &i2c0_cfg_func>;
-+			status = "disabled";
-+		};
-+
-+		i2c1: i2c at f7101000 {
-+			compatible = "snps,designware-i2c";
-+			reg = <0x0 0xf7101000 0x0 0x1000>;
-+			interrupts = <0 45 4>;
-+			clocks = <&sys_ctrl HI6220_I2C1_CLK>;
-+			clock-names = "clk_i2c1";
-+			i2c-sda-hold-time-ns = <300>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c1_pmx_func &i2c1_cfg_func>;
-+			status = "disabled";
-+		};
-+
-+		i2c2: i2c at f7102000 {
-+			compatible = "snps,designware-i2c";
-+			reg = <0x0 0xf7102000 0x0 0x1000>;
-+			interrupts = <0 46 4>;
-+			clocks = <&sys_ctrl HI6220_I2C2_CLK>;
-+			clock-names = "clk_i2c2";
-+			i2c-sda-hold-time-ns = <300>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c2_pmx_func &i2c2_cfg_func>;
-+			status = "disabled";
-+		};
-+
- 	};
- };
--- 
-1.9.1
+Applied to remoteproc-fixes, thanks.
