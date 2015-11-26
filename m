@@ -1,33 +1,43 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 26 Nov 2015 14:23:37 +0000
-Subject: [PATCH v2 10/11] PM / Hibernate: clean cached pages on
- architectures that require it
-In-Reply-To: <1445966960-31724-11-git-send-email-james.morse@arm.com>
-References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
- <1445966960-31724-11-git-send-email-james.morse@arm.com>
-Message-ID: <565715E9.4080805@arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 26 Nov 2015 15:44:28 +0100
+Subject: Preprocessor arithmetic in dtsi files (base + offset)
+In-Reply-To: <20151126135957.GC8644@n2100.arm.linux.org.uk>
+References: <56570620.3070106@free.fr>
+ <20151126135957.GC8644@n2100.arm.linux.org.uk>
+Message-ID: <56571ACC.9080306@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/10/15 17:29, James Morse wrote:
-> Some architectures require code written to memory as if it were data to be
-> 'cleaned' from any data caches so that the processor can fetch them as new
-> instructions.
+On 26/11/2015 14:59, Russell King - ARM Linux wrote:
+> On Thu, Nov 26, 2015 at 02:16:16PM +0100, Mason wrote:
+>> #define SCU_BASE 0x20000000
+>>
+>> 	scu: scu at XXX {
+>> 		compatible = "arm,cortex-a9-scu";
+>> 		reg = <SCU_BASE 0x100>;
+>> 	
+>> 	gic: interrupt-controller at XXX {
+>> 		compatible = "arm,cortex-a9-gic";
+>> 		reg = <SCU_BASE+0x1000 0x1000>, <SCU_BASE+0x100 0x0100>;
 > 
-> During resume from hibernate, the snapshot code copies some pages directly,
-> meaning these architectures do not get a chance to perform their cache
-> maintenance. Add a call to flush_icache_range(), which is provided by
-> architectures that require it, to perform the maintenance.
+> You don't get preprocessor arithmetic here.  What you get is this passed
+> to DTC:
 > 
-> This mirrors the kernel's behaviour when loading kernel modules and when
-> mapping executable pages to user space.
+> 		reg = <0x20000000+0x1000 0x1000>...
+> 
+> The only time the preprocessor does arithmetic is when it needs to
+> evaluate an expression, eg, in an #if statement.
 
-While trying to benchmark the impact of this patch on 32bit ARM, I've
-discovered the fix is in the wrong place! do_copy_page() isn't used on
-the resume path for the pages restored 'in place'.
+Doh! Brain malfunction. No arithmetic indeed.
+Working with the preprocessor would have to involve token-pasting.
 
-I will produce another version of the series - hopefully later today.
+#define SCU_BASE(OFFSET)	2000##OFFSET
+#define SCU_BASEX(OFFSET)	0x2000##OFFSET
 
+	gic: interrupt-controller at SCU_BASE(1000) {
+		reg = <SCU_BASEX(1000) 0x1000>, <SCU_BASEX(0100) 0x0100>;
+	};
 
+My very own abomination!
 
-James
+Regards.
