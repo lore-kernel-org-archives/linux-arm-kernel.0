@@ -1,10 +1,8 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Nov 2015 13:49:40 +0000
-Subject: [PATCH 2/2] ARM: mm: keep reserved ASIDs in sync with mm after
+Date: Thu, 26 Nov 2015 13:49:39 +0000
+Subject: [PATCH 1/2] arm64: mm: keep reserved ASIDs in sync with mm after
  multiple rollovers
-In-Reply-To: <1448545780-1550-1-git-send-email-will.deacon@arm.com>
-References: <1448545780-1550-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1448545780-1550-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1448545780-1550-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -44,19 +42,18 @@ This patch fixes the problem by updating all of the matching reserved
 ASIDs when we hit on the slowpath (i.e. in step 3 above). This keeps
 the reserved ASIDs in-sync with the mm and avoids the problem.
 
-Cc: <stable@vger.kernel.org>
 Reported-by: Tony Thompson <anthony.thompson@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mm/context.c | 39 ++++++++++++++++++++++++++-------------
- 1 file changed, 26 insertions(+), 13 deletions(-)
+ arch/arm64/mm/context.c | 38 ++++++++++++++++++++++++++------------
+ 1 file changed, 26 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
-index 845769e41332..0930884ff1ac 100644
---- a/arch/arm/mm/context.c
-+++ b/arch/arm/mm/context.c
-@@ -165,13 +165,28 @@ static void flush_context(unsigned int cpu)
+diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+index f636a2639f03..e87f53ff5f58 100644
+--- a/arch/arm64/mm/context.c
++++ b/arch/arm64/mm/context.c
+@@ -76,13 +76,28 @@ static void flush_context(unsigned int cpu)
  		__flush_icache_all();
  }
  
@@ -90,7 +87,7 @@ index 845769e41332..0930884ff1ac 100644
  }
  
  static u64 new_context(struct mm_struct *mm, unsigned int cpu)
-@@ -181,12 +196,14 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
+@@ -92,12 +107,14 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
  	u64 generation = atomic64_read(&asid_generation);
  
  	if (asid != 0) {
@@ -107,7 +104,7 @@ index 845769e41332..0930884ff1ac 100644
  
  		/*
  		 * We had a valid ASID in a previous life, so try to re-use
-@@ -194,7 +211,7 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
+@@ -105,7 +122,7 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
  		 */
  		asid &= ~ASID_MASK;
  		if (!__test_and_set_bit(asid, asid_map))
@@ -116,18 +113,17 @@ index 845769e41332..0930884ff1ac 100644
  	}
  
  	/*
-@@ -216,11 +233,7 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
- 
+@@ -129,10 +146,7 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
+ set_asid:
  	__set_bit(asid, asid_map);
  	cur_idx = asid;
 -
 -bump_gen:
 -	asid |= generation;
--	cpumask_clear(mm_cpumask(mm));
 -	return asid;
 +	return asid | generation;
  }
  
- void check_and_switch_context(struct mm_struct *mm, struct task_struct *tsk)
+ void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
 -- 
 2.1.4
