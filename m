@@ -1,25 +1,26 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Thu, 26 Nov 2015 10:33:49 +0000
-Subject: [PATCH 2/2] arm64: efi: fix initcall return values
-In-Reply-To: <1448264604-19411-3-git-send-email-ard.biesheuvel@linaro.org>
-References: <1448264604-19411-1-git-send-email-ard.biesheuvel@linaro.org>
- <1448264604-19411-3-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20151126103349.GG2765@codeblueprint.co.uk>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Thu, 26 Nov 2015 16:04:01 +0530
+Subject: [PATCH 06/14] ARM: am437x: cm-t43: dts: add dual emac support
+In-Reply-To: <1448371155-17307-7-git-send-email-nikita@compulab.co.il>
+References: <1448371155-17307-1-git-send-email-nikita@compulab.co.il>
+ <1448371155-17307-7-git-send-email-nikita@compulab.co.il>
+Message-ID: <5656E019.3000903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Nov, at 08:43:24AM, Ard Biesheuvel wrote:
-> Even though initcall return values are typically ignored, the
-> prototype is to return 0 on success or a negative errno value on
-> error. So fix the arm_enable_runtime_services() implementation to
-> return 0 on conditions that are not in fact errors, and return a
-> meaningful error code otherwise.
+On Tuesday 24 November 2015 06:49 PM, Nikita Kiryanov wrote:
+> CM-T43 comes with 2 ethernet ports connected to the cpsw subsystem, which
+> has 2 modes of operation: switch mode and dual emac mode.
+> Add the relevant muxing and set it up to work in dual emac mode by
+> default.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/efi.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
+> Signed-off-by: Nikita Kiryanov <nikita@compulab.co.il>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Igor Grinberg <grinberg@compulab.co.il>
+> Cc: Dmitry Lifshitz <lifshitz@compulab.co.il>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
 
-FWIW, 
+Acked-by: Mugunthan V N <mugunthanvnm@ti.com>
 
-Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
+Regards
+Mugunthan V N
