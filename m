@@ -1,39 +1,72 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 26 Nov 2015 19:27:36 +0100
-Subject: [PATCH v2 net 2/6] net: mvneta: fix bit assignment in
- MVNETA_RXQ_CONFIG_REG
-In-Reply-To: <1448561293-16431-3-git-send-email-mw@semihalf.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Thu, 26 Nov 2015 19:38:53 +0100
+Subject: [PATCH v2 net 4/6] net: mvneta: fix error path for building skb
+In-Reply-To: <1448561293-16431-5-git-send-email-mw@semihalf.com>
 References: <1448561293-16431-1-git-send-email-mw@semihalf.com>
- <1448561293-16431-3-git-send-email-mw@semihalf.com>
-Message-ID: <20151126192736.662634d3@free-electrons.com>
+ <1448561293-16431-5-git-send-email-mw@semihalf.com>
+Message-ID: <20151126183853.GI4665@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Marcin Wojtas,
-
-On Thu, 26 Nov 2015 19:08:09 +0100, Marcin Wojtas wrote:
-> MVNETA_RXQ_HW_BUF_ALLOC bit which controls enabling hardware buffer
-> allocation was mistakenly set as BIT(1). This commit fixes the assignment.
+On Thu, Nov 26, 2015 at 07:08:11PM +0100, Marcin Wojtas wrote:
+> In the actual RX processing, there is same error path for both descriptor
+> ring refilling and building skb fails. This is not correct, because after
+> successful refill, the ring is already updated with newly allocated
+> buffer. Then, in case of build_skb() fail, hitherto code left the original
+> buffer unmapped.
+> 
+> This patch fixes above situation by swapping error check of skb build with
+> DMA-unmap of original buffer.
 > 
 > Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Cc: <stable@vger.kernel.org> # v3.8+
-> Fixes: c5aff18204da ("net: mvneta: driver for Marvell Armada 370/XP network
-> unit")
+> Cc: <stable@vger.kernel.org> # v4.2+
+> Fixes a84e32894191 ("net: mvneta: fix refilling for Rx DMA buffers")
 > ---
->  drivers/net/ethernet/marvell/mvneta.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/net/ethernet/marvell/mvneta.c | 8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
+> 
 
-What is the user-visible impact of this bug? Indeed, the code is wrong,
-but things were working fine until now.
+Acked-by: Simon Guinot <simon.guinot@sequanux.org>
 
-So I am not questioning that this patch should be merged, but only
-questioning whether the stable tag is appropriate.
+Thanks,
 
-Same questions for your patch 3/6.
+Simon
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> index 0c3d923..62cf971 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> @@ -1580,12 +1580,16 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
+>  		}
+>  
+>  		skb = build_skb(data, pp->frag_size > PAGE_SIZE ? 0 : pp->frag_size);
+> -		if (!skb)
+> -			goto err_drop_frame;
+>  
+> +		/* After refill old buffer has to be unmapped regardless
+> +		 * the skb is successfully built or not.
+> +		 */
+>  		dma_unmap_single(dev->dev.parent, phys_addr,
+>  				 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
+>  
+> +		if (!skb)
+> +			goto err_drop_frame;
+> +
+>  		rcvd_pkts++;
+>  		rcvd_bytes += rx_bytes;
+>  
+> -- 
+> 1.8.3.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151126/5280f300/attachment.sig>
