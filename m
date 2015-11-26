@@ -1,42 +1,30 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Thu, 26 Nov 2015 12:08:55 +0100
-Subject: [PATCH v2 2/2] restrict /dev/mem to idle io memory ranges
-In-Reply-To: <CAPcyv4ijWns879DytqUa+=r5hzQ1qzmB83VV6Z16kQNtmHUtbA@mail.gmail.com>
-References: <20151124000553.26360.57819.stgit@dwillia2-desk3.jf.intel.com>
- <20151124000604.26360.56945.stgit@dwillia2-desk3.jf.intel.com>
- <20151124142521.e6d23e44a8b2c24c044c2dec@linux-foundation.org>
- <CAPcyv4ijWns879DytqUa+=r5hzQ1qzmB83VV6Z16kQNtmHUtbA@mail.gmail.com>
-Message-ID: <20151126110855.GA32226@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 26 Nov 2015 11:32:13 +0000
+Subject: next-20151126 build: 3 failures 15 warnings (next-20151126)
+In-Reply-To: <E1a1sVV-00079q-My@optimist>
+References: <E1a1sVV-00079q-My@optimist>
+Message-ID: <20151126113213.GC1929@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Nov 26, 2015 at 09:06:25AM +0000, Build bot for Mark Brown wrote:
 
-* Dan Williams <dan.j.williams@intel.com> wrote:
+Today's -next fails to build an arm64 allnoconfig due to:
 
-> > - why is the patch mucking with access to PCI and BIOS space?  Is the
-> >   persistent memory even mappable in those regions?  Or is the concern
-> >   that userspace can access control registers associated with the
-> >   persistent memory?  What is the problem scenario?
-> 
-> It seems to me that letting /dev/mem do arbitrary access to any region
-> of memory is a dangerous capability for a production environment.
+> 	arm64-allnoconfig
+> ../arch/arm64/mm/mmap.c:55:49: error: 'mmap_rnd_compat_bits' undeclared (first use in this function)
 
-So basically the original motivation years ago was to disable /dev/mem altogether: 
-it used to be a wide open roothole if anything with write access to it (such as 
-old Xorg) is exploited, plus it's a favorite and convenient tool for stealth 
-access to system areas of memory in cases where the attacker already has root. 
-
-(this is relevant as even being root might not give easy access to system mmio 
-areas if things like being able to load modules is restricted even for room, and 
-if the system has readonly storage and a few other things configured.)
-
-But we couldn't disable /dev/mem completely due to Xorg and dosemu legacies - so 
-we came up with this restriction feature that limits its scope.
-
-Any additional steps that limit the scope of access under the STRICT_DEVMEM option 
-(which is really a misnomer: it should be RESTRICT_DEVMEM instead) are welcome 
-from a generic Linux distro POV.
-
-Thanks,
-
-	Ingo
+which was introduced by a combination of 8f62c06c279a3 (mm: mmap: add
+new /proc tunable for mmap_base ASLR) and 9411708692954 (arm64: mm:
+support ARCH_MMAP_RND_BITS).  These add an unconditional use of
+mmap_rnd_compat_bits which is only defined in linux/mmap.h if
+HAVE_ARCH_MMAP_RND_COMPAT_BITS is selected but that is only enabled for
+arm64 if COMPAT is enabled.  Either the select needs to be unconditional
+or the use needs to be.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151126/74d1d735/attachment.sig>
