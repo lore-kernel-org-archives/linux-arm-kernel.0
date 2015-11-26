@@ -1,67 +1,74 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 26 Nov 2015 13:52:54 +0000
-Subject: Preprocessor arithmetic in dtsi files (base + offset)
-In-Reply-To: <56570620.3070106@free.fr>
-References: <56570620.3070106@free.fr>
-Message-ID: <20151126135254.GD32343@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Nov 2015 13:55:35 +0000
+Subject: [PATCH 2/2] ARM: mm: keep reserved ASIDs in sync with mm after
+ multiple rollovers
+In-Reply-To: <1448545780-1550-2-git-send-email-will.deacon@arm.com>
+References: <1448545780-1550-1-git-send-email-will.deacon@arm.com>
+ <1448545780-1550-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20151126135534.GC1467@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2015 at 02:16:16PM +0100, Mason wrote:
-> Hello,
+On Thu, Nov 26, 2015 at 01:49:40PM +0000, Will Deacon wrote:
+> Under some unusual context-switching patterns, it is possible to end up
+> with multiple threads from the same mm running concurrently with
+> different ASIDs:
 > 
-> In the device tree for my ARM platform, I have several nodes with
-> addresses within the SCU block:
+> 1. CPU x schedules task t with mm p containing ASID a and generation g
+>    This task doesn't block and the CPU doesn't context switch.
+>    So:
+>      * per_cpu(active_asid, x) = {g,a}
+>      * p->context.id = {g,a}
 > 
-> 	scu: scu at 20000000 {
-> 		compatible = "arm,cortex-a9-scu";
-> 		reg = <0x20000000 0x100>;
+> 2. Some other CPU generates an ASID rollover. The global generation is
+>    now (g + 1). CPU x is still running t, with no context switch and
+>    so per_cpu(reserved_asid, x) = {g,a}
 > 
-> 	gic: interrupt-controller at 20001000 {
-> 		compatible = "arm,cortex-a9-gic";
-> 		reg = <0x20001000 0x1000>, <0x20000100 0x0100>;
+> 3. CPU y schedules task t', which shares mm p with t. The generation
+>    mismatches, so we take the slowpath and hit the reserved ASID from
+>    CPU x. p is then updated so that p->context.id = {g + 1,a}
 > 
-> 	twd-timer at 20000600 {
-> 		compatible = "arm,cortex-a9-twd-timer";
-> 		reg = <0x20000600 0x10>;
+> 4. CPU y schedules some other task u, which has an mm != p.
 > 
-> Can I use preprocessor arithmetic to abstract the base address,
-> as would be done in C?
+> 5. Some other CPU generates *another* CPU rollover. The global
+>    generation is now (g + 2). CPU x is still running t, with no context
+>    switch and so per_cpu(reserved_asid, x) = {g,a}.
 > 
-> #define SCU_BASE 0x20000000
+> 6. CPU y once again schedules task t', but now *fails* to hit the
+>    reserved ASID from CPU x because of the generation mismatch. This
+>    results in a new ASID being allocated, despite the fact that t is
+>    still running on CPU x with the same mm.
 > 
-> 	scu: scu at XXX {
-> 		compatible = "arm,cortex-a9-scu";
-> 		reg = <SCU_BASE 0x100>;
-> 	
-> 	gic: interrupt-controller at XXX {
-> 		compatible = "arm,cortex-a9-gic";
-> 		reg = <SCU_BASE+0x1000 0x1000>, <SCU_BASE+0x100 0x0100>;
-
-The pre-processor would only do substitution, not arithmetic. So the '+'
-would flow all the way to DTC.
-
-DTC does have some basic integer expression support (see [1]), but it
-looks like it can only work at the cell level, so generally it needs to
-be avoided (in case #address-cells >1, for example).
-
-So generally I think that such arithmetic should be avoided.
-
-> 	twd-timer at XXX {
-> 		compatible = "arm,cortex-a9-twd-timer";
-> 		reg = <SCU_BASE+0x600 0x10>;
+> Consequently, TLBIs (e.g. as a result of CoW) will not be synchronised
+> between the two threads.
 > 
-> Are the @XXX important? Can they be removed altogether?
+> This patch fixes the problem by updating all of the matching reserved
+> ASIDs when we hit on the slowpath (i.e. in step 3 above). This keeps
+> the reserved ASIDs in-sync with the mm and avoids the problem.
+> 
+> Cc: <stable@vger.kernel.org>
+> Reported-by: Tony Thompson <anthony.thompson@arm.com>
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/mm/context.c | 39 ++++++++++++++++++++++++++-------------
+>  1 file changed, 26 insertions(+), 13 deletions(-)
 
-The bit after the @ is called the unit-address.
+[...]
 
-It's meant to be there (matching the base address of the first reg
-entry) to disambiguate nodes and make it simple to figure out where a
-node lives in the physical address space.
+> @@ -216,11 +233,7 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
+>  
+>  	__set_bit(asid, asid_map);
+>  	cur_idx = asid;
+> -
+> -bump_gen:
+> -	asid |= generation;
+> -	cpumask_clear(mm_cpumask(mm));
+> -	return asid;
+> +	return asid | generation;
 
-They should stay.
+Hmm, I probably shouldn't be dropping the cpumask_clear line here. It
+hasn't made a difference in practice, but it does defeat the optimisation
+in switch_mm, so I'll add that back in v2.
 
-Thanks,
-Mark.
-
-[1] https://git.kernel.org/cgit/linux/kernel/git/jdl/dtc.git/commit/?id=5f0c3b2d6235dec65fff1628a97f45e21680b36d
+Will
