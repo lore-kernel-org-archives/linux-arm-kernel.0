@@ -1,104 +1,75 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 26 Nov 2015 17:19:07 +0000
-Subject: [Xen-devel] [PATCH v3 42/62] arm/acpi: Prepare FADT table for Dom0
-In-Reply-To: <1447753261-7552-43-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-43-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511261710350.8984@kaball.uk.xensource.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 26 Nov 2015 17:25:59 +0000
+Subject: [PATCH v2 2/5] irqdomain: introduce irq_of_phandle_args_to_fwspec
+In-Reply-To: <1448273816-11290-3-git-send-email-carlo@caione.org>
+References: <1448273816-11290-1-git-send-email-carlo@caione.org>
+ <1448273816-11290-3-git-send-email-carlo@caione.org>
+Message-ID: <20151126172559.4e3cb76c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On Mon, 23 Nov 2015 11:16:53 +0100
+Carlo Caione <carlo@caione.org> wrote:
+
+> From: Carlo Caione <carlo@endlessm.com>
 > 
-> Copy and modify FADT table before passing it to Dom0. Set PSCI_COMPLIANT
-> and PSCI_USE_HVC.
+> Export of_phandle_args_to_fwspec with a new compliant name.
 > 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->
->  xen/arch/arm/domain_build.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> ---
+>  include/linux/of_irq.h | 2 ++
+>  kernel/irq/irqdomain.c | 5 +++--
+>  2 files changed, 5 insertions(+), 2 deletions(-)
 > 
-> diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
-> index b5ed44c..5d03dc0 100644
-> --- a/xen/arch/arm/domain_build.c
-> +++ b/xen/arch/arm/domain_build.c
-> @@ -1357,6 +1357,46 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
+> diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
+> index 6f879c6..66bd92e 100644
+> --- a/include/linux/of_irq.h
+> +++ b/include/linux/of_irq.h
+> @@ -34,6 +34,8 @@ static inline int of_irq_parse_oldworld(struct device_node *device, int index,
+>  extern int of_irq_parse_raw(const __be32 *addr, struct of_phandle_args *out_irq);
+>  extern int of_irq_parse_one(struct device_node *device, int index,
+>  			  struct of_phandle_args *out_irq);
+> +extern void irq_of_phandle_args_to_fwspec(struct of_phandle_args *irq_data,
+> +					  struct irq_fwspec *fwspec);
+>  extern unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data);
+>  extern int of_irq_to_resource(struct device_node *dev, int index,
+>  			      struct resource *r);
+> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> index 22aa961..b2ff223 100644
+> --- a/kernel/irq/irqdomain.c
+> +++ b/kernel/irq/irqdomain.c
+> @@ -554,7 +554,7 @@ static int irq_domain_translate(struct irq_domain *d,
+>  	return 0;
 >  }
 >  
->  #ifdef CONFIG_ACPI
-> +#define XEN_HYPERVISOR_ID 0x000058656E564D4D  /* "XenVMM" */
-
-This needs to be documented somewhere. A new doc under docs/ might be
-enough.
-
-
-> +static int acpi_create_fadt(struct domain *d, struct membank tbl_add[])
-> +{
-> +    struct acpi_table_header *table = NULL;
-> +    struct acpi_table_fadt *fadt = NULL;
-> +    u64 table_size;
-> +    acpi_status status;
-> +    u8 *base_ptr;
-> +    u8 checksum;
-> +
-> +    status = acpi_get_table(ACPI_SIG_FADT, 0, &table);
-> +
-> +    if ( ACPI_FAILURE(status) )
-> +    {
-> +        const char *msg = acpi_format_exception(status);
-> +
-> +        printk("Failed to get FADT table, %s\n", msg);
-> +        return -EINVAL;
-> +    }
-> +
-> +    table_size = table->length;
-> +    base_ptr = d->arch.efi_acpi_table
-> +               + acpi_get_table_offset(tbl_add, TBL_FADT);
-> +    ACPI_MEMCPY(base_ptr, table, table_size);
-> +    fadt = (struct acpi_table_fadt *)base_ptr;
-> +
-> +    /* Set PSCI_COMPLIANT and PSCI_USE_HVC */
-> +    fadt->arm_boot_flags |= (ACPI_FADT_PSCI_COMPLIANT | ACPI_FADT_PSCI_USE_HVC);
-> +    fadt->hypervisor_id = XEN_HYPERVISOR_ID;
-> +    checksum = acpi_tb_checksum(ACPI_CAST_PTR(u8, fadt), table_size);
-> +    fadt->header.checksum -= checksum;
-> +
-> +    tbl_add[TBL_FADT].start = d->arch.efi_acpi_gpa
-> +                              + acpi_get_table_offset(tbl_add, TBL_FADT);
-> +    tbl_add[TBL_FADT].size = table_size;
-> +
-> +    return 0;
-> +}
-> +
->  static int estimate_acpi_efi_size(struct domain *d, struct kernel_info *kinfo)
+> -static void of_phandle_args_to_fwspec(struct of_phandle_args *irq_data,
+> +void irq_of_phandle_args_to_fwspec(struct of_phandle_args *irq_data,
+>  				      struct irq_fwspec *fwspec)
 >  {
->      u64 efi_size, acpi_size = 0, addr;
-> @@ -1400,6 +1440,7 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
->  {
->      int rc = 0;
->      int order;
-> +    struct membank tbl_add[TBL_MMAX] = {};
->  
->      rc = estimate_acpi_efi_size(d, kinfo);
->      if ( rc != 0 )
-> @@ -1418,6 +1459,10 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
->       * region. So we use it as the ACPI table mapped address. */
->      d->arch.efi_acpi_gpa = kinfo->gnttab_start;
->  
-> +    rc = acpi_create_fadt(d, tbl_add);
-> +    if ( rc != 0 )
-> +        return rc;
-> +
->      return 0;
+>  	int i;
+> @@ -565,6 +565,7 @@ static void of_phandle_args_to_fwspec(struct of_phandle_args *irq_data,
+>  	for (i = 0; i < irq_data->args_count; i++)
+>  		fwspec->param[i] = irq_data->args[i];
 >  }
->  #else
-> -- 
-> 2.1.0
-> 
-> 
-> _______________________________________________
-> Xen-devel mailing list
-> Xen-devel at lists.xen.org
-> http://lists.xen.org/xen-devel
-> 
+> +EXPORT_SYMBOL_GPL(irq_of_phandle_args_to_fwspec);
+>  
+>  unsigned int irq_create_fwspec_mapping(struct irq_fwspec *fwspec)
+>  {
+> @@ -618,7 +619,7 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
+>  {
+>  	struct irq_fwspec fwspec;
+>  
+> -	of_phandle_args_to_fwspec(irq_data, &fwspec);
+> +	irq_of_phandle_args_to_fwspec(irq_data, &fwspec);
+>  	return irq_create_fwspec_mapping(&fwspec);
+>  }
+>  EXPORT_SYMBOL_GPL(irq_create_of_mapping);
+
+Given what I've said earlier about keeping fwspec structures around,
+you can probably discard that patch.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
