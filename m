@@ -1,71 +1,84 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 26 Nov 2015 15:41:09 +0800
-Subject: [PATCH] pwm: berlin: Add PM support
-In-Reply-To: <20151125151627.GB31492@ulmo.nvidia.com>
-References: <1448343785-1540-1-git-send-email-jszhang@marvell.com>
- <20151124162306.GC32623@ulmo.nvidia.com>	<20151125163019.64e80799@xhacker>
- <20151125151627.GB31492@ulmo.nvidia.com>
-Message-ID: <20151126154109.6257b0bd@xhacker>
+From: salil.mehta@huawei.com (Salil Mehta)
+Date: Thu, 26 Nov 2015 07:44:25 +0000
+Subject: [PATCH V3 net-next 1/5] net:hns: Add support of Hip06 SoC to
+ the Hislicon Network Subsystem
+In-Reply-To: <CO2PR11MB0088145308CE8BF0C504C9C497180@CO2PR11MB0088.namprd11.prod.outlook.com>
+References: <1447966706-16219-1-git-send-email-salil.mehta@huawei.com>
+ <1447966706-16219-2-git-send-email-salil.mehta@huawei.com>
+ <CO2PR11MB0088145308CE8BF0C504C9C497180@CO2PR11MB0088.namprd11.prod.outlook.com>
+Message-ID: <5656B859.7010106@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Nov 2015 16:16:27 +0100
-Thierry Reding wrote:
 
-> On Wed, Nov 25, 2015 at 04:30:19PM +0800, Jisheng Zhang wrote:
-> > On Tue, 24 Nov 2015 17:23:06 +0100 Thierry Reding wrote:  
-> > > On Tue, Nov 24, 2015 at 01:43:05PM +0800, Jisheng Zhang wrote:  
-> > > > This patch adds S2R support for berlin pwm driver.
-> > > > 
-> > > > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > > > ---
-> > > >  drivers/pwm/pwm-berlin.c | 57 +++++++++++++++++++++++++++++++++++++++++++++++-
-> > > >  1 file changed, 56 insertions(+), 1 deletion(-)  
-> [...]
-> > > > +	for (i = 0; i < pwm->chip.npwm; i++) {
-> > > > +		struct berlin_pwm_context *ctx = &pwm->ctx[i];
-> > > > +
-> > > > +		berlin_pwm_writel(pwm, i, ctx->ctrl, BERLIN_PWM_CONTROL);
-> > > > +		berlin_pwm_writel(pwm, i, ctx->duty, BERLIN_PWM_DUTY);
-> > > > +		berlin_pwm_writel(pwm, i, ctx->tcnt, BERLIN_PWM_TCNT);
-> > > > +		berlin_pwm_writel(pwm, i, ctx->enable, BERLIN_PWM_ENABLE);
-> > > > +	}
-> > > > +
-> > > > +	return 0;
-> > > > +}
-> > > > +
-> > > > +static SIMPLE_DEV_PM_OPS(berlin_pwm_pm_ops, berlin_pwm_suspend,
-> > > > +			 berlin_pwm_resume);
-> > > > +#define BERLIN_PWM_PM_OPS	(&berlin_pwm_pm_ops)
-> > > > +#else
-> > > > +#define BERLIN_PWM_PM_OPS	NULL
-> > > > +#endif    
-> > > 
-> > > This is a weird way of writing this. I think a more typical way would be
-> > > to have the #ifdef contain only the implementation and then define the
-> > > dev_pm_ops variable unconditonally, so you don't need a separate macro
-> > > for it.
-> > >   
-> > 
-> > The reason why I introduced one more macro is: struct dev_pm_ops contains
-> > 23 pointers now, if there's no BERLIN_PWM_PM_OPS macro, there will be always a
-> > dev_pm_ops even if PM_SLEEP isn't enabled. I dunno whether there's any
-> > elegant solution for this case.  
-> 
-> I wouldn't bother. PM_SLEEP is in almost all cases going to be enabled.
-> If it isn't enabled it's likely going to be in test builds, at which
-> point nobody will care about the extra 23 pointers.
-> 
-> > How about define SIMPLE_DEV_PM_OPS as NULL if PM_SLEEP isn't enabled?  
-> 
-> That won't work, "static NULL;" wouldn't be valid syntax. Like I said,
-> if you go through the trouble of implementing suspend/resume, you're
-> almost certainly going to want to enable it, so just define it
-> unconditionally.
-> 
+On 11/22/2015 9:19 AM, Yuval Mintz wrote:
+>> +void hns_rcbv2_int_ctrl_hw(struct hnae_queue *q, u32 flag, u32 mask)
+>> +{
+>> +	u32 int_mask_en = !!mask;
+>> +
+>> +	if (flag & RCB_INT_FLAG_TX)
+>> +		dsaf_write_dev(q, RCB_RING_INTMSK_TXWL_REG,
+>> int_mask_en);
+>> +
+>> +	if (flag & RCB_INT_FLAG_RX)
+>> +		dsaf_write_dev(q, RCB_RING_INTMSK_RXWL_REG,
+>> int_mask_en);
+>> +}
+>> +
+>> +void hns_rcbv2_int_clr_hw(struct hnae_queue *q, u32 flag)
+>> +{
+>> +	u32 clr = 1;
+>> +
+>> +	if (flag & RCB_INT_FLAG_TX)
+>> +		dsaf_write_dev(q, RCBV2_TX_RING_INT_STS_REG, clr);
+>> +
+>> +	if (flag & RCB_INT_FLAG_RX)
+>> +		dsaf_write_dev(q, RCBV2_RX_RING_INT_STS_REG, clr);
+>> +}
+>> +
+> Why do you need the int_mask_en, clr variables? Why not directly use values?
+'clr' variable can be avoided and is kind of redundant as it always 
+holds the
+same value. This chnage is now part of latest floated PATCH V5.
 
-Thanks for detailed explanation. In yesterday's v2, the BERLIN_PWM_PM_OPS
-was removed.
-
-Thanks for review,
-Jisheng
+Purpose of the mask is coming from the previous/legacy
+SoC Hip05 where operation is done on the basis of RX or TX direction.
+This mask does not seem very useful for now but we would like to take
+this change in future, if there is not any API's using this kind of 
+interface.
+-Salil
+>
+>> +static void fill_v2_desc(struct hnae_ring *ring, void *priv,
+> ....
+>> +	hnae_set_field(bn_pid, 0x7, 0, buf_num - 1);
+> Magic values?
+Changed to macro in PATCH V5. Thanks!
+-Salil
+>
+>> +int hns_nic_net_xmit_hw(struct net_device *ndev,
+>> +			struct sk_buff *skb,
+>> +			struct hns_nic_ring_data *ring_data)
+>> +{
+>> -	/* If everything has gone correctly network should be the
+>> +	/**
+>> +	 * If everything has gone correctly network should be the
+>>   	 * data section of the packet and will be the end of the header.
+>>   	 * If not then it probably represents the end of the last recognized
+>>   	 * header.
+> What happened to the network style comments?
+Fixed this in PATCH V5. Thanks !!
+-Salil
+>
+>>   static int hns_nic_poll_rx_skb(struct hns_nic_ring_data *ring_data,
+>>   			       struct sk_buff **out_skb, int *out_bnum)
+>> +	/**
+>> +	 * we will be copying header into skb->data in
+>> +	 * pskb_may_pull so it is in our interest to prefetch
+>> +	 * it now to avoid a possible cache miss
+>> +	 */
+>> +	prefetchw(skb->data);
+>> +
+> Likewise
+Fixed this in PATCH V5. Thanks !!
+-Salil
+>
