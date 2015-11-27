@@ -1,29 +1,81 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Fri, 27 Nov 2015 18:43:06 +0530
-Subject: [PATCH v12 08/16] arm64/kexec: Add core kexec support
-In-Reply-To: <6ac232ad37d6b02cf2d5848b15236f26f5ac61ac.1448403503.git.geoff@infradead.org>
-References: <cover.1448403503.git.geoff@infradead.org>
- <6ac232ad37d6b02cf2d5848b15236f26f5ac61ac.1448403503.git.geoff@infradead.org>
-Message-ID: <20151127131306.GE23908@dhcppc13.redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Nov 2015 13:27:23 +0000
+Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
+ "/chosen/linux,atags" entry
+In-Reply-To: <20151126090739.GD14190@pali>
+References: <20150713131902.GH26485@atomide.com> <20151123144545.GD24147@pali>
+ <20151125181644.GI2517@atomide.com> <17134653.86P3dFyQKK@wuerfel>
+ <20151125210310.GT2517@atomide.com> <56568849.5080103@gmail.com>
+ <20151126090739.GD14190@pali>
+Message-ID: <20151127132722.GA30871@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
+On Thu, Nov 26, 2015 at 10:07:39AM +0100, Pali Roh?r wrote:
+> On Wednesday 25 November 2015 20:19:21 Frank Rowand wrote:
+> > > Or populate /proc/atags only for the ones that need it from machine
+> > > specific init_early?
+> > 
+> > This is circling back to the first comment from Russell King where
+> > he suggested a legacy file for the N900 which calls save_atags():
+> > 
+> >     Are the ATAGs at a fixed address on the N900?  Can that be handled in
+> >     some kind of legacy file for the N900 which calls save_atags() on it, so
+> >     we don't end up introducing yet more stuff that we have to maintain into
+> >     the distant future?  If not, what about copying a known working atag
+> >     structure into a legacy file for the N900?
+> > 
+> > It seems to me that patches 1, 2, 4, and 5 could be replaced by this
+> > approach.
+> 
+> Hi Frank, in this case I will ask my question again: It is possible to
+> read atags from that legacy file. And if yes how? I was not thinking
+> about this approach because somebody in past wrote that this is not
+> possible...
 
-On 24/11/2015:10:25:34 PM, Geoff Levand wrote:
-> +	/* Test the entry flags. */
-> +.Ltest_source:
-> +	tbz	x18, IND_SOURCE_BIT, .Ltest_indirection
-> +
-> +	mov x20, x13				/*  x20 = copy dest */
-> +	mov x21, x12				/*  x21 = copy src */
+It is possible to redirect any program to open any other file.  You can
+do it via a LD preload, and intercepting the open(), and possibly the
+read() calls if you want to do something more fancy.  The down-side is
+that you have to arrange for the preloaded object to be used by the
+linker, and the additional overhead it places on the intercepted
+functions.
 
-Till v10 we had here invalidation for relocated destination page to PoC. I could
-not understand, why it was removed. Removing that piece of code breaks kexec
-booting with mustang. I need [1] to kexec boot into second kernel with mustang
-platform.
+Eg,
 
-[1]
-https://github.com/pratyushanand/linux/commit/431e3247391981a1e8b2864a83a5743e8a274cb9
+openatags.c:
 
-~Pratyush
+#define open libc_open
+#include <fcntl.h>
+#undef open
+#include <string.h>
+
+int open(const char *pathname, int flags, mode_t mode)
+{
+        static int (*old_open)(const char *pathname, int flags, mode_t mode);
+
+        if (strcmp(pathname, "/proc/atags") == 0)
+		pathname = "/tmp/my-atags";
+
+        if (!old_open)
+                old_open = dlsym(RTLD_NEXT, "open");
+
+        return old_open(pathname, flags, mode);
+}
+
+Build the above (untested) with:
+gcc -O2 -o openatags.o -c openatags.c
+gcc -shared -o openatags.so openatags.o -ldl
+
+Now, when running one of these programs, you can test it with:
+LD_PRELOAD=openatags.so /name/of/program
+
+You could also list the full pathname to openatags.so in /etc/ld.so.preload,
+but test it first, because it will always be used by the linker in that
+case, and you wouldn't want normal commands to misbehave.
+
+Note that putting it in /etc/ld.so.preload will also have the effect that
+cat /proc/atags will also get redirected to /tmp/my-atags too.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
