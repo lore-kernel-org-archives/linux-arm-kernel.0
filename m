@@ -1,83 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Nov 2015 11:44:06 +0000
-Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
- concurrent lockers
-Message-ID: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 27 Nov 2015 11:47:16 +0000
+Subject: [PATCH v7 3/3] arm64: Add do_softirq_own_stack() and enable
+ irq_stacks
+In-Reply-To: <8F6484A9-18B9-4A81-B58D-528D81BC196D@gmail.com>
+References: <1447698128-8490-1-git-send-email-james.morse@arm.com>
+ <1447698128-8490-4-git-send-email-james.morse@arm.com>
+ <8F6484A9-18B9-4A81-B58D-528D81BC196D@gmail.com>
+Message-ID: <20151127114715.GA25499@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boqun Feng reported a rather nasty ordering issue with spin_unlock_wait
-on architectures implementing spin_lock with LL/SC sequences and acquire
-semantics:
+On Thu, Nov 19, 2015 at 11:26:08PM +0900, Jungseok Lee wrote:
+> > +/*
+> > + * do_softirq_own_stack() is called from irq_exit() before __do_softirq()
+> > + * re-enables interrupts, at which point we may re-enter el?_irq(). We
+> > + * increase irq_count here so that el1_irq() knows that it is already on the
+> > + * irq stack.
+> > + *
+> > + * Called with interrupts disabled, so we don't worry about moving cpu, or
+> > + * being interrupted while modifying irq_count.
+> > + *
+> > + * This function doesn't actually switch stack.
+> > + */
+> > +void do_softirq_own_stack(void)
+> > +{
+> > +	int cpu = smp_processor_id();
+> > +
+> > +	WARN_ON_ONCE(!irqs_disabled());
+> > +
+> > +	if (on_irq_stack(current_stack_pointer, cpu)) {
+> > +		per_cpu(irq_count, cpu)++;
+> > +		__do_softirq();
+> > +		per_cpu(irq_count, cpu)--;
+> > +	} else {
+> > +		__do_softirq();
+> > +	}
+> > +}
+> 
+> I'm really interested in feedbacks from other folks since, as you know
+> well, softirq could be handled using a process stack under this design.
 
- | CPU 1                   CPU 2                     CPU 3
- | ==================      ====================      ==============
- |                                                   spin_unlock(&lock);
- |                         spin_lock(&lock):
- |                           r1 = *lock; // r1 == 0;
- |                         o = READ_ONCE(object); // reordered here
- | object = NULL;
- | smp_mb();
- | spin_unlock_wait(&lock);
- |                           *lock = 1;
- | smp_mb();
- | o->dead = true;
- |                         if (o) // true
- |                           BUG_ON(o->dead); // true!!
+With this approach, we could run softirq either on the IRQ stack or on
+the process stack. One such process is softirqd, so there shouldn't be a
+problem since its goal is to run softirqs. But do_softirq() may be
+invoked from other contexts (network stack), I'm not sure what the stack
+looks like at that point.
 
-The crux of the problem is that spin_unlock_wait(&lock) can return on
-CPU 1 whilst CPU 2 is in the process of taking the lock. This can be
-resolved by upgrading spin_unlock_wait to a LOCK operation, forcing it
-to serialise against a concurrent locker and giving it acquire semantics
-in the process (although it is not at all clear whether this is needed -
-different callers seem to assume different things about the barrier
-semantics and architectures are similarly disjoint in their
-implementations of the macro).
+We could just do like x86 and always switch to the IRQ stack before
+invoking __do_softirq(). I don't think we lose much.
 
-This patch implements spin_unlock_wait using an LL/SC sequence with
-acquire semantics on arm64. For v8.1 systems with the LSE atomics, the
-exclusive writeback is omitted, since the spin_lock operation is
-indivisible and no intermediate state can be observed.
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/spinlock.h | 23 +++++++++++++++++++++--
- 1 file changed, 21 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
-index c85e96d174a5..fc9682bfe002 100644
---- a/arch/arm64/include/asm/spinlock.h
-+++ b/arch/arm64/include/asm/spinlock.h
-@@ -26,9 +26,28 @@
-  * The memory barriers are implicit with the load-acquire and store-release
-  * instructions.
-  */
-+static inline void arch_spin_unlock_wait(arch_spinlock_t *lock)
-+{
-+	unsigned int tmp;
-+	arch_spinlock_t lockval;
- 
--#define arch_spin_unlock_wait(lock) \
--	do { while (arch_spin_is_locked(lock)) cpu_relax(); } while (0)
-+	asm volatile(
-+"	sevl\n"
-+"1:	wfe\n"
-+"2:	ldaxr	%w0, %2\n"
-+"	eor	%w1, %w0, %w0, ror #16\n"
-+"	cbnz	%w1, 1b\n"
-+	ARM64_LSE_ATOMIC_INSN(
-+	/* LL/SC */
-+"	stxr	%w1, %w0, %2\n"
-+"	cbnz	%w1, 2b\n", /* Serialise against any concurrent lockers */
-+	/* LSE atomics */
-+"	nop\n"
-+"	nop\n")
-+	: "=&r" (lockval), "=&r" (tmp), "+Q" (*lock)
-+	:
-+	: "memory");
-+}
- 
- #define arch_spin_lock_flags(lock, flags) arch_spin_lock(lock)
- 
 -- 
-2.1.4
+Catalin
