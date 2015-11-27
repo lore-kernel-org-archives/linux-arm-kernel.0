@@ -1,52 +1,80 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Fri, 27 Nov 2015 09:50:11 +0000
-Subject: [Xen-devel] [PATCH v3 42/62] arm/acpi: Prepare FADT table for Dom0
-In-Reply-To: <alpine.DEB.2.02.1511261710350.8984@kaball.uk.xensource.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-43-git-send-email-shannon.zhao@linaro.org>
- <alpine.DEB.2.02.1511261710350.8984@kaball.uk.xensource.com>
-Message-ID: <1448617811.13576.60.camel@citrix.com>
+From: ynezz@true.cz (=?UTF-8?q?Petr=20=C5=A0tetiar?=)
+Date: Fri, 27 Nov 2015 11:01:39 +0100
+Subject: [PATCH v2] PCI: imx6: Fix reset-gpio to work with active low GPIO
+In-Reply-To: <1448373334.3689.33.camel@pengutronix.de>
+References: <1448373334.3689.33.camel@pengutronix.de>
+Message-ID: <1448618499-14990-1-git-send-email-ynezz@true.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-11-26 at 17:19 +0000, Stefano Stabellini wrote:
-> On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> > From: Shannon Zhao <shannon.zhao@linaro.org>
-> > 
-> > Copy and modify FADT table before passing it to Dom0. Set
-> > PSCI_COMPLIANT
-> > and PSCI_USE_HVC.
-> > 
-> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> > 
-> > ?xen/arch/arm/domain_build.c | 45
-> > +++++++++++++++++++++++++++++++++++++++++++++
-> > ?1 file changed, 45 insertions(+)
-> > 
-> > diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
-> > index b5ed44c..5d03dc0 100644
-> > --- a/xen/arch/arm/domain_build.c
-> > +++ b/xen/arch/arm/domain_build.c
-> > @@ -1357,6 +1357,46 @@ static int prepare_dtb(struct domain *d, struct
-> > kernel_info *kinfo)
-> > ?}
-> > ?
-> > ?#ifdef CONFIG_ACPI
-> > +#define XEN_HYPERVISOR_ID 0x000058656E564D4D??/* "XenVMM" */
-> 
-> This needs to be documented somewhere. A new doc under docs/ might be
-> enough.
+It's currently not possible to use reset-gpio on board where the GPIO is
+active low as the code incorrectly assumes, that reset-gpio will be
+always active high.
 
-Should (also?) probably be in xen/include/public/arch-arm.h in the same
-"#if defined(__XEN__) || defined(__XEN_TOOLS__)" as the other guest non-ABI 
-stuff[0] which is needed by both Xen and the toolstack.
+In my case the broken behavior was observed on Toradex Apalis SoM with
+Ixora base board.
 
-We don't actually have ACPI guest support today, so the toolstack has no
-current interest, but I think that is still a logical place for it do be
-defined.
+Signed-off-by: Petr ?tetiar <ynezz@true.cz>
+---
 
-Ian.
+Changes since v1:
+ * reworked to use descriptor based GPIO interface
 
-[0] That is, stuff which is part of the current implementation but which is
-exposed to guests through other means, e.g. DT or ACPI and not through the
-use of the arch-arm.h public header.
+ drivers/pci/host/pci-imx6.c |   20 ++++++--------------
+ 1 file changed, 6 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index 22e8224..c0e121d 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -32,7 +32,7 @@
+ #define to_imx6_pcie(x)	container_of(x, struct imx6_pcie, pp)
+ 
+ struct imx6_pcie {
+-	int			reset_gpio;
++	struct gpio_desc	*reset_gpio;
+ 	struct clk		*pcie_bus;
+ 	struct clk		*pcie_phy;
+ 	struct clk		*pcie;
+@@ -287,10 +287,10 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+ 	usleep_range(200, 500);
+ 
+ 	/* Some boards don't have PCIe reset GPIO. */
+-	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
+-		gpio_set_value(imx6_pcie->reset_gpio, 0);
++	if (imx6_pcie->reset_gpio) {
++		gpiod_set_value(imx6_pcie->reset_gpio, 0);
+ 		msleep(100);
+-		gpio_set_value(imx6_pcie->reset_gpio, 1);
++		gpiod_set_value(imx6_pcie->reset_gpio, 1);
+ 	}
+ 	return 0;
+ 
+@@ -560,7 +560,6 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+ {
+ 	struct imx6_pcie *imx6_pcie;
+ 	struct pcie_port *pp;
+-	struct device_node *np = pdev->dev.of_node;
+ 	struct resource *dbi_base;
+ 	int ret;
+ 
+@@ -581,15 +580,8 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+ 		return PTR_ERR(pp->dbi_base);
+ 
+ 	/* Fetch GPIOs */
+-	imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
+-	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
+-		ret = devm_gpio_request_one(&pdev->dev, imx6_pcie->reset_gpio,
+-					    GPIOF_OUT_INIT_LOW, "PCIe reset");
+-		if (ret) {
+-			dev_err(&pdev->dev, "unable to get reset gpio\n");
+-			return ret;
+-		}
+-	}
++	imx6_pcie->reset_gpio = devm_gpiod_get_optional(&pdev->dev, "reset",
++							GPIOD_OUT_LOW);
+ 
+ 	/* Fetch clocks */
+ 	imx6_pcie->pcie_phy = devm_clk_get(&pdev->dev, "pcie_phy");
+-- 
+1.7.9.5
