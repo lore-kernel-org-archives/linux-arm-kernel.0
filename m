@@ -1,77 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Nov 2015 20:39:32 +0000
-Subject: [PATCH 1/3] dt-bindings: add Marvell core PLL and clock divider
- PMU documentation
-In-Reply-To: <20151127202114.GA613@rob-hp-laptop>
-References: <E1a24wj-0004iw-Rf@rmk-PC.arm.linux.org.uk>
- <20151127202114.GA613@rob-hp-laptop>
-Message-ID: <20151127203932.GP8644@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Nov 2015 21:46:37 +0100
+Subject: [RFC] ARM64: simplify dma_get_ops
+In-Reply-To: <20151127165719.GD25499@e104818-lin.cambridge.arm.com>
+References: <4270550.cGd11OgA5n@wuerfel> <7483659.O8uXXLFCFD@wuerfel>
+ <20151127165719.GD25499@e104818-lin.cambridge.arm.com>
+Message-ID: <7450408.Z6bvbAd5fD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 27, 2015 at 02:21:14PM -0600, Rob Herring wrote:
-> On Thu, Nov 26, 2015 at 10:23:21PM +0000, Russell King wrote:
-> > Add documentation for the Marvell clock divider driver, which is used
-> > to source clocks for the AXI bus, video decoder, GPU and LCD blocks.
+On Friday 27 November 2015 16:57:21 Catalin Marinas wrote:
+> On Tue, Nov 17, 2015 at 01:50:24PM +0100, Arnd Bergmann wrote:
+> > On Tuesday 17 November 2015 12:22:51 Catalin Marinas wrote:
+> > > 
+> > The size variable here is the mask that of_dma_configure() computes,
+> > though it is not a "default": it is whatever the parent bus can support,
+> > independent of additional restrictions that may be present in the
+> > device and that are set by the driver.
 > > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  .../bindings/clock/dove-divider-clock.txt          | 28 ++++++++++++++++++++++
-> >  1 file changed, 28 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/clock/dove-divider-clock.txt
+> > Checking against that is what I meant above, see below for a prototype
+> > that I have not even compile-tested and that might be missing some corner
+> > cases.
 > > 
-> > diff --git a/Documentation/devicetree/bindings/clock/dove-divider-clock.txt b/Documentation/devicetree/bindings/clock/dove-divider-clock.txt
-> > new file mode 100644
-> > index 000000000000..0c602de279e5
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/clock/dove-divider-clock.txt
-> > @@ -0,0 +1,28 @@
-> > +PLl divider based Dove clocks
-> > +
-> > +Marvell Dove has a 2GHz PLL, which feeds into a set of dividers to provide
-> > +high speed clocks for a number of peripherals.  These dividers are part of
-> > +the PMU, and thus this node should be a child of the PMU node.
+> > We actually have the option of swapping out the dev->dma_ops in set_mask
+> > so we don't have to go through the swiotlb code for devices that don't
+> > need it.
 > 
-> It seems a bit strange to just be documenting these clocks. What about 
-> the rest of the SOC clocks?
+> We could indeed have a lighter implementation that only does cache
+> maintenance but I guess this assumes that the device supports all the
+> physical address space. Swiotlb detects the masks and doesn't bounce the
+> buffer unless necessary, so the overhead shouldn't be that large.
 
-This is all that this pair of registers provide.
+Right, that part is certainly optional.
 
-The SoC has other clocks handled by other DT nodes - for Dove, we now
-have:
+> > --- a/arch/arm64/mm/dma-mapping.c
+> > +++ b/arch/arm64/mm/dma-mapping.c
+> > @@ -341,6 +341,31 @@ static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
+> >  	return ret;
+> >  }
+> >  
+> > +static int __swiotlb_set_dma_mask(struct device *dev, u64 mask)
+> > +{
+> > +	/* device is not DMA capable */
+> > +	if (!dev->dma_mask)
+> > +		return -EIO;
+> > +
+> > +	/* mask is below swiotlb bounce buffer, so fail */
+> > +	if (!swiotlb_dma_supported(dev, mask))
+> > +		return -EIO;
+> > +
+> > +	/*
+> > +	 * because of the swiotlb, we can return success for
+> > +	 * larger masks, but need to ensure that bounce buffers
+> > +	 * are used above parent_dma_mask, so set that as
+> > +	 * the effective mask.
+> > +	 */
+> > +	if (mask > dev->dev_archdata.parent_dma_mask)
+> > +		mask = dev->dev_archdata.parent_dma_mask;
+> 
+> Is there any check for parent_dma_mask being supported by swiotlb? If
+> not, should we move the mask setting above?
 
-        gate_clk: clock-gating-ctrl at 0038 {
-                compatible = "marvell,dove-gating-clock";
-                reg = <0x0038 0x4>;
-                clocks = <&core_clk 0>;
-                #clock-cells = <1>;
-        };
-        divider_clk: core-clock at 0064 {
-                compatible = "marvell,dove-divider-clock";
-                reg = <0x0064 0x8>;
-                #clock-cells = <1>;
-        };
-        core_clk: core-clocks at 0214 {
-                compatible = "marvell,dove-core-clock";
-                reg = <0x0214 0x4>;
-                #clock-cells = <1>;
-        };
+I think swiotlb assumes that the bus can always handle all of RAM,
+as that is typically the case on x86: you can have PCI devices that
+don't support 64-bit DMA, but the PCI host bridge always does, and
+there are practically never any DMA masters outside of PCI.
 
-and all three of these are part of the PMU register block.  I'm not sure
-why the mvebu maintainers decided to minutely describe the PMU like this,
-but unfortunately that's the structure we have.
+powerpc has a 'max_direct_dma_addr' variable in dev_archdata, and we
+should probably use the same name rather than parent_dma_mask (but
+note the difference when an offset is involved). On powerpc, we assume
+that the device driver knows what memory the bus supports, which works
+because there are fewer SoC vendors reusing the same parts in different
+ways. The max_direct_dma_addr there appears to only be used for PCI
+devices.
 
-What's more silly is that the "dove-core-clock" appears to disagree in
-terminology with the manual - there's a "Core PLL" which supplies the
-dividers in the "divider_clk" block, and is entirely separate from the
-CPU PLL which "core_clk" is describing.
-
-IMHO, it would've been cleaner to have these components registered
-separately from a central PMU driver (as I'm doing with the power
-domains, resets and IRQs that are part of the PMU), but my view is
-limited to Dove and not the other mvebu clocks, so there may be a good
-reason for it.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
