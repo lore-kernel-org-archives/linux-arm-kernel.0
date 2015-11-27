@@ -1,67 +1,40 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 27 Nov 2015 14:32:26 +0100
-Subject: [PATCH v8 14/17] drm: bridge: analogix/dp: add max link rate and
- lane count limit for RK3288
-In-Reply-To: <1446022561-16870-1-git-send-email-ykk@rock-chips.com>
-References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
- <1446022561-16870-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <2807882.UeSPH80il3@diego>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Nov 2015 14:46:41 +0100
+Subject: [PATCH, RESEND] regulator: core: fix regulator_lock_supply regression
+Message-ID: <3504080.aWaTxHbgxH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 28. Oktober 2015, 16:56:01 schrieb Yakir Yang:
-> There are some IP limit on rk3288 that only support 4 physical lanes
-> of 2.7/1.6 Gbps/lane, so seprate them out by device_type flag.
-> 
-> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> ---
+As noticed by Geert Uytterhoeven, my patch to avoid a harmless build warning
+in regulator_lock_supply() was total crap and introduced a real bug:
 
-[...]
+> [ BUG: bad unlock balance detected! ]
+> kworker/u4:0/6 is trying to release lock (&rdev->mutex) at:
+> [<c0247b84>] regulator_set_voltage+0x38/0x50
 
-> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-> b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c index
-> 6307060..563ffb1d 100644
-> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-> @@ -890,8 +890,8 @@ static void analogix_dp_commit(struct analogix_dp_device
-> *dp) return;
->  	}
-> 
-> -	ret = analogix_dp_set_link_train(dp, dp->video_info.lane_count,
-> -					 dp->video_info.link_rate);
-> +	ret = analogix_dp_set_link_train(dp, dp->video_info.max_lane_count,
-> +					 dp->video_info.max_link_rate);
->  	if (ret) {
->  		dev_err(dp->dev, "unable to do link train\n");
->  		return;
-> @@ -1156,16 +1156,25 @@ static int analogix_dp_dt_parse_pdata(struct
-> analogix_dp_device *dp) struct device_node *dp_node = dp->dev->of_node;
->  	struct video_info *video_info = &dp->video_info;
-> 
-> -	if (of_property_read_u32(dp_node, "samsung,link-rate",
-> -				 &video_info->link_rate)) {
-> -		dev_err(dp->dev, "failed to get link-rate\n");
-> -		return -EINVAL;
-> -	}
-> -
-> -	if (of_property_read_u32(dp_node, "samsung,lane-count",
-> -				 &video_info->lane_count)) {
-> -		dev_err(dp->dev, "failed to get lane-count\n");
-> -		return -EINVAL;
-> +	switch (dp->plat_data && dp->plat_data->dev_type) {
+we still lock the regulator supplies, but not the actual regulators,
+so we are missing a lock, and the unlock is unbalanced.
 
-drivers/gpu/drm/bridge/analogix/analogix_dp_core.c: In function ?analogix_dp_dt_parse_pdata?:
-drivers/gpu/drm/bridge/analogix/analogix_dp_core.c:1191:10: warning: switch condition has boolean value [-Wswitch-bool]
-  switch (dp->plat_data && dp->plat_data->dev_type) {
-          ^
+This rectifies it by first locking the regulator device itself before
+using the same loop as before to lock its supplies.
 
-As I think we always will need to distinguish between implementations,
-I guess it should be safe to exit with an error, it that implementation-data
-is not available, like just doing before the switch a:
+Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 716fec9d1965 ("[SUBMITTED] regulator: core: avoid unused variable warning")
+---
+rebased on top of regulators.git #for-next
 
-if (!dp->plat_data)
-	return -EINVAL;
-
-
-Heiko
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index c9bdca5f3b9b..89e4dcb84758 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -140,7 +140,8 @@ static void regulator_lock_supply(struct regulator_dev *rdev)
+ {
+ 	int i;
+ 
+-	for (i = 0; rdev->supply; rdev = rdev->supply->rdev, i++)
++	mutex_lock(&rdev->mutex);
++	for (i = 1; rdev->supply; rdev = rdev->supply->rdev, i++)
+ 		mutex_lock_nested(&rdev->mutex, i);
+ }
+ 
