@@ -1,28 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Nov 2015 23:37:20 +0000
-Subject: armv7 + lpae broken in 4.1.12+ ?
-In-Reply-To: <5657952E.906@heeltoe.com>
-References: <5657952E.906@heeltoe.com>
-Message-ID: <20151126233720.GG8644@n2100.arm.linux.org.uk>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 27 Nov 2015 10:20:24 +0900
+Subject: [PATCH] serial: sh-sci: Add device tree support for r8a779[23]
+Message-ID: <1448587224-8633-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2015 at 06:26:38PM -0500, Brad Parker wrote:
-> I found that the pte entries were garbage, which really confused me.  I
-> finally discovered that the code in proc-v7-3level.S expects data in r0, r2
-> & r3, but in fact it comes in on r0, r1 & r2.
+Simply document new compat strings.
+There appears to be no need for a driver updates.
 
-This seems wrong.  If you're building LPAE, then you should have AEABI
-enabled, which means you're using EABI.  (ARM_LPAE should depend on
-AEABI, but it doesn't.)
+Also update the name of the r8a7791 to M2-W: the name changed a while back.
 
-EABI places 64-bit arguments in an even/odd register pair.  So:
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ .../devicetree/bindings/serial/renesas,sci-serial.txt      | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
 
-void cpu_set_pte_ext(pte_t *ptep, pte_t pte, unsigned int ext);
-
-ptep is in r0, and if pte_t is 64-bit, then pte is passed in r2 and r3.
-Not r1 and r2.  ext is passed on the stack.
-
+diff --git a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
+index e84b13a8eda3..38bb05223f47 100644
+--- a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
++++ b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
+@@ -15,10 +15,16 @@ Required properties:
+     - "renesas,scifa-r8a7790" for R8A7790 (R-Car H2) SCIFA compatible UART.
+     - "renesas,scifb-r8a7790" for R8A7790 (R-Car H2) SCIFB compatible UART.
+     - "renesas,hscif-r8a7790" for R8A7790 (R-Car H2) HSCIF compatible UART.
+-    - "renesas,scif-r8a7791" for R8A7791 (R-Car M2) SCIF compatible UART.
+-    - "renesas,scifa-r8a7791" for R8A7791 (R-Car M2) SCIFA compatible UART.
+-    - "renesas,scifb-r8a7791" for R8A7791 (R-Car M2) SCIFB compatible UART.
+-    - "renesas,hscif-r8a7791" for R8A7791 (R-Car M2) HSCIF compatible UART.
++    - "renesas,scif-r8a7791" for R8A7791 (R-Car M2-W) SCIF compatible UART.
++    - "renesas,scifa-r8a7791" for R8A7791 (R-Car M2-W) SCIFA compatible UART.
++    - "renesas,scifb-r8a7791" for R8A7791 (R-Car M2-W) SCIFB compatible UART.
++    - "renesas,hscif-r8a7791" for R8A7791 (R-Car M2-W) HSCIF compatible UART.
++    - "renesas,scif-r8a7792" for R8A7792 (R-Car V2H) SCIF compatible UART.
++    - "renesas,hscif-r8a7792" for R8A7792 (R-Car V2H) HSCIF compatible UART.
++    - "renesas,scif-r8a7793" for R8A7793 (R-Car M2-N) SCIF compatible UART.
++    - "renesas,scifa-r8a7793" for R8A7793 (R-Car M2-N) SCIFA compatible UART.
++    - "renesas,scifb-r8a7793" for R8A7793 (R-Car M2-N) SCIFB compatible UART.
++    - "renesas,hscif-r8a7793" for R8A7793 (R-Car M2-N) HSCIF compatible UART.
+     - "renesas,scif-r8a7794" for R8A7794 (R-Car E2) SCIF compatible UART.
+     - "renesas,scifa-r8a7794" for R8A7794 (R-Car E2) SCIFA compatible UART.
+     - "renesas,scifb-r8a7794" for R8A7794 (R-Car E2) SCIFB compatible UART.
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
