@@ -1,53 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Nov 2015 10:02:11 +0000
-Subject: [PATCH RFT] arm64: kasan: Make KASAN work with 16K pages + 48
- bit VA
-In-Reply-To: <20151127093529.GX3109@e104818-lin.cambridge.arm.com>
-References: <1448543686-31869-1-git-send-email-aryabinin@virtuozzo.com>
- <CAKv+Gu_L1shTWp_5KydCW97Z6TbeXEB9gjmb2oUSuCHfC29M9A@mail.gmail.com>
- <5658106C.10207@virtuozzo.com>
- <20151127093529.GX3109@e104818-lin.cambridge.arm.com>
-Message-ID: <20151127100210.GB25781@arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 27 Nov 2015 11:18:04 +0100
+Subject: [PATCH v4] pwm-backlight: Avoid backlight flicker when probed
+ from DT
+In-Reply-To: <20151110173257.GA21727@ulmo>
+References: <1446483356-14338-1-git-send-email-p.zabel@pengutronix.de>
+ <3447562.c3gSANEMio@phil> <20151110173257.GA21727@ulmo>
+Message-ID: <5498492.8XSal22i1Y@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 27, 2015 at 09:35:29AM +0000, Catalin Marinas wrote:
-> On Fri, Nov 27, 2015 at 11:12:28AM +0300, Andrey Ryabinin wrote:
-> > On 11/26/2015 07:40 PM, Ard Biesheuvel wrote:
-> > > On 26 November 2015 at 14:14, Andrey Ryabinin <aryabinin@virtuozzo.com> wrote:
-> > >> Currently kasan assumes that shadow memory covers one or more entire PGDs.
-> > >> That's not true for 16K pages + 48bit VA space, where PGDIR_SIZE is bigger
-> > >> than the whole shadow memory.
-> > >>
-> > >> This patch tries to fix that case.
-> > >> clear_page_tables() is a new replacement of clear_pgs(). Instead of always
-> > >> clearing pgds it clears top level page table entries that entirely belongs
-> > >> to shadow memory.
-> > >> In addition to 'tmp_pg_dir' we now have 'tmp_pud' which is used to store
-> > >> puds that now might be cleared by clear_page_tables.
-> > >>
-> > >> Reported-by: Suzuki K. Poulose <Suzuki.Poulose@arm.com>
-> > >> Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-> > > 
-> > > I would argue that the Kasan code is complicated enough, and we should
-> > > avoid complicating it even further for a configuration that is highly
-> > > theoretical in nature.
-> > > 
-> > > In a 16k configuration, the 4th level only adds a single bit of VA
-> > > space (which is, as I understand it, exactly the issue you need to
-> > > address here since the top level page table has only 2 entries and
-> > > hence does not divide by 8 cleanly), which means you are better off
-> > > using 3 levels unless you *really* need more than 128 TB of VA space.
-> > > 
-> > > So can't we just live with the limitation, and keep the current code?
+Hi Thierry,
+
+Am Dienstag, 10. November 2015, 18:32:57 schrieb Thierry Reding:
+> On Tue, Nov 10, 2015 at 03:18:10PM +0100, Heiko Stuebner wrote:
+> > Hi Philipp,
 > > 
-> > No objections from my side. Let's keep the current code.
+> > Am Montag, 2. November 2015, 17:55:56 schrieb Philipp Zabel:
+> > > If the driver is probed from the device tree, and there is a phandle
+> > > property set on it, and the enable GPIO is already configured as output,
+> > > and the backlight is currently disabled, keep it disabled.
+> > > If all these conditions are met, assume there will be some other driver
+> > > that can enable the backlight at the appropriate time.
+> > > 
+> > > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > > Reviewed-by: Christian Gmeiner <christian.gmeiner@gmail.com>
+> > 
+> > this patch improves the white screen when booting a veyron chromebook
+> > a lot. I still see a small white flash, but that can probably come from
+> > the WIP edp driver.
 > 
-> Ard had a good point, so fine by me as well.
+> Some panels require a couple of frames before they actually enable. You
+> may want to look at the datasheet of your panel to see if it has some
+> specific requirement and update the panel driver with that.
+> 
+> From a high-level view the way that this is supposed to work is that
+> your encoder driver (e.g. eDP) "prepares" the panel, then starts sending
+> frames and finally "enables" the panel. With something like the simple
+> panel driver you can influence this by setting the delay.enable field in
+> the panel descriptor.
+> 
+> See struct panel_desc in drivers/gpu/drm/panel/panel-simple.c
 
-Ok, so obvious follow-up question: why do we even support 48-bit + 16k
-pages in the kernel? Either it's useful, and we make things work with it,
-or it's not and we can drop it (or, at least, hide it behind EXPERT like
-we do for 36-bit).
+Thanks for the pointers :-)
 
-Will
+Just to follow up a little bit, after moving to Yakir's Analogix-dp driver 
+from the chromeos-one I was using till now, that actually works nicely for me 
+and even the short flash is gone.
+
+
+Heiko
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151127/60d0f669/attachment.sig>
