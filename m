@@ -1,63 +1,25 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Fri, 27 Nov 2015 09:41:38 +0800
-Subject: [PATCH v3] mmc: core: fix __mmc_switch timeout caused by preempt
-Message-ID: <1448588498-28652-1-git-send-email-chaotian.jing@mediatek.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 27 Nov 2015 10:52:44 +0900
+Subject: [PATCH 0/2] ARM: shmobile: r8a7793: Increase scif support
+Message-ID: <1448589166-11612-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-there is a time window between __mmc_send_status() and time_afer(),
-on some eMMC chip, the timeout_ms is only 10ms, if this thread was
-scheduled out during this period, then, even card has already changes
-to transfer state by the result of CMD13, this part of code also treat
-it to timeout error.
-So, need calculate timeout first, then call __mmc_send_status(), if
-already timeout and card still in programing state, then treat it to
-the real timeout error.
+Hi,
 
-Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
----
- drivers/mmc/core/mmc_ops.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+this short series enables DMA for serial devices already present
+and then adds missing serial ports to the r8a7793 device tree.
 
-diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
-index 1f44426..371aa4b 100644
---- a/drivers/mmc/core/mmc_ops.c
-+++ b/drivers/mmc/core/mmc_ops.c
-@@ -489,6 +489,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
- 	unsigned long timeout;
- 	u32 status = 0;
- 	bool use_r1b_resp = use_busy_signal;
-+	bool expired = false;
- 
- 	mmc_retune_hold(host);
- 
-@@ -544,6 +545,12 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
- 	/* Must check status to be sure of no errors. */
- 	timeout = jiffies + msecs_to_jiffies(timeout_ms);
- 	do {
-+		/*
-+		 * Due to the possibility of being preempted after sending the
-+		 * status command, check the expiration time first.
-+		 */
-+		expired = time_after(jiffies, timeout);
-+
- 		if (send_status) {
- 			err = __mmc_send_status(card, &status, ignore_crc);
- 			if (err)
-@@ -565,12 +572,13 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
- 		}
- 
- 		/* Timeout if the device never leaves the program state. */
--		if (time_after(jiffies, timeout)) {
-+		if (expired && R1_CURRENT_STATE(status) == R1_STATE_PRG) {
- 			pr_err("%s: Card stuck in programming state! %s\n",
- 				mmc_hostname(host), __func__);
- 			err = -ETIMEDOUT;
- 			goto out;
- 		}
-+
- 	} while (R1_CURRENT_STATE(status) == R1_STATE_PRG);
- 
- 	err = mmc_switch_status_error(host, status);
+This is based on prior work for the r8a7791 SoC by Laurent Pinchart.
+
+Lightly tested on top of renesas-devel-20151126-v4.4-rc2.
+
+Simon Horman (2):
+  ARM: shmobile: r8a7793: Add missing serial devices to DT
+  ARM: shmobile: r8a7793: Describe DMA for the serial ports
+
+ arch/arm/boot/dts/r8a7793.dtsi | 215 ++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 213 insertions(+), 2 deletions(-)
+
 -- 
-1.8.1.1.dirty
+2.1.4
