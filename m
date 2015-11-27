@@ -1,69 +1,91 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 27 Nov 2015 10:38:05 +0100
-Subject: [PATCH v3 13/13] ARM: add UEFI stub support
-In-Reply-To: <20151126104711.GH2765@codeblueprint.co.uk>
-References: <1448269593-20758-1-git-send-email-ard.biesheuvel@linaro.org>
- <1448269593-20758-14-git-send-email-ard.biesheuvel@linaro.org>
- <20151126104711.GH2765@codeblueprint.co.uk>
-Message-ID: <CAKv+Gu_RC5qG=BGPSEf=j7AV4SbjXELjBxmcboj1oVs-Dn87qw@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 27 Nov 2015 10:49:23 +0100
+Subject: [PATCH v1 1/5] thermal: rockchip: fix a trivial typo
+In-Reply-To: <1448592746-2129-2-git-send-email-wxt@rock-chips.com>
+References: <1448592746-2129-1-git-send-email-wxt@rock-chips.com>
+ <1448592746-2129-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <5259912.5mmETGszQg@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 November 2015 at 11:47, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> On Mon, 23 Nov, at 10:06:33AM, Ard Biesheuvel wrote:
->> From: Roy Franz <roy.franz@linaro.org>
->>
->> This patch adds EFI stub support for the ARM Linux kernel.
->>
->> The EFI stub operates similarly to the x86 and arm64 stubs: it is a
->> shim between the EFI firmware and the normal zImage entry point, and
->> sets up the environment that the zImage is expecting. This includes
->> optionally loading the initrd and device tree from the system partition
->> based on the kernel command line.
->>
->> Signed-off-by: Roy Franz <roy.franz@linaro.org>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm/Kconfig                          |  19 +++
->>  arch/arm/boot/compressed/Makefile         |   4 +-
->>  arch/arm/boot/compressed/efi-header.S     | 130 ++++++++++++++++++++
->>  arch/arm/boot/compressed/head.S           |  54 +++++++-
->>  arch/arm/boot/compressed/vmlinux.lds.S    |   7 ++
->>  arch/arm/include/asm/efi.h                |  23 ++++
->>  drivers/firmware/efi/libstub/Makefile     |   9 ++
->>  drivers/firmware/efi/libstub/arm-stub.c   |   4 +-
->>  drivers/firmware/efi/libstub/arm32-stub.c |  85 +++++++++++++
->>  9 files changed, 331 insertions(+), 4 deletions(-)
->
-> [...]
->
->> +
->> +     /*
->> +      * Relocate the zImage, if required. ARM doesn't have a
->> +      * preferred address, so we set it to 0, as we want to allocate
->> +      * as low in memory as possible.
->> +      */
->> +     *image_size = image->image_size;
->> +     status = efi_relocate_kernel(sys_table, image_addr, *image_size,
->> +                                  *image_size, 0, 0);
->> +     if (status != EFI_SUCCESS) {
->> +             pr_efi_err(sys_table, "Failed to relocate kernel.\n");
->> +             efi_free(sys_table, *reserve_size, *reserve_addr);
->> +             *reserve_size = 0;
->> +             return status;
->> +     }
->
-> If efi_relocate_kernel() successfully allocates memory at address 0x0,
-> is that going to cause issues with NULL pointer checking?
+Hi Caesar,
 
-Actually, it is the reservation done a bit earlier that could
-potentially end up at 0x0, and the [compressed] kernel is always at
-least 32 MB up in memory, so that it can be decompressed as close to
-the base of DRAM as possible.
+Am Freitag, 27. November 2015, 10:52:22 schrieb Caesar Wang:
+> This patchset trys to dictate unified format for driver.
+> 
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> 
+> ---
+> 
+> Changes in v1:
+> - Search more trivial typo for me.
+> 
+>  drivers/thermal/rockchip_thermal.c | 18 +++++++++---------
+>  1 file changed, 9 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/thermal/rockchip_thermal.c
+> b/drivers/thermal/rockchip_thermal.c index e845841..5a8840b 100644
+> --- a/drivers/thermal/rockchip_thermal.c
+> +++ b/drivers/thermal/rockchip_thermal.c
+> @@ -38,7 +38,7 @@ enum tshut_mode {
+>  };
+> 
+>  /**
+> - * the system Temperature Sensors tshut(tshut) polarity
+> + * The system Temperature Sensors tshut(tshut) polarity
+>   * the bit 8 is tshut polarity.
+>   * 0: low active, 1: high active
+>   */
+> @@ -57,10 +57,10 @@ enum sensor_id {
+>  };
+> 
+>  /**
+> -* The conversion table has the adc value and temperature.
+> -* ADC_DECREMENT is the adc value decremnet.(e.g. v2_code_table)
+> -* ADC_INCREMNET is the adc value incremnet.(e.g. v3_code_table)
+> -*/
+> + * The conversion table has the adc value and temperature.
+> + * ADC_DECREMENT: the adc value is of diminishing.(e.g. v2_code_table)
+> + * ADC_INCREMENT: the adc value is incremental.(e.g. v3_code_table)
+> + */
+>  enum adc_sort_mode {
+>  	ADC_DECREMENT = 0,
+>  	ADC_INCREMENT,
+> @@ -75,13 +75,13 @@ enum adc_sort_mode {
 
-As far as I can tell, efi_free() deals correctly with allocations at
-address 0x0, and that is the only dealing we have with the
-reservation. So I don't think there is an issue here.
+You could simply move to documenting the fields in the header (like 
+exynos_tmu.c for example) instead of inside the table. I think there are even 
+tools that create documention from these comments, so I'd suggest:
 
--- 
-Ard.
+/*
+ * struct chip_tsadc_table: hold information about chip-specific differences
+ * @id: conversion table
+ * @length: size of conversion table
+ * @data_mask: mask to apply on data inputs
+ * @mode: sort mode of this adc variant (incrementing or decrementing)
+ */
+>  struct chip_tsadc_table {
+>  	const struct tsadc_table *id;
+> 
+> -	/* the array table size*/
+> +	/* The array table size */
+>  	unsigned int length;
+> 
+> -	/* that analogic mask data */
+> +	/* That analogic mask data */
+>  	u32 data_mask;
+> 
+> -	/* the sort mode is adc value that increment or decrement in table */
+> +	/* The sort mode is adc value that increment or decrement in table */
+>  	enum adc_sort_mode mode;
+>  };
+> 
+> @@ -617,7 +617,7 @@ rockchip_thermal_register_sensor(struct platform_device
+> *pdev, return 0;
+>  }
+> 
+> -/*
+> +/**
+>   * Reset TSADC Controller, reset all tsadc registers.
+>   */
+>  static void rockchip_thermal_reset_controller(struct reset_control *reset)
