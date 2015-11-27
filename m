@@ -1,30 +1,63 @@
-From: vbabka@suse.cz (Vlastimil Babka)
-Date: Fri, 27 Nov 2015 15:06:14 +0100
-Subject: [PATCH] mm, page_owner: only track migration if enabled
-In-Reply-To: <3209032.Njpu4mxStH@wuerfel>
-References: <3209032.Njpu4mxStH@wuerfel>
-Message-ID: <56586356.3030308@suse.cz>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 27 Nov 2015 14:11:22 +0000
+Subject: [PATCH RFT] arm64: kasan: Make KASAN work with 16K pages + 48
+ bit VA
+In-Reply-To: <20151127100210.GB25781@arm.com>
+References: <1448543686-31869-1-git-send-email-aryabinin@virtuozzo.com>
+ <CAKv+Gu_L1shTWp_5KydCW97Z6TbeXEB9gjmb2oUSuCHfC29M9A@mail.gmail.com>
+ <5658106C.10207@virtuozzo.com>
+ <20151127093529.GX3109@e104818-lin.cambridge.arm.com>
+ <20151127100210.GB25781@arm.com>
+Message-ID: <20151127141122.GB25499@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2015 02:58 PM, Arnd Bergmann wrote:
-> The newly added code to print page ownership in dump_page fails
-> to link when CONFIG_MIGRATION is disabled:
->
-> mm/built-in.o: In function `print_page_owner':
-> frame_vector.c:(.text+0x72358): undefined reference to `migrate_reason_names'
->
-> This changes the two users of migrate_reason_names to first check
-> CONFIG_MIGRATION, which avoids the error.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: cf7ec391dae4 ("mm, page_owner: dump page owner info from dump_page()")
-> ---
-> Found on yesterday's linux-next with ARM randconfig builds. The patch
-> that introduced this is currently in Andrews tree.
->
-> If you don't already have a fix, please apply this one on top, or fold
-> it into the original commit.
+On Fri, Nov 27, 2015 at 10:02:11AM +0000, Will Deacon wrote:
+> On Fri, Nov 27, 2015 at 09:35:29AM +0000, Catalin Marinas wrote:
+> > On Fri, Nov 27, 2015 at 11:12:28AM +0300, Andrey Ryabinin wrote:
+> > > On 11/26/2015 07:40 PM, Ard Biesheuvel wrote:
+> > > > On 26 November 2015 at 14:14, Andrey Ryabinin <aryabinin@virtuozzo.com> wrote:
+> > > >> Currently kasan assumes that shadow memory covers one or more entire PGDs.
+> > > >> That's not true for 16K pages + 48bit VA space, where PGDIR_SIZE is bigger
+> > > >> than the whole shadow memory.
+> > > >>
+> > > >> This patch tries to fix that case.
+> > > >> clear_page_tables() is a new replacement of clear_pgs(). Instead of always
+> > > >> clearing pgds it clears top level page table entries that entirely belongs
+> > > >> to shadow memory.
+> > > >> In addition to 'tmp_pg_dir' we now have 'tmp_pud' which is used to store
+> > > >> puds that now might be cleared by clear_page_tables.
+> > > >>
+> > > >> Reported-by: Suzuki K. Poulose <Suzuki.Poulose@arm.com>
+> > > >> Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+> > > > 
+> > > > I would argue that the Kasan code is complicated enough, and we should
+> > > > avoid complicating it even further for a configuration that is highly
+> > > > theoretical in nature.
+> > > > 
+> > > > In a 16k configuration, the 4th level only adds a single bit of VA
+> > > > space (which is, as I understand it, exactly the issue you need to
+> > > > address here since the top level page table has only 2 entries and
+> > > > hence does not divide by 8 cleanly), which means you are better off
+> > > > using 3 levels unless you *really* need more than 128 TB of VA space.
+> > > > 
+> > > > So can't we just live with the limitation, and keep the current code?
+> > > 
+> > > No objections from my side. Let's keep the current code.
+> > 
+> > Ard had a good point, so fine by me as well.
+> 
+> Ok, so obvious follow-up question: why do we even support 48-bit + 16k
+> pages in the kernel? Either it's useful, and we make things work with it,
+> or it's not and we can drop it (or, at least, hide it behind EXPERT like
+> we do for 36-bit).
 
-Thanks. I posted a different one yesterday:
-http://marc.info/?l=linux-mm&m=144853435200591&w=2
+One reason is hardware validation (I guess that may be the only reason
+for 16KB in general ;)). For each of the page sizes we support two VA
+ranges: 48-bit (maximum) and a recommended one for the corresponding
+granule. With 16K, the difference is not significant (47 to 48), so we
+could follow Ard's suggestion and make it depend on EXPERT (we already
+do this for 16KB and 36-bit VA).
+
+-- 
+Catalin
