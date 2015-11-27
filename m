@@ -1,43 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Nov 2015 22:06:20 +0100
-Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
- "/chosen/linux, atags" entry
-In-Reply-To: <20151127195148.GB30871@n2100.arm.linux.org.uk>
-References: <20150713131902.GH26485@atomide.com>
- <20151127132722.GA30871@n2100.arm.linux.org.uk>
- <20151127195148.GB30871@n2100.arm.linux.org.uk>
-Message-ID: <11537945.4HX4Y84tjV@wuerfel>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Fri, 27 Nov 2015 21:21:55 +0000
+Subject: [PATCH v3 13/13] ARM: add UEFI stub support
+In-Reply-To: <CAKv+Gu_RC5qG=BGPSEf=j7AV4SbjXELjBxmcboj1oVs-Dn87qw@mail.gmail.com>
+References: <1448269593-20758-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1448269593-20758-14-git-send-email-ard.biesheuvel@linaro.org>
+ <20151126104711.GH2765@codeblueprint.co.uk>
+ <CAKv+Gu_RC5qG=BGPSEf=j7AV4SbjXELjBxmcboj1oVs-Dn87qw@mail.gmail.com>
+Message-ID: <20151127212155.GC13918@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 November 2015 19:51:48 Russell King - ARM Linux wrote:
-> On Fri, Nov 27, 2015 at 01:27:23PM +0000, Russell King - ARM Linux wrote:
-> > It is possible to redirect any program to open any other file.  You can
-> > do it via a LD preload, and intercepting the open(), and possibly the
-> > read() calls if you want to do something more fancy.  The down-side is
-> > that you have to arrange for the preloaded object to be used by the
-> > linker, and the additional overhead it places on the intercepted
-> > functions.
+On Fri, 27 Nov, at 10:38:05AM, Ard Biesheuvel wrote:
 > 
-> Another idea if people don't like the preload idea.
+> Actually, it is the reservation done a bit earlier that could
+> potentially end up at 0x0, and the [compressed] kernel is always at
+> least 32 MB up in memory, so that it can be decompressed as close to
+> the base of DRAM as possible.
 > 
-> We could create a zero-sized /proc/atags, and then use a bind mount in
-> userspace to bind some other file containing the required information
-> on top.  That could even be the atag blob from /sys/firmware/whatever.
-> The N700 (or whatever platform needs it) could be responsible for
-> creating the zero-sized /proc/atags so that we don't have it everywhere.
+> As far as I can tell, efi_free() deals correctly with allocations at
+> address 0x0, and that is the only dealing we have with the
+> reservation. So I don't think there is an issue here.
 
-I don't mind creating the /proc/atags compatibility hack from the kernel
-for a DT based N700 kernel, as long as we limit it as much as we can
-to the machines that need it. Leaving a board file for the N700 in place
-that contains the procfs code (and not much more) seems reasonable
-here, as we are talking about a board specific hack and the whole point
-appears to be running unmodified user space.
-
-Regarding how to get the data into the kernel in the first place, my
-preferred choice would still be to have an intermediate bootloader
-such as pxa-impedance-matcher, but I won't complain if others are
-happy enough about putting it into the ATAGS compat code we already
-have, as long as it's limited to the boards we know need it.
-
-	Arnd
+OK, great.
