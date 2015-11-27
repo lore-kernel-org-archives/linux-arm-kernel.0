@@ -1,57 +1,77 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri, 27 Nov 2015 10:52:21 +0800
-Subject: [PATCH v1 0/5] Fix a trivial typo and support rk3228/rk3399 SoCs for
- thermal driver.
-Message-ID: <1448592746-2129-1-git-send-email-wxt@rock-chips.com>
+Date: Fri, 27 Nov 2015 10:52:22 +0800
+Subject: [PATCH v1 1/5] thermal: rockchip: fix a trivial typo
+In-Reply-To: <1448592746-2129-1-git-send-email-wxt@rock-chips.com>
+References: <1448592746-2129-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1448592746-2129-2-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series pacthes to support the next soc for this thermal driver.
-I don't add the dts thermal data since these SoCs have *_not_* land
-in this mainline. I believe these SoCs dts will land in this mainline
-lately,
-then I will add the thermal data for Heiko.
+This patchset trys to dictate unified format for driver.
 
-This series patches can apply into Eduardo branch.
-https://git.kernel.org/cgit/linux/kernel/git/evalenti/linux-soc-thermal.git
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 
-Also, this series pacthes have built on github branch.
-https://github.com/rockchip-linux/kernel/commits/develop4.4
-
-PATCH[1/5]:
-That's bit ugly typo, sorry for sending again :(.
-
-PATCH[2/5]:
-To fix a build warning came from Dan Carpenter report smatch check,
-Thanks. :)
-
-PATCH[3/5]:
-Add the rk3228/rk3399 SoCs compatible for dt-bindings.
-
-PATCH[4/5]:
-Add the rk3228 SoCs for thermal driver.
-
-PATCH[5/5]:
-Add the rk3399 SoCs for thermal driver based on PATCH[4/5].
-
+---
 
 Changes in v1:
 - Search more trivial typo for me.
-- As Heiko comments, fix a copy incorrect name.
-- Add a Acked from Rob.
-- fix a irq ack is similar with RK3228 SoCs.
 
-Caesar Wang (5):
-  thermal: rockchip: fix a trivial typo
-  thermal: rockchip: fix a impossible condition caused by the warning
-  dt-bindings: rockchip-thermal: Support the RK3228/RK3399 SoCs
-    compatible
-  thermal: rockchip: Support the RK3228 SoCs in thermal driver
-  thermal: rockchip: Support the RK3399 SoCs in thermal driver
+ drivers/thermal/rockchip_thermal.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
- .../bindings/thermal/rockchip-thermal.txt          |   2 +
- drivers/thermal/rockchip_thermal.c                 | 167 +++++++++++++++++++--
- 2 files changed, 159 insertions(+), 10 deletions(-)
-
+diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
+index e845841..5a8840b 100644
+--- a/drivers/thermal/rockchip_thermal.c
++++ b/drivers/thermal/rockchip_thermal.c
+@@ -38,7 +38,7 @@ enum tshut_mode {
+ };
+ 
+ /**
+- * the system Temperature Sensors tshut(tshut) polarity
++ * The system Temperature Sensors tshut(tshut) polarity
+  * the bit 8 is tshut polarity.
+  * 0: low active, 1: high active
+  */
+@@ -57,10 +57,10 @@ enum sensor_id {
+ };
+ 
+ /**
+-* The conversion table has the adc value and temperature.
+-* ADC_DECREMENT is the adc value decremnet.(e.g. v2_code_table)
+-* ADC_INCREMNET is the adc value incremnet.(e.g. v3_code_table)
+-*/
++ * The conversion table has the adc value and temperature.
++ * ADC_DECREMENT: the adc value is of diminishing.(e.g. v2_code_table)
++ * ADC_INCREMENT: the adc value is incremental.(e.g. v3_code_table)
++ */
+ enum adc_sort_mode {
+ 	ADC_DECREMENT = 0,
+ 	ADC_INCREMENT,
+@@ -75,13 +75,13 @@ enum adc_sort_mode {
+ struct chip_tsadc_table {
+ 	const struct tsadc_table *id;
+ 
+-	/* the array table size*/
++	/* The array table size */
+ 	unsigned int length;
+ 
+-	/* that analogic mask data */
++	/* That analogic mask data */
+ 	u32 data_mask;
+ 
+-	/* the sort mode is adc value that increment or decrement in table */
++	/* The sort mode is adc value that increment or decrement in table */
+ 	enum adc_sort_mode mode;
+ };
+ 
+@@ -617,7 +617,7 @@ rockchip_thermal_register_sensor(struct platform_device *pdev,
+ 	return 0;
+ }
+ 
+-/*
++/**
+  * Reset TSADC Controller, reset all tsadc registers.
+  */
+ static void rockchip_thermal_reset_controller(struct reset_control *reset)
 -- 
 1.9.1
