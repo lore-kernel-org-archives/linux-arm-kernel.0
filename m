@@ -1,38 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Nov 2015 15:04:03 +0100
-Subject: [PATCH] ARM: avoid ARCH_MMAP_RND_BITS for NOMMU
-Message-ID: <2874133.c4GDUf0t6t@wuerfel>
+From: vbabka@suse.cz (Vlastimil Babka)
+Date: Fri, 27 Nov 2015 15:06:14 +0100
+Subject: [PATCH] mm, page_owner: only track migration if enabled
+In-Reply-To: <3209032.Njpu4mxStH@wuerfel>
+References: <3209032.Njpu4mxStH@wuerfel>
+Message-ID: <56586356.3030308@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM kernels with MMU disabled fail to build because of CONFIG_ARCH_MMAP_RND_BITS:
+On 11/27/2015 02:58 PM, Arnd Bergmann wrote:
+> The newly added code to print page ownership in dump_page fails
+> to link when CONFIG_MIGRATION is disabled:
+>
+> mm/built-in.o: In function `print_page_owner':
+> frame_vector.c:(.text+0x72358): undefined reference to `migrate_reason_names'
+>
+> This changes the two users of migrate_reason_names to first check
+> CONFIG_MIGRATION, which avoids the error.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: cf7ec391dae4 ("mm, page_owner: dump page owner info from dump_page()")
+> ---
+> Found on yesterday's linux-next with ARM randconfig builds. The patch
+> that introduced this is currently in Andrews tree.
+>
+> If you don't already have a fix, please apply this one on top, or fold
+> it into the original commit.
 
-kernel/built-in.o:(.data+0x754): undefined reference to `mmap_rnd_bits'
-kernel/built-in.o:(.data+0x76c): undefined reference to `mmap_rnd_bits_min'
-kernel/built-in.o:(.data+0x770): undefined reference to `mmap_rnd_bits_max'
-
-This changes the newly added line to only select this allow for
-MMU-enabled kernels.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 14570b3fd31a ("arm: mm: support ARCH_MMAP_RND_BITS")
----
-Found on yesterday's linux-next with ARM randconfig. The commit that
-introduced this is currently in Andrew's tree.
-
-If you don't already have a fix, please either apply this patch on top,
-or fold it into the original patch.
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b64f64d124c4..5a0957e3ea36 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -34,7 +34,7 @@ config ARM
- 	select HAVE_ARCH_BITREVERSE if (CPU_32v7M || CPU_32v7) && !CPU_32v6
- 	select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL && !CPU_ENDIAN_BE32 && MMU
- 	select HAVE_ARCH_KGDB if !CPU_ENDIAN_BE32 && MMU
--	select HAVE_ARCH_MMAP_RND_BITS
-+	select HAVE_ARCH_MMAP_RND_BITS if MMU
- 	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_BPF_JIT
+Thanks. I posted a different one yesterday:
+http://marc.info/?l=linux-mm&m=144853435200591&w=2
