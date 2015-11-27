@@ -1,42 +1,43 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 27 Nov 2015 21:12:12 +0100
-Subject: [PATCH 3/3] ARM: dts: dove: add Dove divider clocks
-In-Reply-To: <E1a24wu-0004jh-3M@rmk-PC.arm.linux.org.uk>
-References: <E1a24wu-0004jh-3M@rmk-PC.arm.linux.org.uk>
-Message-ID: <20151127201212.GE14645@lunn.ch>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 27 Nov 2015 14:17:02 -0600
+Subject: [PATCH 1/2] ARM: mvebu: add kirkwood compatibles for cloudengine
+ boards
+In-Reply-To: <1448578854-6256-1-git-send-email-linus.walleij@linaro.org>
+References: <1448578854-6256-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20151127201702.GA32398@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2015 at 10:23:32PM +0000, Russell King wrote:
-> Add the Dove divider clocks to the Dove dtsi file.
+On Fri, Nov 27, 2015 at 12:00:54AM +0100, Linus Walleij wrote:
+> This adds the compatible strings for Cloudengine PogoPlug E02 and
+> series 4. The former already has a devicetree in the kernel.
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
-
-	  Andrew
+Acked-by: Rob Herring <robh@kernel.org>
 
 > ---
->  arch/arm/boot/dts/dove.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
+>  Documentation/devicetree/bindings/arm/marvell,kirkwood.txt | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-> index 179121630ad7..ea36a262d056 100644
-> --- a/arch/arm/boot/dts/dove.dtsi
-> +++ b/arch/arm/boot/dts/dove.dtsi
-> @@ -459,6 +459,12 @@
->  					#clock-cells = <1>;
->  				};
->  
-> +				divider_clk: core-clock at 0064 {
-> +					compatible = "marvell,dove-divider-clock";
-> +					reg = <0x0064 0x8>;
-> +					#clock-cells = <1>;
-> +				};
-> +
->  				pinctrl: pin-ctrl at 0200 {
->  					compatible = "marvell,dove-pinctrl";
->  					reg = <0x0200 0x14>,
+> diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+> index 5171ad8f48ff..ab0c9cdf388e 100644
+> --- a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+> +++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+> @@ -24,6 +24,8 @@ board. Currently known boards are:
+>  "buffalo,lswxl"
+>  "buffalo,lsxhl"
+>  "buffalo,lsxl"
+> +"cloudengines,pogo02"
+> +"cloudengines,pogoplugv4"
+>  "dlink,dns-320"
+>  "dlink,dns-320-a1"
+>  "dlink,dns-325"
 > -- 
-> 2.1.0
+> 2.4.3
 > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
