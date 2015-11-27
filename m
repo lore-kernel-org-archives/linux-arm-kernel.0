@@ -1,48 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Nov 2015 14:49:49 +0100
-Subject: [PATCH] null_blk: use sector_div instead of do_div
-Message-ID: <3768541.ja0r6f0Odi@wuerfel>
+Date: Fri, 27 Nov 2015 14:52:33 +0100
+Subject: [PATCH] evm: EVM_LOAD_X509 depends on EVM
+Message-ID: <6677122.Oqut6OGZ1C@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dividing a sector_t number should be done using sector_div rather
-than do_div to optimize the 32-bit sector_t case, and with
-the latest do_div optimizations, we now get a compile-time
-warning for this:
+The newly added EVM_LOAD_X509 code can be configured even if
+CONFIG_EVM is disabled, but that causes a link error:
 
-arch/arm/include/asm/div64.h:32:95: note: expected 'uint64_t * {aka long long unsigned int *}' but argument is of type 'sector_t * {aka long unsigned int *}'
-drivers/block/null_blk.c:521:81: warning: comparison of distinct pointer types lacks a cast
+security/built-in.o: In function `integrity_load_keys':
+digsig_asymmetric.c:(.init.text+0x400): undefined reference to `evm_load_x509'
 
-This changes the newly added code to use sector_div.
+This adds a Kconfig dependency to ensure it is only enabled when
+CONFIG_EVM is set as well.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: b2b7e00148a2 ("null_blk: register as a LightNVM device")
+Fixes: 7f753c992343 ("evm: load x509 certificate from the kernel")
 ---
-Found on ARM randconfig builds with today's linux-next
+Found on yesterday's linux-next with ARM randconfig builds
 
-diff --git a/drivers/block/null_blk.c b/drivers/block/null_blk.c
-index 5c8ba5484d86..d0eeecd294de 100644
---- a/drivers/block/null_blk.c
-+++ b/drivers/block/null_blk.c
-@@ -510,17 +510,17 @@ static int null_lnvm_id(struct request_queue *q, struct nvm_id *id)
- 	id->ppaf.ch_offset = 56;
- 	id->ppaf.ch_len = 8;
+diff --git a/security/integrity/evm/Kconfig b/security/integrity/evm/Kconfig
+index b1433e9cd8cb..87e83adf4c6e 100644
+--- a/security/integrity/evm/Kconfig
++++ b/security/integrity/evm/Kconfig
+@@ -44,7 +44,7 @@ config EVM_EXTRA_SMACK_XATTRS
  
--	do_div(size, bs); /* convert size to pages */
--	do_div(size, 256); /* concert size to pgs pr blk */
-+	sector_div(size, bs); /* convert size to pages */
-+	sector_div(size, 256); /* concert size to pgs pr blk */
- 	grp = &id->groups[0];
- 	grp->mtype = 0;
- 	grp->fmtype = 0;
- 	grp->num_ch = 1;
- 	grp->num_pg = 256;
- 	blksize = size;
--	do_div(size, (1 << 16));
-+	sector_div(size, (1 << 16));
- 	grp->num_lun = size + 1;
--	do_div(blksize, grp->num_lun);
-+	sector_div(blksize, grp->num_lun);
- 	grp->num_blk = blksize;
- 	grp->num_pln = 1;
- 
+ config EVM_LOAD_X509
+ 	bool "Load X509 certificate to the '.evm' trusted keyring"
+-	depends on INTEGRITY_TRUSTED_KEYRING
++	depends on EVM && INTEGRITY_TRUSTED_KEYRING
+ 	default n
+ 	help
+ 	   Load X509 certificate to the '.evm' trusted keyring.
