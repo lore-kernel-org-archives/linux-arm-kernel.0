@@ -1,30 +1,76 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 27 Nov 2015 12:11:26 +0000
-Subject: mx28: bad unlock balance detected
-In-Reply-To: <CAOMZO5B+j5s69JeeYPnpwn2e_doCA+ARzBSGAcGoJGEJ3=u3BA@mail.gmail.com>
-References: <CAOMZO5B+j5s69JeeYPnpwn2e_doCA+ARzBSGAcGoJGEJ3=u3BA@mail.gmail.com>
-Message-ID: <20151127121126.GM1929@sirena.org.uk>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 27 Nov 2015 12:16:22 +0000
+Subject: [PATCH v3 49/62] arm/acpi: Map rest tables for Dom0
+In-Reply-To: <1447753261-7552-50-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-50-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511271211590.8984@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2015 at 02:18:04PM -0200, Fabio Estevam wrote:
-> Hi,
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> Running linux-next 20151126 on a mx28evk leads to the following bug:
-> 
-> sgtl5000 0-000a: sgtl5000 revision 0x11
-> sgtl5000 0-000a: Using internal LDO instead of VDDD
-> 
-> =====================================
-> [ BUG: bad unlock balance detected! ]
-> 4.4.0-rc2-next-20151126-00001-g44eb6b2 #156 Not tainted
+> Map other reused tables for Dom0.
 
-This should be fixed in the next -next, Arnd noticed a problem with his
-code.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151127/d94668ce/attachment.sig>
+"Map all other tables to Dom0 using 1:1 mappings."
+
+
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  xen/arch/arm/domain_build.c | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+> 
+> diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
+> index 6ae5761..da4e271 100644
+> --- a/xen/arch/arm/domain_build.c
+> +++ b/xen/arch/arm/domain_build.c
+> @@ -1359,6 +1359,29 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
+>  #ifdef CONFIG_ACPI
+>  #define XEN_HYPERVISOR_ID 0x000058656E564D4D  /* "XenVMM" */
+>  
+> +static void acpi_map_rest_tables(struct domain *d)
+
+The name doesn't sound nice, "acpi_map_other_tables" would be better.
+However this function is not actually mapping the other tables, it is
+mapping *all* of them, including the original madt and fadt, right? I
+think it would be best to avoid mapping the originals.
+
+
+> +{
+> +    int i;
+> +    unsigned long res;
+> +    u64 addr, size;
+
+Add a comment that they are being mapped 1:1
+
+
+> +    for( i = 0; i < acpi_gbl_root_table_list.count; i++ )
+> +    {
+> +        addr = acpi_gbl_root_table_list.tables[i].address;
+> +        size = acpi_gbl_root_table_list.tables[i].length;
+> +        res = map_regions(d,
+> +                          paddr_to_pfn(addr & PAGE_MASK),
+> +                          DIV_ROUND_UP(size, PAGE_SIZE),
+> +                          paddr_to_pfn(addr & PAGE_MASK));
+> +        if ( res )
+> +        {
+> +             panic(XENLOG_ERR "Unable to map 0x%"PRIx64
+> +                   " - 0x%"PRIx64" in domain \n",
+> +                   addr & PAGE_MASK, PAGE_ALIGN(addr + size) - 1);
+> +        }
+> +    }
+> +}
+> +
+>  static int acpi_create_rsdp(struct domain *d, struct membank tbl_add[])
+>  {
+>  
+> @@ -1711,6 +1734,8 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
+>      if ( rc != 0 )
+>          return rc;
+>  
+> +    acpi_map_rest_tables(d);
+> +
+>      return 0;
+>  }
+>  #else
