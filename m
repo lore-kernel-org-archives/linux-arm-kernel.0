@@ -1,49 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Nov 2015 14:58:37 +0100
-Subject: [PATCH] mm, page_owner: only track migration if enabled
-Message-ID: <3209032.Njpu4mxStH@wuerfel>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 27 Nov 2015 15:00:30 +0100
+Subject: [PATCH v3] mmc: core: fix __mmc_switch timeout caused by preempt
+In-Reply-To: <1448588498-28652-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1448588498-28652-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <CAPDyKFpLZn9t8ODE3_-6=QbaiC4Br+w98MDaqE3DTPmSRXw2xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added code to print page ownership in dump_page fails
-to link when CONFIG_MIGRATION is disabled:
+On 27 November 2015 at 02:41, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> there is a time window between __mmc_send_status() and time_afer(),
+> on some eMMC chip, the timeout_ms is only 10ms, if this thread was
+> scheduled out during this period, then, even card has already changes
+> to transfer state by the result of CMD13, this part of code also treat
+> it to timeout error.
+> So, need calculate timeout first, then call __mmc_send_status(), if
+> already timeout and card still in programing state, then treat it to
+> the real timeout error.
+>
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> ---
+>  drivers/mmc/core/mmc_ops.c | 10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
+> index 1f44426..371aa4b 100644
+> --- a/drivers/mmc/core/mmc_ops.c
+> +++ b/drivers/mmc/core/mmc_ops.c
+> @@ -489,6 +489,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>         unsigned long timeout;
+>         u32 status = 0;
+>         bool use_r1b_resp = use_busy_signal;
+> +       bool expired = false;
+>
+>         mmc_retune_hold(host);
+>
+> @@ -544,6 +545,12 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>         /* Must check status to be sure of no errors. */
+>         timeout = jiffies + msecs_to_jiffies(timeout_ms);
+>         do {
+> +               /*
+> +                * Due to the possibility of being preempted after sending the
+> +                * status command, check the expiration time first.
+> +                */
+> +               expired = time_after(jiffies, timeout);
 
-mm/built-in.o: In function `print_page_owner':
-frame_vector.c:(.text+0x72358): undefined reference to `migrate_reason_names'
+The update of "expired" should have remained within the "if (send_status) {"
 
-This changes the two users of migrate_reason_names to first check
-CONFIG_MIGRATION, which avoids the error.
+Please change that.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: cf7ec391dae4 ("mm, page_owner: dump page owner info from dump_page()")
----
-Found on yesterday's linux-next with ARM randconfig builds. The patch
-that introduced this is currently in Andrews tree.
+I realize that the entire __mmc_switch() function deserves a round of
+re-factoring, as it's just too complicated to understand all what goes
+on in here. That's another task though. :-)
 
-If you don't already have a fix, please apply this one on top, or fold
-it into the original commit.
+> +
+>                 if (send_status) {
+>                         err = __mmc_send_status(card, &status, ignore_crc);
+>                         if (err)
+> @@ -565,12 +572,13 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>                 }
+>
+>                 /* Timeout if the device never leaves the program state. */
+> -               if (time_after(jiffies, timeout)) {
+> +               if (expired && R1_CURRENT_STATE(status) == R1_STATE_PRG) {
+>                         pr_err("%s: Card stuck in programming state! %s\n",
+>                                 mmc_hostname(host), __func__);
+>                         err = -ETIMEDOUT;
+>                         goto out;
+>                 }
+> +
+>         } while (R1_CURRENT_STATE(status) == R1_STATE_PRG);
+>
+>         err = mmc_switch_status_error(host, status);
+> --
+> 1.8.1.1.dirty
+>
 
-diff --git a/mm/page_owner.c b/mm/page_owner.c
-index a81cfa0c13c3..4033542c3f5a 100644
---- a/mm/page_owner.c
-+++ b/mm/page_owner.c
-@@ -170,7 +170,8 @@ print_page_owner(char __user *buf, size_t count, unsigned long pfn,
- 	if (ret >= count)
- 		goto err;
- 
--	if (page_ext->last_migrate_reason != -1) {
-+	if (IS_ENABLED(CONFIG_MIGRATION) &&
-+	    page_ext->last_migrate_reason != -1) {
- 		ret += snprintf(kbuf + ret, count - ret,
- 			"Page has been migrated, last migrate reason: %s\n",
- 			migrate_reason_names[page_ext->last_migrate_reason]);
-@@ -213,7 +214,8 @@ void __dump_page_owner(struct page *page)
- 	dump_gfpflag_names(gfp_mask);
- 	print_stack_trace(&trace, 0);
- 
--	if (page_ext->last_migrate_reason != -1)
-+	if (IS_ENABLED(CONFIG_MIGRATION) &&
-+	    page_ext->last_migrate_reason != -1)
- 		pr_alert("page has been migrated, last migrate reason: %s\n",
- 			migrate_reason_names[page_ext->last_migrate_reason]);
- }
+Kind regards
+Uffe
