@@ -1,86 +1,69 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 27 Nov 2015 11:37:20 +0100
-Subject: [linux-sunxi] Re: [PATCH v3 1/2] phy-sun4i-usb: Use of_match_node
- to get model specific config data
-In-Reply-To: <20151127085332.GU32142@lukather>
-References: <1448470202-3628-1-git-send-email-hdegoede@redhat.com>
- <CAGb2v64XL=bptxoCwiVkf8u-EfckpuASS3Foo=Q3i4a_6CaJYA@mail.gmail.com>
- <5656F6F4.1040801@redhat.com> <20151127085332.GU32142@lukather>
-Message-ID: <56583260.1080106@redhat.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 27 Nov 2015 11:39:09 +0100
+Subject: [PATCH RFT] arm64: kasan: Make KASAN work with 16K pages + 48 bit
+ VA
+In-Reply-To: <20151127100210.GB25781@arm.com>
+References: <1448543686-31869-1-git-send-email-aryabinin@virtuozzo.com>
+ <CAKv+Gu_L1shTWp_5KydCW97Z6TbeXEB9gjmb2oUSuCHfC29M9A@mail.gmail.com>
+ <5658106C.10207@virtuozzo.com>
+ <20151127093529.GX3109@e104818-lin.cambridge.arm.com>
+ <20151127100210.GB25781@arm.com>
+Message-ID: <CAKv+Gu9109GjRqdVZBKckuEkj261gzW=RQGXHjP19TXDAC_cBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 27-11-15 09:53, Maxime Ripard wrote:
-> On Thu, Nov 26, 2015 at 01:11:32PM +0100, Hans de Goede wrote:
->>>> +enum sun4i_usb_phy_type {
->>>> +       sun4i_a10_phy,
->>>> +       sun8i_a33_phy,
->>>> +};
->>>> +
->>>> +struct sun4i_usb_phy_cfg {
->>>> +       int num_phys;
->>>> +       u32 disc_thresh;
->>>> +       enum sun4i_usb_phy_type type;
->>>> +       bool dedicated_clocks;
->>>> +};
->>>> +
->>>>   struct sun4i_usb_phy_data {
->>>>          void __iomem *base;
->>>> +       const struct sun4i_usb_phy_cfg *cfg;
->>>>          struct mutex mutex;
->>>> -       int num_phys;
->>>> -       u32 disc_thresh;
->>>> -       bool has_a33_phyctl;
->>>>          struct sun4i_usb_phy {
->>>>                  struct phy *phy;
->>>>                  void __iomem *pmu;
->>>> @@ -164,12 +174,15 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
->>>>
->>>>          mutex_lock(&phy_data->mutex);
->>>>
->>>> -       if (phy_data->has_a33_phyctl) {
->>>> +       switch (phy_data->cfg->type) {
->>>> +       case sun4i_a10_phy:
->>>> +               phyctl = phy_data->base + REG_PHYCTL_A10;
->>>
->>> Any reason why this offset isn't incorporated into phy_data?
+On 27 November 2015 at 11:02, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Nov 27, 2015 at 09:35:29AM +0000, Catalin Marinas wrote:
+>> On Fri, Nov 27, 2015 at 11:12:28AM +0300, Andrey Ryabinin wrote:
+>> > On 11/26/2015 07:40 PM, Ard Biesheuvel wrote:
+>> > > On 26 November 2015 at 14:14, Andrey Ryabinin <aryabinin@virtuozzo.com> wrote:
+>> > >> Currently kasan assumes that shadow memory covers one or more entire PGDs.
+>> > >> That's not true for 16K pages + 48bit VA space, where PGDIR_SIZE is bigger
+>> > >> than the whole shadow memory.
+>> > >>
+>> > >> This patch tries to fix that case.
+>> > >> clear_page_tables() is a new replacement of clear_pgs(). Instead of always
+>> > >> clearing pgds it clears top level page table entries that entirely belongs
+>> > >> to shadow memory.
+>> > >> In addition to 'tmp_pg_dir' we now have 'tmp_pud' which is used to store
+>> > >> puds that now might be cleared by clear_page_tables.
+>> > >>
+>> > >> Reported-by: Suzuki K. Poulose <Suzuki.Poulose@arm.com>
+>> > >> Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+>> > >
+>> > > I would argue that the Kasan code is complicated enough, and we should
+>> > > avoid complicating it even further for a configuration that is highly
+>> > > theoretical in nature.
+>> > >
+>> > > In a 16k configuration, the 4th level only adds a single bit of VA
+>> > > space (which is, as I understand it, exactly the issue you need to
+>> > > address here since the top level page table has only 2 entries and
+>> > > hence does not divide by 8 cleanly), which means you are better off
+>> > > using 3 levels unless you *really* need more than 128 TB of VA space.
+>> > >
+>> > > So can't we just live with the limitation, and keep the current code?
+>> >
+>> > No objections from my side. Let's keep the current code.
 >>
->> You mean in phy_data->cfg I assume, the difference needed for
->> the "sun4i_usb_phy_write" functionality are not just the phyctl
->> register offset...
->>
->>>
->>>> +               break;
->>>> +       case sun8i_a33_phy:
->>>>                  phyctl = phy_data->base + REG_PHYCTL_A33;
->>>>                  /* A33 needs us to set phyctl to 0 explicitly */
->>>>                  writel(0, phyctl);
->>
->> e.g. the A33 needs this extra write, and on the H3 we need to do
->> similar bitbanging, but slightly different, see:
->>
->> https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/usb/host/sunxi_hci.c#L899
->>
->> Notice how it uses different addr and write register addresses
->> their through the usb_phy_csr_add and usb_phy_csr_write helper
->> functions as well as directly poking offset 0x20.
+>> Ard had a good point, so fine by me as well.
 >
-> Then it easy to support: one u8 for each register that changes, one
-> bool to tell if you need to clear the phyctl register or not, And you
-> don't have to duplicate the switch everywhere, and basically just
-> reimplement of_device_is_compatible without an actual compatible to
-> workaround the review ;)
+> Ok, so obvious follow-up question: why do we even support 48-bit + 16k
+> pages in the kernel? Either it's useful, and we make things work with it,
+> or it's not and we can drop it (or, at least, hide it behind EXPERT like
+> we do for 36-bit).
+>
 
-You clearly have not looked at the actual code I've linked to, the
-entire "algorithm" for sun4i_usb_phy_write is different on the H3.
+So there's 10 kinds of features in the world, useful ones and !useful ones? :-)
 
-Moreover, this has nothing to do with this patch, the code coding the
-difference behavior for the a10 style phy and the a33 style phy is already
-there before this patch-set, and this is not something Kishon asked
-me to change.
+I think 48-bit/16k is somewhat useful, and I think we should support
+it. But I also think we should be pragmatic, and not go out of our way
+to support the combinatorial expansion of all niche features enabled
+together. I think it is perfectly fine to limit kasan support to
+configurations whose top level translation table divides by 8 cleanly
+(which only excludes 16k/48-bit anyway)
 
-Regards,
+However, I think it deserves being hidden behind CONFIG_EXPERT more
+than 36-bit/16k does.
 
-Hans
+-- 
+Ard.
