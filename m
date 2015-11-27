@@ -1,230 +1,275 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Nov 2015 14:39:35 +0000
-Subject: [PATCH v12 12/16] arm64: kdump: implement machine_crash_shutdown()
-In-Reply-To: <9ae67f7515c66bfd747486c8dc1c1772913a8d46.1448403503.git.geoff@infradead.org>
-References: <cover.1448403503.git.geoff@infradead.org>
- <9ae67f7515c66bfd747486c8dc1c1772913a8d46.1448403503.git.geoff@infradead.org>
-Message-ID: <56586B27.9080508@arm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 27 Nov 2015 14:44:53 +0000
+Subject: [Xen-devel] [PATCH v3 54/62] arm/acpi: Create min DT stub for Dom0
+In-Reply-To: <1447753261-7552-55-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-55-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511271436570.8984@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/11/15 22:25, Geoff Levand wrote:
-> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> kdump calls machine_crash_shutdown() to shut down non-boot cpus and
-> save registers' status in per-cpu ELF notes before starting the crash
-> dump kernel. See kernel_kexec().
+> Create a DT for Dom0 for ACPI-case only. DT contains minimal required
+> informations such as Dom0 bootargs, initrd, efi description table and
+> address of uefi memory table.
 > 
-> ipi_cpu_stop() is a bit modified and used to support this behavior.
+> Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
+> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+
+We should add a document under docs/misc/arm/device-tree for these
+bindings.  This is an external interface maintained by Xen for
+compatibility.
+
+
+>  xen/arch/arm/domain_build.c | 142 ++++++++++++++++++++++++++++++++++++++++++++
+>  xen/common/efi/boot.c       |  47 +++++++++++++++
+>  xen/include/asm-arm/setup.h |   2 +
+>  3 files changed, 191 insertions(+)
 > 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm64/include/asm/kexec.h    | 34 +++++++++++++++++++++++++++++++++-
->  arch/arm64/kernel/machine_kexec.c | 31 +++++++++++++++++++++++++++++--
->  arch/arm64/kernel/smp.c           | 16 ++++++++++++++--
->  3 files changed, 76 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
-> index 46d63cd..555a955 100644
-> --- a/arch/arm64/include/asm/kexec.h
-> +++ b/arch/arm64/include/asm/kexec.h
-> @@ -30,6 +30,8 @@
+> diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
+> index 55f85b4..6d8536b 100644
+> --- a/xen/arch/arm/domain_build.c
+> +++ b/xen/arch/arm/domain_build.c
+> @@ -1358,6 +1358,144 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 >  
->  #if !defined(__ASSEMBLY__)
->  
-> +extern bool in_crash_kexec;
+>  #ifdef CONFIG_ACPI
+>  #define XEN_HYPERVISOR_ID 0x000058656E564D4D  /* "XenVMM" */
+> +#define ACPI_DOM0_FDT_MIN_SIZE 4096
 > +
->  /**
->   * crash_setup_regs() - save registers for the panic kernel
->   *
-> @@ -40,7 +42,37 @@
->  static inline void crash_setup_regs(struct pt_regs *newregs,
->  				    struct pt_regs *oldregs)
->  {
-> -	/* Empty routine needed to avoid build errors. */
-> +	if (oldregs) {
-> +		memcpy(newregs, oldregs, sizeof(*newregs));
-> +	} else {
-> +		__asm__ __volatile__ (
-> +			"stp	 x0,   x1, [%3, #16 *  0]\n"
-> +			"stp	 x2,   x3, [%3, #16 *  1]\n"
-> +			"stp	 x4,   x5, [%3, #16 *  2]\n"
-> +			"stp	 x6,   x7, [%3, #16 *  3]\n"
-> +			"stp	 x8,   x9, [%3, #16 *  4]\n"
-> +			"stp	x10,  x11, [%3, #16 *  5]\n"
-> +			"stp	x12,  x13, [%3, #16 *  6]\n"
-> +			"stp	x14,  x15, [%3, #16 *  7]\n"
-> +			"stp	x16,  x17, [%3, #16 *  8]\n"
-> +			"stp	x18,  x19, [%3, #16 *  9]\n"
-> +			"stp	x20,  x21, [%3, #16 * 10]\n"
-> +			"stp	x22,  x23, [%3, #16 * 11]\n"
-> +			"stp	x24,  x25, [%3, #16 * 12]\n"
-> +			"stp	x26,  x27, [%3, #16 * 13]\n"
-> +			"stp	x28,  x29, [%3, #16 * 14]\n"
-> +			"str	x30,	   [%3, #16 * 15]\n"
-> +			"mov	%0, sp\n"
-> +			"adr	%1, 1f\n"
-> +			"mrs	%2, spsr_el1\n"
-> +		"1:"
-> +			: "=r" (newregs->sp),
-> +			  "=r" (newregs->pc),
-> +			  "=r" (newregs->pstate)
-> +			: "r"  (&newregs->regs)
-> +			: "memory"
-> +		);
-
-I wonder how useful this thing is, given that it starts by corrupting
-whatever register is holding newregs->regs. Maybe this is not supposed
-to be accurate anyway...
-
-
-> +	}
->  }
->  
->  #endif /* !defined(__ASSEMBLY__) */
-> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> index da28a26..d2d7e90 100644
-> --- a/arch/arm64/kernel/machine_kexec.c
-> +++ b/arch/arm64/kernel/machine_kexec.c
-> @@ -9,6 +9,7 @@
->   * published by the Free Software Foundation.
->   */
->  
-> +#include <linux/kernel.h>
->  #include <linux/kexec.h>
->  #include <linux/of_fdt.h>
->  #include <linux/slab.h>
-> @@ -23,6 +24,7 @@
->  extern const unsigned char arm64_relocate_new_kernel[];
->  extern const unsigned long arm64_relocate_new_kernel_size;
->  
-> +bool in_crash_kexec;
->  static unsigned long kimage_start;
->  
->  /**
-> @@ -203,13 +205,38 @@ void machine_kexec(struct kimage *kimage)
->  	 */
->  
->  	cpu_soft_restart(virt_to_phys(cpu_reset),
-> -		is_hyp_mode_available(),
-> +		in_crash_kexec ? 0 : is_hyp_mode_available(),
->  		reboot_code_buffer_phys, kimage->head, kimage_start);
->  
->  	BUG(); /* Should never get here. */
->  }
->  
-> +/**
-> + * machine_crash_shutdown - shutdown non-boot cpus and save registers
+> +static int make_chosen_node(const struct kernel_info *kinfo,
+> +                            struct membank tbl_add[])
+> +{
+> +    int res;
+> +    const char *bootargs = NULL;
+> +    const struct bootmodule *mod = kinfo->kernel_bootmodule;
+> +    void *fdt = kinfo->fdt;
+> +
+> +    DPRINT("Create chosen node\n");
+> +    res = fdt_begin_node(fdt, "chosen");
+> +    if ( res )
+> +        return res;
+> +
+> +    if ( mod && mod->cmdline[0] )
+> +    {
+> +        bootargs = &mod->cmdline[0];
+> +        res = fdt_property(fdt, "bootargs", bootargs, strlen(bootargs) + 1);
+> +        if ( res )
+> +           return res;
+> +    }
+> +
+> +    /*
+> +     * If the bootloader provides an initrd, we must create a placeholder
+> +     * for the initrd properties. The values will be replaced later.
+> +     */
+> +    if ( mod && mod->size )
+> +    {
+> +        u64 a = 0;
+> +        res = fdt_property(kinfo->fdt, "linux,initrd-start", &a, sizeof(a));
+> +        if ( res )
+> +            return res;
+> +
+> +        res = fdt_property(kinfo->fdt, "linux,initrd-end", &a, sizeof(a));
+> +        if ( res )
+> +            return res;
+> +    }
+> +
+> +    res = fdt_end_node(fdt);
+> +
+> +    return res;
+> +}
+> +
+> +static int acpi_make_hypervisor_node(const struct kernel_info *kinfo,
+> +                                     struct membank tbl_add[])
+> +{
+> +    const char compat[] =
+> +        "xen,xen-"__stringify(XEN_VERSION)"."__stringify(XEN_SUBVERSION)"\0"
+> +        "xen,xen";
+> +    int res;
+> +    /* Convenience alias */
+> +    void *fdt = kinfo->fdt;
+> +
+> +    DPRINT("Create hypervisor node\n");
+> +
+> +    /* See linux Documentation/devicetree/bindings/arm/xen.txt */
+> +    res = fdt_begin_node(fdt, "hypervisor");
+> +    if ( res )
+> +        return res;
+> +
+> +    /* Cannot use fdt_property_string due to embedded nulls */
+> +    res = fdt_property(fdt, "compatible", compat, sizeof(compat));
+> +    if ( res )
+> +        return res;
+> +
+> +    res = arm_acpi_make_efi_nodes(fdt, tbl_add);
+> +    if ( res )
+> +        return res;
+> +
+> +    res = fdt_end_node(fdt);
+> +
+> +    return res;
+> +}
+> +
+> +/*
+> + * Prepare a minimal DTB for Dom0 which contains bootargs, initrd, memory
+> + * information, EFI table.
 > + */
->  void machine_crash_shutdown(struct pt_regs *regs)
+> +static int create_acpi_dtb(struct kernel_info *kinfo, struct membank tbl_add[])
+> +{
+> +    int new_size;
+> +    int ret;
+> +
+> +    DPRINT("Prepare a min DTB for DOM0\n");
+> +
+> +    /* Allocate min size for DT */
+> +    new_size = ACPI_DOM0_FDT_MIN_SIZE;
+> +    kinfo->fdt = xmalloc_bytes(new_size);
+> +
+> +    if ( kinfo->fdt == NULL )
+> +        return -ENOMEM;
+> +
+> +    /* Create a new empty DT for DOM0 */
+> +    ret = fdt_create(kinfo->fdt, new_size);
+> +    if ( ret < 0 )
+> +        goto err;
+> +
+> +    ret = fdt_finish_reservemap(kinfo->fdt);
+> +    if ( ret < 0 )
+> +        goto err;
+> +
+> +    ret = fdt_begin_node(kinfo->fdt, "/");
+> +    if ( ret < 0 )
+> +        goto err;
+> +
+> +    ret = fdt_property_cell(kinfo->fdt, "#address-cells", 2);
+> +    if ( ret )
+> +        return ret;
+> +
+> +    ret = fdt_property_cell(kinfo->fdt, "#size-cells", 1);
+> +    if ( ret )
+> +        return ret;
+> +
+> +    /* Create a chosen node for DOM0 */
+> +    ret = make_chosen_node(kinfo, tbl_add);
+> +    if ( ret )
+> +        goto err;
+> +
+> +    ret = acpi_make_hypervisor_node(kinfo, tbl_add);
+> +    if ( ret )
+> +        goto err;
+> +
+> +    ret = fdt_end_node(kinfo->fdt);
+> +    if ( ret < 0 )
+> +        goto err;
+> +
+> +    ret = fdt_finish(kinfo->fdt);
+> +    if ( ret < 0 )
+> +        goto err;
+> +
+> +    return 0;
+> +
+> +  err:
+> +    printk("Device tree generation failed (%d).\n", ret);
+> +    xfree(kinfo->fdt);
+> +    return -EINVAL;
+> +}
+>  
+>  static void acpi_map_rest_tables(struct domain *d)
 >  {
-> -	/* Empty routine needed to avoid build errors. */
-> +	struct pt_regs dummy_regs;
-> +	int cpu;
+> @@ -1755,6 +1893,10 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
+>          return rc;
+>      }
+>  
+> +    rc = create_acpi_dtb(kinfo, tbl_add);
+> +    if ( rc != 0 )
+> +        return rc;
 > +
-> +	local_irq_disable();
-> +
-> +	in_crash_kexec = true;
-> +
-> +	/*
-> +	 * clear and initialize the per-cpu info. This is necessary
-> +	 * because, otherwise, slots for offline cpus would never be
-> +	 * filled up. See smp_send_stop().
-> +	 */
-> +	memset(&dummy_regs, 0, sizeof(dummy_regs));
-> +	for_each_possible_cpu(cpu)
-> +		crash_save_cpu(&dummy_regs, cpu);
-> +
-> +	/* shutdown non-boot cpus */
-> +	smp_send_stop();
-> +
-> +	/* for boot cpu */
-> +	crash_save_cpu(regs, smp_processor_id());
-> +
-> +	pr_info("Starting crashdump kernel...\n");
+>      return 0;
 >  }
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index b1adc51..15aabef 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -37,6 +37,7 @@
->  #include <linux/completion.h>
->  #include <linux/of.h>
->  #include <linux/irq_work.h>
-> +#include <linux/kexec.h>
->  
->  #include <asm/alternative.h>
->  #include <asm/atomic.h>
-> @@ -54,6 +55,8 @@
->  #include <asm/ptrace.h>
->  #include <asm/virt.h>
->  
-> +#include "cpu-reset.h"
-> +
->  #define CREATE_TRACE_POINTS
->  #include <trace/events/ipi.h>
->  
-> @@ -683,8 +686,12 @@ static DEFINE_RAW_SPINLOCK(stop_lock);
->  /*
->   * ipi_cpu_stop - handle IPI from smp_send_stop()
->   */
-> -static void ipi_cpu_stop(unsigned int cpu)
-> +static void ipi_cpu_stop(unsigned int cpu, struct pt_regs *regs)
->  {
-> +#ifdef CONFIG_KEXEC
-> +	/* printing messages may slow down the shutdown. */
-> +	if (!in_crash_kexec)
-> +#endif
->  	if (system_state == SYSTEM_BOOTING ||
->  	    system_state == SYSTEM_RUNNING) {
->  		raw_spin_lock(&stop_lock);
-
-Irrespective of how useful this change is, how about having a predicate
-instead? Something like:
-
-static inline bool is_in_crash_kexec(void)
-{
-#ifdef CONFIG_KEXEC
-	return in_crash_kexec;
-#else
-	return false;
-#endif
-}
-
-located in machine_kexec.c (making the in_crash_kernel static), and then
-
-	if (!is_in_crash_kexec() && (systen_state == ... || ...) {
-
-It would certainly look better.
-
-> @@ -697,6 +704,11 @@ static void ipi_cpu_stop(unsigned int cpu)
->  
->  	local_irq_disable();
->  
-> +#ifdef CONFIG_KEXEC
-> +	if (in_crash_kexec)
-> +		crash_save_cpu(regs, cpu);
-> +#endif /* CONFIG_KEXEC */
-> +
-
-Same here.
-
->  	while (1)
->  		cpu_relax();
+>  #else
+> diff --git a/xen/common/efi/boot.c b/xen/common/efi/boot.c
+> index ff2faed..d233cef 100644
+> --- a/xen/common/efi/boot.c
+> +++ b/xen/common/efi/boot.c
+> @@ -1304,6 +1304,53 @@ void __init acpi_create_efi_mmap_table(paddr_t paddr, void *efi_acpi_table,
+>          memory_map[offset].Attribute = EFI_MEMORY_WB;
+>      }
 >  }
-> @@ -727,7 +739,7 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+> +
+> +/* Create place holder for efi values. */
+> +int __init arm_acpi_make_efi_nodes(void *fdt, struct membank tbl_add[])
+> +{
+> +    u64 fdt_val64;
+> +    u32 fdt_val32;
+> +    int desc_ver = mdesc_ver;
+> +    int res;
+> +
+> +    res = fdt_begin_node(fdt, "uefi");
+> +    if ( res )
+> +        return res;
+> +
+> +    fdt_val64 = cpu_to_fdt64(tbl_add[TBL_EFIT].start);
+> +    res = fdt_property(fdt, "xen,uefi-system-table",
+> +                       &fdt_val64, sizeof(fdt_val64));
+> +    if ( res )
+> +        return res;
+> +
+> +    fdt_val64 = cpu_to_fdt64(tbl_add[TBL_MMAP].start);
+> +    res = fdt_property(fdt, "xen,uefi-mmap-start",
+> +                       &fdt_val64,  sizeof(fdt_val64));
+> +    if ( res )
+> +        return res;
+> +
+> +    fdt_val32 = cpu_to_fdt32(tbl_add[TBL_MMAP].size);
+> +    res = fdt_property(fdt, "xen,uefi-mmap-size",
+> +                       &fdt_val32,  sizeof(fdt_val32));
+> +    if ( res )
+> +        return res;
+> +
+> +    fdt_val32 = cpu_to_fdt32(sizeof(EFI_MEMORY_DESCRIPTOR));
+> +    res = fdt_property(fdt, "xen,uefi-mmap-desc-size",
+> +                         &fdt_val32, sizeof(fdt_val32));
+> +    if ( res )
+> +        return res;
+> +
+> +    fdt_val32 = cpu_to_fdt32(desc_ver);
+> +    res = fdt_property(fdt, "xen,uefi-mmap-desc-ver",
+> +                         &fdt_val32, sizeof(fdt_val32));
+> +    if ( res )
+> +        return res;
+> +
+> +    res = fdt_end_node(fdt);
+> +
+> +    return res;
+> +}
+
+This function shouldn't be in this file.
+
+
+>  #endif
 >  
->  	case IPI_CPU_STOP:
->  		irq_enter();
-> -		ipi_cpu_stop(cpu);
-> +		ipi_cpu_stop(cpu, regs);
->  		irq_exit();
->  		break;
+>  #ifndef CONFIG_ARM /* TODO - runtime service support */
+> diff --git a/xen/include/asm-arm/setup.h b/xen/include/asm-arm/setup.h
+> index 35447ee..c4cf5ea 100644
+> --- a/xen/include/asm-arm/setup.h
+> +++ b/xen/include/asm-arm/setup.h
+> @@ -60,6 +60,8 @@ void acpi_create_efi_mmap_table(paddr_t paddr, void *efi_acpi_table,
+>                                  const struct meminfo *mem,
+>                                  struct membank tbl_add[]);
 >  
+> +int arm_acpi_make_efi_nodes(void *fdt, struct membank tbl_add[]);
+> +
+>  int construct_dom0(struct domain *d);
+>  
+>  void discard_initial_modules(void);
+> -- 
+> 2.1.0
 > 
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> 
+> _______________________________________________
+> Xen-devel mailing list
+> Xen-devel at lists.xen.org
+> http://lists.xen.org/xen-devel
+> 
