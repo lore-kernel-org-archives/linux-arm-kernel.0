@@ -1,76 +1,50 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 27 Nov 2015 12:16:22 +0000
-Subject: [PATCH v3 49/62] arm/acpi: Map rest tables for Dom0
-In-Reply-To: <1447753261-7552-50-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-50-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511271211590.8984@kaball.uk.xensource.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 27 Nov 2015 12:21:25 +0000
+Subject: [RESEND RFC/PATCH 3/8] media: platform: mtk-vpu: Support Mediatek
+ VPU
+In-Reply-To: <1448626209.7734.26.camel@mtksdaap41>
+References: <1447764885-23100-1-git-send-email-tiffany.lin@mediatek.com>
+ <1447764885-23100-4-git-send-email-tiffany.lin@mediatek.com>
+ <5655DDB4.2080002@linaro.org> <1448626209.7734.26.camel@mtksdaap41>
+Message-ID: <56584AC5.7020704@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Map other reused tables for Dom0.
+On 27/11/15 12:10, andrew-ct chen wrote:
+>>> +
+>>> > >+	memcpy((void *)send_obj->share_buf, buf, len);
+>>> > >+	send_obj->len = len;
+>>> > >+	send_obj->id = id;
+>>> > >+	vpu_cfg_writel(vpu, 0x1, HOST_TO_VPU);
+>>> > >+
+>>> > >+	/* Wait until VPU receives the command */
+>>> > >+	timeout = jiffies + msecs_to_jiffies(IPI_TIMEOUT_MS);
+>>> > >+	do {
+>>> > >+		if (time_after(jiffies, timeout)) {
+>>> > >+			dev_err(vpu->dev, "vpu_ipi_send: IPI timeout!\n");
+>>> > >+			return -EIO;
+>>> > >+		}
+>>> > >+	} while (vpu_cfg_readl(vpu, HOST_TO_VPU));
+>> >
+>> >Do we need to busy wait every time we communicate with the co-processor?
+>> >Couldn't we put this wait*before*  we write to HOST_TO_VPU above.
+>> >
+>> >That way we only spin when there is a need to.
+>> >
+> Since the hardware VPU only allows that one client sends the command to
+> it each time.
+> We need the wait to make sure VPU accepted the command and cleared the
+> interrupt and then the next command would be served.
 
-"Map all other tables to Dom0 using 1:1 mappings."
+I understand that the VPU  can only have on message outstanding at once.
+
+I just wonder why we busy wait *after* sending the first command rather 
+than *before* sending the second one.
+
+Streamed decode/encode typically ends up being rate controlled by 
+capture or display meaning that in these cases we don't need to busy 
+wait at all (because by the time we send the next frame the VPU has 
+already accepted the previous message).
 
 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  xen/arch/arm/domain_build.c | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
-> 
-> diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
-> index 6ae5761..da4e271 100644
-> --- a/xen/arch/arm/domain_build.c
-> +++ b/xen/arch/arm/domain_build.c
-> @@ -1359,6 +1359,29 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
->  #ifdef CONFIG_ACPI
->  #define XEN_HYPERVISOR_ID 0x000058656E564D4D  /* "XenVMM" */
->  
-> +static void acpi_map_rest_tables(struct domain *d)
-
-The name doesn't sound nice, "acpi_map_other_tables" would be better.
-However this function is not actually mapping the other tables, it is
-mapping *all* of them, including the original madt and fadt, right? I
-think it would be best to avoid mapping the originals.
-
-
-> +{
-> +    int i;
-> +    unsigned long res;
-> +    u64 addr, size;
-
-Add a comment that they are being mapped 1:1
-
-
-> +    for( i = 0; i < acpi_gbl_root_table_list.count; i++ )
-> +    {
-> +        addr = acpi_gbl_root_table_list.tables[i].address;
-> +        size = acpi_gbl_root_table_list.tables[i].length;
-> +        res = map_regions(d,
-> +                          paddr_to_pfn(addr & PAGE_MASK),
-> +                          DIV_ROUND_UP(size, PAGE_SIZE),
-> +                          paddr_to_pfn(addr & PAGE_MASK));
-> +        if ( res )
-> +        {
-> +             panic(XENLOG_ERR "Unable to map 0x%"PRIx64
-> +                   " - 0x%"PRIx64" in domain \n",
-> +                   addr & PAGE_MASK, PAGE_ALIGN(addr + size) - 1);
-> +        }
-> +    }
-> +}
-> +
->  static int acpi_create_rsdp(struct domain *d, struct membank tbl_add[])
->  {
->  
-> @@ -1711,6 +1734,8 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
->      if ( rc != 0 )
->          return rc;
->  
-> +    acpi_map_rest_tables(d);
-> +
->      return 0;
->  }
->  #else
+Daniel.
