@@ -1,126 +1,180 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 27 Nov 2015 19:44:20 +0530
-Subject: [PATCH 1/7] phy: brcmstb-sata: add missing of_node_put
-In-Reply-To: <20151117013830.GV8456@google.com>
-References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
- <1447673600-8881-2-git-send-email-Julia.Lawall@lip6.fr>
- <20151117013830.GV8456@google.com>
-Message-ID: <5658653C.2050006@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 27 Nov 2015 14:19:37 +0000
+Subject: [PATCH v12 05/16] arm64: Add back cpu_reset routines
+In-Reply-To: <3279584774ba40f088b79f4df864d69a5b57b516.1448403503.git.geoff@infradead.org>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <3279584774ba40f088b79f4df864d69a5b57b516.1448403503.git.geoff@infradead.org>
+Message-ID: <56586679.8060403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Grant
+On 24/11/15 22:25, Geoff Levand wrote:
+> Commit 68234df4ea7939f98431aa81113fbdce10c4a84b (arm64: kill flush_cache_all())
+> removed the global arm64 routines cpu_reset() and cpu_soft_restart() needed by
+> the arm64 kexec and kdump support.  Add simplified versions of those two
+> routines back with some changes needed for kexec in the new files cpu_reset.S,
+> and cpu_reset.h.
+> 
+> When a CPU is reset it needs to be put into the exception level it had
+> when it entered the kernel. Update cpu_reset() to accept an argument
+> which signals if the reset address needs to be entered at EL1 or EL2.
+> 
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+>  arch/arm64/kernel/cpu-reset.S | 84 +++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/cpu-reset.h | 22 ++++++++++++
+>  2 files changed, 106 insertions(+)
+>  create mode 100644 arch/arm64/kernel/cpu-reset.S
+>  create mode 100644 arch/arm64/kernel/cpu-reset.h
+> 
+> diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
+> new file mode 100644
+> index 0000000..0423f27
+> --- /dev/null
+> +++ b/arch/arm64/kernel/cpu-reset.S
+> @@ -0,0 +1,84 @@
+> +/*
+> + * cpu reset routines
+> + *
+> + * Copyright (C) 2001 Deep Blue Solutions Ltd.
+> + * Copyright (C) 2012 ARM Ltd.
+> + * Copyright (C) 2015 Huawei Futurewei Technologies.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/linkage.h>
+> +#include <asm/assembler.h>
+> +#include <asm/virt.h>
+> +
+> +#define SCTLR_ELx_I	(1 << 12)
+> +#define SCTLR_ELx_SA	(1 << 3)
+> +#define SCTLR_ELx_C	(1 << 2)
+> +#define SCTLR_ELx_A	(1 << 1)
+> +#define SCTLR_ELx_M	1
 
-Hi,
+kvm_arm.h already has some of these defined, and sysreg.h has another
+bunch. Can you please consolidate this into a single place (probably
+sysreg.h)?
 
-On Tuesday 17 November 2015 07:08 AM, Brian Norris wrote:
-> On Mon, Nov 16, 2015 at 12:33:14PM +0100, Julia Lawall wrote:
->> for_each_available_child_of_node performs an of_node_get on each iteration,
->> so a return from the middle of the loop requires an of_node_put.
->>
->> A simplified version of the semantic patch that finds this problem is as
->> follows (http://coccinelle.lip6.fr):
->>
->> // <smpl>
->> @@
->> expression root,e;
->> local idexpression child;
->> @@
->>
->>  for_each_available_child_of_node(root, child) {
->>    ... when != of_node_put(child)
->>        when != e = child
->> (
->>    return child;
->> |
->> *  return ...;
->> )
->>    ...
->>  }
->> // </smpl>
->>
->> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
->>
->> ---
-> 
-> For this patch:
-> 
-> Acked-by: Brian Norris <computersforpeace@gmail.com>
-> 
->>  drivers/phy/phy-brcmstb-sata.c |   17 ++++++++++++-----
->>  1 file changed, 12 insertions(+), 5 deletions(-)
-> 
-> [snip patch, which fixes of_node_put() handling for
-> for_each_available_child_of_node() loop, which creates PHY devices with
-> devm_phy_create()]
-> 
-> This reminds me of a potential problem I'm looking at in other
-> subsystems: from code reading (I haven't seen any issues in practice,
-> probably because I don't use OF_DYNAMIC) it looks like device-creating
-> infrastructure like the PHY subsystem should be acquiring a reference to
-> the device_node when they stash it away. But drivers/phy/phy-core.c does
-> not do this, AFAICT.
-> 
-> See phy_create(), which does
-> 
-> 	phy->dev.of_node = node ?: dev->of_node;
-> 
-> and later might reuse this of_node pointer, even though it never called
-> of_node_get() on this node.
-> 
-> Potential patch to fix this (not tested).
-> 
-> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-> 
-> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-> index fc48fac003a6..8df29caeeef9 100644
-> --- a/drivers/phy/phy-core.c
-> +++ b/drivers/phy/phy-core.c
-> @@ -697,6 +697,7 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
->  	phy->dev.class = phy_class;
->  	phy->dev.parent = dev;
->  	phy->dev.of_node = node ?: dev->of_node;
-> +	of_node_get(phy->dev.of_node);
->  	phy->id = id;
->  	phy->ops = ops;
->  
-> @@ -726,6 +727,7 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
->  	return phy;
->  
->  put_dev:
-> +	of_node_put(phy->dev.of_node);
->  	put_device(&phy->dev);  /* calls phy_release() which frees resources */
->  	return ERR_PTR(ret);
->  
-> @@ -775,6 +777,7 @@ EXPORT_SYMBOL_GPL(devm_phy_create);
->   */
->  void phy_destroy(struct phy *phy)
->  {
-> +	of_node_put(phy->dev.of_node);
+> +#define SCTLR_ELx_FLAGS	(SCTLR_ELx_M | SCTLR_ELx_A | SCTLR_ELx_C |	\
+> +			 SCTLR_ELx_SA | SCTLR_ELx_I)
+> +
+> +.text
+> +.pushsection    .idmap.text, "ax"
+> +
+> +.align 5
 
-I think it's better to have this patch in phy-core though OF_DYNAMIC is not
-enabled?
+Why is this .align directive required?
 
-Grant,
+> +
+> +/*
+> + * cpu_soft_restart(cpu_reset, el2_switch, entry, arg0, arg1) - Perform a cpu
+> + * soft reset.
+> + *
+> + * @cpu_reset: Physical address of the cpu_reset routine.
+> + * @el2_switch: Flag to indicate a swich to EL2 is needed, passed to cpu_reset.
+> + * @entry: Location to jump to for soft reset, passed to cpu_reset.
+> + * arg0: First argument passed to @entry.
+> + * arg1: Second argument passed to @entry.
+> + */
+> +
+> +ENTRY(cpu_soft_restart)
+> +	mov	x18, x0				// cpu_reset
+> +	mov	x0, x1				// el2_switch
+> +	mov	x1, x2				// entry
+> +	mov	x2, x3				// arg0
+> +	mov	x3, x4				// arg1
+> +	ret	x18
+> +ENDPROC(cpu_soft_restart)
 
-Is it safe to assume of_node_get() will prevent "anyone else" from deleting the
-node?
-Here phy core uses the node pointer (passed to it by phy providers) and we
-would like to avoid "anyone" from removing this node pointer resulting in phy
-core having an invalid node pointer. Using of_node_get() in phy core should be
-sufficient for this?
+Grepping through the tree, I can only find a single use of
+cpu_soft_restart, with cpu_reset as its first parameter.
 
-We are also interested in this todo tasklist for Devicetree..
-"Document node lifecycle for CONFIG_OF_DYNAMIC"
+Why do we need this indirection? Having
 
-Please find the complete thread of this mail chain here [1]
+void cpu_soft_restart(el2_switch, entry, arg0, arg1);
 
-[1] -> http://www.gossamer-threads.com/lists/linux/kernel/2304857
+should be enough...
 
-Thanks
-Kishon
+> +
+> +/*
+> + * cpu_reset(el2_switch, entry, arg0, arg1) - Helper for cpu_soft_restart.
+> + *
+> + * @el2_switch: Flag to indicate a swich to EL2 is needed.
+> + * @entry: Location to jump to for soft reset.
+> + * arg0: First argument passed to @entry.
+> + * arg1: Second argument passed to @entry.
+> + *
+> + * Put the CPU into the same state as it would be if it had been reset, and
+> + * branch to what would be the reset vector. It must be executed with the
+> + * flat identity mapping.
+> + */
+> +
+> +ENTRY(cpu_reset)
+> +	/* Clear sctlr_el1 flags. */
+> +	mrs	x12, sctlr_el1
+> +	ldr	x13, =SCTLR_ELx_FLAGS
+> +	bic	x12, x12, x13
+> +	msr	sctlr_el1, x12
+> +	isb
+> +
+> +	cbz	x0, 1f				// el2_switch?
+> +
+> +	mov	x0, x1				// entry
+> +	mov	x1, x2				// arg0
+> +	mov	x2, x3				// arg1
+> +	hvc	#HVC_CALL_FUNC			// no return
+> +
+> +1:	mov	x18, x1				// entry
+> +	mov	x0, x2				// arg0
+> +	mov	x1, x3				// arg1
+> +	ret	x18
+> +ENDPROC(cpu_reset)
 
->  	pm_runtime_disable(&phy->dev);
->  	device_unregister(&phy->dev);
->  }
+And this can be an actual part of cpu_soft_reset.
+
+> +
+> +.popsection
+> diff --git a/arch/arm64/kernel/cpu-reset.h b/arch/arm64/kernel/cpu-reset.h
+> new file mode 100644
+> index 0000000..79816b6
+> --- /dev/null
+> +++ b/arch/arm64/kernel/cpu-reset.h
+> @@ -0,0 +1,22 @@
+> +/*
+> + * cpu reset routines
+> + *
+> + * Copyright (C) 2015 Huawei Futurewei Technologies.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#if !defined(_ARM64_CPU_RESET_H)
+
+The usual idiom is "#ifndef __BLAH_H".
+
+> +#define _ARM64_CPU_RESET_H
+> +
+> +#include <asm/virt.h>
+> +
+> +void __attribute__((noreturn)) cpu_reset(unsigned long el2_switch,
+> +	unsigned long entry, unsigned long arg0, unsigned long arg1);
+> +void __attribute__((noreturn)) cpu_soft_restart(phys_addr_t cpu_reset,
+> +	unsigned long el2_switch, unsigned long entry, unsigned long arg0,
+> +	unsigned long arg1);
+> +
+> +#endif
 > 
+
+There is a __noreturn attribute already defined.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
