@@ -1,89 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Nov 2015 18:04:16 +0000
-Subject: interruptible_sleep_on_timeout replacement
-In-Reply-To: <565894EB.7040200@free.fr>
-References: <565894EB.7040200@free.fr>
-Message-ID: <20151127180416.GO8644@n2100.arm.linux.org.uk>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Fri, 27 Nov 2015 10:07:54 -0800
+Subject: [PATCH] null_blk: use sector_div instead of do_div
+In-Reply-To: <3768541.ja0r6f0Odi@wuerfel>
+References: <3768541.ja0r6f0Odi@wuerfel>
+Message-ID: <CA+55aFy=JjwmtNysByu822S2Av0sv_KUCLfa86tAz5K5Unwsmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 27, 2015 at 06:37:47PM +0100, Mason wrote:
-> Hello Arnd,
-> 
-> I have to port /ancient/ code to v4.1
-> The problematic line is:
-> 
->   long timeout_jiffies = US_TO_JIFFIES(wait_param->timeout_microsecond);
->   ...
->   timeout_jiffies = interruptible_sleep_on_timeout(&(llad_context.irq_queue), timeout_jiffies);
->   wait_param->timeout_microsecond = JIFFIES_TO_US(timeout_jiffies);
+On Fri, Nov 27, 2015 at 5:49 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> -       do_div(size, bs); /* convert size to pages */
+> -       do_div(size, 256); /* concert size to pgs pr blk */
+> +       sector_div(size, bs); /* convert size to pages */
+> +       sector_div(size, 256); /* concert size to pgs pr blk */
 
-Right, so it's most probably buggy (anything using *_sleep_on* is
-buggy almost by definition.)
+Ugh.
 
-> IIUC, the appropriate replacement is
-> 
->   wait_event_interruptible_timeout(wq, condition, timeout)
-> 
-> where wq and timeout are the original parameters?
+Dividing by 256 should never be done with do_div() *or* sector-div.
 
-wait_event_interruptible_timeout is documented very well in
-include/linux/wait.h.
+Same goes for this, which is just obnoxiously idiotic:
 
-> To determine the condition... do I have to examine the corresponding
-> wake_up_interruptible() calls? I do see several
-> 
-> 	if (status & SOME_VAL) {
-> 		if (!test_and_set_bit(LOG2_SOME_VAL, &(llad_context.irq_bits)))
-> 			wake_up_interruptible(&(llad_context.irq_queue));
-> 	}
+> -       do_div(size, (1 << 16));
+> +       sector_div(size, (1 << 16));
 
-Quoting random bits of out of context code really doesn't help anyone,
-especially with something this complex.  We really need to see the
-whole driver to comment properly.
+WTF? It explicitly divides by a particular power-of-two?
 
-Condition is, as the documentation says, is the condition to be waited
-for, which should evaluate to true to terminate the wait prior to the
-timeout.
+Has nobody ever heard of expensive divide operations? Sure, for the
+cases where we *don't* do this with inline asm etc because it's
+already fairly cheap, the compiler will DTRT. But that "divide by (1
+<< 16)" is just a sign of insanity.
 
-> Also I'm not sure the return value is a direct match?
+Why is that not just
 
-It doesn't.  You're expected to know how much longer you need to wait.
-So, you need something like:
+    size >>= 16;
 
-I think you will want something like this:
+instead, which is certainly not any less legible, and won't generate
+potentially crap code?
 
-	long timeout_jiffies = US_TO_JIFFIES(wait_param->timeout_microsecond);
-	long target_jiffies = jiffies + timeout_jiffies;
-	long ret;
-	...
-
-	ret = wait_event_interruptible_timeout(&llad_context.irq_queue,
-					       ... some condition ...
-					       timeout_jiffies);
-
-	if (ret < 0) {
-		long now = jiffies;
-
-		if (time_before_eq(now, target_jiffies))
-			wait_param->timeout_microsecond =
-				JIFFIES_TO_US(target_jiffies - now);
-		else
-			wait_param->timeout_microsecond = 0;
-
-		return ret;
-	}
-
-	if (ret == 0) {
-		timed out
-	} else {
-		condition was satisfied
-	}
-
-Even better, change the API so that 'timeout_microsecond' is an
-absolute time so you don't have accumulated errors if you're repeatedly
-interrupted.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+                  Linus
