@@ -1,66 +1,67 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 27 Nov 2015 21:28:31 +0800
-Subject: [PATCH v2 0/4] ACPI based NUMA support for ARM64
-In-Reply-To: <56582195.80306@huawei.com>
-References: <1447784733-10419-1-git-send-email-gkulkarni@caviumnetworks.com>
- <56582195.80306@huawei.com>
-Message-ID: <56585A7F.3010505@linaro.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 27 Nov 2015 14:32:26 +0100
+Subject: [PATCH v8 14/17] drm: bridge: analogix/dp: add max link rate and
+ lane count limit for RK3288
+In-Reply-To: <1446022561-16870-1-git-send-email-ykk@rock-chips.com>
+References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
+ <1446022561-16870-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <2807882.UeSPH80il3@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2015 05:25 PM, Shannon Zhao wrote:
->
->
-> On 2015/11/18 2:25, Ganapatrao Kulkarni wrote:
->>   -v2 rebased on arm64-numa v7 patches.
->>   http://www.spinics.net/lists/arm-kernel/msg460813.html
->>
->>   -v1 initial patches from Hanjun Guo
->>
->> Hanjun Guo (4):
->>    acpi, numa: Use pr_fmt() instead of printk
->>    acpi, numa: Replace ACPI_DEBUG_PRINT() with pr_debug()
->>    arm64, acpi, numa: NUMA support based on SRAT and SLIT
->>    acpi, numa: Enable ACPI based NUMA on ARM64
->>
->>   arch/arm64/include/asm/acpi.h |   4 +
->>   arch/arm64/kernel/Makefile    |   1 +
->>   arch/arm64/kernel/acpi_numa.c | 215 ++++++++++++++++++++++++++++++++++++++++++
->>   arch/arm64/mm/numa.c          |   7 +-
->>   drivers/acpi/Kconfig          |   4 +-
->>   drivers/acpi/numa.c           | 106 ++++++++++++---------
->>   include/linux/acpi.h          |  15 +++
->>   7 files changed, 306 insertions(+), 46 deletions(-)
->>   create mode 100644 arch/arm64/kernel/acpi_numa.c
->>
->
-> I've tested this patch set on QEMU VM and guest prints below log:
->
-> ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x0 -> Node 0 cpu 1
-> ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x1 -> Node 0 cpu 2
-> ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x2 -> Node 1 cpu 3
-> ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x3 -> Node 1 cpu 4
-> ACPI: NUMA: SRAT: Node 0 PXM 0 [mem 0x40000000-0x5fffffff]
-> NUMA: Adding memblock [0x40000000 - 0x5fffffff] on node 0
-> ACPI: NUMA: SRAT: Node 1 PXM 1 [mem 0x60000000-0x7fffffff]
-> NUMA: Adding memblock [0x60000000 - 0x7fffffff] on node 1
-> Initmem setup node 0 [mem 0x40000000-0x5fffffff]
->    NODE_DATA [mem 0x5fffe400-0x5fffffff]
-> Initmem setup node 1 [mem 0x60000000-0x7fffffff]
->    NODE_DATA [mem 0x7effd400-0x7effefff]
-> Zone ranges:
->    DMA      [mem 0x0000000040000000-0x000000007fffffff]
->    Normal   empty
-> Movable zone start for each node
-> Early memory node ranges
->    node   0: [mem 0x0000000040000000-0x000000005fffffff]
->    node   1: [mem 0x0000000060000000-0x000000007fffffff]
-> Initmem setup node 0 [mem 0x0000000040000000-0x000000005fffffff]
-> Initmem setup node 1 [mem 0x0000000060000000-0x000000007fffffff]
->
-> So, Tested-by: Shannon Zhao <shannon.zhao@linaro.org>
+Am Mittwoch, 28. Oktober 2015, 16:56:01 schrieb Yakir Yang:
+> There are some IP limit on rk3288 that only support 4 physical lanes
+> of 2.7/1.6 Gbps/lane, so seprate them out by device_type flag.
+> 
+> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> ---
 
-Hi Shannon, thanks a lot!
+[...]
 
-Thanks
-Hanjun
+> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c index
+> 6307060..563ffb1d 100644
+> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> @@ -890,8 +890,8 @@ static void analogix_dp_commit(struct analogix_dp_device
+> *dp) return;
+>  	}
+> 
+> -	ret = analogix_dp_set_link_train(dp, dp->video_info.lane_count,
+> -					 dp->video_info.link_rate);
+> +	ret = analogix_dp_set_link_train(dp, dp->video_info.max_lane_count,
+> +					 dp->video_info.max_link_rate);
+>  	if (ret) {
+>  		dev_err(dp->dev, "unable to do link train\n");
+>  		return;
+> @@ -1156,16 +1156,25 @@ static int analogix_dp_dt_parse_pdata(struct
+> analogix_dp_device *dp) struct device_node *dp_node = dp->dev->of_node;
+>  	struct video_info *video_info = &dp->video_info;
+> 
+> -	if (of_property_read_u32(dp_node, "samsung,link-rate",
+> -				 &video_info->link_rate)) {
+> -		dev_err(dp->dev, "failed to get link-rate\n");
+> -		return -EINVAL;
+> -	}
+> -
+> -	if (of_property_read_u32(dp_node, "samsung,lane-count",
+> -				 &video_info->lane_count)) {
+> -		dev_err(dp->dev, "failed to get lane-count\n");
+> -		return -EINVAL;
+> +	switch (dp->plat_data && dp->plat_data->dev_type) {
+
+drivers/gpu/drm/bridge/analogix/analogix_dp_core.c: In function ?analogix_dp_dt_parse_pdata?:
+drivers/gpu/drm/bridge/analogix/analogix_dp_core.c:1191:10: warning: switch condition has boolean value [-Wswitch-bool]
+  switch (dp->plat_data && dp->plat_data->dev_type) {
+          ^
+
+As I think we always will need to distinguish between implementations,
+I guess it should be safe to exit with an error, it that implementation-data
+is not available, like just doing before the switch a:
+
+if (!dp->plat_data)
+	return -EINVAL;
+
+
+Heiko
