@@ -1,79 +1,35 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Fri, 27 Nov 2015 11:36:30 +0300
-Subject: [PATCH v3 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
-In-Reply-To: <56561C71.30602@android.com>
-References: <1447888808-31571-1-git-send-email-dcashman@android.com>
- <1447888808-31571-2-git-send-email-dcashman@android.com>
- <1447888808-31571-3-git-send-email-dcashman@android.com>
- <1447888808-31571-4-git-send-email-dcashman@android.com>
- <20151123150459.GD4236@arm.com> <56536114.1020305@android.com>
- <20151125120601.GC3109@e104818-lin.cambridge.arm.com>
- <56561C71.30602@android.com>
-Message-ID: <CAPAsAGyJr5OD+_4TO9dt2EwOGUGewEy4bAmhFhDbP3RJ+6QxaA@mail.gmail.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Fri, 27 Nov 2015 09:38:33 +0100
+Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
+ "/chosen/linux,atags" entry
+In-Reply-To: <20151126203930.GW2517@atomide.com>
+References: <20150713131902.GH26485@atomide.com> <20151123144545.GD24147@pali>
+ <20151125181644.GI2517@atomide.com> <17134653.86P3dFyQKK@wuerfel>
+ <20151125210310.GT2517@atomide.com> <56568849.5080103@gmail.com>
+ <20151126090739.GD14190@pali> <20151126203930.GW2517@atomide.com>
+Message-ID: <20151127083833.GA430@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-11-25 23:39 GMT+03:00 Daniel Cashman <dcashman@android.com>:
-> On 11/25/2015 04:06 AM, Catalin Marinas wrote:
->> On Mon, Nov 23, 2015 at 10:55:16AM -0800, Daniel Cashman wrote:
->>> On 11/23/2015 07:04 AM, Will Deacon wrote:
->>>> On Wed, Nov 18, 2015 at 03:20:07PM -0800, Daniel Cashman wrote:
->>>>> +config ARCH_MMAP_RND_BITS_MAX
->>>>> +       default 20 if ARM64_64K_PAGES && ARCH_VA_BITS=39
->>
->> Where is ARCH_VA_BITS defined? We only have options like
->> ARM64_VA_BITS_39.
->>
->> BTW, we no longer allow the 64K pages and 39-bit VA combination.
->
-> It is not, and should have been ARM64_VA_BITS.  This stanza was meant to
-> mimic the one for ARM64_VA_BITS.  Thank you for pointing this, and the
-> 39-bit combination out.
->
->>>>> +       default 24 if ARCH_VA_BITS=39
->>>>> +       default 23 if ARM64_64K_PAGES && ARCH_VA_BITS=42
->>>>> +       default 27 if ARCH_VA_BITS=42
->>>>> +       default 29 if ARM64_64K_PAGES && ARCH_VA_BITS=48
->>>>> +       default 33 if ARCH_VA_BITS=48
->>>>> +       default 15 if ARM64_64K_PAGES
->>>>> +       default 19
->>>>> +
->>>>> +config ARCH_MMAP_RND_COMPAT_BITS_MIN
->>>>> +       default 7 if ARM64_64K_PAGES
->>>>> +       default 11
->>>>
->>>> FYI: we now support 16k pages too, so this might need updating. It would
->>>> be much nicer if this was somehow computed rather than have the results
->>>> all open-coded like this.
->>>
->>> Yes, I ideally wanted this to be calculated based on the different page
->>> options and VA_BITS (which itself has a similar stanza), but I don't
->>> know how to do that/if it is currently supported in Kconfig. This would
->>> be even more desirable with the addition of 16K_PAGES, as with this
->>> setup we have a combinatorial problem.
->>
->> For KASan, we ended up calculating KASAN_SHADOW_OFFSET in
->> arch/arm64/Makefile. What would the formula be for the above
->> ARCH_MMAP_RND_BITS_MAX?
->
-> The general formula I used ended up being:
-> _max = floor(log(TASK_SIZE)) - log(PAGE_SIZE) - 3
->
+On Thursday 26 November 2015 12:39:30 Tony Lindgren wrote:
+> Just to explore options.. How about make a minimal device driver that
+> just loads the atags blob from /lib/firmware and then shows it in
+> /proc/atags? Of course some checking on the atags should be done by
+> the driver..
 
-For kasan, we calculate KASAN_SHADOW_OFFSET in Makefile, because we need to use
-that value in Makefiles.
+And who can dynamically create that blob file in /lib/firmware? If
+kernel does not export those atags (somehow) from bootloader, then
+userspace is not able to create that blob... cyclic problem.
 
-For ARCH_MMAP_RND_COMPAT_BITS_MIN/MAX I don't see a reason why it has
-to be in Kconfig.
-Can't we just use your formula to #define ARCH_MMAP_RND_COMPAT_BITS_*
-in some arch header?
+So no, problem is that bootloader provides via custom atags dynamic
+information like: boot reason (how was device started, by rtc alarm? by
+reboot? by usb charger? by power button?), boot mode (should be enter
+into firmware update mode?, is this normal boot mode?), ... and those
+information are needed for some proprietary software (e.g. firmware
+upgrade/flash) but also by any other open source applications (based on
+usb charger we enter different runlevel -- for just only charging
+device).
 
-> which in the case of arm64 ended up being VA_BITS - PAGE_SHIFT - 3.
-> Aside: following this would actually put COMPAT_BITS_MAX at 17 for 4k
-> pages, rather than 16, but I left it at 16 to mirror what was put in
-> arch/arm/Kconfig.
->
->
-> Thank You,
-> Dan
->
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
