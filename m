@@ -1,80 +1,53 @@
-From: ynezz@true.cz (=?UTF-8?q?Petr=20=C5=A0tetiar?=)
-Date: Fri, 27 Nov 2015 11:01:39 +0100
-Subject: [PATCH v2] PCI: imx6: Fix reset-gpio to work with active low GPIO
-In-Reply-To: <1448373334.3689.33.camel@pengutronix.de>
-References: <1448373334.3689.33.camel@pengutronix.de>
-Message-ID: <1448618499-14990-1-git-send-email-ynezz@true.cz>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Nov 2015 10:02:11 +0000
+Subject: [PATCH RFT] arm64: kasan: Make KASAN work with 16K pages + 48
+ bit VA
+In-Reply-To: <20151127093529.GX3109@e104818-lin.cambridge.arm.com>
+References: <1448543686-31869-1-git-send-email-aryabinin@virtuozzo.com>
+ <CAKv+Gu_L1shTWp_5KydCW97Z6TbeXEB9gjmb2oUSuCHfC29M9A@mail.gmail.com>
+ <5658106C.10207@virtuozzo.com>
+ <20151127093529.GX3109@e104818-lin.cambridge.arm.com>
+Message-ID: <20151127100210.GB25781@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's currently not possible to use reset-gpio on board where the GPIO is
-active low as the code incorrectly assumes, that reset-gpio will be
-always active high.
+On Fri, Nov 27, 2015 at 09:35:29AM +0000, Catalin Marinas wrote:
+> On Fri, Nov 27, 2015 at 11:12:28AM +0300, Andrey Ryabinin wrote:
+> > On 11/26/2015 07:40 PM, Ard Biesheuvel wrote:
+> > > On 26 November 2015 at 14:14, Andrey Ryabinin <aryabinin@virtuozzo.com> wrote:
+> > >> Currently kasan assumes that shadow memory covers one or more entire PGDs.
+> > >> That's not true for 16K pages + 48bit VA space, where PGDIR_SIZE is bigger
+> > >> than the whole shadow memory.
+> > >>
+> > >> This patch tries to fix that case.
+> > >> clear_page_tables() is a new replacement of clear_pgs(). Instead of always
+> > >> clearing pgds it clears top level page table entries that entirely belongs
+> > >> to shadow memory.
+> > >> In addition to 'tmp_pg_dir' we now have 'tmp_pud' which is used to store
+> > >> puds that now might be cleared by clear_page_tables.
+> > >>
+> > >> Reported-by: Suzuki K. Poulose <Suzuki.Poulose@arm.com>
+> > >> Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+> > > 
+> > > I would argue that the Kasan code is complicated enough, and we should
+> > > avoid complicating it even further for a configuration that is highly
+> > > theoretical in nature.
+> > > 
+> > > In a 16k configuration, the 4th level only adds a single bit of VA
+> > > space (which is, as I understand it, exactly the issue you need to
+> > > address here since the top level page table has only 2 entries and
+> > > hence does not divide by 8 cleanly), which means you are better off
+> > > using 3 levels unless you *really* need more than 128 TB of VA space.
+> > > 
+> > > So can't we just live with the limitation, and keep the current code?
+> > 
+> > No objections from my side. Let's keep the current code.
+> 
+> Ard had a good point, so fine by me as well.
 
-In my case the broken behavior was observed on Toradex Apalis SoM with
-Ixora base board.
+Ok, so obvious follow-up question: why do we even support 48-bit + 16k
+pages in the kernel? Either it's useful, and we make things work with it,
+or it's not and we can drop it (or, at least, hide it behind EXPERT like
+we do for 36-bit).
 
-Signed-off-by: Petr ?tetiar <ynezz@true.cz>
----
-
-Changes since v1:
- * reworked to use descriptor based GPIO interface
-
- drivers/pci/host/pci-imx6.c |   20 ++++++--------------
- 1 file changed, 6 insertions(+), 14 deletions(-)
-
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index 22e8224..c0e121d 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -32,7 +32,7 @@
- #define to_imx6_pcie(x)	container_of(x, struct imx6_pcie, pp)
- 
- struct imx6_pcie {
--	int			reset_gpio;
-+	struct gpio_desc	*reset_gpio;
- 	struct clk		*pcie_bus;
- 	struct clk		*pcie_phy;
- 	struct clk		*pcie;
-@@ -287,10 +287,10 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
- 	usleep_range(200, 500);
- 
- 	/* Some boards don't have PCIe reset GPIO. */
--	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
--		gpio_set_value(imx6_pcie->reset_gpio, 0);
-+	if (imx6_pcie->reset_gpio) {
-+		gpiod_set_value(imx6_pcie->reset_gpio, 0);
- 		msleep(100);
--		gpio_set_value(imx6_pcie->reset_gpio, 1);
-+		gpiod_set_value(imx6_pcie->reset_gpio, 1);
- 	}
- 	return 0;
- 
-@@ -560,7 +560,6 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
- {
- 	struct imx6_pcie *imx6_pcie;
- 	struct pcie_port *pp;
--	struct device_node *np = pdev->dev.of_node;
- 	struct resource *dbi_base;
- 	int ret;
- 
-@@ -581,15 +580,8 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
- 		return PTR_ERR(pp->dbi_base);
- 
- 	/* Fetch GPIOs */
--	imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
--	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
--		ret = devm_gpio_request_one(&pdev->dev, imx6_pcie->reset_gpio,
--					    GPIOF_OUT_INIT_LOW, "PCIe reset");
--		if (ret) {
--			dev_err(&pdev->dev, "unable to get reset gpio\n");
--			return ret;
--		}
--	}
-+	imx6_pcie->reset_gpio = devm_gpiod_get_optional(&pdev->dev, "reset",
-+							GPIOD_OUT_LOW);
- 
- 	/* Fetch clocks */
- 	imx6_pcie->pcie_phy = devm_clk_get(&pdev->dev, "pcie_phy");
--- 
-1.7.9.5
+Will
