@@ -1,38 +1,79 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Fri, 27 Nov 2015 12:01:37 -0800
-Subject: [PATCH] arm64: Enable selection of CONFIG_IRQ_TIME_ACCOUNTING on arm64
-Message-ID: <1448654497-3492-1-git-send-email-m.smarduch@samsung.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 27 Nov 2015 12:02:46 -0800
+Subject: [PATCH 1/2] ARM: dts: imx6: Add support for Toradex Apalis SoM
+In-Reply-To: <20151126101742.GM19674@ibawizard.net>
+References: <1447935900-13635-1-git-send-email-ynezz@true.cz>
+ <1447935900-13635-2-git-send-email-ynezz@true.cz>
+ <1447942325.3144.86.camel@pengutronix.de>
+ <20151126101742.GM19674@ibawizard.net>
+Message-ID: <5b507c5d85e51d56074a8f8c32b8dcf9@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently 'simple tick accounting' and 'full dynticks accounting' can
-be selected on arm64. simple tick accounting doesn't accumulate per-cpu irq 
-time and full dynticks accounting doesn't accumulate softirq time.
+Hi Petr,
 
-This patch enables selection of "Fine Granularity task level IRQ time 
-accounting" which accumulates irq, softirq times. All three modes accumulate 
-guest time.
+On 2015-11-26 02:17, Petr ?tetiar wrote:
+> Lucas Stach <l.stach@pengutronix.de> [2015-11-19 15:12:05]:
+>> > +&fec {
+>> > +	pinctrl-names = "default";
+>> > +	pinctrl-0 = <&pinctrl_enet &pinctrl_enet_ctrl>;
+>> > +	phy-mode = "rgmii";
+>> > +	status = "okay";
+>> > +
+>> > +	#address-cells = <0>;
+>> > +	#size-cells = <1>;
+>> > +	phy_int {
+>> > +		reg = <0x6>;
+>> > +		interrupt-parent = <&gpio1>;
+>> > +		interrupts = <30 IRQ_TYPE_LEVEL_LOW>;
+>> > +	};
+>>
+>> I don't think that's the right way to describe a PHY with the mainline
+>> kernel bindings.
+> 
+> I'm quite stuck here as I don't have schematics of that SOM, so I don't know
+> how the PHY is connected to the i.MX6. I've asked Toradex about the details,
+> but they've just replied with "These signals connect to the on module Ethernet
+> PHY.", which isn't much helpful :-) and gave me a link to the DTS[1] with a same
+> content.
+> 
+> So, I've simply tried to convert it to the mainline DTS:
+> 
+> &fec {
+> 	pinctrl-names = "default";
+> 	pinctrl-0 = <&pinctrl_enet &pinctrl_enet_ctrl>;
+> 	phy-mode = "rgmii";
+> 
+> 	phy-reset-gpios = <&gpio1 25 GPIO_ACTIVE_HIGH>;
+> 	interrupts-extended = <&gpio1 30 IRQ_TYPE_LEVEL_LOW>,
+> 			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+> 	status = "okay";
+> };
 
-This patch is against 4.4.0-rc2 commit 5a44ed0d was tested on Juno in 
-'periodic', and 'tickless idle' - modes. Running a ping flood or
-lmbench timer - benchmark results in un-accounted cpu time usage. 
+According to the schema, &gpio1 30 is low active as well as the reset
+GPIO &gpio1 25. Both pulled high externally...
 
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
----
- arch/arm64/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+So phy reset GPIO should be ACTIVE_LOW, otherwise things look correct to
+me.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 9ac16a4..080dbf1 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -92,6 +92,7 @@ config ARM64
- 	select SPARSE_IRQ
- 	select SYSCTL_EXCEPTION_TRACE
- 	select HAVE_CONTEXT_TRACKING
-+	select HAVE_IRQ_TIME_ACCOUNTING
- 	help
- 	  ARM 64-bit (AArch64) Linux support.
- 
--- 
-1.9.1
+> but it doesn't work, the PHY isn't being initialized. Then I've tried
+> bruteforce method with all remaining combinations of high/low level types for
+> both reset and interrupt GPIOs, but without success. If I simply remove reset
+> and interrupt GPIO descriptions, then it boots, but I don't know if everything
+> is setup as it should be. Any ideas?
+
+I guess in that case U-Boot took care of it. However, this is not a
+clean solution...
+
+Not sure what happens exactly, maybe the phy-reset does not honor the
+GPIO_ACTIVE_LOW flag?
+
+Maybe also check the reset pad control, I guess you need to set
+something different here anyway.
+MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25 PAD_CTRL_NO
+
+In case that does not help, I can have a look here what is going on next
+week.
+
+--
+Stefan
