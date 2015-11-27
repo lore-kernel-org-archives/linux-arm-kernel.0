@@ -1,44 +1,47 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 Nov 2015 09:32:50 +0000
-Subject: [PATCH v3 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
-In-Reply-To: <CAPAsAGyJr5OD+_4TO9dt2EwOGUGewEy4bAmhFhDbP3RJ+6QxaA@mail.gmail.com>
-References: <1447888808-31571-1-git-send-email-dcashman@android.com>
- <1447888808-31571-2-git-send-email-dcashman@android.com>
- <1447888808-31571-3-git-send-email-dcashman@android.com>
- <1447888808-31571-4-git-send-email-dcashman@android.com>
- <20151123150459.GD4236@arm.com> <56536114.1020305@android.com>
- <20151125120601.GC3109@e104818-lin.cambridge.arm.com>
- <56561C71.30602@android.com>
- <CAPAsAGyJr5OD+_4TO9dt2EwOGUGewEy4bAmhFhDbP3RJ+6QxaA@mail.gmail.com>
-Message-ID: <20151127093249.GW3109@e104818-lin.cambridge.arm.com>
+Date: Fri, 27 Nov 2015 09:35:29 +0000
+Subject: [PATCH RFT] arm64: kasan: Make KASAN work with 16K pages + 48
+ bit VA
+In-Reply-To: <5658106C.10207@virtuozzo.com>
+References: <1448543686-31869-1-git-send-email-aryabinin@virtuozzo.com>
+ <CAKv+Gu_L1shTWp_5KydCW97Z6TbeXEB9gjmb2oUSuCHfC29M9A@mail.gmail.com>
+ <5658106C.10207@virtuozzo.com>
+Message-ID: <20151127093529.GX3109@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 27, 2015 at 11:36:30AM +0300, Andrey Ryabinin wrote:
-> 2015-11-25 23:39 GMT+03:00 Daniel Cashman <dcashman@android.com>:
-> > On 11/25/2015 04:06 AM, Catalin Marinas wrote:
-> >> For KASan, we ended up calculating KASAN_SHADOW_OFFSET in
-> >> arch/arm64/Makefile. What would the formula be for the above
-> >> ARCH_MMAP_RND_BITS_MAX?
-> >
-> > The general formula I used ended up being:
-> > _max = floor(log(TASK_SIZE)) - log(PAGE_SIZE) - 3
+On Fri, Nov 27, 2015 at 11:12:28AM +0300, Andrey Ryabinin wrote:
+> On 11/26/2015 07:40 PM, Ard Biesheuvel wrote:
+> > On 26 November 2015 at 14:14, Andrey Ryabinin <aryabinin@virtuozzo.com> wrote:
+> >> Currently kasan assumes that shadow memory covers one or more entire PGDs.
+> >> That's not true for 16K pages + 48bit VA space, where PGDIR_SIZE is bigger
+> >> than the whole shadow memory.
+> >>
+> >> This patch tries to fix that case.
+> >> clear_page_tables() is a new replacement of clear_pgs(). Instead of always
+> >> clearing pgds it clears top level page table entries that entirely belongs
+> >> to shadow memory.
+> >> In addition to 'tmp_pg_dir' we now have 'tmp_pud' which is used to store
+> >> puds that now might be cleared by clear_page_tables.
+> >>
+> >> Reported-by: Suzuki K. Poulose <Suzuki.Poulose@arm.com>
+> >> Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+> > 
+> > I would argue that the Kasan code is complicated enough, and we should
+> > avoid complicating it even further for a configuration that is highly
+> > theoretical in nature.
+> > 
+> > In a 16k configuration, the 4th level only adds a single bit of VA
+> > space (which is, as I understand it, exactly the issue you need to
+> > address here since the top level page table has only 2 entries and
+> > hence does not divide by 8 cleanly), which means you are better off
+> > using 3 levels unless you *really* need more than 128 TB of VA space.
+> > 
+> > So can't we just live with the limitation, and keep the current code?
 > 
-> For kasan, we calculate KASAN_SHADOW_OFFSET in Makefile, because we need to use
-> that value in Makefiles.
-> 
-> For ARCH_MMAP_RND_COMPAT_BITS_MIN/MAX I don't see a reason why it has
-> to be in Kconfig.
-> Can't we just use your formula to #define ARCH_MMAP_RND_COMPAT_BITS_*
-> in some arch header?
+> No objections from my side. Let's keep the current code.
 
-Because there is another option, ARCH_MMAP_RND_BITS depending on EXPERT
-which uses the MIN/MAX range defined per architecture. Since it's an
-expert feature, we could as well ignore the MIN/MAX in Kconfig and just
-add BUILD_BUG_ON checks to the code. This way we could simply define
-them in C files.
-
-Alternatively, add arithmetics support to kbuild ;).
+Ard had a good point, so fine by me as well.
 
 -- 
 Catalin
