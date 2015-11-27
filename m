@@ -1,75 +1,79 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 27 Nov 2015 10:55:48 +0900
-Subject: [PATCH 3/3] ARM: shmobile: Remove legacy mach/irqs.h
-In-Reply-To: <cover.1448585673.git.horms+renesas@verge.net.au>
-References: <cover.1448585673.git.horms+renesas@verge.net.au>
-Message-ID: <c8cd74a1468ffe20db3ddc6e6f408d5377f9be43.1448585673.git.horms+renesas@verge.net.au>
+Date: Fri, 27 Nov 2015 10:55:56 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for v4.5
+Message-ID: <cover.1448586938.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-The header isn't needed anymore now that all SoCs use multiplatform
-kernels. Remove it.
+Please consider these second round of Renesas ARM based SoC DT updates for v4.5.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/include/mach/irqs.h | 10 ----------
- arch/arm/mach-shmobile/irqs.h              | 15 ---------------
- arch/arm/mach-shmobile/setup-r8a7778.c     |  1 -
- 3 files changed, 26 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/include/mach/irqs.h
- delete mode 100644 arch/arm/mach-shmobile/irqs.h
+This pull request extends support for Renesas ARM Based SoCs via DT
+and includes several minor fixes and cleanups.
 
-diff --git a/arch/arm/mach-shmobile/include/mach/irqs.h b/arch/arm/mach-shmobile/include/mach/irqs.h
-deleted file mode 100644
-index 5aee83f079e2..000000000000
---- a/arch/arm/mach-shmobile/include/mach/irqs.h
-+++ /dev/null
-@@ -1,10 +0,0 @@
--#ifndef __ASM_MACH_IRQS_H
--#define __ASM_MACH_IRQS_H
--
--/* Stuck here until drivers/pinctl/sh-pfc gets rid of legacy code */
--
--/* External IRQ pins */
--#define IRQPIN_BASE		2000
--#define irq_pin(nr)		((nr) + IRQPIN_BASE)
--
--#endif /* __ASM_MACH_IRQS_H */
-diff --git a/arch/arm/mach-shmobile/irqs.h b/arch/arm/mach-shmobile/irqs.h
-deleted file mode 100644
-index 3070f6d887eb..000000000000
---- a/arch/arm/mach-shmobile/irqs.h
-+++ /dev/null
-@@ -1,15 +0,0 @@
--#ifndef __SHMOBILE_IRQS_H
--#define __SHMOBILE_IRQS_H
--
--#include "include/mach/irqs.h"
--
--/* GIC */
--#define gic_spi(nr)		((nr) + 32)
--#define gic_iid(nr)		(nr) /* ICCIAR / interrupt ID */
--
--/* GPIO IRQ */
--#define _GPIO_IRQ_BASE		2500
--#define GPIO_IRQ_BASE(x)	(_GPIO_IRQ_BASE + (32 * x))
--#define GPIO_IRQ(x, y)		(_GPIO_IRQ_BASE + (32 * x) + y)
--
--#endif /* __SHMOBILE_IRQS_H */
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index 0ab9d3272875..fab95d1271bc 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -22,7 +22,6 @@
- #include <asm/mach/arch.h>
- 
- #include "common.h"
--#include "irqs.h"
- 
- #define MODEMR 0xffcc0020
- 
--- 
-2.1.4
+
+The following changes since commit 998f468f34f41905051556a9897dbc204b1b75b4:
+
+  Merge tag 'v4.4-rc1' into HEAD (2015-11-24 12:00:02 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v4.5
+
+for you to fetch changes up to c8d9fdbe2d648caaa510d45dc13eba2e9957140b:
+
+  ARM: shmobile: sh73a0 dtsi: Add L2 cache-controller node (2015-11-25 10:42:38 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC DT Updates for v4.5
+
+* sh73a0, r8a7740: Add L2 cache-controller node
+* r8a7791, r8a7794: remove deprecated #gpio-range-cells
+* r8a7793: Add DU support and enable for VGA port
+* r8a7790: switch console back to scif0
+* alt: Correct ether and scif2 pinmux
+* koelsch: Correct hdmi pinmux
+* silk, lager, porter, bockw: Move SPI FLASH partitions to subnode
+* bockw: Add schi0 pinmux
+
+----------------------------------------------------------------
+Geert Uytterhoeven (6):
+      ARM: shmobile: bockw: Move SPI FLASH partition to subnode
+      ARM: shmobile: porter: Move SPI FLASH partitions to subnode
+      ARM: shmobile: lager: Move SPI FLASH partitions to subnode
+      ARM: shmobile: silk: Move SPI FLASH partitions to subnode
+      ARM: shmobile: r8a7740 dtsi: Add L2 cache-controller node
+      ARM: shmobile: sh73a0 dtsi: Add L2 cache-controller node
+
+Laurent Pinchart (2):
+      ARM: shmobile: r8a7793: Add DU node to device tree
+      ARM: shmobile: r8a7791: koelsch: Fix pinmux for HDMI
+
+Magnus Damm (1):
+      ARM: shmobile: r8a7794: alt: Enable PFC DU for the VGA port
+
+Simon Horman (2):
+      ARM: shmobile: alt: Correct scif2 pfc
+      ARM: shmobile: alt: Correct ether pfc
+
+Ulrich Hecht (2):
+      ARM: shmobile: r8a7790: switch console back to scif0
+      ARM: shmobile: bockw dts: define sdhi0 pins with pull-ups
+
+Wolfram Sang (2):
+      ARM: shmobile: r8a7791: remove deprecated #gpio-range-cells from dtsi
+      ARM: shmobile: r8a7794: remove deprecated #gpio-range-cells from dtsi
+
+ arch/arm/boot/dts/r8a7740.dtsi        | 13 ++++++++++
+ arch/arm/boot/dts/r8a7778-bockw.dts   | 23 +++++++++++------
+ arch/arm/boot/dts/r8a7790-lager.dts   | 47 +++++++++++++++++++----------------
+ arch/arm/boot/dts/r8a7791-koelsch.dts |  2 +-
+ arch/arm/boot/dts/r8a7791-porter.dts  | 33 +++++++++++++-----------
+ arch/arm/boot/dts/r8a7791.dtsi        |  1 -
+ arch/arm/boot/dts/r8a7793.dtsi        | 30 ++++++++++++++++++++++
+ arch/arm/boot/dts/r8a7794-alt.dts     | 19 +++++++++++---
+ arch/arm/boot/dts/r8a7794-silk.dts    | 33 +++++++++++++-----------
+ arch/arm/boot/dts/r8a7794.dtsi        |  1 -
+ arch/arm/boot/dts/sh73a0.dtsi         | 14 +++++++++++
+ 11 files changed, 150 insertions(+), 66 deletions(-)
