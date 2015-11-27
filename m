@@ -1,86 +1,72 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 27 Nov 2015 10:39:36 -0800
-Subject: [PATCH 1/1] kconfig: add CPU endian selection beconfig and
- leconfig
-In-Reply-To: <1448567995-8784-2-git-send-email-sbranden@broadcom.com>
-References: <1448567995-8784-1-git-send-email-sbranden@broadcom.com>
- <1448567995-8784-2-git-send-email-sbranden@broadcom.com>
-Message-ID: <5658A368.7080509@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 27 Nov 2015 18:49:55 +0000
+Subject: [PATCH v2 01/21] arm64: Add macros to read/write system registers
+In-Reply-To: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1448650215-15218-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 26/11/2015 11:59, Scott Branden a ?crit :
-> Add support for switching defconfig between big and little endian CPU.
-> Various CPU types have ability to select big and little endian
-> CPU in the kernel configuration.
-> 
-> "make beconfig" will set CONFIG_CPU_BIG_ENDIAN
-> "make leconfig" will unset CONFIG_CPU_BIG_ENDIAN
+From: Mark Rutland <mark.rutland@arm.com>
 
-I believe I understand what you are trying to achieve here, which is to
-have an identical defconfig file that you can share between a big-endian
-and little-endian kernel?
+Rather than crafting custom macros for reading/writing each system
+register provide generics accessors, read_sysreg and write_sysreg, for
+this purpose.
 
-Is not this something better left to a build system which understands
-what config fragments are in general?
+Unlike read_cpuid, calls to read_exception_reg are never expected
+to be optimized away or replaced with synthetic values.
 
-Since we seem to have support for fragments now with kvm and friends,
-having this does not seem to be a big stretch though.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Suzuki Poulose <suzuki.poulose@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/sysreg.h | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-> 
-> Signed-off-by: Scott Branden <sbranden@broadcom.com>
-> ---
->  kernel/configs/be.config |  1 +
->  kernel/configs/le.config |  1 +
->  scripts/kconfig/Makefile | 10 ++++++++++
->  3 files changed, 12 insertions(+)
->  create mode 100644 kernel/configs/be.config
->  create mode 100644 kernel/configs/le.config
-> 
-> diff --git a/kernel/configs/be.config b/kernel/configs/be.config
-> new file mode 100644
-> index 0000000..c5cdc99
-> --- /dev/null
-> +++ b/kernel/configs/be.config
-> @@ -0,0 +1 @@
-> +CONFIG_CPU_BIG_ENDIAN=y
-> diff --git a/kernel/configs/le.config b/kernel/configs/le.config
-> new file mode 100644
-> index 0000000..be479cf
-> --- /dev/null
-> +++ b/kernel/configs/le.config
-> @@ -0,0 +1 @@
-> +# CONFIG_CPU_BIG_ENDIAN is not set
-> diff --git a/scripts/kconfig/Makefile b/scripts/kconfig/Makefile
-> index d79cba4..2e8007e 100644
-> --- a/scripts/kconfig/Makefile
-> +++ b/scripts/kconfig/Makefile
-> @@ -126,6 +126,14 @@ PHONY += tinyconfig
->  tinyconfig:
->  	$(Q)$(MAKE) -f $(srctree)/Makefile allnoconfig tiny.config
->  
-> +PHONY += beconfig
-> +beconfig: be.config
-> +	@:
-> +
-> +PHONY += leconfig
-> +leconfig: le.config
-> +	@:
-> +
->  # Help text used by make help
->  help:
->  	@echo  '  config	  - Update current config utilising a line-oriented program'
-> @@ -151,6 +159,8 @@ help:
->  	@echo  '  kvmconfig	  - Enable additional options for kvm guest kernel support'
->  	@echo  '  xenconfig       - Enable additional options for xen dom0 and guest kernel support'
->  	@echo  '  tinyconfig	  - Configure the tiniest possible kernel'
-> +	@echo  '  beconfig	  - Update current config to use big endian CPU'
-> +	@echo  '  leconfig	  - Update current config to use little endian CPU'
->  
->  # lxdialog stuff
->  check-lxdialog  := $(srctree)/$(src)/lxdialog/check-lxdialog.sh
-> 
-
-
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index d48ab5b..c9c283a 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -20,6 +20,8 @@
+ #ifndef __ASM_SYSREG_H
+ #define __ASM_SYSREG_H
+ 
++#include <linux/stringify.h>
++
+ #include <asm/opcodes.h>
+ 
+ /*
+@@ -208,6 +210,8 @@
+ 
+ #else
+ 
++#include <linux/types.h>
++
+ asm(
+ "	.irp	num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30\n"
+ "	.equ	__reg_num_x\\num, \\num\n"
+@@ -232,6 +236,19 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
+ 	val |= set;
+ 	asm volatile("msr sctlr_el1, %0" : : "r" (val));
+ }
++
++#define read_sysreg(r) ({					\
++	u64 __val;						\
++	asm volatile("mrs %0, " __stringify(r) : "=r" (__val));	\
++	__val;							\
++})
++
++#define write_sysreg(v, r) do {					\
++	u64 __val = (u64)v;					\
++	asm volatile("msr " __stringify(r) ", %0"		\
++		     : : "r" (__val));				\
++} while (0)
++
+ #endif
+ 
+ #endif	/* __ASM_SYSREG_H */
 -- 
-Florian
+2.1.4
