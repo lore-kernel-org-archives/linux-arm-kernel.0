@@ -1,57 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Nov 2015 22:31:26 +0100
-Subject: [PATCH] null_blk: use sector_div instead of do_div
-In-Reply-To: <CA+55aFy=JjwmtNysByu822S2Av0sv_KUCLfa86tAz5K5Unwsmw@mail.gmail.com>
-References: <3768541.ja0r6f0Odi@wuerfel>
- <CA+55aFy=JjwmtNysByu822S2Av0sv_KUCLfa86tAz5K5Unwsmw@mail.gmail.com>
-Message-ID: <4449032.oPBtpzlXyB@wuerfel>
+From: peda@lysator.liu.se (Peter Rosin)
+Date: Fri, 27 Nov 2015 22:36:11 +0100
+Subject: [RFC PATCH 0/2] Expose the PIO_ISR register on SAMA5D3
+Message-ID: <1448660173-29214-1-git-send-email-peda@lysator.liu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 November 2015 10:07:54 Linus Torvalds wrote:
-> On Fri, Nov 27, 2015 at 5:49 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > -       do_div(size, bs); /* convert size to pages */
-> > -       do_div(size, 256); /* concert size to pgs pr blk */
-> > +       sector_div(size, bs); /* convert size to pages */
-> > +       sector_div(size, 256); /* concert size to pgs pr blk */
-> 
-> Ugh.
-> 
-> Dividing by 256 should never be done with do_div() *or* sector-div.
+From: Peter Rosin <peda@axentia.se>
 
-You are right, I missed what should have been an obvious simplification.
-FWIW, the division by 256 should now be optimized automatically when the
-new asm-generic do_div() implementation is used (which in turn caused
-the type mismatch warning that I'm trying to avoid). Of course that
-is no excuse for writing silly code like that, and it doesn't catch the
-cases where the argument is a power-of-two variable number.
+Hi!
 
-The first do_div() is also questionable: 'bs' is a global variable
-from a module parameter that defaults to 512 and is fixed to 4096
-when the device is used for lightnvm. I would guess that we run into
-bugs if this is ever set to a number that is not a power of two,
-smaller than 512, or larger than PAGE_SIZE.
+I have a signal connected to a gpio pin which is the output of
+a comparator. By changing the level of one of the inputs to the
+comparator, I can detect the envelope of the other input to
+the comparator by using a series of measurements much in the
+same maner a manual ADC works, but watching for changes on the
+comparator over a period of time instead of only the immediate
+output.
 
-> Same goes for this, which is just obnoxiously idiotic:
-> 
-> > -       do_div(size, (1 << 16));
-> > +       sector_div(size, (1 << 16));
-> 
-> WTF? It explicitly divides by a particular power-of-two?
-> 
-> Has nobody ever heard of expensive divide operations? Sure, for the
-> cases where we *don't* do this with inline asm etc because it's
-> already fairly cheap, the compiler will DTRT. But that "divide by (1
-> << 16)" is just a sign of insanity.
-> 
-> Why is that not just
-> 
->     size >>= 16;
-> 
-> instead, which is certainly not any less legible, and won't generate
-> potentially crap code?
+Now, the input signal to the comparator might have a high frequency,
+which will cause the output from the comparator (and thus the GPIO
+input) to change rapidly.
 
-I'll wait for Matias or Jens to comment on the blocksize, but can
-do a new patch unless they beat me to it.
+A common(?) idiom for this is to use the interrupt status register
+to catch the glitches, but then not have any interrupt tied to
+the pin as that could possibly generate pointless bursts of
+(expensive) interrupts.
 
-	Arnd
+So, these two patches expose an interface to the PIO_ISR register
+of the pio controllers on the platform I'm targetting. The first
+patch adds some infrastructure to the gpio core and the second
+patch hooks up "my" pin controller.
+
+But hey, this seems like an old problem and I was surprised that
+I had to touch the source to do it. Which makes me wonder what I'm
+missing and what others needing to see short pulses on a pin but not
+needing/wanting interrupts are doing?
+
+Yes, there needs to be a way to select the interrupt edge w/o
+actually arming the interrupt, that is missing. And probably
+other things too, but I didn't want to do more work in case this
+is a dead end for some reason...
+
+Cheers,
+Peter
+
+Peter Rosin (2):
+  gpio: Add isr property of gpio pins
+  pinctrl: at91: expose the isr bit
+
+ Documentation/gpio/sysfs.txt   |   12 ++++++++++
+ drivers/gpio/gpiolib-sysfs.c   |   30 ++++++++++++++++++++++++
+ drivers/gpio/gpiolib.c         |   15 ++++++++++++
+ drivers/pinctrl/pinctrl-at91.c |   50 ++++++++++++++++++++++++++++++++++++----
+ include/linux/gpio/consumer.h  |    1 +
+ include/linux/gpio/driver.h    |    2 ++
+ 6 files changed, 106 insertions(+), 4 deletions(-)
+
+-- 
+1.7.10.4
