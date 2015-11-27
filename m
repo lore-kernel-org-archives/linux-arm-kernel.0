@@ -1,154 +1,150 @@
 From: peda@lysator.liu.se (Peter Rosin)
-Date: Fri, 27 Nov 2015 22:36:12 +0100
-Subject: [RFC PATCH 1/2] gpio: Add isr property of gpio pins
+Date: Fri, 27 Nov 2015 22:36:13 +0100
+Subject: [RFC PATCH 2/2] pinctrl: at91: expose the isr bit
 In-Reply-To: <1448660173-29214-1-git-send-email-peda@lysator.liu.se>
 References: <1448660173-29214-1-git-send-email-peda@lysator.liu.se>
-Message-ID: <1448660173-29214-2-git-send-email-peda@lysator.liu.se>
+Message-ID: <1448660173-29214-3-git-send-email-peda@lysator.liu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Peter Rosin <peda@axentia.se>
 
-Adds the possibility to read the interrupt status register bit for the
-gpio pin. Expose the bit as an isr file in sysfs.
+This is a bit horrible, as reading the isr register will interfere with
+interrupts on other pins in the same pio. So, be careful...
 
 Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- Documentation/gpio/sysfs.txt  |   12 ++++++++++++
- drivers/gpio/gpiolib-sysfs.c  |   30 ++++++++++++++++++++++++++++++
- drivers/gpio/gpiolib.c        |   15 +++++++++++++++
- include/linux/gpio/consumer.h |    1 +
- include/linux/gpio/driver.h   |    2 ++
- 5 files changed, 60 insertions(+)
+ drivers/pinctrl/pinctrl-at91.c |   50 ++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 46 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/gpio/sysfs.txt b/Documentation/gpio/sysfs.txt
-index 535b6a8a7a7c..ded7ef9d01be 100644
---- a/Documentation/gpio/sysfs.txt
-+++ b/Documentation/gpio/sysfs.txt
-@@ -97,6 +97,18 @@ and have the following read/write attributes:
- 		for "rising" and "falling" edges will follow this
- 		setting.
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index 2deb1309fcac..6ae615264e6a 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -16,6 +16,7 @@
+ #include <linux/of_irq.h>
+ #include <linux/slab.h>
+ #include <linux/interrupt.h>
++#include <linux/spinlock.h>
+ #include <linux/io.h>
+ #include <linux/gpio.h>
+ #include <linux/pinctrl/machine.h>
+@@ -40,6 +41,8 @@ struct at91_gpio_chip {
+ 	int			pioc_hwirq;	/* PIO bank interrupt identifier on AIC */
+ 	int			pioc_virq;	/* PIO bank Linux virtual interrupt */
+ 	int			pioc_idx;	/* PIO bank index */
++	spinlock_t		isr_lock;	/* PIO_ISR cache lock */
++	unsigned		isr_cache;	/* PIO_ISR cache */
+ 	void __iomem		*regbase;	/* PIO bank virtual address */
+ 	struct clk		*clock;		/* associated clock */
+ 	struct at91_pinctrl_mux_ops *ops;	/* ops */
+@@ -737,7 +740,9 @@ static int at91_pmx_set(struct pinctrl_dev *pctldev, unsigned selector,
+ 			continue;
  
-+	"isr" ... reads as either 0 (false) or 1 (true). Reading the
-+		file will clear the value, so that reading a 1 means
-+		that there has been an interrupt-triggering action
-+		on the pin since the file was last read.
-+
-+		This file exists only if the gpio chip supports reading
-+		the interrupt status register bit for the pin.
-+
-+		Note that if reading the isr register for this pin
-+		interferes with active interrupts, the read will fail
-+		with an error.
-+
- GPIO controllers have paths like /sys/class/gpio/gpiochip42/ (for the
- controller implementing GPIOs starting at #42) and have the following
- read-only attributes:
-diff --git a/drivers/gpio/gpiolib-sysfs.c b/drivers/gpio/gpiolib-sysfs.c
-index b57ed8e55ab5..f6fe68fab191 100644
---- a/drivers/gpio/gpiolib-sysfs.c
-+++ b/drivers/gpio/gpiolib-sysfs.c
-@@ -139,6 +139,28 @@ static ssize_t value_store(struct device *dev,
+ 		mask = pin_to_mask(pin->pin);
++		spin_lock(&gpio_chips[pin->bank]->isr_lock);
+ 		at91_mux_disable_interrupt(pio, mask);
++		spin_unlock(&gpio_chips[pin->bank]->isr_lock);
+ 		switch (pin->mux) {
+ 		case AT91_MUX_GPIO:
+ 			at91_mux_gpio_enable(pio, mask, 1);
+@@ -1331,6 +1336,29 @@ static int at91_gpio_get(struct gpio_chip *chip, unsigned offset)
+ 	return (pdsr & mask) != 0;
  }
- static DEVICE_ATTR_RW(value);
  
-+static ssize_t isr_show(struct device *dev,
-+		struct device_attribute *attr, char *buf)
++static int at91_gpio_get_isr(struct gpio_chip *chip, unsigned offset)
 +{
-+	struct gpiod_data	*data = dev_get_drvdata(dev);
-+	struct gpio_desc	*desc = data->desc;
-+	ssize_t			status;
-+	int			isr;
++	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
++	void __iomem *pio = at91_gpio->regbase;
++	unsigned mask = 1 << offset;
++	int res;
 +
-+	mutex_lock(&data->mutex);
++	spin_lock(&at91_gpio->isr_lock);
++	if (readl_relaxed(pio + PIO_IMR)) {
++		/* do not clobber PIO_ISR if any interrupts are enabled */
++		res = -EBUSY;
++		goto out;
++	}
 +
-+	isr = gpiod_get_isr_cansleep(desc);
-+	if (isr < 0)
-+		status = isr;
-+	else
-+		status = sprintf(buf, "%d\n", isr);
++	at91_gpio->isr_cache |= readl_relaxed(pio + PIO_ISR);
++	res = (at91_gpio->isr_cache & mask) != 0;
++	at91_gpio->isr_cache &= ~mask;
 +
-+	mutex_unlock(&data->mutex);
-+
-+	return status;
++ out:
++	spin_unlock(&at91_gpio->isr_lock);
++	return res;
 +}
-+static DEVICE_ATTR_RO(isr);
 +
- static irqreturn_t gpio_sysfs_irq(int irq, void *priv)
+ static void at91_gpio_set(struct gpio_chip *chip, unsigned offset,
+ 				int val)
  {
- 	struct gpiod_data *data = priv;
-@@ -367,6 +389,13 @@ static umode_t gpio_is_visible(struct kobject *kobj, struct attribute *attr,
- 			mode = 0;
- 		if (!show_direction && test_bit(FLAG_IS_OUT, &desc->flags))
- 			mode = 0;
-+	} else if (attr == &dev_attr_isr.attr) {
-+		if (!desc->chip->get_isr)
-+			mode = 0;
-+		if (gpiod_to_irq(desc) < 0)
-+			mode = 0;
-+		if (!show_direction && test_bit(FLAG_IS_OUT, &desc->flags))
-+			mode = 0;
+@@ -1425,8 +1453,12 @@ static void gpio_irq_mask(struct irq_data *d)
+ 	void __iomem	*pio = at91_gpio->regbase;
+ 	unsigned	mask = 1 << d->hwirq;
+ 
+-	if (pio)
+-		writel_relaxed(mask, pio + PIO_IDR);
++	if (!pio)
++		return;
++
++	spin_lock(&at91_gpio->isr_lock);
++	writel_relaxed(mask, pio + PIO_IDR);
++	spin_unlock(&at91_gpio->isr_lock);
+ }
+ 
+ static void gpio_irq_unmask(struct irq_data *d)
+@@ -1435,8 +1467,12 @@ static void gpio_irq_unmask(struct irq_data *d)
+ 	void __iomem	*pio = at91_gpio->regbase;
+ 	unsigned	mask = 1 << d->hwirq;
+ 
+-	if (pio)
+-		writel_relaxed(mask, pio + PIO_IER);
++	if (!pio)
++		return;
++
++	spin_lock(&at91_gpio->isr_lock);
++	writel_relaxed(mask, pio + PIO_IER);
++	spin_unlock(&at91_gpio->isr_lock);
+ }
+ 
+ static int gpio_irq_type(struct irq_data *d, unsigned type)
+@@ -1562,8 +1598,10 @@ void at91_pinctrl_gpio_suspend(void)
+ 		pio = gpio_chips[i]->regbase;
+ 
+ 		backups[i] = readl_relaxed(pio + PIO_IMR);
++		spin_lock(&gpio_chips[i]->isr_lock);
+ 		writel_relaxed(backups[i], pio + PIO_IDR);
+ 		writel_relaxed(wakeups[i], pio + PIO_IER);
++		spin_unlock(&gpio_chips[i]->isr_lock);
+ 
+ 		if (!wakeups[i])
+ 			clk_disable_unprepare(gpio_chips[i]->clock);
+@@ -1588,8 +1626,10 @@ void at91_pinctrl_gpio_resume(void)
+ 		if (!wakeups[i])
+ 			clk_prepare_enable(gpio_chips[i]->clock);
+ 
++		spin_lock(&gpio_chips[i]->isr_lock);
+ 		writel_relaxed(wakeups[i], pio + PIO_IDR);
+ 		writel_relaxed(backups[i], pio + PIO_IER);
++		spin_unlock(&gpio_chips[i]->isr_lock);
+ 	}
+ }
+ 
+@@ -1713,6 +1753,7 @@ static struct gpio_chip at91_gpio_template = {
+ 	.get_direction		= at91_gpio_get_direction,
+ 	.direction_input	= at91_gpio_direction_input,
+ 	.get			= at91_gpio_get,
++	.get_isr		= at91_gpio_get_isr,
+ 	.direction_output	= at91_gpio_direction_output,
+ 	.set			= at91_gpio_set,
+ 	.set_multiple		= at91_gpio_set_multiple,
+@@ -1789,6 +1830,7 @@ static int at91_gpio_probe(struct platform_device *pdev)
  	}
  
- 	return mode;
-@@ -377,6 +406,7 @@ static struct attribute *gpio_attrs[] = {
- 	&dev_attr_edge.attr,
- 	&dev_attr_value.attr,
- 	&dev_attr_active_low.attr,
-+	&dev_attr_isr.attr,
- 	NULL,
- };
+ 	at91_chip->chip = at91_gpio_template;
++	spin_lock_init(&at91_chip->isr_lock);
  
-diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index bf4bd1d120c3..b45e70b2713e 100644
---- a/drivers/gpio/gpiolib.c
-+++ b/drivers/gpio/gpiolib.c
-@@ -1572,6 +1572,21 @@ int gpiod_get_value_cansleep(const struct gpio_desc *desc)
- }
- EXPORT_SYMBOL_GPL(gpiod_get_value_cansleep);
- 
-+int gpiod_get_isr_cansleep(const struct gpio_desc *desc)
-+{
-+	struct gpio_chip *chip;
-+	int offset;
-+
-+	might_sleep_if(extra_checks);
-+	if (!desc)
-+		return -EINVAL;
-+
-+	chip = desc->chip;
-+	offset = gpio_chip_hwgpio(desc);
-+	return chip->get_isr ? chip->get_isr(chip, offset) : -ENXIO;
-+}
-+EXPORT_SYMBOL_GPL(gpiod_get_isr_cansleep);
-+
- /**
-  * gpiod_set_raw_value_cansleep() - assign a gpio's raw value
-  * @desc: gpio whose value will be assigned
-diff --git a/include/linux/gpio/consumer.h b/include/linux/gpio/consumer.h
-index adac255aee86..d0290c14dc84 100644
---- a/include/linux/gpio/consumer.h
-+++ b/include/linux/gpio/consumer.h
-@@ -119,6 +119,7 @@ void gpiod_set_raw_value_cansleep(struct gpio_desc *desc, int value);
- void gpiod_set_raw_array_value_cansleep(unsigned int array_size,
- 					struct gpio_desc **desc_array,
- 					int *value_array);
-+int gpiod_get_isr_cansleep(const struct gpio_desc *desc);
- 
- int gpiod_set_debounce(struct gpio_desc *desc, unsigned debounce);
- 
-diff --git a/include/linux/gpio/driver.h b/include/linux/gpio/driver.h
-index c8393cd4d44f..dccfb12f9112 100644
---- a/include/linux/gpio/driver.h
-+++ b/include/linux/gpio/driver.h
-@@ -96,6 +96,8 @@ struct gpio_chip {
- 						unsigned offset);
- 	void			(*set)(struct gpio_chip *chip,
- 						unsigned offset, int value);
-+	int			(*get_isr)(struct gpio_chip *chip,
-+						unsigned offset);
- 	void			(*set_multiple)(struct gpio_chip *chip,
- 						unsigned long *mask,
- 						unsigned long *bits);
+ 	chip = &at91_chip->chip;
+ 	chip->of_node = np;
 -- 
 1.7.10.4
