@@ -1,44 +1,73 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 27 Nov 2015 10:20:24 +0900
-Subject: [PATCH] serial: sh-sci: Add device tree support for r8a779[23]
-Message-ID: <1448587224-8633-1-git-send-email-horms+renesas@verge.net.au>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Fri, 27 Nov 2015 09:20:44 +0800
+Subject: [PATCH v8 02/17] drm: bridge: analogix/dp: split exynos dp driver
+ to bridge directory
+In-Reply-To: <1812354.kkj0DGG9mi@diego>
+References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
+ <1446020519-625-1-git-send-email-ykk@rock-chips.com>
+ <1812354.kkj0DGG9mi@diego>
+Message-ID: <5657AFEC.60004@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simply document new compat strings.
-There appears to be no need for a driver updates.
+Hi Heiko,
 
-Also update the name of the r8a7791 to M2-W: the name changed a while back.
+Thanks you for feedback, I do see some conflicts in Exynos Make/Kconfig
+file [02/17] and dtsi file [07/17] when I try to apply this series on 
+4.4-rc1
+branch.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- .../devicetree/bindings/serial/renesas,sci-serial.txt      | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+Hmm... Due to I have update some patches to version 10 already, this
+series may be become harder to reviewed, should I just send the whole
+series out that update the version to v10.
 
-diff --git a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
-index e84b13a8eda3..38bb05223f47 100644
---- a/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
-+++ b/Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
-@@ -15,10 +15,16 @@ Required properties:
-     - "renesas,scifa-r8a7790" for R8A7790 (R-Car H2) SCIFA compatible UART.
-     - "renesas,scifb-r8a7790" for R8A7790 (R-Car H2) SCIFB compatible UART.
-     - "renesas,hscif-r8a7790" for R8A7790 (R-Car H2) HSCIF compatible UART.
--    - "renesas,scif-r8a7791" for R8A7791 (R-Car M2) SCIF compatible UART.
--    - "renesas,scifa-r8a7791" for R8A7791 (R-Car M2) SCIFA compatible UART.
--    - "renesas,scifb-r8a7791" for R8A7791 (R-Car M2) SCIFB compatible UART.
--    - "renesas,hscif-r8a7791" for R8A7791 (R-Car M2) HSCIF compatible UART.
-+    - "renesas,scif-r8a7791" for R8A7791 (R-Car M2-W) SCIF compatible UART.
-+    - "renesas,scifa-r8a7791" for R8A7791 (R-Car M2-W) SCIFA compatible UART.
-+    - "renesas,scifb-r8a7791" for R8A7791 (R-Car M2-W) SCIFB compatible UART.
-+    - "renesas,hscif-r8a7791" for R8A7791 (R-Car M2-W) HSCIF compatible UART.
-+    - "renesas,scif-r8a7792" for R8A7792 (R-Car V2H) SCIF compatible UART.
-+    - "renesas,hscif-r8a7792" for R8A7792 (R-Car V2H) HSCIF compatible UART.
-+    - "renesas,scif-r8a7793" for R8A7793 (R-Car M2-N) SCIF compatible UART.
-+    - "renesas,scifa-r8a7793" for R8A7793 (R-Car M2-N) SCIFA compatible UART.
-+    - "renesas,scifb-r8a7793" for R8A7793 (R-Car M2-N) SCIFB compatible UART.
-+    - "renesas,hscif-r8a7793" for R8A7793 (R-Car M2-N) HSCIF compatible UART.
-     - "renesas,scif-r8a7794" for R8A7794 (R-Car E2) SCIF compatible UART.
-     - "renesas,scifa-r8a7794" for R8A7794 (R-Car E2) SCIFA compatible UART.
-     - "renesas,scifb-r8a7794" for R8A7794 (R-Car E2) SCIFB compatible UART.
--- 
-2.1.4
+Thanks
+- Yakir
+
+
+On 11/27/2015 01:30 AM, Heiko St?bner wrote:
+> Hi Yakir,
+>
+> Am Mittwoch, 28. Oktober 2015, 16:21:59 schrieb Yakir Yang:
+>> Split the dp core driver from exynos directory to bridge directory,
+>> and rename the core driver to analogix_dp_*, rename the platform
+>> code to exynos_dp.
+>>
+>> Beside the new analogix_dp driver would export four hooks.
+>> "analogix_dp_bind()" and "analogix_dp_unbind()"
+>> "analogix_dp_detect()" and "analogix_dp_get_modes()"
+>>
+>> The bind/unbind symbols is used for analogix platform driver to connect
+>> with analogix_dp core driver. And the detect/get_modes is used for analogix
+>> platform driver to init the connector.
+>>
+>> They reason why connector need register in helper driver is rockchip drm
+>> haven't implement the atomic API, but Exynos drm have implement it, so
+>> there would need two different connector helper functions, that's why we
+>> leave the connector register in helper driver.
+>>
+>> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> [...]
+>
+>> diff --git a/drivers/gpu/drm/exynos/Kconfig b/drivers/gpu/drm/exynos/Kconfig
+>> index bd1a415..5f74f80 100644
+>> --- a/drivers/gpu/drm/exynos/Kconfig
+>> +++ b/drivers/gpu/drm/exynos/Kconfig
+>> @@ -55,8 +55,9 @@ config DRM_EXYNOS_DSI
+>>   	  This enables support for Exynos MIPI-DSI device.
+>>
+>>   config DRM_EXYNOS_DP
+>> -	bool "EXYNOS DRM DP driver support"
+>> +	bool "EXYNOS specific extensions for Analogix DP driver"
+>>   	depends on DRM_EXYNOS && (DRM_EXYNOS_FIMD || DRM_EXYNOS7_DECON)
+>> +	select DRM_ANALOGIX_DP
+>>   	default DRM_EXYNOS
+>>   	select DRM_PANEL
+>>   	help
+> This doesn't apply anymore to 4.4-rc due to other changes in there. The
+> exynos/Makefile is affected as well.
+>
+>
+>
+>
