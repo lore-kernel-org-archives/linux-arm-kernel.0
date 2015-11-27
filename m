@@ -1,108 +1,39 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Fri, 27 Nov 2015 10:09:30 +0800
-Subject: [PATCH v4] clk: rockchip: switch PLLs to slow mode before reboot for
- rk3288
-Message-ID: <1448590170-23776-1-git-send-email-zyw@rock-chips.com>
+From: majun258@huawei.com (majun (F))
+Date: Fri, 27 Nov 2015 10:31:20 +0800
+Subject: ARM: Question about irq-gic-v3-its.c
+Message-ID: <5657C078.3020806@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've been seeing some crashes at reboot test on rk3288-based systems,
-which boards have not reset pin connected to NPOR, they reboot by
-setting 0xfdb9 to RK3288_GLB_SRST_FST register. If the APLL works in
-a high frequency mode, some IPs might hang during soft reset.
-It appears that we can fix the problem by switching to slow mode before
-reboot, just like what we did before suspend.
+Hi Marc:
+	I think there is a bug in current its_alloc_tables().
+When "val |= alloc_pages - 1;" is called
+the "alloc_pages" is not updated accroding to "psz" value.
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+I mean we need do
+alloc_pages = (alloc_size / psz);
 
----
+Further more, I also have a question about GITS_CBASER register.
+In gic-v3 spec:
 
-Changes in v4:
-- get rid of the CONFIG_PM_SLEEP conditionals completely
+Bits [7:0]. Size. The number of '4kB' pages of physical memory provided for the command queue, minus
+one.
 
-Changes in v3:
-- remove include reboot.h
+But In its_alloc_tables() function,
 
-Changes in v2:
-- replace restart_handlers with the shutdown callback of syscore
+alloc_pages = (alloc_size / psz);   //  majun: pze = 64KB
+if (alloc_pages > GITS_BASER_PAGES_MAX) {
+	alloc_pages = GITS_BASER_PAGES_MAX;
+	order = get_order(GITS_BASER_PAGES_MAX * psz);
+	pr_warn("ITS at 0x%lx: Device Table too large, reduce its page order to %u (%u pages)\n",
+		its->phys_base, order, alloc_pages);
+}
+GITS_BASER_PAGES_MAX = 256
+I think this value means the maximum page number of 4KB ,right ?
 
- drivers/clk/rockchip/clk-rk3288.c | 32 ++++++++++++++------------------
- 1 file changed, 14 insertions(+), 18 deletions(-)
+But when calc alloc_pages for first time, the psz = 64KB.
 
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index 9040878..97d314d 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -783,10 +783,10 @@ static const char *const rk3288_critical_clocks[] __initconst = {
- 	"pclk_pd_pmu",
- };
- 
--#ifdef CONFIG_PM_SLEEP
- static void __iomem *rk3288_cru_base;
- 
--/* Some CRU registers will be reset in maskrom when the system
-+/*
-+ * Some CRU registers will be reset in maskrom when the system
-  * wakes up from fastboot.
-  * So save them before suspend, restore them after resume.
-  */
-@@ -840,33 +840,28 @@ static void rk3288_clk_resume(void)
- 	}
- }
- 
-+static void rk3288_clk_shutdown(void)
-+{
-+	writel_relaxed(0xf3030000, rk3288_cru_base + RK3288_MODE_CON);
-+}
-+
- static struct syscore_ops rk3288_clk_syscore_ops = {
- 	.suspend = rk3288_clk_suspend,
- 	.resume = rk3288_clk_resume,
-+	.shutdown = rk3288_clk_shutdown,
- };
- 
--static void rk3288_clk_sleep_init(void __iomem *reg_base)
--{
--	rk3288_cru_base = reg_base;
--	register_syscore_ops(&rk3288_clk_syscore_ops);
--}
--
--#else /* CONFIG_PM_SLEEP */
--static void rk3288_clk_sleep_init(void __iomem *reg_base) {}
--#endif
--
- static void __init rk3288_clk_init(struct device_node *np)
- {
--	void __iomem *reg_base;
- 	struct clk *clk;
- 
--	reg_base = of_iomap(np, 0);
--	if (!reg_base) {
-+	rk3288_cru_base = of_iomap(np, 0);
-+	if (!rk3288_cru_base) {
- 		pr_err("%s: could not map cru region\n", __func__);
- 		return;
- 	}
- 
--	rockchip_clk_init(np, reg_base, CLK_NR_CLKS);
-+	rockchip_clk_init(np, rk3288_cru_base, CLK_NR_CLKS);
- 
- 	/* xin12m is created by an cru-internal divider */
- 	clk = clk_register_fixed_factor(NULL, "xin12m", "xin24m", 0, 1, 2);
-@@ -907,10 +902,11 @@ static void __init rk3288_clk_init(struct device_node *np)
- 			&rk3288_cpuclk_data, rk3288_cpuclk_rates,
- 			ARRAY_SIZE(rk3288_cpuclk_rates));
- 
--	rockchip_register_softrst(np, 12, reg_base + RK3288_SOFTRST_CON(0),
-+	rockchip_register_softrst(np, 12,
-+				  rk3288_cru_base + RK3288_SOFTRST_CON(0),
- 				  ROCKCHIP_SOFTRST_HIWORD_MASK);
- 
- 	rockchip_register_restart_notifier(RK3288_GLB_SRST_FST);
--	rk3288_clk_sleep_init(reg_base);
-+	register_syscore_ops(&rk3288_clk_syscore_ops);
- }
- CLK_OF_DECLARE(rk3288_cru, "rockchip,rk3288-cru", rk3288_clk_init);
--- 
-2.6.3
+So, I think maybe this is a bug too.
+
+Thanks!
+Ma Jun
