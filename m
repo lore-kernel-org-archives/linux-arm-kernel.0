@@ -1,44 +1,98 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Nov 2015 16:06:15 +0000
-Subject: armv7 + lpae broken in 4.1.12+ ?
-In-Reply-To: <56587CF7.9060302@heeltoe.com>
-References: <5657952E.906@heeltoe.com> <20151127093601.GA25781@arm.com>
- <56587CF7.9060302@heeltoe.com>
-Message-ID: <20151127160615.GM8644@n2100.arm.linux.org.uk>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 27 Nov 2015 16:13:15 +0000
+Subject: [PATCH v3 60/62] arm/acpi: Configure interrupts dynamically
+In-Reply-To: <1447753261-7552-61-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-61-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511271557200.8984@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 27, 2015 at 10:55:35AM -0500, Brad Parker wrote:
-> That all makes sense. I'm using a linaro toolchain (which I'll admit I
-> grabbed because I was lazy)
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Parth Dixit <parth.dixit@linaro.org>
 > 
-> gcc-linaro-arm-linux-gnueabihf-4.8-2014.04_linux/bin/arm-linux-gnueabihf-
+> Interrupt information is described in DSDT and is not available at
+> the time of booting. Configure the interrupts dynamically when requested
+> by Dom0
 > 
-> It seems really odd.  I would have thought "gnueabihf" would be EABI, so
-> a 64 bit arg should be in r2,r3; but it's not.  It's in r1, r2.
+> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  xen/arch/arm/vgic.c | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
 > 
-> could something in my .config cause this?  (I'd be surprised if that were the case, but...).
+> diff --git a/xen/arch/arm/vgic.c b/xen/arch/arm/vgic.c
+> index 7bb4570..d05abde 100644
+> --- a/xen/arch/arm/vgic.c
+> +++ b/xen/arch/arm/vgic.c
+> @@ -25,6 +25,7 @@
+>  #include <xen/irq.h>
+>  #include <xen/sched.h>
+>  #include <xen/perfc.h>
+> +#include <xen/acpi.h>
+>  
+>  #include <asm/current.h>
+>  
+> @@ -310,6 +311,8 @@ void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
+>      }
+>  }
+>  
+> +#define VGIC_ICFG_MASK(intr) ( 1 << ( ( 2 * ( intr % 16 ) ) + 1 ) )
+
+Coding style.
+
+
+>  void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
+>  {
+>      struct domain *d = v->domain;
+> @@ -321,7 +324,23 @@ void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
+>      struct vcpu *v_target;
+>  
+>      while ( (i = find_next_bit(&mask, 32, i)) < 32 ) {
+> +#ifdef CONFIG_ACPI
+> +        struct vgic_irq_rank *vr = vgic_get_rank(v, n);
+
+The rank is always the same, you can move this out of the while loop.
+
+
+> +        uint32_t tr;
+> +
+>          irq = i + (32 * n);
+> +        if( ( !acpi_disabled ) && ( n != 0 ) && is_hardware_domain(d) )
+
+Instead of n != 0, I would prefer a more obvious irq >= 32 check
+
+
+> +        {
+> +            tr = vr->icfg[i >> 4] ;
+> +
+> +            if( ( tr & VGIC_ICFG_MASK(i) ) )
+
+Coding style.
+
+
+> +                irq_set_type(irq, ACPI_IRQ_TYPE_EDGE_BOTH);
+> +            else
+> +                irq_set_type(irq, ACPI_IRQ_TYPE_LEVEL_MASK);
+
+Instead of this ad-hoc ACPI code, I would prefer if we get the irq type
+and, if it is set to NONE or INVALID, we set it to what is in the
+r->icfg (only for the hardware_domain of course). If it is set to
+something other than NONE or INVALID, and it doesn't match what is on
+r->icfg, then we could print out a warning.
+
+
+> +        }
+> +#else
+> +        irq = i + (32 * n);
+> +#endif
+
+Please leave the irq = i + (32 * n) out of the #ifdef.
+
+
+>          v_target = d->arch.vgic.handler->get_target_vcpu(v, irq);
+>          p = irq_to_pending(v_target, irq);
+>          set_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
+> -- 
+> 2.1.0
 > 
-> I'm happy to try a better toolchain if you can point me to one (binary).
-
-It doesn't matter what toolchain you have.  We don't rely on how the
-toolchain happened to be configured to build the kernel, we explicitly
-state to the compiler what we want it to do.
-
-Many people tend to be under the incorrect impression that they need
-specific compilers to build the kernel in certain ways.  This is untrue,
-and has been untrue for the last 20 years.
-
-If you have CONFIG_AEABI disabled, you will get an OABI kernel, or an
-error from the toolchain if the toolchain doesn't support it.  If you
-have CONFIG_AEABI enabled, you will get an EABI kernel, or an error
-from the toolchain if the toolchain doesn't support it.
-
-As I said in my previous reply, LPAE really ought to depend on AEABI
-being enabled.
-
-Please check whether you have CONFIG_AEABI enabled.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
