@@ -1,36 +1,60 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 27 Nov 2015 18:28:50 -0500 (EST)
-Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
- "/chosen/linux,atags" entry
-In-Reply-To: <11537945.4HX4Y84tjV@wuerfel>
-References: <20150713131902.GH26485@atomide.com>
- <20151127132722.GA30871@n2100.arm.linux.org.uk>
- <20151127195148.GB30871@n2100.arm.linux.org.uk> <11537945.4HX4Y84tjV@wuerfel>
-Message-ID: <alpine.LFD.2.20.1511271817230.22569@knanqh.ubzr>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Fri, 27 Nov 2015 15:45:57 -0800
+Subject: [PATCH 1/1] kconfig: add CPU endian selection beconfig and
+ leconfig
+In-Reply-To: <4689388.tNd2tB57aZ@wuerfel>
+References: <1448567995-8784-1-git-send-email-sbranden@broadcom.com>
+ <1448567995-8784-2-git-send-email-sbranden@broadcom.com>
+ <4689388.tNd2tB57aZ@wuerfel>
+Message-ID: <5658EB35.3050707@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Nov 2015, Arnd Bergmann wrote:
+Hi Arnd,
 
-> I don't mind creating the /proc/atags compatibility hack from the kernel
-> for a DT based N700 kernel, as long as we limit it as much as we can
-> to the machines that need it. Leaving a board file for the N700 in place
-> that contains the procfs code (and not much more) seems reasonable
-> here, as we are talking about a board specific hack and the whole point
-> appears to be running unmodified user space.
-> 
-> Regarding how to get the data into the kernel in the first place, my
-> preferred choice would still be to have an intermediate bootloader
-> such as pxa-impedance-matcher, but I won't complain if others are
-> happy enough about putting it into the ATAGS compat code we already
-> have, as long as it's limited to the boards we know need it.
+Thanks for comment - I forgot to directly add you to CC list so was 
+going to add you in a couple days if you didn't find this patch proposal.
 
-Assuming you have a N700 board file for special procfs code, then why 
-not getting at the atags in memory where the bootloader has put them 
-directly from that same board file? This way it'll really be limited to 
-the board we know needs it and the special exception will be contained 
-to that one file.  Amongst the machine specific hooks, there is one that 
-gets invoked early during boot before those atags are overwritten.
+Response below.
 
+On 15-11-27 07:59 AM, Arnd Bergmann wrote:
+> On Thursday 26 November 2015 11:59:55 Scott Branden wrote:
+>> @@ -151,6 +159,8 @@ help:
+>>          @echo  '  kvmconfig       - Enable additional options for kvm guest kernel support'
+>>          @echo  '  xenconfig       - Enable additional options for xen dom0 and guest kernel support'
+>>          @echo  '  tinyconfig      - Configure the tiniest possible kernel'
+>> +       @echo  '  beconfig        - Update current config to use big endian CPU'
+>> +       @echo  '  leconfig        - Update current config to use little endian CPU'
+>>
+>>
+>
+> Most architectures don't actually support picking the endianess, I think
+> it would be better to keep this architecture specific in some form. If we
+> limit it to ARM/ARM64, we might not need the leconfig target at all, because
+> that is the default for all defconfig files in the kernel aside from ixp4xx,
+> which we can probably ignore here.
 
-Nicolas
+Yes, I thought about placing le.config in arm64/configs.  Then I would 
+need it in arm/configs also.
+
+CONFIG_CPU_BIG_ENDIAN is currently used by arc, sh, c6x, powerpc, arm, 
+arm64, and mips.  Then the next architecture comes along.
+So to have the same feature on those architectures they would also need 
+le.config in their configs directory.
+
+running "make leconfig" or "make beconfig" on architectures that do not 
+support CPU_BIG_ENDIAN has no harmful side affect other than the 
+endianness selection will not change.
+
+For these reasons placing the functionality in kernel/configs alongside 
+xen.config seemed like the sensible thing to do.  kernel/configs seems 
+like a very good place to add more .config selection options to as well.
+
+Of course, whatever method is selected to switch between big and little 
+endian sharing a single defconfig I'm open to.
+
+>
+> 	Arnd
+>
+Thanks for comment.
+Scott
