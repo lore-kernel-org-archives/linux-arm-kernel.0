@@ -1,39 +1,53 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Nov 2015 18:50:08 +0000
-Subject: [PATCH v2 14/21] arm64: KVM: HYP mode entry points
+Date: Fri, 27 Nov 2015 18:50:00 +0000
+Subject: [PATCH v2 06/21] arm64: KVM: Implement system register save/restore
 In-Reply-To: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
 References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1448650215-15218-15-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1448650215-15218-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the entry points for HYP mode (both for hypercalls and
-exception handling).
+Implement the system registe save restore as a direct translation of
+the assembly code version.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/Makefile    |   1 +
- arch/arm64/kvm/hyp/hyp-entry.S | 198 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 199 insertions(+)
- create mode 100644 arch/arm64/kvm/hyp/hyp-entry.S
+ arch/arm64/kvm/hyp/Makefile    |  1 +
+ arch/arm64/kvm/hyp/hyp.h       |  3 ++
+ arch/arm64/kvm/hyp/sysreg-sr.c | 90 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 94 insertions(+)
+ create mode 100644 arch/arm64/kvm/hyp/sysreg-sr.c
 
 diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-index 1a529f5..826032b 100644
+index 455dc0a..ec94200 100644
 --- a/arch/arm64/kvm/hyp/Makefile
 +++ b/arch/arm64/kvm/hyp/Makefile
-@@ -11,3 +11,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += entry.o
- obj-$(CONFIG_KVM_ARM_HOST) += switch.o
- obj-$(CONFIG_KVM_ARM_HOST) += fpsimd.o
- obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
-+obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -5,3 +5,4 @@
+ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
++obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
+diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+index 86aa5a2..087d3a5 100644
+--- a/arch/arm64/kvm/hyp/hyp.h
++++ b/arch/arm64/kvm/hyp/hyp.h
+@@ -36,5 +36,8 @@ void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+ void __timer_save_state(struct kvm_vcpu *vcpu);
+ void __timer_restore_state(struct kvm_vcpu *vcpu);
+ 
++void __sysreg_save_state(struct kvm_cpu_context *ctxt);
++void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
++
+ #endif /* __ARM64_KVM_HYP_H__ */
+ 
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
 new file mode 100644
-index 0000000..8334407
+index 0000000..add8fcb
 --- /dev/null
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -0,0 +1,198 @@
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -0,0 +1,90 @@
 +/*
-+ * Copyright (C) 2015 - ARM Ltd
++ * Copyright (C) 2012-2015 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -49,186 +63,78 @@ index 0000000..8334407
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/linkage.h>
++#include <linux/compiler.h>
++#include <linux/kvm_host.h>
 +
-+#include <asm/alternative.h>
-+#include <asm/assembler.h>
-+#include <asm/asm-offsets.h>
-+#include <asm/cpufeature.h>
-+#include <asm/kvm_arm.h>
-+#include <asm/kvm_asm.h>
 +#include <asm/kvm_mmu.h>
 +
-+	.text
-+	.pushsection	.hyp.text, "ax"
++#include "hyp.h"
 +
-+el1_sync:					// Guest trapped into EL2
-+	push	x0, x1
-+	push	x2, x3
++/* ctxt is already in the HYP VA space */
++void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
++{
++	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
++	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
++	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg(sctlr_el1);
++	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
++	ctxt->sys_regs[CPACR_EL1]	= read_sysreg(cpacr_el1);
++	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg(ttbr0_el1);
++	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg(ttbr1_el1);
++	ctxt->sys_regs[TCR_EL1]		= read_sysreg(tcr_el1);
++	ctxt->sys_regs[ESR_EL1]		= read_sysreg(esr_el1);
++	ctxt->sys_regs[AFSR0_EL1]	= read_sysreg(afsr0_el1);
++	ctxt->sys_regs[AFSR1_EL1]	= read_sysreg(afsr1_el1);
++	ctxt->sys_regs[FAR_EL1]		= read_sysreg(far_el1);
++	ctxt->sys_regs[MAIR_EL1]	= read_sysreg(mair_el1);
++	ctxt->sys_regs[VBAR_EL1]	= read_sysreg(vbar_el1);
++	ctxt->sys_regs[CONTEXTIDR_EL1]	= read_sysreg(contextidr_el1);
++	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
++	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
++	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
++	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg(amair_el1);
++	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg(cntkctl_el1);
++	ctxt->sys_regs[PAR_EL1]		= read_sysreg(par_el1);
++	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
 +
-+	mrs	x1, esr_el2
-+	lsr	x2, x1, #ESR_ELx_EC_SHIFT
++	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
++	ctxt->gp_regs.regs.pc		= read_sysreg(elr_el2);
++	ctxt->gp_regs.regs.pstate	= read_sysreg(spsr_el2);
++	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
++	ctxt->gp_regs.elr_el1		= read_sysreg(elr_el1);
++	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg(spsr_el1);
++}
 +
-+	cmp	x2, #ESR_ELx_EC_HVC64
-+	b.ne	el1_trap
++void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
++{
++	write_sysreg(ctxt->sys_regs[MPIDR_EL1],	  vmpidr_el2);
++	write_sysreg(ctxt->sys_regs[CSSELR_EL1],  csselr_el1);
++	write_sysreg(ctxt->sys_regs[SCTLR_EL1],	  sctlr_el1);
++	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  actlr_el1);
++	write_sysreg(ctxt->sys_regs[CPACR_EL1],	  cpacr_el1);
++	write_sysreg(ctxt->sys_regs[TTBR0_EL1],	  ttbr0_el1);
++	write_sysreg(ctxt->sys_regs[TTBR1_EL1],	  ttbr1_el1);
++	write_sysreg(ctxt->sys_regs[TCR_EL1],	  tcr_el1);
++	write_sysreg(ctxt->sys_regs[ESR_EL1],	  esr_el1);
++	write_sysreg(ctxt->sys_regs[AFSR0_EL1],	  afsr0_el1);
++	write_sysreg(ctxt->sys_regs[AFSR1_EL1],	  afsr1_el1);
++	write_sysreg(ctxt->sys_regs[FAR_EL1],	  far_el1);
++	write_sysreg(ctxt->sys_regs[MAIR_EL1],	  mair_el1);
++	write_sysreg(ctxt->sys_regs[VBAR_EL1],	  vbar_el1);
++	write_sysreg(ctxt->sys_regs[CONTEXTIDR_EL1], contextidr_el1);
++	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
++	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
++	write_sysreg(ctxt->sys_regs[TPIDR_EL1],	  tpidr_el1);
++	write_sysreg(ctxt->sys_regs[AMAIR_EL1],	  amair_el1);
++	write_sysreg(ctxt->sys_regs[CNTKCTL_EL1], cntkctl_el1);
++	write_sysreg(ctxt->sys_regs[PAR_EL1],	  par_el1);
++	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
 +
-+	mrs	x3, vttbr_el2			// If vttbr is valid, the 64bit guest
-+	cbnz	x3, el1_trap			// called HVC
-+
-+	/* Here, we're pretty sure the host called HVC. */
-+	pop	x2, x3
-+	pop	x0, x1
-+
-+	/* Check for __hyp_get_vectors */
-+	cbnz	x0, 1f
-+	mrs	x0, vbar_el2
-+	b	2f
-+
-+1:	push	lr, xzr
-+
-+	/*
-+	 * Compute the function address in EL2, and shuffle the parameters.
-+	 */
-+	kern_hyp_va	x0
-+	mov	lr, x0
-+	mov	x0, x1
-+	mov	x1, x2
-+	mov	x2, x3
-+	blr	lr
-+
-+	pop	lr, xzr
-+2:	eret
-+
-+el1_trap:
-+	/*
-+	 * x1: ESR
-+	 * x2: ESR_EC
-+	 */
-+
-+	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
-+	cmp	x2, #ESR_ELx_EC_FP_ASIMD
-+	b.eq	__fpsimd_guest_restore
-+
-+	cmp	x2, #ESR_ELx_EC_DABT_LOW
-+	mov	x0, #ESR_ELx_EC_IABT_LOW
-+	ccmp	x2, x0, #4, ne
-+	b.ne	1f		// Not an abort we care about
-+
-+	/* This is an abort. Check for permission fault */
-+alternative_if_not ARM64_WORKAROUND_834220
-+	and	x2, x1, #ESR_ELx_FSC_TYPE
-+	cmp	x2, #FSC_PERM
-+	b.ne	1f		// Not a permission fault
-+alternative_else
-+	nop			// Use the permission fault path to
-+	nop			// check for a valid S1 translation,
-+	nop			// regardless of the ESR value.
-+alternative_endif
-+
-+
-+	/*
-+	 * Check for Stage-1 page table walk, which is guaranteed
-+	 * to give a valid HPFAR_EL2.
-+	 */
-+	tbnz	x1, #7, 1f	// S1PTW is set
-+
-+	/* Preserve PAR_EL1 */
-+	mrs	x3, par_el1
-+	push	x3, xzr
-+
-+	/*
-+	 * Permission fault, HPFAR_EL2 is invalid.
-+	 * Resolve the IPA the hard way using the guest VA.
-+	 * Stage-1 translation already validated the memory access rights.
-+	 * As such, we can use the EL1 translation regime, and don't have
-+	 * to distinguish between EL0 and EL1 access.
-+	 */
-+	mrs	x2, far_el2
-+	at	s1e1r, x2
-+	isb
-+
-+	/* Read result */
-+	mrs	x3, par_el1
-+	pop	x0, xzr			// Restore PAR_EL1 from the stack
-+	msr	par_el1, x0
-+	tbnz	x3, #0, 3f		// Bail out if we failed the translation
-+	ubfx	x3, x3, #12, #36	// Extract IPA
-+	lsl	x3, x3, #4		// and present it like HPFAR
-+	b	2f
-+
-+1:	mrs	x3, hpfar_el2
-+	mrs	x2, far_el2
-+
-+2:	mrs	x0, tpidr_el2
-+	str	w1, [x0, #VCPU_ESR_EL2]
-+	str	x2, [x0, #VCPU_FAR_EL2]
-+	str	x3, [x0, #VCPU_HPFAR_EL2]
-+
-+	mov	x1, #ARM_EXCEPTION_TRAP
-+	b	__guest_exit
-+
-+	/*
-+	 * Translation failed. Just return to the guest and
-+	 * let it fault again. Another CPU is probably playing
-+	 * behind our back.
-+	 */
-+3:	pop	x2, x3
-+	pop	x0, x1
-+
-+	eret
-+
-+el1_irq:
-+	push	x0, x1
-+	push	x2, x3
-+	mrs	x0, tpidr_el2
-+	mov	x1, #ARM_EXCEPTION_IRQ
-+	b	__guest_exit
-+
-+.macro invalid_vector	label, target = __kvm_hyp_panic
-+	.align	2
-+\label:
-+	b \target
-+ENDPROC(\label)
-+.endm
-+
-+	/* None of these should ever happen */
-+	invalid_vector	el2t_sync_invalid
-+	invalid_vector	el2t_irq_invalid
-+	invalid_vector	el2t_fiq_invalid
-+	invalid_vector	el2t_error_invalid
-+	invalid_vector	el2h_sync_invalid
-+	invalid_vector	el2h_irq_invalid
-+	invalid_vector	el2h_fiq_invalid
-+	invalid_vector	el2h_error_invalid
-+	invalid_vector	el1_sync_invalid
-+	invalid_vector	el1_irq_invalid
-+	invalid_vector	el1_fiq_invalid
-+	invalid_vector	el1_error_invalid
-+
-+	.ltorg
-+
-+	.align 11
-+
-+ENTRY(__hyp_vector)
-+	ventry	el2t_sync_invalid		// Synchronous EL2t
-+	ventry	el2t_irq_invalid		// IRQ EL2t
-+	ventry	el2t_fiq_invalid		// FIQ EL2t
-+	ventry	el2t_error_invalid		// Error EL2t
-+
-+	ventry	el2h_sync_invalid		// Synchronous EL2h
-+	ventry	el2h_irq_invalid		// IRQ EL2h
-+	ventry	el2h_fiq_invalid		// FIQ EL2h
-+	ventry	el2h_error_invalid		// Error EL2h
-+
-+	ventry	el1_sync			// Synchronous 64-bit EL1
-+	ventry	el1_irq				// IRQ 64-bit EL1
-+	ventry	el1_fiq_invalid			// FIQ 64-bit EL1
-+	ventry	el1_error_invalid		// Error 64-bit EL1
-+
-+	ventry	el1_sync			// Synchronous 32-bit EL1
-+	ventry	el1_irq				// IRQ 32-bit EL1
-+	ventry	el1_fiq_invalid			// FIQ 32-bit EL1
-+	ventry	el1_error_invalid		// Error 32-bit EL1
-+ENDPROC(__hyp_vector)
++	write_sysreg(ctxt->gp_regs.regs.sp,	sp_el0);
++	write_sysreg(ctxt->gp_regs.regs.pc,	elr_el2);
++	write_sysreg(ctxt->gp_regs.regs.pstate,	spsr_el2);
++	write_sysreg(ctxt->gp_regs.sp_el1,	sp_el1);
++	write_sysreg(ctxt->gp_regs.elr_el1,	elr_el1);
++	write_sysreg(ctxt->gp_regs.spsr[KVM_SPSR_EL1], spsr_el1);
++}
 -- 
 2.1.4
