@@ -1,67 +1,68 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 27 Nov 2015 21:47:04 +0200
-Subject: [PATCH v3] clocksource: arm_global_timer: fix suspend resume
-Message-ID: <1448653624-25006-1-git-send-email-grygorii.strashko@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 27 Nov 2015 20:49:30 +0100
+Subject: [PATCH] ARM: l2c: tauros2: use descriptive definitions for
+ register bits
+In-Reply-To: <E1a24qY-0004Vp-1G@rmk-PC.arm.linux.org.uk>
+References: <E1a24qY-0004Vp-1G@rmk-PC.arm.linux.org.uk>
+Message-ID: <20151127194930.GB14645@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now the System stall is observed on TI AM437x based board
-(am437x-gp-evm) during resuming from System suspend when ARM Global
-timer is selected as clocksource device (CPUIdle not enabled) - SysRq are working,
-but nothing else.
+On Thu, Nov 26, 2015 at 10:16:58PM +0000, Russell King wrote:
+> Use descriptive definitions for the Tauros2 register bits, and while
+> we're here, clean up the "Tauros2: %s line fill burt8." message.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-The reason of stall is that ARM Global timer loses its contexts during
-System suspend:
-   GT_CONTROL.TIMER_ENABLE = 0 (unbanked)
-   GT_COUNTERx = 0
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-Hence, update ARM Global timer driver to reflect above behaviour
-- re-enable ARM Global timer on resume GT_CONTROL.TIMER_ENABLE = 1.
+Thanks
+	Andrew
 
-CC: Arnd Bergmann <arnd@arndb.de>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Santosh Shilimkar <ssantosh@kernel.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
-Changes in v3:
- - dropped all DT specific code
-Changes in v2:
- - suspend/resume simplified: nothing is stored any more and
-   ARM GT just re-enabled
-Link on v2:
- https://lkml.org/lkml/2015/11/20/355
-Link on v1:
- https://lkml.org/lkml/2015/11/13/456
-
- drivers/clocksource/arm_global_timer.c | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
-index a2cb6fa..10d1417 100644
---- a/drivers/clocksource/arm_global_timer.c
-+++ b/drivers/clocksource/arm_global_timer.c
-@@ -195,12 +195,19 @@ static cycle_t gt_clocksource_read(struct clocksource *cs)
- 	return gt_counter_read();
- }
- 
-+static void gt_resume(struct clocksource *cs)
-+{
-+	/* re-enable timer on resume */
-+	writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
-+}
-+
- static struct clocksource gt_clocksource = {
- 	.name	= "arm_global_timer",
- 	.rating	= 300,
- 	.read	= gt_clocksource_read,
- 	.mask	= CLOCKSOURCE_MASK(64),
- 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
-+	.resume = gt_resume,
- };
- 
- #ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
--- 
-2.6.3
+> ---
+>  arch/arm/mm/cache-tauros2.c | 15 ++++++++++-----
+>  1 file changed, 10 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mm/cache-tauros2.c b/arch/arm/mm/cache-tauros2.c
+> index 95eb524ce556..88255bea65e4 100644
+> --- a/arch/arm/mm/cache-tauros2.c
+> +++ b/arch/arm/mm/cache-tauros2.c
+> @@ -22,6 +22,11 @@
+>  #include <asm/cputype.h>
+>  #include <asm/hardware/cache-tauros2.h>
+>  
+> +/* CP15 PJ4 Control configuration register */
+> +#define CCR_L2C_PREFETCH_DISABLE	BIT(24)
+> +#define CCR_L2C_ECC_ENABLE		BIT(23)
+> +#define CCR_L2C_WAY7_4_DISABLE		BIT(21)
+> +#define CCR_L2C_BURST8_ENABLE		BIT(20)
+>  
+>  /*
+>   * When Tauros2 is used on a CPU that supports the v7 hierarchical
+> @@ -182,18 +187,18 @@ static void enable_extra_feature(unsigned int features)
+>  	u = read_extra_features();
+>  
+>  	if (features & CACHE_TAUROS2_PREFETCH_ON)
+> -		u &= ~0x01000000;
+> +		u &= ~CCR_L2C_PREFETCH_DISABLE;
+>  	else
+> -		u |= 0x01000000;
+> +		u |= CCR_L2C_PREFETCH_DISABLE;
+>  	pr_info("Tauros2: %s L2 prefetch.\n",
+>  			(features & CACHE_TAUROS2_PREFETCH_ON)
+>  			? "Enabling" : "Disabling");
+>  
+>  	if (features & CACHE_TAUROS2_LINEFILL_BURST8)
+> -		u |= 0x00100000;
+> +		u |= CCR_L2C_BURST8_ENABLE;
+>  	else
+> -		u &= ~0x00100000;
+> -	pr_info("Tauros2: %s line fill burt8.\n",
+> +		u &= ~CCR_L2C_BURST8_ENABLE;
+> +	pr_info("Tauros2: %s burst8 line fill.\n",
+>  			(features & CACHE_TAUROS2_LINEFILL_BURST8)
+>  			? "Enabling" : "Disabling");
+>  
+> -- 
+> 2.1.0
+> 
