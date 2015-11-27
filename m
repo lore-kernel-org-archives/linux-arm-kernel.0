@@ -1,49 +1,159 @@
-From: michael@amarulasolutions.com (Michael Trimarchi)
-Date: Fri, 27 Nov 2015 09:44:51 +0100
-Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
- "/chosen/linux,atags" entry
-In-Reply-To: <20151127083833.GA430@pali>
-References: <20150713131902.GH26485@atomide.com> <20151123144545.GD24147@pali>
- <20151125181644.GI2517@atomide.com> <17134653.86P3dFyQKK@wuerfel>
- <20151125210310.GT2517@atomide.com> <56568849.5080103@gmail.com>
- <20151126090739.GD14190@pali> <20151126203930.GW2517@atomide.com>
- <20151127083833.GA430@pali>
-Message-ID: <CAOf5uwn_3gY=xE8gBS2hZ-O4ZBZruxYRN8a_hO0bqCHy-yA2Gg@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 27 Nov 2015 16:45:35 +0800
+Subject: [PATCH v2 6/6] arm64: dts: berlin4ct: add pll and clock nodes
+In-Reply-To: <20151127163937.0da33a93@xhacker>
+References: <1448008952-1787-1-git-send-email-jszhang@marvell.com>
+ <1448008952-1787-7-git-send-email-jszhang@marvell.com>
+ <564F8B73.7070403@gmail.com>	<20151123152158.483aa6b5@xhacker>
+ <5652CEB2.9030902@gmail.com>	<20151123165444.740b457c@xhacker>
+ <20151124103504.0a07b258@xhacker>	<56580B7F.5060709@gmail.com>
+ <20151127163937.0da33a93@xhacker>
+Message-ID: <20151127164535.02ea0ae5@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Fri, 27 Nov 2015 16:39:37 +0800
+Jisheng Zhang wrote:
 
-On Fri, Nov 27, 2015 at 9:38 AM, Pali Roh?r <pali.rohar@gmail.com> wrote:
-> On Thursday 26 November 2015 12:39:30 Tony Lindgren wrote:
->> Just to explore options.. How about make a minimal device driver that
->> just loads the atags blob from /lib/firmware and then shows it in
->> /proc/atags? Of course some checking on the atags should be done by
->> the driver..
->
-> And who can dynamically create that blob file in /lib/firmware? If
-> kernel does not export those atags (somehow) from bootloader, then
-> userspace is not able to create that blob... cyclic problem.
->
+> On Fri, 27 Nov 2015 08:51:27 +0100
+> Sebastian Hesselbarth wrote:
+> 
+> > On 24.11.2015 03:35, Jisheng Zhang wrote:  
+> > > On Mon, 23 Nov 2015 16:54:44 +0800
+> > > Jisheng Zhang wrote:    
+> > >> On Mon, 23 Nov 2015 09:30:42 +0100
+> > >> Sebastian Hesselbarth wrote:    
+> > >>> On 23.11.2015 08:21, Jisheng Zhang wrote:    
+> > >>>> On Fri, 20 Nov 2015 22:06:59 +0100
+> > >>>> Sebastian Hesselbarth wrote:    
+> > >>>>> On 20.11.2015 09:42, Jisheng Zhang wrote:    
+> > >>>>>> Add syspll, mempll, cpupll, gateclk and berlin-clk nodes.
+> > >>>>>>
+> > >>>>>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > >>>>>> ---    
+> > >>> [...]    
+> > >>>>>> +		syspll: syspll {
+> > >>>>>> +			compatible = "marvell,berlin-pll";
+> > >>>>>> +			reg = <0xea0200 0x14>, <0xea0710 4>;
+> > >>>>>> +			#clock-cells = <0>;
+> > >>>>>> +			clocks = <&osc>;
+> > >>>>>> +			bypass-shift = /bits/ 8 <0>;
+> > >>>>>> +		};
+> > >>>>>> +
+> > >>>>>> +		gateclk: gateclk {
+> > >>>>>> +			compatible = "marvell,berlin4ct-gateclk";
+> > >>>>>> +			reg = <0xea0700 4>;
+> > >>>>>> +			#clock-cells = <1>;
+> > >>>>>> +		};
+> > >>>>>> +
+> > >>>>>> +		clk: clk {
+> > >>>>>> +			compatible = "marvell,berlin4ct-clk";
+> > >>>>>> +			reg = <0xea0720 0x144>;    
+> > >>>>>
+> > >>>>> Looking at the reg ranges, I'd say that they are all clock related
+> > >>>>> and pretty close to each other:
+> > >>>>>
+> > >>>>> gateclk: reg = <0xea0700 4>;
+> > >>>>> bypass:  reg = <0xea0710 4>;
+> > >>>>> clk:     reg = <0xea0720 0x144>;    
+> > >>>>
+> > >>>> Although these ranges sit close, but we should represent HW structure as you
+> > >>>> said.    
+> > >>>
+> > >>> Then how do you argue that you have to share the gate clock register
+> > >>> with every PLL? The answer is quite simple: You are not separating by
+> > >>> HW either but existing SW API.    
+> > >>
+> > >> No, PLLs don't share register any more. You can find what all clock nodes will
+> > >> look like in:    
+> > 
+> > Jisheng,
+> > 
+> > referring to the sunxi clock related thread, I am glad you finally
+> > picked up the idea of merging clock nodes. Before you start reworking
+> > bg4 clocks, I think I should be a little bit more clear about what I
+> > expect to be the outcome.
+> > 
+> > When I said "one single clock complex node", I was referring to the
+> > clocks located within the system-controller reg region, i.e. those at
+> > 0xea0000. With bg2x we came to the conclusion that those registers
+> > cannot be not cleanly separated by functions, so we decided to have
+> > a single system-controller simple-mfd node with sub-nodes for
+> > pinctrl, clock, reset, and whatever we will find there in the future.
+> > 
+> > Please also follow this scheme for bg4 because when you start looking
+> > at reset, you'll likely see the same issues we were facing: Either you
+> > have a reset controller node with a plethora of reg property entries
+> > or you constantly undermine the concept of requested resources by using
+> > of_iomap().
+> > 
+> > Using simple-mfd is a compromise between detailed HW description and
+> > usability. It will also automatically deal with concurrent accesses to
+> > the same register for e.g. clock and reset because simple-mfd and syscon
+> > install an access lock for the reg region. Even though there may be no
+> > real concurrent accesses to the same register, it does no real harm
+> > because we are locking resisters that aren't supposed to be used in
+> > high-speed applications. Some of them are touched once at boot, most
+> > of them are never touched by Linux at all.  
+> 
+> Thank you so much for the detailed information. It do help me to have
+> a better understanding why.
+> 
+> > 
+> > For the other PLLs at <0x922000 0x14> and <0x940034 0x14>, I do accept
+> > that they are not part of the system-controller sub-node. For the short
+> > run, I would accept separate nodes for the PLLs alone, but on the long
+> > run they should be hidden within the functional node they belong to,
+> > i.e. mempll should be a clock provided by some memory-controller node.
+> > As soon as you look at power saving modes for the memory-controller,
+> > you would need access to memory-controller register _and_ mempll anyway.
+> > 
+> > We do have our DT tagged unstable, so we still can easily revert our
+> > limited view of some nodes later.
+> > 
+> > BTW, if the clock provided by mempll is used to generate peripheral
+> > clocks that are dealt with in the sysctrl clock complex, you should,  
+> 
+> mempll is only for ddrphy clk. So we are lucky ;)
 
-Are those atags from bootloader fix or they change device by device. If they
-are fixed they can be included in some firmware and get from the disk.
+oops, no, we are not lucky. mempll and memfastrefclk are clk-muxed to ddrphy clk
+which is dealt within the complex big clock block. So is for cpupll, cpufastrefclk
+But it's not that hard to add this support in the code.
 
-Michael
+Thanks for the example, I do need that....
 
-> So no, problem is that bootloader provides via custom atags dynamic
-> information like: boot reason (how was device started, by rtc alarm? by
-> reboot? by usb charger? by power button?), boot mode (should be enter
-> into firmware update mode?, is this normal boot mode?), ... and those
-> information are needed for some proprietary software (e.g. firmware
-> upgrade/flash) but also by any other open source applications (based on
-> usb charger we enter different runlevel -- for just only charging
-> device).
->
-> --
-> Pali Roh?r
-> pali.rohar at gmail.com
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+> 
+> Thanks,
+> Jisheng
+> 
+> > of course, expose that relation in DT, e.g.:
+> > 
+> > sysctrl: system-controller {
+> > 	reg = <0xea0700 0xfoo>;
+> > 
+> > 	sysclk: clock {
+> > 		#clock-cells = <1>;
+> > 		clocks = <&osc>, <&memctrl 0>;
+> > 		clock-names = "osc", "mempll";
+> > 	};
+> > };
+> > 
+> > memctrl: memory-controller {
+> > 	reg = <0x920000 0xbar>;
+> > 	/*
+> > 	 * clock-cells can also be 0
+> > 	 * if there is no other clock provided
+> > 	 */
+> > 	#clock-cells = <1>;
+> > 
+> > 	clocks = <&osc>;
+> > 	clock-names = "osc";
+> > };
+> > 
+> > some-peripheral: bla {
+> > 	clocks = <&sysclk SOME_PERIPHERAL_CLOCK_ID>;
+> > };
+> > 
+> > Sebastian
+> >   
