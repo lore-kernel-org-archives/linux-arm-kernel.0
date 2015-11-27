@@ -1,41 +1,33 @@
-From: aryabinin@virtuozzo.com (Andrey Ryabinin)
-Date: Fri, 27 Nov 2015 11:12:28 +0300
-Subject: [PATCH RFT] arm64: kasan: Make KASAN work with 16K pages + 48 bit
- VA
-In-Reply-To: <CAKv+Gu_L1shTWp_5KydCW97Z6TbeXEB9gjmb2oUSuCHfC29M9A@mail.gmail.com>
-References: <1448543686-31869-1-git-send-email-aryabinin@virtuozzo.com>
- <CAKv+Gu_L1shTWp_5KydCW97Z6TbeXEB9gjmb2oUSuCHfC29M9A@mail.gmail.com>
-Message-ID: <5658106C.10207@virtuozzo.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 27 Nov 2015 09:17:07 +0100
+Subject: [PATCH 06/18] arm64: renesas: r8a7795: add I2C support
+In-Reply-To: <32bc0c51be7c9db3762cbb34af465676c769886b.1448587800.git.horms+renesas@verge.net.au>
+References: <cover.1448587800.git.horms+renesas@verge.net.au>
+ <32bc0c51be7c9db3762cbb34af465676c769886b.1448587800.git.horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdU0eKSe9_sRnw8nxuMPz8i0B0vLQzBDbOxTQ9Nb85M9jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/2015 07:40 PM, Ard Biesheuvel wrote:
-> On 26 November 2015 at 14:14, Andrey Ryabinin <aryabinin@virtuozzo.com> wrote:
->> Currently kasan assumes that shadow memory covers one or more entire PGDs.
->> That's not true for 16K pages + 48bit VA space, where PGDIR_SIZE is bigger
->> than the whole shadow memory.
->>
->> This patch tries to fix that case.
->> clear_page_tables() is a new replacement of clear_pgs(). Instead of always
->> clearing pgds it clears top level page table entries that entirely belongs
->> to shadow memory.
->> In addition to 'tmp_pg_dir' we now have 'tmp_pud' which is used to store
->> puds that now might be cleared by clear_page_tables.
->>
->> Reported-by: Suzuki K. Poulose <Suzuki.Poulose@arm.com>
->> Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-> 
-> I would argue that the Kasan code is complicated enough, and we should
-> avoid complicating it even further for a configuration that is highly
-> theoretical in nature.
-> 
-> In a 16k configuration, the 4th level only adds a single bit of VA
-> space (which is, as I understand it, exactly the issue you need to
-> address here since the top level page table has only 2 entries and
-> hence does not divide by 8 cleanly), which means you are better off
-> using 3 levels unless you *really* need more than 128 TB of VA space.
-> 
-> So can't we just live with the limitation, and keep the current code?
- 
+On Fri, Nov 27, 2015 at 2:55 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+>
+> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> [geert: aAdd clock-output-names properties]
 
-No objections from my side. Let's keep the current code.
+That part is no longer true.
+
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
