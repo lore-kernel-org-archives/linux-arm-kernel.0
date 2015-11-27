@@ -1,41 +1,51 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Fri, 27 Nov 2015 16:44:23 +0100
-Subject: [PATCH v3 net 3/6] net: mvneta: fix bit assignment for RX packet irq
- enable
+Date: Fri, 27 Nov 2015 16:44:24 +0100
+Subject: [PATCH v3 net 4/6] net: mvneta: fix error path for building skb
 In-Reply-To: <1448639066-13074-1-git-send-email-mw@semihalf.com>
 References: <1448639066-13074-1-git-send-email-mw@semihalf.com>
-Message-ID: <1448639066-13074-4-git-send-email-mw@semihalf.com>
+Message-ID: <1448639066-13074-5-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A value originally defined in the driver was inappropriate. Even though
-the ingress was somehow working, writing MVNETA_RXQ_INTR_ENABLE_ALL_MASK
-to MVNETA_INTR_ENABLE didn't make any effect, because the bits [31:16]
-are reserved and read-only.
+In the actual RX processing, there is same error path for both descriptor
+ring refilling and building skb fails. This is not correct, because after
+successful refill, the ring is already updated with newly allocated
+buffer. Then, in case of build_skb() fail, hitherto code left the original
+buffer unmapped.
 
-This commit updates MVNETA_RXQ_INTR_ENABLE_ALL_MASK to be compliant with
-the controller's documentation.
+This patch fixes above situation by swapping error check of skb build with
+DMA-unmap of original buffer.
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-
-Fixes: c5aff18204da ("net: mvneta: driver for Marvell Armada 370/XP network
-unit")
+Acked-by: Simon Guinot <simon.guinot@sequanux.org>
+Cc: <stable@vger.kernel.org> # v4.2+
+Fixes a84e32894191 ("net: mvneta: fix refilling for Rx DMA buffers")
 ---
- drivers/net/ethernet/marvell/mvneta.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/ethernet/marvell/mvneta.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 64c46f0..5dffb68 100644
+index 5dffb68..5a98c5d 100644
 --- a/drivers/net/ethernet/marvell/mvneta.c
 +++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -160,7 +160,7 @@
+@@ -1580,12 +1580,16 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
+ 		}
  
- #define MVNETA_INTR_ENABLE                       0x25b8
- #define      MVNETA_TXQ_INTR_ENABLE_ALL_MASK     0x0000ff00
--#define      MVNETA_RXQ_INTR_ENABLE_ALL_MASK     0xff000000  // note: neta says it's 0x000000FF
-+#define      MVNETA_RXQ_INTR_ENABLE_ALL_MASK     0x000000ff
+ 		skb = build_skb(data, pp->frag_size > PAGE_SIZE ? 0 : pp->frag_size);
+-		if (!skb)
+-			goto err_drop_frame;
  
- #define MVNETA_RXQ_CMD                           0x2680
- #define      MVNETA_RXQ_DISABLE_SHIFT            8
++		/* After refill old buffer has to be unmapped regardless
++		 * the skb is successfully built or not.
++		 */
+ 		dma_unmap_single(dev->dev.parent, phys_addr,
+ 				 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
+ 
++		if (!skb)
++			goto err_drop_frame;
++
+ 		rcvd_pkts++;
+ 		rcvd_bytes += rx_bytes;
+ 
 -- 
 1.8.3.1
