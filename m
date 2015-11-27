@@ -1,58 +1,93 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 27 Nov 2015 11:18:04 +0100
-Subject: [PATCH v4] pwm-backlight: Avoid backlight flicker when probed
- from DT
-In-Reply-To: <20151110173257.GA21727@ulmo>
-References: <1446483356-14338-1-git-send-email-p.zabel@pengutronix.de>
- <3447562.c3gSANEMio@phil> <20151110173257.GA21727@ulmo>
-Message-ID: <5498492.8XSal22i1Y@diego>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 27 Nov 2015 11:34:24 +0100
+Subject: [PATCH v2] PCI: imx6: Fix reset-gpio to work with active low GPIO
+In-Reply-To: <1448618499-14990-1-git-send-email-ynezz@true.cz>
+References: <1448373334.3689.33.camel@pengutronix.de>
+ <1448618499-14990-1-git-send-email-ynezz@true.cz>
+Message-ID: <1448620464.3689.94.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
-
-Am Dienstag, 10. November 2015, 18:32:57 schrieb Thierry Reding:
-> On Tue, Nov 10, 2015 at 03:18:10PM +0100, Heiko Stuebner wrote:
-> > Hi Philipp,
-> > 
-> > Am Montag, 2. November 2015, 17:55:56 schrieb Philipp Zabel:
-> > > If the driver is probed from the device tree, and there is a phandle
-> > > property set on it, and the enable GPIO is already configured as output,
-> > > and the backlight is currently disabled, keep it disabled.
-> > > If all these conditions are met, assume there will be some other driver
-> > > that can enable the backlight at the appropriate time.
-> > > 
-> > > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > > Reviewed-by: Christian Gmeiner <christian.gmeiner@gmail.com>
-> > 
-> > this patch improves the white screen when booting a veyron chromebook
-> > a lot. I still see a small white flash, but that can probably come from
-> > the WIP edp driver.
+Am Freitag, den 27.11.2015, 11:01 +0100 schrieb Petr ?tetiar:
+> It's currently not possible to use reset-gpio on board where the GPIO is
+> active low as the code incorrectly assumes, that reset-gpio will be
+> always active high.
 > 
-> Some panels require a couple of frames before they actually enable. You
-> may want to look at the datasheet of your panel to see if it has some
-> specific requirement and update the panel driver with that.
+> In my case the broken behavior was observed on Toradex Apalis SoM with
+> Ixora base board.
 > 
-> From a high-level view the way that this is supposed to work is that
-> your encoder driver (e.g. eDP) "prepares" the panel, then starts sending
-> frames and finally "enables" the panel. With something like the simple
-> panel driver you can influence this by setting the delay.enable field in
-> the panel descriptor.
+> Signed-off-by: Petr ?tetiar <ynezz@true.cz>
+> ---
 > 
-> See struct panel_desc in drivers/gpu/drm/panel/panel-simple.c
+> Changes since v1:
+>  * reworked to use descriptor based GPIO interface
+> 
+>  drivers/pci/host/pci-imx6.c |   20 ++++++--------------
+>  1 file changed, 6 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index 22e8224..c0e121d 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -32,7 +32,7 @@
+>  #define to_imx6_pcie(x)	container_of(x, struct imx6_pcie, pp)
+>  
+>  struct imx6_pcie {
+> -	int			reset_gpio;
+> +	struct gpio_desc	*reset_gpio;
+>  	struct clk		*pcie_bus;
+>  	struct clk		*pcie_phy;
+>  	struct clk		*pcie;
+> @@ -287,10 +287,10 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+>  	usleep_range(200, 500);
+>  
+>  	/* Some boards don't have PCIe reset GPIO. */
+> -	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
+> -		gpio_set_value(imx6_pcie->reset_gpio, 0);
+> +	if (imx6_pcie->reset_gpio) {
+> +		gpiod_set_value(imx6_pcie->reset_gpio, 0);
 
-Thanks for the pointers :-)
+This now collides with a fix from Fabio that allows this function to
+sleep. So this should use gpiod_set_value_cansleep() and be rebased to
+pci/host-imx6, or if Bjorn prefers to pull this in quickly, replace
+Fabios commit.
 
-Just to follow up a little bit, after moving to Yakir's Analogix-dp driver 
-from the chromeos-one I was using till now, that actually works nicely for me 
-and even the short flash is gone.
+Regards,
+Lucas
 
+>  		msleep(100);
+> -		gpio_set_value(imx6_pcie->reset_gpio, 1);
+> +		gpiod_set_value(imx6_pcie->reset_gpio, 1);
+>  	}
+>  	return 0;
+>  
+> @@ -560,7 +560,6 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+>  {
+>  	struct imx6_pcie *imx6_pcie;
+>  	struct pcie_port *pp;
+> -	struct device_node *np = pdev->dev.of_node;
+>  	struct resource *dbi_base;
+>  	int ret;
+>  
+> @@ -581,15 +580,8 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+>  		return PTR_ERR(pp->dbi_base);
+>  
+>  	/* Fetch GPIOs */
+> -	imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
+> -	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
+> -		ret = devm_gpio_request_one(&pdev->dev, imx6_pcie->reset_gpio,
+> -					    GPIOF_OUT_INIT_LOW, "PCIe reset");
+> -		if (ret) {
+> -			dev_err(&pdev->dev, "unable to get reset gpio\n");
+> -			return ret;
+> -		}
+> -	}
+> +	imx6_pcie->reset_gpio = devm_gpiod_get_optional(&pdev->dev, "reset",
+> +							GPIOD_OUT_LOW);
+>  
+>  	/* Fetch clocks */
+>  	imx6_pcie->pcie_phy = devm_clk_get(&pdev->dev, "pcie_phy");
 
-Heiko
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151127/60d0f669/attachment.sig>
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
