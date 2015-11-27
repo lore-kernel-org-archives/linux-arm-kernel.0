@@ -1,81 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Nov 2015 13:27:23 +0000
-Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
- "/chosen/linux,atags" entry
-In-Reply-To: <20151126090739.GD14190@pali>
-References: <20150713131902.GH26485@atomide.com> <20151123144545.GD24147@pali>
- <20151125181644.GI2517@atomide.com> <17134653.86P3dFyQKK@wuerfel>
- <20151125210310.GT2517@atomide.com> <56568849.5080103@gmail.com>
- <20151126090739.GD14190@pali>
-Message-ID: <20151127132722.GA30871@n2100.arm.linux.org.uk>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 27 Nov 2015 21:28:31 +0800
+Subject: [PATCH v2 0/4] ACPI based NUMA support for ARM64
+In-Reply-To: <56582195.80306@huawei.com>
+References: <1447784733-10419-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <56582195.80306@huawei.com>
+Message-ID: <56585A7F.3010505@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2015 at 10:07:39AM +0100, Pali Roh?r wrote:
-> On Wednesday 25 November 2015 20:19:21 Frank Rowand wrote:
-> > > Or populate /proc/atags only for the ones that need it from machine
-> > > specific init_early?
-> > 
-> > This is circling back to the first comment from Russell King where
-> > he suggested a legacy file for the N900 which calls save_atags():
-> > 
-> >     Are the ATAGs at a fixed address on the N900?  Can that be handled in
-> >     some kind of legacy file for the N900 which calls save_atags() on it, so
-> >     we don't end up introducing yet more stuff that we have to maintain into
-> >     the distant future?  If not, what about copying a known working atag
-> >     structure into a legacy file for the N900?
-> > 
-> > It seems to me that patches 1, 2, 4, and 5 could be replaced by this
-> > approach.
-> 
-> Hi Frank, in this case I will ask my question again: It is possible to
-> read atags from that legacy file. And if yes how? I was not thinking
-> about this approach because somebody in past wrote that this is not
-> possible...
+On 11/27/2015 05:25 PM, Shannon Zhao wrote:
+>
+>
+> On 2015/11/18 2:25, Ganapatrao Kulkarni wrote:
+>>   -v2 rebased on arm64-numa v7 patches.
+>>   http://www.spinics.net/lists/arm-kernel/msg460813.html
+>>
+>>   -v1 initial patches from Hanjun Guo
+>>
+>> Hanjun Guo (4):
+>>    acpi, numa: Use pr_fmt() instead of printk
+>>    acpi, numa: Replace ACPI_DEBUG_PRINT() with pr_debug()
+>>    arm64, acpi, numa: NUMA support based on SRAT and SLIT
+>>    acpi, numa: Enable ACPI based NUMA on ARM64
+>>
+>>   arch/arm64/include/asm/acpi.h |   4 +
+>>   arch/arm64/kernel/Makefile    |   1 +
+>>   arch/arm64/kernel/acpi_numa.c | 215 ++++++++++++++++++++++++++++++++++++++++++
+>>   arch/arm64/mm/numa.c          |   7 +-
+>>   drivers/acpi/Kconfig          |   4 +-
+>>   drivers/acpi/numa.c           | 106 ++++++++++++---------
+>>   include/linux/acpi.h          |  15 +++
+>>   7 files changed, 306 insertions(+), 46 deletions(-)
+>>   create mode 100644 arch/arm64/kernel/acpi_numa.c
+>>
+>
+> I've tested this patch set on QEMU VM and guest prints below log:
+>
+> ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x0 -> Node 0 cpu 1
+> ACPI: NUMA: SRAT: PXM 0 -> MPIDR 0x1 -> Node 0 cpu 2
+> ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x2 -> Node 1 cpu 3
+> ACPI: NUMA: SRAT: PXM 1 -> MPIDR 0x3 -> Node 1 cpu 4
+> ACPI: NUMA: SRAT: Node 0 PXM 0 [mem 0x40000000-0x5fffffff]
+> NUMA: Adding memblock [0x40000000 - 0x5fffffff] on node 0
+> ACPI: NUMA: SRAT: Node 1 PXM 1 [mem 0x60000000-0x7fffffff]
+> NUMA: Adding memblock [0x60000000 - 0x7fffffff] on node 1
+> Initmem setup node 0 [mem 0x40000000-0x5fffffff]
+>    NODE_DATA [mem 0x5fffe400-0x5fffffff]
+> Initmem setup node 1 [mem 0x60000000-0x7fffffff]
+>    NODE_DATA [mem 0x7effd400-0x7effefff]
+> Zone ranges:
+>    DMA      [mem 0x0000000040000000-0x000000007fffffff]
+>    Normal   empty
+> Movable zone start for each node
+> Early memory node ranges
+>    node   0: [mem 0x0000000040000000-0x000000005fffffff]
+>    node   1: [mem 0x0000000060000000-0x000000007fffffff]
+> Initmem setup node 0 [mem 0x0000000040000000-0x000000005fffffff]
+> Initmem setup node 1 [mem 0x0000000060000000-0x000000007fffffff]
+>
+> So, Tested-by: Shannon Zhao <shannon.zhao@linaro.org>
 
-It is possible to redirect any program to open any other file.  You can
-do it via a LD preload, and intercepting the open(), and possibly the
-read() calls if you want to do something more fancy.  The down-side is
-that you have to arrange for the preloaded object to be used by the
-linker, and the additional overhead it places on the intercepted
-functions.
+Hi Shannon, thanks a lot!
 
-Eg,
-
-openatags.c:
-
-#define open libc_open
-#include <fcntl.h>
-#undef open
-#include <string.h>
-
-int open(const char *pathname, int flags, mode_t mode)
-{
-        static int (*old_open)(const char *pathname, int flags, mode_t mode);
-
-        if (strcmp(pathname, "/proc/atags") == 0)
-		pathname = "/tmp/my-atags";
-
-        if (!old_open)
-                old_open = dlsym(RTLD_NEXT, "open");
-
-        return old_open(pathname, flags, mode);
-}
-
-Build the above (untested) with:
-gcc -O2 -o openatags.o -c openatags.c
-gcc -shared -o openatags.so openatags.o -ldl
-
-Now, when running one of these programs, you can test it with:
-LD_PRELOAD=openatags.so /name/of/program
-
-You could also list the full pathname to openatags.so in /etc/ld.so.preload,
-but test it first, because it will always be used by the linker in that
-case, and you wouldn't want normal commands to misbehave.
-
-Note that putting it in /etc/ld.so.preload will also have the effect that
-cat /proc/atags will also get redirected to /tmp/my-atags too.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks
+Hanjun
