@@ -1,47 +1,31 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 27 Nov 2015 23:53:35 +0100
-Subject: [PATCH] ARM: dts: rockchip: add gpio-ir-receiver to the R89 board
-Message-ID: <2515484.rcZl3ThkRZ@diego>
+From: anton.bondarenko.sama@gmail.com (Anton Bondarenko)
+Date: Sat, 28 Nov 2015 00:15:58 +0100
+Subject: [PATCH v4 0/7]  Improvements for SPI IMX driver for Freescale IMX51,
+ IMX53 and IMX6
+Message-ID: <1448666165-7473-1-git-send-email-anton.bondarenko.sama@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the IR receiver present on the R89 board.
+A number of patches to impove or add the implementation
+for the spi-imx driver related to Freescale IMX51, IMX53 and IMX6.
+It would also possible some of patches can be applied for other
+Freescale controllers using spi-imx driver but could not be tested
+due to lack of hardware.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3288-r89.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Changes since V3:
+ Addressed comments from V3 review, simplified timeout calculation
 
-diff --git a/arch/arm/boot/dts/rk3288-r89.dts b/arch/arm/boot/dts/rk3288-r89.dts
-index 14b9fc7..17f13c7 100644
---- a/arch/arm/boot/dts/rk3288-r89.dts
-+++ b/arch/arm/boot/dts/rk3288-r89.dts
-@@ -78,6 +78,13 @@
- 		};
- 	};
- 
-+	ir: ir-receiver {
-+		compatible = "gpio-ir-receiver";
-+		gpios = <&gpio7 0 GPIO_ACTIVE_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&ir_int>;
-+	};
-+
- 	vcc_host: vcc-host-regulator {
- 		compatible = "regulator-fixed";
- 		enable-active-high;
-@@ -310,6 +317,12 @@
- 		};
- 	};
- 
-+	ir {
-+		ir_int: ir-int {
-+			rockchip,pins = <7 0 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+	};
-+
- 	pmic {
- 		pmic_int: pmic-int {
- 			rockchip,pins = <RK_GPIO0 4 RK_FUNC_GPIO &pcfg_pull_up>;
+Anton Bondarenko (7):
+  spi: imx: Fix DMA transfer
+  spi: imx: replace fixed timeout with calculated one
+  spi: imx: add support for all SPI word width for DMA transfer
+  spi: imx: add function to check for IMX51 family controller
+  spi: imx: Add support for loopback for ECSPI controllers
+  spi: imx: return error from dma channel request
+  spi: imx: defer spi initialization, if DMA engine is pending
+
+ drivers/spi/spi-imx.c | 320 +++++++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 237 insertions(+), 83 deletions(-)
+
 -- 
-2.6.1
+2.6.3
