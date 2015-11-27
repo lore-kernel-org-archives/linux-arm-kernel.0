@@ -1,65 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 27 Nov 2015 10:55:20 +0900
-Subject: [PATCH 03/18] arm64: dts: r8a7795: enable EthernetAVB on Salvator-X
-In-Reply-To: <cover.1448587800.git.horms+renesas@verge.net.au>
-References: <cover.1448587800.git.horms+renesas@verge.net.au>
-Message-ID: <6fa501c549aa170b790bf68da6ffed8fe1efdaee.1448587800.git.horms+renesas@verge.net.au>
+Date: Fri, 27 Nov 2015 10:56:06 +0900
+Subject: [PATCH] ARM: shmobile: r8a7793: proper constness with __initconst
+In-Reply-To: <cover.1448586153.git.horms+renesas@verge.net.au>
+References: <cover.1448586153.git.horms+renesas@verge.net.au>
+Message-ID: <c29d387b0bffb3ccce76e4fcdad9bfa7344ba338.1448586153.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+From: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+Both the pointer array and the pointed data have to be const when using
+__initconst to be correct.  This also fixes LTO builds that otherwise
+fail with section mismatch errors.
+
+Fixes: ec60d95b4fac ("ARM: shmobile: Basic r8a7793 SoC support")
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 31 ++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ arch/arm/mach-shmobile/setup-r8a7793.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index a3db98384e53..afdf53874da1 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -45,6 +45,11 @@
- 		renesas,groups = "scif2_data_a";
- 		renesas,function = "scif2";
- 	};
-+
-+	avb_pins: avb {
-+		renesas,groups = "avb_mdc";
-+		renesas,function = "avb";
-+	};
- };
+diff --git a/arch/arm/mach-shmobile/setup-r8a7793.c b/arch/arm/mach-shmobile/setup-r8a7793.c
+index 1d2825cb7a65..5fce87f7f254 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7793.c
++++ b/arch/arm/mach-shmobile/setup-r8a7793.c
+@@ -19,7 +19,7 @@
+ #include "common.h"
+ #include "rcar-gen2.h"
  
- &scif1 {
-@@ -60,3 +65,29 @@
- 
- 	status = "okay";
+-static const char *r8a7793_boards_compat_dt[] __initconst = {
++static const char * const r8a7793_boards_compat_dt[] __initconst = {
+ 	"renesas,r8a7793",
+ 	NULL,
  };
-+
-+&avb {
-+	pinctrl-0 = <&avb_pins>;
-+	pinctrl-names = "default";
-+	renesas,no-ether-link;
-+	phy-handle = <&phy0>;
-+	status = "okay";
-+
-+	phy0: ethernet-phy at 0 {
-+		rxc-skew-ps = <900>;
-+		rxdv-skew-ps = <0>;
-+		rxd0-skew-ps = <0>;
-+		rxd1-skew-ps = <0>;
-+		rxd2-skew-ps = <0>;
-+		rxd3-skew-ps = <0>;
-+		txc-skew-ps = <900>;
-+		txen-skew-ps = <0>;
-+		txd0-skew-ps = <0>;
-+		txd1-skew-ps = <0>;
-+		txd2-skew-ps = <0>;
-+		txd3-skew-ps = <0>;
-+		reg = <0>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
 -- 
 2.1.4
