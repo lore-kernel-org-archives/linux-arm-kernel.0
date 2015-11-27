@@ -1,79 +1,68 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 27 Nov 2015 10:55:56 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for v4.5
-Message-ID: <cover.1448586938.git.horms+renesas@verge.net.au>
+Date: Fri, 27 Nov 2015 10:55:44 +0900
+Subject: [PATCH 01/15] ARM: shmobile: r8a7790: switch console back to scif0
+In-Reply-To: <cover.1448586938.git.horms+renesas@verge.net.au>
+References: <cover.1448586938.git.horms+renesas@verge.net.au>
+Message-ID: <430d7baddf2d913de76e8101d807f4f2861705f7.1448586938.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-Please consider these second round of Renesas ARM based SoC DT updates for v4.5.
+The boot loader uses scif0, and so must we if we want earlycon to work.
 
-This pull request extends support for Renesas ARM Based SoCs via DT
-and includes several minor fixes and cleanups.
+Partially reverts 7c0558941 ("ARM: shmobile: r8a7790: switch from scif
+to scifa").
 
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7790-lager.dts | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-The following changes since commit 998f468f34f41905051556a9897dbc204b1b75b4:
-
-  Merge tag 'v4.4-rc1' into HEAD (2015-11-24 12:00:02 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v4.5
-
-for you to fetch changes up to c8d9fdbe2d648caaa510d45dc13eba2e9957140b:
-
-  ARM: shmobile: sh73a0 dtsi: Add L2 cache-controller node (2015-11-25 10:42:38 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC DT Updates for v4.5
-
-* sh73a0, r8a7740: Add L2 cache-controller node
-* r8a7791, r8a7794: remove deprecated #gpio-range-cells
-* r8a7793: Add DU support and enable for VGA port
-* r8a7790: switch console back to scif0
-* alt: Correct ether and scif2 pinmux
-* koelsch: Correct hdmi pinmux
-* silk, lager, porter, bockw: Move SPI FLASH partitions to subnode
-* bockw: Add schi0 pinmux
-
-----------------------------------------------------------------
-Geert Uytterhoeven (6):
-      ARM: shmobile: bockw: Move SPI FLASH partition to subnode
-      ARM: shmobile: porter: Move SPI FLASH partitions to subnode
-      ARM: shmobile: lager: Move SPI FLASH partitions to subnode
-      ARM: shmobile: silk: Move SPI FLASH partitions to subnode
-      ARM: shmobile: r8a7740 dtsi: Add L2 cache-controller node
-      ARM: shmobile: sh73a0 dtsi: Add L2 cache-controller node
-
-Laurent Pinchart (2):
-      ARM: shmobile: r8a7793: Add DU node to device tree
-      ARM: shmobile: r8a7791: koelsch: Fix pinmux for HDMI
-
-Magnus Damm (1):
-      ARM: shmobile: r8a7794: alt: Enable PFC DU for the VGA port
-
-Simon Horman (2):
-      ARM: shmobile: alt: Correct scif2 pfc
-      ARM: shmobile: alt: Correct ether pfc
-
-Ulrich Hecht (2):
-      ARM: shmobile: r8a7790: switch console back to scif0
-      ARM: shmobile: bockw dts: define sdhi0 pins with pull-ups
-
-Wolfram Sang (2):
-      ARM: shmobile: r8a7791: remove deprecated #gpio-range-cells from dtsi
-      ARM: shmobile: r8a7794: remove deprecated #gpio-range-cells from dtsi
-
- arch/arm/boot/dts/r8a7740.dtsi        | 13 ++++++++++
- arch/arm/boot/dts/r8a7778-bockw.dts   | 23 +++++++++++------
- arch/arm/boot/dts/r8a7790-lager.dts   | 47 +++++++++++++++++++----------------
- arch/arm/boot/dts/r8a7791-koelsch.dts |  2 +-
- arch/arm/boot/dts/r8a7791-porter.dts  | 33 +++++++++++++-----------
- arch/arm/boot/dts/r8a7791.dtsi        |  1 -
- arch/arm/boot/dts/r8a7793.dtsi        | 30 ++++++++++++++++++++++
- arch/arm/boot/dts/r8a7794-alt.dts     | 19 +++++++++++---
- arch/arm/boot/dts/r8a7794-silk.dts    | 33 +++++++++++++-----------
- arch/arm/boot/dts/r8a7794.dtsi        |  1 -
- arch/arm/boot/dts/sh73a0.dtsi         | 14 +++++++++++
- 11 files changed, 150 insertions(+), 66 deletions(-)
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index e2174d816e78..79f141188d99 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -47,13 +47,13 @@
+ 	compatible = "renesas,lager", "renesas,r8a7790";
+ 
+ 	aliases {
+-		serial0 = &scifa0;
++		serial0 = &scif0;
+ 		serial1 = &scifa1;
+ 	};
+ 
+ 	chosen {
+ 		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
+-		stdout-path = &scifa0;
++		stdout-path = &scif0;
+ 	};
+ 
+ 	memory at 40000000 {
+@@ -296,9 +296,9 @@
+ 		renesas,function = "du";
+ 	};
+ 
+-	scifa0_pins: serial0 {
+-		renesas,groups = "scifa0_data";
+-		renesas,function = "scifa0";
++	scif0_pins: serial0 {
++		renesas,groups = "scif0_data";
++		renesas,function = "scif0";
+ 	};
+ 
+ 	ether_pins: ether {
+@@ -467,8 +467,8 @@
+ 	};
+ };
+ 
+-&scifa0 {
+-	pinctrl-0 = <&scifa0_pins>;
++&scif0 {
++	pinctrl-0 = <&scif0_pins>;
+ 	pinctrl-names = "default";
+ 
+ 	status = "okay";
+-- 
+2.1.4
