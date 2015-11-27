@@ -1,45 +1,30 @@
-From: mmarek@suse.com (Michal Marek)
-Date: Fri, 27 Nov 2015 15:50:05 +0100
-Subject: [PATCH] logfs: clarify MTD dependency
-In-Reply-To: <3269089.8XYbbcUOLH@wuerfel>
-References: <9365895.IkncCfXjo6@wuerfel>
- <20151127141406.GA29886@sepie.suse.cz> <3269089.8XYbbcUOLH@wuerfel>
-Message-ID: <56586D9D.1000603@suse.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 27 Nov 2015 14:50:21 +0000
+Subject: [PATCH v3 56/62] arm/acpi: Deny MMIO access of UART
+In-Reply-To: <564B275A.6060309@huawei.com>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-57-git-send-email-shannon.zhao@linaro.org>
+ <564B17E2.8030205@citrix.com> <564B275A.6060309@huawei.com>
+Message-ID: <alpine.DEB.2.02.1511271449260.8984@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-11-27 15:30, Arnd Bergmann wrote:
-> On Friday 27 November 2015 15:14:06 Michal Marek wrote:
->>
->> Hi Arnd,
->>
->> I hit this as well and was about to submit a slightly different fix. Can
->> you try the logfs portion of the below patch? Proper changelog is to be
->> done, but the gist of the patch is that IS_REACHABLE(CONFIG_FOO) 
->> evaluates to 1 if CONFIG_FOO=y or we are building a module and
->> CONFIG_FOO=m.
->>
-> 
-> I thought about doing it that way, and I'm sure that also worked.
-> The possible behaviors are basically:
-> 
-> a) before your original patch, building logfs with CONFIG_MTD=m would
->    silently leave out MTD support, which was rather confusing.
-> 
-> b) with my patch, it becomes impossible to have logfs as the built-in
->    root file system on a block device while also using CONFIG_MTD=m,
->    and that may be slightly annoying
-> 
-> c) your patch restores a), but makes it work in the case where both
->    logfs and mtd are loadable modules, which is an improvement but
->    may still confuse users.
-> 
-> My preference is still version b) as I sent, but I don't really mind
-> your version either.
+On Tue, 17 Nov 2015, Shannon Zhao wrote:
+> On 2015/11/17 20:04, Julien Grall wrote:
+> > On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
+> >> From: Shannon Zhao <shannon.zhao@linaro.org>
+> >>
+> >> Firstly it permits full MMIO capabilities for Dom0. Then deny MMIO
+> >> access of UART device.
+> > 
+> > I'm nearly sure we want to deny other MMIO such as the GIC regions and SMMU.
+> > 
+> But Dom0 will not know the real GIC hardware MMIO space, how would it
+> map these regions? In case of wrong use?
 
-I used the IS_REACHABLE macro because it hides the boolean expressions
-nicely :). But I also do not insist on a particular solution. J?rn, what
-would be your preference?
+It could try regions at random or by mistake.
+I know that Dom0 is "trusted", but the less we trust it, the better.
 
-Thanks,
-Michal
+
+> Regarding SMMU, since it doesn't support now, so I didn't add it but it
+> could be added later.
