@@ -1,53 +1,32 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 27 Nov 2015 10:55:47 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Cleanup for v4.5
-Message-ID: <cover.1448585673.git.horms+renesas@verge.net.au>
+Date: Fri, 27 Nov 2015 10:55:46 +0900
+Subject: [PATCH 1/3] MAINTAINERS: Remove link to oss.renesas.com which is
+ closed
+In-Reply-To: <cover.1448585673.git.horms+renesas@verge.net.au>
+References: <cover.1448585673.git.horms+renesas@verge.net.au>
+Message-ID: <804b0d7011ee464d8ca8c52dc38525572e526ab4.1448585673.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+There doesn't seem much value in keeping this link listed
+in the MAINTAINERS file any more.
 
-Please consider these Renesas ARM based SoC cleanup for v4.5.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ MAINTAINERS | 1 -
+ 1 file changed, 1 deletion(-)
 
-This pull request includes some minor cleanups and
-introduces ARCH_RENESAS as a firs step to migrating away
-from ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI.
-
-
-The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
-
-  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-for-v4.5
-
-for you to fetch changes up to c8cd74a1468ffe20db3ddc6e6f408d5377f9be43:
-
-  ARM: shmobile: Remove legacy mach/irqs.h (2015-11-19 16:28:01 -0800)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Cleanup for v4.5
-
-* Remove now unnecessary header
-* Introduce ARCH_RENESAS
-* Remove unmaintened URL from MAINTAINERS
-
-----------------------------------------------------------------
-Laurent Pinchart (1):
-      ARM: shmobile: Remove legacy mach/irqs.h
-
-Simon Horman (2):
-      MAINTAINERS: Remove link to oss.renesas.com which is closed
-      ARM: shmobile: Introduce ARCH_RENESAS
-
- MAINTAINERS                                |  1 -
- arch/arm/configs/multi_v7_defconfig        |  2 +-
- arch/arm/configs/shmobile_defconfig        |  2 +-
- arch/arm/mach-shmobile/Kconfig             | 10 +++++++---
- arch/arm/mach-shmobile/include/mach/irqs.h | 10 ----------
- arch/arm/mach-shmobile/irqs.h              | 15 ---------------
- arch/arm/mach-shmobile/setup-r8a7778.c     |  1 -
- 7 files changed, 9 insertions(+), 32 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/include/mach/irqs.h
- delete mode 100644 arch/arm/mach-shmobile/irqs.h
+diff --git a/MAINTAINERS b/MAINTAINERS
+index e9caa4b28828..bea4c8ba7a80 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1517,7 +1517,6 @@ ARM/SHMOBILE ARM ARCHITECTURE
+ M:	Simon Horman <horms@verge.net.au>
+ M:	Magnus Damm <magnus.damm@gmail.com>
+ L:	linux-sh at vger.kernel.org
+-W:	http://oss.renesas.com
+ Q:	http://patchwork.kernel.org/project/linux-sh/list/
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git next
+ S:	Supported
+-- 
+2.1.4
