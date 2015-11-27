@@ -1,50 +1,21 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 27 Nov 2015 12:21:25 +0000
-Subject: [RESEND RFC/PATCH 3/8] media: platform: mtk-vpu: Support Mediatek
- VPU
-In-Reply-To: <1448626209.7734.26.camel@mtksdaap41>
-References: <1447764885-23100-1-git-send-email-tiffany.lin@mediatek.com>
- <1447764885-23100-4-git-send-email-tiffany.lin@mediatek.com>
- <5655DDB4.2080002@linaro.org> <1448626209.7734.26.camel@mtksdaap41>
-Message-ID: <56584AC5.7020704@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 27 Nov 2015 12:28:51 +0000
+Subject: [PATCH] regulator: core: fix regulator_lock_supply regression
+In-Reply-To: <3399746.xt7N4lig0U@wuerfel>
+References: <3399746.xt7N4lig0U@wuerfel>
+Message-ID: <20151127122851.GO1929@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/11/15 12:10, andrew-ct chen wrote:
->>> +
->>> > >+	memcpy((void *)send_obj->share_buf, buf, len);
->>> > >+	send_obj->len = len;
->>> > >+	send_obj->id = id;
->>> > >+	vpu_cfg_writel(vpu, 0x1, HOST_TO_VPU);
->>> > >+
->>> > >+	/* Wait until VPU receives the command */
->>> > >+	timeout = jiffies + msecs_to_jiffies(IPI_TIMEOUT_MS);
->>> > >+	do {
->>> > >+		if (time_after(jiffies, timeout)) {
->>> > >+			dev_err(vpu->dev, "vpu_ipi_send: IPI timeout!\n");
->>> > >+			return -EIO;
->>> > >+		}
->>> > >+	} while (vpu_cfg_readl(vpu, HOST_TO_VPU));
->> >
->> >Do we need to busy wait every time we communicate with the co-processor?
->> >Couldn't we put this wait*before*  we write to HOST_TO_VPU above.
->> >
->> >That way we only spin when there is a need to.
->> >
-> Since the hardware VPU only allows that one client sends the command to
-> it each time.
-> We need the wait to make sure VPU accepted the command and cleared the
-> interrupt and then the next command would be served.
+On Fri, Nov 27, 2015 at 01:04:30PM +0100, Arnd Bergmann wrote:
+> As noticed by Geert Uytterhoeven, my patch to avoid a harmless build warning
+> in regulator_lock_supply() was total crap and introduced a real bug:
 
-I understand that the VPU  can only have on message outstanding at once.
-
-I just wonder why we busy wait *after* sending the first command rather 
-than *before* sending the second one.
-
-Streamed decode/encode typically ends up being rate controlled by 
-capture or display meaning that in these cases we don't need to busy 
-wait at all (because by the time we send the next frame the VPU has 
-already accepted the previous message).
-
-
-Daniel.
+This doesn't apply against current code, please check and resend.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151127/55bee90b/attachment.sig>
