@@ -1,47 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 Nov 2015 09:35:29 +0000
-Subject: [PATCH RFT] arm64: kasan: Make KASAN work with 16K pages + 48
- bit VA
-In-Reply-To: <5658106C.10207@virtuozzo.com>
-References: <1448543686-31869-1-git-send-email-aryabinin@virtuozzo.com>
- <CAKv+Gu_L1shTWp_5KydCW97Z6TbeXEB9gjmb2oUSuCHfC29M9A@mail.gmail.com>
- <5658106C.10207@virtuozzo.com>
-Message-ID: <20151127093529.GX3109@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Nov 2015 09:36:01 +0000
+Subject: armv7 + lpae broken in 4.1.12+ ?
+In-Reply-To: <5657952E.906@heeltoe.com>
+References: <5657952E.906@heeltoe.com>
+Message-ID: <20151127093601.GA25781@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 27, 2015 at 11:12:28AM +0300, Andrey Ryabinin wrote:
-> On 11/26/2015 07:40 PM, Ard Biesheuvel wrote:
-> > On 26 November 2015 at 14:14, Andrey Ryabinin <aryabinin@virtuozzo.com> wrote:
-> >> Currently kasan assumes that shadow memory covers one or more entire PGDs.
-> >> That's not true for 16K pages + 48bit VA space, where PGDIR_SIZE is bigger
-> >> than the whole shadow memory.
-> >>
-> >> This patch tries to fix that case.
-> >> clear_page_tables() is a new replacement of clear_pgs(). Instead of always
-> >> clearing pgds it clears top level page table entries that entirely belongs
-> >> to shadow memory.
-> >> In addition to 'tmp_pg_dir' we now have 'tmp_pud' which is used to store
-> >> puds that now might be cleared by clear_page_tables.
-> >>
-> >> Reported-by: Suzuki K. Poulose <Suzuki.Poulose@arm.com>
-> >> Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-> > 
-> > I would argue that the Kasan code is complicated enough, and we should
-> > avoid complicating it even further for a configuration that is highly
-> > theoretical in nature.
-> > 
-> > In a 16k configuration, the 4th level only adds a single bit of VA
-> > space (which is, as I understand it, exactly the issue you need to
-> > address here since the top level page table has only 2 entries and
-> > hence does not divide by 8 cleanly), which means you are better off
-> > using 3 levels unless you *really* need more than 128 TB of VA space.
-> > 
-> > So can't we just live with the limitation, and keep the current code?
+On Thu, Nov 26, 2015 at 06:26:38PM -0500, Brad Parker wrote:
+> I was recently building a 4.1.12 kernel for a generic V7 platform with LPAE.
+> I could not get it to boot and then discovered two things:
 > 
-> No objections from my side. Let's keep the current code.
+> - the early printk code in tty/serial call ioremap very early and it fails
+> because there's no heap
+> - the code in proc-v7-3level.S/cpu_v7_set_pte_ext doesn't work
+> 
+> The printk issue is no big deal.  The pte issue is more important.
+> 
+> I found that the pte entries were garbage, which really confused me.  I
+> finally discovered that the code in proc-v7-3level.S expects data in r0, r2
+> & r3, but in fact it comes in on r0, r1 & r2.
+> 
+> My guess is that this is some vestige of the change made to
+> cpu_v7_switch_mm() some time ago to make the PA a 64 bit value (hence using
+> r0,r1).  But this change was not made to cpu_v7_set_pte_ext, so it writes
+> garbage.
+> 
+> lol.  I guess I'm the only one who turns on LPAE for v7 cpu's...
 
-Ard had a good point, so fine by me as well.
+FWIW, anybody using virtualisation with a v7 CPU has LPAE enabled. Whilst
+that's admittedly not the majority of users, you're certainly not alone.
 
--- 
-Catalin
+You are, however, the only person who seems to be hitting this problem.
+
+As Russell says, AEABI requires the 64-bit pte value to be passed in r2
+and r3 for cpu_v7_set_pte_ext:
+
+  C.3 If the argument requires double-word alignment (8-byte), the NCRN
+      is rounded up to the next even register number.
+
+> The simple fix is to add "mov r3, r2; mov r2,r1" at the begining of
+> cpu_v7_set_pte_ext(), but that's a hack (but it does solve the problem and
+> the kernel boots).
+
+... so this would actually cause breakage for other people.
+
+Which toolchain are you using?
+
+Will
