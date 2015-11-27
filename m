@@ -1,17 +1,15 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Fri, 27 Nov 2015 16:44:21 +0100
-Subject: [PATCH v3 net 1/6] net: mvneta: add configuration for MBUS windows
- access protection
+Date: Fri, 27 Nov 2015 16:44:22 +0100
+Subject: [PATCH v3 net 2/6] net: mvneta: fix bit assignment in
+ MVNETA_RXQ_CONFIG_REG
 In-Reply-To: <1448639066-13074-1-git-send-email-mw@semihalf.com>
 References: <1448639066-13074-1-git-send-email-mw@semihalf.com>
-Message-ID: <1448639066-13074-2-git-send-email-mw@semihalf.com>
+Message-ID: <1448639066-13074-3-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds missing configuration of MBUS windows access protection
-in mvneta_conf_mbus_windows function - a dedicated variable for that
-purpose remained there unused since v3.8 initial mvneta support. Because
-of that the register contents were inherited from the bootloader.
+MVNETA_RXQ_HW_BUF_ALLOC bit which controls enabling hardware buffer
+allocation was mistakenly set as BIT(1). This commit fixes the assignment.
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
@@ -19,28 +17,21 @@ Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Fixes: c5aff18204da ("net: mvneta: driver for Marvell Armada 370/XP network
 unit")
 ---
- drivers/net/ethernet/marvell/mvneta.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/net/ethernet/marvell/mvneta.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index e84c7f2..2d80256 100644
+index 2d80256..64c46f0 100644
 --- a/drivers/net/ethernet/marvell/mvneta.c
 +++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -62,6 +62,7 @@
- #define MVNETA_WIN_SIZE(w)                      (0x2204 + ((w) << 3))
- #define MVNETA_WIN_REMAP(w)                     (0x2280 + ((w) << 2))
- #define MVNETA_BASE_ADDR_ENABLE                 0x2290
-+#define MVNETA_ACCESS_PROTECT_ENABLE            0x2294
- #define MVNETA_PORT_CONFIG                      0x2400
- #define      MVNETA_UNI_PROMISC_MODE            BIT(0)
- #define      MVNETA_DEF_RXQ(q)                  ((q) << 1)
-@@ -3191,6 +3192,7 @@ static void mvneta_conf_mbus_windows(struct mvneta_port *pp,
- 	}
+@@ -36,7 +36,7 @@
  
- 	mvreg_write(pp, MVNETA_BASE_ADDR_ENABLE, win_enable);
-+	mvreg_write(pp, MVNETA_ACCESS_PROTECT_ENABLE, win_protect);
- }
- 
- /* Power up the port */
+ /* Registers */
+ #define MVNETA_RXQ_CONFIG_REG(q)                (0x1400 + ((q) << 2))
+-#define      MVNETA_RXQ_HW_BUF_ALLOC            BIT(1)
++#define      MVNETA_RXQ_HW_BUF_ALLOC            BIT(0)
+ #define      MVNETA_RXQ_PKT_OFFSET_ALL_MASK     (0xf    << 8)
+ #define      MVNETA_RXQ_PKT_OFFSET_MASK(offs)   ((offs) << 8)
+ #define MVNETA_RXQ_THRESHOLD_REG(q)             (0x14c0 + ((q) << 2))
 -- 
 1.8.3.1
