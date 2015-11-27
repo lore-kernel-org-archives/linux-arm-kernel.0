@@ -1,91 +1,52 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 27 Nov 2015 10:49:23 +0100
-Subject: [PATCH v1 1/5] thermal: rockchip: fix a trivial typo
-In-Reply-To: <1448592746-2129-2-git-send-email-wxt@rock-chips.com>
-References: <1448592746-2129-1-git-send-email-wxt@rock-chips.com>
- <1448592746-2129-2-git-send-email-wxt@rock-chips.com>
-Message-ID: <5259912.5mmETGszQg@diego>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Fri, 27 Nov 2015 09:50:11 +0000
+Subject: [Xen-devel] [PATCH v3 42/62] arm/acpi: Prepare FADT table for Dom0
+In-Reply-To: <alpine.DEB.2.02.1511261710350.8984@kaball.uk.xensource.com>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-43-git-send-email-shannon.zhao@linaro.org>
+ <alpine.DEB.2.02.1511261710350.8984@kaball.uk.xensource.com>
+Message-ID: <1448617811.13576.60.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
+On Thu, 2015-11-26 at 17:19 +0000, Stefano Stabellini wrote:
+> On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> > From: Shannon Zhao <shannon.zhao@linaro.org>
+> > 
+> > Copy and modify FADT table before passing it to Dom0. Set
+> > PSCI_COMPLIANT
+> > and PSCI_USE_HVC.
+> > 
+> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> > 
+> > ?xen/arch/arm/domain_build.c | 45
+> > +++++++++++++++++++++++++++++++++++++++++++++
+> > ?1 file changed, 45 insertions(+)
+> > 
+> > diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
+> > index b5ed44c..5d03dc0 100644
+> > --- a/xen/arch/arm/domain_build.c
+> > +++ b/xen/arch/arm/domain_build.c
+> > @@ -1357,6 +1357,46 @@ static int prepare_dtb(struct domain *d, struct
+> > kernel_info *kinfo)
+> > ?}
+> > ?
+> > ?#ifdef CONFIG_ACPI
+> > +#define XEN_HYPERVISOR_ID 0x000058656E564D4D??/* "XenVMM" */
+> 
+> This needs to be documented somewhere. A new doc under docs/ might be
+> enough.
 
-Am Freitag, 27. November 2015, 10:52:22 schrieb Caesar Wang:
-> This patchset trys to dictate unified format for driver.
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> 
-> ---
-> 
-> Changes in v1:
-> - Search more trivial typo for me.
-> 
->  drivers/thermal/rockchip_thermal.c | 18 +++++++++---------
->  1 file changed, 9 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/thermal/rockchip_thermal.c
-> b/drivers/thermal/rockchip_thermal.c index e845841..5a8840b 100644
-> --- a/drivers/thermal/rockchip_thermal.c
-> +++ b/drivers/thermal/rockchip_thermal.c
-> @@ -38,7 +38,7 @@ enum tshut_mode {
->  };
-> 
->  /**
-> - * the system Temperature Sensors tshut(tshut) polarity
-> + * The system Temperature Sensors tshut(tshut) polarity
->   * the bit 8 is tshut polarity.
->   * 0: low active, 1: high active
->   */
-> @@ -57,10 +57,10 @@ enum sensor_id {
->  };
-> 
->  /**
-> -* The conversion table has the adc value and temperature.
-> -* ADC_DECREMENT is the adc value decremnet.(e.g. v2_code_table)
-> -* ADC_INCREMNET is the adc value incremnet.(e.g. v3_code_table)
-> -*/
-> + * The conversion table has the adc value and temperature.
-> + * ADC_DECREMENT: the adc value is of diminishing.(e.g. v2_code_table)
-> + * ADC_INCREMENT: the adc value is incremental.(e.g. v3_code_table)
-> + */
->  enum adc_sort_mode {
->  	ADC_DECREMENT = 0,
->  	ADC_INCREMENT,
-> @@ -75,13 +75,13 @@ enum adc_sort_mode {
+Should (also?) probably be in xen/include/public/arch-arm.h in the same
+"#if defined(__XEN__) || defined(__XEN_TOOLS__)" as the other guest non-ABI 
+stuff[0] which is needed by both Xen and the toolstack.
 
-You could simply move to documenting the fields in the header (like 
-exynos_tmu.c for example) instead of inside the table. I think there are even 
-tools that create documention from these comments, so I'd suggest:
+We don't actually have ACPI guest support today, so the toolstack has no
+current interest, but I think that is still a logical place for it do be
+defined.
 
-/*
- * struct chip_tsadc_table: hold information about chip-specific differences
- * @id: conversion table
- * @length: size of conversion table
- * @data_mask: mask to apply on data inputs
- * @mode: sort mode of this adc variant (incrementing or decrementing)
- */
->  struct chip_tsadc_table {
->  	const struct tsadc_table *id;
-> 
-> -	/* the array table size*/
-> +	/* The array table size */
->  	unsigned int length;
-> 
-> -	/* that analogic mask data */
-> +	/* That analogic mask data */
->  	u32 data_mask;
-> 
-> -	/* the sort mode is adc value that increment or decrement in table */
-> +	/* The sort mode is adc value that increment or decrement in table */
->  	enum adc_sort_mode mode;
->  };
-> 
-> @@ -617,7 +617,7 @@ rockchip_thermal_register_sensor(struct platform_device
-> *pdev, return 0;
->  }
-> 
-> -/*
-> +/**
->   * Reset TSADC Controller, reset all tsadc registers.
->   */
->  static void rockchip_thermal_reset_controller(struct reset_control *reset)
+Ian.
+
+[0] That is, stuff which is part of the current implementation but which is
+exposed to guests through other means, e.g. DT or ACPI and not through the
+use of the arch-arm.h public header.
