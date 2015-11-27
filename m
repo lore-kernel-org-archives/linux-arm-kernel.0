@@ -1,67 +1,108 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 27 Nov 2015 11:15:52 +0000
-Subject: [PATCH v3 44/62] ACPICA: ACPI 6.0: Add support for STAO table
-In-Reply-To: <1447753261-7552-45-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-45-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511271115450.8984@kaball.uk.xensource.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 27 Nov 2015 13:16:37 +0200
+Subject: [RFC 3/6] dmaengine: core: Introduce new, universal API to
+ request a channel
+In-Reply-To: <24788322.ynD35Kf0xi@wuerfel>
+References: <1448612982-28141-1-git-send-email-peter.ujfalusi@ti.com>
+ <1448612982-28141-4-git-send-email-peter.ujfalusi@ti.com>
+ <24788322.ynD35Kf0xi@wuerfel>
+Message-ID: <56583B95.7060503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> From: Bob Moore <robert.moore@intel.com>
+On 11/27/2015 01:00 PM, Arnd Bergmann wrote:
+> On Friday 27 November 2015 10:29:39 Peter Ujfalusi wrote:
+>> struct dma_chan *dma_request_chan(struct device *dev, const char *name,
+>> 				  const dma_cap_mask_t *mask);
+>> To request a slave channel. The mask parameter is optional and it is used
+>> to check if the received channel's capabilities can satisfy the requested
+>> mask. The dma_request_chan() will try to find the channel via DT, ACPI or
+>> in case if the kernel booted in non DT/ACPI mode it will use a filter
+>> lookup table and retrieves the RESOURCE_DMA from the requester's device.
+>> This legacy mode needs changes in platform code, in dmaengine drivers and
+>> finally the dmaengine user drivers can be converted:
 > 
-> ACPICA commit 532bf402a503061afd9d80a23e1d3c8fd99b052c
-> 
-> _STA override table.
-> 
-> Link: https://github.com/acpica/acpica/commit/532bf402
-> Signed-off-by: Bob Moore <robert.moore@intel.com>
-> Signed-off-by: Lv Zheng <lv.zheng@intel.com>
-> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> [Linux commit 37e12657f8922ebc62f696494c56c81db509053e]
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> I think we should not introduce the mask parameter at all. In the rare
+> case that we actually need to pass a mask other than DMA_SLAVE today,
+> we should be able to encode that in the data we pass to the filter
+> function.
 
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+I have seen that drivers check the capabilities themselves after getting the
+channel, so I thought that if we move that also to the core we can save on
+duplicated lines around the kernel. It is not needed to get the channel. As
+you can see in the mmc patch, I pass NULL and the channel I got is the correct
+one.
+Sure, I can remove it.
 
+>> RESOURCE_DMA needs to be added to the platform devices with names
+>>
+>> For each dmaengine driver a string array listing the devices handled by the
+>> given DMA driver:
+>>
+>> static char *da8xx_edma0_devices[] = {
+>> 	"davinci-mcasp.0",
+>> 	"da830-mmc.0",
+>> };
+>>
+>> This information is going to be needed by the dmaengine driver, so
+>> modification to the platform_data is needed, and the driver map should be
+>> added to the pdata of the DMA driver:
+> 
+> However, a lot of drivers definitely need to pass a data pointer for
+> each device. I see that you currently rely on the IORESOURCE_DMA
+> method that a couple of platforms use today, but I think it would
+> be backwards to do it that way for the platforms that require passing
+> more than an integer number today.
+> 
+> Having a pointer as the filter function argument is intentional and I'd
+> prefer to change the platforms that currently use IORESOURCE_DMA (davinci,
+> pxa, omap1, blackfin, alchemy) to stop doing it instead, and return
+> IORESOURCE_DMA to its original meaning that was limited to ISAPNP style
+> devices not using the dmaengine API.
 
->  xen/include/acpi/actbl3.h | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/xen/include/acpi/actbl3.h b/xen/include/acpi/actbl3.h
-> index fc96963..cb9e1c0 100644
-> --- a/xen/include/acpi/actbl3.h
-> +++ b/xen/include/acpi/actbl3.h
-> @@ -68,6 +68,7 @@
->  #define ACPI_SIG_PCCT           "PCCT"	/* Platform Communications Channel Table */
->  #define ACPI_SIG_PMTT           "PMTT"	/* Platform Memory Topology Table */
->  #define ACPI_SIG_RASF           "RASF"	/* RAS Feature table */
-> +#define ACPI_SIG_STAO           "STAO" /* Status Override table */
->  
->  #define ACPI_SIG_S3PT           "S3PT"	/* S3 Performance (sub)Table */
->  #define ACPI_SIG_PCCS           "PCC"	/* PCC Shared Memory Region */
-> @@ -618,6 +619,21 @@ enum acpi_rasf_status {
->  #define ACPI_RASF_ERROR                 (1<<2)
->  #define ACPI_RASF_STATUS                (0x1F<<3)
->  
-> +/*******************************************************************************
-> + *
-> + * STAO - Status Override Table (_STA override) - ACPI 6.0
-> + *        Version 1
-> + *
-> + * Conforms to "ACPI Specification for Status Override Table"
-> + * 6 January 2015
-> + *
-> + ******************************************************************************/
-> +
-> +struct acpi_table_stao {
-> +	struct acpi_table_header header;	/* Common ACPI table header */
-> +	u8 ignore_uart;
-> +};
-> +
->  /* Reset to default packing */
->  
->  #pragma pack()
-> -- 
-> 2.1.0
-> 
+Something like this:
+
+/* include/linux/dmaengine.h */
+
+struct dma_filter_map {
+	char *devname;
+	char *slave;
+	void *param;
+};
+
+struct dma_filter {
+	dma_filter_fn filter_fn;
+	int mapcnt;
+	struct dma_filter_map *map;
+};
+
+/* arch/arm/mach-davinci/devices-da8xx.c */
+
+static struct dma_filter_map da8xx_edma0_map[] = {
+	{
+		.devname = "davinci-mcasp.0",
+		.slave = "tx",
+		.param = (void*)DAVINCI_DA8XX_DMA_MCASP0_AXEVT,
+	},
+	{
+		.devname = "davinci-mcasp.0",
+		.slave = "rx",
+		.param = (void*)DAVINCI_DA8XX_DMA_MCASP0_AREVT,
+	},
+	{
+		.devname = "da830-mmc.0",
+		.slave = "tx",
+		.param = (void*)DA8XX_DMA_MMCSD0_TX,
+	},
+	{
+		.devname = "da830-mmc.0",
+		.slave = "rx",
+		.param = (void*)DA8XX_DMA_MMCSD0_RX,
+	},
+};
+
+I had this version first, but decided to go with a simpler one present in this
+RFC series.
+
+-- 
+P?ter
