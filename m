@@ -1,79 +1,38 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 27 Nov 2015 15:00:30 +0100
-Subject: [PATCH v3] mmc: core: fix __mmc_switch timeout caused by preempt
-In-Reply-To: <1448588498-28652-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1448588498-28652-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <CAPDyKFpLZn9t8ODE3_-6=QbaiC4Br+w98MDaqE3DTPmSRXw2xw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Nov 2015 15:04:03 +0100
+Subject: [PATCH] ARM: avoid ARCH_MMAP_RND_BITS for NOMMU
+Message-ID: <2874133.c4GDUf0t6t@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 November 2015 at 02:41, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> there is a time window between __mmc_send_status() and time_afer(),
-> on some eMMC chip, the timeout_ms is only 10ms, if this thread was
-> scheduled out during this period, then, even card has already changes
-> to transfer state by the result of CMD13, this part of code also treat
-> it to timeout error.
-> So, need calculate timeout first, then call __mmc_send_status(), if
-> already timeout and card still in programing state, then treat it to
-> the real timeout error.
->
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> ---
->  drivers/mmc/core/mmc_ops.c | 10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
-> index 1f44426..371aa4b 100644
-> --- a/drivers/mmc/core/mmc_ops.c
-> +++ b/drivers/mmc/core/mmc_ops.c
-> @@ -489,6 +489,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->         unsigned long timeout;
->         u32 status = 0;
->         bool use_r1b_resp = use_busy_signal;
-> +       bool expired = false;
->
->         mmc_retune_hold(host);
->
-> @@ -544,6 +545,12 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->         /* Must check status to be sure of no errors. */
->         timeout = jiffies + msecs_to_jiffies(timeout_ms);
->         do {
-> +               /*
-> +                * Due to the possibility of being preempted after sending the
-> +                * status command, check the expiration time first.
-> +                */
-> +               expired = time_after(jiffies, timeout);
+ARM kernels with MMU disabled fail to build because of CONFIG_ARCH_MMAP_RND_BITS:
 
-The update of "expired" should have remained within the "if (send_status) {"
+kernel/built-in.o:(.data+0x754): undefined reference to `mmap_rnd_bits'
+kernel/built-in.o:(.data+0x76c): undefined reference to `mmap_rnd_bits_min'
+kernel/built-in.o:(.data+0x770): undefined reference to `mmap_rnd_bits_max'
 
-Please change that.
+This changes the newly added line to only select this allow for
+MMU-enabled kernels.
 
-I realize that the entire __mmc_switch() function deserves a round of
-re-factoring, as it's just too complicated to understand all what goes
-on in here. That's another task though. :-)
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 14570b3fd31a ("arm: mm: support ARCH_MMAP_RND_BITS")
+---
+Found on yesterday's linux-next with ARM randconfig. The commit that
+introduced this is currently in Andrew's tree.
 
-> +
->                 if (send_status) {
->                         err = __mmc_send_status(card, &status, ignore_crc);
->                         if (err)
-> @@ -565,12 +572,13 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->                 }
->
->                 /* Timeout if the device never leaves the program state. */
-> -               if (time_after(jiffies, timeout)) {
-> +               if (expired && R1_CURRENT_STATE(status) == R1_STATE_PRG) {
->                         pr_err("%s: Card stuck in programming state! %s\n",
->                                 mmc_hostname(host), __func__);
->                         err = -ETIMEDOUT;
->                         goto out;
->                 }
-> +
->         } while (R1_CURRENT_STATE(status) == R1_STATE_PRG);
->
->         err = mmc_switch_status_error(host, status);
-> --
-> 1.8.1.1.dirty
->
+If you don't already have a fix, please either apply this patch on top,
+or fold it into the original patch.
 
-Kind regards
-Uffe
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index b64f64d124c4..5a0957e3ea36 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -34,7 +34,7 @@ config ARM
+ 	select HAVE_ARCH_BITREVERSE if (CPU_32v7M || CPU_32v7) && !CPU_32v6
+ 	select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL && !CPU_ENDIAN_BE32 && MMU
+ 	select HAVE_ARCH_KGDB if !CPU_ENDIAN_BE32 && MMU
+-	select HAVE_ARCH_MMAP_RND_BITS
++	select HAVE_ARCH_MMAP_RND_BITS if MMU
+ 	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
+ 	select HAVE_ARCH_TRACEHOOK
+ 	select HAVE_BPF_JIT
