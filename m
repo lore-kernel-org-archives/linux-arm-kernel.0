@@ -1,46 +1,36 @@
-From: anton.bondarenko.sama@gmail.com (Anton Bondarenko)
-Date: Sat, 28 Nov 2015 00:16:05 +0100
-Subject: [PATCH v4 7/7] spi: imx: defer spi initialization,
- if DMA engine is pending
-In-Reply-To: <1448666165-7473-1-git-send-email-anton.bondarenko.sama@gmail.com>
-References: <1448666165-7473-1-git-send-email-anton.bondarenko.sama@gmail.com>
-Message-ID: <1448666165-7473-8-git-send-email-anton.bondarenko.sama@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 27 Nov 2015 18:28:50 -0500 (EST)
+Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
+ "/chosen/linux,atags" entry
+In-Reply-To: <11537945.4HX4Y84tjV@wuerfel>
+References: <20150713131902.GH26485@atomide.com>
+ <20151127132722.GA30871@n2100.arm.linux.org.uk>
+ <20151127195148.GB30871@n2100.arm.linux.org.uk> <11537945.4HX4Y84tjV@wuerfel>
+Message-ID: <alpine.LFD.2.20.1511271817230.22569@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If SPI device supports DMA mode, but DMA controller is not yet
-available due to e.g. a delay in the corresponding kernel module
-initialization, retry to initialize SPI driver later on instead of
-falling back into PIO only mode.
+On Fri, 27 Nov 2015, Arnd Bergmann wrote:
 
-Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-Signed-off-by: Anton Bondarenko <anton.bondarenko.sama@gmail.com>
----
- drivers/spi/spi-imx.c | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+> I don't mind creating the /proc/atags compatibility hack from the kernel
+> for a DT based N700 kernel, as long as we limit it as much as we can
+> to the machines that need it. Leaving a board file for the N700 in place
+> that contains the procfs code (and not much more) seems reasonable
+> here, as we are talking about a board specific hack and the whole point
+> appears to be running unmodified user space.
+> 
+> Regarding how to get the data into the kernel in the first place, my
+> preferred choice would still be to have an intermediate bootloader
+> such as pxa-impedance-matcher, but I won't complain if others are
+> happy enough about putting it into the ATAGS compat code we already
+> have, as long as it's limited to the boards we know need it.
 
-diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index aaa32c2..c2edd0f 100644
---- a/drivers/spi/spi-imx.c
-+++ b/drivers/spi/spi-imx.c
-@@ -1341,9 +1341,15 @@ static int spi_imx_probe(struct platform_device *pdev)
- 	 * Only validated on i.mx6 now, can remove the constrain if validated on
- 	 * other chips.
- 	 */
--	if (is_imx51_ecspi(spi_imx) &&
--	    spi_imx_sdma_init(&pdev->dev, spi_imx, master))
--		dev_err(&pdev->dev, "dma setup error,use pio instead\n");
-+	if (is_imx51_ecspi(spi_imx)) {
-+		ret = spi_imx_sdma_init(&pdev->dev, spi_imx, master);
-+		if (ret == -EPROBE_DEFER)
-+			goto out_clk_put;
-+
-+		if (ret < 0)
-+			dev_err(&pdev->dev, "dma setup error %d, use pio\n",
-+				ret);
-+	}
- 
- 	spi_imx->devtype_data->reset(spi_imx);
- 
--- 
-2.6.3
+Assuming you have a N700 board file for special procfs code, then why 
+not getting at the atags in memory where the bootloader has put them 
+directly from that same board file? This way it'll really be limited to 
+the board we know needs it and the special exception will be contained 
+to that one file.  Amongst the machine specific hooks, there is one that 
+gets invoked early during boot before those atags are overwritten.
+
+
+Nicolas
