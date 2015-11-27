@@ -1,102 +1,57 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 27 Nov 2015 10:55:29 +0900
-Subject: [PATCH 12/18] arm64: renesas: r8a7795: Sound SRC support
-In-Reply-To: <cover.1448587800.git.horms+renesas@verge.net.au>
-References: <cover.1448587800.git.horms+renesas@verge.net.au>
-Message-ID: <b868ff51d5625a28a50ce8d40992d562535d3972.1448587800.git.horms+renesas@verge.net.au>
+Date: Fri, 27 Nov 2015 10:55:45 +0900
+Subject: [PATCH 02/15] ARM: shmobile: bockw dts: define sdhi0 pins with
+ pull-ups
+In-Reply-To: <cover.1448586938.git.horms+renesas@verge.net.au>
+References: <cover.1448586938.git.horms+renesas@verge.net.au>
+Message-ID: <781f278a16fbd74ffa2acf3f14134953631f076d.1448586938.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Ensures that the pull-ups for pins SD0_CD and SD0_WP are enabled.
+
+This is one of two features from the DT reference platform that are
+still missing in MP.
+
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 61 ++++++++++++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
+ arch/arm/boot/dts/r8a7778-bockw.dts | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 5d684e961675..c3b2089de531 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -585,6 +585,11 @@
- 				 <&cpg CPG_MOD 1010>, <&cpg CPG_MOD 1011>,
- 				 <&cpg CPG_MOD 1012>, <&cpg CPG_MOD 1013>,
- 				 <&cpg CPG_MOD 1014>, <&cpg CPG_MOD 1015>,
-+				 <&cpg CPG_MOD 1022>, <&cpg CPG_MOD 1023>,
-+				 <&cpg CPG_MOD 1024>, <&cpg CPG_MOD 1025>,
-+				 <&cpg CPG_MOD 1026>, <&cpg CPG_MOD 1027>,
-+				 <&cpg CPG_MOD 1028>, <&cpg CPG_MOD 1029>,
-+				 <&cpg CPG_MOD 1030>, <&cpg CPG_MOD 1031>,
- 				 <&audio_clk_a>, <&audio_clk_b>,
- 				 <&audio_clk_c>,
- 				 <&cpg CPG_CORE R8A7795_CLK_S0D4>;
-@@ -592,10 +597,66 @@
- 				      "ssi.9", "ssi.8", "ssi.7", "ssi.6",
- 				      "ssi.5", "ssi.4", "ssi.3", "ssi.2",
- 				      "ssi.1", "ssi.0",
-+				      "src.9", "src.8", "src.7", "src.6",
-+				      "src.5", "src.4", "src.3", "src.2",
-+				      "src.1", "src.0",
- 				      "clk_a", "clk_b", "clk_c", "clk_i";
- 			power-domains = <&cpg>;
- 			status = "disabled";
+diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
+index 90543b12d7e2..8a5407678717 100644
+--- a/arch/arm/boot/dts/r8a7778-bockw.dts
++++ b/arch/arm/boot/dts/r8a7778-bockw.dts
+@@ -137,10 +137,14 @@
+ 	};
  
-+			rcar_sound,src {
-+				src0: src at 0 {
-+					interrupts = <0 352 IRQ_TYPE_LEVEL_HIGH>;
-+					dmas = <&audma0 0x85>, <&audma1 0x9a>;
-+					dma-names = "rx", "tx";
-+				};
-+				src1: src at 1 {
-+					interrupts = <0 353 IRQ_TYPE_LEVEL_HIGH>;
-+					dmas = <&audma0 0x87>, <&audma1 0x9c>;
-+					dma-names = "rx", "tx";
-+				};
-+				src2: src at 2 {
-+					interrupts = <0 354 IRQ_TYPE_LEVEL_HIGH>;
-+					dmas = <&audma0 0x89>, <&audma1 0x9e>;
-+					dma-names = "rx", "tx";
-+				};
-+				src3: src at 3 {
-+					interrupts = <0 355 IRQ_TYPE_LEVEL_HIGH>;
-+					dmas = <&audma0 0x8b>, <&audma1 0xa0>;
-+					dma-names = "rx", "tx";
-+				};
-+				src4: src at 4 {
-+					interrupts = <0 356 IRQ_TYPE_LEVEL_HIGH>;
-+					dmas = <&audma0 0x8d>, <&audma1 0xb0>;
-+					dma-names = "rx", "tx";
-+				};
-+				src5: src at 5 {
-+					interrupts = <0 357 IRQ_TYPE_LEVEL_HIGH>;
-+					dmas = <&audma0 0x8f>, <&audma1 0xb2>;
-+					dma-names = "rx", "tx";
-+				};
-+				src6: src at 6 {
-+					interrupts = <0 358 IRQ_TYPE_LEVEL_HIGH>;
-+					dmas = <&audma0 0x91>, <&audma1 0xb4>;
-+					dma-names = "rx", "tx";
-+				};
-+				src7: src at 7 {
-+					interrupts = <0 359 IRQ_TYPE_LEVEL_HIGH>;
-+					dmas = <&audma0 0x93>, <&audma1 0xb6>;
-+					dma-names = "rx", "tx";
-+				};
-+				src8: src at 8 {
-+					interrupts = <0 360 IRQ_TYPE_LEVEL_HIGH>;
-+					dmas = <&audma0 0x95>, <&audma1 0xb8>;
-+					dma-names = "rx", "tx";
-+				};
-+				src9: src at 9 {
-+					interrupts = <0 361 IRQ_TYPE_LEVEL_HIGH>;
-+					dmas = <&audma0 0x97>, <&audma1 0xba>;
-+					dma-names = "rx", "tx";
-+				};
-+			};
-+
- 			rcar_sound,ssi {
- 				ssi0: ssi at 0 {
- 					interrupts = <0 370 IRQ_TYPE_LEVEL_HIGH>;
+ 	sdhi0_pins: sd0 {
+-		renesas,groups = "sdhi0_data4", "sdhi0_ctrl",
+-				  "sdhi0_cd";
++		renesas,groups = "sdhi0_data4", "sdhi0_ctrl";
+ 		renesas,function = "sdhi0";
+ 	};
++	sdhi0_pup_pins: sd0_pup {
++		renesas,groups = "sdhi0_cd", "sdhi0_wp";
++		renesas,function = "sdhi0";
++		bias-pull-up;
++	};
+ 
+ 	hspi0_pins: hspi0 {
+ 		renesas,groups = "hspi0_a";
+@@ -169,7 +173,7 @@
+ };
+ 
+ &sdhi0 {
+-	pinctrl-0 = <&sdhi0_pins>;
++	pinctrl-0 = <&sdhi0_pins>, <&sdhi0_pup_pins>;
+ 	pinctrl-names = "default";
+ 
+ 	vmmc-supply = <&fixedregulator3v3>;
 -- 
 2.1.4
