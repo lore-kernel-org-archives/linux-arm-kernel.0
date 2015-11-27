@@ -1,61 +1,75 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 27 Nov 2015 14:21:14 -0600
-Subject: [PATCH 1/3] dt-bindings: add Marvell core PLL and clock divider
- PMU documentation
-In-Reply-To: <E1a24wj-0004iw-Rf@rmk-PC.arm.linux.org.uk>
-References: <E1a24wj-0004iw-Rf@rmk-PC.arm.linux.org.uk>
-Message-ID: <20151127202114.GA613@rob-hp-laptop>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 27 Nov 2015 21:27:38 +0100
+Subject: [PATCH 2/2] ARM: mvebu: kirkwood: add PogoPlug series 4 device
+ tree
+In-Reply-To: <1448578868-6323-1-git-send-email-linus.walleij@linaro.org>
+References: <1448578868-6323-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20151127202738.GC32356@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2015 at 10:23:21PM +0000, Russell King wrote:
-> Add documentation for the Marvell clock divider driver, which is used
-> to source clocks for the AXI bus, video decoder, GPU and LCD blocks.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  .../bindings/clock/dove-divider-clock.txt          | 28 ++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/dove-divider-clock.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/dove-divider-clock.txt b/Documentation/devicetree/bindings/clock/dove-divider-clock.txt
-> new file mode 100644
-> index 000000000000..0c602de279e5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/dove-divider-clock.txt
-> @@ -0,0 +1,28 @@
-> +PLl divider based Dove clocks
-> +
-> +Marvell Dove has a 2GHz PLL, which feeds into a set of dividers to provide
-> +high speed clocks for a number of peripherals.  These dividers are part of
-> +the PMU, and thus this node should be a child of the PMU node.
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200n8";
+> +		stdout-path = &uart0;
 
-It seems a bit strange to just be documenting these clocks. What about 
-the rest of the SOC clocks?
+Hi Linus
 
+You can append the baud rate etc to uart0, and then don't need
+bootargs.
+
+> +	};
 > +
-> +The following clocks are provided:
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pinctrl-0 = <&pmx_button_eject>;
+> +		pinctrl-names = "default";
 > +
-> +ID	Clock
-> +-------------
-> +0	AXI bus clock
-> +1	GPU clock
-> +2	VMeta clock
-> +3	LCD clock
+> +		button at 1 {
+> +			debounce_interval = <50>;
+> +			wakeup-source;
+> +			/* KEY_EJECTCD */
+> +			linux,code = <161>;
+
+include/dt-bindings/input/linux-event-codes.h and then
+
+	                linux,code = <KEY_EJECTCD>
+
+> +			label = "Eject Button";
+> +			gpios = <&gpio0 29 GPIO_ACTIVE_LOW>;
+> +		};
+> +	};
 > +
-> +Required properties:
-> +- compatible : shall be "marvell,dove-divider-clock"
-> +- reg : shall be the register address of the Core PLL and Clock Divider
-> +   Control 0 register.  This will cover that register, as well as the
-> +   Core PLL and Clock Divider Control 1 register.  Thus, it will have
-> +   a size of 8.
-> +- #clock-cells : from common clock binding; shall be set to 1
+> +	gpio-leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-0 = <&pmx_led_green &pmx_led_red>;
+> +		pinctrl-names = "default";
 > +
-> +divider_clk: core-clock at 0064 {
-> +	compatible = "marvell,dove-divider-clock";
-> +	reg = <0x0064 0x8>;
-> +	#clock-cells = <1>;
+> +		health {
+> +			label = "status:green:health";
+
+The convention is that the first part of the label is the machine
+name. OpenWRT and others often does something else... So
+
+s/status/pogoplugv4/g
+ 
+> +			gpios = <&gpio0 22 GPIO_ACTIVE_LOW>;
+> +			default-state = "on";
+> +		};
+> +		fault {
+> +			label = "status:red:fault";
+> +			gpios = <&gpio0 24 GPIO_ACTIVE_LOW>;
+> +		};
+> +	};
 > +};
-> -- 
-> 2.1.0
-> 
+
+
+> +&i2c0 {
+> +	status = "okay";
+> +};
+
+Is there something on this i2c bus?
+
+Thanks
+	Andrew
