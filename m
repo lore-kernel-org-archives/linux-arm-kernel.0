@@ -1,74 +1,42 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 27 Nov 2015 22:10:26 +0200
-Subject: [RFC PATCH] clocksource: ti-32k: convert to platform device
-In-Reply-To: <87h9kgcz1k.fsf@saruman.tx.rr.com>
-References: <1448040129-23869-1-git-send-email-grygorii.strashko@ti.com>
- <87h9kgcz1k.fsf@saruman.tx.rr.com>
-Message-ID: <5658B8B2.5030505@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 27 Nov 2015 21:12:12 +0100
+Subject: [PATCH 3/3] ARM: dts: dove: add Dove divider clocks
+In-Reply-To: <E1a24wu-0004jh-3M@rmk-PC.arm.linux.org.uk>
+References: <E1a24wu-0004jh-3M@rmk-PC.arm.linux.org.uk>
+Message-ID: <20151127201212.GE14645@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
-
-On 11/20/2015 08:21 PM, Felipe Balbi wrote:
-> Grygorii Strashko <grygorii.strashko@ti.com> writes:
->> Since system clocksource is finally selected by Clocksource core at
->> fs_initcall stage during boot there are no reasons to initialize
->> ti_32k_timer at early boot stages. Hence, ti_32k_timer can be
->> converted to use platform device/driver model and its PM can be
->> implemented using PM runtime which is common for OMAP devices.
->>
->> Platform specific initialization code has to be disabled once as
->> ti_32k_timer is converted to platform device - otherwise OMAP platform
->> code will generate boot warnings.
->>
->> After this change, all counter_32k's platform code can be removed
->> once all OMAP boards will be converted to DT.
->>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Felipe Balbi <balbi@ti.com>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> ---
-
-[...]
-
->> +
->> +static struct platform_driver ti_32k_driver __initdata = {
->> +	.probe		= ti_32k_probe,
->> +	.driver		= {
->> +		.name	= "ti_32k_timer",
->> +		.of_match_table = of_match_ptr(ti_32k_of_table),
->> +	}
->> +};
->> +
->> +static int __init ti_32k_init(void)
->> +{
->> +	return platform_driver_register(&ti_32k_driver);
->>   }
->> -CLOCKSOURCE_OF_DECLARE(ti_32k_timer, "ti,omap-counter32k",
->> -		ti_32k_timer_init);
->> +
->> +subsys_initcall(ti_32k_init);
->> +
->> +MODULE_AUTHOR("Paul Mundt");
->> +MODULE_AUTHOR("Juha Yrj?l?");
->> +MODULE_DESCRIPTION("OMAP2 32k Timer");
->> +MODULE_ALIAS("platform:ti_32k_timer");
->> +MODULE_LICENSE("GPL v2");
+On Thu, Nov 26, 2015 at 10:23:32PM +0000, Russell King wrote:
+> Add the Dove divider clocks to the Dove dtsi file.
 > 
-> this will break clksource_of_init(), right ? Eventually, we want that to
-> be the only thing called by our .init_time method. I'll leave it to Tony
-> to decide, but IMO this is not a good path forward for timers.
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+
+	  Andrew
+
+> ---
+>  arch/arm/boot/dts/dove.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-
-Yeh :(.  I did additional tests, and, unfortunately, this can't be used as is.
-But not because of clocksource_of_init() which will just produce boot warning.
-It can't be done because of sched_clock_register() which is expected to be
-called during early boot time only and with disabled IRQs.
-
-It was so tempting to try :)
-Thanks for your comment.
-
--- 
-regards,
--grygorii
+> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+> index 179121630ad7..ea36a262d056 100644
+> --- a/arch/arm/boot/dts/dove.dtsi
+> +++ b/arch/arm/boot/dts/dove.dtsi
+> @@ -459,6 +459,12 @@
+>  					#clock-cells = <1>;
+>  				};
+>  
+> +				divider_clk: core-clock at 0064 {
+> +					compatible = "marvell,dove-divider-clock";
+> +					reg = <0x0064 0x8>;
+> +					#clock-cells = <1>;
+> +				};
+> +
+>  				pinctrl: pin-ctrl at 0200 {
+>  					compatible = "marvell,dove-pinctrl";
+>  					reg = <0x0200 0x14>,
+> -- 
+> 2.1.0
+> 
