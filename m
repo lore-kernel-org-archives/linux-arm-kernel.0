@@ -1,63 +1,55 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 Nov 2015 14:11:22 +0000
-Subject: [PATCH RFT] arm64: kasan: Make KASAN work with 16K pages + 48
- bit VA
-In-Reply-To: <20151127100210.GB25781@arm.com>
-References: <1448543686-31869-1-git-send-email-aryabinin@virtuozzo.com>
- <CAKv+Gu_L1shTWp_5KydCW97Z6TbeXEB9gjmb2oUSuCHfC29M9A@mail.gmail.com>
- <5658106C.10207@virtuozzo.com>
- <20151127093529.GX3109@e104818-lin.cambridge.arm.com>
- <20151127100210.GB25781@arm.com>
-Message-ID: <20151127141122.GB25499@e104818-lin.cambridge.arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 27 Nov 2015 15:11:58 +0100
+Subject: [PATCH] mmc: sdhci-of-at91: controller is suspended too early
+In-Reply-To: <1448556091-502-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1448556091-502-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <CAPDyKFpuemq05PZN6-p9gY6qvm23Fkxvr3u=4_xXPbBHeq4CRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 27, 2015 at 10:02:11AM +0000, Will Deacon wrote:
-> On Fri, Nov 27, 2015 at 09:35:29AM +0000, Catalin Marinas wrote:
-> > On Fri, Nov 27, 2015 at 11:12:28AM +0300, Andrey Ryabinin wrote:
-> > > On 11/26/2015 07:40 PM, Ard Biesheuvel wrote:
-> > > > On 26 November 2015 at 14:14, Andrey Ryabinin <aryabinin@virtuozzo.com> wrote:
-> > > >> Currently kasan assumes that shadow memory covers one or more entire PGDs.
-> > > >> That's not true for 16K pages + 48bit VA space, where PGDIR_SIZE is bigger
-> > > >> than the whole shadow memory.
-> > > >>
-> > > >> This patch tries to fix that case.
-> > > >> clear_page_tables() is a new replacement of clear_pgs(). Instead of always
-> > > >> clearing pgds it clears top level page table entries that entirely belongs
-> > > >> to shadow memory.
-> > > >> In addition to 'tmp_pg_dir' we now have 'tmp_pud' which is used to store
-> > > >> puds that now might be cleared by clear_page_tables.
-> > > >>
-> > > >> Reported-by: Suzuki K. Poulose <Suzuki.Poulose@arm.com>
-> > > >> Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-> > > > 
-> > > > I would argue that the Kasan code is complicated enough, and we should
-> > > > avoid complicating it even further for a configuration that is highly
-> > > > theoretical in nature.
-> > > > 
-> > > > In a 16k configuration, the 4th level only adds a single bit of VA
-> > > > space (which is, as I understand it, exactly the issue you need to
-> > > > address here since the top level page table has only 2 entries and
-> > > > hence does not divide by 8 cleanly), which means you are better off
-> > > > using 3 levels unless you *really* need more than 128 TB of VA space.
-> > > > 
-> > > > So can't we just live with the limitation, and keep the current code?
-> > > 
-> > > No objections from my side. Let's keep the current code.
-> > 
-> > Ard had a good point, so fine by me as well.
-> 
-> Ok, so obvious follow-up question: why do we even support 48-bit + 16k
-> pages in the kernel? Either it's useful, and we make things work with it,
-> or it's not and we can drop it (or, at least, hide it behind EXPERT like
-> we do for 36-bit).
+On 26 November 2015 at 17:41, Ludovic Desroches
+<ludovic.desroches@atmel.com> wrote:
+> When calling sdhci_add_host(), the controller is already suspended. It
+> causes to read 0 in registers.
+> Increment the device's usage counter before calling sdhci_add_host(),
+> decrement it after and put it in suspend if it is possible.
+>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Fixes: "mmc: sdhci-of-at91: add PM support"
 
-One reason is hardware validation (I guess that may be the only reason
-for 16KB in general ;)). For each of the page sizes we support two VA
-ranges: 48-bit (maximum) and a recommended one for the corresponding
-granule. With 16K, the difference is not significant (47 to 48), so we
-could follow Ard's suggestion and make it depend on EXPERT (we already
-do this for 16KB and 36-bit VA).
+Thanks, applied for next!
 
--- 
-Catalin
+Actually I decided to squash this change into the "Fixes commit"
+itself, thus not breaking bisecting.
+
+Kind regards
+Uffe
+
+> ---
+>  drivers/mmc/host/sdhci-of-at91.c | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/drivers/mmc/host/sdhci-of-at91.c b/drivers/mmc/host/sdhci-of-at91.c
+> index 81ab9db..7e7d8f0 100644
+> --- a/drivers/mmc/host/sdhci-of-at91.c
+> +++ b/drivers/mmc/host/sdhci-of-at91.c
+> @@ -200,6 +200,7 @@ static int sdhci_at91_probe(struct platform_device *pdev)
+>
+>         sdhci_get_of_property(pdev);
+>
+> +       pm_runtime_get_noresume(&pdev->dev);
+>         pm_runtime_set_active(&pdev->dev);
+>         pm_runtime_enable(&pdev->dev);
+>         pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
+> @@ -209,6 +210,8 @@ static int sdhci_at91_probe(struct platform_device *pdev)
+>         if (ret)
+>                 goto pm_runtime_disable;
+>
+> +       pm_runtime_put_autosuspend(&pdev->dev);
+> +
+>         return 0;
+>
+>  pm_runtime_disable:
+> --
+> 2.5.0
+>
