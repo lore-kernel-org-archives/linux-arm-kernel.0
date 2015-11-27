@@ -1,40 +1,108 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 27 Nov 2015 10:56:05 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.4
-Message-ID: <cover.1448586153.git.horms+renesas@verge.net.au>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Fri, 27 Nov 2015 10:09:30 +0800
+Subject: [PATCH v4] clk: rockchip: switch PLLs to slow mode before reboot for
+ rk3288
+Message-ID: <1448590170-23776-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+We've been seeing some crashes at reboot test on rk3288-based systems,
+which boards have not reset pin connected to NPOR, they reboot by
+setting 0xfdb9 to RK3288_GLB_SRST_FST register. If the APLL works in
+a high frequency mode, some IPs might hang during soft reset.
+It appears that we can fix the problem by switching to slow mode before
+reboot, just like what we did before suspend.
 
-Please consider these Renesas ARM based SoC fixes for v4.4.
+Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-The single patch in this pull-request corrects a section mismatch
-in r8a7793 SoC code. Thanks to Nicolas Pitre for this fix.
+---
 
+Changes in v4:
+- get rid of the CONFIG_PM_SLEEP conditionals completely
 
-The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+Changes in v3:
+- remove include reboot.h
 
-  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+Changes in v2:
+- replace restart_handlers with the shutdown callback of syscore
 
-are available in the git repository at:
+ drivers/clk/rockchip/clk-rk3288.c | 32 ++++++++++++++------------------
+ 1 file changed, 14 insertions(+), 18 deletions(-)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v4.4
-
-for you to fetch changes up to c29d387b0bffb3ccce76e4fcdad9bfa7344ba338:
-
-  ARM: shmobile: r8a7793: proper constness with __initconst (2015-11-22 17:13:13 -0800)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Fixes for v4.4
-
-* r8a7793 SoC: Annotate r8a7793_boards_compat_dt with __initconst
-  Aside from being correct this builds that otherwise
-  fail with section mismatch errors.
-
-----------------------------------------------------------------
-Nicolas Pitre (1):
-      ARM: shmobile: r8a7793: proper constness with __initconst
-
- arch/arm/mach-shmobile/setup-r8a7793.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index 9040878..97d314d 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -783,10 +783,10 @@ static const char *const rk3288_critical_clocks[] __initconst = {
+ 	"pclk_pd_pmu",
+ };
+ 
+-#ifdef CONFIG_PM_SLEEP
+ static void __iomem *rk3288_cru_base;
+ 
+-/* Some CRU registers will be reset in maskrom when the system
++/*
++ * Some CRU registers will be reset in maskrom when the system
+  * wakes up from fastboot.
+  * So save them before suspend, restore them after resume.
+  */
+@@ -840,33 +840,28 @@ static void rk3288_clk_resume(void)
+ 	}
+ }
+ 
++static void rk3288_clk_shutdown(void)
++{
++	writel_relaxed(0xf3030000, rk3288_cru_base + RK3288_MODE_CON);
++}
++
+ static struct syscore_ops rk3288_clk_syscore_ops = {
+ 	.suspend = rk3288_clk_suspend,
+ 	.resume = rk3288_clk_resume,
++	.shutdown = rk3288_clk_shutdown,
+ };
+ 
+-static void rk3288_clk_sleep_init(void __iomem *reg_base)
+-{
+-	rk3288_cru_base = reg_base;
+-	register_syscore_ops(&rk3288_clk_syscore_ops);
+-}
+-
+-#else /* CONFIG_PM_SLEEP */
+-static void rk3288_clk_sleep_init(void __iomem *reg_base) {}
+-#endif
+-
+ static void __init rk3288_clk_init(struct device_node *np)
+ {
+-	void __iomem *reg_base;
+ 	struct clk *clk;
+ 
+-	reg_base = of_iomap(np, 0);
+-	if (!reg_base) {
++	rk3288_cru_base = of_iomap(np, 0);
++	if (!rk3288_cru_base) {
+ 		pr_err("%s: could not map cru region\n", __func__);
+ 		return;
+ 	}
+ 
+-	rockchip_clk_init(np, reg_base, CLK_NR_CLKS);
++	rockchip_clk_init(np, rk3288_cru_base, CLK_NR_CLKS);
+ 
+ 	/* xin12m is created by an cru-internal divider */
+ 	clk = clk_register_fixed_factor(NULL, "xin12m", "xin24m", 0, 1, 2);
+@@ -907,10 +902,11 @@ static void __init rk3288_clk_init(struct device_node *np)
+ 			&rk3288_cpuclk_data, rk3288_cpuclk_rates,
+ 			ARRAY_SIZE(rk3288_cpuclk_rates));
+ 
+-	rockchip_register_softrst(np, 12, reg_base + RK3288_SOFTRST_CON(0),
++	rockchip_register_softrst(np, 12,
++				  rk3288_cru_base + RK3288_SOFTRST_CON(0),
+ 				  ROCKCHIP_SOFTRST_HIWORD_MASK);
+ 
+ 	rockchip_register_restart_notifier(RK3288_GLB_SRST_FST);
+-	rk3288_clk_sleep_init(reg_base);
++	register_syscore_ops(&rk3288_clk_syscore_ops);
+ }
+ CLK_OF_DECLARE(rk3288_cru, "rockchip,rk3288-cru", rk3288_clk_init);
+-- 
+2.6.3
