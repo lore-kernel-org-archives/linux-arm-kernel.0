@@ -1,64 +1,144 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 27 Nov 2015 10:55:58 +0900
-Subject: [PATCH 15/15] ARM: shmobile: sh73a0 dtsi: Add L2 cache-controller node
-In-Reply-To: <cover.1448586938.git.horms+renesas@verge.net.au>
-References: <cover.1448586938.git.horms+renesas@verge.net.au>
-Message-ID: <c8d9fdbe2d648caaa510d45dc13eba2e9957140b.1448586938.git.horms+renesas@verge.net.au>
+Date: Fri, 27 Nov 2015 10:55:18 +0900
+Subject: [PATCH 01/18] arm64: dts: r8a7795: add GPIO nodes
+In-Reply-To: <cover.1448587800.git.horms+renesas@verge.net.au>
+References: <cover.1448587800.git.horms+renesas@verge.net.au>
+Message-ID: <7b08623add8205b18e56c5b4549e83657756aec3.1448587800.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-Add the missing L2 cache-controller node, and link the CPU nodes to it.
-This will allow migration to the generic l2c OF initialization.
-
-The L2 cache is an ARM L2C-310 (r3p1), of size 512 KiB (64 KiB x 8
-ways).
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/sh73a0.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 112 +++++++++++++++++++++++++++++++
+ 1 file changed, 112 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index ff7c8f298f30..319551f0fcdb 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -28,6 +28,7 @@
- 			reg = <0>;
- 			clock-frequency = <1196000000>;
- 			power-domains = <&pd_a2sl>;
-+			next-level-cache = <&L2>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index e26eecf1230f..44967a8f00ac 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -60,6 +60,118 @@
+ 					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
  		};
- 		cpu at 1 {
- 			device_type = "cpu";
-@@ -35,6 +36,7 @@
- 			reg = <1>;
- 			clock-frequency = <1196000000>;
- 			power-domains = <&pd_a2sl>;
-+			next-level-cache = <&L2>;
- 		};
- 	};
  
-@@ -53,6 +55,18 @@
- 		      <0xf0000100 0x100>;
- 	};
- 
-+	L2: cache-controller {
-+		compatible = "arm,pl310-cache";
-+		reg = <0xf0100000 0x1000>;
-+		interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>;
-+		power-domains = <&pd_a3sm>;
-+		arm,data-latency = <3 3 3>;
-+		arm,tag-latency = <2 2 2>;
-+		arm,shared-override;
-+		cache-unified;
-+		cache-level = <2>;
-+	};
++		gpio0: gpio at e6050000 {
++			compatible = "renesas,gpio-r8a7795",
++				     "renesas,gpio-rcar";
++			reg = <0 0xe6050000 0 0x50>;
++			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 0 16>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 912>;
++			power-domains = <&cpg>;
++		};
 +
- 	sbsc2: memory-controller at fb400000 {
- 		compatible = "renesas,sbsc-sh73a0";
- 		reg = <0xfb400000 0x400>;
++		gpio1: gpio at e6051000 {
++			compatible = "renesas,gpio-r8a7795",
++				     "renesas,gpio-rcar";
++			reg = <0 0xe6051000 0 0x50>;
++			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 32 28>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 911>;
++			power-domains = <&cpg>;
++		};
++
++		gpio2: gpio at e6052000 {
++			compatible = "renesas,gpio-r8a7795",
++				     "renesas,gpio-rcar";
++			reg = <0 0xe6052000 0 0x50>;
++			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 64 15>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 910>;
++			power-domains = <&cpg>;
++		};
++
++		gpio3: gpio at e6053000 {
++			compatible = "renesas,gpio-r8a7795",
++				     "renesas,gpio-rcar";
++			reg = <0 0xe6053000 0 0x50>;
++			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 96 16>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 909>;
++			power-domains = <&cpg>;
++		};
++
++		gpio4: gpio at e6054000 {
++			compatible = "renesas,gpio-r8a7795",
++				     "renesas,gpio-rcar";
++			reg = <0 0xe6054000 0 0x50>;
++			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 128 18>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 908>;
++			power-domains = <&cpg>;
++		};
++
++		gpio5: gpio at e6055000 {
++			compatible = "renesas,gpio-r8a7795",
++				     "renesas,gpio-rcar";
++			reg = <0 0xe6055000 0 0x50>;
++			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 160 26>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 907>;
++			power-domains = <&cpg>;
++		};
++
++		gpio6: gpio at e6055400 {
++			compatible = "renesas,gpio-r8a7795",
++				     "renesas,gpio-rcar";
++			reg = <0 0xe6055400 0 0x50>;
++			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 192 32>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 906>;
++			power-domains = <&cpg>;
++		};
++
++		gpio7: gpio at e6055800 {
++			compatible = "renesas,gpio-r8a7795",
++				     "renesas,gpio-rcar";
++			reg = <0 0xe6055800 0 0x50>;
++			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 224 4>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 905>;
++			power-domains = <&cpg>;
++		};
++
+ 		timer {
+ 			compatible = "arm,armv8-timer";
+ 			interrupts = <GIC_PPI 13
 -- 
 2.1.4
