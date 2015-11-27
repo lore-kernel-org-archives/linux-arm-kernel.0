@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 27 Nov 2015 10:55:53 +0900
-Subject: [PATCH 10/15] ARM: shmobile: lager: Move SPI FLASH partitions to
+Date: Fri, 27 Nov 2015 10:55:54 +0900
+Subject: [PATCH 11/15] ARM: shmobile: silk: Move SPI FLASH partitions to
  subnode
 In-Reply-To: <cover.1448586938.git.horms+renesas@verge.net.au>
 References: <cover.1448586938.git.horms+renesas@verge.net.au>
-Message-ID: <f58bac70bf2d6cd9ff852d58199b598bfa6365c6.1448586938.git.horms+renesas@verge.net.au>
+Message-ID: <99e14b36594cb6d6fb59aa44999c1f72508af348.1448586938.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,24 +20,24 @@ Based on similar work for the koelsch board by Geert Uytterhoeven.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 33 ++++++++++++++++++---------------
+ arch/arm/boot/dts/r8a7794-silk.dts | 33 ++++++++++++++++++---------------
  1 file changed, 18 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 79f141188d99..c46295afb08a 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -439,8 +439,6 @@
+diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
+index a49942b626c8..58f0ddf21c17 100644
+--- a/arch/arm/boot/dts/r8a7794-silk.dts
++++ b/arch/arm/boot/dts/r8a7794-silk.dts
+@@ -194,8 +194,6 @@
  	status = "okay";
  
- 	flash: flash at 0 {
+ 	flash at 0 {
 -		#address-cells = <1>;
 -		#size-cells = <1>;
  		compatible = "spansion,s25fl512s", "jedec,spi-nor";
  		reg = <0>;
  		spi-max-frequency = <30000000>;
-@@ -450,19 +448,24 @@
- 		spi-cpol;
+@@ -205,19 +203,24 @@
+ 		spi-cpha;
  		m25p,fast-read;
  
 -		partition at 0 {
