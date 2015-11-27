@@ -1,18 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Nov 2015 17:29:43 +0100
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.4 (#1)
-In-Reply-To: <87bnag8ov7.fsf@free-electrons.com>
-References: <87bnag8ov7.fsf@free-electrons.com>
-Message-ID: <3202572.WhyOuz4o17@wuerfel>
+Date: Fri, 27 Nov 2015 17:30:04 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.4
+In-Reply-To: <cover.1448586153.git.horms+renesas@verge.net.au>
+References: <cover.1448586153.git.horms+renesas@verge.net.au>
+Message-ID: <3789266.5u2KpAtNbX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 26 November 2015 21:52:44 Gregory CLEMENT wrote:
-> mvebu fixes for 4.4 (part 1)
+On Friday 27 November 2015 10:56:05 Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> ----------------------------------------------------------------
+> Renesas ARM Based SoC Fixes for v4.4
 > 
-> - Fix QNAP TS219 power-off in dts
-> - Fix legacy get_irqnr_and_base for dove and orion5x
-> 
-> 
+> * r8a7793 SoC: Annotate r8a7793_boards_compat_dt with __initconst
+>   Aside from being correct this builds that otherwise
+>   fail with section mismatch errors.
 
 Pulled into fixes, thanks!
+
+	Arnd
