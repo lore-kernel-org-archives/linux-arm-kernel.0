@@ -1,85 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 27 Nov 2015 09:53:32 +0100
-Subject: [linux-sunxi] Re: [PATCH v3 1/2] phy-sun4i-usb: Use
- of_match_node to get model specific config data
-In-Reply-To: <5656F6F4.1040801@redhat.com>
-References: <1448470202-3628-1-git-send-email-hdegoede@redhat.com>
- <CAGb2v64XL=bptxoCwiVkf8u-EfckpuASS3Foo=Q3i4a_6CaJYA@mail.gmail.com>
- <5656F6F4.1040801@redhat.com>
-Message-ID: <20151127085332.GU32142@lukather>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 27 Nov 2015 08:55:20 +0000
+Subject: PING-2: [PATCH v4 TRIVIAL 1/2] ARM: Enable GICv2m on 32-bit
+ virt machine
+In-Reply-To: <005001d128e6$ed51b880$c7f52980$@samsung.com>
+References: <005001d128e6$ed51b880$c7f52980$@samsung.com>
+Message-ID: <20151127085520.4d94c738@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2015 at 01:11:32PM +0100, Hans de Goede wrote:
-> >>+enum sun4i_usb_phy_type {
-> >>+       sun4i_a10_phy,
-> >>+       sun8i_a33_phy,
-> >>+};
-> >>+
-> >>+struct sun4i_usb_phy_cfg {
-> >>+       int num_phys;
-> >>+       u32 disc_thresh;
-> >>+       enum sun4i_usb_phy_type type;
-> >>+       bool dedicated_clocks;
-> >>+};
-> >>+
-> >>  struct sun4i_usb_phy_data {
-> >>         void __iomem *base;
-> >>+       const struct sun4i_usb_phy_cfg *cfg;
-> >>         struct mutex mutex;
-> >>-       int num_phys;
-> >>-       u32 disc_thresh;
-> >>-       bool has_a33_phyctl;
-> >>         struct sun4i_usb_phy {
-> >>                 struct phy *phy;
-> >>                 void __iomem *pmu;
-> >>@@ -164,12 +174,15 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
-> >>
-> >>         mutex_lock(&phy_data->mutex);
-> >>
-> >>-       if (phy_data->has_a33_phyctl) {
-> >>+       switch (phy_data->cfg->type) {
-> >>+       case sun4i_a10_phy:
-> >>+               phyctl = phy_data->base + REG_PHYCTL_A10;
-> >
-> >Any reason why this offset isn't incorporated into phy_data?
-> 
-> You mean in phy_data->cfg I assume, the difference needed for
-> the "sun4i_usb_phy_write" functionality are not just the phyctl
-> register offset...
-> 
-> >
-> >>+               break;
-> >>+       case sun8i_a33_phy:
-> >>                 phyctl = phy_data->base + REG_PHYCTL_A33;
-> >>                 /* A33 needs us to set phyctl to 0 explicitly */
-> >>                 writel(0, phyctl);
-> 
-> e.g. the A33 needs this extra write, and on the H3 we need to do
-> similar bitbanging, but slightly different, see:
-> 
-> https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/usb/host/sunxi_hci.c#L899
-> 
-> Notice how it uses different addr and write register addresses
-> their through the usb_phy_csr_add and usb_phy_csr_write helper
-> functions as well as directly poking offset 0x20.
+On Fri, 27 Nov 2015 10:40:45 +0300
+Pavel Fedin <p.fedin@samsung.com> wrote:
 
-Then it easy to support: one u8 for each register that changes, one
-bool to tell if you need to clear the phyctl register or not, And you
-don't have to duplicate the switch everywhere, and basically just
-reimplement of_device_is_compatible without an actual compatible to
-workaround the review ;)
+>  Hello!
+> 
+> > > The generic MSI domain (which is what asm-generic/msi.h is about -
+> > > nothing GIC specific about it) is entirely isolated from the rest of the
+> > > MSI infrastructure used on 32bit ARM, and is very unlikely to introduce
+> > > any regression.
+> > 
+> > That's good to hear.  Okay, let's get this patch in the patch system then,
+> > and I'll see whether it has any effect on Armada 388.
+> 
+>  I am reviewing current status of my patches, and there are no news
+> about this one so far. I have checked the patch system several times
+> and i was never able to find this patch in it. Are there any known
+> problems?
 
-Maxime
+The problem is that you never put it in the patch system, so it never
+went anywhere.
 
+0ab089c solved part of it, so you may want to post the required delta
+and put it in the patch system.
+
+Thanks,
+
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151127/a54dd928/attachment.sig>
+Jazz is not dead. It just smells funny.
