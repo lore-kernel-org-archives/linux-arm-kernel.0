@@ -1,90 +1,89 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 Nov 2015 17:55:59 +0000
-Subject: [GIT PULL] arm64 fixes for 4.4-rc3
-Message-ID: <20151127175556.GA32029@e104818-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Nov 2015 18:04:16 +0000
+Subject: interruptible_sleep_on_timeout replacement
+In-Reply-To: <565894EB.7040200@free.fr>
+References: <565894EB.7040200@free.fr>
+Message-ID: <20151127180416.GO8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, Nov 27, 2015 at 06:37:47PM +0100, Mason wrote:
+> Hello Arnd,
+> 
+> I have to port /ancient/ code to v4.1
+> The problematic line is:
+> 
+>   long timeout_jiffies = US_TO_JIFFIES(wait_param->timeout_microsecond);
+>   ...
+>   timeout_jiffies = interruptible_sleep_on_timeout(&(llad_context.irq_queue), timeout_jiffies);
+>   wait_param->timeout_microsecond = JIFFIES_TO_US(timeout_jiffies);
 
-Please pull the arm64 fixes below. Thanks.
+Right, so it's most probably buggy (anything using *_sleep_on* is
+buggy almost by definition.)
 
-The following changes since commit 1ec218373b8ebda821aec00bb156a9c94fad9cd4:
+> IIUC, the appropriate replacement is
+> 
+>   wait_event_interruptible_timeout(wq, condition, timeout)
+> 
+> where wq and timeout are the original parameters?
 
-  Linux 4.4-rc2 (2015-11-22 16:45:59 -0800)
+wait_event_interruptible_timeout is documented very well in
+include/linux/wait.h.
 
-are available in the git repository at:
+> To determine the condition... do I have to examine the corresponding
+> wake_up_interruptible() calls? I do see several
+> 
+> 	if (status & SOME_VAL) {
+> 		if (!test_and_set_bit(LOG2_SOME_VAL, &(llad_context.irq_bits)))
+> 			wake_up_interruptible(&(llad_context.irq_queue));
+> 	}
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+Quoting random bits of out of context code really doesn't help anyone,
+especially with something this complex.  We really need to see the
+whole driver to comment properly.
 
-for you to fetch changes up to 66362c9afc1d4a806280b9e3646d2d0a26cf83e9:
+Condition is, as the documentation says, is the condition to be waited
+for, which should evaluate to true to terminate the wait prior to the
+timeout.
 
-  arm64: efi: fix initcall return values (2015-11-26 18:15:54 +0000)
+> Also I'm not sure the return value is a direct match?
 
-----------------------------------------------------------------
-arm64 fixes:
+It doesn't.  You're expected to know how much longer you need to wait.
+So, you need something like:
 
-- Build fix when !CONFIG_UID16 (the patch is touching generic files but
-  it only affects arm64 builds; submitted by Arnd Bergmann)
+I think you will want something like this:
 
-- EFI fixes to deal with early_memremap() returning NULL and correctly
-  mapping run-time regions
+	long timeout_jiffies = US_TO_JIFFIES(wait_param->timeout_microsecond);
+	long target_jiffies = jiffies + timeout_jiffies;
+	long ret;
+	...
 
-- Fix CPUID register extraction of unsigned fields (not to be
-  sign-extended)
+	ret = wait_event_interruptible_timeout(&llad_context.irq_queue,
+					       ... some condition ...
+					       timeout_jiffies);
 
-- ASID allocator fix to deal with long-running tasks over multiple
-  generation roll-overs
+	if (ret < 0) {
+		long now = jiffies;
 
-- Revert support for marking page ranges as contiguous PTEs (it leads to
-  TLB conflicts and requires additional non-trivial kernel changes)
+		if (time_before_eq(now, target_jiffies))
+			wait_param->timeout_microsecond =
+				JIFFIES_TO_US(target_jiffies - now);
+		else
+			wait_param->timeout_microsecond = 0;
 
-- Proper early_alloc() failure check
+		return ret;
+	}
 
-- Disable KASan for 48-bit VA and 16KB page configuration (the pgd is
-  larger than the KASan shadow memory)
+	if (ret == 0) {
+		timed out
+	} else {
+		condition was satisfied
+	}
 
-- Update the fault_info table (original descriptions based on early
-  engineering spec)
-
-----------------------------------------------------------------
-Andrey Ryabinin (1):
-      arm64: KASAN depends on !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
-
-Ard Biesheuvel (2):
-      arm64: efi: deal with NULL return value of early_memremap()
-      arm64: efi: fix initcall return values
-
-Arnd Bergmann (1):
-      arm64: fix building without CONFIG_UID16
-
-Catalin Marinas (1):
-      Revert "arm64: Mark kernel page ranges contiguous"
-
-Mark Rutland (2):
-      arm64: mm: fix fault_info table xFSC decoding
-      arm64: efi: correctly map runtime regions
-
-Suzuki K. Poulose (4):
-      arm64: early_alloc: Fix check for allocation failure
-      arm64: cpufeature: Add helpers for extracting unsigned values
-      arm64: cpufeature: Track unsigned fields
-      arm64: debug: Treat the BRPs/WRPs as unsigned
-
-Will Deacon (1):
-      arm64: mm: keep reserved ASIDs in sync with mm after multiple rollovers
-
- arch/arm64/Kconfig                     |  2 +-
- arch/arm64/include/asm/cpufeature.h    | 22 +++++++++-
- arch/arm64/include/asm/hw_breakpoint.h |  6 ++-
- arch/arm64/kernel/cpufeature.c         | 37 +++++++++-------
- arch/arm64/kernel/efi.c                | 33 +++++++++------
- arch/arm64/mm/context.c                | 38 +++++++++++------
- arch/arm64/mm/fault.c                  | 28 ++++++-------
- arch/arm64/mm/mmu.c                    | 77 +++++++---------------------------
- include/linux/syscalls.h               |  2 +-
- include/linux/types.h                  |  2 +-
- 10 files changed, 124 insertions(+), 123 deletions(-)
+Even better, change the API so that 'timeout_microsecond' is an
+absolute time so you don't have accumulated errors if you're repeatedly
+interrupted.
 
 -- 
-Catalin
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
