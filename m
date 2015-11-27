@@ -1,68 +1,78 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 27 Nov 2015 10:55:44 +0900
-Subject: [PATCH 01/15] ARM: shmobile: r8a7790: switch console back to scif0
+Date: Fri, 27 Nov 2015 10:55:52 +0900
+Subject: [PATCH 09/15] ARM: shmobile: porter: Move SPI FLASH partitions to
+ subnode
 In-Reply-To: <cover.1448586938.git.horms+renesas@verge.net.au>
 References: <cover.1448586938.git.horms+renesas@verge.net.au>
-Message-ID: <430d7baddf2d913de76e8101d807f4f2861705f7.1448586938.git.horms+renesas@verge.net.au>
+Message-ID: <26fac0eebccec898a7a7670856cbde5583a5ec2e.1448586938.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-The boot loader uses scif0, and so must we if we want earlycon to work.
+As of commits 5cfdedb7b9a0fe38 ("mtd: ofpart: move ofpart partitions to a
+dedicated dt node") and fe2585e9c29a650a ("doc: dt: mtd: support partitions
+in a special 'partitions' subnode"), having partitions as direct subnodes
+of an mtd device is discouraged. Hence move the SPI FLASH partitions to a
+"partitions" subnode.
 
-Partially reverts 7c0558941 ("ARM: shmobile: r8a7790: switch from scif
-to scifa").
+Based on similar work for the koelsch board by Geert Uytterhoeven.
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/r8a7791-porter.dts | 33 ++++++++++++++++++---------------
+ 1 file changed, 18 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index e2174d816e78..79f141188d99 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -47,13 +47,13 @@
- 	compatible = "renesas,lager", "renesas,r8a7790";
+diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
+index 3e198e7b3ee4..f2dd5356eac8 100644
+--- a/arch/arm/boot/dts/r8a7791-porter.dts
++++ b/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -192,8 +192,6 @@
+ 	status = "okay";
  
- 	aliases {
--		serial0 = &scifa0;
-+		serial0 = &scif0;
- 		serial1 = &scifa1;
- 	};
+ 	flash at 0 {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+ 		compatible = "spansion,s25fl512s", "jedec,spi-nor";
+ 		reg = <0>;
+ 		spi-max-frequency = <30000000>;
+@@ -201,19 +199,24 @@
+ 		spi-rx-bus-width = <4>;
+ 		m25p,fast-read;
  
- 	chosen {
- 		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
--		stdout-path = &scifa0;
-+		stdout-path = &scif0;
- 	};
- 
- 	memory at 40000000 {
-@@ -296,9 +296,9 @@
- 		renesas,function = "du";
- 	};
- 
--	scifa0_pins: serial0 {
--		renesas,groups = "scifa0_data";
--		renesas,function = "scifa0";
-+	scif0_pins: serial0 {
-+		renesas,groups = "scif0_data";
-+		renesas,function = "scif0";
- 	};
- 
- 	ether_pins: ether {
-@@ -467,8 +467,8 @@
+-		partition at 0 {
+-			label = "loader_prg";
+-			reg = <0x00000000 0x00040000>;
+-			read-only;
+-		};
+-		partition at 40000 {
+-			label = "user_prg";
+-			reg = <0x00040000 0x00400000>;
+-			read-only;
+-		};
+-		partition at 440000 {
+-			label = "flash_fs";
+-			reg = <0x00440000 0x03bc0000>;
++		partitions {
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			partition at 0 {
++				label = "loader_prg";
++				reg = <0x00000000 0x00040000>;
++				read-only;
++			};
++			partition at 40000 {
++				label = "user_prg";
++				reg = <0x00040000 0x00400000>;
++				read-only;
++			};
++			partition at 440000 {
++				label = "flash_fs";
++				reg = <0x00440000 0x03bc0000>;
++			};
+ 		};
  	};
  };
- 
--&scifa0 {
--	pinctrl-0 = <&scifa0_pins>;
-+&scif0 {
-+	pinctrl-0 = <&scif0_pins>;
- 	pinctrl-names = "default";
- 
- 	status = "okay";
 -- 
 2.1.4
