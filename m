@@ -1,74 +1,25 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 27 Nov 2015 15:13:55 +0800
-Subject: [PATCH v3 3/5] clk: sunxi: Add sun9i A80 cpus (cpu special) clock
- support
-In-Reply-To: <20151125173252.GN32142@lukather>
-References: <1448357536-26613-1-git-send-email-wens@csie.org>
- <1448357536-26613-4-git-send-email-wens@csie.org>
- <20151125173252.GN32142@lukather>
-Message-ID: <CAGb2v64+LS4QA_xfnbdMUwd0simjpXoSQKRdvPcC1rsjhBHK8w@mail.gmail.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Fri, 27 Nov 2015 10:40:45 +0300
+Subject: PING-2: [PATCH v4 TRIVIAL 1/2] ARM: Enable GICv2m on 32-bit virt
+ machine
+Message-ID: <005001d128e6$ed51b880$c7f52980$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2015 at 1:32 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Tue, Nov 24, 2015 at 05:32:14PM +0800, Chen-Yu Tsai wrote:
->> The "cpus" clock is the clock for the embedded processor in the A80.
->> It is also part of the PRCM clock tree. This clock includes a pre-
->> divider on one of its inputs. For now we are using a custom clock
->> driver for it. In the future we may want to develop a generalized
->> driver for these types of clocks, which also includes the AHB clock
->> driver on sun[5678]i.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>
->> Hi Maxime,
->>
->> I'll do the factors clock refactoring mentioned during the discussion
->> around v2 later on.
->
-> I have no idea what you are talking about :)
+ Hello!
 
-Then I guess I have more time to figure something out. :)
+> > The generic MSI domain (which is what asm-generic/msi.h is about -
+> > nothing GIC specific about it) is entirely isolated from the rest of the
+> > MSI infrastructure used on 32bit ARM, and is very unlikely to introduce
+> > any regression.
+> 
+> That's good to hear.  Okay, let's get this patch in the patch system then,
+> and I'll see whether it has any effect on Armada 388.
 
->>
->> ---
->>  Documentation/devicetree/bindings/clock/sunxi.txt |   1 +
->>  drivers/clk/sunxi/Makefile                        |   1 +
->>  drivers/clk/sunxi/clk-sun9i-cpus.c                | 240 ++++++++++++++++++++++
->>  3 files changed, 242 insertions(+)
->>  create mode 100644 drivers/clk/sunxi/clk-sun9i-cpus.c
->>
->> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
->> index b6859ed6913f..153ac72869e8 100644
->> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
->> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
->> @@ -27,6 +27,7 @@ Required properties:
->>       "allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
->>       "allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
->>       "allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
->> +     "allwinner,sun9i-a80-cpus-clk" - for the CPUS on A80
->>       "allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
->>       "allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
->>       "allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
->> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
->> index 121333ce34ea..07d914c3f6d1 100644
->> --- a/drivers/clk/sunxi/Makefile
->> +++ b/drivers/clk/sunxi/Makefile
->> @@ -13,6 +13,7 @@ obj-y += clk-simple-gates.o
->>  obj-y += clk-sun8i-apb0.o
->>  obj-y += clk-sun8i-mbus.o
->>  obj-y += clk-sun9i-core.o
->> +obj-y += clk-sun9i-cpus.o
->
-> Same thing here, if it's only used in the A80, just compile it when
-> ARCH_SUN9I is compiled.
+ I am reviewing current status of my patches, and there are no news about this one so far. I have checked the patch system several
+times and i was never able to find this patch in it. Are there any known problems?
 
-Sure. Should I add a patch changing the ones already in? sun9i-core
-and sun9i-mmc that is.
-
-Thanks
-ChenYu
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
