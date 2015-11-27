@@ -1,116 +1,486 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri, 27 Nov 2015 10:52:26 +0800
-Subject: [PATCH v1 5/5] thermal: rockchip: Support the RK3399 SoCs in thermal
- driver
-In-Reply-To: <1448592746-2129-1-git-send-email-wxt@rock-chips.com>
-References: <1448592746-2129-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1448592746-2129-6-git-send-email-wxt@rock-chips.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 27 Nov 2015 12:10:27 +0900
+Subject: [PATCH v2] arm64: dts: uniphier: add PH1-LD10 SoC/board support
+In-Reply-To: <1448505224-29430-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1448505224-29430-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNARk-syRbZYtFm6+_jzc2EzB5WeiH=PggP3XxwXSnp+Xhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RK3399 SoCs have two Temperature Sensors, channel 0 is for CPU.
-channel 1 is for GPU.
+I found a bug in the DTSI.
+I will send v3.
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+2015-11-26 11:33 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> This is the first ARMv8 SoC from Socionext Inc.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+>
+> Changes in v2:
+>   - Split into a single patch
+>
+>  MAINTAINERS                                        |   1 +
+>  arch/arm64/boot/dts/Makefile                       |   1 +
+>  arch/arm64/boot/dts/socionext/Makefile             |   4 +
+>  .../boot/dts/socionext/uniphier-ph1-ld10-ref.dts   |  95 +++++++
+>  .../boot/dts/socionext/uniphier-ph1-ld10.dtsi      | 280 +++++++++++++++++++++
+>  .../arm64/boot/dts/socionext/uniphier-pinctrl.dtsi |   1 +
+>  .../boot/dts/socionext/uniphier-support-card.dtsi  |   1 +
+>  7 files changed, 383 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/socionext/Makefile
+>  create mode 100644 arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts
+>  create mode 100644 arch/arm64/boot/dts/socionext/uniphier-ph1-ld10.dtsi
+>  create mode 120000 arch/arm64/boot/dts/socionext/uniphier-pinctrl.dtsi
+>  create mode 120000 arch/arm64/boot/dts/socionext/uniphier-support-card.dtsi
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 3f92804..99a1424 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1642,6 +1642,7 @@ F:        arch/arm/boot/dts/uniphier*
+>  F:     arch/arm/include/asm/hardware/cache-uniphier.h
+>  F:     arch/arm/mach-uniphier/
+>  F:     arch/arm/mm/cache-uniphier.c
+> +F:     arch/arm64/boot/dts/socionext/
+>  F:     drivers/i2c/busses/i2c-uniphier*
+>  F:     drivers/pinctrl/uniphier/
+>  F:     drivers/tty/serial/8250/8250_uniphier.c
+> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+> index eb3c42d..6672a96 100644
+> --- a/arch/arm64/boot/dts/Makefile
+> +++ b/arch/arm64/boot/dts/Makefile
+> @@ -11,6 +11,7 @@ dts-dirs += marvell
+>  dts-dirs += mediatek
+>  dts-dirs += qcom
+>  dts-dirs += rockchip
+> +dts-dirs += socionext
+>  dts-dirs += sprd
+>  dts-dirs += xilinx
+>
+> diff --git a/arch/arm64/boot/dts/socionext/Makefile b/arch/arm64/boot/dts/socionext/Makefile
+> new file mode 100644
+> index 0000000..8d72771
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/socionext/Makefile
+> @@ -0,0 +1,4 @@
+> +dtb-$(CONFIG_ARCH_UNIPHIER) += uniphier-ph1-ld10-ref.dtb
+> +
+> +always         := $(dtb-y)
+> +clean-files    := *.dtb
+> diff --git a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts
+> new file mode 100644
+> index 0000000..3e53317
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10-ref.dts
+> @@ -0,0 +1,95 @@
+> +/*
+> + * Device Tree Source for UniPhier PH1-LD10 Reference Board
+> + *
+> + * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "uniphier-ph1-ld10.dtsi"
+> +/include/ "uniphier-support-card.dtsi"
+> +
+> +/ {
+> +       model = "UniPhier PH1-LD10 Reference Board";
+> +       compatible = "socionext,ph1-ld10-ref", "socionext,ph1-ld10";
+> +
+> +       memory {
+> +               device_type = "memory";
+> +               reg = <0 0x80000000 0 0xc0000000>;
+> +       };
+> +
+> +       chosen {
+> +               stdout-path = "serial0:115200n8";
+> +       };
+> +
+> +       aliases {
+> +               serial0 = &serial0;
+> +               serial1 = &serial1;
+> +               serial2 = &serial2;
+> +               serial3 = &serial3;
+> +               i2c0 = &i2c0;
+> +               i2c1 = &i2c1;
+> +               i2c2 = &i2c2;
+> +               i2c3 = &i2c3;
+> +               i2c4 = &i2c4;
+> +               i2c5 = &i2c5;
+> +               i2c6 = &i2c6;
+> +       };
+> +};
+> +
+> +&extbus {
+> +       ranges = <1 0x00000000 0x42000000 0x02000000>;
+> +};
+> +
+> +&support_card {
+> +       ranges = <0x00000000 1 0x01f00000 0x00100000>;
+> +};
+> +
+> +&ethsc {
+> +       interrupts = <0 48 4>;
+> +};
+> +
+> +&serial0 {
+> +       status = "okay";
+> +};
+> +
+> +&i2c0 {
+> +       status = "okay";
+> +};
+> diff --git a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10.dtsi
+> new file mode 100644
+> index 0000000..1d66602
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld10.dtsi
+> @@ -0,0 +1,280 @@
+> +/*
+> + * Device Tree Source for UniPhier PH1-LD10 SoC
+> + *
+> + * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/ {
+> +       compatible = "socionext,ph1-ld10";
+> +       #address-cells = <2>;
+> +       #size-cells = <2>;
+> +       interrupt-parent = <&gic>;
+> +
+> +       cpus {
+> +               #address-cells = <2>;
+> +               #size-cells = <0>;
+> +
+> +               cpu-map {
+> +                       cluster0 {
+> +                               core0 {
+> +                                       cpu = <&cpu0>;
+> +                               };
+> +                               core1 {
+> +                                       cpu = <&cpu1>;
+> +                               };
+> +                       };
+> +
+> +                       cluster1 {
+> +                               core0 {
+> +                                       cpu = <&cpu0>;
+> +                               };
+> +                               core1 {
+> +                                       cpu = <&cpu1>;
+> +                               };
+> +                       };
+> +               };
+> +
+> +               cpu0: cpu at 0 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a72", "arm,armv8";
+> +                       reg = <0 0x000>;
+> +                       enable-method = "spin-table";
+> +                       cpu-release-addr = <0 0x80000100>;
+> +               };
+> +
+> +               cpu1: cpu at 1 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a72", "arm,armv8";
+> +                       reg = <0 0x001>;
+> +                       enable-method = "spin-table";
+> +                       cpu-release-addr = <0 0x80000100>;
+> +               };
+> +
+> +               cpu2: cpu at 100 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a53", "arm,armv8";
+> +                       reg = <0 0x100>;
+> +                       enable-method = "spin-table";
+> +                       cpu-release-addr = <0 0x80000100>;
+> +               };
+> +
+> +               cpu3: cpu at 101 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a53", "arm,armv8";
+> +                       reg = <0 0x101>;
+> +                       enable-method = "spin-table";
+> +                       cpu-release-addr = <0 0x80000100>;
+> +               };
+> +       };
+> +
+> +       clocks {
+> +               uart_clk: uart_clk {
+> +                       #clock-cells = <0>;
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <58820000>;
+> +               };
+> +
+> +               i2c_clk: i2c_clk {
+> +                       #clock-cells = <0>;
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <50000000>;
+> +               };
+> +       };
+> +
+> +       timer {
+> +               compatible = "arm,armv8-timer";
+> +               interrupts = <1 13 0xf01>,
+> +                            <1 14 0xf01>,
+> +                            <1 11 0xf01>,
+> +                            <1 10 0xf01>;
+> +       };
+> +
+> +       soc {
+> +               compatible = "simple-bus";
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               ranges = <0 0 0 0xffffffff>;
+> +
+> +               extbus: extbus {
+> +                       compatible = "simple-bus";
+> +                       #address-cells = <2>;
+> +                       #size-cells = <1>;
+> +               };
+> +
+> +               serial0: serial at 54006800 {
+> +                       compatible = "socionext,uniphier-uart";
+> +                       status = "disabled";
+> +                       reg = <0x54006800 0x40>;
+> +                       pinctrl-names = "default";
+> +                       pinctrl-0 = <&pinctrl_uart0>;
+> +                       interrupts = <0 33 4>;
+> +                       clocks = <&uart_clk>;
+> +               };
+> +
+> +               serial1: serial at 54006900 {
+> +                       compatible = "socionext,uniphier-uart";
+> +                       status = "disabled";
+> +                       reg = <0x54006900 0x40>;
+> +                       pinctrl-names = "default";
+> +                       pinctrl-0 = <&pinctrl_uart1>;
+> +                       interrupts = <0 35 4>;
+> +                       clocks = <&uart_clk>;
+> +               };
+> +
+> +               serial2: serial at 54006a00 {
+> +                       compatible = "socionext,uniphier-uart";
+> +                       status = "disabled";
+> +                       reg = <0x54006a00 0x40>;
+> +                       pinctrl-names = "default";
+> +                       pinctrl-0 = <&pinctrl_uart2>;
+> +                       interrupts = <0 37 4>;
+> +                       clocks = <&uart_clk>;
+> +               };
+> +
+> +               serial3: serial at 54006b00 {
+> +                       compatible = "socionext,uniphier-uart";
+> +                       status = "disabled";
+> +                       reg = <0x54006b00 0x40>;
+> +                       pinctrl-names = "default";
+> +                       pinctrl-0 = <&pinctrl_uart3>;
+> +                       interrupts = <0 177 4>;
+> +                       clocks = <&uart_clk>;
+> +               };
+> +
+> +               i2c0: i2c at 58780000 {
+> +                       compatible = "socionext,uniphier-fi2c";
+> +                       status = "disabled";
+> +                       reg = <0x58780000 0x80>;
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       pinctrl-names = "default";
+> +                       pinctrl-0 = <&pinctrl_i2c0>;
+> +                       interrupts = <0 41 4>;
+> +                       clocks = <&i2c_clk>;
+> +                       clock-frequency = <100000>;
+> +               };
+> +
+> +               i2c1: i2c at 58781000 {
+> +                       compatible = "socionext,uniphier-fi2c";
+> +                       status = "disabled";
+> +                       reg = <0x58781000 0x80>;
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       pinctrl-names = "default";
+> +                       pinctrl-0 = <&pinctrl_i2c1>;
+> +                       interrupts = <0 42 4>;
+> +                       clocks = <&i2c_clk>;
+> +                       clock-frequency = <100000>;
+> +               };
+> +
+> +               i2c2: i2c at 58782000 {
+> +                       compatible = "socionext,uniphier-fi2c";
+> +                       status = "disabled";
+> +                       reg = <0x58782000 0x80>;
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       pinctrl-names = "default";
+> +                       pinctrl-0 = <&pinctrl_i2c2>;
+> +                       interrupts = <0 43 4>;
+> +                       clocks = <&i2c_clk>;
+> +                       clock-frequency = <100000>;
+> +               };
+> +
+> +               i2c3: i2c at 58783000 {
+> +                       compatible = "socionext,uniphier-fi2c";
+> +                       status = "disabled";
+> +                       reg = <0x58783000 0x80>;
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       pinctrl-names = "default";
+> +                       pinctrl-0 = <&pinctrl_i2c3>;
+> +                       interrupts = <0 44 4>;
+> +                       clocks = <&i2c_clk>;
+> +                       clock-frequency = <100000>;
+> +               };
+> +
+> +               i2c4: i2c at 58784000 {
+> +                       compatible = "socionext,uniphier-fi2c";
+> +                       reg = <0x58784000 0x80>;
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       interrupts = <0 45 4>;
+> +                       clocks = <&i2c_clk>;
+> +                       clock-frequency = <400000>;
+> +               };
+> +
+> +               i2c5: i2c at 58785000 {
+> +                       compatible = "socionext,uniphier-fi2c";
+> +                       reg = <0x58785000 0x80>;
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       interrupts = <0 25 4>;
+> +                       clocks = <&i2c_clk>;
+> +                       clock-frequency = <400000>;
+> +               };
+> +
+> +               i2c6: i2c at 58786000 {
+> +                       compatible = "socionext,uniphier-fi2c";
+> +                       reg = <0x58786000 0x80>;
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       interrupts = <0 26 4>;
+> +                       clocks = <&i2c_clk>;
+> +                       clock-frequency = <400000>;
+> +               };
+> +
+> +               pinctrl: pinctrl at 5f801000 {
+> +                       compatible = "socionext,ph1-ld10-pinctrl", "syscon";
+> +                       reg = <0x5f801000 0xe00>;
+> +               };
+> +
+> +               gic: interrupt-controller at 5fe00000 {
+> +                       compatible = "arm,gic-v3";
+> +                       interrupt-controller;
+> +                       #interrupt-cells = <3>;
+> +                       reg = <0x5fe00000 0x10000>,     /* GICD */
+> +                             <0x5fe80000 0x80000>;     /* GICR */
+> +                       interrupts = <1 9 4>;
+> +               };
+> +       };
+> +};
+> +
+> +/include/ "uniphier-pinctrl.dtsi"
+> diff --git a/arch/arm64/boot/dts/socionext/uniphier-pinctrl.dtsi b/arch/arm64/boot/dts/socionext/uniphier-pinctrl.dtsi
+> new file mode 120000
+> index 0000000..f42fb6f
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/socionext/uniphier-pinctrl.dtsi
+> @@ -0,0 +1 @@
+> +../../../../arm/boot/dts/uniphier-pinctrl.dtsi
+> \ No newline at end of file
+> diff --git a/arch/arm64/boot/dts/socionext/uniphier-support-card.dtsi b/arch/arm64/boot/dts/socionext/uniphier-support-card.dtsi
+> new file mode 120000
+> index 0000000..1246db9
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/socionext/uniphier-support-card.dtsi
+> @@ -0,0 +1 @@
+> +../../../../arm/boot/dts/uniphier-support-card.dtsi
+> \ No newline at end of file
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
----
 
-Changes in v1:
-- fix a irq ack is similar with RK3228 SoCs.
 
- drivers/thermal/rockchip_thermal.c | 66 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
-
-diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-index 37772dd..8e02b86 100644
---- a/drivers/thermal/rockchip_thermal.c
-+++ b/drivers/thermal/rockchip_thermal.c
-@@ -291,6 +291,44 @@ static const struct tsadc_table v3_code_table[] = {
- 	{TSADCV3_DATA_MASK, 125000},
- };
- 
-+static const struct tsadc_table v4_code_table[] = {
-+	{TSADCV3_DATA_MASK, -40000},
-+	{431, -40000},
-+	{426, -35000},
-+	{421, -30000},
-+	{415, -25000},
-+	{410, -20000},
-+	{405, -15000},
-+	{399, -10000},
-+	{394, -5000},
-+	{389, 0},
-+	{383, 5000},
-+	{378, 10000},
-+	{373, 15000},
-+	{367, 20000},
-+	{362, 25000},
-+	{357, 30000},
-+	{351, 35000},
-+	{346, 40000},
-+	{340, 45000},
-+	{335, 50000},
-+	{330, 55000},
-+	{324, 60000},
-+	{319, 65000},
-+	{313, 70000},
-+	{308, 75000},
-+	{302, 80000},
-+	{297, 85000},
-+	{291, 90000},
-+	{286, 95000},
-+	{281, 100000},
-+	{275, 105000},
-+	{270, 110000},
-+	{264, 115000},
-+	{259, 120000},
-+	{253, 125000},
-+};
-+
- static u32 rk_tsadcv2_temp_to_code(struct chip_tsadc_table table,
- 				   int temp)
- {
-@@ -554,6 +592,30 @@ static const struct rockchip_tsadc_chip rk3368_tsadc_data = {
- 	},
- };
- 
-+static const struct rockchip_tsadc_chip rk3399_tsadc_data = {
-+	.chn_id[SENSOR_CPU] = 0, /* cpu sensor is channel 0 */
-+	.chn_id[SENSOR_GPU] = 1, /* gpu sensor is channel 1 */
-+	.chn_num = 2, /* two channels for tsadc */
-+
-+	.tshut_mode = TSHUT_MODE_GPIO, /* default TSHUT via GPIO give PMIC */
-+	.tshut_polarity = TSHUT_LOW_ACTIVE, /* default TSHUT LOW ACTIVE */
-+	.tshut_temp = 95000,
-+
-+	.initialize = rk_tsadcv2_initialize,
-+	.irq_ack = rk_tsadcv1_irq_ack,
-+	.control = rk_tsadcv2_control,
-+	.get_temp = rk_tsadcv2_get_temp,
-+	.set_tshut_temp = rk_tsadcv2_tshut_temp,
-+	.set_tshut_mode = rk_tsadcv2_tshut_mode,
-+
-+	.table = {
-+		.id = v4_code_table,
-+		.length = ARRAY_SIZE(v4_code_table),
-+		.data_mask = TSADCV3_DATA_MASK,
-+		.mode = ADC_DECREMENT,
-+	},
-+};
-+
- static const struct of_device_id of_rockchip_thermal_match[] = {
- 	{
- 		.compatible = "rockchip,rk3228-tsadc",
-@@ -567,6 +629,10 @@ static const struct of_device_id of_rockchip_thermal_match[] = {
- 		.compatible = "rockchip,rk3368-tsadc",
- 		.data = (void *)&rk3368_tsadc_data,
- 	},
-+	{
-+		.compatible = "rockchip,rk3399-tsadc",
-+		.data = (void *)&rk3399_tsadc_data,
-+	},
- 	{ /* end */ },
- };
- MODULE_DEVICE_TABLE(of, of_rockchip_thermal_match);
 -- 
-1.9.1
+Best Regards
+Masahiro Yamada
