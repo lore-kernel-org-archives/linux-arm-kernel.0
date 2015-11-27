@@ -1,130 +1,74 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 27 Nov 2015 14:43:29 +0800
-Subject: [PATCH v5 8/9] ARM: dts: sun8i: sinlinx-sina33: Add AXP223 PMIC
- device and regulator nodes
-In-Reply-To: <1448606610-32647-1-git-send-email-wens@csie.org>
-References: <1448606610-32647-1-git-send-email-wens@csie.org>
-Message-ID: <1448606610-32647-9-git-send-email-wens@csie.org>
+Date: Fri, 27 Nov 2015 15:13:55 +0800
+Subject: [PATCH v3 3/5] clk: sunxi: Add sun9i A80 cpus (cpu special) clock
+ support
+In-Reply-To: <20151125173252.GN32142@lukather>
+References: <1448357536-26613-1-git-send-email-wens@csie.org>
+ <1448357536-26613-4-git-send-email-wens@csie.org>
+ <20151125173252.GN32142@lukather>
+Message-ID: <CAGb2v64+LS4QA_xfnbdMUwd0simjpXoSQKRdvPcC1rsjhBHK8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This board has a X-Powers AXP223 PMIC connected via RSB. Its regulators
-provide power to various parts of the SoC and the board.
+On Thu, Nov 26, 2015 at 1:32 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Tue, Nov 24, 2015 at 05:32:14PM +0800, Chen-Yu Tsai wrote:
+>> The "cpus" clock is the clock for the embedded processor in the A80.
+>> It is also part of the PRCM clock tree. This clock includes a pre-
+>> divider on one of its inputs. For now we are using a custom clock
+>> driver for it. In the future we may want to develop a generalized
+>> driver for these types of clocks, which also includes the AHB clock
+>> driver on sun[5678]i.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>
+>> Hi Maxime,
+>>
+>> I'll do the factors clock refactoring mentioned during the discussion
+>> around v2 later on.
+>
+> I have no idea what you are talking about :)
 
-Also update the regulator supply phandles.
+Then I guess I have more time to figure something out. :)
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 76 +++++++++++++++++++++++++-
- 1 file changed, 73 insertions(+), 3 deletions(-)
+>>
+>> ---
+>>  Documentation/devicetree/bindings/clock/sunxi.txt |   1 +
+>>  drivers/clk/sunxi/Makefile                        |   1 +
+>>  drivers/clk/sunxi/clk-sun9i-cpus.c                | 240 ++++++++++++++++++++++
+>>  3 files changed, 242 insertions(+)
+>>  create mode 100644 drivers/clk/sunxi/clk-sun9i-cpus.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> index b6859ed6913f..153ac72869e8 100644
+>> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+>> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> @@ -27,6 +27,7 @@ Required properties:
+>>       "allwinner,sun5i-a10s-ahb-gates-clk" - for the AHB gates on A10s
+>>       "allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
+>>       "allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
+>> +     "allwinner,sun9i-a80-cpus-clk" - for the CPUS on A80
+>>       "allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
+>>       "allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+>>       "allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
+>> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+>> index 121333ce34ea..07d914c3f6d1 100644
+>> --- a/drivers/clk/sunxi/Makefile
+>> +++ b/drivers/clk/sunxi/Makefile
+>> @@ -13,6 +13,7 @@ obj-y += clk-simple-gates.o
+>>  obj-y += clk-sun8i-apb0.o
+>>  obj-y += clk-sun8i-mbus.o
+>>  obj-y += clk-sun9i-core.o
+>> +obj-y += clk-sun9i-cpus.o
+>
+> Same thing here, if it's only used in the A80, just compile it when
+> ARCH_SUN9I is compiled.
 
-diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-index 13ce68f06dd6..2809e079902e 100644
---- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-+++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-@@ -68,7 +68,7 @@
- };
- 
- &lradc {
--	vref-supply = <&reg_vcc3v0>;
-+	vref-supply = <&reg_dcdc1>;
- 	status = "okay";
- 
- 	button at 200 {
-@@ -96,7 +96,7 @@
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_sina33>;
--	vmmc-supply = <&reg_vcc3v0>;
-+	vmmc-supply = <&reg_dcdc1>;
- 	bus-width = <4>;
- 	cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
- 	cd-inverted;
-@@ -106,7 +106,7 @@
- &mmc2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc2_8bit_pins>;
--	vmmc-supply = <&reg_vcc3v0>;
-+	vmmc-supply = <&reg_dcdc1>;
- 	bus-width = <8>;
- 	non-removable;
- 	status = "okay";
-@@ -132,6 +132,76 @@
- 
- &r_rsb {
- 	status = "okay";
-+
-+	axp22x: pmic at 3e3 {
-+		compatible = "x-powers,axp223";
-+		reg = <0x3e3>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		eldoin-supply = <&reg_dcdc1>;
-+	};
-+};
-+
-+#include "axp22x.dtsi"
-+
-+&reg_aldo1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-io";
-+};
-+
-+&reg_aldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2350000>;
-+	regulator-max-microvolt = <2650000>;
-+	regulator-name = "vdd-dll";
-+};
-+
-+&reg_aldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2700000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-pll-avcc";
-+};
-+
-+&reg_dc5ldo {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpus";
-+};
-+
-+&reg_dcdc1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-3v0";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-sys";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc5 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1500000>;
-+	regulator-max-microvolt = <1500000>;
-+	regulator-name = "vcc-dram";
-+};
-+
-+&reg_rtc_ldo {
-+	regulator-name = "vcc-rtc";
- };
- 
- &uart0 {
--- 
-2.6.2
+Sure. Should I add a patch changing the ones already in? sun9i-core
+and sun9i-mmc that is.
+
+Thanks
+ChenYu
