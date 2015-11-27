@@ -1,40 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Nov 2015 14:46:41 +0100
-Subject: [PATCH, RESEND] regulator: core: fix regulator_lock_supply regression
-Message-ID: <3504080.aWaTxHbgxH@wuerfel>
+Date: Fri, 27 Nov 2015 14:49:49 +0100
+Subject: [PATCH] null_blk: use sector_div instead of do_div
+Message-ID: <3768541.ja0r6f0Odi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As noticed by Geert Uytterhoeven, my patch to avoid a harmless build warning
-in regulator_lock_supply() was total crap and introduced a real bug:
+Dividing a sector_t number should be done using sector_div rather
+than do_div to optimize the 32-bit sector_t case, and with
+the latest do_div optimizations, we now get a compile-time
+warning for this:
 
-> [ BUG: bad unlock balance detected! ]
-> kworker/u4:0/6 is trying to release lock (&rdev->mutex) at:
-> [<c0247b84>] regulator_set_voltage+0x38/0x50
+arch/arm/include/asm/div64.h:32:95: note: expected 'uint64_t * {aka long long unsigned int *}' but argument is of type 'sector_t * {aka long unsigned int *}'
+drivers/block/null_blk.c:521:81: warning: comparison of distinct pointer types lacks a cast
 
-we still lock the regulator supplies, but not the actual regulators,
-so we are missing a lock, and the unlock is unbalanced.
+This changes the newly added code to use sector_div.
 
-This rectifies it by first locking the regulator device itself before
-using the same loop as before to lock its supplies.
-
-Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 716fec9d1965 ("[SUBMITTED] regulator: core: avoid unused variable warning")
+Fixes: b2b7e00148a2 ("null_blk: register as a LightNVM device")
 ---
-rebased on top of regulators.git #for-next
+Found on ARM randconfig builds with today's linux-next
 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index c9bdca5f3b9b..89e4dcb84758 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -140,7 +140,8 @@ static void regulator_lock_supply(struct regulator_dev *rdev)
- {
- 	int i;
+diff --git a/drivers/block/null_blk.c b/drivers/block/null_blk.c
+index 5c8ba5484d86..d0eeecd294de 100644
+--- a/drivers/block/null_blk.c
++++ b/drivers/block/null_blk.c
+@@ -510,17 +510,17 @@ static int null_lnvm_id(struct request_queue *q, struct nvm_id *id)
+ 	id->ppaf.ch_offset = 56;
+ 	id->ppaf.ch_len = 8;
  
--	for (i = 0; rdev->supply; rdev = rdev->supply->rdev, i++)
-+	mutex_lock(&rdev->mutex);
-+	for (i = 1; rdev->supply; rdev = rdev->supply->rdev, i++)
- 		mutex_lock_nested(&rdev->mutex, i);
- }
+-	do_div(size, bs); /* convert size to pages */
+-	do_div(size, 256); /* concert size to pgs pr blk */
++	sector_div(size, bs); /* convert size to pages */
++	sector_div(size, 256); /* concert size to pgs pr blk */
+ 	grp = &id->groups[0];
+ 	grp->mtype = 0;
+ 	grp->fmtype = 0;
+ 	grp->num_ch = 1;
+ 	grp->num_pg = 256;
+ 	blksize = size;
+-	do_div(size, (1 << 16));
++	sector_div(size, (1 << 16));
+ 	grp->num_lun = size + 1;
+-	do_div(blksize, grp->num_lun);
++	sector_div(blksize, grp->num_lun);
+ 	grp->num_blk = blksize;
+ 	grp->num_pln = 1;
  
