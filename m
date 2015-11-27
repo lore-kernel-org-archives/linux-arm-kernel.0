@@ -1,108 +1,104 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 27 Nov 2015 13:16:37 +0200
-Subject: [RFC 3/6] dmaengine: core: Introduce new, universal API to
- request a channel
-In-Reply-To: <24788322.ynD35Kf0xi@wuerfel>
-References: <1448612982-28141-1-git-send-email-peter.ujfalusi@ti.com>
- <1448612982-28141-4-git-send-email-peter.ujfalusi@ti.com>
- <24788322.ynD35Kf0xi@wuerfel>
-Message-ID: <56583B95.7060503@ti.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 27 Nov 2015 11:24:38 +0000
+Subject: [Xen-devel] [PATCH v3 45/62] arm/acpi: Prepare STAO table for Dom0
+In-Reply-To: <1447753261-7552-46-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-46-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <alpine.DEB.2.02.1511271120020.8984@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2015 01:00 PM, Arnd Bergmann wrote:
-> On Friday 27 November 2015 10:29:39 Peter Ujfalusi wrote:
->> struct dma_chan *dma_request_chan(struct device *dev, const char *name,
->> 				  const dma_cap_mask_t *mask);
->> To request a slave channel. The mask parameter is optional and it is used
->> to check if the received channel's capabilities can satisfy the requested
->> mask. The dma_request_chan() will try to find the channel via DT, ACPI or
->> in case if the kernel booted in non DT/ACPI mode it will use a filter
->> lookup table and retrieves the RESOURCE_DMA from the requester's device.
->> This legacy mode needs changes in platform code, in dmaengine drivers and
->> finally the dmaengine user drivers can be converted:
+On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> I think we should not introduce the mask parameter at all. In the rare
-> case that we actually need to pass a mask other than DMA_SLAVE today,
-> we should be able to encode that in the data we pass to the filter
-> function.
-
-I have seen that drivers check the capabilities themselves after getting the
-channel, so I thought that if we move that also to the core we can save on
-duplicated lines around the kernel. It is not needed to get the channel. As
-you can see in the mmc patch, I pass NULL and the channel I got is the correct
-one.
-Sure, I can remove it.
-
->> RESOURCE_DMA needs to be added to the platform devices with names
->>
->> For each dmaengine driver a string array listing the devices handled by the
->> given DMA driver:
->>
->> static char *da8xx_edma0_devices[] = {
->> 	"davinci-mcasp.0",
->> 	"da830-mmc.0",
->> };
->>
->> This information is going to be needed by the dmaengine driver, so
->> modification to the platform_data is needed, and the driver map should be
->> added to the pdata of the DMA driver:
+> Create STAO table for Dom0. This table is used to tell Dom0 whether it
+> should ignore UART defined in SPCR table or the ACPI namespace names.
 > 
-> However, a lot of drivers definitely need to pass a data pointer for
-> each device. I see that you currently rely on the IORESOURCE_DMA
-> method that a couple of platforms use today, but I think it would
-> be backwards to do it that way for the platforms that require passing
-> more than an integer number today.
+> Look at below url for details:
+> http://wiki.xenproject.org/mediawiki/images/0/02/Status-override-table.pdf
 > 
-> Having a pointer as the filter function argument is intentional and I'd
-> prefer to change the platforms that currently use IORESOURCE_DMA (davinci,
-> pxa, omap1, blackfin, alchemy) to stop doing it instead, and return
-> IORESOURCE_DMA to its original meaning that was limited to ISAPNP style
-> devices not using the dmaengine API.
+> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  xen/arch/arm/domain_build.c | 43 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+> 
+> diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
+> index 4591955..fb3f150 100644
+> --- a/xen/arch/arm/domain_build.c
+> +++ b/xen/arch/arm/domain_build.c
+> @@ -1359,6 +1359,45 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
+>  #ifdef CONFIG_ACPI
+>  #define XEN_HYPERVISOR_ID 0x000058656E564D4D  /* "XenVMM" */
+>  
+> +static int acpi_create_stao(struct domain *d, struct membank tbl_add[])
+> +{
+> +    struct acpi_table_header *table = NULL;
+> +    struct acpi_table_stao *stao = NULL;
+> +    u64 table_size = sizeof(struct acpi_table_stao);
+> +    acpi_status status;
+> +    u8 *base_ptr;
+> +    u8 checksum;
+> +
+> +    status = acpi_get_table(ACPI_SIG_MADT, 0, &table);
 
-Something like this:
+This needs a comment: why are we trying to get the MADT table while this
+function is to create the STAO table?
 
-/* include/linux/dmaengine.h */
 
-struct dma_filter_map {
-	char *devname;
-	char *slave;
-	void *param;
-};
+> +    if ( ACPI_FAILURE(status) )
+> +    {
+> +        const char *msg = acpi_format_exception(status);
+> +
+> +        printk("Failed to get MADT table, %s\n", msg);
+> +        return -EINVAL;
+> +    }
+> +
+> +    base_ptr = d->arch.efi_acpi_table
+> +               + acpi_get_table_offset(tbl_add, TBL_STAO);
+> +    /* Copy header of one table, here use MADT */
 
-struct dma_filter {
-	dma_filter_fn filter_fn;
-	int mapcnt;
-	struct dma_filter_map *map;
-};
+Please move the comment above. This is just to copy the OEM fields, I
+guess?
 
-/* arch/arm/mach-davinci/devices-da8xx.c */
 
-static struct dma_filter_map da8xx_edma0_map[] = {
-	{
-		.devname = "davinci-mcasp.0",
-		.slave = "tx",
-		.param = (void*)DAVINCI_DA8XX_DMA_MCASP0_AXEVT,
-	},
-	{
-		.devname = "davinci-mcasp.0",
-		.slave = "rx",
-		.param = (void*)DAVINCI_DA8XX_DMA_MCASP0_AREVT,
-	},
-	{
-		.devname = "da830-mmc.0",
-		.slave = "tx",
-		.param = (void*)DA8XX_DMA_MMCSD0_TX,
-	},
-	{
-		.devname = "da830-mmc.0",
-		.slave = "rx",
-		.param = (void*)DA8XX_DMA_MMCSD0_RX,
-	},
-};
-
-I had this version first, but decided to go with a simpler one present in this
-RFC series.
-
--- 
-P?ter
+> +    ACPI_MEMCPY(base_ptr, table, sizeof(struct acpi_table_header));
+> +    stao = (struct acpi_table_stao *)base_ptr;
+> +
+> +    ACPI_MEMCPY(stao->header.signature, ACPI_SIG_STAO, 4);
+> +    stao->header.revision = 1;
+> +    stao->header.length = table_size;
+> +    stao->ignore_uart = 1;
+> +    checksum = acpi_tb_checksum(ACPI_CAST_PTR(u8, stao), table_size);
+> +    stao->header.checksum = stao->header.checksum - checksum;
+> +
+> +    tbl_add[TBL_STAO].start = d->arch.efi_acpi_gpa
+> +                              + acpi_get_table_offset(tbl_add, TBL_STAO);
+> +    tbl_add[TBL_STAO].size = table_size;
+> +
+> +    return 0;
+> +}
+> +
+>  static int acpi_create_madt(struct domain *d, struct membank tbl_add[])
+>  {
+>      struct acpi_table_header *table = NULL;
+> @@ -1561,6 +1600,10 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
+>      if ( rc != 0 )
+>          return rc;
+>  
+> +    rc = acpi_create_stao(d, tbl_add);
+> +    if ( rc != 0 )
+> +        return rc;
+> +
+>      return 0;
+>  }
+>  #else
+> -- 
+> 2.1.0
+> 
+> 
+> _______________________________________________
+> Xen-devel mailing list
+> Xen-devel at lists.xen.org
+> http://lists.xen.org/xen-devel
+> 
