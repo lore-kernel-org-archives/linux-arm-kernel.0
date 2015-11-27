@@ -1,93 +1,86 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 27 Nov 2015 11:34:24 +0100
-Subject: [PATCH v2] PCI: imx6: Fix reset-gpio to work with active low GPIO
-In-Reply-To: <1448618499-14990-1-git-send-email-ynezz@true.cz>
-References: <1448373334.3689.33.camel@pengutronix.de>
- <1448618499-14990-1-git-send-email-ynezz@true.cz>
-Message-ID: <1448620464.3689.94.camel@pengutronix.de>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 27 Nov 2015 11:37:20 +0100
+Subject: [linux-sunxi] Re: [PATCH v3 1/2] phy-sun4i-usb: Use of_match_node
+ to get model specific config data
+In-Reply-To: <20151127085332.GU32142@lukather>
+References: <1448470202-3628-1-git-send-email-hdegoede@redhat.com>
+ <CAGb2v64XL=bptxoCwiVkf8u-EfckpuASS3Foo=Q3i4a_6CaJYA@mail.gmail.com>
+ <5656F6F4.1040801@redhat.com> <20151127085332.GU32142@lukather>
+Message-ID: <56583260.1080106@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 27.11.2015, 11:01 +0100 schrieb Petr ?tetiar:
-> It's currently not possible to use reset-gpio on board where the GPIO is
-> active low as the code incorrectly assumes, that reset-gpio will be
-> always active high.
-> 
-> In my case the broken behavior was observed on Toradex Apalis SoM with
-> Ixora base board.
-> 
-> Signed-off-by: Petr ?tetiar <ynezz@true.cz>
-> ---
-> 
-> Changes since v1:
->  * reworked to use descriptor based GPIO interface
-> 
->  drivers/pci/host/pci-imx6.c |   20 ++++++--------------
->  1 file changed, 6 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index 22e8224..c0e121d 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
-> @@ -32,7 +32,7 @@
->  #define to_imx6_pcie(x)	container_of(x, struct imx6_pcie, pp)
->  
->  struct imx6_pcie {
-> -	int			reset_gpio;
-> +	struct gpio_desc	*reset_gpio;
->  	struct clk		*pcie_bus;
->  	struct clk		*pcie_phy;
->  	struct clk		*pcie;
-> @@ -287,10 +287,10 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
->  	usleep_range(200, 500);
->  
->  	/* Some boards don't have PCIe reset GPIO. */
-> -	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
-> -		gpio_set_value(imx6_pcie->reset_gpio, 0);
-> +	if (imx6_pcie->reset_gpio) {
-> +		gpiod_set_value(imx6_pcie->reset_gpio, 0);
+Hi,
 
-This now collides with a fix from Fabio that allows this function to
-sleep. So this should use gpiod_set_value_cansleep() and be rebased to
-pci/host-imx6, or if Bjorn prefers to pull this in quickly, replace
-Fabios commit.
+On 27-11-15 09:53, Maxime Ripard wrote:
+> On Thu, Nov 26, 2015 at 01:11:32PM +0100, Hans de Goede wrote:
+>>>> +enum sun4i_usb_phy_type {
+>>>> +       sun4i_a10_phy,
+>>>> +       sun8i_a33_phy,
+>>>> +};
+>>>> +
+>>>> +struct sun4i_usb_phy_cfg {
+>>>> +       int num_phys;
+>>>> +       u32 disc_thresh;
+>>>> +       enum sun4i_usb_phy_type type;
+>>>> +       bool dedicated_clocks;
+>>>> +};
+>>>> +
+>>>>   struct sun4i_usb_phy_data {
+>>>>          void __iomem *base;
+>>>> +       const struct sun4i_usb_phy_cfg *cfg;
+>>>>          struct mutex mutex;
+>>>> -       int num_phys;
+>>>> -       u32 disc_thresh;
+>>>> -       bool has_a33_phyctl;
+>>>>          struct sun4i_usb_phy {
+>>>>                  struct phy *phy;
+>>>>                  void __iomem *pmu;
+>>>> @@ -164,12 +174,15 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
+>>>>
+>>>>          mutex_lock(&phy_data->mutex);
+>>>>
+>>>> -       if (phy_data->has_a33_phyctl) {
+>>>> +       switch (phy_data->cfg->type) {
+>>>> +       case sun4i_a10_phy:
+>>>> +               phyctl = phy_data->base + REG_PHYCTL_A10;
+>>>
+>>> Any reason why this offset isn't incorporated into phy_data?
+>>
+>> You mean in phy_data->cfg I assume, the difference needed for
+>> the "sun4i_usb_phy_write" functionality are not just the phyctl
+>> register offset...
+>>
+>>>
+>>>> +               break;
+>>>> +       case sun8i_a33_phy:
+>>>>                  phyctl = phy_data->base + REG_PHYCTL_A33;
+>>>>                  /* A33 needs us to set phyctl to 0 explicitly */
+>>>>                  writel(0, phyctl);
+>>
+>> e.g. the A33 needs this extra write, and on the H3 we need to do
+>> similar bitbanging, but slightly different, see:
+>>
+>> https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/usb/host/sunxi_hci.c#L899
+>>
+>> Notice how it uses different addr and write register addresses
+>> their through the usb_phy_csr_add and usb_phy_csr_write helper
+>> functions as well as directly poking offset 0x20.
+>
+> Then it easy to support: one u8 for each register that changes, one
+> bool to tell if you need to clear the phyctl register or not, And you
+> don't have to duplicate the switch everywhere, and basically just
+> reimplement of_device_is_compatible without an actual compatible to
+> workaround the review ;)
+
+You clearly have not looked at the actual code I've linked to, the
+entire "algorithm" for sun4i_usb_phy_write is different on the H3.
+
+Moreover, this has nothing to do with this patch, the code coding the
+difference behavior for the a10 style phy and the a33 style phy is already
+there before this patch-set, and this is not something Kishon asked
+me to change.
 
 Regards,
-Lucas
 
->  		msleep(100);
-> -		gpio_set_value(imx6_pcie->reset_gpio, 1);
-> +		gpiod_set_value(imx6_pcie->reset_gpio, 1);
->  	}
->  	return 0;
->  
-> @@ -560,7 +560,6 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
->  {
->  	struct imx6_pcie *imx6_pcie;
->  	struct pcie_port *pp;
-> -	struct device_node *np = pdev->dev.of_node;
->  	struct resource *dbi_base;
->  	int ret;
->  
-> @@ -581,15 +580,8 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
->  		return PTR_ERR(pp->dbi_base);
->  
->  	/* Fetch GPIOs */
-> -	imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
-> -	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
-> -		ret = devm_gpio_request_one(&pdev->dev, imx6_pcie->reset_gpio,
-> -					    GPIOF_OUT_INIT_LOW, "PCIe reset");
-> -		if (ret) {
-> -			dev_err(&pdev->dev, "unable to get reset gpio\n");
-> -			return ret;
-> -		}
-> -	}
-> +	imx6_pcie->reset_gpio = devm_gpiod_get_optional(&pdev->dev, "reset",
-> +							GPIOD_OUT_LOW);
->  
->  	/* Fetch clocks */
->  	imx6_pcie->pcie_phy = devm_clk_get(&pdev->dev, "pcie_phy");
-
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Hans
