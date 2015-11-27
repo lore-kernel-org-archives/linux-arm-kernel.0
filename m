@@ -1,174 +1,90 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 Nov 2015 17:38:16 +0000
-Subject: [PATCH v7 3/3] arm64: Add do_softirq_own_stack() and enable
- irq_stacks
-In-Reply-To: <61333097-CD88-472C-8E59-A8FF0DBC1DC7@gmail.com>
-References: <1447698128-8490-1-git-send-email-james.morse@arm.com>
- <1447698128-8490-4-git-send-email-james.morse@arm.com>
- <8F6484A9-18B9-4A81-B58D-528D81BC196D@gmail.com>
- <20151127114715.GA25499@e104818-lin.cambridge.arm.com>
- <61333097-CD88-472C-8E59-A8FF0DBC1DC7@gmail.com>
-Message-ID: <20151127173810.GE25499@e104818-lin.cambridge.arm.com>
+Date: Fri, 27 Nov 2015 17:55:59 +0000
+Subject: [GIT PULL] arm64 fixes for 4.4-rc3
+Message-ID: <20151127175556.GA32029@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 28, 2015 at 12:37:31AM +0900, Jungseok Lee wrote:
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 9ac16a4..a12f015 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -70,6 +70,7 @@ config ARM64
->  	select HAVE_FUNCTION_GRAPH_TRACER
->  	select HAVE_GENERIC_DMA_COHERENT
->  	select HAVE_HW_BREAKPOINT if PERF_EVENTS
-> +	select HAVE_IRQ_EXIT_ON_IRQ_STACK
+Hi Linus,
 
-I'm not convinced about this. See below.
+Please pull the arm64 fixes below. Thanks.
 
->  	select HAVE_MEMBLOCK
->  	select HAVE_PATA_PLATFORM
->  	select HAVE_PERF_EVENTS
-> diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-> index 23eb450..d4cbae6 100644
-> --- a/arch/arm64/include/asm/irq.h
-> +++ b/arch/arm64/include/asm/irq.h
-> @@ -1,10 +1,26 @@
->  #ifndef __ASM_IRQ_H
->  #define __ASM_IRQ_H
->  
-> +#define IRQ_STACK_SIZE		16384
+The following changes since commit 1ec218373b8ebda821aec00bb156a9c94fad9cd4:
 
-8K should be enough.
+  Linux 4.4-rc2 (2015-11-22 16:45:59 -0800)
 
-> +
-> +#ifndef __ASSEMBLY__
-> +
->  #include <asm-generic/irq.h>
->  
-> +#define __ARCH_HAS_DO_SOFTIRQ
-> +
-> +struct irq_stack {
-> +	unsigned int count;
-> +	/*
-> +	 * The stack must be quad-word aligned according to '5.2.2 The stack'
-> +	 * of 'Procedure Call Standard for the ARM 64-bit Architecture'.
-> +	 */
-> +	char stack[IRQ_STACK_SIZE] __aligned(16);
-> +};
+are available in the git repository at:
 
-This looks fine.
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
 
-> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> index 25de8b2..f8b4df7 100644
-> --- a/arch/arm64/kernel/asm-offsets.c
-> +++ b/arch/arm64/kernel/asm-offsets.c
-> @@ -41,6 +41,8 @@ int main(void)
->    BLANK();
->    DEFINE(THREAD_CPU_CONTEXT,	offsetof(struct task_struct, thread.cpu_context));
->    BLANK();
-> +  DEFINE(IRQ_STACK,		offsetof(struct irq_stack, stack));
-> +  BLANK();
->    DEFINE(S_X0,			offsetof(struct pt_regs, regs[0]));
->    DEFINE(S_X1,			offsetof(struct pt_regs, regs[1]));
->    DEFINE(S_X2,			offsetof(struct pt_regs, regs[2]));
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index fc87373..bc01102 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -27,9 +27,12 @@
->  #include <asm/cpufeature.h>
->  #include <asm/errno.h>
->  #include <asm/esr.h>
-> +#include <asm/irq.h>
->  #include <asm/thread_info.h>
->  #include <asm/unistd.h>
->  
-> +#define IRQ_STACK_START_SP	(IRQ_STACK + IRQ_STACK_SIZE - 16)
-> +
->  /*
->   * Context tracking subsystem.  Used to instrument transitions
->   * between user and kernel mode.
-> @@ -175,6 +178,29 @@ alternative_endif
->  	mrs	\rd, sp_el0
->  	.endm
->  
-> +	.macro	irq_stack_entry
-> +	adr_l	x19, irq_stacks
-> +	mrs	x20, tpidr_el1
-> +	add	x20, x19, x20
-> +	mov	x19, sp
-> +	ldr	w23, [x20]
-> +	cbnz	w23, 1f				// check irq re-entrance
-> +	mov	x24, #IRQ_STACK_START_SP
-> +	add	x24, x20, x24			// x24 = top of irq stack
-> +	mov	sp, x24
-> +1:	add	w23, w23, #1
-> +	str	w23, [x20]
-> +	.endm
-> +
-> +	/*
-> +	 * x19, x20, w23 are preserved between irq_stack_{entry|exit}.
-> +	 */
-> +	.macro	irq_stack_exit
-> +	sub	w23, w23, #1
-> +	str	w23, [x20]
-> +	mov	sp, x19
-> +	.endm
+for you to fetch changes up to 66362c9afc1d4a806280b9e3646d2d0a26cf83e9:
 
-With your approach to select HAVE_IRQ_EXIT_ON_IRQ_STACK you need to
-always update the irq_count every time you enter or exit the IRQ. Since
-presumably softirqs are rarer than hardirqs, I suggest that you only
-increment/decrement irq_count via do_softirq_own_stack() and not select
-HAVE_IRQ_EXIT_ON_IRQ_STACK. The only downside is having to check whether
-SP is the IRQ stack (the irq_count) in this function before invoking
-__do_softirq() rather than calling __do_softirq() directly. But it
-doesn't look too bad.
+  arm64: efi: fix initcall return values (2015-11-26 18:15:54 +0000)
 
-> @@ -190,10 +216,11 @@ tsk	.req	x28		// current thread_info
->   * Interrupt handling.
->   */
->  	.macro	irq_handler
-> -	adrp	x1, handle_arch_irq
-> -	ldr	x1, [x1, #:lo12:handle_arch_irq]
-> +	ldr_l	x1, handle_arch_irq
->  	mov	x0, sp
-> +	irq_stack_entry
->  	blr	x1
-> +	irq_stack_exit
->  	.endm
->  
->  	.text
-> @@ -741,3 +768,25 @@ ENTRY(sys_rt_sigreturn_wrapper)
->  	mov	x0, sp
->  	b	sys_rt_sigreturn
->  ENDPROC(sys_rt_sigreturn_wrapper)
-> +
-> +/*
-> + * Softirq is handled on IRQ stack.
-> + */
-> +ENTRY(do_softirq_own_stack)
-> +	stp	x29, lr, [sp, #-96]!
-> +	stp	x19, x20, [sp, #16]
-> +	stp	x21, x22, [sp, #32]
-> +	stp	x23, x24, [sp, #48]
-> +	stp	x25, x26, [sp, #64]
-> +	stp	x27, x28, [sp, #80]
-> +	irq_stack_entry
-> +	bl	__do_softirq
-> +	irq_stack_exit
-> +	ldp	x19, x20, [sp, #16]
-> +	ldp	x21, x22, [sp, #32]
-> +	ldp	x23, x24, [sp, #48]
-> +	ldp	x25, x26, [sp, #64]
-> +	ldp	x27, x28, [sp, #80]
-> +	ldp	x29, lr, [sp], #96
-> +	ret
-> +ENDPROC(do_softirq_own_stack)
+----------------------------------------------------------------
+arm64 fixes:
 
-Since irq_stack_entry/exit shouldn't increment irq_count as I mentioned
-above, you can hand-code the stack switching (or maybe parametrise the
-irq_stack_* macros) to only use caller-saved registers and avoid too
-many stp/ldp, probably just one for fp/lr.
+- Build fix when !CONFIG_UID16 (the patch is touching generic files but
+  it only affects arm64 builds; submitted by Arnd Bergmann)
+
+- EFI fixes to deal with early_memremap() returning NULL and correctly
+  mapping run-time regions
+
+- Fix CPUID register extraction of unsigned fields (not to be
+  sign-extended)
+
+- ASID allocator fix to deal with long-running tasks over multiple
+  generation roll-overs
+
+- Revert support for marking page ranges as contiguous PTEs (it leads to
+  TLB conflicts and requires additional non-trivial kernel changes)
+
+- Proper early_alloc() failure check
+
+- Disable KASan for 48-bit VA and 16KB page configuration (the pgd is
+  larger than the KASan shadow memory)
+
+- Update the fault_info table (original descriptions based on early
+  engineering spec)
+
+----------------------------------------------------------------
+Andrey Ryabinin (1):
+      arm64: KASAN depends on !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+
+Ard Biesheuvel (2):
+      arm64: efi: deal with NULL return value of early_memremap()
+      arm64: efi: fix initcall return values
+
+Arnd Bergmann (1):
+      arm64: fix building without CONFIG_UID16
+
+Catalin Marinas (1):
+      Revert "arm64: Mark kernel page ranges contiguous"
+
+Mark Rutland (2):
+      arm64: mm: fix fault_info table xFSC decoding
+      arm64: efi: correctly map runtime regions
+
+Suzuki K. Poulose (4):
+      arm64: early_alloc: Fix check for allocation failure
+      arm64: cpufeature: Add helpers for extracting unsigned values
+      arm64: cpufeature: Track unsigned fields
+      arm64: debug: Treat the BRPs/WRPs as unsigned
+
+Will Deacon (1):
+      arm64: mm: keep reserved ASIDs in sync with mm after multiple rollovers
+
+ arch/arm64/Kconfig                     |  2 +-
+ arch/arm64/include/asm/cpufeature.h    | 22 +++++++++-
+ arch/arm64/include/asm/hw_breakpoint.h |  6 ++-
+ arch/arm64/kernel/cpufeature.c         | 37 +++++++++-------
+ arch/arm64/kernel/efi.c                | 33 +++++++++------
+ arch/arm64/mm/context.c                | 38 +++++++++++------
+ arch/arm64/mm/fault.c                  | 28 ++++++-------
+ arch/arm64/mm/mmu.c                    | 77 +++++++---------------------------
+ include/linux/syscalls.h               |  2 +-
+ include/linux/types.h                  |  2 +-
+ 10 files changed, 124 insertions(+), 123 deletions(-)
 
 -- 
 Catalin
