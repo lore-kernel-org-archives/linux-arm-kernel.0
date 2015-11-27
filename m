@@ -1,67 +1,38 @@
-From: jcmvbkbc@gmail.com (Max Filippov)
-Date: Fri, 27 Nov 2015 17:26:16 +0300
-Subject: [PATCH v2 1/5] printk/nmi: Generic solution for safe printk in NMI
-In-Reply-To: <1448622572-16900-2-git-send-email-pmladek@suse.com>
-References: <1448622572-16900-1-git-send-email-pmladek@suse.com>
- <1448622572-16900-2-git-send-email-pmladek@suse.com>
-Message-ID: <CAMo8BfJKrrCxhHFEgOrB+KgttjZOSKO1a=FMdEw=YcHa2KDCqw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Nov 2015 15:30:12 +0100
+Subject: [PATCH] logfs: clarify MTD dependency
+In-Reply-To: <20151127141406.GA29886@sepie.suse.cz>
+References: <9365895.IkncCfXjo6@wuerfel> <20151127141406.GA29886@sepie.suse.cz>
+Message-ID: <3269089.8XYbbcUOLH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Friday 27 November 2015 15:14:06 Michal Marek wrote:
+> 
+> Hi Arnd,
+> 
+> I hit this as well and was about to submit a slightly different fix. Can
+> you try the logfs portion of the below patch? Proper changelog is to be
+> done, but the gist of the patch is that IS_REACHABLE(CONFIG_FOO) 
+> evaluates to 1 if CONFIG_FOO=y or we are building a module and
+> CONFIG_FOO=m.
+> 
 
-On Fri, Nov 27, 2015 at 2:09 PM, Petr Mladek <pmladek@suse.com> wrote:
-> printk() takes some locks and could not be used a safe way in NMI
-> context.
->
-> The chance of a deadlock is real especially when printing
-> stacks from all CPUs. This particular problem has been addressed
-> on x86 by the commit a9edc8809328 ("x86/nmi: Perform a safe NMI stack
-> trace on all CPUs").
->
-> This patch reuses most of the code and makes it generic. It is
-> useful for all messages and architectures that support NMI.
->
-> The alternative printk_func is set when entering and is reseted when
-> leaving NMI context. It queues IRQ work to copy the messages into
-> the main ring buffer in a safe context.
->
-> __printk_nmi_flush() copies all available messages and reset
-> the buffer. Then we could use a simple cmpxchg operations to
-> get synchronized with writers. There is also used a spinlock
-> to get synchronized with other flushers.
->
-> We do not longer use seq_buf because it depends on external lock.
-> It would be hard to make all supported operations safe for
-> a lockless use. It would be confusing and error prone to
-> make only some operations safe.
->
-> The code is put into separate printk/nmi.c as suggested by
-> Steven Rostedt. It needs a per-CPU buffer and is compiled only
-> on architectures that call nmi_enter(). This is achieved by
-> the new HAVE_NMI Kconfig flag.
->
-> One exception is arm where the deferred printing is used for
-> printing backtraces even without NMI. For this purpose,
-> we define NEED_PRINTK_NMI Kconfig flag. The alternative
-> printk_func is explicitly set when IPI_CPU_BACKTRACE is
-> handled.
->
-> Another exception is Xtensa architecture that uses just a
-> fake NMI.
+I thought about doing it that way, and I'm sure that also worked.
+The possible behaviors are basically:
 
-It's called fake because it's actually maskable, but sometimes
-it is safe to use it as NMI (when there are no other IRQs at the
-same priority level and that level equals EXCM level). That
-condition is checked in arch/xtensa/include/asm/processor.h
-So 'fake' here is to avoid confusion with real NMI that exists
-on xtensa (and is not currently used in linux), otherwise code
-that runs in fake NMI must follow the NMI rules.
+a) before your original patch, building logfs with CONFIG_MTD=m would
+   silently leave out MTD support, which was rather confusing.
 
-To make xtensa compatible with your change we can add a
-choice whether fake NMI should be used to kconfig. It can
-then set HAVE_NMI accordingly. I'll post a patch for xtensa.
+b) with my patch, it becomes impossible to have logfs as the built-in
+   root file system on a block device while also using CONFIG_MTD=m,
+   and that may be slightly annoying
 
--- 
-Thanks.
--- Max
+c) your patch restores a), but makes it work in the case where both
+   logfs and mtd are loadable modules, which is an improvement but
+   may still confuse users.
+
+My preference is still version b) as I sent, but I don't really mind
+your version either.
+
+	Arnd
