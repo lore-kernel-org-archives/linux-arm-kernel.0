@@ -1,79 +1,166 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 27 Nov 2015 15:16:18 +0000
-Subject: [Xen-devel] [PATCH v3 62/62] xen/arm64: Add ACPI support
-In-Reply-To: <1447753261-7552-63-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-63-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <alpine.DEB.2.02.1511271515480.8984@kaball.uk.xensource.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 27 Nov 2015 15:33:09 +0000
+Subject: [PATCH v10] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+ PCIe Host Controller
+In-Reply-To: <1448636523-20503-1-git-send-email-bharatku@xilinx.com>
+References: <1448636523-20503-1-git-send-email-bharatku@xilinx.com>
+Message-ID: <565877B5.9060503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> From: Naresh Bhat <naresh.bhat@linaro.org>
+On 27/11/15 15:02, Bharat Kumar Gogada wrote:
+> Adding PCIe Root Port driver for Xilinx PCIe NWL bridge IP.
 > 
-> Add ACPI support on arm64 xen hypervisor. Enable EFI support on ARM.
-> 
-> Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 > ---
->  config/arm64.mk              | 1 +
->  xen/common/efi/runtime.c     | 2 +-
->  xen/include/asm-arm/config.h | 5 +++++
->  3 files changed, 7 insertions(+), 1 deletion(-)
+> Changes for v10:
+> -> Changed MSI address to PCIe controller base.
+> -> Removed nwl_check_hwirq function, instead using bitmap_find_next_zero_area
+>    API to do the same.
+> ---
+>  .../devicetree/bindings/pci/xilinx-nwl-pcie.txt    |   68 ++
+>  drivers/pci/host/Kconfig                           |   10 +
+>  drivers/pci/host/Makefile                          |    1 +
+>  drivers/pci/host/pcie-xilinx-nwl.c                 | 1068 ++++++++++++++++++++
+>  4 files changed, 1147 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/xilinx-nwl-pcie.txt
+>  create mode 100644 drivers/pci/host/pcie-xilinx-nwl.c
 > 
-> diff --git a/config/arm64.mk b/config/arm64.mk
-> index c5deb4e..c6a040b 100644
-> --- a/config/arm64.mk
-> +++ b/config/arm64.mk
-> @@ -11,6 +11,7 @@ HAS_CADENCE_UART := y
->  HAS_NS16550 := y
->  HAS_MEM_ACCESS := y
->  HAS_GICV3 := y
-> +HAS_ACPI := y
->  
->  # Use only if calling $(LD) directly.
->  LDFLAGS_DIRECT += -EL
-> diff --git a/xen/common/efi/runtime.c b/xen/common/efi/runtime.c
-> index ae87557..7748056 100644
-> --- a/xen/common/efi/runtime.c
-> +++ b/xen/common/efi/runtime.c
-> @@ -11,7 +11,7 @@ DEFINE_XEN_GUEST_HANDLE(CHAR16);
->  #ifndef COMPAT
->  
->  #ifdef CONFIG_ARM  /* Disabled until runtime services implemented */
-> -const bool_t efi_enabled = 0;
-> +const bool_t efi_enabled = 1;
+> diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
+> new file mode 100644
+> index 0000000..d070344
+> --- /dev/null
+> +++ b/drivers/pci/host/pcie-xilinx-nwl.c
 
-Don't we want to remove the comment at least?
-We should also document under docs/ what is the supported interface to
-access runtime services.
+[...]
 
-
->  #else
->  # include <asm/i387.h>
->  # include <asm/xstate.h>
-> diff --git a/xen/include/asm-arm/config.h b/xen/include/asm-arm/config.h
-> index 817c216..e87fd27 100644
-> --- a/xen/include/asm-arm/config.h
-> +++ b/xen/include/asm-arm/config.h
-> @@ -33,6 +33,11 @@
->  
->  #define CONFIG_ARM_L1_CACHE_SHIFT 7 /* XXX */
->  
-> +#if defined(CONFIG_ARM_64)
-> +#define CONFIG_ACPI 1
-> +#define CONFIG_ACPI_BOOT 1
-> +#endif
+> +#define MSI_ADDRESS				0xFD480000
 > +
->  #define CONFIG_SMP 1
->  
->  #define CONFIG_VIDEO 1
-> -- 
-> 2.1.0
-> 
-> 
-> _______________________________________________
-> Xen-devel mailing list
-> Xen-devel at lists.xen.org
-> http://lists.xen.org/xen-devel
-> 
+
+Really? Why do you bother having DT support then? You might as well
+hardcode everything, while you're at it.
+
+/me felling depressed now.
+
+> +struct nwl_msi {			/* MSI information */
+> +	struct irq_domain *msi_domain;
+> +	unsigned long *bitmap;
+> +	struct irq_domain *dev_domain;
+> +	struct mutex lock;		/* protect bitmap variable */
+> +	int irq_msi0;
+> +	int irq_msi1;
+> +};
+> +
+> +struct nwl_pcie {
+> +	struct device *dev;
+> +	void __iomem *breg_base;
+> +	void __iomem *pcireg_base;
+> +	void __iomem *ecam_base;
+> +	u32 phys_breg_base;		/* Physical Bridge Register Base */
+> +	u32 phys_pcie_reg_base;		/* Physical PCIe Controller Base */
+> +	u32 phys_ecam_base;		/* Physical Configuration Base */
+
+All these u32 should be phys_addr_t. Not all the world is 32bit,
+fortunately.
+
+> +	u32 breg_size;
+> +	u32 pcie_reg_size;
+> +	u32 ecam_size;
+> +	int irq_intx;
+> +	int irq_misc;
+> +	u32 ecam_value;
+> +	u8 last_busno;
+> +	u8 root_busno;
+> +	u8 link_up;
+> +	struct nwl_msi msi;
+> +	struct irq_domain *legacy_irq_domain;
+> +};
+
+[...]
+
+> +static void nwl_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
+> +{
+> +	phys_addr_t msi_addr = MSI_ADDRESS;
+
+Fix this.
+
+> +
+> +	msg->address_lo = lower_32_bits(msi_addr);
+> +	msg->address_hi = upper_32_bits(msi_addr);
+> +	msg->data = data->hwirq;
+> +}
+
+[...]
+
+> +static int nwl_pcie_bridge_init(struct nwl_pcie *pcie)
+> +{
+> +	struct platform_device *pdev = to_platform_device(pcie->dev);
+> +	u32 breg_val, ecam_val, first_busno = 0;
+> +	int err;
+> +	int check_link_up = 0;
+> +
+> +	/* Check for BREG present bit */
+> +	breg_val = nwl_bridge_readl(pcie, E_BREG_CAPABILITIES) & BREG_PRESENT;
+> +	if (!breg_val) {
+> +		dev_err(pcie->dev, "BREG is not present\n");
+> +		return breg_val;
+> +	}
+> +	/* Write bridge_off to breg base */
+> +	nwl_bridge_writel(pcie, (u32)(pcie->phys_breg_base),
+> +			  E_BREG_BASE_LO);
+> +
+
+I love the casting of a u32 to a u32. You have to program E_BREG_BASE_HI
+as well, once you've fixed the data type.
+
+> +	/* Enable BREG */
+> +	nwl_bridge_writel(pcie, ~BREG_ENABLE_FORCE & BREG_ENABLE,
+> +			  E_BREG_CONTROL);
+> +
+> +	/* Disable DMA channel registers */
+> +	nwl_bridge_writel(pcie, nwl_bridge_readl(pcie, BRCFG_PCIE_RX0) |
+> +			  CFG_DMA_REG_BAR, BRCFG_PCIE_RX0);
+> +
+> +	/* Enable the bridge config interrupt */
+> +	nwl_bridge_writel(pcie, nwl_bridge_readl(pcie, BRCFG_INTERRUPT) |
+> +			  BRCFG_INTERRUPT_MASK, BRCFG_INTERRUPT);
+> +	/* Enable Ingress subtractive decode translation */
+> +	nwl_bridge_writel(pcie, SET_ISUB_CONTROL, I_ISUB_CONTROL);
+> +
+> +	/* Enable msg filtering details */
+> +	nwl_bridge_writel(pcie, CFG_ENABLE_MSG_FILTER_MASK,
+> +			  BRCFG_PCIE_RX_MSG_FILTER);
+> +	do {
+> +		err = nwl_pcie_link_up(pcie, PHY_RDY_LINKUP);
+> +		if (err != 1) {
+> +			check_link_up++;
+> +			if (check_link_up > LINKUP_ITER_CHECK)
+> +				return -ENODEV;
+> +			mdelay(1000);
+> +		}
+> +	} while (!err);
+> +
+> +	/* Check for ECAM present bit */
+> +	ecam_val = nwl_bridge_readl(pcie, E_ECAM_CAPABILITIES) & E_ECAM_PRESENT;
+> +	if (!ecam_val) {
+> +		dev_err(pcie->dev, "ECAM is not present\n");
+> +		return ecam_val;
+> +	}
+> +
+> +	/* Enable ECAM */
+> +	nwl_bridge_writel(pcie, nwl_bridge_readl(pcie, E_ECAM_CONTROL) |
+> +			  E_ECAM_CR_ENABLE, E_ECAM_CONTROL);
+> +	/* Write ecam_value on ecam_control */
+> +	nwl_bridge_writel(pcie, nwl_bridge_readl(pcie, E_ECAM_CONTROL) |
+> +			  (pcie->ecam_value << E_ECAM_SIZE_SHIFT),
+> +			  E_ECAM_CONTROL);
+> +	/* Write phy_reg_base to ecam base */
+> +	nwl_bridge_writel(pcie, (u32)pcie->phys_ecam_base, E_ECAM_BASE_LO);
+
+Same here.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
