@@ -1,64 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 27 Nov 2015 10:55:35 +0900
-Subject: [PATCH 18/18] arm64: renesas: salvator-x: Sound DVC support
-In-Reply-To: <cover.1448587800.git.horms+renesas@verge.net.au>
-References: <cover.1448587800.git.horms+renesas@verge.net.au>
-Message-ID: <672b79312c04016481a11d4b996b4512207ffbd3.1448587800.git.horms+renesas@verge.net.au>
+Date: Fri, 27 Nov 2015 10:55:47 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Cleanup for v4.5
+Message-ID: <cover.1448585673.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 27 ++++++++++++++++++++--
- 1 file changed, 25 insertions(+), 2 deletions(-)
+Please consider these Renesas ARM based SoC cleanup for v4.5.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index 47bf252774d7..c5f709e7c0ba 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -8,6 +8,29 @@
-  * kind, whether express or implied.
-  */
- 
-+/*
-+ * SSI-AK4613
-+ *
-+ * This command is required when Playback/Capture
-+ *
-+ *	amixer set "DVC Out" 100%
-+ *	amixer set "DVC In" 100%
-+ *
-+ * You can use Mute
-+ *
-+ *	amixer set "DVC Out Mute" on
-+ *	amixer set "DVC In Mute" on
-+ *
-+ * You can use Volume Ramp
-+ *
-+ *	amixer set "DVC Out Ramp Up Rate"   "0.125 dB/64 steps"
-+ *	amixer set "DVC Out Ramp Down Rate" "0.125 dB/512 steps"
-+ *	amixer set "DVC Out Ramp" on
-+ *	aplay xxx.wav &
-+ *	amixer set "DVC Out"  80%  // Volume Down
-+ *	amixer set "DVC Out" 100%  // Volume Up
-+ */
-+
- /dts-v1/;
- #include "r8a7795.dtsi"
- 
-@@ -136,8 +159,8 @@
- 
- 	rcar_sound,dai {
- 		dai0 {
--			playback = <&ssi0 &src0>;
--			capture  = <&ssi1 &src1>;
-+			playback = <&ssi0 &src0 &dvc0>;
-+			capture  = <&ssi1 &src1 &dvc1>;
- 		};
- 	};
- };
--- 
-2.1.4
+This pull request includes some minor cleanups and
+introduces ARCH_RENESAS as a firs step to migrating away
+from ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI.
+
+
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-for-v4.5
+
+for you to fetch changes up to c8cd74a1468ffe20db3ddc6e6f408d5377f9be43:
+
+  ARM: shmobile: Remove legacy mach/irqs.h (2015-11-19 16:28:01 -0800)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Cleanup for v4.5
+
+* Remove now unnecessary header
+* Introduce ARCH_RENESAS
+* Remove unmaintened URL from MAINTAINERS
+
+----------------------------------------------------------------
+Laurent Pinchart (1):
+      ARM: shmobile: Remove legacy mach/irqs.h
+
+Simon Horman (2):
+      MAINTAINERS: Remove link to oss.renesas.com which is closed
+      ARM: shmobile: Introduce ARCH_RENESAS
+
+ MAINTAINERS                                |  1 -
+ arch/arm/configs/multi_v7_defconfig        |  2 +-
+ arch/arm/configs/shmobile_defconfig        |  2 +-
+ arch/arm/mach-shmobile/Kconfig             | 10 +++++++---
+ arch/arm/mach-shmobile/include/mach/irqs.h | 10 ----------
+ arch/arm/mach-shmobile/irqs.h              | 15 ---------------
+ arch/arm/mach-shmobile/setup-r8a7778.c     |  1 -
+ 7 files changed, 9 insertions(+), 32 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/include/mach/irqs.h
+ delete mode 100644 arch/arm/mach-shmobile/irqs.h
