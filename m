@@ -1,34 +1,57 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 27 Nov 2015 10:55:55 +0900
-Subject: [PATCH 12/15] ARM: shmobile: alt: Correct scif2 pfc
+Date: Fri, 27 Nov 2015 10:55:57 +0900
+Subject: [PATCH 14/15] ARM: shmobile: r8a7740 dtsi: Add L2 cache-controller
+ node
 In-Reply-To: <cover.1448586938.git.horms+renesas@verge.net.au>
 References: <cover.1448586938.git.horms+renesas@verge.net.au>
-Message-ID: <7256587cf15e349b7241e4cc70e4132976765e1f.1448586938.git.horms+renesas@verge.net.au>
+Message-ID: <374e70075e58acfe922869aad1202b29f8fb76f5.1448586938.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-22b160713cb6 ("ARM: shmobile: alt: Add pfc pins to DT") introduced pfc pins
-to the alt device tree but did not reference them. This patch fixes scif2
-pfc by adding references to the scif2 pins.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Add the missing L2 cache-controller node, and link the CPU node to it.
+This will allow migration to the generic l2c OF initialization.
+
+The L2 cache is an ARM L2C-310 (r3p1-150rel0), of size 256 KiB (32 KiB x
+8 ways).
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794-alt.dts | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/r8a7740.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
-index b255a8791841..c8cafc1d55c3 100644
---- a/arch/arm/boot/dts/r8a7794-alt.dts
-+++ b/arch/arm/boot/dts/r8a7794-alt.dts
-@@ -189,5 +189,8 @@
- };
+diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+index e14cb1438216..7676646f7085 100644
+--- a/arch/arm/boot/dts/r8a7740.dtsi
++++ b/arch/arm/boot/dts/r8a7740.dtsi
+@@ -26,6 +26,7 @@
+ 			reg = <0x0>;
+ 			clock-frequency = <800000000>;
+ 			power-domains = <&pd_a3sm>;
++			next-level-cache = <&L2>;
+ 		};
+ 	};
  
- &scif2 {
-+	pinctrl-0 = <&scif2_pins>;
-+	pinctrl-names = "default";
+@@ -37,6 +38,18 @@
+ 		      <0xc2000000 0x1000>;
+ 	};
+ 
++	L2: cache-controller {
++		compatible = "arm,pl310-cache";
++		reg = <0xf0100000 0x1000>;
++		interrupts = <0 84 IRQ_TYPE_LEVEL_HIGH>;
++		power-domains = <&pd_a3sm>;
++		arm,data-latency = <3 3 3>;
++		arm,tag-latency = <2 2 2>;
++		arm,shared-override;
++		cache-unified;
++		cache-level = <2>;
++	};
 +
- 	status = "okay";
- };
+ 	dbsc3: memory-controller at fe400000 {
+ 		compatible = "renesas,dbsc3-r8a7740";
+ 		reg = <0xfe400000 0x400>;
 -- 
 2.1.4
