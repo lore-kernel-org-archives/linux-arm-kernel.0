@@ -1,28 +1,23 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Fri, 27 Nov 2015 21:55:31 -0800
-Subject: [PATCH 0/5] ATAGs to DT patches
-In-Reply-To: <5659282F.8020104@gmail.com>
-References: <1436214373-12969-1-git-send-email-pali.rohar@gmail.com>
- <5659282F.8020104@gmail.com>
-Message-ID: <565941D3.3080405@gmail.com>
+From: yankejian@huawei.com (yankejian)
+Date: Sat, 28 Nov 2015 14:15:13 +0800
+Subject: [PATCH net-next 0/3] dts: hisi: fixes can't find eth for hip05-D02
+Message-ID: <1448691316-236111-1-git-send-email-yankejian@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2015 8:06 PM, Frank Rowand wrote:
-> On 7/6/2015 1:26 PM, Pali Roh?r wrote:
->> This patch series converts some legacy ATAGs into DT and provide them to
->> userspace. It is needed for userspace applications which needs some
->> informations from legacy bootloaders which are not DT compatible.
->>
->> Patch series is for now without DT documentation files. It was tested in
->> QEMU for Nokia N900. File /proc/cpuinfo contains correct "Revision" line
->> from ATAG_REVISION and /proc/atags contains full ATAGs structure.
-> 
-> Pali,
-> 
-> Is this needed just for the N900, or are there other devices that need it?
-> If so, which devices?
+this patchset fixes the bug that eth can't initial successful. because the
+the dts files doesn't match the source code.
 
-Nevermind...  I've re-read the earlier threads.
+yankejian (3):
+  dts: hisi: enables the ethX for D02 board
+  dts: hisi: fixes no syscon error when init mdio
+  arm64: hip05-d02: Document devicetree bindings for Hisilicon D02 Board
 
--Frank
+ .../devicetree/bindings/arm/hisilicon/hisilicon.txt      | 16 ++++++++++++++++
+ arch/arm64/boot/dts/hisilicon/hip05-d02.dts              | 16 ++++++++++++++++
+ arch/arm64/boot/dts/hisilicon/hip05.dtsi                 |  4 ++++
+ arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi             |  4 ++--
+ 4 files changed, 38 insertions(+), 2 deletions(-)
+
+-- 
+1.9.1
