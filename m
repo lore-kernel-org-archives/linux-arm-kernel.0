@@ -1,40 +1,24 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 28 Nov 2015 18:00:36 +0100
-Subject: [PATCH 2/4] ARM: dt: mvebu: ix4-300d: move partitions to
- partition sub-node
-In-Reply-To: <1448709248-21177-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Sat, 28 Nov 2015 18:01:55 +0100
+Subject: [PATCH 3/4] ARM: dt: mvebu: ix4-300d: Cleanup NAND partition
+ ranges
+In-Reply-To: <1448709248-21177-4-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1448709248-21177-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1448709248-21177-3-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20151128170036.GH32356@lunn.ch>
+ <1448709248-21177-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20151128170155.GI32356@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 28, 2015 at 12:14:06PM +0100, Sebastian Hesselbarth wrote:
-> NAND flash partitions should be part of a partitions sub-node
-> not the flash node itself. Move the partitions which will also
-> allow different bootloaders get rid of the stock partitions
-> easily by removing the partitions node.
+On Sat, Nov 28, 2015 at 12:14:07PM +0100, Sebastian Hesselbarth wrote:
+> Prefix all partition reg properties to 32-bit to ease readability.
+> While at it, also remove a stale x in front of boot partition
+> offset and make some upper-case hex numbers lower-case.
 > 
 > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-
-Humm, did not know that. Quoting Documentation/devicetree/bindings/mtd/partition.txt:
-
-      The partition table should be a subnode of the mtd node and
-      should be named 'partitions'. Partitions are defined in subnodes
-      of the partitions node.
-
-      For backwards compatibility partitions as direct subnodes of the
-      mtd device are supported. This use is discouraged.
-
-It also looks like none of the other MVEBU maintainers know that
-either, since a quick look at the .dts files shows very few have a
-partitions node.
-
 Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-Thanks
-	Andrew
+	  Andrew
 
 > ---
 > Cc: Jason Cooper <jason@lakedaemon.net> 
@@ -51,87 +35,56 @@ Thanks
 > Cc: devicetree at vger.kernel.org 
 > Cc: linux-kernel at vger.kernel.org 
 > ---
->  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 67 +++++++++++++------------
->  1 file changed, 36 insertions(+), 31 deletions(-)
+>  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
 > 
 > diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-> index 30a0a6eac645..76781fd18624 100644
+> index 76781fd18624..13cf69a8d0fb 100644
 > --- a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
 > +++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-> @@ -151,37 +151,42 @@
->  				marvell,nand-enable-arbiter;
->  				nand-on-flash-bbt;
+> @@ -157,35 +157,35 @@
 >  
-> -				partition at 0 {
-> -					label = "u-boot";
-> -					reg = <0x0000000 0xe0000>;
-> -					read-only;
-> -				};
-> -
-> -				partition at e0000 {
-> -					label = "u-boot-env";
-> -					reg = <0xe0000 0x20000>;
-> -					read-only;
-> -				};
-> -
-> -				partition at 100000 {
-> -					label = "u-boot-env2";
-> -					reg = <0x100000 0x20000>;
-> -					read-only;
-> -				};
-> -
-> -				partition at 120000 {
-> -					label = "zImage";
-> -					reg = <0x120000 0x400000>;
-> -				};
-> -
-> -				partition at 520000 {
-> -					label = "initrd";
-> -					reg = <0x520000 0x400000>;
-> -				};
-> -
-> -				partition at xE00000 {
-> -					label = "boot";
-> -					reg = <0xE00000 0x3F200000>;
-> +				partitions {
-> +					#address-cells = <1>;
-> +					#size-cells = <1>;
-> +
-> +					partition at 0 {
-> +						label = "u-boot";
-> +						reg = <0x0000000 0xe0000>;
-> +						read-only;
-> +					};
-> +
-> +					partition at e0000 {
-> +						label = "u-boot-env";
-> +						reg = <0xe0000 0x20000>;
-> +						read-only;
-> +					};
-> +
-> +					partition at 100000 {
-> +						label = "u-boot-env2";
-> +						reg = <0x100000 0x20000>;
-> +						read-only;
-> +					};
-> +
-> +					partition at 120000 {
-> +						label = "zImage";
-> +						reg = <0x120000 0x400000>;
-> +					};
-> +
-> +					partition at 520000 {
-> +						label = "initrd";
-> +						reg = <0x520000 0x400000>;
-> +					};
-> +
-> +					partition at xE00000 {
-> +						label = "boot";
-> +						reg = <0xE00000 0x3F200000>;
-> +					};
+>  					partition at 0 {
+>  						label = "u-boot";
+> -						reg = <0x0000000 0xe0000>;
+> +						reg = <0x00000000 0x000e0000>;
+>  						read-only;
+>  					};
+>  
+>  					partition at e0000 {
+>  						label = "u-boot-env";
+> -						reg = <0xe0000 0x20000>;
+> +						reg = <0x000e0000 0x00020000>;
+>  						read-only;
+>  					};
+>  
+>  					partition at 100000 {
+>  						label = "u-boot-env2";
+> -						reg = <0x100000 0x20000>;
+> +						reg = <0x00100000 0x00020000>;
+>  						read-only;
+>  					};
+>  
+>  					partition at 120000 {
+>  						label = "zImage";
+> -						reg = <0x120000 0x400000>;
+> +						reg = <0x00120000 0x00400000>;
+>  					};
+>  
+>  					partition at 520000 {
+>  						label = "initrd";
+> -						reg = <0x520000 0x400000>;
+> +						reg = <0x00520000 0x00400000>;
+>  					};
+>  
+> -					partition at xE00000 {
+> +					partition at e00000 {
+>  						label = "boot";
+> -						reg = <0xE00000 0x3F200000>;
+> +						reg = <0x00e00000 0x3f200000>;
+>  					};
 >  				};
 >  			};
->  		};
 > -- 
 > 2.1.4
 > 
