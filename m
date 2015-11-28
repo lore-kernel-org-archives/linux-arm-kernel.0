@@ -1,94 +1,121 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 28 Nov 2015 10:35:55 +0100
-Subject: [PATCH 1/3] dt-bindings: add Marvell core PLL and clock divider
- PMU documentation
-In-Reply-To: <20151127203932.GP8644@n2100.arm.linux.org.uk>
-References: <E1a24wj-0004iw-Rf@rmk-PC.arm.linux.org.uk>
- <20151127202114.GA613@rob-hp-laptop>
- <20151127203932.GP8644@n2100.arm.linux.org.uk>
-Message-ID: <5659757B.7060904@gmail.com>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Sat, 28 Nov 2015 09:56:36 +0000
+Subject: [PATCH v10] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+ PCIe Host Controller
+In-Reply-To: <565877B5.9060503@arm.com>
+References: <1448636523-20503-1-git-send-email-bharatku@xilinx.com>
+ <565877B5.9060503@arm.com>
+Message-ID: <8520D5D51A55D047800579B09414719825866D65@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.11.2015 21:39, Russell King - ARM Linux wrote:
-> On Fri, Nov 27, 2015 at 02:21:14PM -0600, Rob Herring wrote:
->> On Thu, Nov 26, 2015 at 10:23:21PM +0000, Russell King wrote:
->>> Add documentation for the Marvell clock divider driver, which is used
->>> to source clocks for the AXI bus, video decoder, GPU and LCD blocks.
->>>
->>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->>> ---
->>>  .../bindings/clock/dove-divider-clock.txt          | 28 ++++++++++++++++++++++
->>>  1 file changed, 28 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/clock/dove-divider-clock.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/clock/dove-divider-clock.txt b/Documentation/devicetree/bindings/clock/dove-divider-clock.txt
->>> new file mode 100644
->>> index 000000000000..0c602de279e5
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/clock/dove-divider-clock.txt
->>> @@ -0,0 +1,28 @@
->>> +PLl divider based Dove clocks
->>> +
->>> +Marvell Dove has a 2GHz PLL, which feeds into a set of dividers to provide
->>> +high speed clocks for a number of peripherals.  These dividers are part of
->>> +the PMU, and thus this node should be a child of the PMU node.
->>
->> It seems a bit strange to just be documenting these clocks. What about 
->> the rest of the SOC clocks?
+> Subject: Re: [PATCH v10] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+> PCIe Host Controller
 > 
-> This is all that this pair of registers provide.
+> On 27/11/15 15:02, Bharat Kumar Gogada wrote:
+> > Adding PCIe Root Port driver for Xilinx PCIe NWL bridge IP.
+> >
+> > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> > Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > ---
+> > Changes for v10:
+> > -> Changed MSI address to PCIe controller base.
+> > -> Removed nwl_check_hwirq function, instead using
+> > -> bitmap_find_next_zero_area
+> >    API to do the same.
+> > ---
+> >  .../devicetree/bindings/pci/xilinx-nwl-pcie.txt    |   68 ++
+> >  drivers/pci/host/Kconfig                           |   10 +
+> >  drivers/pci/host/Makefile                          |    1 +
+> >  drivers/pci/host/pcie-xilinx-nwl.c                 | 1068 ++++++++++++++++++++
+> >  4 files changed, 1147 insertions(+)
+> >  create mode 100644
+> > Documentation/devicetree/bindings/pci/xilinx-nwl-pcie.txt
+> >  create mode 100644 drivers/pci/host/pcie-xilinx-nwl.c
+> >
+> > diff --git a/drivers/pci/host/pcie-xilinx-nwl.c
+> > b/drivers/pci/host/pcie-xilinx-nwl.c
+> > new file mode 100644
+> > index 0000000..d070344
+> > --- /dev/null
+> > +++ b/drivers/pci/host/pcie-xilinx-nwl.c
 > 
-> The SoC has other clocks handled by other DT nodes - for Dove, we now
-> have:
+> [...]
 > 
->         gate_clk: clock-gating-ctrl at 0038 {
->                 compatible = "marvell,dove-gating-clock";
->                 reg = <0x0038 0x4>;
->                 clocks = <&core_clk 0>;
->                 #clock-cells = <1>;
->         };
->         divider_clk: core-clock at 0064 {
->                 compatible = "marvell,dove-divider-clock";
->                 reg = <0x0064 0x8>;
->                 #clock-cells = <1>;
->         };
->         core_clk: core-clocks at 0214 {
->                 compatible = "marvell,dove-core-clock";
->                 reg = <0x0214 0x4>;
->                 #clock-cells = <1>;
->         };
+> > +#define MSI_ADDRESS				0xFD480000
+> > +
 > 
-> and all three of these are part of the PMU register block.  I'm not sure
-> why the mvebu maintainers decided to minutely describe the PMU like this,
-> but unfortunately that's the structure we have.
+> Really? Why do you bother having DT support then? You might as well
+> hardcode everything, while you're at it.
 > 
-> What's more silly is that the "dove-core-clock" appears to disagree in
-> terminology with the manual - there's a "Core PLL" which supplies the
-> dividers in the "divider_clk" block, and is entirely separate from the
-> CPU PLL which "core_clk" is describing.
+> /me felling depressed now.
+Agreed, I'm already having this parameter in nwl_pcie structure, will use it. 
 > 
-> IMHO, it would've been cleaner to have these components registered
-> separately from a central PMU driver (as I'm doing with the power
-> domains, resets and IRQs that are part of the PMU), but my view is
-> limited to Dove and not the other mvebu clocks, so there may be a good
-> reason for it.
+> > +struct nwl_msi {			/* MSI information */
+> > +	struct irq_domain *msi_domain;
+> > +	unsigned long *bitmap;
+> > +	struct irq_domain *dev_domain;
+> > +	struct mutex lock;		/* protect bitmap variable */
+> > +	int irq_msi0;
+> > +	int irq_msi1;
+> > +};
+> > +
+> > +struct nwl_pcie {
+> > +	struct device *dev;
+> > +	void __iomem *breg_base;
+> > +	void __iomem *pcireg_base;
+> > +	void __iomem *ecam_base;
+> > +	u32 phys_breg_base;		/* Physical Bridge Register Base */
+> > +	u32 phys_pcie_reg_base;		/* Physical PCIe Controller
+> Base */
+> > +	u32 phys_ecam_base;		/* Physical Configuration Base */
 > 
+> All these u32 should be phys_addr_t. Not all the world is 32bit, fortunately.
+Agreed will address it next patch.
+> 
+> > +	u32 breg_size;
+> [...]
+> 
+> 
+> > +static int nwl_pcie_bridge_init(struct nwl_pcie *pcie) {
+> > +	struct platform_device *pdev = to_platform_device(pcie->dev);
+> > +	u32 breg_val, ecam_val, first_busno = 0;
+> > +	int err;
+> > +	int check_link_up = 0;
+> > +
+> > +	/* Check for BREG present bit */
+> > +	breg_val = nwl_bridge_readl(pcie, E_BREG_CAPABILITIES) &
+> BREG_PRESENT;
+> > +	if (!breg_val) {
+> > +		dev_err(pcie->dev, "BREG is not present\n");
+> > +		return breg_val;
+> > +	}
+> > +	/* Write bridge_off to breg base */
+> > +	nwl_bridge_writel(pcie, (u32)(pcie->phys_breg_base),
+> > +			  E_BREG_BASE_LO);
+> > +
+> 
+> I love the casting of a u32 to a u32. You have to program E_BREG_BASE_HI as
+> well, once you've fixed the data type.
+> Agreed, will address this in next patch.
+> > +	/* Enable BREG */
+> > +	nwl_bridge_writel(pcie, ~BREG_ENABLE_FORCE & BREG_ENABLE,
+> > +			  E_BREG_CONTROL);
+> > +	/* Check for ECAM present bit */
+> > +	ecam_val = nwl_bridge_readl(pcie, E_ECAM_CAPABILITIES) &
+> E_ECAM_PRESENT;
+> > +	if (!ecam_val) {
+> > +		dev_err(pcie->dev, "ECAM is not present\n");
+> > +		return ecam_val;
+> > +	}
+> |
+> > +	/* Write phy_reg_base to ecam base */
+> > +	nwl_bridge_writel(pcie, (u32)pcie->phys_ecam_base,
+> E_ECAM_BASE_LO);
+> 
+> Same here.
+> Agreed, will address this in next patch.
 
-Rob, Russell,
-
-the main reason why dove clocks are the way they are is that back
-when we thought of the bindings for mvebu SoC clocks, CCF and DT was
-in its very beginning. Looking back, some decisions shouldn't have
-been made that way. Also, we tried to describe Dove and the other SoCs
-similarily, but Dove is always a little odd.
-
->From todays point of view, I certainly agree with Russell that all
-PMU related stuff is best kept in a single PMU node.
-
-Thanks for providing the patches, I appreciate the extra work of
-separating those from your working trees.
-
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-
-Sebastian
+Regards,
+Bharat
