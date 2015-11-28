@@ -1,208 +1,292 @@
 From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Sat, 28 Nov 2015 18:38:57 +0800
-Subject: [PATCH v2 02/10] drm/hisilicon: Add DT binding docs for hi6220
- display subsystem
+Date: Sat, 28 Nov 2015 18:38:58 +0800
+Subject: [PATCH v2 03/10] drm/hisilicon: Add hisilicon DRM master driver
 In-Reply-To: <1448707145-69348-1-git-send-email-xinliang.liu@linaro.org>
 References: <1448707145-69348-1-git-send-email-xinliang.liu@linaro.org>
-Message-ID: <1448707145-69348-3-git-send-email-xinliang.liu@linaro.org>
+Message-ID: <1448707145-69348-4-git-send-email-xinliang.liu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the device tree binding documentation for hi6220 SoC display subsystem.
-drm master device binding doc.
-ADE display controller binding doc.
-DSI controller binding doc.
+Add DRM master driver for hi6220 SoC which used in HiKey board.
+Add dumb buffer feature.
+Add prime dmabuf feature.
 
 Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
 Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
 Signed-off-by: Andy Green <andy.green@linaro.org>
 ---
- .../bindings/display/hisilicon/hisi-ade.txt        | 42 ++++++++++++++
- .../bindings/display/hisilicon/hisi-drm.txt        | 66 ++++++++++++++++++++++
- .../bindings/display/hisilicon/hisi-dsi.txt        | 53 +++++++++++++++++
- 3 files changed, 161 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
- create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-drm.txt
- create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-dsi.txt
+ drivers/gpu/drm/Kconfig                  |   2 +
+ drivers/gpu/drm/Makefile                 |   1 +
+ drivers/gpu/drm/hisilicon/Kconfig        |   9 ++
+ drivers/gpu/drm/hisilicon/Makefile       |   3 +
+ drivers/gpu/drm/hisilicon/hisi_drm_drv.c | 214 +++++++++++++++++++++++++++++++
+ 5 files changed, 229 insertions(+)
+ create mode 100644 drivers/gpu/drm/hisilicon/Kconfig
+ create mode 100644 drivers/gpu/drm/hisilicon/Makefile
+ create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_drv.c
 
-diff --git a/Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt b/Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
+diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
+index 8773fad..038aae8 100644
+--- a/drivers/gpu/drm/Kconfig
++++ b/drivers/gpu/drm/Kconfig
+@@ -274,3 +274,5 @@ source "drivers/gpu/drm/amd/amdkfd/Kconfig"
+ source "drivers/gpu/drm/imx/Kconfig"
+ 
+ source "drivers/gpu/drm/vc4/Kconfig"
++
++source "drivers/gpu/drm/hisilicon/Kconfig"
+diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+index 1e9ff4c..e7efcb7 100644
+--- a/drivers/gpu/drm/Makefile
++++ b/drivers/gpu/drm/Makefile
+@@ -75,3 +75,4 @@ obj-y			+= i2c/
+ obj-y			+= panel/
+ obj-y			+= bridge/
+ obj-$(CONFIG_DRM_FSL_DCU) += fsl-dcu/
++obj-$(CONFIG_DRM_HISI) += hisilicon/
+diff --git a/drivers/gpu/drm/hisilicon/Kconfig b/drivers/gpu/drm/hisilicon/Kconfig
 new file mode 100644
-index 0000000..2777a2c
+index 0000000..70aa8d1
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
-@@ -0,0 +1,42 @@
-+Device-Tree bindings for hisilicon ADE display controller driver
-+
-+ADE (Advanced Display Engine) is the display controller which grab image
-+data from memory, do composition, do post image processing, generate RGB
-+timing stream and transfer to DSI.
-+
-+Required properties:
-+- compatible: value should be one of the following
-+	"hisilicon,hi6220-ade".
-+- reg: physical base address and length of the controller's registers.
-+- reg-names: name of physical base.
-+- interrupt: the interrupt number.
-+- clocks: the clocks needed.
-+- clock-names: the name of the clocks.
-+- ade_core_clk_rate: ADE core clock rate.
-+- media_noc_clk_rate: media noc module clock rate.
-+
-+
-+A example of HiKey board hi6220 SoC specific DT entry:
-+Example:
-+
-+	ade: ade at f4100000 {
-+		compatible = "hisilicon,hi6220-ade";
-+		reg = <0x0 0xf4100000 0x0 0x7800>,
-+		      <0x0 0xf4410000 0x0 0x1000>;
-+		reg-names = "ade_base",
-+			    "media_base";
-+		interrupts = <0 115 4>;
-+
-+		clocks = <&media_ctrl HI6220_ADE_CORE>,
-+			 <&media_ctrl HI6220_CODEC_JPEG>,
-+			 <&media_ctrl HI6220_ADE_PIX_SRC>,
-+			 <&media_ctrl HI6220_PLL_SYS>,
-+			 <&media_ctrl HI6220_PLL_SYS_MEDIA>;
-+		clock-names  = "clk_ade_core",
-+			       "aclk_codec_jpeg_src",
-+			       "clk_ade_pix",
-+			       "clk_syspll_src",
-+			       "clk_medpll_src";
-+		ade_core_clk_rate = <360000000>;
-+		media_noc_clk_rate = <288000000>;
-+	};
-diff --git a/Documentation/devicetree/bindings/display/hisilicon/hisi-drm.txt b/Documentation/devicetree/bindings/display/hisilicon/hisi-drm.txt
++++ b/drivers/gpu/drm/hisilicon/Kconfig
+@@ -0,0 +1,9 @@
++config DRM_HISI
++	tristate "DRM Support for Hisilicon SoCs Platform"
++	depends on DRM
++	select DRM_KMS_HELPER
++	select DRM_GEM_CMA_HELPER
++	select DRM_KMS_CMA_HELPER
++	help
++	  Choose this option if you have a hisilicon chipsets(hi6220).
++	  If M is selected the module will be called hisi-drm.
+diff --git a/drivers/gpu/drm/hisilicon/Makefile b/drivers/gpu/drm/hisilicon/Makefile
 new file mode 100644
-index 0000000..fd93026
+index 0000000..7375456
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/display/hisilicon/hisi-drm.txt
-@@ -0,0 +1,66 @@
-+Hisilicon DRM master device
++++ b/drivers/gpu/drm/hisilicon/Makefile
+@@ -0,0 +1,3 @@
++hisi-drm-y := hisi_drm_drv.o 
 +
-+The Hisilicon DRM master device is a virtual device needed to list all
-+the other display relevant nodes that comprise the display subsystem.
-+
-+
-+Required properties:
-+- compatible: Should be "hisilicon,<chip>-dss"
-+- #address-cells: should be set to 2.
-+- #size-cells: should be set to 2.
-+- range: to allow probing of subdevices.
-+
-+Optional properties:
-+- dma-coherent: Present if dma operations are coherent.
-+
-+Required sub nodes:
-+All the device nodes of display subsystem of SoC should be the sub nodes.
-+Such as display controller node, DSI node and so on.
-+
-+A example of HiKey board hi6220 SoC specific DT entry:
-+Example:
-+
-+	display-subsystem {
-+		compatible = "hisilicon,hi6220-dss";
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+		dma-coherent;
-+
-+		ade: ade at f4100000 {
-+			compatible = "hisilicon,hi6220-ade";
-+			reg = <0x0 0xf4100000 0x0 0x7800>,
-+			      <0x0 0xf4410000 0x0 0x1000>;
-+			reg-names = "ade_base",
-+				    "media_base";
-+			interrupts = <0 115 4>; /* ldi interrupt */
-+
-+			clocks = <&media_ctrl HI6220_ADE_CORE>,
-+				 <&media_ctrl HI6220_CODEC_JPEG>,
-+				 <&media_ctrl HI6220_ADE_PIX_SRC>,
-+				 <&media_ctrl HI6220_PLL_SYS>,
-+				 <&media_ctrl HI6220_PLL_SYS_MEDIA>;
-+			/*clock name*/
-+			clock-names  = "clk_ade_core",
-+				       "aclk_codec_jpeg_src",
-+				       "clk_ade_pix",
-+				       "clk_syspll_src",
-+				       "clk_medpll_src";
-+			ade_core_clk_rate = <360000000>;
-+			media_noc_clk_rate = <288000000>;
-+		};
-+
-+		dsi: dsi at 0xf4107800 {
-+			compatible = "hisilicon,hi6220-dsi";
-+			reg = <0x0 0xf4107800 0x0 0x100>;
-+			clocks = <&media_ctrl  HI6220_DSI_PCLK>;
-+			clock-names = "pclk_dsi";
-+
-+			port {
-+				dsi_out: endpoint {
-+					remote-endpoint = <&adv_in>;
-+				};
-+			};
-+
-+		};
-+	};
-diff --git a/Documentation/devicetree/bindings/display/hisilicon/hisi-dsi.txt b/Documentation/devicetree/bindings/display/hisilicon/hisi-dsi.txt
++obj-$(CONFIG_DRM_HISI)	+= hisi-drm.o
+diff --git a/drivers/gpu/drm/hisilicon/hisi_drm_drv.c b/drivers/gpu/drm/hisilicon/hisi_drm_drv.c
 new file mode 100644
-index 0000000..30abaa85
+index 0000000..445e2ec
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/display/hisilicon/hisi-dsi.txt
-@@ -0,0 +1,53 @@
-+Device-Tree bindings for hisilicon DSI controller driver
++++ b/drivers/gpu/drm/hisilicon/hisi_drm_drv.c
+@@ -0,0 +1,214 @@
++/*
++ * Hisilicon SoCs drm master driver
++ *
++ * Copyright (c) 2014-2015 Hisilicon Limited.
++ * Author:
++ *	Xinliang Liu <xinliang.liu@linaro.org>
++ *	Xinliang Liu <z.liuxinliang@hisilicon.com>
++ *	Xinwei Kong <kong.kongxinwei@hisilicon.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
 +
-+A DSI controller resides in the middle of display controller and external
-+HDMI converter.
++#include <linux/of_platform.h>
++#include <linux/component.h>
 +
-+Required properties:
-+- compatible: value should be one of the following
-+	"hisilicon,hi6220-dsi".
-+- reg: physical base address and length of the controller's registers.
-+- clocks: the clocks needed.
-+- clock-names: the name of the clocks.
-+- port: DSI controller output port. This contains one endpoint subnode, with its
-+  remote-endpoint set to the phandle of the connected external HDMI endpoint.
-+  See Documentation/devicetree/bindings/graph.txt for device graph info.
++#include <drm/drmP.h>
++#include <drm/drm_gem_cma_helper.h>
++#include <drm/drm_fb_cma_helper.h>
++#include <drm/drm_atomic_helper.h>
 +
-+A example of HiKey board hi6220 SoC and board specific DT entry:
-+Example:
++#define DRIVER_NAME	"hisi-drm"
 +
-+SoC specific:
-+	dsi: dsi at 0xf4107800 {
-+		compatible = "hisilicon,hi6220-dsi";
-+		reg = <0x0 0xf4107800 0x0 0x100>;
-+		clocks = <&media_ctrl  HI6220_DSI_PCLK>;
-+		clock-names = "pclk_dsi";
++static int hisi_drm_unload(struct drm_device *dev)
++{
++	drm_mode_config_cleanup(dev);
++	return 0;
++}
 +
-+		port {
-+			dsi_out: endpoint {
-+				remote-endpoint = <&adv_in>;
-+			};
-+		};
++static const struct drm_mode_config_funcs hisi_drm_mode_config_funcs = {
++	.fb_create = drm_fb_cma_create,
++	.atomic_check = drm_atomic_helper_check,
++	.atomic_commit = drm_atomic_helper_commit,
++};
 +
-+	};
++static void hisi_drm_mode_config_init(struct drm_device *dev)
++{
++	dev->mode_config.min_width = 0;
++	dev->mode_config.min_height = 0;
 +
-+Board specific:
-+	i2c2: i2c at f7102000 {
-+		status = "ok";
++	dev->mode_config.max_width = 2048;
++	dev->mode_config.max_height = 2048;
 +
-+		adv7533: adv7533 at 39 {
-+			compatible = "adi,adv7533";
-+			reg = <0x39>;
-+			interrupt-parent = <&gpio1>;
-+			interrupts = <1 2>;
-+			pd-gpio = <&gpio0 4 0>;
-+			adi,dsi-lanes = <4>;
++	dev->mode_config.funcs = &hisi_drm_mode_config_funcs;
++}
 +
-+			port {
-+				adv_in: endpoint {
-+					remote-endpoint = <&dsi_out>;
-+				};
-+			};
-+		};
-+	};
++static int hisi_drm_load(struct drm_device *dev, unsigned long flags)
++{
++	int ret;
 +
++	dev_set_drvdata(dev->dev, dev);
++
++	/* dev->mode_config initialization */
++	drm_mode_config_init(dev);
++	hisi_drm_mode_config_init(dev);
++
++	/* bind and init sub drivers */
++	ret = component_bind_all(dev->dev, dev);
++	if (ret) {
++		DRM_ERROR("failed to bind all component.\n");
++		goto err_mode_config_cleanup;
++	}
++
++	/* reset all the states of crtc/plane/encoder/connector */
++	drm_mode_config_reset(dev);
++
++	return 0;
++
++err_mode_config_cleanup:
++	drm_mode_config_cleanup(dev);
++
++	return ret;
++}
++
++static const struct file_operations hisi_drm_fops = {
++	.owner		= THIS_MODULE,
++	.open		= drm_open,
++	.release	= drm_release,
++	.unlocked_ioctl	= drm_ioctl,
++#ifdef CONFIG_COMPAT
++	.compat_ioctl	= drm_compat_ioctl,
++#endif
++	.poll		= drm_poll,
++	.read		= drm_read,
++	.llseek		= no_llseek,
++	.mmap		= drm_gem_cma_mmap,
++};
++
++static struct dma_buf *hisi_gem_prime_export(struct drm_device *dev,
++					     struct drm_gem_object *obj,
++					     int flags)
++{
++	/* we want to be able to write in mmapped buffer */
++	flags |= O_RDWR;
++	return drm_gem_prime_export(dev, obj, flags);
++}
++
++static int hisi_gem_cma_dumb_create(struct drm_file *file,
++				    struct drm_device *dev,
++				    struct drm_mode_create_dumb *args)
++{
++	int min_pitch = DIV_ROUND_UP(args->width * args->bpp, 8);
++
++	/* mali gpu need pitch 8 bytes alignment for 32bpp */
++	args->pitch = roundup(min_pitch, 8);
++
++	return drm_gem_cma_dumb_create_internal(file, dev, args);
++}
++
++static struct drm_driver hisi_drm_driver = {
++	.driver_features	= DRIVER_GEM | DRIVER_MODESET | DRIVER_PRIME |
++				  DRIVER_ATOMIC,
++	.load			= hisi_drm_load,
++	.unload                 = hisi_drm_unload,
++	.fops			= &hisi_drm_fops,
++	.set_busid		= drm_platform_set_busid,
++
++	.gem_free_object	= drm_gem_cma_free_object,
++	.gem_vm_ops		= &drm_gem_cma_vm_ops,
++	.dumb_create		= hisi_gem_cma_dumb_create,
++	.dumb_map_offset	= drm_gem_cma_dumb_map_offset,
++	.dumb_destroy		= drm_gem_dumb_destroy,
++
++	.prime_handle_to_fd	= drm_gem_prime_handle_to_fd,
++	.prime_fd_to_handle	= drm_gem_prime_fd_to_handle,
++	.gem_prime_export	= hisi_gem_prime_export,
++	.gem_prime_import	= drm_gem_prime_import,
++	.gem_prime_get_sg_table = drm_gem_cma_prime_get_sg_table,
++	.gem_prime_import_sg_table = drm_gem_cma_prime_import_sg_table,
++	.gem_prime_vmap		= drm_gem_cma_prime_vmap,
++	.gem_prime_vunmap	= drm_gem_cma_prime_vunmap,
++	.gem_prime_mmap		= drm_gem_cma_prime_mmap,
++
++	.name			= "hisi",
++	.desc			= "Hisilicon SoCs' DRM Driver",
++	.date			= "20150718",
++	.major			= 1,
++	.minor			= 0,
++};
++
++static int compare_of(struct device *dev, void *data)
++{
++	return dev->of_node == data;
++}
++
++static int hisi_drm_bind(struct device *dev)
++{
++	dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
++	return drm_platform_init(&hisi_drm_driver, to_platform_device(dev));
++}
++
++static void hisi_drm_unbind(struct device *dev)
++{
++	drm_put_dev(dev_get_drvdata(dev));
++}
++
++static const struct component_master_ops hisi_drm_ops = {
++	.bind = hisi_drm_bind,
++	.unbind = hisi_drm_unbind,
++};
++
++static int hisi_drm_platform_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *node = dev->of_node;
++	struct device_node *child_np;
++	struct component_match *match = NULL;
++
++	of_platform_populate(node, NULL, NULL, dev);
++
++	child_np = of_get_next_available_child(node, NULL);
++	while (child_np) {
++		component_match_add(dev, &match, compare_of, child_np);
++		of_node_put(child_np);
++		child_np = of_get_next_available_child(node, child_np);
++	}
++
++	return component_master_add_with_match(dev, &hisi_drm_ops, match);
++
++	return 0;
++}
++
++static int hisi_drm_platform_remove(struct platform_device *pdev)
++{
++	component_master_del(&pdev->dev, &hisi_drm_ops);
++	of_platform_depopulate(&pdev->dev);
++	return 0;
++}
++
++static const struct of_device_id hisi_drm_dt_ids[] = {
++	{ .compatible = "hisilicon,hi6220-dss", },
++	{ /* end node */ },
++};
++MODULE_DEVICE_TABLE(of, hisi_drm_dt_ids);
++
++static struct platform_driver hisi_drm_platform_driver = {
++	.probe = hisi_drm_platform_probe,
++	.remove = hisi_drm_platform_remove,
++	.driver = {
++		.owner = THIS_MODULE,
++		.name = DRIVER_NAME,
++		.of_match_table = hisi_drm_dt_ids,
++	},
++};
++
++module_platform_driver(hisi_drm_platform_driver);
++
++MODULE_AUTHOR("Xinliang Liu <xinliang.liu@linaro.org>");
++MODULE_AUTHOR("Xinliang Liu <z.liuxinliang@hisilicon.com>");
++MODULE_AUTHOR("Xinwei Kong <kong.kongxinwei@hisilicon.com>");
++MODULE_DESCRIPTION("hisilicon SoCs' DRM master driver");
++MODULE_LICENSE("GPL v2");
 -- 
 1.9.1
