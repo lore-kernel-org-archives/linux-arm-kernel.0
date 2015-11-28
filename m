@@ -1,62 +1,53 @@
-From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
-Date: Sat, 28 Nov 2015 20:47:19 +0100
-Subject: [PATCH 1/2] ARM: dts: imx6: Add support for Toradex Apalis SoM
-In-Reply-To: <ecfde8366160cb17f7b1e571f81488de@agner.ch>
-References: <1447935900-13635-1-git-send-email-ynezz@true.cz>
- <1447935900-13635-2-git-send-email-ynezz@true.cz>
- <1447942325.3144.86.camel@pengutronix.de>
- <ecfde8366160cb17f7b1e571f81488de@agner.ch>
-Message-ID: <20151128194719.GO19674@ibawizard.net>
+From: benoitm@perenite.com (Benoit Masson)
+Date: Sat, 28 Nov 2015 21:32:29 +0100
+Subject: [PATCH 1/4] ARM: dt: mvebu: ix4-300d: remove whole flash partition
+In-Reply-To: <5659E687.9090502@gmail.com>
+References: <1448709248-21177-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1448709248-21177-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20151128165258.GG32356@lunn.ch> <5659E687.9090502@gmail.com>
+Message-ID: <6257884654271000421@unknownmsgid>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Agner <stefan@agner.ch> [2015-11-27 11:38:44]:
+>From mobile
 
-> >> + * Copyright 2014-2015 Toradex AG
-> >> + * Copyright 2012 Freescale Semiconductor, Inc.
-> >> + * Copyright 2011 Linaro Ltd.
-> >> + *
-> >> + * The code contained herein is licensed under the GNU General Public
-> >> + * License. You may obtain a copy of the GNU General Public License
-> >> + * Version 2 or later at the following locations:
-> >> + *
-> >> + * http://www.opensource.org/licenses/gpl-license.html
-> >> + * http://www.gnu.org/copyleft/gpl.html
-> 
-> New device trees typically come with a dual license, X11/GPL. It makes
-> sense that we use that too, Toradex agrees...
+> Le 28 nov. 2015 ? 18:38, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> a ?crit :
+>
+>> On 28.11.2015 17:52, Andrew Lunn wrote:
+>>> On Sat, Nov 28, 2015 at 12:14:05PM +0100, Sebastian Hesselbarth wrote:
+>>> Current NAND node has an additional flash partition for the whole
+>>> flash overlapping with real partitions. Remove this partition as
+>>> the whole flash is already represented by the NAND device itself.
+>>
+>> If i remember correctly, we discussed this when the contribution was
+>> made. I think the stock firmware might use this for applying updates.
+>> Maybe Benoit can comment?
+>
+> Yes, please.
+>From my memory since I'm not running the stock firmware it uses the
+MTD device directly. This is safe to remove. I was not very contort
+able with this flash dts part it was copied over from a netgear mevbu
+device ...
 
-IANAL, but shouldn't we get some form of relicensing agreement from FSL and
-Linaro also?
-
-> >> +	clocks {
-> >> +		clk24m: clk24m {
-> >> +			compatible = "fixed-clock";
-> >> +			#clock-cells = <0>;
-> >> +			clock-frequency = <24000000>;
-> >> +		};
-> >> +	};
-> 
-> There is a 24Mhz osc defined in imx6qdl.dtsi, but I think that is the
-> internal osc? I am not entierly familar with the i.MX6 clocks...
-> 
-> However, this seems not to be used anywhere and other boards also do not
-> define that clock, hence I would drop it.
-
-Ok, I'll try to drop it and will see if everything still works.
-
-> > Were v1.0 modules sold to customers? If not the value of having those
-> > supported by mainline is really limited.
-> 
-> I am inclined to say lets not support them. They anyway lead to
-> headaches since you need to use a different U-Boot binary too...
-> 
-> Petr, do you happen to have one of them?
-
-I've simply dropped support for v1.0 modules in patch v2. I've v1.1 module.
-
-> Can we set fsl,dte-mode to false?
-
-Ok, I'll remove that property.
-
--- ynezz
+>
+>> If so, removing this will break compatibility with stock firmware. Do
+>> we want to do that? There are a few other mvebu dts files with a
+>> partition spanning the whole flash. Should we remove them as well?
+>
+> Well, there is already a mtd device that spans the whole flash so
+> what is the purpose of another "partition" that isn't a part but
+> all of the device? Actually, I doubt that a FW update will wipe
+> the flash as a whole, i.e. including boot loader, boot env, user
+> config.
+>
+> Anyway, let's see if Benoit can shed some light on this.
+>
+> FWIW, neither single partitions nor a combined partitions node
+> should be a direct sub-node of the _controller_ but a NAND
+> _device_ node instead. Luckily, multi-device systems are not that
+> common, so I guess we wait with it until such a system pops up for
+> testing.
+>
+> Sebastian
+>
+>
