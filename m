@@ -1,52 +1,26 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 27 Nov 2015 19:34:24 -0800
-Subject: [PATCH net] drivers: net: xgene: fix possible use after free
-In-Reply-To: <1448470930.24696.10.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <20151125155753.GE12434@leverpostej>
- <1448468256.24696.5.camel@edumazet-glaptop2.roam.corp.google.com>
- <20151125163402.GA29094@leverpostej>
- <1448470930.24696.10.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <CAKh23FkcjtJVrP91x5dBkKZ=nK6anp5dmFmsUm1-58McSQSWbg@mail.gmail.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Fri, 27 Nov 2015 20:06:07 -0800
+Subject: [PATCH 0/5] ATAGs to DT patches
+In-Reply-To: <1436214373-12969-1-git-send-email-pali.rohar@gmail.com>
+References: <1436214373-12969-1-git-send-email-pali.rohar@gmail.com>
+Message-ID: <5659282F.8020104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 9:02 AM, Eric Dumazet <eric.dumazet@gmail.com> wrote:
-> From: Eric Dumazet <edumazet@google.com>
->
-> Once TX has been enabled on a NIC, it is illegal to access skb,
-> as this skb might have been freed by another cpu, from TX completion
-> handler.
->
-> Signed-off-by: Eric Dumazet <edumazet@google.com>
-> Reported-by: Mark Rutland <mark.rutland@arm.com>
-> Tested-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Iyappan Subramanian <isubramanian@apm.com>
-> ---
->  drivers/net/ethernet/apm/xgene/xgene_enet_main.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-> index 1adfe7036843..9147a0107c44 100644
-> --- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-> @@ -450,12 +450,12 @@ static netdev_tx_t xgene_enet_start_xmit(struct sk_buff *skb,
->                 return NETDEV_TX_OK;
->         }
->
-> -       pdata->ring_ops->wr_cmd(tx_ring, count);
->         skb_tx_timestamp(skb);
->
->         pdata->stats.tx_packets++;
->         pdata->stats.tx_bytes += skb->len;
->
-> +       pdata->ring_ops->wr_cmd(tx_ring, count);
+On 7/6/2015 1:26 PM, Pali Roh?r wrote:
+> This patch series converts some legacy ATAGs into DT and provide them to
+> userspace. It is needed for userspace applications which needs some
+> informations from legacy bootloaders which are not DT compatible.
+> 
+> Patch series is for now without DT documentation files. It was tested in
+> QEMU for Nokia N900. File /proc/cpuinfo contains correct "Revision" line
+> from ATAG_REVISION and /proc/atags contains full ATAGs structure.
 
-Thanks Mark and Eric, for the fix.
+Pali,
 
-Acked-by: Iyappan Subramanian <isubramanian@apm.com>
+Is this needed just for the N900, or are there other devices that need it?
+If so, which devices?
 
->         return NETDEV_TX_OK;
->  }
->
->
->
+Thanks,
+
+Frank
