@@ -1,150 +1,81 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 28 Nov 2015 18:38:26 +0100
-Subject: [PATCH 2/4] ARM: dt: mvebu: ix4-300d: move partitions to
- partition sub-node
-In-Reply-To: <20151128170036.GH32356@lunn.ch>
-References: <1448709248-21177-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1448709248-21177-3-git-send-email-sebastian.hesselbarth@gmail.com>
- <20151128170036.GH32356@lunn.ch>
-Message-ID: <5659E692.9040007@gmail.com>
+From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
+Date: Sat, 28 Nov 2015 20:38:24 +0100
+Subject: [PATCH 1/2] ARM: dts: imx6: Add support for Toradex Apalis SoM
+In-Reply-To: <5b507c5d85e51d56074a8f8c32b8dcf9@agner.ch>
+References: <1447935900-13635-1-git-send-email-ynezz@true.cz>
+ <1447935900-13635-2-git-send-email-ynezz@true.cz>
+ <1447942325.3144.86.camel@pengutronix.de>
+ <20151126101742.GM19674@ibawizard.net>
+ <5b507c5d85e51d56074a8f8c32b8dcf9@agner.ch>
+Message-ID: <20151128193824.GN19674@ibawizard.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28.11.2015 18:00, Andrew Lunn wrote:
-> On Sat, Nov 28, 2015 at 12:14:06PM +0100, Sebastian Hesselbarth wrote:
->> NAND flash partitions should be part of a partitions sub-node
->> not the flash node itself. Move the partitions which will also
->> allow different bootloaders get rid of the stock partitions
->> easily by removing the partitions node.
->>
->> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Stefan Agner <stefan@agner.ch> [2015-11-27 12:02:46]:
+
+> Hi Petr,
+
+Hi,
+
+> > &fec {
+> > 	pinctrl-names = "default";
+> > 	pinctrl-0 = <&pinctrl_enet &pinctrl_enet_ctrl>;
+> > 	phy-mode = "rgmii";
+> > 
+> > 	phy-reset-gpios = <&gpio1 25 GPIO_ACTIVE_HIGH>;
+> > 	interrupts-extended = <&gpio1 30 IRQ_TYPE_LEVEL_LOW>,
+> > 			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+> > 	status = "okay";
+> > };
 > 
-> Humm, did not know that. Quoting Documentation/devicetree/bindings/mtd/partition.txt:
+> According to the schema, &gpio1 30 is low active as well as the reset
+> GPIO &gpio1 25. Both pulled high externally...
 > 
->       The partition table should be a subnode of the mtd node and
->       should be named 'partitions'. Partitions are defined in subnodes
->       of the partitions node.
+> So phy reset GPIO should be ACTIVE_LOW, otherwise things look correct to
+> me.
 > 
->       For backwards compatibility partitions as direct subnodes of the
->       mtd device are supported. This use is discouraged.
-> 
-> It also looks like none of the other MVEBU maintainers know that
-> either, since a quick look at the .dts files shows very few have a
-> partitions node.
+> I guess in that case U-Boot took care of it. However, this is not a
+> clean solution...
 
-Me neither, Linus Walleij's latest contribution to the pogoplug
-series showed it to me. And while I am working on barebox support
-for the ix4, I always wanted to remove the stock partitions easily.
+Yes, I think, that it's being setup by U-Boot and there is something not
+properly(*) defined in the DTS or in kernel. I'll probably start over with a
+vanilla U-Boot to get relatively clean table.
 
-Barebox always uses internal registers at 0xf1000000 so it will
-never boot that stupid stock kernel that depends on 0xd0000000
-registers.
+* If I boot Toradex's 3.10.17+gitr602505a35 first and then reboot into
+  4.4.0-rc2, the kernel hangs somewhere in the platform init. It's probably
+  the PAD_CTRL_NO problem. I'll get into this once I fix the fec.
 
-> Acked-by: Andrew Lunn <andrew@lunn.ch>
-> 
-> Thanks
-> 	Andrew
+> Not sure what happens exactly, maybe the phy-reset does not honor the
+> GPIO_ACTIVE_LOW flag?
 
-ditto ;)
+Reset works probably fine, I haven't verified that with a scope, but if I boot
+over NFS, it takes longer then without reset-gpio defined.
 
-Sebastian
+The issue is with IRQ GPIO, which I can't get to work. Here are two cases I've
+observed so far:
 
->> ---
->> Cc: Jason Cooper <jason@lakedaemon.net> 
->> Cc: Andrew Lunn <andrew@lunn.ch>
->> Cc: Gregory Clement <gregory.clement@free-electrons.com> 
->> Cc: Rob Herring <robh+dt@kernel.org> 
->> Cc: Pawel Moll <pawel.moll@arm.com> 
->> Cc: Mark Rutland <mark.rutland@arm.com> 
->> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk> 
->> Cc: Kumar Gala <galak@codeaurora.org> 
->> Cc: Russell King <linux@arm.linux.org.uk> 
->> Cc: Benoit Masson <yahoo@perenite.com>
->> Cc: linux-arm-kernel at lists.infradead.org 
->> Cc: devicetree at vger.kernel.org 
->> Cc: linux-kernel at vger.kernel.org 
->> ---
->>  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 67 +++++++++++++------------
->>  1 file changed, 36 insertions(+), 31 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
->> index 30a0a6eac645..76781fd18624 100644
->> --- a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
->> +++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
->> @@ -151,37 +151,42 @@
->>  				marvell,nand-enable-arbiter;
->>  				nand-on-flash-bbt;
->>  
->> -				partition at 0 {
->> -					label = "u-boot";
->> -					reg = <0x0000000 0xe0000>;
->> -					read-only;
->> -				};
->> -
->> -				partition at e0000 {
->> -					label = "u-boot-env";
->> -					reg = <0xe0000 0x20000>;
->> -					read-only;
->> -				};
->> -
->> -				partition at 100000 {
->> -					label = "u-boot-env2";
->> -					reg = <0x100000 0x20000>;
->> -					read-only;
->> -				};
->> -
->> -				partition at 120000 {
->> -					label = "zImage";
->> -					reg = <0x120000 0x400000>;
->> -				};
->> -
->> -				partition at 520000 {
->> -					label = "initrd";
->> -					reg = <0x520000 0x400000>;
->> -				};
->> -
->> -				partition at xE00000 {
->> -					label = "boot";
->> -					reg = <0xE00000 0x3F200000>;
->> +				partitions {
->> +					#address-cells = <1>;
->> +					#size-cells = <1>;
->> +
->> +					partition at 0 {
->> +						label = "u-boot";
->> +						reg = <0x0000000 0xe0000>;
->> +						read-only;
->> +					};
->> +
->> +					partition at e0000 {
->> +						label = "u-boot-env";
->> +						reg = <0xe0000 0x20000>;
->> +						read-only;
->> +					};
->> +
->> +					partition at 100000 {
->> +						label = "u-boot-env2";
->> +						reg = <0x100000 0x20000>;
->> +						read-only;
->> +					};
->> +
->> +					partition at 120000 {
->> +						label = "zImage";
->> +						reg = <0x120000 0x400000>;
->> +					};
->> +
->> +					partition at 520000 {
->> +						label = "initrd";
->> +						reg = <0x520000 0x400000>;
->> +					};
->> +
->> +					partition at xE00000 {
->> +						label = "boot";
->> +						reg = <0xE00000 0x3F200000>;
->> +					};
->>  				};
->>  			};
->>  		};
->> -- 
->> 2.1.4
->>
+1. PHY init failure due to MDIO read timeout
+
+  interrupts-extended = <&gpio1 30 IRQ_TYPE_LEVEL_LOW>, <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+
+  [    2.685556] of_irq_parse_raw:  /soc/aips-bus at 02000000/gpio at 0209c000:0000001e,00000008
+  [    2.701521] of_irq_parse_raw:  /interrupt-controller at 00a01000:00000000,00000077,00000004
+  [    2.732258] fec 2188000.ethernet (unnamed net_device) (uninitialized): MDIO read timeout
+  [    2.740859] fec: probe of 2188000.ethernet failed with error -5
+
+2. PHY init is OK, but MX6QDL_PAD_ENET_TXD0__GPIO1_IO30 is not being used as IRQ:
+
+  interrupts-extended = <&gpio1 30 IRQ_TYPE_LEVEL_LOW>, <&intc 0 118 IRQ_TYPE_LEVEL_HIGH>;
+
+  [    2.685479] of_irq_parse_raw:  /soc/aips-bus at 02000000/gpio at 0209c000:0000001e,00000008
+  [    2.701440] of_irq_parse_raw:  /interrupt-controller at 00a01000:00000000,00000076,00000004
+  [    2.714595] libphy: fec_enet_mii_bus: probed
+  [    2.719674] fec 2188000.ethernet eth0: registered PHC device 0
+
+  root at OpenWrt:/# cat /proc/interrupts | grep ethernet
+   65:          0          0          0          0  gpio-mxc  30 Level     2188000.ethernet
+  288:       7513          0          0          0       GIC 150 Level     2188000.ethernet
+
+I've to look into it deeper next week. Thanks!
+
+-- ynezz
