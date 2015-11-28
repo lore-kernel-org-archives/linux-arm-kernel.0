@@ -1,15 +1,18 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 28 Nov 2015 13:27:07 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 28 Nov 2015 12:33:28 +0000
 Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
- "/chosen/linux, atags" entry
+ "/chosen/linux,atags" entry
 In-Reply-To: <alpine.LFD.2.20.1511271817230.22569@knanqh.ubzr>
-References: <20150713131902.GH26485@atomide.com> <11537945.4HX4Y84tjV@wuerfel>
+References: <20150713131902.GH26485@atomide.com>
+ <20151127132722.GA30871@n2100.arm.linux.org.uk>
+ <20151127195148.GB30871@n2100.arm.linux.org.uk>
+ <11537945.4HX4Y84tjV@wuerfel>
  <alpine.LFD.2.20.1511271817230.22569@knanqh.ubzr>
-Message-ID: <2565382.eR6yg1spIk@wuerfel>
+Message-ID: <20151128123328.GC30871@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 November 2015 18:28:50 Nicolas Pitre wrote:
+On Fri, Nov 27, 2015 at 06:28:50PM -0500, Nicolas Pitre wrote:
 > On Fri, 27 Nov 2015, Arnd Bergmann wrote:
 > 
 > > I don't mind creating the /proc/atags compatibility hack from the kernel
@@ -32,11 +35,8 @@ On Friday 27 November 2015 18:28:50 Nicolas Pitre wrote:
 > to that one file.  Amongst the machine specific hooks, there is one that 
 > gets invoked early during boot before those atags are overwritten.
 
-I didn't realize this was possible, as we don't know the atags pointer
-when we instead get a DTB pointer. However you are right: the board
-file knows exactly that the atag_offset is 0x100, so we can grab it
-from there, and that will make the implementation really easy and
-contained to a single file that has access to the atags and that
-can create the /proc/atags file for it.
+I've already suggested that.
 
-	Arnd
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
