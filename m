@@ -1,32 +1,46 @@
-From: colin.king@canonical.com (Colin King)
-Date: Sat, 28 Nov 2015 16:27:34 +0000
-Subject: [PATCH] ARM: mach-imx: iomux-imx31: fix spelling mistake in error
- message
-Message-ID: <1448728054-8766-1-git-send-email-colin.king@canonical.com>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Sun, 29 Nov 2015 01:32:36 +0900
+Subject: [PATCH v7 1/3] arm64: Add irq_stack boiler plate,
+ store struct task_info in sp_el0
+In-Reply-To: <1447698128-8490-2-git-send-email-james.morse@arm.com>
+References: <1447698128-8490-1-git-send-email-james.morse@arm.com>
+ <1447698128-8490-2-git-send-email-james.morse@arm.com>
+Message-ID: <C4231496-71BE-4D48-9575-D375D141136D@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+On Nov 17, 2015, at 3:22 AM, James Morse wrote:
 
-Minor issue, fix spelling mistake, nonexistant -> nonexistent
+Hi James,
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- arch/arm/mach-imx/iomux-imx31.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> From: Jungseok Lee <jungseoklee85@gmail.com>
+> 
+> There is need for figuring out how to manage struct thread_info data when
+> IRQ stack is introduced. struct thread_info information should be copied
+> to IRQ stack under the current thread_info calculation logic whenever
+> context switching is invoked. This is too expensive to keep supporting
+> the approach.
+> 
+> Instead, this patch pays attention to sp_el0 which is an unused scratch
+> register in EL1 context. sp_el0 utilization not only simplifies the
+> management, but also prevents text section size from being increased
+> largely due to static allocated IRQ stack as removing masking operation
+> using THREAD_SIZE in many places.
+> 
+> This patch adds per_cpu definitions and initialisation for the irq_stack,
+> that will be used by a later patch.
+> 
+> Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
+> [Added per_cpu definitions and initialisation for irq_stack]
 
-diff --git a/arch/arm/mach-imx/iomux-imx31.c b/arch/arm/mach-imx/iomux-imx31.c
-index 6dd22ca..0b5ba4b 100644
---- a/arch/arm/mach-imx/iomux-imx31.c
-+++ b/arch/arm/mach-imx/iomux-imx31.c
-@@ -100,7 +100,7 @@ int mxc_iomux_alloc_pin(unsigned int pin, const char *label)
- 	unsigned pad = pin & IOMUX_PADNUM_MASK;
- 
- 	if (pad >= (PIN_MAX + 1)) {
--		printk(KERN_ERR "mxc_iomux: Attempt to request nonexistant pin %u for \"%s\"\n",
-+		printk(KERN_ERR "mxc_iomux: Attempt to request nonexistent pin %u for \"%s\"\n",
- 			pad, label ? label : "?");
- 		return -EINVAL;
- 	}
--- 
-2.6.2
+How about moving all irq_stack items to [PATCH 2/3] or [PATCH 3/3]?
+
+First of all, I'd like to focus on only thread_info management, which has
+no objection yet, via this patch. Secondly, this hunk is now considered
+a common part for IRQ stack written by both of us. If a process stack is
+allowed in softirq context, I will wait for your next version. If "always
+switch" method is picked up, I'd like to write down the feature based on
+this patch.
+
+Best Regards
+Jungseok Lee
