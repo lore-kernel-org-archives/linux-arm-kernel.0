@@ -1,87 +1,106 @@
 From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Sat, 28 Nov 2015 18:38:55 +0800
-Subject: [PATCH v2 00/10] Add New DRM Driver for HiSilicon hi6220 SoC
-Message-ID: <1448707145-69348-1-git-send-email-xinliang.liu@linaro.org>
+Date: Sat, 28 Nov 2015 18:38:56 +0800
+Subject: [PATCH v2 01/10] arm64: dts: hisilicon: Add display subsystem DT
+ nodes for hi6220
+In-Reply-To: <1448707145-69348-1-git-send-email-xinliang.liu@linaro.org>
+References: <1448707145-69348-1-git-send-email-xinliang.liu@linaro.org>
+Message-ID: <1448707145-69348-2-git-send-email-xinliang.liu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  This patch set adds a new drm driver for HiSilicon hi6220 SoC.
-Current testing and support board is Hikey board which is one of Linaro
-96boards. It is an arm64 open source board. For more information about
-this board, please access https://www.96boards.org.
+Add ade, dsi and adv7533 DT nodes for hikey board.
 
-Hardware Detail
----------------
-  The display subsystem of Hi6220 SoC is shown as bellow:
- +-----+       +----------+     +-----+     +---------+
- |     |       |          |     |     |     |         |             	
- | FB  |------>|   ADE    |---->| DSI |---->| External|
- |     |       |          |     |     |     |  HDMI   |
- +-----+       +----------+     +-----+     +---------+
+Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+Signed-off-by: Andy Green <andy.green@linaro.org>
+---
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 21 ++++++++++++
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 44 ++++++++++++++++++++++++++
+ 2 files changed, 65 insertions(+)
 
-- ADE(Advanced Display Engine) is the display controller. It contains 7
-channels, 3 overlay compositors and a LDI.
-  - A channel looks like: DMA-->clip-->scale-->ctrans(or called csc).
-  - Overlay compositor is response to compose planes which come from 7
-  channels and pass composed image to LDI.
-  - LDI is response to generate timings and RGB data stream.
-- DSI converts the RGB data stream from ADE to DSI packets.
-- External HDMI module is connected with DSI bus. Now Hikey use a ADI's
-  ADV7533 external HDMI chip.
-
-Change History
--------------
-Changes in v2:
-- Remove abtraction layer of plane/crtc/encoder/connector.
-- Refactor atomic implementation according to Daniel Vetter's guides:
-http://blog.ffwll.ch/2014/11/atomic-modeset-support-for-kms-drivers.html
-http://blog.ffwll.ch/2015/09/xdc-2015-atomic-modesetting-for-drivers.html
-http://blog.ffwll.ch/2015/08/atomic-modesetting-design-overview.html
-- Use bridge instead of slave encoder to connect external HDMI.
-- Move dt binding docs to bindings/display/hisilicon directory. 
-
-
-Xinliang Liu (10):
-  arm64: dts: hisilicon: Add display subsystem DT nodes for hi6220.
-  drm/hisilicon: Add device tree binding for hi6220 display subsystem
-  drm/hisilicon: Add hisilicon DRM master driver
-  drm/hisilicon: Add crtc funcs for ADE
-  drm/hisilicon: Add plane funcs for ADE
-  drm/hisilicon: Add vblank feature
-  drm/hisilicon: Add cma fbdev and hotplug
-  drm/hisilicon: Add dsi encoder driver
-  drm/hisilicon: Add dsi host driver
-  drm/hisilicon: Add support for external bridge
-
- .../bindings/display/hisilicon/hisi-ade.txt        |   42 +
- .../bindings/display/hisilicon/hisi-drm.txt        |   66 ++
- .../bindings/display/hisilicon/hisi-dsi.txt        |   53 +
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |   21 +
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |   44 +
- drivers/gpu/drm/Kconfig                            |    2 +
- drivers/gpu/drm/Makefile                           |    1 +
- drivers/gpu/drm/hisilicon/Kconfig                  |   10 +
- drivers/gpu/drm/hisilicon/Makefile                 |    5 +
- drivers/gpu/drm/hisilicon/hisi_ade_reg.h           |  490 +++++++++
- drivers/gpu/drm/hisilicon/hisi_drm_ade.c           | 1068 ++++++++++++++++++++
- drivers/gpu/drm/hisilicon/hisi_drm_ade.h           |   16 +
- drivers/gpu/drm/hisilicon/hisi_drm_drv.c           |  280 +++++
- drivers/gpu/drm/hisilicon/hisi_drm_drv.h           |   19 +
- drivers/gpu/drm/hisilicon/hisi_drm_dsi.c           |  829 +++++++++++++++
- drivers/gpu/drm/hisilicon/hisi_dsi_reg.h           |   89 ++
- 16 files changed, 3035 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
- create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-drm.txt
- create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-dsi.txt
- create mode 100644 drivers/gpu/drm/hisilicon/Kconfig
- create mode 100644 drivers/gpu/drm/hisilicon/Makefile
- create mode 100644 drivers/gpu/drm/hisilicon/hisi_ade_reg.h
- create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_ade.c
- create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_ade.h
- create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_drv.c
- create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_drv.h
- create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_dsi.c
- create mode 100644 drivers/gpu/drm/hisilicon/hisi_dsi_reg.h
-
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+index 8d43a0f..81236b3 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+@@ -31,4 +31,25 @@
+ 		device_type = "memory";
+ 		reg = <0x0 0x0 0x0 0x40000000>;
+ 	};
++
++	soc {
++		i2c2: i2c at f7102000 {
++			status = "ok";
++
++			adv7533: adv7533 at 39 {
++				compatible = "adi,adv7533";
++				reg = <0x39>;
++				interrupt-parent = <&gpio1>;
++				interrupts = <1 2>;
++				pd-gpio = <&gpio0 4 0>;
++				adi,dsi-lanes = <4>;
++
++				port {
++					adv_in: endpoint {
++						remote-endpoint = <&dsi_out>;
++					};
++				};
++			};
++		};
++	};
+ };
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index 82d2488..2d6cf03 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -208,5 +208,49 @@
+ 			clock-names = "uartclk", "apb_pclk";
+ 			status = "disabled";
+ 		};
++
++		display-subsystem {
++			compatible = "hisilicon,hi6220-dss";
++			#address-cells = <2>;
++			#size-cells = <2>;
++			ranges;
++
++			ade: ade at f4100000 {
++				compatible = "hisilicon,hi6220-ade";
++				reg = <0x0 0xf4100000 0x0 0x7800>,
++				      <0x0 0xf4410000 0x0 0x1000>;
++				reg-names = "ade_base",
++					    "media_base";
++				interrupts = <0 115 4>; /* ldi interrupt */
++
++				clocks = <&media_ctrl HI6220_ADE_CORE>,
++					 <&media_ctrl HI6220_CODEC_JPEG>,
++					 <&media_ctrl HI6220_ADE_PIX_SRC>,
++					 <&media_ctrl HI6220_PLL_SYS>,
++					 <&media_ctrl HI6220_PLL_SYS_MEDIA>;
++				/*clock name*/
++				clock-names  = "clk_ade_core",
++					       "aclk_codec_jpeg_src",
++					       "clk_ade_pix",
++					       "clk_syspll_src",
++					       "clk_medpll_src";
++				ade_core_clk_rate = <360000000>;
++				media_noc_clk_rate = <288000000>;
++			};
++
++			dsi: dsi at 0xf4107800 {
++				compatible = "hisilicon,hi6220-dsi";
++				reg = <0x0 0xf4107800 0x0 0x100>;
++				clocks = <&media_ctrl  HI6220_DSI_PCLK>;
++				clock-names = "pclk_dsi";
++
++				port {
++					dsi_out: endpoint {
++						remote-endpoint = <&adv_in>;
++					};
++				};
++
++			};
++		};
+ 	};
+ };
 -- 
 1.9.1
