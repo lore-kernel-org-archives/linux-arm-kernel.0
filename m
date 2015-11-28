@@ -1,93 +1,84 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 28 Nov 2015 12:20:01 +0100
-Subject: [PATCH] arm: dts: berlin2q-marvell-dmp: add sdhci1 fully
- functionality
-In-Reply-To: <1448543588-1021-1-git-send-email-jszhang@marvell.com>
-References: <1448543588-1021-1-git-send-email-jszhang@marvell.com>
-Message-ID: <56598DE1.9010209@gmail.com>
+Date: Sat, 28 Nov 2015 12:36:16 +0100
+Subject: [PATCH RESEND 1/8] arm: dts: berlin2q: add watchdog nodes
+In-Reply-To: <20151123125953.5c30a0ef@xhacker>
+References: <1447672194-483-1-git-send-email-jszhang@marvell.com>
+ <1447672194-483-2-git-send-email-jszhang@marvell.com>
+ <564E3549.2050700@gmail.com> <20151120113414.1aa1e48e@xhacker>
+ <564F8062.8070609@gmail.com> <20151123125953.5c30a0ef@xhacker>
+Message-ID: <565991B0.5030909@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.11.2015 14:13, Jisheng Zhang wrote:
-> The sdhci1 on Marvell BG2Q DMP board is used as sdcard interface, we
-> have gpios for card detection, write-protect, vqmmc and vmmc.
+On 23.11.2015 05:59, Jisheng Zhang wrote:
+> On Fri, 20 Nov 2015 21:19:46 +0100
+> Sebastian Hesselbarth wrote:
+>> On 20.11.2015 04:34, Jisheng Zhang wrote:
+>>> On Thu, 19 Nov 2015 21:47:05 +0100
+>>> Sebastian Hesselbarth wrote:  
+>>>> On 16.11.2015 12:09, Jisheng Zhang wrote:  
+>>>>> The Marvell Berlin BG2Q has 3 watchdogs which are compatible with the
+>>>>> snps,dw-wdt driver sit in the sysmgr domain. This patch adds the
+>>>>> corresponding device tree nodes.
+>>>>>
+>>>>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+>>>>> ---
+[...]
+>>>>> +			wdt0: watchdog at 1000 {
+>>>>> +				compatible = "snps,dw-wdt";
+>>>>> +				reg = <0x1000 0x100>;
+>>>>> +				clocks = <&refclk>;
+>>>>> +				interrupts = <0>;
+>>>>> +				status = "disabled";    
+>>>>
+>>>> as the watchdogs are internal and cannot be clock gated
+>>>> at all, how about we remove the status = "disabled" and
+>>>> make them always available?  
+>>>
+>>> there are two issues here:
+>>>
+>>> 1. the dw-wdt can't support multiple variants now. I have rewrite the driver
+>>> with watchdog core supplied framework, but the patch isn't sent out and
+>>> may be need time to clean up and review.  
+>>
+>> Ok.
+>>
+>>> 2. not all dw-wdt devices are available and functional. This depends on
+>>> board design and configuration.  
+>>
+>> I understand that "board design and configuration" may hinder the wdt
+>> to issue a hard reset. But all others are able to issue a soft reset
+>> or just an interrupt, right?
+>>
+>> So, I still don't see why we should disable wdt nodes by default
+>> except for the driver issue above.
+>>
+>>> So IMHO status=disabled and patch5-8 is necessary, what do you think?  
+>>
+>> No. I'd agree to enable wdt0 by default and leave wdt[1,2] disabled
+>> because of the driver issue. Patches 5-8 only enable wdt0 anyway.
 > 
-> This patch adds pinmux for this sdcard interface, then adds regulators
-> for vmmc and vqmmc, lastly adds cd-gpios, wp-gpios properties.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 43 ++++++++++++++++++++++++++++--
->  1 file changed, 41 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> index cdcf89b..1fdc1d7 100644
-> --- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> +++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> @@ -84,12 +84,51 @@
->  			gpio = <&portb 12 GPIO_ACTIVE_HIGH>;
->  			enable-active-high;
->  		};
-> +
-> +		reg_sdio1_vmmc: regulator at 3 {
-> +			compatible = "regulator-fixed";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			regulator-name = "sdio1_vmmc";
-> +			enable-active-high;
-> +			regulator-boot-on;
-> +			gpio = <&portb 21 GPIO_ACTIVE_HIGH>;
-> +		};
-> +
-> +		reg_sdio1_vqmmc: regulator at 4 {
-> +			compatible = "regulator-gpio";
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			regulator-name = "sdio1_vqmmc";
-> +			regulator-type = "voltage";
-> +			enable-active-high;
-> +			gpios = <&portb 16 GPIO_ACTIVE_HIGH>;
-> +			states = <3300000 0x1
-> +				  1800000 0x0>;
-> +		};
-> +	};
-> +};
-> +
-> +&soc_pinctrl {
-> +	sd1gpio_pmux: sd1pwr-pmux {
-> +		groups = "G23", "G32";
-> +		function = "gpio";
-> +	};
-> +
-> +	sd1_pmux: sd1-pmux {
-> +		groups = "G31";
-> +		function = "sd1";
+> That's fine.
 
 Jisheng,
 
-while having the sd1gpio_pmux in the board file, I think the
-sd1_pmux is best kept in the SoC.dtsi.
+I amended your SoC dtsi watchdog patches accordingly. wdt0 is
+now always enabled, while the others are disabled.
 
->  	};
->  };
->  
->  &sdhci1 {
-> -	broken-cd;
-> -	sdhci,wp-inverted;
-> +	vmmc-supply = <&reg_sdio1_vmmc>;
-> +	vqmmc-supply = <&reg_sdio1_vqmmc>;
-> +	cd-inverted;
-> +	cd-gpios = <&portc 30 GPIO_ACTIVE_HIGH>;
+So, with the changes Patches 1-4 applied to berlin/dt and berlin64/dt
+respectively. Patches 5-8 dropped.
 
-How about removing cd-inverted and make cd-gpio GPIO_ACTIVE_LOW
-instead?
+>> As soon as the driver issue is resolved, we enable all wdt nodes
+>> unconditionally.
+> 
+> I will submit patch for the wdt driver and hope it will be merged
+> in v4.5.
+
+Ok. Feel free to add a patch that removes the status disabled properties
+again if berlin[64]/dt has already hit mainline in the meantime.
+
+If not, keep me posted on the DW wdt patch outcome.
+
+Thanks,
 
 Sebastian
-
-> +	wp-gpios = <&portd 0 GPIO_ACTIVE_HIGH>;
-> +	pinctrl-0 = <&sd1gpio_pmux>, <&sd1_pmux>;
-> +	pinctrl-names = "default";
->  	status = "okay";
->  };
->  
-> 
