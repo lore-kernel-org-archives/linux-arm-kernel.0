@@ -1,110 +1,87 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 28 Nov 2015 11:26:49 +0100
-Subject: [PATCH v2] pinctrl: mvebu: complain about missing group after
- checking variant
-In-Reply-To: <1448705645-13881-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1448705645-13881-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1448706409-16912-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: xinliang.liu@linaro.org (Xinliang Liu)
+Date: Sat, 28 Nov 2015 18:38:55 +0800
+Subject: [PATCH v2 00/10] Add New DRM Driver for HiSilicon hi6220 SoC
+Message-ID: <1448707145-69348-1-git-send-email-xinliang.liu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Common MVEBU pinctrl driver core gets an array of controls to modify
-a specific set of registers and an array of modes for each pingroup
-from each of the different SoC families of MVEBU.
+  This patch set adds a new drm driver for HiSilicon hi6220 SoC.
+Current testing and support board is Hikey board which is one of Linaro
+96boards. It is an arm64 open source board. For more information about
+this board, please access https://www.96boards.org.
 
-Some SoC families comprise different variants that differ in available
-pingroups and also controls, but to ease driver development, we can
-pass a variant mask to disable specific pingroups for some variants.
-However, controls are limited to the true number of pinctrl groups
-avaiable on a variant.
+Hardware Detail
+---------------
+  The display subsystem of Hi6220 SoC is shown as bellow:
+ +-----+       +----------+     +-----+     +---------+
+ |     |       |          |     |     |     |         |             	
+ | FB  |------>|   ADE    |---->| DSI |---->| External|
+ |     |       |          |     |     |     |  HDMI   |
+ +-----+       +----------+     +-----+     +---------+
 
-Now, when pinctrl core driver parses over above arrays, it tries to
-match modes with available controls and complains about missing
-controls for modes that are passed to the core but actually are not
-avaiable on a variant with:
+- ADE(Advanced Display Engine) is the display controller. It contains 7
+channels, 3 overlay compositors and a LDI.
+  - A channel looks like: DMA-->clip-->scale-->ctrans(or called csc).
+  - Overlay compositor is response to compose planes which come from 7
+  channels and pass composed image to LDI.
+  - LDI is response to generate timings and RGB data stream.
+- DSI converts the RGB data stream from ADE to DSI packets.
+- External HDMI module is connected with DSI bus. Now Hikey use a ADI's
+  ADV7533 external HDMI chip.
 
-kirkwood-pinctrl f1010000.pin-controller: unknown pinctrl group 36
+Change History
+-------------
+Changes in v2:
+- Remove abtraction layer of plane/crtc/encoder/connector.
+- Refactor atomic implementation according to Daniel Vetter's guides:
+http://blog.ffwll.ch/2014/11/atomic-modeset-support-for-kms-drivers.html
+http://blog.ffwll.ch/2015/09/xdc-2015-atomic-modesetting-for-drivers.html
+http://blog.ffwll.ch/2015/08/atomic-modesetting-design-overview.html
+- Use bridge instead of slave encoder to connect external HDMI.
+- Move dt binding docs to bindings/display/hisilicon directory. 
 
-This warning is a false-positive and annoying, so move the warning
-after we checked the variant mask for each mode setting. Also, if
-there is no supported setting for this variant, do not complain at
-all.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Reported-by: Linus Walleij <linus.walleij@linaro.org>
----
-Changelog:
-v1->v2:
-- modify settings loop to allow to check for !num_settings
+Xinliang Liu (10):
+  arm64: dts: hisilicon: Add display subsystem DT nodes for hi6220.
+  drm/hisilicon: Add device tree binding for hi6220 display subsystem
+  drm/hisilicon: Add hisilicon DRM master driver
+  drm/hisilicon: Add crtc funcs for ADE
+  drm/hisilicon: Add plane funcs for ADE
+  drm/hisilicon: Add vblank feature
+  drm/hisilicon: Add cma fbdev and hotplug
+  drm/hisilicon: Add dsi encoder driver
+  drm/hisilicon: Add dsi host driver
+  drm/hisilicon: Add support for external bridge
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Simon Guinot <simon.guinot@sequanux.org>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: linux-gpio at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/pinctrl/mvebu/pinctrl-mvebu.c | 29 ++++++++++++++++-------------
- 1 file changed, 16 insertions(+), 13 deletions(-)
+ .../bindings/display/hisilicon/hisi-ade.txt        |   42 +
+ .../bindings/display/hisilicon/hisi-drm.txt        |   66 ++
+ .../bindings/display/hisilicon/hisi-dsi.txt        |   53 +
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |   21 +
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |   44 +
+ drivers/gpu/drm/Kconfig                            |    2 +
+ drivers/gpu/drm/Makefile                           |    1 +
+ drivers/gpu/drm/hisilicon/Kconfig                  |   10 +
+ drivers/gpu/drm/hisilicon/Makefile                 |    5 +
+ drivers/gpu/drm/hisilicon/hisi_ade_reg.h           |  490 +++++++++
+ drivers/gpu/drm/hisilicon/hisi_drm_ade.c           | 1068 ++++++++++++++++++++
+ drivers/gpu/drm/hisilicon/hisi_drm_ade.h           |   16 +
+ drivers/gpu/drm/hisilicon/hisi_drm_drv.c           |  280 +++++
+ drivers/gpu/drm/hisilicon/hisi_drm_drv.h           |   19 +
+ drivers/gpu/drm/hisilicon/hisi_drm_dsi.c           |  829 +++++++++++++++
+ drivers/gpu/drm/hisilicon/hisi_dsi_reg.h           |   89 ++
+ 16 files changed, 3035 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
+ create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-drm.txt
+ create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-dsi.txt
+ create mode 100644 drivers/gpu/drm/hisilicon/Kconfig
+ create mode 100644 drivers/gpu/drm/hisilicon/Makefile
+ create mode 100644 drivers/gpu/drm/hisilicon/hisi_ade_reg.h
+ create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_ade.c
+ create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_ade.h
+ create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_drv.c
+ create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_drv.h
+ create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_dsi.c
+ create mode 100644 drivers/gpu/drm/hisilicon/hisi_dsi_reg.h
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-index 77d2221d379d..e4d473811bb3 100644
---- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-@@ -663,28 +663,20 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
- 	/* assign mpp modes to groups */
- 	for (n = 0; n < soc->nmodes; n++) {
- 		struct mvebu_mpp_mode *mode = &soc->modes[n];
--		struct mvebu_pinctrl_group *grp =
--			mvebu_pinctrl_find_group_by_pid(pctl, mode->pid);
-+		struct mvebu_mpp_ctrl_setting *set = &mode->settings[0];
-+		struct mvebu_pinctrl_group *grp;
- 		unsigned num_settings;
- 
--		if (!grp) {
--			dev_warn(&pdev->dev, "unknown pinctrl group %d\n",
--				mode->pid);
--			continue;
--		}
--
--		for (num_settings = 0; ;) {
--			struct mvebu_mpp_ctrl_setting *set =
--				&mode->settings[num_settings];
--
-+		for (num_settings = 0; ; set++) {
- 			if (!set->name)
- 				break;
--			num_settings++;
- 
- 			/* skip unsupported settings for this variant */
- 			if (pctl->variant && !(pctl->variant & set->variant))
- 				continue;
- 
-+			num_settings++;
-+
- 			/* find gpio/gpo/gpi settings */
- 			if (strcmp(set->name, "gpio") == 0)
- 				set->flags = MVEBU_SETTING_GPI |
-@@ -695,6 +687,17 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
- 				set->flags = MVEBU_SETTING_GPI;
- 		}
- 
-+		/* skip modes with no settings for this variant */
-+		if (!num_settings)
-+			continue;
-+
-+		grp = mvebu_pinctrl_find_group_by_pid(pctl, mode->pid);
-+		if (!grp) {
-+			dev_warn(&pdev->dev, "unknown pinctrl group %d\n",
-+				mode->pid);
-+			continue;
-+		}
-+
- 		grp->settings = mode->settings;
- 		grp->num_settings = num_settings;
- 	}
 -- 
-2.1.4
+1.9.1
