@@ -1,63 +1,120 @@
-From: alex.aring@gmail.com (Alexander Aring)
-Date: Sun, 29 Nov 2015 17:59:33 +0100
-Subject: [PATCHv2 4/4] ARM: bcm2835: update rpi devicetree entries
-In-Reply-To: <1448816373-18235-1-git-send-email-alex.aring@gmail.com>
-References: <1448816373-18235-1-git-send-email-alex.aring@gmail.com>
-Message-ID: <1448816373-18235-5-git-send-email-alex.aring@gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Sun, 29 Nov 2015 11:06:06 -0600
+Subject: [PATCH 01/18] ARM: am57xx: cl-som-am57x: dts: add basic module
+ support
+In-Reply-To: <565AEB19.4050107@compulab.co.il>
+References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
+ <1448433590-1399-2-git-send-email-lifshitz@compulab.co.il>
+ <565629D2.2010401@ti.com> <565AEB19.4050107@compulab.co.il>
+Message-ID: <565B307E.2000203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the Raspberry Pi devicetree bindings to support the
-power domain driver and enable the USB power domain.
+On 11/29/2015 06:10 AM, Dmitry Lifshitz wrote:
+[...]
+>>> +    };
+>>> +
+>>> +    leds {
+>>> +        compatible = "gpio-leds";
+>>> +        pinctrl-names = "default";
+>>> +        pinctrl-0 = <&leds_pins_default>;
+>>> +
+>>> +        led at 0 {
+>>> +            label = "cl-som-am57x:green";
+>>> +            gpios = <&gpio2 5 GPIO_ACTIVE_HIGH>;
+>>> +            linux,default-trigger = "heartbeat";
+>>> +            default-state = "off";
+>>> +        };
+>>> +    };
+>>> +};
+>>> +
+>>> +&dra7_pmx_core {
+>>> +    leds_pins_default: leds_pins_default {
+>>> +        pinctrl-single,pins = <
+>>> +            DRA7XX_CORE_IOPAD(0x347c, PIN_OUTPUT | MUX_MODE14)    /*
+>>> gpmc_a15.gpio2_5 */
+>>> +        >;
+>>> +    };
+>>> +
+>>> +    i2c1_pins_default: i2c1_pins_default {
+>>> +        pinctrl-single,pins = <
+>>> +            DRA7XX_CORE_IOPAD(0x3800, PIN_INPUT_PULLUP |
+>>> MUX_MODE0)    /* i2c1_sda.sda */
+>>> +            DRA7XX_CORE_IOPAD(0x3804, PIN_INPUT_PULLUP |
+>>> MUX_MODE0)    /* i2c1_scl.scl */
+>>> +        >;
+>>> +    };
+>>> +
+>>> +    tps659038_pins_default: tps659038_pins_default {
+>>> +        pinctrl-single,pins = <
+>>> +            DRA7XX_CORE_IOPAD(0x3818, PIN_INPUT_PULLUP | MUX_MODE14)
+>>> /* wakeup0.gpio1_0 */
+>>> +        >;
+>>> +    };
+>>
+>> Generic comment: As per requirements of the SoC -> all pinctrl must be
+>> done in bootloader. this was a recommendation that came in too late
+>> for TI platforms that got introduced in upstream, but that cleanup
+>> should eventually take place as well.
+>>
+> 
+> Please, could you provide a reference to those recommendations.
+> Do you mean pinctrl for PMIC pins only?
 
-Signed-off-by: Alexander Aring <alex.aring@gmail.com>
----
- arch/arm/boot/dts/bcm2835-rpi.dtsi | 11 +++++++++++
- arch/arm/boot/dts/bcm2835.dtsi     |  2 +-
- 2 files changed, 12 insertions(+), 1 deletion(-)
+You might want to ask your TI support contact for IODelay
+recommendations. TRM mentions that pinmuxing must be performed under IO
+isolation. There are silicon constraints in DRA7/AM57xx family, which
+were not present previously.
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index 3572f03..f828202 100644
---- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -1,3 +1,4 @@
-+#include <dt-bindings/arm/raspberrypi-power.h>
- #include "bcm2835.dtsi"
- 
- / {
-@@ -20,6 +21,12 @@
- 			compatible = "raspberrypi,bcm2835-firmware";
- 			mboxes = <&mailbox>;
- 		};
-+
-+		power: power {
-+			compatible = "raspberrypi,bcm2835-power";
-+			firmware = <&firmware>;
-+			#power-domain-cells = <1>;
-+		};
- 	};
- };
- 
-@@ -60,3 +67,7 @@
- 	status = "okay";
- 	bus-width = <4>;
- };
-+
-+&usb {
-+	power-domains = <&power RPI_POWER_DOMAIN_USB>;
-+};
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index aef64de..6d62af0 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -177,7 +177,7 @@
- 			status = "disabled";
- 		};
- 
--		usb at 7e980000 {
-+		usb: usb at 7e980000 {
- 			compatible = "brcm,bcm2835-usb";
- 			reg = <0x7e980000 0x10000>;
- 			interrupts = <1 9>;
+>>> +    tps659038: tps659038 at 58 {
+>>> +        compatible = "ti,tps659038";
+>>> +        reg = <0x58>;
+>>> +        interrupt-parent = <&gpio1>;
+>>> +        interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+>>
+>> Also See: https://patchwork.kernel.org/patch/7596541/ ->
+>> Documentation/devicetree/bindings/i2c/i2c.txt -> since you seem to
+>> have a PMIC with power button, you might be able to get wakeup source
+>> also there.
+>>
+> 
+> Do you mean just adding "wakeup-source" property?
+> 
+> According to Documentation/devicetree/bindings/i2c/i2c.txt the primary
+> interrupt will be used as wakeup interrupt.
+
+I think you might have to describe a "wakeup" interrupt -> which will be
+similar in description to the one you used to describe uart wakeup
+capability.
+
+[..]
+
+>>> +        pinctrl-names = "default";
+>>> +        pinctrl-0 = <&tps659038_pins_default>;
+>>> +
+>>> +        #interrupt-cells = <2>;
+>>> +        interrupt-controller;
+>>> +
+>>> +        ti,system-power-controller;
+>>
+>> Assuming powerhold signal and BOOT0,1 is proper here, else poweroff
+>> will never work.
+>>
+> 
+> Please, could you provide more details regarding this issue.
+
+well,  if poweroff command does not completely power off your board, you
+may want to investigate further. overall, the better circuit
+configuration is the X15 configuration:
+https://github.com/beagleboard/beagleboard-x15/blob/master/BeagleBoard-X15_RevA2.pdf
+Pay close attention to the PMIC GPIO_&/POWERHOLD signal. Also notice the
+extra reset circuit involved.
+
+Again, a topic that you should probably discuss with your TI support
+contact person.
+
+[...]
+
 -- 
-2.6.1
+Regards,
+Nishanth Menon
