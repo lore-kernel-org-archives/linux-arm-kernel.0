@@ -1,57 +1,35 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Sun, 29 Nov 2015 19:19:18 +0100
-Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
- "/chosen/linux, atags" entry
-In-Reply-To: <20151129180939.GE30871@n2100.arm.linux.org.uk>
-References: <20150713131902.GH26485@atomide.com>
- <alpine.LFD.2.20.1511281232440.22569@knanqh.ubzr>
- <20151129180939.GE30871@n2100.arm.linux.org.uk>
-Message-ID: <201511291919.18179@pali>
+From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
+Date: Sun, 29 Nov 2015 19:27:06 +0100
+Subject: [PATCH 5/5] iio: adc: New driver for Cirrus Logic EP93xx ADC
+In-Reply-To: <565B33AC.40908@kernel.org>
+References: <56558B23.4080506@gmail.com> <5655A0A5.20908@gmail.com>
+ <565B23FB.9040405@kernel.org> <565B2A91.6050409@gmail.com>
+ <565B33AC.40908@kernel.org>
+Message-ID: <565B437A.4030501@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 29 November 2015 19:09:39 Russell King - ARM Linux wrote:
-> On Sat, Nov 28, 2015 at 12:34:23PM -0500, Nicolas Pitre wrote:
-> > Good. And Arnd likes the idea too. So we might be converging at
-> > last which is a good thing.
-> 
-> I disagree with the idea that there is convergence.  There might be
-> convergence towards an idea, but... Here's a mail extract, from July
-> 7th, from earlier in this very thread:
-> 
-> Pali:
-> > Me:
-> > > Are the ATAGs at a fixed address on the N900?
-> > 
-> > Yes, in board-rx51.c is:
-> > 
-> > .atag_offset    = 0x100
-> > 
-> > and Nokia Bootloader (proprietary) store them to that address.
-> > 
-> > > Can that be handled in
-> > > some kind of legacy file for the N900 which calls save_atags() on
-> > > it, so we don't end up introducing yet more stuff that we have
-> > > to maintain into the distant future?  If not, what about copying
-> > > a known working atag structure into a legacy file for the N900?
-> > 
-> > I already asked question if it is possible to read ATAGs from DT
-> > booted kernel. And somebody (do not remember who) wrote to ML,
-> > that it is not possible and it can be done in that uncompress
-> > code.
-> 
-> So you're converging on an idea that has already been rejected. 
-> That's not a good thing, IMHO.
+Hello Jonathan,
 
-Or in other case show that such implementation is possible...
+On 29/11/15 18:19, Jonathan Cameron wrote:
+>> High end models (EP9307, EP9312, EP9315) have TS controller, which can operate
+>> > in general purpose ADC mode. In this mode these names are just ball names on the
+>> > pinout. They are all the same. There is only one issue -- I have not found any
+>> > official numbering for these devices, therefore wanted to expose this naming to
+>> > user space. Low end devices (EP9301, EP9302) have same hw block where TS mode is
+>> > not advertised, and even though the balls/pins are still named as in TS controller,
+>> > they are also referred as ADC0-ADC4 in datasheet. But there are only 5 of them,
+>> > so we do not know the numbers for other 3 in the bigger devices.
+>> > 
+>> > If this is not the purpose of extend_name, I'll drop them.
+> It's not.  We've had discussions about either exposing the datasheet names via
+> sysfs or perhaps allowing arbitrary labelling but nothing has come of it yet.
+> 
+> Perhaps in this case clear documentation of the mapping is the way to go in 
+> documentation for the driver.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151129/ae6813f3/attachment.sig>
+Do you think something like Documentation/ABI/testing/sysfs-bus-iio-adc-ep93xx is a right
+place?
+
+Regards,
+Alexander.
