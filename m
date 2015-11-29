@@ -1,35 +1,45 @@
-From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
-Date: Sun, 29 Nov 2015 19:27:06 +0100
-Subject: [PATCH 5/5] iio: adc: New driver for Cirrus Logic EP93xx ADC
-In-Reply-To: <565B33AC.40908@kernel.org>
-References: <56558B23.4080506@gmail.com> <5655A0A5.20908@gmail.com>
- <565B23FB.9040405@kernel.org> <565B2A91.6050409@gmail.com>
- <565B33AC.40908@kernel.org>
-Message-ID: <565B437A.4030501@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 29 Nov 2015 22:26:42 +0100
+Subject: [PATCH 1/3] ste_dma40: Delete an unnecessary check before the
+ function call "kmem_cache_destroy"
+In-Reply-To: <564A4935.6010307@users.sourceforge.net>
+References: <5307CAA2.8060406@users.sourceforge.net>
+ <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
+ <530A086E.8010901@users.sourceforge.net>
+ <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
+ <530A72AA.3000601@users.sourceforge.net>
+ <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
+ <530B5FB6.6010207@users.sourceforge.net>
+ <alpine.DEB.2.10.1402241710370.2074@hadrien>
+ <530C5E18.1020800@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251014170.2080@hadrien>
+ <530CD2C4.4050903@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251840450.7035@hadrien>
+ <530CF8FF.8080600@users.sourceforge.net>
+ <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
+ <530DD06F.4090703@users.sourceforge.net>
+ <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
+ <5317A59D.4@users.sourceforge.net>
+ <564A4899.8040109@users.sourceforge.net>
+ <564A4935.6010307@users.sourceforge.net>
+Message-ID: <CACRpkdZHhSy5Y0O0j9dSutfej_Ro6zCjZQuUiHG9X1b1feC3Mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jonathan,
+On Mon, Nov 16, 2015 at 10:23 PM, SF Markus Elfring
+<elfring@users.sourceforge.net> wrote:
 
-On 29/11/15 18:19, Jonathan Cameron wrote:
->> High end models (EP9307, EP9312, EP9315) have TS controller, which can operate
->> > in general purpose ADC mode. In this mode these names are just ball names on the
->> > pinout. They are all the same. There is only one issue -- I have not found any
->> > official numbering for these devices, therefore wanted to expose this naming to
->> > user space. Low end devices (EP9301, EP9302) have same hw block where TS mode is
->> > not advertised, and even though the balls/pins are still named as in TS controller,
->> > they are also referred as ADC0-ADC4 in datasheet. But there are only 5 of them,
->> > so we do not know the numbers for other 3 in the bigger devices.
->> > 
->> > If this is not the purpose of extend_name, I'll drop them.
-> It's not.  We've had discussions about either exposing the datasheet names via
-> sysfs or perhaps allowing arbitrary labelling but nothing has come of it yet.
-> 
-> Perhaps in this case clear documentation of the mapping is the way to go in 
-> documentation for the driver.
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Mon, 16 Nov 2015 20:26:27 +0100
+>
+> The kmem_cache_destroy() function tests whether its argument is NULL
+> and then returns immediately. Thus the test around the call is not needed.
+>
+> This issue was detected by using the Coccinelle software.
+>
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 
-Do you think something like Documentation/ABI/testing/sysfs-bus-iio-adc-ep93xx is a right
-place?
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Regards,
-Alexander.
+Yours,
+Linus Walleij
