@@ -1,31 +1,33 @@
 From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Sun, 29 Nov 2015 16:31:35 +0800
-Subject: [PATCH 1/4] cpufreq: mt8173: add CPUFREQ_HAVE_GOVERNOR_PER_POLICY flag
-Message-ID: <1448785898-17838-1-git-send-email-pi-cheng.chen@linaro.org>
+Date: Sun, 29 Nov 2015 16:31:36 +0800
+Subject: [PATCH 2/4] cpufreq: mt8173: remove redundant regulator_get_voltage()
+ call
+In-Reply-To: <1448785898-17838-1-git-send-email-pi-cheng.chen@linaro.org>
+References: <1448785898-17838-1-git-send-email-pi-cheng.chen@linaro.org>
+Message-ID: <1448785898-17838-2-git-send-email-pi-cheng.chen@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add CPUFREQ_HAVE_GOVERNOR_PER_POLICY to have individual set of tunables
-for each cluster of MT8173.
+Remove redundant regulator_get_voltage() call to get Vsram value
+since it will be obtained later at the beginning of voltage tracking
+loop.
 
 Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
 ---
- drivers/cpufreq/mt8173-cpufreq.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/cpufreq/mt8173-cpufreq.c | 1 -
+ 1 file changed, 1 deletion(-)
 
 diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
-index 83001dc..c438109 100644
+index c438109..750cda7 100644
 --- a/drivers/cpufreq/mt8173-cpufreq.c
 +++ b/drivers/cpufreq/mt8173-cpufreq.c
-@@ -469,7 +469,8 @@ static int mtk_cpufreq_exit(struct cpufreq_policy *policy)
- }
+@@ -59,7 +59,6 @@ static int mtk_cpufreq_voltage_tracking(struct mtk_cpu_dvfs_info *info,
+ 	int old_vproc, old_vsram, new_vsram, vsram, vproc, ret;
  
- static struct cpufreq_driver mt8173_cpufreq_driver = {
--	.flags = CPUFREQ_STICKY | CPUFREQ_NEED_INITIAL_FREQ_CHECK,
-+	.flags = CPUFREQ_STICKY | CPUFREQ_NEED_INITIAL_FREQ_CHECK |
-+		 CPUFREQ_HAVE_GOVERNOR_PER_POLICY,
- 	.verify = cpufreq_generic_frequency_table_verify,
- 	.target_index = mtk_cpufreq_set_target,
- 	.get = cpufreq_generic_get,
+ 	old_vproc = regulator_get_voltage(proc_reg);
+-	old_vsram = regulator_get_voltage(sram_reg);
+ 	/* Vsram should not exceed the maximum allowed voltage of SoC. */
+ 	new_vsram = min(new_vproc + MIN_VOLT_SHIFT, MAX_VOLT_LIMIT);
+ 
 -- 
 1.9.1
