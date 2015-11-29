@@ -1,26 +1,21 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 29 Nov 2015 22:35:39 +0100
-Subject: [PATCH] pinctrl: mediatek: fix a memleak when do dt maps.
-In-Reply-To: <1447799622-3340-1-git-send-email-hongzhou.yang@mediatek.com>
-References: <1447799622-3340-1-git-send-email-hongzhou.yang@mediatek.com>
-Message-ID: <CACRpkdZLA-qu8uzO-7HRnwR6h6y8Gkhw0rs8St8BXjfduUFykA@mail.gmail.com>
+From: crosthwaitepeter@gmail.com (Peter Crosthwaite)
+Date: Sun, 29 Nov 2015 14:18:24 -0800
+Subject: Adding VIRTIO to the multi_v7_defconfig
+Message-ID: <CAPokK=rMi0OuqwePNkWMEi+5f_GZzw-j8fkN__2docvzwGV5+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 11:33 PM, Hongzhou Yang
-<hongzhou.yang@mediatek.com> wrote:
+Hi,
 
-> configs will kmemdup to dup_configs in pictrl util function.
-> So configs need to be freed.
->
-> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
-> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
-> ---
->  Fix a memleak issue.
->  According to Yingjoe's comment, add return checek for pinconf_generic_parse_dt_config.
+I started a small project to test as many QEMU emulated ARM boards
+using the multi_v7 defconfig:
 
-Patch applied with Yingjoe's review tag.
+https://lists.gnu.org/archive/html/qemu-devel/2015-10/msg00755.html
 
-Yours,
-Linus Walleij
+One thing that came up was we cannot use the virt board as it relies
+on virtio hotplug and drivers to get block and network support. The
+defconfig is missing the drivers. Should we add the VIRTIO drivers to
+the defconfig to bring this into play?
+
+Regards,
+Peter
