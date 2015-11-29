@@ -1,119 +1,81 @@
-From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
-Date: Sun, 29 Nov 2015 17:40:49 +0100
-Subject: [PATCH 5/5] iio: adc: New driver for Cirrus Logic EP93xx ADC
-In-Reply-To: <565B23FB.9040405@kernel.org>
-References: <56558B23.4080506@gmail.com> <5655A0A5.20908@gmail.com>
- <565B23FB.9040405@kernel.org>
-Message-ID: <565B2A91.6050409@gmail.com>
+From: alex.aring@gmail.com (Alexander Aring)
+Date: Sun, 29 Nov 2015 17:59:29 +0100
+Subject: [PATCHv2 0/4] ARM: bcm2835: add support for rpi power domain driver 
+Message-ID: <1448816373-18235-1-git-send-email-alex.aring@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jonathan!
+Hi,
 
-Thanks for your review!
+this patch series contains at first a patch for the power domain subsystem
+which offers to exit generic power domains when init was called before.
 
-On 29/11/15 17:12, Jonathan Cameron wrote:
->> New driver adding support for ADC found on Cirrus Logic EP93xx series of SoCs.
->> > Board specific code must take care to create platform device with all necessary
->> > resources.
->> > 
->> > Signed-off-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
-> Datasheet links always appreciated if available.
-> 
-> Right now Cirrus' website is fighting back so I can't get to any
-> of their docs - hence bare with me!
+The RPi Power-Domains need to be enabled/disabled by interacting with the
+RPi firmware which can fail. To cleanup the probing we need to undo the
+power domains again which was registered before.
 
-Yeah, with Cirrus one is served elsewhere much better than on the Cirrus's website.
-First hit by Google (on "ep9301 user's guide") gives the document which is even
-missing at Cirrus:
-https://www.embeddedarm.com/documentation/third-party/ts-7000_ep9301-ug.pdf
+- Alex
 
-> A few bits inline.  Primary question which is hard to answer without the
-> datasheets is what meaning the channel names actually have?  THe brief
-> says they are general purpose.  If so then it's not really valid
-> to given them extended names suggesting anything more.
+changes since PATCHv2:
+ - rename pm_genpd_uninit to pm_genpd_exit. I adapted here a review note
+   from another patch. Usually kernel naming style is like "foobar_init"
+   and "foobar_exit" but rarely "uninit". That's why I don't add the ack
+   from Ulf Hansson here.
+ - split dtsi updates into a separate patch.
+ - remove testing steps from commit message.
+ - change to "depends on ARCH_BCM2835 || COMPILE_TEST".
+ - Add Rob Herring ack.
+ - Add Eric Anholt sob.
 
-High end models (EP9307, EP9312, EP9315) have TS controller, which can operate
-in general purpose ADC mode. In this mode these names are just ball names on the
-pinout. They are all the same. There is only one issue -- I have not found any
-official numbering for these devices, therefore wanted to expose this naming to
-user space. Low end devices (EP9301, EP9302) have same hw block where TS mode is
-not advertised, and even though the balls/pins are still named as in TS controller,
-they are also referred as ADC0-ADC4 in datasheet. But there are only 5 of them,
-so we do not know the numbers for other 3 in the bigger devices.
+changes since PATCH (was RFCv2 before):
+ - add WARN_ON_ONCE if there are still references from generic power domain
+   inside the power domain subsystem when running pm_genpd_uninit.
+ - add mutex_destroy when running pm_genpd_uninit.
+ - split devicetree binding for rpi power domain driver into a separate patch.
+ - rename config RASPBERRY_POWER to RASPBERRYPI_POWER
+ - order list of <linux/...> includes alphabetical.
+ - use rpi_ prefix than raspberrypi_ prefix.
+ - rename _DT_BINDINGS_ARM_BCM2835_MBOX_POWER_H to _DT_BINDINGS_ARM_BCM2835_RPI_POWER_H
 
-If this is not the purpose of extend_name, I'll drop them.
+changes since RFCv2:
+ - add pm_genpd_uninit to handle probing failure.
+ - move power domain drive to his own driver in arch/arm/mach-bcm/
+   Also add own devicetree node for this driver, "raspberrypi,bcm2835-power".
+ - Removing all power domains which might exists for the firmware API but
+   we currently have no use-case for it. I tried to keep the same domain
+   numbering in generic power domains subsystem like they are offered from
+   the firmware API. This works, all power_domains which are NULL inside
+   the array of genpd_onecell_data.domains[#] will be ignored.
+ - Adding Eric Anholt and me to the authors.
+ - Creating devicetree documentation for the power domain driver.
+ - fix error handling in raspberrypi_firmware_set_power.
+ - Remove comment about mapping between power domains array, this is not
+   necessary anymore. I add a "enabled" attribute to raspberrypi_power_domain
+   which indicates if a domain should be registered or not (zeroed values
+   does not indicate such handling, but enabled is false then).
+ - remove "goto mbox" not necessary anymore because an own driver
+   implementation.
+ - Update devicetrees for changes in v2.
 
-[...]
+Alexander Aring (4):
+  power: domain: add pm_genpd_exit
+  ARM: bcm2835: add rpi power domain driver
+  devicetree: add rpi power domain driver bindings
+  ARM: bcm2835: update rpi devicetree entries
 
->> > +static const struct iio_chan_spec ep93xx_adc_channels[EP93XX_NUM_CHANNELS] = {
->> > +	EP93XX_ADC_CH(0, "YM",	"ym",	0x608),
->> > +	EP93XX_ADC_CH(1, "SXP",	"sxp",	0x680),
->> > +	EP93XX_ADC_CH(2, "SXM",	"sxm",	0x640),
->> > +	EP93XX_ADC_CH(3, "SYP",	"syp",	0x620),
->> > +	EP93XX_ADC_CH(4, "SYM",	"sym",	0x610),
->> > +	EP93XX_ADC_CH(5, "XP",	"xp",	0x601),
->> > +	EP93XX_ADC_CH(6, "XM",	"xm",	0x602),
->> > +	EP93XX_ADC_CH(7, "YP",	"yp",	0x604),
->> > +};
-> Hmm.  I'm a little dubious about the extended names.  What in the device
-> acutally restricts them to these uses?  This naming is probably something
-> to do with touch screens?  If there is no special purpose hardware then
-> I'd just drop the extended names (datasheet names obviously fine if thats
-> what they are called on the datasheet!)
+ .../bindings/arm/bcm/raspberrypi,bcm2835-power.txt |  25 +++
+ arch/arm/boot/dts/bcm2835-rpi.dtsi                 |  11 ++
+ arch/arm/boot/dts/bcm2835.dtsi                     |   2 +-
+ arch/arm/mach-bcm/Kconfig                          |  10 ++
+ arch/arm/mach-bcm/Makefile                         |   1 +
+ arch/arm/mach-bcm/raspberrypi-power.c              | 180 +++++++++++++++++++++
+ drivers/base/power/domain.c                        |  22 +++
+ include/dt-bindings/arm/raspberrypi-power.h        |  14 ++
+ include/linux/pm_domain.h                          |   4 +
+ 9 files changed, 268 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-power.txt
+ create mode 100644 arch/arm/mach-bcm/raspberrypi-power.c
+ create mode 100644 include/dt-bindings/arm/raspberrypi-power.h
 
-see above...
-
->> > +		ep93xx_adc_delay(DIV_ROUND_UP(1000000, 925),
->> > +				 DIV_ROUND_UP(1000000, 925));
->> > +		/* At this point conversion must be completed, but anyway... */
->> > +		while (1) {
-> Might be worth a timeout and adding a sleep in here to avoid a tight
-> spin.  Obviously it should always be fine, but who knows!
-
-Yes, I've added a timeout for v2. We really don't need a second sleep here, the sleep
-before should ensure polling ends up immediately. But timeout will ensure read
-will not hang even if HW is exploded.
-
-[...]
-
->> > +	ret = devm_iio_device_register(&pdev->dev, iiodev);
->> > +	if (ret)
->> > +		return ret;
->> > +
->> > +	platform_set_drvdata(pdev, iiodev);
-> I'd reorder as Peter suggested - it doesn't mater obviously but
-> you could then do return devm_iio_device_register and save
-> a few lines of code without a lost of functionality.
-> 
-> However, this is racey as the userspace interface will be removed
-> 'after' the clk_disable below.  Basic rule of thumb is that if
-> you do anything at all in the remove, you can't use devm_iio_device_register
-> as if it makes sense to do it it must effect device functionality of a
-> device still exposed to userspace.
-
-This is a valid point... Will drop devm_iio_device_register() usage in v2...
-
->> > +
->> > +	return 0;
->> > +}
->> > +
->> > +static int ep93xx_adc_remove(struct platform_device *pdev)
->> > +{
->> > +	struct iio_dev *iiodev = platform_get_drvdata(pdev);
->> > +	struct ep93xx_adc_priv *priv = iio_priv(iiodev);
-> Personal taste, but I'd roll the above into one call as we never
-> use the iio_dev in this function..
-
-Well, dropping devm_iio_device_register() will require its usage...
-
->> > +
->> > +	clk_disable(priv->clk);
->> > +
->> > +	return 0;
->> > +}
-
-[...]
-
-Regards,
-Alexander.
+-- 
+2.6.1
