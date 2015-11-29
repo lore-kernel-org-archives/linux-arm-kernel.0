@@ -1,66 +1,38 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Sun, 29 Nov 2015 15:48:58 +0200
-Subject: [GIT PULL] LPC32xx DTS changes for v4.4
-In-Reply-To: <1447863700-15681-1-git-send-email-vz@mleia.com>
-References: <1447863700-15681-1-git-send-email-vz@mleia.com>
-Message-ID: <565B024A.2030704@mleia.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 29 Nov 2015 15:35:48 +0100
+Subject: [PATCH 4/4] ARM: dt: mvebu: ix4-300d: Add ECC properties to
+ NAND flash
+In-Reply-To: <1448709248-21177-5-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1448709248-21177-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1448709248-21177-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20151129153548.304522af@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Sebastian,
 
-On 18.11.2015 18:21, Vladimir Zapolskiy wrote:
-> Hi arm-soc team,
-> 
-> Please consider pulling these DTS changes for the NXP LPC32xx
-> platform and related boards.
-> 
-> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
-> 
->   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/vzapolskiy/linux.git lpc32xx-dts
-> 
-> for you to fetch changes up to aa29efb445f11506daca0db934331f144b38ddc4:
-> 
->   arm: dts: lpc32xx: move USB controller subdevices into own device node (2015-11-18 18:01:27 +0200)
+Adding Ezequiel Garcia in Cc.
 
-this is an old reviewed series, I suppose it is too late to include it
-into v4.4, should I resend the same pull request for v4.5?
+On Sat, 28 Nov 2015 12:14:08 +0100, Sebastian Hesselbarth wrote:
+> The NAND device found on Lenovo ix4-300d uses 4-bit BCH ECC protection.
+> Add the corresponding properties to the NAND node.
 
-Or is it possible to merge it as is?
+If the ONFI information from the NAND flash say that it requires 4 bits
+per 512, then there should be no need to add this information to the
+Device Tree as the pxa3xx_nand driver by default uses the ONFI
+information.
 
-With best wishes,
-Vladimir
+Those properties are only needed when for some reason the vendor has
+chosen to use a ECC strength that doesn't match with the one advertised
+by the flash in its ONFI information (either stronger or weaker). But
+in this case, your commit log is confusing, because it says that the
+"NAND device ... uses 4-bit BCH ECC protection". If it really does,
+then the patch is not needed :-)
 
-> ----------------------------------------------------------------
-> Main changes in the series:
-> - Added description of the second PWM controller device
-> - Added External Memory Controller device tree node (Primecell PL175)
-> - Added device tree nodes for standard timer controllers
-> - USB controllers are grouped
-> - Various minor clean-ups needed for further development of LPC32xx
-> 
-> ----------------------------------------------------------------
-> Vladimir Zapolskiy (8):
->       arm: dts: lpc32xx: change include syntax to be C preprocessor friendly
->       arm: dts: lpc32xx: add labels to all defined peripheral nodes
->       arm: dts: lpc32xx: add reg property to cpu device node
->       arm: dts: lpc32xx: add device node for the second pwm controller
->       arm: dts: ea3250/phy3250: specify phys memory offset for lpc32xx boards
->       arm: dts: lpc32xx: add external memory controller device node
->       arm: dts: lpc32xx: add device nodes for standard timers
->       arm: dts: lpc32xx: move USB controller subdevices into own device node
-> 
->  arch/arm/boot/dts/ea3250.dts   |  41 +++++-------
->  arch/arm/boot/dts/lpc32xx.dtsi | 142 ++++++++++++++++++++++++++++++-----------
->  arch/arm/boot/dts/phy3250.dts  |  41 +++++-------
->  3 files changed, 139 insertions(+), 85 deletions(-)
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
