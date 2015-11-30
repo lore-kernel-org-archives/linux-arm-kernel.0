@@ -1,165 +1,145 @@
 From: sunil.kovvuri@gmail.com (Sunil Goutham)
-Date: Mon, 30 Nov 2015 23:49:03 +0530
-Subject: [PATCH 07/13] net: thunderx: Remove unnecessary rcv buffer start
- address management
+Date: Mon, 30 Nov 2015 23:49:04 +0530
+Subject: [PATCH 08/13] net: thunderx: Enable BGX LMAC's RX/TX only after VF is
+ up
 In-Reply-To: <y>
 References: <y>
-Message-ID: <1448907549-5296-8-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1448907549-5296-9-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sunil Goutham <sgoutham@cavium.com>
 
-Since we have moved on to using allocated pages to carve receive
-buffers instead of netdev_alloc_skb() there is no need to store
-any pointers for later retrieval. Earlier we had to store
-skb and skb->data pointers which later are used to handover
-received packet to network stack.
+Enable or disable BGX LMAC's RX/TX based on corresponding VF's
+status. If otherwise, when multiple LMAC's physical link is up
+then packets from all LMAC's whose corresponding VF is not yet
+initialized will get forwarded to VF0. This is due to VNIC's default
+configuration where CPI, RSSI e.t.c point to VF0/QSET0/RQ0.
 
-This will avoid an unnecessary cache miss as well.
+This patch will prevent multiple copies of packets on VF0.
 
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nicvf_queues.c |   49 ++++----------------
- drivers/net/ethernet/cavium/thunder/nicvf_queues.h |   10 +---
- 2 files changed, 11 insertions(+), 48 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nic_main.c    |   20 +++++++++++++++++++-
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c |   20 ++++++++++++++++++--
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h |    1 +
+ 3 files changed, 38 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-index 99a29d0..1fbd908 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-@@ -18,14 +18,6 @@
- #include "q_struct.h"
- #include "nicvf_queues.h"
+diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
+index cfc24a1..4b7fd63 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
+@@ -37,6 +37,7 @@ struct nicpf {
+ #define	NIC_GET_BGX_FROM_VF_LMAC_MAP(map)	((map >> 4) & 0xF)
+ #define	NIC_GET_LMAC_FROM_VF_LMAC_MAP(map)	(map & 0xF)
+ 	u8			vf_lmac_map[MAX_LMAC];
++	u8			lmac_cnt;
+ 	struct delayed_work     dwork;
+ 	struct workqueue_struct *check_link;
+ 	u8			link[MAX_LMAC];
+@@ -279,6 +280,7 @@ static void nic_set_lmac_vf_mapping(struct nicpf *nic)
+ 	u64 lmac_credit;
  
--struct rbuf_info {
--	struct page *page;
--	void	*data;
--	u64	offset;
--};
--
--#define GET_RBUF_INFO(x) ((struct rbuf_info *)(x - NICVF_RCV_BUF_ALIGN_BYTES))
--
- /* Poll a register for a specific value */
- static int nicvf_poll_reg(struct nicvf *nic, int qidx,
- 			  u64 reg, int bit_pos, int bits, int val)
-@@ -86,8 +78,6 @@ static void nicvf_free_q_desc_mem(struct nicvf *nic, struct q_desc_mem *dmem)
- static inline int nicvf_alloc_rcv_buffer(struct nicvf *nic, gfp_t gfp,
- 					 u32 buf_len, u64 **rbuf)
- {
--	u64 data;
--	struct rbuf_info *rinfo;
- 	int order = get_order(buf_len);
+ 	nic->num_vf_en = 0;
++	nic->lmac_cnt = 0;
  
- 	/* Check if request can be accomodated in previous allocated page */
-@@ -113,46 +103,28 @@ static inline int nicvf_alloc_rcv_buffer(struct nicvf *nic, gfp_t gfp,
- 		nic->rb_page_offset = 0;
- 	}
+ 	for (bgx = 0; bgx < NIC_MAX_BGX; bgx++) {
+ 		if (!(bgx_map & (1 << bgx)))
+@@ -288,6 +290,7 @@ static void nic_set_lmac_vf_mapping(struct nicpf *nic)
+ 			nic->vf_lmac_map[next_bgx_lmac++] =
+ 						NIC_SET_VF_LMAC_MAP(bgx, lmac);
+ 		nic->num_vf_en += lmac_cnt;
++		nic->lmac_cnt += lmac_cnt;
  
--	data = (u64)page_address(nic->rb_page) + nic->rb_page_offset;
--
--	/* Align buffer addr to cache line i.e 128 bytes */
--	rinfo = (struct rbuf_info *)(data + NICVF_RCV_BUF_ALIGN_LEN(data));
--	/* Save page address for reference updation */
--	rinfo->page = nic->rb_page;
--	/* Store start address for later retrieval */
--	rinfo->data = (void *)data;
--	/* Store alignment offset */
--	rinfo->offset = NICVF_RCV_BUF_ALIGN_LEN(data);
-+	*rbuf = (u64 *)((u64)page_address(nic->rb_page) + nic->rb_page_offset);
+ 		/* Program LMAC credits */
+ 		lmac_credit = (1ull << 1); /* channel credit enable */
+@@ -715,6 +718,13 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 	case NIC_MBOX_MSG_CFG_DONE:
+ 		/* Last message of VF config msg sequence */
+ 		nic->vf_enabled[vf] = true;
++		if (vf >= nic->lmac_cnt)
++			goto unlock;
++
++		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++
++		bgx_lmac_rx_tx_enable(nic->node, bgx, lmac, true);
+ 		goto unlock;
+ 	case NIC_MBOX_MSG_SHUTDOWN:
+ 		/* First msg in VF teardown sequence */
+@@ -722,6 +732,14 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 		if (vf >= nic->num_vf_en)
+ 			nic->sqs_used[vf - nic->num_vf_en] = false;
+ 		nic->pqs_vf[vf] = 0;
++
++		if (vf >= nic->lmac_cnt)
++			break;
++
++		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++
++		bgx_lmac_rx_tx_enable(nic->node, bgx, lmac, false);
+ 		break;
+ 	case NIC_MBOX_MSG_ALLOC_SQS:
+ 		nic_alloc_sqs(nic, &mbx.sqs_alloc);
+@@ -940,7 +958,7 @@ static void nic_poll_for_link(struct work_struct *work)
  
--	data += rinfo->offset;
--
--	/* Give next aligned address to hw for DMA */
--	*rbuf = (u64 *)(data + NICVF_RCV_BUF_ALIGN_BYTES);
- 	return 0;
+ 	mbx.link_status.msg = NIC_MBOX_MSG_BGX_LINK_CHANGE;
+ 
+-	for (vf = 0; vf < nic->num_vf_en; vf++) {
++	for (vf = 0; vf < nic->lmac_cnt; vf++) {
+ 		/* Poll only if VF is UP */
+ 		if (!nic->vf_enabled[vf])
+ 			continue;
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+index d9f27ad..c51d5c9 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+@@ -186,6 +186,23 @@ void bgx_set_lmac_mac(int node, int bgx_idx, int lmacid, const u8 *mac)
  }
+ EXPORT_SYMBOL(bgx_set_lmac_mac);
  
--/* Retrieve actual buffer start address and build skb for received packet */
-+/* Build skb around receive buffer */
- static struct sk_buff *nicvf_rb_ptr_to_skb(struct nicvf *nic,
- 					   u64 rb_ptr, int len)
++void bgx_lmac_rx_tx_enable(int node, int bgx_idx, int lmacid, bool enable)
++{
++	struct bgx *bgx = bgx_vnic[(node * MAX_BGX_PER_CN88XX) + bgx_idx];
++	u64 cfg;
++
++	if (!bgx)
++		return;
++
++	cfg = bgx_reg_read(bgx, lmacid, BGX_CMRX_CFG);
++	if (enable)
++		cfg |= CMR_PKT_RX_EN | CMR_PKT_TX_EN;
++	else
++		cfg &= ~(CMR_PKT_RX_EN | CMR_PKT_TX_EN);
++	bgx_reg_write(bgx, lmacid, BGX_CMRX_CFG, cfg);
++}
++EXPORT_SYMBOL(bgx_lmac_rx_tx_enable);
++
+ static void bgx_sgmii_change_link_state(struct lmac *lmac)
  {
-+	void *data;
- 	struct sk_buff *skb;
--	struct rbuf_info *rinfo;
- 
--	rb_ptr = (u64)phys_to_virt(rb_ptr);
--	/* Get buffer start address and alignment offset */
--	rinfo = GET_RBUF_INFO(rb_ptr);
-+	data = phys_to_virt(rb_ptr);
- 
- 	/* Now build an skb to give to stack */
--	skb = build_skb(rinfo->data, RCV_FRAG_LEN);
-+	skb = build_skb(data, RCV_FRAG_LEN);
- 	if (!skb) {
--		put_page(rinfo->page);
-+		put_page(virt_to_page(data));
- 		return NULL;
+ 	struct bgx *bgx = lmac->bgx;
+@@ -656,8 +673,7 @@ static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
  	}
  
--	/* Set correct skb->data */
--	skb_reserve(skb, rinfo->offset + NICVF_RCV_BUF_ALIGN_BYTES);
--
--	prefetch((void *)rb_ptr);
-+	prefetch(skb->data);
- 	return skb;
- }
+ 	/* Enable lmac */
+-	bgx_reg_modify(bgx, lmacid, BGX_CMRX_CFG,
+-		       CMR_EN | CMR_PKT_RX_EN | CMR_PKT_TX_EN);
++	bgx_reg_modify(bgx, lmacid, BGX_CMRX_CFG, CMR_EN);
  
-@@ -196,7 +168,6 @@ static void nicvf_free_rbdr(struct nicvf *nic, struct rbdr *rbdr)
- 	int head, tail;
- 	u64 buf_addr;
- 	struct rbdr_entry_t *desc;
--	struct rbuf_info *rinfo;
+ 	/* Restore default cfg, incase low level firmware changed it */
+ 	bgx_reg_write(bgx, lmacid, BGX_CMRX_RX_DMAC_CTL, 0x03);
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+index 89a02fa..149e179 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+@@ -183,6 +183,7 @@ enum MCAST_MODE {
+ #define CAM_ACCEPT	1
  
- 	if (!rbdr)
- 		return;
-@@ -212,16 +183,14 @@ static void nicvf_free_rbdr(struct nicvf *nic, struct rbdr *rbdr)
- 	while (head != tail) {
- 		desc = GET_RBDR_DESC(rbdr, head);
- 		buf_addr = desc->buf_addr << NICVF_RCV_BUF_ALIGN;
--		rinfo = GET_RBUF_INFO((u64)phys_to_virt(buf_addr));
--		put_page(rinfo->page);
-+		put_page(virt_to_page(phys_to_virt(buf_addr)));
- 		head++;
- 		head &= (rbdr->dmem.q_len - 1);
- 	}
- 	/* Free SKB of tail desc */
- 	desc = GET_RBDR_DESC(rbdr, tail);
- 	buf_addr = desc->buf_addr << NICVF_RCV_BUF_ALIGN;
--	rinfo = GET_RBUF_INFO((u64)phys_to_virt(buf_addr));
--	put_page(rinfo->page);
-+	put_page(virt_to_page(phys_to_virt(buf_addr)));
- 
- 	/* Free RBDR ring */
- 	nicvf_free_q_desc_mem(nic, &rbdr->dmem);
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-index 457eaee..bce8099 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-@@ -83,10 +83,8 @@
- #define MAX_RCV_BUF_COUNT	(1ULL << (RBDR_SIZE6 + 13))
- #define RBDR_THRESH		(RCV_BUF_COUNT / 2)
- #define DMA_BUFFER_LEN		2048 /* In multiples of 128bytes */
--#define RCV_FRAG_LEN	(SKB_DATA_ALIGN(DMA_BUFFER_LEN + NET_SKB_PAD) + \
--			 SKB_DATA_ALIGN(sizeof(struct skb_shared_info)) + \
--			 (NICVF_RCV_BUF_ALIGN_BYTES * 2))
--#define RCV_DATA_OFFSET		NICVF_RCV_BUF_ALIGN_BYTES
-+#define RCV_FRAG_LEN	 (SKB_DATA_ALIGN(DMA_BUFFER_LEN + NET_SKB_PAD) + \
-+			 SKB_DATA_ALIGN(sizeof(struct skb_shared_info)))
- 
- #define MAX_CQES_FOR_TX		((SND_QUEUE_LEN / MIN_SQ_DESC_PER_PKT_XMIT) * \
- 				 MAX_CQE_PER_PKT_XMIT)
-@@ -108,10 +106,6 @@
- #define NICVF_SQ_BASE_ALIGN_BYTES	128  /* 7 bits */
- 
- #define NICVF_ALIGNED_ADDR(ADDR, ALIGN_BYTES)	ALIGN(ADDR, ALIGN_BYTES)
--#define NICVF_ADDR_ALIGN_LEN(ADDR, BYTES)\
--	(NICVF_ALIGNED_ADDR(ADDR, BYTES) - BYTES)
--#define NICVF_RCV_BUF_ALIGN_LEN(X)\
--	(NICVF_ALIGNED_ADDR(X, NICVF_RCV_BUF_ALIGN_BYTES) - X)
- 
- /* Queue enable/disable */
- #define NICVF_SQ_EN		BIT_ULL(19)
+ void octeon_mdiobus_force_mod_depencency(void);
++void bgx_lmac_rx_tx_enable(int node, int bgx_idx, int lmacid, bool enable);
+ void bgx_add_dmac_addr(u64 dmac, int node, int bgx_idx, int lmac);
+ unsigned bgx_get_map(int node);
+ int bgx_get_lmac_count(int node, int bgx);
 -- 
 1.7.1
