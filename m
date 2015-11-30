@@ -1,37 +1,44 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 30 Nov 2015 15:45:45 +0200
-Subject: [RFC v02 15/15] ARM: davinci: dm365: Remove DMA resources for SPI
-In-Reply-To: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1448891145-10766-16-git-send-email-peter.ujfalusi@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 30 Nov 2015 14:47:00 +0100
+Subject: [PATCH v2 1/5] of/irq: export of_irq_find_parent again
+In-Reply-To: <1448273816-11290-2-git-send-email-carlo@caione.org>
+References: <1448273816-11290-1-git-send-email-carlo@caione.org>
+ <1448273816-11290-2-git-send-email-carlo@caione.org>
+Message-ID: <CACRpkdaN4t3dkXegbbn4E42Xt9M9BQQLhY3=WgFNzvH97Jv05A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver is converted to not use the DMA resource.
+On Mon, Nov 23, 2015 at 11:16 AM, Carlo Caione <carlo@caione.org> wrote:
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/mach-davinci/dm365.c | 8 --------
- 1 file changed, 8 deletions(-)
+> From: Carlo Caione <carlo@endlessm.com>
+>
+> of_irq_find_parent was made static since it had no users outside of
+> of_irq.c. Export it again since we are going to use it again.
+>
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> ---
+>  drivers/of/irq.c       | 2 +-
+>  include/linux/of_irq.h | 6 ++++++
+>  2 files changed, 7 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+> index 902b89b..45735d5 100644
+> --- a/drivers/of/irq.c
+> +++ b/drivers/of/irq.c
+> @@ -53,7 +53,7 @@ EXPORT_SYMBOL_GPL(irq_of_parse_and_map);
+>   * Returns a pointer to the interrupt parent node, or NULL if the interrupt
+>   * parent could not be determined.
+>   */
+> -static struct device_node *of_irq_find_parent(struct device_node *child)
+> +struct device_node *of_irq_find_parent(struct device_node *child)
 
-diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index 3dfcf7c9aa20..fe98e5f55634 100644
---- a/arch/arm/mach-davinci/dm365.c
-+++ b/arch/arm/mach-davinci/dm365.c
-@@ -660,14 +660,6 @@ static struct resource dm365_spi0_resources[] = {
- 		.start = IRQ_DM365_SPIINT0_0,
- 		.flags = IORESOURCE_IRQ,
- 	},
--	{
--		.start = 17,
--		.flags = IORESOURCE_DMA,
--	},
--	{
--		.start = 16,
--		.flags = IORESOURCE_DMA,
--	},
- };
- 
- static struct platform_device dm365_spi0_device = {
--- 
-2.6.3
+If you're making this public you should also
+EXPORT_SYMBOL_GPL(of_irq_find_parent)
+
+I need an ACK from Rob if this should be merged through
+the GPIO tree. If it is going through the OF tree we'll have
+to defer the resto of the stuff to the next merge window or
+set it up on an immutable branch I can pull.
+
+Yours,
+Linus Walleij
