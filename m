@@ -1,126 +1,288 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 30 Nov 2015 10:59:04 +0100
-Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
- bindings
-In-Reply-To: <20151124105423.GM26372@e106622-lin>
-References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
- <1448288921-30307-3-git-send-email-juri.lelli@arm.com>
- <20151124020631.GA15165@rob-hp-laptop>
- <20151124105423.GM26372@e106622-lin>
-Message-ID: <CAKfTPtAww=r6H2Jrgu+8jDsYohPj7HD=_sdAP2utEEH-YLVsaA@mail.gmail.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Mon, 30 Nov 2015 09:59:32 +0000
+Subject: [PATCH v2 04/21] arm64: KVM: Implement vgic-v3 save/restore
+In-Reply-To: <1448650215-15218-5-git-send-email-marc.zyngier@arm.com>
+References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+ <1448650215-15218-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <87egf7byez.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Juri,
 
-On 24 November 2015 at 11:54, Juri Lelli <juri.lelli@arm.com> wrote:
-> Hi,
->
-> On 23/11/15 20:06, Rob Herring wrote:
->> On Mon, Nov 23, 2015 at 02:28:35PM +0000, Juri Lelli wrote:
->> > ARM systems may be configured to have cpus with different power/performance
->> > characteristics within the same chip. In this case, additional information
->> > has to be made available to the kernel (the scheduler in particular) for it
->> > to be aware of such differences and take decisions accordingly.
->> >
+Marc Zyngier <marc.zyngier@arm.com> writes:
 
-[snip]
+> Implement the vgic-v3 save restore as a direct translation of
+> the assembly code version.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/hyp/Makefile     |   1 +
+>  arch/arm64/kvm/hyp/hyp.h        |   3 +
+>  arch/arm64/kvm/hyp/vgic-v3-sr.c | 222 ++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 226 insertions(+)
+>  create mode 100644 arch/arm64/kvm/hyp/vgic-v3-sr.c
+>
+> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+> index d8d5968..d1e38ce 100644
+> --- a/arch/arm64/kvm/hyp/Makefile
+> +++ b/arch/arm64/kvm/hyp/Makefile
+> @@ -3,3 +3,4 @@
+>  #
+>
+>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+> +obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
+> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+> index 78f25c4..a31cb6e 100644
+> --- a/arch/arm64/kvm/hyp/hyp.h
+> +++ b/arch/arm64/kvm/hyp/hyp.h
+> @@ -30,5 +30,8 @@
+>  void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
+>  void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+>
+> +void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+> +void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+> +
+>  #endif /* __ARM64_KVM_HYP_H__ */
+>
+> diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+> new file mode 100644
+> index 0000000..b490db5
+> --- /dev/null
+> +++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+> @@ -0,0 +1,222 @@
+> +/*
+> + * Copyright (C) 2012-2015 - ARM Ltd
+> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/compiler.h>
+> +#include <linux/irqchip/arm-gic-v3.h>
 
->> > +==========================================
->> > +2 - CPU capacity definition
->> > +==========================================
->> > +
->> > +CPU capacity is a number that provides the scheduler information about CPUs
->> > +heterogeneity. Such heterogeneity can come from micro-architectural differences
->> > +(e.g., ARM big.LITTLE systems) or maximum frequency at which CPUs can run
->> > +(e.g., SMP systems with multiple frequency domains). Heterogeneity in this
->> > +context is about differing performance characteristics; this binding tries to
->> > +capture a first-order approximation of the relative performance of CPUs.
->> > +
->> > +One simple way to estimate CPU capacities is to iteratively run a well-known
->> > +CPU user space benchmark (e.g, sysbench, dhrystone, etc.) on each CPU at
->> > +maximum frequency and then normalize values w.r.t.  the best performing CPU.
->> > +One can also do a statistically significant study of a wide collection of
->> > +benchmarks, but pros of such an approach are not really evident at the time of
->> > +writing.
->> > +
->> > +==========================================
->> > +3 - capacity-scale
->> > +==========================================
->> > +
->> > +CPUs capacities are defined with respect to capacity-scale property in the cpus
->> > +node [1]. The property is optional; if not defined a 1024 capacity-scale is
->> > +assumed. This property defines both the highest CPU capacity present in the
->> > +system and granularity of CPU capacity values.
->>
->> I don't really see the point of this vs. having an absolute scale.
->>
->
-> IMHO, we need this for several reasons, one being to address one of your
-> concerns below: vendors are free to choose their scale without being
-> forced to publish absolute data. Another reason is that it might make
-> life easier in certain cases; for example, someone could implement a
-> system with a few clusters of, say, A57s, but some run at half the clock
-> of the others (e.g., you have a 1.2GHz cluster and a 600MHz cluster); in
-> this case I think it is just easier to define capacity-scale as 1200 and
-> capacities as 1200 and 600. Last reason that I can think of right now is
-> that we don't probably want to bound ourself to some particular range
-> from the beginning, as that range might be enough now, but it could
-> change in the future (as in, right now [1-1024] looks fine for
-> scheduling purposes, but that might change).
+This include starts spitting out compiler warnings due to use of
+undefined barrier primitives. I'm not sure where the best place to:
 
-Like Rob, i don't really see the benefit of this optional
-capacity-scale property. Parsing the capacity of all cpu nodes should
-give you a range as well.
-IMHO, this property looks like an optimization of the code that will
-parse the dt more than a HW description
+ #include <asm/barrier.h>
 
->
->> > +
->> > +==========================================
->> > +4 - capacity
->> > +==========================================
->> > +
->> > +capacity is an optional cpu node [1] property: u32 value representing CPU
->> > +capacity, relative to capacity-scale. It is required and enforced that capacity
->> > +<= capacity-scale.
->>
->> I think you need something absolute and probably per MHz (like
->> dynamic-power-coefficient property). Perhaps the IPC (instructions per
->> clock) value?
->>
->> In other words, I want to see these numbers have a defined method
->> of determining them and don't want to see random values from every
->> vendor. ARM, Ltd. says core X has a value of Y would be good enough for
->> me. Vendor X's A57 having a value of 2 and Vendor Y's A57 having a
->> value of 1024 is not what I want to see. Of course things like cache
->> sizes can vary the performance, but is a baseline value good enough?
->>
->
-> A standard reference baseline is what we advocate with this set, but
-> making this baseline work for every vendor's implementation is hardly
-> achievable, IMHO. I don't think we can come up with any number that
-> applies to each and every implementation; you can have different
-> revisions of the same core and vendors might make implementation choices
-> that end up with different peak performance.
->
->> However, no vendor will want to publish their values if these are
->> absolute values relative to other vendors.
->>
->
-> Right. That is why I think we need to abstract numbers, as we do with
-> capacity-scale.
->
->> If you expect these to need frequent tuning, then don't put them in DT.
->>
->
-> I expect that it is possible to come up with a sensible baseline number
-> for a specific platform implementation, so there is value in
-> standardizing how we specify this value and how it is then consumed.
-> Finer grained tuning might then happen both offline (with changes to the
-> mainline DT) and online (using the sysfs interface), but that should
-> only apply to a narrow set of use cases.
->
-> Thanks,
->
-> - Juri
+is. I added it to:
+
+  arch/arm64/include/asm/arch_gicv3.h
+
+> +#include <linux/kvm_host.h>
+> +
+> +#include <asm/kvm_mmu.h>
+> +
+> +#include "hyp.h"
+> +
+> +/*
+> + * We store LRs in reverse order to let the CPU deal with streaming
+> + * access. Use this macro to make it look saner...
+> + */
+> +#define LR_OFFSET(n)	(15 - n)
+> +
+> +#define read_gicreg(r)							\
+> +	({								\
+> +		u64 reg;						\
+> +		asm volatile("mrs_s %0, " __stringify(r) : "=r" (reg));	\
+> +		reg;							\
+> +	})
+> +
+> +#define write_gicreg(v,r)						\
+> +	do {								\
+> +		u64 __val = (v);					\
+> +		asm volatile("msr_s " __stringify(r) ", %0" : : "r" (__val));\
+> +	} while (0)
+> +
+> +/* vcpu is already in the HYP VA space */
+> +void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+> +	u64 val;
+> +	u32 nr_lr, nr_pri;
+> +
+> +	/*
+> +	 * Make sure stores to the GIC via the memory mapped interface
+> +	 * are now visible to the system register interface.
+> +	 */
+> +	dsb(st);
+> +
+> +	cpu_if->vgic_vmcr  = read_gicreg(ICH_VMCR_EL2);
+> +	cpu_if->vgic_misr  = read_gicreg(ICH_MISR_EL2);
+> +	cpu_if->vgic_eisr  = read_gicreg(ICH_EISR_EL2);
+> +	cpu_if->vgic_elrsr = read_gicreg(ICH_ELSR_EL2);
+> +
+> +	write_gicreg(0, ICH_HCR_EL2);
+> +	val = read_gicreg(ICH_VTR_EL2);
+> +	nr_lr = val & 0xf;
+> +	nr_pri = ((u32)val >> 29) + 1;
+> +
+> +	switch (nr_lr) {
+> +	case 15:
+> +		cpu_if->vgic_lr[LR_OFFSET(15)] = read_gicreg(ICH_LR15_EL2);
+> +	case 14:
+> +		cpu_if->vgic_lr[LR_OFFSET(14)] = read_gicreg(ICH_LR14_EL2);
+> +	case 13:
+> +		cpu_if->vgic_lr[LR_OFFSET(13)] = read_gicreg(ICH_LR13_EL2);
+> +	case 12:
+> +		cpu_if->vgic_lr[LR_OFFSET(12)] = read_gicreg(ICH_LR12_EL2);
+> +	case 11:
+> +		cpu_if->vgic_lr[LR_OFFSET(11)] = read_gicreg(ICH_LR11_EL2);
+> +	case 10:
+> +		cpu_if->vgic_lr[LR_OFFSET(10)] = read_gicreg(ICH_LR10_EL2);
+> +	case 9:
+> +		cpu_if->vgic_lr[LR_OFFSET(9)] = read_gicreg(ICH_LR9_EL2);
+> +	case 8:
+> +		cpu_if->vgic_lr[LR_OFFSET(8)] = read_gicreg(ICH_LR8_EL2);
+> +	case 7:
+> +		cpu_if->vgic_lr[LR_OFFSET(7)] = read_gicreg(ICH_LR7_EL2);
+> +	case 6:
+> +		cpu_if->vgic_lr[LR_OFFSET(6)] = read_gicreg(ICH_LR6_EL2);
+> +	case 5:
+> +		cpu_if->vgic_lr[LR_OFFSET(5)] = read_gicreg(ICH_LR5_EL2);
+> +	case 4:
+> +		cpu_if->vgic_lr[LR_OFFSET(4)] = read_gicreg(ICH_LR4_EL2);
+> +	case 3:
+> +		cpu_if->vgic_lr[LR_OFFSET(3)] = read_gicreg(ICH_LR3_EL2);
+> +	case 2:
+> +		cpu_if->vgic_lr[LR_OFFSET(2)] = read_gicreg(ICH_LR2_EL2);
+> +	case 1:
+> +		cpu_if->vgic_lr[LR_OFFSET(1)] = read_gicreg(ICH_LR1_EL2);
+> +	case 0:
+> +		cpu_if->vgic_lr[LR_OFFSET(0)] = read_gicreg(ICH_LR0_EL2);
+> +	}
+> +
+> +	switch (nr_pri) {
+> +	case 7:
+> +		cpu_if->vgic_ap0r[3] = read_gicreg(ICH_AP0R3_EL2);
+> +		cpu_if->vgic_ap0r[2] = read_gicreg(ICH_AP0R2_EL2);
+> +	case 6:
+> +		cpu_if->vgic_ap0r[1] = read_gicreg(ICH_AP0R1_EL2);
+> +	default:
+> +		cpu_if->vgic_ap0r[0] = read_gicreg(ICH_AP0R0_EL2);
+> +	}
+> +
+> +	switch (nr_pri) {
+> +	case 7:
+> +		cpu_if->vgic_ap1r[3] = read_gicreg(ICH_AP1R3_EL2);
+> +		cpu_if->vgic_ap1r[2] = read_gicreg(ICH_AP1R2_EL2);
+> +	case 6:
+> +		cpu_if->vgic_ap1r[1] = read_gicreg(ICH_AP1R1_EL2);
+> +	default:
+> +		cpu_if->vgic_ap1r[0] = read_gicreg(ICH_AP1R0_EL2);
+> +	}
+> +
+> +	write_gicreg(read_gicreg(ICC_SRE_EL2) | ICC_SRE_EL2_ENABLE,
+> +		     ICC_SRE_EL2);
+> +	isb();
+> +	write_gicreg(1, ICC_SRE_EL1);
+> +}
+> +
+> +void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+> +	u64 val;
+> +	u32 nr_lr, nr_pri;
+> +
+> +	/* Make sure SRE is valid before writing the other registers */
+> +	write_gicreg(cpu_if->vgic_sre, ICC_SRE_EL1);
+> +	isb();
+> +
+> +	write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
+> +	write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
+> +
+> +	val = read_gicreg(ICH_VTR_EL2);
+> +	nr_lr = val & 0xf;
+> +	nr_pri = ((u32)val >> 29) + 1;
+> +
+> +	switch (nr_pri) {
+> +	case 7:
+> +		 write_gicreg(cpu_if->vgic_ap1r[3], ICH_AP1R3_EL2);
+> +		 write_gicreg(cpu_if->vgic_ap1r[2], ICH_AP1R2_EL2);
+> +	case 6:
+> +		 write_gicreg(cpu_if->vgic_ap1r[1], ICH_AP1R1_EL2);
+> +	default:
+> +		 write_gicreg(cpu_if->vgic_ap1r[0], ICH_AP1R0_EL2);
+> +	}
+> +
+> +	switch (nr_pri) {
+> +	case 7:
+> +		 write_gicreg(cpu_if->vgic_ap0r[3], ICH_AP0R3_EL2);
+> +		 write_gicreg(cpu_if->vgic_ap0r[2], ICH_AP0R2_EL2);
+> +	case 6:
+> +		 write_gicreg(cpu_if->vgic_ap0r[1], ICH_AP0R1_EL2);
+> +	default:
+> +		 write_gicreg(cpu_if->vgic_ap0r[0], ICH_AP0R0_EL2);
+> +	}
+> +
+> +	switch (nr_lr) {
+> +	case 15:
+> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(15)], ICH_LR15_EL2);
+> +	case 14:
+> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(14)], ICH_LR14_EL2);
+> +	case 13:
+> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(13)], ICH_LR13_EL2);
+> +	case 12:
+> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(12)], ICH_LR12_EL2);
+> +	case 11:
+> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(11)], ICH_LR11_EL2);
+> +	case 10:
+> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(10)], ICH_LR10_EL2);
+> +	case 9:
+> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(9)], ICH_LR9_EL2);
+> +	case 8:
+> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(8)], ICH_LR8_EL2);
+> +	case 7:
+> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(7)], ICH_LR7_EL2);
+> +	case 6:
+> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(6)], ICH_LR6_EL2);
+> +	case 5:
+> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(5)], ICH_LR5_EL2);
+> +	case 4:
+> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(4)], ICH_LR4_EL2);
+> +	case 3:
+> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(3)], ICH_LR3_EL2);
+> +	case 2:
+> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(2)], ICH_LR2_EL2);
+> +	case 1:
+> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(1)], ICH_LR1_EL2);
+> +	case 0:
+> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(0)], ICH_LR0_EL2);
+> +	}
+> +
+> +	/*
+> +	 * Ensure that the above will have reached the
+> +	 * (re)distributors. This ensure the guest will read the
+> +	 * correct values from the memory-mapped interface.
+> +	 */
+> +	isb();
+> +	dsb(sy);
+> +
+> +	/*
+> +	 * Prevent the guest from touching the GIC system registers if
+> +	 * SRE isn't enabled for GICv3 emulation.
+> +	 */
+> +	if (!cpu_if->vgic_sre) {
+> +		write_gicreg(read_gicreg(ICC_SRE_EL2) & ~ICC_SRE_EL2_ENABLE,
+> +			     ICC_SRE_EL2);
+> +	}
+> +}
+> +
+> +u64 __hyp_text __vgic_v3_read_ich_vtr_el2(void)
+> +{
+> +	return read_gicreg(ICH_VTR_EL2);
+> +}
+
+
+--
+Alex Benn?e
