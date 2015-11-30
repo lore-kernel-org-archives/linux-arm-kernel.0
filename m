@@ -1,78 +1,272 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 30 Nov 2015 20:27:33 +0200
-Subject: [PATCH] ARM: OMAP4: execute initcall to reserve SRAM for I688
- only on OMAP4
-In-Reply-To: <1448904431.8275.36.camel@pengutronix.de>
-References: <1447673117-32719-1-git-send-email-l.stach@pengutronix.de>
- <5649CB16.2030706@ti.com> <1448904431.8275.36.camel@pengutronix.de>
-Message-ID: <565C9515.1040600@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 30 Nov 2015 18:31:30 +0000
+Subject: [PATCH v4 21/21] KVM: ARM64: Add a new kvm ARM PMU device
+In-Reply-To: <1446186123-11548-22-git-send-email-zhaoshenglong@huawei.com>
+References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>
+ <1446186123-11548-22-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <20151130183130.3e90a733@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2015 07:27 PM, Lucas Stach wrote:
-> Am Montag, den 16.11.2015, 14:24 +0200 schrieb Grygorii Strashko:
->> On 11/16/2015 01:25 PM, Lucas Stach wrote:
->>> omap_interconnect_sync() is the only user of the SRAM scratch area
->>> allocated in the omap4_sram_init initcall. The interconnect sync is
->>> used exclusively in the OMAP4 specific WFI implementation, so there
->>> is no point in allocating the SRAM scratch on other SoC types.
->>>
->>> Bail out of the initcall if the kernel is not running on OMAP4 to
->>> avoid a confusing warning about being unable to allocate the SRAM
->>> needed for I688 handling.
->>>
->>> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
->>> Tested-by: Bastian Stender <bst@pengutronix.de>
->>> ---
->>>    arch/arm/mach-omap2/omap4-common.c | 3 +++
->>>    1 file changed, 3 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
->>> index 949696b6f17b..6db393a30a28 100644
->>> --- a/arch/arm/mach-omap2/omap4-common.c
->>> +++ b/arch/arm/mach-omap2/omap4-common.c
->>> @@ -131,6 +131,9 @@ static int __init omap4_sram_init(void)
->>>    	struct device_node *np;
->>>    	struct gen_pool *sram_pool;
->>>    
->>> +	if (!cpu_is_omap44xx())
->>> +		return 0;
->>
->> This one affects on am43xx also
->>
-> So you are saying this erratum is also present on AM43xx? I wasn't able
-> to deduce this from the information provided by Richard Woodruff.
+On Fri, 30 Oct 2015 14:22:03 +0800
+Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-
-"..SOCs using similar chassis components of OMAP4430 time are impacted..."
-"..But AM335x should be immune from this particular issue..."
-
-Advisory 11 Asynchronous Bridge Corruption
-http://www.ti.com/lit/er/sprz408b/sprz408b.pdf
-
-
-
->>
->>> +
->>>    	np = of_find_compatible_node(NULL, NULL, "ti,omap4-mpu");
->>>    	if (!np)
->>>    		pr_warn("%s:Unable to allocate sram needed to handle errata I688\n",
->>
->> Since all OMAP4+ platforms are now DT based why can't we just return from here silently?
->>
-> If we are unable to allocate the SRAM needed to work around I688 this is
-> a real error on platforms that expose this erratum, so silently bailing
-> out at this point may obscure a real issue.
+> Add a new kvm device type KVM_DEV_TYPE_ARM_PMU_V3 for ARM PMU. Implement
+> the kvm_device_ops for it.
 > 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  Documentation/virtual/kvm/devices/arm-pmu.txt | 15 +++++
+>  arch/arm64/include/uapi/asm/kvm.h             |  3 +
+>  include/linux/kvm_host.h                      |  1 +
+>  include/uapi/linux/kvm.h                      |  2 +
+>  virt/kvm/arm/pmu.c                            | 92 +++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic.c                           |  8 +++
+>  virt/kvm/arm/vgic.h                           |  1 +
+>  virt/kvm/kvm_main.c                           |  4 ++
+>  8 files changed, 126 insertions(+)
+>  create mode 100644 Documentation/virtual/kvm/devices/arm-pmu.txt
+> 
+> diff --git a/Documentation/virtual/kvm/devices/arm-pmu.txt b/Documentation/virtual/kvm/devices/arm-pmu.txt
+> new file mode 100644
+> index 0000000..49481c4
+> --- /dev/null
+> +++ b/Documentation/virtual/kvm/devices/arm-pmu.txt
+> @@ -0,0 +1,15 @@
+> +ARM Virtual Performance Monitor Unit (vPMU)
+> +===========================================
+> +
+> +Device types supported:
+> +  KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
+> +
+> +Instantiate one PMU instance for per VCPU through this API.
+> +
+> +Groups:
+> +  KVM_DEV_ARM_PMU_GRP_IRQ
+> +  Attributes:
+> +    A value describing the interrupt number of PMU overflow interrupt.
+> +
+> +  Errors:
+> +    -EINVAL: Value set is out of the expected range
 
-SRAM is not allocated here - It's just check to understand do we need it or not
-in case of multiplatform build where CONFIG_OMAP_INTERCONNECT_BARRIER will be selected most
-probably.
+What is the expected range?
 
-And if "ti,omap4-mpu" was not found - it just means that this, particular, platform
-is not affected by i688 errata.
-If someone misses corresponding node in DT - we can't do nothing :)
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index 0cd7b59..1309a93 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -204,6 +204,9 @@ struct kvm_arch_memory_slot {
+>  #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
+>  #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
+>  
+> +/* Device Control API: ARM PMU */
+> +#define KVM_DEV_ARM_PMU_GRP_IRQ		0
+> +
+>  /* KVM_IRQ_LINE irq field index values */
+>  #define KVM_ARM_IRQ_TYPE_SHIFT		24
+>  #define KVM_ARM_IRQ_TYPE_MASK		0xff
+> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+> index 1bef9e2..f6be696 100644
+> --- a/include/linux/kvm_host.h
+> +++ b/include/linux/kvm_host.h
+> @@ -1122,6 +1122,7 @@ extern struct kvm_device_ops kvm_mpic_ops;
+>  extern struct kvm_device_ops kvm_xics_ops;
+>  extern struct kvm_device_ops kvm_arm_vgic_v2_ops;
+>  extern struct kvm_device_ops kvm_arm_vgic_v3_ops;
+> +extern struct kvm_device_ops kvm_arm_pmu_ops;
+>  
+>  #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
+>  
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index a9256f0..f41e6b6 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -1025,6 +1025,8 @@ enum kvm_device_type {
+>  #define KVM_DEV_TYPE_FLIC		KVM_DEV_TYPE_FLIC
+>  	KVM_DEV_TYPE_ARM_VGIC_V3,
+>  #define KVM_DEV_TYPE_ARM_VGIC_V3	KVM_DEV_TYPE_ARM_VGIC_V3
+> +	KVM_DEV_TYPE_ARM_PMU_V3,
+> +#define	KVM_DEV_TYPE_ARM_PMU_V3		KVM_DEV_TYPE_ARM_PMU_V3
+>  	KVM_DEV_TYPE_MAX,
+>  };
+>  
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index d78ce7b..0a00d04 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -19,10 +19,13 @@
+>  #include <linux/kvm.h>
+>  #include <linux/kvm_host.h>
+>  #include <linux/perf_event.h>
+> +#include <linux/uaccess.h>
+>  #include <asm/kvm_emulate.h>
+>  #include <kvm/arm_pmu.h>
+>  #include <kvm/arm_vgic.h>
+>  
+> +#include "vgic.h"
+> +
+>  /**
+>   * kvm_pmu_get_counter_value - get PMU counter value
+>   * @vcpu: The vcpu pointer
+> @@ -416,3 +419,92 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
+>  
+>  	pmc->perf_event = event;
+>  }
+> +
+> +static int kvm_arm_pmu_set_irq(struct kvm *kvm, int irq)
+> +{
+> +	int j;
+> +	struct kvm_vcpu *vcpu;
+> +
+> +	kvm_for_each_vcpu(j, vcpu, kvm) {
+> +		struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +
+> +		kvm_debug("Set kvm ARM PMU irq: %d\n", irq);
+> +		pmu->irq_num = irq;
+> +		vgic_dist_irq_set_cfg(vcpu, irq, true);
+> +	}
 
+So obviously, the irq must be a PPI, since all vcpus are getting the
+same one. Worth documenting.
+
+> +
+> +	return 0;
+> +}
+> +
+> +static int kvm_arm_pmu_create(struct kvm_device *dev, u32 type)
+> +{
+> +	int i, j;
+> +	struct kvm_vcpu *vcpu;
+> +	struct kvm *kvm = dev->kvm;
+> +
+> +	kvm_for_each_vcpu(j, vcpu, kvm) {
+> +		struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +
+> +		memset(pmu, 0, sizeof(*pmu));
+> +		for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
+> +			pmu->pmc[i].idx = i;
+> +			pmu->pmc[i].vcpu = vcpu;
+> +			pmu->pmc[i].bitmask = 0xffffffffUL;
+> +		}
+> +		pmu->irq_num = -1;
+> +	}
+
+Surely this can be shared with the reset code?
+
+> +
+> +	return 0;
+> +}
+> +
+> +static void kvm_arm_pmu_destroy(struct kvm_device *dev)
+> +{
+> +	kfree(dev);
+> +}
+> +
+> +static int kvm_arm_pmu_set_attr(struct kvm_device *dev,
+> +				struct kvm_device_attr *attr)
+> +{
+> +	switch (attr->group) {
+> +	case KVM_DEV_ARM_PMU_GRP_IRQ: {
+> +		int __user *uaddr = (int __user *)(long)attr->addr;
+> +		int reg;
+> +
+> +		if (get_user(reg, uaddr))
+> +			return -EFAULT;
+> +
+> +		if (reg < VGIC_NR_SGIS || reg > dev->kvm->arch.vgic.nr_irqs)
+> +			return -EINVAL;
+
+On the other have, this doesn't prevent a SPI from being used.
+Something is wrong.
+
+> +
+> +		return kvm_arm_pmu_set_irq(dev->kvm, reg);
+> +	}
+> +	}
+> +
+> +	return -ENXIO;
+> +}
+> +
+> +static int kvm_arm_pmu_get_attr(struct kvm_device *dev,
+> +				struct kvm_device_attr *attr)
+> +{
+> +	return 0;
+> +}
+> +
+> +static int kvm_arm_pmu_has_attr(struct kvm_device *dev,
+> +				struct kvm_device_attr *attr)
+> +{
+> +	switch (attr->group) {
+> +	case KVM_DEV_ARM_PMU_GRP_IRQ:
+> +		return 0;
+> +	}
+> +
+> +	return -ENXIO;
+> +}
+> +
+> +struct kvm_device_ops kvm_arm_pmu_ops = {
+> +	.name = "kvm-arm-pmu",
+> +	.create = kvm_arm_pmu_create,
+> +	.destroy = kvm_arm_pmu_destroy,
+> +	.set_attr = kvm_arm_pmu_set_attr,
+> +	.get_attr = kvm_arm_pmu_get_attr,
+> +	.has_attr = kvm_arm_pmu_has_attr,
+> +};
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 66c6616..8e00987 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -380,6 +380,14 @@ void vgic_dist_irq_clear_pending(struct kvm_vcpu *vcpu, int irq)
+>  	vgic_bitmap_set_irq_val(&dist->irq_pending, vcpu->vcpu_id, irq, 0);
+>  }
+>  
+> +void vgic_dist_irq_set_cfg(struct kvm_vcpu *vcpu, int irq, bool level)
+> +{
+> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+> +
+> +	vgic_bitmap_set_irq_val(&dist->irq_cfg, vcpu->vcpu_id, irq,
+> +				level ? VGIC_CFG_LEVEL : VGIC_CFG_EDGE);
+> +}
+> +
+
+This has nothing to do here. If the interrupt must be configured, it
+should be explicit, not hidden here.
+
+>  static void vgic_cpu_irq_set(struct kvm_vcpu *vcpu, int irq)
+>  {
+>  	if (irq < VGIC_NR_PRIVATE_IRQS)
+> diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
+> index 0df74cb..eb814f5 100644
+> --- a/virt/kvm/arm/vgic.h
+> +++ b/virt/kvm/arm/vgic.h
+> @@ -49,6 +49,7 @@ u32 *vgic_bytemap_get_reg(struct vgic_bytemap *x, int cpuid, u32 offset);
+>  
+>  void vgic_dist_irq_set_pending(struct kvm_vcpu *vcpu, int irq);
+>  void vgic_dist_irq_clear_pending(struct kvm_vcpu *vcpu, int irq);
+> +void vgic_dist_irq_set_cfg(struct kvm_vcpu *vcpu, int irq, bool level);
+>  void vgic_cpu_irq_clear(struct kvm_vcpu *vcpu, int irq);
+>  void vgic_bitmap_set_irq_val(struct vgic_bitmap *x, int cpuid,
+>  			     int irq, int val);
+> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+> index 8db1d93..5decfb5 100644
+> --- a/virt/kvm/kvm_main.c
+> +++ b/virt/kvm/kvm_main.c
+> @@ -2641,6 +2641,10 @@ static struct kvm_device_ops *kvm_device_ops_table[KVM_DEV_TYPE_MAX] = {
+>  #ifdef CONFIG_KVM_XICS
+>  	[KVM_DEV_TYPE_XICS]		= &kvm_xics_ops,
+>  #endif
+> +
+> +#ifdef CONFIG_KVM_ARM_PMU
+> +	[KVM_DEV_TYPE_ARM_PMU_V3]	= &kvm_arm_pmu_ops,
+> +#endif
+>  };
+>  
+>  int kvm_register_device_ops(struct kvm_device_ops *ops, u32 type)
+
+Thanks,
+
+	M.
 -- 
-regards,
--grygorii
+Jazz is not dead. It just smells funny.
