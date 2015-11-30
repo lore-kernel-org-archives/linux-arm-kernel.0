@@ -1,96 +1,61 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Mon, 30 Nov 2015 13:27:45 +0100
-Subject: [PATCH v4 net 5/6] net: mvneta: enable setting custom TX IP checksum
- limit
-In-Reply-To: <1448886466-31538-1-git-send-email-mw@semihalf.com>
-References: <1448886466-31538-1-git-send-email-mw@semihalf.com>
-Message-ID: <1448886466-31538-6-git-send-email-mw@semihalf.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 30 Nov 2015 13:28:25 +0100
+Subject: [PATCH v4 11/13] ARM: only consider memblocks with NOMAP cleared for
+ linear mapping
+In-Reply-To: <1448886507-3216-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1448886507-3216-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1448886507-3216-12-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since Armada 38x SoC can support IP checksum for jumbo frames only on
-a single port, it means that this feature should be enabled per-port,
-rather than for the whole SoC.
+Take the new memblock attribute MEMBLOCK_NOMAP into account when
+deciding whether a certain region is or should be covered by the
+kernel direct mapping.
 
-This patch enables setting custom TX IP checksum limit by adding new
-optional property to the mvneta device tree node. If not used, by
-default 1600B is set for "marvell,armada-370-neta" and 9800B for other
-strings, which ensures backward compatibility. Binding documentation
-is updated accordingly.
-
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Tested-by: Ryan Harkin <ryan.harkin@linaro.org>
+Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- .../bindings/net/marvell-armada-370-neta.txt          |  6 ++++++
- drivers/net/ethernet/marvell/mvneta.c                 | 19 +++++++++++++++++--
- 2 files changed, 23 insertions(+), 2 deletions(-)
+ arch/arm/mm/init.c | 5 ++++-
+ arch/arm/mm/mmu.c  | 3 +++
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
-index f5a8ca2..aeea50c 100644
---- a/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
-+++ b/Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt
-@@ -8,6 +8,11 @@ Required properties:
- - phy-mode: See ethernet.txt file in the same directory
- - clocks: a pointer to the reference clock for this device.
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 8a63b4cdc0f2..16104b1e2661 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -191,7 +191,7 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
+ #ifdef CONFIG_HAVE_ARCH_PFN_VALID
+ int pfn_valid(unsigned long pfn)
+ {
+-	return memblock_is_memory(__pfn_to_phys(pfn));
++	return memblock_is_map_memory(__pfn_to_phys(pfn));
+ }
+ EXPORT_SYMBOL(pfn_valid);
+ #endif
+@@ -432,6 +432,9 @@ static void __init free_highpages(void)
+ 		if (end <= max_low)
+ 			continue;
  
-+Optional properties:
-+- tx-csum-limit: maximum mtu supported by port that allow TX checksum.
-+  Value is presented in bytes. If not used, by default 1600B is set for
-+  "marvell,armada-370-neta" and 9800B for others.
++		if (memblock_is_nomap(mem))
++			continue;
 +
- Example:
+ 		/* Truncate partial highmem entries */
+ 		if (start < max_low)
+ 			start = max_low;
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 8c69830e791a..c615d2eb9232 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1435,6 +1435,9 @@ static void __init map_lowmem(void)
+ 		phys_addr_t end = start + reg->size;
+ 		struct map_desc map;
  
- ethernet at d0070000 {
-@@ -15,6 +20,7 @@ ethernet at d0070000 {
- 	reg = <0xd0070000 0x2500>;
- 	interrupts = <8>;
- 	clocks = <&gate_clk 4>;
-+	tx-csum-limit = <9800>
- 	status = "okay";
- 	phy = <&phy0>;
- 	phy-mode = "rgmii-id";
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 5a98c5d..ed622fa 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -243,6 +243,7 @@
- #define MVNETA_VLAN_TAG_LEN             4
- 
- #define MVNETA_CPU_D_CACHE_LINE_SIZE    32
-+#define MVNETA_TX_CSUM_DEF_SIZE		1600
- #define MVNETA_TX_CSUM_MAX_SIZE		9800
- #define MVNETA_ACC_MODE_EXT		1
- 
-@@ -3256,6 +3257,7 @@ static int mvneta_probe(struct platform_device *pdev)
- 	char hw_mac_addr[ETH_ALEN];
- 	const char *mac_from;
- 	const char *managed;
-+	int tx_csum_limit;
- 	int phy_mode;
- 	int err;
- 	int cpu;
-@@ -3356,8 +3358,21 @@ static int mvneta_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	if (of_device_is_compatible(dn, "marvell,armada-370-neta"))
--		pp->tx_csum_limit = 1600;
-+	if (!of_property_read_u32(dn, "tx-csum-limit", &tx_csum_limit)) {
-+		if (tx_csum_limit < 0 ||
-+		    tx_csum_limit > MVNETA_TX_CSUM_MAX_SIZE) {
-+			tx_csum_limit = MVNETA_TX_CSUM_DEF_SIZE;
-+			dev_info(&pdev->dev,
-+				 "Wrong TX csum limit in DT, set to %dB\n",
-+				 MVNETA_TX_CSUM_DEF_SIZE);
-+		}
-+	} else if (of_device_is_compatible(dn, "marvell,armada-370-neta")) {
-+		tx_csum_limit = MVNETA_TX_CSUM_DEF_SIZE;
-+	} else {
-+		tx_csum_limit = MVNETA_TX_CSUM_MAX_SIZE;
-+	}
++		if (memblock_is_nomap(reg))
++			continue;
 +
-+	pp->tx_csum_limit = tx_csum_limit;
- 
- 	pp->tx_ring_size = MVNETA_MAX_TXD;
- 	pp->rx_ring_size = MVNETA_MAX_RXD;
+ 		if (end > arm_lowmem_limit)
+ 			end = arm_lowmem_limit;
+ 		if (start >= end)
 -- 
-1.8.3.1
+1.9.1
