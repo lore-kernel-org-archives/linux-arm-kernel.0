@@ -1,99 +1,82 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Nov 2015 16:34:59 +0100
-Subject: [PATCH] clk: sunxi: pll2: Fix clock running too fast
-Message-ID: <1448897699-20475-1-git-send-email-maxime.ripard@free-electrons.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Mon, 30 Nov 2015 16:39:33 +0100
+Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
+ "/chosen/linux,atags" entry
+In-Reply-To: <20151130152352.GY2517@atomide.com>
+References: <20150713131902.GH26485@atomide.com>
+ <20151129180939.GE30871@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.20.1511291902100.22569@knanqh.ubzr>
+ <201511300115.12478@pali> <20151130152352.GY2517@atomide.com>
+Message-ID: <20151130153933.GD29576@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Contrary to what the datasheet says, the pre divider doesn't seem to be
-incremented by one in the PLL2, but just uses the value from the register,
-with 0 being a bypass.
+On Monday 30 November 2015 07:23:53 Tony Lindgren wrote:
+> * Pali Roh?r <pali.rohar@gmail.com> [151129 16:16]:
+> > On Monday 30 November 2015 01:09:17 Nicolas Pitre wrote:
+> > > On Sun, 29 Nov 2015, Russell King - ARM Linux wrote:
+> > > > On Sat, Nov 28, 2015 at 12:34:23PM -0500, Nicolas Pitre wrote:
+> > > > > Good. And Arnd likes the idea too. So we might be converging at
+> > > > > last which is a good thing.
+> > > > 
+> > > > I disagree with the idea that there is convergence.  There might be
+> > > > convergence towards an idea, but... Here's a mail extract, from
+> > > > July 7th, from earlier in this very thread:
+> > > > 
+> > > > Pali:
+> > > > > Me:
+> > > > > > Are the ATAGs at a fixed address on the N900?
+> > > > > 
+> > > > > Yes, in board-rx51.c is:
+> > > > > 
+> > > > > .atag_offset    = 0x100
+> > > > > 
+> > > > > and Nokia Bootloader (proprietary) store them to that address.
+> > > > > 
+> > > > > > Can that be handled in
+> > > > > > some kind of legacy file for the N900 which calls save_atags()
+> > > > > > on it, so we don't end up introducing yet more stuff that we
+> > > > > > have to maintain into the distant future?  If not, what about
+> > > > > > copying a known working atag structure into a legacy file for
+> > > > > > the N900?
+> > > > > 
+> > > > > I already asked question if it is possible to read ATAGs from DT
+> > > > > booted kernel. And somebody (do not remember who) wrote to ML,
+> > > > > that it is not possible and it can be done in that uncompress
+> > > > > code.
+> > > 
+> > > Who is that somebody? If ever it happened to be me then objection is
+> > > withdrawn. Otherwise that somebody should come forth and speak up
+> > > again.
+> > > 
+> > 
+> > ... do not remember ... this discussion were in more email threads and 
+> > takes more then one year... sorry but my memory is not excellent
+> 
+> Yes this certainly seems like the best solution. I think we got into
+> the atags-to-dt track as some of the atags are already being translated.
+> 
+> In this case there's no need to translate them AFAIK. You can just
+> parse them and have them available for the user space. So as long as
+> nothing trashes the atags at the atag_offset, you should be able to
+> call a function to parse them in the n900 specific init_machine.
+> 
+> Regards,
+> 
+> Tony
 
-This fixes the audio playing too fast.
+In arch/arm/kernel/setup.c is function setup_arch() and it calls:
 
-Since we now have the same pre-divider flags, and the only difference with
-the A10 is the post-divider offset, also remove the structure to just pass
-the offset as an argument.
+  mdesc = setup_machine_fdt(__atags_pointer);
+  if (!mdesc)
+      mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
+So it looks like that on atags address is stored either atags structure
+or DT structure... so it is truth kernel uncompress code put DT blob to
+same offset where is expected atags structure? If yes, then this is
+probably reason why atags cannot be read from booted DT kernel. Can
+somebody with deep knowledge of DT/atags and uncompress code verify this?
 
-Hi Stephen, Mike,
-
-Could you apply this patch for 4.4?
-
-Thanks,
-Maxime
-
- drivers/clk/sunxi/clk-a10-pll2.c | 23 +++++------------------
- 1 file changed, 5 insertions(+), 18 deletions(-)
-
-diff --git a/drivers/clk/sunxi/clk-a10-pll2.c b/drivers/clk/sunxi/clk-a10-pll2.c
-index 5484c31ec568..30d4bfb4cd3d 100644
---- a/drivers/clk/sunxi/clk-a10-pll2.c
-+++ b/drivers/clk/sunxi/clk-a10-pll2.c
-@@ -41,15 +41,10 @@
- 
- #define SUN4I_PLL2_OUTPUTS		4
- 
--struct sun4i_pll2_data {
--	u32	post_div_offset;
--	u32	pre_div_flags;
--};
--
- static DEFINE_SPINLOCK(sun4i_a10_pll2_lock);
- 
- static void __init sun4i_pll2_setup(struct device_node *node,
--				    struct sun4i_pll2_data *data)
-+				    int post_div_offset)
- {
- 	const char *clk_name = node->name, *parent;
- 	struct clk **clks, *base_clk, *prediv_clk;
-@@ -76,7 +71,7 @@ static void __init sun4i_pll2_setup(struct device_node *node,
- 					  parent, 0, reg,
- 					  SUN4I_PLL2_PRE_DIV_SHIFT,
- 					  SUN4I_PLL2_PRE_DIV_WIDTH,
--					  data->pre_div_flags,
-+					  CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO,
- 					  &sun4i_a10_pll2_lock);
- 	if (!prediv_clk) {
- 		pr_err("Couldn't register the prediv clock\n");
-@@ -127,7 +122,7 @@ static void __init sun4i_pll2_setup(struct device_node *node,
- 	 */
- 	val = readl(reg);
- 	val &= ~(SUN4I_PLL2_POST_DIV_MASK << SUN4I_PLL2_POST_DIV_SHIFT);
--	val |= (SUN4I_PLL2_POST_DIV_VALUE - data->post_div_offset) << SUN4I_PLL2_POST_DIV_SHIFT;
-+	val |= (SUN4I_PLL2_POST_DIV_VALUE - post_div_offset) << SUN4I_PLL2_POST_DIV_SHIFT;
- 	writel(val, reg);
- 
- 	of_property_read_string_index(node, "clock-output-names",
-@@ -191,25 +186,17 @@ err_unmap:
- 	iounmap(reg);
- }
- 
--static struct sun4i_pll2_data sun4i_a10_pll2_data = {
--	.pre_div_flags	= CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO,
--};
--
- static void __init sun4i_a10_pll2_setup(struct device_node *node)
- {
--	sun4i_pll2_setup(node, &sun4i_a10_pll2_data);
-+	sun4i_pll2_setup(node, &sun4i_a10_pll2_data, 0);
- }
- 
- CLK_OF_DECLARE(sun4i_a10_pll2, "allwinner,sun4i-a10-pll2-clk",
- 	       sun4i_a10_pll2_setup);
- 
--static struct sun4i_pll2_data sun5i_a13_pll2_data = {
--	.post_div_offset	= 1,
--};
--
- static void __init sun5i_a13_pll2_setup(struct device_node *node)
- {
--	sun4i_pll2_setup(node, &sun5i_a13_pll2_data);
-+	sun4i_pll2_setup(node, &sun5i_a13_pll2_data, 1);
- }
- 
- CLK_OF_DECLARE(sun5i_a13_pll2, "allwinner,sun5i-a13-pll2-clk",
 -- 
-2.6.3
+Pali Roh?r
+pali.rohar at gmail.com
