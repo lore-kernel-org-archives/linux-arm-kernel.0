@@ -1,44 +1,117 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 30 Nov 2015 14:47:00 +0100
-Subject: [PATCH v2 1/5] of/irq: export of_irq_find_parent again
-In-Reply-To: <1448273816-11290-2-git-send-email-carlo@caione.org>
-References: <1448273816-11290-1-git-send-email-carlo@caione.org>
- <1448273816-11290-2-git-send-email-carlo@caione.org>
-Message-ID: <CACRpkdaN4t3dkXegbbn4E42Xt9M9BQQLhY3=WgFNzvH97Jv05A@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 30 Nov 2015 15:49:04 +0200
+Subject: [4.4-rc][PATCH] ARM: dts: am4372: fix clock source for arm twd
+ and global timers
+In-Reply-To: <565C4FE2.3090403@ti.com>
+References: <1448653468-24908-1-git-send-email-grygorii.strashko@ti.com>
+ <565C0814.3000001@ti.com> <565C38CE.1070907@ti.com> <565C4FE2.3090403@ti.com>
+Message-ID: <565C53D0.6090305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23, 2015 at 11:16 AM, Carlo Caione <carlo@caione.org> wrote:
+On 11/30/2015 03:32 PM, Tero Kristo wrote:
+> On 11/30/2015 01:53 PM, Grygorii Strashko wrote:
+>> On 11/30/2015 10:25 AM, Tero Kristo wrote:
+>>> On 11/27/2015 09:44 PM, Grygorii Strashko wrote:
+>>>> ARM TWD and Global timer are clocked by PERIPHCLK which is MPU_CLK/2.
+>>>> But now they are clocked by dpll_mpu_m2_ck == MPU_CLK and, as result.
+>>>> Timekeeping core misbehaves. For example, execution of command
+>>>> "sleep 5" will take 10 sec instead of 5.
+>>>>
+>>>> Hence, fix it by adding mpu_periphclk ("fixed-factor-clock") and use
+>>>> it for clocking ARM TWD and Global timer (same way as on OMAP4).
+>>>>
+>>>> Cc: Tony Lindgren <tony@atomide.com>
+>>>> Cc: Felipe Balbi <balbi@ti.com>
+>>>> Cc: Tero Kristo <t-kristo@ti.com>
+>>>> Fixes:commit 8cbd4c2f6a99 ("arm: boot: dts: am4372: add ARM timers and
+>>>> SCU nodes")
+>>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>>>> ---
+>>>>   arch/arm/boot/dts/am4372.dtsi        | 4 ++--
+>>>>   arch/arm/boot/dts/am43xx-clocks.dtsi | 8 ++++++++
+>>>>   2 files changed, 10 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/am4372.dtsi
+>>>> b/arch/arm/boot/dts/am4372.dtsi
+>>>> index d83ff9c..de8791a 100644
+>>>> --- a/arch/arm/boot/dts/am4372.dtsi
+>>>> +++ b/arch/arm/boot/dts/am4372.dtsi
+>>>> @@ -74,7 +74,7 @@
+>>>>           reg = <0x48240200 0x100>;
+>>>>           interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
+>>>>           interrupt-parent = <&gic>;
+>>>> -        clocks = <&dpll_mpu_m2_ck>;
+>>>> +        clocks = <&mpu_periphclk>;
+>>>>       };
+>>>>
+>>>>       local_timer: timer at 48240600 {
+>>>> @@ -82,7 +82,7 @@
+>>>>           reg = <0x48240600 0x100>;
+>>>>           interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
+>>>>           interrupt-parent = <&gic>;
+>>>> -        clocks = <&dpll_mpu_m2_ck>;
+>>>> +        clocks = <&mpu_periphclk>;
+>>>>       };
+>>>>
+>>>>       l2-cache-controller at 48242000 {
+>>>> diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi
+>>>> b/arch/arm/boot/dts/am43xx-clocks.dtsi
+>>>> index cc88728..2ff58b1 100644
+>>>> --- a/arch/arm/boot/dts/am43xx-clocks.dtsi
+>>>> +++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
+>>>> @@ -259,6 +259,14 @@
+>>>>           ti,invert-autoidle-bit;
+>>>>       };
+>>>>
+>>>> +    mpu_periphclk: mpu_periphclk {
+>>>> +        #clock-cells = <0>;
+>>>> +        compatible = "fixed-factor-clock";
+>>>> +        clocks = <&dpll_mpu_ck>;
+>>>
+>>> I don't think this is correct, ARM core is fed dpll_mpu_m2_ck, where the
+>>> divisor value can potentially differ from 1. If you feed this clock
+>>> directly from dpll_mpu_ck, you bypass this divisor.
+>>
+>> Sry. My mistake. I'll update it to use dpll_mpu_m2_ck.
+>>
+>>>
+>>> Did you check what is the impact of cpufreq on the ARM TWD/timers?
+>>
+>> TWD is cpufreq friendly, ARM GT is not.
+> 
+> I think the TWD kick period changes with cpufreq also right?
 
-> From: Carlo Caione <carlo@endlessm.com>
->
-> of_irq_find_parent was made static since it had no users outside of
-> of_irq.c. Export it again since we are going to use it again.
->
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
-> ---
->  drivers/of/irq.c       | 2 +-
->  include/linux/of_irq.h | 6 ++++++
->  2 files changed, 7 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-> index 902b89b..45735d5 100644
-> --- a/drivers/of/irq.c
-> +++ b/drivers/of/irq.c
-> @@ -53,7 +53,7 @@ EXPORT_SYMBOL_GPL(irq_of_parse_and_map);
->   * Returns a pointer to the interrupt parent node, or NULL if the interrupt
->   * parent could not be determined.
->   */
-> -static struct device_node *of_irq_find_parent(struct device_node *child)
-> +struct device_node *of_irq_find_parent(struct device_node *child)
+linux/arch/arm/kernel/smp_twd.c has code to handle cpufreq.
 
-If you're making this public you should also
-EXPORT_SYMBOL_GPL(of_irq_find_parent)
+> 
+> How are the clocks handled with cpufreq? The user just needs to 
+> understand that the timers will be screwed if he uses ARM GT? Should we 
+> add some sort of dependency to disable the ARM GT if cpufreq is enabled?
 
-I need an ACK from Rob if this should be merged through
-the GPIO tree. If it is going through the OF tree we'll have
-to defer the resto of the stuff to the next merge window or
-set it up on an immutable branch I can pull.
+Yep. May be, but very good question is how to do that in case of
+OMAP multiplatform build which enables most of all config options at once.
 
-Yours,
-Linus Walleij
+There two threads related to this:
+[1] http://www.spinics.net/lists/arm-kernel/msg459649.html
+[2] http://www.spinics.net/lists/arm-kernel/msg461141.html
+
+Personally, I've do not see better way than [2] right now.
+
+
+>>>> +        clock-mult = <1>;
+>>>> +        clock-div = <2>;
+>>>> +    };
+>>>> +
+>>>>       dpll_ddr_ck: dpll_ddr_ck {
+>>>>           #clock-cells = <0>;
+>>>>           compatible = "ti,am3-dpll-clock";
+>>>>
+
+By the way, does this patch is still correct taking into account dependency
+from cpufreq?
+Does it make sense update it to use dpll_mpu_ck and resend?
+
+-- 
+regards,
+-grygorii
