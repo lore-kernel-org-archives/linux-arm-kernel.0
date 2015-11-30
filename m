@@ -1,29 +1,37 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 30 Nov 2015 15:58:45 +0900
-Subject: [PATCH v2 1/4] ARM: dts: exynos4210: MDMA1 device belongs to LCD0
- power domain
-In-Reply-To: <1448542190-19498-2-git-send-email-m.szyprowski@samsung.com>
-References: <1448542190-19498-1-git-send-email-m.szyprowski@samsung.com>
- <1448542190-19498-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <565BF3A5.30103@samsung.com>
+From: mkarthi3@visteon.com (Mutharaju, Prasanna (P.))
+Date: Mon, 30 Nov 2015 07:01:08 +0000
+Subject: [PATCH] CLK: s3c2410: removed unneeded code in
+ s3c24xx_clkout_set_parent
+Message-ID: <20151130070044.GA23071@jci-VirtualBox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.11.2015 21:49, Marek Szyprowski wrote:
-> On Exynos 4210 MDMA1 device belongs to LCD0 power domain, so add proper
-> power-domains property. On Exynos 4x12, it belongs to TOP power domain,
-> which is always enabled, thus require no assignment in exynos4x12.dtsi.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4210.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
+From: Prasanna Karthik <mkarthi3@visteon.com>
 
-Makes sense. I suppose the rest of the patchset does not depends on it
-directly so it can go through samsung-soc tree (otherwise please let us
-know).
+Remove unneeded variable used to store return value.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Prasanna Karthik <mkarthi3@visteon.com>
+---
+ drivers/clk/samsung/clk-s3c2410-dclk.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Best regards,
-Krzysztof
+diff --git a/drivers/clk/samsung/clk-s3c2410-dclk.c b/drivers/clk/samsung/clk-s3c2410-dclk.c
+index e9eb935..ec6fb14 100644
+--- a/drivers/clk/samsung/clk-s3c2410-dclk.c
++++ b/drivers/clk/samsung/clk-s3c2410-dclk.c
+@@ -77,12 +77,11 @@ static u8 s3c24xx_clkout_get_parent(struct clk_hw *hw)
+ static int s3c24xx_clkout_set_parent(struct clk_hw *hw, u8 index)
+ {
+ 	struct s3c24xx_clkout *clkout = to_s3c24xx_clkout(hw);
+-	int ret = 0;
+ 
+ 	s3c2410_modify_misccr((clkout->mask << clkout->shift),
+ 			      (index << clkout->shift));
+ 
+-	return ret;
++	return 0;
+ }
+ 
+ static const struct clk_ops s3c24xx_clkout_ops = {
+-- 
+1.9.1
