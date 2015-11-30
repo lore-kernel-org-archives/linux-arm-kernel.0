@@ -1,32 +1,46 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 30 Nov 2015 14:51:41 +0100
-Subject: [PATCH] i2c: mv64xxx: The n clockdiv factor is 0 based on sunxi
- SoCs
-In-Reply-To: <1443365828-8956-1-git-send-email-hdegoede@redhat.com>
-References: <1443365828-8956-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20151130135140.GD1513@katana>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 30 Nov 2015 14:53:23 +0100
+Subject: [PATCH v2 0/5] pinctrl: meson: enable support for external GPIO
+ interrupts
+In-Reply-To: <1448273816-11290-1-git-send-email-carlo@caione.org>
+References: <1448273816-11290-1-git-send-email-carlo@caione.org>
+Message-ID: <CACRpkdZqv62Vsb1Fs9fo27-K-T=O6wJLfzRB6ZCPehWOGrxUzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 27, 2015 at 04:57:08PM +0200, Hans de Goede wrote:
-> According to the datasheets to n factor for dividing the tclk is
-> 2 to the power n on Allwinner?SoCs, not 2 to the power n + 1 as it is
-> on other mv64xxx implementations.
-> 
-> I've contacted Allwinner about this and they have confirmed that the
-> datasheet is correct.
-> 
-> This commit fixes the clk-divider calculations for Allwinner SoCs
-> accordingly.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On Mon, Nov 23, 2015 at 11:16 AM, Carlo Caione <carlo@caione.org> wrote:
 
-Applied to for-current, thanks!
+> From: Carlo Caione <carlo@endlessm.com>
+>
+> In Meson SoCs we have 8 independent GPIO interrupts that can be programmed to
+> use any of the GPIOs in the chip as interrupt source.
+>
+> These GPIOs are managed by GIC but they can be conditioned (and enabled) by
+> some registers external to the GIC.
+>
+> GPIOs |--[mux1 or mux2]--[polarity]--[filter]--[edge_select]--> GIC
+>
+> For discussion see comment to the [PATCH 3/5].
+>
+> Changelog:
+>
+> * V2:
+>     - Introduced .irq_request_resources() and .irq_release_resources()
+>     - s/virq/irq/ and s/pin/hwirq/
+>     - Moved to the new irq_fwspec
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151130/ed500ee0/attachment-0001.sig>
+I'm waiting for the next version of this patch set.
+
+However I am a bit concerned that we're starting to have a few
+GPIO controllers now that are not really cascaded irqchips,
+but instead just shunt the line through to some other interrupt
+controller through a mux or latch.
+
+We might need to add some handling to gpiolib core that
+does this, like gpiochip_add_irq_mux() that sets up the
+irqdomain we have for GPIOLIB_IRQCHIP to be used like
+this and pull this code into gpiolib to avoid duplication of
+code and bugs.
+
+Yours,
+Linus Walleij
