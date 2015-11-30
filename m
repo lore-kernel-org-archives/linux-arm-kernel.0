@@ -1,102 +1,144 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 30 Nov 2015 15:32:18 +0200
-Subject: [4.4-rc][PATCH] ARM: dts: am4372: fix clock source for arm twd
- and global timers
-In-Reply-To: <565C38CE.1070907@ti.com>
-References: <1448653468-24908-1-git-send-email-grygorii.strashko@ti.com>
- <565C0814.3000001@ti.com> <565C38CE.1070907@ti.com>
-Message-ID: <565C4FE2.3090403@ti.com>
+From: lifshitz@compulab.co.il (Dmitry Lifshitz)
+Date: Mon, 30 Nov 2015 15:29:56 +0200
+Subject: [PATCH 01/18] ARM: am57xx: cl-som-am57x: dts: add basic module
+ support
+In-Reply-To: <565B307E.2000203@ti.com>
+References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
+ <1448433590-1399-2-git-send-email-lifshitz@compulab.co.il>
+ <565629D2.2010401@ti.com> <565AEB19.4050107@compulab.co.il>
+ <565B307E.2000203@ti.com>
+Message-ID: <565C4F54.50405@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2015 01:53 PM, Grygorii Strashko wrote:
-> On 11/30/2015 10:25 AM, Tero Kristo wrote:
->> On 11/27/2015 09:44 PM, Grygorii Strashko wrote:
->>> ARM TWD and Global timer are clocked by PERIPHCLK which is MPU_CLK/2.
->>> But now they are clocked by dpll_mpu_m2_ck == MPU_CLK and, as result.
->>> Timekeeping core misbehaves. For example, execution of command
->>> "sleep 5" will take 10 sec instead of 5.
+On 11/29/2015 07:06 PM, Nishanth Menon wrote:
+> On 11/29/2015 06:10 AM, Dmitry Lifshitz wrote:
+> [...]
+>>>> +    };
+>>>> +
+>>>> +    leds {
+>>>> +        compatible = "gpio-leds";
+>>>> +        pinctrl-names = "default";
+>>>> +        pinctrl-0 = <&leds_pins_default>;
+>>>> +
+>>>> +        led at 0 {
+>>>> +            label = "cl-som-am57x:green";
+>>>> +            gpios = <&gpio2 5 GPIO_ACTIVE_HIGH>;
+>>>> +            linux,default-trigger = "heartbeat";
+>>>> +            default-state = "off";
+>>>> +        };
+>>>> +    };
+>>>> +};
+>>>> +
+>>>> +&dra7_pmx_core {
+>>>> +    leds_pins_default: leds_pins_default {
+>>>> +        pinctrl-single,pins = <
+>>>> +            DRA7XX_CORE_IOPAD(0x347c, PIN_OUTPUT | MUX_MODE14)    /*
+>>>> gpmc_a15.gpio2_5 */
+>>>> +        >;
+>>>> +    };
+>>>> +
+>>>> +    i2c1_pins_default: i2c1_pins_default {
+>>>> +        pinctrl-single,pins = <
+>>>> +            DRA7XX_CORE_IOPAD(0x3800, PIN_INPUT_PULLUP |
+>>>> MUX_MODE0)    /* i2c1_sda.sda */
+>>>> +            DRA7XX_CORE_IOPAD(0x3804, PIN_INPUT_PULLUP |
+>>>> MUX_MODE0)    /* i2c1_scl.scl */
+>>>> +        >;
+>>>> +    };
+>>>> +
+>>>> +    tps659038_pins_default: tps659038_pins_default {
+>>>> +        pinctrl-single,pins = <
+>>>> +            DRA7XX_CORE_IOPAD(0x3818, PIN_INPUT_PULLUP | MUX_MODE14)
+>>>> /* wakeup0.gpio1_0 */
+>>>> +        >;
+>>>> +    };
 >>>
->>> Hence, fix it by adding mpu_periphclk ("fixed-factor-clock") and use
->>> it for clocking ARM TWD and Global timer (same way as on OMAP4).
->>>
->>> Cc: Tony Lindgren <tony@atomide.com>
->>> Cc: Felipe Balbi <balbi@ti.com>
->>> Cc: Tero Kristo <t-kristo@ti.com>
->>> Fixes:commit 8cbd4c2f6a99 ("arm: boot: dts: am4372: add ARM timers and
->>> SCU nodes")
->>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>> ---
->>>   arch/arm/boot/dts/am4372.dtsi        | 4 ++--
->>>   arch/arm/boot/dts/am43xx-clocks.dtsi | 8 ++++++++
->>>   2 files changed, 10 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/am4372.dtsi
->>> b/arch/arm/boot/dts/am4372.dtsi
->>> index d83ff9c..de8791a 100644
->>> --- a/arch/arm/boot/dts/am4372.dtsi
->>> +++ b/arch/arm/boot/dts/am4372.dtsi
->>> @@ -74,7 +74,7 @@
->>>           reg = <0x48240200 0x100>;
->>>           interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
->>>           interrupt-parent = <&gic>;
->>> -        clocks = <&dpll_mpu_m2_ck>;
->>> +        clocks = <&mpu_periphclk>;
->>>       };
->>>
->>>       local_timer: timer at 48240600 {
->>> @@ -82,7 +82,7 @@
->>>           reg = <0x48240600 0x100>;
->>>           interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
->>>           interrupt-parent = <&gic>;
->>> -        clocks = <&dpll_mpu_m2_ck>;
->>> +        clocks = <&mpu_periphclk>;
->>>       };
->>>
->>>       l2-cache-controller at 48242000 {
->>> diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi
->>> b/arch/arm/boot/dts/am43xx-clocks.dtsi
->>> index cc88728..2ff58b1 100644
->>> --- a/arch/arm/boot/dts/am43xx-clocks.dtsi
->>> +++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
->>> @@ -259,6 +259,14 @@
->>>           ti,invert-autoidle-bit;
->>>       };
->>>
->>> +    mpu_periphclk: mpu_periphclk {
->>> +        #clock-cells = <0>;
->>> +        compatible = "fixed-factor-clock";
->>> +        clocks = <&dpll_mpu_ck>;
->>
->> I don't think this is correct, ARM core is fed dpll_mpu_m2_ck, where the
->> divisor value can potentially differ from 1. If you feed this clock
->> directly from dpll_mpu_ck, you bypass this divisor.
->
-> Sry. My mistake. I'll update it to use dpll_mpu_m2_ck.
->
->>
->> Did you check what is the impact of cpufreq on the ARM TWD/timers?
->
-> TWD is cpufreq friendly, ARM GT is not.
-
-I think the TWD kick period changes with cpufreq also right?
-
-How are the clocks handled with cpufreq? The user just needs to 
-understand that the timers will be screwed if he uses ARM GT? Should we 
-add some sort of dependency to disable the ARM GT if cpufreq is enabled?
-
--Tero
-
->
->
->>> +        clock-mult = <1>;
->>> +        clock-div = <2>;
->>> +    };
->>> +
->>>       dpll_ddr_ck: dpll_ddr_ck {
->>>           #clock-cells = <0>;
->>>           compatible = "ti,am3-dpll-clock";
+>>> Generic comment: As per requirements of the SoC -> all pinctrl must be
+>>> done in bootloader. this was a recommendation that came in too late
+>>> for TI platforms that got introduced in upstream, but that cleanup
+>>> should eventually take place as well.
 >>>
 >>
+>> Please, could you provide a reference to those recommendations.
+>> Do you mean pinctrl for PMIC pins only?
 >
+> You might want to ask your TI support contact for IODelay
+> recommendations. TRM mentions that pinmuxing must be performed under IO
+> isolation. There are silicon constraints in DRA7/AM57xx family, which
+> were not present previously.
 >
+
+Ok. I understand. This might take time...
+Since we'd like to have this in for 4.5, what would you recommend?
+Should I drop the muxes from this patch set? All the muxes?
+Or should we merge this (as it works correctly) in our tests and check
+on this later after investigation with TI?
+
+Also, in theory, there might be pins shared between two or more
+different functionalities and remuxed during runtime.
+Can this kind of thing be supported on AM57x?
+
+>>>> +    tps659038: tps659038 at 58 {
+>>>> +        compatible = "ti,tps659038";
+>>>> +        reg = <0x58>;
+>>>> +        interrupt-parent = <&gpio1>;
+>>>> +        interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+>>>
+>>> Also See: https://patchwork.kernel.org/patch/7596541/ ->
+>>> Documentation/devicetree/bindings/i2c/i2c.txt -> since you seem to
+>>> have a PMIC with power button, you might be able to get wakeup source
+>>> also there.
+>>>
+>>
+>> Do you mean just adding "wakeup-source" property?
+>>
+>> According to Documentation/devicetree/bindings/i2c/i2c.txt the primary
+>> interrupt will be used as wakeup interrupt.
+>
+> I think you might have to describe a "wakeup" interrupt -> which will be
+> similar in description to the one you used to describe uart wakeup
+> capability.
+
+Ok. Thanks!
+Well, we are not there yet.
+I think it would be better to work this out when I will work on the
+suspend/resume.
+
+>
+> [..]
+>
+>>>> +        pinctrl-names = "default";
+>>>> +        pinctrl-0 = <&tps659038_pins_default>;
+>>>> +
+>>>> +        #interrupt-cells = <2>;
+>>>> +        interrupt-controller;
+>>>> +
+>>>> +        ti,system-power-controller;
+>>>
+>>> Assuming powerhold signal and BOOT0,1 is proper here, else poweroff
+>>> will never work.
+>>>
+>>
+>> Please, could you provide more details regarding this issue.
+>
+> well,  if poweroff command does not completely power off your board, you
+> may want to investigate further. overall, the better circuit
+> configuration is the X15 configuration:
+> https://github.com/beagleboard/beagleboard-x15/blob/master/BeagleBoard-X15_RevA2.pdf
+> Pay close attention to the PMIC GPIO_&/POWERHOLD signal. Also notice the
+> extra reset circuit involved.
+>
+> Again, a topic that you should probably discuss with your TI support
+> contact person.
+
+Ok. Thanks for the explanation! Indeed it does not currently work.
+I will forward your comments to the h/w designer.
+
+>
+> [...]
+>
+
+Regards,
+
+Dmitry
