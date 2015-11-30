@@ -1,45 +1,70 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 30 Nov 2015 23:21:41 +0300
-Subject: [PATCH v6 14/19] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <2133692.Tueq9xZUPQ@wuerfel>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <1447795019-30176-15-git-send-email-ynorov@caviumnetworks.com>
- <3754277.KmO9Nk3XLD@wuerfel> <2133692.Tueq9xZUPQ@wuerfel>
-Message-ID: <20151130202141.GA23254@yury-N73SV>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 30 Nov 2015 21:33:45 +0100
+Subject: [PATCH v2 00/21] arm64: KVM: world switch in C
+In-Reply-To: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20151130203345.GI11704@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 04:34:22PM +0100, Arnd Bergmann wrote:
-> On Tuesday 17 November 2015 22:57:52 Arnd Bergmann wrote:
-> > On Wednesday 18 November 2015 00:16:54 Yury Norov wrote:
-> > > From: Andrew Pinski <apinski@cavium.com>
-> > > 
-> > > Add a separate syscall-table for ILP32, which dispatches either to native
-> > > LP64 system call implementation or to compat-syscalls, as appropriate.
-> > 
-> > I like it much better than the previous version, thanks for the rework!
+On Fri, Nov 27, 2015 at 06:49:54PM +0000, Marc Zyngier wrote:
+> Once upon a time, the KVM/arm64 world switch was a nice, clean, lean
+> and mean piece of hand-crafted assembly code. Over time, features have
+> crept in, the code has become harder to maintain, and the smallest
+> change is a pain to introduce. The VHE patches are a prime example of
+> why this doesn't work anymore.
 > 
-> Hi Yuri,
+> This series rewrites most of the existing assembly code in C, but keeps
+> the existing code structure in place (most function names will look
+> familiar to the reader). The biggest change is that we don't have to
+> deal with a static register allocation (the compiler does it for us),
+> we can easily follow structure and pointers, and only the lowest level
+> is still in assembly code. Oh, and a negative diffstat.
 > 
-> you must have missed my reply below. Are you still working on ilp32
-> or did you drop this thread because you got distracted with something
-> else?
-> 
-> 	Arnd
-> 
+> There is still a healthy dose of inline assembly (system register
+> accessors, runtime code patching), but I've tried not to make it too
+> invasive. The generated code, while not exactly brilliant, doesn't
+> look too shaby. I do expect a small performance degradation, but I
+> believe this is something we can improve over time (my initial
+> measurements don't show any obvious regression though).
 
-Hi Arnd,
+I ran this through my experimental setup on m400 and got this:
 
-I didn't miss it, and I continue with ILP32. I really appreciate your
-attention and time you spend on ILP32.
+BM		v4.4-rc2	v4.4-rc2-wsinc	overhead
+--		--------	--------------	--------
+Apache		5297.11		5243.77		101.02%
+fio rand read	4354.33		4294.50		101.39%
+fio rand write	2465.33		2231.33		110.49%
+hackbench	17.48		19.78		113.16%
+memcached	96442.69	101274.04	95.23%
+TCP_MAERTS	5966.89		6029.72		98.96%
+TCP_STREAM	6284.60		6351.74		98.94%
+TCP_RR		15044.71	14324.03	105.03%
+pbzip2 c	18.13		17.89		98.68%
+pbzip2 d	11.42		11.45		100.26%
+kernbench	50.13		50.28		100.30%
+mysql 1		152.84		154.01		100.77%
+mysql 2		98.12		98.94		100.84%
+mysql 4		51.32		51.17		99.71%
+mysql 8		27.31		27.70		101.42%
+mysql 20	16.80		17.21		102.47%
+mysql 100	13.71		14.11		102.92%
+mysql 200	15.20		15.20		100.00%
+mysql 400	17.16		17.16		100.00%
 
-There's a tricky bug with signal stack, that Andreas also discovered.
-It makes almost all tests that use posix threads crash. I want to fix
-it and other bugs before next submission. 
+(you want to see this with a viewer that renders clear-text and tabs
+properly)
 
-I also update glibc to follow all recommendations, and I want to
-upload it together with kernel patches.
+What this tells me is that we do take a noticable hit on the
+world-switch path, which shows up in the TCP_RR and hackbench workloads,
+which have a high precision in their output.
 
-BR,
-Yury.
+Note that the memcached number is well within its variability between
+individual benchmark runs, where it varies to 12% of its average in over
+80% of the executions.
+
+I don't think this is a showstopper thought, but we could consider
+looking more closely at a breakdown of the world-switch path and verify
+if/where we are really taking a hit.
+
+-Christoffer
