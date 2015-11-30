@@ -1,72 +1,55 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 30 Nov 2015 15:19:09 -0800
-Subject: [PATCH 1/3] power: domain: add pm_genpd_uninit
-In-Reply-To: <1447956490-22930-2-git-send-email-alex.aring@gmail.com>
- (Alexander Aring's message of "Thu, 19 Nov 2015 19:08:08 +0100")
-References: <1447956490-22930-1-git-send-email-alex.aring@gmail.com>
- <1447956490-22930-2-git-send-email-alex.aring@gmail.com>
-Message-ID: <7h7fkz9itu.fsf@deeprootsystems.com>
+From: dcashman@google.com (Daniel Cashman)
+Date: Mon, 30 Nov 2015 15:40:10 -0800
+Subject: [PATCH] ARM: avoid ARCH_MMAP_RND_BITS for NOMMU
+In-Reply-To: <2874133.c4GDUf0t6t@wuerfel>
+References: <2874133.c4GDUf0t6t@wuerfel>
+Message-ID: <CAJQetW5j4+XPyJMyFFVKyxOaLOKtA4pnKZsZTrxDKqYJ-mtDkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alexander Aring <alex.aring@gmail.com> writes:
+Thank you for this.  I will add this to the recently posted patchset
+v4.   Without CONFIG_MMU, arch_pick_mmap_layout() is a no-op and the
+arch/$ARCH/mm/mmap.c source is not included, so this change makes
+sense.  In addition, we should drop the nommu default and add
+depends-on for the Kconfig portions.
 
-> This patch adds function pm_genpd_uninit for undo a pm_genpd_init. This
-> is useful for multiple power domains while probing. If the probing fails
-> after one pm_genpd_init was called we need to undo all previous
-> registrations of generic pm domains inside the gpd_list list.
+-Dan
+
+On Fri, Nov 27, 2015 at 6:04 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> ARM kernels with MMU disabled fail to build because of CONFIG_ARCH_MMAP_RND_BITS:
 >
-> There is a check on IS_ERR_OR_NULL(genpd) which is useful to check again
-> registered power domains and not registered domains, the driver can use
-> this mechanism to have an array with registered and non-registered power
-> domains, where non-registered power domains are NULL.
+> kernel/built-in.o:(.data+0x754): undefined reference to `mmap_rnd_bits'
+> kernel/built-in.o:(.data+0x76c): undefined reference to `mmap_rnd_bits_min'
+> kernel/built-in.o:(.data+0x770): undefined reference to `mmap_rnd_bits_max'
 >
-> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Pavel Machek <pavel@ucw.cz>
-> Cc: Len Brown <len.brown@intel.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
+> This changes the newly added line to only select this allow for
+> MMU-enabled kernels.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 14570b3fd31a ("arm: mm: support ARCH_MMAP_RND_BITS")
 > ---
->  drivers/base/power/domain.c | 22 ++++++++++++++++++++++
->  include/linux/pm_domain.h   |  4 ++++
->  2 files changed, 26 insertions(+)
+> Found on yesterday's linux-next with ARM randconfig. The commit that
+> introduced this is currently in Andrew's tree.
 >
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index e03b1ad..24f54b8 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -1509,6 +1509,28 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
->  }
->  EXPORT_SYMBOL_GPL(pm_genpd_init);
->  
-> +/**
-> + * pm_genpd_uninit - Uninitialize a generic I/O PM domain object.
-> + * @genpd: PM domain object to initialize.
-> + */
-> +void pm_genpd_uninit(struct generic_pm_domain *genpd)
-> +{
-> +	if (IS_ERR_OR_NULL(genpd))
-> +		return;
-> +
-> +	/* check if domain is still in registered inside the pm subsystem */
-> +	WARN_ON_ONCE(!list_empty(&genpd->master_links) ||
-> +		     !list_empty(&genpd->slave_links) ||
-> +		     !list_empty(&genpd->dev_list));
+> If you don't already have a fix, please either apply this patch on top,
+> or fold it into the original patch.
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index b64f64d124c4..5a0957e3ea36 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -34,7 +34,7 @@ config ARM
+>         select HAVE_ARCH_BITREVERSE if (CPU_32v7M || CPU_32v7) && !CPU_32v6
+>         select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL && !CPU_ENDIAN_BE32 && MMU
+>         select HAVE_ARCH_KGDB if !CPU_ENDIAN_BE32 && MMU
+> -       select HAVE_ARCH_MMAP_RND_BITS
+> +       select HAVE_ARCH_MMAP_RND_BITS if MMU
+>         select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
+>         select HAVE_ARCH_TRACEHOOK
+>         select HAVE_BPF_JIT
+>
 
-So we WARN if there are parents/children/devices, but shouldn't this
-return an error instead of continuing to remove/uninit the genpd?
 
-The caller of _uninit should probably also be removing any
-parents/children and removing devices before calling _uninit, no?
 
-> +	mutex_lock(&gpd_list_lock);
-> +	list_del(&genpd->gpd_list_node);
-> +	mutex_unlock(&gpd_list_lock);
-> +
-> +	mutex_destroy(&genpd->lock);
-> +}
-> +EXPORT_SYMBOL_GPL(pm_genpd_uninit);
-
-Kevin
+-- 
+Dan Cashman
