@@ -1,91 +1,103 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Mon, 30 Nov 2015 20:53:44 +0100
-Subject: [PATCH 00/13] mvneta Buffer Management and enhancements
-In-Reply-To: <87lh9f4dbt.fsf@free-electrons.com>
-References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
- <87lh9f4dbt.fsf@free-electrons.com>
-Message-ID: <CAPv3WKc+HbirDxKy5n6W5O5BUTDEc3X5et5dTKdp81WOXjphGg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 30 Nov 2015 20:58:23 +0100
+Subject: [linux-sunxi] Re: [PATCH v2 3/5] thermal: Add a driver for the
+ Allwinner THS sensor
+In-Reply-To: <0edf1031924124377647dfb0f62ec6c8@rainloop.atalax.net>
+References: <20151124084342.GJ32142@lukather>
+ <cover.1448263428.git.atx@atx.name>
+ <ea5d8edefd251f2b76660b43a4ea4dc89c3b2f38.1448263428.git.atx@atx.name>
+ <0edf1031924124377647dfb0f62ec6c8@rainloop.atalax.net>
+Message-ID: <20151130195823.GE3664@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+On Wed, Nov 25, 2015 at 11:02:34AM +0000, Josef Gajdusek wrote:
+> >> +struct sun8i_ths_type {
+> >> + int (*init)(struct platform_device *, struct sun8i_ths_data *);
+> >> + int (*get_temp)(struct sun8i_ths_data *, int *out);
+> >> + void (*irq)(struct sun8i_ths_data *);
+> >> + void (*deinit)(struct sun8i_ths_data *);
+> >> +};
+> > 
+> > AFAIK, you never got back on why it was actually needed, instead of
+> > directly calling these functions.
+> 
+> It is preparation for supporting the other SoCs with THS as they have
+> slightly different register layouts and thus cannot be controlled by the
+> same code.
 
-2015-11-30 18:16 GMT+01:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
-> Hi Marcin,
->
->  On dim., nov. 22 2015, Marcin Wojtas <mw@semihalf.com> wrote:
->
->> Hi,
->>
->> Hereby I submit a patchset that introduces various fixes and support
->> for new features and enhancements to the mvneta driver:
->>
->> 1. First three patches are minimal fixes, stable-CC'ed.
->>
->> 2. Suspend to ram ('s2ram') support. Due to some stability problems
->> Thomas Petazzoni's patches did not get merged yet, but I used them for
->> verification. Contrary to wfi mode ('standby' - linux does not
->> differentiate between them, so same routines are used) all registers'
->> contents are lost due to power down, so the configuration has to be
->> fully reconstructed during resume.
->>
->> 3. Optimisations - concatenating TX descriptors' flush, basing on
->> xmit_more support and combined approach for finalizing egress processing.
->> Thanks to HR timer buffers can be released with small latency, which is
->> good for low transfer and small queues. Along with the timer, coalescing
->> irqs are used, whose threshold could be increased back to 15.
->>
->> 4. Buffer manager (BM) support with two preparatory commits. As it is a
->> separate block, common for all network ports, a new driver is introduced,
->> which configures it and exposes API to the main network driver. It is
->> throughly described in binding documentation and commit log. Please note,
->> that enabling per-port BM usage is done using phandle and the data passed
->> in mvneta_bm_probe. It is designed for usage of on-demand device probe
->> and dev_set/get_drvdata, however it's awaiting merge to linux-next.
->> Therefore, deferring probe is not used - if something goes wrong (same
->> in case of errors during changing MTU or suspend/resume cycle) mvneta
->> driver falls back to software buffer management and works in a regular way.
->>
->> Known issues:
->> - problems with obtaining all mapped buffers from internal SRAM, when
->> destroying the buffer pointer pool
->> - problems with unmapping chunk of SRAM during driver removal
->> Above do not have an impact on the operation, as they are called during
->> driver removal or in error path.
->>
->> 5. Enable BM on Armada XP and 38X development boards - those ones and
->> A370 I could check on my own. In all cases they survived night-long
->> linerate iperf. Also tests were performed with A388 SoC working as a
->> network bridge between two packet generators. They showed increase of
->> maximum processed 64B packets by ~20k (~555k packets with BM enabled
->> vs ~535 packets without BM). Also when pushing 1500B-packets with a
->> line rate achieved, CPU load decreased from around 25% without BM vs
->> 18-20% with BM.
->
-> I was trying to test the BM part of tour series on the Armada XP GP
-> board. However it failed very quickly during the pool allocation. After
-> a first debug I found that the size of the cs used in the
-> mvebu_mbus_dram_info struct was 0. I have applied your series on a
-> v4.4-rc1 kernel. At this stage I don't know if it is a regression in the
-> mbus driver, a misconfiguration on my side or something else.
->
-> Does it ring a bell for you?
+Do you have support and / or informations on what's going to be needed
+for these other SoCs yet?
 
-Frankly, I'm a bit surprised, I've never seen such problems on any of
-the boards (AXP-GP/DB, A38X-DB/GP/AP). Did mvebu_mbus_dram_win_info
-function exit with an error? Can you please apply below diff:
-http://pastebin.com/2ws1txWk
-And send me a full log beginning from u-boot?
+Which SoCs are we talking about?
 
->
-> How do you test test it exactly?
-> Especially on which kernel and with which U-Boot?
->
+> >> + /* The final sample period is calculated as follows:
+> >> + * (THERMAL_PER + 1) * 4096 / f_clk * 2^(FILTER_TYPE + 1)
+> >> + *
+> >> + * This results to about 1Hz with these settings.
+> >> + */
+> >> + ret = clk_set_rate(data->clk, 4000000);
+> > 
+> > I don't follow you here. You have a complicated math function, that
+> > has many input variables, and then, you just set the clock rate to a
+> > constant?
+> 
+> How should this be handled then? I guess the sampling rate could
+> be set in the device tree and then the values calculated, but none
+> of the other thermal drivers seem to have configurable sample rate.
 
-I've just re-built the patchset I sent, which is on top of 4.4-rc1.
+I don't know, I would have expected some actual computation, like a
+function taking the frequency as a parameter and returning the clock
+rate. At least that way we now what we're doing and which part might
+change and which will not.
 
-I use AXP-GP, 78460 @ 1600MHz, 2GB DRAM, and everything works fine. My
-u-boot version: v2011.12 2014_T2.0_eng_dropv2.
+But you do not need to change the sample rate itself.
 
-Best regards,
-Marcin
+> >> +static int sun8i_ths_h3_get_temp(struct sun8i_ths_data *data, int *out)
+> >> +{
+> >> + int val = readl(data->regs + THS_H3_DATA);
+> >> + *out = sun8i_ths_reg_to_temperature(val, 8253, 217000);
+> >> + return 0;
+> > 
+> > Can't you just return the value directly?
+> 
+> I did that in the v1, clabbe.montjoie suggested to use temp variable to
+> avoid column wrap.
+
+I was talking about the out pointer. Can the value not be returned?
+
+> >> + ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
+> >> + sun8i_ths_irq_thread, IRQF_ONESHOT,
+> >> + dev_name(&pdev->dev), data);
+> > 
+> > Why a threaded irq?
+> 
+> I thought threaded IRQs are preferred? Other thermal drivers
+> use them too.
+
+It's close to pointless in this case. You're not doing much more than
+what the default handler will do anyway, and you avoid scheduling a
+thread doing so.
+
+And other thermal drivers use a regular interrupt handler too :)
+
+> I am also not really sure thermal_zone_device_update() can even be
+> called in interrupt context.
+
+I can't really tell on this one. Judging from a quick look, I can't
+see anything that could prevent it, and since others are using it, it
+seems doable.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151130/124199bd/attachment-0001.sig>
