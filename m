@@ -1,51 +1,28 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 30 Nov 2015 11:14:06 -0600
-Subject: [PATCH v4 2/5] clk: sunxi: Add sun9i A80 apbs gates support
-In-Reply-To: <1448766190-11345-3-git-send-email-wens@csie.org>
-References: <1448766190-11345-1-git-send-email-wens@csie.org>
- <1448766190-11345-3-git-send-email-wens@csie.org>
-Message-ID: <20151130171406.GA10111@rob-hp-laptop>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 30 Nov 2015 09:17:36 -0800
+Subject: [PATCH] pinctrl: bcm2835: Fix initial value for direction_output
+In-Reply-To: <1447893147-9458-1-git-send-email-stefan.wahren@i2se.com>
+References: <1447893147-9458-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <87r3j7tnin.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 29, 2015 at 11:03:07AM +0800, Chen-Yu Tsai wrote:
-> This patch adds support for the PRCM apbs clock gates found on the
-> Allwinner A80 SoC.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-Acked-by: Rob Herring <robh@kernel.org>
+> Currently the provided initial value for bcm2835_gpio_direction_output
+> has no effect. So fix this issue by changing the value before
+> changing the GPIO direction. As a result we need to move the function below
+> bcm2835_gpio_set.
+>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> CC: Martin Sperl <kernel@martin.sperl.org>
+> CC: Stephen Warren <swarren@wwwdotorg.org>
 
-> ---
->  Documentation/devicetree/bindings/clock/sunxi.txt | 1 +
->  drivers/clk/sunxi/clk-simple-gates.c              | 2 ++
->  2 files changed, 3 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index a94bb56a0e9e..b6859ed6913f 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -55,6 +55,7 @@ Required properties:
->  	"allwinner,sun9i-a80-apb1-gates-clk" - for the APB1 gates on A80
->  	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
->  	"allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
-> +	"allwinner,sun9i-a80-apbs-gates-clk" - for the APBS gates on A80
->  	"allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
->  	"allwinner,sun4i-a10-mmc-clk" - for the MMC clock
->  	"allwinner,sun9i-a80-mmc-clk" - for mmc module clocks on A80
-> diff --git a/drivers/clk/sunxi/clk-simple-gates.c b/drivers/clk/sunxi/clk-simple-gates.c
-> index 0214c6548afd..c8acc0612c15 100644
-> --- a/drivers/clk/sunxi/clk-simple-gates.c
-> +++ b/drivers/clk/sunxi/clk-simple-gates.c
-> @@ -140,6 +140,8 @@ CLK_OF_DECLARE(sun9i_a80_apb0, "allwinner,sun9i-a80-apb0-gates-clk",
->  	       sunxi_simple_gates_init);
->  CLK_OF_DECLARE(sun9i_a80_apb1, "allwinner,sun9i-a80-apb1-gates-clk",
->  	       sunxi_simple_gates_init);
-> +CLK_OF_DECLARE(sun9i_a80_apbs, "allwinner,sun9i-a80-apbs-gates-clk",
-> +	       sunxi_simple_gates_init);
->  
->  static const int sun4i_a10_ahb_critical_clocks[] __initconst = {
->  	14,	/* ahb_sdram */
-> -- 
-> 2.6.2
-> 
+Acked-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151130/0a065946/attachment.sig>
