@@ -1,25 +1,87 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 30 Nov 2015 16:57:23 +0100
-Subject: [PATCH 1/3] i2c: at91: add setting HOLD field of TWIHS_CWGR via DT
-In-Reply-To: <20151130151319.GM1513@katana>
-References: <1448372862-11912-1-git-send-email-ludovic.desroches@atmel.com>
- <20151130151319.GM1513@katana>
-Message-ID: <20151130155723.GA29282@odux.rfo.atmel.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Mon, 30 Nov 2015 16:57:36 +0100
+Subject: [PATCH 06/13] net: mvneta: enable mixed egress processing using
+ HR timer
+In-Reply-To: <20151126164540.GH4665@kw.sim.vm.gnt>
+References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
+ <1448178839-3541-7-git-send-email-mw@semihalf.com>
+ <20151126164540.GH4665@kw.sim.vm.gnt>
+Message-ID: <CAPv3WKf5hRKsSuwVx94qoAzJTd6MSK=WfSi0Av7X3U_L47G=Ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 04:13:20PM +0100, Wolfram Sang wrote:
-> On Tue, Nov 24, 2015 at 02:47:40PM +0100, Ludovic Desroches wrote:
-> > From: Wenyou Yang <wenyou.yang@atmel.com>
-> > 
-> > Add the HOLD field management. Some i2c devices need a longer data hold
-> > time than the one given in the i2c bus specification. Since this value
-> > depends on the i2c device connected to the bus, add a DT property to
-> > configure it: "atmel,twd-hold-cycles".
-> 
-> We already have "i2c-sda-hold-time-ns". Can you use that one? Sorry that
-> this is not obviously documented, I am working on it...
-> 
+Hi Simon,
 
-I think we can use it, I'll rework the patch to convert duration in
-number of cycles.
+2015-11-26 17:45 GMT+01:00 Simon Guinot <simon.guinot@sequanux.org>:
+> Hi Marcin,
+>
+> On Sun, Nov 22, 2015 at 08:53:52AM +0100, Marcin Wojtas wrote:
+>> Mixed approach allows using higher interrupt threshold (increased back to
+>> 15 packets), useful in high throughput. In case of small amount of data
+>> or very short TX queues HR timer ensures releasing buffers with small
+>> latency.
+>>
+>> Along with existing tx_done processing by coalescing interrupts this
+>> commit enables triggering HR timer each time the packets are sent.
+>> Time threshold can also be configured, using ethtool.
+>>
+>> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+>> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+>> ---
+>>  drivers/net/ethernet/marvell/mvneta.c | 89 +++++++++++++++++++++++++++++++++--
+>>  1 file changed, 85 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+>> index 9c9e858..f5acaf6 100644
+>> --- a/drivers/net/ethernet/marvell/mvneta.c
+>> +++ b/drivers/net/ethernet/marvell/mvneta.c
+>> @@ -21,6 +21,8 @@
+>>  #include <linux/module.h>
+>>  #include <linux/interrupt.h>
+>>  #include <linux/if_vlan.h>
+>> +#include <linux/hrtimer.h>
+>> +#include <linux/ktime.h>
+>
+> ktime.h is already included by hrtimer.h.
+>
+>>  #include <net/ip.h>
+>>  #include <net/ipv6.h>
+>>  #include <linux/io.h>
+>> @@ -226,7 +228,8 @@
+>>  /* Various constants */
+>>
+>>  /* Coalescing */
+>> -#define MVNETA_TXDONE_COAL_PKTS              1
+>> +#define MVNETA_TXDONE_COAL_PKTS              15
+>> +#define MVNETA_TXDONE_COAL_USEC              100
+>
+> Maybe we should keep the default configuration and let the user choose
+> to enable (or not) this feature ?
+
+I think that this feature should be enabled by default, same as in RX
+(which is enabled by HW in ingress). It satisfies all kinds of traffic
+or queues sizes. I'd prefer a situation that if someone really wants
+to disable it (even if I don't know the possible justification), then
+let him use ethtool for this purpose.
+
+>
+>>  #define MVNETA_RX_COAL_PKTS          32
+>>  #define MVNETA_RX_COAL_USEC          100
+>>
+>> @@ -356,6 +359,11 @@ struct mvneta_port {
+>>       struct net_device *dev;
+>>       struct notifier_block cpu_notifier;
+>>
+>> +     /* Egress finalization */
+>> +     struct tasklet_struct tx_done_tasklet;
+>> +     struct hrtimer tx_done_timer;
+>> +     bool timer_scheduled;
+>
+> I think we could use hrtimer_is_queued() instead of introducing a new
+> variable.
+>
+
+Good point, i'll try that.
+
+Best regards,
+Marcin
