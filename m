@@ -1,44 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Nov 2015 12:24:23 +0100
-Subject: [PATCH] backlight: adp8860: fix another uninitialized variable use
-Message-ID: <3284846.T0rzz6n1As@wuerfel>
+Date: Mon, 30 Nov 2015 12:29:31 +0100
+Subject: [PATCH] phy: sun9i-usb: add USB dependency
+Message-ID: <2655929.DjdP30bhQY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent patch I did fixed two potential uses of uninitialized
-variables in the adp8870 and adp8860 drivers. Unfortunately,
-I missed another one:
+The sun9i usb phy driver calls of_usb_get_phy_mode(), which is not
+available if USB is disabled:
 
-drivers/video/backlight/adp8860_bl.c: In function 'adp8860_bl_ambient_light_level_show':
-drivers/video/backlight/adp8860_bl.c:570:11: warning: 'reg_val' may be used uninitialized in this function
+drivers/built-in.o: In function `sun9i_usb_phy_probe':
+:(.text+0x7fb0): undefined reference to `of_usb_get_phy_mode'
 
-This does the same change as before in one additional function,
-and also changes the check for the return value in a way that
-avoids another false positive warning with a similar message.
+This adds a dependency to avoid the randconfig build errors.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 6be3a5a9cd91 ("backlight: adp88x0: Fix uninitialized variable use")
----
-Sorry for missing this third hunk the first time around.
+Fixes: 9c3b44302636 ("phy: Add driver to support individual USB PHYs on sun9i")
 
-diff --git a/drivers/video/backlight/adp8860_bl.c b/drivers/video/backlight/adp8860_bl.c
-index f0d4c0324580..510e559c060e 100644
---- a/drivers/video/backlight/adp8860_bl.c
-+++ b/drivers/video/backlight/adp8860_bl.c
-@@ -566,11 +566,13 @@ static ssize_t adp8860_bl_ambient_light_level_show(struct device *dev,
- 
- 	mutex_lock(&data->lock);
- 	error = adp8860_read(data->client, ADP8860_PH1LEVL, &reg_val);
--	ret_val = reg_val;
--	error |= adp8860_read(data->client, ADP8860_PH1LEVH, &reg_val);
-+	if (!error) {
-+		ret_val = reg_val;
-+		error = adp8860_read(data->client, ADP8860_PH1LEVH, &reg_val);
-+	}
- 	mutex_unlock(&data->lock);
- 
--	if (error < 0)
-+	if (error)
- 		return error;
- 
- 	/* Return 13-bit conversion value for the first light sensor */
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index 7eb5859dd035..03cb3ea2d2c0 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -233,6 +233,7 @@ config PHY_SUN9I_USB
+ 	tristate "Allwinner sun9i SoC USB PHY driver"
+ 	depends on ARCH_SUNXI && HAS_IOMEM && OF
+ 	depends on RESET_CONTROLLER
++	depends on USB_COMMON
+ 	select GENERIC_PHY
+ 	help
+ 	  Enable this to support the transceiver that is part of Allwinner
