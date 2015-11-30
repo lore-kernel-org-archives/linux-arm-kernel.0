@@ -1,61 +1,170 @@
-From: nyushchenko@dev.rtsoft.ru (Nikita Yushchenko)
-Date: Mon, 30 Nov 2015 11:25:15 +0300
-Subject: [RFC/PATCH] arm: do not skip SMP init calls on SMP_ON_UP case
-In-Reply-To: <56598C59.4070307@dev.rtsoft.ru>
-References: <1448279946-19975-1-git-send-email-nyushchenko@dev.rtsoft.ru>
- <20151123120317.GN8644@n2100.arm.linux.org.uk>
- <5653015C.4020405@dev.rtsoft.ru> <56530769.4030403@arm.com>
- <5653099A.7020604@dev.rtsoft.ru> <56530AE6.2060407@dev.rtsoft.ru>
- <20151123130424.GQ8644@n2100.arm.linux.org.uk>
- <5654799E.5080903@dev.rtsoft.ru>
- <20151124153305.GD8644@n2100.arm.linux.org.uk>
- <56598C59.4070307@dev.rtsoft.ru>
-Message-ID: <565C07EB.1060306@dev.rtsoft.ru>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 30 Nov 2015 09:29:39 +0100
+Subject: [PATCH v4 1/7] spi: imx: Fix DMA transfer
+In-Reply-To: <1448666165-7473-2-git-send-email-anton.bondarenko.sama@gmail.com>
+References: <1448666165-7473-1-git-send-email-anton.bondarenko.sama@gmail.com>
+ <1448666165-7473-2-git-send-email-anton.bondarenko.sama@gmail.com>
+Message-ID: <20151130082939.GU11966@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-28.11.2015 14:13, Nikita Yushchenko ?????:
->>> Not sure I understand logic behind this. With the current code,
->>> resulting cpu_possible_mask depends on CONFIG_SMP_ON_UP:
->>> - if it is set, cpu_possible_mask contains (0 1), as initialized in
->>> arm_dt_init_cpu_maps()
->>> - if it is not set, cpu_possible_mask contains (0), since
->>> imx_smp_init_cpus() removes 1 from there.
->>
->> Right, adding debug to arch/arm/kernel/setup.c, just before the
->> "if (is_smp())" shows:
->>
->> is_smp() 0 possible 3 present 1 online 1
->>
->> which is totally wrong: if is_smp() is false, we should not be setting
->> up any possible CPUs.  See a patch below to fix that.
->>
->> However, this doesn't matter much, because the code in setup.c won't
->> initialise the SMP operations struct ...
+On Sat, Nov 28, 2015 at 12:15:59AM +0100, Anton Bondarenko wrote:
+> RX DMA tail data handling doesn't work correctly in many cases with
+> current implementation. It happens because SPI core was setup
+> to generates both RX watermark level and RX DATA TAIL events
+> incorrectly. SPI transfer triggering for DMA also done in wrong way.
 > 
-> But cpu start code is not the only place in the kernel that uses cpu_present_mask.
+> SPI client wants to transfer 70 words for example. The old DMA
+> implementation setup RX DATA TAIL equal 6 words. In this case
+> RX DMA event will be generated after 6 words read from RX FIFO.
+> The garbage can be read out from RX FIFO because SPI HW does
+> not receive all required words to trigger RX watermark event.
 > 
-> Are you sure that running with invalid cpu_present_mask has no side effects?
+> New implementation change handling of RX data tail. DMA is used to process
+> all TX data and only full chunks of RX data with size aligned to FIFO/2.
+> Driver is waiting until both TX and RX DMA transaction done and all
+> TX data are pushed out. At that moment there is only RX data tail in
+> the RX FIFO. This data read out using PIO.
+> 
+> Transfer triggering changed to avoid RX data loss.
+> 
+> Signed-off-by: Anton Bondarenko <anton.bondarenko.sama@gmail.com>
 
-At least LTP suite does not like it:
-while running /opt/ltp/runtest/cpuhotplug, we see things like the above
+This patch doesn't make me feel very comfortable. It's quite big and I
+think it contains multiple logical changes. It should be split up
+further.
 
-<<<test_start>>>
-tag=cpuhotplug02 stime=1446628761
-cmdline="cpuhotplug02.sh -c 1 -l 1"
-contacts=""
-analysis=exit
-<<<test_output>>>
-Name:   cpuhotplug02
-Date:   Wed Nov  4 09:19:21 UTC 2015
-Desc:   What happens to a process when its CPU is offlined?
+> ---
+>  drivers/spi/spi-imx.c | 115 +++++++++++++++++++++++++++++++++-----------------
+>  1 file changed, 76 insertions(+), 39 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index 0e5723a..bd7b721 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -53,6 +53,7 @@
+>  /* generic defines to abstract from the different register layouts */
+>  #define MXC_INT_RR	(1 << 0) /* Receive data ready interrupt */
+>  #define MXC_INT_TE	(1 << 1) /* Transmit FIFO empty interrupt */
+> +#define MXC_INT_TCEN	BIT(7)   /* Transfer complete */
+>  
+>  /* The maximum  bytes that a sdma BD can transfer.*/
+>  #define MAX_SDMA_BD_BYTES  (1 << 15)
+> @@ -104,9 +105,7 @@ struct spi_imx_data {
+>  	unsigned int dma_is_inited;
+>  	unsigned int dma_finished;
+>  	bool usedma;
+> -	u32 rx_wml;
+> -	u32 tx_wml;
+> -	u32 rxt_wml;
+> +	u32 wml;
 
-CPU is 1
-/opt/ltp/testcases/bin/cpuhotplug_hotplug.sh: line 76: echo: write error:
-Function not implemented
-cpuhotplug02 1 TBROK : CPU1 cannot be onlined
-<<<execution_status>>>
-initiation_status="ok"
-duration=1 termination_type=exited termination_id=2 corefile=no
-cutime=4 cstime=6
-<<<test_end>>>
+One logical change is: Merge the different FIFO watermark level
+variables into a single variable since they are all the same.
+
+>  	struct completion dma_rx_completion;
+>  	struct completion dma_tx_completion;
+>  
+> @@ -939,17 +944,18 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+>  	/* Trigger the cspi module. */
+>  	spi_imx->dma_finished = 0;
+>  
+> -	dma = readl(spi_imx->base + MX51_ECSPI_DMA);
+> -	dma = dma & (~MX51_ECSPI_DMA_RXT_WML_MASK);
+> -	/* Change RX_DMA_LENGTH trigger dma fetch tail data */
+> -	left = transfer->len % spi_imx->rxt_wml;
+> -	if (left)
+> -		writel(dma | (left << MX51_ECSPI_DMA_RXT_WML_OFFSET),
+> -				spi_imx->base + MX51_ECSPI_DMA);
+> +	/*
+> +	 * Set these order to avoid potential RX overflow. The overflow may
+> +	 * happen if we enable SPI HW before starting RX DMA due to rescheduling
+> +	 * for another task and/or interrupt.
+> +	 * So RX DMA enabled first to make sure data would be read out from FIFO
+> +	 * ASAP. TX DMA enabled next to start filling TX FIFO with new data.
+> +	 * And finaly SPI HW enabled to start actual data transfer.
+> +	 */
+> +	dma_async_issue_pending(master->dma_rx);
+> +	dma_async_issue_pending(master->dma_tx);
+>  	spi_imx->devtype_data->trigger(spi_imx);
+>  
+> -	dma_async_issue_pending(master->dma_tx);
+> -	dma_async_issue_pending(master->dma_rx);
+
+Here you fix the order of the different step to start a transfer. This
+could also be a separate patch, no?
+
+>  	/* Wait SDMA to finish the data transfer.*/
+>  	timeout = wait_for_completion_timeout(&spi_imx->dma_tx_completion,
+>  						IMX_DMA_TIMEOUT);
+> @@ -958,6 +964,7 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+>  			dev_driver_string(&master->dev),
+>  			dev_name(&master->dev));
+>  		dmaengine_terminate_all(master->dma_tx);
+> +		dmaengine_terminate_all(master->dma_rx);
+
+This could also be a separate "Add missing dmaengine_terminate_all() for
+rx dma" patch.
+
+>  	} else {
+>  		timeout = wait_for_completion_timeout(
+>  				&spi_imx->dma_rx_completion, IMX_DMA_TIMEOUT);
+> @@ -967,10 +974,40 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+>  				dev_name(&master->dev));
+>  			spi_imx->devtype_data->reset(spi_imx);
+>  			dmaengine_terminate_all(master->dma_rx);
+> +		} else if (left) {
+> +			void *pio_buffer = transfer->rx_buf
+> +						+ (transfer->len - left);
+> +
+> +			dma_sync_sg_for_cpu(master->dma_rx->device->dev,
+> +					    &rx->sgl[rx->nents - 1], 1,
+> +					    DMA_FROM_DEVICE);
+> +
+> +			spi_imx->rx_buf = pio_buffer;
+> +			spi_imx->txfifo = left;
+> +			reinit_completion(&spi_imx->xfer_done);
+> +
+> +			spi_imx->devtype_data->intctrl(spi_imx, MXC_INT_TCEN);
+> +
+> +			timeout = wait_for_completion_timeout(
+> +					&spi_imx->xfer_done, IMX_DMA_TIMEOUT);
+> +			if (!timeout) {
+> +				pr_warn("%s %s: I/O Error in RX tail\n",
+> +					dev_driver_string(&master->dev),
+> +					dev_name(&master->dev));
+> +			}
+> +
+> +			/*
+> +			 * WARNING: this call will cause DMA debug complains
+> +			 * about wrong combination of DMA direction and sync
+> +			 * function. But we must use it to make sure the data
+> +			 * read by PIO mode will be cleared from CPU cache.
+> +			 * Otherwise SPI core will invalidate it during unmap of
+> +			 * SG buffers.
+> +			 */
+> +			dma_sync_sg_for_device(master->dma_rx->device->dev,
+> +					       &rx->sgl[rx->nents - 1], 1,
+> +					       DMA_TO_DEVICE);
+
+This is the most scary place in this patch and I think this should not
+be resolved like that. The problem you are solving here is that you want
+to transfer most of the data using DMA and only the remaining non
+burstsize aligned data using PIO. Such a mixed DMA/PIO transfer doesn't
+seem to be supported by the SPI core. To support it we must probably add
+some possibility to call __spi_unmap_msg from the driver.
+
+A much simpler approach to fix the issue would be to just forbid DMA
+when the transfer size is not a multiple of the burstsize. Only bigger
+transfers benefit from DMA, for the smaller ones DMA can even be slower.
+I assume that the bigger transfers are burstsize aligned anyway, so it
+might even not be necessary to have support for non burstsize aligned
+DMA transfers.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
