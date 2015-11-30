@@ -1,87 +1,38 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 30 Nov 2015 10:57:51 +0530
-Subject: [PATCH 3/4] cpufreq: mt8173: check return value of
- regulator_get_voltage() call
-In-Reply-To: <1448785898-17838-3-git-send-email-pi-cheng.chen@linaro.org>
-References: <1448785898-17838-1-git-send-email-pi-cheng.chen@linaro.org>
- <1448785898-17838-3-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <20151130052751.GK3373@ubuntu>
+From: panand@redhat.com (Pratyush Anand)
+Date: Mon, 30 Nov 2015 10:58:43 +0530
+Subject: [PATCH v12 05/16] arm64: Add back cpu_reset routines
+In-Reply-To: <56586679.8060403@arm.com>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <3279584774ba40f088b79f4df864d69a5b57b516.1448403503.git.geoff@infradead.org>
+ <56586679.8060403@arm.com>
+Message-ID: <20151130052843.GG23908@dhcppc13.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29-11-15, 16:31, Pi-Cheng Chen wrote:
-> Sometimes regulator_get_voltage() call returns negative values for
-> reasons(e.g. underlying I2C bus timeout). Add check for the return
-> values and fail out early.
+On 27/11/2015:02:19:37 PM, Marc Zyngier wrote:
+> On 24/11/15 22:25, Geoff Levand wrote:
+> > +ENTRY(cpu_soft_restart)
+> > +	mov	x18, x0				// cpu_reset
+> > +	mov	x0, x1				// el2_switch
+> > +	mov	x1, x2				// entry
+> > +	mov	x2, x3				// arg0
+> > +	mov	x3, x4				// arg1
+> > +	ret	x18
+> > +ENDPROC(cpu_soft_restart)
 > 
-> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
-> ---
->  drivers/cpufreq/mt8173-cpufreq.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
+> Grepping through the tree, I can only find a single use of
+> cpu_soft_restart, with cpu_reset as its first parameter.
 > 
-> diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
-> index 750cda7..9d0fe37 100644
-> --- a/drivers/cpufreq/mt8173-cpufreq.c
-> +++ b/drivers/cpufreq/mt8173-cpufreq.c
-> @@ -59,6 +59,10 @@ static int mtk_cpufreq_voltage_tracking(struct mtk_cpu_dvfs_info *info,
->  	int old_vproc, old_vsram, new_vsram, vsram, vproc, ret;
->  
->  	old_vproc = regulator_get_voltage(proc_reg);
-> +	if (old_vproc < 0) {
-> +		pr_err("%s: invalid Vproc value: %d\n", __func__, old_vproc);
-> +		return old_vproc;
-> +	}
->  	/* Vsram should not exceed the maximum allowed voltage of SoC. */
->  	new_vsram = min(new_vproc + MIN_VOLT_SHIFT, MAX_VOLT_LIMIT);
->  
-> @@ -71,7 +75,17 @@ static int mtk_cpufreq_voltage_tracking(struct mtk_cpu_dvfs_info *info,
->  		 */
->  		do {
->  			old_vsram = regulator_get_voltage(sram_reg);
-> +			if (old_vsram < 0) {
-> +				pr_err("%s: invalid Vsram value: %d\n",
-> +				       __func__, old_vsram);
-> +				return old_vsram;
-> +			}
->  			old_vproc = regulator_get_voltage(proc_reg);
-> +			if (old_vproc < 0) {
-> +				pr_err("%s: invalid Vproc value: %d\n",
-> +				       __func__, old_vproc);
-> +				return old_vproc;
-> +			}
->  
->  			vsram = min(new_vsram, old_vproc + MAX_VOLT_SHIFT);
->  
-> @@ -116,7 +130,17 @@ static int mtk_cpufreq_voltage_tracking(struct mtk_cpu_dvfs_info *info,
->  		 */
->  		do {
->  			old_vproc = regulator_get_voltage(proc_reg);
-> +			if (old_vproc < 0) {
-> +				pr_err("%s: invalid Vproc value: %d\n",
-> +				       __func__, old_vproc);
-> +				return old_vproc;
-> +			}
->  			old_vsram = regulator_get_voltage(sram_reg);
-> +			if (old_vsram < 0) {
-> +				pr_err("%s: invalid Vsram value: %d\n",
-> +				       __func__, old_vsram);
-> +				return old_vsram;
-> +			}
->  
->  			vproc = max(new_vproc, old_vsram - MAX_VOLT_SHIFT);
->  			ret = regulator_set_voltage(proc_reg, vproc,
-> @@ -184,6 +208,10 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
->  
->  	old_freq_hz = clk_get_rate(cpu_clk);
->  	old_vproc = regulator_get_voltage(info->proc_reg);
-> +	if (old_vproc < 0) {
-> +		pr_err("%s: invalid Vproc value: %d\n", __func__, old_vproc);
-> +		return old_vproc;
-> +	}
->  
->  	freq_hz = freq_table[index].frequency * 1000;
+> Why do we need this indirection? Having
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+It is needed because we need to execute cpu_reset() in physical address space.
 
--- 
-viresh
+> 
+> void cpu_soft_restart(el2_switch, entry, arg0, arg1);
+> 
+> should be enough...
+
+We can do with only cpu_soft_restart(), but then a function pointer to __pa() of
+it need to be called. May  be current approach is more cleaner.
+
+~Pratyush
