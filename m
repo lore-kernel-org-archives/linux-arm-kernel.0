@@ -1,74 +1,52 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 30 Nov 2015 11:23:23 -0800
-Subject: [PATCH 1/7] ARM: dts: qcom: msm8974-honami: Define pinctrl state
- for blsp_uart2
-In-Reply-To: <1445403470-17434-1-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1445403470-17434-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <CAMAWPa9fHWY3diCfZG2s0ZaNqza+SnK+4QZzkAwW8xb9zjOqHg@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 30 Nov 2015 11:26:36 -0800
+Subject: [PATCH 1/1] kconfig: add CPU endian selection beconfig and
+ leconfig
+In-Reply-To: <5658EC0C.1030305@broadcom.com>
+References: <1448567995-8784-1-git-send-email-sbranden@broadcom.com>
+ <1448567995-8784-2-git-send-email-sbranden@broadcom.com>
+ <5658A368.7080509@gmail.com> <5658EC0C.1030305@broadcom.com>
+Message-ID: <565CA2EC.8050709@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 9:57 PM, Bjorn Andersson
-<bjorn.andersson@sonymobile.com> wrote:
-> Make sure the blsp1_uart2 pins are in the correct state for the uart.
->
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+On 27/11/15 15:49, Scott Branden wrote:
+> Hi Florian,
+> 
+> On 15-11-27 10:39 AM, Florian Fainelli wrote:
+>> Le 26/11/2015 11:59, Scott Branden a ?crit :
+>>> Add support for switching defconfig between big and little endian CPU.
+>>> Various CPU types have ability to select big and little endian
+>>> CPU in the kernel configuration.
+>>>
+>>> "make beconfig" will set CONFIG_CPU_BIG_ENDIAN
+>>> "make leconfig" will unset CONFIG_CPU_BIG_ENDIAN
+>>
+>> I believe I understand what you are trying to achieve here, which is to
+>> have an identical defconfig file that you can share between a big-endian
+>> and little-endian kernel?
+> You understand correct - ARM64 maintainers have only allowed 1 defconfig
+> upstream and it supports little endian.  And it doesn't make sense to
+> have another defconfig with a single line difference upstreamed.  Yet
+> the defconfig does not allow the system to boot in big endian mode.
+>>
+>> Is not this something better left to a build system which understands
+>> what config fragments are in general?
+> Every build system would need to invent their own procedure.  By adding
+> this into the upstream kernel there is no need to.
+> make defconfig
+> make beconfig (or make leconfig)
+> make
 
-kernelci.org has been detecting boot failures on my z1 since
-next-20151120[1] and I finally got around to bisecting, which pointed
-to this patch which is in next in the for of commit 14cd83b824aa ARM:
-dts: qcom: msm8974-honami: Define pinctrl state for blsp_uart2
+In my experience build systems like OpenWrt, Yocto/OE know about config
+fragments, but have a harder time dealing with running multiple make
+targets within the Linux source tree...
 
-That commit doesn't revert cleanly on top of next-20151130, but
-manually removing the stuff added in this patch, next-20151130 boots
-fine on the z1.
+>>
+>> Since we seem to have support for fragments now with kvm and friends,
+>> having this does not seem to be a big stretch though.
+> Yes, that is why I proposed place it in a common location.
 
-Kevin
-
-[1] http://kernelci.org/boot/qcom-msm8974-sony-xperia-honami/job/next/kernel/next-20151127/defconfig/multi_v7_defconfig/lab/lab-khilman/?_id=5658061359b5140196b5fd2f
-
-> ---
->  .../boot/dts/qcom-msm8974-sony-xperia-honami.dts   | 23 ++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-> index 016f9ad9392a..6f7e4ef4ccf7 100644
-> --- a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-> +++ b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-> @@ -23,6 +23,29 @@
->  &soc {
->         serial at f991e000 {
->                 status = "ok";
-> +
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&blsp1_uart2_pin_a>;
-> +       };
-> +
-> +       pinctrl at fd510000 {
-> +               blsp1_uart2_pin_a: blsp1-uart2-pin-active {
-> +                       rx {
-> +                               pins = "gpio5";
-> +                               function = "blsp_uart2";
-> +
-> +                               drive-strength = <2>;
-> +                               bias-pull-up;
-> +                       };
-> +
-> +                       tx {
-> +                               pins = "gpio4";
-> +                               function = "blsp_uart2";
-> +
-> +                               drive-strength = <4>;
-> +                               bias-disable;
-> +                       };
-> +               };
->         };
->  };
->
-> --
-> 2.4.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Fair enough.
+-- 
+Florian
