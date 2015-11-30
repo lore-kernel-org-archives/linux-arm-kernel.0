@@ -1,46 +1,35 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 30 Nov 2015 18:53:33 +0900
-Subject: [PATCH 1/4] i2c: uniphier: error out if clock rate is zero
-In-Reply-To: <1448877216-32286-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1448877216-32286-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1448877216-32286-2-git-send-email-yamada.masahiro@socionext.com>
+From: mkarthi3@visteon.com (Mutharaju, Prasanna (P.))
+Date: Mon, 30 Nov 2015 09:55:27 +0000
+Subject: [PATCH v3] clk: s3c2410: removed unneeded variable in
+ s3c24xx_clkout_set_parent
+In-Reply-To: <20151130081543.GI10431@pengutronix.de>
+References: <20151130075219.GA27737@jci-VirtualBox>
+ <20151130081543.GI10431@pengutronix.de>
+Message-ID: <20151130095403.GA28879@jci-VirtualBox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This input clock is used to generate the sampling clock for I2C bus.
-If the clock rate is zero, there is something wrong with the clock
-driver.  Bail out with the appropriate error message in such a case.
-It would make it easier to find the root cause of failure.
+On Mon, Nov 30, 2015 at 09:15:43AM +0100, Uwe Kleine-K?nig wrote:
+> On Mon, Nov 30, 2015 at 07:52:22AM +0000, Mutharaju, Prasanna (P.) wrote:
+> > From: Prasanna Karthik <mkarthi3@visteon.com>
+> > 
+> > Remove unneeded variable used to store return value.
+> > ---
+> > v3: Modified subject and changelog comments
+> > ---
+> > 
+> > Signed-off-by: Prasanna Karthik <mkarthi3@visteon.com>
+> 
+> Everything after the first triple-dash doesn't make it into the git
+> history, so you are expected to write the S-o-b line above the list of
+> things changed since a previous submission.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- drivers/i2c/busses/i2c-uniphier.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/i2c/busses/i2c-uniphier.c b/drivers/i2c/busses/i2c-uniphier.c
-index e3c3861..2b2c20b 100644
---- a/drivers/i2c/busses/i2c-uniphier.c
-+++ b/drivers/i2c/busses/i2c-uniphier.c
-@@ -342,6 +342,10 @@ static int uniphier_i2c_clk_init(struct device *dev,
- 		return ret;
- 
- 	clk_rate = clk_get_rate(priv->clk);
-+	if (!clk_rate) {
-+		dev_err(dev, "input clock rate should not be zero\n");
-+		return -EINVAL;
-+	}
- 
- 	uniphier_i2c_reset(priv, true);
- 
-@@ -388,7 +392,7 @@ static int uniphier_i2c_probe(struct platform_device *pdev)
- 
- 	ret = uniphier_i2c_clk_init(dev, priv);
- 	if (ret)
--		return ret;
-+		goto err;
- 
- 	ret = devm_request_irq(dev, irq, uniphier_i2c_interrupt, 0, pdev->name,
- 			       priv);
--- 
-1.9.1
+Thanks, I resent the patch again with S-o-b before changelog. 
+> 
+> Other than that the patch looks fine.
+> 
+> Uwe
+> 
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
