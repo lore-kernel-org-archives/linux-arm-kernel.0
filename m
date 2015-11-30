@@ -1,40 +1,37 @@
-From: heiko.stuebner@collabora.com (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 30 Nov 2015 14:14:26 +0100
-Subject: [PATCH 2/2] ARM: dts: rockchip: override thermal settings on
- veyron-speedy
-In-Reply-To: <2402718.WBE9iyTUZ2@diego>
-References: <2402718.WBE9iyTUZ2@diego>
-Message-ID: <2523702.pCcOIjvoVs@diego>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 30 Nov 2015 13:19:22 +0000
+Subject: [PATCH v4 06/21] KVM: ARM64: Add reset and access handlers for
+ PMCEID0 and PMCEID1 register
+In-Reply-To: <565C3A39.5020600@huawei.com>
+References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>
+ <1446186123-11548-7-git-send-email-zhaoshenglong@huawei.com>
+ <20151130114230.136abc6f@arm.com> <565C3A39.5020600@huawei.com>
+Message-ID: <20151130131922.0e8789b7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to a commit on the ChromeOS kernel, the temperature of the Speedy
-surface is over skin temperature spec. So adjust the thermal settings
-to mimic the ChromeOS tree to stay within these spec limits.
+On Mon, 30 Nov 2015 19:59:53 +0800
+Shannon Zhao <zhaoshenglong@huawei.com> wrote:
 
-Signed-off-by: Heiko Stuebner <heiko.stuebner@collabora.com>
----
- arch/arm/boot/dts/rk3288-veyron-speedy.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+> Hi Marc,
+> 
+> On 2015/11/30 19:42, Marc Zyngier wrote:
+> >> +static void reset_pmceid(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+> >> > +{
+> >> > +	u64 pmceid;
+> >> > +
+> >> > +	if (r->reg == PMCEID0_EL0 || r->reg == c9_PMCEID0)
+> > That feels wrong. We should only reset the 64bit view of the sysregs,
+> > as the 32bit view is directly mapped to it.
+> > 
+> Just to confirm, if guest access c9_PMCEID0, KVM will trap this register
+> with the register index as PMCEID0_EL0? Or still as c9_PMCEID0?
 
-diff --git a/arch/arm/boot/dts/rk3288-veyron-speedy.dts b/arch/arm/boot/dts/rk3288-veyron-speedy.dts
-index a7ea7d0..b34a7b5 100644
---- a/arch/arm/boot/dts/rk3288-veyron-speedy.dts
-+++ b/arch/arm/boot/dts/rk3288-veyron-speedy.dts
-@@ -88,6 +88,14 @@
- 	};
- };
- 
-+&cpu_alert0 {
-+	temperature = <65000>;
-+};
-+
-+&cpu_alert1 {
-+	temperature = <70000>;
-+};
-+
- &rk808 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pmic_int_l>;
+The traps are per execution mode (you'll get c9_PMCEID0 with a 32bit
+guest). But the reset function is only concerned with the 64bit view.
+
+Thanks,
+
+	M.
 -- 
-2.6.1
+Jazz is not dead. It just smells funny.
