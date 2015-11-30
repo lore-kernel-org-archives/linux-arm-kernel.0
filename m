@@ -1,24 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 30 Nov 2015 09:29:55 +0100
-Subject: [PATCH] pinctrl: bcm2835: Fix initial value for direction_output
-In-Reply-To: <1447893147-9458-1-git-send-email-stefan.wahren@i2se.com>
-References: <1447893147-9458-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <CACRpkdbZicosnYnp6ZxqvOhLdyuTJTHv2gYR0spWoGMzbToYOg@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 30 Nov 2015 09:30:05 +0100
+Subject: [PATCH 4/4] ARM: dt: mvebu: ix4-300d: Add ECC properties to NAND
+ flash
+In-Reply-To: <20151129153548.304522af@free-electrons.com>
+References: <1448709248-21177-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1448709248-21177-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20151129153548.304522af@free-electrons.com>
+Message-ID: <565C090D.4060006@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2015 at 1:32 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-
-> Currently the provided initial value for bcm2835_gpio_direction_output
-> has no effect. So fix this issue by changing the value before
-> changing the GPIO direction. As a result we need to move the function below
-> bcm2835_gpio_set.
+On 29.11.2015 15:35, Thomas Petazzoni wrote:
+> Adding Ezequiel Garcia in Cc.
 >
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> CC: Martin Sperl <kernel@martin.sperl.org>
-> CC: Stephen Warren <swarren@wwwdotorg.org>
+> On Sat, 28 Nov 2015 12:14:08 +0100, Sebastian Hesselbarth wrote:
+>> The NAND device found on Lenovo ix4-300d uses 4-bit BCH ECC protection.
+>> Add the corresponding properties to the NAND node.
+>
+> If the ONFI information from the NAND flash say that it requires 4 bits
+> per 512, then there should be no need to add this information to the
+> Device Tree as the pxa3xx_nand driver by default uses the ONFI
+> information.
 
-Waiting for Stephen's ACK on this.
+Thomas,
 
-Yours,
-Linus Walleij
+as said in the cover letter, this is also DT cleanup with barebox
+bootloader in mind. I do not accept what Linux' pxa3xx_nand driver
+is doing as a reference here ;)
+
+> Those properties are only needed when for some reason the vendor has
+> chosen to use a ECC strength that doesn't match with the one advertised
+> by the flash in its ONFI information (either stronger or weaker). But
+> in this case, your commit log is confusing, because it says that the
+> "NAND device ... uses 4-bit BCH ECC protection". If it really does,
+> then the patch is not needed :-)
+
+I agree that if ONFI is already advertising 4/512 ECC (and it is), we
+do not need the properties. Anyway, IIRC barebox does not yet properly
+parse ONFI or at least it does not derive minimum ECC settings from it.
+
+I'll have to have a closer look at barebox' ONFI parsing capabilites
+and can live with this patch not applied even though it does no harm.
+
+Sebastian
