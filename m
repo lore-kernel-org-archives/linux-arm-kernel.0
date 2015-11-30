@@ -1,42 +1,72 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 30 Nov 2015 15:04:46 -0800
-Subject: [PATCH 1/7] ARM: omap1: make headers more local
-In-Reply-To: <1448924458-3279040-2-git-send-email-arnd@arndb.de>
-References: <1448924458-3279040-1-git-send-email-arnd@arndb.de>
- <1448924458-3279040-2-git-send-email-arnd@arndb.de>
-Message-ID: <20151130230445.GN23396@atomide.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 30 Nov 2015 15:19:09 -0800
+Subject: [PATCH 1/3] power: domain: add pm_genpd_uninit
+In-Reply-To: <1447956490-22930-2-git-send-email-alex.aring@gmail.com>
+ (Alexander Aring's message of "Thu, 19 Nov 2015 19:08:08 +0100")
+References: <1447956490-22930-1-git-send-email-alex.aring@gmail.com>
+ <1447956490-22930-2-git-send-email-alex.aring@gmail.com>
+Message-ID: <7h7fkz9itu.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [151130 15:02]:
-> Some header files are never included outside of a mach-omap1
-> directory and do not need to be made visible in include/mach,
-> so let's just move them all down one level.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Alexander Aring <alex.aring@gmail.com> writes:
+
+> This patch adds function pm_genpd_uninit for undo a pm_genpd_init. This
+> is useful for multiple power domains while probing. If the probing fails
+> after one pm_genpd_init was called we need to undo all previous
+> registrations of generic pm domains inside the gpd_list list.
+>
+> There is a check on IS_ERR_OR_NULL(genpd) which is useful to check again
+> registered power domains and not registered domains, the driver can use
+> this mechanism to have an array with registered and non-registered power
+> domains, where non-registered power domains are NULL.
+>
+> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Pavel Machek <pavel@ucw.cz>
+> Cc: Len Brown <len.brown@intel.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
 > ---
->  arch/arm/mach-omap1/board-ams-delta.c              | 2 +-
->  arch/arm/mach-omap1/board-fsample.c                | 2 +-
->  arch/arm/mach-omap1/board-h2.c                     | 2 +-
->  arch/arm/mach-omap1/board-h3.c                     | 2 +-
->  arch/arm/mach-omap1/board-innovator.c              | 2 +-
->  arch/arm/mach-omap1/board-osk.c                    | 2 +-
->  arch/arm/mach-omap1/board-palmte.c                 | 2 +-
->  arch/arm/mach-omap1/board-palmtt.c                 | 2 +-
->  arch/arm/mach-omap1/board-palmz71.c                | 2 +-
->  arch/arm/mach-omap1/board-perseus2.c               | 2 +-
->  arch/arm/mach-omap1/board-sx1-mmc.c                | 2 +-
->  arch/arm/mach-omap1/board-sx1.c                    | 4 ++--
->  arch/arm/mach-omap1/{include/mach => }/board-sx1.h | 0
->  arch/arm/mach-omap1/{include/mach => }/camera.h    | 0
->  arch/arm/mach-omap1/devices.c                      | 2 +-
->  arch/arm/mach-omap1/flash.c                        | 2 +-
->  arch/arm/mach-omap1/{include/mach => }/flash.h     | 0
->  17 files changed, 15 insertions(+), 15 deletions(-)
->  rename arch/arm/mach-omap1/{include/mach => }/board-sx1.h (100%)
->  rename arch/arm/mach-omap1/{include/mach => }/camera.h (100%)
->  rename arch/arm/mach-omap1/{include/mach => }/flash.h (100%)
+>  drivers/base/power/domain.c | 22 ++++++++++++++++++++++
+>  include/linux/pm_domain.h   |  4 ++++
+>  2 files changed, 26 insertions(+)
+>
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index e03b1ad..24f54b8 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1509,6 +1509,28 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
+>  }
+>  EXPORT_SYMBOL_GPL(pm_genpd_init);
+>  
+> +/**
+> + * pm_genpd_uninit - Uninitialize a generic I/O PM domain object.
+> + * @genpd: PM domain object to initialize.
+> + */
+> +void pm_genpd_uninit(struct generic_pm_domain *genpd)
+> +{
+> +	if (IS_ERR_OR_NULL(genpd))
+> +		return;
+> +
+> +	/* check if domain is still in registered inside the pm subsystem */
+> +	WARN_ON_ONCE(!list_empty(&genpd->master_links) ||
+> +		     !list_empty(&genpd->slave_links) ||
+> +		     !list_empty(&genpd->dev_list));
 
-Looks good to me:
+So we WARN if there are parents/children/devices, but shouldn't this
+return an error instead of continuing to remove/uninit the genpd?
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+The caller of _uninit should probably also be removing any
+parents/children and removing devices before calling _uninit, no?
+
+> +	mutex_lock(&gpd_list_lock);
+> +	list_del(&genpd->gpd_list_node);
+> +	mutex_unlock(&gpd_list_lock);
+> +
+> +	mutex_destroy(&genpd->lock);
+> +}
+> +EXPORT_SYMBOL_GPL(pm_genpd_uninit);
+
+Kevin
