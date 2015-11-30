@@ -1,49 +1,49 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 30 Nov 2015 16:35:31 +0200
-Subject: [RFC v02 01/15] dmaengine: core: Allow NULL mask pointer in
- __dma_device_satisfies_mask()
-In-Reply-To: <1448891145-10766-2-git-send-email-peter.ujfalusi@ti.com>
-References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
- <1448891145-10766-2-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <CAHp75VfY=NU4MG7q1w=oYdTiTr0dqtNTQU3UkEaL=tXPJADH5Q@mail.gmail.com>
+From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
+Date: Mon, 30 Nov 2015 22:38:57 +0800
+Subject: [PATCH 4/4] cpufreq: mt8173: move resources allocation into
+ ->probe()
+In-Reply-To: <20151130053206.GL3373@ubuntu>
+References: <CAAJzSMeYKGLkVoh0_zPLpVekQpc2rR5ud9YNCPJxRaJRCNX2nQ@mail.gmail.com>
+ <20151130053206.GL3373@ubuntu>
+Message-ID: <CALx668XUU4H1QnVAF8Mo78_QbeNawb6yFbxC30ZCuzoD0tuKnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 3:45 PM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
-> Treat as true condition the case when the mask is NULL.
+On Mon, Nov 30, 2015 at 1:32 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 30-11-15, 11:02, Ricky Liang wrote:
+>> On Sun, Nov 29, 2015 at 4:31 PM, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
+>> >         ret = cpufreq_register_driver(&mt8173_cpufreq_driver);
+>> >         if (ret)
+>> >                 pr_err("failed to register mtk cpufreq driver\n");
+>>
+>> I think you want "return ret;" inside the if block.
+>
+> Not just that, he needs to jump to release_dvfs_info_list.
 
-What do you think about setting some default (all "on") mask when mask
-is not supplied?
+Hi Ricky and Viresh,
 
-I don't know for sure but there might be cases when you don't want
-literally *any* channel to satisfy.
+Thanks for reviewing.
+I failed to check this error case handling.
+I will fix it and resend again.
+
+Best Regards,
+Pi-Cheng
 
 >
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
->  drivers/dma/dmaengine.c | 3 +++
->  1 file changed, 3 insertions(+)
+>> >
+>> > +       return 0;
+>> > +
+>> > +release_dvfs_info_list:
+>> > +       list_for_each_safe(list, tmp, &dvfs_info_list) {
+>> > +               info = list_entry(list, struct mtk_cpu_dvfs_info, list_head);
+>> > +
+>> > +               mtk_cpu_dvfs_info_release(info);
+>> > +               list_del(list);
+>> > +               kfree(info);
+>> > +       }
+>> > +
+>> >         return ret;
+>> >  }
 >
-> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-> index daf54a39bcc7..52c3eee48e2e 100644
-> --- a/drivers/dma/dmaengine.c
-> +++ b/drivers/dma/dmaengine.c
-> @@ -184,6 +184,9 @@ __dma_device_satisfies_mask(struct dma_device *device,
->  {
->         dma_cap_mask_t has;
->
-> +       if (!want)
-> +               return true;
-> +
->         bitmap_and(has.bits, want->bits, device->cap_mask.bits,
->                 DMA_TX_TYPE_END);
->         return bitmap_equal(want->bits, has.bits, DMA_TX_TYPE_END);
 > --
-> 2.6.3
->
-
-
-
--- 
-With Best Regards,
-Andy Shevchenko
+> viresh
