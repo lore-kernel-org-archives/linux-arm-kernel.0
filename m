@@ -1,73 +1,95 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 30 Nov 2015 13:51:46 +0200
-Subject: [PATCH v3] clocksource: arm_global_timer: fix suspend resume
-In-Reply-To: <565B9869.10800@oracle.com>
-References: <1448653624-25006-1-git-send-email-grygorii.strashko@ti.com>
- <565B9869.10800@oracle.com>
-Message-ID: <565C3852.4000605@ti.com>
+Date: Mon, 30 Nov 2015 13:53:50 +0200
+Subject: [4.4-rc][PATCH] ARM: dts: am4372: fix clock source for arm twd
+ and global timers
+In-Reply-To: <565C0814.3000001@ti.com>
+References: <1448653468-24908-1-git-send-email-grygorii.strashko@ti.com>
+ <565C0814.3000001@ti.com>
+Message-ID: <565C38CE.1070907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2015 02:29 AM, santosh.shilimkar at oracle.com wrote:
-> On 11/27/15 11:47 AM, Grygorii Strashko wrote:
->> Now the System stall is observed on TI AM437x based board
->> (am437x-gp-evm) during resuming from System suspend when ARM Global
->> timer is selected as clocksource device (CPUIdle not enabled) - SysRq
->> are working,
->> but nothing else.
+On 11/30/2015 10:25 AM, Tero Kristo wrote:
+> On 11/27/2015 09:44 PM, Grygorii Strashko wrote:
+>> ARM TWD and Global timer are clocked by PERIPHCLK which is MPU_CLK/2.
+>> But now they are clocked by dpll_mpu_m2_ck == MPU_CLK and, as result.
+>> Timekeeping core misbehaves. For example, execution of command
+>> "sleep 5" will take 10 sec instead of 5.
 >>
->> The reason of stall is that ARM Global timer loses its contexts during
->> System suspend:
->>     GT_CONTROL.TIMER_ENABLE = 0 (unbanked)
->>     GT_COUNTERx = 0
+>> Hence, fix it by adding mpu_periphclk ("fixed-factor-clock") and use
+>> it for clocking ARM TWD and Global timer (same way as on OMAP4).
 >>
->> Hence, update ARM Global timer driver to reflect above behaviour
->> - re-enable ARM Global timer on resume GT_CONTROL.TIMER_ENABLE = 1.
->>
->> CC: Arnd Bergmann <arnd@arndb.de>
->> Cc: John Stultz <john.stultz@linaro.org>
->> Cc: Felipe Balbi <balbi@ti.com>
 >> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Santosh Shilimkar <ssantosh@kernel.org>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Felipe Balbi <balbi@ti.com>
+>> Cc: Tero Kristo <t-kristo@ti.com>
+>> Fixes:commit 8cbd4c2f6a99 ("arm: boot: dts: am4372: add ARM timers and
+>> SCU nodes")
 >> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 >> ---
->> Changes in v3:
->>   - dropped all DT specific code
->> Changes in v2:
->>   - suspend/resume simplified: nothing is stored any more and
->>     ARM GT just re-enabled
->> Link on v2:
->>   https://lkml.org/lkml/2015/11/20/355
->> Link on v1:
->>   https://lkml.org/lkml/2015/11/13/456
+>>   arch/arm/boot/dts/am4372.dtsi        | 4 ++--
+>>   arch/arm/boot/dts/am43xx-clocks.dtsi | 8 ++++++++
+>>   2 files changed, 10 insertions(+), 2 deletions(-)
 >>
-> Looks reasonable to me.
->>   drivers/clocksource/arm_global_timer.c | 7 +++++++
->>   1 file changed, 7 insertions(+)
+>> diff --git a/arch/arm/boot/dts/am4372.dtsi
+>> b/arch/arm/boot/dts/am4372.dtsi
+>> index d83ff9c..de8791a 100644
+>> --- a/arch/arm/boot/dts/am4372.dtsi
+>> +++ b/arch/arm/boot/dts/am4372.dtsi
+>> @@ -74,7 +74,7 @@
+>>           reg = <0x48240200 0x100>;
+>>           interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
+>>           interrupt-parent = <&gic>;
+>> -        clocks = <&dpll_mpu_m2_ck>;
+>> +        clocks = <&mpu_periphclk>;
+>>       };
 >>
->> diff --git a/drivers/clocksource/arm_global_timer.c
->> b/drivers/clocksource/arm_global_timer.c
->> index a2cb6fa..10d1417 100644
->> --- a/drivers/clocksource/arm_global_timer.c
->> +++ b/drivers/clocksource/arm_global_timer.c
->> @@ -195,12 +195,19 @@ static cycle_t gt_clocksource_read(struct
->> clocksource *cs)
->>       return gt_counter_read();
->>   }
+>>       local_timer: timer at 48240600 {
+>> @@ -82,7 +82,7 @@
+>>           reg = <0x48240600 0x100>;
+>>           interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
+>>           interrupt-parent = <&gic>;
+>> -        clocks = <&dpll_mpu_m2_ck>;
+>> +        clocks = <&mpu_periphclk>;
+>>       };
 >>
->> +static void gt_resume(struct clocksource *cs)
->> +{
->> +    /* re-enable timer on resume */
->> +    writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
+>>       l2-cache-controller at 48242000 {
+>> diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi
+>> b/arch/arm/boot/dts/am43xx-clocks.dtsi
+>> index cc88728..2ff58b1 100644
+>> --- a/arch/arm/boot/dts/am43xx-clocks.dtsi
+>> +++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
+>> @@ -259,6 +259,14 @@
+>>           ti,invert-autoidle-bit;
+>>       };
+>>
+>> +    mpu_periphclk: mpu_periphclk {
+>> +        #clock-cells = <0>;
+>> +        compatible = "fixed-factor-clock";
+>> +        clocks = <&dpll_mpu_ck>;
 >
-> Check if its disabled before enabling it.
-> Other than that,
-> Reviewed-by: Santosh Shilimkar <ssantosh@kernel.org>
+> I don't think this is correct, ARM core is fed dpll_mpu_m2_ck, where the
+> divisor value can potentially differ from 1. If you feed this clock
+> directly from dpll_mpu_ck, you bypass this divisor.
 
-Sure, I'll update.
+Sry. My mistake. I'll update it to use dpll_mpu_m2_ck.
 
-Thanks.
+>
+> Did you check what is the impact of cpufreq on the ARM TWD/timers?
+
+TWD is cpufreq friendly, ARM GT is not.
+
+
+>> +        clock-mult = <1>;
+>> +        clock-div = <2>;
+>> +    };
+>> +
+>>       dpll_ddr_ck: dpll_ddr_ck {
+>>           #clock-cells = <0>;
+>>           compatible = "ti,am3-dpll-clock";
+>>
+>
+
+
 -- 
 regards,
 -grygorii
