@@ -1,27 +1,21 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 30 Nov 2015 20:04:31 +0100
-Subject: [PATCH 1/3] rtc: sunxi: fix signedness issues
-In-Reply-To: <1447930210-27008-1-git-send-email-clabbe.montjoie@gmail.com>
+Date: Mon, 30 Nov 2015 20:04:46 +0100
+Subject: [PATCH 2/3] rtc: sunxi: constify the data_year_param structure
+In-Reply-To: <1447930210-27008-2-git-send-email-clabbe.montjoie@gmail.com>
 References: <1447930210-27008-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <20151130190431.GK22136@piout.net>
+ <1447930210-27008-2-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <20151130190446.GL22136@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/11/2015 at 11:50:08 +0100, LABBE Corentin wrote :
-> The variable year must be set as unsigned since it is used with
-> sunxi_rtc_data_year{.min|.max} and as parameter of is_leap_year() which
-> wait for unsigned int.
-> Only tm_year is not unsigned, but it is long.
-> This patch fix also the format of printing of min/max. (must use %u since
-> they are unsigned)
-> 
-> The parameter to of sunxi_rtc_setaie() must be set to uint since callers
-> give always uint data.
+On 19/11/2015 at 11:50:09 +0100, LABBE Corentin wrote :
+> The data_year_param struct is never modified, so lets constify it.
+> This permit to remove cast since of_device_id is const also.
 > 
 > Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
 > ---
->  drivers/rtc/rtc-sunxi.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+>  drivers/rtc/rtc-sunxi.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
 Applied, thanks.
 
