@@ -1,114 +1,69 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Sun, 29 Nov 2015 19:14:36 -0700
-Subject: [PATCH V5 15/26] coresight: etm3x: implementing perf_enable/disable()
- API
+Date: Sun, 29 Nov 2015 19:14:37 -0700
+Subject: [PATCH V5 16/26] coresight: etb10: moving to local atomic operations
 In-Reply-To: <1448849687-5724-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1448849687-5724-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1448849687-5724-16-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1448849687-5724-17-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-That way traces can be enabled and disabled automatically
-from the Perf subystem using the PMU abstraction.
+Moving to use local atomic operations to take advantage of the
+lockless implementation, something that will come handy when
+the ETB is accessed from the Perf subsystem. Also changing the
+name of the variable to something more meaningful.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm3x.c | 47 ++++++++++++++++++++++++---
- 1 file changed, 43 insertions(+), 4 deletions(-)
+ drivers/hwtracing/coresight/coresight-etb10.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index cda28e0211f5..fbd04979e21c 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -372,8 +372,10 @@ static void etm_enable_hw(void *info)
- 	etm_set_prog(drvdata);
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index 1301edc44629..09e306361e4f 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -10,6 +10,7 @@
+  * GNU General Public License for more details.
+  */
  
- 	etmcr = etm_readl(drvdata, ETMCR);
--	etmcr &= (ETMCR_PWD_DWN | ETMCR_ETM_PRG);
-+	/* Clear setting from a previous run if need be */
-+	etmcr &= ~ETM3X_SUPPORTED_OPTIONS;
- 	etmcr |= drvdata->port_size;
-+	etmcr |= ETMCR_ETM_EN;
- 	etm_writel(drvdata, config->ctrl | etmcr, ETMCR);
- 	etm_writel(drvdata, config->trigger_event, ETMTRIGGER);
- 	etm_writel(drvdata, config->startstop_ctrl, ETMTSSCR);
-@@ -413,9 +415,6 @@ static void etm_enable_hw(void *info)
- 	/* No VMID comparator value selected */
- 	etm_writel(drvdata, 0x0, ETMVMIDCVR);
++#include <asm/local.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/init.h>
+@@ -71,7 +72,7 @@
+  * @csdev:	component vitals needed by the framework.
+  * @miscdev:	specifics to handle "/dev/xyz.etb" entry.
+  * @spinlock:	only one at a time pls.
+- * @in_use:	synchronise user space access to etb buffer.
++ * @reading:	synchronise user space access to etb buffer.
+  * @buf:	area of memory where ETB buffer content gets sent.
+  * @buffer_depth: size of @buf.
+  * @enable:	this ETB is being used.
+@@ -84,7 +85,7 @@ struct etb_drvdata {
+ 	struct coresight_device	*csdev;
+ 	struct miscdevice	miscdev;
+ 	spinlock_t		spinlock;
+-	atomic_t		in_use;
++	local_t			reading;
+ 	u8			*buf;
+ 	u32			buffer_depth;
+ 	bool			enable;
+@@ -277,7 +278,7 @@ static int etb_open(struct inode *inode, struct file *file)
+ 	struct etb_drvdata *drvdata = container_of(file->private_data,
+ 						   struct etb_drvdata, miscdev);
  
--	/* Ensures trace output is enabled from this ETM */
--	etm_writel(drvdata, config->ctrl | ETMCR_ETM_EN | etmcr, ETMCR);
--
- 	etm_clr_prog(drvdata);
- 	CS_LOCK(drvdata->base);
+-	if (atomic_cmpxchg(&drvdata->in_use, 0, 1))
++	if (local_cmpxchg(&drvdata->reading, 0, 1))
+ 		return -EBUSY;
  
-@@ -495,6 +494,18 @@ static void etm_set_config(struct coresight_device *csdev, void *config)
- 	drvdata->config = config;
- }
- 
-+static int etm_enable_perf(struct coresight_device *csdev)
-+{
-+	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
-+		return -EINVAL;
-+
-+	etm_enable_hw(drvdata);
-+
-+	return 0;
-+}
-+
- static int etm_enable_sysfs(struct coresight_device *csdev)
+ 	dev_dbg(drvdata->dev, "%s: successfully opened\n", __func__);
+@@ -313,7 +314,7 @@ static int etb_release(struct inode *inode, struct file *file)
  {
- 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-@@ -541,6 +552,9 @@ static int etm_enable(struct coresight_device *csdev, u32 mode)
- 	case CS_MODE_SYSFS:
- 		ret = etm_enable_sysfs(csdev);
- 		break;
-+	case CS_MODE_PERF:
-+		ret = etm_enable_perf(csdev);
-+		break;
- 	default:
- 		ret = -EINVAL;
- 	}
-@@ -579,6 +593,28 @@ static void etm_disable_hw(void *info)
- 	dev_dbg(drvdata->dev, "cpu: %d disable smp call done\n", drvdata->cpu);
- }
+ 	struct etb_drvdata *drvdata = container_of(file->private_data,
+ 						   struct etb_drvdata, miscdev);
+-	atomic_set(&drvdata->in_use, 0);
++	local_set(&drvdata->reading, 0);
  
-+static void etm_disable_perf(struct coresight_device *csdev)
-+{
-+	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
-+		return;
-+
-+	CS_UNLOCK(drvdata->base);
-+
-+	/* Setting the prog bit disables tracing immediately */
-+	etm_set_prog(drvdata);
-+	/* Get ready for another session */
-+	drvdata->config = NULL;
-+	/*
-+	 * There is no way to know when the tracer will be used again so
-+	 * power down the tracer.
-+	 */
-+	etm_set_pwrdwn(drvdata);
-+
-+	CS_LOCK(drvdata->base);
-+}
-+
- static void etm_disable_sysfs(struct coresight_device *csdev)
- {
- 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-@@ -624,6 +660,9 @@ static void etm_disable(struct coresight_device *csdev)
- 	case CS_MODE_SYSFS:
- 		etm_disable_sysfs(csdev);
- 		break;
-+	case CS_MODE_PERF:
-+		etm_disable_perf(csdev);
-+		break;
- 	default:
- 		WARN_ON_ONCE(mode);
- 		return;
+ 	dev_dbg(drvdata->dev, "%s: released\n", __func__);
+ 	return 0;
 -- 
 2.1.4
