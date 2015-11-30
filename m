@@ -1,80 +1,92 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 30 Nov 2015 15:03:45 -0600
-Subject: [PATCH 1/3] dt-bindings: add Marvell core PLL and clock divider
- PMU documentation
-In-Reply-To: <20151127203932.GP8644@n2100.arm.linux.org.uk>
-References: <E1a24wj-0004iw-Rf@rmk-PC.arm.linux.org.uk>
- <20151127202114.GA613@rob-hp-laptop>
- <20151127203932.GP8644@n2100.arm.linux.org.uk>
-Message-ID: <20151130210345.GA18808@rob-hp-laptop>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 30 Nov 2015 22:06:37 +0100
+Subject: [PATCH 0/6] pinctrl: pxa: add pxa27x pin control support
+In-Reply-To: <CACRpkdaJO6noUd_a5d122G3EiO6-u9bu_gZMg1Tky=PS9O5yUA@mail.gmail.com>
+ (Linus Walleij's message of "Mon, 30 Nov 2015 14:05:35 +0100")
+References: <1448129093-20722-1-git-send-email-robert.jarzmik@free.fr>
+ <CACRpkdaJO6noUd_a5d122G3EiO6-u9bu_gZMg1Tky=PS9O5yUA@mail.gmail.com>
+Message-ID: <87lh9f6vtu.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 27, 2015 at 08:39:32PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Nov 27, 2015 at 02:21:14PM -0600, Rob Herring wrote:
-> > On Thu, Nov 26, 2015 at 10:23:21PM +0000, Russell King wrote:
-> > > Add documentation for the Marvell clock divider driver, which is used
-> > > to source clocks for the AXI bus, video decoder, GPU and LCD blocks.
-> > > 
-> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > > ---
-> > >  .../bindings/clock/dove-divider-clock.txt          | 28 ++++++++++++++++++++++
-> > >  1 file changed, 28 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/clock/dove-divider-clock.txt
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/clock/dove-divider-clock.txt b/Documentation/devicetree/bindings/clock/dove-divider-clock.txt
-> > > new file mode 100644
-> > > index 000000000000..0c602de279e5
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/clock/dove-divider-clock.txt
-> > > @@ -0,0 +1,28 @@
-> > > +PLl divider based Dove clocks
-> > > +
-> > > +Marvell Dove has a 2GHz PLL, which feeds into a set of dividers to provide
-> > > +high speed clocks for a number of peripherals.  These dividers are part of
-> > > +the PMU, and thus this node should be a child of the PMU node.
-> > 
-> > It seems a bit strange to just be documenting these clocks. What about 
-> > the rest of the SOC clocks?
-> 
-> This is all that this pair of registers provide.
-> 
-> The SoC has other clocks handled by other DT nodes - for Dove, we now
-> have:
-> 
->         gate_clk: clock-gating-ctrl at 0038 {
->                 compatible = "marvell,dove-gating-clock";
->                 reg = <0x0038 0x4>;
->                 clocks = <&core_clk 0>;
->                 #clock-cells = <1>;
->         };
->         divider_clk: core-clock at 0064 {
->                 compatible = "marvell,dove-divider-clock";
->                 reg = <0x0064 0x8>;
->                 #clock-cells = <1>;
->         };
->         core_clk: core-clocks at 0214 {
->                 compatible = "marvell,dove-core-clock";
->                 reg = <0x0214 0x4>;
->                 #clock-cells = <1>;
->         };
-> 
-> and all three of these are part of the PMU register block.  I'm not sure
-> why the mvebu maintainers decided to minutely describe the PMU like this,
-> but unfortunately that's the structure we have.
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-Okay,
+> On Sat, Nov 21, 2015 at 7:04 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>
+>> I've been working on this for some time now, it's time pxa archtecture gets a
+>> proper pin control support.
+>>
+>> This serie provides support for pxa27x architecture, and paves the way to pxa2xx
+>> one. I've tested this on my pxa27x board, in both device-tree and non
+>> device-tree builds.
+>
+> So in 2013 Haojian removed PXA3xx, MMP2, PXA168 and PXA910 in favor
+> of using pinctrl-single.c shared with OMAP.
+>
+> See
+> commit 62194200e5e383af2085faf35b6f009364446069
+> "pinctrl: remove pxa pinctrl driver"
+Yes, for MMP2, PXA168 and PXA910. Up to my best understanding this didn't cover
+pxa3xx, but I might be wrong.
 
-Acked-by: Rob Herring <robh@kernel.org>
- 
-> IMHO, it would've been cleaner to have these components registered
-> separately from a central PMU driver (as I'm doing with the power
-> domains, resets and IRQs that are part of the PMU), but my view is
-> limited to Dove and not the other mvebu clocks, so there may be a good
-> reason for it.
+> What makes the PXA27x so different from its siblings that it still
+> warrants its own driver? Why can this one not use pinctrl-single
+> as well?
+There are several factors I considered, which apply for both pxa25x and pxa27x :
+ - pinmuxing
+   - the "alternate" function is not dictated by a single register for a given
+     pin. The function is dictated by 2 registers : the gpio direction register
+     and the alternate function register.
+     That means that setting alternate function "MMCLK" for examples implies
+     writing to the gpio direction register (GPDR) "output", and writing to the
+     alternate function register (GAFR) the function.
+     I don't think pinctrl-single can handle this complexity, correct me if I'm
+     wrong.
 
-Yes, we debated which way to go early on and decided generally to go 
-this direction, but it seems Dove was before that. We could try to 
-migrate Dove, but it is probably not worth the pain at this point.
+   - MMP2, PXA168 and PXA910 are "post-multi platform" kernel. That means there
+     is not "machine code", and that all their boards are described in
+     devicetree (correct me Haojian if I'm wrong).
+     On the other hand, pxa25x, pxa27x and pxa3xx platform have still a lot of
+     machine files (arch/arm/mach-pxa/*.c). The goal of this serie is to remove
+     arch/arm/mach-pxa/mfp-*.c files, which predate pin control API, by
+     converting these machine files to pin control.
+     The long term goal is to have only one code maintained for pxa pinmuxing,
+     for both devicetree and platform_data board, and I'd rather have it in
+     pinctrl rather than arch/arm/mach-pxa.
 
-Rob
+   - gpio direction register sharing
+     As GPDR is needed for both gpio driver and pinctrl, I'd like to have a
+     single point where GPDR is manipulated. As pincontrol cannot be configured
+     without it, I was thinking have a pinctrl driver driving GPDR, and
+     gpio-pxa.c using it.
+     I don't see pinctrl-single enabling that either.
+
+   - non contiguous register ranges
+     GPDR and GAFR are not contiguous, ie. you don't have the guarantee that
+     GPDR(pin(x+1)) is either GPDR(pin(x)) or GPDR(pin(x)) + 4.
+     Or said differently the register sets are sparse, and I don't know if
+     pinctrl-single can handle that.
+
+ - pinconf
+   - nothing special here, only a register set (sparse AFAIR).
+     I don't know if pinctrl-single can handle non contiguous MMIO ranges.
+
+Now for pxa3xx, I think pinctrl-single might be usable, as this architecture has
+a proper pincontrol register set. This is something I will look into next, as
+long as the legacy platform can use pinctrl-single too (ie. from machine code).
+
+I might remember other reasons in the next days, these ones are the most obvious
+which came to my mind.
+
+If you think of another way, I'm all for it, my personal objectives are :
+ - removing mfp* files
+ - having the same code handle devicetree and platform_data boards
+ - having consistency in gpio direction handling
+ - having pinctrl debug facilities (I love /sys/kernel/debug/pinctrl**)
+ - having pin function names consistency across the boards if possible (ie. if
+   MMCLK is used on boardX, then MMCLK must be used in boardY, and not MMCCLK)
+
+Cheers.
+
+-- 
+Robert
