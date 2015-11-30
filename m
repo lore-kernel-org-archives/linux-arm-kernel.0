@@ -1,48 +1,70 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Mon, 30 Nov 2015 10:21:37 -0800
-Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
- concurrent lockers
-In-Reply-To: <20151130155839.GK17308@twins.programming.kicks-ass.net>
-References: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
- <20151130155839.GK17308@twins.programming.kicks-ass.net>
-Message-ID: <20151130182137.GY26643@linux.vnet.ibm.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Mon, 30 Nov 2015 10:20:50 -0800
+Subject: [GIT PULL] arm64: DTS changes for X-Gene platforms queued for v4.5
+Message-ID: <CADaLNDnM463bnMq349q_2XEh2AeGs4yrp-y474wQZ-NCSE0Cqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 04:58:39PM +0100, Peter Zijlstra wrote:
-> On Fri, Nov 27, 2015 at 11:44:06AM +0000, Will Deacon wrote:
-> > Boqun Feng reported a rather nasty ordering issue with spin_unlock_wait
-> > on architectures implementing spin_lock with LL/SC sequences and acquire
-> > semantics:
-> > 
-> >  | CPU 1                   CPU 2                     CPU 3
-> >  | ==================      ====================      ==============
-> >  |                                                   spin_unlock(&lock);
-> >  |                         spin_lock(&lock):
-> >  |                           r1 = *lock; // r1 == 0;
-> >  |                         o = READ_ONCE(object); // reordered here
-> >  | object = NULL;
-> >  | smp_mb();
-> >  | spin_unlock_wait(&lock);
-> >  |                           *lock = 1;
-> >  | smp_mb();
-> >  | o->dead = true;
-> >  |                         if (o) // true
-> >  |                           BUG_ON(o->dead); // true!!
-> > 
-> > The crux of the problem is that spin_unlock_wait(&lock) can return on
-> > CPU 1 whilst CPU 2 is in the process of taking the lock. This can be
-> > resolved by upgrading spin_unlock_wait to a LOCK operation, forcing it
-> > to serialise against a concurrent locker and giving it acquire semantics
-> > in the process (although it is not at all clear whether this is needed -
-> > different callers seem to assume different things about the barrier
-> > semantics and architectures are similarly disjoint in their
-> > implementations of the macro).
-> 
-> Do we want to go do a note with spin_unlock_wait() in
-> include/linux/spinlock.h warning about these subtle issues for the next
-> arch that thinks this is a 'trivial' thing to implement?
+[Resend email in text format]
 
-Hear, hear!!!
+Hi Arnd and Olof,
 
-							Thanx, Paul
+Following is the first batch of dts changes for X-Gene platforms for
+4.5. These are all the changes that missed 4.4 merge window.
+
+Regards,
+Duc Dang.
+------
+
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+
+are available in the git repository at:
+
+  https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.5-v1
+
+for you to fetch changes up to 8000bc3fe99a304e244edfaf185b418b22e5579c:
+
+  arm64: dts: Add L2 cache topology for APM X-Gene SoC (2015-11-17
+13:11:56 -0800)
+
+----------------------------------------------------------------
+DTS changes for X-Gene platforms queued for v4.5
+
+This patch set adds DTS entries to support various IPs
+for X-Gene v1 and X-Gene v2 SoC:
+- X-Gene v1: Enable support for MMC, USB, GPIO controllers,
+  I2C controller, L2 Cache topology
+- X-Gene v2: Enable support for MMC, USB, GPIO controller,
+  I2C controller (with RTC), PCIe controller with GICv2m MSI,
+  EDAC, L2 Cache topology, TRNG
+
+----------------------------------------------------------------
+Duc Dang (16):
+      arm64: dts: Add the arasan mmc DTS entries for APm X-Gene v2 SoC
+      arm64: dts: X-Gene: Do not reset or enable/disable clock for AHB block
+      arm64: dts: Add RNG device tree nodes for APM X-Gene v2 platform
+      arm64: dts: Add v2m MSI frame nodes for APM X-Gene v2 platforms
+      arm64: dts: Add PCIe node for APM X-Gene v2 platforms
+      arm64: dts: Add USB nodes for APM X-Gene v1 platforms
+      arm64: dts: Add USB nodes for APM X-Gene v2 platforms
+      arm64: dts: Add APM X-Gene v1 SoC GFC GPIO controller DTS entries
+      arm64: dts: Add APM X-Gene v2 SoC GFC GPIO controller DTS entry
+      arm64: dts: Add Designware GPIO dts binding for APM X-Gene v1 platform
+      arm64: dts: Add APM X-Gene v2 SoC Designware GPIO controller DTS entry
+      arm64: dts: Add APM X-Gene v2 SoC EDAC DTS entries
+      arm64: dts: Add Designware I2C controller DTS entries for X-Gene v1 SoC
+      arm64: dts: Add Designware I2C controller DTS entries for X-Gene
+v2 SoC platform
+      arm64: dts: Add RTC DTS entry for X-Gene v2 SoC platform
+      arm64: dts: Add L2 cache topology for APM X-Gene SoC
+
+Suman Tripathi (1):
+      arm64: dts: Add the arasan mmc DTS entries for APM X-Gene v1 SoC
+
+ arch/arm64/boot/dts/apm/apm-merlin.dts     |  12 +
+ arch/arm64/boot/dts/apm/apm-mustang.dts    |   4 +
+ arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 401 +++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/apm/apm-storm.dtsi     | 126 +++++++++
+ 4 files changed, 543 insertions(+)
