@@ -1,144 +1,40 @@
-From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Mon, 30 Nov 2015 15:29:56 +0200
-Subject: [PATCH 01/18] ARM: am57xx: cl-som-am57x: dts: add basic module
- support
-In-Reply-To: <565B307E.2000203@ti.com>
-References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
- <1448433590-1399-2-git-send-email-lifshitz@compulab.co.il>
- <565629D2.2010401@ti.com> <565AEB19.4050107@compulab.co.il>
- <565B307E.2000203@ti.com>
-Message-ID: <565C4F54.50405@compulab.co.il>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon, 30 Nov 2015 14:35:34 +0100
+Subject: [PATCH] ARM: shmobile: defconfig: Enable CONFIG_PRINTK_TIME
+Message-ID: <1448890534-1430-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2015 07:06 PM, Nishanth Menon wrote:
-> On 11/29/2015 06:10 AM, Dmitry Lifshitz wrote:
-> [...]
->>>> +    };
->>>> +
->>>> +    leds {
->>>> +        compatible = "gpio-leds";
->>>> +        pinctrl-names = "default";
->>>> +        pinctrl-0 = <&leds_pins_default>;
->>>> +
->>>> +        led at 0 {
->>>> +            label = "cl-som-am57x:green";
->>>> +            gpios = <&gpio2 5 GPIO_ACTIVE_HIGH>;
->>>> +            linux,default-trigger = "heartbeat";
->>>> +            default-state = "off";
->>>> +        };
->>>> +    };
->>>> +};
->>>> +
->>>> +&dra7_pmx_core {
->>>> +    leds_pins_default: leds_pins_default {
->>>> +        pinctrl-single,pins = <
->>>> +            DRA7XX_CORE_IOPAD(0x347c, PIN_OUTPUT | MUX_MODE14)    /*
->>>> gpmc_a15.gpio2_5 */
->>>> +        >;
->>>> +    };
->>>> +
->>>> +    i2c1_pins_default: i2c1_pins_default {
->>>> +        pinctrl-single,pins = <
->>>> +            DRA7XX_CORE_IOPAD(0x3800, PIN_INPUT_PULLUP |
->>>> MUX_MODE0)    /* i2c1_sda.sda */
->>>> +            DRA7XX_CORE_IOPAD(0x3804, PIN_INPUT_PULLUP |
->>>> MUX_MODE0)    /* i2c1_scl.scl */
->>>> +        >;
->>>> +    };
->>>> +
->>>> +    tps659038_pins_default: tps659038_pins_default {
->>>> +        pinctrl-single,pins = <
->>>> +            DRA7XX_CORE_IOPAD(0x3818, PIN_INPUT_PULLUP | MUX_MODE14)
->>>> /* wakeup0.gpio1_0 */
->>>> +        >;
->>>> +    };
->>>
->>> Generic comment: As per requirements of the SoC -> all pinctrl must be
->>> done in bootloader. this was a recommendation that came in too late
->>> for TI platforms that got introduced in upstream, but that cleanup
->>> should eventually take place as well.
->>>
->>
->> Please, could you provide a reference to those recommendations.
->> Do you mean pinctrl for PMIC pins only?
->
-> You might want to ask your TI support contact for IODelay
-> recommendations. TRM mentions that pinmuxing must be performed under IO
-> isolation. There are silicon constraints in DRA7/AM57xx family, which
-> were not present previously.
->
+Enable timestamps for kernel log output to improve debugging.
+You can always use "dmesg -t" to strip the timestamps.
 
-Ok. I understand. This might take time...
-Since we'd like to have this in for 4.5, what would you recommend?
-Should I drop the muxes from this patch set? All the muxes?
-Or should we merge this (as it works correctly) in our tests and check
-on this later after investigation with TI?
+Don't specify CONFIG_LOG_BUF_SHIFT=16 while we're at it.  There's a
+reason the default in Kconfig is higher ;-)
 
-Also, in theory, there might be pins shared between two or more
-different functionalities and remuxed during runtime.
-Can this kind of thing be supported on AM57x?
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/configs/shmobile_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
->>>> +    tps659038: tps659038 at 58 {
->>>> +        compatible = "ti,tps659038";
->>>> +        reg = <0x58>;
->>>> +        interrupt-parent = <&gpio1>;
->>>> +        interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
->>>
->>> Also See: https://patchwork.kernel.org/patch/7596541/ ->
->>> Documentation/devicetree/bindings/i2c/i2c.txt -> since you seem to
->>> have a PMIC with power button, you might be able to get wakeup source
->>> also there.
->>>
->>
->> Do you mean just adding "wakeup-source" property?
->>
->> According to Documentation/devicetree/bindings/i2c/i2c.txt the primary
->> interrupt will be used as wakeup interrupt.
->
-> I think you might have to describe a "wakeup" interrupt -> which will be
-> similar in description to the one you used to describe uart wakeup
-> capability.
-
-Ok. Thanks!
-Well, we are not there yet.
-I think it would be better to work this out when I will work on the
-suspend/resume.
-
->
-> [..]
->
->>>> +        pinctrl-names = "default";
->>>> +        pinctrl-0 = <&tps659038_pins_default>;
->>>> +
->>>> +        #interrupt-cells = <2>;
->>>> +        interrupt-controller;
->>>> +
->>>> +        ti,system-power-controller;
->>>
->>> Assuming powerhold signal and BOOT0,1 is proper here, else poweroff
->>> will never work.
->>>
->>
->> Please, could you provide more details regarding this issue.
->
-> well,  if poweroff command does not completely power off your board, you
-> may want to investigate further. overall, the better circuit
-> configuration is the X15 configuration:
-> https://github.com/beagleboard/beagleboard-x15/blob/master/BeagleBoard-X15_RevA2.pdf
-> Pay close attention to the PMIC GPIO_&/POWERHOLD signal. Also notice the
-> extra reset circuit involved.
->
-> Again, a topic that you should probably discuss with your TI support
-> contact person.
-
-Ok. Thanks for the explanation! Indeed it does not currently work.
-I will forward your comments to the h/w designer.
-
->
-> [...]
->
-
-Regards,
-
-Dmitry
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index cc8ece33a7e38796..70d718e088a65fed 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -2,7 +2,6 @@ CONFIG_SYSVIPC=y
+ CONFIG_NO_HZ=y
+ CONFIG_IKCONFIG=y
+ CONFIG_IKCONFIG_PROC=y
+-CONFIG_LOG_BUF_SHIFT=16
+ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+ CONFIG_SYSCTL_SYSCALL=y
+@@ -199,6 +198,7 @@ CONFIG_NFS_V4_1=y
+ CONFIG_ROOT_NFS=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
++CONFIG_PRINTK_TIME=y
+ # CONFIG_ENABLE_WARN_DEPRECATED is not set
+ # CONFIG_ENABLE_MUST_CHECK is not set
+ # CONFIG_ARM_UNWIND is not set
+-- 
+1.9.1
