@@ -1,57 +1,124 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 30 Nov 2015 11:01:33 -0300
-Subject: [PATCH v2] arm: dts: Fix audio card detection on peach boards
-In-Reply-To: <1444653438-6532-1-git-send-email-alim.akhtar@samsung.com>
-References: <1444653438-6532-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <565C56BD.2050002@osg.samsung.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 30 Nov 2015 16:02:59 +0200
+Subject: [4.4-rc][PATCH] ARM: dts: am4372: fix clock source for arm twd
+ and global timers
+In-Reply-To: <565C53D0.6090305@ti.com>
+References: <1448653468-24908-1-git-send-email-grygorii.strashko@ti.com>
+ <565C0814.3000001@ti.com> <565C38CE.1070907@ti.com> <565C4FE2.3090403@ti.com>
+ <565C53D0.6090305@ti.com>
+Message-ID: <565C5713.6030900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Alim,
+On 11/30/2015 03:49 PM, Grygorii Strashko wrote:
+> On 11/30/2015 03:32 PM, Tero Kristo wrote:
+>> On 11/30/2015 01:53 PM, Grygorii Strashko wrote:
+>>> On 11/30/2015 10:25 AM, Tero Kristo wrote:
+>>>> On 11/27/2015 09:44 PM, Grygorii Strashko wrote:
+>>>>> ARM TWD and Global timer are clocked by PERIPHCLK which is MPU_CLK/2.
+>>>>> But now they are clocked by dpll_mpu_m2_ck == MPU_CLK and, as result.
+>>>>> Timekeeping core misbehaves. For example, execution of command
+>>>>> "sleep 5" will take 10 sec instead of 5.
+>>>>>
+>>>>> Hence, fix it by adding mpu_periphclk ("fixed-factor-clock") and use
+>>>>> it for clocking ARM TWD and Global timer (same way as on OMAP4).
+>>>>>
+>>>>> Cc: Tony Lindgren <tony@atomide.com>
+>>>>> Cc: Felipe Balbi <balbi@ti.com>
+>>>>> Cc: Tero Kristo <t-kristo@ti.com>
+>>>>> Fixes:commit 8cbd4c2f6a99 ("arm: boot: dts: am4372: add ARM timers and
+>>>>> SCU nodes")
+>>>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>>>>> ---
+>>>>>    arch/arm/boot/dts/am4372.dtsi        | 4 ++--
+>>>>>    arch/arm/boot/dts/am43xx-clocks.dtsi | 8 ++++++++
+>>>>>    2 files changed, 10 insertions(+), 2 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/am4372.dtsi
+>>>>> b/arch/arm/boot/dts/am4372.dtsi
+>>>>> index d83ff9c..de8791a 100644
+>>>>> --- a/arch/arm/boot/dts/am4372.dtsi
+>>>>> +++ b/arch/arm/boot/dts/am4372.dtsi
+>>>>> @@ -74,7 +74,7 @@
+>>>>>            reg = <0x48240200 0x100>;
+>>>>>            interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
+>>>>>            interrupt-parent = <&gic>;
+>>>>> -        clocks = <&dpll_mpu_m2_ck>;
+>>>>> +        clocks = <&mpu_periphclk>;
+>>>>>        };
+>>>>>
+>>>>>        local_timer: timer at 48240600 {
+>>>>> @@ -82,7 +82,7 @@
+>>>>>            reg = <0x48240600 0x100>;
+>>>>>            interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
+>>>>>            interrupt-parent = <&gic>;
+>>>>> -        clocks = <&dpll_mpu_m2_ck>;
+>>>>> +        clocks = <&mpu_periphclk>;
+>>>>>        };
+>>>>>
+>>>>>        l2-cache-controller at 48242000 {
+>>>>> diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi
+>>>>> b/arch/arm/boot/dts/am43xx-clocks.dtsi
+>>>>> index cc88728..2ff58b1 100644
+>>>>> --- a/arch/arm/boot/dts/am43xx-clocks.dtsi
+>>>>> +++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
+>>>>> @@ -259,6 +259,14 @@
+>>>>>            ti,invert-autoidle-bit;
+>>>>>        };
+>>>>>
+>>>>> +    mpu_periphclk: mpu_periphclk {
+>>>>> +        #clock-cells = <0>;
+>>>>> +        compatible = "fixed-factor-clock";
+>>>>> +        clocks = <&dpll_mpu_ck>;
+>>>>
+>>>> I don't think this is correct, ARM core is fed dpll_mpu_m2_ck, where the
+>>>> divisor value can potentially differ from 1. If you feed this clock
+>>>> directly from dpll_mpu_ck, you bypass this divisor.
+>>>
+>>> Sry. My mistake. I'll update it to use dpll_mpu_m2_ck.
+>>>
+>>>>
+>>>> Did you check what is the impact of cpufreq on the ARM TWD/timers?
+>>>
+>>> TWD is cpufreq friendly, ARM GT is not.
+>>
+>> I think the TWD kick period changes with cpufreq also right?
+>
+> linux/arch/arm/kernel/smp_twd.c has code to handle cpufreq.
+>
+>>
+>> How are the clocks handled with cpufreq? The user just needs to
+>> understand that the timers will be screwed if he uses ARM GT? Should we
+>> add some sort of dependency to disable the ARM GT if cpufreq is enabled?
+>
+> Yep. May be, but very good question is how to do that in case of
+> OMAP multiplatform build which enables most of all config options at once.
+>
+> There two threads related to this:
+> [1] http://www.spinics.net/lists/arm-kernel/msg459649.html
+> [2] http://www.spinics.net/lists/arm-kernel/msg461141.html
+>
+> Personally, I've do not see better way than [2] right now.
 
-On 10/12/2015 09:37 AM, Alim Akhtar wrote:
-> Since commit 2fad972d45c4 ("ARM: dts: Add mclk entry for Peach boards"),
-> sound card detection is broken on peach boards and gives below errors:
-> 
-> [    3.630457] max98090 7-0010: MAX98091 REVID=0x51
-> [    3.634233] max98090 7-0010: use default 2.8v micbias
-> [    3.640985] snow-audio sound: HiFi <-> 3830000.i2s mapping ok
-> [    3.645307] max98090 7-0010: Invalid master clock frequency
-> [    3.650824] snow-audio sound: ASoC: Peach-Pi-I2S-MAX98091 late_probe() failed: -22
-> [    3.658914] snow-audio sound: snd_soc_register_card failed (-22)
-> [    3.664366] snow-audio: probe of sound failed with error -22
-> 
-> This patch adds missing assigned-clocks and assigned-clock-parents for
-> pmu_system_controller node which is used as "mclk" for audio codec.
-> 
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> Fixes: 2fad972d45c4 ("ARM: dts: Add mclk entry for Peach boards")
+Yeah, [2] seems the way to go.
 
-I found that this patch is not enough to have proper audio working
-on an Exynos5800 Peach Pi. Even playing a simple wav does not work:
+>
+>
+>>>>> +        clock-mult = <1>;
+>>>>> +        clock-div = <2>;
+>>>>> +    };
+>>>>> +
+>>>>>        dpll_ddr_ck: dpll_ddr_ck {
+>>>>>            #clock-cells = <0>;
+>>>>>            compatible = "ti,am3-dpll-clock";
+>>>>>
+>
+> By the way, does this patch is still correct taking into account dependency
+> from cpufreq?
+> Does it make sense update it to use dpll_mpu_ck and resend?
+>
 
-$ time aplay -D sysdefault /usr/share/sounds/alsa/Front_Center.wav 
-Playing WAVE '/usr/share/sounds/alsa/Front_Center.wav' : Signed 16 bit Little Endian, Rate 48000 Hz, Mono
+Well, this patch is still valid, as the selection of the clocksource 
+should be done elsewhere, and this patch should not care about that.
 
-real	0m1.138s
-user	0m0.005s
-sys	0m0.005s
-
-This should be ~1.5 seconds so audio is processed faster than expected.
-
-So something else besides making the CLKOUT to provide a valid frequency
-for the codec's master clock is needed.
-
-Do you know what's missing in mainline? For instance, I see that the
-sound/soc/samsung/snow.c ASoC machine driver doesn't have a hw_params
-but I'm not that familiar with ALSA to know if that makes sense or not.
-
-Also, do you know if the "simple-audio-card" can be used instead for
-snow and peachs as it is used for other Exynos5 boards or a specific
-ASoC machine driver is really needed for these Chromebooks?
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+-Tero
