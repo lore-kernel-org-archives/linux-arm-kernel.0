@@ -1,103 +1,153 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Nov 2015 20:58:23 +0100
-Subject: [linux-sunxi] Re: [PATCH v2 3/5] thermal: Add a driver for the
- Allwinner THS sensor
-In-Reply-To: <0edf1031924124377647dfb0f62ec6c8@rainloop.atalax.net>
-References: <20151124084342.GJ32142@lukather>
- <cover.1448263428.git.atx@atx.name>
- <ea5d8edefd251f2b76660b43a4ea4dc89c3b2f38.1448263428.git.atx@atx.name>
- <0edf1031924124377647dfb0f62ec6c8@rainloop.atalax.net>
-Message-ID: <20151130195823.GE3664@lukather>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 30 Nov 2015 20:59:55 +0100
+Subject: [PATCH v2 05/21] arm64: KVM: Implement timer save/restore
+In-Reply-To: <1448650215-15218-6-git-send-email-marc.zyngier@arm.com>
+References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+ <1448650215-15218-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20151130195955.GE11704@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 11:02:34AM +0000, Josef Gajdusek wrote:
-> >> +struct sun8i_ths_type {
-> >> + int (*init)(struct platform_device *, struct sun8i_ths_data *);
-> >> + int (*get_temp)(struct sun8i_ths_data *, int *out);
-> >> + void (*irq)(struct sun8i_ths_data *);
-> >> + void (*deinit)(struct sun8i_ths_data *);
-> >> +};
-> > 
-> > AFAIK, you never got back on why it was actually needed, instead of
-> > directly calling these functions.
+On Fri, Nov 27, 2015 at 06:49:59PM +0000, Marc Zyngier wrote:
+> Implement the timer save restore as a direct translation of
+> the assembly code version.
 > 
-> It is preparation for supporting the other SoCs with THS as they have
-> slightly different register layouts and thus cannot be controlled by the
-> same code.
-
-Do you have support and / or informations on what's going to be needed
-for these other SoCs yet?
-
-Which SoCs are we talking about?
-
-> >> + /* The final sample period is calculated as follows:
-> >> + * (THERMAL_PER + 1) * 4096 / f_clk * 2^(FILTER_TYPE + 1)
-> >> + *
-> >> + * This results to about 1Hz with these settings.
-> >> + */
-> >> + ret = clk_set_rate(data->clk, 4000000);
-> > 
-> > I don't follow you here. You have a complicated math function, that
-> > has many input variables, and then, you just set the clock rate to a
-> > constant?
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/hyp/Makefile          |  1 +
+>  arch/arm64/kvm/hyp/hyp.h             |  3 ++
+>  arch/arm64/kvm/hyp/timer-sr.c        | 71 ++++++++++++++++++++++++++++++++++++
+>  include/clocksource/arm_arch_timer.h |  6 +++
+>  4 files changed, 81 insertions(+)
+>  create mode 100644 arch/arm64/kvm/hyp/timer-sr.c
 > 
-> How should this be handled then? I guess the sampling rate could
-> be set in the device tree and then the values calculated, but none
-> of the other thermal drivers seem to have configurable sample rate.
+> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+> index d1e38ce..455dc0a 100644
+> --- a/arch/arm64/kvm/hyp/Makefile
+> +++ b/arch/arm64/kvm/hyp/Makefile
+> @@ -4,3 +4,4 @@
+>  
+>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
+> +obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
+> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+> index a31cb6e..86aa5a2 100644
+> --- a/arch/arm64/kvm/hyp/hyp.h
+> +++ b/arch/arm64/kvm/hyp/hyp.h
+> @@ -33,5 +33,8 @@ void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+>  void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+>  void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+>  
+> +void __timer_save_state(struct kvm_vcpu *vcpu);
+> +void __timer_restore_state(struct kvm_vcpu *vcpu);
+> +
+>  #endif /* __ARM64_KVM_HYP_H__ */
+>  
+> diff --git a/arch/arm64/kvm/hyp/timer-sr.c b/arch/arm64/kvm/hyp/timer-sr.c
+> new file mode 100644
+> index 0000000..8e2209c
+> --- /dev/null
+> +++ b/arch/arm64/kvm/hyp/timer-sr.c
+> @@ -0,0 +1,71 @@
+> +/*
+> + * Copyright (C) 2012-2015 - ARM Ltd
+> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <clocksource/arm_arch_timer.h>
+> +#include <linux/compiler.h>
+> +#include <linux/kvm_host.h>
+> +
+> +#include <asm/kvm_mmu.h>
+> +
+> +#include "hyp.h"
+> +
+> +/* vcpu is already in the HYP VA space */
+> +void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
+> +{
+> +	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> +
+> +	if (kvm->arch.timer.enabled) {
+> +		timer->cntv_ctl = read_sysreg(cntv_ctl_el0);
+> +		isb();
+> +		timer->cntv_cval = read_sysreg(cntv_cval_el0);
+> +	}
+> +
+> +	/* Disable the virtual timer */
+> +	write_sysreg(0, cntv_ctl_el0);
+> +
+> +	/* Allow physical timer/counter access for the host */
+> +	write_sysreg((read_sysreg(cnthctl_el2) | CNTHCTL_EL1PCTEN |
+> +		      CNTHCTL_EL1PCEN),
+> +		     cnthctl_el2);
 
-I don't know, I would have expected some actual computation, like a
-function taking the frequency as a parameter and returning the clock
-rate. At least that way we now what we're doing and which part might
-change and which will not.
+nit: again I probably prefer reading cnthctl_el2 into a variable, modify
+the bits and write it back, but it's no big deal.
 
-But you do not need to change the sample rate itself.
+> +
+> +	/* Clear cntvoff for the host */
+> +	write_sysreg(0, cntvoff_el2);
 
-> >> +static int sun8i_ths_h3_get_temp(struct sun8i_ths_data *data, int *out)
-> >> +{
-> >> + int val = readl(data->regs + THS_H3_DATA);
-> >> + *out = sun8i_ths_reg_to_temperature(val, 8253, 217000);
-> >> + return 0;
-> > 
-> > Can't you just return the value directly?
+why do we do this when we've just disabled the timer?
+
+> +}
+> +
+> +void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
+> +{
+> +	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> +	u64 val;
+> +
+> +	/*
+> +	 * Disallow physical timer access for the guest
+> +	 * Physical counter access is allowed
+> +	 */
+> +	val = read_sysreg(cnthctl_el2);
+> +	val &= ~CNTHCTL_EL1PCEN;
+> +	val |= CNTHCTL_EL1PCTEN;
+> +	write_sysreg(val, cnthctl_el2);
+> +
+> +	if (kvm->arch.timer.enabled) {
+> +		write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
+> +		write_sysreg(timer->cntv_cval, cntv_cval_el0);
+> +		isb();
+> +		write_sysreg(timer->cntv_ctl, cntv_ctl_el0);
+> +	}
+> +}
+> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+> index 9916d0e..25d0914 100644
+> --- a/include/clocksource/arm_arch_timer.h
+> +++ b/include/clocksource/arm_arch_timer.h
+> @@ -23,6 +23,12 @@
+>  #define ARCH_TIMER_CTRL_IT_MASK		(1 << 1)
+>  #define ARCH_TIMER_CTRL_IT_STAT		(1 << 2)
+>  
+> +#define CNTHCTL_EL1PCTEN		(1 << 0)
+> +#define CNTHCTL_EL1PCEN			(1 << 1)
+> +#define CNTHCTL_EVNTEN			(1 << 2)
+> +#define CNTHCTL_EVNTDIR			(1 << 3)
+> +#define CNTHCTL_EVNTI			(0xF << 4)
+> +
+>  enum arch_timer_reg {
+>  	ARCH_TIMER_REG_CTRL,
+>  	ARCH_TIMER_REG_TVAL,
+> -- 
+> 2.1.4
 > 
-> I did that in the v1, clabbe.montjoie suggested to use temp variable to
-> avoid column wrap.
 
-I was talking about the out pointer. Can the value not be returned?
+Otherwise this looks good.
 
-> >> + ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
-> >> + sun8i_ths_irq_thread, IRQF_ONESHOT,
-> >> + dev_name(&pdev->dev), data);
-> > 
-> > Why a threaded irq?
-> 
-> I thought threaded IRQs are preferred? Other thermal drivers
-> use them too.
-
-It's close to pointless in this case. You're not doing much more than
-what the default handler will do anyway, and you avoid scheduling a
-thread doing so.
-
-And other thermal drivers use a regular interrupt handler too :)
-
-> I am also not really sure thermal_zone_device_update() can even be
-> called in interrupt context.
-
-I can't really tell on this one. Judging from a quick look, I can't
-see anything that could prevent it, and since others are using it, it
-seems doable.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151130/124199bd/attachment-0001.sig>
+-Christoffer
