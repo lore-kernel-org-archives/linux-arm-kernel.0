@@ -1,55 +1,54 @@
-From: yalin.wang2010@gmail.com (yalin wang)
-Date: Mon, 30 Nov 2015 08:42:04 -0800
-Subject: [PATCH v2 5/5] printk/nmi: Increase the size of the temporary
- buffer
-In-Reply-To: <1448622572-16900-6-git-send-email-pmladek@suse.com>
-References: <1448622572-16900-1-git-send-email-pmladek@suse.com>
- <1448622572-16900-6-git-send-email-pmladek@suse.com>
-Message-ID: <81211733-2484-40A9-9D4A-644AA27FBC73@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 30 Nov 2015 10:52:28 -0600
+Subject: [PATCH 1/2] dt-bindings: soc: Add supplies for Mediatek SCPSYS
+ unit
+In-Reply-To: <1448880100-23396-2-git-send-email-s.hauer@pengutronix.de>
+References: <1448880100-23396-1-git-send-email-s.hauer@pengutronix.de>
+ <1448880100-23396-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20151130165228.GA30957@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Nov 30, 2015 at 11:41:39AM +0100, Sascha Hauer wrote:
+> The power domains in the SCPSYS unit are supplied by regulators. Add the
+> properties for them to the binding document.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: devicetree at vger.kernel.org
 
-> On Nov 27, 2015, at 19:09, Petr Mladek <pmladek@suse.com> wrote:
-> 
-> Testing has shown that the backtrace sometimes does not fit
-> into the 4kB temporary buffer that is used in NMI context.
-> 
-> The warnings are gone when I double the temporary buffer size.
-> 
-> Note that this problem existed even in the x86-specific
-> implementation that was added by the commit a9edc8809328
-> ("x86/nmi: Perform a safe NMI stack trace on all CPUs").
-> Nobody noticed it because it did not print any warnings.
-> 
-> Signed-off-by: Petr Mladek <pmladek@suse.com>
+Acked-by: Rob Herring <robh@kernel.org>
+
 > ---
-> kernel/printk/nmi.c | 2 +-
-> 1 file changed, 1 insertion(+), 1 deletion(-)
+>  Documentation/devicetree/bindings/soc/mediatek/scpsys.txt | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 > 
-> diff --git a/kernel/printk/nmi.c b/kernel/printk/nmi.c
-> index 8af1e4016719..6111644d5f01 100644
-> --- a/kernel/printk/nmi.c
-> +++ b/kernel/printk/nmi.c
-> @@ -42,7 +42,7 @@ atomic_t nmi_message_lost;
-> struct nmi_seq_buf {
-> 	atomic_t		len;	/* length of written data */
-> 	struct irq_work		work;	/* IRQ work that flushes the buffer */
-> -	unsigned char		buffer[PAGE_SIZE - sizeof(atomic_t) -
-> +	unsigned char		buffer[2 * PAGE_SIZE - sizeof(atomic_t) -
-> 				       sizeof(struct irq_work)];
-> };
+> diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+> index a6c8afc..e8f15e3 100644
+> --- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+> +++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+> @@ -21,6 +21,18 @@ Required properties:
+>  		      These are the clocks which hardware needs to be enabled
+>  		      before enabling certain power domains.
+>  
+> +Optional properties:
+> +- vdec-supply: Power supply for the vdec power domain
+> +- venc-supply: Power supply for the venc power domain
+> +- isp-supply: Power supply for the isp power domain
+> +- mm-supply: Power supply for the mm power domain
+> +- venc_lt-supply: Power supply for the venc_lt power domain
+> +- audio-supply: Power supply for the audio power domain
+> +- usb-supply: Power supply for the usb power domain
+> +- mfg_async-supply: Power supply for the mfg_async power domain
+> +- mfg_2d-supply: Power supply for the mfg_2d power domain
+> +- mfg-supply: Power supply for the mfg power domain
+> +
+>  Example:
+>  
+>  	scpsys: scpsys at 10006000 {
+> -- 
+> 2.6.2
 > 
-
-why not define like this:
-
-union {
-struct {atomic_t		len;	
-	struct irq_work		work;
-}
-unsigned char		buffer[PAGE_SIZE * 2] ;
-}
-
-we can make sure the union is 2 PAGE_SIZE .
-
-Thanks
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
