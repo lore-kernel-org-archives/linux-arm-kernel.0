@@ -1,27 +1,37 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 30 Nov 2015 14:50:57 -0500 (EST)
-Subject: [PATCH V5 net-next 1/5] net:hns: Add support of Hip06 SoC to
- the Hislicon Network Subsystem
-In-Reply-To: <1448522050-5576-2-git-send-email-salil.mehta@huawei.com>
-References: <1448522050-5576-1-git-send-email-salil.mehta@huawei.com>
- <1448522050-5576-2-git-send-email-salil.mehta@huawei.com>
-Message-ID: <20151130.145057.216796732457000987.davem@davemloft.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 30 Nov 2015 11:51:23 -0800
+Subject: [PATCH v2 1/6] ARM: OMAP2+: dts: cm-t335: add initial support
+In-Reply-To: <1448373733-5839-2-git-send-email-uri.mashiach@compulab.co.il>
+References: <1445948100-16446-1-git-send-email-uri.mashiach@compulab.co.il>
+ <1448373733-5839-1-git-send-email-uri.mashiach@compulab.co.il>
+ <1448373733-5839-2-git-send-email-uri.mashiach@compulab.co.il>
+Message-ID: <20151130195123.GP2517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Salil Mehta <salil.mehta@huawei.com>
-Date: Thu, 26 Nov 2015 07:14:06 +0000
+* Uri Mashiach <uri.mashiach@compulab.co.il> [151124 06:03]:
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/am335x-cm-t335.dts
+...
 
-> -#define ENABLE		(0x1)
-> -#define DISABLE		(0x0)
-> +#define ENABLE		0x1
-> +#define DISABLE		0x0
+> +&uart0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart0_pins>;
+> +
+> +	status = "okay";
+> +};
+> +
 
-Defining such common macros names for such incredibly simple boolean values
-is asking for trouble, in particular it can possibly collide with other
-defines in the global namespace.
+FYI, the extra line break at the end of the file causes whitespace
+warnings when applying. And fixing that causes extra hassles with
+applying the other patches in the series as the patches won't apply..
+So for the next time, you may want to check that ;)
 
-Use "true", "false", and the "bool" type, because that is exactly how you
-are using these values.
+Also, the subject line should be "ARM: dts: ..." for the dts changes
+so the git log loooks unified for all the ARM SoCs.
 
-Thanks.
+Anyways, I've fixed up those locally and applying into omap-for-v4.5/dt.
+
+Regards,
+
+Tony
