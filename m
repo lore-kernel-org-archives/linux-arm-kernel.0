@@ -1,203 +1,491 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Sun, 29 Nov 2015 19:14:40 -0700
-Subject: [PATCH V5 19/26] coresight: updating documentation to reflect
- integration with perf
+Date: Sun, 29 Nov 2015 19:14:27 -0700
+Subject: [PATCH V5 06/26] coresight: associating path with session rather than
+ tracer
 In-Reply-To: <1448849687-5724-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1448849687-5724-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1448849687-5724-20-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1448849687-5724-7-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding a new section giving information on how coresight has been
-integrated with the perf subsystem along with a general idea of how
-to control tracing from the perf tool cmd line.
+When using the Coresight framework from the sysFS interface a
+tracer is always handling a single session and as such, a path
+can be associated with a tracer.  But when supporting multiple
+session per tracer there is no guarantee that sessions will always
+have the same path from source to sink.
+
+This patch is removing the automatic association between path and
+tracers.  The building of a path and enablement of the components
+in the path are decoupled, allowing for the association of a path
+with a session rather than a tracer.
+
+To keep backward functionality with the current sysFS access methods
+a per-cpu place holder is used to keep a handle on the path built when
+tracers are enabled.  Lastly APIs to build paths and enable tracers are
+made public so that other subsystem can interact with the Coresight
+framework.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- Documentation/trace/coresight.txt | 138 ++++++++++++++++++++++++++++++++++----
- 1 file changed, 124 insertions(+), 14 deletions(-)
+ drivers/hwtracing/coresight/coresight-priv.h |   5 +
+ drivers/hwtracing/coresight/coresight.c      | 300 ++++++++++++++++++---------
+ include/linux/coresight.h                    |   2 -
+ 3 files changed, 208 insertions(+), 99 deletions(-)
 
-diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
-index 0a5c3290e732..9515206b4b1a 100644
---- a/Documentation/trace/coresight.txt
-+++ b/Documentation/trace/coresight.txt
-@@ -20,13 +20,13 @@ Components are generally categorised as source, link and sinks and are
+diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
+index 62fcd98cc7cf..7b193a34d709 100644
+--- a/drivers/hwtracing/coresight/coresight-priv.h
++++ b/drivers/hwtracing/coresight/coresight-priv.h
+@@ -52,6 +52,11 @@ static inline void CS_UNLOCK(void __iomem *addr)
+ 	} while (0);
+ }
  
- "Sources" generate a compressed stream representing the processor instruction
- path based on tracing scenarios as configured by users.  From there the stream
--flows through the coresight system (via ATB bus) using links that are connecting
--the emanating source to a sink(s).  Sinks serve as endpoints to the coresight
-+flows through the Coresight system (via ATB bus) using links that are connecting
-+the emanating source to a sink(s).  Sinks serve as endpoints to the Coresight
- implementation, either storing the compressed stream in a memory buffer or
- creating an interface to the outside world where data can be transferred to a
--host without fear of filling up the onboard coresight memory buffer.
-+host without fear of filling up the onboard Coresight memory buffer.
++void coresight_disable_path(struct list_head *path);
++int coresight_enable_path(struct list_head *path);
++struct list_head *coresight_build_path(struct coresight_device *csdev);
++void coresight_release_path(struct list_head *path);
++
+ #ifdef CONFIG_CORESIGHT_SOURCE_ETM3X
+ extern int etm_readl_cp14(u32 off, unsigned int *val);
+ extern int etm_writel_cp14(u32 off, u32 val);
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 93738dfbf631..74beba461aa2 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -29,6 +29,22 @@
  
--At typical coresight system would look like this:
-+At typical Coresight system would look like this:
+ static DEFINE_MUTEX(coresight_mutex);
  
-   *****************************************************************
-  **************************** AMBA AXI  ****************************===||
-@@ -83,8 +83,8 @@ While on target configuration of the components is done via the APB bus,
- all trace data are carried out-of-band on the ATB bus.  The CTM provides
- a way to aggregate and distribute signals between CoreSight components.
++/**
++ * struct coresight_node - elements of a path, from source to sink
++ * @csdev:	Address of an element.
++ * @link:	hook to the list.
++ */
++struct coresight_node {
++	struct coresight_device *csdev;
++	struct list_head link;
++};
++
++/*
++ * When operating Coresight drivers from the sysFS interface, only a single
++ * path can exist from a tracer (associated to a CPU) to a sink.
++ */
++static DEFINE_PER_CPU(struct list_head *, sysfs_path);
++
+ static int coresight_id_match(struct device *dev, void *data)
+ {
+ 	int trace_id, i_trace_id;
+@@ -68,15 +84,12 @@ static int coresight_source_is_unique(struct coresight_device *csdev)
+ 				 csdev, coresight_id_match);
+ }
  
--The coresight framework provides a central point to represent, configure and
--manage coresight devices on a platform.  This first implementation centers on
-+The Coresight framework provides a central point to represent, configure and
-+manage Coresight devices on a platform.  This first implementation centers on
- the basic tracing functionality, enabling components such ETM/PTM, funnel,
- replicator, TMC, TPIU and ETB.  Future work will enable more
- intricate IP blocks such as STM and CTI.
-@@ -129,11 +129,11 @@ expected to be added as the solution matures.
- Framework and implementation
- ----------------------------
+-static int coresight_find_link_inport(struct coresight_device *csdev)
++static int coresight_find_link_inport(struct coresight_device *csdev,
++				      struct coresight_device *parent)
+ {
+ 	int i;
+-	struct coresight_device *parent;
+ 	struct coresight_connection *conn;
  
--The coresight framework provides a central point to represent, configure and
--manage coresight devices on a platform.  Any coresight compliant device can
-+The Coresight framework provides a central point to represent, configure and
-+manage Coresight devices on a platform.  Any Coresight compliant device can
- register with the framework for as long as they use the right APIs:
+-	parent = container_of(csdev->path_link.next,
+-			      struct coresight_device, path_link);
+-
+ 	for (i = 0; i < parent->nr_outport; i++) {
+ 		conn = &parent->conns[i];
+ 		if (conn->child_dev == csdev)
+@@ -89,15 +102,12 @@ static int coresight_find_link_inport(struct coresight_device *csdev)
+ 	return 0;
+ }
  
--struct coresight_device *coresight_register(struct coresight_desc *desc);
-+struct Coresight_device *coresight_register(struct coresight_desc *desc);
- void coresight_unregister(struct coresight_device *csdev);
+-static int coresight_find_link_outport(struct coresight_device *csdev)
++static int coresight_find_link_outport(struct coresight_device *csdev,
++				       struct coresight_device *child)
+ {
+ 	int i;
+-	struct coresight_device *child;
+ 	struct coresight_connection *conn;
  
- The registering function is taking a "struct coresight_device *csdev" and
-@@ -193,10 +193,120 @@ the information carried in "THIS_MODULE".
- How to use
- ----------
+-	child = container_of(csdev->path_link.prev,
+-			     struct coresight_device, path_link);
+-
+ 	for (i = 0; i < csdev->nr_outport; i++) {
+ 		conn = &csdev->conns[i];
+ 		if (conn->child_dev == child)
+@@ -138,14 +148,19 @@ static void coresight_disable_sink(struct coresight_device *csdev)
+ 	}
+ }
  
--Before trace collection can start, a coresight sink needs to be identify.
--There is no limit on the amount of sinks (nor sources) that can be enabled at
--any given moment.  As a generic operation, all device pertaining to the sink
--class will have an "active" entry in sysfs:
-+There is two ways to use the Coresight framework: 1) using the perf cmd line
-+tool and 2) interacting directly with the Coresight devices using the sysFS
-+interface.  The latter will slowly be faded out as more functionality become
-+available from the perf cmd line tool but for the time being both are still
-+supported.  The following sections provide details on using both methods.
-+
-+1) Using perf framework:
-+
-+Coresight tracers like ETM and PTM are represented using the Perf framework's
-+Performance Monitoring Unit (PMU).  As such the perf framework takes charge of
-+controlling when tracing happens based on when the process(es) of interest are
-+scheduled.  When configure in a system, Coresight PMUs will be listed when
-+queried by the perf command line tool:
-+
-+linaro at linaro-nano:~$ ./perf list pmu
-+
-+List of pre-defined events (to be used in -e):
-+
-+  cs_etm//                                           [Kernel PMU event]
-+
-+linaro at linaro-nano:~$
-+
-+Regardless of the amount ETM/PTM IP block in a system (usually equal to the
-+amount of processor core), the "cs_etm" PMU will be listed only once.
-+
-+Before a trace can be configured and started a Coresight sink needs to be
-+selected using the sysFS method (see below).  This is only temporary until
-+sink selection can be made from the command line tool.
-+
-+linaro at linaro-nano:~$ ls /sys/bus/coresight/devices
-+20010000.etb  20030000.tpiu  20040000.funnel  2201c000.ptm
-+2201d000.ptm  2203c000.etm  2203d000.etm  2203e000.etm  replicator
-+
-+linaro at linaro-nano:~$ echo 1 > /sys/bus/coresight/devices/20010000.etb/enable_sink
-+
-+Once a sink has been selected configuring a Coresight PMU works the same way as
-+any other PMU.  As such tracing can happen for a single CPU, a group of CPU, per
-+thread or a combination of those:
-+
-+linaro at linaro-nano:~$ perf record -e cs_etm// --per-thread <command>
-+
-+linaro at linaro-nano:~$ perf record -C 0,2-3 -e cs_etm// <command>
-+
-+Tracing limited to user and kernel space can also be used to narrow the amount
-+of collected traces:
-+
-+linaro at linaro-nano:~$ perf record -e cs_etm//u --per-thread <command>
-+
-+linaro at linaro-nano:~$ perf record -C 0,2-3 -e cs_etm//k <command>
-+
-+As of this writing two ETM/PTM specific options have are available: cycle
-+accurate and timestamp (please refer to the Embedded Trace Macrocell reference
-+manual for details on these options).  By default both are disabled but using
-+the "cycacc" and "timestamp" mnemonic within the double '/' will see those
-+options configure for the upcoming trace run:
-+
-+linaro at linaro-nano:~$ perf record -e cs_etm/cycacc/ --per-thread <command>
-+
-+linaro at linaro-nano:~$ perf record -C 0,2-3 -e cs_etm/cycacc,timestamp/ <command>
-+
-+The Coresight PMUs can be configured to work in "full trace" or "snapshot" mode.
-+In full trace mode trace acquisition is enabled from beginning to end with trace
-+data being recorded continuously:
-+
-+linaro at linaro-nano:~$ perf record -e cs_etm// dd if=/dev/random of=./test.txt bs=1k count=1000
-+
-+Since this can lead to a significant amount of data and because some devices are
-+limited in disk space snapshot mode can be used instead.  In snapshot mode
-+traces are still collected in the ring buffer but not communicated to user
-+space.  The ring buffer is allowed to wrap around, providing the latest
-+information before an event of interest happens.  Significant events are
-+communicated by sending a USR2 signal to the user space command line tool.
-+From there the tool will stop trace collection and harvest data from the ring
-+buffer before re-enabling traces.  Snapshot mode can be invoked using '-S' when
-+launching a trace collection:
-+
-+linaro at linaro-nano:~$ perf record -S -e cs_etm// dd if=/dev/random of=./test.txt bs=1k count=1000
-+
-+Trace data collected during trace runs ends up in the "perf.data" file.  Trace
-+configuration information necessary for trace decoding is also embedded in the
-+"perf.data" file.  Two new headers, 'PERF_RECORD_AUXTRACE_INFO' and
-+'PERF_RECORD_AUXTRACE' have been added to the list of event types in order to
-+find out where the different sections start.
-+
-+It is worth noting that a set of metadata information exists for each tracer
-+that participated in a trace run.  As such if 5 processors have been engaged,
-+5 sets of metadata will be found in the perf.data file.  This is to ensure that
-+tracer decompression tools have all the information they need in order to
-+process the trace data.
-+
-+Metadata information is collected directly from the ETM/PTM management registers
-+using the sysFS interface.  Since there is no way for the perf command line
-+tool to associate a CPU with a tracer, a symbolic link has been created between
-+the cs_etm sysFS event directory and each Coresight tracer:
-+
-+linaro at linaro-nano:~$ ls /sys/bus/event_source/devices/cs_etm
-+cpu0  cpu1  cpu2  cpu3  cpu4  format  perf_event_mux_interval_ms
-+power  subsystem  type  uevent
-+
-+linaro at linaro-nano:~$ ls /sys/bus/event_source/devices/cs_etm/cpu0/mgmt/
-+etmccer  etmccr  etmcr  etmidr  etmscr  etmtecr1  etmtecr2
-+etmteevr  etmtraceidr  etmtssvr
-+
-+2) Using the sysFS interface:
-+
-+Most, if not all, configuration registers are made available to users via the
-+sysFS interface.  Until all Coresight ETM drivers have been converted to perf,
-+it will also be possible to start and stop traces from sysFS.
-+
-+As with the perf method described above, a Coresight sink needs to be identify
-+before trace collection can commence.  Using the sysFS method _only_, there is
-+no limit on the amount of sinks (nor sources) that can be enabled at
-+any given moment.  As a generic operation, all devices pertaining to the sink
-+class will have an "enable_sink" entry in sysfs:
+-static int coresight_enable_link(struct coresight_device *csdev)
++static int coresight_enable_link(struct coresight_device *csdev,
++				 struct coresight_device *parent,
++				 struct coresight_device *child)
+ {
+ 	int ret;
+ 	int link_subtype;
+ 	int refport, inport, outport;
  
- root:/sys/bus/coresight/devices# ls
- replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
-@@ -246,7 +356,7 @@ The file cstrace.bin can be decompressed using "ptm2human", DS-5 or Trace32.
+-	inport = coresight_find_link_inport(csdev);
+-	outport = coresight_find_link_outport(csdev);
++	if (!parent || !child)
++		return -EINVAL;
++
++	inport = coresight_find_link_inport(csdev, parent);
++	outport = coresight_find_link_outport(csdev, child);
+ 	link_subtype = csdev->subtype.link_subtype;
  
- Following is a DS-5 output of an experimental loop that increments a variable up
- to a certain value.  The example is simple and yet provides a glimpse of the
--wealth of possibilities that coresight provides.
-+wealth of possibilities that Coresight provides.
+ 	if (link_subtype == CORESIGHT_DEV_SUBTYPE_LINK_MERG)
+@@ -168,14 +183,19 @@ static int coresight_enable_link(struct coresight_device *csdev)
+ 	return 0;
+ }
  
- Info                                    Tracing enabled
- Instruction     106378866       0x8026B53C      E52DE004        false   PUSH     {lr}
+-static void coresight_disable_link(struct coresight_device *csdev)
++static void coresight_disable_link(struct coresight_device *csdev,
++				   struct coresight_device *parent,
++				   struct coresight_device *child)
+ {
+ 	int i, nr_conns;
+ 	int link_subtype;
+ 	int refport, inport, outport;
+ 
+-	inport = coresight_find_link_inport(csdev);
+-	outport = coresight_find_link_outport(csdev);
++	if (!parent || !child)
++		return;
++
++	inport = coresight_find_link_inport(csdev, parent);
++	outport = coresight_find_link_outport(csdev, child);
+ 	link_subtype = csdev->subtype.link_subtype;
+ 
+ 	if (link_subtype == CORESIGHT_DEV_SUBTYPE_LINK_MERG) {
+@@ -235,109 +255,167 @@ static void coresight_disable_source(struct coresight_device *csdev)
+ 	}
+ }
+ 
+-static int coresight_enable_path(struct list_head *path)
++void coresight_disable_path(struct list_head *path)
+ {
+-	int ret = 0;
+-	struct coresight_device *cd;
+-
+-	/*
+-	 * At this point we have a full @path, from source to sink.  The
+-	 * sink is the first entry and the source the last one.  Go through
+-	 * all the components and enable them one by one.
+-	 */
+-	list_for_each_entry(cd, path, path_link) {
+-		if (cd == list_first_entry(path, struct coresight_device,
+-					   path_link)) {
+-			ret = coresight_enable_sink(cd);
+-		} else if (list_is_last(&cd->path_link, path)) {
+-			/*
+-			 * Don't enable the source just yet - this needs to
+-			 * happen at the very end when all links and sink
+-			 * along the path have been configured properly.
+-			 */
+-			;
+-		} else {
+-			ret = coresight_enable_link(cd);
++	struct coresight_node *nd;
++	struct coresight_device *csdev, *parent, *child;
++
++	list_for_each_entry(nd, path, link) {
++		csdev = nd->csdev;
++
++		switch (csdev->type) {
++		case CORESIGHT_DEV_TYPE_SINK:
++		case CORESIGHT_DEV_TYPE_LINKSINK:
++			coresight_disable_sink(csdev);
++			break;
++		case CORESIGHT_DEV_TYPE_SOURCE:
++			/* sources are disabled from either sysFS or Perf */
++			break;
++		case CORESIGHT_DEV_TYPE_LINK:
++			parent = list_prev_entry(nd, link)->csdev;
++			child = list_next_entry(nd, link)->csdev;
++			coresight_disable_link(csdev, parent, child);
++			break;
++		default:
++			break;
+ 		}
+-		if (ret)
+-			goto err;
+ 	}
++}
+ 
+-	return 0;
+-err:
+-	list_for_each_entry_continue_reverse(cd, path, path_link) {
+-		if (cd == list_first_entry(path, struct coresight_device,
+-					   path_link)) {
+-			coresight_disable_sink(cd);
+-		} else if (list_is_last(&cd->path_link, path)) {
+-			;
+-		} else {
+-			coresight_disable_link(cd);
++int coresight_enable_path(struct list_head *path)
++{
++
++	int ret = 0;
++	struct coresight_node *nd;
++	struct coresight_device *csdev, *parent, *child;
++
++	list_for_each_entry_reverse(nd, path, link) {
++		csdev = nd->csdev;
++
++		switch (csdev->type) {
++		case CORESIGHT_DEV_TYPE_SINK:
++		case CORESIGHT_DEV_TYPE_LINKSINK:
++			ret = coresight_enable_sink(csdev);
++			if (ret)
++				goto err;
++			break;
++		case CORESIGHT_DEV_TYPE_SOURCE:
++			/* sources are enabled from either sysFS or Perf */
++			break;
++		case CORESIGHT_DEV_TYPE_LINK:
++			parent = list_prev_entry(nd, link)->csdev;
++			child = list_next_entry(nd, link)->csdev;
++			ret = coresight_enable_link(csdev, parent, child);
++			if (ret)
++				goto err;
++			break;
++		default:
++			goto err;
+ 		}
+ 	}
+ 
++out:
+ 	return ret;
++err:
++	coresight_disable_path(path);
++	goto out;
+ }
+ 
+-static int coresight_disable_path(struct list_head *path)
++/**
++ * _coresight_build_path - recursively build a path from a @csdev to a sink.
++ * @csdev:	The device to start from.
++ * @path:	The list to add devices to.
++ *
++ * The tree of Coresight device is traversed until an activated sink is
++ * found.  From there the sink is added to the list along with all the
++ * devices that led to that point - the end result is a list from source
++ * to sink. In that list the source is the first device and the sink the
++ * last one.
++ */
++static int _coresight_build_path(struct coresight_device *csdev,
++				 struct list_head *path)
+ {
+-	struct coresight_device *cd;
+-
+-	list_for_each_entry_reverse(cd, path, path_link) {
+-		if (cd == list_first_entry(path, struct coresight_device,
+-					   path_link)) {
+-			coresight_disable_sink(cd);
+-		} else if (list_is_last(&cd->path_link, path)) {
+-			/*
+-			 * The source has already been stopped, no need
+-			 * to do it again here.
+-			 */
+-			;
+-		} else {
+-			coresight_disable_link(cd);
++	int i;
++	bool found = false;
++	struct coresight_node *node;
++	struct coresight_connection *conn;
++
++	/* An activated sink has been found.  Enqueue the element */
++	if ((csdev->type == CORESIGHT_DEV_TYPE_SINK ||
++	     csdev->type == CORESIGHT_DEV_TYPE_LINKSINK) && csdev->activated)
++		goto out;
++
++	/* Not a sink - recursively explore each port found on this element */
++	for (i = 0; i < csdev->nr_outport; i++) {
++		conn = &csdev->conns[i];
++		if (_coresight_build_path(conn->child_dev, path) == 0) {
++			found = true;
++			break;
+ 		}
+ 	}
+ 
++	if (!found)
++		return -ENODEV;
++
++out:
++	/*
++	 * A path from this element to a sink has been found.  The elements
++	 * leading to the sink are already enqueued, all that is left to do
++	 * is add a node for this element.
++	 */
++	node = kzalloc(sizeof(struct coresight_node), GFP_KERNEL);
++	if (!node)
++		return -ENOMEM;
++
++	node->csdev = csdev;
++	list_add(&node->link, path);
++
+ 	return 0;
+ }
+ 
+-static int coresight_build_paths(struct coresight_device *csdev,
+-				 struct list_head *path,
+-				 bool enable)
++struct list_head *coresight_build_path(struct coresight_device *csdev)
+ {
+-	int i, ret = -EINVAL;
+-	struct coresight_connection *conn;
++	struct list_head *path;
+ 
+-	list_add(&csdev->path_link, path);
++	path = kzalloc(sizeof(struct list_head), GFP_KERNEL);
++	if (!path)
++		return NULL;
+ 
+-	if ((csdev->type == CORESIGHT_DEV_TYPE_SINK ||
+-	    csdev->type == CORESIGHT_DEV_TYPE_LINKSINK) &&
+-	    csdev->activated) {
+-		if (enable)
+-			ret = coresight_enable_path(path);
+-		else
+-			ret = coresight_disable_path(path);
+-	} else {
+-		for (i = 0; i < csdev->nr_outport; i++) {
+-			conn = &csdev->conns[i];
+-			if (coresight_build_paths(conn->child_dev,
+-						    path, enable) == 0)
+-				ret = 0;
+-		}
++	INIT_LIST_HEAD(path);
++
++	if (_coresight_build_path(csdev, path)) {
++		kfree(path);
++		path = NULL;
+ 	}
+ 
+-	if (list_first_entry(path, struct coresight_device, path_link) != csdev)
+-		dev_err(&csdev->dev, "wrong device in %s\n", __func__);
++	return path;
++}
+ 
+-	list_del(&csdev->path_link);
++/**
++ * coresight_release_path - release a previously built path.
++ * @path:	the path to release.
++ *
++ * Go through all the elements of a path and 1) removed it from the list and
++ * 2) free the memory allocated for each node.
++ */
++void coresight_release_path(struct list_head *path)
++{
++	struct coresight_node *nd, *next;
+ 
+-	return ret;
++	list_for_each_entry_safe(nd, next, path, link) {
++		list_del(&nd->link);
++		kfree(nd);
++	}
++
++	kfree(path);
++	path = NULL;
+ }
+ 
+ int coresight_enable(struct coresight_device *csdev)
+ {
+ 	int ret = 0;
+-	LIST_HEAD(path);
++	int cpu;
++	struct list_head *path;
+ 
+ 	mutex_lock(&coresight_mutex);
+ 	if (csdev->type != CORESIGHT_DEV_TYPE_SOURCE) {
+@@ -348,22 +426,47 @@ int coresight_enable(struct coresight_device *csdev)
+ 	if (csdev->enable)
+ 		goto out;
+ 
+-	if (coresight_build_paths(csdev, &path, true)) {
+-		dev_err(&csdev->dev, "building path(s) failed\n");
++	path = coresight_build_path(csdev);
++	if (!path) {
++		pr_err("building path(s) failed\n");
+ 		goto out;
+ 	}
+ 
+-	if (coresight_enable_source(csdev))
+-		dev_err(&csdev->dev, "source enable failed\n");
++	ret = coresight_enable_path(path);
++	if (ret)
++		goto err_path;
++
++	ret = coresight_enable_source(csdev);
++	if (ret)
++		goto err_source;
++
++	/*
++	 * When working from sysFS it is important to keep track
++	 * of the paths that were created so that they can be
++	 * undone in 'coresight_disable()'.  Since there can only
++	 * be a single session per tracer (when working from sysFS)
++	 * a per-cpu variable will do just fine.
++	 */
++	cpu = source_ops(csdev)->cpu_id(csdev);
++	per_cpu(sysfs_path, cpu) = path;
++
+ out:
+ 	mutex_unlock(&coresight_mutex);
+ 	return ret;
++
++err_source:
++	coresight_disable_path(path);
++
++err_path:
++	coresight_release_path(path);
++	goto out;
+ }
+ EXPORT_SYMBOL_GPL(coresight_enable);
+ 
+ void coresight_disable(struct coresight_device *csdev)
+ {
+-	LIST_HEAD(path);
++	int cpu;
++	struct list_head *path;
+ 
+ 	mutex_lock(&coresight_mutex);
+ 	if (csdev->type != CORESIGHT_DEV_TYPE_SOURCE) {
+@@ -373,9 +476,12 @@ void coresight_disable(struct coresight_device *csdev)
+ 	if (!csdev->enable)
+ 		goto out;
+ 
++	cpu = source_ops(csdev)->cpu_id(csdev);
++	path = per_cpu(sysfs_path, cpu);
+ 	coresight_disable_source(csdev);
+-	if (coresight_build_paths(csdev, &path, false))
+-		dev_err(&csdev->dev, "releasing path(s) failed\n");
++	coresight_disable_path(path);
++	coresight_release_path(path);
++	per_cpu(sysfs_path, cpu) = NULL;
+ 
+ out:
+ 	mutex_unlock(&coresight_mutex);
+diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+index bf62b265bf52..851ecb22397e 100644
+--- a/include/linux/coresight.h
++++ b/include/linux/coresight.h
+@@ -152,7 +152,6 @@ struct coresight_connection {
+ 		by @coresight_ops.
+  * @dev:	The device entity associated to this component.
+  * @refcnt:	keep track of what is in use.
+- * @path_link:	link of current component into the path being enabled.
+  * @orphan:	true if the component has connections that haven't been linked.
+  * @enable:	'true' if component is currently part of an active path.
+  * @activated:	'true' only if a _sink_ has been activated.  A sink can be
+@@ -168,7 +167,6 @@ struct coresight_device {
+ 	const struct coresight_ops *ops;
+ 	struct device dev;
+ 	atomic_t *refcnt;
+-	struct list_head path_link;
+ 	bool orphan;
+ 	bool enable;	/* true only if configured as part of a path */
+ 	bool activated;	/* true only if a sink is part of a path */
 -- 
 2.1.4
