@@ -1,41 +1,26 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 30 Nov 2015 17:40:05 +0100
-Subject: [PATCH net-next 3/3] net: mvneta: Add naive RSS support
-In-Reply-To: <CAPv3WKfEJGAHgDvfyeHKZaiJqbsyrV+uKM+E3enbNLVznLY6zA@mail.gmail.com>
- (Marcin Wojtas's message of "Sat, 28 Nov 2015 17:43:57 +0100")
-References: <1448463243-21057-1-git-send-email-gregory.clement@free-electrons.com>
- <1448463243-21057-4-git-send-email-gregory.clement@free-electrons.com>
- <CAPv3WKfEJGAHgDvfyeHKZaiJqbsyrV+uKM+E3enbNLVznLY6zA@mail.gmail.com>
-Message-ID: <87poyr4f16.fsf@free-electrons.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 30 Nov 2015 16:41:39 +0000
+Subject: [PATCH 1/2] regulator: Add coupled regulator
+In-Reply-To: <1448897346-17780-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1448897346-17780-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1448897346-17780-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20151130164139.GD1929@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
- 
- On sam., nov. 28 2015, Marcin Wojtas <mw@semihalf.com> wrote:
+On Mon, Nov 30, 2015 at 04:29:05PM +0100, Maxime Ripard wrote:
 
-> Hi Gregory,
->
->> +
->> +       /* update unicast mapping */
->> +       mvneta_set_rx_mode(pp->dev);
->
-> I know it may be an ultimate level of nitpicking, but can you start a
-> comment with capital letter?:)
+> +static struct of_device_id coupled_regulator_of_match[] = {
+> +	{ .compatible = "coupled-voltage-regulator" },
+> +	{ /* Sentinel */ },
+> +};
 
-If I got other review, then I can fix it in the next version. But if you
-have a look on the otehr commet not all of them start by capital letter.
-
-Thanks,
-
-Greogry
-
->
-> Best regards,
-> Marcin
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+This defines a device tree binding but does not document it -
+doucmentation is mandatory for all new device tree bindings.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151130/dccefb60/attachment-0001.sig>
