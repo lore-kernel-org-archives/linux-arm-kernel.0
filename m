@@ -1,85 +1,52 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 30 Nov 2015 15:13:10 +0900
-Subject: [PATCH] ARM: shmobile: alt: Add QSPI device to DT
-Message-ID: <1448863990-16276-1-git-send-email-horms+renesas@verge.net.au>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 30 Nov 2015 15:31:23 +0900
+Subject: [PATCH] ARM: exynos_defconfig: Set recommended options for systemd
+Message-ID: <1448865083-13272-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the QSPI controller in the alt device tree.
+Set following options to recommended value by systemd (which also
+matches the multi_v7 deconfig):
+1. Enable AUTOFS4_FS - for systemd.automount [0];
+2. Enable BLK_DEV_BSG - SG v4 for recend udev [0][1];
+3. Disable UEVENT_HELPER_PATH - legacy hook for hotplug, forked for each
+   uevent, slows down booting [0];
 
-Based similar work for the silk board by by Vladimir Barinov and
-Sergei Shtylyov.
+[0] http://cgit.freedesktop.org/systemd/systemd/tree/README
+[1] http://patchwork.ozlabs.org/patch/47921/
 
-Cc: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
-Testedon top of renesas-devel-20151126-v4.4-rc2.
-Read /dev/mtd0 with 512K blocks at 6.5Mb/s
----
- arch/arm/boot/dts/r8a7794-alt.dts | 45 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+ arch/arm/configs/exynos_defconfig | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
-index 767d9224d6cc..0dae87639328 100644
---- a/arch/arm/boot/dts/r8a7794-alt.dts
-+++ b/arch/arm/boot/dts/r8a7794-alt.dts
-@@ -138,6 +138,13 @@
- 	status = "okay";
- };
- 
-+&pfc {
-+	qspi_pins: spi0 {
-+		renesas,groups = "qspi_ctrl", "qspi_data4";
-+		renesas,function = "qspi";
-+	};
-+};
-+
- &ether {
- 	pinctrl-0 = <&ether_pins &phy1_pins>;
- 	pinctrl-names = "default";
-@@ -197,3 +204,41 @@
- 
- 	status = "okay";
- };
-+
-+&qspi {
-+	pinctrl-0 = <&qspi_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+
-+	flash at 0 {
-+		compatible = "spansion,s25fl512s", "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <30000000>;
-+		spi-tx-bus-width = <4>;
-+		spi-rx-bus-width = <4>;
-+		spi-cpol;
-+		spi-cpha;
-+		m25p,fast-read;
-+
-+		partitions {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			partition at 0 {
-+				label = "loader";
-+				reg = <0x00000000 0x00040000>;
-+				read-only;
-+			};
-+			partition at 40000 {
-+				label = "user";
-+				reg = <0x00040000 0x00400000>;
-+				read-only;
-+			};
-+			partition at 440000 {
-+				label = "flash";
-+				reg = <0x00440000 0x03bc0000>;
-+			};
-+		};
-+	};
-+};
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 409adc1eaf33..24dcd2bb1215 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -7,7 +7,6 @@ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_KALLSYMS_ALL=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+-# CONFIG_BLK_DEV_BSG is not set
+ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_ARCH_EXYNOS=y
+ CONFIG_ARCH_EXYNOS3=y
+@@ -44,7 +43,6 @@ CONFIG_IP_PNP_BOOTP=y
+ CONFIG_IP_PNP_RARP=y
+ CONFIG_CFG80211=y
+ CONFIG_RFKILL_REGULATOR=y
+-CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_DMA_CMA=y
+@@ -217,6 +215,7 @@ CONFIG_PHY_EXYNOS5250_SATA=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ CONFIG_EXT4_FS=y
++CONFIG_AUTOFS4_FS=y
+ CONFIG_MSDOS_FS=y
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
 -- 
-2.1.4
+1.9.1
