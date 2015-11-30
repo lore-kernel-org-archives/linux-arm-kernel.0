@@ -1,9 +1,9 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 30 Nov 2015 15:45:38 +0200
-Subject: [RFC v02 08/15] ARM: davinci: dm644x: Add dma_filter_map to edma
+Date: Mon, 30 Nov 2015 15:45:39 +0200
+Subject: [RFC v02 09/15] ARM: davinci: dm646x: Add dma_filter_map to edma
 In-Reply-To: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1448891145-10766-9-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1448891145-10766-10-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,39 +13,38 @@ for the devices.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-davinci/dm644x.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/mach-davinci/dm646x.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index d38f5049d56e..3550488b5bfd 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -11,6 +11,7 @@
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index 70eb42725eec..560841a0c4fa 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -9,6 +9,7 @@
+  * or implied.
+  */
+ #include <linux/dma-mapping.h>
++#include <linux/dmaengine.h>
  #include <linux/init.h>
  #include <linux/clk.h>
  #include <linux/serial_8250.h>
-+#include <linux/dmaengine.h>
- #include <linux/platform_device.h>
- #include <linux/platform_data/edma.h>
- #include <linux/platform_data/gpio-davinci.h>
-@@ -505,9 +506,20 @@ static s8 queue_priority_mapping[][2] = {
+@@ -540,9 +541,19 @@ static s8 dm646x_queue_priority_mapping[][2] = {
  	{-1, -1},
  };
  
-+static struct dma_filter_map da644x_edma_map[] = {
-+	DMA_FILTER_ENTRY("davinci-mcbsp", "tx", EDMA_CTLR_CHAN(0, 2)),
-+	DMA_FILTER_ENTRY("davinci-mcbsp", "rx", EDMA_CTLR_CHAN(0, 3)),
++static struct dma_filter_map da646x_edma_map[] = {
++	DMA_FILTER_ENTRY("davinci-mcasp.0", "tx", EDMA_CTLR_CHAN(0, 6)),
++	DMA_FILTER_ENTRY("davinci-mcasp.0", "rx", EDMA_CTLR_CHAN(0, 9)),
++	DMA_FILTER_ENTRY("davinci-mcasp.1", "tx", EDMA_CTLR_CHAN(0, 12)),
 +	DMA_FILTER_ENTRY("spi_davinci", "tx", EDMA_CTLR_CHAN(0, 16)),
 +	DMA_FILTER_ENTRY("spi_davinci", "rx", EDMA_CTLR_CHAN(0, 17)),
-+	DMA_FILTER_ENTRY("dm6441-mmc.0", "rx", EDMA_CTLR_CHAN(0, 26)),
-+	DMA_FILTER_ENTRY("dm6441-mmc.0", "tx", EDMA_CTLR_CHAN(0, 27)),
 +};
 +
- static struct edma_soc_info dm644x_edma_pdata = {
- 	.queue_priority_mapping	= queue_priority_mapping,
+ static struct edma_soc_info dm646x_edma_pdata = {
+ 	.queue_priority_mapping	= dm646x_queue_priority_mapping,
  	.default_queue		= EVENTQ_1,
-+	.filter_map		= da644x_edma_map,
-+	.filtercnt		= ARRAY_SIZE(da644x_edma_map),
++	.filter_map		= da646x_edma_map,
++	.filtercnt		= ARRAY_SIZE(da646x_edma_map),
  };
  
  static struct resource edma_resources[] = {
