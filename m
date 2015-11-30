@@ -1,26 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 30 Nov 2015 09:44:45 +0100
-Subject: [PATCH v2 7/7] pinctrl: Rename gpio driver from cygnus to iproc
-In-Reply-To: <1447905139-16002-8-git-send-email-pramodku@broadcom.com>
-References: <1447905139-16002-1-git-send-email-pramodku@broadcom.com>
- <1447905139-16002-8-git-send-email-pramodku@broadcom.com>
-Message-ID: <CACRpkdZmJC3K24VYj+zRg3J=XkiuZoWOdhsNN1mpBacBrsFYgA@mail.gmail.com>
+Date: Mon, 30 Nov 2015 09:47:03 +0100
+Subject: [PATCH v2] pinctrl: at91-pio4: use %pr format string for resource
+In-Reply-To: <5199877.GVYeflqET9@wuerfel>
+References: <5199877.GVYeflqET9@wuerfel>
+Message-ID: <CACRpkdZ4F8Loyoh6niCvkM=S8KcekTs8EvXRmB-0WxcRFw_8+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 19, 2015 at 4:52 AM, Pramod Kumar <pramodku@broadcom.com> wrote:
+On Wed, Nov 18, 2015 at 4:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> Rename gpio driver file name from pinctrl-cygnus-gpio.c to
-> pinctrl-iproc-gpio.c to make it more generic so that all
-> iproc based future SoCs using the same gpio block could
-> use this driver.
+> resource_size_t may be defined as 32 or 64 bit depending on configuration,
+> so it cannot be printed using the normal format strings, as gcc correctly
+> warns:
 >
-> Signed-off-by: Pramod Kumar <pramodku@broadcom.com>
-> Reviewed-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
-> Acked-by: Rob Herring <robh@kernel.org>
+> pinctrl-at91-pio4.c: In function 'atmel_pinctrl_probe':
+> pinctrl-at91-pio4.c:1003:41: warning: format '%u' expects argument of type 'unsigned int', but argument 5 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
+>    dev_dbg(dev, "bank %i: hwirq=%u\n", i, res->start);
+>
+> This changes the format string to use the special "%pr" format
+> string that prints a resource, and changes the arguments so we
+> the resource structure directly.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> v2: don't break ordering of arguments, that part was correct already, unlike
+> what I said in v1.
 
-Patch applied.
+Patch applied with Ludovic's review tag.
 
 Yours,
 Linus Walleij
