@@ -1,86 +1,103 @@
 From: sunil.kovvuri@gmail.com (Sunil Goutham)
-Date: Mon, 30 Nov 2015 23:49:09 +0530
-Subject: [PATCH 13/13] net: thunderx: Add rx timeout and rcv buffer alloc
- failure stats
+Date: Mon, 30 Nov 2015 23:49:02 +0530
+Subject: [PATCH 06/13] net: thunderx: Switchon carrier only upon interface
+ link up
 In-Reply-To: <y>
 References: <y>
-Message-ID: <1448907549-5296-14-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1448907549-5296-7-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thanneeru Srinivasulu <tsrinivasulu@caviumnetworks.com>
+From: Sunil Goutham <sgoutham@cavium.com>
 
-Instead of error message added counter for receive buffer allocation failures.
-Also added counter for transmit timeout event for debug purposes.
+Call netif_carrier_on() only if interface's link is up. Switching this on
+upon IFF_UP by default, is causing issues with ethernet channel bonding
+in LACP mode. Initial NETDEV_CHANGE notification was being skipped.
 
-Signed-off-by: Thanneeru Srinivasulu <tsrinivasulu@caviumnetworks.com>
+Also fixed some issues with link/speed/duplex reporting via ethtool.
+
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nic.h          |    3 +++
- .../net/ethernet/cavium/thunder/nicvf_ethtool.c    |    2 ++
- drivers/net/ethernet/cavium/thunder/nicvf_main.c   |    1 +
- drivers/net/ethernet/cavium/thunder/nicvf_queues.c |    3 +--
- 4 files changed, 7 insertions(+), 2 deletions(-)
+ .../net/ethernet/cavium/thunder/nicvf_ethtool.c    |   16 +++++++++++++++-
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   |    4 +---
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |    2 ++
+ 3 files changed, 18 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
-index e782856..defbf17 100644
---- a/drivers/net/ethernet/cavium/thunder/nic.h
-+++ b/drivers/net/ethernet/cavium/thunder/nic.h
-@@ -250,10 +250,13 @@ struct nicvf_drv_stats {
- 	u64 rx_frames_jumbo;
- 	u64 rx_drops;
- 
-+	u64 rcv_buffer_alloc_failures;
-+
- 	/* Tx */
- 	u64 tx_frames_ok;
- 	u64 tx_drops;
- 	u64 tx_tso;
-+	u64 tx_timeout;
- 	u64 txq_stop;
- 	u64 txq_wake;
- };
 diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
-index a12b2e3..d2d8ef2 100644
+index af54c10..a12b2e3 100644
 --- a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
 +++ b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
-@@ -89,9 +89,11 @@ static const struct nicvf_stat nicvf_drv_stats[] = {
- 	NICVF_DRV_STAT(rx_frames_1518),
- 	NICVF_DRV_STAT(rx_frames_jumbo),
- 	NICVF_DRV_STAT(rx_drops),
-+	NICVF_DRV_STAT(rcv_buffer_alloc_failures),
- 	NICVF_DRV_STAT(tx_frames_ok),
- 	NICVF_DRV_STAT(tx_tso),
- 	NICVF_DRV_STAT(tx_drops),
-+	NICVF_DRV_STAT(tx_timeout),
- 	NICVF_DRV_STAT(txq_stop),
- 	NICVF_DRV_STAT(txq_wake),
- };
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index a75f21f..a7e2951 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -1392,6 +1392,7 @@ static void nicvf_tx_timeout(struct net_device *dev)
- 		netdev_warn(dev, "%s: Transmit timed out, resetting\n",
- 			    dev->name);
+@@ -112,6 +112,13 @@ static int nicvf_get_settings(struct net_device *netdev,
  
-+	nic->drv_stats.tx_timeout++;
- 	schedule_work(&nic->reset_task);
+ 	cmd->supported = 0;
+ 	cmd->transceiver = XCVR_EXTERNAL;
++
++	if (!nic->link_up) {
++		cmd->duplex = DUPLEX_UNKNOWN;
++		ethtool_cmd_speed_set(cmd, SPEED_UNKNOWN);
++		return 0;
++	}
++
+ 	if (nic->speed <= 1000) {
+ 		cmd->port = PORT_MII;
+ 		cmd->autoneg = AUTONEG_ENABLE;
+@@ -125,6 +132,13 @@ static int nicvf_get_settings(struct net_device *netdev,
+ 	return 0;
  }
  
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-index 4e9709e..28df11a 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-@@ -96,8 +96,7 @@ static inline int nicvf_alloc_rcv_buffer(struct nicvf *nic, gfp_t gfp,
- 		nic->rb_page = alloc_pages(gfp | __GFP_COMP | __GFP_NOWARN,
- 					   order);
- 		if (!nic->rb_page) {
--			netdev_err(nic->netdev,
--				   "Failed to allocate new rcv buffer\n");
-+			nic->drv_stats.rcv_buffer_alloc_failures++;
- 			return -ENOMEM;
- 		}
- 		nic->rb_page_offset = 0;
++static u32 nicvf_get_link(struct net_device *netdev)
++{
++	struct nicvf *nic = netdev_priv(netdev);
++
++	return nic->link_up;
++}
++
+ static void nicvf_get_drvinfo(struct net_device *netdev,
+ 			      struct ethtool_drvinfo *info)
+ {
+@@ -660,7 +674,7 @@ static int nicvf_set_channels(struct net_device *dev,
+ 
+ static const struct ethtool_ops nicvf_ethtool_ops = {
+ 	.get_settings		= nicvf_get_settings,
+-	.get_link		= ethtool_op_get_link,
++	.get_link		= nicvf_get_link,
+ 	.get_drvinfo		= nicvf_get_drvinfo,
+ 	.get_msglevel		= nicvf_get_msglevel,
+ 	.set_msglevel		= nicvf_set_msglevel,
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+index 7f709cb..dde8dc7 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+@@ -1057,6 +1057,7 @@ int nicvf_stop(struct net_device *netdev)
+ 
+ 	netif_carrier_off(netdev);
+ 	netif_tx_stop_all_queues(nic->netdev);
++	nic->link_up = false;
+ 
+ 	/* Teardown secondary qsets first */
+ 	if (!nic->sqs_mode) {
+@@ -1211,9 +1212,6 @@ int nicvf_open(struct net_device *netdev)
+ 	nic->drv_stats.txq_stop = 0;
+ 	nic->drv_stats.txq_wake = 0;
+ 
+-	netif_carrier_on(netdev);
+-	netif_tx_start_all_queues(netdev);
+-
+ 	return 0;
+ cleanup:
+ 	nicvf_disable_intr(nic, NICVF_INTR_MBOX, 0);
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+index 2076ac3..d9f27ad 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+@@ -612,6 +612,8 @@ static void bgx_poll_for_link(struct work_struct *work)
+ 		lmac->last_duplex = 1;
+ 	} else {
+ 		lmac->link_up = 0;
++		lmac->last_speed = SPEED_UNKNOWN;
++		lmac->last_duplex = DUPLEX_UNKNOWN;
+ 	}
+ 
+ 	if (lmac->last_link != lmac->link_up) {
 -- 
 1.7.1
