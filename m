@@ -1,38 +1,37 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 30 Nov 2015 10:58:43 +0530
-Subject: [PATCH v12 05/16] arm64: Add back cpu_reset routines
-In-Reply-To: <56586679.8060403@arm.com>
-References: <cover.1448403503.git.geoff@infradead.org>
- <3279584774ba40f088b79f4df864d69a5b57b516.1448403503.git.geoff@infradead.org>
- <56586679.8060403@arm.com>
-Message-ID: <20151130052843.GG23908@dhcppc13.redhat.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 30 Nov 2015 11:02:06 +0530
+Subject: [PATCH 4/4] cpufreq: mt8173: move resources allocation into
+ ->probe()
+In-Reply-To: <CAAJzSMeYKGLkVoh0_zPLpVekQpc2rR5ud9YNCPJxRaJRCNX2nQ@mail.gmail.com>
+References: <CAAJzSMeYKGLkVoh0_zPLpVekQpc2rR5ud9YNCPJxRaJRCNX2nQ@mail.gmail.com>
+Message-ID: <20151130053206.GL3373@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/11/2015:02:19:37 PM, Marc Zyngier wrote:
-> On 24/11/15 22:25, Geoff Levand wrote:
-> > +ENTRY(cpu_soft_restart)
-> > +	mov	x18, x0				// cpu_reset
-> > +	mov	x0, x1				// el2_switch
-> > +	mov	x1, x2				// entry
-> > +	mov	x2, x3				// arg0
-> > +	mov	x3, x4				// arg1
-> > +	ret	x18
-> > +ENDPROC(cpu_soft_restart)
+On 30-11-15, 11:02, Ricky Liang wrote:
+> On Sun, Nov 29, 2015 at 4:31 PM, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
+> >         ret = cpufreq_register_driver(&mt8173_cpufreq_driver);
+> >         if (ret)
+> >                 pr_err("failed to register mtk cpufreq driver\n");
 > 
-> Grepping through the tree, I can only find a single use of
-> cpu_soft_restart, with cpu_reset as its first parameter.
-> 
-> Why do we need this indirection? Having
+> I think you want "return ret;" inside the if block.
 
-It is needed because we need to execute cpu_reset() in physical address space.
+Not just that, he needs to jump to release_dvfs_info_list.
 
-> 
-> void cpu_soft_restart(el2_switch, entry, arg0, arg1);
-> 
-> should be enough...
+> >
+> > +       return 0;
+> > +
+> > +release_dvfs_info_list:
+> > +       list_for_each_safe(list, tmp, &dvfs_info_list) {
+> > +               info = list_entry(list, struct mtk_cpu_dvfs_info, list_head);
+> > +
+> > +               mtk_cpu_dvfs_info_release(info);
+> > +               list_del(list);
+> > +               kfree(info);
+> > +       }
+> > +
+> >         return ret;
+> >  }
 
-We can do with only cpu_soft_restart(), but then a function pointer to __pa() of
-it need to be called. May  be current approach is more cleaner.
-
-~Pratyush
+-- 
+viresh
