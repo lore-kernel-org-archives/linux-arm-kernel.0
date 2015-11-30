@@ -1,61 +1,38 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Sun, 29 Nov 2015 16:29:29 -0800
-Subject: [PATCH v3] clocksource: arm_global_timer: fix suspend resume
-In-Reply-To: <1448653624-25006-1-git-send-email-grygorii.strashko@ti.com>
-References: <1448653624-25006-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <565B9869.10800@oracle.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 30 Nov 2015 09:38:30 +0900
+Subject: [PATCH 06/18] arm64: renesas: r8a7795: add I2C support
+In-Reply-To: <CAMuHMdU0eKSe9_sRnw8nxuMPz8i0B0vLQzBDbOxTQ9Nb85M9jg@mail.gmail.com>
+References: <cover.1448587800.git.horms+renesas@verge.net.au>
+ <32bc0c51be7c9db3762cbb34af465676c769886b.1448587800.git.horms+renesas@verge.net.au>
+ <CAMuHMdU0eKSe9_sRnw8nxuMPz8i0B0vLQzBDbOxTQ9Nb85M9jg@mail.gmail.com>
+Message-ID: <20151130003829.GC3501@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/15 11:47 AM, Grygorii Strashko wrote:
-> Now the System stall is observed on TI AM437x based board
-> (am437x-gp-evm) during resuming from System suspend when ARM Global
-> timer is selected as clocksource device (CPUIdle not enabled) - SysRq are working,
-> but nothing else.
->
-> The reason of stall is that ARM Global timer loses its contexts during
-> System suspend:
->     GT_CONTROL.TIMER_ENABLE = 0 (unbanked)
->     GT_COUNTERx = 0
->
-> Hence, update ARM Global timer driver to reflect above behaviour
-> - re-enable ARM Global timer on resume GT_CONTROL.TIMER_ENABLE = 1.
->
-> CC: Arnd Bergmann <arnd@arndb.de>
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
-> Changes in v3:
->   - dropped all DT specific code
-> Changes in v2:
->   - suspend/resume simplified: nothing is stored any more and
->     ARM GT just re-enabled
-> Link on v2:
->   https://lkml.org/lkml/2015/11/20/355
-> Link on v1:
->   https://lkml.org/lkml/2015/11/13/456
->
-Looks reasonable to me.
->   drivers/clocksource/arm_global_timer.c | 7 +++++++
->   1 file changed, 7 insertions(+)
->
-> diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
-> index a2cb6fa..10d1417 100644
-> --- a/drivers/clocksource/arm_global_timer.c
-> +++ b/drivers/clocksource/arm_global_timer.c
-> @@ -195,12 +195,19 @@ static cycle_t gt_clocksource_read(struct clocksource *cs)
->   	return gt_counter_read();
->   }
->
-> +static void gt_resume(struct clocksource *cs)
-> +{
-> +	/* re-enable timer on resume */
-> +	writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
+On Fri, Nov 27, 2015 at 09:17:07AM +0100, Geert Uytterhoeven wrote:
+> On Fri, Nov 27, 2015 at 2:55 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> >
+> > Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > [geert: aAdd clock-output-names properties]
+> 
+> That part is no longer true.
 
-Check if its disabled before enabling it.
-Other than that,
-Reviewed-by: Santosh Shilimkar <ssantosh@kernel.org>
+Oops. I'll drop that if there is a need to repost this pull-request.
+
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
