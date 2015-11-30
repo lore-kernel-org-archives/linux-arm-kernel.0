@@ -1,33 +1,30 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 30 Nov 2015 13:40:27 +0100
-Subject: [PATCH 1/2] ARM: mvebu: update v5 defconfig
-In-Reply-To: <20151125143954.GD11384@lunn.ch> (Andrew Lunn's message of "Wed,
- 25 Nov 2015 15:39:54 +0100")
-References: <1448461036-16724-1-git-send-email-linus.walleij@linaro.org>
- <20151125143954.GD11384@lunn.ch>
-Message-ID: <87a8pv7j9g.fsf@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 30 Nov 2015 13:51:56 +0100
+Subject: [PATCH] staging: ste_rmi4: avoid unused function warnings
+In-Reply-To: <4938658.kvPtQAFlP6@wuerfel>
+References: <4938658.kvPtQAFlP6@wuerfel>
+Message-ID: <CACRpkdZra=A_axSueevK8On+abwtAdO5B2-C_94D2p3qjDykuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
- 
- On mer., nov. 25 2015, Andrew Lunn <andrew@lunn.ch> wrote:
-[...]
-> Humm
+On Fri, Nov 20, 2015 at 10:59 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+
+> The rmi4 touchscreen driver encloses the power-management
+> functions in #ifdef CONFIG_PM, but the smtcfb_pci_suspend/resume
+> functions are only really used when CONFIG_PM_SLEEP is also
+> set, as a frequent gcc warning shows:
 >
-> I think i will be sending a follow-up patch to re-enable these things.
-> Add the missing dependencies.
+> ste_rmi4/synaptics_i2c_rmi4.c:1050:12: warning: 'synaptics_rmi4_suspend' defined but not used
+> ste_rmi4/synaptics_i2c_rmi4.c:1084:12: warning: 'synaptics_rmi4_resume' defined but not used
+>
+> This changes the driver to remove the #ifdef and instead mark
+> the functions as __maybe_unused, which is a nicer anyway, as it
+> provides build testing for all the code in all configurations
+> and is harder to get wrong.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Does it means thay you agree with this series?
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-If you do, then I am going tp apply it on mvebu/defconfig.
-
-Thanks,
-
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Yours,
+Linus Walleij
