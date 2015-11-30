@@ -1,25 +1,20 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 30 Nov 2015 16:50:54 +0800
-Subject: [PATCH v2 0/3] dmaengine: Add supports for APM X-Gene SoC CRC32C
- accerlerator driver
-In-Reply-To: <CAFd313z2dncWmBQJY48RkReVOhQqLs13UzehwrbizBbputOSEw@mail.gmail.com>
-References: <rsahu@apm.com> <1447665169-14003-1-git-send-email-rsahu@apm.com>
- <CAFd313zqimQtG8epeo3U7gzxWRf0hqO4K8hOFy4UK-6pG5GcJg@mail.gmail.com>
- <20151130083950.GA7792@gondor.apana.org.au>
- <CAFd313z2dncWmBQJY48RkReVOhQqLs13UzehwrbizBbputOSEw@mail.gmail.com>
-Message-ID: <20151130085054.GA7928@gondor.apana.org.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 30 Nov 2015 09:54:10 +0100
+Subject: [PATCH 0/4] gpio: lpc32xx: add new LPC32xx GPIO controller driver
+In-Reply-To: <1447982995-30231-1-git-send-email-vz@mleia.com>
+References: <1447982995-30231-1-git-send-email-vz@mleia.com>
+Message-ID: <CACRpkdYN+_2qrP3tDDj2SxDAEJr05FnPLKyFPEF9BGdVyQdTuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 02:19:33PM +0530, Rameshwar Sahu wrote:
->
-> One of our client is using this layer for offloading the crc32c to our
-> dmaengine hw.
+On Fri, Nov 20, 2015 at 2:29 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
 
-Is this going to be merged into the kernel?
+> Unfortunately the old driver has too many hacks inherited from the
+> ancient legacy NXP BSP and I find it can not be maintained, the new
+> driver has compatible interface to device tree clients, so moving
+> to the new driver should not impact any GPIO consumers.
 
-Cheers,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Has it been tested on the old hardware too?
+
+Yours,
+Linus Walleij
