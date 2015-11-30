@@ -1,154 +1,182 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 30 Nov 2015 13:28:23 +0100
-Subject: [PATCH v4 09/13] ARM: add support for non-global kernel mappings
-In-Reply-To: <1448886507-3216-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1448886507-3216-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1448886507-3216-10-git-send-email-ard.biesheuvel@linaro.org>
+Date: Mon, 30 Nov 2015 13:28:14 +0100
+Subject: [PATCH v4 00/13] UEFI boot and runtime services support for 32-bit ARM
+Message-ID: <1448886507-3216-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to the kernel translation table population routines for
-creating non-global mappings. This will be used by the UEFI runtime
-services, which will use temporary mappings in the userland range.
+This series adds support for booting the 32-bit ARM kernel directly from
+UEFI firmware using a builtin UEFI stub. It mostly reuses refactored arm64
+code, and the differences (primarily the PE/COFF header and entry point and
+the efi_create_mapping() implementation) are split out into arm64 and ARM
+versions.
 
-Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/mm/mmu.c | 35 +++++++++++---------
- 1 file changed, 20 insertions(+), 15 deletions(-)
+Since I did not receive any further comments in reply to v3 from the people who
+commented on v2, I think this series in now in sufficient shape to be pulled.
+Note that patch #1 touches mm/memblock.c and include/linux/memblock.h, for which
+get_maintainer.pl does not provide a maintainer, so it has been cc'ed to various
+past editors of those files, and to the linux-mm mailing list.
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 87dc49dbe231..2d9f628a7fe8 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -745,18 +745,20 @@ static pte_t * __init early_pte_alloc(pmd_t *pmd, unsigned long addr,
- static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 				  unsigned long end, unsigned long pfn,
- 				  const struct mem_type *type,
--				  void *(*alloc)(unsigned long sz))
-+				  void *(*alloc)(unsigned long sz),
-+				  bool ng)
- {
- 	pte_t *pte = pte_alloc(pmd, addr, type->prot_l1, alloc);
- 	do {
--		set_pte_ext(pte, pfn_pte(pfn, __pgprot(type->prot_pte)), 0);
-+		set_pte_ext(pte, pfn_pte(pfn, __pgprot(type->prot_pte)),
-+			    ng ? PTE_EXT_NG : 0);
- 		pfn++;
- 	} while (pte++, addr += PAGE_SIZE, addr != end);
- }
- 
- static void __init __map_init_section(pmd_t *pmd, unsigned long addr,
- 			unsigned long end, phys_addr_t phys,
--			const struct mem_type *type)
-+			const struct mem_type *type, bool ng)
- {
- 	pmd_t *p = pmd;
- 
-@@ -774,7 +776,7 @@ static void __init __map_init_section(pmd_t *pmd, unsigned long addr,
- 		pmd++;
- #endif
- 	do {
--		*pmd = __pmd(phys | type->prot_sect);
-+		*pmd = __pmd(phys | type->prot_sect | (ng ? PMD_SECT_nG : 0));
- 		phys += SECTION_SIZE;
- 	} while (pmd++, addr += SECTION_SIZE, addr != end);
- 
-@@ -784,7 +786,7 @@ static void __init __map_init_section(pmd_t *pmd, unsigned long addr,
- static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
- 				      unsigned long end, phys_addr_t phys,
- 				      const struct mem_type *type,
--				      void *(*alloc)(unsigned long sz))
-+				      void *(*alloc)(unsigned long sz), bool ng)
- {
- 	pmd_t *pmd = pmd_offset(pud, addr);
- 	unsigned long next;
-@@ -802,10 +804,10 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
- 		 */
- 		if (type->prot_sect &&
- 				((addr | next | phys) & ~SECTION_MASK) == 0) {
--			__map_init_section(pmd, addr, next, phys, type);
-+			__map_init_section(pmd, addr, next, phys, type, ng);
- 		} else {
- 			alloc_init_pte(pmd, addr, next,
--				       __phys_to_pfn(phys), type, alloc);
-+				       __phys_to_pfn(phys), type, alloc, ng);
- 		}
- 
- 		phys += next - addr;
-@@ -816,14 +818,14 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
- static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
- 				  unsigned long end, phys_addr_t phys,
- 				  const struct mem_type *type,
--				  void *(*alloc)(unsigned long sz))
-+				  void *(*alloc)(unsigned long sz), bool ng)
- {
- 	pud_t *pud = pud_offset(pgd, addr);
- 	unsigned long next;
- 
- 	do {
- 		next = pud_addr_end(addr, end);
--		alloc_init_pmd(pud, addr, next, phys, type, alloc);
-+		alloc_init_pmd(pud, addr, next, phys, type, alloc, ng);
- 		phys += next - addr;
- 	} while (pud++, addr = next, addr != end);
- }
-@@ -831,7 +833,8 @@ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
- #ifndef CONFIG_ARM_LPAE
- static void __init create_36bit_mapping(struct mm_struct *mm,
- 					struct map_desc *md,
--					const struct mem_type *type)
-+					const struct mem_type *type,
-+					bool ng)
- {
- 	unsigned long addr, length, end;
- 	phys_addr_t phys;
-@@ -879,7 +882,8 @@ static void __init create_36bit_mapping(struct mm_struct *mm,
- 		int i;
- 
- 		for (i = 0; i < 16; i++)
--			*pmd++ = __pmd(phys | type->prot_sect | PMD_SECT_SUPER);
-+			*pmd++ = __pmd(phys | type->prot_sect | PMD_SECT_SUPER |
-+				       (ng ? PMD_SECT_nG : 0));
- 
- 		addr += SUPERSECTION_SIZE;
- 		phys += SUPERSECTION_SIZE;
-@@ -889,7 +893,8 @@ static void __init create_36bit_mapping(struct mm_struct *mm,
- #endif	/* !CONFIG_ARM_LPAE */
- 
- static void __init __create_mapping(struct mm_struct *mm, struct map_desc *md,
--				    void *(*alloc)(unsigned long sz))
-+				    void *(*alloc)(unsigned long sz),
-+				    bool ng)
- {
- 	unsigned long addr, length, end;
- 	phys_addr_t phys;
-@@ -903,7 +908,7 @@ static void __init __create_mapping(struct mm_struct *mm, struct map_desc *md,
- 	 * Catch 36-bit addresses
- 	 */
- 	if (md->pfn >= 0x100000) {
--		create_36bit_mapping(mm, md, type);
-+		create_36bit_mapping(mm, md, type, ng);
- 		return;
- 	}
- #endif
-@@ -923,7 +928,7 @@ static void __init __create_mapping(struct mm_struct *mm, struct map_desc *md,
- 	do {
- 		unsigned long next = pgd_addr_end(addr, end);
- 
--		alloc_init_pud(pgd, addr, next, phys, type, alloc);
-+		alloc_init_pud(pgd, addr, next, phys, type, alloc, ng);
- 
- 		phys += next - addr;
- 		addr = next;
-@@ -952,7 +957,7 @@ static void __init create_mapping(struct map_desc *md)
- 			(long long)__pfn_to_phys((u64)md->pfn), md->virtual);
- 	}
- 
--	__create_mapping(&init_mm, md, early_alloc);
-+	__create_mapping(&init_mm, md, early_alloc, false);
- }
- 
- /*
--- 
-1.9.1
+Since the series affects both arm64 and ARM, it is up to the maintainers to let
+me know how and when they wish to proceed with this. My suggestion would be to
+send out pull request for patches #1 - #5 to the arm64 maintainer, and for the
+whole series to the ARM maintainer. This should keep any conflicts on either
+side confined to the respective maintainer tree, rather then propagating all the
+way to -next.
+
+For the result of regression testing against these patches, please refer to the
+following links for build and boot reports (respectively) generated by
+kernelci.org (thanks guys). 
+
+http://kernelci.org/build/ardb/kernel/v4.4-rc3-13-g9e4dc4695ba0/
+http://kernelci.org/boot/all/job/ardb/kernel/v4.4-rc3-13-g9e4dc4695ba0/
+
+Note that the above is regression testing only, as kernelci does not yet support
+booting 32-bit ARM targets in EFI mode. This functionality has been verified
+independently (on actual hardware) by Ryan Harkin <ryan.harkin@linaro.org>, who
+has kindly given his Tested-by for the ARM patches in this series (#6 - #13)
+
+Please find instructions for duplicating the EFI boot testing using QEMU at the
+end of this email.
+
+Changes since v3:
+- rebased onto v4.4-rc3
+- minor change in #13: use 'dram_base + MAX_UNCOMP_KERNEL_SIZE' as preferred
+  base for the allocation that holds the relocated compressed kernel image
+  (the former value of 0x0 is usually not covered by DRAM, resulting in the
+  value above to be used anyway)
+- added Reviewed-by from Matt Fleming
+- added Tested-by from Ryan Harkin (#6 - #13)
+
+Changes since v2:
+- Some issues pointed out by Russell and Matt that were not introduced by this
+  series but merely became apparent due to the code movement in patch #4 have
+  been addressed in a separate 2-piece series I sent out this morning. This v3
+  is rebased on top of those patches.
+- Added a patch (#9) that adds support for creating non-global mappings. This
+  addresses a concern raised by Russell in response to v2 where the use of
+  global mappings combined with a flawed context switch and TBL flush sequence
+  could result in memory corruption.
+- Rebased onto v4.4-rc2
+
+Changes since v1:
+- The primary difference between this version and the first one is that all
+  prerequisites have either been merged, dropped for now (early FDT handling)
+  or folded into this series (MEMBLOCK_NOMAP). IOW, this series can be applied
+  on top of v4.4-rc1 directly.
+- Dropped handling of UEFI permission bits. The reason is that the UEFIv2.5
+  approach (EFI_PROPERTIES_TABLE) is flawed, and will be replaced by something
+  better in the next version of the spec.
+
+Patch #1 adds support for the MEMBLOCK_NOMAP attribute to the generic memblock
+code. Its purpose is to annotate memory regions as normal memory even if they
+are removed from the kernel direct mapping.
+
+Patch #2 implements MEMBLOCK_NOMAP support for arm64
+
+Patch #3 updates the EFI init code to remove UEFI reserved regions and regions
+used by runtime services from the kernel direct mapping
+
+Patch #4 splits off most of arch/arm64/kernel/efi.c into arch agnostic files
+arm-init.c and arm-runtime.c under drivers/firmware/efi.
+
+Patch #5 refactors the code split off in patch #1 to isolate the arm64 specific
+pieces, and change a couple of arm64-isms that ARM handles slightly differently.
+
+Patch #6 enables the generic early_ioremap and early_memremap implementations
+for ARM. It reuses the kmap fixmap region, which is not used that early anyway.
+
+Patch #7 splits off the core functionality of create_mapping() into a new
+function __create_mapping() that we can reuse for mapping UEFI runtime regions.
+
+Patch #8 factors out the early_alloc() routine so we can invoke __create_mapping
+using another (late) allocator.
+
+Patch #9 adds support to __create_mapping() for creating non-global translation
+table entries. (new in v3)
+
+Patch #10 implements create_mapping_late() that uses a late allocator.
+
+Patch #11 implements MEMBLOCK_NOMAP support for ARM
+
+Patch #12 implements the UEFI support in the kernel proper to probe the UEFI
+memory map and map the runtime services.
+
+Patch #13 ties together all of the above, by implementing the UEFI stub, and
+introducing the Kconfig symbols that allow all of this to be built.
+
+
+Ard Biesheuvel (12):
+  mm/memblock: add MEMBLOCK_NOMAP attribute to memblock memory table
+  arm64: only consider memblocks with NOMAP cleared for linear mapping
+  arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP
+  arm64/efi: split off EFI init and runtime code for reuse by 32-bit ARM
+  arm64/efi: refactor EFI init and runtime code for reuse by 32-bit ARM
+  ARM: add support for generic early_ioremap/early_memremap
+  ARM: split off core mapping logic from create_mapping
+  ARM: factor out allocation routine from __create_mapping()
+  ARM: add support for non-global kernel mappings
+  ARM: implement create_mapping_late() for EFI use
+  ARM: only consider memblocks with NOMAP cleared for linear mapping
+  ARM: wire up UEFI init and runtime support
+
+Roy Franz (1):
+  ARM: add UEFI stub support
+
+ arch/arm/Kconfig                          |  20 ++
+ arch/arm/boot/compressed/Makefile         |   4 +-
+ arch/arm/boot/compressed/efi-header.S     | 130 ++++++++
+ arch/arm/boot/compressed/head.S           |  54 +++-
+ arch/arm/boot/compressed/vmlinux.lds.S    |   7 +
+ arch/arm/include/asm/Kbuild               |   1 +
+ arch/arm/include/asm/efi.h                |  83 +++++
+ arch/arm/include/asm/fixmap.h             |  29 +-
+ arch/arm/include/asm/mach/map.h           |   2 +
+ arch/arm/include/asm/mmu_context.h        |   2 +-
+ arch/arm/kernel/Makefile                  |   1 +
+ arch/arm/kernel/efi.c                     |  38 +++
+ arch/arm/kernel/setup.c                   |  10 +-
+ arch/arm/mm/init.c                        |   5 +-
+ arch/arm/mm/ioremap.c                     |   9 +
+ arch/arm/mm/mmu.c                         | 128 +++++---
+ arch/arm64/include/asm/efi.h              |   9 +
+ arch/arm64/kernel/efi.c                   | 334 +-------------------
+ arch/arm64/mm/init.c                      |   2 +-
+ arch/arm64/mm/mmu.c                       |   2 +
+ drivers/firmware/efi/Makefile             |   4 +
+ drivers/firmware/efi/arm-init.c           | 209 ++++++++++++
+ drivers/firmware/efi/arm-runtime.c        | 135 ++++++++
+ drivers/firmware/efi/efi.c                |   2 +
+ drivers/firmware/efi/libstub/Makefile     |   9 +
+ drivers/firmware/efi/libstub/arm-stub.c   |   4 +-
+ drivers/firmware/efi/libstub/arm32-stub.c |  85 +++++
+ include/linux/memblock.h                  |   8 +
+ mm/memblock.c                             |  28 ++
+ 29 files changed, 986 insertions(+), 368 deletions(-)
+ create mode 100644 arch/arm/boot/compressed/efi-header.S
+ create mode 100644 arch/arm/include/asm/efi.h
+ create mode 100644 arch/arm/kernel/efi.c
+ create mode 100644 drivers/firmware/efi/arm-init.c
+ create mode 100644 drivers/firmware/efi/arm-runtime.c
+ create mode 100644 drivers/firmware/efi/libstub/arm32-stub.c
+
+
+Testing instructions
+====================
+
+1. Download a prebuilt firmware binary:
+http://snapshots.linaro.org/components/kernel/leg-virt-tianocore-edk2-upstream/latest/QEMU-ARM/RELEASE_GCC49/QEMU_EFI.img.gz
+
+2. Unzip it
+gunzip QEMU_EFI.img.gz
+
+3. Download a prebuilt kernel binary (non-LPAE or LPAE, respectively):
+http://storage.kernelci.org/ardb/v4.4-rc3-13-g9e4dc4695ba0/arm-multi_v7_defconfig+CONFIG_EFI=y/zImage
+http://storage.kernelci.org/ardb/v4.4-rc3-13-g9e4dc4695ba0/arm-multi_v7_defconfig+CONFIG_EFI=y+CONFIG_ARM_LPAE=y/zImage
+
+4. Run it
+qemu-system-arm -M virt -m 512 -nographic \
+	-bios QEMU_EFI.img -kernel zImage \
+	-append 'earlycon efi=debug console=ttyAMA0'
+
+(Ctrl-A Ctrl-X to quit)
