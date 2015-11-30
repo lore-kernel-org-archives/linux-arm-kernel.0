@@ -1,75 +1,73 @@
-From: andrew-ct.chen@mediatek.com (andrew-ct chen)
-Date: Mon, 30 Nov 2015 19:43:39 +0800
-Subject: [RESEND RFC/PATCH 3/8] media: platform: mtk-vpu: Support
- Mediatek VPU
-In-Reply-To: <56584AC5.7020704@linaro.org>
-References: <1447764885-23100-1-git-send-email-tiffany.lin@mediatek.com>
- <1447764885-23100-4-git-send-email-tiffany.lin@mediatek.com>
- <5655DDB4.2080002@linaro.org> <1448626209.7734.26.camel@mtksdaap41>
- <56584AC5.7020704@linaro.org>
-Message-ID: <1448883819.15961.7.camel@mtksdaap41>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 30 Nov 2015 13:51:46 +0200
+Subject: [PATCH v3] clocksource: arm_global_timer: fix suspend resume
+In-Reply-To: <565B9869.10800@oracle.com>
+References: <1448653624-25006-1-git-send-email-grygorii.strashko@ti.com>
+ <565B9869.10800@oracle.com>
+Message-ID: <565C3852.4000605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-11-27 at 12:21 +0000, Daniel Thompson wrote:
-> On 27/11/15 12:10, andrew-ct chen wrote:
-> >>> +
-> >>> > >+	memcpy((void *)send_obj->share_buf, buf, len);
-> >>> > >+	send_obj->len = len;
-> >>> > >+	send_obj->id = id;
-> >>> > >+	vpu_cfg_writel(vpu, 0x1, HOST_TO_VPU);
-> >>> > >+
-> >>> > >+	/* Wait until VPU receives the command */
-> >>> > >+	timeout = jiffies + msecs_to_jiffies(IPI_TIMEOUT_MS);
-> >>> > >+	do {
-> >>> > >+		if (time_after(jiffies, timeout)) {
-> >>> > >+			dev_err(vpu->dev, "vpu_ipi_send: IPI timeout!\n");
-> >>> > >+			return -EIO;
-> >>> > >+		}
-> >>> > >+	} while (vpu_cfg_readl(vpu, HOST_TO_VPU));
-> >> >
-> >> >Do we need to busy wait every time we communicate with the co-processor?
-> >> >Couldn't we put this wait*before*  we write to HOST_TO_VPU above.
-> >> >
-> >> >That way we only spin when there is a need to.
-> >> >
-> > Since the hardware VPU only allows that one client sends the command to
-> > it each time.
-> > We need the wait to make sure VPU accepted the command and cleared the
-> > interrupt and then the next command would be served.
-> 
-> I understand that the VPU  can only have on message outstanding at once.
-> 
-> I just wonder why we busy wait *after* sending the first command rather 
-> than *before* sending the second one.
+On 11/30/2015 02:29 AM, santosh.shilimkar at oracle.com wrote:
+> On 11/27/15 11:47 AM, Grygorii Strashko wrote:
+>> Now the System stall is observed on TI AM437x based board
+>> (am437x-gp-evm) during resuming from System suspend when ARM Global
+>> timer is selected as clocksource device (CPUIdle not enabled) - SysRq
+>> are working,
+>> but nothing else.
+>>
+>> The reason of stall is that ARM Global timer loses its contexts during
+>> System suspend:
+>>     GT_CONTROL.TIMER_ENABLE = 0 (unbanked)
+>>     GT_COUNTERx = 0
+>>
+>> Hence, update ARM Global timer driver to reflect above behaviour
+>> - re-enable ARM Global timer on resume GT_CONTROL.TIMER_ENABLE = 1.
+>>
+>> CC: Arnd Bergmann <arnd@arndb.de>
+>> Cc: John Stultz <john.stultz@linaro.org>
+>> Cc: Felipe Balbi <balbi@ti.com>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Santosh Shilimkar <ssantosh@kernel.org>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>> ---
+>> Changes in v3:
+>>   - dropped all DT specific code
+>> Changes in v2:
+>>   - suspend/resume simplified: nothing is stored any more and
+>>     ARM GT just re-enabled
+>> Link on v2:
+>>   https://lkml.org/lkml/2015/11/20/355
+>> Link on v1:
+>>   https://lkml.org/lkml/2015/11/13/456
+>>
+> Looks reasonable to me.
+>>   drivers/clocksource/arm_global_timer.c | 7 +++++++
+>>   1 file changed, 7 insertions(+)
+>>
+>> diff --git a/drivers/clocksource/arm_global_timer.c
+>> b/drivers/clocksource/arm_global_timer.c
+>> index a2cb6fa..10d1417 100644
+>> --- a/drivers/clocksource/arm_global_timer.c
+>> +++ b/drivers/clocksource/arm_global_timer.c
+>> @@ -195,12 +195,19 @@ static cycle_t gt_clocksource_read(struct
+>> clocksource *cs)
+>>       return gt_counter_read();
+>>   }
+>>
+>> +static void gt_resume(struct clocksource *cs)
+>> +{
+>> +    /* re-enable timer on resume */
+>> +    writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
+>
+> Check if its disabled before enabling it.
+> Other than that,
+> Reviewed-by: Santosh Shilimkar <ssantosh@kernel.org>
 
-No other special reasons. Just send one command and wait until VPU gets
-the command. Then, I think this wait also can be put before we write to
-HOST_TO_VPU.Is this better than former? May I know the reason?
+Sure, I'll update.
 
-
-> 
-> Streamed decode/encode typically ends up being rate controlled by 
-> capture or display meaning that in these cases we don't need to busy 
-> wait at all (because by the time we send the next frame the VPU has 
-> already accepted the previous message).
-
-For now, only one device "encoder" exists, it is true.
-But, we'll have encoder and decoder devices, the decode and encode
-requested to VPU are simultaneous.
-Is this supposed to be removed for this patches and we can add it back
-if the another device(decoder) is ready for review?
-
-
-Andrew
-
-
-> 
-> 
-> Daniel.
-> 
-> 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+Thanks.
+-- 
+regards,
+-grygorii
