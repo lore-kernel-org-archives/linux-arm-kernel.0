@@ -1,97 +1,53 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Mon, 30 Nov 2015 12:39:39 +0530
-Subject: [PATCH v4 1/8] thermal: qcom: tsens: Add a skeletal TSENS drivers
-In-Reply-To: <563AFCE9.8020000@codeaurora.org>
-References: <1444383670-32693-1-git-send-email-rnayak@codeaurora.org>
- <1444383670-32693-2-git-send-email-rnayak@codeaurora.org>
- <20151102203021.GB4469@localhost.localdomain>
- <563AFCE9.8020000@codeaurora.org>
-Message-ID: <565BF633.7070701@codeaurora.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 30 Nov 2015 16:10:55 +0900
+Subject: [PATCH] CLK: s3c2410: removed unneeded code in
+ s3c24xx_clkout_set_parent
+In-Reply-To: <20151130070044.GA23071@jci-VirtualBox>
+References: <20151130070044.GA23071@jci-VirtualBox>
+Message-ID: <565BF67F.3070705@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[]..
+On 30.11.2015 16:01, Mutharaju, Prasanna (P.) wrote:
+> From: Prasanna Karthik <mkarthi3@visteon.com>
+> 
+> Remove unneeded variable used to store return value.
+> 
+> Signed-off-by: Prasanna Karthik <mkarthi3@visteon.com>
 
->>> +Optional properties:
->>> +- qcom,sensor-id: List of sensor instances used in a given SoC. A TSENS IP can
->>> +		  have a fixed number of sensors (like 11) but a given SoC can
->>> +		  use only 5 of these and they might not always the first 5. They
->>> +		  could be sensors 0, 1, 4, 8 and 9. This property is used to
->>> +		  describe the subset of the sensors used. If this property is
->>> +		  missing they are assumed to be the first 'n' sensors numbered
->>> +		  sequentially in which case the number of sensors defaults to
->>> +		  the number of slope values.
->>
->> Can you please elaborate a bit more on why you could not solve this
->> using the thermal sensor descriptor id?
->>
->>> +
->>> +Example:
->>> +tsens: thermal-sensor at 900000 {
->>> +		compatible = "qcom,msm8916-tsens";
->>> +		nvmem-cells = <&tsens_caldata>, <&tsens_calsel>;
->>> +		nvmem-cell-names = "caldata", "calsel";
->>> +		qcom,tsens-slopes = <3200 3200 3200 3200 3200>;
->>
+You need to sign it off too.
+
+The prefix in subject should be lowercase 'clk:' and you are removing
+rather a variable, not code.
+
+The patch looks good, so with these changes:
+
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
 
 
->>> +		qcom,sensor-id = <0 1 2 4 5>;
->>> +		#thermal-sensor-cells = <1>;
->>
->> How about if you simply make the sensor driver expose all sensors, then in the
->> thermal zone descriptor, you pick which sensor to use using the thermal sensor
->> descriptor (quoting the binding again):
-
-Hi Eduardo,
-
-What you suggested would work, except for that the calibration data in eeprom would
-be available for only the _subset_ of sensors on the SoC. So the driver in some way would
-need to know which exact sensors the eeprom data corresponds to.
-
-If this does not seem like something which needs to be described in DT, I can have the 
-data embedded into the driver so it gets picked based on the right compatibles.
-
-regards,
-Rajendra
-
->>
->> ocp {
->>         ...
->>         /*
->>          * A simple IC with several bandgap temperature sensors.
->>          */
->>         bandgap0: bandgap at 0x0000ED00 {
->>                 ...
->>                 #thermal-sensor-cells = <1>;
->>         };
->> };
->>
->> thermal-zones {
->>         cpu_thermal: cpu-thermal {
->>                 polling-delay-passive = <250>; /* milliseconds */
->>                 polling-delay = <1000>; /* milliseconds */
->>
->>                                 /* sensor       ID */
->>                 thermal-sensors = <&bandgap0     0>;
->> 	};
->> 	gpu_thermal: gpu-thermal {
->>                 polling-delay-passive = <120>; /* milliseconds */
->>                 polling-delay = <1000>; /* milliseconds */
->>
->>                                 /* sensor       ID */
->>                 thermal-sensors = <&bandgap0     1>;
->>
->> 	};
->>
->> };
->>
->> Would that simplify ?
->>
->> BR,
->>
->> Eduardo Valentin
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> ---
+>  drivers/clk/samsung/clk-s3c2410-dclk.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-s3c2410-dclk.c b/drivers/clk/samsung/clk-s3c2410-dclk.c
+> index e9eb935..ec6fb14 100644
+> --- a/drivers/clk/samsung/clk-s3c2410-dclk.c
+> +++ b/drivers/clk/samsung/clk-s3c2410-dclk.c
+> @@ -77,12 +77,11 @@ static u8 s3c24xx_clkout_get_parent(struct clk_hw *hw)
+>  static int s3c24xx_clkout_set_parent(struct clk_hw *hw, u8 index)
+>  {
+>  	struct s3c24xx_clkout *clkout = to_s3c24xx_clkout(hw);
+> -	int ret = 0;
+>  
+>  	s3c2410_modify_misccr((clkout->mask << clkout->shift),
+>  			      (index << clkout->shift));
+>  
+> -	return ret;
+> +	return 0;
+>  }
+>  
+>  static const struct clk_ops s3c24xx_clkout_ops = {
+> 
