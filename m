@@ -1,43 +1,54 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 30 Nov 2015 11:41:39 +0100
-Subject: [PATCH 1/2] dt-bindings: soc: Add supplies for Mediatek SCPSYS unit
-In-Reply-To: <1448880100-23396-1-git-send-email-s.hauer@pengutronix.de>
-References: <1448880100-23396-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1448880100-23396-2-git-send-email-s.hauer@pengutronix.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 30 Nov 2015 11:50:03 +0100
+Subject: [PATCH] arm: renesas: select PINCTRL for Renesas SoC
+In-Reply-To: <565C2635.3090907@codethink.co.uk>
+References: <1448648871-15008-1-git-send-email-ben.dooks@codethink.co.uk>
+ <CAMuHMdVNDWSehXpuBANFCN4HWx7H6ms9o-Ru-nZ7u9QJiUSNbw@mail.gmail.com>
+ <565C2635.3090907@codethink.co.uk>
+Message-ID: <CAMuHMdVEqbvNhVTbNbwbfXFVu4AyhkdV7RGiVJhfG9XydVN+3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The power domains in the SCPSYS unit are supplied by regulators. Add the
-properties for them to the binding document.
+Hi Ben,
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: devicetree at vger.kernel.org
----
- Documentation/devicetree/bindings/soc/mediatek/scpsys.txt | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+On Mon, Nov 30, 2015 at 11:34 AM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+> On 28/11/15 09:15, Geert Uytterhoeven wrote:
+>> On Fri, Nov 27, 2015 at 7:27 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+>>> If Renesas SoCs are the only devices selected then the
+>>> pinctrl core is not selected and the renesas pfc controller
+>>> will not get included in the kernel.
+>>>
+>>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+>>> ---
+>>>  arch/arm64/Kconfig.platforms | 1 +
+>>>  1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+>>> index 25a9031..fc3d692 100644
+>>> --- a/arch/arm64/Kconfig.platforms
+>>> +++ b/arch/arm64/Kconfig.platforms
+>>> @@ -72,6 +72,7 @@ config ARCH_SHMOBILE
+>>>  config ARCH_RENESAS
+>>>         bool "Renesas SoC Platform"
+>>>         select ARCH_SHMOBILE
+>>> +       select PINCTRL
+>>
+>> This was added quite a while ago. renesas-devel-20151123-v4.4-rc2 has it.
+>
+> Hi, where is the tree?
 
-diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-index a6c8afc..e8f15e3 100644
---- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-+++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-@@ -21,6 +21,18 @@ Required properties:
- 		      These are the clocks which hardware needs to be enabled
- 		      before enabling certain power domains.
- 
-+Optional properties:
-+- vdec-supply: Power supply for the vdec power domain
-+- venc-supply: Power supply for the venc power domain
-+- isp-supply: Power supply for the isp power domain
-+- mm-supply: Power supply for the mm power domain
-+- venc_lt-supply: Power supply for the venc_lt power domain
-+- audio-supply: Power supply for the audio power domain
-+- usb-supply: Power supply for the usb power domain
-+- mfg_async-supply: Power supply for the mfg_async power domain
-+- mfg_2d-supply: Power supply for the mfg_2d power domain
-+- mfg-supply: Power supply for the mfg power domain
-+
- Example:
- 
- 	scpsys: scpsys at 10006000 {
--- 
-2.6.2
+As usual, Simon's Renesas tree:
+git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git
+
+Which tree are you looking at?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
