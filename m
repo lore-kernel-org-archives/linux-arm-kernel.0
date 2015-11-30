@@ -1,98 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 30 Nov 2015 18:12:47 +0000
-Subject: [PATCH v4 08/21] KVM: ARM64: Add reset and access handlers for
- PMXEVTYPER register
-In-Reply-To: <1446186123-11548-9-git-send-email-zhaoshenglong@huawei.com>
-References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>
- <1446186123-11548-9-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <20151130181247.55649fc7@arm.com>
+From: sunil.kovvuri@gmail.com (Sunil Goutham)
+Date: Mon, 30 Nov 2015 23:48:56 +0530
+Subject: [PATCH 00/13] net: thunderx: HW TSO support and other fixes
+In-Reply-To: <y>
+References: <y>
+Message-ID: <1448907549-5296-1-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 30 Oct 2015 14:21:50 +0800
-Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+From: Sunil Goutham <sgoutham@cavium.com>
 
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Since the reset value of PMXEVTYPER is UNKNOWN, use reset_unknown or
-> reset_unknown_cp15 for its reset handler. Add access handler which
-> emulates writing and reading PMXEVTYPER register. When writing to
-> PMXEVTYPER, call kvm_pmu_set_counter_event_type to create a perf_event
-> for the selected event type.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 26 ++++++++++++++++++++++++--
->  1 file changed, 24 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index cb82b15..4e606ea 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -491,6 +491,17 @@ static bool access_pmu_regs(struct kvm_vcpu *vcpu,
->  
->  	if (p->is_write) {
->  		switch (r->reg) {
-> +		case PMXEVTYPER_EL0: {
-> +			val = vcpu_sys_reg(vcpu, PMSELR_EL0);
-> +			kvm_pmu_set_counter_event_type(vcpu,
-> +						       *vcpu_reg(vcpu, p->Rt),
-> +						       val);
+This patch series contains fixes for various issues and support for 
+HW TSO which is added in pass2 silicon.
 
-You are blindingly truncating 64bit values to u32. Is that intentional?
+Sunil Goutham (9):
+  net: thunderx: Increase transmit queue length
+  net: thunderx: Set CQ timer threshold properly
+  net: thunderx: Switchon carrier only upon interface link up
+  net: thunderx: Remove unnecessary rcv buffer start address management
+  net: thunderx: Enable BGX LMAC's RX/TX only after VF is up
+  net: thunderx: HW TSO support for pass2 chips
+  net: thunderx: Enable CQE count threshold interrupt for pass2 chip
+  net: thunderx: HW errata workaround for non-tunneled TSO pkts
+  net: thunderx: Fix for duplicate CQEs by HW for TSO packets
 
-> +			vcpu_sys_reg(vcpu, PMXEVTYPER_EL0) =
-> +							 *vcpu_reg(vcpu, p->Rt);
-> +			vcpu_sys_reg(vcpu, PMEVTYPER0_EL0 + val) =
-> +							 *vcpu_reg(vcpu, p->Rt);
+Thanneeru Srinivasulu (3):
+  net: thunderx: Force to load octeon-mdio before bgx driver.
+  net: thunderx: Wait for delayed work to finish before destroying it
+  net: thunderx: Add TX timeout, RX buff allocation fail to driver
+    stats.
 
-Please do not break assignments like this, it makes the code
-unreadable. I don't care what the 80-character police says... ;-)
+Yury Norov (1):
+  net: thunderx: nicvf_queues: nivc_*_intr: remove duplication
 
-> +			break;
-> +		}
->  		case PMCR_EL0: {
->  			/* Only update writeable bits of PMCR */
->  			val = vcpu_sys_reg(vcpu, r->reg);
-> @@ -735,7 +746,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  	  trap_raz_wi },
->  	/* PMXEVTYPER_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b001),
-> -	  trap_raz_wi },
-> +	  access_pmu_regs, reset_unknown, PMXEVTYPER_EL0 },
->  	/* PMXEVCNTR_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b010),
->  	  trap_raz_wi },
-> @@ -951,6 +962,16 @@ static bool access_pmu_cp15_regs(struct kvm_vcpu *vcpu,
->  
->  	if (p->is_write) {
->  		switch (r->reg) {
-> +		case c9_PMXEVTYPER: {
-> +			val = vcpu_cp15(vcpu, c9_PMSELR);
-> +			kvm_pmu_set_counter_event_type(vcpu,
-> +						       *vcpu_reg(vcpu, p->Rt),
-> +						       val);
-> +			vcpu_cp15(vcpu, c9_PMXEVTYPER) = *vcpu_reg(vcpu, p->Rt);
-> +			vcpu_cp15(vcpu, c14_PMEVTYPER0 + val) =
-> +							 *vcpu_reg(vcpu, p->Rt);
-> +			break;
-> +		}
->  		case c9_PMCR: {
->  			/* Only update writeable bits of PMCR */
->  			val = vcpu_cp15(vcpu, r->reg);
-> @@ -1024,7 +1045,8 @@ static const struct sys_reg_desc cp15_regs[] = {
->  	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmu_cp15_regs,
->  	  reset_pmceid, c9_PMCEID1 },
->  	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
-> -	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), trap_raz_wi },
-> +	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), access_pmu_cp15_regs,
-> +	  reset_unknown_cp15, c9_PMXEVTYPER },
->  	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), trap_raz_wi },
->  	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
->  	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), trap_raz_wi },
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+ drivers/net/ethernet/cavium/thunder/nic.h          |   22 ++-
+ drivers/net/ethernet/cavium/thunder/nic_main.c     |   34 ++-
+ drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c    |   18 ++-
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   |   20 ++-
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c |  219 +++++++-------------
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.h |   19 +-
+ drivers/net/ethernet/cavium/thunder/q_struct.h     |   30 ++--
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |   28 +++-
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h  |    2 +
+ 9 files changed, 189 insertions(+), 203 deletions(-)
