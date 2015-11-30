@@ -1,227 +1,75 @@
 From: sunil.kovvuri@gmail.com (Sunil Goutham)
-Date: Mon, 30 Nov 2015 23:49:01 +0530
-Subject: [PATCH 05/13] net: thunderx: nicvf_queues: nivc_*_intr: remove
- duplication
+Date: Mon, 30 Nov 2015 23:49:07 +0530
+Subject: [PATCH 11/13] net: thunderx: HW errata workaround for non-tunneled
+ TSO pkts
 In-Reply-To: <y>
 References: <y>
-Message-ID: <1448907549-5296-6-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1448907549-5296-12-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yury Norov <yury.norov@auriga.com>
+From: Sunil Goutham <sgoutham@cavium.com>
 
-The same switch-case repeates for nivc_*_intr functions.
-In this patch it is moved to a helper nicvf_int_type_to_mask().
+A HW errata mandates inner layer3 offset field of send header for a non-tunneled 
+TSO packet to point to L2 ethertype in the payload. Also added counter for HW 
+TSO packets.
 
-By the way:
- - Unneeded write to NICVF register dropped if int_type is unknown.
- - netdev_dbg() is used instead of netdev_err().
-
-Signed-off-by: Yury Norov <yury.norov@auriga.com>
-Signed-off-by: Aleksey Makarov <aleksey.makarov@caviumnetworks.com>
-Acked-by: Vadim Lomovtsev <Vadim.Lomovtsev@caiumnetworks.com>
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nicvf_queues.c |  140 ++++++--------------
- 1 files changed, 40 insertions(+), 100 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c |   17 ++++++++++-------
+ 1 files changed, 10 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-index 206b6a7..99a29d0 100644
+index 5855828..4e9709e 100644
 --- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
 +++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-@@ -1234,153 +1234,93 @@ struct sk_buff *nicvf_get_rcv_skb(struct nicvf *nic, struct cqe_rx_t *cqe_rx)
- 	return skb;
- }
- 
--/* Enable interrupt */
--void nicvf_enable_intr(struct nicvf *nic, int int_type, int q_idx)
-+static u64 nicvf_int_type_to_mask(int int_type, int q_idx)
+@@ -943,8 +943,8 @@ static int nicvf_sq_subdesc_required(struct nicvf *nic, struct sk_buff *skb)
+  * First subdescriptor for every send descriptor.
+  */
+ static inline void
+-nicvf_sq_add_hdr_subdesc(struct snd_queue *sq, int qentry, int subdesc_cnt,
+-			 struct sk_buff *skb, int len, bool hw_tso)
++nicvf_sq_add_hdr_subdesc(struct nicvf *nic, struct snd_queue *sq, int qentry,
++			 int subdesc_cnt, struct sk_buff *skb, int len)
  {
- 	u64 reg_val;
- 
--	reg_val = nicvf_reg_read(nic, NIC_VF_ENA_W1S);
--
- 	switch (int_type) {
- 	case NICVF_INTR_CQ:
--		reg_val |= ((1ULL << q_idx) << NICVF_INTR_CQ_SHIFT);
-+		reg_val = ((1ULL << q_idx) << NICVF_INTR_CQ_SHIFT);
- 		break;
- 	case NICVF_INTR_SQ:
--		reg_val |= ((1ULL << q_idx) << NICVF_INTR_SQ_SHIFT);
-+		reg_val = ((1ULL << q_idx) << NICVF_INTR_SQ_SHIFT);
- 		break;
- 	case NICVF_INTR_RBDR:
--		reg_val |= ((1ULL << q_idx) << NICVF_INTR_RBDR_SHIFT);
-+		reg_val = ((1ULL << q_idx) << NICVF_INTR_RBDR_SHIFT);
- 		break;
- 	case NICVF_INTR_PKT_DROP:
--		reg_val |= (1ULL << NICVF_INTR_PKT_DROP_SHIFT);
-+		reg_val = (1ULL << NICVF_INTR_PKT_DROP_SHIFT);
- 		break;
- 	case NICVF_INTR_TCP_TIMER:
--		reg_val |= (1ULL << NICVF_INTR_TCP_TIMER_SHIFT);
-+		reg_val = (1ULL << NICVF_INTR_TCP_TIMER_SHIFT);
- 		break;
- 	case NICVF_INTR_MBOX:
--		reg_val |= (1ULL << NICVF_INTR_MBOX_SHIFT);
-+		reg_val = (1ULL << NICVF_INTR_MBOX_SHIFT);
- 		break;
- 	case NICVF_INTR_QS_ERR:
--		reg_val |= (1ULL << NICVF_INTR_QS_ERR_SHIFT);
-+		reg_val = (1ULL << NICVF_INTR_QS_ERR_SHIFT);
- 		break;
- 	default:
--		netdev_err(nic->netdev,
--			   "Failed to enable interrupt: unknown type\n");
--		break;
-+		reg_val = 0;
+ 	int proto;
+ 	struct sq_hdr_subdesc *hdr;
+@@ -980,10 +980,13 @@ nicvf_sq_add_hdr_subdesc(struct snd_queue *sq, int qentry, int subdesc_cnt,
+ 		}
  	}
  
--	nicvf_reg_write(nic, NIC_VF_ENA_W1S, reg_val);
-+	return reg_val;
-+}
-+
-+/* Enable interrupt */
-+void nicvf_enable_intr(struct nicvf *nic, int int_type, int q_idx)
-+{
-+	u64 mask = nicvf_int_type_to_mask(int_type, q_idx);
-+
-+	if (!mask) {
-+		netdev_dbg(nic->netdev,
-+			   "Failed to enable interrupt: unknown type\n");
-+		return;
-+	}
-+	nicvf_reg_write(nic, NIC_VF_ENA_W1S,
-+			nicvf_reg_read(nic, NIC_VF_ENA_W1S) | mask);
- }
- 
- /* Disable interrupt */
- void nicvf_disable_intr(struct nicvf *nic, int int_type, int q_idx)
- {
--	u64 reg_val = 0;
-+	u64 mask = nicvf_int_type_to_mask(int_type, q_idx);
- 
--	switch (int_type) {
--	case NICVF_INTR_CQ:
--		reg_val |= ((1ULL << q_idx) << NICVF_INTR_CQ_SHIFT);
--		break;
--	case NICVF_INTR_SQ:
--		reg_val |= ((1ULL << q_idx) << NICVF_INTR_SQ_SHIFT);
--		break;
--	case NICVF_INTR_RBDR:
--		reg_val |= ((1ULL << q_idx) << NICVF_INTR_RBDR_SHIFT);
--		break;
--	case NICVF_INTR_PKT_DROP:
--		reg_val |= (1ULL << NICVF_INTR_PKT_DROP_SHIFT);
--		break;
--	case NICVF_INTR_TCP_TIMER:
--		reg_val |= (1ULL << NICVF_INTR_TCP_TIMER_SHIFT);
--		break;
--	case NICVF_INTR_MBOX:
--		reg_val |= (1ULL << NICVF_INTR_MBOX_SHIFT);
--		break;
--	case NICVF_INTR_QS_ERR:
--		reg_val |= (1ULL << NICVF_INTR_QS_ERR_SHIFT);
--		break;
--	default:
--		netdev_err(nic->netdev,
-+	if (!mask) {
-+		netdev_dbg(nic->netdev,
- 			   "Failed to disable interrupt: unknown type\n");
--		break;
-+		return;
+-	if (hw_tso && skb_shinfo(skb)->gso_size) {
++	if (nic->hw_tso && skb_shinfo(skb)->gso_size) {
+ 		hdr->tso = 1;
+ 		hdr->tso_start = skb_transport_offset(skb) + tcp_hdrlen(skb);
+ 		hdr->tso_max_paysize = skb_shinfo(skb)->gso_size;
++		/* For non-tunneled pkts, point this to L2 ethertype */
++		hdr->inner_l3_offset = skb_network_offset(skb) - 2;
++		nic->drv_stats.tx_tso++;
  	}
- 
--	nicvf_reg_write(nic, NIC_VF_ENA_W1C, reg_val);
-+	nicvf_reg_write(nic, NIC_VF_ENA_W1C, mask);
  }
  
- /* Clear interrupt */
- void nicvf_clear_intr(struct nicvf *nic, int int_type, int q_idx)
- {
--	u64 reg_val = 0;
-+	u64 mask = nicvf_int_type_to_mask(int_type, q_idx);
+@@ -1054,8 +1057,8 @@ static int nicvf_sq_append_tso(struct nicvf *nic, struct snd_queue *sq,
+ 			data_left -= size;
+ 			tso_build_data(skb, &tso, size);
+ 		}
+-		nicvf_sq_add_hdr_subdesc(sq, hdr_qentry,
+-					 seg_subdescs - 1, skb, seg_len, false);
++		nicvf_sq_add_hdr_subdesc(nic, sq, hdr_qentry,
++					 seg_subdescs - 1, skb, seg_len);
+ 		sq->skbuff[hdr_qentry] = (u64)NULL;
+ 		qentry = nicvf_get_nxt_sqentry(sq, qentry);
  
--	switch (int_type) {
--	case NICVF_INTR_CQ:
--		reg_val = ((1ULL << q_idx) << NICVF_INTR_CQ_SHIFT);
--		break;
--	case NICVF_INTR_SQ:
--		reg_val = ((1ULL << q_idx) << NICVF_INTR_SQ_SHIFT);
--		break;
--	case NICVF_INTR_RBDR:
--		reg_val = ((1ULL << q_idx) << NICVF_INTR_RBDR_SHIFT);
--		break;
--	case NICVF_INTR_PKT_DROP:
--		reg_val = (1ULL << NICVF_INTR_PKT_DROP_SHIFT);
--		break;
--	case NICVF_INTR_TCP_TIMER:
--		reg_val = (1ULL << NICVF_INTR_TCP_TIMER_SHIFT);
--		break;
--	case NICVF_INTR_MBOX:
--		reg_val = (1ULL << NICVF_INTR_MBOX_SHIFT);
--		break;
--	case NICVF_INTR_QS_ERR:
--		reg_val |= (1ULL << NICVF_INTR_QS_ERR_SHIFT);
--		break;
--	default:
--		netdev_err(nic->netdev,
-+	if (!mask) {
-+		netdev_dbg(nic->netdev,
- 			   "Failed to clear interrupt: unknown type\n");
--		break;
-+		return;
- 	}
+@@ -1111,8 +1114,8 @@ int nicvf_sq_append_skb(struct nicvf *nic, struct sk_buff *skb)
+ 		return nicvf_sq_append_tso(nic, sq, sq_num, qentry, skb);
  
--	nicvf_reg_write(nic, NIC_VF_INT, reg_val);
-+	nicvf_reg_write(nic, NIC_VF_INT, mask);
- }
+ 	/* Add SQ header subdesc */
+-	nicvf_sq_add_hdr_subdesc(sq, qentry, subdesc_cnt - 1, skb,
+-				 skb->len, nic->hw_tso);
++	nicvf_sq_add_hdr_subdesc(nic, sq, qentry, subdesc_cnt - 1,
++				 skb, skb->len);
  
- /* Check if interrupt is enabled */
- int nicvf_is_intr_enabled(struct nicvf *nic, int int_type, int q_idx)
- {
--	u64 reg_val;
--	u64 mask = 0xff;
--
--	reg_val = nicvf_reg_read(nic, NIC_VF_ENA_W1S);
--
--	switch (int_type) {
--	case NICVF_INTR_CQ:
--		mask = ((1ULL << q_idx) << NICVF_INTR_CQ_SHIFT);
--		break;
--	case NICVF_INTR_SQ:
--		mask = ((1ULL << q_idx) << NICVF_INTR_SQ_SHIFT);
--		break;
--	case NICVF_INTR_RBDR:
--		mask = ((1ULL << q_idx) << NICVF_INTR_RBDR_SHIFT);
--		break;
--	case NICVF_INTR_PKT_DROP:
--		mask = NICVF_INTR_PKT_DROP_MASK;
--		break;
--	case NICVF_INTR_TCP_TIMER:
--		mask = NICVF_INTR_TCP_TIMER_MASK;
--		break;
--	case NICVF_INTR_MBOX:
--		mask = NICVF_INTR_MBOX_MASK;
--		break;
--	case NICVF_INTR_QS_ERR:
--		mask = NICVF_INTR_QS_ERR_MASK;
--		break;
--	default:
--		netdev_err(nic->netdev,
-+	u64 mask = nicvf_int_type_to_mask(int_type, q_idx);
-+	/* If interrupt type is unknown, we treat it disabled. */
-+	if (!mask) {
-+		netdev_dbg(nic->netdev,
- 			   "Failed to check interrupt enable: unknown type\n");
--		break;
-+		return 0;
- 	}
- 
--	return (reg_val & mask);
-+	return mask & nicvf_reg_read(nic, NIC_VF_ENA_W1S);
- }
- 
- void nicvf_update_rq_stats(struct nicvf *nic, int rq_idx)
+ 	/* Add SQ gather subdescs */
+ 	qentry = nicvf_get_nxt_sqentry(sq, qentry);
 -- 
 1.7.1
