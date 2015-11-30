@@ -1,75 +1,42 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 30 Nov 2015 17:56:38 +0200
-Subject: [4.4-rc][PATCH v2] ARM: dts: am4372: fix clock source for arm twd and
- global timers
-Message-ID: <1448898998-32749-1-git-send-email-grygorii.strashko@ti.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 30 Nov 2015 16:58:39 +0100
+Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
+ concurrent lockers
+In-Reply-To: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
+References: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20151130155839.GK17308@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM TWD and Global timer are clocked by PERIPHCLK which is MPU_CLK/2.
-But now they are clocked by dpll_mpu_m2_ck == MPU_CLK and, as result.
-Timekeeping core misbehaves. For example, execution of command
-"sleep 5" will take 10 sec instead of 5.
+On Fri, Nov 27, 2015 at 11:44:06AM +0000, Will Deacon wrote:
+> Boqun Feng reported a rather nasty ordering issue with spin_unlock_wait
+> on architectures implementing spin_lock with LL/SC sequences and acquire
+> semantics:
+> 
+>  | CPU 1                   CPU 2                     CPU 3
+>  | ==================      ====================      ==============
+>  |                                                   spin_unlock(&lock);
+>  |                         spin_lock(&lock):
+>  |                           r1 = *lock; // r1 == 0;
+>  |                         o = READ_ONCE(object); // reordered here
+>  | object = NULL;
+>  | smp_mb();
+>  | spin_unlock_wait(&lock);
+>  |                           *lock = 1;
+>  | smp_mb();
+>  | o->dead = true;
+>  |                         if (o) // true
+>  |                           BUG_ON(o->dead); // true!!
+> 
+> The crux of the problem is that spin_unlock_wait(&lock) can return on
+> CPU 1 whilst CPU 2 is in the process of taking the lock. This can be
+> resolved by upgrading spin_unlock_wait to a LOCK operation, forcing it
+> to serialise against a concurrent locker and giving it acquire semantics
+> in the process (although it is not at all clear whether this is needed -
+> different callers seem to assume different things about the barrier
+> semantics and architectures are similarly disjoint in their
+> implementations of the macro).
 
-Hence, fix it by adding mpu_periphclk ("fixed-factor-clock") and use
-it for clocking ARM TWD and Global timer (same way as on OMAP4).
-
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Tero Kristo <t-kristo@ti.com>
-Fixes:commit 8cbd4c2f6a99 ("arm: boot: dts: am4372: add ARM timers and SCU nodes")
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
-Changes in v2:
- - fix: mpu_periphclk should be clocked from dpll_mpu_m2_ck instead of
-   dpll_mpu_ck.
-link on v1:
- http://www.spinics.net/lists/arm-kernel/msg463898.html
-
- arch/arm/boot/dts/am4372.dtsi        | 4 ++--
- arch/arm/boot/dts/am43xx-clocks.dtsi | 8 ++++++++
- 2 files changed, 10 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index d83ff9c..de8791a 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -74,7 +74,7 @@
- 		reg = <0x48240200 0x100>;
- 		interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-parent = <&gic>;
--		clocks = <&dpll_mpu_m2_ck>;
-+		clocks = <&mpu_periphclk>;
- 	};
- 
- 	local_timer: timer at 48240600 {
-@@ -82,7 +82,7 @@
- 		reg = <0x48240600 0x100>;
- 		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-parent = <&gic>;
--		clocks = <&dpll_mpu_m2_ck>;
-+		clocks = <&mpu_periphclk>;
- 	};
- 
- 	l2-cache-controller at 48242000 {
-diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi b/arch/arm/boot/dts/am43xx-clocks.dtsi
-index cc88728..a38af2b 100644
---- a/arch/arm/boot/dts/am43xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
-@@ -259,6 +259,14 @@
- 		ti,invert-autoidle-bit;
- 	};
- 
-+	mpu_periphclk: mpu_periphclk {
-+		#clock-cells = <0>;
-+		compatible = "fixed-factor-clock";
-+		clocks = <&dpll_mpu_m2_ck>;
-+		clock-mult = <1>;
-+		clock-div = <2>;
-+	};
-+
- 	dpll_ddr_ck: dpll_ddr_ck {
- 		#clock-cells = <0>;
- 		compatible = "ti,am3-dpll-clock";
--- 
-2.6.3
+Do we want to go do a note with spin_unlock_wait() in
+include/linux/spinlock.h warning about these subtle issues for the next
+arch that thinks this is a 'trivial' thing to implement?
