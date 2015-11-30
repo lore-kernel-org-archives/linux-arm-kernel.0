@@ -1,36 +1,39 @@
-From: gabriel@lse.epita.fr (Gabriel Laskar)
-Date: Mon, 30 Nov 2015 15:10:45 +0100
-Subject: [PATCH 07/20] drm: fix inclusion of drm.h in exynos_sarea.h
-In-Reply-To: <1448892658-14256-1-git-send-email-gabriel@lse.epita.fr>
-References: <1448892658-14256-1-git-send-email-gabriel@lse.epita.fr>
-Message-ID: <1448892658-14256-8-git-send-email-gabriel@lse.epita.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 Nov 2015 15:11:49 +0100
+Subject: [RFC v02 04/15] dmaengine: edma: Add support for DMA filter
+ mapping to slave devices
+In-Reply-To: <1448891145-10766-5-git-send-email-peter.ujfalusi@ti.com>
+References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
+ <1448891145-10766-5-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <7490116.jHcmUxB3Rf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using `#include "drm.h"` instead of `#include <drm/drm.h>` allow drm
-headers to be moved in another directory without changes, like for the
-libdrm imports.
+On Monday 30 November 2015 15:45:34 Peter Ujfalusi wrote:
+> @@ -2428,6 +2436,22 @@ bool edma_filter_fn(struct dma_chan *chan, void *param)
+>  }
+>  EXPORT_SYMBOL(edma_filter_fn);
+>  
+> +static bool edma_filter_for_map(struct dma_chan *chan, void *param)
+> +{
+> +       bool match = false;
+> +
+> +       if (chan->device->dev->driver == &edma_driver.driver) {
+> +               struct edma_chan *echan = to_edma_chan(chan);
+> +               unsigned ch_req = (unsigned)param;
+> +               if (ch_req == echan->ch_num) {
+> +                       /* The channel is going to be used as HW synchronized */
+> +                       echan->hw_triggered = true;
+> +                       match = true;
+> +               }
+> +       }
+> +       return match;
+> +}
+> +
+>  static int edma_init(void)
+> 
 
-Signed-off-by: Gabriel Laskar <gabriel@lse.epita.fr>
-CC: Emil Velikov <emil.l.velikov@gmail.com>
-CC: Mikko Rapeli <mikko.rapeli@iki.fi>
+I don't see the difference between edma_filter_fn and edma_filter_for_map.
+Why do you need both?
 
----
- include/uapi/drm/exynos_drm.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/include/uapi/drm/exynos_drm.h b/include/uapi/drm/exynos_drm.h
-index 5575ed1..a5b2dd9 100644
---- a/include/uapi/drm/exynos_drm.h
-+++ b/include/uapi/drm/exynos_drm.h
-@@ -15,7 +15,7 @@
- #ifndef _UAPI_EXYNOS_DRM_H_
- #define _UAPI_EXYNOS_DRM_H_
- 
--#include <drm/drm.h>
-+#include "drm.h"
- 
- /**
-  * User-desired buffer creation information structure.
--- 
-2.6.2
+	Arnd
