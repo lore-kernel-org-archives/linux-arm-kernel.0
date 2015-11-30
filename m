@@ -1,22 +1,93 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 30 Nov 2015 11:41:38 +0100
-Subject: [PATCH) soc: mediatek: scpsys: Add regulator support to power domain
- driver
-Message-ID: <1448880100-23396-1-git-send-email-s.hauer@pengutronix.de>
+Date: Mon, 30 Nov 2015 11:41:40 +0100
+Subject: [PATCH 2/2] soc: mediatek: SCPSYS: Add regulator support
+In-Reply-To: <1448880100-23396-1-git-send-email-s.hauer@pengutronix.de>
+References: <1448880100-23396-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1448880100-23396-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some power domains on the MT8173 are supplied by controllable external
-regulators that must be handled properly. This series adds support for
-them.
+The power domains are supplied by regulators. Add support for them so
+that the regulators are properly turned on before a domain is powered up
+and turned off when a domain is powered down.
 
-Sascha
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/soc/mediatek/mtk-scpsys.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-----------------------------------------------------------------
-Sascha Hauer (2):
-      dt-bindings: soc: Add supplies for Mediatek SCPSYS unit
-      soc: mediatek: SCPSYS: Add regulator support
-
- .../devicetree/bindings/soc/mediatek/scpsys.txt    | 12 ++++++++++
- drivers/soc/mediatek/mtk-scpsys.c                  | 27 ++++++++++++++++++++++
- 2 files changed, 39 insertions(+)
+diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+index 4d4203c..e425619 100644
+--- a/drivers/soc/mediatek/mtk-scpsys.c
++++ b/drivers/soc/mediatek/mtk-scpsys.c
+@@ -21,6 +21,7 @@
+ #include <linux/pm_domain.h>
+ #include <linux/regmap.h>
+ #include <linux/soc/mediatek/infracfg.h>
++#include <linux/regulator/consumer.h>
+ #include <dt-bindings/power/mt8173-power.h>
+ 
+ #define SPM_VDE_PWR_CON			0x0210
+@@ -179,6 +180,7 @@ struct scp_domain {
+ 	u32 sram_pdn_ack_bits;
+ 	u32 bus_prot_mask;
+ 	bool active_wakeup;
++	struct regulator *supply;
+ };
+ 
+ struct scp {
+@@ -221,6 +223,12 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
+ 	int ret;
+ 	int i;
+ 
++	if (scpd->supply) {
++		ret = regulator_enable(scpd->supply);
++		if (ret)
++			return ret;
++	}
++
+ 	for (i = 0; i < MAX_CLKS && scpd->clk[i]; i++) {
+ 		ret = clk_prepare_enable(scpd->clk[i]);
+ 		if (ret) {
+@@ -299,6 +307,9 @@ err_pwr_ack:
+ 			clk_disable_unprepare(scpd->clk[i]);
+ 	}
+ err_clk:
++	if (scpd->supply)
++		regulator_disable(scpd->supply);
++
+ 	dev_err(scp->dev, "Failed to power on domain %s\n", genpd->name);
+ 
+ 	return ret;
+@@ -379,6 +390,9 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
+ 	for (i = 0; i < MAX_CLKS && scpd->clk[i]; i++)
+ 		clk_disable_unprepare(scpd->clk[i]);
+ 
++	if (scpd->supply)
++		regulator_disable(scpd->supply);
++
+ 	return 0;
+ 
+ out:
+@@ -448,6 +462,19 @@ static int __init scpsys_probe(struct platform_device *pdev)
+ 		return PTR_ERR(scp->infracfg);
+ 	}
+ 
++	for (i = 0; i < NUM_DOMAINS; i++) {
++		struct scp_domain *scpd = &scp->domains[i];
++		const struct scp_domain_data *data = &scp_domain_data[i];
++
++		scpd->supply = devm_regulator_get_optional(&pdev->dev, data->name);
++		if (IS_ERR(scpd->supply)) {
++			if (PTR_ERR(scpd->supply) == -ENODEV)
++				scpd->supply = NULL;
++			else
++				return PTR_ERR(scpd->supply);
++		}
++	}
++
+ 	pd_data->num_domains = NUM_DOMAINS;
+ 
+ 	for (i = 0; i < NUM_DOMAINS; i++) {
+-- 
+2.6.2
