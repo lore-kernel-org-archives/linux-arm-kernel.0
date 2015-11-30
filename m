@@ -1,54 +1,32 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 30 Nov 2015 10:52:28 -0600
-Subject: [PATCH 1/2] dt-bindings: soc: Add supplies for Mediatek SCPSYS
- unit
-In-Reply-To: <1448880100-23396-2-git-send-email-s.hauer@pengutronix.de>
-References: <1448880100-23396-1-git-send-email-s.hauer@pengutronix.de>
- <1448880100-23396-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20151130165228.GA30957@rob-hp-laptop>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 30 Nov 2015 18:00:11 +0100
+Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: enable PCI_MSI
+In-Reply-To: <1448902811-11399-1-git-send-email-l.stach@pengutronix.de>
+References: <1448902811-11399-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1448902811-11399-2-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 11:41:39AM +0100, Sascha Hauer wrote:
-> The power domains in the SCPSYS unit are supplied by regulators. Add the
-> properties for them to the binding document.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: devicetree at vger.kernel.org
+This has been stable on i.MX6 for a good while now and there is no
+reason to keep it disabled, as it allows to allocate non-shared
+IRQs if several PCIe devices are connected to a single host.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-> ---
->  Documentation/devicetree/bindings/soc/mediatek/scpsys.txt | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> index a6c8afc..e8f15e3 100644
-> --- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> +++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> @@ -21,6 +21,18 @@ Required properties:
->  		      These are the clocks which hardware needs to be enabled
->  		      before enabling certain power domains.
->  
-> +Optional properties:
-> +- vdec-supply: Power supply for the vdec power domain
-> +- venc-supply: Power supply for the venc power domain
-> +- isp-supply: Power supply for the isp power domain
-> +- mm-supply: Power supply for the mm power domain
-> +- venc_lt-supply: Power supply for the venc_lt power domain
-> +- audio-supply: Power supply for the audio power domain
-> +- usb-supply: Power supply for the usb power domain
-> +- mfg_async-supply: Power supply for the mfg_async power domain
-> +- mfg_2d-supply: Power supply for the mfg_2d power domain
-> +- mfg-supply: Power supply for the mfg power domain
-> +
->  Example:
->  
->  	scpsys: scpsys at 10006000 {
-> -- 
-> 2.6.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 4187f69f6630..e2ce60d00e8a 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -45,6 +45,7 @@ CONFIG_SOC_IMX7D=y
+ CONFIG_SOC_LS1021A=y
+ CONFIG_SOC_VF610=y
+ CONFIG_PCI=y
++CONFIG_PCI_MSI=y
+ CONFIG_PCI_IMX6=y
+ CONFIG_SMP=y
+ CONFIG_PREEMPT_VOLUNTARY=y
+-- 
+2.6.2
