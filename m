@@ -1,103 +1,165 @@
 From: sunil.kovvuri@gmail.com (Sunil Goutham)
-Date: Mon, 30 Nov 2015 23:49:02 +0530
-Subject: [PATCH 06/13] net: thunderx: Switchon carrier only upon interface
- link up
+Date: Mon, 30 Nov 2015 23:49:03 +0530
+Subject: [PATCH 07/13] net: thunderx: Remove unnecessary rcv buffer start
+ address management
 In-Reply-To: <y>
 References: <y>
-Message-ID: <1448907549-5296-7-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1448907549-5296-8-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sunil Goutham <sgoutham@cavium.com>
 
-Call netif_carrier_on() only if interface's link is up. Switching this on
-upon IFF_UP by default, is causing issues with ethernet channel bonding
-in LACP mode. Initial NETDEV_CHANGE notification was being skipped.
+Since we have moved on to using allocated pages to carve receive
+buffers instead of netdev_alloc_skb() there is no need to store
+any pointers for later retrieval. Earlier we had to store
+skb and skb->data pointers which later are used to handover
+received packet to network stack.
 
-Also fixed some issues with link/speed/duplex reporting via ethtool.
+This will avoid an unnecessary cache miss as well.
 
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- .../net/ethernet/cavium/thunder/nicvf_ethtool.c    |   16 +++++++++++++++-
- drivers/net/ethernet/cavium/thunder/nicvf_main.c   |    4 +---
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |    2 ++
- 3 files changed, 18 insertions(+), 4 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c |   49 ++++----------------
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.h |   10 +---
+ 2 files changed, 11 insertions(+), 48 deletions(-)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
-index af54c10..a12b2e3 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
-@@ -112,6 +112,13 @@ static int nicvf_get_settings(struct net_device *netdev,
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+index 99a29d0..1fbd908 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+@@ -18,14 +18,6 @@
+ #include "q_struct.h"
+ #include "nicvf_queues.h"
  
- 	cmd->supported = 0;
- 	cmd->transceiver = XCVR_EXTERNAL;
-+
-+	if (!nic->link_up) {
-+		cmd->duplex = DUPLEX_UNKNOWN;
-+		ethtool_cmd_speed_set(cmd, SPEED_UNKNOWN);
-+		return 0;
-+	}
-+
- 	if (nic->speed <= 1000) {
- 		cmd->port = PORT_MII;
- 		cmd->autoneg = AUTONEG_ENABLE;
-@@ -125,6 +132,13 @@ static int nicvf_get_settings(struct net_device *netdev,
+-struct rbuf_info {
+-	struct page *page;
+-	void	*data;
+-	u64	offset;
+-};
+-
+-#define GET_RBUF_INFO(x) ((struct rbuf_info *)(x - NICVF_RCV_BUF_ALIGN_BYTES))
+-
+ /* Poll a register for a specific value */
+ static int nicvf_poll_reg(struct nicvf *nic, int qidx,
+ 			  u64 reg, int bit_pos, int bits, int val)
+@@ -86,8 +78,6 @@ static void nicvf_free_q_desc_mem(struct nicvf *nic, struct q_desc_mem *dmem)
+ static inline int nicvf_alloc_rcv_buffer(struct nicvf *nic, gfp_t gfp,
+ 					 u32 buf_len, u64 **rbuf)
+ {
+-	u64 data;
+-	struct rbuf_info *rinfo;
+ 	int order = get_order(buf_len);
+ 
+ 	/* Check if request can be accomodated in previous allocated page */
+@@ -113,46 +103,28 @@ static inline int nicvf_alloc_rcv_buffer(struct nicvf *nic, gfp_t gfp,
+ 		nic->rb_page_offset = 0;
+ 	}
+ 
+-	data = (u64)page_address(nic->rb_page) + nic->rb_page_offset;
+-
+-	/* Align buffer addr to cache line i.e 128 bytes */
+-	rinfo = (struct rbuf_info *)(data + NICVF_RCV_BUF_ALIGN_LEN(data));
+-	/* Save page address for reference updation */
+-	rinfo->page = nic->rb_page;
+-	/* Store start address for later retrieval */
+-	rinfo->data = (void *)data;
+-	/* Store alignment offset */
+-	rinfo->offset = NICVF_RCV_BUF_ALIGN_LEN(data);
++	*rbuf = (u64 *)((u64)page_address(nic->rb_page) + nic->rb_page_offset);
+ 
+-	data += rinfo->offset;
+-
+-	/* Give next aligned address to hw for DMA */
+-	*rbuf = (u64 *)(data + NICVF_RCV_BUF_ALIGN_BYTES);
  	return 0;
  }
  
-+static u32 nicvf_get_link(struct net_device *netdev)
-+{
-+	struct nicvf *nic = netdev_priv(netdev);
-+
-+	return nic->link_up;
-+}
-+
- static void nicvf_get_drvinfo(struct net_device *netdev,
- 			      struct ethtool_drvinfo *info)
+-/* Retrieve actual buffer start address and build skb for received packet */
++/* Build skb around receive buffer */
+ static struct sk_buff *nicvf_rb_ptr_to_skb(struct nicvf *nic,
+ 					   u64 rb_ptr, int len)
  {
-@@ -660,7 +674,7 @@ static int nicvf_set_channels(struct net_device *dev,
++	void *data;
+ 	struct sk_buff *skb;
+-	struct rbuf_info *rinfo;
  
- static const struct ethtool_ops nicvf_ethtool_ops = {
- 	.get_settings		= nicvf_get_settings,
--	.get_link		= ethtool_op_get_link,
-+	.get_link		= nicvf_get_link,
- 	.get_drvinfo		= nicvf_get_drvinfo,
- 	.get_msglevel		= nicvf_get_msglevel,
- 	.set_msglevel		= nicvf_set_msglevel,
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index 7f709cb..dde8dc7 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -1057,6 +1057,7 @@ int nicvf_stop(struct net_device *netdev)
+-	rb_ptr = (u64)phys_to_virt(rb_ptr);
+-	/* Get buffer start address and alignment offset */
+-	rinfo = GET_RBUF_INFO(rb_ptr);
++	data = phys_to_virt(rb_ptr);
  
- 	netif_carrier_off(netdev);
- 	netif_tx_stop_all_queues(nic->netdev);
-+	nic->link_up = false;
- 
- 	/* Teardown secondary qsets first */
- 	if (!nic->sqs_mode) {
-@@ -1211,9 +1212,6 @@ int nicvf_open(struct net_device *netdev)
- 	nic->drv_stats.txq_stop = 0;
- 	nic->drv_stats.txq_wake = 0;
- 
--	netif_carrier_on(netdev);
--	netif_tx_start_all_queues(netdev);
--
- 	return 0;
- cleanup:
- 	nicvf_disable_intr(nic, NICVF_INTR_MBOX, 0);
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-index 2076ac3..d9f27ad 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-@@ -612,6 +612,8 @@ static void bgx_poll_for_link(struct work_struct *work)
- 		lmac->last_duplex = 1;
- 	} else {
- 		lmac->link_up = 0;
-+		lmac->last_speed = SPEED_UNKNOWN;
-+		lmac->last_duplex = DUPLEX_UNKNOWN;
+ 	/* Now build an skb to give to stack */
+-	skb = build_skb(rinfo->data, RCV_FRAG_LEN);
++	skb = build_skb(data, RCV_FRAG_LEN);
+ 	if (!skb) {
+-		put_page(rinfo->page);
++		put_page(virt_to_page(data));
+ 		return NULL;
  	}
  
- 	if (lmac->last_link != lmac->link_up) {
+-	/* Set correct skb->data */
+-	skb_reserve(skb, rinfo->offset + NICVF_RCV_BUF_ALIGN_BYTES);
+-
+-	prefetch((void *)rb_ptr);
++	prefetch(skb->data);
+ 	return skb;
+ }
+ 
+@@ -196,7 +168,6 @@ static void nicvf_free_rbdr(struct nicvf *nic, struct rbdr *rbdr)
+ 	int head, tail;
+ 	u64 buf_addr;
+ 	struct rbdr_entry_t *desc;
+-	struct rbuf_info *rinfo;
+ 
+ 	if (!rbdr)
+ 		return;
+@@ -212,16 +183,14 @@ static void nicvf_free_rbdr(struct nicvf *nic, struct rbdr *rbdr)
+ 	while (head != tail) {
+ 		desc = GET_RBDR_DESC(rbdr, head);
+ 		buf_addr = desc->buf_addr << NICVF_RCV_BUF_ALIGN;
+-		rinfo = GET_RBUF_INFO((u64)phys_to_virt(buf_addr));
+-		put_page(rinfo->page);
++		put_page(virt_to_page(phys_to_virt(buf_addr)));
+ 		head++;
+ 		head &= (rbdr->dmem.q_len - 1);
+ 	}
+ 	/* Free SKB of tail desc */
+ 	desc = GET_RBDR_DESC(rbdr, tail);
+ 	buf_addr = desc->buf_addr << NICVF_RCV_BUF_ALIGN;
+-	rinfo = GET_RBUF_INFO((u64)phys_to_virt(buf_addr));
+-	put_page(rinfo->page);
++	put_page(virt_to_page(phys_to_virt(buf_addr)));
+ 
+ 	/* Free RBDR ring */
+ 	nicvf_free_q_desc_mem(nic, &rbdr->dmem);
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
+index 457eaee..bce8099 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
+@@ -83,10 +83,8 @@
+ #define MAX_RCV_BUF_COUNT	(1ULL << (RBDR_SIZE6 + 13))
+ #define RBDR_THRESH		(RCV_BUF_COUNT / 2)
+ #define DMA_BUFFER_LEN		2048 /* In multiples of 128bytes */
+-#define RCV_FRAG_LEN	(SKB_DATA_ALIGN(DMA_BUFFER_LEN + NET_SKB_PAD) + \
+-			 SKB_DATA_ALIGN(sizeof(struct skb_shared_info)) + \
+-			 (NICVF_RCV_BUF_ALIGN_BYTES * 2))
+-#define RCV_DATA_OFFSET		NICVF_RCV_BUF_ALIGN_BYTES
++#define RCV_FRAG_LEN	 (SKB_DATA_ALIGN(DMA_BUFFER_LEN + NET_SKB_PAD) + \
++			 SKB_DATA_ALIGN(sizeof(struct skb_shared_info)))
+ 
+ #define MAX_CQES_FOR_TX		((SND_QUEUE_LEN / MIN_SQ_DESC_PER_PKT_XMIT) * \
+ 				 MAX_CQE_PER_PKT_XMIT)
+@@ -108,10 +106,6 @@
+ #define NICVF_SQ_BASE_ALIGN_BYTES	128  /* 7 bits */
+ 
+ #define NICVF_ALIGNED_ADDR(ADDR, ALIGN_BYTES)	ALIGN(ADDR, ALIGN_BYTES)
+-#define NICVF_ADDR_ALIGN_LEN(ADDR, BYTES)\
+-	(NICVF_ALIGNED_ADDR(ADDR, BYTES) - BYTES)
+-#define NICVF_RCV_BUF_ALIGN_LEN(X)\
+-	(NICVF_ALIGNED_ADDR(X, NICVF_RCV_BUF_ALIGN_BYTES) - X)
+ 
+ /* Queue enable/disable */
+ #define NICVF_SQ_EN		BIT_ULL(19)
 -- 
 1.7.1
