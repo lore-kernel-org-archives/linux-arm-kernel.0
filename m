@@ -1,82 +1,42 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Mon, 30 Nov 2015 10:32:18 +0800
-Subject: [PATCH v1 1/5] thermal: rockchip: fix a trivial typo
-In-Reply-To: <5259912.5mmETGszQg@diego>
-References: <1448592746-2129-1-git-send-email-wxt@rock-chips.com>
- <1448592746-2129-2-git-send-email-wxt@rock-chips.com>
- <5259912.5mmETGszQg@diego>
-Message-ID: <565BB532.4010804@gmail.com>
+From: Yuantian.Tang@freescale.com (Yuantian.Tang at freescale.com)
+Date: Mon, 30 Nov 2015 11:39:35 +0800
+Subject: [PATCH v2] ARM: DTS: LS1021A: add SATA node to DTS
+Message-ID: <1448854775-19865-1-git-send-email-Yuantian.Tang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+From: Tang Yuantian <Yuantian.Tang@freescale.com>
 
-Thanks to take your time to review that.
+Added SATA node to LS1021A DTS to support SATA function.
 
-? 2015?11?27? 17:49, Heiko St?bner ??:
-> Hi Caesar,
->
-> Am Freitag, 27. November 2015, 10:52:22 schrieb Caesar Wang:
+Signed-off-by: Tang Yuantian <Yuantian.Tang@freescale.com>
+---
+v2:
+	- put reg-names right after reg property
 
-[...]
->
->   /**
-> -* The conversion table has the adc value and temperature.
-> -* ADC_DECREMENT is the adc value decremnet.(e.g. v2_code_table)
-> -* ADC_INCREMNET is the adc value incremnet.(e.g. v3_code_table)
-> -*/
-> + * The conversion table has the adc value and temperature.
-> + * ADC_DECREMENT: the adc value is of diminishing.(e.g. v2_code_table)
-> + * ADC_INCREMENT: the adc value is incremental.(e.g. v3_code_table)
-> + */
->   enum adc_sort_mode {
->   	ADC_DECREMENT = 0,
->   	ADC_INCREMENT,
-> @@ -75,13 +75,13 @@ enum adc_sort_mode {
-> You could simply move to documenting the fields in the header (like
-> exynos_tmu.c for example) instead of inside the table. I think there are even
-> tools that create documention from these comments, so I'd suggest:
->
-> /*
->   * struct chip_tsadc_table: hold information about chip-specific differences
->   * @id: conversion table
->   * @length: size of conversion table
->   * @data_mask: mask to apply on data inputs
->   * @mode: sort mode of this adc variant (incrementing or decrementing)
->   */
+ arch/arm/boot/dts/ls1021a.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-That's a good idea for this.
-Fixed in next patch v2.
-
->>   struct chip_tsadc_table {
->>   	const struct tsadc_table *id;
->>
->> -	/* the array table size*/
->> +	/* The array table size */
->>   	unsigned int length;
->>
->> -	/* that analogic mask data */
->> +	/* That analogic mask data */
->>   	u32 data_mask;
->>
->> -	/* the sort mode is adc value that increment or decrement in table */
->> +	/* The sort mode is adc value that increment or decrement in table */
->>   	enum adc_sort_mode mode;
->>   };
->>
->> @@ -617,7 +617,7 @@ rockchip_thermal_register_sensor(struct platform_device
->> *pdev, return 0;
->>   }
->>
->> -/*
->> +/**
->>    * Reset TSADC Controller, reset all tsadc registers.
->>    */
->>   static void rockchip_thermal_reset_controller(struct reset_control *reset)
->
->
->
->
-> -- 
-> Thanks,
-> Caesar
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index 9430a99..33aae8d 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -143,6 +143,16 @@
+ 			status = "disabled";
+ 		};
+ 
++		sata: sata at 3200000 {
++			compatible = "fsl,ls1021a-ahci";
++			reg = <0x0 0x3200000 0x0 0x10000>,
++			      <0x0 0x20220520 0x0 0x4>;
++			reg-names = "ahci", "sata-ecc";
++			interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&platform_clk 1>;
++			dma-coherent;
++		};
++
+ 		scfg: scfg at 1570000 {
+ 			compatible = "fsl,ls1021a-scfg", "syscon";
+ 			reg = <0x0 0x1570000 0x0 0x10000>;
+-- 
+2.1.0.27.g96db324
