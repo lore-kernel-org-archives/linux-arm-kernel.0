@@ -1,59 +1,63 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Mon, 30 Nov 2015 15:14:07 +0000
-Subject: [Xen-devel] [PATCH v3 40/62] arm/acpi: Estimate memory required
- for acpi/efi tables
-In-Reply-To: <1447753261-7552-41-git-send-email-shannon.zhao@linaro.org>
+Date: Mon, 30 Nov 2015 15:10:34 +0000
+Subject: [PATCH v3 38/62] arm/acpi: Add placeholder for efi and acpi load
+ address
+In-Reply-To: <alpine.DEB.2.02.1511261604080.8984@kaball.uk.xensource.com>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-41-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <565C67BF.4040804@citrix.com>
+ <1447753261-7552-39-git-send-email-shannon.zhao@linaro.org>
+ <564B1666.4060008@citrix.com> <564B2152.9000904@huawei.com>
+ <564B3845.4060801@citrix.com> <564BEA22.1040909@huawei.com>
+ <564C6763.6050107@citrix.com>
+ <alpine.DEB.2.02.1511261604080.8984@kaball.uk.xensource.com>
+Message-ID: <565C66EA.3040201@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shannon,
+Hi Stefano,
 
-On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
-> diff --git a/xen/common/efi/boot.c b/xen/common/efi/boot.c
-> index 53c7452..78d8ae9 100644
-> --- a/xen/common/efi/boot.c
-> +++ b/xen/common/efi/boot.c
-> @@ -13,6 +13,7 @@
->  #include <xen/multiboot.h>
->  #include <xen/pci_regs.h>
->  #include <xen/pfn.h>
-> +#include <asm/acpi.h>
->  #if EFI_PAGE_SIZE != PAGE_SIZE
->  # error Cannot use xen/pfn.h here!
->  #endif
-> @@ -1171,6 +1172,26 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
->      for( ; ; ); /* not reached */
->  }
->  
-> +#ifdef CONFIG_ACPI
-> +/* Constant to indicate "Xen" in unicode u16 format */
-> +static const u16 XEN_EFI_FW_VENDOR[] ={0x0058,0x0065,0x006E,0x0000};
-> +
-> +int __init estimate_efi_size(int mem_nr_banks)
-> +{
-> +    int size;
-> +    int est_size = sizeof(EFI_SYSTEM_TABLE);
-> +    int ect_size = sizeof(EFI_CONFIGURATION_TABLE);
-> +    int emd_size = sizeof(EFI_MEMORY_DESCRIPTOR);
-> +    int fw_vendor_size = sizeof(XEN_EFI_FW_VENDOR);
-> +
-> +    size = PAGE_ALIGN(est_size + ect_size + fw_vendor_size)
-> +           + PAGE_ALIGN(emd_size *
-> +                        (mem_nr_banks + acpi_mem.nr_banks + TBL_MMAX));
-> +
-> +    return size;
-> +}
-> +#endif
-> +
+On 26/11/15 16:04, Stefano Stabellini wrote:
+> On Wed, 18 Nov 2015, Julien Grall wrote:
+>> On 18/11/15 03:01, Shannon Zhao wrote:
+>>> "All above tables will be mapped to Dom0 non-RAM space. Since when
+>>> booting through ACPI it doesn't need the grant table region(see below
+>>> section 3), it could use this region to store the tables or use the same
+>>> way to find one memory region to store them."
+>>>
+>>> Firstly, as Jan suggested, these tables should not be in RAM space, so
+>>> we drop the previous way that copying these tables to Dom0 RAM.
+>>> Then I suggested map these tables to the space after the Dom0 RAM space,
+>>> but this not right because Dom0 RAM region might be at the edge of
+>>> physical RAM space and there might be device MMIO regions.
+>>> Then you suggest it could map these tables to the region which is used
+>>> for grant table(or the region found by the same way) while it's not used
+>>> when it boots with ACPI. These regions are not used by Xen and will not
+>>> be used by Dom0 either currently. But as you say, it will be wrong if
+>>> Dom0 memory is not 1:1 mapped.
+>>
+>> Will you remember in 6 months why you wrote the code like that?
+>>
+>> My point on the previous mail is you don't describe what you did,
+>> neither in the code nor in the commit message.
+>>
+>> Most of the place in the code are trying to avoid the assumption that
+>> DOM0 is using direct mapped. If not, we always have a comment/commit
+>> message explaining why we are doing like that and the implication (see
+>> the grant table example [1]).
+>>
+>>> So how about below idea:
+>>> We still copy these tables to Dom0 RAM space but when we create
+>>> EFI_MMAP_TABLE, we remove the space occupied by these tables from the
+>>> EfiConventionalMemory descriptor.
+>>
+>> As you don't need the grant table region, why don't you re-use it fopr
+>> your tables? It may also be possible that we have some space just after
+>> for the EFI table.
+> 
+> I think that the current approach is good, please just extend the
+> in-code comment in patch #40.
 
-efi/boot.c only contains code related to the stub EFI. This is not the
-case of this code.
-
-Moreover, this code won't compile on x86 because acpi_mem is only
-defined for ARM.
+In fact my suggestion was wrong :/. We need real memory for EFI/ACPI
+placeholder.
 
 Regards,
 
