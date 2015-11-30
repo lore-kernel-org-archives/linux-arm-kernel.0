@@ -1,99 +1,45 @@
 From: paul.burton@imgtec.com (Paul Burton)
-Date: Mon, 30 Nov 2015 16:21:31 +0000
-Subject: [PATCH 06/28] PCI: xilinx: unify INTx & MSI interrupt FIFO decode
+Date: Mon, 30 Nov 2015 16:21:32 +0000
+Subject: [PATCH 07/28] PCI: xilinx: always clear interrupt decode register
 In-Reply-To: <1448900513-20856-1-git-send-email-paul.burton@imgtec.com>
 References: <1448900513-20856-1-git-send-email-paul.burton@imgtec.com>
-Message-ID: <1448900513-20856-7-git-send-email-paul.burton@imgtec.com>
+Message-ID: <1448900513-20856-8-git-send-email-paul.burton@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When decoding either an INTx or MSI interrupt, the driver has no way to
-know which it will pull out of the interrupt FIFO. If both were pending
-then this would lead to either the interrupt being handled incorrectly
-(MSI interrupt treated as INTx) or not at all (INTx interrupt dropped by
-MSI path). Unify the reading of the interrupt FIFO & act according to
-the type of interrupt actually read.
+If an MSI or INTx interrupt is incorrectly triggered with an empty FIFO
+then xilinx_pcie_intr_handler will print a warning & skip further
+processing. However it did not clear the interrupt in the decode
+register, so the same INTX or MSI interrupt would trigger again
+immediately even though the FIFO is still empty. Clear the interrupt in
+the decode register to avoid that situation.
 
 Signed-off-by: Paul Burton <paul.burton@imgtec.com>
 ---
 
- drivers/pci/host/pcie-xilinx.c | 45 +++++++++++-------------------------------
- 1 file changed, 12 insertions(+), 33 deletions(-)
+ drivers/pci/host/pcie-xilinx.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-index c412a37..c6fe273 100644
+index c6fe273..3058a57 100644
 --- a/drivers/pci/host/pcie-xilinx.c
 +++ b/drivers/pci/host/pcie-xilinx.c
-@@ -397,7 +397,7 @@ static const struct irq_domain_ops intx_domain_ops = {
- static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
- {
- 	struct xilinx_pcie_port *port = (struct xilinx_pcie_port *)data;
--	u32 val, mask, status, msi_data;
-+	u32 val, mask, status;
- 
- 	/* Read interrupt decode and mask registers */
- 	val = pcie_read(port, XILINX_PCIE_REG_IDR);
-@@ -437,8 +437,8 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
- 		xilinx_pcie_clear_err_interrupts(port);
- 	}
- 
--	if (status & XILINX_PCIE_INTR_INTX) {
--		/* INTx interrupt received */
-+	if (status & (XILINX_PCIE_INTR_INTX | XILINX_PCIE_INTR_MSI)) {
-+		/* Interrupt received */
- 		val = pcie_read(port, XILINX_PCIE_REG_RPIFR1);
- 
+@@ -444,7 +444,7 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
  		/* Check whether interrupt valid */
-@@ -447,41 +447,20 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
- 			return IRQ_HANDLED;
- 		}
- 
--		if (!(val & XILINX_PCIE_RPIFR1_MSI_INTR)) {
--			/* Clear interrupt FIFO register 1 */
--			pcie_write(port, XILINX_PCIE_RPIFR1_ALL_MASK,
--				   XILINX_PCIE_REG_RPIFR1);
--
--			/* Handle INTx Interrupt */
-+		if (val & XILINX_PCIE_RPIFR1_MSI_INTR) {
-+			irq = pcie_read(port, XILINX_PCIE_REG_RPIFR2) &
-+				XILINX_PCIE_RPIFR2_MSG_DATA;
-+		} else {
- 			val = ((val & XILINX_PCIE_RPIFR1_INTR_MASK) >>
- 				XILINX_PCIE_RPIFR1_INTR_SHIFT) + 1;
--			generic_handle_irq(irq_find_mapping(port->irq_domain,
--							    val));
-+			irq = irq_find_mapping(port->irq_domain, val);
- 		}
--	}
- 
--	if (status & XILINX_PCIE_INTR_MSI) {
--		/* MSI Interrupt */
--		val = pcie_read(port, XILINX_PCIE_REG_RPIFR1);
-+		/* Clear interrupt FIFO register 1 */
-+		pcie_write(port, XILINX_PCIE_RPIFR1_ALL_MASK,
-+			   XILINX_PCIE_REG_RPIFR1);
- 
--		if (!(val & XILINX_PCIE_RPIFR1_INTR_VALID)) {
--			dev_warn(port->dev, "RP Intr FIFO1 read error\n");
+ 		if (!(val & XILINX_PCIE_RPIFR1_INTR_VALID)) {
+ 			dev_warn(port->dev, "RP Intr FIFO1 read error\n");
 -			return IRQ_HANDLED;
--		}
--
--		if (val & XILINX_PCIE_RPIFR1_MSI_INTR) {
--			msi_data = pcie_read(port, XILINX_PCIE_REG_RPIFR2) &
--				   XILINX_PCIE_RPIFR2_MSG_DATA;
--
--			/* Clear interrupt FIFO register 1 */
--			pcie_write(port, XILINX_PCIE_RPIFR1_ALL_MASK,
--				   XILINX_PCIE_REG_RPIFR1);
--
--			if (IS_ENABLED(CONFIG_PCI_MSI)) {
--				/* Handle MSI Interrupt */
--				generic_handle_irq(msi_data);
--			}
--		}
-+		generic_handle_irq(irq);
- 	}
++			goto out;
+ 		}
  
- 	if (status & XILINX_PCIE_INTR_SLV_UNSUPP)
+ 		if (val & XILINX_PCIE_RPIFR1_MSI_INTR) {
+@@ -490,6 +490,7 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
+ 	if (status & XILINX_PCIE_INTR_MST_ERRP)
+ 		dev_warn(port->dev, "Master error poison\n");
+ 
++out:
+ 	/* Clear the Interrupt Decode register */
+ 	pcie_write(port, status, XILINX_PCIE_REG_IDR);
+ 
 -- 
 2.6.2
