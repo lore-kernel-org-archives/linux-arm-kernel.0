@@ -1,36 +1,51 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 30 Nov 2015 15:54:15 +0100
-Subject: [PATCH] i2c: mv64xxx: The n clockdiv factor is 0 based on sunxi
- SoCs
-In-Reply-To: <20151130135140.GD1513@katana>
-References: <1443365828-8956-1-git-send-email-hdegoede@redhat.com>
- <20151130135140.GD1513@katana>
-Message-ID: <20151130145415.GJ1513@katana>
+From: luisbg@osg.samsung.com (Luis de Bethencourt)
+Date: Mon, 30 Nov 2015 14:56:56 +0000
+Subject: [PATCH] drm/rockchip: Fix module autoload for OF platform driver
+Message-ID: <1448895416-9502-1-git-send-email-luisbg@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 02:51:41PM +0100, Wolfram Sang wrote:
-> On Sun, Sep 27, 2015 at 04:57:08PM +0200, Hans de Goede wrote:
-> > According to the datasheets to n factor for dividing the tclk is
-> > 2 to the power n on Allwinner?SoCs, not 2 to the power n + 1 as it is
-> > on other mv64xxx implementations.
-> > 
-> > I've contacted Allwinner about this and they have confirmed that the
-> > datasheet is correct.
-> > 
-> > This commit fixes the clk-divider calculations for Allwinner SoCs
-> > accordingly.
-> > 
-> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> 
-> Applied to for-current, thanks!
+This platform driver has a OF device ID table but the OF module
+alias information is not created so module autoloading won't work.
 
-And added stable...
+Signed-off-by: Luis de Bethencourt <luisbg@osg.samsung.com>
+---
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151130/b2c41b4d/attachment.sig>
+Hi,
+
+This is a Resend of a patch from October 20th [0]
+
+I am adding Andrew Morton to the CC list as was recommended at the Korea Linux
+Forum.
+
+This patch adds the missing MODULE_DEVICE_TABLE() for OF to export
+that information so modules have the correct aliases built-in and
+autoloading works correctly.
+
+A longer explanation by Javier Canillas can be found here:
+https://lkml.org/lkml/2015/7/30/519
+A multitude of similar patches have been merged for other drivers, search
+the git log for "module autoload for OF platform driver".
+
+Thanks,
+Luis
+
+[0] https://lkml.org/lkml/2015/10/20/485
+
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 5d8ae5e..5897851 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -374,6 +374,7 @@ static const struct of_device_id vop_driver_dt_match[] = {
+ 	  .data = &rk3288_vop },
+ 	{},
+ };
++MODULE_DEVICE_TABLE(of, vop_driver_dt_match);
+ 
+ static inline void vop_writel(struct vop *vop, uint32_t offset, uint32_t v)
+ {
+-- 
+2.5.3
