@@ -1,111 +1,117 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Sun, 29 Nov 2015 19:14:45 -0700
-Subject: [PATCH V5 24/26] perf tools: adding perf_session to *info_prive_size()
+Date: Sun, 29 Nov 2015 19:14:46 -0700
+Subject: [PATCH V5 25/26] perf tools: making coresight PMU listable
 In-Reply-To: <1448849687-5724-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1448849687-5724-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1448849687-5724-25-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1448849687-5724-26-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some architecture the size of the private header may
-be dependent on the number of tracers used in the session.  As
-such adding a "struct perf_session" parameter, which should
-contain all the required information.
-
-Also adjusting the existing client of the interface to take
-the new parameter into account.
+Adding the required mechanic allowing 'perf list pmu' to
+discover coresight ETM/PTM tracers.
 
 Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
 Cc: Ingo Molnar <mingo@redhat.com>
 Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- tools/perf/arch/x86/util/intel-bts.c | 4 +++-
- tools/perf/arch/x86/util/intel-pt.c  | 4 +++-
- tools/perf/util/auxtrace.c           | 7 ++++---
- tools/perf/util/auxtrace.h           | 6 ++++--
- 4 files changed, 14 insertions(+), 7 deletions(-)
+ MAINTAINERS                    |  1 +
+ tools/perf/arch/arm/util/Build |  2 ++
+ tools/perf/arch/arm/util/pmu.c | 34 ++++++++++++++++++++++++++++++++++
+ tools/perf/config/Makefile     | 17 ++++++++++++-----
+ 4 files changed, 49 insertions(+), 5 deletions(-)
+ create mode 100644 tools/perf/arch/arm/util/pmu.c
 
-diff --git a/tools/perf/arch/x86/util/intel-bts.c b/tools/perf/arch/x86/util/intel-bts.c
-index 9b94ce520917..6efdc5e86d97 100644
---- a/tools/perf/arch/x86/util/intel-bts.c
-+++ b/tools/perf/arch/x86/util/intel-bts.c
-@@ -60,7 +60,9 @@ struct branch {
- 	u64 misc;
- };
+diff --git a/MAINTAINERS b/MAINTAINERS
+index e9caa4b28828..571a1dbe6bd1 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1007,6 +1007,7 @@ F:	drivers/hwtracing/coresight/*
+ F:	Documentation/trace/coresight.txt
+ F:	Documentation/devicetree/bindings/arm/coresight.txt
+ F:	Documentation/ABI/testing/sysfs-bus-coresight-devices-*
++F:	tools/perf/arch/arm/util/pmu.c
  
--static size_t intel_bts_info_priv_size(struct auxtrace_record *itr __maybe_unused)
-+static size_t
-+intel_bts_info_priv_size(struct auxtrace_record *itr __maybe_unused,
-+			 struct perf_session *session __maybe_unused)
- {
- 	return INTEL_BTS_AUXTRACE_PRIV_SIZE;
- }
-diff --git a/tools/perf/arch/x86/util/intel-pt.c b/tools/perf/arch/x86/util/intel-pt.c
-index b02af064f0f9..ad4e45c6eb9d 100644
---- a/tools/perf/arch/x86/util/intel-pt.c
-+++ b/tools/perf/arch/x86/util/intel-pt.c
-@@ -273,7 +273,9 @@ intel_pt_pmu_default_config(struct perf_pmu *intel_pt_pmu)
- 	return attr;
- }
+ ARM/CORGI MACHINE SUPPORT
+ M:	Richard Purdie <rpurdie@rpsys.net>
+diff --git a/tools/perf/arch/arm/util/Build b/tools/perf/arch/arm/util/Build
+index d22e3d07de3d..66ab0b05549c 100644
+--- a/tools/perf/arch/arm/util/Build
++++ b/tools/perf/arch/arm/util/Build
+@@ -2,3 +2,5 @@ libperf-$(CONFIG_DWARF) += dwarf-regs.o
  
--static size_t intel_pt_info_priv_size(struct auxtrace_record *itr __maybe_unused)
-+static size_t
-+intel_pt_info_priv_size(struct auxtrace_record *itr __maybe_unused,
-+			struct perf_session *session __maybe_unused)
- {
- 	return INTEL_PT_AUXTRACE_PRIV_SIZE;
- }
-diff --git a/tools/perf/util/auxtrace.c b/tools/perf/util/auxtrace.c
-index 7f10430af39c..90dc11ccf929 100644
---- a/tools/perf/util/auxtrace.c
-+++ b/tools/perf/util/auxtrace.c
-@@ -478,10 +478,11 @@ void auxtrace_heap__pop(struct auxtrace_heap *heap)
- 			 heap_array[last].ordinal);
- }
+ libperf-$(CONFIG_LIBUNWIND)          += unwind-libunwind.o
+ libperf-$(CONFIG_LIBDW_DWARF_UNWIND) += unwind-libdw.o
++
++libperf-$(CONFIG_AUXTRACE) += pmu.o
+diff --git a/tools/perf/arch/arm/util/pmu.c b/tools/perf/arch/arm/util/pmu.c
+new file mode 100644
+index 000000000000..af9fb666b44f
+--- /dev/null
++++ b/tools/perf/arch/arm/util/pmu.c
+@@ -0,0 +1,34 @@
++/*
++ * Copyright(C) 2015 Linaro Limited. All rights reserved.
++ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <string.h>
++#include <linux/coresight-pmu.h>
++#include <linux/perf_event.h>
++
++#include "../../util/pmu.h"
++
++struct perf_event_attr
++*perf_pmu__get_default_config(struct perf_pmu *pmu __maybe_unused)
++{
++#ifdef HAVE_AUXTRACE_SUPPORT
++	if (!strcmp(pmu->name, CORESIGHT_ETM_PMU_NAME)) {
++		/* add ETM default config here */
++		pmu->selectable = true;
++	}
++#endif
++	return NULL;
++}
+diff --git a/tools/perf/config/Makefile b/tools/perf/config/Makefile
+index de89ec574361..905faabff8b1 100644
+--- a/tools/perf/config/Makefile
++++ b/tools/perf/config/Makefile
+@@ -647,12 +647,19 @@ ifdef LIBBABELTRACE
+ endif
  
--size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr)
-+size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr,
-+				       struct perf_session *session)
- {
- 	if (itr)
--		return itr->info_priv_size(itr);
-+		return itr->info_priv_size(itr, session);
- 	return 0;
- }
+ ifndef NO_AUXTRACE
+-  ifeq ($(feature-get_cpuid), 0)
+-    msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
+-    NO_AUXTRACE := 1
++  ifeq ($(ARCH),x86)
++    ifeq ($(feature-get_cpuid), 0)
++      msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
++      NO_AUXTRACE := 1
++    else
++      $(call detected,CONFIG_AUXTRACE)
++      CFLAGS += -DHAVE_AUXTRACE_SUPPORT
++    endif
+   else
+-    $(call detected,CONFIG_AUXTRACE)
+-    CFLAGS += -DHAVE_AUXTRACE_SUPPORT
++    ifeq ($(ARCH),$(filter $(ARCH), arm arm64))
++      $(call detected,CONFIG_AUXTRACE)
++      CFLAGS += -DHAVE_AUXTRACE_SUPPORT
++    endif
+   endif
+ endif
  
-@@ -852,7 +853,7 @@ int perf_event__synthesize_auxtrace_info(struct auxtrace_record *itr,
- 	int err;
- 
- 	pr_debug2("Synthesizing auxtrace information\n");
--	priv_size = auxtrace_record__info_priv_size(itr);
-+	priv_size = auxtrace_record__info_priv_size(itr, session);
- 	ev = zalloc(sizeof(struct auxtrace_info_event) + priv_size);
- 	if (!ev)
- 		return -ENOMEM;
-diff --git a/tools/perf/util/auxtrace.h b/tools/perf/util/auxtrace.h
-index b86f90db1352..4bace9a396a6 100644
---- a/tools/perf/util/auxtrace.h
-+++ b/tools/perf/util/auxtrace.h
-@@ -293,7 +293,8 @@ struct auxtrace_record {
- 	int (*recording_options)(struct auxtrace_record *itr,
- 				 struct perf_evlist *evlist,
- 				 struct record_opts *opts);
--	size_t (*info_priv_size)(struct auxtrace_record *itr);
-+	size_t (*info_priv_size)(struct auxtrace_record *itr,
-+				 struct perf_session *session);
- 	int (*info_fill)(struct auxtrace_record *itr,
- 			 struct perf_session *session,
- 			 struct auxtrace_info_event *auxtrace_info,
-@@ -429,7 +430,8 @@ int auxtrace_parse_snapshot_options(struct auxtrace_record *itr,
- int auxtrace_record__options(struct auxtrace_record *itr,
- 			     struct perf_evlist *evlist,
- 			     struct record_opts *opts);
--size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr);
-+size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr,
-+				       struct perf_session *session);
- int auxtrace_record__info_fill(struct auxtrace_record *itr,
- 			       struct perf_session *session,
- 			       struct auxtrace_info_event *auxtrace_info,
 -- 
 2.1.4
