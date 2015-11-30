@@ -1,34 +1,31 @@
-From: rsahu@apm.com (Rameshwar Sahu)
-Date: Mon, 30 Nov 2015 14:27:34 +0530
-Subject: [PATCH v2 0/3] dmaengine: Add supports for APM X-Gene SoC CRC32C
- accerlerator driver
-In-Reply-To: <20151130085054.GA7928@gondor.apana.org.au>
-References: <rsahu@apm.com> <1447665169-14003-1-git-send-email-rsahu@apm.com>
- <CAFd313zqimQtG8epeo3U7gzxWRf0hqO4K8hOFy4UK-6pG5GcJg@mail.gmail.com>
- <20151130083950.GA7792@gondor.apana.org.au>
- <CAFd313z2dncWmBQJY48RkReVOhQqLs13UzehwrbizBbputOSEw@mail.gmail.com>
- <20151130085054.GA7928@gondor.apana.org.au>
-Message-ID: <CAFd313yfmA9eWUqTXuPb7w8L7RBLR0zHRqbaRKWkQqH9FUhyEQ@mail.gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 30 Nov 2015 17:20:15 +0800
+Subject: [PATCH] media: atmel-isi: fix debug message which only show the first
+ format
+Message-ID: <1448875215-19097-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Herbert,
+Correct the debug output message to show correct format.
 
-On Mon, Nov 30, 2015 at 2:20 PM, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> On Mon, Nov 30, 2015 at 02:19:33PM +0530, Rameshwar Sahu wrote:
->>
->> One of our client is using this layer for offloading the crc32c to our
->> dmaengine hw.
->
-> Is this going to be merged into the kernel?
-I am not sure about it, but as what I thought is Linux kernel supports
-many algos in async mode and sync mode, later client has to take care
-which one they are going to use.
-Any way this offload implementation is specific to Applied Micro
-X-Gene SoC, where we have such a dmaengine can do CRC32c.
->
-> Cheers,
-> --
-> Email: Herbert Xu <herbert@gondor.apana.org.au>
-> Home Page: http://gondor.apana.org.au/~herbert/
-> PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+
+ drivers/media/platform/soc_camera/atmel-isi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+index f51e41e..d5a5119 100644
+--- a/drivers/media/platform/soc_camera/atmel-isi.c
++++ b/drivers/media/platform/soc_camera/atmel-isi.c
+@@ -795,7 +795,7 @@ static int isi_camera_get_formats(struct soc_camera_device *icd,
+ 			xlate->host_fmt	= &isi_camera_formats[i];
+ 			xlate->code	= code.code;
+ 			dev_dbg(icd->parent, "Providing format %s using code %d\n",
+-				isi_camera_formats[0].name, code.code);
++				xlate->host_fmt->name, xlate->code);
+ 		}
+ 		break;
+ 	default:
+-- 
+1.9.1
