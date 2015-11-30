@@ -1,27 +1,35 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Mon, 30 Nov 2015 19:59:53 +0800
-Subject: [PATCH v4 06/21] KVM: ARM64: Add reset and access handlers for
- PMCEID0 and PMCEID1 register
-In-Reply-To: <20151130114230.136abc6f@arm.com>
-References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>	<1446186123-11548-7-git-send-email-zhaoshenglong@huawei.com>
- <20151130114230.136abc6f@arm.com>
-Message-ID: <565C3A39.5020600@huawei.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 30 Nov 2015 09:02:43 -0300
+Subject: [PATCH] ARM: exynos_defconfig: Set recommended options for systemd
+In-Reply-To: <1448865083-13272-1-git-send-email-k.kozlowski@samsung.com>
+References: <1448865083-13272-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <565C3AE3.4080006@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hello Krzysztof,
 
-On 2015/11/30 19:42, Marc Zyngier wrote:
->> +static void reset_pmceid(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
->> > +{
->> > +	u64 pmceid;
->> > +
->> > +	if (r->reg == PMCEID0_EL0 || r->reg == c9_PMCEID0)
-> That feels wrong. We should only reset the 64bit view of the sysregs,
-> as the 32bit view is directly mapped to it.
+On 11/30/2015 03:31 AM, Krzysztof Kozlowski wrote:
+> Set following options to recommended value by systemd (which also
+> matches the multi_v7 deconfig):
+> 1. Enable AUTOFS4_FS - for systemd.automount [0];
+> 2. Enable BLK_DEV_BSG - SG v4 for recend udev [0][1];
+> 3. Disable UEVENT_HELPER_PATH - legacy hook for hotplug, forked for each
+>    uevent, slows down booting [0];
 > 
-Just to confirm, if guest access c9_PMCEID0, KVM will trap this register
-with the register index as PMCEID0_EL0? Or still as c9_PMCEID0?
+> [0] http://cgit.freedesktop.org/systemd/systemd/tree/README
+> [1] http://patchwork.ozlabs.org/patch/47921/
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/configs/exynos_defconfig | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
 
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
 -- 
-Shannon
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
