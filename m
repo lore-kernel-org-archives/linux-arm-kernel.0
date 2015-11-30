@@ -1,42 +1,52 @@
-From: axboe@fb.com (Jens Axboe)
-Date: Mon, 30 Nov 2015 14:49:50 -0700
-Subject: [PATCH] null_blk: use sector_div instead of do_div
-In-Reply-To: <4449032.oPBtpzlXyB@wuerfel>
-References: <3768541.ja0r6f0Odi@wuerfel>
- <CA+55aFy=JjwmtNysByu822S2Av0sv_KUCLfa86tAz5K5Unwsmw@mail.gmail.com>
- <4449032.oPBtpzlXyB@wuerfel>
-Message-ID: <565CC47E.9020209@fb.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 Nov 2015 22:49:43 +0100
+Subject: [PATCH v6 14/19] arm64:ilp32: add sys_ilp32.c and a separate
+ table (in entry.S) to use it
+In-Reply-To: <20151130202141.GA23254@yury-N73SV>
+References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
+ <2133692.Tueq9xZUPQ@wuerfel> <20151130202141.GA23254@yury-N73SV>
+Message-ID: <3463212.HtU7UeIULQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2015 02:31 PM, Arnd Bergmann wrote:
-> On Friday 27 November 2015 10:07:54 Linus Torvalds wrote:
->> On Fri, Nov 27, 2015 at 5:49 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> -       do_div(size, bs); /* convert size to pages */
->>> -       do_div(size, 256); /* concert size to pgs pr blk */
->>> +       sector_div(size, bs); /* convert size to pages */
->>> +       sector_div(size, 256); /* concert size to pgs pr blk */
->>
->> Ugh.
->>
->> Dividing by 256 should never be done with do_div() *or* sector-div.
->
-> You are right, I missed what should have been an obvious simplification.
-> FWIW, the division by 256 should now be optimized automatically when the
-> new asm-generic do_div() implementation is used (which in turn caused
-> the type mismatch warning that I'm trying to avoid). Of course that
-> is no excuse for writing silly code like that, and it doesn't catch the
-> cases where the argument is a power-of-two variable number.
->
-> The first do_div() is also questionable: 'bs' is a global variable
-> from a module parameter that defaults to 512 and is fixed to 4096
-> when the device is used for lightnvm. I would guess that we run into
-> bugs if this is ever set to a number that is not a power of two,
-> smaller than 512, or larger than PAGE_SIZE.
+On Monday 30 November 2015 23:21:41 Yury Norov wrote:
+> On Mon, Nov 30, 2015 at 04:34:22PM +0100, Arnd Bergmann wrote:
+> > On Tuesday 17 November 2015 22:57:52 Arnd Bergmann wrote:
+> > > On Wednesday 18 November 2015 00:16:54 Yury Norov wrote:
+> > > > From: Andrew Pinski <apinski@cavium.com>
+> > > > 
+> > > > Add a separate syscall-table for ILP32, which dispatches either to native
+> > > > LP64 system call implementation or to compat-syscalls, as appropriate.
+> > > 
+> > > I like it much better than the previous version, thanks for the rework!
+> > 
+> > Hi Yuri,
+> > 
+> > you must have missed my reply below. Are you still working on ilp32
+> > or did you drop this thread because you got distracted with something
+> > else?
+> > 
+> 
+> I didn't miss it, and I continue with ILP32. I really appreciate your
+> attention and time you spend on ILP32.
+> 
+> There's a tricky bug with signal stack, that Andreas also discovered.
+> It makes almost all tests that use posix threads crash. I want to fix
+> it and other bugs before next submission. 
+> 
+> I also update glibc to follow all recommendations, and I want to
+> upload it together with kernel patches.
 
-We can use the shift, but honestly, it's just setup code. For hot paths, 
-avoiding the div is definitely of higher priority. And for the sake of 
-people copy/pasting or similar, making it a shift is probably a good idea.
+Ok. As a reviewer, I find long waits between submissions a bit annoying
+because that means I have already forgotten everything I commented on
+the previous time.
 
--- 
-Jens Axboe
+Could we try to get consensus on how the syscall ABI should look
+before you start adapting glibc to another intermediate version?
+I think that would also save you duplicate work, as it's always
+possible that we misunderstand each other in the review. Also,
+when someone asks you questions during a review, please reply to
+those questions so we can get a common understanding of the facts
+and document that in the mail archives.
+
+	Arnd
