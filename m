@@ -1,48 +1,36 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 30 Nov 2015 16:23:46 +0200
-Subject: [PATCH 04/18] ARM: am57xx: cl-som-am57x: dts: add EEPROM support
-In-Reply-To: <1448433590-1399-5-git-send-email-lifshitz@compulab.co.il>
-References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
- <1448433590-1399-5-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <565C5BF2.5000601@compulab.co.il>
+From: pmladek@suse.com (Petr Mladek)
+Date: Mon, 30 Nov 2015 15:25:45 +0100
+Subject: [PATCH v2 1/5] printk/nmi: Generic solution for safe printk in NMI
+In-Reply-To: <CAMo8BfJKrrCxhHFEgOrB+KgttjZOSKO1a=FMdEw=YcHa2KDCqw@mail.gmail.com>
+References: <1448622572-16900-1-git-send-email-pmladek@suse.com>
+ <1448622572-16900-2-git-send-email-pmladek@suse.com>
+ <CAMo8BfJKrrCxhHFEgOrB+KgttjZOSKO1a=FMdEw=YcHa2KDCqw@mail.gmail.com>
+Message-ID: <20151130142545.GB8047@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dima,
+On Fri 2015-11-27 17:26:16, Max Filippov wrote:
+Hi Max,
 
-On 11/25/15 08:39, Dmitry Lifshitz wrote:
-> On-board EEPROM chip is used for storing a board production
-> info.
+> > Another exception is Xtensa architecture that uses just a
+> > fake NMI.
 > 
-> Add module EEPROM support (over I2C4 bus).
+> It's called fake because it's actually maskable, but sometimes
+> it is safe to use it as NMI (when there are no other IRQs at the
+> same priority level and that level equals EXCM level). That
+> condition is checked in arch/xtensa/include/asm/processor.h
+> So 'fake' here is to avoid confusion with real NMI that exists
+> on xtensa (and is not currently used in linux), otherwise code
+> that runs in fake NMI must follow the NMI rules.
 > 
-> Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
-> ---
->  arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-> index eb9b81b..b6919a7 100644
-> --- a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-> +++ b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-> @@ -289,6 +289,12 @@
->  		compatible = "emmicro,em3027";
->  		reg = <0x56>;
->  	};
-> +
-> +	eeprom_module: atmel at 50 {
-> +		compatible = "atmel,24c02";
+> To make xtensa compatible with your change we can add a
+> choice whether fake NMI should be used to kconfig. It can
+> then set HAVE_NMI accordingly. I'll post a patch for xtensa.
 
-If I'm not mistaken, the eeprom should be 24c08, no?
+Thanks a lot for explanation. I'll wait for the destiny of
+the patch adding CONFIG_XTENSA_FAKE_NMI. It is not easy
+for me to review. Anyway, we could select HAVE_NMI for
+Xtensa anytime later if this patchset goes in earlier.
 
-> +		reg = <0x50>;
-> +		pagesize = <16>;
-> +	};
->  };
->  
->  
-> 
-
--- 
-Regards,
-Igor.
+Best Regards,
+Petr
