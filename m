@@ -1,50 +1,145 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 30 Nov 2015 15:28:26 +0100
-Subject: [PATCH 2/2] ARM: mvebu: add Kirkwood cpuidle to defconfig
-In-Reply-To: <1448461045-16772-1-git-send-email-linus.walleij@linaro.org>
- (Linus Walleij's message of "Wed, 25 Nov 2015 15:17:25 +0100")
-References: <1448461045-16772-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <871tb75zp1.fsf@free-electrons.com>
+From: lifshitz@compulab.co.il (Dmitry Lifshitz)
+Date: Mon, 30 Nov 2015 16:27:31 +0200
+Subject: [PATCH v2 07/18] ARM: am57xx: cl-som-am57x: dts: add dual EMAC support
+In-Reply-To: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
+References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1448893651-764-1-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Add dual EMAC support.
+
+Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+---
+ v2: 
+
+   * Fix pinmux comments for RGMII0/1 clock/data lines
+   * Fix pinmux for MDIO bus clock/data lines
+   * Fix PHYs addresses
+
+ arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 105 ++++++++++++++++++++++++++++++
+ 1 file changed, 105 insertions(+)
+
+diff --git a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+index 9042185..1efa090 100644
+--- a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
++++ b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+@@ -104,6 +104,85 @@
+ 			DRA7XX_CORE_IOPAD(0x34bc, PIN_INPUT_PULLUP | MUX_MODE1)	/* gpmc_cs3.qspi1_cs1 */
+ 		>;
+ 	};
++
++	cpsw_pins_default: cpsw_pins_default {
++		pinctrl-single,pins = <
++			/* Slave at addr 0x0 */
++			DRA7XX_CORE_IOPAD(0x3650, PIN_OUTPUT | MUX_MODE0)	/* rgmii0_tclk */
++			DRA7XX_CORE_IOPAD(0x3654, PIN_OUTPUT | MUX_MODE0)	/* rgmii0_tctl */
++			DRA7XX_CORE_IOPAD(0x3658, PIN_OUTPUT | MUX_MODE0)	/* rgmii0_td3 */
++			DRA7XX_CORE_IOPAD(0x365c, PIN_OUTPUT | MUX_MODE0)	/* rgmii0_td2 */
++			DRA7XX_CORE_IOPAD(0x3660, PIN_OUTPUT | MUX_MODE0)	/* rgmii0_td1 */
++			DRA7XX_CORE_IOPAD(0x3664, PIN_OUTPUT | MUX_MODE0)	/* rgmii0_td0 */
++			DRA7XX_CORE_IOPAD(0x3668, PIN_INPUT_PULLDOWN | MUX_MODE0) /* rgmii0_rclk */
++			DRA7XX_CORE_IOPAD(0x366c, PIN_INPUT_PULLDOWN | MUX_MODE0) /* rgmii0_rctl */
++			DRA7XX_CORE_IOPAD(0x3670, PIN_INPUT_PULLDOWN | MUX_MODE0) /* rgmii0_rd3 */
++			DRA7XX_CORE_IOPAD(0x3674, PIN_INPUT_PULLDOWN | MUX_MODE0) /* rgmii0_rd2 */
++			DRA7XX_CORE_IOPAD(0x3678, PIN_INPUT_PULLDOWN | MUX_MODE0) /* rgmii0_rd1 */
++			DRA7XX_CORE_IOPAD(0x367c, PIN_INPUT_PULLDOWN | MUX_MODE0) /* rgmii0_rd0 */
++
++			/* Slave@addr 0x1 */
++			DRA7XX_CORE_IOPAD(0x3598, PIN_OUTPUT | MUX_MODE3)	/* vin2a_d12.rgmii1_tclk */
++			DRA7XX_CORE_IOPAD(0x359c, PIN_OUTPUT | MUX_MODE3)	/* vin2a_d13.rgmii1_tctl */
++			DRA7XX_CORE_IOPAD(0x35a0, PIN_OUTPUT | MUX_MODE3)	/* vin2a_d14.rgmii1_td3 */
++			DRA7XX_CORE_IOPAD(0x35a4, PIN_OUTPUT | MUX_MODE3)	/* vin2a_d15.rgmii1_td2 */
++			DRA7XX_CORE_IOPAD(0x35a8, PIN_OUTPUT | MUX_MODE3)	/* vin2a_d16.rgmii1_td1 */
++			DRA7XX_CORE_IOPAD(0x35ac, PIN_OUTPUT | MUX_MODE3)	/* vin2a_d17.rgmii1_td0 */
++			DRA7XX_CORE_IOPAD(0x35b0, PIN_INPUT_PULLDOWN | MUX_MODE3) /* vin2a_d18.rgmii1_rclk */
++			DRA7XX_CORE_IOPAD(0x35b4, PIN_INPUT_PULLDOWN | MUX_MODE3) /* vin2a_d19.rgmii1_rctl */
++			DRA7XX_CORE_IOPAD(0x35b8, PIN_INPUT_PULLDOWN | MUX_MODE3) /* vin2a_d20.rgmii1_rd3 */
++			DRA7XX_CORE_IOPAD(0x35bc, PIN_INPUT_PULLDOWN | MUX_MODE3) /* vin2a_d21.rgmii1_rd2 */
++			DRA7XX_CORE_IOPAD(0x35c0, PIN_INPUT_PULLDOWN | MUX_MODE3) /* vin2a_d22.rgmii1_rd1 */
++			DRA7XX_CORE_IOPAD(0x35c4, PIN_INPUT_PULLUP | MUX_MODE3)	/* vin2a_d23.rgmii1_rd0 */
++		>;
++	};
++
++	cpsw_pins_sleep: cpsw_pins_sleep {
++		pinctrl-single,pins = <
++			/* Slave 1 */
++			DRA7XX_CORE_IOPAD(0x3650, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x3654, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x3658, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x365c, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x3660, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x3664, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x3668, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x366c, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x3670, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x3674, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x3678, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x367c, PIN_INPUT | MUX_MODE15)
++
++			/* Slave 2 */
++			DRA7XX_CORE_IOPAD(0x3598, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x359c, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x35a0, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x35a4, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x35a8, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x35ac, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x35b0, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x35b4, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x35b8, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x35bc, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x35c0, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x35c4, PIN_INPUT | MUX_MODE15)
++		>;
++	};
++
++	davinci_mdio_pins_default: davinci_mdio_pins_default {
++		pinctrl-single,pins = <
++			/* MDIO */
++			DRA7XX_CORE_IOPAD(0x3590, PIN_OUTPUT_PULLUP | MUX_MODE3)/* vin2a_d10.mdio_mclk */
++			DRA7XX_CORE_IOPAD(0x3594, PIN_INPUT_PULLUP | MUX_MODE3)	/* vin2a_d11.mdio_d */
++		>;
++	};
++
++	davinci_mdio_pins_sleep: davinci_mdio_pins_sleep {
++		pinctrl-single,pins = <
++			DRA7XX_CORE_IOPAD(0x3590, PIN_INPUT | MUX_MODE15)
++			DRA7XX_CORE_IOPAD(0x3594, PIN_INPUT | MUX_MODE15)
++		>;
++	};
+ };
  
- On mer., nov. 25 2015, Linus Walleij <linus.walleij@linaro.org> wrote:
-
-> The Kirkwood v5 platforms need their CPUIDLE driver, so put it
-> into the defconfig.
->
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-Applied on mvebu/defconfig
-
-Thanks,
-
-Gregory
-
-> ---
->  arch/arm/configs/mvebu_v5_defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
-> index 519c72725798..aa9079c84024 100644
-> --- a/arch/arm/configs/mvebu_v5_defconfig
-> +++ b/arch/arm/configs/mvebu_v5_defconfig
-> @@ -25,6 +25,7 @@ CONFIG_CPU_FREQ=y
->  CONFIG_CPU_FREQ_STAT_DETAILS=y
->  CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
->  CONFIG_CPU_IDLE=y
-> +CONFIG_ARM_KIRKWOOD_CPUIDLE=y
->  CONFIG_NET=y
->  CONFIG_PACKET=y
->  CONFIG_UNIX=y
-> -- 
-> 2.4.3
->
-
+ &i2c1 {
+@@ -375,3 +454,29 @@
+ 		};
+ 	};
+ };
++
++&mac {
++	status = "okay";
++	pinctrl-names = "default", "sleep";
++	pinctrl-0 = <&cpsw_pins_default>;
++	pinctrl-1 = <&cpsw_pins_sleep>;
++	dual_emac;
++};
++
++&cpsw_emac0 {
++	phy_id = <&davinci_mdio>, <0>;
++	phy-mode = "rgmii";
++	dual_emac_res_vlan = <0>;
++};
++
++&cpsw_emac1 {
++	phy_id = <&davinci_mdio>, <1>;
++	phy-mode = "rgmii";
++	dual_emac_res_vlan = <1>;
++};
++
++&davinci_mdio {
++	pinctrl-names = "default", "sleep";
++	pinctrl-0 = <&davinci_mdio_pins_default>;
++	pinctrl-1 = <&davinci_mdio_pins_sleep>;
++};
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.9.1
