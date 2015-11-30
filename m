@@ -1,56 +1,68 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Mon, 30 Nov 2015 14:24:07 -0800
-Subject: [RESEND PATCH] arm64: bpf: add 'store immediate' instruction
-Message-ID: <1448922247-5692-1-git-send-email-yang.shi@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 30 Nov 2015 15:03:14 -0800
+Subject: Incomplete DM814x support in 4.3
+In-Reply-To: <564C7AF5.9070209@linutronix.de>
+References: <564C7AF5.9070209@linutronix.de>
+Message-ID: <20151130230314.GM23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-aarch64 doesn't have native store immediate instruction, such operation
-has to be implemented by the below instruction sequence:
+Hi,
 
-Load immediate to register
-Store register
+Adding linux-omap to Cc.
 
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
-CC: Zi Shen Lim <zlim.lnx@gmail.com>
-CC: Xi Wang <xi.wang@gmail.com>
----
-Thsi patch might be buried by the storm of xadd discussion, however, it is
-absolutely irrelevent to xadd, so resend the patch itself.
+* Philipp Rosenberger <ilu@linutronix.de> [151118 05:20]:
+> Hi,
+> 
+> I have seen with pleasure that some support for DM814x was integrated to the kernel. But it seems incomplete I get various errors when I try to boot the kernel on a DM814x/AM387x based board.
 
- arch/arm64/net/bpf_jit_comp.c | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+Sorry for the delay in replying. Current dm8148 support is based on the
+bootloader clocks right now so YMMW. I fixed up the basic support for
+dm8148 on hp t410 and that is bootable to NFSroot with mainline.
 
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index 6809647..49c1f1b 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -563,7 +563,25 @@ emit_cond_jmp:
- 	case BPF_ST | BPF_MEM | BPF_H:
- 	case BPF_ST | BPF_MEM | BPF_B:
- 	case BPF_ST | BPF_MEM | BPF_DW:
--		goto notyet;
-+		/* Load imm to a register then store it */
-+		ctx->tmp_used = 1;
-+		emit_a64_mov_i(1, tmp2, off, ctx);
-+		emit_a64_mov_i(1, tmp, imm, ctx);
-+		switch (BPF_SIZE(code)) {
-+		case BPF_W:
-+			emit(A64_STR32(tmp, dst, tmp2), ctx);
-+			break;
-+		case BPF_H:
-+			emit(A64_STRH(tmp, dst, tmp2), ctx);
-+			break;
-+		case BPF_B:
-+			emit(A64_STRB(tmp, dst, tmp2), ctx);
-+			break;
-+		case BPF_DW:
-+			emit(A64_STR64(tmp, dst, tmp2), ctx);
-+			break;
-+		}
-+		break;
- 
- 	/* STX: *(size *)(dst + off) = src */
- 	case BPF_STX | BPF_MEM | BPF_W:
--- 
-2.0.2
+I'll try to post some patches soon for adding the clock driver and more devices.
+So far I have GPIOs, Ethernet, USB and MMC working.. Also on dm8148-evm.
+
+I still need to clean up things a bit, hoping to be able to post this week at
+some point.
+
+> End in the end it panics with this:
+> [    0.379442] platform ocp: Cannot lookup hwmod 'l3_main'
+> [    0.387920] platform 48032000.gpio: Cannot lookup hwmod 'gpio1'
+> [    0.394638] omap_gpio 48032000.gpio: Could not get gpio dbck. Disable debounce
+> [    0.402220] omap_gpio 48032000.gpio: _od_fail_runtime_resume: FIXME: missing hwmod/omap_dev info
+> [    0.411448] Unhandled fault: external abort on non-linefetch (0x1028) at 0xfa032034
+
+Yup this is what I'm seeing too on dm8148-evm after I got one. It's because of
+the missing clocks.
+
+> I searched for 'l3_main' in the hwmods for dm814x but it is not defined in there.
+
+I think I have fixed up that one too.. Need to check :)
+
+> I didn't find a driver in the tree which is compatible with "ti,dm814-pllss" so no driver for pll handling.
+
+I have an initial driver coming up for that.. Heh it also works as a loadable
+module on hp t410 :)
+
+> Is there some work in progress to bring the missing parts into the kernel?
+
+Yes, best to coordinate the effort on linux-omap and linux-arm-kernel lists.
+
+FYI, I have these pieces coming up this week:
+
+- Few fixes for for the clock muxes for system timers
+
+- Basic clock driver for dm8148 ADPLLs, still in read-only mode for the PLLs
+
+- DTS + hwmod support for GPIOs, MMC and MUSB
+
+- Minimal board support for j5eco-evm
+
+Then the PWM support done for dm816x should also work on others, and I belive
+people are working on getting the DSP supported but don't know the current
+status. Maybe somebody can reply on that?
+
+Regards,
+
+Tony
