@@ -1,61 +1,59 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Mon, 30 Nov 2015 15:25:34 +0000
-Subject: [PATCH v3 49/62] arm/acpi: Map rest tables for Dom0
-In-Reply-To: <alpine.DEB.2.02.1511271211590.8984@kaball.uk.xensource.com>
+Date: Mon, 30 Nov 2015 15:14:07 +0000
+Subject: [Xen-devel] [PATCH v3 40/62] arm/acpi: Estimate memory required
+ for acpi/efi tables
+In-Reply-To: <1447753261-7552-41-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-50-git-send-email-shannon.zhao@linaro.org>
- <alpine.DEB.2.02.1511271211590.8984@kaball.uk.xensource.com>
-Message-ID: <565C6A6E.3000102@citrix.com>
+ <1447753261-7552-41-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <565C67BF.4040804@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Shannon,
 
-On 27/11/15 12:16, Stefano Stabellini wrote:
-> On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
->>
->> Map other reused tables for Dom0.
-> 
-> "Map all other tables to Dom0 using 1:1 mappings."
-> 
-> 
->> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> ---
->>  xen/arch/arm/domain_build.c | 25 +++++++++++++++++++++++++
->>  1 file changed, 25 insertions(+)
->>
->> diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
->> index 6ae5761..da4e271 100644
->> --- a/xen/arch/arm/domain_build.c
->> +++ b/xen/arch/arm/domain_build.c
->> @@ -1359,6 +1359,29 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
->>  #ifdef CONFIG_ACPI
->>  #define XEN_HYPERVISOR_ID 0x000058656E564D4D  /* "XenVMM" */
->>  
->> +static void acpi_map_rest_tables(struct domain *d)
-> 
-> The name doesn't sound nice, "acpi_map_other_tables" would be better.
-> However this function is not actually mapping the other tables, it is
-> mapping *all* of them, including the original madt and fadt, right? I
-> think it would be best to avoid mapping the originals.
-> 
-> 
->> +{
->> +    int i;
->> +    unsigned long res;
->> +    u64 addr, size;
-> 
-> Add a comment that they are being mapped 1:1
+On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
+> diff --git a/xen/common/efi/boot.c b/xen/common/efi/boot.c
+> index 53c7452..78d8ae9 100644
+> --- a/xen/common/efi/boot.c
+> +++ b/xen/common/efi/boot.c
+> @@ -13,6 +13,7 @@
+>  #include <xen/multiboot.h>
+>  #include <xen/pci_regs.h>
+>  #include <xen/pfn.h>
+> +#include <asm/acpi.h>
+>  #if EFI_PAGE_SIZE != PAGE_SIZE
+>  # error Cannot use xen/pfn.h here!
+>  #endif
+> @@ -1171,6 +1172,26 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
+>      for( ; ; ); /* not reached */
+>  }
+>  
+> +#ifdef CONFIG_ACPI
+> +/* Constant to indicate "Xen" in unicode u16 format */
+> +static const u16 XEN_EFI_FW_VENDOR[] ={0x0058,0x0065,0x006E,0x0000};
+> +
+> +int __init estimate_efi_size(int mem_nr_banks)
+> +{
+> +    int size;
+> +    int est_size = sizeof(EFI_SYSTEM_TABLE);
+> +    int ect_size = sizeof(EFI_CONFIGURATION_TABLE);
+> +    int emd_size = sizeof(EFI_MEMORY_DESCRIPTOR);
+> +    int fw_vendor_size = sizeof(XEN_EFI_FW_VENDOR);
+> +
+> +    size = PAGE_ALIGN(est_size + ect_size + fw_vendor_size)
+> +           + PAGE_ALIGN(emd_size *
+> +                        (mem_nr_banks + acpi_mem.nr_banks + TBL_MMAX));
+> +
+> +    return size;
+> +}
+> +#endif
+> +
 
-I don't like the fact that we begin to assume domain is mapped 1:1 in so
-many places.
+efi/boot.c only contains code related to the stub EFI. This is not the
+case of this code.
 
-If we decide one day to drop the 1:1 mapping it would be more difficult.
-
-Can we try to rationalize the place where the 1:1 mapping is added?
-
-Some ASSERT(is_domain_direct_mapped(..)) would be useful too.
+Moreover, this code won't compile on x86 because acpi_mem is only
+defined for ARM.
 
 Regards,
 
