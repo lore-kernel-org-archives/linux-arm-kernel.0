@@ -1,93 +1,43 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 30 Nov 2015 11:41:40 +0100
-Subject: [PATCH 2/2] soc: mediatek: SCPSYS: Add regulator support
+Date: Mon, 30 Nov 2015 11:41:39 +0100
+Subject: [PATCH 1/2] dt-bindings: soc: Add supplies for Mediatek SCPSYS unit
 In-Reply-To: <1448880100-23396-1-git-send-email-s.hauer@pengutronix.de>
 References: <1448880100-23396-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1448880100-23396-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1448880100-23396-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The power domains are supplied by regulators. Add support for them so
-that the regulators are properly turned on before a domain is powered up
-and turned off when a domain is powered down.
+The power domains in the SCPSYS unit are supplied by regulators. Add the
+properties for them to the binding document.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: devicetree at vger.kernel.org
 ---
- drivers/soc/mediatek/mtk-scpsys.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ Documentation/devicetree/bindings/soc/mediatek/scpsys.txt | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-index 4d4203c..e425619 100644
---- a/drivers/soc/mediatek/mtk-scpsys.c
-+++ b/drivers/soc/mediatek/mtk-scpsys.c
-@@ -21,6 +21,7 @@
- #include <linux/pm_domain.h>
- #include <linux/regmap.h>
- #include <linux/soc/mediatek/infracfg.h>
-+#include <linux/regulator/consumer.h>
- #include <dt-bindings/power/mt8173-power.h>
+diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+index a6c8afc..e8f15e3 100644
+--- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
++++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+@@ -21,6 +21,18 @@ Required properties:
+ 		      These are the clocks which hardware needs to be enabled
+ 		      before enabling certain power domains.
  
- #define SPM_VDE_PWR_CON			0x0210
-@@ -179,6 +180,7 @@ struct scp_domain {
- 	u32 sram_pdn_ack_bits;
- 	u32 bus_prot_mask;
- 	bool active_wakeup;
-+	struct regulator *supply;
- };
- 
- struct scp {
-@@ -221,6 +223,12 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
- 	int ret;
- 	int i;
- 
-+	if (scpd->supply) {
-+		ret = regulator_enable(scpd->supply);
-+		if (ret)
-+			return ret;
-+	}
++Optional properties:
++- vdec-supply: Power supply for the vdec power domain
++- venc-supply: Power supply for the venc power domain
++- isp-supply: Power supply for the isp power domain
++- mm-supply: Power supply for the mm power domain
++- venc_lt-supply: Power supply for the venc_lt power domain
++- audio-supply: Power supply for the audio power domain
++- usb-supply: Power supply for the usb power domain
++- mfg_async-supply: Power supply for the mfg_async power domain
++- mfg_2d-supply: Power supply for the mfg_2d power domain
++- mfg-supply: Power supply for the mfg power domain
 +
- 	for (i = 0; i < MAX_CLKS && scpd->clk[i]; i++) {
- 		ret = clk_prepare_enable(scpd->clk[i]);
- 		if (ret) {
-@@ -299,6 +307,9 @@ err_pwr_ack:
- 			clk_disable_unprepare(scpd->clk[i]);
- 	}
- err_clk:
-+	if (scpd->supply)
-+		regulator_disable(scpd->supply);
-+
- 	dev_err(scp->dev, "Failed to power on domain %s\n", genpd->name);
+ Example:
  
- 	return ret;
-@@ -379,6 +390,9 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
- 	for (i = 0; i < MAX_CLKS && scpd->clk[i]; i++)
- 		clk_disable_unprepare(scpd->clk[i]);
- 
-+	if (scpd->supply)
-+		regulator_disable(scpd->supply);
-+
- 	return 0;
- 
- out:
-@@ -448,6 +462,19 @@ static int __init scpsys_probe(struct platform_device *pdev)
- 		return PTR_ERR(scp->infracfg);
- 	}
- 
-+	for (i = 0; i < NUM_DOMAINS; i++) {
-+		struct scp_domain *scpd = &scp->domains[i];
-+		const struct scp_domain_data *data = &scp_domain_data[i];
-+
-+		scpd->supply = devm_regulator_get_optional(&pdev->dev, data->name);
-+		if (IS_ERR(scpd->supply)) {
-+			if (PTR_ERR(scpd->supply) == -ENODEV)
-+				scpd->supply = NULL;
-+			else
-+				return PTR_ERR(scpd->supply);
-+		}
-+	}
-+
- 	pd_data->num_domains = NUM_DOMAINS;
- 
- 	for (i = 0; i < NUM_DOMAINS; i++) {
+ 	scpsys: scpsys at 10006000 {
 -- 
 2.6.2
