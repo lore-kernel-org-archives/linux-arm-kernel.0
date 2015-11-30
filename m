@@ -1,85 +1,99 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 30 Nov 2015 15:36:07 +0000
-Subject: [RESEND RFC/PATCH 3/8] media: platform: mtk-vpu: Support Mediatek
- VPU
-In-Reply-To: <1448883819.15961.7.camel@mtksdaap41>
-References: <1447764885-23100-1-git-send-email-tiffany.lin@mediatek.com>
- <1447764885-23100-4-git-send-email-tiffany.lin@mediatek.com>
- <5655DDB4.2080002@linaro.org> <1448626209.7734.26.camel@mtksdaap41>
- <56584AC5.7020704@linaro.org> <1448883819.15961.7.camel@mtksdaap41>
-Message-ID: <CAMTL27G8WRTTGCtU9pXpp1-inyzZE9Jat1SkOiX5HMG5E-eFzw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 30 Nov 2015 16:34:59 +0100
+Subject: [PATCH] clk: sunxi: pll2: Fix clock running too fast
+Message-ID: <1448897699-20475-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 November 2015 at 11:43, andrew-ct chen
-<andrew-ct.chen@mediatek.com> wrote:
-> On Fri, 2015-11-27 at 12:21 +0000, Daniel Thompson wrote:
->> On 27/11/15 12:10, andrew-ct chen wrote:
->> >>> +
->> >>> > >+      memcpy((void *)send_obj->share_buf, buf, len);
->> >>> > >+      send_obj->len = len;
->> >>> > >+      send_obj->id = id;
->> >>> > >+      vpu_cfg_writel(vpu, 0x1, HOST_TO_VPU);
->> >>> > >+
->> >>> > >+      /* Wait until VPU receives the command */
->> >>> > >+      timeout = jiffies + msecs_to_jiffies(IPI_TIMEOUT_MS);
->> >>> > >+      do {
->> >>> > >+              if (time_after(jiffies, timeout)) {
->> >>> > >+                      dev_err(vpu->dev, "vpu_ipi_send: IPI timeout!\n");
->> >>> > >+                      return -EIO;
->> >>> > >+              }
->> >>> > >+      } while (vpu_cfg_readl(vpu, HOST_TO_VPU));
->> >> >
->> >> >Do we need to busy wait every time we communicate with the co-processor?
->> >> >Couldn't we put this wait*before*  we write to HOST_TO_VPU above.
->> >> >
->> >> >That way we only spin when there is a need to.
->> >> >
->> > Since the hardware VPU only allows that one client sends the command to
->> > it each time.
->> > We need the wait to make sure VPU accepted the command and cleared the
->> > interrupt and then the next command would be served.
->>
->> I understand that the VPU  can only have on message outstanding at once.
->>
->> I just wonder why we busy wait *after* sending the first command rather
->> than *before* sending the second one.
->
-> No other special reasons. Just send one command and wait until VPU gets
-> the command. Then, I think this wait also can be put before we write to
-> HOST_TO_VPU.Is this better than former? May I know the reason?
+Contrary to what the datasheet says, the pre divider doesn't seem to be
+incremented by one in the PLL2, but just uses the value from the register,
+with 0 being a bypass.
 
-Busy waiting is bad; it is a waste of host CPU processor time and/or power.
+This fixes the audio playing too fast.
 
-When the busy wait occurs after queuing then we will busy wait for
-every command we send.
+Since we now have the same pre-divider flags, and the only difference with
+the A10 is the post-divider offset, also remove the structure to just pass
+the offset as an argument.
 
-If busy wait occurs before next queuing then we will wait for a
-shorter time in total because we have the chance to do something
-useful on the host before we have to wait.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
 
+Hi Stephen, Mike,
 
->> Streamed decode/encode typically ends up being rate controlled by
->> capture or display meaning that in these cases we don't need to busy
->> wait at all (because by the time we send the next frame the VPU has
->> already accepted the previous message).
->
-> For now, only one device "encoder" exists, it is true.
-> But, we'll have encoder and decoder devices, the decode and encode
-> requested to VPU are simultaneous.
+Could you apply this patch for 4.4?
 
-Sure, I accept that lock and busy-wait is an appropriate way to ensure
-safety (assuming the VPU is fairly quick clearing the HOST_TO_VPU
-flag).
+Thanks,
+Maxime
 
+ drivers/clk/sunxi/clk-a10-pll2.c | 23 +++++------------------
+ 1 file changed, 5 insertions(+), 18 deletions(-)
 
-> Is this supposed to be removed for this patches and we can add it back
-> if the another device(decoder) is ready for review?
-
-No I'm not suggesting that.
-
-I only recommend moving the busy wait *before* end sending of command
-(for efficiency reasons mentioned above).
-
-
-Daniel.
+diff --git a/drivers/clk/sunxi/clk-a10-pll2.c b/drivers/clk/sunxi/clk-a10-pll2.c
+index 5484c31ec568..30d4bfb4cd3d 100644
+--- a/drivers/clk/sunxi/clk-a10-pll2.c
++++ b/drivers/clk/sunxi/clk-a10-pll2.c
+@@ -41,15 +41,10 @@
+ 
+ #define SUN4I_PLL2_OUTPUTS		4
+ 
+-struct sun4i_pll2_data {
+-	u32	post_div_offset;
+-	u32	pre_div_flags;
+-};
+-
+ static DEFINE_SPINLOCK(sun4i_a10_pll2_lock);
+ 
+ static void __init sun4i_pll2_setup(struct device_node *node,
+-				    struct sun4i_pll2_data *data)
++				    int post_div_offset)
+ {
+ 	const char *clk_name = node->name, *parent;
+ 	struct clk **clks, *base_clk, *prediv_clk;
+@@ -76,7 +71,7 @@ static void __init sun4i_pll2_setup(struct device_node *node,
+ 					  parent, 0, reg,
+ 					  SUN4I_PLL2_PRE_DIV_SHIFT,
+ 					  SUN4I_PLL2_PRE_DIV_WIDTH,
+-					  data->pre_div_flags,
++					  CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO,
+ 					  &sun4i_a10_pll2_lock);
+ 	if (!prediv_clk) {
+ 		pr_err("Couldn't register the prediv clock\n");
+@@ -127,7 +122,7 @@ static void __init sun4i_pll2_setup(struct device_node *node,
+ 	 */
+ 	val = readl(reg);
+ 	val &= ~(SUN4I_PLL2_POST_DIV_MASK << SUN4I_PLL2_POST_DIV_SHIFT);
+-	val |= (SUN4I_PLL2_POST_DIV_VALUE - data->post_div_offset) << SUN4I_PLL2_POST_DIV_SHIFT;
++	val |= (SUN4I_PLL2_POST_DIV_VALUE - post_div_offset) << SUN4I_PLL2_POST_DIV_SHIFT;
+ 	writel(val, reg);
+ 
+ 	of_property_read_string_index(node, "clock-output-names",
+@@ -191,25 +186,17 @@ err_unmap:
+ 	iounmap(reg);
+ }
+ 
+-static struct sun4i_pll2_data sun4i_a10_pll2_data = {
+-	.pre_div_flags	= CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO,
+-};
+-
+ static void __init sun4i_a10_pll2_setup(struct device_node *node)
+ {
+-	sun4i_pll2_setup(node, &sun4i_a10_pll2_data);
++	sun4i_pll2_setup(node, &sun4i_a10_pll2_data, 0);
+ }
+ 
+ CLK_OF_DECLARE(sun4i_a10_pll2, "allwinner,sun4i-a10-pll2-clk",
+ 	       sun4i_a10_pll2_setup);
+ 
+-static struct sun4i_pll2_data sun5i_a13_pll2_data = {
+-	.post_div_offset	= 1,
+-};
+-
+ static void __init sun5i_a13_pll2_setup(struct device_node *node)
+ {
+-	sun4i_pll2_setup(node, &sun5i_a13_pll2_data);
++	sun4i_pll2_setup(node, &sun5i_a13_pll2_data, 1);
+ }
+ 
+ CLK_OF_DECLARE(sun5i_a13_pll2, "allwinner,sun5i-a13-pll2-clk",
+-- 
+2.6.3
