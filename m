@@ -1,55 +1,75 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 30 Nov 2015 12:42:33 +0100
-Subject: [PATCH 3/3] ARM64: dts: mt8173: Add thermal/auxadc device nodes
-In-Reply-To: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
-References: <1448883753-19068-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1448883753-19068-4-git-send-email-s.hauer@pengutronix.de>
+From: andrew-ct.chen@mediatek.com (andrew-ct chen)
+Date: Mon, 30 Nov 2015 19:43:39 +0800
+Subject: [RESEND RFC/PATCH 3/8] media: platform: mtk-vpu: Support
+ Mediatek VPU
+In-Reply-To: <56584AC5.7020704@linaro.org>
+References: <1447764885-23100-1-git-send-email-tiffany.lin@mediatek.com>
+ <1447764885-23100-4-git-send-email-tiffany.lin@mediatek.com>
+ <5655DDB4.2080002@linaro.org> <1448626209.7734.26.camel@mtksdaap41>
+ <56584AC5.7020704@linaro.org>
+Message-ID: <1448883819.15961.7.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the thermal controller and auxadc nodes to the Mediatek MT8173
-dtsi file.
+On Fri, 2015-11-27 at 12:21 +0000, Daniel Thompson wrote:
+> On 27/11/15 12:10, andrew-ct chen wrote:
+> >>> +
+> >>> > >+	memcpy((void *)send_obj->share_buf, buf, len);
+> >>> > >+	send_obj->len = len;
+> >>> > >+	send_obj->id = id;
+> >>> > >+	vpu_cfg_writel(vpu, 0x1, HOST_TO_VPU);
+> >>> > >+
+> >>> > >+	/* Wait until VPU receives the command */
+> >>> > >+	timeout = jiffies + msecs_to_jiffies(IPI_TIMEOUT_MS);
+> >>> > >+	do {
+> >>> > >+		if (time_after(jiffies, timeout)) {
+> >>> > >+			dev_err(vpu->dev, "vpu_ipi_send: IPI timeout!\n");
+> >>> > >+			return -EIO;
+> >>> > >+		}
+> >>> > >+	} while (vpu_cfg_readl(vpu, HOST_TO_VPU));
+> >> >
+> >> >Do we need to busy wait every time we communicate with the co-processor?
+> >> >Couldn't we put this wait*before*  we write to HOST_TO_VPU above.
+> >> >
+> >> >That way we only spin when there is a need to.
+> >> >
+> > Since the hardware VPU only allows that one client sends the command to
+> > it each time.
+> > We need the wait to make sure VPU accepted the command and cleared the
+> > interrupt and then the next command would be served.
+> 
+> I understand that the VPU  can only have on message outstanding at once.
+> 
+> I just wonder why we busy wait *after* sending the first command rather 
+> than *before* sending the second one.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+No other special reasons. Just send one command and wait until VPU gets
+the command. Then, I think this wait also can be put before we write to
+HOST_TO_VPU.Is this better than former? May I know the reason?
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 06a1564..e2ddd03 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -277,6 +277,11 @@
- 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
- 		};
- 
-+		auxadc: auxadc at 11001000 {
-+			compatible = "mediatek,mt8173-auxadc";
-+			reg = <0 0x11001000 0 0x1000>;
-+		};
-+
- 		uart0: serial at 11002000 {
- 			compatible = "mediatek,mt8173-uart",
- 				     "mediatek,mt6577-uart";
-@@ -487,6 +492,18 @@
- 			clock-names = "source", "hclk";
- 			status = "disabled";
- 		};
-+
-+		thermal: thermal at 1100b000 {
-+			#thermal-sensor-cells = <0>;
-+			compatible = "mediatek,mt8173-thermal";
-+			reg = <0 0x1100b000 0 0x1000>;
-+			interrupts = <0 70 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
-+			clock-names = "therm", "auxadc";
-+			resets = <&pericfg MT8173_PERI_THERM_SW_RST>;
-+			mediatek,auxadc = <&auxadc>;
-+			mediatek,apmixedsys = <&apmixedsys>;
-+		};
- 	};
- };
- 
--- 
-2.6.2
+
+> 
+> Streamed decode/encode typically ends up being rate controlled by 
+> capture or display meaning that in these cases we don't need to busy 
+> wait at all (because by the time we send the next frame the VPU has 
+> already accepted the previous message).
+
+For now, only one device "encoder" exists, it is true.
+But, we'll have encoder and decoder devices, the decode and encode
+requested to VPU are simultaneous.
+Is this supposed to be removed for this patches and we can add it back
+if the another device(decoder) is ready for review?
+
+
+Andrew
+
+
+> 
+> 
+> Daniel.
+> 
+> 
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
