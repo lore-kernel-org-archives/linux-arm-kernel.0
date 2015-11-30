@@ -1,33 +1,80 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 30 Nov 2015 18:34:19 +0000
-Subject: [PATCH v4 00/21] KVM: ARM64: Add guest PMU support
-In-Reply-To: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <20151130183419.471ec20f@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 30 Nov 2015 10:37:07 -0800
+Subject: [PATCH 3/3] arm: plat-omap: Add PWM dmtimer platform data quirks
+In-Reply-To: <56374592.4060201@baylibre.com>
+References: <56374592.4060201@baylibre.com>
+Message-ID: <20151130183707.GK2517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 30 Oct 2015 14:21:42 +0800
-Shannon Zhao <zhaoshenglong@huawei.com> wrote:
-
-Hi Shannon,
-
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+* Neil Armstrong <narmstrong@baylibre.com> [151102 03:14]:
+> In order to set the currently platform dependent dmtimer
+> functions pointers as platform data for the pwm-omap-dmtimer
+> platform driver, add it to plat-omap auxdata_lookup table.
 > 
-> This patchset adds guest PMU support for KVM on ARM64. It takes
-> trap-and-emulate approach. When guest wants to monitor one event, it
-> will be trapped by KVM and KVM will call perf_event API to create a perf
-> event and call relevant perf_event APIs to get the count value of event.
+> Suggested-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-I've been through this whole series, and while this is shaping nicely,
-there is still a number of things that are a bit odd (interrupt
-injection is one, the whole CP15 reset is another).
+Actually this one will need to wait for Thierry to merge the driver
+first because of the dependency to the platform_data. Please resend
+this one separately once the driver hits the mainline tree.
 
-Can you please respin this soon? I'd really like to have this in for
-4.5...
+Regards,
 
-Thanks,
+Tony
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+> ---
+>  arch/arm/mach-omap2/pdata-quirks.c | 23 +++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+> index ea56397..647dec5 100644
+> --- a/arch/arm/mach-omap2/pdata-quirks.c
+> +++ b/arch/arm/mach-omap2/pdata-quirks.c
+> @@ -23,6 +23,8 @@
+>  #include <linux/platform_data/pinctrl-single.h>
+>  #include <linux/platform_data/iommu-omap.h>
+>  #include <linux/platform_data/wkup_m3.h>
+> +#include <linux/platform_data/pwm_omap_dmtimer.h>
+> +#include <plat/dmtimer.h>
+> 
+>  #include <asm/siginfo.h>
+>  #include <asm/signal.h>
+> @@ -453,6 +455,24 @@ void omap_auxdata_legacy_init(struct device *dev)
+>  	dev->platform_data = &twl_gpio_auxdata;
+>  }
+> 
+> +/* Dual mode timer PWM callbacks platdata */
+> +#if IS_ENABLED(CONFIG_OMAP_DM_TIMER)
+> +struct pwm_omap_dmtimer_pdata pwm_dmtimer_pdata = {
+> +	.request_by_node = omap_dm_timer_request_by_node,
+> +	.free = omap_dm_timer_free,
+> +	.enable = omap_dm_timer_enable,
+> +	.disable = omap_dm_timer_disable,
+> +	.get_fclk = omap_dm_timer_get_fclk,
+> +	.start = omap_dm_timer_start,
+> +	.stop = omap_dm_timer_stop,
+> +	.set_load = omap_dm_timer_set_load,
+> +	.set_match = omap_dm_timer_set_match,
+> +	.set_pwm = omap_dm_timer_set_pwm,
+> +	.set_prescaler = omap_dm_timer_set_prescaler,
+> +	.write_counter = omap_dm_timer_write_counter,
+> +};
+> +#endif
+> +
+>  /*
+>   * Few boards still need auxdata populated before we populate
+>   * the dev entries in of_platform_populate().
+> @@ -506,6 +526,9 @@ static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+>  	OF_DEV_AUXDATA("ti,am4372-wkup-m3", 0x44d00000, "44d00000.wkup_m3",
+>  		       &wkup_m3_data),
+>  #endif
+> +#if IS_ENABLED(CONFIG_OMAP_DM_TIMER)
+> +	OF_DEV_AUXDATA("ti,omap-dmtimer-pwm", 0, NULL, &pwm_dmtimer_pdata),
+> +#endif
+>  #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
+>  	OF_DEV_AUXDATA("ti,omap4-iommu", 0x4a066000, "4a066000.mmu",
+>  		       &omap4_iommu_pdata),
+> -- 
+> 1.9.1
+> 
