@@ -1,117 +1,32 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 30 Nov 2015 15:49:04 +0200
-Subject: [4.4-rc][PATCH] ARM: dts: am4372: fix clock source for arm twd
- and global timers
-In-Reply-To: <565C4FE2.3090403@ti.com>
-References: <1448653468-24908-1-git-send-email-grygorii.strashko@ti.com>
- <565C0814.3000001@ti.com> <565C38CE.1070907@ti.com> <565C4FE2.3090403@ti.com>
-Message-ID: <565C53D0.6090305@ti.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 30 Nov 2015 14:51:41 +0100
+Subject: [PATCH] i2c: mv64xxx: The n clockdiv factor is 0 based on sunxi
+ SoCs
+In-Reply-To: <1443365828-8956-1-git-send-email-hdegoede@redhat.com>
+References: <1443365828-8956-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20151130135140.GD1513@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2015 03:32 PM, Tero Kristo wrote:
-> On 11/30/2015 01:53 PM, Grygorii Strashko wrote:
->> On 11/30/2015 10:25 AM, Tero Kristo wrote:
->>> On 11/27/2015 09:44 PM, Grygorii Strashko wrote:
->>>> ARM TWD and Global timer are clocked by PERIPHCLK which is MPU_CLK/2.
->>>> But now they are clocked by dpll_mpu_m2_ck == MPU_CLK and, as result.
->>>> Timekeeping core misbehaves. For example, execution of command
->>>> "sleep 5" will take 10 sec instead of 5.
->>>>
->>>> Hence, fix it by adding mpu_periphclk ("fixed-factor-clock") and use
->>>> it for clocking ARM TWD and Global timer (same way as on OMAP4).
->>>>
->>>> Cc: Tony Lindgren <tony@atomide.com>
->>>> Cc: Felipe Balbi <balbi@ti.com>
->>>> Cc: Tero Kristo <t-kristo@ti.com>
->>>> Fixes:commit 8cbd4c2f6a99 ("arm: boot: dts: am4372: add ARM timers and
->>>> SCU nodes")
->>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>>> ---
->>>>   arch/arm/boot/dts/am4372.dtsi        | 4 ++--
->>>>   arch/arm/boot/dts/am43xx-clocks.dtsi | 8 ++++++++
->>>>   2 files changed, 10 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/am4372.dtsi
->>>> b/arch/arm/boot/dts/am4372.dtsi
->>>> index d83ff9c..de8791a 100644
->>>> --- a/arch/arm/boot/dts/am4372.dtsi
->>>> +++ b/arch/arm/boot/dts/am4372.dtsi
->>>> @@ -74,7 +74,7 @@
->>>>           reg = <0x48240200 0x100>;
->>>>           interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
->>>>           interrupt-parent = <&gic>;
->>>> -        clocks = <&dpll_mpu_m2_ck>;
->>>> +        clocks = <&mpu_periphclk>;
->>>>       };
->>>>
->>>>       local_timer: timer at 48240600 {
->>>> @@ -82,7 +82,7 @@
->>>>           reg = <0x48240600 0x100>;
->>>>           interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
->>>>           interrupt-parent = <&gic>;
->>>> -        clocks = <&dpll_mpu_m2_ck>;
->>>> +        clocks = <&mpu_periphclk>;
->>>>       };
->>>>
->>>>       l2-cache-controller at 48242000 {
->>>> diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi
->>>> b/arch/arm/boot/dts/am43xx-clocks.dtsi
->>>> index cc88728..2ff58b1 100644
->>>> --- a/arch/arm/boot/dts/am43xx-clocks.dtsi
->>>> +++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
->>>> @@ -259,6 +259,14 @@
->>>>           ti,invert-autoidle-bit;
->>>>       };
->>>>
->>>> +    mpu_periphclk: mpu_periphclk {
->>>> +        #clock-cells = <0>;
->>>> +        compatible = "fixed-factor-clock";
->>>> +        clocks = <&dpll_mpu_ck>;
->>>
->>> I don't think this is correct, ARM core is fed dpll_mpu_m2_ck, where the
->>> divisor value can potentially differ from 1. If you feed this clock
->>> directly from dpll_mpu_ck, you bypass this divisor.
->>
->> Sry. My mistake. I'll update it to use dpll_mpu_m2_ck.
->>
->>>
->>> Did you check what is the impact of cpufreq on the ARM TWD/timers?
->>
->> TWD is cpufreq friendly, ARM GT is not.
+On Sun, Sep 27, 2015 at 04:57:08PM +0200, Hans de Goede wrote:
+> According to the datasheets to n factor for dividing the tclk is
+> 2 to the power n on Allwinner?SoCs, not 2 to the power n + 1 as it is
+> on other mv64xxx implementations.
 > 
-> I think the TWD kick period changes with cpufreq also right?
-
-linux/arch/arm/kernel/smp_twd.c has code to handle cpufreq.
-
+> I've contacted Allwinner about this and they have confirmed that the
+> datasheet is correct.
 > 
-> How are the clocks handled with cpufreq? The user just needs to 
-> understand that the timers will be screwed if he uses ARM GT? Should we 
-> add some sort of dependency to disable the ARM GT if cpufreq is enabled?
+> This commit fixes the clk-divider calculations for Allwinner SoCs
+> accordingly.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Yep. May be, but very good question is how to do that in case of
-OMAP multiplatform build which enables most of all config options at once.
+Applied to for-current, thanks!
 
-There two threads related to this:
-[1] http://www.spinics.net/lists/arm-kernel/msg459649.html
-[2] http://www.spinics.net/lists/arm-kernel/msg461141.html
-
-Personally, I've do not see better way than [2] right now.
-
-
->>>> +        clock-mult = <1>;
->>>> +        clock-div = <2>;
->>>> +    };
->>>> +
->>>>       dpll_ddr_ck: dpll_ddr_ck {
->>>>           #clock-cells = <0>;
->>>>           compatible = "ti,am3-dpll-clock";
->>>>
-
-By the way, does this patch is still correct taking into account dependency
-from cpufreq?
-Does it make sense update it to use dpll_mpu_ck and resend?
-
--- 
-regards,
--grygorii
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151130/ed500ee0/attachment-0001.sig>
