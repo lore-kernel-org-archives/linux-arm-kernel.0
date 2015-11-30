@@ -1,38 +1,54 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 30 Nov 2015 14:12:39 -0800
-Subject: [PATCHv2 2/4] ARM: bcm2835: add rpi power domain driver
-In-Reply-To: <1448816373-18235-3-git-send-email-alex.aring@gmail.com>
-References: <1448816373-18235-1-git-send-email-alex.aring@gmail.com>
- <1448816373-18235-3-git-send-email-alex.aring@gmail.com>
-Message-ID: <87vb8jgmqw.fsf@eliezer.anholt.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 30 Nov 2015 14:34:09 -0800
+Subject: [PATCH v4 4/5] ARM: dts: DRA7: add entry for qspi mmap region
+In-Reply-To: <1448860515-28336-5-git-send-email-vigneshr@ti.com>
+References: <1448860515-28336-1-git-send-email-vigneshr@ti.com>
+ <1448860515-28336-5-git-send-email-vigneshr@ti.com>
+Message-ID: <20151130223408.GJ23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alexander Aring <alex.aring@gmail.com> writes:
+* Vignesh R <vigneshr@ti.com> [151129 21:16]:
+> Add qspi memory mapped region entries for DRA7xx based SoCs. Also,
+> update the binding documents for the controller to document this change.
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+...
+> --- a/Documentation/devicetree/bindings/spi/ti_qspi.txt
+> +++ b/Documentation/devicetree/bindings/spi/ti_qspi.txt
+> @@ -26,3 +26,17 @@ qspi: qspi at 4b300000 {
+>  	spi-max-frequency = <25000000>;
+>  	ti,hwmods = "qspi";
+>  };
+> +
+> +For dra7xx:
+> +qspi: qspi at 4b300000 {
+> +	compatible = "ti,dra7xxx-qspi";
+> +	reg = <0x4b300000 0x100>,
+> +	      <0x5c000000 0x4000000>,
+> +	      <0x4a002558 0x4>;
+> +	reg-names = "qspi_base", "qspi_mmap",
+> +		    "qspi_ctrlmod";
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	spi-max-frequency = <48000000>;
+> +	ti,hwmods = "qspi";
+> +};
 
-> This patch adds support for RPi several Power Domains and enable support
-> to enable the USB Power Domain when it's not enabled before.
->
-> This patch based on Eric Anholt's patch to support Power Domains. He had
-> an issue about -EPROBE_DEFER inside the power domain subsystem, this
-> issue was solved by commit <311fa6a> ("PM / Domains: Return -EPROBE_DEFER
-> if we fail to init or turn-on domain").
->
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Lee Jones <lee@kernel.org>
-> Cc: Eric Anholt <eric@anholt.net>
-> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
-> Signed-off-by: Eric Anholt <eric@anholt.net>
+Actually none of the IO areas above are within the same interconnect target:
 
-Acked-by: Eric Anholt <eric@anholt.net>
+0x4b300000  QSPI0 address space in L3 main interconnect
+0x5c000000  QSPI1 address space in L3 main interconnect
+0x4a002558  CTRL_CORE_CONTROL_IO_2 in System Control Module (SCM) in L4_CFG
 
-I'm still hoping Ulf will pull this patch along with the genpd change,
-to reduce synchronization between trees.  (That just leaves the DT
-change's dependency on the header in this one).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151130/2311a782/attachment.sig>
+The first two address spaces should be two separate instances of this driver.
+The CTRL_CORE_CONTROL_IO_2 needs seems like a shared clock register that
+needs to be accessed using the clock framework most likely.
+
+So not applying, this will be impossible to move to some real interconnect
+driver until these issues are fixed.
+
+Regards,
+
+Tony
