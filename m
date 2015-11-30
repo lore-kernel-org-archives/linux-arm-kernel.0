@@ -1,134 +1,166 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 30 Nov 2015 14:36:28 +0100
-Subject: [PATCH v2 2/4] driver core: handle -EPROBE_DEFER from
- bus_type.match()
-In-Reply-To: <1448542190-19498-3-git-send-email-m.szyprowski@samsung.com>
-References: <1448542190-19498-1-git-send-email-m.szyprowski@samsung.com>
- <1448542190-19498-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAPDyKFrhWeY_2-1np72TLbibMUPJ2s+As48WMGgfbj2CS-waBw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 30 Nov 2015 14:37:31 +0100
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <1448466557-435335-1-git-send-email-arnd@arndb.de> (Arnd
+ Bergmann's message of "Wed, 25 Nov 2015 16:49:12 +0100")
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+Message-ID: <87610j7gmc.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 November 2015 at 13:49, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> From: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->
-> Lets implementations of the match() callback in struct bus_type to
+Hi Arnd,
+ 
+ On mer., nov. 25 2015, Arnd Bergmann <arnd@arndb.de> wrote:
 
-/s/Lets/Allow
+> I've posted these before and now gotten around to a rebase and
+> want to include them in the arm-soc next/multiplatform branch for
+> 4.5.
+>
+> Originally the plan for these platforms was to convert all of
+> them to DT and use only mach-mvebu. That has not happened,
+> so I would do it this way instead so we can at least have
+> them in a single kernel.
+>
+> Let me know if there are any concerns or objections.
 
-> return errors and if it's -EPROBE_DEFER then queue the device for
-> deferred probing.
->
-> This is useful to buses such as AMBA in which devices are registered
-> before their matching information can be retrieved from the HW
-> (typically because a clock driver hasn't probed yet).
->
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/base/dd.c      | 24 ++++++++++++++++++++++--
->  include/linux/device.h |  2 +-
->  2 files changed, 23 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index a641cf3..a20c119 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -490,6 +490,7 @@ static int __device_attach_driver(struct device_driver *drv, void *_data)
->         struct device_attach_data *data = _data;
->         struct device *dev = data->dev;
->         bool async_allowed;
-> +       int ret;
->
->         /*
->          * Check if device has already been claimed. This may
-> @@ -500,8 +501,17 @@ static int __device_attach_driver(struct device_driver *drv, void *_data)
->         if (dev->driver)
->                 return -EBUSY;
->
-> -       if (!driver_match_device(drv, dev))
-> +       ret = driver_match_device(drv, dev);
-> +       if (!ret)
->                 return 0;
-> +       else if (ret < 0) {
+I have applied all the patches on mvebu/oldmvebu_multiplatform (I fixed
+the last one which didn't apply on Kconfig). I also merged it
+mvebu/for-netx to be part of the linux-next.
 
-Depending on what happens with the added dev_warn() below, perhaps a
-switch statement can make it a bit clearer, instead of these messy if
-clauses?
+But before making it part of mvebu/soc, I would like to get some
+Tested-by. The series is available on
+git://git.infradead.org/linux-mvebu.git
+in the branch mvebu/oldmvebu_multiplatform but it also will be part soon
+of linux-next.
 
-> +               if (ret == -EPROBE_DEFER) {
-> +                       dev_dbg(dev, "Device match requests probe deferral\n");
-> +                       driver_deferred_probe_add(dev);
-> +               } else
-> +                       dev_warn(dev, "Bus failed to match device: %d", ret);
+Russell, Sebastian,
 
-Greg commented on this before, as it may introduce some noise [1].
+would you have some time to test it on Dove?
 
-I started browsing various bus?s implementation of the ->match()
-callback. A quick search tells me that most implementations are
-following the Documentation/driver-model/porting.txt, which means
-returning 0 or 1. Actually I couldn't find anyone returning any other
-value, though it was a quick search.
+Detlef, Benjamin,
 
-On the other hand, include/linux/device.h states a "non-zero" value is
-allowed to be return, so there's a tiny conflict between the code and
-the documentation. I guess we should fix that!?
+could you test it on an Orion5x based board?
 
-No matter what, I realize that it could be useful to print a message
-when receiving a negative error code, maybe dev_dbg() could be
-sufficient?
+Evgeniy,
 
-> +               return ret;
-> +       }
+could you test it on an mv78xx0 base board?
+
+Actually we consider removing the support for this SoC unless there are
+some user interested on them. As you are the last one claiming using a
+mainline kernel on a mv78xx0, keeping the support will mainly depends on
+you :)
+
+Thanks,
+
+Gregory
+
 >
->         async_allowed = driver_allows_async_probing(drv);
+> Arnd Bergmann (5):
+>   ARM: orion: move watchdog setup to mach-orion5x
+>   ARM: orion: always use MULTI_IRQ_HANDLER
+>   ARM: orion: use SPARSE_IRQ everywhere
+>   ARM: orion: clean up mach/*.h headers
+>   ARM: orion: multiplatform support
 >
-> @@ -621,6 +631,7 @@ void device_initial_probe(struct device *dev)
->  static int __driver_attach(struct device *dev, void *data)
->  {
->         struct device_driver *drv = data;
-> +       int ret;
+>  arch/arm/Kconfig                                   | 40 ------------------
+>  arch/arm/configs/dove_defconfig                    |  2 +
+>  arch/arm/configs/mv78xx0_defconfig                 |  3 ++
+>  arch/arm/configs/orion5x_defconfig                 |  3 ++
+>  arch/arm/mach-dove/Kconfig                         | 15 +++++--
+>  arch/arm/mach-dove/Makefile                        |  2 +
+>  .../arm/mach-dove/{include/mach => }/bridge-regs.h |  4 +-
+>  arch/arm/mach-dove/cm-a510.c                       |  4 +-
+>  arch/arm/mach-dove/common.c                        |  4 +-
+>  arch/arm/mach-dove/dove-db-setup.c                 |  3 +-
+>  arch/arm/mach-dove/{include/mach => }/dove.h       |  4 +-
+>  arch/arm/mach-dove/include/mach/entry-macro.S      | 33 ---------------
+>  arch/arm/mach-dove/include/mach/hardware.h         | 19 ---------
+>  arch/arm/mach-dove/include/mach/uncompress.h       | 36 ----------------
+>  arch/arm/mach-dove/irq.c                           | 22 ++++------
+>  arch/arm/mach-dove/{include/mach => }/irqs.h       |  4 +-
+>  arch/arm/mach-dove/mpp.c                           |  2 +-
+>  arch/arm/mach-dove/pcie.c                          |  4 +-
+>  arch/arm/mach-dove/{include/mach => }/pm.h         |  6 +--
+>  arch/arm/mach-mv78xx0/Kconfig                      | 15 +++++--
+>  arch/arm/mach-mv78xx0/Makefile                     |  2 +
+>  .../mach-mv78xx0/{include/mach => }/bridge-regs.h  |  4 +-
+>  arch/arm/mach-mv78xx0/buffalo-wxl-setup.c          |  3 +-
+>  arch/arm/mach-mv78xx0/common.c                     |  4 +-
+>  arch/arm/mach-mv78xx0/db78x00-bp-setup.c           |  3 +-
+>  arch/arm/mach-mv78xx0/include/mach/entry-macro.S   | 41 ------------------
+>  arch/arm/mach-mv78xx0/include/mach/hardware.h      | 14 -------
+>  arch/arm/mach-mv78xx0/include/mach/uncompress.h    | 46 ---------------------
+>  arch/arm/mach-mv78xx0/irq.c                        | 35 +++++++++++++++-
+>  arch/arm/mach-mv78xx0/{include/mach => }/irqs.h    |  4 +-
+>  arch/arm/mach-mv78xx0/mpp.c                        |  2 +-
+>  arch/arm/mach-mv78xx0/{include/mach => }/mv78xx0.h |  4 +-
+>  arch/arm/mach-mv78xx0/pcie.c                       |  2 +-
+>  arch/arm/mach-mv78xx0/rd78x00-masa-setup.c         |  3 +-
+>  arch/arm/mach-orion5x/Kconfig                      | 18 ++++++--
+>  arch/arm/mach-orion5x/Makefile                     |  2 +
+>  arch/arm/mach-orion5x/board-d2net.c                |  2 +-
+>  arch/arm/mach-orion5x/board-dt.c                   |  4 +-
+>  arch/arm/mach-orion5x/board-mss2.c                 |  4 +-
+>  arch/arm/mach-orion5x/board-rd88f5182.c            |  2 +-
+>  .../mach-orion5x/{include/mach => }/bridge-regs.h  |  4 +-
+>  arch/arm/mach-orion5x/common.c                     | 20 +++++++--
+>  arch/arm/mach-orion5x/db88f5281-setup.c            |  3 +-
+>  arch/arm/mach-orion5x/dns323-setup.c               |  3 +-
+>  arch/arm/mach-orion5x/include/mach/entry-macro.S   | 25 -----------
+>  arch/arm/mach-orion5x/include/mach/hardware.h      | 14 -------
+>  arch/arm/mach-orion5x/include/mach/uncompress.h    | 48 ----------------------
+>  arch/arm/mach-orion5x/irq.c                        | 13 +-----
+>  arch/arm/mach-orion5x/{include/mach => }/irqs.h    |  4 +-
+>  arch/arm/mach-orion5x/kurobox_pro-setup.c          |  4 +-
+>  arch/arm/mach-orion5x/ls-chl-setup.c               |  3 +-
+>  arch/arm/mach-orion5x/ls_hgl-setup.c               |  3 +-
+>  arch/arm/mach-orion5x/mpp.c                        |  2 +-
+>  arch/arm/mach-orion5x/mv2120-setup.c               |  3 +-
+>  arch/arm/mach-orion5x/net2big-setup.c              |  3 +-
+>  arch/arm/mach-orion5x/{include/mach => }/orion5x.h |  4 +-
+>  arch/arm/mach-orion5x/pci.c                        |  2 +-
+>  arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c       |  3 +-
+>  arch/arm/mach-orion5x/rd88f5181l-ge-setup.c        |  3 +-
+>  arch/arm/mach-orion5x/rd88f5182-setup.c            |  3 +-
+>  arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c       |  3 +-
+>  arch/arm/mach-orion5x/terastation_pro2-setup.c     |  3 +-
+>  arch/arm/mach-orion5x/ts209-setup.c                |  3 +-
+>  arch/arm/mach-orion5x/ts409-setup.c                |  3 +-
+>  arch/arm/mach-orion5x/ts78xx-setup.c               |  3 +-
+>  arch/arm/mach-orion5x/tsx09-common.c               |  2 +-
+>  arch/arm/mach-orion5x/wnr854t-setup.c              |  3 +-
+>  arch/arm/mach-orion5x/wrt350n-v2-setup.c           |  3 +-
+>  arch/arm/plat-orion/common.c                       | 21 ----------
+>  arch/arm/plat-orion/include/plat/common.h          |  2 -
+>  arch/arm/plat-orion/irq.c                          |  1 -
+>  arch/arm/plat-orion/mpp.c                          |  1 -
+>  72 files changed, 185 insertions(+), 454 deletions(-)
+>  rename arch/arm/mach-dove/{include/mach => }/bridge-regs.h (96%)
+>  rename arch/arm/mach-dove/{include/mach => }/dove.h (99%)
+>  delete mode 100644 arch/arm/mach-dove/include/mach/entry-macro.S
+>  delete mode 100644 arch/arm/mach-dove/include/mach/hardware.h
+>  delete mode 100644 arch/arm/mach-dove/include/mach/uncompress.h
+>  rename arch/arm/mach-dove/{include/mach => }/irqs.h (96%)
+>  rename arch/arm/mach-dove/{include/mach => }/pm.h (95%)
+>  rename arch/arm/mach-mv78xx0/{include/mach => }/bridge-regs.h (92%)
+>  delete mode 100644 arch/arm/mach-mv78xx0/include/mach/entry-macro.S
+>  delete mode 100644 arch/arm/mach-mv78xx0/include/mach/hardware.h
+>  delete mode 100644 arch/arm/mach-mv78xx0/include/mach/uncompress.h
+>  rename arch/arm/mach-mv78xx0/{include/mach => }/irqs.h (95%)
+>  rename arch/arm/mach-mv78xx0/{include/mach => }/mv78xx0.h (98%)
+>  rename arch/arm/mach-orion5x/{include/mach => }/bridge-regs.h (92%)
+>  delete mode 100644 arch/arm/mach-orion5x/include/mach/entry-macro.S
+>  delete mode 100644 arch/arm/mach-orion5x/include/mach/hardware.h
+>  delete mode 100644 arch/arm/mach-orion5x/include/mach/uncompress.h
+>  rename arch/arm/mach-orion5x/{include/mach => }/irqs.h (94%)
+>  rename arch/arm/mach-orion5x/{include/mach => }/orion5x.h (99%)
 >
->         /*
->          * Lock device and try to bind to it. We drop the error
-> @@ -632,8 +643,17 @@ static int __driver_attach(struct device *dev, void *data)
->          * is an error.
->          */
->
-> -       if (!driver_match_device(drv, dev))
-> +       ret = driver_match_device(drv, dev);
-> +       if (!ret)
-> +               return 0;
-> +       else if (ret < 0) {
-> +               if (ret == -EPROBE_DEFER) {
-> +                       dev_dbg(dev, "Device match requests probe deferral\n");
-> +                       driver_deferred_probe_add(dev);
-> +               } else
-> +                       dev_warn(dev, "Bus failed to match device: %d", ret);
->                 return 0;
-> +       }
->
->         if (dev->parent)        /* Needed for USB */
->                 device_lock(dev->parent);
-> diff --git a/include/linux/device.h b/include/linux/device.h
-> index b8f411b..d4e7d1f 100644
-> --- a/include/linux/device.h
-> +++ b/include/linux/device.h
-> @@ -70,7 +70,7 @@ extern void bus_remove_file(struct bus_type *, struct bus_attribute *);
->   * @dev_groups:        Default attributes of the devices on the bus.
->   * @drv_groups: Default attributes of the device drivers on the bus.
->   * @match:     Called, perhaps multiple times, whenever a new device or driver
-> - *             is added for this bus. It should return a nonzero value if the
-> + *             is added for this bus. It should return a positive value if the
->   *             given device can be handled by the given driver.
->   * @uevent:    Called when a device is added, removed, or a few other things
->   *             that generate uevents to add the environment variables.
-> --
-> 1.9.2
+> -- 
+> 2.1.0.rc2
 >
 
-Kind regards
-Uffe
-
-[1]
-https://lkml.org/lkml/2015/10/17/24
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
