@@ -1,29 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 30 Nov 2015 12:55:37 -0800
-Subject: [PATCH 1/3] ARM: imx: clk-vf610: fix SAI clock tree
-In-Reply-To: <20151123014613.GB13744@tiger>
-References: <1445141122-14183-1-git-send-email-stefan@agner.ch>
- <20151123014613.GB13744@tiger>
-Message-ID: <20151130205537.GP11298@codeaurora.org>
+From: agross@codeaurora.org (Andy Gross)
+Date: Mon, 30 Nov 2015 15:01:17 -0600
+Subject: [PATCH 1/7] ARM: dts: qcom: msm8974-honami: Define pinctrl state
+ for blsp_uart2
+In-Reply-To: <CAJAp7OjWj2ZGwypXdWbkDVadJePT7PrPSDJ3-89q+oxGdhDHWw@mail.gmail.com>
+References: <1445403470-17434-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <CAMAWPa9fHWY3diCfZG2s0ZaNqza+SnK+4QZzkAwW8xb9zjOqHg@mail.gmail.com>
+ <CAJAp7OjWj2ZGwypXdWbkDVadJePT7PrPSDJ3-89q+oxGdhDHWw@mail.gmail.com>
+Message-ID: <20151130210117.GA14162@Agamemnon.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23, Shawn Guo wrote:
-> On Sat, Oct 17, 2015 at 09:05:20PM -0700, Stefan Agner wrote:
-> > 
-> > Since Patch 3 also uses the fixed clock layout, it should be
-> > applied after the clock tree fix too...
-> > 
-> > Not sure through which tree these changes should go?
+On Mon, Nov 30, 2015 at 12:19:13PM -0800, Bjorn Andersson wrote:
+> On Mon, Nov 30, 2015 at 11:23 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> > On Tue, Oct 20, 2015 at 9:57 PM, Bjorn Andersson
+> > <bjorn.andersson@sonymobile.com> wrote:
+> >> Make sure the blsp1_uart2 pins are in the correct state for the uart.
+> >>
+> >> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> >
+> > kernelci.org has been detecting boot failures on my z1 since
+> > next-20151120[1] and I finally got around to bisecting, which pointed
+> > to this patch which is in next in the for of commit 14cd83b824aa ARM:
+> > dts: qcom: msm8974-honami: Define pinctrl state for blsp_uart2
+> >
+> > That commit doesn't revert cleanly on top of next-20151130, but
+> > manually removing the stuff added in this patch, next-20151130 boots
+> > fine on the z1.
+> >
+> > Kevin
+> >
+> > [1] http://kernelci.org/boot/qcom-msm8974-sony-xperia-honami/job/next/kernel/next-20151127/defconfig/multi_v7_defconfig/lab/lab-khilman/?_id=5658061359b5140196b5fd2f
 > 
-> Mike, Stephen,
+> Thanks Kevin,
 > 
-> Can I have your ACK on patch #1 so that I can send it together with 
-> #2 for v4.4-rc inclusion?
+> I did see these too. But at the same time, as far as I can see, the
+> qcom_defconfig boots just fine - indicating that this particular
+> commit would not be the cause.
 > 
+> I'll fire up some builds to figure out what's going on.
 
-Yes that's fine.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I threw the extra config options that qcom_defconfig had on it on top of my next
+branch.  I hadn't seen any kernel ci runs on that yet.
