@@ -1,34 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Nov 2015 15:09:33 +0100
-Subject: [RFC v02 03/15] dmaengine: core: Introduce new,
- universal API to request a channel
-In-Reply-To: <1448891145-10766-4-git-send-email-peter.ujfalusi@ti.com>
-References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
- <1448891145-10766-4-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <2436417.uspUkNqtIA@wuerfel>
+From: gabriel@lse.epita.fr (Gabriel Laskar)
+Date: Mon, 30 Nov 2015 15:10:45 +0100
+Subject: [PATCH 07/20] drm: fix inclusion of drm.h in exynos_sarea.h
+In-Reply-To: <1448892658-14256-1-git-send-email-gabriel@lse.epita.fr>
+References: <1448892658-14256-1-git-send-email-gabriel@lse.epita.fr>
+Message-ID: <1448892658-14256-8-git-send-email-gabriel@lse.epita.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 30 November 2015 15:45:33 Peter Ujfalusi wrote:
->                                                   const char *name);
->  struct dma_chan *dma_request_slave_channel(struct device *dev, const char *name);
-> +
-> +struct dma_chan *dma_request_chan(struct device *dev, const char *name);
-> +struct dma_chan *dma_request_chan_by_mask(const dma_cap_mask_t *mask);
-> +
->  void dma_release_channel(struct dma_chan *chan);
->  int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_caps *caps);
->  #else
-> @@ -1268,6 +1291,14 @@ static inline struct dma_chan *dma_request_slave_channel(struct device *dev,
->  {
->         return NULL;
->  }
-> +static inline struct dma_chan *dma_request_chan(struct device *dev)
-> +{
-> +       return ERR_PTR(-ENODEV);
-> +}
-> 
+Using `#include "drm.h"` instead of `#include <drm/drm.h>` allow drm
+headers to be moved in another directory without changes, like for the
+libdrm imports.
 
-The prototypes for dma_request_chan() don't match, otherwise looks good.
+Signed-off-by: Gabriel Laskar <gabriel@lse.epita.fr>
+CC: Emil Velikov <emil.l.velikov@gmail.com>
+CC: Mikko Rapeli <mikko.rapeli@iki.fi>
 
-	Arnd
+---
+ include/uapi/drm/exynos_drm.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/uapi/drm/exynos_drm.h b/include/uapi/drm/exynos_drm.h
+index 5575ed1..a5b2dd9 100644
+--- a/include/uapi/drm/exynos_drm.h
++++ b/include/uapi/drm/exynos_drm.h
+@@ -15,7 +15,7 @@
+ #ifndef _UAPI_EXYNOS_DRM_H_
+ #define _UAPI_EXYNOS_DRM_H_
+ 
+-#include <drm/drm.h>
++#include "drm.h"
+ 
+ /**
+  * User-desired buffer creation information structure.
+-- 
+2.6.2
