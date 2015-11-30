@@ -1,33 +1,32 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Mon, 30 Nov 2015 15:30:54 +0000
-Subject: [PATCH v3 58/62] xen/acpi: Fix event-channel interrupt when
- booting with ACPI
-In-Reply-To: <alpine.DEB.2.02.1511271510350.8984@kaball.uk.xensource.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-59-git-send-email-shannon.zhao@linaro.org>
- <alpine.DEB.2.02.1511271510350.8984@kaball.uk.xensource.com>
-Message-ID: <565C6BAE.5000600@citrix.com>
+From: nikita@compulab.co.il (Nikita Kiryanov)
+Date: Mon, 30 Nov 2015 17:33:43 +0200
+Subject: [PATCH 01/14] ARM: am437x: cm-t43: dts: add basic support for
+ sbc-t43
+In-Reply-To: <20151125230300.GA23057@rob-hp-laptop>
+References: <1448371155-17307-1-git-send-email-nikita@compulab.co.il>
+ <1448371155-17307-2-git-send-email-nikita@compulab.co.il>
+ <20151125230300.GA23057@rob-hp-laptop>
+Message-ID: <20151130153343.GB17574@skynet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/11/15 15:12, Stefano Stabellini wrote:
->> +    }
->> +    else
->> +    {
->> +        int type = 3;
->> +        int flag = 2; /* Active-low level-sensitive  */
->> +        d->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ] = (u64)type << 56
->> +                                                            | flag << 8
->> +                                                            | d->arch.evtchn_irq;
->> +    }
->>  }
+On Wed, Nov 25, 2015 at 05:03:00PM -0600, Rob Herring wrote:
+> On Tue, Nov 24, 2015 at 03:19:02PM +0200, Nikita Kiryanov wrote:
+> > Add basic support for SBC-T43: a CM-T43 based single board computer.
+> > CM-T43 is an AM437x based System-on-Module designed to serve as a building
+> > block in embedded applications. SBC-T43 is composed of CM-T43 module on
+> > top of the SB-SOM-T43 baseboard.
+> > Basic support includes UART, GPIO, and I2C.
+> > 
+> > Signed-off-by: Nikita Kiryanov <nikita@compulab.co.il>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> > Cc: Igor Grinberg <grinberg@compulab.co.il>
+> > Cc: Dmitry Lifshitz <lifshitz@compulab.co.il>
+> > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
 > 
-> Actually there is no point in setting HVM_PARAM_CALLBACK_IRQ only on
-> ACPI: I would just set it on all cases.
+> Some minor nits below, otherwise:
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
+>
 
-+1
-
-Regards,
-
--- 
-Julien Grall
+V2 coming up.
