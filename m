@@ -1,98 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 30 Nov 2015 08:26:29 -0800
-Subject: [PATCH 2/2] ARM: OMAP2+: Change core_initcall levels to
- postcore_initcall
-In-Reply-To: <1448900789-4034-1-git-send-email-tony@atomide.com>
-References: <1448900789-4034-1-git-send-email-tony@atomide.com>
-Message-ID: <1448900789-4034-3-git-send-email-tony@atomide.com>
+From: paul.burton@imgtec.com (Paul Burton)
+Date: Mon, 30 Nov 2015 16:21:45 +0000
+Subject: [PATCH 20/28] net: pch_gbe: clear interrupt FIFO during probe
+In-Reply-To: <1448900513-20856-1-git-send-email-paul.burton@imgtec.com>
+References: <1448900513-20856-1-git-send-email-paul.burton@imgtec.com>
+Message-ID: <1448900513-20856-21-git-send-email-paul.burton@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want to be able to probe a few selected device drivers before hwmod
-code populates the clocks in omap_hwmod_setup_all(). This allows us to
-convert most of the clock drivers into regular device drivers.
+xilinx_pcie_init_port clears the pending interrupts in the interrupt
+decode register, but does not clear the interrupt FIFO. This would lead
+to spurious interrupts if any were present in the FIFO at probe time.
+Clear the interrupt FIFO prior to the interrupt decode register in order
+to start with a clean slate as expected.
 
-We only need a few minimal clock drivers early for the system timers to
-select between the 32KiHz clock and the high frequency oscillator.
-
-With these changes, initializing the clock drivers can be just done at
-core_initcall time with something like:
-
-np = of_find_node_by_name(NULL, "plls");
-if (np)
-	of_platform_populate(np, NULL, NULL, NULL);
-
-And then these clocks will be available for the interconnect code to use.
-
-Having most of the clock drivers being regular device drivers allows
-us to use the nice things like devm_* functions and dev_err and dev_dbg.
-As an extra bonus, this also allows us to develop the clock drivers for
-new SoCs as loadable modules initially for cases where we can boot up
-the system based on the bootloader configured clocks.
-
-To do this, let's change the core_initcalls to postcore_initcall under
-mach-omap2.
-
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Grygorii Strashko <grygorii.strashko@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tero Kristo <t-kristo@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Paul Burton <paul.burton@imgtec.com>
 ---
- arch/arm/mach-omap2/omap2-restart.c | 2 +-
- arch/arm/mach-omap2/omap_device.c   | 2 +-
- arch/arm/mach-omap2/omap_hwmod.c    | 2 +-
- arch/arm/mach-omap2/serial.c        | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap2-restart.c b/arch/arm/mach-omap2/omap2-restart.c
-index d937b2e..497269d 100644
---- a/arch/arm/mach-omap2/omap2-restart.c
-+++ b/arch/arm/mach-omap2/omap2-restart.c
-@@ -62,4 +62,4 @@ static int __init omap2xxx_common_look_up_clks_for_reset(void)
+ drivers/pci/host/pcie-xilinx.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+index ac9da72..0edb612 100644
+--- a/drivers/pci/host/pcie-xilinx.c
++++ b/drivers/pci/host/pcie-xilinx.c
+@@ -566,6 +566,8 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
+  */
+ static void xilinx_pcie_init_port(struct xilinx_pcie_port *port)
+ {
++	u32 val;
++
+ 	if (xilinx_pcie_link_is_up(port))
+ 		dev_info(port->dev, "PCIe Link is UP\n");
+ 	else
+@@ -575,6 +577,17 @@ static void xilinx_pcie_init_port(struct xilinx_pcie_port *port)
+ 	pcie_write(port, ~XILINX_PCIE_IDR_ALL_MASK,
+ 		   XILINX_PCIE_REG_IMR);
  
- 	return 0;
- }
--omap_core_initcall(omap2xxx_common_look_up_clks_for_reset);
-+omap_postcore_initcall(omap2xxx_common_look_up_clks_for_reset);
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index 72ebc4c..3750ed1 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -869,7 +869,7 @@ static int __init omap_device_init(void)
- 	bus_register_notifier(&platform_bus_type, &platform_nb);
- 	return 0;
- }
--omap_core_initcall(omap_device_init);
-+omap_postcore_initcall(omap_device_init);
- 
- /**
-  * omap_device_late_idle - idle devices without drivers
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index cc8a987..49d5376 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -3307,7 +3307,7 @@ static int __init omap_hwmod_setup_all(void)
- 
- 	return 0;
- }
--omap_core_initcall(omap_hwmod_setup_all);
-+omap_postcore_initcall(omap_hwmod_setup_all);
- 
- /**
-  * omap_hwmod_enable - enable an omap_hwmod
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index 5fb50fe..f164c6b 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -213,7 +213,7 @@ static int __init omap_serial_early_init(void)
- 
- 	return 0;
- }
--omap_core_initcall(omap_serial_early_init);
-+omap_postcore_initcall(omap_serial_early_init);
- 
- /**
-  * omap_serial_init_port() - initialize single serial port
++	/* Clear interrupt FIFO */
++	while (1) {
++		val = pcie_read(port, XILINX_PCIE_REG_RPIFR1);
++
++		if (!(val & XILINX_PCIE_RPIFR1_INTR_VALID))
++			break;
++
++		pcie_write(port, XILINX_PCIE_RPIFR1_ALL_MASK,
++			   XILINX_PCIE_REG_RPIFR1);
++	}
++
+ 	/* Clear pending interrupts */
+ 	pcie_write(port, pcie_read(port, XILINX_PCIE_REG_IDR) &
+ 			 XILINX_PCIE_IMR_ALL_MASK,
 -- 
 2.6.2
