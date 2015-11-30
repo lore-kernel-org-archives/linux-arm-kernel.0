@@ -1,32 +1,62 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 30 Nov 2015 18:27:04 +0100
-Subject: [PATCH v2 3/5] i2c: add I2C_AQ_NO_CLK_STRETCH to i2c-bcm2835.c
-In-Reply-To: <1446118467-26453-3-git-send-email-nicola@corna.info>
-References: <1445976718-7449-1-git-send-email-nicola@corna.info>
- <1446118467-26453-1-git-send-email-nicola@corna.info>
- <1446118467-26453-3-git-send-email-nicola@corna.info>
-Message-ID: <20151130172704.GD9554@katana>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 30 Nov 2015 18:27:11 +0100
+Subject: [PATCH] ARM: OMAP4: execute initcall to reserve SRAM for I688
+ only on OMAP4
+In-Reply-To: <5649CB16.2030706@ti.com>
+References: <1447673117-32719-1-git-send-email-l.stach@pengutronix.de>
+ <5649CB16.2030706@ti.com>
+Message-ID: <1448904431.8275.36.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 29, 2015 at 12:34:25PM +0100, Nicola Corna wrote:
-> As reported here
-> http://www.advamation.com/knowhow/raspberrypi/rpi-i2c-bug.html
-> and confirmed here
-> https://www.raspberrypi.org/forums/viewtopic.php?p=146272
-> the BCM2835 has a hardware bug in its i2c module which prevents a correct
-> clock stretching. This patch adds the I2C_AQ_NO_CLK_STRETCH quirk flag
-> to i2c-bcm2835.
+Am Montag, den 16.11.2015, 14:24 +0200 schrieb Grygorii Strashko:
+> On 11/16/2015 01:25 PM, Lucas Stach wrote:
+> > omap_interconnect_sync() is the only user of the SRAM scratch area
+> > allocated in the omap4_sram_init initcall. The interconnect sync is
+> > used exclusively in the OMAP4 specific WFI implementation, so there
+> > is no point in allocating the SRAM scratch on other SoC types.
+> > 
+> > Bail out of the initcall if the kernel is not running on OMAP4 to
+> > avoid a confusing warning about being unable to allocate the SRAM
+> > needed for I688 handling.
+> > 
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > Tested-by: Bastian Stender <bst@pengutronix.de>
+> > ---
+> >   arch/arm/mach-omap2/omap4-common.c | 3 +++
+> >   1 file changed, 3 insertions(+)
+> > 
+> > diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+> > index 949696b6f17b..6db393a30a28 100644
+> > --- a/arch/arm/mach-omap2/omap4-common.c
+> > +++ b/arch/arm/mach-omap2/omap4-common.c
+> > @@ -131,6 +131,9 @@ static int __init omap4_sram_init(void)
+> >   	struct device_node *np;
+> >   	struct gen_pool *sram_pool;
+> >   
+> > +	if (!cpu_is_omap44xx())
+> > +		return 0;
 > 
-> Signed-off-by: Nicola Corna <nicola@corna.info>
+> This one affects on am43xx also
+> 
+So you are saying this erratum is also present on AM43xx? I wasn't able
+to deduce this from the information provided by Richard Woodruff.
 
-I put the above links into the code as comments, reworded the commit
-message a little and applied it to for-next, thanks!
+> 
+> > +
+> >   	np = of_find_compatible_node(NULL, NULL, "ti,omap4-mpu");
+> >   	if (!np)
+> >   		pr_warn("%s:Unable to allocate sram needed to handle errata I688\n",
+> 
+> Since all OMAP4+ platforms are now DT based why can't we just return from here silently?
+> 
+If we are unable to allocate the SRAM needed to work around I688 this is
+a real error on platforms that expose this erratum, so silently bailing
+out at this point may obscure a real issue.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151130/eee0f79a/attachment.sig>
+Regards,
+Lucas
+
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
