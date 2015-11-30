@@ -1,41 +1,35 @@
-From: mkarthi3@visteon.com (Mutharaju, Prasanna (P.))
-Date: Mon, 30 Nov 2015 10:08:46 +0000
-Subject: [PATCH v3] clk: s3c2410: removed unneeded variable in
- s3c24xx_clkout_set_parent
-Message-ID: <20151130100720.GA29096@jci-VirtualBox>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Mon, 30 Nov 2015 18:12:18 +0800
+Subject: [PATCH] cpufreq: mediatek: Use REGCACHE_RBTREE
+Message-ID: <1448878338-28496-1-git-send-email-djkurtz@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Prasanna Karthik <mkarthi3@visteon.com>
+This regulator is on a slow i2c bus.  Register accesses are very simple,
+they all either enable/disable a regulator channel, or select a new
+voltage level.  Thus, reading registers from the device will always
+return what was last written.
 
-Remove unneeded variable used to store return value.
+Therefore we can save a lot of time when reading registers by using a
+regmap_cache.  Since the register map is relatively large, but we only
+ever access a few of them, we use an RBTREE cache.
 
-Signed-off-by: Prasanna Karthik <mkarthi3@visteon.com>
-
+Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
 ---
-v3: Modified subject and changelog comments
----
----
- drivers/clk/samsung/clk-s3c2410-dclk.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/regulator/mt6311-regulator.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clk/samsung/clk-s3c2410-dclk.c b/drivers/clk/samsung/clk-s3c2410-dclk.c
-index e9eb935..ec6fb14 100644
---- a/drivers/clk/samsung/clk-s3c2410-dclk.c
-+++ b/drivers/clk/samsung/clk-s3c2410-dclk.c
-@@ -77,12 +77,11 @@ static u8 s3c24xx_clkout_get_parent(struct clk_hw *hw)
- static int s3c24xx_clkout_set_parent(struct clk_hw *hw, u8 index)
- {
- 	struct s3c24xx_clkout *clkout = to_s3c24xx_clkout(hw);
--	int ret = 0;
+diff --git a/drivers/regulator/mt6311-regulator.c b/drivers/regulator/mt6311-regulator.c
+index 02c4e5f..0495716 100644
+--- a/drivers/regulator/mt6311-regulator.c
++++ b/drivers/regulator/mt6311-regulator.c
+@@ -30,6 +30,7 @@ static const struct regmap_config mt6311_regmap_config = {
+ 	.reg_bits = 8,
+ 	.val_bits = 8,
+ 	.max_register = MT6311_FQMTR_CON4,
++	.cache_type = REGCACHE_RBTREE,
+ };
  
- 	s3c2410_modify_misccr((clkout->mask << clkout->shift),
- 			      (index << clkout->shift));
- 
--	return ret;
-+	return 0;
- }
- 
- static const struct clk_ops s3c24xx_clkout_ops = {
+ /* Default limits measured in millivolts and milliamps */
 -- 
-1.9.1
+2.6.0.rc2.230.g3dd15c0
