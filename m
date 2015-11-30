@@ -1,31 +1,68 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 30 Nov 2015 14:05:35 +0100
-Subject: [PATCH 0/6] pinctrl: pxa: add pxa27x pin control support
-In-Reply-To: <1448129093-20722-1-git-send-email-robert.jarzmik@free.fr>
-References: <1448129093-20722-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <CACRpkdaJO6noUd_a5d122G3EiO6-u9bu_gZMg1Tky=PS9O5yUA@mail.gmail.com>
+From: heiko.stuebner@collabora.com (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 30 Nov 2015 14:13:17 +0100
+Subject: [PATCH 1/2] ARM: dts: rockchip: update the thermal management on
+ rk3288
+Message-ID: <2402718.WBE9iyTUZ2@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 21, 2015 at 7:04 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+From: Caesar Wang <wxt@rock-chips.com>
 
-> I've been working on this for some time now, it's time pxa archtecture gets a
-> proper pin control support.
->
-> This serie provides support for pxa27x architecture, and paves the way to pxa2xx
-> one. I've tested this on my pxa27x board, in both device-tree and non
-> device-tree builds.
+In some cases the machine radiating is very poor,sometime the temperature
+is rising very quickly on heavy loading.So we need have more frequent
+polling and better granularity.
 
-So in 2013 Haojian removed PXA3xx, MMP2, PXA168 and PXA910 in favor
-of using pinctrl-single.c shared with OMAP.
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Reviewed-by: Dmitry Torokhov <dtor@chromium.org>
+Signed-off-by: Heiko Stuebner <heiko.stuebner@collabora.com>
+---
+ arch/arm/boot/dts/rk3288-thermal.dtsi | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-See
-commit 62194200e5e383af2085faf35b6f009364446069
-"pinctrl: remove pxa pinctrl driver"
-
-What makes the PXA27x so different from its siblings that it still
-warrants its own driver? Why can this one not use pinctrl-single
-as well?
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/rk3288-thermal.dtsi b/arch/arm/boot/dts/rk3288-thermal.dtsi
+index 3404066..651b962 100644
+--- a/arch/arm/boot/dts/rk3288-thermal.dtsi
++++ b/arch/arm/boot/dts/rk3288-thermal.dtsi
+@@ -52,7 +52,7 @@ reserve_thermal: reserve_thermal {
+ };
+ 
+ cpu_thermal: cpu_thermal {
+-	polling-delay-passive = <1000>; /* milliseconds */
++	polling-delay-passive = <100>; /* milliseconds */
+ 	polling-delay = <5000>; /* milliseconds */
+ 
+ 	thermal-sensors = <&tsadc 1>;
+@@ -63,6 +63,11 @@ cpu_thermal: cpu_thermal {
+ 			hysteresis = <2000>; /* millicelsius */
+ 			type = "passive";
+ 		};
++		cpu_alert1: cpu_alert1 {
++			temperature = <75000>; /* millicelsius */
++			hysteresis = <2000>; /* millicelsius */
++			type = "passive";
++		};
+ 		cpu_crit: cpu_crit {
+ 			temperature = <90000>; /* millicelsius */
+ 			hysteresis = <2000>; /* millicelsius */
+@@ -74,13 +79,18 @@ cpu_thermal: cpu_thermal {
+ 		map0 {
+ 			trip = <&cpu_alert0>;
+ 			cooling-device =
++				<&cpu0 THERMAL_NO_LIMIT 6>;
++		};
++		map1 {
++			trip = <&cpu_alert1>;
++			cooling-device =
+ 				<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+ 		};
+ 	};
+ };
+ 
+ gpu_thermal: gpu_thermal {
+-	polling-delay-passive = <1000>; /* milliseconds */
++	polling-delay-passive = <100>; /* milliseconds */
+ 	polling-delay = <5000>; /* milliseconds */
+ 
+ 	thermal-sensors = <&tsadc 2>;
+-- 
+2.6.1
