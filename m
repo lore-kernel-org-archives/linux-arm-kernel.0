@@ -1,47 +1,34 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Mon, 30 Nov 2015 15:01:20 +0000
-Subject: [Xen-devel] [PATCH v3 22/62] arm/gic-v3: Refactor gicv3_init
- into generic and dt specific parts
-In-Reply-To: <alpine.DEB.2.02.1511241046350.1107@kaball.uk.xensource.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-23-git-send-email-shannon.zhao@linaro.org>
- <alpine.DEB.2.02.1511241046350.1107@kaball.uk.xensource.com>
-Message-ID: <565C64C0.7080506@citrix.com>
+From: mmarek@suse.com (Michal Marek)
+Date: Mon, 30 Nov 2015 16:11:16 +0100
+Subject: [PATCH v2 1/2] scripts: Add a recorduidiv program
+In-Reply-To: <20151125234711.GT8644@n2100.arm.linux.org.uk>
+References: <1448488264-23400-1-git-send-email-sboyd@codeaurora.org>
+ <1448488264-23400-2-git-send-email-sboyd@codeaurora.org>
+ <20151125234711.GT8644@n2100.arm.linux.org.uk>
+Message-ID: <565C6714.802@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/11/15 10:51, Stefano Stabellini wrote:
-> On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
->>
->> Refactor gic-v3 related functions into dt and generic parts. This will be
->> helpful when adding acpi support for gic-v3.
->>
->> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> ---
->>  xen/arch/arm/gic-v3.c | 95 +++++++++++++++++++++++++++------------------------
->>  1 file changed, 51 insertions(+), 44 deletions(-)
->>
->> diff --git a/xen/arch/arm/gic-v3.c b/xen/arch/arm/gic-v3.c
->> index 4fe0c37..bd13010 100644
->> --- a/xen/arch/arm/gic-v3.c
->> +++ b/xen/arch/arm/gic-v3.c
->> @@ -1138,62 +1138,27 @@ static int __init cmp_rdist(const void *a, const void *b)
->>      return ( l->base < r->base) ? -1 : 0;
->>  }
->>  
->> +static paddr_t __initdata dbase = 0, cbase = 0, csize = 0, vbase = 0;
+On 2015-11-26 00:47, Russell King - ARM Linux wrote:
+> On Wed, Nov 25, 2015 at 01:51:03PM -0800, Stephen Boyd wrote:
+>> The ARM compiler inserts calls to __aeabi_uidiv() and
+>> __aeabi_idiv() when it needs to perform division on signed and
+>> unsigned integers. If a processor has support for the udiv and
+>> sdiv division instructions the calls to these support routines
+>> can be replaced with those instructions. Therefore, record the
+>> location of calls to these library functions into two sections
+>> (one for udiv and one for sdiv) similar to how we trace calls to
+>> mcount. When the kernel boots up it will check to see if the
+>> processor supports the instructions and then patch the call sites
+>> with the instruction.
 > 
-> It might be best to initialize them to something like INVALID_PADDR
-> rather then 0, which is actually a possible address value.
+> Do we have any resolution on these programs which modify the object
+> files in-place, rather than breaking any hard-links which may be
+> present (eg, as a result of using ccache in hard-link mode) ?
 
-It's even mandatory, we had a patch [1] to allow base address to be 0
-and there is no point to re-introduce this restriction.
+Good point, but I do not think anybody is using CCACHE_HARDLINK with the
+kernel. As the manpage says, it is going to confuse make, so the time
+saved by ccache would be offset by make trying to recompile all *.c
+files each time.
 
-Regards,
-
-[1] c1fde0dcd4ecb78378ffe8b3e263d28dc3b9c0eb "xen/arm: gic: Allow the
-base address to be 0"
-
--- 
-Julien Grall
+Michal
