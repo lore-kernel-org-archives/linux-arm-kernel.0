@@ -1,25 +1,58 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 29 Nov 2015 22:52:14 -0500 (EST)
-Subject: [PATCH net] drivers: net: xgene: fix possible use after free
-In-Reply-To: <1448470930.24696.10.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <1448468256.24696.5.camel@edumazet-glaptop2.roam.corp.google.com>
- <20151125163402.GA29094@leverpostej>
- <1448470930.24696.10.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <20151129.225214.564332641043989256.davem@davemloft.net>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Mon, 30 Nov 2015 12:35:43 +0800
+Subject: [PATCH] arm64: dts: add hi6220 usb node
+Message-ID: <1448858143-24361-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Dumazet <eric.dumazet@gmail.com>
-Date: Wed, 25 Nov 2015 09:02:10 -0800
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+---
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 33 +++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-> From: Eric Dumazet <edumazet@google.com>
-> 
-> Once TX has been enabled on a NIC, it is illegal to access skb,
-> as this skb might have been freed by another cpu, from TX completion
-> handler.
-> 
-> Signed-off-by: Eric Dumazet <edumazet@google.com>
-> Reported-by: Mark Rutland <mark.rutland@arm.com>
-> Tested-by: Mark Rutland <mark.rutland@arm.com>
-
-Applied, thanks Eric.
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index 0f11e2a..abb2ea0 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -209,6 +209,39 @@
+ 			clock-names = "uartclk", "apb_pclk";
+ 			status = "disabled";
+ 		};
++
++		fixed_5v_hub: regulator at 0 {
++			compatible = "regulator-fixed";
++			regulator-name = "fixed_5v_hub";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			regulator-boot-on;
++			gpio = <&gpio0 7 0>;
++			regulator-always-on;
++		};
++
++		usb_phy: usbphy {
++			compatible = "hisilicon,hi6220-usb-phy";
++			#phy-cells = <0>;
++			phy-supply = <&fixed_5v_hub>;
++			hisilicon,peripheral-syscon = <&sys_ctrl>;
++		};
++
++		usb: usb at f72c0000 {
++			compatible = "hisilicon,hi6220-usb";
++			reg = <0x0 0xf72c0000 0x0 0x40000>;
++			phys = <&usb_phy>;
++			phy-names = "usb2-phy";
++			clocks = <&sys_ctrl HI6220_USBOTG_HCLK>;
++			clock-names = "otg";
++			dr_mode = "otg";
++			g-use-dma;
++			g-rx-fifo-size = <512>;
++			g-np-tx-fifo-size = <128>;
++			g-tx-fifo-size = <128 128 128 128 128 128>;
++			interrupts = <0 77 0x4>;
++		};
++
+ 		gpio0: gpio at f8011000 {
+ 			compatible = "arm,pl061", "arm,primecell";
+ 			reg = <0x0 0xf8011000 0x0 0x1000>;
+-- 
+1.9.1
