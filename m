@@ -1,94 +1,96 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 30 Nov 2015 10:43:40 +0000
-Subject: [PATCH v2 04/21] arm64: KVM: Implement vgic-v3 save/restore
-In-Reply-To: <87egf7byez.fsf@linaro.org>
-References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
- <1448650215-15218-5-git-send-email-marc.zyngier@arm.com>
- <87egf7byez.fsf@linaro.org>
-Message-ID: <20151130104340.4157d11e@why.wild-wind.fr.eu.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 30 Nov 2015 11:40:29 +0100
+Subject: [PATCH 1/4] dt-bindings: gpio: update desription of LPC32xx GPIO
+ controller
+In-Reply-To: <1447982995-30231-2-git-send-email-vz@mleia.com>
+References: <1447982995-30231-1-git-send-email-vz@mleia.com>
+ <1447982995-30231-2-git-send-email-vz@mleia.com>
+Message-ID: <CACRpkdY4rZKi+1Ff=9cfxpspZmpTjN-B2X8qjXNcONtAFy5mhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Nov 2015 09:59:32 +0000
-Alex Benn?e <alex.bennee@linaro.org> wrote:
+On Fri, Nov 20, 2015 at 2:29 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
 
-> 
-> Marc Zyngier <marc.zyngier@arm.com> writes:
-> 
-> > Implement the vgic-v3 save restore as a direct translation of
-> > the assembly code version.
-> >
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  arch/arm64/kvm/hyp/Makefile     |   1 +
-> >  arch/arm64/kvm/hyp/hyp.h        |   3 +
-> >  arch/arm64/kvm/hyp/vgic-v3-sr.c | 222 ++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 226 insertions(+)
-> >  create mode 100644 arch/arm64/kvm/hyp/vgic-v3-sr.c
-> >
-> > diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-> > index d8d5968..d1e38ce 100644
-> > --- a/arch/arm64/kvm/hyp/Makefile
-> > +++ b/arch/arm64/kvm/hyp/Makefile
-> > @@ -3,3 +3,4 @@
-> >  #
-> >
-> >  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
-> > +obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
-> > diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
-> > index 78f25c4..a31cb6e 100644
-> > --- a/arch/arm64/kvm/hyp/hyp.h
-> > +++ b/arch/arm64/kvm/hyp/hyp.h
-> > @@ -30,5 +30,8 @@
-> >  void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
-> >  void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
-> >
-> > +void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
-> > +void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
-> > +
-> >  #endif /* __ARM64_KVM_HYP_H__ */
-> >
-> > diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-> > new file mode 100644
-> > index 0000000..b490db5
-> > --- /dev/null
-> > +++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-> > @@ -0,0 +1,222 @@
-> > +/*
-> > + * Copyright (C) 2012-2015 - ARM Ltd
-> > + * Author: Marc Zyngier <marc.zyngier@arm.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License
-> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> > + */
-> > +
-> > +#include <linux/compiler.h>
-> > +#include <linux/irqchip/arm-gic-v3.h>
-> 
-> This include starts spitting out compiler warnings due to use of
-> undefined barrier primitives. I'm not sure where the best place to:
-> 
->  #include <asm/barrier.h>
-> 
-> is. I added it to:
-> 
->   arch/arm64/include/asm/arch_gicv3.h
+> For the purpose of better description of NXP LPC32xx GPIO controller
+> hardware in device tree format, extend the existing description with
+> device tree subnodes, which represent 6 GPIO banks within the
+> controller.
+>
+> Note, client interface to the GPIO controller is untouched.
+>
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 
-I already have a couple of fixes queued to that effect in my tree,
-hopefully heading for 4.4-rc4. If you pull the branch I have on korg,
-you'll get the whole thing that should compile without warning.
+(...)
 
-Thanks,
+> +
+> +Required properties:
+> +- reg: should contain 3 integer values:
+> +   1) GPIO bank id from 0 to 5,
+> +   2) physical base address of this GPIO bank,
+> +   3) total size of the GPIO bank registers.
 
-	M.
--- 
-Without deviation from the norm, progress is not possible.
+If each bank has a unique physical address, it should be a
+unique device with a compatible string.
+
+Below: rethink this. All are named gpio-* which is the generic
+GPIO namespace and should be documented in
+Documentation/devicetree/bindings/gpio/gpio.txt
+so figure out if what you're adding is generic or not.
+
+> +Optional properties:
+> +- gpio-bank-name: human readable name of a GPIO bank,
+
+The node name is unique enough and is what we use in device
+trees. Get rid of this.
+
+> +- gpio-no-output-state: property of P2 bank, which has special,
+> +  mapping of its control registers,
+
+Looks like it should be nxp,no-output-state
+
+> +- gpio-offset: property of P3/GPIO bank, offset of bits representing
+> +  GPIO lines in output and direction registers,
+
+Explain more. I think this should probably be generic and
+described together with ngpios.
+
+> +- gpios: number of GPIO lines per GPIO bank, if this property is
+> +  omitted, then gpio-input-mask must be present,
+
+Use the generic ngpios, also one does not exclude the other, e.g
+if there is 32 gpios, offset it 8 ngpios is 8, we know that
+bits 8..15 are GPIO lines.
+
+> +- gpio-input-mask: should contain two bitmasks, the first bitmask is
+> +  the mapping of GPIO lines to input status register, the second
+> +  bitmask should be a subset of the first bitmask and it represents
+> +  input GPIO lines, which may serve as an interrupt source,
+> +  if gpio-input-mask roperty is omitted, gpios property should be
+> +  present,
+
+This is really hopeless to understand. This document needs a
+detailed description about how this GPIO block works so we
+have the background for this.
+
+> +- interrupts: list of parent interrupts mapped to input GPIO lines,
+> +- interrupts-extended: list of parent interrupts mapped to input GPIO
+> +  lines, used if parent interrupts are provided by more than one
+> +  interrupt controller, this option is used by GPI bank,
+> +- interrupt-controller: indicates that GPIO bank may serve as an
+> +  interrupt controller,
+> +- #interrupt-cells: if interrupt-controller property is present,
+> +  it should be 2, interrupt id and its flags.
+
+You need to add a description of how the block maps IRQs
+to GPIO lines. It seems like it is doing some kind of
+phone-exchange type of thing and just latches the GPIO line
+out to an IRQ line on the interrupt controller, and that is
+why even setting up trigger type has to percolate up to
+the parent? Explain this in this document.
+
+> +                       gpio-output-only;
+
+You forgot to documen this property.
+
+Yours,
+Linus Walleij
