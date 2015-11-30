@@ -1,78 +1,76 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 30 Nov 2015 08:28:16 -0800
-Subject: [RFC PATCH] clocksource: ti-32k: convert to platform device
-In-Reply-To: <5658B8B2.5030505@ti.com>
-References: <1448040129-23869-1-git-send-email-grygorii.strashko@ti.com>
- <87h9kgcz1k.fsf@saruman.tx.rr.com> <5658B8B2.5030505@ti.com>
-Message-ID: <20151130162815.GA2517@atomide.com>
+Date: Mon, 30 Nov 2015 08:34:30 -0800
+Subject: [PATCH v2] arm, am335x: add support for the bosch shc board
+In-Reply-To: <565BF1D5.8020708@denx.de>
+References: <1447748655-2088-1-git-send-email-hs@denx.de>
+ <564B9C3D.7070303@ti.com> <564C35D0.8060609@denx.de>
+ <565BF1D5.8020708@denx.de>
+Message-ID: <20151130163429.GB2517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [151127 12:11]:
-> Hi Felipe,
+* Heiko Schocher <hs@denx.de> [151129 22:51]:
+> Hello all,
 > 
-> On 11/20/2015 08:21 PM, Felipe Balbi wrote:
-> > Grygorii Strashko <grygorii.strashko@ti.com> writes:
-> >> Since system clocksource is finally selected by Clocksource core at
-> >> fs_initcall stage during boot there are no reasons to initialize
-> >> ti_32k_timer at early boot stages. Hence, ti_32k_timer can be
-> >> converted to use platform device/driver model and its PM can be
-> >> implemented using PM runtime which is common for OMAP devices.
+> Am 18.11.2015 um 09:24 schrieb Heiko Schocher:
+> >Hello Dave,
+> >
+> >Am 17.11.2015 um 22:29 schrieb Dave Gerlach:
+> >>Hi,
+> >>On 11/17/2015 02:24 AM, Heiko Schocher wrote:
+> >>>add support for the am335x based shc board.
+> >>>
+> >>>UART: 0-2 and 4
+> >>>DRAM: 512 MiB
+> >>>MMC:  OMAP SD/MMC: 0 @ 26 MHz
+> >>>       OMAP SD/MMC: 1 @ 26 MHz
+> >>>I2C:  at24 eeprom, pcf8563
+> >>>USB:  USB1 (host)
+> >>>
+> >>>Signed-off-by: Heiko Schocher <hs@denx.de>
+> >>>---
+> >>>The following patches are needed to get all working
+> >>>for the shc board:
+> >>>- disable clkout on pcf8563
+> >>>   accepted.
+> >>>   http://www.spinics.net/lists/devicetree/msg98542.html
+> >>>
+> >>>- leds: leds-gpio: add shutdown function
+> >>>   accepted.
+> >>>   https://lkml.org/lkml/2015/10/13/169
+> >>>
+> >>>- net: phy: smsc: disable energy detect mode
+> >>>   accepted
+> >>>   [PATCH v2 2/2] net: phy: smsc: disable energy detect mode
+> >>>   https://lkml.org/lkml/2015/10/17/2
+> >>>   [PATCH v2 1/2] drivers: net: cpsw: add phy-handle parsing
+> >>>   https://lkml.org/lkml/2015/10/17/4
+> >>>
+> >>>- ARM: OMAP2+: omap_hwmod: Introduce ti,no-init dt property
+> >>>   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/328204.html
+> >>>   @Dave: What is the current state of this patch?
+> >>>   I have the same problem here on this am335x based board
+> >>>
 > >>
-> >> Platform specific initialization code has to be disabled once as
-> >> ti_32k_timer is converted to platform device - otherwise OMAP platform
-> >> code will generate boot warnings.
-> >>
-> >> After this change, all counter_32k's platform code can be removed
-> >> once all OMAP boards will be converted to DT.
-> >>
-> >> Cc: Tony Lindgren <tony@atomide.com>
-> >> Cc: Felipe Balbi <balbi@ti.com>
-> >> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> >> ---
+> >>A different approach is being taken for resolving the issue of rtc hwmod on am43x epos evm [1],
+> >>which is what I was attempting to solve with the patch you have linked. We decided to avoid changing
+> >>omap_hwmod code and I haven't been pursuing the ti,no-init flag anymore.
+> >
+> >Maybe I overlook something, but I cannot see, how [1] solves the RTC
+> >hwmod problem on am335x SoC based boards. Not all boards have this problem,
+> >so the RTC hwmod cannot be disabled for all am335x boards ...
+> >
+> >It must be somehow configurable for boards ... I have am335x boards
+> >which use the rtc from the SoC
 > 
-> [...]
+> gentle ping ...
 > 
-> >> +
-> >> +static struct platform_driver ti_32k_driver __initdata = {
-> >> +	.probe		= ti_32k_probe,
-> >> +	.driver		= {
-> >> +		.name	= "ti_32k_timer",
-> >> +		.of_match_table = of_match_ptr(ti_32k_of_table),
-> >> +	}
-> >> +};
-> >> +
-> >> +static int __init ti_32k_init(void)
-> >> +{
-> >> +	return platform_driver_register(&ti_32k_driver);
-> >>   }
-> >> -CLOCKSOURCE_OF_DECLARE(ti_32k_timer, "ti,omap-counter32k",
-> >> -		ti_32k_timer_init);
-> >> +
-> >> +subsys_initcall(ti_32k_init);
-> >> +
-> >> +MODULE_AUTHOR("Paul Mundt");
-> >> +MODULE_AUTHOR("Juha Yrj?l?");
-> >> +MODULE_DESCRIPTION("OMAP2 32k Timer");
-> >> +MODULE_ALIAS("platform:ti_32k_timer");
-> >> +MODULE_LICENSE("GPL v2");
-> > 
-> > this will break clksource_of_init(), right ? Eventually, we want that to
-> > be the only thing called by our .init_time method. I'll leave it to Tony
-> > to decide, but IMO this is not a good path forward for timers.
-> > 
-> 
-> Yeh :(.  I did additional tests, and, unfortunately, this can't be used as is.
-> But not because of clocksource_of_init() which will just produce boot warning.
-> It can't be done because of sched_clock_register() which is expected to be
-> called during early boot time only and with disabled IRQs.
-> 
-> It was so tempting to try :)
+> No more comments on this patch? Is it Ok for mainline or are
+> there more issues?
 
-We should be able to make this into an early_platform_device and just
-have it depend on the source clock muxes. See the omap initcall changes
-patches I just posted.
-
-Regards,
+Looks OK to me, hoping to start applying the dts changes for v4.5 this
+week.
 
 Tony
+
+> >>[1] http://www.spinics.net/lists/linux-omap/msg121987.html
