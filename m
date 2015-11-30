@@ -1,170 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 Nov 2015 16:34:22 +0100
-Subject: [PATCH v6 14/19] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <3754277.KmO9Nk3XLD@wuerfel>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <1447795019-30176-15-git-send-email-ynorov@caviumnetworks.com>
- <3754277.KmO9Nk3XLD@wuerfel>
-Message-ID: <2133692.Tueq9xZUPQ@wuerfel>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 30 Nov 2015 15:36:07 +0000
+Subject: [RESEND RFC/PATCH 3/8] media: platform: mtk-vpu: Support Mediatek
+ VPU
+In-Reply-To: <1448883819.15961.7.camel@mtksdaap41>
+References: <1447764885-23100-1-git-send-email-tiffany.lin@mediatek.com>
+ <1447764885-23100-4-git-send-email-tiffany.lin@mediatek.com>
+ <5655DDB4.2080002@linaro.org> <1448626209.7734.26.camel@mtksdaap41>
+ <56584AC5.7020704@linaro.org> <1448883819.15961.7.camel@mtksdaap41>
+Message-ID: <CAMTL27G8WRTTGCtU9pXpp1-inyzZE9Jat1SkOiX5HMG5E-eFzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 November 2015 22:57:52 Arnd Bergmann wrote:
-> On Wednesday 18 November 2015 00:16:54 Yury Norov wrote:
-> > From: Andrew Pinski <apinski@cavium.com>
-> > 
-> > Add a separate syscall-table for ILP32, which dispatches either to native
-> > LP64 system call implementation or to compat-syscalls, as appropriate.
-> 
-> I like it much better than the previous version, thanks for the rework!
+On 30 November 2015 at 11:43, andrew-ct chen
+<andrew-ct.chen@mediatek.com> wrote:
+> On Fri, 2015-11-27 at 12:21 +0000, Daniel Thompson wrote:
+>> On 27/11/15 12:10, andrew-ct chen wrote:
+>> >>> +
+>> >>> > >+      memcpy((void *)send_obj->share_buf, buf, len);
+>> >>> > >+      send_obj->len = len;
+>> >>> > >+      send_obj->id = id;
+>> >>> > >+      vpu_cfg_writel(vpu, 0x1, HOST_TO_VPU);
+>> >>> > >+
+>> >>> > >+      /* Wait until VPU receives the command */
+>> >>> > >+      timeout = jiffies + msecs_to_jiffies(IPI_TIMEOUT_MS);
+>> >>> > >+      do {
+>> >>> > >+              if (time_after(jiffies, timeout)) {
+>> >>> > >+                      dev_err(vpu->dev, "vpu_ipi_send: IPI timeout!\n");
+>> >>> > >+                      return -EIO;
+>> >>> > >+              }
+>> >>> > >+      } while (vpu_cfg_readl(vpu, HOST_TO_VPU));
+>> >> >
+>> >> >Do we need to busy wait every time we communicate with the co-processor?
+>> >> >Couldn't we put this wait*before*  we write to HOST_TO_VPU above.
+>> >> >
+>> >> >That way we only spin when there is a need to.
+>> >> >
+>> > Since the hardware VPU only allows that one client sends the command to
+>> > it each time.
+>> > We need the wait to make sure VPU accepted the command and cleared the
+>> > interrupt and then the next command would be served.
+>>
+>> I understand that the VPU  can only have on message outstanding at once.
+>>
+>> I just wonder why we busy wait *after* sending the first command rather
+>> than *before* sending the second one.
+>
+> No other special reasons. Just send one command and wait until VPU gets
+> the command. Then, I think this wait also can be put before we write to
+> HOST_TO_VPU.Is this better than former? May I know the reason?
 
-Hi Yuri,
+Busy waiting is bad; it is a waste of host CPU processor time and/or power.
 
-you must have missed my reply below. Are you still working on ilp32
-or did you drop this thread because you got distracted with something
-else?
+When the busy wait occurs after queuing then we will busy wait for
+every command we send.
 
-	Arnd
+If busy wait occurs before next queuing then we will wait for a
+shorter time in total because we have the chance to do something
+useful on the host before we have to wait.
 
-> However, it seems that you accidentally have a lot more redirects
-> than you should have:
-> 
-> > +/* Using non-compat syscalls where necessary */
-> > +#define compat_sys_fadvise64_64        sys_fadvise64_64
-> > +#define compat_sys_fallocate           sys_fallocate
-> > +#define compat_sys_ftruncate64         sys_ftruncate
-> > +#define compat_sys_pread64             sys_pread64
-> > +#define compat_sys_pwrite64            sys_pwrite64
-> > +#define compat_sys_readahead           sys_readahead
-> 
-> Makes sense. These of course all require the respective changes
-> in glibc as discussed in the thread regarding loff_t handling.
-> 
-> > +#define compat_sys_rt_sigaction        sys_rt_sigaction
-> > +#define compat_sys_shmat               sys_shmat
-> 
-> What's special about compat_sys_shmat?
-> 
-> > +#define compat_sys_sync_file_range     sys_sync_file_range
-> > +#define compat_sys_truncate64          sys_truncate
-> > +#define compat_sys_sigaltstack         sys_sigaltstack
-> > +
-> > +#define compat_sys_io_getevents        sys_io_getevents
-> 
-> io_getevents seems wrong, you are passing the wrong timespec and
-> aio_context_t here.
-> 
-> > +#define compat_sys_lookup_dcookie      sys_lookup_dcookie
-> > +#define compat_sys_epoll_pwait         sys_epoll_pwait
-> 
-> epoll_pwait takes sigset_t, which I'd assume is different between
-> ilp32 and lp64, so this is probably wrong too, at least on big-endian.
-> 
-> > +#define compat_sys_fcntl64             compat_sys_fcntl
-> 
-> This uses compat_off_t, not compat_loff_t, and needs to be changed.
-> 
-> > +#define compat_sys_signalfd4           sys_signalfd4
-> > +#define compat_sys_rt_sigsuspend       sys_rt_sigsuspend
-> > +#define compat_sys_rt_sigprocmask      sys_rt_sigprocmask
-> > +#define compat_sys_rt_sigpending       sys_rt_sigpending
-> 
-> sigset_t again, all four of these.
-> 
-> > +#define compat_sys_rt_sigqueueinfo     sys_rt_sigqueueinfo
-> 
-> this looks ok though, as you have the 64-bit siginfo
-> 
-> > +#define compat_sys_semtimedop          sys_semtimedop
-> 
-> timespec again
-> 
-> > +#define compat_sys_rt_tgsigqueueinfo   sys_rt_tgsigqueueinfo
-> > +
-> > +#define compat_sys_timer_create        sys_timer_create
-> > +#define compat_sys_timer_gettime       sys_timer_gettime
-> > +#define compat_sys_timer_settime       sys_timer_settime
-> 
-> timespec again for gettime/settime. create seems fine if you require
-> the use of the 64-bit sigevent (why?)
-> 
-> > +#define compat_sys_rt_sigtimedwait     sys_rt_sigtimedwait
-> 
-> This one probably needs a custom wrapper as you have the 64-bit
-> siginfo, but the 32-bit sigset and timespec.
-> 
-> > +#define compat_sys_mq_open             sys_mq_open
-> > +#define compat_sys_mq_timedsend        sys_mq_timedsend
-> > +#define compat_sys_mq_timedreceive     sys_mq_timedreceive
-> > +#define compat_sys_mq_getsetattr       sys_mq_getsetattr
-> > +#define compat_sys_mq_open             sys_mq_open
-> 
-> You have compat_sys_mq_open twice, and they all look wrong because
-> you get the wrong struct mq_attr.
-> 
-> > +#define compat_sys_open_by_handle_at   sys_open_by_handle_at
-> 
-> The only difference here is the forced O_LARGEFILE, but that
-> is set by glibc anyway, right?
-> 
-> > +#define compat_sys_clock_adjtime       sys_clock_adjtime
-> 
-> wrong timex structure
-> 
-> > +#define compat_sys_openat              sys_openat
-> 
-> same as open_by_handle_at
-> 
-> > +#define compat_sys_getdents64          sys_getdents64
-> 
-> glibc uses linux_dirent64 for 32-bit architectures, so this looks wrong
-> 
-> > +#define compat_sys_waitid              sys_waitid
-> 
-> This will probably need a separate wrapper to convert rusage but not siginfo
-> 
-> > +#define compat_sys_timer_settime       sys_timer_settime
-> > +#define compat_sys_sched_rr_get_interval sys_sched_rr_get_interval
-> 
-> timespec again
-> 
-> > +#define compat_sys_execveat            sys_execveat
-> 
-> This probably gives you the wrong struct user_arg_ptr
-> 
-> > +#define compat_sys_mq_notify           sys_mq_notify
-> 
-> ok.
-> 
-> > +#define compat_sys_clock_nanosleep     sys_clock_nanosleep
-> > +#define compat_sys_clock_getres        sys_clock_getres
-> 
-> timespec
-> 
-> > +#define sys_lseek                      sys_llseek
-> 
-> This seems pointless, as there is no sys_lseek
-> 
-> > +asmlinkage long compat_sys_mmap2_wrapper(void);
-> > +#define sys_mmap2                      compat_sys_mmap2_wrapper
-> > +
-> > +asmlinkage long compat_sys_fstatfs64_wrapper(void);
-> > +#define compat_sys_fstatfs64    compat_sys_fstatfs64_wrapper
-> > +asmlinkage long compat_sys_statfs64_wrapper(void);
-> > +#define compat_sys_statfs64             compat_sys_statfs64_wrapper
-> 
-> What are the wrappers for again? Maybe add a comment here.
-> 
-> > +#define compat_sys_preadv              compat_sys_preadv64
-> > +#define compat_sys_pwritev	       compat_sys_pwritev64
-> 
-> wrong iovec.
-> 
-> 	Arnd
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+>> Streamed decode/encode typically ends up being rate controlled by
+>> capture or display meaning that in these cases we don't need to busy
+>> wait at all (because by the time we send the next frame the VPU has
+>> already accepted the previous message).
+>
+> For now, only one device "encoder" exists, it is true.
+> But, we'll have encoder and decoder devices, the decode and encode
+> requested to VPU are simultaneous.
+
+Sure, I accept that lock and busy-wait is an appropriate way to ensure
+safety (assuming the VPU is fairly quick clearing the HOST_TO_VPU
+flag).
+
+
+> Is this supposed to be removed for this patches and we can add it back
+> if the another device(decoder) is ready for review?
+
+No I'm not suggesting that.
+
+I only recommend moving the busy wait *before* end sending of command
+(for efficiency reasons mentioned above).
+
+
+Daniel.
