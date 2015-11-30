@@ -1,80 +1,52 @@
-From: heiko.stuebner@collabora.com (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 30 Nov 2015 15:17:39 +0100
-Subject: [PATCH 1/2] ARM: dts: rockchip: update the thermal management on
- rk3288
-In-Reply-To: <2402718.WBE9iyTUZ2@diego>
-References: <2402718.WBE9iyTUZ2@diego>
-Message-ID: <11978217.g8EG36HDJ0@diego>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 Nov 2015 15:18:02 +0100
+Subject: [RFC v02 00/15] dmaengine: New 'universal' API for requesting
+ channel
+In-Reply-To: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <13562653.8QgTG33tZS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+On Monday 30 November 2015 15:45:30 Peter Ujfalusi wrote:
+> Changes since RFC v01:
+>- dma_request_chan(); lost the mask parameter
+>- The new API does not rely on RESOURCE_DMA, instead the dma_filter_map table
+>  will be used to provide the needed information to the filter function in
+>  legacy mode
+>- Extended the example patches to convert most of daVinci to use the new API to
+>  request the DMA channels.
 
-Am Montag, 30. November 2015, 14:13:17 schrieb Heiko St?bner:
-> From: Caesar Wang <wxt@rock-chips.com>
-> 
-> In some cases the machine radiating is very poor,sometime the temperature
-> is rising very quickly on heavy loading.So we need have more frequent
-> polling and better granularity.
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> Reviewed-by: Dmitry Torokhov <dtor@chromium.org>
-> Signed-off-by: Heiko Stuebner <heiko.stuebner@collabora.com>
+Very nice overall. Just a few minor comments.
 
-it looks like I forget to Cc you on this mail, because I'd like to keep your 
-Reviewed-by tag :-) . So can I keep your tag? Otherwise I'll just drop it when 
-applying.
+> static struct dma_filter_map da830_edma_map[] = {
+>         DMA_FILTER_ENTRY("davinci-mcasp.0", "rx", EDMA_CTLR_CHAN(0, 0)),
+>         DMA_FILTER_ENTRY("davinci-mcasp.0", "tx", EDMA_CTLR_CHAN(0, 1)),
+>         DMA_FILTER_ENTRY("davinci-mcasp.1", "rx", EDMA_CTLR_CHAN(0, 2)),
+>         DMA_FILTER_ENTRY("davinci-mcasp.1", "tx", EDMA_CTLR_CHAN(0, 3)),
+>         DMA_FILTER_ENTRY("davinci-mcasp.2", "rx", EDMA_CTLR_CHAN(0, 4)),
+>         DMA_FILTER_ENTRY("davinci-mcasp.2", "tx", EDMA_CTLR_CHAN(0, 5)),
+>         DMA_FILTER_ENTRY("spi_davinci.0", "rx", EDMA_CTLR_CHAN(0, 14)),
+>         DMA_FILTER_ENTRY("spi_davinci.0", "tx", EDMA_CTLR_CHAN(0, 15)),
+>         DMA_FILTER_ENTRY("da830-mmc.0", "rx", EDMA_CTLR_CHAN(0, 16)),
+>         DMA_FILTER_ENTRY("da830-mmc.0", "tx", EDMA_CTLR_CHAN(0, 17)),
+>         DMA_FILTER_ENTRY("spi_davinci.1", "rx", EDMA_CTLR_CHAN(0, 18)),
+>         DMA_FILTER_ENTRY("spi_davinci.1", "tx", EDMA_CTLR_CHAN(0, 19)),
+> };
 
+I wonder if we should mandate that the lookup table is 'const'.
 
-Thanks
-Heiko
+We could also drop the DMA_FILTER_ENTRY() macro above, and open-code the
+table like
 
-> ---
->  arch/arm/boot/dts/rk3288-thermal.dtsi | 14 ++++++++++++--
->  1 file changed, 12 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/rk3288-thermal.dtsi
-> b/arch/arm/boot/dts/rk3288-thermal.dtsi index 3404066..651b962 100644
-> --- a/arch/arm/boot/dts/rk3288-thermal.dtsi
-> +++ b/arch/arm/boot/dts/rk3288-thermal.dtsi
-> @@ -52,7 +52,7 @@ reserve_thermal: reserve_thermal {
->  };
-> 
->  cpu_thermal: cpu_thermal {
-> -	polling-delay-passive = <1000>; /* milliseconds */
-> +	polling-delay-passive = <100>; /* milliseconds */
->  	polling-delay = <5000>; /* milliseconds */
-> 
->  	thermal-sensors = <&tsadc 1>;
-> @@ -63,6 +63,11 @@ cpu_thermal: cpu_thermal {
->  			hysteresis = <2000>; /* millicelsius */
->  			type = "passive";
->  		};
-> +		cpu_alert1: cpu_alert1 {
-> +			temperature = <75000>; /* millicelsius */
-> +			hysteresis = <2000>; /* millicelsius */
-> +			type = "passive";
-> +		};
->  		cpu_crit: cpu_crit {
->  			temperature = <90000>; /* millicelsius */
->  			hysteresis = <2000>; /* millicelsius */
-> @@ -74,13 +79,18 @@ cpu_thermal: cpu_thermal {
->  		map0 {
->  			trip = <&cpu_alert0>;
->  			cooling-device =
-> +				<&cpu0 THERMAL_NO_LIMIT 6>;
-> +		};
-> +		map1 {
-> +			trip = <&cpu_alert1>;
-> +			cooling-device =
->  				<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
->  		};
->  	};
->  };
-> 
->  gpu_thermal: gpu_thermal {
-> -	polling-delay-passive = <1000>; /* milliseconds */
-> +	polling-delay-passive = <100>; /* milliseconds */
->  	polling-delay = <5000>; /* milliseconds */
-> 
->  	thermal-sensors = <&tsadc 2>;
+static struct dma_filter_map da830_edma_map[] = {
+         { "davinci-mcasp.0", "rx", EDMA_CTLR_CHAN(0, 0)},
+         { "davinci-mcasp.0", "tx", EDMA_CTLR_CHAN(0, 1)},
+         { "davinci-mcasp.1", "rx", EDMA_CTLR_CHAN(0, 2)},
+	 ...
+};
+
+which is a little more compact and more obvious, but loses the
+named initializers.
+
+	Arnd
