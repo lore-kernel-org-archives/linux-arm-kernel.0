@@ -1,139 +1,80 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 30 Nov 2015 15:17:12 +0100
-Subject: [PATCH 2/4] ARM: dt: mvebu: ix4-300d: move partitions to
- partition sub-node
-In-Reply-To: <1448709248-21177-3-git-send-email-sebastian.hesselbarth@gmail.com>
- (Sebastian Hesselbarth's message of "Sat, 28 Nov 2015 12:14:06 +0100")
-References: <1448709248-21177-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1448709248-21177-3-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <87lh9f607r.fsf@free-electrons.com>
+From: heiko.stuebner@collabora.com (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 30 Nov 2015 15:17:39 +0100
+Subject: [PATCH 1/2] ARM: dts: rockchip: update the thermal management on
+ rk3288
+In-Reply-To: <2402718.WBE9iyTUZ2@diego>
+References: <2402718.WBE9iyTUZ2@diego>
+Message-ID: <11978217.g8EG36HDJ0@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
- 
- On sam., nov. 28 2015, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+Hi Dmitry,
 
-> NAND flash partitions should be part of a partitions sub-node
-> not the flash node itself. Move the partitions which will also
-> allow different bootloaders get rid of the stock partitions
-> easily by removing the partitions node.
->
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Am Montag, 30. November 2015, 14:13:17 schrieb Heiko St?bner:
+> From: Caesar Wang <wxt@rock-chips.com>
+> 
+> In some cases the machine radiating is very poor,sometime the temperature
+> is rising very quickly on heavy loading.So we need have more frequent
+> polling and better granularity.
+> 
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> Reviewed-by: Dmitry Torokhov <dtor@chromium.org>
+> Signed-off-by: Heiko Stuebner <heiko.stuebner@collabora.com>
 
-Applied on mvebu/dt
+it looks like I forget to Cc you on this mail, because I'd like to keep your 
+Reviewed-by tag :-) . So can I keep your tag? Otherwise I'll just drop it when 
+applying.
 
-Thanks,
 
-Gregory
+Thanks
+Heiko
 
 > ---
-> Cc: Jason Cooper <jason@lakedaemon.net> 
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com> 
-> Cc: Rob Herring <robh+dt@kernel.org> 
-> Cc: Pawel Moll <pawel.moll@arm.com> 
-> Cc: Mark Rutland <mark.rutland@arm.com> 
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk> 
-> Cc: Kumar Gala <galak@codeaurora.org> 
-> Cc: Russell King <linux@arm.linux.org.uk> 
-> Cc: Benoit Masson <yahoo@perenite.com>
-> Cc: linux-arm-kernel at lists.infradead.org 
-> Cc: devicetree at vger.kernel.org 
-> Cc: linux-kernel at vger.kernel.org 
-> ---
->  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 67 +++++++++++++------------
->  1 file changed, 36 insertions(+), 31 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-> index 30a0a6eac645..76781fd18624 100644
-> --- a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-> +++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
-> @@ -151,37 +151,42 @@
->  				marvell,nand-enable-arbiter;
->  				nand-on-flash-bbt;
->  
-> -				partition at 0 {
-> -					label = "u-boot";
-> -					reg = <0x0000000 0xe0000>;
-> -					read-only;
-> -				};
-> -
-> -				partition at e0000 {
-> -					label = "u-boot-env";
-> -					reg = <0xe0000 0x20000>;
-> -					read-only;
-> -				};
-> -
-> -				partition at 100000 {
-> -					label = "u-boot-env2";
-> -					reg = <0x100000 0x20000>;
-> -					read-only;
-> -				};
-> -
-> -				partition at 120000 {
-> -					label = "zImage";
-> -					reg = <0x120000 0x400000>;
-> -				};
-> -
-> -				partition at 520000 {
-> -					label = "initrd";
-> -					reg = <0x520000 0x400000>;
-> -				};
-> -
-> -				partition at xE00000 {
-> -					label = "boot";
-> -					reg = <0xE00000 0x3F200000>;
-> +				partitions {
-> +					#address-cells = <1>;
-> +					#size-cells = <1>;
-> +
-> +					partition at 0 {
-> +						label = "u-boot";
-> +						reg = <0x0000000 0xe0000>;
-> +						read-only;
-> +					};
-> +
-> +					partition at e0000 {
-> +						label = "u-boot-env";
-> +						reg = <0xe0000 0x20000>;
-> +						read-only;
-> +					};
-> +
-> +					partition at 100000 {
-> +						label = "u-boot-env2";
-> +						reg = <0x100000 0x20000>;
-> +						read-only;
-> +					};
-> +
-> +					partition at 120000 {
-> +						label = "zImage";
-> +						reg = <0x120000 0x400000>;
-> +					};
-> +
-> +					partition at 520000 {
-> +						label = "initrd";
-> +						reg = <0x520000 0x400000>;
-> +					};
-> +
-> +					partition at xE00000 {
-> +						label = "boot";
-> +						reg = <0xE00000 0x3F200000>;
-> +					};
->  				};
->  			};
+>  arch/arm/boot/dts/rk3288-thermal.dtsi | 14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/rk3288-thermal.dtsi
+> b/arch/arm/boot/dts/rk3288-thermal.dtsi index 3404066..651b962 100644
+> --- a/arch/arm/boot/dts/rk3288-thermal.dtsi
+> +++ b/arch/arm/boot/dts/rk3288-thermal.dtsi
+> @@ -52,7 +52,7 @@ reserve_thermal: reserve_thermal {
+>  };
+> 
+>  cpu_thermal: cpu_thermal {
+> -	polling-delay-passive = <1000>; /* milliseconds */
+> +	polling-delay-passive = <100>; /* milliseconds */
+>  	polling-delay = <5000>; /* milliseconds */
+> 
+>  	thermal-sensors = <&tsadc 1>;
+> @@ -63,6 +63,11 @@ cpu_thermal: cpu_thermal {
+>  			hysteresis = <2000>; /* millicelsius */
+>  			type = "passive";
 >  		};
-> -- 
-> 2.1.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> +		cpu_alert1: cpu_alert1 {
+> +			temperature = <75000>; /* millicelsius */
+> +			hysteresis = <2000>; /* millicelsius */
+> +			type = "passive";
+> +		};
+>  		cpu_crit: cpu_crit {
+>  			temperature = <90000>; /* millicelsius */
+>  			hysteresis = <2000>; /* millicelsius */
+> @@ -74,13 +79,18 @@ cpu_thermal: cpu_thermal {
+>  		map0 {
+>  			trip = <&cpu_alert0>;
+>  			cooling-device =
+> +				<&cpu0 THERMAL_NO_LIMIT 6>;
+> +		};
+> +		map1 {
+> +			trip = <&cpu_alert1>;
+> +			cooling-device =
+>  				<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+>  		};
+>  	};
+>  };
+> 
+>  gpu_thermal: gpu_thermal {
+> -	polling-delay-passive = <1000>; /* milliseconds */
+> +	polling-delay-passive = <100>; /* milliseconds */
+>  	polling-delay = <5000>; /* milliseconds */
+> 
+>  	thermal-sensors = <&tsadc 2>;
