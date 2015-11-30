@@ -1,332 +1,203 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Sun, 29 Nov 2015 19:14:39 -0700
-Subject: [PATCH V5 18/26] coresight: etb10: implementing AUX space API
+Date: Sun, 29 Nov 2015 19:14:40 -0700
+Subject: [PATCH V5 19/26] coresight: updating documentation to reflect
+ integration with perf
 In-Reply-To: <1448849687-5724-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1448849687-5724-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1448849687-5724-19-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1448849687-5724-20-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding an ETB10 specific AUX area operations to be used
-by the perf framework when events are initialised.
-
-Part of this operation involves modeling the mmap'ed area
-based on the specific ways a sink buffer gathers information.
+Adding a new section giving information on how coresight has been
+integrated with the perf subsystem along with a general idea of how
+to control tracing from the perf tool cmd line.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etb10.c | 237 ++++++++++++++++++++++++++
- include/linux/coresight.h                     |  22 ++-
- 2 files changed, 257 insertions(+), 2 deletions(-)
+ Documentation/trace/coresight.txt | 138 ++++++++++++++++++++++++++++++++++----
+ 1 file changed, 124 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index dc4d707b28aa..79c87f42c550 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -28,6 +28,11 @@
- #include <linux/coresight.h>
- #include <linux/amba/bus.h>
- #include <linux/clk.h>
-+#include <linux/circ_buf.h>
-+#include <linux/mm.h>
-+#include <linux/perf_event.h>
-+
-+#include <asm/local.h>
+diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
+index 0a5c3290e732..9515206b4b1a 100644
+--- a/Documentation/trace/coresight.txt
++++ b/Documentation/trace/coresight.txt
+@@ -20,13 +20,13 @@ Components are generally categorised as source, link and sinks and are
  
- #include "coresight-priv.h"
+ "Sources" generate a compressed stream representing the processor instruction
+ path based on tracing scenarios as configured by users.  From there the stream
+-flows through the coresight system (via ATB bus) using links that are connecting
+-the emanating source to a sink(s).  Sinks serve as endpoints to the coresight
++flows through the Coresight system (via ATB bus) using links that are connecting
++the emanating source to a sink(s).  Sinks serve as endpoints to the Coresight
+ implementation, either storing the compressed stream in a memory buffer or
+ creating an interface to the outside world where data can be transferred to a
+-host without fear of filling up the onboard coresight memory buffer.
++host without fear of filling up the onboard Coresight memory buffer.
  
-@@ -65,6 +70,26 @@
- #define ETB_FRAME_SIZE_WORDS	4
+-At typical coresight system would look like this:
++At typical Coresight system would look like this:
  
- /**
-+ * struct cs_buffer - keep track of a recording session' specifics
-+ * @cur:	index of the current buffer
-+ * @nr_pages:	max number of pages granted to us
-+ * @offset:	offset within the current buffer
-+ * @data_size:	how much we collected in this run
-+ * @lost:	other than zero if we had a HW buffer wrap around
-+ * @snapshot:	is this run in snapshot mode
-+ * @data_pages:	a handle the ring buffer
-+ */
-+struct cs_buffers {
-+	unsigned int		cur;
-+	unsigned int		nr_pages;
-+	unsigned long		offset;
-+	local_t			data_size;
-+	local_t			lost;
-+	bool			snapshot;
-+	void			**data_pages;
-+};
-+
-+/**
-  * struct etb_drvdata - specifics associated to an ETB component
-  * @base:	memory mapped base address for this component.
-  * @dev:	the device entity associated to this component.
-@@ -266,9 +291,221 @@ static void etb_disable(struct coresight_device *csdev)
- 	dev_info(drvdata->dev, "ETB disabled\n");
- }
+   *****************************************************************
+  **************************** AMBA AXI  ****************************===||
+@@ -83,8 +83,8 @@ While on target configuration of the components is done via the APB bus,
+ all trace data are carried out-of-band on the ATB bus.  The CTM provides
+ a way to aggregate and distribute signals between CoreSight components.
  
-+static void *etb_get_config(struct coresight_device *csdev, int cpu,
-+			    void **pages, int nr_pages, bool overwrite)
-+{
-+	int node;
-+	struct cs_buffers *buf;
-+
-+	if (cpu == -1)
-+		cpu = smp_processor_id();
-+	node = cpu_to_node(cpu);
-+
-+	buf = kzalloc_node(sizeof(struct cs_buffers), GFP_KERNEL, node);
-+	if (!buf)
-+		return NULL;
-+
-+	buf->snapshot = overwrite;
-+	buf->nr_pages = nr_pages;
-+	buf->data_pages = pages;
-+
-+	return buf;
-+}
-+
-+static void etb_put_config(void *config)
-+{
-+	struct cs_buffers *buf = config;
-+
-+	kfree(buf);
-+}
-+
-+static int etb_set_buffer(struct coresight_device *csdev,
-+			  struct perf_output_handle *handle,
-+			  void *sink_config)
-+{
-+	int ret = 0;
-+	unsigned long head;
-+	struct cs_buffers *buf = sink_config;
-+
-+	/* wrap head around to the amount of space we have */
-+	head = handle->head & ((buf->nr_pages << PAGE_SHIFT) - 1);
-+
-+	/* find the page to write to */
-+	buf->cur = head / PAGE_SIZE;
-+
-+	/* and offset within that page */
-+	buf->offset = head % PAGE_SIZE;
-+
-+	local_set(&buf->data_size, 0);
-+
-+	return ret;
-+}
-+
-+static unsigned long etb_reset_buffer(struct coresight_device *csdev,
-+				      struct perf_output_handle *handle,
-+				      void *sink_config, bool *lost)
-+{
-+	unsigned long size = 0;
-+	struct cs_buffers *buf = sink_config;
-+
-+	if (buf) {
-+		/*
-+		 * In snapshot mode ->data_size holds the new address of the
-+		 * ring buffer's head.  The size itself is the whole address
-+		 * range since we want the latest information.
-+		 */
-+		if (buf->snapshot)
-+			handle->head = local_xchg(&buf->data_size,
-+						  buf->nr_pages << PAGE_SHIFT);
-+
-+		/*
-+		 * Tell the tracer PMU how much we got in this run and if
-+		 * something went wrong along the way.  Nobody else can use
-+		 * this cs_buffers instance until we are done.  As such
-+		 * resetting parameters here and squaring off with the ring
-+		 * buffer API in the tracer PMU is fine.
-+		 */
-+		*lost = local_xchg(&buf->lost, 0);
-+		size = local_xchg(&buf->data_size, 0);
-+	}
-+
-+	return size;
-+}
-+
-+static void etb_update_buffer(struct coresight_device *csdev,
-+			      struct perf_output_handle *handle,
-+			      void *sink_config)
-+{
-+	int i, cur;
-+	u8 *buf_ptr;
-+	u32 read_ptr, write_ptr, capacity;
-+	u32 status, read_data, to_read;
-+	unsigned long flags, offset;
-+	struct cs_buffers *buf = sink_config;
-+	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	if (!buf)
-+		return;
-+
-+	capacity = drvdata->buffer_depth * ETB_FRAME_SIZE_WORDS;
-+
-+	spin_lock_irqsave(&drvdata->spinlock, flags);
-+
-+	CS_UNLOCK(drvdata->base);
-+	etb_disable_hw(drvdata);
-+
-+	/* unit is in words, not bytes */
-+	read_ptr = readl_relaxed(drvdata->base + ETB_RAM_READ_POINTER);
-+	write_ptr = readl_relaxed(drvdata->base + ETB_RAM_WRITE_POINTER);
-+
-+	/*
-+	 * Entries should be aligned to the frame size.  If they are not
-+	 * go back to the last alignement point to give decoding tools a
-+	 * chance to fix things.
-+	 */
-+	if (write_ptr % ETB_FRAME_SIZE_WORDS) {
-+		dev_err(drvdata->dev,
-+			"write_ptr: %lu not aligned to formatter frame size\n",
-+			(unsigned long)write_ptr);
-+
-+		write_ptr &= ~(ETB_FRAME_SIZE_WORDS - 1);
-+		local_inc(&buf->lost);
-+	}
-+
-+	/*
-+	 * Get a hold of the status register and see if a wrap around
-+	 * has occurred.  If so adjust things accordingly.  Otherwise
-+	 * start at the beginning and go until the write pointer has
-+	 * been reached.
-+	 */
-+	status = readl_relaxed(drvdata->base + ETB_STATUS_REG);
-+	if (status & ETB_STATUS_RAM_FULL) {
-+		local_inc(&buf->lost);
-+		to_read = capacity;
-+		read_ptr = write_ptr;
-+	} else {
-+		to_read = CIRC_CNT(write_ptr, read_ptr, drvdata->buffer_depth);
-+		to_read *= ETB_FRAME_SIZE_WORDS;
-+	}
-+
-+	/*
-+	 * Make sure we don't overwrite data that hasn't been consumed yet.
-+	 * It is entirely possible that the HW buffer has more data than the
-+	 * ring buffer can currently handle.  If so adjust the start address
-+	 * to take only the last traces.
-+	 *
-+	 * In snapshot mode we are looking to get the latest traces only and as
-+	 * such, we don't care about not overwriting data that hasn't been
-+	 * processed by user space.
-+	 */
-+	if (!buf->snapshot && to_read > handle->size) {
-+		u32 mask = ~(ETB_FRAME_SIZE_WORDS - 1);
-+
-+		/* The new read pointer must be frame size aligned */
-+		to_read -= handle->size & mask;
-+		/*
-+		 * Move the RAM read pointer up, keeping in mind that
-+		 * everything is in frame size units.
-+		 */
-+		read_ptr = (write_ptr + drvdata->buffer_depth) -
-+					to_read / ETB_FRAME_SIZE_WORDS;
-+		/* Wrap around if need be*/
-+		read_ptr &= ~(drvdata->buffer_depth - 1);
-+		/* let the decoder know we've skipped ahead */
-+		local_inc(&buf->lost);
-+	}
-+
-+	/* finally tell HW where we want to start reading from */
-+	writel_relaxed(read_ptr, drvdata->base + ETB_RAM_READ_POINTER);
-+
-+	cur = buf->cur;
-+	offset = buf->offset;
-+	for (i = 0; i < to_read; i += 4) {
-+		buf_ptr = buf->data_pages[cur] + offset;
-+		read_data = readl_relaxed(drvdata->base +
-+					  ETB_RAM_READ_DATA_REG);
-+		*buf_ptr++ = read_data >> 0;
-+		*buf_ptr++ = read_data >> 8;
-+		*buf_ptr++ = read_data >> 16;
-+		*buf_ptr++ = read_data >> 24;
-+
-+		offset += 4;
-+		if (offset >= PAGE_SIZE) {
-+			offset = 0;
-+			cur++;
-+			/* wrap around at the end of the buffer */
-+			cur &= buf->nr_pages - 1;
-+		}
-+	}
-+
-+	/* reset ETB buffer for next run */
-+	writel_relaxed(0x0, drvdata->base + ETB_RAM_READ_POINTER);
-+	writel_relaxed(0x0, drvdata->base + ETB_RAM_WRITE_POINTER);
-+
-+	/*
-+	 * In snapshot mode all we have to do is communicate to
-+	 * perf_aux_output_end() the address of the current head.  In full
-+	 * trace mode the same function expects a size to move rb->aux_head
-+	 * forward.
-+	 */
-+	if (buf->snapshot)
-+		local_set(&buf->data_size, (cur * PAGE_SIZE) + offset);
-+	else
-+		local_add(to_read, &buf->data_size);
-+
-+	etb_enable_hw(drvdata);
-+	CS_LOCK(drvdata->base);
-+	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-+}
-+
- static const struct coresight_ops_sink etb_sink_ops = {
- 	.enable		= etb_enable,
- 	.disable	= etb_disable,
-+	.get_config	= etb_get_config,
-+	.put_config	= etb_put_config,
-+	.set_buffer	= etb_set_buffer,
-+	.reset_buffer	= etb_reset_buffer,
-+	.update_buffer	= etb_update_buffer,
- };
+-The coresight framework provides a central point to represent, configure and
+-manage coresight devices on a platform.  This first implementation centers on
++The Coresight framework provides a central point to represent, configure and
++manage Coresight devices on a platform.  This first implementation centers on
+ the basic tracing functionality, enabling components such ETM/PTM, funnel,
+ replicator, TMC, TPIU and ETB.  Future work will enable more
+ intricate IP blocks such as STM and CTI.
+@@ -129,11 +129,11 @@ expected to be added as the solution matures.
+ Framework and implementation
+ ----------------------------
  
- static const struct coresight_ops etb_cs_ops = {
-diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-index 2b94994d2c02..12af12f54173 100644
---- a/include/linux/coresight.h
-+++ b/include/linux/coresight.h
-@@ -14,6 +14,7 @@
- #define _LINUX_CORESIGHT_H
+-The coresight framework provides a central point to represent, configure and
+-manage coresight devices on a platform.  Any coresight compliant device can
++The Coresight framework provides a central point to represent, configure and
++manage Coresight devices on a platform.  Any Coresight compliant device can
+ register with the framework for as long as they use the right APIs:
  
- #include <linux/device.h>
-+#include <linux/perf_event.h>
- #include <linux/sched.h>
+-struct coresight_device *coresight_register(struct coresight_desc *desc);
++struct Coresight_device *coresight_register(struct coresight_desc *desc);
+ void coresight_unregister(struct coresight_device *csdev);
  
- /* Peripheral id registers (0xFD0-0xFEC) */
-@@ -181,12 +182,29 @@ struct coresight_device {
- /**
-  * struct coresight_ops_sink - basic operations for a sink
-  * Operations available for sinks
-- * @enable:	enables the sink.
-- * @disable:	disables the sink.
-+ * @enable:		enables the sink.
-+ * @disable:		disables the sink.
-+ * @get_config:		initialises perf's ring buffer for trace collection.
-+ * @put_config:		release memory allocated in @get_config.
-+ * @set_buffer:		initialises buffer mechanic before a trace session.
-+ * @reset_buffer:	finalises buffer mechanic after a trace session.
-+ * @update_buffer:	update buffer pointers after a trace session.
-  */
- struct coresight_ops_sink {
- 	int (*enable)(struct coresight_device *csdev, u32 mode);
- 	void (*disable)(struct coresight_device *csdev);
-+	void *(*get_config)(struct coresight_device *csdev, int cpu,
-+			    void **pages, int nr_pages, bool overwrite);
-+	void (*put_config)(void *config);
-+	int (*set_buffer)(struct coresight_device *csdev,
-+			  struct perf_output_handle *handle,
-+			  void *sink_config);
-+	unsigned long (*reset_buffer)(struct coresight_device *csdev,
-+				      struct perf_output_handle *handle,
-+				      void *sink_config, bool *lost);
-+	void (*update_buffer)(struct coresight_device *csdev,
-+			      struct perf_output_handle *handle,
-+			      void *sink_config);
- };
+ The registering function is taking a "struct coresight_device *csdev" and
+@@ -193,10 +193,120 @@ the information carried in "THIS_MODULE".
+ How to use
+ ----------
  
- /**
+-Before trace collection can start, a coresight sink needs to be identify.
+-There is no limit on the amount of sinks (nor sources) that can be enabled at
+-any given moment.  As a generic operation, all device pertaining to the sink
+-class will have an "active" entry in sysfs:
++There is two ways to use the Coresight framework: 1) using the perf cmd line
++tool and 2) interacting directly with the Coresight devices using the sysFS
++interface.  The latter will slowly be faded out as more functionality become
++available from the perf cmd line tool but for the time being both are still
++supported.  The following sections provide details on using both methods.
++
++1) Using perf framework:
++
++Coresight tracers like ETM and PTM are represented using the Perf framework's
++Performance Monitoring Unit (PMU).  As such the perf framework takes charge of
++controlling when tracing happens based on when the process(es) of interest are
++scheduled.  When configure in a system, Coresight PMUs will be listed when
++queried by the perf command line tool:
++
++linaro at linaro-nano:~$ ./perf list pmu
++
++List of pre-defined events (to be used in -e):
++
++  cs_etm//                                           [Kernel PMU event]
++
++linaro at linaro-nano:~$
++
++Regardless of the amount ETM/PTM IP block in a system (usually equal to the
++amount of processor core), the "cs_etm" PMU will be listed only once.
++
++Before a trace can be configured and started a Coresight sink needs to be
++selected using the sysFS method (see below).  This is only temporary until
++sink selection can be made from the command line tool.
++
++linaro at linaro-nano:~$ ls /sys/bus/coresight/devices
++20010000.etb  20030000.tpiu  20040000.funnel  2201c000.ptm
++2201d000.ptm  2203c000.etm  2203d000.etm  2203e000.etm  replicator
++
++linaro at linaro-nano:~$ echo 1 > /sys/bus/coresight/devices/20010000.etb/enable_sink
++
++Once a sink has been selected configuring a Coresight PMU works the same way as
++any other PMU.  As such tracing can happen for a single CPU, a group of CPU, per
++thread or a combination of those:
++
++linaro at linaro-nano:~$ perf record -e cs_etm// --per-thread <command>
++
++linaro at linaro-nano:~$ perf record -C 0,2-3 -e cs_etm// <command>
++
++Tracing limited to user and kernel space can also be used to narrow the amount
++of collected traces:
++
++linaro at linaro-nano:~$ perf record -e cs_etm//u --per-thread <command>
++
++linaro at linaro-nano:~$ perf record -C 0,2-3 -e cs_etm//k <command>
++
++As of this writing two ETM/PTM specific options have are available: cycle
++accurate and timestamp (please refer to the Embedded Trace Macrocell reference
++manual for details on these options).  By default both are disabled but using
++the "cycacc" and "timestamp" mnemonic within the double '/' will see those
++options configure for the upcoming trace run:
++
++linaro at linaro-nano:~$ perf record -e cs_etm/cycacc/ --per-thread <command>
++
++linaro at linaro-nano:~$ perf record -C 0,2-3 -e cs_etm/cycacc,timestamp/ <command>
++
++The Coresight PMUs can be configured to work in "full trace" or "snapshot" mode.
++In full trace mode trace acquisition is enabled from beginning to end with trace
++data being recorded continuously:
++
++linaro at linaro-nano:~$ perf record -e cs_etm// dd if=/dev/random of=./test.txt bs=1k count=1000
++
++Since this can lead to a significant amount of data and because some devices are
++limited in disk space snapshot mode can be used instead.  In snapshot mode
++traces are still collected in the ring buffer but not communicated to user
++space.  The ring buffer is allowed to wrap around, providing the latest
++information before an event of interest happens.  Significant events are
++communicated by sending a USR2 signal to the user space command line tool.
++From there the tool will stop trace collection and harvest data from the ring
++buffer before re-enabling traces.  Snapshot mode can be invoked using '-S' when
++launching a trace collection:
++
++linaro at linaro-nano:~$ perf record -S -e cs_etm// dd if=/dev/random of=./test.txt bs=1k count=1000
++
++Trace data collected during trace runs ends up in the "perf.data" file.  Trace
++configuration information necessary for trace decoding is also embedded in the
++"perf.data" file.  Two new headers, 'PERF_RECORD_AUXTRACE_INFO' and
++'PERF_RECORD_AUXTRACE' have been added to the list of event types in order to
++find out where the different sections start.
++
++It is worth noting that a set of metadata information exists for each tracer
++that participated in a trace run.  As such if 5 processors have been engaged,
++5 sets of metadata will be found in the perf.data file.  This is to ensure that
++tracer decompression tools have all the information they need in order to
++process the trace data.
++
++Metadata information is collected directly from the ETM/PTM management registers
++using the sysFS interface.  Since there is no way for the perf command line
++tool to associate a CPU with a tracer, a symbolic link has been created between
++the cs_etm sysFS event directory and each Coresight tracer:
++
++linaro at linaro-nano:~$ ls /sys/bus/event_source/devices/cs_etm
++cpu0  cpu1  cpu2  cpu3  cpu4  format  perf_event_mux_interval_ms
++power  subsystem  type  uevent
++
++linaro at linaro-nano:~$ ls /sys/bus/event_source/devices/cs_etm/cpu0/mgmt/
++etmccer  etmccr  etmcr  etmidr  etmscr  etmtecr1  etmtecr2
++etmteevr  etmtraceidr  etmtssvr
++
++2) Using the sysFS interface:
++
++Most, if not all, configuration registers are made available to users via the
++sysFS interface.  Until all Coresight ETM drivers have been converted to perf,
++it will also be possible to start and stop traces from sysFS.
++
++As with the perf method described above, a Coresight sink needs to be identify
++before trace collection can commence.  Using the sysFS method _only_, there is
++no limit on the amount of sinks (nor sources) that can be enabled at
++any given moment.  As a generic operation, all devices pertaining to the sink
++class will have an "enable_sink" entry in sysfs:
+ 
+ root:/sys/bus/coresight/devices# ls
+ replicator  20030000.tpiu    2201c000.ptm  2203c000.etm  2203e000.etm
+@@ -246,7 +356,7 @@ The file cstrace.bin can be decompressed using "ptm2human", DS-5 or Trace32.
+ 
+ Following is a DS-5 output of an experimental loop that increments a variable up
+ to a certain value.  The example is simple and yet provides a glimpse of the
+-wealth of possibilities that coresight provides.
++wealth of possibilities that Coresight provides.
+ 
+ Info                                    Tracing enabled
+ Instruction     106378866       0x8026B53C      E52DE004        false   PUSH     {lr}
 -- 
 2.1.4
