@@ -1,32 +1,34 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 30 Nov 2015 18:00:11 +0100
-Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: enable PCI_MSI
-In-Reply-To: <1448902811-11399-1-git-send-email-l.stach@pengutronix.de>
-References: <1448902811-11399-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1448902811-11399-2-git-send-email-l.stach@pengutronix.de>
+Date: Mon, 30 Nov 2015 18:00:10 +0100
+Subject: [PATCH 1/2] ARM: imx6: remove config space from PCIe controller
+ ranges property
+Message-ID: <1448902811-11399-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This has been stable on i.MX6 for a good while now and there is no
-reason to keep it disabled, as it allows to allocate non-shared
-IRQs if several PCIe devices are connected to a single host.
+This has been moved to the reg property where it belongs for quite some
+time. The range has been unused by the kernel since then and with kernel
+4.4 it's flagged as an unparsable range, as it does not comply to the
+PCI ranges DT binding. Fix this by removing the superfluous range.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/imx6qdl.dtsi | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 4187f69f6630..e2ce60d00e8a 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -45,6 +45,7 @@ CONFIG_SOC_IMX7D=y
- CONFIG_SOC_LS1021A=y
- CONFIG_SOC_VF610=y
- CONFIG_PCI=y
-+CONFIG_PCI_MSI=y
- CONFIG_PCI_IMX6=y
- CONFIG_SMP=y
- CONFIG_PREEMPT_VOLUNTARY=y
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 2b6cc8bf3c5c..a5a731519d9e 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -173,8 +173,7 @@
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			device_type = "pci";
+-			ranges = <0x00000800 0 0x01f00000 0x01f00000 0 0x00080000 /* configuration space */
+-				  0x81000000 0 0          0x01f80000 0 0x00010000 /* downstream I/O */
++			ranges = <0x81000000 0 0          0x01f80000 0 0x00010000 /* downstream I/O */
+ 				  0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable memory */
+ 			num-lanes = <1>;
+ 			interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
 -- 
 2.6.2
