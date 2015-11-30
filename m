@@ -1,9 +1,9 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 30 Nov 2015 15:45:43 +0200
-Subject: [RFC v02 13/15] ARM: davinci: devices: Remove DMA resources for MMC
+Date: Mon, 30 Nov 2015 15:45:45 +0200
+Subject: [RFC v02 15/15] ARM: davinci: dm365: Remove DMA resources for SPI
 In-Reply-To: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1448891145-10766-14-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1448891145-10766-16-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,52 +11,27 @@ The driver is converted to not use the DMA resource.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-davinci/devices.c | 19 -------------------
- 1 file changed, 19 deletions(-)
+ arch/arm/mach-davinci/dm365.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
-index 6257aa452568..3ae70f2909b0 100644
---- a/arch/arm/mach-davinci/devices.c
-+++ b/arch/arm/mach-davinci/devices.c
-@@ -36,9 +36,6 @@
- #define DM365_MMCSD0_BASE	     0x01D11000
- #define DM365_MMCSD1_BASE	     0x01D00000
- 
--#define DAVINCI_DMA_MMCRXEVT	26
--#define DAVINCI_DMA_MMCTXEVT	27
--
- void __iomem  *davinci_sysmod_base;
- 
- void davinci_map_sysmod(void)
-@@ -144,14 +141,6 @@ static struct resource mmcsd0_resources[] = {
- 		.start = IRQ_SDIOINT,
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index 3dfcf7c9aa20..fe98e5f55634 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -660,14 +660,6 @@ static struct resource dm365_spi0_resources[] = {
+ 		.start = IRQ_DM365_SPIINT0_0,
  		.flags = IORESOURCE_IRQ,
  	},
--	/* DMA channels: RX, then TX */
 -	{
--		.start = EDMA_CTLR_CHAN(0, DAVINCI_DMA_MMCRXEVT),
+-		.start = 17,
 -		.flags = IORESOURCE_DMA,
--	}, {
--		.start = EDMA_CTLR_CHAN(0, DAVINCI_DMA_MMCTXEVT),
+-	},
+-	{
+-		.start = 16,
 -		.flags = IORESOURCE_DMA,
 -	},
  };
  
- static struct platform_device davinci_mmcsd0_device = {
-@@ -181,14 +170,6 @@ static struct resource mmcsd1_resources[] = {
- 		.start = IRQ_DM355_SDIOINT1,
- 		.flags = IORESOURCE_IRQ,
- 	},
--	/* DMA channels: RX, then TX */
--	{
--		.start = EDMA_CTLR_CHAN(0, 30),	/* rx */
--		.flags = IORESOURCE_DMA,
--	}, {
--		.start = EDMA_CTLR_CHAN(0, 31),	/* tx */
--		.flags = IORESOURCE_DMA,
--	},
- };
- 
- static struct platform_device davinci_mmcsd1_device = {
+ static struct platform_device dm365_spi0_device = {
 -- 
 2.6.3
