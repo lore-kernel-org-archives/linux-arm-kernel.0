@@ -1,82 +1,67 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Mon, 30 Nov 2015 07:51:01 +0100
-Subject: [PATCH v2] arm, am335x: add support for the bosch shc board
-In-Reply-To: <564C35D0.8060609@denx.de>
-References: <1447748655-2088-1-git-send-email-hs@denx.de>
- <564B9C3D.7070303@ti.com> <564C35D0.8060609@denx.de>
-Message-ID: <565BF1D5.8020708@denx.de>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 30 Nov 2015 14:54:32 +0800
+Subject: [PATCH V5 04/26] coresight: etm3x: splitting struct etm_drvdata
+In-Reply-To: <1448849687-5724-5-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <201511301448.IIogN7Qo%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+Hi Mathieu,
 
-Am 18.11.2015 um 09:24 schrieb Heiko Schocher:
-> Hello Dave,
->
-> Am 17.11.2015 um 22:29 schrieb Dave Gerlach:
->> Hi,
->> On 11/17/2015 02:24 AM, Heiko Schocher wrote:
->>> add support for the am335x based shc board.
->>>
->>> UART: 0-2 and 4
->>> DRAM: 512 MiB
->>> MMC:  OMAP SD/MMC: 0 @ 26 MHz
->>>        OMAP SD/MMC: 1 @ 26 MHz
->>> I2C:  at24 eeprom, pcf8563
->>> USB:  USB1 (host)
->>>
->>> Signed-off-by: Heiko Schocher <hs@denx.de>
->>> ---
->>> The following patches are needed to get all working
->>> for the shc board:
->>> - disable clkout on pcf8563
->>>    accepted.
->>>    http://www.spinics.net/lists/devicetree/msg98542.html
->>>
->>> - leds: leds-gpio: add shutdown function
->>>    accepted.
->>>    https://lkml.org/lkml/2015/10/13/169
->>>
->>> - net: phy: smsc: disable energy detect mode
->>>    accepted
->>>    [PATCH v2 2/2] net: phy: smsc: disable energy detect mode
->>>    https://lkml.org/lkml/2015/10/17/2
->>>    [PATCH v2 1/2] drivers: net: cpsw: add phy-handle parsing
->>>    https://lkml.org/lkml/2015/10/17/4
->>>
->>> - ARM: OMAP2+: omap_hwmod: Introduce ti,no-init dt property
->>>    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/328204.html
->>>    @Dave: What is the current state of this patch?
->>>    I have the same problem here on this am335x based board
->>>
->>
->> A different approach is being taken for resolving the issue of rtc hwmod on am43x epos evm [1],
->> which is what I was attempting to solve with the patch you have linked. We decided to avoid changing
->> omap_hwmod code and I haven't been pursuing the ti,no-init flag anymore.
->
-> Maybe I overlook something, but I cannot see, how [1] solves the RTC
-> hwmod problem on am335x SoC based boards. Not all boards have this problem,
-> so the RTC hwmod cannot be disabled for all am335x boards ...
->
-> It must be somehow configurable for boards ... I have am335x boards
-> which use the rtc from the SoC
+[auto build test ERROR on: tip/perf/core]
+[also build test ERROR on: v4.4-rc3 next-20151127]
 
-gentle ping ...
+url:    https://github.com/0day-ci/linux/commits/Mathieu-Poirier/Coresight-integration-with-perf/20151130-102706
+config: arm-allyesconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-No more comments on this patch? Is it Ok for mainline or are
-there more issues?
+Note: the linux-review/Mathieu-Poirier/Coresight-integration-with-perf/20151130-102706 HEAD c898ed8b47ed7662cd702f15ed57c520a826fbfb builds fine.
+      It only hurts bisectibility.
 
-bye,
-Heiko
->
->> Regards,
->> Dave
->>
->> [1] http://www.spinics.net/lists/linux-omap/msg121987.html
->
-> bye,
-> Heiko
+All errors (new ones prefixed by >>):
 
--- 
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+   In file included from arch/arm/include/asm/bug.h:62:0,
+                    from arch/arm/include/asm/div64.h:63,
+                    from include/linux/kernel.h:136,
+                    from drivers/hwtracing/coresight/coresight-etm3x.c:13:
+   drivers/hwtracing/coresight/coresight-etm3x.c: In function 'etm_disable_hw':
+>> drivers/hwtracing/coresight/coresight-etm3x.c:387:20: error: 'config' undeclared (first use in this function)
+     if (WARN_ON_ONCE(!config))
+                       ^
+   include/asm-generic/bug.h:111:27: note: in definition of macro 'WARN_ON_ONCE'
+     int __ret_warn_once = !!(condition);   \
+                              ^
+   drivers/hwtracing/coresight/coresight-etm3x.c:387:20: note: each undeclared identifier is reported only once for each function it appears in
+     if (WARN_ON_ONCE(!config))
+                       ^
+   include/asm-generic/bug.h:111:27: note: in definition of macro 'WARN_ON_ONCE'
+     int __ret_warn_once = !!(condition);   \
+                              ^
+
+vim +/config +387 drivers/hwtracing/coresight/coresight-etm3x.c
+
+   381	
+   382	static void etm_disable_hw(void *info)
+   383	{
+   384		int i;
+   385		struct etm_drvdata *drvdata = info;
+   386	
+ > 387		if (WARN_ON_ONCE(!config))
+   388			return;
+   389	
+   390		CS_UNLOCK(drvdata->base);
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 53921 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151130/67d07710/attachment-0001.obj>
