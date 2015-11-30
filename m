@@ -1,43 +1,49 @@
-From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Mon, 30 Nov 2015 16:33:57 +0200
-Subject: [PATCH v2 04/18] ARM: am57xx: cl-som-am57x: dts: add EEPROM support
-In-Reply-To: <1448433590-1399-5-git-send-email-lifshitz@compulab.co.il>
-References: <1448433590-1399-5-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1448894037-1337-1-git-send-email-lifshitz@compulab.co.il>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 30 Nov 2015 16:35:31 +0200
+Subject: [RFC v02 01/15] dmaengine: core: Allow NULL mask pointer in
+ __dma_device_satisfies_mask()
+In-Reply-To: <1448891145-10766-2-git-send-email-peter.ujfalusi@ti.com>
+References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
+ <1448891145-10766-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <CAHp75VfY=NU4MG7q1w=oYdTiTr0dqtNTQU3UkEaL=tXPJADH5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On-board EEPROM chip is used for storing a board production
-info.
+On Mon, Nov 30, 2015 at 3:45 PM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
+> Treat as true condition the case when the mask is NULL.
 
-Add module EEPROM support (over I2C4 bus).
+What do you think about setting some default (all "on") mask when mask
+is not supplied?
 
-Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
----
+I don't know for sure but there might be cases when you don't want
+literally *any* channel to satisfy.
 
-  v2:
+>
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>  drivers/dma/dmaengine.c | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+> index daf54a39bcc7..52c3eee48e2e 100644
+> --- a/drivers/dma/dmaengine.c
+> +++ b/drivers/dma/dmaengine.c
+> @@ -184,6 +184,9 @@ __dma_device_satisfies_mask(struct dma_device *device,
+>  {
+>         dma_cap_mask_t has;
+>
+> +       if (!want)
+> +               return true;
+> +
+>         bitmap_and(has.bits, want->bits, device->cap_mask.bits,
+>                 DMA_TX_TYPE_END);
+>         return bitmap_equal(want->bits, has.bits, DMA_TX_TYPE_END);
+> --
+> 2.6.3
+>
 
-   * Fix EEPROM chip model
 
- arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-index 9f15dda..695f250 100644
---- a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-+++ b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-@@ -290,6 +290,12 @@
- 		compatible = "emmicro,em3027";
- 		reg = <0x56>;
- 	};
-+
-+	eeprom_module: atmel at 50 {
-+		compatible = "atmel,24c08";
-+		reg = <0x50>;
-+		pagesize = <16>;
-+	};
- };
- 
- 
 -- 
-1.9.1
+With Best Regards,
+Andy Shevchenko
