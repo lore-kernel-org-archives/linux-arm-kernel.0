@@ -1,49 +1,44 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 30 Nov 2015 12:13:02 +0100
-Subject: [RFC PATCH 1/8] ARM: initialize cpu_scale to its default
-In-Reply-To: <1448288921-30307-2-git-send-email-juri.lelli@arm.com>
-References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
- <1448288921-30307-2-git-send-email-juri.lelli@arm.com>
-Message-ID: <CAKfTPtCVv_dwAu-PVfkmpCPjNMo_nnLQzr2Yc1p2oFYOORH=GA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 Nov 2015 12:24:23 +0100
+Subject: [PATCH] backlight: adp8860: fix another uninitialized variable use
+Message-ID: <3284846.T0rzz6n1As@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 November 2015 at 15:28, Juri Lelli <juri.lelli@arm.com> wrote:
-> Instead of looping through all cpus calling set_capacity_scale, we can
-> initialise cpu_scale per-cpu variables to SCHED_CAPACITY_SCALE with their
-> definition.
->
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Juri Lelli <juri.lelli@arm.com>
-> ---
->  arch/arm/kernel/topology.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
->
-> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-> index 08b7847..ec279d1 100644
-> --- a/arch/arm/kernel/topology.c
-> +++ b/arch/arm/kernel/topology.c
-> @@ -40,7 +40,7 @@
->   * to run the rebalance_domains for all idle cores and the cpu_capacity can be
->   * updated during this sequence.
->   */
-> -static DEFINE_PER_CPU(unsigned long, cpu_scale);
-> +static DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
->
->  unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
->  {
-> @@ -306,8 +306,6 @@ void __init init_cpu_topology(void)
->                 cpu_topo->socket_id = -1;
->                 cpumask_clear(&cpu_topo->core_sibling);
->                 cpumask_clear(&cpu_topo->thread_sibling);
-> -
-> -               set_capacity_scale(cpu, SCHED_CAPACITY_SCALE);
->         }
->         smp_wmb();
+A recent patch I did fixed two potential uses of uninitialized
+variables in the adp8870 and adp8860 drivers. Unfortunately,
+I missed another one:
 
-FWIW, Acked-by: Vincent Guittot <vincent.guittot@linaro.org>
+drivers/video/backlight/adp8860_bl.c: In function 'adp8860_bl_ambient_light_level_show':
+drivers/video/backlight/adp8860_bl.c:570:11: warning: 'reg_val' may be used uninitialized in this function
 
->
-> --
-> 2.2.2
->
+This does the same change as before in one additional function,
+and also changes the check for the return value in a way that
+avoids another false positive warning with a similar message.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 6be3a5a9cd91 ("backlight: adp88x0: Fix uninitialized variable use")
+---
+Sorry for missing this third hunk the first time around.
+
+diff --git a/drivers/video/backlight/adp8860_bl.c b/drivers/video/backlight/adp8860_bl.c
+index f0d4c0324580..510e559c060e 100644
+--- a/drivers/video/backlight/adp8860_bl.c
++++ b/drivers/video/backlight/adp8860_bl.c
+@@ -566,11 +566,13 @@ static ssize_t adp8860_bl_ambient_light_level_show(struct device *dev,
+ 
+ 	mutex_lock(&data->lock);
+ 	error = adp8860_read(data->client, ADP8860_PH1LEVL, &reg_val);
+-	ret_val = reg_val;
+-	error |= adp8860_read(data->client, ADP8860_PH1LEVH, &reg_val);
++	if (!error) {
++		ret_val = reg_val;
++		error = adp8860_read(data->client, ADP8860_PH1LEVH, &reg_val);
++	}
+ 	mutex_unlock(&data->lock);
+ 
+-	if (error < 0)
++	if (error)
+ 		return error;
+ 
+ 	/* Return 13-bit conversion value for the first light sensor */
