@@ -1,40 +1,42 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 30 Nov 2015 14:35:34 +0100
-Subject: [PATCH] ARM: shmobile: defconfig: Enable CONFIG_PRINTK_TIME
-Message-ID: <1448890534-1430-1-git-send-email-geert+renesas@glider.be>
+From: menon.nishanth@gmail.com (Nishanth Menon)
+Date: Mon, 30 Nov 2015 07:36:26 -0600
+Subject: [PATCH 01/18] ARM: am57xx: cl-som-am57x: dts: add basic module
+ support
+In-Reply-To: <565C4F54.50405@compulab.co.il>
+References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
+ <1448433590-1399-2-git-send-email-lifshitz@compulab.co.il>
+ <565629D2.2010401@ti.com> <565AEB19.4050107@compulab.co.il>
+ <565B307E.2000203@ti.com> <565C4F54.50405@compulab.co.il>
+Message-ID: <565C50DA.4010901@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable timestamps for kernel log output to improve debugging.
-You can always use "dmesg -t" to strip the timestamps.
+On 11/30/2015 07:29 AM, Dmitry Lifshitz wrote:
+> On 11/29/2015 07:06 PM, Nishanth Menon wrote:
+>> On 11/29/2015 06:10 AM, Dmitry Lifshitz wrote:
+[...]
+>>
+>> You might want to ask your TI support contact for IODelay
+>> recommendations. TRM mentions that pinmuxing must be performed under IO
+>> isolation. There are silicon constraints in DRA7/AM57xx family, which
+>> were not present previously.
+>>
+> 
+> Ok. I understand. This might take time...
+> Since we'd like to have this in for 4.5, what would you recommend?
+> Should I drop the muxes from this patch set? All the muxes?
+> Or should we merge this (as it works correctly) in our tests and check
+> on this later after investigation with TI?
+> 
+> Also, in theory, there might be pins shared between two or more
+> different functionalities and remuxed during runtime.
+> Can this kind of thing be supported on AM57x?
 
-Don't specify CONFIG_LOG_BUF_SHIFT=16 while we're at it.  There's a
-reason the default in Kconfig is higher ;-)
+This is why I suggested to talk and confirm with TI support contact on
+this. I understand the motivation of SoM concept, but this requires some
+careful designing around.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/configs/shmobile_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index cc8ece33a7e38796..70d718e088a65fed 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -2,7 +2,6 @@ CONFIG_SYSVIPC=y
- CONFIG_NO_HZ=y
- CONFIG_IKCONFIG=y
- CONFIG_IKCONFIG_PROC=y
--CONFIG_LOG_BUF_SHIFT=16
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_CC_OPTIMIZE_FOR_SIZE=y
- CONFIG_SYSCTL_SYSCALL=y
-@@ -199,6 +198,7 @@ CONFIG_NFS_V4_1=y
- CONFIG_ROOT_NFS=y
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ISO8859_1=y
-+CONFIG_PRINTK_TIME=y
- # CONFIG_ENABLE_WARN_DEPRECATED is not set
- # CONFIG_ENABLE_MUST_CHECK is not set
- # CONFIG_ARM_UNWIND is not set
 -- 
-1.9.1
+Regards,
+Nishanth Menon
