@@ -1,35 +1,50 @@
-From: mkarthi3@visteon.com (Mutharaju, Prasanna (P.))
-Date: Mon, 30 Nov 2015 09:55:27 +0000
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 30 Nov 2015 18:55:49 +0900
 Subject: [PATCH v3] clk: s3c2410: removed unneeded variable in
  s3c24xx_clkout_set_parent
-In-Reply-To: <20151130081543.GI10431@pengutronix.de>
-References: <20151130075219.GA27737@jci-VirtualBox>
- <20151130081543.GI10431@pengutronix.de>
-Message-ID: <20151130095403.GA28879@jci-VirtualBox>
+In-Reply-To: <20151130095109.GA28767@jci-VirtualBox>
+References: <20151130095109.GA28767@jci-VirtualBox>
+Message-ID: <565C1D25.602@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 09:15:43AM +0100, Uwe Kleine-K?nig wrote:
-> On Mon, Nov 30, 2015 at 07:52:22AM +0000, Mutharaju, Prasanna (P.) wrote:
-> > From: Prasanna Karthik <mkarthi3@visteon.com>
-> > 
-> > Remove unneeded variable used to store return value.
-> > ---
-> > v3: Modified subject and changelog comments
-> > ---
-> > 
-> > Signed-off-by: Prasanna Karthik <mkarthi3@visteon.com>
+W dniu 30.11.2015 o 18:52, Mutharaju, Prasanna (P.) pisze:
+> Remove unneeded variable used to store return value.
 > 
-> Everything after the first triple-dash doesn't make it into the git
-> history, so you are expected to write the S-o-b line above the list of
-> things changed since a previous submission.
+> Signed-off-by: Prasanna Karthik <mkarthi3@visteon.com>
 
-Thanks, I resent the patch again with S-o-b before changelog. 
+Previous issues fixed, thanks! But now you changed the From field and it
+does not match exactly the Signed-off-by (email matches but name does
+not). Please fix this - signed-off-by should be the same as "From" (in
+previous versions it was ok...).
+
+Best regards,
+Krzysztof
+
 > 
-> Other than that the patch looks fine.
+> ---
+> v3: Modified subject and changelog comments
+> ---
+> ---
+>  drivers/clk/samsung/clk-s3c2410-dclk.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 > 
-> Uwe
+> diff --git a/drivers/clk/samsung/clk-s3c2410-dclk.c b/drivers/clk/samsung/clk-s3c2410-dclk.c
+> index e9eb935..ec6fb14 100644
+> --- a/drivers/clk/samsung/clk-s3c2410-dclk.c
+> +++ b/drivers/clk/samsung/clk-s3c2410-dclk.c
+> @@ -77,12 +77,11 @@ static u8 s3c24xx_clkout_get_parent(struct clk_hw *hw)
+>  static int s3c24xx_clkout_set_parent(struct clk_hw *hw, u8 index)
+>  {
+>  	struct s3c24xx_clkout *clkout = to_s3c24xx_clkout(hw);
+> -	int ret = 0;
+>  
+>  	s3c2410_modify_misccr((clkout->mask << clkout->shift),
+>  			      (index << clkout->shift));
+>  
+> -	return ret;
+> +	return 0;
+>  }
+>  
+>  static const struct clk_ops s3c24xx_clkout_ops = {
 > 
-> -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
