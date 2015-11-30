@@ -1,24 +1,57 @@
-From: heiko.carstens@de.ibm.com (Heiko Carstens)
-Date: Mon, 30 Nov 2015 09:38:58 +0100
-Subject: [PATCH] ARM64: fix building without CONFIG_UID16
-In-Reply-To: <3891403.6hGat7eHq5@wuerfel>
-References: <3891403.6hGat7eHq5@wuerfel>
-Message-ID: <20151130083858.GB4045@osiris>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Mon, 30 Nov 2015 16:39:50 +0800
+Subject: [PATCH v2 0/3] dmaengine: Add supports for APM X-Gene SoC CRC32C
+ accerlerator driver
+In-Reply-To: <CAFd313zqimQtG8epeo3U7gzxWRf0hqO4K8hOFy4UK-6pG5GcJg@mail.gmail.com>
+References: <rsahu@apm.com> <1447665169-14003-1-git-send-email-rsahu@apm.com>
+ <CAFd313zqimQtG8epeo3U7gzxWRf0hqO4K8hOFy4UK-6pG5GcJg@mail.gmail.com>
+Message-ID: <20151130083950.GA7792@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 12:12:21PM +0100, Arnd Bergmann wrote:
-> As reported by Michal Simek, building an ARM64 kernel with CONFIG_UID16
-> disabled currently fails because the system call table still needs to
-> reference the individual function entry points that are provided by
-> kernel/sys_ni.c in this case, and the declarations are hidden inside
-> of #ifdef CONFIG_UID16:
+On Mon, Nov 30, 2015 at 02:06:03PM +0530, Rameshwar Sahu wrote:
+> On Mon, Nov 16, 2015 at 2:42 PM,  <rsahu@apm.com> wrote:
+> > From: Rameshwar Prasad Sahu <rsahu@apm.com>
+> >
+> > This patch implements support for APM X-Gene SoC CRC32C h/w accelerator driver
+> > and adds CRC32C computations support in dmaengine framework. APM X-Gene SoC has
+> > DMA engine capable of performing CRC32C computations.
+> >
+> > v2 changes:
+> >         1. Added helper function in dmaengine framework
+> >         2. Documented CRC32C support in Documentations/dmaengine/provider.txt
+> >         3. Fixed algo name
+> >         4. Fixed coding style issues
+> >
+> > Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+> > ---
+> >
+> > Rameshwar Prasad Sahu (3):
+> >   dmaengine: Add support for new feature CRC32C computations
+> >   dmaengine: xgene-dma: Add support for CRC32C computations via DMA
+> >     engine
+> >   Crypto: Add support for APM X-Gene SoC CRC32C h/w accelerator driver
+> >
+> >  Documentation/dmaengine/provider.txt |    3 +
+> >  drivers/crypto/Kconfig               |    8 +
+> >  drivers/crypto/Makefile              |    1 +
+> >  drivers/crypto/xgene-crc32c.c        |  234 +++++++++++++++++++++++++
+> >  drivers/dma/dmaengine.c              |    2 +
+> >  drivers/dma/xgene-dma.c              |  314 ++++++++++++++++++++++++++++++++--
+> >  include/linux/dmaengine.h            |   13 ++
+> >  7 files changed, 560 insertions(+), 15 deletions(-)
+> >  create mode 100755 drivers/crypto/xgene-crc32c.c
+> 
+> Any Comments on above patchset ??
 
-Will we ever get rid of UID16? kernel/uid.c contains this nice comment:
+The main user of crc32c is lib/libcrc32c.c.  Unfortunately it is
+entire synchronous so it won't be able to use your crc32c driver
+at all.
 
-/*
- *	Wrapper functions for 16bit uid back compatibility. All nicely tied
- *	together in the faint hope we can take the out in five years time.
- */
+So who is going to be using this?
 
-Which seems to exist since at least February 2000. ;)
+Cheers,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
