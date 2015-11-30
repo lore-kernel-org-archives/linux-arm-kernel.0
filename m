@@ -1,62 +1,61 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Mon, 30 Nov 2015 01:15:12 +0100
-Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
- "/chosen/linux, atags" entry
-In-Reply-To: <alpine.LFD.2.20.1511291902100.22569@knanqh.ubzr>
-References: <20150713131902.GH26485@atomide.com>
- <20151129180939.GE30871@n2100.arm.linux.org.uk>
- <alpine.LFD.2.20.1511291902100.22569@knanqh.ubzr>
-Message-ID: <201511300115.12478@pali>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Sun, 29 Nov 2015 16:29:29 -0800
+Subject: [PATCH v3] clocksource: arm_global_timer: fix suspend resume
+In-Reply-To: <1448653624-25006-1-git-send-email-grygorii.strashko@ti.com>
+References: <1448653624-25006-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <565B9869.10800@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 30 November 2015 01:09:17 Nicolas Pitre wrote:
-> On Sun, 29 Nov 2015, Russell King - ARM Linux wrote:
-> > On Sat, Nov 28, 2015 at 12:34:23PM -0500, Nicolas Pitre wrote:
-> > > Good. And Arnd likes the idea too. So we might be converging at
-> > > last which is a good thing.
-> > 
-> > I disagree with the idea that there is convergence.  There might be
-> > convergence towards an idea, but... Here's a mail extract, from
-> > July 7th, from earlier in this very thread:
-> > 
-> > Pali:
-> > > Me:
-> > > > Are the ATAGs at a fixed address on the N900?
-> > > 
-> > > Yes, in board-rx51.c is:
-> > > 
-> > > .atag_offset    = 0x100
-> > > 
-> > > and Nokia Bootloader (proprietary) store them to that address.
-> > > 
-> > > > Can that be handled in
-> > > > some kind of legacy file for the N900 which calls save_atags()
-> > > > on it, so we don't end up introducing yet more stuff that we
-> > > > have to maintain into the distant future?  If not, what about
-> > > > copying a known working atag structure into a legacy file for
-> > > > the N900?
-> > > 
-> > > I already asked question if it is possible to read ATAGs from DT
-> > > booted kernel. And somebody (do not remember who) wrote to ML,
-> > > that it is not possible and it can be done in that uncompress
-> > > code.
-> 
-> Who is that somebody? If ever it happened to be me then objection is
-> withdrawn. Otherwise that somebody should come forth and speak up
-> again.
-> 
+On 11/27/15 11:47 AM, Grygorii Strashko wrote:
+> Now the System stall is observed on TI AM437x based board
+> (am437x-gp-evm) during resuming from System suspend when ARM Global
+> timer is selected as clocksource device (CPUIdle not enabled) - SysRq are working,
+> but nothing else.
+>
+> The reason of stall is that ARM Global timer loses its contexts during
+> System suspend:
+>     GT_CONTROL.TIMER_ENABLE = 0 (unbanked)
+>     GT_COUNTERx = 0
+>
+> Hence, update ARM Global timer driver to reflect above behaviour
+> - re-enable ARM Global timer on resume GT_CONTROL.TIMER_ENABLE = 1.
+>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> Cc: John Stultz <john.stultz@linaro.org>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Santosh Shilimkar <ssantosh@kernel.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+> Changes in v3:
+>   - dropped all DT specific code
+> Changes in v2:
+>   - suspend/resume simplified: nothing is stored any more and
+>     ARM GT just re-enabled
+> Link on v2:
+>   https://lkml.org/lkml/2015/11/20/355
+> Link on v1:
+>   https://lkml.org/lkml/2015/11/13/456
+>
+Looks reasonable to me.
+>   drivers/clocksource/arm_global_timer.c | 7 +++++++
+>   1 file changed, 7 insertions(+)
+>
+> diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+> index a2cb6fa..10d1417 100644
+> --- a/drivers/clocksource/arm_global_timer.c
+> +++ b/drivers/clocksource/arm_global_timer.c
+> @@ -195,12 +195,19 @@ static cycle_t gt_clocksource_read(struct clocksource *cs)
+>   	return gt_counter_read();
+>   }
+>
+> +static void gt_resume(struct clocksource *cs)
+> +{
+> +	/* re-enable timer on resume */
+> +	writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
 
-... do not remember ... this discussion were in more email threads and 
-takes more then one year... sorry but my memory is not excellent
-
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151130/151f05bd/attachment.sig>
+Check if its disabled before enabling it.
+Other than that,
+Reviewed-by: Santosh Shilimkar <ssantosh@kernel.org>
