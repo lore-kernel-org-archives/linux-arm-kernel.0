@@ -1,166 +1,42 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 30 Nov 2015 14:37:31 +0100
-Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
-In-Reply-To: <1448466557-435335-1-git-send-email-arnd@arndb.de> (Arnd
- Bergmann's message of "Wed, 25 Nov 2015 16:49:12 +0100")
-References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
-Message-ID: <87610j7gmc.fsf@free-electrons.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 30 Nov 2015 07:36:34 -0600
+Subject: [PATCH 01/18] ARM: am57xx: cl-som-am57x: dts: add basic module
+ support
+In-Reply-To: <565C4F54.50405@compulab.co.il>
+References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
+ <1448433590-1399-2-git-send-email-lifshitz@compulab.co.il>
+ <565629D2.2010401@ti.com> <565AEB19.4050107@compulab.co.il>
+ <565B307E.2000203@ti.com> <565C4F54.50405@compulab.co.il>
+Message-ID: <565C50E2.1060009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
- 
- On mer., nov. 25 2015, Arnd Bergmann <arnd@arndb.de> wrote:
+On 11/30/2015 07:29 AM, Dmitry Lifshitz wrote:
+> On 11/29/2015 07:06 PM, Nishanth Menon wrote:
+>> On 11/29/2015 06:10 AM, Dmitry Lifshitz wrote:
+[...]
+>>
+>> You might want to ask your TI support contact for IODelay
+>> recommendations. TRM mentions that pinmuxing must be performed under IO
+>> isolation. There are silicon constraints in DRA7/AM57xx family, which
+>> were not present previously.
+>>
+> 
+> Ok. I understand. This might take time...
+> Since we'd like to have this in for 4.5, what would you recommend?
+> Should I drop the muxes from this patch set? All the muxes?
+> Or should we merge this (as it works correctly) in our tests and check
+> on this later after investigation with TI?
+> 
+> Also, in theory, there might be pins shared between two or more
+> different functionalities and remuxed during runtime.
+> Can this kind of thing be supported on AM57x?
 
-> I've posted these before and now gotten around to a rebase and
-> want to include them in the arm-soc next/multiplatform branch for
-> 4.5.
->
-> Originally the plan for these platforms was to convert all of
-> them to DT and use only mach-mvebu. That has not happened,
-> so I would do it this way instead so we can at least have
-> them in a single kernel.
->
-> Let me know if there are any concerns or objections.
+This is why I suggested to talk and confirm with TI support contact on
+this. I understand the motivation of SoM concept, but this requires some
+careful designing around.
 
-I have applied all the patches on mvebu/oldmvebu_multiplatform (I fixed
-the last one which didn't apply on Kconfig). I also merged it
-mvebu/for-netx to be part of the linux-next.
-
-But before making it part of mvebu/soc, I would like to get some
-Tested-by. The series is available on
-git://git.infradead.org/linux-mvebu.git
-in the branch mvebu/oldmvebu_multiplatform but it also will be part soon
-of linux-next.
-
-Russell, Sebastian,
-
-would you have some time to test it on Dove?
-
-Detlef, Benjamin,
-
-could you test it on an Orion5x based board?
-
-Evgeniy,
-
-could you test it on an mv78xx0 base board?
-
-Actually we consider removing the support for this SoC unless there are
-some user interested on them. As you are the last one claiming using a
-mainline kernel on a mv78xx0, keeping the support will mainly depends on
-you :)
-
-Thanks,
-
-Gregory
-
->
-> Arnd Bergmann (5):
->   ARM: orion: move watchdog setup to mach-orion5x
->   ARM: orion: always use MULTI_IRQ_HANDLER
->   ARM: orion: use SPARSE_IRQ everywhere
->   ARM: orion: clean up mach/*.h headers
->   ARM: orion: multiplatform support
->
->  arch/arm/Kconfig                                   | 40 ------------------
->  arch/arm/configs/dove_defconfig                    |  2 +
->  arch/arm/configs/mv78xx0_defconfig                 |  3 ++
->  arch/arm/configs/orion5x_defconfig                 |  3 ++
->  arch/arm/mach-dove/Kconfig                         | 15 +++++--
->  arch/arm/mach-dove/Makefile                        |  2 +
->  .../arm/mach-dove/{include/mach => }/bridge-regs.h |  4 +-
->  arch/arm/mach-dove/cm-a510.c                       |  4 +-
->  arch/arm/mach-dove/common.c                        |  4 +-
->  arch/arm/mach-dove/dove-db-setup.c                 |  3 +-
->  arch/arm/mach-dove/{include/mach => }/dove.h       |  4 +-
->  arch/arm/mach-dove/include/mach/entry-macro.S      | 33 ---------------
->  arch/arm/mach-dove/include/mach/hardware.h         | 19 ---------
->  arch/arm/mach-dove/include/mach/uncompress.h       | 36 ----------------
->  arch/arm/mach-dove/irq.c                           | 22 ++++------
->  arch/arm/mach-dove/{include/mach => }/irqs.h       |  4 +-
->  arch/arm/mach-dove/mpp.c                           |  2 +-
->  arch/arm/mach-dove/pcie.c                          |  4 +-
->  arch/arm/mach-dove/{include/mach => }/pm.h         |  6 +--
->  arch/arm/mach-mv78xx0/Kconfig                      | 15 +++++--
->  arch/arm/mach-mv78xx0/Makefile                     |  2 +
->  .../mach-mv78xx0/{include/mach => }/bridge-regs.h  |  4 +-
->  arch/arm/mach-mv78xx0/buffalo-wxl-setup.c          |  3 +-
->  arch/arm/mach-mv78xx0/common.c                     |  4 +-
->  arch/arm/mach-mv78xx0/db78x00-bp-setup.c           |  3 +-
->  arch/arm/mach-mv78xx0/include/mach/entry-macro.S   | 41 ------------------
->  arch/arm/mach-mv78xx0/include/mach/hardware.h      | 14 -------
->  arch/arm/mach-mv78xx0/include/mach/uncompress.h    | 46 ---------------------
->  arch/arm/mach-mv78xx0/irq.c                        | 35 +++++++++++++++-
->  arch/arm/mach-mv78xx0/{include/mach => }/irqs.h    |  4 +-
->  arch/arm/mach-mv78xx0/mpp.c                        |  2 +-
->  arch/arm/mach-mv78xx0/{include/mach => }/mv78xx0.h |  4 +-
->  arch/arm/mach-mv78xx0/pcie.c                       |  2 +-
->  arch/arm/mach-mv78xx0/rd78x00-masa-setup.c         |  3 +-
->  arch/arm/mach-orion5x/Kconfig                      | 18 ++++++--
->  arch/arm/mach-orion5x/Makefile                     |  2 +
->  arch/arm/mach-orion5x/board-d2net.c                |  2 +-
->  arch/arm/mach-orion5x/board-dt.c                   |  4 +-
->  arch/arm/mach-orion5x/board-mss2.c                 |  4 +-
->  arch/arm/mach-orion5x/board-rd88f5182.c            |  2 +-
->  .../mach-orion5x/{include/mach => }/bridge-regs.h  |  4 +-
->  arch/arm/mach-orion5x/common.c                     | 20 +++++++--
->  arch/arm/mach-orion5x/db88f5281-setup.c            |  3 +-
->  arch/arm/mach-orion5x/dns323-setup.c               |  3 +-
->  arch/arm/mach-orion5x/include/mach/entry-macro.S   | 25 -----------
->  arch/arm/mach-orion5x/include/mach/hardware.h      | 14 -------
->  arch/arm/mach-orion5x/include/mach/uncompress.h    | 48 ----------------------
->  arch/arm/mach-orion5x/irq.c                        | 13 +-----
->  arch/arm/mach-orion5x/{include/mach => }/irqs.h    |  4 +-
->  arch/arm/mach-orion5x/kurobox_pro-setup.c          |  4 +-
->  arch/arm/mach-orion5x/ls-chl-setup.c               |  3 +-
->  arch/arm/mach-orion5x/ls_hgl-setup.c               |  3 +-
->  arch/arm/mach-orion5x/mpp.c                        |  2 +-
->  arch/arm/mach-orion5x/mv2120-setup.c               |  3 +-
->  arch/arm/mach-orion5x/net2big-setup.c              |  3 +-
->  arch/arm/mach-orion5x/{include/mach => }/orion5x.h |  4 +-
->  arch/arm/mach-orion5x/pci.c                        |  2 +-
->  arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c       |  3 +-
->  arch/arm/mach-orion5x/rd88f5181l-ge-setup.c        |  3 +-
->  arch/arm/mach-orion5x/rd88f5182-setup.c            |  3 +-
->  arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c       |  3 +-
->  arch/arm/mach-orion5x/terastation_pro2-setup.c     |  3 +-
->  arch/arm/mach-orion5x/ts209-setup.c                |  3 +-
->  arch/arm/mach-orion5x/ts409-setup.c                |  3 +-
->  arch/arm/mach-orion5x/ts78xx-setup.c               |  3 +-
->  arch/arm/mach-orion5x/tsx09-common.c               |  2 +-
->  arch/arm/mach-orion5x/wnr854t-setup.c              |  3 +-
->  arch/arm/mach-orion5x/wrt350n-v2-setup.c           |  3 +-
->  arch/arm/plat-orion/common.c                       | 21 ----------
->  arch/arm/plat-orion/include/plat/common.h          |  2 -
->  arch/arm/plat-orion/irq.c                          |  1 -
->  arch/arm/plat-orion/mpp.c                          |  1 -
->  72 files changed, 185 insertions(+), 454 deletions(-)
->  rename arch/arm/mach-dove/{include/mach => }/bridge-regs.h (96%)
->  rename arch/arm/mach-dove/{include/mach => }/dove.h (99%)
->  delete mode 100644 arch/arm/mach-dove/include/mach/entry-macro.S
->  delete mode 100644 arch/arm/mach-dove/include/mach/hardware.h
->  delete mode 100644 arch/arm/mach-dove/include/mach/uncompress.h
->  rename arch/arm/mach-dove/{include/mach => }/irqs.h (96%)
->  rename arch/arm/mach-dove/{include/mach => }/pm.h (95%)
->  rename arch/arm/mach-mv78xx0/{include/mach => }/bridge-regs.h (92%)
->  delete mode 100644 arch/arm/mach-mv78xx0/include/mach/entry-macro.S
->  delete mode 100644 arch/arm/mach-mv78xx0/include/mach/hardware.h
->  delete mode 100644 arch/arm/mach-mv78xx0/include/mach/uncompress.h
->  rename arch/arm/mach-mv78xx0/{include/mach => }/irqs.h (95%)
->  rename arch/arm/mach-mv78xx0/{include/mach => }/mv78xx0.h (98%)
->  rename arch/arm/mach-orion5x/{include/mach => }/bridge-regs.h (92%)
->  delete mode 100644 arch/arm/mach-orion5x/include/mach/entry-macro.S
->  delete mode 100644 arch/arm/mach-orion5x/include/mach/hardware.h
->  delete mode 100644 arch/arm/mach-orion5x/include/mach/uncompress.h
->  rename arch/arm/mach-orion5x/{include/mach => }/irqs.h (94%)
->  rename arch/arm/mach-orion5x/{include/mach => }/orion5x.h (99%)
->
-> -- 
-> 2.1.0.rc2
->
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+Nishanth Menon
