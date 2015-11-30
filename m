@@ -1,52 +1,82 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 30 Nov 2015 15:31:23 +0900
-Subject: [PATCH] ARM: exynos_defconfig: Set recommended options for systemd
-Message-ID: <1448865083-13272-1-git-send-email-k.kozlowski@samsung.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Mon, 30 Nov 2015 07:51:01 +0100
+Subject: [PATCH v2] arm, am335x: add support for the bosch shc board
+In-Reply-To: <564C35D0.8060609@denx.de>
+References: <1447748655-2088-1-git-send-email-hs@denx.de>
+ <564B9C3D.7070303@ti.com> <564C35D0.8060609@denx.de>
+Message-ID: <565BF1D5.8020708@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set following options to recommended value by systemd (which also
-matches the multi_v7 deconfig):
-1. Enable AUTOFS4_FS - for systemd.automount [0];
-2. Enable BLK_DEV_BSG - SG v4 for recend udev [0][1];
-3. Disable UEVENT_HELPER_PATH - legacy hook for hotplug, forked for each
-   uevent, slows down booting [0];
+Hello all,
 
-[0] http://cgit.freedesktop.org/systemd/systemd/tree/README
-[1] http://patchwork.ozlabs.org/patch/47921/
+Am 18.11.2015 um 09:24 schrieb Heiko Schocher:
+> Hello Dave,
+>
+> Am 17.11.2015 um 22:29 schrieb Dave Gerlach:
+>> Hi,
+>> On 11/17/2015 02:24 AM, Heiko Schocher wrote:
+>>> add support for the am335x based shc board.
+>>>
+>>> UART: 0-2 and 4
+>>> DRAM: 512 MiB
+>>> MMC:  OMAP SD/MMC: 0 @ 26 MHz
+>>>        OMAP SD/MMC: 1 @ 26 MHz
+>>> I2C:  at24 eeprom, pcf8563
+>>> USB:  USB1 (host)
+>>>
+>>> Signed-off-by: Heiko Schocher <hs@denx.de>
+>>> ---
+>>> The following patches are needed to get all working
+>>> for the shc board:
+>>> - disable clkout on pcf8563
+>>>    accepted.
+>>>    http://www.spinics.net/lists/devicetree/msg98542.html
+>>>
+>>> - leds: leds-gpio: add shutdown function
+>>>    accepted.
+>>>    https://lkml.org/lkml/2015/10/13/169
+>>>
+>>> - net: phy: smsc: disable energy detect mode
+>>>    accepted
+>>>    [PATCH v2 2/2] net: phy: smsc: disable energy detect mode
+>>>    https://lkml.org/lkml/2015/10/17/2
+>>>    [PATCH v2 1/2] drivers: net: cpsw: add phy-handle parsing
+>>>    https://lkml.org/lkml/2015/10/17/4
+>>>
+>>> - ARM: OMAP2+: omap_hwmod: Introduce ti,no-init dt property
+>>>    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/328204.html
+>>>    @Dave: What is the current state of this patch?
+>>>    I have the same problem here on this am335x based board
+>>>
+>>
+>> A different approach is being taken for resolving the issue of rtc hwmod on am43x epos evm [1],
+>> which is what I was attempting to solve with the patch you have linked. We decided to avoid changing
+>> omap_hwmod code and I haven't been pursuing the ti,no-init flag anymore.
+>
+> Maybe I overlook something, but I cannot see, how [1] solves the RTC
+> hwmod problem on am335x SoC based boards. Not all boards have this problem,
+> so the RTC hwmod cannot be disabled for all am335x boards ...
+>
+> It must be somehow configurable for boards ... I have am335x boards
+> which use the rtc from the SoC
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/configs/exynos_defconfig | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+gentle ping ...
 
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 409adc1eaf33..24dcd2bb1215 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -7,7 +7,6 @@ CONFIG_BLK_DEV_INITRD=y
- CONFIG_KALLSYMS_ALL=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
--# CONFIG_BLK_DEV_BSG is not set
- CONFIG_PARTITION_ADVANCED=y
- CONFIG_ARCH_EXYNOS=y
- CONFIG_ARCH_EXYNOS3=y
-@@ -44,7 +43,6 @@ CONFIG_IP_PNP_BOOTP=y
- CONFIG_IP_PNP_RARP=y
- CONFIG_CFG80211=y
- CONFIG_RFKILL_REGULATOR=y
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_DMA_CMA=y
-@@ -217,6 +215,7 @@ CONFIG_PHY_EXYNOS5250_SATA=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- CONFIG_EXT4_FS=y
-+CONFIG_AUTOFS4_FS=y
- CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
+No more comments on this patch? Is it Ok for mainline or are
+there more issues?
+
+bye,
+Heiko
+>
+>> Regards,
+>> Dave
+>>
+>> [1] http://www.spinics.net/lists/linux-omap/msg121987.html
+>
+> bye,
+> Heiko
+
 -- 
-1.9.1
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
