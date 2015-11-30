@@ -1,61 +1,129 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 30 Nov 2015 13:28:25 +0100
-Subject: [PATCH v4 11/13] ARM: only consider memblocks with NOMAP cleared for
- linear mapping
+Date: Mon, 30 Nov 2015 13:28:22 +0100
+Subject: [PATCH v4 08/13] ARM: factor out allocation routine from
+ __create_mapping()
 In-Reply-To: <1448886507-3216-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1448886507-3216-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1448886507-3216-12-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1448886507-3216-9-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Take the new memblock attribute MEMBLOCK_NOMAP into account when
-deciding whether a certain region is or should be covered by the
-kernel direct mapping.
+To allow __create_mapping() to be used for populating UEFI Runtime
+Services page tables, factor out the allocation routine 'early_alloc'
+and pass it down as a function pointer into alloc_init_[pud|pmd|pte].
+This way, new users of __create_mapping() can supply another allocation
+function.
 
 Tested-by: Ryan Harkin <ryan.harkin@linaro.org>
 Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/mm/init.c | 5 ++++-
- arch/arm/mm/mmu.c  | 3 +++
- 2 files changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/mm/mmu.c | 34 +++++++++++++-------
+ 1 file changed, 23 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 8a63b4cdc0f2..16104b1e2661 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -191,7 +191,7 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
- #ifdef CONFIG_HAVE_ARCH_PFN_VALID
- int pfn_valid(unsigned long pfn)
- {
--	return memblock_is_memory(__pfn_to_phys(pfn));
-+	return memblock_is_map_memory(__pfn_to_phys(pfn));
- }
- EXPORT_SYMBOL(pfn_valid);
- #endif
-@@ -432,6 +432,9 @@ static void __init free_highpages(void)
- 		if (end <= max_low)
- 			continue;
- 
-+		if (memblock_is_nomap(mem))
-+			continue;
-+
- 		/* Truncate partial highmem entries */
- 		if (start < max_low)
- 			start = max_low;
 diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 8c69830e791a..c615d2eb9232 100644
+index 3100de92148b..87dc49dbe231 100644
 --- a/arch/arm/mm/mmu.c
 +++ b/arch/arm/mm/mmu.c
-@@ -1435,6 +1435,9 @@ static void __init map_lowmem(void)
- 		phys_addr_t end = start + reg->size;
- 		struct map_desc map;
+@@ -724,21 +724,30 @@ static void __init *early_alloc(unsigned long sz)
+ 	return early_alloc_aligned(sz, sz);
+ }
  
-+		if (memblock_is_nomap(reg))
-+			continue;
+-static pte_t * __init early_pte_alloc(pmd_t *pmd, unsigned long addr, unsigned long prot)
++static pte_t * __init pte_alloc(pmd_t *pmd, unsigned long addr,
++				unsigned long prot,
++				void *(*alloc)(unsigned long sz))
+ {
+ 	if (pmd_none(*pmd)) {
+-		pte_t *pte = early_alloc(PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE);
++		pte_t *pte = alloc(PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE);
+ 		__pmd_populate(pmd, __pa(pte), prot);
+ 	}
+ 	BUG_ON(pmd_bad(*pmd));
+ 	return pte_offset_kernel(pmd, addr);
+ }
+ 
++static pte_t * __init early_pte_alloc(pmd_t *pmd, unsigned long addr,
++				      unsigned long prot)
++{
++	return pte_alloc(pmd, addr, prot, early_alloc);
++}
 +
- 		if (end > arm_lowmem_limit)
- 			end = arm_lowmem_limit;
- 		if (start >= end)
+ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 				  unsigned long end, unsigned long pfn,
+-				  const struct mem_type *type)
++				  const struct mem_type *type,
++				  void *(*alloc)(unsigned long sz))
+ {
+-	pte_t *pte = early_pte_alloc(pmd, addr, type->prot_l1);
++	pte_t *pte = pte_alloc(pmd, addr, type->prot_l1, alloc);
+ 	do {
+ 		set_pte_ext(pte, pfn_pte(pfn, __pgprot(type->prot_pte)), 0);
+ 		pfn++;
+@@ -774,7 +783,8 @@ static void __init __map_init_section(pmd_t *pmd, unsigned long addr,
+ 
+ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+ 				      unsigned long end, phys_addr_t phys,
+-				      const struct mem_type *type)
++				      const struct mem_type *type,
++				      void *(*alloc)(unsigned long sz))
+ {
+ 	pmd_t *pmd = pmd_offset(pud, addr);
+ 	unsigned long next;
+@@ -795,7 +805,7 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+ 			__map_init_section(pmd, addr, next, phys, type);
+ 		} else {
+ 			alloc_init_pte(pmd, addr, next,
+-						__phys_to_pfn(phys), type);
++				       __phys_to_pfn(phys), type, alloc);
+ 		}
+ 
+ 		phys += next - addr;
+@@ -805,14 +815,15 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+ 
+ static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
+ 				  unsigned long end, phys_addr_t phys,
+-				  const struct mem_type *type)
++				  const struct mem_type *type,
++				  void *(*alloc)(unsigned long sz))
+ {
+ 	pud_t *pud = pud_offset(pgd, addr);
+ 	unsigned long next;
+ 
+ 	do {
+ 		next = pud_addr_end(addr, end);
+-		alloc_init_pmd(pud, addr, next, phys, type);
++		alloc_init_pmd(pud, addr, next, phys, type, alloc);
+ 		phys += next - addr;
+ 	} while (pud++, addr = next, addr != end);
+ }
+@@ -877,7 +888,8 @@ static void __init create_36bit_mapping(struct mm_struct *mm,
+ }
+ #endif	/* !CONFIG_ARM_LPAE */
+ 
+-static void __init __create_mapping(struct mm_struct *mm, struct map_desc *md)
++static void __init __create_mapping(struct mm_struct *mm, struct map_desc *md,
++				    void *(*alloc)(unsigned long sz))
+ {
+ 	unsigned long addr, length, end;
+ 	phys_addr_t phys;
+@@ -911,7 +923,7 @@ static void __init __create_mapping(struct mm_struct *mm, struct map_desc *md)
+ 	do {
+ 		unsigned long next = pgd_addr_end(addr, end);
+ 
+-		alloc_init_pud(pgd, addr, next, phys, type);
++		alloc_init_pud(pgd, addr, next, phys, type, alloc);
+ 
+ 		phys += next - addr;
+ 		addr = next;
+@@ -940,7 +952,7 @@ static void __init create_mapping(struct map_desc *md)
+ 			(long long)__pfn_to_phys((u64)md->pfn), md->virtual);
+ 	}
+ 
+-	__create_mapping(&init_mm, md);
++	__create_mapping(&init_mm, md, early_alloc);
+ }
+ 
+ /*
 -- 
 1.9.1
