@@ -1,46 +1,37 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 30 Nov 2015 18:53:35 +0900
-Subject: [PATCH 3/4] i2c: uniphier_f: error out if clock rate is zero
+Date: Mon, 30 Nov 2015 18:53:36 +0900
+Subject: [PATCH 4/4] i2c: uniphier_f: error out if bus speed is zero
 In-Reply-To: <1448877216-32286-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1448877216-32286-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1448877216-32286-4-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1448877216-32286-5-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This input clock is used to generate the sampling clock for I2C bus.
-If the clock rate is zero, there is something wrong with the clock
-driver.  Bail out with the appropriate error message in such a case.
-It would make it easier to find the root cause of failure.
+There is code to divide by "bus_speed" some lines below.
+To eliminate the possibility of division by zero, bail out if
+"clock-frequency" is specified as zero.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- drivers/i2c/busses/i2c-uniphier-f.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/i2c/busses/i2c-uniphier-f.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/drivers/i2c/busses/i2c-uniphier-f.c b/drivers/i2c/busses/i2c-uniphier-f.c
-index e8d03bc..67109e1 100644
+index 67109e1..f3e5ff8 100644
 --- a/drivers/i2c/busses/i2c-uniphier-f.c
 +++ b/drivers/i2c/busses/i2c-uniphier-f.c
-@@ -481,6 +481,10 @@ static int uniphier_fi2c_clk_init(struct device *dev,
- 		return ret;
+@@ -466,6 +466,11 @@ static int uniphier_fi2c_clk_init(struct device *dev,
+ 	if (of_property_read_u32(np, "clock-frequency", &bus_speed))
+ 		bus_speed = UNIPHIER_FI2C_DEFAULT_SPEED;
  
- 	clk_rate = clk_get_rate(priv->clk);
-+	if (!clk_rate) {
-+		dev_err(dev, "input clock rate should not be zero\n");
++	if (!bus_speed) {
++		dev_err(dev, "clock-freqyency should not be zero\n");
 +		return -EINVAL;
 +	}
++
+ 	if (bus_speed > UNIPHIER_FI2C_MAX_SPEED)
+ 		bus_speed = UNIPHIER_FI2C_MAX_SPEED;
  
- 	uniphier_fi2c_reset(priv);
- 
-@@ -531,7 +535,7 @@ static int uniphier_fi2c_probe(struct platform_device *pdev)
- 
- 	ret = uniphier_fi2c_clk_init(dev, priv);
- 	if (ret)
--		return ret;
-+		goto err;
- 
- 	ret = devm_request_irq(dev, irq, uniphier_fi2c_interrupt, 0,
- 			       pdev->name, priv);
 -- 
 1.9.1
