@@ -1,40 +1,47 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Mon, 30 Nov 2015 14:57:53 +0000
-Subject: [Xen-devel] [PATCH v3 20/62] arm/acpi: Add ACPI support for SMP
- initialization
-In-Reply-To: <1447753261-7552-21-git-send-email-shannon.zhao@linaro.org>
+Date: Mon, 30 Nov 2015 15:01:20 +0000
+Subject: [Xen-devel] [PATCH v3 22/62] arm/gic-v3: Refactor gicv3_init
+ into generic and dt specific parts
+In-Reply-To: <alpine.DEB.2.02.1511241046350.1107@kaball.uk.xensource.com>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-21-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <565C63F1.5070303@citrix.com>
+ <1447753261-7552-23-git-send-email-shannon.zhao@linaro.org>
+ <alpine.DEB.2.02.1511241046350.1107@kaball.uk.xensource.com>
+Message-ID: <565C64C0.7080506@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shannon,
+On 24/11/15 10:51, Stefano Stabellini wrote:
+> On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>
+>> Refactor gic-v3 related functions into dt and generic parts. This will be
+>> helpful when adding acpi support for gic-v3.
+>>
+>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> ---
+>>  xen/arch/arm/gic-v3.c | 95 +++++++++++++++++++++++++++------------------------
+>>  1 file changed, 51 insertions(+), 44 deletions(-)
+>>
+>> diff --git a/xen/arch/arm/gic-v3.c b/xen/arch/arm/gic-v3.c
+>> index 4fe0c37..bd13010 100644
+>> --- a/xen/arch/arm/gic-v3.c
+>> +++ b/xen/arch/arm/gic-v3.c
+>> @@ -1138,62 +1138,27 @@ static int __init cmp_rdist(const void *a, const void *b)
+>>      return ( l->base < r->base) ? -1 : 0;
+>>  }
+>>  
+>> +static paddr_t __initdata dbase = 0, cbase = 0, csize = 0, vbase = 0;
+> 
+> It might be best to initialize them to something like INVALID_PADDR
+> rather then 0, which is actually a possible address value.
 
-On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
-> diff --git a/xen/arch/arm/psci.c b/xen/arch/arm/psci.c
-> index d800cb6..dede0e1 100644
-> --- a/xen/arch/arm/psci.c
-> +++ b/xen/arch/arm/psci.c
-> @@ -22,6 +22,7 @@
->  #include <xen/mm.h>
->  #include <xen/smp.h>
->  #include <asm/psci.h>
-> +#include <asm/acpi.h>
->  
->  /*
->   * While a 64-bit OS can make calls with SMC32 calling conventions, for
-> @@ -86,6 +87,9 @@ int __init psci_init_0_1(void)
->      int ret;
->      const struct dt_device_node *psci;
->  
-> +    if ( !acpi_disabled )
-> +        return -EINVAL;
-
-Please explain in the commit message why PSCI 0.1 is not supported on ACPI.
-
+It's even mandatory, we had a patch [1] to allow base address to be 0
+and there is no point to re-introduce this restriction.
 
 Regards,
+
+[1] c1fde0dcd4ecb78378ffe8b3e263d28dc3b9c0eb "xen/arm: gic: Allow the
+base address to be 0"
 
 -- 
 Julien Grall
