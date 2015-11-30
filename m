@@ -1,26 +1,55 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 30 Nov 2015 16:41:39 +0000
-Subject: [PATCH 1/2] regulator: Add coupled regulator
-In-Reply-To: <1448897346-17780-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1448897346-17780-1-git-send-email-maxime.ripard@free-electrons.com>
- <1448897346-17780-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20151130164139.GD1929@sirena.org.uk>
+From: yalin.wang2010@gmail.com (yalin wang)
+Date: Mon, 30 Nov 2015 08:42:04 -0800
+Subject: [PATCH v2 5/5] printk/nmi: Increase the size of the temporary
+ buffer
+In-Reply-To: <1448622572-16900-6-git-send-email-pmladek@suse.com>
+References: <1448622572-16900-1-git-send-email-pmladek@suse.com>
+ <1448622572-16900-6-git-send-email-pmladek@suse.com>
+Message-ID: <81211733-2484-40A9-9D4A-644AA27FBC73@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 04:29:05PM +0100, Maxime Ripard wrote:
 
-> +static struct of_device_id coupled_regulator_of_match[] = {
-> +	{ .compatible = "coupled-voltage-regulator" },
-> +	{ /* Sentinel */ },
-> +};
+> On Nov 27, 2015, at 19:09, Petr Mladek <pmladek@suse.com> wrote:
+> 
+> Testing has shown that the backtrace sometimes does not fit
+> into the 4kB temporary buffer that is used in NMI context.
+> 
+> The warnings are gone when I double the temporary buffer size.
+> 
+> Note that this problem existed even in the x86-specific
+> implementation that was added by the commit a9edc8809328
+> ("x86/nmi: Perform a safe NMI stack trace on all CPUs").
+> Nobody noticed it because it did not print any warnings.
+> 
+> Signed-off-by: Petr Mladek <pmladek@suse.com>
+> ---
+> kernel/printk/nmi.c | 2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/kernel/printk/nmi.c b/kernel/printk/nmi.c
+> index 8af1e4016719..6111644d5f01 100644
+> --- a/kernel/printk/nmi.c
+> +++ b/kernel/printk/nmi.c
+> @@ -42,7 +42,7 @@ atomic_t nmi_message_lost;
+> struct nmi_seq_buf {
+> 	atomic_t		len;	/* length of written data */
+> 	struct irq_work		work;	/* IRQ work that flushes the buffer */
+> -	unsigned char		buffer[PAGE_SIZE - sizeof(atomic_t) -
+> +	unsigned char		buffer[2 * PAGE_SIZE - sizeof(atomic_t) -
+> 				       sizeof(struct irq_work)];
+> };
+> 
 
-This defines a device tree binding but does not document it -
-doucmentation is mandatory for all new device tree bindings.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151130/dccefb60/attachment-0001.sig>
+why not define like this:
+
+union {
+struct {atomic_t		len;	
+	struct irq_work		work;
+}
+unsigned char		buffer[PAGE_SIZE * 2] ;
+}
+
+we can make sure the union is 2 PAGE_SIZE .
+
+Thanks
