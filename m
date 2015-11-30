@@ -1,45 +1,27 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 30 Nov 2015 11:25:28 -0600
-Subject: [PATCH v2 03/10] drm/hisilicon: Add hisilicon DRM master driver
-In-Reply-To: <20151130074603.GE17050@phenom.ffwll.local>
-References: <CACvgo51NJNRKObgExtv=vNJ10GSgDPz=nQs=4BHAcgqPpSB_ug@mail.gmail.com>
- <20151130074603.GE17050@phenom.ffwll.local>
-Message-ID: <20151130172528.GA10974@rob-hp-laptop>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 30 Nov 2015 18:26:02 +0100
+Subject: [PATCH v2 2/5] i2c: add I2C_AQ_NO_CLK_STRETCH to i2c-algo-bit.c
+In-Reply-To: <1446118467-26453-2-git-send-email-nicola@corna.info>
+References: <1445976718-7449-1-git-send-email-nicola@corna.info>
+ <1446118467-26453-1-git-send-email-nicola@corna.info>
+ <1446118467-26453-2-git-send-email-nicola@corna.info>
+Message-ID: <20151130172602.GC9554@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 08:46:03AM +0100, Daniel Vetter wrote:
-> On Sat, Nov 28, 2015 at 03:25:35PM +0000, Emil Velikov wrote:
-> > Hi Xinliang,
-> > 
-> > On 28 November 2015 at 10:38, Xinliang Liu <xinliang.liu@linaro.org> wrote:
-> > > Add DRM master driver for hi6220 SoC which used in HiKey board.
-> > > Add dumb buffer feature.
-> > > Add prime dmabuf feature.
-> > >
-
-> > > +static int hisi_gem_cma_dumb_create(struct drm_file *file,
-> > > +                                   struct drm_device *dev,
-> > > +                                   struct drm_mode_create_dumb *args)
-> > > +{
-> > > +       int min_pitch = DIV_ROUND_UP(args->width * args->bpp, 8);
-> > > +
-> > > +       /* mali gpu need pitch 8 bytes alignment for 32bpp */
-> > > +       args->pitch = roundup(min_pitch, 8);
-> > > +
-> > I'm not sure you want this kind of dependency of an out of tree driver
-> > upstream. If this is some limitation on the display engine so be it,
-> > but tailoring things for an external module seems like a very bad
-> > idea.
+On Thu, Oct 29, 2015 at 12:34:24PM +0100, Nicola Corna wrote:
+> Add I2C_AQ_NO_CLK_STRETCH to drivers/i2c/algos/i2c-algo-bit.c when getscl
+> is not available.
 > 
-> Yup, nacked. dumb_create is for dumb buffers, not rendering. Mali needs to
-> go upstream to fix this ...
+> Signed-off-by: Nicola Corna <nicola@corna.info>
 
-I believe this is copy-n-paste from Rockchip driver.
+Applied to for-next, thanks! Please check git-log next time to see how
+the subsystem likes its prefixes, here "i2c: algo-bit: ...".
 
-I'm curious why there is not a common interface for rendering buffers at 
-least for systems without graphics memory like most ARM systems. Are the 
-requirements of GPU so diverse that things like pitch alignment can't be 
-parameterized?
-
-Rob
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151130/4829bf49/attachment.sig>
