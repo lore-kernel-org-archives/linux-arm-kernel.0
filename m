@@ -1,43 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Nov 2015 21:14:12 +0100
-Subject: [PATCH] clk: sunxi: pll2: Fix clock running too fast
-In-Reply-To: <20151130193216.GI11298@codeaurora.org>
-References: <1448897699-20475-1-git-send-email-maxime.ripard@free-electrons.com>
- <20151130193216.GI11298@codeaurora.org>
-Message-ID: <20151130201412.GA29263@lukather>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Mon, 30 Nov 2015 12:19:13 -0800
+Subject: [PATCH 1/7] ARM: dts: qcom: msm8974-honami: Define pinctrl state
+ for blsp_uart2
+In-Reply-To: <CAMAWPa9fHWY3diCfZG2s0ZaNqza+SnK+4QZzkAwW8xb9zjOqHg@mail.gmail.com>
+References: <1445403470-17434-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <CAMAWPa9fHWY3diCfZG2s0ZaNqza+SnK+4QZzkAwW8xb9zjOqHg@mail.gmail.com>
+Message-ID: <CAJAp7OjWj2ZGwypXdWbkDVadJePT7PrPSDJ3-89q+oxGdhDHWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 11:32:16AM -0800, Stephen Boyd wrote:
-> On 11/30, Maxime Ripard wrote:
-> > @@ -191,25 +186,17 @@ err_unmap:
-> >  	iounmap(reg);
-> >  }
-> >  
-> > -static struct sun4i_pll2_data sun4i_a10_pll2_data = {
-> > -	.pre_div_flags	= CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO,
-> > -};
-> > -
-> >  static void __init sun4i_a10_pll2_setup(struct device_node *node)
-> >  {
-> > -	sun4i_pll2_setup(node, &sun4i_a10_pll2_data);
-> > +	sun4i_pll2_setup(node, &sun4i_a10_pll2_data, 0);
-> 
-> And it doesn't compile, because we just deleted the data that
-> this is taking an address of. Hmph.
+On Mon, Nov 30, 2015 at 11:23 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> On Tue, Oct 20, 2015 at 9:57 PM, Bjorn Andersson
+> <bjorn.andersson@sonymobile.com> wrote:
+>> Make sure the blsp1_uart2 pins are in the correct state for the uart.
+>>
+>> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+>
+> kernelci.org has been detecting boot failures on my z1 since
+> next-20151120[1] and I finally got around to bisecting, which pointed
+> to this patch which is in next in the for of commit 14cd83b824aa ARM:
+> dts: qcom: msm8974-honami: Define pinctrl state for blsp_uart2
+>
+> That commit doesn't revert cleanly on top of next-20151130, but
+> manually removing the stuff added in this patch, next-20151130 boots
+> fine on the z1.
+>
+> Kevin
+>
+> [1] http://kernelci.org/boot/qcom-msm8974-sony-xperia-honami/job/next/kernel/next-20151127/defconfig/multi_v7_defconfig/lab/lab-khilman/?_id=5658061359b5140196b5fd2f
 
-Sorry for the screw up, I'll resend a new version tomorrow...
+Thanks Kevin,
 
-Maxime
+I did see these too. But at the same time, as far as I can see, the
+qcom_defconfig boots just fine - indicating that this particular
+commit would not be the cause.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151130/10f70392/attachment-0001.sig>
+I'll fire up some builds to figure out what's going on.
+
+
+PS. I believe earlycon would be more helpful than earlyprintk on the
+multi platform build command line...
+
+Regards,
+Bjorn
