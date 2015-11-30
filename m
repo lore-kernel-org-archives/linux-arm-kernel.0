@@ -1,123 +1,73 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  1 Dec 2015 00:00:51 +0100
-Subject: [PATCH 0/7] ARM: make mach/*.h headers more local
-Message-ID: <1448924458-3279040-1-git-send-email-arnd@arndb.de>
+Date: Tue,  1 Dec 2015 00:00:56 +0100
+Subject: [PATCH 5/7] ARM: w90x900: make headers more local
+In-Reply-To: <1448924458-3279040-1-git-send-email-arnd@arndb.de>
+References: <1448924458-3279040-1-git-send-email-arnd@arndb.de>
+Message-ID: <1448924458-3279040-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've already posted the mach-pxa cleanup along the same lines,
-here is another bunch of patches. I'd like to put them into
-the next/multiplatform branch in arm-soc.
+Some header files are never included outside of a mach-w90x900
+directory and do not need to be made visible in include/mach,
+so let's just move them all down one level.
 
-They come from an old script of mine to look for headers that
-are not used by drivers, and I've done thousands of randconfig
-builds with them applied, so I'm rather sure that they are all
-harmless.
-
-Arnd Bergmann (7):
-  ARM: omap1: make headers more local
-  ARM: ks8695: make headers more local
-  ARM: davinci: make headers more local
-  ARM: iop13xx: make headers more local
-  ARM: w90x900: make headers more local
-  ARM: mvebu: remove unused mach/gpio.h
-  ARM: netx: remove unused mach/param.h
-
- arch/arm/mach-davinci/board-da830-evm.c            |  2 +-
- arch/arm/mach-davinci/board-da850-evm.c            |  4 +-
- arch/arm/mach-davinci/board-mityomapl138.c         |  2 +-
- arch/arm/mach-davinci/board-omapl138-hawk.c        |  2 +-
- arch/arm/mach-davinci/clock.c                      |  2 +-
- arch/arm/mach-davinci/cp_intc.c                    |  2 +-
- arch/arm/mach-davinci/{include/mach => }/cp_intc.h |  0
- arch/arm/mach-davinci/cpuidle.c                    |  4 +-
- arch/arm/mach-davinci/{include/mach => }/cpuidle.h |  0
- arch/arm/mach-davinci/da830.c                      |  2 +-
- arch/arm/mach-davinci/da850.c                      |  2 +-
- arch/arm/mach-davinci/da8xx-dt.c                   |  2 +-
- arch/arm/mach-davinci/{include/mach => }/ddr2.h    |  0
- arch/arm/mach-davinci/devices-da8xx.c              |  4 +-
- arch/arm/mach-davinci/dm355.c                      |  2 +-
- arch/arm/mach-davinci/dm365.c                      |  2 +-
- arch/arm/mach-davinci/dm644x.c                     |  2 +-
- arch/arm/mach-davinci/dm646x.c                     |  2 +-
- arch/arm/mach-davinci/pm.c                         |  2 +-
- arch/arm/mach-davinci/psc.c                        |  2 +-
- arch/arm/mach-davinci/{include/mach => }/psc.h     |  0
- arch/arm/mach-davinci/sleep.S                      |  4 +-
- arch/arm/mach-davinci/sram.c                       |  2 +-
- arch/arm/mach-davinci/{include/mach => }/sram.h    |  0
- arch/arm/mach-iop13xx/include/mach/pci.h           | 57 ---------------------
- arch/arm/mach-iop13xx/iq81340mc.c                  |  2 +-
- arch/arm/mach-iop13xx/iq81340sc.c                  |  2 +-
- arch/arm/mach-iop13xx/irq.c                        |  2 +-
- arch/arm/mach-iop13xx/{include/mach => }/msi.h     |  0
- arch/arm/mach-iop13xx/pci.c                        |  2 +-
- arch/arm/mach-iop13xx/pci.h                        | 58 ++++++++++++++++++++++
- arch/arm/mach-ks8695/board-acs5k.c                 |  2 +-
- arch/arm/mach-ks8695/board-dsm320.c                |  2 +-
- arch/arm/mach-ks8695/board-micrel.c                |  2 +-
- arch/arm/mach-ks8695/board-og.c                    |  2 +-
- arch/arm/mach-ks8695/board-sg.c                    |  2 +-
- arch/arm/mach-ks8695/cpu.c                         |  2 +-
- arch/arm/mach-ks8695/devices.c                     |  6 +--
- arch/arm/mach-ks8695/{include/mach => }/devices.h  |  0
- arch/arm/mach-ks8695/pci.c                         |  4 +-
- .../arm/mach-ks8695/{include/mach => }/regs-hpna.h |  0
- arch/arm/mach-ks8695/{include/mach => }/regs-lan.h |  0
- arch/arm/mach-ks8695/{include/mach => }/regs-mem.h |  0
- arch/arm/mach-ks8695/{include/mach => }/regs-pci.h |  0
- arch/arm/mach-ks8695/{include/mach => }/regs-sys.h |  0
- arch/arm/mach-ks8695/{include/mach => }/regs-wan.h |  0
- arch/arm/mach-mvebu/include/mach/gpio.h            |  1 -
- arch/arm/mach-netx/include/mach/param.h            | 18 -------
- arch/arm/mach-omap1/board-ams-delta.c              |  2 +-
- arch/arm/mach-omap1/board-fsample.c                |  2 +-
- arch/arm/mach-omap1/board-h2.c                     |  2 +-
- arch/arm/mach-omap1/board-h3.c                     |  2 +-
- arch/arm/mach-omap1/board-innovator.c              |  2 +-
- arch/arm/mach-omap1/board-osk.c                    |  2 +-
- arch/arm/mach-omap1/board-palmte.c                 |  2 +-
- arch/arm/mach-omap1/board-palmtt.c                 |  2 +-
- arch/arm/mach-omap1/board-palmz71.c                |  2 +-
- arch/arm/mach-omap1/board-perseus2.c               |  2 +-
- arch/arm/mach-omap1/board-sx1-mmc.c                |  2 +-
- arch/arm/mach-omap1/board-sx1.c                    |  4 +-
- arch/arm/mach-omap1/{include/mach => }/board-sx1.h |  0
- arch/arm/mach-omap1/{include/mach => }/camera.h    |  0
- arch/arm/mach-omap1/devices.c                      |  2 +-
- arch/arm/mach-omap1/flash.c                        |  2 +-
- arch/arm/mach-omap1/{include/mach => }/flash.h     |  0
- arch/arm/mach-w90x900/cpu.c                        |  4 +-
- .../arm/mach-w90x900/{include/mach => }/regs-ebi.h |  0
- .../arm/mach-w90x900/{include/mach => }/regs-gcr.h |  0
- .../mach-w90x900/{include/mach => }/regs-timer.h   |  0
- .../arm/mach-w90x900/{include/mach => }/regs-usb.h |  0
- arch/arm/mach-w90x900/time.c                       |  2 +-
- 71 files changed, 114 insertions(+), 132 deletions(-)
- rename arch/arm/mach-davinci/{include/mach => }/cp_intc.h (100%)
- rename arch/arm/mach-davinci/{include/mach => }/cpuidle.h (100%)
- rename arch/arm/mach-davinci/{include/mach => }/ddr2.h (100%)
- rename arch/arm/mach-davinci/{include/mach => }/psc.h (100%)
- rename arch/arm/mach-davinci/{include/mach => }/sram.h (100%)
- delete mode 100644 arch/arm/mach-iop13xx/include/mach/pci.h
- rename arch/arm/mach-iop13xx/{include/mach => }/msi.h (100%)
- rename arch/arm/mach-ks8695/{include/mach => }/devices.h (100%)
- rename arch/arm/mach-ks8695/{include/mach => }/regs-hpna.h (100%)
- rename arch/arm/mach-ks8695/{include/mach => }/regs-lan.h (100%)
- rename arch/arm/mach-ks8695/{include/mach => }/regs-mem.h (100%)
- rename arch/arm/mach-ks8695/{include/mach => }/regs-pci.h (100%)
- rename arch/arm/mach-ks8695/{include/mach => }/regs-sys.h (100%)
- rename arch/arm/mach-ks8695/{include/mach => }/regs-wan.h (100%)
- delete mode 100644 arch/arm/mach-mvebu/include/mach/gpio.h
- delete mode 100644 arch/arm/mach-netx/include/mach/param.h
- rename arch/arm/mach-omap1/{include/mach => }/board-sx1.h (100%)
- rename arch/arm/mach-omap1/{include/mach => }/camera.h (100%)
- rename arch/arm/mach-omap1/{include/mach => }/flash.h (100%)
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-w90x900/cpu.c                           | 4 ++--
+ arch/arm/mach-w90x900/{include/mach => }/regs-ebi.h   | 0
+ arch/arm/mach-w90x900/{include/mach => }/regs-gcr.h   | 0
+ arch/arm/mach-w90x900/{include/mach => }/regs-timer.h | 0
+ arch/arm/mach-w90x900/{include/mach => }/regs-usb.h   | 0
+ arch/arm/mach-w90x900/time.c                          | 2 +-
+ 6 files changed, 3 insertions(+), 3 deletions(-)
  rename arch/arm/mach-w90x900/{include/mach => }/regs-ebi.h (100%)
  rename arch/arm/mach-w90x900/{include/mach => }/regs-gcr.h (100%)
  rename arch/arm/mach-w90x900/{include/mach => }/regs-timer.h (100%)
  rename arch/arm/mach-w90x900/{include/mach => }/regs-usb.h (100%)
 
+diff --git a/arch/arm/mach-w90x900/cpu.c b/arch/arm/mach-w90x900/cpu.c
+index 213230ee57d1..ca763251ffe0 100644
+--- a/arch/arm/mach-w90x900/cpu.c
++++ b/arch/arm/mach-w90x900/cpu.c
+@@ -33,8 +33,8 @@
+ #include <mach/hardware.h>
+ #include <mach/regs-serial.h>
+ #include <mach/regs-clock.h>
+-#include <mach/regs-ebi.h>
+-#include <mach/regs-timer.h>
++#include "regs-ebi.h"
++#include "regs-timer.h"
+ 
+ #include "cpu.h"
+ #include "clock.h"
+diff --git a/arch/arm/mach-w90x900/include/mach/regs-ebi.h b/arch/arm/mach-w90x900/regs-ebi.h
+similarity index 100%
+rename from arch/arm/mach-w90x900/include/mach/regs-ebi.h
+rename to arch/arm/mach-w90x900/regs-ebi.h
+diff --git a/arch/arm/mach-w90x900/include/mach/regs-gcr.h b/arch/arm/mach-w90x900/regs-gcr.h
+similarity index 100%
+rename from arch/arm/mach-w90x900/include/mach/regs-gcr.h
+rename to arch/arm/mach-w90x900/regs-gcr.h
+diff --git a/arch/arm/mach-w90x900/include/mach/regs-timer.h b/arch/arm/mach-w90x900/regs-timer.h
+similarity index 100%
+rename from arch/arm/mach-w90x900/include/mach/regs-timer.h
+rename to arch/arm/mach-w90x900/regs-timer.h
+diff --git a/arch/arm/mach-w90x900/include/mach/regs-usb.h b/arch/arm/mach-w90x900/regs-usb.h
+similarity index 100%
+rename from arch/arm/mach-w90x900/include/mach/regs-usb.h
+rename to arch/arm/mach-w90x900/regs-usb.h
+diff --git a/arch/arm/mach-w90x900/time.c b/arch/arm/mach-w90x900/time.c
+index cd1966ec9143..cda085245e34 100644
+--- a/arch/arm/mach-w90x900/time.c
++++ b/arch/arm/mach-w90x900/time.c
+@@ -31,7 +31,7 @@
+ #include <asm/mach/time.h>
+ 
+ #include <mach/map.h>
+-#include <mach/regs-timer.h>
++#include "regs-timer.h"
+ 
+ #include "nuc9xx.h"
+ 
 -- 
 2.1.0.rc2
