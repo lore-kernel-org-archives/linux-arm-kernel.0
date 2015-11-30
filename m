@@ -1,93 +1,110 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 30 Nov 2015 11:08:45 +0530
-Subject: [PATCH v4 3/3] thermal: mediatek: Add cpu dynamic power cooling
- model.
-In-Reply-To: <1448616727-29367-4-git-send-email-dawei.chien@mediatek.com>
-References: <1448616727-29367-1-git-send-email-dawei.chien@mediatek.com>
- <1448616727-29367-4-git-send-email-dawei.chien@mediatek.com>
-Message-ID: <20151130053845.GM3373@ubuntu>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 30 Nov 2015 14:42:11 +0900
+Subject: [PATCHv2] ARM: dts: use vmmc-supply of emmc/sd for
+ exynos5422-odroidxu3
+In-Reply-To: <CANAwSgR+UTZSQYhXcP1a_T9AvJCS98dj1fafzJZ1S3oXvMUx+A@mail.gmail.com>
+References: <1445345793-5189-1-git-send-email-linux.amoon@gmail.com>
+ <56283582.5010908@samsung.com>
+ <CANAwSgQFqcM++D6FoTXTnZJryaoi92pEiSvbjyz8rj79VmGOMQ@mail.gmail.com>
+ <CANAwSgR+UTZSQYhXcP1a_T9AvJCS98dj1fafzJZ1S3oXvMUx+A@mail.gmail.com>
+Message-ID: <565BE1B3.1070505@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27-11-15, 17:32, Dawei Chien wrote:
-> MT8173 cpufreq driver use of_cpufreq_power_cooling_register registering
-> cooling devices with dynamic power coefficient.
+On 27.11.2015 15:42, Anand Moon wrote:
+> hi Krzysztof,
 > 
-> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
-> ---
-> This patch is base on patchset:
-> https://lkml.org/lkml/2015/11/17/251
-> ---
->  drivers/cpufreq/mt8173-cpufreq.c |   28 ++++++++++++++++++++--------
->  1 file changed, 20 insertions(+), 8 deletions(-)
+> On 22 October 2015 at 18:34, Anand Moon <linux.amoon@gmail.com> wrote:
+>> hi Krzysztof,
+>>
+>> On 22 October 2015 at 06:31, Krzysztof Kozlowski
+>> <k.kozlowski@samsung.com> wrote:
+>>> On 20.10.2015 21:56, Anand Moon wrote:
+>>>> Changes need for host controller to detect UHS-I highspeed cards.
+>>>> Changes in VDDQ_MMC2 voltage range help scale
+>>>> the required voltage to detect and load the microSD cards.
+>>>
+>>> Thanks for updating description of commit.
+>>>
+>>>>
+>>>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>>>> ---
+>>>> Changes based on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git v4.4-next/dt-samsung branch
+>>>>
+>>>> Changes:
+>>>> Drop the ranp_delay for LDO9.
+>>>>
+>>>> Thanks to : Krzysztof, Doug Anderson, Jaehoon Chung for helping
+>>>> me out figure out the mmc core requirement.
+>>>>
+>>>> Also drop the previous changes:
+>>>> use cd-gpio method to detect sd-card.
+>>>> Added UHS-I bus speed support.
+>>>>
+>>>> [    4.713553] random: nonblocking pool is initialized
+>>>> [    4.718423] 14530000.hdmi supply hdmi-en not found, using dummy regulator
+>>>> [    4.726206] exynos-drm exynos-drm: bound 14400000.fimd (ops fimd_component_ops)
+>>>> [    4.732555] exynos-drm exynos-drm: bound 14450000.mixer (ops mixer_component_ops)
+>>>> [    4.740180] exynos-drm exynos-drm: bound 14530000.hdmi (ops hdmi_component_ops)
+>>>> [    4.746936] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+>>>> [    4.753428] [drm] No driver support for vblank timestamp query.
+>>>> [    4.940794] Console: switching to colour frame buffer device 274x77
+>>>> [    4.995344] exynos-drm exynos-drm: fb0:  frame buffer device
+>>>> [    5.024573] [drm] Initialized exynos 1.0.0 20110530 on minor 0
+>>>> [    5.031164] exynos-dwc3 usb at 12000000: no suspend clk specified
+>>>> [    5.054571] usb 2-1: new full-speed USB device number 2 using exynos-ohci
+>>>> [    5.159527] dwmmc_exynos 12220000.mmc: Busy; trying anyway
+>>>> [    5.163705] mmc_host mmc1: Timeout sending command (cmd 0x202000 arg 0x0 status 0x0)
+>>>> ---
+>>>>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 7 ++++++-
+>>>>  1 file changed, 6 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>>>> index 1af5bdc..a4be3e0 100644
+>>>> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>>>> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>>>> @@ -182,9 +182,10 @@
+>>>>
+>>>>                       ldo13_reg: LDO13 {
+>>>>                               regulator-name = "vdd_ldo13";
+>>>> -                             regulator-min-microvolt = <2800000>;
+>>>> +                             regulator-min-microvolt = <1800000>;
+>>>
+>>> You did not convinced me in previous discussion about the change to
+>>> 1.8V. I said that:
+>>>> On the same diagram few lines below:
+>>>> VDDQ_MMC2: 2.8V 250mA
+>>>
+>>> You responded:
+>>>> You are correct.
+>>>
+>>> So I am confused. Are you sure that this SD card block can/should
+>>> operate on 1.8V? Have you actually tried this?
+>>>
+>>
+>> Look like I missed this point. Here is the link I would like to share.
+>>
+>> http://www.hjreggel.net/cardspeed/cs_sdxc.html
+>> Section: Summary of SD modes
+>>
+>> https://en.wikipedia.org/wiki/Secure_Digital
+>> Section: Power consumption
+>>
+>> Their different requirement for voltage requirement for UHS-I, the max
+>> value is around 3.3V
 > 
-> diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
-> index 83001dc..4d39468 100644
-> --- a/drivers/cpufreq/mt8173-cpufreq.c
-> +++ b/drivers/cpufreq/mt8173-cpufreq.c
-> @@ -263,24 +263,34 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
->  	return 0;
->  }
->  
-> +#define DYNAMIC_POWER "dynamic-power-coefficient"
-> +
->  static void mtk_cpufreq_ready(struct cpufreq_policy *policy)
->  {
->  	struct mtk_cpu_dvfs_info *info = policy->driver_data;
->  	struct device_node *np = of_node_get(info->cpu_dev->of_node);
-> +	u32 capacitance;
->  
->  	if (WARN_ON(!np))
->  		return;
->  
->  	if (of_find_property(np, "#cooling-cells", NULL)) {
-> -		info->cdev = of_cpufreq_cooling_register(np,
-> -							 policy->related_cpus);
-> +		if (!info->cdev) {
+> Do you have any comment on this voltage selection for UHS-I card (1.8V).
 
-Why will info->cdev be non-NULL here ?
+I asked whether you tried this, whether setting real 1.8V works fine.
+You did not respond. As you can see on Odroid schematics, the VDDQ for
+MMC[01] operates under 1.8V.
 
-> +			of_property_read_u32(np, DYNAMIC_POWER, &capacitance);
+The VDDQ for MMC2 - under 2.8V.
 
-This can fail, in which case capacitance will be used uninitialized.
-Fix that by initializing it with 0 at the beginning of this routine.
+In commit description you mentioned that this voltage "helps scale the
+required voltage to detect and load the microSD cards". What does it
+mean "help"? I would expect that detecting and loading of microSD cards
+either works or does not work. I am not sure how does it help.
 
-> +			info->cdev = of_cpufreq_power_cooling_register(np,
-> +							policy->related_cpus,
-> +							capacitance,
-> +							NULL);
->  
-> -		if (IS_ERR(info->cdev)) {
-> -			dev_err(info->cpu_dev,
-> -				"running cpufreq without cooling device: %ld\n",
-> -				PTR_ERR(info->cdev));
-> +			if (IS_ERR(info->cdev)) {
-> +				dev_err(info->cpu_dev,
-> +					"running cpufreq without cooling device: %ld\n",
-> +					PTR_ERR(info->cdev));
->  
-> -			info->cdev = NULL;
-> +				info->cdev = NULL;
-> +			}
->  		}
->  	}
->  
-> @@ -460,7 +470,9 @@ static int mtk_cpufreq_exit(struct cpufreq_policy *policy)
->  {
->  	struct mtk_cpu_dvfs_info *info = policy->driver_data;
->  
-> -	cpufreq_cooling_unregister(info->cdev);
-> +	if (info->cdev)
-> +		cpufreq_cooling_unregister(info->cdev);
-> +
-
-Why do you need to update this?
-
->  	dev_pm_opp_free_cpufreq_table(info->cpu_dev, &policy->freq_table);
->  	mtk_cpu_dvfs_info_release(info);
->  	kfree(info);
-> -- 
-> 1.7.9.5
-
--- 
-viresh
+Best regards,
+Krzysztof
