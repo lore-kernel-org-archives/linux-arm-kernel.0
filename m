@@ -1,134 +1,26 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 30 Nov 2015 18:16:54 +0100
-Subject: [PATCH 00/13] mvneta Buffer Management and enhancements
-In-Reply-To: <1448178839-3541-1-git-send-email-mw@semihalf.com> (Marcin
- Wojtas's message of "Sun, 22 Nov 2015 08:53:46 +0100")
-References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
-Message-ID: <87lh9f4dbt.fsf@free-electrons.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 30 Nov 2015 18:24:44 +0100
+Subject: [PATCH v2 1/5] i2c: add i2c quirk flag for unsupported clock
+ stretching
+In-Reply-To: <1446118467-26453-1-git-send-email-nicola@corna.info>
+References: <1445976718-7449-1-git-send-email-nicola@corna.info>
+ <1446118467-26453-1-git-send-email-nicola@corna.info>
+Message-ID: <20151130172444.GB9554@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
- 
- On dim., nov. 22 2015, Marcin Wojtas <mw@semihalf.com> wrote:
+On Thu, Oct 29, 2015 at 12:34:23PM +0100, Nicola Corna wrote:
+> Add I2C_AQ_NO_CLK_STRETCH quirk flag, to be used when clock stretching is
+> not supported.
+> 
+> Signed-off-by: Nicola Corna <nicola@corna.info>
 
-> Hi,
->
-> Hereby I submit a patchset that introduces various fixes and support
-> for new features and enhancements to the mvneta driver:
->
-> 1. First three patches are minimal fixes, stable-CC'ed.
->
-> 2. Suspend to ram ('s2ram') support. Due to some stability problems
-> Thomas Petazzoni's patches did not get merged yet, but I used them for
-> verification. Contrary to wfi mode ('standby' - linux does not
-> differentiate between them, so same routines are used) all registers'
-> contents are lost due to power down, so the configuration has to be
-> fully reconstructed during resume.
->
-> 3. Optimisations - concatenating TX descriptors' flush, basing on
-> xmit_more support and combined approach for finalizing egress processing.
-> Thanks to HR timer buffers can be released with small latency, which is
-> good for low transfer and small queues. Along with the timer, coalescing
-> irqs are used, whose threshold could be increased back to 15.
->
-> 4. Buffer manager (BM) support with two preparatory commits. As it is a
-> separate block, common for all network ports, a new driver is introduced,
-> which configures it and exposes API to the main network driver. It is
-> throughly described in binding documentation and commit log. Please note,
-> that enabling per-port BM usage is done using phandle and the data passed
-> in mvneta_bm_probe. It is designed for usage of on-demand device probe
-> and dev_set/get_drvdata, however it's awaiting merge to linux-next.
-> Therefore, deferring probe is not used - if something goes wrong (same
-> in case of errors during changing MTU or suspend/resume cycle) mvneta
-> driver falls back to software buffer management and works in a regular way.
->
-> Known issues:
-> - problems with obtaining all mapped buffers from internal SRAM, when
-> destroying the buffer pointer pool
-> - problems with unmapping chunk of SRAM during driver removal
-> Above do not have an impact on the operation, as they are called during
-> driver removal or in error path.
->
-> 5. Enable BM on Armada XP and 38X development boards - those ones and
-> A370 I could check on my own. In all cases they survived night-long
-> linerate iperf. Also tests were performed with A388 SoC working as a
-> network bridge between two packet generators. They showed increase of
-> maximum processed 64B packets by ~20k (~555k packets with BM enabled
-> vs ~535 packets without BM). Also when pushing 1500B-packets with a
-> line rate achieved, CPU load decreased from around 25% without BM vs
-> 18-20% with BM.
+Applied to for-next, thanks!
 
-I was trying to test the BM part of tour series on the Armada XP GP
-board. However it failed very quickly during the pool allocation. After
-a first debug I found that the size of the cs used in the
-mvebu_mbus_dram_info struct was 0. I have applied your series on a
-v4.4-rc1 kernel. At this stage I don't know if it is a regression in the
-mbus driver, a misconfiguration on my side or something else.
-
-Does it ring a bell for you?
-
-How do you test test it exactly?
-Especially on which kernel and with which U-Boot?
-
-Thanks,
-
-Gregory
-
-
->
-> I'm looking forward to any remarks and comments.
->
-> Best regards,
-> Marcin Wojtas
->
-> Marcin Wojtas (12):
->   net: mvneta: add configuration for MBUS windows access protection
->   net: mvneta: enable IP checksum with jumbo frames for Armada 38x on
->     Port0
->   net: mvneta: fix bit assignment in MVNETA_RXQ_CONFIG_REG
->   net: mvneta: enable suspend/resume support
->   net: mvneta: enable mixed egress processing using HR timer
->   bus: mvebu-mbus: provide api for obtaining IO and DRAM window
->     information
->   ARM: mvebu: enable SRAM support in mvebu_v7_defconfig
->   net: mvneta: bm: add support for hardware buffer management
->   ARM: mvebu: add buffer manager nodes to armada-38x.dtsi
->   ARM: mvebu: enable buffer manager support on Armada 38x boards
->   ARM: mvebu: add buffer manager nodes to armada-xp.dtsi
->   ARM: mvebu: enable buffer manager support on Armada XP boards
->
-> Simon Guinot (1):
->   net: mvneta: add xmit_more support
->
->  .../bindings/net/marvell-armada-370-neta.txt       |  19 +-
->  .../devicetree/bindings/net/marvell-neta-bm.txt    |  49 ++
->  arch/arm/boot/dts/armada-385-db-ap.dts             |  20 +-
->  arch/arm/boot/dts/armada-388-db.dts                |  17 +-
->  arch/arm/boot/dts/armada-388-gp.dts                |  17 +-
->  arch/arm/boot/dts/armada-38x.dtsi                  |  20 +-
->  arch/arm/boot/dts/armada-xp-db.dts                 |  19 +-
->  arch/arm/boot/dts/armada-xp-gp.dts                 |  19 +-
->  arch/arm/boot/dts/armada-xp.dtsi                   |  18 +
->  arch/arm/configs/mvebu_v7_defconfig                |   1 +
->  drivers/bus/mvebu-mbus.c                           |  51 ++
->  drivers/net/ethernet/marvell/Kconfig               |  14 +
->  drivers/net/ethernet/marvell/Makefile              |   1 +
->  drivers/net/ethernet/marvell/mvneta.c              | 660 +++++++++++++++++++--
->  drivers/net/ethernet/marvell/mvneta_bm.c           | 642 ++++++++++++++++++++
->  drivers/net/ethernet/marvell/mvneta_bm.h           | 171 ++++++
->  include/linux/mbus.h                               |   3 +
->  17 files changed, 1677 insertions(+), 64 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/net/marvell-neta-bm.txt
->  create mode 100644 drivers/net/ethernet/marvell/mvneta_bm.c
->  create mode 100644 drivers/net/ethernet/marvell/mvneta_bm.h
->
-> -- 
-> 1.8.3.1
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151130/4bb983be/attachment.sig>
