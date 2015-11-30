@@ -1,158 +1,52 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 30 Nov 2015 16:42:33 +0200
-Subject: [RFC v02 02/15] dmaengine: core: Move and merge the code paths
- using private_candidate
-In-Reply-To: <1448891145-10766-3-git-send-email-peter.ujfalusi@ti.com>
-References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
- <1448891145-10766-3-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <CAHp75VdbV3C8h8V8M=dKpTov70rPvmxuXCr5Kh=Ns3y+ZGnkhQ@mail.gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 30 Nov 2015 16:44:50 +0200
+Subject: [PATCH v2 04/18] ARM: am57xx: cl-som-am57x: dts: add EEPROM
+ support
+In-Reply-To: <1448894037-1337-1-git-send-email-lifshitz@compulab.co.il>
+References: <1448433590-1399-5-git-send-email-lifshitz@compulab.co.il>
+ <1448894037-1337-1-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <565C60E2.5060002@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 3:45 PM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
-> Channel matching with private_candidate() is used in two paths, the error
-> checking is slightly different in them and they are duplicating code also.
-> Move the code under dma_get_channel() to provide consistent execution and
-> going to allow us to reuse this mode of channel lookup later.
->
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+On 11/30/15 16:33, Dmitry Lifshitz wrote:
+> On-board EEPROM chip is used for storing a board production
+> info.
+> 
+> Add module EEPROM support (over I2C4 bus).
+> 
+> Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
+
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+
 > ---
->  drivers/dma/dmaengine.c | 81 +++++++++++++++++++++++++------------------------
->  1 file changed, 42 insertions(+), 39 deletions(-)
->
-> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
-> index 52c3eee48e2e..1249165fb4b2 100644
-> --- a/drivers/dma/dmaengine.c
-> +++ b/drivers/dma/dmaengine.c
-> @@ -549,6 +549,42 @@ static struct dma_chan *private_candidate(const dma_cap_mask_t *mask,
->         return NULL;
->  }
->
-> +static struct dma_chan *dma_get_channel(struct dma_device *device,
-
-Naming scheme inside dmaengine.c looks like a mess.
-
-Since it's static function that utilizes private_candidate() may I
-propose the name like find_candidate() ?
-
-> +                                       const dma_cap_mask_t *mask,
-> +                                       dma_filter_fn fn, void *fn_param)
-> +{
-> +       struct dma_chan *chan = private_candidate(mask, device, fn, fn_param);
-> +       int err;
+> 
+>   v2:
+> 
+>    * Fix EEPROM chip model
+> 
+>  arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+> index 9f15dda..695f250 100644
+> --- a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+> +++ b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+> @@ -290,6 +290,12 @@
+>  		compatible = "emmicro,em3027";
+>  		reg = <0x56>;
+>  	};
 > +
-> +       if (chan) {
-> +               /* Found a suitable channel, try to grab, prep, and return it.
-> +                * We first set DMA_PRIVATE to disable balance_ref_count as this
-> +                * channel will not be published in the general-purpose
-> +                * allocator
-> +                */
-> +               dma_cap_set(DMA_PRIVATE, device->cap_mask);
-> +               device->privatecnt++;
-> +               err = dma_chan_get(chan);
-> +
-> +               if (err) {
-> +                       if (err == -ENODEV) {
-> +                               pr_debug("%s: %s module removed\n", __func__,
-> +                                        dma_chan_name(chan));
-> +                               list_del_rcu(&device->global_node);
-> +                       } else
-> +                               pr_debug("%s: failed to get %s: (%d)\n",
-> +                                        __func__, dma_chan_name(chan), err);
-> +
-> +                       if (--device->privatecnt == 0)
-> +                               dma_cap_clear(DMA_PRIVATE, device->cap_mask);
-> +
-> +                       chan = ERR_PTR(err);
-> +               }
-> +       }
-> +
-> +       return chan ? chan : ERR_PTR(-EPROBE_DEFER);
-> +}
-> +
->  /**
->   * dma_get_slave_channel - try to get specific channel exclusively
->   * @chan: target channel
-> @@ -587,7 +623,6 @@ struct dma_chan *dma_get_any_slave_channel(struct dma_device *device)
->  {
->         dma_cap_mask_t mask;
->         struct dma_chan *chan;
-> -       int err;
->
->         dma_cap_zero(mask);
->         dma_cap_set(DMA_SLAVE, mask);
-> @@ -595,23 +630,11 @@ struct dma_chan *dma_get_any_slave_channel(struct dma_device *device)
->         /* lock against __dma_request_channel */
->         mutex_lock(&dma_list_mutex);
->
-> -       chan = private_candidate(&mask, device, NULL, NULL);
-> -       if (chan) {
-> -               dma_cap_set(DMA_PRIVATE, device->cap_mask);
-> -               device->privatecnt++;
-> -               err = dma_chan_get(chan);
-> -               if (err) {
-> -                       pr_debug("%s: failed to get %s: (%d)\n",
-> -                               __func__, dma_chan_name(chan), err);
-> -                       chan = NULL;
-> -                       if (--device->privatecnt == 0)
-> -                               dma_cap_clear(DMA_PRIVATE, device->cap_mask);
-> -               }
-> -       }
-> +       chan = dma_get_channel(device, &mask, NULL, NULL);
->
->         mutex_unlock(&dma_list_mutex);
->
-> -       return chan;
-> +       return IS_ERR(chan) ? NULL : chan;
->  }
->  EXPORT_SYMBOL_GPL(dma_get_any_slave_channel);
->
-> @@ -628,35 +651,15 @@ struct dma_chan *__dma_request_channel(const dma_cap_mask_t *mask,
->  {
->         struct dma_device *device, *_d;
->         struct dma_chan *chan = NULL;
-> -       int err;
->
->         /* Find a channel */
->         mutex_lock(&dma_list_mutex);
->         list_for_each_entry_safe(device, _d, &dma_device_list, global_node) {
-> -               chan = private_candidate(mask, device, fn, fn_param);
-> -               if (chan) {
-> -                       /* Found a suitable channel, try to grab, prep, and
-> -                        * return it.  We first set DMA_PRIVATE to disable
-> -                        * balance_ref_count as this channel will not be
-> -                        * published in the general-purpose allocator
-> -                        */
-> -                       dma_cap_set(DMA_PRIVATE, device->cap_mask);
-> -                       device->privatecnt++;
-> -                       err = dma_chan_get(chan);
-> +               chan = dma_get_channel(device, mask, fn, fn_param);
-> +               if (!IS_ERR(chan))
-> +                       break;
->
-> -                       if (err == -ENODEV) {
-> -                               pr_debug("%s: %s module removed\n",
-> -                                        __func__, dma_chan_name(chan));
-> -                               list_del_rcu(&device->global_node);
-> -                       } else if (err)
-> -                               pr_debug("%s: failed to get %s: (%d)\n",
-> -                                        __func__, dma_chan_name(chan), err);
-> -                       else
-> -                               break;
-> -                       if (--device->privatecnt == 0)
-> -                               dma_cap_clear(DMA_PRIVATE, device->cap_mask);
-> -                       chan = NULL;
-> -               }
-> +               chan = NULL;
->         }
->         mutex_unlock(&dma_list_mutex);
->
-> --
-> 2.6.3
->
-
-
+> +	eeprom_module: atmel at 50 {
+> +		compatible = "atmel,24c08";
+> +		reg = <0x50>;
+> +		pagesize = <16>;
+> +	};
+>  };
+>  
+>  
+> 
 
 -- 
-With Best Regards,
-Andy Shevchenko
+Regards,
+Igor.
