@@ -1,101 +1,309 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Nov 2015 16:29:06 +0100
-Subject: [PATCH 2/2] ARM: sunxi: chip: Add Wifi chip
+Date: Mon, 30 Nov 2015 16:29:05 +0100
+Subject: [PATCH 1/2] regulator: Add coupled regulator
 In-Reply-To: <1448897346-17780-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1448897346-17780-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1448897346-17780-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1448897346-17780-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CHIP has a WiFi/BT chip on an SDIO bus. That controller is maintained
-in reset through a GPIO and uses two independent regulators to be powered
-that must be kept in sync.
+Some boards, in order to power devices that have a quite high power
+consumption, wire multiple regulators in parallel.
 
-Model this using an MMC power sequence and a coupled voltage regulator.
+In such a case, the regulators need to be kept in sync, all of them being
+enabled or disabled in parallel.
+
+This also requires to expose only the voltages that are common to all the
+regulators.
+
+Eventually support for changing the voltage in parallel should be added
+too, possibly with delays between each other to avoid having a too brutal
+peak consumption.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun5i-r8-chip.dts | 44 ++++++++++++++++++++++++++++++++++++-
- 1 file changed, 43 insertions(+), 1 deletion(-)
+ drivers/regulator/Kconfig                     |   7 +
+ drivers/regulator/Makefile                    |   1 +
+ drivers/regulator/coupled-voltage-regulator.c | 241 ++++++++++++++++++++++++++
+ 3 files changed, 249 insertions(+)
+ create mode 100644 drivers/regulator/coupled-voltage-regulator.c
 
-diff --git a/arch/arm/boot/dts/sun5i-r8-chip.dts b/arch/arm/boot/dts/sun5i-r8-chip.dts
-index 530ab28e9ca2..b5ef4eb5b6b4 100644
---- a/arch/arm/boot/dts/sun5i-r8-chip.dts
-+++ b/arch/arm/boot/dts/sun5i-r8-chip.dts
-@@ -64,6 +64,24 @@
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
+diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+index 8df0b0e62976..6ba7bc8fda13 100644
+--- a/drivers/regulator/Kconfig
++++ b/drivers/regulator/Kconfig
+@@ -35,6 +35,13 @@ config REGULATOR_FIXED_VOLTAGE
+ 	  useful for systems which use a combination of software
+ 	  managed regulators and simple non-configurable regulators.
+ 
++config REGULATOR_COUPLED_VOLTAGE
++	tristate "Coupled voltage regulator support"
++	help
++	  This driver provides support for regulators that are an
++	  aggregate of other regulators in the system, and need to
++	  keep them all in sync.
 +
-+	mmc0_pwrseq: mmc0_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&chip_wifi_reg_on_pin>;
-+		reset-gpios = <&pio 2 19 GPIO_ACTIVE_LOW>; /* PC19 */
-+	};
+ config REGULATOR_VIRTUAL_CONSUMER
+ 	tristate "Virtual regulator consumer support"
+ 	help
+diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+index 0f8174913c17..c05839257386 100644
+--- a/drivers/regulator/Makefile
++++ b/drivers/regulator/Makefile
+@@ -22,6 +22,7 @@ obj-$(CONFIG_REGULATOR_AS3711) += as3711-regulator.o
+ obj-$(CONFIG_REGULATOR_AS3722) += as3722-regulator.o
+ obj-$(CONFIG_REGULATOR_AXP20X) += axp20x-regulator.o
+ obj-$(CONFIG_REGULATOR_BCM590XX) += bcm590xx-regulator.o
++obj-$(CONFIG_REGULATOR_COUPLED_VOLTAGE) += coupled-voltage-regulator.o
+ obj-$(CONFIG_REGULATOR_DA903X)	+= da903x.o
+ obj-$(CONFIG_REGULATOR_DA9052)	+= da9052-regulator.o
+ obj-$(CONFIG_REGULATOR_DA9055)	+= da9055-regulator.o
+diff --git a/drivers/regulator/coupled-voltage-regulator.c b/drivers/regulator/coupled-voltage-regulator.c
+new file mode 100644
+index 000000000000..dc7aa2aca7e6
+--- /dev/null
++++ b/drivers/regulator/coupled-voltage-regulator.c
+@@ -0,0 +1,241 @@
++/*
++ * Copyright 2015 Free Electrons
++ * Copyright 2015 NextThing Co.
++ *
++ * Author: Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of the
++ * License, or (at your option) any later version.
++ */
++
++#include <linux/module.h>
++#include <linux/mod_devicetable.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++
++#include <linux/regulator/consumer.h>
++#include <linux/regulator/driver.h>
++#include <linux/regulator/of_regulator.h>
++
++#define COUPLED_REGULATOR_MAX_SUPPLIES	16
++
++struct coupled_regulator {
++	struct regulator	**regulators;
++	int			n_regulators;
++
++	int			*voltages;
++	int			n_voltages;
++};
++
++static int coupled_regulator_disable(struct regulator_dev *rdev)
++{
++	struct coupled_regulator *creg = rdev_get_drvdata(rdev);
++	int ret, i;
++
++	for (i = 0; i < creg->n_regulators; i++) {
++		ret = regulator_disable(creg->regulators[i]);
++		if (ret)
++			break;
++	}
++
++	return ret;
++}
++
++static int coupled_regulator_enable(struct regulator_dev *rdev)
++{
++	struct coupled_regulator *creg = rdev_get_drvdata(rdev);
++	int ret, i;
++
++	for (i = 0; i < creg->n_regulators; i++) {
++		ret = regulator_enable(creg->regulators[i]);
++		if (ret)
++			break;
++	}
++
++	return ret;
++}
++
++static int coupled_regulator_is_enabled(struct regulator_dev *rdev)
++{
++	struct coupled_regulator *creg = rdev_get_drvdata(rdev);
++	int ret = 0, i;
++
++	for (i = 0; i < creg->n_regulators; i++) {
++		ret &= regulator_is_enabled(creg->regulators[i]);
++		if (ret < 0)
++			break;
++	}
++
++	return ret;
++}
++
++static int coupled_regulator_list_voltage(struct regulator_dev *rdev,
++					  unsigned int selector)
++{
++	struct coupled_regulator *creg = rdev_get_drvdata(rdev);
++
++	if (selector >= creg->n_voltages)
++		return -EINVAL;
++
++	return creg->voltages[selector];
++}
++
++static struct regulator_ops coupled_regulator_ops = {
++	.enable			= coupled_regulator_enable,
++	.disable		= coupled_regulator_disable,
++	.is_enabled		= coupled_regulator_is_enabled,
++	.list_voltage		= coupled_regulator_list_voltage,
++};
++
++static struct regulator_desc coupled_regulator_desc = {
++	.name		= "coupled-voltage-regulator",
++	.type		= REGULATOR_VOLTAGE,
++	.ops		= &coupled_regulator_ops,
++	.owner		= THIS_MODULE,
++};
++
++static int coupled_regulator_probe(struct platform_device *pdev)
++{
++	const struct regulator_init_data *init_data;
++	struct coupled_regulator *creg;
++	struct regulator_config config = { };
++	struct regulator_dev *regulator;
++	struct regulator_desc *desc;
++	struct device_node *np = pdev->dev.of_node;
++	int max_voltages, i;
++
++	if (!np) {
++		dev_err(&pdev->dev, "Device Tree node missing\n");
++		return -EINVAL;
++	}
++
++	creg = devm_kzalloc(&pdev->dev, sizeof(*creg), GFP_KERNEL);
++	if (!creg)
++		return -ENOMEM;
++
++	init_data = of_get_regulator_init_data(&pdev->dev, np,
++					       &coupled_regulator_desc);
++	if (!init_data)
++		return -ENOMEM;
++
++	config.of_node = np;
++	config.dev = &pdev->dev;
++	config.driver_data = creg;
++	config.init_data = init_data;
++
++	for (i = 0; i < COUPLED_REGULATOR_MAX_SUPPLIES; i++) {
++		char *propname = kasprintf(GFP_KERNEL, "vin%d-supply", i);
++		const void *prop = of_get_property(np, propname, NULL);
++		kfree(propname);
++
++		if (!prop) {
++			creg->n_regulators = i;
++			break;
++		}
++	}
++
++	dev_dbg(&pdev->dev, "Found %d parent regulators\n",
++		creg->n_regulators);
++
++	if (!creg->n_regulators) {
++		dev_err(&pdev->dev, "No parent regulators listed\n");
++		return -EINVAL;
++	}
++
++	creg->regulators = devm_kcalloc(&pdev->dev, creg->n_regulators,
++					sizeof(*creg->regulators), GFP_KERNEL);
++	if (!creg->regulators)
++		return -ENOMEM;
++
++	for (i = 0; i < creg->n_regulators; i++) {
++		char *propname = kasprintf(GFP_KERNEL, "vin%d", i);
++
++		dev_dbg(&pdev->dev, "Trying to get supply %s\n", propname);
++
++		creg->regulators[i] = devm_regulator_get(&pdev->dev, propname);
++		kfree(propname);
++
++		if (IS_ERR(creg->regulators[i])) {
++			dev_err(&pdev->dev, "Couldn't get regulator vin%d\n",
++				i);
++			return PTR_ERR(creg->regulators[i]);
++		}
++	}
 +
 +	/*
-+	 * Both LDO3 and LDO4 are used in parallel to power up the
-+	 * WiFi/BT Chip.
++	 * Since we want only to expose voltages that can be set on
++	 * all the regulators, we won't have more voltages supported
++	 * than the number of voltages supported by the first
++	 * regulator in our list
 +	 */
-+	vcc_wifi: wifi_reg {
-+		compatible = "coupled-voltage-regulator";
-+		regulator-name = "vcc-wifi";
-+		vin0-supply = <&reg_ldo3>;
-+		vin1-supply = <&reg_ldo4>;
-+	};
- };
- 
- &codec {
-@@ -113,10 +131,15 @@
- 	};
- };
- 
-+&mmc0_pins_a {
-+	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	max_voltages = regulator_count_voltages(creg->regulators[0]);
++
++	creg->voltages = devm_kcalloc(&pdev->dev, max_voltages, sizeof(int),
++				      GFP_KERNEL);
++
++	/* Build up list of supported voltages */
++	for (i = 0; i < max_voltages; i++) {
++		int voltage = regulator_list_voltage(creg->regulators[0], i);
++		bool usable = true;
++		int j;
++
++		if (voltage <= 0)
++			continue;
++
++		dev_dbg(&pdev->dev, "Checking voltage %d...\n", voltage);
++
++		for (j = 1; j < creg->n_regulators; j++) {
++			if (!regulator_is_supported_voltage(creg->regulators[j],
++							    voltage, voltage)) {
++				usable = false;
++				break;
++			}
++		}
++
++		if (usable) {
++			creg->voltages[creg->n_voltages++] = voltage;
++			dev_dbg(&pdev->dev,
++				 "Adding voltage %d to the list of supported voltages\n",
++				 voltage);
++		}
++	}
++
++	dev_dbg(&pdev->dev, "Supporting %d voltages\n", creg->n_voltages);
++
++	desc = devm_kmemdup(&pdev->dev, &coupled_regulator_desc,
++			    sizeof(coupled_regulator_desc), GFP_KERNEL);
++	if (!desc)
++		return -ENOMEM;
++	desc->n_voltages = creg->n_voltages;
++
++	regulator = devm_regulator_register(&pdev->dev, desc, &config);
++	if (IS_ERR(regulator)) {
++		dev_err(&pdev->dev, "Failed to register regulator %s\n",
++			coupled_regulator_desc.name);
++		return PTR_ERR(regulator);
++	}
++
++	return 0;
++}
++
++static struct of_device_id coupled_regulator_of_match[] = {
++	{ .compatible = "coupled-voltage-regulator" },
++	{ /* Sentinel */ },
 +};
 +
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins_a>;
--	vmmc-supply = <&reg_vcc3v3>;
-+	vmmc-supply = <&vcc_wifi>;
-+	mmc-pwrseq = <&mmc0_pwrseq>;
- 	bus-width = <4>;
- 	non-removable;
- 	status = "okay";
-@@ -138,6 +161,13 @@
- 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
- 
-+	chip_wifi_reg_on_pin: chip_wifi_reg_on_pin at 0 {
-+		allwinner,pins = "PC19";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
++static struct platform_driver coupled_regulator_driver = {
++	.probe	= coupled_regulator_probe,
 +
- 	chip_id_det_pin: chip_id_det_pin at 0 {
- 		allwinner,pins = "PG2";
- 		allwinner,function = "gpio_in";
-@@ -171,6 +201,18 @@
- 	regulator-always-on;
- };
- 
-+&reg_ldo3 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi-1";
++	.driver = {
++		.name		= "coupled-voltage-regulator",
++		.of_match_table	= coupled_regulator_of_match,
++	},
 +};
++module_platform_driver(coupled_regulator_driver);
 +
-+&reg_ldo4 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi-2";
-+};
-+
- &reg_ldo5 {
- 	regulator-min-microvolt = <1800000>;
- 	regulator-max-microvolt = <1800000>;
++MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
++MODULE_DESCRIPTION("Coupled Regulator Driver");
++MODULE_LICENSE("GPL");
 -- 
 2.6.3
