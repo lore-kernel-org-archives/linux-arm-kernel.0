@@ -1,39 +1,82 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 30 Nov 2015 18:33:24 +0100
-Subject: [PATCH v5 5/5] iio: humidity: si7020: add No Hold read mode
-In-Reply-To: <56349644.2060308@kernel.org>
-References: <1445976718-7449-1-git-send-email-nicola@corna.info>
- <1446118467-26453-1-git-send-email-nicola@corna.info>
- <1446118467-26453-5-git-send-email-nicola@corna.info>
- <56349644.2060308@kernel.org>
-Message-ID: <20151130173324.GG9554@katana>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 30 Nov 2015 17:56:00 +0000
+Subject: [PATCH v4 05/21] KVM: ARM64: Add reset and access handlers for
+ PMSELR register
+In-Reply-To: <1446186123-11548-6-git-send-email-zhaoshenglong@huawei.com>
+References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>
+ <1446186123-11548-6-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <20151130175600.0ce835cd@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 31, 2015 at 10:21:56AM +0000, Jonathan Cameron wrote:
-> On 29/10/15 11:34, Nicola Corna wrote:
-> > The Si7013/20/21 modules support 2 read modes:
-> >  * Hold mode (blocking), where the device stretches the clock until the end
-> > of the measurement
-> >  * No Hold mode (non-blocking), where the device replies NACK for every I2C
-> > call during the measurement
-> > Here the No Hold mode is implemented, selectable with the blocking_io
-> > variable within si7020_platform_data. The default mode is Hold, unless the
-> > adapter does not support clock stretching, in which case the No Hold mode
-> > is used.
-> > 
-> > Signed-off-by: Nicola Corna <nicola@corna.info>
-> I'm fine with this.  The dependency below should I think show up in the
-> coming merge window, so this lot might as well go via Wolfram.
+On Fri, 30 Oct 2015 14:21:47 +0800
+Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> Acked-by: Jonathan Cameron <jic23@kernel.org>
+> Since the reset value of PMSELR_EL0 is UNKNOWN, use reset_unknown for
+> its reset handler. As it doesn't need to deal with the acsessing action
+> specially, it uses default case to emulate writing and reading PMSELR
+> register.
+> 
+> Add a helper for CP15 registers reset to UNKNOWN.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 5 +++--
+>  arch/arm64/kvm/sys_regs.h | 8 ++++++++
+>  2 files changed, 11 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 5b591d6..35d232e 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -707,7 +707,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  	  trap_raz_wi },
+>  	/* PMSELR_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b101),
+> -	  trap_raz_wi },
+> +	  access_pmu_regs, reset_unknown, PMSELR_EL0 },
+>  	/* PMCEID0_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b110),
+>  	  trap_raz_wi },
+> @@ -998,7 +998,8 @@ static const struct sys_reg_desc cp15_regs[] = {
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
+> -	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), trap_raz_wi },
+> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmu_cp15_regs,
+> +	  reset_unknown_cp15, c9_PMSELR },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
+> diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
+> index eaa324e..8afeff7 100644
+> --- a/arch/arm64/kvm/sys_regs.h
+> +++ b/arch/arm64/kvm/sys_regs.h
+> @@ -110,6 +110,14 @@ static inline void reset_unknown(struct kvm_vcpu *vcpu,
+>  	vcpu_sys_reg(vcpu, r->reg) = 0x1de7ec7edbadc0deULL;
+>  }
+>  
+> +static inline void reset_unknown_cp15(struct kvm_vcpu *vcpu,
+> +				      const struct sys_reg_desc *r)
+> +{
+> +	BUG_ON(!r->reg);
+> +	BUG_ON(r->reg >= NR_COPRO_REGS);
+> +	vcpu_cp15(vcpu, r->reg) = 0xdecafbad;
+> +}
+> +
+>  static inline void reset_val(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>  {
+>  	BUG_ON(!r->reg);
 
-Not sure, will think about it...
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151130/35d428e1/attachment.sig>
+Same remark here as the one I made earlier. I'm pretty sure we don't
+call any CP15 reset because they are all shared with their 64bit
+counterparts. The same thing goes for the whole series.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
