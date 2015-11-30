@@ -1,123 +1,103 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 30 Nov 2015 09:42:01 -0500
-Subject: [PATCH V7 2/3] dma: add Qualcomm Technologies HIDMA management
- driver
-In-Reply-To: <20151130082141.GB3901@localhost>
-References: <1448245707-27499-1-git-send-email-okaya@codeaurora.org>
- <1448245707-27499-3-git-send-email-okaya@codeaurora.org>
- <20151130082141.GB3901@localhost>
-Message-ID: <565C6039.6050404@codeaurora.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 30 Nov 2015 16:43:25 +0200
+Subject: [PATCH] clk: ti: omap5+: dpll: implement errata i810
+Message-ID: <1448894605-30097-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2015 3:21 AM, Vinod Koul wrote:
-> On Sun, Nov 22, 2015 at 09:28:24PM -0500, Sinan Kaya wrote:
-> 
->> +++ b/Documentation/ABI/testing/sysfs-platform-hidma-mgmt
->> @@ -0,0 +1,97 @@
->> +What:		/sys/devices/platform/hidma-mgmt*/chan*/priority
->> +		/sys/devices/platform/QCOM8060:*/chan*/priority
->> +Date:		Nov 2015
->> +KernelVersion:	4.4
->> +Contact:	"Sinan Kaya <okaya@cudeaurora.org>"
->> +Description:
->> +		Contains either 0 or 1 and indicates if the DMA channel is a
->> +		low priority (0) or high priority (1) channel.
-> 
-> What is purpose of adding sysfs entries here ?
-> 
+Errata i810 states that DPLL controller can get stuck while transitioning
+to a power saving state, while its M/N ratio is being re-programmed.
 
-The goal is to run hidma channels in the guest machines and have
-management driver adjust the runtime characteristics of the channels
-such as round robing weight, priority, max read request etc. All of
-these are runtime configurable.
+As a workaround, before re-programming the M/N ratio, SW has to ensure
+the DPLL cannot start an idle state transition. SW can disable DPLL
+idling by setting the DPLL AUTO_DPLL_MODE=0 or keeping a clock request
+active by setting a dependent clock domain in SW_WKUP.
 
-There will be a userspace application that will configure this on behalf
-of the system administrator via sysfs. System administrator will decide
-how to allocate hardware resources to the guest machines.
+This errata impacts OMAP5 and DRA7 chips, so enable the errata for these.
 
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/mach-omap2/clock.c |    4 ++++
+ drivers/clk/ti/dpll3xxx.c   |   25 ++++++++++++++++++++++++-
+ include/linux/clk/ti.h      |    1 +
+ 3 files changed, 29 insertions(+), 1 deletion(-)
 
->> +
->> +#define QOS_N_OFFSET			0x300
->> +#define CFG_OFFSET			0x400
->> +#define MAX_BUS_REQ_LEN_OFFSET		0x41C
->> +#define MAX_XACTIONS_OFFSET		0x420
->> +#define HW_VERSION_OFFSET		0x424
->> +#define CHRESET_TIMEOUT_OFFSET		0x418
->> +
->> +#define MAX_WR_XACTIONS_MASK		GENMASK(4, 0)
->> +#define MAX_RD_XACTIONS_MASK		GENMASK(4, 0)
->> +#define WEIGHT_MASK			GENMASK(6, 0)
->> +#define MAX_BUS_REQ_LEN_MASK		GENMASK(15, 0)
->> +#define CHRESET_TIMEOUUT_MASK		GENMASK(19, 0)
->> +
->> +#define MAX_WR_XACTIONS_BIT_POS	16
->> +#define MAX_BUS_WR_REQ_BIT_POS		16
->> +#define WRR_BIT_POS			8
->> +#define PRIORITY_BIT_POS		15
->> +
->> +#define AUTOSUSPEND_TIMEOUT		2000
->> +#define MAX_CHANNEL_WEIGHT		15
-> 
-> These names are quite generic and prone to collide with generic names,
-> please prefix them with your driver name
-> 
-
-OK
-
->> +}
->> +EXPORT_SYMBOL_GPL(hidma_mgmt_setup);
-> 
-> Why is this exported or rather who would be users of this?
-
-This driver consists of two files as hidma_mgmt.c and hidma_mgmt_sys.c.
-I'm calling hidma_mgmt_setup from the hidma_mgmt_sys.c file when a
-parameter such as priority and weight is changed to reconfigure the
-hardware. I got linker errors without this export as this function is in
-hidma_mgmt.c file.
-
-> 
->> +static int hidma_mgmt_probe(struct platform_device *pdev)
->> +{
->> +	struct hidma_mgmt_dev *mgmtdev;
->> +	struct resource *res;
->> +	void __iomem *virtaddr;
->> +	int irq;
->> +	int rc;
->> +	u32 val;
->> +
->> +	pm_runtime_set_autosuspend_delay(&pdev->dev, AUTOSUSPEND_TIMEOUT);
->> +	pm_runtime_use_autosuspend(&pdev->dev);
->> +	pm_runtime_set_active(&pdev->dev);
->> +	pm_runtime_enable(&pdev->dev);
-> 
-> at this time pm core will treat device as fully enabled and pm methods can
-> be invoked, but you are not ready yet right. Typically these are done at the
-> end of the probe unless you have a reason... 
-
-I need it here because the clocks are declared as ACPI power resources.
-The kernel is turning off all power resources during initialization. In
-order for this code to touch the hardware, I need to call enable so that
-clocks are enabled once again.
-
-> 
->> +static ssize_t show_values(struct device *dev, struct device_attribute *attr,
->> +				char *buf)
-> 
-> Please fix the coding style here and other places as well. 
-
-what's the problem here?
-
-> Specifically
-> please read Chapter 2
-> 
-
-Why is checkpatch not complaining about any of the coding style issues?
-I'm checking my code with checkpatch before submitting. Is there any
-other tool that would catch this?
-
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index acb60ed..d058125 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -225,5 +225,9 @@ void __init ti_clk_init_features(void)
+ 	if (omap_rev() == OMAP3430_REV_ES1_0)
+ 		features.flags |= TI_CLK_DPLL4_DENY_REPROGRAM;
+ 
++	/* Errata I810 for omap5 / dra7 */
++	if (soc_is_omap54xx() || soc_is_dra7xx())
++		features.flags |= TI_CLK_ERRATA_I810;
++
+ 	ti_clk_setup_features(&features);
+ }
+diff --git a/drivers/clk/ti/dpll3xxx.c b/drivers/clk/ti/dpll3xxx.c
+index f4dec00..1c30038 100644
+--- a/drivers/clk/ti/dpll3xxx.c
++++ b/drivers/clk/ti/dpll3xxx.c
+@@ -305,8 +305,9 @@ static void _lookup_sddiv(struct clk_hw_omap *clk, u8 *sd_div, u16 m, u8 n)
+ static int omap3_noncore_dpll_program(struct clk_hw_omap *clk, u16 freqsel)
+ {
+ 	struct dpll_data *dd = clk->dpll_data;
+-	u8 dco, sd_div;
++	u8 dco, sd_div, ai = 0;
+ 	u32 v;
++	bool errata_i810;
+ 
+ 	/* 3430 ES2 TRM: 4.7.6.9 DPLL Programming Sequence */
+ 	_omap3_noncore_dpll_bypass(clk);
+@@ -350,6 +351,25 @@ static int omap3_noncore_dpll_program(struct clk_hw_omap *clk, u16 freqsel)
+ 		v |= sd_div << __ffs(dd->sddiv_mask);
+ 	}
+ 
++	/*
++	 * Errata i810 - DPLL controller can get stuck while transitioning
++	 * to a power saving state. Software must ensure the DPLL can not
++	 * transition to a low power state while changing M/N values.
++	 * Easiest way to accomplish this is to prevent DPLL autoidle
++	 * before doing the M/N re-program.
++	 */
++	errata_i810 = ti_clk_get_features()->flags & TI_CLK_ERRATA_I810;
++
++	if (errata_i810) {
++		ai = omap3_dpll_autoidle_read(clk);
++		if (ai) {
++			omap3_dpll_deny_idle(clk);
++
++			/* OCP barrier */
++			omap3_dpll_autoidle_read(clk);
++		}
++	}
++
+ 	ti_clk_ll_ops->clk_writel(v, dd->mult_div1_reg);
+ 
+ 	/* Set 4X multiplier and low-power mode */
+@@ -379,6 +399,9 @@ static int omap3_noncore_dpll_program(struct clk_hw_omap *clk, u16 freqsel)
+ 
+ 	_omap3_noncore_dpll_lock(clk);
+ 
++	if (errata_i810 && ai)
++		omap3_dpll_allow_idle(clk);
++
+ 	return 0;
+ }
+ 
+diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+index 223be69..75205df 100644
+--- a/include/linux/clk/ti.h
++++ b/include/linux/clk/ti.h
+@@ -286,6 +286,7 @@ struct ti_clk_features {
+ #define TI_CLK_DPLL_HAS_FREQSEL			BIT(0)
+ #define TI_CLK_DPLL4_DENY_REPROGRAM		BIT(1)
+ #define TI_CLK_DISABLE_CLKDM_CONTROL		BIT(2)
++#define TI_CLK_ERRATA_I810			BIT(3)
+ 
+ void ti_clk_setup_features(struct ti_clk_features *features);
+ const struct ti_clk_features *ti_clk_get_features(void);
 -- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
-Linux Foundation Collaborative Project
+1.7.9.5
