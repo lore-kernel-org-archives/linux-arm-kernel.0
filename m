@@ -1,42 +1,56 @@
-From: Yuantian.Tang@freescale.com (Yuantian.Tang at freescale.com)
-Date: Mon, 30 Nov 2015 11:39:35 +0800
-Subject: [PATCH v2] ARM: DTS: LS1021A: add SATA node to DTS
-Message-ID: <1448854775-19865-1-git-send-email-Yuantian.Tang@freescale.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Mon, 30 Nov 2015 11:48:00 +0800
+Subject: [PATCH v6] clk: mediatek: Export CPU mux clocks for CPU frequency
+ control
+In-Reply-To: <1442230072-31593-1-git-send-email-pi-cheng.chen@linaro.org>
+References: <1442230072-31593-1-git-send-email-pi-cheng.chen@linaro.org>
+Message-ID: <CAGS+omCkYTPyjMk6QaoxGAL4QVU8VcpWyFqWhST+iP2EFRcRYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tang Yuantian <Yuantian.Tang@freescale.com>
+Hi Pi-Cheng and Michael,
 
-Added SATA node to LS1021A DTS to support SATA function.
+On Mon, Sep 14, 2015 at 7:27 PM, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
+> From: "pi-cheng.chen" <pi-cheng.chen@linaro.org>
+>
+> This patch adds CPU mux clocks which are used by Mediatek cpufreq driver
+> for intermediate clock source switching.
 
-Signed-off-by: Tang Yuantian <Yuantian.Tang@freescale.com>
----
-v2:
-	- put reg-names right after reg property
+It looks like this patch was never picked up.
+It is required for MT8173 cpufreq.
 
- arch/arm/boot/dts/ls1021a.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+What is the plan to get this one merged?
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 9430a99..33aae8d 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -143,6 +143,16 @@
- 			status = "disabled";
- 		};
- 
-+		sata: sata at 3200000 {
-+			compatible = "fsl,ls1021a-ahci";
-+			reg = <0x0 0x3200000 0x0 0x10000>,
-+			      <0x0 0x20220520 0x0 0x4>;
-+			reg-names = "ahci", "sata-ecc";
-+			interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&platform_clk 1>;
-+			dma-coherent;
-+		};
-+
- 		scfg: scfg at 1570000 {
- 			compatible = "fsl,ls1021a-scfg", "syscon";
- 			reg = <0x0 0x1570000 0x0 0x10000>;
--- 
-2.1.0.27.g96db324
+-Dan
+
+>
+> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+> ---
+> Changes in v6:
+> - Relace __clk_get_num_parents with clk_hw_get_num_parents to reflect
+>   API change
+>
+> Changes in v5:
+> - Replace __initdata with __initconst to fix compiling error
+>
+> Changes in v4:
+> - Fix some minor issues for v3
+> - Rebase to the patch that adds 13mhz clock for MT8173[1]
+>
+> Changes in v3:
+> - Rebase to 4.2-rc1
+> - Fix some issues of v2
+>
+> Changes in v2:
+> - Remove use of .determine_rate callback
+> ---
+>  drivers/clk/mediatek/Makefile          |   2 +-
+>  drivers/clk/mediatek/clk-cpumux.c      | 127 +++++++++++++++++++++++++++++++++
+>  drivers/clk/mediatek/clk-cpumux.h      |  22 ++++++
+>  drivers/clk/mediatek/clk-mt8173.c      |  23 ++++++
+>  include/dt-bindings/clock/mt8173-clk.h |   4 +-
+>  5 files changed, 176 insertions(+), 2 deletions(-)
+>  create mode 100644 drivers/clk/mediatek/clk-cpumux.c
+>  create mode 100644 drivers/clk/mediatek/clk-cpumux.h
+
+[snip]
