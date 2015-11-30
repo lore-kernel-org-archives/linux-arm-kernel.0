@@ -1,49 +1,66 @@
 From: sunil.kovvuri@gmail.com (Sunil Goutham)
-Date: Mon, 30 Nov 2015 23:48:59 +0530
-Subject: [PATCH 03/13] net: thunderx: Increase transmit queue length
+Date: Mon, 30 Nov 2015 23:49:00 +0530
+Subject: [PATCH 04/13] net: thunderx: Set CQ timer threshold properly
 In-Reply-To: <y>
 References: <y>
-Message-ID: <1448907549-5296-4-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1448907549-5296-5-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sunil Goutham <sgoutham@cavium.com>
 
-Under high transmit rates and with TSO enabled observing fluctuations
-in TX performance. Seen especially with iperf3 application.
-
-Since TSO is taken care at driver level, with 64KB of TSO packets
-and when window size is also high the rate at which CPU fills in
-transmit descriptors is much higher than what HW is able to process.
-Each 64KB TSO packet occupies gets segmented to ~43 1500 byte MTU packets
-and occupies ~130 descriptors. Hence increasing transmit queue size.
+Properly set CQ timer threshold and also set it to 2us.
+With previous incorrect settings it was set to 0.5us which is too less.
 
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nicvf_queues.h |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nic.h          |    5 ++---
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c |    2 +-
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.h |    2 +-
+ 3 files changed, 4 insertions(+), 5 deletions(-)
 
+diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
+index d3950b2..39ca674 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic.h
++++ b/drivers/net/ethernet/cavium/thunder/nic.h
+@@ -120,10 +120,9 @@
+  * Calculated for SCLK of 700Mhz
+  * value written should be a 1/16th of what is expected
+  *
+- * 1 tick per 0.05usec = value of 2.2
+- * This 10% would be covered in CQ timer thresh value
++ * 1 tick per 0.025usec
+  */
+-#define NICPF_CLK_PER_INT_TICK		2
++#define NICPF_CLK_PER_INT_TICK		1
+ 
+ /* Time to wait before we decide that a SQ is stuck.
+  *
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+index e404ea8..206b6a7 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+@@ -592,7 +592,7 @@ void nicvf_cmp_queue_config(struct nicvf *nic, struct queue_set *qs,
+ 	/* Set threshold value for interrupt generation */
+ 	nicvf_queue_reg_write(nic, NIC_QSET_CQ_0_7_THRESH, qidx, cq->thresh);
+ 	nicvf_queue_reg_write(nic, NIC_QSET_CQ_0_7_CFG2,
+-			      qidx, nic->cq_coalesce_usecs);
++			      qidx, CMP_QUEUE_TIMER_THRESH);
+ }
+ 
+ /* Configures transmit queue */
 diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-index fb4957d..b1e93a9 100644
+index b1e93a9..457eaee 100644
 --- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
 +++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-@@ -62,7 +62,7 @@
- #define SND_QUEUE_CNT		8
- #define CMP_QUEUE_CNT		8 /* Max of RCV and SND qcount */
- 
--#define SND_QSIZE		SND_QUEUE_SIZE2
-+#define SND_QSIZE		SND_QUEUE_SIZE3
- #define SND_QUEUE_LEN		(1ULL << (SND_QSIZE + 10))
- #define MAX_SND_QUEUE_LEN	(1ULL << (SND_QUEUE_SIZE6 + 10))
- #define SND_QUEUE_THRESH	2ULL
-@@ -73,7 +73,7 @@
- /* Keep CQ and SQ sizes same, if timestamping
-  * is enabled this equation will change.
-  */
--#define CMP_QSIZE		CMP_QUEUE_SIZE2
-+#define CMP_QSIZE		CMP_QUEUE_SIZE3
+@@ -76,7 +76,7 @@
+ #define CMP_QSIZE		CMP_QUEUE_SIZE3
  #define CMP_QUEUE_LEN		(1ULL << (CMP_QSIZE + 10))
  #define CMP_QUEUE_CQE_THRESH	0
- #define CMP_QUEUE_TIMER_THRESH	220 /* 10usec */
+-#define CMP_QUEUE_TIMER_THRESH	220 /* 10usec */
++#define CMP_QUEUE_TIMER_THRESH	80 /* ~2usec */
+ 
+ #define RBDR_SIZE		RBDR_SIZE0
+ #define RCV_BUF_COUNT		(1ULL << (RBDR_SIZE + 13))
 -- 
 1.7.1
