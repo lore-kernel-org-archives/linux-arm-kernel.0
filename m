@@ -1,37 +1,93 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 30 Nov 2015 11:02:06 +0530
-Subject: [PATCH 4/4] cpufreq: mt8173: move resources allocation into
- ->probe()
-In-Reply-To: <CAAJzSMeYKGLkVoh0_zPLpVekQpc2rR5ud9YNCPJxRaJRCNX2nQ@mail.gmail.com>
-References: <CAAJzSMeYKGLkVoh0_zPLpVekQpc2rR5ud9YNCPJxRaJRCNX2nQ@mail.gmail.com>
-Message-ID: <20151130053206.GL3373@ubuntu>
+Date: Mon, 30 Nov 2015 11:08:45 +0530
+Subject: [PATCH v4 3/3] thermal: mediatek: Add cpu dynamic power cooling
+ model.
+In-Reply-To: <1448616727-29367-4-git-send-email-dawei.chien@mediatek.com>
+References: <1448616727-29367-1-git-send-email-dawei.chien@mediatek.com>
+ <1448616727-29367-4-git-send-email-dawei.chien@mediatek.com>
+Message-ID: <20151130053845.GM3373@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30-11-15, 11:02, Ricky Liang wrote:
-> On Sun, Nov 29, 2015 at 4:31 PM, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
-> >         ret = cpufreq_register_driver(&mt8173_cpufreq_driver);
-> >         if (ret)
-> >                 pr_err("failed to register mtk cpufreq driver\n");
+On 27-11-15, 17:32, Dawei Chien wrote:
+> MT8173 cpufreq driver use of_cpufreq_power_cooling_register registering
+> cooling devices with dynamic power coefficient.
 > 
-> I think you want "return ret;" inside the if block.
+> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
+> ---
+> This patch is base on patchset:
+> https://lkml.org/lkml/2015/11/17/251
+> ---
+>  drivers/cpufreq/mt8173-cpufreq.c |   28 ++++++++++++++++++++--------
+>  1 file changed, 20 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
+> index 83001dc..4d39468 100644
+> --- a/drivers/cpufreq/mt8173-cpufreq.c
+> +++ b/drivers/cpufreq/mt8173-cpufreq.c
+> @@ -263,24 +263,34 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
+>  	return 0;
+>  }
+>  
+> +#define DYNAMIC_POWER "dynamic-power-coefficient"
+> +
+>  static void mtk_cpufreq_ready(struct cpufreq_policy *policy)
+>  {
+>  	struct mtk_cpu_dvfs_info *info = policy->driver_data;
+>  	struct device_node *np = of_node_get(info->cpu_dev->of_node);
+> +	u32 capacitance;
+>  
+>  	if (WARN_ON(!np))
+>  		return;
+>  
+>  	if (of_find_property(np, "#cooling-cells", NULL)) {
+> -		info->cdev = of_cpufreq_cooling_register(np,
+> -							 policy->related_cpus);
+> +		if (!info->cdev) {
 
-Not just that, he needs to jump to release_dvfs_info_list.
+Why will info->cdev be non-NULL here ?
 
-> >
-> > +       return 0;
-> > +
-> > +release_dvfs_info_list:
-> > +       list_for_each_safe(list, tmp, &dvfs_info_list) {
-> > +               info = list_entry(list, struct mtk_cpu_dvfs_info, list_head);
-> > +
-> > +               mtk_cpu_dvfs_info_release(info);
-> > +               list_del(list);
-> > +               kfree(info);
-> > +       }
-> > +
-> >         return ret;
-> >  }
+> +			of_property_read_u32(np, DYNAMIC_POWER, &capacitance);
+
+This can fail, in which case capacitance will be used uninitialized.
+Fix that by initializing it with 0 at the beginning of this routine.
+
+> +			info->cdev = of_cpufreq_power_cooling_register(np,
+> +							policy->related_cpus,
+> +							capacitance,
+> +							NULL);
+>  
+> -		if (IS_ERR(info->cdev)) {
+> -			dev_err(info->cpu_dev,
+> -				"running cpufreq without cooling device: %ld\n",
+> -				PTR_ERR(info->cdev));
+> +			if (IS_ERR(info->cdev)) {
+> +				dev_err(info->cpu_dev,
+> +					"running cpufreq without cooling device: %ld\n",
+> +					PTR_ERR(info->cdev));
+>  
+> -			info->cdev = NULL;
+> +				info->cdev = NULL;
+> +			}
+>  		}
+>  	}
+>  
+> @@ -460,7 +470,9 @@ static int mtk_cpufreq_exit(struct cpufreq_policy *policy)
+>  {
+>  	struct mtk_cpu_dvfs_info *info = policy->driver_data;
+>  
+> -	cpufreq_cooling_unregister(info->cdev);
+> +	if (info->cdev)
+> +		cpufreq_cooling_unregister(info->cdev);
+> +
+
+Why do you need to update this?
+
+>  	dev_pm_opp_free_cpufreq_table(info->cpu_dev, &policy->freq_table);
+>  	mtk_cpu_dvfs_info_release(info);
+>  	kfree(info);
+> -- 
+> 1.7.9.5
 
 -- 
 viresh
