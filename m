@@ -1,85 +1,48 @@
-From: sunil.kovvuri@gmail.com (Sunil Goutham)
-Date: Mon, 30 Nov 2015 23:49:06 +0530
-Subject: [PATCH 10/13] net: thunderx: Enable CQE count threshold irq on pass2
- silicon
-In-Reply-To: <y>
-References: <y>
-Message-ID: <1448907549-5296-11-git-send-email-sunil.kovvuri@gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Mon, 30 Nov 2015 10:21:37 -0800
+Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
+ concurrent lockers
+In-Reply-To: <20151130155839.GK17308@twins.programming.kicks-ass.net>
+References: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
+ <20151130155839.GK17308@twins.programming.kicks-ass.net>
+Message-ID: <20151130182137.GY26643@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
+On Mon, Nov 30, 2015 at 04:58:39PM +0100, Peter Zijlstra wrote:
+> On Fri, Nov 27, 2015 at 11:44:06AM +0000, Will Deacon wrote:
+> > Boqun Feng reported a rather nasty ordering issue with spin_unlock_wait
+> > on architectures implementing spin_lock with LL/SC sequences and acquire
+> > semantics:
+> > 
+> >  | CPU 1                   CPU 2                     CPU 3
+> >  | ==================      ====================      ==============
+> >  |                                                   spin_unlock(&lock);
+> >  |                         spin_lock(&lock):
+> >  |                           r1 = *lock; // r1 == 0;
+> >  |                         o = READ_ONCE(object); // reordered here
+> >  | object = NULL;
+> >  | smp_mb();
+> >  | spin_unlock_wait(&lock);
+> >  |                           *lock = 1;
+> >  | smp_mb();
+> >  | o->dead = true;
+> >  |                         if (o) // true
+> >  |                           BUG_ON(o->dead); // true!!
+> > 
+> > The crux of the problem is that spin_unlock_wait(&lock) can return on
+> > CPU 1 whilst CPU 2 is in the process of taking the lock. This can be
+> > resolved by upgrading spin_unlock_wait to a LOCK operation, forcing it
+> > to serialise against a concurrent locker and giving it acquire semantics
+> > in the process (although it is not at all clear whether this is needed -
+> > different callers seem to assume different things about the barrier
+> > semantics and architectures are similarly disjoint in their
+> > implementations of the macro).
+> 
+> Do we want to go do a note with spin_unlock_wait() in
+> include/linux/spinlock.h warning about these subtle issues for the next
+> arch that thinks this is a 'trivial' thing to implement?
 
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/nic.h          |    2 ++
- drivers/net/ethernet/cavium/thunder/nicvf_main.c   |    2 +-
- drivers/net/ethernet/cavium/thunder/nicvf_queues.c |    5 ++++-
- drivers/net/ethernet/cavium/thunder/nicvf_queues.h |    3 ++-
- 4 files changed, 9 insertions(+), 3 deletions(-)
+Hear, hear!!!
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
-index 02571f4..e782856 100644
---- a/drivers/net/ethernet/cavium/thunder/nic.h
-+++ b/drivers/net/ethernet/cavium/thunder/nic.h
-@@ -34,6 +34,8 @@
- /* NIC priv flags */
- #define	NIC_SRIOV_ENABLED		BIT(0)
- 
-+#define	VNIC_NAPI_WEIGHT		NAPI_POLL_WEIGHT
-+
- /* Min/Max packet size */
- #define	NIC_HW_MIN_FRS			64
- #define	NIC_HW_MAX_FRS			9200 /* 9216 max packet including FCS */
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index df07bd7..51bbe67 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -1147,7 +1147,7 @@ int nicvf_open(struct net_device *netdev)
- 		cq_poll->cq_idx = qidx;
- 		cq_poll->nicvf = nic;
- 		netif_napi_add(netdev, &cq_poll->napi, nicvf_poll,
--			       NAPI_POLL_WEIGHT);
-+			       VNIC_NAPI_WEIGHT);
- 		napi_enable(&cq_poll->napi);
- 		nic->napi[qidx] = cq_poll;
- 	}
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-index 209e495..5855828 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-@@ -299,7 +299,10 @@ static int nicvf_init_cmp_queue(struct nicvf *nic,
- 		return err;
- 
- 	cq->desc = cq->dmem.base;
--	cq->thresh = CMP_QUEUE_CQE_THRESH;
-+	if (!pass1_silicon(nic->pdev))
-+		cq->thresh = CMP_QUEUE_CQE_THRESH;
-+	else
-+		cq->thresh = 0;
- 	nic->cq_coalesce_usecs = (CMP_QUEUE_TIMER_THRESH * 0.05) - 1;
- 
- 	return 0;
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-index bce8099..2cfc85b 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-@@ -10,6 +10,7 @@
- #define NICVF_QUEUES_H
- 
- #include <linux/netdevice.h>
-+#include "nic.h"
- #include "q_struct.h"
- 
- #define MAX_QUEUE_SET			128
-@@ -75,7 +76,7 @@
-  */
- #define CMP_QSIZE		CMP_QUEUE_SIZE3
- #define CMP_QUEUE_LEN		(1ULL << (CMP_QSIZE + 10))
--#define CMP_QUEUE_CQE_THRESH	0
-+#define CMP_QUEUE_CQE_THRESH	(VNIC_NAPI_WEIGHT / 2)
- #define CMP_QUEUE_TIMER_THRESH	80 /* ~2usec */
- 
- #define RBDR_SIZE		RBDR_SIZE0
--- 
-1.7.1
+							Thanx, Paul
