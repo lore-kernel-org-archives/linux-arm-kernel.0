@@ -1,31 +1,61 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Mon, 30 Nov 2015 15:22:15 +0000
-Subject: [PATCH v3 47/62] arm/p2m: Add helper functions to map memory
- regions
-In-Reply-To: <alpine.DEB.2.02.1511271203460.8984@kaball.uk.xensource.com>
+Date: Mon, 30 Nov 2015 15:25:34 +0000
+Subject: [PATCH v3 49/62] arm/acpi: Map rest tables for Dom0
+In-Reply-To: <alpine.DEB.2.02.1511271211590.8984@kaball.uk.xensource.com>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-48-git-send-email-shannon.zhao@linaro.org>
- <alpine.DEB.2.02.1511271203460.8984@kaball.uk.xensource.com>
-Message-ID: <565C69A7.1020806@citrix.com>
+ <1447753261-7552-50-git-send-email-shannon.zhao@linaro.org>
+ <alpine.DEB.2.02.1511271211590.8984@kaball.uk.xensource.com>
+Message-ID: <565C6A6E.3000102@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 27/11/15 12:04, Stefano Stabellini wrote:
+On 27/11/15 12:16, Stefano Stabellini wrote:
 > On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
->> From: Parth Dixit <parth.dixit@linaro.org>
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
 >>
->> Create a helper function for mapping with cached attributes.
->>
->> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
->> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> Map other reused tables for Dom0.
 > 
-> You might be able to use the existing guest_physmap_add_entry and
-> guest_physmap_remove_page for your purposes.
+> "Map all other tables to Dom0 using 1:1 mappings."
+> 
+> 
+>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> ---
+>>  xen/arch/arm/domain_build.c | 25 +++++++++++++++++++++++++
+>>  1 file changed, 25 insertions(+)
+>>
+>> diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
+>> index 6ae5761..da4e271 100644
+>> --- a/xen/arch/arm/domain_build.c
+>> +++ b/xen/arch/arm/domain_build.c
+>> @@ -1359,6 +1359,29 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
+>>  #ifdef CONFIG_ACPI
+>>  #define XEN_HYPERVISOR_ID 0x000058656E564D4D  /* "XenVMM" */
+>>  
+>> +static void acpi_map_rest_tables(struct domain *d)
+> 
+> The name doesn't sound nice, "acpi_map_other_tables" would be better.
+> However this function is not actually mapping the other tables, it is
+> mapping *all* of them, including the original madt and fadt, right? I
+> think it would be best to avoid mapping the originals.
+> 
+> 
+>> +{
+>> +    int i;
+>> +    unsigned long res;
+>> +    u64 addr, size;
+> 
+> Add a comment that they are being mapped 1:1
 
-I would rather avoid to do that, those function use the type p2m_ram_rw
-which imply the memory is executable.
+I don't like the fact that we begin to assume domain is mapped 1:1 in so
+many places.
+
+If we decide one day to drop the 1:1 mapping it would be more difficult.
+
+Can we try to rationalize the place where the 1:1 mapping is added?
+
+Some ASSERT(is_domain_direct_mapped(..)) would be useful too.
 
 Regards,
 
