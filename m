@@ -1,53 +1,29 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 30 Nov 2015 14:34:09 -0800
+Date: Mon, 30 Nov 2015 14:34:50 -0800
 Subject: [PATCH v4 4/5] ARM: dts: DRA7: add entry for qspi mmap region
-In-Reply-To: <1448860515-28336-5-git-send-email-vigneshr@ti.com>
+In-Reply-To: <20151130220102.GG23396@atomide.com>
 References: <1448860515-28336-1-git-send-email-vigneshr@ti.com>
  <1448860515-28336-5-git-send-email-vigneshr@ti.com>
-Message-ID: <20151130223408.GJ23396@atomide.com>
+ <20151130220102.GG23396@atomide.com>
+Message-ID: <20151130223449.GK23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vignesh R <vigneshr@ti.com> [151129 21:16]:
-> Add qspi memory mapped region entries for DRA7xx based SoCs. Also,
-> update the binding documents for the controller to document this change.
+* Tony Lindgren <tony@atomide.com> [151130 14:03]:
+> * Vignesh R <vigneshr@ti.com> [151129 21:16]:
+> > Add qspi memory mapped region entries for DRA7xx based SoCs. Also,
+> > update the binding documents for the controller to document this change.
+> > 
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > Signed-off-by: Vignesh R <vigneshr@ti.com>
+> > ---
+> > 
+> > v4: No changes.
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-...
-> --- a/Documentation/devicetree/bindings/spi/ti_qspi.txt
-> +++ b/Documentation/devicetree/bindings/spi/ti_qspi.txt
-> @@ -26,3 +26,17 @@ qspi: qspi at 4b300000 {
->  	spi-max-frequency = <25000000>;
->  	ti,hwmods = "qspi";
->  };
-> +
-> +For dra7xx:
-> +qspi: qspi at 4b300000 {
-> +	compatible = "ti,dra7xxx-qspi";
-> +	reg = <0x4b300000 0x100>,
-> +	      <0x5c000000 0x4000000>,
-> +	      <0x4a002558 0x4>;
-> +	reg-names = "qspi_base", "qspi_mmap",
-> +		    "qspi_ctrlmod";
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	spi-max-frequency = <48000000>;
-> +	ti,hwmods = "qspi";
-> +};
+> OK I'll apply patches 4 and 5 of this series into omap-for-v4.5/dt thanks.
+> The rest should get merged via the MTD tree.
 
-Actually none of the IO areas above are within the same interconnect target:
-
-0x4b300000  QSPI0 address space in L3 main interconnect
-0x5c000000  QSPI1 address space in L3 main interconnect
-0x4a002558  CTRL_CORE_CONTROL_IO_2 in System Control Module (SCM) in L4_CFG
-
-The first two address spaces should be two separate instances of this driver.
-The CTRL_CORE_CONTROL_IO_2 needs seems like a shared clock register that
-needs to be accessed using the clock framework most likely.
-
-So not applying, this will be impossible to move to some real interconnect
-driver until these issues are fixed.
+Actually ddropping them after looking at the IO ranges like I commented.
 
 Regards,
 
