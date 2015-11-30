@@ -1,97 +1,39 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 30 Nov 2015 10:38:14 +0100
-Subject: [PATCHv2 1/4] power: domain: add pm_genpd_exit
-In-Reply-To: <1448816373-18235-2-git-send-email-alex.aring@gmail.com>
-References: <1448816373-18235-1-git-send-email-alex.aring@gmail.com>
- <1448816373-18235-2-git-send-email-alex.aring@gmail.com>
-Message-ID: <CAPDyKFqG5XT8dQrLB+dbXydWSejgoQaVmDVCAj2B-B+5c3X-xw@mail.gmail.com>
+From: mkarthi3@visteon.com (Mutharaju, Prasanna (P.))
+Date: Mon, 30 Nov 2015 09:52:35 +0000
+Subject: [PATCH v3] clk: s3c2410: removed unneeded variable in
+ s3c24xx_clkout_set_parent
+Message-ID: <20151130095109.GA28767@jci-VirtualBox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 November 2015 at 17:59, Alexander Aring <alex.aring@gmail.com> wrote:
-> This patch adds function pm_genpd_exit for undo a pm_genpd_init. This
-> is useful for multiple power domains while probing. If the probing fails
-> after one pm_genpd_init was called we need to undo all previous
-> registrations of generic pm domains inside the gpd_list list.
->
-> There is a check on IS_ERR_OR_NULL(genpd) which is useful to check again
-> registered power domains and not registered domains, the driver can use
-> this mechanism to have an array with registered and non-registered power
-> domains, where non-registered power domains are NULL.
->
-> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Pavel Machek <pavel@ucw.cz>
-> Cc: Len Brown <len.brown@intel.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
+Remove unneeded variable used to store return value.
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Prasanna Karthik <mkarthi3@visteon.com>
 
-Kind regards
-Uffe
+---
+v3: Modified subject and changelog comments
+---
+---
+ drivers/clk/samsung/clk-s3c2410-dclk.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-> ---
->  drivers/base/power/domain.c | 22 ++++++++++++++++++++++
->  include/linux/pm_domain.h   |  4 ++++
->  2 files changed, 26 insertions(+)
->
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index e03b1ad..311cb0e 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -1509,6 +1509,28 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
->  }
->  EXPORT_SYMBOL_GPL(pm_genpd_init);
->
-> +/**
-> + * pm_genpd_exit - Uninitialize a generic I/O PM domain object.
-> + * @genpd: PM domain object to uninitialize.
-> + */
-> +void pm_genpd_exit(struct generic_pm_domain *genpd)
-> +{
-> +       if (IS_ERR_OR_NULL(genpd))
-> +               return;
-> +
-> +       /* check if domain is still in registered inside the pm subsystem */
-> +       WARN_ON_ONCE(!list_empty(&genpd->master_links) ||
-> +                    !list_empty(&genpd->slave_links) ||
-> +                    !list_empty(&genpd->dev_list));
-> +
-> +       mutex_lock(&gpd_list_lock);
-> +       list_del(&genpd->gpd_list_node);
-> +       mutex_unlock(&gpd_list_lock);
-> +
-> +       mutex_destroy(&genpd->lock);
-> +}
-> +EXPORT_SYMBOL_GPL(pm_genpd_exit);
-> +
->  #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
->  /*
->   * Device Tree based PM domain providers.
-> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-> index ba4ced3..5020b36 100644
-> --- a/include/linux/pm_domain.h
-> +++ b/include/linux/pm_domain.h
-> @@ -123,6 +123,7 @@ extern int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
->                                      struct generic_pm_domain *target);
->  extern void pm_genpd_init(struct generic_pm_domain *genpd,
->                           struct dev_power_governor *gov, bool is_off);
-> +extern void pm_genpd_exit(struct generic_pm_domain *genpd);
->
->  extern struct dev_power_governor simple_qos_governor;
->  extern struct dev_power_governor pm_domain_always_on_gov;
-> @@ -161,6 +162,9 @@ static inline void pm_genpd_init(struct generic_pm_domain *genpd,
->                                  struct dev_power_governor *gov, bool is_off)
->  {
->  }
-> +static inline void pm_genpd_exit(struct generic_pm_domain *genpd)
-> +{
-> +}
->  #endif
->
->  static inline int pm_genpd_add_device(struct generic_pm_domain *genpd,
-> --
-> 2.6.1
->
+diff --git a/drivers/clk/samsung/clk-s3c2410-dclk.c b/drivers/clk/samsung/clk-s3c2410-dclk.c
+index e9eb935..ec6fb14 100644
+--- a/drivers/clk/samsung/clk-s3c2410-dclk.c
++++ b/drivers/clk/samsung/clk-s3c2410-dclk.c
+@@ -77,12 +77,11 @@ static u8 s3c24xx_clkout_get_parent(struct clk_hw *hw)
+ static int s3c24xx_clkout_set_parent(struct clk_hw *hw, u8 index)
+ {
+ 	struct s3c24xx_clkout *clkout = to_s3c24xx_clkout(hw);
+-	int ret = 0;
+ 
+ 	s3c2410_modify_misccr((clkout->mask << clkout->shift),
+ 			      (index << clkout->shift));
+ 
+-	return ret;
++	return 0;
+ }
+ 
+ static const struct clk_ops s3c24xx_clkout_ops = {
+-- 
+1.9.1
