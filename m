@@ -1,34 +1,43 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 29 Nov 2015 21:02:10 -0500 (EST)
-Subject: [PATCH 00/13] mvneta Buffer Management and enhancements
-In-Reply-To: <CAPv3WKc4zSmjtw_FeePCVCaq_aUubbCw_ggtxgxs0-7LwL7fHQ@mail.gmail.com>
-References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
- <5655FF36.20202@gmail.com>
- <CAPv3WKc4zSmjtw_FeePCVCaq_aUubbCw_ggtxgxs0-7LwL7fHQ@mail.gmail.com>
-Message-ID: <20151129.210210.1777978635596463961.davem@davemloft.net>
+From: huawei.libin@huawei.com (libin)
+Date: Mon, 30 Nov 2015 10:03:26 +0800
+Subject: [PATCH] arm64: ftrace: stop using kstop_machine to enable/disable
+ tracing
+In-Reply-To: <20151128105819.3451ab3e@grimm.local.home>
+References: <1448697009-17211-1-git-send-email-huawei.libin@huawei.com>
+ <20151128105819.3451ab3e@grimm.local.home>
+Message-ID: <565BAE6E.9060309@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcin Wojtas <mw@semihalf.com>
-Date: Sun, 29 Nov 2015 14:21:35 +0100
 
->> Looking at your patches, it was not entirely clear to me how the buffer
->> manager on these Marvell SoCs work, but other networking products have
->> something similar, like Broadcom's Cable Modem SoCs (BCM33xx) FPM, and
->> maybe Freescale's FMAN/DPAA seems to do something similar.
->>
->> Does the buffer manager allocation work by giving you a reference/token
->> to a buffer as opposed to its address? If that is the case, it would be
->> good to design support for such hardware in a way that it can be used by
->> more drivers.
-> 
-> It does not operate on a reference/token but buffer pointers (physical
-> adresses). It's a ring and you cannot control which buffer will be
-> taken at given moment.
 
-He understands this, he's asking you to make an "abstraction".
+on 2015/11/28 23:58, Steven Rostedt wrote:
+> On Sat, 28 Nov 2015 15:50:09 +0800
+> Li Bin <huawei.libin@huawei.com> wrote:
+>
+>> On arm64, kstop_machine which is hugely disruptive to a running
+>> system is not needed to convert nops to ftrace calls or back,
+>> because that modifed code is a single 32bit instructions which
+>> is impossible to cross cache (or page) boundaries, and the used str
+>> instruction is single-copy atomic.
+> Is this really true? I thought that arm (and then perhaps arm64) has
+> some 2 byte instructions. If that's the case it is very well possible
+> that a 4 byte instruction can cross cache lines.
 
-FWIW, I know of at least one more chip that operates this way too and
-the code I wrote for it, particularly the buffer management, took a
-while to solidify.  Common helpers for this kind of situation would
-have helped me back when I wrote it.
+When system in aarch32 state, it will use A32 or T32 instrucion set, and
+T32 (thumb) have 16-bit instructions. But arm64 that in aarch64 state only
+using A64 instruction set, which is a clean and fixed length instruction
+set that instuctions are always 32 bits wide. Right?
+
+Thanks,
+Li Bin
+
+> -- Steve
+>
+>> Cc: <stable@vger.kernel.org> # 3.18+
+>> Signed-off-by: Li Bin <huawei.libin@huawei.com>
+>> ---
+>>  arch/arm64/kernel/ftrace.c |    5 +++++
+>>  1 files changed, 5 insertions(+), 0 deletions(-)
+> .
+>
