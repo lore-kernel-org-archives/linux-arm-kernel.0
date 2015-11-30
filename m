@@ -1,195 +1,99 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 30 Nov 2015 18:22:58 +0000
-Subject: [PATCH v4 18/21] KVM: ARM64: Add PMU overflow interrupt routing
-In-Reply-To: <1446186123-11548-19-git-send-email-zhaoshenglong@huawei.com>
-References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>
- <1446186123-11548-19-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <20151130182258.684c9df6@arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 30 Nov 2015 15:24:03 -0300
+Subject: [PATCH v2] arm: dts: Fix audio card detection on peach boards
+In-Reply-To: <CAGOxZ52=rci6MaEL4aa_G8VP16kDi9QhYUcYS8qF263nZeHgpg@mail.gmail.com>
+References: <1444653438-6532-1-git-send-email-alim.akhtar@samsung.com>
+ <565C56BD.2050002@osg.samsung.com>
+ <CAGOxZ52=rci6MaEL4aa_G8VP16kDi9QhYUcYS8qF263nZeHgpg@mail.gmail.com>
+Message-ID: <565C9443.3010303@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 30 Oct 2015 14:22:00 +0800
-Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+Hi Alim,
 
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On 11/30/2015 01:59 PM, Alim Akhtar wrote:
+> Hi Javier,
 > 
-> When calling perf_event_create_kernel_counter to create perf_event,
-> assign a overflow handler. Then when perf event overflows, set
-> irq_pending and call kvm_vcpu_kick() to sync the interrupt.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm/kvm/arm.c    |  4 +++
->  include/kvm/arm_pmu.h |  4 +++
->  virt/kvm/arm/pmu.c    | 76 ++++++++++++++++++++++++++++++++++++++++++++++++++-
->  3 files changed, 83 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 78b2869..9c0fec4 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -28,6 +28,7 @@
->  #include <linux/sched.h>
->  #include <linux/kvm.h>
->  #include <trace/events/kvm.h>
-> +#include <kvm/arm_pmu.h>
->  
->  #define CREATE_TRACE_POINTS
->  #include "trace.h"
-> @@ -551,6 +552,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  
->  		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
->  			local_irq_enable();
-> +			kvm_pmu_sync_hwstate(vcpu);
+> On Mon, Nov 30, 2015 at 7:31 PM, Javier Martinez Canillas
+> <javier@osg.samsung.com> wrote:
+>> Hello Alim,
+>>
+>> On 10/12/2015 09:37 AM, Alim Akhtar wrote:
+>>> Since commit 2fad972d45c4 ("ARM: dts: Add mclk entry for Peach boards"),
+>>> sound card detection is broken on peach boards and gives below errors:
+>>>
+>>> [    3.630457] max98090 7-0010: MAX98091 REVID=0x51
+>>> [    3.634233] max98090 7-0010: use default 2.8v micbias
+>>> [    3.640985] snow-audio sound: HiFi <-> 3830000.i2s mapping ok
+>>> [    3.645307] max98090 7-0010: Invalid master clock frequency
+>>> [    3.650824] snow-audio sound: ASoC: Peach-Pi-I2S-MAX98091 late_probe() failed: -22
+>>> [    3.658914] snow-audio sound: snd_soc_register_card failed (-22)
+>>> [    3.664366] snow-audio: probe of sound failed with error -22
+>>>
+>>> This patch adds missing assigned-clocks and assigned-clock-parents for
+>>> pmu_system_controller node which is used as "mclk" for audio codec.
+>>>
+>>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>>> Fixes: 2fad972d45c4 ("ARM: dts: Add mclk entry for Peach boards")
+>>
+>> I found that this patch is not enough to have proper audio working
+>> on an Exynos5800 Peach Pi. Even playing a simple wav does not work:
+>>
+>> $ time aplay -D sysdefault /usr/share/sounds/alsa/Front_Center.wav
+>> Playing WAVE '/usr/share/sounds/alsa/Front_Center.wav' : Signed 16 bit Little Endian, Rate 48000 Hz, Mono
+>>
+>> real    0m1.138s
+>> user    0m0.005s
+>> sys     0m0.005s
+>>
+>> This should be ~1.5 seconds so audio is processed faster than expected.
+>>
+> Did you tried playing any other file, like 128 KHz rate files etc..?
 
-This is very weird. Are you only injecting interrupts when a signal is
-pending? I don't understand how this works...
+Yes, I see the same problem with all the files I tested.
 
->  			kvm_vgic_sync_hwstate(vcpu);
->  			preempt_enable();
->  			kvm_timer_sync_hwstate(vcpu);
-> @@ -598,6 +600,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		kvm_guest_exit();
->  		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
->  
-> +		kvm_pmu_post_sync_hwstate(vcpu);
-> +
->  		kvm_vgic_sync_hwstate(vcpu);
->  
->  		preempt_enable();
-> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-> index acd025a..5e7f943 100644
-> --- a/include/kvm/arm_pmu.h
-> +++ b/include/kvm/arm_pmu.h
-> @@ -39,6 +39,8 @@ struct kvm_pmu {
->  };
->  
->  #ifdef CONFIG_KVM_ARM_PMU
-> +void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu);
-> +void kvm_pmu_post_sync_hwstate(struct kvm_vcpu *vcpu);
+>> So something else besides making the CLKOUT to provide a valid frequency
+>> for the codec's master clock is needed.
+>>
+> The $SUBJECT patch actually  fix the audio card detection issue, which
+> was failing because of the missing master clock.
+>
 
-Please follow the current terminology: _flush_ on VM entry, _sync_ on
-VM exit.
+I thought the problem was not a missing master clock, but an invalid clock
+frequency. Since the error message in the patch change log was:
 
->  unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx);
->  void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val);
->  void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u32 val, bool all_enable);
-> @@ -49,6 +51,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
->  				    u32 select_idx);
->  void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u32 val);
->  #else
-> +void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu) {}
-> +void kvm_pmu_post_sync_hwstate(struct kvm_vcpu *vcpu) {}
->  unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx)
->  {
->  	return 0;
-> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-> index 11d1bfb..6d48d9a 100644
-> --- a/virt/kvm/arm/pmu.c
-> +++ b/virt/kvm/arm/pmu.c
-> @@ -21,6 +21,7 @@
->  #include <linux/perf_event.h>
->  #include <asm/kvm_emulate.h>
->  #include <kvm/arm_pmu.h>
-> +#include <kvm/arm_vgic.h>
->  
->  /**
->   * kvm_pmu_get_counter_value - get PMU counter value
-> @@ -69,6 +70,78 @@ static void kvm_pmu_stop_counter(struct kvm_pmc *pmc)
->  }
->  
->  /**
-> + * kvm_pmu_sync_hwstate - sync pmu state for cpu
-> + * @vcpu: The vcpu pointer
-> + *
-> + * Inject virtual PMU IRQ if IRQ is pending for this cpu.
-> + */
-> +void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu)
-> +{
-> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> +	u32 overflow;
-> +
-> +	if (!vcpu_mode_is_32bit(vcpu))
-> +		overflow = vcpu_sys_reg(vcpu, PMOVSSET_EL0);
-> +	else
-> +		overflow = vcpu_cp15(vcpu, c9_PMOVSSET);
-> +
-> +	if ((pmu->irq_pending || overflow != 0) && (pmu->irq_num != -1))
-> +		kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id, pmu->irq_num, 1);
-> +
-> +	pmu->irq_pending = false;
-> +}
-> +
-> +/**
-> + * kvm_pmu_post_sync_hwstate - post sync pmu state for cpu
-> + * @vcpu: The vcpu pointer
-> + *
-> + * Inject virtual PMU IRQ if IRQ is pending for this cpu when back from guest.
-> + */
-> +void kvm_pmu_post_sync_hwstate(struct kvm_vcpu *vcpu)
-> +{
-> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> +
-> +	if (pmu->irq_pending && (pmu->irq_num != -1))
-> +		kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id, pmu->irq_num, 1);
-> +
-> +	pmu->irq_pending = false;
-> +}
-> +
-> +/**
-> + * When perf event overflows, set irq_pending and call kvm_vcpu_kick() to inject
-> + * the interrupt.
-> + */
-> +static void kvm_pmu_perf_overflow(struct perf_event *perf_event,
-> +				  struct perf_sample_data *data,
-> +				  struct pt_regs *regs)
-> +{
-> +	struct kvm_pmc *pmc = perf_event->overflow_handler_context;
-> +	struct kvm_vcpu *vcpu = pmc->vcpu;
-> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> +	int idx = pmc->idx;
-> +
-> +	if (!vcpu_mode_is_32bit(vcpu)) {
-> +		if ((vcpu_sys_reg(vcpu, PMINTENSET_EL1) >> idx) & 0x1) {
-> +			__set_bit(idx,
-> +			    (unsigned long *)&vcpu_sys_reg(vcpu, PMOVSSET_EL0));
-> +			__set_bit(idx,
-> +			    (unsigned long *)&vcpu_sys_reg(vcpu, PMOVSCLR_EL0));
-> +			pmu->irq_pending = true;
-> +			kvm_vcpu_kick(vcpu);
-> +		}
-> +	} else {
-> +		if ((vcpu_cp15(vcpu, c9_PMINTENSET) >> idx) & 0x1) {
-> +			__set_bit(idx,
-> +				(unsigned long *)&vcpu_cp15(vcpu, c9_PMOVSSET));
-> +			__set_bit(idx,
-> +				(unsigned long *)&vcpu_cp15(vcpu, c9_PMOVSCLR));
-> +			pmu->irq_pending = true;
-> +			kvm_vcpu_kick(vcpu);
+"max98090 7-0010: Invalid master clock frequency"
 
-There is some obvious code factorization that can be done here.
+But what I tried to ask was what else was missing to have playback working.
 
-> +		}
-> +	}
-> +}
-> +
-> +/**
->   * kvm_pmu_enable_counter - enable selected PMU counter
->   * @vcpu: The vcpu pointer
->   * @val: the value guest writes to PMCNTENSET register
-> @@ -293,7 +366,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
->  	/* The initial sample period (overflow count) of an event. */
->  	attr.sample_period = (-counter) & pmc->bitmask;
->  
-> -	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
-> +	event = perf_event_create_kernel_counter(&attr, -1, current,
-> +						 kvm_pmu_perf_overflow, pmc);
->  	if (IS_ERR(event)) {
->  		printk_once("kvm: pmu event creation failed %ld\n",
->  			    PTR_ERR(event));
+>> Do you know what's missing in mainline? For instance, I see that the
+>> sound/soc/samsung/snow.c ASoC machine driver doesn't have a hw_params
+>> but I'm not that familiar with ALSA to know if that makes sense or not.
+>>
+> I need to check this, currently I am out on a business travel, so
+> won't be able to check.
 
-Thanks,
+No worries, I was asked in case you had more information. Audio is the
+only thing that is missing to have all peripherals working correctly with
+mainline.
 
-	M.
+> Probably we can go back to before "2fad972d45c4" and check that.
+>
+
+Do you mean to revert $SUBJECT and "2fad972d45c4" to see if the bootloader
+sets this correctly? If I revert both patches then I have no audio at all.
+ 
+>> Also, do you know if the "simple-audio-card" can be used instead for
+>> snow and peachs as it is used for other Exynos5 boards or a specific
+>> ASoC machine driver is really needed for these Chromebooks?
+>>
+> Not sure, AFAIR, I used machine driver on chromebooks (snow and peach).
+>
+
+Yes, the downstream 3.8 ChromiumOS tree has also a machine driver but I
+don't see a simple-audio-card in that tree so it seems that predates it.
+
 -- 
-Jazz is not dead. It just smells funny.
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
