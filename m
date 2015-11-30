@@ -1,37 +1,102 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 30 Nov 2015 13:19:22 +0000
-Subject: [PATCH v4 06/21] KVM: ARM64: Add reset and access handlers for
- PMCEID0 and PMCEID1 register
-In-Reply-To: <565C3A39.5020600@huawei.com>
-References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>
- <1446186123-11548-7-git-send-email-zhaoshenglong@huawei.com>
- <20151130114230.136abc6f@arm.com> <565C3A39.5020600@huawei.com>
-Message-ID: <20151130131922.0e8789b7@arm.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 30 Nov 2015 15:32:18 +0200
+Subject: [4.4-rc][PATCH] ARM: dts: am4372: fix clock source for arm twd
+ and global timers
+In-Reply-To: <565C38CE.1070907@ti.com>
+References: <1448653468-24908-1-git-send-email-grygorii.strashko@ti.com>
+ <565C0814.3000001@ti.com> <565C38CE.1070907@ti.com>
+Message-ID: <565C4FE2.3090403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Nov 2015 19:59:53 +0800
-Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+On 11/30/2015 01:53 PM, Grygorii Strashko wrote:
+> On 11/30/2015 10:25 AM, Tero Kristo wrote:
+>> On 11/27/2015 09:44 PM, Grygorii Strashko wrote:
+>>> ARM TWD and Global timer are clocked by PERIPHCLK which is MPU_CLK/2.
+>>> But now they are clocked by dpll_mpu_m2_ck == MPU_CLK and, as result.
+>>> Timekeeping core misbehaves. For example, execution of command
+>>> "sleep 5" will take 10 sec instead of 5.
+>>>
+>>> Hence, fix it by adding mpu_periphclk ("fixed-factor-clock") and use
+>>> it for clocking ARM TWD and Global timer (same way as on OMAP4).
+>>>
+>>> Cc: Tony Lindgren <tony@atomide.com>
+>>> Cc: Felipe Balbi <balbi@ti.com>
+>>> Cc: Tero Kristo <t-kristo@ti.com>
+>>> Fixes:commit 8cbd4c2f6a99 ("arm: boot: dts: am4372: add ARM timers and
+>>> SCU nodes")
+>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>>> ---
+>>>   arch/arm/boot/dts/am4372.dtsi        | 4 ++--
+>>>   arch/arm/boot/dts/am43xx-clocks.dtsi | 8 ++++++++
+>>>   2 files changed, 10 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/am4372.dtsi
+>>> b/arch/arm/boot/dts/am4372.dtsi
+>>> index d83ff9c..de8791a 100644
+>>> --- a/arch/arm/boot/dts/am4372.dtsi
+>>> +++ b/arch/arm/boot/dts/am4372.dtsi
+>>> @@ -74,7 +74,7 @@
+>>>           reg = <0x48240200 0x100>;
+>>>           interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
+>>>           interrupt-parent = <&gic>;
+>>> -        clocks = <&dpll_mpu_m2_ck>;
+>>> +        clocks = <&mpu_periphclk>;
+>>>       };
+>>>
+>>>       local_timer: timer at 48240600 {
+>>> @@ -82,7 +82,7 @@
+>>>           reg = <0x48240600 0x100>;
+>>>           interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
+>>>           interrupt-parent = <&gic>;
+>>> -        clocks = <&dpll_mpu_m2_ck>;
+>>> +        clocks = <&mpu_periphclk>;
+>>>       };
+>>>
+>>>       l2-cache-controller at 48242000 {
+>>> diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi
+>>> b/arch/arm/boot/dts/am43xx-clocks.dtsi
+>>> index cc88728..2ff58b1 100644
+>>> --- a/arch/arm/boot/dts/am43xx-clocks.dtsi
+>>> +++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
+>>> @@ -259,6 +259,14 @@
+>>>           ti,invert-autoidle-bit;
+>>>       };
+>>>
+>>> +    mpu_periphclk: mpu_periphclk {
+>>> +        #clock-cells = <0>;
+>>> +        compatible = "fixed-factor-clock";
+>>> +        clocks = <&dpll_mpu_ck>;
+>>
+>> I don't think this is correct, ARM core is fed dpll_mpu_m2_ck, where the
+>> divisor value can potentially differ from 1. If you feed this clock
+>> directly from dpll_mpu_ck, you bypass this divisor.
+>
+> Sry. My mistake. I'll update it to use dpll_mpu_m2_ck.
+>
+>>
+>> Did you check what is the impact of cpufreq on the ARM TWD/timers?
+>
+> TWD is cpufreq friendly, ARM GT is not.
 
-> Hi Marc,
-> 
-> On 2015/11/30 19:42, Marc Zyngier wrote:
-> >> +static void reset_pmceid(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
-> >> > +{
-> >> > +	u64 pmceid;
-> >> > +
-> >> > +	if (r->reg == PMCEID0_EL0 || r->reg == c9_PMCEID0)
-> > That feels wrong. We should only reset the 64bit view of the sysregs,
-> > as the 32bit view is directly mapped to it.
-> > 
-> Just to confirm, if guest access c9_PMCEID0, KVM will trap this register
-> with the register index as PMCEID0_EL0? Or still as c9_PMCEID0?
+I think the TWD kick period changes with cpufreq also right?
 
-The traps are per execution mode (you'll get c9_PMCEID0 with a 32bit
-guest). But the reset function is only concerned with the 64bit view.
+How are the clocks handled with cpufreq? The user just needs to 
+understand that the timers will be screwed if he uses ARM GT? Should we 
+add some sort of dependency to disable the ARM GT if cpufreq is enabled?
 
-Thanks,
+-Tero
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+>
+>
+>>> +        clock-mult = <1>;
+>>> +        clock-div = <2>;
+>>> +    };
+>>> +
+>>>       dpll_ddr_ck: dpll_ddr_ck {
+>>>           #clock-cells = <0>;
+>>>           compatible = "ti,am3-dpll-clock";
+>>>
+>>
+>
+>
