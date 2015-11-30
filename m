@@ -1,48 +1,74 @@
-From: zohar@linux.vnet.ibm.com (Mimi Zohar)
-Date: Mon, 30 Nov 2015 14:13:26 -0500
-Subject: [PATCH] evm: EVM_LOAD_X509 depends on EVM
-In-Reply-To: <6677122.Oqut6OGZ1C@wuerfel>
-References: <6677122.Oqut6OGZ1C@wuerfel>
-Message-ID: <1448910806.12924.17.camel@linux.vnet.ibm.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 30 Nov 2015 11:23:23 -0800
+Subject: [PATCH 1/7] ARM: dts: qcom: msm8974-honami: Define pinctrl state
+ for blsp_uart2
+In-Reply-To: <1445403470-17434-1-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1445403470-17434-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <CAMAWPa9fHWY3diCfZG2s0ZaNqza+SnK+4QZzkAwW8xb9zjOqHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-11-27 at 14:52 +0100, Arnd Bergmann wrote:
-> The newly added EVM_LOAD_X509 code can be configured even if
-> CONFIG_EVM is disabled, but that causes a link error:
-> 
-> security/built-in.o: In function `integrity_load_keys':
-> digsig_asymmetric.c:(.init.text+0x400): undefined reference to `evm_load_x509'
-> 
-> This adds a Kconfig dependency to ensure it is only enabled when
-> CONFIG_EVM is set as well.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 7f753c992343 ("evm: load x509 certificate from the kernel")
+On Tue, Oct 20, 2015 at 9:57 PM, Bjorn Andersson
+<bjorn.andersson@sonymobile.com> wrote:
+> Make sure the blsp1_uart2 pins are in the correct state for the uart.
+>
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
-Thanks for the patch!
+kernelci.org has been detecting boot failures on my z1 since
+next-20151120[1] and I finally got around to bisecting, which pointed
+to this patch which is in next in the for of commit 14cd83b824aa ARM:
+dts: qcom: msm8974-honami: Define pinctrl state for blsp_uart2
 
-Mimi
+That commit doesn't revert cleanly on top of next-20151130, but
+manually removing the stuff added in this patch, next-20151130 boots
+fine on the z1.
+
+Kevin
+
+[1] http://kernelci.org/boot/qcom-msm8974-sony-xperia-honami/job/next/kernel/next-20151127/defconfig/multi_v7_defconfig/lab/lab-khilman/?_id=5658061359b5140196b5fd2f
 
 > ---
-> Found on yesterday's linux-next with ARM randconfig builds
-> 
-> diff --git a/security/integrity/evm/Kconfig b/security/integrity/evm/Kconfig
-> index b1433e9cd8cb..87e83adf4c6e 100644
-> --- a/security/integrity/evm/Kconfig
-> +++ b/security/integrity/evm/Kconfig
-> @@ -44,7 +44,7 @@ config EVM_EXTRA_SMACK_XATTRS
-> 
->  config EVM_LOAD_X509
->  	bool "Load X509 certificate to the '.evm' trusted keyring"
-> -	depends on INTEGRITY_TRUSTED_KEYRING
-> +	depends on EVM && INTEGRITY_TRUSTED_KEYRING
->  	default n
->  	help
->  	   Load X509 certificate to the '.evm' trusted keyring.
-> 
+>  .../boot/dts/qcom-msm8974-sony-xperia-honami.dts   | 23 ++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
+> index 016f9ad9392a..6f7e4ef4ccf7 100644
+> --- a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
+> +++ b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
+> @@ -23,6 +23,29 @@
+>  &soc {
+>         serial at f991e000 {
+>                 status = "ok";
+> +
+> +               pinctrl-names = "default";
+> +               pinctrl-0 = <&blsp1_uart2_pin_a>;
+> +       };
+> +
+> +       pinctrl at fd510000 {
+> +               blsp1_uart2_pin_a: blsp1-uart2-pin-active {
+> +                       rx {
+> +                               pins = "gpio5";
+> +                               function = "blsp_uart2";
+> +
+> +                               drive-strength = <2>;
+> +                               bias-pull-up;
+> +                       };
+> +
+> +                       tx {
+> +                               pins = "gpio4";
+> +                               function = "blsp_uart2";
+> +
+> +                               drive-strength = <4>;
+> +                               bias-disable;
+> +                       };
+> +               };
+>         };
+>  };
+>
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-security-module" in
+> 2.4.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
