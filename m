@@ -1,44 +1,97 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed,  2 Dec 2015 00:33:29 +0100
-Subject: [PATCH 2/5] ARM: config: Reenable DSA in multi_v5_defconfig
+Date: Wed,  2 Dec 2015 00:33:28 +0100
+Subject: [PATCH 1/5] ARM: config: Regenerate multi_v5_defconfig
 In-Reply-To: <1449012812-9779-1-git-send-email-andrew@lunn.ch>
 References: <1449012812-9779-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1449012812-9779-3-git-send-email-andrew@lunn.ch>
+Message-ID: <1449012812-9779-2-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DSA now depends on switchdev. Enable it, and re-enable DSA and its
-drivers, which were removed when multi_v5_defconfig was regenerated.
+Dues the Kconfig changes, multi_v5_defconfig needs regenerating.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/configs/multi_v5_defconfig | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/configs/multi_v5_defconfig | 17 ++++-------------
+ 1 file changed, 4 insertions(+), 13 deletions(-)
 
 diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
-index f98d4b8b54c5..920db77916b1 100644
+index f69a459f4f92..f98d4b8b54c5 100644
 --- a/arch/arm/configs/multi_v5_defconfig
 +++ b/arch/arm/configs/multi_v5_defconfig
-@@ -37,6 +37,8 @@ CONFIG_IP_PNP=y
- CONFIG_IP_PNP_DHCP=y
- CONFIG_IP_PNP_BOOTP=y
- # CONFIG_IPV6 is not set
-+CONFIG_NET_DSA=y
-+CONFIG_NET_SWITCHDEV=y
- CONFIG_NET_PKTGEN=m
- CONFIG_CFG80211=y
- CONFIG_MAC80211=y
-@@ -64,6 +66,11 @@ CONFIG_ATA=y
+@@ -11,10 +11,9 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_ARCH_MULTI_V7 is not set
+ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_KIRKWOOD=y
+-CONFIG_MACH_NETXBIG=y
+ CONFIG_ARCH_MXC=y
+-CONFIG_SOC_IMX25=y
+ CONFIG_MACH_IMX27_DT=y
++CONFIG_SOC_IMX25=y
+ CONFIG_ARCH_U300=y
+ CONFIG_PCI_MVEBU=y
+ CONFIG_PREEMPT=y
+@@ -53,7 +52,6 @@ CONFIG_MTD_CFI_GEOMETRY=y
+ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_CFI_STAA=y
+ CONFIG_MTD_PHYSMAP=y
+-CONFIG_MTD_M25P80=y
+ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_ORION=y
+ CONFIG_BLK_DEV_LOOP=y
+@@ -66,8 +64,6 @@ CONFIG_ATA=y
  CONFIG_SATA_AHCI=y
  CONFIG_SATA_MV=y
  CONFIG_NETDEVICES=y
-+CONFIG_NET_DSA_MV88E6060=y
-+CONFIG_NET_DSA_MV88E6131=y
-+CONFIG_NET_DSA_MV88E6123_61_65=y
-+CONFIG_NET_DSA_MV88E6171=y
-+CONFIG_NET_DSA_MV88E6352=y
+-CONFIG_NET_DSA_MV88E6123_61_65=y
+-CONFIG_NET_DSA_MV88E6171=y
  CONFIG_MV643XX_ETH=y
  CONFIG_R8169=y
  CONFIG_MARVELL_PHY=y
+@@ -92,7 +88,6 @@ CONFIG_I2C_NOMADIK=y
+ CONFIG_SPI=y
+ CONFIG_SPI_ORION=y
+ CONFIG_GPIO_SYSFS=y
+-CONFIG_POWER_SUPPLY=y
+ CONFIG_POWER_RESET=y
+ CONFIG_POWER_RESET_GPIO=y
+ CONFIG_POWER_RESET_QNAP=y
+@@ -105,17 +100,16 @@ CONFIG_THERMAL=y
+ CONFIG_KIRKWOOD_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_ORION_WATCHDOG=y
++# CONFIG_ABX500_CORE is not set
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_FB=y
+ CONFIG_SOUND=y
+ CONFIG_SND=y
+ CONFIG_SND_SOC=y
+ CONFIG_SND_KIRKWOOD_SOC=y
+-CONFIG_SND_KIRKWOOD_SOC_T5325=y
+ CONFIG_SND_SOC_ALC5623=y
+ CONFIG_SND_SIMPLE_CARD=y
+-# CONFIG_ABX500_CORE is not set
+-CONFIG_REGULATOR=y
+-CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_HID_DRAGONRISE=y
+ CONFIG_HID_GYRATION=y
+ CONFIG_HID_TWINHAN=y
+@@ -162,8 +156,6 @@ CONFIG_STAGING=y
+ CONFIG_FB_XGI=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+-# CONFIG_EXT3_FS_XATTR is not set
+-CONFIG_EXT4_FS=y
+ CONFIG_ISO9660_FS=m
+ CONFIG_JOLIET=y
+ CONFIG_UDF_FS=m
+@@ -189,7 +181,6 @@ CONFIG_DEBUG_KERNEL=y
+ CONFIG_DEBUG_USER=y
+ CONFIG_CRYPTO_CBC=m
+ CONFIG_CRYPTO_PCBC=m
+-# CONFIG_CRYPTO_ANSI_CPRNG is not set
+ CONFIG_CRYPTO_DEV_MV_CESA=y
+ CONFIG_CRC_CCITT=y
+ CONFIG_LIBCRC32C=y
 -- 
 2.6.2
