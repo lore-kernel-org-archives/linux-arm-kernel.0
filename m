@@ -1,65 +1,48 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 1 Dec 2015 13:57:54 +0100
-Subject: [PATCH v2 2/4] driver core: handle -EPROBE_DEFER from
- bus_type.match()
-In-Reply-To: <565D679A.6010303@samsung.com>
-References: <1448542190-19498-1-git-send-email-m.szyprowski@samsung.com>
- <1448542190-19498-3-git-send-email-m.szyprowski@samsung.com>
- <CAPDyKFrhWeY_2-1np72TLbibMUPJ2s+As48WMGgfbj2CS-waBw@mail.gmail.com>
- <565D679A.6010303@samsung.com>
-Message-ID: <CAPDyKFqTkNe+OrhmgontJXuayfUH_z_YRWaX7SGnZsFSOHEAPQ@mail.gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 1 Dec 2015 14:58:35 +0200
+Subject: [RFC v02 01/15] dmaengine: core: Allow NULL mask pointer in
+ __dma_device_satisfies_mask()
+In-Reply-To: <565D6CB1.8030808@ti.com>
+References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
+ <1448891145-10766-2-git-send-email-peter.ujfalusi@ti.com>
+ <CAHp75VfY=NU4MG7q1w=oYdTiTr0dqtNTQU3UkEaL=tXPJADH5Q@mail.gmail.com>
+ <565D6CB1.8030808@ti.com>
+Message-ID: <CAHp75Vfk_GAANRYdbHNxtCy-Ni18FppsKhPPX1X84v1Zu6JXvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
-
->>> @@ -500,8 +501,17 @@ static int __device_attach_driver(struct
->>> device_driver *drv, void *_data)
->>>          if (dev->driver)
->>>                  return -EBUSY;
->>>
->>> -       if (!driver_match_device(drv, dev))
->>> +       ret = driver_match_device(drv, dev);
->>> +       if (!ret)
->>>                  return 0;
->>> +       else if (ret < 0) {
+On Tue, Dec 1, 2015 at 11:47 AM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
+> On 11/30/2015 04:35 PM, Andy Shevchenko wrote:
+>> On Mon, Nov 30, 2015 at 3:45 PM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
+>>> Treat as true condition the case when the mask is NULL.
 >>
->> Depending on what happens with the added dev_warn() below, perhaps a
->> switch statement can make it a bit clearer, instead of these messy if
->> clauses?
+>> What do you think about setting some default (all "on") mask when mask
+>> is not supplied?
 >
+> Probably rephrasing the commit message to say that when the mask is NULL it
+> means that the caller does not care about the capabilities of the dma device
+> thus return with true in such a case.
 >
-> Frankly, I have no idea how to convert this to switch statement and make
-
-You are right!
-
-I was thinking that "1" was the only supported positive value,
-according to the documentation.
-
-> the code easier to read. Please note that we have the following 4 cases:
+> We could also drop this patch and in private_candidate() :
 >
-> ret > 0: positive match
-> ret == 0: negative match
-> ret == -EPROBE_DEFER: deferred probe
-> ret < 0: other, unknown error
+> -       if (!__dma_device_satisfies_mask(dev, mask)) {
+> +       if (mask && !__dma_device_satisfies_mask(dev, mask)) {
+>                 pr_debug("%s: wrong capabilities\n", __func__);
+>                 return NULL;
+>         }
+
+Between patch and above proposal I would choose the latter one.
+
+>> I don't know for sure but there might be cases when you don't want
+>> literally *any* channel to satisfy.
 >
-> Another way to encode this logic is the following code:
->
-> if (ret == 0) {
->         /* no match */
->         return 0;
-> } else if (ret == -EPROBE_DEFER) {
->         dev_dbg(dev, "Device match requests probe deferral\n");
->         driver_deferred_probe_add(dev);
->         return ret;
-> } else if (ret < 0) {
->         dev_dbg(dev, "Bus failed to match device: %d", ret);
->         return ret;
-> } /* ret > 0 means positive match */
+> Or set DMA_SLAVE only in dma_request_chan()? What happens if we have cases
+> when we are able to request channel for memcpy via dma_request_chan()
+> (dedicated memcpy channel/DMA engine?) in that case we will have the SLAVE
+> set, but not MEMCPY, or any other variation we do not know yet?
 
-Okay! To me this looks better!
+Frankly, have no idea.
 
-[...]
-
-Kind regards
-Uffe
+-- 
+With Best Regards,
+Andy Shevchenko
