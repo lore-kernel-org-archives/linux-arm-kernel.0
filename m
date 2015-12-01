@@ -1,136 +1,34 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue,  1 Dec 2015 12:03:08 +0100
-Subject: [PATCH v2 11/25] coccinelle: nand: detect and correct drivers
- embedding an mtd_info object
+Date: Tue,  1 Dec 2015 12:03:07 +0100
+Subject: [PATCH v2 10/25] mtd: nand: add nand_to_mtd() helper
 In-Reply-To: <1448967802-25796-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1448967802-25796-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1448967802-25796-12-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1448967802-25796-11-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nand-priv-no-mtd.cocci to detect and correct NAND controller drivers
-directly embedding an mtd_info struct in their private struct.
+Add a new helper to retrieve the MTD device attached to a NAND chip.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Cc: Julia Lawall <Julia.Lawall@lip6.fr>
 ---
-Hi Julia,
+ include/linux/mtd/nand.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Not sure this is the correct way to detect and fix offending drivers,
-but I get some warnings when launching coccicheck in org or report mode:
-
-"warning: fix2: inherited metavariable __chipfield not used in the -, +,
-or context code"
-
-Note that I don't get those warnings when running in patch mode.
-
-Any idea (feel free to propose a better solution to detect and fix those
-offending drivers)?
-
-Best Regards,
-
-Boris
----
- scripts/coccinelle/api/nand-priv-no-mtd.cocci | 91 +++++++++++++++++++++++++++
- 1 file changed, 91 insertions(+)
- create mode 100644 scripts/coccinelle/api/nand-priv-no-mtd.cocci
-
-diff --git a/scripts/coccinelle/api/nand-priv-no-mtd.cocci b/scripts/coccinelle/api/nand-priv-no-mtd.cocci
-new file mode 100644
-index 0000000..b2c0c22
---- /dev/null
-+++ b/scripts/coccinelle/api/nand-priv-no-mtd.cocci
-@@ -0,0 +1,91 @@
-+/// Fix NAND controller drivers declaring their own mtd_info struct instead
-+/// of the one provided in struct nand_chip.
-+///
-+// Confidence: Low
-+// Copyright: (C) 2015 Boris Brezillon GPL v2.
+diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
+index c4e39ff..8ec071e 100644
+--- a/include/linux/mtd/nand.h
++++ b/include/linux/mtd/nand.h
+@@ -737,6 +737,11 @@ static inline struct nand_chip *mtd_to_nand(struct mtd_info *mtd)
+ 	return mtd->priv;
+ }
+ 
++static inline struct mtd_info *nand_to_mtd(struct nand_chip *chip)
++{
++	return &chip->mtd;
++}
 +
-+virtual patch
-+virtual context
-+virtual org
-+virtual report
-+
-+ at match1@
-+identifier __chipfield, __mtdfield;
-+type __type;
-+@@
-+(
-+	__type {
-+		...
-+		struct nand_chip __chipfield;
-+		...
-+		struct mtd_info __mtdfield;
-+		...
-+	};
-+|
-+	__type {
-+		...
-+		struct mtd_info __mtdfield;
-+		...
-+		struct nand_chip __chipfield;
-+		...
-+	};
-+)
-+
-+ at fix1 depends on match1 && patch && !context && !org && !report@
-+identifier match1.__mtdfield;
-+type match1.__type;
-+@@
-+	__type {
-+		...
-+-		struct mtd_info __mtdfield;
-+		...
-+	};
-+
-+ at fix2 depends on match1 && patch && !context && !org && !report@
-+identifier match1.__chipfield, match1.__mtdfield;
-+identifier __subfield;
-+type match1.__type;
-+__type *__priv;
-+@@
-+<...
-+(
-+-	__priv->__mtdfield.__subfield
-++	nand_to_mtd(&__priv->__chipfield)->__subfield
-+|
-+-	&(__priv->__mtdfield)
-++	nand_to_mtd(&__priv->__chipfield)
-+)
-+...>
-+
-+// ----------------------------------------------------------------------------
-+
-+ at fix1_context depends on match1 && !patch && (context || org || report)@
-+identifier match1.__mtdfield;
-+type match1.__type;
-+position j0;
-+@@
-+
-+	__type {
-+		...
-+*		struct mtd_info __mtdfield at j0;
-+		...
-+	};
-+
-+// ----------------------------------------------------------------------------
-+
-+ at script:python fix1_org depends on org@
-+j0 << fix1_context.j0;
-+@@
-+
-+msg = "struct nand_chip already embeds an mtd_info object (use nand_to_mtd())."
-+coccilib.org.print_todo(j0[0], msg)
-+
-+// ----------------------------------------------------------------------------
-+
-+@script:python fix1_report depends on report@
-+j0 << fix1_context.j0;
-+@@
-+
-+msg = "struct nand_chip already embeds an mtd_info object (use nand_to_mtd())."
-+coccilib.report.print_report(j0[0], msg)
-+
+ /*
+  * NAND Flash Manufacturer ID Codes
+  */
 -- 
 2.1.4
