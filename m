@@ -1,33 +1,42 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue,  1 Dec 2015 12:03:02 +0100
-Subject: [PATCH v2 05/25] sh: nand: make use of mtd_to_nand() where appropriate
+Date: Tue,  1 Dec 2015 12:03:20 +0100
+Subject: [PATCH v2 23/25] ARM: make use of nand_set/get_controller_data()
+ helpers
 In-Reply-To: <1448967802-25796-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1448967802-25796-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1448967802-25796-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1448967802-25796-24-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mtd_to_nand() was recently introduced to avoid direct accesses to the
-mtd->priv field. Update all SH specific implementations to use this
-helper.
+New helpers have been added to avoid directly accessing chip->field. Use
+them where appropriate.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- arch/sh/boards/mach-migor/setup.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-ixp4xx/ixdp425-setup.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/sh/boards/mach-migor/setup.c b/arch/sh/boards/mach-migor/setup.c
-index 29b7c0d..8673f91 100644
---- a/arch/sh/boards/mach-migor/setup.c
-+++ b/arch/sh/boards/mach-migor/setup.c
-@@ -167,7 +167,7 @@ static struct mtd_partition migor_nand_flash_partitions[] = {
- static void migor_nand_flash_cmd_ctl(struct mtd_info *mtd, int cmd,
- 				     unsigned int ctrl)
+diff --git a/arch/arm/mach-ixp4xx/ixdp425-setup.c b/arch/arm/mach-ixp4xx/ixdp425-setup.c
+index 333b0f9..508c2d7 100644
+--- a/arch/arm/mach-ixp4xx/ixdp425-setup.c
++++ b/arch/arm/mach-ixp4xx/ixdp425-setup.c
+@@ -77,7 +77,7 @@ static void
+ ixdp425_flash_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
  {
--	struct nand_chip *chip = mtd->priv;
-+	struct nand_chip *chip = mtd_to_nand(mtd);
+ 	struct nand_chip *this = mtd_to_nand(mtd);
+-	int offset = (int)this->priv;
++	int offset = (int)nand_get_controller_data(this);
  
- 	if (cmd == NAND_CMD_NONE)
- 		return;
+ 	if (ctrl & NAND_CTRL_CHANGE) {
+ 		if (ctrl & NAND_NCE) {
+@@ -88,7 +88,7 @@ ixdp425_flash_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
+ 
+ 		offset = (ctrl & NAND_CLE) ? IXDP425_NAND_CMD_BYTE : 0;
+ 		offset |= (ctrl & NAND_ALE) ? IXDP425_NAND_ADDR_BYTE : 0;
+-		this->priv = (void *)offset;
++		nand_set_controller_data(this, (void *)offset);
+ 	}
+ 
+ 	if (cmd != NAND_CMD_NONE)
 -- 
 2.1.4
