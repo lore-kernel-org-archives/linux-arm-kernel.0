@@ -1,81 +1,217 @@
-From: asamson@codeaurora.org (Azriel Samson)
-Date: Tue, 1 Dec 2015 11:32:47 -0700
-Subject: [PATCH v12 08/16] arm64/kexec: Add core kexec support
-In-Reply-To: <20151201021615.GA5704@dhcppc13.redhat.com>
-References: <cover.1448403503.git.geoff@infradead.org>
- <6ac232ad37d6b02cf2d5848b15236f26f5ac61ac.1448403503.git.geoff@infradead.org>
- <20151127131306.GE23908@dhcppc13.redhat.com>
- <1448909475.31214.27.camel@infradead.org>
- <20151201021615.GA5704@dhcppc13.redhat.com>
-Message-ID: <002101d12c66$ae985440$0bc8fcc0$@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 01 Dec 2015 18:34:19 +0000
+Subject: [PATCH v2 08/21] arm64: KVM: Implement debug save/restore
+In-Reply-To: <20151201154152.GU11704@cbox>
+References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+ <1448650215-15218-9-git-send-email-marc.zyngier@arm.com>
+ <20151201125639.GP11704@cbox> <565D9B57.2080005@arm.com>
+ <20151201144737.GQ11704@cbox> <565DB63C.6090508@arm.com>
+ <20151201154152.GU11704@cbox>
+Message-ID: <565DE82B.1030100@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 01/12/15 15:41, Christoffer Dall wrote:
+> On Tue, Dec 01, 2015 at 03:01:16PM +0000, Marc Zyngier wrote:
+>> On 01/12/15 14:47, Christoffer Dall wrote:
+>>> On Tue, Dec 01, 2015 at 01:06:31PM +0000, Marc Zyngier wrote:
+>>>> On 01/12/15 12:56, Christoffer Dall wrote:
+>>>>> On Fri, Nov 27, 2015 at 06:50:02PM +0000, Marc Zyngier wrote:
+>>>>>> Implement the debug save restore as a direct translation of
+>>>>>> the assembly code version.
+>>>>>>
+>>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>>>> ---
+>>>>>>  arch/arm64/kvm/hyp/Makefile   |   1 +
+>>>>>>  arch/arm64/kvm/hyp/debug-sr.c | 130 ++++++++++++++++++++++++++++++++++++++++++
+>>>>>>  arch/arm64/kvm/hyp/hyp.h      |   9 +++
+>>>>>>  3 files changed, 140 insertions(+)
+>>>>>>  create mode 100644 arch/arm64/kvm/hyp/debug-sr.c
+>>>>>>
+>>>>>> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+>>>>>> index ec94200..ec14cac 100644
+>>>>>> --- a/arch/arm64/kvm/hyp/Makefile
+>>>>>> +++ b/arch/arm64/kvm/hyp/Makefile
+>>>>>> @@ -6,3 +6,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+>>>>>>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
+>>>>>>  obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
+>>>>>>  obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
+>>>>>> +obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
+>>>>>> diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+>>>>>> new file mode 100644
+>>>>>> index 0000000..a0b2b99
+>>>>>> --- /dev/null
+>>>>>> +++ b/arch/arm64/kvm/hyp/debug-sr.c
+>>>>>> @@ -0,0 +1,130 @@
+>>>>>> +/*
+>>>>>> + * Copyright (C) 2015 - ARM Ltd
+>>>>>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+>>>>>> + *
+>>>>>> + * This program is free software; you can redistribute it and/or modify
+>>>>>> + * it under the terms of the GNU General Public License version 2 as
+>>>>>> + * published by the Free Software Foundation.
+>>>>>> + *
+>>>>>> + * This program is distributed in the hope that it will be useful,
+>>>>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>>>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>>>>> + * GNU General Public License for more details.
+>>>>>> + *
+>>>>>> + * You should have received a copy of the GNU General Public License
+>>>>>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>>>>> + */
+>>>>>> +
+>>>>>> +#include <linux/compiler.h>
+>>>>>> +#include <linux/kvm_host.h>
+>>>>>> +
+>>>>>> +#include <asm/kvm_mmu.h>
+>>>>>> +
+>>>>>> +#include "hyp.h"
+>>>>>> +
+>>>>>> +#define read_debug(r,n)		read_sysreg(r##n##_el1)
+>>>>>> +#define write_debug(v,r,n)	write_sysreg(v, r##n##_el1)
+>>>>>> +
+>>>>>> +#define save_debug(ptr,reg,nr)						\
+>>>>>> +	switch (nr) {							\
+>>>>>> +	case 15:	ptr[15] = read_debug(reg, 15);			\
+>>>>>> +	case 14:	ptr[14] = read_debug(reg, 14);			\
+>>>>>> +	case 13:	ptr[13] = read_debug(reg, 13);			\
+>>>>>> +	case 12:	ptr[12] = read_debug(reg, 12);			\
+>>>>>> +	case 11:	ptr[11] = read_debug(reg, 11);			\
+>>>>>> +	case 10:	ptr[10] = read_debug(reg, 10);			\
+>>>>>> +	case 9:		ptr[9] = read_debug(reg, 9);			\
+>>>>>> +	case 8:		ptr[8] = read_debug(reg, 8);			\
+>>>>>> +	case 7:		ptr[7] = read_debug(reg, 7);			\
+>>>>>> +	case 6:		ptr[6] = read_debug(reg, 6);			\
+>>>>>> +	case 5:		ptr[5] = read_debug(reg, 5);			\
+>>>>>> +	case 4:		ptr[4] = read_debug(reg, 4);			\
+>>>>>> +	case 3:		ptr[3] = read_debug(reg, 3);			\
+>>>>>> +	case 2:		ptr[2] = read_debug(reg, 2);			\
+>>>>>> +	case 1:		ptr[1] = read_debug(reg, 1);			\
+>>>>>> +	default:	ptr[0] = read_debug(reg, 0);			\
+>>>>>> +	}
+>>>>>> +
+>>>>>> +#define restore_debug(ptr,reg,nr)					\
+>>>>>> +	switch (nr) {							\
+>>>>>> +	case 15:	write_debug(ptr[15], reg, 15);			\
+>>>>>> +	case 14:	write_debug(ptr[14], reg, 14);			\
+>>>>>> +	case 13:	write_debug(ptr[13], reg, 13);			\
+>>>>>> +	case 12:	write_debug(ptr[12], reg, 12);			\
+>>>>>> +	case 11:	write_debug(ptr[11], reg, 11);			\
+>>>>>> +	case 10:	write_debug(ptr[10], reg, 10);			\
+>>>>>> +	case 9:		write_debug(ptr[9], reg, 9);			\
+>>>>>> +	case 8:		write_debug(ptr[8], reg, 8);			\
+>>>>>> +	case 7:		write_debug(ptr[7], reg, 7);			\
+>>>>>> +	case 6:		write_debug(ptr[6], reg, 6);			\
+>>>>>> +	case 5:		write_debug(ptr[5], reg, 5);			\
+>>>>>> +	case 4:		write_debug(ptr[4], reg, 4);			\
+>>>>>> +	case 3:		write_debug(ptr[3], reg, 3);			\
+>>>>>> +	case 2:		write_debug(ptr[2], reg, 2);			\
+>>>>>> +	case 1:		write_debug(ptr[1], reg, 1);			\
+>>>>>> +	default:	write_debug(ptr[0], reg, 0);			\
+>>>>>> +	}
+>>>>>> +
+>>>>>> +void __hyp_text __debug_save_state(struct kvm_vcpu *vcpu,
+>>>>>> +				   struct kvm_guest_debug_arch *dbg,
+>>>>>> +				   struct kvm_cpu_context *ctxt)
+>>>>>> +{
+>>>>>> +	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY) {
+>>>>>> +		u64 aa64dfr0 = read_sysreg(id_aa64dfr0_el1);
+>>>>>> +		int brps, wrps;
+>>>>>> +
+>>>>>> +		brps = (aa64dfr0 >> 12) & 0xf;
+>>>>>> +		wrps = (aa64dfr0 >> 20) & 0xf;
+>>>>>> +
+>>>>>> +		save_debug(dbg->dbg_bcr, dbgbcr, brps);
+>>>>>> +		save_debug(dbg->dbg_bvr, dbgbvr, brps);
+>>>>>> +		save_debug(dbg->dbg_wcr, dbgwcr, wrps);
+>>>>>> +		save_debug(dbg->dbg_wvr, dbgwvr, wrps);
+>>>>>> +
+>>>>>> +		ctxt->sys_regs[MDCCINT_EL1] = read_sysreg(mdccint_el1);
+>>>>>> +	}
+>>>>>> +}
+>>>>>> +
+>>>>>> +void __hyp_text __debug_restore_state(struct kvm_vcpu *vcpu,
+>>>>>> +				      struct kvm_guest_debug_arch *dbg,
+>>>>>> +				      struct kvm_cpu_context *ctxt)
+>>>>>> +{
+>>>>>> +	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY) {
+>>>>>> +		u64 aa64dfr0 = read_sysreg(id_aa64dfr0_el1);
+>>>>>> +		int brps, wrps;
+>>>>>> +
+>>>>>> +		brps = (aa64dfr0 >> 12) & 0xf;
+>>>>>> +		wrps = (aa64dfr0 >> 20) & 0xf;
+>>>>>> +
+>>>>>> +		restore_debug(dbg->dbg_bcr, dbgbcr, brps);
+>>>>>> +		restore_debug(dbg->dbg_bvr, dbgbvr, brps);
+>>>>>> +		restore_debug(dbg->dbg_wcr, dbgwcr, wrps);
+>>>>>> +		restore_debug(dbg->dbg_wvr, dbgwvr, wrps);
+>>>>>> +
+>>>>>> +		write_sysreg(ctxt->sys_regs[MDCCINT_EL1], mdccint_el1);
+>>>>>> +	}
+>>>>>> +}
+>>>>>> +
+>>>>>> +void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
+>>>>>> +{
+>>>>>> +	if ((vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_KDE) ||
+>>>>>> +	    (vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_KDE))
+>>>>>> +		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
+>>>>>> +
+>>>>>> +	__debug_save_state(vcpu, &vcpu->arch.host_debug_state,
+>>>>>> +			   kern_hyp_va(vcpu->arch.host_cpu_context));
+>>>>>
+>>>>> doesn't the assmebly code jump across saving this state neither bits are
+>>>>> set where this always saves the state?
+>>>>
+>>>> It doesn't. The save/restore functions are guarded by tests on
+>>>> KVM_ARM64_DEBUG_DIRTY, just like we have skip_debug_state on all actions
+>>>> involving the save/restore in the assembly version.
+>>>
+>>> I think the confusing part is that the save function unconditionally
+>>> calls __debug_save_state where the restore function only calls it when
+>>> the dirty flag is set.  Plus I suck at reading assembly apparently.
+>>
+>> So the way I initially wrote it, I had the same 'if' statement as in the
+>> restore function, making them fairly symmetric. But it quickly became
+>> obvious that this double-if was a bit pointless.
+>>
+>> And actually, I wonder if I shouldn't drop it from the restore function,
+>> because it only save us a spurious clear of the dirty bit.
+>>
+> 
+> I would just move the __debug_restore_state call above the conditional,
+> then they look more symmetric.  Does that work?
+> 
+>>>>> in any case, I feel some context is lost when this is moved away from
+>>>>> assembly and understanding this patch would be easier if the semantics
+>>>>> of these two _cond functions were documented.
+>>>>
+>>>> I can migrate the existing comments if you think that helps.
+>>>>
+>>> It just wasn't not quite clear to me exactly when
+>>> __debug_cond_save_host_state is called for example - is this going to be
+>>> called unconditionally on every entry - that's how I understand it now
+>>> anyway.
+>>
+>> On every entry, yes. I'm trying to have the guest_run function as simple
+>> as possible, with the various subsystems making their 'own' decisions.
+>>
+>> Not optimal (you get to branch for nothing), but clearer. At least for
+>> me, but I may be the odd duck out here. Any idea to make the flow look
+>> clearer?
+>>
+> 
+> For me, if you always make the call unconditionally on both paths and
+> then change the implementations to do 
+> 
+> 	if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY))
+> 		return;
+> 
+> then I think it's clear enough.
 
-I tested with v11 on our platform and I too needed the invalidation fix.
+Fair enough. I'll rework it that way.
 
 Thanks,
-Azriel Samson
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,?
-a Linux Foundation Collaborative Project
 
------Original Message-----
-From: kexec [mailto:kexec-bounces at lists.infradead.org] On Behalf Of Pratyush
-Anand
-Sent: Monday, November 30, 2015 7:16 PM
-To: Geoff Levand
-Cc: Mark Rutland; marc.zyngier at arm.com; Catalin Marinas; Will Deacon; AKASHI
-Takahiro; linux-arm-kernel at lists.infradead.org; Dave Young;
-kexec at lists.infradead.org; christoffer.dall at linaro.org
-Subject: Re: [PATCH v12 08/16] arm64/kexec: Add core kexec support
-
-Hi Geoff,
-
-On 30/11/2015:10:51:15 AM, Geoff Levand wrote:
-> Hi,
-> 
-> On Fri, 2015-11-27 at 18:43 +0530, Pratyush Anand wrote:
-> 
-> > On 24/11/2015:10:25:34 PM, Geoff Levand wrote:
-> > > +> > 	> > /* Test the entry flags. */
-> > > +.Ltest_source:
-> > > +> > 	> > tbz> > 	> > x18, IND_SOURCE_BIT, .Ltest_indirection
-> > > +
-> > > +> > 	> > mov x20, x13> > 	> > 	> > 	> > 	> > /*  x20
-= copy dest */
-> > > +> > 	> > mov x21, x12> > 	> > 	> > 	> > 	> > /*  x21
-= copy src */
-> > 
-> > Till v10 we had here invalidation for relocated destination page to 
-> > PoC. I could not understand, why it was removed. Removing that piece 
-> > of code breaks kexec booting with mustang. I need [1] to kexec boot 
-> > into second kernel with mustang platform.
-> 
-> We need to flush the new kernel to PoC.  The code that was here that 
-> was doing that would only be executed when the new kernel needed 
-> relocation (the standard kexec case).  We also need to flush kernels 
-> that do not need relocation (the standard kdump case).
-> 
-> I moved the new kernel flush to kexec_segment_flush(), called 
-> unconditionally in machine_kexec() so we can handle both cases with 
-> one piece of code.
-
-Yes, I had noticed that. Actually flushing before cache is disabled can
-always cause heisenbug.
-
-> 
-> Have you experienced a problem on mustang with the current version?
-
-Yes, v10 works fine, but I need invalidation fix for both v11 and v12 to
-work on mustang.
-I have not tested vanilla v12 on seattle, but v12 ported on rhelsa needs
-invalidation fix to work on seattle as well.
-
-~Pratyush
-
-_______________________________________________
-kexec mailing list
-kexec at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/kexec
+	M.
+-- 
+Jazz is not dead. It just smells funny...
