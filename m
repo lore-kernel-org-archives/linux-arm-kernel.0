@@ -1,58 +1,74 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Sun, 1 Nov 2015 17:57:18 +1100
-Subject: linux-next: build failure after merge of the pm tree
-Message-ID: <20151101175718.130f33f2@canb.auug.org.au>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 1 Dec 2015 09:06:17 +0100
+Subject: [PATCH] ARM: shmobile: alt: Add QSPI device to DT
+In-Reply-To: <20151201064149.GH16260@verge.net.au>
+References: <1448863990-16276-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdWnyZbHiLEPn-6dEweBEXHzWr6o2KF2iCpzg2-OhZRVSw@mail.gmail.com>
+ <20151201064149.GH16260@verge.net.au>
+Message-ID: <CAMuHMdXgr5FbS0_L8g0xdesFZ-utPH+G8VgXQKqXZd3t4OsXcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+Hi Simon,
 
-After merging the pm tree, today's linux-next build (arm
-multi_v7_defconfig) failed like this:
+On Tue, Dec 1, 2015 at 7:41 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Nov 30, 2015 at 09:34:10AM +0100, Geert Uytterhoeven wrote:
+>> On Mon, Nov 30, 2015 at 7:13 AM, Simon Horman
+>> <horms+renesas@verge.net.au> wrote:
+>> > Enable the QSPI controller in the alt device tree.
+>> >
+>> > Based similar work for the silk board by by Vladimir Barinov and
+>> > Sergei Shtylyov.
+>> >
+>> > Cc: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>> > Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>
+>> Verified against Alt schematics and r8a7794 datasheet.
+>>
+>> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>>
+>> I can't verify the FLASH layout. Note that p.11 of
+>> ALT_MiniMonitor_Manual(SPI_Boot)_Rev0.01_e.pdf shows a different
+>> FLASH layout for the second and third partition.
+>
+> Thanks. I see the following in v1.9.6 of the BSP[1]. Is it
+> the same as the document you referred to above?
+>
+>
+>                 partition at 0 {
+>                         label = "loader";
+>                         reg = <0x00000000 0x00080000>;
+>                         read-only;
+>                 };
+>                 partition at 40000 {
+>                         label = "user";
+>                         reg = <0x00080000 0x00580000>;
+>                         read-only;
+>                 };
+>                 partition at 440000 {
+>                         label = "flash";
+>                         reg = <0x00600000 0x03a00000>;
+>                 };
+>
+>
+> [1] https://git.kernel.org/cgit/linux/kernel/git/horms/renesas-backport.git/tree/arch/arm/boot/dts/r8a7794-alt.dts?h=rcar-gen2/v1.9.6&id=e1acbe074f36d96e901bf5346c50ee51da2ced42#n379
 
-arch/arm/mach-mediatek/mediatek.c: In function 'mediatek_timer_init':
-arch/arm/mach-mediatek/mediatek.c:43:2: error: implicit declaration of function 'clocksource_of_init' [-Werror=implicit-function-declaration]
-  clocksource_of_init();
-  ^
+No, the document specifies 3 partitions:
+  - SA0: loader program area, 16 KiB,
+  - SA1: System area, 16 KiB,
+  - SA2: User program area, remainder.
 
-Caused by commit
+FWIW, the unit addresses in the device nodes above are not consistent
+with their reg properties.
 
-  3722ed2380ad ("clocksource: cosmetic: Drop OF 'dependency' from symbols")
+Gr{oetje,eeting}s,
 
-interacting with commit
+                        Geert
 
-  9821e545c5e0 ("ARM: mediatek: enable gpt6 on boot up to make arch timer working")
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-from the arm-soc tree.
-
-I applied the following merge fix patch for today (someone should tell
-Linus when theese trees are merged):
-
-From: Stephen Rothwell <sfr@canb.auug.org.au>
-Date: Sun, 1 Nov 2015 17:52:26 +1100
-Subject: [PATCH] ARM: mediatek: fixup for clocksource_of_init API change
-
-Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
----
- arch/arm/mach-mediatek/mediatek.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
-index 19dc738c1abc..c88a47a3dc37 100644
---- a/arch/arm/mach-mediatek/mediatek.c
-+++ b/arch/arm/mach-mediatek/mediatek.c
-@@ -40,7 +40,7 @@ static void __init mediatek_timer_init(void)
- 	}
- 
- 	of_clk_init(NULL);
--	clocksource_of_init();
-+	clocksource_probe();
- };
- 
- static const char * const mediatek_board_dt_compat[] = {
--- 
-2.6.1
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
