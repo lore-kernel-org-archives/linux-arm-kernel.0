@@ -1,53 +1,44 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed,  2 Dec 2015 00:33:30 +0100
-Subject: [PATCH 3/5] ARM: config: Add orion5x to multi_v5_defconfig
+Date: Wed,  2 Dec 2015 00:33:31 +0100
+Subject: [PATCH 4/5] ARM: mvebu: Reenable DSA in mvebu_v5_defconfig
 In-Reply-To: <1449012812-9779-1-git-send-email-andrew@lunn.ch>
 References: <1449012812-9779-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1449012812-9779-4-git-send-email-andrew@lunn.ch>
+Message-ID: <1449012812-9779-5-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that Orion5x is part of the v5 multiarch kernel enable it in the
-multi_v5_defconfig.
+DSA now depends on switchdev. Enable it, and re-enable DSA and its
+drivers, which were removed when mvebu_v5_defconfig was regenerated.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/configs/multi_v5_defconfig | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ arch/arm/configs/mvebu_v5_defconfig | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
-index 920db77916b1..1f9ca4737ef6 100644
---- a/arch/arm/configs/multi_v5_defconfig
-+++ b/arch/arm/configs/multi_v5_defconfig
-@@ -14,6 +14,29 @@ CONFIG_MACH_KIRKWOOD=y
- CONFIG_ARCH_MXC=y
- CONFIG_MACH_IMX27_DT=y
- CONFIG_SOC_IMX25=y
-+CONFIG_ARCH_ORION5X=y
-+CONFIG_MACH_DB88F5281=y
-+CONFIG_MACH_RD88F5182=y
-+CONFIG_MACH_RD88F5182_DT=y
-+CONFIG_MACH_KUROBOX_PRO=y
-+CONFIG_MACH_DNS323=y
-+CONFIG_MACH_TS209=y
-+CONFIG_MACH_TERASTATION_PRO2=y
-+CONFIG_MACH_LINKSTATION_PRO=y
-+CONFIG_MACH_LINKSTATION_LSCHL=y
-+CONFIG_MACH_LINKSTATION_MINI=y
-+CONFIG_MACH_LINKSTATION_LS_HGL=y
-+CONFIG_MACH_TS409=y
-+CONFIG_MACH_WRT350N_V2=y
-+CONFIG_MACH_TS78XX=y
-+CONFIG_MACH_MV2120=y
-+CONFIG_MACH_D2NET_DT=y
-+CONFIG_MACH_NET2BIG=y
-+CONFIG_MACH_MSS2_DT=y
-+CONFIG_MACH_WNR854T=y
-+CONFIG_MACH_RD88F5181L_GE=y
-+CONFIG_MACH_RD88F5181L_FXO=y
-+CONFIG_MACH_RD88F6183AP_GE=y
- CONFIG_ARCH_U300=y
- CONFIG_PCI_MVEBU=y
- CONFIG_PREEMPT=y
+diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
+index aa9079c84024..d7c17864a1eb 100644
+--- a/arch/arm/configs/mvebu_v5_defconfig
++++ b/arch/arm/configs/mvebu_v5_defconfig
+@@ -35,6 +35,8 @@ CONFIG_IP_PNP=y
+ CONFIG_IP_PNP_DHCP=y
+ CONFIG_IP_PNP_BOOTP=y
+ # CONFIG_IPV6 is not set
++CONFIG_NET_DSA=y
++CONFIG_NET_SWITCHDEV=y
+ CONFIG_NET_PKTGEN=m
+ CONFIG_CFG80211=y
+ CONFIG_MAC80211=y
+@@ -66,6 +68,11 @@ CONFIG_ATA=y
+ CONFIG_SATA_AHCI=y
+ CONFIG_SATA_MV=y
+ CONFIG_NETDEVICES=y
++CONFIG_NET_DSA_MV88E6060=y
++CONFIG_NET_DSA_MV88E6131=y
++CONFIG_NET_DSA_MV88E6123_61_65=y
++CONFIG_NET_DSA_MV88E6171=y
++CONFIG_NET_DSA_MV88E6352=y
+ CONFIG_MV643XX_ETH=y
+ CONFIG_R8169=y
+ CONFIG_MARVELL_PHY=y
 -- 
 2.6.2
