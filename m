@@ -1,224 +1,85 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 01 Dec 2015 14:50:13 +0000
-Subject: [PATCH v4 18/21] KVM: ARM64: Add PMU overflow interrupt routing
-In-Reply-To: <565DB021.3020901@huawei.com>
-References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>	<1446186123-11548-19-git-send-email-zhaoshenglong@huawei.com>
- <20151130182258.684c9df6@arm.com> <565DB021.3020901@huawei.com>
-Message-ID: <565DB3A5.3030701@arm.com>
+From: sebastian_frias@sigmadesigns.com (Sebastian Frias)
+Date: Tue, 1 Dec 2015 15:50:20 +0100
+Subject: Virtual addresses, ioremap, vmalloc, etc
+In-Reply-To: <565DB036.3010306@free.fr>
+References: <565D8DA9.8040700@free.fr> <2755513.X6tENxzvXm@wuerfel>
+ <565DB036.3010306@free.fr>
+Message-ID: <565DB3AC.4010905@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/15 14:35, Shannon Zhao wrote:
-> 
-> 
-> On 2015/12/1 2:22, Marc Zyngier wrote:
->> On Fri, 30 Oct 2015 14:22:00 +0800
->> Shannon Zhao <zhaoshenglong@huawei.com> wrote:
->>
->>> From: Shannon Zhao <shannon.zhao@linaro.org>
+On 12/01/2015 03:35 PM, Mason wrote:
+> On 01/12/2015 14:15, Arnd Bergmann wrote:
+>> On Tuesday 01 December 2015 13:08:09 Mason wrote:
+>>> Hello everyone,
 >>>
->>> When calling perf_event_create_kernel_counter to create perf_event,
->>> assign a overflow handler. Then when perf event overflows, set
->>> irq_pending and call kvm_vcpu_kick() to sync the interrupt.
+>>> I was wondering if someone could help clear my confusion.
 >>>
->>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->>> ---
->>>  arch/arm/kvm/arm.c    |  4 +++
->>>  include/kvm/arm_pmu.h |  4 +++
->>>  virt/kvm/arm/pmu.c    | 76 ++++++++++++++++++++++++++++++++++++++++++++++++++-
->>>  3 files changed, 83 insertions(+), 1 deletion(-)
+>>> In my company's legacy port (based on 3.4, dating back to 2.6) someone
+>>> chose to map the first 16 MB of physical addresses using:
 >>>
->>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->>> index 78b2869..9c0fec4 100644
->>> --- a/arch/arm/kvm/arm.c
->>> +++ b/arch/arm/kvm/arm.c
->>> @@ -28,6 +28,7 @@
->>>  #include <linux/sched.h>
->>>  #include <linux/kvm.h>
->>>  #include <trace/events/kvm.h>
->>> +#include <kvm/arm_pmu.h>
->>>  
->>>  #define CREATE_TRACE_POINTS
->>>  #include "trace.h"
->>> @@ -551,6 +552,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>  
->>>  		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
->>>  			local_irq_enable();
->>> +			kvm_pmu_sync_hwstate(vcpu);
+>>> static struct map_desc tango_map_desc[] __initdata = {
+>>> 	{
+>>> 		.virtual	= 0xf0000000,
+>>> 		.pfn		=__phys_to_pfn(0),
+>>> 		.length		= SZ_16M,
+>>> 		.type 		= MT_DEVICE,
+>>> 	},
+>>> };
+>>>
+>>> static void __init tango_map_io(void)
+>>> {
+>>> 	iotable_init(tango_map_desc, ARRAY_SIZE(tango_map_desc));
+>>> }
+>>>
+>>> Is the virtual address 0xf0000000 chosen arbitrary?
+>>> Could I pick 0xf04200000 for example?
 >>
->> This is very weird. Are you only injecting interrupts when a signal is
->> pending? I don't understand how this works...
+>> It is arbitrary, but normally should be naturally aligned.
 >>
->>>  			kvm_vgic_sync_hwstate(vcpu);
->>>  			preempt_enable();
->>>  			kvm_timer_sync_hwstate(vcpu);
->>> @@ -598,6 +600,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>  		kvm_guest_exit();
->>>  		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
->>>  
->>> +		kvm_pmu_post_sync_hwstate(vcpu);
->>> +
->>>  		kvm_vgic_sync_hwstate(vcpu);
->>>  
->>>  		preempt_enable();
->>> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
->>> index acd025a..5e7f943 100644
->>> --- a/include/kvm/arm_pmu.h
->>> +++ b/include/kvm/arm_pmu.h
->>> @@ -39,6 +39,8 @@ struct kvm_pmu {
->>>  };
->>>  
->>>  #ifdef CONFIG_KVM_ARM_PMU
->>> +void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu);
->>> +void kvm_pmu_post_sync_hwstate(struct kvm_vcpu *vcpu);
+>>> The same kernel, with no such boot-time mapping prints:
+>>>
+>>> [    0.000000] Memory: 641720K/655360K available (3135K kernel code, 109K rwdata, 1056K rodata, 3044K init, 218K bss, 13640K reserved, 0K cma-reserve)
+>>> [    0.000000] Virtual kernel memory layout:
+>>> [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+>>> [    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
+>>> [    0.000000]     vmalloc : 0xe8800000 - 0xff000000   ( 360 MB)
+>>> [    0.000000]     lowmem  : 0xc0000000 - 0xe8000000   ( 640 MB)
+>>>
+>>> It looks like 0xf0000000 is in the middle of the vmalloc space.
+>>> Is it a good idea to "statically" map something there?
 >>
->> Please follow the current terminology: _flush_ on VM entry, _sync_ on
->> VM exit.
+>> We deal with that on a lof of platforms that still use a static
+>> mapping. I normally advocate not using that kind of mapping unless
+>> you can show a measurable performance difference on your platform.
 >>
-> 
-> Hi Marc,
-> 
-> Is below patch the right way for this?
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 78b2869..84008d1 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -28,6 +28,7 @@
->  #include <linux/sched.h>
->  #include <linux/kvm.h>
->  #include <trace/events/kvm.h>
-> +#include <kvm/arm_pmu.h>
-> 
->  #define CREATE_TRACE_POINTS
->  #include "trace.h"
-> @@ -531,6 +532,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu,
-> struct kvm_run *run)
->                  */
->                 kvm_timer_flush_hwstate(vcpu);
-> 
-> +               kvm_pmu_flush_hwstate(vcpu);
-> +
->                 /*
->                  * Preparing the interrupts to be injected also
->                  * involves poking the GIC, which must be done in a
-> @@ -554,6 +557,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu,
-> struct kvm_run *run)
->                         kvm_vgic_sync_hwstate(vcpu);
->                         preempt_enable();
->                         kvm_timer_sync_hwstate(vcpu);
-> +                       kvm_pmu_sync_hwstate(vcpu);
->                         continue;
->                 }
-> 
-> @@ -604,6 +608,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu,
-> struct kvm_run *run)
-> 
->                 kvm_timer_sync_hwstate(vcpu);
-> 
-> +               kvm_pmu_sync_hwstate(vcpu);
-> +
->                 ret = handle_exit(vcpu, run, ret);
->         }
+>>> If I were to call ioremap(0, SZ_16M); at run-time, I would imagine
+>>> the virtual address could be anywhere in the vmalloc space?
+>>> There's no reason it would be 0xf0000000, right?
+>>>
+>>> In short, is virtual address 0xf0000000 special in any way?
+>>> (Other than being in the vmalloc space perhaps.)
+>>>
+>>> For my own reference:
+>>> https://www.kernel.org/doc/Documentation/arm/memory.txt
+>>
+>> I think 0xf0000000 is a common choice because that made an easy
+>> computation back in the days when most platforms used an
+>> io_p2v() to get a hardcoded virtual address, rather than calling
+>> ioremap as we do today.
+>
+> Thanks for the detailed answer.
+>
+> One more thing: when I configure earlyprintk, I'm supposed to provide
+> physical AND virtual address of the UART.
+>
+> If I'm not using a hard-coded P2V mapping, and instead rely on ioremap,
+> how am I supposed to know the virtual address of the UART?
+>
+> Regards.
+>
 
-yeah, that's more like it!
-
-> 
-> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-> index 47bbd43..edfe4e5 100644
-> --- a/include/kvm/arm_pmu.h
-> +++ b/include/kvm/arm_pmu.h
-> @@ -41,6 +41,8 @@ struct kvm_pmu {
->  };
-> 
->  #ifdef CONFIG_KVM_ARM_PMU
-> +void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
-> +void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu);
->  unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32
-> select_idx);
->  void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val);
->  void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u32 val, bool
-> all_enable);
-> @@ -51,6 +53,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu
-> *vcpu, u32 data,
->                                     u32 select_idx);
->  void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u32 val);
->  #else
-> +void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
-> +void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu) {}
->  unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32
-> select_idx)
->  {
->         return 0;
-> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-> index 15cac45..9aad2f7 100644
-> --- a/virt/kvm/arm/pmu.c
-> +++ b/virt/kvm/arm/pmu.c
-> @@ -21,6 +21,7 @@
->  #include <linux/perf_event.h>
->  #include <asm/kvm_emulate.h>
->  #include <kvm/arm_pmu.h>
-> +#include <kvm/arm_vgic.h>
-> 
->  /**
->   * kvm_pmu_get_counter_value - get PMU counter value
-> @@ -79,6 +80,78 @@ static void kvm_pmu_stop_counter(struct kvm_pmc *pmc)
->  }
-> 
->  /**
-> + * kvm_pmu_flush_hwstate - flush pmu state to cpu
-> + * @vcpu: The vcpu pointer
-> + *
-> + * Inject virtual PMU IRQ if IRQ is pending for this cpu.
-> + */
-> +void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu)
-> +{
-> +       struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> +       u32 overflow;
-> +
-> +       if (!vcpu_mode_is_32bit(vcpu))
-> +               overflow = vcpu_sys_reg(vcpu, PMOVSSET_EL0);
-> +       else
-> +               overflow = vcpu_cp15(vcpu, c9_PMOVSSET);
-> +
-> +       if ((pmu->irq_pending || overflow != 0) && (pmu->irq_num != -1))
-> +               kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
-> pmu->irq_num, 1);
-> +
-> +       pmu->irq_pending = false;
-
-Now, we get to the critical point. Why do you need to keep this shadow
-state for the interrupt?
-
-The way I see it, you should set the line high when the overflow has
-been registered, and set it low when the overflow condition has been
-cleared by the guest. And nothing else.
-
-> +}
-> +
-> +/**
-> + * kvm_pmu_sync_hwstate - sync pmu state for cpu
-> + * @vcpu: The vcpu pointer
-> + *
-> + * Inject virtual PMU IRQ if IRQ is pending for this cpu when back from
-> guest.
-> + */
-> +void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu)
-> +{
-> +       struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> +
-> +       if (pmu->irq_pending && (pmu->irq_num != -1))
-> +               kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
-> pmu->irq_num, 1);
-> +
-> +       pmu->irq_pending = false;
-> +}
-> 
-
-Why do you have to do it twice??
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I think you can use anything as long as it is correctly aligned (w.r.t 
+MMU specification)
+There is a specific mapping setup in arch/arm/kernel/head.S by the 
+addruart macro
