@@ -1,104 +1,508 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Tue,  1 Dec 2015 17:13:26 +0800
-Subject: [PATCH 3/3] arm64: dts: rockchip: add the pwm node info for RK3368
- SoCs
+Date: Tue,  1 Dec 2015 17:13:25 +0800
+Subject: [PATCH 2/3] arm64: dts: rockchip: add rk3368 evaluation board
 In-Reply-To: <1448961206-23769-1-git-send-email-wxt@rock-chips.com>
 References: <1448961206-23769-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1448961206-23769-4-git-send-email-wxt@rock-chips.com>
+Message-ID: <1448961206-23769-3-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pulse-width modulator (PWM) feature is very common in
-embedded systems. There exust 4 built-in PWM channels.
+This board is similar with the rk3288 evb board but the rk3368 top
+board. There exist the act8846 as the pmic.
 
-In general, the pwm pins can via the pinctrl to
-configure iomux mode but the pwm2 since the pwm2 iomux mode from
-the SoC control register.
+Moment, add the balight/thermal/emmc/usb.. stuff,
+Let the board can happy work.
 
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-
 ---
 
- arch/arm64/boot/dts/rockchip/rk3368.dtsi | 60 ++++++++++++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
+ arch/arm64/boot/dts/rockchip/Makefile              |   2 +-
+ .../arm64/boot/dts/rockchip/rk3368-evb-act8846.dts | 173 +++++++++++++
+ arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi       | 286 +++++++++++++++++++++
+ 3 files changed, 460 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-evb-act8846.dts
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-index 1f10b85..3b4cc84 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-@@ -472,6 +472,48 @@
- 		status = "disabled";
- 	};
+diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
+index 601e6a2..b6cd1ed 100644
+--- a/arch/arm64/boot/dts/rockchip/Makefile
++++ b/arch/arm64/boot/dts/rockchip/Makefile
+@@ -1,4 +1,4 @@
+-dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
++dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb rk3368-evb-act8846.dtb
  
-+	pwm0: pwm at ff680000 {
-+		compatible = "rockchip,rk3368-pwm", "rockchip,rk3288-pwm";
-+		reg = <0x0 0xff680000 0x0 0x10>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm0_pin>;
-+		clocks = <&cru PCLK_PWM1>;
-+		clock-names = "pwm";
-+		status = "disabled";
+ always		:= $(dtb-y)
+ subdir-y	:= $(dts-dirs)
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368-evb-act8846.dts b/arch/arm64/boot/dts/rockchip/rk3368-evb-act8846.dts
+new file mode 100644
+index 0000000..d315be2
+--- /dev/null
++++ b/arch/arm64/boot/dts/rockchip/rk3368-evb-act8846.dts
+@@ -0,0 +1,173 @@
++/*
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "rk3368-evb.dtsi"
++
++/ {
++	compatible = "rockchip,rk3368-evb-act8846", "rockchip,rk3368";
++};
++
++&i2c0 {
++	clock-frequency = <400000>;
++
++	vdd_cpu: syr827 at 40 {
++		compatible = "silergy,syr827";
++		fcs,suspend-voltage-selector = <1>;
++		reg = <0x40>;
++		regulator-name = "vdd_cpu";
++		regulator-min-microvolt = <850000>;
++		regulator-max-microvolt = <1350000>;
++		regulator-always-on;
++		regulator-boot-on;
++		vin-supply = <&vcc_sys>;
 +	};
 +
-+	pwm1: pwm at ff680010 {
-+		compatible = "rockchip,rk3368-pwm", "rockchip,rk3288-pwm";
-+		reg = <0x0 0xff680010 0x0 0x10>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm1_pin>;
-+		clocks = <&cru PCLK_PWM1>;
-+		clock-names = "pwm";
-+		status = "disabled";
++	vdd_gpu: syr828 at 41 {
++		compatible = "silergy,syr828";
++		fcs,suspend-voltage-selector = <1>;
++		reg = <0x41>;
++		regulator-name = "vdd_gpu";
++		regulator-min-microvolt = <850000>;
++		regulator-max-microvolt = <1350000>;
++		regulator-always-on;
++		vin-supply = <&vcc_sys>;
 +	};
 +
-+	pwm2: pwm at ff680020 {
-+		compatible = "rockchip,rk3368-pwm", "rockchip,rk3288-pwm";
-+		reg = <0x0 0xff680020 0x0 0x10>;
-+		#pwm-cells = <3>;
-+		clocks = <&cru PCLK_PWM1>;
-+		clock-names = "pwm";
-+		status = "disabled";
-+	};
++	act8846: act8846 at 5a {
++		compatible = "active-semi,act8846";
++		reg = <0x5a>;
++		status = "okay";
 +
-+	pwm3: pwm at ff680030 {
-+		compatible = "rockchip,rk3368-pwm", "rockchip,rk3288-pwm";
-+		reg = <0x0 0xff680030 0x0 0x10>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm3_pin>;
-+		clocks = <&cru PCLK_PWM1>;
-+		clock-names = "pwm";
-+		status = "disabled";
-+	};
++		vp1-supply = <&vcc_sys>;
++		vp2-supply = <&vcc_sys>;
++		vp3-supply = <&vcc_sys>;
++		vp4-supply = <&vcc_sys>;
++		inl1-supply = <&vcc_io>;
++		inl2-supply = <&vcc_sys>;
++		inl3-supply = <&vcc_20>;
 +
- 	uart2: serial at ff690000 {
- 		compatible = "rockchip,rk3368-uart", "snps,dw-apb-uart";
- 		reg = <0x0 0xff690000 0x0 0x100>;
-@@ -713,6 +755,24 @@
- 			};
- 		};
- 
-+		pwm0 {
-+			pwm0_pin: pwm0-pin {
-+				rockchip,pins = <3 8 RK_FUNC_2 &pcfg_pull_none>;
++		regulators {
++			vcc_ddr: REG1 {
++				regulator-name = "VCC_DDR";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1200000>;
++				regulator-always-on;
++			};
++
++			vcc_io: REG2 {
++				regulator-name = "VCC_IO";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vdd_log: REG3 {
++				regulator-name = "VDD_LOG";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++			};
++
++			vcc_20: REG4 {
++				regulator-name = "VCC_20";
++				regulator-min-microvolt = <2000000>;
++				regulator-max-microvolt = <2000000>;
++				regulator-always-on;
++			};
++
++			vccio_sd: REG5 {
++				regulator-name = "VCCIO_SD";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vdd10_lcd: REG6 {
++				regulator-name = "VDD10_LCD";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++			};
++
++			vcca_codec: REG7 {
++				regulator-name = "VCCA_CODEC";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vcca_tp: REG8 {
++				regulator-name = "VCCA_TP";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vccio_pmu: REG9 {
++				regulator-name = "VCCIO_PMU";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vdd_10: REG10 {
++				regulator-name = "VDD_10";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++			};
++
++			vcc_18: REG11 {
++				regulator-name = "VCC_18";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++
++			vcc18_lcd: REG12 {
++				regulator-name = "VCC18_LCD";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
 +			};
 +		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi b/arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi
+new file mode 100644
+index 0000000..251073e
+--- /dev/null
++++ b/arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi
+@@ -0,0 +1,286 @@
++/*
++ * Copyright (c) 2015 Heiko Stuebner <heiko@sntech.de>
++ * Copyright (c) 2015 Caesar Wang <wxt@rock-chips.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+		pwm1 {
-+			pwm1_pin: pwm1-pin {
-+				rockchip,pins = <0 8 RK_FUNC_2 &pcfg_pull_none>;
-+			};
++#include <dt-bindings/pwm/pwm.h>
++#include "rk3368.dtsi"
++
++/ {
++	model = "Rockchip EVB";
++	compatible = "rockchip,evb", "rockchip,rk3368";
++
++	chosen {
++		stdout-path = "serial2:115200n8";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x0 0x0 0x0 0x40000000>;
++	};
++
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		brightness-levels = <
++			  0   1   2   3   4   5   6   7
++			  8   9  10  11  12  13  14  15
++			 16  17  18  19  20  21  22  23
++			 24  25  26  27  28  29  30  31
++			 32  33  34  35  36  37  38  39
++			 40  41  42  43  44  45  46  47
++			 48  49  50  51  52  53  54  55
++			 56  57  58  59  60  61  62  63
++			 64  65  66  67  68  69  70  71
++			 72  73  74  75  76  77  78  79
++			 80  81  82  83  84  85  86  87
++			 88  89  90  91  92  93  94  95
++			 96  97  98  99 100 101 102 103
++			104 105 106 107 108 109 110 111
++			112 113 114 115 116 117 118 119
++			120 121 122 123 124 125 126 127
++			128 129 130 131 132 133 134 135
++			136 137 138 139 140 141 142 143
++			144 145 146 147 148 149 150 151
++			152 153 154 155 156 157 158 159
++			160 161 162 163 164 165 166 167
++			168 169 170 171 172 173 174 175
++			176 177 178 179 180 181 182 183
++			184 185 186 187 188 189 190 191
++			192 193 194 195 196 197 198 199
++			200 201 202 203 204 205 206 207
++			208 209 210 211 212 213 214 215
++			216 217 218 219 220 221 222 223
++			224 225 226 227 228 229 230 231
++			232 233 234 235 236 237 238 239
++			240 241 242 243 244 245 246 247
++			248 249 250 251 252 253 254 255>;
++		default-brightness-level = <128>;
++		enable-gpios = <&gpio0 20 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&bl_en>;
++		pwms = <&pwm0 0 1000000 PWM_POLARITY_INVERTED>;
++		pwm-delay-us = <10000>;
++	};
++
++	emmc_pwrseq: emmc-pwrseq {
++		compatible = "mmc-pwrseq-emmc";
++		pinctrl-0 = <&emmc_reset>;
++		pinctrl-names = "default";
++		reset-gpios = <&gpio2 3 GPIO_ACTIVE_HIGH>;
++	};
++
++	keys: gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwr_key>;
++
++		button at 0 {
++			gpio-key,wakeup = <1>;
++			gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
++			label = "GPIO Power";
++			linux,code = <116>;
++		};
++	};
++
++	/* supplies both host and otg */
++	vcc_host: vcc-host-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio0 4 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&host_vbus_drv>;
++		regulator-name = "vcc_host";
++		regulator-always-on;
++		regulator-boot-on;
++		vin-supply = <&vcc_sys>;
++	};
++
++	vcc_lan: vcc-lan-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc_lan";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		regulator-boot-on;
++		vin-supply = <&vcc_io>;
++	};
++
++	vcc_sys: vcc-sys-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc_sys";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
++};
++
++&emmc {
++	broken-cd;
++	bus-width = <8>;
++	cap-mmc-highspeed;
++	disable-wp;
++	mmc-pwrseq = <&emmc_pwrseq>;
++	non-removable;
++	num-slots = <1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_bus8>;
++	status = "okay";
++};
++
++&gmac {
++	phy-supply = <&vcc_lan>;
++	phy-mode = "rmii";
++	clock_in_out = "output";
++	snps,reset-gpio = <&gpio3 12 0>;
++	snps,reset-active-low;
++	snps,reset-delays-us = <0 10000 1000000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&rmii_pins>;
++	tx_delay = <0x30>;
++	rx_delay = <0x10>;
++	status = "ok";
++};
++
++&i2c0 {
++	status = "okay";
++};
++
++&pinctrl {
++	pcfg_pull_none_drv_8ma: pcfg-pull-none-drv-8ma {
++		bias-disable;
++		drive-strength = <8>;
++	};
++
++	pcfg_pull_up_drv_8ma: pcfg-pull-up-drv-8ma {
++		bias-pull-up;
++		drive-strength = <8>;
++	};
++
++	emmc {
++		emmc_bus8: emmc-bus8 {
++			rockchip,pins = <1 18 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
++					<1 19 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
++					<1 20 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
++					<1 21 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
++					<1 22 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
++					<1 23 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
++					<1 24 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
++					<1 25 RK_FUNC_2 &pcfg_pull_up_drv_8ma>;
 +		};
 +
-+		pwm3 {
-+			pwm3_pin: pwm3-pin {
-+				rockchip,pins = <3 29 RK_FUNC_3 &pcfg_pull_none>;
-+			};
++		emmc-clk {
++			rockchip,pins = <2 4 RK_FUNC_2 &pcfg_pull_none_drv_8ma>;
 +		};
 +
- 		sdio0 {
- 			sdio0_bus1: sdio0-bus1 {
- 				rockchip,pins = <2 28 RK_FUNC_1 &pcfg_pull_up>;
++		emmc-cmd {
++			rockchip,pins = <1 26 RK_FUNC_2 &pcfg_pull_up_drv_8ma>;
++		};
++
++		emmc_reset: emmc-reset {
++			rockchip,pins = <2 3 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	keys {
++		pwr_key: pwr-key {
++			rockchip,pins = <0 2 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++	};
++
++
++	backlight {
++		bl_en: bl-en {
++			rockchip,pins = <0 20 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	pmic {
++		pmic_int: pmic-int {
++			rockchip,pins = <0 1 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++	};
++
++	sdio {
++		wifi_reg_on: wifi-reg-on {
++			rockchip,pins = <3 4 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++
++		bt_rst: bt-rst {
++			rockchip,pins = <3 5 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	usb {
++		host_vbus_drv: host-vbus-drv {
++			rockchip,pins = <0 4 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++};
++
++&pwm0 {
++	status = "okay";
++};
++
++&tsadc {
++	rockchip,hw-tshut-mode = <0>; /* tshut mode 0:CRU 1:GPIO */
++	rockchip,hw-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
++	status = "okay";
++};
++
++&uart2 {
++	status = "okay";
++};
++
++&usb_host0_ehci {
++	status = "okay";
++};
++
++&usb_otg {
++	dr_mode = "host";
++	status = "okay";
++};
++
++&wdt {
++	status = "okay";
++};
 -- 
 1.9.1
