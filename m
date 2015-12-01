@@ -1,80 +1,46 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 1 Dec 2015 14:47:50 -0800
-Subject: [PATCH] ARM: defconfig: multi_v7: Enable Qualcomm options for Honami
-In-Reply-To: <1448518557-14250-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1449010070-9796-1-git-send-email-bjorn.andersson@sonymobile.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 1 Dec 2015 23:51:26 +0100
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <87610j7gmc.fsf@free-electrons.com>
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+ <87610j7gmc.fsf@free-electrons.com>
+Message-ID: <20151201225126.GB5542@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Honami device does not boot due to the lack of pinctrl support
-compiled in with the multi_v7_defconfig. This patch correct this and
-enables coincell, sdhci, smsm, smp2p and wcnss_ctrl as well, all found
-on a variety of Qualcomm boards.
+On Mon, Nov 30, 2015 at 02:37:31PM +0100, Gregory CLEMENT wrote:
+> Hi Arnd,
+>  
+>  On mer., nov. 25 2015, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> > I've posted these before and now gotten around to a rebase and
+> > want to include them in the arm-soc next/multiplatform branch for
+> > 4.5.
+> >
+> > Originally the plan for these platforms was to convert all of
+> > them to DT and use only mach-mvebu. That has not happened,
+> > so I would do it this way instead so we can at least have
+> > them in a single kernel.
+> >
+> > Let me know if there are any concerns or objections.
+> 
+> I have applied all the patches on mvebu/oldmvebu_multiplatform (I fixed
+> the last one which didn't apply on Kconfig). I also merged it
+> mvebu/for-netx to be part of the linux-next.
+> 
+> But before making it part of mvebu/soc, I would like to get some
+> Tested-by. The series is available on
+> git://git.infradead.org/linux-mvebu.git
+> in the branch mvebu/oldmvebu_multiplatform but it also will be part soon
+> of linux-next.
 
-Reported-by: Kevin Hilman <khilman@kernel.org>
-Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
----
+Hi Gregory
 
-For next/deconfig.
+I blew the dust of my Orion5x NAS Reference Design. It boots.
 
-As Kevin reported the Honami stops booting with the addition of pinctrl
-reference in the serial node, simply due to the fact that it references a
-pinctrl driver that's not enabled in the defconfig.
+Tested-by: Andrew Lunn <andrew@lunn.ch>
 
-The patch sent by Andy is hence not enough to fix the problem.
+It would be nice to make Orion5x part of the multi_v5_defconfig and
+mvebu_v5_defconfig. I will see about cooking up some patches.
 
-
-PS. It would be mighty convenient if savedefconfig could be used on the
-multi_v7_defconfig.
-
- arch/arm/configs/multi_v7_defconfig | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index fa7ba92cfe70..dc30a48374b2 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -186,6 +186,7 @@ CONFIG_AD525X_DPOT_I2C=y
- CONFIG_ATMEL_TCLIB=y
- CONFIG_ICS932S401=y
- CONFIG_ATMEL_SSC=m
-+CONFIG_QCOM_COINCELL=m
- CONFIG_APDS9802ALS=y
- CONFIG_ISL29003=y
- CONFIG_EEPROM_AT24=y
-@@ -347,6 +348,11 @@ CONFIG_PINCTRL_AS3722=y
- CONFIG_PINCTRL_PALMAS=y
- CONFIG_PINCTRL_APQ8064=y
- CONFIG_PINCTRL_APQ8084=y
-+CONFIG_PINCTRL_IPQ8064=y
-+CONFIG_PINCTRL_MSM8660=y
-+CONFIG_PINCTRL_MSM8960=y
-+CONFIG_PINCTRL_MSM8X74=y
-+CONFIG_PINCTRL_MSM8916=y
- CONFIG_PINCTRL_QCOM_SPMI_PMIC=y
- CONFIG_PINCTRL_QCOM_SSBI_PMIC=y
- CONFIG_GPIO_SYSFS=y
-@@ -580,6 +586,7 @@ CONFIG_MMC_SDHCI_ST=y
- CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
- CONFIG_MMC_ATMELMCI=y
-+CONFIG_MMC_SDHCI_MSM=y
- CONFIG_MMC_MVSDIO=y
- CONFIG_MMC_SDHI=y
- CONFIG_MMC_DW=y
-@@ -668,9 +675,12 @@ CONFIG_NVEC_POWER=y
- CONFIG_NVEC_PAZ00=y
- CONFIG_QCOM_GSBI=y
- CONFIG_QCOM_PM=y
-+CONFIG_QCOM_SMEM=y
- CONFIG_QCOM_SMD=y
- CONFIG_QCOM_SMD_RPM=y
--CONFIG_QCOM_SMEM=y
-+CONFIG_QCOM_SMP2P=y
-+CONFIG_QCOM_SMSM=y
-+CONFIG_QCOM_WCNSS_CTRL=m
- CONFIG_COMMON_CLK_QCOM=y
- CONFIG_CHROME_PLATFORMS=y
- CONFIG_CROS_EC_CHARDEV=m
--- 
-2.4.2
+    Andrew
