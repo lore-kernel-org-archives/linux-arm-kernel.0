@@ -1,74 +1,34 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 1 Dec 2015 08:21:28 +0100
-Subject: [RFC PATCH 8/9] drm: bridge/dw_hdmi: Covert to support atomic API
-In-Reply-To: <1448940953-23604-1-git-send-email-mark.yao@rock-chips.com>
-References: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>
- <1448940953-23604-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <20151201072128.GF17050@phenom.ffwll.local>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 01 Dec 2015 08:22:34 +0100
+Subject: [PATCH] ARM: pxa: make more mach/*.h files local
+In-Reply-To: <1905725.SU2iekYqHg@wuerfel> (Arnd Bergmann's message of "Mon, 30
+ Nov 2015 15:53:01 +0100")
+References: <1905725.SU2iekYqHg@wuerfel>
+Message-ID: <87a8pu7hvp.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 11:35:53AM +0800, Mark Yao wrote:
-> Fill atomic needed funcs with default atomic helper library.
-> 
-> Rockchip use dw_hdmi, and drm/rockchip will covert to atomic api,
-> we need dw_hdmi support atomic funcs.
-> 
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Aren't there drivers around which use dw_hdmi and which are still not yet
-atomic? This would break them. I think we neeed two connector_func tables
-and dw_hdmi needs to check for DRIVER_ATOMIC at runtime and pick the right
-version.
-
-The larger problem here is that "who should register the drm_connector" is
-a bit an unsolved problem, since both the bridge and the driver should be
-able to customize/adjust the drm_connector at the end of a bridge chain.
-This here is just another example of this problem.
--Daniel
-
+> Lots of header files are never included outside of a mach-pxa
+> directory and do not need to be made visible in include/mach,
+> so let's just move them all down one level.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  drivers/gpu/drm/bridge/dw_hdmi.c |    6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
-> index 56de9f1..587065a 100644
-> --- a/drivers/gpu/drm/bridge/dw_hdmi.c
-> +++ b/drivers/gpu/drm/bridge/dw_hdmi.c
-> @@ -22,6 +22,7 @@
->  
->  #include <drm/drm_of.h>
->  #include <drm/drmP.h>
-> +#include <drm/drm_atomic_helper.h>
->  #include <drm/drm_crtc_helper.h>
->  #include <drm/drm_edid.h>
->  #include <drm/drm_encoder_slave.h>
-> @@ -1515,11 +1516,14 @@ static void dw_hdmi_connector_force(struct drm_connector *connector)
->  }
->  
->  static struct drm_connector_funcs dw_hdmi_connector_funcs = {
-> -	.dpms = drm_helper_connector_dpms,
-> +	.dpms = drm_atomic_helper_connector_dpms,
->  	.fill_modes = drm_helper_probe_single_connector_modes,
->  	.detect = dw_hdmi_connector_detect,
->  	.destroy = dw_hdmi_connector_destroy,
->  	.force = dw_hdmi_connector_force,
-> +	.reset = drm_atomic_helper_connector_reset,
-> +	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
-> +	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
->  };
->  
->  static struct drm_connector_helper_funcs dw_hdmi_connector_helper_funcs = {
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+> I've been carrying patches like this one in my multiplatform series
+> for a while, the PXA one is the largest.
+>
+> I'd like to merge that for 4.5, any objections?
+No, I like this very much.
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+> Do you want to take it into a PXA branch to avoid conflicts, or should
+> I put it into arm-soc directly?
+I don't have any patch so far queued for v4.5, so please take it, I think I'll
+skip v4.5 pull.
+
+Cheers.
+
+--
+Robert
