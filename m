@@ -1,248 +1,184 @@
-From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Tue, 1 Dec 2015 11:16:19 +0800
-Subject: [PATCH v2 06/10] drm/hisilicon: Add vblank feature
-In-Reply-To: <20151130075432.GF17050@phenom.ffwll.local>
-References: <1448707145-69348-1-git-send-email-xinliang.liu@linaro.org>
- <1448707145-69348-7-git-send-email-xinliang.liu@linaro.org>
- <20151130075432.GF17050@phenom.ffwll.local>
-Message-ID: <CAGd==05xhhdA7FWveei4U91rGKCHRNLyRG3-kin5B2V+ao+GrA@mail.gmail.com>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Tue,  1 Dec 2015 11:26:24 +0800
+Subject: [RFC PATCH 2/9] drm/rockchip: Use new vblank api drm_crtc_vblank_*
+In-Reply-To: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>
+References: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1448940391-23333-3-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 November 2015 at 15:54, Daniel Vetter <daniel@ffwll.ch> wrote:
-> On Sat, Nov 28, 2015 at 06:39:01PM +0800, Xinliang Liu wrote:
->> Add vblank handle for ADE.
->>
->> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
->> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
->> Signed-off-by: Andy Green <andy.green@linaro.org>
->> ---
->>  drivers/gpu/drm/hisilicon/hisi_drm_ade.c | 78 ++++++++++++++++++++++++++++++++
->>  drivers/gpu/drm/hisilicon/hisi_drm_ade.h | 16 +++++++
->>  drivers/gpu/drm/hisilicon/hisi_drm_drv.c | 19 +++++++-
->>  3 files changed, 112 insertions(+), 1 deletion(-)
->>  create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_ade.h
->>
->> diff --git a/drivers/gpu/drm/hisilicon/hisi_drm_ade.c b/drivers/gpu/drm/hisilicon/hisi_drm_ade.c
->> index b0976c3..acb11e7 100644
->> --- a/drivers/gpu/drm/hisilicon/hisi_drm_ade.c
->> +++ b/drivers/gpu/drm/hisilicon/hisi_drm_ade.c
->> @@ -267,7 +267,79 @@ static void ade_power_down(struct ade_hw_ctx *ctx)
->>       ctx->power_on = false;
->>  }
->>
->> +static struct drm_crtc *hisi_get_crtc_from_index(struct drm_device *dev,
->> +                                              unsigned int index)
->
-> Ugly that you had to add this, but unfortunately necessary :( Fixing up
-> the drm vblank hooks so that they deal with struct drm_crtc directly is
-> somewhere on my todo. But drm_irq.c is still a bit a mess, so this is some
-> ways off still.
->
-> What might be possible as a follow-up cleanup though is to add
-> vblank_enable and vblank_disable functions to struct
-> drm_crtc_helper_funcs. And then provide this code here to map from int
-> index to struct drm_crtc * as helpers in a new drm_vblank_helper.c file.
-> That might be a good intermediate step.
+No functional update, drm_vblank_* is the legacy version of
+drm_crtc_vblank_*. and use new api make driver more clean.
 
-I would like to have a try to make this intermediate step patch and
-send out for review soon.
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c |   13 +++++++------
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h |    7 +++----
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   24 +++++++++++-------------
+ 3 files changed, 21 insertions(+), 23 deletions(-)
 
-> But nothing that needs to be done before merging hisilicon, that's for
-> sure.
->
-> One more comment below.
->
->> +{
->> +     unsigned int index_tmp = 0;
->> +     struct drm_crtc *crtc;
->> +
->> +     list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
->> +             if (index_tmp == index)
->> +                     return crtc;
->> +
->> +             index_tmp++;
->> +     }
->> +
->> +     WARN_ON(true);
->> +}
->> +
->> +int ade_enable_vblank(struct drm_device *dev, int crtc_index)
->> +{
->> +     struct drm_crtc *crtc = hisi_get_crtc_from_index(dev, crtc_index);
->> +     struct ade_crtc *acrtc = to_ade_crtc(crtc);
->> +     struct ade_hw_ctx *ctx = acrtc->ctx;
->> +     void __iomem *base = ctx->base;
->> +     u32 intr_en;
->> +
->> +     DRM_INFO("enable_vblank enter.\n");
->> +     if (!ctx->power_on)
->> +             (void)ade_power_up(ctx);
->> +
->> +     intr_en = readl(base + LDI_INT_EN);
->> +     intr_en |= LDI_ISR_FRAME_END_INT;
->> +     writel(intr_en, base + LDI_INT_EN);
->>
->> +     return 0;
->> +}
->> +
->> +void ade_disable_vblank(struct drm_device *dev, int crtc_index)
->> +{
->> +     struct drm_crtc *crtc = hisi_get_crtc_from_index(dev, crtc_index);
->> +     struct ade_crtc *acrtc = to_ade_crtc(crtc);
->> +     struct ade_hw_ctx *ctx = acrtc->ctx;
->> +     void __iomem *base = ctx->base;
->> +     u32 intr_en;
->> +
->> +     DRM_INFO("disable_vblank enter.\n");
->> +     if (!ctx->power_on) {
->> +             DRM_ERROR("power is down! vblank disable fail\n");
->> +             return;
->> +     }
->> +     intr_en = readl(base + LDI_INT_EN);
->> +     intr_en &= ~LDI_ISR_FRAME_END_INT;
->> +     writel(intr_en, base + LDI_INT_EN);
->> +}
->> +
->> +static irqreturn_t ade_irq_handler(int irq, void *data)
->> +{
->> +     struct ade_crtc *acrtc = data;
->> +     struct ade_hw_ctx *ctx = acrtc->ctx;
->> +     struct drm_crtc *crtc = &acrtc->base;
->> +     struct drm_device *dev = crtc->dev;
->> +     void __iomem *base = ctx->base;
->> +     u32 status;
->> +
->> +     status = readl(base + LDI_MSK_INT);
->> +     /* DRM_INFO("LDI IRQ: status=0x%X\n",status); */
->> +
->> +     /* vblank irq */
->> +     if (status & LDI_ISR_FRAME_END_INT) {
->> +             writel(LDI_ISR_FRAME_END_INT, base + LDI_INT_CLR);
->> +             drm_handle_vblank(dev, drm_crtc_index(crtc));
->
-> drm_crtc_handle_vblank please. At least when calling into the vblank code
-> drivers don't have to do the struct drm_crtc -> int index conversion any
-> more. Please make sure you do that everywhere, in case I've missed one.
-
-will use drm_crtc_handle_vblank in v3.
-
-Thanks,
--xinliang
-
->
-> Cheers, Daniel
->
->> +     }
->> +
->> +     return IRQ_HANDLED;
->> +}
->>
->>  /*
->>   * set modules' reset mode: by software or hardware
->> @@ -858,6 +930,12 @@ static int ade_bind(struct device *dev, struct device *master, void *data)
->>       if (ret)
->>               return ret;
->>
->> +     /* vblank irq init */
->> +     ret = request_irq(ctx->irq, ade_irq_handler, DRIVER_IRQ_SHARED,
->> +                       drm_dev->driver->name, acrtc);
->> +     if (ret)
->> +             return ret;
->> +
->>       return 0;
->>  }
->>
->> diff --git a/drivers/gpu/drm/hisilicon/hisi_drm_ade.h b/drivers/gpu/drm/hisilicon/hisi_drm_ade.h
->> new file mode 100644
->> index 0000000..d1d7b5d
->> --- /dev/null
->> +++ b/drivers/gpu/drm/hisilicon/hisi_drm_ade.h
->> @@ -0,0 +1,16 @@
->> +/*
->> + * Copyright (c) 2014-2015 Hisilicon Limited.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + */
->> +
->> +#ifndef __HISI_DRM_ADE_H__
->> +#define __HISI_DRM_ADE_H__
->> +
->> +int ade_enable_vblank(struct drm_device *dev, int crtc_index);
->> +void ade_disable_vblank(struct drm_device *dev, int crtc_index);
->> +
->> +#endif
->> diff --git a/drivers/gpu/drm/hisilicon/hisi_drm_drv.c b/drivers/gpu/drm/hisilicon/hisi_drm_drv.c
->> index d0eca80..13f59aa 100644
->> --- a/drivers/gpu/drm/hisilicon/hisi_drm_drv.c
->> +++ b/drivers/gpu/drm/hisilicon/hisi_drm_drv.c
->> @@ -21,6 +21,7 @@
->>  #include <drm/drm_fb_cma_helper.h>
->>  #include <drm/drm_atomic_helper.h>
->>
->> +#include "hisi_drm_ade.h"
->>  #include "hisi_drm_drv.h"
->>
->>  #define DRIVER_NAME  "hisi-drm"
->> @@ -29,6 +30,7 @@ static int hisi_drm_unload(struct drm_device *dev)
->>  {
->>       struct hisi_drm_private *priv = dev->dev_private;
->>
->> +     drm_vblank_cleanup(dev);
->>       drm_mode_config_cleanup(dev);
->>       devm_kfree(dev->dev, priv);
->>       dev->dev_private = NULL;
->> @@ -76,11 +78,22 @@ static int hisi_drm_load(struct drm_device *dev, unsigned long flags)
->>               goto err_mode_config_cleanup;
->>       }
->>
->> +     /* vblank init */
->> +     ret = drm_vblank_init(dev, dev->mode_config.num_crtc);
->> +     if (ret) {
->> +             DRM_ERROR("failed to initialize vblank.\n");
->> +             goto err_unbind_all;
->> +     }
->> +     /* with irq_enabled = true, we can use the vblank feature. */
->> +     dev->irq_enabled = true;
->> +
->>       /* reset all the states of crtc/plane/encoder/connector */
->>       drm_mode_config_reset(dev);
->>
->>       return 0;
->>
->> +err_unbind_all:
->> +     component_unbind_all(dev->dev, dev);
->>  err_mode_config_cleanup:
->>       drm_mode_config_cleanup(dev);
->>       devm_kfree(dev->dev, priv);
->> @@ -126,7 +139,7 @@ static int hisi_gem_cma_dumb_create(struct drm_file *file,
->>
->>  static struct drm_driver hisi_drm_driver = {
->>       .driver_features        = DRIVER_GEM | DRIVER_MODESET | DRIVER_PRIME |
->> -                               DRIVER_ATOMIC,
->> +                               DRIVER_ATOMIC | DRIVER_HAVE_IRQ,
->>       .load                   = hisi_drm_load,
->>       .unload                 = hisi_drm_unload,
->>       .fops                   = &hisi_drm_fops,
->> @@ -148,6 +161,10 @@ static struct drm_driver hisi_drm_driver = {
->>       .gem_prime_vunmap       = drm_gem_cma_prime_vunmap,
->>       .gem_prime_mmap         = drm_gem_cma_prime_mmap,
->>
->> +     .get_vblank_counter     = drm_vblank_count,
->> +     .enable_vblank          = ade_enable_vblank,
->> +     .disable_vblank         = ade_disable_vblank,
->> +
->>       .name                   = "hisi",
->>       .desc                   = "Hisilicon SoCs' DRM Driver",
->>       .date                   = "20150718",
->> --
->> 1.9.1
->>
->
-> --
-> Daniel Vetter
-> Software Engineer, Intel Corporation
-> http://blog.ffwll.ch
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index 574324e..ccd46f2 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -65,11 +65,11 @@ void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
+ }
+ EXPORT_SYMBOL_GPL(rockchip_drm_dma_detach_device);
+ 
+-int rockchip_register_crtc_funcs(struct drm_device *dev,
+-				 const struct rockchip_crtc_funcs *crtc_funcs,
+-				 int pipe)
++int rockchip_register_crtc_funcs(struct drm_crtc *crtc,
++				 const struct rockchip_crtc_funcs *crtc_funcs)
+ {
+-	struct rockchip_drm_private *priv = dev->dev_private;
++	int pipe = drm_crtc_index(crtc);
++	struct rockchip_drm_private *priv = crtc->dev->dev_private;
+ 
+ 	if (pipe > ROCKCHIP_MAX_CRTC)
+ 		return -EINVAL;
+@@ -80,9 +80,10 @@ int rockchip_register_crtc_funcs(struct drm_device *dev,
+ }
+ EXPORT_SYMBOL_GPL(rockchip_register_crtc_funcs);
+ 
+-void rockchip_unregister_crtc_funcs(struct drm_device *dev, int pipe)
++void rockchip_unregister_crtc_funcs(struct drm_crtc *crtc)
+ {
+-	struct rockchip_drm_private *priv = dev->dev_private;
++	int pipe = drm_crtc_index(crtc);
++	struct rockchip_drm_private *priv = crtc->dev->dev_private;
+ 
+ 	if (pipe > ROCKCHIP_MAX_CRTC)
+ 		return;
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+index dc4e5f0..069d6d4 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+@@ -52,10 +52,9 @@ struct rockchip_drm_private {
+ 	const struct rockchip_crtc_funcs *crtc_funcs[ROCKCHIP_MAX_CRTC];
+ };
+ 
+-int rockchip_register_crtc_funcs(struct drm_device *dev,
+-				 const struct rockchip_crtc_funcs *crtc_funcs,
+-				 int pipe);
+-void rockchip_unregister_crtc_funcs(struct drm_device *dev, int pipe);
++int rockchip_register_crtc_funcs(struct drm_crtc *crtc,
++				 const struct rockchip_crtc_funcs *crtc_funcs);
++void rockchip_unregister_crtc_funcs(struct drm_crtc *crtc);
+ int rockchip_drm_encoder_get_mux_id(struct device_node *node,
+ 				    struct drm_encoder *encoder);
+ int rockchip_drm_crtc_mode_config(struct drm_crtc *crtc, int connector_type,
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 41905e2..3d16e70 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -119,8 +119,6 @@ struct vop {
+ 	/* vop dclk reset */
+ 	struct reset_control *dclk_rst;
+ 
+-	int pipe;
+-
+ 	struct vop_win win[];
+ };
+ 
+@@ -691,7 +689,7 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
+ 
+ 	enable_irq(vop->irq);
+ 
+-	drm_vblank_on(vop->drm_dev, vop->pipe);
++	drm_crtc_vblank_on(crtc);
+ 
+ 	return;
+ 
+@@ -710,7 +708,7 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
+ 	if (!vop->is_enabled)
+ 		return;
+ 
+-	drm_vblank_off(crtc->dev, vop->pipe);
++	drm_crtc_vblank_off(crtc);
+ 
+ 	/*
+ 	 * Vop standby will take effect at end of current frame,
+@@ -917,7 +915,7 @@ static int vop_update_plane_event(struct drm_plane *plane,
+ 	 */
+ 	mutex_lock(&vop->vsync_mutex);
+ 	if (fb != vop_win_last_pending_fb(vop_win)) {
+-		ret = drm_vblank_get(plane->dev, vop->pipe);
++		ret = drm_crtc_vblank_get(crtc);
+ 		if (ret) {
+ 			DRM_ERROR("failed to get vblank, %d\n", ret);
+ 			mutex_unlock(&vop->vsync_mutex);
+@@ -928,7 +926,7 @@ static int vop_update_plane_event(struct drm_plane *plane,
+ 
+ 		ret = vop_win_queue_fb(vop_win, fb, yrgb_mst, event);
+ 		if (ret) {
+-			drm_vblank_put(plane->dev, vop->pipe);
++			drm_crtc_vblank_put(crtc);
+ 			mutex_unlock(&vop->vsync_mutex);
+ 			return ret;
+ 		}
+@@ -1022,7 +1020,7 @@ static int vop_disable_plane(struct drm_plane *plane)
+ 
+ 	vop = to_vop(plane->crtc);
+ 
+-	ret = drm_vblank_get(plane->dev, vop->pipe);
++	ret = drm_crtc_vblank_get(plane->crtc);
+ 	if (ret) {
+ 		DRM_ERROR("failed to get vblank, %d\n", ret);
+ 		return ret;
+@@ -1032,7 +1030,7 @@ static int vop_disable_plane(struct drm_plane *plane)
+ 
+ 	ret = vop_win_queue_fb(vop_win, NULL, 0, NULL);
+ 	if (ret) {
+-		drm_vblank_put(plane->dev, vop->pipe);
++		drm_crtc_vblank_put(plane->crtc);
+ 		mutex_unlock(&vop->vsync_mutex);
+ 		return ret;
+ 	}
+@@ -1265,7 +1263,7 @@ static void vop_win_state_complete(struct vop_win *vop_win,
+ 	}
+ 
+ 	list_del(&state->head);
+-	drm_vblank_put(crtc->dev, vop->pipe);
++	drm_crtc_vblank_put(crtc);
+ }
+ 
+ static void vop_crtc_destroy(struct drm_crtc *crtc)
+@@ -1380,6 +1378,7 @@ done:
+ static irqreturn_t vop_isr(int irq, void *data)
+ {
+ 	struct vop *vop = data;
++	struct drm_crtc *crtc = &vop->crtc;
+ 	uint32_t intr0_reg, active_irqs;
+ 	unsigned long flags;
+ 	int ret = IRQ_NONE;
+@@ -1408,7 +1407,7 @@ static irqreturn_t vop_isr(int irq, void *data)
+ 	}
+ 
+ 	if (active_irqs & FS_INTR) {
+-		drm_handle_vblank(vop->drm_dev, vop->pipe);
++		drm_crtc_handle_vblank(crtc);
+ 		active_irqs &= ~FS_INTR;
+ 		ret = (vop->vsync_work_pending) ? IRQ_WAKE_THREAD : IRQ_HANDLED;
+ 	}
+@@ -1501,8 +1500,7 @@ static int vop_create_crtc(struct vop *vop)
+ 
+ 	init_completion(&vop->dsp_hold_completion);
+ 	crtc->port = port;
+-	vop->pipe = drm_crtc_index(crtc);
+-	rockchip_register_crtc_funcs(drm_dev, &private_crtc_funcs, vop->pipe);
++	rockchip_register_crtc_funcs(crtc, &private_crtc_funcs);
+ 
+ 	return 0;
+ 
+@@ -1518,7 +1516,7 @@ static void vop_destroy_crtc(struct vop *vop)
+ {
+ 	struct drm_crtc *crtc = &vop->crtc;
+ 
+-	rockchip_unregister_crtc_funcs(vop->drm_dev, vop->pipe);
++	rockchip_unregister_crtc_funcs(crtc);
+ 	of_node_put(crtc->port);
+ 	drm_crtc_cleanup(crtc);
+ }
+-- 
+1.7.9.5
