@@ -1,156 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Dec 2015 15:46:24 +0000
-Subject: [PATCH v3 2/3] ARM: amba: Move reading of periphid to amba_match()
-In-Reply-To: <1448976866-7892-3-git-send-email-m.szyprowski@samsung.com>
-References: <1448976866-7892-1-git-send-email-m.szyprowski@samsung.com>
- <1448976866-7892-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20151201154624.GW8644@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 1 Dec 2015 07:47:05 -0800
+Subject: [PATCH 1/2] ARM: OMAP2+: Initialize timers later with
+ late_time_init
+In-Reply-To: <565DA609.2020204@ti.com>
+References: <1448900789-4034-1-git-send-email-tony@atomide.com>
+ <1448900789-4034-2-git-send-email-tony@atomide.com>
+ <565DA609.2020204@ti.com>
+Message-ID: <20151201154705.GP23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 02:34:25PM +0100, Marek Szyprowski wrote:
-> From: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+* Grygorii Strashko <grygorii.strashko@ti.com> [151201 05:53]:
+> On 11/30/2015 06:26 PM, Tony Lindgren wrote:
+> > We don't need timers right away and initializing them later gives us few
+> > nice things like interrupts and kmalloc. As the timers have a dependency
+> > to the clock framework, we're better off initializing things later rather
+> > than early if things go wrong. And this allows us to make the mux clock
+> > driver needed for system timers into early_platform drivers.
+> > 
+> > Note that smp_prepare_cpus() will get called later on during the init so
+> > we just need to local_irq_enable/disable for clocksource_probe().
+> > 
+> > Cc: Felipe Balbi <balbi@ti.com>
+> > Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Cc: Tero Kristo <t-kristo@ti.com>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > ---
+> >   arch/arm/mach-omap2/timer.c | 46 +++++++++++++++++++++++++++++++++++++++------
+> >   1 file changed, 40 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> > index b18ebbe..68bf482 100644
+> > --- a/arch/arm/mach-omap2/timer.c
+> > +++ b/arch/arm/mach-omap2/timer.c
+> > @@ -478,36 +478,56 @@ static void __init __omap_sync32k_timer_init(int clkev_nr, const char *clkev_src
+> >   	omap2_gp_clockevent_init(clkev_nr, clkev_src, clkev_prop);
+> >   
+> >   	/* Enable the use of clocksource="gp_timer" kernel parameter */
+> > +	local_irq_disable();
+> >   	if (use_gptimer_clksrc || gptimer)
+> >   		omap2_gptimer_clocksource_init(clksrc_nr, clksrc_src,
+> >   						clksrc_prop);
+> >   	else
+> >   		omap2_sync32k_clocksource_init();
+> > +	local_irq_enable();
 > 
-> Reading the periphid when the Primecell device is registered means that
-> the apb pclk must be available by then or the device won't be registered
-> at all.
+> So, this will be called now after sched_clock_postinit() and to W/A warnings
+> you've added local_irq_disable()/local_irq_enable(). Am I right?
 > 
-> By reading the periphid in amba_match() we can return -EPROBE_DEFER if
-> the apb pclk isn't there yet and the device will be retried later.
-> 
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> [minor code adjustments, added missing comment]
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/amba/bus.c | 77 +++++++++++++++++++++++++++++-------------------------
->  1 file changed, 41 insertions(+), 36 deletions(-)
-> 
-> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-> index f009936..879a421 100644
-> --- a/drivers/amba/bus.c
-> +++ b/drivers/amba/bus.c
-> @@ -24,6 +24,8 @@
->  
->  #define to_amba_driver(d)	container_of(d, struct amba_driver, drv)
->  
-> +static int amba_read_periphid(struct amba_device *dev);
-> +
+> Are you sure this is safe?
 
-Please avoid forward declarations where possible.
+Hmm good point, update_sched_clock() is never called again and so it's
+running on jiffies. We could separate out the sched_clock when the 32k
+source or a local timer is used. But that does allow initializing the
+gptimer later on. Anyways, clearly this needs more work.
 
->  static const struct amba_id *
->  amba_lookup(const struct amba_id *table, struct amba_device *dev)
->  {
-> @@ -43,11 +45,23 @@ static int amba_match(struct device *dev, struct device_driver *drv)
->  {
->  	struct amba_device *pcdev = to_amba_device(dev);
->  	struct amba_driver *pcdrv = to_amba_driver(drv);
-> +	int ret;
->  
->  	/* When driver_override is set, only bind to the matching driver */
->  	if (pcdev->driver_override)
->  		return !strcmp(pcdev->driver_override, drv->name);
->  
-> +	/* Do plug-n-play if no hard-coded primecell ID has been provided */
-> +	if (!pcdev->periphid) {
-> +		ret = amba_read_periphid(pcdev);
-> +		if (ret) {
-> +			if (ret != -EPROBE_DEFER)
-> +				dev_err(dev, "Failed to read periphid: %d",
-> +					ret);
-> +			return ret;
-> +		}
-> +	}
-> +
->  	return amba_lookup(pcdrv->id_table, pcdev) != NULL;
->  }
->  
-> @@ -336,31 +350,11 @@ static void amba_device_release(struct device *dev)
->  	kfree(d);
->  }
->  
-> -/**
-> - *	amba_device_add - add a previously allocated AMBA device structure
-> - *	@dev: AMBA device allocated by amba_device_alloc
-> - *	@parent: resource parent for this devices resources
-> - *
-> - *	Claim the resource, and read the device cell ID if not already
-> - *	initialized.  Register the AMBA device with the Linux device
-> - *	manager.
-> - */
-> -int amba_device_add(struct amba_device *dev, struct resource *parent)
-> +static int amba_read_periphid(struct amba_device *dev)
->  {
->  	u32 size;
->  	void __iomem *tmp;
-> -	int i, ret;
-> -
-> -	WARN_ON(dev->irq[0] == (unsigned int)-1);
-> -	WARN_ON(dev->irq[1] == (unsigned int)-1);
-> -
-> -	ret = request_resource(parent, &dev->res);
-> -	if (ret)
-> -		goto err_out;
-> -
-> -	/* Hard-coded primecell ID instead of plug-n-play */
-> -	if (dev->periphid != 0)
-> -		goto skip_probe;
-> +	int i, ret = 0;
->  
->  	/*
->  	 * Dynamically calculate the size of the resource
-> @@ -368,10 +362,8 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
->  	 */
->  	size = resource_size(&dev->res);
->  	tmp = ioremap(dev->res.start, size);
-> -	if (!tmp) {
-> -		ret = -ENOMEM;
-> -		goto err_release;
-> -	}
-> +	if (!tmp)
-> +		return -ENOMEM;
->  
->  	ret = amba_get_enable_pclk(dev);
->  	if (ret == 0) {
-> @@ -399,26 +391,39 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
->  
->  	iounmap(tmp);
->  
-> +	return ret;
-> +}
-> +
-> +/**
-> + *	amba_device_add - add a previously allocated AMBA device structure
-> + *	@dev: AMBA device allocated by amba_device_alloc
-> + *	@parent: resource parent for this devices resources
-> + *
-> + *	Claim the resource, and register the AMBA device with the Linux device
-> + *	manager.
-> + */
-> +int amba_device_add(struct amba_device *dev, struct resource *parent)
-> +{
-> +	int ret;
-> +
-> +	WARN_ON(dev->irq[0] == (unsigned int)-1);
-> +	WARN_ON(dev->irq[1] == (unsigned int)-1);
-> +
-> +	ret = request_resource(parent, &dev->res);
->  	if (ret)
-> -		goto err_release;
-> +		return ret;
->  
-> - skip_probe:
->  	ret = device_add(&dev->dev);
->  	if (ret)
-> -		goto err_release;
-> +		return ret;
+Regards,
 
-NAK.
-
-The original code handled error conditions correctly.  This new code
-completely breaks the error handling here by removing the release of
-the above requested resource.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Tony
