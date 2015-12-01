@@ -1,47 +1,39 @@
 From: haibo.chen@freescale.com (Haibo Chen)
-Date: Tue, 1 Dec 2015 16:22:29 +0800
-Subject: [PATCH v4 3/4] ARM: dts: imx7d.dtsi: add ADC support
+Date: Tue, 1 Dec 2015 16:22:30 +0800
+Subject: [PATCH v4 4/4] ARM: dts: imx7d-sdb: add ADC support
 In-Reply-To: <1448958150-25579-1-git-send-email-haibo.chen@freescale.com>
 References: <1448958150-25579-1-git-send-email-haibo.chen@freescale.com>
-Message-ID: <1448958150-25579-4-git-send-email-haibo.chen@freescale.com>
+Message-ID: <1448958150-25579-5-git-send-email-haibo.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add imx7d ADC support.
+Add ADC support for imx7d-sdb board.
 
 Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
 ---
- arch/arm/boot/dts/imx7d.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/boot/dts/imx7d-sdb.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-index ebc053a..aa0624d 100644
---- a/arch/arm/boot/dts/imx7d.dtsi
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -583,6 +583,24 @@
- 			reg = <0x30400000 0x400000>;
- 			ranges;
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index 432aaf5..b2c4536 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -97,6 +97,16 @@
+ 	};
+ };
  
-+			adc1: adc at 30610000 {
-+				compatible = "fsl,imx7d-adc";
-+				reg = <0x30610000 0x10000>;
-+				interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_ADC_ROOT_CLK>;
-+				clock-names = "adc";
-+				status = "disabled";
-+			};
++&adc1 {
++	vref-supply = <&reg_vref_1v8>;
++	status = "okay";
++};
 +
-+			adc2: adc at 30620000 {
-+				compatible = "fsl,imx7d-adc";
-+				reg = <0x30620000 0x10000>;
-+				interrupts = <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_ADC_ROOT_CLK>;
-+				clock-names = "adc";
-+				status = "disabled";
-+			};
++&adc2 {
++	vref-supply = <&reg_vref_1v8>;
++	status = "okay";
++};
 +
- 			pwm1: pwm at 30660000 {
- 				compatible = "fsl,imx7d-pwm", "fsl,imx27-pwm";
- 				reg = <0x30660000 0x10000>;
+ &cpu0 {
+ 	arm-supply = <&sw1a_reg>;
+ };
 -- 
 1.9.1
