@@ -1,23 +1,31 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 01 Dec 2015 15:20:47 -0800
-Subject: [PATCH] Enable PCIe PHY support in Cygnus
-In-Reply-To: <4359956.cn9R5kOVVW@wuerfel>
-References: <1447870619-2828-1-git-send-email-rjui@broadcom.com>
- <5654FCF5.40406@gmail.com> <565E2969.7000500@gmail.com>
- <4359956.cn9R5kOVVW@wuerfel>
-Message-ID: <565E2B4F.2020002@gmail.com>
+From: jikos@kernel.org (Jiri Kosina)
+Date: Wed, 2 Dec 2015 00:24:49 +0100 (CET)
+Subject: [PATCH v2 1/5] printk/nmi: Generic solution for safe printk in NMI
+In-Reply-To: <20151127153804.GC2648@pathway.suse.cz>
+References: <1448622572-16900-2-git-send-email-pmladek@suse.com>
+ <201511271919.aEZuZKNe%fengguang.wu@intel.com>
+ <20151127153804.GC2648@pathway.suse.cz>
+Message-ID: <alpine.LNX.2.00.1512020022460.32500@pobox.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/15 15:18, Arnd Bergmann wrote:
-> On Tuesday 01 December 2015 15:12:41 Florian Fainelli wrote:
->>   CC      lib/bitmap.o
->>
->> I added an #address-cells = <0> and #size-cells = <1> to fix this, since
->> your reg property is a single digit.
-> 
-> Did you mean #address-cells = <1> and #size-cells = <0>?
+On Fri, 27 Nov 2015, Petr Mladek wrote:
 
-Ermm, yes, thanks for catching this..
+> MN10300 has its own implementation for entering and exiting NMI 
+> handlers. It does not call nmi_enter() and nmi_exit(). Please, find 
+> below an updated patch that adds printk_nmi_enter() and 
+> printk_nmi_exit() to the custom entry points. Then we could add HAVE_NMI 
+> to arch/mn10300/Kconfig and avoid the above warning.
+
+Hmm, so what exactly would go wrong if MN10300 (whatever that architecture 
+is) would call nmi_enter() and nmi_exit() at the places where it's 
+starting and finishing NMI handler?
+
+>From a cursory look, it seems like most (if not all) of the things called 
+from nmi_{enter,exit}() would be nops there anyway.
+
+Thanks,
+
 -- 
-Florian
+Jiri Kosina
+SUSE Labs
