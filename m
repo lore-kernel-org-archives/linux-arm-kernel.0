@@ -1,61 +1,72 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 1 Dec 2015 14:17:47 -0800
-Subject: [PATCH v2 17/25] mtd: nand: remove useless mtd->priv = chip
- assignments
-In-Reply-To: <1448967802-25796-18-git-send-email-boris.brezillon@free-electrons.com>
-References: <1448967802-25796-1-git-send-email-boris.brezillon@free-electrons.com>
- <1448967802-25796-18-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20151201221747.GB64635@google.com>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Tue, 01 Dec 2015 14:20:40 -0800
+Subject: [RESEND PATCH] arm64: bpf: add 'store immediate' instruction
+In-Reply-To: <1448922247-5692-1-git-send-email-yang.shi@linaro.org>
+References: <1448922247-5692-1-git-send-email-yang.shi@linaro.org>
+Message-ID: <565E1D38.7020906@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 12:03:14PM +0100, Boris Brezillon wrote:
-> mtd_to_nand() now uses the container_of() approach to transform an
-> mtd_info pointer into a nand_chip one. Drop useless mtd->priv
-> assignments from NAND controller drivers.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+On 11/30/2015 2:24 PM, Yang Shi wrote:
+> aarch64 doesn't have native store immediate instruction, such operation
+> has to be implemented by the below instruction sequence:
+>
+> Load immediate to register
+> Store register
+>
+> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+> CC: Zi Shen Lim <zlim.lnx@gmail.com>
+
+Had email exchange offline with Zi Shen Lim since he is traveling and 
+cannot send text-only mail, quoted below for his reply:
+
+"I've given reviewed-by in response to original posting. Unless 
+something has changed, feel free to add it."
+
+Since there is nothing changed, added his reviewed-by.
+
+Reviewed-by: Zi Shen Lim <zlim.lnx@gmail.com>
+
+Thanks,
+Yang
+
+> CC: Xi Wang <xi.wang@gmail.com>
 > ---
-> Patch generated with the following coccinelle script:
-> 
-> ---8<----
-> virtual patch
-> 
-> @@
-> struct mtd_info m;
-> struct mtd_info *mp;
-> struct nand_chip *c;
-> @@
-> (
-> -(m).priv = c;
-> |
-> -(mp)->priv = c;
-> |
-> -(mp)->priv = (void *)c;
-> )
-> ---8<----
-> ---
-
-...
-
-> diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
-> index 3f29734..ed4184c 100644
-> --- a/drivers/mtd/nand/s3c2410.c
-> +++ b/drivers/mtd/nand/s3c2410.c
-> @@ -834,7 +834,6 @@ static void s3c2410_nand_init_chip(struct s3c2410_nand_info *info,
->  	chip->IO_ADDR_R = chip->IO_ADDR_W;
->  
->  	nmtd->info	   = info;
-> -	mtd->priv	   = chip;
-
-After this one, we have:
-
-drivers/mtd/nand/s3c2410.c: In function ?s3c2410_nand_init_chip?:
-drivers/mtd/nand/s3c2410.c:791:19: warning: unused variable ?mtd? [-Wunused-variable]
-
-
->  	nmtd->set	   = set;
->  
->  #ifdef CONFIG_MTD_NAND_S3C2410_HWECC
- 
-Brian
+> Thsi patch might be buried by the storm of xadd discussion, however, it is
+> absolutely irrelevent to xadd, so resend the patch itself.
+>
+>   arch/arm64/net/bpf_jit_comp.c | 20 +++++++++++++++++++-
+>   1 file changed, 19 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+> index 6809647..49c1f1b 100644
+> --- a/arch/arm64/net/bpf_jit_comp.c
+> +++ b/arch/arm64/net/bpf_jit_comp.c
+> @@ -563,7 +563,25 @@ emit_cond_jmp:
+>   	case BPF_ST | BPF_MEM | BPF_H:
+>   	case BPF_ST | BPF_MEM | BPF_B:
+>   	case BPF_ST | BPF_MEM | BPF_DW:
+> -		goto notyet;
+> +		/* Load imm to a register then store it */
+> +		ctx->tmp_used = 1;
+> +		emit_a64_mov_i(1, tmp2, off, ctx);
+> +		emit_a64_mov_i(1, tmp, imm, ctx);
+> +		switch (BPF_SIZE(code)) {
+> +		case BPF_W:
+> +			emit(A64_STR32(tmp, dst, tmp2), ctx);
+> +			break;
+> +		case BPF_H:
+> +			emit(A64_STRH(tmp, dst, tmp2), ctx);
+> +			break;
+> +		case BPF_B:
+> +			emit(A64_STRB(tmp, dst, tmp2), ctx);
+> +			break;
+> +		case BPF_DW:
+> +			emit(A64_STR64(tmp, dst, tmp2), ctx);
+> +			break;
+> +		}
+> +		break;
+>
+>   	/* STX: *(size *)(dst + off) = src */
+>   	case BPF_STX | BPF_MEM | BPF_W:
+>
