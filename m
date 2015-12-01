@@ -1,55 +1,60 @@
 From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 1 Dec 2015 08:12:13 +0100
-Subject: [PATCH v2 03/10] drm/hisilicon: Add hisilicon DRM master driver
-In-Reply-To: <20151130172528.GA10974@rob-hp-laptop>
-References: <CACvgo51NJNRKObgExtv=vNJ10GSgDPz=nQs=4BHAcgqPpSB_ug@mail.gmail.com>
- <20151130074603.GE17050@phenom.ffwll.local>
- <20151130172528.GA10974@rob-hp-laptop>
-Message-ID: <20151201071213.GD17050@phenom.ffwll.local>
+Date: Tue, 1 Dec 2015 08:13:25 +0100
+Subject: [PATCH v2 06/10] drm/hisilicon: Add vblank feature
+In-Reply-To: <CAGd==05xhhdA7FWveei4U91rGKCHRNLyRG3-kin5B2V+ao+GrA@mail.gmail.com>
+References: <1448707145-69348-1-git-send-email-xinliang.liu@linaro.org>
+ <1448707145-69348-7-git-send-email-xinliang.liu@linaro.org>
+ <20151130075432.GF17050@phenom.ffwll.local>
+ <CAGd==05xhhdA7FWveei4U91rGKCHRNLyRG3-kin5B2V+ao+GrA@mail.gmail.com>
+Message-ID: <20151201071325.GE17050@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 11:25:28AM -0600, Rob Herring wrote:
-> On Mon, Nov 30, 2015 at 08:46:03AM +0100, Daniel Vetter wrote:
-> > On Sat, Nov 28, 2015 at 03:25:35PM +0000, Emil Velikov wrote:
-> > > Hi Xinliang,
-> > > 
-> > > On 28 November 2015 at 10:38, Xinliang Liu <xinliang.liu@linaro.org> wrote:
-> > > > Add DRM master driver for hi6220 SoC which used in HiKey board.
-> > > > Add dumb buffer feature.
-> > > > Add prime dmabuf feature.
-> > > >
+On Tue, Dec 01, 2015 at 11:16:19AM +0800, Xinliang Liu wrote:
+> On 30 November 2015 at 15:54, Daniel Vetter <daniel@ffwll.ch> wrote:
+> > On Sat, Nov 28, 2015 at 06:39:01PM +0800, Xinliang Liu wrote:
+> >> Add vblank handle for ADE.
+> >>
+> >> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+> >> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+> >> Signed-off-by: Andy Green <andy.green@linaro.org>
+> >> ---
+> >>  drivers/gpu/drm/hisilicon/hisi_drm_ade.c | 78 ++++++++++++++++++++++++++++++++
+> >>  drivers/gpu/drm/hisilicon/hisi_drm_ade.h | 16 +++++++
+> >>  drivers/gpu/drm/hisilicon/hisi_drm_drv.c | 19 +++++++-
+> >>  3 files changed, 112 insertions(+), 1 deletion(-)
+> >>  create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_ade.h
+> >>
+> >> diff --git a/drivers/gpu/drm/hisilicon/hisi_drm_ade.c b/drivers/gpu/drm/hisilicon/hisi_drm_ade.c
+> >> index b0976c3..acb11e7 100644
+> >> --- a/drivers/gpu/drm/hisilicon/hisi_drm_ade.c
+> >> +++ b/drivers/gpu/drm/hisilicon/hisi_drm_ade.c
+> >> @@ -267,7 +267,79 @@ static void ade_power_down(struct ade_hw_ctx *ctx)
+> >>       ctx->power_on = false;
+> >>  }
+> >>
+> >> +static struct drm_crtc *hisi_get_crtc_from_index(struct drm_device *dev,
+> >> +                                              unsigned int index)
+> >
+> > Ugly that you had to add this, but unfortunately necessary :( Fixing up
+> > the drm vblank hooks so that they deal with struct drm_crtc directly is
+> > somewhere on my todo. But drm_irq.c is still a bit a mess, so this is some
+> > ways off still.
+> >
+> > What might be possible as a follow-up cleanup though is to add
+> > vblank_enable and vblank_disable functions to struct
+> > drm_crtc_helper_funcs. And then provide this code here to map from int
+> > index to struct drm_crtc * as helpers in a new drm_vblank_helper.c file.
+> > That might be a good intermediate step.
 > 
-> > > > +static int hisi_gem_cma_dumb_create(struct drm_file *file,
-> > > > +                                   struct drm_device *dev,
-> > > > +                                   struct drm_mode_create_dumb *args)
-> > > > +{
-> > > > +       int min_pitch = DIV_ROUND_UP(args->width * args->bpp, 8);
-> > > > +
-> > > > +       /* mali gpu need pitch 8 bytes alignment for 32bpp */
-> > > > +       args->pitch = roundup(min_pitch, 8);
-> > > > +
-> > > I'm not sure you want this kind of dependency of an out of tree driver
-> > > upstream. If this is some limitation on the display engine so be it,
-> > > but tailoring things for an external module seems like a very bad
-> > > idea.
-> > 
-> > Yup, nacked. dumb_create is for dumb buffers, not rendering. Mali needs to
-> > go upstream to fix this ...
-> 
-> I believe this is copy-n-paste from Rockchip driver.
-> 
-> I'm curious why there is not a common interface for rendering buffers at 
-> least for systems without graphics memory like most ARM systems. Are the 
-> requirements of GPU so diverse that things like pitch alignment can't be 
-> parameterized?
+> I would like to have a try to make this intermediate step patch and
+> send out for review soon.
 
-pitch requirements is generally the least worry. The real fun starts with
-tiling modes and how all that stuff interacts. Atm the only solution we
-have is "userspace needs to know" in form of either gralloc (android) or
-gbm (cros, desktop linux). There have been ideas to for describing buffer
-limits, but nothing concrete yet.
--Daniel
+Awesome, looking forward to reviewing it. If you have questions about
+details fastest to ping me on irc (nick: danvet, #dri-devel on
+freenode.net).
+
+Cheers, Daniel
 -- 
 Daniel Vetter
 Software Engineer, Intel Corporation
