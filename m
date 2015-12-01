@@ -1,27 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 01 Dec 2015 11:22:02 +0100
-Subject: [PATCH v6 14/19] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <87bnaafrt0.fsf@igel.home>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <20151130202141.GA23254@yury-N73SV> <87bnaafrt0.fsf@igel.home>
-Message-ID: <2776283.xtmDQm6BqS@wuerfel>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 1 Dec 2015 11:26:03 +0100
+Subject: [PATCH] pinctrl: update document for
+ pinconf_generic_parse_dt_config
+In-Reply-To: <CACRpkdZ_9EOA2PVcPQgoM2UHor5jdtsGBSzomYEn0hOJEF=g1w@mail.gmail.com>
+References: <1448453603-38980-1-git-send-email-yingjoe.chen@mediatek.com>
+ <CACRpkdZ_9EOA2PVcPQgoM2UHor5jdtsGBSzomYEn0hOJEF=g1w@mail.gmail.com>
+Message-ID: <20151201102603.GC29282@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 December 2015 10:20:59 Andreas Schwab wrote:
-> Yury Norov <ynorov@caviumnetworks.com> writes:
+On Tue, Dec 01, 2015 at 11:12:16AM +0100, Linus Walleij wrote:
+> On Wed, Nov 25, 2015 at 1:13 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
 > 
-> > There's a tricky bug with signal stack, that Andreas also discovered.
+> > The returned configs from pinconf_generic_parse_dt_config() is
+> > duplicated from original. Make it clear it must be freed when no
+> > longer necessary.
+> >
+> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 > 
-> That was only a confusion about the compat state of sys_rt_sigaction.
-> It just requires making sure glibc uses the correct (64bit layout)
-> struct kernel_sigaction.
+> Patch applied.
+> 
+> > It seems memleak in pinctrl-mtk-common.c[1] is not alone. After a quick
+> > glance I notice similar issues in drivers/pinctrl/pinctrl-at91-pio4.c and
+> > drivers/pinctrl/nomadik/pinctrl-abx500.c.
+> 
+> Patches fixing them are coming? ;)
 
-I don't think we need to use the 64-bit version of sigaction, both
-kernel and libc are simpler if we use the normal 32-bit version.
+Yes, it's planned.
 
-We should always default to using the generic 32-bit structures
-unless there is a strong reason not to.
+Regards
 
-	Arnd
+Ludovic
