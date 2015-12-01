@@ -1,86 +1,45 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 1 Dec 2015 18:47:42 +0000
-Subject: [PATCH v3 4/4] drivers: psci: replace psci firmware calls
-In-Reply-To: <1448449461-5043-5-git-send-email-jens.wiklander@linaro.org>
-References: <1448449461-5043-1-git-send-email-jens.wiklander@linaro.org>
- <1448449461-5043-5-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <20151201184741.GE29045@leverpostej>
+Date: Tue, 1 Dec 2015 18:50:29 +0000
+Subject: [PATCH v2 2/6] arm64: Move kill_cpu_early to smp.c
+In-Reply-To: <565DE289.2000105@arm.com>
+References: <1448982731-17182-1-git-send-email-suzuki.poulose@arm.com>
+ <1448982731-17182-3-git-send-email-suzuki.poulose@arm.com>
+ <20151201152826.GA28370@leverpostej> <565DC5DB.7070905@arm.com>
+ <20151201163138.GA29045@leverpostej> <565DDB2E.2010308@arm.com>
+ <20151201175254.GD29045@leverpostej> <565DE289.2000105@arm.com>
+Message-ID: <20151201185028.GF29045@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jens,
-
-On Wed, Nov 25, 2015 at 12:04:21PM +0100, Jens Wiklander wrote:
-> Switch to use a generic interface for issuing SMC/HVC based on ARM SMC
-> Calling Convention. Removes now the now unused psci-call.S.
+On Tue, Dec 01, 2015 at 06:10:17PM +0000, Suzuki K. Poulose wrote:
+> On 01/12/15 17:52, Mark Rutland wrote:
+> >On Tue, Dec 01, 2015 at 05:38:54PM +0000, Suzuki K. Poulose wrote:
+> >>On 01/12/15 16:31, Mark Rutland wrote:
+> >
+> >[...]
+> >
+> >>>We need stuck-in-the-kernel flag to account for CPUs which didn't manage
+> >>>to turn the MMU on (which are either in the spin-table, or failed when
+> >>>they were individually onlined).
+> >>
+> >>Did you mean to say "turn the MMU off" ?
+> >
+> >No, I mean CPUs which were unable to turn the MMU on in the first place.
+> >Perhaps they entered the spin-table but were never individually onlined,
+> >perhaps they didn't support the kernel page size, etc.
+> >
+> >When CPUs exit the kernel via PSCI they never switch the MMU off within
+> >the kernel.
 > 
-> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/kernel/Makefile      |  1 -
->  arch/arm/kernel/psci-call.S   | 31 -------------------------------
->  arch/arm64/kernel/Makefile    |  2 +-
->  arch/arm64/kernel/psci-call.S | 28 ----------------------------
->  drivers/firmware/psci.c       | 23 +++++++++++++++++++++--
->  5 files changed, 22 insertions(+), 63 deletions(-)
->  delete mode 100644 arch/arm/kernel/psci-call.S
->  delete mode 100644 arch/arm64/kernel/psci-call.S
+> OK. So the flag will also be used for CPUs which are stuck-in-the-kernel
+> with MMU turned on. e.g, a CPU (using spin-table) we try to bring down
+> in kill_cpu_early(). Correct ?
 
-As a heads-up, this conflicts with changes in drivers/firmware/psci.c
-that appeared in for v4.4-rc1.
+Yes.
 
-The conflict is trivial (upstream some functions were added to the same
-location as the invocation functions), but even git am -3 doesn't seem
-to be able to fix that up automatically, so it would be good if you
-could rebase this to v4.4-rc1 so as to avoid that conflict.
-
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index 42700f0..9c55d11 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -19,6 +19,7 @@
->  #include <linux/pm.h>
->  #include <linux/printk.h>
->  #include <linux/psci.h>
-> +#include <linux/arm-smccc.h>
->  #include <linux/reboot.h>
-
-Nit: please move the arm-smccc.h include to the start of the list to
-keep this ordered alphabetically.
-
-> +static unsigned long __invoke_psci_fn_hvc(unsigned long function_id,
-> +			unsigned long arg0, unsigned long arg1,
-> +			unsigned long arg2)
-> +{
-> +	struct arm_smccc_res res;
-> +
-> +	arm_smccc_hvc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
-> +	return res.a0;
-> +}
-> +
-> +static unsigned long __invoke_psci_fn_smc(unsigned long function_id,
-> +			unsigned long arg0, unsigned long arg1,
-> +			unsigned long arg2)
-> +{
-> +	struct arm_smccc_res res;
-> +
-> +	arm_smccc_smc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
-> +	return res.a0;
-> +}
-> +
-
-As mentioned above, this part needs to be rebased to v4.4-rc1 to avoid
-conflicts.
-
-I've given this a spin on arm64 (native and virtual) and arm (virtual).
-SMP bringup, hotplug, and reboot worked as expected in all cases.
-
-Assuming you apply the fixes requested above, for the PSCI parts:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-
-What's the plan for merging this? I assume this'll go via arm-soc?
+We'd also pad it such that nothing else shares the same writeback
+granule, and when writing to it with the MMU off we can invalidate the
+stale cached copy.
 
 Thanks,
 Mark.
