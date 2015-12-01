@@ -1,44 +1,45 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 1 Dec 2015 13:12:07 +0100
-Subject: [PATCH v3 0/3] Remove ARCH_MSM* configs
-In-Reply-To: <1448933123-9843-1-git-send-email-sboyd@codeaurora.org>
-References: <1448933123-9843-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <565D8E97.4030505@linaro.org>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Tue, 1 Dec 2015 20:12:34 +0800
+Subject: [PATCH] mmc: mediatek: change some dev_err to dev_dbg
+Message-ID: <1448971954-398-1-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/2015 02:25 AM, Stephen Boyd wrote:
-> This patch series allows us to remove the ARCH_MSM* configs that live
-> in mach-qcom/Kconfig. They're mostly proxy configs for user selectable
-> clocksource configurations anyway.
->
-> Changes from v2:
->   * Renamed config in patch 1 to QCOM_ARCH_A_FAMILY to be less confusing
->
-> Changes from v1:
->   * Patch 1 replaced with one that moves config to mach-qcom/Kconfig
->   * Applied Arnd's acks to patches 2 and 3
->
-> Stephen Boyd (3):
->    ARM: qcom: Make an option for qcom 'a-family' platforms
->    ARM: qcom_defconfig: Enable HAVE_ARM_ARCH_TIMER
->    ARM: qcom: Drop ARCH_MSM* configs
->
->   arch/arm/Makefile               |  3 +--
->   arch/arm/configs/qcom_defconfig |  1 +
->   arch/arm/mach-qcom/Kconfig      | 17 +++++++++--------
->   3 files changed, 11 insertions(+), 10 deletions(-)
+there are too many error logs shown when use CMD21/CMD19 to do tune,
+and it will appear at each resume time, print out so many logs to the
+uart console cost too mush time. so change it to dev_dbg.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+---
+ drivers/mmc/host/mtk-sd.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Even it does not hurt, ARCH_MSM8X60, ARCH_MSM8960 and ARCH_MSM8974 could 
-be also removed from the defconfig. Better to do it right now, so they 
-won't be forgotten.
-
-
+diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+index 39568cc..34d23b8 100644
+--- a/drivers/mmc/host/mtk-sd.c
++++ b/drivers/mmc/host/mtk-sd.c
+@@ -972,7 +972,7 @@ static bool msdc_data_xfer_done(struct msdc_host *host, u32 events,
+ 		if ((events & MSDC_INT_XFER_COMPL) && (!stop || !stop->error)) {
+ 			data->bytes_xfered = data->blocks * data->blksz;
+ 		} else {
+-			dev_err(host->dev, "interrupt events: %x\n", events);
++			dev_dbg(host->dev, "interrupt events: %x\n", events);
+ 			msdc_reset_hw(host);
+ 			host->error |= REQ_DAT_ERR;
+ 			data->bytes_xfered = 0;
+@@ -982,10 +982,10 @@ static bool msdc_data_xfer_done(struct msdc_host *host, u32 events,
+ 			else if (events & MSDC_INT_DATCRCERR)
+ 				data->error = -EILSEQ;
+ 
+-			dev_err(host->dev, "%s: cmd=%d; blocks=%d",
++			dev_dbg(host->dev, "%s: cmd=%d; blocks=%d",
+ 				__func__, mrq->cmd->opcode, data->blocks);
+-			dev_err(host->dev, "data_error=%d xfer_size=%d\n",
+-					(int)data->error, data->bytes_xfered);
++			dev_dbg(host->dev, "data_error=%d xfer_size=%d\n",
++				(int)data->error, data->bytes_xfered);
+ 		}
+ 
+ 		msdc_data_xfer_next(host, mrq, data);
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.8.1.1.dirty
