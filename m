@@ -1,91 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Dec 2015 17:10:14 +0000
-Subject: [PATCH v2 1/2] scripts: Add a recorduidiv program
-In-Reply-To: <20151201114929.655433a2@gandalf.local.home>
-References: <1448488264-23400-1-git-send-email-sboyd@codeaurora.org>
- <1448488264-23400-2-git-send-email-sboyd@codeaurora.org>
- <20151125234711.GT8644@n2100.arm.linux.org.uk>
- <565C6714.802@suse.com>
- <20151130153208.GR8644@n2100.arm.linux.org.uk>
- <565C6DE9.2020302@suse.com> <565DC5A9.2010305@suse.cz>
- <20151201161944.GX8644@n2100.arm.linux.org.uk>
- <20151201114929.655433a2@gandalf.local.home>
-Message-ID: <20151201171014.GY8644@n2100.arm.linux.org.uk>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 1 Dec 2015 19:12:26 +0200
+Subject: [RFC PATCH] clocksource: ti-32k: convert to platform device
+In-Reply-To: <20151201160707.GQ23396@atomide.com>
+References: <1448040129-23869-1-git-send-email-grygorii.strashko@ti.com>
+ <87h9kgcz1k.fsf@saruman.tx.rr.com> <5658B8B2.5030505@ti.com>
+ <20151130162815.GA2517@atomide.com> <565DB7F7.4020702@ti.com>
+ <20151201160707.GQ23396@atomide.com>
+Message-ID: <565DD4FA.3000308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 11:49:29AM -0500, Steven Rostedt wrote:
-> On Tue, 1 Dec 2015 16:19:44 +0000
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->  
-> > They hardly "do nothing", as the (eg) recordmcount plasters the build
-> > log with warnings.  A solution to that would be to make recordmcount
-> > silent if the section is already present.
-> 
-> Note, that warning found plenty of bugs when modifications of the build
-> system was being done and broke recordmcount.c. I really don't want to
-> silent it.
-> 
-> But for some reason, your build is causing lots of warnings and not for
-> others. Perhaps we can add a "SILENT_RECORDMCOUNT" environment variable
-> and have it set when something like CCACHE_HARDLINK or whatever is
-> causing it to trigger when we don't care.
+On 12/01/2015 06:07 PM, Tony Lindgren wrote:
+> * Grygorii Strashko <grygorii.strashko@ti.com> [151201 07:09]:
+>> On 11/30/2015 06:28 PM, Tony Lindgren wrote:
+>>>
+>>> We should be able to make this into an early_platform_device and just
+>>> have it depend on the source clock muxes. See the omap initcall changes
+>>> patches I just posted.
+>>>
+>>
+>> Sry, may be I've missed smth, but how early_platform_device will help us
+>> to get rid of platform code - We'd still need to power on manually
+>> early_platform_device's from platform code :( through hwmod.
+>
+> Having minimal platform code early is not a problem. The problem is that
+> our early code is not minimal.
+>
+> For the system timers, we should only initialize the mux clocks needed
+> early to select between 32k and hf oscillator source. This needs to be done
+> using the clock framework, but we don't need the other clocks initialized
+> early.
+>
+> The system timers we're using should be in the alwon power domain, if they
+> are not, then we should change the timers around so we're using only timers
+> in the alwon domain for system timers. Typically at least gpt1 and 12 are
+> always powered. That allows us to leave out the hwmod dependency for system
+> timers.
+>
+> Or am I forgetting some other dependency with our system timers?
 
-The case is:
+both counter32 and GP timer have to be enabled through sysc registers.
+They are in "Force idle" state after reset.
 
-Build 1 runs with CCACHE_HARDLINK enabled.
-- Each object ccache creates will be stored in ccache, and hard linked
-  into the throw-away object tree.
-- recordmcount modifies in-place the object in the object tree, which
-  also modifies the object in the ccache repository.
-
-The throw-away object tree is thrown away, and a new tree is created,
-and the build re-run.  It doesn't matter what CCACHE options are used,
-the effect will now be the same:
-- Each "hit" ccache object from the previous build will be linked or
-  copied to the new throw-away object tree.
-- recordmcount will be re-run on the object, which now contains the
-  results of the previous recordmcount in-place modification.  This
-  causes recordmcount to issue a warning.
-
-There's two solutions to this: one is to disable CCACHE_HARDLINK for
-all kernel builds which use in-place object modification.  The other
-solution is to avoid in-place object modification, instead doing a
-read-write-rename.
-
-I think I ought to ask another question though, before we decide what
-to do.  With recordmcount doing in-place object modification, what
-happens if a SIGINT or similar is received half way through the
-modification of an object?  I would hope that make would delete the
-object and not leave it around.
-
-Another suggestion - maybe recordmcount, which fstat()s the file,
-should check the st_nlink before modifying the file, and error out
-with a helpful error message telling people not to use hardlinks,
-which would stop nasty surprises (and make it a rule that this should
-be implemented as a general principle for good build behaviour) - iow,
-something like this (untested):
-
- scripts/recordmcount.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/scripts/recordmcount.c b/scripts/recordmcount.c
-index 698768bdc581..bb7589fd7392 100644
---- a/scripts/recordmcount.c
-+++ b/scripts/recordmcount.c
-@@ -203,6 +203,10 @@ static void *mmap_file(char const *fname)
- 		fprintf(stderr, "not a regular file: %s\n", fname);
- 		fail_file();
- 	}
-+	if (sb.st_nlink != 1) {
-+		fprintf(stderr, "file is hard linked: %s\n", fname);
-+		fail_file();
-+	}
- 	addr = mmap(0, sb.st_size, PROT_READ|PROT_WRITE, MAP_PRIVATE,
- 		    fd_map, 0);
- 	mmap_failed = 0;
+>
+>> The main reason why I've tried this is because clocksource will be really selected
+>> only at fs_initcall time - and at that time we have no restriction for using platform
+>> devices, Pm runtime APIs, etc. (exception/blocker is sched_clock :().
+>
+> Right. But it seems we can leave out quite a bit of the dependencies
+> for system timers. We already have gptimer probe not touching the system
+> timers later on and can use shared gptimer functions after the clock
+> muxing is done.
 
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+regards,
+-grygorii
