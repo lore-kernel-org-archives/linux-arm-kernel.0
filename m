@@ -1,27 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 1 Dec 2015 10:02:09 +0100
-Subject: [PATCH] pinctrl: qcom: pmic-gpio/mpp: of_irq_count() == npins
-In-Reply-To: <1447875197-21645-1-git-send-email-sboyd@codeaurora.org>
-References: <1447808426-21834-1-git-send-email-sboyd@codeaurora.org>
- <1447875197-21645-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CACRpkdYJwW-5hg-d0Q+CUAB6vNXiPzSSk9fR-mE_ZD6enZUiEA@mail.gmail.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Tue, 01 Dec 2015 12:03:16 +0300
+Subject: [PATCH v3 5/5] ARM: exynos: select POWER_RESET_SYSCON and
+ POWER_RESET_SYSCON_POWEROFF
+In-Reply-To: <1447996629-18232-6-git-send-email-alim.akhtar@samsung.com>
+References: <1447996629-18232-1-git-send-email-alim.akhtar@samsung.com>
+ <1447996629-18232-6-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <010401d12c17$1e883d10$5b98b730$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2015 at 8:33 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+ Hello!
 
-> The number of interrupts is always equal to the number of pins
-> provided by the PMIC gpio and MPP hardware blocks. Count the
-> number of irqs to figure out the number of pins instead of adding
-> more compatible strings or doing math on the reg property. This
-> should make the code more generic and ease the number of changes
-> we have to make to the driver for each new pmic revision.
->
-> Cc: "Ivan T. Ivanov" <iivanov@mm-sol.com>
-> Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Tested it on top of 4.4-rc3.
+ 
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index 3a10f1a8317a..d279edf9b10d 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -27,6 +27,9 @@ menuconfig ARCH_EXYNOS
+>  	select SRAM
+>  	select THERMAL
+>  	select MFD_SYSCON
+> +	select POWER_RESET
+> +	select POWER_RESET_SYSCON
+> +	select POWER_RESET_SYSCON_POWEROFF
 
-Patch applied with Andy's and Bj?rn's ACKs.
+"select POWER_SUPPLY" is missing here. Without is we get:
+--- cut ---
+warning: (ARCH_HISI && ARCH_INTEGRATOR && ARCH_EXYNOS && ARCH_VEXPRESS && REALVIEW_DT) selects POWER_RESET which has unmet direct
+dependencies (POWER_SUPPLY)
+warning: (ARCH_EXYNOS) selects POWER_RESET_SYSCON which has unmet direct dependencies (POWER_SUPPLY && POWER_RESET && OF)
+warning: (ARCH_EXYNOS) selects POWER_RESET_SYSCON_POWEROFF which has unmet direct dependencies (POWER_SUPPLY && POWER_RESET && OF)
+--- cut ---
 
-Yours,
-Linus Walleij
+>  	help
+>  	  Support for SAMSUNG EXYNOS SoCs (EXYNOS4/5)
+
+ Otherwise works fine.
+
+ Tested-by: Pavel Fedin <p.fedin@samsung.com>
+
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
