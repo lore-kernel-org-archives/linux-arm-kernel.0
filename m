@@ -1,88 +1,114 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 1 Dec 2015 11:51:27 +0100
-Subject: [PATCH] ARM: at91: fix pinctrl driver selection
-In-Reply-To: <1448966680-30281-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1448966680-30281-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <565D7BAF.6070208@atmel.com>
+From: xinliang.liu@linaro.org (Xinliang Liu)
+Date: Tue, 1 Dec 2015 18:52:20 +0800
+Subject: [PATCH v2 03/10] drm/hisilicon: Add hisilicon DRM master driver
+In-Reply-To: <20151130074603.GE17050@phenom.ffwll.local>
+References: <CACvgo51NJNRKObgExtv=vNJ10GSgDPz=nQs=4BHAcgqPpSB_ug@mail.gmail.com>
+ <20151130074603.GE17050@phenom.ffwll.local>
+Message-ID: <CAGd==07=HgFjRRW6b8xEKHOTwc+Fs+=Zy2LbNL1NoS+M2DyfLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 01/12/2015 11:44, Ludovic Desroches a ?crit :
-> Move the selection of the pinctrl driver to SoC family level since we
-> have two pinctrl drivers. It is useless to select one which is not
-> compatible with the SoC.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+On 30 November 2015 at 15:46, Daniel Vetter <daniel@ffwll.ch> wrote:
+> On Sat, Nov 28, 2015 at 03:25:35PM +0000, Emil Velikov wrote:
+>> Hi Xinliang,
+>>
+>> On 28 November 2015 at 10:38, Xinliang Liu <xinliang.liu@linaro.org> wrote:
+>> > Add DRM master driver for hi6220 SoC which used in HiKey board.
+>> > Add dumb buffer feature.
+>> > Add prime dmabuf feature.
+>> >
+>> > Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+>> > Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+>> > Signed-off-by: Andy Green <andy.green@linaro.org>
+>> Your s-o-b should be the bottom of the list. There was a presentation
+>> (ages ago) from Greg KH, who nicely described the order as a "chain of
+>> command" or "guilt path". Looks like the rest of the series could use
+>> this tweak.
+>>
+>> > ---
+>> >  drivers/gpu/drm/Kconfig                  |   2 +
+>> >  drivers/gpu/drm/Makefile                 |   1 +
+>> >  drivers/gpu/drm/hisilicon/Kconfig        |   9 ++
+>> >  drivers/gpu/drm/hisilicon/Makefile       |   3 +
+>> >  drivers/gpu/drm/hisilicon/hisi_drm_drv.c | 214 +++++++++++++++++++++++++++++++
+>> >  5 files changed, 229 insertions(+)
+>> >  create mode 100644 drivers/gpu/drm/hisilicon/Kconfig
+>> >  create mode 100644 drivers/gpu/drm/hisilicon/Makefile
+>> >  create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_drv.c
+>> >
+>> > diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
+>> > index 8773fad..038aae8 100644
+>> > --- a/drivers/gpu/drm/Kconfig
+>> > +++ b/drivers/gpu/drm/Kconfig
+>> > @@ -274,3 +274,5 @@ source "drivers/gpu/drm/amd/amdkfd/Kconfig"
+>> >  source "drivers/gpu/drm/imx/Kconfig"
+>> >
+>> >  source "drivers/gpu/drm/vc4/Kconfig"
+>> > +
+>> > +source "drivers/gpu/drm/hisilicon/Kconfig"
+>> I could swear that we can a patch that sorts these alphabetically,
+>> although it doesn't seem to have made it upstream yet :-(
+>>
+>> > --- /dev/null
+>> > +++ b/drivers/gpu/drm/hisilicon/hisi_drm_drv.c
+>>
+>> > +static int hisi_drm_load(struct drm_device *dev, unsigned long flags)
+>> > +{
+>> The use of .load (and .unload?) callbacks is not recommended. Take a
+>> look at Laurent Pinchart's patch [1] about the whys and hows on the
+>> topic
+>>
+>> > +static struct dma_buf *hisi_gem_prime_export(struct drm_device *dev,
+>> > +                                            struct drm_gem_object *obj,
+>> > +                                            int flags)
+>> > +{
+>> > +       /* we want to be able to write in mmapped buffer */
+>> > +       flags |= O_RDWR;
+>> Erm... something feels fishy here. Out of the existing 15 drivers
+>> setting up the prime callbacks only one (sti) does a similar thing. So
+>> either everyone else is missing something obvious or hisilicon and sti
+>> can rework their inner working to remove this (dare I say it) hack.
+>
+> Mmap on drm dma-bufs doesn't work, and fairly intentionally. There's been
+> some rfc patch series to address this:
+>
+> http://lists.freedesktop.org/archives/dri-devel/2015-August/089263.html
+>
+> Unfortunately it seems stuck with getting the userspace piece in shape.
+> Might be best to ping Tiago for an update.
+>
+> Meanwhile please don't do this in drivers ;-)
 
-Yep, it's even better. I plan to send it to 4.4-fixes very soon.
+It seems Tiago's patch is the best way to fix mmap issue.
+I'll ping him, hope he will repsonse.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>
+>> > +static int hisi_gem_cma_dumb_create(struct drm_file *file,
+>> > +                                   struct drm_device *dev,
+>> > +                                   struct drm_mode_create_dumb *args)
+>> > +{
+>> > +       int min_pitch = DIV_ROUND_UP(args->width * args->bpp, 8);
+>> > +
+>> > +       /* mali gpu need pitch 8 bytes alignment for 32bpp */
+>> > +       args->pitch = roundup(min_pitch, 8);
+>> > +
+>> I'm not sure you want this kind of dependency of an out of tree driver
+>> upstream. If this is some limitation on the display engine so be it,
+>> but tailoring things for an external module seems like a very bad
+>> idea.
+>
+> Yup, nacked. dumb_create is for dumb buffers, not rendering. Mali needs to
+> go upstream to fix this ...
 
+Oh! I have use dumb buffers for rendering now. What does dumb buffer
+mean and what's dumb buffers  for?
+For rendering buffer requirements how should I do then?
 
-> ---
-> 
-> This patch is an improvement of this one (already acked by Linus and Nicolas):
-> https://lkml.org/lkml/2015/9/16/522
-> 
-> Without it, at91 pio4 driver is not compiled causing boot failure for SAMA5D2.
-> 
->  arch/arm/mach-at91/Kconfig | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index 9267300..28656c2 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -4,7 +4,6 @@ menuconfig ARCH_AT91
->  	select ARCH_REQUIRE_GPIOLIB
->  	select COMMON_CLK_AT91
->  	select PINCTRL
-> -	select PINCTRL_AT91
->  	select SOC_BUS
->  
->  if ARCH_AT91
-> @@ -17,6 +16,7 @@ config SOC_SAMA5D2
->  	select HAVE_AT91_USB_CLK
->  	select HAVE_AT91_H32MX
->  	select HAVE_AT91_GENERATED_CLK
-> +	select PINCTRL_AT91PIO4
->  	help
->  	  Select this if ou are using one of Atmel's SAMA5D2 family SoC.
->  
-> @@ -27,6 +27,7 @@ config SOC_SAMA5D3
->  	select HAVE_AT91_UTMI
->  	select HAVE_AT91_SMD
->  	select HAVE_AT91_USB_CLK
-> +	select PINCTRL_AT91
->  	help
->  	  Select this if you are using one of Atmel's SAMA5D3 family SoC.
->  	  This support covers SAMA5D31, SAMA5D33, SAMA5D34, SAMA5D35, SAMA5D36.
-> @@ -40,6 +41,7 @@ config SOC_SAMA5D4
->  	select HAVE_AT91_SMD
->  	select HAVE_AT91_USB_CLK
->  	select HAVE_AT91_H32MX
-> +	select PINCTRL_AT91
->  	help
->  	  Select this if you are using one of Atmel's SAMA5D4 family SoC.
->  
-> @@ -50,6 +52,7 @@ config SOC_AT91RM9200
->  	select CPU_ARM920T
->  	select HAVE_AT91_USB_CLK
->  	select MIGHT_HAVE_PCI
-> +	select PINCTRL_AT91
->  	select SOC_SAM_V4_V5
->  	select SRAM if PM
->  	help
-> @@ -65,6 +68,7 @@ config SOC_AT91SAM9
->  	select HAVE_AT91_UTMI
->  	select HAVE_FB_ATMEL
->  	select MEMORY
-> +	select PINCTRL_AT91
->  	select SOC_SAM_V4_V5
->  	select SRAM if PM
->  	help
-> 
+Thanks,
+-xinliang
 
-
--- 
-Nicolas Ferre
+> -Daniel
+> --
+> Daniel Vetter
+> Software Engineer, Intel Corporation
+> http://blog.ffwll.ch
