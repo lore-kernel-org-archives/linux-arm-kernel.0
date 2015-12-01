@@ -1,105 +1,92 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Tue,  1 Dec 2015 11:26:26 +0800
-Subject: [RFC PATCH 4/9] drm/rockchip: support atomic asynchronous commit
+Date: Tue,  1 Dec 2015 11:26:23 +0800
+Subject: [RFC PATCH 1/9] drm/rockchip: vop: replace dpms with enable/disable
 In-Reply-To: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>
 References: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1448940391-23333-5-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1448940391-23333-2-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If drm core requests a async commit, rockchip_drm_atomic_commit
-will schedule a work task to update later.
+For vop, power by enable/disable is more suitable then legacy dpms
+function, and enable/disable more closely to the new atomic API.
 
 Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 ---
- drivers/gpu/drm/rockchip/rockchip_drm_fb.c |   60 ++++++++++++++++++++++------
- 1 file changed, 47 insertions(+), 13 deletions(-)
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   37 +++------------------------
+ 1 file changed, 4 insertions(+), 33 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-index c86d93a..30ddf4a 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-@@ -29,6 +29,12 @@ struct rockchip_drm_fb {
- 	struct drm_gem_object *obj[ROCKCHIP_MAX_FB_BUFFER];
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 5f79d06..41905e2 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -633,7 +633,7 @@ static void vop_dsp_hold_valid_irq_disable(struct vop *vop)
+ 	spin_unlock_irqrestore(&vop->irq_lock, flags);
+ }
+ 
+-static void vop_enable(struct drm_crtc *crtc)
++static void vop_crtc_enable(struct drm_crtc *crtc)
+ {
+ 	struct vop *vop = to_vop(crtc);
+ 	int ret;
+@@ -703,7 +703,7 @@ err_disable_hclk:
+ 	clk_disable(vop->hclk);
+ }
+ 
+-static void vop_disable(struct drm_crtc *crtc)
++static void vop_crtc_disable(struct drm_crtc *crtc)
+ {
+ 	struct vop *vop = to_vop(crtc);
+ 
+@@ -1108,30 +1108,6 @@ static const struct rockchip_crtc_funcs private_crtc_funcs = {
+ 	.disable_vblank = vop_crtc_disable_vblank,
  };
  
-+struct rockchip_atomic_commit {
-+	struct work_struct	work;
-+	struct drm_device	*dev;
-+	struct drm_atomic_state *state;
-+};
-+
- struct drm_gem_object *rockchip_fb_get_gem_obj(struct drm_framebuffer *fb,
- 					       unsigned int plane)
- {
-@@ -195,20 +201,11 @@ static void rockchip_atomic_wait_for_complete(struct drm_atomic_state *state)
- 	}
+-static void vop_crtc_dpms(struct drm_crtc *crtc, int mode)
+-{
+-	DRM_DEBUG_KMS("crtc[%d] mode[%d]\n", crtc->base.id, mode);
+-
+-	switch (mode) {
+-	case DRM_MODE_DPMS_ON:
+-		vop_enable(crtc);
+-		break;
+-	case DRM_MODE_DPMS_STANDBY:
+-	case DRM_MODE_DPMS_SUSPEND:
+-	case DRM_MODE_DPMS_OFF:
+-		vop_disable(crtc);
+-		break;
+-	default:
+-		DRM_DEBUG_KMS("unspecified mode %d\n", mode);
+-		break;
+-	}
+-}
+-
+-static void vop_crtc_prepare(struct drm_crtc *crtc)
+-{
+-	vop_crtc_dpms(crtc, DRM_MODE_DPMS_ON);
+-}
+-
+ static bool vop_crtc_mode_fixup(struct drm_crtc *crtc,
+ 				const struct drm_display_mode *mode,
+ 				struct drm_display_mode *adjusted_mode)
+@@ -1242,17 +1218,12 @@ out:
+ 	return ret;
  }
  
--int rockchip_drm_atomic_commit(struct drm_device *dev,
--			       struct drm_atomic_state *state,
--			       bool async)
-+static void
-+rockchip_atomic_commit_complete(struct rockchip_atomic_commit *commit)
- {
--	int ret;
+-static void vop_crtc_commit(struct drm_crtc *crtc)
+-{
+-}
 -
--	if (async)
--		return -EBUSY;
--
--	ret = drm_atomic_helper_prepare_planes(dev, state);
--	if (ret)
--		return ret;
--
--	drm_atomic_helper_swap_state(dev, state);
-+	struct drm_device *dev = commit->dev;
-+	struct drm_atomic_state *state = commit->state;
+ static const struct drm_crtc_helper_funcs vop_crtc_helper_funcs = {
+-	.dpms = vop_crtc_dpms,
+-	.prepare = vop_crtc_prepare,
++	.enable = vop_crtc_enable,
++	.disable = vop_crtc_disable,
+ 	.mode_fixup = vop_crtc_mode_fixup,
+ 	.mode_set = vop_crtc_mode_set,
+ 	.mode_set_base = vop_crtc_mode_set_base,
+-	.commit = vop_crtc_commit,
+ };
  
- 	/*
- 	 * TODO: do fence wait here.
-@@ -226,6 +223,43 @@ int rockchip_drm_atomic_commit(struct drm_device *dev,
- 
- 	drm_atomic_state_free(state);
- 
-+	kfree(commit);
-+}
-+
-+static void rockchip_drm_atomic_work(struct work_struct *work)
-+{
-+	struct rockchip_atomic_commit *commit = container_of(work,
-+					struct rockchip_atomic_commit, work);
-+
-+	rockchip_atomic_commit_complete(commit);
-+}
-+
-+int rockchip_drm_atomic_commit(struct drm_device *dev,
-+			       struct drm_atomic_state *state,
-+			       bool async)
-+{
-+	int ret;
-+	struct rockchip_atomic_commit *commit;
-+
-+	ret = drm_atomic_helper_prepare_planes(dev, state);
-+	if (ret)
-+		return ret;
-+
-+	drm_atomic_helper_swap_state(dev, state);
-+
-+	commit = kzalloc(sizeof(*commit), GFP_KERNEL);
-+	if (!commit)
-+		return -ENOMEM;
-+
-+	INIT_WORK(&commit->work, rockchip_drm_atomic_work);
-+	commit->dev = dev;
-+	commit->state = state;
-+
-+	if (async)
-+		schedule_work(&commit->work);
-+	else
-+		rockchip_atomic_commit_complete(commit);
-+
- 	return 0;
- }
- 
+ static int vop_crtc_page_flip(struct drm_crtc *crtc,
 -- 
 1.7.9.5
