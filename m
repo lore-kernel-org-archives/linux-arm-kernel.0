@@ -1,173 +1,156 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 1 Dec 2015 15:42:43 +0000
-Subject: [RESEND RFC/PATCH 6/8] media: platform: mtk-vcodec: Add Mediatek
- V4L2 Video Encoder Driver
-In-Reply-To: <1448966550.7534.95.camel@mtksdaap41>
-References: <1447764885-23100-1-git-send-email-tiffany.lin@mediatek.com>
- <1447764885-23100-7-git-send-email-tiffany.lin@mediatek.com>
- <56588622.8060600@linaro.org> <1448883594.25093.45.camel@mtksdaap41>
- <CAMTL27FchgtJZS4YpVge-x+TstnVHmG1aAnaOV32qCU3zMUbAQ@mail.gmail.com>
- <1448966550.7534.95.camel@mtksdaap41>
-Message-ID: <565DBFF3.1000409@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Dec 2015 15:46:24 +0000
+Subject: [PATCH v3 2/3] ARM: amba: Move reading of periphid to amba_match()
+In-Reply-To: <1448976866-7892-3-git-send-email-m.szyprowski@samsung.com>
+References: <1448976866-7892-1-git-send-email-m.szyprowski@samsung.com>
+ <1448976866-7892-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20151201154624.GW8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/15 10:42, tiffany lin wrote:
->>>>   > diff --git a/drivers/media/platform/mtk-vcodec/common/venc_drv_if.c
->>>> b/drivers/media/platform/mtk-vcodec/common/venc_drv_if.c
->>>>   > new file mode 100644
->>>>   > index 0000000..9b3f025
->>>>   > --- /dev/null
-> [snip]
->>>>   > +int venc_if_create(void *ctx, unsigned int fourcc, unsigned long
->>>> *handle)
->>>>   > +{
->>>>   > +  struct venc_handle *h;
->>>>   > +  char str[10];
->>>>   > +
->>>>   > +  mtk_vcodec_fmt2str(fourcc, str);
->>>>   > +
->>>>   > +  h = kzalloc(sizeof(*h), GFP_KERNEL);
->>>>   > +  if (!h)
->>>>   > +          return -ENOMEM;
->>>>   > +
->>>>   > +  h->fourcc = fourcc;
->>>>   > +  h->ctx = ctx;
->>>>   > +  mtk_vcodec_debug(h, "fmt = %s handle = %p", str, h);
->>>>   > +
->>>>   > +  switch (fourcc) {
->>>>   > +  default:
->>>>   > +          mtk_vcodec_err(h, "invalid format %s", str);
->>>>   > +          goto err_out;
->>>>   > +  }
->>>>   > +
->>>>   > +  *handle = (unsigned long)h;
->>>>   > +  return 0;
->>>>   > +
->>>>   > +err_out:
->>>>   > +  kfree(h);
->>>>   > +  return -EINVAL;
->>>>   > +}
->>>>   > +
->>>>   > +int venc_if_init(unsigned long handle)
->>>>   > +{
->>>>   > +  int ret = 0;
->>>>   > +  struct venc_handle *h = (struct venc_handle *)handle;
->>>>   > +
->>>>   > +  mtk_vcodec_debug_enter(h);
->>>>   > +
->>>>   > +  mtk_venc_lock(h->ctx);
->>>>   > +  mtk_vcodec_enc_clock_on();
->>>>   > +  vpu_enable_clock(vpu_get_plat_device(h->ctx->dev->plat_dev));
->>>>   > +  ret = h->enc_if->init(h->ctx, (unsigned long *)&h->drv_handle);
->>>>   > +  vpu_disable_clock(vpu_get_plat_device(h->ctx->dev->plat_dev));
->>>>   > +  mtk_vcodec_enc_clock_off();
->>>>   > +  mtk_venc_unlock(h->ctx);
->>>>   > +
->>>>   > +  return ret;
->>>>   > +}
->>>>
->>>> To me this looks more like an obfuscation layer rather than a
->>>> abstraction layer. I don't understand why we need to hide things from
->>>> the V4L2 implementation that this code forms part of.
->>>>
->>>> More importantly, if this code was included somewhere where it could be
->>>> properly integrated with the device model you might be able to use the
->>>> pm_runtime system to avoid this sort of "heroics" to manage the clocks
->>>> anyway.
->>>>
->>> We want to abstract common part from encoder driver.
->>> Every encoder driver follow same calling flow and only need to take care
->>> about how to communicate with vpu to encode specific format.
->>> Encoder driver do not need to take care clock and multiple instance
->>> issue.
->>
->> Looking at each of those stages:
->>
->> mtk_venc_lock():
->> Why isn't one of the existing V4L2 locking strategies ok for you?
->>
-> We only has one encoder hw.
-> To support multiple encode instances.
-> When one encoder ctx access encoder hw, it need to get lock first.
->
->> mtk_vcodec_enc_clock_on():
->> This does seem like something a sub-driver *should* be doing for itself
-> This is for enabling encoder hw related clock.
-> To support multiple instances, one encode ctx must get hw lock first
-> then clock on/off hw relate clock.
->
->> vpu_enable_clock():
->> Why can't the VPU driver manage this internally using pm_runtime?
->>
-> Our VPU do not have power domain.
-> We will remove VPU clock on/off and let vpu control it in next version.
->
->>
->> That is why I described this as an obfuscation layer. It is collecting
->> a bunch of stuff that can be handled using the kernel driver model and
->> clumping them together in a special middle layer.
->>
-> We do use kernel driver model, but we put it in
-> mtk_vcodec_enc_clock_on/mtk_vcodec_enc_clock_off.
-> Every sub-driver has no need to write the same code.
-> And once clock configuration change or porting to other chips, we don't
-> need to change sub-driver one-by-one, just change abstract layer.
+On Tue, Dec 01, 2015 at 02:34:25PM +0100, Marek Szyprowski wrote:
+> From: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> 
+> Reading the periphid when the Primecell device is registered means that
+> the apb pclk must be available by then or the device won't be registered
+> at all.
+> 
+> By reading the periphid in amba_match() we can return -EPROBE_DEFER if
+> the apb pclk isn't there yet and the device will be retried later.
+> 
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> [minor code adjustments, added missing comment]
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/amba/bus.c | 77 +++++++++++++++++++++++++++++-------------------------
+>  1 file changed, 41 insertions(+), 36 deletions(-)
+> 
+> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+> index f009936..879a421 100644
+> --- a/drivers/amba/bus.c
+> +++ b/drivers/amba/bus.c
+> @@ -24,6 +24,8 @@
+>  
+>  #define to_amba_driver(d)	container_of(d, struct amba_driver, drv)
+>  
+> +static int amba_read_periphid(struct amba_device *dev);
+> +
 
-I'm afraid I remain extremely unconvinced by the value of this API. It 
-is possible that once the types are fixed and it is tidied up it won't 
-stick out so much but I will be very surprised.
+Please avoid forward declarations where possible.
 
-Either way, I can wait until v2 before we discuss it further.
+>  static const struct amba_id *
+>  amba_lookup(const struct amba_id *table, struct amba_device *dev)
+>  {
+> @@ -43,11 +45,23 @@ static int amba_match(struct device *dev, struct device_driver *drv)
+>  {
+>  	struct amba_device *pcdev = to_amba_device(dev);
+>  	struct amba_driver *pcdrv = to_amba_driver(drv);
+> +	int ret;
+>  
+>  	/* When driver_override is set, only bind to the matching driver */
+>  	if (pcdev->driver_override)
+>  		return !strcmp(pcdev->driver_override, drv->name);
+>  
+> +	/* Do plug-n-play if no hard-coded primecell ID has been provided */
+> +	if (!pcdev->periphid) {
+> +		ret = amba_read_periphid(pcdev);
+> +		if (ret) {
+> +			if (ret != -EPROBE_DEFER)
+> +				dev_err(dev, "Failed to read periphid: %d",
+> +					ret);
+> +			return ret;
+> +		}
+> +	}
+> +
+>  	return amba_lookup(pcdrv->id_table, pcdev) != NULL;
+>  }
+>  
+> @@ -336,31 +350,11 @@ static void amba_device_release(struct device *dev)
+>  	kfree(d);
+>  }
+>  
+> -/**
+> - *	amba_device_add - add a previously allocated AMBA device structure
+> - *	@dev: AMBA device allocated by amba_device_alloc
+> - *	@parent: resource parent for this devices resources
+> - *
+> - *	Claim the resource, and read the device cell ID if not already
+> - *	initialized.  Register the AMBA device with the Linux device
+> - *	manager.
+> - */
+> -int amba_device_add(struct amba_device *dev, struct resource *parent)
+> +static int amba_read_periphid(struct amba_device *dev)
+>  {
+>  	u32 size;
+>  	void __iomem *tmp;
+> -	int i, ret;
+> -
+> -	WARN_ON(dev->irq[0] == (unsigned int)-1);
+> -	WARN_ON(dev->irq[1] == (unsigned int)-1);
+> -
+> -	ret = request_resource(parent, &dev->res);
+> -	if (ret)
+> -		goto err_out;
+> -
+> -	/* Hard-coded primecell ID instead of plug-n-play */
+> -	if (dev->periphid != 0)
+> -		goto skip_probe;
+> +	int i, ret = 0;
+>  
+>  	/*
+>  	 * Dynamically calculate the size of the resource
+> @@ -368,10 +362,8 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
+>  	 */
+>  	size = resource_size(&dev->res);
+>  	tmp = ioremap(dev->res.start, size);
+> -	if (!tmp) {
+> -		ret = -ENOMEM;
+> -		goto err_release;
+> -	}
+> +	if (!tmp)
+> +		return -ENOMEM;
+>  
+>  	ret = amba_get_enable_pclk(dev);
+>  	if (ret == 0) {
+> @@ -399,26 +391,39 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
+>  
+>  	iounmap(tmp);
+>  
+> +	return ret;
+> +}
+> +
+> +/**
+> + *	amba_device_add - add a previously allocated AMBA device structure
+> + *	@dev: AMBA device allocated by amba_device_alloc
+> + *	@parent: resource parent for this devices resources
+> + *
+> + *	Claim the resource, and register the AMBA device with the Linux device
+> + *	manager.
+> + */
+> +int amba_device_add(struct amba_device *dev, struct resource *parent)
+> +{
+> +	int ret;
+> +
+> +	WARN_ON(dev->irq[0] == (unsigned int)-1);
+> +	WARN_ON(dev->irq[1] == (unsigned int)-1);
+> +
+> +	ret = request_resource(parent, &dev->res);
+>  	if (ret)
+> -		goto err_release;
+> +		return ret;
+>  
+> - skip_probe:
+>  	ret = device_add(&dev->dev);
+>  	if (ret)
+> -		goto err_release;
+> +		return ret;
 
+NAK.
 
->>>> If the start streaming operation implemented cleanup-on-error properly
->>>> then there would only be two useful states: Started and stopped. Even
->>>> the "sticky" error behavior looks unnecessary to me (meaning we don't
->>>> need to track its state).
->>>>
->>> We cannot guaranteed that IOCTLs called from the user space follow
->>> required sequence.
->>> We need states to know if our driver could accept IOCTL command.
->>
->> I believe that knowing whether the streaming is started or stopped
->> (e.g. two states) is sufficient for a driver to correctly handle
->> abitrary ioctls from userspace and even then, the core code tracks
->> this state for you so there's no need for you do it.
->>
->> The queue/dequeue ioctls succeed or fail based on the length of the
->> queue (i.e. is the buffer queue overflowing or not) and have no need
->> to check the streaming state.
->
->> If you are absolutely sure that the other states are needed then
->> please provide an example of an ioctl() sequence where the additional
->> state is needed.
->>
-> I know your point that we have too many state changes in start_streaming
-> and stop_streaming function.
-> We will refine these two functions in next version.
->
-> For the example, we need MTK_STATE_HEADER state, to make sure before
-> encode start, driver already get information to set encode parameters.
+The original code handled error conditions correctly.  This new code
+completely breaks the error handling here by removing the release of
+the above requested resource.
 
-Interesting. Again, I'll wait to see how the state simplifcation goes 
-before commenting further.
-
-
-> We need MTK_STATE_ABORT to inform encoder thread (mtk_venc_worker) that
-> stop encodeing job from stopped ctx instance.
-> When user space qbuf, we need to make sure everything is ready to sent
-> buf to encode.
-
-Agree that you need a flag here. In fact currently you have two, 
-MTK_STATE_ABORT and an unused one called aborting.
-
-You need to be very careful with these flags though. They are a magnet 
-for data race bugs (especially combined with SMP).
-
-For example at present I can't see any locking in the worker code. This 
-means there is nothing to make all those read-modify-write sequences 
-that manage the state atomic (thus risking state corruption).
-
-
-Daniel.
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
