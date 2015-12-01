@@ -1,39 +1,90 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 1 Dec 2015 09:34:48 -0600
-Subject: [PATCH] reset: Introduce static inline dummy function when
- CONFIG_RESET_CONTROLLER
-Message-ID: <1448984088-31904-1-git-send-email-nm@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 1 Dec 2015 16:39:00 +0100
+Subject: [PATCH v2 10/21] arm64: KVM: Add patchable function selector
+In-Reply-To: <1448650215-15218-11-git-send-email-marc.zyngier@arm.com>
+References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+ <1448650215-15218-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20151201153900.GT11704@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_RESET_CONTROLLER is not defined (example COMPILE_TEST),
-provide a dummy static inline implementation.
+On Fri, Nov 27, 2015 at 06:50:04PM +0000, Marc Zyngier wrote:
+> KVM so far relies on code patching, and is likely to use it more
+> in the future. The main issue is that our alternative system works
+> at the instruction level, while we'd like to have alternatives at
+> the function level.
+> 
+> In order to cope with this, add the "hyp_alternate_select" macro that
+> outputs a brief sequence of code that in turn can be patched, allowing
+> al alternative function to be selected.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- include/linux/reset-controller.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
+s/al/an/ ?
 
-diff --git a/include/linux/reset-controller.h b/include/linux/reset-controller.h
-index ce6b962ffed4..4badecb2619e 100644
---- a/include/linux/reset-controller.h
-+++ b/include/linux/reset-controller.h
-@@ -48,7 +48,16 @@ struct reset_controller_dev {
- 	unsigned int nr_resets;
- };
- 
-+#if IS_ENABLED(CONFIG_RESET_CONTROLLER)
- int reset_controller_register(struct reset_controller_dev *rcdev);
- void reset_controller_unregister(struct reset_controller_dev *rcdev);
-+#else
-+static inline int reset_controller_register(struct reset_controller_dev *r)
-+{
-+	return -EINVAL;
-+}
- 
-+static inline void reset_controller_unregister(struct reset_controller_dev *r)
-+{
-+}
- #endif
--- 
-2.6.2.402.g2635c2b
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/hyp/hyp.h | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+> index 7ac8e11..f0427ee 100644
+> --- a/arch/arm64/kvm/hyp/hyp.h
+> +++ b/arch/arm64/kvm/hyp/hyp.h
+> @@ -27,6 +27,22 @@
+>  
+>  #define kern_hyp_va(v) (typeof(v))((unsigned long)v & HYP_PAGE_OFFSET_MASK)
+>  
+> +/*
+> + * Generates patchable code sequences that are used to switch between
+> + * two implementations of a function, depending on the availability of
+> + * a feature.
+> + */
+
+This looks right to me, but I'm a bit unclear what the types of this is
+and how to use it.
+
+Are orig and alt function pointers and cond is a CONFIG_FOO ?  fname is
+a symbol, which is defined as a prototype somewhere and then implemented
+here, or?
+
+Perhaps a Usage: part of the docs would be helpful.
+
+
+> +#define hyp_alternate_select(fname, orig, alt, cond)			\
+> +typeof(orig) * __hyp_text fname(void)					\
+> +{									\
+> +	typeof(alt) *val = orig;					\
+> +	asm volatile(ALTERNATIVE("nop		\n",			\
+> +				 "mov	%0, %1	\n",			\
+> +				 cond)					\
+> +		     : "+r" (val) : "r" (alt));				\
+> +	return val;							\
+> +}
+> +
+>  void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
+>  void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+>  
+> -- 
+> 2.1.4
+> 
+
+I haven't thought much about how all of this is implemented, but from my
+point of views the ideal situation would be something like:
+
+void foo(int a, int b)
+{
+	ALTERNATIVE_IF_NOT CONFIG_BAR
+	foo_legacy(a, b);
+	ALTERNATIVE_ELSE
+	foo_new(a, b);
+	ALTERNATIVE_END
+}
+
+I realize this may be impossible because the C code could implement all
+sort of fun stuff around the actual function calls, but would there be
+some way to annotate the functions and find the actual branch statement
+and change the target?
+
+Apologies if this question is just outright ridiculous.
+
+-Christoffer
