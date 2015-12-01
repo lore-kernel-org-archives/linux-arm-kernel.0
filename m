@@ -1,246 +1,361 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 1 Dec 2015 17:04:58 +0530
-Subject: [PATCH V7 3/3] dma: add Qualcomm Technologies HIDMA channel driver
-In-Reply-To: <565CAC4C.7080909@codeaurora.org>
-References: <1448245707-27499-1-git-send-email-okaya@codeaurora.org>
- <1448245707-27499-4-git-send-email-okaya@codeaurora.org>
- <20151130085948.GC3901@localhost> <565CAC4C.7080909@codeaurora.org>
-Message-ID: <20151201113458.GL3901@localhost>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 01 Dec 2015 11:32:20 +0000
+Subject: [PATCH v2 04/21] arm64: KVM: Implement vgic-v3 save/restore
+In-Reply-To: <20151130195054.GD11704@cbox>
+References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+ <1448650215-15218-5-git-send-email-marc.zyngier@arm.com>
+ <20151130195054.GD11704@cbox>
+Message-ID: <565D8544.8040400@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 03:06:36PM -0500, Sinan Kaya wrote:
-> I have split the debugfs support from this patch to its own patch. Any
-> other idea on how else you'd break the code? I can take one more step
-> and separate the lower layer from the OS layer by using stub functions
-> on the initial commit.
-
-Yes the ll.c can be a separate patch and no need to add placeholders as
-makefile can be last
-
-> > 
-> >> +static enum dma_status hidma_tx_status(struct dma_chan *dmach,
-> >> +			dma_cookie_t cookie, struct dma_tx_state *txstate)
-> >> +{
-> >> +	struct hidma_chan *mchan = to_hidma_chan(dmach);
-> >> +	enum dma_status ret;
-> >> +
-> >> +	if (mchan->paused)
-> >> +		ret = DMA_PAUSED;
-> > 
-> > This is not quite right. The status query is for a descriptor and NOT for
-> > channel. Here if the descriptor queried was running then it would be paused
-> > for the rest pending txn, it would be DMA_IN_PROGRESS.
+On 30/11/15 19:50, Christoffer Dall wrote:
+> On Fri, Nov 27, 2015 at 06:49:58PM +0000, Marc Zyngier wrote:
+>> Implement the vgic-v3 save restore as a direct translation of
+>> the assembly code version.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/hyp/Makefile     |   1 +
+>>  arch/arm64/kvm/hyp/hyp.h        |   3 +
+>>  arch/arm64/kvm/hyp/vgic-v3-sr.c | 222 ++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 226 insertions(+)
+>>  create mode 100644 arch/arm64/kvm/hyp/vgic-v3-sr.c
+>>
+>> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+>> index d8d5968..d1e38ce 100644
+>> --- a/arch/arm64/kvm/hyp/Makefile
+>> +++ b/arch/arm64/kvm/hyp/Makefile
+>> @@ -3,3 +3,4 @@
+>>  #
+>>  
+>>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+>> +obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
+>> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+>> index 78f25c4..a31cb6e 100644
+>> --- a/arch/arm64/kvm/hyp/hyp.h
+>> +++ b/arch/arm64/kvm/hyp/hyp.h
+>> @@ -30,5 +30,8 @@
+>>  void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
+>>  void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+>>  
+>> +void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+>> +void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+>> +
+>>  #endif /* __ARM64_KVM_HYP_H__ */
+>>  
+>> diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+>> new file mode 100644
+>> index 0000000..b490db5
+>> --- /dev/null
+>> +++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+>> @@ -0,0 +1,222 @@
+>> +/*
+>> + * Copyright (C) 2012-2015 - ARM Ltd
+>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#include <linux/compiler.h>
+>> +#include <linux/irqchip/arm-gic-v3.h>
+>> +#include <linux/kvm_host.h>
+>> +
+>> +#include <asm/kvm_mmu.h>
+>> +
+>> +#include "hyp.h"
+>> +
+>> +/*
+>> + * We store LRs in reverse order to let the CPU deal with streaming
+>> + * access. Use this macro to make it look saner...
+>> + */
+>> +#define LR_OFFSET(n)	(15 - n)
+>> +
+>> +#define read_gicreg(r)							\
+>> +	({								\
+>> +		u64 reg;						\
+>> +		asm volatile("mrs_s %0, " __stringify(r) : "=r" (reg));	\
+>> +		reg;							\
+>> +	})
+>> +
+>> +#define write_gicreg(v,r)						\
+>> +	do {								\
+>> +		u64 __val = (v);					\
+>> +		asm volatile("msr_s " __stringify(r) ", %0" : : "r" (__val));\
+>> +	} while (0)
 > 
-> The channel can be paused by the hypervisor. If it is paused, then no
-> other transaction will go through including the pending requests. That's
-> why, I'm checking the state first.
+> remind me what the msr_s and mrs_s do compared to msr and mrs?
 
-You are missing the point. Channel can be paused, yes but the descriptor
-is in queue and is not paused. The descriptor running is paused, yes.
-There is subtle difference between these
+They do the same job, only for the system registers which are not in the
+original ARMv8 architecture spec, and most likely not implemented by
+old(er) compilers.
 
-> >> +static dma_cookie_t hidma_tx_submit(struct dma_async_tx_descriptor *txd)
-> >> +{
-> >> +	struct hidma_chan *mchan = to_hidma_chan(txd->chan);
-> >> +	struct hidma_dev *dmadev = mchan->dmadev;
-> >> +	struct hidma_desc *mdesc;
-> >> +	unsigned long irqflags;
-> >> +	dma_cookie_t cookie;
-> >> +
-> >> +	if (!hidma_ll_isenabled(dmadev->lldev))
-> >> +		return -ENODEV;
-> > 
-> > is this not too late for this check, you should fail this on prepare
-> > method
+> are these the reason why we need separate macros to access the gic
+> registers compared to 'normal' sysregs?
+
+Indeed.
+
+>> +
+>> +/* vcpu is already in the HYP VA space */
+>> +void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+>> +{
+>> +	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+>> +	u64 val;
+>> +	u32 nr_lr, nr_pri;
+>> +
+>> +	/*
+>> +	 * Make sure stores to the GIC via the memory mapped interface
+>> +	 * are now visible to the system register interface.
+>> +	 */
+>> +	dsb(st);
+>> +
+>> +	cpu_if->vgic_vmcr  = read_gicreg(ICH_VMCR_EL2);
+>> +	cpu_if->vgic_misr  = read_gicreg(ICH_MISR_EL2);
+>> +	cpu_if->vgic_eisr  = read_gicreg(ICH_EISR_EL2);
+>> +	cpu_if->vgic_elrsr = read_gicreg(ICH_ELSR_EL2);
+>> +
+>> +	write_gicreg(0, ICH_HCR_EL2);
+>> +	val = read_gicreg(ICH_VTR_EL2);
+>> +	nr_lr = val & 0xf;
 > 
-> The channels can be paused by the hypervisor at runtime after the guest
-> OS boot. The client might have allocated the channels during guest
-> machine boot. If a channel is paused and client makes a request, client
-> will never get the callback. By placing this check, I'm looking at the
-> runtime status of the channel and rejecting the transmit request right
-> ahead.
+> this is not technically nr_lr, it's max_lr or max_lr_idx or something
+> like that.
 
-In this case you have request already given to you, here the request is
-submitted to the pending queue, if hypervisor has paused you, so the entire
-txn queue is paused. But from API semantics I would argue that this should be
-accepted and suffer the same fate as already submitted txns
+Let's go for max_lr_idx  then.
 
+>> +	nr_pri = ((u32)val >> 29) + 1;
 > 
-> > 
-> > 
-> >> +static int hidma_alloc_chan_resources(struct dma_chan *dmach)
-> >> +{
-> >> +	struct hidma_chan *mchan = to_hidma_chan(dmach);
-> >> +	struct hidma_dev *dmadev = mchan->dmadev;
-> >> +	struct hidma_desc *mdesc, *tmp;
-> >> +	unsigned long irqflags;
-> >> +	LIST_HEAD(descs);
-> >> +	unsigned int i;
-> >> +	int rc = 0;
-> >> +
-> >> +	if (mchan->allocated)
-> >> +		return 0;
-> >> +
-> >> +	/* Alloc descriptors for this channel */
-> >> +	for (i = 0; i < dmadev->nr_descriptors; i++) {
-> >> +		mdesc = kzalloc(sizeof(struct hidma_desc), GFP_KERNEL);
-> > 
-> > GFP_NOWAIT pls, this can be called from atomic context
+> nit: nr_pri_bits
 > 
-> I'll change it, but why would anyone allocate a channel in an interrupt
-> handler?
-
-remember this is dmaengine, where people traditionally wanted to offload
-from cpu and were not allowed to sleep.
-
-I think am okay with this one..
-
+>> +
+>> +	switch (nr_lr) {
+>> +	case 15:
+>> +		cpu_if->vgic_lr[LR_OFFSET(15)] = read_gicreg(ICH_LR15_EL2);
+>> +	case 14:
+>> +		cpu_if->vgic_lr[LR_OFFSET(14)] = read_gicreg(ICH_LR14_EL2);
+>> +	case 13:
+>> +		cpu_if->vgic_lr[LR_OFFSET(13)] = read_gicreg(ICH_LR13_EL2);
+>> +	case 12:
+>> +		cpu_if->vgic_lr[LR_OFFSET(12)] = read_gicreg(ICH_LR12_EL2);
+>> +	case 11:
+>> +		cpu_if->vgic_lr[LR_OFFSET(11)] = read_gicreg(ICH_LR11_EL2);
+>> +	case 10:
+>> +		cpu_if->vgic_lr[LR_OFFSET(10)] = read_gicreg(ICH_LR10_EL2);
+>> +	case 9:
+>> +		cpu_if->vgic_lr[LR_OFFSET(9)] = read_gicreg(ICH_LR9_EL2);
+>> +	case 8:
+>> +		cpu_if->vgic_lr[LR_OFFSET(8)] = read_gicreg(ICH_LR8_EL2);
+>> +	case 7:
+>> +		cpu_if->vgic_lr[LR_OFFSET(7)] = read_gicreg(ICH_LR7_EL2);
+>> +	case 6:
+>> +		cpu_if->vgic_lr[LR_OFFSET(6)] = read_gicreg(ICH_LR6_EL2);
+>> +	case 5:
+>> +		cpu_if->vgic_lr[LR_OFFSET(5)] = read_gicreg(ICH_LR5_EL2);
+>> +	case 4:
+>> +		cpu_if->vgic_lr[LR_OFFSET(4)] = read_gicreg(ICH_LR4_EL2);
+>> +	case 3:
+>> +		cpu_if->vgic_lr[LR_OFFSET(3)] = read_gicreg(ICH_LR3_EL2);
+>> +	case 2:
+>> +		cpu_if->vgic_lr[LR_OFFSET(2)] = read_gicreg(ICH_LR2_EL2);
+>> +	case 1:
+>> +		cpu_if->vgic_lr[LR_OFFSET(1)] = read_gicreg(ICH_LR1_EL2);
+>> +	case 0:
+>> +		cpu_if->vgic_lr[LR_OFFSET(0)] = read_gicreg(ICH_LR0_EL2);
 > 
-> > 
-> >> +		if (!mdesc) {
-> >> +			rc = -ENOMEM;
-> >> +			break;
-> >> +		}
-> >> +		dma_async_tx_descriptor_init(&mdesc->desc, dmach);
-> >> +		mdesc->desc.flags = DMA_CTRL_ACK;
-> > 
-> > what is the purpose of setting this flag here
+> I don't understand this; LR_OFFSET(0) == (15 - 0) == 15, so
 > 
-> It means that the code only supports interrupt. Maybe, you can correct
-> me here. I couldn't see a very useful info about the DMA engine flags.
-> My understanding is that DMA_CTRL_ACK means user wants an interrupt
-> based callback.
+> cpu_if->vgic_lr[15] = read_gicreg(ICH_LR0_EL2) ?
 
-Right user wants, you are not user though
+Just like in the assembly version. We store the LRs in the order we read
+them so that we don't confuse the CPU by writing backward (believe it or
+not, CPUs do get horribly confused if you do that).
 
+>> +	}
+>> +
+>> +	switch (nr_pri) {
+>> +	case 7:
+>> +		cpu_if->vgic_ap0r[3] = read_gicreg(ICH_AP0R3_EL2);
+>> +		cpu_if->vgic_ap0r[2] = read_gicreg(ICH_AP0R2_EL2);
+>> +	case 6:
+>> +		cpu_if->vgic_ap0r[1] = read_gicreg(ICH_AP0R1_EL2);
+>> +	default:
+>> +		cpu_if->vgic_ap0r[0] = read_gicreg(ICH_AP0R0_EL2);
+>> +	}
+>> +
+>> +	switch (nr_pri) {
+>> +	case 7:
+>> +		cpu_if->vgic_ap1r[3] = read_gicreg(ICH_AP1R3_EL2);
+>> +		cpu_if->vgic_ap1r[2] = read_gicreg(ICH_AP1R2_EL2);
+>> +	case 6:
+>> +		cpu_if->vgic_ap1r[1] = read_gicreg(ICH_AP1R1_EL2);
+>> +	default:
+>> +		cpu_if->vgic_ap1r[0] = read_gicreg(ICH_AP1R0_EL2);
+>> +	}
+>> +
+>> +	write_gicreg(read_gicreg(ICC_SRE_EL2) | ICC_SRE_EL2_ENABLE,
+>> +		     ICC_SRE_EL2);
 > 
-> If DMA_CTRL_ACK is not specified, then user wants to poll for the
-> results. The current code only supports the interrupt based delivery for
-> callbacks. Polling support is another to-do in my list for small sized
-> transfers.
-
-See the documentation for flags and usage. The point here is that user
-should set this. I know some old driver do this but that is not right
-
+> nit: reading this out in a variable probably looks nicer.
 > 
-> > 
-> >> +static void hidma_free_chan_resources(struct dma_chan *dmach)
-> >> +{
-> >> +	struct hidma_chan *mchan = to_hidma_chan(dmach);
-> >> +	struct hidma_dev *mdma = mchan->dmadev;
-> >> +	struct hidma_desc *mdesc, *tmp;
-> >> +	unsigned long irqflags;
-> >> +	LIST_HEAD(descs);
-> >> +
-> >> +	if (!list_empty(&mchan->prepared) || !list_empty(&mchan->active) ||
-> >> +		!list_empty(&mchan->completed)) {
-> >> +		/*
-> >> +		 * We have unfinished requests waiting.
-> >> +		 * Terminate the request from the hardware.
-> > 
-> > that sounds as bug.. free should be called when txn are completed/aborted
+>> +	isb();
 > 
-> Let me see what other drivers are doing...
+> nit: should we comment on why the isb is required?
 > 
-> > 
-> >> +		 */
-> >> +		hidma_cleanup_pending_tre(mdma->lldev, ERR_INFO_SW,
-> >> +					ERR_CODE_UNEXPECTED_TERMINATE);
-> >> +
-> >> +		/* Give enough time for completions to be called. */
-> >> +		msleep(100);
-> > 
-> > should we not poll/read after delay, also we are still in atomic context
-> > 
-> >> +	}
-> >> +
-> >> +	spin_lock_irqsave(&mchan->lock, irqflags);
-> >> +	/* Channel must be idle */
-> > 
-> > sorry I do not like that assumption
-> > 
-> >> +	/* return all user requests */
-> >> +	list_for_each_entry_safe(mdesc, tmp, &list, node) {
-> >> +		struct dma_async_tx_descriptor *txd = &mdesc->desc;
-> >> +		dma_async_tx_callback callback = mdesc->desc.callback;
-> >> +		void *param = mdesc->desc.callback_param;
-> >> +		enum dma_status status;
-> >> +
-> >> +		dma_descriptor_unmap(txd);
-> >> +
-> >> +		status = hidma_ll_status(dmadev->lldev, mdesc->tre_ch);
-> >> +		/*
-> >> +		 * The API requires that no submissions are done from a
-> >> +		 * callback, so we don't need to drop the lock here
-> >> +		 */
-> > 
-> > That is correct assumption for async_tx and which is deprecated now.
-> > In fact the converse is true for rest!
+>> +	write_gicreg(1, ICC_SRE_EL1);
+>> +}
+>> +
+>> +void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+>> +{
+>> +	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+>> +	u64 val;
+>> +	u32 nr_lr, nr_pri;
+>> +
+>> +	/* Make sure SRE is valid before writing the other registers */
 > 
-> I copied this function from another driver. The cookie/unmap business
-> seemed scary to me. Can you point me to a good/recent implementation if
-> this is deprecated?
+> I know that I've reviewed this code before (the asm version) but coming
+> back to it I have no idea what the above really means...
 
+The meaning of some of the bits in ICH_VMCR_EL2 are conditioned by the
+configuration set in ICC_SRE_EL1. For example, VFIQEn is RES1 if
+ICC_SRE_EL1.SRE is 1. This causes a Group0 interrupt (as generated in
+GICv2 mode) to be delivered as a FIQ to the guest, with potentially
+fatal consequences.
 
+So we must make sure that ICC_SRE_EL1 has been actually programmed with
+the value we want before starting to mess with the rest of the GIC.
+
+>> +	write_gicreg(cpu_if->vgic_sre, ICC_SRE_EL1);
+>> +	isb();
+>> +
+>> +	write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
+>> +	write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
+>> +
+>> +	val = read_gicreg(ICH_VTR_EL2);
+>> +	nr_lr = val & 0xf;
+>> +	nr_pri = ((u32)val >> 29) + 1;
 > 
-> > 
-> >> +static int hidma_pause(struct dma_chan *chan)
-> >> +{
-> >> +	struct hidma_chan *mchan;
-> >> +	struct hidma_dev *dmadev;
-> >> +
-> >> +	mchan = to_hidma_chan(chan);
-> >> +	dmadev = to_hidma_dev(mchan->chan.device);
-> >> +	if (!mchan->paused) {
-> >> +		pm_runtime_get_sync(dmadev->ddev.dev);
-> >> +		if (hidma_ll_pause(dmadev->lldev))
-> >> +			dev_warn(dmadev->ddev.dev, "channel did not stop\n");
-> >> +		mchan->paused = true;
-> >> +		pm_runtime_mark_last_busy(dmadev->ddev.dev);
-> >> +		pm_runtime_put_autosuspend(dmadev->ddev.dev);
-> >> +	}
-> >> +	return 0;
-> >> +}
-> > 
-> > This is interesting, we associate pause/resume for slave dma ops and not for
-> > memcpy ops, what is the reason for adding pause/resume here?
+> you could have a define for this shift now that you use it more than
+> once.
+
+Sure.
+
+>> +
+>> +	switch (nr_pri) {
+>> +	case 7:
+>> +		 write_gicreg(cpu_if->vgic_ap1r[3], ICH_AP1R3_EL2);
+>> +		 write_gicreg(cpu_if->vgic_ap1r[2], ICH_AP1R2_EL2);
+>> +	case 6:	 	                           
+>> +		 write_gicreg(cpu_if->vgic_ap1r[1], ICH_AP1R1_EL2);
+>> +	default: 	       		    
+>> +		 write_gicreg(cpu_if->vgic_ap1r[0], ICH_AP1R0_EL2);
+>> +	}	 	                           
+>> +		 	                           
+>> +	switch (nr_pri) {
+>> +	case 7:	 	                           
+>> +		 write_gicreg(cpu_if->vgic_ap0r[3], ICH_AP0R3_EL2);
+>> +		 write_gicreg(cpu_if->vgic_ap0r[2], ICH_AP0R2_EL2);
+>> +	case 6:	 	                           
+>> +		 write_gicreg(cpu_if->vgic_ap0r[1], ICH_AP0R1_EL2);
+>> +	default: 	       		    
+>> +		 write_gicreg(cpu_if->vgic_ap0r[0], ICH_AP0R0_EL2);
+>> +	}
+>> +
+>> +	switch (nr_lr) {
+>> +	case 15:
+>> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(15)], ICH_LR15_EL2);
+>> +	case 14:	      			      
+>> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(14)], ICH_LR14_EL2);
+>> +	case 13:	      			      
+>> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(13)], ICH_LR13_EL2);
+>> +	case 12:	      			      
+>> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(12)], ICH_LR12_EL2);
+>> +	case 11:	      			      
+>> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(11)], ICH_LR11_EL2);
+>> +	case 10:	      			      
+>> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(10)], ICH_LR10_EL2);
+>> +	case 9:		                                    
+>> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(9)], ICH_LR9_EL2);
+>> +	case 8:		                                    
+>> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(8)], ICH_LR8_EL2);
+>> +	case 7:		                                    
+>> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(7)], ICH_LR7_EL2);
+>> +	case 6:		                                    
+>> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(6)], ICH_LR6_EL2);
+>> +	case 5:		                                    
+>> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(5)], ICH_LR5_EL2);
+>> +	case 4:		                                    
+>> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(4)], ICH_LR4_EL2);
+>> +	case 3:		                                    
+>> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(3)], ICH_LR3_EL2);
+>> +	case 2:		                                    
+>> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(2)], ICH_LR2_EL2);
+>> +	case 1:		                                    
+>> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(1)], ICH_LR1_EL2);
+>> +	case 0:
+>> +		write_gicreg(cpu_if->vgic_lr[LR_OFFSET(0)], ICH_LR0_EL2);
 > 
-> Why is it limited to the slave device only? I can queue a bunch of
-> requests. I can pause and resume their execution with the current
-> implementation.
-
-Traditionally no one paused memcpy... People want the copy to be done with
-as fast as possible :)
-
+> same question as above.
 > 
-> > 
-> >> +static int hidma_remove(struct platform_device *pdev)
-> >> +{
-> >> +	struct hidma_dev *dmadev = platform_get_drvdata(pdev);
-> >> +
-> >> +	pm_runtime_get_sync(dmadev->ddev.dev);
-> >> +	dma_async_device_unregister(&dmadev->ddev);
-> >> +	hidma_debug_uninit(dmadev);
-> >> +	hidma_ll_uninit(dmadev->lldev);
-> >> +	hidma_free(dmadev);
-> >> +
-> >> +	dev_info(&pdev->dev, "HI-DMA engine removed\n");
-> >> +	pm_runtime_put_sync_suspend(&pdev->dev);
-> >> +	pm_runtime_disable(&pdev->dev);
-> > 
-> > and your irq is still active and can invoke your irq handler!
-> > 
+>> +	}
 > 
-> why? I shutdown the IRQ in hidma_ll_uninit and request the interrupt
-> with devm_request_irq. As soon as this driver is removed, the interrupt
-> should be released by the managed code.
+> loads of trailing whitespace all over above
+> 
+>> +
+>> +	/*
+>> +	 * Ensure that the above will have reached the
+>> +	 * (re)distributors. This ensure the guest will read the
+> 
+> s/ensure/ensures/
+> 
+>> +	 * correct values from the memory-mapped interface.
+>> +	 */
+>> +	isb();
+>> +	dsb(sy);
+>> +
+>> +	/*
+>> +	 * Prevent the guest from touching the GIC system registers if
+>> +	 * SRE isn't enabled for GICv3 emulation.
+> 
+> so can we emulate a GICv3 to the guest without system register access?
+> I.e. an MMIO only GICv3 interface?
 
-but there is a delay between that and free getting called. Since you don't
-free up explicitly you can still have irq and tasklets scheduled.
+There is no such thing as a MMIO-based GICv3 CPU interface. The only
+purpose of this is to ensure that a guest presented with a GICv2 doesn't
+see the system registers as being available, because that both confusing
+and borderline illegal.
 
-Recommendation is that free up irq or ensure none are scheduled and
-disabled
+>> +	 */
+>> +	if (!cpu_if->vgic_sre) {
+>> +		write_gicreg(read_gicreg(ICC_SRE_EL2) & ~ICC_SRE_EL2_ENABLE,
+>> +			     ICC_SRE_EL2);
+>> +	}
+>> +}
+>> +
+>> +u64 __hyp_text __vgic_v3_read_ich_vtr_el2(void)
+>> +{
+>> +	return read_gicreg(ICH_VTR_EL2);
+>> +}
+>> -- 
+>> 2.1.4
+>>
+> 
+> As for translating the assembly code to C, this patch looks correct.
+> 
+> Nevertheless, I felt obliged to ask into the details above, now when
+> you're touching all this code.
 
+No problem. Thanks for reviewing it.
+
+	M.
 -- 
-~Vinod
+Jazz is not dead. It just smells funny...
