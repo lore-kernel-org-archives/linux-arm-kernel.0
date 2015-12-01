@@ -1,8 +1,8 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 01 Dec 2015 18:12:54 +0100
+From: heiko.stuebner@collabora.com (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 01 Dec 2015 18:13:20 +0100
 Subject: [PATCH 1/3] ARM: dts: rockchip: make sure edp_24m is associated to
  xin24m on veyron
-Message-ID: <2065075.OS6iJrKehZ@diego>
+Message-ID: <2211452.2WPFOUcQC0@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,7 +26,8 @@ Signed-off-by: Heiko Stuebner <heiko.stuebner@collabora.com>
  arch/arm/boot/dts/rk3288-veyron.dtsi | 5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
+diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-
+veyron.dtsi
 index 5e61f07..9fce91f 100644
 --- a/arch/arm/boot/dts/rk3288-veyron.dtsi
 +++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
