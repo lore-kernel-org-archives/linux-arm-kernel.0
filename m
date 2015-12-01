@@ -1,165 +1,216 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 1 Dec 2015 19:54:06 +0800
-Subject: [PATCH v4 1/5] clk: sunxi: Add CLK_OF_DECLARE support for
- sun8i-a23-apb0-clk driver
-In-Reply-To: <20151201100416.GF29263@lukather>
-References: <1448766190-11345-1-git-send-email-wens@csie.org>
- <1448766190-11345-2-git-send-email-wens@csie.org>
- <20151201100416.GF29263@lukather>
-Message-ID: <CAGb2v66bJJZ_xmD8B2X6nR3bxte9CdrnBpnd1KMRTmyRTr1KRQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 01 Dec 2015 11:57:16 +0000
+Subject: [PATCH v2 04/21] arm64: KVM: Implement vgic-v3 save/restore
+In-Reply-To: <20151201115034.GM11704@cbox>
+References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+ <1448650215-15218-5-git-send-email-marc.zyngier@arm.com>
+ <20151130195054.GD11704@cbox> <565D8544.8040400@arm.com>
+ <20151201114426.GK11704@cbox> <20151201115034.GM11704@cbox>
+Message-ID: <565D8B1C.3060301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 1, 2015 at 6:04 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Sun, Nov 29, 2015 at 11:03:06AM +0800, Chen-Yu Tsai wrote:
->> The APBS clock on sun9i is the same as the APB0 clock on sun8i. With
->> sun9i we are supporting the PRCM clocks by using CLK_OF_DECLARE,
->> instead of through a PRCM mfd device and subdevices for each clock
->> and reset control. As such we need a CLK_OF_DECLARE version of
->> the sun8i-a23-apb0-clk driver.
+On 01/12/15 11:50, Christoffer Dall wrote:
+> On Tue, Dec 01, 2015 at 12:44:26PM +0100, Christoffer Dall wrote:
+>> On Tue, Dec 01, 2015 at 11:32:20AM +0000, Marc Zyngier wrote:
+>>> On 30/11/15 19:50, Christoffer Dall wrote:
+>>>> On Fri, Nov 27, 2015 at 06:49:58PM +0000, Marc Zyngier wrote:
+>>>>> Implement the vgic-v3 save restore as a direct translation of
+>>>>> the assembly code version.
+>>>>>
+>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>>> ---
+>>>>>  arch/arm64/kvm/hyp/Makefile     |   1 +
+>>>>>  arch/arm64/kvm/hyp/hyp.h        |   3 +
+>>>>>  arch/arm64/kvm/hyp/vgic-v3-sr.c | 222 ++++++++++++++++++++++++++++++++++++++++
+>>>>>  3 files changed, 226 insertions(+)
+>>>>>  create mode 100644 arch/arm64/kvm/hyp/vgic-v3-sr.c
+>>>>>
+>>>>> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+>>>>> index d8d5968..d1e38ce 100644
+>>>>> --- a/arch/arm64/kvm/hyp/Makefile
+>>>>> +++ b/arch/arm64/kvm/hyp/Makefile
+>>>>> @@ -3,3 +3,4 @@
+>>>>>  #
+>>>>>  
+>>>>>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+>>>>> +obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
+>>>>> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+>>>>> index 78f25c4..a31cb6e 100644
+>>>>> --- a/arch/arm64/kvm/hyp/hyp.h
+>>>>> +++ b/arch/arm64/kvm/hyp/hyp.h
+>>>>> @@ -30,5 +30,8 @@
+>>>>>  void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
+>>>>>  void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+>>>>>  
+>>>>> +void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+>>>>> +void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+>>>>> +
+>>>>>  #endif /* __ARM64_KVM_HYP_H__ */
+>>>>>  
+>>>>> diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+>>>>> new file mode 100644
+>>>>> index 0000000..b490db5
+>>>>> --- /dev/null
+>>>>> +++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+>>>>> @@ -0,0 +1,222 @@
+>>>>> +/*
+>>>>> + * Copyright (C) 2012-2015 - ARM Ltd
+>>>>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+>>>>> + *
+>>>>> + * This program is free software; you can redistribute it and/or modify
+>>>>> + * it under the terms of the GNU General Public License version 2 as
+>>>>> + * published by the Free Software Foundation.
+>>>>> + *
+>>>>> + * This program is distributed in the hope that it will be useful,
+>>>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>>>> + * GNU General Public License for more details.
+>>>>> + *
+>>>>> + * You should have received a copy of the GNU General Public License
+>>>>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>>>> + */
+>>>>> +
+>>>>> +#include <linux/compiler.h>
+>>>>> +#include <linux/irqchip/arm-gic-v3.h>
+>>>>> +#include <linux/kvm_host.h>
+>>>>> +
+>>>>> +#include <asm/kvm_mmu.h>
+>>>>> +
+>>>>> +#include "hyp.h"
+>>>>> +
+>>>>> +/*
+>>>>> + * We store LRs in reverse order to let the CPU deal with streaming
+>>>>> + * access. Use this macro to make it look saner...
+>>>>> + */
+>>>>> +#define LR_OFFSET(n)	(15 - n)
+>>>>> +
+>>>>> +#define read_gicreg(r)							\
+>>>>> +	({								\
+>>>>> +		u64 reg;						\
+>>>>> +		asm volatile("mrs_s %0, " __stringify(r) : "=r" (reg));	\
+>>>>> +		reg;							\
+>>>>> +	})
+>>>>> +
+>>>>> +#define write_gicreg(v,r)						\
+>>>>> +	do {								\
+>>>>> +		u64 __val = (v);					\
+>>>>> +		asm volatile("msr_s " __stringify(r) ", %0" : : "r" (__val));\
+>>>>> +	} while (0)
+>>>>
+>>>> remind me what the msr_s and mrs_s do compared to msr and mrs?
+>>>
+>>> They do the same job, only for the system registers which are not in the
+>>> original ARMv8 architecture spec, and most likely not implemented by
+>>> old(er) compilers.
+>>>
+>>>> are these the reason why we need separate macros to access the gic
+>>>> registers compared to 'normal' sysregs?
+>>>
+>>> Indeed.
+>>>
+>>>>> +
+>>>>> +/* vcpu is already in the HYP VA space */
+>>>>> +void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+>>>>> +{
+>>>>> +	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+>>>>> +	u64 val;
+>>>>> +	u32 nr_lr, nr_pri;
+>>>>> +
+>>>>> +	/*
+>>>>> +	 * Make sure stores to the GIC via the memory mapped interface
+>>>>> +	 * are now visible to the system register interface.
+>>>>> +	 */
+>>>>> +	dsb(st);
+>>>>> +
+>>>>> +	cpu_if->vgic_vmcr  = read_gicreg(ICH_VMCR_EL2);
+>>>>> +	cpu_if->vgic_misr  = read_gicreg(ICH_MISR_EL2);
+>>>>> +	cpu_if->vgic_eisr  = read_gicreg(ICH_EISR_EL2);
+>>>>> +	cpu_if->vgic_elrsr = read_gicreg(ICH_ELSR_EL2);
+>>>>> +
+>>>>> +	write_gicreg(0, ICH_HCR_EL2);
+>>>>> +	val = read_gicreg(ICH_VTR_EL2);
+>>>>> +	nr_lr = val & 0xf;
+>>>>
+>>>> this is not technically nr_lr, it's max_lr or max_lr_idx or something
+>>>> like that.
+>>>
+>>> Let's go for max_lr_idx  then.
+>>>
+>>>>> +	nr_pri = ((u32)val >> 29) + 1;
+>>>>
+>>>> nit: nr_pri_bits
+>>>>
+>>>>> +
+>>>>> +	switch (nr_lr) {
+>>>>> +	case 15:
+>>>>> +		cpu_if->vgic_lr[LR_OFFSET(15)] = read_gicreg(ICH_LR15_EL2);
+>>>>> +	case 14:
+>>>>> +		cpu_if->vgic_lr[LR_OFFSET(14)] = read_gicreg(ICH_LR14_EL2);
+>>>>> +	case 13:
+>>>>> +		cpu_if->vgic_lr[LR_OFFSET(13)] = read_gicreg(ICH_LR13_EL2);
+>>>>> +	case 12:
+>>>>> +		cpu_if->vgic_lr[LR_OFFSET(12)] = read_gicreg(ICH_LR12_EL2);
+>>>>> +	case 11:
+>>>>> +		cpu_if->vgic_lr[LR_OFFSET(11)] = read_gicreg(ICH_LR11_EL2);
+>>>>> +	case 10:
+>>>>> +		cpu_if->vgic_lr[LR_OFFSET(10)] = read_gicreg(ICH_LR10_EL2);
+>>>>> +	case 9:
+>>>>> +		cpu_if->vgic_lr[LR_OFFSET(9)] = read_gicreg(ICH_LR9_EL2);
+>>>>> +	case 8:
+>>>>> +		cpu_if->vgic_lr[LR_OFFSET(8)] = read_gicreg(ICH_LR8_EL2);
+>>>>> +	case 7:
+>>>>> +		cpu_if->vgic_lr[LR_OFFSET(7)] = read_gicreg(ICH_LR7_EL2);
+>>>>> +	case 6:
+>>>>> +		cpu_if->vgic_lr[LR_OFFSET(6)] = read_gicreg(ICH_LR6_EL2);
+>>>>> +	case 5:
+>>>>> +		cpu_if->vgic_lr[LR_OFFSET(5)] = read_gicreg(ICH_LR5_EL2);
+>>>>> +	case 4:
+>>>>> +		cpu_if->vgic_lr[LR_OFFSET(4)] = read_gicreg(ICH_LR4_EL2);
+>>>>> +	case 3:
+>>>>> +		cpu_if->vgic_lr[LR_OFFSET(3)] = read_gicreg(ICH_LR3_EL2);
+>>>>> +	case 2:
+>>>>> +		cpu_if->vgic_lr[LR_OFFSET(2)] = read_gicreg(ICH_LR2_EL2);
+>>>>> +	case 1:
+>>>>> +		cpu_if->vgic_lr[LR_OFFSET(1)] = read_gicreg(ICH_LR1_EL2);
+>>>>> +	case 0:
+>>>>> +		cpu_if->vgic_lr[LR_OFFSET(0)] = read_gicreg(ICH_LR0_EL2);
+>>>>
+>>>> I don't understand this; LR_OFFSET(0) == (15 - 0) == 15, so
+>>>>
+>>>> cpu_if->vgic_lr[15] = read_gicreg(ICH_LR0_EL2) ?
+>>>
+>>> Just like in the assembly version. We store the LRs in the order we read
+>>> them so that we don't confuse the CPU by writing backward (believe it or
+>>> not, CPUs do get horribly confused if you do that).
 >>
->> Also, build it for sun9i/A80, and not just for configurations with
->> MFD_SUN6I_PRCM enabled.
+>> but aren't we storing the wrong register to the wrong index in the
+>> array?
 >>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  drivers/clk/sunxi/Makefile         |  5 +--
->>  drivers/clk/sunxi/clk-sun8i-apb0.c | 71 +++++++++++++++++++++++++++++++-------
->>  2 files changed, 62 insertions(+), 14 deletions(-)
+>> Do we really access cpu_if->vgic_lr[15..12] in the C-code if the system
+>> only has 4 LRs?
 >>
->> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
->> index cb4c299214ce..c55d5cd1c0e5 100644
->> --- a/drivers/clk/sunxi/Makefile
->> +++ b/drivers/clk/sunxi/Makefile
->> @@ -15,6 +15,7 @@ obj-y += clk-sun9i-core.o
->>  obj-y += clk-sun9i-mmc.o
->>  obj-y += clk-usb.o
->>
->> +obj-$(CONFIG_MACH_SUN9I) += clk-sun8i-apb0.o
->> +
->
-> So sun8i doesn't use it?
+> ok, I looked at the code myself (not sure why I didn't do that in the
+> first place) and indeed we use a different but with similar results
+> macro to access the array from the C code.
+> 
+> This is just insane to me, and we don't have a comment on the data
+> structure saying "this is not stored the way you'd think it is".
+> 
+> Why can't we just do:
+> 
+> cpu_if->vgic_lr[3] = read_gicreg(ICH_LR3_EL2);
+> cpu_if->vgic_lr[2] = read_gicreg(ICH_LR2_EL2);
+> cpu_if->vgic_lr[1] = read_gicreg(ICH_LR1_EL2);
+> cpu_if->vgic_lr[0] = read_gicreg(ICH_LR0_EL2);
+> 
+> ?
 
-Shit... I messed up. clk-sun8i-apb0.o should also be under
-CONFIG_MFD_SUN6I_PRCM.
+Because you're *really* killing performance by doing what are
+essentially streaming read/writes in the opposite direction. CPU
+prefetchers only work in one direction (incrementing the address). Doing
+it backwards breaks it.
 
-I'll send a new version of this patch. No need to keep spamming
-people with the whole series.
-
->>  obj-$(CONFIG_MFD_SUN6I_PRCM) += \
->> -     clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o \
->> -     clk-sun8i-apb0.o
->> +     clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o
->> diff --git a/drivers/clk/sunxi/clk-sun8i-apb0.c b/drivers/clk/sunxi/clk-sun8i-apb0.c
->> index 7ae5d2c2cde1..c1e2ac8f4b0d 100644
->> --- a/drivers/clk/sunxi/clk-sun8i-apb0.c
->> +++ b/drivers/clk/sunxi/clk-sun8i-apb0.c
->> @@ -17,13 +17,68 @@
->>  #include <linux/clk-provider.h>
->>  #include <linux/module.h>
->>  #include <linux/of.h>
->> +#include <linux/of_address.h>
->>  #include <linux/platform_device.h>
->>
->> +static struct clk *sun8i_a23_apb0_register(struct device_node *node,
->> +                                        void __iomem *reg)
->> +{
->> +     const char *clk_name = node->name;
->> +     const char *clk_parent;
->> +     struct clk *clk;
->> +     int ret;
->> +
->> +     clk_parent = of_clk_get_parent_name(node, 0);
->> +     if (!clk_parent)
->> +             return ERR_PTR(-EINVAL);
->> +
->> +     of_property_read_string(node, "clock-output-names", &clk_name);
->> +
->> +     /* The A23 APB0 clock is a standard 2 bit wide divider clock */
->> +     clk = clk_register_divider(NULL, clk_name, clk_parent, 0, reg,
->> +                                0, 2, CLK_DIVIDER_POWER_OF_TWO, NULL);
->> +     if (IS_ERR(clk))
->> +             return clk;
->> +
->> +     ret = of_clk_add_provider(node, of_clk_src_simple_get, clk);
->> +     if (ret)
->> +             goto err_unregister;
->> +
->> +     return clk;
->> +
->> +err_unregister:
->> +     clk_unregister_divider(clk);
->> +
->> +     return ERR_PTR(ret);
->> +}
->> +
->> +static void sun8i_a23_apb0_setup(struct device_node *node)
->> +{
->> +     void __iomem *reg;
->> +     struct resource res;
->> +     struct clk *clk;
->> +
->> +     reg = of_io_request_and_map(node, 0, of_node_full_name(node));
->> +     if (IS_ERR(reg))
->> +             return;
->> +
->> +     clk = sun8i_a23_apb0_register(node, reg);
->> +     if (IS_ERR(clk))
->> +             goto err_unmap;
->> +
->> +     return;
->> +
->> +err_unmap:
->> +     iounmap(reg);
->> +     of_address_to_resource(node, 0, &res);
->> +     release_mem_region(res.start, resource_size(&res));
->> +}
->> +CLK_OF_DECLARE(sun8i_a23_apb0, "allwinner,sun8i-a23-apb0-clk",
->> +            sun8i_a23_apb0_setup);
->> +
->>  static int sun8i_a23_apb0_clk_probe(struct platform_device *pdev)
->>  {
->>       struct device_node *np = pdev->dev.of_node;
->> -     const char *clk_name = np->name;
->> -     const char *clk_parent;
->>       struct resource *r;
->>       void __iomem *reg;
->>       struct clk *clk;
->> @@ -33,19 +88,11 @@ static int sun8i_a23_apb0_clk_probe(struct platform_device *pdev)
->>       if (IS_ERR(reg))
->>               return PTR_ERR(reg);
->>
->> -     clk_parent = of_clk_get_parent_name(np, 0);
->> -     if (!clk_parent)
->> -             return -EINVAL;
->> -
->> -     of_property_read_string(np, "clock-output-names", &clk_name);
->> -
->> -     /* The A23 APB0 clock is a standard 2 bit wide divider clock */
->> -     clk = clk_register_divider(&pdev->dev, clk_name, clk_parent, 0, reg,
->> -                                0, 2, CLK_DIVIDER_POWER_OF_TWO, NULL);
->> +     clk = sun8i_a23_apb0_register(np, reg);
->>       if (IS_ERR(clk))
->>               return PTR_ERR(clk);
->>
->> -     return of_clk_add_provider(np, of_clk_src_simple_get, clk);
->> +     return 0;
->>  }
->
-> Won't this probe twice now? First the CLK_OF_DECLARE will register a
-> clock, and then the device model will call probe a second time.
-
-AFAIK it will.
-
-> I guess then request_mem_region will catch it, but then you return an
-> error code, which is probably an error success, since the clock is
-> registered :)
-
-Indeed. clk-mod0.c actually has a comment block explaining this.
-I didn't want to repeat the whole thing though.
-
-Regards
-ChenYu
+	M.
+-- 
+Jazz is not dead. It just smells funny...
