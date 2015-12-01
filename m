@@ -1,184 +1,39 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Tue,  1 Dec 2015 11:26:24 +0800
-Subject: [RFC PATCH 2/9] drm/rockchip: Use new vblank api drm_crtc_vblank_*
-In-Reply-To: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>
-References: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1448940391-23333-3-git-send-email-mark.yao@rock-chips.com>
+Date: Tue,  1 Dec 2015 11:26:22 +0800
+Subject: [RFC PATCH 0/9] drm/rockchip: covert to support atomic API
+Message-ID: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No functional update, drm_vblank_* is the legacy version of
-drm_crtc_vblank_*. and use new api make driver more clean.
+The series of patches coverting drm rockchip to atomic API, do some
+cleanup and some fixes on atomic side.
 
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
----
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c |   13 +++++++------
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h |    7 +++----
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   24 +++++++++++-------------
- 3 files changed, 21 insertions(+), 23 deletions(-)
+TODO: fence is not support on current version.
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-index 574324e..ccd46f2 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-@@ -65,11 +65,11 @@ void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
- }
- EXPORT_SYMBOL_GPL(rockchip_drm_dma_detach_device);
- 
--int rockchip_register_crtc_funcs(struct drm_device *dev,
--				 const struct rockchip_crtc_funcs *crtc_funcs,
--				 int pipe)
-+int rockchip_register_crtc_funcs(struct drm_crtc *crtc,
-+				 const struct rockchip_crtc_funcs *crtc_funcs)
- {
--	struct rockchip_drm_private *priv = dev->dev_private;
-+	int pipe = drm_crtc_index(crtc);
-+	struct rockchip_drm_private *priv = crtc->dev->dev_private;
- 
- 	if (pipe > ROCKCHIP_MAX_CRTC)
- 		return -EINVAL;
-@@ -80,9 +80,10 @@ int rockchip_register_crtc_funcs(struct drm_device *dev,
- }
- EXPORT_SYMBOL_GPL(rockchip_register_crtc_funcs);
- 
--void rockchip_unregister_crtc_funcs(struct drm_device *dev, int pipe)
-+void rockchip_unregister_crtc_funcs(struct drm_crtc *crtc)
- {
--	struct rockchip_drm_private *priv = dev->dev_private;
-+	int pipe = drm_crtc_index(crtc);
-+	struct rockchip_drm_private *priv = crtc->dev->dev_private;
- 
- 	if (pipe > ROCKCHIP_MAX_CRTC)
- 		return;
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-index dc4e5f0..069d6d4 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-@@ -52,10 +52,9 @@ struct rockchip_drm_private {
- 	const struct rockchip_crtc_funcs *crtc_funcs[ROCKCHIP_MAX_CRTC];
- };
- 
--int rockchip_register_crtc_funcs(struct drm_device *dev,
--				 const struct rockchip_crtc_funcs *crtc_funcs,
--				 int pipe);
--void rockchip_unregister_crtc_funcs(struct drm_device *dev, int pipe);
-+int rockchip_register_crtc_funcs(struct drm_crtc *crtc,
-+				 const struct rockchip_crtc_funcs *crtc_funcs);
-+void rockchip_unregister_crtc_funcs(struct drm_crtc *crtc);
- int rockchip_drm_encoder_get_mux_id(struct device_node *node,
- 				    struct drm_encoder *encoder);
- int rockchip_drm_crtc_mode_config(struct drm_crtc *crtc, int connector_type,
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 41905e2..3d16e70 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -119,8 +119,6 @@ struct vop {
- 	/* vop dclk reset */
- 	struct reset_control *dclk_rst;
- 
--	int pipe;
--
- 	struct vop_win win[];
- };
- 
-@@ -691,7 +689,7 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
- 
- 	enable_irq(vop->irq);
- 
--	drm_vblank_on(vop->drm_dev, vop->pipe);
-+	drm_crtc_vblank_on(crtc);
- 
- 	return;
- 
-@@ -710,7 +708,7 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
- 	if (!vop->is_enabled)
- 		return;
- 
--	drm_vblank_off(crtc->dev, vop->pipe);
-+	drm_crtc_vblank_off(crtc);
- 
- 	/*
- 	 * Vop standby will take effect at end of current frame,
-@@ -917,7 +915,7 @@ static int vop_update_plane_event(struct drm_plane *plane,
- 	 */
- 	mutex_lock(&vop->vsync_mutex);
- 	if (fb != vop_win_last_pending_fb(vop_win)) {
--		ret = drm_vblank_get(plane->dev, vop->pipe);
-+		ret = drm_crtc_vblank_get(crtc);
- 		if (ret) {
- 			DRM_ERROR("failed to get vblank, %d\n", ret);
- 			mutex_unlock(&vop->vsync_mutex);
-@@ -928,7 +926,7 @@ static int vop_update_plane_event(struct drm_plane *plane,
- 
- 		ret = vop_win_queue_fb(vop_win, fb, yrgb_mst, event);
- 		if (ret) {
--			drm_vblank_put(plane->dev, vop->pipe);
-+			drm_crtc_vblank_put(crtc);
- 			mutex_unlock(&vop->vsync_mutex);
- 			return ret;
- 		}
-@@ -1022,7 +1020,7 @@ static int vop_disable_plane(struct drm_plane *plane)
- 
- 	vop = to_vop(plane->crtc);
- 
--	ret = drm_vblank_get(plane->dev, vop->pipe);
-+	ret = drm_crtc_vblank_get(plane->crtc);
- 	if (ret) {
- 		DRM_ERROR("failed to get vblank, %d\n", ret);
- 		return ret;
-@@ -1032,7 +1030,7 @@ static int vop_disable_plane(struct drm_plane *plane)
- 
- 	ret = vop_win_queue_fb(vop_win, NULL, 0, NULL);
- 	if (ret) {
--		drm_vblank_put(plane->dev, vop->pipe);
-+		drm_crtc_vblank_put(plane->crtc);
- 		mutex_unlock(&vop->vsync_mutex);
- 		return ret;
- 	}
-@@ -1265,7 +1263,7 @@ static void vop_win_state_complete(struct vop_win *vop_win,
- 	}
- 
- 	list_del(&state->head);
--	drm_vblank_put(crtc->dev, vop->pipe);
-+	drm_crtc_vblank_put(crtc);
- }
- 
- static void vop_crtc_destroy(struct drm_crtc *crtc)
-@@ -1380,6 +1378,7 @@ done:
- static irqreturn_t vop_isr(int irq, void *data)
- {
- 	struct vop *vop = data;
-+	struct drm_crtc *crtc = &vop->crtc;
- 	uint32_t intr0_reg, active_irqs;
- 	unsigned long flags;
- 	int ret = IRQ_NONE;
-@@ -1408,7 +1407,7 @@ static irqreturn_t vop_isr(int irq, void *data)
- 	}
- 
- 	if (active_irqs & FS_INTR) {
--		drm_handle_vblank(vop->drm_dev, vop->pipe);
-+		drm_crtc_handle_vblank(crtc);
- 		active_irqs &= ~FS_INTR;
- 		ret = (vop->vsync_work_pending) ? IRQ_WAKE_THREAD : IRQ_HANDLED;
- 	}
-@@ -1501,8 +1500,7 @@ static int vop_create_crtc(struct vop *vop)
- 
- 	init_completion(&vop->dsp_hold_completion);
- 	crtc->port = port;
--	vop->pipe = drm_crtc_index(crtc);
--	rockchip_register_crtc_funcs(drm_dev, &private_crtc_funcs, vop->pipe);
-+	rockchip_register_crtc_funcs(crtc, &private_crtc_funcs);
- 
- 	return 0;
- 
-@@ -1518,7 +1516,7 @@ static void vop_destroy_crtc(struct vop *vop)
- {
- 	struct drm_crtc *crtc = &vop->crtc;
- 
--	rockchip_unregister_crtc_funcs(vop->drm_dev, vop->pipe);
-+	rockchip_unregister_crtc_funcs(crtc);
- 	of_node_put(crtc->port);
- 	drm_crtc_cleanup(crtc);
- }
+Tested on rk3288 popmetal board.
+
+All guys can test it with following url:
+ test case: https://github.com/markyzq/libdrm.git atomictest
+ kernel: https://github.com/markyzq/kernel-drm-rockchip.git drm-rockchip-2015-11-31
+
+Mark Yao (9):
+  drm/rockchip: vop: replace dpms with enable/disable
+  drm/rockchip: Use new vblank api drm_crtc_vblank_*
+  drm/rockchip: Convert to support atomic API
+  drm/rockchip: support atomic asynchronous commit
+  drm/rockchip: Optimization vop mode set
+  drm/rockchip: direct config connecter gate and out_mode
+  drm/rockchip: force enable vop when do mode setting
+  drm: bridge/dw_hdmi: Covert to support atomic API
+  drm/rockchip: dw_hdmi: use encoder enable function
+
+ drivers/gpu/drm/bridge/dw_hdmi.c            |    6 +-
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c |   14 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c |   18 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h |    9 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_fb.c  |   99 ++++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  735 +++++++++++----------------
+ 6 files changed, 413 insertions(+), 468 deletions(-)
+
 -- 
 1.7.9.5
