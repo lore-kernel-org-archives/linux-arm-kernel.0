@@ -1,79 +1,81 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 1 Dec 2015 16:31:39 +0000
-Subject: [PATCH v2 2/6] arm64: Move kill_cpu_early to smp.c
-In-Reply-To: <565DC5DB.7070905@arm.com>
-References: <1448982731-17182-1-git-send-email-suzuki.poulose@arm.com>
- <1448982731-17182-3-git-send-email-suzuki.poulose@arm.com>
- <20151201152826.GA28370@leverpostej> <565DC5DB.7070905@arm.com>
-Message-ID: <20151201163138.GA29045@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 1 Dec 2015 16:32:33 +0000
+Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
+ concurrent lockers
+In-Reply-To: <20151201004017.GA1135@fixme-laptop.cn.ibm.com>
+References: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
+ <20151201004017.GA1135@fixme-laptop.cn.ibm.com>
+Message-ID: <20151201163232.GD27751@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >>+#ifdef CONFIG_HOTPLUG_CPU
-> >>+	/* Check if we can park ourselves */
-> >>+	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
-> >>+		cpu_ops[cpu]->cpu_die(cpu);
-> >>+#endif
-> >
-> >Is there no way we can synchronise against this from another CPU, to be
-> >sure that this CPU is actually gone?
+On Tue, Dec 01, 2015 at 08:40:17AM +0800, Boqun Feng wrote:
+> Hi Will,
+
+Hi Boqun,
+
+> On Fri, Nov 27, 2015 at 11:44:06AM +0000, Will Deacon wrote:
+> > Boqun Feng reported a rather nasty ordering issue with spin_unlock_wait
+> > on architectures implementing spin_lock with LL/SC sequences and acquire
+> > semantics:
+> > 
+> >  | CPU 1                   CPU 2                     CPU 3
+> >  | ==================      ====================      ==============
+> >  |                                                   spin_unlock(&lock);
+> >  |                         spin_lock(&lock):
+> >  |                           r1 = *lock; // r1 == 0;
+> >  |                         o = READ_ONCE(object); // reordered here
+> >  | object = NULL;
+> >  | smp_mb();
+> >  | spin_unlock_wait(&lock);
+> >  |                           *lock = 1;
+> >  | smp_mb();
+> >  | o->dead = true;
+> >  |                         if (o) // true
+> >  |                           BUG_ON(o->dead); // true!!
+> > 
+> > The crux of the problem is that spin_unlock_wait(&lock) can return on
+> > CPU 1 whilst CPU 2 is in the process of taking the lock. This can be
+> > resolved by upgrading spin_unlock_wait to a LOCK operation, forcing it
 > 
-> Unfortunately, no. It cannot be guaranteed whether the CPU died gracefully
-> or is held up in the kernel. All the other CPU can find is whether the
-> CPU successfully turned online or not (using a wait_for_completion_timeout).
-
-That's true if we only consider the kernel, but the firmware can help
-us.
-
-For PSCI 0.2+ we can query AFFINITY_INFO to discover whether a CPU is
-whether or not it is in the firmware (i.e. whether or not it is
-potentially in the kernel), so we can certainly query this in some
-cases.
-
-We already do this in the usual hotplug-off case; see cpu_kill.
-
-> >>+
-> >>+	asm(
-> >>+	"1:	wfe\n"
-> >>+	"	wfi\n"
-> >>+	"	b	1b");
-> >>+}
-> >
-> >This can be:
-> >
-> >for (;;) {
-> >	wfe();
-> >	wfi();
-> >}
+> I wonder whether upgrading it to a LOCK operation is necessary. Please
+> see below.
 > 
-> Nice, I will change it.
+> > to serialise against a concurrent locker and giving it acquire semantics
+> > in the process (although it is not at all clear whether this is needed -
+> > different callers seem to assume different things about the barrier
+> > semantics and architectures are similarly disjoint in their
+> > implementations of the macro).
+> > 
+> > This patch implements spin_unlock_wait using an LL/SC sequence with
+> > acquire semantics on arm64. For v8.1 systems with the LSE atomics, the
 > 
-> >
-> >Regardless of that, we now have a CPU stuck in the kernel, despite
-> >beleiving it to be !present (and therefore !online).
+> IIUC, you implement this with acquire semantics because a LOCK requires
+> acquire semantics, right? I get that spin_unlock_wait() becoming a LOCK
+> will surely simply our analysis, because LOCK->LOCK is always globally
+> ordered. But for this particular problem, seems only a relaxed LL/SC
+> loop suffices, and the use of spin_unlock_wait() in do_exit() only
+> requires a control dependency which could be fulfilled by a relaxed
+> LL/SC loop. So the acquire semantics may be not necessary here.
 > 
-> Right, the CPU could be spinning in the kernel.
-> 
-> >
-> >This is problematic for anything where we need to offline or stop
-> >secondary CPUs. For instance, we need to inhibit kexec here (as we will
-> >also need to in case CPUs were stuck in the spinning due to spin-table).
-> 
-> Correct, I didn't think about kexec. May be we could indicate the result
-> back (that we are looping in kernel) in secondary_data and that could solve
-> the synchronisation part ?
+> Am I missing something subtle here which is the reason you want to
+> upgrading spin_unlock_wait() to a LOCK?
 
-I think we need to have two flags, a cpu-must-die flag in secondary
-data, and a global stuck-in-the-kernel flag.
+There's two things going on here:
 
-The CPU wanting to die could set its cpu-must-die flag, signal the
-completion, then cpu_die(). The CPU awaiting the completion would then
-check cpu-must-die, and if so, cpu_kill() that CPU. If not set, we had a
-successful onlining.
+  (1) Having spin_unlock_wait do a complete LL/SC sequence (i.e. writing
+      to the lock, like a LOCK operation would)
 
-We need stuck-in-the-kernel flag to account for CPUs which didn't manage
-to turn the MMU on (which are either in the spin-table, or failed when
-they were individually onlined).
+  (2) Giving it ACQUIRE semantics
 
-Thanks,
-Mark.
+(2) is not necessary to fix the problem you described. However, LOCK
+operations do imply ACQUIRE and it's not clear to me that what the
+ordering semantics are for spin_unlock_wait.
+
+I'd really like to keep this as simple as possible. Introducing yet
+another magic barrier macro that isn't well understood or widely used
+feels like a major step backwards to me, so I opted to upgrade
+spin_unlock_wait to LOCK on arm64 so that I no longer have to worry
+about it.
+
+Will
