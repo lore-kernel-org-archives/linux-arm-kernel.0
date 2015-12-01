@@ -1,86 +1,126 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 30 Nov 2015 19:19:47 -0800
-Subject: [PATCH v2 00/21] arm64: KVM: world switch in C
-In-Reply-To: <20151130203345.GI11704@cbox>
-References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
- <20151130203345.GI11704@cbox>
-Message-ID: <565D11D3.3030502@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 30 Nov 2015 21:53:33 -0800
+Subject: [PATCH v2] arm, am335x: add support for the bosch shc board
+In-Reply-To: <565D2DF9.2010806@denx.de>
+References: <1447748655-2088-1-git-send-email-hs@denx.de>
+ <20151130214130.GA23396@atomide.com> <565D2DF9.2010806@denx.de>
+Message-ID: <20151201055333.GO23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Heiko Schocher <hs@denx.de> [151130 21:21]:
+> Hello Tony,
+> 
+> Am 30.11.2015 um 22:41 schrieb Tony Lindgren:
+> >* Heiko Schocher <hs@denx.de> [151117 00:25]:
+> >>--- /dev/null
+> >>+++ b/arch/arm/boot/dts/am335x-shc.dts
+> >>+&tps {
+> >>+	compatible = "ti,tps65217";
+> >>+	ti,pmic-shutdown-controller;
+> >>+
+> >>+	regulators {
+> >>+		#address-cells = <1>;
+> >>+		#size-cells = <0>;
+> >>+
+> >>+		dcdc1_reg: regulator at 0 {
+> >>+			reg = <0>;
+> >>+			regulator-name = "vdds_dpr";
+> >>+			regulator-compatible = "dcdc1";
+> >>+			regulator-min-microvolt = <1300000>;
+> >>+			regulator-max-microvolt = <1450000>;
+> >>+			regulator-boot-on;
+> >>+			regulator-always-on;
+> >>+		};
+> >>+
+> >>+		dcdc2_reg: regulator at 1 {
+> >>+			reg = <1>;
+> >>+			/*
+> >>+			 * VDD_MPU voltage limits 0.95V - 1.26V with
+> >>+			 * +/-4% tolerance
+> >>+			 */
+> >>+			regulator-compatible = "dcdc2";
+> >>+			regulator-name = "vdd_mpu";
+> >>+			regulator-min-microvolt = <925000>;
+> >>+			regulator-max-microvolt = <1375000>;
+> >>+			regulator-boot-on;
+> >>+			regulator-always-on;
+> >>+			regulator-ramp-delay = <70000>;
+> >>+		};
+> >>+
+> >>+		dcdc3_reg: regulator at 2 {
+> >>+			reg = <2>;
+> >>+			/*
+> >>+			 * VDD_CORE voltage limits 0.95V - 1.1V with
+> >>+			 * +/-4% tolerance
+> >>+			 */
+> >>+			regulator-name = "vdd_core";
+> >>+			regulator-compatible = "dcdc3";
+> >>+			regulator-min-microvolt = <925000>;
+> >>+			regulator-max-microvolt = <1125000>;
+> >>+			regulator-boot-on;
+> >>+			regulator-always-on;
+> >>+		};
+> >>+
+> >>+		ldo1_reg: regulator at 3 {
+> >>+			reg = <3>;
+> >>+			regulator-name = "vio,vrtc,vdds";
+> >>+			regulator-compatible = "ldo1";
+> >>+			regulator-min-microvolt = <1000000>;
+> >>+			regulator-max-microvolt = <1800000>;
+> >>+			regulator-always-on;
+> >>+		};
+> >>+
+> >>+		ldo2_reg: regulator at 4 {
+> >>+			reg = <4>;
+> >>+			regulator-name = "vdd_3v3aux";
+> >>+			regulator-compatible = "ldo2";
+> >>+			regulator-min-microvolt = <900000>;
+> >>+			regulator-max-microvolt = <3300000>;
+> >>+			regulator-always-on;
+> >>+		};
+> >>+
+> >>+		ldo3_reg: regulator at 5 {
+> >>+			reg = <5>;
+> >>+			regulator-name = "vdd_1v8";
+> >>+			regulator-compatible = "ldo3";
+> >>+			regulator-min-microvolt = <900000>;
+> >>+			regulator-max-microvolt = <1800000>;
+> >>+			regulator-always-on;
+> >>+		};
+> >>+
+> >>+		ldo4_reg: regulator at 6 {
+> >>+			reg = <6>;
+> >>+			regulator-name = "vdd_3v3a";
+> >>+			regulator-compatible = "ldo4";
+> >>+			regulator-min-microvolt = <1800000>;
+> >>+			regulator-max-microvolt = <3300000>;
+> >>+			regulator-always-on;
+> >>+		};
+> >>+	};
+> >>+};
+> >
+> >Applying this into omap-for-v4.5/dt.. But I'm getting concerned about this
+> >"regulator-always-on" stuff and having multiple copies of the same thing.
+> >
+> >I think we should have a common am33xx-tps65217.dtsi file that has the
+> >regulators defined at one place and other then include it. And they are
+> >controllable AFAIK..
+> 
+> Hmm... Mark Brown (added to Cc) suggested to move this regulator nodes
+> into the board DT file and remove such files [1].
+
+Hmm it was probably the name of that file causing confusion as it was not
+am33xx specific. If we have many board variants using almost the same exact
+regulators and configuration it totally makes sense to have a shared dtsi
+file for them :)
+
+It may actually be better to have it as am33xx-common.dtsi and I bet that
+covers quite a few am33xx boards for the basic shared functionality.
+
+Regards,
+
+Tony
 
 
-On 11/30/2015 12:33 PM, Christoffer Dall wrote:
-> On Fri, Nov 27, 2015 at 06:49:54PM +0000, Marc Zyngier wrote:
->> Once upon a time, the KVM/arm64 world switch was a nice, clean, lean
->> and mean piece of hand-crafted assembly code. Over time, features have
->> crept in, the code has become harder to maintain, and the smallest
->> change is a pain to introduce. The VHE patches are a prime example of
->> why this doesn't work anymore.
->>
->> This series rewrites most of the existing assembly code in C, but keeps
->> the existing code structure in place (most function names will look
->> familiar to the reader). The biggest change is that we don't have to
->> deal with a static register allocation (the compiler does it for us),
->> we can easily follow structure and pointers, and only the lowest level
->> is still in assembly code. Oh, and a negative diffstat.
->>
->> There is still a healthy dose of inline assembly (system register
->> accessors, runtime code patching), but I've tried not to make it too
->> invasive. The generated code, while not exactly brilliant, doesn't
->> look too shaby. I do expect a small performance degradation, but I
->> believe this is something we can improve over time (my initial
->> measurements don't show any obvious regression though).
-> 
-> I ran this through my experimental setup on m400 and got this:
-> 
-> BM		v4.4-rc2	v4.4-rc2-wsinc	overhead
-> --		--------	--------------	--------
-> Apache		5297.11		5243.77		101.02%
-> fio rand read	4354.33		4294.50		101.39%
-> fio rand write	2465.33		2231.33		110.49%
-> hackbench	17.48		19.78		113.16%
-> memcached	96442.69	101274.04	95.23%
-> TCP_MAERTS	5966.89		6029.72		98.96%
-> TCP_STREAM	6284.60		6351.74		98.94%
-> TCP_RR		15044.71	14324.03	105.03%
-> pbzip2 c	18.13		17.89		98.68%
-> pbzip2 d	11.42		11.45		100.26%
-> kernbench	50.13		50.28		100.30%
-> mysql 1		152.84		154.01		100.77%
-> mysql 2		98.12		98.94		100.84%
-> mysql 4		51.32		51.17		99.71%
-> mysql 8		27.31		27.70		101.42%
-> mysql 20	16.80		17.21		102.47%
-> mysql 100	13.71		14.11		102.92%
-> mysql 200	15.20		15.20		100.00%
-> mysql 400	17.16		17.16		100.00%
-> 
-> (you want to see this with a viewer that renders clear-text and tabs
-> properly)
-> 
-> What this tells me is that we do take a noticable hit on the
-> world-switch path, which shows up in the TCP_RR and hackbench workloads,
-> which have a high precision in their output.
-> 
-> Note that the memcached number is well within its variability between
-> individual benchmark runs, where it varies to 12% of its average in over
-> 80% of the executions.
-> 
-> I don't think this is a showstopper thought, but we could consider
-> looking more closely at a breakdown of the world-switch path and verify
-> if/where we are really taking a hit.
-> 
-> -Christoffer
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
-> 
-
-I ran some of the lmbench 'micro benchmarks' - currently
-the usleep one consistently stands out by about .4% or extra 300ns
-per sleep. Few other ones have some outliers, I will look at these
-closer. Tests were ran on Juno.
-
-- Mario
+> [1] https://lkml.org/lkml/2015/10/21/581
