@@ -1,22 +1,38 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Tue, 01 Dec 2015 07:33:05 -0800
-Subject: [PATCH 3/6] net: thunderx: Increase transmit queue length
-In-Reply-To: <01d101d12c46$2de43b40$89acb1c0$@samsung.com>
-References: <y@samsung.com>
- <1448961223-41888-4-git-send-email-sunil.kovvuri@gmail.com>
- <01d101d12c46$2de43b40$89acb1c0$@samsung.com>
-Message-ID: <1448983985.25582.35.camel@edumazet-glaptop2.roam.corp.google.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 01 Dec 2015 16:33:24 +0100
+Subject: [PATCH 03/10] gpio: samsung: move gpio-samsung driver back to
+ platform code
+In-Reply-To: <565CEB0A.4090107@samsung.com>
+References: <1448467615-447097-1-git-send-email-arnd@arndb.de>
+ <1448467615-447097-4-git-send-email-arnd@arndb.de>
+ <565CEB0A.4090107@samsung.com>
+Message-ID: <7302923.ORKinVl6Ne@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-12-01 at 17:40 +0300, Pavel Fedin wrote:
->  Hello!
+On Tuesday 01 December 2015 09:34:18 Krzysztof Kozlowski wrote:
+> On 26.11.2015 01:06, Arnd Bergmann wrote:
+> > diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+> > index 57729b915003..83697414bfa0 100644
+> > --- a/arch/arm/plat-samsung/Kconfig
+> > +++ b/arch/arm/plat-samsung/Kconfig
+> > @@ -294,6 +294,9 @@ config SAMSUNG_WDT_RESET
+> >         Compile support for system restart by triggering watchdog reset.
+> >         Used on SoCs that do not provide dedicated reset control.
+> >  
+> > +config GPIO_SAMSUNG
+> > +     def_bool SAMSUNG_ATAGS
+> > +
 > 
->  This one breaks networking on my machine:
-> --- cut ---
-> swiotlb: coherent allocation failed for device 0002:01:08.4 size=4198400
-> CPU: 2 PID: 3655 Comm: NetworkManager Tainted: G        W  O    4.2.6+ #201
-> Hardware name: Cavium ThunderX CN88XX
+> I think this should be put inside "if SAMSUNG_ATAGS" section, just
+> before SAMSUNG_PM_GPIO (with default=y?). It makes more consistent with
+> rest of the options depending on ATAGS.
 
-Are you sure 4.2.6 kernel is suitable for backporting this patch aimed
-for linux-4.5 ?
+Good idea, changed that now.
+
+> Rest seems fine:
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Thanks,
+
+	Arnd
