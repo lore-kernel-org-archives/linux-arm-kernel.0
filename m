@@ -1,96 +1,95 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Tue, 1 Dec 2015 20:41:29 +0100
-Subject: [PATCH v3 4/6] pinctrl: meson: Enable GPIO IRQs
-In-Reply-To: <565DF211.8000005@arm.com>
-References: <1448987062-31225-1-git-send-email-carlo@caione.org>
- <1448987062-31225-5-git-send-email-carlo@caione.org>
- <565DF211.8000005@arm.com>
-Message-ID: <CAOQ7t2YN8Ey1vZO4yrn9SdbR7FzPNVY-HGRBZOctLgK1vHo9VA@mail.gmail.com>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Tue, 1 Dec 2015 20:44:22 +0100
+Subject: [PATCH v3 4/4] drivers: psci: replace psci firmware calls
+In-Reply-To: <20151201184741.GE29045@leverpostej>
+References: <1448449461-5043-1-git-send-email-jens.wiklander@linaro.org>
+ <1448449461-5043-5-git-send-email-jens.wiklander@linaro.org>
+ <20151201184741.GE29045@leverpostej>
+Message-ID: <20151201194421.GA29068@ermac>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 1, 2015 at 8:16 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 01/12/15 16:24, Carlo Caione wrote:
->> From: Carlo Caione <carlo@endlessm.com>
++Lorenzo
 
->> +static int meson_irq_domain_alloc(struct irq_domain *domain, unsigned int irq,
->> +                               unsigned int nr_irqs, void *arg)
->> +{
->> +     struct meson_pinctrl *pc = domain->host_data;
->> +     struct irq_fwspec *irq_data = arg;
->> +     struct irq_fwspec gic_data;
->> +     irq_hw_number_t hwirq;
->> +     int index, ret, i;
->> +
->> +     if (irq_data->param_count != 2)
->> +             return -EINVAL;
->> +
->> +     hwirq = irq_data->param[0];
->> +     dev_dbg(pc->dev, "%s irq %d, nr %d, hwirq %lu\n",
->> +                     __func__, irq, nr_irqs, hwirq);
->> +
->> +     for (i = 0; i < nr_irqs; i++) {
->> +             index = meson_map_gic_irq(domain, hwirq + i);
->> +             if (index < 0)
->> +                     return index;
->> +
->> +             irq_domain_set_hwirq_and_chip(domain, irq + i,
->> +                                           hwirq + i,
->> +                                           &meson_irq_chip,
->> +                                           pc);
->> +
->> +             gic_data.param_count = 3;
->> +             gic_data.fwnode = domain->parent->fwnode;
->> +             gic_data.param[0] = 0; /* SPI */
->> +             gic_data.param[1] = pc->gic_irqs[index];
->> +             gic_data.param[1] = IRQ_TYPE_EDGE_RISING;
+On Tue, Dec 01, 2015 at 06:47:42PM +0000, Mark Rutland wrote:
+> Hi Jens,
+> 
+> On Wed, Nov 25, 2015 at 12:04:21PM +0100, Jens Wiklander wrote:
+> > Switch to use a generic interface for issuing SMC/HVC based on ARM SMC
+> > Calling Convention. Removes now the now unused psci-call.S.
+> > 
+> > Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+> > Acked-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm/kernel/Makefile      |  1 -
+> >  arch/arm/kernel/psci-call.S   | 31 -------------------------------
+> >  arch/arm64/kernel/Makefile    |  2 +-
+> >  arch/arm64/kernel/psci-call.S | 28 ----------------------------
+> >  drivers/firmware/psci.c       | 23 +++++++++++++++++++++--
+> >  5 files changed, 22 insertions(+), 63 deletions(-)
+> >  delete mode 100644 arch/arm/kernel/psci-call.S
+> >  delete mode 100644 arch/arm64/kernel/psci-call.S
+> 
+> As a heads-up, this conflicts with changes in drivers/firmware/psci.c
+> that appeared in for v4.4-rc1.
+> 
+> The conflict is trivial (upstream some functions were added to the same
+> location as the invocation functions), but even git am -3 doesn't seem
+> to be able to fix that up automatically, so it would be good if you
+> could rebase this to v4.4-rc1 so as to avoid that conflict.
+> 
+> > diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+> > index 42700f0..9c55d11 100644
+> > --- a/drivers/firmware/psci.c
+> > +++ b/drivers/firmware/psci.c
+> > @@ -19,6 +19,7 @@
+> >  #include <linux/pm.h>
+> >  #include <linux/printk.h>
+> >  #include <linux/psci.h>
+> > +#include <linux/arm-smccc.h>
+> >  #include <linux/reboot.h>
+> 
+> Nit: please move the arm-smccc.h include to the start of the list to
+> keep this ordered alphabetically.
+> 
+> > +static unsigned long __invoke_psci_fn_hvc(unsigned long function_id,
+> > +			unsigned long arg0, unsigned long arg1,
+> > +			unsigned long arg2)
+> > +{
+> > +	struct arm_smccc_res res;
+> > +
+> > +	arm_smccc_hvc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
+> > +	return res.a0;
+> > +}
+> > +
+> > +static unsigned long __invoke_psci_fn_smc(unsigned long function_id,
+> > +			unsigned long arg0, unsigned long arg1,
+> > +			unsigned long arg2)
+> > +{
+> > +	struct arm_smccc_res res;
+> > +
+> > +	arm_smccc_smc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
+> > +	return res.a0;
+> > +}
+> > +
+> 
+> As mentioned above, this part needs to be rebased to v4.4-rc1 to avoid
+> conflicts.
+> 
+> I've given this a spin on arm64 (native and virtual) and arm (virtual).
+> SMP bringup, hotplug, and reboot worked as expected in all cases.
+> 
+> Assuming you apply the fixes requested above, for the PSCI parts:
+> 
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> Tested-by: Mark Rutland <mark.rutland@arm.com>
 
-Oh, this should be gic_data.param[2]. Just noticed.
+Thanks for the feeback and heads up, I'll fix.
 
-> That feels quite wrong. Hardcoding the trigger like this and hoping for
-> a set_type to set it right at a later time is just asking for trouble.
-> Why can't you use the trigger type that has been provided by the
-> interrupt descriptor?
+> 
+> What's the plan for merging this? I assume this'll go via arm-soc?
 
-In v2 I had the set of fwspec to track number and trigger type of the
-IRQ, so it was straightforward. With this patch I have moved away from
-that solution (as you suggested) and I'm using the 'amlogic,irqs-gpio'
-parameter to track down the IRQ numbers (but not the trigger type).
-It's the same solution we have in drivers/irqchip/irq-crossbar.c where
-the trigger type is hardcoded in allocate_gic_irq().
-If I need to save both the IRQ and the trigger type at this point I
-wonder if it's better to go back to the set of fwspec or convert the
-fwspec to of_phandle_args and save that.
+I talked to Arnd about this and he suggested to go via Russel.
 
->> +static int meson_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
->> +{
->> +     struct meson_domain *domain = to_meson_domain(chip);
->> +     struct meson_pinctrl *pc = domain->pinctrl;
->> +     struct meson_bank *bank;
->> +     struct irq_fwspec irq_data;
->> +     unsigned int hwirq, irq;
->> +
->> +     hwirq = domain->data->pin_base + offset;
->> +
->> +     if (meson_get_bank(domain, hwirq, &bank))
->> +             return -ENXIO;
->> +
->> +     irq_data.param_count = 2;
->> +     irq_data.param[0] = hwirq;
->> +
->> +     /* dummy. It will be changed later in meson_irq_set_type */
->> +     irq_data.param[1] = IRQ_TYPE_EDGE_RISING;
->
-> Blah. Worse than I though... How do you end-up here? Why can't you
-> obtain the corresponding of_phandle_args instead of making things up?
-
-because I do not have a of_phandle. This is basically the .to_irq hook
-of the gpio_chip. This code is being called programmatically from the
-gpiolib. No DTS/OF involved here.
-
-> This looks mad. Do you really need this?
-
-Well, I'm open to any suggestion on how improve this mess.
-
--- 
-Carlo Caione
+Thanks,
+Jens
