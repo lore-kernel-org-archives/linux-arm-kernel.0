@@ -1,64 +1,49 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue,  1 Dec 2015 15:38:18 -0800
-Subject: [PATCH 05/10] ARM: OMAP2+: Disable GPIO softreset for dm81xx
+Date: Tue,  1 Dec 2015 15:38:20 -0800
+Subject: [PATCH 07/10] ARM: dts: Fix dm814x entries for pllss and prcm
 In-Reply-To: <1449013103-23238-1-git-send-email-tony@atomide.com>
 References: <1449013103-23238-1-git-send-email-tony@atomide.com>
-Message-ID: <1449013103-23238-6-git-send-email-tony@atomide.com>
+Message-ID: <1449013103-23238-8-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like GPIO softreset status bit on both dm8168 and dm8148
-is broken and only goes high initially. After writing to sysc
-softreset bit, the resetdone bit never goes high again.
+Otherwise drivers under pllss and prcm won't probe properly.
 
-I noticed this as GPIOs are enabled from u-boot at least on t410.
-And this can be tested easliy with the following commands in u-boot:
-
-# mw.l 0x4818155c 0x2
-# md.l 0x48032114 1
-48032114: 00000001    ....
-# mw.l 0x48032010 0x2
-# md.l 0x48032114 1
-48032114: 00000000    ....
-
-Looks like the GPIO module is functional even with the resetdone
-bit down.
-
-Let's just tag the GPIOs for dm81xx with HWMOD_INIT_NO_RESET.
-
-Cc: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/dm814x.dtsi | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-index 1b96cdf..440fd6c 100644
---- a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-@@ -432,6 +432,7 @@ static struct omap_hwmod_ocp_if dm81xx_l4_ls__elm = {
- 	.user		= OCP_USER_MPU,
- };
+diff --git a/arch/arm/boot/dts/dm814x.dtsi b/arch/arm/boot/dts/dm814x.dtsi
+index 7988b42..5c8de19 100644
+--- a/arch/arm/boot/dts/dm814x.dtsi
++++ b/arch/arm/boot/dts/dm814x.dtsi
+@@ -215,7 +215,10 @@
  
-+/* On dm81xx RESETDONE bit seems to never goes high again after SOFTRESET */
- static struct omap_hwmod_class_sysconfig dm81xx_gpio_sysc = {
- 	.rev_offs	= 0x0000,
- 	.sysc_offs	= 0x0010,
-@@ -463,6 +464,7 @@ static struct omap_hwmod dm81xx_gpio1_hwmod = {
- 	.name		= "gpio1",
- 	.clkdm_name	= "alwon_l3s_clkdm",
- 	.class		= &dm81xx_gpio_hwmod_class,
-+	.flags		= HWMOD_INIT_NO_RESET,
- 	.main_clk	= "sysclk6_ck",
- 	.prcm = {
- 		.omap4 = {
-@@ -490,6 +492,7 @@ static struct omap_hwmod dm81xx_gpio2_hwmod = {
- 	.clkdm_name	= "alwon_l3s_clkdm",
- 	.class		= &dm81xx_gpio_hwmod_class,
- 	.main_clk	= "sysclk6_ck",
-+	.flags		= HWMOD_INIT_NO_RESET,
- 	.prcm = {
- 		.omap4 = {
- 			.clkctrl_offs = DM81XX_CM_ALWON_GPIO_1_CLKCTRL,
+ 			prcm: prcm at 180000 {
+ 				compatible = "ti,dm814-prcm", "simple-bus";
+-				reg = <0x180000 0x4000>;
++				reg = <0x180000 0x2000>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x180000 0x2000>;
+ 
+ 				prcm_clocks: clocks {
+ 					#address-cells = <1>;
+@@ -226,9 +229,13 @@
+ 				};
+ 			};
+ 
++			/* See TRM PLL_SUBSYS_BASE and "PLLSS Registers" */
+ 			pllss: pllss at 1c5000 {
+ 				compatible = "ti,dm814-pllss", "simple-bus";
+-				reg = <0x1c5000 0x2000>;
++				reg = <0x1c5000 0x1000>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x1c5000 0x1000>;
+ 
+ 				pllss_clocks: clocks {
+ 					#address-cells = <1>;
 -- 
 2.6.2
