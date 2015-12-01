@@ -1,133 +1,74 @@
-From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Tue, 1 Dec 2015 15:17:24 +0800
-Subject: [PATCH v2 02/10] drm/hisilicon: Add DT binding docs for hi6220
- display subsystem
-In-Reply-To: <20151130193130.GA1616@rob-hp-laptop>
-References: <1448707145-69348-1-git-send-email-xinliang.liu@linaro.org>
- <1448707145-69348-3-git-send-email-xinliang.liu@linaro.org>
- <20151130193130.GA1616@rob-hp-laptop>
-Message-ID: <CAGd==07B4e6uevH5LmW_MeG4SbViKqQ+MwKTtWtXi4UBmv6pSw@mail.gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 1 Dec 2015 08:21:28 +0100
+Subject: [RFC PATCH 8/9] drm: bridge/dw_hdmi: Covert to support atomic API
+In-Reply-To: <1448940953-23604-1-git-send-email-mark.yao@rock-chips.com>
+References: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>
+ <1448940953-23604-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <20151201072128.GF17050@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 December 2015 at 03:31, Rob Herring <robh@kernel.org> wrote:
+On Tue, Dec 01, 2015 at 11:35:53AM +0800, Mark Yao wrote:
+> Fill atomic needed funcs with default atomic helper library.
+> 
+> Rockchip use dw_hdmi, and drm/rockchip will covert to atomic api,
+> we need dw_hdmi support atomic funcs.
+> 
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 
-Hi Rob, thank you for review.
+Aren't there drivers around which use dw_hdmi and which are still not yet
+atomic? This would break them. I think we neeed two connector_func tables
+and dw_hdmi needs to check for DRIVER_ATOMIC at runtime and pick the right
+version.
 
-> On Sat, Nov 28, 2015 at 06:38:57PM +0800, Xinliang Liu wrote:
->> Add the device tree binding documentation for hi6220 SoC display subsystem.
->> drm master device binding doc.
->> ADE display controller binding doc.
->> DSI controller binding doc.
->>
->> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
->> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
->> Signed-off-by: Andy Green <andy.green@linaro.org>
->> ---
->>  .../bindings/display/hisilicon/hisi-ade.txt        | 42 ++++++++++++++
->>  .../bindings/display/hisilicon/hisi-drm.txt        | 66 ++++++++++++++++++++++
->>  .../bindings/display/hisilicon/hisi-dsi.txt        | 53 +++++++++++++++++
->>  3 files changed, 161 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
->>  create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-drm.txt
->>  create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-dsi.txt
->>
->> diff --git a/Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt b/Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
->> new file mode 100644
->> index 0000000..2777a2c
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
->> @@ -0,0 +1,42 @@
->> +Device-Tree bindings for hisilicon ADE display controller driver
->> +
->> +ADE (Advanced Display Engine) is the display controller which grab image
->> +data from memory, do composition, do post image processing, generate RGB
->> +timing stream and transfer to DSI.
->> +
->> +Required properties:
->> +- compatible: value should be one of the following
->> +     "hisilicon,hi6220-ade".
->> +- reg: physical base address and length of the controller's registers.
->> +- reg-names: name of physical base.
->> +- interrupt: the interrupt number.
->> +- clocks: the clocks needed.
->> +- clock-names: the name of the clocks.
->> +- ade_core_clk_rate: ADE core clock rate.
->> +- media_noc_clk_rate: media noc module clock rate.
->
-> I think you can use assigned clock properties instead:
->
-> assigned-clocks = <&media_ctrl HI6220_ADE_CORE>;
-> assigned-clock-rates = <360000000>;
->
-> I'm not sure about what media_noc corresponds to in clocks list though.
->
+The larger problem here is that "who should register the drm_connector" is
+a bit an unsolved problem, since both the bridge and the driver should be
+able to customize/adjust the drm_connector at the end of a bridge chain.
+This here is just another example of this problem.
+-Daniel
 
-will use assigned-clocks in v3.
+> ---
+>  drivers/gpu/drm/bridge/dw_hdmi.c |    6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
+> index 56de9f1..587065a 100644
+> --- a/drivers/gpu/drm/bridge/dw_hdmi.c
+> +++ b/drivers/gpu/drm/bridge/dw_hdmi.c
+> @@ -22,6 +22,7 @@
+>  
+>  #include <drm/drm_of.h>
+>  #include <drm/drmP.h>
+> +#include <drm/drm_atomic_helper.h>
+>  #include <drm/drm_crtc_helper.h>
+>  #include <drm/drm_edid.h>
+>  #include <drm/drm_encoder_slave.h>
+> @@ -1515,11 +1516,14 @@ static void dw_hdmi_connector_force(struct drm_connector *connector)
+>  }
+>  
+>  static struct drm_connector_funcs dw_hdmi_connector_funcs = {
+> -	.dpms = drm_helper_connector_dpms,
+> +	.dpms = drm_atomic_helper_connector_dpms,
+>  	.fill_modes = drm_helper_probe_single_connector_modes,
+>  	.detect = dw_hdmi_connector_detect,
+>  	.destroy = dw_hdmi_connector_destroy,
+>  	.force = dw_hdmi_connector_force,
+> +	.reset = drm_atomic_helper_connector_reset,
+> +	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+> +	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
+>  };
+>  
+>  static struct drm_connector_helper_funcs dw_hdmi_connector_helper_funcs = {
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
 
->> +
->> +
->> +A example of HiKey board hi6220 SoC specific DT entry:
->> +Example:
->> +
->> +     ade: ade at f4100000 {
->> +             compatible = "hisilicon,hi6220-ade";
->> +             reg = <0x0 0xf4100000 0x0 0x7800>,
->> +                   <0x0 0xf4410000 0x0 0x1000>;
->> +             reg-names = "ade_base",
->> +                         "media_base";
->> +             interrupts = <0 115 4>;
->> +
->> +             clocks = <&media_ctrl HI6220_ADE_CORE>,
->> +                      <&media_ctrl HI6220_CODEC_JPEG>,
->> +                      <&media_ctrl HI6220_ADE_PIX_SRC>,
->> +                      <&media_ctrl HI6220_PLL_SYS>,
->> +                      <&media_ctrl HI6220_PLL_SYS_MEDIA>;
->> +             clock-names  = "clk_ade_core",
->> +                            "aclk_codec_jpeg_src",
->> +                            "clk_ade_pix",
->> +                            "clk_syspll_src",
->> +                            "clk_medpll_src";
->> +             ade_core_clk_rate = <360000000>;
->> +             media_noc_clk_rate = <288000000>;
->> +     };
->> diff --git a/Documentation/devicetree/bindings/display/hisilicon/hisi-drm.txt b/Documentation/devicetree/bindings/display/hisilicon/hisi-drm.txt
->> new file mode 100644
->> index 0000000..fd93026
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/display/hisilicon/hisi-drm.txt
->> @@ -0,0 +1,66 @@
->> +Hisilicon DRM master device
->> +
->> +The Hisilicon DRM master device is a virtual device needed to list all
->> +the other display relevant nodes that comprise the display subsystem.
->
-> There is no need for this in DT. The ADE can be the master device and
-> of-graph can link to the DSI node. I have a similar example here[1]
-> with a LCD controller block, DSI block and adv7533.
-
-This sounds good, then I can remove the virtual master device.
-I will refer to this example and make ADE as the master device in v3.
-
->
->> +Required properties:
->> +- compatible: Should be "hisilicon,<chip>-dss"
->> +- #address-cells: should be set to 2.
->> +- #size-cells: should be set to 2.
->> +- range: to allow probing of subdevices.
->> +
->> +Optional properties:
->> +- dma-coherent: Present if dma operations are coherent.
->
-> Put this on the actually DMA master.
-
-The DMA modules reside in the begining of each channel(or plane) of ADE.
-So I need to put this dma-coherent property to ADE device node, right?
-
-Thanks,
--xinliang
-
->
-> Rob
->
-> [1] https://git.linaro.org/people/rob.herring/linux.git pxa1928-drm-v2
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
