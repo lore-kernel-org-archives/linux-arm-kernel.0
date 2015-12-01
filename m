@@ -1,108 +1,66 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 1 Dec 2015 13:27:45 +0100
-Subject: [PATCH v2 11/25] coccinelle: nand: detect and correct drivers
- embedding an mtd_info object
-In-Reply-To: <alpine.DEB.2.10.1512011207580.2736@hadrien>
-References: <1448967802-25796-1-git-send-email-boris.brezillon@free-electrons.com>
- <1448967802-25796-12-git-send-email-boris.brezillon@free-electrons.com>
- <alpine.DEB.2.10.1512011207580.2736@hadrien>
-Message-ID: <20151201132745.2bc1e294@bbrezillon>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 1 Dec 2015 20:28:44 +0800
+Subject: [PATCH v2 12/25] mtd: nand: use the mtd instance embedded in
+ struct nand_chip
+In-Reply-To: <1448967802-25796-13-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <201512012058.JdJjJKAX%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Boris,
 
-On Tue, 1 Dec 2015 12:17:44 +0100 (CET)
-Julia Lawall <julia.lawall@lip6.fr> wrote:
+[auto build test ERROR on next-20151127]
+[cannot apply to mtd/master v4.4-rc3 v4.4-rc2 v4.4-rc1 v4.4-rc3]
 
-> 
-> 
-> On Tue, 1 Dec 2015, Boris Brezillon wrote:
-> 
-> > Add nand-priv-no-mtd.cocci to detect and correct NAND controller drivers
-> > directly embedding an mtd_info struct in their private struct.
-> >
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Cc: Julia Lawall <Julia.Lawall@lip6.fr>
-> > ---
-> > Hi Julia,
-> >
-> > Not sure this is the correct way to detect and fix offending drivers,
-> > but I get some warnings when launching coccicheck in org or report mode:
-> >
-> > "warning: fix2: inherited metavariable __chipfield not used in the -, +,
-> > or context code"
-> >
-> > Note that I don't get those warnings when running in patch mode.
-> >
-> > Any idea (feel free to propose a better solution to detect and fix those
-> > offending drivers)?
-> 
-> Hi,
-> 
-> Is this code generated with sgen?  If so, could you send me the original
-> semantic patch?
+url:    https://github.com/0day-ci/linux/commits/Boris-Brezillon/mtd-nand-refactor-the-NAND-subsystem-part-1/20151201-190822
+config: arm-imx_v6_v7_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Nope, it's been hand written, which might explain the warnings :-/.
-Didn't know about sgen, I thought those scripts were all hand written.
+All errors (new ones prefixed by >>):
 
-> 
-> Another thing that is immediately apparent is that you have <... ...> on
-> the outside of one of the rules.  This should never be needed.
-> 
-> The warning suggests that your org and report versions are not doing as
-> much as the patch version.  If you have used sgen to generate the semantic
-> patch then that would be strange.  If you have hand written the whole
-> thing, then maybe you could simplify it to just do the patch version, and
-> then I can check it and run sgen on it to make a complete version.
+   drivers/mtd/nand/gpmi-nand/gpmi-nand.c: In function 'set_geometry_by_ecc_info':
+>> drivers/mtd/nand/gpmi-nand/gpmi-nand.c:142:39: error: 'mtd' undeclared (first use in this function)
+     struct nand_chip *chip = mtd_to_nand(mtd);
+                                          ^
+   drivers/mtd/nand/gpmi-nand/gpmi-nand.c:142:39: note: each undeclared identifier is reported only once for each function it appears in
+   drivers/mtd/nand/gpmi-nand/gpmi-nand.c: In function 'gpmi_init_last':
+   drivers/mtd/nand/gpmi-nand/gpmi-nand.c:1840:39: error: 'mtd' undeclared (first use in this function)
+     struct nand_chip *chip = mtd_to_nand(mtd);
+                                          ^
+   drivers/mtd/nand/gpmi-nand/gpmi-nand.c:1841:19: warning: unused variable 'mtd' [-Wunused-variable]
+     struct mtd_info *mtd = nand_to_mtd(chip);
+                      ^
 
-Sure, here it is:
+vim +/mtd +142 drivers/mtd/nand/gpmi-nand/gpmi-nand.c
 
---->8---
-virtual patch
+2febcdf84 Huang Shijie    2013-05-17  136   *
+2febcdf84 Huang Shijie    2013-05-17  137   * We may have available oob space in this case.
+2febcdf84 Huang Shijie    2013-05-17  138   */
+2febcdf84 Huang Shijie    2013-05-17  139  static bool set_geometry_by_ecc_info(struct gpmi_nand_data *this)
+2febcdf84 Huang Shijie    2013-05-17  140  {
+2febcdf84 Huang Shijie    2013-05-17  141  	struct bch_geometry *geo = &this->bch_geometry;
+6bdedcfa5 Boris Brezillon 2015-12-01 @142  	struct nand_chip *chip = mtd_to_nand(mtd);
+4864cfd67 Boris Brezillon 2015-12-01  143  	struct mtd_info *mtd = nand_to_mtd(chip);
+2febcdf84 Huang Shijie    2013-05-17  144  	struct nand_oobfree *of = gpmi_hw_ecclayout.oobfree;
+2febcdf84 Huang Shijie    2013-05-17  145  	unsigned int block_mark_bit_offset;
 
-@fix1@
-identifier __chipfield, __mtdfield;
-type __type;
-@@
-(
-	__type {
-		...
-		struct nand_chip __chipfield;
-		...
--		struct mtd_info __mtdfield;
-		...
-	};
-|
-	__type {
-		...
--		struct mtd_info __mtdfield;
-		...
-		struct nand_chip __chipfield;
-		...
-	};
-)
+:::::: The code at line 142 was first introduced by commit
+:::::: 6bdedcfa57b52f471682054a599855677b1b132c mtd: nand: make use of mtd_to_nand() in NAND drivers
 
-@fix2 depends on fix1@
-identifier fix1.__chipfield, fix1.__mtdfield;
-identifier __subfield;
-type fix1.__type;
-__type *__priv;
-@@
-(
--	__priv->__mtdfield.__subfield
-+	nand_to_mtd(&__priv->__chipfield)->__subfield
-|
--	&(__priv->__mtdfield)
-+	nand_to_mtd(&__priv->__chipfield)
-)
---->8---
+:::::: TO: Boris Brezillon <boris.brezillon@free-electrons.com>
+:::::: CC: 0day robot <fengguang.wu@intel.com>
 
-Thanks,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 28779 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151201/2e0d2169/attachment-0001.obj>
