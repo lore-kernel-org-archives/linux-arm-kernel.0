@@ -1,50 +1,49 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 1 Dec 2015 23:56:40 +0800
-Subject: [PATCH] reset: Introduce static inline dummy function when
- CONFIG_RESET_CONTROLLER
-In-Reply-To: <1448984088-31904-1-git-send-email-nm@ti.com>
-Message-ID: <201512012339.srrujPao%fengguang.wu@intel.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Tue, 1 Dec 2015 17:02:21 +0100
+Subject: [linux-meson] Re: [PATCH v2 4/5] pinctrl: dt-binding: Extend
+ meson documentation with GPIO IRQs support
+In-Reply-To: <20151123234720.GA879@rob-hp-laptop>
+References: <1448273816-11290-1-git-send-email-carlo@caione.org>
+ <1448273816-11290-5-git-send-email-carlo@caione.org>
+ <20151123234720.GA879@rob-hp-laptop>
+Message-ID: <20151201160221.GA28755@caronte>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth,
+On lun, nov 23, 2015 at 05:47:20 -0600, Rob Herring wrote:
+> On Mon, Nov 23, 2015 at 11:16:55AM +0100, Carlo Caione wrote:
+> > From: Carlo Caione <carlo@endlessm.com>
+> > 
+> > Extend the pinctrl binding documentation with the support for external
+> > GPIO interrupts.
+> > 
+> > Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> > Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+> > ---
+> >  Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt | 12 ++++++++++++
+> >  1 file changed, 12 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
+> > index 3f6a524..56743eb 100644
+> > --- a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
+> > +++ b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
+> > @@ -3,6 +3,12 @@
+> >  Required properties for the root node:
+> >   - compatible: "amlogic,meson8-pinctrl" or "amlogic,meson8b-pinctrl"
+> >   - reg: address and size of registers controlling irq functionality
+> > + - reg-names: should be "irq"
+> 
+> You don't really need names when there is only one. Otherwise:
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
 
-[auto build test ERROR on v4.4-rc3]
-[also build test ERROR on next-20151127]
+I missed this reply sorry. The name is conveniently used so that I can
+use the meson_map_resource() helper function to map that and get back
+the regmap struct in one shot.
 
-url:    https://github.com/0day-ci/linux/commits/Nishanth-Menon/reset-Introduce-static-inline-dummy-function-when-CONFIG_RESET_CONTROLLER/20151201-233708
-config: i386-randconfig-n0-201548 (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+I'm going to submit v3 soon without this modification leaving out your
+Acked-by. Let me know if your ACK is still valid without this code
+change.
 
-All errors (new ones prefixed by >>):
-
-   In file included from drivers/reset/core.c:18:0:
->> include/linux/reset-controller.h:1:0: error: unterminated #ifndef
-    #ifndef _LINUX_RESET_CONTROLLER_H_
-    ^
-
-vim +1 include/linux/reset-controller.h
-
-61fc4131 Philipp Zabel 2012-11-19 @1  #ifndef _LINUX_RESET_CONTROLLER_H_
-61fc4131 Philipp Zabel 2012-11-19  2  #define _LINUX_RESET_CONTROLLER_H_
-61fc4131 Philipp Zabel 2012-11-19  3  
-61fc4131 Philipp Zabel 2012-11-19  4  #include <linux/list.h>
-
-:::::: The code at line 1 was first introduced by commit
-:::::: 61fc41317666be400802ac793f47de816ef7bd57 reset: Add reset controller API
-
-:::::: TO: Philipp Zabel <p.zabel@pengutronix.de>
-:::::: CC: Philipp Zabel <p.zabel@pengutronix.de>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 19727 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151201/b8cfedd7/attachment-0001.obj>
+-- 
+Carlo Caione
