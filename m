@@ -1,64 +1,136 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue,  1 Dec 2015 12:03:17 +0100
-Subject: [PATCH v2 20/25] mtd: nand: simplify nand_dt_init() usage
+Date: Tue,  1 Dec 2015 12:03:08 +0100
+Subject: [PATCH v2 11/25] coccinelle: nand: detect and correct drivers
+ embedding an mtd_info object
 In-Reply-To: <1448967802-25796-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1448967802-25796-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1448967802-25796-21-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1448967802-25796-12-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-nand_dt_init() function requires 3 arguments where it actually needs one
-(dn and mtd can both be retrieved from chip). Drop these parameters.
-
-Testing for dn != NULL inside nand_dt_init() also helps simplifying the
-caller code.
+Add nand-priv-no-mtd.cocci to detect and correct NAND controller drivers
+directly embedding an mtd_info struct in their private struct.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Cc: Julia Lawall <Julia.Lawall@lip6.fr>
 ---
- drivers/mtd/nand/nand_base.c | 21 +++++++++++----------
- 1 file changed, 11 insertions(+), 10 deletions(-)
+Hi Julia,
 
-diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-index 5aec154..ae3fd2a 100644
---- a/drivers/mtd/nand/nand_base.c
-+++ b/drivers/mtd/nand/nand_base.c
-@@ -3937,11 +3937,17 @@ ident_done:
- 	return type;
- }
- 
--static int nand_dt_init(struct mtd_info *mtd, struct nand_chip *chip,
--			struct device_node *dn)
-+static int nand_dt_init(struct nand_chip *chip)
- {
-+	struct device_node *dn = nand_get_flash_node(chip);
- 	int ecc_mode, ecc_strength, ecc_step;
- 
-+	if (!dn)
-+		return 0;
+Not sure this is the correct way to detect and fix offending drivers,
+but I get some warnings when launching coccicheck in org or report mode:
+
+"warning: fix2: inherited metavariable __chipfield not used in the -, +,
+or context code"
+
+Note that I don't get those warnings when running in patch mode.
+
+Any idea (feel free to propose a better solution to detect and fix those
+offending drivers)?
+
+Best Regards,
+
+Boris
+---
+ scripts/coccinelle/api/nand-priv-no-mtd.cocci | 91 +++++++++++++++++++++++++++
+ 1 file changed, 91 insertions(+)
+ create mode 100644 scripts/coccinelle/api/nand-priv-no-mtd.cocci
+
+diff --git a/scripts/coccinelle/api/nand-priv-no-mtd.cocci b/scripts/coccinelle/api/nand-priv-no-mtd.cocci
+new file mode 100644
+index 0000000..b2c0c22
+--- /dev/null
++++ b/scripts/coccinelle/api/nand-priv-no-mtd.cocci
+@@ -0,0 +1,91 @@
++/// Fix NAND controller drivers declaring their own mtd_info struct instead
++/// of the one provided in struct nand_chip.
++///
++// Confidence: Low
++// Copyright: (C) 2015 Boris Brezillon GPL v2.
 +
-+	/* MTD can automatically handle DT partitions, etc. */
-+	mtd_set_of_node(nand_to_mtd(chip), dn);
++virtual patch
++virtual context
++virtual org
++virtual report
 +
- 	if (of_get_nand_bus_width(dn) == 16)
- 		chip->options |= NAND_BUSWIDTH_16;
- 
-@@ -3989,14 +3995,9 @@ int nand_scan_ident(struct mtd_info *mtd, int maxchips,
- 	struct nand_flash_dev *type;
- 	int ret;
- 
--	if (nand_get_flash_node(chip)) {
--		/* MTD can automatically handle DT partitions, etc. */
--		mtd_set_of_node(mtd, nand_get_flash_node(chip));
--
--		ret = nand_dt_init(mtd, chip, nand_get_flash_node(chip));
--		if (ret)
--			return ret;
--	}
-+	ret = nand_dt_init(chip);
-+	if (ret)
-+		return ret;
- 
- 	/* Set the default functions */
- 	nand_set_defaults(chip, chip->options & NAND_BUSWIDTH_16);
++ at match1@
++identifier __chipfield, __mtdfield;
++type __type;
++@@
++(
++	__type {
++		...
++		struct nand_chip __chipfield;
++		...
++		struct mtd_info __mtdfield;
++		...
++	};
++|
++	__type {
++		...
++		struct mtd_info __mtdfield;
++		...
++		struct nand_chip __chipfield;
++		...
++	};
++)
++
++ at fix1 depends on match1 && patch && !context && !org && !report@
++identifier match1.__mtdfield;
++type match1.__type;
++@@
++	__type {
++		...
++-		struct mtd_info __mtdfield;
++		...
++	};
++
++ at fix2 depends on match1 && patch && !context && !org && !report@
++identifier match1.__chipfield, match1.__mtdfield;
++identifier __subfield;
++type match1.__type;
++__type *__priv;
++@@
++<...
++(
++-	__priv->__mtdfield.__subfield
+++	nand_to_mtd(&__priv->__chipfield)->__subfield
++|
++-	&(__priv->__mtdfield)
+++	nand_to_mtd(&__priv->__chipfield)
++)
++...>
++
++// ----------------------------------------------------------------------------
++
++ at fix1_context depends on match1 && !patch && (context || org || report)@
++identifier match1.__mtdfield;
++type match1.__type;
++position j0;
++@@
++
++	__type {
++		...
++*		struct mtd_info __mtdfield at j0;
++		...
++	};
++
++// ----------------------------------------------------------------------------
++
++ at script:python fix1_org depends on org@
++j0 << fix1_context.j0;
++@@
++
++msg = "struct nand_chip already embeds an mtd_info object (use nand_to_mtd())."
++coccilib.org.print_todo(j0[0], msg)
++
++// ----------------------------------------------------------------------------
++
++@script:python fix1_report depends on report@
++j0 << fix1_context.j0;
++@@
++
++msg = "struct nand_chip already embeds an mtd_info object (use nand_to_mtd())."
++coccilib.report.print_report(j0[0], msg)
++
 -- 
 2.1.4
