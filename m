@@ -1,107 +1,42 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 30 Nov 2015 17:20:35 -0800
-Subject: [PATCH] ARM: mm: flip priority of CONFIG_DEBUG_RODATA
-In-Reply-To: <CAGXu5jJUv3EKkFA3J43nVO+v=-K5kgwSqwrVA9hxJGeZ79CkAg@mail.gmail.com>
-References: <20151130233819.GA18873@www.outflux.net>
- <565CF1E5.2070003@redhat.com>
- <CAGXu5jJUv3EKkFA3J43nVO+v=-K5kgwSqwrVA9hxJGeZ79CkAg@mail.gmail.com>
-Message-ID: <565CF5E3.7000109@redhat.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 30 Nov 2015 17:25:23 -0800
+Subject: [PATCH v3 3/3] ARM: qcom: Drop ARCH_MSM* configs
+In-Reply-To: <1448933123-9843-1-git-send-email-sboyd@codeaurora.org>
+References: <1448933123-9843-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1448933123-9843-4-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2015 05:08 PM, Kees Cook wrote:
-> On Mon, Nov 30, 2015 at 5:03 PM, Laura Abbott <labbott@redhat.com> wrote:
->> On 11/30/2015 03:38 PM, Kees Cook wrote:
->>>
->>> Given the choice between making things NX or making things RO, we want
->>> RO first. As such, redefine CONFIG_DEBUG_RODATA to actually do the bulk
->>
->>
->> Can you give a citation for why? The thread that inspired it might be
->> a good link.
->
-> This was inspired by my examining the existing architecture's
-> implementations of CONFIG_DEBUG_RODATA after Ingo suggested it be made
-> a common feature not a build-time config (or at least renamed):
-> http://www.openwall.com/lists/kernel-hardening/2015/11/30/13
->
+Drop these configs now that we select the clocksources we need
+via the defconfig.
 
-Thanks. I read the thread and I think it would be good to put a link
-in the commit message to make it clearer why this is going in.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/mach-qcom/Kconfig | 12 ------------
+ 1 file changed, 12 deletions(-)
 
->>> index 41218867a9a6..b617084e9520 100644
->>> --- a/arch/arm/mm/Kconfig
->>> +++ b/arch/arm/mm/Kconfig
->>> @@ -1039,24 +1039,26 @@ config ARCH_SUPPORTS_BIG_ENDIAN
->>>            This option specifies the architecture can support big endian
->>>            operation.
->>>
->>> -config ARM_KERNMEM_PERMS
->>> -       bool "Restrict kernel memory permissions"
->>> +config DEBUG_RODATA
->>> +       bool "Make kernel text and rodata read-only"
->>>          depends on MMU
->>> +       default y if CPU_V7
->>>          help
->>> -         If this is set, kernel memory other than kernel text (and
->>> rodata)
->>> -         will be made non-executable. The tradeoff is that each region is
->>> -         padded to section-size (1MiB) boundaries (because their
->>> permissions
->>> -         are different and splitting the 1M pages into 4K ones causes TLB
->>> -         performance problems), wasting memory.
->>> +         If this is set, kernel memory (text, rodata, etc) will be made
->>> +         read-only, and non-text kernel memory will be made
->>> non-executable.
->>> +         The tradeoff is that each region is padded to section-size
->>> (1MiB)
->>> +         boundaries (because their permissions are different and
->>> splitting
->>> +         the 1M pages into 4K ones causes TLB performance problems),
->>> which
->>> +         can waste memory.
->>>
->>> -config DEBUG_RODATA
->>> -       bool "Make kernel text and rodata read-only"
->>> -       depends on ARM_KERNMEM_PERMS
->>> +config DEBUG_ALIGN_RODATA
->>> +       bool "Make rodata strictly non-executable"
->>> +       depends on DEBUG_RODATA
->>>          default y
->>>          help
->>> -         If this is set, kernel text and rodata will be made read-only.
->>> This
->>> -         is to help catch accidental or malicious attempts to change the
->>> -         kernel's executable code. Additionally splits rodata from kernel
->>> -         text so it can be made explicitly non-executable. This creates
->>> -         another section-size padded region, so it can waste more memory
->>> -         space while gaining the read-only protections.
->>> +         If this is set, rodata will be made explicitly non-executable.
->>> This
->>> +         provides protection on the rare chance that attackers might find
->>> and
->>> +         use ROP gadgets that exist in the rodata section. This adds an
->>> +         additional section-aligned split of rodata from kernel text so
->>> it
->>> +         can be made explicitly non-executable. This padding may waste
->>> memory
->>> +         space to gain this additional protection.
->>
->>
->> I get that you want to make this match arm64 but it's really not intuitive that
->> something with ALIGN_RODATA in the name is actually for setting NX. The purpose
->> of ALIGN_RODATA was also slightly different on arm64 since the RO/NX will still
->> be there, the difference is if the sections are present versus broken down into
->> pages.
->
-> Well, it seems to have the same effect: without the alignment, a
-> portion of rodata may remain executable on arm64. Unless I
-> misunderstand?
->
-
-No, on arm64 everything should always be NX, the difference is part of the NX
-sections may be mapped as pages instead of sections so you take the TLB hit.
-It's a trade off of memory vs TLB pressure instead of just security vs TLB.
-
-Thanks,
-Laura
+diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
+index 230c7e8a32fb..9cd3b50d891f 100644
+--- a/arch/arm/mach-qcom/Kconfig
++++ b/arch/arm/mach-qcom/Kconfig
+@@ -23,16 +23,4 @@ config ARCH_QCOM_A_FAMILY
+ 	  B-family includes all Snapdragon 2xx/4xx/6xx/8xx models starting
+ 	  in 2013 with the MSM8x74 SoC.
+ 
+-config ARCH_MSM8X60
+-	bool "Enable support for MSM8X60"
+-	select CLKSRC_QCOM
+-
+-config ARCH_MSM8960
+-	bool "Enable support for MSM8960"
+-	select CLKSRC_QCOM
+-
+-config ARCH_MSM8974
+-	bool "Enable support for MSM8974"
+-	select HAVE_ARM_ARCH_TIMER
+-
+ endif
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
