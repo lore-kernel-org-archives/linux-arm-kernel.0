@@ -1,207 +1,189 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  1 Dec 2015 15:00:24 +0100
-Subject: [PATCH] ARM/clocksource: use automatic DT probing for ux500 PRCMU
-Message-ID: <1448978424-9756-1-git-send-email-linus.walleij@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 1 Dec 2015 15:04:36 +0100
+Subject: [PATCH 1/2] regulator: Add coupled regulator
+In-Reply-To: <CANLsYkzBjDTCr1NPkPAQXnR5LCQ0MFFGb8EXXO2oVaxuZ0DH_A@mail.gmail.com>
+References: <1448897346-17780-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1448897346-17780-2-git-send-email-maxime.ripard@free-electrons.com>
+ <CANLsYkzBjDTCr1NPkPAQXnR5LCQ0MFFGb8EXXO2oVaxuZ0DH_A@mail.gmail.com>
+Message-ID: <20151201140436.GQ29263@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM core kernel already calls clocksource_of_init() so why
-go to all the trouble of locating and probing this node in the
-machine. CLOCKSOURCE_OF_DECLARE() will take care of it in the
-clocksource driver, and thus we can also get rid of the
-dangling header file <linux/clksrc-dbx500-prcmu.h>
+Hi Mathieu,
 
-Suggested-by: Arnd Bergmann <arndb@linaro.org>
-Acked-by: Thomas Gleixner <tglx@linutronix.de>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC folks: I have only this Ux500 patch queued for v4.5.
-Can you please apply it directly to the proper place in
-ARM SoC?
----
- arch/arm/mach-ux500/Makefile              |  2 +-
- arch/arm/mach-ux500/cpu-db8500.c          |  2 --
- arch/arm/mach-ux500/cpu.c                 |  1 -
- arch/arm/mach-ux500/setup.h               |  3 --
- arch/arm/mach-ux500/timer.c               | 48 -------------------------------
- drivers/clocksource/clksrc-dbx500-prcmu.c |  9 ++++--
- include/linux/clksrc-dbx500-prcmu.h       | 20 -------------
- 7 files changed, 7 insertions(+), 78 deletions(-)
- delete mode 100644 arch/arm/mach-ux500/timer.c
- delete mode 100644 include/linux/clksrc-dbx500-prcmu.h
+On Mon, Nov 30, 2015 at 10:17:45AM -0700, Mathieu Poirier wrote:
+> On 30 November 2015 at 08:29, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Some boards, in order to power devices that have a quite high power
+> > consumption, wire multiple regulators in parallel.
+> >
+> > In such a case, the regulators need to be kept in sync, all of them being
+> > enabled or disabled in parallel.
+> >
+> > This also requires to expose only the voltages that are common to all the
+> > regulators.
+> >
+> > Eventually support for changing the voltage in parallel should be added
+> > too, possibly with delays between each other to avoid having a too brutal
+> > peak consumption.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/regulator/Kconfig                     |   7 +
+> >  drivers/regulator/Makefile                    |   1 +
+> >  drivers/regulator/coupled-voltage-regulator.c | 241 ++++++++++++++++++++++++++
+> >  3 files changed, 249 insertions(+)
+> >  create mode 100644 drivers/regulator/coupled-voltage-regulator.c
+> >
+> > diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+> > index 8df0b0e62976..6ba7bc8fda13 100644
+> > --- a/drivers/regulator/Kconfig
+> > +++ b/drivers/regulator/Kconfig
+> > @@ -35,6 +35,13 @@ config REGULATOR_FIXED_VOLTAGE
+> >           useful for systems which use a combination of software
+> >           managed regulators and simple non-configurable regulators.
+> >
+> > +config REGULATOR_COUPLED_VOLTAGE
+> > +       tristate "Coupled voltage regulator support"
+> > +       help
+> > +         This driver provides support for regulators that are an
+> > +         aggregate of other regulators in the system, and need to
+> > +         keep them all in sync.
+> > +
+> >  config REGULATOR_VIRTUAL_CONSUMER
+> >         tristate "Virtual regulator consumer support"
+> >         help
+> > diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+> > index 0f8174913c17..c05839257386 100644
+> > --- a/drivers/regulator/Makefile
+> > +++ b/drivers/regulator/Makefile
+> > @@ -22,6 +22,7 @@ obj-$(CONFIG_REGULATOR_AS3711) += as3711-regulator.o
+> >  obj-$(CONFIG_REGULATOR_AS3722) += as3722-regulator.o
+> >  obj-$(CONFIG_REGULATOR_AXP20X) += axp20x-regulator.o
+> >  obj-$(CONFIG_REGULATOR_BCM590XX) += bcm590xx-regulator.o
+> > +obj-$(CONFIG_REGULATOR_COUPLED_VOLTAGE) += coupled-voltage-regulator.o
+> >  obj-$(CONFIG_REGULATOR_DA903X) += da903x.o
+> >  obj-$(CONFIG_REGULATOR_DA9052) += da9052-regulator.o
+> >  obj-$(CONFIG_REGULATOR_DA9055) += da9055-regulator.o
+> > diff --git a/drivers/regulator/coupled-voltage-regulator.c b/drivers/regulator/coupled-voltage-regulator.c
+> > new file mode 100644
+> > index 000000000000..dc7aa2aca7e6
+> > --- /dev/null
+> > +++ b/drivers/regulator/coupled-voltage-regulator.c
+> > @@ -0,0 +1,241 @@
+> > +/*
+> > + * Copyright 2015 Free Electrons
+> > + * Copyright 2015 NextThing Co.
+> > + *
+> > + * Author: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License as
+> > + * published by the Free Software Foundation; either version 2 of the
+> > + * License, or (at your option) any later version.
+> > + */
+> > +
+> > +#include <linux/module.h>
+> > +#include <linux/mod_devicetable.h>
+> > +#include <linux/of.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/slab.h>
+> > +
+> > +#include <linux/regulator/consumer.h>
+> > +#include <linux/regulator/driver.h>
+> > +#include <linux/regulator/of_regulator.h>
+> > +
+> > +#define COUPLED_REGULATOR_MAX_SUPPLIES 16
+> > +
+> > +struct coupled_regulator {
+> > +       struct regulator        **regulators;
+> > +       int                     n_regulators;
+> > +
+> 
+> Extra line.
+> 
+> > +       int                     *voltages;
+> > +       int                     n_voltages;
+> > +};
+> 
+> This new structure needs documentation.
 
-diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
-index c8643ac5db71..edfff1ae1f8d 100644
---- a/arch/arm/mach-ux500/Makefile
-+++ b/arch/arm/mach-ux500/Makefile
-@@ -2,7 +2,7 @@
- # Makefile for the linux kernel, U8500 machine.
- #
- 
--obj-y				:= cpu.o id.o timer.o pm.o
-+obj-y				:= cpu.o id.o pm.o
- obj-$(CONFIG_CACHE_L2X0)	+= cache-l2x0.o
- obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o
- obj-$(CONFIG_MACH_MOP500)	+= board-mop500-regulators.o \
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index f80560318c58..a0ffaad1fb61 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -156,8 +156,6 @@ static const char * stericsson_dt_platform_compat[] = {
- DT_MACHINE_START(U8500_DT, "ST-Ericsson Ux5x0 platform (Device Tree Support)")
- 	.map_io		= u8500_map_io,
- 	.init_irq	= ux500_init_irq,
--	/* we re-use nomadik timer here */
--	.init_time	= ux500_timer_init,
- 	.init_machine	= u8500_init_machine,
- 	.init_late	= NULL,
- 	.dt_compat      = stericsson_dt_platform_compat,
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index 41b81c4fbe63..82156cbc22ce 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -9,7 +9,6 @@
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/mfd/dbx500-prcmu.h>
--#include <linux/clksrc-dbx500-prcmu.h>
- #include <linux/sys_soc.h>
- #include <linux/err.h>
- #include <linux/slab.h>
-diff --git a/arch/arm/mach-ux500/setup.h b/arch/arm/mach-ux500/setup.h
-index 65876eac0761..c704254ab67c 100644
---- a/arch/arm/mach-ux500/setup.h
-+++ b/arch/arm/mach-ux500/setup.h
-@@ -12,7 +12,6 @@
- #define __ASM_ARCH_SETUP_H
- 
- #include <asm/mach/arch.h>
--#include <asm/mach/time.h>
- #include <linux/init.h>
- #include <linux/mfd/abx500/ab8500.h>
- 
-@@ -24,8 +23,6 @@ extern void __init ux500_init_irq(void);
- 
- extern struct device *ux500_soc_device_init(const char *soc_id);
- 
--extern void ux500_timer_init(void);
--
- extern void ux500_cpu_die(unsigned int cpu);
- 
- #endif /*  __ASM_ARCH_SETUP_H */
-diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
-deleted file mode 100644
-index 8d2d233f8e6c..000000000000
---- a/arch/arm/mach-ux500/timer.c
-+++ /dev/null
-@@ -1,48 +0,0 @@
--/*
-- * Copyright (C) ST-Ericsson SA 2011
-- *
-- * License Terms: GNU General Public License v2
-- * Author: Mattias Wallin <mattias.wallin@stericsson.com> for ST-Ericsson
-- */
--#include <linux/io.h>
--#include <linux/errno.h>
--#include <linux/clksrc-dbx500-prcmu.h>
--#include <linux/clocksource.h>
--#include <linux/of.h>
--#include <linux/of_address.h>
--
--#include "setup.h"
--
--#include "db8500-regs.h"
--#include "id.h"
--
--static const struct of_device_id prcmu_timer_of_match[] __initconst = {
--	{ .compatible = "stericsson,db8500-prcmu-timer-4", },
--	{ },
--};
--
--void __init ux500_timer_init(void)
--{
--	void __iomem *prcmu_timer_base;
--	void __iomem *tmp_base;
--	struct device_node *np;
--
--	if (cpu_is_u8500_family() || cpu_is_ux540_family())
--		prcmu_timer_base = __io_address(U8500_PRCMU_TIMER_4_BASE);
--	else
--		ux500_unknown_soc();
--
--	np = of_find_matching_node(NULL, prcmu_timer_of_match);
--	if (!np)
--		goto dt_fail;
--
--	tmp_base = of_iomap(np, 0);
--	if (!tmp_base)
--		goto dt_fail;
--
--	prcmu_timer_base = tmp_base;
--
--dt_fail:
--	clksrc_dbx500_prcmu_init(prcmu_timer_base);
--	clocksource_probe();
--}
-diff --git a/drivers/clocksource/clksrc-dbx500-prcmu.c b/drivers/clocksource/clksrc-dbx500-prcmu.c
-index b375106844d8..dfad6eb99662 100644
---- a/drivers/clocksource/clksrc-dbx500-prcmu.c
-+++ b/drivers/clocksource/clksrc-dbx500-prcmu.c
-@@ -12,8 +12,9 @@
-  * power domain.  We use the Timer 4 for our always-on clock
-  * source on DB8500.
-  */
-+#include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/clockchips.h>
--#include <linux/clksrc-dbx500-prcmu.h>
- #include <linux/sched_clock.h>
- 
- #define RATE_32K		32768
-@@ -63,9 +64,9 @@ static u64 notrace dbx500_prcmu_sched_clock_read(void)
- 
- #endif
- 
--void __init clksrc_dbx500_prcmu_init(void __iomem *base)
-+static void __init clksrc_dbx500_prcmu_init(struct device_node *node)
- {
--	clksrc_dbx500_timer_base = base;
-+	clksrc_dbx500_timer_base = of_iomap(node, 0);
- 
- 	/*
- 	 * The A9 sub system expects the timer to be configured as
-@@ -85,3 +86,5 @@ void __init clksrc_dbx500_prcmu_init(void __iomem *base)
- #endif
- 	clocksource_register_hz(&clocksource_dbx500_prcmu, RATE_32K);
- }
-+CLOCKSOURCE_OF_DECLARE(dbx500_prcmu, "stericsson,db8500-prcmu-timer-4",
-+		       clksrc_dbx500_prcmu_init);
-diff --git a/include/linux/clksrc-dbx500-prcmu.h b/include/linux/clksrc-dbx500-prcmu.h
-deleted file mode 100644
-index 4fb8119c49e4..000000000000
---- a/include/linux/clksrc-dbx500-prcmu.h
-+++ /dev/null
-@@ -1,20 +0,0 @@
--/*
-- * Copyright (C) ST-Ericsson SA 2011
-- *
-- * License Terms: GNU General Public License v2
-- * Author: Mattias Wallin <mattias.wallin@stericsson.com>
-- *
-- */
--#ifndef __CLKSRC_DBX500_PRCMU_H
--#define __CLKSRC_DBX500_PRCMU_H
--
--#include <linux/init.h>
--#include <linux/io.h>
--
--#ifdef CONFIG_CLKSRC_DBX500_PRCMU
--void __init clksrc_dbx500_prcmu_init(void __iomem *base);
--#else
--static inline void __init clksrc_dbx500_prcmu_init(void __iomem *base) {}
--#endif
--
--#endif
+Ack.
+
+> > +
+> > +static int coupled_regulator_disable(struct regulator_dev *rdev)
+> > +{
+> > +       struct coupled_regulator *creg = rdev_get_drvdata(rdev);
+> > +       int ret, i;
+> > +
+> > +       for (i = 0; i < creg->n_regulators; i++) {
+> > +               ret = regulator_disable(creg->regulators[i]);
+> > +               if (ret)
+> > +                       break;
+> > +       }
+> > +
+> > +       return ret;
+> > +}
+> 
+> What happens to the other regulators when an element of the chain
+> fails to disable?  Should they be powered on again?
+> 
+> > +
+> > +static int coupled_regulator_enable(struct regulator_dev *rdev)
+> > +{
+> > +       struct coupled_regulator *creg = rdev_get_drvdata(rdev);
+> > +       int ret, i;
+> > +
+> > +       for (i = 0; i < creg->n_regulators; i++) {
+> > +               ret = regulator_enable(creg->regulators[i]);
+> > +               if (ret)
+> > +                       break;
+> > +       }
+> > +
+> > +       return ret;
+> > +}
+> 
+> Same thing here - shouldn't the previously enabled regulators be
+> switched off when one fails to come on?  It might be worth documenting
+> the behaviour being enacted.
+
+That's actually a very good question, and I don't have a good answer
+to it. I guess the safest approach would be to roll back and do the
+opposite operation on the one we previously enabled / disabled.
+
+I wonder whether it might damage the hardware or not though.
+
+Mark?
+
+> > +
+> > +static int coupled_regulator_is_enabled(struct regulator_dev *rdev)
+> > +{
+> > +       struct coupled_regulator *creg = rdev_get_drvdata(rdev);
+> > +       int ret = 0, i;
+> > +
+> > +       for (i = 0; i < creg->n_regulators; i++) {
+> > +               ret &= regulator_is_enabled(creg->regulators[i]);
+> 
+> Why is the '&=' here?  Since it is set to '0' from the start, won't it
+> always clear all the bits in a potential error return code?  Apologies
+> if I'm missing something.
+
+It was supposed to be a bitwise or, and not an and, sorry.
+
+But your comment on the error code that might be altered is still
+valid though, I'll rework that part.
+
+Thanks!
+Maxime
+
 -- 
-2.4.3
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151201/de3729a6/attachment-0001.sig>
