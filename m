@@ -1,39 +1,56 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 1 Dec 2015 11:56:42 +0200
-Subject: [RFC v02 03/15] dmaengine: core: Introduce new, universal API to
- request a channel
-In-Reply-To: <CAHp75VeTe6hcnuqHNv=GX8pZJmde0H-AjZpxMHq=f5YfOL5hSA@mail.gmail.com>
-References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
- <1448891145-10766-4-git-send-email-peter.ujfalusi@ti.com>
- <CAHp75VeTe6hcnuqHNv=GX8pZJmde0H-AjZpxMHq=f5YfOL5hSA@mail.gmail.com>
-Message-ID: <565D6EDA.4070002@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 01 Dec 2015 09:58:23 +0000
+Subject: [PATCH v2 00/21] arm64: KVM: world switch in C
+In-Reply-To: <20151130203345.GI11704@cbox>
+References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+ <20151130203345.GI11704@cbox>
+Message-ID: <565D6F3F.5030700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2015 04:51 PM, Andy Shevchenko wrote:
->> +struct dma_chan *dma_request_chan(struct device *dev, const char *name)
->> +{
->> +       struct dma_device *device, *_d;
->> +       struct dma_chan *chan = NULL;
->> +
->> +       /* If device-tree is present get slave info from here */
->> +       if (dev->of_node)
->> +               chan = of_dma_request_slave_channel(dev->of_node, name);
->> +
->> +       /* If device was enumerated by ACPI get slave info from here */
->> +       if (ACPI_HANDLE(dev) && !chan)
+On 30/11/15 20:33, Christoffer Dall wrote:
+> On Fri, Nov 27, 2015 at 06:49:54PM +0000, Marc Zyngier wrote:
+>> Once upon a time, the KVM/arm64 world switch was a nice, clean, lean
+>> and mean piece of hand-crafted assembly code. Over time, features have
+>> crept in, the code has become harder to maintain, and the smallest
+>> change is a pain to introduce. The VHE patches are a prime example of
+>> why this doesn't work anymore.
+>>
+>> This series rewrites most of the existing assembly code in C, but keeps
+>> the existing code structure in place (most function names will look
+>> familiar to the reader). The biggest change is that we don't have to
+>> deal with a static register allocation (the compiler does it for us),
+>> we can easily follow structure and pointers, and only the lowest level
+>> is still in assembly code. Oh, and a negative diffstat.
+>>
+>> There is still a healthy dose of inline assembly (system register
+>> accessors, runtime code patching), but I've tried not to make it too
+>> invasive. The generated code, while not exactly brilliant, doesn't
+>> look too shaby. I do expect a small performance degradation, but I
+>> believe this is something we can improve over time (my initial
+>> measurements don't show any obvious regression though).
 > 
-> The preferable way is to use
-> has_acpi_companion() instead of ACPI_HANDLE().
+> I ran this through my experimental setup on m400 and got this:
 
-I have done this part based on the dma_request_slave_channel_reason().
-Will switch to use the has_acpi_companion() for the next RFC.
+[...]
 
->> +               chan = acpi_dma_request_slave_chan_by_name(dev, name);
->> +
->> +       if (chan)
->> +               return chan;
->> +
+> What this tells me is that we do take a noticable hit on the
+> world-switch path, which shows up in the TCP_RR and hackbench workloads,
+> which have a high precision in their output.
+> 
+> Note that the memcached number is well within its variability between
+> individual benchmark runs, where it varies to 12% of its average in over
+> 80% of the executions.
+> 
+> I don't think this is a showstopper thought, but we could consider
+> looking more closely at a breakdown of the world-switch path and verify
+> if/where we are really taking a hit.
 
+Thanks for doing so, very interesting. As a data point, what compiler
+are you using? I'd expect some variability based on the compiler version...
+
+Thanks,
+
+	M.
 -- 
-P?ter
+Jazz is not dead. It just smells funny...
