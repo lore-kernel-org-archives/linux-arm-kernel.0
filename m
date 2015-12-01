@@ -1,45 +1,39 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Tue, 1 Dec 2015 20:12:34 +0800
-Subject: [PATCH] mmc: mediatek: change some dev_err to dev_dbg
-Message-ID: <1448971954-398-1-git-send-email-chaotian.jing@mediatek.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue,  1 Dec 2015 13:20:40 +0100
+Subject: [PATCH] arm64: update linker script to increased L1_CACHE_BYTES value
+Message-ID: <1448972440-32633-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-there are too many error logs shown when use CMD21/CMD19 to do tune,
-and it will appear at each resume time, print out so many logs to the
-uart console cost too mush time. so change it to dev_dbg.
+Bring the linker script in line with the recent increase of
+L1_CACHE_BYTES to 128. Replace the hardcoded value of 64 with the
+symbolic constant.
 
-Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/mmc/host/mtk-sd.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm64/kernel/vmlinux.lds.S | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index 39568cc..34d23b8 100644
---- a/drivers/mmc/host/mtk-sd.c
-+++ b/drivers/mmc/host/mtk-sd.c
-@@ -972,7 +972,7 @@ static bool msdc_data_xfer_done(struct msdc_host *host, u32 events,
- 		if ((events & MSDC_INT_XFER_COMPL) && (!stop || !stop->error)) {
- 			data->bytes_xfered = data->blocks * data->blksz;
- 		} else {
--			dev_err(host->dev, "interrupt events: %x\n", events);
-+			dev_dbg(host->dev, "interrupt events: %x\n", events);
- 			msdc_reset_hw(host);
- 			host->error |= REQ_DAT_ERR;
- 			data->bytes_xfered = 0;
-@@ -982,10 +982,10 @@ static bool msdc_data_xfer_done(struct msdc_host *host, u32 events,
- 			else if (events & MSDC_INT_DATCRCERR)
- 				data->error = -EILSEQ;
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 1ee2c3937d4e..3388970fbc0f 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -5,6 +5,7 @@
+  */
  
--			dev_err(host->dev, "%s: cmd=%d; blocks=%d",
-+			dev_dbg(host->dev, "%s: cmd=%d; blocks=%d",
- 				__func__, mrq->cmd->opcode, data->blocks);
--			dev_err(host->dev, "data_error=%d xfer_size=%d\n",
--					(int)data->error, data->bytes_xfered);
-+			dev_dbg(host->dev, "data_error=%d xfer_size=%d\n",
-+				(int)data->error, data->bytes_xfered);
- 		}
+ #include <asm-generic/vmlinux.lds.h>
++#include <asm/cache.h>
+ #include <asm/kernel-pgtable.h>
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
+@@ -140,7 +141,7 @@ SECTIONS
+ 		ARM_EXIT_KEEP(EXIT_DATA)
+ 	}
  
- 		msdc_data_xfer_next(host, mrq, data);
+-	PERCPU_SECTION(64)
++	PERCPU_SECTION(L1_CACHE_BYTES)
+ 
+ 	. = ALIGN(PAGE_SIZE);
+ 	__init_end = .;
 -- 
-1.8.1.1.dirty
+1.9.1
