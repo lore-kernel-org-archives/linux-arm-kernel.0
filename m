@@ -1,64 +1,30 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 1 Dec 2015 12:12:47 +0200
-Subject: [RFC v02 00/15] dmaengine: New 'universal' API for requesting
- channel
-In-Reply-To: <13562653.8QgTG33tZS@wuerfel>
-References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
- <13562653.8QgTG33tZS@wuerfel>
-Message-ID: <565D729F.2000104@ti.com>
+From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
+Date: Tue, 1 Dec 2015 11:14:02 +0100
+Subject: [PATCH] ARM: ep93xx: Fix clocksource registration
+In-Reply-To: <CACRpkdZy7TnrmkWrRerjm6dZW9m65Dsc_kp8TPHzbhTxz5Hbrw@mail.gmail.com>
+References: <565513EA.6020603@gmail.com>
+ <CACRpkdZy7TnrmkWrRerjm6dZW9m65Dsc_kp8TPHzbhTxz5Hbrw@mail.gmail.com>
+Message-ID: <565D72EA.9070609@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2015 04:18 PM, Arnd Bergmann wrote:
-> On Monday 30 November 2015 15:45:30 Peter Ujfalusi wrote:
->> Changes since RFC v01:
->> - dma_request_chan(); lost the mask parameter
->> - The new API does not rely on RESOURCE_DMA, instead the dma_filter_map table
->>  will be used to provide the needed information to the filter function in
->>  legacy mode
->> - Extended the example patches to convert most of daVinci to use the new API to
->>  request the DMA channels.
-> 
-> Very nice overall. Just a few minor comments.
-> 
->> static struct dma_filter_map da830_edma_map[] = {
->>         DMA_FILTER_ENTRY("davinci-mcasp.0", "rx", EDMA_CTLR_CHAN(0, 0)),
->>         DMA_FILTER_ENTRY("davinci-mcasp.0", "tx", EDMA_CTLR_CHAN(0, 1)),
->>         DMA_FILTER_ENTRY("davinci-mcasp.1", "rx", EDMA_CTLR_CHAN(0, 2)),
->>         DMA_FILTER_ENTRY("davinci-mcasp.1", "tx", EDMA_CTLR_CHAN(0, 3)),
->>         DMA_FILTER_ENTRY("davinci-mcasp.2", "rx", EDMA_CTLR_CHAN(0, 4)),
->>         DMA_FILTER_ENTRY("davinci-mcasp.2", "tx", EDMA_CTLR_CHAN(0, 5)),
->>         DMA_FILTER_ENTRY("spi_davinci.0", "rx", EDMA_CTLR_CHAN(0, 14)),
->>         DMA_FILTER_ENTRY("spi_davinci.0", "tx", EDMA_CTLR_CHAN(0, 15)),
->>         DMA_FILTER_ENTRY("da830-mmc.0", "rx", EDMA_CTLR_CHAN(0, 16)),
->>         DMA_FILTER_ENTRY("da830-mmc.0", "tx", EDMA_CTLR_CHAN(0, 17)),
->>         DMA_FILTER_ENTRY("spi_davinci.1", "rx", EDMA_CTLR_CHAN(0, 18)),
->>         DMA_FILTER_ENTRY("spi_davinci.1", "tx", EDMA_CTLR_CHAN(0, 19)),
->> };
-> 
-> I wonder if we should mandate that the lookup table is 'const'.
+Hello Linus,
 
-I had been wondering the same, I'll make it const for the next round.
-
-> We could also drop the DMA_FILTER_ENTRY() macro above, and open-code the
-> table like
+On 01/12/15 11:09, Linus Walleij wrote:
+>> clocksource_mmio_init() explicitly checks for counter's width and refuses to
+>> > register anything with resolution higher than 32 bits. We need to use
+>> > clocksource_register_hz() directly to repair HIGH_RES_TIMERS.
+> Maybe tglx want to jump in on this.
 > 
-> static struct dma_filter_map da830_edma_map[] = {
->          { "davinci-mcasp.0", "rx", EDMA_CTLR_CHAN(0, 0)},
->          { "davinci-mcasp.0", "tx", EDMA_CTLR_CHAN(0, 1)},
->          { "davinci-mcasp.1", "rx", EDMA_CTLR_CHAN(0, 2)},
-> 	 ...
-> };
+> Isn't it better to fix clocksource_mmio_init() to accept > 32 bits?
 > 
-> which is a little more compact and more obvious, but loses the
-> named initializers.
+> What is really prompting this in drivers/clocksource/mmio.c:
+> 
+> if (bits > 32 || bits < 16)
+>                 return -EINVAL;
 
-We would need:
-	{ "da830-mmc.0", "rx", (void*)EDMA_CTLR_CHAN(0, 16) },
-	{ "da830-mmc.0", "tx", (void*)EDMA_CTLR_CHAN(0, 17) },
+probably lack of >32bit access functions in the driver. But I do not know
+the original intentions of the author. In any case, if we modify the check here,
+probably the access function for 64 bits should be moved to the mmio.c?
 
-as we need to cast the param.
-It is still compact, but having to add the (void*) casting makes it a bit ugly.
-
--- 
-P?ter
+Alex.
