@@ -1,127 +1,86 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 30 Nov 2015 22:20:32 -0500 (EST)
-Subject: [PATCH] ARM: mm: flip priority of CONFIG_DEBUG_RODATA
-In-Reply-To: <565CF5E3.7000109@redhat.com>
-References: <20151130233819.GA18873@www.outflux.net>
- <565CF1E5.2070003@redhat.com>
- <CAGXu5jJUv3EKkFA3J43nVO+v=-K5kgwSqwrVA9hxJGeZ79CkAg@mail.gmail.com>
- <565CF5E3.7000109@redhat.com>
-Message-ID: <alpine.LFD.2.20.1511302219260.22569@knanqh.ubzr>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Mon, 30 Nov 2015 19:19:47 -0800
+Subject: [PATCH v2 00/21] arm64: KVM: world switch in C
+In-Reply-To: <20151130203345.GI11704@cbox>
+References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+ <20151130203345.GI11704@cbox>
+Message-ID: <565D11D3.3030502@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Nov 2015, Laura Abbott wrote:
-
-> On 11/30/2015 05:08 PM, Kees Cook wrote:
-> > On Mon, Nov 30, 2015 at 5:03 PM, Laura Abbott <labbott@redhat.com> wrote:
-> > > On 11/30/2015 03:38 PM, Kees Cook wrote:
-> > > >
-> > > > Given the choice between making things NX or making things RO, we want
-> > > > RO first. As such, redefine CONFIG_DEBUG_RODATA to actually do the bulk
-> > >
-> > >
-> > > Can you give a citation for why? The thread that inspired it might be
-> > > a good link.
-> >
-> > This was inspired by my examining the existing architecture's
-> > implementations of CONFIG_DEBUG_RODATA after Ingo suggested it be made
-> > a common feature not a build-time config (or at least renamed):
-> > http://www.openwall.com/lists/kernel-hardening/2015/11/30/13
-> >
-> 
-> Thanks. I read the thread and I think it would be good to put a link
-> in the commit message to make it clearer why this is going in.
-
-A link is good, but a summary is even better. You may add both for best 
-results.
 
 
+On 11/30/2015 12:33 PM, Christoffer Dall wrote:
+> On Fri, Nov 27, 2015 at 06:49:54PM +0000, Marc Zyngier wrote:
+>> Once upon a time, the KVM/arm64 world switch was a nice, clean, lean
+>> and mean piece of hand-crafted assembly code. Over time, features have
+>> crept in, the code has become harder to maintain, and the smallest
+>> change is a pain to introduce. The VHE patches are a prime example of
+>> why this doesn't work anymore.
+>>
+>> This series rewrites most of the existing assembly code in C, but keeps
+>> the existing code structure in place (most function names will look
+>> familiar to the reader). The biggest change is that we don't have to
+>> deal with a static register allocation (the compiler does it for us),
+>> we can easily follow structure and pointers, and only the lowest level
+>> is still in assembly code. Oh, and a negative diffstat.
+>>
+>> There is still a healthy dose of inline assembly (system register
+>> accessors, runtime code patching), but I've tried not to make it too
+>> invasive. The generated code, while not exactly brilliant, doesn't
+>> look too shaby. I do expect a small performance degradation, but I
+>> believe this is something we can improve over time (my initial
+>> measurements don't show any obvious regression though).
 > 
-> > > > index 41218867a9a6..b617084e9520 100644
-> > > > --- a/arch/arm/mm/Kconfig
-> > > > +++ b/arch/arm/mm/Kconfig
-> > > > @@ -1039,24 +1039,26 @@ config ARCH_SUPPORTS_BIG_ENDIAN
-> > > >            This option specifies the architecture can support big endian
-> > > >            operation.
-> > > >
-> > > > -config ARM_KERNMEM_PERMS
-> > > > -       bool "Restrict kernel memory permissions"
-> > > > +config DEBUG_RODATA
-> > > > +       bool "Make kernel text and rodata read-only"
-> > > >          depends on MMU
-> > > > +       default y if CPU_V7
-> > > >          help
-> > > > -         If this is set, kernel memory other than kernel text (and
-> > > > rodata)
-> > > > -         will be made non-executable. The tradeoff is that each region
-> > > > is
-> > > > -         padded to section-size (1MiB) boundaries (because their
-> > > > permissions
-> > > > -         are different and splitting the 1M pages into 4K ones causes
-> > > > TLB
-> > > > -         performance problems), wasting memory.
-> > > > +         If this is set, kernel memory (text, rodata, etc) will be made
-> > > > +         read-only, and non-text kernel memory will be made
-> > > > non-executable.
-> > > > +         The tradeoff is that each region is padded to section-size
-> > > > (1MiB)
-> > > > +         boundaries (because their permissions are different and
-> > > > splitting
-> > > > +         the 1M pages into 4K ones causes TLB performance problems),
-> > > > which
-> > > > +         can waste memory.
-> > > >
-> > > > -config DEBUG_RODATA
-> > > > -       bool "Make kernel text and rodata read-only"
-> > > > -       depends on ARM_KERNMEM_PERMS
-> > > > +config DEBUG_ALIGN_RODATA
-> > > > +       bool "Make rodata strictly non-executable"
-> > > > +       depends on DEBUG_RODATA
-> > > >          default y
-> > > >          help
-> > > > -         If this is set, kernel text and rodata will be made read-only.
-> > > > This
-> > > > -         is to help catch accidental or malicious attempts to change
-> > > > the
-> > > > -         kernel's executable code. Additionally splits rodata from
-> > > > kernel
-> > > > -         text so it can be made explicitly non-executable. This creates
-> > > > -         another section-size padded region, so it can waste more
-> > > > memory
-> > > > -         space while gaining the read-only protections.
-> > > > +         If this is set, rodata will be made explicitly non-executable.
-> > > > This
-> > > > +         provides protection on the rare chance that attackers might
-> > > > find
-> > > > and
-> > > > +         use ROP gadgets that exist in the rodata section. This adds an
-> > > > +         additional section-aligned split of rodata from kernel text so
-> > > > it
-> > > > +         can be made explicitly non-executable. This padding may waste
-> > > > memory
-> > > > +         space to gain this additional protection.
-> > >
-> > >
-> > > I get that you want to make this match arm64 but it's really not intuitive
-> > > that
-> > > something with ALIGN_RODATA in the name is actually for setting NX. The
-> > > purpose
-> > > of ALIGN_RODATA was also slightly different on arm64 since the RO/NX will
-> > > still
-> > > be there, the difference is if the sections are present versus broken down
-> > > into
-> > > pages.
-> >
-> > Well, it seems to have the same effect: without the alignment, a
-> > portion of rodata may remain executable on arm64. Unless I
-> > misunderstand?
-> >
+> I ran this through my experimental setup on m400 and got this:
 > 
-> No, on arm64 everything should always be NX, the difference is part of the NX
-> sections may be mapped as pages instead of sections so you take the TLB hit.
-> It's a trade off of memory vs TLB pressure instead of just security vs TLB.
+> BM		v4.4-rc2	v4.4-rc2-wsinc	overhead
+> --		--------	--------------	--------
+> Apache		5297.11		5243.77		101.02%
+> fio rand read	4354.33		4294.50		101.39%
+> fio rand write	2465.33		2231.33		110.49%
+> hackbench	17.48		19.78		113.16%
+> memcached	96442.69	101274.04	95.23%
+> TCP_MAERTS	5966.89		6029.72		98.96%
+> TCP_STREAM	6284.60		6351.74		98.94%
+> TCP_RR		15044.71	14324.03	105.03%
+> pbzip2 c	18.13		17.89		98.68%
+> pbzip2 d	11.42		11.45		100.26%
+> kernbench	50.13		50.28		100.30%
+> mysql 1		152.84		154.01		100.77%
+> mysql 2		98.12		98.94		100.84%
+> mysql 4		51.32		51.17		99.71%
+> mysql 8		27.31		27.70		101.42%
+> mysql 20	16.80		17.21		102.47%
+> mysql 100	13.71		14.11		102.92%
+> mysql 200	15.20		15.20		100.00%
+> mysql 400	17.16		17.16		100.00%
 > 
-> Thanks,
-> Laura
+> (you want to see this with a viewer that renders clear-text and tabs
+> properly)
 > 
+> What this tells me is that we do take a noticable hit on the
+> world-switch path, which shows up in the TCP_RR and hackbench workloads,
+> which have a high precision in their output.
 > 
+> Note that the memcached number is well within its variability between
+> individual benchmark runs, where it varies to 12% of its average in over
+> 80% of the executions.
+> 
+> I don't think this is a showstopper thought, but we could consider
+> looking more closely at a breakdown of the world-switch path and verify
+> if/where we are really taking a hit.
+> 
+> -Christoffer
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> 
+
+I ran some of the lmbench 'micro benchmarks' - currently
+the usleep one consistently stands out by about .4% or extra 300ns
+per sleep. Few other ones have some outliers, I will look at these
+closer. Tests were ran on Juno.
+
+- Mario
