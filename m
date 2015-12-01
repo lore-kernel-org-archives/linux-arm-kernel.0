@@ -1,69 +1,80 @@
 From: kapilh@broadcom.com (Kapil Hali)
-Date: Tue, 1 Dec 2015 11:24:07 -0500
-Subject: [PATCH v4 3/5] ARM: dts: Add SMP support for Broadcom NSP
+Date: Tue, 1 Dec 2015 11:24:05 -0500
+Subject: [PATCH v4 1/5] dt-bindings: add SMP enable-method for Broadcom NSP
 In-Reply-To: <1448987049-17041-1-git-send-email-kapilh@broadcom.com>
 References: <1448987049-17041-1-git-send-email-kapilh@broadcom.com>
-Message-ID: <1448987049-17041-4-git-send-email-kapilh@broadcom.com>
+Message-ID: <1448987049-17041-2-git-send-email-kapilh@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree changes required for providing SMP support
-for Broadcom Northstar Plus SoC.
+Add a compatible string "brcm,bcm-nsp-smp" for Broadcom's
+Northstar Plus CPU to the 32-bit ARM CPU device tree binding
+documentation file and create a new binding documentation for
+Northstar Plus CPU.
 
 Signed-off-by: Kapil Hali <kapilh@broadcom.com>
 ---
- arch/arm/boot/dts/bcm-nsp.dtsi | 33 +++++++++++++++++++++------------
- 1 file changed, 21 insertions(+), 12 deletions(-)
+ .../bindings/arm/bcm/brcm,nsp-cpu-method.txt       | 39 ++++++++++++++++++++++
+ Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
+ 2 files changed, 40 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
 
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index 58aca27..4c52417 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -40,24 +40,33 @@
- 	model = "Broadcom Northstar Plus SoC";
- 	interrupt-parent = <&gic>;
- 
+diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+new file mode 100644
+index 0000000..bf08872
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+@@ -0,0 +1,39 @@
++Broadcom Northstar Plus SoC CPU Enable Method
++---------------------------------------------
++This binding defines the enable method used for starting secondary
++CPUs in the following Broadcom SoCs:
++  BCM58522, BCM58525, BCM58535, BCM58622, BCM58623, BCM58625, BCM88312
++
++The enable method is specified by defining the following required
++properties in the "cpus" device tree node:
++  - enable-method = "brcm,bcm-nsp-smp";
++  - secondary-boot-reg = <...>;
++
++The secondary-boot-reg property is a u32 value that specifies the
++physical address of the register which should hold the common
++entry point for a secondary CPU. This entry is cpu node specific
++and should be added per cpu. E.g., in case of NSP (BCM58625) which
++is a dual core CPU SoC, this entry should be added to cpu1 node.
++
++
++Example:
 +	cpus {
 +		#address-cells = <1>;
 +		#size-cells = <0>;
 +		enable-method = "brcm,bcm-nsp-smp";
 +
-+		cpu at 0 {
++		cpu0: cpu at 0 {
 +			device_type = "cpu";
 +			compatible = "arm,cortex-a9";
 +			next-level-cache = <&L2>;
-+			reg = <0x0>;
++			reg = <0>;
 +		};
 +
-+		cpu at 1 {
++		cpu1: cpu at 1 {
 +			device_type = "cpu";
 +			compatible = "arm,cortex-a9";
 +			next-level-cache = <&L2>;
++			reg = <1>;
 +			secondary-boot-reg = <0xffff042c>;
-+			reg = <0x1>;
 +		};
 +	};
-+
- 	mpcore {
- 		compatible = "simple-bus";
- 		ranges = <0x00000000 0x19020000 0x00003000>;
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 
--		cpus {
--			#address-cells = <1>;
--			#size-cells = <0>;
--
--			cpu at 0 {
--				device_type = "cpu";
--				compatible = "arm,cortex-a9";
--				next-level-cache = <&L2>;
--				reg = <0x0>;
--			};
--		};
--
- 		L2: l2-cache {
- 			compatible = "arm,pl310-cache";
- 			reg = <0x2000 0x1000>;
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 3a07a87..d191554 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -190,6 +190,7 @@ nodes to be present and contain the properties described below.
+ 			    "allwinner,sun6i-a31"
+ 			    "allwinner,sun8i-a23"
+ 			    "arm,psci"
++			    "brcm,bcm-nsp-smp"
+ 			    "brcm,brahma-b15"
+ 			    "marvell,armada-375-smp"
+ 			    "marvell,armada-380-smp"
 -- 
 2.1.0
