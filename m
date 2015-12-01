@@ -1,40 +1,40 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 1 Dec 2015 11:48:34 +0200
-Subject: [RFC v02 03/15] dmaengine: core: Introduce new, universal API to
- request a channel
-In-Reply-To: <2436417.uspUkNqtIA@wuerfel>
-References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
- <1448891145-10766-4-git-send-email-peter.ujfalusi@ti.com>
- <2436417.uspUkNqtIA@wuerfel>
-Message-ID: <565D6CF2.8090305@ti.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Tue, 1 Dec 2015 10:53:24 +0100
+Subject: [PATCH v2 4/9] pinctrl: Add support STM32 MCUs
+In-Reply-To: <1445102604-11502-5-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1445102604-11502-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1445102604-11502-5-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <CALszF6Cd=yei0m2Zs=+k=KT5RUzdesGWPK7PAQPdj_-Ouan=2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2015 04:09 PM, Arnd Bergmann wrote:
-> On Monday 30 November 2015 15:45:33 Peter Ujfalusi wrote:
->>                                                   const char *name);
->>  struct dma_chan *dma_request_slave_channel(struct device *dev, const char *name);
->> +
->> +struct dma_chan *dma_request_chan(struct device *dev, const char *name);
->> +struct dma_chan *dma_request_chan_by_mask(const dma_cap_mask_t *mask);
->> +
->>  void dma_release_channel(struct dma_chan *chan);
->>  int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_caps *caps);
->>  #else
->> @@ -1268,6 +1291,14 @@ static inline struct dma_chan *dma_request_slave_channel(struct device *dev,
->>  {
->>         return NULL;
->>  }
->> +static inline struct dma_chan *dma_request_chan(struct device *dev)
->> +{
->> +       return ERR_PTR(-ENODEV);
->> +}
->>
-> 
-> The prototypes for dma_request_chan() don't match, otherwise looks good.
+Hi Linus,
 
-Aargh, the !CONFIG_DMA_ENGINE path...
-Fixed for the next RFC
+2015-10-17 19:23 GMT+02:00 Maxime Coquelin <mcoquelin.stm32@gmail.com>:
+> This patch adds pinctrl and GPIO support to STMicroelectronic's STM32
+> family of MCUs.
+>
+> While it only supports STM32F429 for now, it has been designed to enable
+> support of other MCUs of the family (e.g. STM32F746).
+>
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> ---
+>  drivers/pinctrl/Kconfig                   |    1 +
+>  drivers/pinctrl/Makefile                  |    1 +
+>  drivers/pinctrl/stm32/Kconfig             |   16 +
+>  drivers/pinctrl/stm32/Makefile            |    5 +
+>  drivers/pinctrl/stm32/pinctrl-stm32.c     |  856 +++++++++++++++
+>  drivers/pinctrl/stm32/pinctrl-stm32.h     |   43 +
+>  drivers/pinctrl/stm32/pinctrl-stm32f429.c | 1598 +++++++++++++++++++++++++++++
+>  7 files changed, 2520 insertions(+)
+>  create mode 100644 drivers/pinctrl/stm32/Kconfig
+>  create mode 100644 drivers/pinctrl/stm32/Makefile
+>  create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.c
+>  create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.h
+>  create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32f429.c
+>
 
-Thanks,
-P?ter
+Gentle reminder, do you know when you will be able to review this driver?
+
+Thanks in advance,
+Maxime
