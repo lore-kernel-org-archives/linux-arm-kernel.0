@@ -1,17 +1,17 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Tue,  1 Dec 2015 20:03:18 +0200
-Subject: [PATCH V2 16/19] ARM: dts: am57xx: sbc-am57x: add LCD support
+Date: Tue,  1 Dec 2015 20:03:15 +0200
+Subject: [PATCH V2 13/19] ARM: dts: am57xx: sbc-am57x: add usb vbus pinmux
 In-Reply-To: <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
 References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
  <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1448993001-19495-17-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1448993001-19495-14-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Startek-kd050c 800x480 LCD panel timings are described in
-compulab-sb-som.dtsi.
+usb1_drvvbus pin is used to Drive-VBUS enable to external charge
+pump/power switch.
 
-Add appropriate DT endpoints to connect DPI output and LCD.
+Add a pinmux for that pin.
 
 Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
 Acked-by: Igor Grinberg <grinberg@compulab.co.il>
@@ -22,68 +22,34 @@ Acked-by: Igor Grinberg <grinberg@compulab.co.il>
    * No fuctional changes
    * Reformat subject
 
- arch/arm/boot/dts/am57xx-sbc-am57x.dts | 38 ++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+ arch/arm/boot/dts/am57xx-sbc-am57x.dts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/arch/arm/boot/dts/am57xx-sbc-am57x.dts b/arch/arm/boot/dts/am57xx-sbc-am57x.dts
-index edce6c6..8e4c0fd 100644
+index 93852e2..17a1972 100644
 --- a/arch/arm/boot/dts/am57xx-sbc-am57x.dts
 +++ b/arch/arm/boot/dts/am57xx-sbc-am57x.dts
-@@ -15,6 +15,10 @@
- / {
- 	model = "CompuLab CL-SOM-AM57x on SB-SOM-AM57x";
- 	compatible = "compulab,sbc-am57x", "compulab,cl-som-am57x", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7";
-+
-+	aliases {
-+		display0 = &lcd0;
-+	};
- };
- 
- &dra7_pmx_core {
-@@ -50,6 +54,12 @@
- 			DRA7XX_CORE_IOPAD(0x36b8, PIN_INPUT| MUX_MODE10)	/* mcasp1_axr1.i2c5_scl */
+@@ -37,6 +37,12 @@
+ 			DRA7XX_CORE_IOPAD(0x377c, PIN_INPUT | MUX_MODE14)	/* mmc1_sdwp.gpio6_28 */
  		>;
  	};
 +
-+	lcd_pins_default: lcd_pins_default {
++	usb1_pins: pinmux_usb1_pins {
 +		pinctrl-single,pins = <
-+			DRA7XX_CORE_IOPAD(0x3564, PIN_OUTPUT | MUX_MODE14)      /* vin2a_vsync0.gpio4_0 */
++			DRA7XX_CORE_IOPAD(0x3680, PIN_INPUT_SLEW | MUX_MODE0) /* usb1_drvvbus */
 +		>;
 +	};
  };
  
  &uart3 {
-@@ -97,3 +107,31 @@
- 		#gpio-cells = <2>;
- 	};
+@@ -59,3 +65,8 @@
+ 	cd-gpios = <&gpio6 27 GPIO_ACTIVE_LOW>;
+ 	wp-gpios = <&gpio6 28 GPIO_ACTIVE_HIGH>;
  };
 +
-+&dss {
-+	status = "ok";
-+
-+	vdda_video-supply = <&ldoln_reg>;
-+
-+	port {
-+		dpi_lcd_out: endpoint at 0 {
-+			remote-endpoint = <&lcd_in>;
-+			data-lines = <24>;
-+		};
-+	};
-+};
-+
-+&lcd0 {
++&usb1 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&lcd_pins_default>;
-+
-+	enable-gpios = <&pca9555 14 GPIO_ACTIVE_HIGH
-+			&gpio4 0 GPIO_ACTIVE_HIGH>;
-+
-+	port {
-+		lcd_in: endpoint {
-+			remote-endpoint = <&dpi_lcd_out>;
-+			data-lines = <24>;
-+		};
-+	};
++	pinctrl-0 = <&usb1_pins>;
 +};
 -- 
 1.9.1
