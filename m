@@ -1,49 +1,49 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Tue,  1 Dec 2015 20:03:10 +0200
-Subject: [PATCH V2 08/19] ARM: dts: am57xx: cl-som-am57x: add USB support
+Date: Tue,  1 Dec 2015 20:03:06 +0200
+Subject: [PATCH V3 04/19] ARM: dts: am57xx: cl-som-am57x: add EEPROM support
 In-Reply-To: <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
 References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
  <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1448993001-19495-9-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1448993001-19495-5-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add USB support.
+On-board EEPROM chip is used for storing a board production
+info.
+
+Add module EEPROM support (over I2C4 bus).
 
 Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 ---
+
+  v3: 
+ 
+   * No fuctional changes 
+   * Reformat subject 
+
   v2:
 
-   * No fuctional changes
-   * Reformat subject
+   * Fix EEPROM chip model
 
- arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-index fe4baba..c603136 100644
+index 2074fd4..1badfa9 100644
 --- a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
 +++ b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-@@ -478,3 +478,19 @@
- 	pinctrl-0 = <&davinci_mdio_pins_default>;
- 	pinctrl-1 = <&davinci_mdio_pins_sleep>;
+@@ -261,6 +261,12 @@
+ 		compatible = "emmicro,em3027";
+ 		reg = <0x56>;
+ 	};
++
++	eeprom_module: atmel at 50 {
++		compatible = "atmel,24c08";
++		reg = <0x50>;
++		pagesize = <16>;
++	};
  };
-+
-+&usb2_phy1 {
-+	phy-supply = <&ldousb_reg>;
-+};
-+
-+&usb2_phy2 {
-+	phy-supply = <&ldousb_reg>;
-+};
-+
-+&usb1 {
-+	dr_mode = "host";
-+};
-+
-+&usb2 {
-+	dr_mode = "peripheral";
-+};
+ 
+ &cpu0 {
 -- 
 1.9.1
