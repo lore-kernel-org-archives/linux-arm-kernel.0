@@ -1,62 +1,23 @@
-From: michael.hennerich@analog.com (Michael Hennerich)
-Date: Tue, 1 Dec 2015 10:32:39 +0100
-Subject: [PATCH] backlight: adp8860: fix another uninitialized variable use
-In-Reply-To: <3284846.T0rzz6n1As@wuerfel>
-References: <3284846.T0rzz6n1As@wuerfel>
-Message-ID: <565D6937.90503@analog.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 1 Dec 2015 10:42:25 +0100
+Subject: [PATCH 3/3] pinctrl: spear: guard sub-directory with
+ CONFIG_PINCTRL_SPEAR
+In-Reply-To: <1448365524-12605-4-git-send-email-yamada.masahiro@socionext.com>
+References: <1448365524-12605-1-git-send-email-yamada.masahiro@socionext.com>
+ <1448365524-12605-4-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdbxuRMFwps0Z-K4e=a9KCAxxqtPLXTZ7xKWTQNz--K1ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2015 12:24 PM, Arnd Bergmann wrote:
-> A recent patch I did fixed two potential uses of uninitialized
-> variables in the adp8870 and adp8860 drivers. Unfortunately,
-> I missed another one:
->
-> drivers/video/backlight/adp8860_bl.c: In function 'adp8860_bl_ambient_light_level_show':
-> drivers/video/backlight/adp8860_bl.c:570:11: warning: 'reg_val' may be used uninitialized in this function
->
-> This does the same change as before in one additional function,
-> and also changes the check for the return value in a way that
-> avoids another false positive warning with a similar message.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On Tue, Nov 24, 2015 at 12:45 PM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 
-Acked-by: Michael Hennerich <michael.hennerich@analog.com>
+> CONFIG_PINCTRL_SPEAR is more suitable than CONFIG_PLAT_SPEAR
+> to guard the drivers/pinctrl/spear/ directory.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-> Fixes: 6be3a5a9cd91 ("backlight: adp88x0: Fix uninitialized variable use")
-> ---
-> Sorry for missing this third hunk the first time around.
->
-> diff --git a/drivers/video/backlight/adp8860_bl.c b/drivers/video/backlight/adp8860_bl.c
-> index f0d4c0324580..510e559c060e 100644
-> --- a/drivers/video/backlight/adp8860_bl.c
-> +++ b/drivers/video/backlight/adp8860_bl.c
-> @@ -566,11 +566,13 @@ static ssize_t adp8860_bl_ambient_light_level_show(struct device *dev,
->
->   	mutex_lock(&data->lock);
->   	error = adp8860_read(data->client, ADP8860_PH1LEVL, &reg_val);
-> -	ret_val = reg_val;
-> -	error |= adp8860_read(data->client, ADP8860_PH1LEVH, &reg_val);
-> +	if (!error) {
-> +		ret_val = reg_val;
-> +		error = adp8860_read(data->client, ADP8860_PH1LEVH, &reg_val);
-> +	}
->   	mutex_unlock(&data->lock);
->
-> -	if (error < 0)
-> +	if (error)
->   		return error;
->
->   	/* Return 13-bit conversion value for the first light sensor */
->
+Patch applied.
 
-
--- 
-Greetings,
-Michael
-
---
-Analog Devices GmbH      Wilhelm-Wagenfeld-Str. 6      80807 Muenchen
-Sitz der Gesellschaft: Muenchen; Registergericht: Muenchen HRB 40368;
-Geschaeftsfuehrer:Dr.Carsten Suckrow, Thomas Wessel, William A. Martin,
-Margaret Seif
+Yours,
+Linus Walleij
