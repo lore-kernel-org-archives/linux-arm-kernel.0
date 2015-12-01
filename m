@@ -1,127 +1,87 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Tue,  1 Dec 2015 20:03:12 +0200
-Subject: [PATCH V2 10/19] ARM: dts: am57xx: cl-som-am57x: add analog audio
- support
-In-Reply-To: <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
+Date: Tue,  1 Dec 2015 20:03:02 +0200
+Subject: [PATCH V2 00/19] Add support for CL-SOM-AM57X and SBC-AM57X
+In-Reply-To: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
 References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
- <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1448993001-19495-11-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add analog audio DT nodes:
+SBC-AM57X boards.
 
-1. simple-audio-card node
-2. wm8731 codec node
-3. MCASP3 pinmux
+CL-SOM-AM57x is a miniature System-on-Module (SoM) based on
+TI Sitara AM57x ARM Cortex-A15 System-on-Chip family.
 
-Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
----
+SBC-AM57x is a single board computer, implemented with the
+CL-SOM-AM57x computer-on-module providing most of the functions,
+and SB-SOM-AM57x carrier board providing additional peripheral
+functions and connectors.
 
-  v2:
+The SBC-AM57x has the following features:
 
-   * No fuctional changes
-   * Reformat subject
 
- arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 67 +++++++++++++++++++++++++++++++
- 1 file changed, 67 insertions(+)
+CPU:		Texas Instruments Sitara AM5728 dual-core ARM Cortex-A15, 1.5GHz or
+		Texas Instruments Sitara AM5718 single-core ARM Cortex-A15, 1.5GHz
 
-diff --git a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-index a75c382..b2c4451 100644
---- a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-+++ b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-@@ -50,6 +50,33 @@
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
- 	};
-+
-+	sound0: sound at 0 {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "CL-SOM-AM57x-Sound-Card";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,bitclock-master = <&dailink0_master>;
-+		simple-audio-card,frame-master = <&dailink0_master>;
-+		simple-audio-card,widgets =
-+					"Headphone", "Headphone Jack",
-+					"Microphone", "Microphone Jack",
-+					"Line", "Line Jack";
-+		simple-audio-card,routing =
-+					"Headphone Jack", "RHPOUT",
-+					"Headphone Jack", "LHPOUT",
-+					"LLINEIN", "Line Jack",
-+					"MICIN", "Mic Bias",
-+					"Mic Bias", "Microphone Jack";
-+
-+		dailink0_master: simple-audio-card,cpu {
-+			sound-dai = <&mcasp3>;
-+		};
-+
-+		simple-audio-card,codec {
-+			sound-dai = <&wm8731>;
-+			system-clock-frequency = <12000000>;
-+		};
-+	};
- };
- 
- &dra7_pmx_core {
-@@ -196,6 +223,24 @@
- 			DRA7XX_CORE_IOPAD(0x3464, PIN_INPUT_PULLDOWN | MUX_MODE14) /* gpmc_a9.gpio1_31 */
- 		>;
- 	};
-+
-+	mcasp3_pins_default: mcasp3_pins_default {
-+		pinctrl-single,pins = <
-+			DRA7XX_CORE_IOPAD(0x3724, PIN_INPUT_PULLDOWN | MUX_MODE0) /* mcasp3_aclkx.mcasp3_aclkx */
-+			DRA7XX_CORE_IOPAD(0x3728, PIN_INPUT_PULLDOWN | MUX_MODE0) /* mcasp3_fsx.mcasp3_fsx */
-+			DRA7XX_CORE_IOPAD(0x372c, PIN_OUTPUT_PULLDOWN | MUX_MODE0) /* mcasp3_axr0.mcasp3_axr0 */
-+			DRA7XX_CORE_IOPAD(0x3730, PIN_INPUT_PULLDOWN | MUX_MODE0) /* mcasp3_axr1.mcasp3_axr1 */
-+		>;
-+	};
-+
-+	mcasp3_pins_sleep: mcasp3_pins_sleep {
-+		pinctrl-single,pins = <
-+			DRA7XX_CORE_IOPAD(0x3724, PIN_INPUT | MUX_MODE15)
-+			DRA7XX_CORE_IOPAD(0x3728, PIN_INPUT | MUX_MODE15)
-+			DRA7XX_CORE_IOPAD(0x372c, PIN_INPUT | MUX_MODE15)
-+			DRA7XX_CORE_IOPAD(0x3730, PIN_INPUT | MUX_MODE15)
-+		>;
-+	};
- };
- 
- &i2c1 {
-@@ -392,6 +437,13 @@
- 		reg = <0x50>;
- 		pagesize = <16>;
- 	};
-+
-+	wm8731: wm8731 at 1a {
-+		#sound-dai-cells = <0>;
-+		compatible = "wlf,wm8731";
-+		reg = <0x1a>;
-+		status = "okay";
-+	};
- };
- 
- &cpu0 {
-@@ -538,3 +590,18 @@
- &usb2 {
- 	dr_mode = "peripheral";
- };
-+
-+&mcasp3 {
-+	#sound-dai-cells = <0>;
-+	pinctrl-names = "default", "sleep";
-+	pinctrl-0 = <&mcasp3_pins_default>;
-+	pinctrl-1 = <&mcasp3_pins_sleep>;
-+	status = "okay";
-+
-+	op-mode = <0>;	/* MCASP_IIS_MODE */
-+	tdm-slots = <2>;
-+	/* 4 serializers */
-+	serial-dir = <	/* 0: INACTIVE, 1: TX, 2: RX */
-+		1 2 0 0
-+	>;
-+};
+RAM:		DDR3, 512MB ? 4GB
+
+Storage:	NAND flash, 512MB - 1GB or eMMC flash, 4GB - 32GB
+		SPI-flash 2MB
+
+Ethernet:	Up to 2x 10/100/1000Mbps Ethernet ports (MAC+PHY)
+
+WiFi/BT:	802.11b/g/n WiFi interface (TI WiLink 8 WL1801 chipset) or
+		Dual-band 2x2 802.11a/b/g/n WiFi interface (TI WiLink 8 WL1837 chipset)
+
+Analog Audio:	Audio codec with stereo output, stereo input and microphone support
+
+More details can be found here:
+
+https://www.compulab.co.il/products/computer-on-modules/cl-som-am57x-ti-am5728-am5718-system-on-module/
+
+https://www.compulab.co.il/products/sbcs/sbc-am57x-ti-am5728-am5718-single-board-computer/
+
+This series is based on the following patch set ("Add support for sbc-t43" Nikita Kiryanov):
+
+https://www.mail-archive.com/linux-omap at vger.kernel.org/msg121905.html
+
+Changes in V2:
+	- Removed unnecessary line breaks in end of file and elsewhere
+	- Changed subject lines to start with "ARM: dts:"
+	- PMIC moved from I2C1 to I2C4
+	- Fixed SPI flash compatible string
+	- Skipped resetting ETH PHYs
+	- Fixed HDMI lanes polarity
+
+Dmitry Lifshitz (19):
+  ARM: dts: am57xx: cl-som-am57x: add basic module support
+  ARM: dts: am57xx: cl-som-am57x: dts: add RTC support
+  ARM: dts: am57xx: cl-som-am57x: add I2C3 support
+  ARM: dts: am57xx: cl-som-am57x: add EEPROM support
+  ARM: dts: am57xx: cl-som-am57x: add eMMC support
+  ARM: dts: am57xx: cl-som-am57x: add spi-flash support
+  ARM: dts: am57xx: cl-som-am57x: add dual EMAC support
+  ARM: dts: am57xx: cl-som-am57x: add USB support
+  ARM: dts: am57xx: cl-som-am57x: add touchscreen support
+  ARM: dts: am57xx: cl-som-am57x: add analog audio support
+  ARM: dts: am57xx: sbc-am57x: add basic board support
+  ARM: dts: am57xx: cl-som-am57x: add MMC1 support
+  ARM: dts: am57xx: sbc-am57x: add usb vbus pinmux
+  ARM: dts: am57xx: sbc-am57x: add EEPROM support
+  ARM: dts: am57xx: sbc-am57x: add GPIO expander support
+  ARM: dts: am57xx: sbc-am57x: add LCD support
+  ARM: dts: am57xx: compulab-sb-som: add HDMI connector
+  ARM: dts: am57xx: sbc-am57x: add HDMI support
+  ARM: dts: am57xx: cl-som-am57x: skip resetting ETH PHYs
+
+ .../devicetree/bindings/arm/omap/omap.txt          |   6 +
+ arch/arm/boot/dts/Makefile                         |   4 +-
+ arch/arm/boot/dts/am57xx-cl-som-am57x.dts          | 617 +++++++++++++++++++++
+ arch/arm/boot/dts/am57xx-sbc-am57x.dts             | 179 ++++++
+ arch/arm/boot/dts/compulab-sb-som.dtsi             |   7 +
+ 5 files changed, 812 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+ create mode 100644 arch/arm/boot/dts/am57xx-sbc-am57x.dts
+
 -- 
 1.9.1
