@@ -1,54 +1,44 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 1 Dec 2015 13:08:09 +0100
-Subject: Virtual addresses, ioremap, vmalloc, etc
-Message-ID: <565D8DA9.8040700@free.fr>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 1 Dec 2015 13:12:07 +0100
+Subject: [PATCH v3 0/3] Remove ARCH_MSM* configs
+In-Reply-To: <1448933123-9843-1-git-send-email-sboyd@codeaurora.org>
+References: <1448933123-9843-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <565D8E97.4030505@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everyone,
+On 12/01/2015 02:25 AM, Stephen Boyd wrote:
+> This patch series allows us to remove the ARCH_MSM* configs that live
+> in mach-qcom/Kconfig. They're mostly proxy configs for user selectable
+> clocksource configurations anyway.
+>
+> Changes from v2:
+>   * Renamed config in patch 1 to QCOM_ARCH_A_FAMILY to be less confusing
+>
+> Changes from v1:
+>   * Patch 1 replaced with one that moves config to mach-qcom/Kconfig
+>   * Applied Arnd's acks to patches 2 and 3
+>
+> Stephen Boyd (3):
+>    ARM: qcom: Make an option for qcom 'a-family' platforms
+>    ARM: qcom_defconfig: Enable HAVE_ARM_ARCH_TIMER
+>    ARM: qcom: Drop ARCH_MSM* configs
+>
+>   arch/arm/Makefile               |  3 +--
+>   arch/arm/configs/qcom_defconfig |  1 +
+>   arch/arm/mach-qcom/Kconfig      | 17 +++++++++--------
+>   3 files changed, 11 insertions(+), 10 deletions(-)
 
-I was wondering if someone could help clear my confusion.
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-In my company's legacy port (based on 3.4, dating back to 2.6) someone
-chose to map the first 16 MB of physical addresses using:
+Even it does not hurt, ARCH_MSM8X60, ARCH_MSM8960 and ARCH_MSM8974 could 
+be also removed from the defconfig. Better to do it right now, so they 
+won't be forgotten.
 
-static struct map_desc tango_map_desc[] __initdata = {
-	{
-		.virtual	= 0xf0000000,
-		.pfn		=__phys_to_pfn(0),
-		.length		= SZ_16M,
-		.type 		= MT_DEVICE,
-	},
-};
 
-static void __init tango_map_io(void)
-{
-	iotable_init(tango_map_desc, ARRAY_SIZE(tango_map_desc));
-}
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Is the virtual address 0xf0000000 chosen arbitrary?
-Could I pick 0xf04200000 for example?
-
-The same kernel, with no such boot-time mapping prints:
-
-[    0.000000] Memory: 641720K/655360K available (3135K kernel code, 109K rwdata, 1056K rodata, 3044K init, 218K bss, 13640K reserved, 0K cma-reserve)
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-[    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
-[    0.000000]     vmalloc : 0xe8800000 - 0xff000000   ( 360 MB)
-[    0.000000]     lowmem  : 0xc0000000 - 0xe8000000   ( 640 MB)
-
-It looks like 0xf0000000 is in the middle of the vmalloc space.
-Is it a good idea to "statically" map something there?
-
-If I were to call ioremap(0, SZ_16M); at run-time, I would imagine
-the virtual address could be anywhere in the vmalloc space?
-There's no reason it would be 0xf0000000, right?
-
-In short, is virtual address 0xf0000000 special in any way?
-(Other than being in the vmalloc space perhaps.)
-
-For my own reference:
-https://www.kernel.org/doc/Documentation/arm/memory.txt
-
-Regards.
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
