@@ -1,35 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 1 Dec 2015 12:16:15 +0100
-Subject: [PATCH v4 2/5] clk: sunxi: Add sun9i A80 apbs gates support
-In-Reply-To: <20151130171406.GA10111@rob-hp-laptop>
-References: <1448766190-11345-1-git-send-email-wens@csie.org>
- <1448766190-11345-3-git-send-email-wens@csie.org>
- <20151130171406.GA10111@rob-hp-laptop>
-Message-ID: <20151201111615.GG29263@lukather>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue,  1 Dec 2015 12:03:06 +0100
+Subject: [PATCH v2 09/25] mtd: nand: embed an mtd_info structure into nand_chip
+In-Reply-To: <1448967802-25796-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1448967802-25796-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1448967802-25796-10-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 11:14:06AM -0600, Rob Herring wrote:
-> On Sun, Nov 29, 2015 at 11:03:07AM +0800, Chen-Yu Tsai wrote:
-> > This patch adds support for the PRCM apbs clock gates found on the
-> > Allwinner A80 SoC.
-> > 
-> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
+Currently all NAND controller drivers are providing both the mtd_info and
+nand_chip struct and then let the NAND subsystem to initialize a few
+things before registering the mtd instance to the MTD layer.
+Embed an mtd_info field into nand_chip to add some consistency to all NAND
+controller drivers.
+This change will also help factorizing boilerplate code copied in all NAND
+drivers.
 
-Applied, thanks!
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ include/linux/mtd/nand.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Maxime
-
+diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
+index 056d165..c4e39ff 100644
+--- a/include/linux/mtd/nand.h
++++ b/include/linux/mtd/nand.h
+@@ -540,6 +540,7 @@ struct nand_buffers {
+ 
+ /**
+  * struct nand_chip - NAND Private Flash Chip Data
++ * @mtd:		MTD device registered to the MTD framework
+  * @IO_ADDR_R:		[BOARDSPECIFIC] address to read the 8 I/O lines of the
+  *			flash device
+  * @IO_ADDR_W:		[BOARDSPECIFIC] address to write the 8 I/O lines of the
+@@ -640,6 +641,7 @@ struct nand_buffers {
+  */
+ 
+ struct nand_chip {
++	struct mtd_info mtd;
+ 	void __iomem *IO_ADDR_R;
+ 	void __iomem *IO_ADDR_W;
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151201/4aca4e94/attachment.sig>
+2.1.4
