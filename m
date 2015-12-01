@@ -1,17 +1,17 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Tue,  1 Dec 2015 20:03:19 +0200
-Subject: [PATCH V2 17/19] ARM: dts: am57xx: compulab-sb-som: add HDMI connector
+Date: Tue,  1 Dec 2015 20:03:18 +0200
+Subject: [PATCH V2 16/19] ARM: dts: am57xx: sbc-am57x: add LCD support
 In-Reply-To: <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
 References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
  <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1448993001-19495-18-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1448993001-19495-17-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add HDMI connector node without a valid input endpoint.
+Startek-kd050c 800x480 LCD panel timings are described in
+compulab-sb-som.dtsi.
 
-CompuLab SB-SOM is a carrier board, hence the endpoint
-should be added in the board DT with a valid HDMI output.
+Add appropriate DT endpoints to connect DPI output and LCD.
 
 Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
 Acked-by: Igor Grinberg <grinberg@compulab.co.il>
@@ -22,24 +22,68 @@ Acked-by: Igor Grinberg <grinberg@compulab.co.il>
    * No fuctional changes
    * Reformat subject
 
- arch/arm/boot/dts/compulab-sb-som.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/am57xx-sbc-am57x.dts | 38 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/arch/arm/boot/dts/compulab-sb-som.dtsi b/arch/arm/boot/dts/compulab-sb-som.dtsi
-index 402a143..93d7e23 100644
---- a/arch/arm/boot/dts/compulab-sb-som.dtsi
-+++ b/arch/arm/boot/dts/compulab-sb-som.dtsi
-@@ -39,4 +39,11 @@
- 			pixelclk-active = <1>;
- 		};
- 	};
+diff --git a/arch/arm/boot/dts/am57xx-sbc-am57x.dts b/arch/arm/boot/dts/am57xx-sbc-am57x.dts
+index edce6c6..8e4c0fd 100644
+--- a/arch/arm/boot/dts/am57xx-sbc-am57x.dts
++++ b/arch/arm/boot/dts/am57xx-sbc-am57x.dts
+@@ -15,6 +15,10 @@
+ / {
+ 	model = "CompuLab CL-SOM-AM57x on SB-SOM-AM57x";
+ 	compatible = "compulab,sbc-am57x", "compulab,cl-som-am57x", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7";
 +
-+	hdmi_conn: connector at 0 {
-+		compatible = "hdmi-connector";
-+		label = "hdmi";
-+
-+		type = "a";
++	aliases {
++		display0 = &lcd0;
 +	};
  };
+ 
+ &dra7_pmx_core {
+@@ -50,6 +54,12 @@
+ 			DRA7XX_CORE_IOPAD(0x36b8, PIN_INPUT| MUX_MODE10)	/* mcasp1_axr1.i2c5_scl */
+ 		>;
+ 	};
++
++	lcd_pins_default: lcd_pins_default {
++		pinctrl-single,pins = <
++			DRA7XX_CORE_IOPAD(0x3564, PIN_OUTPUT | MUX_MODE14)      /* vin2a_vsync0.gpio4_0 */
++		>;
++	};
+ };
+ 
+ &uart3 {
+@@ -97,3 +107,31 @@
+ 		#gpio-cells = <2>;
+ 	};
+ };
++
++&dss {
++	status = "ok";
++
++	vdda_video-supply = <&ldoln_reg>;
++
++	port {
++		dpi_lcd_out: endpoint at 0 {
++			remote-endpoint = <&lcd_in>;
++			data-lines = <24>;
++		};
++	};
++};
++
++&lcd0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&lcd_pins_default>;
++
++	enable-gpios = <&pca9555 14 GPIO_ACTIVE_HIGH
++			&gpio4 0 GPIO_ACTIVE_HIGH>;
++
++	port {
++		lcd_in: endpoint {
++			remote-endpoint = <&dpi_lcd_out>;
++			data-lines = <24>;
++		};
++	};
++};
 -- 
 1.9.1
