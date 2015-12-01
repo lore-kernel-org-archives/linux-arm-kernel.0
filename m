@@ -1,77 +1,69 @@
 From: kapilh@broadcom.com (Kapil Hali)
-Date: Tue, 1 Dec 2015 11:24:04 -0500
-Subject: [PATCH v4 0/5] SMP support for Broadcom NSP
-Message-ID: <1448987049-17041-1-git-send-email-kapilh@broadcom.com>
+Date: Tue, 1 Dec 2015 11:24:07 -0500
+Subject: [PATCH v4 3/5] ARM: dts: Add SMP support for Broadcom NSP
+In-Reply-To: <1448987049-17041-1-git-send-email-kapilh@broadcom.com>
+References: <1448987049-17041-1-git-send-email-kapilh@broadcom.com>
+Message-ID: <1448987049-17041-4-git-send-email-kapilh@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change in v4:
-* Cleaned up kona_smp.c and associated DT file.
-* Corrected documentation for DT bindings.
-* Corrected secondary-boot-reg entry for bcm4708 DT file.
+Add device tree changes required for providing SMP support
+for Broadcom Northstar Plus SoC.
 
-Change in v3:
-* Fixed patch subject from RESEND PATCH to PATCH
-* Deleted arch/arm/mach-bcm/bcm_nsp.h file
-* Removed inclusion of header file bcm_nsp.h in platsmp.c
-* Removed unused variable 'timeout' in nsp_boot_secondary()
+Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+---
+ arch/arm/boot/dts/bcm-nsp.dtsi | 33 +++++++++++++++++++++------------
+ 1 file changed, 21 insertions(+), 12 deletions(-)
 
-Changes in v2:
-Removed the pen_holding method of SMP bringup for NSP SoC and
-replaced it with simple wakeup of secondary core using ARM IPI.
-
-
-This series adds SMP support for Broadcom's Northstar Plus SoC.
-
-There are similar SMP enablement methods for many ARMv7 bsed SoCs.
-BCM NSP SoC, has a typical such mechanism - after power-on, the
-secondary core is held in a standby state, primary core provides a
-startup address for the secondary core and wakes it up. Booting of
-the secondary core is serialized using pen_release global variable.
-
-The startup address is programmed at a special register location
-which is defined in the device tree using a "secondary-boot-reg"
-property in a node whose "enable-method" property matches.
-
-The first patch adds cpu-enable-method in the device tree bindings
-documentation. It also updates ARM CPU device tree documentation
-with Broadcom Northstar Plus CPU details.
-
-The second patch adds SMP support to the BCM NSP device tree file.
-
-The third patch, enables SMP on BCM NSP. It also consolidates
-common SMP handling between BCM NSP and BCM Kona.
-
-The final patch, enables SMP on BCM 4708 and this patch is pulled
-in from Jon Mason's patch from the mailing list.
-
-This patch series is constructed based on Linux v4.4-rc1.
-
-The source code is available at GITHUB:
-https://github.com/Broadcom/cygnus-linux/tree/nsp-smp-v2
-
-
-Jon Mason (1):
-  ARM: BCM: Add SMP support for Broadcom 4708
-
-Kapil Hali (4):
-  dt-bindings: add SMP enable-method for Broadcom NSP
-  ARM: BCM: Clean up SMP support for Broadcom Kona
-  ARM: dts: Add SMP support for Broadcom NSP
-  ARM: BCM: Add SMP support for Broadcom NSP
-
- .../bindings/arm/bcm/brcm,nsp-cpu-method.txt       |  39 ++++++
- Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
- arch/arm/boot/dts/bcm-nsp.dtsi                     |  33 +++--
- arch/arm/boot/dts/bcm11351.dtsi                    |   2 +-
- arch/arm/boot/dts/bcm21664.dtsi                    |   2 +-
- arch/arm/boot/dts/bcm4708.dtsi                     |   2 +
- arch/arm/mach-bcm/Kconfig                          |   3 +
- arch/arm/mach-bcm/Makefile                         |  11 +-
- arch/arm/mach-bcm/{kona_smp.c => platsmp.c}        | 144 +++++++++++++++++----
- 9 files changed, 193 insertions(+), 44 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
- rename arch/arm/mach-bcm/{kona_smp.c => platsmp.c} (63%)
-
+diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
+index 58aca27..4c52417 100644
+--- a/arch/arm/boot/dts/bcm-nsp.dtsi
++++ b/arch/arm/boot/dts/bcm-nsp.dtsi
+@@ -40,24 +40,33 @@
+ 	model = "Broadcom Northstar Plus SoC";
+ 	interrupt-parent = <&gic>;
+ 
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		enable-method = "brcm,bcm-nsp-smp";
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			next-level-cache = <&L2>;
++			reg = <0x0>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			next-level-cache = <&L2>;
++			secondary-boot-reg = <0xffff042c>;
++			reg = <0x1>;
++		};
++	};
++
+ 	mpcore {
+ 		compatible = "simple-bus";
+ 		ranges = <0x00000000 0x19020000 0x00003000>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 
+-		cpus {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			cpu at 0 {
+-				device_type = "cpu";
+-				compatible = "arm,cortex-a9";
+-				next-level-cache = <&L2>;
+-				reg = <0x0>;
+-			};
+-		};
+-
+ 		L2: l2-cache {
+ 			compatible = "arm,pl310-cache";
+ 			reg = <0x2000 0x1000>;
 -- 
 2.1.0
