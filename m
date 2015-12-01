@@ -1,104 +1,137 @@
-From: martyn.welch@collabora.co.uk (Martyn Welch)
-Date: Tue,  1 Dec 2015 19:12:51 +0000
-Subject: [PATCH 3/3] Addition of binding for firmware signals on peach-pi
-In-Reply-To: <1448997171-7064-1-git-send-email-martyn.welch@collabora.co.uk>
-References: <1448997171-7064-1-git-send-email-martyn.welch@collabora.co.uk>
-Message-ID: <1448997171-7064-4-git-send-email-martyn.welch@collabora.co.uk>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 1 Dec 2015 11:15:47 -0800
+Subject: [PATCH] ARM: mm: flip priority of CONFIG_DEBUG_RODATA
+In-Reply-To: <565CF5E3.7000109@redhat.com>
+References: <20151130233819.GA18873@www.outflux.net>
+ <565CF1E5.2070003@redhat.com>
+ <CAGXu5jJUv3EKkFA3J43nVO+v=-K5kgwSqwrVA9hxJGeZ79CkAg@mail.gmail.com>
+ <565CF5E3.7000109@redhat.com>
+Message-ID: <CAGXu5jKcg7wwrh_8vxVRnvwsXKofpvda=ZmoaUk8epPHkwMdWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The peach pi has a GPIO connected to the firmware write protect, developer
-mode and recovery mode lines. This patch adds the required nodes to the
-device tree to configure the pinmuxing and allow these to be read from
-user space.
+On Mon, Nov 30, 2015 at 5:20 PM, Laura Abbott <labbott@redhat.com> wrote:
+> On 11/30/2015 05:08 PM, Kees Cook wrote:
+>>
+>> On Mon, Nov 30, 2015 at 5:03 PM, Laura Abbott <labbott@redhat.com> wrote:
+>>>
+>>> On 11/30/2015 03:38 PM, Kees Cook wrote:
+>>>>
+>>>>
+>>>> Given the choice between making things NX or making things RO, we want
+>>>> RO first. As such, redefine CONFIG_DEBUG_RODATA to actually do the bulk
+>>>
+>>>
+>>>
+>>> Can you give a citation for why? The thread that inspired it might be
+>>> a good link.
+>>
+>>
+>> This was inspired by my examining the existing architecture's
+>> implementations of CONFIG_DEBUG_RODATA after Ingo suggested it be made
+>> a common feature not a build-time config (or at least renamed):
+>> http://www.openwall.com/lists/kernel-hardening/2015/11/30/13
+>>
+>
+> Thanks. I read the thread and I think it would be good to put a link
+> in the commit message to make it clearer why this is going in.
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
-Signed-off-by: Martyn Welch <martyn.welch@collabora.co.uk>
----
- arch/arm/boot/dts/exynos5800-peach-pi.dts | 40 +++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+Okay, I will add this (and a summary, as Nicolas suggested).
 
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 49a4f43..485c18f 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -53,6 +53,25 @@
- 		};
- 	};
- 
-+	chromeos-firmware {
-+		compatible = "google,gpio-firmware";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wp_gpio &dev_mode &rec_mode>;
-+
-+		write-protect {
-+			gpios = <&gpx3 0 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		developer-switch {
-+			gpios = <&gpx1 3 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		recovery-switch {
-+			gpios = <&gpx0 7 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 
-@@ -731,6 +750,13 @@
- 		samsung,pin-val = <0>;
- 	};
- 
-+	rec_mode: rec-mode {
-+		samsung,pins = "gpx0-7";
-+		samsung,pin-function = <0>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
- 	tpm_irq: tpm-irq {
- 		samsung,pins = "gpx1-0";
- 		samsung,pin-function = <0>;
-@@ -752,6 +778,13 @@
- 		samsung,pin-drv = <0>;
- 	};
- 
-+	dev_mode: dev-mode {
-+		samsung,pins = "gpx1-3";
-+		samsung,pin-function = <0>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
- 	ec_irq: ec-irq {
- 		samsung,pins = "gpx1-5";
- 		samsung,pin-function = <0>;
-@@ -773,6 +806,13 @@
- 		samsung,pin-drv = <0>;
- 	};
- 
-+	wp_gpio: wp_gpio {
-+		samsung,pins = "gpx3-0";
-+		samsung,pin-function = <0>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
- 	max77802_irq: max77802-irq {
- 		samsung,pins = "gpx3-1";
- 		samsung,pin-function = <0>;
+>>>> index 41218867a9a6..b617084e9520 100644
+>>>> --- a/arch/arm/mm/Kconfig
+>>>> +++ b/arch/arm/mm/Kconfig
+>>>> @@ -1039,24 +1039,26 @@ config ARCH_SUPPORTS_BIG_ENDIAN
+>>>>            This option specifies the architecture can support big endian
+>>>>            operation.
+>>>>
+>>>> -config ARM_KERNMEM_PERMS
+>>>> -       bool "Restrict kernel memory permissions"
+>>>> +config DEBUG_RODATA
+>>>> +       bool "Make kernel text and rodata read-only"
+>>>>          depends on MMU
+>>>> +       default y if CPU_V7
+>>>>          help
+>>>> -         If this is set, kernel memory other than kernel text (and
+>>>> rodata)
+>>>> -         will be made non-executable. The tradeoff is that each region
+>>>> is
+>>>> -         padded to section-size (1MiB) boundaries (because their
+>>>> permissions
+>>>> -         are different and splitting the 1M pages into 4K ones causes
+>>>> TLB
+>>>> -         performance problems), wasting memory.
+>>>> +         If this is set, kernel memory (text, rodata, etc) will be made
+>>>> +         read-only, and non-text kernel memory will be made
+>>>> non-executable.
+>>>> +         The tradeoff is that each region is padded to section-size
+>>>> (1MiB)
+>>>> +         boundaries (because their permissions are different and
+>>>> splitting
+>>>> +         the 1M pages into 4K ones causes TLB performance problems),
+>>>> which
+>>>> +         can waste memory.
+>>>>
+>>>> -config DEBUG_RODATA
+>>>> -       bool "Make kernel text and rodata read-only"
+>>>> -       depends on ARM_KERNMEM_PERMS
+>>>> +config DEBUG_ALIGN_RODATA
+>>>> +       bool "Make rodata strictly non-executable"
+>>>> +       depends on DEBUG_RODATA
+>>>>          default y
+>>>>          help
+>>>> -         If this is set, kernel text and rodata will be made read-only.
+>>>> This
+>>>> -         is to help catch accidental or malicious attempts to change
+>>>> the
+>>>> -         kernel's executable code. Additionally splits rodata from
+>>>> kernel
+>>>> -         text so it can be made explicitly non-executable. This creates
+>>>> -         another section-size padded region, so it can waste more
+>>>> memory
+>>>> -         space while gaining the read-only protections.
+>>>> +         If this is set, rodata will be made explicitly non-executable.
+>>>> This
+>>>> +         provides protection on the rare chance that attackers might
+>>>> find
+>>>> and
+>>>> +         use ROP gadgets that exist in the rodata section. This adds an
+>>>> +         additional section-aligned split of rodata from kernel text so
+>>>> it
+>>>> +         can be made explicitly non-executable. This padding may waste
+>>>> memory
+>>>> +         space to gain this additional protection.
+>>>
+>>>
+>>>
+>>> I get that you want to make this match arm64 but it's really not
+>>> intuitive that
+>>> something with ALIGN_RODATA in the name is actually for setting NX. The
+>>> purpose
+>>> of ALIGN_RODATA was also slightly different on arm64 since the RO/NX will
+>>> still
+>>> be there, the difference is if the sections are present versus broken
+>>> down into
+>>> pages.
+>>
+>>
+>> Well, it seems to have the same effect: without the alignment, a
+>> portion of rodata may remain executable on arm64. Unless I
+>> misunderstand?
+>>
+>
+> No, on arm64 everything should always be NX, the difference is part of the
+> NX
+> sections may be mapped as pages instead of sections so you take the TLB hit.
+> It's a trade off of memory vs TLB pressure instead of just security vs TLB.
+
+Ah! I understand now. I will clarify the commit and Kconfig text on
+ARM. I'd still prefer to keep the name, since it's still doing
+section-alignment of rodata, it's just that without ARM's
+ALIGN_RODATA, you get an executable rodata section.
+
+-Kees
+
 -- 
-2.1.4
+Kees Cook
+Chrome OS & Brillo Security
