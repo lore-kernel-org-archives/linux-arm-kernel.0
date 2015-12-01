@@ -1,53 +1,25 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 1 Dec 2015 11:58:53 +0200
-Subject: [RFC v02 04/15] dmaengine: edma: Add support for DMA filter
- mapping to slave devices
-In-Reply-To: <7490116.jHcmUxB3Rf@wuerfel>
-References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
- <1448891145-10766-5-git-send-email-peter.ujfalusi@ti.com>
- <7490116.jHcmUxB3Rf@wuerfel>
-Message-ID: <565D6F5D.3060603@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 1 Dec 2015 11:00:31 +0100
+Subject: [PATCH 3/3] ARM: dts: enable pinctrl for Broadcom NSP
+In-Reply-To: <5654FBE4.5010802@gmail.com>
+References: <1448042309-46445-1-git-send-email-yrdreddy@broadcom.com>
+ <5654FBE4.5010802@gmail.com>
+Message-ID: <CACRpkdZCBbrfHq+DiWcfe6i_2FPUXyMQwbsQu5_zAKYa=fJugg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2015 04:11 PM, Arnd Bergmann wrote:
-> On Monday 30 November 2015 15:45:34 Peter Ujfalusi wrote:
->> @@ -2428,6 +2436,22 @@ bool edma_filter_fn(struct dma_chan *chan, void *param)
->>  }
->>  EXPORT_SYMBOL(edma_filter_fn);
->>  
->> +static bool edma_filter_for_map(struct dma_chan *chan, void *param)
->> +{
->> +       bool match = false;
->> +
->> +       if (chan->device->dev->driver == &edma_driver.driver) {
->> +               struct edma_chan *echan = to_edma_chan(chan);
->> +               unsigned ch_req = (unsigned)param;
->> +               if (ch_req == echan->ch_num) {
->> +                       /* The channel is going to be used as HW synchronized */
->> +                       echan->hw_triggered = true;
->> +                       match = true;
->> +               }
->> +       }
->> +       return match;
->> +}
->> +
->>  static int edma_init(void)
+On Wed, Nov 25, 2015 at 1:08 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 20/11/15 09:58, Yendapally Reddy Dhananjaya Reddy wrote:
+>> This enables the pinctrl support for Broadcom NSP SoC
 >>
-> 
-> I don't see the difference between edma_filter_fn and edma_filter_for_map.
-> Why do you need both?
+>> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yrdreddy@broadcom.com>
+>
+> Looks like a sane pinctrl node here, unless there are objections, I
+> would like to go ahead and apply this for v4.5, thanks!
 
-edma_filter_fn:
-	unsigned ch_req = *(unsigned *)param;
+I'm waiting for an indication from the other BCM pinctrl
+maintainers to tell whether this SoC is unique enough to deserve
+its own driver.
 
-edma_filter_for_map:
-	unsigned ch_req = (unsigned)param;
-
-
-If I want to reuse the edma_filter_fn, I would need an unsigned array for the
-eDMA event numbers in the board files to be able to provide the pointer to
-each of them.
-
--- 
-P?ter
+Yours,
+Linus Walleij
