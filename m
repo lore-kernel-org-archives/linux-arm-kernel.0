@@ -1,133 +1,88 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 1 Dec 2015 13:30:25 +0900
-Subject: [Question] DT-Bindings for run-time configurable bus?
-Message-ID: <CAK7LNATGi4isAaG0XS13ZnfFQKCxzaxeJvusSg3RYn7z29BF9A@mail.gmail.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Tue, 1 Dec 2015 10:15:26 +0530
+Subject: [PATCH v4 4/5] ARM: dts: DRA7: add entry for qspi mmap region
+In-Reply-To: <20151130223408.GJ23396@atomide.com>
+References: <1448860515-28336-1-git-send-email-vigneshr@ti.com>
+ <1448860515-28336-5-git-send-email-vigneshr@ti.com>
+ <20151130223408.GJ23396@atomide.com>
+Message-ID: <565D25E6.4070206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello experts,
-
-I am tackling on a new bus driver, but I am worndering
-what the DT-binding specification should be.
-
-Here is my hardware situation:
-
-My SoC has an external bus (it is called UniPhier System Bus).
-This is a simple parallel bus with address, data,
-chip-selects, and some other control signals.
-It supports up to 8 chip-selects.
-
-Each CS address space can be mapped onto the CPU view,
-and it must be configured run-time via the bus controller registers.
-
-Let's assume this situation:
-
- - An ethernet device is connected at the offset address 0x01f00000 of CS1
- - A UART device is connected at the offset address 0x00200000 of CS5
 
 
-A quick draft of device tree would be as follows:
+On 12/01/2015 04:04 AM, Tony Lindgren wrote:
+> * Vignesh R <vigneshr@ti.com> [151129 21:16]:
+>> Add qspi memory mapped region entries for DRA7xx based SoCs. Also,
+>> update the binding documents for the controller to document this change.
+>>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ...
+>> --- a/Documentation/devicetree/bindings/spi/ti_qspi.txt
+>> +++ b/Documentation/devicetree/bindings/spi/ti_qspi.txt
+>> @@ -26,3 +26,17 @@ qspi: qspi at 4b300000 {
+>>  	spi-max-frequency = <25000000>;
+>>  	ti,hwmods = "qspi";
+>>  };
+>> +
+>> +For dra7xx:
+>> +qspi: qspi at 4b300000 {
+>> +	compatible = "ti,dra7xxx-qspi";
+>> +	reg = <0x4b300000 0x100>,
+>> +	      <0x5c000000 0x4000000>,
+>> +	      <0x4a002558 0x4>;
+>> +	reg-names = "qspi_base", "qspi_mmap",
+>> +		    "qspi_ctrlmod";
+>> +	#address-cells = <1>;
+>> +	#size-cells = <0>;
+>> +	spi-max-frequency = <48000000>;
+>> +	ti,hwmods = "qspi";
+>> +};
+> 
+> Actually none of the IO areas above are within the same interconnect target:
+> 
+> 0x4b300000  QSPI0 address space in L3 main interconnect
+> 0x5c000000  QSPI1 address space in L3 main interconnect
 
 
-amba {
-     compatible = "simple-bus";
-     #address-cells = <1>;
-     #size-cells = <1>;
-     ranges;
+First address range (configuration port: 0x4b300000) corresponds to QSPI
+registers space. These registers alone are sufficient for generic SPI
+communication (serial flash as well as non-flash SPI devices).
 
-     extbus {
-           compatible = "socionext,uniphier-system-bus";
-           reg = <0x58c00000 0x400>; /* registers of bus controller */
-           #address-cells = <2>;
-           #size-cells = <1>;
+In order to speed up SPI flash reads SFI_MM_IF(SPI memory mapped
+interface) is provided by QSPI IP. This _cannot_ be used with non-flash
+devices.
+The second address range (0x5c000000) corresponds to memory-mapped
+region of SFI_MM_IF, through which SPI flash memories can be read as if
+though they were RAM addresses (i.e using readl/memcpy). The SFI_MM_IF
+block that takes care of communicating over SPI bus and getting the data
+from flash device.
+But SFI_MM_IF block needs to know some flash specific information(such
+as read opcode, address bytes, dummy bytes, mode). This information must
+first be populated in QSPI_SPI_SETUP*_REG(0x4B300054-60) before
+accessing SFI_MM_IF address range via readl.
+Both addresses space belong to same instance of the driver, one
+corresponds to register space and other is memory-mapped region.
+Therefore both regions are claimed by the same driver.
 
-           ethernet at 1,01f00000 {
-                 compatible = "smsc,lan9115";
-                 reg = <1 0x01f00000 0x1000>;
-                 interrupts = <0 48 4>
-                 phy-mode = "mii";
-           };
+> 0x4a002558  CTRL_CORE_CONTROL_IO_2 in System Control Module (SCM) in L4_CFG
+> 
+> The first two address spaces should be two separate instances of this driver.
 
-           uart at 5,00200000 {
-                 compatible = "ns16550a";
-                 reg = <5 0x00200000 0x20>;
-                 interrupts = <0 49 4>
-                 clock-frequency = <12288000>;
-           };
-     };
-};
+Not actually two instances.
 
+> The CTRL_CORE_CONTROL_IO_2 needs seems like a shared clock register that
+> needs to be accessed using the clock framework most likely.
+> 
 
-
-Please note "ranges" property is missing from the extbus node.
-
-As mentioned above, the address translation from the external bus
-to the parent bus is run-time configurable.
-
-
-It is possible to map
-  CS1 of extbus  to  0x40000000-0x41ffffff of CPU view
-  CS5 of extbus  to  0x42000000-0x43ffffff of CPU view
-
-It is also possible to map
-  CS1 of extbus  to  0x46000000-0x47ffffff of CPU view
-  CS5 of extbus  to  0x44000000-0x45ffffff of CPU view
-
-There is nothing preventing us from a particular
-address mapping.
-It is completely up to the software (driver)
-to choose one mapping from another.
-
-
-And I notice a conflict between the followings.
-
-[1] Device Tree is a hardware description language.
-It should not describe the software configuration.
-
-So, ranges such as
-   ranges = <1 0 0x40000000 0x02000000
-             5 0 0x42000000 0x02000000>;
-
-   or
-
-   ranges = <1 0 0x46000000 0x02000000
-             5 0 0x44000000 0x02000000>;
-
-are configuration information, which should not be
-included in the device tree.
-
-Any address mapping is OK as long as no region overlap occurs.
-No point to specify "ranges" from the device tree.
-
-
-[2] of_translate_address() expects "ranges" in every bus node
-
-When we need to translate the "reg" property into the CPU-viewed address,
-we call of_translate_address().  It translates addresses,
-parsing "ranges" property when crossing buses.
-It potentially means, "ranges" properties are statically defined
-in the device tree.
-
-
-I have not been able to find a good way
-to solve the conflict between [1] and [2].
-
-
-To sum up, what I want is:
-
- - Let the driver to configure the address translation on run-time
- - Once the bus is configured, I want the sub nodes to be accessed
-   from the CPU, like the other statically instantiated devices.
-
-
-Any comment is welcome!
-
-
-BTW, perhaps Marvell Mbus has a similar situation (run-time configurable)?
-(Documentation/devicetree/bindings/bus/mvebu-mbus.txt)
-I am not familiar with such SoCs, though.
-
+Not shared clock.
+The CTRL_CORE_CONTROL_IO_2[10:8] QSPI_MEMMAPPED_CS bit fields provides a
+functionality for remapping the previously described address space which
+starts at 0x5C000000 L3_MAIN address to one of the four supported chip
+selects.
+How about using syscon to access CTRL_CORE_CONTROL_IO_2?
 
 -- 
-Best Regards
-Masahiro Yamada
+Regards
+Vignesh
