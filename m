@@ -1,47 +1,68 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 01 Dec 2015 13:53:08 +0100
-Subject: [PATCH 6/7] ARM: mvebu: remove unused mach/gpio.h
-In-Reply-To: <1448924458-3279040-7-git-send-email-arnd@arndb.de> (Arnd
- Bergmann's message of "Tue, 1 Dec 2015 00:00:57 +0100")
-References: <1448924458-3279040-1-git-send-email-arnd@arndb.de>
- <1448924458-3279040-7-git-send-email-arnd@arndb.de>
-Message-ID: <878u5e49fv.fsf@free-electrons.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Tue, 1 Dec 2015 20:46:29 +0800
+Subject: [PATCH v4 05/21] KVM: ARM64: Add reset and access handlers for
+ PMSELR register
+In-Reply-To: <565D5F2F.1020709@arm.com>
+References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>	<1446186123-11548-6-git-send-email-zhaoshenglong@huawei.com>
+ <20151130175600.0ce835cd@arm.com> <565CFD2F.8010902@huawei.com>
+ <565D5F2F.1020709@arm.com>
+Message-ID: <565D96A5.3000401@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
- 
- On mar., d?c. 01 2015, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> This file was left over from a cleanup of asm/gpio.h and has
-> not been used in a while. Let's just remove it now, so the
-> arch/arm/mach-mvebu/include/ directory can also disappear.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Applied on mvebu/cleanup
-
-Thanks,
-
-Gregory
-> ---
->  arch/arm/mach-mvebu/include/mach/gpio.h | 1 -
->  1 file changed, 1 deletion(-)
->  delete mode 100644 arch/arm/mach-mvebu/include/mach/gpio.h
->
-> diff --git a/arch/arm/mach-mvebu/include/mach/gpio.h b/arch/arm/mach-mvebu/include/mach/gpio.h
-> deleted file mode 100644
-> index 40a8c178f10d..000000000000
-> --- a/arch/arm/mach-mvebu/include/mach/gpio.h
-> +++ /dev/null
-> @@ -1 +0,0 @@
-> -/* empty */
-> -- 
-> 2.1.0.rc2
->
+On 2015/12/1 16:49, Marc Zyngier wrote:
+> On 01/12/15 01:51, Shannon Zhao wrote:
+>> Hi Marc,
+>>
+>> On 2015/12/1 1:56, Marc Zyngier wrote:
+>>> Same remark here as the one I made earlier. I'm pretty sure we don't
+>>> call any CP15 reset because they are all shared with their 64bit
+>>> counterparts. The same thing goes for the whole series.
+>> Ok, I see. But within the 64bit reset function, it needs to update the
+>> 32bit register value, right? Since when accessing these 32bit registers,
+>> it uses the offset c9_PMXXXX.
+> 
+> It shouldn't,  because the 64bit and 32bit share the same storage. From
+> your own patch:
+> 
+> +/* Performance Monitors*/
+> +#define c9_PMCR		(PMCR_EL0 * 2)
+> +#define c9_PMOVSSET	(PMOVSSET_EL0 * 2)
+> +#define c9_PMOVSCLR	(PMOVSCLR_EL0 * 2)
+> +#define c9_PMCCNTR	(PMCCNTR_EL0 * 2)
+> +#define c9_PMSELR	(PMSELR_EL0 * 2)
+> +#define c9_PMCEID0	(PMCEID0_EL0 * 2)
+> +#define c9_PMCEID1	(PMCEID1_EL0 * 2)
+> +#define c9_PMXEVCNTR	(PMXEVCNTR_EL0 * 2)
+> +#define c9_PMXEVTYPER	(PMXEVTYPER_EL0 * 2)
+> +#define c9_PMCNTENSET	(PMCNTENSET_EL0 * 2)
+> +#define c9_PMCNTENCLR	(PMCNTENCLR_EL0 * 2)
+> +#define c9_PMINTENSET	(PMINTENSET_EL1 * 2)
+> +#define c9_PMINTENCLR	(PMINTENCLR_EL1 * 2)
+> +#define c9_PMUSERENR	(PMUSERENR_EL0 * 2)
+> +#define c9_PMSWINC	(PMSWINC_EL0 * 2)
+> 
+> These are indexes in the copro array:
+> 
+> struct kvm_cpu_context {
+> 	struct kvm_regs	gp_regs;
+> 	union {
+> 		u64 sys_regs[NR_SYS_REGS];
+> 		u32 copro[NR_COPRO_REGS];
+> 	};
+> };
+> 
+> which is in a union with the sys_reg array. So anything that affects one
+> affects the other because:
+> - there is only one state in the physical CPU, no matter which mode
+> you're in,
+> - the guest EL1 is either 32bit or 64bit, and never changes over time.
+> 
+> Hope this helps,
+> 
+Ok, I see. Thanks for the explanation. :)
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Shannon
