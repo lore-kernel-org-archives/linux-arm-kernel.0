@@ -1,32 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 01 Dec 2015 14:21:45 +0100
-Subject: [PATCH,
- RESEND] regulator: core: fix regulator_lock_supply regression
-In-Reply-To: <20151201131639.GH1929@sirena.org.uk>
-References: <3504080.aWaTxHbgxH@wuerfel> <20151201131639.GH1929@sirena.org.uk>
-Message-ID: <1708414.D0FXtrOgf1@wuerfel>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 01 Dec 2015 14:34:23 +0100
+Subject: [PATCH v3 0/3] Exynos4210: fix power domain for MDMA1 device
+Message-ID: <1448976866-7892-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 December 2015 13:16:39 Mark Brown wrote:
-> On Fri, Nov 27, 2015 at 02:46:41PM +0100, Arnd Bergmann wrote:
-> > As noticed by Geert Uytterhoeven, my patch to avoid a harmless build warning
-> > in regulator_lock_supply() was total crap and introduced a real bug:
-> 
-> I'm going to drop both this and the commit it's fixing for now as this
-> is causing boot failures on several boards (none of which I have sadly)
-> in -next:
-> 
->   http://kernelci.org/boot/all/job/broonie-regulator/kernel/v4.4-rc3-17-ga6498dba8869/
-> 
-> which were bisected by Tyler to this:
-> 
->   http://hastebin.com/noluripepa.sm
-> 
-> I'm not seeing anything obvious in the code at the minute having looked
-> for several seconds, I'll have a proper look later today all being well.
-> 
+This patchset fixes mysterious boot hang on Exynos 4210 SoCs, when IOMMU
+is enabled. There is no direct dependency between IOMMU devices and
+MDMA1. However enabling IOMMU changes the device probe order, what
+results in LCD0 power domain being turned off for some time. During that
+time the registration of MDMA1 device happens, what results in system
+hangs, because the common bus code tries to read PID/CID registers from
+turned-off device.
 
-Ok, sorry about the double screwup and thanks for looking into it.
+Changes since v2 include some code refactoring done to fix issues
+pointed by Ulf Hansson.
 
-	Arnd
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
+
+Changelog:
+v3:
+- fixed issues pointed by Ulf Hansson
+- dropped patch for exynos4210 dts, because it already got queued for merging
+
+v2: https://lkml.org/lkml/2015/11/26/229
+- added 2 patches from 'On-demand device probing' thread
+  (https://lkml.org/lkml/2015/9/29/189), which move PID/CIR reading
+  from amba_device_add() to amba_match()
+- moved dev_pm_domain_attach() to amba_match(), which is allowed to
+  return -EPROBE_DEFER
+
+v1: http://www.spinics.net/lists/arm-kernel/msg463185.html
+- initial version
+
+
+Patch summary:
+
+Marek Szyprowski (1):
+  ARM: amba: Properly handle devices with power domains
+
+Tomeu Vizoso (2):
+  driver core: handle -EPROBE_DEFER from bus_type.match()
+  ARM: amba: Move reading of periphid to amba_match()
+
+ Documentation/driver-model/porting.txt |  6 ++-
+ drivers/amba/bus.c                     | 83 +++++++++++++++++++---------------
+ drivers/base/dd.c                      | 24 +++++++++-
+ include/linux/device.h                 |  2 +-
+ 4 files changed, 74 insertions(+), 41 deletions(-)
+
+-- 
+1.9.2
