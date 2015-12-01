@@ -1,85 +1,127 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 30 Nov 2015 17:59:26 -0800
-Subject: [PATCH] ARM: dts: vf610: use reset values for L2 cache latencies
-Message-ID: <1448935166-2697-1-git-send-email-stefan@agner.ch>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 30 Nov 2015 22:20:32 -0500 (EST)
+Subject: [PATCH] ARM: mm: flip priority of CONFIG_DEBUG_RODATA
+In-Reply-To: <565CF5E3.7000109@redhat.com>
+References: <20151130233819.GA18873@www.outflux.net>
+ <565CF1E5.2070003@redhat.com>
+ <CAGXu5jJUv3EKkFA3J43nVO+v=-K5kgwSqwrVA9hxJGeZ79CkAg@mail.gmail.com>
+ <565CF5E3.7000109@redhat.com>
+Message-ID: <alpine.LFD.2.20.1511302219260.22569@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linux on Vybrid used several different L2 latencies so far, none
-of them seem to be the right ones. According to the application note
-AN4947 ("Understanding Vybrid Architecture"), the tag portion runs
-on CPU clock and is inside the L2 cache controller, whereas the data
-portion is stored in the external SRAM running on platform clock.
-Hence it is likely that the correct value requires a higher data
-latency then tag latency.
+On Mon, 30 Nov 2015, Laura Abbott wrote:
 
-These are the values which have been used so far:
-- The mainline values:
-  arm,data-latency = <1 1 1>;
-  arm,tag-latency = <2 2 2>;
-  Those values have lead to problems on higher clocks. They look
-  like a poor translation from the reset values (missing +1 offset
-  and a mix up between tag/latency values).
-- The Linux 3.0 (SoC vendor BSP) values (converted to DT notation):
-  arm,data-latency = <4 2 3>
-  arm,tag-latency = <4 2 3>
-  The cache initialization function along with the value matches the
-  i.MX6 code from the same kernel, so it seems that those values have
-  just been copied.
-- The Colibri values:
-  arm,data-latency = <2 1 2>;
-  arm,tag-latency = <3 2 3>;
-  Those were a mix between the values of the Linux 3.0 based BSP and
-  the mainline values above.
-- The SoC Reset values (converted to DT notation):
-  arm,data-latency = <3 3 3>;
-  arm,tag-latency = <2 2 2>;
+> On 11/30/2015 05:08 PM, Kees Cook wrote:
+> > On Mon, Nov 30, 2015 at 5:03 PM, Laura Abbott <labbott@redhat.com> wrote:
+> > > On 11/30/2015 03:38 PM, Kees Cook wrote:
+> > > >
+> > > > Given the choice between making things NX or making things RO, we want
+> > > > RO first. As such, redefine CONFIG_DEBUG_RODATA to actually do the bulk
+> > >
+> > >
+> > > Can you give a citation for why? The thread that inspired it might be
+> > > a good link.
+> >
+> > This was inspired by my examining the existing architecture's
+> > implementations of CONFIG_DEBUG_RODATA after Ingo suggested it be made
+> > a common feature not a build-time config (or at least renamed):
+> > http://www.openwall.com/lists/kernel-hardening/2015/11/30/13
+> >
+> 
+> Thanks. I read the thread and I think it would be good to put a link
+> in the commit message to make it clearer why this is going in.
 
-So far there is no official statement on what the correct values are.
-See also the related Freescale community thread:
-https://community.freescale.com/message/579785#579785
+A link is good, but a summary is even better. You may add both for best 
+results.
 
-For now, the reset values seem to be the best bet. Remove all other
-"bogus" values and use the reset value on vf610.dtsi level.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-Hi Shawn,
-
-Any chance to get this into 4.4?
-
---
-Stefan
-
- arch/arm/boot/dts/vf610-colibri.dtsi | 5 -----
- arch/arm/boot/dts/vf610.dtsi         | 2 +-
- 2 files changed, 1 insertion(+), 6 deletions(-)
-
-diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
-index 19fe045..2d7eab7 100644
---- a/arch/arm/boot/dts/vf610-colibri.dtsi
-+++ b/arch/arm/boot/dts/vf610-colibri.dtsi
-@@ -18,8 +18,3 @@
- 		reg = <0x80000000 0x10000000>;
- 	};
- };
--
--&L2 {
--	arm,data-latency = <2 1 2>;
--	arm,tag-latency = <3 2 3>;
--};
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index 5f8eb1b..58bc6e4 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -19,7 +19,7 @@
- 		reg = <0x40006000 0x1000>;
- 		cache-unified;
- 		cache-level = <2>;
--		arm,data-latency = <1 1 1>;
-+		arm,data-latency = <3 3 3>;
- 		arm,tag-latency = <2 2 2>;
- 	};
- };
--- 
-2.6.2
+> 
+> > > > index 41218867a9a6..b617084e9520 100644
+> > > > --- a/arch/arm/mm/Kconfig
+> > > > +++ b/arch/arm/mm/Kconfig
+> > > > @@ -1039,24 +1039,26 @@ config ARCH_SUPPORTS_BIG_ENDIAN
+> > > >            This option specifies the architecture can support big endian
+> > > >            operation.
+> > > >
+> > > > -config ARM_KERNMEM_PERMS
+> > > > -       bool "Restrict kernel memory permissions"
+> > > > +config DEBUG_RODATA
+> > > > +       bool "Make kernel text and rodata read-only"
+> > > >          depends on MMU
+> > > > +       default y if CPU_V7
+> > > >          help
+> > > > -         If this is set, kernel memory other than kernel text (and
+> > > > rodata)
+> > > > -         will be made non-executable. The tradeoff is that each region
+> > > > is
+> > > > -         padded to section-size (1MiB) boundaries (because their
+> > > > permissions
+> > > > -         are different and splitting the 1M pages into 4K ones causes
+> > > > TLB
+> > > > -         performance problems), wasting memory.
+> > > > +         If this is set, kernel memory (text, rodata, etc) will be made
+> > > > +         read-only, and non-text kernel memory will be made
+> > > > non-executable.
+> > > > +         The tradeoff is that each region is padded to section-size
+> > > > (1MiB)
+> > > > +         boundaries (because their permissions are different and
+> > > > splitting
+> > > > +         the 1M pages into 4K ones causes TLB performance problems),
+> > > > which
+> > > > +         can waste memory.
+> > > >
+> > > > -config DEBUG_RODATA
+> > > > -       bool "Make kernel text and rodata read-only"
+> > > > -       depends on ARM_KERNMEM_PERMS
+> > > > +config DEBUG_ALIGN_RODATA
+> > > > +       bool "Make rodata strictly non-executable"
+> > > > +       depends on DEBUG_RODATA
+> > > >          default y
+> > > >          help
+> > > > -         If this is set, kernel text and rodata will be made read-only.
+> > > > This
+> > > > -         is to help catch accidental or malicious attempts to change
+> > > > the
+> > > > -         kernel's executable code. Additionally splits rodata from
+> > > > kernel
+> > > > -         text so it can be made explicitly non-executable. This creates
+> > > > -         another section-size padded region, so it can waste more
+> > > > memory
+> > > > -         space while gaining the read-only protections.
+> > > > +         If this is set, rodata will be made explicitly non-executable.
+> > > > This
+> > > > +         provides protection on the rare chance that attackers might
+> > > > find
+> > > > and
+> > > > +         use ROP gadgets that exist in the rodata section. This adds an
+> > > > +         additional section-aligned split of rodata from kernel text so
+> > > > it
+> > > > +         can be made explicitly non-executable. This padding may waste
+> > > > memory
+> > > > +         space to gain this additional protection.
+> > >
+> > >
+> > > I get that you want to make this match arm64 but it's really not intuitive
+> > > that
+> > > something with ALIGN_RODATA in the name is actually for setting NX. The
+> > > purpose
+> > > of ALIGN_RODATA was also slightly different on arm64 since the RO/NX will
+> > > still
+> > > be there, the difference is if the sections are present versus broken down
+> > > into
+> > > pages.
+> >
+> > Well, it seems to have the same effect: without the alignment, a
+> > portion of rodata may remain executable on arm64. Unless I
+> > misunderstand?
+> >
+> 
+> No, on arm64 everything should always be NX, the difference is part of the NX
+> sections may be mapped as pages instead of sections so you take the TLB hit.
+> It's a trade off of memory vs TLB pressure instead of just security vs TLB.
+> 
+> Thanks,
+> Laura
+> 
+> 
