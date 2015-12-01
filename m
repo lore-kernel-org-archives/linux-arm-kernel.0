@@ -1,38 +1,50 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 1 Dec 2015 18:10:17 +0000
-Subject: [PATCH v2 2/6] arm64: Move kill_cpu_early to smp.c
-In-Reply-To: <20151201175254.GD29045@leverpostej>
-References: <1448982731-17182-1-git-send-email-suzuki.poulose@arm.com>
- <1448982731-17182-3-git-send-email-suzuki.poulose@arm.com>
- <20151201152826.GA28370@leverpostej> <565DC5DB.7070905@arm.com>
- <20151201163138.GA29045@leverpostej> <565DDB2E.2010308@arm.com>
- <20151201175254.GD29045@leverpostej>
-Message-ID: <565DE289.2000105@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Dec 2015 18:16:43 +0000
+Subject: [PATCH v2 1/2] scripts: Add a recorduidiv program
+In-Reply-To: <20151201122212.474afce5@gandalf.local.home>
+References: <1448488264-23400-2-git-send-email-sboyd@codeaurora.org>
+ <20151125234711.GT8644@n2100.arm.linux.org.uk>
+ <565C6714.802@suse.com>
+ <20151130153208.GR8644@n2100.arm.linux.org.uk>
+ <565C6DE9.2020302@suse.com> <565DC5A9.2010305@suse.cz>
+ <20151201161944.GX8644@n2100.arm.linux.org.uk>
+ <20151201114929.655433a2@gandalf.local.home>
+ <20151201171014.GY8644@n2100.arm.linux.org.uk>
+ <20151201122212.474afce5@gandalf.local.home>
+Message-ID: <20151201181643.GZ8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/15 17:52, Mark Rutland wrote:
-> On Tue, Dec 01, 2015 at 05:38:54PM +0000, Suzuki K. Poulose wrote:
->> On 01/12/15 16:31, Mark Rutland wrote:
->
-> [...]
->
->>> We need stuck-in-the-kernel flag to account for CPUs which didn't manage
->>> to turn the MMU on (which are either in the spin-table, or failed when
->>> they were individually onlined).
->>
->> Did you mean to say "turn the MMU off" ?
->
-> No, I mean CPUs which were unable to turn the MMU on in the first place.
-> Perhaps they entered the spin-table but were never individually onlined,
-> perhaps they didn't support the kernel page size, etc.
->
-> When CPUs exit the kernel via PSCI they never switch the MMU off within
-> the kernel.
+On Tue, Dec 01, 2015 at 12:22:12PM -0500, Steven Rostedt wrote:
+> On Tue, 1 Dec 2015 17:10:14 +0000
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> 
+> > Another suggestion - maybe recordmcount, which fstat()s the file,
+> > should check the st_nlink before modifying the file, and error out
+> > with a helpful error message telling people not to use hardlinks,
+> > which would stop nasty surprises (and make it a rule that this should
+> > be implemented as a general principle for good build behaviour) - iow,
+> 
+> Actually I like this solution the best.
+> 
+> > something like this (untested):
+> 
+> Can you test it to see if it gives you the error, otherwise I need to
+> set up a CCACHE_HARDLINK environment :-)
 
-OK. So the flag will also be used for CPUs which are stuck-in-the-kernel
-with MMU turned on. e.g, a CPU (using spin-table) we try to bring down
-in kill_cpu_early(). Correct ?
+It does indeed:
 
-Thanks
-Suzuki
+  CC      init/do_mounts_initrd.o
+file is hard linked: init/do_mounts_initrd.o
+/home/rmk/git/linux-rmk/scripts/Makefile.build:258: recipe for target 'init/do_mounts_initrd.o' failed
+make[2]: *** [init/do_mounts_initrd.o] Error 1
+
+> I guess another solution is to do a copy instead of modifying in place
+> if it detects the multiple hard link?
+
+That would be the "transparent" solution.  If you think it's worth
+persuing, I'll have a go at fixing recordmcount to do that.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
