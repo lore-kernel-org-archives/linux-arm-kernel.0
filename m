@@ -1,33 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 01 Dec 2015 23:46:03 +0100
-Subject: [PATCH] ARM: ixp4xx: fix read{b,w,l} return types
-In-Reply-To: <m3h9kaz2ej.fsf@t19.piap.pl>
-References: <4577677.sEiIMqkHSM@wuerfel> <m3h9kaz2ej.fsf@t19.piap.pl>
-Message-ID: <4900418.HEVAcnQtkC@wuerfel>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Tue, 1 Dec 2015 14:47:50 -0800
+Subject: [PATCH] ARM: defconfig: multi_v7: Enable Qualcomm options for Honami
+In-Reply-To: <1448518557-14250-1-git-send-email-agross@codeaurora.org>
+Message-ID: <1449010070-9796-1-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 November 2015 13:31:16 Krzysztof Ha?asa wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
-> 
-> > On ixp4xx, the readl() function returns an 'unsigned long' output
-> > when indirect I/O is used. This is unlike any other platform, and
-> > it causes lots of harmless compiler warnings, such as:
-> >
-> > drivers/ata/libahci.c: In function 'ahci_show_host_version':
-> > drivers/ata/libahci.c:254:22: warning: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'long unsigned int' [-Wformat=]
-> > drivers/block/mtip32xx/mtip32xx.c: In function 'mtip_hw_read_registers':
-> > drivers/block/mtip32xx/mtip32xx.c:2602:31: warning: format '%X' expects argument of type 'unsigned int', but argument 3 has type 'long unsigned int' [-Wformat=]
-> > drivers/block/cciss.c: In function 'print_cfg_table':
-> > drivers/block/cciss.c:3845:25: warning: format '%d' expects argument of type 'int', but argument 4 has type 'long unsigned int' [-Wformat=]
-> >
-> > This changes all six of the ixp4xx specific I/O read functions
-> > to return the same types that we have in the normal asm/io.h,
-> > to avoid the warnings.
-> 
-> Thanks for fixing this.
-> 
-> Acked-by: Krzysztof Halasa <khalasa@piap.pl>
-> 
+The Honami device does not boot due to the lack of pinctrl support
+compiled in with the multi_v7_defconfig. This patch correct this and
+enables coincell, sdhci, smsm, smp2p and wcnss_ctrl as well, all found
+on a variety of Qualcomm boards.
 
-Applied to fixes for 4.4 now with your ack.
+Reported-by: Kevin Hilman <khilman@kernel.org>
+Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+---
+
+For next/deconfig.
+
+As Kevin reported the Honami stops booting with the addition of pinctrl
+reference in the serial node, simply due to the fact that it references a
+pinctrl driver that's not enabled in the defconfig.
+
+The patch sent by Andy is hence not enough to fix the problem.
+
+
+PS. It would be mighty convenient if savedefconfig could be used on the
+multi_v7_defconfig.
+
+ arch/arm/configs/multi_v7_defconfig | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index fa7ba92cfe70..dc30a48374b2 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -186,6 +186,7 @@ CONFIG_AD525X_DPOT_I2C=y
+ CONFIG_ATMEL_TCLIB=y
+ CONFIG_ICS932S401=y
+ CONFIG_ATMEL_SSC=m
++CONFIG_QCOM_COINCELL=m
+ CONFIG_APDS9802ALS=y
+ CONFIG_ISL29003=y
+ CONFIG_EEPROM_AT24=y
+@@ -347,6 +348,11 @@ CONFIG_PINCTRL_AS3722=y
+ CONFIG_PINCTRL_PALMAS=y
+ CONFIG_PINCTRL_APQ8064=y
+ CONFIG_PINCTRL_APQ8084=y
++CONFIG_PINCTRL_IPQ8064=y
++CONFIG_PINCTRL_MSM8660=y
++CONFIG_PINCTRL_MSM8960=y
++CONFIG_PINCTRL_MSM8X74=y
++CONFIG_PINCTRL_MSM8916=y
+ CONFIG_PINCTRL_QCOM_SPMI_PMIC=y
+ CONFIG_PINCTRL_QCOM_SSBI_PMIC=y
+ CONFIG_GPIO_SYSFS=y
+@@ -580,6 +586,7 @@ CONFIG_MMC_SDHCI_ST=y
+ CONFIG_MMC_OMAP=y
+ CONFIG_MMC_OMAP_HS=y
+ CONFIG_MMC_ATMELMCI=y
++CONFIG_MMC_SDHCI_MSM=y
+ CONFIG_MMC_MVSDIO=y
+ CONFIG_MMC_SDHI=y
+ CONFIG_MMC_DW=y
+@@ -668,9 +675,12 @@ CONFIG_NVEC_POWER=y
+ CONFIG_NVEC_PAZ00=y
+ CONFIG_QCOM_GSBI=y
+ CONFIG_QCOM_PM=y
++CONFIG_QCOM_SMEM=y
+ CONFIG_QCOM_SMD=y
+ CONFIG_QCOM_SMD_RPM=y
+-CONFIG_QCOM_SMEM=y
++CONFIG_QCOM_SMP2P=y
++CONFIG_QCOM_SMSM=y
++CONFIG_QCOM_WCNSS_CTRL=m
+ CONFIG_COMMON_CLK_QCOM=y
+ CONFIG_CHROME_PLATFORMS=y
+ CONFIG_CROS_EC_CHARDEV=m
+-- 
+2.4.2
