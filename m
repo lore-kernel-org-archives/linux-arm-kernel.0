@@ -1,199 +1,89 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 01 Dec 2015 15:01:16 +0000
-Subject: [PATCH v2 08/21] arm64: KVM: Implement debug save/restore
-In-Reply-To: <20151201144737.GQ11704@cbox>
-References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
- <1448650215-15218-9-git-send-email-marc.zyngier@arm.com>
- <20151201125639.GP11704@cbox> <565D9B57.2080005@arm.com>
- <20151201144737.GQ11704@cbox>
-Message-ID: <565DB63C.6090508@arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 1 Dec 2015 17:08:39 +0200
+Subject: [RFC PATCH] clocksource: ti-32k: convert to platform device
+In-Reply-To: <20151130162815.GA2517@atomide.com>
+References: <1448040129-23869-1-git-send-email-grygorii.strashko@ti.com>
+ <87h9kgcz1k.fsf@saruman.tx.rr.com> <5658B8B2.5030505@ti.com>
+ <20151130162815.GA2517@atomide.com>
+Message-ID: <565DB7F7.4020702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/15 14:47, Christoffer Dall wrote:
-> On Tue, Dec 01, 2015 at 01:06:31PM +0000, Marc Zyngier wrote:
->> On 01/12/15 12:56, Christoffer Dall wrote:
->>> On Fri, Nov 27, 2015 at 06:50:02PM +0000, Marc Zyngier wrote:
->>>> Implement the debug save restore as a direct translation of
->>>> the assembly code version.
+Hi Tony,
+
+On 11/30/2015 06:28 PM, Tony Lindgren wrote:
+> * Grygorii Strashko <grygorii.strashko@ti.com> [151127 12:11]:
+>> On 11/20/2015 08:21 PM, Felipe Balbi wrote:
+>>> Grygorii Strashko <grygorii.strashko@ti.com> writes:
+>>>> Since system clocksource is finally selected by Clocksource core at
+>>>> fs_initcall stage during boot there are no reasons to initialize
+>>>> ti_32k_timer at early boot stages. Hence, ti_32k_timer can be
+>>>> converted to use platform device/driver model and its PM can be
+>>>> implemented using PM runtime which is common for OMAP devices.
 >>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> Platform specific initialization code has to be disabled once as
+>>>> ti_32k_timer is converted to platform device - otherwise OMAP platform
+>>>> code will generate boot warnings.
+>>>>
+>>>> After this change, all counter_32k's platform code can be removed
+>>>> once all OMAP boards will be converted to DT.
+>>>>
+>>>> Cc: Tony Lindgren <tony@atomide.com>
+>>>> Cc: Felipe Balbi <balbi@ti.com>
+>>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 >>>> ---
->>>>  arch/arm64/kvm/hyp/Makefile   |   1 +
->>>>  arch/arm64/kvm/hyp/debug-sr.c | 130 ++++++++++++++++++++++++++++++++++++++++++
->>>>  arch/arm64/kvm/hyp/hyp.h      |   9 +++
->>>>  3 files changed, 140 insertions(+)
->>>>  create mode 100644 arch/arm64/kvm/hyp/debug-sr.c
->>>>
->>>> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
->>>> index ec94200..ec14cac 100644
->>>> --- a/arch/arm64/kvm/hyp/Makefile
->>>> +++ b/arch/arm64/kvm/hyp/Makefile
->>>> @@ -6,3 +6,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
->>>>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
->>>>  obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
->>>>  obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
->>>> +obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
->>>> diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
->>>> new file mode 100644
->>>> index 0000000..a0b2b99
->>>> --- /dev/null
->>>> +++ b/arch/arm64/kvm/hyp/debug-sr.c
->>>> @@ -0,0 +1,130 @@
->>>> +/*
->>>> + * Copyright (C) 2015 - ARM Ltd
->>>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
->>>> + *
->>>> + * This program is free software; you can redistribute it and/or modify
->>>> + * it under the terms of the GNU General Public License version 2 as
->>>> + * published by the Free Software Foundation.
->>>> + *
->>>> + * This program is distributed in the hope that it will be useful,
->>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>>> + * GNU General Public License for more details.
->>>> + *
->>>> + * You should have received a copy of the GNU General Public License
->>>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>>> + */
+>>
+>> [...]
+>>
 >>>> +
->>>> +#include <linux/compiler.h>
->>>> +#include <linux/kvm_host.h>
->>>> +
->>>> +#include <asm/kvm_mmu.h>
->>>> +
->>>> +#include "hyp.h"
->>>> +
->>>> +#define read_debug(r,n)		read_sysreg(r##n##_el1)
->>>> +#define write_debug(v,r,n)	write_sysreg(v, r##n##_el1)
->>>> +
->>>> +#define save_debug(ptr,reg,nr)						\
->>>> +	switch (nr) {							\
->>>> +	case 15:	ptr[15] = read_debug(reg, 15);			\
->>>> +	case 14:	ptr[14] = read_debug(reg, 14);			\
->>>> +	case 13:	ptr[13] = read_debug(reg, 13);			\
->>>> +	case 12:	ptr[12] = read_debug(reg, 12);			\
->>>> +	case 11:	ptr[11] = read_debug(reg, 11);			\
->>>> +	case 10:	ptr[10] = read_debug(reg, 10);			\
->>>> +	case 9:		ptr[9] = read_debug(reg, 9);			\
->>>> +	case 8:		ptr[8] = read_debug(reg, 8);			\
->>>> +	case 7:		ptr[7] = read_debug(reg, 7);			\
->>>> +	case 6:		ptr[6] = read_debug(reg, 6);			\
->>>> +	case 5:		ptr[5] = read_debug(reg, 5);			\
->>>> +	case 4:		ptr[4] = read_debug(reg, 4);			\
->>>> +	case 3:		ptr[3] = read_debug(reg, 3);			\
->>>> +	case 2:		ptr[2] = read_debug(reg, 2);			\
->>>> +	case 1:		ptr[1] = read_debug(reg, 1);			\
->>>> +	default:	ptr[0] = read_debug(reg, 0);			\
+>>>> +static struct platform_driver ti_32k_driver __initdata = {
+>>>> +	.probe		= ti_32k_probe,
+>>>> +	.driver		= {
+>>>> +		.name	= "ti_32k_timer",
+>>>> +		.of_match_table = of_match_ptr(ti_32k_of_table),
 >>>> +	}
+>>>> +};
 >>>> +
->>>> +#define restore_debug(ptr,reg,nr)					\
->>>> +	switch (nr) {							\
->>>> +	case 15:	write_debug(ptr[15], reg, 15);			\
->>>> +	case 14:	write_debug(ptr[14], reg, 14);			\
->>>> +	case 13:	write_debug(ptr[13], reg, 13);			\
->>>> +	case 12:	write_debug(ptr[12], reg, 12);			\
->>>> +	case 11:	write_debug(ptr[11], reg, 11);			\
->>>> +	case 10:	write_debug(ptr[10], reg, 10);			\
->>>> +	case 9:		write_debug(ptr[9], reg, 9);			\
->>>> +	case 8:		write_debug(ptr[8], reg, 8);			\
->>>> +	case 7:		write_debug(ptr[7], reg, 7);			\
->>>> +	case 6:		write_debug(ptr[6], reg, 6);			\
->>>> +	case 5:		write_debug(ptr[5], reg, 5);			\
->>>> +	case 4:		write_debug(ptr[4], reg, 4);			\
->>>> +	case 3:		write_debug(ptr[3], reg, 3);			\
->>>> +	case 2:		write_debug(ptr[2], reg, 2);			\
->>>> +	case 1:		write_debug(ptr[1], reg, 1);			\
->>>> +	default:	write_debug(ptr[0], reg, 0);			\
->>>> +	}
->>>> +
->>>> +void __hyp_text __debug_save_state(struct kvm_vcpu *vcpu,
->>>> +				   struct kvm_guest_debug_arch *dbg,
->>>> +				   struct kvm_cpu_context *ctxt)
+>>>> +static int __init ti_32k_init(void)
 >>>> +{
->>>> +	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY) {
->>>> +		u64 aa64dfr0 = read_sysreg(id_aa64dfr0_el1);
->>>> +		int brps, wrps;
+>>>> +	return platform_driver_register(&ti_32k_driver);
+>>>>    }
+>>>> -CLOCKSOURCE_OF_DECLARE(ti_32k_timer, "ti,omap-counter32k",
+>>>> -		ti_32k_timer_init);
 >>>> +
->>>> +		brps = (aa64dfr0 >> 12) & 0xf;
->>>> +		wrps = (aa64dfr0 >> 20) & 0xf;
+>>>> +subsys_initcall(ti_32k_init);
 >>>> +
->>>> +		save_debug(dbg->dbg_bcr, dbgbcr, brps);
->>>> +		save_debug(dbg->dbg_bvr, dbgbvr, brps);
->>>> +		save_debug(dbg->dbg_wcr, dbgwcr, wrps);
->>>> +		save_debug(dbg->dbg_wvr, dbgwvr, wrps);
->>>> +
->>>> +		ctxt->sys_regs[MDCCINT_EL1] = read_sysreg(mdccint_el1);
->>>> +	}
->>>> +}
->>>> +
->>>> +void __hyp_text __debug_restore_state(struct kvm_vcpu *vcpu,
->>>> +				      struct kvm_guest_debug_arch *dbg,
->>>> +				      struct kvm_cpu_context *ctxt)
->>>> +{
->>>> +	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY) {
->>>> +		u64 aa64dfr0 = read_sysreg(id_aa64dfr0_el1);
->>>> +		int brps, wrps;
->>>> +
->>>> +		brps = (aa64dfr0 >> 12) & 0xf;
->>>> +		wrps = (aa64dfr0 >> 20) & 0xf;
->>>> +
->>>> +		restore_debug(dbg->dbg_bcr, dbgbcr, brps);
->>>> +		restore_debug(dbg->dbg_bvr, dbgbvr, brps);
->>>> +		restore_debug(dbg->dbg_wcr, dbgwcr, wrps);
->>>> +		restore_debug(dbg->dbg_wvr, dbgwvr, wrps);
->>>> +
->>>> +		write_sysreg(ctxt->sys_regs[MDCCINT_EL1], mdccint_el1);
->>>> +	}
->>>> +}
->>>> +
->>>> +void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
->>>> +{
->>>> +	if ((vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_KDE) ||
->>>> +	    (vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_KDE))
->>>> +		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
->>>> +
->>>> +	__debug_save_state(vcpu, &vcpu->arch.host_debug_state,
->>>> +			   kern_hyp_va(vcpu->arch.host_cpu_context));
+>>>> +MODULE_AUTHOR("Paul Mundt");
+>>>> +MODULE_AUTHOR("Juha Yrj?l?");
+>>>> +MODULE_DESCRIPTION("OMAP2 32k Timer");
+>>>> +MODULE_ALIAS("platform:ti_32k_timer");
+>>>> +MODULE_LICENSE("GPL v2");
 >>>
->>> doesn't the assmebly code jump across saving this state neither bits are
->>> set where this always saves the state?
+>>> this will break clksource_of_init(), right ? Eventually, we want that to
+>>> be the only thing called by our .init_time method. I'll leave it to Tony
+>>> to decide, but IMO this is not a good path forward for timers.
+>>>
 >>
->> It doesn't. The save/restore functions are guarded by tests on
->> KVM_ARM64_DEBUG_DIRTY, just like we have skip_debug_state on all actions
->> involving the save/restore in the assembly version.
+>> Yeh :(.  I did additional tests, and, unfortunately, this can't be used as is.
+>> But not because of clocksource_of_init() which will just produce boot warning.
+>> It can't be done because of sched_clock_register() which is expected to be
+>> called during early boot time only and with disabled IRQs.
+>>
+>> It was so tempting to try :)
 > 
-> I think the confusing part is that the save function unconditionally
-> calls __debug_save_state where the restore function only calls it when
-> the dirty flag is set.  Plus I suck at reading assembly apparently.
+> We should be able to make this into an early_platform_device and just
+> have it depend on the source clock muxes. See the omap initcall changes
+> patches I just posted.
+> 
 
-So the way I initially wrote it, I had the same 'if' statement as in the
-restore function, making them fairly symmetric. But it quickly became
-obvious that this double-if was a bit pointless.
+Sry, may be I've missed smth, but how early_platform_device will help us
+to get rid of platform code - We'd still need to power on manually 
+early_platform_device's from platform code :( through hwmod.
 
-And actually, I wonder if I shouldn't drop it from the restore function,
-because it only save us a spurious clear of the dirty bit.
+The main reason why I've tried this is because clocksource will be really selected
+only at fs_initcall time - and at that time we have no restriction for using platform
+devices, Pm runtime APIs, etc. (exception/blocker is sched_clock :().
 
->>> in any case, I feel some context is lost when this is moved away from
->>> assembly and understanding this patch would be easier if the semantics
->>> of these two _cond functions were documented.
->>
->> I can migrate the existing comments if you think that helps.
->>
-> It just wasn't not quite clear to me exactly when
-> __debug_cond_save_host_state is called for example - is this going to be
-> called unconditionally on every entry - that's how I understand it now
-> anyway.
-
-On every entry, yes. I'm trying to have the guest_run function as simple
-as possible, with the various subsystems making their 'own' decisions.
-
-Not optimal (you get to branch for nothing), but clearer. At least for
-me, but I may be the odd duck out here. Any idea to make the flow look
-clearer?
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+regards,
+-grygorii
