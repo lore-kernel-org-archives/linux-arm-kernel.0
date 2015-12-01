@@ -1,33 +1,56 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 1 Dec 2015 14:42:37 +0100
-Subject: [PATCH] ARM: at91/dt: sama5d4 master clock can run at 200MHz now
-Message-ID: <1448977357-19396-1-git-send-email-nicolas.ferre@atmel.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 1 Dec 2015 15:45:32 +0200
+Subject: [RFC v02 00/15] dmaengine: New 'universal' API for requesting
+ channel
+In-Reply-To: <CAHp75VcC5uwGTp_N13q5P8MPtkhy0DFytDaXGrnoiHfnoEo8ng@mail.gmail.com>
+References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
+ <CAHp75VcC5uwGTp_N13q5P8MPtkhy0DFytDaXGrnoiHfnoEo8ng@mail.gmail.com>
+Message-ID: <565DA47C.4000308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the change of frequency a SAMA5D4 can reach, we have to modify the
-maximum clock specification for the master clock, up to 200MHz now.
+On 11/30/2015 04:32 PM, Andy Shevchenko wrote:
+>> Andy: I did looked at the unified device properties, but I decided to not to use
+>> it as I don't see it to fit well and most of the legacy board files are using
+>> resources to specify at least their memory regions so adding the DMA resource
+>> to them would be more inline with the rest of the code.
+> 
+> We could return back to this in the future, still we have to amend
+> built-in device properties (there is a patch series already in the
+> wild).
 
-It avoids the wrong message saying that "master clk is overclocked" for this
-configuration.
+I believe we could have similar dmaengine 'infra' for the built-in device
+properties as we have now for DT and ACPI. I need to dig deeper to get full
+understanding on the device properties, but from a quick view it looks to me
+that it could replace the direct OF and ACPI property handing in a unified
+API. I might be totally mistaken here ;)
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/sama5d4.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+>> static struct dma_filter_map da830_edma_map[] = {
+>>         DMA_FILTER_ENTRY("davinci-mcasp.0", "rx", EDMA_CTLR_CHAN(0, 0)),
+>>         DMA_FILTER_ENTRY("davinci-mcasp.0", "tx", EDMA_CTLR_CHAN(0, 1)),
+>>         DMA_FILTER_ENTRY("davinci-mcasp.1", "rx", EDMA_CTLR_CHAN(0, 2)),
+>>         DMA_FILTER_ENTRY("davinci-mcasp.1", "tx", EDMA_CTLR_CHAN(0, 3)),
+>>         DMA_FILTER_ENTRY("davinci-mcasp.2", "rx", EDMA_CTLR_CHAN(0, 4)),
+>>         DMA_FILTER_ENTRY("davinci-mcasp.2", "tx", EDMA_CTLR_CHAN(0, 5)),
+>>         DMA_FILTER_ENTRY("spi_davinci.0", "rx", EDMA_CTLR_CHAN(0, 14)),
+>>         DMA_FILTER_ENTRY("spi_davinci.0", "tx", EDMA_CTLR_CHAN(0, 15)),
+>>         DMA_FILTER_ENTRY("da830-mmc.0", "rx", EDMA_CTLR_CHAN(0, 16)),
+>>         DMA_FILTER_ENTRY("da830-mmc.0", "tx", EDMA_CTLR_CHAN(0, 17)),
+>>         DMA_FILTER_ENTRY("spi_davinci.1", "rx", EDMA_CTLR_CHAN(0, 18)),
+>>         DMA_FILTER_ENTRY("spi_davinci.1", "tx", EDMA_CTLR_CHAN(0, 19)),
+> 
+> Does this ".2" and so prevent driver to use auto ID for platform devices?
 
-diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index 2193637b9cd2..fce9a984aa6f 100644
---- a/arch/arm/boot/dts/sama5d4.dtsi
-+++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -451,7 +451,7 @@
- 					interrupt-parent = <&pmc>;
- 					interrupts = <AT91_PMC_MCKRDY>;
- 					clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>;
--					atmel,clk-output-range = <125000000 177000000>;
-+					atmel,clk-output-range = <125000000 200000000>;
- 					atmel,clk-divisors = <1 2 4 3>;
- 				};
- 
+Yes, as all the infra around the traditional board files with platform_device
+creation does. Ideally we could have 'phandle' pointing from this table to the
+device in question (or other way around), but I'm not aware of anything we can
+use.
+Auto ID did not really worked for us since the driver does need to know their
+ID in some cases, or we need to be able to be sure that for example McASP1 is
+handled as davinci-mcasp.1
+We have clocks and other dependencies where the device name or device ID need
+to be predictable.
+It is different in DT cases, but we are talking about legacy things.
+
 -- 
-2.1.3
+P?ter
