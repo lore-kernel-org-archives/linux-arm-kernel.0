@@ -1,55 +1,142 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  1 Dec 2015 13:47:24 +0800
-Subject: [PATCH 6/7] ARM: dts: sun9i: Add Reduced Serial Bus controller device
- node to A80 dtsi
-In-Reply-To: <1448948845-28347-1-git-send-email-wens@csie.org>
-References: <1448948845-28347-1-git-send-email-wens@csie.org>
-Message-ID: <1448948845-28347-7-git-send-email-wens@csie.org>
+From: hs@denx.de (Heiko Schocher)
+Date: Tue, 1 Dec 2015 07:09:27 +0100
+Subject: [PATCH v2] arm, am335x: add support for the bosch shc board
+In-Reply-To: <20151201055333.GO23396@atomide.com>
+References: <1447748655-2088-1-git-send-email-hs@denx.de>
+ <20151130214130.GA23396@atomide.com> <565D2DF9.2010806@denx.de>
+ <20151201055333.GO23396@atomide.com>
+Message-ID: <565D3997.9060905@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a device node for the Reduced Serial Bus (RSB)
-controller and the defacto pinmux setting to the A80 dtsi.
+Hello Tony,
 
-Since there is only one possible pinmux setting for RSB, just
-set it in the dtsi.
+Am 01.12.2015 um 06:53 schrieb Tony Lindgren:
+> * Heiko Schocher <hs@denx.de> [151130 21:21]:
+>> Hello Tony,
+>>
+>> Am 30.11.2015 um 22:41 schrieb Tony Lindgren:
+>>> * Heiko Schocher <hs@denx.de> [151117 00:25]:
+>>>> --- /dev/null
+>>>> +++ b/arch/arm/boot/dts/am335x-shc.dts
+>>>> +&tps {
+>>>> +	compatible = "ti,tps65217";
+>>>> +	ti,pmic-shutdown-controller;
+>>>> +
+>>>> +	regulators {
+>>>> +		#address-cells = <1>;
+>>>> +		#size-cells = <0>;
+>>>> +
+>>>> +		dcdc1_reg: regulator at 0 {
+>>>> +			reg = <0>;
+>>>> +			regulator-name = "vdds_dpr";
+>>>> +			regulator-compatible = "dcdc1";
+>>>> +			regulator-min-microvolt = <1300000>;
+>>>> +			regulator-max-microvolt = <1450000>;
+>>>> +			regulator-boot-on;
+>>>> +			regulator-always-on;
+>>>> +		};
+>>>> +
+>>>> +		dcdc2_reg: regulator at 1 {
+>>>> +			reg = <1>;
+>>>> +			/*
+>>>> +			 * VDD_MPU voltage limits 0.95V - 1.26V with
+>>>> +			 * +/-4% tolerance
+>>>> +			 */
+>>>> +			regulator-compatible = "dcdc2";
+>>>> +			regulator-name = "vdd_mpu";
+>>>> +			regulator-min-microvolt = <925000>;
+>>>> +			regulator-max-microvolt = <1375000>;
+>>>> +			regulator-boot-on;
+>>>> +			regulator-always-on;
+>>>> +			regulator-ramp-delay = <70000>;
+>>>> +		};
+>>>> +
+>>>> +		dcdc3_reg: regulator at 2 {
+>>>> +			reg = <2>;
+>>>> +			/*
+>>>> +			 * VDD_CORE voltage limits 0.95V - 1.1V with
+>>>> +			 * +/-4% tolerance
+>>>> +			 */
+>>>> +			regulator-name = "vdd_core";
+>>>> +			regulator-compatible = "dcdc3";
+>>>> +			regulator-min-microvolt = <925000>;
+>>>> +			regulator-max-microvolt = <1125000>;
+>>>> +			regulator-boot-on;
+>>>> +			regulator-always-on;
+>>>> +		};
+>>>> +
+>>>> +		ldo1_reg: regulator at 3 {
+>>>> +			reg = <3>;
+>>>> +			regulator-name = "vio,vrtc,vdds";
+>>>> +			regulator-compatible = "ldo1";
+>>>> +			regulator-min-microvolt = <1000000>;
+>>>> +			regulator-max-microvolt = <1800000>;
+>>>> +			regulator-always-on;
+>>>> +		};
+>>>> +
+>>>> +		ldo2_reg: regulator at 4 {
+>>>> +			reg = <4>;
+>>>> +			regulator-name = "vdd_3v3aux";
+>>>> +			regulator-compatible = "ldo2";
+>>>> +			regulator-min-microvolt = <900000>;
+>>>> +			regulator-max-microvolt = <3300000>;
+>>>> +			regulator-always-on;
+>>>> +		};
+>>>> +
+>>>> +		ldo3_reg: regulator at 5 {
+>>>> +			reg = <5>;
+>>>> +			regulator-name = "vdd_1v8";
+>>>> +			regulator-compatible = "ldo3";
+>>>> +			regulator-min-microvolt = <900000>;
+>>>> +			regulator-max-microvolt = <1800000>;
+>>>> +			regulator-always-on;
+>>>> +		};
+>>>> +
+>>>> +		ldo4_reg: regulator at 6 {
+>>>> +			reg = <6>;
+>>>> +			regulator-name = "vdd_3v3a";
+>>>> +			regulator-compatible = "ldo4";
+>>>> +			regulator-min-microvolt = <1800000>;
+>>>> +			regulator-max-microvolt = <3300000>;
+>>>> +			regulator-always-on;
+>>>> +		};
+>>>> +	};
+>>>> +};
+>>>
+>>> Applying this into omap-for-v4.5/dt.. But I'm getting concerned about this
+>>> "regulator-always-on" stuff and having multiple copies of the same thing.
+>>>
+>>> I think we should have a common am33xx-tps65217.dtsi file that has the
+>>> regulators defined at one place and other then include it. And they are
+>>> controllable AFAIK..
+>>
+>> Hmm... Mark Brown (added to Cc) suggested to move this regulator nodes
+>> into the board DT file and remove such files [1].
+>
+> Hmm it was probably the name of that file causing confusion as it was not
+> am33xx specific. If we have many board variants using almost the same exact
+> regulators and configuration it totally makes sense to have a shared dtsi
+> file for them :)
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun9i-a80.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+Ack.
 
-diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index 80777a33ee78..dc666c69f6ab 100644
---- a/arch/arm/boot/dts/sun9i-a80.dtsi
-+++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -900,6 +900,27 @@
- 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
-+
-+			r_rsb_pins: r_rsb {
-+				allwinner,pins = "PN0", "PN1";
-+				allwinner,function = "s_rsb";
-+				allwinner,drive = <SUN4I_PINCTRL_20_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+			};
-+		};
-+
-+		r_rsb: i2c at 08003400 {
-+			compatible = "allwinner,sun8i-a23-rsb";
-+			reg = <0x08003400 0x400>;
-+			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&apbs_gates 3>;
-+			clock-frequency = <3000000>;
-+			resets = <&apbs_rst 3>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&r_rsb_pins>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
- 		};
- 	};
- };
+> It may actually be better to have it as am33xx-common.dtsi and I bet that
+> covers quite a few am33xx boards for the basic shared functionality.
+
+I try to find some time to make such a patch...
+
+bye,
+Heiko
+>
+> Regards,
+>
+> Tony
+>
+>
+>> [1] https://lkml.org/lkml/2015/10/21/581
+>
+
 -- 
-2.6.2
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
