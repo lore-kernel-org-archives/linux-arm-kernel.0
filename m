@@ -1,53 +1,34 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Tue,  1 Dec 2015 17:24:21 +0100
-Subject: [PATCH v3 5/6] pinctrl: dt-binding: Extend meson documentation with
- GPIO IRQs support
+Date: Tue,  1 Dec 2015 17:24:22 +0100
+Subject: [PATCH v3 6/6] ARM: meson: DTS: Enable GPIO IRQs
 In-Reply-To: <1448987062-31225-1-git-send-email-carlo@caione.org>
 References: <1448987062-31225-1-git-send-email-carlo@caione.org>
-Message-ID: <1448987062-31225-6-git-send-email-carlo@caione.org>
+Message-ID: <1448987062-31225-7-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Carlo Caione <carlo@endlessm.com>
 
-Extend the pinctrl binding documentation with the support for external
-GPIO interrupts.
-
 Signed-off-by: Carlo Caione <carlo@endlessm.com>
-Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
 ---
- Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/meson8b.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
-index 3f6a524..de669ce 100644
---- a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
-@@ -3,6 +3,12 @@
- Required properties for the root node:
-  - compatible: "amlogic,meson8-pinctrl" or "amlogic,meson8b-pinctrl"
-  - reg: address and size of registers controlling irq functionality
-+ - reg-names: should be "irq"
-+ - interrupt-controller: marks the device node as an interrupt controller
-+ - #interrupt-cells: should be 2. The first cell is the GPIO number. The
-+		     second cell is used to specify trigger type.
-+ - amlogic,irqs-gpio: specifies the GPIO IRQ numbers on the GIC (GPIO_IRQ#)
-+ - interrupt-parent: specifies the parent interrupt controller.
- 
- === GPIO sub-nodes ===
- 
-@@ -46,7 +52,12 @@ pinctrl-bindings.txt
- 
- 	pinctrl: pinctrl at c1109880 {
- 		compatible = "amlogic,meson8-pinctrl";
-+		reg-names = "irq";
- 		reg = <0xc1109880 0x10>;
-+		interrupt-parent = <&gic>;
-+		amlogic,irqs-gpio = <64 65 66 67 68 69 70 71>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		ranges;
+diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
+index ee352bf..dd7ccd3 100644
+--- a/arch/arm/boot/dts/meson8b.dtsi
++++ b/arch/arm/boot/dts/meson8b.dtsi
+@@ -152,6 +152,11 @@
+ 		pinctrl: pinctrl at c1109880 {
+ 			compatible = "amlogic,meson8b-pinctrl";
+ 			reg = <0xc1109880 0x10>;
++			reg-names = "irq";
++			interrupt-parent = <&gic>;
++			amlogic,irqs-gpio = <64 65 66 67 68 69 70 71>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			ranges;
 -- 
 2.5.0
