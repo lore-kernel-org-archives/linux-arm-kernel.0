@@ -1,41 +1,67 @@
-From: schwab@suse.de (Andreas Schwab)
-Date: Tue, 01 Dec 2015 12:01:12 +0100
-Subject: [PATCH v6 14/19] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <2776283.xtmDQm6BqS@wuerfel> (Arnd Bergmann's message of "Tue, 01
- Dec 2015 11:22:02 +0100")
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <20151130202141.GA23254@yury-N73SV> <87bnaafrt0.fsf@igel.home>
- <2776283.xtmDQm6BqS@wuerfel>
-Message-ID: <87zixue8lj.fsf@igel.home>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 1 Dec 2015 11:02:55 +0000
+Subject: arm64 boot requirements
+In-Reply-To: <565BAA2E.5090102@cog.systems>
+References: <565BAA2E.5090102@cog.systems>
+Message-ID: <20151201110159.GA4757@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Hi,
 
-> On Tuesday 01 December 2015 10:20:59 Andreas Schwab wrote:
->> Yury Norov <ynorov@caviumnetworks.com> writes:
->> 
->> > There's a tricky bug with signal stack, that Andreas also discovered.
->> 
->> That was only a confusion about the compat state of sys_rt_sigaction.
->> It just requires making sure glibc uses the correct (64bit layout)
->> struct kernel_sigaction.
->
-> I don't think we need to use the 64-bit version of sigaction, both
-> kernel and libc are simpler if we use the normal 32-bit version.
+On Mon, Nov 30, 2015 at 12:45:18PM +1100, Carl van Schaik wrote:
+> In commit bd00cd5f8c8c3c282bb1e1eac6a6679a4f808091, the idmap_pg_dir
+> and swapper_pg_dir where moved from before the kernel to after it.
+> 
+> The problem is that these symbols fall outside the range covered by
+> the ELF file - outside of any section.
+> 
+> A bootloader which loads the kernel ELF file and dynamically
+> determines where to place the DTB, may try place it after the
+> kernel. We've just run into this problem and the DTB gets
+> overwritten as soon as the pagetables are created.
 
-Since glibc has to do the conversion anyway (due to sigset_t), using the
-64bit layout avoids a second conversion in the kernel.
+We had similar issues with the BSS when booting Image files prior to
+this and commit a2c1d73b94ed49f5 ("arm64: Update the Image header").
+Since then, the image_size field in the Image header tells you how much
+memory the kernel may clobber (including the BSS and page tables).
 
-> We should always default to using the generic 32-bit structures
-> unless there is a strong reason not to.
+Prior to that, the page tables were below the kernel, and also not
+described in any ELF section.
 
-The goal should be to avoid conversion layers where it makes sense.
+Others booting the kernel vmlinux haven't reported similar issues, so I
+assume that either they are parsing the Image header, or getting lucky.
+Parsing the header is necessary to get the correct text offset, too...
 
-Andreas.
+Pratyush, Geoff, I understood you were loading the kernel vmlinux for
+kexec. Do you parse the Image header to figure out where to place
+things?
 
--- 
-Andreas Schwab, SUSE Labs, schwab at suse.de
-GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
-"And now for something completely different."
+> I'd suggest that the kernel either:
+>  A. document this boot requirement for where not to load a DTB
+
+Do you have any particular suggestion?
+
+We already describe the Image footprint (including BSS and page tables)
+by the image_size in the Image header, which is sufficient. The size of
+the BSS and page tables is effectively unbound, so we can't define some
+upper bound that will always be true.
+
+The documentation is written on the assumption that an Image file is
+being used rather than a vmlinux. Perhaps that is something to consider.
+
+>  B. update the vmlinux.lds.S such that these symbols (and _end) are
+> properly covered by a section in the ELF, and thus preventing this
+> issue.
+
+I'm worried that this only solves this one case, and it means that there
+are two (potentially conflicting) sources of information that a
+bootloader might be using -- the ELF or the Image header. I don't want
+to have to duplicate text_offset and so on, which implies that parsing
+the Image header is necessary anyway.
+
+That's something we can discuss if you send a patch (inline rather than
+attached).
+
+Thanks,
+Mark.
