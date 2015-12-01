@@ -1,56 +1,27 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 1 Dec 2015 10:01:27 +0100
-Subject: [RFC PATCH 2/9] drm/rockchip: Use new vblank api drm_crtc_vblank_*
-In-Reply-To: <565D5B57.4040102@rock-chips.com>
-References: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>
- <1448940391-23333-3-git-send-email-mark.yao@rock-chips.com>
- <CAPj87rNs+c5Y01zVPF3a+8puFH1ZWuLZUGoDq6EPfDQB5DVZGw@mail.gmail.com>
- <565D5B57.4040102@rock-chips.com>
-Message-ID: <20151201090127.GN17050@phenom.ffwll.local>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 1 Dec 2015 10:02:09 +0100
+Subject: [PATCH] pinctrl: qcom: pmic-gpio/mpp: of_irq_count() == npins
+In-Reply-To: <1447875197-21645-1-git-send-email-sboyd@codeaurora.org>
+References: <1447808426-21834-1-git-send-email-sboyd@codeaurora.org>
+ <1447875197-21645-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CACRpkdYJwW-5hg-d0Q+CUAB6vNXiPzSSk9fR-mE_ZD6enZUiEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 04:33:27PM +0800, Mark yao wrote:
-> On 2015?12?01? 15:56, Daniel Stone wrote:
-> >Hi,
-> >
-> >On 1 December 2015 at 03:26, Mark Yao <mark.yao@rock-chips.com> wrote:
-> >>No functional update, drm_vblank_* is the legacy version of
-> >>drm_crtc_vblank_*. and use new api make driver more clean.
-> >>
-> >>Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> >Heh, I had the same patch in my series to fix pageflip events.
-> >
-> >Reviewed-by: Daniel Stone <daniels@collabora.com>
-> >
-> >Cheers,
-> >Daniel
-> >
-> >
-> >
-> 
-> Hi Daniel
->    I had picked your patch "[PATCH 1/2] drm/rockchip: Use CRTC vblank event
-> interface" into my drm-next, this patch is base on it.
+On Wed, Nov 18, 2015 at 8:33 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-That really should be mentioned in the commit message, and you must keep
-the signed-off-by chain intact when adapting or reusing other peoples
-work.
--Daniel
+> The number of interrupts is always equal to the number of pins
+> provided by the PMIC gpio and MPP hardware blocks. Count the
+> number of irqs to figure out the number of pins instead of adding
+> more compatible strings or doing math on the reg property. This
+> should make the code more generic and ease the number of changes
+> we have to make to the driver for each new pmic revision.
+>
+> Cc: "Ivan T. Ivanov" <iivanov@mm-sol.com>
+> Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-> 
-> Thanks for your review.
-> 
-> -- 
-> ?ark Yao
-> 
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+Patch applied with Andy's and Bj?rn's ACKs.
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Yours,
+Linus Walleij
