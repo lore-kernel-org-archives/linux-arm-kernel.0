@@ -1,55 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 01 Dec 2015 23:39:42 +0100
-Subject: [PATCH v6 14/19] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <20151201212904.GA14442@yury-N73SV>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <3754277.KmO9Nk3XLD@wuerfel> <20151201212904.GA14442@yury-N73SV>
-Message-ID: <12844690.Yr8y3jA010@wuerfel>
+Date: Tue, 01 Dec 2015 23:46:03 +0100
+Subject: [PATCH] ARM: ixp4xx: fix read{b,w,l} return types
+In-Reply-To: <m3h9kaz2ej.fsf@t19.piap.pl>
+References: <4577677.sEiIMqkHSM@wuerfel> <m3h9kaz2ej.fsf@t19.piap.pl>
+Message-ID: <4900418.HEVAcnQtkC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 December 2015 00:29:04 Yury Norov wrote:
-> > > +#define compat_sys_shmat               sys_shmat
-> > 
-> > What's special about compat_sys_shmat?
-> > 
+On Wednesday 25 November 2015 13:31:16 Krzysztof Ha?asa wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
 > 
-> It's about  	 definition.
-> For aarch32 glibc defines it as (__getpagesize () << 2).
-> For ILP32 there's no definition, and so generic one is used: (__getpagesize ()).
-
-Ok, got it.
-
-> In kernel, for ARM64, COMPAT_SHMLBA defined just as 0x4000. Both
-> compat and non-compat shmat syscalls pass identical arguments to
-> do_shmat, except shmlba. Effectively, library expects shmlba to
-> be 0x1000, as sys_shmat does. And compat_sys_shmat expects 0x4000.
+> > On ixp4xx, the readl() function returns an 'unsigned long' output
+> > when indirect I/O is used. This is unlike any other platform, and
+> > it causes lots of harmless compiler warnings, such as:
+> >
+> > drivers/ata/libahci.c: In function 'ahci_show_host_version':
+> > drivers/ata/libahci.c:254:22: warning: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'long unsigned int' [-Wformat=]
+> > drivers/block/mtip32xx/mtip32xx.c: In function 'mtip_hw_read_registers':
+> > drivers/block/mtip32xx/mtip32xx.c:2602:31: warning: format '%X' expects argument of type 'unsigned int', but argument 3 has type 'long unsigned int' [-Wformat=]
+> > drivers/block/cciss.c: In function 'print_cfg_table':
+> > drivers/block/cciss.c:3845:25: warning: format '%d' expects argument of type 'int', but argument 4 has type 'long unsigned int' [-Wformat=]
+> >
+> > This changes all six of the ixp4xx specific I/O read functions
+> > to return the same types that we have in the normal asm/io.h,
+> > to avoid the warnings.
 > 
-> I think, both kernel and library parts are to be fixed. In library
-> we'd use definition identical to ARM. For kernel we'd use compat
-> syscall.
-
-I'm not sure I understand this part. What changes specifically do we need?
-
-It sounds like shmat is one of the cases we an override makes sense
-and we should use sys_shmat with PAGE_SIZE for aarch64 ilp32 mode.
-
-> My question. Why aarch64 defines COMPAT_SHMLBA as 0x4000? If there's
-> no specific reason for it, it looks like a bug, and we should
-> define it like in arch/arm:
->         #define SHMLBA  (4 * PAGE_SIZE)          /* attach addr a multiple of this */
+> Thanks for fixing this.
 > 
-> Maybe that's why AARCH32 is limited to 4K pages in config.
+> Acked-by: Krzysztof Halasa <khalasa@piap.pl>
+> 
 
-The reason why AARCH32 is limited to 4K pages is the alignment of
-ELF sections, and with newer binutils versions, that is no longer
-a problem, other than the bug you just found.
-
-We normally assume that the page size on ARM is fixed to 4K, so
-there might be user space that just hardcodes 16K SHMLBA rather
-than using the glibc (__getpagesize () << 2) definition. Changing
-the kernel would break those programs, but you can also argue that
-they are already broken today.
-
-	Arnd
+Applied to fixes for 4.4 now with your ack.
