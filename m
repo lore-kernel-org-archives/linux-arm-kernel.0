@@ -1,68 +1,64 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue,  1 Dec 2015 12:03:12 +0100
-Subject: [PATCH v2 15/25] cris: nand: use the mtd instance embedded in struct
- nand_chip
+Date: Tue,  1 Dec 2015 12:03:17 +0100
+Subject: [PATCH v2 20/25] mtd: nand: simplify nand_dt_init() usage
 In-Reply-To: <1448967802-25796-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1448967802-25796-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1448967802-25796-16-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1448967802-25796-21-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct nand_chip now embeds an mtd device. Patch all drivers to make use
-of this mtd instance instead of using the instance embedded in their
-private struct or dynamically allocated.
+nand_dt_init() function requires 3 arguments where it actually needs one
+(dn and mtd can both be retrieved from chip). Drop these parameters.
+
+Testing for dn != NULL inside nand_dt_init() also helps simplifying the
+caller code.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
-Most of those changes were generated with the coccinelle script added
-in commit c671312 "coccinelle: nand: detect and correct drivers embedding
-an mtd_info object"
----
- arch/cris/arch-v32/drivers/mach-a3/nandflash.c | 3 +--
- arch/cris/arch-v32/drivers/mach-fs/nandflash.c | 3 +--
- 2 files changed, 2 insertions(+), 4 deletions(-)
+ drivers/mtd/nand/nand_base.c | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
 
-diff --git a/arch/cris/arch-v32/drivers/mach-a3/nandflash.c b/arch/cris/arch-v32/drivers/mach-a3/nandflash.c
-index db953cf..ee74e45 100644
---- a/arch/cris/arch-v32/drivers/mach-a3/nandflash.c
-+++ b/arch/cris/arch-v32/drivers/mach-a3/nandflash.c
-@@ -36,7 +36,6 @@
- #define CE_BIT 12
+diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+index 5aec154..ae3fd2a 100644
+--- a/drivers/mtd/nand/nand_base.c
++++ b/drivers/mtd/nand/nand_base.c
+@@ -3937,11 +3937,17 @@ ident_done:
+ 	return type;
+ }
  
- struct mtd_info_wrapper {
--	struct mtd_info info;
- 	struct nand_chip chip;
- };
+-static int nand_dt_init(struct mtd_info *mtd, struct nand_chip *chip,
+-			struct device_node *dn)
++static int nand_dt_init(struct nand_chip *chip)
+ {
++	struct device_node *dn = nand_get_flash_node(chip);
+ 	int ecc_mode, ecc_strength, ecc_step;
  
-@@ -148,7 +147,7 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
++	if (!dn)
++		return 0;
++
++	/* MTD can automatically handle DT partitions, etc. */
++	mtd_set_of_node(nand_to_mtd(chip), dn);
++
+ 	if (of_get_nand_bus_width(dn) == 16)
+ 		chip->options |= NAND_BUSWIDTH_16;
  
- 	/* Get pointer to private data */
- 	this = &wrapper->chip;
--	crisv32_mtd = &wrapper->info;
-+	crisv32_mtd = nand_to_mtd(this);
+@@ -3989,14 +3995,9 @@ int nand_scan_ident(struct mtd_info *mtd, int maxchips,
+ 	struct nand_flash_dev *type;
+ 	int ret;
  
- 	/* Link the private data with the MTD structure */
- 	crisv32_mtd->priv = this;
-diff --git a/arch/cris/arch-v32/drivers/mach-fs/nandflash.c b/arch/cris/arch-v32/drivers/mach-fs/nandflash.c
-index 22a6467..5626297 100644
---- a/arch/cris/arch-v32/drivers/mach-fs/nandflash.c
-+++ b/arch/cris/arch-v32/drivers/mach-fs/nandflash.c
-@@ -31,7 +31,6 @@
- #define BY_BIT 7
+-	if (nand_get_flash_node(chip)) {
+-		/* MTD can automatically handle DT partitions, etc. */
+-		mtd_set_of_node(mtd, nand_get_flash_node(chip));
+-
+-		ret = nand_dt_init(mtd, chip, nand_get_flash_node(chip));
+-		if (ret)
+-			return ret;
+-	}
++	ret = nand_dt_init(chip);
++	if (ret)
++		return ret;
  
- struct mtd_info_wrapper {
--	struct mtd_info info;
- 	struct nand_chip chip;
- };
- 
-@@ -129,7 +128,7 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
- 
- 	/* Get pointer to private data */
- 	this = &wrapper->chip;
--	crisv32_mtd = &wrapper->info;
-+	crisv32_mtd = nand_to_mtd(this);
- 
- 	pa_oe.oe |= 1 << CE_BIT;
- 	pa_oe.oe |= 1 << ALE_BIT;
+ 	/* Set the default functions */
+ 	nand_set_defaults(chip, chip->options & NAND_BUSWIDTH_16);
 -- 
 2.1.4
