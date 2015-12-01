@@ -1,42 +1,33 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 30 Nov 2015 17:25:23 -0800
-Subject: [PATCH v3 3/3] ARM: qcom: Drop ARCH_MSM* configs
+Date: Mon, 30 Nov 2015 17:25:22 -0800
+Subject: [PATCH v3 2/3] ARM: qcom_defconfig: Enable HAVE_ARM_ARCH_TIMER
 In-Reply-To: <1448933123-9843-1-git-send-email-sboyd@codeaurora.org>
 References: <1448933123-9843-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1448933123-9843-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1448933123-9843-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop these configs now that we select the clocksources we need
-via the defconfig.
+Enable this config in the defconfig so that we can delete the
+selection logic surrounding it that exists in mach-qcom/Kconfig.
 
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-qcom/Kconfig | 12 ------------
- 1 file changed, 12 deletions(-)
+ arch/arm/configs/qcom_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
-index 230c7e8a32fb..9cd3b50d891f 100644
---- a/arch/arm/mach-qcom/Kconfig
-+++ b/arch/arm/mach-qcom/Kconfig
-@@ -23,16 +23,4 @@ config ARCH_QCOM_A_FAMILY
- 	  B-family includes all Snapdragon 2xx/4xx/6xx/8xx models starting
- 	  in 2013 with the MSM8x74 SoC.
- 
--config ARCH_MSM8X60
--	bool "Enable support for MSM8X60"
--	select CLKSRC_QCOM
--
--config ARCH_MSM8960
--	bool "Enable support for MSM8960"
--	select CLKSRC_QCOM
--
--config ARCH_MSM8974
--	bool "Enable support for MSM8974"
--	select HAVE_ARM_ARCH_TIMER
--
- endif
+diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
+index ee54a706e8a3..6f34da7afd75 100644
+--- a/arch/arm/configs/qcom_defconfig
++++ b/arch/arm/configs/qcom_defconfig
+@@ -22,6 +22,7 @@ CONFIG_ARCH_MSM8X60=y
+ CONFIG_ARCH_MSM8960=y
+ CONFIG_ARCH_MSM8974=y
+ CONFIG_SMP=y
++CONFIG_HAVE_ARM_ARCH_TIMER=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
