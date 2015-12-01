@@ -1,30 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 1 Dec 2015 08:43:17 -0800
-Subject: [PATCH v2 01/18] ARM: am57xx: cl-som-am57x: dts: add basic
- module support
-In-Reply-To: <565DC9CC.1070000@compulab.co.il>
-References: <1448433590-1399-2-git-send-email-lifshitz@compulab.co.il>
- <1448893551-676-1-git-send-email-lifshitz@compulab.co.il>
- <20151130215415.GE23396@atomide.com>
- <565DC9CC.1070000@compulab.co.il>
-Message-ID: <20151201164317.GS23396@atomide.com>
+From: mmarek@suse.cz (Michal Marek)
+Date: Tue, 1 Dec 2015 17:43:47 +0100
+Subject: [PATCH v2 1/2] scripts: Add a recorduidiv program
+In-Reply-To: <20151201161944.GX8644@n2100.arm.linux.org.uk>
+References: <1448488264-23400-1-git-send-email-sboyd@codeaurora.org>
+ <1448488264-23400-2-git-send-email-sboyd@codeaurora.org>
+ <20151125234711.GT8644@n2100.arm.linux.org.uk> <565C6714.802@suse.com>
+ <20151130153208.GR8644@n2100.arm.linux.org.uk> <565C6DE9.2020302@suse.com>
+ <565DC5A9.2010305@suse.cz> <20151201161944.GX8644@n2100.arm.linux.org.uk>
+Message-ID: <565DCE43.7010904@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dmitry Lifshitz <lifshitz@compulab.co.il> [151201 08:26]:
+On 2015-12-01 17:19, Russell King - ARM Linux wrote:
+> On Tue, Dec 01, 2015 at 05:07:05PM +0100, Michal Marek wrote:
+>> So, both recordmcount and the new recordudiv program are idempotent.
+>> They check if the to-be-added section is already present and do nothing.
 > 
-> It might looks the same set of regulators for multiple boards,
-> but it is not. Each board may apply its own regulators usage scheme, and
-> this is our case (as compared to am57xx-beagle-x15.dts).
+> They hardly "do nothing", as the (eg) recordmcount plasters the build
+> log with warnings.  A solution to that would be to make recordmcount
+> silent if the section is already present.
+
+Right, there is a warning. The recorduidiv program exits silently.
+
+
+>> So the result is correct even with CCACHE_HARDLINK, just the
+>> intermediate file might be incorrect. If this still is considered an
+>> issue, I suggest clearing CCACHE_HARDLINK when using any of these
+>> postprocessors, so as not to penalize other use cases.
 > 
-> For the best of my knowledge, it used to be in a common *.dtsi file (at
-> least in early OMAP5 DT support in TI kernel tree), but then I found that
-> PMIC registration had been moved to the boards DT files.
+> Another solution would be to have the top level make file unset the
+> CCACHE_HARDLINK environment variable if any of the options which enable
+> in-place editing of object files is enabled.
 
-Have you actually looked at how much of the implementation is same across
-the omap5 boards? My guess is that a whole lot is same.. See for example
-omap5-board-common.dtsi.
+This is what I meant, sorry for not being clear.
 
-Regards,
 
-Tony
+> Looking at the ccache
+> code, the environment variable has to be deleted from the environment
+> to turn off the option - and I'm not sure whether make can delete
+> environment variables.  It certainly can override them, but I see
+> nothing in the info pages which suggests that environment variables
+> can be deleted by a makefile.
+
+unexport CCACHE_HARDLINK
+
+will do the trick.
+
+Michal
