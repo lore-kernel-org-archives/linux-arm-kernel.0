@@ -1,98 +1,46 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 1 Dec 2015 20:34:41 +0100
-Subject: [PATCH v2 00/21] arm64: KVM: world switch in C
-In-Reply-To: <565DDE32.6080500@arm.com>
-References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
- <20151130203345.GI11704@cbox> <565D6F3F.5030700@arm.com>
- <20151201120025.GN11704@cbox> <565DDE32.6080500@arm.com>
-Message-ID: <20151201193441.GW11704@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 01 Dec 2015 20:35:51 +0100
+Subject: [PATCH 1/1] irqchip/versatile-fpga: Fix PCI IRQ mapping on
+ Versatile PB
+In-Reply-To: <1448992551-10275-1-git-send-email-guillaume.delbergue@greensocs.com>
+References: <1448992551-10275-1-git-send-email-guillaume.delbergue@greensocs.com>
+Message-ID: <2937087.lLiS9fjU9h@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 05:51:46PM +0000, Marc Zyngier wrote:
-> On 01/12/15 12:00, Christoffer Dall wrote:
-> > On Tue, Dec 01, 2015 at 09:58:23AM +0000, Marc Zyngier wrote:
-> >> On 30/11/15 20:33, Christoffer Dall wrote:
-> >>> On Fri, Nov 27, 2015 at 06:49:54PM +0000, Marc Zyngier wrote:
-> >>>> Once upon a time, the KVM/arm64 world switch was a nice, clean, lean
-> >>>> and mean piece of hand-crafted assembly code. Over time, features have
-> >>>> crept in, the code has become harder to maintain, and the smallest
-> >>>> change is a pain to introduce. The VHE patches are a prime example of
-> >>>> why this doesn't work anymore.
-> >>>>
-> >>>> This series rewrites most of the existing assembly code in C, but keeps
-> >>>> the existing code structure in place (most function names will look
-> >>>> familiar to the reader). The biggest change is that we don't have to
-> >>>> deal with a static register allocation (the compiler does it for us),
-> >>>> we can easily follow structure and pointers, and only the lowest level
-> >>>> is still in assembly code. Oh, and a negative diffstat.
-> >>>>
-> >>>> There is still a healthy dose of inline assembly (system register
-> >>>> accessors, runtime code patching), but I've tried not to make it too
-> >>>> invasive. The generated code, while not exactly brilliant, doesn't
-> >>>> look too shaby. I do expect a small performance degradation, but I
-> >>>> believe this is something we can improve over time (my initial
-> >>>> measurements don't show any obvious regression though).
-> >>>
-> >>> I ran this through my experimental setup on m400 and got this:
-> >>
-> >> [...]
-> >>
-> >>> What this tells me is that we do take a noticable hit on the
-> >>> world-switch path, which shows up in the TCP_RR and hackbench workloads,
-> >>> which have a high precision in their output.
-> >>>
-> >>> Note that the memcached number is well within its variability between
-> >>> individual benchmark runs, where it varies to 12% of its average in over
-> >>> 80% of the executions.
-> >>>
-> >>> I don't think this is a showstopper thought, but we could consider
-> >>> looking more closely at a breakdown of the world-switch path and verify
-> >>> if/where we are really taking a hit.
-> >>
-> >> Thanks for doing so, very interesting. As a data point, what compiler
-> >> are you using? I'd expect some variability based on the compiler version...
-> >>
-> > I used the following (compiling natively on the m400):
-> > 
-> > gcc version 4.8.2 (Ubuntu/Linaro 4.8.2-19ubuntu1)
+On Tuesday 01 December 2015 18:55:51 Guillaume Delbergue wrote:
+> This patch is specifically for PCI support on the Versatile PB board using
+> a DT. Currently, the dynamic IRQ mapping is broken when using DTs. For
+> example, on QEMU, the SCSI driver is unable to request the IRQ. To fix
+> this issue, this patch replaces the current dynamic mechanism with a
+> static value as is done in the non-DT case.
 > 
-> For what it is worth, I've ran hackbench on my Seattle B0 (8xA57 2GHz),
-> with a 4 vcpu VM and got the following results (10 runs per kernel
-> version, same configuration):
-> 
-> v4.4-rc3-wsinc: Average 31.750
-> 32.459
-> 32.124
-> 32.435
-> 31.940
-> 31.085
-> 31.804
-> 31.862
-> 30.985
-> 31.450
-> 31.359
-> 
-> v4.4-rc3: Average 31.954
-> 31.806
-> 31.598
-> 32.697
-> 31.472
-> 31.410
-> 32.562
-> 31.938
-> 31.932
-> 31.672
-> 32.459
-> 
-> This is with GCC as produced by Linaro:
-> aarch64-linux-gnu-gcc (Linaro GCC 5.1-2015.08) 5.1.1 20150608
-> 
-> It could well be that your compiler generates worse code than the one I
-> use, or that the code it outputs is badly tuned for XGene. I guess I
-> need to unearth my Mustang to find out...
-> 
-Worth investigating I suppose.  At any rate, the conclusion stays the
-same; we should proceed with these patches.
+> Signed-off-by: Guillaume Delbergue <guillaume.delbergue@greensocs.com>
+> ---
 
--Christoffer
+Looks good to me. If there are no objections, I'd mark this as
+'Cc: stable at vger.kernel.org' and put it into the fixes branch for 4.4.
+
+	Arnd
+
+>  drivers/irqchip/irq-versatile-fpga.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/drivers/irqchip/irq-versatile-fpga.c b/drivers/irqchip/irq-versatile-fpga.c
+> index 598ab3f..cadf104 100644
+> --- a/drivers/irqchip/irq-versatile-fpga.c
+> +++ b/drivers/irqchip/irq-versatile-fpga.c
+> @@ -210,7 +210,12 @@ int __init fpga_irq_of_init(struct device_node *node,
+>  		parent_irq = -1;
+>  	}
+>  
+> +#ifdef CONFIG_ARCH_VERSATILE
+> +	fpga_irq_init(base, node->name, IRQ_SIC_START, parent_irq, valid_mask,
+> +				  node);
+> +#else
+>  	fpga_irq_init(base, node->name, 0, parent_irq, valid_mask, node);
+> +#endif
+>  
+>  	writel(clear_mask, base + IRQ_ENABLE_CLEAR);
+>  	writel(clear_mask, base + FIQ_ENABLE_CLEAR);
+> 
