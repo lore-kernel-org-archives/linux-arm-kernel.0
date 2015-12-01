@@ -1,164 +1,143 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 01 Dec 2015 11:34:41 +0000
-Subject: [PATCH v2 05/21] arm64: KVM: Implement timer save/restore
-In-Reply-To: <20151130195955.GE11704@cbox>
-References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
- <1448650215-15218-6-git-send-email-marc.zyngier@arm.com>
- <20151130195955.GE11704@cbox>
-Message-ID: <565D85D1.6060908@arm.com>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Tue, 1 Dec 2015 11:20:44 +0000
+Subject: [RFC PATCH 2/8] Documentation: arm: define DT cpu capacity
+ bindings
+In-Reply-To: <CAKfTPtAww=r6H2Jrgu+8jDsYohPj7HD=_sdAP2utEEH-YLVsaA@mail.gmail.com>
+References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
+ <1448288921-30307-3-git-send-email-juri.lelli@arm.com>
+ <20151124020631.GA15165@rob-hp-laptop>
+ <20151124105423.GM26372@e106622-lin>
+ <CAKfTPtAww=r6H2Jrgu+8jDsYohPj7HD=_sdAP2utEEH-YLVsaA@mail.gmail.com>
+Message-ID: <20151201112044.GV20439@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/11/15 19:59, Christoffer Dall wrote:
-> On Fri, Nov 27, 2015 at 06:49:59PM +0000, Marc Zyngier wrote:
->> Implement the timer save restore as a direct translation of
->> the assembly code version.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/kvm/hyp/Makefile          |  1 +
->>  arch/arm64/kvm/hyp/hyp.h             |  3 ++
->>  arch/arm64/kvm/hyp/timer-sr.c        | 71 ++++++++++++++++++++++++++++++++++++
->>  include/clocksource/arm_arch_timer.h |  6 +++
->>  4 files changed, 81 insertions(+)
->>  create mode 100644 arch/arm64/kvm/hyp/timer-sr.c
->>
->> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
->> index d1e38ce..455dc0a 100644
->> --- a/arch/arm64/kvm/hyp/Makefile
->> +++ b/arch/arm64/kvm/hyp/Makefile
->> @@ -4,3 +4,4 @@
->>  
->>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
->>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
->> +obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
->> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
->> index a31cb6e..86aa5a2 100644
->> --- a/arch/arm64/kvm/hyp/hyp.h
->> +++ b/arch/arm64/kvm/hyp/hyp.h
->> @@ -33,5 +33,8 @@ void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
->>  void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
->>  void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
->>  
->> +void __timer_save_state(struct kvm_vcpu *vcpu);
->> +void __timer_restore_state(struct kvm_vcpu *vcpu);
->> +
->>  #endif /* __ARM64_KVM_HYP_H__ */
->>  
->> diff --git a/arch/arm64/kvm/hyp/timer-sr.c b/arch/arm64/kvm/hyp/timer-sr.c
->> new file mode 100644
->> index 0000000..8e2209c
->> --- /dev/null
->> +++ b/arch/arm64/kvm/hyp/timer-sr.c
->> @@ -0,0 +1,71 @@
->> +/*
->> + * Copyright (C) 2012-2015 - ARM Ltd
->> + * Author: Marc Zyngier <marc.zyngier@arm.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include <clocksource/arm_arch_timer.h>
->> +#include <linux/compiler.h>
->> +#include <linux/kvm_host.h>
->> +
->> +#include <asm/kvm_mmu.h>
->> +
->> +#include "hyp.h"
->> +
->> +/* vcpu is already in the HYP VA space */
->> +void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
->> +{
->> +	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
->> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->> +
->> +	if (kvm->arch.timer.enabled) {
->> +		timer->cntv_ctl = read_sysreg(cntv_ctl_el0);
->> +		isb();
->> +		timer->cntv_cval = read_sysreg(cntv_cval_el0);
->> +	}
->> +
->> +	/* Disable the virtual timer */
->> +	write_sysreg(0, cntv_ctl_el0);
->> +
->> +	/* Allow physical timer/counter access for the host */
->> +	write_sysreg((read_sysreg(cnthctl_el2) | CNTHCTL_EL1PCTEN |
->> +		      CNTHCTL_EL1PCEN),
->> +		     cnthctl_el2);
+Hi Vincent,
+
+On 30/11/15 10:59, Vincent Guittot wrote:
+> Hi Juri,
 > 
-> nit: again I probably prefer reading cnthctl_el2 into a variable, modify
-> the bits and write it back, but it's no big deal.
-
-Sure.
-
->> +
->> +	/* Clear cntvoff for the host */
->> +	write_sysreg(0, cntvoff_el2);
+> On 24 November 2015 at 11:54, Juri Lelli <juri.lelli@arm.com> wrote:
+> > Hi,
+> >
+> > On 23/11/15 20:06, Rob Herring wrote:
+> >> On Mon, Nov 23, 2015 at 02:28:35PM +0000, Juri Lelli wrote:
+> >> > ARM systems may be configured to have cpus with different power/performance
+> >> > characteristics within the same chip. In this case, additional information
+> >> > has to be made available to the kernel (the scheduler in particular) for it
+> >> > to be aware of such differences and take decisions accordingly.
+> >> >
 > 
-> why do we do this when we've just disabled the timer?
-
-Because the host does use CNTVCT_EL0 (see the VDSO code), and you don't
-want time to go backward over there...
-
->> +}
->> +
->> +void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
->> +{
->> +	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
->> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->> +	u64 val;
->> +
->> +	/*
->> +	 * Disallow physical timer access for the guest
->> +	 * Physical counter access is allowed
->> +	 */
->> +	val = read_sysreg(cnthctl_el2);
->> +	val &= ~CNTHCTL_EL1PCEN;
->> +	val |= CNTHCTL_EL1PCTEN;
->> +	write_sysreg(val, cnthctl_el2);
->> +
->> +	if (kvm->arch.timer.enabled) {
->> +		write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
->> +		write_sysreg(timer->cntv_cval, cntv_cval_el0);
->> +		isb();
->> +		write_sysreg(timer->cntv_ctl, cntv_ctl_el0);
->> +	}
->> +}
->> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
->> index 9916d0e..25d0914 100644
->> --- a/include/clocksource/arm_arch_timer.h
->> +++ b/include/clocksource/arm_arch_timer.h
->> @@ -23,6 +23,12 @@
->>  #define ARCH_TIMER_CTRL_IT_MASK		(1 << 1)
->>  #define ARCH_TIMER_CTRL_IT_STAT		(1 << 2)
->>  
->> +#define CNTHCTL_EL1PCTEN		(1 << 0)
->> +#define CNTHCTL_EL1PCEN			(1 << 1)
->> +#define CNTHCTL_EVNTEN			(1 << 2)
->> +#define CNTHCTL_EVNTDIR			(1 << 3)
->> +#define CNTHCTL_EVNTI			(0xF << 4)
->> +
->>  enum arch_timer_reg {
->>  	ARCH_TIMER_REG_CTRL,
->>  	ARCH_TIMER_REG_TVAL,
->> -- 
->> 2.1.4
->>
+> [snip]
 > 
-> Otherwise this looks good.
+> >> > +==========================================
+> >> > +2 - CPU capacity definition
+> >> > +==========================================
+> >> > +
+> >> > +CPU capacity is a number that provides the scheduler information about CPUs
+> >> > +heterogeneity. Such heterogeneity can come from micro-architectural differences
+> >> > +(e.g., ARM big.LITTLE systems) or maximum frequency at which CPUs can run
+> >> > +(e.g., SMP systems with multiple frequency domains). Heterogeneity in this
+> >> > +context is about differing performance characteristics; this binding tries to
+> >> > +capture a first-order approximation of the relative performance of CPUs.
+> >> > +
+> >> > +One simple way to estimate CPU capacities is to iteratively run a well-known
+> >> > +CPU user space benchmark (e.g, sysbench, dhrystone, etc.) on each CPU at
+> >> > +maximum frequency and then normalize values w.r.t.  the best performing CPU.
+> >> > +One can also do a statistically significant study of a wide collection of
+> >> > +benchmarks, but pros of such an approach are not really evident at the time of
+> >> > +writing.
+> >> > +
+> >> > +==========================================
+> >> > +3 - capacity-scale
+> >> > +==========================================
+> >> > +
+> >> > +CPUs capacities are defined with respect to capacity-scale property in the cpus
+> >> > +node [1]. The property is optional; if not defined a 1024 capacity-scale is
+> >> > +assumed. This property defines both the highest CPU capacity present in the
+> >> > +system and granularity of CPU capacity values.
+> >>
+> >> I don't really see the point of this vs. having an absolute scale.
+> >>
+> >
+> > IMHO, we need this for several reasons, one being to address one of your
+> > concerns below: vendors are free to choose their scale without being
+> > forced to publish absolute data. Another reason is that it might make
+> > life easier in certain cases; for example, someone could implement a
+> > system with a few clusters of, say, A57s, but some run at half the clock
+> > of the others (e.g., you have a 1.2GHz cluster and a 600MHz cluster); in
+> > this case I think it is just easier to define capacity-scale as 1200 and
+> > capacities as 1200 and 600. Last reason that I can think of right now is
+> > that we don't probably want to bound ourself to some particular range
+> > from the beginning, as that range might be enough now, but it could
+> > change in the future (as in, right now [1-1024] looks fine for
+> > scheduling purposes, but that might change).
+> 
+> Like Rob, i don't really see the benefit of this optional
+> capacity-scale property. Parsing the capacity of all cpu nodes should
+> give you a range as well.
+> IMHO, this property looks like an optimization of the code that will
+> parse the dt more than a HW description
+> 
+
+I agree that we can come up with the same information just looking at
+the biggest capacity value of all CPUs and treat that value as
+capacity-scale. I just thought that having that explicit made things
+clearer, as it could be not easy to immediately see from a DT with many
+CPUs which is the biggest capacity value. But, yes, we could remove that
+anyway.
 
 Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+- Juri
+
+> >
+> >> > +
+> >> > +==========================================
+> >> > +4 - capacity
+> >> > +==========================================
+> >> > +
+> >> > +capacity is an optional cpu node [1] property: u32 value representing CPU
+> >> > +capacity, relative to capacity-scale. It is required and enforced that capacity
+> >> > +<= capacity-scale.
+> >>
+> >> I think you need something absolute and probably per MHz (like
+> >> dynamic-power-coefficient property). Perhaps the IPC (instructions per
+> >> clock) value?
+> >>
+> >> In other words, I want to see these numbers have a defined method
+> >> of determining them and don't want to see random values from every
+> >> vendor. ARM, Ltd. says core X has a value of Y would be good enough for
+> >> me. Vendor X's A57 having a value of 2 and Vendor Y's A57 having a
+> >> value of 1024 is not what I want to see. Of course things like cache
+> >> sizes can vary the performance, but is a baseline value good enough?
+> >>
+> >
+> > A standard reference baseline is what we advocate with this set, but
+> > making this baseline work for every vendor's implementation is hardly
+> > achievable, IMHO. I don't think we can come up with any number that
+> > applies to each and every implementation; you can have different
+> > revisions of the same core and vendors might make implementation choices
+> > that end up with different peak performance.
+> >
+> >> However, no vendor will want to publish their values if these are
+> >> absolute values relative to other vendors.
+> >>
+> >
+> > Right. That is why I think we need to abstract numbers, as we do with
+> > capacity-scale.
+> >
+> >> If you expect these to need frequent tuning, then don't put them in DT.
+> >>
+> >
+> > I expect that it is possible to come up with a sensible baseline number
+> > for a specific platform implementation, so there is value in
+> > standardizing how we specify this value and how it is then consumed.
+> > Finer grained tuning might then happen both offline (with changes to the
+> > mainline DT) and online (using the sysfs interface), but that should
+> > only apply to a narrow set of use cases.
+> >
+> > Thanks,
+> >
+> > - Juri
+> 
