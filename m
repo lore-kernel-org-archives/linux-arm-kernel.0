@@ -1,38 +1,66 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Tue,  1 Dec 2015 17:13:23 +0800
-Subject: [PATCH 0/3] Add the rk3368 evb board with the act8846 pmic
-Message-ID: <1448961206-23769-1-git-send-email-wxt@rock-chips.com>
+Date: Tue,  1 Dec 2015 17:13:24 +0800
+Subject: [PATCH 1/3] clk: rockchip: Force rk3368 PWM clock (and its parents) on
+In-Reply-To: <1448961206-23769-1-git-send-email-wxt@rock-chips.com>
+References: <1448961206-23769-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1448961206-23769-2-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series pacthes try to add the evb dts for rk3368 SoCs,
-This's similar with the rj3288 evb board.
+This's similar with the rk3288 SoCs.
+From: Douglas Anderson <dianders@chromium.org>
 
-On the moment, pwm/backlight/usb/thermal/emmc stuff can work for this
-board, I add the base version for the future firstly.
+Quick summary:
 
-PATCH [1/3]: Force rk3368 PWM clock (and its parents) On
-That's similar HACK way to work.
+Most rk3368 boards (especially those with Pmic that followed the lead
+rom rk3368-evb-act8846) have a PWM regulator on them for vdd_logic.
+This is the main voltage for all kinds of misc stuff including the
+memory controller.
 
-PATCH [2/3]: Add the RK3368 EVB board for with the act8846 pmic for dtsi
+On these boards it is critically important to make sure that the PWM
+never ever glitches and never loses its clock. Any glitch could
+crash the system.
 
-PATCH [3/3]: Add the PWM node info for rk3368 core.
+Right now there are no users of the PWM regulator and also Linux
+thinks that the PWM regulator is disabled.  Things happen to work
+because firmware configured the PWM and Linux doesn't touch it.
+..and the PWM's clock is marked as "ignore unused".
 
+...but things _stop_ working if we turn off serial console.  Why?
+Because:
+    1. Serial console shares a parent clock with the PWM (pclk_cpu)
+    2. If we have no serial console then nobody is holding pclk_cpu on
+       at reboot time.  It gets disabled.
 
+We need to fix a lot of the above problems, but until we get
+everything right the cleanest "hack" seems like it is to just keep
+the "rk_pwm" clock on always.
 
-Caesar Wang (3):
-  clk: rockchip: Force rk3368 PWM clock (and its parents) on
-  arm64: dts: rockchip: add rk3368 evaluation board
-  arm64: dts: rockchip: add the pwm node info for RK3368 SoCs
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+---
 
- arch/arm64/boot/dts/rockchip/Makefile              |   2 +-
- .../arm64/boot/dts/rockchip/rk3368-evb-act8846.dts | 173 +++++++++++++
- arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi       | 286 +++++++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3368.dtsi           |  60 +++++
- drivers/clk/rockchip/clk-rk3368.c                  |   9 +
- 5 files changed, 529 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-evb-act8846.dts
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi
+ drivers/clk/rockchip/clk-rk3368.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
+diff --git a/drivers/clk/rockchip/clk-rk3368.c b/drivers/clk/rockchip/clk-rk3368.c
+index 7e6b783..5385fef 100644
+--- a/drivers/clk/rockchip/clk-rk3368.c
++++ b/drivers/clk/rockchip/clk-rk3368.c
+@@ -819,6 +819,15 @@ static struct rockchip_clk_branch rk3368_clk_branches[] __initdata = {
+ };
+ 
+ static const char *const rk3368_critical_clocks[] __initconst = {
++	/*
++	 * HACK: Make sure this stays enabled so all its parents (like pclk_cpu)
++	 * stay enabled. CLK_IGNORE_UNUSED doesn't take care of parents.
++	 *
++	 * This is temporary until the PWM driver enables the right clock, which
++	 * it can't do until we get the ordering _just right_ and never glitch
++	 * the voltage of the PWM regulator.  Ick.
++	 */
++	"pclk_pwm1",
+ 	"pclk_pd_pmu",
+ };
+ 
 -- 
 1.9.1
