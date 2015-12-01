@@ -1,55 +1,118 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 01 Dec 2015 14:34:23 +0100
-Subject: [PATCH v3 0/3] Exynos4210: fix power domain for MDMA1 device
-Message-ID: <1448976866-7892-1-git-send-email-m.szyprowski@samsung.com>
+Date: Tue, 01 Dec 2015 14:34:24 +0100
+Subject: [PATCH v3 1/3] driver core: handle -EPROBE_DEFER from bus_type.match()
+In-Reply-To: <1448976866-7892-1-git-send-email-m.szyprowski@samsung.com>
+References: <1448976866-7892-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1448976866-7892-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset fixes mysterious boot hang on Exynos 4210 SoCs, when IOMMU
-is enabled. There is no direct dependency between IOMMU devices and
-MDMA1. However enabling IOMMU changes the device probe order, what
-results in LCD0 power domain being turned off for some time. During that
-time the registration of MDMA1 device happens, what results in system
-hangs, because the common bus code tries to read PID/CID registers from
-turned-off device.
+From: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 
-Changes since v2 include some code refactoring done to fix issues
-pointed by Ulf Hansson.
+Allow implementations of the match() callback in struct bus_type to
+return errors and if it's -EPROBE_DEFER then queue the device for
+deferred probing.
 
-Best regards
-Marek Szyprowski
-Samsung R&D Institute Poland
+This is useful to buses such as AMBA in which devices are registered
+before their matching information can be retrieved from the HW
+(typically because a clock driver hasn't probed yet).
 
-Changelog:
-v3:
-- fixed issues pointed by Ulf Hansson
-- dropped patch for exynos4210 dts, because it already got queued for merging
-
-v2: https://lkml.org/lkml/2015/11/26/229
-- added 2 patches from 'On-demand device probing' thread
-  (https://lkml.org/lkml/2015/9/29/189), which move PID/CIR reading
-  from amba_device_add() to amba_match()
-- moved dev_pm_domain_attach() to amba_match(), which is allowed to
-  return -EPROBE_DEFER
-
-v1: http://www.spinics.net/lists/arm-kernel/msg463185.html
-- initial version
-
-
-Patch summary:
-
-Marek Szyprowski (1):
-  ARM: amba: Properly handle devices with power domains
-
-Tomeu Vizoso (2):
-  driver core: handle -EPROBE_DEFER from bus_type.match()
-  ARM: amba: Move reading of periphid to amba_match()
-
- Documentation/driver-model/porting.txt |  6 ++-
- drivers/amba/bus.c                     | 83 +++++++++++++++++++---------------
- drivers/base/dd.c                      | 24 +++++++++-
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+[changed if-else code structure, adjusted documentation to match the code]
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ Documentation/driver-model/porting.txt |  6 ++++--
+ drivers/base/dd.c                      | 24 ++++++++++++++++++++++--
  include/linux/device.h                 |  2 +-
- 4 files changed, 74 insertions(+), 41 deletions(-)
+ 3 files changed, 27 insertions(+), 5 deletions(-)
 
+diff --git a/Documentation/driver-model/porting.txt b/Documentation/driver-model/porting.txt
+index 92d86f7..453053f 100644
+--- a/Documentation/driver-model/porting.txt
++++ b/Documentation/driver-model/porting.txt
+@@ -340,8 +340,10 @@ comparison:
+ 
+   int (*match)(struct device * dev, struct device_driver * drv);
+ 
+-match should return '1' if the driver supports the device, and '0'
+-otherwise. 
++match should return positive value if the driver supports the device,
++and zero otherwise. It may also return error code (for example
++-EPROBE_DEFER) if determining that given driver supports the device is
++not possible.
+ 
+ When a device is registered, the bus's list of drivers is iterated
+ over. bus->match() is called for each one until a match is found. 
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index a641cf3..793e915 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -490,6 +490,7 @@ static int __device_attach_driver(struct device_driver *drv, void *_data)
+ 	struct device_attach_data *data = _data;
+ 	struct device *dev = data->dev;
+ 	bool async_allowed;
++	int ret;
+ 
+ 	/*
+ 	 * Check if device has already been claimed. This may
+@@ -500,8 +501,17 @@ static int __device_attach_driver(struct device_driver *drv, void *_data)
+ 	if (dev->driver)
+ 		return -EBUSY;
+ 
+-	if (!driver_match_device(drv, dev))
++	ret = driver_match_device(drv, dev);
++	if (ret == 0) {
++		/* no match */
+ 		return 0;
++	} else if (ret == -EPROBE_DEFER) {
++		dev_dbg(dev, "Device match requests probe deferral\n");
++		driver_deferred_probe_add(dev);
++	} else if (ret < 0) {
++		dev_dbg(dev, "Bus failed to match device: %d", ret);
++		return ret;
++	} /* ret > 0 means positive match */
+ 
+ 	async_allowed = driver_allows_async_probing(drv);
+ 
+@@ -621,6 +631,7 @@ void device_initial_probe(struct device *dev)
+ static int __driver_attach(struct device *dev, void *data)
+ {
+ 	struct device_driver *drv = data;
++	int ret;
+ 
+ 	/*
+ 	 * Lock device and try to bind to it. We drop the error
+@@ -632,8 +643,17 @@ static int __driver_attach(struct device *dev, void *data)
+ 	 * is an error.
+ 	 */
+ 
+-	if (!driver_match_device(drv, dev))
++	ret = driver_match_device(drv, dev);
++	if (ret == 0) {
++		/* no match */
+ 		return 0;
++	} else if (ret == -EPROBE_DEFER) {
++		dev_dbg(dev, "Device match requests probe deferral\n");
++		driver_deferred_probe_add(dev);
++	} else if (ret < 0) {
++		dev_dbg(dev, "Bus failed to match device: %d", ret);
++		return ret;
++	} /* ret > 0 means positive match */
+ 
+ 	if (dev->parent)	/* Needed for USB */
+ 		device_lock(dev->parent);
+diff --git a/include/linux/device.h b/include/linux/device.h
+index b8f411b..d4e7d1f 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -70,7 +70,7 @@ extern void bus_remove_file(struct bus_type *, struct bus_attribute *);
+  * @dev_groups:	Default attributes of the devices on the bus.
+  * @drv_groups: Default attributes of the device drivers on the bus.
+  * @match:	Called, perhaps multiple times, whenever a new device or driver
+- *		is added for this bus. It should return a nonzero value if the
++ *		is added for this bus. It should return a positive value if the
+  *		given device can be handled by the given driver.
+  * @uevent:	Called when a device is added, removed, or a few other things
+  *		that generate uevents to add the environment variables.
 -- 
 1.9.2
