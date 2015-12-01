@@ -1,248 +1,179 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 1 Dec 2015 14:09:37 -0800
-Subject: [PATCH v4 1/4] mm: mmap: Add new /proc tunable for mmap_base ASLR.
-In-Reply-To: <87610jugw4.fsf@x220.int.ebiederm.org>
-References: <1448578785-17656-1-git-send-email-dcashman@android.com>
- <1448578785-17656-2-git-send-email-dcashman@android.com>
- <20151130155412.b1a087f4f6f4d4180ab4472d@linux-foundation.org>
- <20151130160118.e43a2e53a59e347a95a94d5c@linux-foundation.org>
- <CAGXu5jK7UzjBxXKQajxhLv-uLk_xQXR_FHOsmW6RLJNeK_-dZg@mail.gmail.com>
- <20151130161811.592c205d8dc7b00f44066a37@linux-foundation.org>
- <87610jugw4.fsf@x220.int.ebiederm.org>
-Message-ID: <20151201140937.e07922d9a9404ae0c184cd7f@linux-foundation.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 1 Dec 2015 14:15:31 -0800
+Subject: [PATCH v2 12/25] mtd: nand: use the mtd instance embedded in
+ struct nand_chip
+In-Reply-To: <1448967802-25796-13-git-send-email-boris.brezillon@free-electrons.com>
+References: <1448967802-25796-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1448967802-25796-13-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20151201221531.GA64635@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Nov 2015 18:55:23 -0600 ebiederm at xmission.com (Eric W. Biederman) wrote:
+Hi Boris,
 
-> Andrew Morton <akpm@linux-foundation.org> writes:
+On Tue, Dec 01, 2015 at 12:03:09PM +0100, Boris Brezillon wrote:
+> struct nand_chip now embeds an mtd device. Patch all drivers to make use
+> of this mtd instance instead of using the instance embedded in their
+> private struct or dynamically allocated.
 > 
-> > On Mon, 30 Nov 2015 16:04:36 -0800 Kees Cook <keescook@chromium.org> wrote:
-> >
-> >> >> > +#ifdef CONFIG_HAVE_ARCH_MMAP_RND_BITS
-> >> >> > +   {
-> >> >> > +           .procname       = "mmap_rnd_bits",
-> >> >> > +           .data           = &mmap_rnd_bits,
-> >> >> > +           .maxlen         = sizeof(mmap_rnd_bits),
-> >> >> > +           .mode           = 0600,
-> >> >> > +           .proc_handler   = proc_dointvec_minmax,
-> >> >> > +           .extra1         = (void *) &mmap_rnd_bits_min,
-> >> >> > +           .extra2         = (void *) &mmap_rnd_bits_max,
-> >> >>
-> >> >> hm, why the typecasts?  They're unneeded and are omitted everywhere(?)
-> >> >> else in kernel/sysctl.c.
-> >> >
-> >> > Oh.  Casting away constness.
-> >> >
-> >> > What's the thinking here?  They can change at any time so they aren't
-> >> > const so we shouldn't declare them to be const?
-> >> 
-> >> The _min and _max values shouldn't be changing: they're decided based
-> >> on the various CONFIG options that calculate the valid min/maxes. Only
-> >> mmap_rnd_bits itself should be changing.
-> >
-> > hmpf.
-> >
-> > From: Andrew Morton <akpm@linux-foundation.org>
-> > Subject: include/linux/sysctl.h: make ctl_table.extra1/2 const
-> >
-> > Nothing should be altering these values.  Declare the pointed-to values to
-> > be const so we can actually use const values.
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Cc: Julia Lawall <Julia.Lawall@lip6.fr>
+> ---
+> Most of those changes were generated with the coccinelle script added
+> in commit c671312 "coccinelle: nand: detect and correct drivers embedding
+> an mtd_info object"
+> ---
+>  drivers/mtd/nand/ams-delta.c                   | 13 ++--
+>  drivers/mtd/nand/atmel_nand.c                  | 13 ++--
+>  drivers/mtd/nand/au1550nd.c                    | 19 ++---
+>  drivers/mtd/nand/bcm47xxnflash/bcm47xxnflash.h |  1 -
+>  drivers/mtd/nand/bcm47xxnflash/main.c          |  8 ++-
+>  drivers/mtd/nand/bcm47xxnflash/ops_bcm4706.c   |  2 +-
+>  drivers/mtd/nand/bf5xx_nand.c                  | 12 ++--
+>  drivers/mtd/nand/brcmnand/brcmnand.c           | 13 ++--
+>  drivers/mtd/nand/cafe_nand.c                   |  8 +--
+>  drivers/mtd/nand/cmx270_nand.c                 | 11 ++-
+>  drivers/mtd/nand/cs553x_nand.c                 | 13 ++--
+>  drivers/mtd/nand/davinci_nand.c                | 30 ++++----
+>  drivers/mtd/nand/denali.c                      | 68 ++++++++++--------
+>  drivers/mtd/nand/denali.h                      |  1 -
+>  drivers/mtd/nand/diskonchip.c                  | 11 ++-
+>  drivers/mtd/nand/docg4.c                       | 16 ++---
+>  drivers/mtd/nand/fsl_elbc_nand.c               | 26 ++++---
+>  drivers/mtd/nand/fsl_ifc_nand.c                | 28 ++++----
+>  drivers/mtd/nand/fsl_upm.c                     | 28 ++++----
+>  drivers/mtd/nand/fsmc_nand.c                   | 56 ++++++++-------
+>  drivers/mtd/nand/gpio.c                        | 20 +++---
+>  drivers/mtd/nand/gpmi-nand/gpmi-lib.c          |  2 +-
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c         | 20 +++---
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.h         |  1 -
+>  drivers/mtd/nand/hisi504_nand.c                | 13 ++--
+>  drivers/mtd/nand/jz4740_nand.c                 |  9 ++-
+>  drivers/mtd/nand/lpc32xx_mlc.c                 |  7 +-
+>  drivers/mtd/nand/lpc32xx_slc.c                 |  7 +-
+>  drivers/mtd/nand/mpc5121_nfc.c                 |  3 +-
+>  drivers/mtd/nand/mxc_nand.c                    |  5 +-
+>  drivers/mtd/nand/nandsim.c                     | 12 ++--
+>  drivers/mtd/nand/ndfc.c                        | 24 ++++---
+>  drivers/mtd/nand/nuc900_nand.c                 | 24 +++----
+>  drivers/mtd/nand/omap2.c                       | 98 +++++++++++++++-----------
+>  drivers/mtd/nand/orion_nand.c                  |  4 +-
+>  drivers/mtd/nand/pasemi_nand.c                 | 12 ++--
+>  drivers/mtd/nand/plat_nand.c                   | 15 ++--
+>  drivers/mtd/nand/pxa3xx_nand.c                 | 33 ++++-----
+>  drivers/mtd/nand/r852.c                        | 34 ++++-----
+>  drivers/mtd/nand/r852.h                        |  1 -
+>  drivers/mtd/nand/s3c2410.c                     | 23 +++---
+
+^^ some errors in this one
+
+>  drivers/mtd/nand/sh_flctl.c                    |  8 +--
+>  drivers/mtd/nand/sharpsl.c                     | 22 +++---
+>  drivers/mtd/nand/socrates_nand.c               |  5 +-
+>  drivers/mtd/nand/sunxi_nand.c                  | 13 ++--
+>  drivers/mtd/nand/tmio_nand.c                   | 10 +--
+>  drivers/mtd/nand/txx9ndfmc.c                   |  3 +-
+>  drivers/mtd/nand/vf610_nfc.c                   |  8 ++-
+>  include/linux/mtd/sh_flctl.h                   |  3 +-
+>  49 files changed, 426 insertions(+), 390 deletions(-)
 > 
-> No large objects except we do seem to have values that are stashed
-> in extra1 that are cast to non-const types.
-> 
-> Any chance you will do the work to hunt all of those down and modify
-> the casts to preserve const or to remove the casts entirely?
 
-Below.  Most of it, anyway.
+[...]
 
-net is doing weird stuff, stashing very-much-non-const things into
-extra1 and extra2.  I don't see much point in sprinkling casts
-everywhere to conceal this (ab)use.  extra1 and extra2 clearly aren't
-const, so I think I'll give up and sulk.
+> diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
+> index e658b29..3f29734 100644
+> --- a/drivers/mtd/nand/s3c2410.c
+> +++ b/drivers/mtd/nand/s3c2410.c
+> @@ -104,7 +104,6 @@ struct s3c2410_nand_info;
+>   * @scan_res: The result from calling nand_scan_ident().
+>  */
+>  struct s3c2410_nand_mtd {
+> -	struct mtd_info			mtd;
+>  	struct nand_chip		chip;
+>  	struct s3c2410_nand_set		*set;
+>  	struct s3c2410_nand_info	*info;
+> @@ -168,7 +167,8 @@ struct s3c2410_nand_info {
+>  
+>  static struct s3c2410_nand_mtd *s3c2410_nand_mtd_toours(struct mtd_info *mtd)
+>  {
+> -	return container_of(mtd, struct s3c2410_nand_mtd, mtd);
+> +	return container_of(mtd_to_nand(mtd), struct s3c2410_nand_mtd,
+> +			    chip);
+>  }
+>  
+>  static struct s3c2410_nand_info *s3c2410_nand_mtd_toinfo(struct mtd_info *mtd)
+> @@ -745,7 +745,7 @@ static int s3c24xx_nand_remove(struct platform_device *pdev)
+>  
+>  		for (mtdno = 0; mtdno < info->mtd_count; mtdno++, ptr++) {
+>  			pr_debug("releasing mtd %d (%p)\n", mtdno, ptr);
+> -			nand_release(&ptr->mtd);
+> +			nand_release(nand_to_mtd(&ptr->chip));
+>  		}
+>  	}
+>  
+> @@ -762,9 +762,11 @@ static int s3c2410_nand_add_partition(struct s3c2410_nand_info *info,
+>  				      struct s3c2410_nand_set *set)
+>  {
+>  	if (set) {
+> -		mtd->mtd.name = set->name;
+> +		struct mtd_info *mtd = nand_to_mtd(&mtd->chip);
 
+You're shadowing the earlier 'mtd' variable:
 
- drivers/parport/procfs.c       |    4 ++--
- net/core/neighbour.c           |    6 +++---
- net/decnet/dn_dev.c            |    2 +-
- net/ipv4/devinet.c             |   10 +++++-----
- net/ipv6/addrconf.c            |   12 +++++++-----
- net/ipv6/ndisc.c               |    2 +-
- net/netfilter/ipvs/ip_vs_ctl.c |    2 +-
- 7 files changed, 20 insertions(+), 18 deletions(-)
+drivers/mtd/nand/s3c2410.c: In function ?s3c2410_nand_add_partition?:
+drivers/mtd/nand/s3c2410.c:765:42: error: ?struct mtd_info? has no member named ?chip?
 
-diff -puN net/core/neighbour.c~include-linux-sysctlh-make-ctl_tableextra1-2-const-fix net/core/neighbour.c
---- a/net/core/neighbour.c~include-linux-sysctlh-make-ctl_tableextra1-2-const-fix
-+++ a/net/core/neighbour.c
-@@ -2915,8 +2915,8 @@ static void neigh_copy_dflt_parms(struct
- 
- static void neigh_proc_update(struct ctl_table *ctl, int write)
- {
--	struct net_device *dev = ctl->extra1;
--	struct neigh_parms *p = ctl->extra2;
-+	struct net_device *dev = (void *)ctl->extra1;
-+	struct neigh_parms *p = (void *)ctl->extra2;
- 	struct net *net = neigh_parms_net(p);
- 	int index = (int *) ctl->data - p->data;
- 
-@@ -2999,7 +2999,7 @@ static int neigh_proc_base_reachable_tim
- 					  void __user *buffer,
- 					  size_t *lenp, loff_t *ppos)
- {
--	struct neigh_parms *p = ctl->extra2;
-+	struct neigh_parms *p = (void *)ctl->extra2;
- 	int ret;
- 
- 	if (strcmp(ctl->procname, "base_reachable_time") == 0)
-diff -puN net/decnet/dn_dev.c~include-linux-sysctlh-make-ctl_tableextra1-2-const-fix net/decnet/dn_dev.c
---- a/net/decnet/dn_dev.c~include-linux-sysctlh-make-ctl_tableextra1-2-const-fix
-+++ a/net/decnet/dn_dev.c
-@@ -248,7 +248,7 @@ static int dn_forwarding_proc(struct ctl
- 				size_t *lenp, loff_t *ppos)
- {
- #ifdef CONFIG_DECNET_ROUTER
--	struct net_device *dev = table->extra1;
-+	struct net_device *dev = (void *)table->extra1;
- 	struct dn_dev *dn_db;
- 	int err;
- 	int tmp, old;
-diff -puN net/ipv4/devinet.c~include-linux-sysctlh-make-ctl_tableextra1-2-const-fix net/ipv4/devinet.c
---- a/net/ipv4/devinet.c~include-linux-sysctlh-make-ctl_tableextra1-2-const-fix
-+++ a/net/ipv4/devinet.c
-@@ -2030,8 +2030,8 @@ static int devinet_conf_proc(struct ctl_
- 	int new_value = *(int *)ctl->data;
- 
- 	if (write) {
--		struct ipv4_devconf *cnf = ctl->extra1;
--		struct net *net = ctl->extra2;
-+		struct ipv4_devconf *cnf = (void *)ctl->extra1;
-+		struct net *net = (void *)ctl->extra2;
- 		int i = (int *)ctl->data - cnf->data;
- 		int ifindex;
- 
-@@ -2077,7 +2077,7 @@ static int devinet_sysctl_forward(struct
- 	int ret = proc_dointvec(ctl, write, buffer, lenp, ppos);
- 
- 	if (write && *valp != val) {
--		struct net *net = ctl->extra2;
-+		struct net *net = (void *)ctl->extra2;
- 
- 		if (valp != &IPV4_DEVCONF_DFLT(net, FORWARDING)) {
- 			if (!rtnl_trylock()) {
-@@ -2089,7 +2089,7 @@ static int devinet_sysctl_forward(struct
- 			if (valp == &IPV4_DEVCONF_ALL(net, FORWARDING)) {
- 				inet_forward_change(net);
- 			} else {
--				struct ipv4_devconf *cnf = ctl->extra1;
-+				struct ipv4_devconf *cnf = (void *)ctl->extra1;
- 				struct in_device *idev =
- 					container_of(cnf, struct in_device, cnf);
- 				if (*valp)
-@@ -2117,7 +2117,7 @@ static int ipv4_doint_and_flush(struct c
- 	int *valp = ctl->data;
- 	int val = *valp;
- 	int ret = proc_dointvec(ctl, write, buffer, lenp, ppos);
--	struct net *net = ctl->extra2;
-+	struct net *net = (void *)ctl->extra2;
- 
- 	if (write && *valp != val)
- 		rt_cache_flush(net);
-diff -puN net/ipv6/addrconf.c~include-linux-sysctlh-make-ctl_tableextra1-2-const-fix net/ipv6/addrconf.c
---- a/net/ipv6/addrconf.c~include-linux-sysctlh-make-ctl_tableextra1-2-const-fix
-+++ a/net/ipv6/addrconf.c
-@@ -5203,7 +5203,7 @@ static
- int addrconf_sysctl_mtu(struct ctl_table *ctl, int write,
- 			void __user *buffer, size_t *lenp, loff_t *ppos)
- {
--	struct inet6_dev *idev = ctl->extra1;
-+	const struct inet6_dev *idev = ctl->extra1;
- 	int min_mtu = IPV6_MIN_MTU;
- 	struct ctl_table lctl;
- 
-@@ -5312,7 +5312,7 @@ int addrconf_sysctl_proxy_ndp(struct ctl
- 	new = *valp;
- 
- 	if (write && old != new) {
--		struct net *net = ctl->extra2;
-+		struct net *net = (struct net *)ctl->extra2;
- 
- 		if (!rtnl_trylock())
- 			return restart_syscall();
-@@ -5326,8 +5326,9 @@ int addrconf_sysctl_proxy_ndp(struct ctl
- 						     NETCONFA_IFINDEX_ALL,
- 						     net->ipv6.devconf_all);
- 		else {
--			struct inet6_dev *idev = ctl->extra1;
-+			struct inet6_dev *idev;
- 
-+			idev = (struct inet6_dev *)ctl->extra1;
- 			inet6_netconf_notify_devconf(net, NETCONFA_PROXY_NEIGH,
- 						     idev->dev->ifindex,
- 						     &idev->cnf);
-@@ -5346,7 +5347,7 @@ static int addrconf_sysctl_stable_secret
- 	struct in6_addr addr;
- 	char str[IPV6_MAX_STRLEN];
- 	struct ctl_table lctl = *ctl;
--	struct net *net = ctl->extra2;
-+	const struct net *net = ctl->extra2;
- 	struct ipv6_stable_secret *secret = ctl->data;
- 
- 	if (&net->ipv6.devconf_all->stable_secret == ctl->data)
-@@ -5396,8 +5397,9 @@ static int addrconf_sysctl_stable_secret
- 			}
- 		}
- 	} else {
--		struct inet6_dev *idev = ctl->extra1;
-+		struct inet6_dev *idev;
- 
-+		idev = (struct inet6_dev *)ctl->extra1;
- 		idev->addr_gen_mode = IN6_ADDR_GEN_MODE_STABLE_PRIVACY;
- 	}
- 
-diff -puN net/ipv6/ndisc.c~include-linux-sysctlh-make-ctl_tableextra1-2-const-fix net/ipv6/ndisc.c
---- a/net/ipv6/ndisc.c~include-linux-sysctlh-make-ctl_tableextra1-2-const-fix
-+++ a/net/ipv6/ndisc.c
-@@ -1738,7 +1738,7 @@ static void ndisc_warn_deprecated_sysctl
- 
- int ndisc_ifinfo_sysctl_change(struct ctl_table *ctl, int write, void __user *buffer, size_t *lenp, loff_t *ppos)
- {
--	struct net_device *dev = ctl->extra1;
-+	const struct net_device *dev = ctl->extra1;
- 	struct inet6_dev *idev;
- 	int ret;
- 
-diff -puN net/netfilter/ipvs/ip_vs_ctl.c~include-linux-sysctlh-make-ctl_tableextra1-2-const-fix net/netfilter/ipvs/ip_vs_ctl.c
---- a/net/netfilter/ipvs/ip_vs_ctl.c~include-linux-sysctlh-make-ctl_tableextra1-2-const-fix
-+++ a/net/netfilter/ipvs/ip_vs_ctl.c
-@@ -1608,7 +1608,7 @@ static int
- proc_do_defense_mode(struct ctl_table *table, int write,
- 		     void __user *buffer, size_t *lenp, loff_t *ppos)
- {
--	struct netns_ipvs *ipvs = table->extra2;
-+	struct netns_ipvs *ipvs = (void *)table->extra2;
- 	int *valp = table->data;
- 	int val = *valp;
- 	int rc;
-diff -puN drivers/parport/procfs.c~include-linux-sysctlh-make-ctl_tableextra1-2-const-fix drivers/parport/procfs.c
---- a/drivers/parport/procfs.c~include-linux-sysctlh-make-ctl_tableextra1-2-const-fix
-+++ a/drivers/parport/procfs.c
-@@ -35,7 +35,7 @@
- static int do_active_device(struct ctl_table *table, int write,
- 		      void __user *result, size_t *lenp, loff_t *ppos)
- {
--	struct parport *port = (struct parport *)table->extra1;
-+	const struct parport *port = table->extra1;
- 	char buffer[256];
- 	struct pardevice *dev;
- 	int len = 0;
-@@ -72,7 +72,7 @@ static int do_active_device(struct ctl_t
- static int do_autoprobe(struct ctl_table *table, int write,
- 			void __user *result, size_t *lenp, loff_t *ppos)
- {
--	struct parport_device_info *info = table->extra2;
-+	const struct parport_device_info *info = table->extra2;
- 	const char *str;
- 	char buffer[256];
- 	int len = 0;
-_
+>  
+> -		return mtd_device_parse_register(&mtd->mtd, NULL, NULL,
+> +		mtd->name = set->name;
+> +
+> +		return mtd_device_parse_register(mtd, NULL, NULL,
+>  					 set->partitions, set->nr_partitions);
+>  	}
+>  
+> @@ -786,6 +788,7 @@ static void s3c2410_nand_init_chip(struct s3c2410_nand_info *info,
+>  				   struct s3c2410_nand_set *set)
+>  {
+>  	struct nand_chip *chip = &nmtd->chip;
+> +	struct mtd_info *mtd = nand_to_mtd(chip);
+>  	void __iomem *regs = info->regs;
+>  
+>  	chip->write_buf    = s3c2410_nand_write_buf;
+> @@ -831,7 +834,7 @@ static void s3c2410_nand_init_chip(struct s3c2410_nand_info *info,
+>  	chip->IO_ADDR_R = chip->IO_ADDR_W;
+>  
+>  	nmtd->info	   = info;
+> -	nmtd->mtd.priv	   = chip;
+> +	mtd->priv	   = chip;
+>  	nmtd->set	   = set;
+>  
+>  #ifdef CONFIG_MTD_NAND_S3C2410_HWECC
+> @@ -1012,19 +1015,21 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
+>  	nmtd = info->mtds;
+>  
+>  	for (setno = 0; setno < nr_sets; setno++, nmtd++) {
+> +		struct mtd_info *mtd = nand_to_mtd(&nmtd->chip);
+> +
+>  		pr_debug("initialising set %d (%p, info %p)\n",
+>  			 setno, nmtd, info);
+>  
+> -		nmtd->mtd.dev.parent = &pdev->dev;
+> +		mtd->dev.parent = &pdev->dev;
+>  		s3c2410_nand_init_chip(info, nmtd, sets);
+>  
+> -		nmtd->scan_res = nand_scan_ident(&nmtd->mtd,
+> +		nmtd->scan_res = nand_scan_ident(mtd,
+>  						 (sets) ? sets->nr_chips : 1,
+>  						 NULL);
+>  
+>  		if (nmtd->scan_res == 0) {
+>  			s3c2410_nand_update_chip(info, nmtd);
+> -			nand_scan_tail(&nmtd->mtd);
+> +			nand_scan_tail(mtd);
+>  			s3c2410_nand_add_partition(info, nmtd, sets);
+>  		}
+>  
+
+[...]
+
+Brian
