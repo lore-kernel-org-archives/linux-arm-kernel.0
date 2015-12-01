@@ -1,192 +1,206 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 1 Dec 2015 22:39:14 +0800
-Subject: [PATCH v4 1/5] clk: sunxi: Add CLK_OF_DECLARE support for
- sun8i-a23-apb0-clk driver
-In-Reply-To: <CAGb2v6502U3=GcbZOtj59r2_JRjKfTq=U9TGQgWFKpr3_-hcNw@mail.gmail.com>
-References: <1448766190-11345-1-git-send-email-wens@csie.org>
- <1448766190-11345-2-git-send-email-wens@csie.org>
- <20151201100416.GF29263@lukather>
- <CAGb2v66bJJZ_xmD8B2X6nR3bxte9CdrnBpnd1KMRTmyRTr1KRQ@mail.gmail.com>
- <20151201125032.GH29263@lukather>
- <CAGb2v6502U3=GcbZOtj59r2_JRjKfTq=U9TGQgWFKpr3_-hcNw@mail.gmail.com>
-Message-ID: <CAGb2v645Bb-dAroH3kMO_vKgif-s0at-uJ4PJrZ78zB=HGr+4A@mail.gmail.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Tue, 1 Dec 2015 22:35:13 +0800
+Subject: [PATCH v4 18/21] KVM: ARM64: Add PMU overflow interrupt routing
+In-Reply-To: <20151130182258.684c9df6@arm.com>
+References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>	<1446186123-11548-19-git-send-email-zhaoshenglong@huawei.com>
+ <20151130182258.684c9df6@arm.com>
+Message-ID: <565DB021.3020901@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 1, 2015 at 10:19 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Tue, Dec 1, 2015 at 8:50 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> On Tue, Dec 01, 2015 at 07:54:06PM +0800, Chen-Yu Tsai wrote:
->>> On Tue, Dec 1, 2015 at 6:04 PM, Maxime Ripard
->>> <maxime.ripard@free-electrons.com> wrote:
->>> > Hi,
->>> >
->>> > On Sun, Nov 29, 2015 at 11:03:06AM +0800, Chen-Yu Tsai wrote:
->>> >> The APBS clock on sun9i is the same as the APB0 clock on sun8i. With
->>> >> sun9i we are supporting the PRCM clocks by using CLK_OF_DECLARE,
->>> >> instead of through a PRCM mfd device and subdevices for each clock
->>> >> and reset control. As such we need a CLK_OF_DECLARE version of
->>> >> the sun8i-a23-apb0-clk driver.
->>> >>
->>> >> Also, build it for sun9i/A80, and not just for configurations with
->>> >> MFD_SUN6I_PRCM enabled.
->>> >>
->>> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>> >> ---
->>> >>  drivers/clk/sunxi/Makefile         |  5 +--
->>> >>  drivers/clk/sunxi/clk-sun8i-apb0.c | 71 +++++++++++++++++++++++++++++++-------
->>> >>  2 files changed, 62 insertions(+), 14 deletions(-)
->>> >>
->>> >> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
->>> >> index cb4c299214ce..c55d5cd1c0e5 100644
->>> >> --- a/drivers/clk/sunxi/Makefile
->>> >> +++ b/drivers/clk/sunxi/Makefile
->>> >> @@ -15,6 +15,7 @@ obj-y += clk-sun9i-core.o
->>> >>  obj-y += clk-sun9i-mmc.o
->>> >>  obj-y += clk-usb.o
->>> >>
->>> >> +obj-$(CONFIG_MACH_SUN9I) += clk-sun8i-apb0.o
->>> >> +
->>> >
->>> > So sun8i doesn't use it?
->>>
->>> Shit... I messed up. clk-sun8i-apb0.o should also be under
->>> CONFIG_MFD_SUN6I_PRCM.
->>>
->>> I'll send a new version of this patch. No need to keep spamming
->>> people with the whole series.
+
+
+On 2015/12/1 2:22, Marc Zyngier wrote:
+> On Fri, 30 Oct 2015 14:22:00 +0800
+> Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+> 
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
 >>
->> Ok.
+>> When calling perf_event_create_kernel_counter to create perf_event,
+>> assign a overflow handler. Then when perf event overflows, set
+>> irq_pending and call kvm_vcpu_kick() to sync the interrupt.
 >>
->>> >>  obj-$(CONFIG_MFD_SUN6I_PRCM) += \
->>> >> -     clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o \
->>> >> -     clk-sun8i-apb0.o
->>> >> +     clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o
->>> >> diff --git a/drivers/clk/sunxi/clk-sun8i-apb0.c b/drivers/clk/sunxi/clk-sun8i-apb0.c
->>> >> index 7ae5d2c2cde1..c1e2ac8f4b0d 100644
->>> >> --- a/drivers/clk/sunxi/clk-sun8i-apb0.c
->>> >> +++ b/drivers/clk/sunxi/clk-sun8i-apb0.c
->>> >> @@ -17,13 +17,68 @@
->>> >>  #include <linux/clk-provider.h>
->>> >>  #include <linux/module.h>
->>> >>  #include <linux/of.h>
->>> >> +#include <linux/of_address.h>
->>> >>  #include <linux/platform_device.h>
->>> >>
->>> >> +static struct clk *sun8i_a23_apb0_register(struct device_node *node,
->>> >> +                                        void __iomem *reg)
->>> >> +{
->>> >> +     const char *clk_name = node->name;
->>> >> +     const char *clk_parent;
->>> >> +     struct clk *clk;
->>> >> +     int ret;
->>> >> +
->>> >> +     clk_parent = of_clk_get_parent_name(node, 0);
->>> >> +     if (!clk_parent)
->>> >> +             return ERR_PTR(-EINVAL);
->>> >> +
->>> >> +     of_property_read_string(node, "clock-output-names", &clk_name);
->>> >> +
->>> >> +     /* The A23 APB0 clock is a standard 2 bit wide divider clock */
->>> >> +     clk = clk_register_divider(NULL, clk_name, clk_parent, 0, reg,
->>> >> +                                0, 2, CLK_DIVIDER_POWER_OF_TWO, NULL);
->>> >> +     if (IS_ERR(clk))
->>> >> +             return clk;
->>> >> +
->>> >> +     ret = of_clk_add_provider(node, of_clk_src_simple_get, clk);
->>> >> +     if (ret)
->>> >> +             goto err_unregister;
->>> >> +
->>> >> +     return clk;
->>> >> +
->>> >> +err_unregister:
->>> >> +     clk_unregister_divider(clk);
->>> >> +
->>> >> +     return ERR_PTR(ret);
->>> >> +}
->>> >> +
->>> >> +static void sun8i_a23_apb0_setup(struct device_node *node)
->>> >> +{
->>> >> +     void __iomem *reg;
->>> >> +     struct resource res;
->>> >> +     struct clk *clk;
->>> >> +
->>> >> +     reg = of_io_request_and_map(node, 0, of_node_full_name(node));
->>> >> +     if (IS_ERR(reg))
->>> >> +             return;
->>> >> +
->>> >> +     clk = sun8i_a23_apb0_register(node, reg);
->>> >> +     if (IS_ERR(clk))
->>> >> +             goto err_unmap;
->>> >> +
->>> >> +     return;
->>> >> +
->>> >> +err_unmap:
->>> >> +     iounmap(reg);
->>> >> +     of_address_to_resource(node, 0, &res);
->>> >> +     release_mem_region(res.start, resource_size(&res));
->>> >> +}
->>> >> +CLK_OF_DECLARE(sun8i_a23_apb0, "allwinner,sun8i-a23-apb0-clk",
->>> >> +            sun8i_a23_apb0_setup);
->>> >> +
->>> >>  static int sun8i_a23_apb0_clk_probe(struct platform_device *pdev)
->>> >>  {
->>> >>       struct device_node *np = pdev->dev.of_node;
->>> >> -     const char *clk_name = np->name;
->>> >> -     const char *clk_parent;
->>> >>       struct resource *r;
->>> >>       void __iomem *reg;
->>> >>       struct clk *clk;
->>> >> @@ -33,19 +88,11 @@ static int sun8i_a23_apb0_clk_probe(struct platform_device *pdev)
->>> >>       if (IS_ERR(reg))
->>> >>               return PTR_ERR(reg);
->>> >>
->>> >> -     clk_parent = of_clk_get_parent_name(np, 0);
->>> >> -     if (!clk_parent)
->>> >> -             return -EINVAL;
->>> >> -
->>> >> -     of_property_read_string(np, "clock-output-names", &clk_name);
->>> >> -
->>> >> -     /* The A23 APB0 clock is a standard 2 bit wide divider clock */
->>> >> -     clk = clk_register_divider(&pdev->dev, clk_name, clk_parent, 0, reg,
->>> >> -                                0, 2, CLK_DIVIDER_POWER_OF_TWO, NULL);
->>> >> +     clk = sun8i_a23_apb0_register(np, reg);
->>> >>       if (IS_ERR(clk))
->>> >>               return PTR_ERR(clk);
->>> >>
->>> >> -     return of_clk_add_provider(np, of_clk_src_simple_get, clk);
->>> >> +     return 0;
->>> >>  }
->>> >
->>> > Won't this probe twice now? First the CLK_OF_DECLARE will register a
->>> > clock, and then the device model will call probe a second time.
->>>
->>> AFAIK it will.
->>>
->>> > I guess then request_mem_region will catch it, but then you return an
->>> > error code, which is probably an error success, since the clock is
->>> > registered :)
->>>
->>> Indeed. clk-mod0.c actually has a comment block explaining this.
->>> I didn't want to repeat the whole thing though.
+>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> ---
+>>  arch/arm/kvm/arm.c    |  4 +++
+>>  include/kvm/arm_pmu.h |  4 +++
+>>  virt/kvm/arm/pmu.c    | 76 ++++++++++++++++++++++++++++++++++++++++++++++++++-
+>>  3 files changed, 83 insertions(+), 1 deletion(-)
 >>
->> I guess, we can simply return 0 if of_io_request_and_map returns
->> EBUSY, since it would simply mean that we already probed.
->
-> I think CLK_OF_DECLARE gets probed first, then platform devices.
-> of_io_request_and_map fails for mfd cells, which have no DT reg
-> properties. So we should be ignoring -EINVAL instead of -EBUSY.
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index 78b2869..9c0fec4 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -28,6 +28,7 @@
+>>  #include <linux/sched.h>
+>>  #include <linux/kvm.h>
+>>  #include <trace/events/kvm.h>
+>> +#include <kvm/arm_pmu.h>
+>>  
+>>  #define CREATE_TRACE_POINTS
+>>  #include "trace.h"
+>> @@ -551,6 +552,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  
+>>  		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
+>>  			local_irq_enable();
+>> +			kvm_pmu_sync_hwstate(vcpu);
+> 
+> This is very weird. Are you only injecting interrupts when a signal is
+> pending? I don't understand how this works...
+> 
+>>  			kvm_vgic_sync_hwstate(vcpu);
+>>  			preempt_enable();
+>>  			kvm_timer_sync_hwstate(vcpu);
+>> @@ -598,6 +600,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  		kvm_guest_exit();
+>>  		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
+>>  
+>> +		kvm_pmu_post_sync_hwstate(vcpu);
+>> +
+>>  		kvm_vgic_sync_hwstate(vcpu);
+>>  
+>>  		preempt_enable();
+>> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+>> index acd025a..5e7f943 100644
+>> --- a/include/kvm/arm_pmu.h
+>> +++ b/include/kvm/arm_pmu.h
+>> @@ -39,6 +39,8 @@ struct kvm_pmu {
+>>  };
+>>  
+>>  #ifdef CONFIG_KVM_ARM_PMU
+>> +void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu);
+>> +void kvm_pmu_post_sync_hwstate(struct kvm_vcpu *vcpu);
+> 
+> Please follow the current terminology: _flush_ on VM entry, _sync_ on
+> VM exit.
+> 
 
-Right... I misread your comment. You're talking about the platform device
-part. About ignoring the error here: normally we use CLK_OF_DECLARE with
-clocks under the "clocks" node, which don't get registered as platform
-device. (Or is this not so common?) So if one does get probed twice, I
-think we shouldn't ignore the error. It's likely the DT has a problem
-and the probe error will let the user know.
+Hi Marc,
 
-What do you think?
+Is below patch the right way for this?
 
-ChenYu
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 78b2869..84008d1 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -28,6 +28,7 @@
+ #include <linux/sched.h>
+ #include <linux/kvm.h>
+ #include <trace/events/kvm.h>
++#include <kvm/arm_pmu.h>
 
-> But yeah, I'll have it return 0 in this case, and add a brief
-> comment.
+ #define CREATE_TRACE_POINTS
+ #include "trace.h"
+@@ -531,6 +532,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu,
+struct kvm_run *run)
+                 */
+                kvm_timer_flush_hwstate(vcpu);
+
++               kvm_pmu_flush_hwstate(vcpu);
++
+                /*
+                 * Preparing the interrupts to be injected also
+                 * involves poking the GIC, which must be done in a
+@@ -554,6 +557,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu,
+struct kvm_run *run)
+                        kvm_vgic_sync_hwstate(vcpu);
+                        preempt_enable();
+                        kvm_timer_sync_hwstate(vcpu);
++                       kvm_pmu_sync_hwstate(vcpu);
+                        continue;
+                }
+
+@@ -604,6 +608,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu,
+struct kvm_run *run)
+
+                kvm_timer_sync_hwstate(vcpu);
+
++               kvm_pmu_sync_hwstate(vcpu);
++
+                ret = handle_exit(vcpu, run, ret);
+        }
+
+diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+index 47bbd43..edfe4e5 100644
+--- a/include/kvm/arm_pmu.h
++++ b/include/kvm/arm_pmu.h
+@@ -41,6 +41,8 @@ struct kvm_pmu {
+ };
+
+ #ifdef CONFIG_KVM_ARM_PMU
++void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
++void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu);
+ unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32
+select_idx);
+ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val);
+ void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u32 val, bool
+all_enable);
+@@ -51,6 +53,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu
+*vcpu, u32 data,
+                                    u32 select_idx);
+ void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u32 val);
+ #else
++void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
++void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu) {}
+ unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32
+select_idx)
+ {
+        return 0;
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index 15cac45..9aad2f7 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -21,6 +21,7 @@
+ #include <linux/perf_event.h>
+ #include <asm/kvm_emulate.h>
+ #include <kvm/arm_pmu.h>
++#include <kvm/arm_vgic.h>
+
+ /**
+  * kvm_pmu_get_counter_value - get PMU counter value
+@@ -79,6 +80,78 @@ static void kvm_pmu_stop_counter(struct kvm_pmc *pmc)
+ }
+
+ /**
++ * kvm_pmu_flush_hwstate - flush pmu state to cpu
++ * @vcpu: The vcpu pointer
++ *
++ * Inject virtual PMU IRQ if IRQ is pending for this cpu.
++ */
++void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu)
++{
++       struct kvm_pmu *pmu = &vcpu->arch.pmu;
++       u32 overflow;
++
++       if (!vcpu_mode_is_32bit(vcpu))
++               overflow = vcpu_sys_reg(vcpu, PMOVSSET_EL0);
++       else
++               overflow = vcpu_cp15(vcpu, c9_PMOVSSET);
++
++       if ((pmu->irq_pending || overflow != 0) && (pmu->irq_num != -1))
++               kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+pmu->irq_num, 1);
++
++       pmu->irq_pending = false;
++}
++
++/**
++ * kvm_pmu_sync_hwstate - sync pmu state for cpu
++ * @vcpu: The vcpu pointer
++ *
++ * Inject virtual PMU IRQ if IRQ is pending for this cpu when back from
+guest.
++ */
++void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu)
++{
++       struct kvm_pmu *pmu = &vcpu->arch.pmu;
++
++       if (pmu->irq_pending && (pmu->irq_num != -1))
++               kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+pmu->irq_num, 1);
++
++       pmu->irq_pending = false;
++}
+
+-- 
+Shannon
