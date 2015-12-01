@@ -1,53 +1,34 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 1 Dec 2015 10:14:00 +0100
-Subject: [PATCH] ASoC: sun4i: Implement MIC1 capture
-In-Reply-To: <20151130161705.GY1929@sirena.org.uk>
-References: <1448897867-22320-1-git-send-email-maxime.ripard@free-electrons.com>
- <20151130161705.GY1929@sirena.org.uk>
-Message-ID: <20151201091400.GD29263@lukather>
+From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
+Date: Tue,  1 Dec 2015 11:14:55 +0200
+Subject: [PATCH 0/4] bam dma fixes and one dt extension
+Message-ID: <1448961299-15161-1-git-send-email-stanimir.varbanov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Here are three bam dma fixes, which I made during testing qcrypto
+driver. The first one is a real fix, the second one is related to
+peripherals on which the BAM IP is initialized by remote execution
+environment, and the third one is a sleeping bug IMO.
 
-On Mon, Nov 30, 2015 at 04:17:05PM +0000, Mark Brown wrote:
-> On Mon, Nov 30, 2015 at 04:37:47PM +0100, Maxime Ripard wrote:
-> 
-> A couple of minor issues below but I'll apply this - please send
-> followup patches.
-> 
-> > +static void sun4i_codec_start_capture(struct sun4i_codec *scodec)
-> > +{
-> > +	/*
-> > +	 * FIXME: according to the BSP, we might need to drive a PA
-> > +	 *        GPIO high here on some boards
-> > +	 */
-> 
-> That's not something this driver needs to worry about, that's something
-> the machine driver will do - the whole purpose is to glue all the
-> different components on the board together.
+The last patch is a extension again for peripherals which BAM is
+remotely controlled by other execution environment.
 
-Indeed, I'll remove the comment.
+All patches has been tested on db410c board with apq8016.
 
-> 
-> > +	if (clk_set_rate(scodec->clk_module, clk_freq))
-> > +		return -EINVAL;
-> 
-> It'd be better to pass back the error code from clk_set_rate().
+Comments are welcome!
 
-Ack, I'll send a patch.
+regards,
+Stan
 
-Thanks!
-Maxime
+Stanimir Varbanov (4):
+  dmaengine: qcom_bam_dma: fix dma free memory on remove
+  dmaengine: qcom_bam_dma: clear BAM interrupt only if it is rised
+  dmaengine: qcom_bam_dma: use correct pipe FIFO size
+  dmaengine: qcom_bam_dma: add controlled remotely dt property
+
+ .../devicetree/bindings/dma/qcom_bam_dma.txt       |    2 ++
+ drivers/dma/qcom_bam_dma.c                         |   24 ++++++++++++++++----
+ 2 files changed, 21 insertions(+), 5 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151201/23d528a7/attachment.sig>
+1.7.9.5
