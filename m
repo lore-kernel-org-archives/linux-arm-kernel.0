@@ -1,64 +1,23 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 2 Dec 2015 04:20:11 +0800
-Subject: [PATCH] reset: Introduce static inline dummy function when
- CONFIG_RESET_CONTROLLER
-In-Reply-To: <1448984088-31904-1-git-send-email-nm@ti.com>
-Message-ID: <201512020452.RzkhnbRw%fengguang.wu@intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 01 Dec 2015 21:20:28 +0100
+Subject: [RFC v02 04/15] dmaengine: edma: Add support for DMA filter
+ mapping to slave devices
+In-Reply-To: <20151201172212.GC1696@localhost>
+References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
+ <1448891145-10766-5-git-send-email-peter.ujfalusi@ti.com>
+ <20151201172212.GC1696@localhost>
+Message-ID: <1589780.JL62pLTh05@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth,
+On Tuesday 01 December 2015 22:52:12 Vinod Koul wrote:
+> On Mon, Nov 30, 2015 at 03:45:34PM +0200, Peter Ujfalusi wrote:
+> > Add support for providing device to filter_fn mapping so client drivers
+> > can switch to use the dma_request_chan() API.
+> 
+> Any reason why we dont want to go with DT based only for edma here?
 
-[auto build test WARNING on: v4.4-rc3]
-[also build test WARNING on: next-20151127]
+I think the OMAP2 based platforms using edma are all DT-only, but mach-davinci
+would need a lot of work for that.
 
-url:    https://github.com/0day-ci/linux/commits/Nishanth-Menon/reset-Introduce-static-inline-dummy-function-when-CONFIG_RESET_CONTROLLER/20151201-233708
-reproduce:
-        # apt-get install sparse
-        make ARCH=x86_64 allmodconfig
-        make C=1 CF=-D__CHECK_ENDIAN__
-
-
-sparse warnings: (new ones prefixed by >>)
-
->> include/linux/reset-controller.h:1:2: sparse: unterminated preprocessor conditional
-   include/linux/compiler.h:228:8: sparse: attribute 'no_sanitize_address': unknown attribute
-   In file included from drivers/reset/core.c:18:0:
-   include/linux/reset-controller.h:1:0: error: unterminated #ifndef
-    #ifndef _LINUX_RESET_CONTROLLER_H_
-    ^
---
->> include/linux/reset-controller.h:1:2: sparse: unterminated preprocessor conditional
->> include/linux/reset-controller.h:1:2: sparse: unterminated preprocessor conditional
-   include/linux/compiler.h:228:8: sparse: attribute 'no_sanitize_address': unknown attribute
-   In file included from drivers/clk/qcom/reset.c:17:0:
-   include/linux/reset-controller.h:1:0: error: unterminated #ifndef
-    #ifndef _LINUX_RESET_CONTROLLER_H_
-    ^
-   In file included from drivers/clk/qcom/reset.h:17:0,
-                    from drivers/clk/qcom/reset.c:20:
-   include/linux/reset-controller.h:1:0: error: unterminated #ifndef
-    #ifndef _LINUX_RESET_CONTROLLER_H_
-    ^
-
-vim +1 include/linux/reset-controller.h
-
-61fc4131 Philipp Zabel 2012-11-19 @1  #ifndef _LINUX_RESET_CONTROLLER_H_
-61fc4131 Philipp Zabel 2012-11-19  2  #define _LINUX_RESET_CONTROLLER_H_
-61fc4131 Philipp Zabel 2012-11-19  3  
-61fc4131 Philipp Zabel 2012-11-19  4  #include <linux/list.h>
-61fc4131 Philipp Zabel 2012-11-19  5  
-61fc4131 Philipp Zabel 2012-11-19  6  struct reset_controller_dev;
-61fc4131 Philipp Zabel 2012-11-19  7  
-61fc4131 Philipp Zabel 2012-11-19  8  /**
-61fc4131 Philipp Zabel 2012-11-19  9   * struct reset_control_ops
-
-:::::: The code at line 1 was first introduced by commit
-:::::: 61fc41317666be400802ac793f47de816ef7bd57 reset: Add reset controller API
-
-:::::: TO: Philipp Zabel <p.zabel@pengutronix.de>
-:::::: CC: Philipp Zabel <p.zabel@pengutronix.de>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+	Arnd
