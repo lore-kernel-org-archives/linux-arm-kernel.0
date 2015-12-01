@@ -1,54 +1,53 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 1 Dec 2015 09:57:10 +0800
-Subject: [PATCH] pinctrl: freescale: add ZERO_OFFSET_VALID flag for vf610
- pinctrl
-In-Reply-To: <1448437251-21487-1-git-send-email-shawnguo@kernel.org>
-References: <1448437251-21487-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <20151201015707.GA692@tiger>
+From: panand@redhat.com (Pratyush Anand)
+Date: Tue, 1 Dec 2015 07:46:15 +0530
+Subject: [PATCH v12 08/16] arm64/kexec: Add core kexec support
+In-Reply-To: <1448909475.31214.27.camel@infradead.org>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <6ac232ad37d6b02cf2d5848b15236f26f5ac61ac.1448403503.git.geoff@infradead.org>
+ <20151127131306.GE23908@dhcppc13.redhat.com>
+ <1448909475.31214.27.camel@infradead.org>
+Message-ID: <20151201021615.GA5704@dhcppc13.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 03:40:51PM +0800, Shawn Guo wrote:
-> To support i.MX7D Low Power State Retention IOMUXC, commit e7b37a522aa9
-> ("pinctrl: freescale: imx: allow mux_reg offset zero") changes the way
-> of zero mux_reg offset support with a new flag ZERO_OFFSET_VALID.  But,
-> unfortunately, it forgot to add this flag for vf610 pinctrl which has
-> zero mux_reg offset be valid as well, and hence breaks the vf610
-> support.
-> 
-> Fix the regression by adding flag ZERO_OFFSET_VALID for vf610 pinctrl
-> driver.
-> 
-> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
-> Fixes: e7b37a522aa9 ("pinctrl: freescale: imx: allow mux_reg offset zero")
-> Reported-by: Andrew Lunn <andrew@lunn.ch>
-> Tested-by: Andrew Lunn <andrew@lunn.ch>
-> Acked-by: Stefan Agner <stefan@agner.ch>
+Hi Geoff,
 
-Linus,
-
-Can you help apply the fix for v4.4-rc?
-
-Shawn
-
-> ---
->  drivers/pinctrl/freescale/pinctrl-vf610.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On 30/11/2015:10:51:15 AM, Geoff Levand wrote:
+> Hi,
 > 
-> diff --git a/drivers/pinctrl/freescale/pinctrl-vf610.c b/drivers/pinctrl/freescale/pinctrl-vf610.c
-> index 37a037543d29..587d1ff6210e 100644
-> --- a/drivers/pinctrl/freescale/pinctrl-vf610.c
-> +++ b/drivers/pinctrl/freescale/pinctrl-vf610.c
-> @@ -299,7 +299,7 @@ static const struct pinctrl_pin_desc vf610_pinctrl_pads[] = {
->  static struct imx_pinctrl_soc_info vf610_pinctrl_info = {
->  	.pins = vf610_pinctrl_pads,
->  	.npins = ARRAY_SIZE(vf610_pinctrl_pads),
-> -	.flags = SHARE_MUX_CONF_REG,
-> +	.flags = SHARE_MUX_CONF_REG | ZERO_OFFSET_VALID,
->  };
->  
->  static const struct of_device_id vf610_pinctrl_of_match[] = {
-> -- 
-> 1.9.1
+> On Fri, 2015-11-27 at 18:43 +0530, Pratyush Anand wrote:
 > 
+> > On 24/11/2015:10:25:34 PM, Geoff Levand wrote:
+> > > +> > 	> > /* Test the entry flags. */
+> > > +.Ltest_source:
+> > > +> > 	> > tbz> > 	> > x18, IND_SOURCE_BIT, .Ltest_indirection
+> > > +
+> > > +> > 	> > mov x20, x13> > 	> > 	> > 	> > 	> > /*  x20 = copy dest */
+> > > +> > 	> > mov x21, x12> > 	> > 	> > 	> > 	> > /*  x21 = copy src */
+> > 
+> > Till v10 we had here invalidation for relocated destination page to PoC. I could
+> > not understand, why it was removed. Removing that piece of code breaks kexec
+> > booting with mustang. I need [1] to kexec boot into second kernel with mustang
+> > platform.
 > 
+> We need to flush the new kernel to PoC.  The code that was here that
+> was doing that would only be executed when the new kernel needed
+> relocation (the standard kexec case).  We also need to flush kernels
+> that do not need relocation (the standard kdump case).
+> 
+> I moved the new kernel flush to kexec_segment_flush(), called
+> unconditionally in machine_kexec() so we can handle both cases
+> with one piece of code.
+
+Yes, I had noticed that. Actually flushing before cache is disabled can always
+cause heisenbug.
+
+> 
+> Have you experienced a problem on mustang with the current version?
+
+Yes, v10 works fine, but I need invalidation fix for both v11 and v12 to work on
+mustang.
+I have not tested vanilla v12 on seattle, but v12 ported on rhelsa needs
+invalidation fix to work on seattle as well.
+
+~Pratyush
