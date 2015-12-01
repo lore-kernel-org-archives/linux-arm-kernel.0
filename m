@@ -1,67 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 01 Dec 2015 11:14:29 +0100
-Subject: [RFC v02 04/15] dmaengine: edma: Add support for DMA filter
- mapping to slave devices
-In-Reply-To: <565D6F5D.3060603@ti.com>
+Date: Tue, 01 Dec 2015 11:15:38 +0100
+Subject: [RFC v02 00/15] dmaengine: New 'universal' API for requesting
+ channel
+In-Reply-To: <565D729F.2000104@ti.com>
 References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
- <7490116.jHcmUxB3Rf@wuerfel> <565D6F5D.3060603@ti.com>
-Message-ID: <4013235.sXCFUFy4j4@wuerfel>
+ <13562653.8QgTG33tZS@wuerfel> <565D729F.2000104@ti.com>
+Message-ID: <2237139.FINhECNDsD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 December 2015 11:58:53 Peter Ujfalusi wrote:
-> On 11/30/2015 04:11 PM, Arnd Bergmann wrote:
-> > On Monday 30 November 2015 15:45:34 Peter Ujfalusi wrote:
-> >> @@ -2428,6 +2436,22 @@ bool edma_filter_fn(struct dma_chan *chan, void *param)
-> >>  }
-> >>  EXPORT_SYMBOL(edma_filter_fn);
-> >>  
-> >> +static bool edma_filter_for_map(struct dma_chan *chan, void *param)
-> >> +{
-> >> +       bool match = false;
-> >> +
-> >> +       if (chan->device->dev->driver == &edma_driver.driver) {
-> >> +               struct edma_chan *echan = to_edma_chan(chan);
-> >> +               unsigned ch_req = (unsigned)param;
-> >> +               if (ch_req == echan->ch_num) {
-> >> +                       /* The channel is going to be used as HW synchronized */
-> >> +                       echan->hw_triggered = true;
-> >> +                       match = true;
-> >> +               }
-> >> +       }
-> >> +       return match;
-> >> +}
-> >> +
-> >>  static int edma_init(void)
-> >>
-> > 
-> > I don't see the difference between edma_filter_fn and edma_filter_for_map.
-> > Why do you need both?
+On Tuesday 01 December 2015 12:12:47 Peter Ujfalusi wrote:
 > 
-> edma_filter_fn:
->         unsigned ch_req = *(unsigned *)param;
+> We would need:
+>         { "da830-mmc.0", "rx", (void*)EDMA_CTLR_CHAN(0, 16) },
+>         { "da830-mmc.0", "tx", (void*)EDMA_CTLR_CHAN(0, 17) },
 > 
-> edma_filter_for_map:
->         unsigned ch_req = (unsigned)param;
+> as we need to cast the param.
+> It is still compact, but having to add the (void*) casting makes it a bit ugly.
 
-I see.
-
-> If I want to reuse the edma_filter_fn, I would need an unsigned array for the
-> eDMA event numbers in the board files to be able to provide the pointer to
-> each of them.
-
-How about this:
-
-#define EDMA_CTLR_CHANP(ctlr, chan)      ((const int[]){ [0] = ((ctlr) << 16) | (chan)})
-
-static struct dma_filter_map da830_edma_map[] = {
-         { "davinci-mcasp.0", "rx", EDMA_CTLR_CHANP(0, 0)},
-         { "davinci-mcasp.0", "tx", EDMA_CTLR_CHANP(0, 1)},
-         { "davinci-mcasp.1", "rx", EDMA_CTLR_CHANP(0, 2)},
-         ...
-};
-
-That way, you create an anonymous constant integer expression and the data
-points to that.
+Right, I forgot that, but the cast could also be part of EDMA_CTLR_CHAN(),
+and with the version I just posted in my other reply that part is solved
+as well.
 
 	Arnd
