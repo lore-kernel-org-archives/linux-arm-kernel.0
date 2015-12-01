@@ -1,49 +1,56 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 1 Dec 2015 10:42:30 +0800
-Subject: [PATCH v4 08/21] KVM: ARM64: Add reset and access handlers for
- PMXEVTYPER register
-In-Reply-To: <20151130181247.55649fc7@arm.com>
-References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>	<1446186123-11548-9-git-send-email-zhaoshenglong@huawei.com>
- <20151130181247.55649fc7@arm.com>
-Message-ID: <565D0916.5030300@huawei.com>
+From: xuejiancheng@huawei.com (xuejiancheng)
+Date: Tue, 1 Dec 2015 10:56:04 +0800
+Subject: [PATCH 2/5] ARM: hisi: enable Hi3519 soc
+In-Reply-To: <7hlh9f828y.fsf@deeprootsystems.com>
+References: <1448694937-31282-1-git-send-email-xuejiancheng@huawei.com>
+ <7hlh9f828y.fsf@deeprootsystems.com>
+Message-ID: <565D0C44.6010502@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Kevin,
+   Thank you for your suggestions.
 
-
-On 2015/12/1 2:12, Marc Zyngier wrote:
-> On Fri, 30 Oct 2015 14:21:50 +0800
-> Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+On 2015/12/1 8:02, Kevin Hilman wrote:
+> Jiancheng Xue <xuejiancheng@huawei.com> writes:
 > 
->> > From: Shannon Zhao <shannon.zhao@linaro.org>
->> > 
->> > Since the reset value of PMXEVTYPER is UNKNOWN, use reset_unknown or
->> > reset_unknown_cp15 for its reset handler. Add access handler which
->> > emulates writing and reading PMXEVTYPER register. When writing to
->> > PMXEVTYPER, call kvm_pmu_set_counter_event_type to create a perf_event
->> > for the selected event type.
->> > 
->> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> > ---
->> >  arch/arm64/kvm/sys_regs.c | 26 ++++++++++++++++++++++++--
->> >  1 file changed, 24 insertions(+), 2 deletions(-)
->> > 
->> > diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
->> > index cb82b15..4e606ea 100644
->> > --- a/arch/arm64/kvm/sys_regs.c
->> > +++ b/arch/arm64/kvm/sys_regs.c
->> > @@ -491,6 +491,17 @@ static bool access_pmu_regs(struct kvm_vcpu *vcpu,
->> >  
->> >  	if (p->is_write) {
->> >  		switch (r->reg) {
->> > +		case PMXEVTYPER_EL0: {
->> > +			val = vcpu_sys_reg(vcpu, PMSELR_EL0);
->> > +			kvm_pmu_set_counter_event_type(vcpu,
->> > +						       *vcpu_reg(vcpu, p->Rt),
->> > +						       val);
-> You are blindingly truncating 64bit values to u32. Is that intentional?
+>> Hi3519 SOC is mainly used for ip camera and sport dv
+>> solutions.
+>>
+>> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+>> ---
+>>  arch/arm/mach-hisi/Kconfig     | 9 +++++++++
+>>  arch/arm/mach-hisi/hisilicon.c | 9 +++++++++
+>>  2 files changed, 18 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
+>> index 83061ad..6bb822c 100644
+>> --- a/arch/arm/mach-hisi/Kconfig
+>> +++ b/arch/arm/mach-hisi/Kconfig
+>> @@ -48,6 +48,15 @@ config ARCH_HIX5HD2
+>>  	select PINCTRL_SINGLE
+>>  	help
+>>  	  Support for Hisilicon HIX5HD2 SoC family
+>> +
+>> +config ARCH_HI3519
 > 
-Yeah, the register PMXEVTYPER_EL0 and PMSELR_EL0 are all 32bit.
+> Please keep these sorted alphabetically.
 
--- 
-Shannon
+Sorry about that. I will correct it in next version.
+
+> 
+> Speaking of which, there is already an existing ARCH_HI3xxx entry.
+> Should this be included in that family?   If not, maybe the HI3xxx
+> should be renamed HI36xx ?
+
+ARCH_HI3xxx just represents Hi36xx mobile soc family. Hi3519 is not included.
+It's good advice to rename HI3xxx to HI36xx.
+
+> Kevin
+> 
+> .
+> 
+
+Many thanks,
+
+Jiacheng
