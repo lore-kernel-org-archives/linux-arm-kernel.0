@@ -1,38 +1,97 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 01 Dec 2015 15:24:40 +0100
-Subject: [RFC v02 00/15] dmaengine: New 'universal' API for requesting
- channel
-In-Reply-To: <565DA47C.4000308@ti.com>
-References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
- <CAHp75VcC5uwGTp_N13q5P8MPtkhy0DFytDaXGrnoiHfnoEo8ng@mail.gmail.com>
- <565DA47C.4000308@ti.com>
-Message-ID: <103520159.g0xhtFsXUi@wuerfel>
+From: andrew-ct.chen@mediatek.com (andrew-ct chen)
+Date: Tue, 1 Dec 2015 22:31:12 +0800
+Subject: [RESEND RFC/PATCH 3/8] media: platform: mtk-vpu: Support
+ Mediatek VPU
+In-Reply-To: <CAMTL27G8WRTTGCtU9pXpp1-inyzZE9Jat1SkOiX5HMG5E-eFzw@mail.gmail.com>
+References: <1447764885-23100-1-git-send-email-tiffany.lin@mediatek.com>
+ <1447764885-23100-4-git-send-email-tiffany.lin@mediatek.com>
+ <5655DDB4.2080002@linaro.org> <1448626209.7734.26.camel@mtksdaap41>
+ <56584AC5.7020704@linaro.org> <1448883819.15961.7.camel@mtksdaap41>
+ <CAMTL27G8WRTTGCtU9pXpp1-inyzZE9Jat1SkOiX5HMG5E-eFzw@mail.gmail.com>
+Message-ID: <1448980272.25447.6.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 December 2015 15:45:32 Peter Ujfalusi wrote:
-> >> static struct dma_filter_map da830_edma_map[] = {
-> >>         DMA_FILTER_ENTRY("davinci-mcasp.0", "rx", EDMA_CTLR_CHAN(0, 0)),
-> >>         DMA_FILTER_ENTRY("davinci-mcasp.0", "tx", EDMA_CTLR_CHAN(0, 1)),
-> >>         DMA_FILTER_ENTRY("davinci-mcasp.1", "rx", EDMA_CTLR_CHAN(0, 2)),
-> >>         DMA_FILTER_ENTRY("davinci-mcasp.1", "tx", EDMA_CTLR_CHAN(0, 3)),
-> >>         DMA_FILTER_ENTRY("davinci-mcasp.2", "rx", EDMA_CTLR_CHAN(0, 4)),
-> >>         DMA_FILTER_ENTRY("davinci-mcasp.2", "tx", EDMA_CTLR_CHAN(0, 5)),
-> >>         DMA_FILTER_ENTRY("spi_davinci.0", "rx", EDMA_CTLR_CHAN(0, 14)),
-> >>         DMA_FILTER_ENTRY("spi_davinci.0", "tx", EDMA_CTLR_CHAN(0, 15)),
-> >>         DMA_FILTER_ENTRY("da830-mmc.0", "rx", EDMA_CTLR_CHAN(0, 16)),
-> >>         DMA_FILTER_ENTRY("da830-mmc.0", "tx", EDMA_CTLR_CHAN(0, 17)),
-> >>         DMA_FILTER_ENTRY("spi_davinci.1", "rx", EDMA_CTLR_CHAN(0, 18)),
-> >>         DMA_FILTER_ENTRY("spi_davinci.1", "tx", EDMA_CTLR_CHAN(0, 19)),
-> > 
-> > Does this ".2" and so prevent driver to use auto ID for platform devices?
+On Mon, 2015-11-30 at 15:36 +0000, Daniel Thompson wrote:
+> On 30 November 2015 at 11:43, andrew-ct chen
+> <andrew-ct.chen@mediatek.com> wrote:
+> > On Fri, 2015-11-27 at 12:21 +0000, Daniel Thompson wrote:
+> >> On 27/11/15 12:10, andrew-ct chen wrote:
+> >> >>> +
+> >> >>> > >+      memcpy((void *)send_obj->share_buf, buf, len);
+> >> >>> > >+      send_obj->len = len;
+> >> >>> > >+      send_obj->id = id;
+> >> >>> > >+      vpu_cfg_writel(vpu, 0x1, HOST_TO_VPU);
+> >> >>> > >+
+> >> >>> > >+      /* Wait until VPU receives the command */
+> >> >>> > >+      timeout = jiffies + msecs_to_jiffies(IPI_TIMEOUT_MS);
+> >> >>> > >+      do {
+> >> >>> > >+              if (time_after(jiffies, timeout)) {
+> >> >>> > >+                      dev_err(vpu->dev, "vpu_ipi_send: IPI timeout!\n");
+> >> >>> > >+                      return -EIO;
+> >> >>> > >+              }
+> >> >>> > >+      } while (vpu_cfg_readl(vpu, HOST_TO_VPU));
+> >> >> >
+> >> >> >Do we need to busy wait every time we communicate with the co-processor?
+> >> >> >Couldn't we put this wait*before*  we write to HOST_TO_VPU above.
+> >> >> >
+> >> >> >That way we only spin when there is a need to.
+> >> >> >
+> >> > Since the hardware VPU only allows that one client sends the command to
+> >> > it each time.
+> >> > We need the wait to make sure VPU accepted the command and cleared the
+> >> > interrupt and then the next command would be served.
+> >>
+> >> I understand that the VPU  can only have on message outstanding at once.
+> >>
+> >> I just wonder why we busy wait *after* sending the first command rather
+> >> than *before* sending the second one.
+> >
+> > No other special reasons. Just send one command and wait until VPU gets
+> > the command. Then, I think this wait also can be put before we write to
+> > HOST_TO_VPU.Is this better than former? May I know the reason?
 > 
-> Yes, as all the infra around the traditional board files with platform_device
-> creation does. Ideally we could have 'phandle' pointing from this table to the
-> device in question (or other way around), but I'm not aware of anything we can
-> use.
+> Busy waiting is bad; it is a waste of host CPU processor time and/or power.
+> 
+> When the busy wait occurs after queuing then we will busy wait for
+> every command we send.
+> 
+> If busy wait occurs before next queuing then we will wait for a
+> shorter time in total because we have the chance to do something
+> useful on the host before we have to wait.
+> 
 
-I was thinking that we could use a pointer to the device structure, but
-if you have that, you can also just read the name from it.
+Got it. Thanks a lot for the explanation.
+I'll put the busy wait before next queuing in next version. 
 
-	Arnd
+> 
+> >> Streamed decode/encode typically ends up being rate controlled by
+> >> capture or display meaning that in these cases we don't need to busy
+> >> wait at all (because by the time we send the next frame the VPU has
+> >> already accepted the previous message).
+> >
+> > For now, only one device "encoder" exists, it is true.
+> > But, we'll have encoder and decoder devices, the decode and encode
+> > requested to VPU are simultaneous.
+> 
+> Sure, I accept that lock and busy-wait is an appropriate way to ensure
+> safety (assuming the VPU is fairly quick clearing the HOST_TO_VPU
+> flag).
+> 
+
+The busy wait time is less than 1ms in average.
+
+> 
+> > Is this supposed to be removed for this patches and we can add it back
+> > if the another device(decoder) is ready for review?
+> 
+> No I'm not suggesting that.
+> 
+> I only recommend moving the busy wait *before* end sending of command
+> (for efficiency reasons mentioned above).
+
+Ok. Thanks.
+
+> 
+> 
+> Daniel.
