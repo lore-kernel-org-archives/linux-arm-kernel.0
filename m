@@ -1,29 +1,68 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 1 Dec 2015 14:10:31 +0100
-Subject: [PATCH 7/7] ARM: dts: sun9i: optimus: Enable Reduced Serial Bus
- controller
-In-Reply-To: <1448948845-28347-8-git-send-email-wens@csie.org>
-References: <1448948845-28347-1-git-send-email-wens@csie.org>
- <1448948845-28347-8-git-send-email-wens@csie.org>
-Message-ID: <20151201131031.GP29263@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 01 Dec 2015 14:15:44 +0100
+Subject: Virtual addresses, ioremap, vmalloc, etc
+In-Reply-To: <565D8DA9.8040700@free.fr>
+References: <565D8DA9.8040700@free.fr>
+Message-ID: <2755513.X6tENxzvXm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 01:47:25PM +0800, Chen-Yu Tsai wrote:
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
+On Tuesday 01 December 2015 13:08:09 Mason wrote:
+> Hello everyone,
+> 
+> I was wondering if someone could help clear my confusion.
+> 
+> In my company's legacy port (based on 3.4, dating back to 2.6) someone
+> chose to map the first 16 MB of physical addresses using:
+> 
+> static struct map_desc tango_map_desc[] __initdata = {
+> 	{
+> 		.virtual	= 0xf0000000,
+> 		.pfn		=__phys_to_pfn(0),
+> 		.length		= SZ_16M,
+> 		.type 		= MT_DEVICE,
+> 	},
+> };
+> 
+> static void __init tango_map_io(void)
+> {
+> 	iotable_init(tango_map_desc, ARRAY_SIZE(tango_map_desc));
+> }
+> 
+> Is the virtual address 0xf0000000 chosen arbitrary?
+> Could I pick 0xf04200000 for example?
 
-Applied, thanks!
-Maxime
+It is arbitrary, but normally should be naturally aligned.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151201/64a709b6/attachment.sig>
+> The same kernel, with no such boot-time mapping prints:
+> 
+> [    0.000000] Memory: 641720K/655360K available (3135K kernel code, 109K rwdata, 1056K rodata, 3044K init, 218K bss, 13640K reserved, 0K cma-reserve)
+> [    0.000000] Virtual kernel memory layout:
+> [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+> [    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
+> [    0.000000]     vmalloc : 0xe8800000 - 0xff000000   ( 360 MB)
+> [    0.000000]     lowmem  : 0xc0000000 - 0xe8000000   ( 640 MB)
+> 
+> It looks like 0xf0000000 is in the middle of the vmalloc space.
+> Is it a good idea to "statically" map something there?
+
+We deal with that on a lof of platforms that still use a static
+mapping. I normally advocate not using that kind of mapping unless
+you can show a measurable performance difference on your platform.
+
+> If I were to call ioremap(0, SZ_16M); at run-time, I would imagine
+> the virtual address could be anywhere in the vmalloc space?
+> There's no reason it would be 0xf0000000, right?
+> 
+> In short, is virtual address 0xf0000000 special in any way?
+> (Other than being in the vmalloc space perhaps.)
+> 
+> For my own reference:
+> https://www.kernel.org/doc/Documentation/arm/memory.txt
+
+I think 0xf0000000 is a common choice because that made an easy
+computation back in the days when most platforms used an
+io_p2v() to get a hardcoded virtual address, rather than calling
+ioremap as we do today.
+
+	Arnd
