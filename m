@@ -1,185 +1,197 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 1 Dec 2015 16:55:57 +0100
-Subject: [PATCH v2 11/21] arm64: KVM: Implement the core world switch
-In-Reply-To: <1448650215-15218-12-git-send-email-marc.zyngier@arm.com>
-References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
- <1448650215-15218-12-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20151201155557.GV11704@cbox>
+From: plaes@plaes.org (Priit Laes)
+Date: Tue, 01 Dec 2015 17:56:00 +0200
+Subject: [linux-sunxi] [PATCH v3 2/2] phy-sun4i-usb: Add support for the
+ host usb-phys found on the H3 SoC
+In-Reply-To: <1448470202-3628-2-git-send-email-hdegoede@redhat.com>
+References: <1448470202-3628-1-git-send-email-hdegoede@redhat.com>
+ <1448470202-3628-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1448985360.16313.2.camel@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 27, 2015 at 06:50:05PM +0000, Marc Zyngier wrote:
-> Implement the core of the world switch in C. Not everything is there
-> yet, and there is nothing to re-enter the world switch either.
+On Wed, 2015-11-25 at 17:50 +0100, Hans de Goede wrote:
+> From: Reinder de Haan <patchesrdh@mveas.com>
 > 
-> But this already outlines the code structure well enough.
+> Note this commit only adds support for phys 1-3, phy 0, the otg phy,
+> is
+> not yet (fully) supported after this commit.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 > ---
->  arch/arm64/kvm/hyp/Makefile |   1 +
->  arch/arm64/kvm/hyp/switch.c | 134 ++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 135 insertions(+)
->  create mode 100644 arch/arm64/kvm/hyp/switch.c
+> Changes in v2:
+> -Change break; after dev_err() to return, as intended, fixing a
+> compiler
+> ?warning (the dev_err case should never be reached)
+> Changes in v3:
+> -Use of_match_node to get model specific config data
+> ---
+> ?.../devicetree/bindings/phy/sun4i-usb-phy.txt??????|??1 +
+> ?drivers/phy/phy-sun4i-usb.c????????????????????????| 46
+> +++++++++++++++++-----
+> ?2 files changed, 38 insertions(+), 9 deletions(-)
 > 
-> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-> index 1e1ff06..9c11b0f 100644
-> --- a/arch/arm64/kvm/hyp/Makefile
-> +++ b/arch/arm64/kvm/hyp/Makefile
-> @@ -8,3 +8,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += entry.o
-> +obj-$(CONFIG_KVM_ARM_HOST) += switch.o
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> new file mode 100644
-> index 0000000..d67ed9e
-> --- /dev/null
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -0,0 +1,134 @@
-> +/*
-> + * Copyright (C) 2015 - ARM Ltd
-> + * Author: Marc Zyngier <marc.zyngier@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
+> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> index 0cebf74..95736d7 100644
+> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> @@ -9,6 +9,7 @@ Required properties:
+> ???* allwinner,sun7i-a20-usb-phy
+> ???* allwinner,sun8i-a23-usb-phy
+> ???* allwinner,sun8i-a33-usb-phy
+> +??* allwinner,sun8i-h3-usb-phy
+> ?- reg : a list of offset + length pairs
+> ?- reg-names :
+> ???* "phy_ctrl"
+> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-
+> usb.c
+> index 1d8f85d..2aed482 100644
+> --- a/drivers/phy/phy-sun4i-usb.c
+> +++ b/drivers/phy/phy-sun4i-usb.c
+> @@ -46,6 +46,9 @@
+> ?#define REG_PHYBIST			0x08
+> ?#define REG_PHYTUNE			0x0c
+> ?#define REG_PHYCTL_A33			0x10
+> +#define REG_PHY_UNK_H3			0x20
 > +
-> +#include "hyp.h"
+> +#define REG_PMU_UNK_H3			0x10
+> ?
+> ?#define PHYCTL_DATA			BIT(7)
+> ?
+> @@ -79,7 +82,7 @@
+> ?#define PHY_DISCON_TH_SEL		0x2a
+> ?#define PHY_SQUELCH_DETECT		0x3c
+> ?
+> -#define MAX_PHYS			3
+> +#define MAX_PHYS			4
+> ?
+> ?/*
+> ? * Note do not raise the debounce time, we must report Vusb high
+> within 100ms
+> @@ -91,6 +94,7 @@
+> ?enum sun4i_usb_phy_type {
+> ?	sun4i_a10_phy,
+> ?	sun8i_a33_phy,
+> +	sun8i_h3_phy,
+> ?};
+> ?
+> ?struct sun4i_usb_phy_cfg {
+> @@ -101,6 +105,7 @@ struct sun4i_usb_phy_cfg {
+> ?};
+> ?
+> ?struct sun4i_usb_phy_data {
+> +	struct device *dev;
+> ?	void __iomem *base;
+> ?	const struct sun4i_usb_phy_cfg *cfg;
+> ?	struct mutex mutex;
+> @@ -183,6 +188,9 @@ static void sun4i_usb_phy_write(struct
+> sun4i_usb_phy *phy, u32 addr, u32 data,
+> ?		/* A33 needs us to set phyctl to 0 explicitly */
+> ?		writel(0, phyctl);
+> ?		break;
+> +	case sun8i_h3_phy:
+> +		dev_err(phy_data->dev, "H3 usb_phy_write is not
+> supported\n");
+
+You should unlock the mutex here.
+
+> +		return;
+
+Also, it might make sense to add default case what WARN's on invalid
+enum.
+
+> ?	}
+> ?
+> ?	for (i = 0; i < len; i++) {
+> @@ -243,6 +251,7 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+> ?	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+> ?	struct sun4i_usb_phy_data *data =
+> to_sun4i_usb_phy_data(phy);
+> ?	int ret;
+> +	u32 val;
+> ?
+> ?	ret = clk_prepare_enable(phy->clk);
+> ?	if (ret)
+> @@ -254,16 +263,26 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+> ?		return ret;
+> ?	}
+> ?
+> -	/* Enable USB 45 Ohm resistor calibration */
+> -	if (phy->index == 0)
+> -		sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
+> +	if (data->cfg->type == sun8i_h3_phy) {
+> +		if (phy->index == 0) {
+> +			val = readl(data->base + REG_PHY_UNK_H3);
+> +			writel(val & ~1, data->base +
+> REG_PHY_UNK_H3);
+> +		}
+> ?
+> -	/* Adjust PHY's magnitude and rate */
+> -	sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
+> +		val = readl(phy->pmu + REG_PMU_UNK_H3);
+> +		writel(val & ~2, phy->pmu + REG_PMU_UNK_H3);
+> +	} else {
+> +		/* Enable USB 45 Ohm resistor calibration */
+> +		if (phy->index == 0)
+> +			sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN,
+> 0x01, 1);
+> ?
+> -	/* Disconnect threshold adjustment */
+> -	sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
+> -			????data->cfg->disc_thresh, 2);
+> +		/* Adjust PHY's magnitude and rate */
+> +		sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE,
+> 0x14, 5);
 > +
-> +static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
-> +{
-> +	u64 val;
-> +
-> +	/*
-> +	 * We are about to set CPTR_EL2.TFP to trap all floating point
-> +	 * register accesses to EL2, however, the ARM ARM clearly states that
-> +	 * traps are only taken to EL2 if the operation would not otherwise
-> +	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
-> +	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
-> +	 */
-> +	val = vcpu->arch.hcr_el2;
-> +	if (!(val & HCR_RW)) {
-> +		write_sysreg(1 << 30, fpexc32_el2);
-> +		isb();
+> +		/* Disconnect threshold adjustment */
+> +		sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
+> +				????data->cfg->disc_thresh, 2);
 > +	}
-> +	write_sysreg(val, hcr_el2);
-
-> +	write_sysreg(1 << 15, hstr_el2);
-
-can you add a comment on this 1 << 15 stuff or use a define or something
-to remind mushy-brained people like myself that this is about trapping
-something we care about?
-
-> +	write_sysreg(CPTR_EL2_TTA | CPTR_EL2_TFP, cptr_el2);
-> +	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
-> +}
+> ?
+> ?	sun4i_usb_phy_passby(phy, 1);
+> ?
+> @@ -555,6 +574,13 @@ static const struct sun4i_usb_phy_cfg
+> sun8i_a33_cfg = {
+> ?	.dedicated_clocks = true,
+> ?};
+> ?
+> +static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
+> +	.num_phys = 4,
+> +	.disc_thresh = 3,
+> +	.type = sun8i_h3_phy,
+> +	.dedicated_clocks = true,
+> +};
 > +
-> +static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
-> +{
-> +	write_sysreg(HCR_RW, hcr_el2);
-> +	write_sysreg(0, hstr_el2);
-> +	write_sysreg(read_sysreg(mdcr_el2) & MDCR_EL2_HPMN_MASK, mdcr_el2);
-> +	write_sysreg(0, cptr_el2);
-> +}
-> +
-> +static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
-> +{
-> +	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
-> +	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-> +}
-> +
-> +static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
-> +{
-> +	write_sysreg(0, vttbr_el2);
-> +}
-> +
-> +static hyp_alternate_select(__vgic_call_save_state,
-> +			    __vgic_v2_save_state, __vgic_v3_save_state,
-> +			    ARM64_HAS_SYSREG_GIC_CPUIF);
-> +
-> +static hyp_alternate_select(__vgic_call_restore_state,
-> +			    __vgic_v2_restore_state, __vgic_v3_restore_state,
-> +			    ARM64_HAS_SYSREG_GIC_CPUIF);
-> +
-> +static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
-> +{
-> +	__vgic_call_save_state()(vcpu);
-> +	write_sysreg(read_sysreg(hcr_el2) & ~HCR_INT_OVERRIDE, hcr_el2);
-> +}
-> +
-> +static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
-> +{
-> +	u64 val;
-> +
-> +	val = read_sysreg(hcr_el2);
-> +	val |= 	HCR_INT_OVERRIDE;
-> +	val |= vcpu->arch.irq_lines;
-> +	write_sysreg(val, hcr_el2);
-> +
-> +	__vgic_call_restore_state()(vcpu);
-> +}
-> +
-> +int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
-> +{
-> +	struct kvm_cpu_context *host_ctxt;
-> +	struct kvm_cpu_context *guest_ctxt;
-> +	u64 exit_code;
-> +
-> +	vcpu = kern_hyp_va(vcpu);
-> +	write_sysreg(vcpu, tpidr_el2);
-> +
-> +	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-> +	guest_ctxt = &vcpu->arch.ctxt;
-> +
-> +	__sysreg_save_state(host_ctxt);
-> +	__debug_cond_save_host_state(vcpu);
-> +
-> +	__activate_traps(vcpu);
-> +	__activate_vm(vcpu);
-> +
-> +	__vgic_restore_state(vcpu);
-> +	__timer_restore_state(vcpu);
-> +
-> +	/*
-> +	 * We must restore the 32-bit state before the sysregs, thanks
-> +	 * to Cortex-A57 erratum #852523.
-> +	 */
-> +	__sysreg32_restore_state(vcpu);
-> +	__sysreg_restore_state(guest_ctxt);
-> +	__debug_restore_state(vcpu, kern_hyp_va(vcpu->arch.debug_ptr), guest_ctxt);
-> +
-> +	/* Jump in the fire! */
-> +	exit_code = __guest_enter(vcpu, host_ctxt);
-> +	/* And we're baaack! */
-> +
-> +	__sysreg_save_state(guest_ctxt);
-> +	__sysreg32_save_state(vcpu);
-> +	__timer_save_state(vcpu);
-> +	__vgic_save_state(vcpu);
-> +
-> +	__deactivate_traps(vcpu);
-> +	__deactivate_vm(vcpu);
-> +
-> +	__sysreg_restore_state(host_ctxt);
-> +
-> +	__debug_save_state(vcpu, kern_hyp_va(vcpu->arch.debug_ptr), guest_ctxt);
-> +	__debug_cond_restore_host_state(vcpu);
-> +
-> +	return exit_code;
-> +}
+> ?static const struct of_device_id sun4i_usb_phy_of_match[] = {
+> ?	{ .compatible = "allwinner,sun4i-a10-usb-phy", .data =
+> &sun4i_a10_cfg },
+> ?	{ .compatible = "allwinner,sun5i-a13-usb-phy", .data =
+> &sun5i_a13_cfg },
+> @@ -562,6 +588,7 @@ static const struct of_device_id
+> sun4i_usb_phy_of_match[] = {
+> ?	{ .compatible = "allwinner,sun7i-a20-usb-phy", .data =
+> &sun7i_a20_cfg },
+> ?	{ .compatible = "allwinner,sun8i-a23-usb-phy", .data =
+> &sun8i_a23_cfg },
+> ?	{ .compatible = "allwinner,sun8i-a33-usb-phy", .data =
+> &sun8i_a33_cfg },
+> +	{ .compatible = "allwinner,sun8i-h3-usb-phy", .data =
+> &sun8i_h3_cfg },
+> ?	{ },
+> ?};
+> ?MODULE_DEVICE_TABLE(of, sun4i_usb_phy_of_match);
+> @@ -595,6 +622,7 @@ static int sun4i_usb_phy_probe(struct
+> platform_device *pdev)
+> ?	mutex_init(&data->mutex);
+> ?	INIT_DELAYED_WORK(&data->detect,
+> sun4i_usb_phy0_id_vbus_det_scan);
+> ?	dev_set_drvdata(dev, data);
+> +	data->dev = dev;
+> ?	data->cfg = match->data;
+> ?
+> ?	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+> "phy_ctrl");
 > -- 
-> 2.1.4
+> 2.5.0
 > 
-
-Looks very nice!
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
