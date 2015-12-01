@@ -1,55 +1,116 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 01 Dec 2015 16:57:30 +0000
-Subject: [PATCH v4 18/21] KVM: ARM64: Add PMU overflow interrupt routing
-In-Reply-To: <565DCA24.7000908@linaro.org>
-References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>	<1446186123-11548-19-git-send-email-zhaoshenglong@huawei.com>
- <20151130182258.684c9df6@arm.com> <565DB021.3020901@huawei.com>
- <565DB3A5.3030701@arm.com> <565DB935.5040609@linaro.org>
- <565DBF8D.1070006@arm.com> <565DCA24.7000908@linaro.org>
-Message-ID: <565DD17A.50009@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 1 Dec 2015 09:00:32 -0800
+Subject: [RFC v02 03/15] dmaengine: core: Introduce new, universal API to
+ request a channel
+In-Reply-To: <565D56A0.2090204@ti.com>
+References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
+ <1448891145-10766-4-git-send-email-peter.ujfalusi@ti.com>
+ <20151130155142.GZ2517@atomide.com> <565D56A0.2090204@ti.com>
+Message-ID: <20151201170031.GT23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/15 16:26, Shannon Zhao wrote:
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [151201 00:14]:
+> On 11/30/2015 05:51 PM, Tony Lindgren wrote:
+> > Hi,
+> > 
+> > * Peter Ujfalusi <peter.ujfalusi@ti.com> [151130 05:49]:
+> >>
+> >> For each dmaengine driver an array of DMA device, slave and the parameter
+> >> for the filter function needs to be added:
+> >>
+> >> static struct dma_filter_map da830_edma_map[] = {
+> >> 	DMA_FILTER_ENTRY("davinci-mcasp.0", "rx", EDMA_CTLR_CHAN(0, 0)),
+> >> 	DMA_FILTER_ENTRY("davinci-mcasp.0", "tx", EDMA_CTLR_CHAN(0, 1)),
+> >> 	DMA_FILTER_ENTRY("davinci-mcasp.1", "rx", EDMA_CTLR_CHAN(0, 2)),
+> >> 	DMA_FILTER_ENTRY("davinci-mcasp.1", "tx", EDMA_CTLR_CHAN(0, 3)),
+> >> 	DMA_FILTER_ENTRY("davinci-mcasp.2", "rx", EDMA_CTLR_CHAN(0, 4)),
+> >> 	DMA_FILTER_ENTRY("davinci-mcasp.2", "tx", EDMA_CTLR_CHAN(0, 5)),
+> >> 	DMA_FILTER_ENTRY("spi_davinci.0", "rx", EDMA_CTLR_CHAN(0, 14)),
+> >> 	DMA_FILTER_ENTRY("spi_davinci.0", "tx", EDMA_CTLR_CHAN(0, 15)),
+> >> 	DMA_FILTER_ENTRY("da830-mmc.0", "rx", EDMA_CTLR_CHAN(0, 16)),
+> >> 	DMA_FILTER_ENTRY("da830-mmc.0", "tx", EDMA_CTLR_CHAN(0, 17)),
+> >> 	DMA_FILTER_ENTRY("spi_davinci.1", "rx", EDMA_CTLR_CHAN(0, 18)),
+> >> 	DMA_FILTER_ENTRY("spi_davinci.1", "tx", EDMA_CTLR_CHAN(0, 19)),
+> >> };
+> > 
+> > FYI, if the EDMA_CTRL_CHAN above is just the evtmux registers
 > 
+> No, they are not. They are the eDMA event numbers. I used the EDMA_CTRL_CHAN()
+> macro for all board files to have uniform look for the data. The first
+> parameter means the eDMA instance number while the second is the event number
+> on that eDMA. Since most devices have only one eDMA, we have 0 as eDMA id in
+> most cases.
+> The eventmux, or crossbar is different thing and we have several versions of
+> the event crossbar or mux used.
+
+OK
+
+> > those
+> > can be handled with the pinctrl framework. It seems that would allow
+> > leaving out some of the built-in look up data, and have the mux parts
+> > handled by a proper device driver. Below is a sample from the dm81xx
+> > platform for reference.
+> > 
+> > SoC dtsi file:
+> > 
+> > evtmux: pinmux at f90 {
+> > 	compatible = "pinctrl-single";
+> > 	reg = <0xf90 0x40>;
+> > 	#address-cells = <1>;
+> > 	#size-cells = <0>;
+> > 	pinctrl-single,register-width = <8>;
+> > 	pinctrl-single,function-mask = <0x1f>;
+> > };
+> > 
+> > Board specific dts file:
+> > 
+> > &evtmux {
+> > 	sd2_edma_pins: pinmux_sd2_edma_pins {
+> > 	pinctrl-single,pins = <
+> > 		8 1     /* use SDTXEVT1 for EDMA instead of MCASP0TX */
+> > 		9 2     /* use SDRXEVT1 for EDMA instead of MCASP0RX */
+> > 		>;
+> > 	};
+> > };
 > 
-> On 2015/12/1 23:41, Marc Zyngier wrote:
->>> The reason is that when guest clear the overflow register, it will trap
->>>> to kvm and call kvm_pmu_sync_hwstate() as you see above. At this moment,
->>>> the overflow register is still overflowed(that is some bit is still 1).
->>>> So We need to use some flag to mark we already inject this interrupt.
->>>> And if during guest handling the overflow, there is a new overflow
->>>> happening, the pmu->irq_pending will be set ture by
->>>> kvm_pmu_perf_overflow(), then it needs to inject this new interrupt, right?
->> I don't think so. This is a level interrupt, so the level should stay
->> high as long as the guest hasn't cleared all possible sources for that
->> interrupt.
->>
->> For your example, the guest writes to PMOVSCLR to clear the overflow
->> caused by a given counter. If the status is now 0, the interrupt line
->> drops. If the status is still non zero, the line stays high. And I
->> believe that writing a 1 to PMOVSSET would actually trigger an
->> interrupt, or keep it high if it has already high.
->>
-> Right, writing 1 to PMOVSSET will trigger an interrupt.
+> I see. The dm81xx basically am33xx/am43xx?
+
+Yeah similar to am33xx with different clocks and with a bunch of accelerators.
+
+> Actually I would prefer to use the dmaengine's event router framework and we
+> do have support for the am33xx/am43xx type of crossbar already implemented.
+> I'm going to resend the DTS series for am33xx/am43xx to convert them to use
+> the new DT bindings along with the dma event router support:
+> https://www.mail-archive.com/linux-omap%40vger.kernel.org/msg120828.html
+
+OK yes a dmaengine event router works too when available. Good to see
+them as separate driver instances now :) Are only the dts changes missing
+now?
+
+FYI, when we have separate interconnect driver instances, we don't want to
+and cannot tweak registers outside the interconnect instance because of them
+being in separate clock and/or power domains :p
+
+In any case, it seems there's no harm using pinctrl for evtmux on dm81xx
+until the event router is available. It's currently only needed on the
+t410 emmc that I'm aware of :)
+
+> > Dynamic muxing of these channels can be done too using the pinctrl
+> > framework named modes, but probably is not a good idea in the case of
+> > SD card and MaASP in case something goes wrong :)
 > 
->> In essence, do not try to maintain side state. I've been bitten.
-> 
-> So on VM entry, it check if PMOVSSET is zero. If not, call 
-> kvm_vgic_inject_irq to set the level high. If so, set the level low.
-> On VM exit, it seems there is nothing to do.
+> In theory it can be done, but in practice it is not possible. It is up to the
+> board design decision to select which DMA event is not needed to be used in
+> default mode and that one can be used to route the crossbar hidden request to it.
+> Just imaging: playing audio from MMC (in the example you have), audio needs
+> constant DMA, so the MMC would never get DMA request, also the drivers tend to
+> request the DMA channel in their probe/init and hold to it as long as they are
+> loaded...
 
-It is even simpler than that:
+Yes dynamic muxing of the dma channels sounds like file corruption waiting
+to happen :) Let's stay away from that.
 
-- When you get an overflow, you inject an interrupt with the level set to 1.
-- When the overflow register gets cleared, you inject the same interrupt
-with the level set to 0.
+Regards,
 
-I don't think you need to do anything else, and the world switch should
-be left untouched.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Tony
