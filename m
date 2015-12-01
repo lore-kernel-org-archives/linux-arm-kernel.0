@@ -1,49 +1,35 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue,  1 Dec 2015 15:38:20 -0800
-Subject: [PATCH 07/10] ARM: dts: Fix dm814x entries for pllss and prcm
+Date: Tue,  1 Dec 2015 15:38:19 -0800
+Subject: [PATCH 06/10] ARM: OMAP2+: Remove useless check for legacy booting
+ for dm814x
 In-Reply-To: <1449013103-23238-1-git-send-email-tony@atomide.com>
 References: <1449013103-23238-1-git-send-email-tony@atomide.com>
-Message-ID: <1449013103-23238-8-git-send-email-tony@atomide.com>
+Message-ID: <1449013103-23238-7-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise drivers under pllss and prcm won't probe properly.
+We have never had dm814x booting properly with mainline kernel using
+the legacy platform data based booting. Current minimal support is
+device tree only.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/dm814x.dtsi | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/io.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/dm814x.dtsi b/arch/arm/boot/dts/dm814x.dtsi
-index 7988b42..5c8de19 100644
---- a/arch/arm/boot/dts/dm814x.dtsi
-+++ b/arch/arm/boot/dts/dm814x.dtsi
-@@ -215,7 +215,10 @@
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 3eaeaca..3c87e40 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -612,8 +612,7 @@ void __init ti814x_init_early(void)
+ 	ti814x_clockdomains_init();
+ 	dm814x_hwmod_init();
+ 	omap_hwmod_init_postsetup();
+-	if (of_have_populated_dt())
+-		omap_clk_soc_init = dm814x_dt_clk_init;
++	omap_clk_soc_init = dm814x_dt_clk_init;
+ }
  
- 			prcm: prcm at 180000 {
- 				compatible = "ti,dm814-prcm", "simple-bus";
--				reg = <0x180000 0x4000>;
-+				reg = <0x180000 0x2000>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges = <0 0x180000 0x2000>;
- 
- 				prcm_clocks: clocks {
- 					#address-cells = <1>;
-@@ -226,9 +229,13 @@
- 				};
- 			};
- 
-+			/* See TRM PLL_SUBSYS_BASE and "PLLSS Registers" */
- 			pllss: pllss at 1c5000 {
- 				compatible = "ti,dm814-pllss", "simple-bus";
--				reg = <0x1c5000 0x2000>;
-+				reg = <0x1c5000 0x1000>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges = <0 0x1c5000 0x1000>;
- 
- 				pllss_clocks: clocks {
- 					#address-cells = <1>;
+ void __init ti816x_init_early(void)
 -- 
 2.6.2
