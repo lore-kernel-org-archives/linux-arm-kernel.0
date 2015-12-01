@@ -1,44 +1,20 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 30 Nov 2015 16:29:40 -0800
-Subject: [PATCH 5/5] clk: scpi: add missing of_node_put
-In-Reply-To: <1445460100-26727-6-git-send-email-Julia.Lawall@lip6.fr>
-References: <1445460100-26727-1-git-send-email-Julia.Lawall@lip6.fr>
- <1445460100-26727-6-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <20151201002939.GE21446@codeaurora.org>
+Date: Mon, 30 Nov 2015 16:36:26 -0800
+Subject: [PATCH] clk: imx: Replace clk error check with imx_check_clocks()
+In-Reply-To: <1448504323-17737-1-git-send-email-b51503@freescale.com>
+References: <1448504323-17737-1-git-send-email-b51503@freescale.com>
+Message-ID: <20151201003626.GB17532@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21, Julia Lawall wrote:
-> for_each_available_child_of_node performs an of_node_get on each iteration,
-> so a break out of the loop requires an of_node_put.
+On 11/26, Bai Ping wrote:
+> As we already have a 'imx_check_clocks' to do the clock error
+> check, so cleanup the error check code.
 > 
-> The semantic patch that fixes this problem is as follows
-> (http://coccinelle.lip6.fr):
-> 
-> // <smpl>
-> @@
-> expression root,e;
-> local idexpression child;
-> @@
-> 
->  for_each_available_child_of_node(root, child) {
->    ... when != of_node_put(child)
->        when != e = child
-> (
->    return child;
-> |
-> +  of_node_put(child);
-> ?  return ...;
-> )
->    ...
->  }
-> // </smpl>
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-> 
+> Signed-off-by: Bai Ping <b51503@freescale.com>
 > ---
 
-Applied to clk-fixes
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
