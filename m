@@ -1,57 +1,70 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Tue, 01 Dec 2015 17:43:24 +0800
-Subject: [RFC PATCH 2/9] drm/rockchip: Use new vblank api drm_crtc_vblank_*
-In-Reply-To: <20151201090127.GN17050@phenom.ffwll.local>
-References: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>
- <1448940391-23333-3-git-send-email-mark.yao@rock-chips.com>
- <CAPj87rNs+c5Y01zVPF3a+8puFH1ZWuLZUGoDq6EPfDQB5DVZGw@mail.gmail.com>
- <565D5B57.4040102@rock-chips.com> <20151201090127.GN17050@phenom.ffwll.local>
-Message-ID: <565D6BBC.20608@rock-chips.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 1 Dec 2015 11:47:29 +0200
+Subject: [RFC v02 01/15] dmaengine: core: Allow NULL mask pointer in
+ __dma_device_satisfies_mask()
+In-Reply-To: <CAHp75VfY=NU4MG7q1w=oYdTiTr0dqtNTQU3UkEaL=tXPJADH5Q@mail.gmail.com>
+References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
+ <1448891145-10766-2-git-send-email-peter.ujfalusi@ti.com>
+ <CAHp75VfY=NU4MG7q1w=oYdTiTr0dqtNTQU3UkEaL=tXPJADH5Q@mail.gmail.com>
+Message-ID: <565D6CB1.8030808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?12?01? 17:01, Daniel Vetter wrote:
-> On Tue, Dec 01, 2015 at 04:33:27PM +0800, Mark yao wrote:
->> On 2015?12?01? 15:56, Daniel Stone wrote:
->>> Hi,
->>>
->>> On 1 December 2015 at 03:26, Mark Yao <mark.yao@rock-chips.com> wrote:
->>>> No functional update, drm_vblank_* is the legacy version of
->>>> drm_crtc_vblank_*. and use new api make driver more clean.
->>>>
->>>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
->>> Heh, I had the same patch in my series to fix pageflip events.
->>>
->>> Reviewed-by: Daniel Stone <daniels@collabora.com>
->>>
->>> Cheers,
->>> Daniel
->>>
->>>
->>>
->> Hi Daniel
->>     I had picked your patch "[PATCH 1/2] drm/rockchip: Use CRTC vblank event
->> interface" into my drm-next, this patch is base on it.
-> That really should be mentioned in the commit message, and you must keep
-> the signed-off-by chain intact when adapting or reusing other peoples
-> work.
-> -Daniel
+On 11/30/2015 04:35 PM, Andy Shevchenko wrote:
+> On Mon, Nov 30, 2015 at 3:45 PM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
+>> Treat as true condition the case when the mask is NULL.
+> 
+> What do you think about setting some default (all "on") mask when mask
+> is not supplied?
 
-Oh, Sorry for that, this patch is another patch rebase on Daniel Stone's 
-one, I use "base on it" may be ambiguity.
-like that:
-0e6919f drm/rockchip: Use new vblank api drm_crtc_vblank_*
-4f0cb7c drm/rockchip: Use CRTC vblank event interface
+Probably rephrasing the commit message to say that when the mask is NULL it
+means that the caller does not care about the capabilities of the dma device
+thus return with true in such a case.
 
-Thanks for pointing that, I will be carefully next time.
+We could also drop this patch and in private_candidate() :
 
->> Thanks for your review.
+-	if (!__dma_device_satisfies_mask(dev, mask)) {
++	if (mask && !__dma_device_satisfies_mask(dev, mask)) {
+		pr_debug("%s: wrong capabilities\n", __func__);
+		return NULL;
+	}
+
+
+> I don't know for sure but there might be cases when you don't want
+> literally *any* channel to satisfy.
+
+Or set DMA_SLAVE only in dma_request_chan()? What happens if we have cases
+when we are able to request channel for memcpy via dma_request_chan()
+(dedicated memcpy channel/DMA engine?) in that case we will have the SLAVE
+set, but not MEMCPY, or any other variation we do not know yet?
+
 >>
->> -- 
->> ?ark Yao
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> ---
+>>  drivers/dma/dmaengine.c | 3 +++
+>>  1 file changed, 3 insertions(+)
 >>
+>> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+>> index daf54a39bcc7..52c3eee48e2e 100644
+>> --- a/drivers/dma/dmaengine.c
+>> +++ b/drivers/dma/dmaengine.c
+>> @@ -184,6 +184,9 @@ __dma_device_satisfies_mask(struct dma_device *device,
+>>  {
+>>         dma_cap_mask_t has;
 >>
->> _______________________________________________
->> dri-devel mailing list
->> dri-devel at lists.freedesktop.org
->> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+>> +       if (!want)
+>> +               return true;
+>> +
+>>         bitmap_and(has.bits, want->bits, device->cap_mask.bits,
+>>                 DMA_TX_TYPE_END);
+>>         return bitmap_equal(want->bits, has.bits, DMA_TX_TYPE_END);
+>> --
+>> 2.6.3
+>>
+> 
+> 
+> 
+
+
+-- 
+P?ter
