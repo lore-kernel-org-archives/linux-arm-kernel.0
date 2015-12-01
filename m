@@ -1,150 +1,184 @@
-From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Tue, 1 Dec 2015 22:50:53 +0800
-Subject: [PATCH v2 10/10] drm/hisilicon: Add support for external bridge
-In-Reply-To: <565D62A3.2030301@codeaurora.org>
-References: <1448707145-69348-1-git-send-email-xinliang.liu@linaro.org>
- <1448707145-69348-11-git-send-email-xinliang.liu@linaro.org>
- <565D62A3.2030301@codeaurora.org>
-Message-ID: <CAGd==05Tw5YBWK19jJTruerkkj1Z8q05dB9VyP0AnTMwxyuPNQ@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 1 Dec 2015 15:56:54 +0100
+Subject: [PATCH v2 08/21] arm64: KVM: Implement debug save/restore
+In-Reply-To: <20151201144737.GQ11704@cbox>
+References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+ <1448650215-15218-9-git-send-email-marc.zyngier@arm.com>
+ <20151201125639.GP11704@cbox> <565D9B57.2080005@arm.com>
+ <20151201144737.GQ11704@cbox>
+Message-ID: <20151201145654.GR11704@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 December 2015 at 17:04, Archit Taneja <architt@codeaurora.org> wrote:
->
->
-> On 11/28/2015 04:09 PM, Xinliang Liu wrote:
->>
->> Add support for external HDMI bridge.
->>
->> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
->> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
->> Signed-off-by: Andy Green <andy.green@linaro.org>
->> ---
->>   drivers/gpu/drm/hisilicon/hisi_drm_dsi.c | 51
->> ++++++++++++++++++++++++++++++++
->>   1 file changed, 51 insertions(+)
->>
->> diff --git a/drivers/gpu/drm/hisilicon/hisi_drm_dsi.c
->> b/drivers/gpu/drm/hisilicon/hisi_drm_dsi.c
->> index 066e08d..9e056db 100644
->> --- a/drivers/gpu/drm/hisilicon/hisi_drm_dsi.c
->> +++ b/drivers/gpu/drm/hisilicon/hisi_drm_dsi.c
->> @@ -78,6 +78,7 @@ struct dsi_hw_ctx {
->>
->>   struct hisi_dsi {
->>         struct drm_encoder encoder;
->> +       struct drm_bridge *bridge;
->>         struct mipi_dsi_host host;
->>         struct drm_display_mode cur_mode;
->>         struct dsi_hw_ctx *ctx;
->> @@ -671,6 +672,25 @@ static int dsi_host_init(struct device *dev, struct
->> hisi_dsi *dsi)
->>         return 0;
->>   }
->>
->> +static int dsi_bridge_init(struct drm_device *dev, struct hisi_dsi *dsi)
->> +{
->> +       struct drm_encoder *encoder = &dsi->encoder;
->> +       struct drm_bridge *bridge = dsi->bridge;
->> +       int ret;
->> +
->> +       /* associate the bridge to dsi encoder */
->> +       encoder->bridge = bridge;
->> +       bridge->encoder = encoder;
->> +
->> +       ret = drm_bridge_attach(dev, bridge);
->> +       if (ret) {
->> +               DRM_ERROR("failed to attach exteranl bridge\n");
->
->
-> s/exteranl/external
->
+On Tue, Dec 01, 2015 at 03:47:37PM +0100, Christoffer Dall wrote:
+> On Tue, Dec 01, 2015 at 01:06:31PM +0000, Marc Zyngier wrote:
+> > On 01/12/15 12:56, Christoffer Dall wrote:
+> > > On Fri, Nov 27, 2015 at 06:50:02PM +0000, Marc Zyngier wrote:
+> > >> Implement the debug save restore as a direct translation of
+> > >> the assembly code version.
+> > >>
+> > >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > >> ---
+> > >>  arch/arm64/kvm/hyp/Makefile   |   1 +
+> > >>  arch/arm64/kvm/hyp/debug-sr.c | 130 ++++++++++++++++++++++++++++++++++++++++++
+> > >>  arch/arm64/kvm/hyp/hyp.h      |   9 +++
+> > >>  3 files changed, 140 insertions(+)
+> > >>  create mode 100644 arch/arm64/kvm/hyp/debug-sr.c
+> > >>
+> > >> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+> > >> index ec94200..ec14cac 100644
+> > >> --- a/arch/arm64/kvm/hyp/Makefile
+> > >> +++ b/arch/arm64/kvm/hyp/Makefile
+> > >> @@ -6,3 +6,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+> > >>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
+> > >>  obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
+> > >>  obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
+> > >> +obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
+> > >> diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+> > >> new file mode 100644
+> > >> index 0000000..a0b2b99
+> > >> --- /dev/null
+> > >> +++ b/arch/arm64/kvm/hyp/debug-sr.c
+> > >> @@ -0,0 +1,130 @@
+> > >> +/*
+> > >> + * Copyright (C) 2015 - ARM Ltd
+> > >> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+> > >> + *
+> > >> + * This program is free software; you can redistribute it and/or modify
+> > >> + * it under the terms of the GNU General Public License version 2 as
+> > >> + * published by the Free Software Foundation.
+> > >> + *
+> > >> + * This program is distributed in the hope that it will be useful,
+> > >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > >> + * GNU General Public License for more details.
+> > >> + *
+> > >> + * You should have received a copy of the GNU General Public License
+> > >> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> > >> + */
+> > >> +
+> > >> +#include <linux/compiler.h>
+> > >> +#include <linux/kvm_host.h>
+> > >> +
+> > >> +#include <asm/kvm_mmu.h>
+> > >> +
+> > >> +#include "hyp.h"
+> > >> +
+> > >> +#define read_debug(r,n)		read_sysreg(r##n##_el1)
+> > >> +#define write_debug(v,r,n)	write_sysreg(v, r##n##_el1)
+> > >> +
+> > >> +#define save_debug(ptr,reg,nr)						\
+> > >> +	switch (nr) {							\
+> > >> +	case 15:	ptr[15] = read_debug(reg, 15);			\
+> > >> +	case 14:	ptr[14] = read_debug(reg, 14);			\
+> > >> +	case 13:	ptr[13] = read_debug(reg, 13);			\
+> > >> +	case 12:	ptr[12] = read_debug(reg, 12);			\
+> > >> +	case 11:	ptr[11] = read_debug(reg, 11);			\
+> > >> +	case 10:	ptr[10] = read_debug(reg, 10);			\
+> > >> +	case 9:		ptr[9] = read_debug(reg, 9);			\
+> > >> +	case 8:		ptr[8] = read_debug(reg, 8);			\
+> > >> +	case 7:		ptr[7] = read_debug(reg, 7);			\
+> > >> +	case 6:		ptr[6] = read_debug(reg, 6);			\
+> > >> +	case 5:		ptr[5] = read_debug(reg, 5);			\
+> > >> +	case 4:		ptr[4] = read_debug(reg, 4);			\
+> > >> +	case 3:		ptr[3] = read_debug(reg, 3);			\
+> > >> +	case 2:		ptr[2] = read_debug(reg, 2);			\
+> > >> +	case 1:		ptr[1] = read_debug(reg, 1);			\
+> > >> +	default:	ptr[0] = read_debug(reg, 0);			\
+> > >> +	}
+> > >> +
+> > >> +#define restore_debug(ptr,reg,nr)					\
+> > >> +	switch (nr) {							\
+> > >> +	case 15:	write_debug(ptr[15], reg, 15);			\
+> > >> +	case 14:	write_debug(ptr[14], reg, 14);			\
+> > >> +	case 13:	write_debug(ptr[13], reg, 13);			\
+> > >> +	case 12:	write_debug(ptr[12], reg, 12);			\
+> > >> +	case 11:	write_debug(ptr[11], reg, 11);			\
+> > >> +	case 10:	write_debug(ptr[10], reg, 10);			\
+> > >> +	case 9:		write_debug(ptr[9], reg, 9);			\
+> > >> +	case 8:		write_debug(ptr[8], reg, 8);			\
+> > >> +	case 7:		write_debug(ptr[7], reg, 7);			\
+> > >> +	case 6:		write_debug(ptr[6], reg, 6);			\
+> > >> +	case 5:		write_debug(ptr[5], reg, 5);			\
+> > >> +	case 4:		write_debug(ptr[4], reg, 4);			\
+> > >> +	case 3:		write_debug(ptr[3], reg, 3);			\
+> > >> +	case 2:		write_debug(ptr[2], reg, 2);			\
+> > >> +	case 1:		write_debug(ptr[1], reg, 1);			\
+> > >> +	default:	write_debug(ptr[0], reg, 0);			\
+> > >> +	}
+> > >> +
+> > >> +void __hyp_text __debug_save_state(struct kvm_vcpu *vcpu,
+> > >> +				   struct kvm_guest_debug_arch *dbg,
+> > >> +				   struct kvm_cpu_context *ctxt)
+> > >> +{
+> > >> +	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY) {
+> > >> +		u64 aa64dfr0 = read_sysreg(id_aa64dfr0_el1);
+> > >> +		int brps, wrps;
+> > >> +
+> > >> +		brps = (aa64dfr0 >> 12) & 0xf;
+> > >> +		wrps = (aa64dfr0 >> 20) & 0xf;
+> > >> +
+> > >> +		save_debug(dbg->dbg_bcr, dbgbcr, brps);
+> > >> +		save_debug(dbg->dbg_bvr, dbgbvr, brps);
+> > >> +		save_debug(dbg->dbg_wcr, dbgwcr, wrps);
+> > >> +		save_debug(dbg->dbg_wvr, dbgwvr, wrps);
+> > >> +
+> > >> +		ctxt->sys_regs[MDCCINT_EL1] = read_sysreg(mdccint_el1);
+> > >> +	}
+> > >> +}
+> > >> +
+> > >> +void __hyp_text __debug_restore_state(struct kvm_vcpu *vcpu,
+> > >> +				      struct kvm_guest_debug_arch *dbg,
+> > >> +				      struct kvm_cpu_context *ctxt)
+> > >> +{
+> > >> +	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY) {
+> > >> +		u64 aa64dfr0 = read_sysreg(id_aa64dfr0_el1);
+> > >> +		int brps, wrps;
+> > >> +
+> > >> +		brps = (aa64dfr0 >> 12) & 0xf;
+> > >> +		wrps = (aa64dfr0 >> 20) & 0xf;
+> > >> +
+> > >> +		restore_debug(dbg->dbg_bcr, dbgbcr, brps);
+> > >> +		restore_debug(dbg->dbg_bvr, dbgbvr, brps);
+> > >> +		restore_debug(dbg->dbg_wcr, dbgwcr, wrps);
+> > >> +		restore_debug(dbg->dbg_wvr, dbgwvr, wrps);
+> > >> +
+> > >> +		write_sysreg(ctxt->sys_regs[MDCCINT_EL1], mdccint_el1);
+> > >> +	}
+> > >> +}
+> > >> +
+> > >> +void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
+> > >> +{
+> > >> +	if ((vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_KDE) ||
+> > >> +	    (vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_KDE))
+> > >> +		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
+> > >> +
+> > >> +	__debug_save_state(vcpu, &vcpu->arch.host_debug_state,
+> > >> +			   kern_hyp_va(vcpu->arch.host_cpu_context));
+> > > 
+> > > doesn't the assmebly code jump across saving this state neither bits are
+> > > set where this always saves the state?
+> > 
+> > It doesn't. The save/restore functions are guarded by tests on
+> > KVM_ARM64_DEBUG_DIRTY, just like we have skip_debug_state on all actions
+> > involving the save/restore in the assembly version.
+> 
+> I think the confusing part is that the save function unconditionally
+> calls __debug_save_state where the restore function only calls it when
+> the dirty flag is set.  Plus I suck at reading assembly apparently.
+> 
+> > 
+> > > in any case, I feel some context is lost when this is moved away from
+> > > assembly and understanding this patch would be easier if the semantics
+> > > of these two _cond functions were documented.
+> > 
+> > I can migrate the existing comments if you think that helps.
+> > 
+> It just wasn't not quite clear to me exactly when
+> __debug_cond_save_host_state is called for example - is this going to be
+> called unconditionally on every entry - that's how I understand it now
+> anyway.
+> 
+Assuming I got that right:
 
-will be fixed in v3.
-
->
->> +               return ret;
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->>   static int dsi_bind(struct device *dev, struct device *master, void
->> *data)
->>   {
->>         struct dsi_data *ddata = dev_get_drvdata(dev);
->> @@ -686,6 +706,10 @@ static int dsi_bind(struct device *dev, struct device
->> *master, void *data)
->>         if (ret)
->>                 return ret;
->>
->> +       ret = dsi_bridge_init(drm_dev, dsi);
->> +       if (ret)
->> +               return ret;
->> +
->>         return 0;
->>   }
->>
->> @@ -702,8 +726,35 @@ static const struct component_ops dsi_ops = {
->>   static int dsi_parse_dt(struct platform_device *pdev, struct hisi_dsi
->> *dsi)
->>   {
->>         struct dsi_hw_ctx *ctx = dsi->ctx;
->> +       struct device_node *np = pdev->dev.of_node;
->> +       struct device_node *endpoint, *bridge_node;
->> +       struct drm_bridge *bridge;
->>         struct resource *res;
->>
->> +       /*
->> +        * Get the endpoint node. In our case, dsi has one output port
->> +        * to which the external HDMI bridge is connected.
->> +        */
->> +       endpoint = of_graph_get_next_endpoint(np, NULL);
->> +       if (!endpoint) {
->> +               DRM_ERROR("no valid endpoint node\n");
->> +               return -ENODEV;
->> +       }
->> +       of_node_put(endpoint);
->> +
->> +       bridge_node = of_graph_get_remote_port_parent(endpoint);
->> +       if (!bridge_node) {
->> +               DRM_ERROR("no valid bridge node\n");
->> +               return -ENODEV;
->> +       }
->> +       of_node_put(bridge_node);
->> +
->> +       bridge = of_drm_find_bridge(bridge_node);
->> +       if (!bridge) {
->> +               DRM_INFO("wait for external HDMI bridge driver.\n");
->> +               return -EPROBE_DEFER;
->> +       }
->> +       dsi->bridge = bridge;
->
->
-> This could be left for later, but it would be better if the dsi driver
-> registers even if the bridge driver module isn't inserted yet, or
-> happens much later in boot.
->
-> We could achieve this by trying to attach the bridge (done in
-> dsi_bridge_init) in the dsi_host_attach callback instead of having it
-> in dsi_bind.
-
-Do you mean that it is the right time or place to attach the bridge in
-dsi_host_attach callback.
-Why? Because at this time bridge driver must be register?
-
-Thanks,
--xinliang
-
->
-> Thanks,
-> Archit
->
->>
->>         ctx->dsi_cfg_clk = devm_clk_get(&pdev->dev, "pclk_dsi");
->>         if (IS_ERR(ctx->dsi_cfg_clk)) {
->>
->
-> --
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
