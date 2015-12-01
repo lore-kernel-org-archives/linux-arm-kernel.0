@@ -1,94 +1,322 @@
-From: peda@lysator.liu.se (Peter Rosin)
-Date: Tue, 01 Dec 2015 18:17:16 +0100
-Subject: Regression, was [PATCH 4/4] USB: host: ohci-at91: merge loops in
- ohci_hcd_at91_drv_probe
-In-Reply-To: 1439216592-11381-5-git-send-email-alexandre.belloni@free-electrons.com
-Message-ID: <565DD61C.5010904@lysator.liu.se>
+From: heiko.stuebner@collabora.com (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 01 Dec 2015 18:19:47 +0100
+Subject: [PATCH 3/3] ARM: dts: rockchip: add veyron-minnie board
+In-Reply-To: <2008536.lEUHWtryIT@diego>
+References: <2767415.mEkgRbSSUB@diego> <2008536.lEUHWtryIT@diego>
+Message-ID: <1851502.mTag78mHRJ@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+I don't have much luck with patches today ... obviously that is supposed to be 
+mickey in the subject
 
-Alexandre Belloni wrote:
-> ohci_hcd_at91_drv_probe() has four at91_for_each_port. They can be merged
-> into two loops without changing the driver behaviour.
-
-Not so much, I bisected the following panic to the commit matching this patch
-(e4df92279fd9e01532f65e5ba397877799ed6252).
-
-Reverting that commit on top of 4.3 fixes things for me.
-
-Cheers,
-Peter
-
-...
-ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
-ohci-atmel: OHCI Atmel driver
-Unable to handle kernel NULL pointer dereference at virtual address 0000000c
-pgd = c0004000
-[0000000c] *pgd=00000000
-Internal error: Oops: 5 [#1] ARM
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper Not tainted 4.2.0-rc6+ #5
-Hardware name: Atmel SAMA5
-task: c3825ac0 ti: c3826000 task.ti: c3826000
-PC is at ohci_hcd_at91_overcurrent_irq+0x18/0xe8
-LR is at handle_irq_event_percpu+0x78/0x140
-pc : [<c02f5084>]    lr : [<c00433b0>]    psr: 40000193
-sp : c3827d08  ip : c3000e34  fp : c3a016dc
-r10: c06e8bbd  r9 : c3941880  r8 : 0000007f
-r7 : c392be00  r6 : 00000000  r5 : 00000008  r4 : 00000000
-r3 : c02f506c  r2 : c3941880  r1 : c392be00  r0 : 0000007f
-Flags: nZcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-Control: 10c53c7d  Table: 20004059  DAC: 00000015
-Process swapper (pid: 1, stack limit = 0xc3826208)
-Stack: (0xc3827d08 to 0xc3828000)
-7d00:                   c3a01600 c383fb10 00000000 00000000 0000007f c00433b0
-7d20: 00000000 ffffffff c3941880 c383fb10 c4856648 c383fb10 c485664c c3802460
-7d40: c38a6044 c00434a4 c3941880 c00458b8 0000007f c0042bc4 0000000f c01fe4ac
-7d60: ff0a0110 00008000 00000028 00000000 00000000 00000001 c3802200 00000000
-7d80: 0000007f c0042bc4 c06c91d4 c0042dec c004451c 60000113 ffffffff c3827ddc
-7da0: 60000113 c0013500 c3941880 c3a01600 00000000 00000000 c3941880 0000007f
-7dc0: c3a01600 00000000 60000113 00000000 0000007f c3a016dc 00000000 c3827df0
-7de0: c00446b4 c004451c 60000113 ffffffff c383fb10 c00914d0 c3a01600 00000080
-7e00: c3941880 c02f506c c392be00 c0044954 c392be00 00000000 c392be10 c3f77690
-7e20: c3a016d0 c060d1e4 00000000 c02f5a0c c060d1e4 c392be00 0000004f 00000000
-7e40: 00000001 00000001 c3927178 c070a458 c392be10 c06d7bfc fffffdfb c06d7bfc
-7e60: 00000000 c06b0f68 00000000 c02670ec c02670a8 c070a458 c392be10 00000000
-7e80: c06ecd78 c02655b4 c02657f4 00000000 c06ce538 c392be10 c06d7bfc c392be44
-7ea0: 00000000 c06ce538 00000096 c0265880 00000000 c06d7bfc c02657f4 c0263880
-7ec0: c383ea4c c39168b0 c06d7bfc c39df280 c06ecca0 c0264b80 c060d318 c3a017c0
-7ee0: c06d7bfc c06be860 c3a017c0 c06a1468 00000000 c0266078 c0267050 c06be860
-7f00: c06be860 c00096c8 c3807280 c06fc48c c3839100 c04d9470 00000000 00000000
-7f20: 00004140 c00dff9c 00000000 00000096 c3ffca15 c0031e54 00000000 c06b0f44
-7f40: c0612f0c c3ffcab1 00000006 00000006 00000000 00000000 c06b84b4 00000006
-7f60: c06b0f60 c06f4140 c06f4140 c06b0f68 00000000 c068bda4 00000006 00000006
-7f80: 00000000 c068b5b0 00000000 c04d06ec 00000000 00000000 00000000 00000000
-7fa0: 00000000 c04d06f4 00000000 c000ff68 00000000 00000000 00000000 00000000
-7fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-7fe0: 00000000 00000000 00000000 00000000 00000013 00000000 8aaaaaaa aaaaaaaa
-[<c02f5084>] (ohci_hcd_at91_overcurrent_irq) from [<c00433b0>] (handle_irq_event_percpu+0x78/0x140)
-[<c00433b0>] (handle_irq_event_percpu) from [<c00434a4>] (handle_irq_event+0x2c/0x40)
-[<c00434a4>] (handle_irq_event) from [<c00458b8>] (handle_simple_irq+0x6c/0x80)
-[<c00458b8>] (handle_simple_irq) from [<c0042bc4>] (generic_handle_irq+0x2c/0x3c)
-[<c0042bc4>] (generic_handle_irq) from [<c01fe4ac>] (gpio_irq_handler+0xa4/0x12c)
-[<c01fe4ac>] (gpio_irq_handler) from [<c0042bc4>] (generic_handle_irq+0x2c/0x3c)
-[<c0042bc4>] (generic_handle_irq) from [<c0042dec>] (__handle_domain_irq+0x54/0xa8)
-[<c0042dec>] (__handle_domain_irq) from [<c0013500>] (__irq_svc+0x40/0x54)
-[<c0013500>] (__irq_svc) from [<c004451c>] (__setup_irq+0x248/0x530)
-[<c004451c>] (__setup_irq) from [<c0044954>] (request_threaded_irq+0xc4/0x144)
-[<c0044954>] (request_threaded_irq) from [<c02f5a0c>] (ohci_hcd_at91_drv_probe+0x460/0x518)
-[<c02f5a0c>] (ohci_hcd_at91_drv_probe) from [<c02670ec>] (platform_drv_probe+0x44/0xa4)
-[<c02670ec>] (platform_drv_probe) from [<c02655b4>] (driver_probe_device+0x1fc/0x43c)
-[<c02655b4>] (driver_probe_device) from [<c0265880>] (__driver_attach+0x8c/0x90)
-[<c0265880>] (__driver_attach) from [<c0263880>] (bus_for_each_dev+0x6c/0xa0)
-[<c0263880>] (bus_for_each_dev) from [<c0264b80>] (bus_add_driver+0x1d0/0x268)
-[<c0264b80>] (bus_add_driver) from [<c0266078>] (driver_register+0x78/0xf8)
-[<c0266078>] (driver_register) from [<c00096c8>] (do_one_initcall+0xb8/0x1f0)
-[<c00096c8>] (do_one_initcall) from [<c068bda4>] (kernel_init_freeable+0x138/0x1d8)
-[<c068bda4>] (kernel_init_freeable) from [<c04d06f4>] (kernel_init+0x8/0xe8)
-[<c04d06f4>] (kernel_init) from [<c000ff68>] (ret_from_fork+0x14/0x2c)
-Code: e5916058 e1a08000 e3a04000 e2865008 (e5b50004)
----[ end trace e66fbc480972ac43 ]---
-Kernel panic - not syncing: Fatal exception in interrupt
----[ end Kernel panic - not syncing: Fatal exception in interrupt
+Am Dienstag, 1. Dezember 2015, 18:16:55 schrieb Heiko St?bner:
+> From: Chris Zhong <zyw@rock-chips.com>
+> 
+> Also known as the Asus Chromebit.
+> 
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> Signed-off-by: Heiko Stuebner <heiko.stuebner@collabora.com>
+> ---
+> would cool to get an Ack from ChromeOS-people concerning the
+> license change to GPL2/X11 - as with the dts before
+> 
+> Also if someone else should be designated as author I would be happy
+> got get a shout about that :-) . I did take Chris as he was the one
+> submitting the initial mickey dts to the chromeos tree.
+> 
+> And of course it would be cool if anyone could test that on an actual
+> mickey device.
+> 
+>  Documentation/devicetree/bindings/arm/rockchip.txt |   9 +
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  arch/arm/boot/dts/rk3288-veyron-mickey.dts         | 246
+> +++++++++++++++++++++ 3 files changed, 256 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/rk3288-veyron-mickey.dts
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt
+> b/Documentation/devicetree/bindings/arm/rockchip.txt index 2f8b35a..2fa0a21
+> 100644
+> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
+> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+> @@ -54,6 +54,15 @@ Rockchip platforms device tree bindings
+>  		     "google,veyron-jerry-rev3", "google,veyron-jerry",
+>  		     "google,veyron", "rockchip,rk3288";
+> 
+> +- Google Mickey (Asus Chromebit CS10):
+> +    Required root node properties:
+> +      - compatible = "google,veyron-mickey-rev8",
+> "google,veyron-mickey-rev7", +		     "google,veyron-mickey-rev6",
+> "google,veyron-mickey-rev5",
+> +		     "google,veyron-mickey-rev4", "google,veyron-mickey-rev3",
+> +		     "google,veyron-mickey-rev2", "google,veyron-mickey-rev1",
+> +		     "google,veyron-mickey-rev0", "google,veyron-mickey",
+> +		     "google,veyron", "rockchip,rk3288";
+> +
+>  - Google Minnie (Asus Chromebook Flip C100P):
+>      Required root node properties:
+>        - compatible = "google,veyron-minnie-rev4",
+> "google,veyron-minnie-rev3", diff --git a/arch/arm/boot/dts/Makefile
+> b/arch/arm/boot/dts/Makefile index 2f29350..8b49bfc 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -527,6 +527,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
+>  	rk3288-veyron-brain.dtb \
+>  	rk3288-veyron-jaq.dtb \
+>  	rk3288-veyron-jerry.dtb \
+> +	rk3288-veyron-mickey.dtb \
+>  	rk3288-veyron-minnie.dtb \
+>  	rk3288-veyron-pinky.dtb \
+>  	rk3288-veyron-speedy.dtb
+> diff --git a/arch/arm/boot/dts/rk3288-veyron-mickey.dts
+> b/arch/arm/boot/dts/rk3288-veyron-mickey.dts new file mode 100644
+> index 0000000..365382a
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/rk3288-veyron-mickey.dts
+> @@ -0,0 +1,246 @@
+> +/*
+> + * Google Veyron Mickey Rev 0 board device tree source
+> + *
+> + * Copyright 2015 Google, Inc
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + *  Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "rk3288-veyron.dtsi"
+> +
+> +/ {
+> +	model = "Google Mickey";
+> +	compatible = "google,veyron-mickey-rev8", "google,veyron-mickey-rev7",
+> +		     "google,veyron-mickey-rev6", "google,veyron-mickey-rev5",
+> +		     "google,veyron-mickey-rev4", "google,veyron-mickey-rev3",
+> +		     "google,veyron-mickey-rev2", "google,veyron-mickey-rev1",
+> +		     "google,veyron-mickey-rev0", "google,veyron-mickey",
+> +		     "google,veyron", "rockchip,rk3288";
+> +
+> +	vcc_5v: vcc-5v {
+> +		vin-supply = <&vcc33_sys>;
+> +	};
+> +
+> +	vcc33_io: vcc33_io {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc33_io";
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +		vin-supply = <&vcc33_sys>;
+> +	};
+> +};
+> +
+> +&cpu_thermal {
+> +	/delete-node/ trips;
+> +	/delete-node/ cooling-maps;
+> +
+> +	trips {
+> +		cpu_alert_almost_warm: cpu_alert_almost_warm {
+> +			temperature = <63000>; /* millicelsius */
+> +			hysteresis = <2000>; /* millicelsius */
+> +			type = "passive";
+> +		};
+> +		cpu_alert_warm: cpu_alert_warm {
+> +			temperature = <65000>; /* millicelsius */
+> +			hysteresis = <2000>; /* millicelsius */
+> +			type = "passive";
+> +		};
+> +		cpu_alert_almost_hot: cpu_alert_almost_hot {
+> +			temperature = <80000>; /* millicelsius */
+> +			hysteresis = <2000>; /* millicelsius */
+> +			type = "passive";
+> +		};
+> +		cpu_alert_hot: cpu_alert_hot {
+> +			temperature = <82000>; /* millicelsius */
+> +			hysteresis = <2000>; /* millicelsius */
+> +			type = "passive";
+> +		};
+> +		cpu_alert_hotter: cpu_alert_hotter {
+> +			temperature = <84000>; /* millicelsius */
+> +			hysteresis = <2000>; /* millicelsius */
+> +			type = "passive";
+> +		};
+> +		cpu_alert_very_hot: cpu_alert_very_hot {
+> +			temperature = <85000>; /* millicelsius */
+> +			hysteresis = <2000>; /* millicelsius */
+> +			type = "passive";
+> +		};
+> +		cpu_crit: cpu_crit {
+> +			temperature = <90000>; /* millicelsius */
+> +			hysteresis = <2000>; /* millicelsius */
+> +			type = "critical";
+> +		};
+> +	};
+> +
+> +	cooling-maps {
+> +		/*
+> +		 * After 1st level, throttle the CPU down to as low as 1.4 GHz
+> +		 * and don't let the GPU go faster than 400 MHz.  Note that we
+> +		 * won't throttle the GPU lower than 400 MHz due to CPU
+> +		 * heat--we'll let the GPU do the rest itself.
+> +		 */
+> +		cpu_warm_limit_cpu {
+> +			trip = <&cpu_alert_warm>;
+> +			cooling-device =
+> +				<&cpu0 THERMAL_NO_LIMIT 4>;
+> +		};
+> +
+> +		/*
+> +		 * Add some discrete steps to help throttling system deal
+> +		 * with the fact that there are two passive cooling devices:
+> +		 * the CPU and the GPU.
+> +		 *
+> +		 * - 1.2 GHz - 1.0 GHz (almost hot)
+> +		 * - 800 MHz           (hot)
+> +		 * - 800 MHz - 696 MHz (hotter)
+> +		 * - 696 MHz - min     (very hot)
+> +		 *
+> +		 * Note:
+> +		 * - 800 MHz appears to be a "sweet spot" for me.  I can run
+> +		 *   some pretty serious workload here and be happy.
+> +		 * - After 696 MHz we stop lowering voltage, so throttling
+> +		 *   past there is less effective.
+> +		 */
+> +		cpu_almost_hot_limit_cpu {
+> +			trip = <&cpu_alert_almost_hot>;
+> +			cooling-device =
+> +				<&cpu0 5 6>;
+> +		};
+> +		cpu_hot_limit_cpu {
+> +			trip = <&cpu_alert_hot>;
+> +			cooling-device =
+> +				<&cpu0 7 7>;
+> +		};
+> +		cpu_hotter_limit_cpu {
+> +			trip = <&cpu_alert_hotter>;
+> +			cooling-device =
+> +				<&cpu0 7 8>;
+> +		};
+> +		cpu_very_hot_limit_cpu {
+> +			trip = <&cpu_alert_very_hot>;
+> +			cooling-device =
+> +				<&cpu0 8 THERMAL_NO_LIMIT>;
+> +		};
+> +	};
+> +};
+> +
+> +&i2c2 {
+> +	status = "disabled";
+> +};
+> +
+> +&i2c4 {
+> +	status = "disabled";
+> +};
+> +
+> +&i2s {
+> +	status = "okay";
+> +	clock-names = "i2s_hclk", "i2s_clk", "i2s_clk_out";
+> +	clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>, <&cru SCLK_I2S0_OUT>;
+> +};
+> +
+> +&rk808 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pmic_int_l &dvs_1 &dvs_2>;
+> +	dvs-gpios = <&gpio7 12 GPIO_ACTIVE_HIGH>,
+> +		    <&gpio7 15 GPIO_ACTIVE_HIGH>;
+> +
+> +	/delete-property/ vcc6-supply;
+> +	/delete-property/ vcc12-supply;
+> +
+> +	vcc11-supply = <&vcc33_sys>;
+> +
+> +	regulators {
+> +		/* vcc33_io is sourced directly from vcc33_sys */
+> +		/delete-node/ LDO_REG1;
+> +		/delete-node/ LDO_REG7;
+> +
+> +		/* This is not a pwren anymore, but the real power supply */
+> +		vdd10_lcd: LDO_REG7 {
+> +			regulator-always-on;
+> +			regulator-boot-on;
+> +			regulator-min-microvolt = <1000000>;
+> +			regulator-max-microvolt = <1000000>;
+> +			regulator-name = "vdd10_lcd";
+> +			regulator-suspend-mem-disabled;
+> +		};
+> +
+> +		vcc18_lcd: LDO_REG8 {
+> +			regulator-always-on;
+> +			regulator-boot-on;
+> +			regulator-min-microvolt = <1800000>;
+> +			regulator-max-microvolt = <1800000>;
+> +			regulator-name = "vcc18_lcd";
+> +			regulator-suspend-mem-disabled;
+> +		};
+> +	};
+> +};
+> +
+> +&pinctrl {
+> +	hdmi {
+> +		power_hdmi_on: power-hdmi-on {
+> +			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
+> +		};
+> +	};
+> +
+> +	pmic {
+> +		dvs_1: dvs-1 {
+> +			rockchip,pins = <7 12 RK_FUNC_GPIO &pcfg_pull_down>;
+> +		};
+> +
+> +		dvs_2: dvs-2 {
+> +			rockchip,pins = <7 15 RK_FUNC_GPIO &pcfg_pull_down>;
+> +		};
+> +	};
+> +};
+> +
+> +&usb_host0_ehci {
+> +	status = "disabled";
+> +};
+> +
+> +&usb_host1 {
+> +	status = "disabled";
+> +};
+> +
+> +&vcc50_hdmi {
+> +	enable-active-high;
+> +	gpio = <&gpio7 11 GPIO_ACTIVE_HIGH>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&power_hdmi_on>;
+> +};
