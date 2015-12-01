@@ -1,67 +1,65 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Tue,  1 Dec 2015 17:24:17 +0100
-Subject: [PATCH v3 1/6] of/irq: Export of_irq_find_parent again
+Date: Tue,  1 Dec 2015 17:24:19 +0100
+Subject: [PATCH v3 3/6] pinctrl: meson: Make helper functions public
 In-Reply-To: <1448987062-31225-1-git-send-email-carlo@caione.org>
 References: <1448987062-31225-1-git-send-email-carlo@caione.org>
-Message-ID: <1448987062-31225-2-git-send-email-carlo@caione.org>
+Message-ID: <1448987062-31225-4-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Carlo Caione <carlo@endlessm.com>
 
-of_irq_find_parent was made static since it had no users outside of
-of_irq.c. Export it again since we are going to use it again.
+meson_get_domain_and_bank() and meson_map_resource() are not static
+anymore.
 
 Signed-off-by: Carlo Caione <carlo@endlessm.com>
 ---
- drivers/of/irq.c       | 3 ++-
- include/linux/of_irq.h | 6 ++++++
- 2 files changed, 8 insertions(+), 1 deletion(-)
+ drivers/pinctrl/meson/pinctrl-meson.c | 10 +++++-----
+ drivers/pinctrl/meson/pinctrl-meson.h |  7 +++++++
+ 2 files changed, 12 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-index 902b89b..4fa916d 100644
---- a/drivers/of/irq.c
-+++ b/drivers/of/irq.c
-@@ -53,7 +53,7 @@ EXPORT_SYMBOL_GPL(irq_of_parse_and_map);
-  * Returns a pointer to the interrupt parent node, or NULL if the interrupt
-  * parent could not be determined.
+diff --git a/drivers/pinctrl/meson/pinctrl-meson.c b/drivers/pinctrl/meson/pinctrl-meson.c
+index 84943e4..0c5655b 100644
+--- a/drivers/pinctrl/meson/pinctrl-meson.c
++++ b/drivers/pinctrl/meson/pinctrl-meson.c
+@@ -99,9 +99,9 @@ static int meson_get_bank(struct meson_domain *domain, unsigned int pin,
+  *
+  * Return:	0 on success, a negative value on error
   */
--static struct device_node *of_irq_find_parent(struct device_node *child)
-+struct device_node *of_irq_find_parent(struct device_node *child)
+-static int meson_get_domain_and_bank(struct meson_pinctrl *pc, unsigned int pin,
+-				     struct meson_domain **domain,
+-				     struct meson_bank **bank)
++int meson_get_domain_and_bank(struct meson_pinctrl *pc, unsigned int pin,
++			      struct meson_domain **domain,
++			      struct meson_bank **bank)
  {
- 	struct device_node *p;
- 	const __be32 *parp;
-@@ -77,6 +77,7 @@ static struct device_node *of_irq_find_parent(struct device_node *child)
+ 	struct meson_domain *d;
+ 	int i;
+@@ -618,8 +618,8 @@ static struct regmap_config meson_regmap_config = {
+ 	.reg_stride = 4,
+ };
  
- 	return p;
- }
-+EXPORT_SYMBOL_GPL(of_irq_find_parent);
- 
- /**
-  * of_irq_parse_raw - Low level interrupt tree parsing
-diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
-index 039f2ee..6f879c6 100644
---- a/include/linux/of_irq.h
-+++ b/include/linux/of_irq.h
-@@ -94,6 +94,7 @@ static inline void of_msi_configure(struct device *dev, struct device_node *np)
-  */
- extern unsigned int irq_of_parse_and_map(struct device_node *node, int index);
- u32 of_msi_map_rid(struct device *dev, struct device_node *msi_np, u32 rid_in);
-+extern struct device_node *of_irq_find_parent(struct device_node *child);
- 
- #else /* !CONFIG_OF && !CONFIG_SPARC */
- static inline unsigned int irq_of_parse_and_map(struct device_node *dev,
-@@ -107,6 +108,11 @@ static inline u32 of_msi_map_rid(struct device *dev,
+-static struct regmap *meson_map_resource(struct meson_pinctrl *pc,
+-					 struct device_node *node, char *name)
++struct regmap *meson_map_resource(struct meson_pinctrl *pc,
++				  struct device_node *node, char *name)
  {
- 	return rid_in;
- }
+ 	struct resource res;
+ 	void __iomem *base;
+diff --git a/drivers/pinctrl/meson/pinctrl-meson.h b/drivers/pinctrl/meson/pinctrl-meson.h
+index 374f4b6..a0bf705 100644
+--- a/drivers/pinctrl/meson/pinctrl-meson.h
++++ b/drivers/pinctrl/meson/pinctrl-meson.h
+@@ -214,3 +214,10 @@ struct meson_pinctrl {
+ 
+ extern struct meson_pinctrl_data meson8_pinctrl_data;
+ extern struct meson_pinctrl_data meson8b_pinctrl_data;
 +
-+static inline void *of_irq_find_parent(struct device_node *child)
-+{
-+	return NULL;
-+}
- #endif /* !CONFIG_OF */
- 
- #endif /* __OF_IRQ_H */
++int meson_get_domain_and_bank(struct meson_pinctrl *pc, unsigned int pin,
++			      struct meson_domain **domain,
++			      struct meson_bank **bank);
++
++struct regmap *meson_map_resource(struct meson_pinctrl *pc,
++				  struct device_node *node, char *name);
 -- 
 2.5.0
