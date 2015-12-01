@@ -1,30 +1,67 @@
-From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
-Date: Tue, 1 Dec 2015 11:14:02 +0100
-Subject: [PATCH] ARM: ep93xx: Fix clocksource registration
-In-Reply-To: <CACRpkdZy7TnrmkWrRerjm6dZW9m65Dsc_kp8TPHzbhTxz5Hbrw@mail.gmail.com>
-References: <565513EA.6020603@gmail.com>
- <CACRpkdZy7TnrmkWrRerjm6dZW9m65Dsc_kp8TPHzbhTxz5Hbrw@mail.gmail.com>
-Message-ID: <565D72EA.9070609@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 01 Dec 2015 11:14:29 +0100
+Subject: [RFC v02 04/15] dmaengine: edma: Add support for DMA filter
+ mapping to slave devices
+In-Reply-To: <565D6F5D.3060603@ti.com>
+References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
+ <7490116.jHcmUxB3Rf@wuerfel> <565D6F5D.3060603@ti.com>
+Message-ID: <4013235.sXCFUFy4j4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Linus,
-
-On 01/12/15 11:09, Linus Walleij wrote:
->> clocksource_mmio_init() explicitly checks for counter's width and refuses to
->> > register anything with resolution higher than 32 bits. We need to use
->> > clocksource_register_hz() directly to repair HIGH_RES_TIMERS.
-> Maybe tglx want to jump in on this.
+On Tuesday 01 December 2015 11:58:53 Peter Ujfalusi wrote:
+> On 11/30/2015 04:11 PM, Arnd Bergmann wrote:
+> > On Monday 30 November 2015 15:45:34 Peter Ujfalusi wrote:
+> >> @@ -2428,6 +2436,22 @@ bool edma_filter_fn(struct dma_chan *chan, void *param)
+> >>  }
+> >>  EXPORT_SYMBOL(edma_filter_fn);
+> >>  
+> >> +static bool edma_filter_for_map(struct dma_chan *chan, void *param)
+> >> +{
+> >> +       bool match = false;
+> >> +
+> >> +       if (chan->device->dev->driver == &edma_driver.driver) {
+> >> +               struct edma_chan *echan = to_edma_chan(chan);
+> >> +               unsigned ch_req = (unsigned)param;
+> >> +               if (ch_req == echan->ch_num) {
+> >> +                       /* The channel is going to be used as HW synchronized */
+> >> +                       echan->hw_triggered = true;
+> >> +                       match = true;
+> >> +               }
+> >> +       }
+> >> +       return match;
+> >> +}
+> >> +
+> >>  static int edma_init(void)
+> >>
+> > 
+> > I don't see the difference between edma_filter_fn and edma_filter_for_map.
+> > Why do you need both?
 > 
-> Isn't it better to fix clocksource_mmio_init() to accept > 32 bits?
+> edma_filter_fn:
+>         unsigned ch_req = *(unsigned *)param;
 > 
-> What is really prompting this in drivers/clocksource/mmio.c:
-> 
-> if (bits > 32 || bits < 16)
->                 return -EINVAL;
+> edma_filter_for_map:
+>         unsigned ch_req = (unsigned)param;
 
-probably lack of >32bit access functions in the driver. But I do not know
-the original intentions of the author. In any case, if we modify the check here,
-probably the access function for 64 bits should be moved to the mmio.c?
+I see.
 
-Alex.
+> If I want to reuse the edma_filter_fn, I would need an unsigned array for the
+> eDMA event numbers in the board files to be able to provide the pointer to
+> each of them.
+
+How about this:
+
+#define EDMA_CTLR_CHANP(ctlr, chan)      ((const int[]){ [0] = ((ctlr) << 16) | (chan)})
+
+static struct dma_filter_map da830_edma_map[] = {
+         { "davinci-mcasp.0", "rx", EDMA_CTLR_CHANP(0, 0)},
+         { "davinci-mcasp.0", "tx", EDMA_CTLR_CHANP(0, 1)},
+         { "davinci-mcasp.1", "rx", EDMA_CTLR_CHANP(0, 2)},
+         ...
+};
+
+That way, you create an anonymous constant integer expression and the data
+points to that.
+
+	Arnd
