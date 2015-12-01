@@ -1,48 +1,96 @@
 From: dcashman@android.com (Daniel Cashman)
-Date: Tue,  1 Dec 2015 12:10:54 -0800
-Subject: [PATCH v5 0/4] Allow customizable random offset to mmap_base address.
-Message-ID: <1449000658-11475-1-git-send-email-dcashman@android.com>
+Date: Tue,  1 Dec 2015 12:10:57 -0800
+Subject: [PATCH v5 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
+In-Reply-To: <1449000658-11475-3-git-send-email-dcashman@android.com>
+References: <1449000658-11475-1-git-send-email-dcashman@android.com>
+ <1449000658-11475-2-git-send-email-dcashman@android.com>
+ <1449000658-11475-3-git-send-email-dcashman@android.com>
+Message-ID: <1449000658-11475-4-git-send-email-dcashman@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Address Space Layout Randomization (ASLR) provides a barrier to exploitation of user-space processes in the presence of security vulnerabilities by making it more difficult to find desired code/data which could help an attack. This is done by adding a random offset to the location of regions in the process address space, with a greater range of potential offset values corresponding to better protection/a larger search-space for brute force, but also to greater potential for fragmentation.
+From: dcashman <dcashman@google.com>
 
-The offset added to the mmap_base address, which provides the basis for the majority of the mappings for a process, is set once on process exec in arch_pick_mmap_layout() and is done via hard-coded per-arch values, which reflect, hopefully, the best compromise for all systems. The trade-off between increased entropy in the offset value generation and the corresponding increased variability in address space fragmentation is not absolute, however, and some platforms may tolerate higher amounts of entropy. This patch introduces both new Kconfig values and a sysctl interface which may be used to change the amount of entropy used for offset generation on a system.
+arm64: arch_mmap_rnd() uses STACK_RND_MASK to generate the
+random offset for the mmap base address.  This value represents a
+compromise between increased ASLR effectiveness and avoiding
+address-space fragmentation. Replace it with a Kconfig option, which
+is sensibly bounded, so that platform developers may choose where to
+place this compromise. Keep default values as new minimums.
 
-The direct motivation for this change was in response to the libstagefright vulnerabilities that affected Android, specifically to information provided by Google's project zero at:
+Signed-off-by: Daniel Cashman <dcashman@android.com>
+---
+ arch/arm64/Kconfig   | 31 +++++++++++++++++++++++++++++++
+ arch/arm64/mm/mmap.c |  8 ++++++--
+ 2 files changed, 37 insertions(+), 2 deletions(-)
 
-http://googleprojectzero.blogspot.com/2015/09/stagefrightened.html
-
-The attack presented therein, by Google's project zero, specifically targeted the limited randomness used to generate the offset added to the mmap_base address in order to craft a brute-force-based attack. Concretely, the attack was against the mediaserver process, which was limited to respawning every 5 seconds, on an arm device. The hard-coded 8 bits used resulted in an average expected success rate of defeating the mmap ASLR after just over 10 minutes (128 tries at 5 seconds a piece). With this patch, and an accompanying increase in the entropy value to 16 bits, the same attack would take an average expected time of over 45 hours (32768 tries), which makes it both less feasible and more likely to be noticed.
-
-The introduced Kconfig and sysctl options are limited by per-arch minimum and maximum values, the minimum of which was chosen to match the current hard-coded value and the maximum of which was chosen so as to give the greatest flexibility without generating an invalid mmap_base address, generally a 3-4 bits less than the number of bits in the user-space accessible virtual address space.
-
-When decided whether or not to change the default value, a system developer should consider that mmap_base address could be placed anywhere up to 2^(value) bits away from the non-randomized location, which would introduce variable-sized areas above and below the mmap_base address such that the maximum vm_area_struct size may be reduced, preventing very large allocations.
-
-Changes in v5:
-* Changed all Kconfig selection to depend on MMU config.
-  - inspired by Arnd Bermann patch: "ARM kernels with MMU disabled fail to build because of CONFIG_ARCH_MMAP_RND_BITS:"
-* removed void casts for sysctl ctl_table entries
-  - depends on Andrew Morton patch: "include/linux/sysctl.h: make ctl_table.extra1/2 const"
-
-dcashman (4):
-  mm: mmap: Add new /proc tunable for mmap_base ASLR.
-  arm: mm: support ARCH_MMAP_RND_BITS.
-  arm64: mm: support ARCH_MMAP_RND_BITS.
-  x86: mm: support ARCH_MMAP_RND_BITS.
-
- Documentation/sysctl/vm.txt | 29 +++++++++++++++++++
- arch/Kconfig                | 68 +++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/Kconfig            |  9 ++++++
- arch/arm/mm/mmap.c          |  3 +-
- arch/arm64/Kconfig          | 31 +++++++++++++++++++++
- arch/arm64/mm/mmap.c        |  8 ++++--
- arch/x86/Kconfig            | 16 +++++++++++
- arch/x86/mm/mmap.c          | 12 ++++----
- include/linux/mm.h          | 11 ++++++++
- kernel/sysctl.c             | 22 +++++++++++++++
- mm/mmap.c                   | 12 ++++++++
- 11 files changed, 211 insertions(+), 10 deletions(-)
-
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 871f217..fb57649 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -51,6 +51,8 @@ config ARM64
+ 	select HAVE_ARCH_JUMP_LABEL
+ 	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP && !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+ 	select HAVE_ARCH_KGDB
++	select HAVE_ARCH_MMAP_RND_BITS if MMU
++	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if MMU && COMPAT
+ 	select HAVE_ARCH_SECCOMP_FILTER
+ 	select HAVE_ARCH_TRACEHOOK
+ 	select HAVE_BPF_JIT
+@@ -104,6 +106,35 @@ config ARCH_PHYS_ADDR_T_64BIT
+ config MMU
+ 	def_bool y
+ 
++config ARCH_MMAP_RND_BITS_MIN
++       default 15 if ARM64_64K_PAGES
++       default 17 if ARM64_16K_PAGES
++       default 19
++
++config ARCH_MMAP_RND_BITS_MAX
++       default 19 if ARM64_VA_BITS=36
++       default 20 if ARM64_64K_PAGES && ARM64_VA_BITS=39
++       default 22 if ARM64_16K_PAGES && ARM64_VA_BITS=39
++       default 24 if ARM64_VA_BITS=39
++       default 23 if ARM64_64K_PAGES && ARM64_VA_BITS=42
++       default 25 if ARM64_16K_PAGES && ARM64_VA_BITS=42
++       default 27 if ARM64_VA_BITS=42
++       default 30 if ARM64_VA_BITS=47
++       default 29 if ARM64_64K_PAGES && ARM64_VA_BITS=48
++       default 31 if ARM64_16K_PAGES && ARM64_VA_BITS=48
++       default 33 if ARM64_VA_BITS=48
++       default 15 if ARM64_64K_PAGES
++       default 17 if ARM64_16K_PAGES
++       default 19
++
++config ARCH_MMAP_RND_COMPAT_BITS_MIN
++       default 7 if ARM64_64K_PAGES
++       default 9 if ARM64_16K_PAGES
++       default 11
++
++config ARCH_MMAP_RND_COMPAT_BITS_MAX
++       default 16
++
+ config NO_IOPORT_MAP
+ 	def_bool y if !PCI
+ 
+diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
+index ed17747..af461b9 100644
+--- a/arch/arm64/mm/mmap.c
++++ b/arch/arm64/mm/mmap.c
+@@ -51,8 +51,12 @@ unsigned long arch_mmap_rnd(void)
+ {
+ 	unsigned long rnd;
+ 
+-	rnd = (unsigned long)get_random_int() & STACK_RND_MASK;
+-
++ifdef CONFIG_COMPAT
++	if (test_thread_flag(TIF_32BIT))
++		rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_compat_bits);
++	else
++#endif
++		rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_bits);
+ 	return rnd << PAGE_SHIFT;
+ }
+ 
 -- 
 2.6.0.rc2.230.g3dd15c0
