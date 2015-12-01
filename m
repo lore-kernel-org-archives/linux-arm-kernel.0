@@ -1,142 +1,51 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Tue, 1 Dec 2015 07:09:27 +0100
-Subject: [PATCH v2] arm, am335x: add support for the bosch shc board
-In-Reply-To: <20151201055333.GO23396@atomide.com>
-References: <1447748655-2088-1-git-send-email-hs@denx.de>
- <20151130214130.GA23396@atomide.com> <565D2DF9.2010806@denx.de>
- <20151201055333.GO23396@atomide.com>
-Message-ID: <565D3997.9060905@denx.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 1 Dec 2015 15:41:50 +0900
+Subject: [PATCH] ARM: shmobile: alt: Add QSPI device to DT
+In-Reply-To: <CAMuHMdWnyZbHiLEPn-6dEweBEXHzWr6o2KF2iCpzg2-OhZRVSw@mail.gmail.com>
+References: <1448863990-16276-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdWnyZbHiLEPn-6dEweBEXHzWr6o2KF2iCpzg2-OhZRVSw@mail.gmail.com>
+Message-ID: <20151201064149.GH16260@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tony,
+On Mon, Nov 30, 2015 at 09:34:10AM +0100, Geert Uytterhoeven wrote:
+> On Mon, Nov 30, 2015 at 7:13 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > Enable the QSPI controller in the alt device tree.
+> >
+> > Based similar work for the silk board by by Vladimir Barinov and
+> > Sergei Shtylyov.
+> >
+> > Cc: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> > Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Verified against Alt schematics and r8a7794 datasheet.
+> 
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> I can't verify the FLASH layout. Note that p.11 of
+> ALT_MiniMonitor_Manual(SPI_Boot)_Rev0.01_e.pdf shows a different
+> FLASH layout for the second and third partition.
 
-Am 01.12.2015 um 06:53 schrieb Tony Lindgren:
-> * Heiko Schocher <hs@denx.de> [151130 21:21]:
->> Hello Tony,
->>
->> Am 30.11.2015 um 22:41 schrieb Tony Lindgren:
->>> * Heiko Schocher <hs@denx.de> [151117 00:25]:
->>>> --- /dev/null
->>>> +++ b/arch/arm/boot/dts/am335x-shc.dts
->>>> +&tps {
->>>> +	compatible = "ti,tps65217";
->>>> +	ti,pmic-shutdown-controller;
->>>> +
->>>> +	regulators {
->>>> +		#address-cells = <1>;
->>>> +		#size-cells = <0>;
->>>> +
->>>> +		dcdc1_reg: regulator at 0 {
->>>> +			reg = <0>;
->>>> +			regulator-name = "vdds_dpr";
->>>> +			regulator-compatible = "dcdc1";
->>>> +			regulator-min-microvolt = <1300000>;
->>>> +			regulator-max-microvolt = <1450000>;
->>>> +			regulator-boot-on;
->>>> +			regulator-always-on;
->>>> +		};
->>>> +
->>>> +		dcdc2_reg: regulator at 1 {
->>>> +			reg = <1>;
->>>> +			/*
->>>> +			 * VDD_MPU voltage limits 0.95V - 1.26V with
->>>> +			 * +/-4% tolerance
->>>> +			 */
->>>> +			regulator-compatible = "dcdc2";
->>>> +			regulator-name = "vdd_mpu";
->>>> +			regulator-min-microvolt = <925000>;
->>>> +			regulator-max-microvolt = <1375000>;
->>>> +			regulator-boot-on;
->>>> +			regulator-always-on;
->>>> +			regulator-ramp-delay = <70000>;
->>>> +		};
->>>> +
->>>> +		dcdc3_reg: regulator at 2 {
->>>> +			reg = <2>;
->>>> +			/*
->>>> +			 * VDD_CORE voltage limits 0.95V - 1.1V with
->>>> +			 * +/-4% tolerance
->>>> +			 */
->>>> +			regulator-name = "vdd_core";
->>>> +			regulator-compatible = "dcdc3";
->>>> +			regulator-min-microvolt = <925000>;
->>>> +			regulator-max-microvolt = <1125000>;
->>>> +			regulator-boot-on;
->>>> +			regulator-always-on;
->>>> +		};
->>>> +
->>>> +		ldo1_reg: regulator at 3 {
->>>> +			reg = <3>;
->>>> +			regulator-name = "vio,vrtc,vdds";
->>>> +			regulator-compatible = "ldo1";
->>>> +			regulator-min-microvolt = <1000000>;
->>>> +			regulator-max-microvolt = <1800000>;
->>>> +			regulator-always-on;
->>>> +		};
->>>> +
->>>> +		ldo2_reg: regulator at 4 {
->>>> +			reg = <4>;
->>>> +			regulator-name = "vdd_3v3aux";
->>>> +			regulator-compatible = "ldo2";
->>>> +			regulator-min-microvolt = <900000>;
->>>> +			regulator-max-microvolt = <3300000>;
->>>> +			regulator-always-on;
->>>> +		};
->>>> +
->>>> +		ldo3_reg: regulator at 5 {
->>>> +			reg = <5>;
->>>> +			regulator-name = "vdd_1v8";
->>>> +			regulator-compatible = "ldo3";
->>>> +			regulator-min-microvolt = <900000>;
->>>> +			regulator-max-microvolt = <1800000>;
->>>> +			regulator-always-on;
->>>> +		};
->>>> +
->>>> +		ldo4_reg: regulator at 6 {
->>>> +			reg = <6>;
->>>> +			regulator-name = "vdd_3v3a";
->>>> +			regulator-compatible = "ldo4";
->>>> +			regulator-min-microvolt = <1800000>;
->>>> +			regulator-max-microvolt = <3300000>;
->>>> +			regulator-always-on;
->>>> +		};
->>>> +	};
->>>> +};
->>>
->>> Applying this into omap-for-v4.5/dt.. But I'm getting concerned about this
->>> "regulator-always-on" stuff and having multiple copies of the same thing.
->>>
->>> I think we should have a common am33xx-tps65217.dtsi file that has the
->>> regulators defined at one place and other then include it. And they are
->>> controllable AFAIK..
->>
->> Hmm... Mark Brown (added to Cc) suggested to move this regulator nodes
->> into the board DT file and remove such files [1].
->
-> Hmm it was probably the name of that file causing confusion as it was not
-> am33xx specific. If we have many board variants using almost the same exact
-> regulators and configuration it totally makes sense to have a shared dtsi
-> file for them :)
+Thanks. I see the following in v1.9.6 of the BSP[1]. Is it
+the same as the document you referred to above?
 
-Ack.
 
-> It may actually be better to have it as am33xx-common.dtsi and I bet that
-> covers quite a few am33xx boards for the basic shared functionality.
+		partition at 0 {
+			label = "loader";
+			reg = <0x00000000 0x00080000>;
+			read-only;
+		};
+		partition at 40000 {
+			label = "user";
+			reg = <0x00080000 0x00580000>;
+			read-only;
+		};
+		partition at 440000 {
+			label = "flash";
+			reg = <0x00600000 0x03a00000>;
+		};
 
-I try to find some time to make such a patch...
 
-bye,
-Heiko
->
-> Regards,
->
-> Tony
->
->
->> [1] https://lkml.org/lkml/2015/10/21/581
->
-
--- 
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+[1] https://git.kernel.org/cgit/linux/kernel/git/horms/renesas-backport.git/tree/arch/arm/boot/dts/r8a7794-alt.dts?h=rcar-gen2/v1.9.6&id=e1acbe074f36d96e901bf5346c50ee51da2ced42#n379
