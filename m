@@ -1,126 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 30 Nov 2015 21:53:33 -0800
-Subject: [PATCH v2] arm, am335x: add support for the bosch shc board
-In-Reply-To: <565D2DF9.2010806@denx.de>
-References: <1447748655-2088-1-git-send-email-hs@denx.de>
- <20151130214130.GA23396@atomide.com> <565D2DF9.2010806@denx.de>
-Message-ID: <20151201055333.GO23396@atomide.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 30 Nov 2015 23:21:22 -0800
+Subject: arm64: dts: qcom: Add apq8096 dragonboard dts skeletons
+In-Reply-To: <565D0D83.201@codeaurora.org>
+References: <1448517238-32338-1-git-send-email-rnayak@codeaurora.org>
+ <20151130234817.GC21446@codeaurora.org>
+ <565D0D83.201@codeaurora.org>
+Message-ID: <20151201072122.GA26865@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Heiko Schocher <hs@denx.de> [151130 21:21]:
-> Hello Tony,
+On 12/01, Rajendra Nayak wrote:
 > 
-> Am 30.11.2015 um 22:41 schrieb Tony Lindgren:
-> >* Heiko Schocher <hs@denx.de> [151117 00:25]:
-> >>--- /dev/null
-> >>+++ b/arch/arm/boot/dts/am335x-shc.dts
-> >>+&tps {
-> >>+	compatible = "ti,tps65217";
-> >>+	ti,pmic-shutdown-controller;
-> >>+
-> >>+	regulators {
-> >>+		#address-cells = <1>;
-> >>+		#size-cells = <0>;
-> >>+
-> >>+		dcdc1_reg: regulator at 0 {
-> >>+			reg = <0>;
-> >>+			regulator-name = "vdds_dpr";
-> >>+			regulator-compatible = "dcdc1";
-> >>+			regulator-min-microvolt = <1300000>;
-> >>+			regulator-max-microvolt = <1450000>;
-> >>+			regulator-boot-on;
-> >>+			regulator-always-on;
-> >>+		};
-> >>+
-> >>+		dcdc2_reg: regulator at 1 {
-> >>+			reg = <1>;
-> >>+			/*
-> >>+			 * VDD_MPU voltage limits 0.95V - 1.26V with
-> >>+			 * +/-4% tolerance
-> >>+			 */
-> >>+			regulator-compatible = "dcdc2";
-> >>+			regulator-name = "vdd_mpu";
-> >>+			regulator-min-microvolt = <925000>;
-> >>+			regulator-max-microvolt = <1375000>;
-> >>+			regulator-boot-on;
-> >>+			regulator-always-on;
-> >>+			regulator-ramp-delay = <70000>;
-> >>+		};
-> >>+
-> >>+		dcdc3_reg: regulator at 2 {
-> >>+			reg = <2>;
-> >>+			/*
-> >>+			 * VDD_CORE voltage limits 0.95V - 1.1V with
-> >>+			 * +/-4% tolerance
-> >>+			 */
-> >>+			regulator-name = "vdd_core";
-> >>+			regulator-compatible = "dcdc3";
-> >>+			regulator-min-microvolt = <925000>;
-> >>+			regulator-max-microvolt = <1125000>;
-> >>+			regulator-boot-on;
-> >>+			regulator-always-on;
-> >>+		};
-> >>+
-> >>+		ldo1_reg: regulator at 3 {
-> >>+			reg = <3>;
-> >>+			regulator-name = "vio,vrtc,vdds";
-> >>+			regulator-compatible = "ldo1";
-> >>+			regulator-min-microvolt = <1000000>;
-> >>+			regulator-max-microvolt = <1800000>;
-> >>+			regulator-always-on;
-> >>+		};
-> >>+
-> >>+		ldo2_reg: regulator at 4 {
-> >>+			reg = <4>;
-> >>+			regulator-name = "vdd_3v3aux";
-> >>+			regulator-compatible = "ldo2";
-> >>+			regulator-min-microvolt = <900000>;
-> >>+			regulator-max-microvolt = <3300000>;
-> >>+			regulator-always-on;
-> >>+		};
-> >>+
-> >>+		ldo3_reg: regulator at 5 {
-> >>+			reg = <5>;
-> >>+			regulator-name = "vdd_1v8";
-> >>+			regulator-compatible = "ldo3";
-> >>+			regulator-min-microvolt = <900000>;
-> >>+			regulator-max-microvolt = <1800000>;
-> >>+			regulator-always-on;
-> >>+		};
-> >>+
-> >>+		ldo4_reg: regulator at 6 {
-> >>+			reg = <6>;
-> >>+			regulator-name = "vdd_3v3a";
-> >>+			regulator-compatible = "ldo4";
-> >>+			regulator-min-microvolt = <1800000>;
-> >>+			regulator-max-microvolt = <3300000>;
-> >>+			regulator-always-on;
-> >>+		};
-> >>+	};
-> >>+};
-> >
-> >Applying this into omap-for-v4.5/dt.. But I'm getting concerned about this
-> >"regulator-always-on" stuff and having multiple copies of the same thing.
-> >
-> >I think we should have a common am33xx-tps65217.dtsi file that has the
-> >regulators defined at one place and other then include it. And they are
-> >controllable AFAIK..
+> On 12/01/2015 05:18 AM, Stephen Boyd wrote:
+> > On 11/26, Rajendra Nayak wrote:
+> >> Add new dtsi and dts files for the apq8096 dragonboards with just
+> >> a serial device used as debug console
+> >>
+> >> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+> >> ---
+> >> Patch applies on top of Stephens' patches to add msm8996 dtsi
+> >> https://lkml.org/lkml/2015/11/17/955
+> >>
+> >>  arch/arm64/boot/dts/qcom/Makefile                 |  2 +-
+> >>  arch/arm64/boot/dts/qcom/apq8096-dragonboard.dts  | 21 ++++++++++++++++
+> >>  arch/arm64/boot/dts/qcom/apq8096-dragonboard.dtsi | 30 +++++++++++++++++++++++
+> >>  3 files changed, 52 insertions(+), 1 deletion(-)
+> >>  create mode 100644 arch/arm64/boot/dts/qcom/apq8096-dragonboard.dts
+> >>  create mode 100644 arch/arm64/boot/dts/qcom/apq8096-dragonboard.dtsi
+> >>
+> >> diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
+> >> index fa1f661..bd992ef 100644
+> >> --- a/arch/arm64/boot/dts/qcom/Makefile
+> >> +++ b/arch/arm64/boot/dts/qcom/Makefile
+> >> @@ -1,5 +1,5 @@
+> >>  dtb-$(CONFIG_ARCH_QCOM)	+= apq8016-sbc.dtb msm8916-mtp.dtb
+> >> -dtb-$(CONFIG_ARCH_QCOM)	+= msm8996-mtp.dtb
+> >> +dtb-$(CONFIG_ARCH_QCOM)	+= msm8996-mtp.dtb apq8096-dragonboard.dtb
+> > 
+> > We should move to one dtb per line in this file. Other platforms
+> > are doing the same thing.
 > 
-> Hmm... Mark Brown (added to Cc) suggested to move this regulator nodes
-> into the board DT file and remove such files [1].
+> Sure, will repost with the change. I just saw the 8916/8016 ones were all in
+> a single line so did the same.
+> 
 
-Hmm it was probably the name of that file causing confusion as it was not
-am33xx specific. If we have many board variants using almost the same exact
-regulators and configuration it totally makes sense to have a shared dtsi
-file for them :)
+Yeah we should probably change the 8916 one too. Make everything
+the same.
 
-It may actually be better to have it as am33xx-common.dtsi and I bet that
-covers quite a few am33xx boards for the basic shared functionality.
-
-Regards,
-
-Tony
-
-
-> [1] https://lkml.org/lkml/2015/10/21/581
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
