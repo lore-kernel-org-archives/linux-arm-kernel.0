@@ -1,70 +1,38 @@
-From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Tue,  1 Dec 2015 20:03:14 +0200
-Subject: [PATCH V3 12/19] ARM: dts: am57xx: cl-som-am57x: add MMC1 support
-In-Reply-To: <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
-References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
- <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1448993001-19495-13-git-send-email-lifshitz@compulab.co.il>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Tue, 1 Dec 2015 18:10:17 +0000
+Subject: [PATCH v2 2/6] arm64: Move kill_cpu_early to smp.c
+In-Reply-To: <20151201175254.GD29045@leverpostej>
+References: <1448982731-17182-1-git-send-email-suzuki.poulose@arm.com>
+ <1448982731-17182-3-git-send-email-suzuki.poulose@arm.com>
+ <20151201152826.GA28370@leverpostej> <565DC5DB.7070905@arm.com>
+ <20151201163138.GA29045@leverpostej> <565DDB2E.2010308@arm.com>
+ <20151201175254.GD29045@leverpostej>
+Message-ID: <565DE289.2000105@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MMC1 support, used for SD/MMC card.
+On 01/12/15 17:52, Mark Rutland wrote:
+> On Tue, Dec 01, 2015 at 05:38:54PM +0000, Suzuki K. Poulose wrote:
+>> On 01/12/15 16:31, Mark Rutland wrote:
+>
+> [...]
+>
+>>> We need stuck-in-the-kernel flag to account for CPUs which didn't manage
+>>> to turn the MMU on (which are either in the spin-table, or failed when
+>>> they were individually onlined).
+>>
+>> Did you mean to say "turn the MMU off" ?
+>
+> No, I mean CPUs which were unable to turn the MMU on in the first place.
+> Perhaps they entered the spin-table but were never individually onlined,
+> perhaps they didn't support the kernel page size, etc.
+>
+> When CPUs exit the kernel via PSCI they never switch the MMU off within
+> the kernel.
 
-Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
----
+OK. So the flag will also be used for CPUs which are stuck-in-the-kernel
+with MMU turned on. e.g, a CPU (using spin-table) we try to bring down
+in kill_cpu_early(). Correct ?
 
-  v3:
-
-   * No fuctional changes
-   * Reformat subject
-
-  v2:
-
-   * Fix duplicate SD Card Detect pinmux
-
- arch/arm/boot/dts/am57xx-sbc-am57x.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am57xx-sbc-am57x.dts b/arch/arm/boot/dts/am57xx-sbc-am57x.dts
-index 804ad72..93852e2 100644
---- a/arch/arm/boot/dts/am57xx-sbc-am57x.dts
-+++ b/arch/arm/boot/dts/am57xx-sbc-am57x.dts
-@@ -24,6 +24,19 @@
- 			DRA7XX_CORE_IOPAD(0x37fc, PIN_INPUT_SLEW | MUX_MODE1)	/* uart2_rtsn.uart3_txd */
- 		>;
- 	};
-+
-+	mmc1_pins_default: mmc1_pins_default {
-+		pinctrl-single,pins = <
-+			DRA7XX_CORE_IOPAD(0x3754, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_clk.clk */
-+			DRA7XX_CORE_IOPAD(0x3758, PIN_INPUT_PULLUP | MUX_MODE0)	/* mmc1_cmd.cmd */
-+			DRA7XX_CORE_IOPAD(0x375c, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat0.dat0 */
-+			DRA7XX_CORE_IOPAD(0x3760, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat1.dat1 */
-+			DRA7XX_CORE_IOPAD(0x3764, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat2.dat2 */
-+			DRA7XX_CORE_IOPAD(0x3768, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc1_dat3.dat3 */
-+			DRA7XX_CORE_IOPAD(0x376c, PIN_INPUT | MUX_MODE14)	/* mmc1_sdcd.gpio6_27 */
-+			DRA7XX_CORE_IOPAD(0x377c, PIN_INPUT | MUX_MODE14)	/* mmc1_sdwp.gpio6_28 */
-+		>;
-+	};
- };
- 
- &uart3 {
-@@ -34,3 +47,15 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart3_pins_default>;
- };
-+
-+&mmc1 {
-+	status = "okay";
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins_default>;
-+
-+	vmmc-supply = <&ldo1_reg>;
-+	bus-width = <4>;
-+	cd-gpios = <&gpio6 27 GPIO_ACTIVE_LOW>;
-+	wp-gpios = <&gpio6 28 GPIO_ACTIVE_HIGH>;
-+};
--- 
-1.9.1
+Thanks
+Suzuki
