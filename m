@@ -1,58 +1,46 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 1 Dec 2015 19:12:26 +0200
-Subject: [RFC PATCH] clocksource: ti-32k: convert to platform device
-In-Reply-To: <20151201160707.GQ23396@atomide.com>
-References: <1448040129-23869-1-git-send-email-grygorii.strashko@ti.com>
- <87h9kgcz1k.fsf@saruman.tx.rr.com> <5658B8B2.5030505@ti.com>
- <20151130162815.GA2517@atomide.com> <565DB7F7.4020702@ti.com>
- <20151201160707.GQ23396@atomide.com>
-Message-ID: <565DD4FA.3000308@ti.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 01 Dec 2015 18:12:54 +0100
+Subject: [PATCH 1/3] ARM: dts: rockchip: make sure edp_24m is associated to
+ xin24m on veyron
+Message-ID: <2065075.OS6iJrKehZ@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/2015 06:07 PM, Tony Lindgren wrote:
-> * Grygorii Strashko <grygorii.strashko@ti.com> [151201 07:09]:
->> On 11/30/2015 06:28 PM, Tony Lindgren wrote:
->>>
->>> We should be able to make this into an early_platform_device and just
->>> have it depend on the source clock muxes. See the omap initcall changes
->>> patches I just posted.
->>>
->>
->> Sry, may be I've missed smth, but how early_platform_device will help us
->> to get rid of platform code - We'd still need to power on manually
->> early_platform_device's from platform code :( through hwmod.
->
-> Having minimal platform code early is not a problem. The problem is that
-> our early code is not minimal.
->
-> For the system timers, we should only initialize the mux clocks needed
-> early to select between 32k and hf oscillator source. This needs to be done
-> using the clock framework, but we don't need the other clocks initialized
-> early.
->
-> The system timers we're using should be in the alwon power domain, if they
-> are not, then we should change the timers around so we're using only timers
-> in the alwon domain for system timers. Typically at least gpt1 and 12 are
-> always powered. That allows us to leave out the hwmod dependency for system
-> timers.
->
-> Or am I forgetting some other dependency with our system timers?
+The edp-24m clock has two possible sources: the 24MHz oscillator as well
+as an external 27MHz input. The power-on-default is the 27MHz clock which
+is not supplied on all Rockchip boards. While on all current boards and
+also all Veyron Chromebooks the bootloader seems to adapt the muxing to
+the internal source, this doesn't seem to be the case on headless veyron
+devices like brain and mickey making the edp-24m clock an orphan.
+On the hardware side the 27m input also is not connected at all.
 
-both counter32 and GP timer have to be enabled through sysc registers.
-They are in "Force idle" state after reset.
+With the upcoming deferral of orphan-clocks this results in the power-
+domain code deferring, as it cannot request the needed clock and if the
+synchronous reset is sucessfullat all in this case is also unknown.
 
->
->> The main reason why I've tried this is because clocksource will be really selected
->> only at fs_initcall time - and at that time we have no restriction for using platform
->> devices, Pm runtime APIs, etc. (exception/blocker is sched_clock :().
->
-> Right. But it seems we can leave out quite a bit of the dependencies
-> for system timers. We already have gptimer probe not touching the system
-> timers later on and can use shared gptimer functions after the clock
-> muxing is done.
+So fix that by making sure, the edp-24m clock is muxed to the internal
+24MHz oscillator at all times.
 
+Signed-off-by: Heiko Stuebner <heiko.stuebner@collabora.com>
+---
+ arch/arm/boot/dts/rk3288-veyron.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
+diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
+index 5e61f07..9fce91f 100644
+--- a/arch/arm/boot/dts/rk3288-veyron.dtsi
++++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
+@@ -340,6 +340,11 @@
+ 	i2c-scl-rising-time-ns = <1000>;
+ };
+ 
++&power {
++	assigned-clocks = <&cru SCLK_EDP_24M>;
++	assigned-clock-parents = <&xin24m>;
++};
++
+ &pwm1 {
+ 	status = "okay";
+ };
 -- 
-regards,
--grygorii
+2.6.1
