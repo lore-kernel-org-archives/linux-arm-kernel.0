@@ -1,53 +1,61 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 30 Nov 2015 17:08:57 -0800
-Subject: [PATCH] ARM: defconfig: qcom: Enable SSBI drivers
-Message-ID: <1448932137-12717-1-git-send-email-sboyd@codeaurora.org>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 30 Nov 2015 17:10:07 -0800
+Subject: [PATCHv2] arm: Update all mm structures with section adjustments
+In-Reply-To: <565CECF1.6090101@redhat.com>
+References: <1447892054-8095-1-git-send-email-labbott@fedoraproject.org>
+ <CAGXu5j+y1m9oONvCQg=MgrkwAgUV5OChoAY=q6vvyGNExY1Zjg@mail.gmail.com>
+ <CAGXu5j+P2Y_dSJo=tK7hBNX_7hOiG23rA7nXcQ99csNA0_CSvA@mail.gmail.com>
+ <565CECF1.6090101@redhat.com>
+Message-ID: <CAGXu5jK-b_x5e5Qfm_A8i-k3QpjYXv=nQCXeFQknLt=x=+Mn+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable some ssbi drivers present on msm8660, msm8960 and apq8064
-devices so that we fully exercise the devices present in the dts
-files.
+On Mon, Nov 30, 2015 at 4:42 PM, Laura Abbott <labbott@redhat.com> wrote:
+> On 11/30/2015 03:40 PM, Kees Cook wrote:
+>>
+>> On Thu, Nov 19, 2015 at 11:10 AM, Kees Cook <keescook@chromium.org> wrote:
+>>>
+>>> On Wed, Nov 18, 2015 at 4:14 PM, Laura Abbott <labbott@fedoraproject.org>
+>>> wrote:
+>>>>
+>>>> Currently, when updating section permissions to mark areas RO
+>>>> or NX, the only mm updated is current->mm. This is working off
+>>>> the assumption that there are no additional mm structures at
+>>>> the time. This may not always hold true. (Example: calling
+>>>> modprobe early will trigger a fork/exec). Ensure all mm structres
+>>>> get updated with the new section information.
+>>>>
+>>>> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+>>>
+>>>
+>>> This looks right to me. :)
+>>>
+>>> Reviewed-by: Kees Cook <keescook@chromium.org>
+>>>
+>>> Russell, does this work for you?
+>>
+>>
+>> Did this end up in the patch tracker? (I just sent a patch that'll
+>> collide with this... I'm happy to do the fix up.)
+>>
+>
+> I put this in the patch tracker this morning.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/configs/qcom_defconfig | 5 +++++
- 1 file changed, 5 insertions(+)
+Ah-ha, great! I will rebase my change on to it and send a v2
+(potentially with additional changes).
 
-diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
-index 39e269088b34..195be8b9f172 100644
---- a/arch/arm/configs/qcom_defconfig
-+++ b/arch/arm/configs/qcom_defconfig
-@@ -80,10 +80,13 @@ CONFIG_USB_USBNET=y
- CONFIG_INPUT_EVDEV=y
- # CONFIG_KEYBOARD_ATKBD is not set
- CONFIG_KEYBOARD_GPIO=y
-+CONFIG_KEYBOARD_PMIC8XXX=y
- # CONFIG_MOUSE_PS2 is not set
- CONFIG_INPUT_JOYSTICK=y
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_INPUT_MISC=y
-+CONFIG_INPUT_PM8XXX_VIBRATOR=y
-+CONFIG_INPUT_PMIC8XXX_PWRKEY=y
- CONFIG_INPUT_UINPUT=y
- CONFIG_SERIO_LIBPS2=y
- # CONFIG_LEGACY_PTYS is not set
-@@ -110,6 +113,7 @@ CONFIG_CHARGER_QCOM_SMBB=y
- CONFIG_POWER_RESET=y
- CONFIG_POWER_RESET_MSM=y
- CONFIG_THERMAL=y
-+CONFIG_MFD_PM8921_CORE=y
- CONFIG_MFD_QCOM_RPM=y
- CONFIG_MFD_SPMI_PMIC=y
- CONFIG_REGULATOR=y
-@@ -142,6 +146,7 @@ CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_MSM=y
- CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_PM8XXX=y
- CONFIG_DMADEVICES=y
- CONFIG_QCOM_BAM_DMA=y
- CONFIG_STAGING=y
+-Kees
+
+>
+>>
+>> -Kees
+>>
+>
+> Thanks,
+> Laura
+
+
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Kees Cook
+Chrome OS & Brillo Security
