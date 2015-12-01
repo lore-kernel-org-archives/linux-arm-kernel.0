@@ -1,61 +1,133 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 1 Dec 2015 08:13:25 +0100
-Subject: [PATCH v2 06/10] drm/hisilicon: Add vblank feature
-In-Reply-To: <CAGd==05xhhdA7FWveei4U91rGKCHRNLyRG3-kin5B2V+ao+GrA@mail.gmail.com>
+From: xinliang.liu@linaro.org (Xinliang Liu)
+Date: Tue, 1 Dec 2015 15:17:24 +0800
+Subject: [PATCH v2 02/10] drm/hisilicon: Add DT binding docs for hi6220
+ display subsystem
+In-Reply-To: <20151130193130.GA1616@rob-hp-laptop>
 References: <1448707145-69348-1-git-send-email-xinliang.liu@linaro.org>
- <1448707145-69348-7-git-send-email-xinliang.liu@linaro.org>
- <20151130075432.GF17050@phenom.ffwll.local>
- <CAGd==05xhhdA7FWveei4U91rGKCHRNLyRG3-kin5B2V+ao+GrA@mail.gmail.com>
-Message-ID: <20151201071325.GE17050@phenom.ffwll.local>
+ <1448707145-69348-3-git-send-email-xinliang.liu@linaro.org>
+ <20151130193130.GA1616@rob-hp-laptop>
+Message-ID: <CAGd==07B4e6uevH5LmW_MeG4SbViKqQ+MwKTtWtXi4UBmv6pSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 11:16:19AM +0800, Xinliang Liu wrote:
-> On 30 November 2015 at 15:54, Daniel Vetter <daniel@ffwll.ch> wrote:
-> > On Sat, Nov 28, 2015 at 06:39:01PM +0800, Xinliang Liu wrote:
-> >> Add vblank handle for ADE.
-> >>
-> >> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
-> >> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-> >> Signed-off-by: Andy Green <andy.green@linaro.org>
-> >> ---
-> >>  drivers/gpu/drm/hisilicon/hisi_drm_ade.c | 78 ++++++++++++++++++++++++++++++++
-> >>  drivers/gpu/drm/hisilicon/hisi_drm_ade.h | 16 +++++++
-> >>  drivers/gpu/drm/hisilicon/hisi_drm_drv.c | 19 +++++++-
-> >>  3 files changed, 112 insertions(+), 1 deletion(-)
-> >>  create mode 100644 drivers/gpu/drm/hisilicon/hisi_drm_ade.h
-> >>
-> >> diff --git a/drivers/gpu/drm/hisilicon/hisi_drm_ade.c b/drivers/gpu/drm/hisilicon/hisi_drm_ade.c
-> >> index b0976c3..acb11e7 100644
-> >> --- a/drivers/gpu/drm/hisilicon/hisi_drm_ade.c
-> >> +++ b/drivers/gpu/drm/hisilicon/hisi_drm_ade.c
-> >> @@ -267,7 +267,79 @@ static void ade_power_down(struct ade_hw_ctx *ctx)
-> >>       ctx->power_on = false;
-> >>  }
-> >>
-> >> +static struct drm_crtc *hisi_get_crtc_from_index(struct drm_device *dev,
-> >> +                                              unsigned int index)
-> >
-> > Ugly that you had to add this, but unfortunately necessary :( Fixing up
-> > the drm vblank hooks so that they deal with struct drm_crtc directly is
-> > somewhere on my todo. But drm_irq.c is still a bit a mess, so this is some
-> > ways off still.
-> >
-> > What might be possible as a follow-up cleanup though is to add
-> > vblank_enable and vblank_disable functions to struct
-> > drm_crtc_helper_funcs. And then provide this code here to map from int
-> > index to struct drm_crtc * as helpers in a new drm_vblank_helper.c file.
-> > That might be a good intermediate step.
-> 
-> I would like to have a try to make this intermediate step patch and
-> send out for review soon.
+On 1 December 2015 at 03:31, Rob Herring <robh@kernel.org> wrote:
 
-Awesome, looking forward to reviewing it. If you have questions about
-details fastest to ping me on irc (nick: danvet, #dri-devel on
-freenode.net).
+Hi Rob, thank you for review.
 
-Cheers, Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+> On Sat, Nov 28, 2015 at 06:38:57PM +0800, Xinliang Liu wrote:
+>> Add the device tree binding documentation for hi6220 SoC display subsystem.
+>> drm master device binding doc.
+>> ADE display controller binding doc.
+>> DSI controller binding doc.
+>>
+>> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+>> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+>> Signed-off-by: Andy Green <andy.green@linaro.org>
+>> ---
+>>  .../bindings/display/hisilicon/hisi-ade.txt        | 42 ++++++++++++++
+>>  .../bindings/display/hisilicon/hisi-drm.txt        | 66 ++++++++++++++++++++++
+>>  .../bindings/display/hisilicon/hisi-dsi.txt        | 53 +++++++++++++++++
+>>  3 files changed, 161 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
+>>  create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-drm.txt
+>>  create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-dsi.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt b/Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
+>> new file mode 100644
+>> index 0000000..2777a2c
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
+>> @@ -0,0 +1,42 @@
+>> +Device-Tree bindings for hisilicon ADE display controller driver
+>> +
+>> +ADE (Advanced Display Engine) is the display controller which grab image
+>> +data from memory, do composition, do post image processing, generate RGB
+>> +timing stream and transfer to DSI.
+>> +
+>> +Required properties:
+>> +- compatible: value should be one of the following
+>> +     "hisilicon,hi6220-ade".
+>> +- reg: physical base address and length of the controller's registers.
+>> +- reg-names: name of physical base.
+>> +- interrupt: the interrupt number.
+>> +- clocks: the clocks needed.
+>> +- clock-names: the name of the clocks.
+>> +- ade_core_clk_rate: ADE core clock rate.
+>> +- media_noc_clk_rate: media noc module clock rate.
+>
+> I think you can use assigned clock properties instead:
+>
+> assigned-clocks = <&media_ctrl HI6220_ADE_CORE>;
+> assigned-clock-rates = <360000000>;
+>
+> I'm not sure about what media_noc corresponds to in clocks list though.
+>
+
+will use assigned-clocks in v3.
+
+>> +
+>> +
+>> +A example of HiKey board hi6220 SoC specific DT entry:
+>> +Example:
+>> +
+>> +     ade: ade at f4100000 {
+>> +             compatible = "hisilicon,hi6220-ade";
+>> +             reg = <0x0 0xf4100000 0x0 0x7800>,
+>> +                   <0x0 0xf4410000 0x0 0x1000>;
+>> +             reg-names = "ade_base",
+>> +                         "media_base";
+>> +             interrupts = <0 115 4>;
+>> +
+>> +             clocks = <&media_ctrl HI6220_ADE_CORE>,
+>> +                      <&media_ctrl HI6220_CODEC_JPEG>,
+>> +                      <&media_ctrl HI6220_ADE_PIX_SRC>,
+>> +                      <&media_ctrl HI6220_PLL_SYS>,
+>> +                      <&media_ctrl HI6220_PLL_SYS_MEDIA>;
+>> +             clock-names  = "clk_ade_core",
+>> +                            "aclk_codec_jpeg_src",
+>> +                            "clk_ade_pix",
+>> +                            "clk_syspll_src",
+>> +                            "clk_medpll_src";
+>> +             ade_core_clk_rate = <360000000>;
+>> +             media_noc_clk_rate = <288000000>;
+>> +     };
+>> diff --git a/Documentation/devicetree/bindings/display/hisilicon/hisi-drm.txt b/Documentation/devicetree/bindings/display/hisilicon/hisi-drm.txt
+>> new file mode 100644
+>> index 0000000..fd93026
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/display/hisilicon/hisi-drm.txt
+>> @@ -0,0 +1,66 @@
+>> +Hisilicon DRM master device
+>> +
+>> +The Hisilicon DRM master device is a virtual device needed to list all
+>> +the other display relevant nodes that comprise the display subsystem.
+>
+> There is no need for this in DT. The ADE can be the master device and
+> of-graph can link to the DSI node. I have a similar example here[1]
+> with a LCD controller block, DSI block and adv7533.
+
+This sounds good, then I can remove the virtual master device.
+I will refer to this example and make ADE as the master device in v3.
+
+>
+>> +Required properties:
+>> +- compatible: Should be "hisilicon,<chip>-dss"
+>> +- #address-cells: should be set to 2.
+>> +- #size-cells: should be set to 2.
+>> +- range: to allow probing of subdevices.
+>> +
+>> +Optional properties:
+>> +- dma-coherent: Present if dma operations are coherent.
+>
+> Put this on the actually DMA master.
+
+The DMA modules reside in the begining of each channel(or plane) of ADE.
+So I need to put this dma-coherent property to ADE device node, right?
+
+Thanks,
+-xinliang
+
+>
+> Rob
+>
+> [1] https://git.linaro.org/people/rob.herring/linux.git pxa1928-drm-v2
