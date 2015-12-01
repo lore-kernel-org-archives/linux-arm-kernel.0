@@ -1,77 +1,192 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 1 Dec 2015 15:35:34 +0100
-Subject: Virtual addresses, ioremap, vmalloc, etc
-In-Reply-To: <2755513.X6tENxzvXm@wuerfel>
-References: <565D8DA9.8040700@free.fr> <2755513.X6tENxzvXm@wuerfel>
-Message-ID: <565DB036.3010306@free.fr>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 1 Dec 2015 22:39:14 +0800
+Subject: [PATCH v4 1/5] clk: sunxi: Add CLK_OF_DECLARE support for
+ sun8i-a23-apb0-clk driver
+In-Reply-To: <CAGb2v6502U3=GcbZOtj59r2_JRjKfTq=U9TGQgWFKpr3_-hcNw@mail.gmail.com>
+References: <1448766190-11345-1-git-send-email-wens@csie.org>
+ <1448766190-11345-2-git-send-email-wens@csie.org>
+ <20151201100416.GF29263@lukather>
+ <CAGb2v66bJJZ_xmD8B2X6nR3bxte9CdrnBpnd1KMRTmyRTr1KRQ@mail.gmail.com>
+ <20151201125032.GH29263@lukather>
+ <CAGb2v6502U3=GcbZOtj59r2_JRjKfTq=U9TGQgWFKpr3_-hcNw@mail.gmail.com>
+Message-ID: <CAGb2v645Bb-dAroH3kMO_vKgif-s0at-uJ4PJrZ78zB=HGr+4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2015 14:15, Arnd Bergmann wrote:
-> On Tuesday 01 December 2015 13:08:09 Mason wrote:
->> Hello everyone,
+On Tue, Dec 1, 2015 at 10:19 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Tue, Dec 1, 2015 at 8:50 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> On Tue, Dec 01, 2015 at 07:54:06PM +0800, Chen-Yu Tsai wrote:
+>>> On Tue, Dec 1, 2015 at 6:04 PM, Maxime Ripard
+>>> <maxime.ripard@free-electrons.com> wrote:
+>>> > Hi,
+>>> >
+>>> > On Sun, Nov 29, 2015 at 11:03:06AM +0800, Chen-Yu Tsai wrote:
+>>> >> The APBS clock on sun9i is the same as the APB0 clock on sun8i. With
+>>> >> sun9i we are supporting the PRCM clocks by using CLK_OF_DECLARE,
+>>> >> instead of through a PRCM mfd device and subdevices for each clock
+>>> >> and reset control. As such we need a CLK_OF_DECLARE version of
+>>> >> the sun8i-a23-apb0-clk driver.
+>>> >>
+>>> >> Also, build it for sun9i/A80, and not just for configurations with
+>>> >> MFD_SUN6I_PRCM enabled.
+>>> >>
+>>> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>>> >> ---
+>>> >>  drivers/clk/sunxi/Makefile         |  5 +--
+>>> >>  drivers/clk/sunxi/clk-sun8i-apb0.c | 71 +++++++++++++++++++++++++++++++-------
+>>> >>  2 files changed, 62 insertions(+), 14 deletions(-)
+>>> >>
+>>> >> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+>>> >> index cb4c299214ce..c55d5cd1c0e5 100644
+>>> >> --- a/drivers/clk/sunxi/Makefile
+>>> >> +++ b/drivers/clk/sunxi/Makefile
+>>> >> @@ -15,6 +15,7 @@ obj-y += clk-sun9i-core.o
+>>> >>  obj-y += clk-sun9i-mmc.o
+>>> >>  obj-y += clk-usb.o
+>>> >>
+>>> >> +obj-$(CONFIG_MACH_SUN9I) += clk-sun8i-apb0.o
+>>> >> +
+>>> >
+>>> > So sun8i doesn't use it?
+>>>
+>>> Shit... I messed up. clk-sun8i-apb0.o should also be under
+>>> CONFIG_MFD_SUN6I_PRCM.
+>>>
+>>> I'll send a new version of this patch. No need to keep spamming
+>>> people with the whole series.
 >>
->> I was wondering if someone could help clear my confusion.
+>> Ok.
 >>
->> In my company's legacy port (based on 3.4, dating back to 2.6) someone
->> chose to map the first 16 MB of physical addresses using:
+>>> >>  obj-$(CONFIG_MFD_SUN6I_PRCM) += \
+>>> >> -     clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o \
+>>> >> -     clk-sun8i-apb0.o
+>>> >> +     clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o
+>>> >> diff --git a/drivers/clk/sunxi/clk-sun8i-apb0.c b/drivers/clk/sunxi/clk-sun8i-apb0.c
+>>> >> index 7ae5d2c2cde1..c1e2ac8f4b0d 100644
+>>> >> --- a/drivers/clk/sunxi/clk-sun8i-apb0.c
+>>> >> +++ b/drivers/clk/sunxi/clk-sun8i-apb0.c
+>>> >> @@ -17,13 +17,68 @@
+>>> >>  #include <linux/clk-provider.h>
+>>> >>  #include <linux/module.h>
+>>> >>  #include <linux/of.h>
+>>> >> +#include <linux/of_address.h>
+>>> >>  #include <linux/platform_device.h>
+>>> >>
+>>> >> +static struct clk *sun8i_a23_apb0_register(struct device_node *node,
+>>> >> +                                        void __iomem *reg)
+>>> >> +{
+>>> >> +     const char *clk_name = node->name;
+>>> >> +     const char *clk_parent;
+>>> >> +     struct clk *clk;
+>>> >> +     int ret;
+>>> >> +
+>>> >> +     clk_parent = of_clk_get_parent_name(node, 0);
+>>> >> +     if (!clk_parent)
+>>> >> +             return ERR_PTR(-EINVAL);
+>>> >> +
+>>> >> +     of_property_read_string(node, "clock-output-names", &clk_name);
+>>> >> +
+>>> >> +     /* The A23 APB0 clock is a standard 2 bit wide divider clock */
+>>> >> +     clk = clk_register_divider(NULL, clk_name, clk_parent, 0, reg,
+>>> >> +                                0, 2, CLK_DIVIDER_POWER_OF_TWO, NULL);
+>>> >> +     if (IS_ERR(clk))
+>>> >> +             return clk;
+>>> >> +
+>>> >> +     ret = of_clk_add_provider(node, of_clk_src_simple_get, clk);
+>>> >> +     if (ret)
+>>> >> +             goto err_unregister;
+>>> >> +
+>>> >> +     return clk;
+>>> >> +
+>>> >> +err_unregister:
+>>> >> +     clk_unregister_divider(clk);
+>>> >> +
+>>> >> +     return ERR_PTR(ret);
+>>> >> +}
+>>> >> +
+>>> >> +static void sun8i_a23_apb0_setup(struct device_node *node)
+>>> >> +{
+>>> >> +     void __iomem *reg;
+>>> >> +     struct resource res;
+>>> >> +     struct clk *clk;
+>>> >> +
+>>> >> +     reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+>>> >> +     if (IS_ERR(reg))
+>>> >> +             return;
+>>> >> +
+>>> >> +     clk = sun8i_a23_apb0_register(node, reg);
+>>> >> +     if (IS_ERR(clk))
+>>> >> +             goto err_unmap;
+>>> >> +
+>>> >> +     return;
+>>> >> +
+>>> >> +err_unmap:
+>>> >> +     iounmap(reg);
+>>> >> +     of_address_to_resource(node, 0, &res);
+>>> >> +     release_mem_region(res.start, resource_size(&res));
+>>> >> +}
+>>> >> +CLK_OF_DECLARE(sun8i_a23_apb0, "allwinner,sun8i-a23-apb0-clk",
+>>> >> +            sun8i_a23_apb0_setup);
+>>> >> +
+>>> >>  static int sun8i_a23_apb0_clk_probe(struct platform_device *pdev)
+>>> >>  {
+>>> >>       struct device_node *np = pdev->dev.of_node;
+>>> >> -     const char *clk_name = np->name;
+>>> >> -     const char *clk_parent;
+>>> >>       struct resource *r;
+>>> >>       void __iomem *reg;
+>>> >>       struct clk *clk;
+>>> >> @@ -33,19 +88,11 @@ static int sun8i_a23_apb0_clk_probe(struct platform_device *pdev)
+>>> >>       if (IS_ERR(reg))
+>>> >>               return PTR_ERR(reg);
+>>> >>
+>>> >> -     clk_parent = of_clk_get_parent_name(np, 0);
+>>> >> -     if (!clk_parent)
+>>> >> -             return -EINVAL;
+>>> >> -
+>>> >> -     of_property_read_string(np, "clock-output-names", &clk_name);
+>>> >> -
+>>> >> -     /* The A23 APB0 clock is a standard 2 bit wide divider clock */
+>>> >> -     clk = clk_register_divider(&pdev->dev, clk_name, clk_parent, 0, reg,
+>>> >> -                                0, 2, CLK_DIVIDER_POWER_OF_TWO, NULL);
+>>> >> +     clk = sun8i_a23_apb0_register(np, reg);
+>>> >>       if (IS_ERR(clk))
+>>> >>               return PTR_ERR(clk);
+>>> >>
+>>> >> -     return of_clk_add_provider(np, of_clk_src_simple_get, clk);
+>>> >> +     return 0;
+>>> >>  }
+>>> >
+>>> > Won't this probe twice now? First the CLK_OF_DECLARE will register a
+>>> > clock, and then the device model will call probe a second time.
+>>>
+>>> AFAIK it will.
+>>>
+>>> > I guess then request_mem_region will catch it, but then you return an
+>>> > error code, which is probably an error success, since the clock is
+>>> > registered :)
+>>>
+>>> Indeed. clk-mod0.c actually has a comment block explaining this.
+>>> I didn't want to repeat the whole thing though.
 >>
->> static struct map_desc tango_map_desc[] __initdata = {
->> 	{
->> 		.virtual	= 0xf0000000,
->> 		.pfn		=__phys_to_pfn(0),
->> 		.length		= SZ_16M,
->> 		.type 		= MT_DEVICE,
->> 	},
->> };
->>
->> static void __init tango_map_io(void)
->> {
->> 	iotable_init(tango_map_desc, ARRAY_SIZE(tango_map_desc));
->> }
->>
->> Is the virtual address 0xf0000000 chosen arbitrary?
->> Could I pick 0xf04200000 for example?
-> 
-> It is arbitrary, but normally should be naturally aligned.
-> 
->> The same kernel, with no such boot-time mapping prints:
->>
->> [    0.000000] Memory: 641720K/655360K available (3135K kernel code, 109K rwdata, 1056K rodata, 3044K init, 218K bss, 13640K reserved, 0K cma-reserve)
->> [    0.000000] Virtual kernel memory layout:
->> [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
->> [    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
->> [    0.000000]     vmalloc : 0xe8800000 - 0xff000000   ( 360 MB)
->> [    0.000000]     lowmem  : 0xc0000000 - 0xe8000000   ( 640 MB)
->>
->> It looks like 0xf0000000 is in the middle of the vmalloc space.
->> Is it a good idea to "statically" map something there?
-> 
-> We deal with that on a lof of platforms that still use a static
-> mapping. I normally advocate not using that kind of mapping unless
-> you can show a measurable performance difference on your platform.
-> 
->> If I were to call ioremap(0, SZ_16M); at run-time, I would imagine
->> the virtual address could be anywhere in the vmalloc space?
->> There's no reason it would be 0xf0000000, right?
->>
->> In short, is virtual address 0xf0000000 special in any way?
->> (Other than being in the vmalloc space perhaps.)
->>
->> For my own reference:
->> https://www.kernel.org/doc/Documentation/arm/memory.txt
-> 
-> I think 0xf0000000 is a common choice because that made an easy
-> computation back in the days when most platforms used an
-> io_p2v() to get a hardcoded virtual address, rather than calling
-> ioremap as we do today.
+>> I guess, we can simply return 0 if of_io_request_and_map returns
+>> EBUSY, since it would simply mean that we already probed.
+>
+> I think CLK_OF_DECLARE gets probed first, then platform devices.
+> of_io_request_and_map fails for mfd cells, which have no DT reg
+> properties. So we should be ignoring -EINVAL instead of -EBUSY.
 
-Thanks for the detailed answer.
+Right... I misread your comment. You're talking about the platform device
+part. About ignoring the error here: normally we use CLK_OF_DECLARE with
+clocks under the "clocks" node, which don't get registered as platform
+device. (Or is this not so common?) So if one does get probed twice, I
+think we shouldn't ignore the error. It's likely the DT has a problem
+and the probe error will let the user know.
 
-One more thing: when I configure earlyprintk, I'm supposed to provide
-physical AND virtual address of the UART.
+What do you think?
 
-If I'm not using a hard-coded P2V mapping, and instead rely on ioremap,
-how am I supposed to know the virtual address of the UART?
+ChenYu
 
-Regards.
+> But yeah, I'll have it return 0 in this case, and add a brief
+> comment.
