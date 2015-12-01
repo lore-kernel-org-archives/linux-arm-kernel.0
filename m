@@ -1,25 +1,28 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 1 Dec 2015 10:18:48 +0100
-Subject: [PATCH v3 01/10] arm64: Fold proc-macros.S into assembler.h
-In-Reply-To: <1448559168-8363-2-git-send-email-james.morse@arm.com>
-References: <1448559168-8363-1-git-send-email-james.morse@arm.com>
- <1448559168-8363-2-git-send-email-james.morse@arm.com>
-Message-ID: <20151201091848.GA21222@amd>
+From: schwab@suse.de (Andreas Schwab)
+Date: Tue, 01 Dec 2015 10:20:59 +0100
+Subject: [PATCH v6 14/19] arm64:ilp32: add sys_ilp32.c and a separate
+ table (in entry.S) to use it
+In-Reply-To: <20151130202141.GA23254@yury-N73SV> (Yury Norov's message of
+ "Mon, 30 Nov 2015 23:21:41 +0300")
+References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
+ <1447795019-30176-15-git-send-email-ynorov@caviumnetworks.com>
+ <3754277.KmO9Nk3XLD@wuerfel> <2133692.Tueq9xZUPQ@wuerfel>
+ <20151130202141.GA23254@yury-N73SV>
+Message-ID: <87bnaafrt0.fsf@igel.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2015-11-26 17:32:39, James Morse wrote:
-> From: Geoff Levand <geoff@infradead.org>
-> 
-> To allow the assembler macros defined in arch/arm64/mm/proc-macros.S to be used
-> outside the mm code move the contents of proc-macros.S to asm/assembler.h.  Also,
-> delete proc-macros.S, and fix up all references to proc-macros.S.
-> 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> Signed-off-by: James Morse <james.morse@arm.com>
+Yury Norov <ynorov@caviumnetworks.com> writes:
 
-Acked-by: Pavel Machek <pavel@ucw.cz>
+> There's a tricky bug with signal stack, that Andreas also discovered.
+
+That was only a confusion about the compat state of sys_rt_sigaction.
+It just requires making sure glibc uses the correct (64bit layout)
+struct kernel_sigaction.
+
+Andreas.
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Andreas Schwab, SUSE Labs, schwab at suse.de
+GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+"And now for something completely different."
