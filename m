@@ -1,23 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 1 Dec 2015 10:42:25 +0100
-Subject: [PATCH 3/3] pinctrl: spear: guard sub-directory with
- CONFIG_PINCTRL_SPEAR
-In-Reply-To: <1448365524-12605-4-git-send-email-yamada.masahiro@socionext.com>
-References: <1448365524-12605-1-git-send-email-yamada.masahiro@socionext.com>
- <1448365524-12605-4-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdbxuRMFwps0Z-K4e=a9KCAxxqtPLXTZ7xKWTQNz--K1ig@mail.gmail.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Tue, 01 Dec 2015 17:43:24 +0800
+Subject: [RFC PATCH 2/9] drm/rockchip: Use new vblank api drm_crtc_vblank_*
+In-Reply-To: <20151201090127.GN17050@phenom.ffwll.local>
+References: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>
+ <1448940391-23333-3-git-send-email-mark.yao@rock-chips.com>
+ <CAPj87rNs+c5Y01zVPF3a+8puFH1ZWuLZUGoDq6EPfDQB5DVZGw@mail.gmail.com>
+ <565D5B57.4040102@rock-chips.com> <20151201090127.GN17050@phenom.ffwll.local>
+Message-ID: <565D6BBC.20608@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 24, 2015 at 12:45 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+On 2015?12?01? 17:01, Daniel Vetter wrote:
+> On Tue, Dec 01, 2015 at 04:33:27PM +0800, Mark yao wrote:
+>> On 2015?12?01? 15:56, Daniel Stone wrote:
+>>> Hi,
+>>>
+>>> On 1 December 2015 at 03:26, Mark Yao <mark.yao@rock-chips.com> wrote:
+>>>> No functional update, drm_vblank_* is the legacy version of
+>>>> drm_crtc_vblank_*. and use new api make driver more clean.
+>>>>
+>>>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+>>> Heh, I had the same patch in my series to fix pageflip events.
+>>>
+>>> Reviewed-by: Daniel Stone <daniels@collabora.com>
+>>>
+>>> Cheers,
+>>> Daniel
+>>>
+>>>
+>>>
+>> Hi Daniel
+>>     I had picked your patch "[PATCH 1/2] drm/rockchip: Use CRTC vblank event
+>> interface" into my drm-next, this patch is base on it.
+> That really should be mentioned in the commit message, and you must keep
+> the signed-off-by chain intact when adapting or reusing other peoples
+> work.
+> -Daniel
 
-> CONFIG_PINCTRL_SPEAR is more suitable than CONFIG_PLAT_SPEAR
-> to guard the drivers/pinctrl/spear/ directory.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Oh, Sorry for that, this patch is another patch rebase on Daniel Stone's 
+one, I use "base on it" may be ambiguity.
+like that:
+0e6919f drm/rockchip: Use new vblank api drm_crtc_vblank_*
+4f0cb7c drm/rockchip: Use CRTC vblank event interface
 
-Patch applied.
+Thanks for pointing that, I will be carefully next time.
 
-Yours,
-Linus Walleij
+>> Thanks for your review.
+>>
+>> -- 
+>> ?ark Yao
+>>
+>>
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> http://lists.freedesktop.org/mailman/listinfo/dri-devel
