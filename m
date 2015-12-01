@@ -1,46 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 01 Dec 2015 21:22:26 +0100
-Subject: [PATCH 3/4] dmaengine: qcom_bam_dma: use correct pipe FIFO size
-In-Reply-To: <20151201172535.GB26687@Agamemnon.attlocal.net>
-References: <1448961299-15161-1-git-send-email-stanimir.varbanov@linaro.org>
- <1971752.Auss6gPApO@wuerfel> <20151201172535.GB26687@Agamemnon.attlocal.net>
-Message-ID: <362271933.gkEJO2V159@wuerfel>
+From: alex.aring@gmail.com (Alexander Aring)
+Date: Tue, 1 Dec 2015 22:00:42 +0100
+Subject: [PATCH 2/3] ARM: bcm2835: add rpi power domain driver
+In-Reply-To: <7hr3j782qr.fsf@deeprootsystems.com>
+References: <1447956490-22930-1-git-send-email-alex.aring@gmail.com>
+ <1447956490-22930-3-git-send-email-alex.aring@gmail.com>
+ <7hr3j782qr.fsf@deeprootsystems.com>
+Message-ID: <20151201210037.GB2074@omega>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 December 2015 11:25:35 Andy Gross wrote:
-> On Tue, Dec 01, 2015 at 11:28:32AM +0100, Arnd Bergmann wrote:
-> > On Tuesday 01 December 2015 11:14:58 Stanimir Varbanov wrote:
-> > > 
-> > > diff --git a/drivers/dma/qcom_bam_dma.c b/drivers/dma/qcom_bam_dma.c
-> > > index 0f06f3b7a72b..6d290de9ab2b 100644
-> > > --- a/drivers/dma/qcom_bam_dma.c
-> > > +++ b/drivers/dma/qcom_bam_dma.c
-> > > @@ -458,7 +458,7 @@ static void bam_chan_init_hw(struct bam_chan *bchan,
-> > >          */
-> > >         writel_relaxed(ALIGN(bchan->fifo_phys, sizeof(struct bam_desc_hw)),
-> > >                         bam_addr(bdev, bchan->id, BAM_P_DESC_FIFO_ADDR));
-> > > -       writel_relaxed(BAM_DESC_FIFO_SIZE,
-> > > +       writel_relaxed(BAM_MAX_DATA_SIZE,
-> > >                         bam_addr(bdev, bchan->id, BAM_P_FIFO_SIZES));
-> > >  
-> > >         /* enable the per pipe interrupts, enable EOT, ERR, and INT irqs */
-> > 
-> > I'm looking at that now and fail to see why these have to use writel_relaxed().
+Hi,
+
+On Mon, Nov 30, 2015 at 03:51:56PM -0800, Kevin Hilman wrote:
+> Alexander Aring <alex.aring@gmail.com> writes:
 > 
-> At some point I believe I got a comment about using (readl/writel)_relaxed
-> instead of readl/writel.  So I used these instead.  Has the wind direction
-> changed?  =)
+> > This patch adds support for RPi several Power Domains and enable support
+> > to enable the USB Power Domain when it's not enabled before.
+> >
+> > This patch based on Eric Anholt's patch to support Power Domains. He had
+> > an issue about -EPROBE_DEFER inside the power domain subsystem, this
+> > issue was solved by commit <311fa6a> ("PM / Domains: Return -EPROBE_DEFER
+> > if we fail to init or turn-on domain").
+> 
+> [...]
+> 
+> > +#define RPI_POWER_DOMAIN(_domain, _name)			\
+> > +	[_domain] = {						\
+> 
+> Using _domain as the array index is going to create a sparsely filled
+> array here, wasting memory.   I'm not sure what the other domain numbers
+> are for other domains to know if this is a big waste or not, but it's
+> still a bit wasteful.
+> 
+> In any case, AFAICT, it doesn't look like you need to have the array
+> index match the domain number anyways since you're using container_of().
+> 
+> So I suggest just removing this array index part, and just creating them
+> in arrary order.  Then your _probe function isn't going to try to setup
+> 3 non-enabled domains before it finally hits the USB domain.
+> 
 
-Yes.
+The idea is here to keeping the _same_ power domains indexes for
+device-tree power domain API like the RPi firmware provides it.
 
-> Using the readl/writel is nice w.r.t. having the implicit barriers, especially
-> with the funky 1K boundary on reordering of operations that can occur on Kraits.
-> This can hit you on accesses even within the same IP block.
+If somebody dumps the devicetree and see the power domain index, if
+he/she does then a firmware API power domain index mapping it is wrong.
+Because we need then a separate mapping:
 
-We had a couple of bugs that we should not have had when drivers were mindlessly
-converted, so generally speaking at least I try to get people to only use
-the relaxed functions for the hot path when they can show an advantage as well
-as the fact that it's safe to use.
+$ARRAY_DEFINED_INDEX <-> $RPI_FIRMWARE_POWER_DOMAIN_API_INDEX
 
-	Arnd
+With the current solution to make a 1:1 mapping it there is no
+confusing anymore, because:
+
+$ARRAY_DEFINED_INDEX == $RPI_FIRMWARE_POWER_DOMAIN_API_INDEX
+
+
+Also there exists power domains 1-10 (so far I know), 1-2 are currently
+not used (and dummy-calls inside the rpi firmware implementation). So
+later they should be provided anyway.
+
+There exists a little improvement to let the for (i = 0; i < num_domains
+...) start@"i = 1", the entry with index "0" will be a waste of memory
+then and it's not provided by the firmware API as a power domain.
+
+
+These are my arguments to keeping the current way of registering power
+domains, if you still want that I should change it then I will do it or
+maybe I show here some "good" arguments here to keeping this behaviour.
+
+Please let me know. Thanks.
+
+- Alex
