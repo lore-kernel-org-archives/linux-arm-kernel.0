@@ -1,206 +1,106 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 1 Dec 2015 22:35:13 +0800
-Subject: [PATCH v4 18/21] KVM: ARM64: Add PMU overflow interrupt routing
-In-Reply-To: <20151130182258.684c9df6@arm.com>
-References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>	<1446186123-11548-19-git-send-email-zhaoshenglong@huawei.com>
- <20151130182258.684c9df6@arm.com>
-Message-ID: <565DB021.3020901@huawei.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Tue, 01 Dec 2015 17:40:09 +0300
+Subject: [PATCH 3/6] net: thunderx: Increase transmit queue length
+In-Reply-To: <1448961223-41888-4-git-send-email-sunil.kovvuri@gmail.com>
+References: <y@samsung.com>
+ <1448961223-41888-4-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <01d101d12c46$2de43b40$89acb1c0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ Hello!
+
+ This one breaks networking on my machine:
+--- cut ---
+swiotlb: coherent allocation failed for device 0002:01:08.4 size=4198400
+CPU: 2 PID: 3655 Comm: NetworkManager Tainted: G        W  O    4.2.6+ #201
+Hardware name: Cavium ThunderX CN88XX board (DT)
+Call trace:
+[<ffffffc00008a3d4>] dump_backtrace+0x0/0x124
+[<ffffffc00008a50c>] show_stack+0x14/0x1c
+[<ffffffc0006df258>] dump_stack+0x88/0xc8
+[<ffffffc000416994>] swiotlb_alloc_coherent+0x150/0x168
+[<ffffffc00009555c>] __dma_alloc+0x58/0x1e8
+[<ffffffc000507cd8>] nicvf_alloc_q_desc_mem.isra.14+0xc0/0xdc
+[<ffffffc000508c8c>] nicvf_config_data_transfer+0x448/0x728
+[<ffffffc000506c64>] nicvf_open+0x184/0x994
+[<ffffffc0005ea0b4>] __dev_open+0xb4/0x120
+[<ffffffc0005ea388>] __dev_change_flags+0x8c/0x150
+[<ffffffc0005ea46c>] dev_change_flags+0x20/0x5c
+[<ffffffc0005fb210>] do_setlink+0x27c/0x8e0
+[<ffffffc0005fbe28>] rtnl_newlink+0x4b4/0x6c4
+[<ffffffc0005fa6f0>] rtnetlink_rcv_msg+0x90/0x22c
+[<ffffffc000611b74>] netlink_rcv_skb+0xd8/0x100
+[<ffffffc0005fa650>] rtnetlink_rcv+0x30/0x40
+[<ffffffc000611498>] netlink_unicast+0x158/0x1f8
+[<ffffffc000611910>] netlink_sendmsg+0x324/0x380
+[<ffffffc0005c6690>] sock_sendmsg+0x18/0x58
+[<ffffffc0005c6db8>] ___sys_sendmsg+0x254/0x264
+[<ffffffc0005c7bb8>] __sys_sendmsg+0x40/0x84
+[<ffffffc0005c7c0c>] SyS_sendmsg+0x10/0x20
+thunder-nicvf 0002:01:08.4 enP2p1s8f4: Failed to alloc/config VF's QSet resources
+--- cut ---
+
+ And none of interfaces work after this. Reverting this patch helps.
+
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
 
 
-On 2015/12/1 2:22, Marc Zyngier wrote:
-> On Fri, 30 Oct 2015 14:22:00 +0800
-> Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+> -----Original Message-----
+> From: netdev-owner at vger.kernel.org [mailto:netdev-owner at vger.kernel.org] On Behalf Of Sunil
+> Goutham
+> Sent: Tuesday, December 01, 2015 12:14 PM
+> To: netdev at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> Sunil.Goutham at caviumnetworks.com; Sunil Goutham
+> Subject: [PATCH 3/6] net: thunderx: Increase transmit queue length
 > 
->> From: Shannon Zhao <shannon.zhao@linaro.org>
->>
->> When calling perf_event_create_kernel_counter to create perf_event,
->> assign a overflow handler. Then when perf event overflows, set
->> irq_pending and call kvm_vcpu_kick() to sync the interrupt.
->>
->> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> ---
->>  arch/arm/kvm/arm.c    |  4 +++
->>  include/kvm/arm_pmu.h |  4 +++
->>  virt/kvm/arm/pmu.c    | 76 ++++++++++++++++++++++++++++++++++++++++++++++++++-
->>  3 files changed, 83 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index 78b2869..9c0fec4 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -28,6 +28,7 @@
->>  #include <linux/sched.h>
->>  #include <linux/kvm.h>
->>  #include <trace/events/kvm.h>
->> +#include <kvm/arm_pmu.h>
->>  
->>  #define CREATE_TRACE_POINTS
->>  #include "trace.h"
->> @@ -551,6 +552,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>  
->>  		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
->>  			local_irq_enable();
->> +			kvm_pmu_sync_hwstate(vcpu);
+> From: Sunil Goutham <sgoutham@cavium.com>
 > 
-> This is very weird. Are you only injecting interrupts when a signal is
-> pending? I don't understand how this works...
+> Under high transmit rates and with TSO enabled observing fluctuations
+> in TX performance. Seen especially with iperf3 application.
 > 
->>  			kvm_vgic_sync_hwstate(vcpu);
->>  			preempt_enable();
->>  			kvm_timer_sync_hwstate(vcpu);
->> @@ -598,6 +600,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>  		kvm_guest_exit();
->>  		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
->>  
->> +		kvm_pmu_post_sync_hwstate(vcpu);
->> +
->>  		kvm_vgic_sync_hwstate(vcpu);
->>  
->>  		preempt_enable();
->> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
->> index acd025a..5e7f943 100644
->> --- a/include/kvm/arm_pmu.h
->> +++ b/include/kvm/arm_pmu.h
->> @@ -39,6 +39,8 @@ struct kvm_pmu {
->>  };
->>  
->>  #ifdef CONFIG_KVM_ARM_PMU
->> +void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu);
->> +void kvm_pmu_post_sync_hwstate(struct kvm_vcpu *vcpu);
+> Since TSO is taken care at driver level, with 64KB of TSO packets
+> and when window size is also high the rate at which CPU fills in
+> transmit descriptors is much higher than what HW is able to process.
+> Each 64KB TSO packet occupies gets segmented to ~43 1500 byte MTU packets
+> and occupies ~130 descriptors. Hence increasing transmit queue size.
 > 
-> Please follow the current terminology: _flush_ on VM entry, _sync_ on
-> VM exit.
+> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+> ---
+>  drivers/net/ethernet/cavium/thunder/nicvf_queues.h |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
 > 
-
-Hi Marc,
-
-Is below patch the right way for this?
-
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 78b2869..84008d1 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -28,6 +28,7 @@
- #include <linux/sched.h>
- #include <linux/kvm.h>
- #include <trace/events/kvm.h>
-+#include <kvm/arm_pmu.h>
-
- #define CREATE_TRACE_POINTS
- #include "trace.h"
-@@ -531,6 +532,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu,
-struct kvm_run *run)
-                 */
-                kvm_timer_flush_hwstate(vcpu);
-
-+               kvm_pmu_flush_hwstate(vcpu);
-+
-                /*
-                 * Preparing the interrupts to be injected also
-                 * involves poking the GIC, which must be done in a
-@@ -554,6 +557,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu,
-struct kvm_run *run)
-                        kvm_vgic_sync_hwstate(vcpu);
-                        preempt_enable();
-                        kvm_timer_sync_hwstate(vcpu);
-+                       kvm_pmu_sync_hwstate(vcpu);
-                        continue;
-                }
-
-@@ -604,6 +608,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu,
-struct kvm_run *run)
-
-                kvm_timer_sync_hwstate(vcpu);
-
-+               kvm_pmu_sync_hwstate(vcpu);
-+
-                ret = handle_exit(vcpu, run, ret);
-        }
-
-diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index 47bbd43..edfe4e5 100644
---- a/include/kvm/arm_pmu.h
-+++ b/include/kvm/arm_pmu.h
-@@ -41,6 +41,8 @@ struct kvm_pmu {
- };
-
- #ifdef CONFIG_KVM_ARM_PMU
-+void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
-+void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu);
- unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32
-select_idx);
- void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val);
- void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u32 val, bool
-all_enable);
-@@ -51,6 +53,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu
-*vcpu, u32 data,
-                                    u32 select_idx);
- void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u32 val);
- #else
-+void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
-+void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu) {}
- unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32
-select_idx)
- {
-        return 0;
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 15cac45..9aad2f7 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -21,6 +21,7 @@
- #include <linux/perf_event.h>
- #include <asm/kvm_emulate.h>
- #include <kvm/arm_pmu.h>
-+#include <kvm/arm_vgic.h>
-
- /**
-  * kvm_pmu_get_counter_value - get PMU counter value
-@@ -79,6 +80,78 @@ static void kvm_pmu_stop_counter(struct kvm_pmc *pmc)
- }
-
- /**
-+ * kvm_pmu_flush_hwstate - flush pmu state to cpu
-+ * @vcpu: The vcpu pointer
-+ *
-+ * Inject virtual PMU IRQ if IRQ is pending for this cpu.
-+ */
-+void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu)
-+{
-+       struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+       u32 overflow;
-+
-+       if (!vcpu_mode_is_32bit(vcpu))
-+               overflow = vcpu_sys_reg(vcpu, PMOVSSET_EL0);
-+       else
-+               overflow = vcpu_cp15(vcpu, c9_PMOVSSET);
-+
-+       if ((pmu->irq_pending || overflow != 0) && (pmu->irq_num != -1))
-+               kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
-pmu->irq_num, 1);
-+
-+       pmu->irq_pending = false;
-+}
-+
-+/**
-+ * kvm_pmu_sync_hwstate - sync pmu state for cpu
-+ * @vcpu: The vcpu pointer
-+ *
-+ * Inject virtual PMU IRQ if IRQ is pending for this cpu when back from
-guest.
-+ */
-+void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu)
-+{
-+       struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+
-+       if (pmu->irq_pending && (pmu->irq_num != -1))
-+               kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
-pmu->irq_num, 1);
-+
-+       pmu->irq_pending = false;
-+}
-
--- 
-Shannon
+> diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
+> b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
+> index fb4957d..b1e93a9 100644
+> --- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
+> +++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
+> @@ -62,7 +62,7 @@
+>  #define SND_QUEUE_CNT		8
+>  #define CMP_QUEUE_CNT		8 /* Max of RCV and SND qcount */
+> 
+> -#define SND_QSIZE		SND_QUEUE_SIZE2
+> +#define SND_QSIZE		SND_QUEUE_SIZE3
+>  #define SND_QUEUE_LEN		(1ULL << (SND_QSIZE + 10))
+>  #define MAX_SND_QUEUE_LEN	(1ULL << (SND_QUEUE_SIZE6 + 10))
+>  #define SND_QUEUE_THRESH	2ULL
+> @@ -73,7 +73,7 @@
+>  /* Keep CQ and SQ sizes same, if timestamping
+>   * is enabled this equation will change.
+>   */
+> -#define CMP_QSIZE		CMP_QUEUE_SIZE2
+> +#define CMP_QSIZE		CMP_QUEUE_SIZE3
+>  #define CMP_QUEUE_LEN		(1ULL << (CMP_QSIZE + 10))
+>  #define CMP_QUEUE_CQE_THRESH	0
+>  #define CMP_QUEUE_TIMER_THRESH	220 /* 10usec */
+> --
+> 1.7.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe netdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
