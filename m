@@ -1,45 +1,112 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 1 Dec 2015 18:50:29 +0000
-Subject: [PATCH v2 2/6] arm64: Move kill_cpu_early to smp.c
-In-Reply-To: <565DE289.2000105@arm.com>
-References: <1448982731-17182-1-git-send-email-suzuki.poulose@arm.com>
- <1448982731-17182-3-git-send-email-suzuki.poulose@arm.com>
- <20151201152826.GA28370@leverpostej> <565DC5DB.7070905@arm.com>
- <20151201163138.GA29045@leverpostej> <565DDB2E.2010308@arm.com>
- <20151201175254.GD29045@leverpostej> <565DE289.2000105@arm.com>
-Message-ID: <20151201185028.GF29045@leverpostej>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 01 Dec 2015 18:51:00 +0000
+Subject: [PATCH v2 10/21] arm64: KVM: Add patchable function selector
+In-Reply-To: <20151201153900.GT11704@cbox>
+References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+ <1448650215-15218-11-git-send-email-marc.zyngier@arm.com>
+ <20151201153900.GT11704@cbox>
+Message-ID: <565DEC14.8090206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 06:10:17PM +0000, Suzuki K. Poulose wrote:
-> On 01/12/15 17:52, Mark Rutland wrote:
-> >On Tue, Dec 01, 2015 at 05:38:54PM +0000, Suzuki K. Poulose wrote:
-> >>On 01/12/15 16:31, Mark Rutland wrote:
-> >
-> >[...]
-> >
-> >>>We need stuck-in-the-kernel flag to account for CPUs which didn't manage
-> >>>to turn the MMU on (which are either in the spin-table, or failed when
-> >>>they were individually onlined).
-> >>
-> >>Did you mean to say "turn the MMU off" ?
-> >
-> >No, I mean CPUs which were unable to turn the MMU on in the first place.
-> >Perhaps they entered the spin-table but were never individually onlined,
-> >perhaps they didn't support the kernel page size, etc.
-> >
-> >When CPUs exit the kernel via PSCI they never switch the MMU off within
-> >the kernel.
+On 01/12/15 15:39, Christoffer Dall wrote:
+> On Fri, Nov 27, 2015 at 06:50:04PM +0000, Marc Zyngier wrote:
+>> KVM so far relies on code patching, and is likely to use it more
+>> in the future. The main issue is that our alternative system works
+>> at the instruction level, while we'd like to have alternatives at
+>> the function level.
+>>
+>> In order to cope with this, add the "hyp_alternate_select" macro that
+>> outputs a brief sequence of code that in turn can be patched, allowing
+>> al alternative function to be selected.
 > 
-> OK. So the flag will also be used for CPUs which are stuck-in-the-kernel
-> with MMU turned on. e.g, a CPU (using spin-table) we try to bring down
-> in kill_cpu_early(). Correct ?
+> s/al/an/ ?
+> 
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/hyp/hyp.h | 16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
+>>
+>> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+>> index 7ac8e11..f0427ee 100644
+>> --- a/arch/arm64/kvm/hyp/hyp.h
+>> +++ b/arch/arm64/kvm/hyp/hyp.h
+>> @@ -27,6 +27,22 @@
+>>  
+>>  #define kern_hyp_va(v) (typeof(v))((unsigned long)v & HYP_PAGE_OFFSET_MASK)
+>>  
+>> +/*
+>> + * Generates patchable code sequences that are used to switch between
+>> + * two implementations of a function, depending on the availability of
+>> + * a feature.
+>> + */
+> 
+> This looks right to me, but I'm a bit unclear what the types of this is
+> and how to use it.
+> 
+> Are orig and alt function pointers and cond is a CONFIG_FOO ?  fname is
+> a symbol, which is defined as a prototype somewhere and then implemented
+> here, or?
+> 
+> Perhaps a Usage: part of the docs would be helpful.
 
-Yes.
+How about:
 
-We'd also pad it such that nothing else shares the same writeback
-granule, and when writing to it with the MMU off we can invalidate the
-stale cached copy.
+@fname: a symbol name that will be defined as a function returning a
+function pointer whose type will match @orig and @alt
+@orig: A pointer to the default function, as returned by @fname when
+@cond doesn't hold
+@alt: A pointer to the alternate function, as returned by @fname when
+@cond holds
+@cond: a CPU feature (as described in asm/cpufeature.h)
 
-Thanks,
-Mark.
+> 
+>> +#define hyp_alternate_select(fname, orig, alt, cond)			\
+>> +typeof(orig) * __hyp_text fname(void)					\
+>> +{									\
+>> +	typeof(alt) *val = orig;					\
+>> +	asm volatile(ALTERNATIVE("nop		\n",			\
+>> +				 "mov	%0, %1	\n",			\
+>> +				 cond)					\
+>> +		     : "+r" (val) : "r" (alt));				\
+>> +	return val;							\
+>> +}
+>> +
+>>  void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
+>>  void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+>>  
+>> -- 
+>> 2.1.4
+>>
+> 
+> I haven't thought much about how all of this is implemented, but from my
+> point of views the ideal situation would be something like:
+> 
+> void foo(int a, int b)
+> {
+> 	ALTERNATIVE_IF_NOT CONFIG_BAR
+> 	foo_legacy(a, b);
+> 	ALTERNATIVE_ELSE
+> 	foo_new(a, b);
+> 	ALTERNATIVE_END
+> }
+> 
+> I realize this may be impossible because the C code could implement all
+> sort of fun stuff around the actual function calls, but would there be
+> some way to annotate the functions and find the actual branch statement
+> and change the target?
+
+The main issue is that C doesn't give you any access to the branch
+function itself, except for the asm-goto statements. It also makes it
+very hard to preserve the return type. For your idea to work, we'd need
+some support in the compiler itself. I'm sure that it is doable, just
+not by me! ;-)
+
+This is why I've ended up creating something that returns a function
+*pointer*, because that's something that exists in the language (no new
+concept). I simply made sure I could return it at minimal cost.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
