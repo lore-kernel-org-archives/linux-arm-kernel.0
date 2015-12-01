@@ -1,44 +1,32 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 1 Dec 2015 10:47:48 -0600
-Subject: [PATCH v2 01/18] ARM: am57xx: cl-som-am57x: dts: add basic module
- support
-In-Reply-To: <20151201164317.GS23396@atomide.com>
-References: <1448433590-1399-2-git-send-email-lifshitz@compulab.co.il>
- <1448893551-676-1-git-send-email-lifshitz@compulab.co.il>
- <20151130215415.GE23396@atomide.com> <565DC9CC.1070000@compulab.co.il>
- <20151201164317.GS23396@atomide.com>
-Message-ID: <565DCF34.8070001@ti.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 1 Dec 2015 11:49:29 -0500
+Subject: [PATCH v2 1/2] scripts: Add a recorduidiv program
+In-Reply-To: <20151201161944.GX8644@n2100.arm.linux.org.uk>
+References: <1448488264-23400-1-git-send-email-sboyd@codeaurora.org>
+ <1448488264-23400-2-git-send-email-sboyd@codeaurora.org>
+ <20151125234711.GT8644@n2100.arm.linux.org.uk>
+ <565C6714.802@suse.com>
+ <20151130153208.GR8644@n2100.arm.linux.org.uk>
+ <565C6DE9.2020302@suse.com> <565DC5A9.2010305@suse.cz>
+ <20151201161944.GX8644@n2100.arm.linux.org.uk>
+Message-ID: <20151201114929.655433a2@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/2015 10:43 AM, Tony Lindgren wrote:
-> * Dmitry Lifshitz <lifshitz@compulab.co.il> [151201 08:26]:
->>
->> It might looks the same set of regulators for multiple boards,
->> but it is not. Each board may apply its own regulators usage scheme, and
->> this is our case (as compared to am57xx-beagle-x15.dts).
->>
->> For the best of my knowledge, it used to be in a common *.dtsi file (at
->> least in early OMAP5 DT support in TI kernel tree), but then I found that
->> PMIC registration had been moved to the boards DT files.
-> 
-> Have you actually looked at how much of the implementation is same across
-> the omap5 boards? My guess is that a whole lot is same.. See for example
-> omap5-board-common.dtsi.
+On Tue, 1 Dec 2015 16:19:44 +0000
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+ 
+> They hardly "do nothing", as the (eg) recordmcount plasters the build
+> log with warnings.  A solution to that would be to make recordmcount
+> silent if the section is already present.
 
-Unfortunately with DRA7 / AM57xx:
-at least 2 different PMICs -> DRA74/DRA72 evms.
-even across similar PMIC usage, different voltage rail usage accross
-evms: DRA74evm, x15/GPEVM, AM571x-IDK/AM572x-IDK -> they are not
-necessarily compatible.
+Note, that warning found plenty of bugs when modifications of the build
+system was being done and broke recordmcount.c. I really don't want to
+silent it.
 
-Example: some of them have Ganged voltage rail, others dont - few others
-are mixed. if you are trying to get common regulator usage -> it is
-kinda pretty hard given the freedom board designers are being given by
-TI.. OMAP5 was more controlled in terms of what specific configuration
-the board designers had to follow. that is no longer the case for
-DRA7/AM57 platforms. just my 2 cents here.
+But for some reason, your build is causing lots of warnings and not for
+others. Perhaps we can add a "SILENT_RECORDMCOUNT" environment variable
+and have it set when something like CCACHE_HARDLINK or whatever is
+causing it to trigger when we don't care.
 
--- 
-Regards,
-Nishanth Menon
+-- Steve
