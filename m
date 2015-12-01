@@ -1,33 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 1 Dec 2015 13:16:39 +0000
-Subject: [PATCH, RESEND] regulator: core: fix regulator_lock_supply
- regression
-In-Reply-To: <3504080.aWaTxHbgxH@wuerfel>
-References: <3504080.aWaTxHbgxH@wuerfel>
-Message-ID: <20151201131639.GH1929@sirena.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 1 Dec 2015 16:17:56 +0300
+Subject: [PATCH 1/6] net: thunderx: Force to load octeon-mdio before bgx
+ driver.
+In-Reply-To: <1448961223-41888-2-git-send-email-sunil.kovvuri@gmail.com>
+References: <y> <1448961223-41888-2-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <565D9E04.8010203@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 27, 2015 at 02:46:41PM +0100, Arnd Bergmann wrote:
-> As noticed by Geert Uytterhoeven, my patch to avoid a harmless build warning
-> in regulator_lock_supply() was total crap and introduced a real bug:
+Hello.
 
-I'm going to drop both this and the commit it's fixing for now as this
-is causing boot failures on several boards (none of which I have sadly)
-in -next:
+On 12/1/2015 12:13 PM, Sunil Goutham wrote:
 
-  http://kernelci.org/boot/all/job/broonie-regulator/kernel/v4.4-rc3-17-ga6498dba8869/
+> From: Thanneeru Srinivasulu <tsrinivasulu@caviumnetworks.com>
+>
+> Signed-off-by: Thanneeru Srinivasulu <tsrinivasulu@caviumnetworks.com>
+> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+> ---
+>   drivers/net/ethernet/cavium/thunder/thunder_bgx.c |    3 +++
+>   drivers/net/ethernet/cavium/thunder/thunder_bgx.h |    1 +
+>   2 files changed, 4 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> index 180aa9f..1fb72dd 100644
+> --- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> +++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> @@ -1009,6 +1009,9 @@ static int bgx_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+>   	struct bgx *bgx = NULL;
+>   	u8 lmac;
+>
+> +	/*Load octeon mdio driver*/
 
-which were bisected by Tyler to this:
+    Please insert spaces after /* and before */ (unless it's a common comment 
+style in this driver).
 
-  http://hastebin.com/noluripepa.sm
+[...]
 
-I'm not seeing anything obvious in the code at the minute having looked
-for several seconds, I'll have a proper look later today all being well.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151201/9be2276e/attachment.sig>
+MBR, Sergei
