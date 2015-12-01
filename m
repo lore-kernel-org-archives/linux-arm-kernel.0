@@ -1,21 +1,40 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 30 Nov 2015 16:36:26 -0800
-Subject: [PATCH] clk: imx: Replace clk error check with imx_check_clocks()
-In-Reply-To: <1448504323-17737-1-git-send-email-b51503@freescale.com>
-References: <1448504323-17737-1-git-send-email-b51503@freescale.com>
-Message-ID: <20151201003626.GB17532@codeaurora.org>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 30 Nov 2015 16:42:25 -0800
+Subject: [PATCHv2] arm: Update all mm structures with section adjustments
+In-Reply-To: <CAGXu5j+P2Y_dSJo=tK7hBNX_7hOiG23rA7nXcQ99csNA0_CSvA@mail.gmail.com>
+References: <1447892054-8095-1-git-send-email-labbott@fedoraproject.org>
+ <CAGXu5j+y1m9oONvCQg=MgrkwAgUV5OChoAY=q6vvyGNExY1Zjg@mail.gmail.com>
+ <CAGXu5j+P2Y_dSJo=tK7hBNX_7hOiG23rA7nXcQ99csNA0_CSvA@mail.gmail.com>
+Message-ID: <565CECF1.6090101@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26, Bai Ping wrote:
-> As we already have a 'imx_check_clocks' to do the clock error
-> check, so cleanup the error check code.
-> 
-> Signed-off-by: Bai Ping <b51503@freescale.com>
-> ---
+On 11/30/2015 03:40 PM, Kees Cook wrote:
+> On Thu, Nov 19, 2015 at 11:10 AM, Kees Cook <keescook@chromium.org> wrote:
+>> On Wed, Nov 18, 2015 at 4:14 PM, Laura Abbott <labbott@fedoraproject.org> wrote:
+>>> Currently, when updating section permissions to mark areas RO
+>>> or NX, the only mm updated is current->mm. This is working off
+>>> the assumption that there are no additional mm structures at
+>>> the time. This may not always hold true. (Example: calling
+>>> modprobe early will trigger a fork/exec). Ensure all mm structres
+>>> get updated with the new section information.
+>>>
+>>> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+>>
+>> This looks right to me. :)
+>>
+>> Reviewed-by: Kees Cook <keescook@chromium.org>
+>>
+>> Russell, does this work for you?
+>
+> Did this end up in the patch tracker? (I just sent a patch that'll
+> collide with this... I'm happy to do the fix up.)
+>
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+I put this in the patch tracker this morning.
+  
+> -Kees
+>
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks,
+Laura
