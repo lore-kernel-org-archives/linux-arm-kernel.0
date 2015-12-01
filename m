@@ -1,66 +1,57 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  1 Dec 2015 13:47:18 +0800
-Subject: [PATCH 0/7] ARM: sun9i: R_PIO, IR receiver and RSB support
-Message-ID: <1448948845-28347-1-git-send-email-wens@csie.org>
+Date: Tue,  1 Dec 2015 13:47:22 +0800
+Subject: [PATCH 4/7] ARM: dts: sun9i: Add consumer IR receiver device node and
+ pinmux settings
+In-Reply-To: <1448948845-28347-1-git-send-email-wens@csie.org>
+References: <1448948845-28347-1-git-send-email-wens@csie.org>
+Message-ID: <1448948845-28347-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The Allwinner A80 SoC has a consumer IR receiver, which is the same as
+older SoCs.
 
-This series adds support for various peripherals in the "special/RTC"
-block of the Allwinner A80 SoC that use the PRCM clocks and reset
-controls. The majority of this series are DTS patches, enabling
-peripherals using existing drivers. The only driver patch is for the
-R_PIO pin controller.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun9i-a80.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-This series is based on my earlier sun9i PRCM series. The pinctrl 
-patch has no dependencies though. All patches target sun9i-a80:
-
-Patch 1 adds a driver for the R_PIO "special CPU" block pin controller.
-This was done by Maxime over a year ago, when the A80 was first available.
-
-Patch 2 adds the R_PIO pinctrl device node.
-
-Patch 3 enables LED3 on the A80 Optimus board. This is driven by a GPIO
-from R_PIO.
-
-Patch 4 adds a consumer IR receiver device node, which is compatible with
-earlier Allwinner SoCs, and its associated pinmux.
-
-Patch 5 enables the consumer IR receiver on the A80 Optimus.
-
-Patch 6 adds a device node for the RSB controller. This controller is
-compatible with the one found on the A23/A33.
-
-Patch 7 enables the RSB controller on the A80 Optimus.
-
-Still to come are A80-related PMIC drivers and DTS patches.
-
-
-Regards
-ChenYu
-
-Chen-Yu Tsai (6):
-  ARM: dts: sun9i: Add A80 R_PIO pin controller device node
-  ARM: dts: sun9i: optimus: Enable LED3
-  ARM: dts: sun9i: Add consumer IR receiver device node and pinmux
-    settings
-  ARM: dts: sun9i: optimus: Enable consumer IR receiver
-  ARM: dts: sun9i: Add Reduced Serial Bus controller device node to A80
-    dtsi
-  ARM: dts: sun9i: optimus: Enable Reduced Serial Bus controller
-
-Maxime Ripard (1):
-  pinctrl: sunxi: Add A80 special pin controller
-
- .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   2 +
- arch/arm/boot/dts/sun9i-a80-optimus.dts            |  24 ++-
- arch/arm/boot/dts/sun9i-a80.dtsi                   |  54 ++++++
- drivers/pinctrl/sunxi/Kconfig                      |   5 +
- drivers/pinctrl/sunxi/Makefile                     |   1 +
- drivers/pinctrl/sunxi/pinctrl-sun9i-a80-r.c        | 181 +++++++++++++++++++++
- 6 files changed, 265 insertions(+), 2 deletions(-)
- create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun9i-a80-r.c
-
+diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+index d02ee5d520e2..80777a33ee78 100644
+--- a/arch/arm/boot/dts/sun9i-a80.dtsi
++++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+@@ -858,6 +858,18 @@
+ 			#reset-cells = <1>;
+ 		};
+ 
++		r_ir: ir at 08002000 {
++			compatible = "allwinner,sun5i-a13-ir";
++			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&r_ir_pins>;
++			clocks = <&apbs_gates 1>, <&r_ir_clk>;
++			clock-names = "apb", "ir";
++			resets = <&apbs_rst 1>;
++			reg = <0x08002000 0x40>;
++			status = "disabled";
++		};
++
+ 		r_uart: serial at 08002800 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x08002800 0x400>;
+@@ -881,6 +893,13 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			#gpio-cells = <3>;
++
++			r_ir_pins: r_ir {
++				allwinner,pins = "PL6";
++				allwinner,function = "s_cir_rx";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
+ 		};
+ 	};
+ };
 -- 
 2.6.2
