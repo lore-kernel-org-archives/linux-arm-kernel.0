@@ -1,89 +1,44 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 01 Dec 2015 12:16:14 +0100
-Subject: [PATCH] ARM: OMAP4: execute initcall to reserve SRAM for I688
- only on OMAP4
-In-Reply-To: <565C9515.1040600@ti.com>
-References: <1447673117-32719-1-git-send-email-l.stach@pengutronix.de>
- <5649CB16.2030706@ti.com> <1448904431.8275.36.camel@pengutronix.de>
- <565C9515.1040600@ti.com>
-Message-ID: <1448968574.8275.45.camel@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue,  1 Dec 2015 12:06:47 +0100
+Subject: [PATCH 2/2] ASoC: sun4i-codec: pass through clk_set_rate error
+In-Reply-To: <1448968007-10128-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1448968007-10128-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1448968007-10128-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 30.11.2015, 20:27 +0200 schrieb Grygorii Strashko:
-> On 11/30/2015 07:27 PM, Lucas Stach wrote:
-> > Am Montag, den 16.11.2015, 14:24 +0200 schrieb Grygorii Strashko:
-> >> On 11/16/2015 01:25 PM, Lucas Stach wrote:
-> >>> omap_interconnect_sync() is the only user of the SRAM scratch area
-> >>> allocated in the omap4_sram_init initcall. The interconnect sync is
-> >>> used exclusively in the OMAP4 specific WFI implementation, so there
-> >>> is no point in allocating the SRAM scratch on other SoC types.
-> >>>
-> >>> Bail out of the initcall if the kernel is not running on OMAP4 to
-> >>> avoid a confusing warning about being unable to allocate the SRAM
-> >>> needed for I688 handling.
-> >>>
-> >>> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> >>> Tested-by: Bastian Stender <bst@pengutronix.de>
-> >>> ---
-> >>>    arch/arm/mach-omap2/omap4-common.c | 3 +++
-> >>>    1 file changed, 3 insertions(+)
-> >>>
-> >>> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-> >>> index 949696b6f17b..6db393a30a28 100644
-> >>> --- a/arch/arm/mach-omap2/omap4-common.c
-> >>> +++ b/arch/arm/mach-omap2/omap4-common.c
-> >>> @@ -131,6 +131,9 @@ static int __init omap4_sram_init(void)
-> >>>    	struct device_node *np;
-> >>>    	struct gen_pool *sram_pool;
-> >>>    
-> >>> +	if (!cpu_is_omap44xx())
-> >>> +		return 0;
-> >>
-> >> This one affects on am43xx also
-> >>
-> > So you are saying this erratum is also present on AM43xx? I wasn't able
-> > to deduce this from the information provided by Richard Woodruff.
-> > 
-> 
-> "..SOCs using similar chassis components of OMAP4430 time are impacted..."
-> "..But AM335x should be immune from this particular issue..."
-> 
-> Advisory 11 Asynchronous Bridge Corruption
-> http://www.ti.com/lit/er/sprz408b/sprz408b.pdf
-> 
-> 
-Thanks for the link, it makes things a lot more clear.
-> 
-> >>
-> >>> +
-> >>>    	np = of_find_compatible_node(NULL, NULL, "ti,omap4-mpu");
-> >>>    	if (!np)
-> >>>    		pr_warn("%s:Unable to allocate sram needed to handle errata I688\n",
-> >>
-> >> Since all OMAP4+ platforms are now DT based why can't we just return from here silently?
-> >>
-> > If we are unable to allocate the SRAM needed to work around I688 this is
-> > a real error on platforms that expose this erratum, so silently bailing
-> > out at this point may obscure a real issue.
-> > 
-> 
-> SRAM is not allocated here - It's just check to understand do we need it or not
-> in case of multiplatform build where CONFIG_OMAP_INTERCONNECT_BARRIER will be selected most
-> probably.
-> 
-> And if "ti,omap4-mpu" was not found - it just means that this, particular, platform
-> is not affected by i688 errata.
-> If someone misses corresponding node in DT - we can't do nothing :)
-> 
-Okay, so the above document says that AM43xx is affected by the erratum,
-but the am4372.dtsi doesn't contain a "ti,omap4-mpu" node, so the
-workaround will not be applied. If we silence the warning, we now have a
-system that will be prone to data corruption without ever warning the
-user about it. This is surely not what anyone wants.
+Commit 1fb34b48361e ('ASoC: sun4i: Implement MIC1 capture') added back some
+code that disregards the clk_set_rate error code and always returns
+-EINVAL. Fix that and return the code in order to have more clue about
+what's going on.
 
-Regards,
-Lucas
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ sound/soc/sunxi/sun4i-codec.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+index 516c7c2b479a..0dc11f547937 100644
+--- a/sound/soc/sunxi/sun4i-codec.c
++++ b/sound/soc/sunxi/sun4i-codec.c
+@@ -411,14 +411,15 @@ static int sun4i_codec_hw_params(struct snd_pcm_substream *substream,
+ 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+ 	struct sun4i_codec *scodec = snd_soc_card_get_drvdata(rtd->card);
+ 	unsigned long clk_freq;
+-	int hwrate;
++	int ret, hwrate;
+ 
+ 	clk_freq = sun4i_codec_get_mod_freq(params);
+ 	if (!clk_freq)
+ 		return -EINVAL;
+ 
+-	if (clk_set_rate(scodec->clk_module, clk_freq))
+-		return -EINVAL;
++	ret = clk_set_rate(scodec->clk_module, clk_freq);
++	if (ret)
++		return ret;
+ 
+ 	hwrate = sun4i_codec_get_hw_rate(params);
+ 	if (hwrate < 0)
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+2.6.3
