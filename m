@@ -1,14 +1,15 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Tue,  1 Dec 2015 20:03:20 +0200
-Subject: [PATCH V2 18/19] ARM: dts: am57xx: sbc-am57x: add HDMI support
+Date: Tue,  1 Dec 2015 20:03:11 +0200
+Subject: [PATCH V2 09/19] ARM: dts: am57xx: cl-som-am57x: add touchscreen
+ support
 In-Reply-To: <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
 References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
  <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1448993001-19495-19-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1448993001-19495-10-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add HDMI video output support.
+Add ADS7846 touchscreen support.
 
 Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
 Acked-by: Igor Grinberg <grinberg@compulab.co.il>
@@ -16,75 +17,80 @@ Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 
   v2:
 
-   * Fix HDMI lanes polarity
+   * No fuctional changes
    * Reformat subject
 
- arch/arm/boot/dts/am57xx-sbc-am57x.dts | 42 ++++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 44 +++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am57xx-sbc-am57x.dts b/arch/arm/boot/dts/am57xx-sbc-am57x.dts
-index 8e4c0fd..77bb8e1 100644
---- a/arch/arm/boot/dts/am57xx-sbc-am57x.dts
-+++ b/arch/arm/boot/dts/am57xx-sbc-am57x.dts
-@@ -18,6 +18,7 @@
- 
- 	aliases {
- 		display0 = &lcd0;
-+		display1 = &hdmi;
+diff --git a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+index c603136..a75c382 100644
+--- a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
++++ b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+@@ -43,6 +43,13 @@
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
  	};
++
++	ads7846reg: fixedregulator-ads7846-reg {
++		compatible = "regulator-fixed";
++		regulator-name = "ads7846-reg";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
  };
  
-@@ -60,6 +61,19 @@
- 			DRA7XX_CORE_IOPAD(0x3564, PIN_OUTPUT | MUX_MODE14)      /* vin2a_vsync0.gpio4_0 */
+ &dra7_pmx_core {
+@@ -183,6 +190,12 @@
+ 			DRA7XX_CORE_IOPAD(0x3594, PIN_INPUT | MUX_MODE15)
  		>;
  	};
 +
-+	hdmi_pins: pinmux_hdmi_pins {
++	ads7846_pins: pinmux_ads7846_pins {
 +		pinctrl-single,pins = <
-+			DRA7XX_CORE_IOPAD(0x3808, PIN_INPUT | MUX_MODE1)	/* i2c2_sda.hdmi1_ddc_scl */
-+			DRA7XX_CORE_IOPAD(0x380c, PIN_INPUT | MUX_MODE1)	/* i2c2_scl.hdmi1_ddc_sda */
-+		>;
-+	};
-+
-+	hdmi_conn_pins: pinmux_hdmi_conn_pins {
-+		pinctrl-single,pins = <
-+			DRA7XX_CORE_IOPAD(0x37b8, PIN_INPUT | MUX_MODE14)	/* spi1_cs2.gpio7_12 */
++			DRA7XX_CORE_IOPAD(0x3464, PIN_INPUT_PULLDOWN | MUX_MODE14) /* gpmc_a9.gpio1_31 */
 +		>;
 +	};
  };
  
- &uart3 {
-@@ -135,3 +149,31 @@
+ &i2c1 {
+@@ -451,6 +464,37 @@
+ 			reg = <0x100000 0x0>;
  		};
  	};
++
++	/* touch controller */
++	ads7846 at 0 {
++		pinctrl-names = "default";
++		pinctrl-0 = <&ads7846_pins>;
++
++		compatible = "ti,ads7846";
++		vcc-supply = <&ads7846reg>;
++
++		reg = <1>;                              /* CS1 */
++		spi-max-frequency = <1500000>;
++
++		interrupt-parent = <&gpio1>;
++		interrupts = <31 0>;
++		pendown-gpio = <&gpio1 31 0>;
++
++
++		ti,x-min = /bits/ 16 <0x0>;
++		ti,x-max = /bits/ 16 <0x0fff>;
++		ti,y-min = /bits/ 16 <0x0>;
++		ti,y-max = /bits/ 16 <0x0fff>;
++
++		ti,x-plate-ohms = /bits/ 16 <180>;
++		ti,pressure-max = /bits/ 16 <255>;
++
++		ti,debounce-max = /bits/ 16 <30>;
++		ti,debounce-tol = /bits/ 16 <10>;
++		ti,debounce-rep = /bits/ 16 <1>;
++
++		linux,wakeup;
++	};
  };
-+
-+&hdmi {
-+	status = "ok";
-+	vdda-supply = <&ldo4_reg>;
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&hdmi_pins>;
-+
-+	port {
-+		hdmi_out: endpoint {
-+			remote-endpoint = <&hdmi_connector_in>;
-+			lanes = <1 0 3 2 5 4 7 6>;
-+		};
-+	};
-+};
-+
-+&hdmi_conn {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&hdmi_conn_pins>;
-+
-+	hpd-gpios = <&gpio7 12 GPIO_ACTIVE_HIGH>;
-+
-+	port {
-+		hdmi_connector_in: endpoint {
-+			remote-endpoint = <&hdmi_out>;
-+		};
-+	};
-+};
+ 
+ &mac {
 -- 
 1.9.1
