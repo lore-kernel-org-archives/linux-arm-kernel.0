@@ -1,95 +1,48 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Tue, 1 Dec 2015 20:44:22 +0100
-Subject: [PATCH v3 4/4] drivers: psci: replace psci firmware calls
-In-Reply-To: <20151201184741.GE29045@leverpostej>
-References: <1448449461-5043-1-git-send-email-jens.wiklander@linaro.org>
- <1448449461-5043-5-git-send-email-jens.wiklander@linaro.org>
- <20151201184741.GE29045@leverpostej>
-Message-ID: <20151201194421.GA29068@ermac>
+From: dcashman@android.com (Daniel Cashman)
+Date: Tue,  1 Dec 2015 12:10:54 -0800
+Subject: [PATCH v5 0/4] Allow customizable random offset to mmap_base address.
+Message-ID: <1449000658-11475-1-git-send-email-dcashman@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Lorenzo
+Address Space Layout Randomization (ASLR) provides a barrier to exploitation of user-space processes in the presence of security vulnerabilities by making it more difficult to find desired code/data which could help an attack. This is done by adding a random offset to the location of regions in the process address space, with a greater range of potential offset values corresponding to better protection/a larger search-space for brute force, but also to greater potential for fragmentation.
 
-On Tue, Dec 01, 2015 at 06:47:42PM +0000, Mark Rutland wrote:
-> Hi Jens,
-> 
-> On Wed, Nov 25, 2015 at 12:04:21PM +0100, Jens Wiklander wrote:
-> > Switch to use a generic interface for issuing SMC/HVC based on ARM SMC
-> > Calling Convention. Removes now the now unused psci-call.S.
-> > 
-> > Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
-> > Acked-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/kernel/Makefile      |  1 -
-> >  arch/arm/kernel/psci-call.S   | 31 -------------------------------
-> >  arch/arm64/kernel/Makefile    |  2 +-
-> >  arch/arm64/kernel/psci-call.S | 28 ----------------------------
-> >  drivers/firmware/psci.c       | 23 +++++++++++++++++++++--
-> >  5 files changed, 22 insertions(+), 63 deletions(-)
-> >  delete mode 100644 arch/arm/kernel/psci-call.S
-> >  delete mode 100644 arch/arm64/kernel/psci-call.S
-> 
-> As a heads-up, this conflicts with changes in drivers/firmware/psci.c
-> that appeared in for v4.4-rc1.
-> 
-> The conflict is trivial (upstream some functions were added to the same
-> location as the invocation functions), but even git am -3 doesn't seem
-> to be able to fix that up automatically, so it would be good if you
-> could rebase this to v4.4-rc1 so as to avoid that conflict.
-> 
-> > diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> > index 42700f0..9c55d11 100644
-> > --- a/drivers/firmware/psci.c
-> > +++ b/drivers/firmware/psci.c
-> > @@ -19,6 +19,7 @@
-> >  #include <linux/pm.h>
-> >  #include <linux/printk.h>
-> >  #include <linux/psci.h>
-> > +#include <linux/arm-smccc.h>
-> >  #include <linux/reboot.h>
-> 
-> Nit: please move the arm-smccc.h include to the start of the list to
-> keep this ordered alphabetically.
-> 
-> > +static unsigned long __invoke_psci_fn_hvc(unsigned long function_id,
-> > +			unsigned long arg0, unsigned long arg1,
-> > +			unsigned long arg2)
-> > +{
-> > +	struct arm_smccc_res res;
-> > +
-> > +	arm_smccc_hvc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
-> > +	return res.a0;
-> > +}
-> > +
-> > +static unsigned long __invoke_psci_fn_smc(unsigned long function_id,
-> > +			unsigned long arg0, unsigned long arg1,
-> > +			unsigned long arg2)
-> > +{
-> > +	struct arm_smccc_res res;
-> > +
-> > +	arm_smccc_smc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
-> > +	return res.a0;
-> > +}
-> > +
-> 
-> As mentioned above, this part needs to be rebased to v4.4-rc1 to avoid
-> conflicts.
-> 
-> I've given this a spin on arm64 (native and virtual) and arm (virtual).
-> SMP bringup, hotplug, and reboot worked as expected in all cases.
-> 
-> Assuming you apply the fixes requested above, for the PSCI parts:
-> 
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> Tested-by: Mark Rutland <mark.rutland@arm.com>
+The offset added to the mmap_base address, which provides the basis for the majority of the mappings for a process, is set once on process exec in arch_pick_mmap_layout() and is done via hard-coded per-arch values, which reflect, hopefully, the best compromise for all systems. The trade-off between increased entropy in the offset value generation and the corresponding increased variability in address space fragmentation is not absolute, however, and some platforms may tolerate higher amounts of entropy. This patch introduces both new Kconfig values and a sysctl interface which may be used to change the amount of entropy used for offset generation on a system.
 
-Thanks for the feeback and heads up, I'll fix.
+The direct motivation for this change was in response to the libstagefright vulnerabilities that affected Android, specifically to information provided by Google's project zero at:
 
-> 
-> What's the plan for merging this? I assume this'll go via arm-soc?
+http://googleprojectzero.blogspot.com/2015/09/stagefrightened.html
 
-I talked to Arnd about this and he suggested to go via Russel.
+The attack presented therein, by Google's project zero, specifically targeted the limited randomness used to generate the offset added to the mmap_base address in order to craft a brute-force-based attack. Concretely, the attack was against the mediaserver process, which was limited to respawning every 5 seconds, on an arm device. The hard-coded 8 bits used resulted in an average expected success rate of defeating the mmap ASLR after just over 10 minutes (128 tries at 5 seconds a piece). With this patch, and an accompanying increase in the entropy value to 16 bits, the same attack would take an average expected time of over 45 hours (32768 tries), which makes it both less feasible and more likely to be noticed.
 
-Thanks,
-Jens
+The introduced Kconfig and sysctl options are limited by per-arch minimum and maximum values, the minimum of which was chosen to match the current hard-coded value and the maximum of which was chosen so as to give the greatest flexibility without generating an invalid mmap_base address, generally a 3-4 bits less than the number of bits in the user-space accessible virtual address space.
+
+When decided whether or not to change the default value, a system developer should consider that mmap_base address could be placed anywhere up to 2^(value) bits away from the non-randomized location, which would introduce variable-sized areas above and below the mmap_base address such that the maximum vm_area_struct size may be reduced, preventing very large allocations.
+
+Changes in v5:
+* Changed all Kconfig selection to depend on MMU config.
+  - inspired by Arnd Bermann patch: "ARM kernels with MMU disabled fail to build because of CONFIG_ARCH_MMAP_RND_BITS:"
+* removed void casts for sysctl ctl_table entries
+  - depends on Andrew Morton patch: "include/linux/sysctl.h: make ctl_table.extra1/2 const"
+
+dcashman (4):
+  mm: mmap: Add new /proc tunable for mmap_base ASLR.
+  arm: mm: support ARCH_MMAP_RND_BITS.
+  arm64: mm: support ARCH_MMAP_RND_BITS.
+  x86: mm: support ARCH_MMAP_RND_BITS.
+
+ Documentation/sysctl/vm.txt | 29 +++++++++++++++++++
+ arch/Kconfig                | 68 +++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/Kconfig            |  9 ++++++
+ arch/arm/mm/mmap.c          |  3 +-
+ arch/arm64/Kconfig          | 31 +++++++++++++++++++++
+ arch/arm64/mm/mmap.c        |  8 ++++--
+ arch/x86/Kconfig            | 16 +++++++++++
+ arch/x86/mm/mmap.c          | 12 ++++----
+ include/linux/mm.h          | 11 ++++++++
+ kernel/sysctl.c             | 22 +++++++++++++++
+ mm/mmap.c                   | 12 ++++++++
+ 11 files changed, 211 insertions(+), 10 deletions(-)
+
+-- 
+2.6.0.rc2.230.g3dd15c0
