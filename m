@@ -1,46 +1,26 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 1 Dec 2015 10:31:43 +0100
-Subject: [PATCH v3 10/10] arm64: kernel: Add support for
- hibernate/suspend-to-disk.
-In-Reply-To: <1448559168-8363-11-git-send-email-james.morse@arm.com>
-References: <1448559168-8363-1-git-send-email-james.morse@arm.com>
- <1448559168-8363-11-git-send-email-james.morse@arm.com>
-Message-ID: <20151201093143.GD21222@amd>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 1 Dec 2015 10:31:46 +0100
+Subject: [PATCH] pinctrl: qcom: Add msm8996 pinctrl driver
+In-Reply-To: <1447806946-7137-1-git-send-email-sboyd@codeaurora.org>
+References: <1447806946-7137-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CACRpkdbLOjUfrURnUriMOuZdF9HF1SXcxy4SfM1f4Y8xZyxayQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Wed, Nov 18, 2015 at 1:35 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-> Suspend borrows code from cpu_suspend() to write cpu state onto the stack,
-> before calling swsusp_save() to save the memory image.
-> 
-> Restore creates a set of temporary page tables, covering the kernel and the
-> linear map, copies the restore code to a 'safe' page, then uses the copy to
-> restore the memory image. It calls into cpu_resume(),
-> and then follows the normal cpu_suspend() path back into the suspend code.
-> 
-> The implementation assumes that exactly the same kernel is booted on the
-> same hardware, and that the kernel is loaded at the same physical address.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Acked-by: Pavel Machek <pavel@ucw.cz>
-
-> diff --git a/arch/arm64/include/asm/suspend.h b/arch/arm64/include/asm/suspend.h
-> index 5faa3ce1fa3a..e75ad7aa268c 100644
-> --- a/arch/arm64/include/asm/suspend.h
-> +++ b/arch/arm64/include/asm/suspend.h
-> @@ -1,3 +1,5 @@
-> +#include <linux/suspend.h>
-> +
->  #ifndef __ASM_SUSPEND_H
->  #define __ASM_SUSPEND_H
+> From: Joonwoo Park <joonwoop@codeaurora.org>
 >
+> Add initial pinctrl driver to support pin configuration with
+> pinctrl framework for msm8996.
+>
+> Cc: <devicetree@vger.kernel.org>
+> Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> Signed-off-by: Joonwoo Park <joonwoop@codeaurora.org>
+> [sboyd at codeaurora.org: Remove duplicate entries and enums]
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Actually... even additional includes should go after the #ifdef
-guards.
+Patch applied with the ACKs!
 
-Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Yours,
+Linus Walleij
