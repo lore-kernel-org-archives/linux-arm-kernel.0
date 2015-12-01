@@ -1,80 +1,56 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 1 Dec 2015 08:39:50 -0800
-Subject: [PATCH v4 4/5] ARM: dts: DRA7: add entry for qspi mmap region
-In-Reply-To: <565D25E6.4070206@ti.com>
-References: <1448860515-28336-1-git-send-email-vigneshr@ti.com>
- <1448860515-28336-5-git-send-email-vigneshr@ti.com>
- <20151130223408.GJ23396@atomide.com> <565D25E6.4070206@ti.com>
-Message-ID: <20151201163950.GR23396@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 1 Dec 2015 16:40:36 +0000
+Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
+ concurrent lockers
+In-Reply-To: <20151130155839.GK17308@twins.programming.kicks-ass.net>
+References: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
+ <20151130155839.GK17308@twins.programming.kicks-ass.net>
+Message-ID: <20151201164035.GE27751@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vignesh R <vigneshr@ti.com> [151130 20:46]:
-> On 12/01/2015 04:04 AM, Tony Lindgren wrote:
+On Mon, Nov 30, 2015 at 04:58:39PM +0100, Peter Zijlstra wrote:
+> On Fri, Nov 27, 2015 at 11:44:06AM +0000, Will Deacon wrote:
+> > Boqun Feng reported a rather nasty ordering issue with spin_unlock_wait
+> > on architectures implementing spin_lock with LL/SC sequences and acquire
+> > semantics:
 > > 
-> > Actually none of the IO areas above are within the same interconnect target:
+> >  | CPU 1                   CPU 2                     CPU 3
+> >  | ==================      ====================      ==============
+> >  |                                                   spin_unlock(&lock);
+> >  |                         spin_lock(&lock):
+> >  |                           r1 = *lock; // r1 == 0;
+> >  |                         o = READ_ONCE(object); // reordered here
+> >  | object = NULL;
+> >  | smp_mb();
+> >  | spin_unlock_wait(&lock);
+> >  |                           *lock = 1;
+> >  | smp_mb();
+> >  | o->dead = true;
+> >  |                         if (o) // true
+> >  |                           BUG_ON(o->dead); // true!!
 > > 
-> > 0x4b300000  QSPI0 address space in L3 main interconnect
-> > 0x5c000000  QSPI1 address space in L3 main interconnect
+> > The crux of the problem is that spin_unlock_wait(&lock) can return on
+> > CPU 1 whilst CPU 2 is in the process of taking the lock. This can be
+> > resolved by upgrading spin_unlock_wait to a LOCK operation, forcing it
+> > to serialise against a concurrent locker and giving it acquire semantics
+> > in the process (although it is not at all clear whether this is needed -
+> > different callers seem to assume different things about the barrier
+> > semantics and architectures are similarly disjoint in their
+> > implementations of the macro).
 > 
-> 
-> First address range (configuration port: 0x4b300000) corresponds to QSPI
-> registers space. These registers alone are sufficient for generic SPI
-> communication (serial flash as well as non-flash SPI devices).
+> Do we want to go do a note with spin_unlock_wait() in
+> include/linux/spinlock.h warning about these subtle issues for the next
+> arch that thinks this is a 'trivial' thing to implement?
 
-OK
+Could do, but I still need agreement from Paul on the solution before I
+can describe it in core code. At the moment, the semantics are,
+unfortunately, arch-specific.
 
-> In order to speed up SPI flash reads SFI_MM_IF(SPI memory mapped
-> interface) is provided by QSPI IP. This _cannot_ be used with non-flash
-> devices.
+Paul -- did you have any more thoughts about this? I ended up at:
 
-OK
+  https://lkml.org/lkml/2015/11/16/343
 
-> The second address range (0x5c000000) corresponds to memory-mapped
-> region of SFI_MM_IF, through which SPI flash memories can be read as if
-> though they were RAM addresses (i.e using readl/memcpy). The SFI_MM_IF
-> block that takes care of communicating over SPI bus and getting the data
-> from flash device.
+and then ran out of ideas.
 
-OK
-
-> But SFI_MM_IF block needs to know some flash specific information(such
-> as read opcode, address bytes, dummy bytes, mode). This information must
-> first be populated in QSPI_SPI_SETUP*_REG(0x4B300054-60) before
-> accessing SFI_MM_IF address range via readl.
-> Both addresses space belong to same instance of the driver, one
-> corresponds to register space and other is memory-mapped region.
-> Therefore both regions are claimed by the same driver.
-
-OK
-
-> > 0x4a002558  CTRL_CORE_CONTROL_IO_2 in System Control Module (SCM) in L4_CFG
-> > 
-> > The first two address spaces should be two separate instances of this driver.
-> 
-> Not actually two instances.
-
-OK. They are both on L3 main so that won't cause any issues for separate
-interconnect driver instances. As they are still separate targets flushing
-a posted write to one area will not flush anything to the other.
-
-> > The CTRL_CORE_CONTROL_IO_2 needs seems like a shared clock register that
-> > needs to be accessed using the clock framework most likely.
-> > 
-> 
-> Not shared clock.
-> The CTRL_CORE_CONTROL_IO_2[10:8] QSPI_MEMMAPPED_CS bit fields provides a
-> functionality for remapping the previously described address space which
-> starts at 0x5C000000 L3_MAIN address to one of the four supported chip
-> selects.
-> How about using syscon to access CTRL_CORE_CONTROL_IO_2?
-
-A separate driver implementing some Linux generic framework would be idael :)
-
-But if that does not fit, yeah then syscon makes sense as that IO range
-will be on separate interconnect driver (and clock and possibly power domain)
-instances eventually.
-
-Regards,
-
-Tony
+Will
