@@ -1,29 +1,34 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 01 Dec 2015 11:35:28 +0000
-Subject: [RFC PATCH 03/10] dt-bindings: document the MPS2 UART bindings
-In-Reply-To: <20151125200729.GJ30473@rob-hp-laptop>
-References: <1448447621-17900-1-git-send-email-vladimir.murzin@arm.com>
- <1448447621-17900-4-git-send-email-vladimir.murzin@arm.com>
- <20151125200729.GJ30473@rob-hp-laptop>
-Message-ID: <565D8600.4040105@arm.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 1 Dec 2015 09:35:45 -0200
+Subject: [PATCH v2] multi_v7_defconfig: Remove CONFIG_SOC_LS1021A
+Message-ID: <1448969745-19743-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/11/15 20:07, Rob Herring wrote:
-> On Wed, Nov 25, 2015 at 10:33:34AM +0000, Vladimir Murzin wrote:
->> This adds documentation of device tree bindings for the
->> UART found on ARM MPS2 platform
->>
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> 
-> Why did ARM invent a new UART?
+multi_v7_defconfig is not suitable for booting LS1021 as it needs
+LPAE.
+    
+Remove this option.
 
-It is not something new and it was inherited from MPS (version 1) and I
-can only guess why it was there in a first place ;)
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Improve commit log
 
-> 
-> Acked-by: Rob Herring <robh@kernel.org
+ arch/arm/configs/multi_v7_defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-Thanks for your time.
-
-Vladimir
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index fa7ba92..410a699 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -54,7 +54,6 @@ CONFIG_SOC_IMX6SX=y
+ CONFIG_SOC_IMX6UL=y
+ CONFIG_SOC_IMX7D=y
+ CONFIG_SOC_VF610=y
+-CONFIG_SOC_LS1021A=y
+ CONFIG_ARCH_OMAP3=y
+ CONFIG_ARCH_OMAP4=y
+ CONFIG_SOC_OMAP5=y
+-- 
+1.9.1
