@@ -1,42 +1,68 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 1 Dec 2015 12:07:40 +0200
-Subject: [RFC v02 03/15] dmaengine: core: Introduce new, universal API to
- request a channel
-In-Reply-To: <565D6EDA.4070002@ti.com>
-References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
- <1448891145-10766-4-git-send-email-peter.ujfalusi@ti.com>
- <CAHp75VeTe6hcnuqHNv=GX8pZJmde0H-AjZpxMHq=f5YfOL5hSA@mail.gmail.com>
- <565D6EDA.4070002@ti.com>
-Message-ID: <CAHp75Vd=hzGMr+CDV6MPccLw8WV7aRkjFpN_vYSQhF7cq5rFNg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 1 Dec 2015 11:09:26 +0100
+Subject: [PATCH] ARM: ep93xx: Fix clocksource registration
+In-Reply-To: <565513EA.6020603@gmail.com>
+References: <565513EA.6020603@gmail.com>
+Message-ID: <CACRpkdZy7TnrmkWrRerjm6dZW9m65Dsc_kp8TPHzbhTxz5Hbrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 1, 2015 at 11:56 AM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
-> On 11/30/2015 04:51 PM, Andy Shevchenko wrote:
->>> +struct dma_chan *dma_request_chan(struct device *dev, const char *name)
->>> +{
->>> +       struct dma_device *device, *_d;
->>> +       struct dma_chan *chan = NULL;
->>> +
->>> +       /* If device-tree is present get slave info from here */
->>> +       if (dev->of_node)
->>> +               chan = of_dma_request_slave_channel(dev->of_node, name);
->>> +
->>> +       /* If device was enumerated by ACPI get slave info from here */
->>> +       if (ACPI_HANDLE(dev) && !chan)
->>
->> The preferable way is to use
->> has_acpi_companion() instead of ACPI_HANDLE().
->
-> I have done this part based on the dma_request_slave_channel_reason().
+On Wed, Nov 25, 2015 at 2:50 AM, Alexander Sverdlin
+<alexander.sverdlin@gmail.com> wrote:
 
-Understood, though that function was implemented before
-has_acpi_companion() has been introduced.
+> clocksource_mmio_init() explicitly checks for counter's width and refuses to
+> register anything with resolution higher than 32 bits. We need to use
+> clocksource_register_hz() directly to repair HIGH_RES_TIMERS.
 
-> Will switch to use the has_acpi_companion() for the next RFC.
+Maybe tglx want to jump in on this.
 
-Good.
+Isn't it better to fix clocksource_mmio_init() to accept > 32 bits?
 
--- 
-With Best Regards,
-Andy Shevchenko
+What is really prompting this in drivers/clocksource/mmio.c:
+
+if (bits > 32 || bits < 16)
+                return -EINVAL;
+
+
+> +static struct clocksource timer4_clocksource = {
+> +       .name   = "timer4",
+> +       .rating = 200,
+> +       .read   = ep93xx_clocksource_read,
+> +       .mask   = CLOCKSOURCE_MASK(40),
+> +       .flags  = CLOCK_SOURCE_IS_CONTINUOUS,
+> +};
+> +
+>  static int ep93xx_clkevt_set_next_event(unsigned long next,
+>                                         struct clock_event_device *evt)
+>  {
+> @@ -128,9 +136,8 @@ void __init ep93xx_timer_init(void)
+>         /* Enable and register clocksource and sched_clock on timer 4 */
+>         writel(EP93XX_TIMER4_VALUE_HIGH_ENABLE,
+>                EP93XX_TIMER4_VALUE_HIGH);
+> -       clocksource_mmio_init(NULL, "timer4",
+> -                             EP93XX_TIMER4_RATE, 200, 40,
+> -                             ep93xx_clocksource_read);
+> +       if (clocksource_register_hz(&timer4_clocksource, EP93XX_TIMER4_RATE))
+> +               pr_warn("Failed to register Timer4 as clocksource");
+>         sched_clock_register(ep93xx_read_sched_clock, 40,
+>                              EP93XX_TIMER4_RATE);
+
+Isn't this a better fix:
+
+diff --git a/drivers/clocksource/mmio.c b/drivers/clocksource/mmio.c
+index 1593ade2a815..c4f7d7a9b689 100644
+--- a/drivers/clocksource/mmio.c
++++ b/drivers/clocksource/mmio.c
+@@ -55,7 +55,7 @@ int __init clocksource_mmio_init(void __iomem *base,
+const char *name,
+ {
+        struct clocksource_mmio *cs;
+
+-       if (bits > 32 || bits < 16)
++       if (bits > 64 || bits < 16)
+                return -EINVAL;
+
+        cs = kzalloc(sizeof(struct clocksource_mmio), GFP_KERNEL);
+
+Yours,
+Linus Walleij
