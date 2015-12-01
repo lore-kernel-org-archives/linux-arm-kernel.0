@@ -1,68 +1,104 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 1 Dec 2015 19:03:37 +0000
-Subject: [PATCH v12 08/16] arm64/kexec: Add core kexec support
-In-Reply-To: <20151201021615.GA5704@dhcppc13.redhat.com>
-References: <cover.1448403503.git.geoff@infradead.org>
- <6ac232ad37d6b02cf2d5848b15236f26f5ac61ac.1448403503.git.geoff@infradead.org>
- <20151127131306.GE23908@dhcppc13.redhat.com>
- <1448909475.31214.27.camel@infradead.org>
- <20151201021615.GA5704@dhcppc13.redhat.com>
-Message-ID: <20151201190337.GG29045@leverpostej>
+From: martyn.welch@collabora.co.uk (Martyn Welch)
+Date: Tue,  1 Dec 2015 19:12:51 +0000
+Subject: [PATCH 3/3] Addition of binding for firmware signals on peach-pi
+In-Reply-To: <1448997171-7064-1-git-send-email-martyn.welch@collabora.co.uk>
+References: <1448997171-7064-1-git-send-email-martyn.welch@collabora.co.uk>
+Message-ID: <1448997171-7064-4-git-send-email-martyn.welch@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 07:46:15AM +0530, Pratyush Anand wrote:
-> Hi Geoff,
-> 
-> On 30/11/2015:10:51:15 AM, Geoff Levand wrote:
-> > Hi,
-> > 
-> > On Fri, 2015-11-27 at 18:43 +0530, Pratyush Anand wrote:
-> > 
-> > > On 24/11/2015:10:25:34 PM, Geoff Levand wrote:
-> > > > +> > 	> > /* Test the entry flags. */
-> > > > +.Ltest_source:
-> > > > +> > 	> > tbz> > 	> > x18, IND_SOURCE_BIT, .Ltest_indirection
-> > > > +
-> > > > +> > 	> > mov x20, x13> > 	> > 	> > 	> > 	> > /*  x20 = copy dest */
-> > > > +> > 	> > mov x21, x12> > 	> > 	> > 	> > 	> > /*  x21 = copy src */
-> > > 
-> > > Till v10 we had here invalidation for relocated destination page to PoC. I could
-> > > not understand, why it was removed. Removing that piece of code breaks kexec
-> > > booting with mustang. I need [1] to kexec boot into second kernel with mustang
-> > > platform.
-> > 
-> > We need to flush the new kernel to PoC.  The code that was here that
-> > was doing that would only be executed when the new kernel needed
-> > relocation (the standard kexec case).  We also need to flush kernels
-> > that do not need relocation (the standard kdump case).
-> > 
-> > I moved the new kernel flush to kexec_segment_flush(), called
-> > unconditionally in machine_kexec() so we can handle both cases
-> > with one piece of code.
-> 
-> Yes, I had noticed that. Actually flushing before cache is disabled can always
-> cause heisenbug.
+The peach pi has a GPIO connected to the firmware write protect, developer
+mode and recovery mode lines. This patch adds the required nodes to the
+device tree to configure the pinmuxing and allow these to be read from
+user space.
 
-Please use "clean", "invalidate", or "clean+invalidate" rather than
-"flush". The latter is ambiguous and misleading.
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
+Signed-off-by: Martyn Welch <martyn.welch@collabora.co.uk>
+---
+ arch/arm/boot/dts/exynos5800-peach-pi.dts | 40 +++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-You can validly perform maintenance while the cache may allocate for a
-region of memory, it's just that afterwards the cache may hold a clean
-entries for that region.
-
-You can clean/clean+invalidate to push data to the PoC, or you can
-invalidate/clean+invalidate to ensure that no asynchronous writebacks
-occur later (so long as you do not make a cacheable write to said
-cacheline).
-
-The only thing that you cannot guarantee is that there is not some clean
-cacheline allocated for a region of memory to which cacheable accesses
-may be performed.
-
-Note that the kernel only requires its Image to be clean to the PoC. So
-long as this is true, we know that there will not be asynchrnoous
-writebacks, and can invalidate as necessary as part of the boot process.
-
-Thanks,
-Mark.
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index 49a4f43..485c18f 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -53,6 +53,25 @@
+ 		};
+ 	};
+ 
++	chromeos-firmware {
++		compatible = "google,gpio-firmware";
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&wp_gpio &dev_mode &rec_mode>;
++
++		write-protect {
++			gpios = <&gpx3 0 GPIO_ACTIVE_LOW>;
++		};
++
++		developer-switch {
++			gpios = <&gpx1 3 GPIO_ACTIVE_HIGH>;
++		};
++
++		recovery-switch {
++			gpios = <&gpx0 7 GPIO_ACTIVE_LOW>;
++		};
++	};
++
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
+ 
+@@ -731,6 +750,13 @@
+ 		samsung,pin-val = <0>;
+ 	};
+ 
++	rec_mode: rec-mode {
++		samsung,pins = "gpx0-7";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
+ 	tpm_irq: tpm-irq {
+ 		samsung,pins = "gpx1-0";
+ 		samsung,pin-function = <0>;
+@@ -752,6 +778,13 @@
+ 		samsung,pin-drv = <0>;
+ 	};
+ 
++	dev_mode: dev-mode {
++		samsung,pins = "gpx1-3";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <3>;
++		samsung,pin-drv = <0>;
++	};
++
+ 	ec_irq: ec-irq {
+ 		samsung,pins = "gpx1-5";
+ 		samsung,pin-function = <0>;
+@@ -773,6 +806,13 @@
+ 		samsung,pin-drv = <0>;
+ 	};
+ 
++	wp_gpio: wp_gpio {
++		samsung,pins = "gpx3-0";
++		samsung,pin-function = <0>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
+ 	max77802_irq: max77802-irq {
+ 		samsung,pins = "gpx3-1";
+ 		samsung,pin-function = <0>;
+-- 
+2.1.4
