@@ -1,96 +1,87 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Tue,  1 Dec 2015 11:28:55 +0800
-Subject: [RFC PATCH 5/9] drm/rockchip: Optimization vop mode set
+Date: Tue,  1 Dec 2015 11:30:21 +0800
+Subject: [RFC PATCH 6/9] drm/rockchip: direct config connecter gate and
+ out_mode
 In-Reply-To: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>
 References: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1448940535-23406-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1448940621-23447-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rk3288 vop timing registers is immediately register, when configure
-timing on display active time, will cause tearing. use dclk reset is
-not a good idea to avoid this tearing. we can avoid tearing by using
-standby register.
-
-Vop standby register will take effect at end of current frame, and
-go back to work immediately when exit standby.
-
-So we can use standby register to protect this context.
+Both connecter gate and out_mode are not conflict with mode set
+configure. Direct setting connecter gate and out_mode, that allow
+connector do rockchip_drm_crtc_mode_config after mode set.
 
 Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 ---
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   49 +++++++++++++++++++--------
- 1 file changed, 34 insertions(+), 15 deletions(-)
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   41 ++++++++++++---------------
+ 1 file changed, 18 insertions(+), 23 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index a28e255..6317dea 100644
+index 6317dea..c65b454 100644
 --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
 +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -1098,10 +1098,40 @@ static void vop_crtc_mode_set_nofb(struct drm_crtc *crtc)
- 	uint32_t val;
+@@ -90,9 +90,6 @@ struct vop {
+ 	struct drm_device *drm_dev;
+ 	bool is_enabled;
  
- 	/*
--	 * disable dclk to stop frame scan, so that we can safe config mode and
--	 * enable iommu.
-+	 * If dclk rate is zero, mean that scanout is stop,
-+	 * we don't need wait any more.
- 	 */
--	clk_disable(vop->dclk);
-+	if (clk_get_rate(vop->dclk)) {
-+		/*
-+		 * Rk3288 vop timing register is immediately, when configure
-+		 * display timing on display time, may cause tearing.
-+		 *
-+		 * Vop standby will take effect at end of current frame,
-+		 * if dsp hold valid irq happen, it means standby complete.
-+		 *
-+		 * mode set:
-+		 *    standby and wait complete --> |----
-+		 *                                  | display time
-+		 *                                  |----
-+		 *                                  |---> dsp hold irq
-+		 *     configure display timing --> |
-+		 *         standby exit             |
-+		 *                                  | new frame start.
-+		 */
-+
-+		reinit_completion(&vop->dsp_hold_completion);
-+		vop_dsp_hold_valid_irq_enable(vop);
-+
-+		spin_lock(&vop->reg_lock);
-+
-+		VOP_CTRL_SET(vop, standby, 1);
-+
-+		spin_unlock(&vop->reg_lock);
-+
-+		wait_for_completion(&vop->dsp_hold_completion);
-+
-+		vop_dsp_hold_valid_irq_disable(vop);
-+	}
- 
- 	switch (vop->connector_type) {
- 	case DRM_MODE_CONNECTOR_LVDS:
-@@ -1137,20 +1167,9 @@ static void vop_crtc_mode_set_nofb(struct drm_crtc *crtc)
- 	VOP_CTRL_SET(vop, vact_st_end, val);
- 	VOP_CTRL_SET(vop, vpost_st_end, val);
- 
+-	int connector_type;
+-	int connector_out_mode;
 -
--	/*
--	 * reset dclk, take all mode config affect, so the clk would run in
--	 * correct frame.
--	 */
--	reset_control_assert(vop->dclk_rst);
--	usleep_range(10, 20);
--	reset_control_deassert(vop->dclk_rst);
--
- 	clk_set_rate(vop->dclk, adjusted_mode->clock * 1000);
--out:
--	if (clk_enable(vop->dclk) < 0)
--		dev_err(vop->dev, "failed to enable dclk - %d\n", ret_clk);
+ 	/* mutex vsync_ work */
+ 	struct mutex vsync_mutex;
+ 	bool vsync_work_pending;
+@@ -1029,8 +1026,24 @@ int rockchip_drm_crtc_mode_config(struct drm_crtc *crtc,
+ {
+ 	struct vop *vop = to_vop(crtc);
  
-+	VOP_CTRL_SET(vop, standby, 0);
+-	vop->connector_type = connector_type;
+-	vop->connector_out_mode = out_mode;
++	if (WARN_ON(!vop->is_enabled))
++		return -EINVAL;
++
++	switch (connector_type) {
++	case DRM_MODE_CONNECTOR_LVDS:
++		VOP_CTRL_SET(vop, rgb_en, 1);
++		break;
++	case DRM_MODE_CONNECTOR_eDP:
++		VOP_CTRL_SET(vop, edp_en, 1);
++		break;
++	case DRM_MODE_CONNECTOR_HDMIA:
++		VOP_CTRL_SET(vop, hdmi_en, 1);
++		break;
++	default:
++		DRM_ERROR("unsupport connector_type[%d]\n", connector_type);
++		return -EINVAL;
++	};
++	VOP_CTRL_SET(vop, out_mode, out_mode);
+ 
+ 	return 0;
  }
+@@ -1132,24 +1145,6 @@ static void vop_crtc_mode_set_nofb(struct drm_crtc *crtc)
  
- static void vop_crtc_atomic_flush(struct drm_crtc *crtc,
+ 		vop_dsp_hold_valid_irq_disable(vop);
+ 	}
+-
+-	switch (vop->connector_type) {
+-	case DRM_MODE_CONNECTOR_LVDS:
+-		VOP_CTRL_SET(vop, rgb_en, 1);
+-		break;
+-	case DRM_MODE_CONNECTOR_eDP:
+-		VOP_CTRL_SET(vop, edp_en, 1);
+-		break;
+-	case DRM_MODE_CONNECTOR_HDMIA:
+-		VOP_CTRL_SET(vop, hdmi_en, 1);
+-		break;
+-	default:
+-		DRM_ERROR("unsupport connector_type[%d]\n",
+-			  vop->connector_type);
+-		goto out;
+-	};
+-	VOP_CTRL_SET(vop, out_mode, vop->connector_out_mode);
+-
+ 	val = 0x8;
+ 	val |= (adjusted_mode->flags & DRM_MODE_FLAG_NHSYNC) ? 0 : 1;
+ 	val |= (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC) ? 0 : (1 << 1);
 -- 
 1.7.9.5
