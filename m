@@ -1,19 +1,21 @@
 From: nikita@compulab.co.il (Nikita Kiryanov)
-Date: Tue,  1 Dec 2015 15:55:01 +0200
-Subject: [PATCH V2 06/14] ARM: dts: am437x: cm-t43: add dual emac support
+Date: Tue,  1 Dec 2015 15:54:56 +0200
+Subject: [PATCH V2 01/14] ARM: dts: am437x: cm-t43: add basic support for
+ sbc-t43
 In-Reply-To: <1448978109-5614-1-git-send-email-nikita@compulab.co.il>
 References: <1448978109-5614-1-git-send-email-nikita@compulab.co.il>
-Message-ID: <1448978109-5614-7-git-send-email-nikita@compulab.co.il>
+Message-ID: <1448978109-5614-2-git-send-email-nikita@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CM-T43 comes with 2 ethernet ports connected to the cpsw subsystem, which
-has 2 modes of operation: switch mode and dual emac mode.
-Add the relevant muxing and set it up to work in dual emac mode by
-default.
+Add basic support for SBC-T43: a CM-T43 based single board computer.
+CM-T43 is an AM437x based System-on-Module designed to serve as a building
+block in embedded applications. SBC-T43 is composed of CM-T43 module on
+top of the SB-SOM-T43 baseboard.
+Basic support includes UART, GPIO, and I2C.
 
 Signed-off-by: Nikita Kiryanov <nikita@compulab.co.il>
-Acked-by: Mugunthan V N <mugunthanvnm@ti.com>
+Acked-by: Rob Herring <robh@kernel.org>
 Cc: Tony Lindgren <tony@atomide.com>
 Cc: Benoit Cousson <bcousson@baylibre.com>
 Cc: Rob Herring <robh@kernel.org>
@@ -24,94 +26,209 @@ Cc: Dmitry Lifshitz <lifshitz@compulab.co.il>
 Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
 ---
 Changes in V2:
-	- No changes.
+	- Added spaces between strings in "compatible" properties
+	- Removed extra linebreak in end of am437x-sbc-t43.dts file
 
- arch/arm/boot/dts/am437x-cm-t43.dts | 66 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
+ .../devicetree/bindings/arm/omap/omap.txt          |  6 ++
+ arch/arm/boot/dts/Makefile                         |  6 +-
+ arch/arm/boot/dts/am437x-cm-t43.dts                | 90 ++++++++++++++++++++++
+ arch/arm/boot/dts/am437x-sbc-t43.dts               | 56 ++++++++++++++
+ 4 files changed, 156 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/am437x-cm-t43.dts
+ create mode 100644 arch/arm/boot/dts/am437x-sbc-t43.dts
 
+diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+index 9f4e513..04161f5 100644
+--- a/Documentation/devicetree/bindings/arm/omap/omap.txt
++++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+@@ -141,6 +141,12 @@ Boards:
+ - OMAP5 EVM : Evaluation Module
+   compatible = "ti,omap5-evm", "ti,omap5"
+ 
++- AM437x CM-T43
++  compatible = "compulab,am437x-cm-t43", "ti,am4372", "ti,am43"
++
++- AM437x SBC-T43
++  compatible = "compulab,am437x-sbc-t43", "compulab,am437x-cm-t43", "ti,am4372", "ti,am43"
++
+ - AM43x EPOS EVM
+   compatible = "ti,am43x-epos-evm", "ti,am4372", "ti,am43"
+ 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 30bbc37..dc3b9af 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -478,9 +478,11 @@ dtb-$(CONFIG_ARCH_OMAP4) += \
+ 	omap4-var-stk-om44.dtb
+ dtb-$(CONFIG_SOC_AM43XX) += \
+ 	am43x-epos-evm.dtb \
+-	am437x-sk-evm.dtb \
++	am437x-cm-t43.dtb \
++	am437x-gp-evm.dtb \
+ 	am437x-idk-evm.dtb \
+-	am437x-gp-evm.dtb
++	am437x-sbc-t43.dtb \
++	am437x-sk-evm.dtb
+ dtb-$(CONFIG_SOC_OMAP5) += \
+ 	omap5-cm-t54.dtb \
+ 	omap5-igep0050.dtb \
 diff --git a/arch/arm/boot/dts/am437x-cm-t43.dts b/arch/arm/boot/dts/am437x-cm-t43.dts
-index efabb31..fd97a89 100644
---- a/arch/arm/boot/dts/am437x-cm-t43.dts
+new file mode 100644
+index 0000000..a131b97
+--- /dev/null
 +++ b/arch/arm/boot/dts/am437x-cm-t43.dts
-@@ -73,6 +73,47 @@
- 			AM4372_IOPAD(0x89c, PIN_OUTPUT_PULLDOWN | MUX_MODE0)
- 		>;
- 	};
+@@ -0,0 +1,90 @@
++/*
++ * Copyright (C) 2015 CompuLab, Ltd. - http://www.compulab.co.il/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+	cpsw_default: cpsw_default {
++/dts-v1/;
++
++#include <dt-bindings/pinctrl/am43xx.h>
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include "am4372.dtsi"
++
++/ {
++	model = "CompuLab CM-T43";
++	compatible = "compulab,am437x-cm-t43", "ti,am4372", "ti,am43";
++
++	leds {
++		compatible = "gpio-leds";
++
++		ledb {
++			label = "cm-t43:green";
++			gpios = <&gpio0 24 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++};
++
++&am43xx_pinmux {
++	pinctrl-names = "default";
++	pinctrl-0 = <&cm_t43_led_pins>;
++
++	cm_t43_led_pins: cm_t43_led_pins {
 +		pinctrl-single,pins = <
-+			/* Slave 1 */
-+			AM4372_IOPAD(0x914, PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txen.rgmii1_txen */
-+			AM4372_IOPAD(0x918, PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxdv.rgmii1_rxctl */
-+			AM4372_IOPAD(0x91c, PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd1.rgmii1_txd3 */
-+			AM4372_IOPAD(0x920, PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd0.rgmii1_txd2 */
-+			AM4372_IOPAD(0x924, PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd1.rgmii1_txd1 */
-+			AM4372_IOPAD(0x928, PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd0.rgmii1_txd0 */
-+			AM4372_IOPAD(0x92c, PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txclk.rmii1_tclk */
-+			AM4372_IOPAD(0x930, PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxclk.rmii1_rclk */
-+			AM4372_IOPAD(0x934, PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd1.rgmii1_rxd3 */
-+			AM4372_IOPAD(0x938, PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd0.rgmii1_rxd2 */
-+			AM4372_IOPAD(0x93c, PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd1.rgmii1_rxd1 */
-+			AM4372_IOPAD(0x940, PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd0.rgmii1_rxd0 */
-+			AM4372_IOPAD(0xa74, MUX_MODE3)
-+			/* Slave 2 */
-+			AM4372_IOPAD(0x840, PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a0.txen */
-+			AM4372_IOPAD(0x844, PIN_INPUT_PULLDOWN  | MUX_MODE2)	/* gpmc_a1.rxctl */
-+			AM4372_IOPAD(0x848, PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a2.txd3 */
-+			AM4372_IOPAD(0x84c, PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a3.txd2 */
-+			AM4372_IOPAD(0x850, PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a4.txd1 */
-+			AM4372_IOPAD(0x854, PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a5.txd0 */
-+			AM4372_IOPAD(0x858, PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a6.tclk */
-+			AM4372_IOPAD(0x85c, PIN_INPUT_PULLDOWN  | MUX_MODE2)	/* gpmc_a7.rclk */
-+			AM4372_IOPAD(0x860, PIN_INPUT_PULLDOWN  | MUX_MODE2)	/* gpmc_a8.rxd3 */
-+			AM4372_IOPAD(0x864, PIN_INPUT_PULLDOWN  | MUX_MODE2)	/* gpmc_a9.rxd2 */
-+			AM4372_IOPAD(0x868, PIN_INPUT_PULLDOWN  | MUX_MODE2)	/* gpmc_a10.rxd1 */
-+			AM4372_IOPAD(0x86c, PIN_INPUT_PULLDOWN  | MUX_MODE2)	/* gpmc_a11.rxd0 */
-+			AM4372_IOPAD(0xa38, MUX_MODE7)
++			AM4372_IOPAD(0xa78, MUX_MODE7)
 +		>;
 +	};
 +
-+	davinci_mdio_default: davinci_mdio_default {
++	i2c0_pins: i2c0_pins {
 +		pinctrl-single,pins = <
-+			/* MDIO */
-+			AM4372_IOPAD(0x948, PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)	/* mdio_data.mdio_data */
-+			AM4372_IOPAD(0x94c, PIN_OUTPUT_PULLUP | MUX_MODE0)			/* mdio_clk.mdio_clk */
++			AM4372_IOPAD(0x988, PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)  /* i2c0_sda.i2c0_sda */
++			AM4372_IOPAD(0x98c, PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)  /* i2c0_scl.i2c0_scl */
 +		>;
 +	};
- };
- 
- &gpmc {
-@@ -261,6 +302,31 @@
- 	};
- };
- 
-+&mac {
++};
++
++&i2c0 {
++	status = "okay";
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&cpsw_default>;
-+	dual_emac = <1>;
++	pinctrl-0 = <&i2c0_pins>;
++	clock-frequency = <100000>;
++};
++
++&gpio0 {
 +	status = "okay";
 +};
 +
-+&davinci_mdio {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&davinci_mdio_default>;
++&gpio1 {
 +	status = "okay";
 +};
 +
-+&cpsw_emac0 {
-+	phy_id = <&davinci_mdio>, <0>;
-+	phy-mode = "rgmii-txid";
-+	dual_emac_res_vlan = <1>;
++&gpio2 {
++	status = "okay";
 +};
 +
-+&cpsw_emac1 {
-+	phy_id = <&davinci_mdio>, <1>;
-+	phy-mode = "rgmii-txid";
-+	dual_emac_res_vlan = <2>;
++&gpio3 {
++	status = "okay";
 +};
 +
- &elm {
- 	status = "okay";
- };
++&gpio4 {
++	status = "okay";
++};
++
++&gpio5 {
++	status = "okay";
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&cpu {
++	operating-points = <1000000 1330000>,
++			   <800000 1260000>,
++			   <720000 1200000>,
++			   <600000 1100000>,
++			   <300000 950000>;
++};
+diff --git a/arch/arm/boot/dts/am437x-sbc-t43.dts b/arch/arm/boot/dts/am437x-sbc-t43.dts
+new file mode 100644
+index 0000000..6ca22b7
+--- /dev/null
++++ b/arch/arm/boot/dts/am437x-sbc-t43.dts
+@@ -0,0 +1,56 @@
++/*
++ * Copyright (C) 2015 CompuLab, Ltd. - http://www.compulab.co.il/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include "am437x-cm-t43.dts"
++
++/ {
++	model = "CompuLab CM-T43 on SB-SOM-T43";
++	compatible = "compulab,am437x-sbc-t43", "compulab,am437x-cm-t43", "ti,am4372", "ti,am43";
++};
++
++&am43xx_pinmux {
++	uart0_pins_default: uart0_pins_default {
++		pinctrl-single,pins = <
++			AM4372_IOPAD(0x968, DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE0)
++			AM4372_IOPAD(0x96C, DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE0)
++			AM4372_IOPAD(0x970, PIN_INPUT_PULLUP | SLEWCTRL_FAST | DS0_PULL_UP_DOWN_EN | MUX_MODE0) /* uart0_rxd.uart0_rxd */
++			AM4372_IOPAD(0x974, PIN_INPUT | PULL_DISABLE | SLEWCTRL_FAST | DS0_PULL_UP_DOWN_EN | MUX_MODE0) /* uart0_txd.uart0_txd */
++		>;
++	};
++
++	i2c1_pins: i2c1_pins {
++		pinctrl-single,pins = <
++			AM4372_IOPAD(0xa6c, PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE1)  /* spi2_cs0.i2c1_sda  */
++			AM4372_IOPAD(0xa60, PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE1)  /* spi2_sclk.i2c1_scl */
++		>;
++	};
++
++	i2c2_pins: i2c2_pins {
++		pinctrl-single,pins = <
++			AM4372_IOPAD(0x978, PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE3)  /* uart1_ctsn.i2c2_sda  */
++			AM4372_IOPAD(0x97c, PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE3)  /* uart1_rtsn.i2c2_scl */
++		>;
++	};
++};
++
++&i2c1 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins>;
++};
++
++&i2c2 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins>;
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_default>;
++};
 -- 
 1.9.1
