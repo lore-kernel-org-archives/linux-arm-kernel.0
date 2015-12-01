@@ -1,61 +1,107 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 30 Nov 2015 17:10:07 -0800
-Subject: [PATCHv2] arm: Update all mm structures with section adjustments
-In-Reply-To: <565CECF1.6090101@redhat.com>
-References: <1447892054-8095-1-git-send-email-labbott@fedoraproject.org>
- <CAGXu5j+y1m9oONvCQg=MgrkwAgUV5OChoAY=q6vvyGNExY1Zjg@mail.gmail.com>
- <CAGXu5j+P2Y_dSJo=tK7hBNX_7hOiG23rA7nXcQ99csNA0_CSvA@mail.gmail.com>
- <565CECF1.6090101@redhat.com>
-Message-ID: <CAGXu5jK-b_x5e5Qfm_A8i-k3QpjYXv=nQCXeFQknLt=x=+Mn+Q@mail.gmail.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 30 Nov 2015 17:20:35 -0800
+Subject: [PATCH] ARM: mm: flip priority of CONFIG_DEBUG_RODATA
+In-Reply-To: <CAGXu5jJUv3EKkFA3J43nVO+v=-K5kgwSqwrVA9hxJGeZ79CkAg@mail.gmail.com>
+References: <20151130233819.GA18873@www.outflux.net>
+ <565CF1E5.2070003@redhat.com>
+ <CAGXu5jJUv3EKkFA3J43nVO+v=-K5kgwSqwrVA9hxJGeZ79CkAg@mail.gmail.com>
+Message-ID: <565CF5E3.7000109@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 4:42 PM, Laura Abbott <labbott@redhat.com> wrote:
-> On 11/30/2015 03:40 PM, Kees Cook wrote:
->>
->> On Thu, Nov 19, 2015 at 11:10 AM, Kees Cook <keescook@chromium.org> wrote:
+On 11/30/2015 05:08 PM, Kees Cook wrote:
+> On Mon, Nov 30, 2015 at 5:03 PM, Laura Abbott <labbott@redhat.com> wrote:
+>> On 11/30/2015 03:38 PM, Kees Cook wrote:
 >>>
->>> On Wed, Nov 18, 2015 at 4:14 PM, Laura Abbott <labbott@fedoraproject.org>
->>> wrote:
->>>>
->>>> Currently, when updating section permissions to mark areas RO
->>>> or NX, the only mm updated is current->mm. This is working off
->>>> the assumption that there are no additional mm structures at
->>>> the time. This may not always hold true. (Example: calling
->>>> modprobe early will trigger a fork/exec). Ensure all mm structres
->>>> get updated with the new section information.
->>>>
->>>> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
->>>
->>>
->>> This looks right to me. :)
->>>
->>> Reviewed-by: Kees Cook <keescook@chromium.org>
->>>
->>> Russell, does this work for you?
+>>> Given the choice between making things NX or making things RO, we want
+>>> RO first. As such, redefine CONFIG_DEBUG_RODATA to actually do the bulk
 >>
 >>
->> Did this end up in the patch tracker? (I just sent a patch that'll
->> collide with this... I'm happy to do the fix up.)
->>
+>> Can you give a citation for why? The thread that inspired it might be
+>> a good link.
 >
-> I put this in the patch tracker this morning.
-
-Ah-ha, great! I will rebase my change on to it and send a v2
-(potentially with additional changes).
-
--Kees
-
+> This was inspired by my examining the existing architecture's
+> implementations of CONFIG_DEBUG_RODATA after Ingo suggested it be made
+> a common feature not a build-time config (or at least renamed):
+> http://www.openwall.com/lists/kernel-hardening/2015/11/30/13
 >
+
+Thanks. I read the thread and I think it would be good to put a link
+in the commit message to make it clearer why this is going in.
+
+>>> index 41218867a9a6..b617084e9520 100644
+>>> --- a/arch/arm/mm/Kconfig
+>>> +++ b/arch/arm/mm/Kconfig
+>>> @@ -1039,24 +1039,26 @@ config ARCH_SUPPORTS_BIG_ENDIAN
+>>>            This option specifies the architecture can support big endian
+>>>            operation.
+>>>
+>>> -config ARM_KERNMEM_PERMS
+>>> -       bool "Restrict kernel memory permissions"
+>>> +config DEBUG_RODATA
+>>> +       bool "Make kernel text and rodata read-only"
+>>>          depends on MMU
+>>> +       default y if CPU_V7
+>>>          help
+>>> -         If this is set, kernel memory other than kernel text (and
+>>> rodata)
+>>> -         will be made non-executable. The tradeoff is that each region is
+>>> -         padded to section-size (1MiB) boundaries (because their
+>>> permissions
+>>> -         are different and splitting the 1M pages into 4K ones causes TLB
+>>> -         performance problems), wasting memory.
+>>> +         If this is set, kernel memory (text, rodata, etc) will be made
+>>> +         read-only, and non-text kernel memory will be made
+>>> non-executable.
+>>> +         The tradeoff is that each region is padded to section-size
+>>> (1MiB)
+>>> +         boundaries (because their permissions are different and
+>>> splitting
+>>> +         the 1M pages into 4K ones causes TLB performance problems),
+>>> which
+>>> +         can waste memory.
+>>>
+>>> -config DEBUG_RODATA
+>>> -       bool "Make kernel text and rodata read-only"
+>>> -       depends on ARM_KERNMEM_PERMS
+>>> +config DEBUG_ALIGN_RODATA
+>>> +       bool "Make rodata strictly non-executable"
+>>> +       depends on DEBUG_RODATA
+>>>          default y
+>>>          help
+>>> -         If this is set, kernel text and rodata will be made read-only.
+>>> This
+>>> -         is to help catch accidental or malicious attempts to change the
+>>> -         kernel's executable code. Additionally splits rodata from kernel
+>>> -         text so it can be made explicitly non-executable. This creates
+>>> -         another section-size padded region, so it can waste more memory
+>>> -         space while gaining the read-only protections.
+>>> +         If this is set, rodata will be made explicitly non-executable.
+>>> This
+>>> +         provides protection on the rare chance that attackers might find
+>>> and
+>>> +         use ROP gadgets that exist in the rodata section. This adds an
+>>> +         additional section-aligned split of rodata from kernel text so
+>>> it
+>>> +         can be made explicitly non-executable. This padding may waste
+>>> memory
+>>> +         space to gain this additional protection.
 >>
->> -Kees
 >>
+>> I get that you want to make this match arm64 but it's really not intuitive that
+>> something with ALIGN_RODATA in the name is actually for setting NX. The purpose
+>> of ALIGN_RODATA was also slightly different on arm64 since the RO/NX will still
+>> be there, the difference is if the sections are present versus broken down into
+>> pages.
 >
-> Thanks,
-> Laura
+> Well, it seems to have the same effect: without the alignment, a
+> portion of rodata may remain executable on arm64. Unless I
+> misunderstand?
+>
 
+No, on arm64 everything should always be NX, the difference is part of the NX
+sections may be mapped as pages instead of sections so you take the TLB hit.
+It's a trade off of memory vs TLB pressure instead of just security vs TLB.
 
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+Thanks,
+Laura
