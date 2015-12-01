@@ -1,96 +1,67 @@
-From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Tue,  1 Dec 2015 20:03:11 +0200
-Subject: [PATCH V2 09/19] ARM: dts: am57xx: cl-som-am57x: add touchscreen
- support
-In-Reply-To: <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
-References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
- <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1448993001-19495-10-git-send-email-lifshitz@compulab.co.il>
+From: dcashman@android.com (Daniel Cashman)
+Date: Tue, 1 Dec 2015 10:19:32 -0800
+Subject: [PATCH v4 4/4] x86: mm: support ARCH_MMAP_RND_BITS.
+In-Reply-To: <CAGXu5j+Wj_=27gsYStV5OuwNSznux7MtDcMuYe5wM2ORrna_TQ@mail.gmail.com>
+References: <1448578785-17656-1-git-send-email-dcashman@android.com>
+ <1448578785-17656-2-git-send-email-dcashman@android.com>
+ <1448578785-17656-3-git-send-email-dcashman@android.com>
+ <1448578785-17656-4-git-send-email-dcashman@android.com>
+ <1448578785-17656-5-git-send-email-dcashman@android.com>
+ <CAGXu5j+Wj_=27gsYStV5OuwNSznux7MtDcMuYe5wM2ORrna_TQ@mail.gmail.com>
+Message-ID: <565DE4B4.5050305@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ADS7846 touchscreen support.
+On 11/30/2015 04:03 PM, Kees Cook wrote:
+> On Thu, Nov 26, 2015 at 2:59 PM, Daniel Cashman <dcashman@android.com> wrote:
+>> diff --git a/arch/x86/mm/mmap.c b/arch/x86/mm/mmap.c
+>> index 844b06d..647fecf 100644
+>> --- a/arch/x86/mm/mmap.c
+>> +++ b/arch/x86/mm/mmap.c
+>> @@ -69,14 +69,14 @@ unsigned long arch_mmap_rnd(void)
+>>  {
+>>         unsigned long rnd;
+>>
+>> -       /*
+>> -        *  8 bits of randomness in 32bit mmaps, 20 address space bits
+>> -        * 28 bits of randomness in 64bit mmaps, 40 address space bits
+>> -        */
+>>         if (mmap_is_ia32())
+>> -               rnd = (unsigned long)get_random_int() % (1<<8);
+>> +#ifdef CONFIG_COMPAT
+>> +               rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_compat_bits);
+>> +#else
+>> +               rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_bits);
+>> +#endif
+>>         else
+>> -               rnd = (unsigned long)get_random_int() % (1<<28);
+>> +               rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_bits);
+>>
+>>         return rnd << PAGE_SHIFT;
+>>  }
+>> --
+>> 2.6.0.rc2.230.g3dd15c0
+>>
+> 
+> Can you rework this logic to look more like the arm64 one? I think
+> it's more readable as:
+> 
+> #ifdef CONFIG_COMPAT
+>     if (mmap_is_ia32())
+>             rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_compat_bits);
+>     else
+> #endif
+>             rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_bits);
+> 
+> -Kees
+> 
 
-Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
----
+There is a subtle difference between the two that requires this
+difference. the x86 code was written to be used by both 32-bit and
+64-bit kernels, whereas the arm64 code runs only for 64-bit.  The
+assumption I've made with arm64 is that TIF_32BIT should never be set if
+CONFIG_COMPAT is not set, but with x86 we could encounter a 32-bit
+application without CONFIG_COMPAT, in which case it should use the
+default mmap_rnd_bits, not compat, since there is no compat.
 
-  v2:
-
-   * No fuctional changes
-   * Reformat subject
-
- arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 44 +++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-index c603136..a75c382 100644
---- a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-+++ b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-@@ -43,6 +43,13 @@
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
- 	};
-+
-+	ads7846reg: fixedregulator-ads7846-reg {
-+		compatible = "regulator-fixed";
-+		regulator-name = "ads7846-reg";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
- };
- 
- &dra7_pmx_core {
-@@ -183,6 +190,12 @@
- 			DRA7XX_CORE_IOPAD(0x3594, PIN_INPUT | MUX_MODE15)
- 		>;
- 	};
-+
-+	ads7846_pins: pinmux_ads7846_pins {
-+		pinctrl-single,pins = <
-+			DRA7XX_CORE_IOPAD(0x3464, PIN_INPUT_PULLDOWN | MUX_MODE14) /* gpmc_a9.gpio1_31 */
-+		>;
-+	};
- };
- 
- &i2c1 {
-@@ -451,6 +464,37 @@
- 			reg = <0x100000 0x0>;
- 		};
- 	};
-+
-+	/* touch controller */
-+	ads7846 at 0 {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&ads7846_pins>;
-+
-+		compatible = "ti,ads7846";
-+		vcc-supply = <&ads7846reg>;
-+
-+		reg = <1>;                              /* CS1 */
-+		spi-max-frequency = <1500000>;
-+
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <31 0>;
-+		pendown-gpio = <&gpio1 31 0>;
-+
-+
-+		ti,x-min = /bits/ 16 <0x0>;
-+		ti,x-max = /bits/ 16 <0x0fff>;
-+		ti,y-min = /bits/ 16 <0x0>;
-+		ti,y-max = /bits/ 16 <0x0fff>;
-+
-+		ti,x-plate-ohms = /bits/ 16 <180>;
-+		ti,pressure-max = /bits/ 16 <255>;
-+
-+		ti,debounce-max = /bits/ 16 <30>;
-+		ti,debounce-tol = /bits/ 16 <10>;
-+		ti,debounce-rep = /bits/ 16 <1>;
-+
-+		linux,wakeup;
-+	};
- };
- 
- &mac {
--- 
-1.9.1
+-Dan
