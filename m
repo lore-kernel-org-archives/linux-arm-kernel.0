@@ -1,89 +1,74 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 1 Dec 2015 17:08:39 +0200
-Subject: [RFC PATCH] clocksource: ti-32k: convert to platform device
-In-Reply-To: <20151130162815.GA2517@atomide.com>
-References: <1448040129-23869-1-git-send-email-grygorii.strashko@ti.com>
- <87h9kgcz1k.fsf@saruman.tx.rr.com> <5658B8B2.5030505@ti.com>
- <20151130162815.GA2517@atomide.com>
-Message-ID: <565DB7F7.4020702@ti.com>
+From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
+Date: Tue, 1 Dec 2015 23:09:49 +0800
+Subject: [PATCH v6] clk: mediatek: Export CPU mux clocks for CPU frequency
+ control
+In-Reply-To: <CAGS+omCkYTPyjMk6QaoxGAL4QVU8VcpWyFqWhST+iP2EFRcRYg@mail.gmail.com>
+References: <1442230072-31593-1-git-send-email-pi-cheng.chen@linaro.org>
+ <CAGS+omCkYTPyjMk6QaoxGAL4QVU8VcpWyFqWhST+iP2EFRcRYg@mail.gmail.com>
+Message-ID: <CALx668XVnhhLJWs7RBxvaX=SU=S9=wFVT9HMDP2edqiH4Jio4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On 11/30/2015 06:28 PM, Tony Lindgren wrote:
-> * Grygorii Strashko <grygorii.strashko@ti.com> [151127 12:11]:
->> On 11/20/2015 08:21 PM, Felipe Balbi wrote:
->>> Grygorii Strashko <grygorii.strashko@ti.com> writes:
->>>> Since system clocksource is finally selected by Clocksource core at
->>>> fs_initcall stage during boot there are no reasons to initialize
->>>> ti_32k_timer at early boot stages. Hence, ti_32k_timer can be
->>>> converted to use platform device/driver model and its PM can be
->>>> implemented using PM runtime which is common for OMAP devices.
->>>>
->>>> Platform specific initialization code has to be disabled once as
->>>> ti_32k_timer is converted to platform device - otherwise OMAP platform
->>>> code will generate boot warnings.
->>>>
->>>> After this change, all counter_32k's platform code can be removed
->>>> once all OMAP boards will be converted to DT.
->>>>
->>>> Cc: Tony Lindgren <tony@atomide.com>
->>>> Cc: Felipe Balbi <balbi@ti.com>
->>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>>> ---
+On Mon, Nov 30, 2015 at 11:48 AM, Daniel Kurtz <djkurtz@chromium.org> wrote:
+> Hi Pi-Cheng and Michael,
+>
+> On Mon, Sep 14, 2015 at 7:27 PM, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
+>> From: "pi-cheng.chen" <pi-cheng.chen@linaro.org>
 >>
->> [...]
->>
->>>> +
->>>> +static struct platform_driver ti_32k_driver __initdata = {
->>>> +	.probe		= ti_32k_probe,
->>>> +	.driver		= {
->>>> +		.name	= "ti_32k_timer",
->>>> +		.of_match_table = of_match_ptr(ti_32k_of_table),
->>>> +	}
->>>> +};
->>>> +
->>>> +static int __init ti_32k_init(void)
->>>> +{
->>>> +	return platform_driver_register(&ti_32k_driver);
->>>>    }
->>>> -CLOCKSOURCE_OF_DECLARE(ti_32k_timer, "ti,omap-counter32k",
->>>> -		ti_32k_timer_init);
->>>> +
->>>> +subsys_initcall(ti_32k_init);
->>>> +
->>>> +MODULE_AUTHOR("Paul Mundt");
->>>> +MODULE_AUTHOR("Juha Yrj?l?");
->>>> +MODULE_DESCRIPTION("OMAP2 32k Timer");
->>>> +MODULE_ALIAS("platform:ti_32k_timer");
->>>> +MODULE_LICENSE("GPL v2");
->>>
->>> this will break clksource_of_init(), right ? Eventually, we want that to
->>> be the only thing called by our .init_time method. I'll leave it to Tony
->>> to decide, but IMO this is not a good path forward for timers.
->>>
->>
->> Yeh :(.  I did additional tests, and, unfortunately, this can't be used as is.
->> But not because of clocksource_of_init() which will just produce boot warning.
->> It can't be done because of sched_clock_register() which is expected to be
->> called during early boot time only and with disabled IRQs.
->>
->> It was so tempting to try :)
-> 
-> We should be able to make this into an early_platform_device and just
-> have it depend on the source clock muxes. See the omap initcall changes
-> patches I just posted.
-> 
+>> This patch adds CPU mux clocks which are used by Mediatek cpufreq driver
+>> for intermediate clock source switching.
+>
+> It looks like this patch was never picked up.
+> It is required for MT8173 cpufreq.
+>
+> What is the plan to get this one merged?
 
-Sry, may be I've missed smth, but how early_platform_device will help us
-to get rid of platform code - We'd still need to power on manually 
-early_platform_device's from platform code :( through hwmod.
+Hi Dan,
+Mike is working on a new CCF feature called "coordinated clock rate changes"
+which would help to migrate mt8173-cpufreq driver to generic cpufreq-dt
+driver, and I am working with him to port MT8173 clock driver on the new
+feature. So I think that's why this patch was not picked since it will
+be migrated to new implementation once the new feature's ready.
 
-The main reason why I've tried this is because clocksource will be really selected
-only at fs_initcall time - and at that time we have no restriction for using platform
-devices, Pm runtime APIs, etc. (exception/blocker is sched_clock :().
+@Mike:
+Are you plannig to post those patches on the mailing list ?
+Or is it fine for you to take this first and then I will refine it for
+the new feature later?
 
--- 
-regards,
--grygorii
+Best Regards,
+Pi-Cheng
+
+>
+> -Dan
+>
+>>
+>> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+>> ---
+>> Changes in v6:
+>> - Relace __clk_get_num_parents with clk_hw_get_num_parents to reflect
+>>   API change
+>>
+>> Changes in v5:
+>> - Replace __initdata with __initconst to fix compiling error
+>>
+>> Changes in v4:
+>> - Fix some minor issues for v3
+>> - Rebase to the patch that adds 13mhz clock for MT8173[1]
+>>
+>> Changes in v3:
+>> - Rebase to 4.2-rc1
+>> - Fix some issues of v2
+>>
+>> Changes in v2:
+>> - Remove use of .determine_rate callback
+>> ---
+>>  drivers/clk/mediatek/Makefile          |   2 +-
+>>  drivers/clk/mediatek/clk-cpumux.c      | 127 +++++++++++++++++++++++++++++++++
+>>  drivers/clk/mediatek/clk-cpumux.h      |  22 ++++++
+>>  drivers/clk/mediatek/clk-mt8173.c      |  23 ++++++
+>>  include/dt-bindings/clock/mt8173-clk.h |   4 +-
+>>  5 files changed, 176 insertions(+), 2 deletions(-)
+>>  create mode 100644 drivers/clk/mediatek/clk-cpumux.c
+>>  create mode 100644 drivers/clk/mediatek/clk-cpumux.h
+>
+> [snip]
