@@ -1,59 +1,49 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Tue,  1 Dec 2015 20:03:05 +0200
-Subject: [PATCH V2 03/19] ARM: dts: am57xx: cl-som-am57x: add I2C3 support
+Date: Tue,  1 Dec 2015 20:03:10 +0200
+Subject: [PATCH V2 08/19] ARM: dts: am57xx: cl-som-am57x: add USB support
 In-Reply-To: <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
 References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
  <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1448993001-19495-4-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1448993001-19495-9-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable I2C3 bus and add appropriate pinmux.
+Add USB support.
 
 Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
 Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 ---
-
   v2:
 
    * No fuctional changes
-   * Refactor patch with respect to the previous changes in I2C4 node structure
    * Reformat subject
 
- arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
 diff --git a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-index 58156a9..2074fd4 100644
+index fe4baba..c603136 100644
 --- a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
 +++ b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
-@@ -52,6 +52,13 @@
- 		>;
- 	};
- 
-+	i2c3_pins_default: i2c3_pins_default {
-+		pinctrl-single,pins = <
-+			DRA7XX_CORE_IOPAD(0x36a4, PIN_INPUT| MUX_MODE10)	/* mcasp1_aclkx.i2c3_sda */
-+			DRA7XX_CORE_IOPAD(0x36a8, PIN_INPUT| MUX_MODE10)	/* mcasp1_fsx.i2c3_scl */
-+		>;
-+	};
-+
- 	i2c4_pins_default: i2c4_pins_default {
- 		pinctrl-single,pins = <
- 			DRA7XX_CORE_IOPAD(0x36ac, PIN_INPUT| MUX_MODE10)	/* mcasp1_acl.i2c4_sda */
-@@ -73,6 +80,13 @@
- 	clock-frequency = <400000>;
+@@ -478,3 +478,19 @@
+ 	pinctrl-0 = <&davinci_mdio_pins_default>;
+ 	pinctrl-1 = <&davinci_mdio_pins_sleep>;
  };
- 
-+&i2c3 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c3_pins_default>;
-+	clock-frequency = <400000>;
++
++&usb2_phy1 {
++	phy-supply = <&ldousb_reg>;
 +};
 +
- &i2c4 {
- 	status = "okay";
- 	pinctrl-names = "default";
++&usb2_phy2 {
++	phy-supply = <&ldousb_reg>;
++};
++
++&usb1 {
++	dr_mode = "host";
++};
++
++&usb2 {
++	dr_mode = "peripheral";
++};
 -- 
 1.9.1
