@@ -1,89 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 01 Dec 2015 21:17:06 +0100
-Subject: [RFC v02 00/15] dmaengine: New 'universal' API for requesting
- channel
-In-Reply-To: <20151201165954.GA1696@localhost>
-References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
- <20151201165954.GA1696@localhost>
-Message-ID: <3124382.EhiMyQGKTA@wuerfel>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 2 Dec 2015 04:20:11 +0800
+Subject: [PATCH] reset: Introduce static inline dummy function when
+ CONFIG_RESET_CONTROLLER
+In-Reply-To: <1448984088-31904-1-git-send-email-nm@ti.com>
+Message-ID: <201512020452.RzkhnbRw%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 December 2015 22:29:54 Vinod Koul wrote:
-> On Mon, Nov 30, 2015 at 03:45:30PM +0200, Peter Ujfalusi wrote:
-> > channel via DT, ACPI or in case if the kernel booted in non DT/ACPI mode
-> > it will use a filter lookup table and retrieves the needed information from
-> > the dma_filter_map provided by the DMA drivers.
-> 
-> That sounds right, for the third case would the arch, driver or someone else
-> configure this?
+Hi Nishanth,
 
-The typical case is for the configuration to be defined in arch or platform
-code and passed down to the dmaengine driver.
+[auto build test WARNING on: v4.4-rc3]
+[also build test WARNING on: next-20151127]
 
-I just noticed that the text above (and probably the code too) should
-be changed so we always fall back to this. There are cases where the
-platform is booted with DT in principle, but the DMA engine does not
-(yet) use DT and still wants to be converted. I think we can easily
-handle that case by always trying this if the other methods fail.
+url:    https://github.com/0day-ci/linux/commits/Nishanth-Menon/reset-Introduce-static-inline-dummy-function-when-CONFIG_RESET_CONTROLLER/20151201-233708
+reproduce:
+        # apt-get install sparse
+        make ARCH=x86_64 allmodconfig
+        make C=1 CF=-D__CHECK_ENDIAN__
 
-> > This legacy mode needs changes in platform code, in dmaengine drivers and
-> > finally the dmaengine user drivers can be converted:
-> 
-> Are you marking the current APIs as dericated in the end of this series
 
-I think we practically stopped marking things as deprecated in general.
-Per Linus decree, whenever we want to get rid of something, we should
-instead change all users in tree and then remove the API, expecting
-driver maintainers to do something just because you marked it as deprecated
-often doesn't work.
+sparse warnings: (new ones prefixed by >>)
 
-I can help out converting a few platforms, maybe one interface at a time.
-This is what I see:
+>> include/linux/reset-controller.h:1:2: sparse: unterminated preprocessor conditional
+   include/linux/compiler.h:228:8: sparse: attribute 'no_sanitize_address': unknown attribute
+   In file included from drivers/reset/core.c:18:0:
+   include/linux/reset-controller.h:1:0: error: unterminated #ifndef
+    #ifndef _LINUX_RESET_CONTROLLER_H_
+    ^
+--
+>> include/linux/reset-controller.h:1:2: sparse: unterminated preprocessor conditional
+>> include/linux/reset-controller.h:1:2: sparse: unterminated preprocessor conditional
+   include/linux/compiler.h:228:8: sparse: attribute 'no_sanitize_address': unknown attribute
+   In file included from drivers/clk/qcom/reset.c:17:0:
+   include/linux/reset-controller.h:1:0: error: unterminated #ifndef
+    #ifndef _LINUX_RESET_CONTROLLER_H_
+    ^
+   In file included from drivers/clk/qcom/reset.h:17:0,
+                    from drivers/clk/qcom/reset.c:20:
+   include/linux/reset-controller.h:1:0: error: unterminated #ifndef
+    #ifndef _LINUX_RESET_CONTROLLER_H_
+    ^
 
-arnd at wuerfel:~/arm-soc$ for i in dma_request_slave_channel_reason dma_request_slave_channel dma_request_slave_channel_compat dma_request_channel  ; do echo `git grep -wl $i drivers/  | grep -v drivers/dma | wc -l`\      $i ; done
-14      dma_request_slave_channel_reason
-27      dma_request_slave_channel
-25      dma_request_slave_channel_compat
-34      dma_request_channel
+vim +1 include/linux/reset-controller.h
 
-I would probably leave the users of dma_request_channel() while converting
-the others, as that is still used by all the platforms that don't use any DT
-support.
+61fc4131 Philipp Zabel 2012-11-19 @1  #ifndef _LINUX_RESET_CONTROLLER_H_
+61fc4131 Philipp Zabel 2012-11-19  2  #define _LINUX_RESET_CONTROLLER_H_
+61fc4131 Philipp Zabel 2012-11-19  3  
+61fc4131 Philipp Zabel 2012-11-19  4  #include <linux/list.h>
+61fc4131 Philipp Zabel 2012-11-19  5  
+61fc4131 Philipp Zabel 2012-11-19  6  struct reset_controller_dev;
+61fc4131 Philipp Zabel 2012-11-19  7  
+61fc4131 Philipp Zabel 2012-11-19  8  /**
+61fc4131 Philipp Zabel 2012-11-19  9   * struct reset_control_ops
 
-Changing dma_request_slave_channel_reason and dma_request_slave_channel is
-trivial, we can probably use coccinelle for that, as it does not require
-any platform changes. That brings us to the users of
-dma_request_slave_channel_compat, which currently includes these files:
+:::::: The code at line 1 was first introduced by commit
+:::::: 61fc41317666be400802ac793f47de816ef7bd57 reset: Add reset controller API
 
-$ git grep -wl dma_request_slave_channel_compat drivers/ata/pata_pxa.c
-drivers/crypto/atmel-aes.c
-drivers/crypto/atmel-sha.c
-drivers/crypto/atmel-tdes.c
-drivers/crypto/omap-aes.c
-drivers/crypto/omap-des.c
-drivers/crypto/omap-sham.c
-drivers/media/platform/omap3isp/isphist.c
-drivers/mmc/host/davinci_mmc.c
-drivers/mmc/host/omap.c
-drivers/mmc/host/omap_hsmmc.c
-drivers/mmc/host/pxamci.c
-drivers/mmc/host/s3cmci.c
-drivers/mmc/host/tmio_mmc_dma.c
-drivers/mtd/nand/pxa3xx_nand.c
-drivers/net/ethernet/smsc/smc91x.c
-drivers/net/irda/pxaficp_ir.c
-drivers/spi/spi-omap2-mcspi.c
-drivers/spi/spi-pxa2xx-dma.c
-drivers/spi/spi-rspi.c
-drivers/spi/spi-s3c64xx.c
-drivers/spi/spi-sh-msiof.c
-drivers/tty/serial/8250/8250_dma.c
-drivers/tty/serial/samsung.c
-drivers/tty/serial/sh-sci.c
-include/linux/dmaengine.h
+:::::: TO: Philipp Zabel <p.zabel@pengutronix.de>
+:::::: CC: Philipp Zabel <p.zabel@pengutronix.de>
 
-In other words: arch/avr32 and arch/sh along with omap1, omap2, davinci, pxa, and s3c
-in terms of ARM platforms.
-
-	Arnd
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
