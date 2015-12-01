@@ -1,39 +1,60 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 1 Dec 2015 16:17:56 +0300
-Subject: [PATCH 1/6] net: thunderx: Force to load octeon-mdio before bgx
- driver.
-In-Reply-To: <1448961223-41888-2-git-send-email-sunil.kovvuri@gmail.com>
-References: <y> <1448961223-41888-2-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <565D9E04.8010203@cogentembedded.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Tue, 01 Dec 2015 13:19:24 +0000
+Subject: [PATCH v2 08/21] arm64: KVM: Implement debug save/restore
+In-Reply-To: <565D9B57.2080005@arm.com>
+References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+ <1448650215-15218-9-git-send-email-marc.zyngier@arm.com>
+ <20151201125639.GP11704@cbox> <565D9B57.2080005@arm.com>
+Message-ID: <871tb6b92b.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
 
-On 12/1/2015 12:13 PM, Sunil Goutham wrote:
+Marc Zyngier <marc.zyngier@arm.com> writes:
 
-> From: Thanneeru Srinivasulu <tsrinivasulu@caviumnetworks.com>
+> On 01/12/15 12:56, Christoffer Dall wrote:
+>> On Fri, Nov 27, 2015 at 06:50:02PM +0000, Marc Zyngier wrote:
+>>> Implement the debug save restore as a direct translation of
+>>> the assembly code version.
+>>>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>  arch/arm64/kvm/hyp/Makefile   |   1 +
+>>>  arch/arm64/kvm/hyp/debug-sr.c | 130 ++++++++++++++++++++++++++++++++++++++++++
+>>>  arch/arm64/kvm/hyp/hyp.h      |   9 +++
+>>>  3 files changed, 140 insertions(+)
+>>>  create mode 100644 arch/arm64/kvm/hyp/debug-sr.c
+<snip>
+>>> +void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
+>>> +{
+>>> +	if ((vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_KDE) ||
+>>> +	    (vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_KDE))
+
+I've just noticed I'm seeing double here. Did a DBG_MDSCR_MDE can
+transliterated here?
+
+>>> +		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
+>>> +
+>>> +	__debug_save_state(vcpu, &vcpu->arch.host_debug_state,
+>>> +			   kern_hyp_va(vcpu->arch.host_cpu_context));
+>>
+>> doesn't the assmebly code jump across saving this state neither bits are
+>> set where this always saves the state?
 >
-> Signed-off-by: Thanneeru Srinivasulu <tsrinivasulu@caviumnetworks.com>
-> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
-> ---
->   drivers/net/ethernet/cavium/thunder/thunder_bgx.c |    3 +++
->   drivers/net/ethernet/cavium/thunder/thunder_bgx.h |    1 +
->   2 files changed, 4 insertions(+), 0 deletions(-)
+> It doesn't. The save/restore functions are guarded by tests on
+> KVM_ARM64_DEBUG_DIRTY, just like we have skip_debug_state on all actions
+> involving the save/restore in the assembly version.
 >
-> diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-> index 180aa9f..1fb72dd 100644
-> --- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-> +++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-> @@ -1009,6 +1009,9 @@ static int bgx_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
->   	struct bgx *bgx = NULL;
->   	u8 lmac;
+>> in any case, I feel some context is lost when this is moved away from
+>> assembly and understanding this patch would be easier if the semantics
+>> of these two _cond functions were documented.
 >
-> +	/*Load octeon mdio driver*/
+> I can migrate the existing comments if you think that helps.
+>
+> Thanks,
+>
+> 	M.
 
-    Please insert spaces after /* and before */ (unless it's a common comment 
-style in this driver).
 
-[...]
-
-MBR, Sergei
+--
+Alex Benn?e
