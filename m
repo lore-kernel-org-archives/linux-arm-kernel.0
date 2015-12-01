@@ -1,22 +1,133 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 1 Dec 2015 15:15:23 +0000
-Subject: [PATCH v2 0/6] arm64: cpufeature: Add sanity check for ASIDBits
-In-Reply-To: <1448982731-17182-1-git-send-email-suzuki.poulose@arm.com>
-References: <1448982731-17182-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <565DB98B.9090504@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 1 Dec 2015 16:23:09 +0100
+Subject: [PATCH v3 1/3] driver core: handle -EPROBE_DEFER from
+ bus_type.match()
+In-Reply-To: <1448976866-7892-2-git-send-email-m.szyprowski@samsung.com>
+References: <1448976866-7892-1-git-send-email-m.szyprowski@samsung.com>
+ <1448976866-7892-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAPDyKFrd=mcWN2Bo7aAnVoyOh_gjkmnsmoqq15bYq+LQno=QpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/15 15:12, Suzuki K. Poulose wrote:
-> This series adds support for verifying some of the cpufeatures
-> that are decided early in the boot process based on the boot
-> CPU and cannot be delayed (e.g, ASIDBits and may be VHE?). It also
-> adds one of the users of this early hook, check for ASIDBits.
+On 1 December 2015 at 14:34, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> From: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>
+> Allow implementations of the match() callback in struct bus_type to
+> return errors and if it's -EPROBE_DEFER then queue the device for
+> deferred probing.
+>
+> This is useful to buses such as AMBA in which devices are registered
+> before their matching information can be retrieved from the HW
+> (typically because a clock driver hasn't probed yet).
+>
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> [changed if-else code structure, adjusted documentation to match the code]
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  Documentation/driver-model/porting.txt |  6 ++++--
+>  drivers/base/dd.c                      | 24 ++++++++++++++++++++++--
+>  include/linux/device.h                 |  2 +-
+>  3 files changed, 27 insertions(+), 5 deletions(-)
+>
+> diff --git a/Documentation/driver-model/porting.txt b/Documentation/driver-model/porting.txt
+> index 92d86f7..453053f 100644
+> --- a/Documentation/driver-model/porting.txt
+> +++ b/Documentation/driver-model/porting.txt
+> @@ -340,8 +340,10 @@ comparison:
+>
+>    int (*match)(struct device * dev, struct device_driver * drv);
+>
+> -match should return '1' if the driver supports the device, and '0'
+> -otherwise.
+> +match should return positive value if the driver supports the device,
+> +and zero otherwise. It may also return error code (for example
+> +-EPROBE_DEFER) if determining that given driver supports the device is
+> +not possible.
+>
+>  When a device is registered, the bus's list of drivers is iterated
+>  over. bus->match() is called for each one until a match is found.
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> index a641cf3..793e915 100644
+> --- a/drivers/base/dd.c
+> +++ b/drivers/base/dd.c
+> @@ -490,6 +490,7 @@ static int __device_attach_driver(struct device_driver *drv, void *_data)
+>         struct device_attach_data *data = _data;
+>         struct device *dev = data->dev;
+>         bool async_allowed;
+> +       int ret;
+>
+>         /*
+>          * Check if device has already been claimed. This may
+> @@ -500,8 +501,17 @@ static int __device_attach_driver(struct device_driver *drv, void *_data)
+>         if (dev->driver)
+>                 return -EBUSY;
+>
+> -       if (!driver_match_device(drv, dev))
+> +       ret = driver_match_device(drv, dev);
+> +       if (ret == 0) {
+> +               /* no match */
+>                 return 0;
+> +       } else if (ret == -EPROBE_DEFER) {
+> +               dev_dbg(dev, "Device match requests probe deferral\n");
+> +               driver_deferred_probe_add(dev);
+> +       } else if (ret < 0) {
+> +               dev_dbg(dev, "Bus failed to match device: %d", ret);
+> +               return ret;
+> +       } /* ret > 0 means positive match */
+>
+>         async_allowed = driver_allows_async_probing(drv);
+>
+> @@ -621,6 +631,7 @@ void device_initial_probe(struct device *dev)
+>  static int __driver_attach(struct device *dev, void *data)
+>  {
+>         struct device_driver *drv = data;
+> +       int ret;
+>
+>         /*
+>          * Lock device and try to bind to it. We drop the error
+> @@ -632,8 +643,17 @@ static int __driver_attach(struct device *dev, void *data)
+>          * is an error.
+>          */
+>
+> -       if (!driver_match_device(drv, dev))
+> +       ret = driver_match_device(drv, dev);
+> +       if (ret == 0) {
+> +               /* no match */
+>                 return 0;
+> +       } else if (ret == -EPROBE_DEFER) {
+> +               dev_dbg(dev, "Device match requests probe deferral\n");
+> +               driver_deferred_probe_add(dev);
+> +       } else if (ret < 0) {
+> +               dev_dbg(dev, "Bus failed to match device: %d", ret);
+> +               return ret;
+> +       } /* ret > 0 means positive match */
+>
+>         if (dev->parent)        /* Needed for USB */
+>                 device_lock(dev->parent);
+> diff --git a/include/linux/device.h b/include/linux/device.h
+> index b8f411b..d4e7d1f 100644
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -70,7 +70,7 @@ extern void bus_remove_file(struct bus_type *, struct bus_attribute *);
+>   * @dev_groups:        Default attributes of the devices on the bus.
+>   * @drv_groups: Default attributes of the device drivers on the bus.
+>   * @match:     Called, perhaps multiple times, whenever a new device or driver
+> - *             is added for this bus. It should return a nonzero value if the
+> + *             is added for this bus. It should return a positive value if the
 
-Catalin,
+Perhaps add some more information about what happens when returning
+error codes!?
 
-This is based on 4.4-rc3 and adds the ASIDBits check, which was missed
-in the cpufeature infrastructure series.
+>   *             given device can be handled by the given driver.
+>   * @uevent:    Called when a device is added, removed, or a few other things
+>   *             that generate uevents to add the environment variables.
+> --
+> 1.9.2
+>
 
-Thanks
-Suzuki
+Besides the minor nit above, you may add my:
+
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+
+Kind regards
+Uffe
