@@ -1,23 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 01 Dec 2015 12:50:29 +0100
-Subject: [PATCH v3 0/3] Remove ARCH_MSM* configs
-In-Reply-To: <1448933123-9843-1-git-send-email-sboyd@codeaurora.org>
-References: <1448933123-9843-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <4507574.IoXDhs75Z7@wuerfel>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 1 Dec 2015 12:52:20 +0100
+Subject: arm64 boot requirements
+In-Reply-To: <20151201110159.GA4757@leverpostej>
+References: <565BAA2E.5090102@cog.systems> <20151201110159.GA4757@leverpostej>
+Message-ID: <CAKv+Gu_2ufc_q5OsGDsGUqfEieCHc++-r2zxrpDpHcMbZyS_aQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 30 November 2015 17:25:20 Stephen Boyd wrote:
-> This patch series allows us to remove the ARCH_MSM* configs that live
-> in mach-qcom/Kconfig. They're mostly proxy configs for user selectable
-> clocksource configurations anyway.
-> 
-> 
+On 1 December 2015 at 12:02, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
+>
+> On Mon, Nov 30, 2015 at 12:45:18PM +1100, Carl van Schaik wrote:
+>> In commit bd00cd5f8c8c3c282bb1e1eac6a6679a4f808091, the idmap_pg_dir
+>> and swapper_pg_dir where moved from before the kernel to after it.
+>>
+>> The problem is that these symbols fall outside the range covered by
+>> the ELF file - outside of any section.
+>>
+>> A bootloader which loads the kernel ELF file and dynamically
+>> determines where to place the DTB, may try place it after the
+>> kernel. We've just run into this problem and the DTB gets
+>> overwritten as soon as the pagetables are created.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Could you explain why you are using the ELF file and not the binary image file?
+This is not future proof: currently, the Image is a straight binary
+objcopy of vmlinux, but that is not guaranteed to remain that way.
+Things like KASLR may require post build steps that mangle vmlinux or
+Image afterwards.
 
-I suppose we could have a QCOM_B_FAMILY option as well, but it looks
-like we don't need that. Maybe mention in the help text that B_FAMILY
-is always supported.
+>
+> We had similar issues with the BSS when booting Image files prior to
+> this and commit a2c1d73b94ed49f5 ("arm64: Update the Image header").
+> Since then, the image_size field in the Image header tells you how much
+> memory the kernel may clobber (including the BSS and page tables).
+>
+> Prior to that, the page tables were below the kernel, and also not
+> described in any ELF section.
+>
+> Others booting the kernel vmlinux haven't reported similar issues, so I
+> assume that either they are parsing the Image header, or getting lucky.
+> Parsing the header is necessary to get the correct text offset, too...
+>
+> Pratyush, Geoff, I understood you were loading the kernel vmlinux for
+> kexec. Do you parse the Image header to figure out where to place
+> things?
+>
+>> I'd suggest that the kernel either:
+>>  A. document this boot requirement for where not to load a DTB
+>
+> Do you have any particular suggestion?
+>
+> We already describe the Image footprint (including BSS and page tables)
+> by the image_size in the Image header, which is sufficient. The size of
+> the BSS and page tables is effectively unbound, so we can't define some
+> upper bound that will always be true.
+>
+> The documentation is written on the assumption that an Image file is
+> being used rather than a vmlinux. Perhaps that is something to consider.
+>
+>>  B. update the vmlinux.lds.S such that these symbols (and _end) are
+>> properly covered by a section in the ELF, and thus preventing this
+>> issue.
+>
+> I'm worried that this only solves this one case, and it means that there
+> are two (potentially conflicting) sources of information that a
+> bootloader might be using -- the ELF or the Image header. I don't want
+> to have to duplicate text_offset and so on, which implies that parsing
+> the Image header is necessary anyway.
+>
+> That's something we can discuss if you send a patch (inline rather than
+> attached).
+>
 
-	Arnd
+I think updating the linker script to put the page tables into a
+.pgdir section is reasonable, since it is part of the static footprint
+of the kernel.
+
+However, I strongly feel that the Image header should remain the
+authoritative source of information regarding the nature (big/little
+endian, page size) and the static footprint of the Image .
