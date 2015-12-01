@@ -1,60 +1,41 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue,  1 Dec 2015 15:38:14 -0800
-Subject: [PATCH 01/10] ARM: OMAP2+: Fix timer entries for dm814x
+Date: Tue,  1 Dec 2015 15:38:17 -0800
+Subject: [PATCH 04/10] ARM: OMAP2+: Enable GPIO for dm814x
 In-Reply-To: <1449013103-23238-1-git-send-email-tony@atomide.com>
 References: <1449013103-23238-1-git-send-email-tony@atomide.com>
-Message-ID: <1449013103-23238-2-git-send-email-tony@atomide.com>
+Message-ID: <1449013103-23238-5-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's a mux after the oscillator similar to am335x. I did not
-notice this on hp t410 as it boots even with no clocks configured.
+With the basic clocks now working we can enable GPIO.
 
 Cc: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_81xx_data.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-index 6256052..d5246b3 100644
+index d5246b3..1b96cdf 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-@@ -599,7 +599,7 @@ static struct omap_timer_capability_dev_attr capability_alwon_dev_attr = {
- static struct omap_hwmod dm814x_timer1_hwmod = {
- 	.name		= "timer1",
- 	.clkdm_name	= "alwon_l3s_clkdm",
--	.main_clk	= "timer_sys_ck",
-+	.main_clk	= "timer1_fck",
- 	.dev_attr	= &capability_alwon_dev_attr,
- 	.class		= &dm816x_timer_hwmod_class,
- 	.flags		= HWMOD_NO_IDLEST,
-@@ -608,7 +608,7 @@ static struct omap_hwmod dm814x_timer1_hwmod = {
- static struct omap_hwmod_ocp_if dm814x_l4_ls__timer1 = {
- 	.master		= &dm81xx_l4_ls_hwmod,
- 	.slave		= &dm814x_timer1_hwmod,
--	.clk		= "timer_sys_ck",
-+	.clk		= "timer1_fck",
- 	.user		= OCP_USER_MPU,
- };
+@@ -1230,8 +1230,6 @@ static struct omap_hwmod_ocp_if dm81xx_tptc3__alwon_l3_fast = {
  
-@@ -636,7 +636,7 @@ static struct omap_hwmod_ocp_if dm816x_l4_ls__timer1 = {
- static struct omap_hwmod dm814x_timer2_hwmod = {
- 	.name		= "timer2",
- 	.clkdm_name	= "alwon_l3s_clkdm",
--	.main_clk	= "timer_sys_ck",
-+	.main_clk	= "timer2_fck",
- 	.dev_attr	= &capability_alwon_dev_attr,
- 	.class		= &dm816x_timer_hwmod_class,
- 	.flags		= HWMOD_NO_IDLEST,
-@@ -645,7 +645,7 @@ static struct omap_hwmod dm814x_timer2_hwmod = {
- static struct omap_hwmod_ocp_if dm814x_l4_ls__timer2 = {
- 	.master		= &dm81xx_l4_ls_hwmod,
- 	.slave		= &dm814x_timer2_hwmod,
--	.clk		= "timer_sys_ck",
-+	.clk		= "timer2_fck",
- 	.user		= OCP_USER_MPU,
- };
- 
+ /*
+  * REVISIT: Test and enable the following once clocks work:
+- * dm81xx_l4_ls__gpio1
+- * dm81xx_l4_ls__gpio2
+  * dm81xx_l4_ls__mailbox
+  * dm81xx_alwon_l3_slow__gpmc
+  * dm81xx_default_l3_slow__usbss
+@@ -1250,6 +1248,8 @@ static struct omap_hwmod_ocp_if *dm814x_hwmod_ocp_ifs[] __initdata = {
+ 	&dm81xx_l4_ls__wd_timer1,
+ 	&dm81xx_l4_ls__i2c1,
+ 	&dm81xx_l4_ls__i2c2,
++	&dm81xx_l4_ls__gpio1,
++	&dm81xx_l4_ls__gpio2,
+ 	&dm81xx_l4_ls__elm,
+ 	&dm81xx_l4_ls__mcspi1,
+ 	&dm81xx_alwon_l3_fast__tpcc,
 -- 
 2.6.2
