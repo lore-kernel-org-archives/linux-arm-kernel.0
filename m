@@ -1,56 +1,48 @@
-From: xuejiancheng@huawei.com (xuejiancheng)
-Date: Tue, 1 Dec 2015 10:56:04 +0800
-Subject: [PATCH 2/5] ARM: hisi: enable Hi3519 soc
-In-Reply-To: <7hlh9f828y.fsf@deeprootsystems.com>
-References: <1448694937-31282-1-git-send-email-xuejiancheng@huawei.com>
- <7hlh9f828y.fsf@deeprootsystems.com>
-Message-ID: <565D0C44.6010502@huawei.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Tue, 01 Dec 2015 08:31:23 +0530
+Subject: arm64: dts: qcom: Add apq8096 dragonboard dts skeletons
+In-Reply-To: <20151130234817.GC21446@codeaurora.org>
+References: <1448517238-32338-1-git-send-email-rnayak@codeaurora.org>
+ <20151130234817.GC21446@codeaurora.org>
+Message-ID: <565D0D83.201@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
-   Thank you for your suggestions.
 
-On 2015/12/1 8:02, Kevin Hilman wrote:
-> Jiancheng Xue <xuejiancheng@huawei.com> writes:
-> 
->> Hi3519 SOC is mainly used for ip camera and sport dv
->> solutions.
+On 12/01/2015 05:18 AM, Stephen Boyd wrote:
+> On 11/26, Rajendra Nayak wrote:
+>> Add new dtsi and dts files for the apq8096 dragonboards with just
+>> a serial device used as debug console
 >>
->> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+>> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 >> ---
->>  arch/arm/mach-hisi/Kconfig     | 9 +++++++++
->>  arch/arm/mach-hisi/hisilicon.c | 9 +++++++++
->>  2 files changed, 18 insertions(+)
+>> Patch applies on top of Stephens' patches to add msm8996 dtsi
+>> https://lkml.org/lkml/2015/11/17/955
 >>
->> diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
->> index 83061ad..6bb822c 100644
->> --- a/arch/arm/mach-hisi/Kconfig
->> +++ b/arch/arm/mach-hisi/Kconfig
->> @@ -48,6 +48,15 @@ config ARCH_HIX5HD2
->>  	select PINCTRL_SINGLE
->>  	help
->>  	  Support for Hisilicon HIX5HD2 SoC family
->> +
->> +config ARCH_HI3519
+>>  arch/arm64/boot/dts/qcom/Makefile                 |  2 +-
+>>  arch/arm64/boot/dts/qcom/apq8096-dragonboard.dts  | 21 ++++++++++++++++
+>>  arch/arm64/boot/dts/qcom/apq8096-dragonboard.dtsi | 30 +++++++++++++++++++++++
+>>  3 files changed, 52 insertions(+), 1 deletion(-)
+>>  create mode 100644 arch/arm64/boot/dts/qcom/apq8096-dragonboard.dts
+>>  create mode 100644 arch/arm64/boot/dts/qcom/apq8096-dragonboard.dtsi
+>>
+>> diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
+>> index fa1f661..bd992ef 100644
+>> --- a/arch/arm64/boot/dts/qcom/Makefile
+>> +++ b/arch/arm64/boot/dts/qcom/Makefile
+>> @@ -1,5 +1,5 @@
+>>  dtb-$(CONFIG_ARCH_QCOM)	+= apq8016-sbc.dtb msm8916-mtp.dtb
+>> -dtb-$(CONFIG_ARCH_QCOM)	+= msm8996-mtp.dtb
+>> +dtb-$(CONFIG_ARCH_QCOM)	+= msm8996-mtp.dtb apq8096-dragonboard.dtb
 > 
-> Please keep these sorted alphabetically.
+> We should move to one dtb per line in this file. Other platforms
+> are doing the same thing.
 
-Sorry about that. I will correct it in next version.
+Sure, will repost with the change. I just saw the 8916/8016 ones were all in
+a single line so did the same.
 
-> 
-> Speaking of which, there is already an existing ARCH_HI3xxx entry.
-> Should this be included in that family?   If not, maybe the HI3xxx
-> should be renamed HI36xx ?
-
-ARCH_HI3xxx just represents Hi36xx mobile soc family. Hi3519 is not included.
-It's good advice to rename HI3xxx to HI36xx.
-
-> Kevin
-> 
-> .
 > 
 
-Many thanks,
-
-Jiacheng
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
