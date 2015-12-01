@@ -1,74 +1,78 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 1 Dec 2015 09:06:17 +0100
-Subject: [PATCH] ARM: shmobile: alt: Add QSPI device to DT
-In-Reply-To: <20151201064149.GH16260@verge.net.au>
-References: <1448863990-16276-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdWnyZbHiLEPn-6dEweBEXHzWr6o2KF2iCpzg2-OhZRVSw@mail.gmail.com>
- <20151201064149.GH16260@verge.net.au>
-Message-ID: <CAMuHMdXgr5FbS0_L8g0xdesFZ-utPH+G8VgXQKqXZd3t4OsXcw@mail.gmail.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Tue, 01 Dec 2015 16:07:02 +0800
+Subject: [RFC PATCH 8/9] drm: bridge/dw_hdmi: Covert to support atomic API
+In-Reply-To: <20151201072128.GF17050@phenom.ffwll.local>
+References: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>
+ <1448940953-23604-1-git-send-email-mark.yao@rock-chips.com>
+ <20151201072128.GF17050@phenom.ffwll.local>
+Message-ID: <565D5526.7030009@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Tue, Dec 1, 2015 at 7:41 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Mon, Nov 30, 2015 at 09:34:10AM +0100, Geert Uytterhoeven wrote:
->> On Mon, Nov 30, 2015 at 7:13 AM, Simon Horman
->> <horms+renesas@verge.net.au> wrote:
->> > Enable the QSPI controller in the alt device tree.
->> >
->> > Based similar work for the silk board by by Vladimir Barinov and
->> > Sergei Shtylyov.
->> >
->> > Cc: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->> > Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On 2015?12?01? 15:21, Daniel Vetter wrote:
+> On Tue, Dec 01, 2015 at 11:35:53AM +0800, Mark Yao wrote:
+>> Fill atomic needed funcs with default atomic helper library.
 >>
->> Verified against Alt schematics and r8a7794 datasheet.
+>> Rockchip use dw_hdmi, and drm/rockchip will covert to atomic api,
+>> we need dw_hdmi support atomic funcs.
 >>
->> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> Aren't there drivers around which use dw_hdmi and which are still not yet
+> atomic? This would break them. I think we neeed two connector_func tables
+> and dw_hdmi needs to check for DRIVER_ATOMIC at runtime and pick the right
+> version.
+
+Right, another drm driver use dw_hdmi is imx, not yet atomic, this would 
+break it.
+as you said, I would resend a patch to check DRIVER_ATOMIC at runtime.
+
+Thanks
+-Mark
+
+>
+> The larger problem here is that "who should register the drm_connector" is
+> a bit an unsolved problem, since both the bridge and the driver should be
+> able to customize/adjust the drm_connector at the end of a bridge chain.
+> This here is just another example of this problem.
+> -Daniel
+>
+>> ---
+>>   drivers/gpu/drm/bridge/dw_hdmi.c |    6 +++++-
+>>   1 file changed, 5 insertions(+), 1 deletion(-)
 >>
->> I can't verify the FLASH layout. Note that p.11 of
->> ALT_MiniMonitor_Manual(SPI_Boot)_Rev0.01_e.pdf shows a different
->> FLASH layout for the second and third partition.
->
-> Thanks. I see the following in v1.9.6 of the BSP[1]. Is it
-> the same as the document you referred to above?
->
->
->                 partition at 0 {
->                         label = "loader";
->                         reg = <0x00000000 0x00080000>;
->                         read-only;
->                 };
->                 partition at 40000 {
->                         label = "user";
->                         reg = <0x00080000 0x00580000>;
->                         read-only;
->                 };
->                 partition at 440000 {
->                         label = "flash";
->                         reg = <0x00600000 0x03a00000>;
->                 };
->
->
-> [1] https://git.kernel.org/cgit/linux/kernel/git/horms/renesas-backport.git/tree/arch/arm/boot/dts/r8a7794-alt.dts?h=rcar-gen2/v1.9.6&id=e1acbe074f36d96e901bf5346c50ee51da2ced42#n379
-
-No, the document specifies 3 partitions:
-  - SA0: loader program area, 16 KiB,
-  - SA1: System area, 16 KiB,
-  - SA2: User program area, remainder.
-
-FWIW, the unit addresses in the device nodes above are not consistent
-with their reg properties.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>> diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
+>> index 56de9f1..587065a 100644
+>> --- a/drivers/gpu/drm/bridge/dw_hdmi.c
+>> +++ b/drivers/gpu/drm/bridge/dw_hdmi.c
+>> @@ -22,6 +22,7 @@
+>>   
+>>   #include <drm/drm_of.h>
+>>   #include <drm/drmP.h>
+>> +#include <drm/drm_atomic_helper.h>
+>>   #include <drm/drm_crtc_helper.h>
+>>   #include <drm/drm_edid.h>
+>>   #include <drm/drm_encoder_slave.h>
+>> @@ -1515,11 +1516,14 @@ static void dw_hdmi_connector_force(struct drm_connector *connector)
+>>   }
+>>   
+>>   static struct drm_connector_funcs dw_hdmi_connector_funcs = {
+>> -	.dpms = drm_helper_connector_dpms,
+>> +	.dpms = drm_atomic_helper_connector_dpms,
+>>   	.fill_modes = drm_helper_probe_single_connector_modes,
+>>   	.detect = dw_hdmi_connector_detect,
+>>   	.destroy = dw_hdmi_connector_destroy,
+>>   	.force = dw_hdmi_connector_force,
+>> +	.reset = drm_atomic_helper_connector_reset,
+>> +	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+>> +	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
+>>   };
+>>   
+>>   static struct drm_connector_helper_funcs dw_hdmi_connector_helper_funcs = {
+>> -- 
+>> 1.7.9.5
+>>
+>>
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> http://lists.freedesktop.org/mailman/listinfo/dri-devel
