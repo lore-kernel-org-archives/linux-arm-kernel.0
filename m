@@ -1,103 +1,56 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Mon, 30 Nov 2015 16:03:19 -0800
-Subject: [PATCH v4 4/4] x86: mm: support ARCH_MMAP_RND_BITS.
-In-Reply-To: <1448578785-17656-5-git-send-email-dcashman@android.com>
+Date: Mon, 30 Nov 2015 16:04:36 -0800
+Subject: [PATCH v4 1/4] mm: mmap: Add new /proc tunable for mmap_base ASLR.
+In-Reply-To: <20151130160118.e43a2e53a59e347a95a94d5c@linux-foundation.org>
 References: <1448578785-17656-1-git-send-email-dcashman@android.com>
  <1448578785-17656-2-git-send-email-dcashman@android.com>
- <1448578785-17656-3-git-send-email-dcashman@android.com>
- <1448578785-17656-4-git-send-email-dcashman@android.com>
- <1448578785-17656-5-git-send-email-dcashman@android.com>
-Message-ID: <CAGXu5j+Wj_=27gsYStV5OuwNSznux7MtDcMuYe5wM2ORrna_TQ@mail.gmail.com>
+ <20151130155412.b1a087f4f6f4d4180ab4472d@linux-foundation.org>
+ <20151130160118.e43a2e53a59e347a95a94d5c@linux-foundation.org>
+Message-ID: <CAGXu5jK7UzjBxXKQajxhLv-uLk_xQXR_FHOsmW6RLJNeK_-dZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2015 at 2:59 PM, Daniel Cashman <dcashman@android.com> wrote:
-> x86: arch_mmap_rnd() uses hard-coded values, 8 for 32-bit and 28 for
-> 64-bit, to generate the random offset for the mmap base address.
-> This value represents a compromise between increased ASLR
-> effectiveness and avoiding address-space fragmentation. Replace it
-> with a Kconfig option, which is sensibly bounded, so that platform
-> developers may choose where to place this compromise. Keep default
-> values as new minimums.
+On Mon, Nov 30, 2015 at 4:01 PM, Andrew Morton
+<akpm@linux-foundation.org> wrote:
+> On Mon, 30 Nov 2015 15:54:12 -0800 Andrew Morton <akpm@linux-foundation.org> wrote:
 >
-> Signed-off-by: Daniel Cashman <dcashman@android.com>
-> ---
->  arch/x86/Kconfig   | 16 ++++++++++++++++
->  arch/x86/mm/mmap.c | 12 ++++++------
->  2 files changed, 22 insertions(+), 6 deletions(-)
+>> On Thu, 26 Nov 2015 14:59:42 -0800 Daniel Cashman <dcashman@android.com> wrote:
+>>
+>> > ASLR  only uses as few as 8 bits to generate the random offset for the
+>> > mmap base address on 32 bit architectures. This value was chosen to
+>> > prevent a poorly chosen value from dividing the address space in such
+>> > a way as to prevent large allocations. This may not be an issue on all
+>> > platforms. Allow the specification of a minimum number of bits so that
+>> > platforms desiring greater ASLR protection may determine where to place
+>> > the trade-off.
+>> >
+>> > --- a/kernel/sysctl.c
+>> > +++ b/kernel/sysctl.c
+>> > @@ -1568,6 +1568,28 @@ static struct ctl_table vm_table[] = {
+>> >             .mode           = 0644,
+>> >             .proc_handler   = proc_doulongvec_minmax,
+>> >     },
+>> > +#ifdef CONFIG_HAVE_ARCH_MMAP_RND_BITS
+>> > +   {
+>> > +           .procname       = "mmap_rnd_bits",
+>> > +           .data           = &mmap_rnd_bits,
+>> > +           .maxlen         = sizeof(mmap_rnd_bits),
+>> > +           .mode           = 0600,
+>> > +           .proc_handler   = proc_dointvec_minmax,
+>> > +           .extra1         = (void *) &mmap_rnd_bits_min,
+>> > +           .extra2         = (void *) &mmap_rnd_bits_max,
+>>
+>> hm, why the typecasts?  They're unneeded and are omitted everywhere(?)
+>> else in kernel/sysctl.c.
 >
-> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> index db3622f..12768c4 100644
-> --- a/arch/x86/Kconfig
-> +++ b/arch/x86/Kconfig
-> @@ -82,6 +82,8 @@ config X86
->         select HAVE_ARCH_KASAN                  if X86_64 && SPARSEMEM_VMEMMAP
->         select HAVE_ARCH_KGDB
->         select HAVE_ARCH_KMEMCHECK
-> +       select HAVE_ARCH_MMAP_RND_BITS
-> +       select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
->         select HAVE_ARCH_SECCOMP_FILTER
->         select HAVE_ARCH_SOFT_DIRTY             if X86_64
->         select HAVE_ARCH_TRACEHOOK
-> @@ -183,6 +185,20 @@ config HAVE_LATENCYTOP_SUPPORT
->  config MMU
->         def_bool y
+> Oh.  Casting away constness.
 >
-> +config ARCH_MMAP_RND_BITS_MIN
-> +       default 28 if 64BIT
-> +       default 8
-> +
-> +config ARCH_MMAP_RND_BITS_MAX
-> +       default 32 if 64BIT
-> +       default 16
-> +
-> +config ARCH_MMAP_RND_COMPAT_BITS_MIN
-> +       default 8
-> +
-> +config ARCH_MMAP_RND_COMPAT_BITS_MAX
-> +       default 16
-> +
->  config SBUS
->         bool
->
-> diff --git a/arch/x86/mm/mmap.c b/arch/x86/mm/mmap.c
-> index 844b06d..647fecf 100644
-> --- a/arch/x86/mm/mmap.c
-> +++ b/arch/x86/mm/mmap.c
-> @@ -69,14 +69,14 @@ unsigned long arch_mmap_rnd(void)
->  {
->         unsigned long rnd;
->
-> -       /*
-> -        *  8 bits of randomness in 32bit mmaps, 20 address space bits
-> -        * 28 bits of randomness in 64bit mmaps, 40 address space bits
-> -        */
->         if (mmap_is_ia32())
-> -               rnd = (unsigned long)get_random_int() % (1<<8);
-> +#ifdef CONFIG_COMPAT
-> +               rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_compat_bits);
-> +#else
-> +               rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_bits);
-> +#endif
->         else
-> -               rnd = (unsigned long)get_random_int() % (1<<28);
-> +               rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_bits);
->
->         return rnd << PAGE_SHIFT;
->  }
-> --
-> 2.6.0.rc2.230.g3dd15c0
->
+> What's the thinking here?  They can change at any time so they aren't
+> const so we shouldn't declare them to be const?
 
-Can you rework this logic to look more like the arm64 one? I think
-it's more readable as:
-
-#ifdef CONFIG_COMPAT
-    if (mmap_is_ia32())
-            rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_compat_bits);
-    else
-#endif
-            rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_bits);
+The _min and _max values shouldn't be changing: they're decided based
+on the various CONFIG options that calculate the valid min/maxes. Only
+mmap_rnd_bits itself should be changing.
 
 -Kees
 
