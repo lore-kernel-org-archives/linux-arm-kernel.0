@@ -1,33 +1,16 @@
 From: nikita@compulab.co.il (Nikita Kiryanov)
-Date: Tue,  1 Dec 2015 15:54:55 +0200
-Subject: [PATCH V2 00/14] Add support for sbc-t43
-Message-ID: <1448978109-5614-1-git-send-email-nikita@compulab.co.il>
+Date: Tue,  1 Dec 2015 15:55:05 +0200
+Subject: [PATCH V2 10/14] ARM: dts: am437x: cm-t43: add pca9555 support
+In-Reply-To: <1448978109-5614-1-git-send-email-nikita@compulab.co.il>
+References: <1448978109-5614-1-git-send-email-nikita@compulab.co.il>
+Message-ID: <1448978109-5614-11-git-send-email-nikita@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for CompuLab sbc-t43 single baseboard computer.
-sbc-t43 is composed of cm-t43 (the TI am437x based core module), and sb-som
-baseboard. The sbc-t43 features include:
+SB-SOM comes with a PCA9555 GPIO extender. On SBC-T43 this resides on the
+i2c1 bus. Add it to the device tree.
 
-CPU:    Texas Instruments Sitara AM4379 ARM Cortex-A9, 1GHz, or
-        Texas Instruments Sitara AM4376 ARM Cortex-A9, 800MHz
-RAM:    128MB - 1GB, DDR3-800, 32-bit data bua
-Storage:        NAND flash, 128MB - 512MB, or eMMC flash, 4GB - 32GB
-                SPI-flash 2MB
-Two 1000/100/10Mbps Ethernet ports
-WiFi/Bluetooth/NFC
-Audio codec
-SD-Card slot, up to 3 USB ports
-DVI/LCD connectors
-
-CM-T43 website: http://www.compulab.co.il/products/computer-on-modules/cm-t43/
-SBC-T43 website: http://www.compulab.co.il/products/sbcs/sbc-t43/
-
-This series is based over v4.4-rc3-20-g204187f and depends on the following
-patch:
-https://lkml.org/lkml/2015/11/12/955
-[pinctrl: Move am4372 and dra7 macros to the the SoC header files]
-
+Signed-off-by: Nikita Kiryanov <nikita@compulab.co.il>
 Cc: Tony Lindgren <tony@atomide.com>
 Cc: Benoit Cousson <bcousson@baylibre.com>
 Cc: Rob Herring <robh@kernel.org>
@@ -36,44 +19,30 @@ Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Igor Grinberg <grinberg@compulab.co.il>
 Cc: Dmitry Lifshitz <lifshitz@compulab.co.il>
 Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-
+---
 Changes in V2:
-	- Removed unnecessary line breaks in end of file and elsewhere
-	- Added spaces between strings in "compatible" properties
-	- Renamed startek,startek-kd050c to startek,startek-kd050c.txt
-	- s/QS-600/CM-QS600 in compulab-boards.txt
-	- Changed subject lines to start with "ARM: dts:"
+	- No changes.
 
-Nikita Kiryanov (14):
-  ARM: dts: am437x: cm-t43: add basic support for sbc-t43
-  ARM: dts: am437x: cm-t43: add support for module eeprom
-  ARM: dts: am437x: cm-t43: add PMIC support.
-  ARM: dts: am437x: cm-t43: add spi-flash support
-  ARM: dts: am437x: cm-t43: add NAND support
-  ARM: dts: am437x: cm-t43: add dual emac support
-  ARM: dts: am437x: cm-t43: add USB support
-  ARM: dts: am437x: cm-t43: add eMMC support
-  ARM: dts: am437x: cm-t43: add touchscreen support
-  ARM: dts: am437x: cm-t43: add pca9555 support
-  ARM: dts: am437x: cm-t43: add support for baseboard eeprom
-  ARM: dts: sb-som: introduce SB-SOM baseboard
-  ARM: dts: am437x: cm-t43: add support for mmc1
-  ARM: dts: am437x: cm-t43: add lcd support
+ arch/arm/boot/dts/am437x-sbc-t43.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
- .../devicetree/bindings/arm/compulab-boards.txt    |   5 +
- .../devicetree/bindings/arm/omap/omap.txt          |   6 +
- .../display/panel/startek,startek-kd050c.txt       |   4 +
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/boot/dts/Makefile                         |   6 +-
- arch/arm/boot/dts/am437x-cm-t43.dts                | 422 +++++++++++++++++++++
- arch/arm/boot/dts/am437x-sbc-t43.dts               | 180 +++++++++
- arch/arm/boot/dts/compulab-sb-som.dtsi             |  42 ++
- 8 files changed, 664 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/compulab-boards.txt
- create mode 100644 Documentation/devicetree/bindings/display/panel/startek,startek-kd050c.txt
- create mode 100644 arch/arm/boot/dts/am437x-cm-t43.dts
- create mode 100644 arch/arm/boot/dts/am437x-sbc-t43.dts
- create mode 100644 arch/arm/boot/dts/compulab-sb-som.dtsi
-
+diff --git a/arch/arm/boot/dts/am437x-sbc-t43.dts b/arch/arm/boot/dts/am437x-sbc-t43.dts
+index 3fc824a..c7a1414 100644
+--- a/arch/arm/boot/dts/am437x-sbc-t43.dts
++++ b/arch/arm/boot/dts/am437x-sbc-t43.dts
+@@ -54,6 +54,13 @@
+ 	status = "okay";
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c1_pins>;
++
++	pca9555: pca9555 at 20 {
++		compatible = "nxp,pca9555";
++		reg = <0x20>;
++		gpio-controller;
++		#gpio-cells = <2>;
++	};
+ };
+ 
+ &i2c2 {
 -- 
 1.9.1
