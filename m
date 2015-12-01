@@ -1,54 +1,57 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 1 Dec 2015 08:24:21 -0800
-Subject: [PATCH 3/3] ARM: dts: enable pinctrl for Broadcom NSP
-In-Reply-To: <565DC555.2070004@broadcom.com>
-References: <1448042309-46445-1-git-send-email-yrdreddy@broadcom.com>
- <5654FBE4.5010802@gmail.com>
- <CACRpkdZCBbrfHq+DiWcfe6i_2FPUXyMQwbsQu5_zAKYa=fJugg@mail.gmail.com>
- <565DC555.2070004@broadcom.com>
-Message-ID: <565DC9B5.8070801@broadcom.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Tue,  1 Dec 2015 17:24:16 +0100
+Subject: [PATCH v3 0/6] pinctrl: meson: enable support for external GPIO
+ interrupts
+Message-ID: <1448987062-31225-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Carlo Caione <carlo@endlessm.com>
+
+In Meson SoCs we have 8 independent GPIO interrupts that can be programmed to
+use any of the GPIOs in the chip as interrupt source.
+
+These GPIOs are managed by GIC but they can be conditioned (and enabled) by
+some registers external to the GIC.
+
+GPIOs |--[mux1 or mux2]--[polarity]--[filter]--[edge_select]--> GIC
+
+Changelog:
+
+* V2:
+    - Introduced .irq_request_resources() and .irq_release_resources()
+    - s/virq/irq/ and s/pin/hwirq/
+    - Moved to the new irq_fwspec
+
+* V3:
+    - EXPORT_SYMBOL_GPL for of_irq_find_parent()
+    - split GPIO management and irqchip side
+    - the GIC IRQs list is not kept as set of fwspecs. it's now a regular
+      integer array.
+    - irq_of_phandle_args_to_fwspec discarded
 
 
-On 12/1/2015 8:05 AM, Scott Branden wrote:
-> Hi Linus,
->
-> On 15-12-01 02:00 AM, Linus Walleij wrote:
->> On Wed, Nov 25, 2015 at 1:08 AM, Florian Fainelli
->> <f.fainelli@gmail.com> wrote:
->>> On 20/11/15 09:58, Yendapally Reddy Dhananjaya Reddy wrote:
->>>> This enables the pinctrl support for Broadcom NSP SoC
->>>>
->>>> Signed-off-by: Yendapally Reddy Dhananjaya Reddy
->>>> <yrdreddy@broadcom.com>
->>>
->>> Looks like a sane pinctrl node here, unless there are objections, I
->>> would like to go ahead and apply this for v4.5, thanks!
->>
->> I'm waiting for an indication from the other BCM pinctrl
->> maintainers to tell whether this SoC is unique enough to deserve
->> its own driver.
-> If Stephen Warren is the other maintainer you are talking about he does
-> not work at Broadcom.  I don't think he is familiar with the variety of
-> pinctrl implementations present.  But yes, the pinctrl implementations
-> have been rather unique in these Socs.  As Ray indicated we're trying to
-> get the silicon designers to standardize more going forward so we don't
-> have to create unique drivers for these SoCs.
+Carlo Caione (6):
+  of/irq: Export of_irq_find_parent again
+  pinctrl: meson: Update pinctrl data with GPIO IRQ info
+  pinctrl: meson: Make helper functions public
+  pinctrl: meson: Enable GPIO IRQs
+  pinctrl: dt-binding: Extend meson documentation with GPIO IRQs support
+  ARM: meson: DTS: Enable GPIO IRQs
 
-Yes. Hopefully NSP and NS2 will be the last iProc based SoCs that 
-require unique pinmux driver.
+ .../devicetree/bindings/pinctrl/meson,pinctrl.txt  |  11 +
+ arch/arm/boot/dts/meson8b.dtsi                     |   5 +
+ drivers/of/irq.c                                   |   3 +-
+ drivers/pinctrl/Kconfig                            |   1 +
+ drivers/pinctrl/meson/Makefile                     |   2 +-
+ drivers/pinctrl/meson/irqchip-gpio-meson.c         | 321 +++++++++++++++++++++
+ drivers/pinctrl/meson/pinctrl-meson.c              |  40 ++-
+ drivers/pinctrl/meson/pinctrl-meson.h              |  28 +-
+ drivers/pinctrl/meson/pinctrl-meson8.c             |  36 ++-
+ drivers/pinctrl/meson/pinctrl-meson8b.c            |  36 ++-
+ include/linux/of_irq.h                             |   6 +
+ 11 files changed, 451 insertions(+), 38 deletions(-)
+ create mode 100644 drivers/pinctrl/meson/irqchip-gpio-meson.c
 
->>
->> Yours,
->> Linus Walleij
->>
->
-> Regards,
->   Scott
->
-
-Thanks,
-
-Ray
+-- 
+2.5.0
