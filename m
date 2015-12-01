@@ -1,178 +1,160 @@
-From: Liguo.Zhang@mediatek.com (=?utf-8?B?TGlndW8gWmhhbmcgKOW8oOeri+WbvSk=?=)
-Date: Tue, 1 Dec 2015 11:24:18 +0000
-Subject: [PATCH v2 2/2] i2c: mediatek: fix i2c multi transfer issue in
- high speed mode
-In-Reply-To: <CAGS+omAixwqw2QwR5_4VffHN66aAYNXP1ZJPxsq2WKcgzVxOZw@mail.gmail.com>
-References: <1447047839-5223-1-git-send-email-liguo.zhang@mediatek.com>
- <1447047839-5223-3-git-send-email-liguo.zhang@mediatek.com>
- <CAGS+omAixwqw2QwR5_4VffHN66aAYNXP1ZJPxsq2WKcgzVxOZw@mail.gmail.com>
-Message-ID: <B92A980A447EF9479F8F2A8FDA9DC1C0BAF4B19E@mtkmbs31n1>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Tue, 1 Dec 2015 12:17:44 +0100 (CET)
+Subject: [PATCH v2 11/25] coccinelle: nand: detect and correct drivers
+ embedding an mtd_info object
+In-Reply-To: <1448967802-25796-12-git-send-email-boris.brezillon@free-electrons.com>
+References: <1448967802-25796-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1448967802-25796-12-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <alpine.DEB.2.10.1512011207580.2736@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Daniel,
 
-1. I will rename "TRAN" & "TRANAC" & "I2C_TRAN_DEFAULT_VALUE" & "I2C_TRAN_DEFAULT_VALUE".
 
-2. How does the hardware know that this transaction should be a "master code"?
-When we set i2c speed > 400K , the hardware will send master code. We have a register to configure master code?and usually we use the default value "00001000".
+On Tue, 1 Dec 2015, Boris Brezillon wrote:
 
-How does the hardware know what rate to use?
-The i2c speed is defined in dts, and we will set the i2c speed in i2c register, so HW will know the rate to use.
-
-When sending the master code, arbitration is supposed to occur, such that only one winning master can proceed with the following high speed transaction.
-Where do you check that you won this arbitration?
-Our i2c driver now only support one master.
-
-3. I will delete the completion_done() function.
-
-4. Don't we need to send the master code for *every* HS transaction, not just "auto_restart"?
-When we don't use auto restart, we also need to send the master code, the master code is sent by HW automatically.
-I am improving the master code section when use auto restart, and this will be released in the next patch.
-
-"400000" => You already have a macro for this: MAX_FS_MODE_SPEED
-
-Yes, I will use MAX_FS_MODE_SPEED.
-
-Thanks!
-
------Original Message-----
-From: djkurtz@google.com [mailto:djkurtz at google.com] On Behalf Of Daniel Kurtz
-Sent: 2015?11?14? 22:39
-To: Liguo Zhang (???)
-Cc: Wolfram Sang; srv_heupstream; Matthias Brugger; Eddie Huang (???); Xudong Chen (???); Sascha Hauer; Linux I2C; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-mediatek at lists.infradead.org
-Subject: Re: [PATCH v2 2/2] i2c: mediatek: fix i2c multi transfer issue in high speed mode
-
-On Mon, Nov 9, 2015 at 1:43 PM, Liguo Zhang <liguo.zhang@mediatek.com> wrote:
-> For platform with auto restart support, when doing i2c multi transfer 
-> in high speed, for example, doing write-then-read transfer, the master 
-> code will occupy the first transfer, and the second transfer will be 
-> the read transfer, the write transfer will be discarded. So we should 
-> first send the master code, and then start i2c multi transfer.
+> Add nand-priv-no-mtd.cocci to detect and correct NAND controller drivers
+> directly embedding an mtd_info struct in their private struct.
 >
-> Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
-> Reviewed-by: Eddie Huang <eddie.huang@mediatek.com>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Cc: Julia Lawall <Julia.Lawall@lip6.fr>
 > ---
->  drivers/i2c/busses/i2c-mt65xx.c | 45 
-> +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
+> Hi Julia,
 >
-> diff --git a/drivers/i2c/busses/i2c-mt65xx.c 
-> b/drivers/i2c/busses/i2c-mt65xx.c index dc4aac6..249df86 100644
-> --- a/drivers/i2c/busses/i2c-mt65xx.c
-> +++ b/drivers/i2c/busses/i2c-mt65xx.c
-> @@ -53,6 +53,8 @@
->  #define I2C_FS_TIME_INIT_VALUE         0x1303
->  #define I2C_WRRD_TRANAC_VALUE          0x0002
->  #define I2C_RD_TRANAC_VALUE            0x0001
-> +#define I2C_TRAN_DEFAULT_VALUE         0x0001
-> +#define I2C_TRAN_DEFAULT_VALUE       0x0001
+> Not sure this is the correct way to detect and fix offending drivers,
+> but I get some warnings when launching coccicheck in org or report mode:
+>
+> "warning: fix2: inherited metavariable __chipfield not used in the -, +,
+> or context code"
+>
+> Note that I don't get those warnings when running in patch mode.
+>
+> Any idea (feel free to propose a better solution to detect and fix those
+> offending drivers)?
 
-"TRAN" and "TRANAC" are not good names; this should be "TRANSFER_LEN"
-and "TRANSAC", based on the names of the registers to which you write these constants.
+Hi,
 
-Furthermore, these are not "default" values, they are the transfer length and number of transactions for sending the "master code", so:
+Is this code generated with sgen?  If so, could you send me the original
+semantic patch?
 
-#define I2C_TRANSFER_LEN_MASTER_CODE         0x0001
-#define I2C_TRANSAC_LEN_MASTER_CODE       0x0001
+Another thing that is immediately apparent is that you have <... ...> on
+the outside of one of the rules.  This should never be needed.
 
-Similarly, I think the "TRANAC" in I2C_WRRD_TRANAC_VALUE and I2C_RD_TRANAC_VALUE should also be TRANSAC.
+The warning suggests that your org and report versions are not doing as
+much as the patch version.  If you have used sgen to generate the semantic
+patch then that would be strange.  If you have hand written the whole
+thing, then maybe you could simplify it to just do the patch version, and
+then I can check it and run sgen on it to make a complete version.
+
+julia
 
 >
->  #define I2C_DMA_CON_TX                 0x0000
->  #define I2C_DMA_CON_RX                 0x0001
-> @@ -365,6 +367,43 @@ static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk,
->         return 0;
->  }
+> Best Regards,
 >
-> +static int mtk_i2c_send_master_code(struct mtk_i2c *i2c) {
-> +       int ret = 0;
-> +
-> +       reinit_completion(&i2c->msg_complete);
-> +
-> +       writew(I2C_CONTROL_RS | I2C_CONTROL_ACKERR_DET_EN |
-> +              I2C_CONTROL_CLK_EXT_EN | I2C_CONTROL_DMA_EN,
-> +              i2c->base + OFFSET_CONTROL);
-> +
-> +       /* Clear interrupt status */
-> +       writew(I2C_RS_TRANSFER | I2C_TRANSAC_COMP | I2C_HS_NACKERR | I2C_ACKERR,
-> +              i2c->base + OFFSET_INTR_STAT);
-> +
-> +       /* Enable interrupt */
-> +       writew(I2C_RS_TRANSFER | I2C_TRANSAC_COMP, i2c->base +
-> +              OFFSET_INTR_MASK);
-> +
-> +       writew(I2C_TRAN_DEFAULT_VALUE, i2c->base + OFFSET_TRANSFER_LEN);
-> +       writew(I2C_TRANAC_DEFAULT_VALUE, i2c->base + 
-> + OFFSET_TRANSAC_LEN);
-> +
-> +       writew(I2C_TRANSAC_START | I2C_RS_MUL_CNFG, i2c->base + 
-> + OFFSET_START);
-> +
-> +       ret = wait_for_completion_timeout(&i2c->msg_complete,
-> +                                         i2c->adap.timeout);
-
-How does the hardware know that this transaction should be a "master code"?
-Do you have to tell the hardware what value ('00001XXX') to use as the master code?
-The Master Code must be sent at <= 400 kHz, not the target clock.  How does the hardware know what rate to use?
-When sending the master code, arbitration is supposed to occur, such that only one winning master can proceed with the following high speed transaction.
-Where do you check that you won this arbitration?
-If this is not implemented, adding a "TODO" would be helpful.
-
-> +
-> +       completion_done(&i2c->msg_complete);
-
-This completion_done() is only useful if you check the return value.
-You should check it too, since we should only check for timeout if the message hasn't completed.
-
-> +
-> +       if (ret == 0) {
-> +               dev_dbg(i2c->dev, "send master code timeout.\n");
-> +               mtk_i2c_init_hw(i2c);
-> +               return -ETIMEDOUT;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
->  static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
->                                int num, int left_num)  { @@ -539,6 
-> +578,12 @@ static int mtk_i2c_transfer(struct i2c_adapter *adap,
->                 }
->         }
+> Boris
+> ---
+>  scripts/coccinelle/api/nand-priv-no-mtd.cocci | 91 +++++++++++++++++++++++++++
+>  1 file changed, 91 insertions(+)
+>  create mode 100644 scripts/coccinelle/api/nand-priv-no-mtd.cocci
 >
-> +       if (i2c->auto_restart && i2c->speed_hz > 400000) {
-
-Don't we need to send the master code for *every* HS transaction, not just "auto_restart"?
-
-"400000" => You already have a macro for this: MAX_FS_MODE_SPEED
-
-> +               ret = mtk_i2c_send_master_code(i2c);
-> +               if (ret)
-> +                       return ret;
-> +       }
+> diff --git a/scripts/coccinelle/api/nand-priv-no-mtd.cocci b/scripts/coccinelle/api/nand-priv-no-mtd.cocci
+> new file mode 100644
+> index 0000000..b2c0c22
+> --- /dev/null
+> +++ b/scripts/coccinelle/api/nand-priv-no-mtd.cocci
+> @@ -0,0 +1,91 @@
+> +/// Fix NAND controller drivers declaring their own mtd_info struct instead
+> +/// of the one provided in struct nand_chip.
+> +///
+> +// Confidence: Low
+> +// Copyright: (C) 2015 Boris Brezillon GPL v2.
 > +
->         while (left_num--) {
->                 if (!msgs->buf) {
->                         dev_dbg(i2c->dev, "data buffer is NULL.\n");
+> +virtual patch
+> +virtual context
+> +virtual org
+> +virtual report
+> +
+> + at match1@
+> +identifier __chipfield, __mtdfield;
+> +type __type;
+> +@@
+> +(
+> +	__type {
+> +		...
+> +		struct nand_chip __chipfield;
+> +		...
+> +		struct mtd_info __mtdfield;
+> +		...
+> +	};
+> +|
+> +	__type {
+> +		...
+> +		struct mtd_info __mtdfield;
+> +		...
+> +		struct nand_chip __chipfield;
+> +		...
+> +	};
+> +)
+> +
+> + at fix1 depends on match1 && patch && !context && !org && !report@
+> +identifier match1.__mtdfield;
+> +type match1.__type;
+> +@@
+> +	__type {
+> +		...
+> +-		struct mtd_info __mtdfield;
+> +		...
+> +	};
+> +
+> + at fix2 depends on match1 && patch && !context && !org && !report@
+> +identifier match1.__chipfield, match1.__mtdfield;
+> +identifier __subfield;
+> +type match1.__type;
+> +__type *__priv;
+> +@@
+> +<...
+> +(
+> +-	__priv->__mtdfield.__subfield
+> ++	nand_to_mtd(&__priv->__chipfield)->__subfield
+> +|
+> +-	&(__priv->__mtdfield)
+> ++	nand_to_mtd(&__priv->__chipfield)
+> +)
+> +...>
+> +
+> +// ----------------------------------------------------------------------------
+> +
+> + at fix1_context depends on match1 && !patch && (context || org || report)@
+> +identifier match1.__mtdfield;
+> +type match1.__type;
+> +position j0;
+> +@@
+> +
+> +	__type {
+> +		...
+> +*		struct mtd_info __mtdfield at j0;
+> +		...
+> +	};
+> +
+> +// ----------------------------------------------------------------------------
+> +
+> + at script:python fix1_org depends on org@
+> +j0 << fix1_context.j0;
+> +@@
+> +
+> +msg = "struct nand_chip already embeds an mtd_info object (use nand_to_mtd())."
+> +coccilib.org.print_todo(j0[0], msg)
+> +
+> +// ----------------------------------------------------------------------------
+> +
+> + at script:python fix1_report depends on report@
+> +j0 << fix1_context.j0;
+> +@@
+> +
+> +msg = "struct nand_chip already embeds an mtd_info object (use nand_to_mtd())."
+> +coccilib.report.print_report(j0[0], msg)
+> +
 > --
-> 1.8.1.1.dirty
+> 2.1.4
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe 
-> linux-kernel" in the body of a message to majordomo at vger.kernel.org 
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-
-************* Email Confidentiality Notice ********************
-The information contained in this e-mail message (including any 
-attachments) may be confidential, proprietary, privileged, or otherwise
-exempt from disclosure under applicable laws. It is intended to be 
-conveyed only to the designated recipient(s). Any use, dissemination, 
-distribution, printing, retaining or copying of this e-mail (including its 
-attachments) by unintended recipient(s) is strictly prohibited and may 
-be unlawful. If you are not an intended recipient of this e-mail, or believe 
-that you have received this e-mail in error, please notify the sender 
-immediately (by replying to this e-mail), delete any and all copies of 
-this e-mail (including any attachments) from your system, and do not
-disclose the content of this e-mail to any other person. Thank you!
+>
