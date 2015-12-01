@@ -1,47 +1,107 @@
 From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Tue,  1 Dec 2015 20:03:17 +0200
-Subject: [PATCH V3 15/19] ARM: dts: am57xx: sbc-am57x: add GPIO expander
- support
+Date: Tue,  1 Dec 2015 20:03:13 +0200
+Subject: [PATCH V2 11/19] ARM: dts: am57xx: sbc-am57x: add basic board support
 In-Reply-To: <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
 References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
  <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <1448993001-19495-16-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1448993001-19495-12-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PCA9555 GPIO expander support (over I2C5 bus).
+SBC-AM57x is a single board computer designed for industrial and
+embedded applications. It is based on the Texas Instruments Sitara AM57x
+system-on-chip family. SBC-AM57x is implemented with the CL-SOM-AM57x
+computer-on-module providing most of the functions, and SB-SOM-AM57x
+carrier board providing additional peripheral functions and connectors.
+
+https://www.compulab.co.il/products/sbcs/sbc-am57x-ti-am5728-am5718-single-board-computer/
+
+https://www.compulab.co.il/products/computer-on-modules/cl-som-am57x-ti-am5728-am5718-system-on-module/
+
+Add basic board support, including UART3, used as a serial console.
 
 Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
 Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 ---
 
-  v3:
+  v2:
 
    * No fuctional changes
    * Reformat subject
 
-  v2:
+ .../devicetree/bindings/arm/omap/omap.txt          |  3 ++
+ arch/arm/boot/dts/Makefile                         |  1 +
+ arch/arm/boot/dts/am57xx-sbc-am57x.dts             | 36 ++++++++++++++++++++++
+ 3 files changed, 40 insertions(+)
+ create mode 100644 arch/arm/boot/dts/am57xx-sbc-am57x.dts
 
-   * Fixed patch subject/description
-
- arch/arm/boot/dts/am57xx-sbc-am57x.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am57xx-sbc-am57x.dts b/arch/arm/boot/dts/am57xx-sbc-am57x.dts
-index a3588ba..edce6c6 100644
---- a/arch/arm/boot/dts/am57xx-sbc-am57x.dts
-+++ b/arch/arm/boot/dts/am57xx-sbc-am57x.dts
-@@ -89,4 +89,11 @@
- 		reg = <0x50>;
- 		pagesize = <16>;
- 	};
+diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+index dd53c90..42cdad1 100644
+--- a/Documentation/devicetree/bindings/arm/omap/omap.txt
++++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+@@ -159,6 +159,9 @@ Boards:
+ - AM57XX CL-SOM-AM57x
+   compatible = "compulab,cl-som-am57x", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7"
+ 
++- AM57XX SBC-AM57x
++  compatible = "compulab,sbc-am57x", "compulab,cl-som-am57x", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7"
 +
-+	pca9555: pca9555 at 20 {
-+		compatible = "nxp,pca9555";
-+		reg = <0x20>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
+ - DRA742 EVM:  Software Development Board for DRA742
+   compatible = "ti,dra7-evm", "ti,dra742", "ti,dra74", "ti,dra7"
+ 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 803a020..4c73ab9 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -479,6 +479,7 @@ dtb-$(CONFIG_SOC_OMAP5) += \
+ dtb-$(CONFIG_SOC_DRA7XX) += \
+ 	am57xx-beagle-x15.dtb \
+ 	am57xx-cl-som-am57x.dtb \
++	am57xx-sbc-am57x.dtb \
+ 	dra7-evm.dtb \
+ 	dra72-evm.dtb
+ dtb-$(CONFIG_ARCH_ORION5X) += \
+diff --git a/arch/arm/boot/dts/am57xx-sbc-am57x.dts b/arch/arm/boot/dts/am57xx-sbc-am57x.dts
+new file mode 100644
+index 0000000..804ad72
+--- /dev/null
++++ b/arch/arm/boot/dts/am57xx-sbc-am57x.dts
+@@ -0,0 +1,36 @@
++/*
++ * Support for CompuLab SBC-AM57x single board computer
++ *
++ * Copyright (C) 2015 CompuLab Ltd. - http://www.compulab.co.il/
++ * Author: Dmitry Lifshitz <lifshitz@compulab.co.il>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ */
++
++#include "am57xx-cl-som-am57x.dts"
++#include "compulab-sb-som.dtsi"
++
++/ {
++	model = "CompuLab CL-SOM-AM57x on SB-SOM-AM57x";
++	compatible = "compulab,sbc-am57x", "compulab,cl-som-am57x", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7";
++};
++
++&dra7_pmx_core {
++	uart3_pins_default: uart3_pins_default {
++		pinctrl-single,pins = <
++			DRA7XX_CORE_IOPAD(0x37f8, PIN_INPUT_SLEW | MUX_MODE2)	/* uart2_ctsn.uart3_rxd */
++			DRA7XX_CORE_IOPAD(0x37fc, PIN_INPUT_SLEW | MUX_MODE1)	/* uart2_rtsn.uart3_txd */
++		>;
 +	};
- };
++};
++
++&uart3 {
++	status = "okay";
++	interrupts-extended = <&crossbar_mpu GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
++			      <&dra7_pmx_core 0x3f8>;
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart3_pins_default>;
++};
 -- 
 1.9.1
