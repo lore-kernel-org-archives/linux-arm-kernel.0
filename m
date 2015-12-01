@@ -1,55 +1,61 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 1 Dec 2015 15:52:09 +0200
-Subject: [PATCH 1/2] ARM: OMAP2+: Initialize timers later with
- late_time_init
-In-Reply-To: <1448900789-4034-2-git-send-email-tony@atomide.com>
-References: <1448900789-4034-1-git-send-email-tony@atomide.com>
- <1448900789-4034-2-git-send-email-tony@atomide.com>
-Message-ID: <565DA609.2020204@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 1 Dec 2015 14:55:29 +0100
+Subject: [GIT PULL] Ux500 device tree changes for v4.5
+Message-ID: <CACRpkdbts6_Fk-P=Ojom8-OuJ+UThA54fXB_eTcq0H7imUBhsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2015 06:26 PM, Tony Lindgren wrote:
-> We don't need timers right away and initializing them later gives us few
-> nice things like interrupts and kmalloc. As the timers have a dependency
-> to the clock framework, we're better off initializing things later rather
-> than early if things go wrong. And this allows us to make the mux clock
-> driver needed for system timers into early_platform drivers.
-> 
-> Note that smp_prepare_cpus() will get called later on during the init so
-> we just need to local_irq_enable/disable for clocksource_probe().
-> 
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->   arch/arm/mach-omap2/timer.c | 46 +++++++++++++++++++++++++++++++++++++++------
->   1 file changed, 40 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index b18ebbe..68bf482 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -478,36 +478,56 @@ static void __init __omap_sync32k_timer_init(int clkev_nr, const char *clkev_src
->   	omap2_gp_clockevent_init(clkev_nr, clkev_src, clkev_prop);
->   
->   	/* Enable the use of clocksource="gp_timer" kernel parameter */
-> +	local_irq_disable();
->   	if (use_gptimer_clksrc || gptimer)
->   		omap2_gptimer_clocksource_init(clksrc_nr, clksrc_src,
->   						clksrc_prop);
->   	else
->   		omap2_sync32k_clocksource_init();
-> +	local_irq_enable();
+Hi ARM SoC people,
 
-So, this will be called now after sched_clock_postinit() and to W/A warnings
-you've added local_irq_disable()/local_irq_enable(). Am I right?
+please pull these changes to ARM SoC for the next merge window.
+More detailed description in the signed tag.
 
-Are you sure this is safe?
+Yours,
+Linus Walleij
 
 
--- 
-regards,
--grygorii
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/ux500-dt-for-arm-soc
+
+for you to fetch changes up to 2f23cda3bfa5820fd3702dff45453af4420f7ada:
+
+  ARM: ux500: configure the sensors on the TVK board correctly
+(2015-12-01 14:48:12 +0100)
+
+----------------------------------------------------------------
+Device Tree changes for Ux500:
+- Push the Rohm touchscreen to the STUIB, as the TVK UIB has
+  a Synaptics RMI4 touchscreen.
+- Set up the right sensor IRQs for the Snowball, so that
+  periodic data ready-IRQ capture starts working.
+- Use wakeup-source consequently.
+- Remove legacy regulator-compatible strings.
+- Define the sensors on the HREFP TVK board properly.
+
+----------------------------------------------------------------
+Javier Martinez Canillas (2):
+      ARM: ux500: remove regulator-compatible usage
+      ARM: u300: remove regulator-compatible usage
+
+Linus Walleij (3):
+      ARM: ux500: push down Rohm TS to STUIB
+      ARM: ux500: Assign proper sensor IRQs for Snowball
+      ARM: ux500: configure the sensors on the TVK board correctly
+
+Sudeep Holla (1):
+      ARM: ux500: replace legacy *,wakeup property with wakeup-source
+
+ arch/arm/boot/dts/ste-dbx5x0.dtsi          | 33 -------------------
+ arch/arm/boot/dts/ste-href-stuib.dtsi      | 23 +++++++++++++
+ arch/arm/boot/dts/ste-href-tvk1281618.dtsi | 52 +++++++++++++++++++++++++-----
+ arch/arm/boot/dts/ste-hrefv60plus.dtsi     | 18 -----------
+ arch/arm/boot/dts/ste-nomadik-s8815.dts    |  2 +-
+ arch/arm/boot/dts/ste-snowball.dts         |  7 ++--
+ arch/arm/boot/dts/ste-u300.dts             | 10 ------
+ 7 files changed, 72 insertions(+), 73 deletions(-)
