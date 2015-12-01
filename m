@@ -1,47 +1,39 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 30 Nov 2015 16:01:18 -0800
-Subject: [PATCH v4 1/4] mm: mmap: Add new /proc tunable for mmap_base ASLR.
-In-Reply-To: <20151130155412.b1a087f4f6f4d4180ab4472d@linux-foundation.org>
-References: <1448578785-17656-1-git-send-email-dcashman@android.com>
- <1448578785-17656-2-git-send-email-dcashman@android.com>
- <20151130155412.b1a087f4f6f4d4180ab4472d@linux-foundation.org>
-Message-ID: <20151130160118.e43a2e53a59e347a95a94d5c@linux-foundation.org>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 30 Nov 2015 16:02:37 -0800
+Subject: [PATCH 2/5] ARM: hisi: enable Hi3519 soc
+In-Reply-To: <1448694937-31282-1-git-send-email-xuejiancheng@huawei.com>
+ (Jiancheng Xue's message of "Sat, 28 Nov 2015 15:15:37 +0800")
+References: <1448694937-31282-1-git-send-email-xuejiancheng@huawei.com>
+Message-ID: <7hlh9f828y.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Nov 2015 15:54:12 -0800 Andrew Morton <akpm@linux-foundation.org> wrote:
+Jiancheng Xue <xuejiancheng@huawei.com> writes:
 
-> On Thu, 26 Nov 2015 14:59:42 -0800 Daniel Cashman <dcashman@android.com> wrote:
-> 
-> > ASLR  only uses as few as 8 bits to generate the random offset for the
-> > mmap base address on 32 bit architectures. This value was chosen to
-> > prevent a poorly chosen value from dividing the address space in such
-> > a way as to prevent large allocations. This may not be an issue on all
-> > platforms. Allow the specification of a minimum number of bits so that
-> > platforms desiring greater ASLR protection may determine where to place
-> > the trade-off.
-> > 
-> > --- a/kernel/sysctl.c
-> > +++ b/kernel/sysctl.c
-> > @@ -1568,6 +1568,28 @@ static struct ctl_table vm_table[] = {
-> >  		.mode		= 0644,
-> >  		.proc_handler	= proc_doulongvec_minmax,
-> >  	},
-> > +#ifdef CONFIG_HAVE_ARCH_MMAP_RND_BITS
-> > +	{
-> > +		.procname	= "mmap_rnd_bits",
-> > +		.data		= &mmap_rnd_bits,
-> > +		.maxlen		= sizeof(mmap_rnd_bits),
-> > +		.mode		= 0600,
-> > +		.proc_handler	= proc_dointvec_minmax,
-> > +		.extra1		= (void *) &mmap_rnd_bits_min,
-> > +		.extra2		= (void *) &mmap_rnd_bits_max,
-> 
-> hm, why the typecasts?  They're unneeded and are omitted everywhere(?)
-> else in kernel/sysctl.c.
-> 
+> Hi3519 SOC is mainly used for ip camera and sport dv
+> solutions.
+>
+> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+> ---
+>  arch/arm/mach-hisi/Kconfig     | 9 +++++++++
+>  arch/arm/mach-hisi/hisilicon.c | 9 +++++++++
+>  2 files changed, 18 insertions(+)
+>
+> diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
+> index 83061ad..6bb822c 100644
+> --- a/arch/arm/mach-hisi/Kconfig
+> +++ b/arch/arm/mach-hisi/Kconfig
+> @@ -48,6 +48,15 @@ config ARCH_HIX5HD2
+>  	select PINCTRL_SINGLE
+>  	help
+>  	  Support for Hisilicon HIX5HD2 SoC family
+> +
+> +config ARCH_HI3519
 
-Oh.  Casting away constness.
+Please keep these sorted alphabetically.
 
-What's the thinking here?  They can change at any time so they aren't
-const so we shouldn't declare them to be const?
+Speaking of which, there is already an existing ARCH_HI3xxx entry.
+Should this be included in that family?   If not, maybe the HI3xxx
+should be renamed HI36xx ?
+
+Kevin
