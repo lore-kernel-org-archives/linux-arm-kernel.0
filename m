@@ -1,34 +1,36 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 1 Dec 2015 10:24:02 +0200
-Subject: [GIT PULL] remoteproc fixes for 4.4
-Message-ID: <CAK=Wgbau=_1jcvu7D+UpuLacYfO9RW54Nwz6-KWE=ZcHKOiW0A@mail.gmail.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Tue, 01 Dec 2015 16:33:27 +0800
+Subject: [RFC PATCH 2/9] drm/rockchip: Use new vblank api drm_crtc_vblank_*
+In-Reply-To: <CAPj87rNs+c5Y01zVPF3a+8puFH1ZWuLZUGoDq6EPfDQB5DVZGw@mail.gmail.com>
+References: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>	<1448940391-23333-3-git-send-email-mark.yao@rock-chips.com>
+ <CAPj87rNs+c5Y01zVPF3a+8puFH1ZWuLZUGoDq6EPfDQB5DVZGw@mail.gmail.com>
+Message-ID: <565D5B57.4040102@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 1ec218373b8ebda821aec00bb156a9c94fad9cd4:
+On 2015?12?01? 15:56, Daniel Stone wrote:
+> Hi,
+>
+> On 1 December 2015 at 03:26, Mark Yao <mark.yao@rock-chips.com> wrote:
+>> No functional update, drm_vblank_* is the legacy version of
+>> drm_crtc_vblank_*. and use new api make driver more clean.
+>>
+>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> Heh, I had the same patch in my series to fix pageflip events.
+>
+> Reviewed-by: Daniel Stone <daniels@collabora.com>
+>
+> Cheers,
+> Daniel
+>
+>
+>
 
-  Linux 4.4-rc2 (2015-11-22 16:45:59 -0800)
+Hi Daniel
+    I had picked your patch "[PATCH 1/2] drm/rockchip: Use CRTC vblank 
+event interface" into my drm-next, this patch is base on it.
 
-are available in the git repository at:
+Thanks for your review.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
-tags/remoteproc-4.4-fixes
-
-for you to fetch changes up to f42f79af16ce2e8fff49ea9ba4949d3abdd6f26f:
-
-  remoteproc: fix memory leak of remoteproc ida cache layers
-(2015-11-26 17:44:28 +0200)
-
-----------------------------------------------------------------
-Remoteproc fixes for 4.4: two 1-liners coming from Suman and Arnd.
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      remoteproc: avoid stack overflow in debugfs file
-
-Suman Anna (1):
-      remoteproc: fix memory leak of remoteproc ida cache layers
-
- drivers/remoteproc/remoteproc_core.c    | 2 ++
- drivers/remoteproc/remoteproc_debugfs.c | 2 +-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+-- 
+?ark Yao
