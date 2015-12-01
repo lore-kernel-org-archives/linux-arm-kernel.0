@@ -1,210 +1,173 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 1 Dec 2015 16:41:52 +0100
-Subject: [PATCH v2 08/21] arm64: KVM: Implement debug save/restore
-In-Reply-To: <565DB63C.6090508@arm.com>
-References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
- <1448650215-15218-9-git-send-email-marc.zyngier@arm.com>
- <20151201125639.GP11704@cbox> <565D9B57.2080005@arm.com>
- <20151201144737.GQ11704@cbox> <565DB63C.6090508@arm.com>
-Message-ID: <20151201154152.GU11704@cbox>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 1 Dec 2015 15:42:43 +0000
+Subject: [RESEND RFC/PATCH 6/8] media: platform: mtk-vcodec: Add Mediatek
+ V4L2 Video Encoder Driver
+In-Reply-To: <1448966550.7534.95.camel@mtksdaap41>
+References: <1447764885-23100-1-git-send-email-tiffany.lin@mediatek.com>
+ <1447764885-23100-7-git-send-email-tiffany.lin@mediatek.com>
+ <56588622.8060600@linaro.org> <1448883594.25093.45.camel@mtksdaap41>
+ <CAMTL27FchgtJZS4YpVge-x+TstnVHmG1aAnaOV32qCU3zMUbAQ@mail.gmail.com>
+ <1448966550.7534.95.camel@mtksdaap41>
+Message-ID: <565DBFF3.1000409@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 03:01:16PM +0000, Marc Zyngier wrote:
-> On 01/12/15 14:47, Christoffer Dall wrote:
-> > On Tue, Dec 01, 2015 at 01:06:31PM +0000, Marc Zyngier wrote:
-> >> On 01/12/15 12:56, Christoffer Dall wrote:
-> >>> On Fri, Nov 27, 2015 at 06:50:02PM +0000, Marc Zyngier wrote:
-> >>>> Implement the debug save restore as a direct translation of
-> >>>> the assembly code version.
-> >>>>
-> >>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >>>> ---
-> >>>>  arch/arm64/kvm/hyp/Makefile   |   1 +
-> >>>>  arch/arm64/kvm/hyp/debug-sr.c | 130 ++++++++++++++++++++++++++++++++++++++++++
-> >>>>  arch/arm64/kvm/hyp/hyp.h      |   9 +++
-> >>>>  3 files changed, 140 insertions(+)
-> >>>>  create mode 100644 arch/arm64/kvm/hyp/debug-sr.c
-> >>>>
-> >>>> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-> >>>> index ec94200..ec14cac 100644
-> >>>> --- a/arch/arm64/kvm/hyp/Makefile
-> >>>> +++ b/arch/arm64/kvm/hyp/Makefile
-> >>>> @@ -6,3 +6,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
-> >>>>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
-> >>>>  obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
-> >>>>  obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
-> >>>> +obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
-> >>>> diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
-> >>>> new file mode 100644
-> >>>> index 0000000..a0b2b99
-> >>>> --- /dev/null
-> >>>> +++ b/arch/arm64/kvm/hyp/debug-sr.c
-> >>>> @@ -0,0 +1,130 @@
-> >>>> +/*
-> >>>> + * Copyright (C) 2015 - ARM Ltd
-> >>>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
-> >>>> + *
-> >>>> + * This program is free software; you can redistribute it and/or modify
-> >>>> + * it under the terms of the GNU General Public License version 2 as
-> >>>> + * published by the Free Software Foundation.
-> >>>> + *
-> >>>> + * This program is distributed in the hope that it will be useful,
-> >>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >>>> + * GNU General Public License for more details.
-> >>>> + *
-> >>>> + * You should have received a copy of the GNU General Public License
-> >>>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >>>> + */
-> >>>> +
-> >>>> +#include <linux/compiler.h>
-> >>>> +#include <linux/kvm_host.h>
-> >>>> +
-> >>>> +#include <asm/kvm_mmu.h>
-> >>>> +
-> >>>> +#include "hyp.h"
-> >>>> +
-> >>>> +#define read_debug(r,n)		read_sysreg(r##n##_el1)
-> >>>> +#define write_debug(v,r,n)	write_sysreg(v, r##n##_el1)
-> >>>> +
-> >>>> +#define save_debug(ptr,reg,nr)						\
-> >>>> +	switch (nr) {							\
-> >>>> +	case 15:	ptr[15] = read_debug(reg, 15);			\
-> >>>> +	case 14:	ptr[14] = read_debug(reg, 14);			\
-> >>>> +	case 13:	ptr[13] = read_debug(reg, 13);			\
-> >>>> +	case 12:	ptr[12] = read_debug(reg, 12);			\
-> >>>> +	case 11:	ptr[11] = read_debug(reg, 11);			\
-> >>>> +	case 10:	ptr[10] = read_debug(reg, 10);			\
-> >>>> +	case 9:		ptr[9] = read_debug(reg, 9);			\
-> >>>> +	case 8:		ptr[8] = read_debug(reg, 8);			\
-> >>>> +	case 7:		ptr[7] = read_debug(reg, 7);			\
-> >>>> +	case 6:		ptr[6] = read_debug(reg, 6);			\
-> >>>> +	case 5:		ptr[5] = read_debug(reg, 5);			\
-> >>>> +	case 4:		ptr[4] = read_debug(reg, 4);			\
-> >>>> +	case 3:		ptr[3] = read_debug(reg, 3);			\
-> >>>> +	case 2:		ptr[2] = read_debug(reg, 2);			\
-> >>>> +	case 1:		ptr[1] = read_debug(reg, 1);			\
-> >>>> +	default:	ptr[0] = read_debug(reg, 0);			\
-> >>>> +	}
-> >>>> +
-> >>>> +#define restore_debug(ptr,reg,nr)					\
-> >>>> +	switch (nr) {							\
-> >>>> +	case 15:	write_debug(ptr[15], reg, 15);			\
-> >>>> +	case 14:	write_debug(ptr[14], reg, 14);			\
-> >>>> +	case 13:	write_debug(ptr[13], reg, 13);			\
-> >>>> +	case 12:	write_debug(ptr[12], reg, 12);			\
-> >>>> +	case 11:	write_debug(ptr[11], reg, 11);			\
-> >>>> +	case 10:	write_debug(ptr[10], reg, 10);			\
-> >>>> +	case 9:		write_debug(ptr[9], reg, 9);			\
-> >>>> +	case 8:		write_debug(ptr[8], reg, 8);			\
-> >>>> +	case 7:		write_debug(ptr[7], reg, 7);			\
-> >>>> +	case 6:		write_debug(ptr[6], reg, 6);			\
-> >>>> +	case 5:		write_debug(ptr[5], reg, 5);			\
-> >>>> +	case 4:		write_debug(ptr[4], reg, 4);			\
-> >>>> +	case 3:		write_debug(ptr[3], reg, 3);			\
-> >>>> +	case 2:		write_debug(ptr[2], reg, 2);			\
-> >>>> +	case 1:		write_debug(ptr[1], reg, 1);			\
-> >>>> +	default:	write_debug(ptr[0], reg, 0);			\
-> >>>> +	}
-> >>>> +
-> >>>> +void __hyp_text __debug_save_state(struct kvm_vcpu *vcpu,
-> >>>> +				   struct kvm_guest_debug_arch *dbg,
-> >>>> +				   struct kvm_cpu_context *ctxt)
-> >>>> +{
-> >>>> +	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY) {
-> >>>> +		u64 aa64dfr0 = read_sysreg(id_aa64dfr0_el1);
-> >>>> +		int brps, wrps;
-> >>>> +
-> >>>> +		brps = (aa64dfr0 >> 12) & 0xf;
-> >>>> +		wrps = (aa64dfr0 >> 20) & 0xf;
-> >>>> +
-> >>>> +		save_debug(dbg->dbg_bcr, dbgbcr, brps);
-> >>>> +		save_debug(dbg->dbg_bvr, dbgbvr, brps);
-> >>>> +		save_debug(dbg->dbg_wcr, dbgwcr, wrps);
-> >>>> +		save_debug(dbg->dbg_wvr, dbgwvr, wrps);
-> >>>> +
-> >>>> +		ctxt->sys_regs[MDCCINT_EL1] = read_sysreg(mdccint_el1);
-> >>>> +	}
-> >>>> +}
-> >>>> +
-> >>>> +void __hyp_text __debug_restore_state(struct kvm_vcpu *vcpu,
-> >>>> +				      struct kvm_guest_debug_arch *dbg,
-> >>>> +				      struct kvm_cpu_context *ctxt)
-> >>>> +{
-> >>>> +	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY) {
-> >>>> +		u64 aa64dfr0 = read_sysreg(id_aa64dfr0_el1);
-> >>>> +		int brps, wrps;
-> >>>> +
-> >>>> +		brps = (aa64dfr0 >> 12) & 0xf;
-> >>>> +		wrps = (aa64dfr0 >> 20) & 0xf;
-> >>>> +
-> >>>> +		restore_debug(dbg->dbg_bcr, dbgbcr, brps);
-> >>>> +		restore_debug(dbg->dbg_bvr, dbgbvr, brps);
-> >>>> +		restore_debug(dbg->dbg_wcr, dbgwcr, wrps);
-> >>>> +		restore_debug(dbg->dbg_wvr, dbgwvr, wrps);
-> >>>> +
-> >>>> +		write_sysreg(ctxt->sys_regs[MDCCINT_EL1], mdccint_el1);
-> >>>> +	}
-> >>>> +}
-> >>>> +
-> >>>> +void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
-> >>>> +{
-> >>>> +	if ((vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_KDE) ||
-> >>>> +	    (vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_KDE))
-> >>>> +		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-> >>>> +
-> >>>> +	__debug_save_state(vcpu, &vcpu->arch.host_debug_state,
-> >>>> +			   kern_hyp_va(vcpu->arch.host_cpu_context));
-> >>>
-> >>> doesn't the assmebly code jump across saving this state neither bits are
-> >>> set where this always saves the state?
-> >>
-> >> It doesn't. The save/restore functions are guarded by tests on
-> >> KVM_ARM64_DEBUG_DIRTY, just like we have skip_debug_state on all actions
-> >> involving the save/restore in the assembly version.
-> > 
-> > I think the confusing part is that the save function unconditionally
-> > calls __debug_save_state where the restore function only calls it when
-> > the dirty flag is set.  Plus I suck at reading assembly apparently.
-> 
-> So the way I initially wrote it, I had the same 'if' statement as in the
-> restore function, making them fairly symmetric. But it quickly became
-> obvious that this double-if was a bit pointless.
-> 
-> And actually, I wonder if I shouldn't drop it from the restore function,
-> because it only save us a spurious clear of the dirty bit.
-> 
+On 01/12/15 10:42, tiffany lin wrote:
+>>>>   > diff --git a/drivers/media/platform/mtk-vcodec/common/venc_drv_if.c
+>>>> b/drivers/media/platform/mtk-vcodec/common/venc_drv_if.c
+>>>>   > new file mode 100644
+>>>>   > index 0000000..9b3f025
+>>>>   > --- /dev/null
+> [snip]
+>>>>   > +int venc_if_create(void *ctx, unsigned int fourcc, unsigned long
+>>>> *handle)
+>>>>   > +{
+>>>>   > +  struct venc_handle *h;
+>>>>   > +  char str[10];
+>>>>   > +
+>>>>   > +  mtk_vcodec_fmt2str(fourcc, str);
+>>>>   > +
+>>>>   > +  h = kzalloc(sizeof(*h), GFP_KERNEL);
+>>>>   > +  if (!h)
+>>>>   > +          return -ENOMEM;
+>>>>   > +
+>>>>   > +  h->fourcc = fourcc;
+>>>>   > +  h->ctx = ctx;
+>>>>   > +  mtk_vcodec_debug(h, "fmt = %s handle = %p", str, h);
+>>>>   > +
+>>>>   > +  switch (fourcc) {
+>>>>   > +  default:
+>>>>   > +          mtk_vcodec_err(h, "invalid format %s", str);
+>>>>   > +          goto err_out;
+>>>>   > +  }
+>>>>   > +
+>>>>   > +  *handle = (unsigned long)h;
+>>>>   > +  return 0;
+>>>>   > +
+>>>>   > +err_out:
+>>>>   > +  kfree(h);
+>>>>   > +  return -EINVAL;
+>>>>   > +}
+>>>>   > +
+>>>>   > +int venc_if_init(unsigned long handle)
+>>>>   > +{
+>>>>   > +  int ret = 0;
+>>>>   > +  struct venc_handle *h = (struct venc_handle *)handle;
+>>>>   > +
+>>>>   > +  mtk_vcodec_debug_enter(h);
+>>>>   > +
+>>>>   > +  mtk_venc_lock(h->ctx);
+>>>>   > +  mtk_vcodec_enc_clock_on();
+>>>>   > +  vpu_enable_clock(vpu_get_plat_device(h->ctx->dev->plat_dev));
+>>>>   > +  ret = h->enc_if->init(h->ctx, (unsigned long *)&h->drv_handle);
+>>>>   > +  vpu_disable_clock(vpu_get_plat_device(h->ctx->dev->plat_dev));
+>>>>   > +  mtk_vcodec_enc_clock_off();
+>>>>   > +  mtk_venc_unlock(h->ctx);
+>>>>   > +
+>>>>   > +  return ret;
+>>>>   > +}
+>>>>
+>>>> To me this looks more like an obfuscation layer rather than a
+>>>> abstraction layer. I don't understand why we need to hide things from
+>>>> the V4L2 implementation that this code forms part of.
+>>>>
+>>>> More importantly, if this code was included somewhere where it could be
+>>>> properly integrated with the device model you might be able to use the
+>>>> pm_runtime system to avoid this sort of "heroics" to manage the clocks
+>>>> anyway.
+>>>>
+>>> We want to abstract common part from encoder driver.
+>>> Every encoder driver follow same calling flow and only need to take care
+>>> about how to communicate with vpu to encode specific format.
+>>> Encoder driver do not need to take care clock and multiple instance
+>>> issue.
+>>
+>> Looking at each of those stages:
+>>
+>> mtk_venc_lock():
+>> Why isn't one of the existing V4L2 locking strategies ok for you?
+>>
+> We only has one encoder hw.
+> To support multiple encode instances.
+> When one encoder ctx access encoder hw, it need to get lock first.
+>
+>> mtk_vcodec_enc_clock_on():
+>> This does seem like something a sub-driver *should* be doing for itself
+> This is for enabling encoder hw related clock.
+> To support multiple instances, one encode ctx must get hw lock first
+> then clock on/off hw relate clock.
+>
+>> vpu_enable_clock():
+>> Why can't the VPU driver manage this internally using pm_runtime?
+>>
+> Our VPU do not have power domain.
+> We will remove VPU clock on/off and let vpu control it in next version.
+>
+>>
+>> That is why I described this as an obfuscation layer. It is collecting
+>> a bunch of stuff that can be handled using the kernel driver model and
+>> clumping them together in a special middle layer.
+>>
+> We do use kernel driver model, but we put it in
+> mtk_vcodec_enc_clock_on/mtk_vcodec_enc_clock_off.
+> Every sub-driver has no need to write the same code.
+> And once clock configuration change or porting to other chips, we don't
+> need to change sub-driver one-by-one, just change abstract layer.
 
-I would just move the __debug_restore_state call above the conditional,
-then they look more symmetric.  Does that work?
+I'm afraid I remain extremely unconvinced by the value of this API. It 
+is possible that once the types are fixed and it is tidied up it won't 
+stick out so much but I will be very surprised.
 
-> >>> in any case, I feel some context is lost when this is moved away from
-> >>> assembly and understanding this patch would be easier if the semantics
-> >>> of these two _cond functions were documented.
-> >>
-> >> I can migrate the existing comments if you think that helps.
-> >>
-> > It just wasn't not quite clear to me exactly when
-> > __debug_cond_save_host_state is called for example - is this going to be
-> > called unconditionally on every entry - that's how I understand it now
-> > anyway.
-> 
-> On every entry, yes. I'm trying to have the guest_run function as simple
-> as possible, with the various subsystems making their 'own' decisions.
-> 
-> Not optimal (you get to branch for nothing), but clearer. At least for
-> me, but I may be the odd duck out here. Any idea to make the flow look
-> clearer?
-> 
+Either way, I can wait until v2 before we discuss it further.
 
-For me, if you always make the call unconditionally on both paths and
-then change the implementations to do 
 
-	if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY))
-		return;
+>>>> If the start streaming operation implemented cleanup-on-error properly
+>>>> then there would only be two useful states: Started and stopped. Even
+>>>> the "sticky" error behavior looks unnecessary to me (meaning we don't
+>>>> need to track its state).
+>>>>
+>>> We cannot guaranteed that IOCTLs called from the user space follow
+>>> required sequence.
+>>> We need states to know if our driver could accept IOCTL command.
+>>
+>> I believe that knowing whether the streaming is started or stopped
+>> (e.g. two states) is sufficient for a driver to correctly handle
+>> abitrary ioctls from userspace and even then, the core code tracks
+>> this state for you so there's no need for you do it.
+>>
+>> The queue/dequeue ioctls succeed or fail based on the length of the
+>> queue (i.e. is the buffer queue overflowing or not) and have no need
+>> to check the streaming state.
+>
+>> If you are absolutely sure that the other states are needed then
+>> please provide an example of an ioctl() sequence where the additional
+>> state is needed.
+>>
+> I know your point that we have too many state changes in start_streaming
+> and stop_streaming function.
+> We will refine these two functions in next version.
+>
+> For the example, we need MTK_STATE_HEADER state, to make sure before
+> encode start, driver already get information to set encode parameters.
 
-then I think it's clear enough.
+Interesting. Again, I'll wait to see how the state simplifcation goes 
+before commenting further.
 
-Thanks,
--Christoffer
+
+> We need MTK_STATE_ABORT to inform encoder thread (mtk_venc_worker) that
+> stop encodeing job from stopped ctx instance.
+> When user space qbuf, we need to make sure everything is ready to sent
+> buf to encode.
+
+Agree that you need a flag here. In fact currently you have two, 
+MTK_STATE_ABORT and an unused one called aborting.
+
+You need to be very careful with these flags though. They are a magnet 
+for data race bugs (especially combined with SMP).
+
+For example at present I can't see any locking in the worker code. This 
+means there is nothing to make all those read-modify-write sequences 
+that manage the state atomic (thus risking state corruption).
+
+
+Daniel.
