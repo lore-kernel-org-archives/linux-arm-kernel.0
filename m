@@ -1,48 +1,155 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 1 Dec 2015 14:58:35 +0200
-Subject: [RFC v02 01/15] dmaengine: core: Allow NULL mask pointer in
- __dma_device_satisfies_mask()
-In-Reply-To: <565D6CB1.8030808@ti.com>
-References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
- <1448891145-10766-2-git-send-email-peter.ujfalusi@ti.com>
- <CAHp75VfY=NU4MG7q1w=oYdTiTr0dqtNTQU3UkEaL=tXPJADH5Q@mail.gmail.com>
- <565D6CB1.8030808@ti.com>
-Message-ID: <CAHp75Vfk_GAANRYdbHNxtCy-Ni18FppsKhPPX1X84v1Zu6JXvw@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 1 Dec 2015 14:04:04 +0100
+Subject: [BISECTED] rcu_sched self-detected stall since 3.17
+In-Reply-To: <564F3DCA.1080907@arm.com>
+References: <564F3DCA.1080907@arm.com>
+Message-ID: <20151201130404.GL3816@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 1, 2015 at 11:47 AM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
-> On 11/30/2015 04:35 PM, Andy Shevchenko wrote:
->> On Mon, Nov 30, 2015 at 3:45 PM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
->>> Treat as true condition the case when the mask is NULL.
->>
->> What do you think about setting some default (all "on") mask when mask
->> is not supplied?
->
-> Probably rephrasing the commit message to say that when the mask is NULL it
-> means that the caller does not care about the capabilities of the dma device
-> thus return with true in such a case.
->
-> We could also drop this patch and in private_candidate() :
->
-> -       if (!__dma_device_satisfies_mask(dev, mask)) {
-> +       if (mask && !__dma_device_satisfies_mask(dev, mask)) {
->                 pr_debug("%s: wrong capabilities\n", __func__);
->                 return NULL;
->         }
+Sorry for the delay and thanks for the reminder!
 
-Between patch and above proposal I would choose the latter one.
+On Fri, Nov 20, 2015 at 03:35:38PM +0000, Vladimir Murzin wrote:
+> commit 743162013d40ca612b4cb53d3a200dff2d9ab26e
+> Author: NeilBrown <neilb@suse.de>
+> Date:   Mon Jul 7 15:16:04 2014 +1000
+> 
+>     sched: Remove proliferation of wait_on_bit() action functions
+> 
+> The only change I noticed is from (mm/filemap.c)
+> 
+> 	io_schedule();
+> 	fatal_signal_pending(current)
+> 
+> to (kernel/sched/wait.c)
+> 
+> 	signal_pending_state(current->state, current)
+> 	io_schedule();
+> 
+> and if I apply following diff I don't see stalls anymore.
+> 
+> diff --git a/kernel/sched/wait.c b/kernel/sched/wait.c
+> index a104879..2d68cdb 100644
+> --- a/kernel/sched/wait.c
+> +++ b/kernel/sched/wait.c
+> @@ -514,9 +514,10 @@ EXPORT_SYMBOL(bit_wait);
+> 
+>  __sched int bit_wait_io(void *word)
+>  {
+> +       io_schedule();
+> +
+>         if (signal_pending_state(current->state, current))
+>                 return 1;
+> -       io_schedule();
+>         return 0;
+>  }
+>  EXPORT_SYMBOL(bit_wait_io);
+> 
+> Any ideas why it might happen and why diff above helps?
 
->> I don't know for sure but there might be cases when you don't want
->> literally *any* channel to satisfy.
->
-> Or set DMA_SLAVE only in dma_request_chan()? What happens if we have cases
-> when we are able to request channel for memcpy via dma_request_chan()
-> (dedicated memcpy channel/DMA engine?) in that case we will have the SLAVE
-> set, but not MEMCPY, or any other variation we do not know yet?
+Yes, the code as presented is simply wrong. And in fact most of the code
+it replaced was of the right form (with a few exceptions which would
+indeed have been subject to the same problem you've observed.
 
-Frankly, have no idea.
+Note how the late:
 
--- 
-With Best Regards,
-Andy Shevchenko
+  - cifs_sb_tcon_pending_wait
+  - fscache_wait_bit_interruptible
+  - sleep_on_page_killable
+  - wait_inquiry
+  - key_wait_bit_intr
+
+All check the signal state _after_ calling schedule().
+
+As opposed to:
+
+  - gfs2_journalid_wait
+
+which follows the broken pattern.
+
+Further notice that most expect a return of -EINTR, which also seems
+correct given that this is a signal, those that do not return -EINTR
+only check for a !0 return value so would work equally well with -EINTR.
+
+The reason this is broken is that schedule() will no-op when there is a
+pending signal, while raising a signal will also issue a wakeup.
+
+Thus the right thing to do is check for the signal state after, that way
+you handle both cases:
+
+ - calling schedule() with a signal pending
+ - receiving a signal while sleeping
+
+As such, I would propose the below patch. Oleg, do you concur?
+
+---
+Subject: sched,wait: Fix signal handling in bit wait helpers
+
+Vladimir reported getting RCU stall warnings and bisected it back to
+commit 743162013d40. That commit inadvertently reversed the calls to
+schedule() and signal_pending(), thereby not handling the case where the
+signal receives while we sleep.
+
+Fixes: 743162013d40 ("sched: Remove proliferation of wait_on_bit() action functions")
+Fixes: cbbce8220949 ("SCHED: add some "wait..on_bit...timeout()" interfaces.")
+Reported-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Signed-off-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+---
+ kernel/sched/wait.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/kernel/sched/wait.c b/kernel/sched/wait.c
+index 052e02672d12..f10bd873e684 100644
+--- a/kernel/sched/wait.c
++++ b/kernel/sched/wait.c
+@@ -583,18 +583,18 @@ EXPORT_SYMBOL(wake_up_atomic_t);
+ 
+ __sched int bit_wait(struct wait_bit_key *word)
+ {
+-	if (signal_pending_state(current->state, current))
+-		return 1;
+ 	schedule();
++	if (signal_pending(current))
++		return -EINTR;
+ 	return 0;
+ }
+ EXPORT_SYMBOL(bit_wait);
+ 
+ __sched int bit_wait_io(struct wait_bit_key *word)
+ {
+-	if (signal_pending_state(current->state, current))
+-		return 1;
+ 	io_schedule();
++	if (signal_pending(current))
++		return -EINTR;
+ 	return 0;
+ }
+ EXPORT_SYMBOL(bit_wait_io);
+@@ -602,11 +602,11 @@ EXPORT_SYMBOL(bit_wait_io);
+ __sched int bit_wait_timeout(struct wait_bit_key *word)
+ {
+ 	unsigned long now = READ_ONCE(jiffies);
+-	if (signal_pending_state(current->state, current))
+-		return 1;
+ 	if (time_after_eq(now, word->timeout))
+ 		return -EAGAIN;
+ 	schedule_timeout(word->timeout - now);
++	if (signal_pending(current))
++		return -EINTR;
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(bit_wait_timeout);
+@@ -614,11 +614,11 @@ EXPORT_SYMBOL_GPL(bit_wait_timeout);
+ __sched int bit_wait_io_timeout(struct wait_bit_key *word)
+ {
+ 	unsigned long now = READ_ONCE(jiffies);
+-	if (signal_pending_state(current->state, current))
+-		return 1;
+ 	if (time_after_eq(now, word->timeout))
+ 		return -EAGAIN;
+ 	io_schedule_timeout(word->timeout - now);
++	if (signal_pending(current))
++		return -EINTR;
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(bit_wait_io_timeout);
