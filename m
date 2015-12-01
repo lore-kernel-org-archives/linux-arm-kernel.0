@@ -1,41 +1,21 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue,  1 Dec 2015 22:55:40 +0000
-Subject: [PATCH 2/3] pwm: bcm2835: prevent division by zero
-In-Reply-To: <1449010541-3767-1-git-send-email-stefan.wahren@i2se.com>
-References: <1449010541-3767-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1449010541-3767-3-git-send-email-stefan.wahren@i2se.com>
+Date: Tue,  1 Dec 2015 22:55:38 +0000
+Subject: [PATCH 0/3] pwm: bcm2835: improve clock handling
+Message-ID: <1449010541-3767-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's possible that the pwm clock become an orphan. So better
-check the result of clk_get_rate in order to prevent a division
-by zero.
+With the upcoming PWM clock support the pwm-bcm2835 should take
+more care about the clock handling. But this patch series doesn't
+depend on these clock driver changes.
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- drivers/pwm/pwm-bcm2835.c |   10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+Stefan Wahren (3):
+  pwm: bcm2835: calculate scaler in pwm_config
+  pwm: bcm2835: prevent division by zero
+  pwm: bcm2835: fix email address specifiction
 
-diff --git a/drivers/pwm/pwm-bcm2835.c b/drivers/pwm/pwm-bcm2835.c
-index 174cca9..31a6992 100644
---- a/drivers/pwm/pwm-bcm2835.c
-+++ b/drivers/pwm/pwm-bcm2835.c
-@@ -65,7 +65,15 @@ static int bcm2835_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 			      int duty_ns, int period_ns)
- {
- 	struct bcm2835_pwm *pc = to_bcm2835_pwm(chip);
--	unsigned long scaler = NSEC_PER_SEC / clk_get_rate(pc->clk);
-+	unsigned long rate = clk_get_rate(pc->clk);
-+	unsigned long scaler;
-+
-+	if (!rate) {
-+		dev_err(pc->dev, "failed to get clock rate\n");
-+		return -EINVAL;
-+	}
-+
-+	scaler = NSEC_PER_SEC / rate;
- 
- 	if (period_ns <= MIN_PERIOD) {
- 		dev_err(pc->dev, "period %d not supported, minimum %d\n",
+ drivers/pwm/pwm-bcm2835.c |   18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
+
 -- 
 1.7.9.5
