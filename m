@@ -1,32 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 1 Dec 2015 17:52:55 +0000
-Subject: [PATCH v2 2/6] arm64: Move kill_cpu_early to smp.c
-In-Reply-To: <565DDB2E.2010308@arm.com>
-References: <1448982731-17182-1-git-send-email-suzuki.poulose@arm.com>
- <1448982731-17182-3-git-send-email-suzuki.poulose@arm.com>
- <20151201152826.GA28370@leverpostej> <565DC5DB.7070905@arm.com>
- <20151201163138.GA29045@leverpostej> <565DDB2E.2010308@arm.com>
-Message-ID: <20151201175254.GD29045@leverpostej>
+From: lifshitz@compulab.co.il (Dmitry Lifshitz)
+Date: Tue,  1 Dec 2015 20:03:04 +0200
+Subject: [PATCH V2 02/19] ARM: dts: am57xx: cl-som-am57x: dts: add RTC support
+In-Reply-To: <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
+References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
+ <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1448993001-19495-3-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 05:38:54PM +0000, Suzuki K. Poulose wrote:
-> On 01/12/15 16:31, Mark Rutland wrote:
+Add EM3027 RTC chip support (over I2C4 bus).
 
-[...]
+Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+---
+  v2:
 
-> >We need stuck-in-the-kernel flag to account for CPUs which didn't manage
-> >to turn the MMU on (which are either in the spin-table, or failed when
-> >they were individually onlined).
-> 
-> Did you mean to say "turn the MMU off" ?
+   * No fuctional changes.
+   * Refactor patch with respect to the previous changes in I2C4 node structure.
+   * Reformat subject
 
-No, I mean CPUs which were unable to turn the MMU on in the first place.
-Perhaps they entered the spin-table but were never individually onlined,
-perhaps they didn't support the kernel page size, etc.
+ arch/arm/boot/dts/am57xx-cl-som-am57x.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-When CPUs exit the kernel via PSCI they never switch the MMU off within
-the kernel.
-
-Thanks,
-Mark.
+diff --git a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+index 087d62e..58156a9 100644
+--- a/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
++++ b/arch/arm/boot/dts/am57xx-cl-som-am57x.dts
+@@ -242,6 +242,11 @@
+ 			#gpio-cells = <2>;
+ 		};
+ 	};
++
++	rtc0: rtc at 56 {
++		compatible = "emmicro,em3027";
++		reg = <0x56>;
++	};
+ };
+ 
+ &cpu0 {
+-- 
+1.9.1
