@@ -1,158 +1,55 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 1 Dec 2015 22:29:54 +0530
-Subject: [RFC v02 00/15] dmaengine: New 'universal' API for requesting
- channel
-In-Reply-To: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20151201165954.GA1696@localhost>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 01 Dec 2015 16:57:30 +0000
+Subject: [PATCH v4 18/21] KVM: ARM64: Add PMU overflow interrupt routing
+In-Reply-To: <565DCA24.7000908@linaro.org>
+References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>	<1446186123-11548-19-git-send-email-zhaoshenglong@huawei.com>
+ <20151130182258.684c9df6@arm.com> <565DB021.3020901@huawei.com>
+ <565DB3A5.3030701@arm.com> <565DB935.5040609@linaro.org>
+ <565DBF8D.1070006@arm.com> <565DCA24.7000908@linaro.org>
+Message-ID: <565DD17A.50009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 03:45:30PM +0200, Peter Ujfalusi wrote:
-> Hi,
+On 01/12/15 16:26, Shannon Zhao wrote:
 > 
-> Changes since RFC v01:
-> - dma_request_chan(); lost the mask parameter
-> - The new API does not rely on RESOURCE_DMA, instead the dma_filter_map table
->   will be used to provide the needed information to the filter function in
->   legacy mode
-> - Extended the example patches to convert most of daVinci to use the new API to
->   request the DMA channels.
+> 
+> On 2015/12/1 23:41, Marc Zyngier wrote:
+>>> The reason is that when guest clear the overflow register, it will trap
+>>>> to kvm and call kvm_pmu_sync_hwstate() as you see above. At this moment,
+>>>> the overflow register is still overflowed(that is some bit is still 1).
+>>>> So We need to use some flag to mark we already inject this interrupt.
+>>>> And if during guest handling the overflow, there is a new overflow
+>>>> happening, the pmu->irq_pending will be set ture by
+>>>> kvm_pmu_perf_overflow(), then it needs to inject this new interrupt, right?
+>> I don't think so. This is a level interrupt, so the level should stay
+>> high as long as the guest hasn't cleared all possible sources for that
+>> interrupt.
+>>
+>> For your example, the guest writes to PMOVSCLR to clear the overflow
+>> caused by a given counter. If the status is now 0, the interrupt line
+>> drops. If the status is still non zero, the line stays high. And I
+>> believe that writing a 1 to PMOVSSET would actually trigger an
+>> interrupt, or keep it high if it has already high.
+>>
+> Right, writing 1 to PMOVSSET will trigger an interrupt.
+> 
+>> In essence, do not try to maintain side state. I've been bitten.
+> 
+> So on VM entry, it check if PMOVSSET is zero. If not, call 
+> kvm_vgic_inject_irq to set the level high. If so, set the level low.
+> On VM exit, it seems there is nothing to do.
 
-Hi Peter,
+It is even simpler than that:
 
-Thanks a bunch for fixing this up!
+- When you get an overflow, you inject an interrupt with the level set to 1.
+- When the overflow register gets cleared, you inject the same interrupt
+with the level set to 0.
 
-I think overall I am happy with the proposal and aligning with 2 APIs really
-_helps_.
+I don't think you need to do anything else, and the world switch should
+be left untouched.
 
-> 
-> TODO: Documentation update ;)
->
-> 
-> As it has been discussed in the following thread:
-> http://www.gossamer-threads.com/lists/linux/kernel/2181487#2181487
-> 
-> Andy: I did looked at the unified device properties, but I decided to not to use
-> it as I don't see it to fit well and most of the legacy board files are using
-> resources to specify at least their memory regions so adding the DMA resource
-> to them would be more inline with the rest of the code.
+Thanks,
 
-I think that is okay for now, we can align on that eventually. I think this
-doesn't impact the API design though..
-
-> 
-> The ARM, mmc and spi patches are converting daVinci drivers board files to use
-> the new method of requesting DMA channel.
-> 
-> With this series I have taken a path which would result two new API, which can
-> be used to convert most of the current users already and with some work all
-> users might be able to move to this set.
-> With this set the filter_fn used for legacy (non DT/ACPI) channel request is no
-> longer needed to be exported to client drivers since the selection of the
-> correct filter_fn will be done in the core.
-> 
-> So, the first proposal is to have:
-> 
-> struct dma_chan *dma_request_chan(struct device *dev, const char *name);
-> struct dma_chan *dma_request_chan_by_mask(const dma_cap_mask_t *mask);
-> 
-> The dma_request_chan_by_mask() is to request any channel matching with the
-> requested capabilities, can be used to request channel for memcpy, memset, xor,
-> etc where no hardware synchronization is needed.
-> 
-> The dma_request_chan() is to request a slave channel. The dma_request_chan() will try to find the
-> channel via DT, ACPI or in case if the kernel booted in non DT/ACPI mode
-> it will use a filter lookup table and retrieves the needed information from
-> the dma_filter_map provided by the DMA drivers.
-
-That sounds right, for the third case would the arch, driver or someone else
-configure this?
-
-> This legacy mode needs changes in platform code, in dmaengine drivers and
-> finally the dmaengine user drivers can be converted:
-
-Are you marking the current APIs as dericated in the end of this series
-
-> 
-> For each dmaengine driver an array of DMA device, slave and the parameter
-> for the filter function needs to be added:
-> 
-> static struct dma_filter_map da830_edma_map[] = {
-> 	DMA_FILTER_ENTRY("davinci-mcasp.0", "rx", EDMA_CTLR_CHAN(0, 0)),
-> 	DMA_FILTER_ENTRY("davinci-mcasp.0", "tx", EDMA_CTLR_CHAN(0, 1)),
-> 	DMA_FILTER_ENTRY("davinci-mcasp.1", "rx", EDMA_CTLR_CHAN(0, 2)),
-> 	DMA_FILTER_ENTRY("davinci-mcasp.1", "tx", EDMA_CTLR_CHAN(0, 3)),
-> 	DMA_FILTER_ENTRY("davinci-mcasp.2", "rx", EDMA_CTLR_CHAN(0, 4)),
-> 	DMA_FILTER_ENTRY("davinci-mcasp.2", "tx", EDMA_CTLR_CHAN(0, 5)),
-> 	DMA_FILTER_ENTRY("spi_davinci.0", "rx", EDMA_CTLR_CHAN(0, 14)),
-> 	DMA_FILTER_ENTRY("spi_davinci.0", "tx", EDMA_CTLR_CHAN(0, 15)),
-> 	DMA_FILTER_ENTRY("da830-mmc.0", "rx", EDMA_CTLR_CHAN(0, 16)),
-> 	DMA_FILTER_ENTRY("da830-mmc.0", "tx", EDMA_CTLR_CHAN(0, 17)),
-> 	DMA_FILTER_ENTRY("spi_davinci.1", "rx", EDMA_CTLR_CHAN(0, 18)),
-> 	DMA_FILTER_ENTRY("spi_davinci.1", "tx", EDMA_CTLR_CHAN(0, 19)),
-> };
-> 
-> This information is going to be needed by the dmaengine driver, so
-> modification to the platform_data is needed, and the driver map should be
-> added to the pdata of the DMA driver:
-> 
-> da8xx_edma0_pdata.filter_map = da830_edma_map;
-> da8xx_edma0_pdata.filtercnt = ARRAY_SIZE(da830_edma_map);
-> 
-> The DMA driver then needs to convigure the needed device -> filter_fn
-> mapping before it registers with dma_async_device_register() :
-> 
-> if (info->filter_map) {
-> 	ecc->dma_slave.filter_map.map = info->filter_map;
-> 	ecc->dma_slave.filter_map.mapcnt = info->filtercnt;
-> 	ecc->dma_slave.filter_map.filter_fn = edma_filter_for_map;
-> }
-> 
-> When neither DT or ACPI lookup is available the dma_request_chan() will
-> try to match the requester's device name with the filter_map's list of
-> device names, when a match found it will use the information from the
-> dma_filter_map to get the channel with the dma_get_channel() internal
-> function.
-> 
-> Regards,
-> Peter
-> ---
-> Peter Ujfalusi (15):
->   dmaengine: core: Allow NULL mask pointer in
->     __dma_device_satisfies_mask()
->   dmaengine: core: Move and merge the code paths using private_candidate
->   dmaengine: core: Introduce new, universal API to request a channel
->   dmaengine: edma: Add support for DMA filter mapping to slave devices
->   ARM: davinci: devices-da8xx: Add dma_filter_map to edma
->   ARM: davinci: dm355: Add dma_filter_map to edma
->   ARM: davinci: dm365: Add dma_filter_map to edma
->   ARM: davinci: dm644x: Add dma_filter_map to edma
->   ARM: davinci: dm646x: Add dma_filter_map to edma
->   mmc: davinci_mmc: Use dma_request_chan() to requesting DMA channel
->   spi: davinci: Use dma_request_chan() to requesting DMA channel
->   ARM: davinci: devices-da8xx: Remove DMA resources for MMC and SPI
->   ARM: davinci: devices: Remove DMA resources for MMC
->   ARM: davinci: dm355: Remove DMA resources for SPI
->   ARM: davinci: dm365: Remove DMA resources for SPI
-> 
->  arch/arm/mach-davinci/devices-da8xx.c |  95 ++++++++++----------
->  arch/arm/mach-davinci/devices.c       |  19 ----
->  arch/arm/mach-davinci/dm355.c         |  28 ++++--
->  arch/arm/mach-davinci/dm365.c         |  30 +++++--
->  arch/arm/mach-davinci/dm644x.c        |  12 +++
->  arch/arm/mach-davinci/dm646x.c        |  11 +++
->  drivers/dma/dmaengine.c               | 160 +++++++++++++++++++++++++---------
->  drivers/dma/edma.c                    |  24 +++++
->  drivers/mmc/host/davinci_mmc.c        |  52 +++--------
->  drivers/spi/spi-davinci.c             |  76 +++++-----------
->  include/linux/dmaengine.h             |  31 +++++++
->  include/linux/platform_data/edma.h    |   5 ++
->  12 files changed, 330 insertions(+), 213 deletions(-)
-> 
-> -- 
-> 2.6.3
-> 
-
+	M.
 -- 
-~Vinod
+Jazz is not dead. It just smells funny...
