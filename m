@@ -1,81 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 1 Dec 2015 16:32:33 +0000
-Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
- concurrent lockers
-In-Reply-To: <20151201004017.GA1135@fixme-laptop.cn.ibm.com>
-References: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
- <20151201004017.GA1135@fixme-laptop.cn.ibm.com>
-Message-ID: <20151201163232.GD27751@arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 1 Dec 2015 10:38:33 -0600
+Subject: [PATCH V2] reset: Introduce static inline dummy function when
+ CONFIG_RESET_CONTROLLER is not set
+In-Reply-To: <1448984088-31904-1-git-send-email-nm@ti.com>
+References: <1448984088-31904-1-git-send-email-nm@ti.com>
+Message-ID: <1448987913-17770-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 08:40:17AM +0800, Boqun Feng wrote:
-> Hi Will,
+When CONFIG_RESET_CONTROLLER is not defined (example COMPILE_TEST),
+provide a dummy static inline implementation.
 
-Hi Boqun,
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
 
-> On Fri, Nov 27, 2015 at 11:44:06AM +0000, Will Deacon wrote:
-> > Boqun Feng reported a rather nasty ordering issue with spin_unlock_wait
-> > on architectures implementing spin_lock with LL/SC sequences and acquire
-> > semantics:
-> > 
-> >  | CPU 1                   CPU 2                     CPU 3
-> >  | ==================      ====================      ==============
-> >  |                                                   spin_unlock(&lock);
-> >  |                         spin_lock(&lock):
-> >  |                           r1 = *lock; // r1 == 0;
-> >  |                         o = READ_ONCE(object); // reordered here
-> >  | object = NULL;
-> >  | smp_mb();
-> >  | spin_unlock_wait(&lock);
-> >  |                           *lock = 1;
-> >  | smp_mb();
-> >  | o->dead = true;
-> >  |                         if (o) // true
-> >  |                           BUG_ON(o->dead); // true!!
-> > 
-> > The crux of the problem is that spin_unlock_wait(&lock) can return on
-> > CPU 1 whilst CPU 2 is in the process of taking the lock. This can be
-> > resolved by upgrading spin_unlock_wait to a LOCK operation, forcing it
-> 
-> I wonder whether upgrading it to a LOCK operation is necessary. Please
-> see below.
-> 
-> > to serialise against a concurrent locker and giving it acquire semantics
-> > in the process (although it is not at all clear whether this is needed -
-> > different callers seem to assume different things about the barrier
-> > semantics and architectures are similarly disjoint in their
-> > implementations of the macro).
-> > 
-> > This patch implements spin_unlock_wait using an LL/SC sequence with
-> > acquire semantics on arm64. For v8.1 systems with the LSE atomics, the
-> 
-> IIUC, you implement this with acquire semantics because a LOCK requires
-> acquire semantics, right? I get that spin_unlock_wait() becoming a LOCK
-> will surely simply our analysis, because LOCK->LOCK is always globally
-> ordered. But for this particular problem, seems only a relaxed LL/SC
-> loop suffices, and the use of spin_unlock_wait() in do_exit() only
-> requires a control dependency which could be fulfilled by a relaxed
-> LL/SC loop. So the acquire semantics may be not necessary here.
-> 
-> Am I missing something subtle here which is the reason you want to
-> upgrading spin_unlock_wait() to a LOCK?
+V2: Thanks to kbot, I realized i messed up the patch -> hopefully, this revision
+has better luck.
 
-There's two things going on here:
+V1: https://patchwork.kernel.org/patch/7738191/
 
-  (1) Having spin_unlock_wait do a complete LL/SC sequence (i.e. writing
-      to the lock, like a LOCK operation would)
+ include/linux/reset-controller.h | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-  (2) Giving it ACQUIRE semantics
-
-(2) is not necessary to fix the problem you described. However, LOCK
-operations do imply ACQUIRE and it's not clear to me that what the
-ordering semantics are for spin_unlock_wait.
-
-I'd really like to keep this as simple as possible. Introducing yet
-another magic barrier macro that isn't well understood or widely used
-feels like a major step backwards to me, so I opted to upgrade
-spin_unlock_wait to LOCK on arm64 so that I no longer have to worry
-about it.
-
-Will
+diff --git a/include/linux/reset-controller.h b/include/linux/reset-controller.h
+index ce6b962ffed4..e294565540db 100644
+--- a/include/linux/reset-controller.h
++++ b/include/linux/reset-controller.h
+@@ -48,7 +48,18 @@ struct reset_controller_dev {
+ 	unsigned int nr_resets;
+ };
+ 
++#if IS_ENABLED(CONFIG_RESET_CONTROLLER)
+ int reset_controller_register(struct reset_controller_dev *rcdev);
+ void reset_controller_unregister(struct reset_controller_dev *rcdev);
++#else
++static inline int reset_controller_register(struct reset_controller_dev *r)
++{
++	return -EINVAL;
++}
++
++static inline void reset_controller_unregister(struct reset_controller_dev *r)
++{
++}
++#endif	/* IS_ENABLED(CONFIG_RESET_CONTROLLER) */
+ 
+ #endif
+-- 
+2.6.2.402.g2635c2b
