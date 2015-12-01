@@ -1,255 +1,82 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 30 Nov 2015 17:03:33 -0800
-Subject: [PATCH] ARM: mm: flip priority of CONFIG_DEBUG_RODATA
-In-Reply-To: <20151130233819.GA18873@www.outflux.net>
-References: <20151130233819.GA18873@www.outflux.net>
-Message-ID: <565CF1E5.2070003@redhat.com>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Mon, 30 Nov 2015 18:55:23 -0600
+Subject: [PATCH v4 1/4] mm: mmap: Add new /proc tunable for mmap_base ASLR.
+In-Reply-To: <20151130161811.592c205d8dc7b00f44066a37@linux-foundation.org>
+ (Andrew Morton's message of "Mon, 30 Nov 2015 16:18:11 -0800")
+References: <1448578785-17656-1-git-send-email-dcashman@android.com>
+ <1448578785-17656-2-git-send-email-dcashman@android.com>
+ <20151130155412.b1a087f4f6f4d4180ab4472d@linux-foundation.org>
+ <20151130160118.e43a2e53a59e347a95a94d5c@linux-foundation.org>
+ <CAGXu5jK7UzjBxXKQajxhLv-uLk_xQXR_FHOsmW6RLJNeK_-dZg@mail.gmail.com>
+ <20151130161811.592c205d8dc7b00f44066a37@linux-foundation.org>
+Message-ID: <87610jugw4.fsf@x220.int.ebiederm.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2015 03:38 PM, Kees Cook wrote:
-> Given the choice between making things NX or making things RO, we want
-> RO first. As such, redefine CONFIG_DEBUG_RODATA to actually do the bulk
+Andrew Morton <akpm@linux-foundation.org> writes:
 
-Can you give a citation for why? The thread that inspired it might be
-a good link.
+> On Mon, 30 Nov 2015 16:04:36 -0800 Kees Cook <keescook@chromium.org> wrote:
+>
+>> >> > +#ifdef CONFIG_HAVE_ARCH_MMAP_RND_BITS
+>> >> > +   {
+>> >> > +           .procname       = "mmap_rnd_bits",
+>> >> > +           .data           = &mmap_rnd_bits,
+>> >> > +           .maxlen         = sizeof(mmap_rnd_bits),
+>> >> > +           .mode           = 0600,
+>> >> > +           .proc_handler   = proc_dointvec_minmax,
+>> >> > +           .extra1         = (void *) &mmap_rnd_bits_min,
+>> >> > +           .extra2         = (void *) &mmap_rnd_bits_max,
+>> >>
+>> >> hm, why the typecasts?  They're unneeded and are omitted everywhere(?)
+>> >> else in kernel/sysctl.c.
+>> >
+>> > Oh.  Casting away constness.
+>> >
+>> > What's the thinking here?  They can change at any time so they aren't
+>> > const so we shouldn't declare them to be const?
+>> 
+>> The _min and _max values shouldn't be changing: they're decided based
+>> on the various CONFIG options that calculate the valid min/maxes. Only
+>> mmap_rnd_bits itself should be changing.
+>
+> hmpf.
+>
+> From: Andrew Morton <akpm@linux-foundation.org>
+> Subject: include/linux/sysctl.h: make ctl_table.extra1/2 const
+>
+> Nothing should be altering these values.  Declare the pointed-to values to
+> be const so we can actually use const values.
 
-> of the ROing (and NXing). In the place of the old CONFIG_DEBUG_RODATA,
-> introduce CONFIG_DEBUG_RODATA_ALIGN (after arm64's config that does the
-> same thing) to add the additional section alignment for making rodata
-> explicitly NX. Also adds human readable names to the sections so I
-> could more easily debug my typos, and makes CONFIG_DEBUG_RODATA default
-> "y" for CPU_V7.
->
-> Results in /sys/kernel/debug/kernel_page_tables for each config state:
->
->   # CONFIG_DEBUG_RODATA is not set
->   # CONFIG_DEBUG_ALIGN_RODATA is not set
->
-> ---[ Kernel Mapping ]---
-> 0x80000000-0x80900000           9M     RW x  SHD
-> 0x80900000-0xa0000000         503M     RW NX SHD
->
->   CONFIG_DEBUG_RODATA=y
->   CONFIG_DEBUG_ALIGN_RODATA=y
->
-> ---[ Kernel Mapping ]---
-> 0x80000000-0x80100000           1M     RW NX SHD
-> 0x80100000-0x80700000           6M     ro x  SHD
-> 0x80700000-0x80a00000           3M     ro NX SHD
-> 0x80a00000-0xa0000000         502M     RW NX SHD
->
->   CONFIG_DEBUG_RODATA=y
->   # CONFIG_DEBUG_ALIGN_RODATA is not set
->
-> ---[ Kernel Mapping ]---
-> 0x80000000-0x80100000           1M     RW NX SHD
-> 0x80100000-0x80a00000           9M     ro x  SHD
-> 0x80a00000-0xa0000000         502M     RW NX SHD
->
-> Signed-off-by: Kees Cook <keescook@chromium.org>
+No large objects except we do seem to have values that are stashed
+in extra1 that are cast to non-const types.
+
+Any chance you will do the work to hunt all of those down and modify
+the casts to preserve const or to remove the casts entirely?
+
+Eric
+
+
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Daniel Cashman <dcashman@android.com>
+> Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
 > ---
->   arch/arm/kernel/vmlinux.lds.S | 10 +++++-----
->   arch/arm/mm/Kconfig           | 34 ++++++++++++++++++----------------
->   arch/arm/mm/init.c            | 18 ++++++++++--------
->   3 files changed, 33 insertions(+), 29 deletions(-)
 >
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index 8b60fde5ce48..a6e395c53a48 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -8,7 +8,7 @@
->   #include <asm/thread_info.h>
->   #include <asm/memory.h>
->   #include <asm/page.h>
-> -#ifdef CONFIG_ARM_KERNMEM_PERMS
-> +#ifdef CONFIG_DEBUG_RODATA
->   #include <asm/pgtable.h>
->   #endif
+>  include/linux/sysctl.h |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 >
-> @@ -94,7 +94,7 @@ SECTIONS
->   		HEAD_TEXT
->   	}
->
-> -#ifdef CONFIG_ARM_KERNMEM_PERMS
-> +#ifdef CONFIG_DEBUG_RODATA
->   	. = ALIGN(1<<SECTION_SHIFT);
->   #endif
->
-> @@ -117,7 +117,7 @@ SECTIONS
->   			ARM_CPU_KEEP(PROC_INFO)
->   	}
->
-> -#ifdef CONFIG_DEBUG_RODATA
-> +#ifdef CONFIG_DEBUG_ALIGN_RODATA
->   	. = ALIGN(1<<SECTION_SHIFT);
->   #endif
->   	RO_DATA(PAGE_SIZE)
-> @@ -153,7 +153,7 @@ SECTIONS
->   	_etext = .;			/* End of text and rodata section */
->
->   #ifndef CONFIG_XIP_KERNEL
-> -# ifdef CONFIG_ARM_KERNMEM_PERMS
-> +# ifdef CONFIG_DEBUG_RODATA
->   	. = ALIGN(1<<SECTION_SHIFT);
->   # else
->   	. = ALIGN(PAGE_SIZE);
-> @@ -231,7 +231,7 @@ SECTIONS
->   	__data_loc = ALIGN(4);		/* location in binary */
->   	. = PAGE_OFFSET + TEXT_OFFSET;
->   #else
-> -#ifdef CONFIG_ARM_KERNMEM_PERMS
-> +#ifdef CONFIG_DEBUG_RODATA
->   	. = ALIGN(1<<SECTION_SHIFT);
->   #else
->   	. = ALIGN(THREAD_SIZE);
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 41218867a9a6..b617084e9520 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -1039,24 +1039,26 @@ config ARCH_SUPPORTS_BIG_ENDIAN
->   	  This option specifies the architecture can support big endian
->   	  operation.
->
-> -config ARM_KERNMEM_PERMS
-> -	bool "Restrict kernel memory permissions"
-> +config DEBUG_RODATA
-> +	bool "Make kernel text and rodata read-only"
->   	depends on MMU
-> +	default y if CPU_V7
->   	help
-> -	  If this is set, kernel memory other than kernel text (and rodata)
-> -	  will be made non-executable. The tradeoff is that each region is
-> -	  padded to section-size (1MiB) boundaries (because their permissions
-> -	  are different and splitting the 1M pages into 4K ones causes TLB
-> -	  performance problems), wasting memory.
-> +	  If this is set, kernel memory (text, rodata, etc) will be made
-> +	  read-only, and non-text kernel memory will be made non-executable.
-> +	  The tradeoff is that each region is padded to section-size (1MiB)
-> +	  boundaries (because their permissions are different and splitting
-> +	  the 1M pages into 4K ones causes TLB performance problems), which
-> +	  can waste memory.
->
-> -config DEBUG_RODATA
-> -	bool "Make kernel text and rodata read-only"
-> -	depends on ARM_KERNMEM_PERMS
-> +config DEBUG_ALIGN_RODATA
-> +	bool "Make rodata strictly non-executable"
-> +	depends on DEBUG_RODATA
->   	default y
->   	help
-> -	  If this is set, kernel text and rodata will be made read-only. This
-> -	  is to help catch accidental or malicious attempts to change the
-> -	  kernel's executable code. Additionally splits rodata from kernel
-> -	  text so it can be made explicitly non-executable. This creates
-> -	  another section-size padded region, so it can waste more memory
-> -	  space while gaining the read-only protections.
-> +	  If this is set, rodata will be made explicitly non-executable. This
-> +	  provides protection on the rare chance that attackers might find and
-> +	  use ROP gadgets that exist in the rodata section. This adds an
-> +	  additional section-aligned split of rodata from kernel text so it
-> +	  can be made explicitly non-executable. This padding may waste memory
-> +	  space to gain this additional protection.
-
-I get that you want to make this match arm64 but it's really not intuitive that
-something with ALIGN_RODATA in the name is actually for setting NX. The purpose
-of ALIGN_RODATA was also slightly different on arm64 since the RO/NX will still
-be there, the difference is if the sections are present versus broken down into
-pages.
-
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 8a63b4cdc0f2..e99f65fbcf2b 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -568,8 +568,9 @@ void __init mem_init(void)
->   	}
->   }
->
-> -#ifdef CONFIG_ARM_KERNMEM_PERMS
-> +#ifdef CONFIG_DEBUG_RODATA
->   struct section_perm {
-> +	const char *name;
->   	unsigned long start;
->   	unsigned long end;
->   	pmdval_t mask;
-> @@ -580,6 +581,7 @@ struct section_perm {
->   static struct section_perm nx_perms[] = {
->   	/* Make pages tables, etc before _stext RW (set NX). */
->   	{
-> +		.name	= "pre-text NX",
->   		.start	= PAGE_OFFSET,
->   		.end	= (unsigned long)_stext,
->   		.mask	= ~PMD_SECT_XN,
-> @@ -587,14 +589,16 @@ static struct section_perm nx_perms[] = {
->   	},
->   	/* Make init RW (set NX). */
->   	{
-> +		.name	= "init NX",
->   		.start	= (unsigned long)__init_begin,
->   		.end	= (unsigned long)_sdata,
->   		.mask	= ~PMD_SECT_XN,
->   		.prot	= PMD_SECT_XN,
->   	},
-> -#ifdef CONFIG_DEBUG_RODATA
-> +#ifdef CONFIG_DEBUG_ALIGN_RODATA
->   	/* Make rodata NX (set RO in ro_perms below). */
->   	{
-> +		.name	= "rodata NX",
->   		.start  = (unsigned long)__start_rodata,
->   		.end    = (unsigned long)__init_begin,
->   		.mask   = ~PMD_SECT_XN,
-> @@ -603,10 +607,10 @@ static struct section_perm nx_perms[] = {
->   #endif
->   };
->
-> -#ifdef CONFIG_DEBUG_RODATA
->   static struct section_perm ro_perms[] = {
->   	/* Make kernel code and rodata RX (set RO). */
->   	{
-> +		.name	= "text/rodata RO",
->   		.start  = (unsigned long)_stext,
->   		.end    = (unsigned long)__init_begin,
->   #ifdef CONFIG_ARM_LPAE
-> @@ -619,7 +623,6 @@ static struct section_perm ro_perms[] = {
->   #endif
->   	},
->   };
-> -#endif
->
->   /*
->    * Updates section permissions only for the current mm (sections are
-> @@ -666,7 +669,8 @@ static inline bool arch_has_strict_perms(void)
->   	for (i = 0; i < ARRAY_SIZE(perms); i++) {			\
->   		if (!IS_ALIGNED(perms[i].start, SECTION_SIZE) ||	\
->   		    !IS_ALIGNED(perms[i].end, SECTION_SIZE)) {		\
-> -			pr_err("BUG: section %lx-%lx not aligned to %lx\n", \
-> +			pr_err("BUG: %s section %lx-%lx not aligned to %lx\n", \
-> +				perms[i].name,				\
->   				perms[i].start, perms[i].end,		\
->   				SECTION_SIZE);				\
->   			continue;					\
-> @@ -685,7 +689,6 @@ static inline void fix_kernmem_perms(void)
->   	set_section_perms(nx_perms, prot);
->   }
->
-> -#ifdef CONFIG_DEBUG_RODATA
->   void mark_rodata_ro(void)
->   {
->   	set_section_perms(ro_perms, prot);
-> @@ -700,11 +703,10 @@ void set_kernel_text_ro(void)
->   {
->   	set_section_perms(ro_perms, prot);
->   }
-> -#endif /* CONFIG_DEBUG_RODATA */
->
->   #else
->   static inline void fix_kernmem_perms(void) { }
-> -#endif /* CONFIG_ARM_KERNMEM_PERMS */
-> +#endif /* CONFIG_DEBUG_RODATA */
->
->   void free_tcmmem(void)
->   {
->
-
-Thanks,
-Laura
+> diff -puN include/linux/sysctl.h~a include/linux/sysctl.h
+> --- a/include/linux/sysctl.h~a
+> +++ a/include/linux/sysctl.h
+> @@ -111,8 +111,8 @@ struct ctl_table
+>  	struct ctl_table *child;	/* Deprecated */
+>  	proc_handler *proc_handler;	/* Callback for text formatting */
+>  	struct ctl_table_poll *poll;
+> -	void *extra1;
+> -	void *extra2;
+> +	const void *extra1;
+> +	const void *extra2;
+>  };
+>  
+>  struct ctl_node {
+> diff -puN kernel/sysctl.c~a kernel/sysctl.c
+> _
