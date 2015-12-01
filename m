@@ -1,14 +1,14 @@
 From: nikita@compulab.co.il (Nikita Kiryanov)
-Date: Tue,  1 Dec 2015 15:55:03 +0200
-Subject: [PATCH V2 08/14] ARM: dts: am437x: cm-t43: add eMMC support
+Date: Tue,  1 Dec 2015 15:54:58 +0200
+Subject: [PATCH V2 03/14] ARM: dts: am437x: cm-t43: add PMIC support.
 In-Reply-To: <1448978109-5614-1-git-send-email-nikita@compulab.co.il>
 References: <1448978109-5614-1-git-send-email-nikita@compulab.co.il>
-Message-ID: <1448978109-5614-9-git-send-email-nikita@compulab.co.il>
+Message-ID: <1448978109-5614-4-git-send-email-nikita@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One of the CompuLab cm-t43 configurations comes with on-board eMMC as
-primary storage, residing on the mmc2 interface. Add it to the device tree.
+Add PMIC support for CompuLab cm-t43 module. For now we keep all regulators
+enabled until this could be refined with power management support.
 
 Signed-off-by: Nikita Kiryanov <nikita@compulab.co.il>
 Cc: Tony Lindgren <tony@atomide.com>
@@ -21,68 +21,92 @@ Cc: Dmitry Lifshitz <lifshitz@compulab.co.il>
 Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
 ---
 Changes in V2:
-	- Removed unnecessary line break after fixedregulator-v3_3 section.
+	- No changes.
 
- arch/arm/boot/dts/am437x-cm-t43.dts | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+ arch/arm/boot/dts/am437x-cm-t43.dts | 64 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 64 insertions(+)
 
 diff --git a/arch/arm/boot/dts/am437x-cm-t43.dts b/arch/arm/boot/dts/am437x-cm-t43.dts
-index a2893c6..1011acc 100644
+index ce33b41..27b748a 100644
 --- a/arch/arm/boot/dts/am437x-cm-t43.dts
 +++ b/arch/arm/boot/dts/am437x-cm-t43.dts
-@@ -26,6 +26,15 @@
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
+@@ -52,6 +52,69 @@
+ 	pinctrl-0 = <&i2c0_pins>;
+ 	clock-frequency = <100000>;
+ 
++	tps65218: tps65218 at 24 {
++		compatible = "ti,tps65218";
++		reg = <0x24>;
++		interrupts = <GIC_SPI 7 IRQ_TYPE_NONE>; /* NMIn */
++		interrupt-parent = <&gic>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
 +
-+	vmmc_3v3: fixedregulator-v3_3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vmmc_3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+		enable-active-high;
++		dcdc1: regulator-dcdc1 {
++			compatible = "ti,tps65218-dcdc1";
++			regulator-name = "vdd_core";
++			regulator-min-microvolt = <912000>;
++			regulator-max-microvolt = <1144000>;
++			regulator-boot-on;
++			regulator-always-on;
++		};
++
++		dcdc2: regulator-dcdc2 {
++			compatible = "ti,tps65218-dcdc2";
++			regulator-name = "vdd_mpu";
++			regulator-min-microvolt = <912000>;
++			regulator-max-microvolt = <1378000>;
++			regulator-boot-on;
++			regulator-always-on;
++		};
++
++		dcdc3: regulator-dcdc3 {
++			compatible = "ti,tps65218-dcdc3";
++			regulator-name = "vdcdc3";
++			regulator-suspend-enable;
++			regulator-min-microvolt = <1500000>;
++			regulator-max-microvolt = <1500000>;
++			regulator-boot-on;
++			regulator-always-on;
++		};
++
++		dcdc5: regulator-dcdc5 {
++			compatible = "ti,tps65218-dcdc5";
++			regulator-name = "v1_0bat";
++			regulator-min-microvolt = <1000000>;
++			regulator-max-microvolt = <1000000>;
++			regulator-boot-on;
++			regulator-always-on;
++		};
++
++		dcdc6: regulator-dcdc6 {
++			compatible = "ti,tps65218-dcdc6";
++			regulator-name = "v1_8bat";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			regulator-boot-on;
++			regulator-always-on;
++		};
++
++		ldo1: regulator-ldo1 {
++			compatible = "ti,tps65218-ldo1";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			regulator-boot-on;
++			regulator-always-on;
++		};
 +	};
++
+ 	eeprom_module: at24 at 50 {
+ 		compatible = "atmel,24c02";
+ 		reg = <0x50>;
+@@ -88,6 +151,7 @@
  };
  
- &am43xx_pinmux {
-@@ -45,6 +54,21 @@
- 		>;
- 	};
- 
-+	emmc_pins: emmc_pins {
-+		pinctrl-single,pins = <
-+			AM4372_IOPAD(0x820, PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_ad8.mmc1_dat0 */
-+			AM4372_IOPAD(0x824, PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_ad9.mmc1_dat1 */
-+			AM4372_IOPAD(0x828, PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_ad10.mmc1_dat2 */
-+			AM4372_IOPAD(0x82c, PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_ad11.mmc1_dat3 */
-+			AM4372_IOPAD(0x830, PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_ad12.mmc1_dat4 */
-+			AM4372_IOPAD(0x834, PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_ad13.mmc1_dat5 */
-+			AM4372_IOPAD(0x838, PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_ad14.mmc1_dat6 */
-+			AM4372_IOPAD(0x83c, PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_ad15.mmc1_dat7 */
-+			AM4372_IOPAD(0x880, PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_csn1.mmc1_clk */
-+			AM4372_IOPAD(0x884, PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_csn2.mmc1_cmd */
-+		>;
-+	};
-+
- 	spi0_pins: pinmux_spi0_pins {
- 		pinctrl-single,pins = <
- 			AM4372_IOPAD(0x950, PIN_INPUT | MUX_MODE0) /* spi0_sclk.spi0_sclk */
-@@ -271,6 +295,15 @@
- 	status = "okay";
- };
- 
-+&mmc2 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emmc_pins>;
-+	vmmc-supply = <&vmmc_3v3>;
-+	bus-width = <8>;
-+	ti,non-removable;
-+};
-+
- &spi0 {
- 	status = "okay";
- 	pinctrl-names = "default";
+ &cpu {
++	cpu0-supply = <&dcdc2>;
+ 	operating-points = <1000000 1330000>,
+ 			   <800000 1260000>,
+ 			   <720000 1200000>,
 -- 
 1.9.1
