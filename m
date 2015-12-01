@@ -1,15 +1,14 @@
 From: nikita@compulab.co.il (Nikita Kiryanov)
-Date: Tue,  1 Dec 2015 15:55:00 +0200
-Subject: [PATCH V2 05/14] ARM: dts: am437x: cm-t43: add NAND support
+Date: Tue,  1 Dec 2015 15:55:08 +0200
+Subject: [PATCH V2 13/14] ARM: dts: am437x: cm-t43: add support for mmc1
 In-Reply-To: <1448978109-5614-1-git-send-email-nikita@compulab.co.il>
 References: <1448978109-5614-1-git-send-email-nikita@compulab.co.il>
-Message-ID: <1448978109-5614-6-git-send-email-nikita@compulab.co.il>
+Message-ID: <1448978109-5614-14-git-send-email-nikita@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One of the CompuLab cm-t43 configurations comes with on-board NAND flash as
-primary storage. It is partitioned into kernel, dtb, and rootfs partitions.
-Add it to the device tree.
+On SBC-T43 the mmc1 interface is connected to an SD-Card slot.
+Add the necessary muxing and configuration to the device tree.
 
 Signed-off-by: Nikita Kiryanov <nikita@compulab.co.il>
 Cc: Tony Lindgren <tony@atomide.com>
@@ -24,105 +23,57 @@ Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
 Changes in V2:
 	- No changes.
 
- arch/arm/boot/dts/am437x-cm-t43.dts | 79 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 79 insertions(+)
+ arch/arm/boot/dts/am437x-sbc-t43.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am437x-cm-t43.dts b/arch/arm/boot/dts/am437x-cm-t43.dts
-index 27e5948..efabb31 100644
---- a/arch/arm/boot/dts/am437x-cm-t43.dts
-+++ b/arch/arm/boot/dts/am437x-cm-t43.dts
-@@ -53,6 +53,81 @@
- 			AM4372_IOPAD(0x95C, PIN_OUTPUT | MUX_MODE0) /* spi0_cs0.spi0_cs0 */
- 		>;
- 	};
-+
-+	nand_flash_x8: nand_flash_x8 {
+diff --git a/arch/arm/boot/dts/am437x-sbc-t43.dts b/arch/arm/boot/dts/am437x-sbc-t43.dts
+index 46b2831..6b51151 100644
+--- a/arch/arm/boot/dts/am437x-sbc-t43.dts
++++ b/arch/arm/boot/dts/am437x-sbc-t43.dts
+@@ -7,6 +7,7 @@
+  */
+ 
+ #include "am437x-cm-t43.dts"
++#include "compulab-sb-som.dtsi"
+ 
+ / {
+ 	model = "CompuLab CM-T43 on SB-SOM-T43";
+@@ -14,6 +15,19 @@
+ };
+ 
+ &am43xx_pinmux {
++	mmc1_pins: pinmux_mmc1_pins {
 +		pinctrl-single,pins = <
-+			AM4372_IOPAD(0x800, PIN_INPUT | PULL_DISABLE | MUX_MODE0)
-+			AM4372_IOPAD(0x804, PIN_INPUT | PULL_DISABLE | MUX_MODE0)
-+			AM4372_IOPAD(0x808, PIN_INPUT | PULL_DISABLE | MUX_MODE0)
-+			AM4372_IOPAD(0x80c, PIN_INPUT | PULL_DISABLE | MUX_MODE0)
-+			AM4372_IOPAD(0x810, PIN_INPUT | PULL_DISABLE | MUX_MODE0)
-+			AM4372_IOPAD(0x814, PIN_INPUT | PULL_DISABLE | MUX_MODE0)
-+			AM4372_IOPAD(0x818, PIN_INPUT | PULL_DISABLE | MUX_MODE0)
-+			AM4372_IOPAD(0x81c, PIN_INPUT | PULL_DISABLE | MUX_MODE0)
-+			AM4372_IOPAD(0x870, PIN_INPUT_PULLUP  | MUX_MODE0)
-+			AM4372_IOPAD(0x874, PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			AM4372_IOPAD(0x87c, PIN_OUTPUT_PULLUP | MUX_MODE0)
-+			AM4372_IOPAD(0x898, PIN_OUTPUT_PULLDOWN | MUX_MODE0)
-+			AM4372_IOPAD(0x894, PIN_OUTPUT_PULLDOWN | MUX_MODE0)
-+			AM4372_IOPAD(0x890, PIN_OUTPUT_PULLDOWN | MUX_MODE0)
-+			AM4372_IOPAD(0x89c, PIN_OUTPUT_PULLDOWN | MUX_MODE0)
++			AM4372_IOPAD(0x900, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc0_clk.mmc0_clk */
++			AM4372_IOPAD(0x904, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc0_cmd.mmc0_cmd */
++			AM4372_IOPAD(0x8f0, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc0_dat0.mmc0_dat0 */
++			AM4372_IOPAD(0x8f4, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc0_dat1.mmc0_dat1 */
++			AM4372_IOPAD(0x8f8, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc0_dat2.mmc0_dat2 */
++			AM4372_IOPAD(0x8fc, PIN_INPUT_PULLUP | MUX_MODE0) /* mmc0_dat3.mmc0_dat3 */
++			AM4372_IOPAD(0x960, PIN_INPUT | MUX_MODE7) /* spi0_cs1.gpio0_6 */
++			AM4372_IOPAD(0x964, PIN_INPUT | MUX_MODE7) /* ecap0_in_pwm0_out.gpio0_7 */
 +		>;
 +	};
-+};
 +
-+&gpmc {
+ 	uart0_pins_default: uart0_pins_default {
+ 		pinctrl-single,pins = <
+ 			AM4372_IOPAD(0x968, DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE0)
+@@ -75,6 +89,16 @@
+ 	pinctrl-0 = <&i2c2_pins>;
+ };
+ 
++&mmc1 {
 +	status = "okay";
++	bus-width = <4>;
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&nand_flash_x8>;
-+	ranges = <0 0 0x08000000 0x1000000>;
-+	nand at 0,0 {
-+		reg = <0 0 0>;
-+		ti,nand-ecc-opt = "bch8";
-+		ti,elm-id = <&elm>;
-+
-+		nand-bus-width = <8>;
-+		gpmc,device-width = <1>;
-+		gpmc,sync-clk-ps = <0>;
-+		gpmc,cs-on-ns = <0>;
-+		gpmc,cs-rd-off-ns = <44>;
-+		gpmc,cs-wr-off-ns = <44>;
-+		gpmc,adv-on-ns = <6>;
-+		gpmc,adv-rd-off-ns = <34>;
-+		gpmc,adv-wr-off-ns = <44>;
-+		gpmc,we-on-ns = <0>;
-+		gpmc,we-off-ns = <40>;
-+		gpmc,oe-on-ns = <0>;
-+		gpmc,oe-off-ns = <54>;
-+		gpmc,access-ns = <64>;
-+		gpmc,rd-cycle-ns = <82>;
-+		gpmc,wr-cycle-ns = <82>;
-+		gpmc,wait-on-read = "true";
-+		gpmc,wait-on-write = "true";
-+		gpmc,bus-turnaround-ns = <0>;
-+		gpmc,cycle2cycle-delay-ns = <0>;
-+		gpmc,clk-activation-ns = <0>;
-+		gpmc,wait-monitoring-ns = <0>;
-+		gpmc,wr-access-ns = <40>;
-+		gpmc,wr-data-mux-bus-ns = <0>;
-+
-+		gpmc,wait-pin = <0>;
-+
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		/* MTD partition table */
-+		partition at 0 {
-+			label = "kernel";
-+			reg = <0x0 0x00980000>;
-+		};
-+		partition at 980000 {
-+			label = "dtb";
-+			reg = <0x00980000 0x00080000>;
-+		};
-+		partition at a00000 {
-+			label = "rootfs";
-+			reg = <0x00a00000 0x0>;
-+		};
-+	};
- };
- 
- &i2c0 {
-@@ -186,6 +261,10 @@
- 	};
- };
- 
-+&elm {
-+	status = "okay";
++	pinctrl-0 = <&mmc1_pins>;
++	vmmc-supply = <&vsb_3v3>;
++	cd-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
++	wp-gpios = <&gpio0 7 GPIO_ACTIVE_HIGH>;
 +};
 +
  &uart0 {
- 	status = "okay";
- };
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_default>;
 -- 
 1.9.1
