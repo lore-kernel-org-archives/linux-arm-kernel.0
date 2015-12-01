@@ -1,23 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 1 Dec 2015 10:34:56 +0100
-Subject: [PATCH 2/2] pinctrl: qcom: spmi-mpp: Add pm8994 mpp support
-In-Reply-To: <1447807953-11924-3-git-send-email-sboyd@codeaurora.org>
-References: <1447807953-11924-1-git-send-email-sboyd@codeaurora.org>
- <1447807953-11924-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CACRpkdYq-+UxhB2rXH1U5cKh9iezPFgb+124qYB03G_ywNZQAw@mail.gmail.com>
+Date: Tue, 1 Dec 2015 10:36:49 +0100
+Subject: [PATCH] pinctrl: uniphier: rework UniPhier pinctrl entries in
+ Kconfig
+In-Reply-To: <1448344846-28726-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1448344846-28726-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdaeGjidAQNKWN6MOLUE=EO4WJ6VGQo7SrkZtcoNeDaFiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2015 at 1:52 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+On Tue, Nov 24, 2015 at 7:00 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 
-> Update the driver and binding for pm8994-mpp devices.
+> There is a plan to support more pinctrl drivers for this SoC family.
+> Move the driver entries into a sub menu by using "menuconfig".
+> Also, add the missing dependency "depends on OF && MFD_SYSCON".
 >
-> Cc: <devicetree@vger.kernel.org>
-> Cc: "Ivan T. Ivanov" <iivanov@mm-sol.com>
-> Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Patch applied with the ACKs!
+Patch applied.
 
 Yours,
 Linus Walleij
