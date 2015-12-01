@@ -1,48 +1,200 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 01 Dec 2015 18:14:27 +0100
-Subject: [PATCH 1/3] ARM: dts: rockchip: make sure edp_24m is associated to
- xin24m on veyron
-Message-ID: <2767415.mEkgRbSSUB@diego>
+From: heiko.stuebner@collabora.com (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 01 Dec 2015 18:16:02 +0100
+Subject: [PATCH 2/3] ARM: dts: rockchip: add veyron-brain board
+In-Reply-To: <2767415.mEkgRbSSUB@diego>
+References: <2767415.mEkgRbSSUB@diego>
+Message-ID: <6340149.qAGjxgRvNd@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The edp-24m clock has two possible sources: the 24MHz oscillator as well
-as an external 27MHz input. The power-on-default is the 27MHz clock which
-is not supplied on all Rockchip boards. While on all current boards and
-also all Veyron Chromebooks the bootloader seems to adapt the muxing to
-the internal source, this doesn't seem to be the case on headless veyron
-devices like brain and mickey making the edp-24m clock an orphan.
-On the hardware side the 27m input also is not connected at all.
-
-With the upcoming deferral of orphan-clocks this results in the power-
-domain code deferring, as it cannot request the needed clock and if the
-synchronous reset is sucessfullat all in this case is also unknown.
-
-So fix that by making sure, the edp-24m clock is muxed to the internal
-24MHz oscillator at all times.
+Similar to pinky, brain is a development model and probably also
+nearing extinction. But to keep pinky from being lonely I'll keep
+the two brain boards around as well, especially as they as well
+have easily accessible dut-connectors.
 
 Signed-off-by: Heiko Stuebner <heiko.stuebner@collabora.com>
 ---
-It seems I had some issues sending, sorry about the double-mails.
+would cool to get an Ack from ChromeOS-people concerning the
+license change to GPL2/X11 - as with the dts before
 
- arch/arm/boot/dts/rk3288-veyron.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ Documentation/devicetree/bindings/arm/rockchip.txt |   5 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/rk3288-veyron-brain.dts          | 139 +++++++++++++++++++++
+ 3 files changed, 145 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rk3288-veyron-brain.dts
 
-diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
-index 5e61f07..9fce91f 100644
---- a/arch/arm/boot/dts/rk3288-veyron.dtsi
-+++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
-@@ -340,6 +340,11 @@
- 	i2c-scl-rising-time-ns = <1000>;
- };
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+index 8e985dd..2f8b35a 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+@@ -35,6 +35,11 @@ Rockchip platforms device tree bindings
+     Required root node properties:
+       - compatible = "netxeon,r89", "rockchip,rk3288";
  
-+&power {
-+	assigned-clocks = <&cru SCLK_EDP_24M>;
-+	assigned-clock-parents = <&xin24m>;
++- Google Brain (dev-board):
++    Required root node properties:
++      - compatible = "google,veyron-brain-rev0", "google,veyron-brain",
++		     "google,veyron", "rockchip,rk3288";
++
+ - Google Jaq (Haier Chromebook 11 and more):
+     Required root node properties:
+       - compatible = "google,veyron-jaq-rev5", "google,veyron-jaq-rev4",
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 87c8752..2f29350 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -524,6 +524,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
+ 	rk3288-popmetal.dtb \
+ 	rk3288-r89.dtb \
+ 	rk3288-rock2-square.dtb \
++	rk3288-veyron-brain.dtb \
+ 	rk3288-veyron-jaq.dtb \
+ 	rk3288-veyron-jerry.dtb \
+ 	rk3288-veyron-minnie.dtb \
+diff --git a/arch/arm/boot/dts/rk3288-veyron-brain.dts b/arch/arm/boot/dts/rk3288-veyron-brain.dts
+new file mode 100644
+index 0000000..cf5311d
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3288-veyron-brain.dts
+@@ -0,0 +1,139 @@
++/*
++ * Google Veyron Brain Rev 0 board device tree source
++ *
++ * Copyright 2014 Google, Inc
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *  Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "rk3288-veyron.dtsi"
++
++/ {
++	model = "Google Brain";
++	compatible = "google,veyron-brain-rev0", "google,veyron-brain",
++		     "google,veyron", "rockchip,rk3288";
++
++	vcc33_sys: vcc33-sys {
++		vin-supply = <&vcc_5v>;
++	};
++
++	vcc33_io: vcc33_io {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc33_io";
++		regulator-always-on;
++		regulator-boot-on;
++		vin-supply = <&vcc33_sys>;
++		/* This is gated by vcc_18 too */
++	};
++
++	/* This turns on vbus for host2 and otg (dwc2) */
++	vcc5_host2: vcc5-host2-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio0 12 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&usb2_pwr_en>;
++		regulator-name = "vcc5_host2";
++		regulator-always-on;
++		regulator-boot-on;
++	};
 +};
 +
- &pwm1 {
- 	status = "okay";
- };
++&pinctrl {
++	hdmi {
++		vcc50_hdmi_en: vcc50-hdmi-en {
++			rockchip,pins = <7 2 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	pmic {
++		dvs_1: dvs-1 {
++			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_down>;
++		};
++
++		dvs_2: dvs-2 {
++			rockchip,pins = <7 15 RK_FUNC_GPIO &pcfg_pull_down>;
++		};
++	};
++
++	usb-host {
++		usb2_pwr_en: usb2-pwr-en {
++			rockchip,pins = <0 12 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++};
++
++&rk808 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pmic_int_l &dvs_1 &dvs_2>;
++	dvs-gpios = <&gpio7 11 GPIO_ACTIVE_HIGH>,
++		    <&gpio7 15 GPIO_ACTIVE_HIGH>;
++
++	/delete-property/ vcc6-supply;
++
++	regulators {
++		/* vcc33_io is sourced directly from vcc33_sys */
++		/delete-node/ LDO_REG1;
++
++		/* This is not a pwren anymore, but the real power supply */
++		vdd10_lcd: LDO_REG7 {
++			regulator-always-on;
++			regulator-boot-on;
++			regulator-min-microvolt = <1000000>;
++			regulator-max-microvolt = <1000000>;
++			regulator-name = "vdd10_lcd";
++			regulator-suspend-mem-disabled;
++		};
++
++		vcc18_hdmi: SWITCH_REG2 {
++			regulator-always-on;
++			regulator-boot-on;
++			regulator-name = "vcc18_hdmi";
++			regulator-suspend-mem-disabled;
++		};
++	};
++};
++
++&vcc50_hdmi {
++	enable-active-high;
++	gpio = <&gpio7 2 GPIO_ACTIVE_HIGH>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&vcc50_hdmi_en>;
++};
 -- 
 2.6.1
