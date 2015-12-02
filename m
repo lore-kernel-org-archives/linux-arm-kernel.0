@@ -1,9 +1,9 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 2 Dec 2015 15:59:18 +0200
-Subject: [RFC v03 08/15] ARM: davinci: dm644x: Add dma_filter_map to edma
+Date: Wed, 2 Dec 2015 15:59:17 +0200
+Subject: [RFC v03 07/15] ARM: davinci: dm365: Add dma_filter_map to edma
 In-Reply-To: <1449064765-27427-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1449064765-27427-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1449064765-27427-9-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1449064765-27427-8-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,39 +13,49 @@ for the devices.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-davinci/dm644x.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/mach-davinci/dm365.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index d38f5049d56e..59fae2c3b8f4 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -11,6 +11,7 @@
- #include <linux/init.h>
- #include <linux/clk.h>
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index 2068cbeaeb03..e794bff7d589 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -17,6 +17,7 @@
  #include <linux/serial_8250.h>
-+#include <linux/dmaengine.h>
  #include <linux/platform_device.h>
+ #include <linux/dma-mapping.h>
++#include <linux/dmaengine.h>
+ #include <linux/spi/spi.h>
  #include <linux/platform_data/edma.h>
  #include <linux/platform_data/gpio-davinci.h>
-@@ -505,9 +506,20 @@ static s8 queue_priority_mapping[][2] = {
+@@ -862,9 +863,30 @@ static s8 dm365_queue_priority_mapping[][2] = {
  	{-1, -1},
  };
  
-+static const struct dma_filter_map da644x_edma_map[] = {
-+	{ "davinci-mcbsp", "tx", EDMA_FILTER_PARAM(0, 2) },
-+	{ "davinci-mcbsp", "rx", EDMA_FILTER_PARAM(0, 3) },
-+	{ "spi_davinci", "tx", EDMA_FILTER_PARAM(0, 16) },
-+	{ "spi_davinci", "rx", EDMA_FILTER_PARAM(0, 17) },
++static const struct dma_filter_map da365_edma_map[] = {
++	{ "davinci-mcbsp.0", "tx", EDMA_FILTER_PARAM(0, 2) },
++	{ "davinci-mcbsp.0", "rx", EDMA_FILTER_PARAM(0, 3) },
++	{ "davinci_voicecodec", "tx", EDMA_FILTER_PARAM(0, 2) },
++	{ "davinci_voicecodec", "rx", EDMA_FILTER_PARAM(0, 3) },
++	{ "spi_davinci.2", "tx", EDMA_FILTER_PARAM(0, 10) },
++	{ "spi_davinci.2", "rx", EDMA_FILTER_PARAM(0, 11) },
++	{ "spi_davinci.1", "tx", EDMA_FILTER_PARAM(0, 14) },
++	{ "spi_davinci.1", "rx", EDMA_FILTER_PARAM(0, 15) },
++	{ "spi_davinci.0", "tx", EDMA_FILTER_PARAM(0, 16) },
++	{ "spi_davinci.0", "rx", EDMA_FILTER_PARAM(0, 17) },
++	{ "spi_davinci.3", "tx", EDMA_FILTER_PARAM(0, 18) },
++	{ "spi_davinci.3", "rx", EDMA_FILTER_PARAM(0, 19) },
 +	{ "dm6441-mmc.0", "rx", EDMA_FILTER_PARAM(0, 26) },
 +	{ "dm6441-mmc.0", "tx", EDMA_FILTER_PARAM(0, 27) },
++	{ "dm6441-mmc.1", "rx", EDMA_FILTER_PARAM(0, 30) },
++	{ "dm6441-mmc.1", "tx", EDMA_FILTER_PARAM(0, 31) },
 +};
 +
- static struct edma_soc_info dm644x_edma_pdata = {
- 	.queue_priority_mapping	= queue_priority_mapping,
- 	.default_queue		= EVENTQ_1,
-+	.slave_map		= da644x_edma_map,
-+	.slavecnt		= ARRAY_SIZE(da644x_edma_map),
+ static struct edma_soc_info dm365_edma_pdata = {
+ 	.queue_priority_mapping	= dm365_queue_priority_mapping,
+ 	.default_queue		= EVENTQ_3,
++	.slave_map		= da365_edma_map,
++	.slavecnt		= ARRAY_SIZE(da365_edma_map),
  };
  
  static struct resource edma_resources[] = {
