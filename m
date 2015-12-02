@@ -1,43 +1,20 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 03 Dec 2015 01:23:03 +0300
-Subject: [PATCH 2/2] ARM: shmobile: r8a7791: add EtherAVB DT support
-In-Reply-To: <2926317.Iq110C4Bmk@wasted.cogentembedded.com>
-References: <2926317.Iq110C4Bmk@wasted.cogentembedded.com>
-Message-ID: <4724934.jfARgmuogC@wasted.cogentembedded.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Wed, 2 Dec 2015 16:34:56 -0600
+Subject: [PATCH v2 10/21] arm64: KVM: Add patchable function selector
+In-Reply-To: <1448650215-15218-11-git-send-email-marc.zyngier@arm.com>
+References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+ <1448650215-15218-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20151202223456.GK3233@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the generic R8A7791 part of the EtherAVB device node. 
+On Fri, Nov 27, 2015 at 06:50:04PM +0000, Marc Zyngier wrote:
+> KVM so far relies on code patching, and is likely to use it more
+> in the future. The main issue is that our alternative system works
+> at the instruction level, while we'd like to have alternatives at
+> the function level.
 
-Based on the commit f25d6b977240 ("ARM: shmobile: r8a7790: add EtherAVB DT
-support").
+How about setting static-keys at hyp init time?
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
----
- arch/arm/boot/dts/r8a7791.dtsi |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7791.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7791.dtsi
-@@ -785,6 +785,18 @@
- 		status = "disabled";
- 	};
- 
-+	avb: ethernet at e6800000 {
-+		compatible = "renesas,etheravb-r8a7791",
-+			     "renesas,etheravb-rcar-gen2";
-+		reg = <0 0xe6800000 0 0x800>, <0 0xee0e8000 0 0x4000>;
-+		interrupts = <0 163 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp8_clks R8A7791_CLK_ETHERAVB>;
-+		power-domains = <&cpg_clocks>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
- 	sata0: sata at ee300000 {
- 		compatible = "renesas,sata-r8a7791";
- 		reg = <0 0xee300000 0 0x2000>;
+Thanks,
+drew
