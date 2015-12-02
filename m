@@ -1,29 +1,104 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Dec 2015 14:46:32 +0100
-Subject: [PATCH v6 14/19] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <20151202103522.GB21461@yury-N73SV>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <1712431.VUth4NvudT@wuerfel> <20151202103522.GB21461@yury-N73SV>
-Message-ID: <2623148.F7bGmbuQQh@wuerfel>
+From: carl@cog.systems (Carl van Schaik)
+Date: Thu, 3 Dec 2015 00:46:35 +1100
+Subject: arm64 boot requirements
+In-Reply-To: <CAKv+Gu_2ufc_q5OsGDsGUqfEieCHc++-r2zxrpDpHcMbZyS_aQ@mail.gmail.com>
+References: <565BAA2E.5090102@cog.systems>	<20151201110159.GA4757@leverpostej>
+ <CAKv+Gu_2ufc_q5OsGDsGUqfEieCHc++-r2zxrpDpHcMbZyS_aQ@mail.gmail.com>
+Message-ID: <082101d12d07$dd677160$98365420$@cog.systems>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 December 2015 13:35:22 Yury Norov wrote:
-> On Wed, Dec 02, 2015 at 09:37:05AM +0100, Arnd Bergmann wrote:
-> > The 4*PAGE_SIZE on ARM is an architecture specific oddity, I believe
-> > to work around aliasing caches on ARMv6. As no other architecture does
-> > this, we're probably better off not duplicating it for aarch64-ilp32
-> > and just use sys_shmat as your v6 patch does.
-> >       Arnd
-> 
-> If you feel ARMv6 fix for caches will come soon, just ignore it.
-> Otherwise, please pull it because compat_sys_shmat is broken now
-> for 64K pages.
-> 
-> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> 
+Hi,
 
-Sounds good. Will, do you want to take this for the arm64 tree.
+On 1 December 2015 Ard Biesheuvel <ard.biesheuvel@linaro.org> wote:
+> On 1 December 2015 at 12:02, Mark Rutland <mark.rutland@arm.com>
+> wrote:
+> > Hi,
+> >
+> > On Mon, Nov 30, 2015 at 12:45:18PM +1100, Carl van Schaik wrote:
+> >> In commit bd00cd5f8c8c3c282bb1e1eac6a6679a4f808091, the
+> idmap_pg_dir
+> >> and swapper_pg_dir where moved from before the kernel to after it.
+> >>
+> >> The problem is that these symbols fall outside the range covered by
+> >> the ELF file - outside of any section.
+> >>
+> >> A bootloader which loads the kernel ELF file and dynamically
+> >> determines where to place the DTB, may try place it after the
+> >> kernel. We've just run into this problem and the DTB gets
+> >> overwritten as soon as the pagetables are created.
+> 
+> Could you explain why you are using the ELF file and not the binary image
+> file?
+> This is not future proof: currently, the Image is a straight binary
+> objcopy of vmlinux, but that is not guaranteed to remain that way.
+> Things like KASLR may require post build steps that mangle vmlinux or
+> Image afterwards.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+The reason we've been using ELF files is mostly to do with legacy virtualization
+related reasons in our systems, we used to patch symbols in the ELFs for example
+pre device-tree. However, since it hadn't caused problems until now we had
+continued to use it. We haven't yet added Aarch64 Linux boot image header parsing
+but it should be trivial.
+
+The other area we are looking into is optimized multi-VM static boot images by
+constructing hypervisor-bundle images containing de-duplicated Linux sections,
+allowing an ELF bootloader to populate multiple Linux VMs from a smaller boot
+image - resulting in faster boot.
+
+> >
+> > We had similar issues with the BSS when booting Image files prior to
+> > this and commit a2c1d73b94ed49f5 ("arm64: Update the Image header").
+> > Since then, the image_size field in the Image header tells you how much
+> > memory the kernel may clobber (including the BSS and page tables).
+> >
+> > Prior to that, the page tables were below the kernel, and also not
+> > described in any ELF section.
+> >
+> > Others booting the kernel vmlinux haven't reported similar issues, so I
+> > assume that either they are parsing the Image header, or getting lucky.
+> > Parsing the header is necessary to get the correct text offset, too...
+> >
+> > Pratyush, Geoff, I understood you were loading the kernel vmlinux for
+> > kexec. Do you parse the Image header to figure out where to place
+> > things?
+> >
+> >> I'd suggest that the kernel either:
+> >>  A. document this boot requirement for where not to load a DTB
+> >
+> > Do you have any particular suggestion?
+> >
+> > We already describe the Image footprint (including BSS and page tables)
+> > by the image_size in the Image header, which is sufficient. The size of
+> > the BSS and page tables is effectively unbound, so we can't define some
+> > upper bound that will always be true.
+> >
+> > The documentation is written on the assumption that an Image file is
+> > being used rather than a vmlinux. Perhaps that is something to consider.
+> >
+> >>  B. update the vmlinux.lds.S such that these symbols (and _end) are
+> >> properly covered by a section in the ELF, and thus preventing this
+> >> issue.
+> >
+> > I'm worried that this only solves this one case, and it means that there
+> > are two (potentially conflicting) sources of information that a
+> > bootloader might be using -- the ELF or the Image header. I don't want
+> > to have to duplicate text_offset and so on, which implies that parsing
+> > the Image header is necessary anyway.
+> >
+> > That's something we can discuss if you send a patch (inline rather than
+> > attached).
+> >
+> 
+> I think updating the linker script to put the page tables into a
+> .pgdir section is reasonable, since it is part of the static footprint
+> of the kernel.
+
+I agree
+
+> However, I strongly feel that the Image header should remain the
+> authoritative source of information regarding the nature (big/little
+> endian, page size) and the static footprint of the Image .
+
+Agreed, and there are other ways to de-duplicate which will still work
+with binary image inputs.
