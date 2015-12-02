@@ -1,105 +1,73 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed,  2 Dec 2015 09:33:06 +0000
-Subject: [PATCH v1 06/10] ARM: mps2: introduce MPS2 platform
+Date: Wed,  2 Dec 2015 09:33:05 +0000
+Subject: [PATCH v1 05/10] serial: mps2-uart: add support for early console
 In-Reply-To: <1449048790-25859-1-git-send-email-vladimir.murzin@arm.com>
 References: <1449048790-25859-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1449048790-25859-7-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1449048790-25859-6-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cortex-M Prototyping System (or V2M-MPS2) is designed for
-prototyping and evaluation Cortex-M family of processors including the
-latest Cortex-M7
-
-It comes with a range of useful peripherals including 8MB single cycle
-SRAM, 16MB PSRAM, Ethernet, QSVGA touch screen panel, 4bit RGB VGA
-connector, Audio, SPI and GPIO.
+This adds support early console for MPS2 UART which can be enabled via
+earlycon=mps2,0x40004000
 
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/Kconfig                 |    8 ++++++++
- arch/arm/Makefile                |    1 +
- arch/arm/mach-mps2/Makefile      |    1 +
- arch/arm/mach-mps2/Makefile.boot |    3 +++
- arch/arm/mach-mps2/dtmachine.c   |   21 +++++++++++++++++++++
- 5 files changed, 34 insertions(+)
- create mode 100644 arch/arm/mach-mps2/Makefile
- create mode 100644 arch/arm/mach-mps2/Makefile.boot
- create mode 100644 arch/arm/mach-mps2/dtmachine.c
+ drivers/tty/serial/Kconfig     |    1 +
+ drivers/tty/serial/mps2-uart.c |   30 ++++++++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 34e1569..f9857e7 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -969,6 +969,14 @@ config ARCH_STM32
- 	help
- 	  Support for STMicroelectronics STM32 processors.
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index e98bfea..33d1365 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -1477,6 +1477,7 @@ config SERIAL_MPS2_UART_CONSOLE
+ 	bool "MPS2 UART console support"
+ 	depends on SERIAL_MPS2_UART
+ 	select SERIAL_CORE_CONSOLE
++	select SERIAL_EARLYCON
  
-+config ARCH_MPS2
-+	bool "ARM MPS2 paltform"
-+	depends on ARM_SINGLE_ARMV7M
-+	select ARM_AMBA
-+	select CLKSRC_MPS2
-+	help
-+	  Support for ARM MPS2 Cortex-M platform.
+ config SERIAL_MPS2_UART
+ 	bool "MPS2 UART port"
+diff --git a/drivers/tty/serial/mps2-uart.c b/drivers/tty/serial/mps2-uart.c
+index 09bac16..5f3252e 100644
+--- a/drivers/tty/serial/mps2-uart.c
++++ b/drivers/tty/serial/mps2-uart.c
+@@ -445,6 +445,36 @@ static struct console mps2_uart_console = {
+ 
+ #define MPS2_SERIAL_CONSOLE (&mps2_uart_console)
+ 
++static void mps2_early_putchar(struct uart_port *port, int ch)
++{
 +
- # Definitions to make life easier
- config ARCH_ACORN
- 	bool
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 2c2b28e..dbe06fd 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -183,6 +183,7 @@ machine-$(CONFIG_ARCH_LPC18XX)		+= lpc18xx
- machine-$(CONFIG_ARCH_LPC32XX)		+= lpc32xx
- machine-$(CONFIG_ARCH_MESON)		+= meson
- machine-$(CONFIG_ARCH_MMP)		+= mmp
-+machine-$(CONFIG_ARCH_MPS2)		+= mps2
- machine-$(CONFIG_ARCH_MOXART)		+= moxart
- machine-$(CONFIG_ARCH_MV78XX0)		+= mv78xx0
- machine-$(CONFIG_ARCH_MVEBU)		+= mvebu
-diff --git a/arch/arm/mach-mps2/Makefile b/arch/arm/mach-mps2/Makefile
-new file mode 100644
-index 0000000..3a74af7
---- /dev/null
-+++ b/arch/arm/mach-mps2/Makefile
-@@ -0,0 +1 @@
-+obj-y += dtmachine.o
-diff --git a/arch/arm/mach-mps2/Makefile.boot b/arch/arm/mach-mps2/Makefile.boot
-new file mode 100644
-index 0000000..eacfc3f
---- /dev/null
-+++ b/arch/arm/mach-mps2/Makefile.boot
-@@ -0,0 +1,3 @@
-+# Empty file waiting for deletion once Makefile.boot isn't needed any more.
-+# Patch waits for application at
-+# http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7889/1 .
-diff --git a/arch/arm/mach-mps2/dtmachine.c b/arch/arm/mach-mps2/dtmachine.c
-new file mode 100644
-index 0000000..e7ad9c2
---- /dev/null
-+++ b/arch/arm/mach-mps2/dtmachine.c
-@@ -0,0 +1,21 @@
-+/*
-+ * Copyright (C) 2015 ARM Limited
-+ *
-+ * Author: Vladimir Murzin <vladimir.murzin@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
++	while (readb(port->membase + UARTn_STATE) & UARTn_STATE_TX_FULL)
++		cpu_relax();
 +
-+#include <asm/mach/arch.h>
++	writeb((unsigned char)ch, port->membase + UARTn_DATA);
++}
 +
-+static const char *const mps2_compat[] __initconst = {
-+	"arm,mps2",
-+	NULL
-+};
 +
-+DT_MACHINE_START(MPS2DT, "MPS2 (Device Tree Support)")
-+	.dt_compat = mps2_compat,
-+MACHINE_END
++static void mps2_early_write(struct console *con, const char *s, unsigned n)
++{
++	struct earlycon_device *dev = con->data;
++
++	uart_console_write(&dev->port, s, n, mps2_early_putchar);
++}
++
++static int __init mps2_early_console_setup(struct earlycon_device *device,
++					   const char *opt)
++{
++	if (!device->port.membase)
++		return -ENODEV;
++
++	device->con->write = mps2_early_write;
++
++	return 0;
++}
++EARLYCON_DECLARE(mps2, mps2_early_console_setup);
++OF_EARLYCON_DECLARE(mps2, "arm,mps2-uart", mps2_early_console_setup);
++
+ #else
+ #define MPS2_SERIAL_CONSOLE NULL
+ #endif
 -- 
 1.7.9.5
