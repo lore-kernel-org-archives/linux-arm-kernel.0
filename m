@@ -1,38 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Dec 2015 20:54:31 +0100
-Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
-In-Reply-To: <20151202193707.GG8644@n2100.arm.linux.org.uk>
-References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
- <20151202192825.GF8644@n2100.arm.linux.org.uk>
- <20151202193707.GG8644@n2100.arm.linux.org.uk>
-Message-ID: <14228323.08i3OEZDdG@wuerfel>
+From: leoli@freescale.com (Li Yang)
+Date: Wed, 2 Dec 2015 14:18:08 -0600
+Subject: [PATCH] dts/ls2080a: Update PCIe compatible
+In-Reply-To: <BN3PR0301MB1249CD4A615CCD7308FB067184050@BN3PR0301MB1249.namprd03.prod.outlook.com>
+References: <1448345075-6801-1-git-send-email-Mingkai.Hu@freescale.com>
+ <20151124202203.GA32297@rob-hp-laptop>
+ <BN3PR0301MB1249CD4A615CCD7308FB067184050@BN3PR0301MB1249.namprd03.prod.outlook.com>
+Message-ID: <CADRPPNSG-QJ0rOgq-zp_zXa2M=4xg2fERszutPfRMtjDfsF+3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 December 2015 19:37:08 Russell King - ARM Linux wrote:
-> On Wed, Dec 02, 2015 at 07:28:25PM +0000, Russell King - ARM Linux wrote:
-> > The first is easy to solve, and the second by replacing it with dove.h.
-> > The next problem is this:
-> > 
-> > arch/arm/plat-orion/common.c:25:30: fatal error: mach/bridge-regs.h: No such file or directory
-> > 
-> > which is impossible to solve, because plat-orion/common.c wants
-> > mach-dove/bridge-regs.h.
-> 
-> Another few breakages which is going to be difficult to solve:
-> 
-> drivers/hwmon/dove.c:35:30: fatal error: mach/bridge-regs.h: No such file or directory
-> 
-> drivers/soc/dove/pmu.c: In function 'dove_init_pmu_legacy':
-> drivers/soc/dove/pmu.c:404:46: error: 'IRQ_DOVE_PMU_START' undeclared (first use in this function)
-> drivers/soc/dove/pmu.c:404:46: note: each undeclared identifier is reported only once for each function it appears in
-> 
-> So, all in all this series gets a NAK from me as it totally destroys
-> my ability to do any further work on Dove.
-> 
+On Tue, Nov 24, 2015 at 11:01 PM, Hu Vincent <Mingkai.Hu@freescale.com> wrote:
+>
+>
+>> -----Original Message-----
+>> From: Rob Herring [mailto:robh at kernel.org]
+>> Sent: Wednesday, November 25, 2015 4:22 AM
+>> To: Hu Mingkai-B21284
+>> Cc: arm at kernel.org; linux-arm-kernel at lists.infradead.org;
+>> devicetree at vger.kernel.org; Li Yang-Leo-R58472; Lian Minghuan-B31939
+>> Subject: Re: [PATCH] dts/ls2080a: Update PCIe compatible
+>>
+>> On Tue, Nov 24, 2015 at 02:04:35PM +0800, Mingkai Hu wrote:
+>> > From: Minghuan Lian <Minghuan.Lian@freescale.com>
+>> >
+>> > The patch adds LS2085a to PCIe compatible to fix the compatibility
+>> > issue when using firmware with LS2085a compatible property.
+>> >
+>> > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+>> > Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
+>> > ---
+>> >  Documentation/devicetree/bindings/pci/layerscape-pci.txt |  1 +
+>> >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi           | 12
+>> ++++++++----
+>> >  2 files changed, 9 insertions(+), 4 deletions(-)
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+>> > b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+>> > index e376785..4600007 100644
+>> > --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+>> > +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+>> > @@ -15,6 +15,7 @@ Required properties:
+>> >  - compatible: should contain the platform identifier such as:
+>> >          "fsl,ls1021a-pcie", "snps,dw-pcie"
+>> >          "fsl,ls2080a-pcie", "snps,dw-pcie"
+>> > +        "fsl,ls2085a-pcie", "snps,dw-pcie"
+>> >  - reg: base addresses and lengths of the PCIe controller
+>> >  - interrupts: A list of interrupt outputs of the controller. Must
+>> contain an
+>> >    entry for each entry in the interrupt-names property.
+>> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+>> > b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+>> > index e81cd48..3821bb1 100644
+>> > --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+>> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+>> > @@ -383,7 +383,8 @@
+>> >             };
+>> >
+>> >             pcie at 3400000 {
+>> > -                   compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
+>> > +                   compatible = "fsl,ls2080a-pcie", "fsl,ls2085a-pcie",
+>> > +                                "snps,dw-pcie";
+>>
+>> This doesn't match the doc as to what are valid combinations. The order
+>> here seems backwards too. ls2085a is older?
+>>
+>
+> Yes, ls2085a was released earlier. You mean the older one comes first? Like:
+>
+> compatible = "fsl,ls2085a-pcie", "fsl,ls2080a-pcie",
+>                  "snps,dw-pcie";
 
-Ok, I'll try to take out the dove specific parts that get in the way here
-but would still do the whole series for mv78xx0 and orion5x unless someone
-finds problems.
+No.  The original order should be good.  We should put newer/more
+specific compatible first and older/more generic compatible later.  I
+think the issue is that the binding document.  We don't need to list
+the combinations.  Just list all the possible compatible strings
+specific to layerscape.  You can add a special note about "snps,
+dw-pcie" separately.
 
-	Arnd
+Regards,
+Leo
