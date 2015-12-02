@@ -1,33 +1,49 @@
-From: jay.xu@rock-chips.com (jianqun.xu)
-Date: Wed,  2 Dec 2015 21:22:31 +0800
-Subject: [PATCH] clk: rockchip: rk3368: protect aclk_bus and aclk_peri clocks
-Message-ID: <1449062551-2498-1-git-send-email-jay.xu@rock-chips.com>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Wed, 02 Dec 2015 05:25:33 -0800
+Subject: [PATCH 3/6] net: thunderx: Increase transmit queue length
+In-Reply-To: <CA+sq2CduMnsh_R9zTRMjWT=F5=9U3si-5nO6-gFvGCO9czkDdA@mail.gmail.com>
+References: <01d101d12c46$2de43b40$89acb1c0$@samsung.com>
+ <1448983985.25582.35.camel@edumazet-glaptop2.roam.corp.google.com>
+ <CA+sq2Ce9oH-kCDO8hK_wX+ZZdXyyBuT4V2bt5Ab+2=pEX+BO+w@mail.gmail.com>
+ <20151201.143047.82022857078130793.davem@davemloft.net>
+ <CA+sq2CduMnsh_R9zTRMjWT=F5=9U3si-5nO6-gFvGCO9czkDdA@mail.gmail.com>
+Message-ID: <1449062733.32764.53.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jianqun xu <jay.xu@rock-chips.com>
+On Wed, 2015-12-02 at 11:18 +0530, Sunil Kovvuri wrote:
+> >The driver should successfully recover from out of memory situations
+> > and not stop RX/TX completely.
+> This memory allocation is while interface bringup/initialization and not during
+> packet I/O.
+> 
+> >Don't put this off as not "related" to your patch, it is as this
+> >introduces the behavior for this user, and you should fix it before
+> >expecting me to apply this patch series.
+> I would disagree on this, as this patch hasn't introduced any failure here,
+> if this user has connected any device which asks for a bit large amount
+> of coherent memory then i am sure he will see the same issue.
+> And above i have suggested what could be done to not see this issue.
 
-Add aclk_bus and aclk_peri to the list of rk3368 critical clocks,
-which are the base clocks that supply for all peripherals, never
-to be disabled automatically.
 
-Signed-off-by: Jianqun xu <jay.xu@rock-chips.com>
----
- drivers/clk/rockchip/clk-rk3368.c | 2 ++
- 1 file changed, 2 insertions(+)
+This is unacceptable.
 
-diff --git a/drivers/clk/rockchip/clk-rk3368.c b/drivers/clk/rockchip/clk-rk3368.c
-index 7e6b783..cd9d4aa 100644
---- a/drivers/clk/rockchip/clk-rk3368.c
-+++ b/drivers/clk/rockchip/clk-rk3368.c
-@@ -819,6 +819,8 @@ static struct rockchip_clk_branch rk3368_clk_branches[] __initdata = {
- };
- 
- static const char *const rk3368_critical_clocks[] __initconst = {
-+	"aclk_bus",
-+	"aclk_peri",
- 	"pclk_pd_pmu",
- };
- 
--- 
-1.9.1
+Maybe you did not complete tests. changelog has no 'Tested:' section.
+
+You can not claim this patch was good, especially considering no precise
+numbers were given.
+
+If the performance increase is 4 %, then surely using twice more memory
+is not worth it.
+
+RX/TX ring buffer sizes should be :
+
+- Default to reasonable sizes (ie not gigantic memory usage for typical
+use). For multiqueue devices, one also has to take into account the
+number of queues: 
+
+  If a 10Gbit NIC has 128 queues, then probably having 8192 slots
+  per queue is too much, if this maps to 512 MB of memory !
+
+- ethtool -G support to let the admin change the conservative settings
+for the exceptional workloads.
