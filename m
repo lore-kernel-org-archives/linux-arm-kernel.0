@@ -1,41 +1,39 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 2 Dec 2015 12:08:16 +0100
-Subject: [PATCH 4/4] ARM: at91/dt: sama5d2 Xplained: pmic needs a specific
- sda hold time
-In-Reply-To: <1449052747-20991-4-git-send-email-ludovic.desroches@atmel.com>
-References: <1449052747-20991-1-git-send-email-ludovic.desroches@atmel.com>
- <1449052747-20991-4-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <565ED120.3090603@atmel.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 02 Dec 2015 12:08:34 +0100
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <20151201182226.ea7d860eb3a35086981cd18f@vollmann.ch> (Detlef
+ Vollmann's message of "Tue, 1 Dec 2015 18:22:26 +0100")
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+ <87610j7gmc.fsf@free-electrons.com>
+ <87wpsz61r7.fsf@free-electrons.com>
+ <20151201182226.ea7d860eb3a35086981cd18f@vollmann.ch>
+Message-ID: <87fuzl2jm5.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 02/12/2015 11:39, Ludovic Desroches a ?crit :
-> Data have to been hold longer for the PMIC device.
+Hi Detlef,
+ 
+ On mar., d?c. 01 2015, Detlef Vollmann <dv@vollmann.ch> wrote:
 
-s/been/be/
+> On Mon, 30 Nov 2015 14:43:56 +0100
+> Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+> [...]
+>> > Detlef, Benjamin,
+>> >
+>> > could you test it on an Orion5x based board?
+> Sorry, I'm on tour right now.
+> I'll test it next weekend (or beginning next week) on my DNS-323.
 
-It can also be interesting to know where the value comes from...
+We have still some time to send the series, and furthermore Andrew
+already tested it on an Orion5x platform. However it would be nice to
+have your confirmation on an other board.
 
+Thanks,
 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->  arch/arm/boot/dts/at91-sama5d2_xplained.dts | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> index ad6de73..9bced00 100644
-> --- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> @@ -129,6 +129,7 @@
->  				dmas = <0>, <0>;
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&pinctrl_i2c0_default>;
-> +				i2c-sda-hold-time-ns = <350>;
->  				status = "okay";
->  
->  				pmic: act8865 at 5b {
-> 
-
+Gregory
 
 -- 
-Nicolas Ferre
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
