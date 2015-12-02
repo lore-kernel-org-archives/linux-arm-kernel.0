@@ -1,89 +1,33 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 2 Dec 2015 14:29:53 -0600
-Subject: [PATCH v3 0/3] soc: ti: Introduce wkup_m3_ipc driver
-In-Reply-To: <20151020161843.GE3078@atomide.com>
-References: <1442967294-23837-1-git-send-email-d-gerlach@ti.com>
- <20151020161843.GE3078@atomide.com>
-Message-ID: <565F54C1.8090407@ti.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 02 Dec 2015 15:31:52 -0500 (EST)
+Subject: [PATCH v4 net 0/6] Marvell Armada XP/370/38X Neta fixes
+In-Reply-To: <87wpsx2rll.fsf@free-electrons.com>
+References: <1448886466-31538-1-git-send-email-mw@semihalf.com>
+ <20151201.220337.2287051759324173025.davem@davemloft.net>
+ <87wpsx2rll.fsf@free-electrons.com>
+Message-ID: <20151202.153152.345490122870853342.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On 10/20/2015 11:18 AM, Tony Lindgren wrote:
-> Hi all,
->
-> * Dave Gerlach <d-gerlach@ti.com> [150922 17:20]:
->> Hi,
->> This series is version 3 of the code to introduce a wkup_m3_ipc driver
->> to handle communication between the MPU and Cortex M3 present on TI AM335x
->> and AM437x SoCs. v2 of this series can be found at [1]. Only patch 3
->> has been changed based on a request from Tony and a few cleanups:
->>
->> - Rather than exporting all of the functionality of the driver, added
->>    wkup_m3_ipc_get and wkup_m3_ipc_put to allow users to just get a handle
->>    containing an ops structure for use.
->>
->> - Changed all ops (previously exported functions) to take pointer to
->>    struct wkup_m3_ipc as an argument now that user code will get this
->>    from wkup_m3_ipc_get.
->>
->> - General cleanup to probe function
->>
->> - Added MODULE_DEVICE_TABLE so driver can probe automatically.
->>
->> The series containing the DT nodes can be found here [2]. The actual dt
->> nodes for wkup_m3_ipc (last two patches) have been merged but discussion
->> is still open for the ti,mbox-send-noirq flag patches and depends on the
->> comments provided for the omap-mailbox change presented in patch 1 of
->> this series.
->>
->> A full branch containing all necessary PM code for both am335x and am437x
->> has been pushed here [3] to provide a big picture view of the plan for
->> this series.
->>
->> This driver relies on the firmware at [4] in the next-upstream branch
->> being present in /lib/firmware in the rootfs or built in to the kernel.
->
-> Anybody got comments on this one? Should I pick up this series or
-> what's the plan?
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Date: Wed, 02 Dec 2015 09:16:06 +0100
 
-Now that Patch 1 has been merged [1] can patch 2 and 3 be picked up? 
-These apply cleanly on v4.4-rc3.
+> Hi David,
+>  
+>  On mer., d?c. 02 2015, David Miller <davem@davemloft.net> wrote:
+> 
+>> From: Marcin Wojtas <mw@semihalf.com>
+>> Date: Mon, 30 Nov 2015 13:27:40 +0100
+>>
+>>> I'm sending v4 with corrected commit log of the last patch, in order
+>>> to avoid possible conflicts between the branches as suggested by
+>>> Gregory Clement.
+>>
+>> Series applied, thanks.
+> 
+> Could you confirm that you don't apply the last patch?
 
-Regards,
-Dave
+If I say it's applied then it's applied, and if you don't like it then
+you'll have to submit a revert patch against my tree or similar.
 
-[1] 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8e3c5952144f045a0c81bf674d3f5e1d9aafceb7
-
->
-> Regards,
->
-> Tony
->
->
->> [1] https://lkml.org/lkml/2015/7/17/797
->> [2] https://lkml.org/lkml/2015/7/17/813
->> [3] https://github.com/dgerlach/linux-pm/tree/pm-v4.3-rc1-amx3-suspend
->> [4] https://git.ti.com/ti-cm3-pm-firmware
->>
->> Dave Gerlach (3):
->>    mailbox/omap: Add ti,mbox-send-noirq quirk to fix AM33xx CPU Idle
->>    Documentation: dt: add bindings for TI Wakeup M3 IPC device
->>    soc: ti: Add wkup_m3_ipc driver
->>
->>   .../devicetree/bindings/mailbox/omap-mailbox.txt   |   8 +
->>   .../devicetree/bindings/soc/ti/wkup_m3_ipc.txt     |  57 +++
->>   drivers/mailbox/omap-mailbox.c                     |  49 +-
->>   drivers/soc/ti/Kconfig                             |  10 +
->>   drivers/soc/ti/Makefile                            |   1 +
->>   drivers/soc/ti/wkup_m3_ipc.c                       | 508 +++++++++++++++++++++
->>   include/linux/wkup_m3_ipc.h                        |  55 +++
->>   7 files changed, 684 insertions(+), 4 deletions(-)
->>   create mode 100644 Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
->>   create mode 100644 drivers/soc/ti/wkup_m3_ipc.c
->>   create mode 100644 include/linux/wkup_m3_ipc.h
->>
->> --
->> 2.4.6
->>
+You know you could just check my tree instead of asking.
