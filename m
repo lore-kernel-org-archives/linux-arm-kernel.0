@@ -1,45 +1,49 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Wed, 2 Dec 2015 11:18:43 +0530
-Subject: [PATCH 3/6] net: thunderx: Increase transmit queue length
-In-Reply-To: <20151201.143047.82022857078130793.davem@davemloft.net>
-References: <01d101d12c46$2de43b40$89acb1c0$@samsung.com>
- <1448983985.25582.35.camel@edumazet-glaptop2.roam.corp.google.com>
- <CA+sq2Ce9oH-kCDO8hK_wX+ZZdXyyBuT4V2bt5Ab+2=pEX+BO+w@mail.gmail.com>
- <20151201.143047.82022857078130793.davem@davemloft.net>
-Message-ID: <CA+sq2CduMnsh_R9zTRMjWT=F5=9U3si-5nO6-gFvGCO9czkDdA@mail.gmail.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Wed,  2 Dec 2015 08:02:08 +0200
+Subject: [PATCH] clocksource: correct pr_err() output format
+Message-ID: <1449036128-19968-1-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->The driver should successfully recover from out of memory situations
-> and not stop RX/TX completely.
-This memory allocation is while interface bringup/initialization and not during
-packet I/O.
+If by some reason timerclk is not available, both clockevent and
+clocksource initializations correctly exit, but output of errno to
+kernel log buffer may be confusing:
 
->Don't put this off as not "related" to your patch, it is as this
->introduces the behavior for this user, and you should fix it before
->expecting me to apply this patch series.
-I would disagree on this, as this patch hasn't introduced any failure here,
-if this user has connected any device which asks for a bit large amount
-of coherent memory then i am sure he will see the same issue.
-And above i have suggested what could be done to not see this issue.
+  lpc32xx_clk_init: failed to map system control block registers
+  lpc32xx_clocksource_init: clock get failed (4294966779)
+  lpc32xx_clockevent_init: clock get failed (4294966779)
 
-But anyway for the time being I will resubmit the patch series without this
-patch, hope that would be okay.
+Use signed integer output in the correspondent pr_err() string formats:
 
-On Wed, Dec 2, 2015 at 1:00 AM, David Miller <davem@davemloft.net> wrote:
-> From: Sunil Kovvuri <sunil.kovvuri@gmail.com>
-> Date: Tue, 1 Dec 2015 22:00:49 +0530
->
->> Increasing descriptor ring size will lead to more memory allocation.
->> And what you are seeing is a memory alloc failure and doesn't seem
->> to be due to this driver change.  I mean it looks like the behavior
->> will be same for other drivers as well.
->
-> The driver should successfully recover from out of memory situations
-> and not stop RX/TX completely.
->
-> There might be some other problem with your driver causing this.
->
-> Don't put this off as not "related" to your patch, it is as this
-> introduces the behavior for this user, and you should fix it before
-> expecting me to apply this patch series.
+  lpc32xx_clocksource_init: clock get failed (-517)
+  lpc32xx_clockevent_init: clock get failed (-517)
+
+Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+---
+ drivers/clocksource/time-lpc32xx.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/clocksource/time-lpc32xx.c b/drivers/clocksource/time-lpc32xx.c
+index a1c06a2..1316876 100644
+--- a/drivers/clocksource/time-lpc32xx.c
++++ b/drivers/clocksource/time-lpc32xx.c
+@@ -125,7 +125,7 @@ static int __init lpc32xx_clocksource_init(struct device_node *np)
+ 
+ 	clk = of_clk_get_by_name(np, "timerclk");
+ 	if (IS_ERR(clk)) {
+-		pr_err("clock get failed (%lu)\n", PTR_ERR(clk));
++		pr_err("clock get failed (%ld)\n", PTR_ERR(clk));
+ 		return PTR_ERR(clk);
+ 	}
+ 
+@@ -184,7 +184,7 @@ static int __init lpc32xx_clockevent_init(struct device_node *np)
+ 
+ 	clk = of_clk_get_by_name(np, "timerclk");
+ 	if (IS_ERR(clk)) {
+-		pr_err("clock get failed (%lu)\n", PTR_ERR(clk));
++		pr_err("clock get failed (%ld)\n", PTR_ERR(clk));
+ 		return PTR_ERR(clk);
+ 	}
+ 
+-- 
+2.1.4
