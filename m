@@ -1,77 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Dec 2015 09:37:05 +0100
-Subject: [PATCH v6 14/19] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <20151201233503.GA23156@yury-N73SV>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <12844690.Yr8y3jA010@wuerfel> <20151201233503.GA23156@yury-N73SV>
-Message-ID: <1712431.VUth4NvudT@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 02 Dec 2015 08:45:56 +0000
+Subject: [PATCH v4 18/21] KVM: ARM64: Add PMU overflow interrupt routing
+In-Reply-To: <565E5A13.2080706@huawei.com>
+References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>	<1446186123-11548-19-git-send-email-zhaoshenglong@huawei.com>
+ <20151130182258.684c9df6@arm.com> <565DB021.3020901@huawei.com>
+ <565DB3A5.3030701@arm.com> <565DB935.5040609@linaro.org>
+ <565DBF8D.1070006@arm.com> <565DCA24.7000908@linaro.org>
+ <565DD17A.50009@arm.com> <565E5A13.2080706@huawei.com>
+Message-ID: <565EAFC4.2040301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 December 2015 02:35:03 Yury Norov wrote:
-> On Tue, Dec 01, 2015 at 11:39:42PM +0100, Arnd Bergmann wrote:
-> > On Wednesday 02 December 2015 00:29:04 Yury Norov wrote:
-> > I'm not sure I understand this part. What changes specifically do we need?
-> > 
+On 02/12/15 02:40, Shannon Zhao wrote:
 > 
-> For kernel:
 > 
->         diff --git a/arch/arm64/include/asm/shmparam.h b/arch/arm64/include/asm/shmparam.h
->         index 4df608a..e368a55 100644
->         --- a/arch/arm64/include/asm/shmparam.h
->         +++ b/arch/arm64/include/asm/shmparam.h
->         @@ -21,7 +21,7 @@
->           * alignment value. Since we don't have aliasing D-caches, the rest of
->           * the time we can safely use PAGE_SIZE.
->           */
->         -#define COMPAT_SHMLBA	0x4000
->         +#define COMPAT_SHMLBA	(4 * PAGE_SIZE)
->          
->          #include <asm-generic/shmparam.h>
->          
->         diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
->         index c5bc712..877bedf 100644
->         --- a/arch/arm64/kernel/sys_ilp32.c
->         +++ b/arch/arm64/kernel/sys_ilp32.c
->         @@ -42,15 +42,12 @@ asmlinkage long sys_rt_sigreturn_wrapper(void);
->          #define compat_sys_pwrite64            sys_pwrite64
->          #define compat_sys_readahead           sys_readahead
->          #define compat_sys_rt_sigaction        sys_rt_sigaction
->         -#define compat_sys_shmat               sys_shmat
->          #define compat_sys_sync_file_range     sys_sync_file_range
->          #define compat_sys_truncate64          sys_truncate
->          #define compat_sys_sigaltstack         sys_sigaltstack
->  
-> For library - just create a header in ilp32 directory that defines
-> SHMLBA exactly as arm: __getpagesize () << 2
+> On 2015/12/2 0:57, Marc Zyngier wrote:
+>> On 01/12/15 16:26, Shannon Zhao wrote:
+>>>
+>>>
+>>> On 2015/12/1 23:41, Marc Zyngier wrote:
+>>>>> The reason is that when guest clear the overflow register, it will trap
+>>>>>> to kvm and call kvm_pmu_sync_hwstate() as you see above. At this moment,
+>>>>>> the overflow register is still overflowed(that is some bit is still 1).
+>>>>>> So We need to use some flag to mark we already inject this interrupt.
+>>>>>> And if during guest handling the overflow, there is a new overflow
+>>>>>> happening, the pmu->irq_pending will be set ture by
+>>>>>> kvm_pmu_perf_overflow(), then it needs to inject this new interrupt, right?
+>>>> I don't think so. This is a level interrupt, so the level should stay
+>>>> high as long as the guest hasn't cleared all possible sources for that
+>>>> interrupt.
+>>>>
+>>>> For your example, the guest writes to PMOVSCLR to clear the overflow
+>>>> caused by a given counter. If the status is now 0, the interrupt line
+>>>> drops. If the status is still non zero, the line stays high. And I
+>>>> believe that writing a 1 to PMOVSSET would actually trigger an
+>>>> interrupt, or keep it high if it has already high.
+>>>>
+>>> Right, writing 1 to PMOVSSET will trigger an interrupt.
+>>>
+>>>> In essence, do not try to maintain side state. I've been bitten.
+>>>
+>>> So on VM entry, it check if PMOVSSET is zero. If not, call 
+>>> kvm_vgic_inject_irq to set the level high. If so, set the level low.
+>>> On VM exit, it seems there is nothing to do.
+>>
+>> It is even simpler than that:
+>>
+>> - When you get an overflow, you inject an interrupt with the level set to 1.
+>> - When the overflow register gets cleared, you inject the same interrupt
+>> with the level set to 0.
+>>
+>> I don't think you need to do anything else, and the world switch should
+>> be left untouched.
+>>
+> 
+> On 2015/7/17 23:28, Christoffer Dall wrote:>> > +		
+> kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+>>>> +					    pmu->irq_num, 1);
+>> what context is this overflow handler function?  kvm_vgic_inject_irq
+>> grabs a mutex, so it can sleep...
+>>
+>> from a quick glance at the perf core code, it looks like this is in
+>> interrupt context, so that call to kvm_vgic_inject_irq looks bad.
+>>
+> 
+> But as Christoffer said before, it's not good to call
+> kvm_vgic_inject_irq directly in interrupt context. So if we just kick
+> the vcpu here and call kvm_vgic_inject_irq on VM entry, is this fine?
 
-I think we both reversed our positions here ;-)
+Possibly. I'm slightly worried that inject_irq itself is going to kick
+the vcpu again for no good reason. I guess we'll find out (and maybe
+we'll add a kvm_vgic_inject_irq_no_kick_please() helper...).
 
-The 4*PAGE_SIZE on ARM is an architecture specific oddity, I believe
-to work around aliasing caches on ARMv6. As no other architecture does
-this, we're probably better off not duplicating it for aarch64-ilp32
-and just use sys_shmat as your v6 patch does.
+Thanks,
 
-> > It sounds like shmat is one of the cases we an override makes sense
-> > and we should use sys_shmat with PAGE_SIZE for aarch64 ilp32 mode.
-> > 
-> 
-> [...]
-> 
-> > We normally assume that the page size on ARM is fixed to 4K, so
-> > there might be user space that just hardcodes 16K SHMLBA 
-> 
-> It means that we should use compat_sys_shmat because hardcoded
-> userspace may have a chance to work for 4K pages. If we'll use
-> sys_shmat (and so 4K SHMLBA), we'll definitely make hardcoded
-> userspace broken. Non-hardcoded userspace will work anyway.
-> 
-> We can describe in documentation that 4k pages are prefferable.
-
-The hardcoded user space would only apply to old source code that
-specifically tries to adapt to what ARM does, but gets it wrong,
-If we have source code that is converted from x86 or mips and
-hardcodes anything, it's more likely to be the normal __getpagesize().
-
-	Arnd
+	M.
+-- 
+Jazz is not dead. It just smells funny...
