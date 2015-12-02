@@ -1,39 +1,69 @@
-From: salil.mehta@huawei.com (Salil Mehta)
-Date: Wed, 2 Dec 2015 17:02:08 +0000
-Subject: [PATCH V5 net-next 1/5] net:hns: Add support of Hip06 SoC to
- the Hislicon Network Subsystem
-In-Reply-To: <20151130.145057.216796732457000987.davem@davemloft.net>
-References: <1448522050-5576-1-git-send-email-salil.mehta@huawei.com>	<1448522050-5576-2-git-send-email-salil.mehta@huawei.com>
- <20151130.145057.216796732457000987.davem@davemloft.net>
-Message-ID: <565F2410.9040607@huawei.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Wed,  2 Dec 2015 18:06:52 +0100
+Subject: [PATCH] ARM: dts: stm32f429: Boost perfs by remapping SDRAM Bank 1 to
+ 0x0
+Message-ID: <1449076012-19519-1-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+STM32F429 allows to remap FMC SDRAM Bank 1 from 0xc0000000 to 0x0,
+by writing 0x4 to SYSCFG_MEMRMP register.
 
-On 11/30/2015 7:50 PM, David Miller wrote:
-> From: Salil Mehta <salil.mehta@huawei.com>
-> Date: Thu, 26 Nov 2015 07:14:06 +0000
->
->> -#define ENABLE		(0x1)
->> -#define DISABLE		(0x0)
->> +#define ENABLE		0x1
->> +#define DISABLE		0x0
-> Defining such common macros names for such incredibly simple boolean values
-> is asking for trouble, in particular it can possibly collide with other
-> defines in the global namespace.
->
-> Use "true", "false", and the "bool" type, because that is exactly how you
-> are using these values.
->
-> Thanks.
-Hi David,
-Thanks for your suggestions. I have worked upon the comments and removed 
-these macros
-and introduced the 'bool' type here as well. I think I missed this in my 
-earlier rework. Thanks
-again for pointing it out. I have floated new V6 patch for your 
-consideration.
+As mentionned in the reference manual (see chapter 9.3.1), the performance
+gain is really interresting:
+"In remap mode at address 0x0000 0000, the CPU can access the external
+memory via ICode bus instead of System bus which boosts up the
+performance."
 
-Best Regards
-Salil
->
+These are the dhrystone results with and without the remap enabled:
+Default (SDRAM in 0xc0000000):
+---------------------------------
+Microseconds for one run through Dhrystone:   31.8
+Dhrystones per Second:                      31416.9
+
+Remap (SDRAM in 0x0000000):
+-----------------------------
+Microseconds for one run through Dhrystone:   20.6
+Dhrystones per Second:                      48520.1
+
+This patch first change the SDRAM start address to 0x0 for STM32429i-EVAL
+board, and also set the dma-range property as the other masters than the M4
+CPU still see SDRAM in 0xc0000000.
+
+Note that the Discovery board cannot benefit from this feature, since the
+SDRAM is connected to Bank 2.
+
+Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+---
+ arch/arm/boot/dts/stm32429i-eval.dts | 2 +-
+ arch/arm/boot/dts/stm32f429.dtsi     | 2 ++
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
+index 6964fc9..a717acb 100644
+--- a/arch/arm/boot/dts/stm32429i-eval.dts
++++ b/arch/arm/boot/dts/stm32429i-eval.dts
+@@ -58,7 +58,7 @@
+ 	};
+ 
+ 	memory {
+-		reg = <0xc0000000 0x2000000>;
++		reg = <0x00000000 0x2000000>;
+ 	};
+ 
+ 	aliases {
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index eaf7a72..84e5fb3 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -57,6 +57,8 @@
+ 	};
+ 
+ 	soc {
++		dma-ranges = <0xc0000000 0x0 0x10000000>;
++
+ 		timer2: timer at 40000000 {
+ 			compatible = "st,stm32-timer";
+ 			reg = <0x40000000 0x400>;
+-- 
+1.9.1
