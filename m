@@ -1,172 +1,138 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed,  2 Dec 2015 10:47:06 +0100
-Subject: [PATCH v4 4/4] drivers: psci: replace psci firmware calls
-In-Reply-To: <1449049626-13991-1-git-send-email-jens.wiklander@linaro.org>
-References: <1449049626-13991-1-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <1449049626-13991-5-git-send-email-jens.wiklander@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 02 Dec 2015 09:47:43 +0000
+Subject: [PATCH v2 10/21] arm64: KVM: Add patchable function selector
+In-Reply-To: <20151202092720.GX11704@cbox>
+References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+ <1448650215-15218-11-git-send-email-marc.zyngier@arm.com>
+ <20151201153900.GT11704@cbox> <565DEC14.8090206@arm.com>
+ <20151202092720.GX11704@cbox>
+Message-ID: <565EBE3F.2050708@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to use a generic interface for issuing SMC/HVC based on ARM SMC
-Calling Convention. Removes now the now unused psci-call.S.
+On 02/12/15 09:27, Christoffer Dall wrote:
+> On Tue, Dec 01, 2015 at 06:51:00PM +0000, Marc Zyngier wrote:
+>> On 01/12/15 15:39, Christoffer Dall wrote:
+>>> On Fri, Nov 27, 2015 at 06:50:04PM +0000, Marc Zyngier wrote:
+>>>> KVM so far relies on code patching, and is likely to use it more
+>>>> in the future. The main issue is that our alternative system works
+>>>> at the instruction level, while we'd like to have alternatives at
+>>>> the function level.
+>>>>
+>>>> In order to cope with this, add the "hyp_alternate_select" macro that
+>>>> outputs a brief sequence of code that in turn can be patched, allowing
+>>>> al alternative function to be selected.
+>>>
+>>> s/al/an/ ?
+>>>
+>>>>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>  arch/arm64/kvm/hyp/hyp.h | 16 ++++++++++++++++
+>>>>  1 file changed, 16 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+>>>> index 7ac8e11..f0427ee 100644
+>>>> --- a/arch/arm64/kvm/hyp/hyp.h
+>>>> +++ b/arch/arm64/kvm/hyp/hyp.h
+>>>> @@ -27,6 +27,22 @@
+>>>>  
+>>>>  #define kern_hyp_va(v) (typeof(v))((unsigned long)v & HYP_PAGE_OFFSET_MASK)
+>>>>  
+>>>> +/*
+>>>> + * Generates patchable code sequences that are used to switch between
+>>>> + * two implementations of a function, depending on the availability of
+>>>> + * a feature.
+>>>> + */
+>>>
+>>> This looks right to me, but I'm a bit unclear what the types of this is
+>>> and how to use it.
+>>>
+>>> Are orig and alt function pointers and cond is a CONFIG_FOO ?  fname is
+>>> a symbol, which is defined as a prototype somewhere and then implemented
+>>> here, or?
+>>>
+>>> Perhaps a Usage: part of the docs would be helpful.
+>>
+>> How about:
+>>
+>> @fname: a symbol name that will be defined as a function returning a
+>> function pointer whose type will match @orig and @alt
+>> @orig: A pointer to the default function, as returned by @fname when
+>> @cond doesn't hold
+>> @alt: A pointer to the alternate function, as returned by @fname when
+>> @cond holds
+>> @cond: a CPU feature (as described in asm/cpufeature.h)
+> 
+> looks good.
+> 
+>>
+>>>
+>>>> +#define hyp_alternate_select(fname, orig, alt, cond)			\
+>>>> +typeof(orig) * __hyp_text fname(void)					\
+>>>> +{									\
+>>>> +	typeof(alt) *val = orig;					\
+>>>> +	asm volatile(ALTERNATIVE("nop		\n",			\
+>>>> +				 "mov	%0, %1	\n",			\
+>>>> +				 cond)					\
+>>>> +		     : "+r" (val) : "r" (alt));				\
+>>>> +	return val;							\
+>>>> +}
+>>>> +
+>>>>  void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
+>>>>  void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+>>>>  
+>>>> -- 
+>>>> 2.1.4
+>>>>
+>>>
+>>> I haven't thought much about how all of this is implemented, but from my
+>>> point of views the ideal situation would be something like:
+>>>
+>>> void foo(int a, int b)
+>>> {
+>>> 	ALTERNATIVE_IF_NOT CONFIG_BAR
+>>> 	foo_legacy(a, b);
+>>> 	ALTERNATIVE_ELSE
+>>> 	foo_new(a, b);
+>>> 	ALTERNATIVE_END
+>>> }
+>>>
+>>> I realize this may be impossible because the C code could implement all
+>>> sort of fun stuff around the actual function calls, but would there be
+>>> some way to annotate the functions and find the actual branch statement
+>>> and change the target?
+>>
+>> The main issue is that C doesn't give you any access to the branch
+>> function itself, except for the asm-goto statements. It also makes it
+>> very hard to preserve the return type. For your idea to work, we'd need
+>> some support in the compiler itself. I'm sure that it is doable, just
+>> not by me! ;-)
+> 
+> Not by me either, I'm just asking stupid questions - as always.
 
-Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm/kernel/Makefile      |  1 -
- arch/arm/kernel/psci-call.S   | 31 -------------------------------
- arch/arm64/kernel/Makefile    |  2 +-
- arch/arm64/kernel/psci-call.S | 28 ----------------------------
- drivers/firmware/psci.c       | 23 +++++++++++++++++++++--
- 5 files changed, 22 insertions(+), 63 deletions(-)
- delete mode 100644 arch/arm/kernel/psci-call.S
- delete mode 100644 arch/arm64/kernel/psci-call.S
+I don't find that stupid. Asking that kind of stuff is useful to put
+things in perspective.
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index d2d0042..80856de 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -88,7 +88,6 @@ obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
- 
- obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
- ifeq ($(CONFIG_ARM_PSCI),y)
--obj-y				+= psci-call.o
- obj-$(CONFIG_SMP)		+= psci_smp.o
- endif
- 
-diff --git a/arch/arm/kernel/psci-call.S b/arch/arm/kernel/psci-call.S
-deleted file mode 100644
-index a78e9e1..0000000
---- a/arch/arm/kernel/psci-call.S
-+++ /dev/null
-@@ -1,31 +0,0 @@
--/*
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * Copyright (C) 2015 ARM Limited
-- *
-- * Author: Mark Rutland <mark.rutland@arm.com>
-- */
--
--#include <linux/linkage.h>
--
--#include <asm/opcodes-sec.h>
--#include <asm/opcodes-virt.h>
--
--/* int __invoke_psci_fn_hvc(u32 function_id, u32 arg0, u32 arg1, u32 arg2) */
--ENTRY(__invoke_psci_fn_hvc)
--	__HVC(0)
--	bx	lr
--ENDPROC(__invoke_psci_fn_hvc)
--
--/* int __invoke_psci_fn_smc(u32 function_id, u32 arg0, u32 arg1, u32 arg2) */
--ENTRY(__invoke_psci_fn_smc)
--	__SMC(0)
--	bx	lr
--ENDPROC(__invoke_psci_fn_smc)
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 0170bea..27bf1e5 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -14,7 +14,7 @@ CFLAGS_REMOVE_return_address.o = -pg
- arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
- 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
- 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
--			   hyp-stub.o psci.o psci-call.o cpu_ops.o insn.o	\
-+			   hyp-stub.o psci.o cpu_ops.o insn.o	\
- 			   return_address.o cpuinfo.o cpu_errata.o		\
- 			   cpufeature.o alternative.o cacheinfo.o		\
- 			   smp.o smp_spin_table.o topology.o smccc-call.o
-diff --git a/arch/arm64/kernel/psci-call.S b/arch/arm64/kernel/psci-call.S
-deleted file mode 100644
-index cf83e61..0000000
---- a/arch/arm64/kernel/psci-call.S
-+++ /dev/null
-@@ -1,28 +0,0 @@
--/*
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * Copyright (C) 2015 ARM Limited
-- *
-- * Author: Will Deacon <will.deacon@arm.com>
-- */
--
--#include <linux/linkage.h>
--
--/* int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1, u64 arg2) */
--ENTRY(__invoke_psci_fn_hvc)
--	hvc	#0
--	ret
--ENDPROC(__invoke_psci_fn_hvc)
--
--/* int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1, u64 arg2) */
--ENTRY(__invoke_psci_fn_smc)
--	smc	#0
--	ret
--ENDPROC(__invoke_psci_fn_smc)
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index d24f35d..f25cd79 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -13,6 +13,7 @@
- 
- #define pr_fmt(fmt) "psci: " fmt
- 
-+#include <linux/arm-smccc.h>
- #include <linux/errno.h>
- #include <linux/linkage.h>
- #include <linux/of.h>
-@@ -58,8 +59,6 @@ struct psci_operations psci_ops;
- 
- typedef unsigned long (psci_fn)(unsigned long, unsigned long,
- 				unsigned long, unsigned long);
--asmlinkage psci_fn __invoke_psci_fn_hvc;
--asmlinkage psci_fn __invoke_psci_fn_smc;
- static psci_fn *invoke_psci_fn;
- 
- enum psci_function {
-@@ -107,6 +106,26 @@ bool psci_power_state_is_valid(u32 state)
- 	return !(state & ~valid_mask);
- }
- 
-+static unsigned long __invoke_psci_fn_hvc(unsigned long function_id,
-+			unsigned long arg0, unsigned long arg1,
-+			unsigned long arg2)
-+{
-+	struct arm_smccc_res res;
-+
-+	arm_smccc_hvc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
-+	return res.a0;
-+}
-+
-+static unsigned long __invoke_psci_fn_smc(unsigned long function_id,
-+			unsigned long arg0, unsigned long arg1,
-+			unsigned long arg2)
-+{
-+	struct arm_smccc_res res;
-+
-+	arm_smccc_smc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
-+	return res.a0;
-+}
-+
- static int psci_to_linux_errno(int errno)
- {
- 	switch (errno) {
+>>
+>> This is why I've ended up creating something that returns a function
+>> *pointer*, because that's something that exists in the language (no new
+>> concept). I simply made sure I could return it at minimal cost.
+>>
+> 
+> I don't have a problem with this either.  I'm curious though, how much
+> of a performance improvement (and why) we get from doing this as opposed
+> to a simple if-statement?
+
+An if statement will involve fetching some configuration from memory.
+You can do that, but you are going to waste a cache line and memory
+bandwidth (both which are scarce resources) for something that never
+ever changes over the life of the system. These things tend to accumulate.
+
+There is also a small number of cases where you *have* to patch
+instructions (think VHE, for example). And having two different ways to
+check for things is just asking for trouble in the long run.
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
