@@ -1,34 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 1 Dec 2015 17:22:01 -0800
+From: matthijsvanduin@gmail.com (Matthijs van Duin)
+Date: Wed, 2 Dec 2015 02:21:59 +0100
 Subject: [PATCH 10/10] ARM: dts: Fix dm814x pinctrl address and mask
-In-Reply-To: <CAALWOA8J5xJaa2jSoY3RJ2iGNAcAypbWsC3+9YTNMFZPY2r5pA@mail.gmail.com>
+In-Reply-To: <20151202004623.GX23396@atomide.com>
 References: <1449013103-23238-1-git-send-email-tony@atomide.com>
  <1449013103-23238-11-git-send-email-tony@atomide.com>
  <CAALWOA9LtWxFmKB_My7cv4KODBEmyPm=dUb=tPuap79fm7FkxA@mail.gmail.com>
  <20151202004623.GX23396@atomide.com>
- <CAALWOA8J5xJaa2jSoY3RJ2iGNAcAypbWsC3+9YTNMFZPY2r5pA@mail.gmail.com>
-Message-ID: <20151202012200.GZ23396@atomide.com>
+Message-ID: <CAALWOA_=k=Z4m=1fC4jXJf9-a33OQuhHoEYJ7B8dXR9e4eF9fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matthijs van Duin <matthijsvanduin@gmail.com> [151201 17:15]:
-> On 2 December 2015 at 01:46, Tony Lindgren <tony@atomide.com> wrote:
-> > Ouch. We should probably have separate PIN_INPUT_3V3 and PIN_OUTPUT_3V3
-> > dts macros that ensure that?
-> 
-> Can't we just keep bit 18 out of the function mask? The bootloader
-> should already have made sure all pins have bit 18 set (and bit 19 set
-> to correct values after ROM mucked them up, see advisory 2.1.88), so
-> all that needs to be done is avoid touching them.
+On 2 December 2015 at 01:46, Tony Lindgren <tony@atomide.com> wrote:
+> We should probably have separate PIN_INPUT_3V3 and PIN_OUTPUT_3V3
+> dts macros that ensure that?
 
-Sounds good to me. And people who really want to override the mask can
-do it in the board specifc dts file.
+I'm in general no fan of such macros: it feels really awkward to have
+to make that distinction in dts when doing pin config.
 
-> Are the power savings from disabling unnecessary inputs significant
-> enough to spend any headache on it?
+Note that if you're feeling really enthausiastic about putting in
+effort to allow inputs to be disabled while staying clear of the
+erratum, I think you can detect at runtime which I/O supplies are 3.3V
+by inspecting this register:
 
-Only for some battery powered devices, not in this case for sure.
+#define CTRL_CQDETECT_STATUS    0x48140e00
 
-Regards,.
-
-Tony
+Matthijs
