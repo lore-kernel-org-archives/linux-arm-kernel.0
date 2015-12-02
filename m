@@ -1,34 +1,34 @@
-From: Dongsheng.Wang@freescale.com (Wang Dongsheng)
-Date: Wed, 2 Dec 2015 13:14:50 +0000
-Subject: [RESEND 1/2] ARM: dts: ls1021a: Add DCU dts node
-In-Reply-To: <20151202124406.GT692@tiger>
-References: <1448956977-8930-1-git-send-email-dongsheng.wang@freescale.com>
- <20151202124406.GT692@tiger>
-Message-ID: <CY1PR0301MB16116F5AA83A1EA83EB995919D0E0@CY1PR0301MB1611.namprd03.prod.outlook.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 2 Dec 2015 13:16:59 +0000
+Subject: [PATCH] arm64: ftrace: stop using kstop_machine to
+ enable/disable tracing
+In-Reply-To: <20151202123654.GC4523@arm.com>
+References: <1448697009-17211-1-git-send-email-huawei.libin@huawei.com>
+ <20151202123654.GC4523@arm.com>
+Message-ID: <20151202131659.GA5621@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Wed, Dec 02, 2015 at 12:36:54PM +0000, Will Deacon wrote:
+> On Sat, Nov 28, 2015 at 03:50:09PM +0800, Li Bin wrote:
+> > On arm64, kstop_machine which is hugely disruptive to a running
+> > system is not needed to convert nops to ftrace calls or back,
+> > because that modifed code is a single 32bit instructions which
+> > is impossible to cross cache (or page) boundaries, and the used str
+> > instruction is single-copy atomic.
+> 
+> This commit message is misleading, since the single-copy atomicity
+> guarantees don't apply to the instruction-side. Instead, the architecture
+> calls out a handful of safe instructions in "Concurrent modification and
+> execution of instructions".
+> 
+> Now, those safe instructions *do* include NOP, B and BL, so that should
+> be sufficient for ftrace provided that we don't patch condition codes
+> (and I don't think we do).
 
-Thanks.
+Thinking about this some more, you also need to fix the validate=1 case
+in ftrace_modify_code so that it can run outside of stop_machine. We
+currently rely on that to deal with concurrent modifications (e.g.
+module unloading).
 
-Regards,
--Dongsheng
-
-> 
-> On Tue, Dec 01, 2015 at 04:02:56PM +0800, Dongsheng Wang wrote:
-> > From: Jianwei Wang <jianwei.wang.chn@gmail.com>
-> >
-> > Add DCU node, DCU is a display controller of Freescale named 2D-ACE.
-> >
-> > Signed-off-by: Alison Wang <alison.wang@freescale.com>
-> > Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
-> > Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
-> > Signed-off-by: Yi Meng <b56799@freescale.com>
-> > Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
-> 
-> I have applied the same patches from Meng Yi [1].
-> 
-> Shawn
-> 
-> [1] http://thread.gmane.org/gmane.linux.drivers.devicetree/145580
+Will
