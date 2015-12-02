@@ -1,68 +1,40 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Wed, 2 Dec 2015 09:32:34 -0800
-Subject: [PATCH 1/3] pinctrl: Broadcom NSP GPIO-a device tree bindings
-In-Reply-To: <20151202150735.GA6165@rob-hp-laptop>
-References: <1449031598-18849-1-git-send-email-yrdreddy@broadcom.com>
- <20151202150735.GA6165@rob-hp-laptop>
-Message-ID: <565F2B32.6000808@broadcom.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 02 Dec 2015 17:52:51 +0000
+Subject: [PATCH v2 21/21] arm64: KVM: Remove weak attributes
+In-Reply-To: <20151202162134.GN18376@cbox>
+References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+ <1448650215-15218-22-git-send-email-marc.zyngier@arm.com>
+ <20151202114732.GA18376@cbox> <565F0C8D.9010505@arm.com>
+ <20151202162134.GN18376@cbox>
+Message-ID: <565F2FF3.2030804@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On 12/2/2015 7:07 AM, Rob Herring wrote:
-> On Tue, Dec 01, 2015 at 11:46:38PM -0500, Yendapally Reddy Dhananjaya Reddy wrote:
->> Device tree binding documentation for Broadcom NSP GPIO-a driver
->
-> Bindings are for h/w, not drivers...
->
+On 02/12/15 16:21, Christoffer Dall wrote:
+> On Wed, Dec 02, 2015 at 03:21:49PM +0000, Marc Zyngier wrote:
+>> On 02/12/15 11:47, Christoffer Dall wrote:
+>>> On Fri, Nov 27, 2015 at 06:50:15PM +0000, Marc Zyngier wrote:
+>>>> As we've now switched to the new world switch implementation,
+>>>> remove the weak attributes, as nobody is supposed to override
+>>>> it anymore.
+>>>
+>>> Why not remove the aliases and change the callers?
 >>
->> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yrdreddy@broadcom.com>
->> ---
->>   .../devicetree/bindings/pinctrl/brcm,nsp-gpio.txt  | 80 ++++++++++++++++++++++
->>   1 file changed, 80 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt
+>> This is likely to be a bigger patch, and it would affect the 32bit as
+>> well. So far, I'm choosing to keep things the same. Another solution
+>> would be to completely drop the aliases, and just rename the new
+>> function to have the old names.
 >>
->> diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt b/Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt
->> new file mode 100644
->> index 0000000..bea4211
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt
->> @@ -0,0 +1,80 @@
->> +Broadcom Northstar plus (NSP) GPIO/PINCONF Controller
->> +
->> +Required properties:
->> +- compatible:
->> +    Must be "brcm,nsp-gpio-a"
->> +
->> +- reg:
->> +    Should contain the register physical address and length for each of
->> +    GPIO base, IO control registers
->> +
->> +- #gpio-cells:
->> +    Must be two. The first cell is the GPIO pin number (within the
->> +    controller's pin space) and the second cell is used for the following:
->> +    bit[0]: polarity (0 for active high and 1 for active low)
->> +
->> +- gpio-controller:
->> +    Specifies that the node is a GPIO controller
->> +
->> +- ngpios:
->> +    Number of gpios supported (58x25 supports 32 and 58x23 supports 24)
->
-> 2 chips? You should have 2 compatible strings. I think this is incorrect
-> use of ngpios which AIUI is not for how many lines there are, but how
-> many can be used (e.g. not reserved).
->
+>> I don't mind either way.
+>>
+> I didn't think of the 32-bit side.  I think eventually we should get rid
+> of the aliases and just have the funcitons named as they are called, but
+> there's no rush.  We can wait until we've the done the 32-bit side if
+> you prefer.
 
-I believe this is the identical GPIO controller IP that is integrated 
-into two different SoC chip variants. The only difference is the 
-supported number of GPIO pins.
+Probably safest. We're already changing a lot of things. Hopefully for
+4.6 I'll have the 32bit side sorted.
 
-In this case, I believe this is what Linus prefers: 1) Using a single 
-compatible string (tied to the GPIO controller IP); 2) Addressing 
-difference in number of GPIOs using DT property 'ngpios'.
-
-Thanks,
-
-Ray
+	M.
+-- 
+Jazz is not dead. It just smells funny...
