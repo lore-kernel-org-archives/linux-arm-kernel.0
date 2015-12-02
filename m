@@ -1,24 +1,28 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Tue, 1 Dec 2015 18:02:42 -0600
-Subject: [PATCH] ARM: defconfig: multi_v7: Enable Qualcomm options for
- Honami
-In-Reply-To: <1449010070-9796-1-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1448518557-14250-1-git-send-email-agross@codeaurora.org>
- <1449010070-9796-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <20151202000242.GB30950@Agamemnon.attlocal.net>
+From: matthijsvanduin@gmail.com (Matthijs van Duin)
+Date: Wed, 2 Dec 2015 01:10:10 +0100
+Subject: [PATCH 05/10] ARM: OMAP2+: Disable GPIO softreset for dm81xx
+In-Reply-To: <1449013103-23238-6-git-send-email-tony@atomide.com>
+References: <1449013103-23238-1-git-send-email-tony@atomide.com>
+ <1449013103-23238-6-git-send-email-tony@atomide.com>
+Message-ID: <CAALWOA-Cy7MUUE-6i7sovSQLj8g86E1gZu06+45oB20QGGQweA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 02:47:50PM -0800, Bjorn Andersson wrote:
-> The Honami device does not boot due to the lack of pinctrl support
-> compiled in with the multi_v7_defconfig. This patch correct this and
-> enables coincell, sdhci, smsm, smp2p and wcnss_ctrl as well, all found
-> on a variety of Qualcomm boards.
-> 
-> Reported-by: Kevin Hilman <khilman@kernel.org>
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> ---
+On 2 December 2015 at 00:38, Tony Lindgren <tony@atomide.com> wrote:
+> Looks like GPIO softreset status bit on both dm8168 and dm8148
+> is broken and only goes high initially. After writing to sysc
+> softreset bit, the resetdone bit never goes high again.
 
-That would make a difference, wouldn't it.
+The resetdone bit works fine, but it needs all clocks active to come
+up. You're neglecting to enable the debounce clock to the GPIO module:
 
-Acked-by: Andy Gross <agross@codeaurora.org>
+> # mw.l 0x4818155c 0x2
+
+That should write 0x102 instead.
+
+You can disable the debounce clock after resetting the module if you
+don't need it, though I doubt there's any significant power savings
+there. (More likely it exists as a separate bit to allow it to stay
+enabled even if the module isn't, for wakeup on debounced inputs.)
+
+Matthijs
