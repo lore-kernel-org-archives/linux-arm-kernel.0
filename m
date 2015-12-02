@@ -1,156 +1,141 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Wed, 2 Dec 2015 16:38:30 +0200
-Subject: [RFC v03 00/15] dmaengine: New 'universal' API for requesting
- channel
-In-Reply-To: <1449064765-27427-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1449064765-27427-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <CAHp75VevOJsYCgPtb-C11-JVLBjLr0bRxDOxFoconSje6BNpYA@mail.gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 2 Dec 2015 14:51:55 +0000
+Subject: [PATCH v3 1/4] drm: arm: Add DT bindings documentation for HDLCD
+ driver.
+In-Reply-To: <20151202142515.GA7404@rob-hp-laptop>
+References: <1449058982-18595-1-git-send-email-Liviu.Dudau@arm.com>
+ <1449058982-18595-2-git-send-email-Liviu.Dudau@arm.com>
+ <20151202142515.GA7404@rob-hp-laptop>
+Message-ID: <20151202145155.GA972@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 2, 2015 at 3:59 PM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
-> Hi,
->
-> I keep this still as RFC.
->
-> Changes since RFC v02:
-> - Using has_acpi_companion() instead ACPI_HANDLE()
-> - mask matching change within private_candidate()
-> - Fallback in dma_request_chan() when DT/ACPI lookup fails.
-> - Rename dma_get_channel() -> find_candidate()
-> - Arch code changes as suggested by Arnd
-> - Some documentation updated, more need to be done.
->
-> Changes since RFC v01:
-> - dma_request_chan(); lost the mask parameter
-> - The new API does not rely on RESOURCE_DMA, instead the dma_filter_map table
->   will be used to provide the needed information to the filter function in
->   legacy mode
-> - Extended the example patches to convert most of daVinci to use the new API to
->   request the DMA channels.
->
-> TODO: Documentation update ;)
->
-> As it has been discussed in the following thread:
-> http://www.gossamer-threads.com/lists/linux/kernel/2181487#2181487
->
-> Andy: I did looked at the unified device properties, but I decided to not to use
-> it as I don't see it to fit well and most of the legacy board files are using
-> resources to specify at least their memory regions so adding the DMA resource
-> to them would be more inline with the rest of the code.
->
-> The ARM, mmc and spi patches are converting daVinci drivers board files to use
-> the new method of requesting DMA channel.
->
-> With this series I have taken a path which would result two new API, which can
-> be used to convert most of the current users already and with some work all
-> users might be able to move to this set.
-> With this set the filter_fn used for legacy (non DT/ACPI) channel request is no
-> longer needed to be exported to client drivers since the selection of the
-> correct filter_fn will be done in the core.
->
-> So, the first proposal is to have:
->
-> struct dma_chan *dma_request_chan(struct device *dev, const char *name);
-> struct dma_chan *dma_request_chan_by_mask(const dma_cap_mask_t *mask);
->
-> The dma_request_chan_by_mask() is to request any channel matching with the
-> requested capabilities, can be used to request channel for memcpy, memset, xor,
-> etc where no hardware synchronization is needed.
->
-> The dma_request_chan() is to request a slave channel. The dma_request_chan() will try to find the
-> channel via DT, ACPI or in case if the kernel booted in non DT/ACPI mode
-> it will use a filter lookup table and retrieves the needed information from
-> the dma_filter_map provided by the DMA drivers.
-> This legacy mode needs changes in platform code, in dmaengine drivers and
-> finally the dmaengine user drivers can be converted:
->
-> For each dmaengine driver an array of DMA device, slave and the parameter
-> for the filter function needs to be added:
->
-> static const struct dma_filter_map da830_edma_map[] = {
->         { "davinci-mcasp.0", "rx", EDMA_FILTER_PARAM(0, 0) },
->         { "davinci-mcasp.0", "tx", EDMA_FILTER_PARAM(0, 1) },
->         { "davinci-mcasp.1", "rx", EDMA_FILTER_PARAM(0, 2) },
->         { "davinci-mcasp.1", "tx", EDMA_FILTER_PARAM(0, 3) },
->         { "davinci-mcasp.2", "rx", EDMA_FILTER_PARAM(0, 4) },
->         { "davinci-mcasp.2", "tx", EDMA_FILTER_PARAM(0, 5) },
->         { "spi_davinci.0", "rx", EDMA_FILTER_PARAM(0, 14) },
->         { "spi_davinci.0", "tx", EDMA_FILTER_PARAM(0, 15) },
->         { "da830-mmc.0", "rx", EDMA_FILTER_PARAM(0, 16) },
->         { "da830-mmc.0", "tx", EDMA_FILTER_PARAM(0, 17) },
->         { "spi_davinci.1", "rx", EDMA_FILTER_PARAM(0, 18) },
->         { "spi_davinci.1", "tx", EDMA_FILTER_PARAM(0, 19) },
-> };
->
-> This information is going to be needed by the dmaengine driver, so
-> modification to the platform_data is needed, and the driver map should be
-> added to the pdata of the DMA driver:
->
-> da8xx_edma0_pdata.slave_map = da830_edma_map;
-> da8xx_edma0_pdata.slavecnt = ARRAY_SIZE(da830_edma_map);
->
-> The DMA driver then needs to configure the needed device -> filter_fn
-> mapping before it registers with dma_async_device_register() :
->
-> if (info->slave_map) {
->         ecc->dma_slave.filter_map.map = info->slave_map;
->         ecc->dma_slave.filter_map.mapcnt = info->slavecnt;
->         ecc->dma_slave.filter_map.filter_fn = edma_filter_fn;
-> }
->
-> When neither DT or ACPI lookup is available the dma_request_chan() will
-> try to match the requester's device name with the filter_map's list of
-> device names, when a match found it will use the information from the
-> dma_filter_map to get the channel with the dma_get_channel() internal
-> function.
->
+On Wed, Dec 02, 2015 at 08:25:15AM -0600, Rob Herring wrote:
+> On Wed, Dec 02, 2015 at 12:22:59PM +0000, Liviu Dudau wrote:
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Pawel Moll <pawel.moll@arm.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> > Cc: Kumar Gala <galak@codeaurora.org>
+> > 
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> 
+> I still think you should have a more specific compatible string, but 
+> here's some rope:
 
-I like patches 1 & 2 in current shape.
-Though few comments to patch 3.
+:) Now I need to find some soap and a small wooden box.
 
-> Regards,
-> Peter
-> ---
-> Peter Ujfalusi (15):
->   dmaengine: core: Skip mask matching when it is not provided to
->     private_candidate
->   dmaengine: core: Move and merge the code paths using private_candidate
->   dmaengine: core: Introduce new, universal API to request a channel
->   dmaengine: edma: Add support for DMA filter mapping to slave devices
->   ARM: davinci: devices-da8xx: Add dma_filter_map to edma
->   ARM: davinci: dm355: Add dma_filter_map to edma
->   ARM: davinci: dm365: Add dma_filter_map to edma
->   ARM: davinci: dm644x: Add dma_filter_map to edma
->   ARM: davinci: dm646x: Add dma_filter_map to edma
->   mmc: davinci_mmc: Use dma_request_chan() to requesting DMA channel
->   spi: davinci: Use dma_request_chan() to requesting DMA channel
->   ARM: davinci: devices-da8xx: Remove DMA resources for MMC and SPI
->   ARM: davinci: devices: Remove DMA resources for MMC
->   ARM: davinci: dm355: Remove DMA resources for SPI
->   ARM: davinci: dm365: Remove DMA resources for SPI
->
->  Documentation/dmaengine/client.txt    |  23 ++---
->  arch/arm/mach-davinci/devices-da8xx.c |  95 +++++++++---------
->  arch/arm/mach-davinci/devices.c       |  19 ----
->  arch/arm/mach-davinci/dm355.c         |  28 ++++--
->  arch/arm/mach-davinci/dm365.c         |  30 ++++--
->  arch/arm/mach-davinci/dm644x.c        |  12 +++
->  arch/arm/mach-davinci/dm646x.c        |  11 +++
->  drivers/dma/dmaengine.c               | 181 ++++++++++++++++++++++++++--------
->  drivers/dma/edma.c                    |   6 ++
->  drivers/mmc/host/davinci_mmc.c        |  52 +++-------
->  drivers/spi/spi-davinci.c             |  76 +++++---------
->  include/linux/dmaengine.h             |  27 +++++
->  include/linux/platform_data/edma.h    |   7 ++
->  13 files changed, 336 insertions(+), 231 deletions(-)
->
-> --
-> 2.6.3
->
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
 
+Thanks!
+Liviu
 
+> 
+> > ---
+> >  .../devicetree/bindings/display/arm,hdlcd.txt      | 79 ++++++++++++++++++++++
+> >  1 file changed, 79 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/display/arm,hdlcd.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/display/arm,hdlcd.txt b/Documentation/devicetree/bindings/display/arm,hdlcd.txt
+> > new file mode 100644
+> > index 0000000..78bc242
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/display/arm,hdlcd.txt
+> > @@ -0,0 +1,79 @@
+> > +ARM HDLCD
+> > +
+> > +This is a display controller found on several development platforms produced
+> > +by ARM Ltd and in more modern of its' Fast Models. The HDLCD is an RGB
+> > +streamer that reads the data from a framebuffer and sends it to a single
+> > +digital encoder (DVI or HDMI).
+> > +
+> > +Required properties:
+> > +  - compatible: "arm,hdlcd"
+> > +  - reg: Physical base address and length of the controller's registers.
+> > +  - interrupts: One interrupt used by the display controller to notify the
+> > +    interrupt controller when any of the interrupt sources programmed in
+> > +    the interrupt mask register have activated.
+> > +  - clocks: A list of phandle + clock-specifier pairs, one for each
+> > +    entry in 'clock-names'.
+> > +  - clock-names: A list of clock names. For HDLCD it should contain:
+> > +      - "pxlclk" for the clock feeding the output PLL of the controller.
+> > +
+> > +Required sub-nodes:
+> > +  - port: The HDLCD connection to an encoder chip. The connection is modeled
+> > +    using the OF graph bindings specified in
+> > +    Documentation/devicetree/bindings/graph.txt.
+> > +
+> > +Optional properties:
+> > +  - memory-region: phandle to a node describing memory (see
+> > +    Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt) to be
+> > +    used for the framebuffer; if not present, the framebuffer may be located
+> > +    anywhere in memory.
+> > +
+> > +
+> > +Example:
+> > +
+> > +/ {
+> > +	...
+> > +
+> > +	hdlcd at 2b000000 {
+> > +		compatible = "arm,hdlcd";
+> > +		reg = <0 0x2b000000 0 0x1000>;
+> > +		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+> > +		clocks = <&oscclk5>;
+> > +		clock-names = "pxlclk";
+> > +		port {
+> > +			hdlcd_output: endpoint at 0 {
+> > +				remote-endpoint = <&hdmi_enc_input>;
+> > +			};
+> > +		};
+> > +	};
+> > +
+> > +	/* HDMI encoder on I2C bus */
+> > +	i2c at 7ffa0000 {
+> > +		....
+> > +		hdmi-transmitter at 70 {
+> > +			compatible = ".....";
+> > +			reg = <0x70>;
+> > +			port at 0 {
+> > +				hdmi_enc_input: endpoint {
+> > +					remote-endpoint = <&hdlcd_output>;
+> > +				};
+> > +
+> > +				hdmi_enc_output: endpoint {
+> > +					remote-endpoint = <&hdmi_1_port>;
+> > +				};
+> > +			};
+> > +		};
+> > +
+> > +	};
+> > +
+> > +	hdmi1: connector at 1 {
+> > +		compatible = "hdmi-connector";
+> > +		type = "a";
+> > +		port {
+> > +			hdmi_1_port: endpoint {
+> > +				remote-endpoint = <&hdmi_enc_output>;
+> > +			};
+> > +		};
+> > +	};
+> > +
+> > +	...
+> > +};
+> > -- 
+> > 2.6.2
+> > 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 -- 
-With Best Regards,
-Andy Shevchenko
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
