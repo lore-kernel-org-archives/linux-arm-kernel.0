@@ -1,113 +1,45 @@
-From: michael@amarulasolutions.com (Michael Trimarchi)
-Date: Wed, 2 Dec 2015 10:15:35 +0100
-Subject: [PATCH V3] ARM: dts: imx6q-icore-rqs: Add Engicam IMX6 Q7 initial
- support
-In-Reply-To: <20151202020930.GD692@tiger>
-References: <1447665552.3144.6.camel@pengutronix.de>
- <20151116112931.GA10464@panicking>
- <1447673895.3144.16.camel@pengutronix.de>
- <20151116114127.GB10464@panicking>
- <1447674695.3144.21.camel@pengutronix.de>
- <20151116115421.GC10464@panicking> <20151116172318.GA513@panicking>
- <1447752697.3144.47.camel@pengutronix.de>
- <20151118151030.GA11558@panicking>
- <CAOf5uw=q7fwh93w7LUQaAV3-+YLDwzL65wB1WB5L2BKUe+Vtpg@mail.gmail.com>
- <20151202020930.GD692@tiger>
-Message-ID: <CAOf5uw=khw+nnVBsc3R63whQ=LAqXX47Y+P+5Nv1NVrL_g4m4g@mail.gmail.com>
+From: linux-kernel-dev@beckhoff.com (linux-kernel-dev at beckhoff.com)
+Date: Wed, 2 Dec 2015 10:16:37 +0100
+Subject: [PATCH v2] clk: imx5: ipu_di_sel clocks can set parent rates
+Message-ID: <1449047797-4300-1-git-send-email-linux-kernel-dev@beckhoff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+From: Patrick Br?nn <p.bruenn@beckhoff.com>
 
-On Wed, Dec 2, 2015 at 3:09 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Wed, Nov 25, 2015 at 07:14:13PM +0100, Michael Trimarchi wrote:
->> Hi Shawn
->>
->> On Wed, Nov 18, 2015 at 4:10 PM, Michael Trimarchi
->> <michael@amarulasolutions.com> wrote:
->> > www.engicam.com/en/products/embedded/som/standard/i-core-rqs-m6s-dl-d-q
->> >
->> > Signed-off-by: Michael Trimarchi <michael@amarulasolutions.com>
->> > ---
->> > I'm not quite sure how ethernet tuning parameter
->> > are working in other setup and this seems the
->> > correct way to use it
->> >
->>
->> As you can see my way to connect the ethernet phy is different. I have
->> seen that most of the boards put all the tuning under fec but unfortunately
->> this does not work. I don't know if people check if their value are correctly
->> written to the phy.
->
-> Hmm, I'm not sure what example you are looking at.  But here is what I
-> see from arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
->
-> &fec {
->         pinctrl-names = "default";
->         pinctrl-0 = <&pinctrl_enet>;
->         phy-mode = "rgmii";
->         phy-reset-gpios = <&gpio3 23 GPIO_ACTIVE_LOW>;
->         txen-skew-ps = <0>;
->         txc-skew-ps = <3000>;
->         rxdv-skew-ps = <0>;
->         rxc-skew-ps = <3000>;
->         rxd0-skew-ps = <0>;
->         rxd1-skew-ps = <0>;
->         rxd2-skew-ps = <0>;
->         rxd3-skew-ps = <0>;
->         txd0-skew-ps = <0>;
->         txd1-skew-ps = <0>;
->         txd2-skew-ps = <0>;
->         txd3-skew-ps = <0>;
->         interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
->                               <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
->         status = "okay";
-> };
->
+To obtain exact pixel clocks, allow the DI clock selectors to influence
+the PLLs that they are derived from.
 
-Yes sorry, could be only one. According in what I have seen this can
-not work and the information stored in the
-fec parameters are not written in the registers. Other small thing is
-the IMX6/7 default config does not include
-this phy at all, but that is a minor issue. Can you please do the
-final review of my board so I can take care on this
-too for Sabrelite?
+Commit 4591b13289b5 ("ARM: i.MX6: ipu_di_sel clocks can set parent
+rates") did this for i.MX6.
+Port it to enable high display resolutions on i.MX53 based platforms
+such as CX9020 Embedded PC, too.
 
-Michael
+Signed-off-by: Patrick Br?nn <p.bruenn@beckhoff.com>
+---
+v2: add clk maintainers to CC and fix commit message format
 
-> Shawn
->
->>
->> > +
->> > +&fec {
->> > +       pinctrl-names = "default";
->> > +       pinctrl-0 = <&pinctrl_enet_3>;
->> > +       phy-handle = <&eth_phy>;
->> > +       phy-mode = "rgmii";
->> > +       status = "okay";
->> > +       mdio {
->> > +               eth_phy: ethernet-phy {
->> > +                       rxc-skew-ps = <1140>;
->> > +                       txc-skew-ps = <1140>;
->> > +                       txen-skew-ps = <600>;
->> > +                       rxdv-skew-ps = <240>;
->> > +                       rxd0-skew-ps = <420>;
->> > +                       rxd1-skew-ps = <600>;
->> > +                       rxd2-skew-ps = <420>;
->> > +                       rxd3-skew-ps = <240>;
->> > +                       txd0-skew-ps = <60>;
->> > +                       txd1-skew-ps = <60>;
->> > +                       txd2-skew-ps = <60>;
->> > +                       txd3-skew-ps = <240>;
->> > +               };
->> > +       };
->> > +};
->> > +
+ drivers/clk/imx/clk-imx51-imx53.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-
-
+diff --git a/drivers/clk/imx/clk-imx51-imx53.c b/drivers/clk/imx/clk-imx51-imx53.c
+index c677034..29d4c44 100644
+--- a/drivers/clk/imx/clk-imx51-imx53.c
++++ b/drivers/clk/imx/clk-imx51-imx53.c
+@@ -519,10 +519,10 @@ static void __init mx53_clocks_init(struct device_node *np)
+ 						mx53_ldb_di0_sel, ARRAY_SIZE(mx53_ldb_di0_sel), CLK_SET_RATE_PARENT);
+ 	clk[IMX5_CLK_LDB_DI0_GATE]	= imx_clk_gate2("ldb_di0_gate", "ldb_di0_div", MXC_CCM_CCGR6, 28);
+ 	clk[IMX5_CLK_LDB_DI1_GATE]	= imx_clk_gate2("ldb_di1_gate", "ldb_di1_div", MXC_CCM_CCGR6, 30);
+-	clk[IMX5_CLK_IPU_DI0_SEL]	= imx_clk_mux("ipu_di0_sel", MXC_CCM_CSCMR2, 26, 3,
+-						mx53_ipu_di0_sel, ARRAY_SIZE(mx53_ipu_di0_sel));
+-	clk[IMX5_CLK_IPU_DI1_SEL]	= imx_clk_mux("ipu_di1_sel", MXC_CCM_CSCMR2, 29, 3,
+-						mx53_ipu_di1_sel, ARRAY_SIZE(mx53_ipu_di1_sel));
++	clk[IMX5_CLK_IPU_DI0_SEL]	= imx_clk_mux_flags("ipu_di0_sel", MXC_CCM_CSCMR2, 26, 3,
++						mx53_ipu_di0_sel, ARRAY_SIZE(mx53_ipu_di0_sel), CLK_SET_RATE_PARENT);
++	clk[IMX5_CLK_IPU_DI1_SEL]	= imx_clk_mux_flags("ipu_di1_sel", MXC_CCM_CSCMR2, 29, 3,
++						mx53_ipu_di1_sel, ARRAY_SIZE(mx53_ipu_di1_sel), CLK_SET_RATE_PARENT);
+ 	clk[IMX5_CLK_TVE_EXT_SEL]	= imx_clk_mux_flags("tve_ext_sel", MXC_CCM_CSCMR1, 6, 1,
+ 						mx53_tve_ext_sel, ARRAY_SIZE(mx53_tve_ext_sel), CLK_SET_RATE_PARENT);
+ 	clk[IMX5_CLK_TVE_GATE]		= imx_clk_gate2("tve_gate", "tve_pred", MXC_CCM_CCGR2, 30);
 -- 
-| Michael Nazzareno Trimarchi                     Amarula Solutions BV |
-| COO  -  Founder                                      Cruquiuskade 47 |
-| +31(0)851119172                                 Amsterdam 1018 AM NL |
-|                  [`as] http://www.amarulasolutions.com               |
+1.9.1
