@@ -1,44 +1,56 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 1 Dec 2015 16:54:30 -0800
-Subject: [PATCH 05/10] ARM: OMAP2+: Disable GPIO softreset for dm81xx
-In-Reply-To: <20151202004136.GW23396@atomide.com>
-References: <1449013103-23238-1-git-send-email-tony@atomide.com>
- <1449013103-23238-6-git-send-email-tony@atomide.com>
- <CAALWOA-Cy7MUUE-6i7sovSQLj8g86E1gZu06+45oB20QGGQweA@mail.gmail.com>
- <20151202004136.GW23396@atomide.com>
-Message-ID: <20151202005430.GY23396@atomide.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Wed, 02 Dec 2015 08:57:08 +0800
+Subject: [PATCH] drm/rockchip: Fix module autoload for OF platform driver
+In-Reply-To: <1448895416-9502-1-git-send-email-luisbg@osg.samsung.com>
+References: <1448895416-9502-1-git-send-email-luisbg@osg.samsung.com>
+Message-ID: <565E41E4.4060606@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [151201 16:42]:
-> * Matthijs van Duin <matthijsvanduin@gmail.com> [151201 16:11]:
-> > On 2 December 2015 at 00:38, Tony Lindgren <tony@atomide.com> wrote:
-> > > Looks like GPIO softreset status bit on both dm8168 and dm8148
-> > > is broken and only goes high initially. After writing to sysc
-> > > softreset bit, the resetdone bit never goes high again.
-> > 
-> > The resetdone bit works fine, but it needs all clocks active to come
-> > up. You're neglecting to enable the debounce clock to the GPIO module:
-> > 
-> > > # mw.l 0x4818155c 0x2
-> > 
-> > That should write 0x102 instead.
-> 
-> It seems to work only once based on what I've seen :) If you try it
-> after it's powered it never works. Could be I'm doing something wrong
-> of course..
-> 
-> > You can disable the debounce clock after resetting the module if you
-> > don't need it, though I doubt there's any significant power savings
-> > there. (More likely it exists as a separate bit to allow it to stay
-> > enabled even if the module isn't, for wakeup on debounced inputs.)
-> 
-> Hmm I tried setting HWMOD_CONTROL_OPT_CLKS_IN_RESET flag like we
-> have for many SoCs to enable also sysclk18_ck but no luck. I can
-> recheck that.
+On 2015?11?30? 22:56, Luis de Bethencourt wrote:
+> This platform driver has a OF device ID table but the OF module
+> alias information is not created so module autoloading won't work.
+>
+> Signed-off-by: Luis de Bethencourt <luisbg@osg.samsung.com>
+> ---
+>
+> Hi,
+>
+> This is a Resend of a patch from October 20th [0]
+>
+> I am adding Andrew Morton to the CC list as was recommended at the Korea Linux
+> Forum.
+>
+> This patch adds the missing MODULE_DEVICE_TABLE() for OF to export
+> that information so modules have the correct aliases built-in and
+> autoloading works correctly.
+>
+> A longer explanation by Javier Canillas can be found here:
+> https://lkml.org/lkml/2015/7/30/519
+> A multitude of similar patches have been merged for other drivers, search
+> the git log for "module autoload for OF platform driver".
+>
+> Thanks,
+> Luis
+>
+> [0] https://lkml.org/lkml/2015/10/20/485
+>
+>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 5d8ae5e..5897851 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -374,6 +374,7 @@ static const struct of_device_id vop_driver_dt_match[] = {
+>   	  .data = &rk3288_vop },
+>   	{},
+>   };
+> +MODULE_DEVICE_TABLE(of, vop_driver_dt_match);
+>   
+>   static inline void vop_writel(struct vop *vop, uint32_t offset, uint32_t v)
+>   {
+Applied to my drm-fixes, Thanks for this fix.
 
-You're right with 0x102 it works, need to debug further.
-
-Thanks,
-
-Tony
+-- 
+?ark Yao
