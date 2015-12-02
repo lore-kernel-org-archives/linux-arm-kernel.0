@@ -1,45 +1,59 @@
-From: linux-kernel-dev@beckhoff.com (linux-kernel-dev at beckhoff.com)
-Date: Wed, 2 Dec 2015 10:16:37 +0100
-Subject: [PATCH v2] clk: imx5: ipu_di_sel clocks can set parent rates
-Message-ID: <1449047797-4300-1-git-send-email-linux-kernel-dev@beckhoff.com>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Wed, 2 Dec 2015 11:20:39 +0200
+Subject: [RFC PATCH 1/4] acpi: property: Introduce helper
+ acpi_dev_get_reference_device()
+In-Reply-To: <1449047368-5768-2-git-send-email-wangkefeng.wang@huawei.com>
+References: <1449047368-5768-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1449047368-5768-2-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <20151202092039.GL1593@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrick Br?nn <p.bruenn@beckhoff.com>
+On Wed, Dec 02, 2015 at 05:09:25PM +0800, Kefeng Wang wrote:
+> Like of_parse_phandle() helper function to read and parse a phandle property
+> and return a pointer to the resulting device_node, introduce helper function
+> acpi_dev_get_reference_device() to read and parse a device properties(used in
+> _DSD method) and return a pointer to the resulting acpi_device.
+> 
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
+>  drivers/acpi/property.c | 23 +++++++++++++++++++++++
+>  include/linux/acpi.h    |  7 +++++++
+>  2 files changed, 30 insertions(+)
+> 
+> diff --git a/drivers/acpi/property.c b/drivers/acpi/property.c
+> index 88f4306..e2e7754 100644
+> --- a/drivers/acpi/property.c
+> +++ b/drivers/acpi/property.c
+> @@ -398,6 +398,29 @@ int acpi_dev_get_property(struct acpi_device *adev, const char *name,
+>  }
+>  EXPORT_SYMBOL_GPL(acpi_dev_get_property);
+>  
+> +/**
+> + * acpi_dev_get_reference_device  - return the acpi_device referenced
+> + * @adev: ACPI device to get the property from.
+> + * @name: Name of the property.
+> + * @index: Index of the reference to return
+> + *
+> + * Returns referenced ACPI device pointer, or NULL if not found
+> + */
+> +struct acpi_device *acpi_dev_get_reference_device(struct acpi_device *adev,
+> +						  const char *name, size_t index)
+> +{
+> +	struct acpi_reference_args args;
+> +	int ret;
+> +
+> +	ret = acpi_node_get_property_reference(acpi_fwnode_handle(adev), name, index, &args);
+> +
+> +	if (ret)
+> +		return NULL;
+> +
+> +	return args.adev;
+> +}
+> +EXPORT_SYMBOL(acpi_dev_get_reference_device);
 
-To obtain exact pixel clocks, allow the DI clock selectors to influence
-the PLLs that they are derived from.
+This wrapper looks pretty useless honestly. Why not use
+acpi_node_get_property_reference() directly if you need to get the
+device reference?
 
-Commit 4591b13289b5 ("ARM: i.MX6: ipu_di_sel clocks can set parent
-rates") did this for i.MX6.
-Port it to enable high display resolutions on i.MX53 based platforms
-such as CX9020 Embedded PC, too.
-
-Signed-off-by: Patrick Br?nn <p.bruenn@beckhoff.com>
----
-v2: add clk maintainers to CC and fix commit message format
-
- drivers/clk/imx/clk-imx51-imx53.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/clk/imx/clk-imx51-imx53.c b/drivers/clk/imx/clk-imx51-imx53.c
-index c677034..29d4c44 100644
---- a/drivers/clk/imx/clk-imx51-imx53.c
-+++ b/drivers/clk/imx/clk-imx51-imx53.c
-@@ -519,10 +519,10 @@ static void __init mx53_clocks_init(struct device_node *np)
- 						mx53_ldb_di0_sel, ARRAY_SIZE(mx53_ldb_di0_sel), CLK_SET_RATE_PARENT);
- 	clk[IMX5_CLK_LDB_DI0_GATE]	= imx_clk_gate2("ldb_di0_gate", "ldb_di0_div", MXC_CCM_CCGR6, 28);
- 	clk[IMX5_CLK_LDB_DI1_GATE]	= imx_clk_gate2("ldb_di1_gate", "ldb_di1_div", MXC_CCM_CCGR6, 30);
--	clk[IMX5_CLK_IPU_DI0_SEL]	= imx_clk_mux("ipu_di0_sel", MXC_CCM_CSCMR2, 26, 3,
--						mx53_ipu_di0_sel, ARRAY_SIZE(mx53_ipu_di0_sel));
--	clk[IMX5_CLK_IPU_DI1_SEL]	= imx_clk_mux("ipu_di1_sel", MXC_CCM_CSCMR2, 29, 3,
--						mx53_ipu_di1_sel, ARRAY_SIZE(mx53_ipu_di1_sel));
-+	clk[IMX5_CLK_IPU_DI0_SEL]	= imx_clk_mux_flags("ipu_di0_sel", MXC_CCM_CSCMR2, 26, 3,
-+						mx53_ipu_di0_sel, ARRAY_SIZE(mx53_ipu_di0_sel), CLK_SET_RATE_PARENT);
-+	clk[IMX5_CLK_IPU_DI1_SEL]	= imx_clk_mux_flags("ipu_di1_sel", MXC_CCM_CSCMR2, 29, 3,
-+						mx53_ipu_di1_sel, ARRAY_SIZE(mx53_ipu_di1_sel), CLK_SET_RATE_PARENT);
- 	clk[IMX5_CLK_TVE_EXT_SEL]	= imx_clk_mux_flags("tve_ext_sel", MXC_CCM_CSCMR1, 6, 1,
- 						mx53_tve_ext_sel, ARRAY_SIZE(mx53_tve_ext_sel), CLK_SET_RATE_PARENT);
- 	clk[IMX5_CLK_TVE_GATE]		= imx_clk_gate2("tve_gate", "tve_pred", MXC_CCM_CCGR2, 30);
--- 
-1.9.1
+Also you should use EXPORT_SYMBOL_GPL() here.
