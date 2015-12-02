@@ -1,59 +1,66 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Wed,  2 Dec 2015 18:22:28 +0100
-Subject: [PATCH v2 2/7] dt-bindings: Amlogic: Document the CPU reset
- controller for Meson8b
+Date: Wed,  2 Dec 2015 18:22:33 +0100
+Subject: [PATCH v2 7/7] ARM: DTS: Amlogic: Add SMP related nodes for Meson8b
 In-Reply-To: <1449076953-5058-1-git-send-email-carlo@caione.org>
 References: <1449076953-5058-1-git-send-email-carlo@caione.org>
-Message-ID: <1449076953-5058-3-git-send-email-carlo@caione.org>
+Message-ID: <1449076953-5058-8-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Carlo Caione <carlo@endlessm.com>
 
-The clock controller on Amlogic Meson8b SoCs has been extended with a
-reset controller used to reset the CPU cores. It is used during SMP
+Add nodes for: SCU, PMU and SRAM. Set also the enable-method for SMP
 bringup.
-
-With this patch we extend the clock controller documentation.
 
 Signed-off-by: Carlo Caione <carlo@endlessm.com>
 ---
- Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/meson8b.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt b/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
-index 2b7b3fa..feeb4de 100644
---- a/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
-+++ b/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
-@@ -1,7 +1,8 @@
- * Amlogic Meson8b Clock and Reset Unit
+diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
+index 51b32ed..27e1b2f 100644
+--- a/arch/arm/boot/dts/meson8b.dtsi
++++ b/arch/arm/boot/dts/meson8b.dtsi
+@@ -51,9 +51,20 @@
+ / {
+ 	interrupt-parent = <&gic>;
  
- The Amlogic Meson8b clock controller generates and supplies clock to various
--controllers within the SoC.
-+controllers within the SoC and also implements a reset controller for the CPU
-+cores.
++	scu at c4300000 {
++		compatible = "arm,cortex-a5-scu";
++		reg = <0xc4300000 0x100>;
++	};
++
++	pmu at c81000e4 {
++		compatible = "amlogic,meson8b-pmu", "syscon";
++		reg = <0xc81000e0 0x18>;
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		enable-method = "amlogic,meson8b-smp";
  
- Required Properties:
- 
-@@ -13,16 +14,19 @@ Required Properties:
- 	   mapped region.
- 
- - #clock-cells: should be 1.
-+- #reset-cells: should be 1.
- 
- Each clock is assigned an identifier and client nodes can use this identifier
- to specify the clock which they consume. All available clocks are defined as
- preprocessor macros in the dt-bindings/clock/meson8b-clkc.h header and can be
- used in device tree sources.
-+Similar identifiers exist for the CPU core reset lines.
- 
- Example: Clock controller node:
- 
- 	clkc: clock-controller at c1104000 {
- 		#clock-cells = <1>;
-+		#reset-cells = <1>;
- 		compatible = "amlogic,meson8b-clkc";
- 		reg = <0xc1108000 0x4>, <0xc1104000 0x460>;
+ 		cpu at 200 {
+ 			device_type = "cpu";
+@@ -88,6 +99,19 @@
+ 		};
  	};
+ 
++	sram: sram at d9000000 {
++		compatible = "mmio-sram";
++		reg = <0xd9000000 0x20000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0xd9000000 0x20000>;
++
++		smp-sram at 1ff80 {
++			compatible = "amlogic,meson8b-smp-sram";
++			reg = <0x1ff80 0x8>;
++		};
++	};
++
+ 	soc {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
 -- 
 2.5.0
