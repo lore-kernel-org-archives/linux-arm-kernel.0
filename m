@@ -1,62 +1,61 @@
-From: carlo@endlessm.com (Carlo Caione)
-Date: Wed, 2 Dec 2015 16:44:18 +0100
-Subject: [PATCH v3 5/6] pinctrl: dt-binding: Extend meson documentation
- with GPIO IRQs support
-In-Reply-To: <20151202153010.GA22230@rob-hp-laptop>
-References: <1448987062-31225-1-git-send-email-carlo@caione.org>
- <1448987062-31225-6-git-send-email-carlo@caione.org>
- <20151202153010.GA22230@rob-hp-laptop>
-Message-ID: <CAL9uMOHQi1wwGTSEOyAQ8q5Wbvm71ib3-cf1Q07VReXAis7Pdg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 02 Dec 2015 16:49:38 +0100
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <20151202123310.GC8644@n2100.arm.linux.org.uk>
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+ <87610j7gmc.fsf@free-electrons.com>
+ <20151202123310.GC8644@n2100.arm.linux.org.uk>
+Message-ID: <3059482.yN34NFeWWY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 2, 2015 at 4:30 PM, Rob Herring <robh@kernel.org> wrote:
-> On Tue, Dec 01, 2015 at 05:24:21PM +0100, Carlo Caione wrote:
->> From: Carlo Caione <carlo@endlessm.com>
->>
->> Extend the pinctrl binding documentation with the support for external
->> GPIO interrupts.
->>
->> Signed-off-by: Carlo Caione <carlo@endlessm.com>
->> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
->> ---
->>  Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt | 11 +++++++++++
->>  1 file changed, 11 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
->> index 3f6a524..de669ce 100644
->> --- a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
->> +++ b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
->> @@ -3,6 +3,12 @@
->>  Required properties for the root node:
->>   - compatible: "amlogic,meson8-pinctrl" or "amlogic,meson8b-pinctrl"
->>   - reg: address and size of registers controlling irq functionality
->> + - reg-names: should be "irq"
->> + - interrupt-controller: marks the device node as an interrupt controller
->> + - #interrupt-cells: should be 2. The first cell is the GPIO number. The
->> +                  second cell is used to specify trigger type.
->> + - amlogic,irqs-gpio: specifies the GPIO IRQ numbers on the GIC (GPIO_IRQ#)
->> + - interrupt-parent: specifies the parent interrupt controller.
->>
->>  === GPIO sub-nodes ===
->>
->> @@ -46,7 +52,12 @@ pinctrl-bindings.txt
->>
->>       pinctrl: pinctrl at c1109880 {
->>               compatible = "amlogic,meson8-pinctrl";
->> +             reg-names = "irq";
->>               reg = <0xc1109880 0x10>;
->> +             interrupt-parent = <&gic>;
->> +             amlogic,irqs-gpio = <64 65 66 67 68 69 70 71>;
->
-> Can't you just use "interrupts" here?
+On Wednesday 02 December 2015 12:33:10 Russell King - ARM Linux wrote:
+> On Mon, Nov 30, 2015 at 02:37:31PM +0100, Gregory CLEMENT wrote:
+> > Hi Arnd,
+> >  
+> >  On mer., nov. 25 2015, Arnd Bergmann <arnd@arndb.de> wrote:
+> > 
+> > > I've posted these before and now gotten around to a rebase and
+> > > want to include them in the arm-soc next/multiplatform branch for
+> > > 4.5.
+> > >
+> > > Originally the plan for these platforms was to convert all of
+> > > them to DT and use only mach-mvebu. That has not happened,
+> > > so I would do it this way instead so we can at least have
+> > > them in a single kernel.
+> > >
+> > > Let me know if there are any concerns or objections.
+> > 
+> > I have applied all the patches on mvebu/oldmvebu_multiplatform (I fixed
+> > the last one which didn't apply on Kconfig). I also merged it
+> > mvebu/for-netx to be part of the linux-next.
+> > 
+> > But before making it part of mvebu/soc, I would like to get some
+> > Tested-by. The series is available on
+> > git://git.infradead.org/linux-mvebu.git
+> > in the branch mvebu/oldmvebu_multiplatform but it also will be part soon
+> > of linux-next.
+> > 
+> > Russell, Sebastian,
+> > 
+> > would you have some time to test it on Dove?
+> 
+> Given that I'm testing on my Cubox tree, I've applied this series on top
+> of v4.3.  Patch 5 trivially conflicts on MMP context.  Fixing that and
+> merging the resulting changes gives another load of conflicts which need
+> dealing with:
+> 
+> Recorded preimage for 'arch/arm/Kconfig'
+> Recorded preimage for 'arch/arm/mach-dove/Kconfig'
+> Recorded preimage for 'arch/arm/mach-dove/irq.c'
+> Recorded preimage for 'arch/arm/mach-dove/pm.h'
+> 
+> These look less trivial to resolve, so testing this will have to wait
+> until I have sufficient time to sort this out.
 
-Following this discussion for v2 with Marc
-http://www.spinics.net/lists/devicetree/msg104385.html I decided to
-move away from using the "interrupts" property since these interrupts
-are not actually the pinctrl's interrupts (they are owned by the
-devices using them). I guess that using "interrupts" would be a bit
-misleading.
+I have pushed a rebased version to
+git.kernel.org/pub/scm/linux/kernel/git/arnd/playground.git multiplatform-orion-4.3
 
--- 
-Carlo Caione
+Maybe that helps
+
+	Arnd
