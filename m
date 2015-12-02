@@ -1,95 +1,118 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Wed, 2 Dec 2015 16:03:03 +0100
-Subject: [PATCH v4 5/5] ARM: BCM: Add SMP support for Broadcom 4708
-In-Reply-To: <1448987049-17041-6-git-send-email-kapilh@broadcom.com>
-References: <1448987049-17041-1-git-send-email-kapilh@broadcom.com>
- <1448987049-17041-6-git-send-email-kapilh@broadcom.com>
-Message-ID: <565F0827.4000406@hauke-m.de>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 2 Dec 2015 09:07:35 -0600
+Subject: [PATCH 1/3] pinctrl: Broadcom NSP GPIO-a device tree bindings
+In-Reply-To: <1449031598-18849-1-git-send-email-yrdreddy@broadcom.com>
+References: <1449031598-18849-1-git-send-email-yrdreddy@broadcom.com>
+Message-ID: <20151202150735.GA6165@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/2015 05:24 PM, Kapil Hali wrote:
-> From: Jon Mason <jonmason@broadcom.com>
+On Tue, Dec 01, 2015 at 11:46:38PM -0500, Yendapally Reddy Dhananjaya Reddy wrote:
+> Device tree binding documentation for Broadcom NSP GPIO-a driver
+
+Bindings are for h/w, not drivers...
+
 > 
-> Add SMP support for Broadcom's 4708 SoCs.
-> 
-> Signed-off-by: Jon Mason <jonmason@broadcom.com>
-> Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
-> Tested-by: Hauke Mehrtens <hauke@hauke-m.de>
-> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yrdreddy@broadcom.com>
 > ---
->  arch/arm/boot/dts/bcm4708.dtsi | 2 ++
->  arch/arm/mach-bcm/Kconfig      | 1 +
->  arch/arm/mach-bcm/Makefile     | 3 +++
->  3 files changed, 6 insertions(+)
+>  .../devicetree/bindings/pinctrl/brcm,nsp-gpio.txt  | 80 ++++++++++++++++++++++
+>  1 file changed, 80 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt
 > 
-> diff --git a/arch/arm/boot/dts/bcm4708.dtsi b/arch/arm/boot/dts/bcm4708.dtsi
-> index 31141e8..eed4dd1 100644
-> --- a/arch/arm/boot/dts/bcm4708.dtsi
-> +++ b/arch/arm/boot/dts/bcm4708.dtsi
-> @@ -15,6 +15,7 @@
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		enable-method = "brcm,bcm-nsp-smp";
->  
->  		cpu at 0 {
->  			device_type = "cpu";
-> @@ -27,6 +28,7 @@
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a9";
->  			next-level-cache = <&L2>;
-> +			secondary-boot-reg = <0xffff0400>;
->  			reg = <0x1>;
->  		};
->  	};
-> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> index 83765a0..e85246f 100644
-> --- a/arch/arm/mach-bcm/Kconfig
-> +++ b/arch/arm/mach-bcm/Kconfig
-> @@ -54,6 +54,7 @@ config ARCH_BCM_NSP
->  config ARCH_BCM_5301X
->  	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
->  	select ARCH_BCM_IPROC
-> +	select HAVE_SMP
->  	help
->  	  Support for Broadcom BCM470X and BCM5301X SoCs with ARM CPU cores.
->  
+> diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt b/Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt
+> new file mode 100644
+> index 0000000..bea4211
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt
+> @@ -0,0 +1,80 @@
+> +Broadcom Northstar plus (NSP) GPIO/PINCONF Controller
+> +
+> +Required properties:
+> +- compatible:
+> +    Must be "brcm,nsp-gpio-a"
+> +
+> +- reg:
+> +    Should contain the register physical address and length for each of
+> +    GPIO base, IO control registers
+> +
+> +- #gpio-cells:
+> +    Must be two. The first cell is the GPIO pin number (within the
+> +    controller's pin space) and the second cell is used for the following:
+> +    bit[0]: polarity (0 for active high and 1 for active low)
+> +
+> +- gpio-controller:
+> +    Specifies that the node is a GPIO controller
+> +
+> +- ngpios:
+> +    Number of gpios supported (58x25 supports 32 and 58x23 supports 24)
 
-When applying this patch please make sure it is correctly applied this
-patch causes some problems here:
+2 chips? You should have 2 compatible strings. I think this is incorrect 
+use of ngpios which AIUI is not for how many lines there are, but how 
+many can be used (e.g. not reserved).
 
-http://www.spinics.net/lists/arm-kernel/msg462137.html
+> +
+> +Optional properties:
+> +- interrupts:
+> +    Interrupt ID
+> +
+> +- interrupt-controller:
+> +    Specifies that the node is an interrupt controller
+> +
+> +- gpio-ranges:
+> +    Specifies the mapping between gpio controller and pin-controllers pins.
+> +    This requires 4 fields in cells defined as -
+> +    1. Phandle of pin-controller.
+> +    2. GPIO base pin offset.
+> +    3  Pin-control base pin offset.
+> +    4. number of gpio pins which are linearly mapped from pin base.
+> +
+> +Supported generic PINCONF properties in child nodes:
+> +- pins:
+> +    The list of pins (within the controller's own pin space) that properties
+> +    in the node apply to. Pin names are "gpio-<pin>"
+> +
+> +- bias-disable:
+> +    Disable pin bias
+> +
+> +- bias-pull-up:
+> +    Enable internal pull up resistor
+> +
+> +- bias-pull-down:
+> +    Enable internal pull down resistor
+> +
+> +- drive-strength:
+> +    Valid drive strength values include 2, 4, 6, 8, 10, 12, 14, 16 (mA)
+> +
+> +Example:
+> +
+> +	gpioa: gpio-a at 18000020 {
 
-> diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-> index 5193a25..7d66515 100644
-> --- a/arch/arm/mach-bcm/Makefile
-> +++ b/arch/arm/mach-bcm/Makefile
-> @@ -43,6 +43,9 @@ obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
->  
->  # BCM5301X
->  obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
-> +ifeq ($(CONFIG_ARCH_BCM_5301X),y)
-> +obj-$(CONFIG_SMP)		+= platsmp.o
-> +endif
->  
->  # BCM63XXx
->  ifeq ($(CONFIG_ARCH_BCM_63XX),y)
+node names are preferred to be generic, so just "gpio at ..."
+
+> +		compatible = "brcm,nsp-gpio-a";
+> +		reg = <0x18000020 0x100>,
+> +		      <0x1803f1c4 0x1c>;
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +		ngpios = <32>;
+> +		gpio-ranges = <&pinctrl 0 0 31>;
+> +		interrupt-controller;
+> +		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+> +
+> +		/* Hog a few default settings */
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&led>;
+> +		led: led {
+> +			pins = "gpio-1";
+> +			bias-pull-up;
+> +		};
+> +
+> +		pwr: pwr {
+> +			gpio-hog;
+> +			gpios = <3 1>;
+> +			output-high;
+> +		};
+> +	};
+> -- 
+> 2.1.0
 > 
-
-I am getting this on a Northstar 1 / BCM4708:
-
-[ 0.137634] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-[ 0.143643] Setting up static identity map for 0x82a0 - 0x82d4
-[ 0.189772] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
-[ 0.189861] Brought up 2 CPUs
-[ 0.198845] SMP: Total of 2 processors activated (3188.32 BogoMIPS).
-[ 0.205446] CPU: WARNING: CPU(s) started in wrong/inconsistent modes
-(primary CPU mode 0x13)
-[ 0.214167] CPU: This may indicate a broken bootloader or firmware.
-
-I assume that this is correct and the bootloader is just broken, it uses
-this bootloader: "CFE for Foxconn Router version: v1.0.14", I haven't
-noticed any problems, so it is ok for me.
-
-Hauke
