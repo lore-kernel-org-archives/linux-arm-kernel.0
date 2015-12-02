@@ -1,168 +1,46 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 02 Dec 2015 09:04:09 +0000
-Subject: [BISECTED] rcu_sched self-detected stall since 3.17
-In-Reply-To: <20151201130404.GL3816@twins.programming.kicks-ass.net>
-References: <564F3DCA.1080907@arm.com>
- <20151201130404.GL3816@twins.programming.kicks-ass.net>
-Message-ID: <565EB409.3090202@arm.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Wed, 02 Dec 2015 12:05:41 +0300
+Subject: [PATCH 3/6] net: thunderx: Increase transmit queue length
+In-Reply-To: <CA+sq2Ce9oH-kCDO8hK_wX+ZZdXyyBuT4V2bt5Ab+2=pEX+BO+w@mail.gmail.com>
+References: <y@samsung.com>
+ <1448961223-41888-4-git-send-email-sunil.kovvuri@gmail.com>
+ <01d101d12c46$2de43b40$89acb1c0$@samsung.com>
+ <1448983985.25582.35.camel@edumazet-glaptop2.roam.corp.google.com>
+ <CA+sq2Ce9oH-kCDO8hK_wX+ZZdXyyBuT4V2bt5Ab+2=pEX+BO+w@mail.gmail.com>
+Message-ID: <00cb01d12ce0$9f090540$dd1b0fc0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/15 13:04, Peter Zijlstra wrote:
-> Sorry for the delay and thanks for the reminder!
-> 
-> On Fri, Nov 20, 2015 at 03:35:38PM +0000, Vladimir Murzin wrote:
->> commit 743162013d40ca612b4cb53d3a200dff2d9ab26e
->> Author: NeilBrown <neilb@suse.de>
->> Date:   Mon Jul 7 15:16:04 2014 +1000
->>
->>     sched: Remove proliferation of wait_on_bit() action functions
->>
->> The only change I noticed is from (mm/filemap.c)
->>
->> 	io_schedule();
->> 	fatal_signal_pending(current)
->>
->> to (kernel/sched/wait.c)
->>
->> 	signal_pending_state(current->state, current)
->> 	io_schedule();
->>
->> and if I apply following diff I don't see stalls anymore.
->>
->> diff --git a/kernel/sched/wait.c b/kernel/sched/wait.c
->> index a104879..2d68cdb 100644
->> --- a/kernel/sched/wait.c
->> +++ b/kernel/sched/wait.c
->> @@ -514,9 +514,10 @@ EXPORT_SYMBOL(bit_wait);
->>
->>  __sched int bit_wait_io(void *word)
->>  {
->> +       io_schedule();
->> +
->>         if (signal_pending_state(current->state, current))
->>                 return 1;
->> -       io_schedule();
->>         return 0;
->>  }
->>  EXPORT_SYMBOL(bit_wait_io);
->>
->> Any ideas why it might happen and why diff above helps?
-> 
-> Yes, the code as presented is simply wrong. And in fact most of the code
-> it replaced was of the right form (with a few exceptions which would
-> indeed have been subject to the same problem you've observed.
-> 
-> Note how the late:
-> 
->   - cifs_sb_tcon_pending_wait
->   - fscache_wait_bit_interruptible
->   - sleep_on_page_killable
->   - wait_inquiry
->   - key_wait_bit_intr
-> 
-> All check the signal state _after_ calling schedule().
-> 
-> As opposed to:
-> 
->   - gfs2_journalid_wait
-> 
-> which follows the broken pattern.
-> 
-> Further notice that most expect a return of -EINTR, which also seems
-> correct given that this is a signal, those that do not return -EINTR
-> only check for a !0 return value so would work equally well with -EINTR.
-> 
-> The reason this is broken is that schedule() will no-op when there is a
-> pending signal, while raising a signal will also issue a wakeup.
-> 
+ Hello!
 
-Glad to hear confirmation on a problem. Thanks for detailed answer!
+> Probably you might have to set "coherent_pool" size in bootargs to a
+> higher value.
+> Can you please check.
 
-> Thus the right thing to do is check for the signal state after, that way
-> you handle both cases:
-> 
->  - calling schedule() with a signal pending
->  - receiving a signal while sleeping
-> 
-> As such, I would propose the below patch. Oleg, do you concur?
-> 
-> ---
-> Subject: sched,wait: Fix signal handling in bit wait helpers
-> 
-> Vladimir reported getting RCU stall warnings and bisected it back to
-> commit 743162013d40. That commit inadvertently reversed the calls to
-> schedule() and signal_pending(), thereby not handling the case where the
-> signal receives while we sleep.
-> 
-> Fixes: 743162013d40 ("sched: Remove proliferation of wait_on_bit() action functions")
-> Fixes: cbbce8220949 ("SCHED: add some "wait..on_bit...timeout()" interfaces.")
-> Reported-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> Signed-off-by: Peter Zijlstra (Intel) <peterz@infradead.org>
-> ---
->  kernel/sched/wait.c | 16 ++++++++--------
->  1 file changed, 8 insertions(+), 8 deletions(-)
-> 
-> diff --git a/kernel/sched/wait.c b/kernel/sched/wait.c
-> index 052e02672d12..f10bd873e684 100644
-> --- a/kernel/sched/wait.c
-> +++ b/kernel/sched/wait.c
-> @@ -583,18 +583,18 @@ EXPORT_SYMBOL(wake_up_atomic_t);
->  
->  __sched int bit_wait(struct wait_bit_key *word)
->  {
-> -	if (signal_pending_state(current->state, current))
-> -		return 1;
->  	schedule();
-> +	if (signal_pending(current))
-> +		return -EINTR;
->  	return 0;
->  }
->  EXPORT_SYMBOL(bit_wait);
->  
->  __sched int bit_wait_io(struct wait_bit_key *word)
->  {
-> -	if (signal_pending_state(current->state, current))
-> -		return 1;
->  	io_schedule();
-> +	if (signal_pending(current))
-> +		return -EINTR;
->  	return 0;
->  }
->  EXPORT_SYMBOL(bit_wait_io);
-> @@ -602,11 +602,11 @@ EXPORT_SYMBOL(bit_wait_io);
->  __sched int bit_wait_timeout(struct wait_bit_key *word)
->  {
->  	unsigned long now = READ_ONCE(jiffies);
-> -	if (signal_pending_state(current->state, current))
-> -		return 1;
->  	if (time_after_eq(now, word->timeout))
->  		return -EAGAIN;
->  	schedule_timeout(word->timeout - now);
-> +	if (signal_pending(current))
-> +		return -EINTR;
->  	return 0;
->  }
->  EXPORT_SYMBOL_GPL(bit_wait_timeout);
-> @@ -614,11 +614,11 @@ EXPORT_SYMBOL_GPL(bit_wait_timeout);
->  __sched int bit_wait_io_timeout(struct wait_bit_key *word)
->  {
->  	unsigned long now = READ_ONCE(jiffies);
-> -	if (signal_pending_state(current->state, current))
-> -		return 1;
->  	if (time_after_eq(now, word->timeout))
->  		return -EAGAIN;
->  	io_schedule_timeout(word->timeout - now);
-> +	if (signal_pending(current))
-> +		return -EINTR;
->  	return 0;
->  }
->  EXPORT_SYMBOL_GPL(bit_wait_io_timeout);
-> 
+ I have tried to do this. I was able to enlarge the pool up to 4MB, and still got allocation failures. At 8MB pool preallocation stops working:
+--- cut ---
+Call trace:
+[<ffffffc00012ddb8>] __alloc_pages_nodemask+0x4f4/0x7d4
+[<ffffffc0007be370>] atomic_pool_init+0x60/0x1a4
+[<ffffffc0007be4d4>] arm64_dma_init+0x20/0x28
+[<ffffffc000082848>] do_one_initcall+0x8c/0x1a4
+[<ffffffc0007baac0>] kernel_init_freeable+0x154/0x1f4
+[<ffffffc0005c2b14>] kernel_init+0x10/0xd8
+DMA: failed to allocate 8192 KiB pool for atomic coherent allocation
+--- cut ---
+ and i get even worse faults in the driver.
 
-I run it overnight on top of 4.3 and didn't see stalls. So in case it helps
+ I know that it is possible to allocate larger pools by setting CONFIG_FORCE_MAX_ZONEORDER, but:
+a) This is done on per-platform basis. For ThunderX we used to have a patch (http://www.spinics.net/lists/arm-kernel/msg415457.html), which never made it upstream, because vGIC fixes stopped requiring it at some point. And also we may want to use the nicvf driver not only on actual hardware, but also inside virtual machine in KVM. So do we need to set CONFIG_FORCE_MAX_ZONEORDER for virt too? And what if at some point qemu emulates not only "virt", but some other machine (let's say AMD X-Gene), and we run it on ThunderX and want to use nicvf with this model?
+b) IMHO it's not good to have a driver which simply does not work without some obscure option in boot arguments.
 
-Tested-by: Vladimir Murzin <vladimir.murzin@arm.com>
+ So, i see several possible ways to solve this:
 
-Cheers
-Vladimir
+1. Introduce some mechanism which would allow the driver to tell the kernel that it needs coherent pool of large size. Can be problematic because the driver can be a module, and pool allocation happens early.
+2. Can we use some other method for allocating queues, which would not require such a huge coherent pool?
+3. The driver could check value of atomic_pool_size and adjust own memory requirements accordingly. This indeed looks like a quick hack, but would at least make things running quickly.
+
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
