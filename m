@@ -1,134 +1,181 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Wed, 2 Dec 2015 13:34:20 -0500
-Subject: [PATCH v3 5/7] ARM: dts: imx: Add support for Advantech/GE B450v3
-In-Reply-To: <1447672792.3144.11.camel@pengutronix.de>
-References: <1447178408-26982-1-git-send-email-akshay.bhat@timesys.com>
- <1447178408-26982-6-git-send-email-akshay.bhat@timesys.com>
- <1447672792.3144.11.camel@pengutronix.de>
-Message-ID: <565F39AC.1010201@timesys.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 2 Dec 2015 18:37:29 +0000
+Subject: [PATCH v4 4/4] drivers: psci: replace psci firmware calls
+In-Reply-To: <1449049626-13991-5-git-send-email-jens.wiklander@linaro.org>
+References: <1449049626-13991-1-git-send-email-jens.wiklander@linaro.org>
+ <1449049626-13991-5-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <20151202183729.GC20520@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Dec 02, 2015 at 10:47:06AM +0100, Jens Wiklander wrote:
+> Switch to use a generic interface for issuing SMC/HVC based on ARM SMC
+> Calling Convention. Removes now the now unused psci-call.S.
+> 
+> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> Tested-by: Mark Rutland <mark.rutland@arm.com>
+> ---
+>  arch/arm/kernel/Makefile      |  1 -
+>  arch/arm/kernel/psci-call.S   | 31 -------------------------------
+>  arch/arm64/kernel/Makefile    |  2 +-
+>  arch/arm64/kernel/psci-call.S | 28 ----------------------------
+>  drivers/firmware/psci.c       | 23 +++++++++++++++++++++--
+>  5 files changed, 22 insertions(+), 63 deletions(-)
+>  delete mode 100644 arch/arm/kernel/psci-call.S
+>  delete mode 100644 arch/arm64/kernel/psci-call.S
 
+Thanks for implementing this patchset:
 
-On 11/16/2015 06:19 AM, Lucas Stach wrote:
-> Am Dienstag, den 10.11.2015, 13:00 -0500 schrieb Akshay Bhat:
->> Add support for Advantech/GE B450v3 board.
->>
->> Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
->> ---
->>   arch/arm/boot/dts/Makefile         |  1 +
->>   arch/arm/boot/dts/imx6q-b450v3.dts | 75 ++++++++++++++++++++++++++++++++++++++
->>   2 files changed, 76 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/imx6q-b450v3.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 30bbc37..b3330fe 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -310,6 +310,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->>   	imx6dl-wandboard-revb1.dtb \
->>   	imx6q-apf6dev.dtb \
->>   	imx6q-arm2.dtb \
->> +	imx6q-b450v3.dtb \
->>   	imx6q-cm-fx6.dtb \
->>   	imx6q-cubox-i.dtb \
->>   	imx6q-dfi-fs700-m60.dtb \
->> diff --git a/arch/arm/boot/dts/imx6q-b450v3.dts b/arch/arm/boot/dts/imx6q-b450v3.dts
->> new file mode 100644
->> index 0000000..919e4a4
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/imx6q-b450v3.dts
->> @@ -0,0 +1,75 @@
->> +/*
->> + * Copyright 2015 Timesys Corporation.
->> + * Copyright 2015 General Electric Company
->> + *
->> + * The code contained herein is licensed under the GNU General Public
->> + * License. You may obtain a copy of the GNU General Public License
->> + * Version 2 or later at the following locations:
->> + *
->> + * http://www.opensource.org/licenses/gpl-license.html
->> + * http://www.gnu.org/copyleft/gpl.html
->> + */
->> +
->> +/dts-v1/;
->> +
->> +#include "imx6q-bx50v3.dtsi"
->> +
->> +/ {
->> +	model = "Advantech MX6Q B450V3 QSeven Board";
->> +	compatible = "ge,imx6q-b450v3", "advantech,imx6q-ba16", "fsl,imx6q";
->> +
->> +	chosen {
->> +		stdout-path = &uart3;
->> +	};
->> +};
->> +
->> +&ldb {
->> +	assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
->> +			  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
->> +	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL3_USB_OTG>,
->> +				 <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
->> +	status = "okay";
->> +
->> +	lvds0: lvds-channel at 0 {
->> +		fsl,data-mapping = "spwg";
->> +		fsl,data-width = <24>;
->> +		status = "okay";
->> +
->> +		display-timings {
->> +			native-mode = <&timing0>;
->> +			timing0: G121X1-L03 {
->> +				clock-frequency = <65000000>;
->> +				hactive = <1024>;
->> +				vactive = <768>;
->> +				hback-porch = <320>;
->> +				hfront-porch = <0>;
->> +				vback-porch = <0>;
->> +				vfront-porch = <38>;
->> +				hsync-len = <1>;
->> +				vsync-len = <1>;
->> +			};
->> +		};
->
-> Display timings in DT are deprecated and new boards should add the
-> display with a specific compatible to the simple-panel driver and then
-> link a panel node to the LVDS channels. Take a look at the i.MX6
-> Nitrogen DTs for an example on how to do this.
->
-> Same comment applies to the next patches as well.
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Thanks for the example Lucas. Added G121X1-L03 panel which is now in 
-linux-next 
-(https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/drivers/gpu/drm/panel?h=next-20151127&id=f8fa17ba812b7df1535f6bb75d7264670f5997a6)
-
-v4 patch now uses simple-panel:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/390373.html
-
->
->> +	};
->> +
->> +	lvds1: lvds-channel at 1 {
->> +		fsl,data-mapping = "spwg";
->> +		fsl,data-width = <24>;
->> +		status = "okay";
->> +
->> +		display-timings {
->> +			native-mode = <&timing1>;
->> +			timing1: G121X1-L03 {
->> +				clock-frequency = <65000000>;
->> +				hactive = <1024>;
->> +				vactive = <768>;
->> +				hback-porch = <320>;
->> +				hfront-porch = <0>;
->> +				vback-porch = <0>;
->> +				vfront-porch = <38>;
->> +				hsync-len = <1>;
->> +				vsync-len = <1>;
->> +			};
->> +		};
->> +	};
->> +
->> +};
->
+> 
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index d2d0042..80856de 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -88,7 +88,6 @@ obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
+>  
+>  obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
+>  ifeq ($(CONFIG_ARM_PSCI),y)
+> -obj-y				+= psci-call.o
+>  obj-$(CONFIG_SMP)		+= psci_smp.o
+>  endif
+>  
+> diff --git a/arch/arm/kernel/psci-call.S b/arch/arm/kernel/psci-call.S
+> deleted file mode 100644
+> index a78e9e1..0000000
+> --- a/arch/arm/kernel/psci-call.S
+> +++ /dev/null
+> @@ -1,31 +0,0 @@
+> -/*
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> - *
+> - * Copyright (C) 2015 ARM Limited
+> - *
+> - * Author: Mark Rutland <mark.rutland@arm.com>
+> - */
+> -
+> -#include <linux/linkage.h>
+> -
+> -#include <asm/opcodes-sec.h>
+> -#include <asm/opcodes-virt.h>
+> -
+> -/* int __invoke_psci_fn_hvc(u32 function_id, u32 arg0, u32 arg1, u32 arg2) */
+> -ENTRY(__invoke_psci_fn_hvc)
+> -	__HVC(0)
+> -	bx	lr
+> -ENDPROC(__invoke_psci_fn_hvc)
+> -
+> -/* int __invoke_psci_fn_smc(u32 function_id, u32 arg0, u32 arg1, u32 arg2) */
+> -ENTRY(__invoke_psci_fn_smc)
+> -	__SMC(0)
+> -	bx	lr
+> -ENDPROC(__invoke_psci_fn_smc)
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 0170bea..27bf1e5 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -14,7 +14,7 @@ CFLAGS_REMOVE_return_address.o = -pg
+>  arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
+>  			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
+>  			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
+> -			   hyp-stub.o psci.o psci-call.o cpu_ops.o insn.o	\
+> +			   hyp-stub.o psci.o cpu_ops.o insn.o	\
+>  			   return_address.o cpuinfo.o cpu_errata.o		\
+>  			   cpufeature.o alternative.o cacheinfo.o		\
+>  			   smp.o smp_spin_table.o topology.o smccc-call.o
+> diff --git a/arch/arm64/kernel/psci-call.S b/arch/arm64/kernel/psci-call.S
+> deleted file mode 100644
+> index cf83e61..0000000
+> --- a/arch/arm64/kernel/psci-call.S
+> +++ /dev/null
+> @@ -1,28 +0,0 @@
+> -/*
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> - *
+> - * Copyright (C) 2015 ARM Limited
+> - *
+> - * Author: Will Deacon <will.deacon@arm.com>
+> - */
+> -
+> -#include <linux/linkage.h>
+> -
+> -/* int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1, u64 arg2) */
+> -ENTRY(__invoke_psci_fn_hvc)
+> -	hvc	#0
+> -	ret
+> -ENDPROC(__invoke_psci_fn_hvc)
+> -
+> -/* int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1, u64 arg2) */
+> -ENTRY(__invoke_psci_fn_smc)
+> -	smc	#0
+> -	ret
+> -ENDPROC(__invoke_psci_fn_smc)
+> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+> index d24f35d..f25cd79 100644
+> --- a/drivers/firmware/psci.c
+> +++ b/drivers/firmware/psci.c
+> @@ -13,6 +13,7 @@
+>  
+>  #define pr_fmt(fmt) "psci: " fmt
+>  
+> +#include <linux/arm-smccc.h>
+>  #include <linux/errno.h>
+>  #include <linux/linkage.h>
+>  #include <linux/of.h>
+> @@ -58,8 +59,6 @@ struct psci_operations psci_ops;
+>  
+>  typedef unsigned long (psci_fn)(unsigned long, unsigned long,
+>  				unsigned long, unsigned long);
+> -asmlinkage psci_fn __invoke_psci_fn_hvc;
+> -asmlinkage psci_fn __invoke_psci_fn_smc;
+>  static psci_fn *invoke_psci_fn;
+>  
+>  enum psci_function {
+> @@ -107,6 +106,26 @@ bool psci_power_state_is_valid(u32 state)
+>  	return !(state & ~valid_mask);
+>  }
+>  
+> +static unsigned long __invoke_psci_fn_hvc(unsigned long function_id,
+> +			unsigned long arg0, unsigned long arg1,
+> +			unsigned long arg2)
+> +{
+> +	struct arm_smccc_res res;
+> +
+> +	arm_smccc_hvc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
+> +	return res.a0;
+> +}
+> +
+> +static unsigned long __invoke_psci_fn_smc(unsigned long function_id,
+> +			unsigned long arg0, unsigned long arg1,
+> +			unsigned long arg2)
+> +{
+> +	struct arm_smccc_res res;
+> +
+> +	arm_smccc_smc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
+> +	return res.a0;
+> +}
+> +
+>  static int psci_to_linux_errno(int errno)
+>  {
+>  	switch (errno) {
+> -- 
+> 1.9.1
+> 
