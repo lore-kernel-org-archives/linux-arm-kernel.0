@@ -1,69 +1,55 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Wed, 2 Dec 2015 23:15:23 +0100
-Subject: [PATCH 00/13] mvneta Buffer Management and enhancements
-In-Reply-To: <87two0254c.fsf@free-electrons.com>
-References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
- <87lh9f4dbt.fsf@free-electrons.com>
- <CAPv3WKc+HbirDxKy5n6W5O5BUTDEc3X5et5dTKdp81WOXjphGg@mail.gmail.com>
- <874mg248jf.fsf@free-electrons.com>
- <CAPv3WKc8VrgH+aAfHBMwvuOxP17SnXCajtzpxmXf4rt+WFcE-w@mail.gmail.com>
- <CAPv3WKdAhk71HW8nvMWXUApySE5_WNgx4PDrj4+R4Tv6FVGNqA@mail.gmail.com>
- <87si3l2kx5.fsf@free-electrons.com>
- <87two0254c.fsf@free-electrons.com>
-Message-ID: <CAPv3WKdHu5O2KEHYpWBHbkA2hHd_QCUK12EBggMDsa8J8D5U2Q@mail.gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 2 Dec 2015 23:17:10 +0100
+Subject: [RFC PATCH 7/9] drm/rockchip: force enable vop when do mode
+ setting
+In-Reply-To: <20151202165536.GA14019@ulmo>
+References: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>
+ <1448940721-23488-1-git-send-email-mark.yao@rock-chips.com>
+ <20151202165536.GA14019@ulmo>
+Message-ID: <20151202221710.GB10243@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+On Wed, Dec 02, 2015 at 05:55:36PM +0100, Thierry Reding wrote:
+> On Tue, Dec 01, 2015 at 11:32:01AM +0800, Mark Yao wrote:
+> > When do mode setting, mean that we want to enable display output,
+> > but sometimes, vop_crtc_enable is after mode_set, we can't allow
+> > that, so force enable vop in mode setting.
+> > 
+> > Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> > ---
+> >  drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> > index c65b454..7c07537 100644
+> > --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> > @@ -1110,6 +1110,7 @@ static void vop_crtc_mode_set_nofb(struct drm_crtc *crtc)
+> >  	u16 vact_end = vact_st + vdisplay;
+> >  	uint32_t val;
+> >  
+> > +	vop_crtc_enable(crtc);
+> >  	/*
+> >  	 * If dclk rate is zero, mean that scanout is stop,
+> >  	 * we don't need wait any more.
+> 
+> Have you considered simply moving everything into ->enable()? That's
+> what I did for Tegra, for much the same reasons that you gave in the
+> commit message. Doing so gives you a much simpler call graph. Really
+> the only thing you need to do is move around the code, and perhaps a
+> different way to get ahold of the display mode, but you can use the
+> Tegra driver as a reference for how to do that.
 
-2015-12-02 17:21 GMT+01:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
-> Hi,
->
->  On mer., d?c. 02 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
->
->>>
->>> So far the issue may have been not noticed, because in every IO driver
->>> using mvebu_mbus_dram_info for configuring MBUS windows, there's
->>> following substraction:
->>> (cs->size - 1) & 0xfffff000
->>>
->>> I think there are two options:
->>> 1. Change size type to u64.
->>
->> If we switch to u64 we really must pay attention to be sure that it
->> won't be used to be written in a register, but the regsiter remains
->> 32bits.
->>
->>> 2. Change condition in mvebu_mbus_get_dram_win_info to:
->>> if (cs->base <= phyaddr && phyaddr <= (cs->base + cs->size -1))
->>
->> I think it would be the best solution.
->
-> So I applied the following patch:
-> --- a/drivers/bus/mvebu-mbus.c
-> +++ b/drivers/bus/mvebu-mbus.c
-> @@ -964,7 +964,7 @@ int mvebu_mbus_get_dram_win_info(phys_addr_t phyaddr, u8 *target, u8 *attr)
->         for (i = 0; i < dram->num_cs; i++) {
->                 const struct mbus_dram_window *cs = dram->cs + i;
->
-> -               if (cs->base <= phyaddr && phyaddr <= (cs->base + cs->size)) {
-> +               if (cs->base <= phyaddr && phyaddr <= (cs->base + cs->size - 1)) {
->                         *target = dram->mbus_dram_target_id;
->                         *attr = cs->mbus_attr;
->                         return 0;
->
-> I didn't get any errors during boot related to the BM. However I did not
-> manage to use an ethernet interface. The udhcpc never managed to get an
-> IP and if I set the IP manually I could not ping.
->
-> But on Armada 388 GP I didn't have any issue.
->
-> Do you have some idea about waht I could check?
->
+Yeah if writing mode related registers requires the thing to be on on your
+hw then you can't use the ->mode_set hooks. Those are explicitly called
+when everything is off (not just sometimes, at least with atomic helpers).
 
-I replaced 2GB with 8GB DIMM and after that, on the same kernel/board,
-I can't ping either. Very strange, but as I can reproduce the issue,
-don't debug it, I will.
-
-Best regards,
-Marcin
+Like Thierry said the recommendation is to just shovel that code into
+->enable hooks. ->mode_set_nofb is mostly there to support easier
+transition for drivers which started with the legacy crtc helpers.
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
