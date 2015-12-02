@@ -1,102 +1,57 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Wed,  2 Dec 2015 18:22:31 +0100
-Subject: [PATCH v2 5/7] dt-bindings: Amlogic: Add SMP related documentation
-In-Reply-To: <1449076953-5058-1-git-send-email-carlo@caione.org>
-References: <1449076953-5058-1-git-send-email-carlo@caione.org>
-Message-ID: <1449076953-5058-6-git-send-email-carlo@caione.org>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 2 Dec 2015 11:22:55 -0600
+Subject: [PATCH 3/4] dmaengine: qcom_bam_dma: use correct pipe FIFO size
+In-Reply-To: <565F1FDB.4020106@linaro.org>
+References: <1448961299-15161-1-git-send-email-stanimir.varbanov@linaro.org>
+ <1448961299-15161-4-git-send-email-stanimir.varbanov@linaro.org>
+ <20151201172307.GA26687@Agamemnon.attlocal.net>
+ <565F1FDB.4020106@linaro.org>
+Message-ID: <20151202172255.GA9599@Agamemnon.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+On Wed, Dec 02, 2015 at 06:44:11PM +0200, Stanimir Varbanov wrote:
+> On 12/01/2015 07:23 PM, Andy Gross wrote:
+> > On Tue, Dec 01, 2015 at 11:14:58AM +0200, Stanimir Varbanov wrote:
+> >> The pipe fifo size register must instruct the bam hw
+> >> how many hw descriptors can be pushed to fifo. Currently
+> >> we isntruct the hw with 32KBytes but wrap the tail in
+> >> bam_start_dma in BAM_P_EVNT_REG on 4095 i.e. 32760. This
+> >> leads to stalled transactions when the tail wraps.
+> >>
+> >> Fix this by use the correct fifo size in BAM_P_FIFO_SIZES
+> >> register i.e. 32K - 8.
+> >>
+> >> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
+> >> ---
+> >>  drivers/dma/qcom_bam_dma.c |    2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/dma/qcom_bam_dma.c b/drivers/dma/qcom_bam_dma.c
+> >> index 0f06f3b7a72b..6d290de9ab2b 100644
+> >> --- a/drivers/dma/qcom_bam_dma.c
+> >> +++ b/drivers/dma/qcom_bam_dma.c
+> >> @@ -458,7 +458,7 @@ static void bam_chan_init_hw(struct bam_chan *bchan,
+> >>  	 */
+> >>  	writel_relaxed(ALIGN(bchan->fifo_phys, sizeof(struct bam_desc_hw)),
+> >>  			bam_addr(bdev, bchan->id, BAM_P_DESC_FIFO_ADDR));
+> >> -	writel_relaxed(BAM_DESC_FIFO_SIZE,
+> >> +	writel_relaxed(BAM_MAX_DATA_SIZE,
+> >>  			bam_addr(bdev, bchan->id, BAM_P_FIFO_SIZES));
+> > 
+> > This is just using the #define.  That is ok, but if you use this instead of the
+> > BAM_P_FIFO_SIZES then you need to fix your comment.  Or actually use the
+> > register value.... otherwise looks fine.
+> 
+> I did not follow your comment, but the intension of the patch is to set
+> the proper FIFO size in BAM_P_FIFO_SIZES register, i.e. 32K - 8.
 
-With this patch we add documentation for:
+Sorry, I mixed up the usage and was thinking there was something you read out
+that told you the size.  That's not how it works, unfortunately.  The
+MAX_DATA_SIZE is fine, but the name is a little misleading.  Perhaps just
+BAM_FIFO_SIZE?
 
-* power-management-unit: the PMU is used to bring up the cores during
-  SMP operations
-* sram: among other things the sram is used to store the first code
-  executed by the core when it is powered up
-* cpu-enable-method: the CPU enable method used by Amlogic Meson8b SoCs
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
----
- .../devicetree/bindings/arm/amlogic/pmu.txt        | 16 +++++++++++
- .../devicetree/bindings/arm/amlogic/smp-sram.txt   | 32 ++++++++++++++++++++++
- Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
- 3 files changed, 49 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/amlogic/pmu.txt
- create mode 100644 Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt
+Regards,
 
-diff --git a/Documentation/devicetree/bindings/arm/amlogic/pmu.txt b/Documentation/devicetree/bindings/arm/amlogic/pmu.txt
-new file mode 100644
-index 0000000..7b9b2da
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/amlogic/pmu.txt
-@@ -0,0 +1,16 @@
-+Amlogic power-management-unit:
-+-------------------------------
-+
-+The pmu is used to turn off and on different power domains of the SoCs
-+This includes the power to the CPU cores.
-+
-+Required node properties:
-+- compatible value : = "amlogic,meson8b-pmu";
-+- reg : physical base address and the size of the registers window
-+
-+Example:
-+
-+	pmu at c81000e4 {
-+		compatible = "amlogic,meson8b-pmu", "syscon";
-+		reg = <0xc81000e0 0x18>;
-+	};
-diff --git a/Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt b/Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt
-new file mode 100644
-index 0000000..455ca20
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt
-@@ -0,0 +1,32 @@
-+Amlogic SRAM for smp bringup:
-+------------------------------
-+
-+Amlogic's smp-capable SoCs use part of the sram for the bringup of the cores.
-+Once the core gets powered up it executes the code that is residing at a
-+specific location.
-+
-+Therefore a reserved section sub-node has to be added to the mmio-sram
-+declaration.
-+
-+Required sub-node properties:
-+- compatible : should be "amlogic,meson8b-smp-sram"
-+
-+The rest of the properties should follow the generic mmio-sram discription
-+found in ../../misc/sram.txt
-+
-+Example:
-+
-+	sram: sram at d9000000 {
-+		compatible = "mmio-sram";
-+		reg = <0xd9000000 0x20000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0xd9000000 0x20000>;
-+
-+		smp-sram at 1ff80 {
-+			compatible = "amlogic,meson8b-smp-sram";
-+			reg = <0x1ff80 0x8>;
-+		};
-+	};
-+
-+
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index 3a07a87..22381b4 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -189,6 +189,7 @@ nodes to be present and contain the properties described below.
- 			  can be one of:
- 			    "allwinner,sun6i-a31"
- 			    "allwinner,sun8i-a23"
-+			    "amlogic,meson8b-smp"
- 			    "arm,psci"
- 			    "brcm,brahma-b15"
- 			    "marvell,armada-375-smp"
--- 
-2.5.0
+Andy
