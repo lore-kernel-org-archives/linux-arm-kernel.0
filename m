@@ -1,52 +1,98 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 2 Dec 2015 07:00:05 -0800
-Subject: [RFC v02 03/15] dmaengine: core: Introduce new, universal API to
- request a channel
-In-Reply-To: <565EC14A.6020502@ti.com>
-References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
- <1448891145-10766-4-git-send-email-peter.ujfalusi@ti.com>
- <20151130155142.GZ2517@atomide.com> <565D56A0.2090204@ti.com>
- <20151201170031.GT23396@atomide.com> <565EC14A.6020502@ti.com>
-Message-ID: <20151202150005.GB23396@atomide.com>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Wed,  2 Dec 2015 22:59:05 +0800
+Subject: [PATCH v2] acpi, apei, arm64: APEI initial support for aarch64.
+Message-ID: <1449068345-9021-1-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [151202 02:01]:
-> On 12/01/2015 07:00 PM, Tony Lindgren wrote:
-> >> I see. The dm81xx basically am33xx/am43xx?
-> > 
-> > Yeah similar to am33xx with different clocks and with a bunch of accelerators.
-> > 
-> >> Actually I would prefer to use the dmaengine's event router framework and we
-> >> do have support for the am33xx/am43xx type of crossbar already implemented.
-> >> I'm going to resend the DTS series for am33xx/am43xx to convert them to use
-> >> the new DT bindings along with the dma event router support:
-> >> https://www.mail-archive.com/linux-omap%40vger.kernel.org/msg120828.html
-> > 
-> > OK yes a dmaengine event router works too when available. Good to see
-> > them as separate driver instances now :) Are only the dts changes missing
-> > now?
-> > 
-> > FYI, when we have separate interconnect driver instances, we don't want to
-> > and cannot tweak registers outside the interconnect instance because of them
-> > being in separate clock and/or power domains :p
-> 
-> What does this mean in practice? We can not touch these registers? The DMA
-> crossbar is a separate driver from the eDMA driver.
+From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 
-Seem like it should not affect DMA crossbar as it's a separate driver.
+This commit provides APEI arch-specific bits for aarch64
 
-What I meant is we need a separate driver for clocks, pinctrl, regulators,
-PHY, crossbar or syscon to use the SCM registers from drivers sitting on a
-L4 interonnect.
+Changelog:
+v2: Rebase to latest kernel version(4.4-rc3).
+    Move arch_apei_flush_tlb_one() to arch/arm64/kernel/acpi.c
 
-> > In any case, it seems there's no harm using pinctrl for evtmux on dm81xx
-> > until the event router is available. It's currently only needed on the
-> > t410 emmc that I'm aware of :)
-> 
-> The AM33xx/AM43xx DMA crossbar support is in 4.4 already:
-> 42dbdcc6bf96 dmaengine: ti-dma-crossbar: Add support for crossbar on AM33xx/AM43xx
+v1: https://lkml.org/lkml/2015/8/14/199
+    Move arch_apei_flush_tlb_one() to arch/arm64/include/asm/apci.h.
+    Delete arch/arm64/kernel/apei.c.
+    Add "#ifdef CONFIG_ACPI_APEI" for "acpi_disable_cmcff".
 
-OK great.
+Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+Tested-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+Signed-off-by: Fu Wei <fu.wei@linaro.org>
+---
+ arch/arm64/Kconfig            |  1 +
+ arch/arm64/include/asm/acpi.h |  4 ++++
+ arch/arm64/kernel/acpi.c      | 10 ++++++++++
+ 3 files changed, 15 insertions(+)
 
-Tony
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 871f217..58c8992 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -3,6 +3,7 @@ config ARM64
+ 	select ACPI_CCA_REQUIRED if ACPI
+ 	select ACPI_GENERIC_GSI if ACPI
+ 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
++	select HAVE_ACPI_APEI if ACPI
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+ 	select ARCH_HAS_ELF_RANDOMIZE
+ 	select ARCH_HAS_GCOV_PROFILE_ALL
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index caafd63..0d70c74 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -46,6 +46,9 @@ typedef u64 phys_cpuid_t;
+ extern int acpi_disabled;
+ extern int acpi_noirq;
+ extern int acpi_pci_disabled;
++#ifdef CONFIG_ACPI_APEI
++extern int acpi_disable_cmcff;
++#endif
+ 
+ static inline void disable_acpi(void)
+ {
+@@ -94,6 +97,7 @@ static inline const char *acpi_get_enable_method(int cpu)
+ 
+ #ifdef	CONFIG_ACPI_APEI
+ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
++void arch_apei_flush_tlb_one(unsigned long addr);
+ #endif
+ 
+ #endif /*_ASM_ACPI_H*/
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index d1ce8e2..811fea2 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -32,6 +32,7 @@
+ #ifdef CONFIG_ACPI_APEI
+ # include <linux/efi.h>
+ # include <asm/pgtable.h>
++# include <asm/tlbflush.h>
+ #endif
+ 
+ int acpi_noirq = 1;		/* skip ACPI IRQ initialization */
+@@ -41,6 +42,10 @@ EXPORT_SYMBOL(acpi_disabled);
+ int acpi_pci_disabled = 1;	/* skip ACPI PCI scan and IRQ initialization */
+ EXPORT_SYMBOL(acpi_pci_disabled);
+ 
++#ifdef CONFIG_ACPI_APEI
++int acpi_disable_cmcff;
++#endif
++
+ static bool param_acpi_off __initdata;
+ static bool param_acpi_force __initdata;
+ 
+@@ -233,4 +238,9 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
+ 		return __pgprot(PROT_NORMAL_NC);
+ 	return __pgprot(PROT_DEVICE_nGnRnE);
+ }
++
++void arch_apei_flush_tlb_one(unsigned long addr)
++{
++	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
++}
+ #endif
+-- 
+2.5.0
