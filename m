@@ -1,29 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 Dec 2015 13:22:10 +0000
-Subject: [PATCH v6 2/6] arm64: pass a task parameter to unwind_frame()
-In-Reply-To: <56553B88.6090507@linaro.org>
-References: <1447828989-4980-1-git-send-email-takahiro.akashi@linaro.org>
- <1447828989-4980-3-git-send-email-takahiro.akashi@linaro.org>
- <70D4F7ED-B4CF-4AC0-B85A-2491786847FC@gmail.com>
- <56553B88.6090507@linaro.org>
-Message-ID: <20151202132209.GA5829@arm.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Wed, 02 Dec 2015 16:22:13 +0300
+Subject: [PATCH 3/6] net: thunderx: Increase transmit queue length
+In-Reply-To: <CA+sq2CfSNBQaQnw32tu4ZcZYLd6ybVZ3Ka5Oz=s1YUNegZpd-A@mail.gmail.com>
+References: <y@samsung.com>
+ <1448961223-41888-4-git-send-email-sunil.kovvuri@gmail.com>
+ <01d101d12c46$2de43b40$89acb1c0$@samsung.com>
+ <1448983985.25582.35.camel@edumazet-glaptop2.roam.corp.google.com>
+ <CA+sq2Ce9oH-kCDO8hK_wX+ZZdXyyBuT4V2bt5Ab+2=pEX+BO+w@mail.gmail.com>
+ <00cb01d12ce0$9f090540$dd1b0fc0$@samsung.com>
+ <00eb01d12cec$a32aa500$e97fef00$@samsung.com>
+ <013301d12cfd$0c958a90$25c09fb0$@samsung.com>
+ <CA+sq2CfSNBQaQnw32tu4ZcZYLd6ybVZ3Ka5Oz=s1YUNegZpd-A@mail.gmail.com>
+Message-ID: <013401d12d04$75928230$60b78690$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 25, 2015 at 01:39:36PM +0900, AKASHI Takahiro wrote:
-> On 11/24/2015 10:42 PM, Jungseok Lee wrote:
-> >On Nov 18, 2015, at 3:43 PM, AKASHI Takahiro wrote:
-> >>The change here doesn't make any difference in this patch, but is
-> >>a preparation for later fixing a problem where stacktrace functions,
-> >>unwind_frame() and walk_stackframe(), may return useless call stacks
-> >>under function graph tracer.
-> >
-> >I'm aligned with the argument. The case cannot be handled correctly
-> >without ret_stack[] of struct task_struct.
+ Hello!
+
+> >After getting it working in guest i tried to apply it to host. With total of 128 virtual
+> functions (= 128 interfaces) it does not work at all.
+> > Even after bumping cma region size to insane value of 2GB more than half of interfaces still
+> failed to allocate queues.
+> > And after setting cma=3G i could not mount my rootfs.
 > 
-> Thanks. I will add some description about why we need 'tsk' in a commit
-> message.
+> Here what you are saying is half of the interfaces were initialized
+> succesfully and rest didn't.
 
-Ok, so are you planning to repost this series?
+ After setting cma=2G. With default setting of 16M none of them initialized.
 
-Will
+> So this issue is not something which is introduced by this patch.
+
+ Before this patch all my interfaces were working.
+ I would say the problem with your patch is that it introduces memory requirements which cannot be satisfied by the platform. It's combination of several factors which stops the thing from working, not a single factor. Using dma_alloc_coherent() is not all wrong by itself, of course.
+ Perhaps you did some tricks with your configuration, which make it working. Then, i guess, you should have at least described them in commit message of your patch. Or describe all dependencies in KConfig of your driver, which is better. Or, if the platform needs some very special defconfig, add it to arch/arm64/configs (however, i guess, the goal of ARM64 Linux is to run on all possible hardware, so this would not be good from maintainers' POV).
+
+ Sorry, but this is all i can say. In previous messages i have already suggested several ways to solve the problem (too lazy to quite here, 4 IIRC), or you can suggest your own one and let us test it, or you can even stick to "It works for me, i am the only right guy in the world, and i don't care if it doesn't work for you" position and let David decide who of us is right (and he already did that once).
+ Basically, here is what i did: i took kernel 4.2, added ThunderX PCI drivers to it (they were posted but NAKed those days back, there's some lazy progress on them currently), added necessary errata patches (also posted on lists, all merged into 4.4), took defconfig, adjusted it according to my needs, and this is what i'm running on my board and this is what i'm using for development. If you point me at what i'm doing wrong way, i'll be glad to accept this.
+ I'm over.
+
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
