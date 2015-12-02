@@ -1,99 +1,62 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 2 Dec 2015 16:41:31 +0100
-Subject: [PATCH V3 2/2] ARM: dts: imx6q: add Novena board
-In-Reply-To: <20151202075305.GN692@tiger>
-References: <1448722024-5717-1-git-send-email-marex@denx.de>
- <1448722024-5717-2-git-send-email-marex@denx.de> <20151202075305.GN692@tiger>
-Message-ID: <201512021641.31222.marex@denx.de>
+From: carlo@endlessm.com (Carlo Caione)
+Date: Wed, 2 Dec 2015 16:44:18 +0100
+Subject: [PATCH v3 5/6] pinctrl: dt-binding: Extend meson documentation
+ with GPIO IRQs support
+In-Reply-To: <20151202153010.GA22230@rob-hp-laptop>
+References: <1448987062-31225-1-git-send-email-carlo@caione.org>
+ <1448987062-31225-6-git-send-email-carlo@caione.org>
+ <20151202153010.GA22230@rob-hp-laptop>
+Message-ID: <CAL9uMOHQi1wwGTSEOyAQ8q5Wbvm71ib3-cf1Q07VReXAis7Pdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, December 02, 2015 at 08:53:05 AM, Shawn Guo wrote:
-> On Sat, Nov 28, 2015 at 03:47:04PM +0100, Marek Vasut wrote:
-> > From: Sean Cross <xobs@kosagi.com>
-> > 
-> > Novena is an open-hardware laptop/desktop/bare board.
-> > 
-> > See http://www.kosagi.com/w/index.php?title=Novena_Main_Page
-> > 
-> > Signed-off-by: Sean Cross <xobs@kosagi.com>
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > Cc: Lucas Stach <l.stach@pengutronix.de>
-> > Cc: Sean Cross <xobs@kosagi.com>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> 
-> Looks pretty good.  Some minor comments are below.  Most of them are
-> format/style nits.
+On Wed, Dec 2, 2015 at 4:30 PM, Rob Herring <robh@kernel.org> wrote:
+> On Tue, Dec 01, 2015 at 05:24:21PM +0100, Carlo Caione wrote:
+>> From: Carlo Caione <carlo@endlessm.com>
+>>
+>> Extend the pinctrl binding documentation with the support for external
+>> GPIO interrupts.
+>>
+>> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+>> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+>> ---
+>>  Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt | 11 +++++++++++
+>>  1 file changed, 11 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
+>> index 3f6a524..de669ce 100644
+>> --- a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
+>> +++ b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
+>> @@ -3,6 +3,12 @@
+>>  Required properties for the root node:
+>>   - compatible: "amlogic,meson8-pinctrl" or "amlogic,meson8b-pinctrl"
+>>   - reg: address and size of registers controlling irq functionality
+>> + - reg-names: should be "irq"
+>> + - interrupt-controller: marks the device node as an interrupt controller
+>> + - #interrupt-cells: should be 2. The first cell is the GPIO number. The
+>> +                  second cell is used to specify trigger type.
+>> + - amlogic,irqs-gpio: specifies the GPIO IRQ numbers on the GIC (GPIO_IRQ#)
+>> + - interrupt-parent: specifies the parent interrupt controller.
+>>
+>>  === GPIO sub-nodes ===
+>>
+>> @@ -46,7 +52,12 @@ pinctrl-bindings.txt
+>>
+>>       pinctrl: pinctrl at c1109880 {
+>>               compatible = "amlogic,meson8-pinctrl";
+>> +             reg-names = "irq";
+>>               reg = <0xc1109880 0x10>;
+>> +             interrupt-parent = <&gic>;
+>> +             amlogic,irqs-gpio = <64 65 66 67 68 69 70 71>;
+>
+> Can't you just use "interrupts" here?
 
-Thanks
+Following this discussion for v2 with Marc
+http://www.spinics.net/lists/devicetree/msg104385.html I decided to
+move away from using the "interrupts" property since these interrupts
+are not actually the pinctrl's interrupts (they are owned by the
+devices using them). I guess that using "interrupts" would be a bit
+misleading.
 
-> > ---
-> > 
-> >  arch/arm/boot/dts/Makefile         |   1 +
-> >  arch/arm/boot/dts/imx6q-novena.dts | 846
-> >  +++++++++++++++++++++++++++++++++++++ 2 files changed, 847
-> >  insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/imx6q-novena.dts
-
-[...]
-
-> > +	reg_sata: sata-regulator {
-> > +		compatible = "regulator-fixed";
-> > +		regulator-name = "sata-power";
-> > +		regulator-boot-on;
-> > +		regulator-min-microvolt = <3300000>;
-> > +		regulator-max-microvolt = <3300000>;
-> > +		startup-delay-us = <10000>;
-> > +		gpio = <&gpio3 30 GPIO_ACTIVE_HIGH>;
-> > +		enable-active-high;
-> > +	};
-> > +
-> > +	reg_usb_otg_vbus: usb_otg_vbus {
-> > +		compatible = "regulator-fixed";
-> > +		regulator-name = "usb_otg_vbus";
-> > +		regulator-min-microvolt = <5000000>;
-> > +		regulator-max-microvolt = <5000000>;
-> > +		enable-active-high;
-> > +	};
-> 
-> All these regulator nodes are named so arbitrarily.  Can we name them a
-> bit consistently, something like regulator-xxx?
-
-All of them are named like this (well, but the otg_vbus, I can fix that)
-
-reg_something: something-regulator {}
-
-What do you want to see here ?
-
-[...]
-
-> > +		assigned-clock-rates = <0 0 722534400 22579200>;
-> > +	};
-> > +};
-> > +
-> > +&iomuxc {
-> 
-> I suggest you put the &iomuxc node at the bottom of the file to make it
-> easier to read the file.
-> 
-> > +	audmux {
-> 
-> With commit 5fcdf6a7ed95 (pinctrl: imx: Allow parsing DT without function
-> nodes) in place, all these function nodes can just be saved to reduce one
-> level of indentation.
-
-OK, that's a good change.
-
-> > +		pinctrl_audmux_novena: audmuxgrp-novena {
-> > +			fsl,pins = <
-> > +				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x130b0
-> > +				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x130b0
-> > +				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x110b0
-> > +				MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		
-0x130b0
-> > +			>;
-> > +		};
-> > +	};
-
-[...]
+-- 
+Carlo Caione
