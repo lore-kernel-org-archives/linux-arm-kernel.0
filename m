@@ -1,57 +1,53 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 02 Dec 2015 10:39:46 +0900
-Subject: [GIT PULL 9/9] ARM: EXYNOS: Defconfig for v4.5
-In-Reply-To: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
-References: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1449020386-20250-10-git-send-email-k.kozlowski@samsung.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 2 Dec 2015 09:54:00 +0800
+Subject: [PATCH 11/19] ARM: dts: imx: replace legacy *,wakeup property
+ with wakeup-source
+In-Reply-To: <5656EE1E.2030104@arm.com>
+References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
+ <1445422216-29375-12-git-send-email-sudeep.holla@arm.com>
+ <20151123053705.GH13744@tiger> <5656EE1E.2030104@arm.com>
+Message-ID: <20151202015400.GB692@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On Thu, Nov 26, 2015 at 11:33:50AM +0000, Sudeep Holla wrote:
+> 
+> 
+> On 23/11/15 05:37, Shawn Guo wrote:
+> >On Wed, Oct 21, 2015 at 11:10:08AM +0100, Sudeep Holla wrote:
+> >>Though the keyboard and other driver will continue to support the legacy
+> >>"gpio-key,wakeup", "linux,wakeup" boolean property to enable the wakeup
+> >>source, "wakeup-source" is the new standard binding.
+> >>
+> >>This patch replaces all the legacy wakeup properties with the unified
+> >>"wakeup-source" property in order to avoid any futher copy-paste
+> >>duplication.
+> >>
+> >>Cc: Shawn Guo <shawnguo@kernel.org>
+> >>Cc: Sascha Hauer <kernel@pengutronix.de>
+> >>Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> >
+> ><snip>
+> >
+> >>diff --git a/arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi b/arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi
+> >>index 321662f53e33..16fc69c69ab2 100644
+> >>--- a/arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi
+> >>+++ b/arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi
+> >>@@ -156,7 +156,7 @@
+> >>  	pinctrl-names = "default";
+> >>  	pinctrl-0 = <&pinctrl_esdhc2>;
+> >>  	cap-sdio-irq;
+> >>-	enable-sdio-wakeup;
+> >>+	wakeup-source;
+> >
+> >I do not see this be mentioned in commit log.  I do not see relevant
+> >kernel changes in v4.4-rc1 to support that.  Am I missing anything?
+> >
+> 
+> Sorry for that, you weren't copied on that patch[1], Ulf has queued it
+> now [2]
 
-This may conflict with other arm-soc updates...
+My branch is based on v4.4-rc1 which doesn't have that patch.  That
+said, I can not apply it for now.
 
-Best regards,
-Krzysztof
-
-
-The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
-
-  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-4.5
-
-for you to fetch changes up to 00a5e81fff2d81c3b1bf45712d3a12c905bc7c66:
-
-  ARM: exynos_defconfig: Set recommended options for systemd (2015-12-01 08:28:44 +0900)
-
-----------------------------------------------------------------
-Defconfig (exynos and multi_v7) changes for Exynos based boards for 4.5:
-1. Enable Maxim 8997 and 77693 family drivers (charger, extcon, LED,
-   RTC, haptic/motor, regulator).
-2. Build ChromeOS EC drivers as modules on multi_v7.
-3. Enable drivers important for Exynos4210-based Universal C210 board.
-4. Enable NFSv4 client.
-5. On exynos_defconfig set some options to a value recommended
-   by systemd. This also makes it more consistent with multi_v7.
-
-----------------------------------------------------------------
-Javier Martinez Canillas (1):
-      ARM: multi_v7_defconfig: Build ChromeOS EC drivers as modules
-
-Krzysztof Kozlowski (6):
-      ARM: exynos_defconfig: Enable Maxim 8997 family drivers
-      ARM: exynos_defconfig: Enable Maxim 77693 LED and haptic drivers
-      ARM: multi_v7_defconfig: Enable Maxim 8997 family drivers
-      ARM: multi_v7_defconfig: Enable Maxim 77693 LED and haptic drivers
-      ARM: exynos_defconfig: Enable NFSv4 client
-      ARM: exynos_defconfig: Set recommended options for systemd
-
-Marek Szyprowski (1):
-      ARM: exynos_defconfig: Add drivers for Exynos4210 Universal C210 board
-
- arch/arm/configs/exynos_defconfig   | 18 ++++++++++++++++--
- arch/arm/configs/multi_v7_defconfig | 15 ++++++++++++---
- 2 files changed, 28 insertions(+), 5 deletions(-)
+Shawn
