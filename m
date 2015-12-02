@@ -1,108 +1,163 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 2 Dec 2015 11:37:20 +0100
-Subject: [PATCH v4 09/24] regulator: pwm: use pwm_get/set_default_xxx()
- helpers where appropriate
-In-Reply-To: <20151116184238.GJ31303@sirena.org.uk>
-References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
- <1447664207-24370-10-git-send-email-boris.brezillon@free-electrons.com>
- <20151116105558.GB31303@sirena.org.uk>
- <20151116132359.39d84279@bbrezillon>
- <20151116184238.GJ31303@sirena.org.uk>
-Message-ID: <20151202113720.0a6517b1@bbrezillon>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 2 Dec 2015 11:39:04 +0100
+Subject: [PATCH 1/4] i2c: at91: add upport for the HOLD field
+Message-ID: <1449052747-20991-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The hold field allows to configure the data hold time which can be set
+with the help of the generic binding 'i2c-sda-hold-time-ns'. This
+feature has been introduced with SAMA5D4 SoC family.
 
-On Mon, 16 Nov 2015 18:42:38 +0000
-Mark Brown <broonie@kernel.org> wrote:
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/i2c/busses/i2c-at91.c | 54 ++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 51 insertions(+), 3 deletions(-)
 
-> On Mon, Nov 16, 2015 at 01:23:59PM +0100, Boris Brezillon wrote:
-> > Mark Brown <broonie@kernel.org> wrote:
-> > > On Mon, Nov 16, 2015 at 09:56:32AM +0100, Boris Brezillon wrote:
-> 
-> > > > -	pwm_reg_period = pwm_get_period(drvdata->pwm);
-> > > > +	pwm_reg_period = pwm_get_default_period(drvdata->pwm);
-> 
-> > > It's not clear to me that we're not looking for the current period here
-> > > or in the other use.  Won't configuring based on a period other than the
-> > > one that has been set give the wrong answer?
-> 
-> > Hm, maybe that's naming problem. What I call the 'default' period here
-> > is actually the period configured in your board file (using a PWM lookup
-> > table) or your DT. This value represent the period requested by the PWM
-> > user not a default value specified by the PWM chip driver.
-> 
-> > The reason we're not using the 'current' period value is because it may
-> > have been set by the bootloader, and may be inappropriate for our use
-> > case (ie. the period may be to small to represent the different
-> > voltages).
-> 
-> > ITOH, we're using the current period value when calculating the current
-> > voltage, because we want to get the correct voltage value, and the PWM
-> > device may still use the configuration set by the bootloader (not the
-> > default one specified in your board or DT files).
-> 
-> > I hope this clarifies the differences between the current and default
-> > period, and why we should use the default value here.
-> 
-> To be honest I'm still a bit confused here.  When do we actually apply
-> the default setting and why do we keep on having to constantly override
-> it rather than doing this once at boot?  It feels wrong to be using it
-> every time we set anything.  I'd expect it to be something we only need
-> to do at probe time or which would automatically be handled by the PWM
-> framework (but that'd have issues changing the state and potentially
-> breaking things if done in an uncoordiated fashion).
-
-Thierry, I didn't hear from you after the long discussion we had on IRC
-a few weeks ago.
-The conclusion of this discussion was that using
-pwm_get_default_period() was not acceptable (even after renaming it
-differently, like pwm_get_reference_period()), because it was
-disturbing to get the default/reference period each time we wanted to
-configure the PWM differently.
-Another suggestion was to automatically reconfigure the PWM duty_ns
-value based on the initial PWM state (retrieved through hardware
-readout) and the default period value (specified in the PWM lookup table
-or the DT). But this implied supporting hardware readout in all PWM
-drivers, which prevents a smooth migration to this new approach.
-
-I also proposed to provide helpers to hide the duty cycle to active
-time calculation in the PWM core, so that PWM users just have to choose
-their scale (percent, or any other custom scale) and set their duty
-cycle based on this scale instead of specifying an active/on time in
-nanosecond. You didn't seem to like this idea, but I gave it a try
-(see here [1]), and think it might be worth looking at it.
-
-The commit you should look at are [2], [3] and [4], and the idea is to
-clarify the notion of duty-cycle, which, according to wikipedia [5]
-(and a lot of other references) is supposed to be expressed in a
-relative unit (percent, or any other scale as said earlier).
-After renaming the pwm_set/get_duty_cycle() helpers into
-pwm_set/get_active_time() we can define a new pwm_set_duty_cycle()
-helper to let the PWM user configure its PWM device relatively to a
-chosen scale, without asking him to choose the PWM period (the
-conversion is done based on the default/reference period).
-The pwm_get_duty_cycle() is doing the reverse conversion: it returns the
-duty-cycle expressed relatively to the scale (here the current PWM
-period is used to handle the case where the PWM user hasn't configure
-the PWM yet, but want to retrieve the current duty-cycle extracted from
-hardware readout).
-
-Please let me know what you think of this approach, and if you're happy
-with it I'll rework my series accordingly.
-
-Best Regards,
-
-Boris
-
-[1]https://github.com/bbrezillon/linux-rk/commits/atomic-pwm-alt
-[2]https://github.com/bbrezillon/linux-rk/commit/d7d4d04e147d4ec349c59f70e141877661930c6d
-[3]https://github.com/bbrezillon/linux-rk/commit/66ce78f308f3eb1a9c536689352f208fd51c9030
-[4]https://github.com/bbrezillon/linux-rk/commit/07882a2dd21f0d17d83640ff55204cc7a7d4c8f7
-[5]https://en.wikipedia.org/wiki/Duty_cycle
-
+diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+index 10835d1..09e1690 100644
+--- a/drivers/i2c/busses/i2c-at91.c
++++ b/drivers/i2c/busses/i2c-at91.c
+@@ -64,6 +64,7 @@
+ #define	AT91_TWI_IADR		0x000c	/* Internal Address Register */
+ 
+ #define	AT91_TWI_CWGR		0x0010	/* Clock Waveform Generator Reg */
++#define	AT91_TWI_CWGR_HOLD(x)	(((x) & 0x1f) << 24)
+ 
+ #define	AT91_TWI_SR		0x0020	/* Status Register */
+ #define	AT91_TWI_TXCOMP		BIT(0)	/* Transmission Complete */
+@@ -110,6 +111,7 @@ struct at91_twi_pdata {
+ 	unsigned clk_offset;
+ 	bool has_unre_flag;
+ 	bool has_alt_cmd;
++	bool has_hold_field;
+ 	struct at_dma_slave dma_slave;
+ };
+ 
+@@ -187,10 +189,13 @@ static void at91_init_twi_bus(struct at91_twi_dev *dev)
+  */
+ static void at91_calc_twi_clock(struct at91_twi_dev *dev, int twi_clk)
+ {
+-	int ckdiv, cdiv, div;
++	int ckdiv, cdiv, div, hold = 0;
+ 	struct at91_twi_pdata *pdata = dev->pdata;
+ 	int offset = pdata->clk_offset;
+ 	int max_ckdiv = pdata->clk_max_div;
++	u32 twd_hold_time_ns = 0;
++
++#define MAX_HOLD 31
+ 
+ 	div = max(0, (int)DIV_ROUND_UP(clk_get_rate(dev->clk),
+ 				       2 * twi_clk) - offset);
+@@ -204,8 +209,33 @@ static void at91_calc_twi_clock(struct at91_twi_dev *dev, int twi_clk)
+ 		cdiv = 255;
+ 	}
+ 
+-	dev->twi_cwgr_reg = (ckdiv << 16) | (cdiv << 8) | cdiv;
+-	dev_dbg(dev->dev, "cdiv %d ckdiv %d\n", cdiv, ckdiv);
++	if (pdata->has_hold_field) {
++		of_property_read_u32(dev->dev->of_node, "i2c-sda-hold-time-ns",
++				     &twd_hold_time_ns);
++
++		/*
++		 * hold time = HOLD + 3 x T_peripheral_clock
++		 * Use clk rate in kHz to prevent overflows when computing
++		 * hold.
++		 */
++		hold = DIV_ROUND_UP(twd_hold_time_ns
++				    * (clk_get_rate(dev->clk) / 1000), 1000000);
++		hold -= 3;
++		if (hold < 0)
++			hold = 0;
++		if (hold > MAX_HOLD) {
++			dev_warn(dev->dev,
++				 "HOLD field set to its maximum value (%d instead of %d)\n",
++				 MAX_HOLD, hold);
++			hold = MAX_HOLD;
++		}
++	}
++
++	dev->twi_cwgr_reg = (ckdiv << 16) | (cdiv << 8) | cdiv
++			    | AT91_TWI_CWGR_HOLD(hold);
++
++	dev_dbg(dev->dev, "cdiv %d ckdiv %d hold %d (%d ns)\n",
++		cdiv, ckdiv, hold, twd_hold_time_ns);
+ }
+ 
+ static void at91_twi_dma_cleanup(struct at91_twi_dev *dev)
+@@ -797,6 +827,7 @@ static struct at91_twi_pdata at91rm9200_config = {
+ 	.clk_offset = 3,
+ 	.has_unre_flag = true,
+ 	.has_alt_cmd = false,
++	.has_hold_field = false,
+ };
+ 
+ static struct at91_twi_pdata at91sam9261_config = {
+@@ -804,6 +835,7 @@ static struct at91_twi_pdata at91sam9261_config = {
+ 	.clk_offset = 4,
+ 	.has_unre_flag = false,
+ 	.has_alt_cmd = false,
++	.has_hold_field = false,
+ };
+ 
+ static struct at91_twi_pdata at91sam9260_config = {
+@@ -811,6 +843,7 @@ static struct at91_twi_pdata at91sam9260_config = {
+ 	.clk_offset = 4,
+ 	.has_unre_flag = false,
+ 	.has_alt_cmd = false,
++	.has_hold_field = false,
+ };
+ 
+ static struct at91_twi_pdata at91sam9g20_config = {
+@@ -818,6 +851,7 @@ static struct at91_twi_pdata at91sam9g20_config = {
+ 	.clk_offset = 4,
+ 	.has_unre_flag = false,
+ 	.has_alt_cmd = false,
++	.has_hold_field = false,
+ };
+ 
+ static struct at91_twi_pdata at91sam9g10_config = {
+@@ -825,6 +859,7 @@ static struct at91_twi_pdata at91sam9g10_config = {
+ 	.clk_offset = 4,
+ 	.has_unre_flag = false,
+ 	.has_alt_cmd = false,
++	.has_hold_field = false,
+ };
+ 
+ static const struct platform_device_id at91_twi_devtypes[] = {
+@@ -854,6 +889,15 @@ static struct at91_twi_pdata at91sam9x5_config = {
+ 	.clk_offset = 4,
+ 	.has_unre_flag = false,
+ 	.has_alt_cmd = false,
++	.has_hold_field = false,
++};
++
++static struct at91_twi_pdata sama5d4_config = {
++	.clk_max_div = 7,
++	.clk_offset = 4,
++	.has_unre_flag = false,
++	.has_alt_cmd = false,
++	.has_hold_field = true,
+ };
+ 
+ static struct at91_twi_pdata sama5d2_config = {
+@@ -861,6 +905,7 @@ static struct at91_twi_pdata sama5d2_config = {
+ 	.clk_offset = 4,
+ 	.has_unre_flag = true,
+ 	.has_alt_cmd = true,
++	.has_hold_field = true,
+ };
+ 
+ static const struct of_device_id atmel_twi_dt_ids[] = {
+@@ -883,6 +928,9 @@ static const struct of_device_id atmel_twi_dt_ids[] = {
+ 		.compatible = "atmel,at91sam9x5-i2c",
+ 		.data = &at91sam9x5_config,
+ 	}, {
++		.compatible = "atmel,sama5d4-i2c",
++		.data = &sama5d4_config,
++	}, {
+ 		.compatible = "atmel,sama5d2-i2c",
+ 		.data = &sama5d2_config,
+ 	}, {
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.5.0
