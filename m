@@ -1,41 +1,69 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 2 Dec 2015 13:24:29 +0800
-Subject: [PATCH 1/3] ARM: imx: clk-vf610: fix SAI clock tree
-In-Reply-To: <1445141122-14183-1-git-send-email-stefan@agner.ch>
-References: <1445141122-14183-1-git-send-email-stefan@agner.ch>
-Message-ID: <20151202052429.GE692@tiger>
+From: nava.manne@xilinx.com (Nava kishore Manne)
+Date: Wed, 2 Dec 2015 05:32:14 +0000
+Subject: [PATCH v2 1/3] serial: xuartps: Spliting the ISR into smaller
+ routines.
+In-Reply-To: <20151120144348.GS32017@xsjsorenbubuntu>
+References: <1448026478-22131-1-git-send-email-navam@xilinx.com>
+ <20151120144348.GS32017@xsjsorenbubuntu>
+Message-ID: <C89496FEAE474D468F30D558A9468D9F25949EBB@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 17, 2015 at 09:05:20PM -0700, Stefan Agner wrote:
-> The Synchronous Audio Interface (SAI) instances are clocked by
-> independent clocks: The bus clock and the audio clock (as shown in
-> Figure 51-1 in the Vybrid Reference Manual). The clock gates in
-> CCGR0/CCGR1 for SAI0 through SAI3 are bus clock gates, as access
-> tests to the registers with/without gating those clocks have shown.
-> The audio clock is gated by the SAIx_EN gates in CCM_CSCDR1,
-> followed by a clock divider (SAIx_DIV). Currently, the parent of
-> the bus clock gates has been assigned to SAIx_DIV, which is not
-> involved in the bus clock path for the SAI instances (see chapter
-> 9.10.12, SAI clocking in the Vybrid Reference Manual).
-> 
-> Fix this by define the parent clock of VF610_CLK_SAIx to be the bus
-> clock.
-> 
-> If the driver needs the audio clock (when used in master mode), a
-> fixed device tree is required which assign the audio clock properly
-> to VF610_CLK_SAIx_DIV.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
-> Hi all,
-> 
-> Patch 1 and 2 are actual fixes and should be applied toghether. If
-> the clock tree changes are applied only, master mode won't work
-> anymore. With only the device tree changes applied, it probably
-> will still work but the VF610_CLK_SAIx_DIV will be enabled twice.
-> 
-> Since Patch 3 also uses the fixed clock layout, it should be
-> applied after the clock tree fix too...
 
-Applied all 3, thanks.
+
+> -----Original Message-----
+> From: S?ren Brinkmann [mailto:soren.brinkmann at xilinx.com]
+> Sent: Friday, November 20, 2015 8:14 PM
+> To: Nava kishore Manne
+> Cc: jslaby at suse.com; Michal Simek; Anirudha Sarangi; linux-
+> serial at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; Nava kishore Manne
+> Subject: Re: [PATCH v2 1/3] serial: xuartps: Spliting the ISR into smaller
+> routines.
+> 
+> On Fri, 2015-11-20 at 07:04PM +0530, Nava kishore Manne wrote:
+> > Breaking the single big ISR that has both Rx and Tx in a single
+> > function into smaller ones
+> >
+> > Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+> > ---
+> > Changes for v2:
+> > 	--Splits up the ISR without any functional changes as suggested
+> > 	by Peter Hurley
+> >
+> >  drivers/tty/serial/xilinx_uartps.c | 247
+> > ++++++++++++++++++++-----------------
+> >  1 file changed, 135 insertions(+), 112 deletions(-)
+> >
+> > diff --git a/drivers/tty/serial/xilinx_uartps.c
+> > b/drivers/tty/serial/xilinx_uartps.c
+> > index 009e0db..2e1b0a8 100644
+> > --- a/drivers/tty/serial/xilinx_uartps.c
+> > +++ b/drivers/tty/serial/xilinx_uartps.c
+> > @@ -172,6 +172,9 @@ struct cdns_uart {  #define to_cdns_uart(_nb)
+> > container_of(_nb, struct cdns_uart, \
+> >  		clk_rate_change_nb);
+> >
+> > +static void cdns_uart_handle_tx(void *dev_id); static void
+> > +cdns_uart_handle_rx(void *dev_id, unsigned int isrstatus);
+> 
+> Can't you just move these functions here instead of adding prototypes here?
+
+Initially I created the patch without adding prototypes but that patch was unreadable
+Due to the common lines of code b/w the functions so created the prototypes to make the 
+Patch more readable as suggested by Peter.
+
+Will add one more patch in the next series to get rid of the prototypes.
+
+> Also, this is likely to conflict with
+> https://lkml.org/lkml/2015/11/19/622
+
+Yes I agree l see that no comments for your series of patches as of now...
+Let me know whether I should wait until your patches got applied or you want me to send the next version 
+Of my patches...
+
+Regards,
+Navakishore.
+
+> 
+> 	S?ren
