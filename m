@@ -1,42 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Dec 2015 20:36:24 +0100
-Subject: [PATCH v4 3/7] ARM: dts: imx: Add Advantech BA-16 Qseven module
-In-Reply-To: <1449080180-31945-4-git-send-email-akshay.bhat@timesys.com>
-References: <1449080180-31945-1-git-send-email-akshay.bhat@timesys.com>
- <1449080180-31945-4-git-send-email-akshay.bhat@timesys.com>
-Message-ID: <1647955.6yZUflBPcH@wuerfel>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed,  2 Dec 2015 20:36:55 +0100
+Subject: [PATCH] USB: host: ohci-at91: fix a crash in
+ ohci_hcd_at91_overcurrent_irq
+Message-ID: <1449085015-5538-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 December 2015 13:16:16 Akshay Bhat wrote:
-> +               brightness-levels = <  0   1   2   3   4   5   6   7   8   9
-> +                                     10  11  12  13  14  15  16  17  18  19
-> +                                     20  21  22  23  24  25  26  27  28  29
-> +                                     30  31  32  33  34  35  36  37  38  39
-> +                                     40  41  42  43  44  45  46  47  48  49
-> +                                     50  51  52  53  54  55  56  57  58  59
-> +                                     60  61  62  63  64  65  66  67  68  69
-> +                                     70  71  72  73  74  75  76  77  78  79
-> +                                     80  81  82  83  84  85  86  87  88  89
-> +                                     90  91  92  93  94  95  96  97  98  99
-> +                                    100 101 102 103 104 105 106 107 108 109
-> +                                    110 111 112 113 114 115 116 117 118 119
-> +                                    120 121 122 123 124 125 126 127 128 129
-> +                                    130 131 132 133 134 135 136 137 138 139
-> +                                    140 141 142 143 144 145 146 147 148 149
-> +                                    150 151 152 153 154 155 156 157 158 159
-> +                                    160 161 162 163 164 165 166 167 168 169
-> +                                    170 171 172 173 174 175 176 177 178 179
-> +                                    180 181 182 183 184 185 186 187 188 189
-> +                                    190 191 192 193 194 195 196 197 198 199
-> +                                    200 201 202 203 204 205 206 207 208 209
-> +                                    210 211 212 213 214 215 216 217 218 219
-> +                                    220 221 222 223 224 225 226 227 228 229
-> +                                    230 231 232 233 234 235 236 237 238 239
-> +                                    240 241 242 243 244 245 246 247 248 249
-> +                                    250 251 252 253 254 255>;
-> 
+The interrupt handler, ohci_hcd_at91_overcurrent_irq may be called right
+after registration. At that time, pdev->dev.platform_data is not yet set,
+leading to a NULL pointer dereference.
 
-That is a lot of brightness levels. Why do you need so many of them?
+Fixes: e4df92279fd9 (USB: host: ohci-at91: merge loops in ohci_hcd_at91_drv_probe)
+Reported-by: Peter Rosin <peda@axentia.se>
+Tested-by: Peter Rosin <peda@axentia.se>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/usb/host/ohci-at91.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
 
-	Arnd
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index 342ffd140122..8c6e15bd6ff0 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -473,6 +473,8 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ 	if (!pdata)
+ 		return -ENOMEM;
+ 
++	pdev->dev.platform_data = pdata;
++
+ 	if (!of_property_read_u32(np, "num-ports", &ports))
+ 		pdata->ports = ports;
+ 
+@@ -483,6 +485,7 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ 		 */
+ 		if (i >= pdata->ports) {
+ 			pdata->vbus_pin[i] = -EINVAL;
++			pdata->overcurrent_pin[i] = -EINVAL;
+ 			continue;
+ 		}
+ 
+@@ -513,10 +516,8 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	at91_for_each_port(i) {
+-		if (i >= pdata->ports) {
+-			pdata->overcurrent_pin[i] = -EINVAL;
+-			continue;
+-		}
++		if (i >= pdata->ports)
++			break;
+ 
+ 		pdata->overcurrent_pin[i] =
+ 			of_get_named_gpio_flags(np, "atmel,oc-gpio", i, &flags);
+@@ -552,8 +553,6 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	pdev->dev.platform_data = pdata;
+-
+ 	device_init_wakeup(&pdev->dev, 1);
+ 	return usb_hcd_at91_probe(&ohci_at91_hc_driver, pdev);
+ }
+-- 
+2.5.0
