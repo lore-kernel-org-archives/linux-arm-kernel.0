@@ -1,100 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Dec 2015 19:28:25 +0000
-Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
-In-Reply-To: <3059482.yN34NFeWWY@wuerfel>
-References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
- <87610j7gmc.fsf@free-electrons.com>
- <20151202123310.GC8644@n2100.arm.linux.org.uk>
- <3059482.yN34NFeWWY@wuerfel>
-Message-ID: <20151202192825.GF8644@n2100.arm.linux.org.uk>
+From: peda@lysator.liu.se (Peter Rosin)
+Date: Wed, 02 Dec 2015 20:29:35 +0100
+Subject: Regression, was [PATCH 4/4] USB: host: ohci-at91: merge loops
+ in ohci_hcd_at91_drv_probe
+In-Reply-To: <20151202182002.GF22136@piout.net>
+References: <565DD61C.5010904@lysator.liu.se>
+ <20151202182002.GF22136@piout.net>
+Message-ID: <565F469F.9000004@lysator.liu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 02, 2015 at 04:49:38PM +0100, Arnd Bergmann wrote:
-> On Wednesday 02 December 2015 12:33:10 Russell King - ARM Linux wrote:
-> > On Mon, Nov 30, 2015 at 02:37:31PM +0100, Gregory CLEMENT wrote:
-> > > Hi Arnd,
-> > >  
-> > >  On mer., nov. 25 2015, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > 
-> > > > I've posted these before and now gotten around to a rebase and
-> > > > want to include them in the arm-soc next/multiplatform branch for
-> > > > 4.5.
-> > > >
-> > > > Originally the plan for these platforms was to convert all of
-> > > > them to DT and use only mach-mvebu. That has not happened,
-> > > > so I would do it this way instead so we can at least have
-> > > > them in a single kernel.
-> > > >
-> > > > Let me know if there are any concerns or objections.
-> > > 
-> > > I have applied all the patches on mvebu/oldmvebu_multiplatform (I fixed
-> > > the last one which didn't apply on Kconfig). I also merged it
-> > > mvebu/for-netx to be part of the linux-next.
-> > > 
-> > > But before making it part of mvebu/soc, I would like to get some
-> > > Tested-by. The series is available on
-> > > git://git.infradead.org/linux-mvebu.git
-> > > in the branch mvebu/oldmvebu_multiplatform but it also will be part soon
-> > > of linux-next.
-> > > 
-> > > Russell, Sebastian,
-> > > 
-> > > would you have some time to test it on Dove?
-> > 
-> > Given that I'm testing on my Cubox tree, I've applied this series on top
-> > of v4.3.  Patch 5 trivially conflicts on MMP context.  Fixing that and
-> > merging the resulting changes gives another load of conflicts which need
-> > dealing with:
-> > 
-> > Recorded preimage for 'arch/arm/Kconfig'
-> > Recorded preimage for 'arch/arm/mach-dove/Kconfig'
-> > Recorded preimage for 'arch/arm/mach-dove/irq.c'
-> > Recorded preimage for 'arch/arm/mach-dove/pm.h'
-> > 
-> > These look less trivial to resolve, so testing this will have to wait
-> > until I have sufficient time to sort this out.
+Hi Alexandre,
+
+On 2015-12-02 19:20, Alexandre Belloni wrote:
+> Hi Peter,
 > 
-> I have pushed a rebased version to
-> git.kernel.org/pub/scm/linux/kernel/git/arnd/playground.git multiplatform-orion-4.3
+> On 01/12/2015 at 18:17:16 +0100, Peter Rosin wrote :
+>> [<c02f5084>] (ohci_hcd_at91_overcurrent_irq) from [<c00433b0>] (handle_irq_event_percpu+0x78/0x140)
+>> [<c00433b0>] (handle_irq_event_percpu) from [<c00434a4>] (handle_irq_event+0x2c/0x40)
+>> [<c00434a4>] (handle_irq_event) from [<c00458b8>] (handle_simple_irq+0x6c/0x80)
+>> [<c00458b8>] (handle_simple_irq) from [<c0042bc4>] (generic_handle_irq+0x2c/0x3c)
+>> [<c0042bc4>] (generic_handle_irq) from [<c01fe4ac>] (gpio_irq_handler+0xa4/0x12c)
+>> [<c01fe4ac>] (gpio_irq_handler) from [<c0042bc4>] (generic_handle_irq+0x2c/0x3c)
+>> [<c0042bc4>] (generic_handle_irq) from [<c0042dec>] (__handle_domain_irq+0x54/0xa8)
+>> [<c0042dec>] (__handle_domain_irq) from [<c0013500>] (__irq_svc+0x40/0x54)
+>> [<c0013500>] (__irq_svc) from [<c004451c>] (__setup_irq+0x248/0x530)
+>> [<c004451c>] (__setup_irq) from [<c0044954>] (request_threaded_irq+0xc4/0x144)
+>> [<c0044954>] (request_threaded_irq) from [<c02f5a0c>] (ohci_hcd_at91_drv_probe+0x460/0x518)
+>> [<c02f5a0c>] (ohci_hcd_at91_drv_probe) from [<c02670ec>] (platform_drv_probe+0x44/0xa4)
+>> [<c02670ec>] (platform_drv_probe) from [<c02655b4>] (driver_probe_device+0x1fc/0x43c)
+>> [<c02655b4>] (driver_probe_device) from [<c0265880>] (__driver_attach+0x8c/0x90)
+>> [<c0265880>] (__driver_attach) from [<c0263880>] (bus_for_each_dev+0x6c/0xa0)
+>> [<c0263880>] (bus_for_each_dev) from [<c0264b80>] (bus_add_driver+0x1d0/0x268)
+>> [<c0264b80>] (bus_add_driver) from [<c0266078>] (driver_register+0x78/0xf8)
+>> [<c0266078>] (driver_register) from [<c00096c8>] (do_one_initcall+0xb8/0x1f0)
+>> [<c00096c8>] (do_one_initcall) from [<c068bda4>] (kernel_init_freeable+0x138/0x1d8)
+>> [<c068bda4>] (kernel_init_freeable) from [<c04d06f4>] (kernel_init+0x8/0xe8)
+>> [<c04d06f4>] (kernel_init) from [<c000ff68>] (ret_from_fork+0x14/0x2c)
+>> Code: e5916058 e1a08000 e3a04000 e2865008 (e5b50004)
+>> ---[ end trace e66fbc480972ac43 ]---
+>> Kernel panic - not syncing: Fatal exception in interrupt
+>> ---[ end Kernel panic - not syncing: Fatal exception in interrupt
 > 
-> Maybe that helps
+> I think I understood what happens. Can you try the following patch?
 
-As I said above, that's not the problem, the problem is merging it into
-the rest of my tree.
+Seems to work here. Excellent!
 
-Having done most of that merge, I'm now tripping up on:
+> 8<------
+> From 402f8444bc92d218edc63dcc3c87459981a56c31 Mon Sep 17 00:00:00 2001
+> From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Date: Wed, 2 Dec 2015 18:49:34 +0100
+> Subject: [PATCH] USB: host: ohci-at91: fix a crash in
+>  ohci_hcd_at91_overcurrent_irq
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-arch/arm/mach-dove/common.c: In function 'dove_wdt_init':
-arch/arm/mach-dove/common.c:538:2: error: implicit declaration of function 'orion_wdt_init' [-Werror=implicit-function-declaration]
+Reported-by: Peter Rosin <peda@axentia.se>
+Tested-by: Peter Rosin <peda@axentia.se>
 
-which I guess is because you've deleted the legacy orion watchdog stuff.
-So I'm going to have to revert that.  That then gives me:
+(and bisected-by if anyone cares...)
 
-arch/arm/mach-dove/clock.c:19:21: fatal error: mach/pm.h: No such file or directory
-arch/arm/mach-dove/clock.c:20:27: fatal error: mach/hardware.h: No such file or directory
-
-The first is easy to solve, and the second by replacing it with dove.h.
-The next problem is this:
-
-arch/arm/plat-orion/common.c:25:30: fatal error: mach/bridge-regs.h: No such file or directory
-
-which is impossible to solve, because plat-orion/common.c wants
-mach-dove/bridge-regs.h.
-
-I also have arch/arm/mach-dove/include/mach/sdhci.h to pass the GPIO
-for card detection to the SDHCI driver, which is going to break unless
-it's moved to include/linux/platform-data.
-
-Everything else seems mostly happy, but I've no way to tell whether
-what would be the resulting kernel would work as it's impossible to
-know without fixing the wreckage above.
-
-I'm sure I don't have to repeat my position over what I'm going to do if
-these petty mainline changes which are totally unnecessary break the only
-setup I have which works.  Making mach-dove multi-platform is a "wouldn't
-it be nice if", it's not an absolute necessity.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Cheers,
+Peter
