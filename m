@@ -1,41 +1,86 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 02 Dec 2015 11:43:39 -0800
-Subject: [PATCH 2/3] pwm: bcm2835: prevent division by zero
-In-Reply-To: <565F259D.6060905@i2se.com>
-References: <1449010541-3767-1-git-send-email-stefan.wahren@i2se.com>
- <1449010541-3767-3-git-send-email-stefan.wahren@i2se.com>
- <87h9k1yd2z.fsf@eliezer.anholt.net> <565F259D.6060905@i2se.com>
-Message-ID: <87lh9c8wlw.fsf@eliezer.anholt.net>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 2 Dec 2015 22:46:56 +0300
+Subject: [PATCH V6 net-next 5/5] net:hns: Add the init code to disable
+ Hip06 "Hardware VLAN assist"
+In-Reply-To: <1449075171-4820-6-git-send-email-salil.mehta@huawei.com>
+References: <1449075171-4820-1-git-send-email-salil.mehta@huawei.com>
+ <1449075171-4820-6-git-send-email-salil.mehta@huawei.com>
+Message-ID: <565F4AB0.5020100@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+Hello.
 
-> Am 02.12.2015 um 00:16 schrieb Eric Anholt:
->> Stefan Wahren <stefan.wahren@i2se.com> writes:
->>
->>> It's possible that the pwm clock become an orphan. So better
->>> check the result of clk_get_rate in order to prevent a division
->>> by zero.
->> How would we lose our clock when we're keeping the clock enabled from
->> driver probe until remove?
->
-> It's not the problem that we lose the clock inside this driver. The pwm
-> clock could be initial assigned to a unregistered parent clock like "GND".
->
-> I'm refering to this discussion:
->
-> http://lists.infradead.org/pipermail/linux-rpi-kernel/2015-November/002603.html
+On 12/02/2015 07:52 PM, Salil Mehta wrote:
 
-I actually would have expected that the prepare would error out on a
-clock with no rate set.  Interesting.  This seems like a good safety
-measure, so this one is also:
+> This patch adds the initializzation code to disable the hardware
+> vlan support for VLAN Tag stripping by default for now.
+>
+> Proper support of "hardware VLAN assitance" feature would
+> soon come in the next coming patches.
+>
+> Signed-off-by: Salil Mehta <salil.mehta@huawei.com>
+> ---
+>
+> PATCH V6:
+> - No change over the earlier patch
+>
+> PATCH V5:
+> - Minor merge/reject change resolved to application of previous patch
+>
+> PATCH V4/V3/V2:
+> - No change over the initial floated patch
+>
+> PATCH V1:
+> - Initial code to disable the hardware VLAN assist for now
+> ---
+>   drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c |    7 +++++++
+>   drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h |    1 +
+>   2 files changed, 8 insertions(+)
+>
+> diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
+> index b5e4c44..f302ef9 100644
+> --- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
+> +++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
+> @@ -176,6 +176,11 @@ static void hns_ppe_cnt_clr_ce(struct hns_ppe_cb *ppe_cb)
+>   			 PPE_CNT_CLR_CE_B, 1);
+>   }
+>
+> +static void hns_ppe_set_vlan_strip(struct hns_ppe_cb *ppe_cb, int en)
+> +{
+> +	dsaf_write_dev(ppe_cb, PPEV2_VLAN_STRIP_EN_REG, en);
 
-Reviewed-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151202/dd15c55a/attachment.sig>
+    Why not call it directly?
+
+> +}
+> +
+>   /**
+>    * hns_ppe_checksum_hw - set ppe checksum caculate
+>    * @ppe_device: ppe device
+> @@ -336,6 +341,8 @@ static void hns_ppe_init_hw(struct hns_ppe_cb *ppe_cb)
+>   	hns_ppe_cnt_clr_ce(ppe_cb);
+>
+>   	if (!AE_IS_VER1(dsaf_dev->dsaf_ver)) {
+> +		hns_ppe_set_vlan_strip(ppe_cb, 0);
+> +
+>   		/* set default RSS key in h/w */
+>   		hns_ppe_set_rss_key(ppe_cb, ppe_cb->rss_key);
+>
+> diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
+> index 98c163e..6c18ca9 100644
+> --- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
+> +++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
+> @@ -318,6 +318,7 @@
+>   #define PPE_CFG_PARSE_TAG_REG			0x94
+>   #define PPE_CFG_PRO_CHECK_EN_REG		0x98
+>   #define PPEV2_CFG_TSO_EN_REG                    0xA0
+> +#define PPEV2_VLAN_STRIP_EN_REG                 0xAC
+
+    Please indent with tabs, like all the surrounding #define's are indented 
+(except PPEV2_CFG_TSO_EN_REG).
+
+>   #define PPE_INTEN_REG				0x100
+>   #define PPE_RINT_REG				0x104
+>   #define PPE_INTSTS_REG				0x108
+
+MBR, Sergei
