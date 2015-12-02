@@ -1,61 +1,89 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 2 Dec 2015 09:30:10 -0600
-Subject: [PATCH v3 5/6] pinctrl: dt-binding: Extend meson documentation
- with GPIO IRQs support
-In-Reply-To: <1448987062-31225-6-git-send-email-carlo@caione.org>
-References: <1448987062-31225-1-git-send-email-carlo@caione.org>
- <1448987062-31225-6-git-send-email-carlo@caione.org>
-Message-ID: <20151202153010.GA22230@rob-hp-laptop>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 02 Dec 2015 16:32:13 +0100
+Subject: [PATCH v3 0/8] phy: rockchip-usb: correct pll handling and
+ usb-uart
+In-Reply-To: <1447968149-10979-1-git-send-email-heiko@sntech.de>
+References: <1447968149-10979-1-git-send-email-heiko@sntech.de>
+Message-ID: <5501584.6tGbRU8HS3@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 05:24:21PM +0100, Carlo Caione wrote:
-> From: Carlo Caione <carlo@endlessm.com>
-> 
-> Extend the pinctrl binding documentation with the support for external
-> GPIO interrupts.
-> 
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
-> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
-> ---
->  Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
-> index 3f6a524..de669ce 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
-> @@ -3,6 +3,12 @@
->  Required properties for the root node:
->   - compatible: "amlogic,meson8-pinctrl" or "amlogic,meson8b-pinctrl"
->   - reg: address and size of registers controlling irq functionality
-> + - reg-names: should be "irq"
-> + - interrupt-controller: marks the device node as an interrupt controller
-> + - #interrupt-cells: should be 2. The first cell is the GPIO number. The
-> +		     second cell is used to specify trigger type.
-> + - amlogic,irqs-gpio: specifies the GPIO IRQ numbers on the GIC (GPIO_IRQ#)
-> + - interrupt-parent: specifies the parent interrupt controller.
->  
->  === GPIO sub-nodes ===
->  
-> @@ -46,7 +52,12 @@ pinctrl-bindings.txt
->  
->  	pinctrl: pinctrl at c1109880 {
->  		compatible = "amlogic,meson8-pinctrl";
-> +		reg-names = "irq";
->  		reg = <0xc1109880 0x10>;
-> +		interrupt-parent = <&gic>;
-> +		amlogic,irqs-gpio = <64 65 66 67 68 69 70 71>;
+Hi Kishon,
 
-Can't you just use "interrupts" here?
+Am Donnerstag, 19. November 2015, 22:22:21 schrieb Heiko Stuebner:
+> changes in v3:
+> - rebase on top of Julias of_node_put fix
+> - address comments from Kishon Vijay Abraham
+>   - position of the devm_action in the first patch
+>   - separate compatible-addition into separate patch
+>   - don't rephrase comment when moving stuff around
+> - address Doug's comment and keep clk-tree change and assigned-clocks
+>   setting together
+> - add Doug's review-tag to patches 5,6,7
+> changes in v2:
+> - add Doug's review-tag to patches 1 and 3
+> - address comment and add the missing transistional rk_phy->base
+>   assignment in patch2
 
-Rob
+do you have any further comments for this series?
 
-> +		interrupt-controller;
-> +		#interrupt-cells = <2>;
->  		#address-cells = <1>;
->  		#size-cells = <1>;
->  		ranges;
-> -- 
-> 2.5.0
+
+Thanks
+Heiko
+
+> Patch 1 might be nice to go in as fix together with Julia's patch?
 > 
+> Patches 2-7 fix a long-standing issue with the clock-tree of Rockchip SoCs
+> namely our ignorance of the usbphy-internal pll that creates the needed
+> 480MHz but is also a supply-clock back to the core clock-controller in
+> Rockchip SoCs.
+> 
+> Till now that was worked around using a virtual clock in the cru itself,
+> but that is of course ignorant of other parts then disabling the phy
+> behind the cru's back, thus breaking potential users of these clocks.
+> 
+> 
+> Patch 8, while not associated with the new pll handling, also builds
+> on the groundwork introduced there and adds support for the function
+> repurposing one of the phys as passthrough for uart-data. This enables
+> attaching a ttl converter to the D+ and D- pins of an usb cable to
+> receive uart data this way, when it is not really possible to attach
+> a regular serial console to a board.
+> 
+> One point of critique in my first iteration [0] of this was, that
+> due to when the reconfiguration happens we may miss parts of the logs
+> when earlycon is enabled. So far early_initcall gets used as the
+> unflattened devicetree is necessary to set this up. Doing this for
+> example in the early_param directly would require parsing the flattened
+> devicetree to get needed nodes and properties.
+> 
+> I still maintain that if you're working on anything before smp-bringup
+> you should use a real dev-board instead or try to solder uart cables
+> on hopefully available test-points :-) .
+> 
+> 
+> In any case, if patch 8 causes to much headache, it could be dropped
+> to not hinder the earlier 7 patches.
+> 
+> [0] http://comments.gmane.org/gmane.linux.ports.arm.rockchip/715
+> 
+> Heiko Stuebner (8):
+>   phy: rockchip-usb: fix clock get-put mismatch
+>   phy: rockchip-usb: introduce a common data-struct for the device
+>   phy: rockchip-usb: move per-phy init into a separate function
+>   phy: rockchip-usb: add compatible values for rk3066a and rk3188
+>   phy: rockchip-usb: expose the phy-internal PLLs
+>   ARM: dts: rockchip: add clock-cells for usb phy nodes
+>   clk: rockchip: fix usbphy-related clocks
+>   phy: rockchip-usb: add handler for usb-uart functionality
+> 
+>  .../devicetree/bindings/phy/rockchip-usb-phy.txt   |   6 +-
+>  Documentation/kernel-parameters.txt                |   6 +
+>  arch/arm/boot/dts/rk3066a.dtsi                     |   2 +
+>  arch/arm/boot/dts/rk3188.dtsi                      |   2 +
+>  arch/arm/boot/dts/rk3288-veyron.dtsi               |   2 +-
+>  arch/arm/boot/dts/rk3288.dtsi                      |   3 +
+>  drivers/clk/rockchip/clk-rk3188.c                  |  11 +-
+>  drivers/clk/rockchip/clk-rk3288.c                  |  16 +-
+>  drivers/phy/phy-rockchip-usb.c                     | 458
+> ++++++++++++++++++--- 9 files changed, 417 insertions(+), 89 deletions(-)
