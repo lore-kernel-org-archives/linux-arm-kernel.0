@@ -1,17 +1,23 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 2 Dec 2015 20:57:39 +0800
-Subject: [PATCH v4] arm64: dts: add all hi6220 i2c nodes
-In-Reply-To: <1449051201-7288-1-git-send-email-kong.kongxinwei@hisilicon.com>
-References: <1449051201-7288-1-git-send-email-kong.kongxinwei@hisilicon.com>
-Message-ID: <20151202125739.GU692@tiger>
+Date: Wed, 2 Dec 2015 21:03:02 +0800
+Subject: [PATCH v2] clk: imx5: ipu_di_sel clocks can set parent rates
+In-Reply-To: <1449047797-4300-1-git-send-email-linux-kernel-dev@beckhoff.com>
+References: <1449047797-4300-1-git-send-email-linux-kernel-dev@beckhoff.com>
+Message-ID: <20151202130302.GV692@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 02, 2015 at 06:13:21PM +0800, Xinwei Kong wrote:
-> This patch adds all I2C nodes for the Hi6220 SoC. This hi6220 Soc
-> use this I2C IP of Synopsys Designware for HiKey board.
+On Wed, Dec 02, 2015 at 10:16:37AM +0100, linux-kernel-dev at beckhoff.com wrote:
+> From: Patrick Br?nn <p.bruenn@beckhoff.com>
 > 
-> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-> Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
+> To obtain exact pixel clocks, allow the DI clock selectors to influence
+> the PLLs that they are derived from.
+> 
+> Commit 4591b13289b5 ("ARM: i.MX6: ipu_di_sel clocks can set parent
+> rates") did this for i.MX6.
+> Port it to enable high display resolutions on i.MX53 based platforms
+> such as CX9020 Embedded PC, too.
+> 
+> Signed-off-by: Patrick Br?nn <p.bruenn@beckhoff.com>
 
-Reviewed-by: Shawn Guo <shawnguo@kernel.org>
+Applied, thanks.
