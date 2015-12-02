@@ -1,103 +1,83 @@
-From: sunil.kovvuri@gmail.com (Sunil Goutham)
-Date: Wed,  2 Dec 2015 15:36:16 +0530
-Subject: [PATCH v2 4/5] net: thunderx: Switchon carrier only upon interface
- link up
-In-Reply-To: <1449050777-37836-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1449050777-37836-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1449050777-37836-5-git-send-email-sunil.kovvuri@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 02 Dec 2015 11:03:55 +0100
+Subject: [PATCH v6 14/19] arm64:ilp32: add sys_ilp32.c and a separate
+ table (in entry.S) to use it
+In-Reply-To: <20151202002430.GB23156@yury-N73SV>
+References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
+ <1608639.5Yic1PH469@wuerfel> <20151202002430.GB23156@yury-N73SV>
+Message-ID: <2307165.72VALbNc43@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
+On Wednesday 02 December 2015 03:24:30 Yury Norov wrote:
+> On Tue, Dec 01, 2015 at 12:30:56PM +0100, Arnd Bergmann wrote:
+> > On Tuesday 01 December 2015 12:01:12 Andreas Schwab wrote:
+> > > Arnd Bergmann <arnd@arndb.de> writes:
+> > > 
+> > > > On Tuesday 01 December 2015 10:20:59 Andreas Schwab wrote:
+> > > >> Yury Norov <ynorov@caviumnetworks.com> writes:
+> > > >> 
+> > > >> > There's a tricky bug with signal stack, that Andreas also discovered.
+> > > >> 
+> > > >> That was only a confusion about the compat state of sys_rt_sigaction.
+> > > >> It just requires making sure glibc uses the correct (64bit layout)
+> > > >> struct kernel_sigaction.
+> > > >
+> > > > I don't think we need to use the 64-bit version of sigaction, both
+> > > > kernel and libc are simpler if we use the normal 32-bit version.
+> > > 
+> > > Since glibc has to do the conversion anyway (due to sigset_t), using the
+> > > 64bit layout avoids a second conversion in the kernel.
+> > 
+> > I don't get the part about sigset_t. Why would glibc want to use the
+> > 64-bit layout? This one looks like one of the cases where we absolutely
+> > want to use the 32-bit layout or otherwise get into big trouble if
+> > we ever want to support native ILP32 kernels.
+> > 
+> >       Arnd
+> 
+> So, we drop patch #6, and use 32-bit layout for all signal structures.
+> 
+> Correct?
 
-Call netif_carrier_on() only if interface's link is up. Switching this on
-upon IFF_UP by default, is causing issues with ethernet channel bonding
-in LACP mode. Initial NETDEV_CHANGE notification was being skipped.
+If the 32-bit layout is sane, yes. Andrew can surely judge this better
+than I can. The goal should be to have the most straightforward
+implementation for both kernel and libc, and reuse either the compat
+signal handling or the native one as much as we can.
 
-Also fixed some issues with link/speed/duplex reporting via ethtool.
+Looking at the API, I find that ARM fortunately uses all the standard
+definitions for sigset_t, struct siginfo/siginfo_t, union sigval/sigval_t,
+struct sigaction, struct sigaltstack/stack_t. It took me a while to
+figure out that the definitions in the uapi headers are different but
+actually unused (probably remaining from libc5 days or earlier).
+The signal numbers are all the same, and so are the 
 
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
----
- .../net/ethernet/cavium/thunder/nicvf_ethtool.c    |   16 +++++++++++++++-
- drivers/net/ethernet/cavium/thunder/nicvf_main.c   |    4 +---
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |    2 ++
- 3 files changed, 18 insertions(+), 4 deletions(-)
+The SA_* flags are all the same too, except for SA_THIRTYTWO, but
+that is not implemented by the compat handling because we do not
+support 26 bit tasks anyway.
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
-index af54c10..a12b2e3 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
-@@ -112,6 +112,13 @@ static int nicvf_get_settings(struct net_device *netdev,
- 
- 	cmd->supported = 0;
- 	cmd->transceiver = XCVR_EXTERNAL;
-+
-+	if (!nic->link_up) {
-+		cmd->duplex = DUPLEX_UNKNOWN;
-+		ethtool_cmd_speed_set(cmd, SPEED_UNKNOWN);
-+		return 0;
-+	}
-+
- 	if (nic->speed <= 1000) {
- 		cmd->port = PORT_MII;
- 		cmd->autoneg = AUTONEG_ENABLE;
-@@ -125,6 +132,13 @@ static int nicvf_get_settings(struct net_device *netdev,
- 	return 0;
- }
- 
-+static u32 nicvf_get_link(struct net_device *netdev)
-+{
-+	struct nicvf *nic = netdev_priv(netdev);
-+
-+	return nic->link_up;
-+}
-+
- static void nicvf_get_drvinfo(struct net_device *netdev,
- 			      struct ethtool_drvinfo *info)
- {
-@@ -660,7 +674,7 @@ static int nicvf_set_channels(struct net_device *dev,
- 
- static const struct ethtool_ops nicvf_ethtool_ops = {
- 	.get_settings		= nicvf_get_settings,
--	.get_link		= ethtool_op_get_link,
-+	.get_link		= nicvf_get_link,
- 	.get_drvinfo		= nicvf_get_drvinfo,
- 	.get_msglevel		= nicvf_get_msglevel,
- 	.set_msglevel		= nicvf_set_msglevel,
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index 7f709cb..dde8dc7 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -1057,6 +1057,7 @@ int nicvf_stop(struct net_device *netdev)
- 
- 	netif_carrier_off(netdev);
- 	netif_tx_stop_all_queues(nic->netdev);
-+	nic->link_up = false;
- 
- 	/* Teardown secondary qsets first */
- 	if (!nic->sqs_mode) {
-@@ -1211,9 +1212,6 @@ int nicvf_open(struct net_device *netdev)
- 	nic->drv_stats.txq_stop = 0;
- 	nic->drv_stats.txq_wake = 0;
- 
--	netif_carrier_on(netdev);
--	netif_tx_start_all_queues(netdev);
--
- 	return 0;
- cleanup:
- 	nicvf_disable_intr(nic, NICVF_INTR_MBOX, 0);
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-index 6534b73..d77e41a 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-@@ -612,6 +612,8 @@ static void bgx_poll_for_link(struct work_struct *work)
- 		lmac->last_duplex = 1;
- 	} else {
- 		lmac->link_up = 0;
-+		lmac->last_speed = SPEED_UNKNOWN;
-+		lmac->last_duplex = DUPLEX_UNKNOWN;
- 	}
- 
- 	if (lmac->last_link != lmac->link_up) {
--- 
-1.7.1
+struct sigcontext is obviously different because of the changed
+register set, and we will have to deal with that in some form in the
+compat code. struct ucontext and struct rt_sigframe includes that,
+which I assume is the main part we need to handle correctly
+by having ilp32 specific setup_rt_frame/sys_rt_sigreturn functions.
+
+One small difference is the handling of MINSIGSTKSZ, which would
+currently work for ilp32, but I noticed that commit c9692657c032
+("arm64: Fix MINSIGSTKSZ and SIGSTKSZ") from Manjeet Pawar broke
+compat mode: Any 32-bit (aarch32) task that passes an altstack smaller
+than 5120 bytes now gets rejected by the kernel, whereas the native
+32-bit kernel checks for 2048 bytes instead. We need to fix the
+existing compat case here without breaking the ilp32 case.
+
+With all that said, I would assume that just having separate
+sigcontext/ucontext/rt_sigframe and reusing the compat code otherwise,
+we are overall better off than with using the native 64-bit signal
+handling with everything that ties in (waitid, epoll_pwait,
+signalfd, ppoll, ...), but we can discuss this further if someone
+sees major downsides of that compared to your existing approach.
+In particular, I don't know what the difference means for gdb,
+glibc or strace.
+
+
+	Arnd
