@@ -1,48 +1,28 @@
-From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
-Date: Wed, 2 Dec 2015 14:56:57 +0200
-Subject: [PATCH 2/4] dmaengine: qcom_bam_dma: clear BAM interrupt only if
- it is rised
-In-Reply-To: <6461444.oollnBsbrb@wuerfel>
-References: <1448961299-15161-1-git-send-email-stanimir.varbanov@linaro.org>
- <1448961299-15161-3-git-send-email-stanimir.varbanov@linaro.org>
- <6461444.oollnBsbrb@wuerfel>
-Message-ID: <565EEA99.3070207@linaro.org>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Wed, 2 Dec 2015 18:27:14 +0530
+Subject: [PATCH 3/6] net: thunderx: Increase transmit queue length
+In-Reply-To: <013301d12cfd$0c958a90$25c09fb0$@samsung.com>
+References: <y@samsung.com>
+ <1448961223-41888-4-git-send-email-sunil.kovvuri@gmail.com>
+ <01d101d12c46$2de43b40$89acb1c0$@samsung.com>
+ <1448983985.25582.35.camel@edumazet-glaptop2.roam.corp.google.com>
+ <CA+sq2Ce9oH-kCDO8hK_wX+ZZdXyyBuT4V2bt5Ab+2=pEX+BO+w@mail.gmail.com>
+ <00cb01d12ce0$9f090540$dd1b0fc0$@samsung.com>
+ <00eb01d12cec$a32aa500$e97fef00$@samsung.com>
+ <013301d12cfd$0c958a90$25c09fb0$@samsung.com>
+Message-ID: <CA+sq2CfSNBQaQnw32tu4ZcZYLd6ybVZ3Ka5Oz=s1YUNegZpd-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/2015 12:29 PM, Arnd Bergmann wrote:
-> On Tuesday 01 December 2015 11:14:57 Stanimir Varbanov wrote:
->> +       if (srcs & BAM_IRQ) {
->>                 clr_mask = readl_relaxed(bam_addr(bdev, 0, BAM_IRQ_STTS));
->>  
->> -       /* don't allow reorder of the various accesses to the BAM registers */
->> -       mb();
->> +               /*
->> +                * don't allow reorder of the various accesses to the BAM
->> +                * registers
->> +                */
->> +               mb();
->>  
->> -       writel_relaxed(clr_mask, bam_addr(bdev, 0, BAM_IRQ_CLR));
->> +               writel_relaxed(clr_mask, bam_addr(bdev, 0, BAM_IRQ_CLR));
->> +       }
->>
-> 
-> I think the comment here should be moved: change the writel_relaxed()
-> to writel(), which already includes the appropriate barriers, and
+>After getting it working in guest i tried to apply it to host. With total of 128 virtual functions (= 128 interfaces) it does not work at all.
+> Even after bumping cma region size to insane value of 2GB more than half of interfaces still failed to allocate queues.
+> And after setting cma=3G i could not mount my rootfs.
 
-If we agree with such a change it should be subject to another patch.
+Here what you are saying is half of the interfaces were initialized
+succesfully and rest didn't.
+So this issue is not something which is introduced by this patch.
 
-> add a comment at the readl_relaxed() to explain why it doesn't need
-> a barrier.
-
-Infact I'm not sure that readl_relaxed(BAM_IRQ_STTS) does not need
-barrier. If I read the code above correctly the mb() should guarantee
-that all load and store operations before it are happened before the
-write to BAM_IRQ_CLR register, and on the other hand if we replace
-writel_relaxed with writel, the writel has wmb() which guarantees only
-store operations. Did I miss something?
-
--- 
-regards,
-Stan
+> Can we use some other method for allocating queues, which would not require such a huge coherent pool?
+There are so many drivers which use dma_alloc_coherent() directly or
+via pci_alloc_consistent() to
+allocate memory. How many drivers should we modify.
