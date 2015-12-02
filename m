@@ -1,106 +1,99 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 2 Dec 2015 10:22:09 +0530
-Subject: [RFC v02 00/15] dmaengine: New 'universal' API for requesting
- channel
-In-Reply-To: <3124382.EhiMyQGKTA@wuerfel>
-References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
- <20151201165954.GA1696@localhost> <3124382.EhiMyQGKTA@wuerfel>
-Message-ID: <20151202045209.GB1854@localhost>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 1 Dec 2015 23:57:34 -0500
+Subject: [PATCH V7 2/3] dma: add Qualcomm Technologies HIDMA management
+ driver
+In-Reply-To: <20151201031710.GK3901@localhost>
+References: <1448245707-27499-1-git-send-email-okaya@codeaurora.org>
+ <1448245707-27499-3-git-send-email-okaya@codeaurora.org>
+ <20151130082141.GB3901@localhost> <565C6039.6050404@codeaurora.org>
+ <20151201031710.GK3901@localhost>
+Message-ID: <565E7A3E.1070207@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 09:17:06PM +0100, Arnd Bergmann wrote:
-> On Tuesday 01 December 2015 22:29:54 Vinod Koul wrote:
-> > On Mon, Nov 30, 2015 at 03:45:30PM +0200, Peter Ujfalusi wrote:
-> > > channel via DT, ACPI or in case if the kernel booted in non DT/ACPI mode
-> > > it will use a filter lookup table and retrieves the needed information from
-> > > the dma_filter_map provided by the DMA drivers.
-> > 
-> > That sounds right, for the third case would the arch, driver or someone else
-> > configure this?
+On 11/30/2015 10:17 PM, Vinod Koul wrote:
+> On Mon, Nov 30, 2015 at 09:42:01AM -0500, Sinan Kaya wrote:
 > 
-> The typical case is for the configuration to be defined in arch or platform
-> code and passed down to the dmaengine driver.
+>>>> +static int hidma_mgmt_probe(struct platform_device *pdev)
+>>>> +{
+>>>> +	struct hidma_mgmt_dev *mgmtdev;
+>>>> +	struct resource *res;
+>>>> +	void __iomem *virtaddr;
+>>>> +	int irq;
+>>>> +	int rc;
+>>>> +	u32 val;
+>>>> +
+>>>> +	pm_runtime_set_autosuspend_delay(&pdev->dev, AUTOSUSPEND_TIMEOUT);
+>>>> +	pm_runtime_use_autosuspend(&pdev->dev);
+>>>> +	pm_runtime_set_active(&pdev->dev);
+>>>> +	pm_runtime_enable(&pdev->dev);
+>>>
+>>> at this time pm core will treat device as fully enabled and pm methods can
+>>> be invoked, but you are not ready yet right. Typically these are done at the
+>>> end of the probe unless you have a reason... 
+>>
+>> I need it here because the clocks are declared as ACPI power resources.
+>> The kernel is turning off all power resources during initialization. In
+>> order for this code to touch the hardware, I need to call enable so that
+>> clocks are enabled once again.
 > 
-> I just noticed that the text above (and probably the code too) should
-> be changed so we always fall back to this. There are cases where the
-> platform is booted with DT in principle, but the DMA engine does not
-> (yet) use DT and still wants to be converted. I think we can easily
-> handle that case by always trying this if the other methods fail.
+> The question is are you ready in your driver routines to be invoked by pm
+> core?
+> 
 
-I agree that this makes sense, not just for DT cases but ACPI as well
+I don't have any support for suspend and resume PM APIs. The only PM
+interface I support is PM runtime. PM can turn on/off the clocks based
+on the reference counts it maintains after get/set APIs. Since PM is
+turning off the clocks during power up before my driver load, I do need
+to grab this lock to re-enable it during HW initialization. Then, let PM
+turn off the clocks again after the AUTOSUSPEND_TIMEOUT when I'm done.
 
-> 
-> > > This legacy mode needs changes in platform code, in dmaengine drivers and
-> > > finally the dmaengine user drivers can be converted:
-> > 
-> > Are you marking the current APIs as dericated in the end of this series
-> 
-> I think we practically stopped marking things as deprecated in general.
-> Per Linus decree, whenever we want to get rid of something, we should
-> instead change all users in tree and then remove the API, expecting
-> driver maintainers to do something just because you marked it as deprecated
-> often doesn't work.
+Is there any other interaction with the PM that I'm not aware of?
 
-Yes but while we do conversion we don't know if new users get added which use
-old API..
+>>
+>>>
+>>>> +static ssize_t show_values(struct device *dev, struct device_attribute *attr,
+>>>> +				char *buf)
+>>>
+>>> Please fix the coding style here and other places as well. 
+>>
+>> what's the problem here?
+>>
+>>> Specifically
+>>> please read Chapter 2
+>>>
+>>
+>> Why is checkpatch not complaining about any of the coding style issues?
+>> I'm checking my code with checkpatch before submitting. Is there any
+>> other tool that would catch this?
+> 
+> So did you read the Chapter 2.. Quoting here
+> 
 
-> 
-> I can help out converting a few platforms, maybe one interface at a time.
+I did read the chapter 2. Maybe, my lack of native english speaking but
+I don't get from this sentence that function parameters need to be
+aligned to the opening paranthesis.
 
-Great yes we all will have to chip in and start removing these, i will try
-doing few after new year
+> Descendants are always substantially shorter than the parent
+> and are placed substantially to the right. The same applies to function headers
+> with a long argument list. 
+> 
 
-Am sure Andy can chip in as well :)
+I ran Lindent and manually cleaned up the junk it introduced. The result
+is this
 
-> This is what I see:
+static ssize_t show_values(struct device *dev, struct device_attribute
+*attr,
+			   char *buf)
+
+
+> Your breaking lines is not placed substantially to the right..
+> I do not think checkpatch is checking this..
 > 
-> arnd at wuerfel:~/arm-soc$ for i in dma_request_slave_channel_reason dma_request_slave_channel dma_request_slave_channel_compat dma_request_channel  ; do echo `git grep -wl $i drivers/  | grep -v drivers/dma | wc -l`\      $i ; done
-> 14      dma_request_slave_channel_reason
-> 27      dma_request_slave_channel
-> 25      dma_request_slave_channel_compat
-> 34      dma_request_channel
-> 
-> I would probably leave the users of dma_request_channel() while converting
-> the others, as that is still used by all the platforms that don't use any DT
-> support.
-> 
-> Changing dma_request_slave_channel_reason and dma_request_slave_channel is
-> trivial, we can probably use coccinelle for that, as it does not require
-> any platform changes. That brings us to the users of
-> dma_request_slave_channel_compat, which currently includes these files:
-> 
-> $ git grep -wl dma_request_slave_channel_compat drivers/ata/pata_pxa.c
-> drivers/crypto/atmel-aes.c
-> drivers/crypto/atmel-sha.c
-> drivers/crypto/atmel-tdes.c
-> drivers/crypto/omap-aes.c
-> drivers/crypto/omap-des.c
-> drivers/crypto/omap-sham.c
-> drivers/media/platform/omap3isp/isphist.c
-> drivers/mmc/host/davinci_mmc.c
-> drivers/mmc/host/omap.c
-> drivers/mmc/host/omap_hsmmc.c
-> drivers/mmc/host/pxamci.c
-> drivers/mmc/host/s3cmci.c
-> drivers/mmc/host/tmio_mmc_dma.c
-> drivers/mtd/nand/pxa3xx_nand.c
-> drivers/net/ethernet/smsc/smc91x.c
-> drivers/net/irda/pxaficp_ir.c
-> drivers/spi/spi-omap2-mcspi.c
-> drivers/spi/spi-pxa2xx-dma.c
-> drivers/spi/spi-rspi.c
-> drivers/spi/spi-s3c64xx.c
-> drivers/spi/spi-sh-msiof.c
-> drivers/tty/serial/8250/8250_dma.c
-> drivers/tty/serial/samsung.c
-> drivers/tty/serial/sh-sci.c
-> include/linux/dmaengine.h
-> 
-> In other words: arch/avr32 and arch/sh along with omap1, omap2, davinci, pxa, and s3c
-> in terms of ARM platforms.
-> 
-> 	Arnd
+
 
 -- 
-~Vinod
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
+Linux Foundation Collaborative Project
