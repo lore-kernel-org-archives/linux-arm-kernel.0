@@ -1,48 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Dec 2015 15:57:01 +0100
-Subject: [PATCH 1/5] ARM: config: Regenerate multi_v5_defconfig
-In-Reply-To: <20151202141756.GG29814@lunn.ch>
-References: <1449012812-9779-1-git-send-email-andrew@lunn.ch>
- <2254361.JL23NtLhah@wuerfel> <20151202141756.GG29814@lunn.ch>
-Message-ID: <2115626.l90A97hBkH@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 2 Dec 2015 07:00:05 -0800
+Subject: [RFC v02 03/15] dmaengine: core: Introduce new, universal API to
+ request a channel
+In-Reply-To: <565EC14A.6020502@ti.com>
+References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
+ <1448891145-10766-4-git-send-email-peter.ujfalusi@ti.com>
+ <20151130155142.GZ2517@atomide.com> <565D56A0.2090204@ti.com>
+ <20151201170031.GT23396@atomide.com> <565EC14A.6020502@ti.com>
+Message-ID: <20151202150005.GB23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 December 2015 15:17:56 Andrew Lunn wrote:
-> On Wed, Dec 02, 2015 at 02:44:00PM +0100, Arnd Bergmann wrote:
-> > On Wednesday 02 December 2015 00:33:28 Andrew Lunn wrote:
-> > > Dues the Kconfig changes, multi_v5_defconfig needs regenerating.
-> > > 
-> > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > > ---
-> > >  arch/arm/configs/multi_v5_defconfig | 17 ++++-------------
-> > >  1 file changed, 4 insertions(+), 13 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
-> > > index f69a459f4f92..f98d4b8b54c5 100644
-> > > --- a/arch/arm/configs/multi_v5_defconfig
-> > > +++ b/arch/arm/configs/multi_v5_defconfig
-> > > @@ -11,10 +11,9 @@ CONFIG_MODULE_UNLOAD=y
-> > > @@ -53,7 +52,6 @@ CONFIG_MTD_CFI_GEOMETRY=y
-> > >  CONFIG_MTD_CFI_INTELEXT=y
-> > >  CONFIG_MTD_CFI_STAA=y
-> > >  CONFIG_MTD_PHYSMAP=y
-> > > -CONFIG_MTD_M25P80=y
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [151202 02:01]:
+> On 12/01/2015 07:00 PM, Tony Lindgren wrote:
+> >> I see. The dm81xx basically am33xx/am43xx?
 > > 
-> > I think we need to enable MTD_SPI_NOR_BASE now to get the driver
-> > back, see 03e296f613af ("mtd: m25p80: use the SPI nor framework")
+> > Yeah similar to am33xx with different clocks and with a bunch of accelerators.
+> > 
+> >> Actually I would prefer to use the dmaengine's event router framework and we
+> >> do have support for the am33xx/am43xx type of crossbar already implemented.
+> >> I'm going to resend the DTS series for am33xx/am43xx to convert them to use
+> >> the new DT bindings along with the dma event router support:
+> >> https://www.mail-archive.com/linux-omap%40vger.kernel.org/msg120828.html
+> > 
+> > OK yes a dmaengine event router works too when available. Good to see
+> > them as separate driver instances now :) Are only the dts changes missing
+> > now?
+> > 
+> > FYI, when we have separate interconnect driver instances, we don't want to
+> > and cannot tweak registers outside the interconnect instance because of them
+> > being in separate clock and/or power domains :p
 > 
-> As you noticed, this is a pure regenerate.
+> What does this mean in practice? We can not touch these registers? The DMA
+> crossbar is a separate driver from the eDMA driver.
+
+Seem like it should not affect DMA crossbar as it's a separate driver.
+
+What I meant is we need a separate driver for clocks, pinctrl, regulators,
+PHY, crossbar or syscon to use the SCM registers from drivers sitting on a
+L4 interonnect.
+
+> > In any case, it seems there's no harm using pinctrl for evtmux on dm81xx
+> > until the event router is available. It's currently only needed on the
+> > t410 emmc that I'm aware of :)
 > 
-> I will send a few more followups with the MTD_SPI_NOR_BASE, and
-> dropping EXT[23].
+> The AM33xx/AM43xx DMA crossbar support is in 4.4 already:
+> 42dbdcc6bf96 dmaengine: ti-dma-crossbar: Add support for crossbar on AM33xx/AM43xx
 
-Maybe you can do those changes first and regenerate afterwards?
+OK great.
 
-That makes it more obvious what's going on than removing a symbol
-first and then putting it back.
-
-Sorry for not having a better answer, I realize this is causing extra
-work.
-
-	Arnd
+Tony
