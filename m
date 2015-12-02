@@ -1,125 +1,223 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 02 Dec 2015 08:21:41 +0100
-Subject: [PATCH v4 1/3] driver core: handle -EPROBE_DEFER from bus_type.match()
+Date: Wed, 02 Dec 2015 08:21:42 +0100
+Subject: [PATCH v4 2/3] ARM: amba: Move reading of periphid to amba_match()
 In-Reply-To: <1449040903-26674-1-git-send-email-m.szyprowski@samsung.com>
 References: <1449040903-26674-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1449040903-26674-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1449040903-26674-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 
-Allow implementations of the match() callback in struct bus_type to
-return errors and if it's -EPROBE_DEFER then queue the device for
-deferred probing.
+Reading the periphid when the Primecell device is registered means that
+the apb pclk must be available by then or the device won't be registered
+at all.
 
-This is useful to buses such as AMBA in which devices are registered
-before their matching information can be retrieved from the HW
-(typically because a clock driver hasn't probed yet).
+By reading the periphid in amba_match() we can return -EPROBE_DEFER if
+the apb pclk isn't there yet and the device will be retried later.
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-[changed if-else code structure, adjusted documentation to match the code,
-extended comments]
+[minor code adjustments, removed forward declaration, added missing
+comment]
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- Documentation/driver-model/porting.txt |  6 ++++--
- drivers/base/dd.c                      | 24 ++++++++++++++++++++++--
- include/linux/device.h                 |  7 +++++--
- 3 files changed, 31 insertions(+), 6 deletions(-)
+ drivers/amba/bus.c | 146 +++++++++++++++++++++++++++--------------------------
+ 1 file changed, 75 insertions(+), 71 deletions(-)
 
-diff --git a/Documentation/driver-model/porting.txt b/Documentation/driver-model/porting.txt
-index 92d86f7..453053f 100644
---- a/Documentation/driver-model/porting.txt
-+++ b/Documentation/driver-model/porting.txt
-@@ -340,8 +340,10 @@ comparison:
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index f009936..643127f 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -24,6 +24,71 @@
  
-   int (*match)(struct device * dev, struct device_driver * drv);
+ #define to_amba_driver(d)	container_of(d, struct amba_driver, drv)
  
--match should return '1' if the driver supports the device, and '0'
--otherwise. 
-+match should return positive value if the driver supports the device,
-+and zero otherwise. It may also return error code (for example
-+-EPROBE_DEFER) if determining that given driver supports the device is
-+not possible.
- 
- When a device is registered, the bus's list of drivers is iterated
- over. bus->match() is called for each one until a match is found. 
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index a641cf3..793e915 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -490,6 +490,7 @@ static int __device_attach_driver(struct device_driver *drv, void *_data)
- 	struct device_attach_data *data = _data;
- 	struct device *dev = data->dev;
- 	bool async_allowed;
++static int amba_get_enable_pclk(struct amba_device *pcdev)
++{
 +	int ret;
- 
- 	/*
- 	 * Check if device has already been claimed. This may
-@@ -500,8 +501,17 @@ static int __device_attach_driver(struct device_driver *drv, void *_data)
- 	if (dev->driver)
- 		return -EBUSY;
- 
--	if (!driver_match_device(drv, dev))
-+	ret = driver_match_device(drv, dev);
++
++	pcdev->pclk = clk_get(&pcdev->dev, "apb_pclk");
++	if (IS_ERR(pcdev->pclk))
++		return PTR_ERR(pcdev->pclk);
++
++	ret = clk_prepare_enable(pcdev->pclk);
++	if (ret)
++		clk_put(pcdev->pclk);
++
++	return ret;
++}
++
++static void amba_put_disable_pclk(struct amba_device *pcdev)
++{
++	clk_disable_unprepare(pcdev->pclk);
++	clk_put(pcdev->pclk);
++}
++
++static int amba_read_periphid(struct amba_device *dev)
++{
++	u32 size;
++	void __iomem *tmp;
++	int i, ret = 0;
++
++	/*
++	 * Dynamically calculate the size of the resource
++	 * and use this for iomap
++	 */
++	size = resource_size(&dev->res);
++	tmp = ioremap(dev->res.start, size);
++	if (!tmp)
++		return -ENOMEM;
++
++	ret = amba_get_enable_pclk(dev);
 +	if (ret == 0) {
-+		/* no match */
- 		return 0;
-+	} else if (ret == -EPROBE_DEFER) {
-+		dev_dbg(dev, "Device match requests probe deferral\n");
-+		driver_deferred_probe_add(dev);
-+	} else if (ret < 0) {
-+		dev_dbg(dev, "Bus failed to match device: %d", ret);
-+		return ret;
-+	} /* ret > 0 means positive match */
- 
- 	async_allowed = driver_allows_async_probing(drv);
- 
-@@ -621,6 +631,7 @@ void device_initial_probe(struct device *dev)
- static int __driver_attach(struct device *dev, void *data)
++		u32 pid, cid;
++
++		/*
++		 * Read pid and cid based on size of resource
++		 * they are located at end of region
++		 */
++		for (pid = 0, i = 0; i < 4; i++)
++			pid |= (readl(tmp + size - 0x20 + 4 * i) & 255) <<
++				(i * 8);
++		for (cid = 0, i = 0; i < 4; i++)
++			cid |= (readl(tmp + size - 0x10 + 4 * i) & 255) <<
++				(i * 8);
++
++		amba_put_disable_pclk(dev);
++
++		if (cid == AMBA_CID || cid == CORESIGHT_CID)
++			dev->periphid = pid;
++
++		if (!dev->periphid)
++			ret = -ENODEV;
++	}
++
++	iounmap(tmp);
++
++	return ret;
++}
++
+ static const struct amba_id *
+ amba_lookup(const struct amba_id *table, struct amba_device *dev)
  {
- 	struct device_driver *drv = data;
+@@ -43,11 +108,19 @@ static int amba_match(struct device *dev, struct device_driver *drv)
+ {
+ 	struct amba_device *pcdev = to_amba_device(dev);
+ 	struct amba_driver *pcdrv = to_amba_driver(drv);
 +	int ret;
  
- 	/*
- 	 * Lock device and try to bind to it. We drop the error
-@@ -632,8 +643,17 @@ static int __driver_attach(struct device *dev, void *data)
- 	 * is an error.
- 	 */
+ 	/* When driver_override is set, only bind to the matching driver */
+ 	if (pcdev->driver_override)
+ 		return !strcmp(pcdev->driver_override, drv->name);
  
--	if (!driver_match_device(drv, dev))
-+	ret = driver_match_device(drv, dev);
-+	if (ret == 0) {
-+		/* no match */
- 		return 0;
-+	} else if (ret == -EPROBE_DEFER) {
-+		dev_dbg(dev, "Device match requests probe deferral\n");
-+		driver_deferred_probe_add(dev);
-+	} else if (ret < 0) {
-+		dev_dbg(dev, "Bus failed to match device: %d", ret);
-+		return ret;
-+	} /* ret > 0 means positive match */
++	/* Do plug-n-play if no hard-coded primecell ID has been provided */
++	if (!pcdev->periphid) {
++		ret = amba_read_periphid(pcdev);
++		if (ret)
++			return ret;
++	}
++
+ 	return amba_lookup(pcdrv->id_table, pcdev) != NULL;
+ }
  
- 	if (dev->parent)	/* Needed for USB */
- 		device_lock(dev->parent);
-diff --git a/include/linux/device.h b/include/linux/device.h
-index b8f411b..69bea82 100644
---- a/include/linux/device.h
-+++ b/include/linux/device.h
-@@ -70,8 +70,11 @@ extern void bus_remove_file(struct bus_type *, struct bus_attribute *);
-  * @dev_groups:	Default attributes of the devices on the bus.
-  * @drv_groups: Default attributes of the device drivers on the bus.
-  * @match:	Called, perhaps multiple times, whenever a new device or driver
-- *		is added for this bus. It should return a nonzero value if the
-- *		given device can be handled by the given driver.
-+ *		is added for this bus. It should return a positive value if the
-+ *		given device can be handled by the given driver and zero
-+ *		otherwise. It may also return error code if determining that
-+ *		the driver supports the device is not possible. In case of
-+ *		-EPROBE_DEFER it will queue the device for deferred probing.
-  * @uevent:	Called when a device is added, removed, or a few other things
-  *		that generate uevents to add the environment variables.
-  * @probe:	Called when a new device or driver add to this bus, and callback
+@@ -204,27 +277,6 @@ static int __init amba_init(void)
+ 
+ postcore_initcall(amba_init);
+ 
+-static int amba_get_enable_pclk(struct amba_device *pcdev)
+-{
+-	int ret;
+-
+-	pcdev->pclk = clk_get(&pcdev->dev, "apb_pclk");
+-	if (IS_ERR(pcdev->pclk))
+-		return PTR_ERR(pcdev->pclk);
+-
+-	ret = clk_prepare_enable(pcdev->pclk);
+-	if (ret)
+-		clk_put(pcdev->pclk);
+-
+-	return ret;
+-}
+-
+-static void amba_put_disable_pclk(struct amba_device *pcdev)
+-{
+-	clk_disable_unprepare(pcdev->pclk);
+-	clk_put(pcdev->pclk);
+-}
+-
+ /*
+  * These are the device model conversion veneers; they convert the
+  * device model structures to our more specific structures.
+@@ -341,15 +393,12 @@ static void amba_device_release(struct device *dev)
+  *	@dev: AMBA device allocated by amba_device_alloc
+  *	@parent: resource parent for this devices resources
+  *
+- *	Claim the resource, and read the device cell ID if not already
+- *	initialized.  Register the AMBA device with the Linux device
++ *	Claim the resource, and register the AMBA device with the Linux device
+  *	manager.
+  */
+ int amba_device_add(struct amba_device *dev, struct resource *parent)
+ {
+-	u32 size;
+-	void __iomem *tmp;
+-	int i, ret;
++	int ret;
+ 
+ 	WARN_ON(dev->irq[0] == (unsigned int)-1);
+ 	WARN_ON(dev->irq[1] == (unsigned int)-1);
+@@ -358,51 +407,6 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
+ 	if (ret)
+ 		goto err_out;
+ 
+-	/* Hard-coded primecell ID instead of plug-n-play */
+-	if (dev->periphid != 0)
+-		goto skip_probe;
+-
+-	/*
+-	 * Dynamically calculate the size of the resource
+-	 * and use this for iomap
+-	 */
+-	size = resource_size(&dev->res);
+-	tmp = ioremap(dev->res.start, size);
+-	if (!tmp) {
+-		ret = -ENOMEM;
+-		goto err_release;
+-	}
+-
+-	ret = amba_get_enable_pclk(dev);
+-	if (ret == 0) {
+-		u32 pid, cid;
+-
+-		/*
+-		 * Read pid and cid based on size of resource
+-		 * they are located at end of region
+-		 */
+-		for (pid = 0, i = 0; i < 4; i++)
+-			pid |= (readl(tmp + size - 0x20 + 4 * i) & 255) <<
+-				(i * 8);
+-		for (cid = 0, i = 0; i < 4; i++)
+-			cid |= (readl(tmp + size - 0x10 + 4 * i) & 255) <<
+-				(i * 8);
+-
+-		amba_put_disable_pclk(dev);
+-
+-		if (cid == AMBA_CID || cid == CORESIGHT_CID)
+-			dev->periphid = pid;
+-
+-		if (!dev->periphid)
+-			ret = -ENODEV;
+-	}
+-
+-	iounmap(tmp);
+-
+-	if (ret)
+-		goto err_release;
+-
+- skip_probe:
+ 	ret = device_add(&dev->dev);
+ 	if (ret)
+ 		goto err_release;
 -- 
 1.9.2
