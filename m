@@ -1,118 +1,55 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 02 Dec 2015 12:51:04 -0800
-Subject: [PATCH] ARM: dts: vf610: use reset values for L2 cache latencies
-In-Reply-To: <20151202081306.GR692@tiger>
-References: <1448935166-2697-1-git-send-email-stefan@agner.ch>
- <20151202081306.GR692@tiger>
-Message-ID: <b5a03fc2848b21fcac0f88436a4f7c87@agner.ch>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Wed, 2 Dec 2015 15:53:16 -0500
+Subject: [PATCH v4 3/7] ARM: dts: imx: Add Advantech BA-16 Qseven module
+In-Reply-To: <1647955.6yZUflBPcH@wuerfel>
+References: <1449080180-31945-1-git-send-email-akshay.bhat@timesys.com>
+ <1449080180-31945-4-git-send-email-akshay.bhat@timesys.com>
+ <1647955.6yZUflBPcH@wuerfel>
+Message-ID: <565F5A3C.6080509@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-12-02 00:13, Shawn Guo wrote:
-> On Mon, Nov 30, 2015 at 05:59:26PM -0800, Stefan Agner wrote:
->> Linux on Vybrid used several different L2 latencies so far, none
->> of them seem to be the right ones. According to the application note
->> AN4947 ("Understanding Vybrid Architecture"), the tag portion runs
->> on CPU clock and is inside the L2 cache controller, whereas the data
->> portion is stored in the external SRAM running on platform clock.
->> Hence it is likely that the correct value requires a higher data
->> latency then tag latency.
->> 
->> These are the values which have been used so far:
->> - The mainline values:
->>   arm,data-latency = <1 1 1>;
->>   arm,tag-latency = <2 2 2>;
->>   Those values have lead to problems on higher clocks. They look
->>   like a poor translation from the reset values (missing +1 offset
->>   and a mix up between tag/latency values).
->> - The Linux 3.0 (SoC vendor BSP) values (converted to DT notation):
->>   arm,data-latency = <4 2 3>
->>   arm,tag-latency = <4 2 3>
->>   The cache initialization function along with the value matches the
->>   i.MX6 code from the same kernel, so it seems that those values have
->>   just been copied.
->> - The Colibri values:
->>   arm,data-latency = <2 1 2>;
->>   arm,tag-latency = <3 2 3>;
->>   Those were a mix between the values of the Linux 3.0 based BSP and
->>   the mainline values above.
->> - The SoC Reset values (converted to DT notation):
->>   arm,data-latency = <3 3 3>;
->>   arm,tag-latency = <2 2 2>;
->> 
->> So far there is no official statement on what the correct values are.
->> See also the related Freescale community thread:
->> https://community.freescale.com/message/579785#579785
->> 
->> For now, the reset values seem to be the best bet. Remove all other
->> "bogus" values and use the reset value on vf610.dtsi level.
->> 
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->> Hi Shawn,
->> 
->> Any chance to get this into 4.4?
-> 
-> I can try.  Generally, upstream maintainers are becoming more strict for
-> -rc inclusion after -rc3 phase.  Do you have any user stories about why
-> this is a critical/urgent fix?  If we send this a critical fix for 4.4-rc
-> inclusion, do we need to Cc stable?
-
-It came up a while ago on Freescale community, but I think that user
-used downstream BSP's:
-https://community.freescale.com/thread/332326
-
-The Colibri VF61 board overwrites the latency, so it is not really
-critical for this board.
-
-The Freescale Tower runs at 400MHz by default, but has a CPU which would
-support up to 500MHz. I am pretty sure with 500MHz CPU clock, things
-will go south with current settings.
-
-Regarding stable: Would probably be consistent...
-
---
-Stefan
 
 
-> 
-> Shawn
-> 
->> 
->> --
->> Stefan
->> 
->>  arch/arm/boot/dts/vf610-colibri.dtsi | 5 -----
->>  arch/arm/boot/dts/vf610.dtsi         | 2 +-
->>  2 files changed, 1 insertion(+), 6 deletions(-)
->> 
->> diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
->> index 19fe045..2d7eab7 100644
->> --- a/arch/arm/boot/dts/vf610-colibri.dtsi
->> +++ b/arch/arm/boot/dts/vf610-colibri.dtsi
->> @@ -18,8 +18,3 @@
->>  		reg = <0x80000000 0x10000000>;
->>  	};
->>  };
->> -
->> -&L2 {
->> -	arm,data-latency = <2 1 2>;
->> -	arm,tag-latency = <3 2 3>;
->> -};
->> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
->> index 5f8eb1b..58bc6e4 100644
->> --- a/arch/arm/boot/dts/vf610.dtsi
->> +++ b/arch/arm/boot/dts/vf610.dtsi
->> @@ -19,7 +19,7 @@
->>  		reg = <0x40006000 0x1000>;
->>  		cache-unified;
->>  		cache-level = <2>;
->> -		arm,data-latency = <1 1 1>;
->> +		arm,data-latency = <3 3 3>;
->>  		arm,tag-latency = <2 2 2>;
->>  	};
->>  };
->> --
->> 2.6.2
->> 
->> 
+On 12/02/2015 02:36 PM, Arnd Bergmann wrote:
+> On Wednesday 02 December 2015 13:16:16 Akshay Bhat wrote:
+>> +               brightness-levels = <  0   1   2   3   4   5   6   7   8   9
+>> +                                     10  11  12  13  14  15  16  17  18  19
+>> +                                     20  21  22  23  24  25  26  27  28  29
+>> +                                     30  31  32  33  34  35  36  37  38  39
+>> +                                     40  41  42  43  44  45  46  47  48  49
+>> +                                     50  51  52  53  54  55  56  57  58  59
+>> +                                     60  61  62  63  64  65  66  67  68  69
+>> +                                     70  71  72  73  74  75  76  77  78  79
+>> +                                     80  81  82  83  84  85  86  87  88  89
+>> +                                     90  91  92  93  94  95  96  97  98  99
+>> +                                    100 101 102 103 104 105 106 107 108 109
+>> +                                    110 111 112 113 114 115 116 117 118 119
+>> +                                    120 121 122 123 124 125 126 127 128 129
+>> +                                    130 131 132 133 134 135 136 137 138 139
+>> +                                    140 141 142 143 144 145 146 147 148 149
+>> +                                    150 151 152 153 154 155 156 157 158 159
+>> +                                    160 161 162 163 164 165 166 167 168 169
+>> +                                    170 171 172 173 174 175 176 177 178 179
+>> +                                    180 181 182 183 184 185 186 187 188 189
+>> +                                    190 191 192 193 194 195 196 197 198 199
+>> +                                    200 201 202 203 204 205 206 207 208 209
+>> +                                    210 211 212 213 214 215 216 217 218 219
+>> +                                    220 221 222 223 224 225 226 227 228 229
+>> +                                    230 231 232 233 234 235 236 237 238 239
+>> +                                    240 241 242 243 244 245 246 247 248 249
+>> +                                    250 251 252 253 254 255>;
+>>
+>
+> That is a lot of brightness levels. Why do you need so many of them?
+>
+> 	Arnd
+>
+Hi Arnd,
+
+The product allows for a fine grained selection of the LCD brightness 
+(analogy might be a laptop brightness slider), hence all possible levels 
+have been included.
+
+Thanks,
+Akshay
