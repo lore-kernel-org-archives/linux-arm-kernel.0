@@ -1,340 +1,155 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  2 Dec 2015 22:27:04 +0100
-Subject: [PATCH 2/7] ARM: orion: always use MULTI_IRQ_HANDLER
+Date: Wed,  2 Dec 2015 22:27:07 +0100
+Subject: [PATCH 5/7] ARM: mv78xx0: multiplatform support
 In-Reply-To: <1449091629-2155735-1-git-send-email-arnd@arndb.de>
 References: <1449091629-2155735-1-git-send-email-arnd@arndb.de>
-Message-ID: <1449091629-2155735-3-git-send-email-arnd@arndb.de>
+Message-ID: <1449091629-2155735-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As a preparation for multiplatform support, this enables
-the MULTI_IRQ_HANDLER code unconditionally on dove and
-orion5x, and introduces the respective code on mv78xx0,
-which did not have it so far. The classic entry-macro.S
-files are removed as they are now obsolete.
+The mv78xx0 platform is now ready to be enabled for multiplatform
+support, this patch does the switch over by modifying the Kconfig file,
+the defconfig and removing the last mach/*.h header that becomes obsolete
+with this.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Acked-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/Kconfig                                 |  3 ++
- arch/arm/mach-dove/include/mach/entry-macro.S    | 33 -------------------
- arch/arm/mach-dove/irq.c                         | 12 +------
- arch/arm/mach-mv78xx0/include/mach/entry-macro.S | 41 ------------------------
- arch/arm/mach-mv78xx0/irq.c                      | 33 +++++++++++++++++++
- arch/arm/mach-orion5x/include/mach/entry-macro.S | 25 ---------------
- arch/arm/mach-orion5x/irq.c                      | 11 -------
- arch/arm/plat-orion/irq.c                        |  1 -
- arch/arm/plat-orion/mpp.c                        |  1 -
- 9 files changed, 37 insertions(+), 123 deletions(-)
- delete mode 100644 arch/arm/mach-dove/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-mv78xx0/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-orion5x/include/mach/entry-macro.S
+ arch/arm/Kconfig                                | 14 --------
+ arch/arm/configs/mv78xx0_defconfig              |  3 ++
+ arch/arm/mach-mv78xx0/Kconfig                   | 15 ++++++---
+ arch/arm/mach-mv78xx0/Makefile                  |  2 ++
+ arch/arm/mach-mv78xx0/include/mach/uncompress.h | 44 -------------------------
+ 5 files changed, 16 insertions(+), 62 deletions(-)
+ delete mode 100644 arch/arm/mach-mv78xx0/include/mach/uncompress.h
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 34e1569a11ee..227ff489a080 100644
+index 99676c25536f..6a7ff25376bf 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -512,6 +512,7 @@ config ARCH_DOVE
- 	select CPU_PJ4
- 	select GENERIC_CLOCKEVENTS
- 	select MIGHT_HAVE_PCI
-+	select MULTI_IRQ_HANDLER
- 	select MVEBU_MBUS
- 	select PINCTRL
- 	select PINCTRL_DOVE
-@@ -525,6 +526,7 @@ config ARCH_MV78XX0
- 	select CPU_FEROCEON
- 	select GENERIC_CLOCKEVENTS
- 	select MVEBU_MBUS
-+	select MULTI_IRQ_HANDLER
- 	select PCI
- 	select PLAT_ORION_LEGACY
+@@ -521,20 +521,6 @@ config ARCH_DOVE
  	help
-@@ -538,6 +540,7 @@ config ARCH_ORION5X
- 	select CPU_FEROCEON
- 	select GENERIC_CLOCKEVENTS
- 	select MVEBU_MBUS
-+	select MULTI_IRQ_HANDLER
- 	select PCI
- 	select PLAT_ORION_LEGACY
- 	select MULTI_IRQ_HANDLER
-diff --git a/arch/arm/mach-dove/include/mach/entry-macro.S b/arch/arm/mach-dove/include/mach/entry-macro.S
+ 	  Support for the Marvell Dove SoC 88AP510
+ 
+-config ARCH_MV78XX0
+-	bool "Marvell MV78xx0"
+-	select ARCH_REQUIRE_GPIOLIB
+-	select CPU_FEROCEON
+-	select GENERIC_CLOCKEVENTS
+-	select MVEBU_MBUS
+-	select MULTI_IRQ_HANDLER
+-	select PCI
+-	select PLAT_ORION_LEGACY
+-	select SPARSE_IRQ
+-	help
+-	  Support for the following Marvell MV78xx0 series SoCs:
+-	  MV781x0, MV782x0.
+-
+ config ARCH_ORION5X
+ 	bool "Marvell Orion"
+ 	depends on MMU
+diff --git a/arch/arm/configs/mv78xx0_defconfig b/arch/arm/configs/mv78xx0_defconfig
+index 85d10d2e3d66..fcdffa7d9d78 100644
+--- a/arch/arm/configs/mv78xx0_defconfig
++++ b/arch/arm/configs/mv78xx0_defconfig
+@@ -11,6 +11,9 @@ CONFIG_KPROBES=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
++CONFIG_ARCH_MULTI_V5=y
++# CONFIG_ARCH_MULTI_V6 is not set
++# CONFIG_ARCH_MULTI_V7 is not set
+ CONFIG_ARCH_MV78XX0=y
+ CONFIG_MACH_DB78X00_BP=y
+ CONFIG_MACH_RD78X00_MASA=y
+diff --git a/arch/arm/mach-mv78xx0/Kconfig b/arch/arm/mach-mv78xx0/Kconfig
+index f2d309d0619e..a32575fa3fba 100644
+--- a/arch/arm/mach-mv78xx0/Kconfig
++++ b/arch/arm/mach-mv78xx0/Kconfig
+@@ -1,6 +1,15 @@
+-if ARCH_MV78XX0
++menuconfig ARCH_MV78XX0
++	bool "Marvell MV78xx0" if ARCH_MULTI_V5
++	select ARCH_REQUIRE_GPIOLIB
++	select CPU_FEROCEON
++	select MVEBU_MBUS
++	select PCI
++	select PLAT_ORION_LEGACY
++	help
++	  Support for the following Marvell MV78xx0 series SoCs:
++	  MV781x0, MV782x0.
+ 
+-menu "Marvell MV78xx0 Implementations"
++if ARCH_MV78XX0
+ 
+ config MACH_DB78X00_BP
+ 	bool "Marvell DB-78x00-BP Development Board"
+@@ -20,6 +29,4 @@ config MACH_TERASTATION_WXL
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Buffalo WXL Nas.
+ 
+-endmenu
+-
+ endif
+diff --git a/arch/arm/mach-mv78xx0/Makefile b/arch/arm/mach-mv78xx0/Makefile
+index 7cd04634d302..ddb3aa98a3c7 100644
+--- a/arch/arm/mach-mv78xx0/Makefile
++++ b/arch/arm/mach-mv78xx0/Makefile
+@@ -1,3 +1,5 @@
++ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/arch/arm/plat-orion/include
++
+ obj-y				+= common.o mpp.o irq.o pcie.o
+ obj-$(CONFIG_MACH_DB78X00_BP)	+= db78x00-bp-setup.o
+ obj-$(CONFIG_MACH_RD78X00_MASA)	+= rd78x00-masa-setup.o
+diff --git a/arch/arm/mach-mv78xx0/include/mach/uncompress.h b/arch/arm/mach-mv78xx0/include/mach/uncompress.h
 deleted file mode 100644
-index df1d44bdc375..000000000000
---- a/arch/arm/mach-dove/include/mach/entry-macro.S
+index 2787ef392262..000000000000
+--- a/arch/arm/mach-mv78xx0/include/mach/uncompress.h
 +++ /dev/null
-@@ -1,33 +0,0 @@
+@@ -1,44 +0,0 @@
 -/*
-- * arch/arm/mach-dove/include/mach/entry-macro.S
-- *
-- * Low-level IRQ helper macros for Marvell Dove platforms
-- *
 - * This file is licensed under the terms of the GNU General Public
 - * License version 2.  This program is licensed "as is" without any
 - * warranty of any kind, whether express or implied.
 - */
 -
--#include <mach/bridge-regs.h>
+-#include <linux/serial_reg.h>
 -
--	.macro  get_irqnr_preamble, base, tmp
--	ldr	\base, =IRQ_VIRT_BASE
--	.endm
+-#define UART0_PHYS_BASE (0xf1000000 + 0x12000)
+-#define SERIAL_BASE	((unsigned char *)UART0_PHYS_BASE)
 -
--	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
--	@ check low interrupts
--	ldr	\irqstat, [\base, #IRQ_CAUSE_LOW_OFF]
--	ldr	\tmp, [\base, #IRQ_MASK_LOW_OFF]
--	mov	\irqnr, #32
--	ands	\irqstat, \irqstat, \tmp
+-static void putc(const char c)
+-{
+-	unsigned char *base = SERIAL_BASE;
+-	int i;
 -
--	@ if no low interrupts set, check high interrupts
--	ldreq	\irqstat, [\base, #IRQ_CAUSE_HIGH_OFF]
--	ldreq	\tmp, [\base, #IRQ_MASK_HIGH_OFF]
--	moveq	\irqnr, #64
--	andeqs	\irqstat, \irqstat, \tmp
+-	for (i = 0; i < 0x1000; i++) {
+-		if (base[UART_LSR << 2] & UART_LSR_THRE)
+-			break;
+-		barrier();
+-	}
 -
--	@ find first active interrupt source
--	clzne	\irqstat, \irqstat
--	subne	\irqnr, \irqnr, \irqstat
--	.endm
-diff --git a/arch/arm/mach-dove/irq.c b/arch/arm/mach-dove/irq.c
-index bfb3703357c5..b1c7cae1486b 100644
---- a/arch/arm/mach-dove/irq.c
-+++ b/arch/arm/mach-dove/irq.c
-@@ -13,6 +13,7 @@
- #include <linux/irq.h>
- #include <linux/gpio.h>
- #include <linux/io.h>
-+#include <asm/exception.h>
- #include <asm/mach/arch.h>
- #include <plat/irq.h>
- #include <asm/mach/irq.h>
-@@ -109,14 +110,6 @@ static int __initdata gpio2_irqs[4] = {
- 	0,
- };
- 
--#ifdef CONFIG_MULTI_IRQ_HANDLER
+-	base[UART_TX << 2] = c;
+-}
+-
+-static void flush(void)
+-{
+-	unsigned char *base = SERIAL_BASE;
+-	unsigned char mask;
+-	int i;
+-
+-	mask = UART_LSR_TEMT | UART_LSR_THRE;
+-
+-	for (i = 0; i < 0x1000; i++) {
+-		if ((base[UART_LSR << 2] & mask) == mask)
+-			break;
+-		barrier();
+-	}
+-}
+-
 -/*
-- * Compiling with both non-DT and DT support enabled, will
-- * break asm irq handler used by non-DT boards. Therefore,
-- * we provide a C-style irq handler even for non-DT boards,
-- * if MULTI_IRQ_HANDLER is set.
+- * nothing to do
 - */
--
- static void __iomem *dove_irq_base = IRQ_VIRT_BASE;
- 
- static asmlinkage void
-@@ -139,7 +132,6 @@ __exception_irq_entry dove_legacy_handle_irq(struct pt_regs *regs)
- 		return;
- 	}
- }
--#endif
- 
- void __init dove_init_irq(void)
- {
-@@ -148,9 +140,7 @@ void __init dove_init_irq(void)
- 	orion_irq_init(1, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
- 	orion_irq_init(33, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
- 
--#ifdef CONFIG_MULTI_IRQ_HANDLER
- 	set_handle_irq(dove_legacy_handle_irq);
--#endif
- 
- 	/*
- 	 * Initialize gpiolib for GPIOs 0-71.
-diff --git a/arch/arm/mach-mv78xx0/include/mach/entry-macro.S b/arch/arm/mach-mv78xx0/include/mach/entry-macro.S
-deleted file mode 100644
-index 6b1f088e0597..000000000000
---- a/arch/arm/mach-mv78xx0/include/mach/entry-macro.S
-+++ /dev/null
-@@ -1,41 +0,0 @@
--/*
-- * arch/arm/mach-mv78xx0/include/mach/entry-macro.S
-- *
-- * Low-level IRQ helper macros for Marvell MV78xx0 platforms
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <mach/bridge-regs.h>
--
--	.macro  get_irqnr_preamble, base, tmp
--	ldr	\base, =IRQ_VIRT_BASE
--	.endm
--
--	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
--	@ check low interrupts
--	ldr	\irqstat, [\base, #IRQ_CAUSE_LOW_OFF]
--	ldr	\tmp, [\base, #IRQ_MASK_LOW_OFF]
--	mov	\irqnr, #31
--	ands	\irqstat, \irqstat, \tmp
--	bne	1001f
--
--	@ if no low interrupts set, check high interrupts
--	ldr	\irqstat, [\base, #IRQ_CAUSE_HIGH_OFF]
--	ldr	\tmp, [\base, #IRQ_MASK_HIGH_OFF]
--	mov	\irqnr, #63
--	ands	\irqstat, \irqstat, \tmp
--	bne	1001f
--
--	@ if no high interrupts set, check error interrupts
--	ldr	\irqstat, [\base, #IRQ_CAUSE_ERR_OFF]
--	ldr	\tmp, [\base, #IRQ_MASK_ERR_OFF]
--	mov	\irqnr, #95
--	ands	\irqstat, \irqstat, \tmp
--
--	@ find first active interrupt source
--1001:	clzne	\irqstat, \irqstat
--	subne	\irqnr, \irqnr, \irqstat
--	.endm
-diff --git a/arch/arm/mach-mv78xx0/irq.c b/arch/arm/mach-mv78xx0/irq.c
-index 32073444024b..2453c33faccf 100644
---- a/arch/arm/mach-mv78xx0/irq.c
-+++ b/arch/arm/mach-mv78xx0/irq.c
-@@ -11,6 +11,7 @@
- #include <linux/kernel.h>
- #include <linux/irq.h>
- #include <linux/io.h>
-+#include <asm/exception.h>
- #include <mach/bridge-regs.h>
- #include <plat/orion-gpio.h>
- #include <plat/irq.h>
-@@ -23,12 +24,44 @@ static int __initdata gpio0_irqs[4] = {
- 	IRQ_MV78XX0_GPIO_24_31,
- };
- 
-+static void __iomem *mv78xx0_irq_base = IRQ_VIRT_BASE;
-+
-+static asmlinkage void
-+__exception_irq_entry mv78xx0_legacy_handle_irq(struct pt_regs *regs)
-+{
-+	u32 stat;
-+
-+	stat = readl_relaxed(mv78xx0_irq_base + IRQ_CAUSE_LOW_OFF);
-+	stat &= readl_relaxed(mv78xx0_irq_base + IRQ_MASK_LOW_OFF);
-+	if (stat) {
-+		unsigned int hwirq = __fls(stat);
-+		handle_IRQ(hwirq, regs);
-+		return;
-+	}
-+	stat = readl_relaxed(mv78xx0_irq_base + IRQ_CAUSE_HIGH_OFF);
-+	stat &= readl_relaxed(mv78xx0_irq_base + IRQ_MASK_HIGH_OFF);
-+	if (stat) {
-+		unsigned int hwirq = 32 + __fls(stat);
-+		handle_IRQ(hwirq, regs);
-+		return;
-+	}
-+	stat = readl_relaxed(mv78xx0_irq_base + IRQ_CAUSE_ERR_OFF);
-+	stat &= readl_relaxed(mv78xx0_irq_base + IRQ_MASK_ERR_OFF);
-+	if (stat) {
-+		unsigned int hwirq = 64 + __fls(stat);
-+		handle_IRQ(hwirq, regs);
-+		return;
-+	}
-+}
-+
- void __init mv78xx0_init_irq(void)
- {
- 	orion_irq_init(0, IRQ_VIRT_BASE + IRQ_MASK_LOW_OFF);
- 	orion_irq_init(32, IRQ_VIRT_BASE + IRQ_MASK_HIGH_OFF);
- 	orion_irq_init(64, IRQ_VIRT_BASE + IRQ_MASK_ERR_OFF);
- 
-+	set_handle_irq(mv78xx0_legacy_handle_irq);
-+
- 	/*
- 	 * Initialize gpiolib for GPIOs 0-31.  (The GPIO interrupt mask
- 	 * registers for core #1 are at an offset of 0x18 from those of
-diff --git a/arch/arm/mach-orion5x/include/mach/entry-macro.S b/arch/arm/mach-orion5x/include/mach/entry-macro.S
-deleted file mode 100644
-index 73919a36b577..000000000000
---- a/arch/arm/mach-orion5x/include/mach/entry-macro.S
-+++ /dev/null
-@@ -1,25 +0,0 @@
--/*
-- * arch/arm/mach-orion5x/include/mach/entry-macro.S
-- *
-- * Low-level IRQ helper macros for Orion platforms
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <mach/bridge-regs.h>
--
--	.macro  get_irqnr_preamble, base, tmp
--	ldr	\base, =MAIN_IRQ_CAUSE
--	.endm
--
--	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
--	ldr	\irqstat, [\base, #0]		@ main cause
--	ldr	\tmp, [\base, #(MAIN_IRQ_MASK - MAIN_IRQ_CAUSE)] @ main mask
--	mov	\irqnr, #0			@ default irqnr
--	@ find cause bits that are unmasked
--	ands	\irqstat, \irqstat, \tmp	@ clear Z flag if any
--	clzne	\irqnr,	\irqstat		@ calc irqnr
--	rsbne	\irqnr, \irqnr, #32
--	.endm
-diff --git a/arch/arm/mach-orion5x/irq.c b/arch/arm/mach-orion5x/irq.c
-index 086ecb87d885..8678db1eb1bd 100644
---- a/arch/arm/mach-orion5x/irq.c
-+++ b/arch/arm/mach-orion5x/irq.c
-@@ -26,14 +26,6 @@ static int __initdata gpio0_irqs[4] = {
- 	IRQ_ORION5X_GPIO_24_31,
- };
- 
--#ifdef CONFIG_MULTI_IRQ_HANDLER
--/*
-- * Compiling with both non-DT and DT support enabled, will
-- * break asm irq handler used by non-DT boards. Therefore,
-- * we provide a C-style irq handler even for non-DT boards,
-- * if MULTI_IRQ_HANDLER is set.
-- */
--
- asmlinkage void
- __exception_irq_entry orion5x_legacy_handle_irq(struct pt_regs *regs)
- {
-@@ -47,15 +39,12 @@ __exception_irq_entry orion5x_legacy_handle_irq(struct pt_regs *regs)
- 		return;
- 	}
- }
--#endif
- 
- void __init orion5x_init_irq(void)
- {
- 	orion_irq_init(1, MAIN_IRQ_MASK);
- 
--#ifdef CONFIG_MULTI_IRQ_HANDLER
- 	set_handle_irq(orion5x_legacy_handle_irq);
--#endif
- 
- 	/*
- 	 * Initialize gpiolib for GPIOs 0-31.
-diff --git a/arch/arm/plat-orion/irq.c b/arch/arm/plat-orion/irq.c
-index 8c1fc06007c0..5b63b28b00ac 100644
---- a/arch/arm/plat-orion/irq.c
-+++ b/arch/arm/plat-orion/irq.c
-@@ -18,7 +18,6 @@
- #include <asm/exception.h>
- #include <plat/irq.h>
- #include <plat/orion-gpio.h>
--#include <mach/bridge-regs.h>
- 
- void __init orion_irq_init(unsigned int irq_start, void __iomem *maskaddr)
- {
-diff --git a/arch/arm/plat-orion/mpp.c b/arch/arm/plat-orion/mpp.c
-index 7310bcfb299f..5b4ff9373c89 100644
---- a/arch/arm/plat-orion/mpp.c
-+++ b/arch/arm/plat-orion/mpp.c
-@@ -13,7 +13,6 @@
- #include <linux/mbus.h>
- #include <linux/io.h>
- #include <linux/gpio.h>
--#include <mach/hardware.h>
- #include <plat/orion-gpio.h>
- #include <plat/mpp.h>
- 
+-#define arch_decomp_setup()
 -- 
 2.1.0.rc2
