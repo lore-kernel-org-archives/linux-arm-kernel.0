@@ -1,51 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Dec 2015 09:23:59 +0100
-Subject: [RFC v02 00/15] dmaengine: New 'universal' API for requesting
- channel
-In-Reply-To: <20151202045209.GB1854@localhost>
-References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
- <3124382.EhiMyQGKTA@wuerfel> <20151202045209.GB1854@localhost>
-Message-ID: <2174709.hFEDv974P4@wuerfel>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Wed, 2 Dec 2015 09:26:23 +0100
+Subject: [PATCH 00/13] mvneta Buffer Management and enhancements
+In-Reply-To: <20151130.112500.293198684175670933.davem@redhat.com>
+References: <CAPv3WKc4zSmjtw_FeePCVCaq_aUubbCw_ggtxgxs0-7LwL7fHQ@mail.gmail.com>
+ <20151129.210210.1777978635596463961.davem@davemloft.net>
+ <CAPv3WKcHnJHCvg63Vs79RboNOuESU8jCLouKPRW4NdptAd_hag@mail.gmail.com>
+ <20151130.112500.293198684175670933.davem@redhat.com>
+Message-ID: <CAPv3WKcKm3X3Lys2HwYZXaZxPaajenF7av1wJKXqKxxwibXW4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 December 2015 10:22:09 Vinod Koul wrote:
-> > 
-> > > > This legacy mode needs changes in platform code, in dmaengine drivers and
-> > > > finally the dmaengine user drivers can be converted:
-> > > 
-> > > Are you marking the current APIs as dericated in the end of this series
-> > 
-> > I think we practically stopped marking things as deprecated in general.
-> > Per Linus decree, whenever we want to get rid of something, we should
-> > instead change all users in tree and then remove the API, expecting
-> > driver maintainers to do something just because you marked it as deprecated
-> > often doesn't work.
-> 
-> Yes but while we do conversion we don't know if new users get added which use
-> old API..
+Hi Florian,
 
-We probably don't need to worry about new users of dma_request_channel(),
-as we don't add new ARM platforms without DT, and other architectures
-don't add a lot of new platforms. Similarly, I don't expect a whole lot
-of dma_request_slave_channel_compat() users, because the conversion from
-board files to DT based booting has slowed down a lot after most of the
-actively maintained platforms are done with it.
+Can you please describe in more details, what would you expect from
+such special abstraction layer regarding buffer managers? I'd like to
+understand more of your expectations and evaluate possible work.
 
-If you do a one-line patch to add dma_request_chan() as an alias for
-dma_request_slave_channel_reason() now, we can probably convert most
-users of dma_request_slave_channel() and dma_request_slave_channel_reason()
-to dma_request_chan() in the next merge window and do a patch to
-replace the few remaining ones and remove the API one merge window later.
+Best regards,
+Marcin
 
-If wewant to stage out the conversion of the
-dma_request_slave_channel_compat() and dma_request_channel() similarly,
-it would be good to have all the interface changes for the dmaengine
-core basically in place, so we can start to convert the platforms
-independently for the 4.5 merge window without having a dependency on
-dmaengine patches. It's probably best to not convert a slave driver
-away from dma_request_channel() until the dma map has been created
-for all platforms using that driver, again to avoid having too many
-dependencies.
-
-	Arnd
+2015-11-30 17:25 GMT+01:00 David Miller <davem@redhat.com>:
+> From: Marcin Wojtas <mw@semihalf.com>
+> Date: Mon, 30 Nov 2015 15:13:22 +0100
+>
+>> What kind of abstraction and helpers do you mean? Some kind of API
+>> (e.g. bm_alloc_buffer, bm_initialize_ring bm_put_buffer,
+>> bm_get_buffer), which would be used by platform drivers (and specific
+>> aplications if one wants to develop on top of the kernel)?
+>>
+>> In general, what is your top-view of such solution and its cooperation
+>> with the drivers?
+>
+> The tricky parts involved have to do with allocating pages for the
+> buffer pools and minimizing the number of atomic refcounting
+> operations on those pages for for the puts and gets, particularly
+> around buffer replenish runs.
+>
+> For example, if you're allocating a page for a buffer pool the device
+> will chop into N (for any N < PAGE_SIZE) byte pieces, you can
+> eliminate many atomic operations.
