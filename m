@@ -1,113 +1,109 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 Dec 2015 12:19:19 +0000
-Subject: [PATCH] arm64: Support VDSO remapping
-In-Reply-To: <1448455781-26660-1-git-send-email-cov@codeaurora.org>
-References: <1448455781-26660-1-git-send-email-cov@codeaurora.org>
-Message-ID: <20151202121918.GA4523@arm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed,  2 Dec 2015 12:22:59 +0000
+Subject: [PATCH v3 1/4] drm: arm: Add DT bindings documentation for HDLCD
+ driver.
+In-Reply-To: <1449058982-18595-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1449058982-18595-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1449058982-18595-2-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christopher,
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
 
-On Wed, Nov 25, 2015 at 07:49:29AM -0500, Christopher Covington wrote:
-> Some applications such as Checkpoint/Restore In Userspace (CRIU) remap and
-> unmap the VDSO. Add support for this to the AArch64 kernel by copying in
-> the PowerPC code with slight modifications.
-> 
-> Signed-off-by: Christopher Covington <cov@codeaurora.org>
-> ---
->  arch/arm64/include/asm/Kbuild          |  1 -
->  arch/arm64/include/asm/mm-arch-hooks.h | 28 ++++++++++++++++++++++++++++
->  arch/arm64/include/asm/mmu_context.h   | 23 ++++++++++++++++++++++-
->  3 files changed, 50 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm64/include/asm/mm-arch-hooks.h
-> 
-> diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-> index 70fd9ff..b112a39 100644
-> --- a/arch/arm64/include/asm/Kbuild
-> +++ b/arch/arm64/include/asm/Kbuild
-> @@ -25,7 +25,6 @@ generic-y += kvm_para.h
->  generic-y += local.h
->  generic-y += local64.h
->  generic-y += mcs_spinlock.h
-> -generic-y += mm-arch-hooks.h
->  generic-y += mman.h
->  generic-y += msgbuf.h
->  generic-y += msi.h
-> diff --git a/arch/arm64/include/asm/mm-arch-hooks.h b/arch/arm64/include/asm/mm-arch-hooks.h
-> new file mode 100644
-> index 0000000..e6923fb
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/mm-arch-hooks.h
-> @@ -0,0 +1,28 @@
-> +/*
-> + * Architecture specific mm hooks
-> + *
-> + * Copyright (C) 2015, IBM Corporation
-> + * Author: Laurent Dufour <ldufour@linux.vnet.ibm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __ASM_MM_ARCH_HOOKS_H
-> +#define __ASM_MM_ARCH_HOOKS_H
-> +
-> +static inline void arch_remap(struct mm_struct *mm,
-> +			      unsigned long old_start, unsigned long old_end,
-> +			      unsigned long new_start, unsigned long new_end)
-> +{
-> +	/*
-> +	 * mremap() doesn't allow moving multiple vmas so we can limit the
-> +	 * check to old_start == vdso_base.
-> +	 */
-> +	if ((void *)old_start == mm->context.vdso)
-> +		mm->context.vdso = (void *)new_start;
-> +}
-> +#define arch_remap arch_remap
-> +
-> +#endif /* __ASM_MM_ARCH_HOOKS_H */
-> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-> index 2416578..9fe0773 100644
-> --- a/arch/arm64/include/asm/mmu_context.h
-> +++ b/arch/arm64/include/asm/mmu_context.h
-> @@ -24,7 +24,6 @@
->  
->  #include <asm/cacheflush.h>
->  #include <asm/proc-fns.h>
-> -#include <asm-generic/mm_hooks.h>
->  #include <asm/cputype.h>
->  #include <asm/pgtable.h>
->  
-> @@ -147,4 +146,26 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
->  #define deactivate_mm(tsk,mm)	do { } while (0)
->  #define activate_mm(prev,next)	switch_mm(prev, next, NULL)
->  
-> +static inline void arch_dup_mmap(struct mm_struct *oldmm,
-> +				      struct mm_struct *mm)
-> +{
-> +}
-> +
-> +static inline void arch_exit_mmap(struct mm_struct *mm)
-> +{
-> +}
-> +
-> +static inline void arch_unmap(struct mm_struct *mm,
-> +			      struct vm_area_struct *vma,
-> +			      unsigned long start, unsigned long end)
-> +{
-> +	if ((void *)start <= mm->context.vdso && mm->context.vdso < (void *)end)
-> +		mm->context.vdso = NULL;
-> +}
-> +
-> +static inline void arch_bprm_mm_init(struct mm_struct *mm,
-> +				     struct vm_area_struct *vma)
-> +{
-> +}
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ .../devicetree/bindings/display/arm,hdlcd.txt      | 79 ++++++++++++++++++++++
+ 1 file changed, 79 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/arm,hdlcd.txt
 
-This is virtually identical to the PowerPC implementation, afaict. Any
-chance we could move this to core code and define some generic vdso
-accessors for the mm?
-
-Will
+diff --git a/Documentation/devicetree/bindings/display/arm,hdlcd.txt b/Documentation/devicetree/bindings/display/arm,hdlcd.txt
+new file mode 100644
+index 0000000..78bc242
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/arm,hdlcd.txt
+@@ -0,0 +1,79 @@
++ARM HDLCD
++
++This is a display controller found on several development platforms produced
++by ARM Ltd and in more modern of its' Fast Models. The HDLCD is an RGB
++streamer that reads the data from a framebuffer and sends it to a single
++digital encoder (DVI or HDMI).
++
++Required properties:
++  - compatible: "arm,hdlcd"
++  - reg: Physical base address and length of the controller's registers.
++  - interrupts: One interrupt used by the display controller to notify the
++    interrupt controller when any of the interrupt sources programmed in
++    the interrupt mask register have activated.
++  - clocks: A list of phandle + clock-specifier pairs, one for each
++    entry in 'clock-names'.
++  - clock-names: A list of clock names. For HDLCD it should contain:
++      - "pxlclk" for the clock feeding the output PLL of the controller.
++
++Required sub-nodes:
++  - port: The HDLCD connection to an encoder chip. The connection is modeled
++    using the OF graph bindings specified in
++    Documentation/devicetree/bindings/graph.txt.
++
++Optional properties:
++  - memory-region: phandle to a node describing memory (see
++    Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt) to be
++    used for the framebuffer; if not present, the framebuffer may be located
++    anywhere in memory.
++
++
++Example:
++
++/ {
++	...
++
++	hdlcd at 2b000000 {
++		compatible = "arm,hdlcd";
++		reg = <0 0x2b000000 0 0x1000>;
++		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&oscclk5>;
++		clock-names = "pxlclk";
++		port {
++			hdlcd_output: endpoint at 0 {
++				remote-endpoint = <&hdmi_enc_input>;
++			};
++		};
++	};
++
++	/* HDMI encoder on I2C bus */
++	i2c at 7ffa0000 {
++		....
++		hdmi-transmitter at 70 {
++			compatible = ".....";
++			reg = <0x70>;
++			port at 0 {
++				hdmi_enc_input: endpoint {
++					remote-endpoint = <&hdlcd_output>;
++				};
++
++				hdmi_enc_output: endpoint {
++					remote-endpoint = <&hdmi_1_port>;
++				};
++			};
++		};
++
++	};
++
++	hdmi1: connector at 1 {
++		compatible = "hdmi-connector";
++		type = "a";
++		port {
++			hdmi_1_port: endpoint {
++				remote-endpoint = <&hdmi_enc_output>;
++			};
++		};
++	};
++
++	...
++};
+-- 
+2.6.2
