@@ -1,17 +1,58 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 2 Dec 2015 14:14:12 +0800
-Subject: [PATCH V1] ARM: dts: imx6: Change the clock name for spba clock
-In-Reply-To: <8cd5b975aa4792f1dd9ac2f8909689f8d2018160.1448505436.git.shengjiu.wang@freescale.com>
-References: <8cd5b975aa4792f1dd9ac2f8909689f8d2018160.1448505436.git.shengjiu.wang@freescale.com>
-Message-ID: <20151202061412.GI692@tiger>
+From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
+Date: Wed, 2 Dec 2015 14:29:09 +0800
+Subject: [PATCH v3] arm64: dts: add all hi6220 i2c nodes
+Message-ID: <1449037749-14388-1-git-send-email-kong.kongxinwei@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2015 at 10:39:30AM +0800, Shengjiu Wang wrote:
-> Audio IP need the spba clock, but original clock name "dma" is not
-> accurate, so change it to name "spba". The audio driver has been
-> using the new name "spba", the binding document has been updated.
-> 
-> Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
+This patch adds all I2C nodes for the Hi6220 SoC. This hi6220 Soc
+use this I2C IP of Synopsys Designware for HiKey board.
 
-Applied, thanks.
+Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+---
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index 82d2488..6eae673 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -208,5 +208,36 @@
+ 			clock-names = "uartclk", "apb_pclk";
+ 			status = "disabled";
+ 		};
++
++		i2c0: i2c at f7100000 {
++			compatible = "snps,designware-i2c";
++			reg = <0x0 0xf7100000 0x0 0x1000>;
++			interrupts = <0 44 4>;
++			i2c-sda-hold-time-ns = <300>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pmx_func &i2c0_cfg_func>;
++			status = "disabled";
++		};
++
++		i2c1: i2c at f7101000 {
++			compatible = "snps,designware-i2c";
++			reg = <0x0 0xf7101000 0x0 0x1000>;
++			interrupts = <0 45 4>;
++			i2c-sda-hold-time-ns = <300>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c1_pmx_func &i2c1_cfg_func>;
++			status = "disabled";
++		};
++
++		i2c2: i2c at f7102000 {
++			compatible = "snps,designware-i2c";
++			reg = <0x0 0xf7102000 0x0 0x1000>;
++			interrupts = <0 46 4>;
++			i2c-sda-hold-time-ns = <300>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c2_pmx_func &i2c2_cfg_func>;
++			status = "disabled";
++		};
++
+ 	};
+ };
+-- 
+1.9.1
