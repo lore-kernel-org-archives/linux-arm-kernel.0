@@ -1,27 +1,90 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Wed, 02 Dec 2015 08:59:40 -0800
-Subject: [PATCH 3/6] net: thunderx: Increase transmit queue length
-In-Reply-To: <CA+sq2CfWC0kcxKj1kqMEU3+y9aovqDdpn2G72n5ON9T3Hzew_w@mail.gmail.com>
-References: <01d101d12c46$2de43b40$89acb1c0$@samsung.com>
- <1448983985.25582.35.camel@edumazet-glaptop2.roam.corp.google.com>
- <CA+sq2Ce9oH-kCDO8hK_wX+ZZdXyyBuT4V2bt5Ab+2=pEX+BO+w@mail.gmail.com>
- <20151201.143047.82022857078130793.davem@davemloft.net>
- <CA+sq2CduMnsh_R9zTRMjWT=F5=9U3si-5nO6-gFvGCO9czkDdA@mail.gmail.com>
- <1449062733.32764.53.camel@edumazet-glaptop2.roam.corp.google.com>
- <CA+sq2CfWC0kcxKj1kqMEU3+y9aovqDdpn2G72n5ON9T3Hzew_w@mail.gmail.com>
-Message-ID: <1449075580.6379.1.camel@edumazet-glaptop2.roam.corp.google.com>
+From: salil.mehta@huawei.com (Salil Mehta)
+Date: Wed, 2 Dec 2015 16:52:46 +0000
+Subject: [PATCH V6 net-next 0/5] net:hns: Add support of Hip06 SoC to the
+ Hislicon Network Subsystem
+Message-ID: <1449075171-4820-1-git-send-email-salil.mehta@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-12-02 at 22:20 +0530, Sunil Kovvuri wrote:
-> >
-> > If the performance increase is 4 %, then surely using twice more memory
-> > is not worth it.
-> I haven't mentioned anywhere that i am seeing 4% increase in performance.
+This PATCH V6 addresses the review comments provided by
+David Miller over the existing use of ENABLE/DISABLE
+hash defines with the code. These hash defines are doing
+a similar job as implicit type bool would do. So these are
+kind of duplicate and are redundant.
 
-Yes, this is the complain I made :
+PATCH V5:
+This PATCH addresses the review comments by Yuval Mintz
+ <Yuval.Mintz@qlogic.com>. This rework of comments are basically
+ related to:
+ 1) styling of the code,
+ 2) RSS default Key initiailization related code
+ 3) redundant code removal 
 
-No numbers, just a patch increasing ring size by a 100% factor !
+PATCH V4:
+This addresses the review comment provided by 
+Sergei Shtylyov. The changelog of every patch has also
+been modified.
 
-I really hope you'll have very convincing numbers, especially if your
-driver does not implement BQL.
+PATCH V3:
+ Addresses the review comment floated by David Miller 
+
+PATCH V2:
+1) Bug Fixes and Clean-up: Internally identified
+2) Addresses internal review comments by Kenneth Lee and
+   by Huang Daode
+3) Addresses the review comment from "Yisen.Zhuang(Zhuangyuzeng)"
+4) Adds fix from Fengguang Wu for an error generated from 
+   "kbuild test robot" from Intel
+5) Ethtool support for TSO set option from Lisheng
+
+PATCH V1:
+Adds initial support of Hip06 SoC with below changes:  
+This patch-set adds support of new Hisilicon Hip06 SoC to the existing
+(already part of net-next) HNS ethernet driver for Hip05 SoC. Hip06 is
+a multi-core SoC and is a derivative of Hip05 SoC with lots of new
+hardware featres supported like RSS, TSO, hardware VLAN assist etc. 
+
+The changes in the driver are mainly due to following:
+ 1) changes in the DMA descriptor provided by the Hip06 ethernet 
+    hardware. These changes need to co-exist with already present
+    Hip05 DMA descriptor and its operating functions. The decision
+    to choose the correct type of DMA descriptor is taken dynamically
+    depending upon the version of the hardware (i.e. V1/hip05 or
+    V2/hip06, see already existing hisilicon-hns-nic.txt binding file
+    for the detailed description version and naming).
+ 2) To support new features added to the Hip06 ethernet hardware:
+    a. RSS (Receive Side Scaling)
+    b. TSO (TCP Segment Offload)
+    c. Hardware VLAN support (currently we are initializing hardware
+       to not assist in stripping the vlan tag at hardware level.
+       Proper support of this feature and ethtool would come after
+       these patches have been accepted)
+
+Kindly note that, this patchset has been based on latest net-next.
+
+Salil Mehta (5):
+  net:hns: Add support of Hip06 SoC to the Hislicon Network Subsystem
+  net:hns: Add Hip06 "RSS(Receive Side Scaling)" support to HNS Driver
+  net:hns: Add Hip06 "TSO(TCP Segment Offload)" support HNS Driver
+  net:hns: Add support of ethtool TSO set option for Hip06 in HNS
+  net:hns: Add the init code to disable Hip06 "Hardware VLAN assist"
+
+ drivers/net/ethernet/hisilicon/hns/hnae.h          |   58 ++-
+ drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c  |   98 +++-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c  |   14 +-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h  |    4 +-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c |  213 +++++++--
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h |   24 +-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c |    6 +-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c  |   72 ++-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.h  |   32 +-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c  |   76 ++-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.h  |    8 +-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h  |   88 +++-
+ drivers/net/ethernet/hisilicon/hns/hns_enet.c      |  483 +++++++++++++++++---
+ drivers/net/ethernet/hisilicon/hns/hns_enet.h      |   12 +
+ drivers/net/ethernet/hisilicon/hns/hns_ethtool.c   |   95 +++-
+ 15 files changed, 1077 insertions(+), 206 deletions(-)
+
+-- 
+1.7.9.5
