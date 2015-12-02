@@ -1,51 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 1 Dec 2015 17:38:05 -0800
-Subject: [PATCH 05/10] ARM: OMAP2+: Disable GPIO softreset for dm81xx
-In-Reply-To: <20151202005430.GY23396@atomide.com>
-References: <1449013103-23238-1-git-send-email-tony@atomide.com>
- <1449013103-23238-6-git-send-email-tony@atomide.com>
- <CAALWOA-Cy7MUUE-6i7sovSQLj8g86E1gZu06+45oB20QGGQweA@mail.gmail.com>
- <20151202004136.GW23396@atomide.com>
- <20151202005430.GY23396@atomide.com>
-Message-ID: <20151202013805.GA23396@atomide.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 02 Dec 2015 10:39:37 +0900
+Subject: [GIT PULL 0/9] ARM: EXYNOS: Pull request for v4.5
+Message-ID: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [151201 16:56]:
-> * Tony Lindgren <tony@atomide.com> [151201 16:42]:
-> > * Matthijs van Duin <matthijsvanduin@gmail.com> [151201 16:11]:
-> > > On 2 December 2015 at 00:38, Tony Lindgren <tony@atomide.com> wrote:
-> > > > Looks like GPIO softreset status bit on both dm8168 and dm8148
-> > > > is broken and only goes high initially. After writing to sysc
-> > > > softreset bit, the resetdone bit never goes high again.
-> > > 
-> > > The resetdone bit works fine, but it needs all clocks active to come
-> > > up. You're neglecting to enable the debounce clock to the GPIO module:
-> > > 
-> > > > # mw.l 0x4818155c 0x2
-> > > 
-> > > That should write 0x102 instead.
-> > 
-> > It seems to work only once based on what I've seen :) If you try it
-> > after it's powered it never works. Could be I'm doing something wrong
-> > of course..
-> > 
-> > > You can disable the debounce clock after resetting the module if you
-> > > don't need it, though I doubt there's any significant power savings
-> > > there. (More likely it exists as a separate bit to allow it to stay
-> > > enabled even if the module isn't, for wakeup on debounced inputs.)
-> > 
-> > Hmm I tried setting HWMOD_CONTROL_OPT_CLKS_IN_RESET flag like we
-> > have for many SoCs to enable also sysclk18_ck but no luck. I can
-> > recheck that.
-> 
-> You're right with 0x102 it works, need to debug further.
+Hi Kukjin,
 
-Looks like also am33xx has opt clocks gate bit 18. Probably the best
-way to deal with this in the long run is to set up the clkctrl and
-optfclken as gate clocks with the clock framework. This is also needed
-as we have some devices sharing a single clkctrl register.
+A lot of stuff for v4.5 with 3 dependencies split into
+separate tags. The need for dependency is explained both
+in merge-commit and in description of a tag which is using
+the dependency.
 
-Regards,
+The order goes like (but of course dependencies
+could be pulled all at once at beginning):
+1. tags/samsung-dt-syscon-restart-4.5
+2. tags/samsung-soc-4.5
+3. tags/samsung-clk-arm64-symbols-4.5
+4. tags/samsung-soc64-4.5
+5. tags/samsung-drivers-4.5
+6. tags/samsung-clk-exynos4-4.5
+7. tags/samsung-dt-4.5
+8. tags/samsung-dt64-4.5
+9. tags/samsung-defconfig-4.5
 
-Tony
+I split dependencies to three tags so clock or other folks could
+easily grab them if needed.
+
+Please share your comments or pull as early as possible as we have here
+some more dependencies than usual.
+
+
+Kind regards,
+Krzysztof
