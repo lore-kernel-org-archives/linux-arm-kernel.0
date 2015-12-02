@@ -1,91 +1,112 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Thu, 3 Dec 2015 01:26:39 +0800
-Subject: [PATCH v2] acpi, apei, arm64: APEI initial support for aarch64.
-In-Reply-To: <20151202170257.GB20520@red-moon>
-References: <1449068345-9021-1-git-send-email-fu.wei@linaro.org>
- <20151202170257.GB20520@red-moon>
-Message-ID: <CADyBb7s=QB4X0Gqbtfwwmv3auk_Kd0L_Q3a-vs0TP4TuTVvwJA@mail.gmail.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Wed, 2 Dec 2015 09:26:48 -0800
+Subject: [PATCHv7 2/2] mailbox: Adding driver for Xilinx LogiCORE IP
+ mailbox.
+In-Reply-To: <CABb+yY3tpepdO=s9nb9kAE241sYVTTXB-ci_4ihuthHTekedNg@mail.gmail.com>
+References: <1436922022-17564-1-git-send-email-moritz.fischer@ettus.com>
+ <1436922022-17564-3-git-send-email-moritz.fischer@ettus.com>
+ <CABb+yY3tpepdO=s9nb9kAE241sYVTTXB-ci_4ihuthHTekedNg@mail.gmail.com>
+Message-ID: <CAAtXAHe_7vR71wZPbEw1so_40OEHiNN38mnTuqoX7SCwqEpfcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+Hi Jassi,
 
-On 3 December 2015 at 01:02, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Wed, Dec 02, 2015 at 10:59:05PM +0800, fu.wei at linaro.org wrote:
->
-> [...]
->
->> +#ifdef CONFIG_ACPI_APEI
->> +extern int acpi_disable_cmcff;
->> +#endif
->>
->>  static inline void disable_acpi(void)
->>  {
->> @@ -94,6 +97,7 @@ static inline const char *acpi_get_enable_method(int cpu)
->>
->>  #ifdef       CONFIG_ACPI_APEI
->>  pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
->> +void arch_apei_flush_tlb_one(unsigned long addr);
->>  #endif
->>
->>  #endif /*_ASM_ACPI_H*/
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> index d1ce8e2..811fea2 100644
->> --- a/arch/arm64/kernel/acpi.c
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -32,6 +32,7 @@
->>  #ifdef CONFIG_ACPI_APEI
->>  # include <linux/efi.h>
->>  # include <asm/pgtable.h>
->> +# include <asm/tlbflush.h>
->>  #endif
->>
->>  int acpi_noirq = 1;          /* skip ACPI IRQ initialization */
->> @@ -41,6 +42,10 @@ EXPORT_SYMBOL(acpi_disabled);
->>  int acpi_pci_disabled = 1;   /* skip ACPI PCI scan and IRQ initialization */
->>  EXPORT_SYMBOL(acpi_pci_disabled);
->>
->> +#ifdef CONFIG_ACPI_APEI
->> +int acpi_disable_cmcff;
->> +#endif
->
-> There must be a reason why we keep all these arch agnostic ACPI flags
-> in arch specific code, is there ?
+thanks for your feedback.
 
-very good point, will try to fix it in next patch  :-)
-
->
-> Lorenzo
+On Mon, Aug 10, 2015 at 1:05 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Wed, Jul 15, 2015 at 6:30 AM, Moritz Fischer
+> <moritz.fischer@ettus.com> wrote:
 >
 >> +
->>  static bool param_acpi_off __initdata;
->>  static bool param_acpi_force __initdata;
->>
->> @@ -233,4 +238,9 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
->>               return __pgprot(PROT_NORMAL_NC);
->>       return __pgprot(PROT_DEVICE_nGnRnE);
->>  }
->> +
->> +void arch_apei_flush_tlb_one(unsigned long addr)
+>> +static void xilinx_mbox_rx_data(struct mbox_chan *chan)
 >> +{
->> +     flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
->> +}
->>  #endif
->> --
->> 2.5.0
+>> +       struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
+>> +       u32 data;
+>> +
+>> +       if (xilinx_mbox_pending(mbox)) {
+>> +               data = readl_relaxed(mbox->mbox_base + MAILBOX_REG_RDDATA);
+>> +               mbox_chan_received_data(chan, (void *)data);
 >>
+> If RDDATA is a FIFO, then above seems wrong - you are assuming
+> messages are always going to be exactly 32-bits for every protocol.
+> Ideally you should empty the fifo fully, at least when RX has an
+> interrupt.
 
+>From my understanding it's hard to tell how much actually is in the fifo,
+you can tell if it's full for send direction, or empty for read direction.
 
+Maybe the STI / RTI can be setup in a smart way to work with multiple message
+sizes.
+>
+>> +
+>> +static int xilinx_mbox_irq_send_data(struct mbox_chan *chan, void *data)
+>> +{
+>> +       struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
+>> +       u32 *udata = data;
+>> +
+>> +       if (xilinx_mbox_full(mbox))
+>> +               return -EBUSY;
+>>
+> This check is redundant. last_tx_done already makes sure this is always true.
 
--- 
-Best regards,
+Good to know. I'll fix it.
+>
+>> +       /* enable interrupt before send */
+>> +       xilinx_mbox_tx_intmask(mbox, true);
+>> +
+>> +       writel_relaxed(*udata, mbox->mbox_base + MAILBOX_REG_WRDATA);
+>> +
+> From status EMPTY and FULL, it seems WRDATA is a FIFO. So here also
+> you should expect messages to be <= fifo depth. And not assume exactly
+> 32bit messages always.
 
-Fu Wei
-Software Engineer
-Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
-Ph: +86 21 61221326(direct)
-Ph: +86 186 2020 4684 (mobile)
-Room 1512, Regus One Corporate Avenue,Level 15,
-One Corporate Avenue,222 Hubin Road,Huangpu District,
-Shanghai,China 200021
+How do I determine the message size? Doesn't
+drivers/mailbox/bcm2835-mailbox.c or
+mailbox-altera.c make the same assumption?
+
+>
+>> +
+>> +static bool xilinx_mbox_last_tx_done(struct mbox_chan *chan)
+>> +{
+>> +       struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
+>> +
+>> +       /* return false if mailbox is full */
+>> +       return !xilinx_mbox_full(mbox);
+>>
+> Instead of FULL, I think it should check for stricter EMPTY status ...
+> mbox api submits only 1 message at a time.
+
+The EMPTY status applies to the receive direction only, I could check
+the STI status
+bit though I suppose.
+
+[...]
+>> +
+>> +       mbox->irq = platform_get_irq(pdev, 0);
+>> +       /* if irq is present, we can use it, otherwise, poll */
+>> +       if (mbox->irq > 0) {
+>> +               mbox->controller.txdone_irq = true;
+>> +               mbox->controller.ops = &xilinx_mbox_irq_ops;
+>> +       } else {
+>> +               dev_info(&pdev->dev, "IRQ not found, fallback to polling.\n");
+>> +               mbox->controller.txdone_poll = true;
+>> +               mbox->controller.txpoll_period = MBOX_POLLING_MS;
+>> +               mbox->controller.ops = &xilinx_mbox_poll_ops;
+>> +
+>> +               setup_timer(&mbox->rxpoll_timer, xilinx_mbox_poll_rx,
+>> +                           (unsigned long)&mbox->chan);
+>>
+> I believe there is indeed some platform that doesn't have RX-Interrupt?
+>  If no, please remove this.
+>  If yes, you may want to get some hint from platform about the size of
+> messages and do mbox_chan_received_data() only upon reading those many
+> bytes.
+
+I'd be fine to drop the polling use case for the moment, on my
+platform I can wire up the IRQ.
+We can always add it back in in a follow up use case.
+
+Thanks,
+
+Moritz
