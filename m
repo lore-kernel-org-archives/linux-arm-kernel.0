@@ -1,17 +1,27 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Wed, 2 Dec 2015 01:25:39 +0100
-Subject: [PATCH 10/10] ARM: dts: Fix dm814x pinctrl address and mask
-In-Reply-To: <1449013103-23238-11-git-send-email-tony@atomide.com>
-References: <1449013103-23238-1-git-send-email-tony@atomide.com>
- <1449013103-23238-11-git-send-email-tony@atomide.com>
-Message-ID: <CAALWOA9LtWxFmKB_My7cv4KODBEmyPm=dUb=tPuap79fm7FkxA@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 01 Dec 2015 16:26:49 -0800
+Subject: [PATCH] ARM: defconfig: multi_v7: Enable Qualcomm options for
+ Honami
+In-Reply-To: <1449010070-9796-1-git-send-email-bjorn.andersson@sonymobile.com>
+ (Bjorn Andersson's message of "Tue, 1 Dec 2015 14:47:50 -0800")
+References: <1449010070-9796-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <7hd1up66gm.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 December 2015 at 00:38, Tony Lindgren <tony@atomide.com> wrote:
-> -                                       pinctrl-single,function-mask = <0x300ff>;
-> +                                       pinctrl-single,function-mask = <0x707ff>;
+Bjorn Andersson <bjorn.andersson@sonymobile.com> writes:
 
-Reminder that silicon revision 2.1 and older require input enabled
-(bit 18 set) for all 3.3V I/Os to avoid cumulative hardware damage.
-(Errata advisory 2.1.87)
+> The Honami device does not boot due to the lack of pinctrl support
+> compiled in with the multi_v7_defconfig. This patch correct this and
+> enables coincell, sdhci, smsm, smp2p and wcnss_ctrl as well, all found
+> on a variety of Qualcomm boards.
+>
+> Reported-by: Kevin Hilman <khilman@kernel.org>
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+
+Tested-by: Kevin Hilman <khilman@linaro.org>
+
+Verified that this patch on top of next-20151127 gets my z1 booting
+again.
+
+Kevin
