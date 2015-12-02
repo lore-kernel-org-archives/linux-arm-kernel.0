@@ -1,29 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 02 Dec 2015 15:21:49 +0000
-Subject: [PATCH v2 21/21] arm64: KVM: Remove weak attributes
-In-Reply-To: <20151202114732.GA18376@cbox>
-References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
- <1448650215-15218-22-git-send-email-marc.zyngier@arm.com>
- <20151202114732.GA18376@cbox>
-Message-ID: <565F0C8D.9010505@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 2 Dec 2015 08:23:16 -0700
+Subject: [PATCH 2/3] pwm: bcm2835: prevent division by zero
+In-Reply-To: <1449010541-3767-3-git-send-email-stefan.wahren@i2se.com>
+References: <1449010541-3767-1-git-send-email-stefan.wahren@i2se.com>
+ <1449010541-3767-3-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <CANLsYkzsFzhVVPo6iykExgbCd-4spJPusMCXxKstOw=CXfwQbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/15 11:47, Christoffer Dall wrote:
-> On Fri, Nov 27, 2015 at 06:50:15PM +0000, Marc Zyngier wrote:
->> As we've now switched to the new world switch implementation,
->> remove the weak attributes, as nobody is supposed to override
->> it anymore.
-> 
-> Why not remove the aliases and change the callers?
+On 1 December 2015 at 15:55, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> It's possible that the pwm clock become an orphan. So better
+> check the result of clk_get_rate in order to prevent a division
+> by zero.
+>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> ---
+>  drivers/pwm/pwm-bcm2835.c |   10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/pwm/pwm-bcm2835.c b/drivers/pwm/pwm-bcm2835.c
+> index 174cca9..31a6992 100644
+> --- a/drivers/pwm/pwm-bcm2835.c
+> +++ b/drivers/pwm/pwm-bcm2835.c
+> @@ -65,7 +65,15 @@ static int bcm2835_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+>                               int duty_ns, int period_ns)
+>  {
+>         struct bcm2835_pwm *pc = to_bcm2835_pwm(chip);
+> -       unsigned long scaler = NSEC_PER_SEC / clk_get_rate(pc->clk);
+> +       unsigned long rate = clk_get_rate(pc->clk);
+> +       unsigned long scaler;
+> +
+> +       if (!rate) {
+> +               dev_err(pc->dev, "failed to get clock rate\n");
+> +               return -EINVAL;
+> +       }
+> +
+> +       scaler = NSEC_PER_SEC / rate;
 
-This is likely to be a bigger patch, and it would affect the 32bit as
-well. So far, I'm choosing to keep things the same. Another solution
-would be to completely drop the aliases, and just rename the new
-function to have the old names.
+Stefan,
 
-I don't mind either way.
+Please merge this code into patch 1/3.  That way it is done the right
+way the first time around.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks,
+Mathieu
+
+>
+>         if (period_ns <= MIN_PERIOD) {
+>                 dev_err(pc->dev, "period %d not supported, minimum %d\n",
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
