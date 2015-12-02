@@ -1,137 +1,136 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed,  2 Dec 2015 09:33:08 +0000
-Subject: [PATCH v1 08/10] ARM: configs: add MPS2 defconfig
+Date: Wed,  2 Dec 2015 09:33:10 +0000
+Subject: [PATCH v1 10/10] ARM: dts: introduce MPS2 AN399/AN400
 In-Reply-To: <1449048790-25859-1-git-send-email-vladimir.murzin@arm.com>
 References: <1449048790-25859-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1449048790-25859-9-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1449048790-25859-11-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a new config for MPS2 platform.
+Application Notes 399 and 400 shares the same memory map and
+features. Both are shipped with Cortex-M7 and have the same  peripheral
+as AN385/AN386, but with different location of PSRAM and Ethernet
+controller.
 
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/configs/mps2_defconfig |  112 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 112 insertions(+)
- create mode 100644 arch/arm/configs/mps2_defconfig
+ arch/arm/boot/dts/Makefile       |    4 +-
+ arch/arm/boot/dts/mps2-an399.dts |   92 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 95 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/mps2-an399.dts
 
-diff --git a/arch/arm/configs/mps2_defconfig b/arch/arm/configs/mps2_defconfig
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 4ef3720..6603a1f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -237,7 +237,9 @@ dtb-$(CONFIG_ARCH_MMP) += \
+ dtb-$(CONFIG_MACH_MESON8B) += \
+ 	meson8b-mxq.dtb \
+ 	meson8b-odroidc1.dtb
+-dtb-$(CONFIG_ARCH_MPS2) += mps2-an385.dtb
++dtb-$(CONFIG_ARCH_MPS2) += \
++	mps2-an385.dtb \
++	mps2-an399.dtb
+ dtb-$(CONFIG_ARCH_MOXART) += \
+ 	moxart-uc7112lx.dtb
+ dtb-$(CONFIG_SOC_IMX1) += \
+diff --git a/arch/arm/boot/dts/mps2-an399.dts b/arch/arm/boot/dts/mps2-an399.dts
 new file mode 100644
-index 0000000..c36c519
+index 0000000..e591d75
 --- /dev/null
-+++ b/arch/arm/configs/mps2_defconfig
-@@ -0,0 +1,112 @@
-+# CONFIG_USELIB is not set
-+CONFIG_NO_HZ_IDLE=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_LOG_BUF_SHIFT=16
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+# CONFIG_UID16 is not set
-+# CONFIG_BASE_FULL is not set
-+# CONFIG_FUTEX is not set
-+# CONFIG_EPOLL is not set
-+# CONFIG_SIGNALFD is not set
-+# CONFIG_EVENTFD is not set
-+# CONFIG_AIO is not set
-+CONFIG_EMBEDDED=y
-+# CONFIG_VM_EVENT_COUNTERS is not set
-+# CONFIG_SLUB_DEBUG is not set
-+# CONFIG_BLOCK is not set
-+# CONFIG_MMU is not set
-+CONFIG_ARM_SINGLE_ARMV7M=y
-+CONFIG_ARCH_MPS2=y
-+CONFIG_SET_MEM_PARAM=y
-+CONFIG_DRAM_BASE=0x21000000
-+CONFIG_DRAM_SIZE=0x1000000
-+CONFIG_PREEMPT_VOLUNTARY=y
-+# CONFIG_ATAGS is not set
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_BINFMT_FLAT=y
-+CONFIG_BINFMT_SHARED_FLAT=y
-+# CONFIG_COREDUMP is not set
-+# CONFIG_SUSPEND is not set
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+# CONFIG_INET_LRO is not set
-+# CONFIG_INET_DIAG is not set
-+# CONFIG_IPV6 is not set
-+# CONFIG_WIRELESS is not set
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+# CONFIG_FW_LOADER is not set
-+CONFIG_NETDEVICES=y
-+# CONFIG_NET_CORE is not set
-+# CONFIG_NET_VENDOR_ARC is not set
-+# CONFIG_NET_CADENCE is not set
-+# CONFIG_NET_VENDOR_BROADCOM is not set
-+# CONFIG_NET_VENDOR_CIRRUS is not set
-+# CONFIG_NET_VENDOR_EZCHIP is not set
-+# CONFIG_NET_VENDOR_FARADAY is not set
-+# CONFIG_NET_VENDOR_HISILICON is not set
-+# CONFIG_NET_VENDOR_INTEL is not set
-+# CONFIG_NET_VENDOR_MARVELL is not set
-+# CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_NATSEMI is not set
-+# CONFIG_NET_VENDOR_QUALCOMM is not set
-+# CONFIG_NET_VENDOR_RENESAS is not set
-+# CONFIG_NET_VENDOR_ROCKER is not set
-+# CONFIG_NET_VENDOR_SAMSUNG is not set
-+# CONFIG_NET_VENDOR_SEEQ is not set
-+CONFIG_SMSC911X=y
-+# CONFIG_NET_VENDOR_STMICRO is not set
-+# CONFIG_NET_VENDOR_VIA is not set
-+# CONFIG_NET_VENDOR_WIZNET is not set
-+# CONFIG_WLAN is not set
-+# CONFIG_INPUT is not set
-+# CONFIG_SERIO is not set
-+# CONFIG_VT is not set
-+# CONFIG_LEGACY_PTYS is not set
-+CONFIG_SERIAL_NONSTANDARD=y
-+# CONFIG_DEVKMEM is not set
-+CONFIG_SERIAL_MPS2_UART_CONSOLE=y
-+CONFIG_SERIAL_MPS2_UART=y
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_HWMON is not set
-+CONFIG_WATCHDOG=y
-+CONFIG_ARM_SP805_WATCHDOG=y
-+CONFIG_MFD_SYSCON=y
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_SYSCON=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_TIMER=y
-+CONFIG_LEDS_TRIGGER_ONESHOT=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_BACKLIGHT=y
-+CONFIG_LEDS_TRIGGER_CPU=y
-+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
-+CONFIG_ARM_TIMER_SP804=y
-+# CONFIG_DNOTIFY is not set
-+# CONFIG_INOTIFY_USER is not set
-+# CONFIG_MISC_FILESYSTEMS is not set
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V4=y
-+CONFIG_NFS_V4_1=y
-+CONFIG_NFS_V4_2=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_NLS=y
-+CONFIG_PRINTK_TIME=y
-+CONFIG_DEBUG_INFO=y
-+# CONFIG_ENABLE_WARN_DEPRECATED is not set
-+# CONFIG_ENABLE_MUST_CHECK is not set
-+CONFIG_DEBUG_FS=y
-+CONFIG_MAGIC_SYSRQ=y
-+# CONFIG_SCHED_DEBUG is not set
-+# CONFIG_DEBUG_BUGVERBOSE is not set
-+CONFIG_MEMTEST=y
++++ b/arch/arm/boot/dts/mps2-an399.dts
+@@ -0,0 +1,92 @@
++/*
++ * Copyright (C) 2015 ARM Limited
++ *
++ * Author: Vladimir Murzin <vladimir.murzin@arm.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "mps2.dtsi"
++
++/ {
++	model = "ARM MPS2 Application Note 399/400";
++	compatible = "arm,mps2";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		bootargs = "rdinit=/sbin/init earlycon";
++		stdout-path = "serial0:9600n8";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x60000000 0x1000000>;
++	};
++
++
++	ethernet at a0000000 {
++		compatible = "smsc,lan9220", "smsc,lan9115";
++		reg = <0xa0000000 0x10000>;
++		interrupts = <13>;
++		interrupt-parent = <&nvic>;
++		smsc,irq-active-high;
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
++
++
++&timer0 {
++	status = "okay";
++};
++
++&timer1 {
++	status = "okay";
++};
++
++&wdt {
++	status = "okay";
++};
 -- 
 1.7.9.5
