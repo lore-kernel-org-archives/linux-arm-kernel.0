@@ -1,90 +1,31 @@
-From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
-Date: Wed, 2 Dec 2015 17:06:31 +0800
-Subject: [PATCH v3] arm64: dts: add all hi6220 i2c nodes
-In-Reply-To: <20151202073427.GM692@tiger>
-References: <1449037749-14388-1-git-send-email-kong.kongxinwei@hisilicon.com>
- <20151202073427.GM692@tiger>
-Message-ID: <565EB497.6080700@hisilicon.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Wed, 2 Dec 2015 17:09:24 +0800
+Subject: [RFC PATCH 0/4] add ACPI support for syscon
+Message-ID: <1449047368-5768-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Lots of drivers begin to support both OF and ACPI now, but some drivers depend on syscon,
+so syscon need to support ACPI firstly.
 
+Add ACPI support for syscon, and introduce syscon_regmap_lookup_by_dev_property()
+helper when the driver need to get a regmap handle from syscon, it can used in
+both OF and ACPI.
 
-On 2015/12/2 15:34, Shawn Guo wrote:
-> On Wed, Dec 02, 2015 at 02:29:09PM +0800, Xinwei Kong wrote:
->> This patch adds all I2C nodes for the Hi6220 SoC. This hi6220 Soc
->> use this I2C IP of Synopsys Designware for HiKey board.
->>
->> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
->> ---
->>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 31 +++++++++++++++++++++++++++++++
->>  1 file changed, 31 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
->> index 82d2488..6eae673 100644
->> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
->> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
->> @@ -208,5 +208,36 @@
->>  			clock-names = "uartclk", "apb_pclk";
->>  			status = "disabled";
->>  		};
->> +
->> +		i2c0: i2c at f7100000 {
->> +			compatible = "snps,designware-i2c";
->> +			reg = <0x0 0xf7100000 0x0 0x1000>;
->> +			interrupts = <0 44 4>;
->> +			i2c-sda-hold-time-ns = <300>;
->> +			pinctrl-names = "default";
->> +			pinctrl-0 = <&i2c0_pmx_func &i2c0_cfg_func>;
->> +			status = "disabled";
-> 
-> You got me wrong.  I was asking you to drop property 'clock-names' only,
-> not 'clocks' together.  I do not think it works if you drop property
-> 'clocks', because I see that dw_i2c_plat_probe() will fail if
-> devm_clk_get() fails.  Did you test the patch before posting it out?
+Kefeng Wang (4):
+  acpi: property: Introduce helper acpi_dev_get_reference_device()
+  device property: Introduce helper device_get_reference_node()
+  ACPI/platform: Introduce helper acpi_dev_find_plat_dev()
+  mfd: syscon: add ACPI support
 
-I am sorry that my Hikey board don't work well. I will fix my board and test
-it.
+ drivers/acpi/acpi_platform.c | 25 ++++++++++++++++++++++
+ drivers/acpi/property.c      | 23 ++++++++++++++++++++
+ drivers/base/property.c      | 40 +++++++++++++++++++++++++++++++++++
+ drivers/mfd/syscon.c         | 50 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/acpi.h         | 13 ++++++++++++
+ include/linux/mfd/syscon.h   |  8 +++++++
+ include/linux/property.h     |  6 ++++++
+ 7 files changed, 165 insertions(+)
 
-Thank you very much.
-xinwei
-
-> 
-> Shawn
-> 
->> +		};
->> +
->> +		i2c1: i2c at f7101000 {
->> +			compatible = "snps,designware-i2c";
->> +			reg = <0x0 0xf7101000 0x0 0x1000>;
->> +			interrupts = <0 45 4>;
->> +			i2c-sda-hold-time-ns = <300>;
->> +			pinctrl-names = "default";
->> +			pinctrl-0 = <&i2c1_pmx_func &i2c1_cfg_func>;
->> +			status = "disabled";
->> +		};
->> +
->> +		i2c2: i2c at f7102000 {
->> +			compatible = "snps,designware-i2c";
->> +			reg = <0x0 0xf7102000 0x0 0x1000>;
->> +			interrupts = <0 46 4>;
->> +			i2c-sda-hold-time-ns = <300>;
->> +			pinctrl-names = "default";
->> +			pinctrl-0 = <&i2c2_pmx_func &i2c2_cfg_func>;
->> +			status = "disabled";
->> +		};
->> +
->>  	};
->>  };
->> -- 
->> 1.9.1
->>
->>
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> .
-> 
+-- 
+1.7.12.4
