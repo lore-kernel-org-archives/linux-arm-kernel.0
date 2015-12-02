@@ -1,22 +1,16 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Wed, 2 Dec 2015 07:02:49 +0100
-Subject: [PATCH v4 net 0/6] Marvell Armada XP/370/38X Neta fixes
-In-Reply-To: <20151201.220337.2287051759324173025.davem@davemloft.net>
-References: <1448886466-31538-1-git-send-email-mw@semihalf.com>
- <20151201.220337.2287051759324173025.davem@davemloft.net>
-Message-ID: <CAPv3WKfcAvTrCn7VxQost6UdRR=srnyrNBUc0iWtRP6CwH1Hgg@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 2 Dec 2015 14:11:33 +0800
+Subject: [PATCH] clk: imx: Replace clk error check with imx_check_clocks()
+In-Reply-To: <1448504323-17737-1-git-send-email-b51503@freescale.com>
+References: <1448504323-17737-1-git-send-email-b51503@freescale.com>
+Message-ID: <20151202061133.GH692@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-12-02 4:03 GMT+01:00 David Miller <davem@davemloft.net>:
-> From: Marcin Wojtas <mw@semihalf.com>
-> Date: Mon, 30 Nov 2015 13:27:40 +0100
->
->> I'm sending v4 with corrected commit log of the last patch, in order
->> to avoid possible conflicts between the branches as suggested by
->> Gregory Clement.
->
-> Series applied, thanks.
+On Thu, Nov 26, 2015 at 10:18:43AM +0800, Bai Ping wrote:
+> As we already have a 'imx_check_clocks' to do the clock error
+> check, so cleanup the error check code.
+> 
+> Signed-off-by: Bai Ping <b51503@freescale.com>
 
-Thanks, a lot,
-Marcin
+Applied, thanks.
