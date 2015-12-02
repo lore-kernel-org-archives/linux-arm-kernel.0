@@ -1,96 +1,60 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 02 Dec 2015 10:22:04 +0000
-Subject: [PATCH v4 18/21] KVM: ARM64: Add PMU overflow interrupt routing
-In-Reply-To: <565EBEA3.8080500@huawei.com>
-References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>	<1446186123-11548-19-git-send-email-zhaoshenglong@huawei.com>
- <20151130182258.684c9df6@arm.com> <565DB021.3020901@huawei.com>
- <565DB3A5.3030701@arm.com> <565DB935.5040609@linaro.org>
- <565DBF8D.1070006@arm.com> <565DCA24.7000908@linaro.org>
- <565DD17A.50009@arm.com> <565E5A13.2080706@huawei.com>
- <565EAFC4.2040301@arm.com> <565EBEA3.8080500@huawei.com>
-Message-ID: <565EC64C.1090501@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Dec 2015 10:23:39 +0000
+Subject: [PATCH v2 1/2] scripts: Add a recorduidiv program
+In-Reply-To: <20151201181643.GZ8644@n2100.arm.linux.org.uk>
+References: <20151125234711.GT8644@n2100.arm.linux.org.uk>
+ <565C6714.802@suse.com>
+ <20151130153208.GR8644@n2100.arm.linux.org.uk>
+ <565C6DE9.2020302@suse.com> <565DC5A9.2010305@suse.cz>
+ <20151201161944.GX8644@n2100.arm.linux.org.uk>
+ <20151201114929.655433a2@gandalf.local.home>
+ <20151201171014.GY8644@n2100.arm.linux.org.uk>
+ <20151201122212.474afce5@gandalf.local.home>
+ <20151201181643.GZ8644@n2100.arm.linux.org.uk>
+Message-ID: <20151202102339.GB8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/15 09:49, Shannon Zhao wrote:
+On Tue, Dec 01, 2015 at 06:16:43PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Dec 01, 2015 at 12:22:12PM -0500, Steven Rostedt wrote:
+> > I guess another solution is to do a copy instead of modifying in place
+> > if it detects the multiple hard link?
 > 
-> 
-> On 2015/12/2 16:45, Marc Zyngier wrote:
->> On 02/12/15 02:40, Shannon Zhao wrote:
->>>>
->>>>
->>>> On 2015/12/2 0:57, Marc Zyngier wrote:
->>>>>> On 01/12/15 16:26, Shannon Zhao wrote:
->>>>>>>>
->>>>>>>>
->>>>>>>> On 2015/12/1 23:41, Marc Zyngier wrote:
->>>>>>>>>>>> The reason is that when guest clear the overflow register, it will trap
->>>>>>>>>>>>>> to kvm and call kvm_pmu_sync_hwstate() as you see above. At this moment,
->>>>>>>>>>>>>> the overflow register is still overflowed(that is some bit is still 1).
->>>>>>>>>>>>>> So We need to use some flag to mark we already inject this interrupt.
->>>>>>>>>>>>>> And if during guest handling the overflow, there is a new overflow
->>>>>>>>>>>>>> happening, the pmu->irq_pending will be set ture by
->>>>>>>>>>>>>> kvm_pmu_perf_overflow(), then it needs to inject this new interrupt, right?
->>>>>>>>>> I don't think so. This is a level interrupt, so the level should stay
->>>>>>>>>> high as long as the guest hasn't cleared all possible sources for that
->>>>>>>>>> interrupt.
->>>>>>>>>>
->>>>>>>>>> For your example, the guest writes to PMOVSCLR to clear the overflow
->>>>>>>>>> caused by a given counter. If the status is now 0, the interrupt line
->>>>>>>>>> drops. If the status is still non zero, the line stays high. And I
->>>>>>>>>> believe that writing a 1 to PMOVSSET would actually trigger an
->>>>>>>>>> interrupt, or keep it high if it has already high.
->>>>>>>>>>
->>>>>>>> Right, writing 1 to PMOVSSET will trigger an interrupt.
->>>>>>>>
->>>>>>>>>> In essence, do not try to maintain side state. I've been bitten.
->>>>>>>>
->>>>>>>> So on VM entry, it check if PMOVSSET is zero. If not, call 
->>>>>>>> kvm_vgic_inject_irq to set the level high. If so, set the level low.
->>>>>>>> On VM exit, it seems there is nothing to do.
->>>>>>
->>>>>> It is even simpler than that:
->>>>>>
->>>>>> - When you get an overflow, you inject an interrupt with the level set to 1.
->>>>>> - When the overflow register gets cleared, you inject the same interrupt
->>>>>> with the level set to 0.
->>>>>>
->>>>>> I don't think you need to do anything else, and the world switch should
->>>>>> be left untouched.
->>>>>>
->>>>
->>>> On 2015/7/17 23:28, Christoffer Dall wrote:>> > +		
->>>> kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
->>>>>>>>>> +					    pmu->irq_num, 1);
->>>>>> what context is this overflow handler function?  kvm_vgic_inject_irq
->>>>>> grabs a mutex, so it can sleep...
->>>>>>
->>>>>> from a quick glance at the perf core code, it looks like this is in
->>>>>> interrupt context, so that call to kvm_vgic_inject_irq looks bad.
->>>>>>
->>>>
->>>> But as Christoffer said before, it's not good to call
->>>> kvm_vgic_inject_irq directly in interrupt context. So if we just kick
->>>> the vcpu here and call kvm_vgic_inject_irq on VM entry, is this fine?
->> Possibly. I'm slightly worried that inject_irq itself is going to kick
->> the vcpu again for no good reason. 
-> Yes, this will introduce a extra kick. What's the impact of kicking a
-> kicked vcpu?
+> That would be the "transparent" solution.  If you think it's worth
+> persuing, I'll have a go at fixing recordmcount to do that.
 
-As long as you only kick yourself, it shouldn't be much (trying to
-decipher vcpu_kick).
+Well, copying the file is easy - I've tested this and the linker
+appears happy with the result:
 
->> I guess we'll find out (and maybe
->> we'll add a kvm_vgic_inject_irq_no_kick_please() helper...).
-> And add a parameter "bool kick" for vgic_update_irq_pending ?
+ scripts/recordmcount.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-Given that we're completely rewriting the thing, I'd rather not add more
-hacks to it if we can avoid it.
+diff --git a/scripts/recordmcount.c b/scripts/recordmcount.c
+index 698768bdc581..91705ef30402 100644
+--- a/scripts/recordmcount.c
++++ b/scripts/recordmcount.c
+@@ -211,6 +211,20 @@ static void *mmap_file(char const *fname)
+ 		addr = umalloc(sb.st_size);
+ 		uread(fd_map, addr, sb.st_size);
+ 	}
++	if (sb.st_nlink != 1) {
++		/* file is hard-linked, break the hard link */
++		close(fd_map);
++		if (unlink(fname) < 0) {
++			perror(fname);
++			fail_file();
++		}
++		fd_map = open(fname, O_RDWR | O_CREAT, sb.st_mode);
++		if (fd_map < 0) {
++			perror(fname);
++			fail_file();
++		}
++		uwrite(fd_map, addr, sb.st_size);
++	}
+ 	return addr;
+ }
+ 
 
-Give it a go, and we'll find out!
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
+according to speedtest.net.
