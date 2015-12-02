@@ -1,104 +1,113 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 2 Dec 2015 12:53:59 +0100
-Subject: [PATCH v2 15/21] arm64: KVM: Add panic handling
-In-Reply-To: <1448650215-15218-16-git-send-email-marc.zyngier@arm.com>
-References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
- <1448650215-15218-16-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20151202115359.GK18376@cbox>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 2 Dec 2015 12:19:19 +0000
+Subject: [PATCH] arm64: Support VDSO remapping
+In-Reply-To: <1448455781-26660-1-git-send-email-cov@codeaurora.org>
+References: <1448455781-26660-1-git-send-email-cov@codeaurora.org>
+Message-ID: <20151202121918.GA4523@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 27, 2015 at 06:50:09PM +0000, Marc Zyngier wrote:
-> Add the panic handler, together with the small bits of assembly
-> code to call the kernel's panic implementation.
+Hi Christopher,
+
+On Wed, Nov 25, 2015 at 07:49:29AM -0500, Christopher Covington wrote:
+> Some applications such as Checkpoint/Restore In Userspace (CRIU) remap and
+> unmap the VDSO. Add support for this to the AArch64 kernel by copying in
+> the PowerPC code with slight modifications.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christopher Covington <cov@codeaurora.org>
 > ---
->  arch/arm64/kvm/hyp/hyp-entry.S | 11 ++++++++++-
->  arch/arm64/kvm/hyp/hyp.h       |  1 +
->  arch/arm64/kvm/hyp/switch.c    | 30 ++++++++++++++++++++++++++++++
->  3 files changed, 41 insertions(+), 1 deletion(-)
+>  arch/arm64/include/asm/Kbuild          |  1 -
+>  arch/arm64/include/asm/mm-arch-hooks.h | 28 ++++++++++++++++++++++++++++
+>  arch/arm64/include/asm/mmu_context.h   | 23 ++++++++++++++++++++++-
+>  3 files changed, 50 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/mm-arch-hooks.h
 > 
-> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-> index 8334407..39d6935 100644
-> --- a/arch/arm64/kvm/hyp/hyp-entry.S
-> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
-> @@ -150,7 +150,16 @@ el1_irq:
->  	mov	x1, #ARM_EXCEPTION_IRQ
->  	b	__guest_exit
->  
-> -.macro invalid_vector	label, target = __kvm_hyp_panic
-> +ENTRY(__hyp_do_panic)
-> +	mov	lr, #(PSR_F_BIT | PSR_I_BIT | PSR_A_BIT | PSR_D_BIT |\
-> +		      PSR_MODE_EL1h)
-> +	msr	spsr_el2, lr
-> +	ldr	lr, =panic
-> +	msr	elr_el2, lr
-> +	eret
-> +ENDPROC(__hyp_do_panic)
+> diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+> index 70fd9ff..b112a39 100644
+> --- a/arch/arm64/include/asm/Kbuild
+> +++ b/arch/arm64/include/asm/Kbuild
+> @@ -25,7 +25,6 @@ generic-y += kvm_para.h
+>  generic-y += local.h
+>  generic-y += local64.h
+>  generic-y += mcs_spinlock.h
+> -generic-y += mm-arch-hooks.h
+>  generic-y += mman.h
+>  generic-y += msgbuf.h
+>  generic-y += msi.h
+> diff --git a/arch/arm64/include/asm/mm-arch-hooks.h b/arch/arm64/include/asm/mm-arch-hooks.h
+> new file mode 100644
+> index 0000000..e6923fb
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/mm-arch-hooks.h
+> @@ -0,0 +1,28 @@
+> +/*
+> + * Architecture specific mm hooks
+> + *
+> + * Copyright (C) 2015, IBM Corporation
+> + * Author: Laurent Dufour <ldufour@linux.vnet.ibm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
 > +
-> +.macro invalid_vector	label, target = __hyp_panic
->  	.align	2
->  \label:
->  	b \target
-> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
-> index 18365dd..87f16fa 100644
-> --- a/arch/arm64/kvm/hyp/hyp.h
-> +++ b/arch/arm64/kvm/hyp/hyp.h
-> @@ -74,6 +74,7 @@ static inline bool __fpsimd_enabled(void)
->  }
->  
->  u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
-> +void __noreturn __hyp_do_panic(unsigned long, ...);
->  
->  #endif /* __ARM64_KVM_HYP_H__ */
->  
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 8affc19..7b81089 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -140,3 +140,33 @@ int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
->  
->  	return exit_code;
->  }
+> +#ifndef __ASM_MM_ARCH_HOOKS_H
+> +#define __ASM_MM_ARCH_HOOKS_H
 > +
-> +static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%08llx\nFAR:%016llx HPFAR:%016llx PAR:%016llx\nVCPU:%p\n";
-> +
-> +void __hyp_text __noreturn __hyp_panic(void)
+> +static inline void arch_remap(struct mm_struct *mm,
+> +			      unsigned long old_start, unsigned long old_end,
+> +			      unsigned long new_start, unsigned long new_end)
 > +{
-> +	unsigned long str_va = (unsigned long)__hyp_panic_string;
-> +	u64 spsr = read_sysreg(spsr_el2);
-> +	u64 elr = read_sysreg(elr_el2);
-> +	u64 par = read_sysreg(par_el1);
-> +
-> +	if (read_sysreg(vttbr_el2)) {
-> +		struct kvm_vcpu *vcpu;
-> +		struct kvm_cpu_context *host_ctxt;
-> +
-> +		vcpu = (struct kvm_vcpu *)read_sysreg(tpidr_el2);
-> +		host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-> +		__deactivate_traps(vcpu);
-> +		__deactivate_vm(vcpu);
-> +		__sysreg_restore_state(host_ctxt);
-> +	}
-> +
-> +	/* Call panic for real */
-> +	__hyp_do_panic(str_va - HYP_PAGE_OFFSET + PAGE_OFFSET,
-
-is the first parameter hyp_kern_va(str_va) ?  If so, can you add that
-define instead?
-
-> +		       spsr,  elr,
-> +		       read_sysreg(esr_el2),   read_sysreg(far_el2),
-> +		       read_sysreg(hpfar_el2), par,
-> +		       (void *)read_sysreg(tpidr_el2));
-> +
-> +	unreachable();
+> +	/*
+> +	 * mremap() doesn't allow moving multiple vmas so we can limit the
+> +	 * check to old_start == vdso_base.
+> +	 */
+> +	if ((void *)old_start == mm->context.vdso)
+> +		mm->context.vdso = (void *)new_start;
 > +}
-> -- 
-> 2.1.4
-> 
+> +#define arch_remap arch_remap
+> +
+> +#endif /* __ASM_MM_ARCH_HOOKS_H */
+> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+> index 2416578..9fe0773 100644
+> --- a/arch/arm64/include/asm/mmu_context.h
+> +++ b/arch/arm64/include/asm/mmu_context.h
+> @@ -24,7 +24,6 @@
+>  
+>  #include <asm/cacheflush.h>
+>  #include <asm/proc-fns.h>
+> -#include <asm-generic/mm_hooks.h>
+>  #include <asm/cputype.h>
+>  #include <asm/pgtable.h>
+>  
+> @@ -147,4 +146,26 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
+>  #define deactivate_mm(tsk,mm)	do { } while (0)
+>  #define activate_mm(prev,next)	switch_mm(prev, next, NULL)
+>  
+> +static inline void arch_dup_mmap(struct mm_struct *oldmm,
+> +				      struct mm_struct *mm)
+> +{
+> +}
+> +
+> +static inline void arch_exit_mmap(struct mm_struct *mm)
+> +{
+> +}
+> +
+> +static inline void arch_unmap(struct mm_struct *mm,
+> +			      struct vm_area_struct *vma,
+> +			      unsigned long start, unsigned long end)
+> +{
+> +	if ((void *)start <= mm->context.vdso && mm->context.vdso < (void *)end)
+> +		mm->context.vdso = NULL;
+> +}
+> +
+> +static inline void arch_bprm_mm_init(struct mm_struct *mm,
+> +				     struct vm_area_struct *vma)
+> +{
+> +}
 
-Otherwise:
+This is virtually identical to the PowerPC implementation, afaict. Any
+chance we could move this to core code and define some generic vdso
+accessors for the mm?
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Will
