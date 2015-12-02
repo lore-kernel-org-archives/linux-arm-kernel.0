@@ -1,18 +1,27 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 2 Dec 2015 16:03:28 +0800
-Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: enable PCI_MSI
-In-Reply-To: <1448902811-11399-2-git-send-email-l.stach@pengutronix.de>
-References: <1448902811-11399-1-git-send-email-l.stach@pengutronix.de>
- <1448902811-11399-2-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20151202080328.GQ692@tiger>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Wed, 02 Dec 2015 11:09:15 +0300
+Subject: [PATCH 3/6] net: thunderx: Increase transmit queue length
+In-Reply-To: <1448983985.25582.35.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <y@samsung.com>
+ <1448961223-41888-4-git-send-email-sunil.kovvuri@gmail.com>
+ <01d101d12c46$2de43b40$89acb1c0$@samsung.com>
+ <1448983985.25582.35.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <00b101d12cd8$bd34fea0$379efbe0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 06:00:11PM +0100, Lucas Stach wrote:
-> This has been stable on i.MX6 for a good while now and there is no
-> reason to keep it disabled, as it allows to allocate non-shared
-> IRQs if several PCIe devices are connected to a single host.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+ Hello!
 
-Applied, thanks.
+> > swiotlb: coherent allocation failed for device 0002:01:08.4 size=4198400
+> > CPU: 2 PID: 3655 Comm: NetworkManager Tainted: G        W  O    4.2.6+ #201
+> > Hardware name: Cavium ThunderX CN88XX
+> 
+> Are you sure 4.2.6 kernel is suitable for backporting this patch aimed
+> for linux-4.5 ?
+
+ Why not? It's just a networking driver. And, i also have the same problem on 4.3 running as KVM guest with VFIO.
+
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
