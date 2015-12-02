@@ -1,36 +1,24 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue,  1 Dec 2015 15:38:23 -0800
-Subject: [PATCH 10/10] ARM: dts: Fix dm814x pinctrl address and mask
-In-Reply-To: <1449013103-23238-1-git-send-email-tony@atomide.com>
-References: <1449013103-23238-1-git-send-email-tony@atomide.com>
-Message-ID: <1449013103-23238-11-git-send-email-tony@atomide.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 1 Dec 2015 18:02:42 -0600
+Subject: [PATCH] ARM: defconfig: multi_v7: Enable Qualcomm options for
+ Honami
+In-Reply-To: <1449010070-9796-1-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1448518557-14250-1-git-send-email-agross@codeaurora.org>
+ <1449010070-9796-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <20151202000242.GB30950@Agamemnon.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise pinctrl won't work.
+On Tue, Dec 01, 2015 at 02:47:50PM -0800, Bjorn Andersson wrote:
+> The Honami device does not boot due to the lack of pinctrl support
+> compiled in with the multi_v7_defconfig. This patch correct this and
+> enables coincell, sdhci, smsm, smp2p and wcnss_ctrl as well, all found
+> on a variety of Qualcomm boards.
+> 
+> Reported-by: Kevin Hilman <khilman@kernel.org>
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> ---
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/boot/dts/dm814x.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+That would make a difference, wouldn't it.
 
-diff --git a/arch/arm/boot/dts/dm814x.dtsi b/arch/arm/boot/dts/dm814x.dtsi
-index 68b156b..7bd1961 100644
---- a/arch/arm/boot/dts/dm814x.dtsi
-+++ b/arch/arm/boot/dts/dm814x.dtsi
-@@ -207,11 +207,11 @@
- 
- 				pincntl: pinmux at 800 {
- 					compatible = "pinctrl-single";
--					reg = <0x800 0xc38>;
-+					reg = <0x800 0x438>;
- 					#address-cells = <1>;
- 					#size-cells = <0>;
- 					pinctrl-single,register-width = <32>;
--					pinctrl-single,function-mask = <0x300ff>;
-+					pinctrl-single,function-mask = <0x707ff>;
- 				};
- 			};
- 
--- 
-2.6.2
+Acked-by: Andy Gross <agross@codeaurora.org>
