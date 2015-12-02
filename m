@@ -1,47 +1,50 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 2 Dec 2015 11:39:05 +0100
-Subject: [PATCH 2/4] i2c: at91: update bindings documention
+Date: Wed, 2 Dec 2015 11:39:06 +0100
+Subject: [PATCH 3/4] ARM: at91/dt: sama5d4: update i2c compatible string
 In-Reply-To: <1449052747-20991-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1449052747-20991-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1449052747-20991-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1449052747-20991-3-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i2c-sda-hold-time-ns property is supported from atmel,sama5d4-i2c.
+A new compatible string has been introduced: atmel,sama5d4-i2c. It
+allows to use the i2c-sda-hold-time-ns property if needed.
 
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
- Documentation/devicetree/bindings/i2c/i2c-at91.txt | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sama5d4.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-at91.txt b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
-index 6e81dc1..67c6f2e 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-at91.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-at91.txt
-@@ -3,7 +3,7 @@ I2C for Atmel platforms
- Required properties :
- - compatible : Must be "atmel,at91rm9200-i2c", "atmel,at91sam9261-i2c",
-      "atmel,at91sam9260-i2c", "atmel,at91sam9g20-i2c", "atmel,at91sam9g10-i2c",
--     "atmel,at91sam9x5-i2c" or "atmel,sama5d2-i2c"
-+     "atmel,at91sam9x5-i2c", "atmel,sama5d4-i2c" or "atmel,sama5d2-i2c"
- - reg: physical base address of the controller and length of memory mapped
-      region.
- - interrupts: interrupt number to the cpu.
-@@ -17,6 +17,7 @@ Optional properties:
- - dma-names: should contain "tx" and "rx".
- - atmel,fifo-size: maximum number of data the RX and TX FIFOs can store for FIFO
-   capable I2C controllers.
-+- i2c-sda-hold-time-ns: TWD hold time, only available from "atmel,sama5d4-i2c".
- - Child nodes conforming to i2c bus binding
+diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+index 2193637..83d7e7c 100644
+--- a/arch/arm/boot/dts/sama5d4.dtsi
++++ b/arch/arm/boot/dts/sama5d4.dtsi
+@@ -916,7 +916,7 @@
+ 			};
  
- Examples :
-@@ -52,6 +53,7 @@ i2c0: i2c at f8034600 {
- 	#size-cells = <0>;
- 	clocks = <&flx0>;
- 	atmel,fifo-size = <16>;
-+	i2c-sda-hold-time-ns = <336>;
+ 			i2c0: i2c at f8014000 {
+-				compatible = "atmel,at91sam9x5-i2c";
++				compatible = "atmel,sama5d4-i2c";
+ 				reg = <0xf8014000 0x4000>;
+ 				interrupts = <32 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				dmas = <&dma1
+@@ -935,7 +935,7 @@
+ 			};
  
- 	wm8731: wm8731 at 1a {
- 		compatible = "wm8731";
+ 			i2c1: i2c@f8018000 {
+-				compatible = "atmel,at91sam9x5-i2c";
++				compatible = "atmel,sama5d4-i2c";
+ 				reg = <0xf8018000 0x4000>;
+ 				interrupts = <33 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				dmas = <&dma1
+@@ -975,7 +975,7 @@
+ 			};
+ 
+ 			i2c2: i2c@f8024000 {
+-				compatible = "atmel,at91sam9x5-i2c";
++				compatible = "atmel,sama5d4-i2c";
+ 				reg = <0xf8024000 0x4000>;
+ 				interrupts = <34 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				dmas = <&dma1
 -- 
 2.5.0
