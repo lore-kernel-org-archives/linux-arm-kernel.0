@@ -1,163 +1,137 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  2 Dec 2015 22:27:09 +0100
-Subject: [PATCH 7/7] ARM: orion5x: multiplatform support
+Date: Wed,  2 Dec 2015 22:27:03 +0100
+Subject: [PATCH 1/7] ARM: orion: move watchdog setup to mach-orion5x
 In-Reply-To: <1449091629-2155735-1-git-send-email-arnd@arndb.de>
 References: <1449091629-2155735-1-git-send-email-arnd@arndb.de>
-Message-ID: <1449091629-2155735-8-git-send-email-arnd@arndb.de>
+Message-ID: <1449091629-2155735-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The orion5x platform is now ready to be enabled for multiplatform
-support, this patch does the switch over by modifying the Kconfig file,
-the defconfig and removing the last mach/*.h header that becomes obsolete
-with this.
+The watchdog device node is created in plat-orion/common.c
+but depends on the bridge address that is platform specific,
+so as a preparation for orion multiplatform support, we
+move it out of the common code into orion5x and dove.
+
+At the moment, dove does not use the watchdog, so I'm marking
+the function as __maybe_unused for the moment. The compiler
+will be able to compile out the device definition this way,
+and we can easily add it later.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Acked-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/Kconfig                                | 17 ---------
- arch/arm/configs/orion5x_defconfig              |  3 ++
- arch/arm/mach-orion5x/Kconfig                   | 18 +++++++---
- arch/arm/mach-orion5x/Makefile                  |  2 ++
- arch/arm/mach-orion5x/include/mach/uncompress.h | 46 -------------------------
- 5 files changed, 19 insertions(+), 67 deletions(-)
- delete mode 100644 arch/arm/mach-orion5x/include/mach/uncompress.h
+ arch/arm/mach-dove/common.c               | 17 +++++++++++++++++
+ arch/arm/mach-orion5x/common.c            | 14 +++++++++++++-
+ arch/arm/plat-orion/common.c              | 21 ---------------------
+ arch/arm/plat-orion/include/plat/common.h |  2 --
+ 4 files changed, 30 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 6a7ff25376bf..3b3cd6deb816 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -521,23 +521,6 @@ config ARCH_DOVE
- 	help
- 	  Support for the Marvell Dove SoC 88AP510
+diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+index 0d1a89298ece..25a682fd444f 100644
+--- a/arch/arm/mach-dove/common.c
++++ b/arch/arm/mach-dove/common.c
+@@ -375,6 +375,23 @@ void __init dove_setup_cpu_wins(void)
+ 				    DOVE_SCRATCHPAD_SIZE);
+ }
  
--config ARCH_ORION5X
--	bool "Marvell Orion"
--	depends on MMU
--	select ARCH_REQUIRE_GPIOLIB
--	select CPU_FEROCEON
--	select GENERIC_CLOCKEVENTS
--	select MVEBU_MBUS
--	select MULTI_IRQ_HANDLER
--	select PCI
--	select PLAT_ORION_LEGACY
--	select MULTI_IRQ_HANDLER
--	select SPARSE_IRQ
--	help
--	  Support for the following Marvell Orion 5x series SoCs:
--	  Orion-1 (5181), Orion-VoIP (5181L), Orion-NAS (5182),
--	  Orion-2 (5281), Orion-1-90 (6183).
--
- config ARCH_MMP
- 	bool "Marvell PXA168/910/MMP2"
- 	depends on MMU
-diff --git a/arch/arm/configs/orion5x_defconfig b/arch/arm/configs/orion5x_defconfig
-index 8099417a9466..6ddca8875cb5 100644
---- a/arch/arm/configs/orion5x_defconfig
-+++ b/arch/arm/configs/orion5x_defconfig
-@@ -13,6 +13,9 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- CONFIG_PARTITION_ADVANCED=y
- CONFIG_BSD_DISKLABEL=y
-+CONFIG_ARCH_MULTI_V5=y
-+# CONFIG_ARCH_MULTI_V6 is not set
-+# CONFIG_ARCH_MULTI_V7 is not set
- CONFIG_ARCH_ORION5X=y
- CONFIG_ARCH_ORION5X_DT=y
- CONFIG_MACH_DB88F5281=y
-diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
-index 66f1c952c048..a9ad95f000a1 100644
---- a/arch/arm/mach-orion5x/Kconfig
-+++ b/arch/arm/mach-orion5x/Kconfig
-@@ -1,6 +1,18 @@
--if ARCH_ORION5X
-+menuconfig ARCH_ORION5X
-+	bool "Marvell Orion"
-+	depends on MMU && ARCH_MULTI_V5
-+	select ARCH_REQUIRE_GPIOLIB
-+	select CPU_FEROCEON
-+	select GENERIC_CLOCKEVENTS
-+	select MVEBU_MBUS
-+	select PCI
-+	select PLAT_ORION_LEGACY
-+	help
-+	  Support for the following Marvell Orion 5x series SoCs:
-+	  Orion-1 (5181), Orion-VoIP (5181L), Orion-NAS (5182),
-+	  Orion-2 (5281), Orion-1-90 (6183).
- 
--menu "Orion Implementations"
-+if ARCH_ORION5X
- 
- config ARCH_ORION5X_DT
- 	bool "Marvell Orion5x Flattened Device Tree"
-@@ -163,6 +175,4 @@ config MACH_RD88F6183AP_GE
- 	  Say 'Y' here if you want your kernel to support the
- 	  Marvell Orion-1-90 (88F6183) AP GE RD.
- 
--endmenu
--
- endif
-diff --git a/arch/arm/mach-orion5x/Makefile b/arch/arm/mach-orion5x/Makefile
-index a1e0fbe6a7a1..4b2502b4ca0d 100644
---- a/arch/arm/mach-orion5x/Makefile
-+++ b/arch/arm/mach-orion5x/Makefile
-@@ -1,3 +1,5 @@
-+ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/arch/arm/plat-orion/include
++static struct resource orion_wdt_resource[] = {
++		DEFINE_RES_MEM(TIMER_PHYS_BASE, 0x04),
++		DEFINE_RES_MEM(RSTOUTn_MASK_PHYS, 0x04),
++};
 +
- obj-y				+= common.o pci.o irq.o mpp.o
- obj-$(CONFIG_MACH_DB88F5281)	+= db88f5281-setup.o
- obj-$(CONFIG_MACH_RD88F5182)	+= rd88f5182-setup.o
-diff --git a/arch/arm/mach-orion5x/include/mach/uncompress.h b/arch/arm/mach-orion5x/include/mach/uncompress.h
-deleted file mode 100644
-index 25e5cb98fecc..000000000000
---- a/arch/arm/mach-orion5x/include/mach/uncompress.h
-+++ /dev/null
-@@ -1,46 +0,0 @@
--/*
-- * Tzachi Perelstein <tzachi@marvell.com>
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
++static struct platform_device orion_wdt_device = {
++	.name		= "orion_wdt",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(orion_wdt_resource),
++	.resource	= orion_wdt_resource,
++};
++
++static void __init __maybe_unused orion_wdt_init(void)
++{
++	platform_device_register(&orion_wdt_device);
++}
++
+ void __init dove_init(void)
+ {
+ 	pr_info("Dove 88AP510 SoC, TCLK = %d MHz.\n",
+diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
+index 6bbb7b55c6d1..2b7889e3b7bc 100644
+--- a/arch/arm/mach-orion5x/common.c
++++ b/arch/arm/mach-orion5x/common.c
+@@ -184,9 +184,21 @@ static void __init orion5x_crypto_init(void)
+ /*****************************************************************************
+  * Watchdog
+  ****************************************************************************/
++static struct resource orion_wdt_resource[] = {
++		DEFINE_RES_MEM(TIMER_PHYS_BASE, 0x04),
++		DEFINE_RES_MEM(RSTOUTn_MASK_PHYS, 0x04),
++};
++
++static struct platform_device orion_wdt_device = {
++	.name		= "orion_wdt",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(orion_wdt_resource),
++	.resource	= orion_wdt_resource,
++};
++
+ static void __init orion5x_wdt_init(void)
+ {
+-	orion_wdt_init();
++	platform_device_register(&orion_wdt_device);
+ }
+ 
+ 
+diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+index 8861c367d061..78c8bf4043c0 100644
+--- a/arch/arm/plat-orion/common.c
++++ b/arch/arm/plat-orion/common.c
+@@ -21,7 +21,6 @@
+ #include <net/dsa.h>
+ #include <linux/platform_data/dma-mv_xor.h>
+ #include <linux/platform_data/usb-ehci-orion.h>
+-#include <mach/bridge-regs.h>
+ #include <plat/common.h>
+ 
+ /* Create a clkdev entry for a given device/clk */
+@@ -589,26 +588,6 @@ void __init orion_spi_1_init(unsigned long mapbase)
+ }
+ 
+ /*****************************************************************************
+- * Watchdog
+- ****************************************************************************/
+-static struct resource orion_wdt_resource[] = {
+-		DEFINE_RES_MEM(TIMER_PHYS_BASE, 0x04),
+-		DEFINE_RES_MEM(RSTOUTn_MASK_PHYS, 0x04),
+-};
 -
--#include <linux/serial_reg.h>
+-static struct platform_device orion_wdt_device = {
+-	.name		= "orion_wdt",
+-	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(orion_wdt_resource),
+-	.resource	= orion_wdt_resource,
+-};
 -
--#define UART0_PHYS_BASE (0xf1000000 + 0x12000)
--#define SERIAL_BASE	((unsigned char *)UART0_PHYS_BASE)
--
--static void putc(const char c)
+-void __init orion_wdt_init(void)
 -{
--	unsigned char *base = SERIAL_BASE;
--	int i;
--
--	for (i = 0; i < 0x1000; i++) {
--		if (base[UART_LSR << 2] & UART_LSR_THRE)
--			break;
--		barrier();
--	}
--
--	base[UART_TX << 2] = c;
+-	platform_device_register(&orion_wdt_device);
 -}
 -
--static void flush(void)
--{
--	unsigned char *base = SERIAL_BASE;
--	unsigned char mask;
--	int i;
+-/*****************************************************************************
+  * XOR
+  ****************************************************************************/
+ static u64 orion_xor_dmamask = DMA_BIT_MASK(32);
+diff --git a/arch/arm/plat-orion/include/plat/common.h b/arch/arm/plat-orion/include/plat/common.h
+index d9a24f605a2b..9e6d76ad48a9 100644
+--- a/arch/arm/plat-orion/include/plat/common.h
++++ b/arch/arm/plat-orion/include/plat/common.h
+@@ -75,8 +75,6 @@ void __init orion_spi_init(unsigned long mapbase);
+ 
+ void __init orion_spi_1_init(unsigned long mapbase);
+ 
+-void __init orion_wdt_init(void);
 -
--	mask = UART_LSR_TEMT | UART_LSR_THRE;
--
--	for (i = 0; i < 0x1000; i++) {
--		if ((base[UART_LSR << 2] & mask) == mask)
--			break;
--		barrier();
--	}
--}
--
--/*
-- * nothing to do
-- */
--#define arch_decomp_setup()
+ void __init orion_xor0_init(unsigned long mapbase_low,
+ 			    unsigned long mapbase_high,
+ 			    unsigned long irq_0,
 -- 
 2.1.0.rc2
