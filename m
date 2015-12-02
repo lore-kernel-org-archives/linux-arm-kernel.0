@@ -1,74 +1,27 @@
-From: salil.mehta@huawei.com (Salil Mehta)
-Date: Wed, 2 Dec 2015 16:52:51 +0000
-Subject: [PATCH V6 net-next 5/5] net:hns: Add the init code to disable Hip06
- "Hardware VLAN assist"
-In-Reply-To: <1449075171-4820-1-git-send-email-salil.mehta@huawei.com>
-References: <1449075171-4820-1-git-send-email-salil.mehta@huawei.com>
-Message-ID: <1449075171-4820-6-git-send-email-salil.mehta@huawei.com>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Wed, 02 Dec 2015 08:59:40 -0800
+Subject: [PATCH 3/6] net: thunderx: Increase transmit queue length
+In-Reply-To: <CA+sq2CfWC0kcxKj1kqMEU3+y9aovqDdpn2G72n5ON9T3Hzew_w@mail.gmail.com>
+References: <01d101d12c46$2de43b40$89acb1c0$@samsung.com>
+ <1448983985.25582.35.camel@edumazet-glaptop2.roam.corp.google.com>
+ <CA+sq2Ce9oH-kCDO8hK_wX+ZZdXyyBuT4V2bt5Ab+2=pEX+BO+w@mail.gmail.com>
+ <20151201.143047.82022857078130793.davem@davemloft.net>
+ <CA+sq2CduMnsh_R9zTRMjWT=F5=9U3si-5nO6-gFvGCO9czkDdA@mail.gmail.com>
+ <1449062733.32764.53.camel@edumazet-glaptop2.roam.corp.google.com>
+ <CA+sq2CfWC0kcxKj1kqMEU3+y9aovqDdpn2G72n5ON9T3Hzew_w@mail.gmail.com>
+Message-ID: <1449075580.6379.1.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the initializzation code to disable the hardware
-vlan support for VLAN Tag stripping by default for now.
+On Wed, 2015-12-02 at 22:20 +0530, Sunil Kovvuri wrote:
+> >
+> > If the performance increase is 4 %, then surely using twice more memory
+> > is not worth it.
+> I haven't mentioned anywhere that i am seeing 4% increase in performance.
 
-Proper support of "hardware VLAN assitance" feature would
-soon come in the next coming patches.
+Yes, this is the complain I made :
 
-Signed-off-by: Salil Mehta <salil.mehta@huawei.com>
----
+No numbers, just a patch increasing ring size by a 100% factor !
 
-PATCH V6:
-- No change over the earlier patch
-
-PATCH V5:
-- Minor merge/reject change resolved to application of previous patch
-
-PATCH V4/V3/V2:
-- No change over the initial floated patch
-
-PATCH V1:
-- Initial code to disable the hardware VLAN assist for now
----
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c |    7 +++++++
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h |    1 +
- 2 files changed, 8 insertions(+)
-
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
-index b5e4c44..f302ef9 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
-@@ -176,6 +176,11 @@ static void hns_ppe_cnt_clr_ce(struct hns_ppe_cb *ppe_cb)
- 			 PPE_CNT_CLR_CE_B, 1);
- }
- 
-+static void hns_ppe_set_vlan_strip(struct hns_ppe_cb *ppe_cb, int en)
-+{
-+	dsaf_write_dev(ppe_cb, PPEV2_VLAN_STRIP_EN_REG, en);
-+}
-+
- /**
-  * hns_ppe_checksum_hw - set ppe checksum caculate
-  * @ppe_device: ppe device
-@@ -336,6 +341,8 @@ static void hns_ppe_init_hw(struct hns_ppe_cb *ppe_cb)
- 	hns_ppe_cnt_clr_ce(ppe_cb);
- 
- 	if (!AE_IS_VER1(dsaf_dev->dsaf_ver)) {
-+		hns_ppe_set_vlan_strip(ppe_cb, 0);
-+
- 		/* set default RSS key in h/w */
- 		hns_ppe_set_rss_key(ppe_cb, ppe_cb->rss_key);
- 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-index 98c163e..6c18ca9 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-@@ -318,6 +318,7 @@
- #define PPE_CFG_PARSE_TAG_REG			0x94
- #define PPE_CFG_PRO_CHECK_EN_REG		0x98
- #define PPEV2_CFG_TSO_EN_REG                    0xA0
-+#define PPEV2_VLAN_STRIP_EN_REG                 0xAC
- #define PPE_INTEN_REG				0x100
- #define PPE_RINT_REG				0x104
- #define PPE_INTSTS_REG				0x108
--- 
-1.7.9.5
+I really hope you'll have very convincing numbers, especially if your
+driver does not implement BQL.
