@@ -1,47 +1,29 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 2 Dec 2015 12:27:47 +0100
-Subject: [GIT PULL] at91: fixes for 4.4 #2
-Message-ID: <1449055667-15843-1-git-send-email-nicolas.ferre@atmel.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Wed, 02 Dec 2015 14:30:37 +0300
+Subject: [PATCH v2 4/5] net: thunderx: Switchon carrier only upon interface
+ link up
+In-Reply-To: <00ec01d12cee$26a28a00$73e79e00$@samsung.com>
+References: <1449050777-37836-1-git-send-email-sunil.kovvuri@gmail.com>
+ <1449050777-37836-5-git-send-email-sunil.kovvuri@gmail.com>
+ <00ec01d12cee$26a28a00$73e79e00$@samsung.com>
+Message-ID: <011f01d12cf4$de8bc7c0$9ba35740$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+ Hello again!
 
-This is the second AT91 "fixes" for 4.4. This one allows the sama5d2 to
-properly boot with its PIO4 controller and use one of its main interfaces,
-with the 1.8 capable eMMC, on the sama5d2 Xplained reference platform.
+> Subject: RE: [PATCH v2 4/5] net: thunderx: Switchon carrier only upon interface link up
+> 
+>  Just a reminder, we have issue with this one too, which is not addressed yet.
 
-Thanks, best regards,
+ I have examined the problem thoroughly and discovered that it is a problem with experimental BGX driver patches on my 4.2 host
+kernel build. It fails to send NIC_MBOX_MSG_BGX_LINK_CHANGE, so nothing works.
+ I have retested this series on top of 4.3 running on ThunderX. It has good BGX driver and everything works fine. Therefore, the
+whole series can be safely applied and...
 
-The following changes since commit 50cb2efaa63bdfd4a68b94acc55a12e68d9c33d4:
+ Tested-by: Pavel Fedin <p.fedin@samsung.com>
 
-  MAINTAINERS: Atmel drivers: change NAND and ISI entries (2015-11-17 12:08:46 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-fixes2
-
-for you to fetch changes up to da71bac1b67344174294f9671dd8691cfd486782:
-
-  ARM: at91: fix pinctrl driver selection (2015-12-02 11:09:38 +0100)
-
-----------------------------------------------------------------
-Second fixes for 4.4:
-- fix of a hardware setup that prevents the sd/mmc interface to show up on
-  sama5d2.
-- proper selection of pinctrl drivers. PIO4 is necessary for the sama5d2 to
-  boot.
-
-----------------------------------------------------------------
-Ludovic Desroches (1):
-      ARM: at91: fix pinctrl driver selection
-
-Nicolas Ferre (1):
-      ARM: at91/dt: add always-on to 1.8V regulator
-
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 1 +
- arch/arm/mach-at91/Kconfig                  | 6 +++++-
- 2 files changed, 6 insertions(+), 1 deletion(-)
-
--- 
-Nicolas Ferre
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
