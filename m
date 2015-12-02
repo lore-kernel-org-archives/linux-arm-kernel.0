@@ -1,25 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 2 Dec 2015 19:41:25 +0000
-Subject: [PATCH v4 1/5] spi: introduce accelerated read support for spi
- flash devices
-In-Reply-To: <1448860515-28336-2-git-send-email-vigneshr@ti.com>
-References: <1448860515-28336-1-git-send-email-vigneshr@ti.com>
- <1448860515-28336-2-git-send-email-vigneshr@ti.com>
-Message-ID: <20151202194125.GL1929@sirena.org.uk>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 02 Dec 2015 11:43:39 -0800
+Subject: [PATCH 2/3] pwm: bcm2835: prevent division by zero
+In-Reply-To: <565F259D.6060905@i2se.com>
+References: <1449010541-3767-1-git-send-email-stefan.wahren@i2se.com>
+ <1449010541-3767-3-git-send-email-stefan.wahren@i2se.com>
+ <87h9k1yd2z.fsf@eliezer.anholt.net> <565F259D.6060905@i2se.com>
+Message-ID: <87lh9c8wlw.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 30, 2015 at 10:45:11AM +0530, Vignesh R wrote:
-> In addition to providing direct access to SPI bus, some spi controller
-> hardwares (like ti-qspi) provide special port (like memory mapped port)
-> that are optimized to improve SPI flash read performance.
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-I'm reasonably OK with this from the SPI side but I'd really like to see
-people working on MTD say that this makes sense.
+> Am 02.12.2015 um 00:16 schrieb Eric Anholt:
+>> Stefan Wahren <stefan.wahren@i2se.com> writes:
+>>
+>>> It's possible that the pwm clock become an orphan. So better
+>>> check the result of clk_get_rate in order to prevent a division
+>>> by zero.
+>> How would we lose our clock when we're keeping the clock enabled from
+>> driver probe until remove?
+>
+> It's not the problem that we lose the clock inside this driver. The pwm
+> clock could be initial assigned to a unregistered parent clock like "GND".
+>
+> I'm refering to this discussion:
+>
+> http://lists.infradead.org/pipermail/linux-rpi-kernel/2015-November/002603.html
+
+I actually would have expected that the prepare would error out on a
+clock with no rate set.  Interesting.  This seems like a good safety
+measure, so this one is also:
+
+Reviewed-by: Eric Anholt <eric@anholt.net>
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 473 bytes
+Size: 818 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151202/f62b2a94/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151202/dd15c55a/attachment.sig>
