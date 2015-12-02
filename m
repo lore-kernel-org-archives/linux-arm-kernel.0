@@ -1,43 +1,52 @@
-From: daniel@fooishbar.org (Daniel Stone)
-Date: Wed, 2 Dec 2015 17:21:44 +0000
-Subject: [PATCH v3 2/4] drm: Add support for ARM's HDLCD controller.
-In-Reply-To: <1449058982-18595-3-git-send-email-Liviu.Dudau@arm.com>
-References: <1449058982-18595-1-git-send-email-Liviu.Dudau@arm.com>
- <1449058982-18595-3-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <CAPj87rNFFGeL8z9GBXxyVri1RyhVpMGS0yz7opgCYamHYV1Yow@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed,  2 Dec 2015 18:22:26 +0100
+Subject: [PATCH v2 0/7] Add basic SMP support for Amlogic Meson8b
+Message-ID: <1449076953-5058-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liviu,
+From: Carlo Caione <carlo@endlessm.com>
 
-On 2 December 2015 at 12:23, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> +       if (irq_status & HDLCD_INTERRUPT_VSYNC) {
-> +               unsigned long flags;
-> +
-> +               drm_handle_vblank(drm, 0);
-> +
-> +               spin_lock_irqsave(&drm->event_lock, flags);
-> +               if (hdlcd->event) {
-> +                       drm_send_vblank_event(drm, hdlcd->event->pipe, hdlcd->event);
-> +                       drm_crtc_vblank_put(&hdlcd->crtc);
-> +                       hdlcd->event = NULL;
-> +               }
-> +               spin_unlock_irqrestore(&drm->event_lock, flags);
-> +       }
+This patchset adds SMP support for Amlogic Meson8b SoCs.
 
-As with VC4 and Rockchip, you're missing a ->preclose handler in your
-drm_drv, to make sure that you don't try to send events to a dead
-client (which causes an OOPS):
-https://git.collabora.com/cgit/user/daniels/linux.git/commit/?h=wip/4.4.x/rockchip-drm-fixes&id=d14f21bcd7
-(and its parent)
+Patch 1 fix some paramater for L2 cache needed for SMP.
+Patches 2-4 add a small reset controller used to reset the CPU cores at boot.
+Patches 5-7 deal with the SMP code itself.
 
-Also, is there anything preventing clients from submitting multiple
-pageflips before the event is sent? I couldn't see anything from a
-quick look, so you could have the situation of:
-  - client submits pageflip, event 1 stored to hdlcd->event
-  - client submits pageflip, event 2 stored to hdlcd->event
-  - vblank arrives, event 2 is sent
-  - event 1 has disappeared and been leaked
+Changelog:
 
-Cheers,
-Daniel
+V2:
+    - Add forgotten textofs-$(CONFIG_ARCH_MESON)
+    - Checking for of_reset_control_get() failure
+    - Use more specific subjects
+
+Carlo Caione (7):
+  ARM: DTS: Amlogic: Extend L2 cache controller node for Meson8b
+  dt-bindings: Amlogic: Document the CPU reset controller for Meson8b
+  clk: Amlogic: Add reset controller for CPU cores for Meson8b
+  ARM: DTS: Amlogic: Enable reset controller for Meson8b
+  dt-bindings: Amlogic: Add SMP related documentation
+  ARM: Amlogic: Add SMP bringup code for Meson8b
+  ARM: DTS: Amlogic: Add SMP related nodes for Meson8b
+
+ .../devicetree/bindings/arm/amlogic/pmu.txt        |  16 ++
+ .../devicetree/bindings/arm/amlogic/smp-sram.txt   |  32 +++
+ Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
+ .../bindings/clock/amlogic,meson8b-clkc.txt        |   6 +-
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/meson8b.dtsi                     |  32 +++
+ arch/arm/mach-meson/Kconfig                        |   1 +
+ arch/arm/mach-meson/Makefile                       |   1 +
+ arch/arm/mach-meson/platsmp.c                      | 234 +++++++++++++++++++++
+ drivers/clk/meson/clk-cpu.c                        |  60 +++++-
+ drivers/clk/meson/clkc.c                           |   5 +-
+ drivers/clk/meson/clkc.h                           |   6 +-
+ drivers/clk/meson/meson8b-clkc.c                   |   4 +-
+ include/dt-bindings/clock/meson8b-clkc.h           |   5 +
+ 14 files changed, 396 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/amlogic/pmu.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt
+ create mode 100644 arch/arm/mach-meson/platsmp.c
+
+-- 
+2.5.0
