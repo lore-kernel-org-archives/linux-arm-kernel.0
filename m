@@ -1,39 +1,46 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 02 Dec 2015 12:08:34 +0100
-Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
-In-Reply-To: <20151201182226.ea7d860eb3a35086981cd18f@vollmann.ch> (Detlef
- Vollmann's message of "Tue, 1 Dec 2015 18:22:26 +0100")
-References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
- <87610j7gmc.fsf@free-electrons.com>
- <87wpsz61r7.fsf@free-electrons.com>
- <20151201182226.ea7d860eb3a35086981cd18f@vollmann.ch>
-Message-ID: <87fuzl2jm5.fsf@free-electrons.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Wed,  2 Dec 2015 19:12:20 +0800
+Subject: [PATCH 1/2] arm64: dts: rockchip: change the correct voltage range
+ for rk3368 evb board
+Message-ID: <1449054741-25354-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Detlef,
+In general, the logic voltage is affected by ddr frequency factors.
+We should fix the correct voltage range since assuemd that we have the
+ddr frequency driver in mainline.
+
+AFAIK, the 1.8v voltage is used by the SD3.0 card.
+
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+---
+
+ arch/arm64/boot/dts/rockchip/rk3368-evb-act8846.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368-evb-act8846.dts b/arch/arm64/boot/dts/rockchip/rk3368-evb-act8846.dts
+index eed6d3c..8a5275f 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368-evb-act8846.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3368-evb-act8846.dts
+@@ -104,8 +104,8 @@
  
- On mar., d?c. 01 2015, Detlef Vollmann <dv@vollmann.ch> wrote:
-
-> On Mon, 30 Nov 2015 14:43:56 +0100
-> Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-> [...]
->> > Detlef, Benjamin,
->> >
->> > could you test it on an Orion5x based board?
-> Sorry, I'm on tour right now.
-> I'll test it next weekend (or beginning next week) on my DNS-323.
-
-We have still some time to send the series, and furthermore Andrew
-already tested it on an Orion5x platform. However it would be nice to
-have your confirmation on an other board.
-
-Thanks,
-
-Gregory
-
+ 			vdd_log: REG3 {
+ 				regulator-name = "VDD_LOG";
+-				regulator-min-microvolt = <1000000>;
+-				regulator-max-microvolt = <1000000>;
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1500000>;
+ 				regulator-always-on;
+ 			};
+ 
+@@ -118,7 +118,7 @@
+ 
+ 			vccio_sd: REG5 {
+ 				regulator-name = "VCCIO_SD";
+-				regulator-min-microvolt = <3300000>;
++				regulator-min-microvolt = <1800000>;
+ 				regulator-max-microvolt = <3300000>;
+ 				regulator-always-on;
+ 			};
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.9.1
