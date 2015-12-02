@@ -1,256 +1,89 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 2 Dec 2015 12:27:25 -0800
-Subject: [PATCH v2] ARM: mm: flip priority of CONFIG_DEBUG_RODATA
-Message-ID: <20151202202725.GA794@www.outflux.net>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 2 Dec 2015 14:29:53 -0600
+Subject: [PATCH v3 0/3] soc: ti: Introduce wkup_m3_ipc driver
+In-Reply-To: <20151020161843.GE3078@atomide.com>
+References: <1442967294-23837-1-git-send-email-d-gerlach@ti.com>
+ <20151020161843.GE3078@atomide.com>
+Message-ID: <565F54C1.8090407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The use of CONFIG_DEBUG_RODATA is generally seen as an essential part of
-kernel self-protection:
-http://www.openwall.com/lists/kernel-hardening/2015/11/30/13
-Additionally, its name has grown to mean things beyond just rodata. To
-get ARM closer to this, we ought to rearrange the names of the configs
-that control how the kernel protects its memory. What was called
-CONFIG_ARM_KERNMEM_PERMS is really doing the work that other architectures
-call CONFIG_DEBUG_RODATA.
+Hi,
+On 10/20/2015 11:18 AM, Tony Lindgren wrote:
+> Hi all,
+>
+> * Dave Gerlach <d-gerlach@ti.com> [150922 17:20]:
+>> Hi,
+>> This series is version 3 of the code to introduce a wkup_m3_ipc driver
+>> to handle communication between the MPU and Cortex M3 present on TI AM335x
+>> and AM437x SoCs. v2 of this series can be found at [1]. Only patch 3
+>> has been changed based on a request from Tony and a few cleanups:
+>>
+>> - Rather than exporting all of the functionality of the driver, added
+>>    wkup_m3_ipc_get and wkup_m3_ipc_put to allow users to just get a handle
+>>    containing an ops structure for use.
+>>
+>> - Changed all ops (previously exported functions) to take pointer to
+>>    struct wkup_m3_ipc as an argument now that user code will get this
+>>    from wkup_m3_ipc_get.
+>>
+>> - General cleanup to probe function
+>>
+>> - Added MODULE_DEVICE_TABLE so driver can probe automatically.
+>>
+>> The series containing the DT nodes can be found here [2]. The actual dt
+>> nodes for wkup_m3_ipc (last two patches) have been merged but discussion
+>> is still open for the ti,mbox-send-noirq flag patches and depends on the
+>> comments provided for the omap-mailbox change presented in patch 1 of
+>> this series.
+>>
+>> A full branch containing all necessary PM code for both am335x and am437x
+>> has been pushed here [3] to provide a big picture view of the plan for
+>> this series.
+>>
+>> This driver relies on the firmware at [4] in the next-upstream branch
+>> being present in /lib/firmware in the rootfs or built in to the kernel.
+>
+> Anybody got comments on this one? Should I pick up this series or
+> what's the plan?
 
-This redefines CONFIG_DEBUG_RODATA to actually do the bulk of the
-ROing (and NXing). In the place of the old CONFIG_DEBUG_RODATA, use
-CONFIG_DEBUG_ALIGN_RODATA, since that's what the option does: adds
-section alignment for making rodata explicitly NX, as arm does not split
-the page tables like arm64 does without _ALIGN_RODATA.
+Now that Patch 1 has been merged [1] can patch 2 and 3 be picked up? 
+These apply cleanly on v4.4-rc3.
 
-Also adds human readable names to the sections so I could more easily
-debug my typos, and makes CONFIG_DEBUG_RODATA default "y" for CPU_V7.
+Regards,
+Dave
 
-Results in /sys/kernel/debug/kernel_page_tables for each config state:
+[1] 
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8e3c5952144f045a0c81bf674d3f5e1d9aafceb7
 
- # CONFIG_DEBUG_RODATA is not set
- # CONFIG_DEBUG_ALIGN_RODATA is not set
-
----[ Kernel Mapping ]---
-0x80000000-0x80900000           9M     RW x  SHD
-0x80900000-0xa0000000         503M     RW NX SHD
-
- CONFIG_DEBUG_RODATA=y
- CONFIG_DEBUG_ALIGN_RODATA=y
-
----[ Kernel Mapping ]---
-0x80000000-0x80100000           1M     RW NX SHD
-0x80100000-0x80700000           6M     ro x  SHD
-0x80700000-0x80a00000           3M     ro NX SHD
-0x80a00000-0xa0000000         502M     RW NX SHD
-
- CONFIG_DEBUG_RODATA=y
- # CONFIG_DEBUG_ALIGN_RODATA is not set
-
----[ Kernel Mapping ]---
-0x80000000-0x80100000           1M     RW NX SHD
-0x80100000-0x80a00000           9M     ro x  SHD
-0x80a00000-0xa0000000         502M     RW NX SHD
-
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
-Depends on 8464/1 "Update all mm structures with section adjustments"
----
- arch/arm/kernel/vmlinux.lds.S | 10 +++++-----
- arch/arm/mm/Kconfig           | 34 ++++++++++++++++++----------------
- arch/arm/mm/init.c            | 19 ++++++++++---------
- 3 files changed, 33 insertions(+), 30 deletions(-)
-
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 8b60fde5ce48..a6e395c53a48 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -8,7 +8,7 @@
- #include <asm/thread_info.h>
- #include <asm/memory.h>
- #include <asm/page.h>
--#ifdef CONFIG_ARM_KERNMEM_PERMS
-+#ifdef CONFIG_DEBUG_RODATA
- #include <asm/pgtable.h>
- #endif
- 
-@@ -94,7 +94,7 @@ SECTIONS
- 		HEAD_TEXT
- 	}
- 
--#ifdef CONFIG_ARM_KERNMEM_PERMS
-+#ifdef CONFIG_DEBUG_RODATA
- 	. = ALIGN(1<<SECTION_SHIFT);
- #endif
- 
-@@ -117,7 +117,7 @@ SECTIONS
- 			ARM_CPU_KEEP(PROC_INFO)
- 	}
- 
--#ifdef CONFIG_DEBUG_RODATA
-+#ifdef CONFIG_DEBUG_ALIGN_RODATA
- 	. = ALIGN(1<<SECTION_SHIFT);
- #endif
- 	RO_DATA(PAGE_SIZE)
-@@ -153,7 +153,7 @@ SECTIONS
- 	_etext = .;			/* End of text and rodata section */
- 
- #ifndef CONFIG_XIP_KERNEL
--# ifdef CONFIG_ARM_KERNMEM_PERMS
-+# ifdef CONFIG_DEBUG_RODATA
- 	. = ALIGN(1<<SECTION_SHIFT);
- # else
- 	. = ALIGN(PAGE_SIZE);
-@@ -231,7 +231,7 @@ SECTIONS
- 	__data_loc = ALIGN(4);		/* location in binary */
- 	. = PAGE_OFFSET + TEXT_OFFSET;
- #else
--#ifdef CONFIG_ARM_KERNMEM_PERMS
-+#ifdef CONFIG_DEBUG_RODATA
- 	. = ALIGN(1<<SECTION_SHIFT);
- #else
- 	. = ALIGN(THREAD_SIZE);
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 41218867a9a6..68331f91c90f 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -1039,24 +1039,26 @@ config ARCH_SUPPORTS_BIG_ENDIAN
- 	  This option specifies the architecture can support big endian
- 	  operation.
- 
--config ARM_KERNMEM_PERMS
--	bool "Restrict kernel memory permissions"
-+config DEBUG_RODATA
-+	bool "Make kernel text and rodata read-only"
- 	depends on MMU
-+	default y if CPU_V7
- 	help
--	  If this is set, kernel memory other than kernel text (and rodata)
--	  will be made non-executable. The tradeoff is that each region is
--	  padded to section-size (1MiB) boundaries (because their permissions
--	  are different and splitting the 1M pages into 4K ones causes TLB
--	  performance problems), wasting memory.
-+	  If this is set, kernel text and rodata memory will be made
-+	  read-only, and non-text kernel memory will be made non-executable.
-+	  The tradeoff is that each region is padded to section-size (1MiB)
-+	  boundaries (because their permissions are different and splitting
-+	  the 1M pages into 4K ones causes TLB performance problems), which
-+	  can waste memory.
- 
--config DEBUG_RODATA
--	bool "Make kernel text and rodata read-only"
--	depends on ARM_KERNMEM_PERMS
-+config DEBUG_ALIGN_RODATA
-+	bool "Make rodata strictly non-executable"
-+	depends on DEBUG_RODATA
- 	default y
- 	help
--	  If this is set, kernel text and rodata will be made read-only. This
--	  is to help catch accidental or malicious attempts to change the
--	  kernel's executable code. Additionally splits rodata from kernel
--	  text so it can be made explicitly non-executable. This creates
--	  another section-size padded region, so it can waste more memory
--	  space while gaining the read-only protections.
-+	  If this is set, rodata will be made explicitly non-executable. This
-+	  provides protection on the rare chance that attackers might find and
-+	  use ROP gadgets that exist in the rodata section. This adds an
-+	  additional section-aligned split of rodata from kernel text so it
-+	  can be made explicitly non-executable. This padding may waste memory
-+	  space to gain the additional protection.
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 7f8cd1b3557f..321d3683dc7c 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -569,8 +569,9 @@ void __init mem_init(void)
- 	}
- }
- 
--#ifdef CONFIG_ARM_KERNMEM_PERMS
-+#ifdef CONFIG_DEBUG_RODATA
- struct section_perm {
-+	const char *name;
- 	unsigned long start;
- 	unsigned long end;
- 	pmdval_t mask;
-@@ -581,6 +582,7 @@ struct section_perm {
- static struct section_perm nx_perms[] = {
- 	/* Make pages tables, etc before _stext RW (set NX). */
- 	{
-+		.name	= "pre-text NX",
- 		.start	= PAGE_OFFSET,
- 		.end	= (unsigned long)_stext,
- 		.mask	= ~PMD_SECT_XN,
-@@ -588,14 +590,16 @@ static struct section_perm nx_perms[] = {
- 	},
- 	/* Make init RW (set NX). */
- 	{
-+		.name	= "init NX",
- 		.start	= (unsigned long)__init_begin,
- 		.end	= (unsigned long)_sdata,
- 		.mask	= ~PMD_SECT_XN,
- 		.prot	= PMD_SECT_XN,
- 	},
--#ifdef CONFIG_DEBUG_RODATA
-+#ifdef CONFIG_DEBUG_ALIGN_RODATA
- 	/* Make rodata NX (set RO in ro_perms below). */
- 	{
-+		.name	= "rodata NX",
- 		.start  = (unsigned long)__start_rodata,
- 		.end    = (unsigned long)__init_begin,
- 		.mask   = ~PMD_SECT_XN,
-@@ -604,10 +608,10 @@ static struct section_perm nx_perms[] = {
- #endif
- };
- 
--#ifdef CONFIG_DEBUG_RODATA
- static struct section_perm ro_perms[] = {
- 	/* Make kernel code and rodata RX (set RO). */
- 	{
-+		.name	= "text/rodata RO",
- 		.start  = (unsigned long)_stext,
- 		.end    = (unsigned long)__init_begin,
- #ifdef CONFIG_ARM_LPAE
-@@ -620,7 +624,6 @@ static struct section_perm ro_perms[] = {
- #endif
- 	},
- };
--#endif
- 
- /*
-  * Updates section permissions only for the current mm (sections are
-@@ -667,8 +670,8 @@ void set_section_perms(struct section_perm *perms, int n, bool set,
- 	for (i = 0; i < n; i++) {
- 		if (!IS_ALIGNED(perms[i].start, SECTION_SIZE) ||
- 		    !IS_ALIGNED(perms[i].end, SECTION_SIZE)) {
--			pr_err("BUG: section %lx-%lx not aligned to %lx\n",
--				perms[i].start, perms[i].end,
-+			pr_err("BUG: %s section %lx-%lx not aligned to %lx\n",
-+				perms[i].name, perms[i].start, perms[i].end,
- 				SECTION_SIZE);
- 			continue;
- 		}
-@@ -709,7 +712,6 @@ void fix_kernmem_perms(void)
- 	stop_machine(__fix_kernmem_perms, NULL, NULL);
- }
- 
--#ifdef CONFIG_DEBUG_RODATA
- int __mark_rodata_ro(void *unused)
- {
- 	update_sections_early(ro_perms, ARRAY_SIZE(ro_perms));
-@@ -732,11 +734,10 @@ void set_kernel_text_ro(void)
- 	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), true,
- 				current->active_mm);
- }
--#endif /* CONFIG_DEBUG_RODATA */
- 
- #else
- static inline void fix_kernmem_perms(void) { }
--#endif /* CONFIG_ARM_KERNMEM_PERMS */
-+#endif /* CONFIG_DEBUG_RODATA */
- 
- void free_tcmmem(void)
- {
--- 
-1.9.1
-
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+>
+> Regards,
+>
+> Tony
+>
+>
+>> [1] https://lkml.org/lkml/2015/7/17/797
+>> [2] https://lkml.org/lkml/2015/7/17/813
+>> [3] https://github.com/dgerlach/linux-pm/tree/pm-v4.3-rc1-amx3-suspend
+>> [4] https://git.ti.com/ti-cm3-pm-firmware
+>>
+>> Dave Gerlach (3):
+>>    mailbox/omap: Add ti,mbox-send-noirq quirk to fix AM33xx CPU Idle
+>>    Documentation: dt: add bindings for TI Wakeup M3 IPC device
+>>    soc: ti: Add wkup_m3_ipc driver
+>>
+>>   .../devicetree/bindings/mailbox/omap-mailbox.txt   |   8 +
+>>   .../devicetree/bindings/soc/ti/wkup_m3_ipc.txt     |  57 +++
+>>   drivers/mailbox/omap-mailbox.c                     |  49 +-
+>>   drivers/soc/ti/Kconfig                             |  10 +
+>>   drivers/soc/ti/Makefile                            |   1 +
+>>   drivers/soc/ti/wkup_m3_ipc.c                       | 508 +++++++++++++++++++++
+>>   include/linux/wkup_m3_ipc.h                        |  55 +++
+>>   7 files changed, 684 insertions(+), 4 deletions(-)
+>>   create mode 100644 Documentation/devicetree/bindings/soc/ti/wkup_m3_ipc.txt
+>>   create mode 100644 drivers/soc/ti/wkup_m3_ipc.c
+>>   create mode 100644 include/linux/wkup_m3_ipc.h
+>>
+>> --
+>> 2.4.6
+>>
