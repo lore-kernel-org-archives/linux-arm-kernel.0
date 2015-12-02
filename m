@@ -1,91 +1,72 @@
-From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
-Date: Wed, 2 Dec 2015 10:40:00 +0800
-Subject: [PATCH v2] arm64: dts: add all hi6220 i2c nodes
-In-Reply-To: <20151202020524.GC692@tiger>
-References: <1448524623-10320-1-git-send-email-kong.kongxinwei@hisilicon.com>
- <20151202020524.GC692@tiger>
-Message-ID: <565E5A00.50803@hisilicon.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Wed, 2 Dec 2015 10:40:19 +0800
+Subject: [PATCH v4 18/21] KVM: ARM64: Add PMU overflow interrupt routing
+In-Reply-To: <565DD17A.50009@arm.com>
+References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>	<1446186123-11548-19-git-send-email-zhaoshenglong@huawei.com>
+ <20151130182258.684c9df6@arm.com> <565DB021.3020901@huawei.com>
+ <565DB3A5.3030701@arm.com> <565DB935.5040609@linaro.org>
+ <565DBF8D.1070006@arm.com> <565DCA24.7000908@linaro.org>
+ <565DD17A.50009@arm.com>
+Message-ID: <565E5A13.2080706@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Shawn
 
-On 2015/12/2 10:05, Shawn Guo wrote:
-> On Thu, Nov 26, 2015 at 03:57:03PM +0800, Xinwei Kong wrote:
->> This patch adds all I2C nodes for the Hi6220 SoC. This hi6220 Soc
->> use this I2C IP of Synopsys Designware for HiKey board.
->>
->> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
->> ---
->>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 37 +++++++++++++++++++++++++++++++
->>  1 file changed, 37 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
->> index 82d2488..85d4a8b 100644
->> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
->> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
->> @@ -208,5 +208,42 @@
->>  			clock-names = "uartclk", "apb_pclk";
->>  			status = "disabled";
->>  		};
->> +
->> +		i2c0: i2c at f7100000 {
->> +			compatible = "snps,designware-i2c";
->> +			reg = <0x0 0xf7100000 0x0 0x1000>;
->> +			interrupts = <0 44 4>;
->> +			clocks = <&sys_ctrl HI6220_I2C0_CLK>;
->> +			clock-names = "clk_i2c0";
-> 
-> Neither bindings doc i2c-designware.txt defines this property, nor
-> kernel i2c-designware driver uses this property.  So I think this
-> clock-names property can just be dropped.
-> 
-This property should been delete it. I will debug it in HiKey board then
-send v3 patch.
 
-Thank you
-xinwei
-> Otherwise, the patch looks good to me.
-> 
-> Shawn
-> 
->> +			i2c-sda-hold-time-ns = <300>;
->> +			pinctrl-names = "default";
->> +			pinctrl-0 = <&i2c0_pmx_func &i2c0_cfg_func>;
->> +			status = "disabled";
->> +		};
->> +
->> +		i2c1: i2c at f7101000 {
->> +			compatible = "snps,designware-i2c";
->> +			reg = <0x0 0xf7101000 0x0 0x1000>;
->> +			interrupts = <0 45 4>;
->> +			clocks = <&sys_ctrl HI6220_I2C1_CLK>;
->> +			clock-names = "clk_i2c1";
->> +			i2c-sda-hold-time-ns = <300>;
->> +			pinctrl-names = "default";
->> +			pinctrl-0 = <&i2c1_pmx_func &i2c1_cfg_func>;
->> +			status = "disabled";
->> +		};
->> +
->> +		i2c2: i2c at f7102000 {
->> +			compatible = "snps,designware-i2c";
->> +			reg = <0x0 0xf7102000 0x0 0x1000>;
->> +			interrupts = <0 46 4>;
->> +			clocks = <&sys_ctrl HI6220_I2C2_CLK>;
->> +			clock-names = "clk_i2c2";
->> +			i2c-sda-hold-time-ns = <300>;
->> +			pinctrl-names = "default";
->> +			pinctrl-0 = <&i2c2_pmx_func &i2c2_cfg_func>;
->> +			status = "disabled";
->> +		};
->> +
->>  	};
->>  };
->> -- 
->> 1.9.1
+On 2015/12/2 0:57, Marc Zyngier wrote:
+> On 01/12/15 16:26, Shannon Zhao wrote:
 >>
 >>
+>> On 2015/12/1 23:41, Marc Zyngier wrote:
+>>>> The reason is that when guest clear the overflow register, it will trap
+>>>>> to kvm and call kvm_pmu_sync_hwstate() as you see above. At this moment,
+>>>>> the overflow register is still overflowed(that is some bit is still 1).
+>>>>> So We need to use some flag to mark we already inject this interrupt.
+>>>>> And if during guest handling the overflow, there is a new overflow
+>>>>> happening, the pmu->irq_pending will be set ture by
+>>>>> kvm_pmu_perf_overflow(), then it needs to inject this new interrupt, right?
+>>> I don't think so. This is a level interrupt, so the level should stay
+>>> high as long as the guest hasn't cleared all possible sources for that
+>>> interrupt.
+>>>
+>>> For your example, the guest writes to PMOVSCLR to clear the overflow
+>>> caused by a given counter. If the status is now 0, the interrupt line
+>>> drops. If the status is still non zero, the line stays high. And I
+>>> believe that writing a 1 to PMOVSSET would actually trigger an
+>>> interrupt, or keep it high if it has already high.
+>>>
+>> Right, writing 1 to PMOVSSET will trigger an interrupt.
 >>
+>>> In essence, do not try to maintain side state. I've been bitten.
+>>
+>> So on VM entry, it check if PMOVSSET is zero. If not, call 
+>> kvm_vgic_inject_irq to set the level high. If so, set the level low.
+>> On VM exit, it seems there is nothing to do.
 > 
-> .
+> It is even simpler than that:
 > 
+> - When you get an overflow, you inject an interrupt with the level set to 1.
+> - When the overflow register gets cleared, you inject the same interrupt
+> with the level set to 0.
+> 
+> I don't think you need to do anything else, and the world switch should
+> be left untouched.
+> 
+
+On 2015/7/17 23:28, Christoffer Dall wrote:>> > +		
+kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+>> > +					    pmu->irq_num, 1);
+> what context is this overflow handler function?  kvm_vgic_inject_irq
+> grabs a mutex, so it can sleep...
+>
+> from a quick glance at the perf core code, it looks like this is in
+> interrupt context, so that call to kvm_vgic_inject_irq looks bad.
+>
+
+But as Christoffer said before, it's not good to call
+kvm_vgic_inject_irq directly in interrupt context. So if we just kick
+the vcpu here and call kvm_vgic_inject_irq on VM entry, is this fine?
+
+Thanks,
+-- 
+Shannon
