@@ -1,49 +1,78 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Wed, 02 Dec 2015 05:25:33 -0800
-Subject: [PATCH 3/6] net: thunderx: Increase transmit queue length
-In-Reply-To: <CA+sq2CduMnsh_R9zTRMjWT=F5=9U3si-5nO6-gFvGCO9czkDdA@mail.gmail.com>
-References: <01d101d12c46$2de43b40$89acb1c0$@samsung.com>
- <1448983985.25582.35.camel@edumazet-glaptop2.roam.corp.google.com>
- <CA+sq2Ce9oH-kCDO8hK_wX+ZZdXyyBuT4V2bt5Ab+2=pEX+BO+w@mail.gmail.com>
- <20151201.143047.82022857078130793.davem@davemloft.net>
- <CA+sq2CduMnsh_R9zTRMjWT=F5=9U3si-5nO6-gFvGCO9czkDdA@mail.gmail.com>
-Message-ID: <1449062733.32764.53.camel@edumazet-glaptop2.roam.corp.google.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 2 Dec 2015 13:36:26 +0000
+Subject: linux-next: manual merge of the v4l-dvb tree with the arm-soc tree
+Message-ID: <20151202133626.c5d9729eb0ffa811fb1ebe8e@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-12-02 at 11:18 +0530, Sunil Kovvuri wrote:
-> >The driver should successfully recover from out of memory situations
-> > and not stop RX/TX completely.
-> This memory allocation is while interface bringup/initialization and not during
-> packet I/O.
-> 
-> >Don't put this off as not "related" to your patch, it is as this
-> >introduces the behavior for this user, and you should fix it before
-> >expecting me to apply this patch series.
-> I would disagree on this, as this patch hasn't introduced any failure here,
-> if this user has connected any device which asks for a bit large amount
-> of coherent memory then i am sure he will see the same issue.
-> And above i have suggested what could be done to not see this issue.
+Hi Mauro,
 
+Today's linux-next merge of the v4l-dvb tree got a conflict in
+arch/arm/mach-pxa/palmz72.c, arch/arm/mach-pxa/palmtreo.c and
+arch/arm/mach-pxa/mioa701.c between commit 4c25c5d2985c1 ("ARM:
+pxa: make more mach/*.h files local") from the arm-soc tree and commit a71daaa10ec2e325f ("[media] move media platform data to
+linux/platform_data/media") from the v4l-dvb tree.
 
-This is unacceptable.
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-Maybe you did not complete tests. changelog has no 'Tested:' section.
-
-You can not claim this patch was good, especially considering no precise
-numbers were given.
-
-If the performance increase is 4 %, then surely using twice more memory
-is not worth it.
-
-RX/TX ring buffer sizes should be :
-
-- Default to reasonable sizes (ie not gigantic memory usage for typical
-use). For multiqueue devices, one also has to take into account the
-number of queues: 
-
-  If a 10Gbit NIC has 128 queues, then probably having 8192 slots
-  per queue is too much, if this maps to 512 MB of memory !
-
-- ethtool -G support to let the admin change the conservative settings
-for the exceptional workloads.
+diff --cc arch/arm/mach-pxa/mioa701.c
+index a315f6e3c4a6,ccfd2b63c6a4..000000000000
+--- a/arch/arm/mach-pxa/mioa701.c
++++ b/arch/arm/mach-pxa/mioa701.c
+@@@ -52,9 -52,9 +52,9 @@@
+  #include <linux/platform_data/keypad-pxa27x.h>
+  #include <linux/platform_data/video-pxafb.h>
+  #include <linux/platform_data/mmc-pxamci.h>
+ -#include <mach/udc.h>
+ -#include <mach/pxa27x-udc.h>
+ +#include "udc.h"
+ +#include "pxa27x-udc.h"
+- #include <linux/platform_data/camera-pxa.h>
++ #include <linux/platform_data/media/camera-pxa.h>
+  #include <mach/audio.h>
+  #include <mach/smemc.h>
+  #include <media/soc_camera.h>
+diff --cc arch/arm/mach-pxa/palmtreo.c
+index b2aae54bed42,2dc56062fb7e..000000000000
+--- a/arch/arm/mach-pxa/palmtreo.c
++++ b/arch/arm/mach-pxa/palmtreo.c
+@@@ -43,8 -43,8 +43,8 @@@
+  #include <linux/platform_data/usb-ohci-pxa27x.h>
+  #include <mach/pxa2xx-regs.h>
+  #include <linux/platform_data/asoc-palm27x.h>
+- #include <linux/platform_data/camera-pxa.h>
++ #include <linux/platform_data/media/camera-pxa.h>
+ -#include <mach/palm27x.h>
+ +#include "palm27x.h"
+  
+  #include <sound/pxa2xx-lib.h>
+  
+diff --cc arch/arm/mach-pxa/palmz72.c
+index abba86f3e254,e3df17a7e8d4..000000000000
+--- a/arch/arm/mach-pxa/palmz72.c
++++ b/arch/arm/mach-pxa/palmz72.c
+@@@ -44,12 -44,12 +44,12 @@@
+  #include <linux/platform_data/video-pxafb.h>
+  #include <linux/platform_data/irda-pxaficp.h>
+  #include <linux/platform_data/keypad-pxa27x.h>
+ -#include <mach/udc.h>
+ +#include "udc.h"
+  #include <linux/platform_data/asoc-palm27x.h>
+ -#include <mach/palm27x.h>
+ +#include "palm27x.h"
+  
+ -#include <mach/pm.h>
+ +#include "pm.h"
+- #include <linux/platform_data/camera-pxa.h>
++ #include <linux/platform_data/media/camera-pxa.h>
+  
+  #include <media/soc_camera.h>
+  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151202/b60da1fc/attachment.sig>
