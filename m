@@ -1,8 +1,10 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed,  2 Dec 2015 19:12:20 +0800
-Subject: [PATCH 1/2] arm64: dts: rockchip: change the correct voltage range
- for rk3368 evb board
-Message-ID: <1449054741-25354-1-git-send-email-wxt@rock-chips.com>
+Date: Wed,  2 Dec 2015 19:12:21 +0800
+Subject: [PATCH 2/2] ARM: dts: rockchip: change the correct voltage range for
+ rk3288 evb board
+In-Reply-To: <1449054741-25354-1-git-send-email-wxt@rock-chips.com>
+References: <1449054741-25354-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1449054741-25354-2-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,16 +15,17 @@ ddr frequency driver in mainline.
 AFAIK, the 1.8v voltage is used by the SD3.0 card.
 
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+
 ---
 
- arch/arm64/boot/dts/rockchip/rk3368-evb-act8846.dts | 6 +++---
+ arch/arm/boot/dts/rk3288-evb-act8846.dts | 6 +++---
  1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368-evb-act8846.dts b/arch/arm64/boot/dts/rockchip/rk3368-evb-act8846.dts
-index eed6d3c..8a5275f 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368-evb-act8846.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3368-evb-act8846.dts
-@@ -104,8 +104,8 @@
+diff --git a/arch/arm/boot/dts/rk3288-evb-act8846.dts b/arch/arm/boot/dts/rk3288-evb-act8846.dts
+index 43949a6..2797f32 100644
+--- a/arch/arm/boot/dts/rk3288-evb-act8846.dts
++++ b/arch/arm/boot/dts/rk3288-evb-act8846.dts
+@@ -119,8 +119,8 @@
  
  			vdd_log: REG3 {
  				regulator-name = "VDD_LOG";
@@ -33,7 +36,7 @@ index eed6d3c..8a5275f 100644
  				regulator-always-on;
  			};
  
-@@ -118,7 +118,7 @@
+@@ -133,7 +133,7 @@
  
  			vccio_sd: REG5 {
  				regulator-name = "VCCIO_SD";
