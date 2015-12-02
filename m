@@ -1,65 +1,129 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 2 Dec 2015 16:02:50 +0000
-Subject: [RESEND RFC/PATCH 6/8] media: platform: mtk-vcodec: Add Mediatek
- V4L2 Video Encoder Driver
-In-Reply-To: <1449061708.8326.5.camel@mtksdaap41>
-References: <1447764885-23100-1-git-send-email-tiffany.lin@mediatek.com>
- <1447764885-23100-7-git-send-email-tiffany.lin@mediatek.com>
- <56588622.8060600@linaro.org> <1448883594.25093.45.camel@mtksdaap41>
- <CAMTL27FchgtJZS4YpVge-x+TstnVHmG1aAnaOV32qCU3zMUbAQ@mail.gmail.com>
- <1448966550.7534.95.camel@mtksdaap41> <565DBFF3.1000409@linaro.org>
- <1449061708.8326.5.camel@mtksdaap41>
-Message-ID: <565F162A.4070106@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 02 Dec 2015 17:03:21 +0100
+Subject: [PATCH v3] ARM: mvebu: Disable CPU Idle on Armada 38x
+In-Reply-To: <20151003115756.GA9901@n2100.arm.linux.org.uk> (Russell King's
+ message of "Sat, 3 Oct 2015 12:57:56 +0100")
+References: <1427820378-13415-1-git-send-email-gregory.clement@free-electrons.com>
+ <20151003115756.GA9901@n2100.arm.linux.org.uk>
+Message-ID: <87y4dc25yu.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/15 13:08, tiffany lin wrote:
->>> We need MTK_STATE_ABORT to inform encoder thread (mtk_venc_worker) that
->>> stop encodeing job from stopped ctx instance.
->>> When user space qbuf, we need to make sure everything is ready to sent
->>> buf to encode.
->>
->> Agree that you need a flag here. In fact currently you have two,
->> MTK_STATE_ABORT and an unused one called aborting.
->>
->> You need to be very careful with these flags though. They are a magnet
->> for data race bugs (especially combined with SMP).
->>
->> For example at present I can't see any locking in the worker code. This
->> means there is nothing to make all those read-modify-write sequences
->> that manage the state atomic (thus risking state corruption).
->>
-> We prevent that one function set the flag and others clear the flag.
-> So there is no special lock to protect state.
+Hi Russell King,
+ 
+ On sam., oct. 03 2015, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-What prevents concurrent access from different calling contexts? It 
-looks to me like the work on the work queue may run concurrently with 
-the ioctl calls.
+> On Tue, Mar 31, 2015 at 06:46:18PM +0200, Gregory CLEMENT wrote:
+>> On Armada 38x SoCs, under heavy I/O load, the system hangs when CPU
+>> Idle is enabled. Waiting for a solution to this issue, this patch
+>> disables the CPU Idle support for this SoC.
+>> 
+>> As CPU Hot plug support also uses some of the CPU Idle functions it is
+>> also affected by the same issue. This patch disables it also for the
+>> Armada 38x SoCs.
+>> 
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> Cc: <stable@vger.kernel.org> # v3.17 +
+>> ---
+>> Hi,
+>> 
+>> In this version I removed the unneeded initialization of the ret
+>> variable, I also fixed the warning message, and finally I added the
+>> Tested-by from Thomas.
+>
+> In order not to lose the results of my testing on Armada 388, and to
+> trigger a discussion, I'll reply to this mail.
+>
+> With the Armada 388 board I have, running mainline 4.3-rc3, I see the
+> following board current and power consumption:
+>
+> CPU idle state					Current	Power
+> Patch unreverted				0.33A	3.9W
+> Patch reverted					0.42A	5W
+> Patch reverted, state 1 disabled on one CPU	0.37A	4.4W
+> Patch reverted, state 1 disabled on both CPUs	0.33A	3.9W
+> Patch reverted, state 1 disabled on both CPUs,	0.37A	4.4W
+> CPU 1 hot-unplugged
+> Marvell Vendor-based kernel with CPU idle off	0.37A	4.4W
+> (I don't have a vendor kernel with CPU idle enabled)
+>
+> This is with a mainline 4.3-rc3 kernel with my own patch set on top,
+> which includes things like EEE support giving a 360mW saving compared
+> to kernels without.
+>
+> The result is a 30% _increase_ in power consumption when CPU idle is
+> enabled.  For reference, when placing both CPUs into a loop via
+> while :; do :; done in bash, the consumption goes up to 0.5A / 6W.
+>
+> Thomas suggested to increase the CPU idle thresholds in a similar manner
+> to that done for Armada XP in ce6031c89a35 ("cpuidle: mvebu: Update
+> cpuidle thresholds for Armada XP SOCs"), so I made the following change:
+>
+> @@ -92,9 +92,9 @@ static struct cpuidle_driver armada38x_idle_driver = {
+> -               .exit_latency           = 10,
+> +               .exit_latency           = 100,
+> -               .target_residency       = 100,
+> +               .target_residency       = 1000,
+>
+> This had no effect on the power usage.
+>
+> This brings up the obvious question, is there a bug somewhere, resulting
+> in suspending the CPU not resulting in power savings?
+>
+> I don't think so.  I've fixed the failure path in the mvebu CPU idle code
+> as per the RFC I sent out earlier this morning, which means if we fail to
+> suspend the CPU, time will not be accounted to CPU idle state 1 - this
+> means we can be sure that the statistics for state 1 won't be incorrectly
+> incremented.  The CPU idle statistics indicate that we are hitting the
+> lower power state 1, and spending some time there for each call:
+>
+> /sys/devices/system/cpu/cpu0/cpuidle/state0/time:24726278
+> /sys/devices/system/cpu/cpu0/cpuidle/state0/usage:29991
+> /sys/devices/system/cpu/cpu0/cpuidle/state1/time:290135931
+> /sys/devices/system/cpu/cpu0/cpuidle/state1/usage:74951
+> /sys/devices/system/cpu/cpu1/cpuidle/state0/time:41096682
+> /sys/devices/system/cpu/cpu1/cpuidle/state0/usage:141538
+> /sys/devices/system/cpu/cpu1/cpuidle/state1/time:270641329
+> /sys/devices/system/cpu/cpu1/cpuidle/state1/usage:47845
+>
+> So we're probably _not_ looping trying to enter state 1 and immediately
+> coming back out.  In other words, we are suspending the CPU, and the CPU
+> is staying suspended for a period of time.
+>
+> I think we have to conclude that we are successfully suspending the CPU,
+> and that it is resuming through armada_38x_cpu_resume() and cpu_resume()
+> as we expect, and the result if placing the CPU into suspend actually
+> results in higher power consumption than placing the CPU into WFI
+> mode.
 
+I finally managed to measure the power consumption on my Armada 388 GP
+board and I confirm what you saw. With CPU idle disable in pmsu.c it
+consumes 0.43A at 12V and when it is enable it consumes 0.53A at 12V so around
+30% more.
 
-> +static void vb2ops_venc_stop_streaming(struct vb2_queue *q)
-> +{
-> +	struct mtk_vcodec_ctx *ctx = vb2_get_drv_priv(q);
-> +	struct v4l2_device *v4l2_dev = &ctx->dev->v4l2_dev;
-> +	struct vb2_buffer *src_buf, *dst_buf;
-> +	int retry;
-> +	int ret;
-> +
-> +	mtk_v4l2_debug(2, "[%d]-> type=%d", ctx->idx, q->type);
-> +
-> +	retry = 0;
-> +	while ((ctx->state & MTK_STATE_RUNNING) && (retry < 10)) {
-> +		mtk_vcodec_clean_ctx_int_flags(ctx);
-> +		ctx->state |= MTK_STATE_ABORT;
+If I disable the state1 on a CPU it goes down 0.49 at 12, and if I disable
+the state1 opn both CPU, then it comes back to 0.43A at 12V.
 
-As a simple example I think the above line can run concurrently with the 
-following code near the end of the worker code.
+>
+> It could be that some register isn't set correctly to allow the CPU
+> power domain to be properly shut down.  It could also be that the SoC
+> doesn't implement the isolation barrier between the CPU and surrounding
+> circuitry, resulting in higher leakage when the CPU is placed into
+> suspend mode.  (The SCU power register is always present, but the
+> implementation of the isolation barriers to allow individual CPUs to be
+> independently powered down are optional.)  Either way, without
+> documentation, there's no way to know.
 
-> +	ctx->state &= ~MTK_STATE_RUNNING;
-> +	v4l2_m2m_job_finish(ctx->dev->m2m_dev_enc, ctx->m2m_ctx);
+Now that I can reproduce it, I will investigate to find what we do
+wrong.
 
-If I'm right then the state of the flags can definitely get clobbered 
-due to the read-modify-write actions on the state.
+Thanks,
 
+Gregory
 
-Daniel.
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
