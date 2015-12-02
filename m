@@ -1,86 +1,59 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 2 Dec 2015 22:46:56 +0300
-Subject: [PATCH V6 net-next 5/5] net:hns: Add the init code to disable
- Hip06 "Hardware VLAN assist"
-In-Reply-To: <1449075171-4820-6-git-send-email-salil.mehta@huawei.com>
-References: <1449075171-4820-1-git-send-email-salil.mehta@huawei.com>
- <1449075171-4820-6-git-send-email-salil.mehta@huawei.com>
-Message-ID: <565F4AB0.5020100@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 02 Dec 2015 20:51:04 +0100
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <20151202192825.GF8644@n2100.arm.linux.org.uk>
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+ <3059482.yN34NFeWWY@wuerfel> <20151202192825.GF8644@n2100.arm.linux.org.uk>
+Message-ID: <4984219.tZoFdLBDNB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wednesday 02 December 2015 19:28:25 Russell King - ARM Linux wrote:
+> 
+> As I said above, that's not the problem, the problem is merging it into
+> the rest of my tree.
+> 
+> Having done most of that merge, I'm now tripping up on:
+> 
+> arch/arm/mach-dove/common.c: In function 'dove_wdt_init':
+> arch/arm/mach-dove/common.c:538:2: error: implicit declaration of function 'orion_wdt_init' [-Werror=implicit-function-declaration]
+> 
+> which I guess is because you've deleted the legacy orion watchdog stuff.
+> So I'm going to have to revert that.  That then gives me:
+> 
+> arch/arm/mach-dove/clock.c:19:21: fatal error: mach/pm.h: No such file or directory
+> arch/arm/mach-dove/clock.c:20:27: fatal error: mach/hardware.h: No such file or directory
+> 
+> The first is easy to solve, and the second by replacing it with dove.h.
+> The next problem is this:
+> 
+> arch/arm/plat-orion/common.c:25:30: fatal error: mach/bridge-regs.h: No such file or directory
+> 
+> which is impossible to solve, because plat-orion/common.c wants
+> mach-dove/bridge-regs.h.
 
-On 12/02/2015 07:52 PM, Salil Mehta wrote:
+Ok, I can try to work around that, either by duplicating the device definition,
+or passing the address into orion_wdt_init.
 
-> This patch adds the initializzation code to disable the hardware
-> vlan support for VLAN Tag stripping by default for now.
->
-> Proper support of "hardware VLAN assitance" feature would
-> soon come in the next coming patches.
->
-> Signed-off-by: Salil Mehta <salil.mehta@huawei.com>
-> ---
->
-> PATCH V6:
-> - No change over the earlier patch
->
-> PATCH V5:
-> - Minor merge/reject change resolved to application of previous patch
->
-> PATCH V4/V3/V2:
-> - No change over the initial floated patch
->
-> PATCH V1:
-> - Initial code to disable the hardware VLAN assist for now
-> ---
->   drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c |    7 +++++++
->   drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h |    1 +
->   2 files changed, 8 insertions(+)
->
-> diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
-> index b5e4c44..f302ef9 100644
-> --- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
-> +++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
-> @@ -176,6 +176,11 @@ static void hns_ppe_cnt_clr_ce(struct hns_ppe_cb *ppe_cb)
->   			 PPE_CNT_CLR_CE_B, 1);
->   }
->
-> +static void hns_ppe_set_vlan_strip(struct hns_ppe_cb *ppe_cb, int en)
-> +{
-> +	dsaf_write_dev(ppe_cb, PPEV2_VLAN_STRIP_EN_REG, en);
+> I also have arch/arm/mach-dove/include/mach/sdhci.h to pass the GPIO
+> for card detection to the SDHCI driver, which is going to break unless
+> it's moved to include/linux/platform-data.
 
-    Why not call it directly?
+Right, a platform_data file seems the right approach there. Possibly just
+passing the gpio number by casting it to a pointer, though that's a bit
+ugly.
 
-> +}
-> +
->   /**
->    * hns_ppe_checksum_hw - set ppe checksum caculate
->    * @ppe_device: ppe device
-> @@ -336,6 +341,8 @@ static void hns_ppe_init_hw(struct hns_ppe_cb *ppe_cb)
->   	hns_ppe_cnt_clr_ce(ppe_cb);
->
->   	if (!AE_IS_VER1(dsaf_dev->dsaf_ver)) {
-> +		hns_ppe_set_vlan_strip(ppe_cb, 0);
-> +
->   		/* set default RSS key in h/w */
->   		hns_ppe_set_rss_key(ppe_cb, ppe_cb->rss_key);
->
-> diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-> index 98c163e..6c18ca9 100644
-> --- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-> +++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-> @@ -318,6 +318,7 @@
->   #define PPE_CFG_PARSE_TAG_REG			0x94
->   #define PPE_CFG_PRO_CHECK_EN_REG		0x98
->   #define PPEV2_CFG_TSO_EN_REG                    0xA0
-> +#define PPEV2_VLAN_STRIP_EN_REG                 0xAC
+> Everything else seems mostly happy, but I've no way to tell whether
+> what would be the resulting kernel would work as it's impossible to
+> know without fixing the wreckage above.
+> 
+> I'm sure I don't have to repeat my position over what I'm going to do if
+> these petty mainline changes which are totally unnecessary break the only
+> setup I have which works.  Making mach-dove multi-platform is a "wouldn't
+> it be nice if", it's not an absolute necessity.
 
-    Please indent with tabs, like all the surrounding #define's are indented 
-(except PPEV2_CFG_TSO_EN_REG).
+I'm mostly interested in it because it's the only ARMv7 platform that is
+left after my other patches, and I just want to be done with it after
+spending 5 years on it ;-)
 
->   #define PPE_INTEN_REG				0x100
->   #define PPE_RINT_REG				0x104
->   #define PPE_INTSTS_REG				0x108
-
-MBR, Sergei
+	Arnd
