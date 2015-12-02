@@ -1,56 +1,118 @@
-From: daniel@fooishbar.org (Daniel Stone)
-Date: Wed, 2 Dec 2015 14:22:16 +0000
-Subject: [RFC PATCH 3/9] drm/rockchip: Convert to support atomic API
-In-Reply-To: <CAPj87rO9_sXZHidTpNs_ubFaUX8ZtytK=bLpQSQwSy5G2-JGEA@mail.gmail.com>
-References: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>
- <1448940391-23333-4-git-send-email-mark.yao@rock-chips.com>
- <CAPj87rPtWgH2WE7_EEC-Q41c7Ew2z8CwPMMQD+cC08G7qNZTeg@mail.gmail.com>
- <565D68F0.3010905@rock-chips.com>
- <CAPj87rO9_sXZHidTpNs_ubFaUX8ZtytK=bLpQSQwSy5G2-JGEA@mail.gmail.com>
-Message-ID: <CAPj87rPT7v-SBDbGm9ftER+ykwNBxT5Vtdq_vTXzePQxzCwR4g@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 2 Dec 2015 08:25:15 -0600
+Subject: [PATCH v3 1/4] drm: arm: Add DT bindings documentation for HDLCD
+ driver.
+In-Reply-To: <1449058982-18595-2-git-send-email-Liviu.Dudau@arm.com>
+References: <1449058982-18595-1-git-send-email-Liviu.Dudau@arm.com>
+ <1449058982-18595-2-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20151202142515.GA7404@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Wed, Dec 02, 2015 at 12:22:59PM +0000, Liviu Dudau wrote:
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> 
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-On 2 December 2015 at 14:18, Daniel Stone <daniel@fooishbar.org> wrote:
-> On 1 December 2015 at 09:31, Mark yao <mark.yao@rock-chips.com> wrote:
->>     Can you share your Weston environment to me, I'm interesting to test drm
->> rockchip on weston.
->
-> Of course. You can download Weston from http://wayland.freedesktop.org
-> - the most interesting dependencies are libevdev, libinput, and
-> wayland itself. If you are building newer Weston from git, you'll need
-> the wayland-protocols repository as well, from
-> anongit.freedesktop.org/git/wayland/wayland-protocols/. Please let me
-> know privately if you need some more help with building these, but
-> they should be quite straightforward.
+I still think you should have a more specific compatible string, but 
+here's some rope:
 
-Sorry, left one thing out. When running, if you do not have
-GBM/Wayland enabled for Mali (or no Mali support), you should run
-with:
-weston --use-pixman
-or:
-weston-launch -- --use-pixman
+Acked-by: Rob Herring <robh@kernel.org>
 
-Launching from SSH is a bit more complicated:
-sudo weston-launch --user=$username --tty=/dev/tty3 -- --use-pixman
-
-(Replace tty3 with the TTY of your choice: it must be in text mode.)
-
-Once you have done this, you will find three issues:
-  - passing -1 to drm_send_vblank event causes OOPS - now fixed in your tree
-  - not sending pageflip events for same-fb flips causes Weston hang -
-fixed with my patch, and I believe now fixed in atomic (though it may
-still have some timing issues; I hope to get to review this early next
-week)
-  - not having a preclose hook causes OOPS when Weston exits in the
-middle of rendering - fixed in
-https://git.collabora.com/cgit/user/daniels/linux.git/commit/?h=wip/4.4.x/rockchip-drm-fixes&id=d14f21bcd7e7a1b9ca129c411a9da9c911037965
-and the preceding commit, which I hope to re-send for 4.4 -fixes in
-the next couple of days
-
-Hope this helps.
-
-Cheers,
-Daniel
+> ---
+>  .../devicetree/bindings/display/arm,hdlcd.txt      | 79 ++++++++++++++++++++++
+>  1 file changed, 79 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/arm,hdlcd.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/display/arm,hdlcd.txt b/Documentation/devicetree/bindings/display/arm,hdlcd.txt
+> new file mode 100644
+> index 0000000..78bc242
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/arm,hdlcd.txt
+> @@ -0,0 +1,79 @@
+> +ARM HDLCD
+> +
+> +This is a display controller found on several development platforms produced
+> +by ARM Ltd and in more modern of its' Fast Models. The HDLCD is an RGB
+> +streamer that reads the data from a framebuffer and sends it to a single
+> +digital encoder (DVI or HDMI).
+> +
+> +Required properties:
+> +  - compatible: "arm,hdlcd"
+> +  - reg: Physical base address and length of the controller's registers.
+> +  - interrupts: One interrupt used by the display controller to notify the
+> +    interrupt controller when any of the interrupt sources programmed in
+> +    the interrupt mask register have activated.
+> +  - clocks: A list of phandle + clock-specifier pairs, one for each
+> +    entry in 'clock-names'.
+> +  - clock-names: A list of clock names. For HDLCD it should contain:
+> +      - "pxlclk" for the clock feeding the output PLL of the controller.
+> +
+> +Required sub-nodes:
+> +  - port: The HDLCD connection to an encoder chip. The connection is modeled
+> +    using the OF graph bindings specified in
+> +    Documentation/devicetree/bindings/graph.txt.
+> +
+> +Optional properties:
+> +  - memory-region: phandle to a node describing memory (see
+> +    Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt) to be
+> +    used for the framebuffer; if not present, the framebuffer may be located
+> +    anywhere in memory.
+> +
+> +
+> +Example:
+> +
+> +/ {
+> +	...
+> +
+> +	hdlcd at 2b000000 {
+> +		compatible = "arm,hdlcd";
+> +		reg = <0 0x2b000000 0 0x1000>;
+> +		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&oscclk5>;
+> +		clock-names = "pxlclk";
+> +		port {
+> +			hdlcd_output: endpoint at 0 {
+> +				remote-endpoint = <&hdmi_enc_input>;
+> +			};
+> +		};
+> +	};
+> +
+> +	/* HDMI encoder on I2C bus */
+> +	i2c at 7ffa0000 {
+> +		....
+> +		hdmi-transmitter at 70 {
+> +			compatible = ".....";
+> +			reg = <0x70>;
+> +			port at 0 {
+> +				hdmi_enc_input: endpoint {
+> +					remote-endpoint = <&hdlcd_output>;
+> +				};
+> +
+> +				hdmi_enc_output: endpoint {
+> +					remote-endpoint = <&hdmi_1_port>;
+> +				};
+> +			};
+> +		};
+> +
+> +	};
+> +
+> +	hdmi1: connector at 1 {
+> +		compatible = "hdmi-connector";
+> +		type = "a";
+> +		port {
+> +			hdmi_1_port: endpoint {
+> +				remote-endpoint = <&hdmi_enc_output>;
+> +			};
+> +		};
+> +	};
+> +
+> +	...
+> +};
+> -- 
+> 2.6.2
+> 
