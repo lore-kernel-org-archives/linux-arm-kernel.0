@@ -1,31 +1,129 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 2 Dec 2015 11:39:07 +0100
-Subject: [PATCH 4/4] ARM: at91/dt: sama5d2 Xplained: pmic needs a specific sda
- hold time
-In-Reply-To: <1449052747-20991-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1449052747-20991-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1449052747-20991-4-git-send-email-ludovic.desroches@atmel.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Wed, 02 Dec 2015 13:42:32 +0300
+Subject: [PATCH v2 4/5] net: thunderx: Switchon carrier only upon interface
+ link up
+In-Reply-To: <1449050777-37836-5-git-send-email-sunil.kovvuri@gmail.com>
+References: <1449050777-37836-1-git-send-email-sunil.kovvuri@gmail.com>
+ <1449050777-37836-5-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <00ec01d12cee$26a28a00$73e79e00$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Data have to been hold longer for the PMIC device.
+ Just a reminder, we have issue with this one too, which is not addressed yet.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 1 +
- 1 file changed, 1 insertion(+)
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
 
-diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-index ad6de73..9bced00 100644
---- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-@@ -129,6 +129,7 @@
- 				dmas = <0>, <0>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_i2c0_default>;
-+				i2c-sda-hold-time-ns = <350>;
- 				status = "okay";
- 
- 				pmic: act8865 at 5b {
--- 
-2.5.0
+
+> -----Original Message-----
+> From: netdev-owner at vger.kernel.org [mailto:netdev-owner at vger.kernel.org] On Behalf Of Sunil
+> Goutham
+> Sent: Wednesday, December 02, 2015 1:06 PM
+> To: netdev at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> Sunil.Goutham at caviumnetworks.com; Sunil Goutham
+> Subject: [PATCH v2 4/5] net: thunderx: Switchon carrier only upon interface link up
+> 
+> From: Sunil Goutham <sgoutham@cavium.com>
+> 
+> Call netif_carrier_on() only if interface's link is up. Switching this on
+> upon IFF_UP by default, is causing issues with ethernet channel bonding
+> in LACP mode. Initial NETDEV_CHANGE notification was being skipped.
+> 
+> Also fixed some issues with link/speed/duplex reporting via ethtool.
+> 
+> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+> ---
+>  .../net/ethernet/cavium/thunder/nicvf_ethtool.c    |   16 +++++++++++++++-
+>  drivers/net/ethernet/cavium/thunder/nicvf_main.c   |    4 +---
+>  drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |    2 ++
+>  3 files changed, 18 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
+> b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
+> index af54c10..a12b2e3 100644
+> --- a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
+> +++ b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
+> @@ -112,6 +112,13 @@ static int nicvf_get_settings(struct net_device *netdev,
+> 
+>  	cmd->supported = 0;
+>  	cmd->transceiver = XCVR_EXTERNAL;
+> +
+> +	if (!nic->link_up) {
+> +		cmd->duplex = DUPLEX_UNKNOWN;
+> +		ethtool_cmd_speed_set(cmd, SPEED_UNKNOWN);
+> +		return 0;
+> +	}
+> +
+>  	if (nic->speed <= 1000) {
+>  		cmd->port = PORT_MII;
+>  		cmd->autoneg = AUTONEG_ENABLE;
+> @@ -125,6 +132,13 @@ static int nicvf_get_settings(struct net_device *netdev,
+>  	return 0;
+>  }
+> 
+> +static u32 nicvf_get_link(struct net_device *netdev)
+> +{
+> +	struct nicvf *nic = netdev_priv(netdev);
+> +
+> +	return nic->link_up;
+> +}
+> +
+>  static void nicvf_get_drvinfo(struct net_device *netdev,
+>  			      struct ethtool_drvinfo *info)
+>  {
+> @@ -660,7 +674,7 @@ static int nicvf_set_channels(struct net_device *dev,
+> 
+>  static const struct ethtool_ops nicvf_ethtool_ops = {
+>  	.get_settings		= nicvf_get_settings,
+> -	.get_link		= ethtool_op_get_link,
+> +	.get_link		= nicvf_get_link,
+>  	.get_drvinfo		= nicvf_get_drvinfo,
+>  	.get_msglevel		= nicvf_get_msglevel,
+>  	.set_msglevel		= nicvf_set_msglevel,
+> diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+> b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+> index 7f709cb..dde8dc7 100644
+> --- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+> +++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+> @@ -1057,6 +1057,7 @@ int nicvf_stop(struct net_device *netdev)
+> 
+>  	netif_carrier_off(netdev);
+>  	netif_tx_stop_all_queues(nic->netdev);
+> +	nic->link_up = false;
+> 
+>  	/* Teardown secondary qsets first */
+>  	if (!nic->sqs_mode) {
+> @@ -1211,9 +1212,6 @@ int nicvf_open(struct net_device *netdev)
+>  	nic->drv_stats.txq_stop = 0;
+>  	nic->drv_stats.txq_wake = 0;
+> 
+> -	netif_carrier_on(netdev);
+> -	netif_tx_start_all_queues(netdev);
+> -
+>  	return 0;
+>  cleanup:
+>  	nicvf_disable_intr(nic, NICVF_INTR_MBOX, 0);
+> diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> index 6534b73..d77e41a 100644
+> --- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> +++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> @@ -612,6 +612,8 @@ static void bgx_poll_for_link(struct work_struct *work)
+>  		lmac->last_duplex = 1;
+>  	} else {
+>  		lmac->link_up = 0;
+> +		lmac->last_speed = SPEED_UNKNOWN;
+> +		lmac->last_duplex = DUPLEX_UNKNOWN;
+>  	}
+> 
+>  	if (lmac->last_link != lmac->link_up) {
+> --
+> 1.7.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe netdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
