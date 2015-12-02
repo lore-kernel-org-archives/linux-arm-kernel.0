@@ -1,165 +1,98 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Wed,  2 Dec 2015 13:16:20 -0500
-Subject: [PATCH v4 7/7] ARM: dts: imx: Add support for Advantech/GE B850v3
-In-Reply-To: <1449080180-31945-1-git-send-email-akshay.bhat@timesys.com>
-References: <1449080180-31945-1-git-send-email-akshay.bhat@timesys.com>
-Message-ID: <1449080180-31945-8-git-send-email-akshay.bhat@timesys.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 2 Dec 2015 19:20:02 +0100
+Subject: Regression, was [PATCH 4/4] USB: host: ohci-at91: merge loops in
+ ohci_hcd_at91_drv_probe
+In-Reply-To: <565DD61C.5010904@lysator.liu.se>
+References: <565DD61C.5010904@lysator.liu.se>
+Message-ID: <20151202182002.GF22136@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Advantech/GE B850v3 board.
+Hi Peter,
 
-Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
+On 01/12/2015 at 18:17:16 +0100, Peter Rosin wrote :
+> [<c02f5084>] (ohci_hcd_at91_overcurrent_irq) from [<c00433b0>] (handle_irq_event_percpu+0x78/0x140)
+> [<c00433b0>] (handle_irq_event_percpu) from [<c00434a4>] (handle_irq_event+0x2c/0x40)
+> [<c00434a4>] (handle_irq_event) from [<c00458b8>] (handle_simple_irq+0x6c/0x80)
+> [<c00458b8>] (handle_simple_irq) from [<c0042bc4>] (generic_handle_irq+0x2c/0x3c)
+> [<c0042bc4>] (generic_handle_irq) from [<c01fe4ac>] (gpio_irq_handler+0xa4/0x12c)
+> [<c01fe4ac>] (gpio_irq_handler) from [<c0042bc4>] (generic_handle_irq+0x2c/0x3c)
+> [<c0042bc4>] (generic_handle_irq) from [<c0042dec>] (__handle_domain_irq+0x54/0xa8)
+> [<c0042dec>] (__handle_domain_irq) from [<c0013500>] (__irq_svc+0x40/0x54)
+> [<c0013500>] (__irq_svc) from [<c004451c>] (__setup_irq+0x248/0x530)
+> [<c004451c>] (__setup_irq) from [<c0044954>] (request_threaded_irq+0xc4/0x144)
+> [<c0044954>] (request_threaded_irq) from [<c02f5a0c>] (ohci_hcd_at91_drv_probe+0x460/0x518)
+> [<c02f5a0c>] (ohci_hcd_at91_drv_probe) from [<c02670ec>] (platform_drv_probe+0x44/0xa4)
+> [<c02670ec>] (platform_drv_probe) from [<c02655b4>] (driver_probe_device+0x1fc/0x43c)
+> [<c02655b4>] (driver_probe_device) from [<c0265880>] (__driver_attach+0x8c/0x90)
+> [<c0265880>] (__driver_attach) from [<c0263880>] (bus_for_each_dev+0x6c/0xa0)
+> [<c0263880>] (bus_for_each_dev) from [<c0264b80>] (bus_add_driver+0x1d0/0x268)
+> [<c0264b80>] (bus_add_driver) from [<c0266078>] (driver_register+0x78/0xf8)
+> [<c0266078>] (driver_register) from [<c00096c8>] (do_one_initcall+0xb8/0x1f0)
+> [<c00096c8>] (do_one_initcall) from [<c068bda4>] (kernel_init_freeable+0x138/0x1d8)
+> [<c068bda4>] (kernel_init_freeable) from [<c04d06f4>] (kernel_init+0x8/0xe8)
+> [<c04d06f4>] (kernel_init) from [<c000ff68>] (ret_from_fork+0x14/0x2c)
+> Code: e5916058 e1a08000 e3a04000 e2865008 (e5b50004)
+> ---[ end trace e66fbc480972ac43 ]---
+> Kernel panic - not syncing: Fatal exception in interrupt
+> ---[ end Kernel panic - not syncing: Fatal exception in interrupt
+
+I think I understood what happens. Can you try the following patch?
+
+8<------
+>From 402f8444bc92d218edc63dcc3c87459981a56c31 Mon Sep 17 00:00:00 2001
+From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Date: Wed, 2 Dec 2015 18:49:34 +0100
+Subject: [PATCH] USB: host: ohci-at91: fix a crash in
+ ohci_hcd_at91_overcurrent_irq
+
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/Makefile         |   1 +
- arch/arm/boot/dts/imx6q-b850v3.dts | 127 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 128 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-b850v3.dts
+ drivers/usb/host/ohci-at91.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 9cdff66..37d5b09 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -312,6 +312,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-arm2.dtb \
- 	imx6q-b450v3.dtb \
- 	imx6q-b650v3.dtb \
-+	imx6q-b850v3.dtb \
- 	imx6q-cm-fx6.dtb \
- 	imx6q-cubox-i.dtb \
- 	imx6q-dfi-fs700-m60.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-b850v3.dts b/arch/arm/boot/dts/imx6q-b850v3.dts
-new file mode 100644
-index 0000000..7ebb7d9
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-b850v3.dts
-@@ -0,0 +1,127 @@
-+/*
-+ * Copyright 2015 Timesys Corporation.
-+ * Copyright 2015 General Electric Company
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index 342ffd140122..8c6e15bd6ff0 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -473,6 +473,8 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ 	if (!pdata)
+ 		return -ENOMEM;
+ 
++	pdev->dev.platform_data = pdata;
 +
-+/dts-v1/;
-+
-+#include "imx6q-bx50v3.dtsi"
-+
-+/ {
-+	model = "Advantech MX6Q B850V3 QSeven Board";
-+	compatible = "ge,imx6q-b850v3", "advantech,imx6q-ba16", "fsl,imx6q";
-+
-+	chosen {
-+		stdout-path = &uart3;
-+	};
-+
-+	panel_lvds0 {
-+		compatible = "auo,b133htn01";
-+		backlight = <&backlight_lvds>;
-+		ddc-i2c-bus = <&mux_i2c12>;
-+
-+		port {
-+			panel_in_lvds0: endpoint {
-+				remote-endpoint = <&lvds0_out>;
-+			};
-+		};
-+	};
-+};
-+
-+&ldb {
-+	assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
-+			  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
-+	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL3_USB_OTG>,
-+				 <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
-+	fsl,dual-channel;
-+	status = "okay";
-+
-+	lvds0: lvds-channel at 0 {
-+		fsl,data-mapping = "spwg";
-+		fsl,data-width = <24>;
-+		status = "okay";
-+
-+		port at 4 {
-+			reg = <4>;
-+
-+			lvds0_out: endpoint {
-+				remote-endpoint = <&panel_in_lvds0>;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c2 {
-+	pca9547_ddc: mux at 70 {
-+		compatible = "nxp,pca9547";
-+		reg = <0x70>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		mux_i2c11: i2c at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x0>;
-+		};
-+
-+		mux_i2c12: i2c at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x1>;
-+		};
-+
-+		mux_i2c13: i2c at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x2>;
-+		};
-+
-+		mux_i2c14: i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x3>;
-+		};
-+
-+		mux_i2c15: i2c at 4 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x4>;
-+		};
-+
-+		mux_i2c16: i2c at 5 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x5>;
-+		};
-+
-+		mux_i2c17: i2c at 6 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x6>;
-+		};
-+
-+		mux_i2c18: i2c at 7 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x7>;
-+		};
-+	};
-+};
-+
-+&hdmi {
-+	ddc-i2c-bus = <&mux_i2c11>;
-+};
-+
-+&mux_i2c3 {
-+	ads7830_2: ads7830 at 4a {
-+		compatible = "ti,ads7830";
-+		reg = <0x4a>;
-+	};
-+};
+ 	if (!of_property_read_u32(np, "num-ports", &ports))
+ 		pdata->ports = ports;
+ 
+@@ -483,6 +485,7 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ 		 */
+ 		if (i >= pdata->ports) {
+ 			pdata->vbus_pin[i] = -EINVAL;
++			pdata->overcurrent_pin[i] = -EINVAL;
+ 			continue;
+ 		}
+ 
+@@ -513,10 +516,8 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	at91_for_each_port(i) {
+-		if (i >= pdata->ports) {
+-			pdata->overcurrent_pin[i] = -EINVAL;
+-			continue;
+-		}
++		if (i >= pdata->ports)
++			break;
+ 
+ 		pdata->overcurrent_pin[i] =
+ 			of_get_named_gpio_flags(np, "atmel,oc-gpio", i, &flags);
+@@ -552,8 +553,6 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	pdev->dev.platform_data = pdata;
+-
+ 	device_init_wakeup(&pdev->dev, 1);
+ 	return usb_hcd_at91_probe(&ohci_at91_hc_driver, pdev);
+ }
 -- 
-2.6.3
+2.5.0
