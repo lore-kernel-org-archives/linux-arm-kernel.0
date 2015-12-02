@@ -1,125 +1,138 @@
 From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed,  2 Dec 2015 10:47:04 +0100
-Subject: [PATCH v4 2/4] arm: add implementation for arm-smccc
+Date: Wed,  2 Dec 2015 10:47:05 +0100
+Subject: [PATCH v4 3/4] arm64: add implementation for arm-smccc
 In-Reply-To: <1449049626-13991-1-git-send-email-jens.wiklander@linaro.org>
 References: <1449049626-13991-1-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <1449049626-13991-3-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <1449049626-13991-4-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds implementation for arm-smccc and enables CONFIG_HAVE_SMCCC for
-architectures that may support arm-smccc. It's the responsibility of the
-caller to know if the SMC instruction is supported by the platform.
+Adds implementation for arm-smccc and enables CONFIG_HAVE_SMCCC.
 
 Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
-Reviewed-by: Lars Persson <lars.persson@axis.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/Kconfig             |  1 +
- arch/arm/kernel/Makefile     |  2 ++
- arch/arm/kernel/armksyms.c   |  6 ++++++
- arch/arm/kernel/smccc-call.S | 50 ++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 59 insertions(+)
- create mode 100644 arch/arm/kernel/smccc-call.S
+ arch/arm64/Kconfig              |  1 +
+ arch/arm64/kernel/Makefile      |  2 +-
+ arch/arm64/kernel/arm64ksyms.c  |  5 +++++
+ arch/arm64/kernel/asm-offsets.c |  3 +++
+ arch/arm64/kernel/smccc-call.S  | 43 +++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 53 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/kernel/smccc-call.S
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 34e1569..f6a3167 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -327,6 +327,7 @@ config ARCH_MULTIPLATFORM
- 	select CLKSRC_OF
- 	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
-+	select HAVE_ARM_SMCCC if CPU_V7
- 	select MIGHT_HAVE_PCI
- 	select MULTI_IRQ_HANDLER
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 871f217..96513d0 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -92,6 +92,7 @@ config ARM64
  	select SPARSE_IRQ
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index af9e59b..d2d0042 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -92,4 +92,6 @@ obj-y				+= psci-call.o
- obj-$(CONFIG_SMP)		+= psci_smp.o
- endif
+ 	select SYSCTL_EXCEPTION_TRACE
+ 	select HAVE_CONTEXT_TRACKING
++	select HAVE_ARM_SMCCC
+ 	help
+ 	  ARM 64-bit (AArch64) Linux support.
  
-+obj-$(CONFIG_HAVE_ARM_SMCCC)	+= smccc-call.o
-+
- extra-y := $(head-y) vmlinux.lds
-diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
-index f89811f..7e45f69 100644
---- a/arch/arm/kernel/armksyms.c
-+++ b/arch/arm/kernel/armksyms.c
-@@ -16,6 +16,7 @@
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 474691f..0170bea 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -17,7 +17,7 @@ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
+ 			   hyp-stub.o psci.o psci-call.o cpu_ops.o insn.o	\
+ 			   return_address.o cpuinfo.o cpu_errata.o		\
+ 			   cpufeature.o alternative.o cacheinfo.o		\
+-			   smp.o smp_spin_table.o topology.o
++			   smp.o smp_spin_table.o topology.o smccc-call.o
+ 
+ extra-$(CONFIG_EFI)			:= efi-entry.o
+ 
+diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
+index 3b6d8cc..678f30b0 100644
+--- a/arch/arm64/kernel/arm64ksyms.c
++++ b/arch/arm64/kernel/arm64ksyms.c
+@@ -26,6 +26,7 @@
  #include <linux/syscalls.h>
  #include <linux/uaccess.h>
  #include <linux/io.h>
 +#include <linux/arm-smccc.h>
  
  #include <asm/checksum.h>
- #include <asm/ftrace.h>
-@@ -175,3 +176,8 @@ EXPORT_SYMBOL(__gnu_mcount_nc);
- EXPORT_SYMBOL(__pv_phys_pfn_offset);
- EXPORT_SYMBOL(__pv_offset);
+ 
+@@ -68,3 +69,7 @@ EXPORT_SYMBOL(test_and_change_bit);
+ #ifdef CONFIG_FUNCTION_TRACER
+ EXPORT_SYMBOL(_mcount);
  #endif
 +
-+#ifdef CONFIG_HAVE_ARM_SMCCC
++	/* arm-smccc */
 +EXPORT_SYMBOL(arm_smccc_smc);
 +EXPORT_SYMBOL(arm_smccc_hvc);
-+#endif
-diff --git a/arch/arm/kernel/smccc-call.S b/arch/arm/kernel/smccc-call.S
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 25de8b2..bb493d4 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -28,6 +28,7 @@
+ #include <asm/suspend.h>
+ #include <asm/vdso_datapage.h>
+ #include <linux/kbuild.h>
++#include <linux/arm-smccc.h>
+ 
+ int main(void)
+ {
+@@ -161,5 +162,7 @@ int main(void)
+   DEFINE(SLEEP_SAVE_SP_PHYS,	offsetof(struct sleep_save_sp, save_ptr_stash_phys));
+   DEFINE(SLEEP_SAVE_SP_VIRT,	offsetof(struct sleep_save_sp, save_ptr_stash));
+ #endif
++  DEFINE(ARM_SMCCC_RES_X0_OFFS,	offsetof(struct arm_smccc_res, a0));
++  DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
+   return 0;
+ }
+diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
 new file mode 100644
-index 0000000..8621e06
+index 0000000..ae0496f
 --- /dev/null
-+++ b/arch/arm/kernel/smccc-call.S
-@@ -0,0 +1,50 @@
++++ b/arch/arm64/kernel/smccc-call.S
+@@ -0,0 +1,43 @@
 +/*
 + * Copyright (c) 2015, Linaro Limited
 + *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License Version 2 as
++ * published by the Free Software Foundation.
 + *
 + * This program is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 + * GNU General Public License for more details.
 + *
 + */
 +#include <linux/linkage.h>
-+
-+#include <asm/opcodes-sec.h>
-+#include <asm/opcodes-virt.h>
-+#include <asm/unwind.h>
++#include <asm/asm-offsets.h>
 +
 +	.macro SMCCC instr
-+UNWIND(	.fnstart)
-+	mov	r12, sp
-+	push	{r4-r7}
-+UNWIND(	.save	{r4-r7})
-+	ldm	r12, {r4-r7}
-+	\instr
-+	pop	{r4-r7}
-+	ldr	r12, [sp, #(4 * 4)]
-+	stm	r12, {r0-r3}
-+	bx	lr
-+UNWIND(	.fnend)
++	.cfi_startproc
++	\instr	#0
++	ldr	x4, [sp]
++	stp	x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
++	stp	x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
++	ret
++	.cfi_endproc
 +	.endm
 +
 +/*
-+ * void smccc_smc(unsigned long a0, unsigned long a1, unsigned long a2,
++ * void arm_smccc_smc(unsigned long a0, unsigned long a1, unsigned long a2,
 + *		  unsigned long a3, unsigned long a4, unsigned long a5,
 + *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
 + */
 +ENTRY(arm_smccc_smc)
-+	SMCCC __SMC(0)
++	SMCCC	smc
 +ENDPROC(arm_smccc_smc)
 +
 +/*
-+ * void smccc_hvc(unsigned long a0, unsigned long a1, unsigned long a2,
++ * void arm_smccc_hvc(unsigned long a0, unsigned long a1, unsigned long a2,
 + *		  unsigned long a3, unsigned long a4, unsigned long a5,
 + *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
 + */
 +ENTRY(arm_smccc_hvc)
-+	SMCCC __HVC(0)
++	SMCCC	hvc
 +ENDPROC(arm_smccc_hvc)
 -- 
 1.9.1
