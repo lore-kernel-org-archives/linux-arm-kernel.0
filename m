@@ -1,61 +1,69 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 2 Dec 2015 15:59:16 +0200
-Subject: [RFC v03 06/15] ARM: davinci: dm355: Add dma_filter_map to edma
+Date: Wed, 2 Dec 2015 15:59:14 +0200
+Subject: [RFC v03 04/15] dmaengine: edma: Add support for DMA filter mapping
+ to slave devices
 In-Reply-To: <1449064765-27427-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1449064765-27427-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1449064765-27427-7-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1449064765-27427-5-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide the dma_filter_map to edma which will allow us to move the drivers
-to the new, simpler dmaengine API and we can remove the DMA resources also
-for the devices.
+Add support for providing device to filter_fn mapping so client drivers
+can switch to use the dma_request_chan() API.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-davinci/dm355.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ drivers/dma/edma.c                 | 6 ++++++
+ include/linux/platform_data/edma.h | 7 +++++++
+ 2 files changed, 13 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
-index 609950b8c191..ee7656fa0c52 100644
---- a/arch/arm/mach-davinci/dm355.c
-+++ b/arch/arm/mach-davinci/dm355.c
-@@ -13,6 +13,7 @@
- #include <linux/serial_8250.h>
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
-+#include <linux/dmaengine.h>
- #include <linux/spi/spi.h>
- #include <linux/platform_data/edma.h>
- #include <linux/platform_data/gpio-davinci.h>
-@@ -576,9 +577,28 @@ static s8 queue_priority_mapping[][2] = {
- 	{-1, -1},
- };
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index 0675e268d577..46b305ea0d21 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -2297,6 +2297,12 @@ static int edma_probe(struct platform_device *pdev)
+ 		edma_set_chmap(&ecc->slave_chans[i], ecc->dummy_slot);
+ 	}
  
-+static const struct dma_filter_map da355_edma_map[] = {
-+	{ "davinci-mcbsp.0", "tx", EDMA_FILTER_PARAM(0, 2) },
-+	{ "davinci-mcbsp.0", "rx", EDMA_FILTER_PARAM(0, 3) },
-+	{ "davinci-mcbsp.1", "tx", EDMA_FILTER_PARAM(0, 8) },
-+	{ "davinci-mcbsp.1", "rx", EDMA_FILTER_PARAM(0, 9) },
-+	{ "spi_davinci.2", "tx", EDMA_FILTER_PARAM(0, 10) },
-+	{ "spi_davinci.2", "rx", EDMA_FILTER_PARAM(0, 11) },
-+	{ "spi_davinci.1", "tx", EDMA_FILTER_PARAM(0, 14) },
-+	{ "spi_davinci.1", "rx", EDMA_FILTER_PARAM(0, 15) },
-+	{ "spi_davinci.0", "tx", EDMA_FILTER_PARAM(0, 16) },
-+	{ "spi_davinci.0", "rx", EDMA_FILTER_PARAM(0, 17) },
-+	{ "dm6441-mmc.0", "rx", EDMA_FILTER_PARAM(0, 26) },
-+	{ "dm6441-mmc.0", "tx", EDMA_FILTER_PARAM(0, 27) },
-+	{ "dm6441-mmc.1", "rx", EDMA_FILTER_PARAM(0, 30) },
-+	{ "dm6441-mmc.1", "tx", EDMA_FILTER_PARAM(0, 31) },
-+};
++	if (info->slave_map) {
++		ecc->dma_slave.filter_map.map = info->slave_map;
++		ecc->dma_slave.filter_map.mapcnt = info->slavecnt;
++		ecc->dma_slave.filter_map.filter_fn = edma_filter_fn;
++	}
 +
- static struct edma_soc_info dm355_edma_pdata = {
- 	.queue_priority_mapping	= queue_priority_mapping,
- 	.default_queue		= EVENTQ_1,
-+	.slave_map		= da355_edma_map,
-+	.slavecnt		= ARRAY_SIZE(da355_edma_map),
+ 	ret = dma_async_device_register(&ecc->dma_slave);
+ 	if (ret) {
+ 		dev_err(dev, "slave ddev registration failed (%d)\n", ret);
+diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
+index e2878baeb90e..4e78a946e0c1 100644
+--- a/include/linux/platform_data/edma.h
++++ b/include/linux/platform_data/edma.h
+@@ -53,12 +53,16 @@ enum dma_event_q {
+ #define EDMA_CTLR(i)			((i) >> 16)
+ #define EDMA_CHAN_SLOT(i)		((i) & 0xffff)
+ 
++#define EDMA_FILTER_PARAM(ctlr, chan)	((int[]) { EDMA_CTLR_CHAN(ctlr, chan) })
++
+ struct edma_rsv_info {
+ 
+ 	const s16	(*rsv_chans)[2];
+ 	const s16	(*rsv_slots)[2];
  };
  
- static struct resource edma_resources[] = {
++struct dma_filter_map;
++
+ /* platform_data for EDMA driver */
+ struct edma_soc_info {
+ 	/*
+@@ -76,6 +80,9 @@ struct edma_soc_info {
+ 
+ 	s8	(*queue_priority_mapping)[2];
+ 	const s16	(*xbar_chans)[2];
++
++	const struct dma_filter_map *slave_map;
++	int slavecnt;
+ };
+ 
+ #endif
 -- 
 2.6.3
