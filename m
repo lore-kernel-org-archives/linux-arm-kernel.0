@@ -1,99 +1,53 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 1 Dec 2015 23:57:34 -0500
-Subject: [PATCH V7 2/3] dma: add Qualcomm Technologies HIDMA management
- driver
-In-Reply-To: <20151201031710.GK3901@localhost>
-References: <1448245707-27499-1-git-send-email-okaya@codeaurora.org>
- <1448245707-27499-3-git-send-email-okaya@codeaurora.org>
- <20151130082141.GB3901@localhost> <565C6039.6050404@codeaurora.org>
- <20151201031710.GK3901@localhost>
-Message-ID: <565E7A3E.1070207@codeaurora.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 02 Dec 2015 14:21:47 +0900
+Subject: [PATCH v3 5/5] ARM: exynos: select POWER_RESET_SYSCON and
+ POWER_RESET_SYSCON_POWEROFF
+In-Reply-To: <010401d12c17$1e883d10$5b98b730$@samsung.com>
+References: <1447996629-18232-1-git-send-email-alim.akhtar@samsung.com>
+ <1447996629-18232-6-git-send-email-alim.akhtar@samsung.com>
+ <010401d12c17$1e883d10$5b98b730$@samsung.com>
+Message-ID: <565E7FEB.3040806@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2015 10:17 PM, Vinod Koul wrote:
-> On Mon, Nov 30, 2015 at 09:42:01AM -0500, Sinan Kaya wrote:
+On 01.12.2015 18:03, Pavel Fedin wrote:
+>  Hello!
 > 
->>>> +static int hidma_mgmt_probe(struct platform_device *pdev)
->>>> +{
->>>> +	struct hidma_mgmt_dev *mgmtdev;
->>>> +	struct resource *res;
->>>> +	void __iomem *virtaddr;
->>>> +	int irq;
->>>> +	int rc;
->>>> +	u32 val;
->>>> +
->>>> +	pm_runtime_set_autosuspend_delay(&pdev->dev, AUTOSUSPEND_TIMEOUT);
->>>> +	pm_runtime_use_autosuspend(&pdev->dev);
->>>> +	pm_runtime_set_active(&pdev->dev);
->>>> +	pm_runtime_enable(&pdev->dev);
->>>
->>> at this time pm core will treat device as fully enabled and pm methods can
->>> be invoked, but you are not ready yet right. Typically these are done at the
->>> end of the probe unless you have a reason... 
->>
->> I need it here because the clocks are declared as ACPI power resources.
->> The kernel is turning off all power resources during initialization. In
->> order for this code to touch the hardware, I need to call enable so that
->> clocks are enabled once again.
+> Tested it on top of 4.4-rc3.
+>  
+>> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+>> index 3a10f1a8317a..d279edf9b10d 100644
+>> --- a/arch/arm/mach-exynos/Kconfig
+>> +++ b/arch/arm/mach-exynos/Kconfig
+>> @@ -27,6 +27,9 @@ menuconfig ARCH_EXYNOS
+>>  	select SRAM
+>>  	select THERMAL
+>>  	select MFD_SYSCON
+>> +	select POWER_RESET
+>> +	select POWER_RESET_SYSCON
+>> +	select POWER_RESET_SYSCON_POWEROFF
 > 
-> The question is are you ready in your driver routines to be invoked by pm
-> core?
+> "select POWER_SUPPLY" is missing here. Without is we get:
+> --- cut ---
+> warning: (ARCH_HISI && ARCH_INTEGRATOR && ARCH_EXYNOS && ARCH_VEXPRESS && REALVIEW_DT) selects POWER_RESET which has unmet direct
+> dependencies (POWER_SUPPLY)
+> warning: (ARCH_EXYNOS) selects POWER_RESET_SYSCON which has unmet direct dependencies (POWER_SUPPLY && POWER_RESET && OF)
+> warning: (ARCH_EXYNOS) selects POWER_RESET_SYSCON_POWEROFF which has unmet direct dependencies (POWER_SUPPLY && POWER_RESET && OF)
+> --- cut ---
 > 
-
-I don't have any support for suspend and resume PM APIs. The only PM
-interface I support is PM runtime. PM can turn on/off the clocks based
-on the reference counts it maintains after get/set APIs. Since PM is
-turning off the clocks during power up before my driver load, I do need
-to grab this lock to re-enable it during HW initialization. Then, let PM
-turn off the clocks again after the AUTOSUSPEND_TIMEOUT when I'm done.
-
-Is there any other interaction with the PM that I'm not aware of?
-
->>
->>>
->>>> +static ssize_t show_values(struct device *dev, struct device_attribute *attr,
->>>> +				char *buf)
->>>
->>> Please fix the coding style here and other places as well. 
->>
->> what's the problem here?
->>
->>> Specifically
->>> please read Chapter 2
->>>
->>
->> Why is checkpatch not complaining about any of the coding style issues?
->> I'm checking my code with checkpatch before submitting. Is there any
->> other tool that would catch this?
+>>  	help
+>>  	  Support for SAMSUNG EXYNOS SoCs (EXYNOS4/5)
 > 
-> So did you read the Chapter 2.. Quoting here
+>  Otherwise works fine.
 > 
+>  Tested-by: Pavel Fedin <p.fedin@samsung.com>
 
-I did read the chapter 2. Maybe, my lack of native english speaking but
-I don't get from this sentence that function parameters need to be
-aligned to the opening paranthesis.
+Testing was a little bit too late (late not only looking at date of v1
+and v2 but even for v3)... I appreciate it but I applied it already and
+in fact I sent a pull request with it.
 
-> Descendants are always substantially shorter than the parent
-> and are placed substantially to the right. The same applies to function headers
-> with a long argument list. 
-> 
+Actually the proper fix I think is to remove the dependency between
+POWER_RESET and POWER_SUPPLY.
 
-I ran Lindent and manually cleaned up the junk it introduced. The result
-is this
-
-static ssize_t show_values(struct device *dev, struct device_attribute
-*attr,
-			   char *buf)
-
-
-> Your breaking lines is not placed substantially to the right..
-> I do not think checkpatch is checking this..
-> 
-
-
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
-Linux Foundation Collaborative Project
+Best regards,
+Krzysztof
