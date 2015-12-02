@@ -1,59 +1,59 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 2 Dec 2015 14:54:47 +0800
-Subject: [PATCH] clk: imx5: ipu_di_sel clocks can set parent rates
-In-Reply-To: <1448550620-24219-1-git-send-email-linux-kernel-dev@beckhoff.com>
-References: <1448550620-24219-1-git-send-email-linux-kernel-dev@beckhoff.com>
-Message-ID: <20151202065447.GL692@tiger>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 02 Dec 2015 08:21:40 +0100
+Subject: [PATCH v4 0/3] Exynos4210: fix power domain for MDMA1 device
+Message-ID: <1449040903-26674-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2015 at 04:10:20PM +0100, linux-kernel-dev at beckhoff.com wrote:
-> From: Patrick Br?nn <p.bruenn@beckhoff.com>
-> 
-> To obtain exact pixel clocks, allow the DI clock selectors to influence
-> the PLLs that they are derived from.
-> 
-> Commit 4591b13289b54fb5cbce84ee170f7390c576ef8f did this for i.MX6.
-> Port it to enable high display resolutions on i.MX53 based platforms
-> such as CX9020 Industrial PC, too.
-> 
-> Signed-off-by: Patrick Br?nn <p.bruenn@beckhoff.com>
+This patchset fixes mysterious boot hang on Exynos 4210 SoCs, when IOMMU
+is enabled. There is no direct dependency between IOMMU devices and
+MDMA1. However enabling IOMMU changes the device probe order, what
+results in LCD0 power domain being turned off for some time. During that
+time the registration of MDMA1 device happens, what results in system
+hangs, because the common bus code tries to read PID/CID registers from
+turned-off device.
 
-Please resend the patch to have clk maintainers and list on copy.
+Changes since v3 include some more code refactoring done to fix issues
+pointed by Ulf Hansson and Russel King.
 
-M:      Michael Turquette <mturquette@baylibre.com>
-M:      Stephen Boyd <sboyd@codeaurora.org>
-L:      linux-clk at vger.kernel.org
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
 
-You should have been told that if you run get_maintainer.pl on the
-patch.
+Changelog:
 
-Shawn
+v4:
+- fixed more issues pointed by Ulf Hansson and Russell King
 
-> ---
->  drivers/clk/imx/clk-imx51-imx53.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/clk/imx/clk-imx51-imx53.c b/drivers/clk/imx/clk-imx51-imx53.c
-> index c677034..29d4c44 100644
-> --- a/drivers/clk/imx/clk-imx51-imx53.c
-> +++ b/drivers/clk/imx/clk-imx51-imx53.c
-> @@ -519,10 +519,10 @@ static void __init mx53_clocks_init(struct device_node *np)
->  						mx53_ldb_di0_sel, ARRAY_SIZE(mx53_ldb_di0_sel), CLK_SET_RATE_PARENT);
->  	clk[IMX5_CLK_LDB_DI0_GATE]	= imx_clk_gate2("ldb_di0_gate", "ldb_di0_div", MXC_CCM_CCGR6, 28);
->  	clk[IMX5_CLK_LDB_DI1_GATE]	= imx_clk_gate2("ldb_di1_gate", "ldb_di1_div", MXC_CCM_CCGR6, 30);
-> -	clk[IMX5_CLK_IPU_DI0_SEL]	= imx_clk_mux("ipu_di0_sel", MXC_CCM_CSCMR2, 26, 3,
-> -						mx53_ipu_di0_sel, ARRAY_SIZE(mx53_ipu_di0_sel));
-> -	clk[IMX5_CLK_IPU_DI1_SEL]	= imx_clk_mux("ipu_di1_sel", MXC_CCM_CSCMR2, 29, 3,
-> -						mx53_ipu_di1_sel, ARRAY_SIZE(mx53_ipu_di1_sel));
-> +	clk[IMX5_CLK_IPU_DI0_SEL]	= imx_clk_mux_flags("ipu_di0_sel", MXC_CCM_CSCMR2, 26, 3,
-> +						mx53_ipu_di0_sel, ARRAY_SIZE(mx53_ipu_di0_sel), CLK_SET_RATE_PARENT);
-> +	clk[IMX5_CLK_IPU_DI1_SEL]	= imx_clk_mux_flags("ipu_di1_sel", MXC_CCM_CSCMR2, 29, 3,
-> +						mx53_ipu_di1_sel, ARRAY_SIZE(mx53_ipu_di1_sel), CLK_SET_RATE_PARENT);
->  	clk[IMX5_CLK_TVE_EXT_SEL]	= imx_clk_mux_flags("tve_ext_sel", MXC_CCM_CSCMR1, 6, 1,
->  						mx53_tve_ext_sel, ARRAY_SIZE(mx53_tve_ext_sel), CLK_SET_RATE_PARENT);
->  	clk[IMX5_CLK_TVE_GATE]		= imx_clk_gate2("tve_gate", "tve_pred", MXC_CCM_CCGR2, 30);
-> -- 
-> 1.9.1
-> 
-> 
+v3: https://lkml.org/lkml/2015/12/1/334
+- fixed issues pointed by Ulf Hansson
+- dropped patch for exynos4210 dts, because it already got queued for merging
+
+v2: https://lkml.org/lkml/2015/11/26/229
+- added 2 patches from 'On-demand device probing' thread
+  (https://lkml.org/lkml/2015/9/29/189), which move PID/CIR reading
+  from amba_device_add() to amba_match()
+- moved dev_pm_domain_attach() to amba_match(), which is allowed to
+  return -EPROBE_DEFER
+
+v1: http://www.spinics.net/lists/arm-kernel/msg463185.html
+- initial version
+
+
+Patch summary:
+
+Marek Szyprowski (1):
+  ARM: amba: Properly handle devices with power domains
+
+Tomeu Vizoso (2):
+  driver core: handle -EPROBE_DEFER from bus_type.match()
+  ARM: amba: Move reading of periphid to amba_match()
+
+ Documentation/driver-model/porting.txt |   6 +-
+ drivers/amba/bus.c                     | 152 ++++++++++++++++++---------------
+ drivers/base/dd.c                      |  24 +++++-
+ include/linux/device.h                 |   7 +-
+ 4 files changed, 112 insertions(+), 77 deletions(-)
+
+-- 
+1.9.2
