@@ -1,37 +1,23 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 2 Dec 2015 15:59:25 +0200
-Subject: [RFC v03 15/15] ARM: davinci: dm365: Remove DMA resources for SPI
-In-Reply-To: <1449064765-27427-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1449064765-27427-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1449064765-27427-16-git-send-email-peter.ujfalusi@ti.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Wed, 2 Dec 2015 09:02:24 -0500
+Subject: [PATCH] arm64: ftrace: stop using kstop_machine to
+ enable/disable tracing
+In-Reply-To: <20151202123654.GC4523@arm.com>
+References: <1448697009-17211-1-git-send-email-huawei.libin@huawei.com>
+ <20151202123654.GC4523@arm.com>
+Message-ID: <20151202090224.2520dcd5@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver is converted to not use the DMA resource.
+On Wed, 2 Dec 2015 12:36:55 +0000
+Will Deacon <will.deacon@arm.com> wrote:
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/mach-davinci/dm365.c | 8 --------
- 1 file changed, 8 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index e794bff7d589..664ee6bbef22 100644
---- a/arch/arm/mach-davinci/dm365.c
-+++ b/arch/arm/mach-davinci/dm365.c
-@@ -660,14 +660,6 @@ static struct resource dm365_spi0_resources[] = {
- 		.start = IRQ_DM365_SPIINT0_0,
- 		.flags = IORESOURCE_IRQ,
- 	},
--	{
--		.start = 17,
--		.flags = IORESOURCE_DMA,
--	},
--	{
--		.start = 16,
--		.flags = IORESOURCE_DMA,
--	},
- };
- 
- static struct platform_device dm365_spi0_device = {
--- 
-2.6.3
+> > Cc: <stable@vger.kernel.org> # 3.18+  
+> 
+> I don't think this is stable material.
+> 
+
+No, it definitely isn't. This is a new feature not a fix.
+
+-- Steve
