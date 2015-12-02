@@ -1,115 +1,133 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 02 Dec 2015 11:47:33 +0000
-Subject: [PATCH v3 4/6] pinctrl: meson: Enable GPIO IRQs
-In-Reply-To: <CAL9uMOE1orp8zQABMOW0eFMuZ9XcGfLF1RLOwurEcN-csxfGtg@mail.gmail.com>
-References: <1448987062-31225-1-git-send-email-carlo@caione.org>	<1448987062-31225-5-git-send-email-carlo@caione.org>	<565DF211.8000005@arm.com>	<CAOQ7t2YN8Ey1vZO4yrn9SdbR7FzPNVY-HGRBZOctLgK1vHo9VA@mail.gmail.com>	<565EB3D8.5070400@arm.com>
- <CAL9uMOE1orp8zQABMOW0eFMuZ9XcGfLF1RLOwurEcN-csxfGtg@mail.gmail.com>
-Message-ID: <565EDA55.1080900@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 2 Dec 2015 12:49:20 +0100
+Subject: [PATCH v2 16/21] arm64: KVM: Add compatibility aliases
+In-Reply-To: <1448650215-15218-17-git-send-email-marc.zyngier@arm.com>
+References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+ <1448650215-15218-17-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20151202114920.GB18376@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/15 11:37, Carlo Caione wrote:
-> On Wed, Dec 2, 2015 at 10:03 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 01/12/15 19:41, Carlo Caione wrote:
->>> On Tue, Dec 1, 2015 at 8:16 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>> On 01/12/15 16:24, Carlo Caione wrote:
->>>>> From: Carlo Caione <carlo@endlessm.com>
+On Fri, Nov 27, 2015 at 06:50:10PM +0000, Marc Zyngier wrote:
+> So far, we've implemented the new world switch with a completely
+> different namespace, so that we could have both implementation
+> compiled in.
 > 
-> [...]
+> Let's take things one step further by adding weak aliases that
+> have the same names as the original implementation. The weak
+> attributes allows the new implementation to be overriden by the
+> old one, and everything still work.
+
+Do I understand correctly that the whole point of this is to keep
+everything compiling nicely while at the same time being able to split
+the patches so that you can have an isolated "remove old code" patch
+that doesn't have to change the callers?
+
+If so, I think explaining this rationale would be helpful in the commit
+message in case we have to go back and track these changes in connection
+with a regression and don't remember why we did things this way.
+
+Maybe I'm being over-cautious though...
+
+Otherwise:
+
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+
 > 
->>> In v2 I had the set of fwspec to track number and trigger type of the
->>> IRQ, so it was straightforward. With this patch I have moved away from
->>> that solution (as you suggested) and I'm using the 'amlogic,irqs-gpio'
->>> parameter to track down the IRQ numbers (but not the trigger type).
->>> It's the same solution we have in drivers/irqchip/irq-crossbar.c where
->>> the trigger type is hardcoded in allocate_gic_irq().
->>> If I need to save both the IRQ and the trigger type at this point I
->>> wonder if it's better to go back to the set of fwspec or convert the
->>> fwspec to of_phandle_args and save that.
->>
->> No. This should come from the interrupt specifier you are getting from
->> the device. You should never make up that information.
->>
->> Your amlogic,irqs-gpio property gives you a list of downstream
->> interrupts. The device connected to your pinctrl HW provides you with
->> the upstream interrupt number (which you will map to one of your
->> downstream IRQ) and crucially the trigger type. Please look at how the
->> TI cross bar works (again).
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/hyp/debug-sr.c   | 3 +++
+>  arch/arm64/kvm/hyp/hyp-entry.S  | 3 +++
+>  arch/arm64/kvm/hyp/switch.c     | 3 +++
+>  arch/arm64/kvm/hyp/tlb.c        | 9 +++++++++
+>  arch/arm64/kvm/hyp/vgic-v3-sr.c | 3 +++
+>  5 files changed, 21 insertions(+)
 > 
-> Ok, this definitely makes sense and I'm going to fix it in the next
-> revision, thanks for the explanation. Still I fail to see how the TI
-> cross bar driver is actually doing what you are suggesting here. If
-> I'm correctly reading the code here
-> http://lxr.free-electrons.com/source/drivers/irqchip/irq-crossbar.c#L101
-> the driver is hardcoding the trigger type for the downstream IRQ to be
-> passed to the GIC code. But probably I'm missing something obvious.
-
-Damn. No, you're right. I'll fix that. Thanks for the heads up, and
-apologies for the shouting! ;-)
-
->>>>> +static int meson_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
->>>>> +{
->>>>> +     struct meson_domain *domain = to_meson_domain(chip);
->>>>> +     struct meson_pinctrl *pc = domain->pinctrl;
->>>>> +     struct meson_bank *bank;
->>>>> +     struct irq_fwspec irq_data;
->>>>> +     unsigned int hwirq, irq;
->>>>> +
->>>>> +     hwirq = domain->data->pin_base + offset;
->>>>> +
->>>>> +     if (meson_get_bank(domain, hwirq, &bank))
->>>>> +             return -ENXIO;
->>>>> +
->>>>> +     irq_data.param_count = 2;
->>>>> +     irq_data.param[0] = hwirq;
->>>>> +
->>>>> +     /* dummy. It will be changed later in meson_irq_set_type */
->>>>> +     irq_data.param[1] = IRQ_TYPE_EDGE_RISING;
->>>>
->>>> Blah. Worse than I though... How do you end-up here? Why can't you
->>>> obtain the corresponding of_phandle_args instead of making things up?
->>>
->>> because I do not have a of_phandle. This is basically the .to_irq hook
->>> of the gpio_chip. This code is being called programmatically from the
->>> gpiolib. No DTS/OF involved here.
->>>
->>>> This looks mad. Do you really need this?
->>>
->>> Well, I'm open to any suggestion on how improve this mess.
->>
->> The question to answer is: in what circumstances do you have to convert
->> a GPIO into an IRQ at runtime? The only case should be "when you
->> discover a device having an interrupt pointing to your pinctrl". And in
->> this case, you have all the information to reconfigure the HW and assign
->> the interrupt.
->>
->> I really don't get why you want or need to involve gpiolib in this.
+> diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+> index a0b2b99..afd0a53 100644
+> --- a/arch/arm64/kvm/hyp/debug-sr.c
+> +++ b/arch/arm64/kvm/hyp/debug-sr.c
+> @@ -128,3 +128,6 @@ u32 __hyp_text __debug_read_mdcr_el2(void)
+>  {
+>  	return read_sysreg(mdcr_el2);
+>  }
+> +
+> +__alias(__debug_read_mdcr_el2)
+> +u32 __weak __kvm_get_mdcr_el2(void);
+> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+> index 39d6935..ace919b 100644
+> --- a/arch/arm64/kvm/hyp/hyp-entry.S
+> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
+> @@ -184,6 +184,8 @@ ENDPROC(\label)
+>  
+>  	.align 11
+>  
+> +	.weak	__kvm_hyp_vector
+> +ENTRY(__kvm_hyp_vector)
+>  ENTRY(__hyp_vector)
+>  	ventry	el2t_sync_invalid		// Synchronous EL2t
+>  	ventry	el2t_irq_invalid		// IRQ EL2t
+> @@ -205,3 +207,4 @@ ENTRY(__hyp_vector)
+>  	ventry	el1_fiq_invalid			// FIQ 32-bit EL1
+>  	ventry	el1_error_invalid		// Error 32-bit EL1
+>  ENDPROC(__hyp_vector)
+> +ENDPROC(__kvm_hyp_vector)
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 7b81089..c8ba370 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -141,6 +141,9 @@ int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+>  	return exit_code;
+>  }
+>  
+> +__alias(__guest_run)
+> +int __weak __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+> +
+>  static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%08llx\nFAR:%016llx HPFAR:%016llx PAR:%016llx\nVCPU:%p\n";
+>  
+>  void __hyp_text __noreturn __hyp_panic(void)
+> diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+> index d4a07d0..2c279a8 100644
+> --- a/arch/arm64/kvm/hyp/tlb.c
+> +++ b/arch/arm64/kvm/hyp/tlb.c
+> @@ -47,6 +47,9 @@ void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>  	write_sysreg(0, vttbr_el2);
+>  }
+>  
+> +__alias(__tlb_flush_vmid_ipa)
+> +void __weak __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+> +
+>  void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
+>  {
+>  	dsb(ishst);
+> @@ -63,6 +66,9 @@ void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
+>  	write_sysreg(0, vttbr_el2);
+>  }
+>  
+> +__alias(__tlb_flush_vmid)
+> +void __weak __kvm_tlb_flush_vmid(struct kvm *kvm);
+> +
+>  void __hyp_text __tlb_flush_vm_context(void)
+>  {
+>  	dsb(ishst);
+> @@ -70,3 +76,6 @@ void __hyp_text __tlb_flush_vm_context(void)
+>  		     "ic ialluis	  ": : );
+>  	dsb(ish);
+>  }
+> +
+> +__alias(__tlb_flush_vm_context)
+> +void __weak __kvm_flush_vm_context(void);
+> diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+> index b490db5..1b0eedb 100644
+> --- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
+> +++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+> @@ -220,3 +220,6 @@ u64 __hyp_text __vgic_v3_read_ich_vtr_el2(void)
+>  {
+>  	return read_gicreg(ICH_VTR_EL2);
+>  }
+> +
+> +__alias(__vgic_v3_read_ich_vtr_el2)
+> +u64 __weak __vgic_v3_get_ich_vtr_el2(void);
+> -- 
+> 2.1.4
 > 
-> Again probably I'm missing something (and Linus probably could help
-> here) but the only place I see the .to_irq hook (that is
-> meson_gpio_to_irq() in the driver code) being called is from
-> gpiod_to_irq() function in the gpiolib code.
-> 
-> One practical case in which that code path is involved is when (for
-> example) I have something like 'cd-gpios = <&gpio GPIOX 0>;' for the
-> card detection IRQ in the MMC node and in this case I fail to see an
-> easy way to get the trigger type without touching the MMC / gpiolib
-> code (any idea?).
-> This function is not called at all when in the DTS I explicitly have
-> the interrupt specifier defined using the 'interrupts = <...>'
-> property and in that case I have all the information I need to map the
-> downstream IRQ.
-
-I do think that the moment you want to describe an interrupt (and have
-the HW that can trigger one), you should end up describing this as a
-real interrupt, and not as a "shake this pin" kind of thing.
-
-The former gives you strong guarantees as to how this is going to be
-processed, while the later looks like a hack to paper over missing
-functionalities in past kernels...
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
