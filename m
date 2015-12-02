@@ -1,49 +1,75 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed,  2 Dec 2015 19:12:21 +0800
-Subject: [PATCH 2/2] ARM: dts: rockchip: change the correct voltage range for
- rk3288 evb board
-In-Reply-To: <1449054741-25354-1-git-send-email-wxt@rock-chips.com>
-References: <1449054741-25354-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1449054741-25354-2-git-send-email-wxt@rock-chips.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 2 Dec 2015 11:12:44 +0000
+Subject: linux-next: manual merge of the mvebu tree with the arm-soc tree
+Message-ID: <20151202111244.b7ee49ee06b4a95e407e740d@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In general, the logic voltage is affected by ddr frequency factors.
-We should fix the correct voltage range since assuemd that we have the
-ddr frequency driver in mainline.
+Hi all,
 
-AFAIK, the 1.8v voltage is used by the SD3.0 card.
+Today's linux-next merge of the mvebu tree got a conflict in  between commit
+377524dc4d77f50e ("ARM: mmp: move into ARCH_MULTIPLATFORM") from the arm-soc
+tree and commit 5f4423af9dd17 ("ARM: orion: multiplatform support") from the
+mvebu tree.
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
----
-
- arch/arm/boot/dts/rk3288-evb-act8846.dts | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/rk3288-evb-act8846.dts b/arch/arm/boot/dts/rk3288-evb-act8846.dts
-index 43949a6..2797f32 100644
---- a/arch/arm/boot/dts/rk3288-evb-act8846.dts
-+++ b/arch/arm/boot/dts/rk3288-evb-act8846.dts
-@@ -119,8 +119,8 @@
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5a328472bd8c..882f5f33bc7d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -490,46 +490,6 @@ config ARCH_IXP4XX
+ 	help
+ 	  Support for Intel's IXP4XX (XScale) family of processors.
  
- 			vdd_log: REG3 {
- 				regulator-name = "VDD_LOG";
--				regulator-min-microvolt = <1000000>;
--				regulator-max-microvolt = <1000000>;
-+				regulator-min-microvolt = <700000>;
-+				regulator-max-microvolt = <1500000>;
- 				regulator-always-on;
- 			};
- 
-@@ -133,7 +133,7 @@
- 
- 			vccio_sd: REG5 {
- 				regulator-name = "VCCIO_SD";
--				regulator-min-microvolt = <3300000>;
-+				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <3300000>;
- 				regulator-always-on;
- 			};
--- 
-1.9.1
+-config ARCH_DOVE
+-	bool "Marvell Dove"
+-	select ARCH_REQUIRE_GPIOLIB
+-	select CPU_PJ4
+-	select GENERIC_CLOCKEVENTS
+-	select MIGHT_HAVE_PCI
+-	select MVEBU_MBUS
+-	select PINCTRL
+-	select PINCTRL_DOVE
+-	select PLAT_ORION_LEGACY
+-	help
+-	  Support for the Marvell Dove SoC 88AP510
+-
+-config ARCH_MV78XX0
+-	bool "Marvell MV78xx0"
+-	select ARCH_REQUIRE_GPIOLIB
+-	select CPU_FEROCEON
+-	select GENERIC_CLOCKEVENTS
+-	select MVEBU_MBUS
+-	select PCI
+-	select PLAT_ORION_LEGACY
+-	help
+-	  Support for the following Marvell MV78xx0 series SoCs:
+-	  MV781x0, MV782x0.
+-
+-config ARCH_ORION5X
+-	bool "Marvell Orion"
+-	depends on MMU
+-	select ARCH_REQUIRE_GPIOLIB
+-	select CPU_FEROCEON
+-	select GENERIC_CLOCKEVENTS
+-	select MVEBU_MBUS
+-	select PCI
+-	select PLAT_ORION_LEGACY
+-	select MULTI_IRQ_HANDLER
+-	help
+-	  Support for the following Marvell Orion 5x series SoCs:
+-	  Orion-1 (5181), Orion-VoIP (5181L), Orion-NAS (5182),
+-	  Orion-2 (5281), Orion-1-90 (6183).
+-
+ config ARCH_KS8695
+ 	bool "Micrel/Kendin KS8695"
+ 	select ARCH_REQUIRE_GPIOLIB
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151202/5d3f5e5f/attachment.sig>
