@@ -1,89 +1,44 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Wed, 2 Dec 2015 16:49:21 +0530
-Subject: [PATCH v7 0/4] arm64, numa: Add numa support for arm64 platforms
-In-Reply-To: <1447780843-9223-1-git-send-email-gkulkarni@caviumnetworks.com>
-References: <1447780843-9223-1-git-send-email-gkulkarni@caviumnetworks.com>
-Message-ID: <CAFpQJXViarEkROA2RypxtDzPkSATUnVmizAqN03WQ-_twrFa2A@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 2 Dec 2015 11:21:09 +0000
+Subject: linux-next: manual merge of the renesas tree with the arm-soc tree
+Message-ID: <20151202112109.342837c08019e632b28020fc@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All, Mark R,
+Hi Simon,
 
-please review!!
+Today's linux-next merge of the renesas tree got a conflict in
+arch/arm/mach-shmobile/Kconfig between commit e32465429490 ("ARM: use "depends
+on" for SoC configs instead of "if" after prompt") from the arm-soc tree and
+commit 9b5ba0df4ea4f94 ("ARM: shmobile: Introduce ARCH_RENESAS") from the
+renesas tree.
 
-thanks,
-Ganapat
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-On Tue, Nov 17, 2015 at 10:50 PM, Ganapatrao Kulkarni
-<gkulkarni@caviumnetworks.com> wrote:
-> v7:
->         - managing numa memory mapping using memblock.
->         - Incorporated review comments of Mark Rutland.
->
-> v6:
->         - defined and implemented the numa dt binding using
->         node property proximity and device node distance-map.
->         - renamed dt_numa to of_numa
->
-> v5:
->         - created base verion of numa.c which creates dummy numa without using dt
->           on single socket platforms. Then added patches for dt support.
->         - Incorporated review comments from Hanjun Guo.
->
-> v4:
-> done changes as per Arnd review comments.
->
-> v3:
-> Added changes to support numa on arm64 based platforms.
-> Tested these patches on cavium's multinode(2 node topology) platform.
-> In this patchset, defined and implemented dt bindings for numa mapping
-> for core and memory using device node property arm,associativity.
->
-> v2:
-> Defined and implemented numa map for memory, cores to node and
-> proximity distance matrix of nodes.
->
-> v1:
-> Initial patchset to support numa on arm64 platforms.
->
-> Note:
->         1. This patchset is tested for numa with dt on
->            thunderx single socket and dual socket boards.
->         2. Numa DT booting needs the dt memory nodes, which are deleted in current efi-stub,
->         hence to try numa with dt, you need to rebase with ard's patchset.
->         http://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm64-uefi-early-fdt-handling
->
-> Ganapatrao Kulkarni (4):
->   arm64, numa: adding numa support for arm64 platforms.
->   Documentation, dt, arm64/arm: dt bindings for numa.
->   arm64/arm, numa, dt: adding numa dt binding implementation for arm64
->     platforms.
->   arm64, dt, thunderx: Add initial dts for Cavium Thunderx in 2 node
->     topology.
->
->  Documentation/devicetree/bindings/arm/numa.txt  | 272 ++++++++
->  arch/arm64/Kconfig                              |  35 +
->  arch/arm64/boot/dts/cavium/Makefile             |   2 +-
->  arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts  |  83 +++
->  arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi | 806 ++++++++++++++++++++++++
->  arch/arm64/include/asm/mmzone.h                 |  17 +
->  arch/arm64/include/asm/numa.h                   |  56 ++
->  arch/arm64/kernel/Makefile                      |   1 +
->  arch/arm64/kernel/of_numa.c                     | 265 ++++++++
->  arch/arm64/kernel/setup.c                       |   4 +
->  arch/arm64/kernel/smp.c                         |   4 +
->  arch/arm64/mm/Makefile                          |   1 +
->  arch/arm64/mm/init.c                            |  30 +-
->  arch/arm64/mm/numa.c                            | 392 ++++++++++++
->  14 files changed, 1963 insertions(+), 5 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
->  create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts
->  create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi
->  create mode 100644 arch/arm64/include/asm/mmzone.h
->  create mode 100644 arch/arm64/include/asm/numa.h
->  create mode 100644 arch/arm64/kernel/of_numa.c
->  create mode 100644 arch/arm64/mm/numa.c
->
-> --
-> 1.8.1.4
->
+diff --cc arch/arm/mach-shmobile/Kconfig
+index 0f25f8fa2692,4ed72b124235..000000000000
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@@ -29,10 -31,11 +31,11 @@@ config ARCH_RMOBIL
+        select SYS_SUPPORTS_SH_CMT
+        select SYS_SUPPORTS_SH_TMU
+  
+- menuconfig ARCH_SHMOBILE_MULTI
++ menuconfig ARCH_RENESAS
+ -      bool "Renesas ARM SoCs" if ARCH_MULTI_V7
+ -      depends on MMU
+ +      bool "Renesas ARM SoCs"
+ +      depends on ARCH_MULTI_V7 && MMU
+        select ARCH_SHMOBILE
++       select ARCH_SHMOBILE_MULTI
+        select HAVE_ARM_SCU if SMP
+        select HAVE_ARM_TWD if SMP
+        select ARM_GIC
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151202/6704a56c/attachment.sig>
