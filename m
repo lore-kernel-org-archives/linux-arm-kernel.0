@@ -1,92 +1,100 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Wed, 2 Dec 2015 14:11:00 -0500
-Subject: [PATCH v4 1/2] watchdog: imx2_wdt: add external reset support via
- 'ext-reset-output' dt prop
-In-Reply-To: <20151106220249.GA19791@roeck-us.net>
-References: <1446758362-11702-1-git-send-email-akshay.bhat@timesys.com>
- <1446758362-11702-2-git-send-email-akshay.bhat@timesys.com>
- <20151105222325.GA26159@roeck-us.net>
- <CAJ+vNU2fSxRJ7YvxOfNzoEoiKgzv-dHj=+eksKxH48ekHiUw2Q@mail.gmail.com>
- <20151106220249.GA19791@roeck-us.net>
-Message-ID: <565F4244.7090502@timesys.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Dec 2015 19:28:25 +0000
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <3059482.yN34NFeWWY@wuerfel>
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+ <87610j7gmc.fsf@free-electrons.com>
+ <20151202123310.GC8644@n2100.arm.linux.org.uk>
+ <3059482.yN34NFeWWY@wuerfel>
+Message-ID: <20151202192825.GF8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Dec 02, 2015 at 04:49:38PM +0100, Arnd Bergmann wrote:
+> On Wednesday 02 December 2015 12:33:10 Russell King - ARM Linux wrote:
+> > On Mon, Nov 30, 2015 at 02:37:31PM +0100, Gregory CLEMENT wrote:
+> > > Hi Arnd,
+> > >  
+> > >  On mer., nov. 25 2015, Arnd Bergmann <arnd@arndb.de> wrote:
+> > > 
+> > > > I've posted these before and now gotten around to a rebase and
+> > > > want to include them in the arm-soc next/multiplatform branch for
+> > > > 4.5.
+> > > >
+> > > > Originally the plan for these platforms was to convert all of
+> > > > them to DT and use only mach-mvebu. That has not happened,
+> > > > so I would do it this way instead so we can at least have
+> > > > them in a single kernel.
+> > > >
+> > > > Let me know if there are any concerns or objections.
+> > > 
+> > > I have applied all the patches on mvebu/oldmvebu_multiplatform (I fixed
+> > > the last one which didn't apply on Kconfig). I also merged it
+> > > mvebu/for-netx to be part of the linux-next.
+> > > 
+> > > But before making it part of mvebu/soc, I would like to get some
+> > > Tested-by. The series is available on
+> > > git://git.infradead.org/linux-mvebu.git
+> > > in the branch mvebu/oldmvebu_multiplatform but it also will be part soon
+> > > of linux-next.
+> > > 
+> > > Russell, Sebastian,
+> > > 
+> > > would you have some time to test it on Dove?
+> > 
+> > Given that I'm testing on my Cubox tree, I've applied this series on top
+> > of v4.3.  Patch 5 trivially conflicts on MMP context.  Fixing that and
+> > merging the resulting changes gives another load of conflicts which need
+> > dealing with:
+> > 
+> > Recorded preimage for 'arch/arm/Kconfig'
+> > Recorded preimage for 'arch/arm/mach-dove/Kconfig'
+> > Recorded preimage for 'arch/arm/mach-dove/irq.c'
+> > Recorded preimage for 'arch/arm/mach-dove/pm.h'
+> > 
+> > These look less trivial to resolve, so testing this will have to wait
+> > until I have sufficient time to sort this out.
+> 
+> I have pushed a rebased version to
+> git.kernel.org/pub/scm/linux/kernel/git/arnd/playground.git multiplatform-orion-4.3
+> 
+> Maybe that helps
 
+As I said above, that's not the problem, the problem is merging it into
+the rest of my tree.
 
-On 11/06/2015 05:02 PM, Guenter Roeck wrote:
-> On Fri, Nov 06, 2015 at 11:53:42AM -0800, Tim Harvey wrote:
->> On Thu, Nov 5, 2015 at 2:23 PM, Guenter Roeck <linux@roeck-us.net> wrote:
->>> On Thu, Nov 05, 2015 at 04:19:21PM -0500, Akshay Bhat wrote:
->>>> From: Tim Harvey <tharvey@gateworks.com>
->>>>
->>>> The IMX6 watchdog supports assertion of a signal (WDOG_B) which
->>>> can be pinmux'd to an external pin. This is typically used for boards that
->>>> have PMIC's in control of the IMX6 power rails. In fact, failure to use
->>>> such an external reset on boards with external PMIC's can result in various
->>>> hangs due to the IMX6 not being fully reset [1] as well as the board failing
->>>> to reset because its PMIC has not been reset to provide adequate voltage for
->>>> the CPU when coming out of reset at 800Mhz.
->>>>
->>>> This uses a new device-tree property 'ext-reset-output' to indicate the
->>>> board has such a reset and to cause the watchdog to be configured to assert
->>>> WDOG_B instead of an internal reset both on a watchdog timeout and in
->>>> system_restart.
->>>>
->>>> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/333689.html
->>>>
->>>> Cc: Lucas Stach <l.stach@pengutronix.de>
->>>> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
->>>> ---
->>>>   .../devicetree/bindings/watchdog/fsl-imx-wdt.txt     |  2 ++
->>>>   drivers/watchdog/imx2_wdt.c                          | 20 ++++++++++++++++++--
->>>>   2 files changed, 20 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
->>>> index 8dab6fd..9b89b3a 100644
->>>> --- a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
->>>> +++ b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
->>>> @@ -9,6 +9,8 @@ Optional property:
->>>
->>> properties ?
->>>
->>>>   - big-endian: If present the watchdog device's registers are implemented
->>>>     in big endian mode, otherwise in native mode(same with CPU), for more
->>>>     detail please see: Documentation/devicetree/bindings/regmap/regmap.txt.
->>>> +- ext-reset-output: If present the watchdog device is configured to assert its
->>>
->>> Should that have a vendor prefix ? Also, not sure if "-output"
->>> has any real value in the property name. "fsl,external-reset", maybe ?
->>
->> Hi Guenter,
->>
->> I don't see why a vendor prefix is necessary - its a feature of the
->> IMX6 watchdog supported by this driver to be able to trigger an
->> internal chip-level reset and/or an external signal that can be hooked
->> to additional hardware.
->>
-> Sounded like vendor specific to me, but then I am not a devicetree maintainer,
-> so I am not an authority on the subject.
+Having done most of that merge, I'm now tripping up on:
 
-Devicetree maintainers,
+arch/arm/mach-dove/common.c: In function 'dove_wdt_init':
+arch/arm/mach-dove/common.c:538:2: error: implicit declaration of function 'orion_wdt_init' [-Werror=implicit-function-declaration]
 
-Any thoughts?
+which I guess is because you've deleted the legacy orion watchdog stuff.
+So I'm going to have to revert that.  That then gives me:
 
-Tim,
+arch/arm/mach-dove/clock.c:19:21: fatal error: mach/pm.h: No such file or directory
+arch/arm/mach-dove/clock.c:20:27: fatal error: mach/hardware.h: No such file or directory
 
-After looking at all the other watchdog drivers, it does not appear that 
-there is any other processor which uses a similar feature. Since imx is 
-the only processor that appears to support this feature, it might make 
-sense in making this vendor specific. If in the future it is found more 
-processors support a similar functionality, it can be revisited and 
-moved out from being vendor specific?
+The first is easy to solve, and the second by replacing it with dove.h.
+The next problem is this:
 
->
->> I started with ext-reset, but it was suggested
->> (http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/347437.html)
->> to also make it clear that this is an 'output' and not a reset input.
->>
-> No problem, as long as you get an Ack from a devicetree maintainer.
->
-> Guenter
->
+arch/arm/plat-orion/common.c:25:30: fatal error: mach/bridge-regs.h: No such file or directory
+
+which is impossible to solve, because plat-orion/common.c wants
+mach-dove/bridge-regs.h.
+
+I also have arch/arm/mach-dove/include/mach/sdhci.h to pass the GPIO
+for card detection to the SDHCI driver, which is going to break unless
+it's moved to include/linux/platform-data.
+
+Everything else seems mostly happy, but I've no way to tell whether
+what would be the resulting kernel would work as it's impossible to
+know without fixing the wreckage above.
+
+I'm sure I don't have to repeat my position over what I'm going to do if
+these petty mainline changes which are totally unnecessary break the only
+setup I have which works.  Making mach-dove multi-platform is a "wouldn't
+it be nice if", it's not an absolute necessity.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
