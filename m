@@ -1,90 +1,133 @@
-From: salil.mehta@huawei.com (Salil Mehta)
-Date: Wed, 2 Dec 2015 16:52:46 +0000
-Subject: [PATCH V6 net-next 0/5] net:hns: Add support of Hip06 SoC to the
- Hislicon Network Subsystem
-Message-ID: <1449075171-4820-1-git-send-email-salil.mehta@huawei.com>
+From: kamal@canonical.com (Kamal Mostafa)
+Date: Wed,  2 Dec 2015 08:59:02 -0800
+Subject: [PATCH 3.19.y-ckt 091/164] arm64: bpf: fix div-by-zero case
+In-Reply-To: <1449075615-20754-1-git-send-email-kamal@canonical.com>
+References: <1449075615-20754-1-git-send-email-kamal@canonical.com>
+Message-ID: <1449075615-20754-92-git-send-email-kamal@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This PATCH V6 addresses the review comments provided by
-David Miller over the existing use of ENABLE/DISABLE
-hash defines with the code. These hash defines are doing
-a similar job as implicit type bool would do. So these are
-kind of duplicate and are redundant.
+3.19.8-ckt11 -stable review patch.  If anyone has any objections, please let me know.
 
-PATCH V5:
-This PATCH addresses the review comments by Yuval Mintz
- <Yuval.Mintz@qlogic.com>. This rework of comments are basically
- related to:
- 1) styling of the code,
- 2) RSS default Key initiailization related code
- 3) redundant code removal 
+------------------
 
-PATCH V4:
-This addresses the review comment provided by 
-Sergei Shtylyov. The changelog of every patch has also
-been modified.
+From: Zi Shen Lim <zlim.lnx@gmail.com>
 
-PATCH V3:
- Addresses the review comment floated by David Miller 
+commit 251599e1d6906621f49218d7b474ddd159e58f3b upstream.
 
-PATCH V2:
-1) Bug Fixes and Clean-up: Internally identified
-2) Addresses internal review comments by Kenneth Lee and
-   by Huang Daode
-3) Addresses the review comment from "Yisen.Zhuang(Zhuangyuzeng)"
-4) Adds fix from Fengguang Wu for an error generated from 
-   "kbuild test robot" from Intel
-5) Ethtool support for TSO set option from Lisheng
+In the case of division by zero in a BPF program:
+	A = A / X;  (X == 0)
+the expected behavior is to terminate with return value 0.
 
-PATCH V1:
-Adds initial support of Hip06 SoC with below changes:  
-This patch-set adds support of new Hisilicon Hip06 SoC to the existing
-(already part of net-next) HNS ethernet driver for Hip05 SoC. Hip06 is
-a multi-core SoC and is a derivative of Hip05 SoC with lots of new
-hardware featres supported like RSS, TSO, hardware VLAN assist etc. 
+This is confirmed by the test case introduced in commit 86bf1721b226
+("test_bpf: add tests checking that JIT/interpreter sets A and X to 0.").
 
-The changes in the driver are mainly due to following:
- 1) changes in the DMA descriptor provided by the Hip06 ethernet 
-    hardware. These changes need to co-exist with already present
-    Hip05 DMA descriptor and its operating functions. The decision
-    to choose the correct type of DMA descriptor is taken dynamically
-    depending upon the version of the hardware (i.e. V1/hip05 or
-    V2/hip06, see already existing hisilicon-hns-nic.txt binding file
-    for the detailed description version and naming).
- 2) To support new features added to the Hip06 ethernet hardware:
-    a. RSS (Receive Side Scaling)
-    b. TSO (TCP Segment Offload)
-    c. Hardware VLAN support (currently we are initializing hardware
-       to not assist in stripping the vlan tag at hardware level.
-       Proper support of this feature and ethtool would come after
-       these patches have been accepted)
+Reported-by: Yang Shi <yang.shi@linaro.org>
+Tested-by: Yang Shi <yang.shi@linaro.org>
+CC: Xi Wang <xi.wang@gmail.com>
+CC: Alexei Starovoitov <ast@plumgrid.com>
+CC: linux-arm-kernel at lists.infradead.org
+CC: linux-kernel at vger.kernel.org
+Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
+Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Kamal Mostafa <kamal@canonical.com>
+---
+ arch/arm64/net/bpf_jit.h      |  3 ++-
+ arch/arm64/net/bpf_jit_comp.c | 37 +++++++++++++++++++++++++------------
+ 2 files changed, 27 insertions(+), 13 deletions(-)
 
-Kindly note that, this patchset has been based on latest net-next.
-
-Salil Mehta (5):
-  net:hns: Add support of Hip06 SoC to the Hislicon Network Subsystem
-  net:hns: Add Hip06 "RSS(Receive Side Scaling)" support to HNS Driver
-  net:hns: Add Hip06 "TSO(TCP Segment Offload)" support HNS Driver
-  net:hns: Add support of ethtool TSO set option for Hip06 in HNS
-  net:hns: Add the init code to disable Hip06 "Hardware VLAN assist"
-
- drivers/net/ethernet/hisilicon/hns/hnae.h          |   58 ++-
- drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c  |   98 +++-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c  |   14 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.h  |    4 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c |  213 +++++++--
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h |   24 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_misc.c |    6 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c  |   72 ++-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.h  |   32 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c  |   76 ++-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.h  |    8 +-
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h  |   88 +++-
- drivers/net/ethernet/hisilicon/hns/hns_enet.c      |  483 +++++++++++++++++---
- drivers/net/ethernet/hisilicon/hns/hns_enet.h      |   12 +
- drivers/net/ethernet/hisilicon/hns/hns_ethtool.c   |   95 +++-
- 15 files changed, 1077 insertions(+), 206 deletions(-)
-
+diff --git a/arch/arm64/net/bpf_jit.h b/arch/arm64/net/bpf_jit.h
+index 98a26ce..aee5637 100644
+--- a/arch/arm64/net/bpf_jit.h
++++ b/arch/arm64/net/bpf_jit.h
+@@ -1,7 +1,7 @@
+ /*
+  * BPF JIT compiler for ARM64
+  *
+- * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
++ * Copyright (C) 2014-2015 Zi Shen Lim <zlim.lnx@gmail.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -35,6 +35,7 @@
+ 	aarch64_insn_gen_comp_branch_imm(0, offset, Rt, A64_VARIANT(sf), \
+ 		AARCH64_INSN_BRANCH_COMP_##type)
+ #define A64_CBZ(sf, Rt, imm19) A64_COMP_BRANCH(sf, Rt, (imm19) << 2, ZERO)
++#define A64_CBNZ(sf, Rt, imm19) A64_COMP_BRANCH(sf, Rt, (imm19) << 2, NONZERO)
+ 
+ /* Conditional branch (immediate) */
+ #define A64_COND_BRANCH(cond, offset) \
+diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+index c047598..9ae6f23 100644
+--- a/arch/arm64/net/bpf_jit_comp.c
++++ b/arch/arm64/net/bpf_jit_comp.c
+@@ -1,7 +1,7 @@
+ /*
+  * BPF JIT compiler for ARM64
+  *
+- * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
++ * Copyright (C) 2014-2015 Zi Shen Lim <zlim.lnx@gmail.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -225,6 +225,17 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
+ 	u8 jmp_cond;
+ 	s32 jmp_offset;
+ 
++#define check_imm(bits, imm) do {				\
++	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
++	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
++		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
++			i, imm, imm);				\
++		return -EINVAL;					\
++	}							\
++} while (0)
++#define check_imm19(imm) check_imm(19, imm)
++#define check_imm26(imm) check_imm(26, imm)
++
+ 	switch (code) {
+ 	/* dst = src */
+ 	case BPF_ALU | BPF_MOV | BPF_X:
+@@ -258,8 +269,21 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
+ 		break;
+ 	case BPF_ALU | BPF_DIV | BPF_X:
+ 	case BPF_ALU64 | BPF_DIV | BPF_X:
++	{
++		const u8 r0 = bpf2a64[BPF_REG_0];
++
++		/* if (src == 0) return 0 */
++		jmp_offset = 3; /* skip ahead to else path */
++		check_imm19(jmp_offset);
++		emit(A64_CBNZ(is64, src, jmp_offset), ctx);
++		emit(A64_MOVZ(1, r0, 0, 0), ctx);
++		jmp_offset = epilogue_offset(ctx);
++		check_imm26(jmp_offset);
++		emit(A64_B(jmp_offset), ctx);
++		/* else */
+ 		emit(A64_UDIV(is64, dst, dst, src), ctx);
+ 		break;
++	}
+ 	case BPF_ALU | BPF_MOD | BPF_X:
+ 	case BPF_ALU64 | BPF_MOD | BPF_X:
+ 		ctx->tmp_used = 1;
+@@ -393,17 +417,6 @@ emit_bswap_uxt:
+ 		emit(A64_ASR(is64, dst, dst, imm), ctx);
+ 		break;
+ 
+-#define check_imm(bits, imm) do {				\
+-	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
+-	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
+-		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
+-			i, imm, imm);				\
+-		return -EINVAL;					\
+-	}							\
+-} while (0)
+-#define check_imm19(imm) check_imm(19, imm)
+-#define check_imm26(imm) check_imm(26, imm)
+-
+ 	/* JUMP off */
+ 	case BPF_JMP | BPF_JA:
+ 		jmp_offset = bpf2a64_offset(i + off, i, ctx);
 -- 
-1.7.9.5
+1.9.1
