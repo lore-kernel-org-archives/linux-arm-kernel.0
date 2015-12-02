@@ -1,104 +1,51 @@
-From: carl@cog.systems (Carl van Schaik)
-Date: Thu, 3 Dec 2015 00:46:35 +1100
-Subject: arm64 boot requirements
-In-Reply-To: <CAKv+Gu_2ufc_q5OsGDsGUqfEieCHc++-r2zxrpDpHcMbZyS_aQ@mail.gmail.com>
-References: <565BAA2E.5090102@cog.systems>	<20151201110159.GA4757@leverpostej>
- <CAKv+Gu_2ufc_q5OsGDsGUqfEieCHc++-r2zxrpDpHcMbZyS_aQ@mail.gmail.com>
-Message-ID: <082101d12d07$dd677160$98365420$@cog.systems>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 02 Dec 2015 14:49:52 +0100
+Subject: linux-next: manual merge of the mvebu tree with the arm-soc tree
+In-Reply-To: <2428665.BrOON4cELy@wuerfel> (Arnd Bergmann's message of "Wed, 02
+ Dec 2015 12:21:21 +0100")
+References: <20151202111244.b7ee49ee06b4a95e407e740d@kernel.org>
+ <20151202111829.GE1929@sirena.org.uk> <2428665.BrOON4cELy@wuerfel>
+Message-ID: <87bna92c5b.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd,
+ 
+ On mer., d?c. 02 2015, Arnd Bergmann <arnd@arndb.de> wrote:
 
-On 1 December 2015 Ard Biesheuvel <ard.biesheuvel@linaro.org> wote:
-> On 1 December 2015 at 12:02, Mark Rutland <mark.rutland@arm.com>
-> wrote:
-> > Hi,
-> >
-> > On Mon, Nov 30, 2015 at 12:45:18PM +1100, Carl van Schaik wrote:
-> >> In commit bd00cd5f8c8c3c282bb1e1eac6a6679a4f808091, the
-> idmap_pg_dir
-> >> and swapper_pg_dir where moved from before the kernel to after it.
-> >>
-> >> The problem is that these symbols fall outside the range covered by
-> >> the ELF file - outside of any section.
-> >>
-> >> A bootloader which loads the kernel ELF file and dynamically
-> >> determines where to place the DTB, may try place it after the
-> >> kernel. We've just run into this problem and the DTB gets
-> >> overwritten as soon as the pagetables are created.
-> 
-> Could you explain why you are using the ELF file and not the binary image
-> file?
-> This is not future proof: currently, the Image is a straight binary
-> objcopy of vmlinux, but that is not guaranteed to remain that way.
-> Things like KASLR may require post build steps that mangle vmlinux or
-> Image afterwards.
+> On Wednesday 02 December 2015 11:18:29 Mark Brown wrote:
+>> On Wed, Dec 02, 2015 at 11:12:44AM +0000, Mark Brown wrote:
+>> > Hi all,
+>> > 
+>> > Today's linux-next merge of the mvebu tree got a conflict in  between commit
+>> > 377524dc4d77f50e ("ARM: mmp: move into ARCH_MULTIPLATFORM") from the arm-soc
+>> > tree and commit 5f4423af9dd17 ("ARM: orion: multiplatform support") from the
+>> > mvebu tree.
+>> 
+>> Ccing in Arnd since I forgot to do that.
+>> 
+>
+> I was planning to merge all the multiplatform changes into one next/multiplatform
+> branch, but the mvebu maintainers preferred to keep this one in their
+> tree at
 
-The reason we've been using ELF files is mostly to do with legacy virtualization
-related reasons in our systems, we used to patch symbols in the ELFs for example
-pre device-tree. However, since it hadn't caused problems until now we had
-continued to use it. We haven't yet added Aarch64 Linux boot image header parsing
-but it should be trivial.
+Indeed except the arch/arm/Kconfig file all the other files belong to
+the mbebu subsystem and it is easier to to keep in our tree to handle them.
 
-The other area we are looking into is optimized multi-VM static boot images by
-constructing hypervisor-bundle images containing de-duplicated Linux sections,
-allowing an ELF bootloader to populate multiple Linux VMs from a smaller boot
-image - resulting in faster boot.
+> least initially. The conflict will go away once it's tested sufficiently and
+> I'm pulling it back.
 
-> >
-> > We had similar issues with the BSS when booting Image files prior to
-> > this and commit a2c1d73b94ed49f5 ("arm64: Update the Image header").
-> > Since then, the image_size field in the Image header tells you how much
-> > memory the kernel may clobber (including the BSS and page tables).
-> >
-> > Prior to that, the page tables were below the kernel, and also not
-> > described in any ELF section.
-> >
-> > Others booting the kernel vmlinux haven't reported similar issues, so I
-> > assume that either they are parsing the Image header, or getting lucky.
-> > Parsing the header is necessary to get the correct text offset, too...
-> >
-> > Pratyush, Geoff, I understood you were loading the kernel vmlinux for
-> > kexec. Do you parse the Image header to figure out where to place
-> > things?
-> >
-> >> I'd suggest that the kernel either:
-> >>  A. document this boot requirement for where not to load a DTB
-> >
-> > Do you have any particular suggestion?
-> >
-> > We already describe the Image footprint (including BSS and page tables)
-> > by the image_size in the Image header, which is sufficient. The size of
-> > the BSS and page tables is effectively unbound, so we can't define some
-> > upper bound that will always be true.
-> >
-> > The documentation is written on the assumption that an Image file is
-> > being used rather than a vmlinux. Perhaps that is something to consider.
-> >
-> >>  B. update the vmlinux.lds.S such that these symbols (and _end) are
-> >> properly covered by a section in the ELF, and thus preventing this
-> >> issue.
-> >
-> > I'm worried that this only solves this one case, and it means that there
-> > are two (potentially conflicting) sources of information that a
-> > bootloader might be using -- the ELF or the Image header. I don't want
-> > to have to duplicate text_offset and so on, which implies that parsing
-> > the Image header is necessary anyway.
-> >
-> > That's something we can discuss if you send a patch (inline rather than
-> > attached).
-> >
-> 
-> I think updating the linker script to put the page tables into a
-> .pgdir section is reasonable, since it is part of the static footprint
-> of the kernel.
+By the way, when you will pull our tree, we will still have it our own
+mvebu/for-next branch. Will git managed to automagically resolve the
+conflict by getting the resolution you will do in your branch?
 
-I agree
+A another solution could be to have a separate patch for the
+arch/arm/Kconfig file that you keep in arm-soc.
 
-> However, I strongly feel that the Image header should remain the
-> authoritative source of information regarding the nature (big/little
-> endian, page size) and the static footprint of the Image .
+Gr?gory
 
-Agreed, and there are other ways to de-duplicate which will still work
-with binary image inputs.
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
