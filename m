@@ -1,44 +1,32 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 2 Dec 2015 12:00:42 +0200
-Subject: [RFC v02 03/15] dmaengine: core: Introduce new, universal API to
- request a channel
-In-Reply-To: <20151201170031.GT23396@atomide.com>
+Date: Wed, 2 Dec 2015 12:02:14 +0200
+Subject: [RFC v02 04/15] dmaengine: edma: Add support for DMA filter
+ mapping to slave devices
+In-Reply-To: <20151202043730.GA1854@localhost>
 References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
- <1448891145-10766-4-git-send-email-peter.ujfalusi@ti.com>
- <20151130155142.GZ2517@atomide.com> <565D56A0.2090204@ti.com>
- <20151201170031.GT23396@atomide.com>
-Message-ID: <565EC14A.6020502@ti.com>
+ <1448891145-10766-5-git-send-email-peter.ujfalusi@ti.com>
+ <20151201172212.GC1696@localhost> <1589780.JL62pLTh05@wuerfel>
+ <20151202043730.GA1854@localhost>
+Message-ID: <565EC1A6.3090806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/2015 07:00 PM, Tony Lindgren wrote:
->> I see. The dm81xx basically am33xx/am43xx?
+On 12/02/2015 06:37 AM, Vinod Koul wrote:
+> On Tue, Dec 01, 2015 at 09:20:28PM +0100, Arnd Bergmann wrote:
+>> On Tuesday 01 December 2015 22:52:12 Vinod Koul wrote:
+>>> On Mon, Nov 30, 2015 at 03:45:34PM +0200, Peter Ujfalusi wrote:
+>>>> Add support for providing device to filter_fn mapping so client drivers
+>>>> can switch to use the dma_request_chan() API.
+>>>
+>>> Any reason why we dont want to go with DT based only for edma here?
+>>
+>> I think the OMAP2 based platforms using edma are all DT-only, but mach-davinci
+>> would need a lot of work for that.
 > 
-> Yeah similar to am33xx with different clocks and with a bunch of accelerators.
-> 
->> Actually I would prefer to use the dmaengine's event router framework and we
->> do have support for the am33xx/am43xx type of crossbar already implemented.
->> I'm going to resend the DTS series for am33xx/am43xx to convert them to use
->> the new DT bindings along with the dma event router support:
->> https://www.mail-archive.com/linux-omap%40vger.kernel.org/msg120828.html
-> 
-> OK yes a dmaengine event router works too when available. Good to see
-> them as separate driver instances now :) Are only the dts changes missing
-> now?
-> 
-> FYI, when we have separate interconnect driver instances, we don't want to
-> and cannot tweak registers outside the interconnect instance because of them
-> being in separate clock and/or power domains :p
+> Okay sound fine then
 
-What does this mean in practice? We can not touch these registers? The DMA
-crossbar is a separate driver from the eDMA driver.
-
-> In any case, it seems there's no harm using pinctrl for evtmux on dm81xx
-> until the event router is available. It's currently only needed on the
-> t410 emmc that I'm aware of :)
-
-The AM33xx/AM43xx DMA crossbar support is in 4.4 already:
-42dbdcc6bf96 dmaengine: ti-dma-crossbar: Add support for crossbar on AM33xx/AM43xx
+Yes, daVinci is mostly board file based and the problem is that those devices
+are hard to find to do the conversion to DT.
 
 -- 
 P?ter
