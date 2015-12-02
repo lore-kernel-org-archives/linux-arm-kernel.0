@@ -1,60 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Dec 2015 10:23:39 +0000
-Subject: [PATCH v2 1/2] scripts: Add a recorduidiv program
-In-Reply-To: <20151201181643.GZ8644@n2100.arm.linux.org.uk>
-References: <20151125234711.GT8644@n2100.arm.linux.org.uk>
- <565C6714.802@suse.com>
- <20151130153208.GR8644@n2100.arm.linux.org.uk>
- <565C6DE9.2020302@suse.com> <565DC5A9.2010305@suse.cz>
- <20151201161944.GX8644@n2100.arm.linux.org.uk>
- <20151201114929.655433a2@gandalf.local.home>
- <20151201171014.GY8644@n2100.arm.linux.org.uk>
- <20151201122212.474afce5@gandalf.local.home>
- <20151201181643.GZ8644@n2100.arm.linux.org.uk>
-Message-ID: <20151202102339.GB8644@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 2 Dec 2015 10:26:55 +0000
+Subject: arm64 boot requirements
+In-Reply-To: <565E1A8E.8000506@codeaurora.org>
+References: <565BAA2E.5090102@cog.systems> <20151201110159.GA4757@leverpostej>
+ <CAKv+Gu_2ufc_q5OsGDsGUqfEieCHc++-r2zxrpDpHcMbZyS_aQ@mail.gmail.com>
+ <565E1A8E.8000506@codeaurora.org>
+Message-ID: <20151202102655.GA21365@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 06:16:43PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Dec 01, 2015 at 12:22:12PM -0500, Steven Rostedt wrote:
-> > I guess another solution is to do a copy instead of modifying in place
-> > if it detects the multiple hard link?
+On Tue, Dec 01, 2015 at 05:09:18PM -0500, Christopher Covington wrote:
+> On 12/01/2015 06:52 AM, Ard Biesheuvel wrote:
+> > However, I strongly feel that the Image header should remain the
+> > authoritative source of information regarding the nature (big/little
+> > endian, page size) and the static footprint of the Image.
 > 
-> That would be the "transparent" solution.  If you think it's worth
-> persuing, I'll have a go at fixing recordmcount to do that.
+> I find `readelf -a | less` quite handy. Is there anything comparable for
+> the AArch64 Image format?
 
-Well, copying the file is easy - I've tested this and the linker
-appears happy with the result:
+Not that I am aware of. These days I just use od or hexedit, and parse
+the header manually.
 
- scripts/recordmcount.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+It's documented, so it would be possible to write one.
 
-diff --git a/scripts/recordmcount.c b/scripts/recordmcount.c
-index 698768bdc581..91705ef30402 100644
---- a/scripts/recordmcount.c
-+++ b/scripts/recordmcount.c
-@@ -211,6 +211,20 @@ static void *mmap_file(char const *fname)
- 		addr = umalloc(sb.st_size);
- 		uread(fd_map, addr, sb.st_size);
- 	}
-+	if (sb.st_nlink != 1) {
-+		/* file is hard-linked, break the hard link */
-+		close(fd_map);
-+		if (unlink(fname) < 0) {
-+			perror(fname);
-+			fail_file();
-+		}
-+		fd_map = open(fname, O_RDWR | O_CREAT, sb.st_mode);
-+		if (fd_map < 0) {
-+			perror(fname);
-+			fail_file();
-+		}
-+		uwrite(fd_map, addr, sb.st_size);
-+	}
- 	return addr;
- }
- 
+> Please forgive my ignorance, but is the EFI stub another possible source
+> for sort of information?
 
--- 
-FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
-according to speedtest.net.
+Not really. The PE/COFF header for the EFI stub realistically only tells
+you wether or not the kernel has an EFI stub. It shouldn't be used to
+derive information about the kernel itself.
+
+Thanks,
+Mark.
