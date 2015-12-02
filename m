@@ -1,74 +1,72 @@
-From: Yuantian.Tang@freescale.com (Yuantian.Tang at freescale.com)
-Date: Wed, 2 Dec 2015 15:16:31 +0800
-Subject: [PATCH v3] ARM: dts: ls1021a: add sata node to dts
-Message-ID: <1449040591-13618-1-git-send-email-Yuantian.Tang@freescale.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 2 Dec 2015 15:34:27 +0800
+Subject: [PATCH v3] arm64: dts: add all hi6220 i2c nodes
+In-Reply-To: <1449037749-14388-1-git-send-email-kong.kongxinwei@hisilicon.com>
+References: <1449037749-14388-1-git-send-email-kong.kongxinwei@hisilicon.com>
+Message-ID: <20151202073427.GM692@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tang Yuantian <Yuantian.Tang@freescale.com>
+On Wed, Dec 02, 2015 at 02:29:09PM +0800, Xinwei Kong wrote:
+> This patch adds all I2C nodes for the Hi6220 SoC. This hi6220 Soc
+> use this I2C IP of Synopsys Designware for HiKey board.
+> 
+> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+> ---
+>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 31 +++++++++++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> index 82d2488..6eae673 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> @@ -208,5 +208,36 @@
+>  			clock-names = "uartclk", "apb_pclk";
+>  			status = "disabled";
+>  		};
+> +
+> +		i2c0: i2c at f7100000 {
+> +			compatible = "snps,designware-i2c";
+> +			reg = <0x0 0xf7100000 0x0 0x1000>;
+> +			interrupts = <0 44 4>;
+> +			i2c-sda-hold-time-ns = <300>;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&i2c0_pmx_func &i2c0_cfg_func>;
+> +			status = "disabled";
 
-Added sata node to ls1021aqds and ls1021atwr board to support
-sata function.
+You got me wrong.  I was asking you to drop property 'clock-names' only,
+not 'clocks' together.  I do not think it works if you drop property
+'clocks', because I see that dw_i2c_plat_probe() will fail if
+devm_clk_get() fails.  Did you test the patch before posting it out?
 
-Signed-off-by: Tang Yuantian <Yuantian.Tang@freescale.com>
----
-v3:
-	- refine the title and commit message
-	- added a status property so that sata can be controlled
-	by board specific dts.
-v2:
-	- put reg-names right after reg property
+Shawn
 
- arch/arm/boot/dts/ls1021a-qds.dts |  4 ++++
- arch/arm/boot/dts/ls1021a-twr.dts |  4 ++++
- arch/arm/boot/dts/ls1021a.dtsi    | 11 +++++++++++
- 3 files changed, 19 insertions(+)
-
-diff --git a/arch/arm/boot/dts/ls1021a-qds.dts b/arch/arm/boot/dts/ls1021a-qds.dts
-index 0521e68..803cc54 100644
---- a/arch/arm/boot/dts/ls1021a-qds.dts
-+++ b/arch/arm/boot/dts/ls1021a-qds.dts
-@@ -327,3 +327,7 @@
- &uart1 {
- 	status = "okay";
- };
-+
-+&sata {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
-index fbb89d1..62dec7c 100644
---- a/arch/arm/boot/dts/ls1021a-twr.dts
-+++ b/arch/arm/boot/dts/ls1021a-twr.dts
-@@ -219,3 +219,7 @@
- &uart1 {
- 	status = "okay";
- };
-+
-+&sata {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 9430a99..da9bd7e 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -143,6 +143,17 @@
- 			status = "disabled";
- 		};
- 
-+		sata: sata at 3200000 {
-+			compatible = "fsl,ls1021a-ahci";
-+			reg = <0x0 0x3200000 0x0 0x10000>,
-+			      <0x0 0x20220520 0x0 0x4>;
-+			reg-names = "ahci", "sata-ecc";
-+			interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&platform_clk 1>;
-+			dma-coherent;
-+			status = "disabled";
-+		};
-+
- 		scfg: scfg at 1570000 {
- 			compatible = "fsl,ls1021a-scfg", "syscon";
- 			reg = <0x0 0x1570000 0x0 0x10000>;
--- 
-2.1.0.27.g96db324
+> +		};
+> +
+> +		i2c1: i2c at f7101000 {
+> +			compatible = "snps,designware-i2c";
+> +			reg = <0x0 0xf7101000 0x0 0x1000>;
+> +			interrupts = <0 45 4>;
+> +			i2c-sda-hold-time-ns = <300>;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&i2c1_pmx_func &i2c1_cfg_func>;
+> +			status = "disabled";
+> +		};
+> +
+> +		i2c2: i2c at f7102000 {
+> +			compatible = "snps,designware-i2c";
+> +			reg = <0x0 0xf7102000 0x0 0x1000>;
+> +			interrupts = <0 46 4>;
+> +			i2c-sda-hold-time-ns = <300>;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&i2c2_pmx_func &i2c2_cfg_func>;
+> +			status = "disabled";
+> +		};
+> +
+>  	};
+>  };
+> -- 
+> 1.9.1
+> 
+> 
+> 
