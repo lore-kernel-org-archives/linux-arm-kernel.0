@@ -1,63 +1,21 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 02 Dec 2015 23:56:53 +0100
-Subject: [PATCH 00/13] mvneta Buffer Management and enhancements
-In-Reply-To: <CAPv3WKdHu5O2KEHYpWBHbkA2hHd_QCUK12EBggMDsa8J8D5U2Q@mail.gmail.com>
- (Marcin Wojtas's message of "Wed, 2 Dec 2015 23:15:23 +0100")
-References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
- <87lh9f4dbt.fsf@free-electrons.com>
- <CAPv3WKc+HbirDxKy5n6W5O5BUTDEc3X5et5dTKdp81WOXjphGg@mail.gmail.com>
- <874mg248jf.fsf@free-electrons.com>
- <CAPv3WKc8VrgH+aAfHBMwvuOxP17SnXCajtzpxmXf4rt+WFcE-w@mail.gmail.com>
- <CAPv3WKdAhk71HW8nvMWXUApySE5_WNgx4PDrj4+R4Tv6FVGNqA@mail.gmail.com>
- <87si3l2kx5.fsf@free-electrons.com>
- <87two0254c.fsf@free-electrons.com>
- <CAPv3WKdHu5O2KEHYpWBHbkA2hHd_QCUK12EBggMDsa8J8D5U2Q@mail.gmail.com>
-Message-ID: <87h9k01mtm.fsf@free-electrons.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Wed, 02 Dec 2015 14:57:30 -0800
+Subject: [PATCH v12 05/16] arm64: Add back cpu_reset routines
+In-Reply-To: <20151130104027.7eeaa273@why.wild-wind.fr.eu.org>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <3279584774ba40f088b79f4df864d69a5b57b516.1448403503.git.geoff@infradead.org>
+ <56586679.8060403@arm.com> <20151130052843.GG23908@dhcppc13.redhat.com>
+ <20151130104027.7eeaa273@why.wild-wind.fr.eu.org>
+Message-ID: <1449097050.6139.80.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
- 
- On mer., d?c. 02 2015, Marcin Wojtas <mw@semihalf.com> wrote:
->>>
->>>> 2. Change condition in mvebu_mbus_get_dram_win_info to:
->>>> if (cs->base <= phyaddr && phyaddr <= (cs->base + cs->size -1))
->>>
->>> I think it would be the best solution.
->>
->> So I applied the following patch:
->> --- a/drivers/bus/mvebu-mbus.c
->> +++ b/drivers/bus/mvebu-mbus.c
->> @@ -964,7 +964,7 @@ int mvebu_mbus_get_dram_win_info(phys_addr_t phyaddr, u8 *target, u8 *attr)
->>         for (i = 0; i < dram->num_cs; i++) {
->>                 const struct mbus_dram_window *cs = dram->cs + i;
->>
->> -               if (cs->base <= phyaddr && phyaddr <= (cs->base + cs->size)) {
->> +               if (cs->base <= phyaddr && phyaddr <= (cs->base + cs->size - 1)) {
->>                         *target = dram->mbus_dram_target_id;
->>                         *attr = cs->mbus_attr;
->>                         return 0;
->>
->> I didn't get any errors during boot related to the BM. However I did not
->> manage to use an ethernet interface. The udhcpc never managed to get an
->> IP and if I set the IP manually I could not ping.
->>
->> But on Armada 388 GP I didn't have any issue.
->>
->> Do you have some idea about waht I could check?
->>
->
-> I replaced 2GB with 8GB DIMM and after that, on the same kernel/board,
-> I can't ping either. Very strange, but as I can reproduce the issue,
-> don't debug it, I will.
+On Mon, 2015-11-30 at 10:40 +0000, Marc Zyngier wrote:
 
-Thanks to care about it!
+> All that can be solved in C, and mostly at compile time. Using an
+> assembler trampoline is complicating things for no good reason:
 
+I added this into my kexec-v12.1 branch.  After some more testing I'll
+post a v13 to the list.
 
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+-Geoff
