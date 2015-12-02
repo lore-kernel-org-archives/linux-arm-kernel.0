@@ -1,137 +1,113 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  2 Dec 2015 22:27:03 +0100
-Subject: [PATCH 1/7] ARM: orion: move watchdog setup to mach-orion5x
-In-Reply-To: <1449091629-2155735-1-git-send-email-arnd@arndb.de>
-References: <1449091629-2155735-1-git-send-email-arnd@arndb.de>
-Message-ID: <1449091629-2155735-2-git-send-email-arnd@arndb.de>
+Date: Wed,  2 Dec 2015 22:27:02 +0100
+Subject: [PATCH v2 0/7] ARM: orion5x/mv78xx0 multiplatform
+Message-ID: <1449091629-2155735-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The watchdog device node is created in plat-orion/common.c
-but depends on the bridge address that is platform specific,
-so as a preparation for orion multiplatform support, we
-move it out of the common code into orion5x and dove.
+I've updated the series slightly to leave out the last two patches for
+mach-dove. I think the MULTI_IRQ_HANDLER and SPARSE_IRQ use is useful
+to have for all three platforms for consistency, and the watchdog change
+is required to get orion5x to work right.
 
-At the moment, dove does not use the watchdog, so I'm marking
-the function as __maybe_unused for the moment. The compiler
-will be able to compile out the device definition this way,
-and we can easily add it later.
+Please have another look.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/mach-dove/common.c               | 17 +++++++++++++++++
- arch/arm/mach-orion5x/common.c            | 14 +++++++++++++-
- arch/arm/plat-orion/common.c              | 21 ---------------------
- arch/arm/plat-orion/include/plat/common.h |  2 --
- 4 files changed, 30 insertions(+), 24 deletions(-)
+I've also uploaded this series to
 
-diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-index 0d1a89298ece..25a682fd444f 100644
---- a/arch/arm/mach-dove/common.c
-+++ b/arch/arm/mach-dove/common.c
-@@ -375,6 +375,23 @@ void __init dove_setup_cpu_wins(void)
- 				    DOVE_SCRATCHPAD_SIZE);
- }
- 
-+static struct resource orion_wdt_resource[] = {
-+		DEFINE_RES_MEM(TIMER_PHYS_BASE, 0x04),
-+		DEFINE_RES_MEM(RSTOUTn_MASK_PHYS, 0x04),
-+};
-+
-+static struct platform_device orion_wdt_device = {
-+	.name		= "orion_wdt",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(orion_wdt_resource),
-+	.resource	= orion_wdt_resource,
-+};
-+
-+static void __init __maybe_unused orion_wdt_init(void)
-+{
-+	platform_device_register(&orion_wdt_device);
-+}
-+
- void __init dove_init(void)
- {
- 	pr_info("Dove 88AP510 SoC, TCLK = %d MHz.\n",
-diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
-index 6bbb7b55c6d1..2b7889e3b7bc 100644
---- a/arch/arm/mach-orion5x/common.c
-+++ b/arch/arm/mach-orion5x/common.c
-@@ -184,9 +184,21 @@ static void __init orion5x_crypto_init(void)
- /*****************************************************************************
-  * Watchdog
-  ****************************************************************************/
-+static struct resource orion_wdt_resource[] = {
-+		DEFINE_RES_MEM(TIMER_PHYS_BASE, 0x04),
-+		DEFINE_RES_MEM(RSTOUTn_MASK_PHYS, 0x04),
-+};
-+
-+static struct platform_device orion_wdt_device = {
-+	.name		= "orion_wdt",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(orion_wdt_resource),
-+	.resource	= orion_wdt_resource,
-+};
-+
- static void __init orion5x_wdt_init(void)
- {
--	orion_wdt_init();
-+	platform_device_register(&orion_wdt_device);
- }
- 
- 
-diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-index 8861c367d061..78c8bf4043c0 100644
---- a/arch/arm/plat-orion/common.c
-+++ b/arch/arm/plat-orion/common.c
-@@ -21,7 +21,6 @@
- #include <net/dsa.h>
- #include <linux/platform_data/dma-mv_xor.h>
- #include <linux/platform_data/usb-ehci-orion.h>
--#include <mach/bridge-regs.h>
- #include <plat/common.h>
- 
- /* Create a clkdev entry for a given device/clk */
-@@ -589,26 +588,6 @@ void __init orion_spi_1_init(unsigned long mapbase)
- }
- 
- /*****************************************************************************
-- * Watchdog
-- ****************************************************************************/
--static struct resource orion_wdt_resource[] = {
--		DEFINE_RES_MEM(TIMER_PHYS_BASE, 0x04),
--		DEFINE_RES_MEM(RSTOUTn_MASK_PHYS, 0x04),
--};
--
--static struct platform_device orion_wdt_device = {
--	.name		= "orion_wdt",
--	.id		= -1,
--	.num_resources	= ARRAY_SIZE(orion_wdt_resource),
--	.resource	= orion_wdt_resource,
--};
--
--void __init orion_wdt_init(void)
--{
--	platform_device_register(&orion_wdt_device);
--}
--
--/*****************************************************************************
-  * XOR
-  ****************************************************************************/
- static u64 orion_xor_dmamask = DMA_BIT_MASK(32);
-diff --git a/arch/arm/plat-orion/include/plat/common.h b/arch/arm/plat-orion/include/plat/common.h
-index d9a24f605a2b..9e6d76ad48a9 100644
---- a/arch/arm/plat-orion/include/plat/common.h
-+++ b/arch/arm/plat-orion/include/plat/common.h
-@@ -75,8 +75,6 @@ void __init orion_spi_init(unsigned long mapbase);
- 
- void __init orion_spi_1_init(unsigned long mapbase);
- 
--void __init orion_wdt_init(void);
--
- void __init orion_xor0_init(unsigned long mapbase_low,
- 			    unsigned long mapbase_high,
- 			    unsigned long irq_0,
+git://git.kernel.org/pub/scm/linux/kernel/git/arnd/playground.git multiplatform-orion-4.3
+
+again, that version is based on v4.3, while the patches in these mails
+are based on v4.4-rc3.
+
+I've left Andrew's Ack in place, hope that's ok.
+
+Arnd Bergmann (7):
+  ARM: orion: move watchdog setup to mach-orion5x
+  ARM: orion: always use MULTI_IRQ_HANDLER
+  ARM: orion: use SPARSE_IRQ everywhere
+  ARM: mv78xx0: clean up mach/*.h headers
+  ARM: mv78xx0: multiplatform support
+  ARM: orion5x: clean up mach/*.h headers
+  ARM: orion5x: multiplatform support
+
+ arch/arm/Kconfig                                   | 29 +------------
+ arch/arm/configs/mv78xx0_defconfig                 |  3 ++
+ arch/arm/configs/orion5x_defconfig                 |  3 ++
+ arch/arm/mach-dove/cm-a510.c                       |  1 +
+ arch/arm/mach-dove/common.c                        | 17 ++++++++
+ arch/arm/mach-dove/dove-db-setup.c                 |  1 +
+ arch/arm/mach-dove/include/mach/dove.h             |  2 +
+ arch/arm/mach-dove/include/mach/entry-macro.S      | 33 ---------------
+ arch/arm/mach-dove/include/mach/irqs.h             |  2 +-
+ arch/arm/mach-dove/include/mach/pm.h               |  2 +-
+ arch/arm/mach-dove/irq.c                           | 14 +------
+ arch/arm/mach-mv78xx0/Kconfig                      | 15 +++++--
+ arch/arm/mach-mv78xx0/Makefile                     |  2 +
+ .../mach-mv78xx0/{include/mach => }/bridge-regs.h  |  4 +-
+ arch/arm/mach-mv78xx0/buffalo-wxl-setup.c          |  3 +-
+ arch/arm/mach-mv78xx0/common.c                     |  4 +-
+ arch/arm/mach-mv78xx0/db78x00-bp-setup.c           |  3 +-
+ arch/arm/mach-mv78xx0/include/mach/entry-macro.S   | 41 ------------------
+ arch/arm/mach-mv78xx0/include/mach/hardware.h      | 14 -------
+ arch/arm/mach-mv78xx0/include/mach/uncompress.h    | 46 ---------------------
+ arch/arm/mach-mv78xx0/irq.c                        | 35 +++++++++++++++-
+ arch/arm/mach-mv78xx0/{include/mach => }/irqs.h    |  4 +-
+ arch/arm/mach-mv78xx0/mpp.c                        |  2 +-
+ arch/arm/mach-mv78xx0/{include/mach => }/mv78xx0.h |  4 +-
+ arch/arm/mach-mv78xx0/pcie.c                       |  2 +-
+ arch/arm/mach-mv78xx0/rd78x00-masa-setup.c         |  3 +-
+ arch/arm/mach-orion5x/Kconfig                      | 18 ++++++--
+ arch/arm/mach-orion5x/Makefile                     |  2 +
+ arch/arm/mach-orion5x/board-d2net.c                |  2 +-
+ arch/arm/mach-orion5x/board-dt.c                   |  4 +-
+ arch/arm/mach-orion5x/board-mss2.c                 |  4 +-
+ arch/arm/mach-orion5x/board-rd88f5182.c            |  2 +-
+ .../mach-orion5x/{include/mach => }/bridge-regs.h  |  4 +-
+ arch/arm/mach-orion5x/common.c                     | 20 +++++++--
+ arch/arm/mach-orion5x/db88f5281-setup.c            |  3 +-
+ arch/arm/mach-orion5x/dns323-setup.c               |  3 +-
+ arch/arm/mach-orion5x/include/mach/entry-macro.S   | 25 -----------
+ arch/arm/mach-orion5x/include/mach/hardware.h      | 14 -------
+ arch/arm/mach-orion5x/include/mach/uncompress.h    | 48 ----------------------
+ arch/arm/mach-orion5x/irq.c                        | 13 +-----
+ arch/arm/mach-orion5x/{include/mach => }/irqs.h    |  4 +-
+ arch/arm/mach-orion5x/kurobox_pro-setup.c          |  4 +-
+ arch/arm/mach-orion5x/ls-chl-setup.c               |  3 +-
+ arch/arm/mach-orion5x/ls_hgl-setup.c               |  3 +-
+ arch/arm/mach-orion5x/mpp.c                        |  2 +-
+ arch/arm/mach-orion5x/mv2120-setup.c               |  3 +-
+ arch/arm/mach-orion5x/net2big-setup.c              |  3 +-
+ arch/arm/mach-orion5x/{include/mach => }/orion5x.h |  4 +-
+ arch/arm/mach-orion5x/pci.c                        |  2 +-
+ arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c       |  3 +-
+ arch/arm/mach-orion5x/rd88f5181l-ge-setup.c        |  3 +-
+ arch/arm/mach-orion5x/rd88f5182-setup.c            |  3 +-
+ arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c       |  3 +-
+ arch/arm/mach-orion5x/terastation_pro2-setup.c     |  3 +-
+ arch/arm/mach-orion5x/ts209-setup.c                |  3 +-
+ arch/arm/mach-orion5x/ts409-setup.c                |  3 +-
+ arch/arm/mach-orion5x/ts78xx-setup.c               |  3 +-
+ arch/arm/mach-orion5x/tsx09-common.c               |  2 +-
+ arch/arm/mach-orion5x/wnr854t-setup.c              |  3 +-
+ arch/arm/mach-orion5x/wrt350n-v2-setup.c           |  3 +-
+ arch/arm/plat-orion/common.c                       | 21 ----------
+ arch/arm/plat-orion/include/plat/common.h          |  2 -
+ arch/arm/plat-orion/irq.c                          |  1 -
+ arch/arm/plat-orion/mpp.c                          |  1 -
+ 64 files changed, 175 insertions(+), 361 deletions(-)
+ delete mode 100644 arch/arm/mach-dove/include/mach/entry-macro.S
+ rename arch/arm/mach-mv78xx0/{include/mach => }/bridge-regs.h (92%)
+ delete mode 100644 arch/arm/mach-mv78xx0/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-mv78xx0/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-mv78xx0/include/mach/uncompress.h
+ rename arch/arm/mach-mv78xx0/{include/mach => }/irqs.h (95%)
+ rename arch/arm/mach-mv78xx0/{include/mach => }/mv78xx0.h (98%)
+ rename arch/arm/mach-orion5x/{include/mach => }/bridge-regs.h (92%)
+ delete mode 100644 arch/arm/mach-orion5x/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-orion5x/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-orion5x/include/mach/uncompress.h
+ rename arch/arm/mach-orion5x/{include/mach => }/irqs.h (94%)
+ rename arch/arm/mach-orion5x/{include/mach => }/orion5x.h (99%)
+
 -- 
 2.1.0.rc2
