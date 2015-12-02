@@ -1,145 +1,63 @@
-From: sunil.kovvuri@gmail.com (Sunil Goutham)
-Date: Wed,  2 Dec 2015 15:36:17 +0530
-Subject: [PATCH v2 5/5] net: thunderx: Enable BGX LMAC's RX/TX only after VF
- is up
-In-Reply-To: <1449050777-37836-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1449050777-37836-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1449050777-37836-6-git-send-email-sunil.kovvuri@gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 2 Dec 2015 10:05:24 +0000
+Subject: [PATCH 11/19] ARM: dts: imx: replace legacy *,wakeup property
+ with wakeup-source
+In-Reply-To: <20151202015400.GB692@tiger>
+References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
+ <1445422216-29375-12-git-send-email-sudeep.holla@arm.com>
+ <20151123053705.GH13744@tiger> <5656EE1E.2030104@arm.com>
+ <20151202015400.GB692@tiger>
+Message-ID: <565EC264.80902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
 
-Enable or disable BGX LMAC's RX/TX based on corresponding VF's
-status. If otherwise, when multiple LMAC's physical link is up
-then packets from all LMAC's whose corresponding VF is not yet
-initialized will get forwarded to VF0. This is due to VNIC's default
-configuration where CPI, RSSI e.t.c point to VF0/QSET0/RQ0.
 
-This patch will prevent multiple copies of packets on VF0.
+On 02/12/15 01:54, Shawn Guo wrote:
+> On Thu, Nov 26, 2015 at 11:33:50AM +0000, Sudeep Holla wrote:
+>>
+>>
+>> On 23/11/15 05:37, Shawn Guo wrote:
+>>> On Wed, Oct 21, 2015 at 11:10:08AM +0100, Sudeep Holla wrote:
+>>>> Though the keyboard and other driver will continue to support the legacy
+>>>> "gpio-key,wakeup", "linux,wakeup" boolean property to enable the wakeup
+>>>> source, "wakeup-source" is the new standard binding.
+>>>>
+>>>> This patch replaces all the legacy wakeup properties with the unified
+>>>> "wakeup-source" property in order to avoid any futher copy-paste
+>>>> duplication.
+>>>>
+>>>> Cc: Shawn Guo <shawnguo@kernel.org>
+>>>> Cc: Sascha Hauer <kernel@pengutronix.de>
+>>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>>
+>>> <snip>
+>>>
+>>>> diff --git a/arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi b/arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi
+>>>> index 321662f53e33..16fc69c69ab2 100644
+>>>> --- a/arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi
+>>>> +++ b/arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi
+>>>> @@ -156,7 +156,7 @@
+>>>>   	pinctrl-names = "default";
+>>>>   	pinctrl-0 = <&pinctrl_esdhc2>;
+>>>>   	cap-sdio-irq;
+>>>> -	enable-sdio-wakeup;
+>>>> +	wakeup-source;
+>>>
+>>> I do not see this be mentioned in commit log.  I do not see relevant
+>>> kernel changes in v4.4-rc1 to support that.  Am I missing anything?
+>>>
+>>
+>> Sorry for that, you weren't copied on that patch[1], Ulf has queued it
+>> now [2]
+>
+> My branch is based on v4.4-rc1 which doesn't have that patch.  That
+> said, I can not apply it for now.
+>
 
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/nic_main.c    |   20 +++++++++++++++++++-
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c |   20 ++++++++++++++++++--
- drivers/net/ethernet/cavium/thunder/thunder_bgx.h |    1 +
- 3 files changed, 38 insertions(+), 3 deletions(-)
+Ah OK, that's fine pick it up when appropriate. I just wanted to let you
+know that dependent patch is already queued.
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
-index cfc24a1..4b7fd63 100644
---- a/drivers/net/ethernet/cavium/thunder/nic_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
-@@ -37,6 +37,7 @@ struct nicpf {
- #define	NIC_GET_BGX_FROM_VF_LMAC_MAP(map)	((map >> 4) & 0xF)
- #define	NIC_GET_LMAC_FROM_VF_LMAC_MAP(map)	(map & 0xF)
- 	u8			vf_lmac_map[MAX_LMAC];
-+	u8			lmac_cnt;
- 	struct delayed_work     dwork;
- 	struct workqueue_struct *check_link;
- 	u8			link[MAX_LMAC];
-@@ -279,6 +280,7 @@ static void nic_set_lmac_vf_mapping(struct nicpf *nic)
- 	u64 lmac_credit;
- 
- 	nic->num_vf_en = 0;
-+	nic->lmac_cnt = 0;
- 
- 	for (bgx = 0; bgx < NIC_MAX_BGX; bgx++) {
- 		if (!(bgx_map & (1 << bgx)))
-@@ -288,6 +290,7 @@ static void nic_set_lmac_vf_mapping(struct nicpf *nic)
- 			nic->vf_lmac_map[next_bgx_lmac++] =
- 						NIC_SET_VF_LMAC_MAP(bgx, lmac);
- 		nic->num_vf_en += lmac_cnt;
-+		nic->lmac_cnt += lmac_cnt;
- 
- 		/* Program LMAC credits */
- 		lmac_credit = (1ull << 1); /* channel credit enable */
-@@ -715,6 +718,13 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
- 	case NIC_MBOX_MSG_CFG_DONE:
- 		/* Last message of VF config msg sequence */
- 		nic->vf_enabled[vf] = true;
-+		if (vf >= nic->lmac_cnt)
-+			goto unlock;
-+
-+		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
-+		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
-+
-+		bgx_lmac_rx_tx_enable(nic->node, bgx, lmac, true);
- 		goto unlock;
- 	case NIC_MBOX_MSG_SHUTDOWN:
- 		/* First msg in VF teardown sequence */
-@@ -722,6 +732,14 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
- 		if (vf >= nic->num_vf_en)
- 			nic->sqs_used[vf - nic->num_vf_en] = false;
- 		nic->pqs_vf[vf] = 0;
-+
-+		if (vf >= nic->lmac_cnt)
-+			break;
-+
-+		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
-+		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
-+
-+		bgx_lmac_rx_tx_enable(nic->node, bgx, lmac, false);
- 		break;
- 	case NIC_MBOX_MSG_ALLOC_SQS:
- 		nic_alloc_sqs(nic, &mbx.sqs_alloc);
-@@ -940,7 +958,7 @@ static void nic_poll_for_link(struct work_struct *work)
- 
- 	mbx.link_status.msg = NIC_MBOX_MSG_BGX_LINK_CHANGE;
- 
--	for (vf = 0; vf < nic->num_vf_en; vf++) {
-+	for (vf = 0; vf < nic->lmac_cnt; vf++) {
- 		/* Poll only if VF is UP */
- 		if (!nic->vf_enabled[vf])
- 			continue;
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-index d77e41a..9df26c2 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-@@ -186,6 +186,23 @@ void bgx_set_lmac_mac(int node, int bgx_idx, int lmacid, const u8 *mac)
- }
- EXPORT_SYMBOL(bgx_set_lmac_mac);
- 
-+void bgx_lmac_rx_tx_enable(int node, int bgx_idx, int lmacid, bool enable)
-+{
-+	struct bgx *bgx = bgx_vnic[(node * MAX_BGX_PER_CN88XX) + bgx_idx];
-+	u64 cfg;
-+
-+	if (!bgx)
-+		return;
-+
-+	cfg = bgx_reg_read(bgx, lmacid, BGX_CMRX_CFG);
-+	if (enable)
-+		cfg |= CMR_PKT_RX_EN | CMR_PKT_TX_EN;
-+	else
-+		cfg &= ~(CMR_PKT_RX_EN | CMR_PKT_TX_EN);
-+	bgx_reg_write(bgx, lmacid, BGX_CMRX_CFG, cfg);
-+}
-+EXPORT_SYMBOL(bgx_lmac_rx_tx_enable);
-+
- static void bgx_sgmii_change_link_state(struct lmac *lmac)
- {
- 	struct bgx *bgx = lmac->bgx;
-@@ -656,8 +673,7 @@ static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
- 	}
- 
- 	/* Enable lmac */
--	bgx_reg_modify(bgx, lmacid, BGX_CMRX_CFG,
--		       CMR_EN | CMR_PKT_RX_EN | CMR_PKT_TX_EN);
-+	bgx_reg_modify(bgx, lmacid, BGX_CMRX_CFG, CMR_EN);
- 
- 	/* Restore default cfg, incase low level firmware changed it */
- 	bgx_reg_write(bgx, lmacid, BGX_CMRX_RX_DMAC_CTL, 0x03);
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-index 89a02fa..149e179 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-@@ -183,6 +183,7 @@ enum MCAST_MODE {
- #define CAM_ACCEPT	1
- 
- void octeon_mdiobus_force_mod_depencency(void);
-+void bgx_lmac_rx_tx_enable(int node, int bgx_idx, int lmacid, bool enable);
- void bgx_add_dmac_addr(u64 dmac, int node, int bgx_idx, int lmac);
- unsigned bgx_get_map(int node);
- int bgx_get_lmac_count(int node, int bgx);
 -- 
-1.7.1
+Regards,
+Sudeep
