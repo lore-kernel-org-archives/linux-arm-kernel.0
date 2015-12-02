@@ -1,83 +1,89 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 2 Dec 2015 11:18:29 +0000
-Subject: linux-next: manual merge of the mvebu tree with the arm-soc tree
-In-Reply-To: <20151202111244.b7ee49ee06b4a95e407e740d@kernel.org>
-References: <20151202111244.b7ee49ee06b4a95e407e740d@kernel.org>
-Message-ID: <20151202111829.GE1929@sirena.org.uk>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Wed, 2 Dec 2015 16:49:21 +0530
+Subject: [PATCH v7 0/4] arm64, numa: Add numa support for arm64 platforms
+In-Reply-To: <1447780843-9223-1-git-send-email-gkulkarni@caviumnetworks.com>
+References: <1447780843-9223-1-git-send-email-gkulkarni@caviumnetworks.com>
+Message-ID: <CAFpQJXViarEkROA2RypxtDzPkSATUnVmizAqN03WQ-_twrFa2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 02, 2015 at 11:12:44AM +0000, Mark Brown wrote:
-> Hi all,
-> 
-> Today's linux-next merge of the mvebu tree got a conflict in  between commit
-> 377524dc4d77f50e ("ARM: mmp: move into ARCH_MULTIPLATFORM") from the arm-soc
-> tree and commit 5f4423af9dd17 ("ARM: orion: multiplatform support") from the
-> mvebu tree.
+Hi All, Mark R,
 
-Ccing in Arnd since I forgot to do that.
+please review!!
 
-> 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 5a328472bd8c..882f5f33bc7d 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -490,46 +490,6 @@ config ARCH_IXP4XX
->  	help
->  	  Support for Intel's IXP4XX (XScale) family of processors.
->  
-> -config ARCH_DOVE
-> -	bool "Marvell Dove"
-> -	select ARCH_REQUIRE_GPIOLIB
-> -	select CPU_PJ4
-> -	select GENERIC_CLOCKEVENTS
-> -	select MIGHT_HAVE_PCI
-> -	select MVEBU_MBUS
-> -	select PINCTRL
-> -	select PINCTRL_DOVE
-> -	select PLAT_ORION_LEGACY
-> -	help
-> -	  Support for the Marvell Dove SoC 88AP510
-> -
-> -config ARCH_MV78XX0
-> -	bool "Marvell MV78xx0"
-> -	select ARCH_REQUIRE_GPIOLIB
-> -	select CPU_FEROCEON
-> -	select GENERIC_CLOCKEVENTS
-> -	select MVEBU_MBUS
-> -	select PCI
-> -	select PLAT_ORION_LEGACY
-> -	help
-> -	  Support for the following Marvell MV78xx0 series SoCs:
-> -	  MV781x0, MV782x0.
-> -
-> -config ARCH_ORION5X
-> -	bool "Marvell Orion"
-> -	depends on MMU
-> -	select ARCH_REQUIRE_GPIOLIB
-> -	select CPU_FEROCEON
-> -	select GENERIC_CLOCKEVENTS
-> -	select MVEBU_MBUS
-> -	select PCI
-> -	select PLAT_ORION_LEGACY
-> -	select MULTI_IRQ_HANDLER
-> -	help
-> -	  Support for the following Marvell Orion 5x series SoCs:
-> -	  Orion-1 (5181), Orion-VoIP (5181L), Orion-NAS (5182),
-> -	  Orion-2 (5281), Orion-1-90 (6183).
-> -
->  config ARCH_KS8695
->  	bool "Micrel/Kendin KS8695"
->  	select ARCH_REQUIRE_GPIOLIB
+thanks,
+Ganapat
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151202/a6c11cfc/attachment.sig>
+On Tue, Nov 17, 2015 at 10:50 PM, Ganapatrao Kulkarni
+<gkulkarni@caviumnetworks.com> wrote:
+> v7:
+>         - managing numa memory mapping using memblock.
+>         - Incorporated review comments of Mark Rutland.
+>
+> v6:
+>         - defined and implemented the numa dt binding using
+>         node property proximity and device node distance-map.
+>         - renamed dt_numa to of_numa
+>
+> v5:
+>         - created base verion of numa.c which creates dummy numa without using dt
+>           on single socket platforms. Then added patches for dt support.
+>         - Incorporated review comments from Hanjun Guo.
+>
+> v4:
+> done changes as per Arnd review comments.
+>
+> v3:
+> Added changes to support numa on arm64 based platforms.
+> Tested these patches on cavium's multinode(2 node topology) platform.
+> In this patchset, defined and implemented dt bindings for numa mapping
+> for core and memory using device node property arm,associativity.
+>
+> v2:
+> Defined and implemented numa map for memory, cores to node and
+> proximity distance matrix of nodes.
+>
+> v1:
+> Initial patchset to support numa on arm64 platforms.
+>
+> Note:
+>         1. This patchset is tested for numa with dt on
+>            thunderx single socket and dual socket boards.
+>         2. Numa DT booting needs the dt memory nodes, which are deleted in current efi-stub,
+>         hence to try numa with dt, you need to rebase with ard's patchset.
+>         http://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm64-uefi-early-fdt-handling
+>
+> Ganapatrao Kulkarni (4):
+>   arm64, numa: adding numa support for arm64 platforms.
+>   Documentation, dt, arm64/arm: dt bindings for numa.
+>   arm64/arm, numa, dt: adding numa dt binding implementation for arm64
+>     platforms.
+>   arm64, dt, thunderx: Add initial dts for Cavium Thunderx in 2 node
+>     topology.
+>
+>  Documentation/devicetree/bindings/arm/numa.txt  | 272 ++++++++
+>  arch/arm64/Kconfig                              |  35 +
+>  arch/arm64/boot/dts/cavium/Makefile             |   2 +-
+>  arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts  |  83 +++
+>  arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi | 806 ++++++++++++++++++++++++
+>  arch/arm64/include/asm/mmzone.h                 |  17 +
+>  arch/arm64/include/asm/numa.h                   |  56 ++
+>  arch/arm64/kernel/Makefile                      |   1 +
+>  arch/arm64/kernel/of_numa.c                     | 265 ++++++++
+>  arch/arm64/kernel/setup.c                       |   4 +
+>  arch/arm64/kernel/smp.c                         |   4 +
+>  arch/arm64/mm/Makefile                          |   1 +
+>  arch/arm64/mm/init.c                            |  30 +-
+>  arch/arm64/mm/numa.c                            | 392 ++++++++++++
+>  14 files changed, 1963 insertions(+), 5 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
+>  create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts
+>  create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi
+>  create mode 100644 arch/arm64/include/asm/mmzone.h
+>  create mode 100644 arch/arm64/include/asm/numa.h
+>  create mode 100644 arch/arm64/kernel/of_numa.c
+>  create mode 100644 arch/arm64/mm/numa.c
+>
+> --
+> 1.8.1.4
+>
