@@ -1,165 +1,120 @@
-From: martyn.welch@collabora.co.uk (Martyn Welch)
-Date: Wed, 02 Dec 2015 09:36:05 +0000
-Subject: [PATCH 3/3] Addition of binding for firmware signals on peach-pi
-In-Reply-To: <565E327E.90404@samsung.com>
-References: <1448997171-7064-1-git-send-email-martyn.welch@collabora.co.uk>
- <1448997171-7064-4-git-send-email-martyn.welch@collabora.co.uk>
- <565E327E.90404@samsung.com>
-Message-ID: <565EBB85.2030607@collabora.co.uk>
+From: boqun.feng@gmail.com (Boqun Feng)
+Date: Wed, 2 Dec 2015 17:40:02 +0800
+Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
+ concurrent lockers
+In-Reply-To: <20151201163232.GD27751@arm.com>
+References: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
+ <20151201004017.GA1135@fixme-laptop.cn.ibm.com>
+ <20151201163232.GD27751@arm.com>
+Message-ID: <20151202094002.GA14969@fixme-laptop.cn.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Dec 01, 2015 at 04:32:33PM +0000, Will Deacon wrote:
+> On Tue, Dec 01, 2015 at 08:40:17AM +0800, Boqun Feng wrote:
+> > Hi Will,
+> 
+> Hi Boqun,
+> 
+> > On Fri, Nov 27, 2015 at 11:44:06AM +0000, Will Deacon wrote:
+> > > Boqun Feng reported a rather nasty ordering issue with spin_unlock_wait
+> > > on architectures implementing spin_lock with LL/SC sequences and acquire
+> > > semantics:
+> > > 
+> > >  | CPU 1                   CPU 2                     CPU 3
+> > >  | ==================      ====================      ==============
+> > >  |                                                   spin_unlock(&lock);
+> > >  |                         spin_lock(&lock):
+> > >  |                           r1 = *lock; // r1 == 0;
+> > >  |                         o = READ_ONCE(object); // reordered here
+> > >  | object = NULL;
+> > >  | smp_mb();
+> > >  | spin_unlock_wait(&lock);
+> > >  |                           *lock = 1;
+> > >  | smp_mb();
+> > >  | o->dead = true;
+> > >  |                         if (o) // true
+> > >  |                           BUG_ON(o->dead); // true!!
+> > > 
+> > > The crux of the problem is that spin_unlock_wait(&lock) can return on
+> > > CPU 1 whilst CPU 2 is in the process of taking the lock. This can be
+> > > resolved by upgrading spin_unlock_wait to a LOCK operation, forcing it
+> > 
+> > I wonder whether upgrading it to a LOCK operation is necessary. Please
+> > see below.
+> > 
+> > > to serialise against a concurrent locker and giving it acquire semantics
+> > > in the process (although it is not at all clear whether this is needed -
+> > > different callers seem to assume different things about the barrier
+> > > semantics and architectures are similarly disjoint in their
+> > > implementations of the macro).
+> > > 
+> > > This patch implements spin_unlock_wait using an LL/SC sequence with
+> > > acquire semantics on arm64. For v8.1 systems with the LSE atomics, the
+> > 
+> > IIUC, you implement this with acquire semantics because a LOCK requires
+> > acquire semantics, right? I get that spin_unlock_wait() becoming a LOCK
+> > will surely simply our analysis, because LOCK->LOCK is always globally
+> > ordered. But for this particular problem, seems only a relaxed LL/SC
+> > loop suffices, and the use of spin_unlock_wait() in do_exit() only
+> > requires a control dependency which could be fulfilled by a relaxed
+> > LL/SC loop. So the acquire semantics may be not necessary here.
+> > 
+> > Am I missing something subtle here which is the reason you want to
+> > upgrading spin_unlock_wait() to a LOCK?
+> 
+> There's two things going on here:
+> 
+>   (1) Having spin_unlock_wait do a complete LL/SC sequence (i.e. writing
+>       to the lock, like a LOCK operation would)
+> 
+>   (2) Giving it ACQUIRE semantics
+> 
+> (2) is not necessary to fix the problem you described. However, LOCK
+> operations do imply ACQUIRE and it's not clear to me that what the
+> ordering semantics are for spin_unlock_wait.
+> 
+> I'd really like to keep this as simple as possible. Introducing yet
+> another magic barrier macro that isn't well understood or widely used
+> feels like a major step backwards to me, so I opted to upgrade
+> spin_unlock_wait to LOCK on arm64 so that I no longer have to worry
+> about it.
+> 
 
+Fair enough ;-)
 
-On 01/12/15 23:51, Krzysztof Kozlowski wrote:
-> On 02.12.2015 04:12, Martyn Welch wrote:
->> The peach pi has a GPIO connected to the firmware write protect, developer
->> mode and recovery mode lines. This patch adds the required nodes to the
->> device tree to configure the pinmuxing and allow these to be read from
->> user space.
->>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Pawel Moll <pawel.moll@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
->> Cc: Kumar Gala <galak@codeaurora.org>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Kukjin Kim <kgene@kernel.org>
->> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Cc: devicetree at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-samsung-soc at vger.kernel.org
->> Signed-off-by: Martyn Welch <martyn.welch@collabora.co.uk>
->> ---
->>   arch/arm/boot/dts/exynos5800-peach-pi.dts | 40 +++++++++++++++++++++++++++++++
->>   1 file changed, 40 insertions(+)
->
-> Hi,
->
-> Thanks for the patch.
->
-> Few points from my side:
-> 1. Please add a prefix to the subject: "ARM: dts:".
->
+Another thing about the problem is that it happens only if
+spin_unlock_wait() observes lock is *unlocked* at the first time it
+checks that, IOW, if spin_unlock_wait() observes the transition of the
+state of a lock from locked to unlocked, AFAICS, the problem won't
+happen. Maybe we can use this for a little optimization like(in pseudo
+code):
 
-Ok, sorry.
+	while (1) { // ll/sc loop
+		r1 = load_link(*lock);
+		if (!is_locked(r1)) {
+			res = store_conditional(lock, r1);
+			if (res == SUCC) // store succeeded.
+				return;
+		}
+		else
+			break;
+	}
 
-> 2. There is no need of such huge CC-list in the body of commit. This
-> CC-list comes from get_maintainer so there is no benefit of duplicating
-> it here. The CC is usually used to notify other people who might be
-> interested but get_maintainer does not point them.
->
+	smp_rmb();
+	do {
+		r1 = *lock;	
+	} while(is_locked(r1));
 
-Ok, yes these were pulled from get_maintainer.
+I think this works, and will test this using a PPC litmus in herd to
+verify it.
 
-> 3. I received only this third patch. I did not receive cover letter
-> explaining possible dependencies so I am not sure how to deal with the
-> patch. It looks like there are no dependencies... but maybe there are?
-> Is this is a new binding or no? Please provide a cover letter (if it
-> exists already be sure to send it to all interested parties) or send
-> entire patchset so the big picture could be seen.
->
-
-I'll make sure I do that next time.
-
-The cover letter read:
-
-Some Chromebooks have gpio attached to signals used to cause the 
-firmware to enter alternative modes of operation and/or control other 
-device characteristics (such as write protection on flash devices). This 
-patch adds a driver that exposes a read-only interface to allow these 
-signals to be read from user space.
-
-In addition this patch series provides the required bindings for this to 
-the peach-pi Chromebook.
-
-
-This is a new binding, but the driver is based on functionality in the 
-kernel shipped on Chromebooks. The binding has been modified based on 
-the form of existing bindings in the mainline kernel.
-
-Does that help?
-
-Martyn
-
-> The patch itself looks good but I'll wait with a review tag for #3.
->
-> Best regards,
-> Krzysztof
->
->
->>
->> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> index 49a4f43..485c18f 100644
->> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
->> @@ -53,6 +53,25 @@
->>   		};
->>   	};
->>
->> +	chromeos-firmware {
->> +		compatible = "google,gpio-firmware";
->> +
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&wp_gpio &dev_mode &rec_mode>;
->> +
->> +		write-protect {
->> +			gpios = <&gpx3 0 GPIO_ACTIVE_LOW>;
->> +		};
->> +
->> +		developer-switch {
->> +			gpios = <&gpx1 3 GPIO_ACTIVE_HIGH>;
->> +		};
->> +
->> +		recovery-switch {
->> +			gpios = <&gpx0 7 GPIO_ACTIVE_LOW>;
->> +		};
->> +	};
->> +
->>   	gpio-keys {
->>   		compatible = "gpio-keys";
->>
->> @@ -731,6 +750,13 @@
->>   		samsung,pin-val = <0>;
->>   	};
->>
->> +	rec_mode: rec-mode {
->> +		samsung,pins = "gpx0-7";
->> +		samsung,pin-function = <0>;
->> +		samsung,pin-pud = <0>;
->> +		samsung,pin-drv = <0>;
->> +	};
->> +
->>   	tpm_irq: tpm-irq {
->>   		samsung,pins = "gpx1-0";
->>   		samsung,pin-function = <0>;
->> @@ -752,6 +778,13 @@
->>   		samsung,pin-drv = <0>;
->>   	};
->>
->> +	dev_mode: dev-mode {
->> +		samsung,pins = "gpx1-3";
->> +		samsung,pin-function = <0>;
->> +		samsung,pin-pud = <3>;
->> +		samsung,pin-drv = <0>;
->> +	};
->> +
->>   	ec_irq: ec-irq {
->>   		samsung,pins = "gpx1-5";
->>   		samsung,pin-function = <0>;
->> @@ -773,6 +806,13 @@
->>   		samsung,pin-drv = <0>;
->>   	};
->>
->> +	wp_gpio: wp_gpio {
->> +		samsung,pins = "gpx3-0";
->> +		samsung,pin-function = <0>;
->> +		samsung,pin-pud = <0>;
->> +		samsung,pin-drv = <0>;
->> +	};
->> +
->>   	max77802_irq: max77802-irq {
->>   		samsung,pins = "gpx3-1";
->>   		samsung,pin-function = <0>;
->>
->
+Regards,
+Boqun
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151202/ce74b7e8/attachment.sig>
