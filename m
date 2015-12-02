@@ -1,27 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Dec 2015 16:09:22 +0100
-Subject: linux-next: manual merge of the mvebu tree with the arm-soc tree
-In-Reply-To: <87bna92c5b.fsf@free-electrons.com>
-References: <20151202111244.b7ee49ee06b4a95e407e740d@kernel.org>
- <2428665.BrOON4cELy@wuerfel> <87bna92c5b.fsf@free-electrons.com>
-Message-ID: <241533090.9LSHZ5gDBE@wuerfel>
+Date: Wed, 02 Dec 2015 16:10:58 +0100
+Subject: [PATCH 1/5] ARM: config: Regenerate multi_v5_defconfig
+In-Reply-To: <20151202150801.GL29814@lunn.ch>
+References: <1449012812-9779-1-git-send-email-andrew@lunn.ch>
+ <2115626.l90A97hBkH@wuerfel> <20151202150801.GL29814@lunn.ch>
+Message-ID: <1799595.aerWlahiX8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 December 2015 14:49:52 Gregory CLEMENT wrote:
+On Wednesday 02 December 2015 16:08:01 Andrew Lunn wrote:
 > 
-> > least initially. The conflict will go away once it's tested sufficiently and
-> > I'm pulling it back.
-> 
-> By the way, when you will pull our tree, we will still have it our own
-> mvebu/for-next branch. Will git managed to automagically resolve the
-> conflict by getting the resolution you will do in your branch?
+> Humm, i wounder if 0-day could be of use here. How about at the end of
+> each patch series, it regenerates the _defconfig files. If there are
+> any changes, issue a warning. That will help keep them in sync with
+> reality.
 
-Yes, that should be fine, unless you resolve the same conflict differently.
+Sounds like a good idea, but it will have to regenerate the defconfig files
+before and after and see if there are additional changes.
 
-> A another solution could be to have a separate patch for the
-> arch/arm/Kconfig file that you keep in arm-soc.
-
-No, I don't think that will be necessary.
-
-	Arnd 
+	Arnd
