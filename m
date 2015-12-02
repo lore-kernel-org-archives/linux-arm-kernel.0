@@ -1,56 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 Dec 2015 12:36:55 +0000
-Subject: [PATCH] arm64: ftrace: stop using kstop_machine to
- enable/disable tracing
-In-Reply-To: <1448697009-17211-1-git-send-email-huawei.libin@huawei.com>
-References: <1448697009-17211-1-git-send-email-huawei.libin@huawei.com>
-Message-ID: <20151202123654.GC4523@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 2 Dec 2015 20:40:03 +0800
+Subject: [PATCH 1/2] ARM: dts: ls1021a: Add DCU dts node.
+In-Reply-To: <1448433967-6710-1-git-send-email-b56799@freescale.com>
+References: <1448433967-6710-1-git-send-email-b56799@freescale.com>
+Message-ID: <20151202124003.GS692@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 28, 2015 at 03:50:09PM +0800, Li Bin wrote:
-> On arm64, kstop_machine which is hugely disruptive to a running
-> system is not needed to convert nops to ftrace calls or back,
-> because that modifed code is a single 32bit instructions which
-> is impossible to cross cache (or page) boundaries, and the used str
-> instruction is single-copy atomic.
+On Wed, Nov 25, 2015 at 02:46:06PM +0800, Meng Yi wrote:
+> Signed-off-by: Alison Wang <b18965@freescale.com>
+> Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
+> Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
 
-This commit message is misleading, since the single-copy atomicity
-guarantees don't apply to the instruction-side. Instead, the architecture
-calls out a handful of safe instructions in "Concurrent modification and
-execution of instructions".
+Forgot to mention that you missed adding your own SoB.  Added when
+applying.
 
-Now, those safe instructions *do* include NOP, B and BL, so that should
-be sufficient for ftrace provided that we don't patch condition codes
-(and I don't think we do).
+Shawn
 
-> Cc: <stable@vger.kernel.org> # 3.18+
-
-I don't think this is stable material.
-
-Will
-
-> Signed-off-by: Li Bin <huawei.libin@huawei.com>
 > ---
->  arch/arm64/kernel/ftrace.c |    5 +++++
->  1 files changed, 5 insertions(+), 0 deletions(-)
+>  arch/arm/boot/dts/ls1021a.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
-> diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
-> index c851be7..9669b33 100644
-> --- a/arch/arm64/kernel/ftrace.c
-> +++ b/arch/arm64/kernel/ftrace.c
-> @@ -93,6 +93,11 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
->  	return ftrace_modify_code(pc, old, new, true);
->  }
+> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> index 9430a99..f01c98b 100644
+> --- a/arch/arm/boot/dts/ls1021a.dtsi
+> +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> @@ -428,6 +428,16 @@
+>  				 <&platform_clk 1>;
+>  		};
 >  
-> +void arch_ftrace_update_code(int command)
-> +{
-> +	ftrace_modify_all_code(command);
-> +}
+> +		dcu: dcu at 2ce0000 {
+> +			compatible = "fsl,ls1021a-dcu";
+> +			reg = <0x0 0x2ce0000 0x0 0x10000>;
+> +			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&platform_clk 0>;
+> +			clock-names = "dcu";
+> +			big-endian;
+> +			status = "disabled";
+> +		};
 > +
->  int __init ftrace_dyn_arch_init(void)
->  {
->  	return 0;
+>  		mdio0: mdio at 2d24000 {
+>  			compatible = "gianfar";
+>  			device_type = "mdio";
 > -- 
-> 1.7.1
+> 2.1.0.27.g96db324
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
