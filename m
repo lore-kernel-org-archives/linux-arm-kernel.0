@@ -1,100 +1,37 @@
-From: kapilh@broadcom.com (Kapil Hali)
-Date: Wed, 2 Dec 2015 21:36:09 +0530
-Subject: [PATCH v4 1/5] dt-bindings: add SMP enable-method for Broadcom NSP
-In-Reply-To: <20151202152604.GA20467@rob-hp-laptop>
-References: <1448987049-17041-1-git-send-email-kapilh@broadcom.com>
- <1448987049-17041-2-git-send-email-kapilh@broadcom.com>
- <20151202152604.GA20467@rob-hp-laptop>
-Message-ID: <565F16F1.9070809@broadcom.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 2 Dec 2015 17:10:16 +0100
+Subject: [PATCH] dmaengine: at_xdmac: fix bad behavior in interleaved mode
+Message-ID: <1449072616-22377-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+From: Sylvain ETIENNE <Sylvain.ETIENNE@ingenico.com>
 
-On 12/2/2015 8:56 PM, Rob Herring wrote:
-> On Tue, Dec 01, 2015 at 11:24:05AM -0500, Kapil Hali wrote:
->> Add a compatible string "brcm,bcm-nsp-smp" for Broadcom's
->> Northstar Plus CPU to the 32-bit ARM CPU device tree binding
->> documentation file and create a new binding documentation for
->> Northstar Plus CPU.
->>
->> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
->> ---
->>  .../bindings/arm/bcm/brcm,nsp-cpu-method.txt       | 39 ++++++++++++++++++++++
->>  Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
->>  2 files changed, 40 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
->> new file mode 100644
->> index 0000000..bf08872
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
->> @@ -0,0 +1,39 @@
->> +Broadcom Northstar Plus SoC CPU Enable Method
->> +---------------------------------------------
->> +This binding defines the enable method used for starting secondary
->> +CPUs in the following Broadcom SoCs:
->> +  BCM58522, BCM58525, BCM58535, BCM58622, BCM58623, BCM58625, BCM88312
->> +
->> +The enable method is specified by defining the following required
->> +properties in the "cpus" device tree node:
->> +  - enable-method = "brcm,bcm-nsp-smp";
->> +  - secondary-boot-reg = <...>;
-> 
-> Both of these are supposed to be per cpu core.
+When performing interleaved transfers with numf > 1, an extra line is
+copied. The mbr.bc field is incremented once too often. The length of
+the block is (BLEN+1) microblocks.
 
-'enable-method' if not found in 'cpu' node is looked at in the 'cpus' 
-node. Except for two-three SoC families, 'enable-method' is within 
-'cpus' node. Is my interpretation incorrect? Did I miss anything here?
+Signed-off-by: Sylvain ETIENNE <Sylvain.ETIENNE@ingenico.com>
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Fixes: 4e5385784e69 ("dmaengine: at_xdmac: handle numf > 1")
+---
+ drivers/dma/at_xdmac.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-> 
-> Rob
-> 
->> +
->> +The secondary-boot-reg property is a u32 value that specifies the
->> +physical address of the register which should hold the common
->> +entry point for a secondary CPU. This entry is cpu node specific
->> +and should be added per cpu. E.g., in case of NSP (BCM58625) which
->> +is a dual core CPU SoC, this entry should be added to cpu1 node.
->> +
->> +
->> +Example:
->> +	cpus {
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +		enable-method = "brcm,bcm-nsp-smp";
->> +
->> +		cpu0: cpu at 0 {
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a9";
->> +			next-level-cache = <&L2>;
->> +			reg = <0>;
->> +		};
->> +
->> +		cpu1: cpu at 1 {
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a9";
->> +			next-level-cache = <&L2>;
->> +			reg = <1>;
->> +			secondary-boot-reg = <0xffff042c>;
->> +		};
->> +	};
->> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
->> index 3a07a87..d191554 100644
->> --- a/Documentation/devicetree/bindings/arm/cpus.txt
->> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
->> @@ -190,6 +190,7 @@ nodes to be present and contain the properties described below.
->>  			    "allwinner,sun6i-a31"
->>  			    "allwinner,sun8i-a23"
->>  			    "arm,psci"
->> +			    "brcm,bcm-nsp-smp"
->>  			    "brcm,brahma-b15"
->>  			    "marvell,armada-375-smp"
->>  			    "marvell,armada-380-smp"
->> -- 
->> 2.1.0
->>
-> 
-Thanks,
-Kapil
+diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+index 7f039de..c8faaa5 100644
+--- a/drivers/dma/at_xdmac.c
++++ b/drivers/dma/at_xdmac.c
+@@ -965,7 +965,9 @@ at_xdmac_prep_interleaved(struct dma_chan *chan,
+ 							NULL,
+ 							src_addr, dst_addr,
+ 							xt, xt->sgl);
+-		for (i = 0; i < xt->numf; i++)
++
++		/* Length of the block is (BLEN+1) microblocks. */
++		for (i = 0; i < xt->numf - 1; i++)
+ 			at_xdmac_increment_block_count(chan, first);
+ 
+ 		dev_dbg(chan2dev(chan), "%s: add desc 0x%p to descs_list 0x%p\n",
+-- 
+2.5.0
