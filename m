@@ -1,33 +1,32 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 02 Dec 2015 15:31:52 -0500 (EST)
-Subject: [PATCH v4 net 0/6] Marvell Armada XP/370/38X Neta fixes
-In-Reply-To: <87wpsx2rll.fsf@free-electrons.com>
-References: <1448886466-31538-1-git-send-email-mw@semihalf.com>
- <20151201.220337.2287051759324173025.davem@davemloft.net>
- <87wpsx2rll.fsf@free-electrons.com>
-Message-ID: <20151202.153152.345490122870853342.davem@davemloft.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 2 Dec 2015 21:38:10 +0100
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <20151202202240.GH8644@n2100.arm.linux.org.uk>
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+ <3059482.yN34NFeWWY@wuerfel>
+ <20151202192825.GF8644@n2100.arm.linux.org.uk>
+ <4984219.tZoFdLBDNB@wuerfel>
+ <20151202202240.GH8644@n2100.arm.linux.org.uk>
+Message-ID: <20151202203810.GH9866@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Date: Wed, 02 Dec 2015 09:16:06 +0100
-
-> Hi David,
->  
->  On mer., d?c. 02 2015, David Miller <davem@davemloft.net> wrote:
+On Wed, Dec 02, 2015 at 08:22:40PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Dec 02, 2015 at 08:51:04PM +0100, Arnd Bergmann wrote:
+> > I'm mostly interested in it because it's the only ARMv7 platform that is
+> > left after my other patches, and I just want to be done with it after
+> > spending 5 years on it ;-)
 > 
->> From: Marcin Wojtas <mw@semihalf.com>
->> Date: Mon, 30 Nov 2015 13:27:40 +0100
->>
->>> I'm sending v4 with corrected commit log of the last patch, in order
->>> to avoid possible conflicts between the branches as suggested by
->>> Gregory Clement.
->>
->> Series applied, thanks.
+> My understanding is that the long term goal is to delete mach-dove once
+> everyone has settled down into the mvebu DT world.
 > 
-> Could you confirm that you don't apply the last patch?
+> Right now we have mvebu which covers Dove using DT.  We have mach-dove
+> which is legacy non-DT Dove.
+> 
+> It seems to me to be completely crazy to want to bring legacy code, which
+> is ultimately destined to be deleted, into multiplatform.
 
-If I say it's applied then it's applied, and if you don't like it then
-you'll have to submit a revert patch against my tree or similar.
+I agree. We have multiplatform dove already, it is in mach-mvebu. Do
+we really need both mach-dove and mach-mvebu dove in one kernel?
 
-You know you could just check my tree instead of asking.
+   Andrew
