@@ -1,21 +1,51 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 2 Dec 2015 10:26:26 +0900
-Subject: [PATCH v4 0/3] arm64: renesas: r8a7795: add I2C support
-In-Reply-To: <1445987129-13496-1-git-send-email-horms+renesas@verge.net.au>
-References: <1445987129-13496-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20151202012626.GO27457@verge.net.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 1 Dec 2015 17:38:05 -0800
+Subject: [PATCH 05/10] ARM: OMAP2+: Disable GPIO softreset for dm81xx
+In-Reply-To: <20151202005430.GY23396@atomide.com>
+References: <1449013103-23238-1-git-send-email-tony@atomide.com>
+ <1449013103-23238-6-git-send-email-tony@atomide.com>
+ <CAALWOA-Cy7MUUE-6i7sovSQLj8g86E1gZu06+45oB20QGGQweA@mail.gmail.com>
+ <20151202004136.GW23396@atomide.com>
+ <20151202005430.GY23396@atomide.com>
+Message-ID: <20151202013805.GA23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2015 at 08:05:26AM +0900, Simon Horman wrote:
-> Hi,
+* Tony Lindgren <tony@atomide.com> [151201 16:56]:
+> * Tony Lindgren <tony@atomide.com> [151201 16:42]:
+> > * Matthijs van Duin <matthijsvanduin@gmail.com> [151201 16:11]:
+> > > On 2 December 2015 at 00:38, Tony Lindgren <tony@atomide.com> wrote:
+> > > > Looks like GPIO softreset status bit on both dm8168 and dm8148
+> > > > is broken and only goes high initially. After writing to sysc
+> > > > softreset bit, the resetdone bit never goes high again.
+> > > 
+> > > The resetdone bit works fine, but it needs all clocks active to come
+> > > up. You're neglecting to enable the debounce clock to the GPIO module:
+> > > 
+> > > > # mw.l 0x4818155c 0x2
+> > > 
+> > > That should write 0x102 instead.
+> > 
+> > It seems to work only once based on what I've seen :) If you try it
+> > after it's powered it never works. Could be I'm doing something wrong
+> > of course..
+> > 
+> > > You can disable the debounce clock after resetting the module if you
+> > > don't need it, though I doubt there's any significant power savings
+> > > there. (More likely it exists as a separate bit to allow it to stay
+> > > enabled even if the module isn't, for wakeup on debounced inputs.)
+> > 
+> > Hmm I tried setting HWMOD_CONTROL_OPT_CLKS_IN_RESET flag like we
+> > have for many SoCs to enable also sysclk18_ck but no luck. I can
+> > recheck that.
 > 
-> these patches add i2c support to the r8a7795/Salvator-X.
-> 
-> These patches are an update of work by Kuninori Morimoto,
-> broken out of a larger patchset posted by him.
-> 
-> The main change to the patches themselves since Morimoto-san's v3
-> posting is to update to new CPG/MSSR bindings via Geert Uytterhoeven.
+> You're right with 0x102 it works, need to debug further.
 
-I have queued up these patches for v4.5.
+Looks like also am33xx has opt clocks gate bit 18. Probably the best
+way to deal with this in the long run is to set up the clkctrl and
+optfclken as gate clocks with the clock framework. This is also needed
+as we have some devices sharing a single clkctrl register.
+
+Regards,
+
+Tony
