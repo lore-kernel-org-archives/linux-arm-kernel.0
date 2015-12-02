@@ -1,129 +1,100 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 02 Dec 2015 17:03:21 +0100
-Subject: [PATCH v3] ARM: mvebu: Disable CPU Idle on Armada 38x
-In-Reply-To: <20151003115756.GA9901@n2100.arm.linux.org.uk> (Russell King's
- message of "Sat, 3 Oct 2015 12:57:56 +0100")
-References: <1427820378-13415-1-git-send-email-gregory.clement@free-electrons.com>
- <20151003115756.GA9901@n2100.arm.linux.org.uk>
-Message-ID: <87y4dc25yu.fsf@free-electrons.com>
+From: kapilh@broadcom.com (Kapil Hali)
+Date: Wed, 2 Dec 2015 21:36:09 +0530
+Subject: [PATCH v4 1/5] dt-bindings: add SMP enable-method for Broadcom NSP
+In-Reply-To: <20151202152604.GA20467@rob-hp-laptop>
+References: <1448987049-17041-1-git-send-email-kapilh@broadcom.com>
+ <1448987049-17041-2-git-send-email-kapilh@broadcom.com>
+ <20151202152604.GA20467@rob-hp-laptop>
+Message-ID: <565F16F1.9070809@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell King,
- 
- On sam., oct. 03 2015, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+Hi Rob,
 
-> On Tue, Mar 31, 2015 at 06:46:18PM +0200, Gregory CLEMENT wrote:
->> On Armada 38x SoCs, under heavy I/O load, the system hangs when CPU
->> Idle is enabled. Waiting for a solution to this issue, this patch
->> disables the CPU Idle support for this SoC.
->> 
->> As CPU Hot plug support also uses some of the CPU Idle functions it is
->> also affected by the same issue. This patch disables it also for the
->> Armada 38x SoCs.
->> 
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> Cc: <stable@vger.kernel.org> # v3.17 +
+On 12/2/2015 8:56 PM, Rob Herring wrote:
+> On Tue, Dec 01, 2015 at 11:24:05AM -0500, Kapil Hali wrote:
+>> Add a compatible string "brcm,bcm-nsp-smp" for Broadcom's
+>> Northstar Plus CPU to the 32-bit ARM CPU device tree binding
+>> documentation file and create a new binding documentation for
+>> Northstar Plus CPU.
+>>
+>> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
 >> ---
->> Hi,
->> 
->> In this version I removed the unneeded initialization of the ret
->> variable, I also fixed the warning message, and finally I added the
->> Tested-by from Thomas.
->
-> In order not to lose the results of my testing on Armada 388, and to
-> trigger a discussion, I'll reply to this mail.
->
-> With the Armada 388 board I have, running mainline 4.3-rc3, I see the
-> following board current and power consumption:
->
-> CPU idle state					Current	Power
-> Patch unreverted				0.33A	3.9W
-> Patch reverted					0.42A	5W
-> Patch reverted, state 1 disabled on one CPU	0.37A	4.4W
-> Patch reverted, state 1 disabled on both CPUs	0.33A	3.9W
-> Patch reverted, state 1 disabled on both CPUs,	0.37A	4.4W
-> CPU 1 hot-unplugged
-> Marvell Vendor-based kernel with CPU idle off	0.37A	4.4W
-> (I don't have a vendor kernel with CPU idle enabled)
->
-> This is with a mainline 4.3-rc3 kernel with my own patch set on top,
-> which includes things like EEE support giving a 360mW saving compared
-> to kernels without.
->
-> The result is a 30% _increase_ in power consumption when CPU idle is
-> enabled.  For reference, when placing both CPUs into a loop via
-> while :; do :; done in bash, the consumption goes up to 0.5A / 6W.
->
-> Thomas suggested to increase the CPU idle thresholds in a similar manner
-> to that done for Armada XP in ce6031c89a35 ("cpuidle: mvebu: Update
-> cpuidle thresholds for Armada XP SOCs"), so I made the following change:
->
-> @@ -92,9 +92,9 @@ static struct cpuidle_driver armada38x_idle_driver = {
-> -               .exit_latency           = 10,
-> +               .exit_latency           = 100,
-> -               .target_residency       = 100,
-> +               .target_residency       = 1000,
->
-> This had no effect on the power usage.
->
-> This brings up the obvious question, is there a bug somewhere, resulting
-> in suspending the CPU not resulting in power savings?
->
-> I don't think so.  I've fixed the failure path in the mvebu CPU idle code
-> as per the RFC I sent out earlier this morning, which means if we fail to
-> suspend the CPU, time will not be accounted to CPU idle state 1 - this
-> means we can be sure that the statistics for state 1 won't be incorrectly
-> incremented.  The CPU idle statistics indicate that we are hitting the
-> lower power state 1, and spending some time there for each call:
->
-> /sys/devices/system/cpu/cpu0/cpuidle/state0/time:24726278
-> /sys/devices/system/cpu/cpu0/cpuidle/state0/usage:29991
-> /sys/devices/system/cpu/cpu0/cpuidle/state1/time:290135931
-> /sys/devices/system/cpu/cpu0/cpuidle/state1/usage:74951
-> /sys/devices/system/cpu/cpu1/cpuidle/state0/time:41096682
-> /sys/devices/system/cpu/cpu1/cpuidle/state0/usage:141538
-> /sys/devices/system/cpu/cpu1/cpuidle/state1/time:270641329
-> /sys/devices/system/cpu/cpu1/cpuidle/state1/usage:47845
->
-> So we're probably _not_ looping trying to enter state 1 and immediately
-> coming back out.  In other words, we are suspending the CPU, and the CPU
-> is staying suspended for a period of time.
->
-> I think we have to conclude that we are successfully suspending the CPU,
-> and that it is resuming through armada_38x_cpu_resume() and cpu_resume()
-> as we expect, and the result if placing the CPU into suspend actually
-> results in higher power consumption than placing the CPU into WFI
-> mode.
+>>  .../bindings/arm/bcm/brcm,nsp-cpu-method.txt       | 39 ++++++++++++++++++++++
+>>  Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
+>>  2 files changed, 40 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+>> new file mode 100644
+>> index 0000000..bf08872
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+>> @@ -0,0 +1,39 @@
+>> +Broadcom Northstar Plus SoC CPU Enable Method
+>> +---------------------------------------------
+>> +This binding defines the enable method used for starting secondary
+>> +CPUs in the following Broadcom SoCs:
+>> +  BCM58522, BCM58525, BCM58535, BCM58622, BCM58623, BCM58625, BCM88312
+>> +
+>> +The enable method is specified by defining the following required
+>> +properties in the "cpus" device tree node:
+>> +  - enable-method = "brcm,bcm-nsp-smp";
+>> +  - secondary-boot-reg = <...>;
+> 
+> Both of these are supposed to be per cpu core.
 
-I finally managed to measure the power consumption on my Armada 388 GP
-board and I confirm what you saw. With CPU idle disable in pmsu.c it
-consumes 0.43A at 12V and when it is enable it consumes 0.53A at 12V so around
-30% more.
+'enable-method' if not found in 'cpu' node is looked at in the 'cpus' 
+node. Except for two-three SoC families, 'enable-method' is within 
+'cpus' node. Is my interpretation incorrect? Did I miss anything here?
 
-If I disable the state1 on a CPU it goes down 0.49 at 12, and if I disable
-the state1 opn both CPU, then it comes back to 0.43A at 12V.
-
->
-> It could be that some register isn't set correctly to allow the CPU
-> power domain to be properly shut down.  It could also be that the SoC
-> doesn't implement the isolation barrier between the CPU and surrounding
-> circuitry, resulting in higher leakage when the CPU is placed into
-> suspend mode.  (The SCU power register is always present, but the
-> implementation of the isolation barriers to allow individual CPUs to be
-> independently powered down are optional.)  Either way, without
-> documentation, there's no way to know.
-
-Now that I can reproduce it, I will investigate to find what we do
-wrong.
-
+> 
+> Rob
+> 
+>> +
+>> +The secondary-boot-reg property is a u32 value that specifies the
+>> +physical address of the register which should hold the common
+>> +entry point for a secondary CPU. This entry is cpu node specific
+>> +and should be added per cpu. E.g., in case of NSP (BCM58625) which
+>> +is a dual core CPU SoC, this entry should be added to cpu1 node.
+>> +
+>> +
+>> +Example:
+>> +	cpus {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +		enable-method = "brcm,bcm-nsp-smp";
+>> +
+>> +		cpu0: cpu at 0 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a9";
+>> +			next-level-cache = <&L2>;
+>> +			reg = <0>;
+>> +		};
+>> +
+>> +		cpu1: cpu at 1 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a9";
+>> +			next-level-cache = <&L2>;
+>> +			reg = <1>;
+>> +			secondary-boot-reg = <0xffff042c>;
+>> +		};
+>> +	};
+>> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+>> index 3a07a87..d191554 100644
+>> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+>> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+>> @@ -190,6 +190,7 @@ nodes to be present and contain the properties described below.
+>>  			    "allwinner,sun6i-a31"
+>>  			    "allwinner,sun8i-a23"
+>>  			    "arm,psci"
+>> +			    "brcm,bcm-nsp-smp"
+>>  			    "brcm,brahma-b15"
+>>  			    "marvell,armada-375-smp"
+>>  			    "marvell,armada-380-smp"
+>> -- 
+>> 2.1.0
+>>
+> 
 Thanks,
-
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Kapil
