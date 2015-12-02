@@ -1,46 +1,90 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Wed, 02 Dec 2015 12:05:41 +0300
-Subject: [PATCH 3/6] net: thunderx: Increase transmit queue length
-In-Reply-To: <CA+sq2Ce9oH-kCDO8hK_wX+ZZdXyyBuT4V2bt5Ab+2=pEX+BO+w@mail.gmail.com>
-References: <y@samsung.com>
- <1448961223-41888-4-git-send-email-sunil.kovvuri@gmail.com>
- <01d101d12c46$2de43b40$89acb1c0$@samsung.com>
- <1448983985.25582.35.camel@edumazet-glaptop2.roam.corp.google.com>
- <CA+sq2Ce9oH-kCDO8hK_wX+ZZdXyyBuT4V2bt5Ab+2=pEX+BO+w@mail.gmail.com>
-Message-ID: <00cb01d12ce0$9f090540$dd1b0fc0$@samsung.com>
+From: kong.kongxinwei@hisilicon.com (Xinwei Kong)
+Date: Wed, 2 Dec 2015 17:06:31 +0800
+Subject: [PATCH v3] arm64: dts: add all hi6220 i2c nodes
+In-Reply-To: <20151202073427.GM692@tiger>
+References: <1449037749-14388-1-git-send-email-kong.kongxinwei@hisilicon.com>
+ <20151202073427.GM692@tiger>
+Message-ID: <565EB497.6080700@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
 
-> Probably you might have to set "coherent_pool" size in bootargs to a
-> higher value.
-> Can you please check.
 
- I have tried to do this. I was able to enlarge the pool up to 4MB, and still got allocation failures. At 8MB pool preallocation stops working:
---- cut ---
-Call trace:
-[<ffffffc00012ddb8>] __alloc_pages_nodemask+0x4f4/0x7d4
-[<ffffffc0007be370>] atomic_pool_init+0x60/0x1a4
-[<ffffffc0007be4d4>] arm64_dma_init+0x20/0x28
-[<ffffffc000082848>] do_one_initcall+0x8c/0x1a4
-[<ffffffc0007baac0>] kernel_init_freeable+0x154/0x1f4
-[<ffffffc0005c2b14>] kernel_init+0x10/0xd8
-DMA: failed to allocate 8192 KiB pool for atomic coherent allocation
---- cut ---
- and i get even worse faults in the driver.
+On 2015/12/2 15:34, Shawn Guo wrote:
+> On Wed, Dec 02, 2015 at 02:29:09PM +0800, Xinwei Kong wrote:
+>> This patch adds all I2C nodes for the Hi6220 SoC. This hi6220 Soc
+>> use this I2C IP of Synopsys Designware for HiKey board.
+>>
+>> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+>> ---
+>>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 31 +++++++++++++++++++++++++++++++
+>>  1 file changed, 31 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+>> index 82d2488..6eae673 100644
+>> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+>> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+>> @@ -208,5 +208,36 @@
+>>  			clock-names = "uartclk", "apb_pclk";
+>>  			status = "disabled";
+>>  		};
+>> +
+>> +		i2c0: i2c at f7100000 {
+>> +			compatible = "snps,designware-i2c";
+>> +			reg = <0x0 0xf7100000 0x0 0x1000>;
+>> +			interrupts = <0 44 4>;
+>> +			i2c-sda-hold-time-ns = <300>;
+>> +			pinctrl-names = "default";
+>> +			pinctrl-0 = <&i2c0_pmx_func &i2c0_cfg_func>;
+>> +			status = "disabled";
+> 
+> You got me wrong.  I was asking you to drop property 'clock-names' only,
+> not 'clocks' together.  I do not think it works if you drop property
+> 'clocks', because I see that dw_i2c_plat_probe() will fail if
+> devm_clk_get() fails.  Did you test the patch before posting it out?
 
- I know that it is possible to allocate larger pools by setting CONFIG_FORCE_MAX_ZONEORDER, but:
-a) This is done on per-platform basis. For ThunderX we used to have a patch (http://www.spinics.net/lists/arm-kernel/msg415457.html), which never made it upstream, because vGIC fixes stopped requiring it at some point. And also we may want to use the nicvf driver not only on actual hardware, but also inside virtual machine in KVM. So do we need to set CONFIG_FORCE_MAX_ZONEORDER for virt too? And what if at some point qemu emulates not only "virt", but some other machine (let's say AMD X-Gene), and we run it on ThunderX and want to use nicvf with this model?
-b) IMHO it's not good to have a driver which simply does not work without some obscure option in boot arguments.
+I am sorry that my Hikey board don't work well. I will fix my board and test
+it.
 
- So, i see several possible ways to solve this:
+Thank you very much.
+xinwei
 
-1. Introduce some mechanism which would allow the driver to tell the kernel that it needs coherent pool of large size. Can be problematic because the driver can be a module, and pool allocation happens early.
-2. Can we use some other method for allocating queues, which would not require such a huge coherent pool?
-3. The driver could check value of atomic_pool_size and adjust own memory requirements accordingly. This indeed looks like a quick hack, but would at least make things running quickly.
-
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+> 
+> Shawn
+> 
+>> +		};
+>> +
+>> +		i2c1: i2c at f7101000 {
+>> +			compatible = "snps,designware-i2c";
+>> +			reg = <0x0 0xf7101000 0x0 0x1000>;
+>> +			interrupts = <0 45 4>;
+>> +			i2c-sda-hold-time-ns = <300>;
+>> +			pinctrl-names = "default";
+>> +			pinctrl-0 = <&i2c1_pmx_func &i2c1_cfg_func>;
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		i2c2: i2c at f7102000 {
+>> +			compatible = "snps,designware-i2c";
+>> +			reg = <0x0 0xf7102000 0x0 0x1000>;
+>> +			interrupts = <0 46 4>;
+>> +			i2c-sda-hold-time-ns = <300>;
+>> +			pinctrl-names = "default";
+>> +			pinctrl-0 = <&i2c2_pmx_func &i2c2_cfg_func>;
+>> +			status = "disabled";
+>> +		};
+>> +
+>>  	};
+>>  };
+>> -- 
+>> 1.9.1
+>>
+>>
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> .
+> 
