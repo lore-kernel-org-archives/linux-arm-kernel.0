@@ -1,63 +1,42 @@
-From: peda@lysator.liu.se (Peter Rosin)
-Date: Wed, 02 Dec 2015 20:29:35 +0100
-Subject: Regression, was [PATCH 4/4] USB: host: ohci-at91: merge loops
- in ohci_hcd_at91_drv_probe
-In-Reply-To: <20151202182002.GF22136@piout.net>
-References: <565DD61C.5010904@lysator.liu.se>
- <20151202182002.GF22136@piout.net>
-Message-ID: <565F469F.9000004@lysator.liu.se>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 02 Dec 2015 20:36:24 +0100
+Subject: [PATCH v4 3/7] ARM: dts: imx: Add Advantech BA-16 Qseven module
+In-Reply-To: <1449080180-31945-4-git-send-email-akshay.bhat@timesys.com>
+References: <1449080180-31945-1-git-send-email-akshay.bhat@timesys.com>
+ <1449080180-31945-4-git-send-email-akshay.bhat@timesys.com>
+Message-ID: <1647955.6yZUflBPcH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
-
-On 2015-12-02 19:20, Alexandre Belloni wrote:
-> Hi Peter,
+On Wednesday 02 December 2015 13:16:16 Akshay Bhat wrote:
+> +               brightness-levels = <  0   1   2   3   4   5   6   7   8   9
+> +                                     10  11  12  13  14  15  16  17  18  19
+> +                                     20  21  22  23  24  25  26  27  28  29
+> +                                     30  31  32  33  34  35  36  37  38  39
+> +                                     40  41  42  43  44  45  46  47  48  49
+> +                                     50  51  52  53  54  55  56  57  58  59
+> +                                     60  61  62  63  64  65  66  67  68  69
+> +                                     70  71  72  73  74  75  76  77  78  79
+> +                                     80  81  82  83  84  85  86  87  88  89
+> +                                     90  91  92  93  94  95  96  97  98  99
+> +                                    100 101 102 103 104 105 106 107 108 109
+> +                                    110 111 112 113 114 115 116 117 118 119
+> +                                    120 121 122 123 124 125 126 127 128 129
+> +                                    130 131 132 133 134 135 136 137 138 139
+> +                                    140 141 142 143 144 145 146 147 148 149
+> +                                    150 151 152 153 154 155 156 157 158 159
+> +                                    160 161 162 163 164 165 166 167 168 169
+> +                                    170 171 172 173 174 175 176 177 178 179
+> +                                    180 181 182 183 184 185 186 187 188 189
+> +                                    190 191 192 193 194 195 196 197 198 199
+> +                                    200 201 202 203 204 205 206 207 208 209
+> +                                    210 211 212 213 214 215 216 217 218 219
+> +                                    220 221 222 223 224 225 226 227 228 229
+> +                                    230 231 232 233 234 235 236 237 238 239
+> +                                    240 241 242 243 244 245 246 247 248 249
+> +                                    250 251 252 253 254 255>;
 > 
-> On 01/12/2015 at 18:17:16 +0100, Peter Rosin wrote :
->> [<c02f5084>] (ohci_hcd_at91_overcurrent_irq) from [<c00433b0>] (handle_irq_event_percpu+0x78/0x140)
->> [<c00433b0>] (handle_irq_event_percpu) from [<c00434a4>] (handle_irq_event+0x2c/0x40)
->> [<c00434a4>] (handle_irq_event) from [<c00458b8>] (handle_simple_irq+0x6c/0x80)
->> [<c00458b8>] (handle_simple_irq) from [<c0042bc4>] (generic_handle_irq+0x2c/0x3c)
->> [<c0042bc4>] (generic_handle_irq) from [<c01fe4ac>] (gpio_irq_handler+0xa4/0x12c)
->> [<c01fe4ac>] (gpio_irq_handler) from [<c0042bc4>] (generic_handle_irq+0x2c/0x3c)
->> [<c0042bc4>] (generic_handle_irq) from [<c0042dec>] (__handle_domain_irq+0x54/0xa8)
->> [<c0042dec>] (__handle_domain_irq) from [<c0013500>] (__irq_svc+0x40/0x54)
->> [<c0013500>] (__irq_svc) from [<c004451c>] (__setup_irq+0x248/0x530)
->> [<c004451c>] (__setup_irq) from [<c0044954>] (request_threaded_irq+0xc4/0x144)
->> [<c0044954>] (request_threaded_irq) from [<c02f5a0c>] (ohci_hcd_at91_drv_probe+0x460/0x518)
->> [<c02f5a0c>] (ohci_hcd_at91_drv_probe) from [<c02670ec>] (platform_drv_probe+0x44/0xa4)
->> [<c02670ec>] (platform_drv_probe) from [<c02655b4>] (driver_probe_device+0x1fc/0x43c)
->> [<c02655b4>] (driver_probe_device) from [<c0265880>] (__driver_attach+0x8c/0x90)
->> [<c0265880>] (__driver_attach) from [<c0263880>] (bus_for_each_dev+0x6c/0xa0)
->> [<c0263880>] (bus_for_each_dev) from [<c0264b80>] (bus_add_driver+0x1d0/0x268)
->> [<c0264b80>] (bus_add_driver) from [<c0266078>] (driver_register+0x78/0xf8)
->> [<c0266078>] (driver_register) from [<c00096c8>] (do_one_initcall+0xb8/0x1f0)
->> [<c00096c8>] (do_one_initcall) from [<c068bda4>] (kernel_init_freeable+0x138/0x1d8)
->> [<c068bda4>] (kernel_init_freeable) from [<c04d06f4>] (kernel_init+0x8/0xe8)
->> [<c04d06f4>] (kernel_init) from [<c000ff68>] (ret_from_fork+0x14/0x2c)
->> Code: e5916058 e1a08000 e3a04000 e2865008 (e5b50004)
->> ---[ end trace e66fbc480972ac43 ]---
->> Kernel panic - not syncing: Fatal exception in interrupt
->> ---[ end Kernel panic - not syncing: Fatal exception in interrupt
-> 
-> I think I understood what happens. Can you try the following patch?
 
-Seems to work here. Excellent!
+That is a lot of brightness levels. Why do you need so many of them?
 
-> 8<------
-> From 402f8444bc92d218edc63dcc3c87459981a56c31 Mon Sep 17 00:00:00 2001
-> From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Date: Wed, 2 Dec 2015 18:49:34 +0100
-> Subject: [PATCH] USB: host: ohci-at91: fix a crash in
->  ohci_hcd_at91_overcurrent_irq
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
-Reported-by: Peter Rosin <peda@axentia.se>
-Tested-by: Peter Rosin <peda@axentia.se>
-
-(and bisected-by if anyone cares...)
-
-Cheers,
-Peter
+	Arnd
