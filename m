@@ -1,15 +1,15 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 02 Dec 2015 10:39:39 +0900
-Subject: [GIT PULL 2/9] ARM: EXYNOS: Exynos SoC/mach specific code for v4.5
+Date: Wed, 02 Dec 2015 10:39:40 +0900
+Subject: [GIT PULL 3/9] ARM64: EXYNOS: clk: Clock dependency for ARM64 for v4.5
 In-Reply-To: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
 References: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1449020386-20250-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1449020386-20250-4-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Kukjin,
 
-SoC/mach specific code.
+Dependency for soc64 changes.
 
 Best regards,
 Krzysztof
@@ -21,41 +21,22 @@ The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
 
 are available in the git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc-4.5
+  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-clk-arm64-symbols-4.5
 
-for you to fetch changes up to 8438aef01d3560549b3a95d247b3a69311fa6f2d:
+for you to fetch changes up to 8c2a90ed18a74e8b9cdbba679403faa44d6024fc:
 
-  ARM: EXYNOS: Remove redundant code from regs-pmu.h (2015-11-20 16:00:47 +0900)
-
-----------------------------------------------------------------
-Samsung Exynos improvements for 4.5:
-1. Switch from Exynos-specific restart/poweroff handler
-   (mach-exynos/pmu.c) to generic syscon-reboot and syscon-poweroff
-   drivers.
-   This depends on adding syscon nodes to DTS to preserve
-   bisectability.
-2. Minor improvements.
+  clk: samsung: Don't build ARMv8 clock drivers on ARMv7 (2015-11-22 19:25:29 +0900)
 
 ----------------------------------------------------------------
-Alim Akhtar (5):
-      ARM: dts: Add syscon-{reboot, poweroff} nodes for exynos3250
-      ARM: dts: Add syscon-{reboot, poweroff} nodes for exynos4
-      ARM: dts: Add syscon-{reboot, poweroff} nodes for exynos5
-      ARM: dts: Add syscon-{reboot, poweroff} nodes for exynos5410
-      ARM: EXYNOS: Switch to syscon reboot and poweroff
+Remove CONFIG_ARCH_EXYNOS7 symbol from Samsung clocks and instead
+build all drivers for ARM64 SoCs under CONFIG_EXYNOS_ARM64_COMMON_CLK.
+After the commit there will be no more users of CONFIG_ARCH_EXYNOS7
+except ARM64 mach code.
 
-Krzysztof Kozlowski (2):
-      Merge tag 'samsung-dt-syscon-restart-4.5' into next/soc
-      ARM: EXYNOS: Constify local exynos_pmu_data structure
+----------------------------------------------------------------
+Krzysztof Kozlowski (1):
+      clk: samsung: Don't build ARMv8 clock drivers on ARMv7
 
-Pankaj Dubey (1):
-      ARM: EXYNOS: Remove redundant code from regs-pmu.h
-
- arch/arm/boot/dts/exynos3250.dtsi | 14 ++++++++++++
- arch/arm/boot/dts/exynos4.dtsi    | 14 ++++++++++++
- arch/arm/boot/dts/exynos5.dtsi    | 14 ++++++++++++
- arch/arm/boot/dts/exynos5410.dtsi | 14 ++++++++++++
- arch/arm/mach-exynos/Kconfig      |  3 +++
- arch/arm/mach-exynos/pmu.c        | 45 ++-------------------------------------
- arch/arm/mach-exynos/regs-pmu.h   |  9 --------
- 7 files changed, 61 insertions(+), 52 deletions(-)
+ drivers/clk/samsung/Kconfig  | 6 ++++++
+ drivers/clk/samsung/Makefile | 4 ++--
+ 2 files changed, 8 insertions(+), 2 deletions(-)
