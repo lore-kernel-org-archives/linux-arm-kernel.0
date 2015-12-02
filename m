@@ -1,55 +1,117 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Wed, 2 Dec 2015 15:53:16 -0500
-Subject: [PATCH v4 3/7] ARM: dts: imx: Add Advantech BA-16 Qseven module
-In-Reply-To: <1647955.6yZUflBPcH@wuerfel>
-References: <1449080180-31945-1-git-send-email-akshay.bhat@timesys.com>
- <1449080180-31945-4-git-send-email-akshay.bhat@timesys.com>
- <1647955.6yZUflBPcH@wuerfel>
-Message-ID: <565F5A3C.6080509@timesys.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Wed, 2 Dec 2015 12:54:16 -0800
+Subject: [PATCH v4 1/2] watchdog: imx2_wdt: add external reset support via
+ 'ext-reset-output' dt prop
+In-Reply-To: <565F4244.7090502@timesys.com>
+References: <1446758362-11702-1-git-send-email-akshay.bhat@timesys.com>
+ <1446758362-11702-2-git-send-email-akshay.bhat@timesys.com>
+ <20151105222325.GA26159@roeck-us.net>
+ <CAJ+vNU2fSxRJ7YvxOfNzoEoiKgzv-dHj=+eksKxH48ekHiUw2Q@mail.gmail.com>
+ <20151106220249.GA19791@roeck-us.net>
+ <565F4244.7090502@timesys.com>
+Message-ID: <CAJ+vNU00Bf97HUqkkW9KqOUzHXh482R9O1gasz6ju3Pn-_5chA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 12/02/2015 02:36 PM, Arnd Bergmann wrote:
-> On Wednesday 02 December 2015 13:16:16 Akshay Bhat wrote:
->> +               brightness-levels = <  0   1   2   3   4   5   6   7   8   9
->> +                                     10  11  12  13  14  15  16  17  18  19
->> +                                     20  21  22  23  24  25  26  27  28  29
->> +                                     30  31  32  33  34  35  36  37  38  39
->> +                                     40  41  42  43  44  45  46  47  48  49
->> +                                     50  51  52  53  54  55  56  57  58  59
->> +                                     60  61  62  63  64  65  66  67  68  69
->> +                                     70  71  72  73  74  75  76  77  78  79
->> +                                     80  81  82  83  84  85  86  87  88  89
->> +                                     90  91  92  93  94  95  96  97  98  99
->> +                                    100 101 102 103 104 105 106 107 108 109
->> +                                    110 111 112 113 114 115 116 117 118 119
->> +                                    120 121 122 123 124 125 126 127 128 129
->> +                                    130 131 132 133 134 135 136 137 138 139
->> +                                    140 141 142 143 144 145 146 147 148 149
->> +                                    150 151 152 153 154 155 156 157 158 159
->> +                                    160 161 162 163 164 165 166 167 168 169
->> +                                    170 171 172 173 174 175 176 177 178 179
->> +                                    180 181 182 183 184 185 186 187 188 189
->> +                                    190 191 192 193 194 195 196 197 198 199
->> +                                    200 201 202 203 204 205 206 207 208 209
->> +                                    210 211 212 213 214 215 216 217 218 219
->> +                                    220 221 222 223 224 225 226 227 228 229
->> +                                    230 231 232 233 234 235 236 237 238 239
->> +                                    240 241 242 243 244 245 246 247 248 249
->> +                                    250 251 252 253 254 255>;
+On Wed, Dec 2, 2015 at 11:11 AM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
+>
+>
+> On 11/06/2015 05:02 PM, Guenter Roeck wrote:
 >>
+>> On Fri, Nov 06, 2015 at 11:53:42AM -0800, Tim Harvey wrote:
+>>>
+>>> On Thu, Nov 5, 2015 at 2:23 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+>>>>
+>>>> On Thu, Nov 05, 2015 at 04:19:21PM -0500, Akshay Bhat wrote:
+>>>>>
+>>>>> From: Tim Harvey <tharvey@gateworks.com>
+>>>>>
+>>>>> The IMX6 watchdog supports assertion of a signal (WDOG_B) which
+>>>>> can be pinmux'd to an external pin. This is typically used for boards
+>>>>> that
+>>>>> have PMIC's in control of the IMX6 power rails. In fact, failure to use
+>>>>> such an external reset on boards with external PMIC's can result in
+>>>>> various
+>>>>> hangs due to the IMX6 not being fully reset [1] as well as the board
+>>>>> failing
+>>>>> to reset because its PMIC has not been reset to provide adequate
+>>>>> voltage for
+>>>>> the CPU when coming out of reset at 800Mhz.
+>>>>>
+>>>>> This uses a new device-tree property 'ext-reset-output' to indicate the
+>>>>> board has such a reset and to cause the watchdog to be configured to
+>>>>> assert
+>>>>> WDOG_B instead of an internal reset both on a watchdog timeout and in
+>>>>> system_restart.
+>>>>>
+>>>>> [1]
+>>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/333689.html
+>>>>>
+>>>>> Cc: Lucas Stach <l.stach@pengutronix.de>
+>>>>> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+>>>>> ---
+>>>>>   .../devicetree/bindings/watchdog/fsl-imx-wdt.txt     |  2 ++
+>>>>>   drivers/watchdog/imx2_wdt.c                          | 20
+>>>>> ++++++++++++++++++--
+>>>>>   2 files changed, 20 insertions(+), 2 deletions(-)
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
+>>>>> b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
+>>>>> index 8dab6fd..9b89b3a 100644
+>>>>> --- a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
+>>>>> +++ b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
+>>>>> @@ -9,6 +9,8 @@ Optional property:
+>>>>
+>>>>
+>>>> properties ?
+>>>>
+>>>>>   - big-endian: If present the watchdog device's registers are
+>>>>> implemented
+>>>>>     in big endian mode, otherwise in native mode(same with CPU), for
+>>>>> more
+>>>>>     detail please see:
+>>>>> Documentation/devicetree/bindings/regmap/regmap.txt.
+>>>>> +- ext-reset-output: If present the watchdog device is configured to
+>>>>> assert its
+>>>>
+>>>>
+>>>> Should that have a vendor prefix ? Also, not sure if "-output"
+>>>> has any real value in the property name. "fsl,external-reset", maybe ?
+>>>
+>>>
+>>> Hi Guenter,
+>>>
+>>> I don't see why a vendor prefix is necessary - its a feature of the
+>>> IMX6 watchdog supported by this driver to be able to trigger an
+>>> internal chip-level reset and/or an external signal that can be hooked
+>>> to additional hardware.
+>>>
+>> Sounded like vendor specific to me, but then I am not a devicetree
+>> maintainer,
+>> so I am not an authority on the subject.
 >
-> That is a lot of brightness levels. Why do you need so many of them?
 >
-> 	Arnd
+> Devicetree maintainers,
 >
-Hi Arnd,
+> Any thoughts?
+>
+> Tim,
+>
+> After looking at all the other watchdog drivers, it does not appear that
+> there is any other processor which uses a similar feature. Since imx is the
+> only processor that appears to support this feature, it might make sense in
+> making this vendor specific. If in the future it is found more processors
+> support a similar functionality, it can be revisited and moved out from
+> being vendor specific?
+>
 
-The product allows for a fine grained selection of the LCD brightness 
-(analogy might be a laptop brightness slider), hence all possible levels 
-have been included.
+I'm certainly no expert on device-tree policy. I understand your
+point, but realize that the driver in question is imx2_wdt.c
+(compatible = "fsl,imx21-wdt"). This is an IP block inside the silicon
+of only Freescale chips, so its not like a future omap chip would be
+using this driver - only fsl devices. So why would it need a 'vendor'
+property any more than its other properties?
 
-Thanks,
-Akshay
+Regards,
+
+Tim
