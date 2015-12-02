@@ -1,72 +1,47 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 2 Dec 2015 15:34:27 +0800
-Subject: [PATCH v3] arm64: dts: add all hi6220 i2c nodes
-In-Reply-To: <1449037749-14388-1-git-send-email-kong.kongxinwei@hisilicon.com>
-References: <1449037749-14388-1-git-send-email-kong.kongxinwei@hisilicon.com>
-Message-ID: <20151202073427.GM692@tiger>
+From: pavel@denx.de (Pavel Machek)
+Date: Wed, 2 Dec 2015 08:40:22 +0100
+Subject: [GIT PULL] SoCFPGA DTS cleanup for v4.4
+In-Reply-To: <20151022170941.GI19953@localhost>
+References: <1445005724-32349-1-git-send-email-dinh.linux@gmail.com>
+ <1445005724-32349-2-git-send-email-dinh.linux@gmail.com>
+ <20151022170941.GI19953@localhost>
+Message-ID: <20151202074022.GA27506@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 02, 2015 at 02:29:09PM +0800, Xinwei Kong wrote:
-> This patch adds all I2C nodes for the Hi6220 SoC. This hi6220 Soc
-> use this I2C IP of Synopsys Designware for HiKey board.
+On Thu 2015-10-22 10:09:41, Olof Johansson wrote:
+> On Fri, Oct 16, 2015 at 09:28:43AM -0500, dinh.linux at gmail.com wrote:
+> > Hi Arnd, Kevin, and Olof:
+> > 
+> > Please consider pulling this patch for v4.4.
+> > 
+> > Thanks,
+> > Dinh
+> > 
+> > The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+> > 
+> >   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_for_v4.4_cleanup
+> > 
+> > for you to fetch changes up to 0cdbec626e2e936a7db43d6a697e70673d4478bf:
+> > 
+> >   ARM: socfpga: dts: sort nodes alphabetically (2015-10-16 08:39:22 -0500)
+> > 
+> > ----------------------------------------------------------------
+> > SoCFPGA dts cleanup for v4.4
+> > - Re-order DTS nodes into correct alphabetical order
 > 
-> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-> ---
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 31 +++++++++++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
+> Merged into next/dt.
 > 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> index 82d2488..6eae673 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> @@ -208,5 +208,36 @@
->  			clock-names = "uartclk", "apb_pclk";
->  			status = "disabled";
->  		};
-> +
-> +		i2c0: i2c at f7100000 {
-> +			compatible = "snps,designware-i2c";
-> +			reg = <0x0 0xf7100000 0x0 0x1000>;
-> +			interrupts = <0 44 4>;
-> +			i2c-sda-hold-time-ns = <300>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c0_pmx_func &i2c0_cfg_func>;
-> +			status = "disabled";
+> Note that some SoCs prefer to sort in unit address order instead. I have to
+> admit I do prefer that, but I'm not going to force one or the other.
 
-You got me wrong.  I was asking you to drop property 'clock-names' only,
-not 'clocks' together.  I do not think it works if you drop property
-'clocks', because I see that dw_i2c_plat_probe() will fail if
-devm_clk_get() fails.  Did you test the patch before posting it out?
-
-Shawn
-
-> +		};
-> +
-> +		i2c1: i2c at f7101000 {
-> +			compatible = "snps,designware-i2c";
-> +			reg = <0x0 0xf7101000 0x0 0x1000>;
-> +			interrupts = <0 45 4>;
-> +			i2c-sda-hold-time-ns = <300>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c1_pmx_func &i2c1_cfg_func>;
-> +			status = "disabled";
-> +		};
-> +
-> +		i2c2: i2c at f7102000 {
-> +			compatible = "snps,designware-i2c";
-> +			reg = <0x0 0xf7102000 0x0 0x1000>;
-> +			interrupts = <0 46 4>;
-> +			i2c-sda-hold-time-ns = <300>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c2_pmx_func &i2c2_cfg_func>;
-> +			status = "disabled";
-> +		};
-> +
->  	};
->  };
-> -- 
-> 1.9.1
-> 
-> 
-> 
+Seconded. There's better chance related stuff goes near each other, as
+SoC vendors are likely to put related stuff at similar addresses...
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
