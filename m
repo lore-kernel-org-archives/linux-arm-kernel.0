@@ -1,94 +1,27 @@
-From: damien.riegel@savoirfairelinux.com (Damien Riegel)
-Date: Wed, 2 Dec 2015 18:21:02 -0500
-Subject: [PATCH v7 2/6] mfd: syscon: add a DT property to set value width
-In-Reply-To: <20151130190015.GA31006@rob-hp-laptop>
-References: <1448899191-13891-1-git-send-email-damien.riegel@savoirfairelinux.com>
- <1448899191-13891-3-git-send-email-damien.riegel@savoirfairelinux.com>
- <20151130190015.GA31006@rob-hp-laptop>
-Message-ID: <20151202232102.GB6055@localhost>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 03 Dec 2015 00:31:37 +0100
+Subject: [PATCH] clk: rockchip: rk3368: protect aclk_bus and aclk_peri
+ clocks
+In-Reply-To: <1449062551-2498-1-git-send-email-jay.xu@rock-chips.com>
+References: <1449062551-2498-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <4430667.DaSfi9RHQ7@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lee, Arnd,
+Hi Jianqun,
 
-I had to make changes in this patch to address Rob's comments.
-reg-io-width is now in bytes while bus-width was a value in bits. Could
-you please review this patch ?
-
-Thanks,
-Damien
-
-On Mon, Nov 30, 2015 at 01:00:15PM -0600, Rob Herring wrote:
-> On Mon, Nov 30, 2015 at 10:59:47AM -0500, Damien Riegel wrote:
-> > Currently syscon has a fixed configuration of 32 bits for register and
-> > values widths. In some cases, it would be desirable to be able to
-> > customize the value width.
-> > 
-> > For example, certain boards (like the ones manufactured by Technologic
-> > Systems) have a FPGA that is memory-mapped, but its registers are only
-> > 16-bit wide.
-> > 
-> > This patch adds an optional "reg-io-width" DT binding for syscon that
-> > allows to change the width for the data bus (i.e. val_bits). If this
-> > property is provided, it will also set the register stride to
-> > reg-io-width's value. If not provided, the default configuration is
-> > used.
-> > 
-> > Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+Am Mittwoch, 2. Dezember 2015, 21:22:31 schrieb jianqun.xu:
+> From: Jianqun xu <jay.xu@rock-chips.com>
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
+> Add aclk_bus and aclk_peri to the list of rk3368 critical clocks,
+> which are the base clocks that supply for all peripherals, never
+> to be disabled automatically.
 > 
-> > ---
-> >  Documentation/devicetree/bindings/mfd/syscon.txt |  4 ++++
-> >  drivers/mfd/syscon.c                             | 13 +++++++++++++
-> >  2 files changed, 17 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
-> > index fe8150b..408f768 100644
-> > --- a/Documentation/devicetree/bindings/mfd/syscon.txt
-> > +++ b/Documentation/devicetree/bindings/mfd/syscon.txt
-> > @@ -13,6 +13,10 @@ Required properties:
-> >  - compatible: Should contain "syscon".
-> >  - reg: the register region can be accessed from syscon
-> >  
-> > +Optional property:
-> > +- reg-io-width: the size (in bytes) of the IO accesses that should be
-> > +  performed on the device.
-> > +
-> >  Examples:
-> >  gpr: iomuxc-gpr at 020e0000 {
-> >  	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
-> > diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-> > index 176bf0f..b7aabee 100644
-> > --- a/drivers/mfd/syscon.c
-> > +++ b/drivers/mfd/syscon.c
-> > @@ -47,6 +47,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
-> >  	struct syscon *syscon;
-> >  	struct regmap *regmap;
-> >  	void __iomem *base;
-> > +	u32 reg_io_width;
-> >  	int ret;
-> >  	struct regmap_config syscon_config = syscon_regmap_config;
-> >  
-> > @@ -69,6 +70,18 @@ static struct syscon *of_syscon_register(struct device_node *np)
-> >  	 else if (of_property_read_bool(np, "little-endian"))
-> >  		syscon_config.val_format_endian = REGMAP_ENDIAN_LITTLE;
-> >  
-> > +	/*
-> > +	 * search for reg-io-width property in DT. If it is not provided,
-> > +	 * default to 4 bytes. regmap_init_mmio will return an error if values
-> > +	 * are invalid so there is no need to check them here.
-> > +	 */
-> > +	ret = of_property_read_u32(np, "reg-io-width", &reg_io_width);
-> > +	if (ret)
-> > +		reg_io_width = 4;
-> > +
-> > +	syscon_config.reg_stride = reg_io_width;
-> > +	syscon_config.val_bits = reg_io_width * 8;
-> > +
-> >  	regmap = regmap_init_mmio(NULL, base, &syscon_config);
-> >  	if (IS_ERR(regmap)) {
-> >  		pr_err("regmap init failed\n");
-> > -- 
-> > 2.5.0
-> > 
+> Signed-off-by: Jianqun xu <jay.xu@rock-chips.com>
+
+applied to my clk branch for 4.5
+[after adapting to Caesar's other critical clock]
+
+
+Thanks
+Heiko
