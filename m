@@ -1,109 +1,43 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed,  2 Dec 2015 12:22:59 +0000
-Subject: [PATCH v3 1/4] drm: arm: Add DT bindings documentation for HDLCD
- driver.
+Date: Wed,  2 Dec 2015 12:23:02 +0000
+Subject: [PATCH v3 4/4] MAINTAINERS: Add Liviu Dudau as maintainer for ARM
+ HDLCD driver.
 In-Reply-To: <1449058982-18595-1-git-send-email-Liviu.Dudau@arm.com>
 References: <1449058982-18595-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1449058982-18595-2-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1449058982-18595-5-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
+Update MAINTAINERS file for HDLCD driver.
+
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+Cc: Greg KH <gregkh@linuxfoundation.org>
+Cc: Joe Perches <joe@perches.com>
+Cc: Jiri Slaby <jslaby@suse.com>
 
 Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 ---
- .../devicetree/bindings/display/arm,hdlcd.txt      | 79 ++++++++++++++++++++++
- 1 file changed, 79 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/arm,hdlcd.txt
+ MAINTAINERS | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/arm,hdlcd.txt b/Documentation/devicetree/bindings/display/arm,hdlcd.txt
-new file mode 100644
-index 0000000..78bc242
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/arm,hdlcd.txt
-@@ -0,0 +1,79 @@
-+ARM HDLCD
+diff --git a/MAINTAINERS b/MAINTAINERS
+index cba790b..4c468b7 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -820,6 +820,12 @@ S:	Maintained
+ F:	drivers/net/arcnet/
+ F:	include/uapi/linux/if_arcnet.h
+ 
++ARM HDLCD DRM DRIVER
++M:	Liviu Dudau <liviu.dudau@arm.com>
++S:	Maintained
++F:	drivers/gpu/drm/arm/
++F:	Documentation/devicetree/bindings/display/arm,hdlcd.txt
 +
-+This is a display controller found on several development platforms produced
-+by ARM Ltd and in more modern of its' Fast Models. The HDLCD is an RGB
-+streamer that reads the data from a framebuffer and sends it to a single
-+digital encoder (DVI or HDMI).
-+
-+Required properties:
-+  - compatible: "arm,hdlcd"
-+  - reg: Physical base address and length of the controller's registers.
-+  - interrupts: One interrupt used by the display controller to notify the
-+    interrupt controller when any of the interrupt sources programmed in
-+    the interrupt mask register have activated.
-+  - clocks: A list of phandle + clock-specifier pairs, one for each
-+    entry in 'clock-names'.
-+  - clock-names: A list of clock names. For HDLCD it should contain:
-+      - "pxlclk" for the clock feeding the output PLL of the controller.
-+
-+Required sub-nodes:
-+  - port: The HDLCD connection to an encoder chip. The connection is modeled
-+    using the OF graph bindings specified in
-+    Documentation/devicetree/bindings/graph.txt.
-+
-+Optional properties:
-+  - memory-region: phandle to a node describing memory (see
-+    Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt) to be
-+    used for the framebuffer; if not present, the framebuffer may be located
-+    anywhere in memory.
-+
-+
-+Example:
-+
-+/ {
-+	...
-+
-+	hdlcd at 2b000000 {
-+		compatible = "arm,hdlcd";
-+		reg = <0 0x2b000000 0 0x1000>;
-+		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&oscclk5>;
-+		clock-names = "pxlclk";
-+		port {
-+			hdlcd_output: endpoint at 0 {
-+				remote-endpoint = <&hdmi_enc_input>;
-+			};
-+		};
-+	};
-+
-+	/* HDMI encoder on I2C bus */
-+	i2c at 7ffa0000 {
-+		....
-+		hdmi-transmitter at 70 {
-+			compatible = ".....";
-+			reg = <0x70>;
-+			port at 0 {
-+				hdmi_enc_input: endpoint {
-+					remote-endpoint = <&hdlcd_output>;
-+				};
-+
-+				hdmi_enc_output: endpoint {
-+					remote-endpoint = <&hdmi_1_port>;
-+				};
-+			};
-+		};
-+
-+	};
-+
-+	hdmi1: connector at 1 {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+		port {
-+			hdmi_1_port: endpoint {
-+				remote-endpoint = <&hdmi_enc_output>;
-+			};
-+		};
-+	};
-+
-+	...
-+};
+ ARM MFM AND FLOPPY DRIVERS
+ M:	Ian Molton <spyro@f2s.com>
+ S:	Maintained
 -- 
 2.6.2
