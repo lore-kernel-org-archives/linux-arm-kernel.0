@@ -1,58 +1,38 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Wed, 02 Dec 2015 13:08:33 -0800
-Subject: [PATCH v12 08/16] arm64/kexec: Add core kexec support
-In-Reply-To: <20151201190337.GG29045@leverpostej>
-References: <cover.1448403503.git.geoff@infradead.org>
- <6ac232ad37d6b02cf2d5848b15236f26f5ac61ac.1448403503.git.geoff@infradead.org>
- <20151127131306.GE23908@dhcppc13.redhat.com>
- <1448909475.31214.27.camel@infradead.org>
- <20151201021615.GA5704@dhcppc13.redhat.com>
- <20151201190337.GG29045@leverpostej>
-Message-ID: <1449090513.6139.63.camel@infradead.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 02 Dec 2015 22:15:02 +0100
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <20151202203810.GH9866@lunn.ch>
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+ <20151202202240.GH8644@n2100.arm.linux.org.uk>
+ <20151202203810.GH9866@lunn.ch>
+Message-ID: <10084728.p75H39SaXO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Tue, 2015-12-01 at 19:03 +0000, Mark Rutland wrote:
-> You can validly perform maintenance while the cache may allocate for a
-> region of memory, it's just that afterwards the cache may hold a clean
-> entries for that region.
+On Wednesday 02 December 2015 21:38:10 Andrew Lunn wrote:
+> On Wed, Dec 02, 2015 at 08:22:40PM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Dec 02, 2015 at 08:51:04PM +0100, Arnd Bergmann wrote:
+> > > I'm mostly interested in it because it's the only ARMv7 platform that is
+> > > left after my other patches, and I just want to be done with it after
+> > > spending 5 years on it 
+> > 
+> > My understanding is that the long term goal is to delete mach-dove once
+> > everyone has settled down into the mvebu DT world.
+> > 
+> > Right now we have mvebu which covers Dove using DT.  We have mach-dove
+> > which is legacy non-DT Dove.
+> > 
+> > It seems to me to be completely crazy to want to bring legacy code, which
+> > is ultimately destined to be deleted, into multiplatform.
 > 
-> You can clean/clean+invalidate to push data to the PoC, or you can
-> invalidate/clean+invalidate to ensure that no asynchronous writebacks
-> occur later (so long as you do not make a cacheable write to said
-> cacheline).
-> 
-> The only thing that you cannot guarantee is that there is not some clean
-> cacheline allocated for a region of memory to which cacheable accesses
-> may be performed.
-> 
-> Note that the kernel only requires its Image to be clean to the PoC. So
-> long as this is true, we know that there will not be asynchrnoous
-> writebacks, and can invalidate as necessary as part of the boot process.
+> I agree. We have multiplatform dove already, it is in mach-mvebu. Do
+> we really need both mach-dove and mach-mvebu dove in one kernel?
 
-In v10, which worked for Mustang and Qualcomm, we had:
+I'm also fine with deleting mach-dove, but that would be much more
+disruptive to Russell's work, so I don't think that helps anyone.
 
-  clean+invalidate to PoC all source pages
-  disable d-cache
-  loop {
-    invalidate to PoC destination page
-    copy page source->destination
-  }
-  enter new image
+I've rebased the series to leave out the last two patches for dove,
+and added the watchdog on dove, so I can at least get the other
+patches out of my queue if that works for now.
 
-In v11 I changed this, and it did not work for those platforms:
- 
-  clean+invalidate to PoC all source pages
-  clean+invalidate to PoC all destination pages
-  disable d-cache
-  loop {
-    copy page source->destination
-  }
-  enter new image
-
-Based on your comments above I would think both should work OK.
-
--Geoff
-  
+	Arnd
