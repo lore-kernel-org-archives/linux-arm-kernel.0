@@ -1,28 +1,17 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Wed, 2 Dec 2015 18:27:14 +0530
-Subject: [PATCH 3/6] net: thunderx: Increase transmit queue length
-In-Reply-To: <013301d12cfd$0c958a90$25c09fb0$@samsung.com>
-References: <y@samsung.com>
- <1448961223-41888-4-git-send-email-sunil.kovvuri@gmail.com>
- <01d101d12c46$2de43b40$89acb1c0$@samsung.com>
- <1448983985.25582.35.camel@edumazet-glaptop2.roam.corp.google.com>
- <CA+sq2Ce9oH-kCDO8hK_wX+ZZdXyyBuT4V2bt5Ab+2=pEX+BO+w@mail.gmail.com>
- <00cb01d12ce0$9f090540$dd1b0fc0$@samsung.com>
- <00eb01d12cec$a32aa500$e97fef00$@samsung.com>
- <013301d12cfd$0c958a90$25c09fb0$@samsung.com>
-Message-ID: <CA+sq2CfSNBQaQnw32tu4ZcZYLd6ybVZ3Ka5Oz=s1YUNegZpd-A@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 2 Dec 2015 20:57:39 +0800
+Subject: [PATCH v4] arm64: dts: add all hi6220 i2c nodes
+In-Reply-To: <1449051201-7288-1-git-send-email-kong.kongxinwei@hisilicon.com>
+References: <1449051201-7288-1-git-send-email-kong.kongxinwei@hisilicon.com>
+Message-ID: <20151202125739.GU692@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->After getting it working in guest i tried to apply it to host. With total of 128 virtual functions (= 128 interfaces) it does not work at all.
-> Even after bumping cma region size to insane value of 2GB more than half of interfaces still failed to allocate queues.
-> And after setting cma=3G i could not mount my rootfs.
+On Wed, Dec 02, 2015 at 06:13:21PM +0800, Xinwei Kong wrote:
+> This patch adds all I2C nodes for the Hi6220 SoC. This hi6220 Soc
+> use this I2C IP of Synopsys Designware for HiKey board.
+> 
+> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+> Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
 
-Here what you are saying is half of the interfaces were initialized
-succesfully and rest didn't.
-So this issue is not something which is introduced by this patch.
-
-> Can we use some other method for allocating queues, which would not require such a huge coherent pool?
-There are so many drivers which use dma_alloc_coherent() directly or
-via pci_alloc_consistent() to
-allocate memory. How many drivers should we modify.
+Reviewed-by: Shawn Guo <shawnguo@kernel.org>
