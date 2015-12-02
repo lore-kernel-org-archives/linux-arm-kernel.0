@@ -1,40 +1,48 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 2 Dec 2015 15:55:37 +0100
-Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
-In-Reply-To: <87fuzl2jm5.fsf@free-electrons.com>
-References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
- <87610j7gmc.fsf@free-electrons.com>
- <87wpsz61r7.fsf@free-electrons.com>
- <20151201182226.ea7d860eb3a35086981cd18f@vollmann.ch>
- <87fuzl2jm5.fsf@free-electrons.com>
-Message-ID: <20151202145537.GJ29814@lunn.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 02 Dec 2015 15:57:01 +0100
+Subject: [PATCH 1/5] ARM: config: Regenerate multi_v5_defconfig
+In-Reply-To: <20151202141756.GG29814@lunn.ch>
+References: <1449012812-9779-1-git-send-email-andrew@lunn.ch>
+ <2254361.JL23NtLhah@wuerfel> <20151202141756.GG29814@lunn.ch>
+Message-ID: <2115626.l90A97hBkH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 02, 2015 at 12:08:34PM +0100, Gregory CLEMENT wrote:
-> Hi Detlef,
->  
->  On mar., d?c. 01 2015, Detlef Vollmann <dv@vollmann.ch> wrote:
+On Wednesday 02 December 2015 15:17:56 Andrew Lunn wrote:
+> On Wed, Dec 02, 2015 at 02:44:00PM +0100, Arnd Bergmann wrote:
+> > On Wednesday 02 December 2015 00:33:28 Andrew Lunn wrote:
+> > > Dues the Kconfig changes, multi_v5_defconfig needs regenerating.
+> > > 
+> > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > > ---
+> > >  arch/arm/configs/multi_v5_defconfig | 17 ++++-------------
+> > >  1 file changed, 4 insertions(+), 13 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
+> > > index f69a459f4f92..f98d4b8b54c5 100644
+> > > --- a/arch/arm/configs/multi_v5_defconfig
+> > > +++ b/arch/arm/configs/multi_v5_defconfig
+> > > @@ -11,10 +11,9 @@ CONFIG_MODULE_UNLOAD=y
+> > > @@ -53,7 +52,6 @@ CONFIG_MTD_CFI_GEOMETRY=y
+> > >  CONFIG_MTD_CFI_INTELEXT=y
+> > >  CONFIG_MTD_CFI_STAA=y
+> > >  CONFIG_MTD_PHYSMAP=y
+> > > -CONFIG_MTD_M25P80=y
+> > 
+> > I think we need to enable MTD_SPI_NOR_BASE now to get the driver
+> > back, see 03e296f613af ("mtd: m25p80: use the SPI nor framework")
 > 
-> > On Mon, 30 Nov 2015 14:43:56 +0100
-> > Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-> > [...]
-> >> > Detlef, Benjamin,
-> >> >
-> >> > could you test it on an Orion5x based board?
-> > Sorry, I'm on tour right now.
-> > I'll test it next weekend (or beginning next week) on my DNS-323.
+> As you noticed, this is a pure regenerate.
 > 
-> We have still some time to send the series, and furthermore Andrew
-> already tested it on an Orion5x platform. However it would be nice to
-> have your confirmation on an other board.
+> I will send a few more followups with the MTD_SPI_NOR_BASE, and
+> dropping EXT[23].
 
-Hi Gregory
+Maybe you can do those changes first and regenerate afterwards?
 
-To help with testing, could you pull the defconfig changes into the
-branch? I cannot boot the multi_v5_defconfig on my Orion5x. Its CPU is
-too old, and needs CONFIG_CPU_FEROCEON_OLD_ID, but that is not
-available because CPU_ARM926T is enabled.
+That makes it more obvious what's going on than removing a symbol
+first and then putting it back.
 
-Thanks
-	  Andrew
+Sorry for not having a better answer, I realize this is causing extra
+work.
+
+	Arnd
