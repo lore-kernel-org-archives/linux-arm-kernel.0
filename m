@@ -1,90 +1,80 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Wed, 2 Dec 2015 17:09:26 +0800
-Subject: [RFC PATCH 2/4] device property: Introduce helper
- device_get_reference_node()
+Date: Wed, 2 Dec 2015 17:09:27 +0800
+Subject: [RFC PATCH 3/4] ACPI/platform: Introduce helper
+ acpi_dev_find_plat_dev()
 In-Reply-To: <1449047368-5768-1-git-send-email-wangkefeng.wang@huawei.com>
 References: <1449047368-5768-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1449047368-5768-3-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1449047368-5768-4-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With of_parse_phandle() and acpi_dev_get_reference_device(), we can introduce
-a universal helper device_get_reference_node() to read and parse a device
-property and return a pointer to the resulting firmware node.
+Sometimes in a device object, we refer to another device object,
+mostly in _DSD method, and we need to get platform device with
+the ACPI device node from the referenced device object. So introduce
+the helper acpi_dev_find_plat_dev() to do this.
 
 Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- drivers/base/property.c  | 40 ++++++++++++++++++++++++++++++++++++++++
- include/linux/property.h |  6 ++++++
- 2 files changed, 46 insertions(+)
+ drivers/acpi/acpi_platform.c | 25 +++++++++++++++++++++++++
+ include/linux/acpi.h         |  6 ++++++
+ 2 files changed, 31 insertions(+)
 
-diff --git a/drivers/base/property.c b/drivers/base/property.c
-index 1325ff2..6517140 100644
---- a/drivers/base/property.c
-+++ b/drivers/base/property.c
-@@ -568,6 +568,46 @@ struct fwnode_handle *device_get_next_child_node(struct device *dev,
- EXPORT_SYMBOL_GPL(device_get_next_child_node);
- 
- /**
-+ * fwnode_get_reference_node - Find the firmware node referenced
-+ * @fwnode: Firmware node to get the property from.
-+ * @propname: Name of the property
-+ * @index: Index of the reference
-+ *
-+ * Returns referenced fwnode handler pointer, or an NULL if not found
-+ */
-+struct fwnode_handle *fwnode_get_reference_node(struct fwnode_handle *fwnode,
-+					 const char *propname, int index)
+diff --git a/drivers/acpi/acpi_platform.c b/drivers/acpi/acpi_platform.c
+index 296b7a1..2603f9b 100644
+--- a/drivers/acpi/acpi_platform.c
++++ b/drivers/acpi/acpi_platform.c
+@@ -121,3 +121,28 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *adev)
+ 	return pdev;
+ }
+ EXPORT_SYMBOL_GPL(acpi_create_platform_device);
++
++static int acpi_dev_object_match(struct device *dev, void *data)
 +{
-+	if (is_of_node(fwnode)) {
-+		struct device_node *np;
-+		np = of_parse_phandle(to_of_node(fwnode), propname, index);
-+		return np ? &np->fwnode : NULL;
-+	} else if (is_acpi_node(fwnode)) {
-+		struct acpi_device *adev;
-+		adev = acpi_dev_get_reference_device(to_acpi_device_node(fwnode),
-+						     propname, index);
-+		return adev ? acpi_fwnode_handle(adev) : NULL;
-+	}
++	return ACPI_COMPANION(dev) == data;
++}
++
++/*
++ * acpi_find_plat_device - Find the platform_device associated
++ * with an acpi device
++ * @adev: Pointer to the acpi device
++ *
++ * Returns platform_device pointer, or NULL if not found
++ */
++struct platform_device *acpi_dev_find_plat_dev(struct acpi_device *adev)
++{
++	struct device *dev;
++
++	if (!adev)
++		return NULL;
++
++	dev = bus_find_device(&platform_bus_type, NULL, adev,
++				acpi_dev_object_match);
++	return dev ? to_platform_device(dev) : NULL;
++}
++EXPORT_SYMBOL(acpi_dev_find_plat_dev);
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index d76a688..16af22f 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -468,6 +468,7 @@ int acpi_device_modalias(struct device *, char *, int);
+ void acpi_walk_dep_device_list(acpi_handle handle);
+ 
+ struct platform_device *acpi_create_platform_device(struct acpi_device *);
++struct platform_device *acpi_dev_find_plat_dev(struct acpi_device *adev);
+ #define ACPI_PTR(_ptr)	(_ptr)
+ 
+ #else	/* !CONFIG_ACPI */
+@@ -929,6 +930,11 @@ static inline struct fwnode_handle *acpi_get_next_subnode(struct device *dev,
+ 	return NULL;
+ }
+ 
++static inline struct platform_device *acpi_dev_find_plat_dev(struct acpi_device *adev)
++{
 +	return NULL;
 +}
-+EXPORT_SYMBOL_GPL(fwnode_get_reference_node);
 +
-+/**
-+ * dev_get_reference_node - Find the firmware node referenced
-+ * @dev: Device to get the property from.
-+ * @propname: Name of the property
-+ * @index: Index of the reference
-+ *
-+ * Returns referenced fwnode handler pointer, or an NULL if not found
-+ */
-+struct fwnode_handle *device_get_reference_node(struct device *dev,
-+					 const char *propname, int index)
-+{
-+	return fwnode_get_reference_node(dev_fwnode(dev), propname, index);
-+}
-+EXPORT_SYMBOL_GPL(device_get_reference_node);
-+
-+/**
-  * fwnode_handle_put - Drop reference to a device node
-  * @fwnode: Pointer to the device node to drop the reference to.
-  *
-diff --git a/include/linux/property.h b/include/linux/property.h
-index 0a3705a..d77e6a2 100644
---- a/include/linux/property.h
-+++ b/include/linux/property.h
-@@ -70,6 +70,12 @@ int fwnode_property_read_string(struct fwnode_handle *fwnode,
- int fwnode_property_match_string(struct fwnode_handle *fwnode,
- 				 const char *propname, const char *string);
- 
-+struct fwnode_handle *fwnode_get_reference_node(struct fwnode_handle *fwnode,
-+						const char *propname, int index);
-+
-+struct fwnode_handle *device_get_reference_node(struct device *dev,
-+						const char *propname, int index);
-+
- struct fwnode_handle *device_get_next_child_node(struct device *dev,
- 						 struct fwnode_handle *child);
- 
+ #define ACPI_DECLARE_PROBE_ENTRY(table, name, table_id, subtable, validate, data, fn) \
+ 	static const void * __acpi_table_##name[]			\
+ 		__attribute__((unused))					\
 -- 
 1.7.12.4
