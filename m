@@ -1,174 +1,59 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Wed,  2 Dec 2015 13:43:04 +0800
-Subject: [PATCH v2 3/3] clocksource: add memory-mapped timer support in
- arm_arch_timer.c
-In-Reply-To: <1449034984-12075-1-git-send-email-fu.wei@linaro.org>
-References: <1449034984-12075-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1449034984-12075-4-git-send-email-fu.wei@linaro.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 2 Dec 2015 13:48:14 +0800
+Subject: [PATCH 2/2] ARM: dts: ls1021a: Add a TFT LCD panel.
+In-Reply-To: <1448433967-6710-2-git-send-email-b56799@freescale.com>
+References: <1448433967-6710-1-git-send-email-b56799@freescale.com>
+ <1448433967-6710-2-git-send-email-b56799@freescale.com>
+Message-ID: <20151202054811.GG692@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+On Wed, Nov 25, 2015 at 02:46:07PM +0800, Meng Yi wrote:
+> Signed-off-by: Alison Wang <b18965@freescale.com>
+> Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
+> Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
+> ---
+>  arch/arm/boot/dts/ls1021a-twr.dts | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
+> index fbb89d1..fad2e3b 100644
+> --- a/arch/arm/boot/dts/ls1021a-twr.dts
+> +++ b/arch/arm/boot/dts/ls1021a-twr.dts
+> @@ -105,6 +105,17 @@
+>  			bitclock-master;
+>  		};
+>  	};
+> +
+> +	panel: panel {
+> +		compatible = "nec,nl4827hc19-05b";
+> +	};
+> +
 
-The patch add memory-mapped timer register support for arm_arch_timer driver
-by using the information provided by the new GTDT driver of ACPI.
+This new line shouldn't be needed.
 
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
----
- drivers/clocksource/arm_arch_timer.c | 136 +++++++++++++++++++++++++++++++++++
- 1 file changed, 136 insertions(+)
+> +};
+> +
+> +&dcu {
+> +	fsl,panel = <&panel>;
+> +	status = "okay";
+> +
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 87d6bae..3792fd6 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -666,6 +666,15 @@ arch_timer_needs_probing(int type, const struct of_device_id *matches)
- 		needs_probing = true;
- 	of_node_put(dn);
- 
-+#ifdef CONFIG_ACPI_GTDT
-+	/*
-+	 * Check if we have timer in GTDT table
-+	 */
-+	if (!acpi_disabled && gtdt_timer_is_available(type) &&
-+	    !(arch_timers_present & type))
-+		needs_probing = true;
-+#endif
-+
- 	return needs_probing;
- }
- 
-@@ -835,4 +844,131 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 	return 0;
- }
- CLOCKSOURCE_ACPI_DECLARE(arch_timer, ACPI_SIG_GTDT, arch_timer_acpi_init);
-+
-+static u32 __init arch_timer_mem_cnttidr(struct acpi_gtdt_timer_block *gt_block)
-+{
-+	phys_addr_t cntctlbase_phy;
-+	void __iomem *cntctlbase;
-+	u32 cnttidr;
-+
-+	cntctlbase_phy = (phys_addr_t)gtdt_gt_cntctlbase(gt_block);
-+	if (!cntctlbase_phy) {
-+		pr_err("arch_timer: Can't find CNTCTLBase.\n");
-+		return 0;
-+	}
-+
-+	/*
-+	 * According to ARMv8 Architecture Reference Manual(ARM),
-+	 * the size of CNTCTLBase frame of memory-mapped timer
-+	 * is SZ_4K(Offset 0x000 ? 0xFFF).
-+	 */
-+	cntctlbase = ioremap(cntctlbase_phy, SZ_4K);
-+	if (!cntctlbase) {
-+		pr_err("arch_timer: Can't map CNTCTLBase\n");
-+		return 0;
-+	}
-+	cnttidr = readl_relaxed(cntctlbase + CNTTIDR);
-+	iounmap(cntctlbase);
-+
-+	return cnttidr;
-+}
-+
-+static int __init arch_timer_mem_best_frame(struct acpi_table_header *table,
-+					    struct arch_timer_mem_data *data)
-+{
-+	struct acpi_gtdt_timer_block *gt_block;
-+	u32 frame_number, timer_count, cnttidr;
-+	int i;
-+
-+	gt_block = gtdt_gt_block(table, 0);
-+	if (!gt_block) {
-+		pr_err("arch_timer: Can't find GT Block.\n");
-+		return -EINVAL;
-+	}
-+
-+	timer_count = gtdt_gt_timer_count(gt_block);
-+	if (!timer_count) {
-+		pr_err("arch_timer: Can't find GT frame number.\n");
-+		return -EINVAL;
-+	}
-+
-+	if (gtdt_gt_timer_data(gt_block, 0, false, data)) {
-+		pr_err("arch_timer: Can't get first phy timer.\n");
-+		return -EINVAL;
-+	}
-+
-+	/*
-+	 * Get Generic Timer Counter-timer Timer ID Register
-+	 * for Virtual Timer Capability info
-+	 */
-+	cnttidr = arch_timer_mem_cnttidr(gt_block);
-+
-+	/*
-+	 * Try to find a virtual capable frame.
-+	 * Otherwise fall back to the first physical capable frame.
-+	 */
-+	for (i = 0; i < timer_count; i++) {
-+		frame_number = gtdt_gt_frame_number(gt_block, i);
-+		if (frame_number < ARCH_TIMER_MEM_MAX_FRAME &&
-+		    cnttidr & CNTTIDR_VIRT(frame_number)) {
-+			if (!gtdt_gt_timer_data(gt_block, i, true, data)) {
-+				arch_timer_mem_use_virtual = true;
-+				return 0;
-+			}
-+			pr_warn("arch_timer: Can't get virt timer.\n");
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+/* Initialize memory-mapped timer(wake-up timer) */
-+static int __init arch_timer_mem_acpi_init(struct acpi_table_header *table)
-+{
-+	struct arch_timer_mem_data data;
-+	void __iomem *cntbase;
-+
-+	if (arch_timers_present & ARCH_MEM_TIMER) {
-+		pr_warn("arch_timer_mem: already initialized, skipping\n");
-+		return -EINVAL;
-+	}
-+	arch_timers_present |= ARCH_MEM_TIMER;
-+
-+	if (arch_timer_mem_best_frame(table, &data))
-+		return -EINVAL;
-+
-+	/*
-+	 * According to ARMv8 Architecture Reference Manual(ARM),
-+	 * the size of CNTBaseN frames of memory-mapped timer
-+	 * is SZ_4K(Offset 0x000 ? 0xFFF).
-+	 */
-+	cntbase = ioremap(data.cntbase_phy, SZ_4K);
-+	if (!cntbase) {
-+		pr_err("arch_timer: Can't map CntBase.\n");
-+		return -EINVAL;
-+	}
-+	arch_counter_base = cntbase;
-+
-+	if (!data.irq) {
-+		pr_err("arch_timer: Frame missing %s irq",
-+		       arch_timer_mem_use_virtual ? "virt" : "phys");
-+		return -EINVAL;
-+	}
-+
-+	/*
-+	 * Because in a system that implements both Secure and
-+	 * Non-secure states, CNTFRQ is only accessible in Secure state.
-+	 * So we try to get the system counter frequency from cntfrq_el0
-+	 * (system coprocessor register) here just like arch_timer.
-+	 */
-+	arch_timer_detect_rate(NULL, NULL);
-+
-+	arch_timer_mem_register(cntbase, data.irq);
-+	arch_timer_common_init();
-+
-+	return 0;
-+}
-+
-+CLOCKSOURCE_ACPI_DECLARE(arch_timer_mem, ACPI_SIG_GTDT,
-+			 arch_timer_mem_acpi_init);
- #endif
--- 
-2.5.0
+Ditto
+
+I fixed them up and applied the both patches.
+
+Shawn
+
+>  };
+>  
+>  &dspi1 {
+> -- 
+> 2.1.0.27.g96db324
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
