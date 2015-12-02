@@ -1,17 +1,27 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 01 Dec 2015 22:03:37 -0500 (EST)
-Subject: [PATCH v4 net 0/6] Marvell Armada XP/370/38X Neta fixes
-In-Reply-To: <1448886466-31538-1-git-send-email-mw@semihalf.com>
-References: <1448886466-31538-1-git-send-email-mw@semihalf.com>
-Message-ID: <20151201.220337.2287051759324173025.davem@davemloft.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 1 Dec 2015 20:40:39 -0700
+Subject: [PATCH RFC 1/4] ARM: bcm2835: remove sdhci pins from GPIO pinctrl
+In-Reply-To: <1447949176-21926-2-git-send-email-stefan.wahren@i2se.com>
+References: <1447949176-21926-1-git-send-email-stefan.wahren@i2se.com>
+ <1447949176-21926-2-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <565E6837.1070909@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcin Wojtas <mw@semihalf.com>
-Date: Mon, 30 Nov 2015 13:27:40 +0100
+On 11/19/2015 09:06 AM, Stefan Wahren wrote:
+> Currently the pins alt3 (sdhci) are assigned to GPIO pinctrl.
+> This is bad because a user could export it to sysfs and break
+> sdhci. In order to avoid that remove those pins from GPIO pintrl.
 
-> I'm sending v4 with corrected commit log of the last patch, in order
-> to avoid possible conflicts between the branches as suggested by
-> Gregory Clement.
+> diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
 
-Series applied, thanks.
+>  &gpio {
+> -	pinctrl-0 = <&gpioout &alt0 &i2s_alt0 &alt3>;
+> +	pinctrl-0 = <&gpioout &alt0 &i2s_alt0>;
+
+This doesn't make sense. The current DT content is configuring those
+pins as SDHCI, not as GPIO. Admitedly this is redundant since the
+firmware and/or bootloader already did this in order to boot the system,
+but irrespective, the current DT causes no issues. Removing the pinctrl
+setting should not influence whether the pins can be exported via GPIO
+sysfs either.
