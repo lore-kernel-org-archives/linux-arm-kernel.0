@@ -1,15 +1,15 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 02 Dec 2015 10:39:42 +0900
-Subject: [GIT PULL 5/9] ARM: EXYNOS: Drivers for v4.5
+Date: Wed, 02 Dec 2015 10:39:41 +0900
+Subject: [GIT PULL 4/9] ARM64: EXYNOS: Soc specific code for v4.5
 In-Reply-To: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
 References: <1449020386-20250-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1449020386-20250-6-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1449020386-20250-5-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Kukjin,
 
-Pinctrl for v4.5.
+ARM64 change touch also defconfig.
 
 Best regards,
 Krzysztof
@@ -21,22 +21,27 @@ The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
 
 are available in the git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-4.5
+  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc64-4.5
 
-for you to fetch changes up to 023e06dfa6882f500b9c86fd61f0b1913aa07f36:
+for you to fetch changes up to db44c07a3f0b32815bd1f3e731db9e043e57cf9c:
 
-  pinctrl: exynos: add exynos5410 SoC specific data (2015-11-16 10:54:43 +0900)
-
-----------------------------------------------------------------
-Exynos-specific drivers for 4.5:
-1. Add a pinctrl driver for Exynos5410.
+  arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS (2015-11-22 19:31:30 +0900)
 
 ----------------------------------------------------------------
-Hakjoo Kim (1):
-      pinctrl: exynos: add exynos5410 SoC specific data
+Samsung Exynos ARM64 improvements:
+1. Use just one Kconfig symbol for Exynos SoC: ARCH_EXYNOS.
+   This depends on change in drivers/clk where the old ARCH_EXYNOS7
+   was used.
 
- .../bindings/pinctrl/samsung-pinctrl.txt           |   1 +
- drivers/pinctrl/samsung/pinctrl-exynos.c           | 103 +++++++++++++++++++++
- drivers/pinctrl/samsung/pinctrl-samsung.c          |   2 +
- drivers/pinctrl/samsung/pinctrl-samsung.h          |   1 +
- 4 files changed, 107 insertions(+)
+----------------------------------------------------------------
+Krzysztof Kozlowski (3):
+      clk: samsung: Don't build ARMv8 clock drivers on ARMv7
+      Merge tag 'samsung-clk-arm64-symbols-4.5' into next/soc64
+      arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS
+
+ arch/arm64/Kconfig.platforms        | 11 ++---------
+ arch/arm64/boot/dts/exynos/Makefile |  2 +-
+ arch/arm64/configs/defconfig        |  2 +-
+ drivers/clk/samsung/Kconfig         |  6 ++++++
+ drivers/clk/samsung/Makefile        |  4 ++--
+ 5 files changed, 12 insertions(+), 13 deletions(-)
