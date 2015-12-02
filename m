@@ -1,35 +1,26 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Wed, 2 Dec 2015 17:04:36 +0530
-Subject: [PATCH v2 4/5] net: thunderx: Switchon carrier only upon
- interface link up
-In-Reply-To: <011f01d12cf4$de8bc7c0$9ba35740$@samsung.com>
-References: <1449050777-37836-1-git-send-email-sunil.kovvuri@gmail.com>
- <1449050777-37836-5-git-send-email-sunil.kovvuri@gmail.com>
- <00ec01d12cee$26a28a00$73e79e00$@samsung.com>
- <011f01d12cf4$de8bc7c0$9ba35740$@samsung.com>
-Message-ID: <CA+sq2Cf1v8js0UQoA+b8eO8_i3P7+kriHtknW9Dz3bXTR5Fjqg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 02 Dec 2015 12:35:15 +0100
+Subject: linux-next: manual merge of the renesas tree with the arm-soc tree
+In-Reply-To: <20151202112109.342837c08019e632b28020fc@kernel.org>
+References: <20151202112109.342837c08019e632b28020fc@kernel.org>
+Message-ID: <3662441.U0Roeq6f5X@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the confirmation.
+On Wednesday 02 December 2015 11:21:09 Mark Brown wrote:
+> 
+> Today's linux-next merge of the renesas tree got a conflict in
+> arch/arm/mach-shmobile/Kconfig between commit e32465429490 ("ARM: use "depends
+> on" for SoC configs instead of "if" after prompt") from the arm-soc tree and
+> commit 9b5ba0df4ea4f94 ("ARM: shmobile: Introduce ARCH_RENESAS") from the
+> renesas tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
 
-On Wed, Dec 2, 2015 at 5:00 PM, Pavel Fedin <p.fedin@samsung.com> wrote:
->  Hello again!
->
->> Subject: RE: [PATCH v2 4/5] net: thunderx: Switchon carrier only upon interface link up
->>
->>  Just a reminder, we have issue with this one too, which is not addressed yet.
->
->  I have examined the problem thoroughly and discovered that it is a problem with experimental BGX driver patches on my 4.2 host
-> kernel build. It fails to send NIC_MBOX_MSG_BGX_LINK_CHANGE, so nothing works.
->  I have retested this series on top of 4.3 running on ThunderX. It has good BGX driver and everything works fine. Therefore, the
-> whole series can be safely applied and...
->
->  Tested-by: Pavel Fedin <p.fedin@samsung.com>
->
-> Kind regards,
-> Pavel Fedin
-> Expert Engineer
-> Samsung Electronics Research center Russia
->
->
+(as predicted by Simon ;-) )
+
+I plan to put the cross-platform changes I have in next/cleanup into a separate
+branch that can be pulled into other branches to resolve those issues.
+
+	Arnd
