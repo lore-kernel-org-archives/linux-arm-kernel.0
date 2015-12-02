@@ -1,31 +1,163 @@
-From: ben@smart-cactus.org (Ben Gamari)
-Date: Wed,  2 Dec 2015 22:19:27 +0100
-Subject: [PATCH 12/12] cpufreq: arm-big-little: warn on invalid regulator
-In-Reply-To: <1449091167-20758-1-git-send-email-ben@smart-cactus.org>
-References: <1449091167-20758-1-git-send-email-ben@smart-cactus.org>
-Message-ID: <1449091167-20758-13-git-send-email-ben@smart-cactus.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed,  2 Dec 2015 22:27:09 +0100
+Subject: [PATCH 7/7] ARM: orion5x: multiplatform support
+In-Reply-To: <1449091629-2155735-1-git-send-email-arnd@arndb.de>
+References: <1449091629-2155735-1-git-send-email-arnd@arndb.de>
+Message-ID: <1449091629-2155735-8-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-Signed-off-by: Ben Gamari <ben@smart-cactus.org>
----
- drivers/cpufreq/arm_big_little.c | 3 +++
- 1 file changed, 3 insertions(+)
+The orion5x platform is now ready to be enabled for multiplatform
+support, this patch does the switch over by modifying the Kconfig file,
+the defconfig and removing the last mach/*.h header that becomes obsolete
+with this.
 
-diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
-index 2d5761c..5d30c26 100644
---- a/drivers/cpufreq/arm_big_little.c
-+++ b/drivers/cpufreq/arm_big_little.c
-@@ -158,6 +158,9 @@ bL_cpufreq_set_rate_cluster(u32 cpu, u32 cluster, u32 new_rate_kHz)
- 		volt_old = regulator_get_voltage(reg[cluster]);
- 		pr_debug("%s: cpu %d, cluster: %d, Found OPP: %ld kHz, %ld uV\n",
- 			__func__, cpu, cluster, opp_freq / 1000, volt);
-+	} else {
-+		pr_err("%s: cpu %d, cluster: %d, Have no regulator\n",
-+					 __func__, cpu, cluster);
- 	}
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/Kconfig                                | 17 ---------
+ arch/arm/configs/orion5x_defconfig              |  3 ++
+ arch/arm/mach-orion5x/Kconfig                   | 18 +++++++---
+ arch/arm/mach-orion5x/Makefile                  |  2 ++
+ arch/arm/mach-orion5x/include/mach/uncompress.h | 46 -------------------------
+ 5 files changed, 19 insertions(+), 67 deletions(-)
+ delete mode 100644 arch/arm/mach-orion5x/include/mach/uncompress.h
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 6a7ff25376bf..3b3cd6deb816 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -521,23 +521,6 @@ config ARCH_DOVE
+ 	help
+ 	  Support for the Marvell Dove SoC 88AP510
  
- 	pr_debug("%s: cpu %d, cluster: %d, %u MHz, %ld mV --> %u MHz, %ld mV\n",
+-config ARCH_ORION5X
+-	bool "Marvell Orion"
+-	depends on MMU
+-	select ARCH_REQUIRE_GPIOLIB
+-	select CPU_FEROCEON
+-	select GENERIC_CLOCKEVENTS
+-	select MVEBU_MBUS
+-	select MULTI_IRQ_HANDLER
+-	select PCI
+-	select PLAT_ORION_LEGACY
+-	select MULTI_IRQ_HANDLER
+-	select SPARSE_IRQ
+-	help
+-	  Support for the following Marvell Orion 5x series SoCs:
+-	  Orion-1 (5181), Orion-VoIP (5181L), Orion-NAS (5182),
+-	  Orion-2 (5281), Orion-1-90 (6183).
+-
+ config ARCH_MMP
+ 	bool "Marvell PXA168/910/MMP2"
+ 	depends on MMU
+diff --git a/arch/arm/configs/orion5x_defconfig b/arch/arm/configs/orion5x_defconfig
+index 8099417a9466..6ddca8875cb5 100644
+--- a/arch/arm/configs/orion5x_defconfig
++++ b/arch/arm/configs/orion5x_defconfig
+@@ -13,6 +13,9 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_BSD_DISKLABEL=y
++CONFIG_ARCH_MULTI_V5=y
++# CONFIG_ARCH_MULTI_V6 is not set
++# CONFIG_ARCH_MULTI_V7 is not set
+ CONFIG_ARCH_ORION5X=y
+ CONFIG_ARCH_ORION5X_DT=y
+ CONFIG_MACH_DB88F5281=y
+diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
+index 66f1c952c048..a9ad95f000a1 100644
+--- a/arch/arm/mach-orion5x/Kconfig
++++ b/arch/arm/mach-orion5x/Kconfig
+@@ -1,6 +1,18 @@
+-if ARCH_ORION5X
++menuconfig ARCH_ORION5X
++	bool "Marvell Orion"
++	depends on MMU && ARCH_MULTI_V5
++	select ARCH_REQUIRE_GPIOLIB
++	select CPU_FEROCEON
++	select GENERIC_CLOCKEVENTS
++	select MVEBU_MBUS
++	select PCI
++	select PLAT_ORION_LEGACY
++	help
++	  Support for the following Marvell Orion 5x series SoCs:
++	  Orion-1 (5181), Orion-VoIP (5181L), Orion-NAS (5182),
++	  Orion-2 (5281), Orion-1-90 (6183).
+ 
+-menu "Orion Implementations"
++if ARCH_ORION5X
+ 
+ config ARCH_ORION5X_DT
+ 	bool "Marvell Orion5x Flattened Device Tree"
+@@ -163,6 +175,4 @@ config MACH_RD88F6183AP_GE
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell Orion-1-90 (88F6183) AP GE RD.
+ 
+-endmenu
+-
+ endif
+diff --git a/arch/arm/mach-orion5x/Makefile b/arch/arm/mach-orion5x/Makefile
+index a1e0fbe6a7a1..4b2502b4ca0d 100644
+--- a/arch/arm/mach-orion5x/Makefile
++++ b/arch/arm/mach-orion5x/Makefile
+@@ -1,3 +1,5 @@
++ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/arch/arm/plat-orion/include
++
+ obj-y				+= common.o pci.o irq.o mpp.o
+ obj-$(CONFIG_MACH_DB88F5281)	+= db88f5281-setup.o
+ obj-$(CONFIG_MACH_RD88F5182)	+= rd88f5182-setup.o
+diff --git a/arch/arm/mach-orion5x/include/mach/uncompress.h b/arch/arm/mach-orion5x/include/mach/uncompress.h
+deleted file mode 100644
+index 25e5cb98fecc..000000000000
+--- a/arch/arm/mach-orion5x/include/mach/uncompress.h
++++ /dev/null
+@@ -1,46 +0,0 @@
+-/*
+- * Tzachi Perelstein <tzachi@marvell.com>
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#include <linux/serial_reg.h>
+-
+-#define UART0_PHYS_BASE (0xf1000000 + 0x12000)
+-#define SERIAL_BASE	((unsigned char *)UART0_PHYS_BASE)
+-
+-static void putc(const char c)
+-{
+-	unsigned char *base = SERIAL_BASE;
+-	int i;
+-
+-	for (i = 0; i < 0x1000; i++) {
+-		if (base[UART_LSR << 2] & UART_LSR_THRE)
+-			break;
+-		barrier();
+-	}
+-
+-	base[UART_TX << 2] = c;
+-}
+-
+-static void flush(void)
+-{
+-	unsigned char *base = SERIAL_BASE;
+-	unsigned char mask;
+-	int i;
+-
+-	mask = UART_LSR_TEMT | UART_LSR_THRE;
+-
+-	for (i = 0; i < 0x1000; i++) {
+-		if ((base[UART_LSR << 2] & mask) == mask)
+-			break;
+-		barrier();
+-	}
+-}
+-
+-/*
+- * nothing to do
+- */
+-#define arch_decomp_setup()
 -- 
-2.6.2
+2.1.0.rc2
