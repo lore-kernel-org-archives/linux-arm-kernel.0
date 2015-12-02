@@ -1,83 +1,145 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 02 Dec 2015 11:03:55 +0100
-Subject: [PATCH v6 14/19] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <20151202002430.GB23156@yury-N73SV>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <1608639.5Yic1PH469@wuerfel> <20151202002430.GB23156@yury-N73SV>
-Message-ID: <2307165.72VALbNc43@wuerfel>
+From: sunil.kovvuri@gmail.com (Sunil Goutham)
+Date: Wed,  2 Dec 2015 15:36:17 +0530
+Subject: [PATCH v2 5/5] net: thunderx: Enable BGX LMAC's RX/TX only after VF
+ is up
+In-Reply-To: <1449050777-37836-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1449050777-37836-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1449050777-37836-6-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 December 2015 03:24:30 Yury Norov wrote:
-> On Tue, Dec 01, 2015 at 12:30:56PM +0100, Arnd Bergmann wrote:
-> > On Tuesday 01 December 2015 12:01:12 Andreas Schwab wrote:
-> > > Arnd Bergmann <arnd@arndb.de> writes:
-> > > 
-> > > > On Tuesday 01 December 2015 10:20:59 Andreas Schwab wrote:
-> > > >> Yury Norov <ynorov@caviumnetworks.com> writes:
-> > > >> 
-> > > >> > There's a tricky bug with signal stack, that Andreas also discovered.
-> > > >> 
-> > > >> That was only a confusion about the compat state of sys_rt_sigaction.
-> > > >> It just requires making sure glibc uses the correct (64bit layout)
-> > > >> struct kernel_sigaction.
-> > > >
-> > > > I don't think we need to use the 64-bit version of sigaction, both
-> > > > kernel and libc are simpler if we use the normal 32-bit version.
-> > > 
-> > > Since glibc has to do the conversion anyway (due to sigset_t), using the
-> > > 64bit layout avoids a second conversion in the kernel.
-> > 
-> > I don't get the part about sigset_t. Why would glibc want to use the
-> > 64-bit layout? This one looks like one of the cases where we absolutely
-> > want to use the 32-bit layout or otherwise get into big trouble if
-> > we ever want to support native ILP32 kernels.
-> > 
-> >       Arnd
-> 
-> So, we drop patch #6, and use 32-bit layout for all signal structures.
-> 
-> Correct?
+From: Sunil Goutham <sgoutham@cavium.com>
 
-If the 32-bit layout is sane, yes. Andrew can surely judge this better
-than I can. The goal should be to have the most straightforward
-implementation for both kernel and libc, and reuse either the compat
-signal handling or the native one as much as we can.
+Enable or disable BGX LMAC's RX/TX based on corresponding VF's
+status. If otherwise, when multiple LMAC's physical link is up
+then packets from all LMAC's whose corresponding VF is not yet
+initialized will get forwarded to VF0. This is due to VNIC's default
+configuration where CPI, RSSI e.t.c point to VF0/QSET0/RQ0.
 
-Looking at the API, I find that ARM fortunately uses all the standard
-definitions for sigset_t, struct siginfo/siginfo_t, union sigval/sigval_t,
-struct sigaction, struct sigaltstack/stack_t. It took me a while to
-figure out that the definitions in the uapi headers are different but
-actually unused (probably remaining from libc5 days or earlier).
-The signal numbers are all the same, and so are the 
+This patch will prevent multiple copies of packets on VF0.
 
-The SA_* flags are all the same too, except for SA_THIRTYTWO, but
-that is not implemented by the compat handling because we do not
-support 26 bit tasks anyway.
+Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+---
+ drivers/net/ethernet/cavium/thunder/nic_main.c    |   20 +++++++++++++++++++-
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c |   20 ++++++++++++++++++--
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h |    1 +
+ 3 files changed, 38 insertions(+), 3 deletions(-)
 
-struct sigcontext is obviously different because of the changed
-register set, and we will have to deal with that in some form in the
-compat code. struct ucontext and struct rt_sigframe includes that,
-which I assume is the main part we need to handle correctly
-by having ilp32 specific setup_rt_frame/sys_rt_sigreturn functions.
-
-One small difference is the handling of MINSIGSTKSZ, which would
-currently work for ilp32, but I noticed that commit c9692657c032
-("arm64: Fix MINSIGSTKSZ and SIGSTKSZ") from Manjeet Pawar broke
-compat mode: Any 32-bit (aarch32) task that passes an altstack smaller
-than 5120 bytes now gets rejected by the kernel, whereas the native
-32-bit kernel checks for 2048 bytes instead. We need to fix the
-existing compat case here without breaking the ilp32 case.
-
-With all that said, I would assume that just having separate
-sigcontext/ucontext/rt_sigframe and reusing the compat code otherwise,
-we are overall better off than with using the native 64-bit signal
-handling with everything that ties in (waitid, epoll_pwait,
-signalfd, ppoll, ...), but we can discuss this further if someone
-sees major downsides of that compared to your existing approach.
-In particular, I don't know what the difference means for gdb,
-glibc or strace.
-
-
-	Arnd
+diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
+index cfc24a1..4b7fd63 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
+@@ -37,6 +37,7 @@ struct nicpf {
+ #define	NIC_GET_BGX_FROM_VF_LMAC_MAP(map)	((map >> 4) & 0xF)
+ #define	NIC_GET_LMAC_FROM_VF_LMAC_MAP(map)	(map & 0xF)
+ 	u8			vf_lmac_map[MAX_LMAC];
++	u8			lmac_cnt;
+ 	struct delayed_work     dwork;
+ 	struct workqueue_struct *check_link;
+ 	u8			link[MAX_LMAC];
+@@ -279,6 +280,7 @@ static void nic_set_lmac_vf_mapping(struct nicpf *nic)
+ 	u64 lmac_credit;
+ 
+ 	nic->num_vf_en = 0;
++	nic->lmac_cnt = 0;
+ 
+ 	for (bgx = 0; bgx < NIC_MAX_BGX; bgx++) {
+ 		if (!(bgx_map & (1 << bgx)))
+@@ -288,6 +290,7 @@ static void nic_set_lmac_vf_mapping(struct nicpf *nic)
+ 			nic->vf_lmac_map[next_bgx_lmac++] =
+ 						NIC_SET_VF_LMAC_MAP(bgx, lmac);
+ 		nic->num_vf_en += lmac_cnt;
++		nic->lmac_cnt += lmac_cnt;
+ 
+ 		/* Program LMAC credits */
+ 		lmac_credit = (1ull << 1); /* channel credit enable */
+@@ -715,6 +718,13 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 	case NIC_MBOX_MSG_CFG_DONE:
+ 		/* Last message of VF config msg sequence */
+ 		nic->vf_enabled[vf] = true;
++		if (vf >= nic->lmac_cnt)
++			goto unlock;
++
++		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++
++		bgx_lmac_rx_tx_enable(nic->node, bgx, lmac, true);
+ 		goto unlock;
+ 	case NIC_MBOX_MSG_SHUTDOWN:
+ 		/* First msg in VF teardown sequence */
+@@ -722,6 +732,14 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 		if (vf >= nic->num_vf_en)
+ 			nic->sqs_used[vf - nic->num_vf_en] = false;
+ 		nic->pqs_vf[vf] = 0;
++
++		if (vf >= nic->lmac_cnt)
++			break;
++
++		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++
++		bgx_lmac_rx_tx_enable(nic->node, bgx, lmac, false);
+ 		break;
+ 	case NIC_MBOX_MSG_ALLOC_SQS:
+ 		nic_alloc_sqs(nic, &mbx.sqs_alloc);
+@@ -940,7 +958,7 @@ static void nic_poll_for_link(struct work_struct *work)
+ 
+ 	mbx.link_status.msg = NIC_MBOX_MSG_BGX_LINK_CHANGE;
+ 
+-	for (vf = 0; vf < nic->num_vf_en; vf++) {
++	for (vf = 0; vf < nic->lmac_cnt; vf++) {
+ 		/* Poll only if VF is UP */
+ 		if (!nic->vf_enabled[vf])
+ 			continue;
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+index d77e41a..9df26c2 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+@@ -186,6 +186,23 @@ void bgx_set_lmac_mac(int node, int bgx_idx, int lmacid, const u8 *mac)
+ }
+ EXPORT_SYMBOL(bgx_set_lmac_mac);
+ 
++void bgx_lmac_rx_tx_enable(int node, int bgx_idx, int lmacid, bool enable)
++{
++	struct bgx *bgx = bgx_vnic[(node * MAX_BGX_PER_CN88XX) + bgx_idx];
++	u64 cfg;
++
++	if (!bgx)
++		return;
++
++	cfg = bgx_reg_read(bgx, lmacid, BGX_CMRX_CFG);
++	if (enable)
++		cfg |= CMR_PKT_RX_EN | CMR_PKT_TX_EN;
++	else
++		cfg &= ~(CMR_PKT_RX_EN | CMR_PKT_TX_EN);
++	bgx_reg_write(bgx, lmacid, BGX_CMRX_CFG, cfg);
++}
++EXPORT_SYMBOL(bgx_lmac_rx_tx_enable);
++
+ static void bgx_sgmii_change_link_state(struct lmac *lmac)
+ {
+ 	struct bgx *bgx = lmac->bgx;
+@@ -656,8 +673,7 @@ static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
+ 	}
+ 
+ 	/* Enable lmac */
+-	bgx_reg_modify(bgx, lmacid, BGX_CMRX_CFG,
+-		       CMR_EN | CMR_PKT_RX_EN | CMR_PKT_TX_EN);
++	bgx_reg_modify(bgx, lmacid, BGX_CMRX_CFG, CMR_EN);
+ 
+ 	/* Restore default cfg, incase low level firmware changed it */
+ 	bgx_reg_write(bgx, lmacid, BGX_CMRX_RX_DMAC_CTL, 0x03);
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+index 89a02fa..149e179 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+@@ -183,6 +183,7 @@ enum MCAST_MODE {
+ #define CAM_ACCEPT	1
+ 
+ void octeon_mdiobus_force_mod_depencency(void);
++void bgx_lmac_rx_tx_enable(int node, int bgx_idx, int lmacid, bool enable);
+ void bgx_add_dmac_addr(u64 dmac, int node, int bgx_idx, int lmac);
+ unsigned bgx_get_map(int node);
+ int bgx_get_lmac_count(int node, int bgx);
+-- 
+1.7.1
