@@ -1,27 +1,36 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 2 Dec 2015 10:07:30 +0530
-Subject: [RFC v02 04/15] dmaengine: edma: Add support for DMA filter
- mapping to slave devices
-In-Reply-To: <1589780.JL62pLTh05@wuerfel>
-References: <1448891145-10766-1-git-send-email-peter.ujfalusi@ti.com>
- <1448891145-10766-5-git-send-email-peter.ujfalusi@ti.com>
- <20151201172212.GC1696@localhost> <1589780.JL62pLTh05@wuerfel>
-Message-ID: <20151202043730.GA1854@localhost>
+From: yrdreddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
+Date: Tue, 1 Dec 2015 23:46:01 -0500
+Subject: [PATCH 0/3] gpio support for Broadcom NSP
+Message-ID: <1449031561-18697-1-git-send-email-yrdreddy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 09:20:28PM +0100, Arnd Bergmann wrote:
-> On Tuesday 01 December 2015 22:52:12 Vinod Koul wrote:
-> > On Mon, Nov 30, 2015 at 03:45:34PM +0200, Peter Ujfalusi wrote:
-> > > Add support for providing device to filter_fn mapping so client drivers
-> > > can switch to use the dma_request_chan() API.
-> > 
-> > Any reason why we dont want to go with DT based only for edma here?
-> 
-> I think the OMAP2 based platforms using edma are all DT-only, but mach-davinci
-> would need a lot of work for that.
+This patchset contains the gpio support for the Broadcom's
+Northstar Plus (NSP) SOC.
 
-Okay sound fine then
+The first patch provides the documentation details and the
+second patch contains driver details. The third patch
+contains the enable method.
+
+This patchset has been tested on NSP bcm958625HR board with pinctrl
+patch added.
+This patchset is based on v4.4.0-rc1 and is available from github
+repo: https://github.com/Broadcom/cygnus-linux.git
+branch: nsp-gpio-v1
+
+Yendapally Reddy Dhananjaya Reddy (3):
+  pinctrl: Broadcom NSP GPIO-a device tree bindings
+  pinctrl: nsp: add gpio-a driver support for Broadcom NSP SoC
+  ARM: dts: enable GPIO-a for Broadcom NSP
+
+ .../devicetree/bindings/pinctrl/brcm,nsp-gpio.txt  |  80 +++
+ arch/arm/boot/dts/bcm-nsp.dtsi                     |  12 +
+ drivers/pinctrl/bcm/Kconfig                        |  17 +
+ drivers/pinctrl/bcm/Makefile                       |   1 +
+ drivers/pinctrl/bcm/pinctrl-nsp-gpio.c             | 749 +++++++++++++++++++++
+ 5 files changed, 859 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt
+ create mode 100644 drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
 
 -- 
-~Vinod
+2.1.0
