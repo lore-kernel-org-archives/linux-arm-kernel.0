@@ -1,36 +1,63 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Wed, 02 Dec 2015 14:49:22 -0800
-Subject: [PATCH v12 08/16] arm64/kexec: Add core kexec support
-In-Reply-To: <002101d12c66$ae985440$0bc8fcc0$@codeaurora.org>
-References: <cover.1448403503.git.geoff@infradead.org>
- <6ac232ad37d6b02cf2d5848b15236f26f5ac61ac.1448403503.git.geoff@infradead.org>
- <20151127131306.GE23908@dhcppc13.redhat.com>
- <1448909475.31214.27.camel@infradead.org>
- <20151201021615.GA5704@dhcppc13.redhat.com>
- <002101d12c66$ae985440$0bc8fcc0$@codeaurora.org>
-Message-ID: <1449096562.6139.74.camel@infradead.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 02 Dec 2015 23:56:53 +0100
+Subject: [PATCH 00/13] mvneta Buffer Management and enhancements
+In-Reply-To: <CAPv3WKdHu5O2KEHYpWBHbkA2hHd_QCUK12EBggMDsa8J8D5U2Q@mail.gmail.com>
+ (Marcin Wojtas's message of "Wed, 2 Dec 2015 23:15:23 +0100")
+References: <1448178839-3541-1-git-send-email-mw@semihalf.com>
+ <87lh9f4dbt.fsf@free-electrons.com>
+ <CAPv3WKc+HbirDxKy5n6W5O5BUTDEc3X5et5dTKdp81WOXjphGg@mail.gmail.com>
+ <874mg248jf.fsf@free-electrons.com>
+ <CAPv3WKc8VrgH+aAfHBMwvuOxP17SnXCajtzpxmXf4rt+WFcE-w@mail.gmail.com>
+ <CAPv3WKdAhk71HW8nvMWXUApySE5_WNgx4PDrj4+R4Tv6FVGNqA@mail.gmail.com>
+ <87si3l2kx5.fsf@free-electrons.com>
+ <87two0254c.fsf@free-electrons.com>
+ <CAPv3WKdHu5O2KEHYpWBHbkA2hHd_QCUK12EBggMDsa8J8D5U2Q@mail.gmail.com>
+Message-ID: <87h9k01mtm.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Azriel and Pratyush,
+Hi Marcin,
+ 
+ On mer., d?c. 02 2015, Marcin Wojtas <mw@semihalf.com> wrote:
+>>>
+>>>> 2. Change condition in mvebu_mbus_get_dram_win_info to:
+>>>> if (cs->base <= phyaddr && phyaddr <= (cs->base + cs->size -1))
+>>>
+>>> I think it would be the best solution.
+>>
+>> So I applied the following patch:
+>> --- a/drivers/bus/mvebu-mbus.c
+>> +++ b/drivers/bus/mvebu-mbus.c
+>> @@ -964,7 +964,7 @@ int mvebu_mbus_get_dram_win_info(phys_addr_t phyaddr, u8 *target, u8 *attr)
+>>         for (i = 0; i < dram->num_cs; i++) {
+>>                 const struct mbus_dram_window *cs = dram->cs + i;
+>>
+>> -               if (cs->base <= phyaddr && phyaddr <= (cs->base + cs->size)) {
+>> +               if (cs->base <= phyaddr && phyaddr <= (cs->base + cs->size - 1)) {
+>>                         *target = dram->mbus_dram_target_id;
+>>                         *attr = cs->mbus_attr;
+>>                         return 0;
+>>
+>> I didn't get any errors during boot related to the BM. However I did not
+>> manage to use an ethernet interface. The udhcpc never managed to get an
+>> IP and if I set the IP manually I could not ping.
+>>
+>> But on Armada 388 GP I didn't have any issue.
+>>
+>> Do you have some idea about waht I could check?
+>>
+>
+> I replaced 2GB with 8GB DIMM and after that, on the same kernel/board,
+> I can't ping either. Very strange, but as I can reproduce the issue,
+> don't debug it, I will.
 
-On Tue, 2015-12-01 at 11:32 -0700, Azriel Samson wrote:
-> I tested with v11 on our platform and I too needed the invalidation
-> fix.
+Thanks to care about it!
 
-I pushed out a kexec-v12.1 branch to my linux-kexec repo [1] with
-fixes.  Could you test it with both kexec reboot and kdump?  For
-kdump, use something like:
 
-  CMDLINE += 'crashkernel=64M at 2240M'
+Gregory
 
-then
-
-  # kexec -d --load-panic /boot/vmlinux.strip --append="1 mem=64M maxcpus=1 reset_devices console=... root=..."
-  # echo c > /proc/sysrq-trigger
-
-We need to test both reboot and kdump since the the way the kexec is
-done is different for the two.
-
-[1]  https://git.kernel.org/cgit/linux/kernel/git/geoff/linux-kexec.git
--Geoff
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
