@@ -1,19 +1,49 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Wed, 2 Dec 2015 22:20:46 +0530
-Subject: [PATCH 3/6] net: thunderx: Increase transmit queue length
-In-Reply-To: <1449062733.32764.53.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <01d101d12c46$2de43b40$89acb1c0$@samsung.com>
- <1448983985.25582.35.camel@edumazet-glaptop2.roam.corp.google.com>
- <CA+sq2Ce9oH-kCDO8hK_wX+ZZdXyyBuT4V2bt5Ab+2=pEX+BO+w@mail.gmail.com>
- <20151201.143047.82022857078130793.davem@davemloft.net>
- <CA+sq2CduMnsh_R9zTRMjWT=F5=9U3si-5nO6-gFvGCO9czkDdA@mail.gmail.com>
- <1449062733.32764.53.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <CA+sq2CfWC0kcxKj1kqMEU3+y9aovqDdpn2G72n5ON9T3Hzew_w@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 2 Dec 2015 17:55:36 +0100
+Subject: [RFC PATCH 7/9] drm/rockchip: force enable vop when do mode
+ setting
+In-Reply-To: <1448940721-23488-1-git-send-email-mark.yao@rock-chips.com>
+References: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>
+ <1448940721-23488-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <20151202165536.GA14019@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
-> If the performance increase is 4 %, then surely using twice more memory
-> is not worth it.
-I haven't mentioned anywhere that i am seeing 4% increase in performance.
-Anyways as said already i will recheck and resubmit.
+On Tue, Dec 01, 2015 at 11:32:01AM +0800, Mark Yao wrote:
+> When do mode setting, mean that we want to enable display output,
+> but sometimes, vop_crtc_enable is after mode_set, we can't allow
+> that, so force enable vop in mode setting.
+> 
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> ---
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index c65b454..7c07537 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -1110,6 +1110,7 @@ static void vop_crtc_mode_set_nofb(struct drm_crtc *crtc)
+>  	u16 vact_end = vact_st + vdisplay;
+>  	uint32_t val;
+>  
+> +	vop_crtc_enable(crtc);
+>  	/*
+>  	 * If dclk rate is zero, mean that scanout is stop,
+>  	 * we don't need wait any more.
+
+Have you considered simply moving everything into ->enable()? That's
+what I did for Tegra, for much the same reasons that you gave in the
+commit message. Doing so gives you a much simpler call graph. Really
+the only thing you need to do is move around the code, and perhaps a
+different way to get ahold of the display mode, but you can use the
+Tegra driver as a reference for how to do that.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151202/8fd3a088/attachment.sig>
