@@ -1,98 +1,95 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Wed,  2 Dec 2015 22:59:05 +0800
-Subject: [PATCH v2] acpi, apei, arm64: APEI initial support for aarch64.
-Message-ID: <1449068345-9021-1-git-send-email-fu.wei@linaro.org>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Wed, 2 Dec 2015 16:03:03 +0100
+Subject: [PATCH v4 5/5] ARM: BCM: Add SMP support for Broadcom 4708
+In-Reply-To: <1448987049-17041-6-git-send-email-kapilh@broadcom.com>
+References: <1448987049-17041-1-git-send-email-kapilh@broadcom.com>
+ <1448987049-17041-6-git-send-email-kapilh@broadcom.com>
+Message-ID: <565F0827.4000406@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+On 12/01/2015 05:24 PM, Kapil Hali wrote:
+> From: Jon Mason <jonmason@broadcom.com>
+> 
+> Add SMP support for Broadcom's 4708 SoCs.
+> 
+> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+> Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
+> Tested-by: Hauke Mehrtens <hauke@hauke-m.de>
+> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+> ---
+>  arch/arm/boot/dts/bcm4708.dtsi | 2 ++
+>  arch/arm/mach-bcm/Kconfig      | 1 +
+>  arch/arm/mach-bcm/Makefile     | 3 +++
+>  3 files changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/bcm4708.dtsi b/arch/arm/boot/dts/bcm4708.dtsi
+> index 31141e8..eed4dd1 100644
+> --- a/arch/arm/boot/dts/bcm4708.dtsi
+> +++ b/arch/arm/boot/dts/bcm4708.dtsi
+> @@ -15,6 +15,7 @@
+>  	cpus {
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> +		enable-method = "brcm,bcm-nsp-smp";
+>  
+>  		cpu at 0 {
+>  			device_type = "cpu";
+> @@ -27,6 +28,7 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a9";
+>  			next-level-cache = <&L2>;
+> +			secondary-boot-reg = <0xffff0400>;
+>  			reg = <0x1>;
+>  		};
+>  	};
+> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+> index 83765a0..e85246f 100644
+> --- a/arch/arm/mach-bcm/Kconfig
+> +++ b/arch/arm/mach-bcm/Kconfig
+> @@ -54,6 +54,7 @@ config ARCH_BCM_NSP
+>  config ARCH_BCM_5301X
+>  	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
+>  	select ARCH_BCM_IPROC
+> +	select HAVE_SMP
+>  	help
+>  	  Support for Broadcom BCM470X and BCM5301X SoCs with ARM CPU cores.
+>  
 
-This commit provides APEI arch-specific bits for aarch64
+When applying this patch please make sure it is correctly applied this
+patch causes some problems here:
 
-Changelog:
-v2: Rebase to latest kernel version(4.4-rc3).
-    Move arch_apei_flush_tlb_one() to arch/arm64/kernel/acpi.c
+http://www.spinics.net/lists/arm-kernel/msg462137.html
 
-v1: https://lkml.org/lkml/2015/8/14/199
-    Move arch_apei_flush_tlb_one() to arch/arm64/include/asm/apci.h.
-    Delete arch/arm64/kernel/apei.c.
-    Add "#ifdef CONFIG_ACPI_APEI" for "acpi_disable_cmcff".
+> diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
+> index 5193a25..7d66515 100644
+> --- a/arch/arm/mach-bcm/Makefile
+> +++ b/arch/arm/mach-bcm/Makefile
+> @@ -43,6 +43,9 @@ obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
+>  
+>  # BCM5301X
+>  obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
+> +ifeq ($(CONFIG_ARCH_BCM_5301X),y)
+> +obj-$(CONFIG_SMP)		+= platsmp.o
+> +endif
+>  
+>  # BCM63XXx
+>  ifeq ($(CONFIG_ARCH_BCM_63XX),y)
+> 
 
-Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-Tested-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
----
- arch/arm64/Kconfig            |  1 +
- arch/arm64/include/asm/acpi.h |  4 ++++
- arch/arm64/kernel/acpi.c      | 10 ++++++++++
- 3 files changed, 15 insertions(+)
+I am getting this on a Northstar 1 / BCM4708:
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 871f217..58c8992 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -3,6 +3,7 @@ config ARM64
- 	select ACPI_CCA_REQUIRED if ACPI
- 	select ACPI_GENERIC_GSI if ACPI
- 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
-+	select HAVE_ACPI_APEI if ACPI
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_HAS_ELF_RANDOMIZE
- 	select ARCH_HAS_GCOV_PROFILE_ALL
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index caafd63..0d70c74 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -46,6 +46,9 @@ typedef u64 phys_cpuid_t;
- extern int acpi_disabled;
- extern int acpi_noirq;
- extern int acpi_pci_disabled;
-+#ifdef CONFIG_ACPI_APEI
-+extern int acpi_disable_cmcff;
-+#endif
- 
- static inline void disable_acpi(void)
- {
-@@ -94,6 +97,7 @@ static inline const char *acpi_get_enable_method(int cpu)
- 
- #ifdef	CONFIG_ACPI_APEI
- pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
-+void arch_apei_flush_tlb_one(unsigned long addr);
- #endif
- 
- #endif /*_ASM_ACPI_H*/
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index d1ce8e2..811fea2 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -32,6 +32,7 @@
- #ifdef CONFIG_ACPI_APEI
- # include <linux/efi.h>
- # include <asm/pgtable.h>
-+# include <asm/tlbflush.h>
- #endif
- 
- int acpi_noirq = 1;		/* skip ACPI IRQ initialization */
-@@ -41,6 +42,10 @@ EXPORT_SYMBOL(acpi_disabled);
- int acpi_pci_disabled = 1;	/* skip ACPI PCI scan and IRQ initialization */
- EXPORT_SYMBOL(acpi_pci_disabled);
- 
-+#ifdef CONFIG_ACPI_APEI
-+int acpi_disable_cmcff;
-+#endif
-+
- static bool param_acpi_off __initdata;
- static bool param_acpi_force __initdata;
- 
-@@ -233,4 +238,9 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
- 		return __pgprot(PROT_NORMAL_NC);
- 	return __pgprot(PROT_DEVICE_nGnRnE);
- }
-+
-+void arch_apei_flush_tlb_one(unsigned long addr)
-+{
-+	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
-+}
- #endif
--- 
-2.5.0
+[ 0.137634] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+[ 0.143643] Setting up static identity map for 0x82a0 - 0x82d4
+[ 0.189772] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+[ 0.189861] Brought up 2 CPUs
+[ 0.198845] SMP: Total of 2 processors activated (3188.32 BogoMIPS).
+[ 0.205446] CPU: WARNING: CPU(s) started in wrong/inconsistent modes
+(primary CPU mode 0x13)
+[ 0.214167] CPU: This may indicate a broken bootloader or firmware.
+
+I assume that this is correct and the bootloader is just broken, it uses
+this bootloader: "CFE for Foxconn Router version: v1.0.14", I haven't
+noticed any problems, so it is ok for me.
+
+Hauke
