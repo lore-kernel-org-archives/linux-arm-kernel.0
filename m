@@ -1,65 +1,36 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  2 Dec 2015 20:36:55 +0100
-Subject: [PATCH] USB: host: ohci-at91: fix a crash in
- ohci_hcd_at91_overcurrent_irq
-Message-ID: <1449085015-5538-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Dec 2015 19:37:08 +0000
+Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
+In-Reply-To: <20151202192825.GF8644@n2100.arm.linux.org.uk>
+References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
+ <87610j7gmc.fsf@free-electrons.com>
+ <20151202123310.GC8644@n2100.arm.linux.org.uk>
+ <3059482.yN34NFeWWY@wuerfel>
+ <20151202192825.GF8644@n2100.arm.linux.org.uk>
+Message-ID: <20151202193707.GG8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The interrupt handler, ohci_hcd_at91_overcurrent_irq may be called right
-after registration. At that time, pdev->dev.platform_data is not yet set,
-leading to a NULL pointer dereference.
+On Wed, Dec 02, 2015 at 07:28:25PM +0000, Russell King - ARM Linux wrote:
+> The first is easy to solve, and the second by replacing it with dove.h.
+> The next problem is this:
+> 
+> arch/arm/plat-orion/common.c:25:30: fatal error: mach/bridge-regs.h: No such file or directory
+> 
+> which is impossible to solve, because plat-orion/common.c wants
+> mach-dove/bridge-regs.h.
 
-Fixes: e4df92279fd9 (USB: host: ohci-at91: merge loops in ohci_hcd_at91_drv_probe)
-Reported-by: Peter Rosin <peda@axentia.se>
-Tested-by: Peter Rosin <peda@axentia.se>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/usb/host/ohci-at91.c | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+Another few breakages which is going to be difficult to solve:
 
-diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index 342ffd140122..8c6e15bd6ff0 100644
---- a/drivers/usb/host/ohci-at91.c
-+++ b/drivers/usb/host/ohci-at91.c
-@@ -473,6 +473,8 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
- 	if (!pdata)
- 		return -ENOMEM;
- 
-+	pdev->dev.platform_data = pdata;
-+
- 	if (!of_property_read_u32(np, "num-ports", &ports))
- 		pdata->ports = ports;
- 
-@@ -483,6 +485,7 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
- 		 */
- 		if (i >= pdata->ports) {
- 			pdata->vbus_pin[i] = -EINVAL;
-+			pdata->overcurrent_pin[i] = -EINVAL;
- 			continue;
- 		}
- 
-@@ -513,10 +516,8 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
- 	}
- 
- 	at91_for_each_port(i) {
--		if (i >= pdata->ports) {
--			pdata->overcurrent_pin[i] = -EINVAL;
--			continue;
--		}
-+		if (i >= pdata->ports)
-+			break;
- 
- 		pdata->overcurrent_pin[i] =
- 			of_get_named_gpio_flags(np, "atmel,oc-gpio", i, &flags);
-@@ -552,8 +553,6 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	pdev->dev.platform_data = pdata;
--
- 	device_init_wakeup(&pdev->dev, 1);
- 	return usb_hcd_at91_probe(&ohci_at91_hc_driver, pdev);
- }
+drivers/hwmon/dove.c:35:30: fatal error: mach/bridge-regs.h: No such file or directory
+
+drivers/soc/dove/pmu.c: In function 'dove_init_pmu_legacy':
+drivers/soc/dove/pmu.c:404:46: error: 'IRQ_DOVE_PMU_START' undeclared (first use in this function)
+drivers/soc/dove/pmu.c:404:46: note: each undeclared identifier is reported only once for each function it appears in
+
+So, all in all this series gets a NAK from me as it totally destroys
+my ability to do any further work on Dove.
+
 -- 
-2.5.0
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
