@@ -1,55 +1,65 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Thu, 03 Dec 2015 09:54:56 +0800
-Subject: [RFC PATCH 7/9] drm/rockchip: force enable vop when do mode
- setting
-In-Reply-To: <20151202221710.GB10243@phenom.ffwll.local>
-References: <1448940391-23333-1-git-send-email-mark.yao@rock-chips.com>
- <1448940721-23488-1-git-send-email-mark.yao@rock-chips.com>
- <20151202165536.GA14019@ulmo> <20151202221710.GB10243@phenom.ffwll.local>
-Message-ID: <565FA0F0.1030306@rock-chips.com>
+From: xuejiancheng@huawei.com (Jiancheng Xue)
+Date: Thu, 3 Dec 2015 10:29:14 +0800
+Subject: [PATCH v2 0/9] ARM: hisi: enable hi3519 soc
+Message-ID: <1449109754-23309-1-git-send-email-xuejiancheng@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?12?03? 06:17, Daniel Vetter wrote:
-> On Wed, Dec 02, 2015 at 05:55:36PM +0100, Thierry Reding wrote:
->> On Tue, Dec 01, 2015 at 11:32:01AM +0800, Mark Yao wrote:
->>> When do mode setting, mean that we want to enable display output,
->>> but sometimes, vop_crtc_enable is after mode_set, we can't allow
->>> that, so force enable vop in mode setting.
->>>
->>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
->>> ---
->>>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    1 +
->>>   1 file changed, 1 insertion(+)
->>>
->>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->>> index c65b454..7c07537 100644
->>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->>> @@ -1110,6 +1110,7 @@ static void vop_crtc_mode_set_nofb(struct drm_crtc *crtc)
->>>   	u16 vact_end = vact_st + vdisplay;
->>>   	uint32_t val;
->>>   
->>> +	vop_crtc_enable(crtc);
->>>   	/*
->>>   	 * If dclk rate is zero, mean that scanout is stop,
->>>   	 * we don't need wait any more.
->> Have you considered simply moving everything into ->enable()? That's
->> what I did for Tegra, for much the same reasons that you gave in the
->> commit message. Doing so gives you a much simpler call graph. Really
->> the only thing you need to do is move around the code, and perhaps a
->> different way to get ahold of the display mode, but you can use the
->> Tegra driver as a reference for how to do that.
-> Yeah if writing mode related registers requires the thing to be on on your
-> hw then you can't use the ->mode_set hooks. Those are explicitly called
-> when everything is off (not just sometimes, at least with atomic helpers).
->
-> Like Thierry said the recommendation is to just shovel that code into
-> ->enable hooks. ->mode_set_nofb is mostly there to support easier
-> transition for drivers which started with the legacy crtc helpers.
-> -Daniel
+Hello,
 
-Good, thanks, actually it solve my confusion.
+Hi3519 soc is mainly used for ip camera and sport DV solutions. This patchset adds initial support
+for Hi3519 soc. It includes clock driver, arch configuration, device tree and debug uart configuration.
+It has been tested on hi3519 reference board.
+
+Spi-nor flash driver and other peripheral drivers will be submitted later.
+
+Any comments will be appreciated!
+
+Thanks!
+
+Change Log
+----------
+v2:
+-Rebase to v4.4-rc3
+-Put dt-binding doc and header file in a separate patch.
+-Delete unused clocks definitions.
+-Adjust the ARCH_xxx order in Kconfig file
+-Rename ARCH_HI3xxx to ARCH_36xx
+
+Jiancheng Xue (9):
+  clk: hi3519: add dt-binding document and header file
+  clk: hi3519: add CRG driver for hisilicon hi3519 soc
+  ARM: hisi: enable Hi3519 soc
+  ARM: dts: add dts files for hi3519-demb board
+  ARM: config: enable ARCH_HI3519
+  ARM: debug: add Hi3519 debug uart
+  ARM: hisi: rename ARCH_HI3xxx to ARCH_HI36xx
+  clk: hisilicon: rename ARCH_HI3xxx to ARCH_HI36xx
+  dmaengine: Kconfig: rename ARCH_HI3xxx to ARCH_HI36xx
+
+ .../devicetree/bindings/clock/hi3519-crg.txt       |  46 +++++++
+ arch/arm/Kconfig.debug                             |  14 +-
+ arch/arm/boot/dts/Makefile                         |   4 +-
+ arch/arm/boot/dts/hi3519-demb.dts                  |  55 ++++++++
+ arch/arm/boot/dts/hi3519.dtsi                      | 129 ++++++++++++++++++
+ arch/arm/configs/hisi_defconfig                    |   3 +-
+ arch/arm/configs/multi_v7_defconfig                |   2 +-
+ arch/arm/mach-hisi/Kconfig                         |  11 +-
+ arch/arm/mach-hisi/hisilicon.c                     |   9 ++
+ drivers/clk/hisilicon/Makefile                     |   3 +-
+ drivers/clk/hisilicon/clk-hi3519.c                 | 100 ++++++++++++++
+ drivers/clk/hisilicon/reset.c                      | 149 +++++++++++++++++++++
+ drivers/clk/hisilicon/reset.h                      |  25 ++++
+ drivers/dma/Kconfig                                |   2 +-
+ include/dt-bindings/clock/hi3519-clock.h           |  51 +++++++
+ 15 files changed, 595 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/hi3519-crg.txt
+ create mode 100644 arch/arm/boot/dts/hi3519-demb.dts
+ create mode 100644 arch/arm/boot/dts/hi3519.dtsi
+ create mode 100644 drivers/clk/hisilicon/clk-hi3519.c
+ create mode 100644 drivers/clk/hisilicon/reset.c
+ create mode 100644 drivers/clk/hisilicon/reset.h
+ create mode 100644 include/dt-bindings/clock/hi3519-clock.h
 
 -- 
-?ark Yao
+1.9.1
