@@ -1,42 +1,89 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 3 Dec 2015 12:02:27 +0000
-Subject: [PATCH v6 04/19] arm64: change some CONFIG_COMPAT over to use
- CONFIG_AARCH32_EL0 instead
-In-Reply-To: <1447795019-30176-5-git-send-email-ynorov@caviumnetworks.com>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <1447795019-30176-5-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <20151203120227.GJ10747@e104818-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 3 Dec 2015 12:09:25 +0000
+Subject: [PATCH v3 09/10] PM / Hibernate: Publish pages restored in-place
+ to arch code
+In-Reply-To: <1448559168-8363-10-git-send-email-james.morse@arm.com>
+References: <1448559168-8363-1-git-send-email-james.morse@arm.com>
+ <1448559168-8363-10-git-send-email-james.morse@arm.com>
+Message-ID: <20151203120925.GA2220@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2015 at 12:16:44AM +0300, Yury Norov wrote:
-> From: Andrew Pinski <apinski@cavium.com>
-> 
-> Reviewed-by: David Daney <ddaney@caviumnetworks.com>
-> 
-> Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-> Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
-> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+On Thu, Nov 26, 2015 at 05:32:47PM +0000, James Morse wrote:
 
-Please add a long description to every patch, even if it is trivial.
+[...]
 
-And a nitpick: remove the empty lines between Reviewed-by and
-Signed-off-by. These tags usually come in the same block.
+> @@ -2427,25 +2434,31 @@ static void *get_buffer(struct memory_bitmap *bm, struct chain_allocator *ca)
+>  	if (PageHighMem(page))
+>  		return get_highmem_page_buffer(page, ca);
 
-> +#else
+I know it is not a problem for arm64, but you should export the
+"restored" highmem pages list too because arch code may need to use
+it for the same reasons this patch was implemented.
+
+> -	if (swsusp_page_is_forbidden(page) && swsusp_page_is_free(page))
+> -		/* We have allocated the "original" page frame and we can
+> -		 * use it directly to store the loaded page.
+> -		 */
+> -		return page_address(page);
+> -
+> -	/* The "original" page frame has not been allocated and we have to
+> -	 * use a "safe" page frame to store the loaded page.
+> -	 */
+>  	pbe = chain_alloc(ca, sizeof(struct pbe));
+>  	if (!pbe) {
+>  		swsusp_free();
+>  		return ERR_PTR(-ENOMEM);
+>  	}
+> -	pbe->orig_address = page_address(page);
+> -	pbe->address = safe_pages_list;
+> -	safe_pages_list = safe_pages_list->next;
+> -	pbe->next = restore_pblist;
+> -	restore_pblist = pbe;
 > +
-> +typedef elf_greg_t			compat_elf_greg_t;
-> +typedef elf_gregset_t			compat_elf_gregset_t;
-> +#define compat_a32_elf_check_arch(x)	0
-> +#define COMPAT_SET_PERSONALITY(ex)
-> +#define COMPAT_ARCH_DLINFO
+> +	if (swsusp_page_is_forbidden(page) && swsusp_page_is_free(page)) {
+> +		/* We have allocated the "original" page frame and we can
+> +		 * use it directly to store the loaded page.
+> +		 */
+> +		pbe->orig_address = NULL;
+> +		pbe->address = page_address(page);
+> +		pbe->next = restored_inplace_pblist;
+> +		restored_inplace_pblist = pbe;
+> +	} else {
+> +		/* The "original" page frame has not been allocated and we
+> +		 * have to use a "safe" page frame to store the loaded page.
+> +		 */
+> +		pbe->orig_address = page_address(page);
+> +		pbe->address = safe_pages_list;
+> +		safe_pages_list = safe_pages_list->next;
+> +		pbe->next = restore_pblist;
+> +		restore_pblist = pbe;
+> +	}
+
+This makes sense to me, more so given that the pbe data is already
+pre-allocated regardless in prepare_image() (ie it should not change
+the current behaviour apart from calling chain_alloc() for every page we
+are restoring), you are just adding a pointer to stash that information,
+hence, if it is ok for Pavel and Rafael I think this patch can be considered
+for merging.
+
+Feedback appreciated.
+
+Thanks,
+Lorenzo
+
 > +
-> +#endif
-
-Do you need these definitions here? I guess they may be used later by
-the ILP32 code paths but for A32 compat they don't make much sense (I
-haven't made it to the end of the series yet).
-
--- 
-Catalin
+>  	return pbe->address;
+>  }
+>  
+> @@ -2513,6 +2526,7 @@ int snapshot_write_next(struct snapshot_handle *handle)
+>  			chain_init(&ca, GFP_ATOMIC, PG_SAFE);
+>  			memory_bm_position_reset(&orig_bm);
+>  			restore_pblist = NULL;
+> +			restored_inplace_pblist = NULL;
+>  			handle->buffer = get_buffer(&orig_bm, &ca);
+>  			handle->sync_read = 0;
+>  			if (IS_ERR(handle->buffer))
+> -- 
+> 2.6.2
+> 
