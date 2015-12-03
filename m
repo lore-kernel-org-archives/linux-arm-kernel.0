@@ -1,65 +1,61 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 03 Dec 2015 13:28:12 -0500 (EST)
-Subject: Domain faults when CONFIG_CPU_SW_DOMAIN_PAN is enabled
-In-Reply-To: <20151203172708.GT8644@n2100.arm.linux.org.uk>
-References: <1267b061b66c4d1fa8af1955825bc97a@EMAIL.axentia.se>
- <20151203110041.GK8644@n2100.arm.linux.org.uk>
- <f7774151e4a849e682ae5a607a98140b@EMAIL.axentia.se>
- <20151203115143.GM8644@n2100.arm.linux.org.uk>
- <533b0f1f264e42e78b94bbff9570fb50@EMAIL.axentia.se>
- <20151203133727.GN8644@n2100.arm.linux.org.uk>
- <94580382ca344ae2b64f66fb778c6ff7@EMAIL.axentia.se>
- <20151203164118.GR8644@n2100.arm.linux.org.uk>
- <20151203172708.GT8644@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.20.1512031318580.7560@knanqh.ubzr>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 3 Dec 2015 15:28:49 -0300
+Subject: [PATCH 0/2] ARM: dts: Use MMC pwrseq instead regulators for IGEP
+ WiFi init
+In-Reply-To: <20151203181624.GW23396@atomide.com>
+References: <1449165729-993-1-git-send-email-javier@osg.samsung.com>
+ <20151203181624.GW23396@atomide.com>
+Message-ID: <566089E1.7050805@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Dec 2015, Russell King - ARM Linux wrote:
+Hello Tony,
 
-> On Thu, Dec 03, 2015 at 04:41:18PM +0000, Russell King - ARM Linux wrote:
-> > On Thu, Dec 03, 2015 at 04:12:06PM +0000, Peter Rosin wrote:
-> > > * uaccess_with_memcpy.c:__copy_to_user() has a mode in which it copies
-> > >   "non-atomically" (if faulthandler_disabled() returns 0). If a fault
-> > >   happens during __copy_to_user, what prevents some other thread from
-> > >   clobbering DACR?
-> > 
-> > See the second point above.  Moreover, if we sleep in down_read(),
-> > then __switch_to() reads the current DACR value and saves it in the
-> > thread information, and will restore that value when resuming the
-> > thread - even if the thread has been migrated to a different CPU.
+On 12/03/2015 03:16 PM, Tony Lindgren wrote:
+> * Javier Martinez Canillas <javier@osg.samsung.com> [151203 10:03]:
+>> Hello,
+>>
+>> This series converts the IGEPv2 (IGEP0020) and IGEP COM Module (IGEP0030)
+>> Device Tree to use the MMC power sequence provider to initialize the SDIO
+>> WiFi chip instead of using fake fixed regulators to just toggle the Reset
+>> and Power pins in the chip.
+>>
+>> The patches were tested on an DM3730 IGEPv2 board but the IGEP COM Module
+>> is the same with regard to the SDIO WiFi so it should be safe to land too.
+>>
+>> The IGEPv2 Rev.F and the IGEP COM Module Rev.G DTS were not converted due
+>> using a different WiFi chip (wlcore instead of libertas) than the one in
+>> the board I've access to test so I preferred to leave those untouched.
 > 
-> I thought this was correct, but it isn't - that's what my original solution
-> did, but I think when Will reviewed it, we decided it wasn't necessary -
-> and it isn't necessary for every single case with the exception of this
-> one.  This is exactly what's going wrong: the down_read() in these paths
-> calls into the scheduler, which switches away.  When we come back, the
-> DACR value is reset by the other thread to 0x51.
-> 
-> There's a few ways to solve this:
-> 
-> 1. Make the thread switching code save and restore the DACR register as
->    it would do for domains.  This imposes an overhead on every single
->    context switch whether or not we happen to be in this _single_
->    troublesome code.  (Patch attached - as there's several, I'm attaching
->    them.)
-> 
-> 2. Add additional code to the uaccess-with-memcpy stuff to reset the
->    DACR value prior to using memcpy() or memset().  (Patch attached.)
-> 
-> 3. Make uaccess-with-memcpy depend on !CPU_SW_DOMAINS_PAN (suggested by
->    Will)
-> 
-> 4. Delete the uaccess-with-memcpy code (also suggested by Will.)
-> 
-> I think the best thing I can do is say... "Discuss amongst yourselves" :)
+> Do you have some solution for the start-up latency issue?
+>
 
-Personally, I'd advocate for #2 or #4.  Prior commit 0f64b247e6 I was 
-already leaning towards #4.
+No, I don't and that's one of the reasons why I didn't want to touch the
+DTS that have the wlcore chip.
 
-So if some people are still relying on uaccess-with-memcpy and #2 fixes 
-it then it's all good.  I'd suggest surrounding the DACR accesses with 
-#ifdef CONFIG_CPU_SW_DOMAIN_PAN in the final patch.
+The omap3-igep0020-rev-f.dts and omap3-igep0030-rev-g.dts don't have a
+startup-delay-us property in the regulator for the WLAN_EN pin as is
+the case for the IGEPv5 DTS but I don't know if those DTS are just wrong.
 
+The DTS for the igep0020 and igep0030 that have the libertas chip,
+did have a startup-delay-us for the WIFI_PDN but using the GPIOs
+for RESET_N_W and WIFI_PDN in the mmc-pwrseq-simple reset-gpios is
+enough to make the SDIO chip reset, be enumerated and WiFi to work
+correctly so I don't know if that is really needed or is just a bad
+description in the DTS.
 
-Nicolas
+Since is working for the boards with the libertas chip, I preferred
+to remove the DTS hack but left the boards with wlcore chip since
+you said the startup-delay-us is needed there (but probably we should
+add to the regulators in the boards that don't have it then).
+
+> Regards,
+> 
+> Tony
+> 
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
