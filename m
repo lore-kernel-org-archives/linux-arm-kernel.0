@@ -1,43 +1,75 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 3 Dec 2015 08:00:14 -0800
-Subject: [PATCH 2/2] ARM: OMAP2+: Change core_initcall levels to
- postcore_initcall
-In-Reply-To: <1448900789-4034-3-git-send-email-tony@atomide.com>
-References: <1448900789-4034-1-git-send-email-tony@atomide.com>
- <1448900789-4034-3-git-send-email-tony@atomide.com>
-Message-ID: <20151203160014.GL23396@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 3 Dec 2015 16:06:20 +0000
+Subject: [PATCH v12 08/16] arm64/kexec: Add core kexec support
+In-Reply-To: <1449090513.6139.63.camel@infradead.org>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <6ac232ad37d6b02cf2d5848b15236f26f5ac61ac.1448403503.git.geoff@infradead.org>
+ <20151127131306.GE23908@dhcppc13.redhat.com>
+ <1448909475.31214.27.camel@infradead.org>
+ <20151201021615.GA5704@dhcppc13.redhat.com>
+ <20151201190337.GG29045@leverpostej>
+ <1449090513.6139.63.camel@infradead.org>
+Message-ID: <20151203160619.GA3527@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [151130 08:29]:
-> We want to be able to probe a few selected device drivers before hwmod
-> code populates the clocks in omap_hwmod_setup_all(). This allows us to
-> convert most of the clock drivers into regular device drivers.
+On Wed, Dec 02, 2015 at 01:08:33PM -0800, Geoff Levand wrote:
+> Hi Mark,
 > 
-> We only need a few minimal clock drivers early for the system timers to
-> select between the 32KiHz clock and the high frequency oscillator.
-> 
-> With these changes, initializing the clock drivers can be just done at
-> core_initcall time with something like:
-> 
-> np = of_find_node_by_name(NULL, "plls");
-> if (np)
-> 	of_platform_populate(np, NULL, NULL, NULL);
-> 
-> And then these clocks will be available for the interconnect code to use.
-> 
-> Having most of the clock drivers being regular device drivers allows
-> us to use the nice things like devm_* functions and dev_err and dev_dbg.
-> As an extra bonus, this also allows us to develop the clock drivers for
-> new SoCs as loadable modules initially for cases where we can boot up
-> the system based on the bootloader configured clocks.
-> 
-> To do this, let's change the core_initcalls to postcore_initcall under
-> mach-omap2.
+> On Tue, 2015-12-01 at 19:03 +0000, Mark Rutland wrote:
+> > You can validly perform maintenance while the cache may allocate for a
+> > region of memory, it's just that afterwards the cache may hold a clean
+> > entries for that region.
+> > 
+> > You can clean/clean+invalidate to push data to the PoC, or you can
+> > invalidate/clean+invalidate to ensure that no asynchronous writebacks
+> > occur later (so long as you do not make a cacheable write to said
+> > cacheline).
+> > 
+> > The only thing that you cannot guarantee is that there is not some clean
+> > cacheline allocated for a region of memory to which cacheable accesses
+> > may be performed.
+> > 
+> > Note that the kernel only requires its Image to be clean to the PoC. So
+> > long as this is true, we know that there will not be asynchrnoous
+> > writebacks, and can invalidate as necessary as part of the boot process.
 
-FYI I'm applying this one into omap-for-v4.5/soc today, the first patch
-in this series needs more work as discussed.
+I've realised that my wording here is somewhat confusing.
 
-Regards,
+When I say "clean to the PoC", I mean that for a given PA the cache can
+either:
+* Not hold an entry (i.e. be invalid).
+* Hold a clean entry, where the data is identical to that at the PoC.
 
-Tony
+> In v10, which worked for Mustang and Qualcomm, we had:
+> 
+>   clean+invalidate to PoC all source pages
+>   disable d-cache
+>   loop {
+>     invalidate to PoC destination page
+>     copy page source->destination
+>   }
+>   enter new image
+> 
+> In v11 I changed this, and it did not work for those platforms:
+>  
+>   clean+invalidate to PoC all source pages
+>   clean+invalidate to PoC all destination pages
+>   disable d-cache
+>   loop {
+>     copy page source->destination
+>   }
+>   enter new image
+> 
+> Based on your comments above I would think both should work OK.
+
+No.
+
+In the latter case, clean lines can be allocated before cacheable data
+accesses are inhibited. So stale clean lines can shadow the data copied
+via non-cacheable accesses.
+
+While the cache is clean, it isn't clean to the PoC.
+
+Thanks,
+Mark.
