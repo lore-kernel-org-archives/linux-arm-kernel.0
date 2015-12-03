@@ -1,41 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 3 Dec 2015 08:18:43 +0000
-Subject: [PATCH v2 10/21] arm64: KVM: Add patchable function selector
-In-Reply-To: <20151202223456.GK3233@hawk.localdomain>
-References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
- <1448650215-15218-11-git-send-email-marc.zyngier@arm.com>
- <20151202223456.GK3233@hawk.localdomain>
-Message-ID: <20151203081843.5905bebd@why.wild-wind.fr.eu.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu,  3 Dec 2015 16:20:09 +0800
+Subject: [PATCH 0/4] ARM: sun9i: Support Allwinner A80 NMI controller
+Message-ID: <1449130813-22400-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Dec 2015 16:34:56 -0600
-Andrew Jones <drjones@redhat.com> wrote:
+Hi everyone,
 
-> On Fri, Nov 27, 2015 at 06:50:04PM +0000, Marc Zyngier wrote:
-> > KVM so far relies on code patching, and is likely to use it more
-> > in the future. The main issue is that our alternative system works
-> > at the instruction level, while we'd like to have alternatives at
-> > the function level.
-> 
-> How about setting static-keys at hyp init time?
+This series extends irqchip-sunxi-nmi to add support for the NMI
+controller found in Allwinner's A80 SoC.
 
-That was an option I looked at. And while static keys would work to some
-extent, they also have some nasty side effects:
-- They create both a fast and a slow path. We don't want that - both
-  path should be equally fast, or at least have as little overhead as
-  possible
-- We do need code patching for some assembly code, and using static
-  keys on top creates a parallel mechanism that makes it hard to
-  follow/debug/maintain.
+All Allwinner SoCs have an external NMI pin which the PMIC uses to
+signal interrupts to the processor. On multi-core chips, there's an
+NMI controller handling this pin and chaining interrupts to the GIC.
+We already have support for this on previous sun[678]i family chips.
 
-You can view this alternative function call as a slightly different
-kind of static keys - one that can give you the capability to handle
-function calls instead of just jumping over code sequences. Both have
-their own merits.
+This series extends support to the A80 SoC. This is needed to add
+support for the PMICs. A complete series, including PMIC support,
+can be found here:
 
-Thanks,
+    https://github.com/wens/linux/tree/axp809
 
-	M.
+Patch 1 renames the binding doc, to remove the SoC specific bits from
+the filename.
+
+Patch 2 adds a new compatible string for the A80 variant.
+
+Patch 3 adds driver support for the A80 variant.
+
+Patch 4 adds the NMI controller device node to the A80 dtsi file.
+
+Chen-Yu Tsai (4):
+  irqchip/sunxi-nmi: Rename binding doc filename to
+    allwinner,sunxi-nmi.txt
+  irqchip/sunxi-nmi: Add sun9i-a80 variant to binding doc
+  irqchip/sunxi-nmi: Support sun9i A80 NMI controller
+  ARM: dts: sun9i: Add NMI controller device node
+
+ ...{allwinner,sun67i-sc-nmi.txt => allwinner,sunxi-nmi.txt} |  2 +-
+ arch/arm/boot/dts/sun9i-a80.dtsi                            |  8 ++++++++
+ drivers/irqchip/irq-sunxi-nmi.c                             | 13 +++++++++++++
+ 3 files changed, 22 insertions(+), 1 deletion(-)
+ rename Documentation/devicetree/bindings/interrupt-controller/{allwinner,sun67i-sc-nmi.txt => allwinner,sunxi-nmi.txt} (94%)
+
 -- 
-Without deviation from the norm, progress is not possible.
+2.6.2
