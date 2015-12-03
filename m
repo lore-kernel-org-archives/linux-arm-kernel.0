@@ -1,84 +1,60 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Thu, 3 Dec 2015 18:32:20 +0200
-Subject: [PATCH 0/4] dmaengine: New 'universal' API for requesting channel
-In-Reply-To: <1449153192-9082-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1449153192-9082-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <CAHp75VeLvxwc910ZM-X1_sfZhmf+05CXMuHkMdhVZVHrEmTrDQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 3 Dec 2015 16:32:43 +0000
+Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
+ concurrent lockers
+In-Reply-To: <20151203132839.GA3816@twins.programming.kicks-ass.net>
+References: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
+ <20151130155839.GK17308@twins.programming.kicks-ass.net>
+ <20151201164035.GE27751@arm.com>
+ <20151203001141.GO28602@linux.vnet.ibm.com>
+ <20151203132839.GA3816@twins.programming.kicks-ass.net>
+Message-ID: <20151203163243.GI11337@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 3, 2015 at 4:33 PM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
-> Hi,
+Hi Peter, Paul,
 
-> As it has been discussed in the following thread:
-> http://www.gossamer-threads.com/lists/linux/kernel/2181487#2181487
->
-> With this series I have taken a path which would result two new API, which can
-> be used to convert most of the current users already and with some work all
-> users might be able to move to this set.
-> With this set the filter_fn used for legacy (non DT/ACPI) channel request is no
-> longer needed to be exported to client drivers since the selection of the
-> correct filter_fn will be done in the core.
->
-> So, the first proposal is to have:
->
-> struct dma_chan *dma_request_chan(struct device *dev, const char *name);
-> struct dma_chan *dma_request_chan_by_mask(const dma_cap_mask_t *mask);
->
-> The dma_request_chan_by_mask() is to request any channel matching with the
-> requested capabilities, can be used to request channel for memcpy, memset, xor,
-> etc where no hardware synchronization is needed.
->
-> The dma_request_chan() is to request a slave channel. The dma_request_chan()
-> will try to find the channel via DT, ACPI or in case if the kernel booted in non
-> DT/ACPI mode it will use a filter lookup table and retrieves the needed
-> information from the dma_slave_map provided by the DMA drivers.
-> This legacy mode needs changes in platform code, in dmaengine drivers and
-> finally the dmaengine user drivers can be converted:
->
-> For each dmaengine driver an array of DMA device, slave and the parameter
-> for the filter function needs to be added:
->
-> static const struct dma_slave_map da830_edma_map[] = {
->         { "davinci-mcasp.0", "rx", EDMA_FILTER_PARAM(0, 0) },
->         { "davinci-mcasp.0", "tx", EDMA_FILTER_PARAM(0, 1) },
->         { "davinci-mcasp.1", "rx", EDMA_FILTER_PARAM(0, 2) },
->         { "davinci-mcasp.1", "tx", EDMA_FILTER_PARAM(0, 3) },
->         { "davinci-mcasp.2", "rx", EDMA_FILTER_PARAM(0, 4) },
->         { "davinci-mcasp.2", "tx", EDMA_FILTER_PARAM(0, 5) },
->         { "spi_davinci.0", "rx", EDMA_FILTER_PARAM(0, 14) },
->         { "spi_davinci.0", "tx", EDMA_FILTER_PARAM(0, 15) },
->         { "da830-mmc.0", "rx", EDMA_FILTER_PARAM(0, 16) },
->         { "da830-mmc.0", "tx", EDMA_FILTER_PARAM(0, 17) },
->         { "spi_davinci.1", "rx", EDMA_FILTER_PARAM(0, 18) },
->         { "spi_davinci.1", "tx", EDMA_FILTER_PARAM(0, 19) },
-> };
->
-> This information is going to be used by the dmaengine driver, so
-> modification to the platform_data is needed, and the driver map should be
-> added to the pdata of the DMA driver:
->
-> da8xx_edma0_pdata.slave_map = da830_edma_map;
-> da8xx_edma0_pdata.slavecnt = ARRAY_SIZE(da830_edma_map);
->
-> The DMA driver then needs to configure the needed device -> filter_fn
-> mapping before it registers with dma_async_device_register() :
->
-> if (info->slave_map) {
->         ecc->dma_slave.filter_map.map = info->slave_map;
->         ecc->dma_slave.filter_map.mapcnt = info->slavecnt;
->         ecc->dma_slave.filter_map.filter_fn = edma_filter_fn;
-> }
->
-> When neither DT or ACPI lookup is available the dma_request_chan() will
-> try to match the requester's device name with the filter_map's list of
-> device names, when a match found it will use the information from the
-> dma_slave_map to get the channel with the dma_get_channel() internal
-> function.
+Firstly, thanks for writing that up. I agree that you have something
+that can work in theory, but see below.
 
-For patches 1-3 with regard to comment on 3:
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+On Thu, Dec 03, 2015 at 02:28:39PM +0100, Peter Zijlstra wrote:
+> On Wed, Dec 02, 2015 at 04:11:41PM -0800, Paul E. McKenney wrote:
+> > This looks architecture-agnostic to me:
+> > 
+> > a.	TSO systems have smp_mb__after_unlock_lock() be a no-op, and
+> > 	have a read-only implementation for spin_unlock_wait().
+> > 
+> > b.	Small-scale weakly ordered systems can also have
+> > 	smp_mb__after_unlock_lock() be a no-op, but must instead
+> > 	have spin_unlock_wait() acquire the lock and immediately 
+> > 	release it, or some optimized implementation of this.
+> > 
+> > c.	Large-scale weakly ordered systems are required to define
+> > 	smp_mb__after_unlock_lock() as smp_mb(), but can have a
+> > 	read-only implementation of spin_unlock_wait().
+> 
+> This would still require all relevant spin_lock() sites to be annotated
+> with smp_mb__after_unlock_lock(), which is going to be a painful (no
+> warning when done wrong) exercise and expensive (added MBs all over the
+> place).
+> 
+> But yes, I think the proposal is technically sound, just not quite sure
+> how far we'll want to push this.
 
--- 
-With Best Regards,
-Andy Shevchenko
+When I said that the solution isn't architecture-agnostic, I was referring
+to the fact that spin_unlock_wait acts as a LOCK operation on all
+architectures other than those using case (c) above. You've resolved
+this by requiring smp_mb__after_unlock_lock() after every LOCK, but I
+share Peter's concerns that this isn't going to work in practice because:
+
+  1. The smp_mb__after_unlock_lock additions aren't necessarily in the
+     code where the spin_unlock_wait() is being added, so it's going to
+     require a lot of diligence for developers to get this right
+
+  2. Only PowerPC is going to see the (very occassional) failures, so
+     testing this is nigh on impossible :(
+
+  3. We've now made the kernel memory model even more difficult to
+     understand, so people might not even bother with this addition
+
+Will
