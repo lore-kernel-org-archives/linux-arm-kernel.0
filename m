@@ -1,83 +1,52 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 3 Dec 2015 09:43:20 +0100
-Subject: [PATCH] USB: host: ohci-at91: fix a crash in
- ohci_hcd_at91_overcurrent_irq
-In-Reply-To: <1449085015-5538-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1449085015-5538-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <566000A8.7070107@atmel.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 3 Dec 2015 09:43:53 +0100
+Subject: [linux-sunxi] [PATCH 0/4] ARM: sun9i: Support Allwinner A80 NMI
+ controller
+In-Reply-To: <1449130813-22400-1-git-send-email-wens@csie.org>
+References: <1449130813-22400-1-git-send-email-wens@csie.org>
+Message-ID: <566000C9.3070307@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 02/12/2015 20:36, Alexandre Belloni a ?crit :
-> The interrupt handler, ohci_hcd_at91_overcurrent_irq may be called right
-> after registration. At that time, pdev->dev.platform_data is not yet set,
-> leading to a NULL pointer dereference.
-> 
-> Fixes: e4df92279fd9 (USB: host: ohci-at91: merge loops in ohci_hcd_at91_drv_probe)
+Hi,
 
-Yes, with:
-Cc: stable at vger.kernel.org # 4.3+
+On 03-12-15 09:20, Chen-Yu Tsai wrote:
+> Hi everyone,
+>
+> This series extends irqchip-sunxi-nmi to add support for the NMI
+> controller found in Allwinner's A80 SoC.
+>
+> All Allwinner SoCs have an external NMI pin which the PMIC uses to
+> signal interrupts to the processor. On multi-core chips, there's an
+> NMI controller handling this pin and chaining interrupts to the GIC.
+> We already have support for this on previous sun[678]i family chips.
+>
+> This series extends support to the A80 SoC. This is needed to add
+> support for the PMICs. A complete series, including PMIC support,
+> can be found here:
+>
+>      https://github.com/wens/linux/tree/axp809
+>
+> Patch 1 renames the binding doc, to remove the SoC specific bits from
+> the filename.
+>
+> Patch 2 adds a new compatible string for the A80 variant.
+>
+> Patch 3 adds driver support for the A80 variant.
+>
+> Patch 4 adds the NMI controller device node to the A80 dtsi file.
+>
+> Chen-Yu Tsai (4):
+>    irqchip/sunxi-nmi: Rename binding doc filename to
+>      allwinner,sunxi-nmi.txt
+>    irqchip/sunxi-nmi: Add sun9i-a80 variant to binding doc
+>    irqchip/sunxi-nmi: Support sun9i A80 NMI controller
+>    ARM: dts: sun9i: Add NMI controller device node
 
+Series looks good to me and is:
 
-> Reported-by: Peter Rosin <peda@axentia.se>
-> Tested-by: Peter Rosin <peda@axentia.se>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Regards,
 
-Alan, I think it's a good candidate to enter the 4.4-rcX...
-
-Thanks, bye.
-
-> ---
->  drivers/usb/host/ohci-at91.c | 11 +++++------
->  1 file changed, 5 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> index 342ffd140122..8c6e15bd6ff0 100644
-> --- a/drivers/usb/host/ohci-at91.c
-> +++ b/drivers/usb/host/ohci-at91.c
-> @@ -473,6 +473,8 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
->  	if (!pdata)
->  		return -ENOMEM;
->  
-> +	pdev->dev.platform_data = pdata;
-> +
->  	if (!of_property_read_u32(np, "num-ports", &ports))
->  		pdata->ports = ports;
->  
-> @@ -483,6 +485,7 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
->  		 */
->  		if (i >= pdata->ports) {
->  			pdata->vbus_pin[i] = -EINVAL;
-> +			pdata->overcurrent_pin[i] = -EINVAL;
->  			continue;
->  		}
->  
-> @@ -513,10 +516,8 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
->  	}
->  
->  	at91_for_each_port(i) {
-> -		if (i >= pdata->ports) {
-> -			pdata->overcurrent_pin[i] = -EINVAL;
-> -			continue;
-> -		}
-> +		if (i >= pdata->ports)
-> +			break;
->  
->  		pdata->overcurrent_pin[i] =
->  			of_get_named_gpio_flags(np, "atmel,oc-gpio", i, &flags);
-> @@ -552,8 +553,6 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
->  		}
->  	}
->  
-> -	pdev->dev.platform_data = pdata;
-> -
->  	device_init_wakeup(&pdev->dev, 1);
->  	return usb_hcd_at91_probe(&ohci_at91_hc_driver, pdev);
->  }
-> 
-
-
--- 
-Nicolas Ferre
+Hans
