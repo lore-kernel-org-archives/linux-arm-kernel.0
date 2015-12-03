@@ -1,52 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 03 Dec 2015 16:32:12 +0100
-Subject: [PATCH 3/4] dmaengine: core: Introduce new,
- universal API to request a channel
-In-Reply-To: <1449153192-9082-4-git-send-email-peter.ujfalusi@ti.com>
-References: <1449153192-9082-1-git-send-email-peter.ujfalusi@ti.com>
- <1449153192-9082-4-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <6922343.04ZpTXZq7O@wuerfel>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Thu, 03 Dec 2015 16:33:56 +0100
+Subject: [alsa-devel] [PATCH] ASoC: mediatek: Use current HW pointer for
+ pointer callback
+In-Reply-To: <20151203145612.GF5727@sirena.org.uk>
+References: <1449129208-63615-1-git-send-email-koro.chen@mediatek.com>
+ <s5h8u5b98dp.wl-tiwai@suse.de>
+ <20151203110158.GD5727@sirena.org.uk>
+ <s5hfuzjn635.wl-tiwai@suse.de>
+ <20151203145612.GF5727@sirena.org.uk>
+Message-ID: <s5hoae7sg0r.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 December 2015 16:33:11 Peter Ujfalusi wrote:
-> +
-> +/**
-> + * dma_request_chan - try to allocate an exclusive slave channel
-> + * @dev:       pointer to client device structure
-> + * @name:      slave channel name
-> + *
-> + * Returns pointer to appropriate DMA channel on success or an error pointer.
-> + */
-> +struct dma_chan *dma_request_chan(struct device *dev, const char *name)
-> +{
-> +       struct dma_device *d, *_d;
-> +       struct dma_chan *chan = NULL;
-> +
-> +       /* If device-tree is present get slave info from here */
-> +       if (dev->of_node)
-> +               chan = of_dma_request_slave_channel(dev->of_node, name);
-> +
-> +       /* If device was enumerated by ACPI get slave info from here */
-> +       if (has_acpi_companion(dev) && !chan)
-> +               chan = acpi_dma_request_slave_chan_by_name(dev, name);
+On Thu, 03 Dec 2015 15:56:12 +0100,
+Mark Brown wrote:
+> 
+> On Thu, Dec 03, 2015 at 12:07:26PM +0100, Takashi Iwai wrote:
+> > Mark Brown wrote:
+> > > On Thu, Dec 03, 2015 at 10:41:38AM +0100, Takashi Iwai wrote:
+> 
+> > > > While reading this patch, I wondered how regmap can be used safely in
+> > > > an irq-disabled context.  Mark, do we have any API for that?
+> 
+> > > We can use user supplied locks or spin_lock_irqsave().
+> 
+> > I meant how to guarantee to make regmap_read() working in an already
+> > spin-locked context, typically in an irq handler?  regmap_read()
+> > involves with the regcache and it may invoke kmalloc().
+> 
+> I know that's what you meant - that should be done by preallocating the
+> cache (which can be done with defaults) and providing your own lock
+> if there's a spinlock already held (since we use _irqsave() which IIRC
+> isn't nestable).
 
-I just noticed that you are creating this as a new interface, rather than
-changing dma_request_slave_channel_reason() and making the old interface
-a static inline wrapper. What is the reasoning behind that?
+The extra lock should be fine unless any mutex is involved silently in
+regmap code.  But preallocation sounds not so intuitive.
 
-I think if we make both interfaces do the same thing, it's easier
-to do the migration.
+> We can also use GFP_ATOMIC for some of the allocations
+> in reasonable use cases but it's not in general supported.
 
-> +       if (chan) {
-> +               /* Valid channel found */
-> +               if (!IS_ERR(chan) || PTR_ERR(chan) == -EPROBE_DEFER)
-> +                       return chan;
-> +
-> +               pr_warn("%s: %s DMA request failed, falling back to legacy\n",
-> +                       __func__, dev->of_node ? "OF" : "ACPI");
-> +       }
+Yeah, but we have already map->alloc_flags, so we can use it
+appropriately as a fallback?
 
-Maybe print the error code as well?
 
-	Arnd
+Takashi
