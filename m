@@ -1,32 +1,195 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 3 Dec 2015 10:21:13 -0600
-Subject: [PATCH v2 03/10] drm/hisilicon: Add hisilicon DRM master driver
-In-Reply-To: <1448707145-69348-4-git-send-email-xinliang.liu@linaro.org>
-References: <1448707145-69348-1-git-send-email-xinliang.liu@linaro.org>
- <1448707145-69348-4-git-send-email-xinliang.liu@linaro.org>
-Message-ID: <CAL_Jsq+cr7sQ1eus8Yi-mCMDq9PCZbFTSoPqt9P4a_m-JGKo0g@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 03 Dec 2015 16:22:23 +0000
+Subject: [PATCH v9 2/4] irqchip: add platform device driver for mbigen
+ device
+In-Reply-To: <1448248513-39760-3-git-send-email-majun258@huawei.com>
+References: <1448248513-39760-1-git-send-email-majun258@huawei.com>
+ <1448248513-39760-3-git-send-email-majun258@huawei.com>
+Message-ID: <56606C3F.5050000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 28, 2015 at 4:38 AM, Xinliang Liu <xinliang.liu@linaro.org> wrote:
-> Add DRM master driver for hi6220 SoC which used in HiKey board.
-> Add dumb buffer feature.
-> Add prime dmabuf feature.
->
-> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
-> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-> Signed-off-by: Andy Green <andy.green@linaro.org>
+On 23/11/15 03:15, MaJun wrote:
+> From: Ma Jun <majun258@huawei.com>
+> 
+> Mbigen means Message Based Interrupt Generator(MBIGEN).
+> 
+> Its a kind of interrupt controller that collects
+> the interrupts from external devices and generate msi interrupt.
+> Mbigen is applied to reduce the number of wire connected interrupts.
+> 
+> As the peripherals increasing, the interrupts lines needed is
+> increasing much, especially on the Arm64 server SOC.
+> 
+> Therefore, the interrupt pin in GIC is not enough to cover so
+> many peripherals.
+> 
+> Mbigen is designed to fix this problem.
+> 
+> Mbigen chip locates in ITS or outside of ITS.
+> 
+> Mbigen chip hardware structure shows as below:
+> 
+> 		mbigen chip
+> |---------------------|-------------------|
+> mgn_node0	  mgn_node1		mgn_node2
+>  |		 |-------|		|-------|------|
+> dev1		dev1    dev2		dev1   dev3   dev4
+> 
+> Each mbigen chip contains several mbigen nodes.
+> 
+> External devices can connect to mbigen node through wire connecting way.
+> 
+> Because a mbigen node only can support 128 interrupt maximum, depends
+> on the interrupt lines number of devices, a device can connects to one
+> more mbigen nodes.
+> 
+> Also, several different devices can connect to a same mbigen node.
+> 
+> When devices triggered interrupt,mbigen chip detects and collects
+> the interrupts and generates the MBI interrupts by writing the ITS
+> Translator register.
+> 
+> To simplify mbigen driver,I used a new conception--mbigen device.
+> Each mbigen device is initialized as a platform device.
+> 
+> Mbigen device presents the parts(register, pin definition etc.) in
+> mbigen chip corresponding to a peripheral device.
+> 
+> So from software view, the structure likes below
+> 
+> 	            mbigen chip
+>      |---------------------|-----------------|
+> mbigen device1       mbigen device2  mbigen device3
+>       |                   |                |
+>      dev1                dev2             dev3
+> Signed-off-by: Ma Jun <majun258@huawei.com>
 > ---
-
-> +static int hisi_gem_cma_dumb_create(struct drm_file *file,
-> +                                   struct drm_device *dev,
-> +                                   struct drm_mode_create_dumb *args)
+>  drivers/irqchip/Kconfig      |    8 ++++
+>  drivers/irqchip/Makefile     |    1 +
+>  drivers/irqchip/irq-mbigen.c |   78 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 87 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/irqchip/irq-mbigen.c
+> 
+> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> index 4d7294e..b205e15 100644
+> --- a/drivers/irqchip/Kconfig
+> +++ b/drivers/irqchip/Kconfig
+> @@ -27,6 +27,14 @@ config ARM_GIC_V3_ITS
+>  	bool
+>  	select PCI_MSI_IRQ_DOMAIN
+>  
+> +config HISILICON_IRQ_MBIGEN
+> +	bool "Support mbigen interrupt controller"
+> +	default n
+> +	depends on ARM_GIC_V3 && ARM_GIC_V3_ITS && GENERIC_MSI_IRQ_DOMAIN
+> +	help
+> +	 Enable the mbigen interrupt controller used on
+> +	 Hisilicon platform.
+> +
+>  config ARM_NVIC
+>  	bool
+>  	select IRQ_DOMAIN
+> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> index 177f78f..cd76b11 100644
+> --- a/drivers/irqchip/Makefile
+> +++ b/drivers/irqchip/Makefile
+> @@ -24,6 +24,7 @@ obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
+>  obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
+>  obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
+>  obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o
+> +obj-$(CONFIG_HISILICON_IRQ_MBIGEN)	+= irq-mbigen.o
+>  obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
+>  obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
+>  obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
+> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+> new file mode 100644
+> index 0000000..9f036c2
+> --- /dev/null
+> +++ b/drivers/irqchip/irq-mbigen.c
+> @@ -0,0 +1,78 @@
+> +/*
+> + * Copyright (C) 2015 Hisilicon Limited, All Rights Reserved.
+> + * Author: Jun Ma <majun258@huawei.com>
+> + * Author: Yun Wu <wuyun.wu@huawei.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +
+> +/**
+> + * struct mbigen_device - holds the information of mbigen device.
+> + *
+> + * @pdev:		pointer to the platform device structure of mbigen chip.
+> + * @base:		mapped address of this mbigen chip.
+> + */
+> +struct mbigen_device {
+> +	struct platform_device	*pdev;
+> +	void __iomem		*base;
+> +};
+> +
+> +static int mbigen_device_probe(struct platform_device *pdev)
 > +{
-> +       int min_pitch = DIV_ROUND_UP(args->width * args->bpp, 8);
+> +	struct mbigen_device *mgn_chip;
+> +	struct resource *res;
+> +
+> +	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
+> +	if (!mgn_chip)
+> +		return -ENOMEM;
+> +
+> +	mgn_chip->pdev = pdev;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	mgn_chip->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(mgn_chip->base))
+> +		return PTR_ERR(mgn_chip->base);
+> +
+> +	platform_set_drvdata(pdev, mgn_chip);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id mbigen_of_match[] = {
+> +	{ .compatible = "hisilicon,mbigen-v2" },
+> +	{ /* END */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, mbigen_of_match);
+> +
+> +static struct platform_driver mbigen_platform_driver = {
+> +	.driver = {
+> +		.name		= "Hisilicon MBIGEN-V2",
+> +		.owner		= THIS_MODULE,
+> +		.of_match_table	= mbigen_of_match,
+> +	},
+> +	.probe			= mbigen_device_probe,
+> +};
+> +
+> +module_platform_driver(mbigen_platform_driver);
+> +
+> +MODULE_AUTHOR("Jun Ma <majun258@huawei.com>");
+> +MODULE_AUTHOR("Yun Wu <wuyun.wu@huawei.com>");
+> +MODULE_LICENSE("GPL");
+> +MODULE_DESCRIPTION("Hisilicon MBI Generator driver");
+> 
 
-BTW, is args->bpp supposed to be bits or bytes? I'm using your dumb bo
-support in drm_gralloc which does bytes as that is what
-gralloc_drm_get_bpp returns. The virtio-gpu driver does bits. I'm
-guessing bits is correct.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Rob
+	M.
+-- 
+Jazz is not dead. It just smells funny...
