@@ -1,87 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 3 Dec 2015 08:35:51 -0800
-Subject: [4.4-rc][PATCH v2] ARM: dts: am4372: fix clock source for arm
- twd and global timers
-In-Reply-To: <1448898998-32749-1-git-send-email-grygorii.strashko@ti.com>
-References: <1448898998-32749-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <20151203163551.GQ23396@atomide.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Thu, 3 Dec 2015 16:36:51 +0000
+Subject: [PATCH v2 2/6] arm64: Move kill_cpu_early to smp.c
+In-Reply-To: <20151201185028.GF29045@leverpostej>
+References: <1448982731-17182-1-git-send-email-suzuki.poulose@arm.com>
+ <1448982731-17182-3-git-send-email-suzuki.poulose@arm.com>
+ <20151201152826.GA28370@leverpostej> <565DC5DB.7070905@arm.com>
+ <20151201163138.GA29045@leverpostej> <565DDB2E.2010308@arm.com>
+ <20151201175254.GD29045@leverpostej> <565DE289.2000105@arm.com>
+ <20151201185028.GF29045@leverpostej>
+Message-ID: <56606FA3.3010802@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [151130 07:58]:
-> ARM TWD and Global timer are clocked by PERIPHCLK which is MPU_CLK/2.
-> But now they are clocked by dpll_mpu_m2_ck == MPU_CLK and, as result.
-> Timekeeping core misbehaves. For example, execution of command
-> "sleep 5" will take 10 sec instead of 5.
-> 
-> Hence, fix it by adding mpu_periphclk ("fixed-factor-clock") and use
-> it for clocking ARM TWD and Global timer (same way as on OMAP4).
-> 
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Fixes:commit 8cbd4c2f6a99 ("arm: boot: dts: am4372: add ARM timers and SCU nodes")
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+On 01/12/15 18:50, Mark Rutland wrote:
+> On Tue, Dec 01, 2015 at 06:10:17PM +0000, Suzuki K. Poulose wrote:
+>> On 01/12/15 17:52, Mark Rutland wrote:
+>>> On Tue, Dec 01, 2015 at 05:38:54PM +0000, Suzuki K. Poulose wrote:
+>>>> On 01/12/15 16:31, Mark Rutland wrote:
+>> OK. So the flag will also be used for CPUs which are stuck-in-the-kernel
+>> with MMU turned on. e.g, a CPU (using spin-table) we try to bring down
+>> in kill_cpu_early(). Correct ?
+>
+> Yes.
+>
+> We'd also pad it such that nothing else shares the same writeback
+> granule, and when writing to it with the MMU off we can invalidate the
+> stale cached copy.
 
-Is this fix alone enough or do you still need to disable other the ARM
-timers in the board specific dts file?
+I have started working on this approach. But the changes are a bit more invasive
+and looks more like suited for 4.5. We could push this series(which doesn't change
+the current behavior as it is in 4.4-rc3, except for the code movement) to fix
+the ASID sanity check and introduce the synchronisation part in 4.5.
+What do you think ?
 
-Regards,
-
-Tony
-
-> ---
-> Changes in v2:
->  - fix: mpu_periphclk should be clocked from dpll_mpu_m2_ck instead of
->    dpll_mpu_ck.
-> link on v1:
->  http://www.spinics.net/lists/arm-kernel/msg463898.html
-> 
->  arch/arm/boot/dts/am4372.dtsi        | 4 ++--
->  arch/arm/boot/dts/am43xx-clocks.dtsi | 8 ++++++++
->  2 files changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-> index d83ff9c..de8791a 100644
-> --- a/arch/arm/boot/dts/am4372.dtsi
-> +++ b/arch/arm/boot/dts/am4372.dtsi
-> @@ -74,7 +74,7 @@
->  		reg = <0x48240200 0x100>;
->  		interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
->  		interrupt-parent = <&gic>;
-> -		clocks = <&dpll_mpu_m2_ck>;
-> +		clocks = <&mpu_periphclk>;
->  	};
->  
->  	local_timer: timer at 48240600 {
-> @@ -82,7 +82,7 @@
->  		reg = <0x48240600 0x100>;
->  		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
->  		interrupt-parent = <&gic>;
-> -		clocks = <&dpll_mpu_m2_ck>;
-> +		clocks = <&mpu_periphclk>;
->  	};
->  
->  	l2-cache-controller at 48242000 {
-> diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi b/arch/arm/boot/dts/am43xx-clocks.dtsi
-> index cc88728..a38af2b 100644
-> --- a/arch/arm/boot/dts/am43xx-clocks.dtsi
-> +++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
-> @@ -259,6 +259,14 @@
->  		ti,invert-autoidle-bit;
->  	};
->  
-> +	mpu_periphclk: mpu_periphclk {
-> +		#clock-cells = <0>;
-> +		compatible = "fixed-factor-clock";
-> +		clocks = <&dpll_mpu_m2_ck>;
-> +		clock-mult = <1>;
-> +		clock-div = <2>;
-> +	};
-> +
->  	dpll_ddr_ck: dpll_ddr_ck {
->  		#clock-cells = <0>;
->  		compatible = "ti,am3-dpll-clock";
-> -- 
-> 2.6.3
-> 
+Cheers
+Suzuki
