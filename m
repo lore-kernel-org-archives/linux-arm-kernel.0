@@ -1,69 +1,267 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 3 Dec 2015 12:35:39 -0800
-Subject: [PATCH v3 2/5] thermal: rockchip: fix a impossible condition
- caused by the warning
-In-Reply-To: <20151203203357.GA141945@google.com>
-References: <1449132523-18817-1-git-send-email-wxt@rock-chips.com>
- <1449132523-18817-3-git-send-email-wxt@rock-chips.com>
- <20151203201908.GA34901@dtor-ws>
- <20151203203357.GA141945@google.com>
-Message-ID: <20151203203539.GB34901@dtor-ws>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 3 Dec 2015 14:42:14 -0600
+Subject: [PATCH v4 2/5] DT: PCI: qcom: Document PCIe devicetree bindings
+In-Reply-To: <1449149725-27607-3-git-send-email-stanimir.varbanov@linaro.org>
+References: <1449149725-27607-1-git-send-email-stanimir.varbanov@linaro.org>
+ <1449149725-27607-3-git-send-email-stanimir.varbanov@linaro.org>
+Message-ID: <20151203204214.GA26902@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2015 at 12:33:57PM -0800, Brian Norris wrote:
-> On Thu, Dec 03, 2015 at 12:19:08PM -0800, Dmitry Torokhov wrote:
-> > On Thu, Dec 03, 2015 at 04:48:40PM +0800, Caesar Wang wrote:
-> > > As the Dan report the smatch check the thermal driver warning:
-> > > drivers/thermal/rockchip_thermal.c:551 rockchip_configure_from_dt()
-> > > warn: impossible condition '(thermal->tshut_temp > ((~0 >> 1))) =>
-> > > (s32min-s32max > s32max)'
-> > > 
-> > > Let's we remove the imposssible condition Since the Temperature is
-> > > currently represented as int not long in the thermal driver.
-> > > 
-> > > Fixes: commit 437df2172e8d
-> > > ("thermal: rockchip: consistently use int for temperatures")
-> > > 
-> > > Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-> > > Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> > > 
-> > > ---
-> > > 
-> > > Changes in v3:
-> > > - As Brian comments on https://patchwork.kernel.org/patch/7580661/,
-> > >   let's remove the impossible condition.
-> > > 
-> > > Changes in v2: None
-> > > Changes in v1: None
-> > > 
-> > >  drivers/thermal/rockchip_thermal.c | 6 ------
-> > >  1 file changed, 6 deletions(-)
-> > > 
-> > > diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-> > > index ae796ec..611de00 100644
-> > > --- a/drivers/thermal/rockchip_thermal.c
-> > > +++ b/drivers/thermal/rockchip_thermal.c
-> > > @@ -549,12 +549,6 @@ static int rockchip_configure_from_dt(struct device *dev,
-> > >  		thermal->tshut_temp = shut_temp;
-> > >  	}
-> > >  
-> > > -	if (thermal->tshut_temp > INT_MAX) {
-> > > -		dev_err(dev, "Invalid tshut temperature specified: %d\n",
-> > > -			thermal->tshut_temp);
-> > > -		return -ERANGE;
-> > > -	}
-> > 
-> > Well, that is not entirely correct. The value that we read from DT is
-> > u32, but we convert it down to int. I believe you want to move the check
+On Thu, Dec 03, 2015 at 03:35:21PM +0200, Stanimir Varbanov wrote:
+> From: Stanimir Varbanov <svarbanov@mm-sol.com>
 > 
-> Do we really account for the possibility of sizeof(int) < sizeof(u32)?
+> Document Qualcomm PCIe driver devicetree bindings.
 > 
-> EDIT: A bit after writing the above line, I notice my error, but in case
-> anyone else is thinking the same thing... I guess you're referring to
-> the sign bit, since we're casting unsigned to signed.
+> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
+> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
 
-Yes, exactly. Sorry I was not clear.
+Acked-by: Rob Herring <robh@kernel.org>
 
--- 
-Dmitry
+> ---
+>  .../devicetree/bindings/pci/qcom,pcie.txt          |  233 ++++++++++++++++++++
+>  1 file changed, 233 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/qcom,pcie.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/qcom,pcie.txt b/Documentation/devicetree/bindings/pci/qcom,pcie.txt
+> new file mode 100644
+> index 000000000000..6d71ee2e335d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/qcom,pcie.txt
+> @@ -0,0 +1,233 @@
+> +* Qualcomm PCI express root complex
+> +
+> +- compatible:
+> +	Usage: required
+> +	Value type: <stringlist>
+> +	Definition: Value should contain
+> +			- "qcom,pcie-ipq8064" for ipq8064
+> +			- "qcom,pcie-apq8064" for apq8064
+> +			- "qcom,pcie-apq8084" for apq8084
+> +
+> +- reg:
+> +	Usage: required
+> +	Value type: <prop-encoded-array>
+> +	Definition: Register ranges as listed in the reg-names property
+> +
+> +- reg-names:
+> +	Usage: required
+> +	Value type: <stringlist>
+> +	Definition: Must include the following entries
+> +			- "parf"   Qualcomm specific registers
+> +			- "dbi"	   Designware PCIe registers
+> +			- "elbi"   External local bus interface registers
+> +			- "config" PCIe configuration space
+> +
+> +- device_type:
+> +	Usage: required
+> +	Value type: <string>
+> +	Definition: Should be "pci". As specified in designware-pcie.txt
+> +
+> +- #address-cells:
+> +	Usage: required
+> +	Value type: <u32>
+> +	Definition: Should be set to 3. As specified in designware-pcie.txt
+> +
+> +- #size-cells:
+> +	Usage: required
+> +	Value type: <u32>
+> +	Definition: Should be set 2. As specified in designware-pcie.txt
+> +
+> +- ranges:
+> +	Usage: required
+> +	Value type: <prop-encoded-array>
+> +	Definition: As specified in designware-pcie.txt
+> +
+> +- interrupts:
+> +	Usage: required
+> +	Value type: <prop-encoded-array>
+> +	Definition: MSI interrupt
+> +
+> +- interrupt-names:
+> +	Usage: required
+> +	Value type: <stringlist>
+> +	Definition: Should contain "msi"
+> +
+> +- #interrupt-cells:
+> +	Usage: required
+> +	Value type: <u32>
+> +	Definition: Should be 1. As specified in designware-pcie.txt
+> +
+> +- interrupt-map-mask:
+> +	Usage: required
+> +	Value type: <prop-encoded-array>
+> +	Definition: As specified in designware-pcie.txt
+> +
+> +- interrupt-map:
+> +	Usage: required
+> +	Value type: <prop-encoded-array>
+> +	Definition: As specified in designware-pcie.txt
+> +
+> +- clocks:
+> +	Usage: required
+> +	Value type: <prop-encoded-array>
+> +	Definition: List of phandle and clock specifier pairs as listed
+> +		    in clock-names property
+> +
+> +- clock-names:
+> +	Usage: required
+> +	Value type: <stringlist>
+> +	Definition: Should contain the following entries
+> +			- "iface"	Configuration AHB clock
+> +
+> +- clock-names:
+> +	Usage: required for ipq/apq8064
+> +	Value type: <stringlist>
+> +	Definition: Should contain the following entries
+> +			- "core"	Clocks the pcie hw block
+> +			- "phy"		Clocks the pcie PHY block
+> +- clock-names:
+> +	Usage: required for apq8084
+> +	Value type: <stringlist>
+> +	Definition: Should contain the following entries
+> +			- "aux"		Auxiliary (AUX) clock
+> +			- "bus_master"	Master AXI clock
+> +			- "bus_slave"	Slave AXI clock
+> +- resets:
+> +	Usage: required
+> +	Value type: <prop-encoded-array>
+> +	Definition: List of phandle and reset specifier pairs as listed
+> +		    in reset-names property
+> +
+> +- reset-names:
+> +	Usage: required for ipq/apq8064
+> +	Value type: <stringlist>
+> +	Definition: Should contain the following entries
+> +			- "axi"  AXI reset
+> +			- "ahb"  AHB reset
+> +			- "por"  POR reset
+> +			- "pci"  PCI reset
+> +			- "phy"  PHY reset
+> +
+> +- reset-names:
+> +	Usage: required for apq8084
+> +	Value type: <stringlist>
+> +	Definition: Should contain the following entries
+> +			- "core" Core reset
+> +
+> +- power-domains:
+> +	Usage: required for apq8084
+> +	Value type: <prop-encoded-array>
+> +	Definition: A phandle and power domain specifier pair to the
+> +		    power domain which is responsible for collapsing
+> +		    and restoring power to the peripheral
+> +
+> +- vdda-supply:
+> +	Usage: required
+> +	Value type: <phandle>
+> +	Definition: A phandle to the core analog power supply
+> +
+> +- vdda_phy-supply:
+> +	Usage: required for ipq/apq8064
+> +	Value type: <phandle>
+> +	Definition: A phandle to the analog power supply for PHY
+> +
+> +- vdda_refclk-supply:
+> +	Usage: required for ipq/apq8064
+> +	Value type: <phandle>
+> +	Definition: A phandle to the analog power supply for IC which generates
+> +		    reference clock
+> +
+> +- phys:
+> +	Usage: required for apq8084
+> +	Value type: <phandle>
+> +	Definition: List of phandle(s) as listed in phy-names property
+> +
+> +- phy-names:
+> +	Usage: required for apq8084
+> +	Value type: <stringlist>
+> +	Definition: Should contain "pciephy"
+> +
+> +- <name>-gpios:
+> +	Usage: optional
+> +	Value type: <prop-encoded-array>
+> +	Definition: List of phandle and gpio specifier pairs. Should contain
+> +			- "perst-gpios"	PCIe endpoint reset signal line
+> +			- "wake-gpios"	PCIe endpoint wake signal line
+> +
+> +* Example for ipq/apq8064
+> +	pcie at 1b500000 {
+> +		compatible = "qcom,pcie-apq8064", "qcom,pcie-ipq8064", "snps,dw-pcie";
+> +		reg = <0x1b500000 0x1000
+> +		       0x1b502000 0x80
+> +		       0x1b600000 0x100
+> +		       0x0ff00000 0x100000>;
+> +		reg-names = "dbi", "elbi", "parf", "config";
+> +		device_type = "pci";
+> +		linux,pci-domain = <0>;
+> +		bus-range = <0x00 0xff>;
+> +		num-lanes = <1>;
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +		ranges = <0x81000000 0 0 0x0fe00000 0 0x00100000   /* I/O */
+> +			  0x82000000 0 0 0x08000000 0 0x07e00000>; /* memory */
+> +		interrupts = <GIC_SPI 238 IRQ_TYPE_NONE>;
+> +		interrupt-names = "msi";
+> +		#interrupt-cells = <1>;
+> +		interrupt-map-mask = <0 0 0 0x7>;
+> +		interrupt-map = <0 0 0 1 &intc 0 36 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
+> +				<0 0 0 2 &intc 0 37 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
+> +				<0 0 0 3 &intc 0 38 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
+> +				<0 0 0 4 &intc 0 39 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
+> +		clocks = <&gcc PCIE_A_CLK>,
+> +			 <&gcc PCIE_H_CLK>,
+> +			 <&gcc PCIE_PHY_CLK>;
+> +		clock-names = "core", "iface", "phy";
+> +		resets = <&gcc PCIE_ACLK_RESET>,
+> +			 <&gcc PCIE_HCLK_RESET>,
+> +			 <&gcc PCIE_POR_RESET>,
+> +			 <&gcc PCIE_PCI_RESET>,
+> +			 <&gcc PCIE_PHY_RESET>;
+> +		reset-names = "axi", "ahb", "por", "pci", "phy";
+> +		pinctrl-0 = <&pcie_pins_default>;
+> +		pinctrl-names = "default";
+> +	};
+> +
+> +* Example for apq8084
+> +	pcie0 at fc520000 {
+> +		compatible = "qcom,pcie-apq8084", "snps,dw-pcie";
+> +		reg = <0xfc520000 0x2000>,
+> +		      <0xff000000 0x1000>,
+> +		      <0xff001000 0x1000>,
+> +		      <0xff002000 0x2000>;
+> +		reg-names = "parf", "dbi", "elbi", "config";
+> +		device_type = "pci";
+> +		linux,pci-domain = <0>;
+> +		bus-range = <0x00 0xff>;
+> +		num-lanes = <1>;
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +		ranges = <0x81000000 0 0          0xff200000 0 0x00100000   /* I/O */
+> +			  0x82000000 0 0x00300000 0xff300000 0 0x00d00000>; /* memory */
+> +		interrupts = <GIC_SPI 243 IRQ_TYPE_NONE>;
+> +		interrupt-names = "msi";
+> +		#interrupt-cells = <1>;
+> +		interrupt-map-mask = <0 0 0 0x7>;
+> +		interrupt-map = <0 0 0 1 &intc 0 244 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
+> +				<0 0 0 2 &intc 0 245 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
+> +				<0 0 0 3 &intc 0 247 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
+> +				<0 0 0 4 &intc 0 248 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
+> +		clocks = <&gcc GCC_PCIE_0_CFG_AHB_CLK>,
+> +			 <&gcc GCC_PCIE_0_MSTR_AXI_CLK>,
+> +			 <&gcc GCC_PCIE_0_SLV_AXI_CLK>,
+> +			 <&gcc GCC_PCIE_0_AUX_CLK>;
+> +		clock-names = "iface", "master_bus", "slave_bus", "aux";
+> +		resets = <&gcc GCC_PCIE_0_BCR>;
+> +		reset-names = "core";
+> +		power-domains = <&gcc PCIE0_GDSC>;
+> +		vdda-supply = <&pma8084_l3>;
+> +		phys = <&pciephy0>;
+> +		phy-names = "pciephy";
+> +		perst-gpio = <&tlmm 70 GPIO_ACTIVE_LOW>;
+> +		pinctrl-0 = <&pcie0_pins_default>;
+> +		pinctrl-names = "default";
+> +	};
+> -- 
+> 1.7.9.5
+> 
