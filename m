@@ -1,89 +1,67 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Thu, 3 Dec 2015 15:39:55 -0300
-Subject: [PATCH v2 2/4] nvmem: NXP LPC18xx EEPROM memory NVMEM driver
-In-Reply-To: <5649F856.9000101@linaro.org>
-References: <1445275946-32653-1-git-send-email-ariel@vanguardiasur.com.ar>
- <1445275946-32653-3-git-send-email-ariel@vanguardiasur.com.ar>
- <CAGhQ9Vyg6sScq7yM=7judsMPHOc5VF2zf=7LPxmbmL7wF=vvgw@mail.gmail.com>
- <562E2CB1.80706@linaro.org> <563385B2.90403@vanguardiasur.com.ar>
- <5649F74A.9020706@vanguardiasur.com.ar>
- <5649F856.9000101@linaro.org>
-Message-ID: <CAAEAJfAqqni1UKiyftBE5kW-TegnuYvJrTvPkHm2gDbOuk4=Bw@mail.gmail.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 03 Dec 2015 10:45:05 -0800
+Subject: arm64 sched_clock cpu accounting
+In-Reply-To: <565F81D2.3060401@samsung.com>
+References: <564CD5A7.8000007@samsung.com> <564D31D3.5040207@samsung.com>
+ <20151202180741.GR18376@cbox> <565F81D2.3060401@samsung.com>
+Message-ID: <56608DB1.6010401@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
+Hi Christoffer,
 
-On 16 November 2015 at 12:37, Srinivas Kandagatla
-<srinivas.kandagatla@linaro.org> wrote:
->
->
-> On 16/11/15 15:33, Ariel D'Alessandro wrote:
->>>>
->>>>
->>>> >> >>-------------------------------->cut<----------------------------------
->>>> >> From 8cae10eff8ea8da9c5a8058ff75abeeddd8a8224 Mon Sep 17 00:00:00
->>>> >> 2001
->>>> >>From: Srinivas Kandagatla<srinivas.kandagatla@linaro.org>
->>>> >>Date: Mon, 26 Oct 2015 13:30:24 +0000
->>>> >>Subject: [PATCH] nvmem: core: return error for non word aligned bytes
->>>> >>
->>>> >>nvmem providers have restrictions on register strides, so return error
->>>> >>code when users attempt to read/write buffers with sizes which are not
->>>> >>aligned to the word boundary.
->>>> >>
->>>> >>Without this patch the userspace would continue to try as it does not
->>>> >>get any error from the nvmem core, resulting in a hang.
->>>> >>
->>>> >>Signed-off-by: Srinivas Kandagatla<srinivas.kandagatla@linaro.org>
->>>> >>---
->>>> >>  drivers/nvmem/core.c | 6 ++++++
->>>> >>  1 file changed, 6 insertions(+)
->>>> >>
->>>> >>diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
->>>> >>index 6fd4e5a..9d11d98 100644
->>>> >>--- a/drivers/nvmem/core.c
->>>> >>+++ b/drivers/nvmem/core.c
->>>> >>@@ -70,6 +70,9 @@ static ssize_t bin_attr_nvmem_read(struct file
->>>> >> *filp,
->>>> >>struct kobject *kobj,
->>>> >>      if (pos >= nvmem->size)
->>>> >>          return 0;
->>>> >>
->>>> >>+    if (count < nvmem->word_size)
->>>> >>+        return -EINVAL;
->>>> >>+
->>>> >>      if (pos + count > nvmem->size)
->>>> >>          count = nvmem->size - pos;
->>>> >>
->>>> >>@@ -95,6 +98,9 @@ static ssize_t bin_attr_nvmem_write(struct file
->>>> >> *filp,
->>>> >>struct kobject *kobj,
->>>> >>      if (pos >= nvmem->size)
->>>> >>          return 0;
->>>> >>
->>>> >>+    if (count < nvmem->word_size)
->>>> >>+        return -EINVAL;
->>>> >>+
->>>> >>      if (pos + count > nvmem->size)
->>>> >>          count = nvmem->size - pos;
->>>> >>
->>>
->>> >
->>> >Patch looks good to me. I think that it solves the issue.
->>> >I don't have the board here right now, so I'll check it ASAP and give
->>> >some feedback.
+On 12/2/2015 3:42 PM, Mario Smarduch wrote:
+> 
+> 
+> On 12/2/2015 10:07 AM, Christoffer Dall wrote:
+>> Hi Mario,
 >>
->> Finally tested this. As it seemed, it solved the issue.
->> Are you submitting a patch for this?
->
-> Yes, I will send a patch to the mailing list.
->
+>> On Wed, Nov 18, 2015 at 06:20:03PM -0800, Mario Smarduch wrote:
+>>> Also with tick accounting enabled, and periodic timer HZ set to 1000 no irq time
+>>> is reported. That's with running a ping flood - 1200 int/s, not sure why
+>>> wouldn't any irq time be reported? The other two modes report irq time as expected.
+>>>
+>>> On 11/18/2015 11:46 AM, Mario Smarduch wrote:
+>>>> Hello,
+>>>>   I noticed sched clock accounting can be enabled when arch-timer is
+>>>> initialized. But arm64 doesn't appear to have 'HAVE_IRQ_TIME_ACCOUNTING'
+>>>> selected (as of mainline 4.4-rc1) and IRQ_TIME_ACCOUNTING can't be selected.
+>>>> After adding it to arch/arm64/Kconfig, option appears to work fine. Depending on
+>>>> need all accounting options are fine, but irq time accounting appears to be most
+>>>> preferable.
+>>>>
+>>>> Any thoughts? Is it fine to enable it?
+>>>>
+>> Is any of this related to KVM?
+> 
+> Indirectly, given the guest should yield same results. To be on the safe side I
+> ran the guest in all combinations (7) to confirm that's the case.
+> 
+> Also verified that guest time on host appears fine in all these configurations.
+> It takes extra effort to get the guest time as opposed to other modes.
+> 
+> - Mario
+>>
+>> -Christoffer
+>>
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> 
 
-Ping? It would be good to have that patch and be able to merge this
-lpc18xx-nvmem driver in time for the next merge window.
+While on this topic, one use case for RT like apps is run the host in full sched
+clock accounting mode/NO_HZ_FULL and guest in IRQ time accounting mode/NO_HZ_IDLE.
 
-Thanks!
--- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
+This should make sense for a control plane, gateway guest (using normal IP
+stack, timers, ..) there you have a lot of transitions between run modes. ANd
+irq, softirq accounting matters.
+
+The host on the other side should be fine running a vCPU in full sched clock
+mode, you don't expect to many transitions from the vCPU, and less need for
+irq/softirq accounting if any.
+
+I recall you raised the point of run modes when you fixed guest time accounting,
+but I didn't have a good use case back then for your question.
+
+- Mario.
