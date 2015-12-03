@@ -1,71 +1,143 @@
-From: ben@smart-cactus.org (Ben Gamari)
-Date: Thu, 03 Dec 2015 12:21:33 +0100
-Subject: [PATCH v5 0/12] cpufreq: Add support for Exynos 5800, 5420,
- and 5422
-In-Reply-To: <20151203103703.GC2097@ubuntu>
-References: <1449091167-20758-1-git-send-email-ben@smart-cactus.org>
- <20151203060527.GH4302@ubuntu> <877fkv4ylk.fsf@smart-cactus.org>
- <20151203103703.GC2097@ubuntu>
-Message-ID: <87y4db3hhe.fsf@smart-cactus.org>
+From: vigneshr@ti.com (Vignesh R)
+Date: Thu, 3 Dec 2015 16:53:40 +0530
+Subject: [PATCH v4 3/5] mtd: devices: m25p80: add support for mmap read
+ request
+In-Reply-To: <56600E7B.8010208@atmel.com>
+References: <1448860515-28336-1-git-send-email-vigneshr@ti.com>
+ <1448860515-28336-4-git-send-email-vigneshr@ti.com>
+ <56600E7B.8010208@atmel.com>
+Message-ID: <5660263C.8020406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Viresh Kumar <viresh.kumar@linaro.org> writes:
+Hi,
 
-> On 03-12-15, 11:26, Ben Gamari wrote:
->> Viresh Kumar <viresh.kumar@linaro.org> writes:
->> > But, before I start reviewing this series, I have few comments.
->> > - We weren't able to use cpufreq-dt driver for big LITTLE platforms
->> >   earlier, as it never had multi cluster support and we wanted
->> >   clock-sharing information via DT.
->> 
->> Fair enough.
->> 
->> > - That is all fixed now.
->> 
->> I did not see any mention of this in the cpufreq-dt driver binding
->> documentation, otherwise I would have tried going this route.
->> 
->> Do you have any references? I'd be happy to examine what would be
->> necessary to go this route although, being an independent contributor,
->> it may take time.
->
-> You wouldn't find in cpufreq-dt documentation as its not specific to
-> that. I have seen you DT patches now, and you have created the OPP
-> tables mostly correctly. Just create the cpufreq-platform device for
-> cpufreq-dt instead of arm-big-little one. And it should just work.
->
-Do you mean something along these lines? [1]
+On 12/03/2015 03:12 PM, Cyrille Pitchen wrote:
+> Hi Vignesh,
+> 
+> Le 30/11/2015 06:15, Vignesh R a ?crit :
+>> Certain spi controllers may provide accelerated interface to read from
+>> m25p80 type flash devices. This interface provides better read
+>> performance than regular SPI interface.
+>> Call spi_flash_read(), if supported, to make use of such interface.
+>>
+>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>> ---
+>>
+>> v4: 
+>>  * Use spi_flash_read_message struct to pass args.
+>>  * support passing of opcode/addr/data nbits.
+>>
+>>  drivers/mtd/devices/m25p80.c | 20 ++++++++++++++++++++
+>>  1 file changed, 20 insertions(+)
+>>
+>> diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+>> index fe9ceb7b5405..00094a668c62 100644
+>> --- a/drivers/mtd/devices/m25p80.c
+>> +++ b/drivers/mtd/devices/m25p80.c
+>> @@ -131,6 +131,26 @@ static int m25p80_read(struct spi_nor *nor, loff_t from, size_t len,
+>>  	/* convert the dummy cycles to the number of bytes */
+>>  	dummy /= 8;
+>>  
+>> +	if (spi_flash_read_supported(spi)) {
+>> +		struct spi_flash_read_message msg;
+>> +		int ret;
+>> +
+>> +		msg.buf = buf;
+>> +		msg.from = from;
+>> +		msg.len = len;
+>> +		msg.read_opcode = nor->read_opcode;
+>> +		msg.addr_width = nor->addr_width;
+>> +		msg.dummy_bytes = dummy;
+>> +		/* TODO: Support other combinations */
+>> +		msg.opcode_nbits = SPI_NBITS_SINGLE;
+>> +		msg.addr_nbits = SPI_NBITS_SINGLE;
+>> +		msg.data_nbits = m25p80_rx_nbits(nor);
+> 
+> I wanted to let you know that the support of other SPI protocols has already
+> been implemented by this series:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/371170.html
+> 
+> patches 2 & 3 handle the probing of the (Q)SPI memory in spi_nor_scan() and
+> select the right protocols for register read/write, memory read, memory write,
+> and memory erase operations. The choice is done according to both the memory
+> and SPI controller capabilities.
+> 
+> patch 4 updates the m25p80 driver to take advantage of the bandwidth increase
+> allowed by QSPI protocols. For instance, the Atmel QSPI controller, like TI
+> one, maps the SPI NOR memory to the system bus. Yesterday I ran mtd_speedtest
+> to compare Fast Read 1-1-1 (0x0b) and Fast Read 1-1-4 (0x6b). The SPI clock
+> frequency was limited to 83MHz. The QSPI memory is a Micron n25q128a13.
+> 
+> I only had to change the mode argument of spi_nor_scan() from SPI_NOR_QUAD to
+> SPI_NOR_FAST in the atmel_quadspi driver (based on fsl-quadspi driver from
+> Freescale since Atmel's driver also uses the system bus mapping for memory
+> write operations) to force the spi-nor framework to choose the SPI 1-1-1
+> protocol instead of the SPI-1-1-4.
+> 
+> 1 - Fast Read 1-1-1
+> 
+> mtd_speedtest: testing eraseblock write speed
+> mtd_speedtest: eraseblock read speed is 9319 KiB/s
+> [...]
+> mtd_speedtest: testing page read speed
+> mtd_speedtest: page read speed is 6649 KiB/s
+> [...]
+> mtd_speedtest: testing 2 page read speed
+> mtd_speedtest: 2 page read speed is 7757 KiB/s
+> 
+> 2 - Fast Read 1-1-4
+> 
+> mtd_speedtest: testing eraseblock read speed
+> mtd_speedtest: eraseblock read speed is 30117 KiB/s
+> [...]
+> mtd_speedtest: testing page read speed
+> mtd_speedtest: page read speed is 13096 KiB/s
+> [...]
+> mtd_speedtest: testing 2 page read speed
+> mtd_speedtest: 2 page read speed is 18224 KiB/s
+> 
+> So the performance improvements are:
+> eraseblock read speed (65536 bytes) : +223%
+> page read speed (512 bytes)         :  +97%
+> 2 page read speed (1024 bytes)      : +135%
+> 
+> 
+> That's why I believe that you could take advantage of these performance
+> improvements in the TI (Q)SPI controller driver.
+> 
 
->> Sounds reasonable to me. However, I'd just like to reiterate that this
->> line of work can be pursued independently from the upstreaming of this
->> series.
->
-> I think this is the right time to upstream the right solution. Just
-> try it once, if you face lots of difficulties or issues, then we can
-> ofcourse see..
->
-Sure. I didn't realize things were so close to being functional. Thanks
-for the hint. I'll give it a shot next time my XU4 is free.
-
-> NOTE: Check how OPP nodes are required to be created now in
-> linux-next. They should be named like opp@<freq-hz>. Something I
-> noticed in your DTs.
->
-I've fixed this in the branch.
-
-Thanks again.
-
-Cheers,
-
-- Ben
+Well, I based my patches on linux-next as per Brian's suggestion. If
+patches to support other flash protocol modes are accepted, I would be
+happy to rebase and make use of other modes. It would just be the matter
+of populating msg.{opcode/addr}_n_bits correctly.
 
 
-[1] https://github.com/bgamari/linux/commit/285778aaff464d4dcf152f3e9e0df3d8c6909576
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 472 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151203/b1e97e1c/attachment.sig>
+> 
+> Also please note that you may have to add in the struct spi_flash_read_message
+> two other fields for the number of option/mode cycles and their value.
+> Option/mode cycles are sent between the address and dummy cycles. They are
+> used by some memory manufacturers such as Spansion, Micron and Macronix to
+> enter/leave their continuous read mode.
+> So if uninitialized dummy cycles are interpreted by the QSPI memory as
+> option/mode cycles, depending on the actual value, the memory may enter by
+> mistake in continuous mode. Once in continuous mode, the command op code byte
+> must not be sent and is not expected by the memory: the memory implicitly uses
+> the read op code sent in the SPI message which triggered the memory to enter
+> continuous read mode. Next SPI messages start from the address cycles until
+> the right option/mode cycles are sent to leave the continuous read mode.
+> 
+> Currently the mtd layer doesn't use this feature but it should be aware of it.
+> That's why I believe we'll have to address this point in spi_nor_scan() and the
+> "regular" m25p80() sooner or later.
+> 
+
+Above feature can be added incrementally over this series, (as and when
+m25p80 is updated) moreover ti-qspi controller does not support
+option/mode cycles in memory-mapped mode, so I wont be able to test this
+feature anyway.
+
+
+-- 
+Regards
+Vignesh
