@@ -1,25 +1,58 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 3 Dec 2015 00:59:48 +0100
-Subject: [PATCH 0/5] ARM: orion5x/dove/mv78xx0 multiplatform
-In-Reply-To: <10084728.p75H39SaXO@wuerfel>
-References: <1448466557-435335-1-git-send-email-arnd@arndb.de>
- <20151202202240.GH8644@n2100.arm.linux.org.uk>
- <20151202203810.GH9866@lunn.ch> <10084728.p75H39SaXO@wuerfel>
-Message-ID: <20151202235948.GA1751@lunn.ch>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 2 Dec 2015 16:05:06 -0800
+Subject: [PATCH v2] ARM: mm: flip priority of CONFIG_DEBUG_RODATA
+In-Reply-To: <20151202202725.GA794@www.outflux.net>
+References: <20151202202725.GA794@www.outflux.net>
+Message-ID: <565F8732.5050402@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > I agree. We have multiplatform dove already, it is in mach-mvebu. Do
-> > we really need both mach-dove and mach-mvebu dove in one kernel?
-> 
-> I'm also fine with deleting mach-dove.
+On 12/02/2015 12:27 PM, Kees Cook wrote:
+> The use of CONFIG_DEBUG_RODATA is generally seen as an essential part of
+> kernel self-protection:
+> http://www.openwall.com/lists/kernel-hardening/2015/11/30/13
+> Additionally, its name has grown to mean things beyond just rodata. To
+> get ARM closer to this, we ought to rearrange the names of the configs
+> that control how the kernel protects its memory. What was called
+> CONFIG_ARM_KERNMEM_PERMS is really doing the work that other architectures
+> call CONFIG_DEBUG_RODATA.
+>
+> This redefines CONFIG_DEBUG_RODATA to actually do the bulk of the
+> ROing (and NXing). In the place of the old CONFIG_DEBUG_RODATA, use
+> CONFIG_DEBUG_ALIGN_RODATA, since that's what the option does: adds
+> section alignment for making rodata explicitly NX, as arm does not split
+> the page tables like arm64 does without _ALIGN_RODATA.
+>
+> Also adds human readable names to the sections so I could more easily
+> debug my typos, and makes CONFIG_DEBUG_RODATA default "y" for CPU_V7.
+>
+> Results in /sys/kernel/debug/kernel_page_tables for each config state:
+>
+>   # CONFIG_DEBUG_RODATA is not set
+>   # CONFIG_DEBUG_ALIGN_RODATA is not set
+>
+> ---[ Kernel Mapping ]---
+> 0x80000000-0x80900000           9M     RW x  SHD
+> 0x80900000-0xa0000000         503M     RW NX SHD
+>
+>   CONFIG_DEBUG_RODATA=y
+>   CONFIG_DEBUG_ALIGN_RODATA=y
+>
+> ---[ Kernel Mapping ]---
+> 0x80000000-0x80100000           1M     RW NX SHD
+> 0x80100000-0x80700000           6M     ro x  SHD
+> 0x80700000-0x80a00000           3M     ro NX SHD
+> 0x80a00000-0xa0000000         502M     RW NX SHD
+>
+>   CONFIG_DEBUG_RODATA=y
+>   # CONFIG_DEBUG_ALIGN_RODATA is not set
+>
+> ---[ Kernel Mapping ]---
+> 0x80000000-0x80100000           1M     RW NX SHD
+> 0x80100000-0x80a00000           9M     ro x  SHD
+> 0x80a00000-0xa0000000         502M     RW NX SHD
+>
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> ---
 
-Ah, maybe i worded that badly. By "in one kernel" i mean kernel
-binary. We should keep mach-dove, and allow a mach-dove build of the
-kernel. But there is no reason for that build to be multi-platform. We
-already have multi-platform dove via mvebu.
-
-Anyway, i see your v2 patches do leave mach-dove as a single platform
-kernel.
-
-	Andrew
+Reviewed-by: Laura Abbott <labbott@fedoraproject.org>
