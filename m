@@ -1,24 +1,29 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 3 Dec 2015 11:01:58 +0000
-Subject: [alsa-devel] [PATCH] ASoC: mediatek: Use current HW pointer for
- pointer callback
-In-Reply-To: <s5h8u5b98dp.wl-tiwai@suse.de>
-References: <1449129208-63615-1-git-send-email-koro.chen@mediatek.com>
- <s5h8u5b98dp.wl-tiwai@suse.de>
-Message-ID: <20151203110158.GD5727@sirena.org.uk>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 3 Dec 2015 11:05:06 +0000
+Subject: [PATCH v5 0/12] cpufreq: Add support for Exynos 5800, 5420, and
+ 5422
+In-Reply-To: <20151203060527.GH4302@ubuntu>
+References: <1449091167-20758-1-git-send-email-ben@smart-cactus.org>
+ <20151203060527.GH4302@ubuntu>
+Message-ID: <566021E2.6070000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2015 at 10:41:38AM +0100, Takashi Iwai wrote:
 
-> While reading this patch, I wondered how regmap can be used safely in
-> an irq-disabled context.  Mark, do we have any API for that?
 
-We can use user supplied locks or spin_lock_irqsave().
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151203/9b4a77ca/attachment.sig>
+On 03/12/15 06:05, Viresh Kumar wrote:
+
+[...]
+>
+> @Sudeep: What would it take you to use cpufreq-dt for ARM's platforms
+> ?
+>
+
+The main difference is that we get the OPPs from the firmware rather
+than DT. We may just need to abstract that part and we should be able to
+use it. I will have a look at it and get back to you will more details.
+It has been a while since I looked at cpufreq-dt.
+
+-- 
+Regards,
+Sudeep
