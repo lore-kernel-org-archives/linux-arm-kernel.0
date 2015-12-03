@@ -1,125 +1,130 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Thu, 03 Dec 2015 14:22:14 +0000
-Subject: [PATCH 11/12] cpufreq: arm-big-little: clarify frequency units
-In-Reply-To: <1449091167-20758-12-git-send-email-ben@smart-cactus.org>
-References: <1449091167-20758-1-git-send-email-ben@smart-cactus.org>
- <1449091167-20758-12-git-send-email-ben@smart-cactus.org>
-Message-ID: <1449152534.2817.26.camel@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 3 Dec 2015 08:24:08 -0600
+Subject: [PATCH V2 12/14] ARM: dts: sb-som: introduce SB-SOM baseboard
+In-Reply-To: <1448978109-5614-13-git-send-email-nikita@compulab.co.il>
+References: <1448978109-5614-1-git-send-email-nikita@compulab.co.il>
+ <1448978109-5614-13-git-send-email-nikita@compulab.co.il>
+Message-ID: <20151203142408.GA24844@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-12-02 at 22:19 +0100, Ben Gamari wrote:
-> The frequency units are very confusing in this area as OPPs use Hz
-> whereas cpufreq uses kHz. Be explicit about this in variable naming.
+On Tue, Dec 01, 2015 at 03:55:07PM +0200, Nikita Kiryanov wrote:
+> CompuLab SB-SOM baseboard is a carrier board for multiple arm-based SoMs.
+> It currently supports (with minor adjustments to assembly) CM-T43, CM-T54,
+> and CM-QS600 modules. It is a building block in the SBC-T43 single board
+> computer, which consists of cm-t43 on top of sb-som-t43.
 > 
-> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> Signed-off-by: Ben Gamari <ben@smart-cactus.org>
+> Signed-off-by: Nikita Kiryanov <nikita@compulab.co.il>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Benoit Cousson <bcousson@baylibre.com>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Igor Grinberg <grinberg@compulab.co.il>
+> Cc: Dmitry Lifshitz <lifshitz@compulab.co.il>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+
+Acked-by: Rob Herring <robh@kernel.org>
+
 > ---
->  drivers/cpufreq/arm_big_little.c | 20 ++++++++++----------
->  1 file changed, 10 insertions(+), 10 deletions(-)
+> Changes in V2:
+> 	- Renamed file startek,startek-kd050c to startek,startek-kd050c.txt.
+> 	- s/QS-600/CM-QS600 in file compulab-boards.txt
 > 
-> diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
-> index 855599b..2d5761c 100644
-> --- a/drivers/cpufreq/arm_big_little.c
-> +++ b/drivers/cpufreq/arm_big_little.c
-> @@ -130,14 +130,14 @@ static unsigned int bL_cpufreq_get_rate(unsigned int cpu)
->  }
->  
->  static int
-> -bL_cpufreq_set_rate_cluster(u32 cpu, u32 cluster, u32 new_rate)
-> +bL_cpufreq_set_rate_cluster(u32 cpu, u32 cluster, u32 new_rate_kHz)
->  {
->  	unsigned long volt = 0, volt_old = 0;
->  	long freq_Hz;
->  	u32 old_rate;
-
-IMO variable renaming doesn't seem necessary, if cpufreq uses kHz then
-in a cpufreq driver adding 'kHz' to variable seems redundant, especially
-if Hz values like freq_Hz above are named especially to signal their
-different units. However, if renaming is going to happen it should at
-least be consistent within the same function i.e. also rename the old
-old_rate variable above.
-
->  	int ret;
->  
-> -	freq_Hz = new_rate * 1000;
-> +	freq_Hz = new_rate_kHz * 1000;
->  	old_rate = clk_get_rate(clk[cluster]) / 1000;
->  
->  	if (!IS_ERR(reg[cluster])) {
-> @@ -163,10 +163,10 @@ bL_cpufreq_set_rate_cluster(u32 cpu, u32 cluster, u32 new_rate)
->  	pr_debug("%s: cpu %d, cluster: %d, %u MHz, %ld mV --> %u MHz, %ld mV\n",
->  		__func__, cpu, cluster,
->  		old_rate / 1000, (volt_old > 0) ? volt_old / 1000 : -1,
-> -		new_rate / 1000, volt ? volt / 1000 : -1);
-> +		new_rate_kHz / 1000, volt ? volt / 1000 : -1);
->  
->  	/* scaling up? scale voltage before frequency */
-> -	if (!IS_ERR(reg[cluster]) && new_rate > old_rate) {
-> +	if (!IS_ERR(reg[cluster]) && new_rate_kHz > old_rate) {
->  		ret = regulator_set_voltage_tol(reg[cluster], volt, 0);
->  		if (ret) {
->  			pr_err("%s: cpu: %d, cluster: %d, failed to scale voltage up: %d\n",
-> @@ -175,7 +175,7 @@ bL_cpufreq_set_rate_cluster(u32 cpu, u32 cluster, u32 new_rate)
->  		}
->  	}
->  
-> -	ret = clk_set_rate(clk[cluster], new_rate * 1000);
-> +	ret = clk_set_rate(clk[cluster], new_rate_kHz * 1000);
->  	if (WARN_ON(ret)) {
->  		pr_err("%s: clk_set_rate failed: %d, cluster: %d\n",
->  			__func__, cluster, ret);
-> @@ -185,7 +185,7 @@ bL_cpufreq_set_rate_cluster(u32 cpu, u32 cluster, u32 new_rate)
->  	}
->  
->  	/* scaling down? scale voltage after frequency */
-> -	if (!IS_ERR(reg[cluster]) && new_rate < old_rate) {
-> +	if (!IS_ERR(reg[cluster]) && new_rate_kHz < old_rate) {
->  		ret = regulator_set_voltage_tol(reg[cluster], volt, 0);
->  		if (ret) {
->  			pr_err("%s: cpu: %d, cluster: %d, failed to scale voltage down: %d\n",
-> @@ -199,7 +199,7 @@ bL_cpufreq_set_rate_cluster(u32 cpu, u32 cluster, u32 new_rate)
->  }
->  
->  static unsigned int
-> -bL_cpufreq_set_rate(u32 cpu, u32 old_cluster, u32 new_cluster, u32 rate)
-> +bL_cpufreq_set_rate(u32 cpu, u32 old_cluster, u32 new_cluster, u32 rate_kHz)
->  {
->  	u32 new_rate, prev_rate;
-
-Ditto. Rename these too to add '_kHz' ?
-
->  	int ret;
-> @@ -209,13 +209,13 @@ bL_cpufreq_set_rate(u32 cpu, u32 old_cluster, u32 new_cluster, u32 rate)
->  
->  	if (bLs) {
->  		prev_rate = per_cpu(cpu_last_req_freq, cpu);
-> -		per_cpu(cpu_last_req_freq, cpu) = rate;
-> +		per_cpu(cpu_last_req_freq, cpu) = rate_kHz;
->  		per_cpu(physical_cluster, cpu) = new_cluster;
->  
->  		new_rate = find_cluster_maxfreq(new_cluster);
->  		new_rate = ACTUAL_FREQ(new_cluster, new_rate);
->  	} else {
-> -		new_rate = rate;
-> +		new_rate = rate_kHz;
->  	}
->  
->  	pr_debug("%s: cpu: %d, old cluster: %d, new cluster: %d, freq: %d\n",
-> @@ -236,7 +236,7 @@ bL_cpufreq_set_rate(u32 cpu, u32 old_cluster, u32 new_cluster, u32 rate)
->  	} else if (ret && bLs) {
->  		per_cpu(cpu_last_req_freq, cpu) = prev_rate;
->  		per_cpu(physical_cluster, cpu) = old_cluster;
-> -	} 
-> +	}
-
-There's a spurious whitespace change here. I know the space you deleted
-shouldn't have been there, but doing tidyups like that generally isn't
-done in patches that don't otherwise affect the code in question.
-
->  
->  	mutex_unlock(&cluster_lock[new_cluster]);
->  
-
--- 
-Tixy
+>  .../devicetree/bindings/arm/compulab-boards.txt    |  5 +++
+>  .../display/panel/startek,startek-kd050c.txt       |  4 +++
+>  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+>  arch/arm/boot/dts/compulab-sb-som.dtsi             | 42 ++++++++++++++++++++++
+>  4 files changed, 52 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/compulab-boards.txt
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/startek,startek-kd050c.txt
+>  create mode 100644 arch/arm/boot/dts/compulab-sb-som.dtsi
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/compulab-boards.txt b/Documentation/devicetree/bindings/arm/compulab-boards.txt
+> new file mode 100644
+> index 0000000..71172d5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/compulab-boards.txt
+> @@ -0,0 +1,5 @@
+> +CompuLab SB-SOM is a multi-module baseboard capable of carrying CM-T43, CM-T54,
+> +and CM-QS600 modules with minor modifications to the SB-SOM assembly.
+> +
+> +Required root node properties:
+> +    - compatible = should be "compulab,sb-som"
+> diff --git a/Documentation/devicetree/bindings/display/panel/startek,startek-kd050c.txt b/Documentation/devicetree/bindings/display/panel/startek,startek-kd050c.txt
+> new file mode 100644
+> index 0000000..70cd8d1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/panel/startek,startek-kd050c.txt
+> @@ -0,0 +1,4 @@
+> +Startek Electronic Technology Co. KD050C 5.0" WVGA TFT LCD panel
+> +
+> +Required properties:
+> +- compatible: should be "startek,startek-kd050c"
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 55df1d4..409b134 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -218,6 +218,7 @@ sony	Sony Corporation
+>  spansion	Spansion Inc.
+>  sprd	Spreadtrum Communications Inc.
+>  st	STMicroelectronics
+> +startek	Startek
+>  ste	ST-Ericsson
+>  stericsson	ST-Ericsson
+>  synology	Synology, Inc.
+> diff --git a/arch/arm/boot/dts/compulab-sb-som.dtsi b/arch/arm/boot/dts/compulab-sb-som.dtsi
+> new file mode 100644
+> index 0000000..402a143
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/compulab-sb-som.dtsi
+> @@ -0,0 +1,42 @@
+> +/*
+> + * Copyright (C) 2015 CompuLab, Ltd. - http://www.compulab.co.il/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/ {
+> +	model = "CompuLab SB-SOM";
+> +	compatible = "compulab,sb-som";
+> +
+> +	vsb_3v3: fixedregulator-v3_3 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vsb_3v3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		regulator-always-on;
+> +		enable-active-high;
+> +	};
+> +
+> +	lcd0: display {
+> +		compatible = "startek,startek-kd050c", "panel-dpi";
+> +		label = "lcd";
+> +
+> +		panel-timing {
+> +			clock-frequency = <33000000>;
+> +			hactive = <800>;
+> +			vactive = <480>;
+> +			hfront-porch = <40>;
+> +			hback-porch = <40>;
+> +			hsync-len = <43>;
+> +			vback-porch = <29>;
+> +			vfront-porch = <13>;
+> +			vsync-len = <3>;
+> +			hsync-active = <0>;
+> +			vsync-active = <0>;
+> +			de-active = <1>;
+> +			pixelclk-active = <1>;
+> +		};
+> +	};
+> +};
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
