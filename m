@@ -1,18 +1,125 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 03 Dec 2015 10:40:51 +0100
-Subject: [PATCH v2 7/9] ARM: hisi: rename ARCH_HI3xxx to ARCH_HI36xx
-In-Reply-To: <1449110886-23828-1-git-send-email-xuejiancheng@huawei.com>
-References: <1449110886-23828-1-git-send-email-xuejiancheng@huawei.com>
-Message-ID: <2891172.Pri14dzCQo@wuerfel>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Thu, 03 Dec 2015 10:41:38 +0100
+Subject: [alsa-devel] [PATCH] ASoC: mediatek: Use current HW pointer
+ for	pointer callback
+In-Reply-To: <1449129208-63615-1-git-send-email-koro.chen@mediatek.com>
+References: <1449129208-63615-1-git-send-email-koro.chen@mediatek.com>
+Message-ID: <s5h8u5b98dp.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 December 2015 10:48:06 Jiancheng Xue wrote:
-> ARCH_HI3xxx just represents hi36xx soc family.
+On Thu, 03 Dec 2015 08:53:28 +0100,
+Koro Chen wrote:
 > 
-> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+> Previously we recorded "last interrupt position" and used it in
+> pointer callback. This is not correct implementation, and it causes
+> underruns when user space monitors buffer level to decide when to
+> send next data chunk in low latency application.
+
+Using the last irq position isn't incorrect, per se.  Many hardware
+can do only in this way.  But it's suboptimal for your device, yes.
+
+> Remove position recording in IRQ handler and also hw_ptr in
+> struct mtk_afe_memif used to record that, and let pointer callback
+> reports current HW pointer instead.
 > 
+> Signed-off-by: Koro Chen <koro.chen@mediatek.com>
 
-I don't see why this is necessary.
+While reading this patch, I wondered how regmap can be used safely in
+an irq-disabled context.  Mark, do we have any API for that?
 
-	Arnd
+In this particular case, it would work since it specifies
+REGCACHE_NONE, so it drops all cache support.  As its cost, the driver
+implements its own (kind of) cache in suspend/resume callbacks.  It's
+not ideal, but still practically working.
+
+
+Takashi
+
+> ---
+>  sound/soc/mediatek/mtk-afe-common.h |    1 -
+>  sound/soc/mediatek/mtk-afe-pcm.c    |   22 +++++++++++-----------
+>  2 files changed, 11 insertions(+), 12 deletions(-)
+> 
+> diff --git a/sound/soc/mediatek/mtk-afe-common.h b/sound/soc/mediatek/mtk-afe-common.h
+> index cc4393c..9b1af1a 100644
+> --- a/sound/soc/mediatek/mtk-afe-common.h
+> +++ b/sound/soc/mediatek/mtk-afe-common.h
+> @@ -92,7 +92,6 @@ struct mtk_afe_memif_data {
+>  struct mtk_afe_memif {
+>  	unsigned int phys_buf_addr;
+>  	int buffer_size;
+> -	unsigned int hw_ptr;		/* Previous IRQ's HW ptr */
+>  	struct snd_pcm_substream *substream;
+>  	const struct mtk_afe_memif_data *data;
+>  	const struct mtk_afe_irq_data *irqdata;
+> diff --git a/sound/soc/mediatek/mtk-afe-pcm.c b/sound/soc/mediatek/mtk-afe-pcm.c
+> index 7f71343..5399a0e 100644
+> --- a/sound/soc/mediatek/mtk-afe-pcm.c
+> +++ b/sound/soc/mediatek/mtk-afe-pcm.c
+> @@ -175,8 +175,17 @@ static snd_pcm_uframes_t mtk_afe_pcm_pointer
+>  	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+>  	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+>  	struct mtk_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
+> +	unsigned int hw_ptr;
+> +	int ret;
+> +
+> +	ret = regmap_read(afe->regmap, memif->data->reg_ofs_cur, &hw_ptr);
+> +	if (ret || hw_ptr == 0) {
+> +		dev_err(afe->dev, "%s hw_ptr err\n", __func__);
+> +		hw_ptr = memif->phys_buf_addr;
+> +	}
+>  
+> -	return bytes_to_frames(substream->runtime, memif->hw_ptr);
+> +	return bytes_to_frames(substream->runtime,
+> +			       hw_ptr - memif->phys_buf_addr);
+>  }
+>  
+>  static const struct snd_pcm_ops mtk_afe_pcm_ops = {
+> @@ -602,7 +611,6 @@ static int mtk_afe_dais_hw_params(struct snd_pcm_substream *substream,
+>  
+>  	memif->phys_buf_addr = substream->runtime->dma_addr;
+>  	memif->buffer_size = substream->runtime->dma_bytes;
+> -	memif->hw_ptr = 0;
+>  
+>  	/* start */
+>  	regmap_write(afe->regmap,
+> @@ -737,7 +745,6 @@ static int mtk_afe_dais_trigger(struct snd_pcm_substream *substream, int cmd,
+>  		/* and clear pending IRQ */
+>  		regmap_write(afe->regmap, AFE_IRQ_CLR,
+>  			     1 << memif->data->irq_clr_shift);
+> -		memif->hw_ptr = 0;
+>  		return 0;
+>  	default:
+>  		return -EINVAL;
+> @@ -1081,7 +1088,7 @@ static const struct regmap_config mtk_afe_regmap_config = {
+>  static irqreturn_t mtk_afe_irq_handler(int irq, void *dev_id)
+>  {
+>  	struct mtk_afe *afe = dev_id;
+> -	unsigned int reg_value, hw_ptr;
+> +	unsigned int reg_value;
+>  	int i, ret;
+>  
+>  	ret = regmap_read(afe->regmap, AFE_IRQ_STATUS, &reg_value);
+> @@ -1097,13 +1104,6 @@ static irqreturn_t mtk_afe_irq_handler(int irq, void *dev_id)
+>  		if (!(reg_value & (1 << memif->data->irq_clr_shift)))
+>  			continue;
+>  
+> -		ret = regmap_read(afe->regmap, memif->data->reg_ofs_cur,
+> -				  &hw_ptr);
+> -		if (ret || hw_ptr == 0) {
+> -			dev_err(afe->dev, "%s hw_ptr err\n", __func__);
+> -			hw_ptr = memif->phys_buf_addr;
+> -		}
+> -		memif->hw_ptr = hw_ptr - memif->phys_buf_addr;
+>  		snd_pcm_period_elapsed(memif->substream);
+>  	}
+>  
+> -- 
+> 1.7.9.5
+> 
+> _______________________________________________
+> Alsa-devel mailing list
+> Alsa-devel at alsa-project.org
+> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+> 
