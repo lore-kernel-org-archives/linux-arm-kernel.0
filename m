@@ -1,255 +1,194 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Thu, 03 Dec 2015 17:22:37 +0100
-Subject: [PATCH] drivers: dma-coherent: free memory when failed to init
- DMA memory pool
-In-Reply-To: <20151203153937.GP8644@n2100.arm.linux.org.uk>
-References: <1449138962-8264-1-git-send-email-b38611@freescale.com>
- <xa1toae7y9u8.fsf@mina86.com>
- <CY1PR0301MB12257F63F594E65DE67E64DFF50D0@CY1PR0301MB1225.namprd03.prod.outlook.com>
- <20151203153937.GP8644@n2100.arm.linux.org.uk>
-Message-ID: <xa1t1tb3y01e.fsf@mina86.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 03 Dec 2015 16:25:48 +0000
+Subject: [PATCH v9 3/4] irqchip:create irq domain for each mbigen device
+In-Reply-To: <1448248513-39760-4-git-send-email-majun258@huawei.com>
+References: <1448248513-39760-1-git-send-email-majun258@huawei.com>
+ <1448248513-39760-4-git-send-email-majun258@huawei.com>
+Message-ID: <56606D0C.5010702@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03 2015, Russell King - ARM Linux wrote:
-> On Thu, Dec 03, 2015 at 01:54:05PM +0000, Duan Andy wrote:
->> From: Mike Nazarewicz <mpn@google.com> Sent: Thursday, December 03, 2015 8:51 PM
->> > To: Duan Fugang-B38611; torvalds at linux-foundation.org;
->> > gregkh at linuxfoundation.org; m.szyprowski at samsung.com
->> > Cc: linux-arm-kernel at lists.infradead.org; arnd at arndb.de;
->> > iamjoonsoo.kim at lge.com; Duan Fugang-B38611
->> > Subject: Re: [PATCH] drivers: dma-coherent: free memory when failed to
->> > init DMA memory pool
->> > 
->> > On Thu, Dec 03 2015, Fugang Duan wrote:
->> > > Free dma coherent memory when it failed to init DMA memory pool after
->> > > calling .dma_init_coherent_memory(), otherwise it causes memmory leak.
->> > >
->> > > Signed-off-by: Fugang Duan <B38611@freescale.com>
->> > > ---
->> > >  drivers/base/dma-coherent.c | 1 +
->> > >  1 file changed, 1 insertion(+)
->> > >
->> > > diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
->> > > index 55b8398..beb6bbe 100644
->> > > --- a/drivers/base/dma-coherent.c
->> > > +++ b/drivers/base/dma-coherent.c
->> > > @@ -286,6 +286,7 @@ static int rmem_dma_device_init(struct reserved_mem
->> > *rmem, struct device *dev)
->> > >  				     &mem) != DMA_MEMORY_MAP) {
->> > >  		pr_err("Reserved memory: failed to init DMA memory pool
->> > at %pa, size %ld MiB\n",
->> > >  			&rmem->base, (unsigned long)rmem->size / SZ_1M);
->> > > +		kfree(mem);
->> > 
->> > mem == NULL at this point.  If dma_init_coherent_memory doesn?t return
->> > DMA_MEMORY_MAP, mem pointer is not assigned any value.  If you think
->> > there is a memory leak, please demonstrate a path of it happening.
->> > 
->> Kfree() will check mem NULL condition, so no need to add check in here.
->
-> That isn't what the reviewer was stating.
->
-> However, had the reviewer looked at the existing code, then he may have
-> stated a different opinion. :)
+On 23/11/15 03:15, MaJun wrote:
+> From: Ma Jun <majun258@huawei.com>
+> 
+> For peripheral devices which connect to mbigen,mbigen is a interrupt
+> controller. So, we create irq domain for each mbigen device and add
+> mbigen irq domain into irq hierarchy structure.
+> 
+> Signed-off-by: Ma Jun <majun258@huawei.com>
+> ---
+>  drivers/irqchip/irq-mbigen.c |  119 ++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 119 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+> index 9f036c2..81ae61f 100644
+> --- a/drivers/irqchip/irq-mbigen.c
+> +++ b/drivers/irqchip/irq-mbigen.c
+> @@ -16,13 +16,36 @@
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+>  
+> +#include <linux/interrupt.h>
+> +#include <linux/irqchip.h>
+>  #include <linux/module.h>
+> +#include <linux/msi.h>
+>  #include <linux/of_address.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/slab.h>
+>  
+> +/* Interrupt numbers per mbigen node supported */
+> +#define IRQS_PER_MBIGEN_NODE		128
+> +
+> +/* 64 irqs (Pin0-pin63) are reserved for each mbigen chip */
+> +#define RESERVED_IRQ_PER_MBIGEN_CHIP	64
+> +
+> +/**
+> + * In mbigen vector register
+> + * bit[21:12]:	event id value
+> + * bit[11:0]:	device id
+> + */
+> +#define IRQ_EVENT_ID_SHIFT		12
+> +#define IRQ_EVENT_ID_MASK		0x3ff
+> +
+> +/* register range of each mbigen node */
+> +#define MBIGEN_NODE_OFFSET		0x1000
+> +
+> +/* offset of vector register in mbigen node */
+> +#define REG_MBIGEN_VEC_OFFSET		0x200
+> +
+>  /**
+>   * struct mbigen_device - holds the information of mbigen device.
+>   *
+> @@ -34,10 +57,94 @@ struct mbigen_device {
+>  	void __iomem		*base;
+>  };
+>  
+> +static inline unsigned int get_mbigen_vec_reg(irq_hw_number_t hwirq)
+> +{
+> +	unsigned int nid, pin;
+> +
+> +	hwirq -= RESERVED_IRQ_PER_MBIGEN_CHIP;
+> +	nid = hwirq / IRQS_PER_MBIGEN_NODE + 1;
+> +	pin = hwirq % IRQS_PER_MBIGEN_NODE;
+> +
+> +	return pin * 4 + nid * MBIGEN_NODE_OFFSET
+> +			+ REG_MBIGEN_VEC_OFFSET;
+> +}
+> +
+> +static struct irq_chip mbigen_irq_chip = {
+> +	.name =			"mbigen-v2",
+> +};
+> +
+> +static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
+> +{
+> +	struct irq_data *d = irq_get_irq_data(desc->irq);
+> +	void __iomem *base = d->chip_data;
+> +	u32 val;
+> +
+> +	base += get_mbigen_vec_reg(d->hwirq);
+> +	val = readl_relaxed(base);
+> +
+> +	val &= ~(IRQ_EVENT_ID_MASK << IRQ_EVENT_ID_SHIFT);
+> +	val |= (msg->data << IRQ_EVENT_ID_SHIFT);
+> +
+> +	writel_relaxed(val, base);
 
-I?m not sure that I would.  Here?s code I?m looking at:
+nit: It would be good to have a comment explaining why you do not need
+to program the address of the doorbell...
 
+> +}
+> +
+> +static int mbigen_domain_translate(struct irq_domain *d,
+> +				    struct irq_fwspec *fwspec,
+> +				    unsigned long *hwirq,
+> +				    unsigned int *type)
+> +{
+> +	if (is_of_node(fwspec->fwnode)) {
+> +		if (fwspec->param_count != 2)
+> +			return -EINVAL;
+> +
+> +		*hwirq = fwspec->param[0];
+> +		*type = fwspec->param[1] & IRQ_TYPE_SENSE_MASK;
+> +
+> +		return 0;
+> +	}
+> +	return -EINVAL;
+> +}
+> +
+> +static int mbigen_irq_domain_alloc(struct irq_domain *domain,
+> +					unsigned int virq,
+> +					unsigned int nr_irqs,
+> +					void *args)
+> +{
+> +	struct irq_fwspec *fwspec = args;
+> +	irq_hw_number_t hwirq;
+> +	unsigned int type;
+> +	struct mbigen_device *mgn_chip;
+> +	int i, err;
+> +
+> +	err = mbigen_domain_translate(domain, fwspec, &hwirq, &type);
+> +	if (err)
+> +		return err;
+> +
+> +	err = platform_msi_domain_alloc(domain, virq, nr_irqs);
+> +	if (err)
+> +		return err;
+> +
+> +	mgn_chip = platform_msi_get_host_data(domain);
+> +
+> +	for (i = 0; i < nr_irqs; i++)
+> +		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
+> +				      &mbigen_irq_chip, mgn_chip->base);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct irq_domain_ops mbigen_domain_ops = {
+> +	.translate	= mbigen_domain_translate,
+> +	.alloc		= mbigen_irq_domain_alloc,
+> +	.free		= irq_domain_free_irqs_common,
+> +};
+> +
+>  static int mbigen_device_probe(struct platform_device *pdev)
+>  {
+>  	struct mbigen_device *mgn_chip;
+>  	struct resource *res;
+> +	struct irq_domain *domain;
+> +	u32 num_msis;
+>  
+>  	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
+>  	if (!mgn_chip)
+> @@ -50,6 +157,18 @@ static int mbigen_device_probe(struct platform_device *pdev)
+>  	if (IS_ERR(mgn_chip->base))
+>  		return PTR_ERR(mgn_chip->base);
+>  
+> +	/* If there is no "num-msis" property, assume 64... */
+> +	if (of_property_read_u32(pdev->dev.of_node, "num-msis", &num_msis) < 0)
+> +		num_msis = 64;
 
-static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_addr,
-			     size_t size, int flags,
-			     struct dma_coherent_mem **mem)
-{
-	struct dma_coherent_mem *dma_mem = NULL;
-	void __iomem *mem_base = NULL;
-	int pages = size >> PAGE_SHIFT;
-	int bitmap_size = BITS_TO_LONGS(pages) * sizeof(long);
+nit: Is that always true? This has been lifted from my dummy example, so
+I wonder if that's what you actually want to do.
 
-	if ((flags & (DMA_MEMORY_MAP | DMA_MEMORY_IO)) == 0)
-		goto out;
-	if (!size)
-		goto out;
+> +
+> +	domain = platform_msi_create_device_domain(&pdev->dev, num_msis,
+> +							mbigen_write_msg,
+> +							&mbigen_domain_ops,
+> +							mgn_chip);
+> +
+> +	if (!domain)
+> +		return -ENOMEM;
+> +
+>  	platform_set_drvdata(pdev, mgn_chip);
+>  
+>  	return 0;
+> 
 
-	mem_base = ioremap(phys_addr, size);
-	if (!mem_base)
-		goto out;
+Apart for the two above point,
 
-	dma_mem = kzalloc(sizeof(struct dma_coherent_mem), GFP_KERNEL);
-	if (!dma_mem)
-		goto out;
-	dma_mem->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
-	if (!dma_mem->bitmap)
-		goto out;
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-	dma_mem->virt_base = mem_base;
-	dma_mem->device_base = device_addr;
-	dma_mem->pfn_base = PFN_DOWN(phys_addr);
-	dma_mem->size = pages;
-	dma_mem->flags = flags;
-	spin_lock_init(&dma_mem->spinlock);
-
-	/**************************************************************/
-	/* Here's the only place where mem is set to non-NULL value.  */
-	/**************************************************************/
-	*mem = dma_mem;
-
-	if (flags & DMA_MEMORY_MAP)
-		/******************************************************/
-		/* Here's where function returns.                     */
-		/******************************************************/
-		return DMA_MEMORY_MAP;
-
-	return DMA_MEMORY_IO;
-
-out:
-	kfree(dma_mem);
-	if (mem_base)
-		iounmap(mem_base);
-	return 0;
-}
-
-static int rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
-{
-	struct dma_coherent_mem *mem = rmem->priv;
-
-	if (!mem &&
-	    /**********************************************************/
-	    /* Note that flags & DMA_MEMORY_MAP is non-zero.          */
-	    /**********************************************************/
-	    dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
-				     DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
-				     &mem) != DMA_MEMORY_MAP) {
-		pr_err("Reserved memory: failed to init DMA memory pool at %pa, size %ld MiB\n",
-			&rmem->base, (unsigned long)rmem->size / SZ_1M);
-		return -ENODEV;
-	}
-	rmem->priv = mem;
-	dma_assign_coherent_memory(dev, mem);
-	return 0;
-}
-
-
-> When you look at the existing code, there are three possible return
-> values from dma_init_coherent_memory():
->
-> - zero, which means failure, and the mem pointer is left alone.  In
->   the above code, we know that it's guaranteed to be NULL, as we
->   won't get into the if() unless it was.
-> - DMA_MEMORY_IO, which would mean that mem points at a kmalloc()d
->   chunk of memory, and this case is treated as failure because we
->   want memory.
-
-No.  This never happens in the code that is being patched.  flags &
-DMA_MEMORY_MAP is non-zero thus dma_init_coherent_memory returns
-DMA_MEMORY_MAP.
-
-> - DMA_MEMORY_MAP, which also means that mem points at a kmalloc()d
->   chunk of memory, which we treat as success.
->
-> So, in the case of DMA_MEMORY_IO,
-
-Which never happens.
-
-> we have a failure case where the kmalloc'd memory is dropped on the
-> floor - aka a memory leak.
-
-
-To me it seems that a better patch would be the following (not tested in
-any capacity):
-
-
->From 49cece0c0a052022022776f2555d26308deba959 Mon Sep 17 00:00:00 2001
-From: Michal Nazarewicz <mina86@mina86.com>
-Date: Thu, 3 Dec 2015 17:15:07 +0100
-Subject: [PATCH] drivers: dma-coherent: simplify dma_init_coherent_memory
- return value
-
-Since only dma_declare_coherent_memory cares about
-dma_init_coherent_memory returning part of flags as it return value,
-move the condition to the former and simplify the latter.  This in turn
-makes rmem_dma_device_init less confusing.
-
-Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
----
- drivers/base/dma-coherent.c | 28 +++++++++++-----------------
- 1 file changed, 11 insertions(+), 17 deletions(-)
-
-\o/ negative delta.
-
-diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
-index 55b8398..87b8083 100644
---- a/drivers/base/dma-coherent.c
-+++ b/drivers/base/dma-coherent.c
-@@ -17,9 +17,9 @@ struct dma_coherent_mem {
- 	spinlock_t	spinlock;
- };
- 
--static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_addr,
--			     size_t size, int flags,
--			     struct dma_coherent_mem **mem)
-+static bool dma_init_coherent_memory(
-+	phys_addr_t phys_addr, dma_addr_t device_addr, size_t size, int flags,
-+	struct dma_coherent_mem **mem)
- {
- 	struct dma_coherent_mem *dma_mem = NULL;
- 	void __iomem *mem_base = NULL;
-@@ -50,17 +50,13 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_add
- 	spin_lock_init(&dma_mem->spinlock);
- 
- 	*mem = dma_mem;
--
--	if (flags & DMA_MEMORY_MAP)
--		return DMA_MEMORY_MAP;
--
--	return DMA_MEMORY_IO;
-+	return true;
- 
- out:
- 	kfree(dma_mem);
- 	if (mem_base)
- 		iounmap(mem_base);
--	return 0;
-+	return false;
- }
- 
- static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
-@@ -88,15 +84,13 @@ int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
- 				dma_addr_t device_addr, size_t size, int flags)
- {
- 	struct dma_coherent_mem *mem;
--	int ret;
- 
--	ret = dma_init_coherent_memory(phys_addr, device_addr, size, flags,
--				       &mem);
--	if (ret == 0)
-+	if (!dma_init_coherent_memory(phys_addr, device_addr, size, flags,
-+				      &mem))
- 		return 0;
- 
- 	if (dma_assign_coherent_memory(dev, mem) == 0)
--		return ret;
-+		return flags & DMA_MEMORY_MAP ? DMA_MEMORY_MAP : DMA_MEMORY_IO;
- 
- 	dma_release_coherent_memory(mem);
- 	return 0;
-@@ -281,9 +275,9 @@ static int rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
- 	struct dma_coherent_mem *mem = rmem->priv;
- 
- 	if (!mem &&
--	    dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
--				     DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
--				     &mem) != DMA_MEMORY_MAP) {
-+	    !dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
-+				      DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
-+				      &mem)) {
- 		pr_err("Reserved memory: failed to init DMA memory pool at %pa, size %ld MiB\n",
- 			&rmem->base, (unsigned long)rmem->size / SZ_1M);
- 		return -ENODEV;
+	M.
 -- 
-2.6.0.rc2.230.g3dd15c0
-
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  ??? ?mina86? ??????  (o o)
-ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
+Jazz is not dead. It just smells funny...
