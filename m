@@ -1,98 +1,38 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 3 Dec 2015 14:48:55 +0000
-Subject: [PATCH v3 2/4] drm: Add support for ARM's HDLCD controller.
-In-Reply-To: <CAPj87rOyBciAtBH_MiKA1bcqbpmk8gOscOMcLcgcbcag7k1W9g@mail.gmail.com>
-References: <1449058982-18595-1-git-send-email-Liviu.Dudau@arm.com>
- <1449058982-18595-3-git-send-email-Liviu.Dudau@arm.com>
- <CAPj87rNFFGeL8z9GBXxyVri1RyhVpMGS0yz7opgCYamHYV1Yow@mail.gmail.com>
- <20151203100021.GD972@e106497-lin.cambridge.arm.com>
- <CAPj87rOyBciAtBH_MiKA1bcqbpmk8gOscOMcLcgcbcag7k1W9g@mail.gmail.com>
-Message-ID: <20151203144855.GA12521@e106497-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 3 Dec 2015 14:56:12 +0000
+Subject: [alsa-devel] [PATCH] ASoC: mediatek: Use current HW pointer for
+ pointer callback
+In-Reply-To: <s5hfuzjn635.wl-tiwai@suse.de>
+References: <1449129208-63615-1-git-send-email-koro.chen@mediatek.com>
+ <s5h8u5b98dp.wl-tiwai@suse.de>
+ <20151203110158.GD5727@sirena.org.uk>
+ <s5hfuzjn635.wl-tiwai@suse.de>
+Message-ID: <20151203145612.GF5727@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2015 at 02:20:26PM +0000, Daniel Stone wrote:
-> Hi Liviu,
-> 
-> On 3 December 2015 at 10:00, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > On Wed, Dec 02, 2015 at 05:21:44PM +0000, Daniel Stone wrote:
-> >> On 2 December 2015 at 12:23, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> >> > +       if (irq_status & HDLCD_INTERRUPT_VSYNC) {
-> >> > +               unsigned long flags;
-> >> > +
-> >> > +               drm_handle_vblank(drm, 0);
-> >> > +
-> >> > +               spin_lock_irqsave(&drm->event_lock, flags);
-> >> > +               if (hdlcd->event) {
-> >> > +                       drm_send_vblank_event(drm, hdlcd->event->pipe, hdlcd->event);
-> >> > +                       drm_crtc_vblank_put(&hdlcd->crtc);
-> >> > +                       hdlcd->event = NULL;
-> >> > +               }
-> >> > +               spin_unlock_irqrestore(&drm->event_lock, flags);
-> >> > +       }
-> >>
-> >> As with VC4 and Rockchip, you're missing a ->preclose handler in your
-> >> drm_drv, to make sure that you don't try to send events to a dead
-> >> client (which causes an OOPS):
-> >> https://git.collabora.com/cgit/user/daniels/linux.git/commit/?h=wip/4.4.x/rockchip-drm-fixes&id=d14f21bcd7
-> >> (and its parent)
-> >
-> > Thanks for reviewing this!
-> >
-> > I do acknowledge your concerns and you might correct my understanding on
-> > how atomic DRM works, but I believe in this case we should be safe. The
-> > event stored in hdlcd->event is taken out of the crtc->state->event during
-> > the crtc->atomic_begin() callback. If the client is dead the callback should
-> > not be called, so that's how we avoid the OOPS.
-> 
-> Right, it's taken out of the CRTC state and put into the overall HDLCD
-> structure. So the OOPS happens when:
->   - client submits state with event requested, async flag set
->   - atomic_begin moves crtc->state->event into hdlcd->event
->   - control returns to client, who exits immediately
->   - vblank happens
->   - hdlcd->event->base.file_priv now points to a dead client
->   - OOPS
+On Thu, Dec 03, 2015 at 12:07:26PM +0100, Takashi Iwai wrote:
+> Mark Brown wrote:
+> > On Thu, Dec 03, 2015 at 10:41:38AM +0100, Takashi Iwai wrote:
 
-I will try to construct an userspace test to see if I can trigger this scenario.
+> > > While reading this patch, I wondered how regmap can be used safely in
+> > > an irq-disabled context.  Mark, do we have any API for that?
 
-Thanks for explaining it to me.
+> > We can use user supplied locks or spin_lock_irqsave().
 
-Best regards,
-Liviu
+> I meant how to guarantee to make regmap_read() working in an already
+> spin-locked context, typically in an irq handler?  regmap_read()
+> involves with the regcache and it may invoke kmalloc().
 
-> 
-> >> Also, is there anything preventing clients from submitting multiple
-> >> pageflips before the event is sent? I couldn't see anything from a
-> >> quick look, so you could have the situation of:
-> >>   - client submits pageflip, event 1 stored to hdlcd->event
-> >>   - client submits pageflip, event 2 stored to hdlcd->event
-> >>   - vblank arrives, event 2 is sent
-> >>   - event 1 has disappeared and been leaked
-> >
-> > As for multiple events being submitted before vsync interrupt happening: given
-> > that the event is plucked out of the crtc->state, is that possible? And if so,
-> > is there a case where having the later event overwrite the earlier one a desired
-> > outcome?
-> 
-> Having events being overwritten is extremely undesirable; it could
-> cause a client to stall in the right scenarios (e.g. requests
-> submitted separately for different planes). It would be far better to
-> turn hdlcd->event into a list of events which are sent per-vblank,
-> probably just by retaining a list of pending states to apply; this
-> also makes it easier to handle async commits in the future (which
-> Weston in particular relies on).
-> 
-> Cheers,
-> Daniel
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+I know that's what you meant - that should be done by preallocating the
+cache (which can be done with defaults) and providing your own lock
+if there's a spinlock already held (since we use _irqsave() which IIRC
+isn't nestable).  We can also use GFP_ATOMIC for some of the allocations
+in reasonable use cases but it's not in general supported.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151203/84bd11d3/attachment-0001.sig>
