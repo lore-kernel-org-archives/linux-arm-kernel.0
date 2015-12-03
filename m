@@ -1,48 +1,97 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 3 Dec 2015 17:17:31 +0000
-Subject: [PATCH v6 14/19] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <20151202002430.GB23156@yury-N73SV>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <2776283.xtmDQm6BqS@wuerfel> <87zixue8lj.fsf@igel.home>
- <1608639.5Yic1PH469@wuerfel> <20151202002430.GB23156@yury-N73SV>
-Message-ID: <20151203171730.GN10747@e104818-lin.cambridge.arm.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Thu, 3 Dec 2015 09:22:07 -0800
+Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
+ concurrent lockers
+In-Reply-To: <20151203163243.GI11337@arm.com>
+References: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
+ <20151130155839.GK17308@twins.programming.kicks-ass.net>
+ <20151201164035.GE27751@arm.com>
+ <20151203001141.GO28602@linux.vnet.ibm.com>
+ <20151203132839.GA3816@twins.programming.kicks-ass.net>
+ <20151203163243.GI11337@arm.com>
+Message-ID: <20151203172207.GR28602@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 02, 2015 at 03:24:30AM +0300, Yury Norov wrote:
-> On Tue, Dec 01, 2015 at 12:30:56PM +0100, Arnd Bergmann wrote:
-> > On Tuesday 01 December 2015 12:01:12 Andreas Schwab wrote:
-> > > Arnd Bergmann <arnd@arndb.de> writes:
-> > > 
-> > > > On Tuesday 01 December 2015 10:20:59 Andreas Schwab wrote:
-> > > >> Yury Norov <ynorov@caviumnetworks.com> writes:
-> > > >> 
-> > > >> > There's a tricky bug with signal stack, that Andreas also discovered.
-> > > >> 
-> > > >> That was only a confusion about the compat state of sys_rt_sigaction.
-> > > >> It just requires making sure glibc uses the correct (64bit layout)
-> > > >> struct kernel_sigaction.
-> > > >
-> > > > I don't think we need to use the 64-bit version of sigaction, both
-> > > > kernel and libc are simpler if we use the normal 32-bit version.
-> > > 
-> > > Since glibc has to do the conversion anyway (due to sigset_t), using the
-> > > 64bit layout avoids a second conversion in the kernel.
-> > 
-> > I don't get the part about sigset_t. Why would glibc want to use the
-> > 64-bit layout? This one looks like one of the cases where we absolutely
-> > want to use the 32-bit layout or otherwise get into big trouble if
-> > we ever want to support native ILP32 kernels.
-> > 
-> > 	Arnd
+On Thu, Dec 03, 2015 at 04:32:43PM +0000, Will Deacon wrote:
+> Hi Peter, Paul,
 > 
-> So, we drop patch #6, and use 32-bit layout for all signal structures.
+> Firstly, thanks for writing that up. I agree that you have something
+> that can work in theory, but see below.
 > 
-> Correct?
+> On Thu, Dec 03, 2015 at 02:28:39PM +0100, Peter Zijlstra wrote:
+> > On Wed, Dec 02, 2015 at 04:11:41PM -0800, Paul E. McKenney wrote:
+> > > This looks architecture-agnostic to me:
+> > > 
+> > > a.	TSO systems have smp_mb__after_unlock_lock() be a no-op, and
+> > > 	have a read-only implementation for spin_unlock_wait().
+> > > 
+> > > b.	Small-scale weakly ordered systems can also have
+> > > 	smp_mb__after_unlock_lock() be a no-op, but must instead
+> > > 	have spin_unlock_wait() acquire the lock and immediately 
+> > > 	release it, or some optimized implementation of this.
+> > > 
+> > > c.	Large-scale weakly ordered systems are required to define
+> > > 	smp_mb__after_unlock_lock() as smp_mb(), but can have a
+> > > 	read-only implementation of spin_unlock_wait().
+> > 
+> > This would still require all relevant spin_lock() sites to be annotated
+> > with smp_mb__after_unlock_lock(), which is going to be a painful (no
+> > warning when done wrong) exercise and expensive (added MBs all over the
+> > place).
 
-I would vote for this as well. I think it probably removes patch 12 as
-well (COMPAT_USE_NATIVE_SIGINFO).
+On the lack of warning, agreed, but please see below.  On the added MBs,
+the only alternative I have been able to come up with has even more MBs,
+as in on every lock acquisition.  If I am missing something, please do
+not keep it a secret!
 
--- 
-Catalin
+> > But yes, I think the proposal is technically sound, just not quite sure
+> > how far we'll want to push this.
+> 
+> When I said that the solution isn't architecture-agnostic, I was referring
+> to the fact that spin_unlock_wait acts as a LOCK operation on all
+> architectures other than those using case (c) above. You've resolved
+> this by requiring smp_mb__after_unlock_lock() after every LOCK, but I
+> share Peter's concerns that this isn't going to work in practice because:
+> 
+>   1. The smp_mb__after_unlock_lock additions aren't necessarily in the
+>      code where the spin_unlock_wait() is being added, so it's going to
+>      require a lot of diligence for developers to get this right
+
+Completely agreed.  And Peter's finding a number of missing instances
+of smp_mb__after_unlock_lock() is evidence in favor.  Some diagnostic
+tool will be needed.
+
+I don't see much hope for static-analysis approaches, because you
+might have the spin_unlock_wait() in one translation unit and the
+lock acquisitions in another translation unit.  Plus it can be quite
+difficult for static analysis to work out which lock is which.
+Undecidable, even, in the worst case.
+
+My current thought is to have lockdep mark any lock on which
+spin_unlock_wait() is invoked.  An smp_mb__after_unlock_lock() would
+mark the most recent lock acquisition.  Then if an unlock of a marked
+lock sees that there has been no smp_mb__after_unlock_lock(), you get
+a lockdep splat.
+
+If needed, a Coccinelle could yell if it sees smp_mb__after_unlock_lock()
+without a lock acquisition immediately prior.  As could checkpatch.pl.
+
+Is this reasonable, or am I lockdep-naive?  Would some other approach
+work better?
+
+>   2. Only PowerPC is going to see the (very occassional) failures, so
+>      testing this is nigh on impossible :(
+
+Indeed, we clearly cannot rely on normal testing, witness rcutorture
+failing to find the missing smp_mb__after_unlock_lock() instances that
+Peter found by inspection.  So I believe that augmented testing is
+required, perhaps as suggested above.
+
+>   3. We've now made the kernel memory model even more difficult to
+>      understand, so people might not even bother with this addition
+
+You mean "bother" as in "bother to understand", right?  Given that people
+already are bothering to use spin_unlock_wait()...
+
+							Thanx, Paul
