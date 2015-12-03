@@ -1,24 +1,53 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 3 Dec 2015 13:14:41 +0000
-Subject: [PATCH 0/4] ARM: sun9i: Support Allwinner A80 NMI controller
-In-Reply-To: <1449130813-22400-1-git-send-email-wens@csie.org>
-References: <1449130813-22400-1-git-send-email-wens@csie.org>
-Message-ID: <20151203131441.GI6520@io.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 03 Dec 2015 14:19:47 +0100
+Subject: [RESEND v4 2/6] remoteproc: debugfs: Add ability to boot remote
+ processor using debugfs
+In-Reply-To: <20151203130341.GA26902@x1>
+References: <1448370862-19120-1-git-send-email-lee.jones@linaro.org>
+ <5329827.I5W30K072M@wuerfel> <20151203130341.GA26902@x1>
+Message-ID: <2600153.9u9Z7N2IT1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2015 at 04:20:09PM +0800, Chen-Yu Tsai wrote:
-> Patch 1 renames the binding doc, to remove the SoC specific bits from
-> the filename.
+On Thursday 03 December 2015 13:03:41 Lee Jones wrote:
+> On Thu, 03 Dec 2015, Arnd Bergmann wrote:
 > 
-> Patch 2 adds a new compatible string for the A80 variant.
+> > On Thursday 03 December 2015 12:26:34 Lee Jones wrote:
+> > > > >
+> > > > > +static ssize_t rproc_state_write(struct file *filp, const char __user *userbuf,
+> > > > > +                                size_t count, loff_t *ppos)
+> > > > > +{
+> > > > > +       struct rproc *rproc = filp->private_data;
+> > > > > +       char buf[10];
+> > > > > +       int ret;
+> > > > > +
+> > > > > +       if (count > sizeof(buf))
+> > > > > +               return count;
+> > > > > +       ret = copy_from_user(buf, userbuf, count);
+> > > > > +       if (ret)
+> > > > > +               return -EFAULT;
+> > > > > +
+> > > > > +       if (buf[count - 1] == '\n')
+> > > > > +               buf[count - 1] = '\0';
+> > > > 
+> > > > I believe you can get here with count = 0.
+> > > 
+> > > I'm pretty sure you can't.
+> > > 
+> > > If you are sure that you can, if you can provide me with a way of
+> > > testing, I'd be happy to put in provisions.
+> > > 
+> > 
+> > I think that a zero-length write() from user space ends up in the write
+> > file operation.
 > 
-> Patch 3 adds driver support for the A80 variant.
+> I tested this and didn't see it enter write().  My conclusion was that
+> if the file doesn't change, then nothing is triggered.
+> 
 
-Applied to irqchip/sunxi.  Once this has had a day or two in -next, you
-can consider it stable.  I'll also merge it into irqchip/core around
-that time.  Added Maxime and Hans' tags.
+Ah, interesting. I haven't tried myself, and just tried to read the
+code. Maybe glibc already catches zero-length writes before it gets
+into the kernel, or I just missed the part of the syscall that checks
+for this.
 
-thx,
-
-Jason.
+	arnd
