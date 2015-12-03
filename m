@@ -1,122 +1,31 @@
 From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Thu,  3 Dec 2015 16:10:34 -0500
-Subject: [PATCH v5 5/7] ARM: dts: imx: Add support for Advantech/GE B450v3
+Date: Thu,  3 Dec 2015 16:10:31 -0500
+Subject: [PATCH v5 2/7] of: Add vendor prefix for General Electric Company
 In-Reply-To: <1449177036-13317-1-git-send-email-akshay.bhat@timesys.com>
 References: <1449177036-13317-1-git-send-email-akshay.bhat@timesys.com>
-Message-ID: <1449177036-13317-6-git-send-email-akshay.bhat@timesys.com>
+Message-ID: <1449177036-13317-3-git-send-email-akshay.bhat@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Advantech/GE B450v3 board.
+This patch adds vendor prefix for General Electric Company
 
 Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/boot/dts/Makefile         |  1 +
- arch/arm/boot/dts/imx6q-b450v3.dts | 84 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 85 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-b450v3.dts
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 760a737..219830f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -310,6 +310,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6dl-wandboard-revb1.dtb \
- 	imx6q-apf6dev.dtb \
- 	imx6q-arm2.dtb \
-+	imx6q-b450v3.dtb \
- 	imx6q-cm-fx6.dtb \
- 	imx6q-cubox-i.dtb \
- 	imx6q-dfi-fs700-m60.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-b450v3.dts b/arch/arm/boot/dts/imx6q-b450v3.dts
-new file mode 100644
-index 0000000..6c76d05
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-b450v3.dts
-@@ -0,0 +1,84 @@
-+/*
-+ * Copyright 2015 Timesys Corporation.
-+ * Copyright 2015 General Electric Company
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6q-bx50v3.dtsi"
-+
-+/ {
-+	model = "General Electric B450v3";
-+	compatible = "ge,imx6q-b450v3", "advantech,imx6q-ba16", "fsl,imx6q";
-+
-+	chosen {
-+		stdout-path = &uart3;
-+	};
-+
-+	panel_lvds0 {
-+		compatible = "innolux,g121x1-l03";
-+		backlight = <&backlight_lvds>;
-+		power-supply = <&reg_lvds>;
-+
-+		port {
-+			panel_in_lvds0: endpoint {
-+				remote-endpoint = <&lvds0_out>;
-+			};
-+		};
-+	};
-+
-+	panel_lvds1 {
-+		compatible = "innolux,g121x1-l03";
-+		backlight = <&backlight_lvds>;
-+		power-supply = <&reg_lvds>;
-+
-+		port {
-+			panel_in_lvds1: endpoint {
-+				remote-endpoint = <&lvds1_out>;
-+			};
-+		};
-+	};
-+};
-+
-+&ldb {
-+	assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
-+			  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
-+	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL3_USB_OTG>,
-+				 <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
-+	status = "okay";
-+
-+	lvds0: lvds-channel at 0 {
-+		fsl,data-mapping = "spwg";
-+		fsl,data-width = <24>;
-+		status = "okay";
-+
-+		port at 4 {
-+			reg = <4>;
-+
-+			lvds0_out: endpoint {
-+				remote-endpoint = <&panel_in_lvds0>;
-+			};
-+		};
-+	};
-+
-+	lvds1: lvds-channel at 1 {
-+		fsl,data-mapping = "spwg";
-+		fsl,data-width = <24>;
-+		status = "okay";
-+
-+		port at 4 {
-+			reg = <4>;
-+
-+			lvds1_out: endpoint {
-+				remote-endpoint = <&panel_in_lvds1>;
-+			};
-+		};
-+	};
-+};
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index c51bf7c..f1cc839 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -88,6 +88,7 @@ fcs	Fairchild Semiconductor
+ firefly	Firefly
+ focaltech	FocalTech Systems Co.,Ltd
+ fsl	Freescale Semiconductor
++ge	General Electric Company
+ GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+ gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+ geniatech	Geniatech, Inc.
 -- 
 2.6.3
