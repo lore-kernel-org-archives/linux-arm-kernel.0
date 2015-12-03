@@ -1,169 +1,45 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 3 Dec 2015 11:08:25 +0100
-Subject: [PATCH v2 1/4] i2c: at91: add upport for the HOLD field
-In-Reply-To: <1449136434-27619-3-git-send-email-ludovic.desroches@atmel.com>
-References: <1449136434-27619-1-git-send-email-ludovic.desroches@atmel.com>
- <1449136434-27619-3-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20151203100825.GD5049@odux.rfo.atmel.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 3 Dec 2015 10:11:28 +0000
+Subject: [RFC] rk3368 idle states
+In-Reply-To: <2472961.2QZIyIIJQ0@diego>
+References: <20151202111858.GB18981@red-moon>
+ <2472961.2QZIyIIJQ0@diego>
+Message-ID: <20151203101128.GB2110@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry forget this one, I have sent an old version.
+Hi Heiko,
 
-On Thu, Dec 03, 2015 at 10:53:51AM +0100, Ludovic Desroches wrote:
-> The hold field allows to configure the data hold time which can be set
-> with the help of the generic binding 'i2c-sda-hold-time-ns'. This
-> feature has been introduced with SAMA5D4 SoC family.
+On Thu, Dec 03, 2015 at 02:05:01AM +0100, Heiko St?bner wrote:
+> Hi Lorenzo,
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->  drivers/i2c/busses/i2c-at91.c | 53 ++++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 50 insertions(+), 3 deletions(-)
+> Am Mittwoch, 2. Dezember 2015, 11:18:58 schrieb Lorenzo Pieralisi:
+> > while reviewing other dts idle states bindings I spotted the following
+> > snippet in arch/arm64/boot/dts/rockchip/rk3368.dtsi:
+> > 
+> > cpu_sleep: cpu-sleep-0 {
+> >        compatible = "arm,idle-state";
+> >        arm,psci-suspend-param = <0x1010000>;
+> >        entry-latency-us = <0x3fffffff>;
+> >        exit-latency-us = <0x40000000>;
+> >        min-residency-us = <0xffffffff>;
+> > };
+> > 
+> > Could you please explain to me how you obtained these residency/latency
+> > values ? They make NO sense whatsoever and I am quite tempted to
+> > ask you to remove this data from the dts file, it is just wrong.
 > 
-> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> index 10835d1..921d32b 100644
-> --- a/drivers/i2c/busses/i2c-at91.c
-> +++ b/drivers/i2c/busses/i2c-at91.c
-> @@ -64,6 +64,8 @@
->  #define	AT91_TWI_IADR		0x000c	/* Internal Address Register */
->  
->  #define	AT91_TWI_CWGR		0x0010	/* Clock Waveform Generator Reg */
-> +#define	AT91_TWI_CWGR_HOLD_MAX	0x1f
-> +#define	AT91_TWI_CWGR_HOLD(x)	(((x) & AT91_TWI_CWGR_HOLD_MAX) << 24)
->  
->  #define	AT91_TWI_SR		0x0020	/* Status Register */
->  #define	AT91_TWI_TXCOMP		BIT(0)	/* Transmission Complete */
-> @@ -110,6 +112,7 @@ struct at91_twi_pdata {
->  	unsigned clk_offset;
->  	bool has_unre_flag;
->  	bool has_alt_cmd;
-> +	bool has_hold_field;
->  	struct at_dma_slave dma_slave;
->  };
->  
-> @@ -187,10 +190,11 @@ static void at91_init_twi_bus(struct at91_twi_dev *dev)
->   */
->  static void at91_calc_twi_clock(struct at91_twi_dev *dev, int twi_clk)
->  {
-> -	int ckdiv, cdiv, div;
-> +	int ckdiv, cdiv, div, hold = 0;
->  	struct at91_twi_pdata *pdata = dev->pdata;
->  	int offset = pdata->clk_offset;
->  	int max_ckdiv = pdata->clk_max_div;
-> +	u32 twd_hold_time_ns = 0;
->  
->  	div = max(0, (int)DIV_ROUND_UP(clk_get_rate(dev->clk),
->  				       2 * twi_clk) - offset);
-> @@ -204,8 +208,33 @@ static void at91_calc_twi_clock(struct at91_twi_dev *dev, int twi_clk)
->  		cdiv = 255;
->  	}
->  
-> -	dev->twi_cwgr_reg = (ckdiv << 16) | (cdiv << 8) | cdiv;
-> -	dev_dbg(dev->dev, "cdiv %d ckdiv %d\n", cdiv, ckdiv);
-> +	if (pdata->has_hold_field) {
-> +		of_property_read_u32(dev->dev->of_node, "i2c-sda-hold-time-ns",
-> +				     &twd_hold_time_ns);
-> +
-> +		/*
-> +		 * hold time = HOLD + 3 x T_peripheral_clock
-> +		 * Use clk rate in kHz to prevent overflows when computing
-> +		 * hold.
-> +		 */
-> +		hold = DIV_ROUND_UP(twd_hold_time_ns
-> +				    * (clk_get_rate(dev->clk) / 1000), 1000000);
-> +		hold -= 3;
-> +		if (hold < 0)
-> +			hold = 0;
-> +		if (hold > AT91_TWI_CWGR_HOLD_MAX) {
-> +			dev_warn(dev->dev,
-> +				 "HOLD field set to its maximum value (%d instead of %d)\n",
-> +				 AT91_TWI_CWGR_HOLD_MAX, hold);
-> +			hold = AT91_TWI_CWGR_HOLD_MAX;
-> +		}
-> +	}
-> +
-> +	dev->twi_cwgr_reg = (ckdiv << 16) | (cdiv << 8) | cdiv
-> +			    | AT91_TWI_CWGR_HOLD(hold);
-> +
-> +	dev_dbg(dev->dev, "cdiv %d ckdiv %d hold %d (%d ns)\n",
-> +		cdiv, ckdiv, hold, twd_hold_time_ns);
->  }
->  
->  static void at91_twi_dma_cleanup(struct at91_twi_dev *dev)
-> @@ -797,6 +826,7 @@ static struct at91_twi_pdata at91rm9200_config = {
->  	.clk_offset = 3,
->  	.has_unre_flag = true,
->  	.has_alt_cmd = false,
-> +	.has_hold_field = false,
->  };
->  
->  static struct at91_twi_pdata at91sam9261_config = {
-> @@ -804,6 +834,7 @@ static struct at91_twi_pdata at91sam9261_config = {
->  	.clk_offset = 4,
->  	.has_unre_flag = false,
->  	.has_alt_cmd = false,
-> +	.has_hold_field = false,
->  };
->  
->  static struct at91_twi_pdata at91sam9260_config = {
-> @@ -811,6 +842,7 @@ static struct at91_twi_pdata at91sam9260_config = {
->  	.clk_offset = 4,
->  	.has_unre_flag = false,
->  	.has_alt_cmd = false,
-> +	.has_hold_field = false,
->  };
->  
->  static struct at91_twi_pdata at91sam9g20_config = {
-> @@ -818,6 +850,7 @@ static struct at91_twi_pdata at91sam9g20_config = {
->  	.clk_offset = 4,
->  	.has_unre_flag = false,
->  	.has_alt_cmd = false,
-> +	.has_hold_field = false,
->  };
->  
->  static struct at91_twi_pdata at91sam9g10_config = {
-> @@ -825,6 +858,7 @@ static struct at91_twi_pdata at91sam9g10_config = {
->  	.clk_offset = 4,
->  	.has_unre_flag = false,
->  	.has_alt_cmd = false,
-> +	.has_hold_field = false,
->  };
->  
->  static const struct platform_device_id at91_twi_devtypes[] = {
-> @@ -854,6 +888,15 @@ static struct at91_twi_pdata at91sam9x5_config = {
->  	.clk_offset = 4,
->  	.has_unre_flag = false,
->  	.has_alt_cmd = false,
-> +	.has_hold_field = false,
-> +};
-> +
-> +static struct at91_twi_pdata sama5d4_config = {
-> +	.clk_max_div = 7,
-> +	.clk_offset = 4,
-> +	.has_unre_flag = false,
-> +	.has_alt_cmd = false,
-> +	.has_hold_field = true,
->  };
->  
->  static struct at91_twi_pdata sama5d2_config = {
-> @@ -861,6 +904,7 @@ static struct at91_twi_pdata sama5d2_config = {
->  	.clk_offset = 4,
->  	.has_unre_flag = true,
->  	.has_alt_cmd = true,
-> +	.has_hold_field = true,
->  };
->  
->  static const struct of_device_id atmel_twi_dt_ids[] = {
-> @@ -883,6 +927,9 @@ static const struct of_device_id atmel_twi_dt_ids[] = {
->  		.compatible = "atmel,at91sam9x5-i2c",
->  		.data = &at91sam9x5_config,
->  	}, {
-> +		.compatible = "atmel,sama5d4-i2c",
-> +		.data = &sama5d4_config,
-> +	}, {
->  		.compatible = "atmel,sama5d2-i2c",
->  		.data = &sama5d2_config,
->  	}, {
-> -- 
-> 2.5.0
+> I took these values verbatim from the vendor kernel when adding the core 
+> rk3368 support.
 > 
+> I guess I was overly enthusiastic, that psci worked out of the box for smp, 
+> that I didn't check the latency/residency values enough at that time. As time-
+> values they are really overly long :-) .
+> 
+> 
+> Nevertheless I have inquired now, what the background of those values is.
+
+Thank you, they must be updated, hopefully they won't unearth any issue
+with the idle state - ie at present the idle state simply turns out unused.
+
+Lorenzo
