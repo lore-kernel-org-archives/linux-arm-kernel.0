@@ -1,9 +1,9 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 3 Dec 2015 10:53:50 +0100
-Subject: [PATCH v2 1/4] i2c: at91: add support for the HOLD field
+Date: Thu, 3 Dec 2015 10:53:51 +0100
+Subject: [PATCH v2 1/4] i2c: at91: add upport for the HOLD field
 In-Reply-To: <1449136434-27619-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1449136434-27619-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1449136434-27619-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1449136434-27619-3-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
