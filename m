@@ -1,76 +1,78 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 3 Dec 2015 12:13:03 +0000
-Subject: [PATCH v6 07/19] arm64: introduce is_a32_task and is_a32_thread
- (for AArch32 compat)
-In-Reply-To: <1447795019-30176-8-git-send-email-ynorov@caviumnetworks.com>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <1447795019-30176-8-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <20151203121303.GK10747@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 3 Dec 2015 12:17:12 +0000
+Subject: [PATCH v5 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
+In-Reply-To: <1449000658-11475-4-git-send-email-dcashman@android.com>
+References: <1449000658-11475-1-git-send-email-dcashman@android.com>
+ <1449000658-11475-2-git-send-email-dcashman@android.com>
+ <1449000658-11475-3-git-send-email-dcashman@android.com>
+ <1449000658-11475-4-git-send-email-dcashman@android.com>
+Message-ID: <20151203121712.GE11337@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2015 at 12:16:47AM +0300, Yury Norov wrote:
-> diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-> index 7fbed69..9700e5e 100644
-> --- a/arch/arm64/include/asm/compat.h
-> +++ b/arch/arm64/include/asm/compat.h
-> @@ -299,19 +299,44 @@ struct compat_shmid64_ds {
->  	compat_ulong_t __unused5;
->  };
->  
-> -static inline int is_compat_task(void)
-> +#ifdef CONFIG_AARCH32_EL0
-> +
-> +static inline int is_a32_compat_task(void)
->  {
->  	return test_thread_flag(TIF_32BIT);
->  }
->  
-> -static inline int is_compat_thread(struct thread_info *thread)
-> +static inline int is_a32_compat_thread(struct thread_info *thread)
->  {
->  	return test_ti_thread_flag(thread, TIF_32BIT);
->  }
->  
-> +#else
-> +
-> +static inline int is_a32_compat_task(void)
-> +{
-> +	return 0;
-> +}
-> +
-> +static inline int is_a32_compat_thread(struct thread_info *thread)
-> +{
-> +	return 0;
-> +}
-> +#endif
-> +
-> +static inline int is_compat_task(void)
-> +{
-> +	return is_a32_compat_task();
-> +}
-> +
->  #else /* !CONFIG_COMPAT */
->  
-> -static inline int is_compat_thread(struct thread_info *thread)
-> +static inline int is_a32_compat_thread(struct thread_info *thread)
-> +{
-> +	return 0;
-> +}
-> +
-> +static inline int is_a32_compat_task(void)
->  {
->  	return 0;
->  }
+Hi Daniel,
 
-My main worry with this patch is a potential #include mess. I can see
-that you already had to include asm/compat.h explicitly in
-hw_breakpoint.c even though linux/compat.h was already included. In
-subsequent files (asm/elf.h, asm/memory.h) you check is_compat_task()
-without explicitly including asm/compat.h and hope that it won't break.
+On Tue, Dec 01, 2015 at 12:10:57PM -0800, Daniel Cashman wrote:
+> From: dcashman <dcashman@google.com>
+> 
+> arm64: arch_mmap_rnd() uses STACK_RND_MASK to generate the
+> random offset for the mmap base address.  This value represents a
+> compromise between increased ASLR effectiveness and avoiding
+> address-space fragmentation. Replace it with a Kconfig option, which
+> is sensibly bounded, so that platform developers may choose where to
+> place this compromise. Keep default values as new minimums.
+> 
+> Signed-off-by: Daniel Cashman <dcashman@android.com>
+> ---
+>  arch/arm64/Kconfig   | 31 +++++++++++++++++++++++++++++++
+>  arch/arm64/mm/mmap.c |  8 ++++++--
+>  2 files changed, 37 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 871f217..fb57649 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -51,6 +51,8 @@ config ARM64
+>  	select HAVE_ARCH_JUMP_LABEL
+>  	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP && !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+>  	select HAVE_ARCH_KGDB
+> +	select HAVE_ARCH_MMAP_RND_BITS if MMU
+> +	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if MMU && COMPAT
 
-A solution would be to add these functions in a separate header file
-that gets included where needed (also by asm/compat.h).
+You can drop the 'if MMU' bits, since we don't support !MMU on arm64.
 
--- 
-Catalin
+>  	select HAVE_ARCH_SECCOMP_FILTER
+>  	select HAVE_ARCH_TRACEHOOK
+>  	select HAVE_BPF_JIT
+> @@ -104,6 +106,35 @@ config ARCH_PHYS_ADDR_T_64BIT
+>  config MMU
+>  	def_bool y
+>  
+> +config ARCH_MMAP_RND_BITS_MIN
+> +       default 15 if ARM64_64K_PAGES
+> +       default 17 if ARM64_16K_PAGES
+> +       default 19
+
+Is this correct? We currently have a mask of 0x3ffff, so that's 18 bits.
+
+> +config ARCH_MMAP_RND_BITS_MAX
+> +       default 19 if ARM64_VA_BITS=36
+> +       default 20 if ARM64_64K_PAGES && ARM64_VA_BITS=39
+> +       default 22 if ARM64_16K_PAGES && ARM64_VA_BITS=39
+> +       default 24 if ARM64_VA_BITS=39
+> +       default 23 if ARM64_64K_PAGES && ARM64_VA_BITS=42
+> +       default 25 if ARM64_16K_PAGES && ARM64_VA_BITS=42
+> +       default 27 if ARM64_VA_BITS=42
+> +       default 30 if ARM64_VA_BITS=47
+> +       default 29 if ARM64_64K_PAGES && ARM64_VA_BITS=48
+> +       default 31 if ARM64_16K_PAGES && ARM64_VA_BITS=48
+> +       default 33 if ARM64_VA_BITS=48
+> +       default 15 if ARM64_64K_PAGES
+> +       default 17 if ARM64_16K_PAGES
+> +       default 19
+
+Could you add a comment above this with the formula
+(VA_BITS - PAGE_SHIFT - 3), please, so that we can update this easily in
+the future if we need to?
+
+Will
