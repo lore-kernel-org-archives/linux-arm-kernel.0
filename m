@@ -1,89 +1,47 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 3 Dec 2015 12:09:25 +0000
-Subject: [PATCH v3 09/10] PM / Hibernate: Publish pages restored in-place
- to arch code
-In-Reply-To: <1448559168-8363-10-git-send-email-james.morse@arm.com>
-References: <1448559168-8363-1-git-send-email-james.morse@arm.com>
- <1448559168-8363-10-git-send-email-james.morse@arm.com>
-Message-ID: <20151203120925.GA2220@red-moon>
+From: peda@axentia.se (Peter Rosin)
+Date: Thu, 3 Dec 2015 12:08:11 +0000
+Subject: Domain faults when CONFIG_CPU_SW_DOMAIN_PAN is enabled
+In-Reply-To: <20151203115143.GM8644@n2100.arm.linux.org.uk>
+References: <1267b061b66c4d1fa8af1955825bc97a@EMAIL.axentia.se>
+ <20151203110041.GK8644@n2100.arm.linux.org.uk>
+ <f7774151e4a849e682ae5a607a98140b@EMAIL.axentia.se>
+ <20151203115143.GM8644@n2100.arm.linux.org.uk>
+Message-ID: <533b0f1f264e42e78b94bbff9570fb50@EMAIL.axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 26, 2015 at 05:32:47PM +0000, James Morse wrote:
-
-[...]
-
-> @@ -2427,25 +2434,31 @@ static void *get_buffer(struct memory_bitmap *bm, struct chain_allocator *ca)
->  	if (PageHighMem(page))
->  		return get_highmem_page_buffer(page, ca);
-
-I know it is not a problem for arm64, but you should export the
-"restored" highmem pages list too because arch code may need to use
-it for the same reasons this patch was implemented.
-
-> -	if (swsusp_page_is_forbidden(page) && swsusp_page_is_free(page))
-> -		/* We have allocated the "original" page frame and we can
-> -		 * use it directly to store the loaded page.
-> -		 */
-> -		return page_address(page);
-> -
-> -	/* The "original" page frame has not been allocated and we have to
-> -	 * use a "safe" page frame to store the loaded page.
-> -	 */
->  	pbe = chain_alloc(ca, sizeof(struct pbe));
->  	if (!pbe) {
->  		swsusp_free();
->  		return ERR_PTR(-ENOMEM);
->  	}
-> -	pbe->orig_address = page_address(page);
-> -	pbe->address = safe_pages_list;
-> -	safe_pages_list = safe_pages_list->next;
-> -	pbe->next = restore_pblist;
-> -	restore_pblist = pbe;
-> +
-> +	if (swsusp_page_is_forbidden(page) && swsusp_page_is_free(page)) {
-> +		/* We have allocated the "original" page frame and we can
-> +		 * use it directly to store the loaded page.
-> +		 */
-> +		pbe->orig_address = NULL;
-> +		pbe->address = page_address(page);
-> +		pbe->next = restored_inplace_pblist;
-> +		restored_inplace_pblist = pbe;
-> +	} else {
-> +		/* The "original" page frame has not been allocated and we
-> +		 * have to use a "safe" page frame to store the loaded page.
-> +		 */
-> +		pbe->orig_address = page_address(page);
-> +		pbe->address = safe_pages_list;
-> +		safe_pages_list = safe_pages_list->next;
-> +		pbe->next = restore_pblist;
-> +		restore_pblist = pbe;
-> +	}
-
-This makes sense to me, more so given that the pbe data is already
-pre-allocated regardless in prepare_image() (ie it should not change
-the current behaviour apart from calling chain_alloc() for every page we
-are restoring), you are just adding a pointer to stash that information,
-hence, if it is ok for Pavel and Rafael I think this patch can be considered
-for merging.
-
-Feedback appreciated.
-
-Thanks,
-Lorenzo
-
-> +
->  	return pbe->address;
->  }
->  
-> @@ -2513,6 +2526,7 @@ int snapshot_write_next(struct snapshot_handle *handle)
->  			chain_init(&ca, GFP_ATOMIC, PG_SAFE);
->  			memory_bm_position_reset(&orig_bm);
->  			restore_pblist = NULL;
-> +			restored_inplace_pblist = NULL;
->  			handle->buffer = get_buffer(&orig_bm, &ca);
->  			handle->sync_read = 0;
->  			if (IS_ERR(handle->buffer))
-> -- 
-> 2.6.2
+Russell King wrote:
+> On Thu, Dec 03, 2015 at 11:38:20AM +0000, Peter Rosin wrote:
+> > Russell King wrote:
+> > > On Thu, Dec 03, 2015 at 08:33:13AM +0000, Peter Rosin wrote:
+> > > > I wrote:
+> > > > > If I enable CONFIG_CPU_SW_DOMAIN_PAN, I sometimes (but not always) get the
+> > > > > following (or very similar) on boot.
+> > > > 
+> > > > I should have said "if I don't disable", as the option is "default y".
+> > > > 
+> > > > Also, if it survives on boot, below is an example of later trouble (after
+> > > > 30+ minutes on this occasion).
+> > > 
+> > > Please apply this patch so we (might) get a slightly better oops dump,
+> > > and then try to reproduce.
+> > 
+> > Sure thing, but it's still "DAC: 00000051"...
 > 
+> Thanks, that confirms that something in the uaccess-with-memcpy code
+> is clearing the DACR back to 0x51.
+> 
+> This has come up several times before, and I really can't spot the
+> problem in this code, so I've always said to disable the
+> uaccess-with-memcpy code.  Personally, I'd like to see the back
+> of that code...
+
+Ok, but it's not me doing crazy things if that's what you are implying
+(not saying that you are), because the sama5_defconfig has
+
+	CONFIG_UACCESS_WITH_MEMCPY=y
+
+So, something needs to happen or sama5 remains default-broken.
+
+Cheers,
+Peter
