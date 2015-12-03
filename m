@@ -1,82 +1,120 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 03 Dec 2015 15:00:33 +0100
-Subject: [PATCH 3/3] ARM: dts: rockchip: add veyron-minnie board
-In-Reply-To: <566020EC.7060606@rock-chips.com>
-References: <2767415.mEkgRbSSUB@diego> <3359424.qNn8gsFXpA@diego>
- <566020EC.7060606@rock-chips.com>
-Message-ID: <2137537.DBrTyHZKX9@diego>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 3 Dec 2015 15:05:38 +0100
+Subject: [PATCH v3 3/7] arm64: split off early mapping code from
+ early_fixmap_init()
+In-Reply-To: <20151203135939.GB2936@leverpostej>
+References: <1447672998-20981-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1447672998-20981-4-git-send-email-ard.biesheuvel@linaro.org>
+ <20151203121840.GB28731@leverpostej>
+ <CAKv+Gu8fZ7YeOsnVdosddiDuYd=MW=OYg_Z4KbNU=yH1PWSw+g@mail.gmail.com>
+ <20151203135939.GB2936@leverpostej>
+Message-ID: <CAKv+Gu9q=oAjwOFBdrmgdHm1zfD+ekkTft5sbFUmkAsW1Eb37g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar, Shawn,
+On 3 December 2015 at 14:59, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Dec 03, 2015 at 02:31:19PM +0100, Ard Biesheuvel wrote:
+>> On 3 December 2015 at 13:18, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > Hi Ard,
+>> >
+>> > Apologies that it's taken me so long to get around to this...
+>> >
+>> > On Mon, Nov 16, 2015 at 12:23:14PM +0100, Ard Biesheuvel wrote:
+>> >> This splits off and generalises the population of the statically
+>> >> allocated fixmap page tables so that we may reuse it later for
+>> >> the linear mapping once we move the kernel text mapping out of it.
+>> >>
+>> >> This also involves taking into account that table entries at any of
+>> >> the levels we are populating may have been populated already, since
+>> >> the fixmap mapping might not be disjoint up to the pgd level anymore
+>> >> from other early mappings.
+>> >
+>> > As a heads-up, for avoiding TLB conflicts, I'm currently working on
+>> > alternative way of creating the kernel page tables which will definitely
+>> > conflict here, and may or may not supercede this approach.
+>> >
+>> > By adding new FIX_{PGD,PUD,PMD,PTE} indicees to the fixmap, we can
+>> > allocate page tables from anywhere via memblock, and temporarily map
+>> > them as we need to.
+>> >
+>>
+>> Interesting. So how are you dealing with the va<->pa translations and
+>> vice versa that occur all over the place in create_mapping() et al ?
+>
+> By rewriting create_mapping() et al to not do that ;)
+>
+> That's requiring a fair amount of massaging, but so far I've not hit
+> anything that renders the approach impossible.
+>
+>> > That would avoid the need for the bootstrap tables. In head.S we'd only
+>> > need to create a temporary (coarse-grained, RWX) kernel mapping (with
+>> > the fixmap bolted on). Later we would create a whole new set of tables
+>> > with a fine-grained kernel mapping and a full linear mapping using the
+>> > new fixmap entries to temporarily map tables, then switch over to those
+>> > atomically.
+>> >
+>>
+>> If we change back to a full linear mapping, are we back to not putting
+>> the Image astride a 1GB/32MB/512MB boundary (depending on page size)?
+>
+> I'm not exactly sure what you mean here.
+>
 
-Am Donnerstag, 3. Dezember 2015, 19:01:00 schrieb Caesar Wang:
-> ? 2015?12?03? 18:44, Heiko St?bner ??:
-> > Am Donnerstag, 3. Dezember 2015, 18:27:27 schrieb Caesar Wang:
-> >> .....but,
-> >> reboot long long test, that's seem mmc tune has a issue.
-> >> 
-> >>     2.630892] mmcblk0: error -84 transferring data, sector 0, nr 8, cmd
-> >> 
-> >> response 0x900, card status 0x0
-> >> [    2.631006] mmcblk0: error -110 sending status command, retrying
-> >> [    2.631018] mmcblk0: error -84 transferring data, sector 1, nr 7, cmd
-> >> response 0x900, card status 0x0
-> >> [    2.631703]  mmcblk0: unable to read partition table
-> >> ...
-> > 
-> > Could you try if what we do on Minnie fixes that error (disabling tuning
-> > for now) - i.e. adding the following to the Mickey dts:
-> > 
-> > &emmc {
-> > 
-> > 	/delete-property/mmc-hs200-1_8v;
-> > 
-> > };
-> 
-> Yep, maybe we remove this node firstly but someone fix the emmc tune issues.
+Apologies, I misread 'linear mapping' as 'id mapping, which of course
+are two different things entirely
 
-yep, that is definitly the plan. I've now also done more than a dozen reboot 
-tests on my brain board including running hdparm-speedtests on the emmc there. 
-Tuning and all reads did run without any hickups, so this really seems to be 
-somehow limited.
+> The kernel mapping may inhibit using large section mappings, but this is
+> necessary anyway due to permission changes at sub-section granularity
+> (e.g. in fixup_init).
+>
+> The idea is that when the kernel tables are set up, things are mapped at
+> the largest possible granularity that permits later permission changes
+> without breaking/making sections (such that we can avoid TLB conflicts).
+>
+> So we'd map the kernel and memory in segments, where no two segments
+> share a common last-level entry (i.e. they're all at least page-aligned,
+> and don't share a section with another segment).
+>
+> We'd have separate segments for:
+> * memory below TEXT_OFFSET
+> * text
+> * rodata
+> * init
+> * altinstr (I think this can be folded into rodata)
+> * bss / data, tables
+> * memory above _end
+>
+> Later I think it should be relatively simple to move the memory segment
+> mapping for split-VA.
+>
 
+I'd need to see it to understand, I guess, but getting rid of the
+pa<->va translations is definitely an improvement for the stuff I am
+trying to do, and would probably make it a lot cleaner.
 
-> >> Anyway, the dts is good to support mickey machine.
-> >> I think the mmc tune is not prefect in mainline.
-> > 
-> > yeah, it seems we still have some issues.
-> > 
-> > Although it seems only the disney-mice seem affected ;-) [minnie and
-> > mickey]. Pinky, Brain, Speedy, Jaq all seem to work somehow - at least I
-> > haven't gotten any reports about that
-> 
-> Cc shawn,
-> Maybe,  Shawn at RK has the interesting in debuging this issue.:-)
+>> Anyway, to illustrate where I am headed with this: in my next version
+>> of this series, I intend to move the kernel mapping to the start of
+>> the vmalloc area, which gets moved up 64 MB to make room for the
+>> module area (which also moves down). That way, we can still load
+>> modules as before, but no longer have a need for a dedicated carveout
+>> for the kernel below PAGE_OFFSET.
+>
+> Ok.
+>
+>> The next step is then to move the kernel Image up inside the vmalloc
+>> area based on some randomness we get from the bootloader, and relocate
+>> it in place (using the same approach as in the patches I sent out
+>> beginning of this year). I have implemented module PLTs so that the
+>> Image and the modules no longer need to be within 128 MB of each
+>> other, which means that we can have full KASLR for modules and Image,
+>> and also place the kernel anywhere in physical memory.The module PLTs
+>> would be a runtime penalty only, i.e., a KASLR capable kernel running
+>> without KASLR would not incur the penalty of branching via PLTs. The
+>> only build time option is -mcmodel=large for modules so that data
+>> symbol references are absolute, but that is unlike to hurt
+>> performance.
+>
+> I'm certainly interested in seeing this!
+>
 
-Strangely on the ChromeOS kernel tuning on Minnie seems to work ok. I already 
-checked the code somewhat and the core handling seems to be the same - like 
-the phase clocks and the tuning algorithm.
-
-The only slight difference is that mainline is using mmc_send_tuning() instead 
-of building the packet by hand.
-
-But at least on my Minnie the phases the emmc gets tuned to are always 
-differing somehow: (mainline: 216-218, chromeos: 198-201) while on my jerry 
-the variance is not as big (mainline 176, chromeos: 172).
-
-
-Some more comparisons I did on Minnie:
-sdmmc: phase 197 on both mainline and chromeos
-wifi: around phase 214 on mainline and 204 on chromeos
-
-So at least the sdmmc host seems pretty stable in its phase and the difference 
-on wifi is smaller than with the emmc - not sure if that helps though :-)
-
-
-I'll also try to look more into that issue, but would be glad to hear other 
-bright ideas :-)
-
-
-Thanks
-Heiko
+I have patches for all of this, only they don't live on the same branch yet :-)
