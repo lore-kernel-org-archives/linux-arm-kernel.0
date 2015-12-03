@@ -1,31 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 3 Dec 2015 08:07:13 -0800
-Subject: [PATCH 1/2] clk: ti: Add support for dm814x ADPLL
-In-Reply-To: <1449106504-7645-2-git-send-email-tony@atomide.com>
-References: <1449106504-7645-1-git-send-email-tony@atomide.com>
- <1449106504-7645-2-git-send-email-tony@atomide.com>
-Message-ID: <20151203160712.GM23396@atomide.com>
+From: dcashman@android.com (Daniel Cashman)
+Date: Thu, 3 Dec 2015 08:12:32 -0800
+Subject: [PATCH v5 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
+In-Reply-To: <20151203121712.GE11337@arm.com>
+References: <1449000658-11475-1-git-send-email-dcashman@android.com>
+ <1449000658-11475-2-git-send-email-dcashman@android.com>
+ <1449000658-11475-3-git-send-email-dcashman@android.com>
+ <1449000658-11475-4-git-send-email-dcashman@android.com>
+ <20151203121712.GE11337@arm.com>
+Message-ID: <566069F0.3060409@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [151202 17:36]:
-> On dm814x we have 13 ADPLLs with 3 to 4 outputs on each. The
-> ADPLLs have several dividers and muxes controlled by a shared
-> control register for each PLL.
+On 12/3/15 4:17 AM, Will Deacon wrote:
+>> +	select HAVE_ARCH_MMAP_RND_BITS if MMU
+>> +	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if MMU && COMPAT
 > 
-> Note that for the clocks to work as device drivers for booting on
-> dm814x, this patch depends on "ARM: OMAP2+: Change core_initcall
-> levels to postcore_initcall".
+> You can drop the 'if MMU' bits, since we don't support !MMU on arm64.
+
+Ok, will do. I was a little uneasy leaving it implicit, but even if
+something w/out MMU on arm64 shows up, it'll easily be corrected.
+
+>> +config ARCH_MMAP_RND_BITS_MIN
+>> +       default 15 if ARM64_64K_PAGES
+>> +       default 17 if ARM64_16K_PAGES
+>> +       default 19
 > 
-> Also note that this patch does not implement clk_set_rate,
-> that will be posted later on when available.
+> Is this correct? We currently have a mask of 0x3ffff, so that's 18 bits.
 
-Mike & Stephen, after review, can we have this patch alone in an
-immutable branch against v4.4-rc1 that I can merge in too?
+Off-by-one errors provide a good example of why hardening features are
+useful? =/ Will change.
 
-Also, the dts changes I need to queue separately FYI to avoid merge
-conflicts.
+>> +config ARCH_MMAP_RND_BITS_MAX
+>> +       default 19 if ARM64_VA_BITS=36
+>> +       default 20 if ARM64_64K_PAGES && ARM64_VA_BITS=39
+>> +       default 22 if ARM64_16K_PAGES && ARM64_VA_BITS=39
+>> +       default 24 if ARM64_VA_BITS=39
+>> +       default 23 if ARM64_64K_PAGES && ARM64_VA_BITS=42
+>> +       default 25 if ARM64_16K_PAGES && ARM64_VA_BITS=42
+>> +       default 27 if ARM64_VA_BITS=42
+>> +       default 30 if ARM64_VA_BITS=47
+>> +       default 29 if ARM64_64K_PAGES && ARM64_VA_BITS=48
+>> +       default 31 if ARM64_16K_PAGES && ARM64_VA_BITS=48
+>> +       default 33 if ARM64_VA_BITS=48
+>> +       default 15 if ARM64_64K_PAGES
+>> +       default 17 if ARM64_16K_PAGES
+>> +       default 19
+> 
+> Could you add a comment above this with the formula
+> (VA_BITS - PAGE_SHIFT - 3), please, so that we can update this easily in
+> the future if we need to?
+> 
+Yes, seems reasonable.  Time will tell if this remains true for all
+architectures, or even here, but it would be good to document it where
+someone considering a change could easily find it.
 
-Regards,
-
-Tony
+Thank You,
+Dan
