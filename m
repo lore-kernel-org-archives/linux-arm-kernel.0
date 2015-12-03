@@ -1,115 +1,236 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Thu, 3 Dec 2015 16:08:36 -0500
-Subject: [PATCH v4 5/5] ARM: BCM: Add SMP support for Broadcom 4708
-In-Reply-To: <565F0827.4000406@hauke-m.de>
-References: <1448987049-17041-1-git-send-email-kapilh@broadcom.com>
- <1448987049-17041-6-git-send-email-kapilh@broadcom.com>
- <565F0827.4000406@hauke-m.de>
-Message-ID: <20151203210836.GI18950@broadcom.com>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Thu,  3 Dec 2015 16:10:33 -0500
+Subject: [PATCH v5 4/7] ARM: dts: imx: Add support for Advantech/GE Bx50v3
+In-Reply-To: <1449177036-13317-1-git-send-email-akshay.bhat@timesys.com>
+References: <1449177036-13317-1-git-send-email-akshay.bhat@timesys.com>
+Message-ID: <1449177036-13317-5-git-send-email-akshay.bhat@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 02, 2015 at 04:03:03PM +0100, Hauke Mehrtens wrote:
-> On 12/01/2015 05:24 PM, Kapil Hali wrote:
-> > From: Jon Mason <jonmason@broadcom.com>
-> > 
-> > Add SMP support for Broadcom's 4708 SoCs.
-> > 
-> > Signed-off-by: Jon Mason <jonmason@broadcom.com>
-> > Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
-> > Tested-by: Hauke Mehrtens <hauke@hauke-m.de>
-> > Signed-off-by: Kapil Hali <kapilh@broadcom.com>
-> > ---
-> >  arch/arm/boot/dts/bcm4708.dtsi | 2 ++
-> >  arch/arm/mach-bcm/Kconfig      | 1 +
-> >  arch/arm/mach-bcm/Makefile     | 3 +++
-> >  3 files changed, 6 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/bcm4708.dtsi b/arch/arm/boot/dts/bcm4708.dtsi
-> > index 31141e8..eed4dd1 100644
-> > --- a/arch/arm/boot/dts/bcm4708.dtsi
-> > +++ b/arch/arm/boot/dts/bcm4708.dtsi
-> > @@ -15,6 +15,7 @@
-> >  	cpus {
-> >  		#address-cells = <1>;
-> >  		#size-cells = <0>;
-> > +		enable-method = "brcm,bcm-nsp-smp";
-> >  
-> >  		cpu at 0 {
-> >  			device_type = "cpu";
-> > @@ -27,6 +28,7 @@
-> >  			device_type = "cpu";
-> >  			compatible = "arm,cortex-a9";
-> >  			next-level-cache = <&L2>;
-> > +			secondary-boot-reg = <0xffff0400>;
-> >  			reg = <0x1>;
-> >  		};
-> >  	};
-> > diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> > index 83765a0..e85246f 100644
-> > --- a/arch/arm/mach-bcm/Kconfig
-> > +++ b/arch/arm/mach-bcm/Kconfig
-> > @@ -54,6 +54,7 @@ config ARCH_BCM_NSP
-> >  config ARCH_BCM_5301X
-> >  	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
-> >  	select ARCH_BCM_IPROC
-> > +	select HAVE_SMP
-> >  	help
-> >  	  Support for Broadcom BCM470X and BCM5301X SoCs with ARM CPU cores.
-> >  
-> 
-> When applying this patch please make sure it is correctly applied this
-> patch causes some problems here:
-> 
-> http://www.spinics.net/lists/arm-kernel/msg462137.html
-> 
-> > diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-> > index 5193a25..7d66515 100644
-> > --- a/arch/arm/mach-bcm/Makefile
-> > +++ b/arch/arm/mach-bcm/Makefile
-> > @@ -43,6 +43,9 @@ obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
-> >  
-> >  # BCM5301X
-> >  obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
-> > +ifeq ($(CONFIG_ARCH_BCM_5301X),y)
-> > +obj-$(CONFIG_SMP)		+= platsmp.o
-> > +endif
-> >  
-> >  # BCM63XXx
-> >  ifeq ($(CONFIG_ARCH_BCM_63XX),y)
-> > 
-> 
-> I am getting this on a Northstar 1 / BCM4708:
-> 
-> [ 0.137634] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-> [ 0.143643] Setting up static identity map for 0x82a0 - 0x82d4
-> [ 0.189772] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
-> [ 0.189861] Brought up 2 CPUs
-> [ 0.198845] SMP: Total of 2 processors activated (3188.32 BogoMIPS).
-> [ 0.205446] CPU: WARNING: CPU(s) started in wrong/inconsistent modes
-> (primary CPU mode 0x13)
-> [ 0.214167] CPU: This may indicate a broken bootloader or firmware.
-> 
-> I assume that this is correct and the bootloader is just broken, it uses
-> this bootloader: "CFE for Foxconn Router version: v1.0.14", I haven't
-> noticed any problems, so it is ok for me.
+From: Justin Waters <justin.waters@timesys.com>
 
-On my 4708 SVK, I see the same issue
+Advantech has 3 carrier boards (B450v3, B650v3, B850v3) which use
+the Advantech BA-16 module (based on iMX6D). This file has the
+devicetree entries that are common to all 3 boards.
 
-[    0.090877] CPU: Testing write buffer coherency: ok
-[    0.091231] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-[    0.091377] Setting up static identity map for 0x82a0 - 0x82f8
-[    0.130146] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
-[    0.130251] Brought up 2 CPUs
-[    0.130323] SMP: Total of 2 processors activated (3188.32 BogoMIPS).
-[    0.130345] CPU: WARNING: CPU(s) started in wrong/inconsistent modes (primary CPU mode 0x13)
-[    0.130374] CPU: This may indicate a broken bootloader or firmware.
+Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
+---
+ arch/arm/boot/dts/imx6q-bx50v3.dtsi | 207 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 207 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-bx50v3.dtsi
 
-I'll investigate it more and see if I can bottom out on the cause.
-
-Thanks,
-Jon
-
-
-> 
-> Hauke
+diff --git a/arch/arm/boot/dts/imx6q-bx50v3.dtsi b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
+new file mode 100644
+index 0000000..61bb9aa
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
+@@ -0,0 +1,207 @@
++/*
++ * Copyright 2015 Timesys Corporation.
++ * Copyright 2015 General Electric Company
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include "imx6q-ba16.dtsi"
++
++/ {
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		mclk: clock at 0 {
++			compatible = "fixed-clock";
++			reg = <0>;
++			#clock-cells = <0>;
++			clock-frequency = <22000000>;
++		};
++	};
++
++	reg_wl18xx_vmmc: regulator at 6 {
++		compatible = "regulator-fixed";
++		regulator-name = "vwl1807";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&pca9539 3 GPIO_ACTIVE_HIGH>;
++		startup-delay-us = <70000>;
++		enable-active-high;
++	};
++
++	reg_wlan: regulator at 7 {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V_wlan";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		regulator-boot-on;
++		gpio = <&gpio6 14 GPIO_ACTIVE_HIGH>;
++	};
++
++	sound {
++		compatible = "fsl,imx6q-ba16-sgtl5000",
++			     "fsl,imx-audio-sgtl5000";
++		model = "imx6q-ba16-sgtl5000";
++		ssi-controller = <&ssi1>;
++		audio-codec = <&codec>;
++		audio-routing =
++			"MIC_IN", "Mic Jack",
++			"Mic Jack", "Mic Bias",
++			"LINE_IN", "Line In Jack",
++			"Headphone Jack", "HP_OUT";
++		mux-int-port = <1>;
++		mux-ext-port = <4>;
++	};
++};
++
++&ecspi5 {
++	fsl,spi-num-chipselects = <1>;
++	cs-gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ecspi5>;
++	status = "okay";
++
++	m25_eeprom: m25p80 at 0 {
++		compatible = "atmel,at25";
++		spi-max-frequency = <20000000>;
++		size = <0x8000>;
++		pagesize = <64>;
++		reg = <0>;
++		address-width = <16>;
++	};
++};
++
++&i2c1 {
++	pca9547: mux at 70 {
++		compatible = "nxp,pca9547";
++		reg = <0x70>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		mux_i2c3: i2c at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x0>;
++
++			ads7830: ads7830 at 48 {
++				compatible = "ti,ads7830";
++				reg = <0x48>;
++			};
++
++			mma8453: mma8453 at 1c {
++				compatible = "fsl,mma8453";
++				reg = <0x1c>;
++			};
++		};
++
++		mux_i2c4: i2c at 1 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x1>;
++
++			eeprom: eeprom at 50 {
++				compatible = "atmel,24c08";
++				reg = <0x50>;
++			};
++
++			mpl3115: mpl3115 at 60 {
++				compatible = "fsl,mpl3115";
++				reg = <0x60>;
++			};
++		};
++
++		mux_i2c5: i2c at 2 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x2>;
++		};
++
++		mux_i2c6: i2c at 3 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x3>;
++
++			codec: sgtl5000 at 0a {
++				compatible = "fsl,sgtl5000";
++				reg = <0x0a>;
++				clocks = <&mclk>;
++				VDDA-supply = <&reg_1p8v>;
++				VDDIO-supply = <&reg_3p3v>;
++			};
++		};
++
++		mux_i2c7: i2c at 4 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x4>;
++
++			pca9539: pca9539 at 74 {
++				compatible = "nxp,pca9539";
++				reg = <0x74>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				interrupt-parent = <&gpio2>;
++				interrupts = <3 IRQ_TYPE_LEVEL_LOW>;
++			};
++		};
++
++		mux_i2c8: i2c at 5 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x5>;
++
++			igb at 49 {
++				compatible = "intel,igb";
++				reg = <0x49>;
++			};
++
++			igb at 61 {
++				compatible = "intel,igb";
++				reg = <0x61>;
++			};
++		};
++
++		mux_i2c9: i2c at 6 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x6>;
++		};
++
++		mux_i2c10: i2c at 7 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x7>;
++		};
++	};
++};
++
++&usdhc4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc4>;
++	bus-width = <4>;
++	vmmc-supply = <&reg_wl18xx_vmmc>;
++	no-1-8-v;
++	non-removable;
++	enable-sdio-wakeup;
++	keep-power-in-suspend;
++	cap-power-off-card;
++	max-frequency = <25000000>;
++	status = "okay";
++
++	#address-cells = <1>;
++	#size-cells = <0>;
++	wlcore: wlcore at 0 {
++		compatible = "ti,wl1837";
++		reg = <2>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <6 IRQ_TYPE_LEVEL_HIGH>;
++		tcxo-clock-frequency = <26000000>;
++	};
++};
+-- 
+2.6.3
