@@ -1,74 +1,39 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu,  3 Dec 2015 15:02:09 -0300
-Subject: [PATCH 2/2] ARM: dts: omap3-igep0030: Use MMC pwrseq to init SDIO WiFi
-In-Reply-To: <1449165729-993-1-git-send-email-javier@osg.samsung.com>
-References: <1449165729-993-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1449165729-993-3-git-send-email-javier@osg.samsung.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 3 Dec 2015 20:04:46 +0200
+Subject: [4.4-rc][PATCH v2] ARM: dts: am4372: fix clock source for arm twd
+ and global timers
+In-Reply-To: <20151203163551.GQ23396@atomide.com>
+References: <1448898998-32749-1-git-send-email-grygorii.strashko@ti.com>
+ <20151203163551.GQ23396@atomide.com>
+Message-ID: <5660843E.3000801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the WiFi support was added to the IGEP0030 board, the MMC subsystem
-did not provide a mechanism to define power sequence providers. So a DT
-hack was used to toggle the WiFi chip reset and power down pins by using
-fake fixed regulators whose enable GPIO was the GPIOs connected to these
-pins.
+On 12/03/2015 06:35 PM, Tony Lindgren wrote:
+> * Grygorii Strashko <grygorii.strashko@ti.com> [151130 07:58]:
+>> ARM TWD and Global timer are clocked by PERIPHCLK which is MPU_CLK/2.
+>> But now they are clocked by dpll_mpu_m2_ck == MPU_CLK and, as result.
+>> Timekeeping core misbehaves. For example, execution of command
+>> "sleep 5" will take 10 sec instead of 5.
+>>
+>> Hence, fix it by adding mpu_periphclk ("fixed-factor-clock") and use
+>> it for clocking ARM TWD and Global timer (same way as on OMAP4).
+>>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Felipe Balbi <balbi@ti.com>
+>> Cc: Tero Kristo <t-kristo@ti.com>
+>> Fixes:commit 8cbd4c2f6a99 ("arm: boot: dts: am4372: add ARM timers and SCU nodes")
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> 
+> Is this fix alone enough or do you still need to disable other the ARM
+> timers in the board specific dts file?
+> 
 
-But now the simple MMC power sequence provider can be used for this and
-the workaround removed.
+This one is independent and it's required for -rc, because ARM TWD timer will be selected
+now for am43xx even if http://www.spinics.net/lists/arm-kernel/msg459649.html
+is not merged yet ;) in case of omap2plus_defconfig build.
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
----
-
- arch/arm/boot/dts/omap3-igep0030.dts | 24 ++++++++----------------
- 1 file changed, 8 insertions(+), 16 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
-index 468608dab30a..55b0cc4f5ee5 100644
---- a/arch/arm/boot/dts/omap3-igep0030.dts
-+++ b/arch/arm/boot/dts/omap3-igep0030.dts
-@@ -15,25 +15,17 @@
- 	model = "IGEP COM MODULE Rev. E (TI OMAP AM/DM37x)";
- 	compatible = "isee,omap3-igep0030", "ti,omap36xx", "ti,omap3";
- 
--	/* Regulator to trigger the WIFI_PDN signal of the Wifi module */
--	lbee1usjyc_pdn: lbee1usjyc_pdn {
-+	vmmcsdio_fixed: fixedregulator-mmcsdio {
- 		compatible = "regulator-fixed";
--		regulator-name = "regulator-lbee1usjyc-pdn";
-+		regulator-name = "vmmcsdio_fixed";
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
--		gpio = <&gpio5 10 GPIO_ACTIVE_HIGH>;	/* gpio_138 - WIFI_PDN */
--		startup-delay-us = <10000>;
--		enable-active-high;
- 	};
- 
--	/* Regulator to trigger the RESET_N_W signal of the Wifi module */
--	lbee1usjyc_reset_n_w: lbee1usjyc_reset_n_w {
--		compatible = "regulator-fixed";
--		regulator-name = "regulator-lbee1usjyc-reset-n-w";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--		gpio = <&gpio5 11 GPIO_ACTIVE_HIGH>;	/* gpio_139 - RESET_N_W */
--		enable-active-high;
-+	mmc2_pwrseq: mmc2_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&gpio5 11 GPIO_ACTIVE_LOW>,	/* gpio_139 - RESET_N_W */
-+			      <&gpio5 10 GPIO_ACTIVE_LOW>;	/* gpio_138 - WIFI_PDN */
- 	};
- };
- 
-@@ -62,8 +54,8 @@
- &mmc2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc2_pins &lbee1usjyc_pins>;
--	vmmc-supply = <&lbee1usjyc_pdn>;
--	vmmc_aux-supply = <&lbee1usjyc_reset_n_w>;
-+	vmmc-supply = <&vmmcsdio_fixed>;
-+	mmc-pwrseq = <&mmc2_pwrseq>;
- 	bus-width = <4>;
- 	non-removable;
- };
 -- 
-2.4.3
+regards,
+-grygorii
