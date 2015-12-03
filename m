@@ -1,59 +1,82 @@
-From: fugang.duan@freescale.com (Duan Andy)
-Date: Thu, 3 Dec 2015 13:54:05 +0000
-Subject: [PATCH] drivers: dma-coherent: free memory when failed to init
- DMA memory pool
-In-Reply-To: <xa1toae7y9u8.fsf@mina86.com>
-References: <1449138962-8264-1-git-send-email-b38611@freescale.com>
- <xa1toae7y9u8.fsf@mina86.com>
-Message-ID: <CY1PR0301MB12257F63F594E65DE67E64DFF50D0@CY1PR0301MB1225.namprd03.prod.outlook.com>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Thu, 3 Dec 2015 08:55:32 -0500
+Subject: [PATCH v12 04/16] arm64: kvm: allows kvm cpu hotplug
+In-Reply-To: <CAJ5Y-eYHqQCf=ZQzXb=D_P7VscM=vNc3YpYLJs+UtZLFswiaeQ@mail.gmail.com>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <23ca498d5e28017549c6076812d60b18e86fa20e.1448403503.git.geoff@infradead.org>
+ <CAJ5Y-eYHqQCf=ZQzXb=D_P7VscM=vNc3YpYLJs+UtZLFswiaeQ@mail.gmail.com>
+Message-ID: <CAJ5Y-eaxSAHQon2A1yP6mChsxcqPsU9Y1L1=-Lh8cF337H2pBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mike Nazarewicz <mpn@google.com> Sent: Thursday, December 03, 2015 8:51 PM
-> To: Duan Fugang-B38611; torvalds at linux-foundation.org;
-> gregkh at linuxfoundation.org; m.szyprowski at samsung.com
-> Cc: linux-arm-kernel at lists.infradead.org; arnd at arndb.de;
-> iamjoonsoo.kim at lge.com; Duan Fugang-B38611
-> Subject: Re: [PATCH] drivers: dma-coherent: free memory when failed to
-> init DMA memory pool
-> 
-> On Thu, Dec 03 2015, Fugang Duan wrote:
-> > Free dma coherent memory when it failed to init DMA memory pool after
-> > calling .dma_init_coherent_memory(), otherwise it causes memmory leak.
-> >
-> > Signed-off-by: Fugang Duan <B38611@freescale.com>
-> > ---
-> >  drivers/base/dma-coherent.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
-> > index 55b8398..beb6bbe 100644
-> > --- a/drivers/base/dma-coherent.c
-> > +++ b/drivers/base/dma-coherent.c
-> > @@ -286,6 +286,7 @@ static int rmem_dma_device_init(struct reserved_mem
-> *rmem, struct device *dev)
-> >  				     &mem) != DMA_MEMORY_MAP) {
-> >  		pr_err("Reserved memory: failed to init DMA memory pool
-> at %pa, size %ld MiB\n",
-> >  			&rmem->base, (unsigned long)rmem->size / SZ_1M);
-> > +		kfree(mem);
-> 
-> mem == NULL at this point.  If dma_init_coherent_memory doesn?t return
-> DMA_MEMORY_MAP, mem pointer is not assigned any value.  If you think
-> there is a memory leak, please demonstrate a path of it happening.
-> 
-Kfree() will check mem NULL condition, so no need to add check in here.
+On 2 December 2015 at 17:40, Ashwin Chaugule <ashwin.chaugule@linaro.org> wrote:
+> Hello,
+>
+> On 24 November 2015 at 17:25, Geoff Levand <geoff@infradead.org> wrote:
+>> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>
+>> The current kvm implementation on arm64 does cpu-specific initialization
+>> at system boot, and has no way to gracefully shutdown a core in terms of
+>> kvm. This prevents, especially, kexec from rebooting the system on a boot
+>> core in EL2.
+>>
+>> This patch adds a cpu tear-down function and also puts an existing cpu-init
+>> code into a separate function, kvm_arch_hardware_disable() and
+>> kvm_arch_hardware_enable() respectively.
+>> We don't need arm64-specific cpu hotplug hook any more.
+>>
+>> Since this patch modifies common part of code between arm and arm64, one
+>> stub definition, __cpu_reset_hyp_mode(), is added on arm side to avoid
+>> compiling errors.
+>>
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> ---
+>>  arch/arm/include/asm/kvm_host.h   | 10 ++++-
+>>  arch/arm/include/asm/kvm_mmu.h    |  1 +
+>>  arch/arm/kvm/arm.c                | 79 ++++++++++++++++++---------------------
+>>  arch/arm/kvm/mmu.c                |  5 +++
+>>  arch/arm64/include/asm/kvm_host.h | 16 +++++++-
+>>  arch/arm64/include/asm/kvm_mmu.h  |  1 +
+>>  arch/arm64/include/asm/virt.h     |  9 +++++
+>>  arch/arm64/kvm/hyp-init.S         | 33 ++++++++++++++++
+>>  arch/arm64/kvm/hyp.S              | 32 ++++++++++++++--
+>>  9 files changed, 138 insertions(+), 48 deletions(-)
+>
+> [..]
+>
+>>
+>>
+>>  static struct notifier_block hyp_init_cpu_pm_nb = {
+>> @@ -1108,11 +1119,6 @@ static int init_hyp_mode(void)
+>>         }
+>>
+>>         /*
+>> -        * Execute the init code on each CPU.
+>> -        */
+>> -       on_each_cpu(cpu_init_hyp_mode, NULL, 1);
+>> -
+>> -       /*
+>>          * Init HYP view of VGIC
+>>          */
+>>         err = kvm_vgic_hyp_init();
+>
+> With this flow, the cpu_init_hyp_mode() is called only at VM guest
+> creation, but vgic_hyp_init() is called at bootup. On a system with
+> GICv3, it looks like we end up with bogus values from the ICH_VTR_EL2
+> (to get the number of LRs), because we're not reading it from EL2
+> anymore.
 
+..or more likely, that the function to read the ICH_VTR_EL2 is not
+mapped in EL2, because we deferred the cpu_init_hyp_mode() calls. In
+any case, this ends up breaking KVM and manifests as a guest console
+which is stuck.
 
-> >  		return -ENODEV;
-> >  	}
-> >  	rmem->priv = mem;
-> > --
-> > 1.9.1
-> >
-> 
-> --
-> Best regards,                                         _     _
-> .o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-> ..o | Computer Science,  ??? ?mina86? ??????  (o o)
-> ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
+>
+> Whats the best way to fix this?
+> - Call kvm_arch_hardware_enable() before vgic_hyp_init() and disable later?
+> - Fold the VGIC init stuff back into hardware_enable()?
+> - Read the VGIC number of LRs from the hyp stub?
+> - ..
+>
+> Regards,
+> Ashwin.
