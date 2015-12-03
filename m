@@ -1,99 +1,143 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 03 Dec 2015 21:58:14 +0100
-Subject: [RFC PATCH 1/2] PCI/ACPI: Add ACPI support for non ECAM Host
- Bridge Controllers
-In-Reply-To: <20151203175826.GB2935@red-moon>
-References: <1449155999-220955-1-git-send-email-gabriele.paoloni@huawei.com>
- <1449155999-220955-2-git-send-email-gabriele.paoloni@huawei.com>
- <20151203175826.GB2935@red-moon>
-Message-ID: <5018756.5lEEeJVMod@wuerfel>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu,  3 Dec 2015 14:04:36 -0700
+Subject: [PATCH V6 00/26] Coresight integration with perf
+Message-ID: <1449176702-13213-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 December 2015 17:58:26 Lorenzo Pieralisi wrote:
-> On Thu, Dec 03, 2015 at 11:19:58PM +0800, Gabriele Paoloni wrote:
-> > +void acpi_arm64_quirks(void)
-> > +{
-> > +	int i = 0;
-> > +
-> > +	while (quirks_array[i]) {
-> > +		acpi_scan_add_handler(quirks_array[i]);
-> > +		i++;
-> > +	}
-> > +
-> > +}
-> 
-> This code is not arm64 specific, and this is part of a wider complaint
-> I have about this patchset and PCI/ACPI code I see in general.
+This patchset aims to integrate configuration and control of
+the Coresight tracers with the perf sub-system.
 
-Agreed. We certainly should try to reduce the number of architecture
-specific hacks in arch/arm64/kernel/pci.c instead of adding to it.
+The goal is to use PMUs to represent tracers and the auxiliary
+buffer enhancement to collect processor traces.  As such a lot
+of work is done to move the current Coresight sysFS oriented
+configuration and control commands to perf's AUX API.
 
-Ideally we will remove that file soon after the existing align_resource,
-enabled_device and add_device hacks can be removed.
+For the time being the work concentrates on ETMv3 and ETB1.0
+sink buffer.  Work on ETMv4 and other type of sink buffers
+will follow once a foundation has been established.
 
-> > @@ -253,6 +291,9 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
-> >  		return NULL;
-> >  	}
-> >  
-> > +	if (vendor_specific_ops)
-> > +		acpi_pci_root_ops.pci_ops = vendor_specific_ops;
-> 
-> You are relying on the scan handlers calling ordering here, which as far
-> as I know depends on the ACPI tables layout, this is not acceptable,
-> we need to find a more robust implementation.
-> 
-> Let's first rewind a bit though, to summarize:
-> 
-> 1) we need a way to configure a "generic host controller" with host
->    controller specific config methods (ie ECAM, even though is a PCI
->    standard it is not standard enough for some designers)
+Best regards,
+Mathieu
 
-That code already exists, see drivers/acpi/pci_*.c
+Changes since V5:
+* Addressed Arnaldo's comment about using a struct perf_evlist rather
+  than a struct perf_session.
+* Addressed kbuild test robot's anomaly report [1].
+* Moved perf_aux_output_{begin|end} to etm_event_{start|stop} in
+  accordance with [2].
 
-> 2) we keep the generic "PNP0A03" matching to declare a host bridge and
->    related resources (?). Maybe we can have an HID matching the
->    "real" device (eg "HISI0081" and related DSD) and a CID set to "PNP0A03" ?
->    I do not want to end up with two device objects in the ACPI tables.
-> 
-> I think that all this code belongs in:
-> 
-> drivers/pci/host/pci-host-generic.c
+[1]. https://lkml.org/lkml/2015/11/30/46
+[2]. http://thread.gmane.org/gmane.linux.kernel/2099328/focus=2099343
 
-I disagree:
+Changes since V4:
+* Reworked the way event configuration information is kept, fixing
+  a few corner cases when doing per CPU tracing.
+* Rebased on 4.4-rc1.
+* Added 'Cc' to specific perf related patches in the hope of suscitating
+  interest from reviewers, i.e perf maintainers.
 
-> and the quirks scan should be done _within_ the pci_acpi_scan_root()
-> that should be placed in drivers/pci/host/pci-host-generic.c (ACPI probe
-> path, to be created) so that, if quirks for config space have to be applied
-> they are applied there before calling acpi_pci_root_create() so that
-> ordering is guaranteed.
+Changes since V3:
+* Rebased to GKH's char-misc-next tree (e2d8680741ed).
 
-pci-host-generic.c is just for standard PCI implementations, and it has
-zero code that would be shared with ACPI: Most of the implementation
-deals with parsing DT properties, and all that code is entirely differnet
-for ACPI and already exists in drivers/acpi. The one thing that could be
-shared is the ECAM config space access, but ACPI already needs something
-else here because it requires access to the config space at early boot
-time, way before we even load that driver, see raw_pci_read/raw_pci_write.
+Changes since V2:
+* Rebased to v4.3.
+* Used the -M option to "git format-patch".
+* Decoupled tracers and path - both are now completely independent.
+* Moved path enablement/release to Perf's add/del functions.
+* Moved PM runtime operations to the coresight core rather than
+  individual drivers.
+* Enhanced mutual exclusion scheme between perf and sysFS.
+* Removed architecture specific define in perf cmd line tool.
+* Got rid of unused fields in structure 'cs_buffers'.
+* Enhanced changelog for patch 16/26.
 
-If there are parts missing in drivers/acpi to make it access PCI hosts,
-they can be added there, possibly inside "#ifndef CONFIG_X86".
+Changes since V1:
+ * Fixed typos in typographical error in documentation.
+ * Moved to a multi session support scheme.
+ * Split static and dynamic tracer configuration.
+ * Fixed configuration for user and kernel space tracing.
+ * Using WARN_ON_ONCE() rather than WARN_ON().
+ * Implemented strategy to prevent tracers from being used simultaneously.
+ * Changed sink_ops::unset_buffer() to sink_ops::reset_buffer().
+ * Moves ETM's sysFS interface from driver core to dedicated file.
+ * Removed spinlock in "etm_cpu_id()".
+ * Aggregated PMU driver pieces in a single patch.
+ * Added user space changes and rebased everything to v4.3-rc5.
 
-> I will put together a proposal to define the way we specify HID and
-> related DSD properties for PCI host controllers and send it to
-> the ACPI working group for review.
+Mathieu Poirier (26):
+  coresight: etm3x: moving etm_readl/writel to header file
+  coresight: etm3x: moving sysFS entries to dedicated file
+  coresight: etm3x: unlocking tracers in default arch init
+  coresight: etm3x: splitting struct etm_drvdata
+  coresight: etm3x: implementing 'cpu_id()' API
+  coresight: associating path with session rather than tracer
+  coresight: moving PM runtime operations to core framework
+  coresight: etm3x: adding operation mode for etm_enable()
+  coresight: add API to get sink from path
+  coresight: etm3x: set progbit to stop trace collection
+  coresight: etm3x: changing default trace configuration
+  coresight: etm3x: consolidating initial config
+  coresight: etm3x: implementing user/kernel mode tracing
+  coresight: etm3x: adding perf_get/set_config() API
+  coresight: etm3x: implementing perf_enable/disable() API
+  coresight: etb10: moving to local atomic operations
+  coresight: adding operation mode for sink->enable()
+  coresight: etb10: implementing AUX space API
+  coresight: updating documentation to reflect integration with perf
+  perf: changing pmu::setup_aux() parameter to include event
+  coresight: etm-perf: new PMU driver for ETM tracers
+  coresight: introducing a global trace ID function
+  perf tools: making function set_max_cpu_num() non static
+  perf tools: adding perf_evlist to *info_priv_size()
+  perf tools: making coresight PMU listable
+  perf tools: adding coresight etm PMU record capabilities
 
-That also requires a change to SBSA, right? Today, SBSA assumes that
-we have a standard PCI host that will work with any hardware independent
-PCI implementation in an OS. We either have to give up on SBSA saying
-much about how PCI hosts are implemented, or stop assuming that hardware
-is SBSA compliant.
+ Documentation/trace/coresight.txt                  |  138 +-
+ MAINTAINERS                                        |    4 +
+ arch/x86/kernel/cpu/perf_event_intel_bts.c         |    4 +-
+ arch/x86/kernel/cpu/perf_event_intel_pt.c          |    5 +-
+ drivers/hwtracing/coresight/Kconfig                |    1 +
+ drivers/hwtracing/coresight/Makefile               |    4 +-
+ drivers/hwtracing/coresight/coresight-etb10.c      |  277 +++-
+ drivers/hwtracing/coresight/coresight-etm-perf.c   |  447 +++++
+ drivers/hwtracing/coresight/coresight-etm-perf.h   |   32 +
+ drivers/hwtracing/coresight/coresight-etm.h        |  143 +-
+ .../hwtracing/coresight/coresight-etm3x-sysfs.c    | 1442 ++++++++++++++++
+ drivers/hwtracing/coresight/coresight-etm3x.c      | 1754 +++++---------------
+ drivers/hwtracing/coresight/coresight-etm4x.c      |    8 +-
+ drivers/hwtracing/coresight/coresight-funnel.c     |    2 -
+ drivers/hwtracing/coresight/coresight-priv.h       |   15 +
+ .../coresight/coresight-replicator-qcom.c          |    4 -
+ drivers/hwtracing/coresight/coresight-replicator.c |    2 -
+ drivers/hwtracing/coresight/coresight-tmc.c        |    7 +-
+ drivers/hwtracing/coresight/coresight-tpiu.c       |    4 +-
+ drivers/hwtracing/coresight/coresight.c            |  330 ++--
+ include/linux/coresight-pmu.h                      |   39 +
+ include/linux/coresight.h                          |   40 +-
+ include/linux/perf_event.h                         |    2 +-
+ kernel/events/ring_buffer.c                        |    2 +-
+ tools/perf/arch/arm/util/Build                     |    2 +
+ tools/perf/arch/arm/util/auxtrace.c                |   48 +
+ tools/perf/arch/arm/util/cs_etm.c                  |  466 ++++++
+ tools/perf/arch/arm/util/cs_etm.h                  |   44 +
+ tools/perf/arch/arm/util/pmu.c                     |   34 +
+ tools/perf/arch/x86/util/intel-bts.c               |    4 +-
+ tools/perf/arch/x86/util/intel-pt.c                |    4 +-
+ tools/perf/config/Makefile                         |   17 +-
+ tools/perf/util/auxtrace.c                         |    8 +-
+ tools/perf/util/auxtrace.h                         |    7 +-
+ tools/perf/util/cpumap.c                           |    2 +-
+ tools/perf/util/cpumap.h                           |    1 +
+ 36 files changed, 3753 insertions(+), 1590 deletions(-)
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm-perf.c
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm-perf.h
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+ create mode 100644 include/linux/coresight-pmu.h
+ create mode 100644 tools/perf/arch/arm/util/auxtrace.c
+ create mode 100644 tools/perf/arch/arm/util/cs_etm.c
+ create mode 100644 tools/perf/arch/arm/util/cs_etm.h
+ create mode 100644 tools/perf/arch/arm/util/pmu.c
 
-> Second, I am against merging _any_ ACPI/PCI code for arm64 before we
-> define a way for the kernel to detect if resources should be reassigned
-> or just claimed as they are, as set-up by BIOS.
-
-Why would it ever reassign anything that has been set up by the BIOS?
-We are still talking about server systems, right?
-
-	Arnd
+-- 
+2.1.4
