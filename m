@@ -1,19 +1,18 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Thu,  3 Dec 2015 15:20:50 +0100
-Subject: [PATCH net 2/3] net: mvpp2: fix buffers' DMA handling on RX path
+Date: Thu,  3 Dec 2015 15:20:51 +0100
+Subject: [PATCH net 3/3] net: mvpp2: fix refilling BM pools in RX path
 In-Reply-To: <1449152451-2939-1-git-send-email-mw@semihalf.com>
 References: <1449152451-2939-1-git-send-email-mw@semihalf.com>
-Message-ID: <1449152451-2939-3-git-send-email-mw@semihalf.com>
+Message-ID: <1449152451-2939-4-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Each allocated buffer, whose pointer is put into BM pool is DMA-mapped.
-Hence it should be properly unmapped after usage or when removing buffers
-from pool.
+In hitherto code in case of RX buffer allocation error during refill,
+original buffer is pushed to the network stack, but the amount of
+available buffer pointers in BM pool is decreased.
 
-This commit fixes DMA handling on RX path by adding dma_unmap_single() in
-mvpp2_rx() and in mvpp2_bufs_free(). The latter function's argument number
-had to be increased for this purpose.
+This commit fixes the situation by moving refill call before skb_put(),
+and returning original buffer pointer to the pool in case of an error.
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 
@@ -22,76 +21,92 @@ network unit")
 
 Cc: <stable@vger.kernel.org> # v3.18+
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 21 ++++++++++++++++-----
- 1 file changed, 16 insertions(+), 5 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 28 ++++++++++++++++------------
+ 1 file changed, 16 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 95db519..eaef461 100644
+index eaef461..a4beccf 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -3413,16 +3413,23 @@ static void mvpp2_bm_pool_bufsize_set(struct mvpp2 *priv,
- }
- 
- /* Free all buffers from the pool */
--static void mvpp2_bm_bufs_free(struct mvpp2 *priv, struct mvpp2_bm_pool *bm_pool)
-+static void mvpp2_bm_bufs_free(struct device *dev, struct mvpp2 *priv,
-+			       struct mvpp2_bm_pool *bm_pool)
+@@ -5099,7 +5099,8 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
+ 		    struct mvpp2_rx_queue *rxq)
  {
- 	int i;
+ 	struct net_device *dev = port->dev;
+-	int rx_received, rx_filled, i;
++	int rx_received;
++	int rx_done = 0;
+ 	u32 rcvd_pkts = 0;
+ 	u32 rcvd_bytes = 0;
  
- 	for (i = 0; i < bm_pool->buf_num; i++) {
-+		dma_addr_t buf_phys_addr;
- 		u32 vaddr;
+@@ -5108,17 +5109,18 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
+ 	if (rx_todo > rx_received)
+ 		rx_todo = rx_received;
  
- 		/* Get buffer virtual address (indirect access) */
--		mvpp2_read(priv, MVPP2_BM_PHY_ALLOC_REG(bm_pool->id));
-+		buf_phys_addr = mvpp2_read(priv,
-+					   MVPP2_BM_PHY_ALLOC_REG(bm_pool->id));
- 		vaddr = mvpp2_read(priv, MVPP2_BM_VIRT_ALLOC_REG);
-+
-+		dma_unmap_single(dev, buf_phys_addr,
-+				 bm_pool->buf_size, DMA_FROM_DEVICE);
-+
- 		if (!vaddr)
- 			break;
- 		dev_kfree_skb_any((struct sk_buff *)vaddr);
-@@ -3439,7 +3446,7 @@ static int mvpp2_bm_pool_destroy(struct platform_device *pdev,
- {
- 	u32 val;
+-	rx_filled = 0;
+-	for (i = 0; i < rx_todo; i++) {
++	while (rx_done < rx_todo) {
+ 		struct mvpp2_rx_desc *rx_desc = mvpp2_rxq_next_desc_get(rxq);
+ 		struct mvpp2_bm_pool *bm_pool;
+ 		struct sk_buff *skb;
++		dma_addr_t phys_addr;
+ 		u32 bm, rx_status;
+ 		int pool, rx_bytes, err;
  
--	mvpp2_bm_bufs_free(priv, bm_pool);
-+	mvpp2_bm_bufs_free(&pdev->dev, priv, bm_pool);
- 	if (bm_pool->buf_num) {
- 		WARN(1, "cannot free all buffers in pool %d\n", bm_pool->id);
- 		return 0;
-@@ -3692,7 +3699,8 @@ mvpp2_bm_pool_use(struct mvpp2_port *port, int pool, enum mvpp2_bm_type type,
- 				   MVPP2_BM_LONG_BUF_NUM :
- 				   MVPP2_BM_SHORT_BUF_NUM;
- 		else
--			mvpp2_bm_bufs_free(port->priv, new_pool);
-+			mvpp2_bm_bufs_free(port->dev->dev.parent,
-+					   port->priv, new_pool);
+-		rx_filled++;
++		rx_done++;
+ 		rx_status = rx_desc->status;
+ 		rx_bytes = rx_desc->data_size - MVPP2_MH_SIZE;
++		phys_addr = rx_desc->buf_phys_addr;
  
- 		new_pool->pkt_size = pkt_size;
- 
-@@ -3756,7 +3764,7 @@ static int mvpp2_bm_update_mtu(struct net_device *dev, int mtu)
- 	int pkt_size = MVPP2_RX_PKT_SIZE(mtu);
- 
- 	/* Update BM pool with new buffer size */
--	mvpp2_bm_bufs_free(port->priv, port_pool);
-+	mvpp2_bm_bufs_free(dev->dev.parent, port->priv, port_pool);
- 	if (port_pool->buf_num) {
- 		WARN(1, "cannot free all buffers in pool %d\n", port_pool->id);
- 		return -EIO;
-@@ -5136,6 +5144,9 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
+ 		bm = mvpp2_bm_cookie_build(rx_desc);
+ 		pool = mvpp2_bm_cookie_pool_get(bm);
+@@ -5135,8 +5137,10 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
+ 		 * comprised by the RX descriptor.
+ 		 */
+ 		if (rx_status & MVPP2_RXD_ERR_SUMMARY) {
++		err_drop_frame:
+ 			dev->stats.rx_errors++;
+ 			mvpp2_rx_error(port, rx_desc);
++			/* Return the buffer to the pool */
+ 			mvpp2_pool_refill(port, bm, rx_desc->buf_phys_addr,
+ 					  rx_desc->buf_cookie);
+ 			continue;
+@@ -5144,7 +5148,13 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
  
  		skb = (struct sk_buff *)rx_desc->buf_cookie;
  
-+		dma_unmap_single(dev->dev.parent, rx_desc->buf_phys_addr,
-+				 bm_pool->buf_size, DMA_FROM_DEVICE);
+-		dma_unmap_single(dev->dev.parent, rx_desc->buf_phys_addr,
++		err = mvpp2_rx_refill(port, bm_pool, bm, 0);
++		if (err) {
++			netdev_err(port->dev, "failed to refill BM pools\n");
++			goto err_drop_frame;
++		}
 +
++		dma_unmap_single(dev->dev.parent, phys_addr,
+ 				 bm_pool->buf_size, DMA_FROM_DEVICE);
+ 
  		rcvd_pkts++;
- 		rcvd_bytes += rx_bytes;
- 		atomic_inc(&bm_pool->in_use);
+@@ -5157,12 +5167,6 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
+ 		mvpp2_rx_csum(port, rx_status, skb);
+ 
+ 		napi_gro_receive(&port->napi, skb);
+-
+-		err = mvpp2_rx_refill(port, bm_pool, bm, 0);
+-		if (err) {
+-			netdev_err(port->dev, "failed to refill BM pools\n");
+-			rx_filled--;
+-		}
+ 	}
+ 
+ 	if (rcvd_pkts) {
+@@ -5176,7 +5180,7 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
+ 
+ 	/* Update Rx queue management counters */
+ 	wmb();
+-	mvpp2_rxq_status_update(port, rxq->id, rx_todo, rx_filled);
++	mvpp2_rxq_status_update(port, rxq->id, rx_done, rx_done);
+ 
+ 	return rx_todo;
+ }
 -- 
 1.8.3.1
