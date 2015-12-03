@@ -1,125 +1,59 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 03 Dec 2015 13:05:18 -0500
-Subject: [PATCH] arm64: Support VDSO remapping
-In-Reply-To: <20151202121918.GA4523@arm.com>
-References: <1448455781-26660-1-git-send-email-cov@codeaurora.org>
- <20151202121918.GA4523@arm.com>
-Message-ID: <5660845E.4030705@codeaurora.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 3 Dec 2015 20:08:24 +0200
+Subject: [PATCH 2/2] ARM: OMAP2+: Change core_initcall levels to
+ postcore_initcall
+In-Reply-To: <20151203164113.GS23396@atomide.com>
+References: <1448900789-4034-1-git-send-email-tony@atomide.com>
+ <1448900789-4034-3-git-send-email-tony@atomide.com>
+ <20151203160014.GL23396@atomide.com> <56606F20.9050805@ti.com>
+ <20151203164113.GS23396@atomide.com>
+Message-ID: <56608518.7060406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2015 07:19 AM, Will Deacon wrote:
-> Hi Christopher,
-> 
-> On Wed, Nov 25, 2015 at 07:49:29AM -0500, Christopher Covington wrote:
->> Some applications such as Checkpoint/Restore In Userspace (CRIU) remap and
->> unmap the VDSO. Add support for this to the AArch64 kernel by copying in
->> the PowerPC code with slight modifications.
+On 12/03/2015 06:41 PM, Tony Lindgren wrote:
+> * Grygorii Strashko <grygorii.strashko@ti.com> [151203 08:35]:
+>> On 12/03/2015 06:00 PM, Tony Lindgren wrote:
+>>> * Tony Lindgren <tony@atomide.com> [151130 08:29]:
+>>>> We want to be able to probe a few selected device drivers before hwmod
+>>>> code populates the clocks in omap_hwmod_setup_all(). This allows us to
+>>>> convert most of the clock drivers into regular device drivers.
 >>
->> Signed-off-by: Christopher Covington <cov@codeaurora.org>
->> ---
->>  arch/arm64/include/asm/Kbuild          |  1 -
->>  arch/arm64/include/asm/mm-arch-hooks.h | 28 ++++++++++++++++++++++++++++
->>  arch/arm64/include/asm/mmu_context.h   | 23 ++++++++++++++++++++++-
->>  3 files changed, 50 insertions(+), 2 deletions(-)
->>  create mode 100644 arch/arm64/include/asm/mm-arch-hooks.h
+>> if understand things right, ti clks now will be populated and initialized
+>> from
+>> __omap_sync32k_timer_init
+>>   - omap_clk_init()
+>>     - ..
+>>     - of_clk_init()
+>>     - ..
+>>     - omap_clk_soc_init()
 >>
->> diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
->> index 70fd9ff..b112a39 100644
->> --- a/arch/arm64/include/asm/Kbuild
->> +++ b/arch/arm64/include/asm/Kbuild
->> @@ -25,7 +25,6 @@ generic-y += kvm_para.h
->>  generic-y += local.h
->>  generic-y += local64.h
->>  generic-y += mcs_spinlock.h
->> -generic-y += mm-arch-hooks.h
->>  generic-y += mman.h
->>  generic-y += msgbuf.h
->>  generic-y += msi.h
->> diff --git a/arch/arm64/include/asm/mm-arch-hooks.h b/arch/arm64/include/asm/mm-arch-hooks.h
->> new file mode 100644
->> index 0000000..e6923fb
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/mm-arch-hooks.h
->> @@ -0,0 +1,28 @@
->> +/*
->> + * Architecture specific mm hooks
->> + *
->> + * Copyright (C) 2015, IBM Corporation
->> + * Author: Laurent Dufour <ldufour@linux.vnet.ibm.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#ifndef __ASM_MM_ARCH_HOOKS_H
->> +#define __ASM_MM_ARCH_HOOKS_H
->> +
->> +static inline void arch_remap(struct mm_struct *mm,
->> +			      unsigned long old_start, unsigned long old_end,
->> +			      unsigned long new_start, unsigned long new_end)
->> +{
->> +	/*
->> +	 * mremap() doesn't allow moving multiple vmas so we can limit the
->> +	 * check to old_start == vdso_base.
->> +	 */
->> +	if ((void *)old_start == mm->context.vdso)
->> +		mm->context.vdso = (void *)new_start;
->> +}
->> +#define arch_remap arch_remap
->> +
->> +#endif /* __ASM_MM_ARCH_HOOKS_H */
->> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
->> index 2416578..9fe0773 100644
->> --- a/arch/arm64/include/asm/mmu_context.h
->> +++ b/arch/arm64/include/asm/mmu_context.h
->> @@ -24,7 +24,6 @@
->>  
->>  #include <asm/cacheflush.h>
->>  #include <asm/proc-fns.h>
->> -#include <asm-generic/mm_hooks.h>
->>  #include <asm/cputype.h>
->>  #include <asm/pgtable.h>
->>  
->> @@ -147,4 +146,26 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
->>  #define deactivate_mm(tsk,mm)	do { } while (0)
->>  #define activate_mm(prev,next)	switch_mm(prev, next, NULL)
->>  
->> +static inline void arch_dup_mmap(struct mm_struct *oldmm,
->> +				      struct mm_struct *mm)
->> +{
->> +}
->> +
->> +static inline void arch_exit_mmap(struct mm_struct *mm)
->> +{
->> +}
->> +
->> +static inline void arch_unmap(struct mm_struct *mm,
->> +			      struct vm_area_struct *vma,
->> +			      unsigned long start, unsigned long end)
->> +{
->> +	if ((void *)start <= mm->context.vdso && mm->context.vdso < (void *)end)
->> +		mm->context.vdso = NULL;
->> +}
->> +
->> +static inline void arch_bprm_mm_init(struct mm_struct *mm,
->> +				     struct vm_area_struct *vma)
->> +{
->> +}
+>> and __omap_sync32k_timer_init(), in turn, will be called from:
+>> arch/arm/kernel/time.c
+>>   - time_init()
+>> 	machine_desc->init_time();
+>> (without your patch 1).
 > 
-> This is virtually identical to the PowerPC implementation, afaict. Any
-> chance we could move this to core code and define some generic vdso
-> accessors for the mm?
+> Yes that's the current approach, but we can do better. We only need the following
+> clocks for system timers at that point:
+> 
+> - mux clocks to select between the 32k and hf oscillator source
+> 
+> - clkctrl driver to gate the ocp clock
+> 
+> All the other clocks can be initialized at core_initcall time with this change.
+> 
+>> So, I don't see real dependency here between clk initialization and hwmods :(
+> 
+> You don't because it's only implemented so far for the dm814x ADPLL clock :)
+> 
+> That I posted as "[PATCH 0/2] Clock driver for dm814x ADPLL". Note how it's
+> just a regular device driver that also works as loadable module on boards that
+> have all the necessary clocks enabled already by the bootloader.
+> 
 
-I think the same criticism applies to the VDSO code itself, and I'm not
-sure how easy it is to provide common VDSO remap/unmap without common
-VDSO code. I guess I'll do some investigating when I have then chance.
-
-Thanks,
-Christopher Covington
+Ah. Thanks. I see it now.
 
 -- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+regards,
+-grygorii
