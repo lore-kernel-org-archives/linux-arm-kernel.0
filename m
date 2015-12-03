@@ -1,56 +1,59 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 03 Dec 2015 14:43:05 +0100
-Subject: [PATCH v4 net 0/6] Marvell Armada XP/370/38X Neta fixes
-In-Reply-To: <20151202.153152.345490122870853342.davem@davemloft.net> (David
- Miller's message of "Wed, 02 Dec 2015 15:31:52 -0500 (EST)")
-References: <1448886466-31538-1-git-send-email-mw@semihalf.com>
- <20151201.220337.2287051759324173025.davem@davemloft.net>
- <87wpsx2rll.fsf@free-electrons.com>
- <20151202.153152.345490122870853342.davem@davemloft.net>
-Message-ID: <874mfz1wd2.fsf@free-electrons.com>
+From: fugang.duan@freescale.com (Duan Andy)
+Date: Thu, 3 Dec 2015 13:54:05 +0000
+Subject: [PATCH] drivers: dma-coherent: free memory when failed to init
+ DMA memory pool
+In-Reply-To: <xa1toae7y9u8.fsf@mina86.com>
+References: <1449138962-8264-1-git-send-email-b38611@freescale.com>
+ <xa1toae7y9u8.fsf@mina86.com>
+Message-ID: <CY1PR0301MB12257F63F594E65DE67E64DFF50D0@CY1PR0301MB1225.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
- 
- On mer., d?c. 02 2015, David Miller <davem@davemloft.net> wrote:
-
-> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Date: Wed, 02 Dec 2015 09:16:06 +0100
->
->> Hi David,
->>  
->>  On mer., d?c. 02 2015, David Miller <davem@davemloft.net> wrote:
->> 
->>> From: Marcin Wojtas <mw@semihalf.com>
->>> Date: Mon, 30 Nov 2015 13:27:40 +0100
->>>
->>>> I'm sending v4 with corrected commit log of the last patch, in order
->>>> to avoid possible conflicts between the branches as suggested by
->>>> Gregory Clement.
->>>
->>> Series applied, thanks.
->> 
->> Could you confirm that you don't apply the last patch?
->
-> If I say it's applied then it's applied, and if you don't like it then
-> you'll have to submit a revert patch against my tree or similar.
->
-> You know you could just check my tree instead of asking.
-
-Well I was very surprised that you applied a patch in a subsystem that
-you do not maintain. As written on the lines just below yours, the
-purpose of this v4 was to make clear that the last patch is not for the
-net subsystem but for the arm/mvebu one.
-
-As this series will be part of the next rc, then I hope we won't have
-conflicts during next merge.
-
-Gregory
+From: Mike Nazarewicz <mpn@google.com> Sent: Thursday, December 03, 2015 8:51 PM
+> To: Duan Fugang-B38611; torvalds at linux-foundation.org;
+> gregkh at linuxfoundation.org; m.szyprowski at samsung.com
+> Cc: linux-arm-kernel at lists.infradead.org; arnd at arndb.de;
+> iamjoonsoo.kim at lge.com; Duan Fugang-B38611
+> Subject: Re: [PATCH] drivers: dma-coherent: free memory when failed to
+> init DMA memory pool
+> 
+> On Thu, Dec 03 2015, Fugang Duan wrote:
+> > Free dma coherent memory when it failed to init DMA memory pool after
+> > calling .dma_init_coherent_memory(), otherwise it causes memmory leak.
+> >
+> > Signed-off-by: Fugang Duan <B38611@freescale.com>
+> > ---
+> >  drivers/base/dma-coherent.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+> > index 55b8398..beb6bbe 100644
+> > --- a/drivers/base/dma-coherent.c
+> > +++ b/drivers/base/dma-coherent.c
+> > @@ -286,6 +286,7 @@ static int rmem_dma_device_init(struct reserved_mem
+> *rmem, struct device *dev)
+> >  				     &mem) != DMA_MEMORY_MAP) {
+> >  		pr_err("Reserved memory: failed to init DMA memory pool
+> at %pa, size %ld MiB\n",
+> >  			&rmem->base, (unsigned long)rmem->size / SZ_1M);
+> > +		kfree(mem);
+> 
+> mem == NULL at this point.  If dma_init_coherent_memory doesn?t return
+> DMA_MEMORY_MAP, mem pointer is not assigned any value.  If you think
+> there is a memory leak, please demonstrate a path of it happening.
+> 
+Kfree() will check mem NULL condition, so no need to add check in here.
 
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> >  		return -ENODEV;
+> >  	}
+> >  	rmem->priv = mem;
+> > --
+> > 1.9.1
+> >
+> 
+> --
+> Best regards,                                         _     _
+> .o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+> ..o | Computer Science,  ??? ?mina86? ??????  (o o)
+> ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
