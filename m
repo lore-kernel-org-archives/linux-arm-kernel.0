@@ -1,98 +1,41 @@
-From: koro.chen@mediatek.com (Koro Chen)
-Date: Thu, 3 Dec 2015 15:53:28 +0800
-Subject: [PATCH] ASoC: mediatek: Use current HW pointer for pointer callback
-Message-ID: <1449129208-63615-1-git-send-email-koro.chen@mediatek.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 3 Dec 2015 08:18:43 +0000
+Subject: [PATCH v2 10/21] arm64: KVM: Add patchable function selector
+In-Reply-To: <20151202223456.GK3233@hawk.localdomain>
+References: <1448650215-15218-1-git-send-email-marc.zyngier@arm.com>
+ <1448650215-15218-11-git-send-email-marc.zyngier@arm.com>
+ <20151202223456.GK3233@hawk.localdomain>
+Message-ID: <20151203081843.5905bebd@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously we recorded "last interrupt position" and used it in
-pointer callback. This is not correct implementation, and it causes
-underruns when user space monitors buffer level to decide when to
-send next data chunk in low latency application.
+On Wed, 2 Dec 2015 16:34:56 -0600
+Andrew Jones <drjones@redhat.com> wrote:
 
-Remove position recording in IRQ handler and also hw_ptr in
-struct mtk_afe_memif used to record that, and let pointer callback
-reports current HW pointer instead.
+> On Fri, Nov 27, 2015 at 06:50:04PM +0000, Marc Zyngier wrote:
+> > KVM so far relies on code patching, and is likely to use it more
+> > in the future. The main issue is that our alternative system works
+> > at the instruction level, while we'd like to have alternatives at
+> > the function level.
+> 
+> How about setting static-keys at hyp init time?
 
-Signed-off-by: Koro Chen <koro.chen@mediatek.com>
----
- sound/soc/mediatek/mtk-afe-common.h |    1 -
- sound/soc/mediatek/mtk-afe-pcm.c    |   22 +++++++++++-----------
- 2 files changed, 11 insertions(+), 12 deletions(-)
+That was an option I looked at. And while static keys would work to some
+extent, they also have some nasty side effects:
+- They create both a fast and a slow path. We don't want that - both
+  path should be equally fast, or at least have as little overhead as
+  possible
+- We do need code patching for some assembly code, and using static
+  keys on top creates a parallel mechanism that makes it hard to
+  follow/debug/maintain.
 
-diff --git a/sound/soc/mediatek/mtk-afe-common.h b/sound/soc/mediatek/mtk-afe-common.h
-index cc4393c..9b1af1a 100644
---- a/sound/soc/mediatek/mtk-afe-common.h
-+++ b/sound/soc/mediatek/mtk-afe-common.h
-@@ -92,7 +92,6 @@ struct mtk_afe_memif_data {
- struct mtk_afe_memif {
- 	unsigned int phys_buf_addr;
- 	int buffer_size;
--	unsigned int hw_ptr;		/* Previous IRQ's HW ptr */
- 	struct snd_pcm_substream *substream;
- 	const struct mtk_afe_memif_data *data;
- 	const struct mtk_afe_irq_data *irqdata;
-diff --git a/sound/soc/mediatek/mtk-afe-pcm.c b/sound/soc/mediatek/mtk-afe-pcm.c
-index 7f71343..5399a0e 100644
---- a/sound/soc/mediatek/mtk-afe-pcm.c
-+++ b/sound/soc/mediatek/mtk-afe-pcm.c
-@@ -175,8 +175,17 @@ static snd_pcm_uframes_t mtk_afe_pcm_pointer
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
- 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
- 	struct mtk_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
-+	unsigned int hw_ptr;
-+	int ret;
-+
-+	ret = regmap_read(afe->regmap, memif->data->reg_ofs_cur, &hw_ptr);
-+	if (ret || hw_ptr == 0) {
-+		dev_err(afe->dev, "%s hw_ptr err\n", __func__);
-+		hw_ptr = memif->phys_buf_addr;
-+	}
- 
--	return bytes_to_frames(substream->runtime, memif->hw_ptr);
-+	return bytes_to_frames(substream->runtime,
-+			       hw_ptr - memif->phys_buf_addr);
- }
- 
- static const struct snd_pcm_ops mtk_afe_pcm_ops = {
-@@ -602,7 +611,6 @@ static int mtk_afe_dais_hw_params(struct snd_pcm_substream *substream,
- 
- 	memif->phys_buf_addr = substream->runtime->dma_addr;
- 	memif->buffer_size = substream->runtime->dma_bytes;
--	memif->hw_ptr = 0;
- 
- 	/* start */
- 	regmap_write(afe->regmap,
-@@ -737,7 +745,6 @@ static int mtk_afe_dais_trigger(struct snd_pcm_substream *substream, int cmd,
- 		/* and clear pending IRQ */
- 		regmap_write(afe->regmap, AFE_IRQ_CLR,
- 			     1 << memif->data->irq_clr_shift);
--		memif->hw_ptr = 0;
- 		return 0;
- 	default:
- 		return -EINVAL;
-@@ -1081,7 +1088,7 @@ static const struct regmap_config mtk_afe_regmap_config = {
- static irqreturn_t mtk_afe_irq_handler(int irq, void *dev_id)
- {
- 	struct mtk_afe *afe = dev_id;
--	unsigned int reg_value, hw_ptr;
-+	unsigned int reg_value;
- 	int i, ret;
- 
- 	ret = regmap_read(afe->regmap, AFE_IRQ_STATUS, &reg_value);
-@@ -1097,13 +1104,6 @@ static irqreturn_t mtk_afe_irq_handler(int irq, void *dev_id)
- 		if (!(reg_value & (1 << memif->data->irq_clr_shift)))
- 			continue;
- 
--		ret = regmap_read(afe->regmap, memif->data->reg_ofs_cur,
--				  &hw_ptr);
--		if (ret || hw_ptr == 0) {
--			dev_err(afe->dev, "%s hw_ptr err\n", __func__);
--			hw_ptr = memif->phys_buf_addr;
--		}
--		memif->hw_ptr = hw_ptr - memif->phys_buf_addr;
- 		snd_pcm_period_elapsed(memif->substream);
- 	}
- 
+You can view this alternative function call as a slightly different
+kind of static keys - one that can give you the capability to handle
+function calls instead of just jumping over code sequences. Both have
+their own merits.
+
+Thanks,
+
+	M.
 -- 
-1.7.9.5
+Without deviation from the norm, progress is not possible.
