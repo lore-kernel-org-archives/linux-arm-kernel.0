@@ -1,63 +1,45 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 3 Dec 2015 12:18:40 +0000
-Subject: [PATCH v3 3/7] arm64: split off early mapping code from
- early_fixmap_init()
-In-Reply-To: <1447672998-20981-4-git-send-email-ard.biesheuvel@linaro.org>
-References: <1447672998-20981-1-git-send-email-ard.biesheuvel@linaro.org>
- <1447672998-20981-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20151203121840.GB28731@leverpostej>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 3 Dec 2015 12:20:54 +0000
+Subject: [PATCH v6 10/19] arm64:ilp32 use the native LP64 'start_thread'
+ for ILP32 threads
+In-Reply-To: <1447795019-30176-11-git-send-email-ynorov@caviumnetworks.com>
+References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
+ <1447795019-30176-11-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <20151203122054.GL10747@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Wed, Nov 18, 2015 at 12:16:50AM +0300, Yury Norov wrote:
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -28,6 +28,7 @@
+>  #ifdef __KERNEL__
+>  
+>  #include <linux/string.h>
+> +#include <linux/thread_info.h>
+>  
+>  #include <asm/fpsimd.h>
+>  #include <asm/hw_breakpoint.h>
+> @@ -123,6 +124,15 @@ static inline void start_thread(struct pt_regs *regs, unsigned long pc,
+>  static inline void compat_start_thread(struct pt_regs *regs, unsigned long pc,
+>  				       unsigned long sp)
+>  {
+> +#ifdef CONFIG_ARM64_ILP32
+> +	/* ILP32 thread are started the same way as LP64 threads.
+> +	   Note we cannot use is_ilp32_compat_task here as that
+> +	   would introduce a header depency issue.  */
+> +	if (test_thread_flag(TIF_32BIT_AARCH64)) {
+> +		start_thread(regs, pc, sp);
+> +		return;
+> +	}
 
-Apologies that it's taken me so long to get around to this...
+Nitpicks: use IS_ENABLED(CONFIG_ARM64_ILP32) instead of #ifdef. Also
+follow the coding style for multi-line comments:
 
-On Mon, Nov 16, 2015 at 12:23:14PM +0100, Ard Biesheuvel wrote:
-> This splits off and generalises the population of the statically
-> allocated fixmap page tables so that we may reuse it later for
-> the linear mapping once we move the kernel text mapping out of it.
-> 
-> This also involves taking into account that table entries at any of
-> the levels we are populating may have been populated already, since
-> the fixmap mapping might not be disjoint up to the pgd level anymore
-> from other early mappings.
+	/*
+	 * .....
+	 * .....
+	 */
 
-As a heads-up, for avoiding TLB conflicts, I'm currently working on
-alternative way of creating the kernel page tables which will definitely
-conflict here, and may or may not supercede this approach.
-
-By adding new FIX_{PGD,PUD,PMD,PTE} indicees to the fixmap, we can
-allocate page tables from anywhere via memblock, and temporarily map
-them as we need to.
-
-That would avoid the need for the bootstrap tables. In head.S we'd only
-need to create a temporary (coarse-grained, RWX) kernel mapping (with
-the fixmap bolted on). Later we would create a whole new set of tables
-with a fine-grained kernel mapping and a full linear mapping using the
-new fixmap entries to temporarily map tables, then switch over to those
-atomically.
-
-Otherwise, one minor comment below.
-
-> +static void __init bootstrap_early_mapping(unsigned long addr,
-> +					   struct bootstrap_pgtables *reg,
-> +					   bool pte_level)
-
-The only caller in this patch passes true for pte_level.
-
-Can we not introduce the argument when it is first needed? Or at least
-have something in the commit message as to why we'll need it later?
-
->  	/*
->  	 * The boot-ioremap range spans multiple pmds, for which
-> -	 * we are not preparted:
-> +	 * we are not prepared:
->  	 */
-
-I cannot wait to see this typo go!
-
-Otherwise, this looks fine to me.
-
-Thanks,
-Mark.
+-- 
+Catalin
