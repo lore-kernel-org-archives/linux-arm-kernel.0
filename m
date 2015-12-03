@@ -1,173 +1,79 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 3 Dec 2015 11:30:36 +0100
-Subject: [PATCH v2 1/4] i2c: at91: add support for the HOLD field
-In-Reply-To: <1449136434-27619-2-git-send-email-ludovic.desroches@atmel.com>
-References: <1449136434-27619-1-git-send-email-ludovic.desroches@atmel.com>
- <1449136434-27619-2-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <566019CC.3060005@atmel.com>
+From: ben@smart-cactus.org (Ben Gamari)
+Date: Thu, 03 Dec 2015 11:30:16 +0100
+Subject: [PATCH 02/12] clk: samsung: exynos5420: add cpu clock
+ configuration data and instantiate cpu clock
+In-Reply-To: <565FDC5A.1010504@samsung.com>
+References: <1449091167-20758-1-git-send-email-ben@smart-cactus.org>
+ <1449091167-20758-3-git-send-email-ben@smart-cactus.org>
+ <565FDC5A.1010504@samsung.com>
+Message-ID: <874mfz4yfb.fsf@smart-cactus.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 03/12/2015 10:53, Ludovic Desroches a ?crit :
-> The hold field allows to configure the data hold time which can be set
-> with the help of the generic binding 'i2c-sda-hold-time-ns'. This
-> feature has been introduced with SAMA5D4 SoC family.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> On 03.12.2015 06:19, Ben Gamari wrote:
+>> From: Thomas Abraham <thomas.ab@samsung.com>
+>> 
+>> With the addition of the new Samsung specific cpu-clock type, the
+>> arm clock can be represented as a cpu-clock type. Add the CPU clock
+>> configuration data and instantiate the CPU clock type for Exynos5420.
+>> 
+>> Changes by Bartlomiej:
+>> - split Exynos5420 support from the original patches
+>> - moved E5420_[EGL,KFC]_DIV0() macros to clk-exynos5420.c
+>> 
+>> Changes by Ben Gamari:
+>> - Rebased
+>
+> If only rebasing then you should retain the Lukasz's review tag. He
+> doesn't have to review it again, right? :)
 
+Yep, very true.
 
-> ---
->  drivers/i2c/busses/i2c-at91.c | 53 ++++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 50 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> index 10835d1..921d32b 100644
-> --- a/drivers/i2c/busses/i2c-at91.c
-> +++ b/drivers/i2c/busses/i2c-at91.c
-> @@ -64,6 +64,8 @@
->  #define	AT91_TWI_IADR		0x000c	/* Internal Address Register */
->  
->  #define	AT91_TWI_CWGR		0x0010	/* Clock Waveform Generator Reg */
-> +#define	AT91_TWI_CWGR_HOLD_MAX	0x1f
-> +#define	AT91_TWI_CWGR_HOLD(x)	(((x) & AT91_TWI_CWGR_HOLD_MAX) << 24)
->  
->  #define	AT91_TWI_SR		0x0020	/* Status Register */
->  #define	AT91_TWI_TXCOMP		BIT(0)	/* Transmission Complete */
-> @@ -110,6 +112,7 @@ struct at91_twi_pdata {
->  	unsigned clk_offset;
->  	bool has_unre_flag;
->  	bool has_alt_cmd;
-> +	bool has_hold_field;
->  	struct at_dma_slave dma_slave;
->  };
->  
-> @@ -187,10 +190,11 @@ static void at91_init_twi_bus(struct at91_twi_dev *dev)
->   */
->  static void at91_calc_twi_clock(struct at91_twi_dev *dev, int twi_clk)
->  {
-> -	int ckdiv, cdiv, div;
-> +	int ckdiv, cdiv, div, hold = 0;
->  	struct at91_twi_pdata *pdata = dev->pdata;
->  	int offset = pdata->clk_offset;
->  	int max_ckdiv = pdata->clk_max_div;
-> +	u32 twd_hold_time_ns = 0;
->  
->  	div = max(0, (int)DIV_ROUND_UP(clk_get_rate(dev->clk),
->  				       2 * twi_clk) - offset);
-> @@ -204,8 +208,33 @@ static void at91_calc_twi_clock(struct at91_twi_dev *dev, int twi_clk)
->  		cdiv = 255;
->  	}
->  
-> -	dev->twi_cwgr_reg = (ckdiv << 16) | (cdiv << 8) | cdiv;
-> -	dev_dbg(dev->dev, "cdiv %d ckdiv %d\n", cdiv, ckdiv);
-> +	if (pdata->has_hold_field) {
-> +		of_property_read_u32(dev->dev->of_node, "i2c-sda-hold-time-ns",
-> +				     &twd_hold_time_ns);
-> +
-> +		/*
-> +		 * hold time = HOLD + 3 x T_peripheral_clock
-> +		 * Use clk rate in kHz to prevent overflows when computing
-> +		 * hold.
-> +		 */
-> +		hold = DIV_ROUND_UP(twd_hold_time_ns
-> +				    * (clk_get_rate(dev->clk) / 1000), 1000000);
-> +		hold -= 3;
-> +		if (hold < 0)
-> +			hold = 0;
-> +		if (hold > AT91_TWI_CWGR_HOLD_MAX) {
-> +			dev_warn(dev->dev,
-> +				 "HOLD field set to its maximum value (%d instead of %d)\n",
-> +				 AT91_TWI_CWGR_HOLD_MAX, hold);
-> +			hold = AT91_TWI_CWGR_HOLD_MAX;
-> +		}
-> +	}
-> +
-> +	dev->twi_cwgr_reg = (ckdiv << 16) | (cdiv << 8) | cdiv
-> +			    | AT91_TWI_CWGR_HOLD(hold);
-> +
-> +	dev_dbg(dev->dev, "cdiv %d ckdiv %d hold %d (%d ns)\n",
-> +		cdiv, ckdiv, hold, twd_hold_time_ns);
->  }
->  
->  static void at91_twi_dma_cleanup(struct at91_twi_dev *dev)
-> @@ -797,6 +826,7 @@ static struct at91_twi_pdata at91rm9200_config = {
->  	.clk_offset = 3,
->  	.has_unre_flag = true,
->  	.has_alt_cmd = false,
-> +	.has_hold_field = false,
->  };
->  
->  static struct at91_twi_pdata at91sam9261_config = {
-> @@ -804,6 +834,7 @@ static struct at91_twi_pdata at91sam9261_config = {
->  	.clk_offset = 4,
->  	.has_unre_flag = false,
->  	.has_alt_cmd = false,
-> +	.has_hold_field = false,
->  };
->  
->  static struct at91_twi_pdata at91sam9260_config = {
-> @@ -811,6 +842,7 @@ static struct at91_twi_pdata at91sam9260_config = {
->  	.clk_offset = 4,
->  	.has_unre_flag = false,
->  	.has_alt_cmd = false,
-> +	.has_hold_field = false,
->  };
->  
->  static struct at91_twi_pdata at91sam9g20_config = {
-> @@ -818,6 +850,7 @@ static struct at91_twi_pdata at91sam9g20_config = {
->  	.clk_offset = 4,
->  	.has_unre_flag = false,
->  	.has_alt_cmd = false,
-> +	.has_hold_field = false,
->  };
->  
->  static struct at91_twi_pdata at91sam9g10_config = {
-> @@ -825,6 +858,7 @@ static struct at91_twi_pdata at91sam9g10_config = {
->  	.clk_offset = 4,
->  	.has_unre_flag = false,
->  	.has_alt_cmd = false,
-> +	.has_hold_field = false,
->  };
->  
->  static const struct platform_device_id at91_twi_devtypes[] = {
-> @@ -854,6 +888,15 @@ static struct at91_twi_pdata at91sam9x5_config = {
->  	.clk_offset = 4,
->  	.has_unre_flag = false,
->  	.has_alt_cmd = false,
-> +	.has_hold_field = false,
-> +};
-> +
-> +static struct at91_twi_pdata sama5d4_config = {
-> +	.clk_max_div = 7,
-> +	.clk_offset = 4,
-> +	.has_unre_flag = false,
-> +	.has_alt_cmd = false,
-> +	.has_hold_field = true,
->  };
->  
->  static struct at91_twi_pdata sama5d2_config = {
-> @@ -861,6 +904,7 @@ static struct at91_twi_pdata sama5d2_config = {
->  	.clk_offset = 4,
->  	.has_unre_flag = true,
->  	.has_alt_cmd = true,
-> +	.has_hold_field = true,
->  };
->  
->  static const struct of_device_id atmel_twi_dt_ids[] = {
-> @@ -883,6 +927,9 @@ static const struct of_device_id atmel_twi_dt_ids[] = {
->  		.compatible = "atmel,at91sam9x5-i2c",
->  		.data = &at91sam9x5_config,
->  	}, {
-> +		.compatible = "atmel,sama5d4-i2c",
-> +		.data = &sama5d4_config,
-> +	}, {
->  		.compatible = "atmel,sama5d2-i2c",
->  		.data = &sama5d2_config,
->  	}, {
-> 
+>> +static const struct exynos_cpuclk_cfg_data exynos5420_eglclk_d[] __initconst = {
+>> +	{ 1800000, E5420_EGL_DIV0(3, 7, 7, 4), },
+>> +	{ 1700000, E5420_EGL_DIV0(3, 7, 7, 3), },
+>> +	{ 1600000, E5420_EGL_DIV0(3, 7, 7, 3), },
+>> +	{ 1500000, E5420_EGL_DIV0(3, 7, 7, 3), },
+>> +	{ 1400000, E5420_EGL_DIV0(3, 7, 7, 3), },
+>> +	{ 1300000, E5420_EGL_DIV0(3, 7, 7, 2), },
+>> +	{ 1200000, E5420_EGL_DIV0(3, 7, 7, 2), },
+>> +	{ 1100000, E5420_EGL_DIV0(3, 7, 7, 2), },
+>> +	{ 1000000, E5420_EGL_DIV0(3, 6, 6, 2), },
+>> +	{  900000, E5420_EGL_DIV0(3, 6, 6, 2), },
+>> +	{  800000, E5420_EGL_DIV0(3, 5, 5, 2), },
+>> +	{  700000, E5420_EGL_DIV0(3, 5, 5, 2), },
+>> +	{  600000, E5420_EGL_DIV0(3, 4, 4, 2), },
+>> +	{  500000, E5420_EGL_DIV0(3, 3, 3, 2), },
+>> +	{  400000, E5420_EGL_DIV0(3, 3, 3, 2), },
+>> +	{  300000, E5420_EGL_DIV0(3, 3, 3, 2), },
+>> +	{  200000, E5420_EGL_DIV0(3, 3, 3, 2), },
+>> +	{  0 },
+>
+> The vendor code (Galaxy S5 with Exynos5422) sets pclk_dbg divider to 7.
+> In the same time APLL divider is only 1.
+>
+> For the ACLK divider (of KFC below) the vendor sets 3, not 2.
+>
+> The values also don't match the Exynos5420 from Note 3.
+>
+> The Exynos5800 apparently has values more similar to 5422.
+>
+> The question is: for which exact model this is? We can of course choose
+> the safest values here but probably these would be with the highest
+> dividers?
+>
+I'm afraid I can't comment here. Thomas, perhaps you could offer some
+insight?
 
+Cheers,
 
--- 
-Nicolas Ferre
+- Ben
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 472 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151203/8e177acc/attachment.sig>
