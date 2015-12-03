@@ -1,36 +1,37 @@
-From: kuleshovmail@gmail.com (Alexander Kuleshov)
-Date: Thu, 3 Dec 2015 17:27:42 +0600
-Subject: [PATCH v4 01/13] mm/memblock: add MEMBLOCK_NOMAP attribute to
- memblock memory table
-In-Reply-To: <CAKv+Gu9oboT_Lk8heJWRcM=oxRW=EWioVCvZLH7N0YCkfU5tJw@mail.gmail.com>
-References: <1448886507-3216-1-git-send-email-ard.biesheuvel@linaro.org>
- <1448886507-3216-2-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu9oboT_Lk8heJWRcM=oxRW=EWioVCvZLH7N0YCkfU5tJw@mail.gmail.com>
-Message-ID: <CANCZXo7rdYooBq3NV5xo8u+EpbbPjGDq3oTv=Yy0U9SDAReB9g@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 3 Dec 2015 11:31:58 +0000
+Subject: [PATCH v6 05/19] arm64:uapi: set __BITS_PER_LONG correctly for
+ ILP32 and LP64
+In-Reply-To: <1447795019-30176-6-git-send-email-ynorov@caviumnetworks.com>
+References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
+ <1447795019-30176-6-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <20151203113157.GI10747@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ard,
+On Wed, Nov 18, 2015 at 12:16:45AM +0300, Yury Norov wrote:
+> diff --git a/arch/arm64/include/uapi/asm/bitsperlong.h b/arch/arm64/include/uapi/asm/bitsperlong.h
+> index fce9c29..4265243 100644
+> --- a/arch/arm64/include/uapi/asm/bitsperlong.h
+> +++ b/arch/arm64/include/uapi/asm/bitsperlong.h
+> @@ -16,7 +16,14 @@
+>  #ifndef __ASM_BITSPERLONG_H
+>  #define __ASM_BITSPERLONG_H
+>  
+> -#define __BITS_PER_LONG 64
+> +#if defined(__LP64__)
+> +/* Assuming __LP64__ will be defined for native ELF64's and not for ILP32. */
+> +#  define __BITS_PER_LONG 64
+> +#elif defined(__ILP32__)
+> +#  define __BITS_PER_LONG 32
+> +#else
+> +#  error "Neither LP64 nor ILP32: unsupported ABI in asm/bitsperlong.h"
+> +#endif
 
-On Thu, Dec 3, 2015 at 4:55 PM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 30 November 2015 at 13:28, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> This introduces the MEMBLOCK_NOMAP attribute and the required plumbing
->> to make it usable as an indicator that some parts of normal memory
->> should not be covered by the kernel direct mapping. It is up to the
->> arch to actually honor the attribute when laying out this mapping,
->> but the memblock code itself is modified to disregard these regions
->> for allocations and other general use.
->>....
-> May I kindly ask team-mm/Andrew/Alexander to chime in here, and
-> indicate whether you are ok with this patch going in for 4.5? If so,
-> could you please provide your ack so the patch can be kept together
-> with the rest of the series, which depends on it?
->
-> I should note that this change should not affect any memblock users
-> that never set the MEMBLOCK_NOMAP flag, but please, if you see any
-> issues beyond 'this may conflict with other stuff we have queued for
-> 4.5', please do let me know.
+Quick question: IIRC, earlier aarch64 gcc versions did not generate
+__ILP32__ when -mabi=ilp32, they only removed __LP64__. When did the
+change happen? Could we assume that all compiler versions used to
+generate ILP32 would define this?
 
-Just tested the kernel with this patch with qemu and real hardware and it
-works, nothing does not brake for me.
+-- 
+Catalin
