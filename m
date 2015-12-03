@@ -1,209 +1,141 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 3 Dec 2015 14:11:31 +0800
-Subject: [PATCH v5 21/21] KVM: ARM64: Add a new kvm ARM PMU device
+Date: Thu, 3 Dec 2015 14:11:28 +0800
+Subject: [PATCH v5 18/21] KVM: ARM64: Add PMU overflow interrupt routing
 In-Reply-To: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1449123091-20252-22-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1449123091-20252-19-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add a new kvm device type KVM_DEV_TYPE_ARM_PMU_V3 for ARM PMU. Implement
-the kvm_device_ops for it.
+When calling perf_event_create_kernel_counter to create perf_event,
+assign a overflow handler. Then when perf event overflows, call
+kvm_vcpu_kick() to sync the interrupt.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- Documentation/virtual/kvm/devices/arm-pmu.txt | 16 +++++
- arch/arm64/include/uapi/asm/kvm.h             |  3 +
- include/linux/kvm_host.h                      |  1 +
- include/uapi/linux/kvm.h                      |  2 +
- virt/kvm/arm/pmu.c                            | 87 +++++++++++++++++++++++++++
- virt/kvm/kvm_main.c                           |  4 ++
- 6 files changed, 113 insertions(+)
- create mode 100644 Documentation/virtual/kvm/devices/arm-pmu.txt
+ arch/arm/kvm/arm.c    |  2 ++
+ include/kvm/arm_pmu.h |  2 ++
+ virt/kvm/arm/pmu.c    | 52 ++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 55 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/virtual/kvm/devices/arm-pmu.txt b/Documentation/virtual/kvm/devices/arm-pmu.txt
-new file mode 100644
-index 0000000..5121f1f
---- /dev/null
-+++ b/Documentation/virtual/kvm/devices/arm-pmu.txt
-@@ -0,0 +1,16 @@
-+ARM Virtual Performance Monitor Unit (vPMU)
-+===========================================
-+
-+Device types supported:
-+  KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
-+
-+Instantiate one PMU instance for per VCPU through this API.
-+
-+Groups:
-+  KVM_DEV_ARM_PMU_GRP_IRQ
-+  Attributes:
-+    A value describing the interrupt number of PMU overflow interrupt. This
-+    interrupt should be a PPI.
-+
-+  Errors:
-+    -EINVAL: Value set is out of the expected range (from 16 to 31)
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 2d4ca4b..568afa2 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -204,6 +204,9 @@ struct kvm_arch_memory_slot {
- #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
- #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index e06fd29..cd696ef 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -28,6 +28,7 @@
+ #include <linux/sched.h>
+ #include <linux/kvm.h>
+ #include <trace/events/kvm.h>
++#include <kvm/arm_pmu.h>
  
-+/* Device Control API: ARM PMU */
-+#define KVM_DEV_ARM_PMU_GRP_IRQ		0
-+
- /* KVM_IRQ_LINE irq field index values */
- #define KVM_ARM_IRQ_TYPE_SHIFT		24
- #define KVM_ARM_IRQ_TYPE_MASK		0xff
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index c923350..608dea6 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -1161,6 +1161,7 @@ extern struct kvm_device_ops kvm_mpic_ops;
- extern struct kvm_device_ops kvm_xics_ops;
- extern struct kvm_device_ops kvm_arm_vgic_v2_ops;
- extern struct kvm_device_ops kvm_arm_vgic_v3_ops;
-+extern struct kvm_device_ops kvm_arm_pmu_ops;
+ #define CREATE_TRACE_POINTS
+ #include "trace.h"
+@@ -569,6 +570,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 * non-preemptible context.
+ 		 */
+ 		preempt_disable();
++		kvm_pmu_flush_hwstate(vcpu);
+ 		kvm_timer_flush_hwstate(vcpu);
+ 		kvm_vgic_flush_hwstate(vcpu);
  
- #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
- 
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 03f3618..4ba6fdd 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -1032,6 +1032,8 @@ enum kvm_device_type {
- #define KVM_DEV_TYPE_FLIC		KVM_DEV_TYPE_FLIC
- 	KVM_DEV_TYPE_ARM_VGIC_V3,
- #define KVM_DEV_TYPE_ARM_VGIC_V3	KVM_DEV_TYPE_ARM_VGIC_V3
-+	KVM_DEV_TYPE_ARM_PMU_V3,
-+#define	KVM_DEV_TYPE_ARM_PMU_V3		KVM_DEV_TYPE_ARM_PMU_V3
- 	KVM_DEV_TYPE_MAX,
+diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+index 212a3de..4cb0ade 100644
+--- a/include/kvm/arm_pmu.h
++++ b/include/kvm/arm_pmu.h
+@@ -39,6 +39,7 @@ struct kvm_pmu {
  };
  
+ #ifdef CONFIG_KVM_ARM_PMU
++void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
+ unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx);
+ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val);
+ void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u32 val, bool all_enable);
+@@ -49,6 +50,7 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
+ 				    u32 select_idx);
+ void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u32 val);
+ #else
++void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
+ unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx)
+ {
+ 	return 0;
 diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index bd2fece..82b90e8 100644
+index b81e35e..34e7386 100644
 --- a/virt/kvm/arm/pmu.c
 +++ b/virt/kvm/arm/pmu.c
-@@ -19,10 +19,13 @@
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
+@@ -21,6 +21,7 @@
  #include <linux/perf_event.h>
-+#include <linux/uaccess.h>
  #include <asm/kvm_emulate.h>
  #include <kvm/arm_pmu.h>
- #include <kvm/arm_vgic.h>
++#include <kvm/arm_vgic.h>
  
-+#include "vgic.h"
-+
  /**
   * kvm_pmu_get_counter_value - get PMU counter value
-  * @vcpu: The vcpu pointer
-@@ -436,3 +439,87 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
- 
- 	pmc->perf_event = event;
+@@ -79,6 +80,54 @@ static void kvm_pmu_stop_counter(struct kvm_pmc *pmc)
  }
-+
-+static int kvm_arm_pmu_set_irq(struct kvm *kvm, int irq)
-+{
-+	int j;
-+	struct kvm_vcpu *vcpu;
-+
-+	kvm_for_each_vcpu(j, vcpu, kvm) {
-+		struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+
-+		kvm_debug("Set kvm ARM PMU irq: %d\n", irq);
-+		pmu->irq_num = irq;
-+	}
-+
-+	return 0;
-+}
-+
-+static int kvm_arm_pmu_create(struct kvm_device *dev, u32 type)
-+{
-+	int i;
-+	struct kvm_vcpu *vcpu;
-+	struct kvm *kvm = dev->kvm;
-+
-+	kvm_for_each_vcpu(i, vcpu, kvm) {
-+		struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+
-+		memset(pmu, 0, sizeof(*pmu));
-+		kvm_pmu_vcpu_reset(vcpu);
-+		pmu->irq_num = -1;
-+	}
-+
-+	return 0;
-+}
-+
-+static void kvm_arm_pmu_destroy(struct kvm_device *dev)
-+{
-+	kfree(dev);
-+}
-+
-+static int kvm_arm_pmu_set_attr(struct kvm_device *dev,
-+				struct kvm_device_attr *attr)
-+{
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_PMU_GRP_IRQ: {
-+		int __user *uaddr = (int __user *)(long)attr->addr;
-+		int reg;
-+
-+		if (get_user(reg, uaddr))
-+			return -EFAULT;
-+
-+		if (reg < VGIC_NR_SGIS || reg >= VGIC_NR_PRIVATE_IRQS)
-+			return -EINVAL;
-+
-+		return kvm_arm_pmu_set_irq(dev->kvm, reg);
-+	}
-+	}
-+
-+	return -ENXIO;
-+}
-+
-+static int kvm_arm_pmu_get_attr(struct kvm_device *dev,
-+				struct kvm_device_attr *attr)
-+{
-+	return 0;
-+}
-+
-+static int kvm_arm_pmu_has_attr(struct kvm_device *dev,
-+				struct kvm_device_attr *attr)
-+{
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_PMU_GRP_IRQ:
-+		return 0;
-+	}
-+
-+	return -ENXIO;
-+}
-+
-+struct kvm_device_ops kvm_arm_pmu_ops = {
-+	.name = "kvm-arm-pmu",
-+	.create = kvm_arm_pmu_create,
-+	.destroy = kvm_arm_pmu_destroy,
-+	.set_attr = kvm_arm_pmu_set_attr,
-+	.get_attr = kvm_arm_pmu_get_attr,
-+	.has_attr = kvm_arm_pmu_has_attr,
-+};
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index 484079e..81a42cc 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -2647,6 +2647,10 @@ static struct kvm_device_ops *kvm_device_ops_table[KVM_DEV_TYPE_MAX] = {
- #ifdef CONFIG_KVM_XICS
- 	[KVM_DEV_TYPE_XICS]		= &kvm_xics_ops,
- #endif
-+
-+#ifdef CONFIG_KVM_ARM_PMU
-+	[KVM_DEV_TYPE_ARM_PMU_V3]	= &kvm_arm_pmu_ops,
-+#endif
- };
  
- int kvm_register_device_ops(struct kvm_device_ops *ops, u32 type)
+ /**
++ * kvm_pmu_flush_hwstate - flush pmu state to cpu
++ * @vcpu: The vcpu pointer
++ *
++ * Inject virtual PMU IRQ if IRQ is pending for this cpu.
++ */
++void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu)
++{
++	struct kvm_pmu *pmu = &vcpu->arch.pmu;
++	u32 overflow;
++
++	if (pmu->irq_num == -1)
++		return;
++
++	if (!vcpu_mode_is_32bit(vcpu)) {
++		if (!(vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E))
++			return;
++
++		overflow = vcpu_sys_reg(vcpu, PMCNTENSET_EL0)
++			   & vcpu_sys_reg(vcpu, PMINTENSET_EL1)
++			   & vcpu_sys_reg(vcpu, PMOVSSET_EL0);
++	} else {
++		if (!(vcpu_cp15(vcpu, c9_PMCR) & ARMV8_PMCR_E))
++			return;
++
++		overflow = vcpu_cp15(vcpu, c9_PMCNTENSET)
++			   & vcpu_cp15(vcpu, c9_PMINTENSET)
++			   & vcpu_cp15(vcpu, c9_PMOVSSET);
++	}
++
++	kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id, pmu->irq_num,
++			    overflow ? 1 : 0);
++}
++
++/**
++ * When perf event overflows, call kvm_pmu_overflow_set to set overflow status.
++ */
++static void kvm_pmu_perf_overflow(struct perf_event *perf_event,
++				  struct perf_sample_data *data,
++				  struct pt_regs *regs)
++{
++	struct kvm_pmc *pmc = perf_event->overflow_handler_context;
++	struct kvm_vcpu *vcpu = pmc->vcpu;
++	int idx = pmc->idx;
++
++	kvm_pmu_overflow_set(vcpu, BIT(idx));
++}
++
++/**
+  * kvm_pmu_enable_counter - enable selected PMU counter
+  * @vcpu: The vcpu pointer
+  * @val: the value guest writes to PMCNTENSET register
+@@ -338,7 +387,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
+ 	/* The initial sample period (overflow count) of an event. */
+ 	attr.sample_period = (-counter) & pmc->bitmask;
+ 
+-	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
++	event = perf_event_create_kernel_counter(&attr, -1, current,
++						 kvm_pmu_perf_overflow, pmc);
+ 	if (IS_ERR(event)) {
+ 		printk_once("kvm: pmu event creation failed %ld\n",
+ 			    PTR_ERR(event));
 -- 
 2.0.4
