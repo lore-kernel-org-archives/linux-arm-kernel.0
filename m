@@ -1,44 +1,118 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Thu,  3 Dec 2015 16:48:41 +0800
-Subject: [PATCH v3 3/5] dt-bindings: rockchip-thermal: Support the
- RK3228/RK3399 SoCs compatible
+Date: Thu,  3 Dec 2015 16:48:43 +0800
+Subject: [PATCH v3 5/5] thermal: rockchip: Support the RK3399 SoCs in thermal
+ driver
 In-Reply-To: <1449132523-18817-1-git-send-email-wxt@rock-chips.com>
 References: <1449132523-18817-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1449132523-18817-4-git-send-email-wxt@rock-chips.com>
+Message-ID: <1449132523-18817-6-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset attempts to new compatible for thermal founding
-on RK3228/RK3399 SoCs.
+The RK3399 SoCs have two Temperature Sensors, channel 0 is for CPU.
+channel 1 is for GPU.
 
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
 
 ---
 
 Changes in v3: None
 Changes in v2: None
 Changes in v1:
-- As Heiko comments, fix a copy incorrect name.
-- Add a Acked from Rob.
+- fix a irq ack is similar with RK3228 SoCs.
 
- Documentation/devicetree/bindings/thermal/rockchip-thermal.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/thermal/rockchip_thermal.c | 66 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 66 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
-index 0dfa60d..08efe6b 100644
---- a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
-@@ -2,8 +2,10 @@
+diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
+index 95415ac..c597784 100644
+--- a/drivers/thermal/rockchip_thermal.c
++++ b/drivers/thermal/rockchip_thermal.c
+@@ -292,6 +292,44 @@ static const struct tsadc_table v3_code_table[] = {
+ 	{TSADCV3_DATA_MASK, 125000},
+ };
  
- Required properties:
- - compatible : should be "rockchip,<name>-tsadc"
-+   "rockchip,rk3228-tsadc": found on RK3228 SoCs
-    "rockchip,rk3288-tsadc": found on RK3288 SoCs
-    "rockchip,rk3368-tsadc": found on RK3368 SoCs
-+   "rockchip,rk3399-tsadc": found on RK3399 SoCs
- - reg : physical base address of the controller and length of memory mapped
- 	region.
- - interrupts : The interrupt number to the cpu. The interrupt specifier format
++static const struct tsadc_table v4_code_table[] = {
++	{TSADCV3_DATA_MASK, -40000},
++	{431, -40000},
++	{426, -35000},
++	{421, -30000},
++	{415, -25000},
++	{410, -20000},
++	{405, -15000},
++	{399, -10000},
++	{394, -5000},
++	{389, 0},
++	{383, 5000},
++	{378, 10000},
++	{373, 15000},
++	{367, 20000},
++	{362, 25000},
++	{357, 30000},
++	{351, 35000},
++	{346, 40000},
++	{340, 45000},
++	{335, 50000},
++	{330, 55000},
++	{324, 60000},
++	{319, 65000},
++	{313, 70000},
++	{308, 75000},
++	{302, 80000},
++	{297, 85000},
++	{291, 90000},
++	{286, 95000},
++	{281, 100000},
++	{275, 105000},
++	{270, 110000},
++	{264, 115000},
++	{259, 120000},
++	{253, 125000},
++};
++
+ static u32 rk_tsadcv2_temp_to_code(struct chip_tsadc_table table,
+ 				   int temp)
+ {
+@@ -555,6 +593,30 @@ static const struct rockchip_tsadc_chip rk3368_tsadc_data = {
+ 	},
+ };
+ 
++static const struct rockchip_tsadc_chip rk3399_tsadc_data = {
++	.chn_id[SENSOR_CPU] = 0, /* cpu sensor is channel 0 */
++	.chn_id[SENSOR_GPU] = 1, /* gpu sensor is channel 1 */
++	.chn_num = 2, /* two channels for tsadc */
++
++	.tshut_mode = TSHUT_MODE_GPIO, /* default TSHUT via GPIO give PMIC */
++	.tshut_polarity = TSHUT_LOW_ACTIVE, /* default TSHUT LOW ACTIVE */
++	.tshut_temp = 95000,
++
++	.initialize = rk_tsadcv2_initialize,
++	.irq_ack = rk_tsadcv1_irq_ack,
++	.control = rk_tsadcv2_control,
++	.get_temp = rk_tsadcv2_get_temp,
++	.set_tshut_temp = rk_tsadcv2_tshut_temp,
++	.set_tshut_mode = rk_tsadcv2_tshut_mode,
++
++	.table = {
++		.id = v4_code_table,
++		.length = ARRAY_SIZE(v4_code_table),
++		.data_mask = TSADCV3_DATA_MASK,
++		.mode = ADC_DECREMENT,
++	},
++};
++
+ static const struct of_device_id of_rockchip_thermal_match[] = {
+ 	{
+ 		.compatible = "rockchip,rk3228-tsadc",
+@@ -568,6 +630,10 @@ static const struct of_device_id of_rockchip_thermal_match[] = {
+ 		.compatible = "rockchip,rk3368-tsadc",
+ 		.data = (void *)&rk3368_tsadc_data,
+ 	},
++	{
++		.compatible = "rockchip,rk3399-tsadc",
++		.data = (void *)&rk3399_tsadc_data,
++	},
+ 	{ /* end */ },
+ };
+ MODULE_DEVICE_TABLE(of, of_rockchip_thermal_match);
 -- 
 1.9.1
