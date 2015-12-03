@@ -1,78 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Dec 2015 13:37:27 +0000
-Subject: Domain faults when CONFIG_CPU_SW_DOMAIN_PAN is enabled
-In-Reply-To: <533b0f1f264e42e78b94bbff9570fb50@EMAIL.axentia.se>
-References: <1267b061b66c4d1fa8af1955825bc97a@EMAIL.axentia.se>
- <20151203110041.GK8644@n2100.arm.linux.org.uk>
- <f7774151e4a849e682ae5a607a98140b@EMAIL.axentia.se>
- <20151203115143.GM8644@n2100.arm.linux.org.uk>
- <533b0f1f264e42e78b94bbff9570fb50@EMAIL.axentia.se>
-Message-ID: <20151203133727.GN8644@n2100.arm.linux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 03 Dec 2015 14:43:05 +0100
+Subject: [PATCH v4 net 0/6] Marvell Armada XP/370/38X Neta fixes
+In-Reply-To: <20151202.153152.345490122870853342.davem@davemloft.net> (David
+ Miller's message of "Wed, 02 Dec 2015 15:31:52 -0500 (EST)")
+References: <1448886466-31538-1-git-send-email-mw@semihalf.com>
+ <20151201.220337.2287051759324173025.davem@davemloft.net>
+ <87wpsx2rll.fsf@free-electrons.com>
+ <20151202.153152.345490122870853342.davem@davemloft.net>
+Message-ID: <874mfz1wd2.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2015 at 12:08:11PM +0000, Peter Rosin wrote:
-> Russell King wrote:
-> > On Thu, Dec 03, 2015 at 11:38:20AM +0000, Peter Rosin wrote:
-> > > Russell King wrote:
-> > > > On Thu, Dec 03, 2015 at 08:33:13AM +0000, Peter Rosin wrote:
-> > > > > I wrote:
-> > > > > > If I enable CONFIG_CPU_SW_DOMAIN_PAN, I sometimes (but not always) get the
-> > > > > > following (or very similar) on boot.
-> > > > > 
-> > > > > I should have said "if I don't disable", as the option is "default y".
-> > > > > 
-> > > > > Also, if it survives on boot, below is an example of later trouble (after
-> > > > > 30+ minutes on this occasion).
-> > > > 
-> > > > Please apply this patch so we (might) get a slightly better oops dump,
-> > > > and then try to reproduce.
-> > > 
-> > > Sure thing, but it's still "DAC: 00000051"...
-> > 
-> > Thanks, that confirms that something in the uaccess-with-memcpy code
-> > is clearing the DACR back to 0x51.
-> > 
-> > This has come up several times before, and I really can't spot the
-> > problem in this code, so I've always said to disable the
-> > uaccess-with-memcpy code.  Personally, I'd like to see the back
-> > of that code...
-> 
-> Ok, but it's not me doing crazy things if that's what you are implying
-> (not saying that you are), because the sama5_defconfig has
-> 
-> 	CONFIG_UACCESS_WITH_MEMCPY=y
-> 
-> So, something needs to happen or sama5 remains default-broken.
+Hi David,
+ 
+ On mer., d?c. 02 2015, David Miller <davem@davemloft.net> wrote:
 
-I have no solution for this, other than saying that uaccess-with-memcpy
-seems to be (for some unknown reason) incompatible with SW PAN.
+> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Date: Wed, 02 Dec 2015 09:16:06 +0100
+>
+>> Hi David,
+>>  
+>>  On mer., d?c. 02 2015, David Miller <davem@davemloft.net> wrote:
+>> 
+>>> From: Marcin Wojtas <mw@semihalf.com>
+>>> Date: Mon, 30 Nov 2015 13:27:40 +0100
+>>>
+>>>> I'm sending v4 with corrected commit log of the last patch, in order
+>>>> to avoid possible conflicts between the branches as suggested by
+>>>> Gregory Clement.
+>>>
+>>> Series applied, thanks.
+>> 
+>> Could you confirm that you don't apply the last patch?
+>
+> If I say it's applied then it's applied, and if you don't like it then
+> you'll have to submit a revert patch against my tree or similar.
+>
+> You know you could just check my tree instead of asking.
 
-Out of the two features, I'd go for SW PAN over uaccess-with-memcpy,
-but others will have a different opinion.  The real solution is to
-track down what's going on and why, but I don't think anyone has the
-motivation to do that.
+Well I was very surprised that you applied a patch in a subsystem that
+you do not maintain. As written on the lines just below yours, the
+purpose of this v4 was to make clear that the last patch is not for the
+net subsystem but for the arm/mvebu one.
 
-I've looked into this problem, and I've been unable to identify what's
-going on here.  I can see no reason for the DACR to be set to 0x51 in
-this code.
+As this series will be part of the next rc, then I hope we won't have
+conflicts during next merge.
 
-The entry path into this code is via __copy_to_user(), which saves and
-sets the DACR to 0x55 before calling arm_copy_to_user(), which for
-uaccess-with-memcpy() is in arch/arm/lib/uaccess_with_memcpy.c.  That
-tail-calls into __copy_to_user_memcpy(), which should run with the
-DACR set to 0x55.
+Gregory
 
-The only place that the DACR is changed is inside __put_user(), which
-saves the DACR before also setting it to 0x55, and then restores the
-old DACR value, which, because the old value was 0x55, will have no
-effect.
-
-So, I can see no way that the DACR should ever be 0x51 inside
-__copy_to_user_memcpy(), but you are seeing such a scenario.  I've no
-idea how you could ever get a value of 0x51 out of the DACR within this
-code.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
