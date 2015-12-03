@@ -1,45 +1,41 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu, 3 Dec 2015 20:05:06 +0300
-Subject: [RFC PATCH v6 00/17] ILP32 for ARM64
-In-Reply-To: <1449010556-31699-1-git-send-email-iharutyunov@sonicwall.com>
-References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
- <1449010556-31699-1-git-send-email-iharutyunov@sonicwall.com>
-Message-ID: <20151203170506.GA31818@yury-N73SV>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 3 Dec 2015 17:08:21 +0000
+Subject: [PATCH v2 2/6] arm64: Move kill_cpu_early to smp.c
+In-Reply-To: <56606FA3.3010802@arm.com>
+References: <1448982731-17182-1-git-send-email-suzuki.poulose@arm.com>
+ <1448982731-17182-3-git-send-email-suzuki.poulose@arm.com>
+ <20151201152826.GA28370@leverpostej> <565DC5DB.7070905@arm.com>
+ <20151201163138.GA29045@leverpostej> <565DDB2E.2010308@arm.com>
+ <20151201175254.GD29045@leverpostej> <565DE289.2000105@arm.com>
+ <20151201185028.GF29045@leverpostej> <56606FA3.3010802@arm.com>
+Message-ID: <20151203170820.GB3527@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-[Please don't drop people from CC.]
-
-On Tue, Dec 01, 2015 at 02:55:56PM -0800, Iosif Harutyunov wrote:
-> Sonicwall is very interested in ILP32, is there a way we can get access to the SuSe builds?
+On Thu, Dec 03, 2015 at 04:36:51PM +0000, Suzuki K. Poulose wrote:
+> On 01/12/15 18:50, Mark Rutland wrote:
+> >On Tue, Dec 01, 2015 at 06:10:17PM +0000, Suzuki K. Poulose wrote:
+> >>On 01/12/15 17:52, Mark Rutland wrote:
+> >>>On Tue, Dec 01, 2015 at 05:38:54PM +0000, Suzuki K. Poulose wrote:
+> >>>>On 01/12/15 16:31, Mark Rutland wrote:
+> >>OK. So the flag will also be used for CPUs which are stuck-in-the-kernel
+> >>with MMU turned on. e.g, a CPU (using spin-table) we try to bring down
+> >>in kill_cpu_early(). Correct ?
+> >
+> >Yes.
+> >
+> >We'd also pad it such that nothing else shares the same writeback
+> >granule, and when writing to it with the MMU off we can invalidate the
+> >stale cached copy.
 > 
-> Thanks
-> Iosif,_
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> I have started working on this approach. But the changes are a bit more invasive
+> and looks more like suited for 4.5. We could push this series(which doesn't change
+> the current behavior as it is in 4.4-rc3, except for the code movement) to fix
+> the ASID sanity check and introduce the synchronisation part in 4.5.
+> What do you think ?
 
-You can build it by yourself.
+I'm happy with that. I agree this patch as-is doesn't make matters
+worse.
 
-Kernel:
-https://github.com/norov/linux/tree/ilp32-v6-rfc3
-
-Glibc:
-https://github.com/norov/glibc/tree/thunderx-ilp32-32time_toff_t
-
->From Andrew:
-GCC and binutils support is upstream already and has been for over a
-year now.  gdb support can be found on the
-users/pinskia/gdb-aarch64-ilp32 branch of the binutils-gdb.git repo on
-sourceware.org.
-(https://sourceware.org/git/?p=binutils-gdb.git;a=shortlog;h=refs/heads/users/pinskia/gdb-aarch64-ilp32).
-
-Latest discussion is here:
-https://lkml.org/lkml/2015/11/17/802
-
-BR,
-Yury.
+Thanks,
+Mark.
