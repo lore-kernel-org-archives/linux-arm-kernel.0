@@ -1,38 +1,42 @@
 From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
-Date: Thu,  3 Dec 2015 15:35:19 +0200
-Subject: [PATCH v4 0/5] Qualcomm PCIe driver and designware fixes
-Message-ID: <1449149725-27607-1-git-send-email-stanimir.varbanov@linaro.org>
+Date: Thu,  3 Dec 2015 15:35:20 +0200
+Subject: [PATCH v4 1/5] PCI: designware: add memory barrier after enabling
+ region
+In-Reply-To: <1449149725-27607-1-git-send-email-stanimir.varbanov@linaro.org>
+References: <1449149725-27607-1-git-send-email-stanimir.varbanov@linaro.org>
+Message-ID: <1449149725-27607-2-git-send-email-stanimir.varbanov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add 'write memory' barrier after enable region in PCIE_ATU_CR2
+register. The barrier is needed to ensure that the region enable
+request has been reached it's destination at time when we
+read/write to PCI configuration space.
 
-Here is v4, comments from Bjorn and Rob have been addressed.
-The previous version can be found at [1].
+Without this barrier PCI device enumeration during kernel boot
+is not reliable, and reading configuration space for particular
+PCI device on the bus returns zero aka no device.
 
-regards,
-Stan
+Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
+---
+ drivers/pci/host/pcie-designware.c |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-[1] https://lkml.org/lkml/2015/11/23/114
-
-Stanimir Varbanov (5):
-  PCI: designware: add memory barrier after enabling region
-  DT: PCI: qcom: Document PCIe devicetree bindings
-  PCI: qcom: Add Qualcomm PCIe controller driver
-  ARM: dts: apq8064: add pcie devicetree node
-  ARM: dts: ifc6410: enable pcie dt node for this board
-
- .../devicetree/bindings/pci/qcom,pcie.txt          |  233 ++++++++
- MAINTAINERS                                        |    7 +
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts         |   26 +
- arch/arm/boot/dts/qcom-apq8064.dtsi                |   36 ++
- drivers/pci/host/Kconfig                           |   10 +
- drivers/pci/host/Makefile                          |    1 +
- drivers/pci/host/pcie-designware.c                 |    5 +
- drivers/pci/host/pcie-qcom.c                       |  624 ++++++++++++++++++++
- 8 files changed, 942 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/qcom,pcie.txt
- create mode 100644 drivers/pci/host/pcie-qcom.c
-
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 02a7452bdf23..ed4dc2e2553b 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -164,6 +164,11 @@ static void dw_pcie_prog_outbound_atu(struct pcie_port *pp, int index,
+ 	dw_pcie_writel_rc(pp, upper_32_bits(pci_addr), PCIE_ATU_UPPER_TARGET);
+ 	dw_pcie_writel_rc(pp, type, PCIE_ATU_CR1);
+ 	dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
++	/*
++	 * ensure that the ATU enable has been happaned before accessing
++	 * pci configuration/io spaces through dw_pcie_cfg_[read|write].
++	 */
++	wmb();
+ }
+ 
+ static struct irq_chip dw_msi_irq_chip = {
 -- 
 1.7.9.5
