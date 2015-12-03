@@ -1,40 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Dec 2015 16:56:07 +0000
-Subject: [PATCH v4 0/4] drm: Add support for the ARM HDLCD display
- controller
-In-Reply-To: <1449139249-9171-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1449139249-9171-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <20151203165606.GS8644@n2100.arm.linux.org.uk>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 3 Dec 2015 20:05:06 +0300
+Subject: [RFC PATCH v6 00/17] ILP32 for ARM64
+In-Reply-To: <1449010556-31699-1-git-send-email-iharutyunov@sonicwall.com>
+References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
+ <1449010556-31699-1-git-send-email-iharutyunov@sonicwall.com>
+Message-ID: <20151203170506.GA31818@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2015 at 10:40:45AM +0000, Liviu Dudau wrote:
-> This series depends on Sudeep Holla's SCPI driver (now in mainline) and on
-> the tda998x patches that have been queued on Russell's patch system here [1].
 
-Now merged into my tree.
+[Please don't drop people from CC.]
 
-Can I ask a fairly obvious question...
+On Tue, Dec 01, 2015 at 02:55:56PM -0800, Iosif Harutyunov wrote:
+> Sonicwall is very interested in ILP32, is there a way we can get access to the SuSe builds?
+> 
+> Thanks
+> Iosif,_
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
->  drivers/gpu/drm/Kconfig                            |   2 +
->  drivers/gpu/drm/Makefile                           |   1 +
->  drivers/gpu/drm/arm/Kconfig                        |  29 ++
->  drivers/gpu/drm/arm/Makefile                       |   2 +
->  drivers/gpu/drm/arm/hdlcd_crtc.c                   | 327 ++++++++++++
->  drivers/gpu/drm/arm/hdlcd_drv.c                    | 555 +++++++++++++++++++++
->  drivers/gpu/drm/arm/hdlcd_drv.h                    |  42 ++
->  drivers/gpu/drm/arm/hdlcd_regs.h                   |  87 ++++
+You can build it by yourself.
 
-Why is the subdirectory called "arm" and not "hdlcd" ?
+Kernel:
+https://github.com/norov/linux/tree/ilp32-v6-rfc3
 
-ARM Ltd have more than one display controller (they have the AMBA PL110
-and PL111 in addition to this), and (afaics) this doesn't drive these.
-HDLCD probably won't be the last display hardware which ARM Ltd comes
-out with either.
+Glibc:
+https://github.com/norov/glibc/tree/thunderx-ilp32-32time_toff_t
 
-So, I think naming the subdirectory after the vendor is probably a
-mistake.
+>From Andrew:
+GCC and binutils support is upstream already and has been for over a
+year now.  gdb support can be found on the
+users/pinskia/gdb-aarch64-ilp32 branch of the binutils-gdb.git repo on
+sourceware.org.
+(https://sourceware.org/git/?p=binutils-gdb.git;a=shortlog;h=refs/heads/users/pinskia/gdb-aarch64-ilp32).
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Latest discussion is here:
+https://lkml.org/lkml/2015/11/17/802
+
+BR,
+Yury.
