@@ -1,109 +1,61 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu,  3 Dec 2015 10:40:46 +0000
-Subject: [PATCH v4 1/4] drm: arm: Add DT bindings documentation for HDLCD
- driver.
-In-Reply-To: <1449139249-9171-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1449139249-9171-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1449139249-9171-2-git-send-email-Liviu.Dudau@arm.com>
+Date: Thu,  3 Dec 2015 10:40:45 +0000
+Subject: [PATCH v4 0/4] drm: Add support for the ARM HDLCD display controller
+Message-ID: <1449139249-9171-1-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
+This series adds support for ARM's HDLCD display controller found in Juno
+and ARM TC2 Coretile. The HDLCD outputs an RGB stream that feeds into a
+single digital encoder (DVI or HDMI).
 
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/display/arm,hdlcd.txt      | 79 ++++++++++++++++++++++
- 1 file changed, 79 insertions(+)
+This series depends on Sudeep Holla's SCPI driver (now in mainline) and on
+the tda998x patches that have been queued on Russell's patch system here [1].
+
+Only the Juno functionality has been tested as the TC2 Coretile require
+a working SiI9022 driver for VExpress that is not subject of this patchset.
+
+Changelog:
+v4: Remove some debugging code that could return an error on a critical path
+    and updated the check for valid format in hdlcd_set_pxl_fmt() to only
+    WARN() if an invalid format found (unlikely case). Added the ACKs received.
+v3: Changed the driver to use the memory-region phandle for bespoke framebuffers. [2]
+v2: Added support for atomic modeset [3]
+v1: Original DRM submission [4]
+
+[1] http://www.arm.linux.org.uk/developer/patches/search.php?uid=2895
+[2] http://lists.freedesktop.org/archives/dri-devel/2015-December/095877.html
+[3] http://lists.freedesktop.org/archives/dri-devel/2015-November/094177.html
+[4] http://lists.freedesktop.org/archives/dri-devel/2015-August/087685.html
+
+Best regards,
+Liviu
+
+Liviu Dudau (4):
+  drm: arm: Add DT bindings documentation for HDLCD driver.
+  drm: Add support for ARM's HDLCD controller.
+  arm64: Juno: Add HDLCD support to the Juno boards.
+  MAINTAINERS: Add Liviu Dudau as maintainer for ARM HDLCD driver.
+
+ .../devicetree/bindings/display/arm,hdlcd.txt      |  79 +++
+ MAINTAINERS                                        |   6 +
+ arch/arm64/boot/dts/arm/juno-base.dtsi             |  46 +-
+ drivers/gpu/drm/Kconfig                            |   2 +
+ drivers/gpu/drm/Makefile                           |   1 +
+ drivers/gpu/drm/arm/Kconfig                        |  29 ++
+ drivers/gpu/drm/arm/Makefile                       |   2 +
+ drivers/gpu/drm/arm/hdlcd_crtc.c                   | 327 ++++++++++++
+ drivers/gpu/drm/arm/hdlcd_drv.c                    | 555 +++++++++++++++++++++
+ drivers/gpu/drm/arm/hdlcd_drv.h                    |  42 ++
+ drivers/gpu/drm/arm/hdlcd_regs.h                   |  87 ++++
+ 11 files changed, 1172 insertions(+), 4 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/display/arm,hdlcd.txt
+ create mode 100644 drivers/gpu/drm/arm/Kconfig
+ create mode 100644 drivers/gpu/drm/arm/Makefile
+ create mode 100644 drivers/gpu/drm/arm/hdlcd_crtc.c
+ create mode 100644 drivers/gpu/drm/arm/hdlcd_drv.c
+ create mode 100644 drivers/gpu/drm/arm/hdlcd_drv.h
+ create mode 100644 drivers/gpu/drm/arm/hdlcd_regs.h
 
-diff --git a/Documentation/devicetree/bindings/display/arm,hdlcd.txt b/Documentation/devicetree/bindings/display/arm,hdlcd.txt
-new file mode 100644
-index 0000000..78bc242
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/arm,hdlcd.txt
-@@ -0,0 +1,79 @@
-+ARM HDLCD
-+
-+This is a display controller found on several development platforms produced
-+by ARM Ltd and in more modern of its' Fast Models. The HDLCD is an RGB
-+streamer that reads the data from a framebuffer and sends it to a single
-+digital encoder (DVI or HDMI).
-+
-+Required properties:
-+  - compatible: "arm,hdlcd"
-+  - reg: Physical base address and length of the controller's registers.
-+  - interrupts: One interrupt used by the display controller to notify the
-+    interrupt controller when any of the interrupt sources programmed in
-+    the interrupt mask register have activated.
-+  - clocks: A list of phandle + clock-specifier pairs, one for each
-+    entry in 'clock-names'.
-+  - clock-names: A list of clock names. For HDLCD it should contain:
-+      - "pxlclk" for the clock feeding the output PLL of the controller.
-+
-+Required sub-nodes:
-+  - port: The HDLCD connection to an encoder chip. The connection is modeled
-+    using the OF graph bindings specified in
-+    Documentation/devicetree/bindings/graph.txt.
-+
-+Optional properties:
-+  - memory-region: phandle to a node describing memory (see
-+    Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt) to be
-+    used for the framebuffer; if not present, the framebuffer may be located
-+    anywhere in memory.
-+
-+
-+Example:
-+
-+/ {
-+	...
-+
-+	hdlcd at 2b000000 {
-+		compatible = "arm,hdlcd";
-+		reg = <0 0x2b000000 0 0x1000>;
-+		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&oscclk5>;
-+		clock-names = "pxlclk";
-+		port {
-+			hdlcd_output: endpoint at 0 {
-+				remote-endpoint = <&hdmi_enc_input>;
-+			};
-+		};
-+	};
-+
-+	/* HDMI encoder on I2C bus */
-+	i2c at 7ffa0000 {
-+		....
-+		hdmi-transmitter at 70 {
-+			compatible = ".....";
-+			reg = <0x70>;
-+			port at 0 {
-+				hdmi_enc_input: endpoint {
-+					remote-endpoint = <&hdlcd_output>;
-+				};
-+
-+				hdmi_enc_output: endpoint {
-+					remote-endpoint = <&hdmi_1_port>;
-+				};
-+			};
-+		};
-+
-+	};
-+
-+	hdmi1: connector at 1 {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+		port {
-+			hdmi_1_port: endpoint {
-+				remote-endpoint = <&hdmi_enc_output>;
-+			};
-+		};
-+	};
-+
-+	...
-+};
 -- 
 2.6.2
