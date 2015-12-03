@@ -1,47 +1,39 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  3 Dec 2015 16:20:09 +0800
-Subject: [PATCH 0/4] ARM: sun9i: Support Allwinner A80 NMI controller
-Message-ID: <1449130813-22400-1-git-send-email-wens@csie.org>
+Date: Thu,  3 Dec 2015 16:20:13 +0800
+Subject: [PATCH 4/4] ARM: dts: sun9i: Add NMI controller device node
+In-Reply-To: <1449130813-22400-1-git-send-email-wens@csie.org>
+References: <1449130813-22400-1-git-send-email-wens@csie.org>
+Message-ID: <1449130813-22400-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The Allwinner A80 SoC has an NMI controller. NMI is an external
+interrupt pin exclusely used with PMICs and other system critical
+peripherals (such as RTC) in Allwinner's reference designs.
 
-This series extends irqchip-sunxi-nmi to add support for the NMI
-controller found in Allwinner's A80 SoC.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun9i-a80.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-All Allwinner SoCs have an external NMI pin which the PMIC uses to
-signal interrupts to the processor. On multi-core chips, there's an
-NMI controller handling this pin and chaining interrupts to the GIC.
-We already have support for this on previous sun[678]i family chips.
-
-This series extends support to the A80 SoC. This is needed to add
-support for the PMICs. A complete series, including PMIC support,
-can be found here:
-
-    https://github.com/wens/linux/tree/axp809
-
-Patch 1 renames the binding doc, to remove the SoC specific bits from
-the filename.
-
-Patch 2 adds a new compatible string for the A80 variant.
-
-Patch 3 adds driver support for the A80 variant.
-
-Patch 4 adds the NMI controller device node to the A80 dtsi file.
-
-Chen-Yu Tsai (4):
-  irqchip/sunxi-nmi: Rename binding doc filename to
-    allwinner,sunxi-nmi.txt
-  irqchip/sunxi-nmi: Add sun9i-a80 variant to binding doc
-  irqchip/sunxi-nmi: Support sun9i A80 NMI controller
-  ARM: dts: sun9i: Add NMI controller device node
-
- ...{allwinner,sun67i-sc-nmi.txt => allwinner,sunxi-nmi.txt} |  2 +-
- arch/arm/boot/dts/sun9i-a80.dtsi                            |  8 ++++++++
- drivers/irqchip/irq-sunxi-nmi.c                             | 13 +++++++++++++
- 3 files changed, 22 insertions(+), 1 deletion(-)
- rename Documentation/devicetree/bindings/interrupt-controller/{allwinner,sun67i-sc-nmi.txt => allwinner,sunxi-nmi.txt} (94%)
-
+diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+index dc666c69f6ab..e838f206f2a0 100644
+--- a/arch/arm/boot/dts/sun9i-a80.dtsi
++++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+@@ -858,6 +858,14 @@
+ 			#reset-cells = <1>;
+ 		};
+ 
++		nmi_intc: interrupt-controller at 080015a0 {
++			compatible = "allwinner,sun9i-a80-nmi";
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			reg = <0x080015a0 0xc>;
++			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
+ 		r_ir: ir at 08002000 {
+ 			compatible = "allwinner,sun5i-a13-ir";
+ 			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
 -- 
 2.6.2
