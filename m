@@ -1,60 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 3 Dec 2015 16:32:43 +0000
-Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
- concurrent lockers
-In-Reply-To: <20151203132839.GA3816@twins.programming.kicks-ass.net>
-References: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
- <20151130155839.GK17308@twins.programming.kicks-ass.net>
- <20151201164035.GE27751@arm.com>
- <20151203001141.GO28602@linux.vnet.ibm.com>
- <20151203132839.GA3816@twins.programming.kicks-ass.net>
-Message-ID: <20151203163243.GI11337@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 3 Dec 2015 08:33:11 -0800
+Subject: [4.4-rc][PATCH] ARM: dts: am4372: disable arm twd and global
+ timer's nodes
+In-Reply-To: <564C9ACF.6040107@ti.com>
+References: <1447855315-419-1-git-send-email-grygorii.strashko@ti.com>
+ <20151118141537.GC10644@leverpostej> <564C9ACF.6040107@ti.com>
+Message-ID: <20151203163311.GP23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter, Paul,
-
-Firstly, thanks for writing that up. I agree that you have something
-that can work in theory, but see below.
-
-On Thu, Dec 03, 2015 at 02:28:39PM +0100, Peter Zijlstra wrote:
-> On Wed, Dec 02, 2015 at 04:11:41PM -0800, Paul E. McKenney wrote:
-> > This looks architecture-agnostic to me:
-> > 
-> > a.	TSO systems have smp_mb__after_unlock_lock() be a no-op, and
-> > 	have a read-only implementation for spin_unlock_wait().
-> > 
-> > b.	Small-scale weakly ordered systems can also have
-> > 	smp_mb__after_unlock_lock() be a no-op, but must instead
-> > 	have spin_unlock_wait() acquire the lock and immediately 
-> > 	release it, or some optimized implementation of this.
-> > 
-> > c.	Large-scale weakly ordered systems are required to define
-> > 	smp_mb__after_unlock_lock() as smp_mb(), but can have a
-> > 	read-only implementation of spin_unlock_wait().
+* Grygorii Strashko <grygorii.strashko@ti.com> [151118 07:36]:
+> Hi Mark,
 > 
-> This would still require all relevant spin_lock() sites to be annotated
-> with smp_mb__after_unlock_lock(), which is going to be a painful (no
-> warning when done wrong) exercise and expensive (added MBs all over the
-> place).
+> On 11/18/2015 04:15 PM, Mark Rutland wrote:
+> > On Wed, Nov 18, 2015 at 04:01:55PM +0200, Grygorii Strashko wrote:
+> >> Keep ARM TWD and Global timer's nodes disabled by default - if someone
+> >> would like to use them then those nodes have to be enabled explicitly
+> >> in board file.
+> >>
+> >> The reason for this change is:
+> >> - ARM TWD is not always-on timer on am437x and it will stop in low
+> >>    CPUIdle states and, therefore, broadcast timer has to configured
+> >>    properly if CPU_IDLE=y.
+> >> - ARM Global timer is not always-on timer on am437x and it can't be
+> >>    used as clocksource device if CPU_IDLE=y.
+> > 
+> > I don't understand. What timer do you use in the absence of a TWD, and
+> > if it is better why is it not used even if TWD is present?
 > 
-> But yes, I think the proposal is technically sound, just not quite sure
-> how far we'll want to push this.
+> OMAP GP timer as clockevent device
+> "ti,omap-counter32k" as clocksource
+> both are in wakeup (always-on) PM domain.
+> 
+> I see some problems with selecting clocksource/event device (but may be I'm mistaken):
+> - Current clock event will be selected using "rating" field in clock_event_device
+>   structure and now ARM TWD has higer value (350) vs OMAP GP timer (300),
+>   so ARM TWD will be always selected if it's present. 
+> - we have to force all am437x user to use kernel cmdline parameter "clocksource="
+>   if ARM Global timer is present, but shouldn't be used. But even in this case,
+>   it will be selected as sched_clock.
 
-When I said that the solution isn't architecture-agnostic, I was referring
-to the fact that spin_unlock_wait acts as a LOCK operation on all
-architectures other than those using case (c) above. You've resolved
-this by requiring smp_mb__after_unlock_lock() after every LOCK, but I
-share Peter's concerns that this isn't going to work in practice because:
+Yeah makes sense to me. Eventually when I get my clocksource switch patches
+updated this problem will go away and we can use a local timer clocksource
+during runtime and slower always on timer during idle like we already do
+for clockevents.
 
-  1. The smp_mb__after_unlock_lock additions aren't necessarily in the
-     code where the spin_unlock_wait() is being added, so it's going to
-     require a lot of diligence for developers to get this right
+> We can see benefits from using these timers when Power mangement is not the case,
+> for example on -RT kernel where CPUIdle is not the target.
 
-  2. Only PowerPC is going to see the (very occassional) failures, so
-     testing this is nigh on impossible :(
+Yes we really want to use local timers for RT during runtime.
 
-  3. We've now made the kernel memory model even more difficult to
-     understand, so people might not even bother with this addition
+> By this change, and taking into account discovered issues, I want to make people,
+> who would like to use these timers on AM437x based boards, responsible for such
+> decision with assumption that they know what they are doing.
+> And this is simplest way I found to disable those timers without modifying kernel.
+> 
+> > 
+> >> - ARM Global timer driver doesn't support CPUfreq now.
+> > 
+> > Surely that should be fixed in the driver (e.g. make it fail to probe if
+> > CPUfreq is present)? It's broken for any other users too...
+> 
+> May be.
 
-Will
+I think it's only broken for users who have PM entering deeper idle states
+where the ARM core is powered off.
+
+The selection of the timer needs to be done in the board specific dts file as we
+already have cases where RT works but PM does not and should use the local timer,
+and we have boards where PM works and we must use the always on timer.
+
+> Also, there is additional issue with ARM global timer which I've not
+> mentioned here, because I sent the fix for it already (in progress):
+> https://lkml.org/lkml/2015/11/13/456
+> 
+> and there is ongoing discussion:
+> http://www.spinics.net/lists/arm-kernel/msg459649.html
+
+It seems we should apply this as a fix unless somebody has better ideas.
+
+Regards,
+
+Tony
