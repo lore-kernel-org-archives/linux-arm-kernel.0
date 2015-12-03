@@ -1,54 +1,218 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Thu, 3 Dec 2015 14:17:28 +0800
-Subject: [PATCH] usb: xhci-mtk: fix bpkts value of LS/HS periodic eps not
- behind TT
-Message-ID: <1449123448-22476-1-git-send-email-chunfeng.yun@mediatek.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Thu, 3 Dec 2015 14:11:26 +0800
+Subject: [PATCH v5 16/21] KVM: ARM64: Add access handlers for PMEVCNTRn and
+ PMEVTYPERn register
+In-Reply-To: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1449123091-20252-17-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-when a LS or FS device doesn't connect though a HS hub,
-the @bPkts field of its periodic endpoint context should
-be set to 1.
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Add access handler which emulates writing and reading PMEVCNTRn and
+PMEVTYPERn.
+
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- drivers/usb/host/xhci-mtk-sch.c | 16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 164 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 164 insertions(+)
 
-diff --git a/drivers/usb/host/xhci-mtk-sch.c b/drivers/usb/host/xhci-mtk-sch.c
-index c30de7c..73f763c 100644
---- a/drivers/usb/host/xhci-mtk-sch.c
-+++ b/drivers/usb/host/xhci-mtk-sch.c
-@@ -275,8 +275,9 @@ static bool need_bw_sch(struct usb_host_endpoint *ep,
- 		return false;
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 12f4806..9320277 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -640,6 +640,20 @@ static bool access_pmu_regs(struct kvm_vcpu *vcpu,
+ 	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b111),	\
+ 	  trap_wcr, reset_wcr, n, 0,  get_wcr, set_wcr }
  
- 	/*
--	 * for LS & FS periodic endpoints which its device don't attach
--	 * to TT are also ignored, root-hub will schedule them directly
-+	 * for LS & FS periodic endpoints which its device is not behind
-+	 * a TT are also ignored, root-hub will schedule them directly,
-+	 * but need set @bpkts field of endpoint context to 1.
- 	 */
- 	if (is_fs_or_ls(speed) && !has_tt)
- 		return false;
-@@ -339,8 +340,17 @@ int xhci_mtk_add_ep_quirk(struct usb_hcd *hcd, struct usb_device *udev,
- 		GET_MAX_PACKET(usb_endpoint_maxp(&ep->desc)),
- 		usb_endpoint_dir_in(&ep->desc), ep);
- 
--	if (!need_bw_sch(ep, udev->speed, slot_ctx->tt_info & TT_SLOT))
-+	if (!need_bw_sch(ep, udev->speed, slot_ctx->tt_info & TT_SLOT)) {
-+		/*
-+		 * set @bpkts to 1 if it is LS or FS periodic endpoint, and its
-+		 * device does not connected through an external HS hub
-+		 */
-+		if (usb_endpoint_xfer_int(&ep->desc)
-+			|| usb_endpoint_xfer_isoc(&ep->desc))
-+			ep_ctx->reserved[0] |= cpu_to_le32(EP_BPKTS(1));
++/* Macro to expand the PMEVCNTRn_EL0 register */
++#define PMU_PMEVCNTR_EL0(n)						\
++	/* PMEVCNTRn_EL0 */						\
++	{ Op0(0b11), Op1(0b011), CRn(0b1110),				\
++	  CRm((0b1000 | (((n) >> 3) & 0x3))), Op2(((n) & 0x7)),		\
++	  access_pmu_regs, reset_unknown, (PMEVCNTR0_EL0 + n), }
 +
- 		return 0;
-+	}
++/* Macro to expand the PMEVTYPERn_EL0 register */
++#define PMU_PMEVTYPER_EL0(n)						\
++	/* PMEVTYPERn_EL0 */						\
++	{ Op0(0b11), Op1(0b011), CRn(0b1110),				\
++	  CRm((0b1100 | (((n) >> 3) & 0x3))), Op2(((n) & 0x7)),		\
++	  access_pmu_regs, reset_unknown, (PMEVTYPER0_EL0 + n), }
++
+ /*
+  * Architected system registers.
+  * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
+@@ -854,6 +868,74 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b011),
+ 	  NULL, reset_unknown, TPIDRRO_EL0 },
  
- 	bw_index = get_bw_index(xhci, udev, ep);
- 	sch_bw = &sch_array[bw_index];
++	/* PMEVCNTRn_EL0 */
++	PMU_PMEVCNTR_EL0(0),
++	PMU_PMEVCNTR_EL0(1),
++	PMU_PMEVCNTR_EL0(2),
++	PMU_PMEVCNTR_EL0(3),
++	PMU_PMEVCNTR_EL0(4),
++	PMU_PMEVCNTR_EL0(5),
++	PMU_PMEVCNTR_EL0(6),
++	PMU_PMEVCNTR_EL0(7),
++	PMU_PMEVCNTR_EL0(8),
++	PMU_PMEVCNTR_EL0(9),
++	PMU_PMEVCNTR_EL0(10),
++	PMU_PMEVCNTR_EL0(11),
++	PMU_PMEVCNTR_EL0(12),
++	PMU_PMEVCNTR_EL0(13),
++	PMU_PMEVCNTR_EL0(14),
++	PMU_PMEVCNTR_EL0(15),
++	PMU_PMEVCNTR_EL0(16),
++	PMU_PMEVCNTR_EL0(17),
++	PMU_PMEVCNTR_EL0(18),
++	PMU_PMEVCNTR_EL0(19),
++	PMU_PMEVCNTR_EL0(20),
++	PMU_PMEVCNTR_EL0(21),
++	PMU_PMEVCNTR_EL0(22),
++	PMU_PMEVCNTR_EL0(23),
++	PMU_PMEVCNTR_EL0(24),
++	PMU_PMEVCNTR_EL0(25),
++	PMU_PMEVCNTR_EL0(26),
++	PMU_PMEVCNTR_EL0(27),
++	PMU_PMEVCNTR_EL0(28),
++	PMU_PMEVCNTR_EL0(29),
++	PMU_PMEVCNTR_EL0(30),
++	/* PMEVTYPERn_EL0 */
++	PMU_PMEVTYPER_EL0(0),
++	PMU_PMEVTYPER_EL0(1),
++	PMU_PMEVTYPER_EL0(2),
++	PMU_PMEVTYPER_EL0(3),
++	PMU_PMEVTYPER_EL0(4),
++	PMU_PMEVTYPER_EL0(5),
++	PMU_PMEVTYPER_EL0(6),
++	PMU_PMEVTYPER_EL0(7),
++	PMU_PMEVTYPER_EL0(8),
++	PMU_PMEVTYPER_EL0(9),
++	PMU_PMEVTYPER_EL0(10),
++	PMU_PMEVTYPER_EL0(11),
++	PMU_PMEVTYPER_EL0(12),
++	PMU_PMEVTYPER_EL0(13),
++	PMU_PMEVTYPER_EL0(14),
++	PMU_PMEVTYPER_EL0(15),
++	PMU_PMEVTYPER_EL0(16),
++	PMU_PMEVTYPER_EL0(17),
++	PMU_PMEVTYPER_EL0(18),
++	PMU_PMEVTYPER_EL0(19),
++	PMU_PMEVTYPER_EL0(20),
++	PMU_PMEVTYPER_EL0(21),
++	PMU_PMEVTYPER_EL0(22),
++	PMU_PMEVTYPER_EL0(23),
++	PMU_PMEVTYPER_EL0(24),
++	PMU_PMEVTYPER_EL0(25),
++	PMU_PMEVTYPER_EL0(26),
++	PMU_PMEVTYPER_EL0(27),
++	PMU_PMEVTYPER_EL0(28),
++	PMU_PMEVTYPER_EL0(29),
++	PMU_PMEVTYPER_EL0(30),
++	/* PMCCFILTR_EL0 */
++	{ Op0(0b11), Op1(0b011), CRn(0b1110), CRm(0b1111), Op2(0b111),
++	  access_pmu_regs, reset_unknown, PMCCFILTR_EL0, },
++
+ 	/* DACR32_EL2 */
+ 	{ Op0(0b11), Op1(0b100), CRn(0b0011), CRm(0b0000), Op2(0b000),
+ 	  NULL, reset_unknown, DACR32_EL2 },
+@@ -1184,6 +1266,20 @@ static bool access_pmu_cp15_regs(struct kvm_vcpu *vcpu,
+ 	return true;
+ }
+ 
++/* Macro to expand the PMEVCNTRn register */
++#define PMU_PMEVCNTR(n)							\
++	/* PMEVCNTRn */							\
++	{ Op1(0), CRn(0b1110),						\
++	  CRm((0b1000 | (((n) >> 3) & 0x3))), Op2(((n) & 0x7)),		\
++	  access_pmu_cp15_regs, NULL, (c14_PMEVCNTR0 + n), }
++
++/* Macro to expand the PMEVTYPERn register */
++#define PMU_PMEVTYPER(n)						\
++	/* PMEVTYPERn */						\
++	{ Op1(0), CRn(0b1110),						\
++	  CRm((0b1100 | (((n) >> 3) & 0x3))), Op2(((n) & 0x7)),		\
++	  access_pmu_cp15_regs, NULL, (c14_PMEVTYPER0 + n), }
++
+ /*
+  * Trapped cp15 registers. TTBR0/TTBR1 get a double encoding,
+  * depending on the way they are accessed (as a 32bit or a 64bit
+@@ -1252,6 +1348,74 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 	{ Op1( 0), CRn(12), CRm(12), Op2( 5), trap_raz_wi },
+ 
+ 	{ Op1( 0), CRn(13), CRm( 0), Op2( 1), access_vm_reg, NULL, c13_CID },
++
++	/* PMEVCNTRn */
++	PMU_PMEVCNTR(0),
++	PMU_PMEVCNTR(1),
++	PMU_PMEVCNTR(2),
++	PMU_PMEVCNTR(3),
++	PMU_PMEVCNTR(4),
++	PMU_PMEVCNTR(5),
++	PMU_PMEVCNTR(6),
++	PMU_PMEVCNTR(7),
++	PMU_PMEVCNTR(8),
++	PMU_PMEVCNTR(9),
++	PMU_PMEVCNTR(10),
++	PMU_PMEVCNTR(11),
++	PMU_PMEVCNTR(12),
++	PMU_PMEVCNTR(13),
++	PMU_PMEVCNTR(14),
++	PMU_PMEVCNTR(15),
++	PMU_PMEVCNTR(16),
++	PMU_PMEVCNTR(17),
++	PMU_PMEVCNTR(18),
++	PMU_PMEVCNTR(19),
++	PMU_PMEVCNTR(20),
++	PMU_PMEVCNTR(21),
++	PMU_PMEVCNTR(22),
++	PMU_PMEVCNTR(23),
++	PMU_PMEVCNTR(24),
++	PMU_PMEVCNTR(25),
++	PMU_PMEVCNTR(26),
++	PMU_PMEVCNTR(27),
++	PMU_PMEVCNTR(28),
++	PMU_PMEVCNTR(29),
++	PMU_PMEVCNTR(30),
++	/* PMEVTYPERn */
++	PMU_PMEVTYPER(0),
++	PMU_PMEVTYPER(1),
++	PMU_PMEVTYPER(2),
++	PMU_PMEVTYPER(3),
++	PMU_PMEVTYPER(4),
++	PMU_PMEVTYPER(5),
++	PMU_PMEVTYPER(6),
++	PMU_PMEVTYPER(7),
++	PMU_PMEVTYPER(8),
++	PMU_PMEVTYPER(9),
++	PMU_PMEVTYPER(10),
++	PMU_PMEVTYPER(11),
++	PMU_PMEVTYPER(12),
++	PMU_PMEVTYPER(13),
++	PMU_PMEVTYPER(14),
++	PMU_PMEVTYPER(15),
++	PMU_PMEVTYPER(16),
++	PMU_PMEVTYPER(17),
++	PMU_PMEVTYPER(18),
++	PMU_PMEVTYPER(19),
++	PMU_PMEVTYPER(20),
++	PMU_PMEVTYPER(21),
++	PMU_PMEVTYPER(22),
++	PMU_PMEVTYPER(23),
++	PMU_PMEVTYPER(24),
++	PMU_PMEVTYPER(25),
++	PMU_PMEVTYPER(26),
++	PMU_PMEVTYPER(27),
++	PMU_PMEVTYPER(28),
++	PMU_PMEVTYPER(29),
++	PMU_PMEVTYPER(30),
++	/* PMCCFILTR */
++	{ Op1(0), CRn(14), CRm(15), Op2(7), access_pmu_cp15_regs,
++	  NULL, c14_PMCCFILTR, 0 },
+ };
+ 
+ static const struct sys_reg_desc cp15_64_regs[] = {
 -- 
-1.8.1.1.dirty
+2.0.4
