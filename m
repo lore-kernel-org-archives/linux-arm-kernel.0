@@ -1,35 +1,44 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 3 Dec 2015 10:25:25 -0500 (EST)
-Subject: [PATCH] USB: host: ohci-at91: fix a crash in
- ohci_hcd_at91_overcurrent_irq
-In-Reply-To: <566000A8.7070107@atmel.com>
-Message-ID: <Pine.LNX.4.44L0.1512031024210.1761-100000@iolanthe.rowland.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Dec 2015 15:28:42 +0000
+Subject: [RFC PATCH 2/4] device property: Introduce helper
+ device_get_reference_node()
+In-Reply-To: <1449047368-5768-3-git-send-email-wangkefeng.wang@huawei.com>
+References: <1449047368-5768-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1449047368-5768-3-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <20151203152842.GO8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Dec 2015, Nicolas Ferre wrote:
+On Wed, Dec 02, 2015 at 05:09:26PM +0800, Kefeng Wang wrote:
+> With of_parse_phandle() and acpi_dev_get_reference_device(), we can introduce
+> a universal helper device_get_reference_node() to read and parse a device
+> property and return a pointer to the resulting firmware node.
 
-> Le 02/12/2015 20:36, Alexandre Belloni a ?crit :
-> > The interrupt handler, ohci_hcd_at91_overcurrent_irq may be called right
-> > after registration. At that time, pdev->dev.platform_data is not yet set,
-> > leading to a NULL pointer dereference.
-> > 
-> > Fixes: e4df92279fd9 (USB: host: ohci-at91: merge loops in ohci_hcd_at91_drv_probe)
-> 
-> Yes, with:
-> Cc: stable at vger.kernel.org # 4.3+
-> 
-> 
-> > Reported-by: Peter Rosin <peda@axentia.se>
-> > Tested-by: Peter Rosin <peda@axentia.se>
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> Alan, I think it's a good candidate to enter the 4.4-rcX...
+What's happening to make this fwnode stuff actually usable?  Whenever
+I've looked at it from the DT perspective, it looks very much like a
+half-baked train wreck - although the struct device_node contains a
+fwnode, of_node_init() initialises it partially, and we have a way to
+convert _from_ a fwnode to a device_node (to_of_node), nothing sets
+the struct device fwnode pointer.
 
-I agree.  Greg, please merge this with a CC: stable tag added.
+Whenever I've looked at this, it's always led me to the conclusion
+that the way that fwnode stuff has currently been written, I'm
+supposed to get the device_node, and then use the embedded fwnode
+directly, which I'm pretty sure misses the point of fwnode (as it
+means any driver code making use of this is tied to DT.)
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+This patch seems to confirm my suspicions that it's just wrong -
+trying to use device_get_reference_node() here will fail in a DT
+based setup, because (I assume) dev_fwnode(dev) returns dev->fwnode
+which is NULL there.
 
-Alan Stern
+I don't know, maybe there is an intention that fwnode should not be
+used for DT?
+
+Maybe someone who knows what the intentions are behind this fwnode stuff
+can enlighten the situation, and maybe sort out this apparent oversight
+which IMHO should've been spotted in the initial fwnode review?
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
