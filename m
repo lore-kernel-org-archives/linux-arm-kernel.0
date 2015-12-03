@@ -1,61 +1,65 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu,  3 Dec 2015 10:40:45 +0000
-Subject: [PATCH v4 0/4] drm: Add support for the ARM HDLCD display controller
-Message-ID: <1449139249-9171-1-git-send-email-Liviu.Dudau@arm.com>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Thu, 3 Dec 2015 10:41:31 +0000
+Subject: [RFC PATCH 4/4] mfd: syscon: add ACPI support
+In-Reply-To: <2299982.06P4iKpkWk@wuerfel>
+References: <1449047368-5768-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1449047368-5768-5-git-send-email-wangkefeng.wang@huawei.com>
+ <2299982.06P4iKpkWk@wuerfel>
+Message-ID: <20151203104131.GA11655@xora-haswell.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for ARM's HDLCD display controller found in Juno
-and ARM TC2 Coretile. The HDLCD outputs an RGB stream that feeds into a
-single digital encoder (DVI or HDMI).
+On Wed, Dec 02, 2015 at 11:44:51AM +0100, Arnd Bergmann wrote:
+> On Wednesday 02 December 2015 17:09:28 Kefeng Wang wrote:
+> > This enables syscon with ACPI support.
+> > syscon_regmap_lookup_by_dev_property() function was added. With helper
+> > device_get_reference_node() and acpi_dev_find_plat_dev(), it can be used
+> > in both DT and ACPI.
+> > 
+> > The device driver can obtain syscon using _DSD method in DSDT, an example
+> > is shown below.
+> > 
+> >     Device(CTL0) {
+> >           Name(_HID, "HISI0061")
+> >           Name(_CRS, ResourceTemplate() {
+> >                   Memory32Fixed(ReadWrite, 0x80000000, 0x10000)
+> >           })
+> >     }
+> > 
+> >     Device(DEV0) {
+> >           Name(_HID, "HISI00B1")
+> >           Name(_CRS, ResourceTemplate() {
+> >                   Memory32Fixed(ReadWrite, 0x8c030000, 0x10000)
+> >                   Interrupt(ResourceConsumer, Level, ActiveHigh, Exclusive){ 192 }
+> >           })
+> > 
+> >           Name (_DSD, Package () {
+> >               ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+> >               Package () {
+> >                   Package () {"syscon",Package() {\_SB.CTL0} }
+> >               }
+> >           })
+> >     }
+> > 
+> > Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> 
+> This sounds like a bad idea:
+> 
+> syscon is basically a hack to let us access register that the SoC designer
+> couldn't fit in anywhere sane. We need something like this with devicetree
+> because we decided not to have any interpreted bytecode to do this behind
+> our back.
+> 
+> With ACPI, the same thing is done with AML, which is actually nicer than
+> syscon (once you have to deal with all the problems introduced by AML).
+> 
+> Use that instead.
+> 
 
-This series depends on Sudeep Holla's SCPI driver (now in mainline) and on
-the tda998x patches that have been queued on Russell's patch system here [1].
+I have to agree with Arnd here, this is specifically why it was chosen
+to use ACPI on machines to move all these "hacks" to AML.
 
-Only the Juno functionality has been tested as the TC2 Coretile require
-a working SiI9022 driver for VExpress that is not subject of this patchset.
+This leaves your driver being generic and any "special" initialisation
+can be supplied by the OEM through the ACPI tables.
 
-Changelog:
-v4: Remove some debugging code that could return an error on a critical path
-    and updated the check for valid format in hdlcd_set_pxl_fmt() to only
-    WARN() if an invalid format found (unlikely case). Added the ACKs received.
-v3: Changed the driver to use the memory-region phandle for bespoke framebuffers. [2]
-v2: Added support for atomic modeset [3]
-v1: Original DRM submission [4]
-
-[1] http://www.arm.linux.org.uk/developer/patches/search.php?uid=2895
-[2] http://lists.freedesktop.org/archives/dri-devel/2015-December/095877.html
-[3] http://lists.freedesktop.org/archives/dri-devel/2015-November/094177.html
-[4] http://lists.freedesktop.org/archives/dri-devel/2015-August/087685.html
-
-Best regards,
-Liviu
-
-Liviu Dudau (4):
-  drm: arm: Add DT bindings documentation for HDLCD driver.
-  drm: Add support for ARM's HDLCD controller.
-  arm64: Juno: Add HDLCD support to the Juno boards.
-  MAINTAINERS: Add Liviu Dudau as maintainer for ARM HDLCD driver.
-
- .../devicetree/bindings/display/arm,hdlcd.txt      |  79 +++
- MAINTAINERS                                        |   6 +
- arch/arm64/boot/dts/arm/juno-base.dtsi             |  46 +-
- drivers/gpu/drm/Kconfig                            |   2 +
- drivers/gpu/drm/Makefile                           |   1 +
- drivers/gpu/drm/arm/Kconfig                        |  29 ++
- drivers/gpu/drm/arm/Makefile                       |   2 +
- drivers/gpu/drm/arm/hdlcd_crtc.c                   | 327 ++++++++++++
- drivers/gpu/drm/arm/hdlcd_drv.c                    | 555 +++++++++++++++++++++
- drivers/gpu/drm/arm/hdlcd_drv.h                    |  42 ++
- drivers/gpu/drm/arm/hdlcd_regs.h                   |  87 ++++
- 11 files changed, 1172 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/display/arm,hdlcd.txt
- create mode 100644 drivers/gpu/drm/arm/Kconfig
- create mode 100644 drivers/gpu/drm/arm/Makefile
- create mode 100644 drivers/gpu/drm/arm/hdlcd_crtc.c
- create mode 100644 drivers/gpu/drm/arm/hdlcd_drv.c
- create mode 100644 drivers/gpu/drm/arm/hdlcd_drv.h
- create mode 100644 drivers/gpu/drm/arm/hdlcd_regs.h
-
--- 
-2.6.2
+Graeme
