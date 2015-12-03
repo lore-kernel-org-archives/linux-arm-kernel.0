@@ -1,24 +1,42 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 3 Dec 2015 12:01:18 +0000
-Subject: [PATCH 0/4] ARM: sun9i: Support Allwinner A80 NMI controller
-In-Reply-To: <1449130813-22400-1-git-send-email-wens@csie.org>
-References: <1449130813-22400-1-git-send-email-wens@csie.org>
-Message-ID: <20151203120118.GH6520@io.lakedaemon.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 3 Dec 2015 12:02:27 +0000
+Subject: [PATCH v6 04/19] arm64: change some CONFIG_COMPAT over to use
+ CONFIG_AARCH32_EL0 instead
+In-Reply-To: <1447795019-30176-5-git-send-email-ynorov@caviumnetworks.com>
+References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
+ <1447795019-30176-5-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <20151203120227.GJ10747@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chen-Yu,
-
-On Thu, Dec 03, 2015 at 04:20:09PM +0800, Chen-Yu Tsai wrote:
-> This series extends support to the A80 SoC. This is needed to add
-> support for the PMICs. A complete series, including PMIC support,
-> can be found here:
+On Wed, Nov 18, 2015 at 12:16:44AM +0300, Yury Norov wrote:
+> From: Andrew Pinski <apinski@cavium.com>
 > 
->     https://github.com/wens/linux/tree/axp809
+> Reviewed-by: David Daney <ddaney@caviumnetworks.com>
+> 
+> Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+> Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
 
-I'll pull all but the last patch in this series into a separate, stable
-branch you can base off of at some point today.
+Please add a long description to every patch, even if it is trivial.
 
-thx,
+And a nitpick: remove the empty lines between Reviewed-by and
+Signed-off-by. These tags usually come in the same block.
 
-Jason.
+> +#else
+> +
+> +typedef elf_greg_t			compat_elf_greg_t;
+> +typedef elf_gregset_t			compat_elf_gregset_t;
+> +#define compat_a32_elf_check_arch(x)	0
+> +#define COMPAT_SET_PERSONALITY(ex)
+> +#define COMPAT_ARCH_DLINFO
+> +
+> +#endif
+
+Do you need these definitions here? I guess they may be used later by
+the ILP32 code paths but for A32 compat they don't make much sense (I
+haven't made it to the end of the series yet).
+
+-- 
+Catalin
