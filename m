@@ -1,80 +1,83 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 3 Dec 2015 14:11:17 +0800
-Subject: [PATCH v5 07/21] KVM: ARM64: PMU: Add perf event map and introduce
- perf event creating function
+Date: Thu, 3 Dec 2015 14:11:12 +0800
+Subject: [PATCH v5 02/21] KVM: ARM64: Define PMU data structure for each vcpu
 In-Reply-To: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1449123091-20252-8-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1449123091-20252-3-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-When we use tools like perf on host, perf passes the event type and the
-id of this event type category to kernel, then kernel will map them to
-hardware event number and write this number to PMU PMEVTYPER<n>_EL0
-register. When getting the event number in KVM, directly use raw event
-type to create a perf_event for it.
+Here we plan to support virtual PMU for guest by full software
+emulation, so define some basic structs and functions preparing for
+futher steps. Define struct kvm_pmc for performance monitor counter and
+struct kvm_pmu for performance monitor unit for each vcpu. According to
+ARMv8 spec, the PMU contains at most 32(ARMV8_MAX_COUNTERS) counters.
+
+Since this only supports ARM64 (or PMUv3), add a separate config symbol
+for it.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/arm64/include/asm/pmu.h |   2 +
- arch/arm64/kvm/Makefile      |   1 +
- include/kvm/arm_pmu.h        |  13 +++++
- virt/kvm/arm/pmu.c           | 127 +++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 143 insertions(+)
- create mode 100644 virt/kvm/arm/pmu.c
+ arch/arm64/include/asm/kvm_host.h |  2 ++
+ arch/arm64/kvm/Kconfig            |  8 ++++++++
+ include/kvm/arm_pmu.h             | 41 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 51 insertions(+)
+ create mode 100644 include/kvm/arm_pmu.h
 
-diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
-index 4264ea0..e3cb6b3 100644
---- a/arch/arm64/include/asm/pmu.h
-+++ b/arch/arm64/include/asm/pmu.h
-@@ -28,6 +28,8 @@
- #define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
- #define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
- #define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
-+/* Determines which PMCCNTR_EL0 bit generates an overflow */
-+#define ARMV8_PMCR_LC		(1 << 6)
- #define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
- #define	ARMV8_PMCR_N_MASK	0x1f
- #define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index 1949fe5..18d56d8 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -27,3 +27,4 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
- kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v3-switch.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
-+kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
-diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index 0c13470..59d9085 100644
---- a/include/kvm/arm_pmu.h
-+++ b/include/kvm/arm_pmu.h
-@@ -38,4 +38,17 @@ struct kvm_pmu {
- #endif
- };
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index a35ce72..42e15bb 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -37,6 +37,7 @@
  
-+#ifdef CONFIG_KVM_ARM_PMU
-+unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx);
-+void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
-+				    u32 select_idx);
-+#else
-+unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx)
-+{
-+	return 0;
-+}
-+void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
-+				    u32 select_idx) {}
-+#endif
+ #include <kvm/arm_vgic.h>
+ #include <kvm/arm_arch_timer.h>
++#include <kvm/arm_pmu.h>
+ 
+ #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
+ 
+@@ -132,6 +133,7 @@ struct kvm_vcpu_arch {
+ 	/* VGIC state */
+ 	struct vgic_cpu vgic_cpu;
+ 	struct arch_timer_cpu timer_cpu;
++	struct kvm_pmu pmu;
+ 
+ 	/*
+ 	 * Anything that is not used directly from assembly code goes
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index a5272c0..66da9a2 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -36,6 +36,7 @@ config KVM
+ 	select HAVE_KVM_EVENTFD
+ 	select HAVE_KVM_IRQFD
+ 	select KVM_ARM_VGIC_V3
++	select KVM_ARM_PMU
+ 	---help---
+ 	  Support hosting virtualized guest machines.
+ 	  We don't support KVM with 16K page tables yet, due to the multiple
+@@ -48,6 +49,13 @@ config KVM_ARM_HOST
+ 	---help---
+ 	  Provides host support for ARM processors.
+ 
++config KVM_ARM_PMU
++	bool
++	depends on KVM_ARM_HOST && HW_PERF_EVENTS
++	---help---
++	  Adds support for a virtual Performance Monitoring Unit (PMU) in
++	  virtual machines.
 +
- #endif
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+ source drivers/vhost/Kconfig
+ 
+ endif # VIRTUALIZATION
+diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
 new file mode 100644
-index 0000000..6c50003
+index 0000000..0c13470
 --- /dev/null
-+++ b/virt/kvm/arm/pmu.c
-@@ -0,0 +1,127 @@
++++ b/include/kvm/arm_pmu.h
+@@ -0,0 +1,41 @@
 +/*
 + * Copyright (C) 2015 Linaro Ltd.
 + * Author: Shannon Zhao <shannon.zhao@linaro.org>
@@ -92,115 +95,29 @@ index 0000000..6c50003
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/cpu.h>
-+#include <linux/kvm.h>
-+#include <linux/kvm_host.h>
++#ifndef __ASM_ARM_KVM_PMU_H
++#define __ASM_ARM_KVM_PMU_H
++
 +#include <linux/perf_event.h>
-+#include <asm/kvm_emulate.h>
-+#include <kvm/arm_pmu.h>
++#ifdef CONFIG_KVM_ARM_PMU
++#include <asm/pmu.h>
++#endif
 +
-+/**
-+ * kvm_pmu_get_counter_value - get PMU counter value
-+ * @vcpu: The vcpu pointer
-+ * @select_idx: The counter index
-+ */
-+unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx)
-+{
-+	u64 counter, enabled, running;
-+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
++struct kvm_pmc {
++	u8 idx;/* index into the pmu->pmc array */
++	struct perf_event *perf_event;
++	struct kvm_vcpu *vcpu;
++	u64 bitmask;
++};
 +
-+	if (!vcpu_mode_is_32bit(vcpu))
-+		counter = vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + select_idx);
-+	else
-+		counter = vcpu_cp15(vcpu, c14_PMEVCNTR0 + select_idx);
++struct kvm_pmu {
++#ifdef CONFIG_KVM_ARM_PMU
++	/* PMU IRQ Number per VCPU */
++	int irq_num;
++	struct kvm_pmc pmc[ARMV8_MAX_COUNTERS];
++#endif
++};
 +
-+	if (pmc->perf_event)
-+		counter += perf_event_read_value(pmc->perf_event, &enabled,
-+						 &running);
-+
-+	return counter & pmc->bitmask;
-+}
-+
-+static bool kvm_pmu_counter_is_enabled(struct kvm_vcpu *vcpu, u32 select_idx)
-+{
-+	if (!vcpu_mode_is_32bit(vcpu))
-+		return (vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E) &
-+		       (vcpu_sys_reg(vcpu, PMCNTENSET_EL0) >> select_idx);
-+	else
-+		return (vcpu_sys_reg(vcpu, c9_PMCR) & ARMV8_PMCR_E) &
-+		       (vcpu_sys_reg(vcpu, c9_PMCNTENSET) >> select_idx);
-+}
-+
-+/**
-+ * kvm_pmu_stop_counter - stop PMU counter
-+ * @pmc: The PMU counter pointer
-+ *
-+ * If this counter has been configured to monitor some event, release it here.
-+ */
-+static void kvm_pmu_stop_counter(struct kvm_pmc *pmc)
-+{
-+	struct kvm_vcpu *vcpu = pmc->vcpu;
-+	u64 counter;
-+
-+	if (pmc->perf_event) {
-+		counter = kvm_pmu_get_counter_value(vcpu, pmc->idx);
-+		if (!vcpu_mode_is_32bit(vcpu))
-+			vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + pmc->idx) = counter;
-+		else
-+			vcpu_cp15(vcpu, c14_PMEVCNTR0 + pmc->idx) = counter;
-+
-+		perf_event_release_kernel(pmc->perf_event);
-+		pmc->perf_event = NULL;
-+	}
-+}
-+
-+/**
-+ * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
-+ * @vcpu: The vcpu pointer
-+ * @data: The data guest writes to PMXEVTYPER_EL0
-+ * @select_idx: The number of selected counter
-+ *
-+ * When OS accesses PMXEVTYPER_EL0, that means it wants to set a PMC to count an
-+ * event with given hardware event number. Here we call perf_event API to
-+ * emulate this action and create a kernel perf event for it.
-+ */
-+void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
-+				    u32 select_idx)
-+{
-+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
-+	struct perf_event *event;
-+	struct perf_event_attr attr;
-+	u32 eventsel;
-+	u64 counter;
-+
-+	kvm_pmu_stop_counter(pmc);
-+	eventsel = data & ARMV8_EVTYPE_EVENT;
-+
-+	memset(&attr, 0, sizeof(struct perf_event_attr));
-+	attr.type = PERF_TYPE_RAW;
-+	attr.size = sizeof(attr);
-+	attr.pinned = 1;
-+	attr.disabled = kvm_pmu_counter_is_enabled(vcpu, select_idx);
-+	attr.exclude_user = data & ARMV8_EXCLUDE_EL0 ? 1 : 0;
-+	attr.exclude_kernel = data & ARMV8_EXCLUDE_EL1 ? 1 : 0;
-+	attr.exclude_hv = 1; /* Don't count EL2 events */
-+	attr.exclude_host = 1; /* Don't count host events */
-+	attr.config = eventsel;
-+
-+	counter = kvm_pmu_get_counter_value(vcpu, select_idx);
-+	/* The initial sample period (overflow count) of an event. */
-+	attr.sample_period = (-counter) & pmc->bitmask;
-+
-+	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
-+	if (IS_ERR(event)) {
-+		printk_once("kvm: pmu event creation failed %ld\n",
-+			    PTR_ERR(event));
-+		return;
-+	}
-+
-+	pmc->perf_event = event;
-+}
++#endif
 -- 
 2.0.4
