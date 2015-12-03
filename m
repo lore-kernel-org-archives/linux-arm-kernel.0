@@ -1,56 +1,108 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 3 Dec 2015 07:47:59 -0800
-Subject: [PATCH v3 0/3] soc: ti: Introduce wkup_m3_ipc driver
-In-Reply-To: <565F54C1.8090407@ti.com>
-References: <1442967294-23837-1-git-send-email-d-gerlach@ti.com>
- <20151020161843.GE3078@atomide.com> <565F54C1.8090407@ti.com>
-Message-ID: <20151203154759.GK23396@atomide.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 3 Dec 2015 15:56:12 +0000
+Subject: [RFC PATCH 4/4] mfd: syscon: add ACPI support
+In-Reply-To: <56603D17.4080707@huawei.com>
+References: <1449047368-5768-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1449047368-5768-5-git-send-email-wangkefeng.wang@huawei.com>
+ <2299982.06P4iKpkWk@wuerfel>
+ <20151203104131.GA11655@xora-haswell.xora.org.uk>
+ <56603D17.4080707@huawei.com>
+Message-ID: <20151203155612.GA2935@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [151202 12:30]:
-> On 10/20/2015 11:18 AM, Tony Lindgren wrote:
-> >* Dave Gerlach <d-gerlach@ti.com> [150922 17:20]:
-> >>This series is version 3 of the code to introduce a wkup_m3_ipc driver
-> >>to handle communication between the MPU and Cortex M3 present on TI AM335x
-> >>and AM437x SoCs. v2 of this series can be found at [1]. Only patch 3
-> >>has been changed based on a request from Tony and a few cleanups:
-> >>
-> >>- Rather than exporting all of the functionality of the driver, added
-> >>   wkup_m3_ipc_get and wkup_m3_ipc_put to allow users to just get a handle
-> >>   containing an ops structure for use.
-> >>
-> >>- Changed all ops (previously exported functions) to take pointer to
-> >>   struct wkup_m3_ipc as an argument now that user code will get this
-> >>   from wkup_m3_ipc_get.
-> >>
-> >>- General cleanup to probe function
-> >>
-> >>- Added MODULE_DEVICE_TABLE so driver can probe automatically.
-> >>
-> >>The series containing the DT nodes can be found here [2]. The actual dt
-> >>nodes for wkup_m3_ipc (last two patches) have been merged but discussion
-> >>is still open for the ti,mbox-send-noirq flag patches and depends on the
-> >>comments provided for the omap-mailbox change presented in patch 1 of
-> >>this series.
-> >>
-> >>A full branch containing all necessary PM code for both am335x and am437x
-> >>has been pushed here [3] to provide a big picture view of the plan for
-> >>this series.
-> >>
-> >>This driver relies on the firmware at [4] in the next-upstream branch
-> >>being present in /lib/firmware in the rootfs or built in to the kernel.
-> >
-> >Anybody got comments on this one? Should I pick up this series or
-> >what's the plan?
+On Thu, Dec 03, 2015 at 09:01:11PM +0800, Kefeng Wang wrote:
+> Hi Graeme, Arnd, and Lorenzo,
 > 
-> Now that Patch 1 has been merged [1] can patch 2 and 3 be picked up? These
-> apply cleanly on v4.4-rc3.
+> Firstly, we absolutely agree with the point which use AML to do some "special"
+> initialisation and configuration.
 
-OK applying 1 & 2 into omap-for-v4.5/drivers.
+Good.
 
-Regards,
+> SAS and NIC driver were accepted by linux in hisilicon hip05 chip, and the drivers
+> reset the control by syscon, we want to use "_RST" method, which is introduced by
+> ACPI 6.0 spec in "7.3.25 _RST (Device Reset)", is it reasonable and standard for us?
 
-Tony
+Can you point me at the drivers you are referring to please ?
 
-> [1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8e3c5952144f045a0c81bf674d3f5e1d9aafceb7
+> But here is a scene, we can not find a suitable way to support ACPI. There is no
+> independent memory region in some module(the driver not upstreamed), that is,
+> when write and read the module's register, we must r/w by syscon. Any advice?
+
+What do you mean ? You mean that the reset control is a piece of HW
+that is shared between multiple "components" ? What's your concern
+about AML code driving those registers here ?
+
+Thanks,
+Lorenzo
+
+> 
+> Thanks,
+> Kefeng
+> 
+> On 2015/12/3 18:41, Graeme Gregory wrote:
+> > On Wed, Dec 02, 2015 at 11:44:51AM +0100, Arnd Bergmann wrote:
+> >> On Wednesday 02 December 2015 17:09:28 Kefeng Wang wrote:
+> >>> This enables syscon with ACPI support.
+> >>> syscon_regmap_lookup_by_dev_property() function was added. With helper
+> >>> device_get_reference_node() and acpi_dev_find_plat_dev(), it can be used
+> >>> in both DT and ACPI.
+> >>>
+> >>> The device driver can obtain syscon using _DSD method in DSDT, an example
+> >>> is shown below.
+> >>>
+> >>>     Device(CTL0) {
+> >>>           Name(_HID, "HISI0061")
+> >>>           Name(_CRS, ResourceTemplate() {
+> >>>                   Memory32Fixed(ReadWrite, 0x80000000, 0x10000)
+> >>>           })
+> >>>     }
+> >>>
+> >>>     Device(DEV0) {
+> >>>           Name(_HID, "HISI00B1")
+> >>>           Name(_CRS, ResourceTemplate() {
+> >>>                   Memory32Fixed(ReadWrite, 0x8c030000, 0x10000)
+> >>>                   Interrupt(ResourceConsumer, Level, ActiveHigh, Exclusive){ 192 }
+> >>>           })
+> >>>
+> >>>           Name (_DSD, Package () {
+> >>>               ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+> >>>               Package () {
+> >>>                   Package () {"syscon",Package() {\_SB.CTL0} }
+> >>>               }
+> >>>           })
+> >>>     }
+> >>>
+> >>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> >>
+> >> This sounds like a bad idea:
+> >>
+> >> syscon is basically a hack to let us access register that the SoC designer
+> >> couldn't fit in anywhere sane. We need something like this with devicetree
+> >> because we decided not to have any interpreted bytecode to do this behind
+> >> our back.
+> >>
+> >> With ACPI, the same thing is done with AML, which is actually nicer than
+> >> syscon (once you have to deal with all the problems introduced by AML).
+> >>
+> >> Use that instead.
+> >>
+> > 
+> > I have to agree with Arnd here, this is specifically why it was chosen
+> > to use ACPI on machines to move all these "hacks" to AML.
+> > 
+> > This leaves your driver being generic and any "special" initialisation
+> > can be supplied by the OEM through the ACPI tables.
+> > 
+> > Graeme
+> > 
+> > 
+> > .
+> > 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
