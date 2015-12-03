@@ -1,47 +1,65 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 03 Dec 2015 10:26:48 -0800
-Subject: arm64 sched_clock cpu accounting
-In-Reply-To: <20151203092947.GB7023@arm.com>
-References: <564CD5A7.8000007@samsung.com> <564D31D3.5040207@samsung.com>
- <20151202180741.GR18376@cbox> <565F81D2.3060401@samsung.com>
- <20151203092947.GB7023@arm.com>
-Message-ID: <56608968.8000501@samsung.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 03 Dec 2015 13:28:12 -0500 (EST)
+Subject: Domain faults when CONFIG_CPU_SW_DOMAIN_PAN is enabled
+In-Reply-To: <20151203172708.GT8644@n2100.arm.linux.org.uk>
+References: <1267b061b66c4d1fa8af1955825bc97a@EMAIL.axentia.se>
+ <20151203110041.GK8644@n2100.arm.linux.org.uk>
+ <f7774151e4a849e682ae5a607a98140b@EMAIL.axentia.se>
+ <20151203115143.GM8644@n2100.arm.linux.org.uk>
+ <533b0f1f264e42e78b94bbff9570fb50@EMAIL.axentia.se>
+ <20151203133727.GN8644@n2100.arm.linux.org.uk>
+ <94580382ca344ae2b64f66fb778c6ff7@EMAIL.axentia.se>
+ <20151203164118.GR8644@n2100.arm.linux.org.uk>
+ <20151203172708.GT8644@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.20.1512031318580.7560@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 3 Dec 2015, Russell King - ARM Linux wrote:
+
+> On Thu, Dec 03, 2015 at 04:41:18PM +0000, Russell King - ARM Linux wrote:
+> > On Thu, Dec 03, 2015 at 04:12:06PM +0000, Peter Rosin wrote:
+> > > * uaccess_with_memcpy.c:__copy_to_user() has a mode in which it copies
+> > >   "non-atomically" (if faulthandler_disabled() returns 0). If a fault
+> > >   happens during __copy_to_user, what prevents some other thread from
+> > >   clobbering DACR?
+> > 
+> > See the second point above.  Moreover, if we sleep in down_read(),
+> > then __switch_to() reads the current DACR value and saves it in the
+> > thread information, and will restore that value when resuming the
+> > thread - even if the thread has been migrated to a different CPU.
+> 
+> I thought this was correct, but it isn't - that's what my original solution
+> did, but I think when Will reviewed it, we decided it wasn't necessary -
+> and it isn't necessary for every single case with the exception of this
+> one.  This is exactly what's going wrong: the down_read() in these paths
+> calls into the scheduler, which switches away.  When we come back, the
+> DACR value is reset by the other thread to 0x51.
+> 
+> There's a few ways to solve this:
+> 
+> 1. Make the thread switching code save and restore the DACR register as
+>    it would do for domains.  This imposes an overhead on every single
+>    context switch whether or not we happen to be in this _single_
+>    troublesome code.  (Patch attached - as there's several, I'm attaching
+>    them.)
+> 
+> 2. Add additional code to the uaccess-with-memcpy stuff to reset the
+>    DACR value prior to using memcpy() or memset().  (Patch attached.)
+> 
+> 3. Make uaccess-with-memcpy depend on !CPU_SW_DOMAINS_PAN (suggested by
+>    Will)
+> 
+> 4. Delete the uaccess-with-memcpy code (also suggested by Will.)
+> 
+> I think the best thing I can do is say... "Discuss amongst yourselves" :)
+
+Personally, I'd advocate for #2 or #4.  Prior commit 0f64b247e6 I was 
+already leaning towards #4.
+
+So if some people are still relying on uaccess-with-memcpy and #2 fixes 
+it then it's all good.  I'd suggest surrounding the DACR accesses with 
+#ifdef CONFIG_CPU_SW_DOMAIN_PAN in the final patch.
 
 
-On 12/3/2015 1:29 AM, Will Deacon wrote:
-> On Wed, Dec 02, 2015 at 03:42:10PM -0800, Mario Smarduch wrote:
->> On 12/2/2015 10:07 AM, Christoffer Dall wrote:
->>> On Wed, Nov 18, 2015 at 06:20:03PM -0800, Mario Smarduch wrote:
->>>> Also with tick accounting enabled, and periodic timer HZ set to 1000 no irq time
->>>> is reported. That's with running a ping flood - 1200 int/s, not sure why
->>>> wouldn't any irq time be reported? The other two modes report irq time as expected.
->>>>
->>>> On 11/18/2015 11:46 AM, Mario Smarduch wrote:
->>>>> Hello,
->>>>>   I noticed sched clock accounting can be enabled when arch-timer is
->>>>> initialized. But arm64 doesn't appear to have 'HAVE_IRQ_TIME_ACCOUNTING'
->>>>> selected (as of mainline 4.4-rc1) and IRQ_TIME_ACCOUNTING can't be selected.
->>>>> After adding it to arch/arm64/Kconfig, option appears to work fine. Depending on
->>>>> need all accounting options are fine, but irq time accounting appears to be most
->>>>> preferable.
->>>>>
->>>>> Any thoughts? Is it fine to enable it?
->>>>>
->>> Is any of this related to KVM?
->>
->> Indirectly, given the guest should yield same results. To be on the safe side I
->> ran the guest in all combinations (7) to confirm that's the case.
->>
->> Also verified that guest time on host appears fine in all these configurations.
->> It takes extra effort to get the guest time as opposed to other modes.
-> 
-> I can take this via the arm64 tree (where it's queued, but I've not pushed
-> anything yet).
-> 
-> Will
-
-Great thanks.
-> 
+Nicolas
