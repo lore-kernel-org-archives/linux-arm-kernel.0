@@ -1,45 +1,56 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 3 Dec 2015 17:46:18 +0200
-Subject: [PATCH 4/4] dmaengine: edma: Add support for DMA filter mapping
- to slave devices
-In-Reply-To: <2675730.x1sS4Fa4y8@wuerfel>
-References: <1449153192-9082-1-git-send-email-peter.ujfalusi@ti.com>
- <1449153192-9082-5-git-send-email-peter.ujfalusi@ti.com>
- <2675730.x1sS4Fa4y8@wuerfel>
-Message-ID: <566063CA.20500@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 3 Dec 2015 07:47:59 -0800
+Subject: [PATCH v3 0/3] soc: ti: Introduce wkup_m3_ipc driver
+In-Reply-To: <565F54C1.8090407@ti.com>
+References: <1442967294-23837-1-git-send-email-d-gerlach@ti.com>
+ <20151020161843.GE3078@atomide.com> <565F54C1.8090407@ti.com>
+Message-ID: <20151203154759.GK23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2015 05:38 PM, Arnd Bergmann wrote:
-> On Thursday 03 December 2015 16:33:12 Peter Ujfalusi wrote:
->> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
->> index 0675e268d577..46b305ea0d21 100644
->> --- a/drivers/dma/edma.c
->> +++ b/drivers/dma/edma.c
->> @@ -2297,6 +2297,12 @@ static int edma_probe(struct platform_device *pdev)
->>                 edma_set_chmap(&ecc->slave_chans[i], ecc->dummy_slot);
->>         }
->>  
->> +       if (info->slave_map) {
->> +               ecc->dma_slave.filter_map.map = info->slave_map;
->> +               ecc->dma_slave.filter_map.mapcnt = info->slavecnt;
->> +               ecc->dma_slave.filter_map.filter_fn = edma_filter_fn;
->> +       }
->> +
->>
+* Dave Gerlach <d-gerlach@ti.com> [151202 12:30]:
+> On 10/20/2015 11:18 AM, Tony Lindgren wrote:
+> >* Dave Gerlach <d-gerlach@ti.com> [150922 17:20]:
+> >>This series is version 3 of the code to introduce a wkup_m3_ipc driver
+> >>to handle communication between the MPU and Cortex M3 present on TI AM335x
+> >>and AM437x SoCs. v2 of this series can be found at [1]. Only patch 3
+> >>has been changed based on a request from Tony and a few cleanups:
+> >>
+> >>- Rather than exporting all of the functionality of the driver, added
+> >>   wkup_m3_ipc_get and wkup_m3_ipc_put to allow users to just get a handle
+> >>   containing an ops structure for use.
+> >>
+> >>- Changed all ops (previously exported functions) to take pointer to
+> >>   struct wkup_m3_ipc as an argument now that user code will get this
+> >>   from wkup_m3_ipc_get.
+> >>
+> >>- General cleanup to probe function
+> >>
+> >>- Added MODULE_DEVICE_TABLE so driver can probe automatically.
+> >>
+> >>The series containing the DT nodes can be found here [2]. The actual dt
+> >>nodes for wkup_m3_ipc (last two patches) have been merged but discussion
+> >>is still open for the ti,mbox-send-noirq flag patches and depends on the
+> >>comments provided for the omap-mailbox change presented in patch 1 of
+> >>this series.
+> >>
+> >>A full branch containing all necessary PM code for both am335x and am437x
+> >>has been pushed here [3] to provide a big picture view of the plan for
+> >>this series.
+> >>
+> >>This driver relies on the firmware at [4] in the next-upstream branch
+> >>being present in /lib/firmware in the rootfs or built in to the kernel.
+> >
+> >Anybody got comments on this one? Should I pick up this series or
+> >what's the plan?
 > 
-> Just a minor comment here: I think all three assignments can be done
-> unconditionally.
+> Now that Patch 1 has been merged [1] can patch 2 and 3 be picked up? These
+> apply cleanly on v4.4-rc3.
 
-True.
+OK applying 1 & 2 into omap-for-v4.5/drivers.
 
-> As I mentioned before, I'd also remove 'struct dma_filter'
-> and put the three members in struct dma_device directly. In fact, the
-> filter function can go with the other function pointers for consistency.
+Regards,
 
-I just like to keep things in one place ;)
-I don't have strong stand on keeping the intermediate 'struct dma_filter'
-Let's hear from Vinod regarding to this
+Tony
 
--- 
-P?ter
+> [1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8e3c5952144f045a0c81bf674d3f5e1d9aafceb7
