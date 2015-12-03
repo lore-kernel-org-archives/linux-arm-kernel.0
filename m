@@ -1,70 +1,78 @@
-From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
-Date: Thu,  3 Dec 2015 15:35:24 +0200
-Subject: [PATCH v4 5/5] ARM: dts: ifc6410: enable pcie dt node for this board
-In-Reply-To: <1449149725-27607-1-git-send-email-stanimir.varbanov@linaro.org>
-References: <1449149725-27607-1-git-send-email-stanimir.varbanov@linaro.org>
-Message-ID: <1449149725-27607-6-git-send-email-stanimir.varbanov@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Dec 2015 13:37:27 +0000
+Subject: Domain faults when CONFIG_CPU_SW_DOMAIN_PAN is enabled
+In-Reply-To: <533b0f1f264e42e78b94bbff9570fb50@EMAIL.axentia.se>
+References: <1267b061b66c4d1fa8af1955825bc97a@EMAIL.axentia.se>
+ <20151203110041.GK8644@n2100.arm.linux.org.uk>
+ <f7774151e4a849e682ae5a607a98140b@EMAIL.axentia.se>
+ <20151203115143.GM8644@n2100.arm.linux.org.uk>
+ <533b0f1f264e42e78b94bbff9570fb50@EMAIL.axentia.se>
+Message-ID: <20151203133727.GN8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable pcie dt node and fill pcie dt node with regulator, pinctrl
-and reset gpio, to use the pcie on the ifc6410 board.
+On Thu, Dec 03, 2015 at 12:08:11PM +0000, Peter Rosin wrote:
+> Russell King wrote:
+> > On Thu, Dec 03, 2015 at 11:38:20AM +0000, Peter Rosin wrote:
+> > > Russell King wrote:
+> > > > On Thu, Dec 03, 2015 at 08:33:13AM +0000, Peter Rosin wrote:
+> > > > > I wrote:
+> > > > > > If I enable CONFIG_CPU_SW_DOMAIN_PAN, I sometimes (but not always) get the
+> > > > > > following (or very similar) on boot.
+> > > > > 
+> > > > > I should have said "if I don't disable", as the option is "default y".
+> > > > > 
+> > > > > Also, if it survives on boot, below is an example of later trouble (after
+> > > > > 30+ minutes on this occasion).
+> > > > 
+> > > > Please apply this patch so we (might) get a slightly better oops dump,
+> > > > and then try to reproduce.
+> > > 
+> > > Sure thing, but it's still "DAC: 00000051"...
+> > 
+> > Thanks, that confirms that something in the uaccess-with-memcpy code
+> > is clearing the DACR back to 0x51.
+> > 
+> > This has come up several times before, and I really can't spot the
+> > problem in this code, so I've always said to disable the
+> > uaccess-with-memcpy code.  Personally, I'd like to see the back
+> > of that code...
+> 
+> Ok, but it's not me doing crazy things if that's what you are implying
+> (not saying that you are), because the sama5_defconfig has
+> 
+> 	CONFIG_UACCESS_WITH_MEMCPY=y
+> 
+> So, something needs to happen or sama5 remains default-broken.
 
-Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
----
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |   26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+I have no solution for this, other than saying that uaccess-with-memcpy
+seems to be (for some unknown reason) incompatible with SW PAN.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-index 11ac608b6d50..f203b94ee460 100644
---- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-@@ -47,6 +47,18 @@
- 					bias-disable;
- 				};
- 			};
-+
-+			pcie_pins: pcie_pinmux {
-+				mux {
-+					pins = "gpio27";
-+					function = "gpio";
-+				};
-+				conf {
-+					pins = "gpio27";
-+					drive-strength = <12>;
-+					bias-disable;
-+				};
-+			};
- 		};
- 
- 		rpm at 108000 {
-@@ -123,6 +135,10 @@
- 				pm8921_lvs1: lvs1 {
- 					bias-pull-down;
- 				};
-+
-+				pm8921_lvs6: lvs6 {
-+					bias-pull-down;
-+				};
- 			};
- 		};
- 
-@@ -231,6 +247,16 @@
- 			status = "okay";
- 		};
- 
-+		pci at 1b500000 {
-+			status = "ok";
-+			vdda-supply = <&pm8921_s3>;
-+			vdda_phy-supply = <&pm8921_lvs6>;
-+			vdda_refclk-supply = <&ext_3p3v>;
-+			pinctrl-0 = <&pcie_pins>;
-+			pinctrl-names = "default";
-+			perst-gpio = <&tlmm_pinmux 27 GPIO_ACTIVE_LOW>;
-+		};
-+
- 		qcom,ssbi at 500000 {
- 			pmic at 0 {
- 				gpio at 150 {
+Out of the two features, I'd go for SW PAN over uaccess-with-memcpy,
+but others will have a different opinion.  The real solution is to
+track down what's going on and why, but I don't think anyone has the
+motivation to do that.
+
+I've looked into this problem, and I've been unable to identify what's
+going on here.  I can see no reason for the DACR to be set to 0x51 in
+this code.
+
+The entry path into this code is via __copy_to_user(), which saves and
+sets the DACR to 0x55 before calling arm_copy_to_user(), which for
+uaccess-with-memcpy() is in arch/arm/lib/uaccess_with_memcpy.c.  That
+tail-calls into __copy_to_user_memcpy(), which should run with the
+DACR set to 0x55.
+
+The only place that the DACR is changed is inside __put_user(), which
+saves the DACR before also setting it to 0x55, and then restores the
+old DACR value, which, because the old value was 0x55, will have no
+effect.
+
+So, I can see no way that the DACR should ever be 0x51 inside
+__copy_to_user_memcpy(), but you are seeing such a scenario.  I've no
+idea how you could ever get a value of 0x51 out of the DACR within this
+code.
+
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
