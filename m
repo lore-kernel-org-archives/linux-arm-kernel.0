@@ -1,83 +1,32 @@
-From: leoli@freescale.com (Li Yang)
-Date: Thu, 3 Dec 2015 14:44:34 -0600
-Subject: [PATCH] ARM64: dts: ls2080a: fix eSDHC endianness
-In-Reply-To: <BLUPR0301MB2065FE8A1FB9F462CF44EF5AF20D0@BLUPR0301MB2065.namprd03.prod.outlook.com>
-References: <1446788617-35736-1-git-send-email-yangbo.lu@freescale.com>
- <BLUPR0301MB2065FE8A1FB9F462CF44EF5AF20D0@BLUPR0301MB2065.namprd03.prod.outlook.com>
-Message-ID: <CADRPPNSaJ+0vQs8s5c6d0+dj=NMi7q-uDu_8ERJdB5UFv_06gA@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 3 Dec 2015 21:45:32 +0100
+Subject: [PATCH v2 3/4] ARM: at91/dt: sama5d4: update i2c compatible string
+In-Reply-To: <56601A74.3040507@atmel.com>
+References: <1449136434-27619-1-git-send-email-ludovic.desroches@atmel.com>
+ <1449136434-27619-5-git-send-email-ludovic.desroches@atmel.com>
+ <56601A74.3040507@atmel.com>
+Message-ID: <20151203204532.GB8509@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 2, 2015 at 9:54 PM, Lu Y.B. <yangbo.lu@freescale.com> wrote:
-> Hi Catalin,
->
-> Could you help to review and merge this patch, since it has had no response for a month.
-> Thanks.
+On Thu, Dec 03, 2015 at 11:33:24AM +0100, Nicolas Ferre wrote:
+> Le 03/12/2015 10:53, Ludovic Desroches a ?crit :
+> > A new compatible string has been introduced: atmel,sama5d4-i2c. It
+> > allows to use the i2c-sda-hold-time-ns property if needed.
+> > 
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> Wolfram, we'll take this one with us in the at91 branches that will go
+> into arm-soc. It'll be queued in at91-4.5-dt branch soon.
+> 
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-This is a platform/soc change instead of a core ARM64 change.  I will
-help to collect the pending platform patches and send to the soc
-maintainers to review and accept.
+I squashed patch 1+2 now and applied them to for-next, thanks!
 
->
->
-> Best regards,
-> Yangbo Lu
->
->> -----Original Message-----
->> From: Lu Yangbo-B47093
->> Sent: Thursday, November 26, 2015 10:05 AM
->> To: linux-arm-kernel at lists.infradead.org; Catalin Marinas
->> Subject: RE: [PATCH] ARM64: dts: ls2080a: fix eSDHC endianness
->>
->> Any comments?
->> Thanks.
->>
->>
->> - Yangbo Lu
->>
->> > -----Original Message-----
->> > From: Yangbo Lu [mailto:yangbo.lu at freescale.com]
->> > Sent: Friday, November 06, 2015 1:44 PM
->> > To: linux-arm-kernel at lists.infradead.org; Catalin Marinas
->> > Cc: Lu Yangbo-B47093
->> > Subject: [PATCH] ARM64: dts: ls2080a: fix eSDHC endianness
->> >
->> > Add the "little-endian" property to fix the issue that eSDHC is not
->> > working and dumping out "mmc0: Controller never released inhibit
->> bit(s)."
->> > error messages constantly.
->> >
->> > Fixes: 5461597f6ce0 ("dts/ls2080a: Update DTSI to add support of
->> > various
->> > peripherals")
->> > Signed-off-by: Yangbo Lu <yangbo.lu@freescale.com>
->> > ---
->> >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 1 +
->> >  1 file changed, 1 insertion(+)
->> >
->> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
->> > b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
->> > index e81cd48..ed45e25 100644
->> > --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
->> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
->> > @@ -269,6 +269,7 @@
->> >                     clock-frequency = <0>;  /* Updated by bootloader */
->> >                     voltage-ranges = <1800 1800 3300 3300>;
->> >                     sdhci,auto-cmd12;
->> > +                   little-endian;
->> >                     bus-width = <4>;
->> >             };
->> >
->> > --
->> > 2.1.0.27.g96db324
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
--- 
-- Leo
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151203/404bf284/attachment.sig>
