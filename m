@@ -1,19 +1,36 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 3 Dec 2015 16:55:13 +0530
-Subject: [PATCH v5 0/12] cpufreq: Add support for Exynos 5800, 5420, and
- 5422
-In-Reply-To: <87y4db3hhe.fsf@smart-cactus.org>
-References: <1449091167-20758-1-git-send-email-ben@smart-cactus.org>
- <20151203060527.GH4302@ubuntu> <877fkv4ylk.fsf@smart-cactus.org>
- <20151203103703.GC2097@ubuntu> <87y4db3hhe.fsf@smart-cactus.org>
-Message-ID: <20151203112513.GA16262@ubuntu>
+From: kuleshovmail@gmail.com (Alexander Kuleshov)
+Date: Thu, 3 Dec 2015 17:27:42 +0600
+Subject: [PATCH v4 01/13] mm/memblock: add MEMBLOCK_NOMAP attribute to
+ memblock memory table
+In-Reply-To: <CAKv+Gu9oboT_Lk8heJWRcM=oxRW=EWioVCvZLH7N0YCkfU5tJw@mail.gmail.com>
+References: <1448886507-3216-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1448886507-3216-2-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu9oboT_Lk8heJWRcM=oxRW=EWioVCvZLH7N0YCkfU5tJw@mail.gmail.com>
+Message-ID: <CANCZXo7rdYooBq3NV5xo8u+EpbbPjGDq3oTv=Yy0U9SDAReB9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03-12-15, 12:21, Ben Gamari wrote:
-> Do you mean something along these lines? [1]
+Hello Ard,
 
-Yeah.
+On Thu, Dec 3, 2015 at 4:55 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 30 November 2015 at 13:28, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> This introduces the MEMBLOCK_NOMAP attribute and the required plumbing
+>> to make it usable as an indicator that some parts of normal memory
+>> should not be covered by the kernel direct mapping. It is up to the
+>> arch to actually honor the attribute when laying out this mapping,
+>> but the memblock code itself is modified to disregard these regions
+>> for allocations and other general use.
+>>....
+> May I kindly ask team-mm/Andrew/Alexander to chime in here, and
+> indicate whether you are ok with this patch going in for 4.5? If so,
+> could you please provide your ack so the patch can be kept together
+> with the rest of the series, which depends on it?
+>
+> I should note that this change should not affect any memblock users
+> that never set the MEMBLOCK_NOMAP flag, but please, if you see any
+> issues beyond 'this may conflict with other stuff we have queued for
+> 4.5', please do let me know.
 
--- 
-viresh
+Just tested the kernel with this patch with qemu and real hardware and it
+works, nothing does not brake for me.
