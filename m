@@ -1,45 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 03 Dec 2015 13:49:09 +0100
-Subject: [RESEND v4 2/6] remoteproc: debugfs: Add ability to boot remote
- processor using debugfs
-In-Reply-To: <20151203122634.GX12874@x1>
-References: <1448370862-19120-1-git-send-email-lee.jones@linaro.org>
- <CAJAp7Og2MPapOQmCSB9o4qwQHsA8_iyAWPhjHYPw6J=xCK2xew@mail.gmail.com>
- <20151203122634.GX12874@x1>
-Message-ID: <5329827.I5W30K072M@wuerfel>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Thu, 03 Dec 2015 13:50:55 +0100
+Subject: [PATCH] drivers: dma-coherent: free memory when failed to init
+ DMA memory pool
+In-Reply-To: <1449138962-8264-1-git-send-email-b38611@freescale.com>
+References: <1449138962-8264-1-git-send-email-b38611@freescale.com>
+Message-ID: <xa1toae7y9u8.fsf@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 December 2015 12:26:34 Lee Jones wrote:
-> > >
-> > > +static ssize_t rproc_state_write(struct file *filp, const char __user *userbuf,
-> > > +                                size_t count, loff_t *ppos)
-> > > +{
-> > > +       struct rproc *rproc = filp->private_data;
-> > > +       char buf[10];
-> > > +       int ret;
-> > > +
-> > > +       if (count > sizeof(buf))
-> > > +               return count;
-> > > +       ret = copy_from_user(buf, userbuf, count);
-> > > +       if (ret)
-> > > +               return -EFAULT;
-> > > +
-> > > +       if (buf[count - 1] == '\n')
-> > > +               buf[count - 1] = '\0';
-> > 
-> > I believe you can get here with count = 0.
-> 
-> I'm pretty sure you can't.
-> 
-> If you are sure that you can, if you can provide me with a way of
-> testing, I'd be happy to put in provisions.
-> 
+On Thu, Dec 03 2015, Fugang Duan wrote:
+> Free dma coherent memory when it failed to init DMA memory pool after
+> calling .dma_init_coherent_memory(), otherwise it causes memmory leak.
+>
+> Signed-off-by: Fugang Duan <B38611@freescale.com>
+> ---
+>  drivers/base/dma-coherent.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+> index 55b8398..beb6bbe 100644
+> --- a/drivers/base/dma-coherent.c
+> +++ b/drivers/base/dma-coherent.c
+> @@ -286,6 +286,7 @@ static int rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
+>  				     &mem) != DMA_MEMORY_MAP) {
+>  		pr_err("Reserved memory: failed to init DMA memory pool at %pa, size %ld MiB\n",
+>  			&rmem->base, (unsigned long)rmem->size / SZ_1M);
+> +		kfree(mem);
 
-I think that a zero-length write() from user space ends up in the write
-file operation.
+mem == NULL at this point.  If dma_init_coherent_memory doesn?t return
+DMA_MEMORY_MAP, mem pointer is not assigned any value.  If you think
+there is a memory leak, please demonstrate a path of it happening.
 
-Also, we get a gcc warning about the out-of-bounds access for code like
-this, and checking that count is larger than zero avoids the warning.
+>  		return -ENODEV;
+>  	}
+>  	rmem->priv = mem;
+> -- 
+> 1.9.1
+>
 
-	Arnd
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  ??? ?mina86? ??????  (o o)
+ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
