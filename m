@@ -1,76 +1,96 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu,  3 Dec 2015 14:04:58 -0700
-Subject: [PATCH V6 22/26] coresight: introducing a global trace ID function
+Date: Thu,  3 Dec 2015 14:04:56 -0700
+Subject: [PATCH V6 20/26] perf: changing pmu::setup_aux() parameter to include
+ event
 In-Reply-To: <1449176702-13213-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1449176702-13213-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1449176702-13213-23-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1449176702-13213-21-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TraceID values have to be unique for all tracers and
-consistent between drivers and user space.  As such
-introducing a central function to be used whenever a
-traceID value is required.
+For Coresight ETMv3/4 tracers the event carries information
+about trace modes such as user or kernel space tracing and
+whether tracing is allowed when operating in secure mode.
 
-The patch also account for data traceIDs, which are usually
-I(N) + 1.
+Since this information is to be embedded in the private
+structure returned by setup_aux(),  changing the first
+parameter to be of type struct perf_event * so that all
+the necessary information can be conveyed.  Also changing
+current customer of the API to reflect the modification.
 
+Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm3x.c |  7 ++-----
- include/linux/coresight-pmu.h                 | 12 ++++++++++++
- 2 files changed, 14 insertions(+), 5 deletions(-)
+ arch/x86/kernel/cpu/perf_event_intel_bts.c | 4 +++-
+ arch/x86/kernel/cpu/perf_event_intel_pt.c  | 5 +++--
+ include/linux/perf_event.h                 | 2 +-
+ kernel/events/ring_buffer.c                | 2 +-
+ 4 files changed, 8 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 6170df1b9e59..02186b722d88 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -27,6 +27,7 @@
- #include <linux/cpu.h>
- #include <linux/of.h>
- #include <linux/coresight.h>
-+#include <linux/coresight-pmu.h>
- #include <linux/amba/bus.h>
- #include <linux/seq_file.h>
- #include <linux/uaccess.h>
-@@ -793,11 +794,7 @@ static void etm_init_arch_data(void *info)
- 
- static void etm_init_trace_id(struct etm_drvdata *drvdata)
- {
--	/*
--	 * A trace ID of value 0 is invalid, so let's start at some
--	 * random value that fits in 7 bits and go from there.
--	 */
--	drvdata->traceid = 0x10 + drvdata->cpu;
-+	drvdata->traceid = coresight_get_trace_id(drvdata->cpu);
+diff --git a/arch/x86/kernel/cpu/perf_event_intel_bts.c b/arch/x86/kernel/cpu/perf_event_intel_bts.c
+index 2cad71d1b14c..4bb5bdc092f5 100644
+--- a/arch/x86/kernel/cpu/perf_event_intel_bts.c
++++ b/arch/x86/kernel/cpu/perf_event_intel_bts.c
+@@ -68,10 +68,12 @@ static size_t buf_size(struct page *page)
  }
  
- static int etm_probe(struct amba_device *adev, const struct amba_id *id)
-diff --git a/include/linux/coresight-pmu.h b/include/linux/coresight-pmu.h
-index 6c5386b23b10..7d410260661b 100644
---- a/include/linux/coresight-pmu.h
-+++ b/include/linux/coresight-pmu.h
-@@ -19,9 +19,21 @@
- #define _LINUX_CORESIGHT_PMU_H
+ static void *
+-bts_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool overwrite)
++bts_buffer_setup_aux(struct perf_event *event, void **pages,
++		     int nr_pages, bool overwrite)
+ {
+ 	struct bts_buffer *buf;
+ 	struct page *page;
++	int cpu = event->cpu;
+ 	int node = (cpu == -1) ? cpu : cpu_to_node(cpu);
+ 	unsigned long offset;
+ 	size_t size = nr_pages << PAGE_SHIFT;
+diff --git a/arch/x86/kernel/cpu/perf_event_intel_pt.c b/arch/x86/kernel/cpu/perf_event_intel_pt.c
+index 868e1194337f..ba8077cbc755 100644
+--- a/arch/x86/kernel/cpu/perf_event_intel_pt.c
++++ b/arch/x86/kernel/cpu/perf_event_intel_pt.c
+@@ -860,10 +860,11 @@ static int pt_buffer_init_topa(struct pt_buffer *buf, unsigned long nr_pages,
+  * Return:	Our private PT buffer structure.
+  */
+ static void *
+-pt_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool snapshot)
++pt_buffer_setup_aux(struct perf_event *event, void **pages,
++		    int nr_pages, bool snapshot)
+ {
+ 	struct pt_buffer *buf;
+-	int node, ret;
++	int node, ret, cpu = event->cpu;
  
- #define CORESIGHT_ETM_PMU_NAME "cs_etm"
-+#define CORESIGHT_ETM_PMU_SEED  0x10
+ 	if (!nr_pages)
+ 		return NULL;
+diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
+index d841d33bcdc9..da02d4a0baa2 100644
+--- a/include/linux/perf_event.h
++++ b/include/linux/perf_event.h
+@@ -378,7 +378,7 @@ struct pmu {
+ 	/*
+ 	 * Set up pmu-private data structures for an AUX area
+ 	 */
+-	void *(*setup_aux)		(int cpu, void **pages,
++	void *(*setup_aux)		(struct perf_event *event, void **pages,
+ 					 int nr_pages, bool overwrite);
+ 					/* optional */
  
- /* ETMv3.5/PTM's ETMCR config bit */
- #define ETM_OPT_CYCACC  12
- #define ETM_OPT_TS      28
+diff --git a/kernel/events/ring_buffer.c b/kernel/events/ring_buffer.c
+index b5d1ea79c595..b1316d12bb40 100644
+--- a/kernel/events/ring_buffer.c
++++ b/kernel/events/ring_buffer.c
+@@ -522,7 +522,7 @@ int rb_alloc_aux(struct ring_buffer *rb, struct perf_event *event,
+ 			goto out;
+ 	}
  
-+static inline int coresight_get_trace_id(int cpu)
-+{
-+	/*
-+	 * A trace ID of value 0 is invalid, so let's start at some
-+	 * random value that fits in 7 bits and go from there.  Since
-+	 * the common convention is to have data trace IDs be I(N) + 1,
-+	 * set instruction trace IDs as a function of the CPU number.
-+	 */
-+	return (CORESIGHT_ETM_PMU_SEED + (cpu * 2));
-+}
-+
- #endif
+-	rb->aux_priv = event->pmu->setup_aux(event->cpu, rb->aux_pages, nr_pages,
++	rb->aux_priv = event->pmu->setup_aux(event, rb->aux_pages, nr_pages,
+ 					     overwrite);
+ 	if (!rb->aux_priv)
+ 		goto out;
 -- 
 2.1.4
