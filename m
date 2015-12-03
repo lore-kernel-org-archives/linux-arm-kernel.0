@@ -1,128 +1,87 @@
-From: imr@rtschenk.de (Rojhalat Ibrahim)
-Date: Thu, 03 Dec 2015 14:01:18 +0100
-Subject: [PATCH RFC 0/3] input: rotary_encoder: use more than two gpios as
- input
-In-Reply-To: <20151202185920.GO5072@pengutronix.de>
-References: <1449050834-31779-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <2266988.l83Fg404My@pcimr> <20151202185920.GO5072@pengutronix.de>
-Message-ID: <21976926.6E4NCDDElu@pcimr>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Thu, 3 Dec 2015 21:01:11 +0800
+Subject: [RFC PATCH 4/4] mfd: syscon: add ACPI support
+In-Reply-To: <20151203104131.GA11655@xora-haswell.xora.org.uk>
+References: <1449047368-5768-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1449047368-5768-5-git-send-email-wangkefeng.wang@huawei.com>
+ <2299982.06P4iKpkWk@wuerfel>
+ <20151203104131.GA11655@xora-haswell.xora.org.uk>
+Message-ID: <56603D17.4080707@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 December 2015 19:59:20 Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Wed, Dec 02, 2015 at 01:52:58PM +0100, Rojhalat Ibrahim wrote:
-> > On Wednesday 02 December 2015 11:07:11 Uwe Kleine-K?nig wrote:
-> > > some time ago I worked on the rotary encoder driver to make it support
-> > > more than two input lines. This is the (only slightly tested[1]) rebase of
-> > > this series on top of 4.4-rc2 (from 4.1).
-> > > 
-> > > It would be great to get some feedback, especially (but not only) for my
-> > > change to raumfeld.c.
-> > > 
-> > > Before Ezequiel's patch 3a341a4c30d4 ("Input: rotary-encoder - add
-> > > support for quarter-period mode") we had a dt property
-> > > "rotary-encoder,half-period" defined. It's presence meant that we had 2
-> > > indents per period; it's absence that there is only 1. Ezequiel
-> > > introduced rotary-encoder,steps-per-period instead when adding support
-> > > for quarter-period mode (which has 4 indents per period).
-> > > 
-> > > Up to now (i.e. with two inputs) a period has length 4. Now with (say)
-> > > four inputs a period has length 16 instead. Now how should this be
-> > > modeled in dt? This series implements that I have to pass
-> > > 
-> > > 	rotary-encoder,steps-per-period = <16>;
-> > > 
-> > > now for "quarter-period mode" (i.e. 4 indents per 4 state changes[2]),
-> > > but that feels unnatural. I'd prefer to set a property to <1> instead,
-> > > meaning the device has an indent for each state change[2]. half-period
-> > > mode would be <2> and full-period mode would be <4>. But I don't have a
-> > > nice name for such a property and maybe it's easier to live with
-> > > steps-per-period = <16>? What do you think?
-> > > 
-> > > Also note that these patches are not as technically versatile as
-> > > possible. With 4 (n) input lines we could detect a quick rotation where the
-> > > machine's latency only allows to sample after 7 (2^(n-1)-1) state
-> > > changes. Currently this is not implemented, but can be done later.
-> > > 
-> > > Best regards
-> > > Uwe
-> > > 
-> > 
-> > AFAIUI the rotary encoder driver only handles incremental encoders not
-> > absolute encoders. (So in fact the assumed rotary encoder could also be a
-> 
-> There is a device tree property "rotary-encoder,relative-axis" which
-> switches between absolute and relative reporting. This is maybe badly
-> named, but IIUC is there to differenciate between incremental and
-> absolute encoders.
-> 
+Hi Graeme, Arnd, and Lorenzo,
 
-IMHO the property switches between absolute and relative reporting but the
-driver still handles only incremental encoders. Incremental encoder means that
-the input lines tell you when the encoder moves and in which direction. So
-by counting the steps you can generate an absolute value (which is what the
-driver does). But this absolute value is always _relative_ to the position
-at the time of start-up.
+Firstly, we absolutely agree with the point which use AML to do some "special"
+initialisation and configuration.
 
-An absolute encoder allows you to determine its position by just looking at
-the state of the input lines. There is no need to count steps.
+SAS and NIC driver were accepted by linux in hisilicon hip05 chip, and the drivers
+reset the control by syscon, we want to use "_RST" method, which is introduced by
+ACPI 6.0 spec in "7.3.25 _RST (Device Reset)", is it reasonable and standard for us?
 
-> > linear encoder with an incremental interface.) Those encoders almost always
-> > have an interface with two outputs (A, B) with a phase shift of 90 degrees
-> > between them. So in this case we have 4 steps per period. Sometimes there
-> > is only one line for 1 or 2 steps per period. But I have never seen or
-> 
-> I don't see how using only a single gpio would work for a rotary
-> encoder. I suspect we use different vocabulary to describe our devices
-> and so don't understand each other?! At least you cannot detect the
-> direction of the movement with a single input line, do you?
-> 
+But here is a scene, we can not find a suitable way to support ACPI. There is no
+independent memory region in some module(the driver not upstreamed), that is,
+when write and read the module's register, we must r/w by syscon. Any advice?
 
-Correct. With a single input line you can only count steps upwards and have
-no direction information. Sometimes that is sufficient.
+Thanks,
+Kefeng
 
-> > heard of a device with more than 2 lines (except for the third output which
-> > serves as a reference position index marker).
-> > 
-> > Do devices wirh more than two outputs actually exist?
-> > Or is the purpose of supporting more than 2 lines something other than
-> > connecting an actual encoder to them?
+On 2015/12/3 18:41, Graeme Gregory wrote:
+> On Wed, Dec 02, 2015 at 11:44:51AM +0100, Arnd Bergmann wrote:
+>> On Wednesday 02 December 2015 17:09:28 Kefeng Wang wrote:
+>>> This enables syscon with ACPI support.
+>>> syscon_regmap_lookup_by_dev_property() function was added. With helper
+>>> device_get_reference_node() and acpi_dev_find_plat_dev(), it can be used
+>>> in both DT and ACPI.
+>>>
+>>> The device driver can obtain syscon using _DSD method in DSDT, an example
+>>> is shown below.
+>>>
+>>>     Device(CTL0) {
+>>>           Name(_HID, "HISI0061")
+>>>           Name(_CRS, ResourceTemplate() {
+>>>                   Memory32Fixed(ReadWrite, 0x80000000, 0x10000)
+>>>           })
+>>>     }
+>>>
+>>>     Device(DEV0) {
+>>>           Name(_HID, "HISI00B1")
+>>>           Name(_CRS, ResourceTemplate() {
+>>>                   Memory32Fixed(ReadWrite, 0x8c030000, 0x10000)
+>>>                   Interrupt(ResourceConsumer, Level, ActiveHigh, Exclusive){ 192 }
+>>>           })
+>>>
+>>>           Name (_DSD, Package () {
+>>>               ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+>>>               Package () {
+>>>                   Package () {"syscon",Package() {\_SB.CTL0} }
+>>>               }
+>>>           })
+>>>     }
+>>>
+>>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+>>
+>> This sounds like a bad idea:
+>>
+>> syscon is basically a hack to let us access register that the SoC designer
+>> couldn't fit in anywhere sane. We need something like this with devicetree
+>> because we decided not to have any interpreted bytecode to do this behind
+>> our back.
+>>
+>> With ACPI, the same thing is done with AML, which is actually nicer than
+>> syscon (once you have to deal with all the problems introduced by AML).
+>>
+>> Use that instead.
+>>
 > 
-> I have a real rotary encoder with 4 input lines and so 16
-> distinguishable positions. It would be described as:
+> I have to agree with Arnd here, this is specifically why it was chosen
+> to use ACPI on machines to move all these "hacks" to AML.
 > 
-> 	compatible = "rotary-encoder";
-> 	gpios = <&gpio4 12 GPIO_ACTIVE_HIGH>, <&gpio4 11 GPIO_ACTIVE_HIGH>, <&gpio4 10 GPIO_ACTIVE_HIGH>, <&gpio4 9 GPIO_ACTIVE_HIGH>;
-> 	rotary-encoder,steps = <16>;
-> 	rotary-encoder,steps-per-period = <16>;
+> This leaves your driver being generic and any "special" initialisation
+> can be supplied by the OEM through the ACPI tables.
 > 
-> with the binding implemented in my patches.
+> Graeme
 > 
-> The wikipedia article about rotary encoders[1] uses a device with 3
-> input lines to explain gray encoding. So I didn't consider "my" device
-> as exotic up to now.
 > 
-
-So you have an absolute encoder. From the state of the four input lines you
-can determine the absolute position value. There is no need to count steps.
-At least that's the original purpose of your device.
-
-Of course it might be conceivable to use that kind of absolute encoder in an
-incremental way and count the steps throughout multiple revolutions.
-But why would you do that? The resolution of 16 steps per revolution is not
-very good (incremental encoders often have hundreds or thousands of steps per
-revolution). And the whole point of an absolute encoder is that you are able
-to determine the current position at any time just by looking at the inputs
-without having to count steps.
-
-   Rojhalat
-
-
-> Best regards
-> Uwe
-> 
-> [1] https://en.wikipedia.org/wiki/Rotary_encoder
-> 
+> .
 > 
