@@ -1,45 +1,39 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 3 Dec 2015 10:11:28 +0000
-Subject: [RFC] rk3368 idle states
-In-Reply-To: <2472961.2QZIyIIJQ0@diego>
-References: <20151202111858.GB18981@red-moon>
- <2472961.2QZIyIIJQ0@diego>
-Message-ID: <20151203101128.GB2110@red-moon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 3 Dec 2015 10:18:24 +0000
+Subject: [PATCH v4 00/13] UEFI boot and runtime services support for
+ 32-bit ARM
+In-Reply-To: <1448886507-3216-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1448886507-3216-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20151203101823.GA11337@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Hi Ard,
 
-On Thu, Dec 03, 2015 at 02:05:01AM +0100, Heiko St?bner wrote:
-> Hi Lorenzo,
+On Mon, Nov 30, 2015 at 01:28:14PM +0100, Ard Biesheuvel wrote:
+> This series adds support for booting the 32-bit ARM kernel directly from
+> UEFI firmware using a builtin UEFI stub. It mostly reuses refactored arm64
+> code, and the differences (primarily the PE/COFF header and entry point and
+> the efi_create_mapping() implementation) are split out into arm64 and ARM
+> versions.
 > 
-> Am Mittwoch, 2. Dezember 2015, 11:18:58 schrieb Lorenzo Pieralisi:
-> > while reviewing other dts idle states bindings I spotted the following
-> > snippet in arch/arm64/boot/dts/rockchip/rk3368.dtsi:
-> > 
-> > cpu_sleep: cpu-sleep-0 {
-> >        compatible = "arm,idle-state";
-> >        arm,psci-suspend-param = <0x1010000>;
-> >        entry-latency-us = <0x3fffffff>;
-> >        exit-latency-us = <0x40000000>;
-> >        min-residency-us = <0xffffffff>;
-> > };
-> > 
-> > Could you please explain to me how you obtained these residency/latency
-> > values ? They make NO sense whatsoever and I am quite tempted to
-> > ask you to remove this data from the dts file, it is just wrong.
+> Since I did not receive any further comments in reply to v3 from the people who
+> commented on v2, I think this series in now in sufficient shape to be pulled.
+> Note that patch #1 touches mm/memblock.c and include/linux/memblock.h, for which
+> get_maintainer.pl does not provide a maintainer, so it has been cc'ed to various
+> past editors of those files, and to the linux-mm mailing list.
 > 
-> I took these values verbatim from the vendor kernel when adding the core 
-> rk3368 support.
-> 
-> I guess I was overly enthusiastic, that psci worked out of the box for smp, 
-> that I didn't check the latency/residency values enough at that time. As time-
-> values they are really overly long :-) .
-> 
-> 
-> Nevertheless I have inquired now, what the background of those values is.
+> Since the series affects both arm64 and ARM, it is up to the maintainers to let
+> me know how and when they wish to proceed with this. My suggestion would be to
+> send out pull request for patches #1 - #5 to the arm64 maintainer, and for the
+> whole series to the ARM maintainer. This should keep any conflicts on either
+> side confined to the respective maintainer tree, rather then propagating all the
+> way to -next.
 
-Thank you, they must be updated, hopefully they won't unearth any issue
-with the idle state - ie at present the idle state simply turns out unused.
+For the arm64 bits (patches 2-5):
 
-Lorenzo
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+I'd really like an ack from the mm crowd on patch 1 before I queue it.
+
+Will
