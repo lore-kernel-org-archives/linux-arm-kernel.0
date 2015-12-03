@@ -1,46 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 03 Dec 2015 10:40:01 +0100
-Subject: [PATCH v2 3/9] ARM: hisi: enable Hi3519 soc
-In-Reply-To: <1449110565-23590-1-git-send-email-xuejiancheng@huawei.com>
-References: <1449110565-23590-1-git-send-email-xuejiancheng@huawei.com>
-Message-ID: <8647404.sBOFNLAMdU@wuerfel>
+From: huawei.libin@huawei.com (libin)
+Date: Thu, 3 Dec 2015 17:39:56 +0800
+Subject: [PATCH] arm64: ftrace: stop using kstop_machine to enable/disable
+ tracing
+In-Reply-To: <20151202131659.GA5621@arm.com>
+References: <1448697009-17211-1-git-send-email-huawei.libin@huawei.com>
+ <20151202123654.GC4523@arm.com> <20151202131659.GA5621@arm.com>
+Message-ID: <56600DEC.7050703@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 December 2015 10:42:45 Jiancheng Xue wrote:
-> --- a/arch/arm/mach-hisi/Kconfig
-> +++ b/arch/arm/mach-hisi/Kconfig
-> @@ -12,6 +12,14 @@ if ARCH_HISI
->  
->  menu "Hisilicon platform type"
->  
-> +config ARCH_HI3519
-> +       bool "Hisilicon Hi3519 Soc" if ARCH_MULTI_V7
-> +       select HAVE_ARM_ARCH_TIMER
-> +       select ARCH_HAS_RESET_CONTROLLER
-> +
-> +       help
-> +         Support for Hisilicon Hi3519 Soc
-> +
->  config ARCH_HI3xxx
->         bool "Hisilicon Hi36xx family" if ARCH_MULTI_V7
->         select CACHE_L2X0
 
-Do those need to be separate? I would just extend the Hi36xx
-to cover all Hi3xxx, if nothing in the platform code really
-depends on this.
 
-> +
-> +static const char *const hi3519_compat[] __initconst = {
-> +       "hisilicon,hi3519",
-> +       NULL,
-> +};
-> +
-> +DT_MACHINE_START(HI3519_DT, "Hisilicon Hi3519 (Flattened Device Tree)")
-> +       .dt_compat      = hi3519_compat,
-> +MACHINE_END
+on 2015/12/2 21:16, Will Deacon wrote:
+> On Wed, Dec 02, 2015 at 12:36:54PM +0000, Will Deacon wrote:
+>> On Sat, Nov 28, 2015 at 03:50:09PM +0800, Li Bin wrote:
+>>> On arm64, kstop_machine which is hugely disruptive to a running
+>>> system is not needed to convert nops to ftrace calls or back,
+>>> because that modifed code is a single 32bit instructions which
+>>> is impossible to cross cache (or page) boundaries, and the used str
+>>> instruction is single-copy atomic.
+>> This commit message is misleading, since the single-copy atomicity
+>> guarantees don't apply to the instruction-side. Instead, the architecture
+>> calls out a handful of safe instructions in "Concurrent modification and
+>> execution of instructions".
+>>
+>> Now, those safe instructions *do* include NOP, B and BL, so that should
+>> be sufficient for ftrace provided that we don't patch condition codes
+>> (and I don't think we do).
+> Thinking about this some more, you also need to fix the validate=1 case
+> in ftrace_modify_code so that it can run outside of stop_machine. We
+> currently rely on that to deal with concurrent modifications (e.g.
+> module unloading).
 
-Also drop the "(Flattened Device Tree)" part of the name, we don't
-support any other kind anyway.
+I'm not sure it is really a problem, but on x86, which using breakpoints method,
+add_break() that run outside of stop_machine also has similar code.
 
-	Arnd
+static int add_break(unsigned long ip, const char *old)
+{
+        unsigned char replaced[MCOUNT_INSN_SIZE];
+        unsigned char brk = BREAKPOINT_INSTRUCTION;
+
+        if (probe_kernel_read(replaced, (void *)ip, MCOUNT_INSN_SIZE))
+                return -EFAULT;
+
+        /* Make sure it is what we expect it to be */
+        if (memcmp(replaced, old, MCOUNT_INSN_SIZE) != 0)
+                return -EINVAL;
+
+        return ftrace_write(ip, &brk, 1);
+}
+
+Or I misunderstand what you mean?
+
+Thanks,
+Li Bin
+
+> Will
+>
+> .
+>
