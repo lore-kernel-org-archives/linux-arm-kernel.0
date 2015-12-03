@@ -1,79 +1,81 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 3 Dec 2015 14:11:29 +0800
-Subject: [PATCH v5 19/21] KVM: ARM64: Reset PMU state when resetting vcpu
+Date: Thu, 3 Dec 2015 14:11:30 +0800
+Subject: [PATCH v5 20/21] KVM: ARM64: Free perf event of PMU when destroying
+ vcpu
 In-Reply-To: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1449123091-20252-20-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1449123091-20252-21-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-When resetting vcpu, it needs to reset the PMU state to initial status.
+When KVM frees VCPU, it needs to free the perf_event of PMU.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/arm64/kvm/reset.c |  3 +++
- include/kvm/arm_pmu.h  |  2 ++
- virt/kvm/arm/pmu.c     | 18 ++++++++++++++++++
- 3 files changed, 23 insertions(+)
+ arch/arm/kvm/arm.c    |  1 +
+ include/kvm/arm_pmu.h |  2 ++
+ virt/kvm/arm/pmu.c    | 21 +++++++++++++++++++++
+ 3 files changed, 24 insertions(+)
 
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index f34745c..dfbce78 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -120,6 +120,9 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 	/* Reset system registers */
- 	kvm_reset_sys_regs(vcpu);
- 
-+	/* Reset PMU */
-+	kvm_pmu_vcpu_reset(vcpu);
-+
- 	/* Reset timer */
- 	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index cd696ef..cea2176 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -259,6 +259,7 @@ void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
+ 	kvm_mmu_free_memory_caches(vcpu);
+ 	kvm_timer_vcpu_terminate(vcpu);
+ 	kvm_vgic_vcpu_destroy(vcpu);
++	kvm_pmu_vcpu_destroy(vcpu);
+ 	kmem_cache_free(kvm_vcpu_cache, vcpu);
  }
+ 
 diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index 4cb0ade..fe8035a 100644
+index fe8035a..53feebb 100644
 --- a/include/kvm/arm_pmu.h
 +++ b/include/kvm/arm_pmu.h
-@@ -39,6 +39,7 @@ struct kvm_pmu {
- };
+@@ -40,6 +40,7 @@ struct kvm_pmu {
  
  #ifdef CONFIG_KVM_ARM_PMU
-+void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu);
+ void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu);
++void kvm_pmu_vcpu_destroy(struct kvm_vcpu *vcpu);
  void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
  unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx);
  void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val);
-@@ -50,6 +51,7 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
- 				    u32 select_idx);
+@@ -52,6 +53,7 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
  void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u32 val);
  #else
-+void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu) {}
+ void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu) {}
++void kvm_pmu_vcpu_destroy(struct kvm_vcpu *vcpu) {}
  void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
  unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx)
  {
 diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 34e7386..4014831 100644
+index 4014831..bd2fece 100644
 --- a/virt/kvm/arm/pmu.c
 +++ b/virt/kvm/arm/pmu.c
-@@ -80,6 +80,24 @@ static void kvm_pmu_stop_counter(struct kvm_pmc *pmc)
+@@ -98,6 +98,27 @@ void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu)
  }
  
  /**
-+ * kvm_pmu_vcpu_reset - reset pmu state for cpu
++ * kvm_pmu_vcpu_destroy - free perf event of PMU for cpu
 + * @vcpu: The vcpu pointer
 + *
 + */
-+void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu)
++void kvm_pmu_vcpu_destroy(struct kvm_vcpu *vcpu)
 +{
 +	int i;
 +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
 +
 +	for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
-+		kvm_pmu_stop_counter(&pmu->pmc[i]);
-+		pmu->pmc[i].idx = i;
-+		pmu->pmc[i].vcpu = vcpu;
-+		pmu->pmc[i].bitmask = 0xffffffffUL;
++		struct kvm_pmc *pmc = &pmu->pmc[i];
++
++		if (pmc->perf_event) {
++			perf_event_disable(pmc->perf_event);
++			perf_event_release_kernel(pmc->perf_event);
++			pmc->perf_event = NULL;
++		}
 +	}
 +}
 +
