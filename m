@@ -1,72 +1,87 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 3 Dec 2015 18:34:40 +0200
-Subject: [PATCH 2/2] ARM: OMAP2+: Change core_initcall levels to
- postcore_initcall
-In-Reply-To: <20151203160014.GL23396@atomide.com>
-References: <1448900789-4034-1-git-send-email-tony@atomide.com>
- <1448900789-4034-3-git-send-email-tony@atomide.com>
- <20151203160014.GL23396@atomide.com>
-Message-ID: <56606F20.9050805@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 3 Dec 2015 08:35:51 -0800
+Subject: [4.4-rc][PATCH v2] ARM: dts: am4372: fix clock source for arm
+ twd and global timers
+In-Reply-To: <1448898998-32749-1-git-send-email-grygorii.strashko@ti.com>
+References: <1448898998-32749-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20151203163551.GQ23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2015 06:00 PM, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [151130 08:29]:
->> We want to be able to probe a few selected device drivers before hwmod
->> code populates the clocks in omap_hwmod_setup_all(). This allows us to
->> convert most of the clock drivers into regular device drivers.
-
-if understand things right, ti clks now will be populated and initialized
-from 
-__omap_sync32k_timer_init
- - omap_clk_init()
-   - .. 
-   - of_clk_init()
-   - ..
-   - omap_clk_soc_init()
-
-and __omap_sync32k_timer_init(), in turn, will be called from:
-arch/arm/kernel/time.c
- - time_init()
-	machine_desc->init_time();
-(without your patch 1).
-
-So, I don't see real dependency here between clk initialization and hwmods :(
-
-
->>
->> We only need a few minimal clock drivers early for the system timers to
->> select between the 32KiHz clock and the high frequency oscillator.
->>
->> With these changes, initializing the clock drivers can be just done at
->> core_initcall time with something like:
->>
->> np = of_find_node_by_name(NULL, "plls");
->> if (np)
->> 	of_platform_populate(np, NULL, NULL, NULL);
->>
->> And then these clocks will be available for the interconnect code to use.
->>
->> Having most of the clock drivers being regular device drivers allows
->> us to use the nice things like devm_* functions and dev_err and dev_dbg.
->> As an extra bonus, this also allows us to develop the clock drivers for
->> new SoCs as loadable modules initially for cases where we can boot up
->> the system based on the bootloader configured clocks.
->>
->> To do this, let's change the core_initcalls to postcore_initcall under
->> mach-omap2.
+* Grygorii Strashko <grygorii.strashko@ti.com> [151130 07:58]:
+> ARM TWD and Global timer are clocked by PERIPHCLK which is MPU_CLK/2.
+> But now they are clocked by dpll_mpu_m2_ck == MPU_CLK and, as result.
+> Timekeeping core misbehaves. For example, execution of command
+> "sleep 5" will take 10 sec instead of 5.
 > 
-> FYI I'm applying this one into omap-for-v4.5/soc today, the first patch
-> in this series needs more work as discussed.
+> Hence, fix it by adding mpu_periphclk ("fixed-factor-clock") and use
+> it for clocking ARM TWD and Global timer (same way as on OMAP4).
 > 
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Fixes:commit 8cbd4c2f6a99 ("arm: boot: dts: am4372: add ARM timers and SCU nodes")
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 
-To be honest I don't see how this will help to convert ti clks in regular
-devices right now.
-Wouldn't it be better to move forward with this patch together with future patches?
-So it will be clear what benefits will this approach provide.
+Is this fix alone enough or do you still need to disable other the ARM
+timers in the board specific dts file?
 
-In other words, I think it should be a part of some bigger series.
+Regards,
 
--- 
-regards,
--grygorii
+Tony
+
+> ---
+> Changes in v2:
+>  - fix: mpu_periphclk should be clocked from dpll_mpu_m2_ck instead of
+>    dpll_mpu_ck.
+> link on v1:
+>  http://www.spinics.net/lists/arm-kernel/msg463898.html
+> 
+>  arch/arm/boot/dts/am4372.dtsi        | 4 ++--
+>  arch/arm/boot/dts/am43xx-clocks.dtsi | 8 ++++++++
+>  2 files changed, 10 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+> index d83ff9c..de8791a 100644
+> --- a/arch/arm/boot/dts/am4372.dtsi
+> +++ b/arch/arm/boot/dts/am4372.dtsi
+> @@ -74,7 +74,7 @@
+>  		reg = <0x48240200 0x100>;
+>  		interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-parent = <&gic>;
+> -		clocks = <&dpll_mpu_m2_ck>;
+> +		clocks = <&mpu_periphclk>;
+>  	};
+>  
+>  	local_timer: timer at 48240600 {
+> @@ -82,7 +82,7 @@
+>  		reg = <0x48240600 0x100>;
+>  		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-parent = <&gic>;
+> -		clocks = <&dpll_mpu_m2_ck>;
+> +		clocks = <&mpu_periphclk>;
+>  	};
+>  
+>  	l2-cache-controller at 48242000 {
+> diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi b/arch/arm/boot/dts/am43xx-clocks.dtsi
+> index cc88728..a38af2b 100644
+> --- a/arch/arm/boot/dts/am43xx-clocks.dtsi
+> +++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
+> @@ -259,6 +259,14 @@
+>  		ti,invert-autoidle-bit;
+>  	};
+>  
+> +	mpu_periphclk: mpu_periphclk {
+> +		#clock-cells = <0>;
+> +		compatible = "fixed-factor-clock";
+> +		clocks = <&dpll_mpu_m2_ck>;
+> +		clock-mult = <1>;
+> +		clock-div = <2>;
+> +	};
+> +
+>  	dpll_ddr_ck: dpll_ddr_ck {
+>  		#clock-cells = <0>;
+>  		compatible = "ti,am3-dpll-clock";
+> -- 
+> 2.6.3
+> 
