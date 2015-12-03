@@ -1,97 +1,321 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 3 Dec 2015 16:12:06 +0000
-Subject: Domain faults when CONFIG_CPU_SW_DOMAIN_PAN is enabled
-In-Reply-To: <20151203133727.GN8644@n2100.arm.linux.org.uk>
-References: <1267b061b66c4d1fa8af1955825bc97a@EMAIL.axentia.se>
- <20151203110041.GK8644@n2100.arm.linux.org.uk>
- <f7774151e4a849e682ae5a607a98140b@EMAIL.axentia.se>
- <20151203115143.GM8644@n2100.arm.linux.org.uk>
- <533b0f1f264e42e78b94bbff9570fb50@EMAIL.axentia.se>
- <20151203133727.GN8644@n2100.arm.linux.org.uk>
-Message-ID: <94580382ca344ae2b64f66fb778c6ff7@EMAIL.axentia.se>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 03 Dec 2015 16:13:41 +0000
+Subject: [PATCH v4 3/3] KVM/arm/arm64: enable enhanced armv8 fp/simd lazy
+ switch
+In-Reply-To: <1447539130-4613-4-git-send-email-m.smarduch@samsung.com>
+References: <1447539130-4613-1-git-send-email-m.smarduch@samsung.com>
+ <1447539130-4613-4-git-send-email-m.smarduch@samsung.com>
+Message-ID: <56606A35.9090904@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote:
-> On Thu, Dec 03, 2015 at 12:08:11PM +0000, Peter Rosin wrote:
-> > Russell King wrote:
-> > > On Thu, Dec 03, 2015 at 11:38:20AM +0000, Peter Rosin wrote:
-> > > > Russell King wrote:
-> > > > > On Thu, Dec 03, 2015 at 08:33:13AM +0000, Peter Rosin wrote:
-> > > > > > I wrote:
-> > > > > > > If I enable CONFIG_CPU_SW_DOMAIN_PAN, I sometimes (but not always) get the
-> > > > > > > following (or very similar) on boot.
-> > > > > > 
-> > > > > > I should have said "if I don't disable", as the option is "default y".
-> > > > > > 
-> > > > > > Also, if it survives on boot, below is an example of later trouble (after
-> > > > > > 30+ minutes on this occasion).
-> > > > > 
-> > > > > Please apply this patch so we (might) get a slightly better oops dump,
-> > > > > and then try to reproduce.
-> > > > 
-> > > > Sure thing, but it's still "DAC: 00000051"...
-> > > 
-> > > Thanks, that confirms that something in the uaccess-with-memcpy code
-> > > is clearing the DACR back to 0x51.
-> > > 
-> > > This has come up several times before, and I really can't spot the
-> > > problem in this code, so I've always said to disable the
-> > > uaccess-with-memcpy code.  Personally, I'd like to see the back
-> > > of that code...
-> > 
-> > Ok, but it's not me doing crazy things if that's what you are implying
-> > (not saying that you are), because the sama5_defconfig has
-> > 
-> > 	CONFIG_UACCESS_WITH_MEMCPY=y
-> > 
-> > So, something needs to happen or sama5 remains default-broken.
+On 14/11/15 22:12, Mario Smarduch wrote:
+> This patch tracks armv7 and armv8 fp/simd hardware state with a vcpu lazy flag.
+> On vcpu_load for 32 bit guests enable FP access, and later enable fp/simd
+> trapping for 32 and 64 bit guests if lazy flag is not set. On first fp/simd 
+> access trap to handler to save host and restore guest context, disable 
+> trapping and set vcpu lazy flag. On vcpu_put if flag is set save guest and 
+> restore host context and also save guest fpexc register.
 > 
-> I have no solution for this, other than saying that uaccess-with-memcpy
-> seems to be (for some unknown reason) incompatible with SW PAN.
+> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+> ---
+>  arch/arm/include/asm/kvm_host.h   |  3 ++
+>  arch/arm/kvm/arm.c                | 18 +++++++--
+>  arch/arm64/include/asm/kvm_asm.h  |  2 +
+>  arch/arm64/include/asm/kvm_host.h | 17 +++++++-
+>  arch/arm64/kernel/asm-offsets.c   |  1 +
+>  arch/arm64/kvm/hyp.S              | 83 +++++++++++++++++++++++++--------------
+>  6 files changed, 89 insertions(+), 35 deletions(-)
 > 
-> Out of the two features, I'd go for SW PAN over uaccess-with-memcpy,
-> but others will have a different opinion.  The real solution is to
-> track down what's going on and why, but I don't think anyone has the
-> motivation to do that.
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 8fc7a59..6960ff2 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -40,6 +40,8 @@
+>  
+>  #define KVM_MAX_VCPUS VGIC_V2_MAX_CPUS
+>  
+> +#define kvm_guest_is32bit(vcpu)	true
+
+This should be defined as an inline function, and placed in
+asm/kvm_emulate.h, probably renamed as kvm_guest_vcpu_is_32bit.
+
+> +
+>  /*
+>   * Reads the host FPEXC register, saves to vcpu context and enables the
+>   * FPEXC.
+> @@ -260,6 +262,7 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+>  
+>  struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+>  void kvm_restore_host_vfp_state(struct kvm_vcpu *);
+> +static inline void kvm_save_guest_fpexc(struct kvm_vcpu *vcpu) {}
+>  
+>  static inline void kvm_arch_hardware_disable(void) {}
+>  static inline void kvm_arch_hardware_unsetup(void) {}
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index cfc348a..7a20530 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -292,8 +292,12 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+>  
+>  	kvm_arm_set_running_vcpu(vcpu);
+>  
+> -	/* Save and enable FPEXC before we load guest context */
+> -	kvm_enable_fpexc(vcpu);
+> +	/*
+> +	 * For 32bit guest executing on arm64, enable fp/simd access in
+> +	 * EL2. On arm32 save host fpexc and then enable fp/simd access.
+> +	 */
+> +	if (kvm_guest_is32bit(vcpu))
+> +		kvm_enable_fpexc(vcpu);
+>  }
+>  
+>  void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+> @@ -301,10 +305,18 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+>  	/* If the fp/simd registers are dirty save guest, restore host. */
+>  	if (vcpu->arch.vfp_dirty) {
+>  		kvm_restore_host_vfp_state(vcpu);
+> +
+> +		/*
+> +		 * For 32bit guest on arm64 save the guest fpexc register
+> +		 * in EL2 mode.
+> +		 */
+> +		if (kvm_guest_is32bit(vcpu))
+> +			kvm_save_guest_fpexc(vcpu);
+> +
+>  		vcpu->arch.vfp_dirty = 0;
+>  	}
+>  
+> -	/* Restore host FPEXC trashed in vcpu_load */
+> +	/* For arm32 restore host FPEXC trashed in vcpu_load. */
+>  	kvm_restore_host_fpexc(vcpu);
+>  
+>  	/*
+> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> index 5e37710..c589ca9 100644
+> --- a/arch/arm64/include/asm/kvm_asm.h
+> +++ b/arch/arm64/include/asm/kvm_asm.h
+> @@ -117,6 +117,8 @@ extern char __kvm_hyp_vector[];
+>  extern void __kvm_flush_vm_context(void);
+>  extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+>  extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+> +extern void __kvm_enable_fpexc32(void);
+> +extern void __kvm_save_fpexc32(struct kvm_vcpu *vcpu);
+>  
+>  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+>  
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 83e65dd..6e2d6b5 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -41,6 +41,8 @@
+>  
+>  #define KVM_VCPU_MAX_FEATURES 3
+>  
+> +#define kvm_guest_is32bit(vcpu)	(!(vcpu->arch.hcr_el2 & HCR_RW))
+> +
+>  int __attribute_const__ kvm_target_cpu(void);
+>  int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+>  int kvm_arch_dev_ioctl_check_extension(long ext);
+> @@ -251,9 +253,20 @@ static inline void kvm_arch_hardware_unsetup(void) {}
+>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+>  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
+> -static inline void kvm_enable_fpexc(struct kvm_vcpu *vcpu) {}
+> -static inline void kvm_restore_host_vfp_state(struct kvm_vcpu *vcpu) {}
+> +
+> +static inline void kvm_enable_fpexc(struct kvm_vcpu *vcpu)
+> +{
+> +	/* Enable FP/SIMD access from EL2 mode*/
+> +	kvm_call_hyp(__kvm_enable_fpexc32);
+> +}
+> +
+> +static inline void kvm_save_guest_fpexc(struct kvm_vcpu *vcpu)
+> +{
+> +	/* Save FPEXEC32_EL2 in EL2 mode */
+> +	kvm_call_hyp(__kvm_save_fpexc32, vcpu);
+> +}
+>  static inline void kvm_restore_host_fpexc(struct kvm_vcpu *vcpu) {}
+> +void kvm_restore_host_vfp_state(struct kvm_vcpu *vcpu);
+>  
+>  void kvm_arm_init_debug(void);
+>  void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
+> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+> index 8d89cf8..c9c5242 100644
+> --- a/arch/arm64/kernel/asm-offsets.c
+> +++ b/arch/arm64/kernel/asm-offsets.c
+> @@ -124,6 +124,7 @@ int main(void)
+>    DEFINE(VCPU_HCR_EL2,		offsetof(struct kvm_vcpu, arch.hcr_el2));
+>    DEFINE(VCPU_MDCR_EL2,	offsetof(struct kvm_vcpu, arch.mdcr_el2));
+>    DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
+> +  DEFINE(VCPU_VFP_DIRTY,	offsetof(struct kvm_vcpu, arch.vfp_dirty));
+>    DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
+>    DEFINE(VCPU_HOST_DEBUG_STATE, offsetof(struct kvm_vcpu, arch.host_debug_state));
+>    DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
+> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> index e583613..06efb93 100644
+> --- a/arch/arm64/kvm/hyp.S
+> +++ b/arch/arm64/kvm/hyp.S
+> @@ -36,6 +36,23 @@
+>  #define CPU_SYSREG_OFFSET(x)	(CPU_SYSREGS + 8*x)
+>  
+>  	.text
+> +/**
+> + * void kvm_restore_host_vfp_state(struct vcpu *vcpu) -
+> + *	This function saves the guest, restores host, called from host.
+> + */
+> +ENTRY(kvm_restore_host_vfp_state)
+> +	push	xzr, lr
+> +
+> +	add	x2, x0, #VCPU_CONTEXT
+> +	bl __save_fpsimd
+> +
+> +	ldr	x2, [x0, #VCPU_HOST_CONTEXT]
+> +	bl __restore_fpsimd
+> +
+> +	pop	xzr, lr
+> +	ret
+> +ENDPROC(kvm_restore_host_vfp_state)
+> +
+
+Same here. Don't mix HYP and non-HYP in the same file.
+
+>  	.pushsection	.hyp.text, "ax"
+>  	.align	PAGE_SHIFT
+>  
+> @@ -385,14 +402,6 @@
+>  	tbz	\tmp, #KVM_ARM64_DEBUG_DIRTY_SHIFT, \target
+>  .endm
+>  
+> -/*
+> - * Branch to target if CPTR_EL2.TFP bit is set (VFP/SIMD trapping enabled)
+> - */
+> -.macro skip_fpsimd_state tmp, target
+> -	mrs	\tmp, cptr_el2
+> -	tbnz	\tmp, #CPTR_EL2_TFP_SHIFT, \target
+> -.endm
+> -
+>  .macro compute_debug_state target
+>  	// Compute debug state: If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY
+>  	// is set, we do a full save/restore cycle and disable trapping.
+> @@ -433,10 +442,6 @@
+>  	mrs	x5, ifsr32_el2
+>  	stp	x4, x5, [x3]
+>  
+> -	skip_fpsimd_state x8, 2f
+> -	mrs	x6, fpexc32_el2
+> -	str	x6, [x3, #16]
+> -2:
+>  	skip_debug_state x8, 1f
+>  	mrs	x7, dbgvcr32_el2
+>  	str	x7, [x3, #24]
+> @@ -468,21 +473,13 @@
+>  .macro activate_traps
+>  	ldr     x2, [x0, #VCPU_HCR_EL2]
+>  
+> -	/*
+> -	 * We are about to set CPTR_EL2.TFP to trap all floating point
+> -	 * register accesses to EL2, however, the ARM ARM clearly states that
+> -	 * traps are only taken to EL2 if the operation would not otherwise
+> -	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
+> -	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
+> -	 */
+> -	tbnz	x2, #HCR_RW_SHIFT, 99f // open code skip_32bit_state
+> -	mov	x3, #(1 << 30)
+> -	msr	fpexc32_el2, x3
+> -	isb
+> -99:
+>  	msr     hcr_el2, x2
+>  	mov	x2, #CPTR_EL2_TTA
+> +
+> +	ldrb    w3, [x0, #VCPU_VFP_DIRTY]
+> +	tbnz    w3, #0, 98f
+>  	orr     x2, x2, #CPTR_EL2_TFP
+> +98:
+>  	msr	cptr_el2, x2
+>  
+>  	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
+> @@ -669,14 +666,12 @@ __restore_debug:
+>  	ret
+>  
+>  __save_fpsimd:
+> -	skip_fpsimd_state x3, 1f
+>  	save_fpsimd
+> -1:	ret
+> +	ret
+>  
+>  __restore_fpsimd:
+> -	skip_fpsimd_state x3, 1f
+>  	restore_fpsimd
+> -1:	ret
+> +	ret
+>  
+>  switch_to_guest_fpsimd:
+>  	push	x4, lr
+> @@ -688,6 +683,9 @@ switch_to_guest_fpsimd:
+>  
+>  	mrs	x0, tpidr_el2
+>  
+> +	mov	w2, #1
+> +	strb    w2, [x0, #VCPU_VFP_DIRTY]
+> +
+>  	ldr	x2, [x0, #VCPU_HOST_CONTEXT]
+>  	kern_hyp_va x2
+>  	bl __save_fpsimd
+> @@ -763,7 +761,6 @@ __kvm_vcpu_return:
+>  	add	x2, x0, #VCPU_CONTEXT
+>  
+>  	save_guest_regs
+> -	bl __save_fpsimd
+>  	bl __save_sysregs
+>  
+>  	skip_debug_state x3, 1f
+> @@ -784,7 +781,6 @@ __kvm_vcpu_return:
+>  	kern_hyp_va x2
+>  
+>  	bl __restore_sysregs
+> -	bl __restore_fpsimd
+>  	/* Clear FPSIMD and Trace trapping */
+>  	msr     cptr_el2, xzr
+>  
+> @@ -863,6 +859,33 @@ ENTRY(__kvm_flush_vm_context)
+>  	ret
+>  ENDPROC(__kvm_flush_vm_context)
+>  
+> +/**
+> + * void __kvm_enable_fpexc32(void) -
+> + *	We may be entering the guest and set CPTR_EL2.TFP to trap all floating
+> + *	point register accesses to EL2, however, the ARM manual clearly states
+> + *	that traps are only taken to EL2 if the operation would not otherwise
+> + *	trap to EL1.  Therefore, always make sure that for 32-bit guests,
+> + *	we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
+> + */
+> +ENTRY(__kvm_enable_fpexc32)
+> +	mov	x3, #(1 << 30)
+> +	msr	fpexc32_el2, x3
+> +	ret
+> +ENDPROC(__kvm_enable_fpexc32)
+> +
+> +/**
+> + * void __kvm_save_fpexc32(void) -
+> + *	This function restores guest FPEXC to its vcpu context, we call this
+> + *	function from vcpu_put.
+> + */
+> +ENTRY(__kvm_save_fpexc32)
+> +	kern_hyp_va x0
+> +	add     x2, x0, #VCPU_CONTEXT
+> +	mrs     x1, fpexc32_el2
+> +	str     x1, [x2, #CPU_SYSREG_OFFSET(FPEXC32_EL2)]
+> +	ret
+> +ENDPROC(__kvm_save_fpexc32)
+> +
+>  __kvm_hyp_panic:
+>  	// Guess the context by looking at VTTBR:
+>  	// If zero, then we're already a host.
 > 
-> I've looked into this problem, and I've been unable to identify what's
-> going on here.  I can see no reason for the DACR to be set to 0x51 in
-> this code.
-> 
-> The entry path into this code is via __copy_to_user(), which saves and
-> sets the DACR to 0x55 before calling arm_copy_to_user(), which for
-> uaccess-with-memcpy() is in arch/arm/lib/uaccess_with_memcpy.c.  That
-> tail-calls into __copy_to_user_memcpy(), which should run with the
-> DACR set to 0x55.
-> 
-> The only place that the DACR is changed is inside __put_user(), which
-> saves the DACR before also setting it to 0x55, and then restores the
-> old DACR value, which, because the old value was 0x55, will have no
-> effect.
-> 
-> So, I can see no way that the DACR should ever be 0x51 inside
-> __copy_to_user_memcpy(), but you are seeing such a scenario.  I've no
-> idea how you could ever get a value of 0x51 out of the DACR within this
-> code.
 
-Since it seems like a race is at the bottom of the observed problems, I'm
-going to look for things that look racy. The things that stand out to me
-are:
+Thanks,
 
-* uaccess.h:modify_domain() does a read-modify-write on DACR using
-  get_domain and set_domain, and I don't see any locking. Is that
-  safe? Why?
-
-* uaccess_with_memcpy.c:__copy_to_user() has a mode in which it copies
-  "non-atomically" (if faulthandler_disabled() returns 0). If a fault
-  happens during __copy_to_user, what prevents some other thread from
-  clobbering DACR?
-
-* In uaccess.h:uaccess_save_and_enable(), what prevents a context
-  switch between the get_domain and set_domain calls?
-
-Just asking questions, I have no prior experience with this code...
-
-Cheers,
-Peter
+	M.
+-- 
+Jazz is not dead. It just smells funny...
