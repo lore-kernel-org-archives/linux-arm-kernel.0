@@ -1,37 +1,58 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 03 Dec 2015 11:56:27 -0800
-Subject: [PATCH v12 08/16] arm64/kexec: Add core kexec support
-In-Reply-To: <000b01d12d84$4313a930$c93afb90$@codeaurora.org>
-References: <cover.1448403503.git.geoff@infradead.org>
- <6ac232ad37d6b02cf2d5848b15236f26f5ac61ac.1448403503.git.geoff@infradead.org>
- <20151127131306.GE23908@dhcppc13.redhat.com>
- <1448909475.31214.27.camel@infradead.org>
- <20151201021615.GA5704@dhcppc13.redhat.com>
- <002101d12c66$ae985440$0bc8fcc0$@codeaurora.org>
- <1449096562.6139.74.camel@infradead.org>
- <000b01d12d84$4313a930$c93afb90$@codeaurora.org>
-Message-ID: <1449172587.24127.12.camel@infradead.org>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 03 Dec 2015 12:10:54 -0800
+Subject: [PATCH v4 1/3] KVM/arm/arm64: add hooks for armv7 fp/simd lazy
+ switch support
+In-Reply-To: <566096D6.50402@arm.com>
+References: <1447539130-4613-1-git-send-email-m.smarduch@samsung.com>
+ <1447539130-4613-2-git-send-email-m.smarduch@samsung.com>
+ <566063BE.7080005@arm.com> <56609633.3030307@samsung.com>
+ <566096D6.50402@arm.com>
+Message-ID: <5660A1CE.8010203@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Wed, 2015-12-02 at 21:37 -0700, Azriel Samson wrote:
-> I pushed out a kexec-v12.1 branch to my linux-kexec repo [1] with fixes.
-> Could you test it with both kexec reboot and kdump?  For kdump, use
-> something like:
->  > CMDLINE += 'crashkernel=64M at 2240M'
+
+On 12/3/2015 11:24 AM, Marc Zyngier wrote:
+> On 03/12/15 19:21, Mario Smarduch wrote:
+>>
+>>
+>> On 12/3/2015 7:46 AM, Marc Zyngier wrote:
+>>> On 14/11/15 22:12, Mario Smarduch wrote:
+>>>> This patch adds vcpu fields to track lazy state, save host FPEXC, and
+>>>> offsets to fields.
+>>>>
+>>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>>>> ---
+>>>>  arch/arm/include/asm/kvm_host.h | 6 ++++++
+>>>>  arch/arm/kernel/asm-offsets.c   | 2 ++
+>>>>  2 files changed, 8 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>>>> index 3df1e97..f1bf551 100644
+>>>> --- a/arch/arm/include/asm/kvm_host.h
+>>>> +++ b/arch/arm/include/asm/kvm_host.h
+>>>> @@ -107,6 +107,12 @@ struct kvm_vcpu_arch {
+>>>>  	/* Interrupt related fields */
+>>>>  	u32 irq_lines;		/* IRQ and FIQ levels */
+>>>>  
+>>>> +	/* fp/simd dirty flag true if guest accessed register file */
+>>>> +	bool    vfp_dirty;
+>>>
+>>> I think we do not need this bool, because it is already represented by
+>>> the state of the trapping bits.
+>>
+>> The trapping bit state is lost on exit since they're cleared, no?
 > 
-> For kdump, I also require a version of the patch "arm64/kexec: Add support
-> for kexec-lite". Without this, the dump capture kernel cannot find the
-> device tree even on v11 that I tested.
+> But that's what should actually be preserved, no? At the moment, you
+> maintain some side state to reflect what the trapping state is. You
+> might as well keep it around all the time.
 
-Without that patch, does the 2nd stage kernel get the correct
-dtb address in register x0?
+Ok I see, you should be able to preserve and use the trap registers. I'll rework
+it.
 
-Is the problem that the dtb data is corrupt when in the 2nd
-stage kernel?
-
-Is the dtb data OK when in the 1st stage kernel? 
-
--Geoff
+> 
+> Thanks,
+> 
+> 	M.
+> 
