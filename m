@@ -1,55 +1,44 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Thu,  3 Dec 2015 16:48:40 +0800
-Subject: [PATCH v3 2/5] thermal: rockchip: fix a impossible condition caused
- by the warning
+Date: Thu,  3 Dec 2015 16:48:41 +0800
+Subject: [PATCH v3 3/5] dt-bindings: rockchip-thermal: Support the
+ RK3228/RK3399 SoCs compatible
 In-Reply-To: <1449132523-18817-1-git-send-email-wxt@rock-chips.com>
 References: <1449132523-18817-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1449132523-18817-3-git-send-email-wxt@rock-chips.com>
+Message-ID: <1449132523-18817-4-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the Dan report the smatch check the thermal driver warning:
-drivers/thermal/rockchip_thermal.c:551 rockchip_configure_from_dt()
-warn: impossible condition '(thermal->tshut_temp > ((~0 >> 1))) =>
-(s32min-s32max > s32max)'
+This patchset attempts to new compatible for thermal founding
+on RK3228/RK3399 SoCs.
 
-Let's we remove the imposssible condition Since the Temperature is
-currently represented as int not long in the thermal driver.
-
-Fixes: commit 437df2172e8d
-("thermal: rockchip: consistently use int for temperatures")
-
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Acked-by: Rob Herring <robh@kernel.org>
 
 ---
 
-Changes in v3:
-- As Brian comments on https://patchwork.kernel.org/patch/7580661/,
-  let's remove the impossible condition.
-
+Changes in v3: None
 Changes in v2: None
-Changes in v1: None
+Changes in v1:
+- As Heiko comments, fix a copy incorrect name.
+- Add a Acked from Rob.
 
- drivers/thermal/rockchip_thermal.c | 6 ------
- 1 file changed, 6 deletions(-)
+ Documentation/devicetree/bindings/thermal/rockchip-thermal.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-index ae796ec..611de00 100644
---- a/drivers/thermal/rockchip_thermal.c
-+++ b/drivers/thermal/rockchip_thermal.c
-@@ -549,12 +549,6 @@ static int rockchip_configure_from_dt(struct device *dev,
- 		thermal->tshut_temp = shut_temp;
- 	}
+diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+index 0dfa60d..08efe6b 100644
+--- a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
++++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+@@ -2,8 +2,10 @@
  
--	if (thermal->tshut_temp > INT_MAX) {
--		dev_err(dev, "Invalid tshut temperature specified: %d\n",
--			thermal->tshut_temp);
--		return -ERANGE;
--	}
--
- 	if (of_property_read_u32(np, "rockchip,hw-tshut-mode", &tshut_mode)) {
- 		dev_warn(dev,
- 			 "Missing tshut mode property, using default (%s)\n",
+ Required properties:
+ - compatible : should be "rockchip,<name>-tsadc"
++   "rockchip,rk3228-tsadc": found on RK3228 SoCs
+    "rockchip,rk3288-tsadc": found on RK3288 SoCs
+    "rockchip,rk3368-tsadc": found on RK3368 SoCs
++   "rockchip,rk3399-tsadc": found on RK3399 SoCs
+ - reg : physical base address of the controller and length of memory mapped
+ 	region.
+ - interrupts : The interrupt number to the cpu. The interrupt specifier format
 -- 
 1.9.1
