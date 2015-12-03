@@ -1,95 +1,88 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Thu, 3 Dec 2015 15:51:28 +0530
-Subject: [PATCH v4 4/5] ARM: dts: DRA7: add entry for qspi mmap region
-In-Reply-To: <20151201163950.GR23396@atomide.com>
-References: <1448860515-28336-1-git-send-email-vigneshr@ti.com>
- <1448860515-28336-5-git-send-email-vigneshr@ti.com>
- <20151130223408.GJ23396@atomide.com> <565D25E6.4070206@ti.com>
- <20151201163950.GR23396@atomide.com>
-Message-ID: <566017A8.5040106@ti.com>
+From: ben@smart-cactus.org (Ben Gamari)
+Date: Thu, 03 Dec 2015 11:26:31 +0100
+Subject: [PATCH v5 0/12] cpufreq: Add support for Exynos 5800, 5420,
+ and 5422
+In-Reply-To: <20151203060527.GH4302@ubuntu>
+References: <1449091167-20758-1-git-send-email-ben@smart-cactus.org>
+ <20151203060527.GH4302@ubuntu>
+Message-ID: <877fkv4ylk.fsf@smart-cactus.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Viresh Kumar <viresh.kumar@linaro.org> writes:
 
+> Hi Ben,
 
-On 12/01/2015 10:09 PM, Tony Lindgren wrote:
-> * Vignesh R <vigneshr@ti.com> [151130 20:46]:
->> On 12/01/2015 04:04 AM, Tony Lindgren wrote:
->>>
->>> Actually none of the IO areas above are within the same interconnect target:
->>>
->>> 0x4b300000  QSPI0 address space in L3 main interconnect
->>> 0x5c000000  QSPI1 address space in L3 main interconnect
->>
->>
->> First address range (configuration port: 0x4b300000) corresponds to QSPI
->> registers space. These registers alone are sufficient for generic SPI
->> communication (serial flash as well as non-flash SPI devices).
-> 
-> OK
-> 
->> In order to speed up SPI flash reads SFI_MM_IF(SPI memory mapped
->> interface) is provided by QSPI IP. This _cannot_ be used with non-flash
->> devices.
-> 
-> OK
-> 
->> The second address range (0x5c000000) corresponds to memory-mapped
->> region of SFI_MM_IF, through which SPI flash memories can be read as if
->> though they were RAM addresses (i.e using readl/memcpy). The SFI_MM_IF
->> block that takes care of communicating over SPI bus and getting the data
->> from flash device.
-> 
-> OK
-> 
->> But SFI_MM_IF block needs to know some flash specific information(such
->> as read opcode, address bytes, dummy bytes, mode). This information must
->> first be populated in QSPI_SPI_SETUP*_REG(0x4B300054-60) before
->> accessing SFI_MM_IF address range via readl.
->> Both addresses space belong to same instance of the driver, one
->> corresponds to register space and other is memory-mapped region.
->> Therefore both regions are claimed by the same driver.
-> 
-> OK
-> 
->>> 0x4a002558  CTRL_CORE_CONTROL_IO_2 in System Control Module (SCM) in L4_CFG
->>>
->>> The first two address spaces should be two separate instances of this driver.
->>
->> Not actually two instances.
-> 
-> OK. They are both on L3 main so that won't cause any issues for separate
-> interconnect driver instances. As they are still separate targets flushing
-> a posted write to one area will not flush anything to the other.
-> 
+Hi Viresh,
 
-I didn't quite understand what you meant by interconnect driver instance.
-qspi_base and qspi_mmap region are tightly bound to each other and both
-needs to be accessed by ti-qspi driver (though different targets).
-Besides qspi_mmap region is only used to read data, there will not be
-any write accesses to this target. Are you saying this binding is not
-viable?
+> On 02-12-15, 22:19, Ben Gamari wrote:
+>> 
+>> This patch series adds cpufreq support for the Exynos 5800, 5420, and 5422
+>> SOCs. In particular, it adds support for operating-points-v2 bindings to the
+>> arm-big-little cpufreq driver and updates the above-mentioned SOCs' devicetrees
+>> to take advantage of this support. There are also a couple of patches improving
+>> the clarify of the arm-big-little implementation. It is built on a set posted
+>> by Bartlomiej Zolnierkiewicz in April 2015.
+>> 
+>> The most signficant change from the original series is porting to the
+>> operating-points-v2 devicetree bindings. The series has been tested by me on
+>> and Odroid XU4 and by Javier Martinez Canillas on a Peach Pit.
+>
+> Thanks for working with opp-v2 bindings, really appreciate it.
 
->>> The CTRL_CORE_CONTROL_IO_2 needs seems like a shared clock register that
->>> needs to be accessed using the clock framework most likely.
->>>
->>
->> Not shared clock.
->> The CTRL_CORE_CONTROL_IO_2[10:8] QSPI_MEMMAPPED_CS bit fields provides a
->> functionality for remapping the previously described address space which
->> starts at 0x5C000000 L3_MAIN address to one of the four supported chip
->> selects.
->> How about using syscon to access CTRL_CORE_CONTROL_IO_2?
-> 
-> A separate driver implementing some Linux generic framework would be idael :)
-> 
-> But if that does not fit, yeah then syscon makes sense as that IO range
-> will be on separate interconnect driver (and clock and possibly power domain)
-> instances eventually.
-> 
+My pleasure.
 
-I will go ahead with syscon for accessing CTRL_CORE_CONTROL_IO_2 register.
+> But, before I start reviewing this series, I have few comments.
+> - We weren't able to use cpufreq-dt driver for big LITTLE platforms
+>   earlier, as it never had multi cluster support and we wanted
+>   clock-sharing information via DT.
 
--- 
-Regards
-Vignesh
+Fair enough.
+
+> - That is all fixed now.
+
+I did not see any mention of this in the cpufreq-dt driver binding
+documentation, otherwise I would have tried going this route.
+
+Do you have any references? I'd be happy to examine what would be
+necessary to go this route although, being an independent contributor,
+it may take time.
+
+> - I want Samsung's big LITTLE platforms to use cpufreq-dt and drop
+>   arm_big_little driver completely.
+
+That sounds like a great direction going forward. However, I would still
+kindly request that you consider this series.
+
+The existence of future plans of course does not change the fact that
+users have real hardware today; hardware that they have spent money on
+and would like to use. Cpufreq support has already been deferred once
+for similar reasons of interface churn which essentially forestalled
+working functionality from entering the kernel by eight months; I'd
+really like to avoid having this happen again.
+
+> - The only case for which it (arm_big_little) driver might be useful
+>   is the IKS solution. Which I don't believe you are going to use in
+>   future :)
+
+Indeed.
+
+> My plan for the arm-big-little driver:
+> - Migrate all platforms to use cpufreq-dt instead for non-IKS
+>   solution
+> - Make arm-big-little driver arm-big-little-iks only driver.
+
+Sounds reasonable to me. However, I'd just like to reiterate that this
+line of work can be pursued independently from the upstreaming of this
+series.
+
+Thanks for your time,
+
+- Ben
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 472 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151203/43ae442c/attachment.sig>
