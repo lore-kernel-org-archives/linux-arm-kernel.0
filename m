@@ -1,135 +1,54 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 3 Dec 2015 16:39:59 +0000
-Subject: [PATCH v6 11/19] arm64:ilp32: support core dump generation for
- ILP32
-In-Reply-To: <1447795019-30176-12-git-send-email-ynorov@caviumnetworks.com>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <1447795019-30176-12-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <20151203163959.GM10747@e104818-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 3 Dec 2015 08:41:13 -0800
+Subject: [PATCH 2/2] ARM: OMAP2+: Change core_initcall levels to
+ postcore_initcall
+In-Reply-To: <56606F20.9050805@ti.com>
+References: <1448900789-4034-1-git-send-email-tony@atomide.com>
+ <1448900789-4034-3-git-send-email-tony@atomide.com>
+ <20151203160014.GL23396@atomide.com> <56606F20.9050805@ti.com>
+Message-ID: <20151203164113.GS23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2015 at 12:16:51AM +0300, Yury Norov wrote:
-> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-> index 01e032c..8f13dac 100644
-> --- a/arch/arm64/include/asm/elf.h
-> +++ b/arch/arm64/include/asm/elf.h
-> @@ -134,7 +134,11 @@ typedef struct user_fpsimd_state elf_fpregset_t;
-[...]
-> @@ -179,24 +186,80 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_A32_ELF_NGREG];
->  					 ((x)->e_flags & EF_ARM_EABI_MASK))
->  
->  #define compat_start_thread		compat_start_thread
-> -#define COMPAT_SET_PERSONALITY(ex)	set_thread_flag(TIF_32BIT);
-> -#define COMPAT_ARCH_DLINFO
-> -extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
-> -				      int uses_interp);
-> -#define compat_arch_setup_additional_pages \
-> -					aarch32_setup_vectors_page
-> +#define COMPAT_A32_SET_PERSONALITY(ex)		\
-> +do {						\
-> +	clear_thread_flag(TIF_32BIT_AARCH64);	\
-> +	set_thread_flag(TIF_32BIT);		\
-> +} while (0)
-> +#define COMPAT_A32_ARCH_DLINFO		do {} while (0)
->  
->  #else
->  
->  typedef elf_greg_t			compat_elf_greg_t;
->  typedef elf_gregset_t			compat_elf_gregset_t;
->  #define compat_a32_elf_check_arch(x)	0
-> -#define COMPAT_SET_PERSONALITY(ex)
-> -#define COMPAT_ARCH_DLINFO
-> +#define COMPAT_A32_SET_PERSONALITY(ex)	do {} while (0)
-> +#define COMPAT_A32_ARCH_DLINFO		do {} while (0)
-> +#endif
-> +
-> +/* If ILP32 is turned on, we want to define the compat_elf_greg_t to the non compat
-> +   one and define PR_REG_SIZE/PRSTATUS_SIZE/SET_PR_FPVALID so we pick up the correct
-> +   ones for AARCH32. Note also the definition of the macros have to be correct for
-> +   LP64 as this file is included in the standard binfmt_elf.c. */
-> +#ifdef CONFIG_ARM64_ILP32
-> +typedef elf_greg_t			compat_elf_greg_t;
-> +typedef elf_gregset_t			compat_elf_gregset_t;
-> +#define PR_REG_SIZE(S)			(is_a32_compat_task() ? 72 : 272)
-> +#define PRSTATUS_SIZE(S)		(is_a32_compat_task() ? 124 : (is_ilp32_compat_task() ? 352 : 392))
+* Grygorii Strashko <grygorii.strashko@ti.com> [151203 08:35]:
+> On 12/03/2015 06:00 PM, Tony Lindgren wrote:
+> > * Tony Lindgren <tony@atomide.com> [151130 08:29]:
+> >> We want to be able to probe a few selected device drivers before hwmod
+> >> code populates the clocks in omap_hwmod_setup_all(). This allows us to
+> >> convert most of the clock drivers into regular device drivers.
+> 
+> if understand things right, ti clks now will be populated and initialized
+> from 
+> __omap_sync32k_timer_init
+>  - omap_clk_init()
+>    - .. 
+>    - of_clk_init()
+>    - ..
+>    - omap_clk_soc_init()
+> 
+> and __omap_sync32k_timer_init(), in turn, will be called from:
+> arch/arm/kernel/time.c
+>  - time_init()
+> 	machine_desc->init_time();
+> (without your patch 1).
 
-Can you be more specific about these numbers, what they represent, how
-they are calculated? Can you not use some sizeof()?
+Yes that's the current approach, but we can do better. We only need the following
+clocks for system timers at that point:
 
-> +#define SET_PR_FPVALID(S, V)							\
-> +do {										\
-> +	*(int *) (((void *) &((S)->pr_reg)) + PR_REG_SIZE((S)->pr_reg)) = (V);	\
-> +} while (0)
-> +#else
-> +typedef compat_a32_elf_greg_t compat_elf_greg_t;
-> +typedef compat_a32_elf_gregset_t compat_elf_gregset_t;
-> +#endif
->  
-> +#ifdef CONFIG_ARM64_ILP32
-> +#define compat_ilp32_elf_check_arch(x) ((x)->e_machine == EM_AARCH64)
-> +#define COMPAT_ILP32_SET_PERSONALITY(ex)	\
-> +do {						\
-> +	set_thread_flag(TIF_32BIT_AARCH64);	\
-> +	clear_thread_flag(TIF_32BIT);		\
-> +} while (0)
-> +#define COMPAT_ILP32_ARCH_DLINFO					\
-> +do {									\
-> +	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
-> +		    (elf_addr_t)(long)current->mm->context.vdso);	\
-> +} while (0)
-> +#else
-> +#define compat_ilp32_elf_check_arch(x) 0
-> +#define COMPAT_ILP32_SET_PERSONALITY(ex)	do {} while (0)
-> +#define COMPAT_ILP32_ARCH_DLINFO		do {} while (0)
->  #endif
->  
-> -#define compat_elf_check_arch(x)	compat_a32_elf_check_arch(x)
-> +#define compat_elf_check_arch(x)	(compat_a32_elf_check_arch(x) || compat_ilp32_elf_check_arch(x))
-> +#define COMPAT_SET_PERSONALITY(ex)			\
-> +do {							\
-> +	if (compat_a32_elf_check_arch(&ex))		\
-> +		COMPAT_A32_SET_PERSONALITY(ex);		\
-> +	else						\
-> +		COMPAT_ILP32_SET_PERSONALITY(ex);	\
-> +} while (0)
-> +
-> +/* ILP32 uses the "LP64-like" vdso pages */
-> +#define compat_arch_setup_additional_pages	\
-> +	(is_a32_compat_task()			\
-> +	 ? &aarch32_setup_vectors_page		\
-> +	 : &(arch_setup_additional_pages))
+- mux clocks to select between the 32k and hf oscillator source
 
-I thought vdso is not yet supported for ILP32. Do you still want to
-insert the special mapping?
+- clkctrl driver to gate the ocp clock
 
-BTW, what do you do for sigreturn? It's handled by the vdso code on
-AArch64.
+All the other clocks can be initialized at core_initcall time with this change.
 
-> diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-> index 26352a6..b239b9b 100644
-> --- a/arch/arm64/kernel/vdso.c
-> +++ b/arch/arm64/kernel/vdso.c
-> @@ -107,6 +107,14 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
->  
->  	return PTR_ERR_OR_ZERO(ret);
->  }
-> +#else
-> +int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
-> +{
-> +	(void) bprm;
-> +	(void) uses_interp;
+> So, I don't see real dependency here between clk initialization and hwmods :(
 
-Do you get a warning for unused function arguments?
+You don't because it's only implemented so far for the dm814x ADPLL clock :)
 
-> +
-> +	return -EINVAL;
-> +}
+That I posted as "[PATCH 0/2] Clock driver for dm814x ADPLL". Note how it's
+just a regular device driver that also works as loadable module on boards that
+have all the necessary clocks enabled already by the bootloader.
 
-A BUG() would be useful here.
+Regards,
 
-Alternatively, you can define this aarch32_setup_vectors_page as NULL
-when !AARCH32_EL0.
-
--- 
-Catalin
+Tony
