@@ -1,187 +1,303 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 3 Dec 2015 14:11:10 +0800
-Subject: [PATCH v5 00/21] KVM: ARM64: Add guest PMU support
-Message-ID: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu,  3 Dec 2015 01:12:37 -0500
+Subject: [PATCH V8 5/5] dma: qcom_hidma: add debugfs hooks
+In-Reply-To: <1449123159-28261-1-git-send-email-okaya@codeaurora.org>
+References: <1449123159-28261-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1449123159-28261-6-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+Add debugfs hooks for debugging the execution behavior of the DMA
+channel. The debugfs hooks get initialized by the probe function and
+uninitialized by the remove function.
 
-This patchset adds guest PMU support for KVM on ARM64. It takes
-trap-and-emulate approach. When guest wants to monitor one event, it
-will be trapped by KVM and KVM will call perf_event API to create a perf
-event and call relevant perf_event APIs to get the count value of event.
+A stats file is created in debugfs. The stats file will show the
+information about each HIDMA channel as well as each asynchronous job
+queued and completed at a given time.
 
-Use perf to test this patchset in guest. When using "perf list", it
-shows the list of the hardware events and hardware cache events perf
-supports. Then use "perf stat -e EVENT" to monitor some event. For
-example, use "perf stat -e cycles" to count cpu cycles and
-"perf stat -e cache-misses" to count cache misses.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/dma/qcom/Makefile    |   2 +-
+ drivers/dma/qcom/hidma.c     |   3 +
+ drivers/dma/qcom/hidma.h     |   2 +
+ drivers/dma/qcom/hidma_dbg.c | 219 +++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 225 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/dma/qcom/hidma_dbg.c
 
-Below are the outputs of "perf stat -r 5 sleep 5" when running in host
-and guest.
-
-Host:
- Performance counter stats for 'sleep 5' (5 runs):
-
-          0.510276      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.57% )
-                 1      context-switches          #    0.002 M/sec
-                 0      cpu-migrations            #    0.000 K/sec
-                49      page-faults               #    0.096 M/sec                    ( +-  0.77% )
-           1064117      cycles                    #    2.085 GHz                      ( +-  1.56% )
-   <not supported>      stalled-cycles-frontend
-   <not supported>      stalled-cycles-backend
-            529051      instructions              #    0.50  insns per cycle          ( +-  0.55% )
-   <not supported>      branches
-              9894      branch-misses             #   19.390 M/sec                    ( +-  1.70% )
-
-       5.000853900 seconds time elapsed                                          ( +-  0.00% )
-
-Guest:
- Performance counter stats for 'sleep 5' (5 runs):
-
-          0.642456      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.81% )
-                 1      context-switches          #    0.002 M/sec
-                 0      cpu-migrations            #    0.000 K/sec
-                49      page-faults               #    0.076 M/sec                    ( +-  1.64% )
-           1322717      cycles                    #    2.059 GHz                      ( +-  1.88% )
-   <not supported>      stalled-cycles-frontend
-   <not supported>      stalled-cycles-backend
-            640944      instructions              #    0.48  insns per cycle          ( +-  1.10% )
-   <not supported>      branches
-             10665      branch-misses             #   16.600 M/sec                    ( +-  2.23% )
-
-       5.001181452 seconds time elapsed                                          ( +-  0.00% )
-
-Have a cycle counter read test like below in guest and host:
-
-static void test(void)
-{
-	unsigned long count, count1, count2;
-	count1 = read_cycles();
-	count++;
-	count2 = read_cycles();
-}
-
-Host:
-count1: 3046186213
-count2: 3046186347
-delta: 134
-
-Guest:
-count1: 5645797121
-count2: 5645797270
-delta: 149
-
-The gap between guest and host is very small. One reason for this I
-think is that it doesn't count the cycles in EL2 and host since we add
-exclude_hv = 1. So the cycles spent to store/restore registers which
-happens at EL2 are not included.
-
-This patchset can be fetched from [1] and the relevant QEMU version for
-test can be fetched from [2].
-
-The results of 'perf test' can be found from [3][4].
-The results of perf_event_tests test suite can be found from [5][6].
-
-Also, I have tested "perf top" in two VMs and host at the same time. It
-works well.
-
-Thanks,
-Shannon
-
-[1] https://git.linaro.org/people/shannon.zhao/linux-mainline.git  KVM_ARM64_PMU_v5
-[2] https://git.linaro.org/people/shannon.zhao/qemu.git  virtual_PMU
-[3] http://people.linaro.org/~shannon.zhao/PMU/perf-test-host.txt
-[4] http://people.linaro.org/~shannon.zhao/PMU/perf-test-guest.txt
-[5] http://people.linaro.org/~shannon.zhao/PMU/perf_event_tests-host.txt
-[6] http://people.linaro.org/~shannon.zhao/PMU/perf_event_tests-guest.txt
-
-Changes since v4:
-* Rebase on new linux kernel mainline 
-* Drop the reset handler of CP15 registers
-* Fix a compile failure on arch ARM due to lack of asm/pmu.h
-* Refactor the interrupt injecting flow according to Marc's suggestion
-* Check the value of PMSELR register
-* Calculate the attr.disabled according to PMCR.E and PMCNTENSET/CLR
-* Fix some coding style
-* Document the vPMU irq range
-
-Changes since v3:
-* Rebase on new linux kernel mainline 
-* Use ARMV8_MAX_COUNTERS instead of 32
-* Reset PMCR.E to zero.
-* Trigger overflow for software increment.
-* Optimize PMU interrupt inject logic.
-* Add handler for E,C,P bits of PMCR
-* Fix the overflow bug found by perf_event_tests
-* Run 'perf test', 'perf top' and perf_event_tests test suite
-* Add exclude_hv = 1 configuration to not count in EL2
-
-Changes since v2:
-* Directly use perf raw event type to create perf_event in KVM
-* Add a helper vcpu_sysreg_write
-* remove unrelated header file
-
-Changes since v1:
-* Use switch...case for registers access handler instead of adding
-  alone handler for each register
-* Try to use the sys_regs to store the register value instead of adding
-  new variables in struct kvm_pmc
-* Fix the handle of cp15 regs
-* Create a new kvm device vPMU, then userspace could choose whether to
-  create PMU
-* Fix the handle of PMU overflow interrupt
-
-Shannon Zhao (21):
-  ARM64: Move PMU register related defines to asm/pmu.h
-  KVM: ARM64: Define PMU data structure for each vcpu
-  KVM: ARM64: Add offset defines for PMU registers
-  KVM: ARM64: Add reset and access handlers for PMCR_EL0 register
-  KVM: ARM64: Add reset and access handlers for PMSELR register
-  KVM: ARM64: Add reset and access handlers for PMCEID0 and PMCEID1
-    register
-  KVM: ARM64: PMU: Add perf event map and introduce perf event creating
-    function
-  KVM: ARM64: Add reset and access handlers for PMXEVTYPER register
-  KVM: ARM64: Add reset and access handlers for PMXEVCNTR register
-  KVM: ARM64: Add reset and access handlers for PMCCNTR register
-  KVM: ARM64: Add reset and access handlers for PMCNTENSET and
-    PMCNTENCLR register
-  KVM: ARM64: Add reset and access handlers for PMINTENSET and
-    PMINTENCLR register
-  KVM: ARM64: Add reset and access handlers for PMOVSSET and PMOVSCLR
-    register
-  KVM: ARM64: Add reset and access handlers for PMUSERENR register
-  KVM: ARM64: Add reset and access handlers for PMSWINC register
-  KVM: ARM64: Add access handlers for PMEVCNTRn and PMEVTYPERn register
-  KVM: ARM64: Add helper to handle PMCR register bits
-  KVM: ARM64: Add PMU overflow interrupt routing
-  KVM: ARM64: Reset PMU state when resetting vcpu
-  KVM: ARM64: Free perf event of PMU when destroying vcpu
-  KVM: ARM64: Add a new kvm ARM PMU device
-
- Documentation/virtual/kvm/devices/arm-pmu.txt |  16 +
- arch/arm/kvm/arm.c                            |   3 +
- arch/arm64/include/asm/kvm_asm.h              |  55 ++-
- arch/arm64/include/asm/kvm_host.h             |   2 +
- arch/arm64/include/asm/pmu.h                  |  66 +++
- arch/arm64/include/uapi/asm/kvm.h             |   3 +
- arch/arm64/kernel/perf_event.c                |  36 +-
- arch/arm64/kvm/Kconfig                        |   8 +
- arch/arm64/kvm/Makefile                       |   1 +
- arch/arm64/kvm/reset.c                        |   3 +
- arch/arm64/kvm/sys_regs.c                     | 559 ++++++++++++++++++++++++--
- include/kvm/arm_pmu.h                         |  72 ++++
- include/linux/kvm_host.h                      |   1 +
- include/uapi/linux/kvm.h                      |   2 +
- virt/kvm/arm/pmu.c                            | 525 ++++++++++++++++++++++++
- virt/kvm/kvm_main.c                           |   4 +
- 16 files changed, 1288 insertions(+), 68 deletions(-)
- create mode 100644 Documentation/virtual/kvm/devices/arm-pmu.txt
- create mode 100644 arch/arm64/include/asm/pmu.h
- create mode 100644 include/kvm/arm_pmu.h
- create mode 100644 virt/kvm/arm/pmu.c
-
+diff --git a/drivers/dma/qcom/Makefile b/drivers/dma/qcom/Makefile
+index d2c6bda..f702df1 100644
+--- a/drivers/dma/qcom/Makefile
++++ b/drivers/dma/qcom/Makefile
+@@ -1,4 +1,4 @@
+ obj-$(CONFIG_QCOM_BAM_DMA) += bam_dma.o
+ obj-$(CONFIG_QCOM_HIDMA_MGMT) += hidma_mgmt.o hidma_mgmt_sys.o
+ obj-$(CONFIG_QCOM_HIDMA) +=  hdma.o
+-hdma-objs        := hidma_ll.o hidma.o
++hdma-objs        := hidma_ll.o hidma.o hidma_dbg.o
+diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
+index 1237a26..ee3aacd 100644
+--- a/drivers/dma/qcom/hidma.c
++++ b/drivers/dma/qcom/hidma.c
+@@ -650,6 +650,7 @@ static int hidma_probe(struct platform_device *pdev)
+ 
+ 	dmadev->irq = chirq;
+ 	tasklet_init(&dmadev->task, hidma_issue_task, (unsigned long)dmadev);
++	hidma_debug_init(dmadev);
+ 	dev_info(&pdev->dev, "HI-DMA engine driver registration complete\n");
+ 	platform_set_drvdata(pdev, dmadev);
+ 	pm_runtime_mark_last_busy(dmadev->ddev.dev);
+@@ -658,6 +659,7 @@ static int hidma_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ uninit:
++	hidma_debug_uninit(dmadev);
+ 	hidma_ll_uninit(dmadev->lldev);
+ dmafree:
+ 	if (dmadev)
+@@ -675,6 +677,7 @@ static int hidma_remove(struct platform_device *pdev)
+ 	pm_runtime_get_sync(dmadev->ddev.dev);
+ 	dma_async_device_unregister(&dmadev->ddev);
+ 	devm_free_irq(dmadev->ddev.dev, dmadev->irq, &dmadev->lldev);
++	hidma_debug_uninit(dmadev);
+ 	hidma_ll_uninit(dmadev->lldev);
+ 	hidma_free(dmadev);
+ 
+diff --git a/drivers/dma/qcom/hidma.h b/drivers/dma/qcom/hidma.h
+index b8a7990..88897c7 100644
+--- a/drivers/dma/qcom/hidma.h
++++ b/drivers/dma/qcom/hidma.h
+@@ -156,4 +156,6 @@ int hidma_ll_uninit(struct hidma_lldev *llhndl);
+ irqreturn_t hidma_ll_inthandler(int irq, void *arg);
+ void hidma_cleanup_pending_tre(struct hidma_lldev *llhndl, u8 err_info,
+ 				u8 err_code);
++int hidma_debug_init(struct hidma_dev *dmadev);
++void hidma_debug_uninit(struct hidma_dev *dmadev);
+ #endif
+diff --git a/drivers/dma/qcom/hidma_dbg.c b/drivers/dma/qcom/hidma_dbg.c
+new file mode 100644
+index 0000000..3698257
+--- /dev/null
++++ b/drivers/dma/qcom/hidma_dbg.c
+@@ -0,0 +1,219 @@
++/*
++ * Qualcomm Technologies HIDMA debug file
++ *
++ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/debugfs.h>
++#include <linux/device.h>
++#include <linux/list.h>
++#include <linux/pm_runtime.h>
++
++#include "hidma.h"
++
++static void hidma_ll_chstats(struct seq_file *s, void *llhndl, u32 tre_ch)
++{
++	struct hidma_lldev *lldev = llhndl;
++	struct hidma_tre *tre;
++	u32 length;
++	dma_addr_t src_start;
++	dma_addr_t dest_start;
++	u32 *tre_local;
++
++	if (tre_ch >= lldev->nr_tres) {
++		dev_err(lldev->dev, "invalid TRE number in chstats:%d", tre_ch);
++		return;
++	}
++	tre = &lldev->trepool[tre_ch];
++	seq_printf(s, "------Channel %d -----\n", tre_ch);
++	seq_printf(s, "allocated=%d\n", atomic_read(&tre->allocated));
++	seq_printf(s, "queued = 0x%x\n", tre->queued);
++	seq_printf(s, "err_info = 0x%x\n",
++		   lldev->tx_status_list[tre->chidx].err_info);
++	seq_printf(s, "err_code = 0x%x\n",
++		   lldev->tx_status_list[tre->chidx].err_code);
++	seq_printf(s, "status = 0x%x\n", tre->status);
++	seq_printf(s, "chidx = 0x%x\n", tre->chidx);
++	seq_printf(s, "dma_sig = 0x%x\n", tre->dma_sig);
++	seq_printf(s, "dev_name=%s\n", tre->dev_name);
++	seq_printf(s, "callback=%p\n", tre->callback);
++	seq_printf(s, "data=%p\n", tre->data);
++	seq_printf(s, "tre_index = 0x%x\n", tre->tre_index);
++
++	tre_local = &tre->tre_local[0];
++	src_start = tre_local[TRE_SRC_LOW_IDX];
++	src_start = ((u64) (tre_local[TRE_SRC_HI_IDX]) << 32) + src_start;
++	dest_start = tre_local[TRE_DEST_LOW_IDX];
++	dest_start += ((u64) (tre_local[TRE_DEST_HI_IDX]) << 32);
++	length = tre_local[TRE_LEN_IDX];
++
++	seq_printf(s, "src=%pap\n", &src_start);
++	seq_printf(s, "dest=%pap\n", &dest_start);
++	seq_printf(s, "length = 0x%x\n", length);
++}
++
++static void hidma_ll_devstats(struct seq_file *s, void *llhndl)
++{
++	struct hidma_lldev *lldev = llhndl;
++
++	seq_puts(s, "------Device -----\n");
++	seq_printf(s, "lldev init = 0x%x\n", lldev->initialized);
++	seq_printf(s, "trch_state = 0x%x\n", lldev->trch_state);
++	seq_printf(s, "evch_state = 0x%x\n", lldev->evch_state);
++	seq_printf(s, "evridx = 0x%x\n", lldev->evridx);
++	seq_printf(s, "nr_tres = 0x%x\n", lldev->nr_tres);
++	seq_printf(s, "trca=%p\n", lldev->trca);
++	seq_printf(s, "tre_ring=%p\n", lldev->tre_ring);
++	seq_printf(s, "tre_ring_handle=%pap\n", &lldev->tre_ring_handle);
++	seq_printf(s, "tre_ring_size = 0x%x\n", lldev->tre_ring_size);
++	seq_printf(s, "tre_processed_off = 0x%x\n", lldev->tre_processed_off);
++	seq_printf(s, "pending_tre_count=%d\n", lldev->pending_tre_count);
++	seq_printf(s, "evca=%p\n", lldev->evca);
++	seq_printf(s, "evre_ring=%p\n", lldev->evre_ring);
++	seq_printf(s, "evre_ring_handle=%pap\n", &lldev->evre_ring_handle);
++	seq_printf(s, "evre_ring_size = 0x%x\n", lldev->evre_ring_size);
++	seq_printf(s, "evre_processed_off = 0x%x\n", lldev->evre_processed_off);
++	seq_printf(s, "tre_write_offset = 0x%x\n", lldev->tre_write_offset);
++}
++
++/*
++ * hidma_chan_stats: display HIDMA channel statistics
++ *
++ * Display the statistics for the current HIDMA virtual channel device.
++ */
++static int hidma_chan_stats(struct seq_file *s, void *unused)
++{
++	struct hidma_chan *mchan = s->private;
++	struct hidma_desc *mdesc;
++	struct hidma_dev *dmadev = mchan->dmadev;
++
++	pm_runtime_get_sync(dmadev->ddev.dev);
++	seq_printf(s, "paused=%u\n", mchan->paused);
++	seq_printf(s, "dma_sig=%u\n", mchan->dma_sig);
++	seq_puts(s, "prepared\n");
++	list_for_each_entry(mdesc, &mchan->prepared, node)
++		hidma_ll_chstats(s, mchan->dmadev->lldev, mdesc->tre_ch);
++
++	seq_puts(s, "active\n");
++	list_for_each_entry(mdesc, &mchan->active, node)
++		hidma_ll_chstats(s, mchan->dmadev->lldev, mdesc->tre_ch);
++
++	seq_puts(s, "completed\n");
++	list_for_each_entry(mdesc, &mchan->completed, node)
++		hidma_ll_chstats(s, mchan->dmadev->lldev, mdesc->tre_ch);
++
++	hidma_ll_devstats(s, mchan->dmadev->lldev);
++	pm_runtime_mark_last_busy(dmadev->ddev.dev);
++	pm_runtime_put_autosuspend(dmadev->ddev.dev);
++	return 0;
++}
++
++/*
++ * hidma_dma_info: display HIDMA device info
++ *
++ * Display the info for the current HIDMA device.
++ */
++static int hidma_dma_info(struct seq_file *s, void *unused)
++{
++	struct hidma_dev *dmadev = s->private;
++	resource_size_t sz;
++
++	seq_printf(s, "nr_descriptors=%d\n", dmadev->nr_descriptors);
++	seq_printf(s, "dev_trca=%p\n", &dmadev->dev_trca);
++	seq_printf(s, "dev_trca_phys=%pa\n", &dmadev->trca_resource->start);
++	sz = resource_size(dmadev->trca_resource);
++	seq_printf(s, "dev_trca_size=%pa\n", &sz);
++	seq_printf(s, "dev_evca=%p\n", &dmadev->dev_evca);
++	seq_printf(s, "dev_evca_phys=%pa\n", &dmadev->evca_resource->start);
++	sz = resource_size(dmadev->evca_resource);
++	seq_printf(s, "dev_evca_size=%pa\n", &sz);
++	return 0;
++}
++
++static int hidma_chan_stats_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, hidma_chan_stats, inode->i_private);
++}
++
++static int hidma_dma_info_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, hidma_dma_info, inode->i_private);
++}
++
++static const struct file_operations hidma_chan_fops = {
++	.open = hidma_chan_stats_open,
++	.read = seq_read,
++	.llseek = seq_lseek,
++	.release = single_release,
++};
++
++static const struct file_operations hidma_dma_fops = {
++	.open = hidma_dma_info_open,
++	.read = seq_read,
++	.llseek = seq_lseek,
++	.release = single_release,
++};
++
++void hidma_debug_uninit(struct hidma_dev *dmadev)
++{
++	debugfs_remove_recursive(dmadev->debugfs);
++	debugfs_remove_recursive(dmadev->stats);
++}
++
++int hidma_debug_init(struct hidma_dev *dmadev)
++{
++	int rc = 0;
++	int chidx = 0;
++	struct list_head *position = NULL;
++
++	dmadev->debugfs = debugfs_create_dir(dev_name(dmadev->ddev.dev), NULL);
++	if (!dmadev->debugfs) {
++		rc = -ENODEV;
++		return rc;
++	}
++
++	/* walk through the virtual channel list */
++	list_for_each(position, &dmadev->ddev.channels) {
++		struct hidma_chan *chan;
++
++		chan = list_entry(position, struct hidma_chan,
++				  chan.device_node);
++		sprintf(chan->dbg_name, "chan%d", chidx);
++		chan->debugfs = debugfs_create_dir(chan->dbg_name,
++						   dmadev->debugfs);
++		if (!chan->debugfs) {
++			rc = -ENOMEM;
++			goto cleanup;
++		}
++		chan->stats = debugfs_create_file("stats", S_IRUGO,
++						  chan->debugfs, chan,
++						  &hidma_chan_fops);
++		if (!chan->stats) {
++			rc = -ENOMEM;
++			goto cleanup;
++		}
++		chidx++;
++	}
++
++	dmadev->stats = debugfs_create_file("stats", S_IRUGO,
++					    dmadev->debugfs, dmadev,
++					    &hidma_dma_fops);
++	if (!dmadev->stats) {
++		rc = -ENOMEM;
++		goto cleanup;
++	}
++
++	return 0;
++cleanup:
++	hidma_debug_uninit(dmadev);
++	return rc;
++}
 -- 
-2.0.4
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
