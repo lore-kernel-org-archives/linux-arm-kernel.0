@@ -1,87 +1,57 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Thu, 3 Dec 2015 21:01:11 +0800
-Subject: [RFC PATCH 4/4] mfd: syscon: add ACPI support
-In-Reply-To: <20151203104131.GA11655@xora-haswell.xora.org.uk>
-References: <1449047368-5768-1-git-send-email-wangkefeng.wang@huawei.com>
- <1449047368-5768-5-git-send-email-wangkefeng.wang@huawei.com>
- <2299982.06P4iKpkWk@wuerfel>
- <20151203104131.GA11655@xora-haswell.xora.org.uk>
-Message-ID: <56603D17.4080707@huawei.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 3 Dec 2015 13:03:41 +0000
+Subject: [RESEND v4 2/6] remoteproc: debugfs: Add ability to boot remote
+ processor using debugfs
+In-Reply-To: <5329827.I5W30K072M@wuerfel>
+References: <1448370862-19120-1-git-send-email-lee.jones@linaro.org>
+ <CAJAp7Og2MPapOQmCSB9o4qwQHsA8_iyAWPhjHYPw6J=xCK2xew@mail.gmail.com>
+ <20151203122634.GX12874@x1> <5329827.I5W30K072M@wuerfel>
+Message-ID: <20151203130341.GA26902@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Graeme, Arnd, and Lorenzo,
+On Thu, 03 Dec 2015, Arnd Bergmann wrote:
 
-Firstly, we absolutely agree with the point which use AML to do some "special"
-initialisation and configuration.
+> On Thursday 03 December 2015 12:26:34 Lee Jones wrote:
+> > > >
+> > > > +static ssize_t rproc_state_write(struct file *filp, const char __user *userbuf,
+> > > > +                                size_t count, loff_t *ppos)
+> > > > +{
+> > > > +       struct rproc *rproc = filp->private_data;
+> > > > +       char buf[10];
+> > > > +       int ret;
+> > > > +
+> > > > +       if (count > sizeof(buf))
+> > > > +               return count;
+> > > > +       ret = copy_from_user(buf, userbuf, count);
+> > > > +       if (ret)
+> > > > +               return -EFAULT;
+> > > > +
+> > > > +       if (buf[count - 1] == '\n')
+> > > > +               buf[count - 1] = '\0';
+> > > 
+> > > I believe you can get here with count = 0.
+> > 
+> > I'm pretty sure you can't.
+> > 
+> > If you are sure that you can, if you can provide me with a way of
+> > testing, I'd be happy to put in provisions.
+> > 
+> 
+> I think that a zero-length write() from user space ends up in the write
+> file operation.
 
-SAS and NIC driver were accepted by linux in hisilicon hip05 chip, and the drivers
-reset the control by syscon, we want to use "_RST" method, which is introduced by
-ACPI 6.0 spec in "7.3.25 _RST (Device Reset)", is it reasonable and standard for us?
+I tested this and didn't see it enter write().  My conclusion was that
+if the file doesn't change, then nothing is triggered.
 
-But here is a scene, we can not find a suitable way to support ACPI. There is no
-independent memory region in some module(the driver not upstreamed), that is,
-when write and read the module's register, we must r/w by syscon. Any advice?
+> Also, we get a gcc warning about the out-of-bounds access for code like
+> this, and checking that count is larger than zero avoids the warning.
 
-Thanks,
-Kefeng
+I did however see this warning and wondered what it was talking
+about.  Thanks for clarifying.  Will fix.
 
-On 2015/12/3 18:41, Graeme Gregory wrote:
-> On Wed, Dec 02, 2015 at 11:44:51AM +0100, Arnd Bergmann wrote:
->> On Wednesday 02 December 2015 17:09:28 Kefeng Wang wrote:
->>> This enables syscon with ACPI support.
->>> syscon_regmap_lookup_by_dev_property() function was added. With helper
->>> device_get_reference_node() and acpi_dev_find_plat_dev(), it can be used
->>> in both DT and ACPI.
->>>
->>> The device driver can obtain syscon using _DSD method in DSDT, an example
->>> is shown below.
->>>
->>>     Device(CTL0) {
->>>           Name(_HID, "HISI0061")
->>>           Name(_CRS, ResourceTemplate() {
->>>                   Memory32Fixed(ReadWrite, 0x80000000, 0x10000)
->>>           })
->>>     }
->>>
->>>     Device(DEV0) {
->>>           Name(_HID, "HISI00B1")
->>>           Name(_CRS, ResourceTemplate() {
->>>                   Memory32Fixed(ReadWrite, 0x8c030000, 0x10000)
->>>                   Interrupt(ResourceConsumer, Level, ActiveHigh, Exclusive){ 192 }
->>>           })
->>>
->>>           Name (_DSD, Package () {
->>>               ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
->>>               Package () {
->>>                   Package () {"syscon",Package() {\_SB.CTL0} }
->>>               }
->>>           })
->>>     }
->>>
->>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
->>
->> This sounds like a bad idea:
->>
->> syscon is basically a hack to let us access register that the SoC designer
->> couldn't fit in anywhere sane. We need something like this with devicetree
->> because we decided not to have any interpreted bytecode to do this behind
->> our back.
->>
->> With ACPI, the same thing is done with AML, which is actually nicer than
->> syscon (once you have to deal with all the problems introduced by AML).
->>
->> Use that instead.
->>
-> 
-> I have to agree with Arnd here, this is specifically why it was chosen
-> to use ACPI on machines to move all these "hacks" to AML.
-> 
-> This leaves your driver being generic and any "special" initialisation
-> can be supplied by the OEM through the ACPI tables.
-> 
-> Graeme
-> 
-> 
-> .
-> 
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
