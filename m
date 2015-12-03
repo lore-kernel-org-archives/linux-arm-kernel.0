@@ -1,68 +1,75 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 3 Dec 2015 11:02:38 +0000
-Subject: [RFC PATCH 0/3] ACPI PCI support for arm64
-In-Reply-To: <20151203105628.GD2110@red-moon>
-References: <1449095086-5138-1-git-send-email-jchandra@broadcom.com>
- <20151203105628.GD2110@red-moon>
-Message-ID: <20151203110238.GE2110@red-moon>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Thu, 3 Dec 2015 19:01:00 +0800
+Subject: [PATCH 3/3] ARM: dts: rockchip: add veyron-minnie board
+In-Reply-To: <3359424.qNn8gsFXpA@diego>
+References: <2767415.mEkgRbSSUB@diego> <2008536.lEUHWtryIT@diego>
+ <5660190F.6080204@163.com> <3359424.qNn8gsFXpA@diego>
+Message-ID: <566020EC.7060606@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Resend, LAKML copied-in]
+Hi Heiko,
 
-On Thu, Dec 03, 2015 at 10:56:28AM +0000, Lorenzo Pieralisi wrote:
-> [CC'ing Tomasz]
-> 
-> On Thu, Dec 03, 2015 at 03:54:43AM +0530, Jayachandran C wrote:
-> > This is a very simple and generic implementation of a PCI host controller
-> > based on ACPI. This approach does not pull in the MMCONFIG and ECAM code
-> > from x86.
-> 
-> Why ? Tomasz's patchset does not move MMCONFIG and ECAM code to the generic
-> PCI layer for fun, it is generic code and should be shared by all
-> architectures and most importantly we should not add more churn on
-> top of it which would complicate consolidation even further.
-> 
-> > It is important for us to have a working ACPI based PCI host controller
-> > implementation for arm64, so I thought I would post this as a simple
-> > and less disruptive alternative.
-> 
-> It is important for everyone but that's not a reason granting shortcuts.
-> 
-> > This is tested with arm64 QEMU and OVMF. Comments are very welcome.
-> 
-> Tomasz's patch went through several review cycles, please help review
-> it and test it, that's my comment.
-> 
-> A new version should be posted soon, previous version here:
-> 
-> https://lkml.org/lkml/2015/10/27/504
-> 
-> Thanks,
-> Lorenzo
-> 
-> > 
-> > Thanks,
-> > JC.
-> > 
-> > Jayachandran C (3):
-> >   arm64: pci: Add ACPI support
-> >   pci: Handle NULL parent in pci_bus_assign_domain_nr
-> >   pci/host : Add a generic ACPI based host controller
-> > 
-> >  arch/arm64/kernel/pci.c          |  47 ++++++++-
-> >  drivers/pci/host/Kconfig         |   7 ++
-> >  drivers/pci/host/Makefile        |   1 +
-> >  drivers/pci/host/pci-host-acpi.c | 211 +++++++++++++++++++++++++++++++++++++++
-> >  drivers/pci/pci.c                |   7 +-
-> >  5 files changed, 270 insertions(+), 3 deletions(-)
-> >  create mode 100644 drivers/pci/host/pci-host-acpi.c
-> > 
-> > -- 
-> > 1.9.1
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > 
+? 2015?12?03? 18:44, Heiko St?bner ??:
+> Hi Caesar,
+>
+> Am Donnerstag, 3. Dezember 2015, 18:27:27 schrieb Caesar Wang:
+>> ? 2015?12?02? 01:16, Heiko St?bner ??:
+>>> From: Chris Zhong <zyw@rock-chips.com>
+>>>
+>>> Also known as the Asus Chromebit.
+>>>
+>>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+>>> Signed-off-by: Heiko Stuebner <heiko.stuebner@collabora.com>
+>> Tested-by: Caesar Wang <wxt@rock-chips.com>
+> thanks :-)
+>
+>
+>> Tested on my mickey board with chrome os on kernel 4.4 -rc3.
+>>
+>> localhost / # cat /proc/version
+>> Linux version 4.4.0-rc3+ (wxt at ubuntu) (gcc version 4.6.x-google 20120106
+>> (prerelease) (GCC) ) #59 SMP Thu Dec 3 17:32:10 CST 2015
+>>
+>> .....but,
+>> reboot long long test, that's seem mmc tune has a issue.
+>>
+>>     2.630892] mmcblk0: error -84 transferring data, sector 0, nr 8, cmd
+>> response 0x900, card status 0x0
+>> [    2.631006] mmcblk0: error -110 sending status command, retrying
+>> [    2.631018] mmcblk0: error -84 transferring data, sector 1, nr 7, cmd
+>> response 0x900, card status 0x0
+>> [    2.631703]  mmcblk0: unable to read partition table
+>> ...
+> Could you try if what we do on Minnie fixes that error (disabling tuning for
+> now) - i.e. adding the following to the Mickey dts:
+>
+> &emmc {
+> 	/delete-property/mmc-hs200-1_8v;
+> };
+>
+>
+
+Yep, maybe we remove this node firstly but someone fix the emmc tune issues.
+
+>> Anyway, the dts is good to support mickey machine.
+>> I think the mmc tune is not prefect in mainline.
+> yeah, it seems we still have some issues.
+>
+> Although it seems only the disney-mice seem affected ;-) [minnie and mickey].
+> Pinky, Brain, Speedy, Jaq all seem to work somehow - at least I haven't gotten
+> any reports about that
+
+Cc shawn,
+Maybe,  Shawn at RK has the interesting in debuging this issue.:-)
+
+
+
+>
+> Thanks
+> Heiko
+>
+
+
+-- 
+caesar wang | software engineer | wxt at rock-chip.com
