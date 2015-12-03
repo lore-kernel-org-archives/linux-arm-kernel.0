@@ -1,59 +1,56 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 3 Dec 2015 20:20:13 +0200
-Subject: [4.4-rc][PATCH] ARM: dts: am4372: disable arm twd and global
- timer's nodes
-In-Reply-To: <20151203163708.GR23396@atomide.com>
-References: <1447855315-419-1-git-send-email-grygorii.strashko@ti.com>
- <20151118141537.GC10644@leverpostej> <564C9ACF.6040107@ti.com>
- <20151203163311.GP23396@atomide.com> <20151203163708.GR23396@atomide.com>
-Message-ID: <566087DD.2040006@ti.com>
+From: jchandra@broadcom.com (Jayachandran C.)
+Date: Fri, 4 Dec 2015 00:11:30 +0530
+Subject: [RFC PATCH 0/3] ACPI PCI support for arm64
+In-Reply-To: <20151203105628.GD2110@red-moon>
+References: <1449095086-5138-1-git-send-email-jchandra@broadcom.com>
+ <20151203105628.GD2110@red-moon>
+Message-ID: <20151203184128.GA5890@jayachandranc.netlogicmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2015 06:37 PM, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [151203 08:34]:
->>
->> It seems we should apply this as a fix unless somebody has better ideas.
+On Thu, Dec 03, 2015 at 10:56:28AM +0000, Lorenzo Pieralisi wrote:
+> [CC'ing Tomasz]
 > 
-> Actually I think the fix for now is "[4.4-rc][PATCH v2] ARM: dts: am4372: fix
-> clock source for arm twd and global timers" until PM starts working?
+> On Thu, Dec 03, 2015 at 03:54:43AM +0530, Jayachandran C wrote:
+> > This is a very simple and generic implementation of a PCI host controller
+> > based on ACPI. This approach does not pull in the MMCONFIG and ECAM code
+> > from x86.
 > 
+> Why ? Tomasz's patchset does not move MMCONFIG and ECAM code to the generic
+> PCI layer for fun,
 
-Yes. if no PM it should work, but PM patches are on the fly for Am43.
+Honestly, Lorenzo, I can see that it was not fun :)
 
-But, again, main reason I've posted this patch is that I do not see the
-way how to enable/disable or limit functionality of these timer by using 
-Kconfig options in case of Muliplatform builds :( (or by boot parameters).
+> it is generic code and should be shared by all
+> architectures and most importantly we should not add more churn on
+> top of it which would complicate consolidation even further.
 
-Example 1 (this is how 4.4 kernel is working):
-1) OMAP4 has ARM TWD timer and properly supports it, so in Kconfig we have
-"select HAVE_ARM_TWD" and corresponding "local-timer" is defined in DT.
-AM437x has ARM TWD timer, but does not support it yet, so corresponding "local-timer"
-defined in DT and in Kconfig HAVE_ARM_TWD is not selected.
-(patch http://www.spinics.net/lists/arm-kernel/msg459649.html
- is not merged yet)
+There is no need for such a common/generic infrastructure to
+walk thru a simple table. In my opinion, trying to do this added
+a lot of complexity into what should be a very simple patchset.
 
-Result: ARM TWD timer will be enabled on AM437x !? :(
+The x86 code has to deal with a lot more fw/hw issues and I fail
+to see why that mess should be brought into the a new architecture.
 
-Example 2:
-ARM Global timer can't be used as clocksource device if CPUFreq is enabled
-(this is not supported even by Timekeeping core now).
+> > It is important for us to have a working ACPI based PCI host controller
+> > implementation for arm64, so I thought I would post this as a simple
+> > and less disruptive alternative.
+> 
+> It is important for everyone but that's not a reason granting shortcuts.
+ 
+I am suggesting a simpler (and maybe better) implementation, which
+is much easier to review and merge - not a shortcut.
 
-So, there are two options:
-1) update selection for config SOC_AM43XX
-+ select ARM_GLOBAL_TIMER if !CPU_FREQ
-2) updated ARM GT driver and don't register clocksource device if CPUFreq is enabled
+> > This is tested with arm64 QEMU and OVMF. Comments are very welcome.
+> 
+> Tomasz's patch went through several review cycles, please help review
+> it and test it, that's my comment.
+> 
+> A new version should be posted soon, previous version here:
+> 
+> https://lkml.org/lkml/2015/10/27/504
 
-Both options will not work:
-1) ARM_GLOBAL_TIMER will be selected if any other SoC in multiplatform build
-will select ARM_GLOBAL_TIMER
-2) clocksource device will never be registered if at least one SoC will
-select CPU_FREQ. And this might break SoC which expect it to be registered,
-because CPU_FREQ is not enabled on these SoCs (no CPUFreq drivers registered).
+It seems to be v1, I did not see any ACKs from maintainers either -
+sorry if I am missing something here.
 
-So, as alternative to this patch, ARM timers nodes can be disabled in
-platform DTS files, but then all platform DTS files will need to be updated.
-
--- 
-regards,
--grygorii
+JC.
