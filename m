@@ -1,195 +1,255 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 03 Dec 2015 16:22:23 +0000
-Subject: [PATCH v9 2/4] irqchip: add platform device driver for mbigen
- device
-In-Reply-To: <1448248513-39760-3-git-send-email-majun258@huawei.com>
-References: <1448248513-39760-1-git-send-email-majun258@huawei.com>
- <1448248513-39760-3-git-send-email-majun258@huawei.com>
-Message-ID: <56606C3F.5050000@arm.com>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Thu, 03 Dec 2015 17:22:37 +0100
+Subject: [PATCH] drivers: dma-coherent: free memory when failed to init
+ DMA memory pool
+In-Reply-To: <20151203153937.GP8644@n2100.arm.linux.org.uk>
+References: <1449138962-8264-1-git-send-email-b38611@freescale.com>
+ <xa1toae7y9u8.fsf@mina86.com>
+ <CY1PR0301MB12257F63F594E65DE67E64DFF50D0@CY1PR0301MB1225.namprd03.prod.outlook.com>
+ <20151203153937.GP8644@n2100.arm.linux.org.uk>
+Message-ID: <xa1t1tb3y01e.fsf@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/11/15 03:15, MaJun wrote:
-> From: Ma Jun <majun258@huawei.com>
-> 
-> Mbigen means Message Based Interrupt Generator(MBIGEN).
-> 
-> Its a kind of interrupt controller that collects
-> the interrupts from external devices and generate msi interrupt.
-> Mbigen is applied to reduce the number of wire connected interrupts.
-> 
-> As the peripherals increasing, the interrupts lines needed is
-> increasing much, especially on the Arm64 server SOC.
-> 
-> Therefore, the interrupt pin in GIC is not enough to cover so
-> many peripherals.
-> 
-> Mbigen is designed to fix this problem.
-> 
-> Mbigen chip locates in ITS or outside of ITS.
-> 
-> Mbigen chip hardware structure shows as below:
-> 
-> 		mbigen chip
-> |---------------------|-------------------|
-> mgn_node0	  mgn_node1		mgn_node2
->  |		 |-------|		|-------|------|
-> dev1		dev1    dev2		dev1   dev3   dev4
-> 
-> Each mbigen chip contains several mbigen nodes.
-> 
-> External devices can connect to mbigen node through wire connecting way.
-> 
-> Because a mbigen node only can support 128 interrupt maximum, depends
-> on the interrupt lines number of devices, a device can connects to one
-> more mbigen nodes.
-> 
-> Also, several different devices can connect to a same mbigen node.
-> 
-> When devices triggered interrupt,mbigen chip detects and collects
-> the interrupts and generates the MBI interrupts by writing the ITS
-> Translator register.
-> 
-> To simplify mbigen driver,I used a new conception--mbigen device.
-> Each mbigen device is initialized as a platform device.
-> 
-> Mbigen device presents the parts(register, pin definition etc.) in
-> mbigen chip corresponding to a peripheral device.
-> 
-> So from software view, the structure likes below
-> 
-> 	            mbigen chip
->      |---------------------|-----------------|
-> mbigen device1       mbigen device2  mbigen device3
->       |                   |                |
->      dev1                dev2             dev3
-> Signed-off-by: Ma Jun <majun258@huawei.com>
-> ---
->  drivers/irqchip/Kconfig      |    8 ++++
->  drivers/irqchip/Makefile     |    1 +
->  drivers/irqchip/irq-mbigen.c |   78 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 87 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/irqchip/irq-mbigen.c
-> 
-> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index 4d7294e..b205e15 100644
-> --- a/drivers/irqchip/Kconfig
-> +++ b/drivers/irqchip/Kconfig
-> @@ -27,6 +27,14 @@ config ARM_GIC_V3_ITS
->  	bool
->  	select PCI_MSI_IRQ_DOMAIN
->  
-> +config HISILICON_IRQ_MBIGEN
-> +	bool "Support mbigen interrupt controller"
-> +	default n
-> +	depends on ARM_GIC_V3 && ARM_GIC_V3_ITS && GENERIC_MSI_IRQ_DOMAIN
-> +	help
-> +	 Enable the mbigen interrupt controller used on
-> +	 Hisilicon platform.
-> +
->  config ARM_NVIC
->  	bool
->  	select IRQ_DOMAIN
-> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> index 177f78f..cd76b11 100644
-> --- a/drivers/irqchip/Makefile
-> +++ b/drivers/irqchip/Makefile
-> @@ -24,6 +24,7 @@ obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
->  obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
->  obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
->  obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o
-> +obj-$(CONFIG_HISILICON_IRQ_MBIGEN)	+= irq-mbigen.o
->  obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
->  obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
->  obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
-> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-> new file mode 100644
-> index 0000000..9f036c2
-> --- /dev/null
-> +++ b/drivers/irqchip/irq-mbigen.c
-> @@ -0,0 +1,78 @@
-> +/*
-> + * Copyright (C) 2015 Hisilicon Limited, All Rights Reserved.
-> + * Author: Jun Ma <majun258@huawei.com>
-> + * Author: Yun Wu <wuyun.wu@huawei.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +
-> +/**
-> + * struct mbigen_device - holds the information of mbigen device.
-> + *
-> + * @pdev:		pointer to the platform device structure of mbigen chip.
-> + * @base:		mapped address of this mbigen chip.
-> + */
-> +struct mbigen_device {
-> +	struct platform_device	*pdev;
-> +	void __iomem		*base;
-> +};
-> +
-> +static int mbigen_device_probe(struct platform_device *pdev)
-> +{
-> +	struct mbigen_device *mgn_chip;
-> +	struct resource *res;
-> +
-> +	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
-> +	if (!mgn_chip)
-> +		return -ENOMEM;
-> +
-> +	mgn_chip->pdev = pdev;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	mgn_chip->base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(mgn_chip->base))
-> +		return PTR_ERR(mgn_chip->base);
-> +
-> +	platform_set_drvdata(pdev, mgn_chip);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id mbigen_of_match[] = {
-> +	{ .compatible = "hisilicon,mbigen-v2" },
-> +	{ /* END */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, mbigen_of_match);
-> +
-> +static struct platform_driver mbigen_platform_driver = {
-> +	.driver = {
-> +		.name		= "Hisilicon MBIGEN-V2",
-> +		.owner		= THIS_MODULE,
-> +		.of_match_table	= mbigen_of_match,
-> +	},
-> +	.probe			= mbigen_device_probe,
-> +};
-> +
-> +module_platform_driver(mbigen_platform_driver);
-> +
-> +MODULE_AUTHOR("Jun Ma <majun258@huawei.com>");
-> +MODULE_AUTHOR("Yun Wu <wuyun.wu@huawei.com>");
-> +MODULE_LICENSE("GPL");
-> +MODULE_DESCRIPTION("Hisilicon MBI Generator driver");
-> 
+On Thu, Dec 03 2015, Russell King - ARM Linux wrote:
+> On Thu, Dec 03, 2015 at 01:54:05PM +0000, Duan Andy wrote:
+>> From: Mike Nazarewicz <mpn@google.com> Sent: Thursday, December 03, 2015 8:51 PM
+>> > To: Duan Fugang-B38611; torvalds at linux-foundation.org;
+>> > gregkh at linuxfoundation.org; m.szyprowski at samsung.com
+>> > Cc: linux-arm-kernel at lists.infradead.org; arnd at arndb.de;
+>> > iamjoonsoo.kim at lge.com; Duan Fugang-B38611
+>> > Subject: Re: [PATCH] drivers: dma-coherent: free memory when failed to
+>> > init DMA memory pool
+>> > 
+>> > On Thu, Dec 03 2015, Fugang Duan wrote:
+>> > > Free dma coherent memory when it failed to init DMA memory pool after
+>> > > calling .dma_init_coherent_memory(), otherwise it causes memmory leak.
+>> > >
+>> > > Signed-off-by: Fugang Duan <B38611@freescale.com>
+>> > > ---
+>> > >  drivers/base/dma-coherent.c | 1 +
+>> > >  1 file changed, 1 insertion(+)
+>> > >
+>> > > diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+>> > > index 55b8398..beb6bbe 100644
+>> > > --- a/drivers/base/dma-coherent.c
+>> > > +++ b/drivers/base/dma-coherent.c
+>> > > @@ -286,6 +286,7 @@ static int rmem_dma_device_init(struct reserved_mem
+>> > *rmem, struct device *dev)
+>> > >  				     &mem) != DMA_MEMORY_MAP) {
+>> > >  		pr_err("Reserved memory: failed to init DMA memory pool
+>> > at %pa, size %ld MiB\n",
+>> > >  			&rmem->base, (unsigned long)rmem->size / SZ_1M);
+>> > > +		kfree(mem);
+>> > 
+>> > mem == NULL at this point.  If dma_init_coherent_memory doesn?t return
+>> > DMA_MEMORY_MAP, mem pointer is not assigned any value.  If you think
+>> > there is a memory leak, please demonstrate a path of it happening.
+>> > 
+>> Kfree() will check mem NULL condition, so no need to add check in here.
+>
+> That isn't what the reviewer was stating.
+>
+> However, had the reviewer looked at the existing code, then he may have
+> stated a different opinion. :)
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+I?m not sure that I would.  Here?s code I?m looking at:
 
-	M.
+
+static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_addr,
+			     size_t size, int flags,
+			     struct dma_coherent_mem **mem)
+{
+	struct dma_coherent_mem *dma_mem = NULL;
+	void __iomem *mem_base = NULL;
+	int pages = size >> PAGE_SHIFT;
+	int bitmap_size = BITS_TO_LONGS(pages) * sizeof(long);
+
+	if ((flags & (DMA_MEMORY_MAP | DMA_MEMORY_IO)) == 0)
+		goto out;
+	if (!size)
+		goto out;
+
+	mem_base = ioremap(phys_addr, size);
+	if (!mem_base)
+		goto out;
+
+	dma_mem = kzalloc(sizeof(struct dma_coherent_mem), GFP_KERNEL);
+	if (!dma_mem)
+		goto out;
+	dma_mem->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+	if (!dma_mem->bitmap)
+		goto out;
+
+	dma_mem->virt_base = mem_base;
+	dma_mem->device_base = device_addr;
+	dma_mem->pfn_base = PFN_DOWN(phys_addr);
+	dma_mem->size = pages;
+	dma_mem->flags = flags;
+	spin_lock_init(&dma_mem->spinlock);
+
+	/**************************************************************/
+	/* Here's the only place where mem is set to non-NULL value.  */
+	/**************************************************************/
+	*mem = dma_mem;
+
+	if (flags & DMA_MEMORY_MAP)
+		/******************************************************/
+		/* Here's where function returns.                     */
+		/******************************************************/
+		return DMA_MEMORY_MAP;
+
+	return DMA_MEMORY_IO;
+
+out:
+	kfree(dma_mem);
+	if (mem_base)
+		iounmap(mem_base);
+	return 0;
+}
+
+static int rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
+{
+	struct dma_coherent_mem *mem = rmem->priv;
+
+	if (!mem &&
+	    /**********************************************************/
+	    /* Note that flags & DMA_MEMORY_MAP is non-zero.          */
+	    /**********************************************************/
+	    dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
+				     DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
+				     &mem) != DMA_MEMORY_MAP) {
+		pr_err("Reserved memory: failed to init DMA memory pool at %pa, size %ld MiB\n",
+			&rmem->base, (unsigned long)rmem->size / SZ_1M);
+		return -ENODEV;
+	}
+	rmem->priv = mem;
+	dma_assign_coherent_memory(dev, mem);
+	return 0;
+}
+
+
+> When you look at the existing code, there are three possible return
+> values from dma_init_coherent_memory():
+>
+> - zero, which means failure, and the mem pointer is left alone.  In
+>   the above code, we know that it's guaranteed to be NULL, as we
+>   won't get into the if() unless it was.
+> - DMA_MEMORY_IO, which would mean that mem points at a kmalloc()d
+>   chunk of memory, and this case is treated as failure because we
+>   want memory.
+
+No.  This never happens in the code that is being patched.  flags &
+DMA_MEMORY_MAP is non-zero thus dma_init_coherent_memory returns
+DMA_MEMORY_MAP.
+
+> - DMA_MEMORY_MAP, which also means that mem points at a kmalloc()d
+>   chunk of memory, which we treat as success.
+>
+> So, in the case of DMA_MEMORY_IO,
+
+Which never happens.
+
+> we have a failure case where the kmalloc'd memory is dropped on the
+> floor - aka a memory leak.
+
+
+To me it seems that a better patch would be the following (not tested in
+any capacity):
+
+
+>From 49cece0c0a052022022776f2555d26308deba959 Mon Sep 17 00:00:00 2001
+From: Michal Nazarewicz <mina86@mina86.com>
+Date: Thu, 3 Dec 2015 17:15:07 +0100
+Subject: [PATCH] drivers: dma-coherent: simplify dma_init_coherent_memory
+ return value
+
+Since only dma_declare_coherent_memory cares about
+dma_init_coherent_memory returning part of flags as it return value,
+move the condition to the former and simplify the latter.  This in turn
+makes rmem_dma_device_init less confusing.
+
+Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
+---
+ drivers/base/dma-coherent.c | 28 +++++++++++-----------------
+ 1 file changed, 11 insertions(+), 17 deletions(-)
+
+\o/ negative delta.
+
+diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+index 55b8398..87b8083 100644
+--- a/drivers/base/dma-coherent.c
++++ b/drivers/base/dma-coherent.c
+@@ -17,9 +17,9 @@ struct dma_coherent_mem {
+ 	spinlock_t	spinlock;
+ };
+ 
+-static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_addr,
+-			     size_t size, int flags,
+-			     struct dma_coherent_mem **mem)
++static bool dma_init_coherent_memory(
++	phys_addr_t phys_addr, dma_addr_t device_addr, size_t size, int flags,
++	struct dma_coherent_mem **mem)
+ {
+ 	struct dma_coherent_mem *dma_mem = NULL;
+ 	void __iomem *mem_base = NULL;
+@@ -50,17 +50,13 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_add
+ 	spin_lock_init(&dma_mem->spinlock);
+ 
+ 	*mem = dma_mem;
+-
+-	if (flags & DMA_MEMORY_MAP)
+-		return DMA_MEMORY_MAP;
+-
+-	return DMA_MEMORY_IO;
++	return true;
+ 
+ out:
+ 	kfree(dma_mem);
+ 	if (mem_base)
+ 		iounmap(mem_base);
+-	return 0;
++	return false;
+ }
+ 
+ static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
+@@ -88,15 +84,13 @@ int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
+ 				dma_addr_t device_addr, size_t size, int flags)
+ {
+ 	struct dma_coherent_mem *mem;
+-	int ret;
+ 
+-	ret = dma_init_coherent_memory(phys_addr, device_addr, size, flags,
+-				       &mem);
+-	if (ret == 0)
++	if (!dma_init_coherent_memory(phys_addr, device_addr, size, flags,
++				      &mem))
+ 		return 0;
+ 
+ 	if (dma_assign_coherent_memory(dev, mem) == 0)
+-		return ret;
++		return flags & DMA_MEMORY_MAP ? DMA_MEMORY_MAP : DMA_MEMORY_IO;
+ 
+ 	dma_release_coherent_memory(mem);
+ 	return 0;
+@@ -281,9 +275,9 @@ static int rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
+ 	struct dma_coherent_mem *mem = rmem->priv;
+ 
+ 	if (!mem &&
+-	    dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
+-				     DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
+-				     &mem) != DMA_MEMORY_MAP) {
++	    !dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
++				      DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
++				      &mem)) {
+ 		pr_err("Reserved memory: failed to init DMA memory pool at %pa, size %ld MiB\n",
+ 			&rmem->base, (unsigned long)rmem->size / SZ_1M);
+ 		return -ENODEV;
 -- 
-Jazz is not dead. It just smells funny...
+2.6.0.rc2.230.g3dd15c0
+
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  ??? ?mina86? ??????  (o o)
+ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
