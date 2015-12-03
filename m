@@ -1,341 +1,173 @@
-From: sasukewxt@163.com (Caesar Wang)
-Date: Thu, 3 Dec 2015 18:27:27 +0800
-Subject: [PATCH 3/3] ARM: dts: rockchip: add veyron-minnie board
-In-Reply-To: <2008536.lEUHWtryIT@diego>
-References: <2767415.mEkgRbSSUB@diego> <2008536.lEUHWtryIT@diego>
-Message-ID: <5660190F.6080204@163.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 3 Dec 2015 11:30:36 +0100
+Subject: [PATCH v2 1/4] i2c: at91: add support for the HOLD field
+In-Reply-To: <1449136434-27619-2-git-send-email-ludovic.desroches@atmel.com>
+References: <1449136434-27619-1-git-send-email-ludovic.desroches@atmel.com>
+ <1449136434-27619-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <566019CC.3060005@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko
+Le 03/12/2015 10:53, Ludovic Desroches a ?crit :
+> The hold field allows to configure the data hold time which can be set
+> with the help of the generic binding 'i2c-sda-hold-time-ns'. This
+> feature has been introduced with SAMA5D4 SoC family.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-? 2015?12?02? 01:16, Heiko St?bner ??:
-> From: Chris Zhong <zyw@rock-chips.com>
->
-> Also known as the Asus Chromebit.
->
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> Signed-off-by: Heiko Stuebner <heiko.stuebner@collabora.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Tested-by: Caesar Wang <wxt@rock-chips.com>
 
-Tested on my mickey board with chrome os on kernel 4.4 -rc3.
-
-localhost / # cat /proc/version
-Linux version 4.4.0-rc3+ (wxt at ubuntu) (gcc version 4.6.x-google 20120106 
-(prerelease) (GCC) ) #59 SMP Thu Dec 3 17:32:10 CST 2015
-
-.....but,
-reboot long long test, that's seem mmc tune has a issue.
-
-   2.630892] mmcblk0: error -84 transferring data, sector 0, nr 8, cmd 
-response 0x900, card status 0x0
-[    2.631006] mmcblk0: error -110 sending status command, retrying
-[    2.631018] mmcblk0: error -84 transferring data, sector 1, nr 7, cmd 
-response 0x900, card status 0x0
-[    2.631703]  mmcblk0: unable to read partition table
-...
-
-Anyway, the dts is good to support mickey machine.
-I think the mmc tune is not prefect in mainline.
 > ---
-> would cool to get an Ack from ChromeOS-people concerning the
-> license change to GPL2/X11 - as with the dts before
->
-> Also if someone else should be designated as author I would be happy
-> got get a shout about that :-) . I did take Chris as he was the one
-> submitting the initial mickey dts to the chromeos tree.
->
-> And of course it would be cool if anyone could test that on an actual
-> mickey device.
->
->   Documentation/devicetree/bindings/arm/rockchip.txt |   9 +
->   arch/arm/boot/dts/Makefile                         |   1 +
->   arch/arm/boot/dts/rk3288-veyron-mickey.dts         | 246 +++++++++++++++++++++
->   3 files changed, 256 insertions(+)
->   create mode 100644 arch/arm/boot/dts/rk3288-veyron-mickey.dts
->
-> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-> index 2f8b35a..2fa0a21 100644
-> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
-> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-> @@ -54,6 +54,15 @@ Rockchip platforms device tree bindings
->   		     "google,veyron-jerry-rev3", "google,veyron-jerry",
->   		     "google,veyron", "rockchip,rk3288";
->   
-> +- Google Mickey (Asus Chromebit CS10):
-> +    Required root node properties:
-> +      - compatible = "google,veyron-mickey-rev8", "google,veyron-mickey-rev7",
-> +		     "google,veyron-mickey-rev6", "google,veyron-mickey-rev5",
-> +		     "google,veyron-mickey-rev4", "google,veyron-mickey-rev3",
-> +		     "google,veyron-mickey-rev2", "google,veyron-mickey-rev1",
-> +		     "google,veyron-mickey-rev0", "google,veyron-mickey",
-> +		     "google,veyron", "rockchip,rk3288";
-> +
->   - Google Minnie (Asus Chromebook Flip C100P):
->       Required root node properties:
->         - compatible = "google,veyron-minnie-rev4", "google,veyron-minnie-rev3",
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 2f29350..8b49bfc 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -527,6 +527,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
->   	rk3288-veyron-brain.dtb \
->   	rk3288-veyron-jaq.dtb \
->   	rk3288-veyron-jerry.dtb \
-> +	rk3288-veyron-mickey.dtb \
->   	rk3288-veyron-minnie.dtb \
->   	rk3288-veyron-pinky.dtb \
->   	rk3288-veyron-speedy.dtb
-> diff --git a/arch/arm/boot/dts/rk3288-veyron-mickey.dts b/arch/arm/boot/dts/rk3288-veyron-mickey.dts
-> new file mode 100644
-> index 0000000..365382a
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/rk3288-veyron-mickey.dts
-> @@ -0,0 +1,246 @@
-> +/*
-> + * Google Veyron Mickey Rev 0 board device tree source
-> + *
-> + * Copyright 2015 Google, Inc
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *  Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "rk3288-veyron.dtsi"
-> +
-> +/ {
-> +	model = "Google Mickey";
-> +	compatible = "google,veyron-mickey-rev8", "google,veyron-mickey-rev7",
-> +		     "google,veyron-mickey-rev6", "google,veyron-mickey-rev5",
-> +		     "google,veyron-mickey-rev4", "google,veyron-mickey-rev3",
-> +		     "google,veyron-mickey-rev2", "google,veyron-mickey-rev1",
-> +		     "google,veyron-mickey-rev0", "google,veyron-mickey",
-> +		     "google,veyron", "rockchip,rk3288";
-> +
-> +	vcc_5v: vcc-5v {
-> +		vin-supply = <&vcc33_sys>;
-> +	};
-> +
-> +	vcc33_io: vcc33_io {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc33_io";
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +		vin-supply = <&vcc33_sys>;
-> +	};
-> +};
-> +
-> +&cpu_thermal {
-> +	/delete-node/ trips;
-> +	/delete-node/ cooling-maps;
-> +
-> +	trips {
-> +		cpu_alert_almost_warm: cpu_alert_almost_warm {
-> +			temperature = <63000>; /* millicelsius */
-> +			hysteresis = <2000>; /* millicelsius */
-> +			type = "passive";
-> +		};
-> +		cpu_alert_warm: cpu_alert_warm {
-> +			temperature = <65000>; /* millicelsius */
-> +			hysteresis = <2000>; /* millicelsius */
-> +			type = "passive";
-> +		};
-> +		cpu_alert_almost_hot: cpu_alert_almost_hot {
-> +			temperature = <80000>; /* millicelsius */
-> +			hysteresis = <2000>; /* millicelsius */
-> +			type = "passive";
-> +		};
-> +		cpu_alert_hot: cpu_alert_hot {
-> +			temperature = <82000>; /* millicelsius */
-> +			hysteresis = <2000>; /* millicelsius */
-> +			type = "passive";
-> +		};
-> +		cpu_alert_hotter: cpu_alert_hotter {
-> +			temperature = <84000>; /* millicelsius */
-> +			hysteresis = <2000>; /* millicelsius */
-> +			type = "passive";
-> +		};
-> +		cpu_alert_very_hot: cpu_alert_very_hot {
-> +			temperature = <85000>; /* millicelsius */
-> +			hysteresis = <2000>; /* millicelsius */
-> +			type = "passive";
-> +		};
-> +		cpu_crit: cpu_crit {
-> +			temperature = <90000>; /* millicelsius */
-> +			hysteresis = <2000>; /* millicelsius */
-> +			type = "critical";
-> +		};
-> +	};
-> +
-> +	cooling-maps {
-> +		/*
-> +		 * After 1st level, throttle the CPU down to as low as 1.4 GHz
-> +		 * and don't let the GPU go faster than 400 MHz.  Note that we
-> +		 * won't throttle the GPU lower than 400 MHz due to CPU
-> +		 * heat--we'll let the GPU do the rest itself.
-> +		 */
-> +		cpu_warm_limit_cpu {
-> +			trip = <&cpu_alert_warm>;
-> +			cooling-device =
-> +				<&cpu0 THERMAL_NO_LIMIT 4>;
-> +		};
+>  drivers/i2c/busses/i2c-at91.c | 53 ++++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 50 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+> index 10835d1..921d32b 100644
+> --- a/drivers/i2c/busses/i2c-at91.c
+> +++ b/drivers/i2c/busses/i2c-at91.c
+> @@ -64,6 +64,8 @@
+>  #define	AT91_TWI_IADR		0x000c	/* Internal Address Register */
+>  
+>  #define	AT91_TWI_CWGR		0x0010	/* Clock Waveform Generator Reg */
+> +#define	AT91_TWI_CWGR_HOLD_MAX	0x1f
+> +#define	AT91_TWI_CWGR_HOLD(x)	(((x) & AT91_TWI_CWGR_HOLD_MAX) << 24)
+>  
+>  #define	AT91_TWI_SR		0x0020	/* Status Register */
+>  #define	AT91_TWI_TXCOMP		BIT(0)	/* Transmission Complete */
+> @@ -110,6 +112,7 @@ struct at91_twi_pdata {
+>  	unsigned clk_offset;
+>  	bool has_unre_flag;
+>  	bool has_alt_cmd;
+> +	bool has_hold_field;
+>  	struct at_dma_slave dma_slave;
+>  };
+>  
+> @@ -187,10 +190,11 @@ static void at91_init_twi_bus(struct at91_twi_dev *dev)
+>   */
+>  static void at91_calc_twi_clock(struct at91_twi_dev *dev, int twi_clk)
+>  {
+> -	int ckdiv, cdiv, div;
+> +	int ckdiv, cdiv, div, hold = 0;
+>  	struct at91_twi_pdata *pdata = dev->pdata;
+>  	int offset = pdata->clk_offset;
+>  	int max_ckdiv = pdata->clk_max_div;
+> +	u32 twd_hold_time_ns = 0;
+>  
+>  	div = max(0, (int)DIV_ROUND_UP(clk_get_rate(dev->clk),
+>  				       2 * twi_clk) - offset);
+> @@ -204,8 +208,33 @@ static void at91_calc_twi_clock(struct at91_twi_dev *dev, int twi_clk)
+>  		cdiv = 255;
+>  	}
+>  
+> -	dev->twi_cwgr_reg = (ckdiv << 16) | (cdiv << 8) | cdiv;
+> -	dev_dbg(dev->dev, "cdiv %d ckdiv %d\n", cdiv, ckdiv);
+> +	if (pdata->has_hold_field) {
+> +		of_property_read_u32(dev->dev->of_node, "i2c-sda-hold-time-ns",
+> +				     &twd_hold_time_ns);
 > +
 > +		/*
-> +		 * Add some discrete steps to help throttling system deal
-> +		 * with the fact that there are two passive cooling devices:
-> +		 * the CPU and the GPU.
-> +		 *
-> +		 * - 1.2 GHz - 1.0 GHz (almost hot)
-> +		 * - 800 MHz           (hot)
-> +		 * - 800 MHz - 696 MHz (hotter)
-> +		 * - 696 MHz - min     (very hot)
-> +		 *
-> +		 * Note:
-> +		 * - 800 MHz appears to be a "sweet spot" for me.  I can run
-> +		 *   some pretty serious workload here and be happy.
-> +		 * - After 696 MHz we stop lowering voltage, so throttling
-> +		 *   past there is less effective.
+> +		 * hold time = HOLD + 3 x T_peripheral_clock
+> +		 * Use clk rate in kHz to prevent overflows when computing
+> +		 * hold.
 > +		 */
-> +		cpu_almost_hot_limit_cpu {
-> +			trip = <&cpu_alert_almost_hot>;
-> +			cooling-device =
-> +				<&cpu0 5 6>;
-> +		};
-> +		cpu_hot_limit_cpu {
-> +			trip = <&cpu_alert_hot>;
-> +			cooling-device =
-> +				<&cpu0 7 7>;
-> +		};
-> +		cpu_hotter_limit_cpu {
-> +			trip = <&cpu_alert_hotter>;
-> +			cooling-device =
-> +				<&cpu0 7 8>;
-> +		};
-> +		cpu_very_hot_limit_cpu {
-> +			trip = <&cpu_alert_very_hot>;
-> +			cooling-device =
-> +				<&cpu0 8 THERMAL_NO_LIMIT>;
-> +		};
-> +	};
+> +		hold = DIV_ROUND_UP(twd_hold_time_ns
+> +				    * (clk_get_rate(dev->clk) / 1000), 1000000);
+> +		hold -= 3;
+> +		if (hold < 0)
+> +			hold = 0;
+> +		if (hold > AT91_TWI_CWGR_HOLD_MAX) {
+> +			dev_warn(dev->dev,
+> +				 "HOLD field set to its maximum value (%d instead of %d)\n",
+> +				 AT91_TWI_CWGR_HOLD_MAX, hold);
+> +			hold = AT91_TWI_CWGR_HOLD_MAX;
+> +		}
+> +	}
+> +
+> +	dev->twi_cwgr_reg = (ckdiv << 16) | (cdiv << 8) | cdiv
+> +			    | AT91_TWI_CWGR_HOLD(hold);
+> +
+> +	dev_dbg(dev->dev, "cdiv %d ckdiv %d hold %d (%d ns)\n",
+> +		cdiv, ckdiv, hold, twd_hold_time_ns);
+>  }
+>  
+>  static void at91_twi_dma_cleanup(struct at91_twi_dev *dev)
+> @@ -797,6 +826,7 @@ static struct at91_twi_pdata at91rm9200_config = {
+>  	.clk_offset = 3,
+>  	.has_unre_flag = true,
+>  	.has_alt_cmd = false,
+> +	.has_hold_field = false,
+>  };
+>  
+>  static struct at91_twi_pdata at91sam9261_config = {
+> @@ -804,6 +834,7 @@ static struct at91_twi_pdata at91sam9261_config = {
+>  	.clk_offset = 4,
+>  	.has_unre_flag = false,
+>  	.has_alt_cmd = false,
+> +	.has_hold_field = false,
+>  };
+>  
+>  static struct at91_twi_pdata at91sam9260_config = {
+> @@ -811,6 +842,7 @@ static struct at91_twi_pdata at91sam9260_config = {
+>  	.clk_offset = 4,
+>  	.has_unre_flag = false,
+>  	.has_alt_cmd = false,
+> +	.has_hold_field = false,
+>  };
+>  
+>  static struct at91_twi_pdata at91sam9g20_config = {
+> @@ -818,6 +850,7 @@ static struct at91_twi_pdata at91sam9g20_config = {
+>  	.clk_offset = 4,
+>  	.has_unre_flag = false,
+>  	.has_alt_cmd = false,
+> +	.has_hold_field = false,
+>  };
+>  
+>  static struct at91_twi_pdata at91sam9g10_config = {
+> @@ -825,6 +858,7 @@ static struct at91_twi_pdata at91sam9g10_config = {
+>  	.clk_offset = 4,
+>  	.has_unre_flag = false,
+>  	.has_alt_cmd = false,
+> +	.has_hold_field = false,
+>  };
+>  
+>  static const struct platform_device_id at91_twi_devtypes[] = {
+> @@ -854,6 +888,15 @@ static struct at91_twi_pdata at91sam9x5_config = {
+>  	.clk_offset = 4,
+>  	.has_unre_flag = false,
+>  	.has_alt_cmd = false,
+> +	.has_hold_field = false,
 > +};
 > +
-> +&i2c2 {
-> +	status = "disabled";
-> +};
-> +
-> +&i2c4 {
-> +	status = "disabled";
-> +};
-> +
-> +&i2s {
-> +	status = "okay";
-> +	clock-names = "i2s_hclk", "i2s_clk", "i2s_clk_out";
-> +	clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>, <&cru SCLK_I2S0_OUT>;
-> +};
-> +
-> +&rk808 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pmic_int_l &dvs_1 &dvs_2>;
-> +	dvs-gpios = <&gpio7 12 GPIO_ACTIVE_HIGH>,
-> +		    <&gpio7 15 GPIO_ACTIVE_HIGH>;
-> +
-> +	/delete-property/ vcc6-supply;
-> +	/delete-property/ vcc12-supply;
-> +
-> +	vcc11-supply = <&vcc33_sys>;
-> +
-> +	regulators {
-> +		/* vcc33_io is sourced directly from vcc33_sys */
-> +		/delete-node/ LDO_REG1;
-> +		/delete-node/ LDO_REG7;
-> +
-> +		/* This is not a pwren anymore, but the real power supply */
-> +		vdd10_lcd: LDO_REG7 {
-> +			regulator-always-on;
-> +			regulator-boot-on;
-> +			regulator-min-microvolt = <1000000>;
-> +			regulator-max-microvolt = <1000000>;
-> +			regulator-name = "vdd10_lcd";
-> +			regulator-suspend-mem-disabled;
-> +		};
-> +
-> +		vcc18_lcd: LDO_REG8 {
-> +			regulator-always-on;
-> +			regulator-boot-on;
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <1800000>;
-> +			regulator-name = "vcc18_lcd";
-> +			regulator-suspend-mem-disabled;
-> +		};
-> +	};
-> +};
-> +
-> +&pinctrl {
-> +	hdmi {
-> +		power_hdmi_on: power-hdmi-on {
-> +			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
-> +		};
-> +	};
-> +
-> +	pmic {
-> +		dvs_1: dvs-1 {
-> +			rockchip,pins = <7 12 RK_FUNC_GPIO &pcfg_pull_down>;
-> +		};
-> +
-> +		dvs_2: dvs-2 {
-> +			rockchip,pins = <7 15 RK_FUNC_GPIO &pcfg_pull_down>;
-> +		};
-> +	};
-> +};
-> +
-> +&usb_host0_ehci {
-> +	status = "disabled";
-> +};
-> +
-> +&usb_host1 {
-> +	status = "disabled";
-> +};
-> +
-> +&vcc50_hdmi {
-> +	enable-active-high;
-> +	gpio = <&gpio7 11 GPIO_ACTIVE_HIGH>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&power_hdmi_on>;
-> +};
+> +static struct at91_twi_pdata sama5d4_config = {
+> +	.clk_max_div = 7,
+> +	.clk_offset = 4,
+> +	.has_unre_flag = false,
+> +	.has_alt_cmd = false,
+> +	.has_hold_field = true,
+>  };
+>  
+>  static struct at91_twi_pdata sama5d2_config = {
+> @@ -861,6 +904,7 @@ static struct at91_twi_pdata sama5d2_config = {
+>  	.clk_offset = 4,
+>  	.has_unre_flag = true,
+>  	.has_alt_cmd = true,
+> +	.has_hold_field = true,
+>  };
+>  
+>  static const struct of_device_id atmel_twi_dt_ids[] = {
+> @@ -883,6 +927,9 @@ static const struct of_device_id atmel_twi_dt_ids[] = {
+>  		.compatible = "atmel,at91sam9x5-i2c",
+>  		.data = &at91sam9x5_config,
+>  	}, {
+> +		.compatible = "atmel,sama5d4-i2c",
+> +		.data = &sama5d4_config,
+> +	}, {
+>  		.compatible = "atmel,sama5d2-i2c",
+>  		.data = &sama5d2_config,
+>  	}, {
+> 
+
+
+-- 
+Nicolas Ferre
