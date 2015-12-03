@@ -1,22 +1,21 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 3 Dec 2015 08:37:09 -0800
-Subject: [4.4-rc][PATCH] ARM: dts: am4372: disable arm twd and global
- timer's nodes
-In-Reply-To: <20151203163311.GP23396@atomide.com>
-References: <1447855315-419-1-git-send-email-grygorii.strashko@ti.com>
- <20151118141537.GC10644@leverpostej> <564C9ACF.6040107@ti.com>
- <20151203163311.GP23396@atomide.com>
-Message-ID: <20151203163708.GR23396@atomide.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 03 Dec 2015 11:38:46 -0500 (EST)
+Subject: [RESEND PATCH] arm64: bpf: add 'store immediate' instruction
+In-Reply-To: <1448922247-5692-1-git-send-email-yang.shi@linaro.org>
+References: <1448922247-5692-1-git-send-email-yang.shi@linaro.org>
+Message-ID: <20151203.113846.853547663758521483.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [151203 08:34]:
->
-> It seems we should apply this as a fix unless somebody has better ideas.
+From: Yang Shi <yang.shi@linaro.org>
+Date: Mon, 30 Nov 2015 14:24:07 -0800
 
-Actually I think the fix for now is "[4.4-rc][PATCH v2] ARM: dts: am4372: fix
-clock source for arm twd and global timers" until PM starts working?
+> aarch64 doesn't have native store immediate instruction, such operation
+> has to be implemented by the below instruction sequence:
+> 
+> Load immediate to register
+> Store register
+> 
+> Signed-off-by: Yang Shi <yang.shi@linaro.org>
 
-Regards,
-
-Tony
+Applied, thanks.
