@@ -1,96 +1,109 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 03 Dec 2015 13:58:06 +0000
-Subject: [PATCH v12 04/16] arm64: kvm: allows kvm cpu hotplug
-In-Reply-To: <CAJ5Y-eYHqQCf=ZQzXb=D_P7VscM=vNc3YpYLJs+UtZLFswiaeQ@mail.gmail.com>
-References: <cover.1448403503.git.geoff@infradead.org>
- <23ca498d5e28017549c6076812d60b18e86fa20e.1448403503.git.geoff@infradead.org>
- <CAJ5Y-eYHqQCf=ZQzXb=D_P7VscM=vNc3YpYLJs+UtZLFswiaeQ@mail.gmail.com>
-Message-ID: <56604A6E.60102@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 3 Dec 2015 13:59:39 +0000
+Subject: [PATCH v3 3/7] arm64: split off early mapping code from
+ early_fixmap_init()
+In-Reply-To: <CAKv+Gu8fZ7YeOsnVdosddiDuYd=MW=OYg_Z4KbNU=yH1PWSw+g@mail.gmail.com>
+References: <1447672998-20981-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1447672998-20981-4-git-send-email-ard.biesheuvel@linaro.org>
+ <20151203121840.GB28731@leverpostej>
+ <CAKv+Gu8fZ7YeOsnVdosddiDuYd=MW=OYg_Z4KbNU=yH1PWSw+g@mail.gmail.com>
+Message-ID: <20151203135939.GB2936@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/15 22:40, Ashwin Chaugule wrote:
-> Hello,
+On Thu, Dec 03, 2015 at 02:31:19PM +0100, Ard Biesheuvel wrote:
+> On 3 December 2015 at 13:18, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Hi Ard,
+> >
+> > Apologies that it's taken me so long to get around to this...
+> >
+> > On Mon, Nov 16, 2015 at 12:23:14PM +0100, Ard Biesheuvel wrote:
+> >> This splits off and generalises the population of the statically
+> >> allocated fixmap page tables so that we may reuse it later for
+> >> the linear mapping once we move the kernel text mapping out of it.
+> >>
+> >> This also involves taking into account that table entries at any of
+> >> the levels we are populating may have been populated already, since
+> >> the fixmap mapping might not be disjoint up to the pgd level anymore
+> >> from other early mappings.
+> >
+> > As a heads-up, for avoiding TLB conflicts, I'm currently working on
+> > alternative way of creating the kernel page tables which will definitely
+> > conflict here, and may or may not supercede this approach.
+> >
+> > By adding new FIX_{PGD,PUD,PMD,PTE} indicees to the fixmap, we can
+> > allocate page tables from anywhere via memblock, and temporarily map
+> > them as we need to.
+> >
 > 
-> On 24 November 2015 at 17:25, Geoff Levand <geoff@infradead.org> wrote:
->> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
->>
->> The current kvm implementation on arm64 does cpu-specific initialization
->> at system boot, and has no way to gracefully shutdown a core in terms of
->> kvm. This prevents, especially, kexec from rebooting the system on a boot
->> core in EL2.
->>
->> This patch adds a cpu tear-down function and also puts an existing cpu-init
->> code into a separate function, kvm_arch_hardware_disable() and
->> kvm_arch_hardware_enable() respectively.
->> We don't need arm64-specific cpu hotplug hook any more.
->>
->> Since this patch modifies common part of code between arm and arm64, one
->> stub definition, __cpu_reset_hyp_mode(), is added on arm side to avoid
->> compiling errors.
->>
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> ---
->>  arch/arm/include/asm/kvm_host.h   | 10 ++++-
->>  arch/arm/include/asm/kvm_mmu.h    |  1 +
->>  arch/arm/kvm/arm.c                | 79 ++++++++++++++++++---------------------
->>  arch/arm/kvm/mmu.c                |  5 +++
->>  arch/arm64/include/asm/kvm_host.h | 16 +++++++-
->>  arch/arm64/include/asm/kvm_mmu.h  |  1 +
->>  arch/arm64/include/asm/virt.h     |  9 +++++
->>  arch/arm64/kvm/hyp-init.S         | 33 ++++++++++++++++
->>  arch/arm64/kvm/hyp.S              | 32 ++++++++++++++--
->>  9 files changed, 138 insertions(+), 48 deletions(-)
+> Interesting. So how are you dealing with the va<->pa translations and
+> vice versa that occur all over the place in create_mapping() et al ?
+
+By rewriting create_mapping() et al to not do that ;)
+
+That's requiring a fair amount of massaging, but so far I've not hit
+anything that renders the approach impossible.
+
+> > That would avoid the need for the bootstrap tables. In head.S we'd only
+> > need to create a temporary (coarse-grained, RWX) kernel mapping (with
+> > the fixmap bolted on). Later we would create a whole new set of tables
+> > with a fine-grained kernel mapping and a full linear mapping using the
+> > new fixmap entries to temporarily map tables, then switch over to those
+> > atomically.
+> >
 > 
-> [..]
-> 
->>
->>
->>  static struct notifier_block hyp_init_cpu_pm_nb = {
->> @@ -1108,11 +1119,6 @@ static int init_hyp_mode(void)
->>         }
->>
->>         /*
->> -        * Execute the init code on each CPU.
->> -        */
->> -       on_each_cpu(cpu_init_hyp_mode, NULL, 1);
->> -
->> -       /*
->>          * Init HYP view of VGIC
->>          */
->>         err = kvm_vgic_hyp_init();
-> 
-> With this flow, the cpu_init_hyp_mode() is called only at VM guest
-> creation, but vgic_hyp_init() is called at bootup. On a system with
-> GICv3, it looks like we end up with bogus values from the ICH_VTR_EL2
-> (to get the number of LRs), because we're not reading it from EL2
-> anymore.
+> If we change back to a full linear mapping, are we back to not putting
+> the Image astride a 1GB/32MB/512MB boundary (depending on page size)?
 
-Indeed, this is completely broken (I just reproduced the issue on a
-model). I wish this kind of details had been checked earlier, but thanks
-for pointing it out.
+I'm not exactly sure what you mean here.
 
-> Whats the best way to fix this?
-> - Call kvm_arch_hardware_enable() before vgic_hyp_init() and disable later?
-> - Fold the VGIC init stuff back into hardware_enable()?
+The kernel mapping may inhibit using large section mappings, but this is
+necessary anyway due to permission changes at sub-section granularity
+(e.g. in fixup_init).
 
-None of that works - kvm_arch_hardware_enable() is called once per CPU,
-while vgic_hyp_init() can only be called once. Also,
-kvm_arch_hardware_enable() is called from interrupt context, and I
-wouldn't feel comfortable starting probing DT and allocating stuff from
-there.
+The idea is that when the kernel tables are set up, things are mapped at
+the largest possible granularity that permits later permission changes
+without breaking/making sections (such that we can avoid TLB conflicts).
 
-> - Read the VGIC number of LRs from the hyp stub?
+So we'd map the kernel and memory in segments, where no two segments
+share a common last-level entry (i.e. they're all at least page-aligned,
+and don't share a section with another segment).
 
-That's may UNDEF if called in the wrong context. Also, this defeats the
-point of stubs, which is just to install the vectors for the hypervisor.
+We'd have separate segments for:
+* memory below TEXT_OFFSET
+* text
+* rodata
+* init
+* altinstr (I think this can be folded into rodata)
+* bss / data, tables
+* memory above _end
 
-> - ..
+Later I think it should be relatively simple to move the memory segment
+mapping for split-VA.
 
-Yeah, quite.
+> Anyway, to illustrate where I am headed with this: in my next version
+> of this series, I intend to move the kernel mapping to the start of
+> the vmalloc area, which gets moved up 64 MB to make room for the
+> module area (which also moves down). That way, we can still load
+> modules as before, but no longer have a need for a dedicated carveout
+> for the kernel below PAGE_OFFSET.
 
-Geoff, Takahiro?
+Ok.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> The next step is then to move the kernel Image up inside the vmalloc
+> area based on some randomness we get from the bootloader, and relocate
+> it in place (using the same approach as in the patches I sent out
+> beginning of this year). I have implemented module PLTs so that the
+> Image and the modules no longer need to be within 128 MB of each
+> other, which means that we can have full KASLR for modules and Image,
+> and also place the kernel anywhere in physical memory.The module PLTs
+> would be a runtime penalty only, i.e., a KASLR capable kernel running
+> without KASLR would not incur the penalty of branching via PLTs. The
+> only build time option is -mcmodel=large for modules so that data
+> symbol references are absolute, but that is unlike to hurt
+> performance.
+
+I'm certainly interested in seeing this!
+
+Thanks,
+Mark.
