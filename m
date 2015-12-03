@@ -1,125 +1,136 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Thu, 03 Dec 2015 10:41:38 +0100
-Subject: [alsa-devel] [PATCH] ASoC: mediatek: Use current HW pointer
- for	pointer callback
-In-Reply-To: <1449129208-63615-1-git-send-email-koro.chen@mediatek.com>
-References: <1449129208-63615-1-git-send-email-koro.chen@mediatek.com>
-Message-ID: <s5h8u5b98dp.wl-tiwai@suse.de>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Thu, 3 Dec 2015 10:42:19 +0100
+Subject: [PATCH v4 3/5] mtd: devices: m25p80: add support for mmap read
+ request
+In-Reply-To: <1448860515-28336-4-git-send-email-vigneshr@ti.com>
+References: <1448860515-28336-1-git-send-email-vigneshr@ti.com>
+ <1448860515-28336-4-git-send-email-vigneshr@ti.com>
+Message-ID: <56600E7B.8010208@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 03 Dec 2015 08:53:28 +0100,
-Koro Chen wrote:
+Hi Vignesh,
+
+Le 30/11/2015 06:15, Vignesh R a ?crit :
+> Certain spi controllers may provide accelerated interface to read from
+> m25p80 type flash devices. This interface provides better read
+> performance than regular SPI interface.
+> Call spi_flash_read(), if supported, to make use of such interface.
 > 
-> Previously we recorded "last interrupt position" and used it in
-> pointer callback. This is not correct implementation, and it causes
-> underruns when user space monitors buffer level to decide when to
-> send next data chunk in low latency application.
-
-Using the last irq position isn't incorrect, per se.  Many hardware
-can do only in this way.  But it's suboptimal for your device, yes.
-
-> Remove position recording in IRQ handler and also hw_ptr in
-> struct mtk_afe_memif used to record that, and let pointer callback
-> reports current HW pointer instead.
-> 
-> Signed-off-by: Koro Chen <koro.chen@mediatek.com>
-
-While reading this patch, I wondered how regmap can be used safely in
-an irq-disabled context.  Mark, do we have any API for that?
-
-In this particular case, it would work since it specifies
-REGCACHE_NONE, so it drops all cache support.  As its cost, the driver
-implements its own (kind of) cache in suspend/resume callbacks.  It's
-not ideal, but still practically working.
-
-
-Takashi
-
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
 > ---
->  sound/soc/mediatek/mtk-afe-common.h |    1 -
->  sound/soc/mediatek/mtk-afe-pcm.c    |   22 +++++++++++-----------
->  2 files changed, 11 insertions(+), 12 deletions(-)
 > 
-> diff --git a/sound/soc/mediatek/mtk-afe-common.h b/sound/soc/mediatek/mtk-afe-common.h
-> index cc4393c..9b1af1a 100644
-> --- a/sound/soc/mediatek/mtk-afe-common.h
-> +++ b/sound/soc/mediatek/mtk-afe-common.h
-> @@ -92,7 +92,6 @@ struct mtk_afe_memif_data {
->  struct mtk_afe_memif {
->  	unsigned int phys_buf_addr;
->  	int buffer_size;
-> -	unsigned int hw_ptr;		/* Previous IRQ's HW ptr */
->  	struct snd_pcm_substream *substream;
->  	const struct mtk_afe_memif_data *data;
->  	const struct mtk_afe_irq_data *irqdata;
-> diff --git a/sound/soc/mediatek/mtk-afe-pcm.c b/sound/soc/mediatek/mtk-afe-pcm.c
-> index 7f71343..5399a0e 100644
-> --- a/sound/soc/mediatek/mtk-afe-pcm.c
-> +++ b/sound/soc/mediatek/mtk-afe-pcm.c
-> @@ -175,8 +175,17 @@ static snd_pcm_uframes_t mtk_afe_pcm_pointer
->  	struct snd_soc_pcm_runtime *rtd = substream->private_data;
->  	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
->  	struct mtk_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
-> +	unsigned int hw_ptr;
-> +	int ret;
+> v4: 
+>  * Use spi_flash_read_message struct to pass args.
+>  * support passing of opcode/addr/data nbits.
+> 
+>  drivers/mtd/devices/m25p80.c | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+> 
+> diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+> index fe9ceb7b5405..00094a668c62 100644
+> --- a/drivers/mtd/devices/m25p80.c
+> +++ b/drivers/mtd/devices/m25p80.c
+> @@ -131,6 +131,26 @@ static int m25p80_read(struct spi_nor *nor, loff_t from, size_t len,
+>  	/* convert the dummy cycles to the number of bytes */
+>  	dummy /= 8;
+>  
+> +	if (spi_flash_read_supported(spi)) {
+> +		struct spi_flash_read_message msg;
+> +		int ret;
 > +
-> +	ret = regmap_read(afe->regmap, memif->data->reg_ofs_cur, &hw_ptr);
-> +	if (ret || hw_ptr == 0) {
-> +		dev_err(afe->dev, "%s hw_ptr err\n", __func__);
-> +		hw_ptr = memif->phys_buf_addr;
+> +		msg.buf = buf;
+> +		msg.from = from;
+> +		msg.len = len;
+> +		msg.read_opcode = nor->read_opcode;
+> +		msg.addr_width = nor->addr_width;
+> +		msg.dummy_bytes = dummy;
+> +		/* TODO: Support other combinations */
+> +		msg.opcode_nbits = SPI_NBITS_SINGLE;
+> +		msg.addr_nbits = SPI_NBITS_SINGLE;
+> +		msg.data_nbits = m25p80_rx_nbits(nor);
+
+I wanted to let you know that the support of other SPI protocols has already
+been implemented by this series:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/371170.html
+
+patches 2 & 3 handle the probing of the (Q)SPI memory in spi_nor_scan() and
+select the right protocols for register read/write, memory read, memory write,
+and memory erase operations. The choice is done according to both the memory
+and SPI controller capabilities.
+
+patch 4 updates the m25p80 driver to take advantage of the bandwidth increase
+allowed by QSPI protocols. For instance, the Atmel QSPI controller, like TI
+one, maps the SPI NOR memory to the system bus. Yesterday I ran mtd_speedtest
+to compare Fast Read 1-1-1 (0x0b) and Fast Read 1-1-4 (0x6b). The SPI clock
+frequency was limited to 83MHz. The QSPI memory is a Micron n25q128a13.
+
+I only had to change the mode argument of spi_nor_scan() from SPI_NOR_QUAD to
+SPI_NOR_FAST in the atmel_quadspi driver (based on fsl-quadspi driver from
+Freescale since Atmel's driver also uses the system bus mapping for memory
+write operations) to force the spi-nor framework to choose the SPI 1-1-1
+protocol instead of the SPI-1-1-4.
+
+1 - Fast Read 1-1-1
+
+mtd_speedtest: testing eraseblock write speed
+mtd_speedtest: eraseblock read speed is 9319 KiB/s
+[...]
+mtd_speedtest: testing page read speed
+mtd_speedtest: page read speed is 6649 KiB/s
+[...]
+mtd_speedtest: testing 2 page read speed
+mtd_speedtest: 2 page read speed is 7757 KiB/s
+
+2 - Fast Read 1-1-4
+
+mtd_speedtest: testing eraseblock read speed
+mtd_speedtest: eraseblock read speed is 30117 KiB/s
+[...]
+mtd_speedtest: testing page read speed
+mtd_speedtest: page read speed is 13096 KiB/s
+[...]
+mtd_speedtest: testing 2 page read speed
+mtd_speedtest: 2 page read speed is 18224 KiB/s
+
+So the performance improvements are:
+eraseblock read speed (65536 bytes) : +223%
+page read speed (512 bytes)         :  +97%
+2 page read speed (1024 bytes)      : +135%
+
+
+That's why I believe that you could take advantage of these performance
+improvements in the TI (Q)SPI controller driver.
+
+
+Also please note that you may have to add in the struct spi_flash_read_message
+two other fields for the number of option/mode cycles and their value.
+Option/mode cycles are sent between the address and dummy cycles. They are
+used by some memory manufacturers such as Spansion, Micron and Macronix to
+enter/leave their continuous read mode.
+So if uninitialized dummy cycles are interpreted by the QSPI memory as
+option/mode cycles, depending on the actual value, the memory may enter by
+mistake in continuous mode. Once in continuous mode, the command op code byte
+must not be sent and is not expected by the memory: the memory implicitly uses
+the read op code sent in the SPI message which triggered the memory to enter
+continuous read mode. Next SPI messages start from the address cycles until
+the right option/mode cycles are sent to leave the continuous read mode.
+
+Currently the mtd layer doesn't use this feature but it should be aware of it.
+That's why I believe we'll have to address this point in spi_nor_scan() and the
+"regular" m25p80() sooner or later.
+
+> +
+> +		ret = spi_flash_read(spi, &msg);
+> +		*retlen = msg.retlen;
+> +		return ret;
 > +	}
+> +
+>  	spi_message_init(&m);
+>  	memset(t, 0, (sizeof t));
 >  
-> -	return bytes_to_frames(substream->runtime, memif->hw_ptr);
-> +	return bytes_to_frames(substream->runtime,
-> +			       hw_ptr - memif->phys_buf_addr);
->  }
->  
->  static const struct snd_pcm_ops mtk_afe_pcm_ops = {
-> @@ -602,7 +611,6 @@ static int mtk_afe_dais_hw_params(struct snd_pcm_substream *substream,
->  
->  	memif->phys_buf_addr = substream->runtime->dma_addr;
->  	memif->buffer_size = substream->runtime->dma_bytes;
-> -	memif->hw_ptr = 0;
->  
->  	/* start */
->  	regmap_write(afe->regmap,
-> @@ -737,7 +745,6 @@ static int mtk_afe_dais_trigger(struct snd_pcm_substream *substream, int cmd,
->  		/* and clear pending IRQ */
->  		regmap_write(afe->regmap, AFE_IRQ_CLR,
->  			     1 << memif->data->irq_clr_shift);
-> -		memif->hw_ptr = 0;
->  		return 0;
->  	default:
->  		return -EINVAL;
-> @@ -1081,7 +1088,7 @@ static const struct regmap_config mtk_afe_regmap_config = {
->  static irqreturn_t mtk_afe_irq_handler(int irq, void *dev_id)
->  {
->  	struct mtk_afe *afe = dev_id;
-> -	unsigned int reg_value, hw_ptr;
-> +	unsigned int reg_value;
->  	int i, ret;
->  
->  	ret = regmap_read(afe->regmap, AFE_IRQ_STATUS, &reg_value);
-> @@ -1097,13 +1104,6 @@ static irqreturn_t mtk_afe_irq_handler(int irq, void *dev_id)
->  		if (!(reg_value & (1 << memif->data->irq_clr_shift)))
->  			continue;
->  
-> -		ret = regmap_read(afe->regmap, memif->data->reg_ofs_cur,
-> -				  &hw_ptr);
-> -		if (ret || hw_ptr == 0) {
-> -			dev_err(afe->dev, "%s hw_ptr err\n", __func__);
-> -			hw_ptr = memif->phys_buf_addr;
-> -		}
-> -		memif->hw_ptr = hw_ptr - memif->phys_buf_addr;
->  		snd_pcm_period_elapsed(memif->substream);
->  	}
->  
-> -- 
-> 1.7.9.5
 > 
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
-> 
+
+Best regards,
+
+Cyrille
