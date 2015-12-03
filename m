@@ -1,36 +1,42 @@
-From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
-Date: Thu, 3 Dec 2015 12:36:50 +0100
-Subject: [PATCH v6 05/19] arm64:uapi: set __BITS_PER_LONG correctly for
- ILP32 and LP64
-In-Reply-To: <20151203113157.GI10747@e104818-lin.cambridge.arm.com>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <1447795019-30176-6-git-send-email-ynorov@caviumnetworks.com>
- <20151203113157.GI10747@e104818-lin.cambridge.arm.com>
-Message-ID: <20345DE6-4D42-46E3-BA5F-58FB9741F78A@theobroma-systems.com>
+From: koro.chen@mediatek.com (Koro Chen)
+Date: Thu, 3 Dec 2015 19:39:34 +0800
+Subject: [alsa-devel] [PATCH] ASoC: mediatek: Use current HW pointer for
+ pointer callback
+In-Reply-To: <s5hfuzjn635.wl-tiwai@suse.de>
+References: <1449129208-63615-1-git-send-email-koro.chen@mediatek.com>
+ <s5h8u5b98dp.wl-tiwai@suse.de> <20151203110158.GD5727@sirena.org.uk>
+ <s5hfuzjn635.wl-tiwai@suse.de>
+Message-ID: <1449142774.17544.8.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin,
-
-> Quick question: IIRC, earlier aarch64 gcc versions did not generate
-> __ILP32__ when -mabi=ilp32, they only removed __LP64__. When did the
-> change happen? Could we assume that all compiler versions used to
-> generate ILP32 would define this?
-
-The __ILP32__ define has been supported since 
-> commit b01b37f5768911598640cf8a8c82beacb4200c13
-> Author: yufeng <yufeng@138bc75d-0d04-0410-961f-82ee72b054a4>
-> Date:   Tue Jul 23 12:26:33 2013 +0000
+On Thu, 2015-12-03 at 12:07 +0100, Takashi Iwai wrote:
+> On Thu, 03 Dec 2015 12:01:58 +0100,
+> Mark Brown wrote:
+> > 
+> > On Thu, Dec 03, 2015 at 10:41:38AM +0100, Takashi Iwai wrote:
+> > 
+> > > While reading this patch, I wondered how regmap can be used safely in
+> > > an irq-disabled context.  Mark, do we have any API for that?
+> > 
+> > We can use user supplied locks or spin_lock_irqsave().
 > 
->     [AArch64, ILP32] 4/6 Define _ILP32 and __ILP32__.
->     
->     gcc/
->     
->         * config/aarch64/aarch64.h (TARGET_CPU_CPP_BUILTINS): Define _ILP32
->         and __ILP32__ when the ILP32 model is in use.
->     
->     
->     git-svn-id: svn+ssh://gcc.gnu.org/svn/gcc/trunk at 201167 138bc75d-0d04-0410-961f-82ee72b054a4
+> I meant how to guarantee to make regmap_read() working in an already
+> spin-locked context, typically in an irq handler?  regmap_read()
+> involves with the regcache and it may invoke kmalloc().
+> 
+Yes, we were hit by this before. When using devm_regmap_init_mmio() for
+regmap, it uses spin_lock_irqsave() before every read/write, and if
+cache type is RBTREE, then kmalloc will occur after spin_lock_irqsave()
+and it brings warning. That's why we changed RBTREE to NONE. Setting
+cache type to FLAT will also work, but we think our register accessing
+is fast enough without need of cache.
 
-Best regards,
-Philipp.
+ 
+
+> 
+> Takashi
+> _______________________________________________
+> Alsa-devel mailing list
+> Alsa-devel at alsa-project.org
+> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
