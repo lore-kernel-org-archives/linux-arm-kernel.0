@@ -1,35 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 3 Dec 2015 08:48:18 -0800
-Subject: [PATCH] clk: ti: omap5+: dpll: implement errata i810
-In-Reply-To: <1448894605-30097-1-git-send-email-t-kristo@ti.com>
-References: <1448894605-30097-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20151203164817.GT23396@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Dec 2015 16:56:07 +0000
+Subject: [PATCH v4 0/4] drm: Add support for the ARM HDLCD display
+ controller
+In-Reply-To: <1449139249-9171-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1449139249-9171-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20151203165606.GS8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [151130 06:44]:
-> +	/*
-> +	 * Errata i810 - DPLL controller can get stuck while transitioning
-> +	 * to a power saving state. Software must ensure the DPLL can not
-> +	 * transition to a low power state while changing M/N values.
-> +	 * Easiest way to accomplish this is to prevent DPLL autoidle
-> +	 * before doing the M/N re-program.
-> +	 */
-> +	errata_i810 = ti_clk_get_features()->flags & TI_CLK_ERRATA_I810;
-> +
-> +	if (errata_i810) {
-> +		ai = omap3_dpll_autoidle_read(clk);
-> +		if (ai) {
-> +			omap3_dpll_deny_idle(clk);
-> +
-> +			/* OCP barrier */
-> +			omap3_dpll_autoidle_read(clk);
-> +		}
-> +	}
+On Thu, Dec 03, 2015 at 10:40:45AM +0000, Liviu Dudau wrote:
+> This series depends on Sudeep Holla's SCPI driver (now in mainline) and on
+> the tda998x patches that have been queued on Russell's patch system here [1].
 
-Should we just do this unconditionally? It seems like disabling the
-autoidle always before reprogramming is a good idea.
+Now merged into my tree.
 
-Regards,
+Can I ask a fairly obvious question...
 
-Tony
+>  drivers/gpu/drm/Kconfig                            |   2 +
+>  drivers/gpu/drm/Makefile                           |   1 +
+>  drivers/gpu/drm/arm/Kconfig                        |  29 ++
+>  drivers/gpu/drm/arm/Makefile                       |   2 +
+>  drivers/gpu/drm/arm/hdlcd_crtc.c                   | 327 ++++++++++++
+>  drivers/gpu/drm/arm/hdlcd_drv.c                    | 555 +++++++++++++++++++++
+>  drivers/gpu/drm/arm/hdlcd_drv.h                    |  42 ++
+>  drivers/gpu/drm/arm/hdlcd_regs.h                   |  87 ++++
+
+Why is the subdirectory called "arm" and not "hdlcd" ?
+
+ARM Ltd have more than one display controller (they have the AMBA PL110
+and PL111 in addition to this), and (afaics) this doesn't drive these.
+HDLCD probably won't be the last display hardware which ARM Ltd comes
+out with either.
+
+So, I think naming the subdirectory after the vendor is probably a
+mistake.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
