@@ -1,29 +1,47 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  3 Dec 2015 16:20:10 +0800
-Subject: [PATCH 1/4] irqchip/sunxi-nmi: Rename binding doc filename to
- allwinner, sunxi-nmi.txt
+Date: Thu,  3 Dec 2015 16:20:12 +0800
+Subject: [PATCH 3/4] irqchip/sunxi-nmi: Support sun9i A80 NMI controller
 In-Reply-To: <1449130813-22400-1-git-send-email-wens@csie.org>
 References: <1449130813-22400-1-git-send-email-wens@csie.org>
-Message-ID: <1449130813-22400-2-git-send-email-wens@csie.org>
+Message-ID: <1449130813-22400-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NMI controller is found in all Allwinner multi-core SoCs. It is not
-limited to sun[67]i, nor is it always found in the "system controller"
-block. On sun[68]i, it is in the RTC block, while on sun9i, it is in the
-PRCM block.
-
-Drop these 2 specific bits from the binding doc filename.
+The A80 moves the NMI controller into the PRCM address space, and also
+rearranges the registers.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- .../{allwinner,sun67i-sc-nmi.txt => allwinner,sunxi-nmi.txt}              | 0
- 1 file changed, 0 insertions(+), 0 deletions(-)
- rename Documentation/devicetree/bindings/interrupt-controller/{allwinner,sun67i-sc-nmi.txt => allwinner,sunxi-nmi.txt} (100%)
+ drivers/irqchip/irq-sunxi-nmi.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-nmi.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
-rename to Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-nmi.txt
+diff --git a/drivers/irqchip/irq-sunxi-nmi.c b/drivers/irqchip/irq-sunxi-nmi.c
+index 4ef178078e5b..0820f67cc9a7 100644
+--- a/drivers/irqchip/irq-sunxi-nmi.c
++++ b/drivers/irqchip/irq-sunxi-nmi.c
+@@ -50,6 +50,12 @@ static struct sunxi_sc_nmi_reg_offs sun6i_reg_offs = {
+ 	.enable	= 0x34,
+ };
+ 
++static struct sunxi_sc_nmi_reg_offs sun9i_reg_offs = {
++	.ctrl	= 0x00,
++	.pend	= 0x08,
++	.enable	= 0x04,
++};
++
+ static inline void sunxi_sc_nmi_write(struct irq_chip_generic *gc, u32 off,
+ 				      u32 val)
+ {
+@@ -207,3 +213,10 @@ static int __init sun7i_sc_nmi_irq_init(struct device_node *node,
+ 	return sunxi_sc_nmi_irq_init(node, &sun7i_reg_offs);
+ }
+ IRQCHIP_DECLARE(sun7i_sc_nmi, "allwinner,sun7i-a20-sc-nmi", sun7i_sc_nmi_irq_init);
++
++static int __init sun9i_nmi_irq_init(struct device_node *node,
++				     struct device_node *parent)
++{
++	return sunxi_sc_nmi_irq_init(node, &sun9i_reg_offs);
++}
++IRQCHIP_DECLARE(sun9i_nmi, "allwinner,sun9i-a80-nmi", sun9i_nmi_irq_init);
 -- 
 2.6.2
