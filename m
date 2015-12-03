@@ -1,38 +1,113 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 3 Dec 2015 08:20:37 -0800
-Subject: [PATCH V3 01/19] ARM: dts: am57xx: cl-som-am57x: add basic
- module support
-In-Reply-To: <20151202152326.GA16775@rob-hp-laptop>
-References: <1448433590-1399-1-git-send-email-lifshitz@compulab.co.il>
- <1448993001-19495-1-git-send-email-lifshitz@compulab.co.il>
- <1448993001-19495-2-git-send-email-lifshitz@compulab.co.il>
- <20151202152326.GA16775@rob-hp-laptop>
-Message-ID: <20151203162037.GO23396@atomide.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 03 Dec 2015 16:21:22 +0000
+Subject: [PATCH v9 1/4] dt-binding:Documents of the mbigen bindings
+In-Reply-To: <1448248513-39760-2-git-send-email-majun258@huawei.com>
+References: <1448248513-39760-1-git-send-email-majun258@huawei.com>
+ <1448248513-39760-2-git-send-email-majun258@huawei.com>
+Message-ID: <56606C02.3050702@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robh@kernel.org> [151202 07:24]:
-> On Tue, Dec 01, 2015 at 08:03:03PM +0200, Dmitry Lifshitz wrote:
-> > Add support for CompuLab CM-SOM-AM57X board.
-> > 
-> > CL-SOM-AM57x is a miniature System-on-Module (SoM) based on
-> > TI Sitara AM57x ARM Cortex-A15 System-on-Chip family.
-> > 
-> > https://www.compulab.co.il/products/computer-on-modules/cl-som-am57x-ti-am5728-am5718-system-on-module/
-> > 
-> > Add basic DT support for standalone module (without a carrier board):
-> > 
-> > * Memory configuration
-> > * Heartbeat led
-> > * I2C1 and I2C4
-> > * PMIC
-> > * SATA
-> > 
-> > Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
-> > Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+On 23/11/15 03:15, MaJun wrote:
+> From: Ma Jun <majun258@huawei.com>
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
+> Add the mbigen msi interrupt controller bindings document.
+> 
+> This patch based on Mark Rutland's patch
+> https://lkml.org/lkml/2015/7/23/558
+> 
+> Signed-off-by: Ma Jun <majun258@huawei.com>
+> ---
 
-Applying the whole series into omap-for-v4.5/dt thanks.
+Mark,
 
-Tony
+Do you mind having a look at this from a DT perspective?
+
+Thanks,
+
+	M.
+
+>  Documentation/devicetree/bindings/arm/mbigen.txt |   69 ++++++++++++++++++++++
+>  1 files changed, 69 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/mbigen.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/mbigen.txt b/Documentation/devicetree/bindings/arm/mbigen.txt
+> new file mode 100644
+> index 0000000..8ae59a9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/mbigen.txt
+> @@ -0,0 +1,69 @@
+> +Hisilicon mbigen device tree bindings.
+> +=======================================
+> +
+> +Mbigen means: message based interrupt generator.
+> +
+> +MBI is kind of msi interrupt only used on Non-PCI devices.
+> +
+> +To reduce the wired interrupt number connected to GIC,
+> +Hisilicon designed mbigen to collect and generate interrupt.
+> +
+> +
+> +Non-pci devices can connect to mbigen and generate the
+> +interrupt by writing ITS register.
+> +
+> +The mbigen chip and devices connect to mbigen have the following properties:
+> +
+> +Mbigen main node required properties:
+> +-------------------------------------------
+> +- compatible: Should be "hisilicon,mbigen-v2"
+> +- reg: Specifies the base physical address and size of the Mbigen
+> +  registers.
+> +- interrupt controller: Identifies the node as an interrupt controller
+> +- msi-parent: This property has two cells.
+> +	The 1st cell specifies the ITS this device connected.
+> +	The 2nd cell specifies the device id.
+> +- num-msis:Specifies the total number of interrupt this device has.
+> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> +  interrupt source. The value must be 2.
+> +
+> +  The 1st cell is global hardware pin number of the interrupt.
+> +	This value depends on the Soc design.
+> +
+> +  The 2nd cell is the interrupt trigger type.
+> +	The value of this cell should be:
+> +	1: rising edge triggered
+> +	or
+> +	4: high level triggered	
+> +
+> +Examples:
+> +
+> + 	mbigen_device_gmac:intc {
+> +			compatible = "hisilicon,mbigen-v2";
+> +			reg = <0x0 0xc0080000 0x0 0x10000>;
+> +			interrupt-controller;
+> +			msi-parent = <&its_dsa 0x40b1c>;
+> +			num-msis = <9>;
+> +			#interrupt-cells = <2>;
+> + 	};
+> +
+> +Devices connect to mbigen required properties:
+> +----------------------------------------------------
+> +-interrupt-parent: Specifies the mbigen device node which device connected.
+> +-interrupts:specifies the interrupt source.
+> +  The 1st cell is global hardware pin number of the interrupt.
+> +		This value depends on the Soc design.
+> +  The 2nd cell is the interrupt trigger type(rising edge triggered or high
+> +		level triggered)
+> +
+> +Examples:
+> +	gmac0: ethernet at c2080000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		reg = <0 0xc2080000 0 0x20000>,
+> +		      <0 0xc0000000 0 0x1000>;
+> +		interrupt-parent  = <&mbigen_device_gmac>;
+> +		interrupts =	<656 1>,
+> +				<657 1>;
+> +	};
+> +
+> 
+
+
+-- 
+Jazz is not dead. It just smells funny...
