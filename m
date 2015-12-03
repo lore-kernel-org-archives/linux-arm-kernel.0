@@ -1,89 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Dec 2015 11:00:41 +0000
-Subject: Domain faults when CONFIG_CPU_SW_DOMAIN_PAN is enabled
-In-Reply-To: <1267b061b66c4d1fa8af1955825bc97a@EMAIL.axentia.se>
-References: <1267b061b66c4d1fa8af1955825bc97a@EMAIL.axentia.se>
-Message-ID: <20151203110041.GK8644@n2100.arm.linux.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 3 Dec 2015 11:02:38 +0000
+Subject: [RFC PATCH 0/3] ACPI PCI support for arm64
+In-Reply-To: <20151203105628.GD2110@red-moon>
+References: <1449095086-5138-1-git-send-email-jchandra@broadcom.com>
+ <20151203105628.GD2110@red-moon>
+Message-ID: <20151203110238.GE2110@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2015 at 08:33:13AM +0000, Peter Rosin wrote:
-> I wrote:
-> > If I enable CONFIG_CPU_SW_DOMAIN_PAN, I sometimes (but not always) get the
-> > following (or very similar) on boot.
+[Resend, LAKML copied-in]
+
+On Thu, Dec 03, 2015 at 10:56:28AM +0000, Lorenzo Pieralisi wrote:
+> [CC'ing Tomasz]
 > 
-> I should have said "if I don't disable", as the option is "default y".
+> On Thu, Dec 03, 2015 at 03:54:43AM +0530, Jayachandran C wrote:
+> > This is a very simple and generic implementation of a PCI host controller
+> > based on ACPI. This approach does not pull in the MMCONFIG and ECAM code
+> > from x86.
 > 
-> Also, if it survives on boot, below is an example of later trouble (after
-> 30+ minutes on this occasion).
-
-Please apply this patch so we (might) get a slightly better oops dump,
-and then try to reproduce.
-
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 7a7c4ce..92789ce 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -95,6 +95,22 @@ void __show_regs(struct pt_regs *regs)
- {
- 	unsigned long flags;
- 	char buf[64];
-+#ifndef CONFIG_CPU_V7M
-+	unsigned int domain;
-+#ifdef CONFIG_CPU_SW_DOMAIN_PAN
-+	/*
-+	 * Get the domain register for the parent context. In user
-+	 * mode, we don't save the DACR, so lets use what it should
-+	 * be. For other modes, we place it after the pt_regs struct.
-+	 */
-+	if (user_mode(regs))
-+		domain = DACR_UACCESS_ENABLE;
-+	else
-+		domain = *(unsigned int *)(regs + 1);
-+#else
-+	domain = get_domain();
-+#endif
-+#endif
- 
- 	show_regs_print_info(KERN_DEFAULT);
- 
-@@ -123,21 +139,8 @@ void __show_regs(struct pt_regs *regs)
- 
- #ifndef CONFIG_CPU_V7M
- 	{
--		unsigned int domain = get_domain();
- 		const char *segment;
- 
--#ifdef CONFIG_CPU_SW_DOMAIN_PAN
--		/*
--		 * Get the domain register for the parent context. In user
--		 * mode, we don't save the DACR, so lets use what it should
--		 * be. For other modes, we place it after the pt_regs struct.
--		 */
--		if (user_mode(regs))
--			domain = DACR_UACCESS_ENABLE;
--		else
--			domain = *(unsigned int *)(regs + 1);
--#endif
--
- 		if ((domain & domain_mask(DOMAIN_USER)) ==
- 		    domain_val(DOMAIN_USER, DOMAIN_NOACCESS))
- 			segment = "none";
-@@ -163,11 +166,11 @@ void __show_regs(struct pt_regs *regs)
- 		buf[0] = '\0';
- #ifdef CONFIG_CPU_CP15_MMU
- 		{
--			unsigned int transbase, dac = get_domain();
-+			unsigned int transbase;
- 			asm("mrc p15, 0, %0, c2, c0\n\t"
- 			    : "=r" (transbase));
- 			snprintf(buf, sizeof(buf), "  Table: %08x  DAC: %08x",
--			  	transbase, dac);
-+			  	transbase, domain);
- 		}
- #endif
- 		asm("mrc p15, 0, %0, c1, c0\n" : "=r" (ctrl));
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> Why ? Tomasz's patchset does not move MMCONFIG and ECAM code to the generic
+> PCI layer for fun, it is generic code and should be shared by all
+> architectures and most importantly we should not add more churn on
+> top of it which would complicate consolidation even further.
+> 
+> > It is important for us to have a working ACPI based PCI host controller
+> > implementation for arm64, so I thought I would post this as a simple
+> > and less disruptive alternative.
+> 
+> It is important for everyone but that's not a reason granting shortcuts.
+> 
+> > This is tested with arm64 QEMU and OVMF. Comments are very welcome.
+> 
+> Tomasz's patch went through several review cycles, please help review
+> it and test it, that's my comment.
+> 
+> A new version should be posted soon, previous version here:
+> 
+> https://lkml.org/lkml/2015/10/27/504
+> 
+> Thanks,
+> Lorenzo
+> 
+> > 
+> > Thanks,
+> > JC.
+> > 
+> > Jayachandran C (3):
+> >   arm64: pci: Add ACPI support
+> >   pci: Handle NULL parent in pci_bus_assign_domain_nr
+> >   pci/host : Add a generic ACPI based host controller
+> > 
+> >  arch/arm64/kernel/pci.c          |  47 ++++++++-
+> >  drivers/pci/host/Kconfig         |   7 ++
+> >  drivers/pci/host/Makefile        |   1 +
+> >  drivers/pci/host/pci-host-acpi.c | 211 +++++++++++++++++++++++++++++++++++++++
+> >  drivers/pci/pci.c                |   7 +-
+> >  5 files changed, 270 insertions(+), 3 deletions(-)
+> >  create mode 100644 drivers/pci/host/pci-host-acpi.c
+> > 
+> > -- 
+> > 1.9.1
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > 
