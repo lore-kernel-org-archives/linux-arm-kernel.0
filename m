@@ -1,13 +1,13 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu,  3 Dec 2015 15:02:08 -0300
-Subject: [PATCH 1/2] ARM: dts: omap3-igep0020: Use MMC pwrseq to init SDIO WiFi
+Date: Thu,  3 Dec 2015 15:02:09 -0300
+Subject: [PATCH 2/2] ARM: dts: omap3-igep0030: Use MMC pwrseq to init SDIO WiFi
 In-Reply-To: <1449165729-993-1-git-send-email-javier@osg.samsung.com>
 References: <1449165729-993-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1449165729-993-2-git-send-email-javier@osg.samsung.com>
+Message-ID: <1449165729-993-3-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the WiFi support was added to the IGEP0020 board, the MMC subsystem
+When the WiFi support was added to the IGEP0030 board, the MMC subsystem
 did not provide a mechanism to define power sequence providers. So a DT
 hack was used to toggle the WiFi chip reset and power down pins by using
 fake fixed regulators whose enable GPIO was the GPIOs connected to these
@@ -17,18 +17,19 @@ But now the simple MMC power sequence provider can be used for this and
 the workaround removed.
 
 Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
 ---
 
- arch/arm/boot/dts/omap3-igep0020.dts | 24 ++++++++----------------
+ arch/arm/boot/dts/omap3-igep0030.dts | 24 ++++++++----------------
  1 file changed, 8 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
-index 3835e1569c29..33d6b4ead092 100644
---- a/arch/arm/boot/dts/omap3-igep0020.dts
-+++ b/arch/arm/boot/dts/omap3-igep0020.dts
+diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
+index 468608dab30a..55b0cc4f5ee5 100644
+--- a/arch/arm/boot/dts/omap3-igep0030.dts
++++ b/arch/arm/boot/dts/omap3-igep0030.dts
 @@ -15,25 +15,17 @@
- 	model = "IGEPv2 Rev. C (TI OMAP AM/DM37x)";
- 	compatible = "isee,omap3-igep0020", "ti,omap36xx", "ti,omap3";
+ 	model = "IGEP COM MODULE Rev. E (TI OMAP AM/DM37x)";
+ 	compatible = "isee,omap3-igep0030", "ti,omap36xx", "ti,omap3";
  
 -	/* Regulator to trigger the WIFI_PDN signal of the Wifi module */
 -	lbee1usjyc_pdn: lbee1usjyc_pdn {
@@ -58,7 +59,7 @@ index 3835e1569c29..33d6b4ead092 100644
  	};
  };
  
-@@ -51,8 +43,8 @@
+@@ -62,8 +54,8 @@
  &mmc2 {
  	pinctrl-names = "default";
  	pinctrl-0 = <&mmc2_pins &lbee1usjyc_pins>;
