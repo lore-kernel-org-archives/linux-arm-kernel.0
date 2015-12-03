@@ -1,303 +1,85 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu,  3 Dec 2015 01:12:37 -0500
-Subject: [PATCH V8 5/5] dma: qcom_hidma: add debugfs hooks
-In-Reply-To: <1449123159-28261-1-git-send-email-okaya@codeaurora.org>
-References: <1449123159-28261-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1449123159-28261-6-git-send-email-okaya@codeaurora.org>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Thu, 3 Dec 2015 14:11:29 +0800
+Subject: [PATCH v5 19/21] KVM: ARM64: Reset PMU state when resetting vcpu
+In-Reply-To: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1449123091-20252-20-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add debugfs hooks for debugging the execution behavior of the DMA
-channel. The debugfs hooks get initialized by the probe function and
-uninitialized by the remove function.
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-A stats file is created in debugfs. The stats file will show the
-information about each HIDMA channel as well as each asynchronous job
-queued and completed at a given time.
+When resetting vcpu, it needs to reset the PMU state to initial status.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- drivers/dma/qcom/Makefile    |   2 +-
- drivers/dma/qcom/hidma.c     |   3 +
- drivers/dma/qcom/hidma.h     |   2 +
- drivers/dma/qcom/hidma_dbg.c | 219 +++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 225 insertions(+), 1 deletion(-)
- create mode 100644 drivers/dma/qcom/hidma_dbg.c
+ arch/arm64/kvm/reset.c |  3 +++
+ include/kvm/arm_pmu.h  |  2 ++
+ virt/kvm/arm/pmu.c     | 18 ++++++++++++++++++
+ 3 files changed, 23 insertions(+)
 
-diff --git a/drivers/dma/qcom/Makefile b/drivers/dma/qcom/Makefile
-index d2c6bda..f702df1 100644
---- a/drivers/dma/qcom/Makefile
-+++ b/drivers/dma/qcom/Makefile
-@@ -1,4 +1,4 @@
- obj-$(CONFIG_QCOM_BAM_DMA) += bam_dma.o
- obj-$(CONFIG_QCOM_HIDMA_MGMT) += hidma_mgmt.o hidma_mgmt_sys.o
- obj-$(CONFIG_QCOM_HIDMA) +=  hdma.o
--hdma-objs        := hidma_ll.o hidma.o
-+hdma-objs        := hidma_ll.o hidma.o hidma_dbg.o
-diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
-index 1237a26..ee3aacd 100644
---- a/drivers/dma/qcom/hidma.c
-+++ b/drivers/dma/qcom/hidma.c
-@@ -650,6 +650,7 @@ static int hidma_probe(struct platform_device *pdev)
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index f34745c..dfbce78 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -120,6 +120,9 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	/* Reset system registers */
+ 	kvm_reset_sys_regs(vcpu);
  
- 	dmadev->irq = chirq;
- 	tasklet_init(&dmadev->task, hidma_issue_task, (unsigned long)dmadev);
-+	hidma_debug_init(dmadev);
- 	dev_info(&pdev->dev, "HI-DMA engine driver registration complete\n");
- 	platform_set_drvdata(pdev, dmadev);
- 	pm_runtime_mark_last_busy(dmadev->ddev.dev);
-@@ -658,6 +659,7 @@ static int hidma_probe(struct platform_device *pdev)
- 	return 0;
++	/* Reset PMU */
++	kvm_pmu_vcpu_reset(vcpu);
++
+ 	/* Reset timer */
+ 	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
+ }
+diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+index 4cb0ade..fe8035a 100644
+--- a/include/kvm/arm_pmu.h
++++ b/include/kvm/arm_pmu.h
+@@ -39,6 +39,7 @@ struct kvm_pmu {
+ };
  
- uninit:
-+	hidma_debug_uninit(dmadev);
- 	hidma_ll_uninit(dmadev->lldev);
- dmafree:
- 	if (dmadev)
-@@ -675,6 +677,7 @@ static int hidma_remove(struct platform_device *pdev)
- 	pm_runtime_get_sync(dmadev->ddev.dev);
- 	dma_async_device_unregister(&dmadev->ddev);
- 	devm_free_irq(dmadev->ddev.dev, dmadev->irq, &dmadev->lldev);
-+	hidma_debug_uninit(dmadev);
- 	hidma_ll_uninit(dmadev->lldev);
- 	hidma_free(dmadev);
+ #ifdef CONFIG_KVM_ARM_PMU
++void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu);
+ void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
+ unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx);
+ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val);
+@@ -50,6 +51,7 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
+ 				    u32 select_idx);
+ void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u32 val);
+ #else
++void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu) {}
+ void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
+ unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx)
+ {
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index 34e7386..4014831 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -80,6 +80,24 @@ static void kvm_pmu_stop_counter(struct kvm_pmc *pmc)
+ }
  
-diff --git a/drivers/dma/qcom/hidma.h b/drivers/dma/qcom/hidma.h
-index b8a7990..88897c7 100644
---- a/drivers/dma/qcom/hidma.h
-+++ b/drivers/dma/qcom/hidma.h
-@@ -156,4 +156,6 @@ int hidma_ll_uninit(struct hidma_lldev *llhndl);
- irqreturn_t hidma_ll_inthandler(int irq, void *arg);
- void hidma_cleanup_pending_tre(struct hidma_lldev *llhndl, u8 err_info,
- 				u8 err_code);
-+int hidma_debug_init(struct hidma_dev *dmadev);
-+void hidma_debug_uninit(struct hidma_dev *dmadev);
- #endif
-diff --git a/drivers/dma/qcom/hidma_dbg.c b/drivers/dma/qcom/hidma_dbg.c
-new file mode 100644
-index 0000000..3698257
---- /dev/null
-+++ b/drivers/dma/qcom/hidma_dbg.c
-@@ -0,0 +1,219 @@
-+/*
-+ * Qualcomm Technologies HIDMA debug file
+ /**
++ * kvm_pmu_vcpu_reset - reset pmu state for cpu
++ * @vcpu: The vcpu pointer
 + *
-+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
 + */
-+
-+#include <linux/debugfs.h>
-+#include <linux/device.h>
-+#include <linux/list.h>
-+#include <linux/pm_runtime.h>
-+
-+#include "hidma.h"
-+
-+static void hidma_ll_chstats(struct seq_file *s, void *llhndl, u32 tre_ch)
++void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu)
 +{
-+	struct hidma_lldev *lldev = llhndl;
-+	struct hidma_tre *tre;
-+	u32 length;
-+	dma_addr_t src_start;
-+	dma_addr_t dest_start;
-+	u32 *tre_local;
++	int i;
++	struct kvm_pmu *pmu = &vcpu->arch.pmu;
 +
-+	if (tre_ch >= lldev->nr_tres) {
-+		dev_err(lldev->dev, "invalid TRE number in chstats:%d", tre_ch);
-+		return;
++	for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
++		kvm_pmu_stop_counter(&pmu->pmc[i]);
++		pmu->pmc[i].idx = i;
++		pmu->pmc[i].vcpu = vcpu;
++		pmu->pmc[i].bitmask = 0xffffffffUL;
 +	}
-+	tre = &lldev->trepool[tre_ch];
-+	seq_printf(s, "------Channel %d -----\n", tre_ch);
-+	seq_printf(s, "allocated=%d\n", atomic_read(&tre->allocated));
-+	seq_printf(s, "queued = 0x%x\n", tre->queued);
-+	seq_printf(s, "err_info = 0x%x\n",
-+		   lldev->tx_status_list[tre->chidx].err_info);
-+	seq_printf(s, "err_code = 0x%x\n",
-+		   lldev->tx_status_list[tre->chidx].err_code);
-+	seq_printf(s, "status = 0x%x\n", tre->status);
-+	seq_printf(s, "chidx = 0x%x\n", tre->chidx);
-+	seq_printf(s, "dma_sig = 0x%x\n", tre->dma_sig);
-+	seq_printf(s, "dev_name=%s\n", tre->dev_name);
-+	seq_printf(s, "callback=%p\n", tre->callback);
-+	seq_printf(s, "data=%p\n", tre->data);
-+	seq_printf(s, "tre_index = 0x%x\n", tre->tre_index);
-+
-+	tre_local = &tre->tre_local[0];
-+	src_start = tre_local[TRE_SRC_LOW_IDX];
-+	src_start = ((u64) (tre_local[TRE_SRC_HI_IDX]) << 32) + src_start;
-+	dest_start = tre_local[TRE_DEST_LOW_IDX];
-+	dest_start += ((u64) (tre_local[TRE_DEST_HI_IDX]) << 32);
-+	length = tre_local[TRE_LEN_IDX];
-+
-+	seq_printf(s, "src=%pap\n", &src_start);
-+	seq_printf(s, "dest=%pap\n", &dest_start);
-+	seq_printf(s, "length = 0x%x\n", length);
 +}
 +
-+static void hidma_ll_devstats(struct seq_file *s, void *llhndl)
-+{
-+	struct hidma_lldev *lldev = llhndl;
-+
-+	seq_puts(s, "------Device -----\n");
-+	seq_printf(s, "lldev init = 0x%x\n", lldev->initialized);
-+	seq_printf(s, "trch_state = 0x%x\n", lldev->trch_state);
-+	seq_printf(s, "evch_state = 0x%x\n", lldev->evch_state);
-+	seq_printf(s, "evridx = 0x%x\n", lldev->evridx);
-+	seq_printf(s, "nr_tres = 0x%x\n", lldev->nr_tres);
-+	seq_printf(s, "trca=%p\n", lldev->trca);
-+	seq_printf(s, "tre_ring=%p\n", lldev->tre_ring);
-+	seq_printf(s, "tre_ring_handle=%pap\n", &lldev->tre_ring_handle);
-+	seq_printf(s, "tre_ring_size = 0x%x\n", lldev->tre_ring_size);
-+	seq_printf(s, "tre_processed_off = 0x%x\n", lldev->tre_processed_off);
-+	seq_printf(s, "pending_tre_count=%d\n", lldev->pending_tre_count);
-+	seq_printf(s, "evca=%p\n", lldev->evca);
-+	seq_printf(s, "evre_ring=%p\n", lldev->evre_ring);
-+	seq_printf(s, "evre_ring_handle=%pap\n", &lldev->evre_ring_handle);
-+	seq_printf(s, "evre_ring_size = 0x%x\n", lldev->evre_ring_size);
-+	seq_printf(s, "evre_processed_off = 0x%x\n", lldev->evre_processed_off);
-+	seq_printf(s, "tre_write_offset = 0x%x\n", lldev->tre_write_offset);
-+}
-+
-+/*
-+ * hidma_chan_stats: display HIDMA channel statistics
-+ *
-+ * Display the statistics for the current HIDMA virtual channel device.
-+ */
-+static int hidma_chan_stats(struct seq_file *s, void *unused)
-+{
-+	struct hidma_chan *mchan = s->private;
-+	struct hidma_desc *mdesc;
-+	struct hidma_dev *dmadev = mchan->dmadev;
-+
-+	pm_runtime_get_sync(dmadev->ddev.dev);
-+	seq_printf(s, "paused=%u\n", mchan->paused);
-+	seq_printf(s, "dma_sig=%u\n", mchan->dma_sig);
-+	seq_puts(s, "prepared\n");
-+	list_for_each_entry(mdesc, &mchan->prepared, node)
-+		hidma_ll_chstats(s, mchan->dmadev->lldev, mdesc->tre_ch);
-+
-+	seq_puts(s, "active\n");
-+	list_for_each_entry(mdesc, &mchan->active, node)
-+		hidma_ll_chstats(s, mchan->dmadev->lldev, mdesc->tre_ch);
-+
-+	seq_puts(s, "completed\n");
-+	list_for_each_entry(mdesc, &mchan->completed, node)
-+		hidma_ll_chstats(s, mchan->dmadev->lldev, mdesc->tre_ch);
-+
-+	hidma_ll_devstats(s, mchan->dmadev->lldev);
-+	pm_runtime_mark_last_busy(dmadev->ddev.dev);
-+	pm_runtime_put_autosuspend(dmadev->ddev.dev);
-+	return 0;
-+}
-+
-+/*
-+ * hidma_dma_info: display HIDMA device info
-+ *
-+ * Display the info for the current HIDMA device.
-+ */
-+static int hidma_dma_info(struct seq_file *s, void *unused)
-+{
-+	struct hidma_dev *dmadev = s->private;
-+	resource_size_t sz;
-+
-+	seq_printf(s, "nr_descriptors=%d\n", dmadev->nr_descriptors);
-+	seq_printf(s, "dev_trca=%p\n", &dmadev->dev_trca);
-+	seq_printf(s, "dev_trca_phys=%pa\n", &dmadev->trca_resource->start);
-+	sz = resource_size(dmadev->trca_resource);
-+	seq_printf(s, "dev_trca_size=%pa\n", &sz);
-+	seq_printf(s, "dev_evca=%p\n", &dmadev->dev_evca);
-+	seq_printf(s, "dev_evca_phys=%pa\n", &dmadev->evca_resource->start);
-+	sz = resource_size(dmadev->evca_resource);
-+	seq_printf(s, "dev_evca_size=%pa\n", &sz);
-+	return 0;
-+}
-+
-+static int hidma_chan_stats_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, hidma_chan_stats, inode->i_private);
-+}
-+
-+static int hidma_dma_info_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, hidma_dma_info, inode->i_private);
-+}
-+
-+static const struct file_operations hidma_chan_fops = {
-+	.open = hidma_chan_stats_open,
-+	.read = seq_read,
-+	.llseek = seq_lseek,
-+	.release = single_release,
-+};
-+
-+static const struct file_operations hidma_dma_fops = {
-+	.open = hidma_dma_info_open,
-+	.read = seq_read,
-+	.llseek = seq_lseek,
-+	.release = single_release,
-+};
-+
-+void hidma_debug_uninit(struct hidma_dev *dmadev)
-+{
-+	debugfs_remove_recursive(dmadev->debugfs);
-+	debugfs_remove_recursive(dmadev->stats);
-+}
-+
-+int hidma_debug_init(struct hidma_dev *dmadev)
-+{
-+	int rc = 0;
-+	int chidx = 0;
-+	struct list_head *position = NULL;
-+
-+	dmadev->debugfs = debugfs_create_dir(dev_name(dmadev->ddev.dev), NULL);
-+	if (!dmadev->debugfs) {
-+		rc = -ENODEV;
-+		return rc;
-+	}
-+
-+	/* walk through the virtual channel list */
-+	list_for_each(position, &dmadev->ddev.channels) {
-+		struct hidma_chan *chan;
-+
-+		chan = list_entry(position, struct hidma_chan,
-+				  chan.device_node);
-+		sprintf(chan->dbg_name, "chan%d", chidx);
-+		chan->debugfs = debugfs_create_dir(chan->dbg_name,
-+						   dmadev->debugfs);
-+		if (!chan->debugfs) {
-+			rc = -ENOMEM;
-+			goto cleanup;
-+		}
-+		chan->stats = debugfs_create_file("stats", S_IRUGO,
-+						  chan->debugfs, chan,
-+						  &hidma_chan_fops);
-+		if (!chan->stats) {
-+			rc = -ENOMEM;
-+			goto cleanup;
-+		}
-+		chidx++;
-+	}
-+
-+	dmadev->stats = debugfs_create_file("stats", S_IRUGO,
-+					    dmadev->debugfs, dmadev,
-+					    &hidma_dma_fops);
-+	if (!dmadev->stats) {
-+		rc = -ENOMEM;
-+		goto cleanup;
-+	}
-+
-+	return 0;
-+cleanup:
-+	hidma_debug_uninit(dmadev);
-+	return rc;
-+}
++/**
+  * kvm_pmu_flush_hwstate - flush pmu state to cpu
+  * @vcpu: The vcpu pointer
+  *
 -- 
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+2.0.4
