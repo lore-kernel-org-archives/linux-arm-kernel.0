@@ -1,27 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 03 Dec 2015 22:12:59 +0100
-Subject: [RESEND v4 2/6] remoteproc: debugfs: Add ability to boot remote
- processor using debugfs
-In-Reply-To: <20151203172830.GB26902@x1>
-References: <1448370862-19120-1-git-send-email-lee.jones@linaro.org>
- <2600153.9u9Z7N2IT1@wuerfel> <20151203172830.GB26902@x1>
-Message-ID: <2473673.tSymyNlg3h@wuerfel>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 03 Dec 2015 13:18:45 -0800
+Subject: [PATCH v4 1/5] dt-bindings: add SMP enable-method for Broadcom NSP
+In-Reply-To: <565F16F1.9070809@broadcom.com>
+References: <1448987049-17041-1-git-send-email-kapilh@broadcom.com>
+ <1448987049-17041-2-git-send-email-kapilh@broadcom.com>
+ <20151202152604.GA20467@rob-hp-laptop> <565F16F1.9070809@broadcom.com>
+Message-ID: <5660B1B5.5000702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 03 December 2015 17:28:30 Lee Jones wrote:
-> > 
-> > Ah, interesting. I haven't tried myself, and just tried to read the
-> > code. Maybe glibc already catches zero-length writes before it gets
-> > into the kernel, or I just missed the part of the syscall that checks
-> > for this.
+On 02/12/15 08:06, Kapil Hali wrote:
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+>>> @@ -0,0 +1,39 @@
+>>> +Broadcom Northstar Plus SoC CPU Enable Method
+>>> +---------------------------------------------
+>>> +This binding defines the enable method used for starting secondary
+>>> +CPUs in the following Broadcom SoCs:
+>>> +  BCM58522, BCM58525, BCM58535, BCM58622, BCM58623, BCM58625, BCM88312
+>>> +
+>>> +The enable method is specified by defining the following required
+>>> +properties in the "cpus" device tree node:
+>>> +  - enable-method = "brcm,bcm-nsp-smp";
+>>> +  - secondary-boot-reg = <...>;
+>>
+>> Both of these are supposed to be per cpu core.
 > 
-> Glibc is responsible indeed:
->   
->   http://osxr.org/glibc/source/io/write.c
+> 'enable-method' if not found in 'cpu' node is looked at in the 'cpus' 
+> node. Except for two-three SoC families, 'enable-method' is within 
+> 'cpus' node. Is my interpretation incorrect? Did I miss anything here?
 
-Ok, so an attacker can force the stack overflow by calling
-syscall(__NR_write, fd, p, 0) if that has any potential value,
-but normal users won't hit this case.
+So, what do we do from here? I would appreciate a timely answer from the
+DT maintainers here so we can decide on the fate of this patch series
+for 4.5.
 
-	Arnd
+Thank you
+-- 
+Florian
