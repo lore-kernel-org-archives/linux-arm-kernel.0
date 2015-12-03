@@ -1,46 +1,34 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Thu, 03 Dec 2015 16:33:56 +0100
-Subject: [alsa-devel] [PATCH] ASoC: mediatek: Use current HW pointer for
- pointer callback
-In-Reply-To: <20151203145612.GF5727@sirena.org.uk>
-References: <1449129208-63615-1-git-send-email-koro.chen@mediatek.com>
- <s5h8u5b98dp.wl-tiwai@suse.de>
- <20151203110158.GD5727@sirena.org.uk>
- <s5hfuzjn635.wl-tiwai@suse.de>
- <20151203145612.GF5727@sirena.org.uk>
-Message-ID: <s5hoae7sg0r.wl-tiwai@suse.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 03 Dec 2015 16:38:29 +0100
+Subject: [PATCH 4/4] dmaengine: edma: Add support for DMA filter mapping
+ to slave devices
+In-Reply-To: <1449153192-9082-5-git-send-email-peter.ujfalusi@ti.com>
+References: <1449153192-9082-1-git-send-email-peter.ujfalusi@ti.com>
+ <1449153192-9082-5-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <2675730.x1sS4Fa4y8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 03 Dec 2015 15:56:12 +0100,
-Mark Brown wrote:
+On Thursday 03 December 2015 16:33:12 Peter Ujfalusi wrote:
+> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+> index 0675e268d577..46b305ea0d21 100644
+> --- a/drivers/dma/edma.c
+> +++ b/drivers/dma/edma.c
+> @@ -2297,6 +2297,12 @@ static int edma_probe(struct platform_device *pdev)
+>                 edma_set_chmap(&ecc->slave_chans[i], ecc->dummy_slot);
+>         }
+>  
+> +       if (info->slave_map) {
+> +               ecc->dma_slave.filter_map.map = info->slave_map;
+> +               ecc->dma_slave.filter_map.mapcnt = info->slavecnt;
+> +               ecc->dma_slave.filter_map.filter_fn = edma_filter_fn;
+> +       }
+> +
 > 
-> On Thu, Dec 03, 2015 at 12:07:26PM +0100, Takashi Iwai wrote:
-> > Mark Brown wrote:
-> > > On Thu, Dec 03, 2015 at 10:41:38AM +0100, Takashi Iwai wrote:
-> 
-> > > > While reading this patch, I wondered how regmap can be used safely in
-> > > > an irq-disabled context.  Mark, do we have any API for that?
-> 
-> > > We can use user supplied locks or spin_lock_irqsave().
-> 
-> > I meant how to guarantee to make regmap_read() working in an already
-> > spin-locked context, typically in an irq handler?  regmap_read()
-> > involves with the regcache and it may invoke kmalloc().
-> 
-> I know that's what you meant - that should be done by preallocating the
-> cache (which can be done with defaults) and providing your own lock
-> if there's a spinlock already held (since we use _irqsave() which IIRC
-> isn't nestable).
 
-The extra lock should be fine unless any mutex is involved silently in
-regmap code.  But preallocation sounds not so intuitive.
+Just a minor comment here: I think all three assignments can be done
+unconditionally. As I mentioned before, I'd also remove 'struct dma_filter'
+and put the three members in struct dma_device directly. In fact, the
+filter function can go with the other function pointers for consistency.
 
-> We can also use GFP_ATOMIC for some of the allocations
-> in reasonable use cases but it's not in general supported.
-
-Yeah, but we have already map->alloc_flags, so we can use it
-appropriately as a fallback?
-
-
-Takashi
+	Arnd
