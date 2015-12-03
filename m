@@ -1,53 +1,111 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu,  3 Dec 2015 14:04:59 -0700
-Subject: [PATCH V6 23/26] perf tools: making function set_max_cpu_num() non
- static
+Date: Thu,  3 Dec 2015 14:05:00 -0700
+Subject: [PATCH V6 24/26] perf tools: adding perf_evlist to *info_priv_size()
 In-Reply-To: <1449176702-13213-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1449176702-13213-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1449176702-13213-24-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1449176702-13213-25-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For memory allocation purposes, code located in other places
-then util/cpumap.c may want to know how many CPUs the system has.
+On some architecture the size of the private header may
+be dependent on the number of tracers used in the session.  As
+such adding a "struct perf_evlist *" parameter, which should
+contain all the required information.
 
-This patch is making function set_max_cpu_num() available to
-other parts of the perf tool so that global variable
-@max_cpu_num gets the right value when referenced by cpu__max_cpu().
+Also adjusting the existing client of the interface to take
+the new parameter into account.
 
 Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
 Cc: Ingo Molnar <mingo@redhat.com>
 Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- tools/perf/util/cpumap.c | 2 +-
- tools/perf/util/cpumap.h | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+ tools/perf/arch/x86/util/intel-bts.c | 4 +++-
+ tools/perf/arch/x86/util/intel-pt.c  | 4 +++-
+ tools/perf/util/auxtrace.c           | 7 ++++---
+ tools/perf/util/auxtrace.h           | 6 ++++--
+ 4 files changed, 14 insertions(+), 7 deletions(-)
 
-diff --git a/tools/perf/util/cpumap.c b/tools/perf/util/cpumap.c
-index 10af1e7524fb..ae179320c0c0 100644
---- a/tools/perf/util/cpumap.c
-+++ b/tools/perf/util/cpumap.c
-@@ -380,7 +380,7 @@ out:
- }
- 
- /* Determine highest possible cpu in the system for sparse allocation */
--static void set_max_cpu_num(void)
-+void set_max_cpu_num(void)
- {
- 	const char *mnt;
- 	char path[PATH_MAX];
-diff --git a/tools/perf/util/cpumap.h b/tools/perf/util/cpumap.h
-index 85f7772457fa..45fa963345eb 100644
---- a/tools/perf/util/cpumap.h
-+++ b/tools/perf/util/cpumap.h
-@@ -14,6 +14,7 @@ struct cpu_map {
- 	int map[];
+diff --git a/tools/perf/arch/x86/util/intel-bts.c b/tools/perf/arch/x86/util/intel-bts.c
+index 9b94ce520917..4685a40777cc 100644
+--- a/tools/perf/arch/x86/util/intel-bts.c
++++ b/tools/perf/arch/x86/util/intel-bts.c
+@@ -60,7 +60,9 @@ struct branch {
+ 	u64 misc;
  };
  
-+void set_max_cpu_num(void);
- struct cpu_map *cpu_map__new(const char *cpu_list);
- struct cpu_map *cpu_map__empty_new(int nr);
- struct cpu_map *cpu_map__dummy_new(void);
+-static size_t intel_bts_info_priv_size(struct auxtrace_record *itr __maybe_unused)
++static size_t
++intel_bts_info_priv_size(struct auxtrace_record *itr __maybe_unused,
++			 struct perf_evlist *evlist __maybe_unused)
+ {
+ 	return INTEL_BTS_AUXTRACE_PRIV_SIZE;
+ }
+diff --git a/tools/perf/arch/x86/util/intel-pt.c b/tools/perf/arch/x86/util/intel-pt.c
+index b02af064f0f9..e5c1f2e21f87 100644
+--- a/tools/perf/arch/x86/util/intel-pt.c
++++ b/tools/perf/arch/x86/util/intel-pt.c
+@@ -273,7 +273,9 @@ intel_pt_pmu_default_config(struct perf_pmu *intel_pt_pmu)
+ 	return attr;
+ }
+ 
+-static size_t intel_pt_info_priv_size(struct auxtrace_record *itr __maybe_unused)
++static size_t
++intel_pt_info_priv_size(struct auxtrace_record *itr __maybe_unused,
++			struct perf_evlist *evlist __maybe_unused)
+ {
+ 	return INTEL_PT_AUXTRACE_PRIV_SIZE;
+ }
+diff --git a/tools/perf/util/auxtrace.c b/tools/perf/util/auxtrace.c
+index 7f10430af39c..cc1c9ce5cc56 100644
+--- a/tools/perf/util/auxtrace.c
++++ b/tools/perf/util/auxtrace.c
+@@ -478,10 +478,11 @@ void auxtrace_heap__pop(struct auxtrace_heap *heap)
+ 			 heap_array[last].ordinal);
+ }
+ 
+-size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr)
++size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr,
++				       struct perf_evlist *evlist)
+ {
+ 	if (itr)
+-		return itr->info_priv_size(itr);
++		return itr->info_priv_size(itr, evlist);
+ 	return 0;
+ }
+ 
+@@ -852,7 +853,7 @@ int perf_event__synthesize_auxtrace_info(struct auxtrace_record *itr,
+ 	int err;
+ 
+ 	pr_debug2("Synthesizing auxtrace information\n");
+-	priv_size = auxtrace_record__info_priv_size(itr);
++	priv_size = auxtrace_record__info_priv_size(itr, session->evlist);
+ 	ev = zalloc(sizeof(struct auxtrace_info_event) + priv_size);
+ 	if (!ev)
+ 		return -ENOMEM;
+diff --git a/tools/perf/util/auxtrace.h b/tools/perf/util/auxtrace.h
+index b86f90db1352..e5a8e2d4f2af 100644
+--- a/tools/perf/util/auxtrace.h
++++ b/tools/perf/util/auxtrace.h
+@@ -293,7 +293,8 @@ struct auxtrace_record {
+ 	int (*recording_options)(struct auxtrace_record *itr,
+ 				 struct perf_evlist *evlist,
+ 				 struct record_opts *opts);
+-	size_t (*info_priv_size)(struct auxtrace_record *itr);
++	size_t (*info_priv_size)(struct auxtrace_record *itr,
++				 struct perf_evlist *evlist);
+ 	int (*info_fill)(struct auxtrace_record *itr,
+ 			 struct perf_session *session,
+ 			 struct auxtrace_info_event *auxtrace_info,
+@@ -429,7 +430,8 @@ int auxtrace_parse_snapshot_options(struct auxtrace_record *itr,
+ int auxtrace_record__options(struct auxtrace_record *itr,
+ 			     struct perf_evlist *evlist,
+ 			     struct record_opts *opts);
+-size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr);
++size_t auxtrace_record__info_priv_size(struct auxtrace_record *itr,
++				       struct perf_evlist *evlist);
+ int auxtrace_record__info_fill(struct auxtrace_record *itr,
+ 			       struct perf_session *session,
+ 			       struct auxtrace_info_event *auxtrace_info,
 -- 
 2.1.4
