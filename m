@@ -1,48 +1,65 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 3 Dec 2015 11:21:27 -0800
-Subject: [PATCH 00/10] Patches to get dm814x-evm booting to NFSroot
-In-Reply-To: <5660872E.8080603@ti.com>
-References: <1449013103-23238-1-git-send-email-tony@atomide.com>
- <5660872E.8080603@ti.com>
-Message-ID: <20151203192127.GX23396@atomide.com>
+Date: Thu, 3 Dec 2015 11:23:10 -0800
+Subject: [4.4-rc][PATCH] ARM: dts: am4372: disable arm twd and global
+ timer's nodes
+In-Reply-To: <566087DD.2040006@ti.com>
+References: <1447855315-419-1-git-send-email-grygorii.strashko@ti.com>
+ <20151118141537.GC10644@leverpostej> <564C9ACF.6040107@ti.com>
+ <20151203163311.GP23396@atomide.com>
+ <20151203163708.GR23396@atomide.com> <566087DD.2040006@ti.com>
+Message-ID: <20151203192310.GY23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [151203 10:18]:
-> On 12/02/2015 01:38 AM, Tony Lindgren wrote:
+* Grygorii Strashko <grygorii.strashko@ti.com> [151203 10:21]:
+> On 12/03/2015 06:37 PM, Tony Lindgren wrote:
+> > * Tony Lindgren <tony@atomide.com> [151203 08:34]:
+> >>
+> >> It seems we should apply this as a fix unless somebody has better ideas.
+> > 
+> > Actually I think the fix for now is "[4.4-rc][PATCH v2] ARM: dts: am4372: fix
+> > clock source for arm twd and global timers" until PM starts working?
+> > 
 > 
-> > Tony Lindgren (10):
-> >    ARM: OMAP2+: Fix timer entries for dm814x
-> >    clk: ti: Add few dm814x clock aliases
-> >    ARM: OMAP2+: Add DPPLS clock manager for dm814x
-> >    ARM: OMAP2+: Enable GPIO for dm814x
-> >    ARM: OMAP2+: Disable GPIO softreset for dm81xx
-> >    ARM: OMAP2+: Remove useless check for legacy booting for dm814x
-> >    ARM: dts: Fix dm814x entries for pllss and prcm
-> >    ARM: dts: Fix some mux and divider clocks to get dm814x-evm booting
-> >    ARM: dts: Fix dm8148 control modules ranges
-> >    ARM: dts: Fix dm814x pinctrl address and mask
+> Yes. if no PM it should work, but PM patches are on the fly for Am43.
+
+OK let's not merge this one then.
+
+> But, again, main reason I've posted this patch is that I do not see the
+> way how to enable/disable or limit functionality of these timer by using 
+> Kconfig options in case of Muliplatform builds :( (or by boot parameters).
 > 
-> I'm worry a bit, if you will apply this series in its current order
-> - it will break git bisect.
-> Patch one "ARM: OMAP2+: Fix timer entries for dm814x" will use timerX_fck, but those
-> clocks will be added by patches 2 "clk: ti: Add few dm814x clock aliases"
-> and 8 "ARM: dts: Fix some mux and divider clocks to get dm814x-evm booting"
+> Example 1 (this is how 4.4 kernel is working):
+> 1) OMAP4 has ARM TWD timer and properly supports it, so in Kconfig we have
+> "select HAVE_ARM_TWD" and corresponding "local-timer" is defined in DT.
+> AM437x has ARM TWD timer, but does not support it yet, so corresponding "local-timer"
+> defined in DT and in Kconfig HAVE_ARM_TWD is not selected.
+> (patch http://www.spinics.net/lists/arm-kernel/msg459649.html
+>  is not merged yet)
+> 
+> Result: ARM TWD timer will be enabled on AM437x !? :(
+> 
+> Example 2:
+> ARM Global timer can't be used as clocksource device if CPUFreq is enabled
+> (this is not supported even by Timekeeping core now).
+> 
+> So, there are two options:
+> 1) update selection for config SOC_AM43XX
+> + select ARM_GLOBAL_TIMER if !CPU_FREQ
+> 2) updated ARM GT driver and don't register clocksource device if CPUFreq is enabled
+> 
+> Both options will not work:
+> 1) ARM_GLOBAL_TIMER will be selected if any other SoC in multiplatform build
+> will select ARM_GLOBAL_TIMER
+> 2) clocksource device will never be registered if at least one SoC will
+> select CPU_FREQ. And this might break SoC which expect it to be registered,
+> because CPU_FREQ is not enabled on these SoCs (no CPUFreq drivers registered).
+> 
+> So, as alternative to this patch, ARM timers nodes can be disabled in
+> platform DTS files, but then all platform DTS files will need to be updated.
 
-Yeah you have a point there. I was hoping to separate them to dts and soc
-related patches but clearly that's not possible.
-
-We can keep t410 limping along just fine with this order:
-
-ARM: dts: Fix dm814x entries for pllss and prcm
-clk: ti: Add few dm814x clock aliases
-ARM: OMAP2+: Add DPPLS clock manager for dm814x
-ARM: dts: Fix some mux and divider clocks to get dm814x-evm booting
-ARM: OMAP2+: Fix timer entries for dm814x
-ARM: dts: Fix dm8148 control modules ranges
-ARM: dts: Fix dm814x pinctrl address and mask
-ARM: OMAP2+: Enable GPIO for dm814x
-ARM: OMAP2+: Remove useless check for legacy booting for dm814x
+Yes I don't see any other option right now until we have the clocksource
+switching happening. Only then will the scoring work properly.
 
 Regards,
 
