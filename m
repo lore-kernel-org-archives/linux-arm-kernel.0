@@ -1,34 +1,29 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  3 Dec 2015 16:20:11 +0800
-Subject: [PATCH 2/4] irqchip/sunxi-nmi: Add sun9i-a80 variant to binding doc
+Date: Thu,  3 Dec 2015 16:20:10 +0800
+Subject: [PATCH 1/4] irqchip/sunxi-nmi: Rename binding doc filename to
+ allwinner, sunxi-nmi.txt
 In-Reply-To: <1449130813-22400-1-git-send-email-wens@csie.org>
 References: <1449130813-22400-1-git-send-email-wens@csie.org>
-Message-ID: <1449130813-22400-3-git-send-email-wens@csie.org>
+Message-ID: <1449130813-22400-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun9i A80 introduces a new variant of the NMI controller. The registers
-are reordered, but the functionality remains the same.
+The NMI controller is found in all Allwinner multi-core SoCs. It is not
+limited to sun[67]i, nor is it always found in the "system controller"
+block. On sun[68]i, it is in the RTC block, while on sun9i, it is in the
+PRCM block.
 
-Add a new compatible string for it.
+Drop these 2 specific bits from the binding doc filename.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- .../devicetree/bindings/interrupt-controller/allwinner,sunxi-nmi.txt    | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ .../{allwinner,sun67i-sc-nmi.txt => allwinner,sunxi-nmi.txt}              | 0
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ rename Documentation/devicetree/bindings/interrupt-controller/{allwinner,sun67i-sc-nmi.txt => allwinner,sunxi-nmi.txt} (100%)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-nmi.txt b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-nmi.txt
-index d1c5cdabc3e0..81cd3692405e 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-nmi.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-nmi.txt
-@@ -4,7 +4,7 @@ Allwinner Sunxi NMI Controller
- Required properties:
- 
- - compatible : should be "allwinner,sun7i-a20-sc-nmi" or
--  "allwinner,sun6i-a31-sc-nmi"
-+  "allwinner,sun6i-a31-sc-nmi" or "allwinner,sun9i-a80-nmi"
- - reg : Specifies base physical address and size of the registers.
- - interrupt-controller : Identifies the node as an interrupt controller
- - #interrupt-cells : Specifies the number of cells needed to encode an
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-nmi.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
+rename to Documentation/devicetree/bindings/interrupt-controller/allwinner,sunxi-nmi.txt
 -- 
 2.6.2
