@@ -1,46 +1,83 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  3 Dec 2015 09:25:22 +0100
-Subject: [PATCH v2] ARM/arm64: KVM: correct PTE uncachedness check
-Message-ID: <1449131122-29186-1-git-send-email-ard.biesheuvel@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 3 Dec 2015 09:43:20 +0100
+Subject: [PATCH] USB: host: ohci-at91: fix a crash in
+ ohci_hcd_at91_overcurrent_irq
+In-Reply-To: <1449085015-5538-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1449085015-5538-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <566000A8.7070107@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit e6fab5442345 ("ARM/arm64: KVM: test properly for a PTE's
-uncachedness") modified the logic to test whether a HYP or stage-2
-mapping needs flushing, from [incorrectly] interpreting the page table
-attributes to [incorrectly] checking whether the PFN that backs the
-mapping is covered by host system RAM. The PFN number is part of the
-output of the translation, not the input, so we have to use pte_pfn()
-on the contents of the PTE, not __phys_to_pfn() on the HYP virtual
-address or stage-2 intermediate physical address.
+Le 02/12/2015 20:36, Alexandre Belloni a ?crit :
+> The interrupt handler, ohci_hcd_at91_overcurrent_irq may be called right
+> after registration. At that time, pdev->dev.platform_data is not yet set,
+> leading to a NULL pointer dereference.
+> 
+> Fixes: e4df92279fd9 (USB: host: ohci-at91: merge loops in ohci_hcd_at91_drv_probe)
 
-Fixes: e6fab5442345 ("ARM/arm64: KVM: test properly for a PTE's uncachedness")
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/kvm/mmu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Yes, with:
+Cc: stable at vger.kernel.org # 4.3+
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 7dace909d5cf..61d96a645ff3 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -218,7 +218,7 @@ static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
- 			kvm_tlb_flush_vmid_ipa(kvm, addr);
- 
- 			/* No need to invalidate the cache for device mappings */
--			if (!kvm_is_device_pfn(__phys_to_pfn(addr)))
-+			if (!kvm_is_device_pfn(pte_pfn(old_pte)))
- 				kvm_flush_dcache_pte(old_pte);
- 
- 			put_page(virt_to_page(pte));
-@@ -310,7 +310,7 @@ static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
- 
- 	pte = pte_offset_kernel(pmd, addr);
- 	do {
--		if (!pte_none(*pte) && !kvm_is_device_pfn(__phys_to_pfn(addr)))
-+		if (!pte_none(*pte) && !kvm_is_device_pfn(pte_pfn(*pte)))
- 			kvm_flush_dcache_pte(*pte);
- 	} while (pte++, addr += PAGE_SIZE, addr != end);
- }
+
+> Reported-by: Peter Rosin <peda@axentia.se>
+> Tested-by: Peter Rosin <peda@axentia.se>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Alan, I think it's a good candidate to enter the 4.4-rcX...
+
+Thanks, bye.
+
+> ---
+>  drivers/usb/host/ohci-at91.c | 11 +++++------
+>  1 file changed, 5 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+> index 342ffd140122..8c6e15bd6ff0 100644
+> --- a/drivers/usb/host/ohci-at91.c
+> +++ b/drivers/usb/host/ohci-at91.c
+> @@ -473,6 +473,8 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+>  	if (!pdata)
+>  		return -ENOMEM;
+>  
+> +	pdev->dev.platform_data = pdata;
+> +
+>  	if (!of_property_read_u32(np, "num-ports", &ports))
+>  		pdata->ports = ports;
+>  
+> @@ -483,6 +485,7 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+>  		 */
+>  		if (i >= pdata->ports) {
+>  			pdata->vbus_pin[i] = -EINVAL;
+> +			pdata->overcurrent_pin[i] = -EINVAL;
+>  			continue;
+>  		}
+>  
+> @@ -513,10 +516,8 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	at91_for_each_port(i) {
+> -		if (i >= pdata->ports) {
+> -			pdata->overcurrent_pin[i] = -EINVAL;
+> -			continue;
+> -		}
+> +		if (i >= pdata->ports)
+> +			break;
+>  
+>  		pdata->overcurrent_pin[i] =
+>  			of_get_named_gpio_flags(np, "atmel,oc-gpio", i, &flags);
+> @@ -552,8 +553,6 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+>  		}
+>  	}
+>  
+> -	pdev->dev.platform_data = pdata;
+> -
+>  	device_init_wakeup(&pdev->dev, 1);
+>  	return usb_hcd_at91_probe(&ohci_at91_hc_driver, pdev);
+>  }
+> 
+
+
 -- 
-1.9.1
+Nicolas Ferre
