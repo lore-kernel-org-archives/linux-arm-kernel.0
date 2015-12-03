@@ -1,44 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Dec 2015 15:28:42 +0000
-Subject: [RFC PATCH 2/4] device property: Introduce helper
- device_get_reference_node()
-In-Reply-To: <1449047368-5768-3-git-send-email-wangkefeng.wang@huawei.com>
-References: <1449047368-5768-1-git-send-email-wangkefeng.wang@huawei.com>
- <1449047368-5768-3-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <20151203152842.GO8644@n2100.arm.linux.org.uk>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 3 Dec 2015 10:31:39 -0500
+Subject: [PATCH] arm64: ftrace: stop using kstop_machine to
+ enable/disable tracing
+In-Reply-To: <20151203150926.GG11337@arm.com>
+References: <1448697009-17211-1-git-send-email-huawei.libin@huawei.com>
+ <20151202123654.GC4523@arm.com> <56600992.4040005@huawei.com>
+ <20151203093821.GD7023@arm.com>
+ <20151203100525.70cc40de@gandalf.local.home>
+ <20151203150926.GG11337@arm.com>
+Message-ID: <20151203103139.35648cc2@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 02, 2015 at 05:09:26PM +0800, Kefeng Wang wrote:
-> With of_parse_phandle() and acpi_dev_get_reference_device(), we can introduce
-> a universal helper device_get_reference_node() to read and parse a device
-> property and return a pointer to the resulting firmware node.
+On Thu, 3 Dec 2015 15:09:26 +0000
+Will Deacon <will.deacon@arm.com> wrote:
 
-What's happening to make this fwnode stuff actually usable?  Whenever
-I've looked at it from the DT perspective, it looks very much like a
-half-baked train wreck - although the struct device_node contains a
-fwnode, of_node_init() initialises it partially, and we have a way to
-convert _from_ a fwnode to a device_node (to_of_node), nothing sets
-the struct device fwnode pointer.
+> Yeah, I think the comments on x86 and arm64 are out of date. They also
+> mention the freeing of __init sections -- is that still a concern?
 
-Whenever I've looked at this, it's always led me to the conclusion
-that the way that fwnode stuff has currently been written, I'm
-supposed to get the device_node, and then use the embedded fwnode
-directly, which I'm pretty sure misses the point of fwnode (as it
-means any driver code making use of this is tied to DT.)
+No we black list them, any section that we are not sure will be there
+when we expect it to has recordmcount.c nop out the calls to mcount and
+they are ignored. Remember the e1000e bug? This was the reproducer.
 
-This patch seems to confirm my suspicions that it's just wrong -
-trying to use device_get_reference_node() here will fail in a DT
-based setup, because (I assume) dev_fwnode(dev) returns dev->fwnode
-which is NULL there.
+Anyway, on my todo list is to allow init sections to be traced. To do
+so would mean that I need to add generic code that lets ftrace know to
+remove init sections at boot up. Right now (or at least the last time I
+checked, which was back in 2009), every arch had its own way of freeing
+init memory. If that has changed, or I can just place a hook where it
+happens (which is probably the easy part), I can allow init code to be
+traced too.
 
-I don't know, maybe there is an intention that fwnode should not be
-used for DT?
-
-Maybe someone who knows what the intentions are behind this fwnode stuff
-can enlighten the situation, and maybe sort out this apparent oversight
-which IMHO should've been spotted in the initial fwnode review?
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+-- Steve
