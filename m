@@ -1,27 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 3 Dec 2015 15:45:54 -0200
-Subject: mx28: bad unlock balance detected
-In-Reply-To: <20151127121126.GM1929@sirena.org.uk>
-References: <CAOMZO5B+j5s69JeeYPnpwn2e_doCA+ARzBSGAcGoJGEJ3=u3BA@mail.gmail.com>
- <20151127121126.GM1929@sirena.org.uk>
-Message-ID: <CAOMZO5D-PKSZ76uLxEwtK9K6X3j5OnWd-cJZTz3U9p4EkyJ4hA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 3 Dec 2015 17:47:08 +0000
+Subject: [PATCH v6 14/19] arm64:ilp32: add sys_ilp32.c and a separate
+ table (in entry.S) to use it
+In-Reply-To: <20151201212904.GA14442@yury-N73SV>
+References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
+ <1447795019-30176-15-git-send-email-ynorov@caviumnetworks.com>
+ <3754277.KmO9Nk3XLD@wuerfel> <20151201212904.GA14442@yury-N73SV>
+Message-ID: <20151203174708.GO10747@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 27, 2015 at 10:11 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Thu, Nov 26, 2015 at 02:18:04PM -0200, Fabio Estevam wrote:
->> Hi,
->>
->> Running linux-next 20151126 on a mx28evk leads to the following bug:
->>
->> sgtl5000 0-000a: sgtl5000 revision 0x11
->> sgtl5000 0-000a: Using internal LDO instead of VDDD
->>
->> =====================================
->> [ BUG: bad unlock balance detected! ]
->> 4.4.0-rc2-next-20151126-00001-g44eb6b2 #156 Not tainted
->
-> This should be fixed in the next -next, Arnd noticed a problem with his
-> code.
+On Wed, Dec 02, 2015 at 12:29:04AM +0300, Yury Norov wrote:
+> My question. Why aarch64 defines COMPAT_SHMLBA as 0x4000?
 
-That's correct. linux-next 20151202 does not show the problem, thanks.
+This was done to match the arch/arm value of 4 * 4K. The historical
+32-bit reason for 4 pages is to cope with aliasing VIPT caches (see
+https://git.kernel.org/cgit/linux/kernel/git/tglx/history.git/commit?id=4197692eef113eeb8e3e413cc70993a5e667e5b8)
+
+> If there's
+> no specific reason for it, it looks like a bug, and we should
+> define it like in arch/arm:
+>         #define SHMLBA  (4 * PAGE_SIZE)          /* attach addr a multiple of this */
+
+I guess you meant COMPAT_SHMLBA. I'm not sure there is much value in
+keeping 4*PAGE_SIZE for larger page sizes but I agree that the current
+16K value doesn't work well with 64K pages.
+
+-- 
+Catalin
