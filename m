@@ -1,100 +1,163 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 3 Dec 2015 11:35:52 +0530
-Subject: [PATCH v3 0/8] phy: rockchip-usb: correct pll handling and
- usb-uart
-In-Reply-To: <5501584.6tGbRU8HS3@diego>
-References: <1447968149-10979-1-git-send-email-heiko@sntech.de>
- <5501584.6tGbRU8HS3@diego>
-Message-ID: <565FDBC0.6040207@ti.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 03 Dec 2015 15:08:26 +0900
+Subject: [PATCH 02/12] clk: samsung: exynos5420: add cpu clock
+ configuration data and instantiate cpu clock
+In-Reply-To: <1449091167-20758-3-git-send-email-ben@smart-cactus.org>
+References: <1449091167-20758-1-git-send-email-ben@smart-cactus.org>
+ <1449091167-20758-3-git-send-email-ben@smart-cactus.org>
+Message-ID: <565FDC5A.1010504@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03.12.2015 06:19, Ben Gamari wrote:
+> From: Thomas Abraham <thomas.ab@samsung.com>
+> 
+> With the addition of the new Samsung specific cpu-clock type, the
+> arm clock can be represented as a cpu-clock type. Add the CPU clock
+> configuration data and instantiate the CPU clock type for Exynos5420.
+> 
+> Changes by Bartlomiej:
+> - split Exynos5420 support from the original patches
+> - moved E5420_[EGL,KFC]_DIV0() macros to clk-exynos5420.c
+> 
+> Changes by Ben Gamari:
+> - Rebased
 
-On Wednesday 02 December 2015 09:02 PM, Heiko St?bner wrote:
-> Hi Kishon,
-> 
-> Am Donnerstag, 19. November 2015, 22:22:21 schrieb Heiko Stuebner:
->> changes in v3:
->> - rebase on top of Julias of_node_put fix
->> - address comments from Kishon Vijay Abraham
->>   - position of the devm_action in the first patch
->>   - separate compatible-addition into separate patch
->>   - don't rephrase comment when moving stuff around
->> - address Doug's comment and keep clk-tree change and assigned-clocks
->>   setting together
->> - add Doug's review-tag to patches 5,6,7
->> changes in v2:
->> - add Doug's review-tag to patches 1 and 3
->> - address comment and add the missing transistional rk_phy->base
->>   assignment in patch2
-> 
-> do you have any further comments for this series?
+If only rebasing then you should retain the Lukasz's review tag. He
+doesn't have to review it again, right? :)
 
-Nope. However I'd like to have ACK from the clock maintainer (Mike turquette?)
-for "phy: rockchip-usb: expose the phy-internal PLLs".
+> 
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Ben Gamari <ben@smart-cactus.org>
+> ---
+>  drivers/clk/samsung/clk-exynos5420.c   | 58 ++++++++++++++++++++++++++++++++--
+>  include/dt-bindings/clock/exynos5420.h |  2 ++
+>  2 files changed, 58 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index 389af3c..2288052 100644
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/syscore_ops.h>
+>  
+>  #include "clk.h"
+> +#include "clk-cpu.h"
+>  
+>  #define APLL_LOCK		0x0
+>  #define APLL_CON0		0x100
+> @@ -616,9 +617,11 @@ static struct samsung_mux_clock exynos5x_mux_clks[] __initdata = {
+>  	MUX(0, "mout_mspll_kfc", mout_mspll_cpu_p, SRC_TOP7, 8, 2),
+>  	MUX(0, "mout_mspll_cpu", mout_mspll_cpu_p, SRC_TOP7, 12, 2),
+>  
+> -	MUX(0, "mout_apll", mout_apll_p, SRC_CPU, 0, 1),
+> +	MUX_F(0, "mout_apll", mout_apll_p, SRC_CPU, 0, 1,
+> +	      CLK_SET_RATE_PARENT, 0),
+>  	MUX(0, "mout_cpu", mout_cpu_p, SRC_CPU, 16, 1),
+> -	MUX(0, "mout_kpll", mout_kpll_p, SRC_KFC, 0, 1),
+> +	MUX_F(0, "mout_kpll", mout_kpll_p, SRC_KFC, 0, 1,
+> +	      CLK_SET_RATE_PARENT, 0),
+>  	MUX(0, "mout_kfc", mout_kfc_p, SRC_KFC, 16, 1),
+>  
+>  	MUX(0, "mout_aclk200", mout_group1_p, SRC_TOP0, 8, 2),
+> @@ -1246,6 +1249,50 @@ static struct samsung_pll_clock exynos5x_plls[nr_plls] __initdata = {
+>  		KPLL_CON0, NULL),
+>  };
+>  
+> +#define E5420_EGL_DIV0(apll, pclk_dbg, atb, cpud)			\
+> +		((((apll) << 24) | ((pclk_dbg) << 20) | ((atb) << 16) |	\
+> +		 ((cpud) << 4)))
+> +
+> +static const struct exynos_cpuclk_cfg_data exynos5420_eglclk_d[] __initconst = {
+> +	{ 1800000, E5420_EGL_DIV0(3, 7, 7, 4), },
+> +	{ 1700000, E5420_EGL_DIV0(3, 7, 7, 3), },
+> +	{ 1600000, E5420_EGL_DIV0(3, 7, 7, 3), },
+> +	{ 1500000, E5420_EGL_DIV0(3, 7, 7, 3), },
+> +	{ 1400000, E5420_EGL_DIV0(3, 7, 7, 3), },
+> +	{ 1300000, E5420_EGL_DIV0(3, 7, 7, 2), },
+> +	{ 1200000, E5420_EGL_DIV0(3, 7, 7, 2), },
+> +	{ 1100000, E5420_EGL_DIV0(3, 7, 7, 2), },
+> +	{ 1000000, E5420_EGL_DIV0(3, 6, 6, 2), },
+> +	{  900000, E5420_EGL_DIV0(3, 6, 6, 2), },
+> +	{  800000, E5420_EGL_DIV0(3, 5, 5, 2), },
+> +	{  700000, E5420_EGL_DIV0(3, 5, 5, 2), },
+> +	{  600000, E5420_EGL_DIV0(3, 4, 4, 2), },
+> +	{  500000, E5420_EGL_DIV0(3, 3, 3, 2), },
+> +	{  400000, E5420_EGL_DIV0(3, 3, 3, 2), },
+> +	{  300000, E5420_EGL_DIV0(3, 3, 3, 2), },
+> +	{  200000, E5420_EGL_DIV0(3, 3, 3, 2), },
+> +	{  0 },
 
-Thanks
-Kishon
-> 
-> 
-> Thanks
-> Heiko
-> 
->> Patch 1 might be nice to go in as fix together with Julia's patch?
->>
->> Patches 2-7 fix a long-standing issue with the clock-tree of Rockchip SoCs
->> namely our ignorance of the usbphy-internal pll that creates the needed
->> 480MHz but is also a supply-clock back to the core clock-controller in
->> Rockchip SoCs.
->>
->> Till now that was worked around using a virtual clock in the cru itself,
->> but that is of course ignorant of other parts then disabling the phy
->> behind the cru's back, thus breaking potential users of these clocks.
->>
->>
->> Patch 8, while not associated with the new pll handling, also builds
->> on the groundwork introduced there and adds support for the function
->> repurposing one of the phys as passthrough for uart-data. This enables
->> attaching a ttl converter to the D+ and D- pins of an usb cable to
->> receive uart data this way, when it is not really possible to attach
->> a regular serial console to a board.
->>
->> One point of critique in my first iteration [0] of this was, that
->> due to when the reconfiguration happens we may miss parts of the logs
->> when earlycon is enabled. So far early_initcall gets used as the
->> unflattened devicetree is necessary to set this up. Doing this for
->> example in the early_param directly would require parsing the flattened
->> devicetree to get needed nodes and properties.
->>
->> I still maintain that if you're working on anything before smp-bringup
->> you should use a real dev-board instead or try to solder uart cables
->> on hopefully available test-points :-) .
->>
->>
->> In any case, if patch 8 causes to much headache, it could be dropped
->> to not hinder the earlier 7 patches.
->>
->> [0] http://comments.gmane.org/gmane.linux.ports.arm.rockchip/715
->>
->> Heiko Stuebner (8):
->>   phy: rockchip-usb: fix clock get-put mismatch
->>   phy: rockchip-usb: introduce a common data-struct for the device
->>   phy: rockchip-usb: move per-phy init into a separate function
->>   phy: rockchip-usb: add compatible values for rk3066a and rk3188
->>   phy: rockchip-usb: expose the phy-internal PLLs
->>   ARM: dts: rockchip: add clock-cells for usb phy nodes
->>   clk: rockchip: fix usbphy-related clocks
->>   phy: rockchip-usb: add handler for usb-uart functionality
->>
->>  .../devicetree/bindings/phy/rockchip-usb-phy.txt   |   6 +-
->>  Documentation/kernel-parameters.txt                |   6 +
->>  arch/arm/boot/dts/rk3066a.dtsi                     |   2 +
->>  arch/arm/boot/dts/rk3188.dtsi                      |   2 +
->>  arch/arm/boot/dts/rk3288-veyron.dtsi               |   2 +-
->>  arch/arm/boot/dts/rk3288.dtsi                      |   3 +
->>  drivers/clk/rockchip/clk-rk3188.c                  |  11 +-
->>  drivers/clk/rockchip/clk-rk3288.c                  |  16 +-
->>  drivers/phy/phy-rockchip-usb.c                     | 458
->> ++++++++++++++++++--- 9 files changed, 417 insertions(+), 89 deletions(-)
+The vendor code (Galaxy S5 with Exynos5422) sets pclk_dbg divider to 7.
+In the same time APLL divider is only 1.
+
+For the ACLK divider (of KFC below) the vendor sets 3, not 2.
+
+The values also don't match the Exynos5420 from Note 3.
+
+The Exynos5800 apparently has values more similar to 5422.
+
+The question is: for which exact model this is? We can of course choose
+the safest values here but probably these would be with the highest
+dividers?
+
+Best regards,
+Krzyztof
+
+
+> +};
+> +
+> +#define E5420_KFC_DIV(kpll, pclk, aclk)					\
+> +		((((kpll) << 24) | ((pclk) << 20) | ((aclk) << 4)))
+> +
+> +static const struct exynos_cpuclk_cfg_data exynos5420_kfcclk_d[] __initconst = {
+> +	{ 1300000, E5420_KFC_DIV(3, 5, 2), },
+> +	{ 1200000, E5420_KFC_DIV(3, 5, 2), },
+> +	{ 1100000, E5420_KFC_DIV(3, 5, 2), },
+> +	{ 1000000, E5420_KFC_DIV(3, 5, 2), },
+> +	{  900000, E5420_KFC_DIV(3, 5, 2), },
+> +	{  800000, E5420_KFC_DIV(3, 5, 2), },
+> +	{  700000, E5420_KFC_DIV(3, 4, 2), },
+> +	{  600000, E5420_KFC_DIV(3, 4, 2), },
+> +	{  500000, E5420_KFC_DIV(3, 4, 2), },
+> +	{  400000, E5420_KFC_DIV(3, 3, 2), },
+> +	{  300000, E5420_KFC_DIV(3, 3, 2), },
+> +	{  200000, E5420_KFC_DIV(3, 3, 2), },
+> +	{  0 },
+> +};
+> +
+>  static const struct of_device_id ext_clk_match[] __initconst = {
+>  	{ .compatible = "samsung,exynos5420-oscclk", .data = (void *)0, },
+>  	{ },
+> @@ -1310,6 +1357,13 @@ static void __init exynos5x_clk_init(struct device_node *np,
+>  				ARRAY_SIZE(exynos5800_gate_clks));
+>  	}
+>  
+> +	exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
+> +		mout_cpu_p[0], mout_cpu_p[1], 0x200,
+> +		exynos5420_eglclk_d, ARRAY_SIZE(exynos5420_eglclk_d), 0);
+> +	exynos_register_cpu_clock(ctx, CLK_KFC_CLK, "kfcclk",
+> +		mout_kfc_p[0], mout_kfc_p[1], 0x28200,
+> +		exynos5420_kfcclk_d, ARRAY_SIZE(exynos5420_kfcclk_d), 0);
+> +
+>  	exynos5420_clk_sleep_init();
+>  
+>  	samsung_clk_of_add_provider(np, ctx);
+> diff --git a/include/dt-bindings/clock/exynos5420.h b/include/dt-bindings/clock/exynos5420.h
+> index 99da0d1..dde9664 100644
+> --- a/include/dt-bindings/clock/exynos5420.h
+> +++ b/include/dt-bindings/clock/exynos5420.h
+> @@ -25,6 +25,8 @@
+>  #define CLK_FOUT_MPLL		10
+>  #define CLK_FOUT_BPLL		11
+>  #define CLK_FOUT_KPLL		12
+> +#define CLK_ARM_CLK		13
+> +#define CLK_KFC_CLK		14
+>  
+>  /* gate for special clocks (sclk) */
+>  #define CLK_SCLK_UART0		128
 > 
