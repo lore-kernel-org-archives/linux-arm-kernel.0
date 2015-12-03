@@ -1,72 +1,46 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu,  3 Dec 2015 14:04:47 -0700
-Subject: [PATCH V6 11/26] coresight: etm3x: changing default trace
- configuration
+Date: Thu,  3 Dec 2015 14:04:48 -0700
+Subject: [PATCH V6 12/26] coresight: etm3x: consolidating initial config
 In-Reply-To: <1449176702-13213-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1449176702-13213-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1449176702-13213-12-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1449176702-13213-13-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changing default configuration to include the entire address
-range rather than just the kernel.  That way traces are more
-inclusive and it is easier to narrow down if needed.
+There is really no point in having two functions to take care
+of doing the initials tracer configuration.  As such moving
+everything to 'etm_set_default()'.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm.h   |  2 ++
- drivers/hwtracing/coresight/coresight-etm3x.c | 29 ++++++++++++---------------
- 2 files changed, 15 insertions(+), 16 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm3x.c | 37 ++++++++++-----------------
+ 1 file changed, 14 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
-index a8663780a908..f01862fc98dd 100644
---- a/drivers/hwtracing/coresight/coresight-etm.h
-+++ b/drivers/hwtracing/coresight/coresight-etm.h
-@@ -146,6 +146,7 @@
-  * @startstop_ctrl: setting for register ETMTSSCR.
-  * @enable_event: setting for register ETMTEEVR.
-  * @enable_ctrl1: setting for register ETMTECR1.
-+ * @enable_ctrl2: setting for register ETMTECR2.
-  * @fifofull_level: setting for register ETMFFLR.
-  * @addr_idx:	index for the address comparator selection.
-  * @addr_val:	value for address comparator register.
-@@ -179,6 +180,7 @@ struct etm_config {
- 	u32				startstop_ctrl;
- 	u32				enable_event;
- 	u32				enable_ctrl1;
-+	u32				enable_ctrl2;
- 	u32				fifofull_level;
- 	u8				addr_idx;
- 	u32				addr_val[ETM_MAX_ADDR_CMP];
 diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index a0252ffb4ba7..cfaf8e840bd6 100644
+index cfaf8e840bd6..14927da0f6ba 100644
 --- a/drivers/hwtracing/coresight/coresight-etm3x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -608,26 +608,23 @@ static void etm_init_arch_data(void *info)
+@@ -41,7 +41,6 @@ module_param_named(boot_enable, boot_enable, int, S_IRUGO);
+ /* The number of ETM/PTM currently registered */
+ static int etm_count;
+ static struct etm_drvdata *etmdrvdata[NR_CPUS];
+-static void etm_init_default_data(struct etm_config *config);
  
- static void etm_init_default_data(struct etm_config *config)
- {
--	u32 flags = (1 << 0 | /* instruction execute*/
--		     3 << 3 | /* ARM instruction */
--		     0 << 5 | /* No data value comparison */
--		     0 << 7 | /* No exact mach */
--		     0 << 8 | /* Ignore context ID */
--		     0 << 10); /* Security ignored */
--
+ /*
+  * Memory mapped writes to clear os lock are not supported on some processors
+@@ -199,7 +198,7 @@ struct etm_config *get_etm_config(struct etm_drvdata *drvdata)
+ 		return NULL;
+ 
+ 	/* Set default config */
+-	etm_init_default_data(config);
++	etm_set_default(config);
+ 	drvdata->config = config;
+ out:
+ 	return drvdata->config;
+@@ -212,6 +211,19 @@ void etm_set_default(struct etm_config *config)
  	if (WARN_ON_ONCE(!config))
  		return;
  
--	config->ctrl = (ETMCR_CYC_ACC | ETMCR_TIMESTAMP_EN);
--	config->enable_ctrl1 = ETMTECR1_ADDR_COMP_1;
--	config->addr_val[0] = (u32) _stext;
--	config->addr_val[1] = (u32) _etext;
--	config->addr_acctype[0] = flags;
--	config->addr_acctype[1] = flags;
--	config->addr_type[0] = ETM_ADDR_TYPE_RANGE;
--	config->addr_type[1] = ETM_ADDR_TYPE_RANGE;
--
- 	etm_set_default(config);
-+
 +	/*
 +	 * Taken verbatim from the TRM:
 +	 *
@@ -79,8 +53,37 @@ index a0252ffb4ba7..cfaf8e840bd6 100644
 +	config->enable_ctrl1 = BIT(24);
 +	config->enable_ctrl2 = 0x0;
 +	config->enable_event = ETM_HARD_WIRE_RES_A;
++
+ 	config->trigger_event = ETM_DEFAULT_EVENT_VAL;
+ 	config->enable_event = ETM_HARD_WIRE_RES_A;
+ 
+@@ -606,27 +618,6 @@ static void etm_init_arch_data(void *info)
+ 	CS_LOCK(drvdata->base);
  }
  
+-static void etm_init_default_data(struct etm_config *config)
+-{
+-	if (WARN_ON_ONCE(!config))
+-		return;
+-
+-	etm_set_default(config);
+-
+-	/*
+-	 * Taken verbatim from the TRM:
+-	 *
+-	 * To trace all memory:
+-	 *  set bit [24] in register 0x009, the ETMTECR1, to 1
+-	 *  set all other bits in register 0x009, the ETMTECR1, to 0
+-	 *  set all bits in register 0x007, the ETMTECR2, to 0
+-	 *  set register 0x008, the ETMTEEVR, to 0x6F (TRUE).
+-	 */
+-	config->enable_ctrl1 = BIT(24);
+-	config->enable_ctrl2 = 0x0;
+-	config->enable_event = ETM_HARD_WIRE_RES_A;
+-}
+-
  static void etm_init_trace_id(struct etm_drvdata *drvdata)
+ {
+ 	/*
 -- 
 2.1.4
