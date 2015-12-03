@@ -1,101 +1,52 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 3 Dec 2015 12:26:34 +0000
-Subject: [RESEND v4 2/6] remoteproc: debugfs: Add ability to boot remote
- processor using debugfs
-In-Reply-To: <CAJAp7Og2MPapOQmCSB9o4qwQHsA8_iyAWPhjHYPw6J=xCK2xew@mail.gmail.com>
-References: <1448370862-19120-1-git-send-email-lee.jones@linaro.org>
- <1448370862-19120-3-git-send-email-lee.jones@linaro.org>
- <CAJAp7Og2MPapOQmCSB9o4qwQHsA8_iyAWPhjHYPw6J=xCK2xew@mail.gmail.com>
-Message-ID: <20151203122634.GX12874@x1>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 3 Dec 2015 12:29:44 +0000
+Subject: arm64 boot requirements
+In-Reply-To: <1449083028.6139.25.camel@infradead.org>
+References: <565BAA2E.5090102@cog.systems> <20151201110159.GA4757@leverpostej>
+ <1449083028.6139.25.camel@infradead.org>
+Message-ID: <20151203122943.GD28731@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Nov 2015, Bjorn Andersson wrote:
-
-> On Tue, Nov 24, 2015 at 5:14 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > This functionality is especially useful during the testing phase.  When
-> > used in conjunction with Mailbox's Test Framework we can trivially conduct
-> > end-to-end testing i.e. boot co-processor, send and receive messages to
-> > the co-processor, then shut it down again (repeat as required).
-> >
+On Wed, Dec 02, 2015 at 11:03:48AM -0800, Geoff Levand wrote:
+> Hi,
 > 
-> I want this too!
+> On Tue, 2015-12-01 at 11:02 +0000, Mark Rutland wrote:
+> > Pratyush, Geoff, I understood you were loading the kernel vmlinux for
+> > kexec. Do you parse the Image header to figure out where to place
+> > things?
 > 
-> > Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/remoteproc/remoteproc_debugfs.c | 34 +++++++++++++++++++++++++++++++++
-> >  1 file changed, 34 insertions(+)
-> >
-> > diff --git a/drivers/remoteproc/remoteproc_debugfs.c b/drivers/remoteproc/remoteproc_debugfs.c
-> > index 9d30809..8113c18 100644
-> > --- a/drivers/remoteproc/remoteproc_debugfs.c
-> > +++ b/drivers/remoteproc/remoteproc_debugfs.c
-> > @@ -88,8 +88,42 @@ static ssize_t rproc_state_read(struct file *filp, char __user *userbuf,
-> >         return simple_read_from_buffer(userbuf, count, ppos, buf, i);
-> >  }
-> >
-> > +static ssize_t rproc_state_write(struct file *filp, const char __user *userbuf,
-> > +                                size_t count, loff_t *ppos)
-> > +{
-> > +       struct rproc *rproc = filp->private_data;
-> > +       char buf[10];
-> > +       int ret;
-> > +
-> > +       if (count > sizeof(buf))
-> > +               return count;
-> > +
-> > +       ret = copy_from_user(buf, userbuf, count);
-> > +       if (ret)
-> > +               return -EFAULT;
-> > +
-> > +       if (buf[count - 1] == '\n')
-> > +               buf[count - 1] = '\0';
+> Yes, in the kexec user tools we use text_offset to make
+> enough room for the kernel, but there is also the need for
+> page_offset.
 > 
-> I believe you can get here with count = 0.
+> We need to know the page_offset to be able to do virtual to
+> physical address conversions.  We can calculate the page_offset
+> for a vmlinux image as page_offset = phdr->p_vaddr - text_offset.
 
-I'm pretty sure you can't.
+I don't understadn why you need to do that.
 
-If you are sure that you can, if you can provide me with a way of
-testing, I'd be happy to put in provisions.
+Is that just just so you can figure out where to load the segments
+physically?
 
-> > +
-> > +       if (!strncmp(buf, "start", count)) {
-> > +               ret = rproc_boot(rproc);
-> > +               if (ret) {
-> > +                       dev_err(&rproc->dev, "Boot failed: %d\n", ret);
-> > +                       return ret;
-> > +               }
-> > +       } else if (!strncmp(buf, "stop", count)) {
-> > +               rproc_shutdown(rproc);
-> > +       } else {
-> > +               dev_err(&rproc->dev, "Unrecognised option: %s\n", buf);
-> 
-> Unrecognized
+> The binary Image currently has no info about page_offset or
+> virtual addressing.  We have a kexec-tools option for the
+> user to specify a page_offset.  If that option is not provided
+> we try to look at the running kernel's symbols, and if that
+> fails, fall back to a default page_offset.  This is less than
+> ideal, and certainly makes the binary Image less appealing to
+> use with kexec.
 
-What I have is correct.
+I don't follow at all why this complication is necessary. I don't think
+that the kexec tools should be looking at the kernel symbols in that
+manner, and I don't think that we need to expose the page offset via the
+Image header.
 
-> > +               return -EINVAL;
-> > +       }
-> > +
-> > +       return count;
-> > +}
-> > +
-> >  static const struct file_operations rproc_state_ops = {
-> >         .read = rproc_state_read,
-> > +       .write = rproc_state_write,
-> >         .open = simple_open,
-> >         .llseek = generic_file_llseek,
-> >  };
-> 
-> Part of these nits
-> 
-> Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+The first loaded address in the vmlinux corresponds to PHYS_OFFSET +
+TEXT_OFFSET. If you know that, you can figure out an offset to apply to
+VAs to convert them to PAs when loading.
 
-Thanks.
+What am I missing?
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Mark.
