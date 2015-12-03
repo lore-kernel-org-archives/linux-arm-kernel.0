@@ -1,47 +1,76 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 3 Dec 2015 12:08:11 +0000
-Subject: Domain faults when CONFIG_CPU_SW_DOMAIN_PAN is enabled
-In-Reply-To: <20151203115143.GM8644@n2100.arm.linux.org.uk>
-References: <1267b061b66c4d1fa8af1955825bc97a@EMAIL.axentia.se>
- <20151203110041.GK8644@n2100.arm.linux.org.uk>
- <f7774151e4a849e682ae5a607a98140b@EMAIL.axentia.se>
- <20151203115143.GM8644@n2100.arm.linux.org.uk>
-Message-ID: <533b0f1f264e42e78b94bbff9570fb50@EMAIL.axentia.se>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 3 Dec 2015 12:13:03 +0000
+Subject: [PATCH v6 07/19] arm64: introduce is_a32_task and is_a32_thread
+ (for AArch32 compat)
+In-Reply-To: <1447795019-30176-8-git-send-email-ynorov@caviumnetworks.com>
+References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
+ <1447795019-30176-8-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <20151203121303.GK10747@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote:
-> On Thu, Dec 03, 2015 at 11:38:20AM +0000, Peter Rosin wrote:
-> > Russell King wrote:
-> > > On Thu, Dec 03, 2015 at 08:33:13AM +0000, Peter Rosin wrote:
-> > > > I wrote:
-> > > > > If I enable CONFIG_CPU_SW_DOMAIN_PAN, I sometimes (but not always) get the
-> > > > > following (or very similar) on boot.
-> > > > 
-> > > > I should have said "if I don't disable", as the option is "default y".
-> > > > 
-> > > > Also, if it survives on boot, below is an example of later trouble (after
-> > > > 30+ minutes on this occasion).
-> > > 
-> > > Please apply this patch so we (might) get a slightly better oops dump,
-> > > and then try to reproduce.
-> > 
-> > Sure thing, but it's still "DAC: 00000051"...
-> 
-> Thanks, that confirms that something in the uaccess-with-memcpy code
-> is clearing the DACR back to 0x51.
-> 
-> This has come up several times before, and I really can't spot the
-> problem in this code, so I've always said to disable the
-> uaccess-with-memcpy code.  Personally, I'd like to see the back
-> of that code...
+On Wed, Nov 18, 2015 at 12:16:47AM +0300, Yury Norov wrote:
+> diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
+> index 7fbed69..9700e5e 100644
+> --- a/arch/arm64/include/asm/compat.h
+> +++ b/arch/arm64/include/asm/compat.h
+> @@ -299,19 +299,44 @@ struct compat_shmid64_ds {
+>  	compat_ulong_t __unused5;
+>  };
+>  
+> -static inline int is_compat_task(void)
+> +#ifdef CONFIG_AARCH32_EL0
+> +
+> +static inline int is_a32_compat_task(void)
+>  {
+>  	return test_thread_flag(TIF_32BIT);
+>  }
+>  
+> -static inline int is_compat_thread(struct thread_info *thread)
+> +static inline int is_a32_compat_thread(struct thread_info *thread)
+>  {
+>  	return test_ti_thread_flag(thread, TIF_32BIT);
+>  }
+>  
+> +#else
+> +
+> +static inline int is_a32_compat_task(void)
+> +{
+> +	return 0;
+> +}
+> +
+> +static inline int is_a32_compat_thread(struct thread_info *thread)
+> +{
+> +	return 0;
+> +}
+> +#endif
+> +
+> +static inline int is_compat_task(void)
+> +{
+> +	return is_a32_compat_task();
+> +}
+> +
+>  #else /* !CONFIG_COMPAT */
+>  
+> -static inline int is_compat_thread(struct thread_info *thread)
+> +static inline int is_a32_compat_thread(struct thread_info *thread)
+> +{
+> +	return 0;
+> +}
+> +
+> +static inline int is_a32_compat_task(void)
+>  {
+>  	return 0;
+>  }
 
-Ok, but it's not me doing crazy things if that's what you are implying
-(not saying that you are), because the sama5_defconfig has
+My main worry with this patch is a potential #include mess. I can see
+that you already had to include asm/compat.h explicitly in
+hw_breakpoint.c even though linux/compat.h was already included. In
+subsequent files (asm/elf.h, asm/memory.h) you check is_compat_task()
+without explicitly including asm/compat.h and hope that it won't break.
 
-	CONFIG_UACCESS_WITH_MEMCPY=y
+A solution would be to add these functions in a separate header file
+that gets included where needed (also by asm/compat.h).
 
-So, something needs to happen or sama5 remains default-broken.
-
-Cheers,
-Peter
+-- 
+Catalin
