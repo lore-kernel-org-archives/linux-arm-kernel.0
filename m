@@ -1,31 +1,27 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 3 Dec 2015 10:46:30 +0100
-Subject: [PATCH 4/4] ARM: dts: sun9i: Add NMI controller device node
-In-Reply-To: <1449130813-22400-5-git-send-email-wens@csie.org>
-References: <1449130813-22400-1-git-send-email-wens@csie.org>
- <1449130813-22400-5-git-send-email-wens@csie.org>
-Message-ID: <20151203094630.GX29263@lukather>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 3 Dec 2015 10:53:49 +0100
+Subject: [PATCH v2 0/4] i2c: at91: add support for SDA HOLD
+Message-ID: <1449136434-27619-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2015 at 04:20:13PM +0800, Chen-Yu Tsai wrote:
-> The Allwinner A80 SoC has an NMI controller. NMI is an external
-> interrupt pin exclusely used with PMICs and other system critical
-> peripherals (such as RTC) in Allwinner's reference designs.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Changes:
+- from v1:
+  - fix typos,
+  - change MAX_HOLD macro to follow Nicolas' advice,
+  - make it clear that sama5d2 also support i2c-sda-hold-time-ns.
 
-Applied, thanks!
-Maxime
+Ludovic Desroches (4):
+  i2c: at91: add support for the HOLD field
+  i2c: at91: update bindings documention
+  ARM: at91/dt: sama5d4: update i2c compatible string
+  ARM: at91/dt: sama5d2 Xplained: pmic needs a specific sda hold time
+
+ Documentation/devicetree/bindings/i2c/i2c-at91.txt |  5 +-
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts        |  1 +
+ arch/arm/boot/dts/sama5d4.dtsi                     |  6 +--
+ drivers/i2c/busses/i2c-at91.c                      | 53 ++++++++++++++++++++--
+ 4 files changed, 58 insertions(+), 7 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151203/ba02cb77/attachment-0001.sig>
+2.5.0
