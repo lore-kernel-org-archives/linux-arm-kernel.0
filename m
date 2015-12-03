@@ -1,49 +1,98 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 3 Dec 2015 07:43:11 +0000
-Subject: Domain faults when CONFIG_CPU_SW_DOMAIN_PAN is enabled
-Message-ID: <6ae83861a7c8436d983ef99cd1b48a76@EMAIL.axentia.se>
+From: koro.chen@mediatek.com (Koro Chen)
+Date: Thu, 3 Dec 2015 15:53:28 +0800
+Subject: [PATCH] ASoC: mediatek: Use current HW pointer for pointer callback
+Message-ID: <1449129208-63615-1-git-send-email-koro.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Previously we recorded "last interrupt position" and used it in
+pointer callback. This is not correct implementation, and it causes
+underruns when user space monitors buffer level to decide when to
+send next data chunk in low latency application.
 
-If I enable CONFIG_CPU_SW_DOMAIN_PAN, I sometimes (but not always) get the
-following (or very similar) on boot.
+Remove position recording in IRQ handler and also hw_ptr in
+struct mtk_afe_memif used to record that, and let pointer callback
+reports current HW pointer instead.
 
-Cheers,
-Peter
+Signed-off-by: Koro Chen <koro.chen@mediatek.com>
+---
+ sound/soc/mediatek/mtk-afe-common.h |    1 -
+ sound/soc/mediatek/mtk-afe-pcm.c    |   22 +++++++++++-----------
+ 2 files changed, 11 insertions(+), 12 deletions(-)
 
-Unhandled fault: page domain fault (0x81b) at 0x00086578
-pgd = c2810000
-[00086578] *pgd=22819831, *pte=224fe34f, *ppte=224fe83f
-Internal error: : 81b [#1] ARM
-Modules linked in:
-CPU: 0 PID: 907 Comm: ntpd Not tainted 4.3.0+ #29
-Hardware name: Atmel SAMA5
-task: c398dac0 ti: c2804000 task.ti: c2804000
-PC is at memcpy+0x50/0x330
-LR is at 0x1
-pc : [<c01daff0>]??? lr : [<00000001>]??? psr: 80070013
-sp : c2805ed4? ip : 00000007? fp : 000d3808
-r10: 00000000? r9 : 00000080? r8 : 00000001
-r7 : 00000010? r6 : 00000010? r5 : 003f7374? r4 : 00000000
-r3 : 00000002? r2 : ffffffe0? r1 : c2805f38? r0 : 00086578
-Flags: Nzcv? IRQs on? FIQs on? Mode SVC_32? ISA ARM? Segment none
-Control: 10c53c7d? Table: 22810059? DAC: 00000051
-Process ntpd (pid: 907, stack limit = 0xc2804208)
-Stack: (0xc2805ed4 to 0xc2806000)
-5ec0:????????????????????????????????????????????? 00000000 c2804000 00000000
-5ee0: c2805f18 00086578 00086578 c01e76c4 c2819218 c2ff3b74 000d4344 00086578
-5f00: 00000000 00000051 0000007c c0010224 c2804000 c004c988 00000002 00000000
-5f20: 003f7374 00000010 00000010 00000001 00000007 00000001 01f40000 565ff060
-5f40: 000183ef 00002710 00000000 00000000 00000000 00000000 00000000 00000000
-5f60: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-5f80: 00000000 00000000 00000000 00000000 00000000 00000000 000d3968 0005e38f
-5fa0: 000d4344 c0010060 000d3968 0005e38f 00086578 00000000 ffffffff 00000001
-5fc0: 000d3968 0005e38f 000d4344 0000007c 000d3814 00000001 000d4338 000d3808
-5fe0: 00081e7c bec558b4 00026d3d b6d09126 00000030 00086578 009e3675 2a090bb6
-[<c01daff0>] (memcpy) from [<c01e76c4>] (__copy_to_user_memcpy+0x138/0x17c)
-[<c01e76c4>] (__copy_to_user_memcpy) from [<c004c988>] (SyS_adjtimex+0xd4/0xf0)
-[<c004c988>] (SyS_adjtimex) from [<c0010060>] (ret_fast_syscall+0x0/0x3c)
-Code: f5d1f05c f5d1f07c e8b151f8 e2522020 (e8a051f8)
----[ end trace 04981945a3df2e5e ]---
+diff --git a/sound/soc/mediatek/mtk-afe-common.h b/sound/soc/mediatek/mtk-afe-common.h
+index cc4393c..9b1af1a 100644
+--- a/sound/soc/mediatek/mtk-afe-common.h
++++ b/sound/soc/mediatek/mtk-afe-common.h
+@@ -92,7 +92,6 @@ struct mtk_afe_memif_data {
+ struct mtk_afe_memif {
+ 	unsigned int phys_buf_addr;
+ 	int buffer_size;
+-	unsigned int hw_ptr;		/* Previous IRQ's HW ptr */
+ 	struct snd_pcm_substream *substream;
+ 	const struct mtk_afe_memif_data *data;
+ 	const struct mtk_afe_irq_data *irqdata;
+diff --git a/sound/soc/mediatek/mtk-afe-pcm.c b/sound/soc/mediatek/mtk-afe-pcm.c
+index 7f71343..5399a0e 100644
+--- a/sound/soc/mediatek/mtk-afe-pcm.c
++++ b/sound/soc/mediatek/mtk-afe-pcm.c
+@@ -175,8 +175,17 @@ static snd_pcm_uframes_t mtk_afe_pcm_pointer
+ 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+ 	struct mtk_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+ 	struct mtk_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
++	unsigned int hw_ptr;
++	int ret;
++
++	ret = regmap_read(afe->regmap, memif->data->reg_ofs_cur, &hw_ptr);
++	if (ret || hw_ptr == 0) {
++		dev_err(afe->dev, "%s hw_ptr err\n", __func__);
++		hw_ptr = memif->phys_buf_addr;
++	}
+ 
+-	return bytes_to_frames(substream->runtime, memif->hw_ptr);
++	return bytes_to_frames(substream->runtime,
++			       hw_ptr - memif->phys_buf_addr);
+ }
+ 
+ static const struct snd_pcm_ops mtk_afe_pcm_ops = {
+@@ -602,7 +611,6 @@ static int mtk_afe_dais_hw_params(struct snd_pcm_substream *substream,
+ 
+ 	memif->phys_buf_addr = substream->runtime->dma_addr;
+ 	memif->buffer_size = substream->runtime->dma_bytes;
+-	memif->hw_ptr = 0;
+ 
+ 	/* start */
+ 	regmap_write(afe->regmap,
+@@ -737,7 +745,6 @@ static int mtk_afe_dais_trigger(struct snd_pcm_substream *substream, int cmd,
+ 		/* and clear pending IRQ */
+ 		regmap_write(afe->regmap, AFE_IRQ_CLR,
+ 			     1 << memif->data->irq_clr_shift);
+-		memif->hw_ptr = 0;
+ 		return 0;
+ 	default:
+ 		return -EINVAL;
+@@ -1081,7 +1088,7 @@ static const struct regmap_config mtk_afe_regmap_config = {
+ static irqreturn_t mtk_afe_irq_handler(int irq, void *dev_id)
+ {
+ 	struct mtk_afe *afe = dev_id;
+-	unsigned int reg_value, hw_ptr;
++	unsigned int reg_value;
+ 	int i, ret;
+ 
+ 	ret = regmap_read(afe->regmap, AFE_IRQ_STATUS, &reg_value);
+@@ -1097,13 +1104,6 @@ static irqreturn_t mtk_afe_irq_handler(int irq, void *dev_id)
+ 		if (!(reg_value & (1 << memif->data->irq_clr_shift)))
+ 			continue;
+ 
+-		ret = regmap_read(afe->regmap, memif->data->reg_ofs_cur,
+-				  &hw_ptr);
+-		if (ret || hw_ptr == 0) {
+-			dev_err(afe->dev, "%s hw_ptr err\n", __func__);
+-			hw_ptr = memif->phys_buf_addr;
+-		}
+-		memif->hw_ptr = hw_ptr - memif->phys_buf_addr;
+ 		snd_pcm_period_elapsed(memif->substream);
+ 	}
+ 
+-- 
+1.7.9.5
