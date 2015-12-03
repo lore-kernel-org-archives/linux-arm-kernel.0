@@ -1,103 +1,98 @@
-From: ben@smart-cactus.org (Ben Gamari)
-Date: Thu, 03 Dec 2015 15:37:44 +0100
-Subject: [PATCH 11/12] cpufreq: arm-big-little: clarify frequency units
-In-Reply-To: <1449152534.2817.26.camel@linaro.org>
-References: <1449091167-20758-1-git-send-email-ben@smart-cactus.org>
- <1449091167-20758-12-git-send-email-ben@smart-cactus.org>
- <1449152534.2817.26.camel@linaro.org>
-Message-ID: <87egf338ef.fsf@smart-cactus.org>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 3 Dec 2015 14:48:55 +0000
+Subject: [PATCH v3 2/4] drm: Add support for ARM's HDLCD controller.
+In-Reply-To: <CAPj87rOyBciAtBH_MiKA1bcqbpmk8gOscOMcLcgcbcag7k1W9g@mail.gmail.com>
+References: <1449058982-18595-1-git-send-email-Liviu.Dudau@arm.com>
+ <1449058982-18595-3-git-send-email-Liviu.Dudau@arm.com>
+ <CAPj87rNFFGeL8z9GBXxyVri1RyhVpMGS0yz7opgCYamHYV1Yow@mail.gmail.com>
+ <20151203100021.GD972@e106497-lin.cambridge.arm.com>
+ <CAPj87rOyBciAtBH_MiKA1bcqbpmk8gOscOMcLcgcbcag7k1W9g@mail.gmail.com>
+Message-ID: <20151203144855.GA12521@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
-
-> On Wed, 2015-12-02 at 22:19 +0100, Ben Gamari wrote:
->> The frequency units are very confusing in this area as OPPs use Hz
->> whereas cpufreq uses kHz. Be explicit about this in variable naming.
->> 
->> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
->> Signed-off-by: Ben Gamari <ben@smart-cactus.org>
->> ---
->>  drivers/cpufreq/arm_big_little.c | 20 ++++++++++----------
->>  1 file changed, 10 insertions(+), 10 deletions(-)
->> 
->> diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
->> index 855599b..2d5761c 100644
->> --- a/drivers/cpufreq/arm_big_little.c
->> +++ b/drivers/cpufreq/arm_big_little.c
->> @@ -130,14 +130,14 @@ static unsigned int bL_cpufreq_get_rate(unsigned int cpu)
->>  }
->>  
->>  static int
->> -bL_cpufreq_set_rate_cluster(u32 cpu, u32 cluster, u32 new_rate)
->> +bL_cpufreq_set_rate_cluster(u32 cpu, u32 cluster, u32 new_rate_kHz)
->>  {
->>  	unsigned long volt = 0, volt_old = 0;
->>  	long freq_Hz;
->>  	u32 old_rate;
->
-> IMO variable renaming doesn't seem necessary, if cpufreq uses kHz then
-> in a cpufreq driver adding 'kHz' to variable seems redundant, especially
-> if Hz values like freq_Hz above are named especially to signal their
-> different units.
+On Thu, Dec 03, 2015 at 02:20:26PM +0000, Daniel Stone wrote:
+> Hi Liviu,
 > 
-Correct; it isn't strictly necessary but it would have saved me half an
-hour of poking around trying work out the intent of this code.
+> On 3 December 2015 at 10:00, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > On Wed, Dec 02, 2015 at 05:21:44PM +0000, Daniel Stone wrote:
+> >> On 2 December 2015 at 12:23, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> >> > +       if (irq_status & HDLCD_INTERRUPT_VSYNC) {
+> >> > +               unsigned long flags;
+> >> > +
+> >> > +               drm_handle_vblank(drm, 0);
+> >> > +
+> >> > +               spin_lock_irqsave(&drm->event_lock, flags);
+> >> > +               if (hdlcd->event) {
+> >> > +                       drm_send_vblank_event(drm, hdlcd->event->pipe, hdlcd->event);
+> >> > +                       drm_crtc_vblank_put(&hdlcd->crtc);
+> >> > +                       hdlcd->event = NULL;
+> >> > +               }
+> >> > +               spin_unlock_irqrestore(&drm->event_lock, flags);
+> >> > +       }
+> >>
+> >> As with VC4 and Rockchip, you're missing a ->preclose handler in your
+> >> drm_drv, to make sure that you don't try to send events to a dead
+> >> client (which causes an OOPS):
+> >> https://git.collabora.com/cgit/user/daniels/linux.git/commit/?h=wip/4.4.x/rockchip-drm-fixes&id=d14f21bcd7
+> >> (and its parent)
+> >
+> > Thanks for reviewing this!
+> >
+> > I do acknowledge your concerns and you might correct my understanding on
+> > how atomic DRM works, but I believe in this case we should be safe. The
+> > event stored in hdlcd->event is taken out of the crtc->state->event during
+> > the crtc->atomic_begin() callback. If the client is dead the callback should
+> > not be called, so that's how we avoid the OOPS.
+> 
+> Right, it's taken out of the CRTC state and put into the overall HDLCD
+> structure. So the OOPS happens when:
+>   - client submits state with event requested, async flag set
+>   - atomic_begin moves crtc->state->event into hdlcd->event
+>   - control returns to client, who exits immediately
+>   - vblank happens
+>   - hdlcd->event->base.file_priv now points to a dead client
+>   - OOPS
 
-> However, if renaming is going to happen it should at
-> least be consistent within the same function i.e. also rename the old
-> old_rate variable above.
->
-That's a reasonable objection. I'd be happy to do that.
+I will try to construct an userspace test to see if I can trigger this scenario.
 
-snip
->>  static unsigned int
->> -bL_cpufreq_set_rate(u32 cpu, u32 old_cluster, u32 new_cluster, u32 rate)
->> +bL_cpufreq_set_rate(u32 cpu, u32 old_cluster, u32 new_cluster, u32 rate_kHz)
->>  {
->>  	u32 new_rate, prev_rate;
->
-> Ditto. Rename these too to add '_kHz' ?
->
-Sure.
->>  	int ret;
->> @@ -209,13 +209,13 @@ bL_cpufreq_set_rate(u32 cpu, u32 old_cluster, u32 new_cluster, u32 rate)
->>  
->>  	if (bLs) {
->>  		prev_rate = per_cpu(cpu_last_req_freq, cpu);
->> -		per_cpu(cpu_last_req_freq, cpu) = rate;
->> +		per_cpu(cpu_last_req_freq, cpu) = rate_kHz;
->>  		per_cpu(physical_cluster, cpu) = new_cluster;
->>  
->>  		new_rate = find_cluster_maxfreq(new_cluster);
->>  		new_rate = ACTUAL_FREQ(new_cluster, new_rate);
->>  	} else {
->> -		new_rate = rate;
->> +		new_rate = rate_kHz;
->>  	}
->>  
->>  	pr_debug("%s: cpu: %d, old cluster: %d, new cluster: %d, freq: %d\n",
->> @@ -236,7 +236,7 @@ bL_cpufreq_set_rate(u32 cpu, u32 old_cluster, u32 new_cluster, u32 rate)
->>  	} else if (ret && bLs) {
->>  		per_cpu(cpu_last_req_freq, cpu) = prev_rate;
->>  		per_cpu(physical_cluster, cpu) = old_cluster;
->> -	} 
->> +	}
->
-> There's a spurious whitespace change here. I know the space you deleted
-> shouldn't have been there, but doing tidyups like that generally isn't
-> done in patches that don't otherwise affect the code in question.
->
-Alright, I can drop that change.
+Thanks for explaining it to me.
 
-Cheers,
+Best regards,
+Liviu
 
-- Ben
+> 
+> >> Also, is there anything preventing clients from submitting multiple
+> >> pageflips before the event is sent? I couldn't see anything from a
+> >> quick look, so you could have the situation of:
+> >>   - client submits pageflip, event 1 stored to hdlcd->event
+> >>   - client submits pageflip, event 2 stored to hdlcd->event
+> >>   - vblank arrives, event 2 is sent
+> >>   - event 1 has disappeared and been leaked
+> >
+> > As for multiple events being submitted before vsync interrupt happening: given
+> > that the event is plucked out of the crtc->state, is that possible? And if so,
+> > is there a case where having the later event overwrite the earlier one a desired
+> > outcome?
+> 
+> Having events being overwritten is extremely undesirable; it could
+> cause a client to stall in the right scenarios (e.g. requests
+> submitted separately for different planes). It would be far better to
+> turn hdlcd->event into a list of events which are sent per-vblank,
+> probably just by retaining a list of pending states to apply; this
+> also makes it easier to handle async commits in the future (which
+> Weston in particular relies on).
+> 
+> Cheers,
+> Daniel
+> 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 472 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151203/f9c0b9e2/attachment.sig>
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
