@@ -1,67 +1,68 @@
 From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 03 Dec 2015 10:45:05 -0800
-Subject: arm64 sched_clock cpu accounting
-In-Reply-To: <565F81D2.3060401@samsung.com>
-References: <564CD5A7.8000007@samsung.com> <564D31D3.5040207@samsung.com>
- <20151202180741.GR18376@cbox> <565F81D2.3060401@samsung.com>
-Message-ID: <56608DB1.6010401@samsung.com>
+Date: Thu, 03 Dec 2015 11:21:23 -0800
+Subject: [PATCH v4 1/3] KVM/arm/arm64: add hooks for armv7 fp/simd lazy
+ switch support
+In-Reply-To: <566063BE.7080005@arm.com>
+References: <1447539130-4613-1-git-send-email-m.smarduch@samsung.com>
+ <1447539130-4613-2-git-send-email-m.smarduch@samsung.com>
+ <566063BE.7080005@arm.com>
+Message-ID: <56609633.3030307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
 
-On 12/2/2015 3:42 PM, Mario Smarduch wrote:
-> 
-> 
-> On 12/2/2015 10:07 AM, Christoffer Dall wrote:
->> Hi Mario,
+
+On 12/3/2015 7:46 AM, Marc Zyngier wrote:
+> On 14/11/15 22:12, Mario Smarduch wrote:
+>> This patch adds vcpu fields to track lazy state, save host FPEXC, and
+>> offsets to fields.
 >>
->> On Wed, Nov 18, 2015 at 06:20:03PM -0800, Mario Smarduch wrote:
->>> Also with tick accounting enabled, and periodic timer HZ set to 1000 no irq time
->>> is reported. That's with running a ping flood - 1200 int/s, not sure why
->>> wouldn't any irq time be reported? The other two modes report irq time as expected.
->>>
->>> On 11/18/2015 11:46 AM, Mario Smarduch wrote:
->>>> Hello,
->>>>   I noticed sched clock accounting can be enabled when arch-timer is
->>>> initialized. But arm64 doesn't appear to have 'HAVE_IRQ_TIME_ACCOUNTING'
->>>> selected (as of mainline 4.4-rc1) and IRQ_TIME_ACCOUNTING can't be selected.
->>>> After adding it to arch/arm64/Kconfig, option appears to work fine. Depending on
->>>> need all accounting options are fine, but irq time accounting appears to be most
->>>> preferable.
->>>>
->>>> Any thoughts? Is it fine to enable it?
->>>>
->> Is any of this related to KVM?
-> 
-> Indirectly, given the guest should yield same results. To be on the safe side I
-> ran the guest in all combinations (7) to confirm that's the case.
-> 
-> Also verified that guest time on host appears fine in all these configurations.
-> It takes extra effort to get the guest time as opposed to other modes.
-> 
-> - Mario
+>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>> ---
+>>  arch/arm/include/asm/kvm_host.h | 6 ++++++
+>>  arch/arm/kernel/asm-offsets.c   | 2 ++
+>>  2 files changed, 8 insertions(+)
 >>
->> -Christoffer
->>
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>> index 3df1e97..f1bf551 100644
+>> --- a/arch/arm/include/asm/kvm_host.h
+>> +++ b/arch/arm/include/asm/kvm_host.h
+>> @@ -107,6 +107,12 @@ struct kvm_vcpu_arch {
+>>  	/* Interrupt related fields */
+>>  	u32 irq_lines;		/* IRQ and FIQ levels */
+>>  
+>> +	/* fp/simd dirty flag true if guest accessed register file */
+>> +	bool    vfp_dirty;
 > 
+> I think we do not need this bool, because it is already represented by
+> the state of the trapping bits.
 
-While on this topic, one use case for RT like apps is run the host in full sched
-clock accounting mode/NO_HZ_FULL and guest in IRQ time accounting mode/NO_HZ_IDLE.
+The trapping bit state is lost on exit since they're cleared, no?
 
-This should make sense for a control plane, gateway guest (using normal IP
-stack, timers, ..) there you have a lot of transitions between run modes. ANd
-irq, softirq accounting matters.
-
-The host on the other side should be fine running a vCPU in full sched clock
-mode, you don't expect to many transitions from the vCPU, and less need for
-irq/softirq accounting if any.
-
-I recall you raised the point of run modes when you fixed guest time accounting,
-but I didn't have a good use case back then for your question.
-
-- Mario.
+> 
+>> +
+>> +	/* Save host FPEXC register to later restore on vcpu put */
+>> +	u32	host_fpexc;
+>> +
+>>  	/* Exception Information */
+>>  	struct kvm_vcpu_fault_info fault;
+>>  
+>> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+>> index 871b826..9f79712 100644
+>> --- a/arch/arm/kernel/asm-offsets.c
+>> +++ b/arch/arm/kernel/asm-offsets.c
+>> @@ -186,6 +186,8 @@ int main(void)
+>>    DEFINE(VCPU_CPSR,		offsetof(struct kvm_vcpu, arch.regs.usr_regs.ARM_cpsr));
+>>    DEFINE(VCPU_HCR,		offsetof(struct kvm_vcpu, arch.hcr));
+>>    DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
+>> +  DEFINE(VCPU_VFP_DIRTY,	offsetof(struct kvm_vcpu, arch.vfp_dirty));
+>> +  DEFINE(VCPU_VFP_HOST_FPEXC,	offsetof(struct kvm_vcpu, arch.host_fpexc));
+>>    DEFINE(VCPU_HSR,		offsetof(struct kvm_vcpu, arch.fault.hsr));
+>>    DEFINE(VCPU_HxFAR,		offsetof(struct kvm_vcpu, arch.fault.hxfar));
+>>    DEFINE(VCPU_HPFAR,		offsetof(struct kvm_vcpu, arch.fault.hpfar));
+>>
+> 
+> Thanks,
+> 
+> 	M.
+> 
