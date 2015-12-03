@@ -1,66 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 3 Dec 2015 11:23:10 -0800
-Subject: [4.4-rc][PATCH] ARM: dts: am4372: disable arm twd and global
- timer's nodes
-In-Reply-To: <566087DD.2040006@ti.com>
-References: <1447855315-419-1-git-send-email-grygorii.strashko@ti.com>
- <20151118141537.GC10644@leverpostej> <564C9ACF.6040107@ti.com>
- <20151203163311.GP23396@atomide.com>
- <20151203163708.GR23396@atomide.com> <566087DD.2040006@ti.com>
-Message-ID: <20151203192310.GY23396@atomide.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 03 Dec 2015 19:24:06 +0000
+Subject: [PATCH v4 1/3] KVM/arm/arm64: add hooks for armv7 fp/simd lazy
+ switch support
+In-Reply-To: <56609633.3030307@samsung.com>
+References: <1447539130-4613-1-git-send-email-m.smarduch@samsung.com>
+ <1447539130-4613-2-git-send-email-m.smarduch@samsung.com>
+ <566063BE.7080005@arm.com> <56609633.3030307@samsung.com>
+Message-ID: <566096D6.50402@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [151203 10:21]:
-> On 12/03/2015 06:37 PM, Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [151203 08:34]:
-> >>
-> >> It seems we should apply this as a fix unless somebody has better ideas.
-> > 
-> > Actually I think the fix for now is "[4.4-rc][PATCH v2] ARM: dts: am4372: fix
-> > clock source for arm twd and global timers" until PM starts working?
-> > 
+On 03/12/15 19:21, Mario Smarduch wrote:
 > 
-> Yes. if no PM it should work, but PM patches are on the fly for Am43.
+> 
+> On 12/3/2015 7:46 AM, Marc Zyngier wrote:
+>> On 14/11/15 22:12, Mario Smarduch wrote:
+>>> This patch adds vcpu fields to track lazy state, save host FPEXC, and
+>>> offsets to fields.
+>>>
+>>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>>> ---
+>>>  arch/arm/include/asm/kvm_host.h | 6 ++++++
+>>>  arch/arm/kernel/asm-offsets.c   | 2 ++
+>>>  2 files changed, 8 insertions(+)
+>>>
+>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>>> index 3df1e97..f1bf551 100644
+>>> --- a/arch/arm/include/asm/kvm_host.h
+>>> +++ b/arch/arm/include/asm/kvm_host.h
+>>> @@ -107,6 +107,12 @@ struct kvm_vcpu_arch {
+>>>  	/* Interrupt related fields */
+>>>  	u32 irq_lines;		/* IRQ and FIQ levels */
+>>>  
+>>> +	/* fp/simd dirty flag true if guest accessed register file */
+>>> +	bool    vfp_dirty;
+>>
+>> I think we do not need this bool, because it is already represented by
+>> the state of the trapping bits.
+> 
+> The trapping bit state is lost on exit since they're cleared, no?
 
-OK let's not merge this one then.
+But that's what should actually be preserved, no? At the moment, you
+maintain some side state to reflect what the trapping state is. You
+might as well keep it around all the time.
 
-> But, again, main reason I've posted this patch is that I do not see the
-> way how to enable/disable or limit functionality of these timer by using 
-> Kconfig options in case of Muliplatform builds :( (or by boot parameters).
-> 
-> Example 1 (this is how 4.4 kernel is working):
-> 1) OMAP4 has ARM TWD timer and properly supports it, so in Kconfig we have
-> "select HAVE_ARM_TWD" and corresponding "local-timer" is defined in DT.
-> AM437x has ARM TWD timer, but does not support it yet, so corresponding "local-timer"
-> defined in DT and in Kconfig HAVE_ARM_TWD is not selected.
-> (patch http://www.spinics.net/lists/arm-kernel/msg459649.html
->  is not merged yet)
-> 
-> Result: ARM TWD timer will be enabled on AM437x !? :(
-> 
-> Example 2:
-> ARM Global timer can't be used as clocksource device if CPUFreq is enabled
-> (this is not supported even by Timekeeping core now).
-> 
-> So, there are two options:
-> 1) update selection for config SOC_AM43XX
-> + select ARM_GLOBAL_TIMER if !CPU_FREQ
-> 2) updated ARM GT driver and don't register clocksource device if CPUFreq is enabled
-> 
-> Both options will not work:
-> 1) ARM_GLOBAL_TIMER will be selected if any other SoC in multiplatform build
-> will select ARM_GLOBAL_TIMER
-> 2) clocksource device will never be registered if at least one SoC will
-> select CPU_FREQ. And this might break SoC which expect it to be registered,
-> because CPU_FREQ is not enabled on these SoCs (no CPUFreq drivers registered).
-> 
-> So, as alternative to this patch, ARM timers nodes can be disabled in
-> platform DTS files, but then all platform DTS files will need to be updated.
+Thanks,
 
-Yes I don't see any other option right now until we have the clocksource
-switching happening. Only then will the scoring work properly.
-
-Regards,
-
-Tony
+	M.
+-- 
+Jazz is not dead. It just smells funny...
