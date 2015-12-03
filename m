@@ -1,97 +1,64 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Thu, 3 Dec 2015 09:22:07 -0800
-Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
- concurrent lockers
-In-Reply-To: <20151203163243.GI11337@arm.com>
-References: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
- <20151130155839.GK17308@twins.programming.kicks-ass.net>
- <20151201164035.GE27751@arm.com>
- <20151203001141.GO28602@linux.vnet.ibm.com>
- <20151203132839.GA3816@twins.programming.kicks-ass.net>
- <20151203163243.GI11337@arm.com>
-Message-ID: <20151203172207.GR28602@linux.vnet.ibm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 3 Dec 2015 17:28:30 +0000
+Subject: [RESEND v4 2/6] remoteproc: debugfs: Add ability to boot remote
+ processor using debugfs
+In-Reply-To: <2600153.9u9Z7N2IT1@wuerfel>
+References: <1448370862-19120-1-git-send-email-lee.jones@linaro.org>
+ <5329827.I5W30K072M@wuerfel> <20151203130341.GA26902@x1>
+ <2600153.9u9Z7N2IT1@wuerfel>
+Message-ID: <20151203172830.GB26902@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2015 at 04:32:43PM +0000, Will Deacon wrote:
-> Hi Peter, Paul,
-> 
-> Firstly, thanks for writing that up. I agree that you have something
-> that can work in theory, but see below.
-> 
-> On Thu, Dec 03, 2015 at 02:28:39PM +0100, Peter Zijlstra wrote:
-> > On Wed, Dec 02, 2015 at 04:11:41PM -0800, Paul E. McKenney wrote:
-> > > This looks architecture-agnostic to me:
-> > > 
-> > > a.	TSO systems have smp_mb__after_unlock_lock() be a no-op, and
-> > > 	have a read-only implementation for spin_unlock_wait().
-> > > 
-> > > b.	Small-scale weakly ordered systems can also have
-> > > 	smp_mb__after_unlock_lock() be a no-op, but must instead
-> > > 	have spin_unlock_wait() acquire the lock and immediately 
-> > > 	release it, or some optimized implementation of this.
-> > > 
-> > > c.	Large-scale weakly ordered systems are required to define
-> > > 	smp_mb__after_unlock_lock() as smp_mb(), but can have a
-> > > 	read-only implementation of spin_unlock_wait().
+On Thu, 03 Dec 2015, Arnd Bergmann wrote:
+
+> On Thursday 03 December 2015 13:03:41 Lee Jones wrote:
+> > On Thu, 03 Dec 2015, Arnd Bergmann wrote:
 > > 
-> > This would still require all relevant spin_lock() sites to be annotated
-> > with smp_mb__after_unlock_lock(), which is going to be a painful (no
-> > warning when done wrong) exercise and expensive (added MBs all over the
-> > place).
-
-On the lack of warning, agreed, but please see below.  On the added MBs,
-the only alternative I have been able to come up with has even more MBs,
-as in on every lock acquisition.  If I am missing something, please do
-not keep it a secret!
-
-> > But yes, I think the proposal is technically sound, just not quite sure
-> > how far we'll want to push this.
+> > > On Thursday 03 December 2015 12:26:34 Lee Jones wrote:
+> > > > > >
+> > > > > > +static ssize_t rproc_state_write(struct file *filp, const char __user *userbuf,
+> > > > > > +                                size_t count, loff_t *ppos)
+> > > > > > +{
+> > > > > > +       struct rproc *rproc = filp->private_data;
+> > > > > > +       char buf[10];
+> > > > > > +       int ret;
+> > > > > > +
+> > > > > > +       if (count > sizeof(buf))
+> > > > > > +               return count;
+> > > > > > +       ret = copy_from_user(buf, userbuf, count);
+> > > > > > +       if (ret)
+> > > > > > +               return -EFAULT;
+> > > > > > +
+> > > > > > +       if (buf[count - 1] == '\n')
+> > > > > > +               buf[count - 1] = '\0';
+> > > > > 
+> > > > > I believe you can get here with count = 0.
+> > > > 
+> > > > I'm pretty sure you can't.
+> > > > 
+> > > > If you are sure that you can, if you can provide me with a way of
+> > > > testing, I'd be happy to put in provisions.
+> > > > 
+> > > 
+> > > I think that a zero-length write() from user space ends up in the write
+> > > file operation.
+> > 
+> > I tested this and didn't see it enter write().  My conclusion was that
+> > if the file doesn't change, then nothing is triggered.
+> > 
 > 
-> When I said that the solution isn't architecture-agnostic, I was referring
-> to the fact that spin_unlock_wait acts as a LOCK operation on all
-> architectures other than those using case (c) above. You've resolved
-> this by requiring smp_mb__after_unlock_lock() after every LOCK, but I
-> share Peter's concerns that this isn't going to work in practice because:
-> 
->   1. The smp_mb__after_unlock_lock additions aren't necessarily in the
->      code where the spin_unlock_wait() is being added, so it's going to
->      require a lot of diligence for developers to get this right
+> Ah, interesting. I haven't tried myself, and just tried to read the
+> code. Maybe glibc already catches zero-length writes before it gets
+> into the kernel, or I just missed the part of the syscall that checks
+> for this.
 
-Completely agreed.  And Peter's finding a number of missing instances
-of smp_mb__after_unlock_lock() is evidence in favor.  Some diagnostic
-tool will be needed.
+Glibc is responsible indeed:
+  
+  http://osxr.org/glibc/source/io/write.c
 
-I don't see much hope for static-analysis approaches, because you
-might have the spin_unlock_wait() in one translation unit and the
-lock acquisitions in another translation unit.  Plus it can be quite
-difficult for static analysis to work out which lock is which.
-Undecidable, even, in the worst case.
-
-My current thought is to have lockdep mark any lock on which
-spin_unlock_wait() is invoked.  An smp_mb__after_unlock_lock() would
-mark the most recent lock acquisition.  Then if an unlock of a marked
-lock sees that there has been no smp_mb__after_unlock_lock(), you get
-a lockdep splat.
-
-If needed, a Coccinelle could yell if it sees smp_mb__after_unlock_lock()
-without a lock acquisition immediately prior.  As could checkpatch.pl.
-
-Is this reasonable, or am I lockdep-naive?  Would some other approach
-work better?
-
->   2. Only PowerPC is going to see the (very occassional) failures, so
->      testing this is nigh on impossible :(
-
-Indeed, we clearly cannot rely on normal testing, witness rcutorture
-failing to find the missing smp_mb__after_unlock_lock() instances that
-Peter found by inspection.  So I believe that augmented testing is
-required, perhaps as suggested above.
-
->   3. We've now made the kernel memory model even more difficult to
->      understand, so people might not even bother with this addition
-
-You mean "bother" as in "bother to understand", right?  Given that people
-already are bothering to use spin_unlock_wait()...
-
-							Thanx, Paul
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
