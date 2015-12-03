@@ -1,130 +1,62 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 3 Dec 2015 08:24:08 -0600
-Subject: [PATCH V2 12/14] ARM: dts: sb-som: introduce SB-SOM baseboard
-In-Reply-To: <1448978109-5614-13-git-send-email-nikita@compulab.co.il>
-References: <1448978109-5614-1-git-send-email-nikita@compulab.co.il>
- <1448978109-5614-13-git-send-email-nikita@compulab.co.il>
-Message-ID: <20151203142408.GA24844@rob-hp-laptop>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Thu, 03 Dec 2015 15:32:37 +0100
+Subject: [PATCH] drivers: dma-coherent: free memory when failed to init
+ DMA memory pool
+In-Reply-To: <CY1PR0301MB12257F63F594E65DE67E64DFF50D0@CY1PR0301MB1225.namprd03.prod.outlook.com>
+References: <1449138962-8264-1-git-send-email-b38611@freescale.com>
+ <xa1toae7y9u8.fsf@mina86.com>
+ <CY1PR0301MB12257F63F594E65DE67E64DFF50D0@CY1PR0301MB1225.namprd03.prod.outlook.com>
+Message-ID: <xa1tio4fy54q.fsf@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 01, 2015 at 03:55:07PM +0200, Nikita Kiryanov wrote:
-> CompuLab SB-SOM baseboard is a carrier board for multiple arm-based SoMs.
-> It currently supports (with minor adjustments to assembly) CM-T43, CM-T54,
-> and CM-QS600 modules. It is a building block in the SBC-T43 single board
-> computer, which consists of cm-t43 on top of sb-som-t43.
-> 
-> Signed-off-by: Nikita Kiryanov <nikita@compulab.co.il>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Benoit Cousson <bcousson@baylibre.com>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Igor Grinberg <grinberg@compulab.co.il>
-> Cc: Dmitry Lifshitz <lifshitz@compulab.co.il>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+On Thu, Dec 03 2015, Duan Andy wrote:
+> From: Mike Nazarewicz <mpn@google.com> Sent: Thursday, December 03, 2015 8:51 PM
+>> To: Duan Fugang-B38611; torvalds at linux-foundation.org;
+>> gregkh at linuxfoundation.org; m.szyprowski at samsung.com
+>> Cc: linux-arm-kernel at lists.infradead.org; arnd at arndb.de;
+>> iamjoonsoo.kim at lge.com; Duan Fugang-B38611
+>> Subject: Re: [PATCH] drivers: dma-coherent: free memory when failed to
+>> init DMA memory pool
+>> 
+>> On Thu, Dec 03 2015, Fugang Duan wrote:
+>> > Free dma coherent memory when it failed to init DMA memory pool after
+>> > calling .dma_init_coherent_memory(), otherwise it causes memmory leak.
+>> >
+>> > Signed-off-by: Fugang Duan <B38611@freescale.com>
+>> > ---
+>> >  drivers/base/dma-coherent.c | 1 +
+>> >  1 file changed, 1 insertion(+)
+>> >
+>> > diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+>> > index 55b8398..beb6bbe 100644
+>> > --- a/drivers/base/dma-coherent.c
+>> > +++ b/drivers/base/dma-coherent.c
+>> > @@ -286,6 +286,7 @@ static int rmem_dma_device_init(struct reserved_mem
+>> *rmem, struct device *dev)
+>> >  				     &mem) != DMA_MEMORY_MAP) {
+>> >  		pr_err("Reserved memory: failed to init DMA memory pool
+>> at %pa, size %ld MiB\n",
+>> >  			&rmem->base, (unsigned long)rmem->size / SZ_1M);
+>> > +		kfree(mem);
+>> 
+>> mem == NULL at this point.  If dma_init_coherent_memory doesn?t return
+>> DMA_MEMORY_MAP, mem pointer is not assigned any value.  If you think
+>> there is a memory leak, please demonstrate a path of it happening.
 
-Acked-by: Rob Herring <robh@kernel.org>
+> Kfree() will check mem NULL condition, so no need to add check in
+> here.
 
-> ---
-> Changes in V2:
-> 	- Renamed file startek,startek-kd050c to startek,startek-kd050c.txt.
-> 	- s/QS-600/CM-QS600 in file compulab-boards.txt
-> 
->  .../devicetree/bindings/arm/compulab-boards.txt    |  5 +++
->  .../display/panel/startek,startek-kd050c.txt       |  4 +++
->  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->  arch/arm/boot/dts/compulab-sb-som.dtsi             | 42 ++++++++++++++++++++++
->  4 files changed, 52 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/compulab-boards.txt
->  create mode 100644 Documentation/devicetree/bindings/display/panel/startek,startek-kd050c.txt
->  create mode 100644 arch/arm/boot/dts/compulab-sb-som.dtsi
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/compulab-boards.txt b/Documentation/devicetree/bindings/arm/compulab-boards.txt
-> new file mode 100644
-> index 0000000..71172d5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/compulab-boards.txt
-> @@ -0,0 +1,5 @@
-> +CompuLab SB-SOM is a multi-module baseboard capable of carrying CM-T43, CM-T54,
-> +and CM-QS600 modules with minor modifications to the SB-SOM assembly.
-> +
-> +Required root node properties:
-> +    - compatible = should be "compulab,sb-som"
-> diff --git a/Documentation/devicetree/bindings/display/panel/startek,startek-kd050c.txt b/Documentation/devicetree/bindings/display/panel/startek,startek-kd050c.txt
-> new file mode 100644
-> index 0000000..70cd8d1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/panel/startek,startek-kd050c.txt
-> @@ -0,0 +1,4 @@
-> +Startek Electronic Technology Co. KD050C 5.0" WVGA TFT LCD panel
-> +
-> +Required properties:
-> +- compatible: should be "startek,startek-kd050c"
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 55df1d4..409b134 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -218,6 +218,7 @@ sony	Sony Corporation
->  spansion	Spansion Inc.
->  sprd	Spreadtrum Communications Inc.
->  st	STMicroelectronics
-> +startek	Startek
->  ste	ST-Ericsson
->  stericsson	ST-Ericsson
->  synology	Synology, Inc.
-> diff --git a/arch/arm/boot/dts/compulab-sb-som.dtsi b/arch/arm/boot/dts/compulab-sb-som.dtsi
-> new file mode 100644
-> index 0000000..402a143
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/compulab-sb-som.dtsi
-> @@ -0,0 +1,42 @@
-> +/*
-> + * Copyright (C) 2015 CompuLab, Ltd. - http://www.compulab.co.il/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +/ {
-> +	model = "CompuLab SB-SOM";
-> +	compatible = "compulab,sb-som";
-> +
-> +	vsb_3v3: fixedregulator-v3_3 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vsb_3v3";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		regulator-always-on;
-> +		enable-active-high;
-> +	};
-> +
-> +	lcd0: display {
-> +		compatible = "startek,startek-kd050c", "panel-dpi";
-> +		label = "lcd";
-> +
-> +		panel-timing {
-> +			clock-frequency = <33000000>;
-> +			hactive = <800>;
-> +			vactive = <480>;
-> +			hfront-porch = <40>;
-> +			hback-porch = <40>;
-> +			hsync-len = <43>;
-> +			vback-porch = <29>;
-> +			vfront-porch = <13>;
-> +			vsync-len = <3>;
-> +			hsync-active = <0>;
-> +			vsync-active = <0>;
-> +			de-active = <1>;
-> +			pixelclk-active = <1>;
-> +		};
-> +	};
-> +};
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Sure, but besides the point.  mem is always NULL so kfree(mem) is
+a no-op so why add it?  There is no memory leak possible.  What is this
+patch fixing?
+
+>> >  		return -ENODEV;
+>> >  	}
+>> >  	rmem->priv = mem;
+
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  ??? ?mina86? ??????  (o o)
+ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
