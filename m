@@ -1,46 +1,47 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Thu, 3 Dec 2015 14:14:14 +0800
-Subject: [PATCH] usb: xhci: fix config fail of FS hub behind a HS hub with MTT
-Message-ID: <1449123254-21654-1-git-send-email-chunfeng.yun@mediatek.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Thu, 3 Dec 2015 14:11:15 +0800
+Subject: [PATCH v5 05/21] KVM: ARM64: Add reset and access handlers for PMSELR
+ register
+In-Reply-To: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1449123091-20252-6-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-if a full speed hub connects to a high speed hub which
-supports MTT, the MTT field of its slot context will be set
-to 1 when xHCI driver setups an xHCI virtual device in
-xhci_setup_addressable_virt_dev(); once usb core fetch its
-hub descriptor, and need to update the xHC's internal data
-structures for the device, the HUB field of its slot context
-will be set to 1 too, meanwhile MTT is also set before,
-this will cause configure endpoint command fail, so in the
-case, we should clear MTT to 0 for full speed hub according
-to section 6.2.2
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Since the reset value of PMSELR_EL0 is UNKNOWN, use reset_unknown for
+its reset handler. As it doesn't need to deal with the accessing action
+specially, it uses default case to emulate writing and reading PMSELR
+register.
+
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- drivers/usb/host/xhci.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm64/kvm/sys_regs.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
-index 6cbcd1e..27c8cf8 100644
---- a/drivers/usb/host/xhci.c
-+++ b/drivers/usb/host/xhci.c
-@@ -4785,8 +4785,16 @@ int xhci_update_hub_device(struct usb_hcd *hcd, struct usb_device *hdev,
- 	ctrl_ctx->add_flags |= cpu_to_le32(SLOT_FLAG);
- 	slot_ctx = xhci_get_slot_ctx(xhci, config_cmd->in_ctx);
- 	slot_ctx->dev_info |= cpu_to_le32(DEV_HUB);
-+	/*
-+	 * refer to section 6.2.2: MTT should be 0 for full speed hub,
-+	 * but it may be already set to 1 when setup an xHCI virtual
-+	 * device, so clear it anyway.
-+	 */
- 	if (tt->multi)
- 		slot_ctx->dev_info |= cpu_to_le32(DEV_MTT);
-+	else if (hdev->speed == USB_SPEED_FULL)
-+		slot_ctx->dev_info &= cpu_to_le32(~DEV_MTT);
-+
- 	if (xhci->hci_version > 0x95) {
- 		xhci_dbg(xhci, "xHCI version %x needs hub "
- 				"TT think time and number of ports\n",
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index e020fe0..1f1f6a6 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -698,7 +698,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	  trap_raz_wi },
+ 	/* PMSELR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b101),
+-	  trap_raz_wi },
++	  access_pmu_regs, reset_unknown, PMSELR_EL0 },
+ 	/* PMCEID0_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b110),
+ 	  trap_raz_wi },
+@@ -989,7 +989,8 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
+-	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), trap_raz_wi },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmu_cp15_regs,
++	  NULL, c9_PMSELR },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), trap_raz_wi },
+ 	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
 -- 
-1.8.1.1.dirty
+2.0.4
