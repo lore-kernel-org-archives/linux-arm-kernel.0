@@ -1,78 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 3 Dec 2015 12:17:12 +0000
-Subject: [PATCH v5 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
-In-Reply-To: <1449000658-11475-4-git-send-email-dcashman@android.com>
-References: <1449000658-11475-1-git-send-email-dcashman@android.com>
- <1449000658-11475-2-git-send-email-dcashman@android.com>
- <1449000658-11475-3-git-send-email-dcashman@android.com>
- <1449000658-11475-4-git-send-email-dcashman@android.com>
-Message-ID: <20151203121712.GE11337@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 3 Dec 2015 12:18:40 +0000
+Subject: [PATCH v3 3/7] arm64: split off early mapping code from
+ early_fixmap_init()
+In-Reply-To: <1447672998-20981-4-git-send-email-ard.biesheuvel@linaro.org>
+References: <1447672998-20981-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1447672998-20981-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20151203121840.GB28731@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hi Ard,
 
-On Tue, Dec 01, 2015 at 12:10:57PM -0800, Daniel Cashman wrote:
-> From: dcashman <dcashman@google.com>
+Apologies that it's taken me so long to get around to this...
+
+On Mon, Nov 16, 2015 at 12:23:14PM +0100, Ard Biesheuvel wrote:
+> This splits off and generalises the population of the statically
+> allocated fixmap page tables so that we may reuse it later for
+> the linear mapping once we move the kernel text mapping out of it.
 > 
-> arm64: arch_mmap_rnd() uses STACK_RND_MASK to generate the
-> random offset for the mmap base address.  This value represents a
-> compromise between increased ASLR effectiveness and avoiding
-> address-space fragmentation. Replace it with a Kconfig option, which
-> is sensibly bounded, so that platform developers may choose where to
-> place this compromise. Keep default values as new minimums.
-> 
-> Signed-off-by: Daniel Cashman <dcashman@android.com>
-> ---
->  arch/arm64/Kconfig   | 31 +++++++++++++++++++++++++++++++
->  arch/arm64/mm/mmap.c |  8 ++++++--
->  2 files changed, 37 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 871f217..fb57649 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -51,6 +51,8 @@ config ARM64
->  	select HAVE_ARCH_JUMP_LABEL
->  	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP && !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
->  	select HAVE_ARCH_KGDB
-> +	select HAVE_ARCH_MMAP_RND_BITS if MMU
-> +	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if MMU && COMPAT
+> This also involves taking into account that table entries at any of
+> the levels we are populating may have been populated already, since
+> the fixmap mapping might not be disjoint up to the pgd level anymore
+> from other early mappings.
 
-You can drop the 'if MMU' bits, since we don't support !MMU on arm64.
+As a heads-up, for avoiding TLB conflicts, I'm currently working on
+alternative way of creating the kernel page tables which will definitely
+conflict here, and may or may not supercede this approach.
 
->  	select HAVE_ARCH_SECCOMP_FILTER
->  	select HAVE_ARCH_TRACEHOOK
->  	select HAVE_BPF_JIT
-> @@ -104,6 +106,35 @@ config ARCH_PHYS_ADDR_T_64BIT
->  config MMU
->  	def_bool y
->  
-> +config ARCH_MMAP_RND_BITS_MIN
-> +       default 15 if ARM64_64K_PAGES
-> +       default 17 if ARM64_16K_PAGES
-> +       default 19
+By adding new FIX_{PGD,PUD,PMD,PTE} indicees to the fixmap, we can
+allocate page tables from anywhere via memblock, and temporarily map
+them as we need to.
 
-Is this correct? We currently have a mask of 0x3ffff, so that's 18 bits.
+That would avoid the need for the bootstrap tables. In head.S we'd only
+need to create a temporary (coarse-grained, RWX) kernel mapping (with
+the fixmap bolted on). Later we would create a whole new set of tables
+with a fine-grained kernel mapping and a full linear mapping using the
+new fixmap entries to temporarily map tables, then switch over to those
+atomically.
 
-> +config ARCH_MMAP_RND_BITS_MAX
-> +       default 19 if ARM64_VA_BITS=36
-> +       default 20 if ARM64_64K_PAGES && ARM64_VA_BITS=39
-> +       default 22 if ARM64_16K_PAGES && ARM64_VA_BITS=39
-> +       default 24 if ARM64_VA_BITS=39
-> +       default 23 if ARM64_64K_PAGES && ARM64_VA_BITS=42
-> +       default 25 if ARM64_16K_PAGES && ARM64_VA_BITS=42
-> +       default 27 if ARM64_VA_BITS=42
-> +       default 30 if ARM64_VA_BITS=47
-> +       default 29 if ARM64_64K_PAGES && ARM64_VA_BITS=48
-> +       default 31 if ARM64_16K_PAGES && ARM64_VA_BITS=48
-> +       default 33 if ARM64_VA_BITS=48
-> +       default 15 if ARM64_64K_PAGES
-> +       default 17 if ARM64_16K_PAGES
-> +       default 19
+Otherwise, one minor comment below.
 
-Could you add a comment above this with the formula
-(VA_BITS - PAGE_SHIFT - 3), please, so that we can update this easily in
-the future if we need to?
+> +static void __init bootstrap_early_mapping(unsigned long addr,
+> +					   struct bootstrap_pgtables *reg,
+> +					   bool pte_level)
 
-Will
+The only caller in this patch passes true for pte_level.
+
+Can we not introduce the argument when it is first needed? Or at least
+have something in the commit message as to why we'll need it later?
+
+>  	/*
+>  	 * The boot-ioremap range spans multiple pmds, for which
+> -	 * we are not preparted:
+> +	 * we are not prepared:
+>  	 */
+
+I cannot wait to see this typo go!
+
+Otherwise, this looks fine to me.
+
+Thanks,
+Mark.
