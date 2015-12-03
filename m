@@ -1,145 +1,89 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 03 Dec 2015 16:29:19 +0000
-Subject: [PATCH v9 4/4] irqchip:implement the mbigen irq chip operation
- functions
-In-Reply-To: <1448248513-39760-5-git-send-email-majun258@huawei.com>
-References: <1448248513-39760-1-git-send-email-majun258@huawei.com>
- <1448248513-39760-5-git-send-email-majun258@huawei.com>
-Message-ID: <56606DDF.1070205@arm.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Thu, 3 Dec 2015 18:30:04 +0200
+Subject: [PATCH 3/4] dmaengine: core: Introduce new, universal API to
+ request a channel
+In-Reply-To: <1449153192-9082-4-git-send-email-peter.ujfalusi@ti.com>
+References: <1449153192-9082-1-git-send-email-peter.ujfalusi@ti.com>
+ <1449153192-9082-4-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <CAHp75VdeZBuxTd1rCFDLf9iXuhPidOejF-Ki=nqAqAvSmx99xA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/11/15 03:15, MaJun wrote:
-> From: Ma Jun <majun258@huawei.com>
-> 
-> Add the interrupt controller chip operation functions of mbigen chip.
-> 
-> Signed-off-by: Ma Jun <majun258@huawei.com>
-> ---
->  drivers/irqchip/irq-mbigen.c |   84 ++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 84 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-> index 81ae61f..540ad05 100644
-> --- a/drivers/irqchip/irq-mbigen.c
-> +++ b/drivers/irqchip/irq-mbigen.c
-> @@ -47,6 +47,20 @@
->  #define REG_MBIGEN_VEC_OFFSET		0x200
->  
->  /**
-> + * offset of clear register in mbigen node
-> + * This register is used to clear the status
-> + * of interrupt
-> + */
-> +#define REG_MBIGEN_CLEAR_OFFSET		0xa000
-> +
-> +/**
-> + * offset of interrupt type register
-> + * This register is used to configure interrupt
-> + * trigger type
-> + */
-> +#define REG_MBIGEN_TYPE_OFFSET		0x0
-> +
-> +/**
->   * struct mbigen_device - holds the information of mbigen device.
->   *
->   * @pdev:		pointer to the platform device structure of mbigen chip.
-> @@ -69,8 +83,78 @@ static inline unsigned int get_mbigen_vec_reg(irq_hw_number_t hwirq)
->  			+ REG_MBIGEN_VEC_OFFSET;
->  }
->  
-> +static inline void get_mbigen_type_reg(irq_hw_number_t hwirq,
-> +					unsigned int *mask,
-> +					unsigned int *addr)
+On Thu, Dec 3, 2015 at 4:33 PM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
+> The two API function can cover most, if not all current APIs used to
+> request a channel. With minimal effort dmaengine drivers, platforms and
+> dmaengine user drivers can be converted to use the two function.
+>
+> struct dma_chan *dma_request_chan_by_mask(const dma_cap_mask_t *mask);
+>
+> To request any channel matching with the requested capabilities, can be
+> used to request channel for memcpy, memset, xor, etc where no hardware
+> synchronization is needed.
+>
+> struct dma_chan *dma_request_chan(struct device *dev, const char *name);
+> To request a slave channel. The dma_request_chan() will try to find the
+> channel via DT, ACPI or in case if the kernel booted in non DT/ACPI mode
+> it will use a filter lookup table and retrieves the needed information from
+> the dma_slave_map provided by the DMA drivers.
+> This legacy mode needs changes in platform code, in dmaengine drivers and
+> finally the dmaengine user drivers can be converted:
+>
+> For each dmaengine driver an array of DMA device, slave and the parameter
+> for the filter function needs to be added:
+>
+> static const struct dma_slave_map da830_edma_map[] = {
+>         { "davinci-mcasp.0", "rx", EDMA_FILTER_PARAM(0, 0) },
+>         { "davinci-mcasp.0", "tx", EDMA_FILTER_PARAM(0, 1) },
+>         { "davinci-mcasp.1", "rx", EDMA_FILTER_PARAM(0, 2) },
+>         { "davinci-mcasp.1", "tx", EDMA_FILTER_PARAM(0, 3) },
+>         { "davinci-mcasp.2", "rx", EDMA_FILTER_PARAM(0, 4) },
+>         { "davinci-mcasp.2", "tx", EDMA_FILTER_PARAM(0, 5) },
+>         { "spi_davinci.0", "rx", EDMA_FILTER_PARAM(0, 14) },
+>         { "spi_davinci.0", "tx", EDMA_FILTER_PARAM(0, 15) },
+>         { "da830-mmc.0", "rx", EDMA_FILTER_PARAM(0, 16) },
+>         { "da830-mmc.0", "tx", EDMA_FILTER_PARAM(0, 17) },
+>         { "spi_davinci.1", "rx", EDMA_FILTER_PARAM(0, 18) },
+>         { "spi_davinci.1", "tx", EDMA_FILTER_PARAM(0, 19) },
+> };
+>
+> This information is going to be needed by the dmaengine driver, so
+> modification to the platform_data is needed, and the driver map should be
+> added to the pdata of the DMA driver:
+>
+> da8xx_edma0_pdata.slave_map = da830_edma_map;
+> da8xx_edma0_pdata.slavecnt = ARRAY_SIZE(da830_edma_map);
+>
+> The DMA driver then needs to configure the needed device -> filter_fn
+> mapping before it registers with dma_async_device_register() :
+>
+> if (info->slave_map) {
+>         ecc->dma_slave.filter_map.map = info->slave_map;
+>         ecc->dma_slave.filter_map.mapcnt = info->slavecnt;
+>         ecc->dma_slave.filter_map.filter_fn = edma_filter_fn;
 
-unsigned int is the wrong type if that's something you are going to use
-with readl/writel. It should be u32.
+One nitpick here.
 
-> +{
-> +	unsigned int nid, pin, ofst;
-> +
-> +	hwirq -= RESERVED_IRQ_PER_MBIGEN_CHIP;
-> +	nid = hwirq / IRQS_PER_MBIGEN_NODE + 1;
-> +	pin = hwirq % IRQS_PER_MBIGEN_NODE;
-> +
-> +	*mask = 1 << (pin % 32);
-> +	
-> +	ofst = pin / 32 * 4;
-> +	*addr = ofst + nid * MBIGEN_NODE_OFFSET
-> +		+ REG_MBIGEN_TYPE_OFFSET;
-> +}
-> +
-> +static inline void get_mbigen_clear_reg(irq_hw_number_t hwirq,
-> +					unsigned int *mask,
+I think filter_map.filter_fn naming is duplicate.
 
-Same here.
+What about
 
-> +					unsigned int *addr)
-> +{
-> +	unsigned int ofst;
-> +
-> +	hwirq -= RESERVED_IRQ_PER_MBIGEN_CHIP;
-> +	ofst = hwirq / 32 * 4;
-> +
-> +	*mask = 1 << (hwirq % 32);
-> +	*addr = ofst + REG_MBIGEN_CLEAR_OFFSET;
-> +}
-> +
-> +static void mbigen_eoi_irq(struct irq_data *data)
-> +{
-> +	void __iomem *base = data->chip_data;
-> +	unsigned int mask, addr;
+dma_device
+  .filter -> filter data (or .filter_data)
+    .map -> mappings
+    .map_count -> # of entries in mappings
+    .fn -> filter function
 
-same here.
+What do you think?
 
-> +
-> +	get_mbigen_clear_reg(data->hwirq, &mask, &addr);
-> +
-> +	writel_relaxed(mask, base + addr);
-> +
-> +	irq_chip_eoi_parent(data);
-> +}
-> +
-> +static int mbigen_set_type(struct irq_data *data, unsigned int type)
-> +{
-> +	void __iomem *base = data->chip_data;
-> +	unsigned int mask, addr;
+> }
+>
+> When neither DT or ACPI lookup is available the dma_request_chan() will
+> try to match the requester's device name with the filter_map's list of
+> device names, when a match found it will use the information from the
+> dma_slave_map to get the channel with the dma_get_channel() internal
+> function.
 
-and here.
 
-> +	u32 val;
-> +
-> +	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
-> +		return -EINVAL;
-> +
-> +	get_mbigen_type_reg(data->hwirq, &mask, &addr);
-> +
-> +	val = readl_relaxed(base + addr);
-> +
-> +	if (type == IRQ_TYPE_LEVEL_HIGH)
-> +		val |= mask;
-> +	else
-> +		val &= ~mask;
-> +
-> +	writel_relaxed(val, base + addr);
-> +
-> +	return 0;
-> +}
-> +
->  static struct irq_chip mbigen_irq_chip = {
->  	.name =			"mbigen-v2",
-> +	.irq_mask =		irq_chip_mask_parent,
-> +	.irq_unmask =		irq_chip_unmask_parent,
-> +	.irq_eoi =		mbigen_eoi_irq,
-> +	.irq_set_type =		mbigen_set_type,
-> +	.irq_set_affinity =	irq_chip_set_affinity_parent,
->  };
->  
->  static void mbigen_write_msg(struct msi_desc *desc, struct msi_msg *msg)
-> 
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+With Best Regards,
+Andy Shevchenko
