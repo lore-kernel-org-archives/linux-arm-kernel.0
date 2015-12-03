@@ -1,29 +1,28 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 3 Dec 2015 11:05:06 +0000
-Subject: [PATCH v5 0/12] cpufreq: Add support for Exynos 5800, 5420, and
- 5422
-In-Reply-To: <20151203060527.GH4302@ubuntu>
-References: <1449091167-20758-1-git-send-email-ben@smart-cactus.org>
- <20151203060527.GH4302@ubuntu>
-Message-ID: <566021E2.6070000@arm.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Thu, 03 Dec 2015 12:07:26 +0100
+Subject: [alsa-devel] [PATCH] ASoC: mediatek: Use current HW pointer for
+ pointer callback
+In-Reply-To: <20151203110158.GD5727@sirena.org.uk>
+References: <1449129208-63615-1-git-send-email-koro.chen@mediatek.com>
+ <s5h8u5b98dp.wl-tiwai@suse.de>
+ <20151203110158.GD5727@sirena.org.uk>
+Message-ID: <s5hfuzjn635.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 03 Dec 2015 12:01:58 +0100,
+Mark Brown wrote:
+> 
+> On Thu, Dec 03, 2015 at 10:41:38AM +0100, Takashi Iwai wrote:
+> 
+> > While reading this patch, I wondered how regmap can be used safely in
+> > an irq-disabled context.  Mark, do we have any API for that?
+> 
+> We can use user supplied locks or spin_lock_irqsave().
+
+I meant how to guarantee to make regmap_read() working in an already
+spin-locked context, typically in an irq handler?  regmap_read()
+involves with the regcache and it may invoke kmalloc().
 
 
-On 03/12/15 06:05, Viresh Kumar wrote:
-
-[...]
->
-> @Sudeep: What would it take you to use cpufreq-dt for ARM's platforms
-> ?
->
-
-The main difference is that we get the OPPs from the firmware rather
-than DT. We may just need to abstract that part and we should be able to
-use it. I will have a look at it and get back to you will more details.
-It has been a while since I looked at cpufreq-dt.
-
--- 
-Regards,
-Sudeep
+Takashi
