@@ -1,40 +1,27 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 3 Dec 2015 09:29:47 +0000
-Subject: arm64 sched_clock cpu accounting
-In-Reply-To: <565F81D2.3060401@samsung.com>
-References: <564CD5A7.8000007@samsung.com> <564D31D3.5040207@samsung.com>
- <20151202180741.GR18376@cbox> <565F81D2.3060401@samsung.com>
-Message-ID: <20151203092947.GB7023@arm.com>
+Date: Thu, 3 Dec 2015 09:32:13 +0000
+Subject: [PATCH v12 05/16] arm64: Add back cpu_reset routines
+In-Reply-To: <1449097050.6139.80.camel@infradead.org>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <3279584774ba40f088b79f4df864d69a5b57b516.1448403503.git.geoff@infradead.org>
+ <56586679.8060403@arm.com>
+ <20151130052843.GG23908@dhcppc13.redhat.com>
+ <20151130104027.7eeaa273@why.wild-wind.fr.eu.org>
+ <1449097050.6139.80.camel@infradead.org>
+Message-ID: <20151203093212.GC7023@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 02, 2015 at 03:42:10PM -0800, Mario Smarduch wrote:
-> On 12/2/2015 10:07 AM, Christoffer Dall wrote:
-> > On Wed, Nov 18, 2015 at 06:20:03PM -0800, Mario Smarduch wrote:
-> >> Also with tick accounting enabled, and periodic timer HZ set to 1000 no irq time
-> >> is reported. That's with running a ping flood - 1200 int/s, not sure why
-> >> wouldn't any irq time be reported? The other two modes report irq time as expected.
-> >>
-> >> On 11/18/2015 11:46 AM, Mario Smarduch wrote:
-> >>> Hello,
-> >>>   I noticed sched clock accounting can be enabled when arch-timer is
-> >>> initialized. But arm64 doesn't appear to have 'HAVE_IRQ_TIME_ACCOUNTING'
-> >>> selected (as of mainline 4.4-rc1) and IRQ_TIME_ACCOUNTING can't be selected.
-> >>> After adding it to arch/arm64/Kconfig, option appears to work fine. Depending on
-> >>> need all accounting options are fine, but irq time accounting appears to be most
-> >>> preferable.
-> >>>
-> >>> Any thoughts? Is it fine to enable it?
-> >>>
-> > Is any of this related to KVM?
+On Wed, Dec 02, 2015 at 02:57:30PM -0800, Geoff Levand wrote:
+> On Mon, 2015-11-30 at 10:40 +0000, Marc Zyngier wrote:
 > 
-> Indirectly, given the guest should yield same results. To be on the safe side I
-> ran the guest in all combinations (7) to confirm that's the case.
+> > All that can be solved in C, and mostly at compile time. Using an
+> > assembler trampoline is complicating things for no good reason:
 > 
-> Also verified that guest time on host appears fine in all these configurations.
-> It takes extra effort to get the guest time as opposed to other modes.
+> I added this into my kexec-v12.1 branch.  After some more testing I'll
+> post a v13 to the list.
 
-I can take this via the arm64 tree (where it's queued, but I've not pushed
-anything yet).
+You may well need some notrace annotations if you want to run C code
+here. Can you give it a spin with things like ftrace and kprobes?
 
 Will
