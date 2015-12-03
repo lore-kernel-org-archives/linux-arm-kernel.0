@@ -1,41 +1,102 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 3 Dec 2015 17:08:21 +0000
-Subject: [PATCH v2 2/6] arm64: Move kill_cpu_early to smp.c
-In-Reply-To: <56606FA3.3010802@arm.com>
-References: <1448982731-17182-1-git-send-email-suzuki.poulose@arm.com>
- <1448982731-17182-3-git-send-email-suzuki.poulose@arm.com>
- <20151201152826.GA28370@leverpostej> <565DC5DB.7070905@arm.com>
- <20151201163138.GA29045@leverpostej> <565DDB2E.2010308@arm.com>
- <20151201175254.GD29045@leverpostej> <565DE289.2000105@arm.com>
- <20151201185028.GF29045@leverpostej> <56606FA3.3010802@arm.com>
-Message-ID: <20151203170820.GB3527@leverpostej>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Fri,  4 Dec 2015 01:15:03 +0800
+Subject: [PATCH v3] acpi, apei, arm64: APEI initial support for aarch64.
+Message-ID: <1449162903-11203-1-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2015 at 04:36:51PM +0000, Suzuki K. Poulose wrote:
-> On 01/12/15 18:50, Mark Rutland wrote:
-> >On Tue, Dec 01, 2015 at 06:10:17PM +0000, Suzuki K. Poulose wrote:
-> >>On 01/12/15 17:52, Mark Rutland wrote:
-> >>>On Tue, Dec 01, 2015 at 05:38:54PM +0000, Suzuki K. Poulose wrote:
-> >>>>On 01/12/15 16:31, Mark Rutland wrote:
-> >>OK. So the flag will also be used for CPUs which are stuck-in-the-kernel
-> >>with MMU turned on. e.g, a CPU (using spin-table) we try to bring down
-> >>in kill_cpu_early(). Correct ?
-> >
-> >Yes.
-> >
-> >We'd also pad it such that nothing else shares the same writeback
-> >granule, and when writing to it with the MMU off we can invalidate the
-> >stale cached copy.
-> 
-> I have started working on this approach. But the changes are a bit more invasive
-> and looks more like suited for 4.5. We could push this series(which doesn't change
-> the current behavior as it is in 4.4-rc3, except for the code movement) to fix
-> the ASID sanity check and introduce the synchronisation part in 4.5.
-> What do you think ?
+From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 
-I'm happy with that. I agree this patch as-is doesn't make matters
-worse.
+This commit provides APEI arch-specific bits for aarch64
 
-Thanks,
-Mark.
+The reason for wrapping "acpi_disable_cmcff" by 
+"#if defined(__i386__) || defined(__x86_64__)" in hest.c is:
+according to ACPI spec CMC(Corrected Machine Check) is only for IA-32
+Architecture.
+
+Changelog:
+v3: Remove "acpi_disable_cmcff" from arm64 code,
+    and wrap it in hest.c by "#if defined(__i386__) || defined(__x86_64__)"
+
+v2: https://lkml.org/lkml/2015/12/2/432
+    Rebase to latest kernel version(4.4-rc3).
+    Move arch_apei_flush_tlb_one() to arch/arm64/kernel/acpi.c
+
+v1: https://lkml.org/lkml/2015/8/14/199
+    Move arch_apei_flush_tlb_one() to arch/arm64/include/asm/apci.h.
+    Delete arch/arm64/kernel/apei.c.
+    Add "#ifdef CONFIG_ACPI_APEI" for "acpi_disable_cmcff".
+
+Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+Tested-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+Signed-off-by: Fu Wei <fu.wei@linaro.org>
+---
+ arch/arm64/Kconfig            | 1 +
+ arch/arm64/include/asm/acpi.h | 1 +
+ arch/arm64/kernel/acpi.c      | 6 ++++++
+ drivers/acpi/apei/hest.c      | 2 ++
+ 4 files changed, 10 insertions(+)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 871f217..58c8992 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -3,6 +3,7 @@ config ARM64
+ 	select ACPI_CCA_REQUIRED if ACPI
+ 	select ACPI_GENERIC_GSI if ACPI
+ 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
++	select HAVE_ACPI_APEI if ACPI
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+ 	select ARCH_HAS_ELF_RANDOMIZE
+ 	select ARCH_HAS_GCOV_PROFILE_ALL
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index caafd63..7207f8e 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -94,6 +94,7 @@ static inline const char *acpi_get_enable_method(int cpu)
+ 
+ #ifdef	CONFIG_ACPI_APEI
+ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
++void arch_apei_flush_tlb_one(unsigned long addr);
+ #endif
+ 
+ #endif /*_ASM_ACPI_H*/
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index d1ce8e2..7a742e7 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -32,6 +32,7 @@
+ #ifdef CONFIG_ACPI_APEI
+ # include <linux/efi.h>
+ # include <asm/pgtable.h>
++# include <asm/tlbflush.h>
+ #endif
+ 
+ int acpi_noirq = 1;		/* skip ACPI IRQ initialization */
+@@ -233,4 +234,9 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
+ 		return __pgprot(PROT_NORMAL_NC);
+ 	return __pgprot(PROT_DEVICE_nGnRnE);
+ }
++
++void arch_apei_flush_tlb_one(unsigned long addr)
++{
++	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
++}
+ #endif
+diff --git a/drivers/acpi/apei/hest.c b/drivers/acpi/apei/hest.c
+index 20b3fcf..4ead747 100644
+--- a/drivers/acpi/apei/hest.c
++++ b/drivers/acpi/apei/hest.c
+@@ -232,8 +232,10 @@ void __init acpi_hest_init(void)
+ 		goto err;
+ 	}
+ 
++#if defined(__i386__) || defined(__x86_64__)
+ 	if (!acpi_disable_cmcff)
+ 		apei_hest_parse(hest_parse_cmc, NULL);
++#endif
+ 
+ 	if (!ghes_disable) {
+ 		rc = apei_hest_parse(hest_parse_ghes_count, &ghes_count);
+-- 
+2.5.0
