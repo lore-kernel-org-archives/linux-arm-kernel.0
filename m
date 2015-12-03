@@ -1,42 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 3 Dec 2015 09:38:21 +0000
-Subject: [PATCH] arm64: ftrace: stop using kstop_machine to
- enable/disable tracing
-In-Reply-To: <56600992.4040005@huawei.com>
-References: <1448697009-17211-1-git-send-email-huawei.libin@huawei.com>
- <20151202123654.GC4523@arm.com> <56600992.4040005@huawei.com>
-Message-ID: <20151203093821.GD7023@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 03 Dec 2015 10:40:01 +0100
+Subject: [PATCH v2 3/9] ARM: hisi: enable Hi3519 soc
+In-Reply-To: <1449110565-23590-1-git-send-email-xuejiancheng@huawei.com>
+References: <1449110565-23590-1-git-send-email-xuejiancheng@huawei.com>
+Message-ID: <8647404.sBOFNLAMdU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2015 at 05:21:22PM +0800, libin wrote:
-> 
-> on 2015/12/2 20:36, Will Deacon wrote:
-> > On Sat, Nov 28, 2015 at 03:50:09PM +0800, Li Bin wrote:
-> >> On arm64, kstop_machine which is hugely disruptive to a running
-> >> system is not needed to convert nops to ftrace calls or back,
-> >> because that modifed code is a single 32bit instructions which
-> >> is impossible to cross cache (or page) boundaries, and the used str
-> >> instruction is single-copy atomic.
-> > This commit message is misleading, since the single-copy atomicity
-> > guarantees don't apply to the instruction-side. Instead, the architecture
-> > calls out a handful of safe instructions in "Concurrent modification and
-> > execution of instructions".
-> 
-> Right, thank you for your comments.
-> 
-> > Now, those safe instructions *do* include NOP, B and BL, so that should
-> > be sufficient for ftrace provided that we don't patch condition codes
-> > (and I don't think we do).
-> 
-> Yes, and so far this assumption has no probem, but in order to avoid exceeding these
-> safe insturctions in the future, we can use aarch64_insn_hotpatch_safe() to verify the
-> instruction to determine whether needs stop_machine() to synchronize or use
-> aarch64_insn_patch_text directly. Right or I am missing something?
+On Thursday 03 December 2015 10:42:45 Jiancheng Xue wrote:
+> --- a/arch/arm/mach-hisi/Kconfig
+> +++ b/arch/arm/mach-hisi/Kconfig
+> @@ -12,6 +12,14 @@ if ARCH_HISI
+>  
+>  menu "Hisilicon platform type"
+>  
+> +config ARCH_HI3519
+> +       bool "Hisilicon Hi3519 Soc" if ARCH_MULTI_V7
+> +       select HAVE_ARM_ARCH_TIMER
+> +       select ARCH_HAS_RESET_CONTROLLER
+> +
+> +       help
+> +         Support for Hisilicon Hi3519 Soc
+> +
+>  config ARCH_HI3xxx
+>         bool "Hisilicon Hi36xx family" if ARCH_MULTI_V7
+>         select CACHE_L2X0
 
-I think you're missing the case where the instruction changes under our
-feet after we've read it but before we've replaced it (e.g. due to module
-unloading). I think that's why ftrace_modify_code has the comment about
-lack of locking thanks to stop_machine.
+Do those need to be separate? I would just extend the Hi36xx
+to cover all Hi3xxx, if nothing in the platform code really
+depends on this.
 
-Will
+> +
+> +static const char *const hi3519_compat[] __initconst = {
+> +       "hisilicon,hi3519",
+> +       NULL,
+> +};
+> +
+> +DT_MACHINE_START(HI3519_DT, "Hisilicon Hi3519 (Flattened Device Tree)")
+> +       .dt_compat      = hi3519_compat,
+> +MACHINE_END
+
+Also drop the "(Flattened Device Tree)" part of the name, we don't
+support any other kind anyway.
+
+	Arnd
