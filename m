@@ -1,160 +1,187 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 3 Dec 2015 14:11:14 +0800
-Subject: [PATCH v5 04/21] KVM: ARM64: Add reset and access handlers for
- PMCR_EL0 register
-In-Reply-To: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1449123091-20252-5-git-send-email-zhaoshenglong@huawei.com>
+Date: Thu, 3 Dec 2015 14:11:10 +0800
+Subject: [PATCH v5 00/21] KVM: ARM64: Add guest PMU support
+Message-ID: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add reset handler which gets host value of PMCR_EL0 and make writable
-bits architecturally UNKNOWN except PMCR.E to zero. Add a common access
-handler for PMU registers which emulates writing and reading register
-and add emulation for PMCR.
+This patchset adds guest PMU support for KVM on ARM64. It takes
+trap-and-emulate approach. When guest wants to monitor one event, it
+will be trapped by KVM and KVM will call perf_event API to create a perf
+event and call relevant perf_event APIs to get the count value of event.
 
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
----
- arch/arm64/kvm/sys_regs.c | 97 ++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 95 insertions(+), 2 deletions(-)
+Use perf to test this patchset in guest. When using "perf list", it
+shows the list of the hardware events and hardware cache events perf
+supports. Then use "perf stat -e EVENT" to monitor some event. For
+example, use "perf stat -e cycles" to count cpu cycles and
+"perf stat -e cache-misses" to count cache misses.
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 87a64e8..e020fe0 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -33,6 +33,7 @@
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_host.h>
- #include <asm/kvm_mmu.h>
-+#include <asm/pmu.h>
- 
- #include <trace/events/kvm.h>
- 
-@@ -446,6 +447,58 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
- 	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
- }
- 
-+static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
-+{
-+	u64 pmcr, val;
-+
-+	asm volatile("mrs %0, pmcr_el0\n" : "=r" (pmcr));
-+	/* Writable bits of PMCR_EL0 (ARMV8_PMCR_MASK) is reset to UNKNOWN
-+	 * except PMCR.E resetting to zero.
-+	 */
-+	val = ((pmcr & ~ARMV8_PMCR_MASK) | (ARMV8_PMCR_MASK & 0xdecafbad))
-+	      & (~ARMV8_PMCR_E);
-+	vcpu_sys_reg(vcpu, r->reg) = val;
-+}
-+
-+/* PMU registers accessor. */
-+static bool access_pmu_regs(struct kvm_vcpu *vcpu,
-+			    const struct sys_reg_params *p,
-+			    const struct sys_reg_desc *r)
-+{
-+	u64 val;
-+
-+	if (p->is_write) {
-+		switch (r->reg) {
-+		case PMCR_EL0: {
-+			/* Only update writeable bits of PMCR */
-+			val = vcpu_sys_reg(vcpu, r->reg);
-+			val &= ~ARMV8_PMCR_MASK;
-+			val |= *vcpu_reg(vcpu, p->Rt) & ARMV8_PMCR_MASK;
-+			vcpu_sys_reg(vcpu, r->reg) = val;
-+			break;
-+		}
-+		default:
-+			vcpu_sys_reg(vcpu, r->reg) = *vcpu_reg(vcpu, p->Rt);
-+			break;
-+		}
-+	} else {
-+		switch (r->reg) {
-+		case PMCR_EL0: {
-+			/* PMCR.P & PMCR.C are RAZ */
-+			val = vcpu_sys_reg(vcpu, r->reg)
-+			      & ~(ARMV8_PMCR_P | ARMV8_PMCR_C);
-+			*vcpu_reg(vcpu, p->Rt) = val;
-+			break;
-+		}
-+		default:
-+			*vcpu_reg(vcpu, p->Rt) = vcpu_sys_reg(vcpu, r->reg);
-+			break;
-+		}
-+	}
-+
-+	return true;
-+}
-+
- /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
- #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
- 	/* DBGBVRn_EL1 */						\
-@@ -630,7 +683,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 
- 	/* PMCR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b000),
--	  trap_raz_wi },
-+	  access_pmu_regs, reset_pmcr, PMCR_EL0, },
- 	/* PMCNTENSET_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b001),
- 	  trap_raz_wi },
-@@ -864,6 +917,45 @@ static const struct sys_reg_desc cp14_64_regs[] = {
- 	{ Op1( 0), CRm( 2), .access = trap_raz_wi },
- };
- 
-+/* PMU CP15 registers accessor. */
-+static bool access_pmu_cp15_regs(struct kvm_vcpu *vcpu,
-+				 const struct sys_reg_params *p,
-+				 const struct sys_reg_desc *r)
-+{
-+	u32 val;
-+
-+	if (p->is_write) {
-+		switch (r->reg) {
-+		case c9_PMCR: {
-+			/* Only update writeable bits of PMCR */
-+			val = vcpu_cp15(vcpu, r->reg);
-+			val &= ~ARMV8_PMCR_MASK;
-+			val |= *vcpu_reg(vcpu, p->Rt) & ARMV8_PMCR_MASK;
-+			vcpu_cp15(vcpu, r->reg) = val;
-+			break;
-+		}
-+		default:
-+			vcpu_cp15(vcpu, r->reg) = *vcpu_reg(vcpu, p->Rt);
-+			break;
-+		}
-+	} else {
-+		switch (r->reg) {
-+		case c9_PMCR: {
-+			/* PMCR.P & PMCR.C are RAZ */
-+			val = vcpu_cp15(vcpu, r->reg)
-+			      & ~(ARMV8_PMCR_P | ARMV8_PMCR_C);
-+			*vcpu_reg(vcpu, p->Rt) = val;
-+			break;
-+		}
-+		default:
-+			*vcpu_reg(vcpu, p->Rt) = vcpu_cp15(vcpu, r->reg);
-+			break;
-+		}
-+	}
-+
-+	return true;
-+}
-+
- /*
-  * Trapped cp15 registers. TTBR0/TTBR1 get a double encoding,
-  * depending on the way they are accessed (as a 32bit or a 64bit
-@@ -892,7 +984,8 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	{ Op1( 0), CRn( 7), CRm(14), Op2( 2), access_dcsw },
- 
- 	/* PMU */
--	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmu_cp15_regs,
-+	  NULL, c9_PMCR },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
+Below are the outputs of "perf stat -r 5 sleep 5" when running in host
+and guest.
+
+Host:
+ Performance counter stats for 'sleep 5' (5 runs):
+
+          0.510276      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.57% )
+                 1      context-switches          #    0.002 M/sec
+                 0      cpu-migrations            #    0.000 K/sec
+                49      page-faults               #    0.096 M/sec                    ( +-  0.77% )
+           1064117      cycles                    #    2.085 GHz                      ( +-  1.56% )
+   <not supported>      stalled-cycles-frontend
+   <not supported>      stalled-cycles-backend
+            529051      instructions              #    0.50  insns per cycle          ( +-  0.55% )
+   <not supported>      branches
+              9894      branch-misses             #   19.390 M/sec                    ( +-  1.70% )
+
+       5.000853900 seconds time elapsed                                          ( +-  0.00% )
+
+Guest:
+ Performance counter stats for 'sleep 5' (5 runs):
+
+          0.642456      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.81% )
+                 1      context-switches          #    0.002 M/sec
+                 0      cpu-migrations            #    0.000 K/sec
+                49      page-faults               #    0.076 M/sec                    ( +-  1.64% )
+           1322717      cycles                    #    2.059 GHz                      ( +-  1.88% )
+   <not supported>      stalled-cycles-frontend
+   <not supported>      stalled-cycles-backend
+            640944      instructions              #    0.48  insns per cycle          ( +-  1.10% )
+   <not supported>      branches
+             10665      branch-misses             #   16.600 M/sec                    ( +-  2.23% )
+
+       5.001181452 seconds time elapsed                                          ( +-  0.00% )
+
+Have a cycle counter read test like below in guest and host:
+
+static void test(void)
+{
+	unsigned long count, count1, count2;
+	count1 = read_cycles();
+	count++;
+	count2 = read_cycles();
+}
+
+Host:
+count1: 3046186213
+count2: 3046186347
+delta: 134
+
+Guest:
+count1: 5645797121
+count2: 5645797270
+delta: 149
+
+The gap between guest and host is very small. One reason for this I
+think is that it doesn't count the cycles in EL2 and host since we add
+exclude_hv = 1. So the cycles spent to store/restore registers which
+happens at EL2 are not included.
+
+This patchset can be fetched from [1] and the relevant QEMU version for
+test can be fetched from [2].
+
+The results of 'perf test' can be found from [3][4].
+The results of perf_event_tests test suite can be found from [5][6].
+
+Also, I have tested "perf top" in two VMs and host at the same time. It
+works well.
+
+Thanks,
+Shannon
+
+[1] https://git.linaro.org/people/shannon.zhao/linux-mainline.git  KVM_ARM64_PMU_v5
+[2] https://git.linaro.org/people/shannon.zhao/qemu.git  virtual_PMU
+[3] http://people.linaro.org/~shannon.zhao/PMU/perf-test-host.txt
+[4] http://people.linaro.org/~shannon.zhao/PMU/perf-test-guest.txt
+[5] http://people.linaro.org/~shannon.zhao/PMU/perf_event_tests-host.txt
+[6] http://people.linaro.org/~shannon.zhao/PMU/perf_event_tests-guest.txt
+
+Changes since v4:
+* Rebase on new linux kernel mainline 
+* Drop the reset handler of CP15 registers
+* Fix a compile failure on arch ARM due to lack of asm/pmu.h
+* Refactor the interrupt injecting flow according to Marc's suggestion
+* Check the value of PMSELR register
+* Calculate the attr.disabled according to PMCR.E and PMCNTENSET/CLR
+* Fix some coding style
+* Document the vPMU irq range
+
+Changes since v3:
+* Rebase on new linux kernel mainline 
+* Use ARMV8_MAX_COUNTERS instead of 32
+* Reset PMCR.E to zero.
+* Trigger overflow for software increment.
+* Optimize PMU interrupt inject logic.
+* Add handler for E,C,P bits of PMCR
+* Fix the overflow bug found by perf_event_tests
+* Run 'perf test', 'perf top' and perf_event_tests test suite
+* Add exclude_hv = 1 configuration to not count in EL2
+
+Changes since v2:
+* Directly use perf raw event type to create perf_event in KVM
+* Add a helper vcpu_sysreg_write
+* remove unrelated header file
+
+Changes since v1:
+* Use switch...case for registers access handler instead of adding
+  alone handler for each register
+* Try to use the sys_regs to store the register value instead of adding
+  new variables in struct kvm_pmc
+* Fix the handle of cp15 regs
+* Create a new kvm device vPMU, then userspace could choose whether to
+  create PMU
+* Fix the handle of PMU overflow interrupt
+
+Shannon Zhao (21):
+  ARM64: Move PMU register related defines to asm/pmu.h
+  KVM: ARM64: Define PMU data structure for each vcpu
+  KVM: ARM64: Add offset defines for PMU registers
+  KVM: ARM64: Add reset and access handlers for PMCR_EL0 register
+  KVM: ARM64: Add reset and access handlers for PMSELR register
+  KVM: ARM64: Add reset and access handlers for PMCEID0 and PMCEID1
+    register
+  KVM: ARM64: PMU: Add perf event map and introduce perf event creating
+    function
+  KVM: ARM64: Add reset and access handlers for PMXEVTYPER register
+  KVM: ARM64: Add reset and access handlers for PMXEVCNTR register
+  KVM: ARM64: Add reset and access handlers for PMCCNTR register
+  KVM: ARM64: Add reset and access handlers for PMCNTENSET and
+    PMCNTENCLR register
+  KVM: ARM64: Add reset and access handlers for PMINTENSET and
+    PMINTENCLR register
+  KVM: ARM64: Add reset and access handlers for PMOVSSET and PMOVSCLR
+    register
+  KVM: ARM64: Add reset and access handlers for PMUSERENR register
+  KVM: ARM64: Add reset and access handlers for PMSWINC register
+  KVM: ARM64: Add access handlers for PMEVCNTRn and PMEVTYPERn register
+  KVM: ARM64: Add helper to handle PMCR register bits
+  KVM: ARM64: Add PMU overflow interrupt routing
+  KVM: ARM64: Reset PMU state when resetting vcpu
+  KVM: ARM64: Free perf event of PMU when destroying vcpu
+  KVM: ARM64: Add a new kvm ARM PMU device
+
+ Documentation/virtual/kvm/devices/arm-pmu.txt |  16 +
+ arch/arm/kvm/arm.c                            |   3 +
+ arch/arm64/include/asm/kvm_asm.h              |  55 ++-
+ arch/arm64/include/asm/kvm_host.h             |   2 +
+ arch/arm64/include/asm/pmu.h                  |  66 +++
+ arch/arm64/include/uapi/asm/kvm.h             |   3 +
+ arch/arm64/kernel/perf_event.c                |  36 +-
+ arch/arm64/kvm/Kconfig                        |   8 +
+ arch/arm64/kvm/Makefile                       |   1 +
+ arch/arm64/kvm/reset.c                        |   3 +
+ arch/arm64/kvm/sys_regs.c                     | 559 ++++++++++++++++++++++++--
+ include/kvm/arm_pmu.h                         |  72 ++++
+ include/linux/kvm_host.h                      |   1 +
+ include/uapi/linux/kvm.h                      |   2 +
+ virt/kvm/arm/pmu.c                            | 525 ++++++++++++++++++++++++
+ virt/kvm/kvm_main.c                           |   4 +
+ 16 files changed, 1288 insertions(+), 68 deletions(-)
+ create mode 100644 Documentation/virtual/kvm/devices/arm-pmu.txt
+ create mode 100644 arch/arm64/include/asm/pmu.h
+ create mode 100644 include/kvm/arm_pmu.h
+ create mode 100644 virt/kvm/arm/pmu.c
+
 -- 
 2.0.4
