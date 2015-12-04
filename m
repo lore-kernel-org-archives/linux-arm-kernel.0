@@ -1,67 +1,55 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 4 Dec 2015 15:56:30 +0100
-Subject: [PATCH v4] mmc: core: fix __mmc_switch timeout caused by preempt
-In-Reply-To: <1448846850-14585-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1448846850-14585-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <CAPDyKFqzekCOna5LUBNJRLQ-+7ryO57_B6=7ne3a9Vj6axF=yw@mail.gmail.com>
+Date: Fri, 4 Dec 2015 15:56:48 +0100
+Subject: [PATCH] mmc: mediatek: change some dev_err to dev_dbg
+In-Reply-To: <1448971954-398-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1448971954-398-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <CAPDyKFoAhCzwmAi_ru0u-mdxiuvzufGRBUEjEgRc1zBGiLTDgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 November 2015 at 02:27, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> there is a time window between __mmc_send_status() and time_afer(),
-> on some eMMC chip, the timeout_ms is only 10ms, if this thread was
-> scheduled out during this period, then, even card has already changes
-> to transfer state by the result of CMD13, this part of code also treat
-> it to timeout error.
-> So, need calculate timeout first, then call __mmc_send_status(), if
-> already timeout and card still in programing state, then treat it to
-> the real timeout error.
+On 1 December 2015 at 13:12, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> there are too many error logs shown when use CMD21/CMD19 to do tune,
+> and it will appear at each resume time, print out so many logs to the
+> uart console cost too mush time. so change it to dev_dbg.
 >
 > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
 
-Thanks, applied for next!
+This one didn't apply to my next branch. Can you please rebase.
 
 Kind regards
 Uffe
 
 > ---
->  drivers/mmc/core/mmc_ops.c | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
+>  drivers/mmc/host/mtk-sd.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 >
-> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
-> index 1f44426..2c90635 100644
-> --- a/drivers/mmc/core/mmc_ops.c
-> +++ b/drivers/mmc/core/mmc_ops.c
-> @@ -489,6 +489,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->         unsigned long timeout;
->         u32 status = 0;
->         bool use_r1b_resp = use_busy_signal;
-> +       bool expired = false;
+> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+> index 39568cc..34d23b8 100644
+> --- a/drivers/mmc/host/mtk-sd.c
+> +++ b/drivers/mmc/host/mtk-sd.c
+> @@ -972,7 +972,7 @@ static bool msdc_data_xfer_done(struct msdc_host *host, u32 events,
+>                 if ((events & MSDC_INT_XFER_COMPL) && (!stop || !stop->error)) {
+>                         data->bytes_xfered = data->blocks * data->blksz;
+>                 } else {
+> -                       dev_err(host->dev, "interrupt events: %x\n", events);
+> +                       dev_dbg(host->dev, "interrupt events: %x\n", events);
+>                         msdc_reset_hw(host);
+>                         host->error |= REQ_DAT_ERR;
+>                         data->bytes_xfered = 0;
+> @@ -982,10 +982,10 @@ static bool msdc_data_xfer_done(struct msdc_host *host, u32 events,
+>                         else if (events & MSDC_INT_DATCRCERR)
+>                                 data->error = -EILSEQ;
 >
->         mmc_retune_hold(host);
->
-> @@ -545,6 +546,12 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->         timeout = jiffies + msecs_to_jiffies(timeout_ms);
->         do {
->                 if (send_status) {
-> +                       /*
-> +                        * Due to the possibility of being preempted after
-> +                        * sending the status command, check the expiration
-> +                        * time first.
-> +                        */
-> +                       expired = time_after(jiffies, timeout);
->                         err = __mmc_send_status(card, &status, ignore_crc);
->                         if (err)
->                                 goto out;
-> @@ -565,7 +572,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+> -                       dev_err(host->dev, "%s: cmd=%d; blocks=%d",
+> +                       dev_dbg(host->dev, "%s: cmd=%d; blocks=%d",
+>                                 __func__, mrq->cmd->opcode, data->blocks);
+> -                       dev_err(host->dev, "data_error=%d xfer_size=%d\n",
+> -                                       (int)data->error, data->bytes_xfered);
+> +                       dev_dbg(host->dev, "data_error=%d xfer_size=%d\n",
+> +                               (int)data->error, data->bytes_xfered);
 >                 }
 >
->                 /* Timeout if the device never leaves the program state. */
-> -               if (time_after(jiffies, timeout)) {
-> +               if (expired && R1_CURRENT_STATE(status) == R1_STATE_PRG) {
->                         pr_err("%s: Card stuck in programming state! %s\n",
->                                 mmc_hostname(host), __func__);
->                         err = -ETIMEDOUT;
+>                 msdc_data_xfer_next(host, mrq, data);
 > --
 > 1.8.1.1.dirty
 >
