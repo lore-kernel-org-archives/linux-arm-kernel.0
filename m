@@ -1,228 +1,85 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 04 Dec 2015 18:30:29 +0100
-Subject: [PATCH v3 04/10] ARM: dts: Exynos5420: add CPU OPP and regulator
- supply property
+Date: Fri, 04 Dec 2015 18:30:31 +0100
+Subject: [PATCH v3 06/10] clk: samsung: exynos5800: fix cpu clock configuration
+ data
 In-Reply-To: <1449250235-9613-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1449250235-9613-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1449250235-9613-5-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1449250235-9613-7-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Abraham <thomas.ab@samsung.com>
+Fix cpu clock configuration data for Exynos5800 (it uses
+higher PCLK_DBG divider values than Exynos5420 and supports
+additional frequencies).
 
-For Exynos5420 platforms, add CPU operating points and CPU
-regulator supply properties for migrating from Exynos specific
-cpufreq driver to using generic cpufreq driver.
+Based on Hardkernel's kernel for ODROID-XU3 board.
 
-Changes by Bartlomiej:
-- split Exynos5420 support from the original patch
-
-Changes by Ben Gamari:
-- Port to operating-points-v2
-
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Doug Anderson <dianders@chromium.org>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Mike Turquette <mturquette@linaro.org>
 Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-Cc: Andreas Faerber <afaerber@suse.de>
-Cc: Sachin Kamat <sachin.kamat@linaro.org>
 Cc: Thomas Abraham <thomas.ab@samsung.com>
-Signed-off-by: Ben Gamari <ben@smart-cactus.org>
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- arch/arm/boot/dts/exynos5420.dtsi | 122 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 122 insertions(+)
+ drivers/clk/samsung/clk-exynos5420.c | 36 +++++++++++++++++++++++++++++++++---
+ 1 file changed, 33 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index 48a0a55..f8f70a5 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -50,6 +50,116 @@
- 		usbdrdphy1 = &usbdrd_phy1;
- 	};
+diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+index 2a92546..837329d 100644
+--- a/drivers/clk/samsung/clk-exynos5420.c
++++ b/drivers/clk/samsung/clk-exynos5420.c
+@@ -1274,10 +1274,34 @@ static const struct exynos_cpuclk_cfg_data exynos5420_eglclk_d[] __initconst = {
+ 	{  0 },
+ };
  
-+	cpu0_opp_table: opp_table0 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+		opp00 at 1800000000 {
-+			opp-hz = /bits/ 64 <1800000000>;
-+			opp-microvolt = <1250000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp01 at 1700000000 {
-+			opp-hz = /bits/ 64 <1700000000>;
-+			opp-microvolt = <1212500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp02 at 1600000000 {
-+			opp-hz = /bits/ 64 <1600000000>;
-+			opp-microvolt = <1175000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp03 at 1500000000 {
-+			opp-hz = /bits/ 64 <1500000000>;
-+			opp-microvolt = <1137500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp04 at 1400000000 {
-+			opp-hz = /bits/ 64 <1400000000>;
-+			opp-microvolt = <1112500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp05 at 1300000000 {
-+			opp-hz = /bits/ 64 <1300000000>;
-+			opp-microvolt = <1062500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp06 at 1200000000 {
-+			opp-hz = /bits/ 64 <1200000000>;
-+			opp-microvolt = <1037500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp07 at 1100000000 {
-+			opp-hz = /bits/ 64 <1100000000>;
-+			opp-microvolt = <1012500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp08 at 1000000000 {
-+			opp-hz = /bits/ 64 <1000000000>;
-+			opp-microvolt = < 987500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp09 at 900000000 {
-+			opp-hz = /bits/ 64 <900000000>;
-+			opp-microvolt = < 962500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp10 at 800000000 {
-+			opp-hz = /bits/ 64 <800000000>;
-+			opp-microvolt = < 937500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp11 at 700000000 {
-+			opp-hz = /bits/ 64 <700000000>;
-+			opp-microvolt = < 912500>;
-+			clock-latency-ns = <140000>;
-+		};
-+	};
++static const struct exynos_cpuclk_cfg_data exynos5800_eglclk_d[] __initconst = {
++	{ 2000000, E5420_EGL_DIV0(3, 7, 7, 4), },
++	{ 1900000, E5420_EGL_DIV0(3, 7, 7, 4), },
++	{ 1800000, E5420_EGL_DIV0(3, 7, 7, 4), },
++	{ 1700000, E5420_EGL_DIV0(3, 7, 7, 3), },
++	{ 1600000, E5420_EGL_DIV0(3, 7, 7, 3), },
++	{ 1500000, E5420_EGL_DIV0(3, 7, 7, 3), },
++	{ 1400000, E5420_EGL_DIV0(3, 7, 7, 3), },
++	{ 1300000, E5420_EGL_DIV0(3, 7, 7, 2), },
++	{ 1200000, E5420_EGL_DIV0(3, 7, 7, 2), },
++	{ 1100000, E5420_EGL_DIV0(3, 7, 7, 2), },
++	{ 1000000, E5420_EGL_DIV0(3, 7, 6, 2), },
++	{  900000, E5420_EGL_DIV0(3, 7, 6, 2), },
++	{  800000, E5420_EGL_DIV0(3, 7, 5, 2), },
++	{  700000, E5420_EGL_DIV0(3, 7, 5, 2), },
++	{  600000, E5420_EGL_DIV0(3, 7, 4, 2), },
++	{  500000, E5420_EGL_DIV0(3, 7, 3, 2), },
++	{  400000, E5420_EGL_DIV0(3, 7, 3, 2), },
++	{  300000, E5420_EGL_DIV0(3, 7, 3, 2), },
++	{  200000, E5420_EGL_DIV0(3, 7, 3, 2), },
++	{  0 },
++};
 +
-+	cpu1_opp_table: opp_table1 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+		opp00 at 1300000000 {
-+			opp-hz = /bits/ 64 <1300000000>;
-+			opp-microvolt = <1275000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp01 at 1200000000 {
-+			opp-hz = /bits/ 64 <1200000000>;
-+			opp-microvolt = <1212500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp02 at 1100000000 {
-+			opp-hz = /bits/ 64 <1100000000>;
-+			opp-microvolt = <1162500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp03 at 1000000000 {
-+			opp-hz = /bits/ 64 <1000000000>;
-+			opp-microvolt = <1112500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp04 at 900000000 {
-+			opp-hz = /bits/ 64 <900000000>;
-+			opp-microvolt = <1062500>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp05 at 800000000 {
-+			opp-hz = /bits/ 64 <800000000>;
-+			opp-microvolt = <1025000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp06 at 700000000 {
-+			opp-hz = /bits/ 64 <700000000>;
-+			opp-microvolt = <975000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp07 at 600000000 {
-+			opp-hz = /bits/ 64 <600000000>;
-+			opp-microvolt = <937500>;
-+			clock-latency-ns = <140000>;
-+		};
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -58,8 +168,11 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <0x0>;
-+			clocks = <&clock CLK_ARM_CLK>;
-+			clock-names = "cpu-cluster.0";
- 			clock-frequency = <1800000000>;
- 			cci-control-port = <&cci_control1>;
-+			operating-points-v2 = <&cpu0_opp_table>;
- 		};
+ #define E5420_KFC_DIV(kpll, pclk, aclk)					\
+ 		((((kpll) << 24) | ((pclk) << 20) | ((aclk) << 4)))
  
- 		cpu1: cpu at 1 {
-@@ -68,6 +181,7 @@
- 			reg = <0x1>;
- 			clock-frequency = <1800000000>;
- 			cci-control-port = <&cci_control1>;
-+			operating-points-v2 = <&cpu0_opp_table>;
- 		};
+ static const struct exynos_cpuclk_cfg_data exynos5420_kfcclk_d[] __initconst = {
++	{ 1400000, E5420_KFC_DIV(3, 5, 3), }, /* for Exynos5800 */
+ 	{ 1300000, E5420_KFC_DIV(3, 5, 2), },
+ 	{ 1200000, E5420_KFC_DIV(3, 5, 2), },
+ 	{ 1100000, E5420_KFC_DIV(3, 5, 2), },
+@@ -1357,9 +1381,15 @@ static void __init exynos5x_clk_init(struct device_node *np,
+ 				ARRAY_SIZE(exynos5800_gate_clks));
+ 	}
  
- 		cpu2: cpu at 2 {
-@@ -76,6 +190,7 @@
- 			reg = <0x2>;
- 			clock-frequency = <1800000000>;
- 			cci-control-port = <&cci_control1>;
-+			operating-points-v2 = <&cpu0_opp_table>;
- 		};
- 
- 		cpu3: cpu at 3 {
-@@ -84,14 +199,18 @@
- 			reg = <0x3>;
- 			clock-frequency = <1800000000>;
- 			cci-control-port = <&cci_control1>;
-+			operating-points-v2 = <&cpu0_opp_table>;
- 		};
- 
- 		cpu4: cpu at 100 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0x100>;
-+			clocks = <&clock CLK_KFC_CLK>;
-+			clock-names = "cpu-cluster.1";
- 			clock-frequency = <1000000000>;
- 			cci-control-port = <&cci_control0>;
-+			operating-points-v2 = <&cpu1_opp_table>;
- 		};
- 
- 		cpu5: cpu at 101 {
-@@ -100,6 +219,7 @@
- 			reg = <0x101>;
- 			clock-frequency = <1000000000>;
- 			cci-control-port = <&cci_control0>;
-+			operating-points-v2 = <&cpu1_opp_table>;
- 		};
- 
- 		cpu6: cpu at 102 {
-@@ -108,6 +228,7 @@
- 			reg = <0x102>;
- 			clock-frequency = <1000000000>;
- 			cci-control-port = <&cci_control0>;
-+			operating-points-v2 = <&cpu1_opp_table>;
- 		};
- 
- 		cpu7: cpu at 103 {
-@@ -116,6 +237,7 @@
- 			reg = <0x103>;
- 			clock-frequency = <1000000000>;
- 			cci-control-port = <&cci_control0>;
-+			operating-points-v2 = <&cpu1_opp_table>;
- 		};
- 	};
- 
+-	exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
+-		mout_cpu_p[0], mout_cpu_p[1], 0x200,
+-		exynos5420_eglclk_d, ARRAY_SIZE(exynos5420_eglclk_d), 0);
++	if (soc == EXYNOS5420) {
++		exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
++			mout_cpu_p[0], mout_cpu_p[1], 0x200,
++			exynos5420_eglclk_d, ARRAY_SIZE(exynos5420_eglclk_d), 0);
++	} else {
++		exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
++			mout_cpu_p[0], mout_cpu_p[1], 0x200,
++			exynos5800_eglclk_d, ARRAY_SIZE(exynos5800_eglclk_d), 0);
++	}
+ 	exynos_register_cpu_clock(ctx, CLK_KFC_CLK, "kfcclk",
+ 		mout_kfc_p[0], mout_kfc_p[1], 0x28200,
+ 		exynos5420_kfcclk_d, ARRAY_SIZE(exynos5420_kfcclk_d), 0);
 -- 
 1.9.1
