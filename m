@@ -1,53 +1,30 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  4 Dec 2015 17:17:20 +0000
-Subject: [PATCH 5/5] ARM/arm64: KVM: correct PTE uncachedness check
-In-Reply-To: <1449249440-28878-1-git-send-email-marc.zyngier@arm.com>
-References: <1449249440-28878-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1449249440-28878-6-git-send-email-marc.zyngier@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 4 Dec 2015 17:18:56 +0000
+Subject: [RFC2 PATCH v6 00/19] ILP32 for ARM64
+In-Reply-To: <20151204153550.GB1251@yury-N73SV>
+References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
+ <20151203175955.GP10747@e104818-lin.cambridge.arm.com>
+ <20151204153550.GB1251@yury-N73SV>
+Message-ID: <20151204171856.GP10123@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On Fri, Dec 04, 2015 at 06:35:50PM +0300, Yury Norov wrote:
+> On Thu, Dec 03, 2015 at 05:59:55PM +0000, Catalin Marinas wrote:
+> > On Wed, Nov 18, 2015 at 12:16:40AM +0300, Yury Norov wrote:
+> > >  - ILP32 VDSO code excluded. It's not mandatory, and caused questions
+> > >    during review process. We definitely make sure we will follow up
+> > >    with a VDSO later on because it is needed for performance reasons;
+> > 
+> > I already asked in one of the patches, don't you need a VDSO for
+> > sigreturn?
+> 
+> I didn't realise it's mandatory for ARMv8 when removed it. I'll back
+> it, but I think rework required anyway.
 
-Commit e6fab5442345 ("ARM/arm64: KVM: test properly for a PTE's
-uncachedness") modified the logic to test whether a HYP or stage-2
-mapping needs flushing, from [incorrectly] interpreting the page table
-attributes to [incorrectly] checking whether the PFN that backs the
-mapping is covered by host system RAM. The PFN number is part of the
-output of the translation, not the input, so we have to use pte_pfn()
-on the contents of the PTE, not __phys_to_pfn() on the HYP virtual
-address or stage-2 intermediate physical address.
+The alternative is to use SA_RESTORER but AFAIK, its use has been
+deprecated. I don't know what aarch64 glibc does if it doesn't have a
+vdso.
 
-Fixes: e6fab5442345 ("ARM/arm64: KVM: test properly for a PTE's uncachedness")
-Cc: stable at vger.kernel.org
-Tested-by: Pavel Fedin <p.fedin@samsung.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kvm/mmu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 7dace90..61d96a6 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -218,7 +218,7 @@ static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
- 			kvm_tlb_flush_vmid_ipa(kvm, addr);
- 
- 			/* No need to invalidate the cache for device mappings */
--			if (!kvm_is_device_pfn(__phys_to_pfn(addr)))
-+			if (!kvm_is_device_pfn(pte_pfn(old_pte)))
- 				kvm_flush_dcache_pte(old_pte);
- 
- 			put_page(virt_to_page(pte));
-@@ -310,7 +310,7 @@ static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
- 
- 	pte = pte_offset_kernel(pmd, addr);
- 	do {
--		if (!pte_none(*pte) && !kvm_is_device_pfn(__phys_to_pfn(addr)))
-+		if (!pte_none(*pte) && !kvm_is_device_pfn(pte_pfn(*pte)))
- 			kvm_flush_dcache_pte(*pte);
- 	} while (pte++, addr += PAGE_SIZE, addr != end);
- }
 -- 
-2.1.4
+Catalin
