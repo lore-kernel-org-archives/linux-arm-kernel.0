@@ -1,78 +1,42 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 4 Dec 2015 20:05:23 +0300
-Subject: [PATCH v6 07/19] arm64: introduce is_a32_task and is_a32_thread
- (for AArch32 compat)
-In-Reply-To: <20151203121303.GK10747@e104818-lin.cambridge.arm.com>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <1447795019-30176-8-git-send-email-ynorov@caviumnetworks.com>
- <20151203121303.GK10747@e104818-lin.cambridge.arm.com>
-Message-ID: <20151204170523.GA2791@yury-N73SV>
+From: yrdreddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
+Date: Fri, 4 Dec 2015 12:09:41 -0500
+Subject: [PATCH v2 0/3] gpio support for Broadcom NSP
+Message-ID: <1449248981-12102-1-git-send-email-yrdreddy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2015 at 12:13:03PM +0000, Catalin Marinas wrote:
-> On Wed, Nov 18, 2015 at 12:16:47AM +0300, Yury Norov wrote:
-> > diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-> > index 7fbed69..9700e5e 100644
-> > --- a/arch/arm64/include/asm/compat.h
-> > +++ b/arch/arm64/include/asm/compat.h
-> > @@ -299,19 +299,44 @@ struct compat_shmid64_ds {
-> >  	compat_ulong_t __unused5;
-> >  };
-> >  
-> > -static inline int is_compat_task(void)
-> > +#ifdef CONFIG_AARCH32_EL0
-> > +
-> > +static inline int is_a32_compat_task(void)
-> >  {
-> >  	return test_thread_flag(TIF_32BIT);
-> >  }
-> >  
-> > -static inline int is_compat_thread(struct thread_info *thread)
-> > +static inline int is_a32_compat_thread(struct thread_info *thread)
-> >  {
-> >  	return test_ti_thread_flag(thread, TIF_32BIT);
-> >  }
-> >  
-> > +#else
-> > +
-> > +static inline int is_a32_compat_task(void)
-> > +{
-> > +	return 0;
-> > +}
-> > +
-> > +static inline int is_a32_compat_thread(struct thread_info *thread)
-> > +{
-> > +	return 0;
-> > +}
-> > +#endif
-> > +
-> > +static inline int is_compat_task(void)
-> > +{
-> > +	return is_a32_compat_task();
-> > +}
-> > +
-> >  #else /* !CONFIG_COMPAT */
-> >  
-> > -static inline int is_compat_thread(struct thread_info *thread)
-> > +static inline int is_a32_compat_thread(struct thread_info *thread)
-> > +{
-> > +	return 0;
-> > +}
-> > +
-> > +static inline int is_a32_compat_task(void)
-> >  {
-> >  	return 0;
-> >  }
-> 
-> My main worry with this patch is a potential #include mess. I can see
-> that you already had to include asm/compat.h explicitly in
-> hw_breakpoint.c even though linux/compat.h was already included. In
-> subsequent files (asm/elf.h, asm/memory.h) you check is_compat_task()
-> without explicitly including asm/compat.h and hope that it won't break.
-> 
-> A solution would be to add these functions in a separate header file
-> that gets included where needed (also by asm/compat.h).
+This is the second iteration in the series.
 
-Thank you for pointing that. I don't see big advantage in moving that
-to new file, only if you insist. What about just fixing that mess?
+Changes in v2:
+Addressed the review comments on device tree bindings and
+the device tree file.
+
+This patchset contains the gpio support for the Broadcom's
+Northstar Plus (NSP) SOC.
+
+The first patch provides the documentation details and the
+second patch contains driver details. The third patch
+contains the enable method.
+
+This patchset has been tested on NSP bcm958625HR board with pinctrl
+patch added.
+This patchset is based on v4.4.0-rc1 and is available from github
+repo: https://github.com/Broadcom/cygnus-linux.git
+branch: nsp-gpio-v1
+
+Yendapally Reddy Dhananjaya Reddy (3):
+  pinctrl: Broadcom NSP GPIO-a device tree bindings
+  pinctrl: nsp: add gpio-a driver support for Broadcom NSP SoC
+  ARM: dts: enable GPIO-a for Broadcom NSP
+
+ .../devicetree/bindings/pinctrl/brcm,nsp-gpio.txt  |  80 +++
+ arch/arm/boot/dts/bcm-nsp.dtsi                     |  12 +
+ drivers/pinctrl/bcm/Kconfig                        |  17 +
+ drivers/pinctrl/bcm/Makefile                       |   1 +
+ drivers/pinctrl/bcm/pinctrl-nsp-gpio.c             | 749 +++++++++++++++++++++
+ 5 files changed, 859 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt
+ create mode 100644 drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
+
+-- 
+2.1.0
