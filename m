@@ -1,56 +1,25 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 4 Dec 2015 18:53:57 +0100
-Subject: [PATCH] ARM: at91: fix pinctrl driver selection
-In-Reply-To: <5661CE71.5050206@arm.com>
-References: <1449249513-22972-1-git-send-email-alexandre.belloni@free-electrons.com>
- <5661CE71.5050206@arm.com>
-Message-ID: <20151204175357.GD3515@piout.net>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 5 Dec 2015 02:14:48 +0800
+Subject: [PATCH 2/3] Add support for monitoring gpio switches
+In-Reply-To: <1449250275-23435-3-git-send-email-martyn.welch@collabora.co.uk>
+Message-ID: <201512050224.lVULPyNu%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/2015 at 17:33:37 +0000, Sudeep Holla wrote :
-> 
-> 
-> On 04/12/15 17:18, Alexandre Belloni wrote:
-> >From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> >
-> >Move the selection of the pinctrl driver to SoC family level since we
-> >have two pinctrl drivers. It is useless to select one which is not
-> >compatible with the SoC.
-> >
-> >[abelloni: fixed pm.c when only sama2d2 is selected]
-> >Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> >Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> >Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> >---
-> >  arch/arm/mach-at91/Kconfig | 6 +++++-
-> >  arch/arm/mach-at91/pm.c    | 7 ++++++-
-> >  2 files changed, 11 insertions(+), 2 deletions(-)
-> >
-> 
-> [...]
-> 
-> >diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-> >index 80e277cfcc8b..01cbb17e6f6b 100644
-> >--- a/arch/arm/mach-at91/pm.c
-> >+++ b/arch/arm/mach-at91/pm.c
-> >@@ -41,8 +41,10 @@
-> >   * implementation should be moved down into the pinctrl driver and get
-> >   * called as part of the generic suspend/resume path.
-> >   */
-> >+#ifdef PINCTRL_AT91
-> 
-> Accidentally glanced at this patch when my mail client got hung at this
-> patch :), I think you mean CONFIG_PINCTRL_AT91 here and later below.
-> 
+Hi Martyn,
+
+[auto build test WARNING on char-misc/char-misc-testing]
+[also build test WARNING on v4.4-rc3 next-20151203]
+
+url:    https://github.com/0day-ci/linux/commits/Martyn-Welch/Device-tree-binding-documentation-for-gpio-switch/20151205-014105
 
 
-Raah, sure. Thanks!
-> --
-> Regards,
-> Sudeep
+coccinelle warnings: (new ones prefixed by >>)
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>> drivers/misc/gpio-switch.c:98:34-40: ERROR: application of sizeof to pointer
+
+Please review and possibly fold the followup patch.
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
