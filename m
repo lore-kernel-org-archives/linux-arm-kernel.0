@@ -1,30 +1,44 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Fri, 04 Dec 2015 08:28:51 -0800
-Subject: [PATCH] mpt3sas: add PCI dependency for CONFIG_SCSI_MPT2SAS
-In-Reply-To: <1953916.xaj9Y2FReq@wuerfel>
-References: <1953916.xaj9Y2FReq@wuerfel>
-Message-ID: <1449246531.27077.5.camel@HansenPartnership.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 04 Dec 2015 17:34:29 +0100
+Subject: [PATCH] ahci: don't use MSI when PCI is disabled
+In-Reply-To: <6160865.VIglm5oKj3@wuerfel>
+References: <4754092.OYovO36g28@wuerfel>
+ <CAPcyv4gSjWZ7OPqp9fwtc9yGV9g5AKkkCLDnU-F71XsHBgYUQA@mail.gmail.com>
+ <6160865.VIglm5oKj3@wuerfel>
+Message-ID: <2230814.fGlctTNBzj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-12-04 at 15:27 +0100, Arnd Bergmann wrote:
-> CONFIG_SCSI_MPT2SAS was added as a backwards-compatibility helper that
-> selects the replacement SCSI_MPT3SAS symbol, but lacks the dependencies:
+On Monday 23 November 2015 20:34:30 Arnd Bergmann wrote:
+> On Monday 23 November 2015 09:25:38 Dan Williams wrote:
+> > 
+> > If we had an "static inline ahci_irq_vector(int port)"  helper to
+> > compile out the struct msix_entry de-reference would that be
+> > sufficient?
 > 
-> warning: (SCSI_MPT2SAS) selects SCSI_MPT3SAS which has unmet direct dependencies (SCSI_LOWLEVEL && PCI && SCSI)
-> 0x7E5F9A79 Fri Dec 4 12:36:08 CET 2015 failed
-> drivers/scsi/mpt3sas/mpt3sas_base.c: In function 'mpt3sas_remove_dead_ioc_func':
-> drivers/scsi/mpt3sas/mpt3sas_base.c:140:2: error: implicit declaration of function 'pci_stop_and_remove_bus_device_locked' [-Werror=implicit-function-declaration]
-> drivers/scsi/mpt3sas/mpt3sas_base.c: In function '_base_disable_msix':
-> drivers/scsi/mpt3sas/mpt3sas_base.c:1921:2: error: implicit declaration of function 'pci_disable_msix' [-Werror=implicit-function-declaration]
+> Yes, that is probably a nicer way to do it. We should then also do
+> something like this:
 > 
-> This adds the same dependencies that SCSI_MPT3SAS has.
+> @@ -2510,7 +2513,8 @@ int ahci_host_activate(struct ata_host *host, struct scsi_host_template *sht)
+>         int irq = hpriv->irq;
+>         int rc;
+>  
+> -       if (hpriv->flags & (AHCI_HFLAG_MULTI_MSI | AHCI_HFLAG_MULTI_MSIX))
+> +       if (IS_ENABLED(CONFIG_PCI_MSI) && \
+> +           hpriv->flags & (AHCI_HFLAG_MULTI_MSI | AHCI_HFLAG_MULTI_MSIX))
+>                 rc = ahci_host_activate_multi_irqs(host, sht);
+>         else if (hpriv->flags & AHCI_HFLAG_EDGE_IRQ)
+>                 rc = ata_host_activate(host, irq, ahci_single_edge_irq_intr,
+> 
+> which will let gcc leave out the entire ahci_host_activate_multi_irqs()
+> function but still flag compile errors in it even if CONFIG_PCI is
+> disabled.
+> 
 
-OK, you're about the fifth person to complain about this and this patch
-was posted a few days ago and is now here:
+Dan, are you going to do the ahci_irq_vector patch, or should we use my
+original patch to fix up the build error?
 
-http://git.kernel.org/cgit/linux/kernel/git/jejb/scsi.git/commit/?h=fixes&id=3ddda3e4c82dea58933bde8d0f6ef34470c360cb
+Chen-Yu Tsai just stumbled over the same problem that I noticed, and I'm
+sure others have run into it too.
 
-It's even been in for-next for nearly 24h
-
-James
+	Arnd
