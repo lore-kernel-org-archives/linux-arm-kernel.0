@@ -1,70 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu,  3 Dec 2015 17:25:35 -0800
-Subject: [PATCH 7/7] ARM: dts: Enable emmc on hp t410
-In-Reply-To: <1449192335-10137-1-git-send-email-tony@atomide.com>
-References: <1449192335-10137-1-git-send-email-tony@atomide.com>
-Message-ID: <1449192335-10137-8-git-send-email-tony@atomide.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Fri, 4 Dec 2015 10:06:29 +0800
+Subject: [RESEND,
+ PATCH] phy: core: Get a refcount to phy in devm_of_phy_get_by_index()
+Message-ID: <1449194789-31220-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's a 2GB emmc on hp t410 that's wired to the sd_2 interface.
-Note that we also need to configure the evtmux using edma_xbar for
-edma channels.
+On driver detach, devm_phy_release() will put a refcount to
+the phy, so gets a refconut to it before return.
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- arch/arm/boot/dts/dm8148-t410.dts | 35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+ drivers/phy/phy-core.c | 21 +++++++++++++++------
+ 1 file changed, 15 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/dm8148-t410.dts b/arch/arm/boot/dts/dm8148-t410.dts
-index 79838dd..d1927a7 100644
---- a/arch/arm/boot/dts/dm8148-t410.dts
-+++ b/arch/arm/boot/dts/dm8148-t410.dts
-@@ -15,6 +15,13 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x40000000>;	/* 1 GB */
- 	};
-+
-+	vmmcsd_fixed: fixedregulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vmmcsd_fixed";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
- };
+diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+index fc48fac..8c7f27d 100644
+--- a/drivers/phy/phy-core.c
++++ b/drivers/phy/phy-core.c
+@@ -636,8 +636,9 @@ EXPORT_SYMBOL_GPL(devm_of_phy_get);
+  * @np: node containing the phy
+  * @index: index of the phy
+  *
+- * Gets the phy using _of_phy_get(), and associates a device with it using
+- * devres. On driver detach, release function is invoked on the devres data,
++ * Gets the phy using _of_phy_get(), then gets a refcount to it,
++ * and associates a device with it using devres. On driver detach,
++ * release function is invoked on the devres data,
+  * then, devres data is freed.
+  *
+  */
+@@ -651,13 +652,21 @@ struct phy *devm_of_phy_get_by_index(struct device *dev, struct device_node *np,
+ 		return ERR_PTR(-ENOMEM);
  
- &cpsw_emac0 {
-@@ -26,3 +33,31 @@
- 	phy_id = <&davinci_mdio>, <1>;
- 	phy-mode = "rgmii";
- };
+ 	phy = _of_phy_get(np, index);
+-	if (!IS_ERR(phy)) {
+-		*ptr = phy;
+-		devres_add(dev, ptr);
+-	} else {
++	if (IS_ERR(phy)) {
+ 		devres_free(ptr);
++		return phy;
+ 	}
+ 
++	if (!try_module_get(phy->ops->owner)) {
++		devres_free(ptr);
++		return ERR_PTR(-EPROBE_DEFER);
++	}
 +
-+&mmc3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd2_pins>;
-+	vmmc-supply = <&vmmcsd_fixed>;
-+	bus-width = <8>;
-+	dmas = <&edma_xbar 8 0 1	/* use SDTXEVT1 instead of MCASP0TX */
-+		&edma_xbar 9 0 2>;	/* use SDRXEVT1 instead of MCASP0RX */
-+	dma-names = "tx", "rx";
-+};
++	get_device(&phy->dev);
 +
-+&pincntl {
-+	sd2_pins: pinmux_sd2_pins {
-+		pinctrl-single,pins = <
-+			DM814X_IOPAD(0x09c0, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[7] */
-+			DM814X_IOPAD(0x09c4, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[6] */
-+			DM814X_IOPAD(0x09c8, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[5] */
-+			DM814X_IOPAD(0x09cc, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[4] */
-+			DM814X_IOPAD(0x09d0, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[3] */
-+			DM814X_IOPAD(0x09d4, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[2] */
-+			DM814X_IOPAD(0x09d8, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[1] */
-+			DM814X_IOPAD(0x09dc, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[0] */
-+			DM814X_IOPAD(0x09e0, PIN_INPUT | 0x1)		/* SD2_CLK */
-+			DM814X_IOPAD(0x09f4, PIN_INPUT_PULLUP | 0x2)	/* SD2_CMD */
-+			DM814X_IOPAD(0x0920, PIN_INPUT | 40)	/* SD2_SDCD */
-+			>;
-+	};
-+};
++	*ptr = phy;
++	devres_add(dev, ptr);
++
+ 	return phy;
+ }
+ EXPORT_SYMBOL_GPL(devm_of_phy_get_by_index);
 -- 
-2.6.2
+1.8.1.1.dirty
