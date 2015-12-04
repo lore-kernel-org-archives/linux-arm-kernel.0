@@ -1,73 +1,221 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 4 Dec 2015 12:43:45 +0000
-Subject: [RFC PATCH 0/3] ACPI PCI support for arm64
-In-Reply-To: <20151203184128.GA5890@jayachandranc.netlogicmicro.com>
-References: <1449095086-5138-1-git-send-email-jchandra@broadcom.com>
- <20151203105628.GD2110@red-moon>
- <20151203184128.GA5890@jayachandranc.netlogicmicro.com>
-Message-ID: <20151204124345.GA4169@red-moon>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Fri, 4 Dec 2015 12:47:37 +0000
+Subject: [RFC PATCH 1/2] PCI/ACPI: Add ACPI support for non ECAM Host
+ Bridge Controllers
+In-Reply-To: <20151203175826.GB2935@red-moon>
+References: <1449155999-220955-1-git-send-email-gabriele.paoloni@huawei.com>
+ <1449155999-220955-2-git-send-email-gabriele.paoloni@huawei.com>
+ <20151203175826.GB2935@red-moon>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1EBE3E80@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2015 at 12:11:30AM +0530, Jayachandran C. wrote:
-> On Thu, Dec 03, 2015 at 10:56:28AM +0000, Lorenzo Pieralisi wrote:
-> > [CC'ing Tomasz]
-> > 
-> > On Thu, Dec 03, 2015 at 03:54:43AM +0530, Jayachandran C wrote:
-> > > This is a very simple and generic implementation of a PCI host controller
-> > > based on ACPI. This approach does not pull in the MMCONFIG and ECAM code
-> > > from x86.
-> > 
-> > Why ? Tomasz's patchset does not move MMCONFIG and ECAM code to the generic
-> > PCI layer for fun,
+Hi Lorenzo, many thanks for your review.
+
+> -----Original Message-----
+> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
+> Sent: 03 December 2015 17:58
+> To: Gabriele Paoloni
+> Cc: bhelgaas at google.com; arnd at arndb.de; will.deacon at arm.com;
+> catalin.marinas at arm.com; hanjun.guo at linaro.org; Liviu.Dudau at arm.com;
+> tn at semihalf.com; jiang.liu at linux.intel.com; tglx at linutronix.de; Wangyijing;
+> linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linaro-
+> acpi at lists.linaro.org; Wangzhou (B); liudongdong (C); xuwei (O); Liguozhu
+> (Kenneth)
+> Subject: Re: [RFC PATCH 1/2] PCI/ACPI: Add ACPI support for non ECAM Host
+> Bridge Controllers
 > 
-> Honestly, Lorenzo, I can see that it was not fun :)
-
-Ok, maybe you have not noticed it was done on Bjorn's request to
-consolidate ECAM (ie pulling that code out of x86) instead of reinventing
-the wheel for arm64.
-
-> > it is generic code and should be shared by all
-> > architectures and most importantly we should not add more churn on
-> > top of it which would complicate consolidation even further.
+> Hi Gab,
 > 
-> There is no need for such a common/generic infrastructure to
-> walk thru a simple table. In my opinion, trying to do this added
-> a lot of complexity into what should be a very simple patchset.
+> On Thu, Dec 03, 2015 at 11:19:58PM +0800, Gabriele Paoloni wrote:
 > 
-> The x86 code has to deal with a lot more fw/hw issues and I fail
-> to see why that mess should be brought into the a new architecture.
-
-See above. We can't keep adding code that does the same thing as
-code already in the mainline.
-
-> > > It is important for us to have a working ACPI based PCI host controller
-> > > implementation for arm64, so I thought I would post this as a simple
-> > > and less disruptive alternative.
-> > 
-> > It is important for everyone but that's not a reason granting shortcuts.
->  
-> I am suggesting a simpler (and maybe better) implementation, which
-> is much easier to review and merge - not a shortcut.
-
-You are suggesting adding code to parse the MCFG table, it exists today
-and should be consolidated instead of adding on top of it.
-
-> > > This is tested with arm64 QEMU and OVMF. Comments are very welcome.
-> > 
-> > Tomasz's patch went through several review cycles, please help review
-> > it and test it, that's my comment.
-> > 
-> > A new version should be posted soon, previous version here:
-> > 
-> > https://lkml.org/lkml/2015/10/27/504
+> [...]
 > 
-> It seems to be v1, I did not see any ACKs from maintainers either -
-> sorry if I am missing something here.
+> > +void acpi_arm64_quirks(void)
+> > +{
+> > +	int i = 0;
+> > +
+> > +	while (quirks_array[i]) {
+> > +		acpi_scan_add_handler(quirks_array[i]);
+> > +		i++;
+> > +	}
+> > +
+> > +}
+> 
+> This code is not arm64 specific, and this is part of a wider complaint
+> I have about this patchset and PCI/ACPI code I see in general.
 
-That patchset went through several reviews already, they just reset the
-version. I agree with you it is time we got this done, with Tomasz's code,
-your code or any combination thereof, please help us get this through,
-thanks.
+Mmmm Ok, I just followed the fashion used by pci_acpi_crs_quirks()...
+so I agree that it is not strictly related with the ARM64 ip but
+are quirks for PCI controllers integrated with ARM64 ip...
 
-Lorenzo
+However if we can spot a better place for the quirks I am happier
+
+> 
+> > +
+> > +/*
+> > + * pci_ops specified by vendors that are not
+> > + * ECAM compliant
+> > + */
+> > +struct pci_ops *vendor_specific_ops;
+> > +
+> > +/* function to set vendor specific ops */
+> > +void set_quirk_pci_ops(struct pci_ops *quirk_ops)
+> > +{
+> > +	vendor_specific_ops = quirk_ops;
+> > +}
+> > +
+> > +/* function to unset vendor specific ops */
+> > +void unset_quirk_pci_ops(void)
+> > +{
+> > +	vendor_specific_ops = NULL;
+> > +}
+> > +
+> >  /* Root bridge scanning */
+> >  struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+> >  {
+> > @@ -253,6 +291,9 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root
+> *root)
+> >  		return NULL;
+> >  	}
+> >
+> > +	if (vendor_specific_ops)
+> > +		acpi_pci_root_ops.pci_ops = vendor_specific_ops;
+> 
+> You are relying on the scan handlers calling ordering here, which as far
+> as I know depends on the ACPI tables layout, this is not acceptable,
+
+Yes you're right
+
+> we need to find a more robust implementation.
+
+Can't we use the "_DEP" object to set a dependency between "Device (PCI0)" 
+and "Device (RC0)" (I am referring to the ACPI object example in patch 2/2)?
+
+> 
+> Let's first rewind a bit though, to summarize:
+> 
+> 1) we need a way to configure a "generic host controller" with host
+>    controller specific config methods (ie ECAM, even though is a PCI
+>    standard it is not standard enough for some designers)
+
+Yes
+
+> 2) we keep the generic "PNP0A03" matching to declare a host bridge and
+>    related resources (?). Maybe we can have an HID matching the
+>    "real" device (eg "HISI0081" and related DSD) and a CID set to "PNP0A03" ?
+>    I do not want to end up with two device objects in the ACPI tables.
+
+Mmmm I don't see what's wrong with our approach of having 
+"Device (RC0)" for the specific host bridge HW and "Device (PCI0)"
+for the generic one...
+
+> 
+> I think that all this code belongs in:
+> 
+> drivers/pci/host/pci-host-generic.c
+> 
+> and the quirks scan should be done _within_ the pci_acpi_scan_root()
+> that should be placed in drivers/pci/host/pci-host-generic.c (ACPI probe
+> path, to be created) so that, if quirks for config space have to be applied
+> they are applied there before calling acpi_pci_root_create() so that
+> ordering is guaranteed.
+> 
+> I will put together a proposal to define the way we specify HID and
+> related DSD properties for PCI host controllers and send it to
+> the ACPI working group for review.
+
+Mmmm...what about instead using DMI decode to know which host bridge 
+controller lives in the HW (and therefore calling the respective quirk)?
+So there would be no change to ACPI specs, am I right?
+
+> 
+> Second, I am against merging _any_ ACPI/PCI code for arm64 before we
+> define a way for the kernel to detect if resources should be reassigned
+> or just claimed as they are, as set-up by BIOS.
+> 
+> The current approach, that relies on initcalls (and that's horrible) and
+> that reassigns everything by default has to be overhauled to match
+> what x86 does, which is sensible to me (tries to claim, and for
+> resources that fail, it reassigns).
+> 
+> I will give this more thought and send a proposal to the ACPI working
+> group for review, so that we make this part of the specs before any
+> PCI/ACPI code for ARM64 gets close to the mainline kernel.
+> 
+> Comments welcome.
+> 
+> Thanks,
+> Lorenzo
+> 
+> > +
+> >  	bus = acpi_pci_root_create(root, &acpi_pci_root_ops, info, root);
+> >
+> >  	/* After the PCI-E bus has been walked and all devices discovered,
+> > diff --git a/arch/arm64/kernel/pci_quirks.h b/arch/arm64/kernel/pci_quirks.h
+> > new file mode 100644
+> > index 0000000..27055ff
+> > --- /dev/null
+> > +++ b/arch/arm64/kernel/pci_quirks.h
+> > @@ -0,0 +1,24 @@
+> > +/*
+> > + * PCIe host controller declarations for ACPI quirks
+> > + *
+> > + * Copyright (C) 2015 HiSilicon Co., Ltd. http://www.hisilicon.com
+> > + *
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +
+> > +#ifndef PCI_QUIRKS_H
+> > +#define PCI_QUIRKS_H
+> > +
+> > +/* declarations of vendor specific quirks */
+> > +extern struct acpi_scan_handler pci_root_hisi_handler;
+> > +
+> > +/* function to set vendor specific ops */
+> > +void set_quirk_pci_ops(struct pci_ops *quirk_ops);
+> > +
+> > +/* function to unset vendor specific ops */
+> > +void unset_quirk_pci_ops(void);
+> > +
+> > +#endif /*PCI_QUIRKS_H*/
+> > diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+> > index e682dc6..ff362bb3d 100644
+> > --- a/drivers/acpi/pci_root.c
+> > +++ b/drivers/acpi/pci_root.c
+> > @@ -863,5 +863,9 @@ void __init acpi_pci_root_init(void)
+> >  		return;
+> >
+> >  	pci_acpi_crs_quirks();
+> > +
+> > +	/* Call quirks for non ECAM ARM64 Host Brdge controllers */
+> > +	acpi_arm64_quirks();
+> > +
+> >  	acpi_scan_add_handler_with_hotplug(&pci_root_handler, "pci_root");
+> >  }
+> > diff --git a/include/acpi/acpi_drivers.h b/include/acpi/acpi_drivers.h
+> > index 29c6912..17f4a37 100644
+> > --- a/include/acpi/acpi_drivers.h
+> > +++ b/include/acpi/acpi_drivers.h
+> > @@ -99,6 +99,12 @@ void pci_acpi_crs_quirks(void);
+> >  static inline void pci_acpi_crs_quirks(void) { }
+> >  #endif
+> >
+> > +#ifdef CONFIG_ARM64
+> > +void acpi_arm64_quirks(void);
+> > +#else
+> > +static inline void acpi_arm64_quirks(void) { }
+> > +#endif
+> > +
+> >  /* ------------------------------------------------------------------------
+> --
+> >                                      Processor
+> >     ------------------------------------------------------------------------
+> -- */
+> > --
+> > 1.9.1
+> >
