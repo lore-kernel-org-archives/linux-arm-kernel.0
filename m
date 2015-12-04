@@ -1,45 +1,69 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Fri, 4 Dec 2015 16:47:49 +0100
-Subject: [PATCH v2 5/5] printk/nmi: Increase the size of the temporary
- buffer
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1CBE1231@AcuExch.aculab.com>
-References: <1448622572-16900-1-git-send-email-pmladek@suse.com>
- <1448622572-16900-6-git-send-email-pmladek@suse.com>
- <81211733-2484-40A9-9D4A-644AA27FBC73@gmail.com>
- <063D6719AE5E284EB5DD2968C1650D6D1CBE1231@AcuExch.aculab.com>
-Message-ID: <20151204154749.GC20935@pathway.suse.cz>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 4 Dec 2015 08:00:38 -0800
+Subject: [PATCH 7/7] ARM: dts: Enable emmc on hp t410
+In-Reply-To: <56615AF9.5000208@ti.com>
+References: <1449192335-10137-1-git-send-email-tony@atomide.com>
+ <1449192335-10137-8-git-send-email-tony@atomide.com>
+ <56615AF9.5000208@ti.com>
+Message-ID: <20151204160038.GI23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2015-12-02 16:20:41, David Laight wrote:
-> From: yalin wang
-> > Sent: 30 November 2015 16:42
-> > > On Nov 27, 2015, at 19:09, Petr Mladek <pmladek@suse.com> wrote:
-> > >
-> > > Testing has shown that the backtrace sometimes does not fit
-> > > into the 4kB temporary buffer that is used in NMI context.
-> > >
-> > > The warnings are gone when I double the temporary buffer size.
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [151204 01:21]:
+> On 12/04/2015 03:25 AM, Tony Lindgren wrote:
+> > There's a 2GB emmc on hp t410 that's wired to the sd_2 interface.
+> > Note that we also need to configure the evtmux using edma_xbar for
+> > edma channels.
+> > 
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
 > 
-> You are wasting a lot of memory for something that is infrequently used.
-> There ought to be some way of copying partial tracebacks into the
-> main buffer.
+> One question inlined for the mmc3, other than that:
+> Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> 
+> > ---
+> >  arch/arm/boot/dts/dm8148-t410.dts | 35 +++++++++++++++++++++++++++++++++++
+> >  1 file changed, 35 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/dm8148-t410.dts b/arch/arm/boot/dts/dm8148-t410.dts
+> > index 79838dd..d1927a7 100644
+> > --- a/arch/arm/boot/dts/dm8148-t410.dts
+> > +++ b/arch/arm/boot/dts/dm8148-t410.dts
+> > @@ -15,6 +15,13 @@
+> >  		device_type = "memory";
+> >  		reg = <0x80000000 0x40000000>;	/* 1 GB */
+> >  	};
+> > +
+> > +	vmmcsd_fixed: fixedregulator at 0 {
+> > +		compatible = "regulator-fixed";
+> > +		regulator-name = "vmmcsd_fixed";
+> > +		regulator-min-microvolt = <3300000>;
+> > +		regulator-max-microvolt = <3300000>;
+> > +	};
+> >  };
+> >  
+> >  &cpsw_emac0 {
+> > @@ -26,3 +33,31 @@
+> >  	phy_id = <&davinci_mdio>, <1>;
+> >  	phy-mode = "rgmii";
+> >  };
+> > +
+> > +&mmc3 {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&sd2_pins>;
+> > +	vmmc-supply = <&vmmcsd_fixed>;
+> > +	bus-width = <8>;
+> > +	dmas = <&edma_xbar 8 0 1	/* use SDTXEVT1 instead of MCASP0TX */
+> > +		&edma_xbar 9 0 2>;	/* use SDRXEVT1 instead of MCASP0RX */
+> > +	dma-names = "tx", "rx";
+> 
+> Do you happened to know how the audio is connected on the board?
+> The DM814x-EVM seams to be using McASP2 with aic3106 so it is possible that HP
+> copied the design from there...
 
-I have already tried to use a separate ring buffer that might be
-shared between all CPUs. But it was rejected because it was too
-complex. See
-http://thread.gmane.org/gmane.linux.kernel/1700059/focus=1700066
+I grepped the sources for it and these are the evtmux channels the original
+code is using. So maybe they have some different audio setup, the hacks in the
+original board file mention "hdmi-dai".
 
-If we would want to crate a lockless access to the main ring
-buffer, we would end up with something like
-kernel/trace/ring_buffer.c. It is even more complicated.
-And reading of the messages is pretty slow.
+Regards,
 
-Note that we already have this buffer allocated on x86 and arm.
-It is used there for printing backtrace from all CPUs.
-This patchset makes it usable for all NMI messages.
-
-But I'll make the size configurable in the next version.
-
-Thanks for review,
-Petr
+Tony
