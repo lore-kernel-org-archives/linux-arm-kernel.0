@@ -1,55 +1,33 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 4 Dec 2015 18:35:50 +0300
-Subject: [RFC2 PATCH v6 00/19] ILP32 for ARM64
-In-Reply-To: <20151203175955.GP10747@e104818-lin.cambridge.arm.com>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <20151203175955.GP10747@e104818-lin.cambridge.arm.com>
-Message-ID: <20151204153550.GB1251@yury-N73SV>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 4 Dec 2015 07:46:35 -0800
+Subject: [PATCH 1/3] ARM: OMAP2+: Fix SoC detection for dra62x j5-eco
+In-Reply-To: <CAALWOA-VmW6rqhL20y65+eNz2ujV=V8+X+f652X=g5LUytvNcQ@mail.gmail.com>
+References: <1449184300-15693-1-git-send-email-tony@atomide.com>
+ <1449184300-15693-2-git-send-email-tony@atomide.com>
+ <CAALWOA-VmW6rqhL20y65+eNz2ujV=V8+X+f652X=g5LUytvNcQ@mail.gmail.com>
+Message-ID: <20151204154634.GH23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2015 at 05:59:55PM +0000, Catalin Marinas wrote:
-> On Wed, Nov 18, 2015 at 12:16:40AM +0300, Yury Norov wrote:
-> >  - ILP32 VDSO code excluded. It's not mandatory, and caused questions
-> >    during review process. We definitely make sure we will follow up
-> >    with a VDSO later on because it is needed for performance reasons;
+* Matthijs van Duin <matthijsvanduin@gmail.com> [151203 18:44]:
+> On 4 December 2015 at 00:11, Tony Lindgren <tony@atomide.com> wrote:
+> > We can boot dra62x j5-eco using the dm814x code as the clocks and
+> > devices are mapped in the device tree. The dra62x is also known
+> > as jacinto 5.
 > 
-> I already asked in one of the patches, don't you need a VDSO for
-> sigreturn?
+> I'm pretty sure the "eco" in the name isn't optional. As far as I know:
+> jacinto 5 = dra65x ~ dm814x
+> jacinto 5 eco = dra62x ~ dm811x
+> jacinto 5 entry = dra61x/60x ~ am335x
 > 
-
-I didn't realise it's mandatory for ARMv8 when removed it. I'll back
-it, but I think rework required anyway.
-
+> Here ~ means equivalence modulo efuse bits.
 > 
-> Have you run any AArch32 LTP with these patches? The results should also
-> be included in your table above.
-> 
+> My knowledge of TI's automotive processors is limited however, as is
+> public documentation, so perhaps someone from TI can ack or nak this.
 
-The full regression table is:
-		ILP32		LP64            AARCH32 (v4.3 & v4.3 + ILP32)
+OK I'll update to to use "jacinto 5 eco" specifically to avoid more
+confusion.
 
-float_bessel    FAIL	 134    PASSED	0       PASSED	0
-float_exp_log   FAIL	 134    PASSED	0       PASSED	0
-float_iperb     FAIL	 134    PASSED	0       PASSED	0
-float_power     FAIL	 134    PASSED	0       PASSED	0
-float_trigo     FAIL	 134    PASSED	0       PASSED	0
-abort01         FAIL       2    FAIL 	2       FAIL 	2
-fcntl14         FAIL       2    FAIL 	2       PASSED	0
-kill11          FAIL       2    FAIL 	2       FAIL 	2
-mmap16          FAIL       6    PASSED	0       PASSED	0
-open12          FAIL       2    PASSED	0       PASSED	0
-pause01         PASSED     0    FAIL 	9       FAIL 	9
-pipe07          FAIL       2    PASSED	0       PASSED	0
-readdir01       FAIL       1    PASSED	0       PASSED	0
-rename11        FAIL       2    PASSED	0       PASSED	0
-rmdir02         FAIL       2    PASSED	0       PASSED	0
-setregid02      FAIL       1    FAIL 	1       PASSED	0
-settimeofday01  FAIL       1    FAIL 	1       FAIL 	5
-umount2_01      FAIL       2    PASSED	0       PASSED	0
-umount2_02      FAIL       2    PASSED	0       PASSED	0
-umount2_03      FAIL       2    PASSED	0       PASSED	0
-utime06         FAIL       2    PASSED	0       PASSED	0
+Thanks,
 
-Fortunately, there's no aarch32 regression. Note that pause01 and
-setregid02 are not stable. 
+Tony
