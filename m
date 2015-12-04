@@ -1,45 +1,80 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 4 Dec 2015 16:18:10 +0000
-Subject: [PATCH v8 1/4] arm64: Store struct task_info in sp_el0
-In-Reply-To: <5661A950.7090009@arm.com>
-References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
- <1449226948-14251-2-git-send-email-james.morse@arm.com>
- <20151204132743.GH10123@e104818-lin.cambridge.arm.com>
- <5661A950.7090009@arm.com>
-Message-ID: <20151204161810.GN10123@e104818-lin.cambridge.arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 4 Dec 2015 17:22:39 +0100
+Subject: [PATCH v8 2/2] arm64: dts: mt8173: Add nor flash node
+In-Reply-To: <1448505773.9118.19.camel@mhfsdcap03>
+References: <1447817403-16631-1-git-send-email-bayi.cheng@mediatek.com>
+ <1447817403-16631-3-git-send-email-bayi.cheng@mediatek.com>
+ <CAGS+omBVfc=BPLoobOJSDPnbv97PnGsRxUTF1gbXEz4DeufbmQ@mail.gmail.com>
+ <1448505773.9118.19.camel@mhfsdcap03>
+Message-ID: <5661BDCF.9020105@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2015 at 02:55:12PM +0000, James Morse wrote:
-> Hi Catalin,
-> 
-> On 04/12/15 13:27, Catalin Marinas wrote:
-> > On Fri, Dec 04, 2015 at 11:02:25AM +0000, James Morse wrote:
-> >> --- a/arch/arm64/kernel/entry.S
-> >> +++ b/arch/arm64/kernel/entry.S
-> > [...]
-> >> @@ -599,6 +606,8 @@ ENTRY(cpu_switch_to)
-> >>  	ldp	x29, x9, [x8], #16
-> >>  	ldr	lr, [x8]
-> >>  	mov	sp, x9
-> >> +	and	x9, x9, #~(THREAD_SIZE - 1)
-> >> +	msr	sp_el0, x9
-> >>  	ret
-> >>  ENDPROC(cpu_switch_to)
-> > 
-> > At the beginning of the cpu_switch_to function, could we do
-> > "mrs x9, sp_el0" instead to avoid the "and ... ~(THREAD_SIZE-1)"?
-> 
-> I'm not sure I follow - are you suggesting to store struct thread_info
-> in the thread_cpu_context?
 
-I was thinking of context switching sp_el0 as well but see below.
 
-> This would change a ldr to a ldp, and save the 'and', so its definitely
-> fewer instructions.
+On 26/11/15 03:42, bayi cheng wrote:
+> On Thu, 2015-11-26 at 09:20 +0800, Daniel Kurtz wrote:
+>> Hi Bayi, Matthias,
+>>
+>> Sorry for the late review, one comment below...
+>>
+>> On Wed, Nov 18, 2015 at 11:30 AM, Bayi Cheng <bayi.cheng@mediatek.com> wrote:
+>>> Add Mediatek nor flash node
+>>>
+>>> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
+>>> Acked-by: Brian Norris <computersforpeace@gmail.com>
+>>> ---
+>>>   arch/arm64/boot/dts/mediatek/mt8173.dtsi | 18 +++++++++++++++++-
+>>>   1 file changed, 17 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>>> index 4dd5f93..7988656 100644
+>>> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>>> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>>> @@ -387,7 +387,23 @@
+>>>                          status = "disabled";
+>>>                  };
+>>>
+>>> -               i2c3: i2c at 11010000 {
+>>> +               nor_flash: spi at 1100d000 {
+>>> +                       compatible = "mediatek,mt8173-nor";
+>>> +                       reg = <0 0x1100d000 0 0xe0>;
+>>> +                       clocks = <&pericfg CLK_PERI_SPI>,
+>>> +                                <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
+>>> +                       clock-names = "spi", "sf";
+>>> +                       #address-cells = <1>;
+>>> +                       #size-cells = <0>;
+>>> +                       status = "disabled";
+>>> +
+>>> +                       flash at 0 {
+>>> +                               compatible = "jedec,spi-nor";
+>>> +                               reg = <0>;
+>>> +                       };
+>>
+>> I think this flash at 0 node represents the flash device present on the
+>> board and should therefore be moved to the board-specific .dts.
+>>
+>> -Dan
+>>
 
-I think we end up with an additional memory access, which is usually
-more expensive than arithmetic ops. So just leave it as it is.
+Good catch, thanks.
 
--- 
-Catalin
+> Hi Daniel, Thanks for your comments, and I will fixed it in the next
+> patch.
+
+Ok, I dropped your patch in the meanwhile.
+
+Regards,
+Matthias
+
+>>> +               };
+>>> +
+>>> +               i2c3: i2c3 at 11010000 {
+>>>                          compatible = "mediatek,mt8173-i2c";
+>>>                          reg = <0 0x11010000 0 0x70>,
+>>>                                <0 0x11000280 0 0x80>;
+>>> --
+>>> 1.8.1.1.dirty
+>>>
+>
+>
