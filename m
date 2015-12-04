@@ -1,67 +1,121 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri,  4 Dec 2015 09:45:48 -0800
-Subject: [PATCH v2 5/5] ARM: bcm2835: Add the Raspberry Pi power domain driver
- to the DT.
-In-Reply-To: <1449251148-19344-1-git-send-email-eric@anholt.net>
-References: <1449251148-19344-1-git-send-email-eric@anholt.net>
-Message-ID: <1449251148-19344-6-git-send-email-eric@anholt.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 4 Dec 2015 17:52:33 +0000
+Subject: [PATCH] arm64: add a function to show the different types of
+ pagetable
+In-Reply-To: <1449229397-39900-1-git-send-email-zhongjiang@huawei.com>
+References: <1449229397-39900-1-git-send-email-zhongjiang@huawei.com>
+Message-ID: <20151204175232.GA27672@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexander Aring <alex.aring@gmail.com>
+On Fri, Dec 04, 2015 at 07:43:17PM +0800, zhongjiang wrote:
+> The patch is mainly to show  pagetable number of different level in the direct
+> mapping. pagetable is created from pud to pte in arm64 , resulting in different
+> resluts with x86. For instance, The kernel of two-level pages will produce three
+> types of pagetable.
+> 
+> It can also be used to detect whether there is a large page spliting and merging.
+> Large page will significantly reduce the TLB miss, and improve the system
+> performance.
 
-This connects the USB driver to the USB power domain, so that USB can
-actually be turned on at boot if the bootloader didn't do it for us.
+As I mentioned previously, I still think it makes more sense to expose
+this via the pagetable dumping code.
 
-Signed-off-by: Alexander Aring <alex.aring@gmail.com>
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
- arch/arm/boot/dts/bcm2835-rpi.dtsi | 11 +++++++++++
- arch/arm/boot/dts/bcm2835.dtsi     |  2 +-
- 2 files changed, 12 insertions(+), 1 deletion(-)
+Also, the EFI runtime pagetable code uses __create_mapping, and hence
+alloc_init_{pud,pmd,pte}. This code doesn't seem to account for that, so it
+looks like the values will be misleading.
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index 3572f03..f828202 100644
---- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -1,3 +1,4 @@
-+#include <dt-bindings/arm/raspberrypi-power.h>
- #include "bcm2835.dtsi"
- 
- / {
-@@ -20,6 +21,12 @@
- 			compatible = "raspberrypi,bcm2835-firmware";
- 			mboxes = <&mailbox>;
- 		};
-+
-+		power: power {
-+			compatible = "raspberrypi,bcm2835-power";
-+			firmware = <&firmware>;
-+			#power-domain-cells = <1>;
-+		};
- 	};
- };
- 
-@@ -60,3 +67,7 @@
- 	status = "okay";
- 	bus-width = <4>;
- };
-+
-+&usb {
-+	power-domains = <&power RPI_POWER_DOMAIN_USB>;
-+};
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index aef64de..6d62af0 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -177,7 +177,7 @@
- 			status = "disabled";
- 		};
- 
--		usb at 7e980000 {
-+		usb: usb at 7e980000 {
- 			compatible = "brcm,bcm2835-usb";
- 			reg = <0x7e980000 0x10000>;
- 			interrupts = <1 9>;
--- 
-2.6.2
+> Signed-off-by: zhongjiang <zhongjiang@huawei.com>
+> ---
+>  arch/arm64/include/asm/pgtable-types.h |   19 +++++++++++++++++
+>  arch/arm64/mm/mmu.c                    |   12 +++++++++++
+>  arch/arm64/mm/pageattr.c               |   35 ++++++++++++++++++++++++++++++++
+>  3 files changed, 66 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/pgtable-types.h b/arch/arm64/include/asm/pgtable-types.h
+> index 2b1bd7e..a0f58d0 100644
+> --- a/arch/arm64/include/asm/pgtable-types.h
+> +++ b/arch/arm64/include/asm/pgtable-types.h
+> @@ -86,6 +86,25 @@ typedef pteval_t pgprot_t;
+>  
+>  #endif /* STRICT_MM_TYPECHECKS */
+>  
+> +struct seq_file;
+> +extern void arch_report_meminfo(struct seq_file *m);
+> +
+> +enum pg_level {
+> +	PG_LEVEL_NONE,
+
+This is never used. It can go.
+
+> +	PG_LEVEL_PTE,
+> +	PG_LEVEL_PMD,
+> +	PG_LEVEL_PUD,
+> +	PG_LEVEL_NUM
+> +};
+
+[...]
+
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 0a7bee7..77aef0b 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -30,6 +30,7 @@
+>  #include <linux/stop_machine.h>
+>  #include <linux/bootmem.h>
+>  
+> +#include <asm/pgtable-types.h>
+>  #include <asm/cputype.h>
+>  #include <asm/fixmap.h>
+>  #include <asm/sections.h>
+
+Nit: please keep includes ordered alphabetically.
+
+[...]
+
+> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+> index 7a5ff11..a8257a2 100644
+> --- a/arch/arm64/mm/pageattr.c
+> +++ b/arch/arm64/mm/pageattr.c
+> @@ -15,12 +15,47 @@
+>  #include <linux/module.h>
+>  #include <linux/sched.h>
+>  
+> +#include <linux/seq_file.h>
+>  #include <asm/pgalloc.h>
+>  #include <asm/pgtable.h>
+>  #include <asm/tlbflush.h>
+
+Nit: please keep includes ordered alphabetically.
+
+[...]
+
+> +void arch_report_meminfo(struct seq_file *m)
+> +{
+> +
+> +	seq_printf(m, "DirectMap%ldk:     %8lu kB\n", PAGE_SIZE / SZ_1K,
+> +			direct_pages_count[PG_LEVEL_PTE] * PAGE_SIZE / SZ_1K);
+> +
+> +#if CONFIG_PGTABLE_LEVELS == 2
+
+You can change this to >= 2 ...
+
+> +	seq_printf(m, "DirectMap%ldM:     %8lu kB\n", PMD_SIZE / SZ_1M,
+> +			direct_pages_count[PG_LEVEL_PMD] * PMD_SIZE / SZ_1K);
+> +
+> +#endif
+> +
+> +#if CONFIG_PGTABLE_LEVELS > 2
+> +	seq_printf(m, "DirectMap%ldM:     %8lu kB\n", PMD_SIZE / SZ_1M,
+> +			direct_pages_count[PG_LEVEL_PMD] * PMD_SIZE / SZ_1K);
+
+.... and get rid of this line.
+
+> +	seq_printf(m, "DirectMap%ldG:     %8lu kB\n", PUD_SIZE / SZ_1G,
+> +			direct_pages_count[PG_LEVEL_PUD] * PUD_SIZE  / SZ_1K);
+> +
+> +#endif
+> +}
+
+Thanks,
+Mark.
