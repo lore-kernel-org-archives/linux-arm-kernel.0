@@ -1,26 +1,61 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Fri, 4 Dec 2015 03:43:10 +0100
-Subject: [PATCH 1/3] ARM: OMAP2+: Fix SoC detection for dra62x j5-eco
-In-Reply-To: <1449184300-15693-2-git-send-email-tony@atomide.com>
-References: <1449184300-15693-1-git-send-email-tony@atomide.com>
- <1449184300-15693-2-git-send-email-tony@atomide.com>
-Message-ID: <CAALWOA-VmW6rqhL20y65+eNz2ujV=V8+X+f652X=g5LUytvNcQ@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 3 Dec 2015 21:50:01 -0500
+Subject: [PATCH v2 2/2] arm64: ftrace: fix the comments for
+ ftrace_modify_code
+In-Reply-To: <1449195519-17901-3-git-send-email-huawei.libin@huawei.com>
+References: <1449195519-17901-1-git-send-email-huawei.libin@huawei.com>
+ <1449195519-17901-3-git-send-email-huawei.libin@huawei.com>
+Message-ID: <20151203215001.52fe192f@grimm.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 December 2015 at 00:11, Tony Lindgren <tony@atomide.com> wrote:
-> We can boot dra62x j5-eco using the dm814x code as the clocks and
-> devices are mapped in the device tree. The dra62x is also known
-> as jacinto 5.
+On Fri, 4 Dec 2015 10:18:39 +0800
+Li Bin <huawei.libin@huawei.com> wrote:
 
-I'm pretty sure the "eco" in the name isn't optional. As far as I know:
-jacinto 5 = dra65x ~ dm814x
-jacinto 5 eco = dra62x ~ dm811x
-jacinto 5 entry = dra61x/60x ~ am335x
+> There is no need to worry about module text disappearing case,
+> because that ftrace has a module notifier that is called when
+> a module is being unloaded and before the text goes away, and this
+> code grabs the ftrace_lock mutex and removes the module functions
+> from the ftrace list, such that it will no longer do any
+> modifications to that module's text.
+> The update to make functions be traced or not is done under the
+> ftrace_lock mutex as well.
+> 
+> Signed-off-by: Li Bin <huawei.libin@huawei.com>
+> ---
+>  arch/arm64/kernel/ftrace.c |    5 +----
+>  1 files changed, 1 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+> index 9669b33..ee91c0c 100644
+> --- a/arch/arm64/kernel/ftrace.c
+> +++ b/arch/arm64/kernel/ftrace.c
+> @@ -29,12 +29,9 @@ static int ftrace_modify_code(unsigned long pc, u32 old, u32 new,
+>  
+>  	/*
+>  	 * Note:
+> -	 * Due to modules and __init, code can disappear and change,
+> +	 * Due to __init, code can disappear and change,
 
-Here ~ means equivalence modulo efuse bits.
+Init code should not be modified either because it is black listed in
+recordmcount.c.
 
-My knowledge of TI's automotive processors is limited however, as is
-public documentation, so perhaps someone from TI can ack or nak this.
+I say just change the comment to be something like:
 
-Matthijs
+We are paranoid about modifying text, as if a bug were to happen, it
+could cause us to read or write to someplace that could cause harm.
+Carefully read and modify the code with aarch64_insn_*() which uses
+probe_kernel_*(), and make sure what we read is what we expected it to
+be before modifying it.
+
+-- Steve
+
+
+>  	 * we need to protect against faulting as well as code changing.
+>  	 * We do this by aarch64_insn_*() which use the probe_kernel_*().
+> -	 *
+> -	 * No lock is held here because all the modifications are run
+> -	 * through stop_machine().
+>  	 */
+>  	if (validate) {
+>  		if (aarch64_insn_read((void *)pc, &replaced))
