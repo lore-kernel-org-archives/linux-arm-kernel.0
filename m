@@ -1,87 +1,117 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 04 Dec 2015 11:25:55 +0900
-Subject: [PATCH 02/12] clk: samsung: exynos5420: add cpu clock
- configuration data and instantiate cpu clock
-In-Reply-To: <874mfz4yfb.fsf@smart-cactus.org>
-References: <1449091167-20758-1-git-send-email-ben@smart-cactus.org>
- <1449091167-20758-3-git-send-email-ben@smart-cactus.org>
- <565FDC5A.1010504@samsung.com> <874mfz4yfb.fsf@smart-cactus.org>
-Message-ID: <5660F9B3.8030001@samsung.com>
+From: xuejiancheng@huawei.com (xuejiancheng)
+Date: Fri, 4 Dec 2015 10:27:58 +0800
+Subject: [PATCH v2 4/9] ARM: dts: add dts files for hi3519-demb board
+In-Reply-To: <1728470.0OiiXMcl88@wuerfel>
+References: <1449110668-23647-1-git-send-email-xuejiancheng@huawei.com>
+ <1728470.0OiiXMcl88@wuerfel>
+Message-ID: <5660FA2E.6040601@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.12.2015 19:30, Ben Gamari wrote:
-> Krzysztof Kozlowski <k.kozlowski@samsung.com> writes:
+Hi Arnd,
+   Thank you very much for all your comments.
+
+On 2015/12/3 17:36, Arnd Bergmann wrote:
+> On Thursday 03 December 2015 10:44:28 Jiancheng Xue wrote:
 > 
->> On 03.12.2015 06:19, Ben Gamari wrote:
->>> From: Thomas Abraham <thomas.ab@samsung.com>
->>>
->>> With the addition of the new Samsung specific cpu-clock type, the
->>> arm clock can be represented as a cpu-clock type. Add the CPU clock
->>> configuration data and instantiate the CPU clock type for Exynos5420.
->>>
->>> Changes by Bartlomiej:
->>> - split Exynos5420 support from the original patches
->>> - moved E5420_[EGL,KFC]_DIV0() macros to clk-exynos5420.c
->>>
->>> Changes by Ben Gamari:
->>> - Rebased
->>
->> If only rebasing then you should retain the Lukasz's review tag. He
->> doesn't have to review it again, right? :)
+>> +
+>> +/dts-v1/;
+>> +#include "hi3519.dtsi"
+>> +
+>> +/ {
+>> +	model = "HiSilicon HI3519 DEMO Board";
+>> +	compatible = "hisilicon,hi3519";
+>> +
+>> +	chosen {
+>> +		bootargs = "mem=64M console=ttyAMA0,115200 early_printk \
+>> +root=/dev/mtdblock2 rootfstype=jffs2 \
+>> +mtdparts=hi_sfc:1M(boot),4M(kernel),11M(rootfs)";
+>> +	};
 > 
-> Yep, very true.
+> Most of the arguments should be dropped and replaced with the respective
+> DT properties in this file:
 > 
->>> +static const struct exynos_cpuclk_cfg_data exynos5420_eglclk_d[] __initconst = {
->>> +	{ 1800000, E5420_EGL_DIV0(3, 7, 7, 4), },
->>> +	{ 1700000, E5420_EGL_DIV0(3, 7, 7, 3), },
->>> +	{ 1600000, E5420_EGL_DIV0(3, 7, 7, 3), },
->>> +	{ 1500000, E5420_EGL_DIV0(3, 7, 7, 3), },
->>> +	{ 1400000, E5420_EGL_DIV0(3, 7, 7, 3), },
->>> +	{ 1300000, E5420_EGL_DIV0(3, 7, 7, 2), },
->>> +	{ 1200000, E5420_EGL_DIV0(3, 7, 7, 2), },
->>> +	{ 1100000, E5420_EGL_DIV0(3, 7, 7, 2), },
->>> +	{ 1000000, E5420_EGL_DIV0(3, 6, 6, 2), },
->>> +	{  900000, E5420_EGL_DIV0(3, 6, 6, 2), },
->>> +	{  800000, E5420_EGL_DIV0(3, 5, 5, 2), },
->>> +	{  700000, E5420_EGL_DIV0(3, 5, 5, 2), },
->>> +	{  600000, E5420_EGL_DIV0(3, 4, 4, 2), },
->>> +	{  500000, E5420_EGL_DIV0(3, 3, 3, 2), },
->>> +	{  400000, E5420_EGL_DIV0(3, 3, 3, 2), },
->>> +	{  300000, E5420_EGL_DIV0(3, 3, 3, 2), },
->>> +	{  200000, E5420_EGL_DIV0(3, 3, 3, 2), },
->>> +	{  0 },
->>
->> The vendor code (Galaxy S5 with Exynos5422) sets pclk_dbg divider to 7.
->> In the same time APLL divider is only 1.
->>
->> For the ACLK divider (of KFC below) the vendor sets 3, not 2.
->>
->> The values also don't match the Exynos5420 from Note 3.
->>
->> The Exynos5800 apparently has values more similar to 5422.
->>
->> The question is: for which exact model this is? We can of course choose
->> the safest values here but probably these would be with the highest
->> dividers?
->>
-> I'm afraid I can't comment here. Thomas, perhaps you could offer some
-> insight?
+> mem:		/memory (you have that already, but the size seems wrong)
+> console:	/chosen/stdout-path
+> early_printk:	just drop this, maybe use "earlycon")
+> root:		this one is fine
+> rootfstype:	should not be needed
+> mtdparts:	use nodes below the MTD device
+> 
 
-Actually I found your patch #5 adding support for 5800 with the values
-more like matching 5422. So actually the difference should be between
-5420 and 5422. The Exynos5420 mainline boards are:
- - Peach Pit - chromeos tree could be a good vendor reference,
- - Arndale Octa,
- - SMDK5420.
+This chosen node is just for debug. The real parameters will be set at boot stage.
+I will drop it.
 
-For the last two I don't know where to get the vendor reference.
-Unfortunately sometimes the particular values (supported frequencies and
-clock dividers) differ for one SoC between products but we don't support
-the ASV here.
+>> +
+>> +#include "skeleton.dtsi"
+>> +#include <dt-bindings/clock/hi3519-clock.h>
+>> +/ {
+>> +	aliases {
+>> +		serial0 = &uart0;
+>> +	};
+> 
+> Move this into the .dts file.
 
-Overall probably this means that we should not care about such details,
-except maybe the difference between 5420 and 5422? (where 5422=5800)
+OK. Thank you.
 
-Best regards,
-Krzysztof
+> 
+>> +
+>> +			uart0: uart at 12100000 {
+> 
+> rename to serial at 12100000
+
+OK.
+
+> 
+>> +			dual_timer1: dual_timer at 12001000 {
+>> +				compatible = "arm,sp804", "arm,primecell";
+>> +				interrupts = <0 66 4>, <0 67 4>;
+>> +				reg = <0x12001000 0x1000>;
+>> +				clocks = <&crg HI3519_FIXED_3M>;
+>> +				status = "disable";
+>> +			};
+> 
+> rename to timer at 12001000
+
+OK.
+
+> 
+>> +		sysctrl: system-controller at 12020000 {
+>> +			compatible = "hisilicon,sysctrl";
+>> +			reg = <0x12020000 0x1000>;
+>> +			reboot-offset = <0x4>;
+>> +		};
+> 
+> Is this one identical to the one in hip04?
+> 
+> If not, pick a new unique compatible string
+
+Yes. It's compatible with the one in hip04.
+
+> 
+>> +
+>> +		crg: crg at 12010000 {
+>> +			compatible = "hisilicon,hi3519-crg";
+> 
+> 
+> what is a "crg"? Is there a standard name for these?
+
+The "crg" means Clock and Reset Generator. It's a block which supplies clock
+and reset signals for other modules in the chip. I used "hi3519-clock"
+in last version patch. Rob Herring suggested that it's better to use "hi3519-crg"
+as the compatible string if it's a whole block.
+
+what about writing like this?
+
+crg: clock-reset-controller at 12010000 {
+	compatible = "hisilicon,hi3519-crg";
+	}
+
+> 
+> 	Arnd
+> 
+> .
+> 
+
+Jiancheng
+.
