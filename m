@@ -1,34 +1,30 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 04 Dec 2015 16:26:41 +0000
-Subject: [PATCH v3 09/10] PM / Hibernate: Publish pages restored in-place
- to arch code
-In-Reply-To: <20151203120925.GA2220@red-moon>
-References: <1448559168-8363-1-git-send-email-james.morse@arm.com>
- <1448559168-8363-10-git-send-email-james.morse@arm.com>
- <20151203120925.GA2220@red-moon>
-Message-ID: <5661BEC1.5040400@arm.com>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Fri, 04 Dec 2015 08:28:51 -0800
+Subject: [PATCH] mpt3sas: add PCI dependency for CONFIG_SCSI_MPT2SAS
+In-Reply-To: <1953916.xaj9Y2FReq@wuerfel>
+References: <1953916.xaj9Y2FReq@wuerfel>
+Message-ID: <1449246531.27077.5.camel@HansenPartnership.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
-
-On 03/12/15 12:09, Lorenzo Pieralisi wrote:
-> On Thu, Nov 26, 2015 at 05:32:47PM +0000, James Morse wrote:
->> @@ -2427,25 +2434,31 @@ static void *get_buffer(struct memory_bitmap *bm, struct chain_allocator *ca)
->>  	if (PageHighMem(page))
->>  		return get_highmem_page_buffer(page, ca);
+On Fri, 2015-12-04 at 15:27 +0100, Arnd Bergmann wrote:
+> CONFIG_SCSI_MPT2SAS was added as a backwards-compatibility helper that
+> selects the replacement SCSI_MPT3SAS symbol, but lacks the dependencies:
 > 
-> I know it is not a problem for arm64, but you should export the
-> "restored" highmem pages list too because arch code may need to use
-> it for the same reasons this patch was implemented.
+> warning: (SCSI_MPT2SAS) selects SCSI_MPT3SAS which has unmet direct dependencies (SCSI_LOWLEVEL && PCI && SCSI)
+> 0x7E5F9A79 Fri Dec 4 12:36:08 CET 2015 failed
+> drivers/scsi/mpt3sas/mpt3sas_base.c: In function 'mpt3sas_remove_dead_ioc_func':
+> drivers/scsi/mpt3sas/mpt3sas_base.c:140:2: error: implicit declaration of function 'pci_stop_and_remove_bus_device_locked' [-Werror=implicit-function-declaration]
+> drivers/scsi/mpt3sas/mpt3sas_base.c: In function '_base_disable_msix':
+> drivers/scsi/mpt3sas/mpt3sas_base.c:1921:2: error: implicit declaration of function 'pci_disable_msix' [-Werror=implicit-function-declaration]
+> 
+> This adds the same dependencies that SCSI_MPT3SAS has.
 
-I'm not sure it can be for the same reasons:
-kernel/power/snapshot.c:swap_two_pages_data() does the copy for highmem
-pages, and then kunmap-s them... if the page is to be used for
-execution, it needs to be re-mapped first, possibly at a different address.
-The place to do cache maintenance is in the kunmap/kmap calls.
+OK, you're about the fifth person to complain about this and this patch
+was posted a few days ago and is now here:
 
+http://git.kernel.org/cgit/linux/kernel/git/jejb/scsi.git/commit/?h=fixes&id=3ddda3e4c82dea58933bde8d0f6ef34470c360cb
 
-Thanks,
+It's even been in for-next for nearly 24h
 
 James
