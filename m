@@ -1,105 +1,25 @@
-From: alex.aring@gmail.com (Alexander Aring)
-Date: Fri, 4 Dec 2015 10:22:32 +0100
-Subject: [PATCH 2/3] ARM: bcm2835: add rpi power domain driver
-In-Reply-To: <7hr3j5696q.fsf@deeprootsystems.com>
-References: <1447956490-22930-1-git-send-email-alex.aring@gmail.com>
- <1447956490-22930-3-git-send-email-alex.aring@gmail.com>
- <7hr3j782qr.fsf@deeprootsystems.com> <20151201210037.GB2074@omega>
- <7hr3j5696q.fsf@deeprootsystems.com>
-Message-ID: <20151204092227.GA1915@omega>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 4 Dec 2015 10:36:26 +0100
+Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
+ concurrent lockers
+In-Reply-To: <20151203172207.GR28602@linux.vnet.ibm.com>
+References: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
+ <20151130155839.GK17308@twins.programming.kicks-ass.net>
+ <20151201164035.GE27751@arm.com>
+ <20151203001141.GO28602@linux.vnet.ibm.com>
+ <20151203132839.GA3816@twins.programming.kicks-ass.net>
+ <20151203163243.GI11337@arm.com>
+ <20151203172207.GR28602@linux.vnet.ibm.com>
+Message-ID: <20151204093626.GF17308@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Dec 03, 2015 at 09:22:07AM -0800, Paul E. McKenney wrote:
+> On the added MBs,
+> the only alternative I have been able to come up with has even more MBs,
+> as in on every lock acquisition.  If I am missing something, please do
+> not keep it a secret!
 
-Meanwhile there exists a new RPi firmware with a new interface to setup
-power domains. Eric Anholt already did some work to access new interface
-and old one based on this patch.
-
-The next days he want to sent this new driver mainline, I will stop the work
-now.
-
-I will add some review notes anyway, maybe Eric Anholt can pick them up.
-
-On Tue, Dec 01, 2015 at 03:27:57PM -0800, Kevin Hilman wrote:
-> Alexander Aring <alex.aring@gmail.com> writes:
-> 
-> > Hi,
-> >
-> > On Mon, Nov 30, 2015 at 03:51:56PM -0800, Kevin Hilman wrote:
-> >> Alexander Aring <alex.aring@gmail.com> writes:
-> >> 
-> >> > This patch adds support for RPi several Power Domains and enable support
-> >> > to enable the USB Power Domain when it's not enabled before.
-> >> >
-> >> > This patch based on Eric Anholt's patch to support Power Domains. He had
-> >> > an issue about -EPROBE_DEFER inside the power domain subsystem, this
-> >> > issue was solved by commit <311fa6a> ("PM / Domains: Return -EPROBE_DEFER
-> >> > if we fail to init or turn-on domain").
-> >> 
-> >> [...]
-> >> 
-> >> > +#define RPI_POWER_DOMAIN(_domain, _name)			\
-> >> > +	[_domain] = {						\
-> >> 
-> >> Using _domain as the array index is going to create a sparsely filled
-> >> array here, wasting memory.   I'm not sure what the other domain numbers
-> >> are for other domains to know if this is a big waste or not, but it's
-> >> still a bit wasteful.
-> >> 
-> >> In any case, AFAICT, it doesn't look like you need to have the array
-> >> index match the domain number anyways since you're using container_of().
-> >> 
-> >> So I suggest just removing this array index part, and just creating them
-> >> in arrary order.  Then your _probe function isn't going to try to setup
-> >> 3 non-enabled domains before it finally hits the USB domain.
-> >> 
-> >
-> > The idea is here to keeping the _same_ power domains indexes for
-> > device-tree power domain API like the RPi firmware provides it.
-> >
-> > If somebody dumps the devicetree and see the power domain index, if
-> > he/she does then a firmware API power domain index mapping it is wrong.
-> > Because we need then a separate mapping:
-> >
-> > $ARRAY_DEFINED_INDEX <-> $RPI_FIRMWARE_POWER_DOMAIN_API_INDEX
-> >
-> > With the current solution to make a 1:1 mapping it there is no
-> > confusing anymore, because:
-> >
-> > $ARRAY_DEFINED_INDEX == $RPI_FIRMWARE_POWER_DOMAIN_API_INDEX
-> 
-> I'm not proposing to change the DT numbers or the firmware numbers.  All
-> I'm proposing is that those numbers don't need to be mapped to the array
-> index.  IOW, in your structure definition macro:
-> 
-> +#define RPI_POWER_DOMAIN(_domain, _name)			\
-> +	[_domain] = {						\
-> +		.domain = _domain,				\
-> [...]
-> 
-> just drop the " [_domain] = { " line.
-> 
-
-This requires additional changes. We need to know the "maximum"
-registered index value of RPi power domain.
-
-Because the dynamic allocating array of (linux) power domains, which we
-determine by:
-
-... num_domains = ARRAY_SIZE(rpi_power_domains);
-
-The RPi power domain defines are also used by devicetree. Usually I
-would change it to an enum with a MAX_ATTR entry, which is not possible
-because devicetree compiler can't deal with enums.
-
-
-Anyway we could determine the max registered RPi power domain index by
-doing something like:
-
-num_domains = 0;
-
-for (i = 0; i < ARRAY_SIZE(rpi_power_domains); i++)
-	max(num_domains, array[i].domain);
-
-- Alex
+You're right. And I suppose mpe is still on the fence wrt switching PPC
+over to RCsc lock order.. which would be all those extra MBs you talk
+about.
