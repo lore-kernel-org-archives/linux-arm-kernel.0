@@ -1,53 +1,42 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Fri,  4 Dec 2015 14:38:53 +0100
-Subject: [PATCH 3/3] arm64: dts: r8a7795: Add pmu device nodes
-In-Reply-To: <1449236333-4410-1-git-send-email-dirk.behme@gmail.com>
-References: <1449236333-4410-1-git-send-email-dirk.behme@gmail.com>
-Message-ID: <1449236333-4410-3-git-send-email-dirk.behme@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 4 Dec 2015 13:46:36 +0000
+Subject: [PATCH v8 3/4] arm64: Add do_softirq_own_stack() and enable
+ irq_stacks
+In-Reply-To: <1449226948-14251-4-git-send-email-james.morse@arm.com>
+References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
+ <1449226948-14251-4-git-send-email-james.morse@arm.com>
+Message-ID: <20151204134636.GI10123@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
+On Fri, Dec 04, 2015 at 11:02:27AM +0000, James Morse wrote:
+> +/*
+> + * do_softirq_own_stack() is called from irq_exit() before __do_softirq()
+> + * re-enables interrupts, at which point we may re-enter el?_irq(). We
+> + * increase irq_count here so that el1_irq() knows that it is already on the
+> + * irq stack.
+> + *
+> + * Called with interrupts disabled, so we don't worry about moving cpu, or
+> + * being interrupted while modifying irq_count.
+> + *
+> + * This function doesn't actually switch stack.
+> + */
+> +void do_softirq_own_stack(void)
+> +{
+> +	int cpu = smp_processor_id();
+> +
+> +	WARN_ON_ONCE(!irqs_disabled());
+> +
+> +	if (on_irq_stack(current_stack_pointer, cpu)) {
+> +		IRQ_COUNT()++;
+> +		__do_softirq();
+> +		IRQ_COUNT()--;
+> +	} else {
+> +		__do_softirq();
+> +	}
 
-Enabling the performance monitor unit on r8a7795.
+Following your and my reply on the previous series, should we not
+_always_ switch to the irqstack here?
 
-Signed-off-by: Masaru Nagai <masaru.nagai.vx@renesas.com>
-Signed-off-by: Yoshifumi Hosoya <yoshifumi.hosoya.wj@renesas.com>
-Sigend-off-by: Dirk Behme <dirk.behme@gmail.com>
----
-Note: This patch picked from
-
-https://git.kernel.org/cgit/linux/kernel/git/horms/renesas-bsp.git/log/?h=v4.2/rcar-3.0.x
-
-and rebased against
-
-https://git.kernel.org/cgit/linux/kernel/git/geert/renesas-drivers.git/log/?h=topic/gen3-latest renesas-drivers-2015-12-01-v4.4-rc3
-
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 946a5bb..8113b71 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -247,6 +247,18 @@
- 			power-domains = <&cpg>;
- 		};
- 
-+		pmu {
-+			compatible = "arm,armv8-pmuv3";
-+			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-affinity = <&a57_0>,
-+					     <&a57_1>,
-+					     <&a57_2>,
-+					     <&a57_3>;
-+		};
-+
- 		timer {
- 			compatible = "arm,armv8-timer";
- 			interrupts = <GIC_PPI 13
 -- 
-2.6.3
+Catalin
