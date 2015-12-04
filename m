@@ -1,29 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Dec 2015 22:07:45 +0000
-Subject: [PATCH v2 13/12] ARM: dts: dove: add DT GPU support
-In-Reply-To: <20151204204918.GB809@lunn.ch>
-References: <1449237604-19064-1-git-send-email-l.stach@pengutronix.de>
- <E1a4wLa-0004Vi-2t@rmk-PC.arm.linux.org.uk>
- <20151204204918.GB809@lunn.ch>
-Message-ID: <20151204220745.GF8644@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 04 Dec 2015 23:20:09 +0100
+Subject: [PATCH] [media] exynos4-is: make VIDEO_SAMSUNG_EXYNOS4_IS tristate
+Message-ID: <2086080.9y3TX8CFJu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2015 at 09:49:18PM +0100, Andrew Lunn wrote:
-> > This additional patch is in conjunction with my PMU (already merged)
-> > and clock driver patch sets.
-> 
-> Hi Russell
-> 
-> Please could you respond to my comment about the clock patch.
-> 
-> http://www.spinics.net/lists/devicetree/msg104464.html
+With CONFIG_V4L2=m and VIDEO_SAMSUNG_EXYNOS4_IS=y, we can select the
+individual drivers as built-in code when that should not be possible:
 
-I'm sorry, I haven't had time to look at that your comment yet.  I've
-totally forgotten that you made it, or even what the comment was.  I'll
-look at it at some point though, if I remember.  That's the best I can
-promise.
+drivers/built-in.o: In function `s5pcsis_set_fmt':
+policy.c:(.text+0x13afdc): undefined reference to `v4l_bound_align_image'
+drivers/built-in.o: In function `s5pcsis_probe':
+policy.c:(.text+0x13b440): undefined reference to `v4l2_of_parse_endpoint'
+policy.c:(.text+0x13b72c): undefined reference to `v4l2_subdev_init'
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Changing VIDEO_SAMSUNG_EXYNOS4_IS to tristate means that the dependency
+from CONFIG_V4L2 propates to the individual Kconfig symbols and they
+can only be built as loadable modules if V4L2 or any other of the
+dependencies itself is a module.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
+index 40423c6c5324..57d42c6172c5 100644
+--- a/drivers/media/platform/exynos4-is/Kconfig
++++ b/drivers/media/platform/exynos4-is/Kconfig
+@@ -1,6 +1,6 @@
+ 
+ config VIDEO_SAMSUNG_EXYNOS4_IS
+-	bool "Samsung S5P/EXYNOS4 SoC series Camera Subsystem driver"
++	tristate "Samsung S5P/EXYNOS4 SoC series Camera Subsystem driver"
+ 	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+ 	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
+ 	depends on OF && COMMON_CLK
