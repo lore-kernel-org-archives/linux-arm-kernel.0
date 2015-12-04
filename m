@@ -1,90 +1,48 @@
-From: fugang.duan@freescale.com (Duan Andy)
-Date: Fri, 4 Dec 2015 02:20:35 +0000
-Subject: [PATCH] drivers: dma-coherent: free memory when failed to init
- DMA memory pool
-In-Reply-To: <20151203153937.GP8644@n2100.arm.linux.org.uk>
-References: <1449138962-8264-1-git-send-email-b38611@freescale.com>
- <xa1toae7y9u8.fsf@mina86.com>
- <CY1PR0301MB12257F63F594E65DE67E64DFF50D0@CY1PR0301MB1225.namprd03.prod.outlook.com>
- <20151203153937.GP8644@n2100.arm.linux.org.uk>
-Message-ID: <BN3PR0301MB12195BD3A1CCDF070CD4075EF50C0@BN3PR0301MB1219.namprd03.prod.outlook.com>
+From: Anson.Huang@freescale.com (Anson Huang)
+Date: Fri, 4 Dec 2015 18:13:16 +0800
+Subject: [PATCH] ARM: need to save/restore arm register(r11) when it is
+ corrupted
+Message-ID: <1449223996-2858-1-git-send-email-Anson.Huang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King - ARM Linux <linux@arm.linux.org.uk> Sent: Thursday, December 03, 2015 11:40 PM
-> To: Duan Fugang-B38611
-> Cc: Michal Nazarewicz; torvalds at linux-foundation.org;
-> gregkh at linuxfoundation.org; m.szyprowski at samsung.com;
-> iamjoonsoo.kim at lge.com; arnd at arndb.de; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH] drivers: dma-coherent: free memory when failed to
-> init DMA memory pool
-> 
-> On Thu, Dec 03, 2015 at 01:54:05PM +0000, Duan Andy wrote:
-> > From: Mike Nazarewicz <mpn@google.com> Sent: Thursday, December 03,
-> > 2015 8:51 PM
-> > > To: Duan Fugang-B38611; torvalds at linux-foundation.org;
-> > > gregkh at linuxfoundation.org; m.szyprowski at samsung.com
-> > > Cc: linux-arm-kernel at lists.infradead.org; arnd at arndb.de;
-> > > iamjoonsoo.kim at lge.com; Duan Fugang-B38611
-> > > Subject: Re: [PATCH] drivers: dma-coherent: free memory when failed
-> > > to init DMA memory pool
-> > >
-> > > On Thu, Dec 03 2015, Fugang Duan wrote:
-> > > > Free dma coherent memory when it failed to init DMA memory pool
-> > > > after calling .dma_init_coherent_memory(), otherwise it causes
-> memmory leak.
-> > > >
-> > > > Signed-off-by: Fugang Duan <B38611@freescale.com>
-> > > > ---
-> > > >  drivers/base/dma-coherent.c | 1 +
-> > > >  1 file changed, 1 insertion(+)
-> > > >
-> > > > diff --git a/drivers/base/dma-coherent.c
-> > > > b/drivers/base/dma-coherent.c index 55b8398..beb6bbe 100644
-> > > > --- a/drivers/base/dma-coherent.c
-> > > > +++ b/drivers/base/dma-coherent.c
-> > > > @@ -286,6 +286,7 @@ static int rmem_dma_device_init(struct
-> > > > reserved_mem
-> > > *rmem, struct device *dev)
-> > > >  				     &mem) != DMA_MEMORY_MAP) {
-> > > >  		pr_err("Reserved memory: failed to init DMA memory pool
-> > > at %pa, size %ld MiB\n",
-> > > >  			&rmem->base, (unsigned long)rmem->size / SZ_1M);
-> > > > +		kfree(mem);
-> > >
-> > > mem == NULL at this point.  If dma_init_coherent_memory doesn?t
-> > > return DMA_MEMORY_MAP, mem pointer is not assigned any value.  If
-> > > you think there is a memory leak, please demonstrate a path of it
-> happening.
-> > >
-> > Kfree() will check mem NULL condition, so no need to add check in here.
-> 
-> That isn't what the reviewer was stating.
-> 
-> However, had the reviewer looked at the existing code, then he may have
-> stated a different opinion. :)
-> 
-> When you look at the existing code, there are three possible return
-> values from dma_init_coherent_memory():
-> 
-> - zero, which means failure, and the mem pointer is left alone.  In
->   the above code, we know that it's guaranteed to be NULL, as we
->   won't get into the if() unless it was.
-> - DMA_MEMORY_IO, which would mean that mem points at a kmalloc()d
->   chunk of memory, and this case is treated as failure because we
->   want memory.
-> - DMA_MEMORY_MAP, which also means that mem points at a kmalloc()d
->   chunk of memory, which we treat as success.
-> 
-> So, in the case of DMA_MEMORY_IO, we have a failure case where the
-> kmalloc'd memory is dropped on the floor - aka a memory leak.  In the
-> failure paths, there are two known values for mem: NULL, or validly
-> pointing at kmalloc()'d memory which would be leaked.  So, adding a
-> kfree() here is certainly correct.
-> 
-> However, the above explanation needs to go into the commit message to
-> justify the change.
-> 
-Thanks Russell's detail explain.
-As Michal's comment in next mail,  return DMA_MEMORY_IO never happens. So no need to free the mem.
+In cpu_v7_do_suspend routine, r11 is used while it is NOT
+saved/restored, different compiler may have different usage
+of ARM general registers, so it may cause issues during
+calling cpu_v7_do_suspend.
+
+We meet kernel fault occurs when using GCC 4.8.3, r11 contains
+valid value before calling into cpu_v7_do_suspend, but when returned
+from this routine, r11 is corrupted and lead to kernel fault.
+Doing save/restore for those corrupted registers is a must in
+assemble code.
+
+Signed-off-by: Anson Huang <Anson.Huang@freescale.com>
+---
+ arch/arm/mm/proc-v7.S | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index de2b246..8e1ea43 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -95,7 +95,7 @@ ENDPROC(cpu_v7_dcache_clean_area)
+ .equ	cpu_v7_suspend_size, 4 * 9
+ #ifdef CONFIG_ARM_CPU_SUSPEND
+ ENTRY(cpu_v7_do_suspend)
+-	stmfd	sp!, {r4 - r10, lr}
++	stmfd	sp!, {r4 - r11, lr}
+ 	mrc	p15, 0, r4, c13, c0, 0	@ FCSE/PID
+ 	mrc	p15, 0, r5, c13, c0, 3	@ User r/o thread ID
+ 	stmia	r0!, {r4 - r5}
+@@ -112,7 +112,7 @@ ENTRY(cpu_v7_do_suspend)
+ 	mrc	p15, 0, r9, c1, c0, 1	@ Auxiliary control register
+ 	mrc	p15, 0, r10, c1, c0, 2	@ Co-processor access control
+ 	stmia	r0, {r5 - r11}
+-	ldmfd	sp!, {r4 - r10, pc}
++	ldmfd	sp!, {r4 - r11, pc}
+ ENDPROC(cpu_v7_do_suspend)
+ 
+ ENTRY(cpu_v7_do_resume)
+-- 
+1.9.1
