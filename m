@@ -1,35 +1,82 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri,  4 Dec 2015 18:03:40 +0100
-Subject: [PATCH v3 05/13] clk: at91: only disable available IRQs
+Date: Fri,  4 Dec 2015 18:03:41 +0100
+Subject: [PATCH v3 06/13] clk: at91: pmc: merge at91_pmc_init in
+ atmel_pmc_probe
 In-Reply-To: <1449248628-3486-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1449248628-3486-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1449248628-3486-6-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1449248628-3486-7-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris Brezillon <boris.brezillon@free-electrons.com>
+at91_pmc_init() doesn't do much anymore, merge it in atmel_pmc_probe().
 
-Only disable available IRQs in case writing to a reserved bit has a harmful
-effect.
-
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/clk/at91/pmc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/at91/pmc.c | 31 ++++++-------------------------
+ 1 file changed, 6 insertions(+), 25 deletions(-)
 
 diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index 296d20a29c6c..2f8b9503176f 100644
+index 2f8b9503176f..55ed00fc9310 100644
 --- a/drivers/clk/at91/pmc.c
 +++ b/drivers/clk/at91/pmc.c
-@@ -296,7 +296,7 @@ static int __init atmel_pmc_probe(struct platform_device *pdev)
- 	if (!pmc->irqdomain)
+@@ -231,29 +231,6 @@ static const struct at91_pmc_caps sama5d3_caps = {
+ 			  AT91_PMC_CFDEV,
+ };
+ 
+-static struct at91_pmc *__init at91_pmc_init(struct device_node *np,
+-					     struct regmap *regmap,
+-					     void __iomem *regbase, int virq,
+-					     const struct at91_pmc_caps *caps)
+-{
+-	struct at91_pmc *pmc;
+-
+-	if (!regbase || !virq ||  !caps)
+-		return NULL;
+-
+-	at91_pmc_base = regbase;
+-
+-	pmc = kzalloc(sizeof(*pmc), GFP_KERNEL);
+-	if (!pmc)
+-		return NULL;
+-
+-	pmc->regmap = regmap;
+-	pmc->virq = virq;
+-	pmc->caps = caps;
+-
+-	return pmc;
+-}
+-
+ static const struct of_device_id atmel_pmc_dt_ids[] = {
+ 	{ .compatible = "atmel,at91rm9200-pmc", .data = &at91rm9200_caps },
+ 	{ .compatible = "atmel,at91sam9260-pmc", .data = &at91sam9260_caps },
+@@ -271,11 +248,12 @@ static int __init atmel_pmc_probe(struct platform_device *pdev)
+ 	const struct at91_pmc_caps *caps;
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct at91_pmc *pmc;
+-	void __iomem *regbase = of_iomap(np, 0);
+ 	struct regmap *regmap;
+ 	int virq;
+ 	int ret = 0;
+ 
++	at91_pmc_base = of_iomap(np, 0);
++
+ 	regmap = syscon_node_to_regmap(np);
+ 	if (IS_ERR(regmap))
+ 		panic("Could not retrieve syscon regmap");
+@@ -287,10 +265,13 @@ static int __init atmel_pmc_probe(struct platform_device *pdev)
+ 	of_id = of_match_device(atmel_pmc_dt_ids, &pdev->dev);
+ 	caps = of_id->data;
+ 
+-	pmc = at91_pmc_init(np, regmap, regbase, virq, caps);
++	pmc = kzalloc(sizeof(*pmc), GFP_KERNEL);
+ 	if (!pmc)
  		return 0;
  
--	regmap_write(pmc->regmap, AT91_PMC_IDR, 0xffffffff);
-+	regmap_write(pmc->regmap, AT91_PMC_IDR, pmc->caps->available_irqs);
- 	ret = request_irq(pmc->virq, pmc_irq_handler,
- 			  IRQF_SHARED | IRQF_COND_SUSPEND, "pmc", pmc);
- 	if (ret)
++	pmc->regmap = regmap;
++	pmc->virq = virq;
++	pmc->caps = caps;
+ 	pmc->irqdomain = irq_domain_add_linear(pdev->dev.of_node, 32,
+ 					       &pmc_irq_ops, pmc);
+ 	if (!pmc->irqdomain)
 -- 
 2.5.0
