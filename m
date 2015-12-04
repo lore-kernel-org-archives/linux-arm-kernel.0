@@ -1,66 +1,97 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri,  4 Dec 2015 18:03:48 +0100
-Subject: [PATCH v3 13/13] clk: at91: pmc: drop at91_pmc_base
+Date: Fri,  4 Dec 2015 18:03:44 +0100
+Subject: [PATCH v3 09/13] ARM: at91: pm: find and remap the pmc
 In-Reply-To: <1449248628-3486-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1449248628-3486-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1449248628-3486-14-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1449248628-3486-10-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-at91_pmc_base is not used anymore, remove it along with at91_pmc_read and
-at91_pmc_write.
+To avoid relying on at91_pmc_read(), find the pmc node and remap it
+locally.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/clk/at91/pmc.c       |  5 -----
- include/linux/clk/at91_pmc.h | 12 ------------
- 2 files changed, 17 deletions(-)
+ arch/arm/mach-at91/pm.c | 33 +++++++++++++++++++++++++++------
+ 1 file changed, 27 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index c7bd8c17acad..60dcac1500e5 100644
---- a/drivers/clk/at91/pmc.c
-+++ b/drivers/clk/at91/pmc.c
-@@ -41,9 +41,6 @@ struct at91_pmc {
- 	u32 imr;
- };
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 5c2b60c5a2a1..38e93174031d 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -35,6 +35,8 @@
+ #include "generic.h"
+ #include "pm.h"
  
--void __iomem *at91_pmc_base;
--EXPORT_SYMBOL_GPL(at91_pmc_base);
++void __iomem *pmc;
++
+ /*
+  * FIXME: this is needed to communicate between the pinctrl driver and
+  * the PM implementation in the machine. Possibly part of the PM
+@@ -85,7 +87,7 @@ static int at91_pm_verify_clocks(void)
+ 	unsigned long scsr;
+ 	int i;
+ 
+-	scsr = at91_pmc_read(AT91_PMC_SCSR);
++	scsr = readl(pmc + AT91_PMC_SCSR);
+ 
+ 	/* USB must not be using PLLB */
+ 	if ((scsr & at91_pm_data.uhp_udp_mask) != 0) {
+@@ -99,8 +101,7 @@ static int at91_pm_verify_clocks(void)
+ 
+ 		if ((scsr & (AT91_PMC_PCK0 << i)) == 0)
+ 			continue;
 -
- int of_at91_get_clk_range(struct device_node *np, const char *propname,
- 			  struct clk_range *range)
+-		css = at91_pmc_read(AT91_PMC_PCKR(i)) & AT91_PMC_CSS;
++		css = readl(pmc + AT91_PMC_PCKR(i)) & AT91_PMC_CSS;
+ 		if (css != AT91_PMC_CSS_SLOW) {
+ 			pr_err("AT91: PM - Suspend-to-RAM with PCK%d src %d\n", i, css);
+ 			return 0;
+@@ -143,8 +144,8 @@ static void at91_pm_suspend(suspend_state_t state)
+ 	flush_cache_all();
+ 	outer_disable();
+ 
+-	at91_suspend_sram_fn(at91_pmc_base, at91_ramc_base[0],
+-				at91_ramc_base[1], pm_data);
++	at91_suspend_sram_fn(pmc, at91_ramc_base[0],
++			     at91_ramc_base[1], pm_data);
+ 
+ 	outer_resume();
+ }
+@@ -394,13 +395,33 @@ static void __init at91_pm_sram_init(void)
+ 			&at91_pm_suspend_in_sram, at91_pm_suspend_in_sram_sz);
+ }
+ 
++static const struct of_device_id atmel_pmc_ids[] = {
++	{ .compatible = "atmel,at91rm9200-pmc"  },
++	{ .compatible = "atmel,at91sam9260-pmc" },
++	{ .compatible = "atmel,at91sam9g45-pmc" },
++	{ .compatible = "atmel,at91sam9n12-pmc" },
++	{ .compatible = "atmel,at91sam9x5-pmc" },
++	{ .compatible = "atmel,sama5d3-pmc" },
++	{ .compatible = "atmel,sama5d2-pmc" },
++	{ /* sentinel */ },
++};
++
+ static void __init at91_pm_init(void)
  {
-@@ -249,8 +246,6 @@ static int __init atmel_pmc_probe(struct platform_device *pdev)
- 	int virq;
- 	int ret = 0;
+-	at91_pm_sram_init();
++	struct device_node *pmc_np;
  
--	at91_pmc_base = of_iomap(np, 0);
--
- 	regmap = syscon_node_to_regmap(np);
- 	if (IS_ERR(regmap))
- 		panic("Could not retrieve syscon regmap");
-diff --git a/include/linux/clk/at91_pmc.h b/include/linux/clk/at91_pmc.h
-index 1e6932222e11..17f413bbbedf 100644
---- a/include/linux/clk/at91_pmc.h
-+++ b/include/linux/clk/at91_pmc.h
-@@ -16,18 +16,6 @@
- #ifndef AT91_PMC_H
- #define AT91_PMC_H
+ 	if (at91_cpuidle_device.dev.platform_data)
+ 		platform_device_register(&at91_cpuidle_device);
  
--#ifndef __ASSEMBLY__
--extern void __iomem *at91_pmc_base;
--
--#define at91_pmc_read(field) \
--	readl_relaxed(at91_pmc_base + field)
--
--#define at91_pmc_write(field, value) \
--	writel_relaxed(value, at91_pmc_base + field)
--#else
--.extern at91_pmc_base
--#endif
--
- #define	AT91_PMC_SCER		0x00			/* System Clock Enable Register */
- #define	AT91_PMC_SCDR		0x04			/* System Clock Disable Register */
- 
++	pmc_np = of_find_matching_node(NULL, atmel_pmc_ids);
++	pmc = of_iomap(pmc_np, 0);
++	if (!pmc) {
++		pr_info("AT91: PM not supported, PMC not found\n");
++		return;
++	}
++
++	at91_pm_sram_init();
++
+ 	if (at91_suspend_sram_fn)
+ 		suspend_set_ops(&at91_pm_ops);
+ 	else
 -- 
 2.5.0
