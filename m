@@ -1,101 +1,71 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 04 Dec 2015 18:30:33 +0100
-Subject: [PATCH v3 08/10] ARM: dts: Exynos5422: fix OPP tables
-In-Reply-To: <1449250235-9613-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1449250235-9613-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1449250235-9613-9-git-send-email-b.zolnierkie@samsung.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Fri, 4 Dec 2015 18:39:08 +0100
+Subject: [GIT PULL] KVM/ARM fixes for 4.4-rc4
+In-Reply-To: <1449249440-28878-1-git-send-email-marc.zyngier@arm.com>
+References: <1449249440-28878-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <5661CFBC.3030601@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ben Gamari <ben@smart-cactus.org>
 
-The Exynos 5422 is identical to the 5800 except for the fact that it
-boots from the A7 cores. Consequently, the core numbering is different:
-cores 0-3 are A7s whereas 4-7 are A15s.
 
-We can reuse the device tree of the 5800 for the 5422 but we must take
-care to override the OPP tables and CPU clocks.  These are otherwise
-inherited from the exynos5800 devicetree, which has the CPU clusters
-reversed compared to the 5422. This results in the A15 cores only
-reaching 1.4GHz, the maximum rate of the KFC clock.
+On 04/12/2015 18:17, Marc Zyngier wrote:
+> Hi Paolo,
+> 
+> This pull request contains a number of fixes for 4.4-rc4 (or -rc5 if
+> we already missed the boat).
+> 
+> The first part is a very nice catch from Pavel, who noticed that we
+> were not dealing very well (if at all) with the aliasing between two
+> registers.
+> 
+> The last patch from Ard is a fix for a fix that was merged in
+> -rc3. Hopefully we got it right this time.
+> 
+> Please pull!
+> 
+>        M.
+> 
+> The following changes since commit fbb4574ce9a37e15a9872860bf202f2be5bdf6c4:
+> 
+>   arm64: kvm: report original PAR_EL1 upon panic (2015-11-24 18:20:58 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v4.4-rc4
+> 
+> for you to fetch changes up to 0de58f852875a0f0dcfb120bb8433e4e73c7803b:
+> 
+>   ARM/arm64: KVM: correct PTE uncachedness check (2015-12-04 16:30:17 +0000)
+> 
+> ----------------------------------------------------------------
+> KVM/ARM fixes for v4.4-rc4
+> 
+> - A series of fixes to deal with the aliasing between the sp and xzr register
+> - A fix for the cache flush fix that went in -rc3
+> 
+> ----------------------------------------------------------------
+> Ard Biesheuvel (1):
+>       ARM/arm64: KVM: correct PTE uncachedness check
+> 
+> Pavel Fedin (4):
+>       arm64: KVM: Correctly handle zero register during MMIO
+>       arm64: KVM: Remove const from struct sys_reg_params
+>       arm64: KVM: Correctly handle zero register in system register accesses
+>       arm64: KVM: Get rid of old vcpu_reg()
+> 
+>  arch/arm/include/asm/kvm_emulate.h   |  12 ++++
+>  arch/arm/kvm/mmio.c                  |   5 +-
+>  arch/arm/kvm/mmu.c                   |   4 +-
+>  arch/arm/kvm/psci.c                  |  20 +++---
+>  arch/arm64/include/asm/kvm_emulate.h |  18 +++--
+>  arch/arm64/kvm/handle_exit.c         |   2 +-
+>  arch/arm64/kvm/sys_regs.c            | 123 +++++++++++++++++------------------
+>  arch/arm64/kvm/sys_regs.h            |   8 +--
+>  arch/arm64/kvm/sys_regs_generic_v8.c |   4 +-
+>  9 files changed, 107 insertions(+), 89 deletions(-)
+> 
 
-Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-Signed-off-by: Ben Gamari <ben@smart-cactus.org>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
- arch/arm/boot/dts/exynos5422-cpus.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Pulled, thanks.
 
-diff --git a/arch/arm/boot/dts/exynos5422-cpus.dtsi b/arch/arm/boot/dts/exynos5422-cpus.dtsi
-index b7f60c8..9a5131d 100644
---- a/arch/arm/boot/dts/exynos5422-cpus.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-cpus.dtsi
-@@ -20,8 +20,10 @@
- 	device_type = "cpu";
- 	compatible = "arm,cortex-a7";
- 	reg = <0x100>;
-+	clocks = <&clock CLK_KFC_CLK>;
- 	clock-frequency = <1000000000>;
- 	cci-control-port = <&cci_control0>;
-+	operating-points-v2 = <&cpu1_opp_table>;
- };
- 
- &cpu1 {
-@@ -30,6 +32,7 @@
- 	reg = <0x101>;
- 	clock-frequency = <1000000000>;
- 	cci-control-port = <&cci_control0>;
-+	operating-points-v2 = <&cpu1_opp_table>;
- };
- 
- &cpu2 {
-@@ -38,6 +41,7 @@
- 	reg = <0x102>;
- 	clock-frequency = <1000000000>;
- 	cci-control-port = <&cci_control0>;
-+	operating-points-v2 = <&cpu1_opp_table>;
- };
- 
- &cpu3 {
-@@ -46,14 +50,17 @@
- 	reg = <0x103>;
- 	clock-frequency = <1000000000>;
- 	cci-control-port = <&cci_control0>;
-+	operating-points-v2 = <&cpu1_opp_table>;
- };
- 
- &cpu4 {
- 	device_type = "cpu";
- 	compatible = "arm,cortex-a15";
- 	reg = <0x0>;
-+	clocks = <&clock CLK_ARM_CLK>;
- 	clock-frequency = <1800000000>;
- 	cci-control-port = <&cci_control1>;
-+	operating-points-v2 = <&cpu0_opp_table>;
- };
- 
- &cpu5 {
-@@ -62,6 +69,7 @@
- 	reg = <0x1>;
- 	clock-frequency = <1800000000>;
- 	cci-control-port = <&cci_control1>;
-+	operating-points-v2 = <&cpu0_opp_table>;
- };
- 
- &cpu6 {
-@@ -70,6 +78,7 @@
- 	reg = <0x2>;
- 	clock-frequency = <1800000000>;
- 	cci-control-port = <&cci_control1>;
-+	operating-points-v2 = <&cpu0_opp_table>;
- };
- 
- &cpu7 {
-@@ -78,4 +87,5 @@
- 	reg = <0x3>;
- 	clock-frequency = <1800000000>;
- 	cci-control-port = <&cci_control1>;
-+	operating-points-v2 = <&cpu0_opp_table>;
- };
--- 
-1.9.1
+Paolo
