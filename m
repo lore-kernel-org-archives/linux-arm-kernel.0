@@ -1,20 +1,41 @@
 From: huawei.libin@huawei.com (Li Bin)
-Date: Fri, 4 Dec 2015 10:18:37 +0800
-Subject: [PATCH v2 0/2] arm64: stop using kstop_machine for ftrace
-Message-ID: <1449195519-17901-1-git-send-email-huawei.libin@huawei.com>
+Date: Fri, 4 Dec 2015 10:18:38 +0800
+Subject: [PATCH v2 1/2] arm64: ftrace: stop using kstop_machine to
+ enable/disable tracing
+In-Reply-To: <1449195519-17901-1-git-send-email-huawei.libin@huawei.com>
+References: <1449195519-17901-1-git-send-email-huawei.libin@huawei.com>
+Message-ID: <1449195519-17901-2-git-send-email-huawei.libin@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2:
-Based on the comments from Will and Steve,
-1. Modify the commit message
-2. Fix the misleading comments for ftrace_modify_code
+For ftrace on arm64, kstop_machine which is hugely disruptive
+to a running system is not needed to convert nops to ftrace calls
+or back, because that to be modified instrucions, that NOP, B or BL,
+are all safe instructions which called "concurrent modification
+and execution of instructions", that can be executed by one
+thread of execution as they are being modified by another thread
+of execution without requiring explicit synchronization.
 
-Link: https://lkml.org/lkml/2015/12/3/422
+Signed-off-by: Li Bin <huawei.libin@huawei.com>
+---
+ arch/arm64/kernel/ftrace.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-Li Bin (2):
-  arm64: ftrace: stop using kstop_machine to enable/disable tracing
-  arm64: ftrace: fix the comments for ftrace_modify_code
-
- arch/arm64/kernel/ftrace.c |   10 ++++++----
- 1 files changed, 6 insertions(+), 4 deletions(-)
+diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+index c851be7..9669b33 100644
+--- a/arch/arm64/kernel/ftrace.c
++++ b/arch/arm64/kernel/ftrace.c
+@@ -93,6 +93,11 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
+ 	return ftrace_modify_code(pc, old, new, true);
+ }
+ 
++void arch_ftrace_update_code(int command)
++{
++	ftrace_modify_all_code(command);
++}
++
+ int __init ftrace_dyn_arch_init(void)
+ {
+ 	return 0;
+-- 
+1.7.1
