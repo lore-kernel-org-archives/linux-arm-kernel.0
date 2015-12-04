@@ -1,42 +1,58 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 04 Dec 2015 19:05:50 +0000
-Subject: [PATCH 13/12] ARM: dts: dove: add DT GPU support
-In-Reply-To: <1449237604-19064-1-git-send-email-l.stach@pengutronix.de>
-References: <1449237604-19064-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <E1a4vfy-000655-2j@rmk-PC.arm.linux.org.uk>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Fri, 04 Dec 2015 11:12:30 -0800
+Subject: [PATCH net-next v2 4/4] net: mvneta: Spread out the TX queues
+ management on all CPUs
+In-Reply-To: <1449254700-32685-5-git-send-email-gregory.clement@free-electrons.com>
+References: <1449254700-32685-1-git-send-email-gregory.clement@free-electrons.com>
+ <1449254700-32685-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1449256350.25029.36.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT support for the Vivante GC600 GPU on Marvell Dove platforms.
+On Fri, 2015-12-04 at 19:45 +0100, Gregory CLEMENT wrote:
+> With this patch each CPU is associated with its own set of TX queues. In
+> the same time the SKB received in mvneta_tx is bound to the queue
+> associated to the CPU sending the data. Thanks to this the next IRQ will
+> be received on the same CPU allowing sending more data.
+> 
+> It will also allow to have a more predictable behavior regarding
+> throughput and latency when having multiple threads sending out data on
+> different CPUs.
+> 
+> As an example on Armada XP GP, with an iperf bound to a CPU and a ping
+> bound to another CPU, without this patch the ping round trip was about
+> 2.5ms (and could reach 3s!), whereas with this patch it was around
+> 0.7ms (and sometime it went to 1.2ms).
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-This additional patch is in conjunction with my PMU (already merged)
-and clock driver patch sets.
+This really looks like you need something smarter than pfifo_fast qdisc,
+and maybe BQL (I did not check if this driver already implements this)
 
- arch/arm/boot/dts/dove.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+> 
+> Suggested-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index ea36a262d056..b1d0eb647ed5 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -773,6 +773,16 @@
- 				interrupts = <47>;
- 				status = "disabled";
- 			};
-+
-+			gpu: gpu at 840000 {
-+				clocks = <&divider_clk 1>;
-+				clock-names = "core";
-+				compatible = "vivante,gc";
-+				interrupts = <48>;
-+				power-domains = <&gpu_domain>;
-+				reg = <0x840000 0x4000>;
-+				status = "disabled";
-+			};
- 		};
- 	};
- };
--- 
-2.1.0
+...
+
+> @@ -1824,13 +1835,16 @@ error:
+>  static int mvneta_tx(struct sk_buff *skb, struct net_device *dev)
+>  {
+>  	struct mvneta_port *pp = netdev_priv(dev);
+> -	u16 txq_id = skb_get_queue_mapping(skb);
+> +	u16 txq_id = smp_processor_id() % txq_number;
+>  	struct mvneta_tx_queue *txq = &pp->txqs[txq_id];
+>  	struct mvneta_tx_desc *tx_desc;
+>  	int len = skb->len;
+>  	int frags = 0;
+>  	u32 tx_cmd;
+>  
+> +	/* Use the tx queue bound to this CPU */
+> +	skb_set_queue_mapping(skb, txq_id);
+> +
+
+
+We certainly do not want every driver implementing its own hacks.
+
+We have a standard way to handle this, it is called XPS, and eventually
+ndo_select_queue()
+
+Documentation/networking/scaling.txt contains some hints.
