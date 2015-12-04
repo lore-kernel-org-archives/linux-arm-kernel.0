@@ -1,41 +1,72 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 4 Dec 2015 10:50:01 +0000
-Subject: [PATCH] drivers: dma-coherent: use ioremap_wc() for DMA_MEMORY_MAP
-In-Reply-To: <1448029226-4914-1-git-send-email-brian.starkey@arm.com>
-References: <1448029226-4914-1-git-send-email-brian.starkey@arm.com>
-Message-ID: <20151204105000.GD10123@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 04 Dec 2015 11:49:44 +0100
+Subject: [PATCH v2 4/9] ARM: dts: add dts files for hi3519-demb board
+In-Reply-To: <5660FA2E.6040601@huawei.com>
+References: <1449110668-23647-1-git-send-email-xuejiancheng@huawei.com>
+ <1728470.0OiiXMcl88@wuerfel> <5660FA2E.6040601@huawei.com>
+Message-ID: <3047121.2z9SCS5Au2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 20, 2015 at 02:20:26PM +0000, Brian Starkey wrote:
-> When the DMA_MEMORY_MAP flag is used, memory which can be accessed
-> directly should be returned, so use ioremap_wc() instead of ioremap().
-> Also, ensure that the correct memset operation is used in
-> dma_alloc_from_coherent() with respect to the region's flags.
+On Friday 04 December 2015 10:27:58 xuejiancheng wrote:
+> > 
+> >> +            sysctrl: system-controller at 12020000 {
+> >> +                    compatible = "hisilicon,sysctrl";
+> >> +                    reg = <0x12020000 0x1000>;
+> >> +                    reboot-offset = <0x4>;
+> >> +            };
+> > 
+> > Is this one identical to the one in hip04?
+> > 
+> > If not, pick a new unique compatible string
 > 
-> This fixes the below alignment fault on arm64, caused by invalid use
-> of memset() on Device memory.
+> Yes. It's compatible with the one in hip04.
 
-This is indeed affecting both arm32 and arm64 systems.
+Ok, we should add a compatible string for that then, as the hip04 apparently
+has a slightly different layout from hip01.
 
-> diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
-> index 55b8398..45358d0 100644
-> --- a/drivers/base/dma-coherent.c
-> +++ b/drivers/base/dma-coherent.c
-> @@ -31,7 +31,10 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_add
->  	if (!size)
->  		goto out;
->  
-> -	mem_base = ioremap(phys_addr, size);
-> +	if (flags & DMA_MEMORY_MAP)
-> +		mem_base = ioremap_wc(phys_addr, size);
-> +	else
-> +		mem_base = ioremap(phys_addr, size);
+Can you add a separate patch to clarify the existing hisilicon,sysctrl nodes?
 
-I wonder whether a memremap() approach for the DMA_MEMORY_MAP case would
-be better. This API was added recently by commit 92281dee825f ("arch:
-introduce memremap()"). It only supports write-back and write-through
-but we could add a MEMREMAP_WC flag for this case.
+It look like hi3620 accidentally uses the same string as hip04 already
+but is actually a bit different.
 
--- 
-Catalin
+Maybe split out the sysctrl binding from
+Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt, as it has
+you already have a couple of those, and it's not clear how they relate
+to one another.
+
+If we introduce a string for all hip04 compatible sysctrl devices, we should
+document that and use it consistently, so hi3519 becomes
+
+	compatible = "hisilicon,hi3519-sysctrl", "hisilicon,hip04-sysctrl", "hisilicon,sysctrl";
+
+but I'd clarify in the binding documentation that "hisilicon,sysctrl" should
+only be used for hip04 and hi3519 but not the others.
+
+As this seems to be a standard part, we can also think about making a
+high-level driver for in in drivers/soc rather than relying on the syscon
+driver which we tend to use more for one-off devices with random register
+layouts.
+
+> >> +
+> >> +            crg: crg at 12010000 {
+> >> +                    compatible = "hisilicon,hi3519-crg";
+> > 
+> > 
+> > what is a "crg"? Is there a standard name for these?
+> 
+> The "crg" means Clock and Reset Generator. It's a block which supplies clock
+> and reset signals for other modules in the chip. I used "hi3519-clock"
+> in last version patch. Rob Herring suggested that it's better to use "hi3519-crg"
+> as the compatible string if it's a whole block.
+> 
+> what about writing like this?
+> 
+> crg: clock-reset-controller at 12010000 {
+>         compatible = "hisilicon,hi3519-crg";
+>         }
+> 
+
+Ok, that's better.
+
+	Arnd
