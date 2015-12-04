@@ -1,69 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 4 Dec 2015 08:00:38 -0800
-Subject: [PATCH 7/7] ARM: dts: Enable emmc on hp t410
-In-Reply-To: <56615AF9.5000208@ti.com>
-References: <1449192335-10137-1-git-send-email-tony@atomide.com>
- <1449192335-10137-8-git-send-email-tony@atomide.com>
- <56615AF9.5000208@ti.com>
-Message-ID: <20151204160038.GI23396@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 04 Dec 2015 17:02:53 +0100
+Subject: [PATCH v7 2/6] mfd: syscon: add a DT property to set value width
+In-Reply-To: <20151202232102.GB6055@localhost>
+References: <1448899191-13891-1-git-send-email-damien.riegel@savoirfairelinux.com>
+ <20151130190015.GA31006@rob-hp-laptop> <20151202232102.GB6055@localhost>
+Message-ID: <1488444.chqN1XL3OQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [151204 01:21]:
-> On 12/04/2015 03:25 AM, Tony Lindgren wrote:
-> > There's a 2GB emmc on hp t410 that's wired to the sd_2 interface.
-> > Note that we also need to configure the evtmux using edma_xbar for
-> > edma channels.
+On Wednesday 02 December 2015 18:21:02 Damien Riegel wrote:
+> Lee, Arnd,
+> 
+> I had to make changes in this patch to address Rob's comments.
+> reg-io-width is now in bytes while bus-width was a value in bits. Could
+> you please review this patch ?
+
+
+Ok, that's fine.
+
+> 
+> On Mon, Nov 30, 2015 at 01:00:15PM -0600, Rob Herring wrote:
+> > On Mon, Nov 30, 2015 at 10:59:47AM -0500, Damien Riegel wrote:
+> > > Currently syscon has a fixed configuration of 32 bits for register and
+> > > values widths. In some cases, it would be desirable to be able to
+> > > customize the value width.
+> > > 
+> > > For example, certain boards (like the ones manufactured by Technologic
+> > > Systems) have a FPGA that is memory-mapped, but its registers are only
+> > > 16-bit wide.
+> > > 
+> > > This patch adds an optional "reg-io-width" DT binding for syscon that
+> > > allows to change the width for the data bus (i.e. val_bits). If this
+> > > property is provided, it will also set the register stride to
+> > > reg-io-width's value. If not provided, the default configuration is
+> > > used.
+> > > 
+> > > Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
 > > 
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> One question inlined for the mmc3, other than that:
-> Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> 
-> > ---
-> >  arch/arm/boot/dts/dm8148-t410.dts | 35 +++++++++++++++++++++++++++++++++++
-> >  1 file changed, 35 insertions(+)
+> > Acked-by: Rob Herring <robh@kernel.org>
 > > 
-> > diff --git a/arch/arm/boot/dts/dm8148-t410.dts b/arch/arm/boot/dts/dm8148-t410.dts
-> > index 79838dd..d1927a7 100644
-> > --- a/arch/arm/boot/dts/dm8148-t410.dts
-> > +++ b/arch/arm/boot/dts/dm8148-t410.dts
-> > @@ -15,6 +15,13 @@
-> >  		device_type = "memory";
-> >  		reg = <0x80000000 0x40000000>;	/* 1 GB */
-> >  	};
-> > +
-> > +	vmmcsd_fixed: fixedregulator at 0 {
-> > +		compatible = "regulator-fixed";
-> > +		regulator-name = "vmmcsd_fixed";
-> > +		regulator-min-microvolt = <3300000>;
-> > +		regulator-max-microvolt = <3300000>;
-> > +	};
-> >  };
-> >  
-> >  &cpsw_emac0 {
-> > @@ -26,3 +33,31 @@
-> >  	phy_id = <&davinci_mdio>, <1>;
-> >  	phy-mode = "rgmii";
-> >  };
-> > +
-> > +&mmc3 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&sd2_pins>;
-> > +	vmmc-supply = <&vmmcsd_fixed>;
-> > +	bus-width = <8>;
-> > +	dmas = <&edma_xbar 8 0 1	/* use SDTXEVT1 instead of MCASP0TX */
-> > +		&edma_xbar 9 0 2>;	/* use SDRXEVT1 instead of MCASP0RX */
-> > +	dma-names = "tx", "rx";
 > 
-> Do you happened to know how the audio is connected on the board?
-> The DM814x-EVM seams to be using McASP2 with aic3106 so it is possible that HP
-> copied the design from there...
 
-I grepped the sources for it and these are the evtmux channels the original
-code is using. So maybe they have some different audio setup, the hacks in the
-original board file mention "hdmi-dai".
-
-Regards,
-
-Tony
+Acked-by: Arnd Bergmann <arnd@arndb.de>
