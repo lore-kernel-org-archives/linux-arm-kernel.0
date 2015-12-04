@@ -1,93 +1,21 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 04 Dec 2015 11:58:30 -0800
-Subject: [PATCH] ahci: compile out msi/msix infrastructure
-Message-ID: <20151204195830.2300.48789.stgit@dwillia2-desk3.jf.intel.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 04 Dec 2015 15:01:37 -0500 (EST)
+Subject: [PATCH net 0/3] Marvell Armada 375 mvpp2 fixes
+In-Reply-To: <1449152451-2939-1-git-send-email-mw@semihalf.com>
+References: <1449152451-2939-1-git-send-email-mw@semihalf.com>
+Message-ID: <20151204.150137.97964032407636739.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Arnd:
-    The AHCI driver is used for some on-chip devices that do not use PCI
-    for probing, and it can be built even when CONFIG_PCI is disabled, but
-    that now results in a build failure:
+From: Marcin Wojtas <mw@semihalf.com>
+Date: Thu,  3 Dec 2015 15:20:48 +0100
 
-    ata/libahci.c: In function 'ahci_host_activate_multi_irqs':
-    ata/libahci.c:2475:4: error: invalid use of undefined type 'struct msix_entry'
-    ata/libahci.c:2475:21: error: dereferencing pointer to incomplete type 'struct msix_entry'
+> During my work on mvneta driver I revised mvpp2, and it occurred that the
+> initial version of Marvell Armada 375 SoC comprised bugs around
+> DMA-unmapping in both ingress and egress paths - not all buffers were
+> umapped in TX path and none(!) in RX. Three patches that I send fix
+> this situation.
+> 
+> Any feedback would be welcome.
 
-Add ifdef CONFIG_PCI_MSI infrastructure to compile out the mutli-msi and
-multi-msix code.
-
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Reported-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-Fixes: d684a90d38e2 ("ahci: per-port msix support")
-Signed-off-by: Dan Williams <dan.j.williams@intel.com>
----
- drivers/ata/ahci.h    |   25 +++++++++++++++++++++++--
- drivers/ata/libahci.c |    7 +------
- 2 files changed, 24 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
-index 878470f9c3e2..e3d888d4b6d0 100644
---- a/drivers/ata/ahci.h
-+++ b/drivers/ata/ahci.h
-@@ -237,12 +237,18 @@ enum {
- 	AHCI_HFLAG_DELAY_ENGINE		= (1 << 15), /* do not start engine on
- 						        port start (wait until
- 						        error-handling stage) */
--	AHCI_HFLAG_MULTI_MSI		= (1 << 16), /* multiple PCI MSIs */
- 	AHCI_HFLAG_NO_DEVSLP		= (1 << 17), /* no device sleep */
- 	AHCI_HFLAG_NO_FBS		= (1 << 18), /* no FBS */
- 	AHCI_HFLAG_EDGE_IRQ		= (1 << 19), /* HOST_IRQ_STAT behaves as
- 							Edge Triggered */
--	AHCI_HFLAG_MULTI_MSIX		= (1 << 20), /* per-port MSI-X */
-+#ifdef CONFIG_PCI_MSI
-+	AHCI_HFLAG_MULTI_MSI		= (1 << 20), /* multiple PCI MSIs */
-+	AHCI_HFLAG_MULTI_MSIX		= (1 << 21), /* per-port MSI-X */
-+#else
-+	/* compile out MSI infrastructure */
-+	AHCI_HFLAG_MULTI_MSI		= 0,
-+	AHCI_HFLAG_MULTI_MSIX		= 0,
-+#endif
- 
- 	/* ap->flags bits */
- 
-@@ -355,6 +361,21 @@ struct ahci_host_priv {
- 	void			(*start_engine)(struct ata_port *ap);
- };
- 
-+#ifdef CONFIG_PCI_MSI
-+static inline int ahci_irq_vector(struct ahci_host_priv *hpriv, int port)
-+{
-+	if (hpriv->flags & AHCI_HFLAG_MULTI_MSIX)
-+		return hpriv->msix[i].vector;
-+	else
-+		return hpriv->irq + i;
-+}
-+#else
-+static inline int ahci_irq_vector(struct ahci_host_priv *hpriv, int port)
-+{
-+	return hpriv->irq;
-+}
-+#endif
-+
- extern int ahci_ignore_sss;
- 
- extern struct device_attribute *ahci_shost_attrs[];
-diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
-index 1b6c7cc415bf..eda3cf2163bb 100644
---- a/drivers/ata/libahci.c
-+++ b/drivers/ata/libahci.c
-@@ -2469,12 +2469,7 @@ static int ahci_host_activate_multi_irqs(struct ata_host *host,
- 	 */
- 	for (i = 0; i < host->n_ports; i++) {
- 		struct ahci_port_priv *pp = host->ports[i]->private_data;
--		int irq;
--
--		if (hpriv->flags & AHCI_HFLAG_MULTI_MSIX)
--			irq = hpriv->msix[i].vector;
--		else
--			irq = hpriv->irq + i;
-+		int irq = ahci_irq_vector(hpriv, i);
- 
- 		/* Do not receive interrupts sent by dummy ports */
- 		if (!pp) {
+Series applied, thank you.
