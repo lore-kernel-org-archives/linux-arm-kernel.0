@@ -1,121 +1,36 @@
-From: jenskuske@gmail.com (Jens Kuske)
-Date: Fri,  4 Dec 2015 22:24:43 +0100
-Subject: [PATCH v5 4/4] ARM: dts: sun8i: Add Orange Pi Plus support
-In-Reply-To: <1449264283-25360-1-git-send-email-jenskuske@gmail.com>
-References: <1449264283-25360-1-git-send-email-jenskuske@gmail.com>
-Message-ID: <1449264283-25360-5-git-send-email-jenskuske@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 04 Dec 2015 22:30:35 +0100
+Subject: [PATCH net-next v2 4/4] net: mvneta: Spread out the TX queues
+ management on all CPUs
+In-Reply-To: <1449256350.25029.36.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <1449254700-32685-1-git-send-email-gregory.clement@free-electrons.com>
+ <1449254700-32685-5-git-send-email-gregory.clement@free-electrons.com>
+ <1449256350.25029.36.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <10523514.jXrVKo414l@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Orange Pi Plus is a SBC based on the Allwinner H3 SoC
-with 8GB eMMC, multiple USB ports through a USB hub chip, SATA through
-a USB-SATA bridge, one uSD slot, a 10/100/1000M ethernet port,
-WiFi, HDMI, headphone jack, IR receiver, a microphone, a CSI connector
-and a 40-pin GPIO header.
+On Friday 04 December 2015 11:12:30 Eric Dumazet wrote:
+> On Fri, 2015-12-04 at 19:45 +0100, Gregory CLEMENT wrote:
+> > With this patch each CPU is associated with its own set of TX queues. In
+> > the same time the SKB received in mvneta_tx is bound to the queue
+> > associated to the CPU sending the data. Thanks to this the next IRQ will
+> > be received on the same CPU allowing sending more data.
+> > 
+> > It will also allow to have a more predictable behavior regarding
+> > throughput and latency when having multiple threads sending out data on
+> > different CPUs.
+> > 
+> > As an example on Armada XP GP, with an iperf bound to a CPU and a ping
+> > bound to another CPU, without this patch the ping round trip was about
+> > 2.5ms (and could reach 3s!), whereas with this patch it was around
+> > 0.7ms (and sometime it went to 1.2ms).
+> 
+> This really looks like you need something smarter than pfifo_fast qdisc,
+> and maybe BQL (I did not check if this driver already implements this)
 
-Signed-off-by: Jens Kuske <jenskuske@gmail.com>
----
- arch/arm/boot/dts/Makefile                   |  3 +-
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 77 ++++++++++++++++++++++++++++
- 2 files changed, 79 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+I suggested this change as well as the BQL implementation that Marcin did.
+I believe he hasn't posted that yet while he's doing some more testing,
+but it should come soon.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index e8f44c7..cc7309b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -661,7 +661,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-a33-ga10h-v1.1.dtb \
- 	sun8i-a33-ippo-q8h-v1.2.dtb \
- 	sun8i-a33-q8-tablet.dtb \
--	sun8i-a33-sinlinx-sina33.dtb
-+	sun8i-a33-sinlinx-sina33.dtb \
-+	sun8i-h3-orangepi-plus.dtb
- dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb \
- 	sun9i-a80-cubieboard4.dtb
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-new file mode 100644
-index 0000000..e67df59
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-@@ -0,0 +1,77 @@
-+/*
-+ * Copyright (C) 2015 Jens Kuske <jenskuske@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun8i-h3.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Xunlong Orange Pi Plus";
-+	compatible = "xunlong,orangepi-plus", "allwinner,sun8i-h3";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
--- 
-2.6.3
+	Arnd
