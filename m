@@ -1,68 +1,103 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Dec 2015 17:12:55 +0000
-Subject: [PATCH v2 3/5] printk/nmi: Try hard to print Oops message in NMI
- context
-In-Reply-To: <20151204152709.GA20935@pathway.suse.cz>
-References: <1448622572-16900-1-git-send-email-pmladek@suse.com>
- <1448622572-16900-4-git-send-email-pmladek@suse.com>
- <20151201234437.GA8644@n2100.arm.linux.org.uk>
- <20151204152709.GA20935@pathway.suse.cz>
-Message-ID: <20151204171255.GZ8644@n2100.arm.linux.org.uk>
+From: yrdreddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
+Date: Fri, 4 Dec 2015 12:10:57 -0500
+Subject: [PATCH v2 1/3] pinctrl: Broadcom NSP GPIO-a device tree bindings
+Message-ID: <1449249057-12975-1-git-send-email-yrdreddy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2015 at 04:27:09PM +0100, Petr Mladek wrote:
-> On Tue 2015-12-01 23:44:37, Russell King - ARM Linux wrote:
-> > On Fri, Nov 27, 2015 at 12:09:30PM +0100, Petr Mladek wrote:
-> > > What we can do, though, is to zap all printk locks. We already do this
-> > > when a printk recursion is detected. This should be safe because
-> > > the system is crashing and there shouldn't be any printk caller
-> > > that would cause the deadlock.
-> > 
-> > What about serial consoles which may call out to subsystems like the
-> > clk subsystem to enable a clock, which would want to take their own
-> > spinlocks in addition to the serial console driver?
-> 
-> Yes, there might be more locks used by the serial console but I do
-> not know how to handle them all easily. IMHO, this patch is just better
-> than nothing.
+Device tree binding documentation for Broadcom NSP GPIO-a
 
-I have a slightly different view...
+Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yrdreddy@broadcom.com>
+---
+ .../devicetree/bindings/pinctrl/brcm,nsp-gpio.txt  | 80 ++++++++++++++++++++++
+ 1 file changed, 80 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt
 
-> > I don't see bust_spinlocks() dealing with any of these locks, so IMHO
-> > trying to make this work in NMI context strikes me as making the
-> > existing solution more unreliable on ARM systems.
-> 
-> bust_spinlocks() calls printk_nmi_flush() that would call printk()
-> that would zap "lockbuf_lock" and "console_sem" when in Oops and NMI.
-> Yes, there might be more locks blocked but we try to break at least
-> the first two walls. Also zapping is allowed only once per 30 seconds,
-> see zap_locks(). Why do you think that it might make things more
-> unreliable, please?
-
-Take the scenario where CPU1 is in the middle of a printk(), and is
-holding its lock.
-
-CPU0 comes along and decides to trigger a NMI backtrace.  This sends
-a NMI to CPU1, which takes it in the middle of the serial console
-output.
-
-With the existing solution, the NMI output will be written to the
-temporary buffer, and CPU1 has finished handling the NMI it resumes
-the serial console output, eventually dropping the lock.  That then
-allows CPU0 to print the contents of all buffers, and we get NMI
-printk output.
-
-With this solution, as I understand it, we'll instead end up with
-CPU1's printk trying to output direct to the console, and although
-we've busted a couple of locks, we won't have busted the serial
-console locks, so CPU1 will deadlock - and that will stop any output
-what so ever.
-
-If this is correct, then the net result is that we go from NMI with
-serial console producing output to NMI with serial console being
-less reliable at producing output.
-
+diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt b/Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt
+new file mode 100644
+index 0000000..0844168
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt
+@@ -0,0 +1,80 @@
++Broadcom Northstar plus (NSP) GPIO/PINCONF Controller
++
++Required properties:
++- compatible:
++    Must be "brcm,nsp-gpio-a"
++
++- reg:
++    Should contain the register physical address and length for each of
++    GPIO base, IO control registers
++
++- #gpio-cells:
++    Must be two. The first cell is the GPIO pin number (within the
++    controller's pin space) and the second cell is used for the following:
++    bit[0]: polarity (0 for active high and 1 for active low)
++
++- gpio-controller:
++    Specifies that the node is a GPIO controller
++
++- ngpios:
++    Number of gpios supported (58x25 supports 32 and 58x23 supports 24)
++
++Optional properties:
++- interrupts:
++    Interrupt ID
++
++- interrupt-controller:
++    Specifies that the node is an interrupt controller
++
++- gpio-ranges:
++    Specifies the mapping between gpio controller and pin-controllers pins.
++    This requires 4 fields in cells defined as -
++    1. Phandle of pin-controller.
++    2. GPIO base pin offset.
++    3  Pin-control base pin offset.
++    4. number of gpio pins which are linearly mapped from pin base.
++
++Supported generic PINCONF properties in child nodes:
++- pins:
++    The list of pins (within the controller's own pin space) that properties
++    in the node apply to. Pin names are "gpio-<pin>"
++
++- bias-disable:
++    Disable pin bias
++
++- bias-pull-up:
++    Enable internal pull up resistor
++
++- bias-pull-down:
++    Enable internal pull down resistor
++
++- drive-strength:
++    Valid drive strength values include 2, 4, 6, 8, 10, 12, 14, 16 (mA)
++
++Example:
++
++	gpioa: gpio at 18000020 {
++		compatible = "brcm,nsp-gpio-a";
++		reg = <0x18000020 0x100>,
++		      <0x1803f1c4 0x1c>;
++		#gpio-cells = <2>;
++		gpio-controller;
++		ngpios = <32>;
++		gpio-ranges = <&pinctrl 0 0 31>;
++		interrupt-controller;
++		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
++
++		/* Hog a few default settings */
++		pinctrl-names = "default";
++		pinctrl-0 = <&led>;
++		led: led {
++			pins = "gpio-1";
++			bias-pull-up;
++		};
++
++		pwr: pwr {
++			gpio-hog;
++			gpios = <3 1>;
++			output-high;
++		};
++	};
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.1.0
