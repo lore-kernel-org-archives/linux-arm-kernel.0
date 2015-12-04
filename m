@@ -1,30 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 4 Dec 2015 17:18:56 +0000
-Subject: [RFC2 PATCH v6 00/19] ILP32 for ARM64
-In-Reply-To: <20151204153550.GB1251@yury-N73SV>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <20151203175955.GP10747@e104818-lin.cambridge.arm.com>
- <20151204153550.GB1251@yury-N73SV>
-Message-ID: <20151204171856.GP10123@e104818-lin.cambridge.arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 4 Dec 2015 11:21:49 -0600
+Subject: [PATCH] ARM: DTS: am33xx: Use the new DT bindings for the eDMA3
+In-Reply-To: <1449225915-28879-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1449225915-28879-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <87wpsunn82.fsf@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2015 at 06:35:50PM +0300, Yury Norov wrote:
-> On Thu, Dec 03, 2015 at 05:59:55PM +0000, Catalin Marinas wrote:
-> > On Wed, Nov 18, 2015 at 12:16:40AM +0300, Yury Norov wrote:
-> > >  - ILP32 VDSO code excluded. It's not mandatory, and caused questions
-> > >    during review process. We definitely make sure we will follow up
-> > >    with a VDSO later on because it is needed for performance reasons;
-> > 
-> > I already asked in one of the patches, don't you need a VDSO for
-> > sigreturn?
-> 
-> I didn't realise it's mandatory for ARMv8 when removed it. I'll back
-> it, but I think rework required anyway.
 
-The alternative is to use SA_RESTORER but AFAIK, its use has been
-deprecated. I don't know what aarch64 glibc does if it doesn't have a
-vdso.
+Hi,
+
+Peter Ujfalusi <peter.ujfalusi@ti.com> writes:
+> @@ -174,12 +182,44 @@
+>  		};
+>  
+>  		edma: edma at 49000000 {
+> -			compatible = "ti,edma3";
+> -			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
+> -			reg =	<0x49000000 0x10000>,
+> -				<0x44e10f90 0x40>;
+> +			compatible = "ti,edma3-tpcc";
+> +			ti,hwmods = "tpcc";
+> +			reg =	<0x49000000 0x10000>;
+> +			reg-names = "edma3_cc";
+>  			interrupts = <12 13 14>;
+> -			#dma-cells = <1>;
+> +			interrupt-names = "edma3_ccint", "emda3_mperr",
+> +					  "edma3_ccerrint";
+> +			dma-requests = <64>;
+> +			#dma-cells = <2>;
+> +
+> +			ti,tptcs = <&edma_tptc0 7>, <&edma_tptc1 5>,
+> +				   <&edma_tptc2 0>;
+> +
+> +			ti,edma-memcpy-channels = /bits/ 16 <20 21>;
+
+can you explain this property here ? Are you setting bits 20 and 21 on a
+16-bit field ?
 
 -- 
-Catalin
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151204/a4ae2f4a/attachment-0001.sig>
