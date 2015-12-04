@@ -1,26 +1,21 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 4 Dec 2015 14:46:19 -0600
-Subject: [RFC PATCH 1/2] PCI/ACPI: Add ACPI support for non ECAM Host
- Bridge Controllers
-In-Reply-To: <5018756.5lEEeJVMod@wuerfel>
-References: <1449155999-220955-1-git-send-email-gabriele.paoloni@huawei.com>
- <1449155999-220955-2-git-send-email-gabriele.paoloni@huawei.com>
- <20151203175826.GB2935@red-moon> <5018756.5lEEeJVMod@wuerfel>
-Message-ID: <5661FB9B.20201@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 4 Dec 2015 21:49:18 +0100
+Subject: [PATCH v2 13/12] ARM: dts: dove: add DT GPU support
+In-Reply-To: <E1a4wLa-0004Vi-2t@rmk-PC.arm.linux.org.uk>
+References: <1449237604-19064-1-git-send-email-l.stach@pengutronix.de>
+ <E1a4wLa-0004Vi-2t@rmk-PC.arm.linux.org.uk>
+Message-ID: <20151204204918.GB809@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2015 02:58 PM, Arnd Bergmann wrote:
-> On Thursday 03 December 2015 17:58:26 Lorenzo Pieralisi wrote:
->> I will put together a proposal to define the way we specify HID and
->> related DSD properties for PCI host controllers and send it to
->> the ACPI working group for review.
->
-> That also requires a change to SBSA, right? Today, SBSA assumes that
-> we have a standard PCI host that will work with any hardware independent
-> PCI implementation in an OS. We either have to give up on SBSA saying
-> much about how PCI hosts are implemented, or stop assuming that hardware
-> is SBSA compliant.
+> This additional patch is in conjunction with my PMU (already merged)
+> and clock driver patch sets.
 
-Which would be standardizing nonstandard hardware. It would surprise me 
-if that got much traction.
+Hi Russell
+
+Please could you respond to my comment about the clock patch.
+
+http://www.spinics.net/lists/devicetree/msg104464.html
+
+Thanks
+	Andrew
