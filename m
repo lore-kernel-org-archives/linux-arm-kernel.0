@@ -1,39 +1,67 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 04 Dec 2015 14:55:12 +0000
-Subject: [PATCH v8 1/4] arm64: Store struct task_info in sp_el0
-In-Reply-To: <20151204132743.GH10123@e104818-lin.cambridge.arm.com>
-References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
- <1449226948-14251-2-git-send-email-james.morse@arm.com>
- <20151204132743.GH10123@e104818-lin.cambridge.arm.com>
-Message-ID: <5661A950.7090009@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 4 Dec 2015 15:56:30 +0100
+Subject: [PATCH v4] mmc: core: fix __mmc_switch timeout caused by preempt
+In-Reply-To: <1448846850-14585-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1448846850-14585-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <CAPDyKFqzekCOna5LUBNJRLQ-+7ryO57_B6=7ne3a9Vj6axF=yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+On 30 November 2015 at 02:27, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> there is a time window between __mmc_send_status() and time_afer(),
+> on some eMMC chip, the timeout_ms is only 10ms, if this thread was
+> scheduled out during this period, then, even card has already changes
+> to transfer state by the result of CMD13, this part of code also treat
+> it to timeout error.
+> So, need calculate timeout first, then call __mmc_send_status(), if
+> already timeout and card still in programing state, then treat it to
+> the real timeout error.
+>
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
 
-On 04/12/15 13:27, Catalin Marinas wrote:
-> On Fri, Dec 04, 2015 at 11:02:25AM +0000, James Morse wrote:
->> --- a/arch/arm64/kernel/entry.S
->> +++ b/arch/arm64/kernel/entry.S
-> [...]
->> @@ -599,6 +606,8 @@ ENTRY(cpu_switch_to)
->>  	ldp	x29, x9, [x8], #16
->>  	ldr	lr, [x8]
->>  	mov	sp, x9
->> +	and	x9, x9, #~(THREAD_SIZE - 1)
->> +	msr	sp_el0, x9
->>  	ret
->>  ENDPROC(cpu_switch_to)
-> 
-> At the beginning of the cpu_switch_to function, could we do
-> "mrs x9, sp_el0" instead to avoid the "and ... ~(THREAD_SIZE-1)"?
+Thanks, applied for next!
 
-I'm not sure I follow - are you suggesting to store struct thread_info
-in the thread_cpu_context?
+Kind regards
+Uffe
 
-This would change a ldr to a ldp, and save the 'and', so its definitely
-fewer instructions.
-
-
-
-James
+> ---
+>  drivers/mmc/core/mmc_ops.c | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
+> index 1f44426..2c90635 100644
+> --- a/drivers/mmc/core/mmc_ops.c
+> +++ b/drivers/mmc/core/mmc_ops.c
+> @@ -489,6 +489,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>         unsigned long timeout;
+>         u32 status = 0;
+>         bool use_r1b_resp = use_busy_signal;
+> +       bool expired = false;
+>
+>         mmc_retune_hold(host);
+>
+> @@ -545,6 +546,12 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>         timeout = jiffies + msecs_to_jiffies(timeout_ms);
+>         do {
+>                 if (send_status) {
+> +                       /*
+> +                        * Due to the possibility of being preempted after
+> +                        * sending the status command, check the expiration
+> +                        * time first.
+> +                        */
+> +                       expired = time_after(jiffies, timeout);
+>                         err = __mmc_send_status(card, &status, ignore_crc);
+>                         if (err)
+>                                 goto out;
+> @@ -565,7 +572,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>                 }
+>
+>                 /* Timeout if the device never leaves the program state. */
+> -               if (time_after(jiffies, timeout)) {
+> +               if (expired && R1_CURRENT_STATE(status) == R1_STATE_PRG) {
+>                         pr_err("%s: Card stuck in programming state! %s\n",
+>                                 mmc_hostname(host), __func__);
+>                         err = -ETIMEDOUT;
+> --
+> 1.8.1.1.dirty
+>
