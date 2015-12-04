@@ -1,67 +1,65 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 04 Dec 2015 14:39:44 +0000
-Subject: [PATCH v8 4/4] arm64: switch to irq_stack during softirq
-In-Reply-To: <20151204140119.GL10123@e104818-lin.cambridge.arm.com>
-References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
- <1449226948-14251-5-git-send-email-james.morse@arm.com>
- <20151204140119.GL10123@e104818-lin.cambridge.arm.com>
-Message-ID: <5661A5B0.3080504@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 4 Dec 2015 08:49:35 -0600
+Subject: [PATCH v2 2/7] dt-bindings: Amlogic: Document the CPU reset
+ controller for Meson8b
+In-Reply-To: <1449076953-5058-3-git-send-email-carlo@caione.org>
+References: <1449076953-5058-1-git-send-email-carlo@caione.org>
+ <1449076953-5058-3-git-send-email-carlo@caione.org>
+Message-ID: <20151204144935.GA17537@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-On 04/12/15 14:01, Catalin Marinas wrote:
-> On Fri, Dec 04, 2015 at 11:02:28AM +0000, James Morse wrote:
->> +ENTRY(__do_softirq_on_irqstack)
->> +	push	x19, lr
->> +	push	x25, x26
->> +
->> +	irq_stack_entry lr
->> +
->> +	/* irq_stack_entry leaves irq_count in x25 */
->> +	ldr	x1, [x25]
->> +	add	x1, x1, #1
->> +	str	x1, [x25]
->> +
->> +	bl	__do_softirq
->> +
->> +	ldr	x1, [x25]
->> +	sub	x1, x1, #1
->> +	str	x1, [x25]
->> +
->> +	irq_stack_exit
->> +
->> +	pop x25, x26
->> +	pop x19, lr
->> +	ret
->> +ENDPROC(__do_softirq_on_irqstack)
+On Wed, Dec 02, 2015 at 06:22:28PM +0100, Carlo Caione wrote:
+> From: Carlo Caione <carlo@endlessm.com>
 > 
-> I was thinking of doing do_softirq_own_stack() entirely in assembly
-> without the need to check for on_irq_stack() check in C, just a test of
-> the irq_count value.
+> The clock controller on Amlogic Meson8b SoCs has been extended with a
+> reset controller used to reset the CPU cores. It is used during SMP
+> bringup.
+> 
+> With this patch we extend the clock controller documentation.
+> 
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
 
-I tried that, but couldn't get it to work - maybe I'm missing a trick:
+Acked-by: Rob Herring <robh@kernel.org>
 
-There are at least two ways into do_softirq_own_stack():
-el1_irq() -> __irq_exit() -> do_softirq_own_stack(),
-as well as:
-cpu_switch_to(ksoftirqd) -> do_softirq_own_stack()
-
-In both cases irq_count == 0 because do_softirq_own_stack() is where we
-update irq_count [0]. I can only see two ways to tell them apart,
-increment irq_count in el1_irq(), (which we don't like), or have that
-bounds checking.
-
-
-(We could increase hardirq_count() in el?_irq(), which would mean
-in_irq()/in_interrupt() always returns true when on the irq_stack, which
-would stop softirqs being processed here... but that is a fairly
-significant change in behaviour.)
-
-
-Thanks,
-
-James
-
-[0] http://article.gmane.org/gmane.linux.kernel/2041877
+> ---
+>  Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt b/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
+> index 2b7b3fa..feeb4de 100644
+> --- a/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
+> +++ b/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
+> @@ -1,7 +1,8 @@
+>  * Amlogic Meson8b Clock and Reset Unit
+>  
+>  The Amlogic Meson8b clock controller generates and supplies clock to various
+> -controllers within the SoC.
+> +controllers within the SoC and also implements a reset controller for the CPU
+> +cores.
+>  
+>  Required Properties:
+>  
+> @@ -13,16 +14,19 @@ Required Properties:
+>  	   mapped region.
+>  
+>  - #clock-cells: should be 1.
+> +- #reset-cells: should be 1.
+>  
+>  Each clock is assigned an identifier and client nodes can use this identifier
+>  to specify the clock which they consume. All available clocks are defined as
+>  preprocessor macros in the dt-bindings/clock/meson8b-clkc.h header and can be
+>  used in device tree sources.
+> +Similar identifiers exist for the CPU core reset lines.
+>  
+>  Example: Clock controller node:
+>  
+>  	clkc: clock-controller at c1104000 {
+>  		#clock-cells = <1>;
+> +		#reset-cells = <1>;
+>  		compatible = "amlogic,meson8b-clkc";
+>  		reg = <0xc1108000 0x4>, <0xc1104000 0x460>;
+>  	};
+> -- 
+> 2.5.0
+> 
