@@ -1,172 +1,109 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 4 Dec 2015 12:17:49 -0600
-Subject: [PATCH 05/28] PCI: xilinx: keep references to both IRQ domains
-In-Reply-To: <1448900513-20856-6-git-send-email-paul.burton@imgtec.com>
-References: <1448900513-20856-1-git-send-email-paul.burton@imgtec.com>
- <1448900513-20856-6-git-send-email-paul.burton@imgtec.com>
-Message-ID: <20151204181749.GB20125@localhost>
+From: salil.mehta@huawei.com (Salil Mehta)
+Date: Fri, 4 Dec 2015 18:18:38 +0000
+Subject: [PATCH V6 net-next 5/5] net:hns: Add the init code to disable
+ Hip06 "Hardware VLAN assist"
+In-Reply-To: <565F4AB0.5020100@cogentembedded.com>
+References: <1449075171-4820-1-git-send-email-salil.mehta@huawei.com>
+ <1449075171-4820-6-git-send-email-salil.mehta@huawei.com>
+ <565F4AB0.5020100@cogentembedded.com>
+Message-ID: <5661D8FE.2010909@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
 
-Please capitalize the first word of your PCI changelog subjects.
+On 12/2/2015 7:46 PM, Sergei Shtylyov wrote:
+> Hello.
+>
+> On 12/02/2015 07:52 PM, Salil Mehta wrote:
+>
+>> This patch adds the initializzation code to disable the hardware
+>> vlan support for VLAN Tag stripping by default for now.
+>>
+>> Proper support of "hardware VLAN assitance" feature would
+>> soon come in the next coming patches.
+>>
+>> Signed-off-by: Salil Mehta <salil.mehta@huawei.com>
+>> ---
+>>
+>> PATCH V6:
+>> - No change over the earlier patch
+>>
+>> PATCH V5:
+>> - Minor merge/reject change resolved to application of previous patch
+>>
+>> PATCH V4/V3/V2:
+>> - No change over the initial floated patch
+>>
+>> PATCH V1:
+>> - Initial code to disable the hardware VLAN assist for now
+>> ---
+>>   drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c |    7 +++++++
+>>   drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h |    1 +
+>>   2 files changed, 8 insertions(+)
+>>
+>> diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c 
+>> b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
+>> index b5e4c44..f302ef9 100644
+>> --- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
+>> +++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
+>> @@ -176,6 +176,11 @@ static void hns_ppe_cnt_clr_ce(struct hns_ppe_cb 
+>> *ppe_cb)
+>>                PPE_CNT_CLR_CE_B, 1);
+>>   }
+>>
+>> +static void hns_ppe_set_vlan_strip(struct hns_ppe_cb *ppe_cb, int en)
+>> +{
+>> +    dsaf_write_dev(ppe_cb, PPEV2_VLAN_STRIP_EN_REG, en);
+>
+>    Why not call it directly?
+Hi Sergei,
+The wrapper API abstraction has been put intentionally. The reason is 
+the same code
+is suppose to run across different SoCs so it is always clean approach 
+to hide it so
+that even if there are differences in the way we access or configure 
+hardware
+in other SoCs basic interface of the SET API remains same!!
+Therefore, we are in favour of keeping the above wrapper and therefore not
+changing now.
 
-On Mon, Nov 30, 2015 at 04:21:30PM +0000, Paul Burton wrote:
-> pcie-xilinx creates 2 IRQ domains when built with MSI support: one for
-> MSI interrupts & one for legacy INTx interrupts. However, it only kept a
-> reference to the MSI IRQ domain. This means that any INTx interrupts
-> that may occur would be mapped using the wrong domain, and that only the
-> MSI IRQ domain would be removed along with the driver. Track both IRQ
-> domains & clean up both as appropriate.
+Best regards
+Salil
+>> +}
+>> +
+>>   /**
+>>    * hns_ppe_checksum_hw - set ppe checksum caculate
+>>    * @ppe_device: ppe device
+>> @@ -336,6 +341,8 @@ static void hns_ppe_init_hw(struct hns_ppe_cb 
+>> *ppe_cb)
+>>       hns_ppe_cnt_clr_ce(ppe_cb);
+>>
+>>       if (!AE_IS_VER1(dsaf_dev->dsaf_ver)) {
+>> +        hns_ppe_set_vlan_strip(ppe_cb, 0);
+>> +
+>>           /* set default RSS key in h/w */
+>>           hns_ppe_set_rss_key(ppe_cb, ppe_cb->rss_key);
+>>
+>> diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h 
+>> b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
+>> index 98c163e..6c18ca9 100644
+>> --- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
+>> +++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
+>> @@ -318,6 +318,7 @@
+>>   #define PPE_CFG_PARSE_TAG_REG            0x94
+>>   #define PPE_CFG_PRO_CHECK_EN_REG        0x98
+>>   #define PPEV2_CFG_TSO_EN_REG                    0xA0
+>> +#define PPEV2_VLAN_STRIP_EN_REG                 0xAC
+>
+>    Please indent with tabs, like all the surrounding #define's are 
+> indented (except PPEV2_CFG_TSO_EN_REG).
+Thanks for this. I have changed this in PATCH V7 already floated.
 
-It looks like this fixes a problem in the original commit 8961def56845
-("PCI: xilinx: Add Xilinx AXI PCIe Host Bridge IP driver"), which
-appeared in v3.18.  Does this need a stable backport tag?
-
-It sounds like any device using INTx just won't work?  From later
-patches, I surmise that this series might be related to using Xilinx
-in a new MIPS Boston board.  If that's the case, and pre-v4.5 kernels
-don't support that board anyway, a stable backport might not be
-needed.  It *does* fix a leak even if you don't need INTx, but that
-seems minor and probably not worth a stable backport all by itself.
-
-I probably *would* add a 'Fixes: 8961def56845 ("PCI: xilinx: Add
-Xilinx AXI PCIe Host Bridge IP driver")' line to leave breadcrumbs for
-people backporting things.
-
-This seems to be part of a larger series -- can these PCI patches go
-through my tree, or do they all need to go together because of
-dependencies on the rest of the series?
-
-They all need acks from Michal, of course.
-
-> Signed-off-by: Paul Burton <paul.burton@imgtec.com>
-> ---
-> 
->  drivers/pci/host/pcie-xilinx.c | 58 ++++++++++++++++++++----------------------
->  1 file changed, 28 insertions(+), 30 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-> index 3c7a0d5..c412a37 100644
-> --- a/drivers/pci/host/pcie-xilinx.c
-> +++ b/drivers/pci/host/pcie-xilinx.c
-> @@ -105,6 +105,7 @@
->   * @root_busno: Root Bus number
->   * @dev: Device pointer
->   * @irq_domain: IRQ domain pointer
-> + * @msi_irq_domain: MSI IRQ domain pointer
->   * @bus_range: Bus range
->   * @resources: Bus Resources
->   */
-> @@ -115,6 +116,7 @@ struct xilinx_pcie_port {
->  	u8 root_busno;
->  	struct device *dev;
->  	struct irq_domain *irq_domain;
-> +	struct irq_domain *msi_irq_domain;
->  	struct resource bus_range;
->  	struct list_head resources;
->  };
-> @@ -291,7 +293,7 @@ static int xilinx_pcie_msi_setup_irq(struct msi_controller *chip,
->  	if (hwirq < 0)
->  		return hwirq;
->  
-> -	irq = irq_create_mapping(port->irq_domain, hwirq);
-> +	irq = irq_create_mapping(port->msi_irq_domain, hwirq);
->  	if (!irq)
->  		return -EINVAL;
->  
-> @@ -517,31 +519,21 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
->  
->  /**
->   * xilinx_pcie_free_irq_domain - Free IRQ domain
-> - * @port: PCIe port information
-> + * @domain: the IRQ domain to free
-> + * @nr: the number of IRQs in the domain
->   */
-> -static void xilinx_pcie_free_irq_domain(struct xilinx_pcie_port *port)
-> +static void xilinx_pcie_free_irq_domain(struct irq_domain *domain, int nr)
->  {
->  	int i;
-> -	u32 irq, num_irqs;
-> -
-> -	/* Free IRQ Domain */
-> -	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> -
-> -		free_pages(port->msi_pages, 0);
-> -
-> -		num_irqs = XILINX_NUM_MSI_IRQS;
-> -	} else {
-> -		/* INTx */
-> -		num_irqs = 4;
-> -	}
-> +	u32 irq;
->  
-> -	for (i = 0; i < num_irqs; i++) {
-> -		irq = irq_find_mapping(port->irq_domain, i);
-> +	for (i = 0; i < nr; i++) {
-> +		irq = irq_find_mapping(domain, i);
->  		if (irq > 0)
->  			irq_dispose_mapping(irq);
->  	}
->  
-> -	irq_domain_remove(port->irq_domain);
-> +	irq_domain_remove(domain);
->  }
->  
->  /**
-> @@ -571,20 +563,20 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
->  		return PTR_ERR(port->irq_domain);
->  	}
->  
-> -	/* Setup MSI */
-> -	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> -		port->irq_domain = irq_domain_add_linear(node,
-> -							 XILINX_NUM_MSI_IRQS,
-> -							 &msi_domain_ops,
-> -							 &xilinx_pcie_msi_chip);
-> -		if (!port->irq_domain) {
-> -			dev_err(dev, "Failed to get a MSI IRQ domain\n");
-> -			return PTR_ERR(port->irq_domain);
-> -		}
-> +	if (!IS_ENABLED(CONFIG_PCI_MSI))
-> +		return 0;
->  
-> -		xilinx_pcie_enable_msi(port);
-> +	/* Setup MSI */
-> +	port->msi_irq_domain = irq_domain_add_linear(node,
-> +						     XILINX_NUM_MSI_IRQS,
-> +						     &msi_domain_ops,
-> +						     &xilinx_pcie_msi_chip);
-> +	if (!port->msi_irq_domain) {
-> +		dev_err(dev, "Failed to get a MSI IRQ domain\n");
-> +		return PTR_ERR(port->msi_irq_domain);
->  	}
->  
-> +	xilinx_pcie_enable_msi(port);
->  	return 0;
->  }
->  
-> @@ -868,7 +860,13 @@ static int xilinx_pcie_remove(struct platform_device *pdev)
->  {
->  	struct xilinx_pcie_port *port = platform_get_drvdata(pdev);
->  
-> -	xilinx_pcie_free_irq_domain(port);
-> +	xilinx_pcie_free_irq_domain(port->irq_domain, 4);
-> +
-> +	if (config_enabled(CONFIG_MSI)) {
-> +		free_pages(port->msi_pages, 0);
-> +		xilinx_pcie_free_irq_domain(port->msi_irq_domain,
-> +					    XILINX_NUM_MSI_IRQS);
-> +	}
->  
->  	return 0;
->  }
-> -- 
-> 2.6.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Best Regards
+Salil
+>>   #define PPE_INTEN_REG 0x100
+>>   #define PPE_RINT_REG                0x104
+>>   #define PPE_INTSTS_REG                0x108
+>
+> MBR, Sergei
+>
