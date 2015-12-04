@@ -1,40 +1,39 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 4 Dec 2015 22:08:42 +0100
-Subject: [PATCH 1/2] phy: berlin-usb: remove non-necessary header files
-In-Reply-To: <1449237421-5552-2-git-send-email-jszhang@marvell.com>
+Date: Fri, 4 Dec 2015 22:09:19 +0100
+Subject: [PATCH 2/2] phy: berlin-usb: don't set device's driver_data
+In-Reply-To: <1449237421-5552-3-git-send-email-jszhang@marvell.com>
 References: <1449237421-5552-1-git-send-email-jszhang@marvell.com>
- <1449237421-5552-2-git-send-email-jszhang@marvell.com>
-Message-ID: <20151204210842.GA7200@kwain>
+ <1449237421-5552-3-git-send-email-jszhang@marvell.com>
+Message-ID: <20151204210919.GB7200@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2015 at 09:57:00PM +0800, Jisheng Zhang wrote:
-> We don't need gpio related header files, so remove them.
+On Fri, Dec 04, 2015 at 09:57:01PM +0800, Jisheng Zhang wrote:
+> After commit 739ae3452d0e ("phy: berlin-usb: Set drvdata for phy and
+> use it"), we get the address of priv by phy_get_drvdata(), so there's
+> no need to set device's driver_data any more. This patch removes the
+> call of platform_set_drvdata().
 > 
 > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 
 Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
 > ---
->  drivers/phy/phy-berlin-usb.c | 2 --
->  1 file changed, 2 deletions(-)
+>  drivers/phy/phy-berlin-usb.c | 1 -
+>  1 file changed, 1 deletion(-)
 > 
 > diff --git a/drivers/phy/phy-berlin-usb.c b/drivers/phy/phy-berlin-usb.c
-> index 797ba17..7bbb473 100644
+> index 7bbb473..2017751 100644
 > --- a/drivers/phy/phy-berlin-usb.c
 > +++ b/drivers/phy/phy-berlin-usb.c
-> @@ -9,11 +9,9 @@
->   * warranty of any kind, whether express or implied.
->   */
+> @@ -193,7 +193,6 @@ static int phy_berlin_usb_probe(struct platform_device *pdev)
+>  		return PTR_ERR(phy);
+>  	}
 >  
-> -#include <linux/gpio.h>
->  #include <linux/io.h>
->  #include <linux/module.h>
->  #include <linux/of_device.h>
-> -#include <linux/of_gpio.h>
->  #include <linux/phy/phy.h>
->  #include <linux/platform_device.h>
->  #include <linux/reset.h>
+> -	platform_set_drvdata(pdev, priv);
+>  	phy_set_drvdata(phy, priv);
+>  
+>  	phy_provider =
 > -- 
 > 2.6.2
 > 
@@ -54,4 +53,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151204/91f484a2/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151204/113bb1d5/attachment-0001.sig>
