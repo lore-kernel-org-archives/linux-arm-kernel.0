@@ -1,58 +1,55 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Fri, 4 Dec 2015 16:29:24 +0100
-Subject: [PATCH v2 1/5] printk/nmi: Generic solution for safe printk in NMI
-In-Reply-To: <1449024316.11810.6.camel@ellerman.id.au>
-References: <1448622572-16900-1-git-send-email-pmladek@suse.com>
- <1448622572-16900-2-git-send-email-pmladek@suse.com>
- <1449024316.11810.6.camel@ellerman.id.au>
-Message-ID: <20151204152924.GB20935@pathway.suse.cz>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 4 Dec 2015 18:35:50 +0300
+Subject: [RFC2 PATCH v6 00/19] ILP32 for ARM64
+In-Reply-To: <20151203175955.GP10747@e104818-lin.cambridge.arm.com>
+References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
+ <20151203175955.GP10747@e104818-lin.cambridge.arm.com>
+Message-ID: <20151204153550.GB1251@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2015-12-02 13:45:16, Michael Ellerman wrote:
-> On Fri, 2015-11-27 at 12:09 +0100, Petr Mladek wrote:
+On Thu, Dec 03, 2015 at 05:59:55PM +0000, Catalin Marinas wrote:
+> On Wed, Nov 18, 2015 at 12:16:40AM +0300, Yury Norov wrote:
+> >  - ILP32 VDSO code excluded. It's not mandatory, and caused questions
+> >    during review process. We definitely make sure we will follow up
+> >    with a VDSO later on because it is needed for performance reasons;
 > 
-> > printk() takes some locks and could not be used a safe way in NMI
-> > context.
-> > 
-> > The chance of a deadlock is real especially when printing
-> > stacks from all CPUs. This particular problem has been addressed
-> > on x86 by the commit a9edc8809328 ("x86/nmi: Perform a safe NMI stack
-> > trace on all CPUs").
+> I already asked in one of the patches, don't you need a VDSO for
+> sigreturn?
 > 
-> ...
-> 
-> > diff --git a/kernel/printk/nmi.c b/kernel/printk/nmi.c
-> > new file mode 100644
-> > index 000000000000..3989e13a0021
-> > --- /dev/null
-> > +++ b/kernel/printk/nmi.c
-> > @@ -0,0 +1,200 @@
-> 
-> ...
-> 
-> > +
-> > +struct nmi_seq_buf {
-> > +	atomic_t		len;	/* length of written data */
-> > +	struct irq_work		work;	/* IRQ work that flushes the buffer */
-> > +	unsigned char		buffer[PAGE_SIZE - sizeof(atomic_t) -
-> > +				       sizeof(struct irq_work)];
-> > +};
-> > +static DEFINE_PER_CPU(struct nmi_seq_buf, nmi_print_seq);
-> 
-> 
-> PAGE_SIZE isn't always 4K.
-> 
-> On typical powerpc systems this will give you 128K, and on some 512K, which is
-> probably not what we wanted.
 
-Good point!
+I didn't realise it's mandatory for ARMv8 when removed it. I'll back
+it, but I think rework required anyway.
 
-> The existing code just did:
 > 
-> #define NMI_BUF_SIZE           4096
+> Have you run any AArch32 LTP with these patches? The results should also
+> be included in your table above.
+> 
 
-I will change this to 8192. The 4kB were not enough in some cases.
+The full regression table is:
+		ILP32		LP64            AARCH32 (v4.3 & v4.3 + ILP32)
 
-Best Regards,
-Petr
+float_bessel    FAIL	 134    PASSED	0       PASSED	0
+float_exp_log   FAIL	 134    PASSED	0       PASSED	0
+float_iperb     FAIL	 134    PASSED	0       PASSED	0
+float_power     FAIL	 134    PASSED	0       PASSED	0
+float_trigo     FAIL	 134    PASSED	0       PASSED	0
+abort01         FAIL       2    FAIL 	2       FAIL 	2
+fcntl14         FAIL       2    FAIL 	2       PASSED	0
+kill11          FAIL       2    FAIL 	2       FAIL 	2
+mmap16          FAIL       6    PASSED	0       PASSED	0
+open12          FAIL       2    PASSED	0       PASSED	0
+pause01         PASSED     0    FAIL 	9       FAIL 	9
+pipe07          FAIL       2    PASSED	0       PASSED	0
+readdir01       FAIL       1    PASSED	0       PASSED	0
+rename11        FAIL       2    PASSED	0       PASSED	0
+rmdir02         FAIL       2    PASSED	0       PASSED	0
+setregid02      FAIL       1    FAIL 	1       PASSED	0
+settimeofday01  FAIL       1    FAIL 	1       FAIL 	5
+umount2_01      FAIL       2    PASSED	0       PASSED	0
+umount2_02      FAIL       2    PASSED	0       PASSED	0
+umount2_03      FAIL       2    PASSED	0       PASSED	0
+utime06         FAIL       2    PASSED	0       PASSED	0
+
+Fortunately, there's no aarch32 regression. Note that pause01 and
+setregid02 are not stable. 
