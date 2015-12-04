@@ -1,116 +1,172 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri,  4 Dec 2015 18:56:02 +0100
-Subject: [PATCH v2] ARM: at91: fix pinctrl driver selection
-Message-ID: <1449251762-11666-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 4 Dec 2015 12:17:49 -0600
+Subject: [PATCH 05/28] PCI: xilinx: keep references to both IRQ domains
+In-Reply-To: <1448900513-20856-6-git-send-email-paul.burton@imgtec.com>
+References: <1448900513-20856-1-git-send-email-paul.burton@imgtec.com>
+ <1448900513-20856-6-git-send-email-paul.burton@imgtec.com>
+Message-ID: <20151204181749.GB20125@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+Hi Paul,
 
-Move the selection of the pinctrl driver to SoC family level since we
-have two pinctrl drivers. It is useless to select one which is not
-compatible with the SoC.
+Please capitalize the first word of your PCI changelog subjects.
 
-[abelloni: fixed pm.c when only sama2d2 is selected]
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
-Changes in v2:
- - use CONFIG_PINCTRL_AT91 properly
+On Mon, Nov 30, 2015 at 04:21:30PM +0000, Paul Burton wrote:
+> pcie-xilinx creates 2 IRQ domains when built with MSI support: one for
+> MSI interrupts & one for legacy INTx interrupts. However, it only kept a
+> reference to the MSI IRQ domain. This means that any INTx interrupts
+> that may occur would be mapped using the wrong domain, and that only the
+> MSI IRQ domain would be removed along with the driver. Track both IRQ
+> domains & clean up both as appropriate.
 
+It looks like this fixes a problem in the original commit 8961def56845
+("PCI: xilinx: Add Xilinx AXI PCIe Host Bridge IP driver"), which
+appeared in v3.18.  Does this need a stable backport tag?
 
- arch/arm/mach-at91/Kconfig | 6 +++++-
- arch/arm/mach-at91/pm.c    | 7 ++++++-
- 2 files changed, 11 insertions(+), 2 deletions(-)
+It sounds like any device using INTx just won't work?  From later
+patches, I surmise that this series might be related to using Xilinx
+in a new MIPS Boston board.  If that's the case, and pre-v4.5 kernels
+don't support that board anyway, a stable backport might not be
+needed.  It *does* fix a leak even if you don't need INTx, but that
+seems minor and probably not worth a stable backport all by itself.
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 92673006e55c..28656c2b54a0 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -4,7 +4,6 @@ menuconfig ARCH_AT91
- 	select ARCH_REQUIRE_GPIOLIB
- 	select COMMON_CLK_AT91
- 	select PINCTRL
--	select PINCTRL_AT91
- 	select SOC_BUS
- 
- if ARCH_AT91
-@@ -17,6 +16,7 @@ config SOC_SAMA5D2
- 	select HAVE_AT91_USB_CLK
- 	select HAVE_AT91_H32MX
- 	select HAVE_AT91_GENERATED_CLK
-+	select PINCTRL_AT91PIO4
- 	help
- 	  Select this if ou are using one of Atmel's SAMA5D2 family SoC.
- 
-@@ -27,6 +27,7 @@ config SOC_SAMA5D3
- 	select HAVE_AT91_UTMI
- 	select HAVE_AT91_SMD
- 	select HAVE_AT91_USB_CLK
-+	select PINCTRL_AT91
- 	help
- 	  Select this if you are using one of Atmel's SAMA5D3 family SoC.
- 	  This support covers SAMA5D31, SAMA5D33, SAMA5D34, SAMA5D35, SAMA5D36.
-@@ -40,6 +41,7 @@ config SOC_SAMA5D4
- 	select HAVE_AT91_SMD
- 	select HAVE_AT91_USB_CLK
- 	select HAVE_AT91_H32MX
-+	select PINCTRL_AT91
- 	help
- 	  Select this if you are using one of Atmel's SAMA5D4 family SoC.
- 
-@@ -50,6 +52,7 @@ config SOC_AT91RM9200
- 	select CPU_ARM920T
- 	select HAVE_AT91_USB_CLK
- 	select MIGHT_HAVE_PCI
-+	select PINCTRL_AT91
- 	select SOC_SAM_V4_V5
- 	select SRAM if PM
- 	help
-@@ -65,6 +68,7 @@ config SOC_AT91SAM9
- 	select HAVE_AT91_UTMI
- 	select HAVE_FB_ATMEL
- 	select MEMORY
-+	select PINCTRL_AT91
- 	select SOC_SAM_V4_V5
- 	select SRAM if PM
- 	help
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 80e277cfcc8b..23726fb31741 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -41,8 +41,10 @@
-  * implementation should be moved down into the pinctrl driver and get
-  * called as part of the generic suspend/resume path.
-  */
-+#ifdef CONFIG_PINCTRL_AT91
- extern void at91_pinctrl_gpio_suspend(void);
- extern void at91_pinctrl_gpio_resume(void);
-+#endif
- 
- static struct {
- 	unsigned long uhp_udp_mask;
-@@ -151,8 +153,9 @@ static void at91_pm_suspend(suspend_state_t state)
- 
- static int at91_pm_enter(suspend_state_t state)
- {
-+#ifdef CONFIG_PINCTRL_AT91
- 	at91_pinctrl_gpio_suspend();
--
-+#endif
- 	switch (state) {
- 	/*
- 	 * Suspend-to-RAM is like STANDBY plus slow clock mode, so
-@@ -192,7 +195,9 @@ static int at91_pm_enter(suspend_state_t state)
- error:
- 	target_state = PM_SUSPEND_ON;
- 
-+#ifdef CONFIG_PINCTRL_AT91
- 	at91_pinctrl_gpio_resume();
-+#endif
- 	return 0;
- }
- 
--- 
-2.5.0
+I probably *would* add a 'Fixes: 8961def56845 ("PCI: xilinx: Add
+Xilinx AXI PCIe Host Bridge IP driver")' line to leave breadcrumbs for
+people backporting things.
+
+This seems to be part of a larger series -- can these PCI patches go
+through my tree, or do they all need to go together because of
+dependencies on the rest of the series?
+
+They all need acks from Michal, of course.
+
+> Signed-off-by: Paul Burton <paul.burton@imgtec.com>
+> ---
+> 
+>  drivers/pci/host/pcie-xilinx.c | 58 ++++++++++++++++++++----------------------
+>  1 file changed, 28 insertions(+), 30 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+> index 3c7a0d5..c412a37 100644
+> --- a/drivers/pci/host/pcie-xilinx.c
+> +++ b/drivers/pci/host/pcie-xilinx.c
+> @@ -105,6 +105,7 @@
+>   * @root_busno: Root Bus number
+>   * @dev: Device pointer
+>   * @irq_domain: IRQ domain pointer
+> + * @msi_irq_domain: MSI IRQ domain pointer
+>   * @bus_range: Bus range
+>   * @resources: Bus Resources
+>   */
+> @@ -115,6 +116,7 @@ struct xilinx_pcie_port {
+>  	u8 root_busno;
+>  	struct device *dev;
+>  	struct irq_domain *irq_domain;
+> +	struct irq_domain *msi_irq_domain;
+>  	struct resource bus_range;
+>  	struct list_head resources;
+>  };
+> @@ -291,7 +293,7 @@ static int xilinx_pcie_msi_setup_irq(struct msi_controller *chip,
+>  	if (hwirq < 0)
+>  		return hwirq;
+>  
+> -	irq = irq_create_mapping(port->irq_domain, hwirq);
+> +	irq = irq_create_mapping(port->msi_irq_domain, hwirq);
+>  	if (!irq)
+>  		return -EINVAL;
+>  
+> @@ -517,31 +519,21 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
+>  
+>  /**
+>   * xilinx_pcie_free_irq_domain - Free IRQ domain
+> - * @port: PCIe port information
+> + * @domain: the IRQ domain to free
+> + * @nr: the number of IRQs in the domain
+>   */
+> -static void xilinx_pcie_free_irq_domain(struct xilinx_pcie_port *port)
+> +static void xilinx_pcie_free_irq_domain(struct irq_domain *domain, int nr)
+>  {
+>  	int i;
+> -	u32 irq, num_irqs;
+> -
+> -	/* Free IRQ Domain */
+> -	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> -
+> -		free_pages(port->msi_pages, 0);
+> -
+> -		num_irqs = XILINX_NUM_MSI_IRQS;
+> -	} else {
+> -		/* INTx */
+> -		num_irqs = 4;
+> -	}
+> +	u32 irq;
+>  
+> -	for (i = 0; i < num_irqs; i++) {
+> -		irq = irq_find_mapping(port->irq_domain, i);
+> +	for (i = 0; i < nr; i++) {
+> +		irq = irq_find_mapping(domain, i);
+>  		if (irq > 0)
+>  			irq_dispose_mapping(irq);
+>  	}
+>  
+> -	irq_domain_remove(port->irq_domain);
+> +	irq_domain_remove(domain);
+>  }
+>  
+>  /**
+> @@ -571,20 +563,20 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
+>  		return PTR_ERR(port->irq_domain);
+>  	}
+>  
+> -	/* Setup MSI */
+> -	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> -		port->irq_domain = irq_domain_add_linear(node,
+> -							 XILINX_NUM_MSI_IRQS,
+> -							 &msi_domain_ops,
+> -							 &xilinx_pcie_msi_chip);
+> -		if (!port->irq_domain) {
+> -			dev_err(dev, "Failed to get a MSI IRQ domain\n");
+> -			return PTR_ERR(port->irq_domain);
+> -		}
+> +	if (!IS_ENABLED(CONFIG_PCI_MSI))
+> +		return 0;
+>  
+> -		xilinx_pcie_enable_msi(port);
+> +	/* Setup MSI */
+> +	port->msi_irq_domain = irq_domain_add_linear(node,
+> +						     XILINX_NUM_MSI_IRQS,
+> +						     &msi_domain_ops,
+> +						     &xilinx_pcie_msi_chip);
+> +	if (!port->msi_irq_domain) {
+> +		dev_err(dev, "Failed to get a MSI IRQ domain\n");
+> +		return PTR_ERR(port->msi_irq_domain);
+>  	}
+>  
+> +	xilinx_pcie_enable_msi(port);
+>  	return 0;
+>  }
+>  
+> @@ -868,7 +860,13 @@ static int xilinx_pcie_remove(struct platform_device *pdev)
+>  {
+>  	struct xilinx_pcie_port *port = platform_get_drvdata(pdev);
+>  
+> -	xilinx_pcie_free_irq_domain(port);
+> +	xilinx_pcie_free_irq_domain(port->irq_domain, 4);
+> +
+> +	if (config_enabled(CONFIG_MSI)) {
+> +		free_pages(port->msi_pages, 0);
+> +		xilinx_pcie_free_irq_domain(port->msi_irq_domain,
+> +					    XILINX_NUM_MSI_IRQS);
+> +	}
+>  
+>  	return 0;
+>  }
+> -- 
+> 2.6.2
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
