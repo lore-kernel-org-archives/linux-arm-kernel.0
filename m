@@ -1,61 +1,92 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 4 Dec 2015 16:48:48 -0600
-Subject: [RFC PATCH 1/2] PCI/ACPI: Add ACPI support for non ECAM Host
- Bridge Controllers
-In-Reply-To: <2425021.SWJx48r3Ls@wuerfel>
-References: <1449155999-220955-1-git-send-email-gabriele.paoloni@huawei.com>
- <5018756.5lEEeJVMod@wuerfel> <5661FB9B.20201@arm.com>
- <2425021.SWJx48r3Ls@wuerfel>
-Message-ID: <56621850.4070009@arm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 04 Dec 2015 15:06:34 -0800
+Subject: [PATCH v5 1/5] dt-bindings: add SMP enable-method for Broadcom NSP
+In-Reply-To: <1449260611-24417-2-git-send-email-kapilh@broadcom.com>
+References: <1449260611-24417-1-git-send-email-kapilh@broadcom.com>
+ <1449260611-24417-2-git-send-email-kapilh@broadcom.com>
+Message-ID: <56621C7A.5050202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2015 03:34 PM, Arnd Bergmann wrote:
-> On Friday 04 December 2015 14:46:19 Jeremy Linton wrote:
->> On 12/03/2015 02:58 PM, Arnd Bergmann wrote:
->>> On Thursday 03 December 2015 17:58:26 Lorenzo Pieralisi wrote:
->>>> I will put together a proposal to define the way we specify HID and
->>>> related DSD properties for PCI host controllers and send it to
->>>> the ACPI working group for review.
->>>
->>> That also requires a change to SBSA, right? Today, SBSA assumes that
->>> we have a standard PCI host that will work with any hardware independent
->>> PCI implementation in an OS. We either have to give up on SBSA saying
->>> much about how PCI hosts are implemented, or stop assuming that hardware
->>> is SBSA compliant.
->>
->> Which would be standardizing nonstandard hardware. It would surprise me
->> if that got much traction.
->
-> What do you suggest instead?
+On 04/12/15 12:23, Kapil Hali wrote:
+> Add a compatible string "brcm,bcm-nsp-smp" for Broadcom's
+> Northstar Plus CPU to the 32-bit ARM CPU device tree binding
+> documentation file and create a new binding documentation for
+> Northstar Plus CPU.
+> 
+> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+> ---
+>  .../bindings/arm/bcm/brcm,nsp-cpu-method.txt       | 39 ++++++++++++++++++++++
+>  Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
+>  2 files changed, 40 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+> new file mode 100644
+> index 0000000..bf08872
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+> @@ -0,0 +1,39 @@
+> +Broadcom Northstar Plus SoC CPU Enable Method
+> +---------------------------------------------
+> +This binding defines the enable method used for starting secondary
+> +CPUs in the following Broadcom SoCs:
+> +  BCM58522, BCM58525, BCM58535, BCM58622, BCM58623, BCM58625, BCM88312
+> +
+> +The enable method is specified by defining the following required
+> +properties in the "cpus" device tree node:
+> +  - enable-method = "brcm,bcm-nsp-smp";
+> +  - secondary-boot-reg = <...>;
 
-Arnd,
+That comment is not quite correct with respect to the paragraph below then?
 
-Well... I'm simply trying to say that IMHO involving a standards 
-committee to get involved with quirky hardware is a little unusual. They 
-didn't have to get involved for the dozens of pieces of hardware already 
-quirked by the PCI paths in linux.
+> +
+> +The secondary-boot-reg property is a u32 value that specifies the
+> +physical address of the register which should hold the common
+> +entry point for a secondary CPU. This entry is cpu node specific
+> +and should be added per cpu. E.g., in case of NSP (BCM58625) which
+> +is a dual core CPU SoC, this entry should be added to cpu1 node.
+> +
+> +
+> +Example:
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		enable-method = "brcm,bcm-nsp-smp";
 
-So, in the end I think its more a question of finding an acceptable 
-solution given linux's bus/driver model. In that case I am 100% open to 
-constructive suggestions that will result in something that will be 
-accepted into mainline. AKA if someone says "do it this way and I will 
-take it" then I will go off an make that work. Put another way, I don't 
-think anyone likes the need for the existing quirking/blacklisting/etc 
-mechanisms for dealing with "buggy" hardware but that doesn't stop them 
-from being in the kernel.
+Based on the requested feedback, this property should now be placed
+under the cpu1 node.
 
-For this particular problem, in the case of the APM part I have there 
-are probably a handful of ways to get it working. Mark Salter posted a 
-patch last year (based on ACPI OEM id) which could be rebased. That is 
-where I started recently, but deviated because of complaints on kernel 
-lists about it. Right now, I've been trying to delay the quirk detection 
-until after the scan has started so that I can use the root pcie VID/PID 
-and restart the scan once the correct ops functions have been installed.
+> +
+> +		cpu0: cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			next-level-cache = <&L2>;
+> +			reg = <0>;
+> +		};
+> +
+> +		cpu1: cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			next-level-cache = <&L2>;
+> +			reg = <1>;
+> +			secondary-boot-reg = <0xffff042c>;
+> +		};
+> +	};
+> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> index 3a07a87..d191554 100644
+> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> @@ -190,6 +190,7 @@ nodes to be present and contain the properties described below.
+>  			    "allwinner,sun6i-a31"
+>  			    "allwinner,sun8i-a23"
+>  			    "arm,psci"
+> +			    "brcm,bcm-nsp-smp"
+>  			    "brcm,brahma-b15"
+>  			    "marvell,armada-375-smp"
+>  			    "marvell,armada-380-smp"
+> 
 
-Anyway, these two patches (and my unposted one) all have something in 
-common vs much of the existing quirk infrastructure. We are trying to 
-add a dynamic registration system so the quirks are isolated to the host 
-driver rather than hard-coded into the pcie subsystem. I think that is a 
-good thing. I can model them on the CRS quirks but I'm pretty sure that 
-is worse.
+
+-- 
+Florian
