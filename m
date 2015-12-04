@@ -1,84 +1,105 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 4 Dec 2015 11:20:57 +0200
-Subject: [PATCH 7/7] ARM: dts: Enable emmc on hp t410
-In-Reply-To: <1449192335-10137-8-git-send-email-tony@atomide.com>
-References: <1449192335-10137-1-git-send-email-tony@atomide.com>
- <1449192335-10137-8-git-send-email-tony@atomide.com>
-Message-ID: <56615AF9.5000208@ti.com>
+From: alex.aring@gmail.com (Alexander Aring)
+Date: Fri, 4 Dec 2015 10:22:32 +0100
+Subject: [PATCH 2/3] ARM: bcm2835: add rpi power domain driver
+In-Reply-To: <7hr3j5696q.fsf@deeprootsystems.com>
+References: <1447956490-22930-1-git-send-email-alex.aring@gmail.com>
+ <1447956490-22930-3-git-send-email-alex.aring@gmail.com>
+ <7hr3j782qr.fsf@deeprootsystems.com> <20151201210037.GB2074@omega>
+ <7hr3j5696q.fsf@deeprootsystems.com>
+Message-ID: <20151204092227.GA1915@omega>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2015 03:25 AM, Tony Lindgren wrote:
-> There's a 2GB emmc on hp t410 that's wired to the sd_2 interface.
-> Note that we also need to configure the evtmux using edma_xbar for
-> edma channels.
+Hi,
+
+Meanwhile there exists a new RPi firmware with a new interface to setup
+power domains. Eric Anholt already did some work to access new interface
+and old one based on this patch.
+
+The next days he want to sent this new driver mainline, I will stop the work
+now.
+
+I will add some review notes anyway, maybe Eric Anholt can pick them up.
+
+On Tue, Dec 01, 2015 at 03:27:57PM -0800, Kevin Hilman wrote:
+> Alexander Aring <alex.aring@gmail.com> writes:
 > 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-One question inlined for the mmc3, other than that:
-Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-
-> ---
->  arch/arm/boot/dts/dm8148-t410.dts | 35 +++++++++++++++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
+> > Hi,
+> >
+> > On Mon, Nov 30, 2015 at 03:51:56PM -0800, Kevin Hilman wrote:
+> >> Alexander Aring <alex.aring@gmail.com> writes:
+> >> 
+> >> > This patch adds support for RPi several Power Domains and enable support
+> >> > to enable the USB Power Domain when it's not enabled before.
+> >> >
+> >> > This patch based on Eric Anholt's patch to support Power Domains. He had
+> >> > an issue about -EPROBE_DEFER inside the power domain subsystem, this
+> >> > issue was solved by commit <311fa6a> ("PM / Domains: Return -EPROBE_DEFER
+> >> > if we fail to init or turn-on domain").
+> >> 
+> >> [...]
+> >> 
+> >> > +#define RPI_POWER_DOMAIN(_domain, _name)			\
+> >> > +	[_domain] = {						\
+> >> 
+> >> Using _domain as the array index is going to create a sparsely filled
+> >> array here, wasting memory.   I'm not sure what the other domain numbers
+> >> are for other domains to know if this is a big waste or not, but it's
+> >> still a bit wasteful.
+> >> 
+> >> In any case, AFAICT, it doesn't look like you need to have the array
+> >> index match the domain number anyways since you're using container_of().
+> >> 
+> >> So I suggest just removing this array index part, and just creating them
+> >> in arrary order.  Then your _probe function isn't going to try to setup
+> >> 3 non-enabled domains before it finally hits the USB domain.
+> >> 
+> >
+> > The idea is here to keeping the _same_ power domains indexes for
+> > device-tree power domain API like the RPi firmware provides it.
+> >
+> > If somebody dumps the devicetree and see the power domain index, if
+> > he/she does then a firmware API power domain index mapping it is wrong.
+> > Because we need then a separate mapping:
+> >
+> > $ARRAY_DEFINED_INDEX <-> $RPI_FIRMWARE_POWER_DOMAIN_API_INDEX
+> >
+> > With the current solution to make a 1:1 mapping it there is no
+> > confusing anymore, because:
+> >
+> > $ARRAY_DEFINED_INDEX == $RPI_FIRMWARE_POWER_DOMAIN_API_INDEX
 > 
-> diff --git a/arch/arm/boot/dts/dm8148-t410.dts b/arch/arm/boot/dts/dm8148-t410.dts
-> index 79838dd..d1927a7 100644
-> --- a/arch/arm/boot/dts/dm8148-t410.dts
-> +++ b/arch/arm/boot/dts/dm8148-t410.dts
-> @@ -15,6 +15,13 @@
->  		device_type = "memory";
->  		reg = <0x80000000 0x40000000>;	/* 1 GB */
->  	};
-> +
-> +	vmmcsd_fixed: fixedregulator at 0 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vmmcsd_fixed";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +	};
->  };
->  
->  &cpsw_emac0 {
-> @@ -26,3 +33,31 @@
->  	phy_id = <&davinci_mdio>, <1>;
->  	phy-mode = "rgmii";
->  };
-> +
-> +&mmc3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&sd2_pins>;
-> +	vmmc-supply = <&vmmcsd_fixed>;
-> +	bus-width = <8>;
-> +	dmas = <&edma_xbar 8 0 1	/* use SDTXEVT1 instead of MCASP0TX */
-> +		&edma_xbar 9 0 2>;	/* use SDRXEVT1 instead of MCASP0RX */
-> +	dma-names = "tx", "rx";
-
-Do you happened to know how the audio is connected on the board?
-The DM814x-EVM seams to be using McASP2 with aic3106 so it is possible that HP
-copied the design from there...
-
-> +};
-> +
-> +&pincntl {
-> +	sd2_pins: pinmux_sd2_pins {
-> +		pinctrl-single,pins = <
-> +			DM814X_IOPAD(0x09c0, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[7] */
-> +			DM814X_IOPAD(0x09c4, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[6] */
-> +			DM814X_IOPAD(0x09c8, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[5] */
-> +			DM814X_IOPAD(0x09cc, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[4] */
-> +			DM814X_IOPAD(0x09d0, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[3] */
-> +			DM814X_IOPAD(0x09d4, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[2] */
-> +			DM814X_IOPAD(0x09d8, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[1] */
-> +			DM814X_IOPAD(0x09dc, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[0] */
-> +			DM814X_IOPAD(0x09e0, PIN_INPUT | 0x1)		/* SD2_CLK */
-> +			DM814X_IOPAD(0x09f4, PIN_INPUT_PULLUP | 0x2)	/* SD2_CMD */
-> +			DM814X_IOPAD(0x0920, PIN_INPUT | 40)	/* SD2_SDCD */
-> +			>;
-> +	};
-> +};
+> I'm not proposing to change the DT numbers or the firmware numbers.  All
+> I'm proposing is that those numbers don't need to be mapped to the array
+> index.  IOW, in your structure definition macro:
+> 
+> +#define RPI_POWER_DOMAIN(_domain, _name)			\
+> +	[_domain] = {						\
+> +		.domain = _domain,				\
+> [...]
+> 
+> just drop the " [_domain] = { " line.
 > 
 
+This requires additional changes. We need to know the "maximum"
+registered index value of RPi power domain.
 
--- 
-P?ter
+Because the dynamic allocating array of (linux) power domains, which we
+determine by:
+
+... num_domains = ARRAY_SIZE(rpi_power_domains);
+
+The RPi power domain defines are also used by devicetree. Usually I
+would change it to an enum with a MAX_ATTR entry, which is not possible
+because devicetree compiler can't deal with enums.
+
+
+Anyway we could determine the max registered RPi power domain index by
+doing something like:
+
+num_domains = 0;
+
+for (i = 0; i < ARRAY_SIZE(rpi_power_domains); i++)
+	max(num_domains, array[i].domain);
+
+- Alex
