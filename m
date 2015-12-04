@@ -1,68 +1,112 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 4 Dec 2015 17:15:54 +0000
-Subject: [PATCH] drivers: dma-coherent: use ioremap_wc() for DMA_MEMORY_MAP
-In-Reply-To: <CAPcyv4gti=49v4gUVjf=4nhxBCPPM3xmq6MQ2sBoBnKQbCS5MQ@mail.gmail.com>
-References: <1448029226-4914-1-git-send-email-brian.starkey@arm.com>
- <20151204105000.GD10123@e104818-lin.cambridge.arm.com>
- <CAPcyv4gti=49v4gUVjf=4nhxBCPPM3xmq6MQ2sBoBnKQbCS5MQ@mail.gmail.com>
-Message-ID: <20151204171554.GO10123@e104818-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri,  4 Dec 2015 17:17:16 +0000
+Subject: [PATCH 1/5] arm64: KVM: Correctly handle zero register during MMIO
+In-Reply-To: <1449249440-28878-1-git-send-email-marc.zyngier@arm.com>
+References: <1449249440-28878-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1449249440-28878-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2015 at 08:59:10AM -0800, Dan Williams wrote:
-> On Fri, Dec 4, 2015 at 2:50 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Fri, Nov 20, 2015 at 02:20:26PM +0000, Brian Starkey wrote:
-> >> When the DMA_MEMORY_MAP flag is used, memory which can be accessed
-> >> directly should be returned, so use ioremap_wc() instead of ioremap().
-> >> Also, ensure that the correct memset operation is used in
-> >> dma_alloc_from_coherent() with respect to the region's flags.
-> >>
-> >> This fixes the below alignment fault on arm64, caused by invalid use
-> >> of memset() on Device memory.
-> >
-> > This is indeed affecting both arm32 and arm64 systems.
-> >
-> >> diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
-> >> index 55b8398..45358d0 100644
-> >> --- a/drivers/base/dma-coherent.c
-> >> +++ b/drivers/base/dma-coherent.c
-> >> @@ -31,7 +31,10 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_add
-> >>       if (!size)
-> >>               goto out;
-> >>
-> >> -     mem_base = ioremap(phys_addr, size);
-> >> +     if (flags & DMA_MEMORY_MAP)
-> >> +             mem_base = ioremap_wc(phys_addr, size);
-> >> +     else
-> >> +             mem_base = ioremap(phys_addr, size);
-> >
-> > I wonder whether a memremap() approach for the DMA_MEMORY_MAP case would
-> > be better. This API was added recently by commit 92281dee825f ("arch:
-> > introduce memremap()"). It only supports write-back and write-through
-> > but we could add a MEMREMAP_WC flag for this case.
-> 
-> I originally included both MEMREMAP_WC and MEMREAMP_UC as potential
-> flags to this api, but ultimately decided against it.  The memremap()
-> api is meant for memory that is known to have no i/o side effects.  As
-> far as I can see WC and UC usages are a muddy mix of "sometimes
-> there's I/O side effects, but it depends by arch and driver".  In
-> other words we can't drop the "__iomem" annotation from WC and UC
-> mappings by default.
+From: Pavel Fedin <p.fedin@samsung.com>
 
-In this context, the dma_declare_coherent_memory(DMA_MEMORY_MAP)
-implementation is aimed at normal RAM with no side effects as later
-returned by dma_alloc_coherent(). To me it looks like memremap is better
-suited here for the DMA_MEMORY_MAP case. As per the
-Documentation/DMA-API.txt:
+On ARM64 register index of 31 corresponds to both zero register and SP.
+However, all memory access instructions, use ZR as transfer register. SP
+is used only as a base register in indirect memory addressing, or by
+register-register arithmetics, which cannot be trapped here.
 
-  DMA_MEMORY_MAP - request that the memory returned from
-  dma_alloc_coherent() be directly writable.
+Correct emulation is achieved by introducing new register accessor
+functions, which can do special handling for reg_num == 31. These new
+accessors intentionally do not rely on old vcpu_reg() on ARM64, because
+it is to be removed. Since the affected code is shared by both ARM
+flavours, implementations of these accessors are also added to ARM32 code.
 
-which means no __iomem. Of course, we still need ioremap for
-DMA_MEMORY_IO which is supposed to be written with memcpy_toio() etc.
+This patch fixes setting MMIO register to a random value (actually SP)
+instead of zero by something like:
 
-Which memory type should be used is left to the driver and it should
-pass the corresponding DMA_MEMORY_* flag.
+ *((volatile int *)reg) = 0;
 
+compilers tend to generate "str wzr, [xx]" here
+
+[Marc: Fixed 32bit splat]
+
+Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/kvm_emulate.h   | 12 ++++++++++++
+ arch/arm/kvm/mmio.c                  |  5 +++--
+ arch/arm64/include/asm/kvm_emulate.h | 13 +++++++++++++
+ 3 files changed, 28 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index a9c80a2..3095df0 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -28,6 +28,18 @@
+ unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
+ unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
+ 
++static inline unsigned long vcpu_get_reg(struct kvm_vcpu *vcpu,
++					 u8 reg_num)
++{
++	return *vcpu_reg(vcpu, reg_num);
++}
++
++static inline void vcpu_set_reg(struct kvm_vcpu *vcpu, u8 reg_num,
++				unsigned long val)
++{
++	*vcpu_reg(vcpu, reg_num) = val;
++}
++
+ bool kvm_condition_valid(struct kvm_vcpu *vcpu);
+ void kvm_skip_instr(struct kvm_vcpu *vcpu, bool is_wide_instr);
+ void kvm_inject_undefined(struct kvm_vcpu *vcpu);
+diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+index 974b1c6..3a10c9f 100644
+--- a/arch/arm/kvm/mmio.c
++++ b/arch/arm/kvm/mmio.c
+@@ -115,7 +115,7 @@ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		trace_kvm_mmio(KVM_TRACE_MMIO_READ, len, run->mmio.phys_addr,
+ 			       data);
+ 		data = vcpu_data_host_to_guest(vcpu, data, len);
+-		*vcpu_reg(vcpu, vcpu->arch.mmio_decode.rt) = data;
++		vcpu_set_reg(vcpu, vcpu->arch.mmio_decode.rt, data);
+ 	}
+ 
+ 	return 0;
+@@ -186,7 +186,8 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	rt = vcpu->arch.mmio_decode.rt;
+ 
+ 	if (is_write) {
+-		data = vcpu_data_guest_to_host(vcpu, *vcpu_reg(vcpu, rt), len);
++		data = vcpu_data_guest_to_host(vcpu, vcpu_get_reg(vcpu, rt),
++					       len);
+ 
+ 		trace_kvm_mmio(KVM_TRACE_MMIO_WRITE, len, fault_ipa, data);
+ 		mmio_write_buf(data_buf, len, data);
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 3ca894e..5a182af 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -109,6 +109,19 @@ static inline unsigned long *vcpu_reg(const struct kvm_vcpu *vcpu, u8 reg_num)
+ 	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.regs[reg_num];
+ }
+ 
++static inline unsigned long vcpu_get_reg(const struct kvm_vcpu *vcpu,
++					 u8 reg_num)
++{
++	return (reg_num == 31) ? 0 : vcpu_gp_regs(vcpu)->regs.regs[reg_num];
++}
++
++static inline void vcpu_set_reg(struct kvm_vcpu *vcpu, u8 reg_num,
++				unsigned long val)
++{
++	if (reg_num != 31)
++		vcpu_gp_regs(vcpu)->regs.regs[reg_num] = val;
++}
++
+ /* Get vcpu SPSR for current mode */
+ static inline unsigned long *vcpu_spsr(const struct kvm_vcpu *vcpu)
+ {
 -- 
-Catalin
+2.1.4
