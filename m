@@ -1,112 +1,68 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri,  4 Dec 2015 18:18:33 +0100
-Subject: [PATCH] ARM: at91: fix pinctrl driver selection
-Message-ID: <1449249513-22972-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Dec 2015 17:12:55 +0000
+Subject: [PATCH v2 3/5] printk/nmi: Try hard to print Oops message in NMI
+ context
+In-Reply-To: <20151204152709.GA20935@pathway.suse.cz>
+References: <1448622572-16900-1-git-send-email-pmladek@suse.com>
+ <1448622572-16900-4-git-send-email-pmladek@suse.com>
+ <20151201234437.GA8644@n2100.arm.linux.org.uk>
+ <20151204152709.GA20935@pathway.suse.cz>
+Message-ID: <20151204171255.GZ8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Fri, Dec 04, 2015 at 04:27:09PM +0100, Petr Mladek wrote:
+> On Tue 2015-12-01 23:44:37, Russell King - ARM Linux wrote:
+> > On Fri, Nov 27, 2015 at 12:09:30PM +0100, Petr Mladek wrote:
+> > > What we can do, though, is to zap all printk locks. We already do this
+> > > when a printk recursion is detected. This should be safe because
+> > > the system is crashing and there shouldn't be any printk caller
+> > > that would cause the deadlock.
+> > 
+> > What about serial consoles which may call out to subsystems like the
+> > clk subsystem to enable a clock, which would want to take their own
+> > spinlocks in addition to the serial console driver?
+> 
+> Yes, there might be more locks used by the serial console but I do
+> not know how to handle them all easily. IMHO, this patch is just better
+> than nothing.
 
-Move the selection of the pinctrl driver to SoC family level since we
-have two pinctrl drivers. It is useless to select one which is not
-compatible with the SoC.
+I have a slightly different view...
 
-[abelloni: fixed pm.c when only sama2d2 is selected]
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/Kconfig | 6 +++++-
- arch/arm/mach-at91/pm.c    | 7 ++++++-
- 2 files changed, 11 insertions(+), 2 deletions(-)
+> > I don't see bust_spinlocks() dealing with any of these locks, so IMHO
+> > trying to make this work in NMI context strikes me as making the
+> > existing solution more unreliable on ARM systems.
+> 
+> bust_spinlocks() calls printk_nmi_flush() that would call printk()
+> that would zap "lockbuf_lock" and "console_sem" when in Oops and NMI.
+> Yes, there might be more locks blocked but we try to break at least
+> the first two walls. Also zapping is allowed only once per 30 seconds,
+> see zap_locks(). Why do you think that it might make things more
+> unreliable, please?
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 92673006e55c..28656c2b54a0 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -4,7 +4,6 @@ menuconfig ARCH_AT91
- 	select ARCH_REQUIRE_GPIOLIB
- 	select COMMON_CLK_AT91
- 	select PINCTRL
--	select PINCTRL_AT91
- 	select SOC_BUS
- 
- if ARCH_AT91
-@@ -17,6 +16,7 @@ config SOC_SAMA5D2
- 	select HAVE_AT91_USB_CLK
- 	select HAVE_AT91_H32MX
- 	select HAVE_AT91_GENERATED_CLK
-+	select PINCTRL_AT91PIO4
- 	help
- 	  Select this if ou are using one of Atmel's SAMA5D2 family SoC.
- 
-@@ -27,6 +27,7 @@ config SOC_SAMA5D3
- 	select HAVE_AT91_UTMI
- 	select HAVE_AT91_SMD
- 	select HAVE_AT91_USB_CLK
-+	select PINCTRL_AT91
- 	help
- 	  Select this if you are using one of Atmel's SAMA5D3 family SoC.
- 	  This support covers SAMA5D31, SAMA5D33, SAMA5D34, SAMA5D35, SAMA5D36.
-@@ -40,6 +41,7 @@ config SOC_SAMA5D4
- 	select HAVE_AT91_SMD
- 	select HAVE_AT91_USB_CLK
- 	select HAVE_AT91_H32MX
-+	select PINCTRL_AT91
- 	help
- 	  Select this if you are using one of Atmel's SAMA5D4 family SoC.
- 
-@@ -50,6 +52,7 @@ config SOC_AT91RM9200
- 	select CPU_ARM920T
- 	select HAVE_AT91_USB_CLK
- 	select MIGHT_HAVE_PCI
-+	select PINCTRL_AT91
- 	select SOC_SAM_V4_V5
- 	select SRAM if PM
- 	help
-@@ -65,6 +68,7 @@ config SOC_AT91SAM9
- 	select HAVE_AT91_UTMI
- 	select HAVE_FB_ATMEL
- 	select MEMORY
-+	select PINCTRL_AT91
- 	select SOC_SAM_V4_V5
- 	select SRAM if PM
- 	help
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 80e277cfcc8b..01cbb17e6f6b 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -41,8 +41,10 @@
-  * implementation should be moved down into the pinctrl driver and get
-  * called as part of the generic suspend/resume path.
-  */
-+#ifdef PINCTRL_AT91
- extern void at91_pinctrl_gpio_suspend(void);
- extern void at91_pinctrl_gpio_resume(void);
-+#endif
- 
- static struct {
- 	unsigned long uhp_udp_mask;
-@@ -151,8 +153,9 @@ static void at91_pm_suspend(suspend_state_t state)
- 
- static int at91_pm_enter(suspend_state_t state)
- {
-+#ifdef PINCTRL_AT91
- 	at91_pinctrl_gpio_suspend();
--
-+#endif
- 	switch (state) {
- 	/*
- 	 * Suspend-to-RAM is like STANDBY plus slow clock mode, so
-@@ -192,7 +195,9 @@ static int at91_pm_enter(suspend_state_t state)
- error:
- 	target_state = PM_SUSPEND_ON;
- 
-+#ifdef PINCTRL_AT91
- 	at91_pinctrl_gpio_resume();
-+#endif
- 	return 0;
- }
- 
+Take the scenario where CPU1 is in the middle of a printk(), and is
+holding its lock.
+
+CPU0 comes along and decides to trigger a NMI backtrace.  This sends
+a NMI to CPU1, which takes it in the middle of the serial console
+output.
+
+With the existing solution, the NMI output will be written to the
+temporary buffer, and CPU1 has finished handling the NMI it resumes
+the serial console output, eventually dropping the lock.  That then
+allows CPU0 to print the contents of all buffers, and we get NMI
+printk output.
+
+With this solution, as I understand it, we'll instead end up with
+CPU1's printk trying to output direct to the console, and although
+we've busted a couple of locks, we won't have busted the serial
+console locks, so CPU1 will deadlock - and that will stop any output
+what so ever.
+
+If this is correct, then the net result is that we go from NMI with
+serial console producing output to NMI with serial console being
+less reliable at producing output.
+
 -- 
-2.5.0
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
