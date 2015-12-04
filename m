@@ -1,16 +1,16 @@
 From: eballetbo@gmail.com (Enric Balletbo Serra)
-Date: Fri, 4 Dec 2015 15:36:52 +0100
-Subject: [PATCH 1/2] ARM: dts: omap3-igep0020: Use MMC pwrseq to init SDIO
+Date: Fri, 4 Dec 2015 15:37:12 +0100
+Subject: [PATCH 2/2] ARM: dts: omap3-igep0030: Use MMC pwrseq to init SDIO
  WiFi
-In-Reply-To: <1449165729-993-2-git-send-email-javier@osg.samsung.com>
+In-Reply-To: <1449165729-993-3-git-send-email-javier@osg.samsung.com>
 References: <1449165729-993-1-git-send-email-javier@osg.samsung.com>
- <1449165729-993-2-git-send-email-javier@osg.samsung.com>
-Message-ID: <CAFqH_50v7gkxWqwVMLtwn9g5WTRF7k16_r1Xaztt3GC4wO9wiA@mail.gmail.com>
+ <1449165729-993-3-git-send-email-javier@osg.samsung.com>
+Message-ID: <CAFqH_51Xsmg5D=YCZR3QHmoa_xahOo-P9o4jFcjc6HqUpFF3yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 2015-12-03 19:02 GMT+01:00 Javier Martinez Canillas <javier@osg.samsung.com>:
-> When the WiFi support was added to the IGEP0020 board, the MMC subsystem
+> When the WiFi support was added to the IGEP0030 board, the MMC subsystem
 > did not provide a mechanism to define power sequence providers. So a DT
 > hack was used to toggle the WiFi chip reset and power down pins by using
 > fake fixed regulators whose enable GPIO was the GPIOs connected to these
@@ -20,18 +20,19 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > the workaround removed.
 >
 > Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>
 > ---
 >
->  arch/arm/boot/dts/omap3-igep0020.dts | 24 ++++++++----------------
+>  arch/arm/boot/dts/omap3-igep0030.dts | 24 ++++++++----------------
 >  1 file changed, 8 insertions(+), 16 deletions(-)
 >
-> diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
-> index 3835e1569c29..33d6b4ead092 100644
-> --- a/arch/arm/boot/dts/omap3-igep0020.dts
-> +++ b/arch/arm/boot/dts/omap3-igep0020.dts
+> diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
+> index 468608dab30a..55b0cc4f5ee5 100644
+> --- a/arch/arm/boot/dts/omap3-igep0030.dts
+> +++ b/arch/arm/boot/dts/omap3-igep0030.dts
 > @@ -15,25 +15,17 @@
->         model = "IGEPv2 Rev. C (TI OMAP AM/DM37x)";
->         compatible = "isee,omap3-igep0020", "ti,omap36xx", "ti,omap3";
+>         model = "IGEP COM MODULE Rev. E (TI OMAP AM/DM37x)";
+>         compatible = "isee,omap3-igep0030", "ti,omap36xx", "ti,omap3";
 >
 > -       /* Regulator to trigger the WIFI_PDN signal of the Wifi module */
 > -       lbee1usjyc_pdn: lbee1usjyc_pdn {
@@ -61,7 +62,7 @@ List-Id: linux-arm-kernel.lists.infradead.org
 >         };
 >  };
 >
-> @@ -51,8 +43,8 @@
+> @@ -62,8 +54,8 @@
 >  &mmc2 {
 >         pinctrl-names = "default";
 >         pinctrl-0 = <&mmc2_pins &lbee1usjyc_pins>;
@@ -75,7 +76,5 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > --
 > 2.4.3
 >
-
-I also tested these patches
 
 Acked-by: Enric Balletbo Serra <enric.balletbo@collabora.com>
