@@ -1,47 +1,45 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 4 Dec 2015 22:10:50 +0800
-Subject: [PATCH 5/7] usb: xhci: plat: Remove checks for optional clock in
- error/remove path
+Date: Fri, 4 Dec 2015 22:10:48 +0800
+Subject: [PATCH 3/7] usb: xhci: plat: Fix suspend/resume when the optional
+ usb_phy exists
 In-Reply-To: <1449238252-5630-1-git-send-email-jszhang@marvell.com>
 References: <1449238252-5630-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1449238252-5630-6-git-send-email-jszhang@marvell.com>
+Message-ID: <1449238252-5630-4-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 63589e92c2d9 ("clk: Ignore error and NULL pointers passed to
-clk_{unprepare, disable}()") allows NULL or error pointer to be passed
-unconditionally.
-
-This patch is to simplify probe error and remove code paths.
+Commit 7b8ef22ea547 ("usb: xhci: plat: Add USB phy support") adds the
+usb_phy for usb3, but it forgets to shutdown/init the usb_phy in the
+suspend/resume path. This patch fixes this issue by adding missing
+usb_phy related calls.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- drivers/usb/host/xhci-plat.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ drivers/usb/host/xhci-plat.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index d990135..62f02e5 100644
+index a8c465a..cd49ae5 100644
 --- a/drivers/usb/host/xhci-plat.c
 +++ b/drivers/usb/host/xhci-plat.c
-@@ -197,8 +197,7 @@ put_usb3_hcd:
- 	usb_put_hcd(xhci->shared_hcd);
+@@ -244,6 +244,7 @@ static int xhci_plat_suspend(struct device *dev)
+ 	if (ret)
+ 		return ret;
  
- disable_clk:
--	if (!IS_ERR(clk))
--		clk_disable_unprepare(clk);
-+	clk_disable_unprepare(clk);
++	usb_phy_shutdown(xhci->shared_hcd->usb_phy);
+ 	clk_disable_unprepare(xhci->clk);
  
- put_hcd:
- 	usb_put_hcd(hcd);
-@@ -218,8 +217,7 @@ static int xhci_plat_remove(struct platform_device *dev)
- 	usb_remove_hcd(hcd);
- 	usb_put_hcd(xhci->shared_hcd);
+ 	return ret;
+@@ -259,6 +260,10 @@ static int xhci_plat_resume(struct device *dev)
+ 	if (ret)
+ 		return ret;
  
--	if (!IS_ERR(clk))
--		clk_disable_unprepare(clk);
-+	clk_disable_unprepare(clk);
- 	usb_put_hcd(hcd);
++	ret = usb_phy_init(xhci->shared_hcd->usb_phy);
++	if (ret)
++		return ret;
++
+ 	return xhci_resume(xhci, 0);
+ }
  
- 	return 0;
 -- 
 2.6.2
