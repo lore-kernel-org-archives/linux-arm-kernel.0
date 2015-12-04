@@ -1,213 +1,49 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 04 Dec 2015 18:30:32 +0100
-Subject: [PATCH v3 07/10] ARM: dts: Exynos5800: fix CPU OPP
+Date: Fri, 04 Dec 2015 18:30:35 +0100
+Subject: [PATCH v3 10/10] cpufreq: arm-big-little: accept operating-points-v2
+ nodes
 In-Reply-To: <1449250235-9613-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1449250235-9613-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1449250235-9613-8-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1449250235-9613-11-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix CPU operating points for Exynos5800 (it uses different
-voltages than Exynos5420 and supports additional frequencies).
-However don't use 2000MHz & 1900MHz OPPs (for A15 cores) and
-1400MHz OPP (for A7 cores) until there is a separate DTS for
-ODROID-XU3 Lite board (which doesn't support these higher
-OPPs).
+From: Ben Gamari <ben@smart-cactus.org>
 
-Based on Hardkernel's kernel for ODROID-XU3 board.
+The arm_big_little cpufreq driver can use operating points from
+operating-points-v2 nodes without any trouble.
 
-Changes by Ben Gamari:
-- Port to operating-points-v2
-
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Doug Anderson <dianders@chromium.org>
 Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-Cc: Andreas Faerber <afaerber@suse.de>
-Cc: Sachin Kamat <sachin.kamat@linaro.org>
-Cc: Thomas Abraham <thomas.ab@samsung.com>
 Signed-off-by: Ben Gamari <ben@smart-cactus.org>
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- arch/arm/boot/dts/exynos5800.dtsi | 165 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 165 insertions(+)
+ drivers/cpufreq/arm_big_little_dt.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5800.dtsi b/arch/arm/boot/dts/exynos5800.dtsi
-index c0bb356..e417218 100644
---- a/arch/arm/boot/dts/exynos5800.dtsi
-+++ b/arch/arm/boot/dts/exynos5800.dtsi
-@@ -17,8 +17,173 @@
+diff --git a/drivers/cpufreq/arm_big_little_dt.c b/drivers/cpufreq/arm_big_little_dt.c
+index 16ddeef..be7f632 100644
+--- a/drivers/cpufreq/arm_big_little_dt.c
++++ b/drivers/cpufreq/arm_big_little_dt.c
+@@ -35,12 +35,16 @@ static struct device_node *get_cpu_node_with_valid_op(int cpu)
+ {
+ 	struct device_node *np = of_cpu_device_node_get(cpu);
  
- / {
- 	compatible = "samsung,exynos5800", "samsung,exynos5";
-+
-+	cpu0_opp_table: opp_table0 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+		opp00 at 1800000000 {
-+			opp-hz = /bits/ 64 <1800000000>;
-+			opp-microvolt = <1250000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp01 at 1700000000 {
-+			opp-hz = /bits/ 64 <1700000000>;
-+			opp-microvolt = <1250000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp02 at 1600000000 {
-+			opp-hz = /bits/ 64 <1600000000>;
-+			opp-microvolt = <1250000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp03 at 1500000000 {
-+			opp-hz = /bits/ 64 <1500000000>;
-+			opp-microvolt = <1100000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp04 at 1400000000 {
-+			opp-hz = /bits/ 64 <1400000000>;
-+			opp-microvolt = <1100000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp05 at 1300000000 {
-+			opp-hz = /bits/ 64 <1300000000>;
-+			opp-microvolt = <1100000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp06 at 1200000000 {
-+			opp-hz = /bits/ 64 <1200000000>;
-+			opp-microvolt = <1000000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp07 at 1100000000 {
-+			opp-hz = /bits/ 64 <1100000000>;
-+			opp-microvolt = <1000000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp08 at 1000000000 {
-+			opp-hz = /bits/ 64 <1000000000>;
-+			opp-microvolt = <1000000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp09 at 900000000 {
-+			opp-hz = /bits/ 64 <900000000>;
-+			opp-microvolt = <1000000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp10 at 800000000 {
-+			opp-hz = /bits/ 64 <800000000>;
-+			opp-microvolt = <900000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp11 at 700000000 {
-+			opp-hz = /bits/ 64 <700000000>;
-+			opp-microvolt = <900000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp12 at 600000000 {
-+			opp-hz = /bits/ 64 <600000000>;
-+			opp-microvolt = <900000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp13 at 500000000 {
-+			opp-hz = /bits/ 64 <500000000>;
-+			opp-microvolt = <900000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp14 at 400000000 {
-+			opp-hz = /bits/ 64 <400000000>;
-+			opp-microvolt = <900000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp15 at 300000000 {
-+			opp-hz = /bits/ 64 <300000000>;
-+			opp-microvolt = <900000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp16 at 200000000 {
-+			opp-hz = /bits/ 64 <200000000>;
-+			opp-microvolt = <900000>;
-+			clock-latency-ns = <140000>;
-+		};
-+	};
-+
-+	cpu1_opp_table: opp_table1 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+		opp00 at 1300000000 {
-+			opp-hz = /bits/ 64 <1300000000>;
-+			opp-microvolt = <1250000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp01 at 1200000000 {
-+			opp-hz = /bits/ 64 <1200000000>;
-+			opp-microvolt = <1250000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp02 at 1100000000 {
-+			opp-hz = /bits/ 64 <1100000000>;
-+			opp-microvolt = <1250000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp03 at 1000000000 {
-+			opp-hz = /bits/ 64 <1000000000>;
-+			opp-microvolt = <1100000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp04 at 900000000 {
-+			opp-hz = /bits/ 64 <900000000>;
-+			opp-microvolt = <1100000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp05 at 800000000 {
-+			opp-hz = /bits/ 64 <800000000>;
-+			opp-microvolt = <1100000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp06 at 700000000 {
-+			opp-hz = /bits/ 64 <700000000>;
-+			opp-microvolt = <1000000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp07 at 600000000 {
-+			opp-hz = /bits/ 64 <600000000>;
-+			opp-microvolt = <1000000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp08 at 500000000 {
-+			opp-hz = /bits/ 64 <500000000>;
-+			opp-microvolt = <1000000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp09 at 400000000 {
-+			opp-hz = /bits/ 64 <400000000>;
-+			opp-microvolt = <1000000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp10 at 300000000 {
-+			opp-hz = /bits/ 64 <300000000>;
-+			opp-microvolt = <900000>;
-+			clock-latency-ns = <140000>;
-+		};
-+		opp11 at 200000000 {
-+			opp-hz = /bits/ 64 <200000000>;
-+			opp-microvolt = <900000>;
-+			clock-latency-ns = <140000>;
-+		};
-+	};
- };
+-	if (!of_get_property(np, "operating-points", NULL)) {
+-		of_node_put(np);
+-		np = NULL;
++	if (of_get_property(np, "operating-points-v2", NULL)) {
++		return np;
+ 	}
  
-+&cpu0 { operating-points-v2 = <&cpu0_opp_table>; };
-+&cpu1 { operating-points-v2 = <&cpu0_opp_table>; };
-+&cpu2 { operating-points-v2 = <&cpu0_opp_table>; };
-+&cpu3 { operating-points-v2 = <&cpu0_opp_table>; };
+-	return np;
++	if (of_get_property(np, "operating-points", NULL)) {
++		return np;
++	}
 +
-+&cpu4 { operating-points-v2 = <&cpu1_opp_table>; };
-+&cpu5 { operating-points-v2 = <&cpu1_opp_table>; };
-+&cpu6 { operating-points-v2 = <&cpu1_opp_table>; };
-+&cpu7 { operating-points-v2 = <&cpu1_opp_table>; };
-+
- &clock {
- 	compatible = "samsung,exynos5800-clock";
- };
++	of_node_put(np);
++	return NULL;
+ }
+ 
+ static int dt_init_opp_table(struct device *cpu_dev)
 -- 
 1.9.1
