@@ -1,33 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 4 Dec 2015 07:46:35 -0800
-Subject: [PATCH 1/3] ARM: OMAP2+: Fix SoC detection for dra62x j5-eco
-In-Reply-To: <CAALWOA-VmW6rqhL20y65+eNz2ujV=V8+X+f652X=g5LUytvNcQ@mail.gmail.com>
-References: <1449184300-15693-1-git-send-email-tony@atomide.com>
- <1449184300-15693-2-git-send-email-tony@atomide.com>
- <CAALWOA-VmW6rqhL20y65+eNz2ujV=V8+X+f652X=g5LUytvNcQ@mail.gmail.com>
-Message-ID: <20151204154634.GH23396@atomide.com>
+From: pmladek@suse.com (Petr Mladek)
+Date: Fri, 4 Dec 2015 16:47:49 +0100
+Subject: [PATCH v2 5/5] printk/nmi: Increase the size of the temporary
+ buffer
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1CBE1231@AcuExch.aculab.com>
+References: <1448622572-16900-1-git-send-email-pmladek@suse.com>
+ <1448622572-16900-6-git-send-email-pmladek@suse.com>
+ <81211733-2484-40A9-9D4A-644AA27FBC73@gmail.com>
+ <063D6719AE5E284EB5DD2968C1650D6D1CBE1231@AcuExch.aculab.com>
+Message-ID: <20151204154749.GC20935@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matthijs van Duin <matthijsvanduin@gmail.com> [151203 18:44]:
-> On 4 December 2015 at 00:11, Tony Lindgren <tony@atomide.com> wrote:
-> > We can boot dra62x j5-eco using the dm814x code as the clocks and
-> > devices are mapped in the device tree. The dra62x is also known
-> > as jacinto 5.
+On Wed 2015-12-02 16:20:41, David Laight wrote:
+> From: yalin wang
+> > Sent: 30 November 2015 16:42
+> > > On Nov 27, 2015, at 19:09, Petr Mladek <pmladek@suse.com> wrote:
+> > >
+> > > Testing has shown that the backtrace sometimes does not fit
+> > > into the 4kB temporary buffer that is used in NMI context.
+> > >
+> > > The warnings are gone when I double the temporary buffer size.
 > 
-> I'm pretty sure the "eco" in the name isn't optional. As far as I know:
-> jacinto 5 = dra65x ~ dm814x
-> jacinto 5 eco = dra62x ~ dm811x
-> jacinto 5 entry = dra61x/60x ~ am335x
-> 
-> Here ~ means equivalence modulo efuse bits.
-> 
-> My knowledge of TI's automotive processors is limited however, as is
-> public documentation, so perhaps someone from TI can ack or nak this.
+> You are wasting a lot of memory for something that is infrequently used.
+> There ought to be some way of copying partial tracebacks into the
+> main buffer.
 
-OK I'll update to to use "jacinto 5 eco" specifically to avoid more
-confusion.
+I have already tried to use a separate ring buffer that might be
+shared between all CPUs. But it was rejected because it was too
+complex. See
+http://thread.gmane.org/gmane.linux.kernel/1700059/focus=1700066
 
-Thanks,
+If we would want to crate a lockless access to the main ring
+buffer, we would end up with something like
+kernel/trace/ring_buffer.c. It is even more complicated.
+And reading of the messages is pretty slow.
 
-Tony
+Note that we already have this buffer allocated on x86 and arm.
+It is used there for printing backtrace from all CPUs.
+This patchset makes it usable for all NMI messages.
+
+But I'll make the size configurable in the next version.
+
+Thanks for review,
+Petr
