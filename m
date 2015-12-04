@@ -1,32 +1,63 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Fri, 4 Dec 2015 09:24:05 +0530
-Subject: [PATCH v12 08/16] arm64/kexec: Add core kexec support
-In-Reply-To: <5660E0B0.8010507@codeaurora.org>
-References: <cover.1448403503.git.geoff@infradead.org>
- <6ac232ad37d6b02cf2d5848b15236f26f5ac61ac.1448403503.git.geoff@infradead.org>
- <20151127131306.GE23908@dhcppc13.redhat.com>
- <1448909475.31214.27.camel@infradead.org>
- <20151201021615.GA5704@dhcppc13.redhat.com>
- <002101d12c66$ae985440$0bc8fcc0$@codeaurora.org>
- <1449096562.6139.74.camel@infradead.org>
- <000b01d12d84$4313a930$c93afb90$@codeaurora.org>
- <1449172587.24127.12.camel@infradead.org>
- <5660E0B0.8010507@codeaurora.org>
-Message-ID: <20151204035405.GB737@dhcppc13.redhat.com>
+From: xuejiancheng@huawei.com (xuejiancheng)
+Date: Fri, 4 Dec 2015 12:07:58 +0800
+Subject: [PATCH v2 3/9] ARM: hisi: enable Hi3519 soc
+In-Reply-To: <8647404.sBOFNLAMdU@wuerfel>
+References: <1449110565-23590-1-git-send-email-xuejiancheng@huawei.com>
+ <8647404.sBOFNLAMdU@wuerfel>
+Message-ID: <5661119E.9060309@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
+Hi Arnd,
 
-On 03/12/2015:05:39:12 PM, Azriel Samson wrote:
-> This was a setup issue on my side. kdump with your v11 patches worked fine
-> without the above patch when I used your version of kexec-tools.
+On 2015/12/3 17:40, Arnd Bergmann wrote:
+> On Thursday 03 December 2015 10:42:45 Jiancheng Xue wrote:
+>> --- a/arch/arm/mach-hisi/Kconfig
+>> +++ b/arch/arm/mach-hisi/Kconfig
+>> @@ -12,6 +12,14 @@ if ARCH_HISI
+>>  
+>>  menu "Hisilicon platform type"
+>>  
+>> +config ARCH_HI3519
+>> +       bool "Hisilicon Hi3519 Soc" if ARCH_MULTI_V7
+>> +       select HAVE_ARM_ARCH_TIMER
+>> +       select ARCH_HAS_RESET_CONTROLLER
+>> +
+>> +       help
+>> +         Support for Hisilicon Hi3519 Soc
+>> +
+>>  config ARCH_HI3xxx
+>>         bool "Hisilicon Hi36xx family" if ARCH_MULTI_V7
+>>         select CACHE_L2X0
 > 
-> In kexec-tools, I had to skip check_cpu_nodes() since we are using ACPI and
-> the device tree does not contain cpu_info.
+> Do those need to be separate? I would just extend the Hi36xx
+> to cover all Hi3xxx, if nothing in the platform code really
+> depends on this.
 
-I think, something like following should be squashed into patch "arm64: Add arm64
-kexec support".
-https://github.com/pratyushanand/kexec-tools/commit/85f403cabb9ae0d7a37d1656a00fb609a9525086
+For HI3519, there is really no special platform code. But HI35xx and HI36xx soc families
+belong to different product lines in hisilicon. HI35xx family also composes of various
+architectures socs(single core, smp and big-little). So I think it may be clear to have
+separate arch definitions.
 
-~Pratyush
+Could you give me more suggestions about this?  Thank you!
+
+>> +
+>> +static const char *const hi3519_compat[] __initconst = {
+>> +       "hisilicon,hi3519",
+>> +       NULL,
+>> +};
+>> +
+>> +DT_MACHINE_START(HI3519_DT, "Hisilicon Hi3519 (Flattened Device Tree)")
+>> +       .dt_compat      = hi3519_compat,
+>> +MACHINE_END
+> 
+> Also drop the "(Flattened Device Tree)" part of the name, we don't
+> support any other kind anyway.
+
+OK.
+
+> 
+> 	Arnd
+> 
+> .
+> 
