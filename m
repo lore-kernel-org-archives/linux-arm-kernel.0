@@ -1,64 +1,81 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 4 Dec 2015 14:31:06 +0000
-Subject: [PATCH v8 2/4] arm64: Modify stack trace and dump for use with
- irq_stack
-In-Reply-To: <1449226948-14251-3-git-send-email-james.morse@arm.com>
-References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
- <1449226948-14251-3-git-send-email-james.morse@arm.com>
-Message-ID: <20151204143106.GM10123@e104818-lin.cambridge.arm.com>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Fri, 4 Dec 2015 15:36:52 +0100
+Subject: [PATCH 1/2] ARM: dts: omap3-igep0020: Use MMC pwrseq to init SDIO
+ WiFi
+In-Reply-To: <1449165729-993-2-git-send-email-javier@osg.samsung.com>
+References: <1449165729-993-1-git-send-email-javier@osg.samsung.com>
+ <1449165729-993-2-git-send-email-javier@osg.samsung.com>
+Message-ID: <CAFqH_50v7gkxWqwVMLtwn9g5WTRF7k16_r1Xaztt3GC4wO9wiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2015 at 11:02:26AM +0000, James Morse wrote:
-> diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-> index 8e8d30684392..e2f3f135a3bc 100644
-> --- a/arch/arm64/include/asm/irq.h
-> +++ b/arch/arm64/include/asm/irq.h
-[...]
-> +static inline bool on_irq_stack(unsigned long sp, int cpu)
-> +{
-> +	/* variable names the same as kernel/stacktrace.c */
-> +	unsigned long low = (unsigned long)per_cpu(irq_stack, cpu);
-> +	unsigned long high = low + IRQ_STACK_START_SP;
-> +
-> +	return (low <= sp && sp <= high);
-> +}
-> +
-> +#endif /* !__ASSEMBLER__ */
->  #endif
-> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-> index 9f17ec071ee0..1e3cef578e21 100644
-> --- a/arch/arm64/kernel/irq.c
-> +++ b/arch/arm64/kernel/irq.c
-[...]
-> @@ -39,17 +40,41 @@ int notrace unwind_frame(struct stackframe *frame)
->  {
->  	unsigned long high, low;
->  	unsigned long fp = frame->fp;
-> +	unsigned long irq_stack_ptr;
-> +
-> +	/*
-> +	 * Use raw_smp_processor_id() to avoid false-positives from
-> +	 * CONFIG_DEBUG_PREEMPT. get_wchan() calls unwind_frame() on sleeping
-> +	 * task stacks, we can be pre-empted in this case, so
-> +	 * {raw_,}smp_processor_id() may give us the wrong value. Sleeping
-> +	 * tasks can't ever be on an interrupt stack, so regardless of cpu,
-> +	 * the checks will always fail.
-> +	 */
-> +	irq_stack_ptr = IRQ_STACK_PTR(raw_smp_processor_id());
->  
->  	low  = frame->sp;
-> -	high = ALIGN(low, THREAD_SIZE);
-> +	/* irq stacks are not THREAD_SIZE aligned */
-> +	if (on_irq_stack(frame->sp, raw_smp_processor_id()))
-> +		high = irq_stack_ptr;
-> +	else
-> +		high = ALIGN(low, THREAD_SIZE) - 0x20;
+2015-12-03 19:02 GMT+01:00 Javier Martinez Canillas <javier@osg.samsung.com>:
+> When the WiFi support was added to the IGEP0020 board, the MMC subsystem
+> did not provide a mechanism to define power sequence providers. So a DT
+> hack was used to toggle the WiFi chip reset and power down pins by using
+> fake fixed regulators whose enable GPIO was the GPIOs connected to these
+> pins.
+>
+> But now the simple MMC power sequence provider can be used for this and
+> the workaround removed.
+>
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> ---
+>
+>  arch/arm/boot/dts/omap3-igep0020.dts | 24 ++++++++----------------
+>  1 file changed, 8 insertions(+), 16 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
+> index 3835e1569c29..33d6b4ead092 100644
+> --- a/arch/arm/boot/dts/omap3-igep0020.dts
+> +++ b/arch/arm/boot/dts/omap3-igep0020.dts
+> @@ -15,25 +15,17 @@
+>         model = "IGEPv2 Rev. C (TI OMAP AM/DM37x)";
+>         compatible = "isee,omap3-igep0020", "ti,omap36xx", "ti,omap3";
+>
+> -       /* Regulator to trigger the WIFI_PDN signal of the Wifi module */
+> -       lbee1usjyc_pdn: lbee1usjyc_pdn {
+> +       vmmcsdio_fixed: fixedregulator-mmcsdio {
+>                 compatible = "regulator-fixed";
+> -               regulator-name = "regulator-lbee1usjyc-pdn";
+> +               regulator-name = "vmmcsdio_fixed";
+>                 regulator-min-microvolt = <3300000>;
+>                 regulator-max-microvolt = <3300000>;
+> -               gpio = <&gpio5 10 GPIO_ACTIVE_HIGH>;    /* gpio_138 - WIFI_PDN */
+> -               startup-delay-us = <10000>;
+> -               enable-active-high;
+>         };
+>
+> -       /* Regulator to trigger the RESET_N_W signal of the Wifi module */
+> -       lbee1usjyc_reset_n_w: lbee1usjyc_reset_n_w {
+> -               compatible = "regulator-fixed";
+> -               regulator-name = "regulator-lbee1usjyc-reset-n-w";
+> -               regulator-min-microvolt = <3300000>;
+> -               regulator-max-microvolt = <3300000>;
+> -               gpio = <&gpio5 11 GPIO_ACTIVE_HIGH>;    /* gpio_139 - RESET_N_W */
+> -               enable-active-high;
+> +       mmc2_pwrseq: mmc2_pwrseq {
+> +               compatible = "mmc-pwrseq-simple";
+> +               reset-gpios = <&gpio5 11 GPIO_ACTIVE_LOW>,      /* gpio_139 - RESET_N_W */
+> +                             <&gpio5 10 GPIO_ACTIVE_LOW>;      /* gpio_138 - WIFI_PDN */
+>         };
+>  };
+>
+> @@ -51,8 +43,8 @@
+>  &mmc2 {
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&mmc2_pins &lbee1usjyc_pins>;
+> -       vmmc-supply = <&lbee1usjyc_pdn>;
+> -       vmmc_aux-supply = <&lbee1usjyc_reset_n_w>;
+> +       vmmc-supply = <&vmmcsdio_fixed>;
+> +       mmc-pwrseq = <&mmc2_pwrseq>;
+>         bus-width = <4>;
+>         non-removable;
+>  };
+> --
+> 2.4.3
+>
 
-More of a nitpick: if you rework patch 4, you can remove on_irq_stack()
-here, just expand it inline (and avoid IRQ_STACK_PTR twice, though
-that's pretty cheap).
+I also tested these patches
 
-Either way:
-
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Enric Balletbo Serra <enric.balletbo@collabora.com>
