@@ -1,49 +1,112 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 4 Dec 2015 11:21:49 -0600
-Subject: [PATCH] ARM: DTS: am33xx: Use the new DT bindings for the eDMA3
-In-Reply-To: <1449225915-28879-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1449225915-28879-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <87wpsunn82.fsf@saruman.tx.rr.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri,  4 Dec 2015 18:18:33 +0100
+Subject: [PATCH] ARM: at91: fix pinctrl driver selection
+Message-ID: <1449249513-22972-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Hi,
+Move the selection of the pinctrl driver to SoC family level since we
+have two pinctrl drivers. It is useless to select one which is not
+compatible with the SoC.
 
-Peter Ujfalusi <peter.ujfalusi@ti.com> writes:
-> @@ -174,12 +182,44 @@
->  		};
->  
->  		edma: edma at 49000000 {
-> -			compatible = "ti,edma3";
-> -			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
-> -			reg =	<0x49000000 0x10000>,
-> -				<0x44e10f90 0x40>;
-> +			compatible = "ti,edma3-tpcc";
-> +			ti,hwmods = "tpcc";
-> +			reg =	<0x49000000 0x10000>;
-> +			reg-names = "edma3_cc";
->  			interrupts = <12 13 14>;
-> -			#dma-cells = <1>;
-> +			interrupt-names = "edma3_ccint", "emda3_mperr",
-> +					  "edma3_ccerrint";
-> +			dma-requests = <64>;
-> +			#dma-cells = <2>;
-> +
-> +			ti,tptcs = <&edma_tptc0 7>, <&edma_tptc1 5>,
-> +				   <&edma_tptc2 0>;
-> +
-> +			ti,edma-memcpy-channels = /bits/ 16 <20 21>;
+[abelloni: fixed pm.c when only sama2d2 is selected]
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/mach-at91/Kconfig | 6 +++++-
+ arch/arm/mach-at91/pm.c    | 7 ++++++-
+ 2 files changed, 11 insertions(+), 2 deletions(-)
 
-can you explain this property here ? Are you setting bits 20 and 21 on a
-16-bit field ?
-
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 92673006e55c..28656c2b54a0 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -4,7 +4,6 @@ menuconfig ARCH_AT91
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select COMMON_CLK_AT91
+ 	select PINCTRL
+-	select PINCTRL_AT91
+ 	select SOC_BUS
+ 
+ if ARCH_AT91
+@@ -17,6 +16,7 @@ config SOC_SAMA5D2
+ 	select HAVE_AT91_USB_CLK
+ 	select HAVE_AT91_H32MX
+ 	select HAVE_AT91_GENERATED_CLK
++	select PINCTRL_AT91PIO4
+ 	help
+ 	  Select this if ou are using one of Atmel's SAMA5D2 family SoC.
+ 
+@@ -27,6 +27,7 @@ config SOC_SAMA5D3
+ 	select HAVE_AT91_UTMI
+ 	select HAVE_AT91_SMD
+ 	select HAVE_AT91_USB_CLK
++	select PINCTRL_AT91
+ 	help
+ 	  Select this if you are using one of Atmel's SAMA5D3 family SoC.
+ 	  This support covers SAMA5D31, SAMA5D33, SAMA5D34, SAMA5D35, SAMA5D36.
+@@ -40,6 +41,7 @@ config SOC_SAMA5D4
+ 	select HAVE_AT91_SMD
+ 	select HAVE_AT91_USB_CLK
+ 	select HAVE_AT91_H32MX
++	select PINCTRL_AT91
+ 	help
+ 	  Select this if you are using one of Atmel's SAMA5D4 family SoC.
+ 
+@@ -50,6 +52,7 @@ config SOC_AT91RM9200
+ 	select CPU_ARM920T
+ 	select HAVE_AT91_USB_CLK
+ 	select MIGHT_HAVE_PCI
++	select PINCTRL_AT91
+ 	select SOC_SAM_V4_V5
+ 	select SRAM if PM
+ 	help
+@@ -65,6 +68,7 @@ config SOC_AT91SAM9
+ 	select HAVE_AT91_UTMI
+ 	select HAVE_FB_ATMEL
+ 	select MEMORY
++	select PINCTRL_AT91
+ 	select SOC_SAM_V4_V5
+ 	select SRAM if PM
+ 	help
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 80e277cfcc8b..01cbb17e6f6b 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -41,8 +41,10 @@
+  * implementation should be moved down into the pinctrl driver and get
+  * called as part of the generic suspend/resume path.
+  */
++#ifdef PINCTRL_AT91
+ extern void at91_pinctrl_gpio_suspend(void);
+ extern void at91_pinctrl_gpio_resume(void);
++#endif
+ 
+ static struct {
+ 	unsigned long uhp_udp_mask;
+@@ -151,8 +153,9 @@ static void at91_pm_suspend(suspend_state_t state)
+ 
+ static int at91_pm_enter(suspend_state_t state)
+ {
++#ifdef PINCTRL_AT91
+ 	at91_pinctrl_gpio_suspend();
+-
++#endif
+ 	switch (state) {
+ 	/*
+ 	 * Suspend-to-RAM is like STANDBY plus slow clock mode, so
+@@ -192,7 +195,9 @@ static int at91_pm_enter(suspend_state_t state)
+ error:
+ 	target_state = PM_SUSPEND_ON;
+ 
++#ifdef PINCTRL_AT91
+ 	at91_pinctrl_gpio_resume();
++#endif
+ 	return 0;
+ }
+ 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151204/a4ae2f4a/attachment-0001.sig>
+2.5.0
