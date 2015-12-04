@@ -1,28 +1,84 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 4 Dec 2015 10:21:10 +0100
-Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
- concurrent lockers
-In-Reply-To: <20151203172207.GR28602@linux.vnet.ibm.com>
-References: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
- <20151130155839.GK17308@twins.programming.kicks-ass.net>
- <20151201164035.GE27751@arm.com>
- <20151203001141.GO28602@linux.vnet.ibm.com>
- <20151203132839.GA3816@twins.programming.kicks-ass.net>
- <20151203163243.GI11337@arm.com>
- <20151203172207.GR28602@linux.vnet.ibm.com>
-Message-ID: <20151204092110.GE17308@twins.programming.kicks-ass.net>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 4 Dec 2015 11:20:57 +0200
+Subject: [PATCH 7/7] ARM: dts: Enable emmc on hp t410
+In-Reply-To: <1449192335-10137-8-git-send-email-tony@atomide.com>
+References: <1449192335-10137-1-git-send-email-tony@atomide.com>
+ <1449192335-10137-8-git-send-email-tony@atomide.com>
+Message-ID: <56615AF9.5000208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2015 at 09:22:07AM -0800, Paul E. McKenney wrote:
-> >   2. Only PowerPC is going to see the (very occassional) failures, so
-> >      testing this is nigh on impossible :(
+On 12/04/2015 03:25 AM, Tony Lindgren wrote:
+> There's a 2GB emmc on hp t410 that's wired to the sd_2 interface.
+> Note that we also need to configure the evtmux using edma_xbar for
+> edma channels.
 > 
-> Indeed, we clearly cannot rely on normal testing, witness rcutorture
-> failing to find the missing smp_mb__after_unlock_lock() instances that
-> Peter found by inspection.  So I believe that augmented testing is
-> required, perhaps as suggested above.
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-To be fair, those were in debug code and non critical for correctness
-per se. That is, at worst the debug print would've observed an incorrect
-value.
+One question inlined for the mmc3, other than that:
+Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+
+> ---
+>  arch/arm/boot/dts/dm8148-t410.dts | 35 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 35 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/dm8148-t410.dts b/arch/arm/boot/dts/dm8148-t410.dts
+> index 79838dd..d1927a7 100644
+> --- a/arch/arm/boot/dts/dm8148-t410.dts
+> +++ b/arch/arm/boot/dts/dm8148-t410.dts
+> @@ -15,6 +15,13 @@
+>  		device_type = "memory";
+>  		reg = <0x80000000 0x40000000>;	/* 1 GB */
+>  	};
+> +
+> +	vmmcsd_fixed: fixedregulator at 0 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vmmcsd_fixed";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +	};
+>  };
+>  
+>  &cpsw_emac0 {
+> @@ -26,3 +33,31 @@
+>  	phy_id = <&davinci_mdio>, <1>;
+>  	phy-mode = "rgmii";
+>  };
+> +
+> +&mmc3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&sd2_pins>;
+> +	vmmc-supply = <&vmmcsd_fixed>;
+> +	bus-width = <8>;
+> +	dmas = <&edma_xbar 8 0 1	/* use SDTXEVT1 instead of MCASP0TX */
+> +		&edma_xbar 9 0 2>;	/* use SDRXEVT1 instead of MCASP0RX */
+> +	dma-names = "tx", "rx";
+
+Do you happened to know how the audio is connected on the board?
+The DM814x-EVM seams to be using McASP2 with aic3106 so it is possible that HP
+copied the design from there...
+
+> +};
+> +
+> +&pincntl {
+> +	sd2_pins: pinmux_sd2_pins {
+> +		pinctrl-single,pins = <
+> +			DM814X_IOPAD(0x09c0, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[7] */
+> +			DM814X_IOPAD(0x09c4, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[6] */
+> +			DM814X_IOPAD(0x09c8, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[5] */
+> +			DM814X_IOPAD(0x09cc, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[4] */
+> +			DM814X_IOPAD(0x09d0, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[3] */
+> +			DM814X_IOPAD(0x09d4, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[2] */
+> +			DM814X_IOPAD(0x09d8, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[1] */
+> +			DM814X_IOPAD(0x09dc, PIN_INPUT_PULLUP | 0x1)	/* SD2_DAT[0] */
+> +			DM814X_IOPAD(0x09e0, PIN_INPUT | 0x1)		/* SD2_CLK */
+> +			DM814X_IOPAD(0x09f4, PIN_INPUT_PULLUP | 0x2)	/* SD2_CMD */
+> +			DM814X_IOPAD(0x0920, PIN_INPUT | 40)	/* SD2_SDCD */
+> +			>;
+> +	};
+> +};
+> 
+
+
+-- 
+P?ter
