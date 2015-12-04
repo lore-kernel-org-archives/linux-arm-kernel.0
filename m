@@ -1,42 +1,53 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  4 Dec 2015 14:29:02 +0100
-Subject: [PATCH] ARM: mvebu: remove duplicated regulator definition in Armada
- 388 GP
-Message-ID: <1449235742-5785-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Fri,  4 Dec 2015 14:38:51 +0100
+Subject: [PATCH 1/3] arm64: dts: r8a7795: Add PSCI node
+Message-ID: <1449236333-4410-1-git-send-email-dirk.behme@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 388 GP Device Tree file describes two times a regulator
-named 'reg_usb2_1_vbus', with the exact same description. This has
-been wrong since Armada 388 GP support was introduced.
+From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
 
-Fixes: 928413bd859c0 ("ARM: mvebu: Add Armada 388 General Purpose Development Board support")
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: <stable@vger.kernel.org> # v4.0+
+Add PSCI node for r8a7795 SoC, and cpu node enable-method property is
+set to "psci".
+
+Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Sigend-off-by: Dirk Behme <dirk.behme@gmail.com>
 ---
- arch/arm/boot/dts/armada-388-gp.dts | 10 ----------
- 1 file changed, 10 deletions(-)
+Note: This patch picked from
 
-diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-index a633be3..cd31602 100644
---- a/arch/arm/boot/dts/armada-388-gp.dts
-+++ b/arch/arm/boot/dts/armada-388-gp.dts
-@@ -303,16 +303,6 @@
- 		gpio = <&expander0 4 GPIO_ACTIVE_HIGH>;
+https://git.kernel.org/cgit/linux/kernel/git/horms/renesas-bsp.git/log/?h=v4.2/rcar-3.0.x
+
+and rebased against
+
+https://git.kernel.org/cgit/linux/kernel/git/geert/renesas-drivers.git/log/?h=topic/gen3-latest renesas-drivers-2015-12-01-v4.4-rc3
+
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 816400c..5611597 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -26,6 +26,11 @@
+ 		i2c6 = &i2c6;
  	};
  
--	reg_usb2_1_vbus: v5-vbus1 {
--		compatible = "regulator-fixed";
--		regulator-name = "v5.0-vbus1";
--		regulator-min-microvolt = <5000000>;
--		regulator-max-microvolt = <5000000>;
--		enable-active-high;
--		regulator-always-on;
--		gpio = <&expander0 4 GPIO_ACTIVE_HIGH>;
--	};
--
- 	reg_sata0: pwr-sata0 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "pwr_en_sata0";
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -35,6 +40,7 @@
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			reg = <0x0>;
+ 			device_type = "cpu";
++			enable-method = "psci";
+ 		};
+ 	};
+ 
 -- 
 2.6.3
