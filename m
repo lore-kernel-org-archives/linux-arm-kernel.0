@@ -1,117 +1,73 @@
-From: xuejiancheng@huawei.com (xuejiancheng)
-Date: Fri, 4 Dec 2015 10:27:58 +0800
-Subject: [PATCH v2 4/9] ARM: dts: add dts files for hi3519-demb board
-In-Reply-To: <1728470.0OiiXMcl88@wuerfel>
-References: <1449110668-23647-1-git-send-email-xuejiancheng@huawei.com>
- <1728470.0OiiXMcl88@wuerfel>
-Message-ID: <5660FA2E.6040601@huawei.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Fri, 4 Dec 2015 10:40:07 +0800
+Subject: [PATCH] usb: xhci-mtk: fix AHB bus hang up caused by roothubs polling
+Message-ID: <1449196807-31785-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-   Thank you very much for all your comments.
+when ip fail to enter sleep mode, register access protection will
+be disabed, at the same time if all clocks are disabled, access
+register will hang up AHB bus.
+the common case causes ip sleep fail is that after all ports enter
+U3 but before ip enters sleep mode, a port receives a resume
+signal('K'). this will happens when such as clicks mouse to try to
+do remote wakeup to stop system enter suspend.
+so stop polling roothubs to avoid access xHCI register on bus
+suspend, and restart it when bus resume.
 
-On 2015/12/3 17:36, Arnd Bergmann wrote:
-> On Thursday 03 December 2015 10:44:28 Jiancheng Xue wrote:
-> 
->> +
->> +/dts-v1/;
->> +#include "hi3519.dtsi"
->> +
->> +/ {
->> +	model = "HiSilicon HI3519 DEMO Board";
->> +	compatible = "hisilicon,hi3519";
->> +
->> +	chosen {
->> +		bootargs = "mem=64M console=ttyAMA0,115200 early_printk \
->> +root=/dev/mtdblock2 rootfstype=jffs2 \
->> +mtdparts=hi_sfc:1M(boot),4M(kernel),11M(rootfs)";
->> +	};
-> 
-> Most of the arguments should be dropped and replaced with the respective
-> DT properties in this file:
-> 
-> mem:		/memory (you have that already, but the size seems wrong)
-> console:	/chosen/stdout-path
-> early_printk:	just drop this, maybe use "earlycon")
-> root:		this one is fine
-> rootfstype:	should not be needed
-> mtdparts:	use nodes below the MTD device
-> 
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ drivers/usb/host/xhci-mtk.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-This chosen node is just for debug. The real parameters will be set at boot stage.
-I will drop it.
-
->> +
->> +#include "skeleton.dtsi"
->> +#include <dt-bindings/clock/hi3519-clock.h>
->> +/ {
->> +	aliases {
->> +		serial0 = &uart0;
->> +	};
-> 
-> Move this into the .dts file.
-
-OK. Thank you.
-
-> 
->> +
->> +			uart0: uart at 12100000 {
-> 
-> rename to serial at 12100000
-
-OK.
-
-> 
->> +			dual_timer1: dual_timer at 12001000 {
->> +				compatible = "arm,sp804", "arm,primecell";
->> +				interrupts = <0 66 4>, <0 67 4>;
->> +				reg = <0x12001000 0x1000>;
->> +				clocks = <&crg HI3519_FIXED_3M>;
->> +				status = "disable";
->> +			};
-> 
-> rename to timer at 12001000
-
-OK.
-
-> 
->> +		sysctrl: system-controller at 12020000 {
->> +			compatible = "hisilicon,sysctrl";
->> +			reg = <0x12020000 0x1000>;
->> +			reboot-offset = <0x4>;
->> +		};
-> 
-> Is this one identical to the one in hip04?
-> 
-> If not, pick a new unique compatible string
-
-Yes. It's compatible with the one in hip04.
-
-> 
->> +
->> +		crg: crg at 12010000 {
->> +			compatible = "hisilicon,hi3519-crg";
-> 
-> 
-> what is a "crg"? Is there a standard name for these?
-
-The "crg" means Clock and Reset Generator. It's a block which supplies clock
-and reset signals for other modules in the chip. I used "hi3519-clock"
-in last version patch. Rob Herring suggested that it's better to use "hi3519-crg"
-as the compatible string if it's a whole block.
-
-what about writing like this?
-
-crg: clock-reset-controller at 12010000 {
-	compatible = "hisilicon,hi3519-crg";
-	}
-
-> 
-> 	Arnd
-> 
-> .
-> 
-
-Jiancheng
-.
+diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+index c9ab6a4..38635fb 100644
+--- a/drivers/usb/host/xhci-mtk.c
++++ b/drivers/usb/host/xhci-mtk.c
+@@ -696,9 +696,24 @@ static int xhci_mtk_remove(struct platform_device *dev)
+ }
+ 
+ #ifdef CONFIG_PM_SLEEP
++/*
++ * if ip sleep fail, and all clocks are disabled, access register will hang
++ * AHB bus, so stop poll roothubs to avoid regs access on bus suspend.
++ * and no need to check whether ip sleep fail or not; this will cause SPM to
++ * wakeup system immediately after system suspend complete if ip sleep
++ * fail, it is what we wanted.
++ */
+ static int xhci_mtk_suspend(struct device *dev)
+ {
+ 	struct xhci_hcd_mtk *mtk = dev_get_drvdata(dev);
++	struct usb_hcd *hcd = mtk->hcd;
++	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
++
++	xhci_dbg(xhci, "%s: stop port polling\n", __func__);
++	clear_bit(HCD_FLAG_POLL_RH, &hcd->flags);
++	del_timer_sync(&hcd->rh_timer);
++	clear_bit(HCD_FLAG_POLL_RH, &xhci->shared_hcd->flags);
++	del_timer_sync(&xhci->shared_hcd->rh_timer);
+ 
+ 	xhci_mtk_host_disable(mtk);
+ 	xhci_mtk_phy_power_off(mtk);
+@@ -710,11 +725,19 @@ static int xhci_mtk_suspend(struct device *dev)
+ static int xhci_mtk_resume(struct device *dev)
+ {
+ 	struct xhci_hcd_mtk *mtk = dev_get_drvdata(dev);
++	struct usb_hcd *hcd = mtk->hcd;
++	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+ 
+ 	usb_wakeup_disable(mtk);
+ 	xhci_mtk_clks_enable(mtk);
+ 	xhci_mtk_phy_power_on(mtk);
+ 	xhci_mtk_host_enable(mtk);
++
++	xhci_dbg(xhci, "%s: restart port polling\n", __func__);
++	set_bit(HCD_FLAG_POLL_RH, &hcd->flags);
++	usb_hcd_poll_rh_status(hcd);
++	set_bit(HCD_FLAG_POLL_RH, &xhci->shared_hcd->flags);
++	usb_hcd_poll_rh_status(xhci->shared_hcd);
+ 	return 0;
+ }
+ 
+-- 
+1.8.1.1.dirty
