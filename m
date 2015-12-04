@@ -1,171 +1,201 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri,  4 Dec 2015 11:02:27 +0000
-Subject: [PATCH v8 3/4] arm64: Add do_softirq_own_stack() and enable irq_stacks
-In-Reply-To: <1449226948-14251-1-git-send-email-james.morse@arm.com>
-References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
-Message-ID: <1449226948-14251-4-git-send-email-james.morse@arm.com>
+From: zhongjiang@huawei.com (zhongjiang)
+Date: Fri, 4 Dec 2015 19:43:17 +0800
+Subject: [PATCH] arm64: add a function to show the different types of pagetable
+Message-ID: <1449229397-39900-1-git-send-email-zhongjiang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-entry.S is modified to switch to the per_cpu irq_stack during el{0,1}_irq.
-irq_count is used to detect recursive interrupts on the irq_stack, it is
-updated late by do_softirq_own_stack(), when called on the irq_stack, before
-__do_softirq() re-enables interrupts to process softirqs.
+The patch is mainly to show  pagetable number of different level in the direct
+mapping. pagetable is created from pud to pte in arm64 , resulting in different
+resluts with x86. For instance, The kernel of two-level pages will produce three
+types of pagetable.
 
-do_softirq_own_stack() is added by this patch, but does not yet switch
-stack.
+It can also be used to detect whether there is a large page spliting and merging.
+Large page will significantly reduce the TLB miss, and improve the system
+performance.
 
-This patch adds the dummy stack frame and data needed by the previous
-stack tracing patches.
-
-Signed-off-by: James Morse <james.morse@arm.com>
+Signed-off-by: zhongjiang <zhongjiang@huawei.com>
 ---
- arch/arm64/include/asm/irq.h |  2 ++
- arch/arm64/kernel/entry.S    | 42 ++++++++++++++++++++++++++++++++++++++++--
- arch/arm64/kernel/irq.c      | 38 +++++++++++++++++++++++++++++++++++++-
- 3 files changed, 79 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/pgtable-types.h |   19 +++++++++++++++++
+ arch/arm64/mm/mmu.c                    |   12 +++++++++++
+ arch/arm64/mm/pageattr.c               |   35 ++++++++++++++++++++++++++++++++
+ 3 files changed, 66 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-index e2f3f135a3bc..fa2a8d0e4792 100644
---- a/arch/arm64/include/asm/irq.h
-+++ b/arch/arm64/include/asm/irq.h
-@@ -11,6 +11,8 @@
- #include <asm-generic/irq.h>
- #include <asm/thread_info.h>
+diff --git a/arch/arm64/include/asm/pgtable-types.h b/arch/arm64/include/asm/pgtable-types.h
+index 2b1bd7e..a0f58d0 100644
+--- a/arch/arm64/include/asm/pgtable-types.h
++++ b/arch/arm64/include/asm/pgtable-types.h
+@@ -86,6 +86,25 @@ typedef pteval_t pgprot_t;
  
-+#define __ARCH_HAS_DO_SOFTIRQ
-+
- struct pt_regs;
+ #endif /* STRICT_MM_TYPECHECKS */
  
- DECLARE_PER_CPU(unsigned long [IRQ_STACK_SIZE/sizeof(long)], irq_stack);
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index fc87373d3f88..81cc5380977d 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -27,6 +27,7 @@
- #include <asm/cpufeature.h>
- #include <asm/errno.h>
- #include <asm/esr.h>
-+#include <asm/irq.h>
- #include <asm/thread_info.h>
- #include <asm/unistd.h>
++struct seq_file;
++extern void arch_report_meminfo(struct seq_file *m);
++
++enum pg_level {
++	PG_LEVEL_NONE,
++	PG_LEVEL_PTE,
++	PG_LEVEL_PMD,
++	PG_LEVEL_PUD,
++	PG_LEVEL_NUM
++};
++
++#ifdef CONFIG_PROC_FS
++extern void update_page_count(int level, unsigned long pages);
++extern void split_page_count(int level);
++#else
++static inline void update_page_count(int level, unsigned long pages) {}
++static inline void split_page_count(int level) {}
++#endif
++
+ #if CONFIG_PGTABLE_LEVELS == 2
+ #include <asm-generic/pgtable-nopmd.h>
+ #elif CONFIG_PGTABLE_LEVELS == 3
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 0a7bee7..77aef0b 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -30,6 +30,7 @@
+ #include <linux/stop_machine.h>
+ #include <linux/bootmem.h>
  
-@@ -175,6 +176,42 @@ alternative_endif
- 	mrs	\rd, sp_el0
- 	.endm
- 
-+	.macro	irq_stack_entry, dummy_lr
-+	mov	x19, sp			// preserve the original sp
-+
-+	adr_l	x25, irq_stack
-+	mrs	x26, tpidr_el1
-+	add	x25, x25, x26
-+
-+	/*
-+	 * Check the lowest address on irq_stack for the irq_count value,
-+	 * incremented by do_softirq_own_stack if we have re-enabled irqs
-+	 * while on the irq_stack.
-+	 */
-+	ldr	x26, [x25]
-+	cbnz	x26, 9998f		// recursive use?
-+
-+	/* switch to the irq stack */
-+	mov	x26, #IRQ_STACK_START_SP
-+	add	x26, x25, x26
-+	mov	sp, x26
-+
-+	/* Add a dummy stack frame */
-+	stp     x29, \dummy_lr, [sp, #-16]!           // dummy stack frame
-+	mov	x29, sp
-+	stp     xzr, x19, [sp, #-16]!
-+
-+9998:
-+	.endm
-+
-+	/*
-+	 * x19 should be preserved between irq_stack_entry and
-+	 * irq_stack_exit.
-+	 */
-+	.macro	irq_stack_exit
-+	mov	sp, x19
-+	.endm
-+
- /*
-  * These are the registers used in the syscall handler, and allow us to
-  * have in theory up to 7 arguments to a function - x0 to x6.
-@@ -190,10 +227,11 @@ tsk	.req	x28		// current thread_info
-  * Interrupt handling.
-  */
- 	.macro	irq_handler
--	adrp	x1, handle_arch_irq
--	ldr	x1, [x1, #:lo12:handle_arch_irq]
-+	ldr_l	x1, handle_arch_irq
- 	mov	x0, sp
-+	irq_stack_entry x22
- 	blr	x1
-+	irq_stack_exit
- 	.endm
- 
- 	.text
-diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-index 1e3cef578e21..ff7ebb710e51 100644
---- a/arch/arm64/kernel/irq.c
-+++ b/arch/arm64/kernel/irq.c
-@@ -25,14 +25,24 @@
- #include <linux/irq.h>
- #include <linux/smp.h>
- #include <linux/init.h>
-+#include <linux/interrupt.h>
- #include <linux/irqchip.h>
- #include <linux/seq_file.h>
- 
- unsigned long irq_err_count;
- 
--/* irq stack only needs to be 16 byte aligned - not IRQ_STACK_SIZE aligned */
-+/*
-+ * irq stack only needs to be 16 byte aligned - not IRQ_STACK_SIZE aligned.
-+ * irq_stack[0] is used as irq_count, a non-zero value indicates the stack
-+ * is in use, and el?_irq() shouldn't switch to it. This is used to detect
-+ * recursive use of the irq_stack, it is lazily updated by
-+ * do_softirq_own_stack(), which is called on the irq_stack, before
-+ * re-enabling interrupts to process softirqs.
-+ */
- DEFINE_PER_CPU(unsigned long [IRQ_STACK_SIZE/sizeof(long)], irq_stack) __aligned(16);
- 
-+#define IRQ_COUNT()	(*per_cpu(irq_stack, smp_processor_id()))
-+
- int arch_show_interrupts(struct seq_file *p, int prec)
- {
- 	show_ipi_list(p, prec);
-@@ -56,3 +66,29 @@ void __init init_IRQ(void)
- 	if (!handle_arch_irq)
- 		panic("No interrupt controller found.");
++#include <asm/pgtable-types.h>
+ #include <asm/cputype.h>
+ #include <asm/fixmap.h>
+ #include <asm/sections.h>
+@@ -85,6 +86,7 @@ void split_pmd(pmd_t *pmd, pte_t *pte)
+ 		set_pte(pte, pfn_pte(pfn, prot));
+ 		pfn++;
+ 	} while (pte++, i++, i < PTRS_PER_PTE);
++	split_page_count(PG_LEVEL_PMD);
  }
+ 
+ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+@@ -93,6 +95,7 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 				  void *(*alloc)(unsigned long size))
+ {
+ 	pte_t *pte;
++	unsigned long i = 0;
+ 
+ 	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
+ 		pte = alloc(PTRS_PER_PTE * sizeof(pte_t));
+@@ -107,7 +110,9 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 	do {
+ 		set_pte(pte, pfn_pte(pfn, prot));
+ 		pfn++;
++		i++;
+ 	} while (pte++, addr += PAGE_SIZE, addr != end);
++	update_page_count(PG_LEVEL_PTE, i);
+ }
+ 
+ void split_pud(pud_t *old_pud, pmd_t *pmd)
+@@ -120,6 +125,7 @@ void split_pud(pud_t *old_pud, pmd_t *pmd)
+ 		set_pmd(pmd, __pmd(addr | prot));
+ 		addr += PMD_SIZE;
+ 	} while (pmd++, i++, i < PTRS_PER_PMD);
++	split_page_count(PG_LEVEL_PUD);
+ }
+ 
+ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+@@ -129,6 +135,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+ {
+ 	pmd_t *pmd;
+ 	unsigned long next;
++	unsigned long i = 0;
+ 
+ 	/*
+ 	 * Check for initial section mappings in the pgd/pud and remove them.
+@@ -159,6 +166,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+ 			 * Check for previous table entries created during
+ 			 * boot (__create_page_tables) and flush them.
+ 			 */
++			i++;
+ 			if (!pmd_none(old_pmd)) {
+ 				flush_tlb_all();
+ 				if (pmd_table(old_pmd)) {
+@@ -173,6 +181,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+ 		}
+ 		phys += next - addr;
+ 	} while (pmd++, addr = next, addr != end);
++	update_page_count(PG_LEVEL_PMD, i);
+ }
+ 
+ static inline bool use_1G_block(unsigned long addr, unsigned long next,
+@@ -194,6 +203,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+ {
+ 	pud_t *pud;
+ 	unsigned long next;
++	unsigned long i = 0;
+ 
+ 	if (pgd_none(*pgd)) {
+ 		pud = alloc(PTRS_PER_PUD * sizeof(pud_t));
+@@ -220,6 +230,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+ 			 *
+ 			 * Look up the old pmd table and free it.
+ 			 */
++			i++;
+ 			if (!pud_none(old_pud)) {
+ 				flush_tlb_all();
+ 				if (pud_table(old_pud)) {
+@@ -233,6 +244,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+ 		}
+ 		phys += next - addr;
+ 	} while (pud++, addr = next, addr != end);
++	update_page_count(PG_LEVEL_PUD, i);
+ }
+ 
+ /*
+diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+index 7a5ff11..a8257a2 100644
+--- a/arch/arm64/mm/pageattr.c
++++ b/arch/arm64/mm/pageattr.c
+@@ -15,12 +15,47 @@
+ #include <linux/module.h>
+ #include <linux/sched.h>
+ 
++#include <linux/seq_file.h>
+ #include <asm/pgalloc.h>
+ #include <asm/pgtable.h>
+ #include <asm/tlbflush.h>
+ 
+ #include "mm.h"
+ 
++static unsigned long direct_pages_count[PG_LEVEL_NUM];
 +
-+/*
-+ * do_softirq_own_stack() is called from irq_exit() before __do_softirq()
-+ * re-enables interrupts, at which point we may re-enter el?_irq(). We
-+ * increase irq_count here so that el1_irq() knows that it is already on the
-+ * irq stack.
-+ *
-+ * Called with interrupts disabled, so we don't worry about moving cpu, or
-+ * being interrupted while modifying irq_count.
-+ *
-+ * This function doesn't actually switch stack.
-+ */
-+void do_softirq_own_stack(void)
++void update_page_count(int level, unsigned long pages)
 +{
-+	int cpu = smp_processor_id();
-+
-+	WARN_ON_ONCE(!irqs_disabled());
-+
-+	if (on_irq_stack(current_stack_pointer, cpu)) {
-+		IRQ_COUNT()++;
-+		__do_softirq();
-+		IRQ_COUNT()--;
-+	} else {
-+		__do_softirq();
-+	}
++	direct_pages_count[level] += pages;
 +}
++
++void split_page_count(int level)
++{
++	direct_pages_count[level]--;
++	direct_pages_count[level-1] += PTRS_PER_PTE;
++}
++
++void arch_report_meminfo(struct seq_file *m)
++{
++
++	seq_printf(m, "DirectMap%ldk:     %8lu kB\n", PAGE_SIZE / SZ_1K,
++			direct_pages_count[PG_LEVEL_PTE] * PAGE_SIZE / SZ_1K);
++
++#if CONFIG_PGTABLE_LEVELS == 2
++	seq_printf(m, "DirectMap%ldM:     %8lu kB\n", PMD_SIZE / SZ_1M,
++			direct_pages_count[PG_LEVEL_PMD] * PMD_SIZE / SZ_1K);
++
++#endif
++
++#if CONFIG_PGTABLE_LEVELS > 2
++	seq_printf(m, "DirectMap%ldM:     %8lu kB\n", PMD_SIZE / SZ_1M,
++			direct_pages_count[PG_LEVEL_PMD] * PMD_SIZE / SZ_1K);
++	seq_printf(m, "DirectMap%ldG:     %8lu kB\n", PUD_SIZE / SZ_1G,
++			direct_pages_count[PG_LEVEL_PUD] * PUD_SIZE  / SZ_1K);
++
++#endif
++}
++
+ static int update_pte_range(struct mm_struct *mm, pmd_t *pmd,
+ 				unsigned long addr, unsigned long end,
+ 				pgprot_t clear, pgprot_t set)
 -- 
-2.6.2
+1.7.7
