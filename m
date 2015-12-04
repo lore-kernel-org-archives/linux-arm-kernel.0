@@ -1,37 +1,84 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri,  4 Dec 2015 18:03:46 +0100
-Subject: [PATCH v3 11/13] ARM: at91: remove useless includes and function
- prototypes
+Date: Fri,  4 Dec 2015 18:03:47 +0100
+Subject: [PATCH v3 12/13] usb: gadget: atmel: access the PMC using regmap
 In-Reply-To: <1449248628-3486-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1449248628-3486-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1449248628-3486-12-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1449248628-3486-13-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove leftover from the previous cleanup
+Use regmap to access the PMC to avoid using at91_pmc_read and
+at91_pmc_write.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-at91/generic.h | 7 -------
- 1 file changed, 7 deletions(-)
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 20 ++++++++++----------
+ drivers/usb/gadget/udc/atmel_usba_udc.h |  2 ++
+ 2 files changed, 12 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index d224e195706a..28ca57a2060f 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -11,13 +11,6 @@
- #ifndef _AT91_GENERIC_H
- #define _AT91_GENERIC_H
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index f0f2b066ac08..eb82239dafac 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -17,7 +17,9 @@
+ #include <linux/device.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/list.h>
++#include <linux/mfd/syscon.h>
+ #include <linux/platform_device.h>
++#include <linux/regmap.h>
+ #include <linux/usb/ch9.h>
+ #include <linux/usb/gadget.h>
+ #include <linux/usb/atmel_usba_udc.h>
+@@ -1888,20 +1890,15 @@ static int atmel_usba_stop(struct usb_gadget *gadget)
+ #ifdef CONFIG_OF
+ static void at91sam9rl_toggle_bias(struct usba_udc *udc, int is_on)
+ {
+-	unsigned int uckr = at91_pmc_read(AT91_CKGR_UCKR);
+-
+-	if (is_on)
+-		at91_pmc_write(AT91_CKGR_UCKR, uckr | AT91_PMC_BIASEN);
+-	else
+-		at91_pmc_write(AT91_CKGR_UCKR, uckr & ~(AT91_PMC_BIASEN));
++	regmap_update_bits(udc->pmc, AT91_CKGR_UCKR, AT91_PMC_BIASEN,
++			   is_on ? AT91_PMC_BIASEN : 0);
+ }
  
--#include <linux/of.h>
--#include <linux/reboot.h>
+ static void at91sam9g45_pulse_bias(struct usba_udc *udc)
+ {
+-	unsigned int uckr = at91_pmc_read(AT91_CKGR_UCKR);
 -
-- /* Map io */
--extern void __init at91_map_io(void);
--extern void __init at91_alt_map_io(void);
--
- #ifdef CONFIG_PM
- extern void __init at91rm9200_pm_init(void);
- extern void __init at91sam9260_pm_init(void);
+-	at91_pmc_write(AT91_CKGR_UCKR, uckr & ~(AT91_PMC_BIASEN));
+-	at91_pmc_write(AT91_CKGR_UCKR, uckr | AT91_PMC_BIASEN);
++	regmap_update_bits(udc->pmc, AT91_CKGR_UCKR, AT91_PMC_BIASEN, 0);
++	regmap_update_bits(udc->pmc, AT91_CKGR_UCKR, AT91_PMC_BIASEN,
++			   AT91_PMC_BIASEN);
+ }
+ 
+ static const struct usba_udc_errata at91sam9rl_errata = {
+@@ -1938,6 +1935,9 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+ 		return ERR_PTR(-EINVAL);
+ 
+ 	udc->errata = match->data;
++	udc->pmc = syscon_regmap_lookup_by_compatible("atmel,at91sam9g45-pmc");
++	if (udc->errata && IS_ERR(udc->pmc))
++		return ERR_CAST(udc->pmc);
+ 
+ 	udc->num_ep = 0;
+ 
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.h b/drivers/usb/gadget/udc/atmel_usba_udc.h
+index ea448a344767..3e1c9d589dfa 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.h
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.h
+@@ -354,6 +354,8 @@ struct usba_udc {
+ 	struct dentry *debugfs_root;
+ 	struct dentry *debugfs_regs;
+ #endif
++
++	struct regmap *pmc;
+ };
+ 
+ static inline struct usba_ep *to_usba_ep(struct usb_ep *ep)
 -- 
 2.5.0
