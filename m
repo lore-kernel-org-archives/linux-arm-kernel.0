@@ -1,90 +1,63 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Fri,  4 Dec 2015 21:14:18 +0100
-Subject: [PATCH] drivers: dma-coherent: simplify dma_init_coherent_memory
- return value
-Message-ID: <1449260058-3572-1-git-send-email-mina86@mina86.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 04 Dec 2015 12:15:05 -0800
+Subject: [PATCH 00/13] mvneta Buffer Management and enhancements
+In-Reply-To: <CAPv3WKcKm3X3Lys2HwYZXaZxPaajenF7av1wJKXqKxxwibXW4A@mail.gmail.com>
+References: <CAPv3WKc4zSmjtw_FeePCVCaq_aUubbCw_ggtxgxs0-7LwL7fHQ@mail.gmail.com>	<20151129.210210.1777978635596463961.davem@davemloft.net>	<CAPv3WKcHnJHCvg63Vs79RboNOuESU8jCLouKPRW4NdptAd_hag@mail.gmail.com>	<20151130.112500.293198684175670933.davem@redhat.com>
+ <CAPv3WKcKm3X3Lys2HwYZXaZxPaajenF7av1wJKXqKxxwibXW4A@mail.gmail.com>
+Message-ID: <5661F449.5020205@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since only dma_declare_coherent_memory cares about
-dma_init_coherent_memory returning part of flags as it return value,
-move the condition to the former and simplify the latter.  This in
-turn makes rmem_dma_device_init less confusing.
+(no top posting please)
 
-Reported-by: Fugang Duan <B38611@freescale.com>
-Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
----
- drivers/base/dma-coherent.c | 28 +++++++++++-----------------
- 1 file changed, 11 insertions(+), 17 deletions(-)
+On 02/12/15 00:26, Marcin Wojtas wrote:
+> Hi Florian,
+> 
+> Can you please describe in more details, what would you expect from
+> such special abstraction layer regarding buffer managers? I'd like to
+> understand more of your expectations and evaluate possible work.
 
-diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
-index 55b8398..87b8083 100644
---- a/drivers/base/dma-coherent.c
-+++ b/drivers/base/dma-coherent.c
-@@ -17,9 +17,9 @@ struct dma_coherent_mem {
- 	spinlock_t	spinlock;
- };
- 
--static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_addr,
--			     size_t size, int flags,
--			     struct dma_coherent_mem **mem)
-+static bool dma_init_coherent_memory(
-+	phys_addr_t phys_addr, dma_addr_t device_addr, size_t size, int flags,
-+	struct dma_coherent_mem **mem)
- {
- 	struct dma_coherent_mem *dma_mem = NULL;
- 	void __iomem *mem_base = NULL;
-@@ -50,17 +50,13 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_add
- 	spin_lock_init(&dma_mem->spinlock);
- 
- 	*mem = dma_mem;
--
--	if (flags & DMA_MEMORY_MAP)
--		return DMA_MEMORY_MAP;
--
--	return DMA_MEMORY_IO;
-+	return true;
- 
- out:
- 	kfree(dma_mem);
- 	if (mem_base)
- 		iounmap(mem_base);
--	return 0;
-+	return false;
- }
- 
- static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
-@@ -88,15 +84,13 @@ int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
- 				dma_addr_t device_addr, size_t size, int flags)
- {
- 	struct dma_coherent_mem *mem;
--	int ret;
- 
--	ret = dma_init_coherent_memory(phys_addr, device_addr, size, flags,
--				       &mem);
--	if (ret == 0)
-+	if (!dma_init_coherent_memory(phys_addr, device_addr, size, flags,
-+				      &mem))
- 		return 0;
- 
- 	if (dma_assign_coherent_memory(dev, mem) == 0)
--		return ret;
-+		return flags & DMA_MEMORY_MAP ? DMA_MEMORY_MAP : DMA_MEMORY_IO;
- 
- 	dma_release_coherent_memory(mem);
- 	return 0;
-@@ -281,9 +275,9 @@ static int rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
- 	struct dma_coherent_mem *mem = rmem->priv;
- 
- 	if (!mem &&
--	    dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
--				     DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
--				     &mem) != DMA_MEMORY_MAP) {
-+	    !dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
-+				      DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
-+				      &mem)) {
- 		pr_err("Reserved memory: failed to init DMA memory pool at %pa, size %ld MiB\n",
- 			&rmem->base, (unsigned long)rmem->size / SZ_1M);
- 		return -ENODEV;
+Well, something along these lines:
+
+- have the ability to register a particular pool (location + number of
+buffers) in a way that is relatively device agnostic (initialization
+would of course be device specific)
+
+- provide a set of buffer management APIs like those you proposed below,
+and have some generic code that leverages what
+drivers/net/ethernet/sun/niu.c does for instance
+
+- introduce a netdev_alloc_skb_from_pool() or something like that which
+would limit the amount of code to change in your network driver to
+benefit from that feature so based
+
+I am sure David would be able to suggest more detailed API.
+
+> 
+> Best regards,
+> Marcin
+> 
+> 2015-11-30 17:25 GMT+01:00 David Miller <davem@redhat.com>:
+>> From: Marcin Wojtas <mw@semihalf.com>
+>> Date: Mon, 30 Nov 2015 15:13:22 +0100
+>>
+>>> What kind of abstraction and helpers do you mean? Some kind of API
+>>> (e.g. bm_alloc_buffer, bm_initialize_ring bm_put_buffer,
+>>> bm_get_buffer), which would be used by platform drivers (and specific
+>>> aplications if one wants to develop on top of the kernel)?
+>>>
+>>> In general, what is your top-view of such solution and its cooperation
+>>> with the drivers?
+>>
+>> The tricky parts involved have to do with allocating pages for the
+>> buffer pools and minimizing the number of atomic refcounting
+>> operations on those pages for for the puts and gets, particularly
+>> around buffer replenish runs.
+>>
+>> For example, if you're allocating a page for a buffer pool the device
+>> will chop into N (for any N < PAGE_SIZE) byte pieces, you can
+>> eliminate many atomic operations.
+
+
 -- 
-2.6.0.rc2.230.g3dd15c0
+Florian
