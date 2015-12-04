@@ -1,15 +1,18 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 04 Dec 2015 20:30:37 +0100
-Subject: [PATCH] ARM: dts: rockchip: add gpio-ir-receiver to the R89 board
-In-Reply-To: <2515484.rcZl3ThkRZ@diego>
-References: <2515484.rcZl3ThkRZ@diego>
-Message-ID: <3283786.LNEo46NxAt@diego>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 04 Dec 2015 14:37:42 -0500 (EST)
+Subject: [PATCH V7 net-next 0/5] net:hns: Add support of Hip06 SoC to
+ the Hislicon Network Subsystem
+In-Reply-To: <1449145077-9400-1-git-send-email-salil.mehta@huawei.com>
+References: <1449145077-9400-1-git-send-email-salil.mehta@huawei.com>
+Message-ID: <20151204.143742.2290508303650946149.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 27. November 2015, 23:53:35 schrieb Heiko St?bner:
-> Add support for the IR receiver present on the R89 board.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+From: Salil Mehta <salil.mehta@huawei.com>
+Date: Thu, 3 Dec 2015 12:17:52 +0000
 
-applied to my dts32 branch for 4.5
+> This PATCH V7 addresses the TAB formatting comments by 
+> Sergei Shtylyov. Missing TABs at some other palces have
+> also been corrected.
+
+Series applied, thanks.
