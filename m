@@ -1,101 +1,104 @@
-From: martyn.welch@collabora.co.uk (Martyn Welch)
-Date: Fri,  4 Dec 2015 17:31:15 +0000
-Subject: [PATCH 3/3] ARM: dts: Addition of binding for gpio switches on
- peach-pi
-In-Reply-To: <1449250275-23435-1-git-send-email-martyn.welch@collabora.co.uk>
-References: <1449250275-23435-1-git-send-email-martyn.welch@collabora.co.uk>
-Message-ID: <1449250275-23435-4-git-send-email-martyn.welch@collabora.co.uk>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 04 Dec 2015 18:30:25 +0100
+Subject: [PATCH v3 0/10] cpufreq: add generic cpufreq driver support for
+ Exynos542x/5800 platforms
+Message-ID: <1449250235-9613-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The peach pi has a GPIO connected to the firmware write protect, developer
-mode and recovery mode lines (which are primarily controlled via external
-switches on developer test board). This patch adds the required nodes to
-the device tree to configure the pinmuxing and allow these to be read from
-user space.
+Hi,
 
-Signed-off-by: Martyn Welch <martyn.welch@collabora.co.uk>
----
- arch/arm/boot/dts/exynos5800-peach-pi.dts | 46 +++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+This patch series adds generic arm_big_little_dt cpufreq driver
+support for Exynos542x/5800 (using the new CPU clock type which
+allows it).  It also:
+- enhances arm_big_little[_dt] driver with CPU cluster regulator
+  support
+- adds CPU clock configuration data and CPU operating points
+  setup for Exynos542x/5800
+- adds CPU cluster regulator supplies for Exynos542x/5800 boards
 
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 49a4f43..2937372 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -53,6 +53,31 @@
- 		};
- 	};
- 
-+	gpio-switch {
-+		compatible = "gpio-switch";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wp_gpio &dev_mode &rec_mode>;
-+
-+		write-protect {
-+			label = "write-protect";
-+			gpios = <&gpx3 0 GPIO_ACTIVE_LOW>;
-+			read-only;
-+		};
-+
-+		developer-switch {
-+			label = "developer-switch";
-+			gpios = <&gpx1 3 GPIO_ACTIVE_HIGH>;
-+			read-only;
-+		};
-+
-+		recovery-switch {
-+			label = "recovery-switch";
-+			gpios = <&gpx0 7 GPIO_ACTIVE_LOW>;
-+			read-only;
-+		};
-+	};
-+
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 
-@@ -731,6 +756,13 @@
- 		samsung,pin-val = <0>;
- 	};
- 
-+	rec_mode: rec-mode {
-+		samsung,pins = "gpx0-7";
-+		samsung,pin-function = <0>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
- 	tpm_irq: tpm-irq {
- 		samsung,pins = "gpx1-0";
- 		samsung,pin-function = <0>;
-@@ -752,6 +784,13 @@
- 		samsung,pin-drv = <0>;
- 	};
- 
-+	dev_mode: dev-mode {
-+		samsung,pins = "gpx1-3";
-+		samsung,pin-function = <0>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+
- 	ec_irq: ec-irq {
- 		samsung,pins = "gpx1-5";
- 		samsung,pin-function = <0>;
-@@ -773,6 +812,13 @@
- 		samsung,pin-drv = <0>;
- 	};
- 
-+	wp_gpio: wp_gpio {
-+		samsung,pins = "gpx3-0";
-+		samsung,pin-function = <0>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
- 	max77802_irq: max77802-irq {
- 		samsung,pins = "gpx3-1";
- 		samsung,pin-function = <0>;
+This patch series has been tested on Exynos5422 based ODROID-XU3
+Lite board.
+
+Please note that this is not a final version of the patchset.
+I just wanted to push out current work-in-progress patches that
+integrate changes from Anand, Ben and me.
+
+TODO:
+- porting the Exynos542x/5800 support over cpufreq-dt
+
+Depends on:
+- next-20151124 branch of linux-next kernel tree
+
+Changes since v2:
+- ported over next-20151124 branch
+- integrated missing CLK_RECALC_NEW_RATES flags fix to patch #3
+  (from Anand Moon)
+- added regulator supply properties for ODROID-XU3 Lite and
+  ODROID-XU4 in patch #2
+- ported CPU OPPs to operating-points-v2 (from Ben Gamari)
+- added "ARM: dts: Exynos5422: fix OPP tables" patch (from Ben
+  Gamari)
+- added "cpufreq: arm-big-little: accept operating-points-v2
+  nodes" patch (from Ben Gamari)
+- renamed OPP nodes as opp@<opp-hz>
+
+Changes since v1:
+- added CPU cluster regulator supply properties to
+  exynos5420-arndale-octa.dts, exynos5420-peach-pit.dts,
+  exynos5420-smdk5420.dts and exynos5800-peach-pi.dts
+
+Changes over Thomas' original v12 code:
+- split Exynos5420 and Exynos5800 support
+- moved E5420_[EGL,KFC]_DIV0() macros to clk-exynos5420.c
+- disabled cpufreq if big.LITTLE switcher support is enabled
+- enhanced arm_big_little[_dt] driver with CPU cluster regulator
+  support
+- fixed CPU clock configuration data for Exynos5800
+- fixed CPU operating points setup for Exynos5800
+- added CPU cluster regulator supplies for ODROID-XU3 board
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+
+Bartlomiej Zolnierkiewicz (4):
+  cpufreq: arm_big_little: add cluster regulator support
+  ARM: dts: Exynos5420/5800: add cluster regulator supply properties
+  clk: samsung: exynos5800: fix cpu clock configuration data
+  ARM: dts: Exynos5800: fix CPU OPP
+
+Ben Gamari (2):
+  ARM: dts: Exynos5422: fix OPP tables
+  cpufreq: arm-big-little: accept operating-points-v2 nodes
+
+Thomas Abraham (4):
+  clk: samsung: exynos5420: add cpu clock configuration data and
+    instantiate cpu clock
+  ARM: dts: Exynos5420: add CPU OPP and regulator supply property
+  ARM: Exynos: use generic cpufreq driver for Exynos5420
+  ARM: Exynos: use generic cpufreq driver for Exynos5800
+
+ .../bindings/cpufreq/arm_big_little_dt.txt         |   4 +
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts      |   8 +
+ arch/arm/boot/dts/exynos5420-peach-pit.dts         |   8 +
+ arch/arm/boot/dts/exynos5420-smdk5420.dts          |   8 +
+ arch/arm/boot/dts/exynos5420.dtsi                  | 122 ++++++++++++++
+ arch/arm/boot/dts/exynos5422-cpus.dtsi             |  10 ++
+ arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts    |   8 +
+ arch/arm/boot/dts/exynos5422-odroidxu3.dts         |   8 +
+ arch/arm/boot/dts/exynos5422-odroidxu4.dts         |   8 +
+ arch/arm/boot/dts/exynos5800-peach-pi.dts          |   8 +
+ arch/arm/boot/dts/exynos5800.dtsi                  | 165 +++++++++++++++++++
+ arch/arm/mach-exynos/exynos.c                      |   8 +
+ drivers/clk/samsung/clk-exynos5420.c               |  88 ++++++++++-
+ drivers/cpufreq/arm_big_little.c                   | 175 +++++++++++++++++----
+ drivers/cpufreq/arm_big_little_dt.c                |  12 +-
+ include/dt-bindings/clock/exynos5420.h             |   2 +
+ 16 files changed, 608 insertions(+), 34 deletions(-)
+
 -- 
-2.1.4
+1.9.1
