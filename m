@@ -1,103 +1,40 @@
-From: yrdreddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
-Date: Fri, 4 Dec 2015 12:10:57 -0500
-Subject: [PATCH v2 1/3] pinctrl: Broadcom NSP GPIO-a device tree bindings
-Message-ID: <1449249057-12975-1-git-send-email-yrdreddy@broadcom.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 04 Dec 2015 18:29:40 +0100
+Subject: [PATCH] mpt3sas: add PCI dependency for CONFIG_SCSI_MPT2SAS
+In-Reply-To: <1449246531.27077.5.camel@HansenPartnership.com>
+References: <1953916.xaj9Y2FReq@wuerfel>
+ <1449246531.27077.5.camel@HansenPartnership.com>
+Message-ID: <3653802.WUP6IeqRrU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device tree binding documentation for Broadcom NSP GPIO-a
+On Friday 04 December 2015 08:28:51 James Bottomley wrote:
+> On Fri, 2015-12-04 at 15:27 +0100, Arnd Bergmann wrote:
+> > CONFIG_SCSI_MPT2SAS was added as a backwards-compatibility helper that
+> > selects the replacement SCSI_MPT3SAS symbol, but lacks the dependencies:
+> > 
+> > warning: (SCSI_MPT2SAS) selects SCSI_MPT3SAS which has unmet direct dependencies (SCSI_LOWLEVEL && PCI && SCSI)
+> > 0x7E5F9A79 Fri Dec 4 12:36:08 CET 2015 failed
+> > drivers/scsi/mpt3sas/mpt3sas_base.c: In function 'mpt3sas_remove_dead_ioc_func':
+> > drivers/scsi/mpt3sas/mpt3sas_base.c:140:2: error: implicit declaration of function 'pci_stop_and_remove_bus_device_locked' [-Werror=implicit-function-declaration]
+> > drivers/scsi/mpt3sas/mpt3sas_base.c: In function '_base_disable_msix':
+> > drivers/scsi/mpt3sas/mpt3sas_base.c:1921:2: error: implicit declaration of function 'pci_disable_msix' [-Werror=implicit-function-declaration]
+> > 
+> > This adds the same dependencies that SCSI_MPT3SAS has.
+> 
+> OK, you're about the fifth person to complain about this and this patch
+> was posted a few days ago and is now here:
+> 
+> http://git.kernel.org/cgit/linux/kernel/git/jejb/scsi.git/commit/?h=fixes&id=3ddda3e4c82dea58933bde8d0f6ef34470c360cb
+> 
+> It's even been in for-next for nearly 24h
 
-Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yrdreddy@broadcom.com>
----
- .../devicetree/bindings/pinctrl/brcm,nsp-gpio.txt  | 80 ++++++++++++++++++++++
- 1 file changed, 80 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt
+I only found the bug on today on the latest linux-next, which should have
+contained it if you pushed out the branch in time, but it's not in there.
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt b/Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt
-new file mode 100644
-index 0000000..0844168
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt
-@@ -0,0 +1,80 @@
-+Broadcom Northstar plus (NSP) GPIO/PINCONF Controller
-+
-+Required properties:
-+- compatible:
-+    Must be "brcm,nsp-gpio-a"
-+
-+- reg:
-+    Should contain the register physical address and length for each of
-+    GPIO base, IO control registers
-+
-+- #gpio-cells:
-+    Must be two. The first cell is the GPIO pin number (within the
-+    controller's pin space) and the second cell is used for the following:
-+    bit[0]: polarity (0 for active high and 1 for active low)
-+
-+- gpio-controller:
-+    Specifies that the node is a GPIO controller
-+
-+- ngpios:
-+    Number of gpios supported (58x25 supports 32 and 58x23 supports 24)
-+
-+Optional properties:
-+- interrupts:
-+    Interrupt ID
-+
-+- interrupt-controller:
-+    Specifies that the node is an interrupt controller
-+
-+- gpio-ranges:
-+    Specifies the mapping between gpio controller and pin-controllers pins.
-+    This requires 4 fields in cells defined as -
-+    1. Phandle of pin-controller.
-+    2. GPIO base pin offset.
-+    3  Pin-control base pin offset.
-+    4. number of gpio pins which are linearly mapped from pin base.
-+
-+Supported generic PINCONF properties in child nodes:
-+- pins:
-+    The list of pins (within the controller's own pin space) that properties
-+    in the node apply to. Pin names are "gpio-<pin>"
-+
-+- bias-disable:
-+    Disable pin bias
-+
-+- bias-pull-up:
-+    Enable internal pull up resistor
-+
-+- bias-pull-down:
-+    Enable internal pull down resistor
-+
-+- drive-strength:
-+    Valid drive strength values include 2, 4, 6, 8, 10, 12, 14, 16 (mA)
-+
-+Example:
-+
-+	gpioa: gpio at 18000020 {
-+		compatible = "brcm,nsp-gpio-a";
-+		reg = <0x18000020 0x100>,
-+		      <0x1803f1c4 0x1c>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		ngpios = <32>;
-+		gpio-ranges = <&pinctrl 0 0 31>;
-+		interrupt-controller;
-+		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		/* Hog a few default settings */
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led>;
-+		led: led {
-+			pins = "gpio-1";
-+			bias-pull-up;
-+		};
-+
-+		pwr: pwr {
-+			gpio-hog;
-+			gpios = <3 1>;
-+			output-high;
-+		};
-+	};
--- 
-2.1.0
+2015-12-03 16:33:05 6e3ac04845fb "Merge branch 'fixes' into for-next"
+2015-12-03 21:44:54 de84dfc24842 "Merge remote-tracking branch 'scsi/for-next'"
+
+I'm sure it will be there in the next next.
+
+	Arnd
