@@ -1,36 +1,467 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Fri, 4 Dec 2015 08:07:06 -0800
-Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
- concurrent lockers
-In-Reply-To: <20151204092110.GE17308@twins.programming.kicks-ass.net>
-References: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
- <20151130155839.GK17308@twins.programming.kicks-ass.net>
- <20151201164035.GE27751@arm.com>
- <20151203001141.GO28602@linux.vnet.ibm.com>
- <20151203132839.GA3816@twins.programming.kicks-ass.net>
- <20151203163243.GI11337@arm.com>
- <20151203172207.GR28602@linux.vnet.ibm.com>
- <20151204092110.GE17308@twins.programming.kicks-ass.net>
-Message-ID: <20151204160706.GC28602@linux.vnet.ibm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 4 Dec 2015 10:10:59 -0600
+Subject: [PATCH v2] bus: uniphier-system-bus: add UniPhier System Bus
+ driver
+In-Reply-To: <1449208060-17631-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1449208060-17631-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20151204161059.GA32066@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2015 at 10:21:10AM +0100, Peter Zijlstra wrote:
-> On Thu, Dec 03, 2015 at 09:22:07AM -0800, Paul E. McKenney wrote:
-> > >   2. Only PowerPC is going to see the (very occassional) failures, so
-> > >      testing this is nigh on impossible :(
-> > 
-> > Indeed, we clearly cannot rely on normal testing, witness rcutorture
-> > failing to find the missing smp_mb__after_unlock_lock() instances that
-> > Peter found by inspection.  So I believe that augmented testing is
-> > required, perhaps as suggested above.
+On Fri, Dec 04, 2015 at 02:47:40PM +0900, Masahiro Yamada wrote:
+> The UniPhier System Bus is a simple external that connects on-board
+
+What is a "simple external"?
+
+> devices to the UniPhier SoC.  Each bank (chip select) is dynamically
+> mapped to the CPU-viewed address base via the bus controller.  The
+> bus controller must be configured before any access to the bus.
 > 
-> To be fair, those were in debug code and non critical for correctness
-> per se. That is, at worst the debug print would've observed an incorrect
-> value.
+> This driver parses the "ranges" property of the System Bus node and
+> initialized the bus controller.  After the bus becomes ready, devices
+> below it are populated.
+> 
+> Note:
+> Each bank can be mapped anywhere in the supported address space;
+> there is nothing preventing us from assigning bank 0 on 0x42000000,
+> 0x43000000, or anywhere as long as such region is not used by others.
+> So, the "ranges" is just one possible software configuration, which
+> does not seem to fit in device tree because device tree is a hardware
+> description language.  However, of_translate_address() requires
+> "ranges" in every bus node between CPUs and device mapped on the CPU
+> address space.  In other words, "ranges" properties must be statically
+> defined in device tree.  After some discussion, I decided the self
+> address reassignment by the driver is too bothersome.  Instead, the
+> device tree should provide a reasonable translation setup that the OS
+> can rely on.
 
-True enough, but there is still risk from people repurposing debug code
-for non-debug uses.  Still, thank you, I don't feel -quite- so bad about
-rcutorture's failure to find these.  ;-)
+You have to put the assignment somewhere, so I think DT makes sense. If 
+you had something else doing the setup, you could take that config and 
+populate the DT dynamically.
 
-							Thanx, Paul
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+
+Otherwise, looks good to me. I only skimmed the driver code though:
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+> 
+> Changes in v2:
+>   - Re-design the binding, driver implementation
+>     Switch to a single node, populate children after the bus is setup
+> 
+>  .../bindings/bus/uniphier-system-bus.txt           |  65 +++++
+>  MAINTAINERS                                        |   1 +
+>  drivers/bus/Kconfig                                |   8 +
+>  drivers/bus/Makefile                               |   1 +
+>  drivers/bus/uniphier-system-bus.c                  | 283 +++++++++++++++++++++
+>  5 files changed, 358 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/bus/uniphier-system-bus.txt
+>  create mode 100644 drivers/bus/uniphier-system-bus.c
+> 
+> diff --git a/Documentation/devicetree/bindings/bus/uniphier-system-bus.txt b/Documentation/devicetree/bindings/bus/uniphier-system-bus.txt
+> new file mode 100644
+> index 0000000..5ec47c0
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/bus/uniphier-system-bus.txt
+> @@ -0,0 +1,65 @@
+> +UniPhier System Bus
+> +
+> +The UniPhier System Bus is an external bus that connects on-board devices to
+> +the UniPhier SoC.  It is a simple (semi-)parallel bus with address, data, and
+> +some control signals.  It supports up to 8 banks (chip selects).
+> +
+> +Before any access to the bus, the bus controller must be configured; the bus
+> +controller registers provide the control for the address translation from the
+> +the System Bus to the parent bus.  The needed setup includes the base address,
+> +the size, and some timing parameters of each bank.
+> +
+> +Required properties:
+> +- compatible: should be "socionext,uniphier-system-bus".
+> +- reg: offset and length of the register set for the bus controller device.
+> +- #address-cells: should be 2.  The first cell is the bank number (chip select).
+> +  The second cell is the address offset within the bank.
+> +- #size-cells: should be 1.
+> +- ranges: should provide a proper address translation from the System Bus to
+> +  the parent bus.
+> +
+> +Note:
+> +The address region(s) that can be assigned for the System Bus is implementation
+> +defined.  Some SoCs can use 0x00000000-0x0fffffff and 0x40000000-0x4fffffff,
+> +while other SoCs can only use 0x40000000-0x4fffffff.  There might be additional
+> +limitations depending on SoCs and the boot mode.  The address translation is
+> +arbitrary as long as the banks are assigned in the supported address space with
+> +the required alignment and they do not overlap one another.
+> +For example, it is possible to map:
+> +  bank 0 to 0x42000000-0x43ffffff, bank 5 to 0x46000000-0x46ffffff
+> +It is also possible to map:
+> +  bank 0 to 0x48000000-0x49ffffff, bank 5 to 0x44000000-0x44ffffff
+> +There is no reason to stick to a particular translation mapping, but the
+> +"ranges" property should provide a "reasonable" default that is known to work.
+> +The software should initialize the bus controller according to it.
+> +
+> +Example:
+> +
+> +	system-bus {
+> +		compatible = "socionext,uniphier-system-bus";
+> +		reg = <0x58c00000 0x400>;
+> +		#address-cells = <2>;
+> +		#size-cells = <1>;
+> +		ranges = <1 0x00000000 0x42000000 0x02000000
+> +			  5 0x00000000 0x46000000 0x01000000>;
+> +
+> +		ethernet at 1,01f00000 {
+> +			compatible = "smsc,lan9115";
+> +			reg = <1 0x01f00000 0x1000>;
+> +			interrupts = <0 48 4>
+> +			phy-mode = "mii";
+> +		};
+> +
+> +		uart at 5,00200000 {
+> +			compatible = "ns16550a";
+> +			reg = <5 0x00200000 0x20>;
+> +			interrupts = <0 49 4>
+> +			clock-frequency = <12288000>;
+> +		};
+> +	};
+> +
+> +In this example,
+> + - the Ethernet device is connected at the offset 0x01f00000 of CS1 and
+> +   mapped to 0x43f00000 of the parent bus.
+> + - the UART device is connected at the offset 0x00200000 of CS5 and
+> +   mapped to 0x46200000 of the parent bus.
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 5192700..153b8fa 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1642,6 +1642,7 @@ F:	arch/arm/boot/dts/uniphier*
+>  F:	arch/arm/include/asm/hardware/cache-uniphier.h
+>  F:	arch/arm/mach-uniphier/
+>  F:	arch/arm/mm/cache-uniphier.c
+> +F:	drivers/bus/uniphier-system-bus.c
+>  F:	drivers/i2c/busses/i2c-uniphier*
+>  F:	drivers/pinctrl/uniphier/
+>  F:	drivers/tty/serial/8250/8250_uniphier.c
+> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+> index 116b363..9a92c07 100644
+> --- a/drivers/bus/Kconfig
+> +++ b/drivers/bus/Kconfig
+> @@ -131,6 +131,14 @@ config SUNXI_RSB
+>  	  with various RSB based devices, such as AXP223, AXP8XX PMICs,
+>  	  and AC100/AC200 ICs.
+>  
+> +config UNIPHIER_SYSTEM_BUS
+> +	tristate "UniPhier System Bus driver"
+> +	depends on ARCH_UNIPHIER && OF
+> +	default y
+> +	help
+> +	  Support for UniPhier System Bus, a simple external bus.  This is
+> +	  needed to use on-board devices connected to UniPhier SoCs.
+> +
+>  config VEXPRESS_CONFIG
+>  	bool "Versatile Express configuration bus"
+>  	default y if ARCH_VEXPRESS
+> diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
+> index fcb9f97..ccff007 100644
+> --- a/drivers/bus/Makefile
+> +++ b/drivers/bus/Makefile
+> @@ -17,4 +17,5 @@ obj-$(CONFIG_OMAP_INTERCONNECT)	+= omap_l3_smx.o omap_l3_noc.o
+>  obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
+>  obj-$(CONFIG_SUNXI_RSB)		+= sunxi-rsb.o
+>  obj-$(CONFIG_SIMPLE_PM_BUS)	+= simple-pm-bus.o
+> +obj-$(CONFIG_UNIPHIER_SYSTEM_BUS)	+= uniphier-system-bus.o
+>  obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-config.o
+> diff --git a/drivers/bus/uniphier-system-bus.c b/drivers/bus/uniphier-system-bus.c
+> new file mode 100644
+> index 0000000..9864b8c
+> --- /dev/null
+> +++ b/drivers/bus/uniphier-system-bus.c
+> @@ -0,0 +1,283 @@
+> +/*
+> + * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/log2.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/sort.h>
+> +
+> +/* System Bus Controller registers */
+> +#define UNIPHIER_SBC_BASE	0x100	/* base address of bank0 space */
+> +#define    UNIPHIER_SBC_BASE_BE		BIT(0)	/* bank_enable */
+> +#define UNIPHIER_SBC_CTRL0	0x200	/* timing parameter 0 of bank0 */
+> +#define UNIPHIER_SBC_CTRL1	0x204	/* timing parameter 1 of bank0 */
+> +#define UNIPHIER_SBC_CTRL2	0x208	/* timing parameter 2 of bank0 */
+> +#define UNIPHIER_SBC_CTRL3	0x20c	/* timing parameter 3 of bank0 */
+> +#define UNIPHIER_SBC_CTRL4	0x300	/* timing parameter 4 of bank0 */
+> +
+> +#define UNIPHIER_SBC_STRIDE	0x10	/* register stride to next bank */
+> +#define UNIPHIER_SBC_NR_BANKS	8	/* number of banks (chip select) */
+> +#define UNIPHIER_SBC_BASE_DUMMY	0xffffffff	/* data to squash bank 0, 1 */
+> +
+> +struct uniphier_system_bus_bank {
+> +	u32 base;
+> +	u32 end;
+> +};
+> +
+> +struct uniphier_system_bus_priv {
+> +	struct device *dev;
+> +	void __iomem *membase;
+> +	struct uniphier_system_bus_bank bank[UNIPHIER_SBC_NR_BANKS];
+> +};
+> +
+> +static void uniphier_system_bus_set_reg(struct uniphier_system_bus_priv *priv)
+> +{
+> +	void __iomem *base_reg = priv->membase + UNIPHIER_SBC_BASE;
+> +	u32 base, end, mask, val;
+> +	int i;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(priv->bank); i++) {
+> +		base = priv->bank[i].base;
+> +		end = priv->bank[i].end;
+> +
+> +		if (base == end) {
+> +			/*
+> +			 * If SBC_BASE0 or SBC_BASE1 is set to zero, the access
+> +			 * to anywhere in the system bus space is routed to
+> +			 * bank 0 (if boot swap if off) or bank 1 (if boot swap
+> +			 * if on).  It means that CPUs cannot get access to
+> +			 * bank 2 or later.  In other words, bank 0/1 cannot
+> +			 * be disabled even if its bank_enable bits is cleared.
+> +			 * This seems odd, but it is how this hardware goes.
+> +			 * As a workaround, dummy data (0xffffffff) should be
+> +			 * set when the bank 0/1 is unused.  As for bank 2 and
+> +			 * later, they can be simply disable by clearing the
+> +			 * bank_enable bit.
+> +			 */
+> +			if (i < 2)
+> +				val = UNIPHIER_SBC_BASE_DUMMY;
+> +			else
+> +				val = 0;
+> +		} else {
+> +			mask = base ^ (end - 1);
+> +
+> +			val = base & 0xfffe0000;
+> +			val |= (~mask >> 16) & 0xfffe;
+> +			val |= UNIPHIER_SBC_BASE_BE;
+> +		}
+> +		dev_dbg(priv->dev, "SBC_BASE[%d] = 0x%08x\n", i, val);
+> +
+> +		writel(val, base_reg + UNIPHIER_SBC_STRIDE * i);
+> +	}
+> +}
+> +
+> +static void uniphier_system_bus_check_boot_swap(
+> +					struct uniphier_system_bus_priv *priv)
+> +{
+> +	void __iomem *base_reg = priv->membase + UNIPHIER_SBC_BASE;
+> +	int is_swapped;
+> +
+> +	is_swapped = !(readl(base_reg) & UNIPHIER_SBC_BASE_BE);
+> +
+> +	dev_dbg(priv->dev, "Boot Swap: %s\n", is_swapped ? "on" : "off");
+> +
+> +	if (is_swapped)
+> +		swap(priv->bank[0], priv->bank[1]);
+> +}
+> +
+> +static int uniphier_system_bus_add_bank(struct uniphier_system_bus_priv *priv,
+> +					int bank, u32 addr, u64 paddr, u32 size)
+> +{
+> +	u64 end, mask;
+> +
+> +	dev_dbg(priv->dev,
+> +		"range found: bank = %d, addr = %08x, paddr = %08llx, size = %08x\n",
+> +		bank, addr, paddr, size);
+> +
+> +	if (bank >= ARRAY_SIZE(priv->bank)) {
+> +		dev_err(priv->dev, "unsupported bank number %d\n", bank);
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (priv->bank[bank].base || priv->bank[bank].end) {
+> +		dev_err(priv->dev,
+> +			"range for bank %d has already been specified\n", bank);
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (paddr > U32_MAX) {
+> +		dev_err(priv->dev, "base address %llx is too high\n", paddr);
+> +		return -EINVAL;
+> +	}
+> +
+> +	end = paddr + size;
+> +
+> +	if (addr > paddr) {
+> +		dev_err(priv->dev,
+> +			"base %08x cannot be mapped to %08llx of parent\n",
+> +			addr, paddr);
+> +		return -EINVAL;
+> +	}
+> +	paddr -= addr;
+> +
+> +	paddr = round_down(paddr, 0x00020000);
+> +	end = round_up(end, 0x00020000);
+> +
+> +	if (end > U32_MAX) {
+> +		dev_err(priv->dev, "end address %08llx is too high\n", end);
+> +		return -EINVAL;
+> +	}
+> +	mask = paddr ^ (end - 1);
+> +	mask = roundup_pow_of_two(mask);
+> +
+> +	paddr = round_down(paddr, mask);
+> +	end = round_up(end, mask);
+> +
+> +	priv->bank[bank].base = paddr;
+> +	priv->bank[bank].end = end;
+> +
+> +	dev_dbg(priv->dev, "range added: bank = %d, addr = %08x, end = %08x\n",
+> +		bank, priv->bank[bank].base, priv->bank[bank].end);
+> +
+> +	return 0;
+> +}
+> +
+> +static int uniphier_system_bus_sort_cmp(const void *a, const void *b)
+> +{
+> +	return ((struct uniphier_system_bus_bank *)a)->base
+> +		- ((struct uniphier_system_bus_bank *)b)->base;
+> +}
+> +
+> +static int uniphier_system_bus_check_overlap(
+> +					struct uniphier_system_bus_priv tmp)
+> +{
+> +	int i;
+> +
+> +	sort(&tmp.bank, ARRAY_SIZE(tmp.bank), sizeof(tmp.bank[0]),
+> +	     uniphier_system_bus_sort_cmp, NULL);
+> +
+> +	for (i = 0; i < ARRAY_SIZE(tmp.bank) - 1; i++)
+> +		if (tmp.bank[i].end > tmp.bank[i + 1].base) {
+> +			dev_err(tmp.dev,
+> +				"region overlap between %08x-%08x and %08x-%08x\n",
+> +				tmp.bank[i].base, tmp.bank[i].end,
+> +				tmp.bank[i + 1].base, tmp.bank[i + 1].end);
+> +			return -EINVAL;
+> +		}
+> +
+> +	return 0;
+> +}
+> +
+> +static int uniphier_system_bus_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct uniphier_system_bus_priv *priv;
+> +	struct resource *regs;
+> +	const __be32 *ranges;
+> +	u32 cells, addr, size;
+> +	u64 paddr;
+> +	int pna, bank, rlen, rone, ret;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	priv->membase = devm_ioremap_resource(dev, regs);
+> +	if (IS_ERR(priv->membase))
+> +		return PTR_ERR(priv->membase);
+> +
+> +	priv->dev = dev;
+> +
+> +	pna = of_n_addr_cells(dev->of_node);
+> +
+> +	ret = of_property_read_u32(dev->of_node, "#address-cells", &cells);
+> +	if (ret) {
+> +		dev_err(dev, "failed to get #address-cells\n");
+> +		return ret;
+> +	}
+> +	if (cells != 2) {
+> +		dev_err(dev, "#address-cells must be 2\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	ret = of_property_read_u32(dev->of_node, "#size-cells", &cells);
+> +	if (ret) {
+> +		dev_err(dev, "failed to get #size-cells\n");
+> +		return ret;
+> +	}
+> +	if (cells != 1) {
+> +		dev_err(dev, "#size-cells must be 1\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	ranges = of_get_property(dev->of_node, "ranges", &rlen);
+> +	if (!ranges) {
+> +		dev_err(dev, "failed to get ranges property\n");
+> +		return -ENOENT;
+> +	}
+> +
+> +	rlen /= sizeof(*ranges);
+> +	rone = pna + 2;
+> +
+> +	for (; rlen >= rone; rlen -= rone) {
+> +		bank = be32_to_cpup(ranges++);
+> +		addr = be32_to_cpup(ranges++);
+> +		paddr = of_translate_address(dev->of_node, ranges);
+> +		if (paddr == OF_BAD_ADDR)
+> +			return -EINVAL;
+> +		ranges += pna;
+> +		size = be32_to_cpup(ranges++);
+> +
+> +		ret = uniphier_system_bus_add_bank(priv, bank, addr,
+> +						   paddr, size);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	ret = uniphier_system_bus_check_overlap(*priv);
+> +	if (ret)
+> +		return ret;
+> +
+> +	uniphier_system_bus_check_boot_swap(priv);
+> +
+> +	uniphier_system_bus_set_reg(priv);
+> +
+> +	/* Now, the bus is configured.  Populate platform_devices below it */
+> +	return of_platform_populate(dev->of_node, of_default_bus_match_table,
+> +				    NULL, dev);
+> +}
+> +
+> +static const struct of_device_id uniphier_system_bus_match[] = {
+> +	{ .compatible = "socionext,uniphier-system-bus" },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, uniphier_system_bus_match);
+> +
+> +static struct platform_driver uniphier_system_bus_driver = {
+> +	.probe		= uniphier_system_bus_probe,
+> +	.driver = {
+> +		.name	= "uniphier-system-bus",
+> +		.of_match_table = uniphier_system_bus_match,
+> +	},
+> +};
+> +module_platform_driver(uniphier_system_bus_driver);
+> +
+> +MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
+> +MODULE_DESCRIPTION("UniPhier System Bus driver");
+> +MODULE_LICENSE("GPL");
+> -- 
+> 1.9.1
+> 
