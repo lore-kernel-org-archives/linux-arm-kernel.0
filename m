@@ -1,46 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 04 Dec 2015 22:36:31 +0100
-Subject: [PATCH] ARM: DTS: am33xx: Use the new DT bindings for the eDMA3
-In-Reply-To: <20151204184706.GO23396@atomide.com>
-References: <1449225915-28879-1-git-send-email-peter.ujfalusi@ti.com>
- <87wpsunn82.fsf@saruman.tx.rr.com> <20151204184706.GO23396@atomide.com>
-Message-ID: <5617214.abxPrpfVaF@wuerfel>
+Date: Fri, 04 Dec 2015 22:46:19 +0100
+Subject: [PATCH] ahci: compile out msi/msix infrastructure
+In-Reply-To: <20151204195830.2300.48789.stgit@dwillia2-desk3.jf.intel.com>
+References: <20151204195830.2300.48789.stgit@dwillia2-desk3.jf.intel.com>
+Message-ID: <2378126.FJZNlQmf9U@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 December 2015 10:47:07 Tony Lindgren wrote:
-> > Peter Ujfalusi <peter.ujfalusi@ti.com> writes:
-> > > @@ -174,12 +182,44 @@
-> > >             };
-> > >  
-> > >             edma: edma at 49000000 {
-> > > -                   compatible = "ti,edma3";
-> > > -                   ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
-> > > -                   reg =   <0x49000000 0x10000>,
-> > > -                           <0x44e10f90 0x40>;
-> > > +                   compatible = "ti,edma3-tpcc";
-> > > +                   ti,hwmods = "tpcc";
-> > > +                   reg =   <0x49000000 0x10000>;
-> > > +                   reg-names = "edma3_cc";
-> > >                     interrupts = <12 13 14>;
-> > > -                   #dma-cells = <1>;
-> > > +                   interrupt-names = "edma3_ccint", "emda3_mperr",
-> > > +                                     "edma3_ccerrint";
-> > > +                   dma-requests = <64>;
-> > > +                   #dma-cells = <2>;
-> > > +
-> > > +                   ti,tptcs = <&edma_tptc0 7>, <&edma_tptc1 5>,
-> > > +                              <&edma_tptc2 0>;
-> > > +
-> > > +                   ti,edma-memcpy-channels = /bits/ 16 <20 21>;
-> > 
-> > can you explain this property here ? Are you setting bits 20 and 21 on a
-> > 16-bit field ?
+On Friday 04 December 2015 11:58:30 Dan Williams wrote:
+> Quoting Arnd:
+>     The AHCI driver is used for some on-chip devices that do not use PCI
+>     for probing, and it can be built even when CONFIG_PCI is disabled, but
+>     that now results in a build failure:
 > 
-> I think it's an arry of u16 dma channels.. But could it be just /bits/ 8
-> instead of /bits/ 16?
+>     ata/libahci.c: In function 'ahci_host_activate_multi_irqs':
+>     ata/libahci.c:2475:4: error: invalid use of undefined type 'struct msix_entry'
+>     ata/libahci.c:2475:21: error: dereferencing pointer to incomplete type 'struct msix_entry'
 > 
+> Add ifdef CONFIG_PCI_MSI infrastructure to compile out the mutli-msi and
+> multi-msix code.
+> 
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Reported-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> Fixes: d684a90d38e2 ("ahci: per-port msix support")
+> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 
-Please just drop the /bits/ 16 and use normal cells.
+Thanks a lot, looks good. I've verified that this fixes the build on the
+configuration that failed earlier.
 
-	Arnd
+Tested-by: Arnd Bergmann <arnd@arndb.de>
