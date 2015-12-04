@@ -1,36 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 3 Dec 2015 16:54:40 -0800
-Subject: [PATCH v2 13/14] ARM: DTS: am33xx: Use the new DT bindings for
- the eDMA3
-In-Reply-To: <1444979892-31626-14-git-send-email-peter.ujfalusi@ti.com>
-References: <1444979892-31626-1-git-send-email-peter.ujfalusi@ti.com>
- <1444979892-31626-14-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20151204005440.GE23396@atomide.com>
+From: huawei.libin@huawei.com (libin)
+Date: Fri, 4 Dec 2015 09:00:40 +0800
+Subject: [PATCH] arm64: ftrace: stop using kstop_machine to enable/disable
+ tracing
+In-Reply-To: <20151203103139.35648cc2@gandalf.local.home>
+References: <1448697009-17211-1-git-send-email-huawei.libin@huawei.com>
+ <20151202123654.GC4523@arm.com> <56600992.4040005@huawei.com>
+ <20151203093821.GD7023@arm.com> <20151203100525.70cc40de@gandalf.local.home>
+ <20151203150926.GG11337@arm.com> <20151203103139.35648cc2@gandalf.local.home>
+Message-ID: <5660E5B8.2050103@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [151016 00:23]:
+Thanks very much to Will and Steve for the wonderful comments, I will modify the
+commit message, and remove the misleading comments about module text
+disappearing case.
 
-I noticed something while changing dm81xx to use the edma_xbar..
+Thanks again,
+Li Bin
 
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> +
-> +		edma_xbar: dma-router at 44e10f90 {
-> +			compatible = "ti,am335x-edma-crossbar";
-> +			reg = <0x44e10f90 0x40>;
-> +
-> +			#dma-cells = <3>;
-> +			dma-requests = <32>;
-> +
-> +			dma-masters = <&edma>;
->  		};
-
-The edma_xbar should now be just a child at offset 0xf90 under the
-scm: scm at 210000. Can you please check the other patches too?
-
-Regards,
-
-Tony
+on 2015/12/3 23:31, Steven Rostedt wrote:
+> On Thu, 3 Dec 2015 15:09:26 +0000
+> Will Deacon <will.deacon@arm.com> wrote:
+>
+>> Yeah, I think the comments on x86 and arm64 are out of date. They also
+>> mention the freeing of __init sections -- is that still a concern?
+> No we black list them, any section that we are not sure will be there
+> when we expect it to has recordmcount.c nop out the calls to mcount and
+> they are ignored. Remember the e1000e bug? This was the reproducer.
+>
+> Anyway, on my todo list is to allow init sections to be traced. To do
+> so would mean that I need to add generic code that lets ftrace know to
+> remove init sections at boot up. Right now (or at least the last time I
+> checked, which was back in 2009), every arch had its own way of freeing
+> init memory. If that has changed, or I can just place a hook where it
+> happens (which is probably the easy part), I can allow init code to be
+> traced too.
+>
+> -- Steve
+>
+>
+> .
+>
