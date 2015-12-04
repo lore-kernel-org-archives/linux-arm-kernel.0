@@ -1,55 +1,41 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 4 Dec 2015 15:56:48 +0100
-Subject: [PATCH] mmc: mediatek: change some dev_err to dev_dbg
-In-Reply-To: <1448971954-398-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1448971954-398-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <CAPDyKFoAhCzwmAi_ru0u-mdxiuvzufGRBUEjEgRc1zBGiLTDgA@mail.gmail.com>
+From: pmladek@suse.com (Petr Mladek)
+Date: Fri, 4 Dec 2015 16:27:09 +0100
+Subject: [PATCH v2 3/5] printk/nmi: Try hard to print Oops message in NMI
+ context
+In-Reply-To: <20151201234437.GA8644@n2100.arm.linux.org.uk>
+References: <1448622572-16900-1-git-send-email-pmladek@suse.com>
+ <1448622572-16900-4-git-send-email-pmladek@suse.com>
+ <20151201234437.GA8644@n2100.arm.linux.org.uk>
+Message-ID: <20151204152709.GA20935@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 December 2015 at 13:12, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> there are too many error logs shown when use CMD21/CMD19 to do tune,
-> and it will appear at each resume time, print out so many logs to the
-> uart console cost too mush time. so change it to dev_dbg.
->
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+On Tue 2015-12-01 23:44:37, Russell King - ARM Linux wrote:
+> On Fri, Nov 27, 2015 at 12:09:30PM +0100, Petr Mladek wrote:
+> > What we can do, though, is to zap all printk locks. We already do this
+> > when a printk recursion is detected. This should be safe because
+> > the system is crashing and there shouldn't be any printk caller
+> > that would cause the deadlock.
+> 
+> What about serial consoles which may call out to subsystems like the
+> clk subsystem to enable a clock, which would want to take their own
+> spinlocks in addition to the serial console driver?
 
-This one didn't apply to my next branch. Can you please rebase.
+Yes, there might be more locks used by the serial console but I do
+not know how to handle them all easily. IMHO, this patch is just better
+than nothing.
 
-Kind regards
-Uffe
+> I don't see bust_spinlocks() dealing with any of these locks, so IMHO
+> trying to make this work in NMI context strikes me as making the
+> existing solution more unreliable on ARM systems.
 
-> ---
->  drivers/mmc/host/mtk-sd.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> index 39568cc..34d23b8 100644
-> --- a/drivers/mmc/host/mtk-sd.c
-> +++ b/drivers/mmc/host/mtk-sd.c
-> @@ -972,7 +972,7 @@ static bool msdc_data_xfer_done(struct msdc_host *host, u32 events,
->                 if ((events & MSDC_INT_XFER_COMPL) && (!stop || !stop->error)) {
->                         data->bytes_xfered = data->blocks * data->blksz;
->                 } else {
-> -                       dev_err(host->dev, "interrupt events: %x\n", events);
-> +                       dev_dbg(host->dev, "interrupt events: %x\n", events);
->                         msdc_reset_hw(host);
->                         host->error |= REQ_DAT_ERR;
->                         data->bytes_xfered = 0;
-> @@ -982,10 +982,10 @@ static bool msdc_data_xfer_done(struct msdc_host *host, u32 events,
->                         else if (events & MSDC_INT_DATCRCERR)
->                                 data->error = -EILSEQ;
->
-> -                       dev_err(host->dev, "%s: cmd=%d; blocks=%d",
-> +                       dev_dbg(host->dev, "%s: cmd=%d; blocks=%d",
->                                 __func__, mrq->cmd->opcode, data->blocks);
-> -                       dev_err(host->dev, "data_error=%d xfer_size=%d\n",
-> -                                       (int)data->error, data->bytes_xfered);
-> +                       dev_dbg(host->dev, "data_error=%d xfer_size=%d\n",
-> +                               (int)data->error, data->bytes_xfered);
->                 }
->
->                 msdc_data_xfer_next(host, mrq, data);
-> --
-> 1.8.1.1.dirty
->
+bust_spinlocks() calls printk_nmi_flush() that would call printk()
+that would zap "lockbuf_lock" and "console_sem" when in Oops and NMI.
+Yes, there might be more locks blocked but we try to break at least
+the first two walls. Also zapping is allowed only once per 30 seconds,
+see zap_locks(). Why do you think that it might make things more
+unreliable, please?
+
+
+Thanks for looking,
+Petr
