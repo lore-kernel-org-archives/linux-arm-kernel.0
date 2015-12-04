@@ -1,35 +1,62 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 04 Dec 2015 23:20:09 +0100
-Subject: [PATCH] [media] exynos4-is: make VIDEO_SAMSUNG_EXYNOS4_IS tristate
-Message-ID: <2086080.9y3TX8CFJu@wuerfel>
+Date: Fri,  4 Dec 2015 23:30:35 +0100
+Subject: [PATCH 03/10] ARM: debug-ll: rework ep93xx handling
+In-Reply-To: <1449268242-808553-1-git-send-email-arnd@arndb.de>
+References: <1449268242-808553-1-git-send-email-arnd@arndb.de>
+Message-ID: <1449268242-808553-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With CONFIG_V4L2=m and VIDEO_SAMSUNG_EXYNOS4_IS=y, we can select the
-individual drivers as built-in code when that should not be possible:
+This makes ep93xx debug-ll handling more consistent with the other
+platforms, by adding a separate Kconfig symbol for it that
+in turn selects the standard DEBUG_UART_PL01X symbol.
 
-drivers/built-in.o: In function `s5pcsis_set_fmt':
-policy.c:(.text+0x13afdc): undefined reference to `v4l_bound_align_image'
-drivers/built-in.o: In function `s5pcsis_probe':
-policy.c:(.text+0x13b440): undefined reference to `v4l2_of_parse_endpoint'
-policy.c:(.text+0x13b72c): undefined reference to `v4l2_subdev_init'
-
-Changing VIDEO_SAMSUNG_EXYNOS4_IS to tristate means that the dependency
-from CONFIG_V4L2 propates to the individual Kconfig symbols and they
-can only be built as loadable modules if V4L2 or any other of the
-dependencies itself is a module.
+We still have to pick a physical address even if DEBUG_LL is disabled
+here, because the EP93xx uncompress output code uses
+CONFIG_DEBUG_UART_PHYS. If we ever move to multiplatform support,
+this can go away.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/Kconfig.debug | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
-index 40423c6c5324..57d42c6172c5 100644
---- a/drivers/media/platform/exynos4-is/Kconfig
-+++ b/drivers/media/platform/exynos4-is/Kconfig
-@@ -1,6 +1,6 @@
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 8258f9dd1f77..cbdd096b9d13 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -263,6 +263,14 @@ choice
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to the UA0 serial port in the CX92755.
  
- config VIDEO_SAMSUNG_EXYNOS4_IS
--	bool "Samsung S5P/EXYNOS4 SoC series Camera Subsystem driver"
-+	tristate "Samsung S5P/EXYNOS4 SoC series Camera Subsystem driver"
- 	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
- 	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
- 	depends on OF && COMMON_CLK
++	config DEBUG_EP93XX
++		bool "Kernel low-level debugging messages via ep93xx UART"
++		depends on ARCH_EP93XX
++		select DEBUG_UART_PL01X
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Cirrus Logic EP93xx based platforms.
++
+ 	config DEBUG_FOOTBRIDGE_COM1
+ 		bool "Kernel low-level debugging messages via footbridge 8250 at PCI COM1"
+ 		depends on FOOTBRIDGE
+@@ -1439,7 +1447,7 @@ config DEBUG_UART_PHYS
+ 	default 0x80070000 if DEBUG_IMX23_UART
+ 	default 0x80074000 if DEBUG_IMX28_UART
+ 	default 0x80230000 if DEBUG_PICOXCELL_UART
+-	default 0x808c0000 if ARCH_EP93XX
++	default 0x808c0000 if DEBUG_EP93XX || ARCH_EP93XX
+ 	default 0x90020000 if DEBUG_NSPIRE_CLASSIC_UART || DEBUG_NSPIRE_CX_UART
+ 	default 0xb0060000 if DEBUG_SIRFPRIMA2_UART1
+ 	default 0xb0090000 if DEBUG_VEXPRESS_UART0_CRX
+@@ -1571,7 +1579,7 @@ config DEBUG_UART_VIRT
+ 	default 0xfed60000 if DEBUG_RK29_UART0
+ 	default 0xfed64000 if DEBUG_RK29_UART1 || DEBUG_RK3X_UART2
+ 	default 0xfed68000 if DEBUG_RK29_UART2 || DEBUG_RK3X_UART3
+-	default 0xfedc0000 if ARCH_EP93XX
++	default 0xfedc0000 if DEBUG_EP93XX
+ 	default 0xfee003f8 if FOOTBRIDGE
+ 	default 0xfee20000 if DEBUG_NSPIRE_CLASSIC_UART || DEBUG_NSPIRE_CX_UART
+ 	default 0xfee82340 if ARCH_IOP13XX
+-- 
+2.1.0.rc2
