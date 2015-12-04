@@ -1,37 +1,48 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Fri, 4 Dec 2015 17:57:44 +0100
-Subject: [PATCH v2 1/5] printk/nmi: Generic solution for safe printk in NMI
-In-Reply-To: <alpine.LNX.2.00.1512020022460.32500@pobox.suse.cz>
-References: <1448622572-16900-2-git-send-email-pmladek@suse.com>
- <201511271919.aEZuZKNe%fengguang.wu@intel.com>
- <20151127153804.GC2648@pathway.suse.cz>
- <alpine.LNX.2.00.1512020022460.32500@pobox.suse.cz>
-Message-ID: <20151204165744.GD20935@pathway.suse.cz>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Fri, 4 Dec 2015 08:59:10 -0800
+Subject: [PATCH] drivers: dma-coherent: use ioremap_wc() for DMA_MEMORY_MAP
+In-Reply-To: <20151204105000.GD10123@e104818-lin.cambridge.arm.com>
+References: <1448029226-4914-1-git-send-email-brian.starkey@arm.com>
+ <20151204105000.GD10123@e104818-lin.cambridge.arm.com>
+Message-ID: <CAPcyv4gti=49v4gUVjf=4nhxBCPPM3xmq6MQ2sBoBnKQbCS5MQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2015-12-02 00:24:49, Jiri Kosina wrote:
-> On Fri, 27 Nov 2015, Petr Mladek wrote:
-> 
-> > MN10300 has its own implementation for entering and exiting NMI 
-> > handlers. It does not call nmi_enter() and nmi_exit(). Please, find 
-> > below an updated patch that adds printk_nmi_enter() and 
-> > printk_nmi_exit() to the custom entry points. Then we could add HAVE_NMI 
-> > to arch/mn10300/Kconfig and avoid the above warning.
-> 
-> Hmm, so what exactly would go wrong if MN10300 (whatever that architecture 
-> is) would call nmi_enter() and nmi_exit() at the places where it's 
-> starting and finishing NMI handler?
-> 
-> >From a cursory look, it seems like most (if not all) of the things called 
-> from nmi_{enter,exit}() would be nops there anyway.
+On Fri, Dec 4, 2015 at 2:50 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Fri, Nov 20, 2015 at 02:20:26PM +0000, Brian Starkey wrote:
+>> When the DMA_MEMORY_MAP flag is used, memory which can be accessed
+>> directly should be returned, so use ioremap_wc() instead of ioremap().
+>> Also, ensure that the correct memset operation is used in
+>> dma_alloc_from_coherent() with respect to the region's flags.
+>>
+>> This fixes the below alignment fault on arm64, caused by invalid use
+>> of memset() on Device memory.
+>
+> This is indeed affecting both arm32 and arm64 systems.
+>
+>> diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+>> index 55b8398..45358d0 100644
+>> --- a/drivers/base/dma-coherent.c
+>> +++ b/drivers/base/dma-coherent.c
+>> @@ -31,7 +31,10 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_add
+>>       if (!size)
+>>               goto out;
+>>
+>> -     mem_base = ioremap(phys_addr, size);
+>> +     if (flags & DMA_MEMORY_MAP)
+>> +             mem_base = ioremap_wc(phys_addr, size);
+>> +     else
+>> +             mem_base = ioremap(phys_addr, size);
+>
+> I wonder whether a memremap() approach for the DMA_MEMORY_MAP case would
+> be better. This API was added recently by commit 92281dee825f ("arch:
+> introduce memremap()"). It only supports write-back and write-through
+> but we could add a MEMREMAP_WC flag for this case.
 
-Good point. Max mentioned in the other main that the NMI handler
-should follow the NMI ruler. I do not why it could not work.
-In fact, it might improve things, e.g. nmi_enter() blocks
-recursive NMIs.
-
-I think that it will move it into a separate patch, thought.
-
-Best Regards,
-Petr
+I originally included both MEMREMAP_WC and MEMREAMP_UC as potential
+flags to this api, but ultimately decided against it.  The memremap()
+api is meant for memory that is known to have no i/o side effects.  As
+far as I can see WC and UC usages are a muddy mix of "sometimes
+there's I/O side effects, but it depends by arch and driver".  In
+other words we can't drop the "__iomem" annotation from WC and UC
+mappings by default.
