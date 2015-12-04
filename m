@@ -1,51 +1,39 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 4 Dec 2015 08:53:44 -0600
-Subject: [PATCH v2 7/7] ARM: DTS: Amlogic: Add SMP related nodes for
- Meson8b
-In-Reply-To: <1449076953-5058-8-git-send-email-carlo@caione.org>
-References: <1449076953-5058-1-git-send-email-carlo@caione.org>
- <1449076953-5058-8-git-send-email-carlo@caione.org>
-Message-ID: <20151204145344.GB18876@rob-hp-laptop>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 04 Dec 2015 14:55:12 +0000
+Subject: [PATCH v8 1/4] arm64: Store struct task_info in sp_el0
+In-Reply-To: <20151204132743.GH10123@e104818-lin.cambridge.arm.com>
+References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
+ <1449226948-14251-2-git-send-email-james.morse@arm.com>
+ <20151204132743.GH10123@e104818-lin.cambridge.arm.com>
+Message-ID: <5661A950.7090009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 02, 2015 at 06:22:33PM +0100, Carlo Caione wrote:
-> From: Carlo Caione <carlo@endlessm.com>
+Hi Catalin,
+
+On 04/12/15 13:27, Catalin Marinas wrote:
+> On Fri, Dec 04, 2015 at 11:02:25AM +0000, James Morse wrote:
+>> --- a/arch/arm64/kernel/entry.S
+>> +++ b/arch/arm64/kernel/entry.S
+> [...]
+>> @@ -599,6 +606,8 @@ ENTRY(cpu_switch_to)
+>>  	ldp	x29, x9, [x8], #16
+>>  	ldr	lr, [x8]
+>>  	mov	sp, x9
+>> +	and	x9, x9, #~(THREAD_SIZE - 1)
+>> +	msr	sp_el0, x9
+>>  	ret
+>>  ENDPROC(cpu_switch_to)
 > 
-> Add nodes for: SCU, PMU and SRAM. Set also the enable-method for SMP
-> bringup.
-> 
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
-> ---
->  arch/arm/boot/dts/meson8b.dtsi | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-> index 51b32ed..27e1b2f 100644
-> --- a/arch/arm/boot/dts/meson8b.dtsi
-> +++ b/arch/arm/boot/dts/meson8b.dtsi
-> @@ -51,9 +51,20 @@
->  / {
->  	interrupt-parent = <&gic>;
->  
-> +	scu at c4300000 {
-> +		compatible = "arm,cortex-a5-scu";
-> +		reg = <0xc4300000 0x100>;
-> +	};
-> +
-> +	pmu at c81000e4 {
-> +		compatible = "amlogic,meson8b-pmu", "syscon";
-> +		reg = <0xc81000e0 0x18>;
-> +	};
+> At the beginning of the cpu_switch_to function, could we do
+> "mrs x9, sp_el0" instead to avoid the "and ... ~(THREAD_SIZE-1)"?
 
-These should be under a bus node.
+I'm not sure I follow - are you suggesting to store struct thread_info
+in the thread_cpu_context?
 
-> +
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		enable-method = "amlogic,meson8b-smp";
+This would change a ldr to a ldp, and save the 'and', so its definitely
+fewer instructions.
 
-This property is supposed to be per cpu.
 
-Rob
+
+James
