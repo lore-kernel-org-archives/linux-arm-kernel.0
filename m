@@ -1,94 +1,52 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 4 Dec 2015 16:19:31 -0700
-Subject: [PATCH] ARM: imx6: pm: declare pm domain latency on power_state
- struct.
-In-Reply-To: <1448286153.3689.15.camel@pengutronix.de>
-References: <1447799871-56374-6-git-send-email-lina.iyer@linaro.org>
- <1447858656-62464-1-git-send-email-lina.iyer@linaro.org>
- <1448285460.3689.13.camel@pengutronix.de>
- <1448286153.3689.15.camel@pengutronix.de>
-Message-ID: <20151204231931.GA2230@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri,  4 Dec 2015 15:31:07 -0800
+Subject: [PATCH 4/6] ARM: dts: Add usb support for dm814x-evm
+In-Reply-To: <1449271869-7614-1-git-send-email-tony@atomide.com>
+References: <1449271869-7614-1-git-send-email-tony@atomide.com>
+Message-ID: <1449271869-7614-5-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 23 2015 at 06:42 -0700, Lucas Stach wrote:
->Am Montag, den 23.11.2015, 14:31 +0100 schrieb Lucas Stach:
->> Am Mittwoch, den 18.11.2015, 07:57 -0700 schrieb Lina Iyer:
->> > From: Axel Haslam <ahaslam+renesas@baylibre.com>
->> >
->> > The generic_pm_domain structure uses an array of latencies to be able to
->> > declare multiple intermediate states.
->> >
->> > Declare a single "OFF" state with the default latencies So that the
->> > power_off_latency_ns and power_on_latency_ns fields of generic_pm_domain
->> > structure can be eventualy removed.
->> >
->> > Signed-off-by: Axel Haslam <ahaslam+renesas@baylibre.com>
->> > Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->> > [Lina: pm_genpd_init() argument change]
->> > ---
->> >  arch/arm/mach-imx/gpc.c | 14 ++++++++++++--
->> >  1 file changed, 12 insertions(+), 2 deletions(-)
->> >
->> > diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
->> > index 8e7976a..b070e06 100644
->> > --- a/arch/arm/mach-imx/gpc.c
->> > +++ b/arch/arm/mach-imx/gpc.c
->> > @@ -368,13 +368,23 @@ static struct generic_pm_domain imx6q_arm_domain = {
->> >  	.name = "ARM",
->> >  };
->> >
->> > +static struct genpd_power_state imx6q_arm_domain_states[] = {
->>
->> Those states are for the PU, not the ARM domain.
->>
->> > +	{
->> > +		.name = "OFF",
->> > +		.power_off_latency_ns = 25000,
->> > +		.power_on_latency_ns = 2000000,
->> > +	},
->> > +};
->> > +
->> >  static struct pu_domain imx6q_pu_domain = {
->> >  	.base = {
->> >  		.name = "PU",
->> >  		.power_off = imx6q_pm_pu_power_off,
->> >  		.power_on = imx6q_pm_pu_power_on,
->> > -		.power_off_latency_ns = 25000,
->> > -		.power_on_latency_ns = 2000000,
->> > +		.gov = NULL,
->> > +		.status = GPD_STATE_POWER_OFF,
->>
->> The above 2 lines should not be needed. This is a static struct, so .gov
->> will already be NULL. status is set by pm_genpd_init() and the above
->> value is actively wrong.
->>
-True.
+Add usb support for dm814x-evm
 
->> > +		.states = imx6q_arm_domain_states,
->> > +		.state_count = ARRAY_SIZE(imx6q_arm_domain_states),
->> >  	},
->> >  };
->> >
->>
->> How urgent is this patch? I have a series to rework the GPC driver
->> almost ready and I could fold this change in directly if it's okay for
->> this to sit through a review of the rework.
->
->And I just noticed this depends on changes that are not already in
->v4.4-rc. Why is this sent as a single patch and not as part of the
->series adding multiple state support to genpd?
->
-Sorry, since this is ARM 32, I had not comple tested it when I sent out
-the series. I sent this out after I realized it.
+Cc: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/dm8148-evm.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-Thanks,
-Lina
-
->Regards,
->Lucas
->
->-- 
->Pengutronix e.K.             | Lucas Stach                 |
->Industrial Linux Solutions   | http://www.pengutronix.de/  |
->
+diff --git a/arch/arm/boot/dts/dm8148-evm.dts b/arch/arm/boot/dts/dm8148-evm.dts
+index 08d01c3..e070862 100644
+--- a/arch/arm/boot/dts/dm8148-evm.dts
++++ b/arch/arm/boot/dts/dm8148-evm.dts
+@@ -56,4 +56,28 @@
+ 			DM814X_IOPAD(0x093C, PIN_INPUT_PULLUP |  0x80)	/* GP1[6] */
+ 			>;
+ 	};
++
++	usb0_pins: pinmux_usb0_pins {
++		pinctrl-single,pins = <
++			DM814X_IOPAD(0x0c34, PIN_OUTPUT | 0x1)	/* USB0_DRVVBUS */
++			>;
++	};
++
++	usb1_pins: pinmux_usb1_pins {
++		pinctrl-single,pins = <
++			DM814X_IOPAD(0x0834, PIN_OUTPUT | 0x80)	/* USB1_DRVVBUS */
++			>;
++	};
++};
++
++&usb0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb0_pins>;
++	dr_mode = "host";
++};
++
++&usb1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb1_pins>;
++	dr_mode = "host";
+ };
+-- 
+2.6.2
