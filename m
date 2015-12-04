@@ -1,92 +1,146 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 04 Dec 2015 08:54:49 +0000
-Subject: [PATCH v2] ARM: Enable GICv2m on 32-bit virt machine
-In-Reply-To: <00a901d12e6d$f953b2a0$ebfb17e0$@samsung.com>
-References: <1448624071-9552-1-git-send-email-p.fedin@samsung.com>
- <CANMBJr6D=-meT6MEQtgyiG2rZ+vzsq-AgLEBAJ7ob-ak2-87wQ@mail.gmail.com>
- <00a101d12e6c$aa073600$fe15a200$@samsung.com>
- <00a901d12e6d$f953b2a0$ebfb17e0$@samsung.com>
-Message-ID: <566154D9.3050809@arm.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 4 Dec 2015 11:18:07 +0200
+Subject: [PATCH 2/7] ARM: dts: Update edma bindings on dm814x to use
+ edma_xbar
+In-Reply-To: <1449192335-10137-3-git-send-email-tony@atomide.com>
+References: <1449192335-10137-1-git-send-email-tony@atomide.com>
+ <1449192335-10137-3-git-send-email-tony@atomide.com>
+Message-ID: <56615A4F.3080207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/15 08:30, Pavel Fedin wrote:
->  Hello!
+On 12/04/2015 03:25 AM, Tony Lindgren wrote:
+> The edma is the same as on am33xx, except it has four tptc
+> instances. And we need the edma_xbar for at least mmc3, so
+> let's use the edma_xbar and the new binding as suggested by
+> Peter Ujfalusi <peter.ujfalusi@ti.com>.
 > 
->>  Proposed solution
->>  -----------------
->>
->>  I have studied the code a bit more, and i see that proper MSI domains should have domain->ops
->> == &msi_domain_ops. Based on this, i
->> can suggest the following fix (copypasted from console, so tabs lost, don't pay attention
->> please):
+> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+
+> ---
+>  arch/arm/boot/dts/dm814x.dtsi | 68 ++++++++++++++++++++++++++++++++++++-------
+>  1 file changed, 58 insertions(+), 10 deletions(-)
 > 
->  Damn, sorry, stupid me, pushed "send" before looking at test build results, and overlooked a stupid typo (struct irq_domain, not
-> struct irqdomain).
->  The proper patch is (ignore spaces again plz, if confirmed good and working, i'll post it as appropriate):
-> 
-> $ git diff
-> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-> index 53e4632..8531f89 100644
-> --- a/drivers/pci/msi.c
-> +++ b/drivers/pci/msi.c
-> @@ -43,10 +43,10 @@ static struct irq_domain *pci_msi_get_domain(struct pci_dev *dev)
->         struct irq_domain *domain;
-> 
->         domain = dev_get_msi_domain(&dev->dev);
-> -       if (domain)
-> -               return domain;
-> +       if (!domain)
-> +               domain = arch_get_pci_msi_domain(dev);
-> 
-> -       return arch_get_pci_msi_domain(dev);
-> +       return irq_domain_is_generic_msi(domain) ? domain : NULL;
->  }
-> 
->  static int pci_msi_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
-> diff --git a/include/linux/msi.h b/include/linux/msi.h
-> index f71a25e..c8591a2 100644
-> --- a/include/linux/msi.h
-> +++ b/include/linux/msi.h
-> @@ -268,6 +268,7 @@ int msi_domain_set_affinity(struct irq_data *data, const struct cpumask *mask,
->  struct irq_domain *msi_create_irq_domain(struct fwnode_handle *fwnode,
->                                          struct msi_domain_info *info,
->                                          struct irq_domain *parent);
-> +bool irq_domain_is_generic_msi(struct irq_domain *domain);
->  int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
->                           int nvec);
->  void msi_domain_free_irqs(struct irq_domain *domain, struct device *dev);
-> diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-> index 6b0c0b7..3182aa1 100644
-> --- a/kernel/irq/msi.c
-> +++ b/kernel/irq/msi.c
-> @@ -253,6 +253,17 @@ struct irq_domain *msi_create_irq_domain(struct fwnode_handle *fwnode,
->  }
-> 
->  /**
-> + * irq_domain_is_generic_msi - Check whether the irqdomain belongs to us
-> + * @domain:    The domain to check
-> + *
-> + * Returns: test result (true or false)
-> + */
-> +bool irq_domain_is_generic_msi(struct irq_domain *domain)
-> +{
-> +       return domain && (domain->ops == &msi_domain_ops);
-> +}
+> diff --git a/arch/arm/boot/dts/dm814x.dtsi b/arch/arm/boot/dts/dm814x.dtsi
+> index ca92346..9d81980e 100644
+> --- a/arch/arm/boot/dts/dm814x.dtsi
+> +++ b/arch/arm/boot/dts/dm814x.dtsi
+> @@ -126,8 +126,8 @@
+>  				interrupts = <65>;
+>  				ti,spi-num-cs = <4>;
+>  				ti,hwmods = "mcspi1";
+> -				dmas = <&edma 16 &edma 17
+> -					&edma 18 &edma 19>;
+> +				dmas = <&edma 16 0 &edma 17 0
+> +					&edma 18 0 &edma 19 0>;
+>  				dma-names = "tx0", "rx0", "tx1", "rx1";
+>  			};
+>  
+> @@ -145,7 +145,7 @@
+>  				reg = <0x20000 0x2000>;
+>  				clock-frequency = <48000000>;
+>  				interrupts = <72>;
+> -				dmas = <&edma 26 &edma 27>;
+> +				dmas = <&edma 26 0 &edma 27 0>;
+>  				dma-names = "tx", "rx";
+>  			};
+>  
+> @@ -155,7 +155,7 @@
+>  				reg = <0x22000 0x2000>;
+>  				clock-frequency = <48000000>;
+>  				interrupts = <73>;
+> -				dmas = <&edma 28 &edma 29>;
+> +				dmas = <&edma 28 0 &edma 29 0>;
+>  				dma-names = "tx", "rx";
+>  			};
+>  
+> @@ -165,7 +165,7 @@
+>  				reg = <0x24000 0x2000>;
+>  				clock-frequency = <48000000>;
+>  				interrupts = <74>;
+> -				dmas = <&edma 30 &edma 31>;
+> +				dmas = <&edma 30 0 &edma 31 0>;
+>  				dma-names = "tx", "rx";
+>  			};
+>  
+> @@ -205,6 +205,14 @@
+>  					};
+>  				};
+>  
+> +				edma_xbar: dma-router at f90 {
+> +					compatible = "ti,am335x-edma-crossbar";
+> +					reg = <0xf90 0x40>;
+> +					#dma-cells = <3>;
+> +					dma-requests = <32>;
+> +					dma-masters = <&edma>;
+> +				};
 > +
-> +/**
->   * msi_domain_alloc_irqs - Allocate interrupts from a MSI interrupt domain
->   * @domain:    The domain to allocate from
->   * @dev:       Pointer to device struct of the device for which the interrupts
+>  				/*
+>  				 * Note that silicon revision 2.1 and older
+>  				 * require input enabled (bit 18 set) for all
+> @@ -272,12 +280,52 @@
+>  		};
+>  
+>  		edma: edma at 49000000 {
+> -			compatible = "ti,edma3";
+> -			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
+> -			reg =	<0x49000000 0x10000>,
+> -				<0x44e10f90 0x40>;
+> +			compatible = "ti,edma3-tpcc";
+> +			ti,hwmods = "tpcc";
+> +			reg =	<0x49000000 0x10000>;
+> +			reg-names = "edma3_cc";
+>  			interrupts = <12 13 14>;
+> -			#dma-cells = <1>;
+> +			interrupt-names = "edma3_ccint", "emda3_mperr",
+> +					  "edma3_ccerrint";
+> +			dma-requests = <64>;
+> +			#dma-cells = <2>;
+> +
+> +			ti,tptcs = <&edma_tptc0 7>, <&edma_tptc1 5>,
+> +				   <&edma_tptc2 3>, <&edma_tptc3 0>;
+> +
+> +			ti,edma-memcpy-channels = /bits/ 16 <20 21>;
+> +		};
+> +
+> +		edma_tptc0: tptc at 49800000 {
+> +			compatible = "ti,edma3-tptc";
+> +			ti,hwmods = "tptc0";
+> +			reg =	<0x49800000 0x100000>;
+> +			interrupts = <112>;
+> +			interrupt-names = "edma3_tcerrint";
+> +		};
+> +
+> +		edma_tptc1: tptc at 49900000 {
+> +			compatible = "ti,edma3-tptc";
+> +			ti,hwmods = "tptc1";
+> +			reg =	<0x49900000 0x100000>;
+> +			interrupts = <113>;
+> +			interrupt-names = "edma3_tcerrint";
+> +		};
+> +
+> +		edma_tptc2: tptc at 49a00000 {
+> +			compatible = "ti,edma3-tptc";
+> +			ti,hwmods = "tptc2";
+> +			reg =	<0x49a00000 0x100000>;
+> +			interrupts = <114>;
+> +			interrupt-names = "edma3_tcerrint";
+> +		};
+> +
+> +		edma_tptc3: tptc at 49b00000 {
+> +			compatible = "ti,edma3-tptc";
+> +			ti,hwmods = "tptc3";
+> +			reg =	<0x49b00000 0x100000>;
+> +			interrupts = <115>;
+> +			interrupt-names = "edma3_tcerrint";
+>  		};
+>  
+>  		/* See TRM "Table 1-318. L4HS Instance Summary" */
 > 
-> Actually this looks very similar to Marc's fix, just method of
-> checking is different. Feel free to use whatever you like more.
 
-For what is worth, Bjorn has queued the fix for 4.5, but I'm trying to
-get it applied to 4.3/4.4 instead, as current mainline is affected.
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+P?ter
