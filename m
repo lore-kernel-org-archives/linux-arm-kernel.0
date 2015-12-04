@@ -1,85 +1,46 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 04 Dec 2015 18:30:31 +0100
-Subject: [PATCH v3 06/10] clk: samsung: exynos5800: fix cpu clock configuration
- data
-In-Reply-To: <1449250235-9613-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1449250235-9613-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1449250235-9613-7-git-send-email-b.zolnierkie@samsung.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 4 Dec 2015 17:33:37 +0000
+Subject: [PATCH] ARM: at91: fix pinctrl driver selection
+In-Reply-To: <1449249513-22972-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1449249513-22972-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5661CE71.5050206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix cpu clock configuration data for Exynos5800 (it uses
-higher PCLK_DBG divider values than Exynos5420 and supports
-additional frequencies).
 
-Based on Hardkernel's kernel for ODROID-XU3 board.
 
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-Cc: Thomas Abraham <thomas.ab@samsung.com>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
- drivers/clk/samsung/clk-exynos5420.c | 36 +++++++++++++++++++++++++++++++++---
- 1 file changed, 33 insertions(+), 3 deletions(-)
+On 04/12/15 17:18, Alexandre Belloni wrote:
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+>
+> Move the selection of the pinctrl driver to SoC family level since we
+> have two pinctrl drivers. It is useless to select one which is not
+> compatible with the SoC.
+>
+> [abelloni: fixed pm.c when only sama2d2 is selected]
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>   arch/arm/mach-at91/Kconfig | 6 +++++-
+>   arch/arm/mach-at91/pm.c    | 7 ++++++-
+>   2 files changed, 11 insertions(+), 2 deletions(-)
+>
 
-diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index 2a92546..837329d 100644
---- a/drivers/clk/samsung/clk-exynos5420.c
-+++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -1274,10 +1274,34 @@ static const struct exynos_cpuclk_cfg_data exynos5420_eglclk_d[] __initconst = {
- 	{  0 },
- };
- 
-+static const struct exynos_cpuclk_cfg_data exynos5800_eglclk_d[] __initconst = {
-+	{ 2000000, E5420_EGL_DIV0(3, 7, 7, 4), },
-+	{ 1900000, E5420_EGL_DIV0(3, 7, 7, 4), },
-+	{ 1800000, E5420_EGL_DIV0(3, 7, 7, 4), },
-+	{ 1700000, E5420_EGL_DIV0(3, 7, 7, 3), },
-+	{ 1600000, E5420_EGL_DIV0(3, 7, 7, 3), },
-+	{ 1500000, E5420_EGL_DIV0(3, 7, 7, 3), },
-+	{ 1400000, E5420_EGL_DIV0(3, 7, 7, 3), },
-+	{ 1300000, E5420_EGL_DIV0(3, 7, 7, 2), },
-+	{ 1200000, E5420_EGL_DIV0(3, 7, 7, 2), },
-+	{ 1100000, E5420_EGL_DIV0(3, 7, 7, 2), },
-+	{ 1000000, E5420_EGL_DIV0(3, 7, 6, 2), },
-+	{  900000, E5420_EGL_DIV0(3, 7, 6, 2), },
-+	{  800000, E5420_EGL_DIV0(3, 7, 5, 2), },
-+	{  700000, E5420_EGL_DIV0(3, 7, 5, 2), },
-+	{  600000, E5420_EGL_DIV0(3, 7, 4, 2), },
-+	{  500000, E5420_EGL_DIV0(3, 7, 3, 2), },
-+	{  400000, E5420_EGL_DIV0(3, 7, 3, 2), },
-+	{  300000, E5420_EGL_DIV0(3, 7, 3, 2), },
-+	{  200000, E5420_EGL_DIV0(3, 7, 3, 2), },
-+	{  0 },
-+};
-+
- #define E5420_KFC_DIV(kpll, pclk, aclk)					\
- 		((((kpll) << 24) | ((pclk) << 20) | ((aclk) << 4)))
- 
- static const struct exynos_cpuclk_cfg_data exynos5420_kfcclk_d[] __initconst = {
-+	{ 1400000, E5420_KFC_DIV(3, 5, 3), }, /* for Exynos5800 */
- 	{ 1300000, E5420_KFC_DIV(3, 5, 2), },
- 	{ 1200000, E5420_KFC_DIV(3, 5, 2), },
- 	{ 1100000, E5420_KFC_DIV(3, 5, 2), },
-@@ -1357,9 +1381,15 @@ static void __init exynos5x_clk_init(struct device_node *np,
- 				ARRAY_SIZE(exynos5800_gate_clks));
- 	}
- 
--	exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
--		mout_cpu_p[0], mout_cpu_p[1], 0x200,
--		exynos5420_eglclk_d, ARRAY_SIZE(exynos5420_eglclk_d), 0);
-+	if (soc == EXYNOS5420) {
-+		exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
-+			mout_cpu_p[0], mout_cpu_p[1], 0x200,
-+			exynos5420_eglclk_d, ARRAY_SIZE(exynos5420_eglclk_d), 0);
-+	} else {
-+		exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
-+			mout_cpu_p[0], mout_cpu_p[1], 0x200,
-+			exynos5800_eglclk_d, ARRAY_SIZE(exynos5800_eglclk_d), 0);
-+	}
- 	exynos_register_cpu_clock(ctx, CLK_KFC_CLK, "kfcclk",
- 		mout_kfc_p[0], mout_kfc_p[1], 0x28200,
- 		exynos5420_kfcclk_d, ARRAY_SIZE(exynos5420_kfcclk_d), 0);
--- 
-1.9.1
+[...]
+
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index 80e277cfcc8b..01cbb17e6f6b 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -41,8 +41,10 @@
+>    * implementation should be moved down into the pinctrl driver and get
+>    * called as part of the generic suspend/resume path.
+>    */
+> +#ifdef PINCTRL_AT91
+
+Accidentally glanced at this patch when my mail client got hung at this
+patch :), I think you mean CONFIG_PINCTRL_AT91 here and later below.
+
+--
+Regards,
+Sudeep
