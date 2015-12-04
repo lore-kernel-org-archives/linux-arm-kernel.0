@@ -1,19 +1,34 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 4 Dec 2015 21:56:59 +0800
-Subject: [PATCH 0/2] phy: berlin-usb: clean up
-Message-ID: <1449237421-5552-1-git-send-email-jszhang@marvell.com>
+Date: Fri, 4 Dec 2015 21:57:00 +0800
+Subject: [PATCH 1/2] phy: berlin-usb: remove non-necessary header files
+In-Reply-To: <1449237421-5552-1-git-send-email-jszhang@marvell.com>
+References: <1449237421-5552-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1449237421-5552-2-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-trivial patches to do some clean up: remove non-necessary header files
-and remove useless platform_set_drvdata() calling.
+We don't need gpio related header files, so remove them.
 
-Jisheng Zhang (2):
-  phy: berlin-usb: remove non-necessary header files
-  phy: berlin-usb: don't set device's driver_data
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/phy/phy-berlin-usb.c | 2 --
+ 1 file changed, 2 deletions(-)
 
- drivers/phy/phy-berlin-usb.c | 3 ---
- 1 file changed, 3 deletions(-)
-
+diff --git a/drivers/phy/phy-berlin-usb.c b/drivers/phy/phy-berlin-usb.c
+index 797ba17..7bbb473 100644
+--- a/drivers/phy/phy-berlin-usb.c
++++ b/drivers/phy/phy-berlin-usb.c
+@@ -9,11 +9,9 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
+-#include <linux/gpio.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
+ #include <linux/of_device.h>
+-#include <linux/of_gpio.h>
+ #include <linux/phy/phy.h>
+ #include <linux/platform_device.h>
+ #include <linux/reset.h>
 -- 
 2.6.2
