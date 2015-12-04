@@ -1,136 +1,413 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  4 Dec 2015 23:30:42 +0100
-Subject: [PATCH 10/10] ARM: orion/mvebu: unify debug-ll virtual addresses
+Date: Fri,  4 Dec 2015 23:30:41 +0100
+Subject: [PATCH 09/10] ARM: debug-ll: reorder Kconfig alphanumerically
 In-Reply-To: <1449268242-808553-1-git-send-email-arnd@arndb.de>
 References: <1449268242-808553-1-git-send-email-arnd@arndb.de>
-Message-ID: <1449268242-808553-11-git-send-email-arnd@arndb.de>
+Message-ID: <1449268242-808553-10-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a multiplatform configuration, enabling DEBUG_LL breaks booting
-on all platforms with incompatible settings. In case of the Marvell
-platforms of the Orion/MVEBU family, the physical addresses are
-all the same, we just map them at different virtual addresses,
-which makes it impossible to run a kernel with DEBUG_LL enabled on
-a combination of the merged mvebu and the legacy boardfile based
-platforms.
-
-This is easily solved by using the same virtual address everywhere.
-I picked the address that is already used by mach-mvebu for UART0:
-0xfec12000. All these platforms have a 1MB region with their internal
-registers, almost always at physical address 0xf1000000, so I'm
-updating the iotable for that entry.
-
-In case of mach-dove, this is slightly trickier, as the existing
-mapping is 8MB and a second 8MB mapping is already at the 0xfec00000
-address. I have verified from the datasheet that the last 7MB of the
-physical mapping are "reserved" and nothing in Linux tries to use
-it either. I'm putting this 1MB mapping at the same address as the
-others, and the second 8MB register area immediately before that.
+The file has gotten a little out of sync, as platforms got
+added in the wrong place, or have been renamed. This moves
+the options around, but should not change any functionality.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/Kconfig.debug                 |  5 +----
- arch/arm/mach-dove/include/mach/dove.h | 10 +++++-----
- arch/arm/mach-mv78xx0/mv78xx0.h        |  4 ++--
- arch/arm/mach-orion5x/orion5x.h        |  4 ++--
- 4 files changed, 10 insertions(+), 13 deletions(-)
+ arch/arm/Kconfig.debug | 282 ++++++++++++++++++++++++-------------------------
+ 1 file changed, 141 insertions(+), 141 deletions(-)
 
 diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 974cf51b5182..fe699fba10b3 100644
+index 1d0f5e24ad51..974cf51b5182 100644
 --- a/arch/arm/Kconfig.debug
 +++ b/arch/arm/Kconfig.debug
-@@ -1599,10 +1599,7 @@ config DEBUG_UART_VIRT
- 	default 0xfc705000 if DEBUG_ZTE_ZX
- 	default 0xfcfe8600 if DEBUG_UART_BCM63XX
- 	default 0xfd000000 if DEBUG_SPEAR3XX || DEBUG_SPEAR13XX
--	default 0xfd012000 if DEBUG_MVEBU_UART0_ALTERNATE && ARCH_MV78XX0
+@@ -232,23 +232,6 @@ choice
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to UART0 serial port on DaVinci DMx devices.
+ 
+-	config DEBUG_ZYNQ_UART0
+-		bool "Kernel low-level debugging on Xilinx Zynq using UART0"
+-		depends on ARCH_ZYNQ
+-		help
+-		  Say Y here if you want the debug print routines to direct
+-		  their output to UART0 on the Zynq platform.
+-
+-	config DEBUG_ZYNQ_UART1
+-		bool "Kernel low-level debugging on Xilinx Zynq using UART1"
+-		depends on ARCH_ZYNQ
+-		help
+-		  Say Y here if you want the debug print routines to direct
+-		  their output to UART1 on the Zynq platform.
+-
+-		  If you have a ZC702 board and want early boot messages to
+-		  appear on the USB serial adaptor, select this option.
+-
+ 	config DEBUG_DC21285_PORT
+ 		bool "Kernel low-level debugging messages via footbridge serial port"
+ 		depends on FOOTBRIDGE
+@@ -263,6 +246,20 @@ choice
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to the UA0 serial port in the CX92755.
+ 
++	config DEBUG_LL_UART_EFM32
++		bool "Kernel low-level debugging via efm32 UART"
++		depends on ARCH_EFM32
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to an UART or USART port on efm32 based
++		  machines. Use the following addresses for DEBUG_UART_PHYS:
++
++		    0x4000c000 | USART0
++		    0x4000c400 | USART1
++		    0x4000c800 | USART2
++		    0x4000e000 | UART0
++		    0x4000e400 | UART1
++
+ 	config DEBUG_EP93XX
+ 		bool "Kernel low-level debugging messages via ep93xx UART"
+ 		depends on ARCH_EP93XX
+@@ -512,23 +509,6 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on MMP UART3.
+ 
+-	config DEBUG_QCOM_UARTDM
+-		bool "Kernel low-level debugging messages via QCOM UARTDM"
+-		depends on ARCH_QCOM
+-		help
+-		  Say Y here if you want the debug print routines to direct
+-		  their output to the serial port on Qualcomm devices.
+-
+-		  ARCH      DEBUG_UART_PHYS   DEBUG_UART_VIRT
+-		  APQ8064   0x16640000        0xf0040000
+-		  APQ8084   0xf995e000        0xfa75e000
+-		  MSM8X60   0x19c40000        0xf0040000
+-		  MSM8960   0x16440000        0xf0040000
+-		  MSM8974   0xf991e000        0xfa71e000
+-
+-		  Please adjust DEBUG_UART_PHYS and DEBUG_UART_BASE configuration
+-		  options based on your needs.
+-
+ 	config DEBUG_MVEBU_UART0
+ 		bool "Kernel low-level debugging messages via MVEBU UART0 (old bootloaders)"
+ 		depends on ARCH_MVEBU
+@@ -588,12 +568,29 @@ choice
+ 		  when u-boot hands over to the kernel, the system
+ 		  silently crashes, with no serial output at all.
+ 
+-	config DEBUG_VF_UART
+-		bool "Vybrid UART"
+-		depends on SOC_VF610
++	config DEBUG_MT6589_UART0
++		bool "Mediatek mt6589 UART0"
++		depends on ARCH_MEDIATEK
++		select DEBUG_UART_8250
+ 		help
+ 		  Say Y here if you want kernel low-level debugging support
+-		  on Vybrid based platforms.
++		  for Mediatek mt6589 based platforms on UART0.
++
++	config DEBUG_MT8127_UART0
++		bool "Mediatek mt8127/mt6592 UART0"
++		depends on ARCH_MEDIATEK
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  for Mediatek mt8127 based platforms on UART0.
++
++	config DEBUG_MT8135_UART3
++		bool "Mediatek mt8135 UART3"
++		depends on ARCH_MEDIATEK
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  for Mediatek mt8135 based platforms on UART3.
+ 
+ 	config DEBUG_NETX_UART
+ 		bool "Kernel low-level debugging messages via NetX UART"
+@@ -757,6 +754,23 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on PXA UART1.
+ 
++	config DEBUG_QCOM_UARTDM
++		bool "Kernel low-level debugging messages via QCOM UARTDM"
++		depends on ARCH_QCOM
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the serial port on Qualcomm devices.
++
++		  ARCH      DEBUG_UART_PHYS   DEBUG_UART_VIRT
++		  APQ8064   0x16640000        0xf0040000
++		  APQ8084   0xf995e000        0xfa75e000
++		  MSM8X60   0x19c40000        0xf0040000
++		  MSM8960   0x16440000        0xf0040000
++		  MSM8974   0xf991e000        0xfa71e000
++
++		  Please adjust DEBUG_UART_PHYS and DEBUG_UART_BASE configuration
++		  options based on your needs.
++
+ 	config DEBUG_REALVIEW_STD_PORT
+ 		bool "RealView Default UART"
+ 		depends on ARCH_REALVIEW
+@@ -1027,58 +1041,6 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on Allwinner A31/A23 based platforms on the R_UART.
+ 
+-	config TEGRA_DEBUG_UART_AUTO_ODMDATA
+-		bool "Kernel low-level debugging messages via Tegra UART via ODMDATA"
+-		depends on ARCH_TEGRA
+-		select DEBUG_TEGRA_UART
+-		help
+-		  Automatically determines which UART to use for low-level
+-		  debug based on the ODMDATA value. This value is part of
+-		  the BCT, and is written to the boot memory device using
+-		  nvflash, or other flashing tool.  When bits 19:18 are 3,
+-		  then bits 17:15 indicate which UART to use; 0/1/2/3/4
+-		  are UART A/B/C/D/E.
+-
+-	config TEGRA_DEBUG_UARTA
+-		bool "Kernel low-level debugging messages via Tegra UART A"
+-		depends on ARCH_TEGRA
+-		select DEBUG_TEGRA_UART
+-		help
+-		  Say Y here if you want kernel low-level debugging support
+-		  on Tegra based platforms.
+-
+-	config TEGRA_DEBUG_UARTB
+-		bool "Kernel low-level debugging messages via Tegra UART B"
+-		depends on ARCH_TEGRA
+-		select DEBUG_TEGRA_UART
+-		help
+-		  Say Y here if you want kernel low-level debugging support
+-		  on Tegra based platforms.
+-
+-	config TEGRA_DEBUG_UARTC
+-		bool "Kernel low-level debugging messages via Tegra UART C"
+-		depends on ARCH_TEGRA
+-		select DEBUG_TEGRA_UART
+-		help
+-		  Say Y here if you want kernel low-level debugging support
+-		  on Tegra based platforms.
+-
+-	config TEGRA_DEBUG_UARTD
+-		bool "Kernel low-level debugging messages via Tegra UART D"
+-		depends on ARCH_TEGRA
+-		select DEBUG_TEGRA_UART
+-		help
+-		  Say Y here if you want kernel low-level debugging support
+-		  on Tegra based platforms.
+-
+-	config TEGRA_DEBUG_UARTE
+-		bool "Kernel low-level debugging messages via Tegra UART E"
+-		depends on ARCH_TEGRA
+-		select DEBUG_TEGRA_UART
+-		help
+-		  Say Y here if you want kernel low-level debugging support
+-		  on Tegra based platforms.
+-
+ 	config DEBUG_SIRFPRIMA2_UART1
+ 		bool "Kernel low-level debugging messages via SiRFprimaII UART1"
+ 		depends on ARCH_PRIMA2
+@@ -1143,6 +1105,58 @@ choice
+ 
+ 		  If unsure, say N.
+ 
++	config TEGRA_DEBUG_UART_AUTO_ODMDATA
++		bool "Kernel low-level debugging messages via Tegra UART via ODMDATA"
++		depends on ARCH_TEGRA
++		select DEBUG_TEGRA_UART
++		help
++		  Automatically determines which UART to use for low-level
++		  debug based on the ODMDATA value. This value is part of
++		  the BCT, and is written to the boot memory device using
++		  nvflash, or other flashing tool.  When bits 19:18 are 3,
++		  then bits 17:15 indicate which UART to use; 0/1/2/3/4
++		  are UART A/B/C/D/E.
++
++	config TEGRA_DEBUG_UARTA
++		bool "Kernel low-level debugging messages via Tegra UART A"
++		depends on ARCH_TEGRA
++		select DEBUG_TEGRA_UART
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Tegra based platforms.
++
++	config TEGRA_DEBUG_UARTB
++		bool "Kernel low-level debugging messages via Tegra UART B"
++		depends on ARCH_TEGRA
++		select DEBUG_TEGRA_UART
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Tegra based platforms.
++
++	config TEGRA_DEBUG_UARTC
++		bool "Kernel low-level debugging messages via Tegra UART C"
++		depends on ARCH_TEGRA
++		select DEBUG_TEGRA_UART
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Tegra based platforms.
++
++	config TEGRA_DEBUG_UARTD
++		bool "Kernel low-level debugging messages via Tegra UART D"
++		depends on ARCH_TEGRA
++		select DEBUG_TEGRA_UART
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Tegra based platforms.
++
++	config TEGRA_DEBUG_UARTE
++		bool "Kernel low-level debugging messages via Tegra UART E"
++		depends on ARCH_TEGRA
++		select DEBUG_TEGRA_UART
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Tegra based platforms.
++
+ 	config DEBUG_U300_UART
+ 		bool "Kernel low-level debugging messages via U300 UART0"
+ 		depends on ARCH_U300
+@@ -1158,14 +1172,6 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on Ux500 based platforms.
+ 
+-	config DEBUG_MT6589_UART0
+-		bool "Mediatek mt6589 UART0"
+-		depends on ARCH_MEDIATEK
+-		select DEBUG_UART_8250
+-		help
+-		  Say Y here if you want kernel low-level debugging support
+-		  for Mediatek mt6589 based platforms on UART0.
+-
+ 	config DEBUG_VERSATILE
+ 		bool "Kernel low-level debugging messages via ARM Versatile UART"
+ 		depends on ARCH_VERSATILE
+@@ -1174,22 +1180,6 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on ARM Versatile platforms.
+ 
+-	config DEBUG_MT8127_UART0
+-		bool "Mediatek mt8127/mt6592 UART0"
+-		depends on ARCH_MEDIATEK
+-		select DEBUG_UART_8250
+-		help
+-		  Say Y here if you want kernel low-level debugging support
+-		  for Mediatek mt8127 based platforms on UART0.
+-
+-	config DEBUG_MT8135_UART3
+-		bool "Mediatek mt8135 UART3"
+-		depends on ARCH_MEDIATEK
+-		select DEBUG_UART_8250
+-		help
+-		  Say Y here if you want kernel low-level debugging support
+-		  for Mediatek mt8135 based platforms on UART3.
+-
+ 	config DEBUG_VEXPRESS_UART0_DETECT
+ 		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
+ 		depends on ARCH_VEXPRESS && CPU_CP15_MMU
+@@ -1226,6 +1216,13 @@ choice
+ 		  This option selects UART0 at 0xb0090000. This is appropriate for
+ 		  Cortex-R series tiles and SMMs, such as Cortex-R5 and Cortex-R7
+ 
++	config DEBUG_VF_UART
++		bool "Vybrid UART"
++		depends on SOC_VF610
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Vybrid based platforms.
++
+ 	config DEBUG_VT8500_UART0
+ 		bool "Use UART0 on VIA/Wondermedia SoCs"
+ 		depends on ARCH_VT8500
+@@ -1233,6 +1230,35 @@ choice
+ 		  This option selects UART0 on VIA/Wondermedia System-on-a-chip
+ 		  devices, including VT8500, WM8505, WM8650 and WM8850.
+ 
++	config DEBUG_ZTE_ZX
++		bool "Use ZTE ZX UART"
++		select DEBUG_UART_PL01X
++		depends on ARCH_ZX
++		help
++		  Say Y here if you are enabling ZTE ZX296702 SOC and need
++		  debug uart support.
++
++		  This option is preferred over the platform specific
++		  options; the platform specific options are deprecated
++		  and will be soon removed.
++
++	config DEBUG_ZYNQ_UART0
++		bool "Kernel low-level debugging on Xilinx Zynq using UART0"
++		depends on ARCH_ZYNQ
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to UART0 on the Zynq platform.
++
++	config DEBUG_ZYNQ_UART1
++		bool "Kernel low-level debugging on Xilinx Zynq using UART1"
++		depends on ARCH_ZYNQ
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to UART1 on the Zynq platform.
++
++		  If you have a ZC702 board and want early boot messages to
++		  appear on the USB serial adaptor, select this option.
++
+ 	config DEBUG_ICEDCC
+ 		bool "Kernel low-level debugging via EmbeddedICE DCC channel"
+ 		help
+@@ -1260,18 +1286,6 @@ choice
+ 		  For more details about semihosting, please see
+ 		  chapter 8 of DUI0203I_rvct_developer_guide.pdf from ARM Ltd.
+ 
+-	config DEBUG_ZTE_ZX
+-		bool "Use ZTE ZX UART"
+-		select DEBUG_UART_PL01X
+-		depends on ARCH_ZX
+-		help
+-		  Say Y here if you are enabling ZTE ZX296702 SOC and need
+-		  debug uart support.
+-
+-		  This option is preferred over the platform specific
+-		  options; the platform specific options are deprecated
+-		  and will be soon removed.
+-
+ 	config DEBUG_LL_UART_8250
+ 		bool "Kernel low-level debugging via 8250 UART"
+ 		help
+@@ -1285,20 +1299,6 @@ choice
+ 		  options; the platform specific options are deprecated
+ 		  and will be soon removed.
+ 
+-	config DEBUG_LL_UART_EFM32
+-		bool "Kernel low-level debugging via efm32 UART"
+-		depends on ARCH_EFM32
+-		help
+-		  Say Y here if you want the debug print routines to direct
+-		  their output to an UART or USART port on efm32 based
+-		  machines. Use the following addresses for DEBUG_UART_PHYS:
+-
+-		    0x4000c000 | USART0
+-		    0x4000c400 | USART1
+-		    0x4000c800 | USART2
+-		    0x4000e000 | UART0
+-		    0x4000e400 | UART1
+-
+ 	config DEBUG_LL_UART_PL01X
+ 		bool "Kernel low-level debugging via ARM Ltd PL01x Primecell UART"
+ 		help
+@@ -1572,6 +1572,7 @@ config DEBUG_UART_VIRT
+ 	default 0xf1c28000 if DEBUG_SUNXI_UART0
+ 	default 0xf1c28400 if DEBUG_SUNXI_UART1
+ 	default 0xf1f02800 if DEBUG_SUNXI_R_UART
++	default 0xf31004c0 if DEBUG_MESON_UARTAO
+ 	default 0xf4090000 if DEBUG_LPC32XX
+ 	default 0xf4200000 if DEBUG_GEMINI
+ 	default 0xf6200000 if DEBUG_PXA_UART1
+@@ -1602,7 +1603,6 @@ config DEBUG_UART_VIRT
  	default 0xfd883000 if DEBUG_ALPINE_UART0
--	default 0xfde12000 if DEBUG_MVEBU_UART0_ALTERNATE && ARCH_DOVE
--	default 0xfe012000 if DEBUG_MVEBU_UART0_ALTERNATE && ARCH_ORION5X
+ 	default 0xfde12000 if DEBUG_MVEBU_UART0_ALTERNATE && ARCH_DOVE
+ 	default 0xfe012000 if DEBUG_MVEBU_UART0_ALTERNATE && ARCH_ORION5X
+-	default 0xf31004c0 if DEBUG_MESON_UARTAO
  	default 0xfe017000 if DEBUG_MMP_UART2
  	default 0xfe018000 if DEBUG_MMP_UART3
  	default 0xfe100000 if DEBUG_IMX23_UART || DEBUG_IMX28_UART
-@@ -1616,7 +1613,7 @@ config DEBUG_UART_VIRT
- 	default 0xfeb31000 if DEBUG_KEYSTONE_UART1
- 	default 0xfec02000 if DEBUG_SOCFPGA_UART0
- 	default 0xfec02100 if DEBUG_SOCFPGA_UART1
--	default 0xfec12000 if (DEBUG_MVEBU_UART0 || DEBUG_MVEBU_UART0_ALTERNATE) && ARCH_MVEBU
-+	default 0xfec12000 if (DEBUG_MVEBU_UART0 || DEBUG_MVEBU_UART0_ALTERNATE)
- 	default 0xfec12100 if DEBUG_MVEBU_UART1_ALTERNATE
- 	default 0xfec10000 if DEBUG_SIRFATLAS7_UART0
- 	default 0xfec20000 if DEBUG_DAVINCI_DMx_UART0
-diff --git a/arch/arm/mach-dove/include/mach/dove.h b/arch/arm/mach-dove/include/mach/dove.h
-index 00f45458b3ec..89af5ea7469d 100644
---- a/arch/arm/mach-dove/include/mach/dove.h
-+++ b/arch/arm/mach-dove/include/mach/dove.h
-@@ -20,8 +20,8 @@
-  * c8000000	fdb00000	1M	Cryptographic SRAM
-  * e0000000	@runtime	128M	PCIe-0 Memory space
-  * e8000000	@runtime	128M	PCIe-1 Memory space
-- * f1000000	fde00000	8M	on-chip south-bridge registers
-- * f1800000	fe600000	8M	on-chip north-bridge registers
-+ * f1000000	fec00000	1M	on-chip south-bridge registers
-+ * f1800000	fe400000	8M	on-chip north-bridge registers
-  * f2000000	fee00000	1M	PCIe-0 I/O space
-  * f2100000	fef00000	1M	PCIe-1 I/O space
-  */
-@@ -44,11 +44,11 @@
- #define DOVE_SCRATCHPAD_SIZE		SZ_1M
- 
- #define DOVE_SB_REGS_PHYS_BASE		0xf1000000
--#define DOVE_SB_REGS_VIRT_BASE		IOMEM(0xfde00000)
--#define DOVE_SB_REGS_SIZE		SZ_8M
-+#define DOVE_SB_REGS_VIRT_BASE		IOMEM(0xfec00000)
-+#define DOVE_SB_REGS_SIZE		SZ_1M
- 
- #define DOVE_NB_REGS_PHYS_BASE		0xf1800000
--#define DOVE_NB_REGS_VIRT_BASE		IOMEM(0xfe600000)
-+#define DOVE_NB_REGS_VIRT_BASE		IOMEM(0xfe400000)
- #define DOVE_NB_REGS_SIZE		SZ_8M
- 
- #define DOVE_PCIE0_IO_PHYS_BASE		0xf2000000
-diff --git a/arch/arm/mach-mv78xx0/mv78xx0.h b/arch/arm/mach-mv78xx0/mv78xx0.h
-index 2db1265ec121..c1a9a1d1b295 100644
---- a/arch/arm/mach-mv78xx0/mv78xx0.h
-+++ b/arch/arm/mach-mv78xx0/mv78xx0.h
-@@ -37,7 +37,7 @@
-  * fee50000	f0d00000	64K	PCIe #5 I/O space
-  * fee60000	f0e00000	64K	PCIe #6 I/O space
-  * fee70000	f0f00000	64K	PCIe #7 I/O space
-- * fd000000	f1000000	1M	on-chip peripheral registers
-+ * fec00000	f1000000	1M	on-chip peripheral registers
-  */
- #define MV78XX0_CORE0_REGS_PHYS_BASE	0xf1020000
- #define MV78XX0_CORE1_REGS_PHYS_BASE	0xf1024000
-@@ -49,7 +49,7 @@
- #define MV78XX0_PCIE_IO_SIZE		SZ_1M
- 
- #define MV78XX0_REGS_PHYS_BASE		0xf1000000
--#define MV78XX0_REGS_VIRT_BASE		IOMEM(0xfd000000)
-+#define MV78XX0_REGS_VIRT_BASE		IOMEM(0xfec00000)
- #define MV78XX0_REGS_SIZE		SZ_1M
- 
- #define MV78XX0_PCIE_MEM_PHYS_BASE	0xc0000000
-diff --git a/arch/arm/mach-orion5x/orion5x.h b/arch/arm/mach-orion5x/orion5x.h
-index 3364df331f01..2b66120fba86 100644
---- a/arch/arm/mach-orion5x/orion5x.h
-+++ b/arch/arm/mach-orion5x/orion5x.h
-@@ -31,13 +31,13 @@
-  * fc000000	device bus mappings (cs0/cs1)
-  *
-  * virt		phys		size
-- * fe000000	f1000000	1M	on-chip peripheral registers
-+ * fec00000	f1000000	1M	on-chip peripheral registers
-  * fee00000	f2000000	64K	PCIe I/O space
-  * fee10000	f2100000	64K	PCI I/O space
-  * fd000000	f0000000	16M	PCIe WA space (Orion-1/Orion-NAS only)
-  ****************************************************************************/
- #define ORION5X_REGS_PHYS_BASE		0xf1000000
--#define ORION5X_REGS_VIRT_BASE		IOMEM(0xfe000000)
-+#define ORION5X_REGS_VIRT_BASE		IOMEM(0xfec00000)
- #define ORION5X_REGS_SIZE		SZ_1M
- 
- #define ORION5X_PCIE_IO_PHYS_BASE	0xf2000000
 -- 
 2.1.0.rc2
