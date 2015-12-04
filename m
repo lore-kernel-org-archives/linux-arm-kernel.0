@@ -1,50 +1,36 @@
-From: asamson@codeaurora.org (Azriel Samson)
-Date: Thu, 3 Dec 2015 17:39:12 -0700
-Subject: [PATCH v12 08/16] arm64/kexec: Add core kexec support
-In-Reply-To: <1449172587.24127.12.camel@infradead.org>
-References: <cover.1448403503.git.geoff@infradead.org>
- <6ac232ad37d6b02cf2d5848b15236f26f5ac61ac.1448403503.git.geoff@infradead.org>
- <20151127131306.GE23908@dhcppc13.redhat.com>
- <1448909475.31214.27.camel@infradead.org>
- <20151201021615.GA5704@dhcppc13.redhat.com>
- <002101d12c66$ae985440$0bc8fcc0$@codeaurora.org>
- <1449096562.6139.74.camel@infradead.org>
- <000b01d12d84$4313a930$c93afb90$@codeaurora.org>
- <1449172587.24127.12.camel@infradead.org>
-Message-ID: <5660E0B0.8010507@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 3 Dec 2015 16:54:40 -0800
+Subject: [PATCH v2 13/14] ARM: DTS: am33xx: Use the new DT bindings for
+ the eDMA3
+In-Reply-To: <1444979892-31626-14-git-send-email-peter.ujfalusi@ti.com>
+References: <1444979892-31626-1-git-send-email-peter.ujfalusi@ti.com>
+ <1444979892-31626-14-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20151204005440.GE23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Peter,
 
-On 12/3/2015 12:56 PM, Geoff Levand wrote:
-> Hi,
->
-> On Wed, 2015-12-02 at 21:37 -0700, Azriel Samson wrote:
->> For kdump, I also require a version of the patch "arm64/kexec: Add support
->> for kexec-lite". Without this, the dump capture kernel cannot find the
->> device tree even on v11 that I tested.
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [151016 00:23]:
 
-This was a setup issue on my side. kdump with your v11 patches worked 
-fine without the above patch when I used your version of kexec-tools.
+I noticed something while changing dm81xx to use the edma_xbar..
 
-In kexec-tools, I had to skip check_cpu_nodes() since we are using ACPI 
-and the device tree does not contain cpu_info.
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> +
+> +		edma_xbar: dma-router at 44e10f90 {
+> +			compatible = "ti,am335x-edma-crossbar";
+> +			reg = <0x44e10f90 0x40>;
+> +
+> +			#dma-cells = <3>;
+> +			dma-requests = <32>;
+> +
+> +			dma-masters = <&edma>;
+>  		};
 
->
-> Without that patch, does the 2nd stage kernel get the correct
-> dtb address in register x0?
->
-> Is the problem that the dtb data is corrupt when in the 2nd
-> stage kernel?
->
-> Is the dtb data OK when in the 1st stage kernel?
->
-> -Geoff
->
+The edma_xbar should now be just a child at offset 0xf90 under the
+scm: scm at 210000. Can you please check the other patches too?
 
-Thanks,
-Azriel Samson
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards,
+
+Tony
