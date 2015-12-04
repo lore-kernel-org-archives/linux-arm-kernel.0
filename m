@@ -1,24 +1,24 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu,  3 Dec 2015 17:25:33 -0800
-Subject: [PATCH 5/7] ARM: dts: Add mmc support for dm8148-evm
+Date: Thu,  3 Dec 2015 17:25:34 -0800
+Subject: [PATCH 6/7] ARM: dts: Add mmc support for dra62x j5-eco evm
 In-Reply-To: <1449192335-10137-1-git-send-email-tony@atomide.com>
 References: <1449192335-10137-1-git-send-email-tony@atomide.com>
-Message-ID: <1449192335-10137-6-git-send-email-tony@atomide.com>
+Message-ID: <1449192335-10137-7-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a mmc slot on the dm8148-evm that's wired to the sd_1
-interface.
+There's mmc interface on j5-eco evm that's wired to the
+sd_1 interface.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/dm8148-evm.dts | 31 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/dra62x-j5eco-evm.dts | 31 +++++++++++++++++++++++++++++++
  1 file changed, 31 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dm8148-evm.dts b/arch/arm/boot/dts/dm8148-evm.dts
-index 109fd47..08d01c3 100644
---- a/arch/arm/boot/dts/dm8148-evm.dts
-+++ b/arch/arm/boot/dts/dm8148-evm.dts
+diff --git a/arch/arm/boot/dts/dra62x-j5eco-evm.dts b/arch/arm/boot/dts/dra62x-j5eco-evm.dts
+index 49a05d2..97ac839 100644
+--- a/arch/arm/boot/dts/dra62x-j5eco-evm.dts
++++ b/arch/arm/boot/dts/dra62x-j5eco-evm.dts
 @@ -15,6 +15,14 @@
  		device_type = "memory";
  		reg = <0x80000000 0x40000000>;	/* 1 GB */
