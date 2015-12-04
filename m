@@ -1,81 +1,218 @@
 From: kapilh@broadcom.com (Kapil Hali)
-Date: Fri, 4 Dec 2015 15:23:26 -0500
-Subject: [PATCH v5 0/5] SMP support for Broadcom NSP
-Message-ID: <1449260611-24417-1-git-send-email-kapilh@broadcom.com>
+Date: Fri, 4 Dec 2015 15:23:28 -0500
+Subject: [PATCH v5 2/5] ARM: BCM: Clean up SMP support for Broadcom Kona
+In-Reply-To: <1449260611-24417-1-git-send-email-kapilh@broadcom.com>
+References: <1449260611-24417-1-git-send-email-kapilh@broadcom.com>
+Message-ID: <1449260611-24417-3-git-send-email-kapilh@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes in v5:
-* Made 'enable-method' for SMP per 'cpu' core instead of 'cpus'
-node, in the DT files for BCM NSP and BCM4708.
+These changes cleans up SMP implementaion for Broadcom's
+Kona SoC which are required for handling SMP for iProc
+family of SoCs at a single place for BCM NSP and BCM Kona.
 
-Change in v4:
-* Cleaned up kona_smp.c and associated DT file.
-* Corrected documentation for DT bindings.
-* Corrected secondary-boot-reg entry for bcm4708 DT file.
+Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+---
+ arch/arm/boot/dts/bcm11351.dtsi |  2 +-
+ arch/arm/boot/dts/bcm21664.dtsi |  2 +-
+ arch/arm/mach-bcm/kona_smp.c    | 82 +++++++++++++++++++++++++++--------------
+ 3 files changed, 56 insertions(+), 30 deletions(-)
 
-Change in v3:
-* Fixed patch subject from RESEND PATCH to PATCH
-* Deleted arch/arm/mach-bcm/bcm_nsp.h file
-* Removed inclusion of header file bcm_nsp.h in platsmp.c
-* Removed unused variable 'timeout' in nsp_boot_secondary()
-
-Changes in v2:
-Removed the pen_holding method of SMP bringup for NSP SoC and
-replaced it with simple wakeup of secondary core using ARM IPI.
-
-
-This series adds SMP support for Broadcom's Northstar Plus SoC.
-
-There are similar SMP enablement methods for many ARMv7 bsed SoCs.
-BCM NSP SoC, has a typical such mechanism - after power-on, the
-secondary core is held in a standby state, primary core provides a
-startup address for the secondary core and wakes it up. Booting of
-the secondary core is serialized using pen_release global variable.
-
-The startup address is programmed at a special register location
-which is defined in the device tree using a "secondary-boot-reg"
-property in a node whose "enable-method" property matches.
-
-The first patch adds cpu-enable-method in the device tree bindings
-documentation. It also updates ARM CPU device tree documentation
-with Broadcom Northstar Plus CPU details.
-
-The second patch adds SMP support to the BCM NSP device tree file.
-
-The third patch, enables SMP on BCM NSP. It also consolidates
-common SMP handling between BCM NSP and BCM Kona.
-
-The final patch, enables SMP on BCM 4708 and this patch is pulled
-in from Jon Mason's patch from the mailing list.
-
-This patch series is constructed based on Linux v4.4-rc1.
-
-The source code is available at GITHUB:
-https://github.com/Broadcom/cygnus-linux/tree/nsp-smp-v2
-
-
-Jon Mason (1):
-  ARM: BCM: Add SMP support for Broadcom 4708
-
-Kapil Hali (4):
-  dt-bindings: add SMP enable-method for Broadcom NSP
-  ARM: BCM: Clean up SMP support for Broadcom Kona
-  ARM: dts: Add SMP support for Broadcom NSP
-  ARM: BCM: Add SMP support for Broadcom NSP
-
- .../bindings/arm/bcm/brcm,nsp-cpu-method.txt       |  39 ++++++
- Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
- arch/arm/boot/dts/bcm-nsp.dtsi                     |  33 +++--
- arch/arm/boot/dts/bcm11351.dtsi                    |   2 +-
- arch/arm/boot/dts/bcm21664.dtsi                    |   2 +-
- arch/arm/boot/dts/bcm4708.dtsi                     |   2 +
- arch/arm/mach-bcm/Kconfig                          |   3 +
- arch/arm/mach-bcm/Makefile                         |  11 +-
- arch/arm/mach-bcm/{kona_smp.c => platsmp.c}        | 144 +++++++++++++++++----
- 9 files changed, 193 insertions(+), 44 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
- rename arch/arm/mach-bcm/{kona_smp.c => platsmp.c} (63%)
-
+diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+index 2ddaa51..3dc7a8c 100644
+--- a/arch/arm/boot/dts/bcm11351.dtsi
++++ b/arch/arm/boot/dts/bcm11351.dtsi
+@@ -31,7 +31,6 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		enable-method = "brcm,bcm11351-cpu-method";
+-		secondary-boot-reg = <0x3500417c>;
+ 
+ 		cpu0: cpu at 0 {
+ 			device_type = "cpu";
+@@ -42,6 +41,7 @@
+ 		cpu1: cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
++			secondary-boot-reg = <0x3500417c>;
+ 			reg = <1>;
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/bcm21664.dtsi b/arch/arm/boot/dts/bcm21664.dtsi
+index 2016b72..3f525be 100644
+--- a/arch/arm/boot/dts/bcm21664.dtsi
++++ b/arch/arm/boot/dts/bcm21664.dtsi
+@@ -31,7 +31,6 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		enable-method = "brcm,bcm11351-cpu-method";
+-		secondary-boot-reg = <0x35004178>;
+ 
+ 		cpu0: cpu at 0 {
+ 			device_type = "cpu";
+@@ -42,6 +41,7 @@
+ 		cpu1: cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
++			secondary-boot-reg = <0x35004178>;
+ 			reg = <1>;
+ 		};
+ 	};
+diff --git a/arch/arm/mach-bcm/kona_smp.c b/arch/arm/mach-bcm/kona_smp.c
+index 66a0465..15af781 100644
+--- a/arch/arm/mach-bcm/kona_smp.c
++++ b/arch/arm/mach-bcm/kona_smp.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (C) 2014 Broadcom Corporation
++ * Copyright (C) 2014-2015 Broadcom Corporation
+  * Copyright 2014 Linaro Limited
+  *
+  * This program is free software; you can redistribute it and/or
+@@ -30,9 +30,10 @@
+ 
+ /* Name of device node property defining secondary boot register location */
+ #define OF_SECONDARY_BOOT	"secondary-boot-reg"
++#define MPIDR_CPUID_BITMASK	0x3
+ 
+ /* I/O address of register used to coordinate secondary core startup */
+-static u32	secondary_boot;
++static u32	secondary_boot_addr;
+ 
+ /*
+  * Enable the Cortex A9 Snoop Control Unit
+@@ -78,44 +79,68 @@ static int __init scu_a9_enable(void)
+ static void __init bcm_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 	static cpumask_t only_cpu_0 = { CPU_BITS_CPU0 };
+-	struct device_node *node;
++	struct device_node *cpus_node = NULL;
++	struct device_node *cpu_node = NULL;
+ 	int ret;
+ 
+-	BUG_ON(secondary_boot);		/* We're called only once */
+-
+ 	/*
+ 	 * This function is only called via smp_ops->smp_prepare_cpu().
+ 	 * That only happens if a "/cpus" device tree node exists
+ 	 * and has an "enable-method" property that selects the SMP
+ 	 * operations defined herein.
+ 	 */
+-	node = of_find_node_by_path("/cpus");
+-	BUG_ON(!node);
+-
+-	/*
+-	 * Our secondary enable method requires a "secondary-boot-reg"
+-	 * property to specify a register address used to request the
+-	 * ROM code boot a secondary code.  If we have any trouble
+-	 * getting this we fall back to uniprocessor mode.
+-	 */
+-	if (of_property_read_u32(node, OF_SECONDARY_BOOT, &secondary_boot)) {
+-		pr_err("%s: missing/invalid " OF_SECONDARY_BOOT " property\n",
+-			node->name);
+-		ret = -ENOENT;		/* Arrange to disable SMP */
+-		goto out;
++	cpus_node = of_find_node_by_path("/cpus");
++	if (!cpus_node)
++		return;
++
++	for_each_child_of_node(cpus_node, cpu_node) {
++		u32 cpuid;
++
++		if (of_node_cmp(cpu_node->type, "cpu"))
++			continue;
++
++		if (of_property_read_u32(cpu_node, "reg", &cpuid)) {
++			pr_debug("%s: missing reg property\n",
++				     cpu_node->full_name);
++			ret = -ENOENT;
++			goto out;
++		}
++
++		/*
++		 * "secondary-boot-reg" property should be defined only
++		 * for secondary cpu
++		 */
++		if ((cpuid & MPIDR_CPUID_BITMASK) == 1) {
++			/*
++			 * Our secondary enable method requires a
++			 * "secondary-boot-reg" property to specify a register
++			 * address used to request the ROM code boot a secondary
++			 * core. If we have any trouble getting this we fall
++			 * back to uniprocessor mode.
++			 */
++			if (of_property_read_u32(cpu_node,
++						OF_SECONDARY_BOOT,
++						&secondary_boot_addr)) {
++				pr_warn("%s: no" OF_SECONDARY_BOOT "property\n",
++					cpu_node->name);
++				ret = -ENOENT;
++				goto out;
++			}
++		}
+ 	}
+ 
+ 	/*
+-	 * Enable the SCU on Cortex A9 based SoCs.  If -ENOENT is
++	 * Enable the SCU on Cortex A9 based SoCs. If -ENOENT is
+ 	 * returned, the SoC reported a uniprocessor configuration.
+ 	 * We bail on any other error.
+ 	 */
+ 	ret = scu_a9_enable();
+ out:
+-	of_node_put(node);
++	of_node_put(cpu_node);
++	of_node_put(cpus_node);
++
+ 	if (ret) {
+ 		/* Update the CPU present map to reflect uniprocessor mode */
+-		BUG_ON(ret != -ENOENT);
+ 		pr_warn("disabling SMP\n");
+ 		init_cpu_present(&only_cpu_0);
+ 	}
+@@ -139,7 +164,7 @@ out:
+  * - Wait for the secondary boot register to be re-written, which
+  *   indicates the secondary core has started.
+  */
+-static int bcm_boot_secondary(unsigned int cpu, struct task_struct *idle)
++static int kona_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+ 	void __iomem *boot_reg;
+ 	phys_addr_t boot_func;
+@@ -154,15 +179,16 @@ static int bcm_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 		return -EINVAL;
+ 	}
+ 
+-	if (!secondary_boot) {
++	if (!secondary_boot_addr) {
+ 		pr_err("required secondary boot register not specified\n");
+ 		return -EINVAL;
+ 	}
+ 
+-	boot_reg = ioremap_nocache((phys_addr_t)secondary_boot, sizeof(u32));
++	boot_reg = ioremap_nocache(
++			(phys_addr_t)secondary_boot_addr, sizeof(u32));
+ 	if (!boot_reg) {
+ 		pr_err("unable to map boot register for cpu %u\n", cpu_id);
+-		return -ENOSYS;
++		return -ENOMEM;
+ 	}
+ 
+ 	/*
+@@ -191,12 +217,12 @@ static int bcm_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 
+ 	pr_err("timeout waiting for cpu %u to start\n", cpu_id);
+ 
+-	return -ENOSYS;
++	return -ENXIO;
+ }
+ 
+ static struct smp_operations bcm_smp_ops __initdata = {
+ 	.smp_prepare_cpus	= bcm_smp_prepare_cpus,
+-	.smp_boot_secondary	= bcm_boot_secondary,
++	.smp_boot_secondary	= kona_boot_secondary,
+ };
+ CPU_METHOD_OF_DECLARE(bcm_smp_bcm281xx, "brcm,bcm11351-cpu-method",
+ 			&bcm_smp_ops);
 -- 
 2.1.0
