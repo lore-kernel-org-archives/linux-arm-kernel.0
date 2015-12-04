@@ -1,48 +1,29 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Sat, 5 Dec 2015 00:58:31 +0300
-Subject: [PATCH v6 04/19] arm64: change some CONFIG_COMPAT over to use
- CONFIG_AARCH32_EL0 instead
-In-Reply-To: <20151203120227.GJ10747@e104818-lin.cambridge.arm.com>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <1447795019-30176-5-git-send-email-ynorov@caviumnetworks.com>
- <20151203120227.GJ10747@e104818-lin.cambridge.arm.com>
-Message-ID: <20151204215831.GA26841@yury-N73SV>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Dec 2015 22:07:45 +0000
+Subject: [PATCH v2 13/12] ARM: dts: dove: add DT GPU support
+In-Reply-To: <20151204204918.GB809@lunn.ch>
+References: <1449237604-19064-1-git-send-email-l.stach@pengutronix.de>
+ <E1a4wLa-0004Vi-2t@rmk-PC.arm.linux.org.uk>
+ <20151204204918.GB809@lunn.ch>
+Message-ID: <20151204220745.GF8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2015 at 12:02:27PM +0000, Catalin Marinas wrote:
-> On Wed, Nov 18, 2015 at 12:16:44AM +0300, Yury Norov wrote:
-> > From: Andrew Pinski <apinski@cavium.com>
-> > 
-> > Reviewed-by: David Daney <ddaney@caviumnetworks.com>
-> > 
-> > Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-> > Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
-> > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> > Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+On Fri, Dec 04, 2015 at 09:49:18PM +0100, Andrew Lunn wrote:
+> > This additional patch is in conjunction with my PMU (already merged)
+> > and clock driver patch sets.
 > 
-> Please add a long description to every patch, even if it is trivial.
+> Hi Russell
 > 
-> And a nitpick: remove the empty lines between Reviewed-by and
-> Signed-off-by. These tags usually come in the same block.
+> Please could you respond to my comment about the clock patch.
 > 
-> > +#else
-> > +
-> > +typedef elf_greg_t			compat_elf_greg_t;
-> > +typedef elf_gregset_t			compat_elf_gregset_t;
-> > +#define compat_a32_elf_check_arch(x)	0
-> > +#define COMPAT_SET_PERSONALITY(ex)
-> > +#define COMPAT_ARCH_DLINFO
-> > +
-> > +#endif
-> 
-> Do you need these definitions here? I guess they may be used later by
-> the ILP32 code paths but for A32 compat they don't make much sense (I
-> haven't made it to the end of the series yet).
-> 
+> http://www.spinics.net/lists/devicetree/msg104464.html
 
-It should have been attached to patch "support core dump generation for
-ILP32". I'll fix.
+I'm sorry, I haven't had time to look at that your comment yet.  I've
+totally forgotten that you made it, or even what the comment was.  I'll
+look at it at some point though, if I remember.  That's the best I can
+promise.
 
-> -- 
-> Catalin
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
