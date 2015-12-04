@@ -1,63 +1,63 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 04 Dec 2015 12:15:05 -0800
-Subject: [PATCH 00/13] mvneta Buffer Management and enhancements
-In-Reply-To: <CAPv3WKcKm3X3Lys2HwYZXaZxPaajenF7av1wJKXqKxxwibXW4A@mail.gmail.com>
-References: <CAPv3WKc4zSmjtw_FeePCVCaq_aUubbCw_ggtxgxs0-7LwL7fHQ@mail.gmail.com>	<20151129.210210.1777978635596463961.davem@davemloft.net>	<CAPv3WKcHnJHCvg63Vs79RboNOuESU8jCLouKPRW4NdptAd_hag@mail.gmail.com>	<20151130.112500.293198684175670933.davem@redhat.com>
- <CAPv3WKcKm3X3Lys2HwYZXaZxPaajenF7av1wJKXqKxxwibXW4A@mail.gmail.com>
-Message-ID: <5661F449.5020205@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 4 Dec 2015 15:20:21 -0500 (EST)
+Subject: [PATCH] ARM: need to save/restore arm register(r11) when it is
+ corrupted
+In-Reply-To: <1449223996-2858-1-git-send-email-Anson.Huang@freescale.com>
+References: <1449223996-2858-1-git-send-email-Anson.Huang@freescale.com>
+Message-ID: <alpine.LFD.2.20.1512041504420.7560@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(no top posting please)
+On Fri, 4 Dec 2015, Anson Huang wrote:
 
-On 02/12/15 00:26, Marcin Wojtas wrote:
-> Hi Florian,
+> In cpu_v7_do_suspend routine, r11 is used while it is NOT
+> saved/restored, different compiler may have different usage
+> of ARM general registers, so it may cause issues during
+> calling cpu_v7_do_suspend.
 > 
-> Can you please describe in more details, what would you expect from
-> such special abstraction layer regarding buffer managers? I'd like to
-> understand more of your expectations and evaluate possible work.
-
-Well, something along these lines:
-
-- have the ability to register a particular pool (location + number of
-buffers) in a way that is relatively device agnostic (initialization
-would of course be device specific)
-
-- provide a set of buffer management APIs like those you proposed below,
-and have some generic code that leverages what
-drivers/net/ethernet/sun/niu.c does for instance
-
-- introduce a netdev_alloc_skb_from_pool() or something like that which
-would limit the amount of code to change in your network driver to
-benefit from that feature so based
-
-I am sure David would be able to suggest more detailed API.
-
+> We meet kernel fault occurs when using GCC 4.8.3, r11 contains
+> valid value before calling into cpu_v7_do_suspend, but when returned
+> from this routine, r11 is corrupted and lead to kernel fault.
+> Doing save/restore for those corrupted registers is a must in
+> assemble code.
 > 
-> Best regards,
-> Marcin
+> Signed-off-by: Anson Huang <Anson.Huang@freescale.com>
+
+Clearly, this is a nasty bug that has been there unnoticed for the last 
+4 years.  The culprit is commit 1b6ba46b7e.
+
+You may add the following tags:
+
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
+Cc: <stable@vger.kernel.org> # v3.3+
+
+> ---
+>  arch/arm/mm/proc-v7.S | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> 2015-11-30 17:25 GMT+01:00 David Miller <davem@redhat.com>:
->> From: Marcin Wojtas <mw@semihalf.com>
->> Date: Mon, 30 Nov 2015 15:13:22 +0100
->>
->>> What kind of abstraction and helpers do you mean? Some kind of API
->>> (e.g. bm_alloc_buffer, bm_initialize_ring bm_put_buffer,
->>> bm_get_buffer), which would be used by platform drivers (and specific
->>> aplications if one wants to develop on top of the kernel)?
->>>
->>> In general, what is your top-view of such solution and its cooperation
->>> with the drivers?
->>
->> The tricky parts involved have to do with allocating pages for the
->> buffer pools and minimizing the number of atomic refcounting
->> operations on those pages for for the puts and gets, particularly
->> around buffer replenish runs.
->>
->> For example, if you're allocating a page for a buffer pool the device
->> will chop into N (for any N < PAGE_SIZE) byte pieces, you can
->> eliminate many atomic operations.
-
-
--- 
-Florian
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index de2b246..8e1ea43 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -95,7 +95,7 @@ ENDPROC(cpu_v7_dcache_clean_area)
+>  .equ	cpu_v7_suspend_size, 4 * 9
+>  #ifdef CONFIG_ARM_CPU_SUSPEND
+>  ENTRY(cpu_v7_do_suspend)
+> -	stmfd	sp!, {r4 - r10, lr}
+> +	stmfd	sp!, {r4 - r11, lr}
+>  	mrc	p15, 0, r4, c13, c0, 0	@ FCSE/PID
+>  	mrc	p15, 0, r5, c13, c0, 3	@ User r/o thread ID
+>  	stmia	r0!, {r4 - r5}
+> @@ -112,7 +112,7 @@ ENTRY(cpu_v7_do_suspend)
+>  	mrc	p15, 0, r9, c1, c0, 1	@ Auxiliary control register
+>  	mrc	p15, 0, r10, c1, c0, 2	@ Co-processor access control
+>  	stmia	r0, {r5 - r11}
+> -	ldmfd	sp!, {r4 - r10, pc}
+> +	ldmfd	sp!, {r4 - r11, pc}
+>  ENDPROC(cpu_v7_do_suspend)
+>  
+>  ENTRY(cpu_v7_do_resume)
+> -- 
+> 1.9.1
+> 
+> 
