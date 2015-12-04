@@ -1,77 +1,80 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 4 Dec 2015 10:20:48 +0000
-Subject: [PATCH v4 0/4] drm: Add support for the ARM HDLCD display
- controller
-In-Reply-To: <20151203165606.GS8644@n2100.arm.linux.org.uk>
-References: <1449139249-9171-1-git-send-email-Liviu.Dudau@arm.com>
- <20151203165606.GS8644@n2100.arm.linux.org.uk>
-Message-ID: <20151204102048.GH972@e106497-lin.cambridge.arm.com>
+From: Mingkai.Hu@freescale.com (Mingkai Hu)
+Date: Fri, 4 Dec 2015 18:20:17 +0800
+Subject: [PATCH v2] dts/ls2080a: Update PCIe compatible
+Message-ID: <1449224417-20753-1-git-send-email-Mingkai.Hu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2015 at 04:56:07PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Dec 03, 2015 at 10:40:45AM +0000, Liviu Dudau wrote:
-> > This series depends on Sudeep Holla's SCPI driver (now in mainline) and on
-> > the tda998x patches that have been queued on Russell's patch system here [1].
-> 
-> Now merged into my tree.
+From: Minghuan Lian <Minghuan.Lian@freescale.com>
 
-Thanks!
+The patch adds LS2085a to PCIe compatible to fix the compatibility
+issue when using firmware with LS2085a compatible property.
 
-Are you planning to send those for 4.5 or are they going to be patches for 4.4?
+Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
+---
+v2 change:
+ - Rebased to latest kernel base
 
-> 
-> Can I ask a fairly obvious question...
-> 
-> >  drivers/gpu/drm/Kconfig                            |   2 +
-> >  drivers/gpu/drm/Makefile                           |   1 +
-> >  drivers/gpu/drm/arm/Kconfig                        |  29 ++
-> >  drivers/gpu/drm/arm/Makefile                       |   2 +
-> >  drivers/gpu/drm/arm/hdlcd_crtc.c                   | 327 ++++++++++++
-> >  drivers/gpu/drm/arm/hdlcd_drv.c                    | 555 +++++++++++++++++++++
-> >  drivers/gpu/drm/arm/hdlcd_drv.h                    |  42 ++
-> >  drivers/gpu/drm/arm/hdlcd_regs.h                   |  87 ++++
-> 
-> Why is the subdirectory called "arm" and not "hdlcd" ?
+ Documentation/devicetree/bindings/pci/layerscape-pci.txt |  1 +
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi           | 12 ++++++++----
+ 2 files changed, 9 insertions(+), 4 deletions(-)
 
-Because I plan to add the Mali DP driver to the same directory. The HDLCD
-files are prefixed with the hdlcd_ string, so it should be fairly simple
-to distinguish the relevant files.
-
-> 
-> ARM Ltd have more than one display controller (they have the AMBA PL110
-> and PL111 in addition to this), and (afaics) this doesn't drive these.
-> HDLCD probably won't be the last display hardware which ARM Ltd comes
-> out with either.
-
-There was a PL111 DRM driver submitted at some moment, it doesn't look
-like it has been merged, but the plan was to have it inside the arm
-directory as well. I am following the amd/amdgpu|radeon idea of having
-a vendor directory in display/gpu/drm and then subdirectories (if it
-makes sense) or appropriately named files in there.
-
-> 
-> So, I think naming the subdirectory after the vendor is probably a
-> mistake.
-
-It might turn out that way, but at the moment I'm not seeing too many
-downsides.
-
-Best regards,
-Liviu
-
-> 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
-> 
-
+diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+index e376785..4600007 100644
+--- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
++++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+@@ -15,6 +15,7 @@ Required properties:
+ - compatible: should contain the platform identifier such as:
+         "fsl,ls1021a-pcie", "snps,dw-pcie"
+         "fsl,ls2080a-pcie", "snps,dw-pcie"
++        "fsl,ls2085a-pcie", "snps,dw-pcie"
+ - reg: base addresses and lengths of the PCIe controller
+ - interrupts: A list of interrupt outputs of the controller. Must contain an
+   entry for each entry in the interrupt-names property.
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index e81cd48..3821bb1 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -383,7 +383,8 @@
+ 		};
+ 
+ 		pcie at 3400000 {
+-			compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
++			compatible = "fsl,ls2080a-pcie", "fsl,ls2085a-pcie",
++				     "snps,dw-pcie";
+ 			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
+ 			       0x10 0x00000000 0x0 0x00002000>; /* configuration space */
+ 			reg-names = "regs", "config";
+@@ -406,7 +407,8 @@
+ 		};
+ 
+ 		pcie at 3500000 {
+-			compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
++			compatible = "fsl,ls2080a-pcie", "fsl,ls2085a-pcie",
++				     "snps,dw-pcie";
+ 			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
+ 			       0x12 0x00000000 0x0 0x00002000>; /* configuration space */
+ 			reg-names = "regs", "config";
+@@ -429,7 +431,8 @@
+ 		};
+ 
+ 		pcie at 3600000 {
+-			compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
++			compatible = "fsl,ls2080a-pcie", "fsl,ls2085a-pcie",
++				     "snps,dw-pcie";
+ 			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
+ 			       0x14 0x00000000 0x0 0x00002000>; /* configuration space */
+ 			reg-names = "regs", "config";
+@@ -452,7 +455,8 @@
+ 		};
+ 
+ 		pcie at 3700000 {
+-			compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
++			compatible = "fsl,ls2080a-pcie", "fsl,ls2085a-pcie",
++				     "snps,dw-pcie";
+ 			reg = <0x00 0x03700000 0x0 0x00100000   /* controller registers */
+ 			       0x16 0x00000000 0x0 0x00002000>; /* configuration space */
+ 			reg-names = "regs", "config";
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+2.1.0.27.g96db324
