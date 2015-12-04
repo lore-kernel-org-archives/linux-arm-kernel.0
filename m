@@ -1,80 +1,92 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 4 Dec 2015 17:22:39 +0100
-Subject: [PATCH v8 2/2] arm64: dts: mt8173: Add nor flash node
-In-Reply-To: <1448505773.9118.19.camel@mhfsdcap03>
-References: <1447817403-16631-1-git-send-email-bayi.cheng@mediatek.com>
- <1447817403-16631-3-git-send-email-bayi.cheng@mediatek.com>
- <CAGS+omBVfc=BPLoobOJSDPnbv97PnGsRxUTF1gbXEz4DeufbmQ@mail.gmail.com>
- <1448505773.9118.19.camel@mhfsdcap03>
-Message-ID: <5661BDCF.9020105@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 4 Dec 2015 10:22:43 -0600
+Subject: [PATCH v2] dts/ls2080a: Update PCIe compatible
+In-Reply-To: <1449224417-20753-1-git-send-email-Mingkai.Hu@freescale.com>
+References: <1449224417-20753-1-git-send-email-Mingkai.Hu@freescale.com>
+Message-ID: <20151204162243.GA12415@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Dec 04, 2015 at 06:20:17PM +0800, Mingkai Hu wrote:
+> From: Minghuan Lian <Minghuan.Lian@freescale.com>
+> 
+> The patch adds LS2085a to PCIe compatible to fix the compatibility
+> issue when using firmware with LS2085a compatible property.
+> 
+> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
+> ---
+> v2 change:
+>  - Rebased to latest kernel base
 
+How about implementing my comments on v1, too?
 
-On 26/11/15 03:42, bayi cheng wrote:
-> On Thu, 2015-11-26 at 09:20 +0800, Daniel Kurtz wrote:
->> Hi Bayi, Matthias,
->>
->> Sorry for the late review, one comment below...
->>
->> On Wed, Nov 18, 2015 at 11:30 AM, Bayi Cheng <bayi.cheng@mediatek.com> wrote:
->>> Add Mediatek nor flash node
->>>
->>> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
->>> Acked-by: Brian Norris <computersforpeace@gmail.com>
->>> ---
->>>   arch/arm64/boot/dts/mediatek/mt8173.dtsi | 18 +++++++++++++++++-
->>>   1 file changed, 17 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->>> index 4dd5f93..7988656 100644
->>> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->>> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->>> @@ -387,7 +387,23 @@
->>>                          status = "disabled";
->>>                  };
->>>
->>> -               i2c3: i2c at 11010000 {
->>> +               nor_flash: spi at 1100d000 {
->>> +                       compatible = "mediatek,mt8173-nor";
->>> +                       reg = <0 0x1100d000 0 0xe0>;
->>> +                       clocks = <&pericfg CLK_PERI_SPI>,
->>> +                                <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
->>> +                       clock-names = "spi", "sf";
->>> +                       #address-cells = <1>;
->>> +                       #size-cells = <0>;
->>> +                       status = "disabled";
->>> +
->>> +                       flash at 0 {
->>> +                               compatible = "jedec,spi-nor";
->>> +                               reg = <0>;
->>> +                       };
->>
->> I think this flash at 0 node represents the flash device present on the
->> board and should therefore be moved to the board-specific .dts.
->>
->> -Dan
->>
-
-Good catch, thanks.
-
-> Hi Daniel, Thanks for your comments, and I will fixed it in the next
-> patch.
-
-Ok, I dropped your patch in the meanwhile.
-
-Regards,
-Matthias
-
->>> +               };
->>> +
->>> +               i2c3: i2c3 at 11010000 {
->>>                          compatible = "mediatek,mt8173-i2c";
->>>                          reg = <0 0x11010000 0 0x70>,
->>>                                <0 0x11000280 0 0x80>;
->>> --
->>> 1.8.1.1.dirty
->>>
->
->
+> 
+>  Documentation/devicetree/bindings/pci/layerscape-pci.txt |  1 +
+>  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi           | 12 ++++++++----
+>  2 files changed, 9 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> index e376785..4600007 100644
+> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> @@ -15,6 +15,7 @@ Required properties:
+>  - compatible: should contain the platform identifier such as:
+>          "fsl,ls1021a-pcie", "snps,dw-pcie"
+>          "fsl,ls2080a-pcie", "snps,dw-pcie"
+> +        "fsl,ls2085a-pcie", "snps,dw-pcie"
+>  - reg: base addresses and lengths of the PCIe controller
+>  - interrupts: A list of interrupt outputs of the controller. Must contain an
+>    entry for each entry in the interrupt-names property.
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> index e81cd48..3821bb1 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> @@ -383,7 +383,8 @@
+>  		};
+>  
+>  		pcie at 3400000 {
+> -			compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
+> +			compatible = "fsl,ls2080a-pcie", "fsl,ls2085a-pcie",
+> +				     "snps,dw-pcie";
+>  			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
+>  			       0x10 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> @@ -406,7 +407,8 @@
+>  		};
+>  
+>  		pcie at 3500000 {
+> -			compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
+> +			compatible = "fsl,ls2080a-pcie", "fsl,ls2085a-pcie",
+> +				     "snps,dw-pcie";
+>  			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
+>  			       0x12 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> @@ -429,7 +431,8 @@
+>  		};
+>  
+>  		pcie at 3600000 {
+> -			compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
+> +			compatible = "fsl,ls2080a-pcie", "fsl,ls2085a-pcie",
+> +				     "snps,dw-pcie";
+>  			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
+>  			       0x14 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> @@ -452,7 +455,8 @@
+>  		};
+>  
+>  		pcie at 3700000 {
+> -			compatible = "fsl,ls2080a-pcie", "snps,dw-pcie";
+> +			compatible = "fsl,ls2080a-pcie", "fsl,ls2085a-pcie",
+> +				     "snps,dw-pcie";
+>  			reg = <0x00 0x03700000 0x0 0x00100000   /* controller registers */
+>  			       0x16 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> -- 
+> 2.1.0.27.g96db324
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
