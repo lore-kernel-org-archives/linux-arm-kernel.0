@@ -1,72 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 04 Dec 2015 11:49:44 +0100
-Subject: [PATCH v2 4/9] ARM: dts: add dts files for hi3519-demb board
-In-Reply-To: <5660FA2E.6040601@huawei.com>
-References: <1449110668-23647-1-git-send-email-xuejiancheng@huawei.com>
- <1728470.0OiiXMcl88@wuerfel> <5660FA2E.6040601@huawei.com>
-Message-ID: <3047121.2z9SCS5Au2@wuerfel>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 04 Dec 2015 11:00:19 +0000
+Subject: [PATCH v7 3/3] arm64: Add do_softirq_own_stack() and enable
+ irq_stacks
+In-Reply-To: <20151127114715.GA25499@e104818-lin.cambridge.arm.com>
+References: <1447698128-8490-1-git-send-email-james.morse@arm.com>
+ <1447698128-8490-4-git-send-email-james.morse@arm.com>
+ <8F6484A9-18B9-4A81-B58D-528D81BC196D@gmail.com>
+ <20151127114715.GA25499@e104818-lin.cambridge.arm.com>
+Message-ID: <56617243.5050602@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 04 December 2015 10:27:58 xuejiancheng wrote:
-> > 
-> >> +            sysctrl: system-controller at 12020000 {
-> >> +                    compatible = "hisilicon,sysctrl";
-> >> +                    reg = <0x12020000 0x1000>;
-> >> +                    reboot-offset = <0x4>;
-> >> +            };
-> > 
-> > Is this one identical to the one in hip04?
-> > 
-> > If not, pick a new unique compatible string
-> 
-> Yes. It's compatible with the one in hip04.
+On 27/11/15 11:47, Catalin Marinas wrote:
+> With this approach, we could run softirq either on the IRQ stack or on
+> the process stack. One such process is softirqd, so there shouldn't be a
+> problem since its goal is to run softirqs. But do_softirq() may be
+> invoked from other contexts (network stack), I'm not sure what the stack
+> looks like at that point.
 
-Ok, we should add a compatible string for that then, as the hip04 apparently
-has a slightly different layout from hip01.
+As long as we don't reduce the stack sizes yet - nothing has changed. We
+already run __do_softirq() on other task's stacks via __irq_exit().
 
-Can you add a separate patch to clarify the existing hisilicon,sysctrl nodes?
 
-It look like hi3620 accidentally uses the same string as hip04 already
-but is actually a bit different.
+> We could just do like x86 and always switch to the IRQ stack before
+> invoking __do_softirq(). I don't think we lose much.
 
-Maybe split out the sysctrl binding from
-Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt, as it has
-you already have a couple of those, and it's not clear how they relate
-to one another.
+I will add an extra patch to do this - its not as straight forward as I
+would like - as both ksoftirqd and softirq on irq_stack call
+do_softirq_own_stack() with irq_count == 0.
 
-If we introduce a string for all hip04 compatible sysctrl devices, we should
-document that and use it consistently, so hi3519 becomes
 
-	compatible = "hisilicon,hi3519-sysctrl", "hisilicon,hip04-sysctrl", "hisilicon,sysctrl";
+Thanks,
 
-but I'd clarify in the binding documentation that "hisilicon,sysctrl" should
-only be used for hip04 and hi3519 but not the others.
-
-As this seems to be a standard part, we can also think about making a
-high-level driver for in in drivers/soc rather than relying on the syscon
-driver which we tend to use more for one-off devices with random register
-layouts.
-
-> >> +
-> >> +            crg: crg at 12010000 {
-> >> +                    compatible = "hisilicon,hi3519-crg";
-> > 
-> > 
-> > what is a "crg"? Is there a standard name for these?
-> 
-> The "crg" means Clock and Reset Generator. It's a block which supplies clock
-> and reset signals for other modules in the chip. I used "hi3519-clock"
-> in last version patch. Rob Herring suggested that it's better to use "hi3519-crg"
-> as the compatible string if it's a whole block.
-> 
-> what about writing like this?
-> 
-> crg: clock-reset-controller at 12010000 {
->         compatible = "hisilicon,hi3519-crg";
->         }
-> 
-
-Ok, that's better.
-
-	Arnd
+James
