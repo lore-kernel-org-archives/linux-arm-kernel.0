@@ -1,82 +1,66 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri,  4 Dec 2015 18:03:41 +0100
-Subject: [PATCH v3 06/13] clk: at91: pmc: merge at91_pmc_init in
- atmel_pmc_probe
+Date: Fri,  4 Dec 2015 18:03:48 +0100
+Subject: [PATCH v3 13/13] clk: at91: pmc: drop at91_pmc_base
 In-Reply-To: <1449248628-3486-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1449248628-3486-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1449248628-3486-7-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1449248628-3486-14-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-at91_pmc_init() doesn't do much anymore, merge it in atmel_pmc_probe().
+at91_pmc_base is not used anymore, remove it along with at91_pmc_read and
+at91_pmc_write.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/clk/at91/pmc.c | 31 ++++++-------------------------
- 1 file changed, 6 insertions(+), 25 deletions(-)
+ drivers/clk/at91/pmc.c       |  5 -----
+ include/linux/clk/at91_pmc.h | 12 ------------
+ 2 files changed, 17 deletions(-)
 
 diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
-index 2f8b9503176f..55ed00fc9310 100644
+index c7bd8c17acad..60dcac1500e5 100644
 --- a/drivers/clk/at91/pmc.c
 +++ b/drivers/clk/at91/pmc.c
-@@ -231,29 +231,6 @@ static const struct at91_pmc_caps sama5d3_caps = {
- 			  AT91_PMC_CFDEV,
+@@ -41,9 +41,6 @@ struct at91_pmc {
+ 	u32 imr;
  };
  
--static struct at91_pmc *__init at91_pmc_init(struct device_node *np,
--					     struct regmap *regmap,
--					     void __iomem *regbase, int virq,
--					     const struct at91_pmc_caps *caps)
--{
--	struct at91_pmc *pmc;
+-void __iomem *at91_pmc_base;
+-EXPORT_SYMBOL_GPL(at91_pmc_base);
 -
--	if (!regbase || !virq ||  !caps)
--		return NULL;
--
--	at91_pmc_base = regbase;
--
--	pmc = kzalloc(sizeof(*pmc), GFP_KERNEL);
--	if (!pmc)
--		return NULL;
--
--	pmc->regmap = regmap;
--	pmc->virq = virq;
--	pmc->caps = caps;
--
--	return pmc;
--}
--
- static const struct of_device_id atmel_pmc_dt_ids[] = {
- 	{ .compatible = "atmel,at91rm9200-pmc", .data = &at91rm9200_caps },
- 	{ .compatible = "atmel,at91sam9260-pmc", .data = &at91sam9260_caps },
-@@ -271,11 +248,12 @@ static int __init atmel_pmc_probe(struct platform_device *pdev)
- 	const struct at91_pmc_caps *caps;
- 	struct device_node *np = pdev->dev.of_node;
- 	struct at91_pmc *pmc;
--	void __iomem *regbase = of_iomap(np, 0);
- 	struct regmap *regmap;
+ int of_at91_get_clk_range(struct device_node *np, const char *propname,
+ 			  struct clk_range *range)
+ {
+@@ -249,8 +246,6 @@ static int __init atmel_pmc_probe(struct platform_device *pdev)
  	int virq;
  	int ret = 0;
  
-+	at91_pmc_base = of_iomap(np, 0);
-+
+-	at91_pmc_base = of_iomap(np, 0);
+-
  	regmap = syscon_node_to_regmap(np);
  	if (IS_ERR(regmap))
  		panic("Could not retrieve syscon regmap");
-@@ -287,10 +265,13 @@ static int __init atmel_pmc_probe(struct platform_device *pdev)
- 	of_id = of_match_device(atmel_pmc_dt_ids, &pdev->dev);
- 	caps = of_id->data;
+diff --git a/include/linux/clk/at91_pmc.h b/include/linux/clk/at91_pmc.h
+index 1e6932222e11..17f413bbbedf 100644
+--- a/include/linux/clk/at91_pmc.h
++++ b/include/linux/clk/at91_pmc.h
+@@ -16,18 +16,6 @@
+ #ifndef AT91_PMC_H
+ #define AT91_PMC_H
  
--	pmc = at91_pmc_init(np, regmap, regbase, virq, caps);
-+	pmc = kzalloc(sizeof(*pmc), GFP_KERNEL);
- 	if (!pmc)
- 		return 0;
+-#ifndef __ASSEMBLY__
+-extern void __iomem *at91_pmc_base;
+-
+-#define at91_pmc_read(field) \
+-	readl_relaxed(at91_pmc_base + field)
+-
+-#define at91_pmc_write(field, value) \
+-	writel_relaxed(value, at91_pmc_base + field)
+-#else
+-.extern at91_pmc_base
+-#endif
+-
+ #define	AT91_PMC_SCER		0x00			/* System Clock Enable Register */
+ #define	AT91_PMC_SCDR		0x04			/* System Clock Disable Register */
  
-+	pmc->regmap = regmap;
-+	pmc->virq = virq;
-+	pmc->caps = caps;
- 	pmc->irqdomain = irq_domain_add_linear(pdev->dev.of_node, 32,
- 					       &pmc_irq_ops, pmc);
- 	if (!pmc->irqdomain)
 -- 
 2.5.0
