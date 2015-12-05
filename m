@@ -1,80 +1,184 @@
 From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Sat,  5 Dec 2015 16:53:03 +0800
-Subject: [PATCH 1/2] cpufreq: mt8173: migrate to use operating-points-v2
- bindings
+Date: Sat,  5 Dec 2015 16:53:04 +0800
+Subject: [PATCH 2/2] ARM64: dts: mt8173: Add CPU OPP,
+ clock and regulator supply properties
 In-Reply-To: <1449305584-414-1-git-send-email-pi-cheng.chen@linaro.org>
 References: <1449305584-414-1-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <1449305584-414-2-git-send-email-pi-cheng.chen@linaro.org>
+Message-ID: <1449305584-414-3-git-send-email-pi-cheng.chen@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modify mt8173-cpufreq driver to get OPP-sharing information and set up
-OPP table provided by operating-points-v2 bindings.
+Add operating-points-v2, clock, and regulator supply properties
+required by mt8173-cpufreq driver to enable it.
 
 Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
 ---
-This patch is based on the series[1] which fixes some issues of
-mt8173-cpufreq driver.
+This patch is based on the patch[1] that adds underlying clock MUX for
+MT8173 which is needed by mt8173-cpufreq driver but not yet picked.
 
-[1] http://thread.gmane.org/gmane.linux.power-management.general/68692
+[1] http://article.gmane.org/gmane.linux.kernel.clk/325
 ---
- drivers/cpufreq/mt8173-cpufreq.c | 20 ++++++++++++++------
- 1 file changed, 14 insertions(+), 6 deletions(-)
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 18 ++++++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 90 +++++++++++++++++++++++++++++
+ 2 files changed, 108 insertions(+)
 
-diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
-index 257bcb9..17e9cad 100644
---- a/drivers/cpufreq/mt8173-cpufreq.c
-+++ b/drivers/cpufreq/mt8173-cpufreq.c
-@@ -344,6 +344,9 @@ static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
- 	unsigned long rate;
- 	int ret;
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+index 811cb76..5b6321b 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
++++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+@@ -405,6 +405,24 @@
+ 	status = "okay";
+ };
  
-+	/* Mark the first owner of this CPU DVFS domain information */
-+	cpumask_set_cpu(cpu, &info->cpus);
++&cpu0 {
++	proc-supply = <&mt6397_vpca15_reg>;
++};
 +
- 	cpu_dev = get_cpu_device(cpu);
- 	if (!cpu_dev) {
- 		pr_err("failed to get cpu%d device\n", cpu);
-@@ -390,7 +393,15 @@ static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
- 	/* Both presence and absence of sram regulator are valid cases. */
- 	sram_reg = regulator_get_exclusive(cpu_dev, "sram");
- 
--	ret = dev_pm_opp_of_add_table(cpu_dev);
-+	/* Get OPP-sharing information from "operating-points-v2" bindings */
-+	ret = dev_pm_opp_of_get_sharing_cpus(cpu_dev, &info->cpus);
-+	if (ret) {
-+		pr_err("failed to get OPP-sharing information for cpu%d\n",
-+		       cpu);
-+		goto out_free_resources;
-+	}
++&cpu1 {
++	proc-supply = <&mt6397_vpca15_reg>;
++};
 +
-+	ret = dev_pm_opp_of_cpumask_add_table(&info->cpus);
- 	if (ret) {
- 		pr_warn("no OPP table for cpu%d\n", cpu);
- 		goto out_free_resources;
-@@ -421,13 +432,10 @@ static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
- 	 */
- 	info->need_voltage_tracking = !IS_ERR(sram_reg);
++&cpu2 {
++	proc-supply = <&da9211_vcpu_reg>;
++	sram-supply = <&mt6397_vsramca7_reg>;
++};
++
++&cpu3 {
++	proc-supply = <&da9211_vcpu_reg>;
++	sram-supply = <&mt6397_vsramca7_reg>;
++};
++
+ &uart0 {
+ 	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 4dd5f93..fce1e48 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -24,6 +24,80 @@
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
  
--	/* CPUs in the same cluster share a clock and power domain. */
--	cpumask_copy(&info->cpus, &cpu_topology[cpu].core_sibling);
--
- 	return 0;
++	cluster0_opp: opp_table0 {
++		compatible = "operating-points-v2";
++		opp-shared;
++		opp00 {
++			opp-hz = /bits/ 64 <507000000>;
++			opp-microvolt = <859000>;
++		};
++		opp01 {
++			opp-hz = /bits/ 64 <702000000>;
++			opp-microvolt = <908000>;
++		};
++		opp02 {
++			opp-hz = /bits/ 64 <1001000000>;
++			opp-microvolt = <983000>;
++		};
++		opp03 {
++			opp-hz = /bits/ 64 <1105000000>;
++			opp-microvolt = <1009000>;
++		};
++		opp04 {
++			opp-hz = /bits/ 64 <1183000000>;
++			opp-microvolt = <1028000>;
++		};
++		opp05 {
++			opp-hz = /bits/ 64 <1404000000>;
++			opp-microvolt = <1083000>;
++		};
++		opp06 {
++			opp-hz = /bits/ 64 <1508000000>;
++			opp-microvolt = <1109000>;
++		};
++		opp07 {
++			opp-hz = /bits/ 64 <1573000000>;
++			opp-microvolt = <1125000>;
++		};
++	};
++
++	cluster1_opp: opp_table1 {
++		compatible = "operating-points-v2";
++		opp-shared;
++		opp00 {
++			opp-hz = /bits/ 64 <507000000>;
++			opp-microvolt = <828000>;
++		};
++		opp01 {
++			opp-hz = /bits/ 64 <702000000>;
++			opp-microvolt = <867000>;
++		};
++		opp02 {
++			opp-hz = /bits/ 64 <1001000000>;
++			opp-microvolt = <927000>;
++		};
++		opp03 {
++			opp-hz = /bits/ 64 <1209000000>;
++			opp-microvolt = <968000>;
++		};
++		opp04 {
++			opp-hz = /bits/ 64 <1404000000>;
++			opp-microvolt = <1007000>;
++		};
++		opp05 {
++			opp-hz = /bits/ 64 <1612000000>;
++			opp-microvolt = <1049000>;
++		};
++		opp06 {
++			opp-hz = /bits/ 64 <1807000000>;
++			opp-microvolt = <1089000>;
++		};
++		opp07 {
++			opp-hz = /bits/ 64 <1989000000>;
++			opp-microvolt = <1125000>;
++		};
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -54,6 +128,10 @@
+ 			reg = <0x000>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
++			clocks = <&infracfg CLK_INFRA_CA53SEL>,
++				 <&apmixedsys CLK_APMIXED_MAINPLL>;
++			clock-names = "cpu", "intermediate";
++			operating-points-v2 = <&cluster0_opp>;
+ 		};
  
- out_free_opp_table:
--	dev_pm_opp_of_remove_table(cpu_dev);
-+	dev_pm_opp_of_cpumask_remove_table(&info->cpus);
+ 		cpu1: cpu at 1 {
+@@ -62,6 +140,10 @@
+ 			reg = <0x001>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
++			clocks = <&infracfg CLK_INFRA_CA53SEL>,
++				 <&apmixedsys CLK_APMIXED_MAINPLL>;
++			clock-names = "cpu", "intermediate";
++			operating-points-v2 = <&cluster0_opp>;
+ 		};
  
- out_free_resources:
- 	if (!IS_ERR(proc_reg))
-@@ -453,7 +461,7 @@ static void mtk_cpu_dvfs_info_release(struct mtk_cpu_dvfs_info *info)
- 	if (!IS_ERR(info->inter_clk))
- 		clk_put(info->inter_clk);
+ 		cpu2: cpu at 100 {
+@@ -70,6 +152,10 @@
+ 			reg = <0x100>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
++			clocks = <&infracfg CLK_INFRA_CA57SEL>,
++				 <&apmixedsys CLK_APMIXED_MAINPLL>;
++			clock-names = "cpu", "intermediate";
++			operating-points-v2 = <&cluster1_opp>;
+ 		};
  
--	dev_pm_opp_of_remove_table(info->cpu_dev);
-+	dev_pm_opp_of_cpumask_remove_table(&info->cpus);
- }
+ 		cpu3: cpu at 101 {
+@@ -78,6 +164,10 @@
+ 			reg = <0x101>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
++			clocks = <&infracfg CLK_INFRA_CA57SEL>,
++				 <&apmixedsys CLK_APMIXED_MAINPLL>;
++			clock-names = "cpu", "intermediate";
++			operating-points-v2 = <&cluster1_opp>;
+ 		};
  
- static int mtk_cpufreq_init(struct cpufreq_policy *policy)
+ 		idle-states {
 -- 
 1.9.1
