@@ -1,52 +1,39 @@
-From: kapilh@broadcom.com (Kapil Hali)
-Date: Sat, 5 Dec 2015 17:26:08 +0530
-Subject: [PATCH v5 2/5] ARM: BCM: Clean up SMP support for Broadcom Kona
-In-Reply-To: <56621CA3.3090903@gmail.com>
-References: <1449260611-24417-1-git-send-email-kapilh@broadcom.com>
- <1449260611-24417-3-git-send-email-kapilh@broadcom.com>
- <56621CA3.3090903@gmail.com>
-Message-ID: <5662D0D8.1020004@broadcom.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 5 Dec 2015 20:53:07 +0800
+Subject: [PATCH RESEND net-next 1/3] dts: hisi: enables the ethX for D02
+ board
+In-Reply-To: <1449302218-54374-2-git-send-email-yankejian@huawei.com>
+Message-ID: <201512052010.fCqOAE0r%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+Hi yankejian,
 
-On 12/5/2015 4:37 AM, Florian Fainelli wrote:
-> On 04/12/15 12:23, Kapil Hali wrote:
->> These changes cleans up SMP implementaion for Broadcom's
->> Kona SoC which are required for handling SMP for iProc
->> family of SoCs at a single place for BCM NSP and BCM Kona.
->>
->> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
->> ---
->>  arch/arm/boot/dts/bcm11351.dtsi |  2 +-
->>  arch/arm/boot/dts/bcm21664.dtsi |  2 +-
->>  arch/arm/mach-bcm/kona_smp.c    | 82 +++++++++++++++++++++++++++--------------
->>  3 files changed, 56 insertions(+), 30 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
->> index 2ddaa51..3dc7a8c 100644
->> --- a/arch/arm/boot/dts/bcm11351.dtsi
->> +++ b/arch/arm/boot/dts/bcm11351.dtsi
->> @@ -31,7 +31,6 @@
->>  		#address-cells = <1>;
->>  		#size-cells = <0>;
->>  		enable-method = "brcm,bcm11351-cpu-method";
->> -		secondary-boot-reg = <0x3500417c>;
-> 
-> I would expect the 'enable-method' to be moved as well to be consistent
-> with what you are adding for NSP later on.
-> 
-Right, it is updated in the new patch set.
->>  
->>  		cpu0: cpu at 0 {
->>  			device_type = "cpu";
->> @@ -42,6 +41,7 @@
->>  		cpu1: cpu at 1 {
->>  			device_type = "cpu";
->>  			compatible = "arm,cortex-a9";
->> +			secondary-boot-reg = <0x3500417c>;
->>  			reg = <1>;
->>  		};
-Thanks,
-Kapil
+[auto build test ERROR on net-next/master]
+
+url:    https://github.com/0day-ci/linux/commits/yankejian/dts-hisi-fixes-can-t-find-eth-for-hip05-D02/20151205-155412
+config: arm64-allmodconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
+
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm64/boot/dts/hisilicon/hip05-d02.dts:38.1-6 Label or path eth2 not found
+>> Error: arch/arm64/boot/dts/hisilicon/hip05-d02.dts:42.1-6 Label or path eth3 not found
+>> Error: arch/arm64/boot/dts/hisilicon/hip05-d02.dts:46.1-6 Label or path eth6 not found
+>> Error: arch/arm64/boot/dts/hisilicon/hip05-d02.dts:50.1-6 Label or path eth7 not found
+   FATAL ERROR: Syntax error parsing input tree
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 46778 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151205/05ddaa35/attachment-0001.obj>
