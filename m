@@ -1,36 +1,80 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat,  5 Dec 2015 21:16:47 +0800
-Subject: [PATCH resend 6/6] ARM: dts: sun7i: Add VE (Video Engine) module
- clock node
+Date: Sat,  5 Dec 2015 21:16:46 +0800
+Subject: [PATCH resend 5/6] ARM: dts: sun7i: Add DRAM gates
 In-Reply-To: <1449321407-4531-1-git-send-email-wens@csie.org>
 References: <1449321407-4531-1-git-send-email-wens@csie.org>
-Message-ID: <1449321407-4531-7-git-send-email-wens@csie.org>
+Message-ID: <1449321407-4531-6-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The video engine has its own module clock, which also includes a
-reset control for it.
+The DRAM gates controls direct memory access for some peripherals.
+These peripherals include the display pipeline, so add the required
+gates to the simplefb nodes as well.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/sun7i-a20.dtsi | 32 +++++++++++++++++++++++++++++---
+ 1 file changed, 29 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 21169c0a6627..0940a788f824 100644
+index e02eb720c4fc..21169c0a6627 100644
 --- a/arch/arm/boot/dts/sun7i-a20.dtsi
 +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -527,6 +527,15 @@
- 					     "dram_de_mp", "dram_ace";
+@@ -68,7 +68,7 @@
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0-hdmi";
+ 			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
+-				 <&ahb_gates 44>;
++				 <&ahb_gates 44>, <&dram_gates 26>;
+ 			status = "disabled";
  		};
  
-+		ve_clk: clk at 01c2013c {
-+			#clock-cells = <0>;
-+			#reset-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-ve-clk";
-+			reg = <0x01c2013c 0x4>;
-+			clocks = <&pll4>;
-+			clock-output-names = "ve";
+@@ -76,7 +76,8 @@
+ 			compatible = "allwinner,simple-framebuffer",
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0";
+-			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 44>;
++			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 44>,
++				 <&dram_gates 26>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -85,7 +86,7 @@
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0-tve0";
+ 			clocks = <&pll5 1>, <&ahb_gates 34>, <&ahb_gates 36>,
+-				 <&ahb_gates 44>;
++				 <&ahb_gates 44>, <&dram_gates 26>;
+ 			status = "disabled";
+ 		};
+ 	};
+@@ -501,6 +502,31 @@
+ 			clock-output-names = "spi3";
+ 		};
+ 
++		dram_gates: clk at 01c20100 {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun4i-a10-dram-gates-clk";
++			reg = <0x01c20100 0x4>;
++			clocks = <&pll5 0>;
++			clock-indices = <0>,
++					<1>, <2>,
++					<3>,
++					<4>,
++					<5>, <6>,
++					<15>,
++					<24>, <25>,
++					<26>, <27>,
++					<28>, <29>;
++			clock-output-names = "dram_ve",
++					     "dram_csi0", "dram_csi1",
++					     "dram_ts",
++					     "dram_tvd",
++					     "dram_tve0", "dram_tve1",
++					     "dram_output",
++					     "dram_de_fe1", "dram_de_fe0",
++					     "dram_de_be0", "dram_de_be1",
++					     "dram_de_mp", "dram_ace";
 +		};
 +
  		codec_clk: clk at 01c20140 {
