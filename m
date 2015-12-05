@@ -1,52 +1,208 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Sat, 05 Dec 2015 08:49:49 +0100
-Subject: [PATCH v3 0/10] cpufreq: add generic cpufreq driver support for
- Exynos542x/5800 platforms
-In-Reply-To: <20151205035444.GR3430@ubuntu>
-References: <1449250235-9613-1-git-send-email-b.zolnierkie@samsung.com>
- <20151205035444.GR3430@ubuntu>
-Message-ID: <3776700.7KBsWa2Q4V@amdc1976>
+From: yankejian@huawei.com (yankejian)
+Date: Sat, 5 Dec 2015 15:59:15 +0800
+Subject: [PATCH net-next 1/2] net: hns: enet specisies a reference to dsaf
+In-Reply-To: <1449302356-54658-1-git-send-email-yankejian@huawei.com>
+References: <1449302356-54658-1-git-send-email-yankejian@huawei.com>
+Message-ID: <1449302356-54658-2-git-send-email-yankejian@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+enet is associating with dasf. before this patch, the association is
+the same strings between ae-name and dsa-name. in a general way, enet
+specifies a reference to dsaf should be a good idea. so this patch
+deletes the ae-name in enet, and adds parsing the ae-handle
+from DT to set the associating with dsaf.
 
-Hi,
+Signed-off-by: yankejian <yankejian@huawei.com>
+---
+ drivers/net/ethernet/hisilicon/hns/hnae.c          | 17 +++++++----------
+ drivers/net/ethernet/hisilicon/hns/hnae.h          |  7 +++++--
+ drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c  |  4 ++++
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c | 10 +---------
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h |  1 +
+ drivers/net/ethernet/hisilicon/hns/hns_enet.c      | 13 +++++++++----
+ drivers/net/ethernet/hisilicon/hns/hns_enet.h      |  2 +-
+ 7 files changed, 28 insertions(+), 26 deletions(-)
 
-On Saturday, December 05, 2015 09:24:44 AM Viresh Kumar wrote:
-> On 04-12-15, 18:30, Bartlomiej Zolnierkiewicz wrote:
-> > Hi,
-> > 
-> > This patch series adds generic arm_big_little_dt cpufreq driver
-> > support for Exynos542x/5800 (using the new CPU clock type which
-> > allows it).  It also:
-> > - enhances arm_big_little[_dt] driver with CPU cluster regulator
-> >   support
-> > - adds CPU clock configuration data and CPU operating points
-> >   setup for Exynos542x/5800
-> > - adds CPU cluster regulator supplies for Exynos542x/5800 boards
-> > 
-> > This patch series has been tested on Exynos5422 based ODROID-XU3
-> > Lite board.
-> > 
-> > Please note that this is not a final version of the patchset.
-> > I just wanted to push out current work-in-progress patches that
-> > integrate changes from Anand, Ben and me.
-> 
-> What's going on guys, Ben tried exactly same thing few days back:
-> 
-> http://marc.info/?l=linux-kernel&m=144909193925508&w=2
-
-Why I appreciate Ben's work this not exactly the same thing as
-the above patchset lacks critical CLK_RECALC_NEW_RATES bugfix and
-few other minor fixes.
-
-> And the comments given there applies to you as well.
-
-Yes, sure.  That's why I wrote that this is work-in-progress
-and put the TODO in the cover letter.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+diff --git a/drivers/net/ethernet/hisilicon/hns/hnae.c b/drivers/net/ethernet/hisilicon/hns/hnae.c
+index b364529..3bfe36f 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hnae.c
++++ b/drivers/net/ethernet/hisilicon/hns/hnae.c
+@@ -95,21 +95,17 @@ static struct hnae_buf_ops hnae_bops = {
+ static int __ae_match(struct device *dev, const void *data)
+ {
+ 	struct hnae_ae_dev *hdev = cls_to_ae_dev(dev);
+-	const char *ae_id = data;
+ 
+-	if (!strncmp(ae_id, hdev->name, AE_NAME_SIZE))
+-		return 1;
+-
+-	return 0;
++	return hdev->dev->of_node == data;
+ }
+ 
+-static struct hnae_ae_dev *find_ae(const char *ae_id)
++static struct hnae_ae_dev *find_ae(const struct device_node *ae_node)
+ {
+ 	struct device *dev;
+ 
+-	WARN_ON(!ae_id);
++	WARN_ON(!ae_node);
+ 
+-	dev = class_find_device(hnae_class, NULL, ae_id, __ae_match);
++	dev = class_find_device(hnae_class, NULL, ae_node, __ae_match);
+ 
+ 	return dev ? cls_to_ae_dev(dev) : NULL;
+ }
+@@ -316,7 +312,8 @@ EXPORT_SYMBOL(hnae_reinit_handle);
+  * return handle ptr or ERR_PTR
+  */
+ struct hnae_handle *hnae_get_handle(struct device *owner_dev,
+-				    const char *ae_id, u32 port_id,
++				    const struct device_node *ae_node,
++				    u32 port_id,
+ 				    struct hnae_buf_ops *bops)
+ {
+ 	struct hnae_ae_dev *dev;
+@@ -324,7 +321,7 @@ struct hnae_handle *hnae_get_handle(struct device *owner_dev,
+ 	int i, j;
+ 	int ret;
+ 
+-	dev = find_ae(ae_id);
++	dev = find_ae(ae_node);
+ 	if (!dev)
+ 		return ERR_PTR(-ENODEV);
+ 
+diff --git a/drivers/net/ethernet/hisilicon/hns/hnae.h b/drivers/net/ethernet/hisilicon/hns/hnae.h
+index d1f3316..0012664 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hnae.h
++++ b/drivers/net/ethernet/hisilicon/hns/hnae.h
+@@ -523,8 +523,11 @@ struct hnae_handle {
+ 
+ #define ring_to_dev(ring) ((ring)->q->dev->dev)
+ 
+-struct hnae_handle *hnae_get_handle(struct device *owner_dev, const char *ae_id,
+-				    u32 port_id, struct hnae_buf_ops *bops);
++struct hnae_handle *hnae_get_handle(struct device *owner_dev,
++				    const struct device_node *ae_node,
++				    u32 port_id,
++				    struct hnae_buf_ops *bops);
++
+ void hnae_put_handle(struct hnae_handle *handle);
+ int hnae_ae_register(struct hnae_ae_dev *dev, struct module *owner);
+ void hnae_ae_unregister(struct hnae_ae_dev *dev);
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c b/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
+index 77c6edb..ed9a72c 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
+@@ -848,6 +848,7 @@ static struct hnae_ae_ops hns_dsaf_ops = {
+ int hns_dsaf_ae_init(struct dsaf_device *dsaf_dev)
+ {
+ 	struct hnae_ae_dev *ae_dev = &dsaf_dev->ae_dev;
++	static atomic_t id = ATOMIC_INIT(-1);
+ 
+ 	switch (dsaf_dev->dsaf_ver) {
+ 	case AE_VERSION_1:
+@@ -859,6 +860,9 @@ int hns_dsaf_ae_init(struct dsaf_device *dsaf_dev)
+ 	default:
+ 		break;
+ 	}
++
++	snprintf(ae_dev->name, AE_NAME_SIZE, "%s%d", DSAF_DEVICE_NAME,
++		 (int)atomic_inc_return(&id));
+ 	ae_dev->ops = &hns_dsaf_ops;
+ 	ae_dev->dev = dsaf_dev->dev;
+ 
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+index 636b205..f3de749 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+@@ -35,7 +35,7 @@ int hns_dsaf_get_cfg(struct dsaf_device *dsaf_dev)
+ 	int ret, i;
+ 	u32 desc_num;
+ 	u32 buf_size;
+-	const char *name, *mode_str;
++	const char *mode_str;
+ 	struct device_node *np = dsaf_dev->dev->of_node;
+ 
+ 	if (of_device_is_compatible(np, "hisilicon,hns-dsaf-v1"))
+@@ -43,14 +43,6 @@ int hns_dsaf_get_cfg(struct dsaf_device *dsaf_dev)
+ 	else
+ 		dsaf_dev->dsaf_ver = AE_VERSION_2;
+ 
+-	ret = of_property_read_string(np, "dsa_name", &name);
+-	if (ret) {
+-		dev_err(dsaf_dev->dev, "get dsaf name fail, ret=%d!\n", ret);
+-		return ret;
+-	}
+-	strncpy(dsaf_dev->ae_dev.name, name, AE_NAME_SIZE);
+-	dsaf_dev->ae_dev.name[AE_NAME_SIZE - 1] = '\0';
+-
+ 	ret = of_property_read_string(np, "mode", &mode_str);
+ 	if (ret) {
+ 		dev_err(dsaf_dev->dev, "get dsaf mode fail, ret=%d!\n", ret);
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h
+index 31c312f..40205b9 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h
+@@ -18,6 +18,7 @@ struct hns_mac_cb;
+ 
+ #define DSAF_DRV_NAME "hns_dsaf"
+ #define DSAF_MOD_VERSION "v1.0"
++#define DSAF_DEVICE_NAME "dsaf"
+ 
+ #define HNS_DSAF_DEBUG_NW_REG_OFFSET 0x100000
+ 
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+index cad2663..33b9aab 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
+@@ -1778,7 +1778,7 @@ static int hns_nic_try_get_ae(struct net_device *ndev)
+ 	int ret;
+ 
+ 	h = hnae_get_handle(&priv->netdev->dev,
+-			    priv->ae_name, priv->port_id, NULL);
++			    priv->ae_node, priv->port_id, NULL);
+ 	if (IS_ERR_OR_NULL(h)) {
+ 		ret = PTR_ERR(h);
+ 		dev_dbg(priv->dev, "has not handle, register notifier!\n");
+@@ -1856,9 +1856,12 @@ static int hns_nic_dev_probe(struct platform_device *pdev)
+ 	else
+ 		priv->enet_ver = AE_VERSION_2;
+ 
+-	ret = of_property_read_string(node, "ae-name", &priv->ae_name);
+-	if (ret)
+-		goto out_read_string_fail;
++	priv->ae_node = (void *)of_parse_phandle(node, "ae-handle", 0);
++	if (IS_ERR_OR_NULL(priv->ae_node)) {
++		ret = PTR_ERR(priv->ae_node);
++		dev_err(dev, "not find ae-handle\n");
++		goto out_read_handle_fai;
++	}
+ 
+ 	ret = of_property_read_u32(node, "port-id", &priv->port_id);
+ 	if (ret)
+@@ -1921,6 +1924,8 @@ static int hns_nic_dev_probe(struct platform_device *pdev)
+ 
+ out_notify_fail:
+ 	(void)cancel_work_sync(&priv->service_task);
++out_read_handle_fai:
++
+ out_read_string_fail:
+ 	free_netdev(ndev);
+ 	return ret;
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.h b/drivers/net/ethernet/hisilicon/hns/hns_enet.h
+index 4b75270..c68ab3d 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_enet.h
++++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.h
+@@ -51,7 +51,7 @@ struct hns_nic_ops {
+ };
+ 
+ struct hns_nic_priv {
+-	const char *ae_name;
++	const struct device_node *ae_node;
+ 	u32 enet_ver;
+ 	u32 port_id;
+ 	int phy_mode;
+-- 
+1.9.1
