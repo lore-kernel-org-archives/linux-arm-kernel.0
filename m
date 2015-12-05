@@ -1,52 +1,182 @@
-From: daniel@zonque.org (Daniel Mack)
-Date: Sat, 5 Dec 2015 20:50:18 +0100
-Subject: [PATCH RFC 0/3] input: rotary_encoder: use more than two gpios as
- input
-In-Reply-To: <21976926.6E4NCDDElu@pcimr>
-References: <1449050834-31779-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <2266988.l83Fg404My@pcimr> <20151202185920.GO5072@pengutronix.de>
- <21976926.6E4NCDDElu@pcimr>
-Message-ID: <56633FFA.5080708@zonque.org>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat, 05 Dec 2015 11:52:26 -0800
+Subject: [PATCH v2] pwm: ftm: fix clock enable/disable when using PM
+In-Reply-To: <1448318707-18011-1-git-send-email-stefan@agner.ch>
+References: <1448318707-18011-1-git-send-email-stefan@agner.ch>
+Message-ID: <0f474319c881e76a6a7cc97ab2089b66@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2015 02:01 PM, Rojhalat Ibrahim wrote:
-> On Wednesday 02 December 2015 19:59:20 Uwe Kleine-K?nig wrote:
+Ping
 
->> I have a real rotary encoder with 4 input lines and so 16
->> distinguishable positions. It would be described as:
->>
->> 	compatible = "rotary-encoder";
->> 	gpios = <&gpio4 12 GPIO_ACTIVE_HIGH>, <&gpio4 11 GPIO_ACTIVE_HIGH>, <&gpio4 10 GPIO_ACTIVE_HIGH>, <&gpio4 9 GPIO_ACTIVE_HIGH>;
->> 	rotary-encoder,steps = <16>;
->> 	rotary-encoder,steps-per-period = <16>;
->>
->> with the binding implemented in my patches.
->>
->> The wikipedia article about rotary encoders[1] uses a device with 3
->> input lines to explain gray encoding. So I didn't consider "my" device
->> as exotic up to now.
->>
+On 2015-11-23 14:45, Stefan Agner wrote:
+> A FTM PWM instance enables/disables three clocks: The bus clock, the
+> counter clock and the PWM clock. The bus clock gets enabled on
+> pwm_request, whereas the counter and PWM clocks will be enabled upon
+> pwm_enable.
 > 
-> So you have an absolute encoder. From the state of the four input lines you
-> can determine the absolute position value. There is no need to count steps.
-> At least that's the original purpose of your device.
+> The driver has three closesly related issues when enabling/disabling
+> clocks during suspend/resume:
+> - The three clocks are not treated differently in regards to the
+>   individual PWM state enabled/requested. This can lead to clocks
+>   getting disabled which have not been enabled in the first place
+>   (a PWM channel which only has been requested going through
+>   suspend/resume).
 > 
-> Of course it might be conceivable to use that kind of absolute encoder in an
-> incremental way and count the steps throughout multiple revolutions.
-> But why would you do that? The resolution of 16 steps per revolution is not
-> very good (incremental encoders often have hundreds or thousands of steps per
-> revolution). And the whole point of an absolute encoder is that you are able
-> to determine the current position at any time just by looking at the inputs
-> without having to count steps.
-
-Yes, you're right, that's actually a very different kind of device which
-should be supported with a different mode or something, so that the
-output of the driver reflects the absolute state of the encoder. This
-even simplifies things in the driver: The entire state logic would be
-bypassed in this mode, and the current state of the GPIO lines would be
-used directly to get the absolute value. Makes sense?
-
-
-Thanks,
-Daniel
+> - When entering suspend, the current behavior relies on the
+>   FTM_OUTMASK register: If a PWM output is unmasked, the driver
+>   assumes the clocks are enabled. However, some PWM instances
+>   have only 2 channels connected (e.g. Vybrid's FTM1). In that case,
+>   the FTM_OUTMASK reads 0x3 if all channels are disabled, even if
+>   the code wrote 0xff to it before. For those PWM instances, the
+>   current approach to detect enabled PWM signals does not work.
+> 
+> - A third issue applies to the bus clock only, which can get enabled
+>   multiple times (once for each PWM channel of a PWM chip). This is
+>   fine, however when entering suspend mode, the clock only gets
+>   disabled once.
+> 
+> This change introduces a different approach by relying on the enable
+> and prepared counters of the clock framework and using the frameworks
+> PWM signal states to address all three issues.
+> 
+> Clocks get disabled during suspend and back enabled on resume
+> regarding to the PWM channels individual state (requested/enabled).
+> 
+> Since we do not count the clock enables in the driver, this change no
+> longer clears the Status and Control registers Clock Source Selection
+> (FTM_SC[CLKS]). However, since we disable the selected clock anyway,
+> and we explicitly select the clock source on reenabling a PWM channel
+> this approach should not make a difference in practice.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+> Hi Lee,
+> 
+> I just found your new email address. Thierry and I already had some
+> discussion about the patch here:
+> http://thread.gmane.org/gmane.linux.pwm/2878
+> 
+> Could you have a look at that patch?
+> 
+> Changes since v1:
+> - Use the pwm_is_enabled helper
+> 
+>  drivers/pwm/pwm-fsl-ftm.c | 58 ++++++++++++++++++++---------------------------
+>  1 file changed, 25 insertions(+), 33 deletions(-)
+> 
+> diff --git a/drivers/pwm/pwm-fsl-ftm.c b/drivers/pwm/pwm-fsl-ftm.c
+> index f9dfc8b..7225ac6 100644
+> --- a/drivers/pwm/pwm-fsl-ftm.c
+> +++ b/drivers/pwm/pwm-fsl-ftm.c
+> @@ -80,7 +80,6 @@ struct fsl_pwm_chip {
+>  
+>  	struct mutex lock;
+>  
+> -	unsigned int use_count;
+>  	unsigned int cnt_select;
+>  	unsigned int clk_ps;
+>  
+> @@ -300,9 +299,6 @@ static int fsl_counter_clock_enable(struct
+> fsl_pwm_chip *fpc)
+>  {
+>  	int ret;
+>  
+> -	if (fpc->use_count++ != 0)
+> -		return 0;
+> -
+>  	/* select counter clock source */
+>  	regmap_update_bits(fpc->regmap, FTM_SC, FTM_SC_CLK_MASK,
+>  			   FTM_SC_CLK(fpc->cnt_select));
+> @@ -334,25 +330,6 @@ static int fsl_pwm_enable(struct pwm_chip *chip,
+> struct pwm_device *pwm)
+>  	return ret;
+>  }
+>  
+> -static void fsl_counter_clock_disable(struct fsl_pwm_chip *fpc)
+> -{
+> -	/*
+> -	 * already disabled, do nothing
+> -	 */
+> -	if (fpc->use_count == 0)
+> -		return;
+> -
+> -	/* there are still users, so can't disable yet */
+> -	if (--fpc->use_count > 0)
+> -		return;
+> -
+> -	/* no users left, disable PWM counter clock */
+> -	regmap_update_bits(fpc->regmap, FTM_SC, FTM_SC_CLK_MASK, 0);
+> -
+> -	clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_CNTEN]);
+> -	clk_disable_unprepare(fpc->clk[fpc->cnt_select]);
+> -}
+> -
+>  static void fsl_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+>  {
+>  	struct fsl_pwm_chip *fpc = to_fsl_chip(chip);
+> @@ -362,7 +339,8 @@ static void fsl_pwm_disable(struct pwm_chip *chip,
+> struct pwm_device *pwm)
+>  	regmap_update_bits(fpc->regmap, FTM_OUTMASK, BIT(pwm->hwpwm),
+>  			   BIT(pwm->hwpwm));
+>  
+> -	fsl_counter_clock_disable(fpc);
+> +	clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_CNTEN]);
+> +	clk_disable_unprepare(fpc->clk[fpc->cnt_select]);
+>  
+>  	regmap_read(fpc->regmap, FTM_OUTMASK, &val);
+>  	if ((val & 0xFF) == 0xFF)
+> @@ -492,17 +470,24 @@ static int fsl_pwm_remove(struct platform_device *pdev)
+>  static int fsl_pwm_suspend(struct device *dev)
+>  {
+>  	struct fsl_pwm_chip *fpc = dev_get_drvdata(dev);
+> -	u32 val;
+> +	int i;
+>  
+>  	regcache_cache_only(fpc->regmap, true);
+>  	regcache_mark_dirty(fpc->regmap);
+>  
+> -	/* read from cache */
+> -	regmap_read(fpc->regmap, FTM_OUTMASK, &val);
+> -	if ((val & 0xFF) != 0xFF) {
+> +	for (i = 0; i < fpc->chip.npwm; i++) {
+> +		struct pwm_device *pwm = &fpc->chip.pwms[i];
+> +
+> +		if (!test_bit(PWMF_REQUESTED, &pwm->flags))
+> +			continue;
+> +
+> +		clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_SYS]);
+> +
+> +		if (!pwm_is_enabled(pwm))
+> +			continue;
+> +
+>  		clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_CNTEN]);
+>  		clk_disable_unprepare(fpc->clk[fpc->cnt_select]);
+> -		clk_disable_unprepare(fpc->clk[FSL_PWM_CLK_SYS]);
+>  	}
+>  
+>  	return 0;
+> @@ -511,12 +496,19 @@ static int fsl_pwm_suspend(struct device *dev)
+>  static int fsl_pwm_resume(struct device *dev)
+>  {
+>  	struct fsl_pwm_chip *fpc = dev_get_drvdata(dev);
+> -	u32 val;
+> +	int i;
+> +
+> +	for (i = 0; i < fpc->chip.npwm; i++) {
+> +		struct pwm_device *pwm = &fpc->chip.pwms[i];
+> +
+> +		if (!test_bit(PWMF_REQUESTED, &pwm->flags))
+> +			continue;
+>  
+> -	/* read from cache */
+> -	regmap_read(fpc->regmap, FTM_OUTMASK, &val);
+> -	if ((val & 0xFF) != 0xFF) {
+>  		clk_prepare_enable(fpc->clk[FSL_PWM_CLK_SYS]);
+> +
+> +		if (!pwm_is_enabled(pwm))
+> +			continue;
+> +
+>  		clk_prepare_enable(fpc->clk[fpc->cnt_select]);
+>  		clk_prepare_enable(fpc->clk[FSL_PWM_CLK_CNTEN]);
+>  	}
