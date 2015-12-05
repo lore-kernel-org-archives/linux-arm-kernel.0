@@ -1,47 +1,24 @@
 From: yankejian@huawei.com (yankejian)
-Date: Sat, 5 Dec 2015 15:54:48 +0800
-Subject: [PATCH RESEND net-next 3/3] arm64: hip05-d02: Document devicetree
- bindings for Hisilicon D02 Board
-In-Reply-To: <1449302088-53037-1-git-send-email-yankejian@huawei.com>
-References: <1449302088-53037-1-git-send-email-yankejian@huawei.com>
-Message-ID: <1449302088-53037-4-git-send-email-yankejian@huawei.com>
+Date: Sat, 5 Dec 2015 15:56:55 +0800
+Subject: [PATCH RESEND net-next 0/3] dts: hisi: fixes can't find eth for
+ hip05-D02
+Message-ID: <1449302218-54374-1-git-send-email-yankejian@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for the devicetree bindings used by the
-DT files of Hisilicon Hip05-D02 development board.
+this patchset fixes the bug that eth can't initial successful on hip05-D02
+because the dts files doesn't match the source code.
 
-Signed-off-by: yankejian <yankejian@huawei.com>
----
+yankejian (3):
+  dts: hisi: enables the ethX for D02 board
+  dts: hisi: fixes no syscon error when init mdio
+  arm64: hip05-d02: Document devicetree bindings for Hisilicon D02 Board
+
  .../devicetree/bindings/arm/hisilicon/hisilicon.txt      | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm64/boot/dts/hisilicon/hip05-d02.dts              | 16 ++++++++++++++++
+ arch/arm64/boot/dts/hisilicon/hip05.dtsi                 |  4 ++++
+ arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi             |  4 ++--
+ 4 files changed, 38 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-index 6ac7c00..5318d78 100644
---- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-+++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-@@ -187,6 +187,22 @@ Example:
- 		reg = <0xb0000000 0x10000>;
- 	};
- 
-+Hisilicon HiP05 PERISUB system controller
-+
-+Required properties:
-+- compatible : "hisilicon,peri-c-subctrl", "syscon";
-+- reg : Register address and size
-+
-+The HiP05 PERISUB system controller is shared by peripheral controllers in
-+HiP05 Soc to implement some basic configurations. the peripheral
-+ controllers include mdio, ddr, iic, uart, timer and so on.
-+
-+Example:
-+	/* for HiP05 PCIe-SAS system */
-+	pcie_sas: system_controller at 0xb0000000 {
-+		compatible = "hisilicon,pcie-sas-subctrl", "syscon";
-+		reg = <0xb0000000 0x10000>;
-+	};
- -----------------------------------------------------------------------
- Hisilicon CPU controller
- 
 -- 
 1.9.1
