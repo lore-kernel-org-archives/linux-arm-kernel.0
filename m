@@ -1,66 +1,98 @@
 From: kapilh@broadcom.com (Kapil Hali)
-Date: Sat, 5 Dec 2015 06:53:44 -0500
-Subject: [PATCH v6 5/5] ARM: BCM: Add SMP support for Broadcom 4708
-In-Reply-To: <1449316424-14549-1-git-send-email-kapilh@broadcom.com>
-References: <1449316424-14549-1-git-send-email-kapilh@broadcom.com>
-Message-ID: <1449316424-14549-6-git-send-email-kapilh@broadcom.com>
+Date: Sat, 5 Dec 2015 17:25:09 +0530
+Subject: [PATCH v5 1/5] dt-bindings: add SMP enable-method for Broadcom NSP
+In-Reply-To: <56621C7A.5050202@gmail.com>
+References: <1449260611-24417-1-git-send-email-kapilh@broadcom.com>
+ <1449260611-24417-2-git-send-email-kapilh@broadcom.com>
+ <56621C7A.5050202@gmail.com>
+Message-ID: <5662D09D.8020807@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Mason <jonmason@broadcom.com>
 
-Add SMP support for Broadcom's 4708 SoCs.
 
-Signed-off-by: Jon Mason <jonmason@broadcom.com>
-Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
-Tested-by: Hauke Mehrtens <hauke@hauke-m.de>
-Signed-off-by: Kapil Hali <kapilh@broadcom.com>
----
- arch/arm/boot/dts/bcm4708.dtsi | 3 ++-
- arch/arm/mach-bcm/Kconfig      | 1 +
- arch/arm/mach-bcm/Makefile     | 3 +++
- 3 files changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/bcm4708.dtsi b/arch/arm/boot/dts/bcm4708.dtsi
-index 31141e8..f2d2239 100644
---- a/arch/arm/boot/dts/bcm4708.dtsi
-+++ b/arch/arm/boot/dts/bcm4708.dtsi
-@@ -27,8 +27,9 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			next-level-cache = <&L2>;
-+			enable-method = "brcm,bcm-nsp-smp";
-+			secondary-boot-reg = <0xffff0400>;
- 			reg = <0x1>;
- 		};
- 	};
--
- };
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 83765a0..e85246f 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -54,6 +54,7 @@ config ARCH_BCM_NSP
- config ARCH_BCM_5301X
- 	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
- 	select ARCH_BCM_IPROC
-+	select HAVE_SMP
- 	help
- 	  Support for Broadcom BCM470X and BCM5301X SoCs with ARM CPU cores.
- 
-diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-index 5193a25..7d66515 100644
---- a/arch/arm/mach-bcm/Makefile
-+++ b/arch/arm/mach-bcm/Makefile
-@@ -43,6 +43,9 @@ obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
- 
- # BCM5301X
- obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
-+ifeq ($(CONFIG_ARCH_BCM_5301X),y)
-+obj-$(CONFIG_SMP)		+= platsmp.o
-+endif
- 
- # BCM63XXx
- ifeq ($(CONFIG_ARCH_BCM_63XX),y)
--- 
-2.1.0
+On 12/5/2015 4:36 AM, Florian Fainelli wrote:
+> On 04/12/15 12:23, Kapil Hali wrote:
+>> Add a compatible string "brcm,bcm-nsp-smp" for Broadcom's
+>> Northstar Plus CPU to the 32-bit ARM CPU device tree binding
+>> documentation file and create a new binding documentation for
+>> Northstar Plus CPU.
+>>
+>> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+>> ---
+>>  .../bindings/arm/bcm/brcm,nsp-cpu-method.txt       | 39 ++++++++++++++++++++++
+>>  Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
+>>  2 files changed, 40 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+>> new file mode 100644
+>> index 0000000..bf08872
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+>> @@ -0,0 +1,39 @@
+>> +Broadcom Northstar Plus SoC CPU Enable Method
+>> +---------------------------------------------
+>> +This binding defines the enable method used for starting secondary
+>> +CPUs in the following Broadcom SoCs:
+>> +  BCM58522, BCM58525, BCM58535, BCM58622, BCM58623, BCM58625, BCM88312
+>> +
+>> +The enable method is specified by defining the following required
+>> +properties in the "cpus" device tree node:
+>> +  - enable-method = "brcm,bcm-nsp-smp";
+>> +  - secondary-boot-reg = <...>;
+> 
+> That comment is not quite correct with respect to the paragraph below then?
+> 
+Right, updated in new patch.
+>> +
+>> +The secondary-boot-reg property is a u32 value that specifies the
+>> +physical address of the register which should hold the common
+>> +entry point for a secondary CPU. This entry is cpu node specific
+>> +and should be added per cpu. E.g., in case of NSP (BCM58625) which
+>> +is a dual core CPU SoC, this entry should be added to cpu1 node.
+>> +
+>> +
+>> +Example:
+>> +	cpus {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +		enable-method = "brcm,bcm-nsp-smp";
+> 
+> Based on the requested feedback, this property should now be placed
+> under the cpu1 node.
+> 
+Right, updated in the new patch.
+>> +
+>> +		cpu0: cpu at 0 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a9";
+>> +			next-level-cache = <&L2>;
+>> +			reg = <0>;
+>> +		};
+>> +
+>> +		cpu1: cpu at 1 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,cortex-a9";
+>> +			next-level-cache = <&L2>;
+>> +			reg = <1>;
+>> +			secondary-boot-reg = <0xffff042c>;
+>> +		};
+>> +	};
+>> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+>> index 3a07a87..d191554 100644
+>> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+>> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+>> @@ -190,6 +190,7 @@ nodes to be present and contain the properties described below.
+>>  			    "allwinner,sun6i-a31"
+>>  			    "allwinner,sun8i-a23"
+>>  			    "arm,psci"
+>> +			    "brcm,bcm-nsp-smp"
+>>  			    "brcm,brahma-b15"
+>>  			    "marvell,armada-375-smp"
+>>  			    "marvell,armada-380-smp"
+>>
+> 
+> 
+Thanks,
+Kapil
