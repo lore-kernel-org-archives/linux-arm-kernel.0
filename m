@@ -1,190 +1,41 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Sat,  5 Dec 2015 14:01:46 +0800
-Subject: [PATCH v2] cpufreq: mt8173: move resources allocation into ->probe()
-In-Reply-To: <1448785898-17838-4-git-send-email-pi-cheng.chen@linaro.org>
-References: <1448785898-17838-4-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <1449295306-9222-1-git-send-email-pi-cheng.chen@linaro.org>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Sat, 5 Dec 2015 06:09:47 +0000
+Subject: [PATCH 1/4] ARM: dts: vf610: relicense vf???.dtsi under GPLv2/X11
+In-Reply-To: <1448323069-23208-2-git-send-email-stefan@agner.ch>
+References: <1448323069-23208-1-git-send-email-stefan@agner.ch>
+ <1448323069-23208-2-git-send-email-stefan@agner.ch>
+Message-ID: <BLUPR03MB134302C5956BB070A295C98830B0@BLUPR03MB134.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the return value of ->init() of cpufreq driver is not propagated
-to the device driver model now, move resources allocation into
-->probe() to handle -EPROBE_DEFER properly.
+On 11/24/2015 07:57 AM, Stefan Agner wrote:
+GPLv2-only devicetrees make reuse difficult for software components licensed under a different license.
 
-Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
----
-v1->v2:
-- fix error handling path in ->probe()
----
- drivers/cpufreq/mt8173-cpufreq.c | 98 ++++++++++++++++++++++++++++------------
- 1 file changed, 70 insertions(+), 28 deletions(-)
+The consensus is that a GPL/X11 dual-license should allow all necessary uses, so relicense the vfxxx.dtsi, vf500.dtsi and vf610.dtsi files to this combination.
 
-diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
-index 9d0fe37..257bcb9 100644
---- a/drivers/cpufreq/mt8173-cpufreq.c
-+++ b/drivers/cpufreq/mt8173-cpufreq.c
-@@ -41,16 +41,35 @@
-  * the original PLL becomes stable at target frequency.
-  */
- struct mtk_cpu_dvfs_info {
-+	struct cpumask cpus;
- 	struct device *cpu_dev;
- 	struct regulator *proc_reg;
- 	struct regulator *sram_reg;
- 	struct clk *cpu_clk;
- 	struct clk *inter_clk;
- 	struct thermal_cooling_device *cdev;
-+	struct list_head list_head;
- 	int intermediate_voltage;
- 	bool need_voltage_tracking;
- };
- 
-+static LIST_HEAD(dvfs_info_list);
-+
-+struct mtk_cpu_dvfs_info *get_dvfs_info(int cpu)
-+{
-+	struct mtk_cpu_dvfs_info *info;
-+	struct list_head *list;
-+
-+	list_for_each(list, &dvfs_info_list) {
-+		info = list_entry(list, struct mtk_cpu_dvfs_info, list_head);
-+
-+		if (cpumask_test_cpu(cpu, &info->cpus))
-+			return info;
-+	}
-+
-+	return NULL;
-+}
-+
- static int mtk_cpufreq_voltage_tracking(struct mtk_cpu_dvfs_info *info,
- 					int new_vproc)
- {
-@@ -402,6 +421,9 @@ static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
- 	 */
- 	info->need_voltage_tracking = !IS_ERR(sram_reg);
- 
-+	/* CPUs in the same cluster share a clock and power domain. */
-+	cpumask_copy(&info->cpus, &cpu_topology[cpu].core_sibling);
-+
- 	return 0;
- 
- out_free_opp_table:
-@@ -440,47 +462,32 @@ static int mtk_cpufreq_init(struct cpufreq_policy *policy)
- 	struct cpufreq_frequency_table *freq_table;
- 	int ret;
- 
--	info = kzalloc(sizeof(*info), GFP_KERNEL);
--	if (!info)
--		return -ENOMEM;
--
--	ret = mtk_cpu_dvfs_info_init(info, policy->cpu);
--	if (ret) {
--		pr_err("%s failed to initialize dvfs info for cpu%d\n",
--		       __func__, policy->cpu);
--		goto out_free_dvfs_info;
-+	info = get_dvfs_info(policy->cpu);
-+	if (!info) {
-+		pr_err("dvfs info for cpu%d is not initialized.\n",
-+		       policy->cpu);
-+		return -EINVAL;
- 	}
- 
- 	ret = dev_pm_opp_init_cpufreq_table(info->cpu_dev, &freq_table);
- 	if (ret) {
- 		pr_err("failed to init cpufreq table for cpu%d: %d\n",
- 		       policy->cpu, ret);
--		goto out_release_dvfs_info;
-+		return ret;
- 	}
- 
- 	ret = cpufreq_table_validate_and_show(policy, freq_table);
- 	if (ret) {
- 		pr_err("%s: invalid frequency table: %d\n", __func__, ret);
--		goto out_free_cpufreq_table;
-+		dev_pm_opp_free_cpufreq_table(info->cpu_dev, &freq_table);
-+		return ret;
- 	}
- 
--	/* CPUs in the same cluster share a clock and power domain. */
--	cpumask_copy(policy->cpus, &cpu_topology[policy->cpu].core_sibling);
-+	cpumask_copy(policy->cpus, &info->cpus);
- 	policy->driver_data = info;
- 	policy->clk = info->cpu_clk;
- 
- 	return 0;
--
--out_free_cpufreq_table:
--	dev_pm_opp_free_cpufreq_table(info->cpu_dev, &freq_table);
--
--out_release_dvfs_info:
--	mtk_cpu_dvfs_info_release(info);
--
--out_free_dvfs_info:
--	kfree(info);
--
--	return ret;
- }
- 
- static int mtk_cpufreq_exit(struct cpufreq_policy *policy)
-@@ -489,8 +496,6 @@ static int mtk_cpufreq_exit(struct cpufreq_policy *policy)
- 
- 	cpufreq_cooling_unregister(info->cdev);
- 	dev_pm_opp_free_cpufreq_table(info->cpu_dev, &policy->freq_table);
--	mtk_cpu_dvfs_info_release(info);
--	kfree(info);
- 
- 	return 0;
- }
-@@ -510,11 +515,48 @@ static struct cpufreq_driver mt8173_cpufreq_driver = {
- 
- static int mt8173_cpufreq_probe(struct platform_device *pdev)
- {
--	int ret;
-+	struct mtk_cpu_dvfs_info *info;
-+	struct list_head *list, *tmp;
-+	int cpu, ret;
-+
-+	for_each_possible_cpu(cpu) {
-+		info = get_dvfs_info(cpu);
-+		if (info)
-+			continue;
-+
-+		info = kzalloc(sizeof(*info), GFP_KERNEL);
-+		if (!info) {
-+			ret = -ENOMEM;
-+			goto release_dvfs_info_list;
-+		}
-+
-+		ret = mtk_cpu_dvfs_info_init(info, cpu);
-+		if (ret) {
-+			pr_err("%s failed to initialize dvfs info for cpu%d\n",
-+			       __func__, cpu);
-+			kfree(info);
-+			goto release_dvfs_info_list;
-+		}
-+
-+		list_add(&info->list_head, &dvfs_info_list);
-+	}
- 
- 	ret = cpufreq_register_driver(&mt8173_cpufreq_driver);
--	if (ret)
-+	if (ret) {
- 		pr_err("failed to register mtk cpufreq driver\n");
-+		goto release_dvfs_info_list;
-+	}
-+
-+	return 0;
-+
-+release_dvfs_info_list:
-+	list_for_each_safe(list, tmp, &dvfs_info_list) {
-+		info = list_entry(list, struct mtk_cpu_dvfs_info, list_head);
-+
-+		mtk_cpu_dvfs_info_release(info);
-+		list_del(list);
-+		kfree(info);
-+	}
- 
- 	return ret;
- }
--- 
-1.9.1
+CCs were acquired using (updated some email addresses):
+git shortlog -sne --no-merges arch/arm/boot/dts/vf???.dtsi
+
+CC: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+CC: Chao Fu <B44548@freescale.com>
+CC: Cory Tusar <cory.tusar@pid1solutions.com>
+CC: Cosmin Stoica <cosminstefan.stoica@freescale.com>
+CC: Frank Li <Frank.Li@freescale.com>
+CC: Fugang Duan <B38611@freescale.com>
+CC: Huang Shijie <b32955@freescale.com>
+CC: Jingchang Lu <jingchang.lu@freescale.com>
+CC: Lucas Stach <l.stach@pengutronix.de>
+CC: Sanchayan Maity <maitysanchayan@gmail.com>
+CC: Shawn Guo <shawnguo@kernel.org>
+CC: Stephen Warren <swarren@wwwdotorg.org>
+CC: Xiubo Li <Li.Xiubo@freescale.com>
+CC: Yuan Yao <yao.yuan@freescale.com>
+
+Acked-by: Yuan Yao <yao.yuan@freescale.com>
+
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/boot/dts/vf500.dtsi | 40 ++++++++++++++++++++++++++++++++++++----
+ arch/arm/boot/dts/vf610.dtsi | 40 ++++++++++++++++++++++++++++++++++++----
+ arch/arm/boot/dts/vfxxx.dtsi | 40 ++++++++++++++++++++++++++++++++++++----
+ 3 files changed, 108 insertions(+), 12 deletions(-)
