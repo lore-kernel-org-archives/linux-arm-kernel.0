@@ -1,95 +1,45 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Fri, 04 Dec 2015 16:07:57 -0800
-Subject: [PATCH 6/8] ARM: dts: rockchip: add clock-cells for usb phy nodes
-In-Reply-To: <1446673454-9529-7-git-send-email-heiko@sntech.de>
-References: <1446673454-9529-1-git-send-email-heiko@sntech.de>
- <1446673454-9529-7-git-send-email-heiko@sntech.de>
-Message-ID: <56622add5458d_650d3fc0582a72d87e@quark.notmuch>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 05 Dec 2015 01:53:38 +0100
+Subject: [GIT PULL 1/3] rockchip soc changes for 4.5
+Message-ID: <1936935.FVZdWRYuBf@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko Stuebner wrote:
-> Add the #clock-cells properties for the usbphy nodes as they
-> provide the pll-clocks now.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Hi Arnd, Kevin, Olof,
 
-Reviewed-by: Michael Turquette <mturquette@baylibre.com>
+please find below rockchip soc changes for 4.5 .
 
-> ---
->  arch/arm/boot/dts/rk3066a.dtsi | 2 ++
->  arch/arm/boot/dts/rk3188.dtsi  | 2 ++
->  arch/arm/boot/dts/rk3288.dtsi  | 3 +++
->  3 files changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-> index 946f187..3e4b41b 100644
-> --- a/arch/arm/boot/dts/rk3066a.dtsi
-> +++ b/arch/arm/boot/dts/rk3066a.dtsi
-> @@ -181,6 +181,7 @@
->  			reg = <0x17c>;
->  			clocks = <&cru SCLK_OTGPHY0>;
->  			clock-names = "phyclk";
-> +			#clock-cells = <0>;
->  		};
->  
->  		usbphy1: usb-phy1 {
-> @@ -188,6 +189,7 @@
->  			reg = <0x188>;
->  			clocks = <&cru SCLK_OTGPHY1>;
->  			clock-names = "phyclk";
-> +			#clock-cells = <0>;
->  		};
->  	};
->  
-> diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-> index 6399942..48a287e 100644
-> --- a/arch/arm/boot/dts/rk3188.dtsi
-> +++ b/arch/arm/boot/dts/rk3188.dtsi
-> @@ -156,6 +156,7 @@
->  			reg = <0x10c>;
->  			clocks = <&cru SCLK_OTGPHY0>;
->  			clock-names = "phyclk";
-> +			#clock-cells = <0>;
->  		};
->  
->  		usbphy1: usb-phy1 {
-> @@ -163,6 +164,7 @@
->  			reg = <0x11c>;
->  			clocks = <&cru SCLK_OTGPHY1>;
->  			clock-names = "phyclk";
-> +			#clock-cells = <0>;
->  		};
->  	};
->  
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index c64a116..51a5d29 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -943,6 +943,7 @@
->  			reg = <0x320>;
->  			clocks = <&cru SCLK_OTGPHY0>;
->  			clock-names = "phyclk";
-> +			#clock-cells = <0>;
->  		};
->  
->  		usbphy1: usb-phy1 {
-> @@ -950,6 +951,7 @@
->  			reg = <0x334>;
->  			clocks = <&cru SCLK_OTGPHY1>;
->  			clock-names = "phyclk";
-> +			#clock-cells = <0>;
->  		};
->  
->  		usbphy2: usb-phy2 {
-> @@ -957,6 +959,7 @@
->  			reg = <0x348>;
->  			clocks = <&cru SCLK_OTGPHY2>;
->  			clock-names = "phyclk";
-> +			#clock-cells = <0>;
->  		};
->  	};
->  
-> -- 
-> 2.6.2
-> 
+There exists one possible merge conflict with armsoc/cleanup, due to the newly
+added const/__initconst attributes in the smp_operations.
+
+But I've already also adapted the new smp operation struct accordingly.
+
+
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.5-rockchip-soc
+
+for you to fetch changes up to 24fdb345d7a9e1ee8dc6fe138a250c63f918fed5:
+
+  ARM: rockchip: use const and __initconst for rk3036 smp_operations (2015-12-04 18:36:02 +0100)
+
+----------------------------------------------------------------
+SMP special case for the rk3036 and making sure the arch-timer
+supply is enabled, similar to the rk3288.
+
+----------------------------------------------------------------
+Heiko Stuebner (2):
+      ARM: rockchip: add support smp for rk3036
+      ARM: rockchip: use const and __initconst for rk3036 smp_operations
+
+Xing Zheng (1):
+      ARM: rockchip: make sure timer5 is enabled on rk3036 platforms
+
+ Documentation/devicetree/bindings/arm/cpus.txt |  1 +
+ arch/arm/mach-rockchip/platsmp.c               | 45 +++++++++++++++++++-------
+ arch/arm/mach-rockchip/rockchip.c              | 44 +++++++++++++++----------
+ 3 files changed, 61 insertions(+), 29 deletions(-)
