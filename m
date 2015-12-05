@@ -1,37 +1,90 @@
-From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Sat, 5 Dec 2015 09:25:25 +0800
-Subject: [PATCH v2 03/10] drm/hisilicon: Add hisilicon DRM master driver
-In-Reply-To: <CAL_Jsq+cr7sQ1eus8Yi-mCMDq9PCZbFTSoPqt9P4a_m-JGKo0g@mail.gmail.com>
-References: <1448707145-69348-1-git-send-email-xinliang.liu@linaro.org>
- <1448707145-69348-4-git-send-email-xinliang.liu@linaro.org>
- <CAL_Jsq+cr7sQ1eus8Yi-mCMDq9PCZbFTSoPqt9P4a_m-JGKo0g@mail.gmail.com>
-Message-ID: <CAGd==06=v52p+NeHUH_0WHBTmaN4QMtswY7B+T3LaS8qOSyc6A@mail.gmail.com>
+From: chunfeng.yun@mediatek.com (chunfeng yun)
+Date: Sat, 5 Dec 2015 11:12:43 +0800
+Subject: [PATCH] usb: xhci-mtk: fix AHB bus hang up caused by roothubs
+ polling
+In-Reply-To: <56619410.4000705@cogentembedded.com>
+References: <1449196807-31785-1-git-send-email-chunfeng.yun@mediatek.com>
+ <56619410.4000705@cogentembedded.com>
+Message-ID: <1449285163.11314.5.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 December 2015 at 00:21, Rob Herring <robh@kernel.org> wrote:
-> On Sat, Nov 28, 2015 at 4:38 AM, Xinliang Liu <xinliang.liu@linaro.org> wrote:
->> Add DRM master driver for hi6220 SoC which used in HiKey board.
->> Add dumb buffer feature.
->> Add prime dmabuf feature.
->>
->> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
->> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
->> Signed-off-by: Andy Green <andy.green@linaro.org>
->> ---
->
->> +static int hisi_gem_cma_dumb_create(struct drm_file *file,
->> +                                   struct drm_device *dev,
->> +                                   struct drm_mode_create_dumb *args)
->> +{
->> +       int min_pitch = DIV_ROUND_UP(args->width * args->bpp, 8);
->
-> BTW, is args->bpp supposed to be bits or bytes? I'm using your dumb bo
-> support in drm_gralloc which does bytes as that is what
-> gralloc_drm_get_bpp returns. The virtio-gpu driver does bits. I'm
-> guessing bits is correct.
+Hi,
+On Fri, 2015-12-04 at 16:24 +0300, Sergei Shtylyov wrote:
+> Hello.
+> 
+>     Sorry for the grammar nitpicking but since it's in the comments, I felt 
+> the necessity to comment.
+> 
+> On 12/4/2015 5:40 AM, Chunfeng Yun wrote:
+> 
+> > when ip fail to enter sleep mode, register access protection will
+> 
+>     Fails.
+> 
+> > be disabed, at the same time if all clocks are disabled, access
+>       ^^^^^^^ disabled
+> 
+> > register will hang up AHB bus.
+> > the common case causes ip sleep fail is that after all ports enter
+> 
+>     Failure.
+> 
+> > U3 but before ip enters sleep mode, a port receives a resume
+> > signal('K'). this will happens when such as clicks mouse to try to
+> > do remote wakeup to stop system enter suspend.
+> 
+>     Wake up.
+> 
+> > so stop polling roothubs to avoid access xHCI register on bus
+> 
+>     Root hubs. Accessing.
+> 
+> > suspend, and restart it when bus resume.
+> 
+>     Resumes. Or "is resumed", maybe?
+> 
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > ---
+> >   drivers/usb/host/xhci-mtk.c | 23 +++++++++++++++++++++++
+> >   1 file changed, 23 insertions(+)
+> >
+> > diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+> > index c9ab6a4..38635fb 100644
+> > --- a/drivers/usb/host/xhci-mtk.c
+> > +++ b/drivers/usb/host/xhci-mtk.c
+> > @@ -696,9 +696,24 @@ static int xhci_mtk_remove(struct platform_device *dev)
+> >   }
+> >
+> >   #ifdef CONFIG_PM_SLEEP
+> > +/*
+> > + * if ip sleep fail, and all clocks are disabled, access register will hang
+> 
+>     Fails.
+> 
+> > + * AHB bus, so stop poll roothubs to avoid regs access on bus suspend.
+> 
+>     Polling.
+> 
+> > + * and no need to check whether ip sleep fail or not; this will cause SPM to
+> 
+>     Failed.
+> 
+> > + * wakeup system immediately after system suspend complete if ip sleep
+> 
+>     Wake up.
+> 
+> > + * fail, it is what we wanted.
+> 
+>     Fails.
+> 
 
-yes, it is bits. And pitch is bytes.
+I do need to pay more attention to the grammar from now on.
 
->
-> Rob
+Thanks a lot
+
+> > + */
+> [...]
+> 
+> MBR, Sergei
+> 
