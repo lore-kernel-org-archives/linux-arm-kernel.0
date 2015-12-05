@@ -1,74 +1,37 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Sat, 5 Dec 2015 11:16:45 +0800
-Subject: [PATCH v2] usb: xhci-mtk: fix AHB bus hang up caused by roothubs
- polling
-Message-ID: <1449285405-12015-1-git-send-email-chunfeng.yun@mediatek.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Sat, 5 Dec 2015 09:24:44 +0530
+Subject: [PATCH v3 0/10] cpufreq: add generic cpufreq driver support for
+ Exynos542x/5800 platforms
+In-Reply-To: <1449250235-9613-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1449250235-9613-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <20151205035444.GR3430@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-when ip fails to enter sleep mode, register access protection will
-be disabled, at the same time if all clocks are disabled, access
-register will hang up AHB bus.
-the common case causes ip sleep failure is that after all ports
-enter U3 but before ip enters sleep mode, a port receives a resume
-signal('K'). this will happens when such as clicks mouse to try to
-do remote-wakeup to stop system enter suspend.
-so stop polling root hubs to avoid access xHCI register on bus
-suspend, and restart it when bus resumes.
+On 04-12-15, 18:30, Bartlomiej Zolnierkiewicz wrote:
+> Hi,
+> 
+> This patch series adds generic arm_big_little_dt cpufreq driver
+> support for Exynos542x/5800 (using the new CPU clock type which
+> allows it).  It also:
+> - enhances arm_big_little[_dt] driver with CPU cluster regulator
+>   support
+> - adds CPU clock configuration data and CPU operating points
+>   setup for Exynos542x/5800
+> - adds CPU cluster regulator supplies for Exynos542x/5800 boards
+> 
+> This patch series has been tested on Exynos5422 based ODROID-XU3
+> Lite board.
+> 
+> Please note that this is not a final version of the patchset.
+> I just wanted to push out current work-in-progress patches that
+> integrate changes from Anand, Ben and me.
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/usb/host/xhci-mtk.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+What's going on guys, Ben tried exactly same thing few days back:
 
-diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-index c9ab6a4..9532f5a 100644
---- a/drivers/usb/host/xhci-mtk.c
-+++ b/drivers/usb/host/xhci-mtk.c
-@@ -696,9 +696,24 @@ static int xhci_mtk_remove(struct platform_device *dev)
- }
- 
- #ifdef CONFIG_PM_SLEEP
-+/*
-+ * if ip sleep fails, and all clocks are disabled, access register will hang
-+ * AHB bus, so stop polling roothubs to avoid regs access on bus suspend.
-+ * and no need to check whether ip sleep failed or not; this will cause SPM
-+ * to wake up system immediately after system suspend complete if ip sleep
-+ * fails, it is what we wanted.
-+ */
- static int xhci_mtk_suspend(struct device *dev)
- {
- 	struct xhci_hcd_mtk *mtk = dev_get_drvdata(dev);
-+	struct usb_hcd *hcd = mtk->hcd;
-+	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
-+
-+	xhci_dbg(xhci, "%s: stop port polling\n", __func__);
-+	clear_bit(HCD_FLAG_POLL_RH, &hcd->flags);
-+	del_timer_sync(&hcd->rh_timer);
-+	clear_bit(HCD_FLAG_POLL_RH, &xhci->shared_hcd->flags);
-+	del_timer_sync(&xhci->shared_hcd->rh_timer);
- 
- 	xhci_mtk_host_disable(mtk);
- 	xhci_mtk_phy_power_off(mtk);
-@@ -710,11 +725,19 @@ static int xhci_mtk_suspend(struct device *dev)
- static int xhci_mtk_resume(struct device *dev)
- {
- 	struct xhci_hcd_mtk *mtk = dev_get_drvdata(dev);
-+	struct usb_hcd *hcd = mtk->hcd;
-+	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
- 
- 	usb_wakeup_disable(mtk);
- 	xhci_mtk_clks_enable(mtk);
- 	xhci_mtk_phy_power_on(mtk);
- 	xhci_mtk_host_enable(mtk);
-+
-+	xhci_dbg(xhci, "%s: restart port polling\n", __func__);
-+	set_bit(HCD_FLAG_POLL_RH, &hcd->flags);
-+	usb_hcd_poll_rh_status(hcd);
-+	set_bit(HCD_FLAG_POLL_RH, &xhci->shared_hcd->flags);
-+	usb_hcd_poll_rh_status(xhci->shared_hcd);
- 	return 0;
- }
- 
+http://marc.info/?l=linux-kernel&m=144909193925508&w=2
+
+And the comments given there applies to you as well.
+
 -- 
-1.8.1.1.dirty
+viresh
