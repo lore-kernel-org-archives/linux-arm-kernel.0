@@ -1,66 +1,51 @@
 From: anton.bondarenko.sama@gmail.com (Anton Bondarenko)
-Date: Sat,  5 Dec 2015 17:57:06 +0100
-Subject: [PATCH v5 08/11] spi: imx: allow only WML aligned transfers to use DMA
+Date: Sat,  5 Dec 2015 17:57:02 +0100
+Subject: [PATCH v5 04/11] spi: imx: add function to check for IMX51 family
+ controller
 In-Reply-To: <1449334629-4715-1-git-send-email-anton.bondarenko.sama@gmail.com>
 References: <1449334629-4715-1-git-send-email-anton.bondarenko.sama@gmail.com>
-Message-ID: <1449334629-4715-9-git-send-email-anton.bondarenko.sama@gmail.com>
+Message-ID: <1449334629-4715-5-git-send-email-anton.bondarenko.sama@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RX DMA tail data handling doesn't work correctly in many cases with current
-implementation. It happens because SPI core was setup to generates both RX
-and RX TAIL events. And RX TAIL event does not work correctly.
-This can be easily verified by sending SPI transaction with size modulus
-WML(32 in our case) not equal 0.
-
-Also removing change introduced in f6ee9b582d2db652497b73c1f117591dfb6d3a90
-since this change only fix usecases with transfer size from 33 to 128 bytes
-and does not fix 129 bytes etc.
-
-This is output from transaction with len 138 bytes in loopback mode at 10Mhz:
-TX0000: a3 97 a2 55 53 be f1 fc f9 79 6b 52 14 13 e9 e2
-TX0010: 2d 51 8e 1f 56 08 57 27 a7 05 d4 d0 52 82 77 75
-TX0020: 1b 99 4a ed 58 3d 6a 52 36 d5 24 4a 68 8e ad 95
-TX0030: 5f 3c 35 b5 c4 8c dd 6c 11 32 3d e2 b4 b4 59 cf
-TX0040: ce 23 3d 27 df a7 f9 96 fc 1e e0 66 2c 0e 7b 8c
-TX0050: ca 30 42 8f bc 9f 7b ce d1 b8 b1 87 ec 8a d6 bb
-TX0060: 2e 15 63 0e 3c dc a4 3a 7a 06 20 a7 93 1b 34 dd
-TX0070: 4c f5 ec 88 96 68 d6 68 a0 09 6f 8e 93 47 c9 41
-TX0080: db ac cf 97 89 f3 51 05 79 71
-
-RX0000: a3 97 a2 55 53 be f1 fc f9 79 6b 52 14 13 e9 e2
-RX0010: 2d 51 8e 1f 56 08 57 27 a7 05 d4 d0 52 82 77 75
-RX0020: 1b 99 4a ed 58 3d 6a 52 36 d5 24 4a 68 8e ad 95
-RX0030: 5f 3c 35 00 00 b5 00 00 00 c4 00 00 8c 00 00 dd
-RX0040: 6c 11 32 3d e2 b4 b4 59 cf ce 23 3d 27 df a7 f9
-RX0050: 96 fc 1e e0 66 2c 0e 7b 8c ca 30 42 8f 1f 1f bc
-RX0060: 9f 7b ce d1 b8 b1 87 ec 8a d6 bb 2e 15 63 0e ed
-RX0070: ed 3c 58 58 58 dc 3d 3d a4 6a 6a 3a 52 52 7a 36
-RX0080: 06 20 a7 93 1b 34 dd 4c f5 ec
-
-Zeros at offset 33 and 34 caused by reading empty RX FIFO which not possible
-if DMA RX read was triggered by RX event. This mean DMA was triggered
-by RX TAIL event.
+Similar to other controller type checks add check function for
+IMX51. It includes IMX53 and IMX6.
 
 Signed-off-by: Anton Bondarenko <anton.bondarenko.sama@gmail.com>
 ---
- drivers/spi/spi-imx.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/spi/spi-imx.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index fa24637..7a68c62 100644
+index f811f68..363276d 100644
 --- a/drivers/spi/spi-imx.c
 +++ b/drivers/spi/spi-imx.c
-@@ -204,8 +204,8 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
- {
- 	struct spi_imx_data *spi_imx = spi_master_get_devdata(master);
- 
--	if (spi_imx->dma_is_inited &&
--	    transfer->len > spi_imx->wml * sizeof(u32))
-+	if (spi_imx->dma_is_inited && transfer->len > spi_imx->wml &&
-+	    (transfer->len % spi_imx->wml) == 0)
- 		return true;
- 	return false;
+@@ -122,9 +122,14 @@ static inline int is_imx35_cspi(struct spi_imx_data *d)
+ 	return d->devtype_data->devtype == IMX35_CSPI;
  }
+ 
++static inline int is_imx51_ecspi(struct spi_imx_data *d)
++{
++	return d->devtype_data->devtype == IMX51_ECSPI;
++}
++
+ static inline unsigned spi_imx_get_fifosize(struct spi_imx_data *d)
+ {
+-	return (d->devtype_data->devtype == IMX51_ECSPI) ? 64 : 8;
++	return is_imx51_ecspi(d) ? 64 : 8;
+ }
+ 
+ #define MXC_SPI_BUF_RX(type)						\
+@@ -1199,8 +1204,8 @@ static int spi_imx_probe(struct platform_device *pdev)
+ 	 * Only validated on i.mx6 now, can remove the constrain if validated on
+ 	 * other chips.
+ 	 */
+-	if (spi_imx->devtype_data == &imx51_ecspi_devtype_data
+-	    && spi_imx_sdma_init(&pdev->dev, spi_imx, master, res))
++	if (is_imx51_ecspi(spi_imx) &&
++	    spi_imx_sdma_init(&pdev->dev, spi_imx, master, res))
+ 		dev_err(&pdev->dev, "dma setup error,use pio instead\n");
+ 
+ 	spi_imx->devtype_data->reset(spi_imx);
 -- 
 2.6.3
