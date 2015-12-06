@@ -1,108 +1,61 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Sat, 05 Dec 2015 16:18:44 -0800
-Subject: [PATCH v2] ahci: compile out msi/msix infrastructure
-Message-ID: <20151206001323.35162.30974.stgit@dwillia2-desk3.jf.intel.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 6 Dec 2015 08:44:50 +0800
+Subject: [PATCH v5 2/2] drm/bridge: Add I2C based driver for ps8640 bridge
+In-Reply-To: <1448272793-27232-2-git-send-email-jitao.shi@mediatek.com>
+Message-ID: <201512060814.Fqi6eJfv%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Arnd:
-    The AHCI driver is used for some on-chip devices that do not use PCI
-    for probing, and it can be built even when CONFIG_PCI is disabled, but
-    that now results in a build failure:
+Hi Jitao,
 
-    ata/libahci.c: In function 'ahci_host_activate_multi_irqs':
-    ata/libahci.c:2475:4: error: invalid use of undefined type 'struct msix_entry'
-    ata/libahci.c:2475:21: error: dereferencing pointer to incomplete type 'struct msix_entry'
+[auto build test ERROR on drm/drm-next]
+[also build test ERROR on v4.4-rc3 next-20151203]
 
-Add ifdef CONFIG_PCI_MSI infrastructure to compile out the mutli-msi and
-multi-msix code.
+url:    https://github.com/0day-ci/linux/commits/Jitao-Shi/Documentation-bridge-Add-documentation-for-ps8640-DT-properties/20151123-180220
+base:   git://people.freedesktop.org/~airlied/linux.git drm-next
+config: mips-allmodconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=mips 
 
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Tested--by: Arnd Bergmann <arnd@arndb.de>
-[arnd: fix up pci enabled case]
-Reported-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-Fixes: d684a90d38e2 ("ahci: per-port msix support")
-Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+All errors (new ones prefixed by >>):
+
+   drivers/gpu/drm/bridge/parade-ps8640.c: In function 'ps8640_prepare':
+>> drivers/gpu/drm/bridge/parade-ps8640.c:183:2: error: implicit declaration of function 'gpiod_set_value' [-Werror=implicit-function-declaration]
+     gpiod_set_value(ps_bridge->gpio_slp_n, 1);
+     ^
+   drivers/gpu/drm/bridge/parade-ps8640.c: In function 'ps8640_probe':
+>> drivers/gpu/drm/bridge/parade-ps8640.c:399:31: error: implicit declaration of function 'devm_gpiod_get' [-Werror=implicit-function-declaration]
+     ps_bridge->gpio_mode_sel_n = devm_gpiod_get(&client->dev, "mode-sel",
+                                  ^
+>> drivers/gpu/drm/bridge/parade-ps8640.c:400:11: error: 'GPIOD_OUT_HIGH' undeclared (first use in this function)
+              GPIOD_OUT_HIGH);
+              ^
+   drivers/gpu/drm/bridge/parade-ps8640.c:400:11: note: each undeclared identifier is reported only once for each function it appears in
+   cc1: some warnings being treated as errors
+
+vim +/gpiod_set_value +183 drivers/gpu/drm/bridge/parade-ps8640.c
+
+   177		err = regulator_enable(ps_bridge->pwr_3v3_supply);
+   178		if (err < 0) {
+   179			DRM_ERROR("failed to enable vdd33-supply: %d\n", err);
+   180			goto err_regulator_disable;
+   181		}
+   182	
+ > 183		gpiod_set_value(ps_bridge->gpio_slp_n, 1);
+   184		gpiod_set_value(ps_bridge->gpio_rst_n, 0);
+   185		usleep_range(500, 700);
+   186		gpiod_set_value(ps_bridge->gpio_rst_n, 1);
+
 ---
-
-Changes in v2:
-Arnd noticed that although I tested the CONFIG_PCI_MSI=n case on ARM, I
-neglected to re-test the CONFIG_PCI_MSI=y case.  All fixed up now.
-
- drivers/ata/ahci.h    |   26 ++++++++++++++++++++++++--
- drivers/ata/libahci.c |    7 +------
- 2 files changed, 25 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
-index 878470f9c3e2..a4faa438889c 100644
---- a/drivers/ata/ahci.h
-+++ b/drivers/ata/ahci.h
-@@ -35,6 +35,7 @@
- #ifndef _AHCI_H
- #define _AHCI_H
- 
-+#include <linux/pci.h>
- #include <linux/clk.h>
- #include <linux/libata.h>
- #include <linux/phy/phy.h>
-@@ -237,12 +238,18 @@ enum {
- 	AHCI_HFLAG_DELAY_ENGINE		= (1 << 15), /* do not start engine on
- 						        port start (wait until
- 						        error-handling stage) */
--	AHCI_HFLAG_MULTI_MSI		= (1 << 16), /* multiple PCI MSIs */
- 	AHCI_HFLAG_NO_DEVSLP		= (1 << 17), /* no device sleep */
- 	AHCI_HFLAG_NO_FBS		= (1 << 18), /* no FBS */
- 	AHCI_HFLAG_EDGE_IRQ		= (1 << 19), /* HOST_IRQ_STAT behaves as
- 							Edge Triggered */
--	AHCI_HFLAG_MULTI_MSIX		= (1 << 20), /* per-port MSI-X */
-+#ifdef CONFIG_PCI_MSI
-+	AHCI_HFLAG_MULTI_MSI		= (1 << 20), /* multiple PCI MSIs */
-+	AHCI_HFLAG_MULTI_MSIX		= (1 << 21), /* per-port MSI-X */
-+#else
-+	/* compile out MSI infrastructure */
-+	AHCI_HFLAG_MULTI_MSI		= 0,
-+	AHCI_HFLAG_MULTI_MSIX		= 0,
-+#endif
- 
- 	/* ap->flags bits */
- 
-@@ -355,6 +362,21 @@ struct ahci_host_priv {
- 	void			(*start_engine)(struct ata_port *ap);
- };
- 
-+#ifdef CONFIG_PCI_MSI
-+static inline int ahci_irq_vector(struct ahci_host_priv *hpriv, int port)
-+{
-+	if (hpriv->flags & AHCI_HFLAG_MULTI_MSIX)
-+		return hpriv->msix[port].vector;
-+	else
-+		return hpriv->irq + port;
-+}
-+#else
-+static inline int ahci_irq_vector(struct ahci_host_priv *hpriv, int port)
-+{
-+	return hpriv->irq;
-+}
-+#endif
-+
- extern int ahci_ignore_sss;
- 
- extern struct device_attribute *ahci_shost_attrs[];
-diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
-index 1b6c7cc415bf..eda3cf2163bb 100644
---- a/drivers/ata/libahci.c
-+++ b/drivers/ata/libahci.c
-@@ -2469,12 +2469,7 @@ static int ahci_host_activate_multi_irqs(struct ata_host *host,
- 	 */
- 	for (i = 0; i < host->n_ports; i++) {
- 		struct ahci_port_priv *pp = host->ports[i]->private_data;
--		int irq;
--
--		if (hpriv->flags & AHCI_HFLAG_MULTI_MSIX)
--			irq = hpriv->msix[i].vector;
--		else
--			irq = hpriv->irq + i;
-+		int irq = ahci_irq_vector(hpriv, i);
- 
- 		/* Do not receive interrupts sent by dummy ports */
- 		if (!pp) {
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 39669 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151206/d1adaf31/attachment-0001.obj>
