@@ -1,96 +1,127 @@
-From: boqun.feng@gmail.com (Boqun Feng)
-Date: Sun, 6 Dec 2015 16:16:17 +0800
-Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
- concurrent lockers
-In-Reply-To: <20151203172207.GR28602@linux.vnet.ibm.com>
-References: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
- <20151130155839.GK17308@twins.programming.kicks-ass.net>
- <20151201164035.GE27751@arm.com>
- <20151203001141.GO28602@linux.vnet.ibm.com>
- <20151203132839.GA3816@twins.programming.kicks-ass.net>
- <20151203163243.GI11337@arm.com>
- <20151203172207.GR28602@linux.vnet.ibm.com>
-Message-ID: <20151206081617.GB1549@fixme-laptop.cn.ibm.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sun, 6 Dec 2015 10:04:12 +0100
+Subject: [PATCH] clk: sunxi: Extend the simple gates and handle the
+ Allwinner H3
+Message-ID: <20151206100412.1a74b71da8e9ca28c6e61589@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+The H3 has a clock gate definition similar to the other Allwinner SoCs,
+but with a different parent clock for each single gate.
 
-On Thu, Dec 03, 2015 at 09:22:07AM -0800, Paul E. McKenney wrote:
-> On Thu, Dec 03, 2015 at 04:32:43PM +0000, Will Deacon wrote:
-> > Hi Peter, Paul,
-> > 
-> > Firstly, thanks for writing that up. I agree that you have something
-> > that can work in theory, but see below.
-> > 
-> > On Thu, Dec 03, 2015 at 02:28:39PM +0100, Peter Zijlstra wrote:
-> > > On Wed, Dec 02, 2015 at 04:11:41PM -0800, Paul E. McKenney wrote:
-> > > > This looks architecture-agnostic to me:
-> > > > 
-> > > > a.	TSO systems have smp_mb__after_unlock_lock() be a no-op, and
-> > > > 	have a read-only implementation for spin_unlock_wait().
-> > > > 
-> > > > b.	Small-scale weakly ordered systems can also have
-> > > > 	smp_mb__after_unlock_lock() be a no-op, but must instead
-> > > > 	have spin_unlock_wait() acquire the lock and immediately 
-> > > > 	release it, or some optimized implementation of this.
-> > > > 
-> > > > c.	Large-scale weakly ordered systems are required to define
-> > > > 	smp_mb__after_unlock_lock() as smp_mb(), but can have a
-> > > > 	read-only implementation of spin_unlock_wait().
-> > > 
-> > > This would still require all relevant spin_lock() sites to be annotated
-> > > with smp_mb__after_unlock_lock(), which is going to be a painful (no
-> > > warning when done wrong) exercise and expensive (added MBs all over the
-> > > place).
-> 
-> On the lack of warning, agreed, but please see below.  On the added MBs,
-> the only alternative I have been able to come up with has even more MBs,
-> as in on every lock acquisition.  If I am missing something, please do
-> not keep it a secret!
-> 
+Adding the names of the parent clocks in both the source and output clocks
+permits the use of the simple-gates driver to define the bus gates
+of all known Allwinner SoCs.
 
-Maybe we can treat this problem as a problem of data accesses other than
-one of locks?
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+This patch replaces a part of Jens Kuske's patch
+	[PATCH v5 1/4] clk: sunxi: Add H3 clocks support
+---
+ Documentation/devicetree/bindings/clock/sunxi.txt | 25 +++++++++++++++++++++++
+ drivers/clk/sunxi/clk-simple-gates.c              | 14 ++++++++++++-
+ 2 files changed, 38 insertions(+), 1 deletion(-)
 
-Let's take the example of tsk->flags in do_exit() and tsk->pi_lock, we
-don't need to add a full barrier for every lock acquisition of
-->pi_lock, because some critical sections of ->pi_lock don't access the
-PF_EXITING bit of ->flags at all. What we only need is to add a full
-barrier before reading the PF_EXITING bit in a critical section of
-->pi_lock. To achieve this, we could introduce a primitive like
-smp_load_in_lock():
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index 8a47b77..5736e6d 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -70,6 +70,7 @@ Required properties:
+ 	"allwinner,sun8i-a23-usb-clk" - for usb gates + resets on A23
+ 	"allwinner,sun9i-a80-usb-mod-clk" - for usb gates + resets on A80
+ 	"allwinner,sun9i-a80-usb-phy-clk" - for usb phy gates + resets on A80
++	"allwinner,sunxi-gates-clk" - simple gates
+ 
+ Required properties for all clocks:
+ - reg : shall be the control register address for the clock.
+@@ -93,6 +94,12 @@ The "allwinner,sun9i-a80-mmc-config-clk" clock also requires:
+ - #reset-cells : shall be set to 1
+ - resets : shall be the reset control phandle for the mmc block.
+ 
++The "allwinner,sunxi-gates-clk" clock also requires:
++- clock-names : corresponding names of the parent clocks
++when the output clocks have different parents.
++These names must be 4 characters long and must appear as a prefix in
++the names of the output clocks. See example.
++
+ For "allwinner,sun7i-a20-gmac-clk", the parent clocks shall be fixed rate
+ dummy clocks at 25 MHz and 125 MHz, respectively. See example.
+ 
+@@ -203,3 +210,21 @@ mmc_config_clk: clk at 01c13000 {
+ 	clock-output-names = "mmc0_config", "mmc1_config",
+ 			     "mmc2_config", "mmc3_config";
+ };
++
++bus_gates: clk at 01c20060 {
++	compatible = "allwinner,sunxi-gates-clk";
++	reg = <0x01c20060 0x14>;
++	clocks = <&ahb1>, <&ahb2>;
++	clock-names = "ahb1", "ahb2";
++	clock-indices = <5>, <6>, <8>,
++			<17>, <18>,
++			<26>, <27>,
++			<28>, <29>,
++			<128>, <135>;
++	clock-output-names = "ahb1_ce", "ahb1_dma", "ahb1_mmc0",
++			     "ahb2_emac", "ahb1_ts",
++			     "ahb1_ehci2", "ahb1_ehci3",
++			     "ahb1_otg_ohci0", "ahb2_ohci1",
++			     "ahb1_ephy", "ahb1_dbg";
++	};
++};
+diff --git a/drivers/clk/sunxi/clk-simple-gates.c b/drivers/clk/sunxi/clk-simple-gates.c
+index 0214c65..81c4cb0 100644
+--- a/drivers/clk/sunxi/clk-simple-gates.c
++++ b/drivers/clk/sunxi/clk-simple-gates.c
+@@ -29,12 +29,14 @@ static void __init sunxi_simple_gates_setup(struct device_node *node,
+ {
+ 	struct clk_onecell_data *clk_data;
+ 	const char *clk_parent, *clk_name;
++	char dyn_clk_parent[8];
+ 	struct property *prop;
+ 	struct resource res;
+ 	void __iomem *clk_reg;
+ 	void __iomem *reg;
+ 	const __be32 *p;
+ 	int number, i = 0, j;
++	bool parent_per_gate;
+ 	u8 clk_bit;
+ 	u32 index;
+ 
+@@ -42,7 +44,13 @@ static void __init sunxi_simple_gates_setup(struct device_node *node,
+ 	if (IS_ERR(reg))
+ 		return;
+ 
+-	clk_parent = of_clk_get_parent_name(node, 0);
++	parent_per_gate = of_clk_get_parent_count(node) != 1;
++	if (parent_per_gate) {
++		clk_parent = dyn_clk_parent;
++		dyn_clk_parent[4] = '\0';
++	} else {
++		clk_parent = of_clk_get_parent_name(node, 0);
++	}
+ 
+ 	clk_data = kmalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
+ 	if (!clk_data)
+@@ -58,6 +66,8 @@ static void __init sunxi_simple_gates_setup(struct device_node *node,
+ 	of_property_for_each_u32(node, "clock-indices", prop, p, index) {
+ 		of_property_read_string_index(node, "clock-output-names",
+ 					      i, &clk_name);
++		if (parent_per_gate)
++			strncpy(dyn_clk_parent, clk_name, 4);
+ 
+ 		clk_reg = reg + 4 * (index / 32);
+ 		clk_bit = index % 32;
+@@ -140,6 +150,8 @@ CLK_OF_DECLARE(sun9i_a80_apb0, "allwinner,sun9i-a80-apb0-gates-clk",
+ 	       sunxi_simple_gates_init);
+ CLK_OF_DECLARE(sun9i_a80_apb1, "allwinner,sun9i-a80-apb1-gates-clk",
+ 	       sunxi_simple_gates_init);
++CLK_OF_DECLARE(sunxi_gates, "allwinner,sunxi-gates-clk",sunxi-gates
++	       sunxi_simple_gates_init);
+ 
+ static const int sun4i_a10_ahb_critical_clocks[] __initconst = {
+ 	14,	/* ahb_sdram */
 
-(on PPC and ARM64v8)
-
-	#define smp_load_in_lock(x, lock) 		\
-		({ 					\
-			smp_mb();			\
-			READ_ONCE(x);			\
-		})
-
-(on other archs)
-	
-	#define smp_load_in_lock(x, lock) READ_ONCE(x)
-
-
-And call it every time we read a data which is not protected by the
-current lock critical section but whose updaters synchronize with the
-current lock critical section with spin_unlock_wait().
-
-I admit the name may be bad and the second parameter @lock is for a way
-to diagnosing the usage which I haven't come up with yet ;-)
-
-Thoughts?
-
-Regards,
-Boqun
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151206/8af81c71/attachment.sig>
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
