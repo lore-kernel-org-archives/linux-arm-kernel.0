@@ -1,68 +1,63 @@
-From: kapilh@broadcom.com (Kapil Hali)
-Date: Sun, 6 Dec 2015 23:59:28 +0530
-Subject: [PATCH v4 1/5] dt-bindings: add SMP enable-method for Broadcom NSP
-In-Reply-To: <CAL_JsqLQuXzLpFJj7b=_pPN1Tp66P2o69bytxGPHCQu30Qy_CQ@mail.gmail.com>
-References: <1448987049-17041-1-git-send-email-kapilh@broadcom.com>
- <1448987049-17041-2-git-send-email-kapilh@broadcom.com>
- <20151202152604.GA20467@rob-hp-laptop> <565F16F1.9070809@broadcom.com>
- <CAL_JsqLQuXzLpFJj7b=_pPN1Tp66P2o69bytxGPHCQu30Qy_CQ@mail.gmail.com>
-Message-ID: <56647E88.6040002@broadcom.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Sun, 6 Dec 2015 11:23:02 -0800
+Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
+ concurrent lockers
+In-Reply-To: <20151206073712.GA1549@fixme-laptop.cn.ibm.com>
+References: <20151201164035.GE27751@arm.com>
+ <20151203001141.GO28602@linux.vnet.ibm.com>
+ <20151203132839.GA3816@twins.programming.kicks-ass.net>
+ <20151203163243.GI11337@arm.com>
+ <20151203172207.GR28602@linux.vnet.ibm.com>
+ <20151204092110.GE17308@twins.programming.kicks-ass.net>
+ <20151204160706.GC28602@linux.vnet.ibm.com>
+ <20151204162453.GE15969@arm.com>
+ <20151204164446.GF28602@linux.vnet.ibm.com>
+ <20151206073712.GA1549@fixme-laptop.cn.ibm.com>
+Message-ID: <20151206192302.GS28602@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Sun, Dec 06, 2015 at 03:37:23PM +0800, Boqun Feng wrote:
+> Hi Paul,
+> 
+> On Fri, Dec 04, 2015 at 08:44:46AM -0800, Paul E. McKenney wrote:
+> > On Fri, Dec 04, 2015 at 04:24:54PM +0000, Will Deacon wrote:
+> > > On Fri, Dec 04, 2015 at 08:07:06AM -0800, Paul E. McKenney wrote:
+> > > > On Fri, Dec 04, 2015 at 10:21:10AM +0100, Peter Zijlstra wrote:
+> > > > > On Thu, Dec 03, 2015 at 09:22:07AM -0800, Paul E. McKenney wrote:
+> > > > > > >   2. Only PowerPC is going to see the (very occassional) failures, so
+> > > > > > >      testing this is nigh on impossible :(
+> > > > > > 
+> > > > > > Indeed, we clearly cannot rely on normal testing, witness rcutorture
+> > > > > > failing to find the missing smp_mb__after_unlock_lock() instances that
+> > > > > > Peter found by inspection.  So I believe that augmented testing is
+> > > > > > required, perhaps as suggested above.
+> > > > > 
+> > > > > To be fair, those were in debug code and non critical for correctness
+> > > > > per se. That is, at worst the debug print would've observed an incorrect
+> > > > > value.
+> > > > 
+> > > > True enough, but there is still risk from people repurposing debug code
+> > > > for non-debug uses.  Still, thank you, I don't feel -quite- so bad about
+> > > > rcutorture's failure to find these.  ;-)
+> > > 
+> > > It's the ones that it's yet to find that you should be worried about,
+> > > and the debug code is all fixed ;)
+> > 
+> > Fortunately, when Peter sent the patch fixing the debug-only
+> > cases, he also created wrapper functions for the various types of
+> > lock acquisition for rnp->lock.  Of course, the danger is that I
+> > might type "raw_spin_lock_irqsave(&rnp->lock, flags)" instead of
+> > "raw_spin_lock_irqsave_rcu_node(rnp, flags)" out of force of habit.
+> > So I must occasionally scan the RCU source code for "spin_lock.*->lock",
+> > which I just now did.  ;-)
+> 
+> Maybe you can rename ->lock of rnp to ->lock_acquired_on_your_own_risk
+> to avoid the force of habit ;-)
 
-On 12/6/2015 6:22 AM, Rob Herring wrote:
-> On Wed, Dec 2, 2015 at 10:06 AM, Kapil Hali <kapilh@broadcom.com> wrote:
->> Hi Rob,
->>
->> On 12/2/2015 8:56 PM, Rob Herring wrote:
->>> On Tue, Dec 01, 2015 at 11:24:05AM -0500, Kapil Hali wrote:
->>>> Add a compatible string "brcm,bcm-nsp-smp" for Broadcom's
->>>> Northstar Plus CPU to the 32-bit ARM CPU device tree binding
->>>> documentation file and create a new binding documentation for
->>>> Northstar Plus CPU.
->>>>
->>>> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
->>>> ---
->>>>  .../bindings/arm/bcm/brcm,nsp-cpu-method.txt       | 39 ++++++++++++++++++++++
->>>>  Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
->>>>  2 files changed, 40 insertions(+)
->>>>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
->>>> new file mode 100644
->>>> index 0000000..bf08872
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
->>>> @@ -0,0 +1,39 @@
->>>> +Broadcom Northstar Plus SoC CPU Enable Method
->>>> +---------------------------------------------
->>>> +This binding defines the enable method used for starting secondary
->>>> +CPUs in the following Broadcom SoCs:
->>>> +  BCM58522, BCM58525, BCM58535, BCM58622, BCM58623, BCM58625, BCM88312
->>>> +
->>>> +The enable method is specified by defining the following required
->>>> +properties in the "cpus" device tree node:
->>>> +  - enable-method = "brcm,bcm-nsp-smp";
->>>> +  - secondary-boot-reg = <...>;
->>>
->>> Both of these are supposed to be per cpu core.
->>
->> 'enable-method' if not found in 'cpu' node is looked at in the 'cpus'
->> node. Except for two-three SoC families, 'enable-method' is within
->> 'cpus' node. Is my interpretation incorrect? Did I miss anything here?
-> 
-> I'm not sure how you counted, but it is much more than 2-3 that are
-> correct (including all of PPC). It is quite mixed in dts files, but it
-> is documented to be per cpu node, so lets follow the documentation
-> please.
-> 
-> Rob
-> 
-I looked at arch/arm/* and not other arch types. But, as you said, let
-us keep it how it is in documentation and I have already updated latest
-patch set reflecting this change.
+Sold!  Though with a shorter alternate name...  And timing will be an
+issue.  Probably needs to go into the first post-v4.5 set (due to the
+high expected conflict rate), and probably needs to create wrappers for
+the spin_unlock functions.
 
-Thanks,
-Kapil
+							Thanx, Paul
