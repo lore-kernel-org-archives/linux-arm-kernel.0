@@ -1,35 +1,38 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 6 Dec 2015 11:07:41 +0100
-Subject: [PATCH v2 PART-RESEND 0/2] berlin sdhci clock clean up
-In-Reply-To: <564E3191.8060109@gmail.com>
-References: <1447671395-8023-1-git-send-email-jszhang@marvell.com>
- <564E3191.8060109@gmail.com>
-Message-ID: <566408ED.9040902@gmail.com>
+From: zhaoxiu.zeng@gmail.com (Zhaoxiu Zeng)
+Date: Sun,  6 Dec 2015 18:11:45 +0800
+Subject: [PATCH 02/10] brcmstb_gisb: Replace "hweight_long(mask) != 1" with
+ "!is_power_of_2(mask)"
+Message-ID: <1449396705-14235-1-git-send-email-zhaoxiu.zeng@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.11.2015 21:31, Sebastian Hesselbarth wrote:
-> On 16.11.2015 11:56, Jisheng Zhang wrote:
->> Add or fix the optional clock property, then remove the CLK_IGNORE_UNUSED
->> flag for sdio clk(s).
->>
->> This is a partialy resend of 
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/379457.html
->>
->> patch3, patch4 has been merged.
-> 
-> Great! Really!
-> 
-> As they have been taken without my Acked-by, ignoring my request to
-> _not_ remove the CLK_IGNORE_UNUSED flags _before_ these two, the
-> remaining patches now become fixes.
-> 
-> Please resend the patches with a proper description what and why they
-> are fixes now.
+From: Zeng Zhaoxiu <zhaoxiu.zeng@gmail.com>
 
-Is this going to be resolved anytime soon?
+Signed-off-by: Zeng Zhaoxiu <zhaoxiu.zeng@gmail.com>
+---
+ drivers/bus/brcmstb_gisb.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-If not, I am going to send a revert for the CLK_IGNORE_UNUSED patch
-and we start this from the beginning.
-
-Sebastian
+diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
+index f364fa4..2816a04 100644
+--- a/drivers/bus/brcmstb_gisb.c
++++ b/drivers/bus/brcmstb_gisb.c
+@@ -24,6 +24,7 @@
+ #include <linux/of.h>
+ #include <linux/bitops.h>
+ #include <linux/pm.h>
++#include <linux/log2.h>
+ 
+ #ifdef CONFIG_ARM
+ #include <asm/bug.h>
+@@ -171,7 +172,7 @@ brcmstb_gisb_master_to_str(struct brcmstb_gisb_arb_device *gdev,
+ {
+ 	u32 mask = gdev->valid_mask & masters;
+ 
+-	if (hweight_long(mask) != 1)
++	if (!is_power_of_2(mask))
+ 		return NULL;
+ 
+ 	return gdev->master_names[ffs(mask) - 1];
+-- 
+2.5.0
