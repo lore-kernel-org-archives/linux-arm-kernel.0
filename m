@@ -1,97 +1,48 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Sun, 6 Dec 2015 11:27:34 -0800
-Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
- concurrent lockers
-In-Reply-To: <20151206081617.GB1549@fixme-laptop.cn.ibm.com>
-References: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
- <20151130155839.GK17308@twins.programming.kicks-ass.net>
- <20151201164035.GE27751@arm.com>
- <20151203001141.GO28602@linux.vnet.ibm.com>
- <20151203132839.GA3816@twins.programming.kicks-ass.net>
- <20151203163243.GI11337@arm.com>
- <20151203172207.GR28602@linux.vnet.ibm.com>
- <20151206081617.GB1549@fixme-laptop.cn.ibm.com>
-Message-ID: <20151206192734.GT28602@linux.vnet.ibm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 06 Dec 2015 20:50:56 +0100
+Subject: [GIT PULL] LPC32xx DTS changes for v4.4
+In-Reply-To: <56641DCB.5080600@mleia.com>
+References: <1447863700-15681-1-git-send-email-vz@mleia.com>
+ <565B024A.2030704@mleia.com> <56641DCB.5080600@mleia.com>
+Message-ID: <3112069.RxjfiMKgHG@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 06, 2015 at 04:16:17PM +0800, Boqun Feng wrote:
-> Hi Paul,
-> 
-> On Thu, Dec 03, 2015 at 09:22:07AM -0800, Paul E. McKenney wrote:
-> > On Thu, Dec 03, 2015 at 04:32:43PM +0000, Will Deacon wrote:
-> > > Hi Peter, Paul,
-> > > 
-> > > Firstly, thanks for writing that up. I agree that you have something
-> > > that can work in theory, but see below.
-> > > 
-> > > On Thu, Dec 03, 2015 at 02:28:39PM +0100, Peter Zijlstra wrote:
-> > > > On Wed, Dec 02, 2015 at 04:11:41PM -0800, Paul E. McKenney wrote:
-> > > > > This looks architecture-agnostic to me:
-> > > > > 
-> > > > > a.	TSO systems have smp_mb__after_unlock_lock() be a no-op, and
-> > > > > 	have a read-only implementation for spin_unlock_wait().
-> > > > > 
-> > > > > b.	Small-scale weakly ordered systems can also have
-> > > > > 	smp_mb__after_unlock_lock() be a no-op, but must instead
-> > > > > 	have spin_unlock_wait() acquire the lock and immediately 
-> > > > > 	release it, or some optimized implementation of this.
-> > > > > 
-> > > > > c.	Large-scale weakly ordered systems are required to define
-> > > > > 	smp_mb__after_unlock_lock() as smp_mb(), but can have a
-> > > > > 	read-only implementation of spin_unlock_wait().
-> > > > 
-> > > > This would still require all relevant spin_lock() sites to be annotated
-> > > > with smp_mb__after_unlock_lock(), which is going to be a painful (no
-> > > > warning when done wrong) exercise and expensive (added MBs all over the
-> > > > place).
+On Sunday 06 December 2015 13:36:43 Vladimir Zapolskiy wrote:
+> On 29.11.2015 15:48, Vladimir Zapolskiy wrote:
+> > Hi Arnd,
 > > 
-> > On the lack of warning, agreed, but please see below.  On the added MBs,
-> > the only alternative I have been able to come up with has even more MBs,
-> > as in on every lock acquisition.  If I am missing something, please do
-> > not keep it a secret!
+> > On 18.11.2015 18:21, Vladimir Zapolskiy wrote:
+> >> Hi arm-soc team,
+> >>
+> >> Please consider pulling these DTS changes for the NXP LPC32xx
+> >> platform and related boards.
+> >>
+> >> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+> >>
+> >>   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   https://github.com/vzapolskiy/linux.git lpc32xx-dts
+> >>
+> >> for you to fetch changes up to aa29efb445f11506daca0db934331f144b38ddc4:
+> >>
+> >>   arm: dts: lpc32xx: move USB controller subdevices into own device node (2015-11-18 18:01:27 +0200)
 > > 
+> > this is an old reviewed series, I suppose it is too late to include it
+> > into v4.4, should I resend the same pull request for v4.5?
+> > 
+> > Or is it possible to merge it as is?
 > 
-> Maybe we can treat this problem as a problem of data accesses other than
-> one of locks?
-> 
-> Let's take the example of tsk->flags in do_exit() and tsk->pi_lock, we
-> don't need to add a full barrier for every lock acquisition of
-> ->pi_lock, because some critical sections of ->pi_lock don't access the
-> PF_EXITING bit of ->flags at all. What we only need is to add a full
-> barrier before reading the PF_EXITING bit in a critical section of
-> ->pi_lock. To achieve this, we could introduce a primitive like
-> smp_load_in_lock():
-> 
-> (on PPC and ARM64v8)
-> 
-> 	#define smp_load_in_lock(x, lock) 		\
-> 		({ 					\
-> 			smp_mb();			\
-> 			READ_ONCE(x);			\
-> 		})
-> 
-> (on other archs)
-> 	
-> 	#define smp_load_in_lock(x, lock) READ_ONCE(x)
-> 
-> 
-> And call it every time we read a data which is not protected by the
-> current lock critical section but whose updaters synchronize with the
-> current lock critical section with spin_unlock_wait().
-> 
-> I admit the name may be bad and the second parameter @lock is for a way
-> to diagnosing the usage which I haven't come up with yet ;-)
-> 
-> Thoughts?
+> Is there anything, what prevents this changes from being merged?
 
-In other words, dispense with smp_mb__after_unlock_lock() in those cases,
-and use smp_load_in_lock() to get the desired effect?
+I have them on my radar, this has been another time where we are slow
+to start merging things. I have merged a couple of other branches, but
+none of the  DT changes for any platform so far.
 
-If so, one concern is how to check for proper use of smp_load_in_lock().
-Another concern is redundant smp_mb() instances in case of multiple
-accesses to the data under a given critical section.
+I've just verified that the branch still merges fine into the current
+kernel, otherwise I'd ask you to resubmit it based on v4.4-rc1.
+We should really get to it this time in the next few days.
 
-Or am I missing your point?
-
-							Thanx, Paul
+	Arnd
