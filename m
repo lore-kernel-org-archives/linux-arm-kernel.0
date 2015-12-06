@@ -1,63 +1,56 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 6 Dec 2015 23:17:06 +0100
-Subject: [GIT PULL v2] at91: fixes for 4.4 #2
-Message-ID: <20151206221706.GA25252@piout.net>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Sun, 06 Dec 2015 23:28:26 +0000
+Subject: [PATCH v2 1/3] dt-bindings: add Marvell core PLL and clock divider
+ PMU documentation
+Message-ID: <E1a5ijC-0007pd-SL@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+Add documentation for the Marvell clock divider driver, which is used
+to source clocks for the AXI bus, video decoder, GPU and LCD blocks.
 
-As discussed with Arnd, there was an issue in the previous pinctrl
-selection which is necessary to get sama5d2 to work.
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ .../bindings/clock/dove-divider-clock.txt          | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/dove-divider-clock.txt
 
-That pull request replaces th previous one sent by Nicolas. His message
-was:
-
-"This is the second AT91 "fixes" for 4.4. This one allows the sama5d2 to
-properly boot with its PIO4 controller and use one of its main interfaces,
-with the 1.8 capable eMMC, on the sama5d2 Xplained reference platform."
-
-Thanks!
-
-The following changes since commit 50cb2efaa63bdfd4a68b94acc55a12e68d9c33d4:
-
-  MAINTAINERS: Atmel drivers: change NAND and ISI entries (2015-11-17 12:08:46 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-4.4-fixes-2
-
-for you to fetch changes up to 8423536fe453b3623f4ed7c2c3cca9b86af1ace5:
-
-  ARM: at91: fix pinctrl driver selection (2015-12-04 18:54:53 +0100)
-
-----------------------------------------------------------------
-Second fixes for 4.4:
-- fix of a hardware setup that prevents the sd/mmc interface to show up on
-  sama5d2.
-- proper selection of pinctrl drivers. PIO4 is necessary for the sama5d2 to
-  boot.
-
-----------------------------------------------------------------
-Ludovic Desroches (1):
-      ARM: at91: fix pinctrl driver selection
-
-Nicolas Ferre (1):
-      ARM: at91/dt: add always-on to 1.8V regulator
-
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 1 +
- arch/arm/mach-at91/Kconfig                  | 6 +++++-
- arch/arm/mach-at91/pm.c                     | 7 ++++++-
- 3 files changed, 12 insertions(+), 2 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/clock/dove-divider-clock.txt b/Documentation/devicetree/bindings/clock/dove-divider-clock.txt
+new file mode 100644
+index 000000000000..e3eb0f657c5e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/dove-divider-clock.txt
+@@ -0,0 +1,28 @@
++PLL divider based Dove clocks
++
++Marvell Dove has a 2GHz PLL, which feeds into a set of dividers to provide
++high speed clocks for a number of peripherals.  These dividers are part of
++the PMU, and thus this node should be a child of the PMU node.
++
++The following clocks are provided:
++
++ID	Clock
++-------------
++0	AXI bus clock
++1	GPU clock
++2	VMeta clock
++3	LCD clock
++
++Required properties:
++- compatible : shall be "marvell,dove-divider-clock"
++- reg : shall be the register address of the Core PLL and Clock Divider
++   Control 0 register.  This will cover that register, as well as the
++   Core PLL and Clock Divider Control 1 register.  Thus, it will have
++   a size of 8.
++- #clock-cells : from common clock binding; shall be set to 1
++
++divider_clk: core-clock at 0064 {
++	compatible = "marvell,dove-divider-clock";
++	reg = <0x0064 0x8>;
++	#clock-cells = <1>;
++};
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151206/7d76dd38/attachment-0001.sig>
+2.1.0
