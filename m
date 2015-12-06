@@ -1,119 +1,83 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sun, 06 Dec 2015 23:52:26 +0000
-Subject: [PATCH v2 2/3] soc: dove: add legacy support to PMU driver
-Message-ID: <E1a5j6Q-000879-GO@rmk-PC.arm.linux.org.uk>
+Date: Sun, 06 Dec 2015 23:52:21 +0000
+Subject: [PATCH v2 1/3] dt-bindings: add Marvell PMU documentation
+Message-ID: <E1a5j6L-000873-3P@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for legacy non-DT Dove to the PMU driver, so that we can
-transition the legacy support over.
+Add the required DT binding documentation for the Marvell PMU driver.
 
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
-This is a re-post of a previous patch, except I've split it into two to
-make the eventual removal of legacy Dove easier, as I believe Arnd will
-have some patches which touch legacy Dove which will conflict.  This
-makes it possible to revert this when the legacy Dove code is removed.
+Who takes these patches?  This never got merged when the PMU driver
+itself was merged.
 
- drivers/soc/Makefile         |  1 +
- drivers/soc/dove/pmu.c       | 43 +++++++++++++++++++++++++++++++++++++++++++
- include/linux/soc/dove/pmu.h | 18 ++++++++++++++++++
- 3 files changed, 62 insertions(+)
+ Documentation/devicetree/bindings/soc/dove/pmu.txt | 56 ++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/dove/pmu.txt
 
-diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-index 0b12d777d3c4..c99192f30679 100644
---- a/drivers/soc/Makefile
-+++ b/drivers/soc/Makefile
-@@ -2,6 +2,7 @@
- # Makefile for the Linux Kernel SOC specific device drivers.
- #
- 
-+obj-$(CONFIG_ARCH_DOVE)		+= dove/
- obj-$(CONFIG_MACH_DOVE)		+= dove/
- obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
- obj-$(CONFIG_ARCH_QCOM)		+= qcom/
-diff --git a/drivers/soc/dove/pmu.c b/drivers/soc/dove/pmu.c
-index 052aecf29893..429e32cab55a 100644
---- a/drivers/soc/dove/pmu.c
-+++ b/drivers/soc/dove/pmu.c
-@@ -305,6 +305,49 @@ static int __init dove_init_pmu_irq(struct pmu_data *pmu, int irq)
- 	return 0;
- }
- 
-+int __init dove_init_pmu_legacy(const struct dove_pmu_initdata *initdata)
-+{
-+	const struct dove_pmu_domain_initdata *domain_initdata;
-+	struct pmu_data *pmu;
-+	int ret;
+diff --git a/Documentation/devicetree/bindings/soc/dove/pmu.txt b/Documentation/devicetree/bindings/soc/dove/pmu.txt
+new file mode 100644
+index 000000000000..edd40b796b74
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/dove/pmu.txt
+@@ -0,0 +1,56 @@
++Device Tree bindings for Marvell PMU
 +
-+	pmu = kzalloc(sizeof(*pmu), GFP_KERNEL);
-+	if (!pmu)
-+		return -ENOMEM;
++Required properties:
++ - compatible: value should be "marvell,dove-pmu".
++    May also include "simple-bus" if there are child devices, in which
++    case the ranges node is required.
++ - reg: two base addresses and sizes of the PM controller and PMU.
++ - interrupts: single interrupt number for the PMU interrupt
++ - interrupt-controller: must be specified as the PMU itself is an
++    interrupt controller.
++ - #interrupt-cells: must be 1.
++ - #reset-cells: must be 1.
++ - domains: sub-node containing domain descriptions
 +
-+	spin_lock_init(&pmu->lock);
-+	pmu->pmc_base = initdata->pmc_base;
-+	pmu->pmu_base = initdata->pmu_base;
++Optional properties:
++ - ranges: defines the address mapping for child devices, as per the
++   standard property of this name.  Required when compatible includes
++   "simple-bus".
 +
-+	pmu_reset_init(pmu);
-+	for (domain_initdata = initdata->domains; domain_initdata->name;
-+	     domain_initdata++) {
-+		struct pmu_domain *domain;
++Power domain descriptions are listed as child nodes of the "domains"
++sub-node.  Each domain has the following properties:
 +
-+		domain = kzalloc(sizeof(*domain), GFP_KERNEL);
-+		if (domain) {
-+			domain->pmu = pmu;
-+			domain->pwr_mask = domain_initdata->pwr_mask;
-+			domain->rst_mask = domain_initdata->rst_mask;
-+			domain->iso_mask = domain_initdata->iso_mask;
-+			domain->base.name = domain_initdata->name;
++Required properties:
++ - #power-domain-cells: must be 0.
 +
-+			__pmu_domain_register(domain, NULL);
-+		}
-+	}
-+	pm_genpd_poweroff_unused();
++Optional properties:
++ - marvell,pmu_pwr_mask: specifies the mask value for PMU power register
++ - marvell,pmu_iso_mask: specifies the mask value for PMU isolation register
++ - resets: points to the reset manager (PMU node) and reset index.
 +
-+	ret = dove_init_pmu_irq(pmu, initdata->irq);
-+	if (ret)
-+		pr_err("dove_init_pmu_irq() failed: %d\n", ret);
++Example:
 +
-+	if (pmu->irq_domain)
-+		irq_domain_associate_many(pmu->irq_domain, IRQ_DOVE_PMU_START,
-+					  0, NR_PMU_IRQS);
++	pmu: power-management at d0000 {
++		compatible = "marvell,dove-pmu";
++		reg = <0xd0000 0x8000>, <0xd8000 0x8000>;
++		interrupts = <33>;
++		interrupt-controller;
++		#interrupt-cells = <1>;
++		#reset-cells = <1>;
 +
-+	return 0;
-+}
++		domains {
++			vpu_domain: vpu-domain {
++				#power-domain-cells = <0>;
++				marvell,pmu_pwr_mask = <0x00000008>;
++				marvell,pmu_iso_mask = <0x00000001>;
++				resets = <&pmu 16>;
++			};
 +
- /*
-  * pmu: power-manager at d0000 {
-  *	compatible = "marvell,dove-pmu";
-diff --git a/include/linux/soc/dove/pmu.h b/include/linux/soc/dove/pmu.h
-index 9c99f84bcc0e..431dfac595e7 100644
---- a/include/linux/soc/dove/pmu.h
-+++ b/include/linux/soc/dove/pmu.h
-@@ -1,6 +1,24 @@
- #ifndef LINUX_SOC_DOVE_PMU_H
- #define LINUX_SOC_DOVE_PMU_H
- 
-+#include <linux/types.h>
-+
-+struct dove_pmu_domain_initdata {
-+	u32 pwr_mask;
-+	u32 rst_mask;
-+	u32 iso_mask;
-+	const char *name;
-+};
-+
-+struct dove_pmu_initdata {
-+	void __iomem *pmc_base;
-+	void __iomem *pmu_base;
-+	int irq;
-+	const struct dove_pmu_domain_initdata *domains;
-+};
-+
-+int dove_init_pmu_legacy(const struct dove_pmu_initdata *);
-+
- int dove_init_pmu(void);
- 
- #endif
++			gpu_domain: gpu-domain {
++				#power-domain-cells = <0>;
++				marvell,pmu_pwr_mask = <0x00000004>;
++				marvell,pmu_iso_mask = <0x00000002>;
++				resets = <&pmu 18>;
++			};
++		};
++	};
 -- 
 2.1.0
