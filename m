@@ -1,75 +1,51 @@
 From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Sun, 6 Dec 2015 22:51:10 +0900
-Subject: [PATCH v8 4/4] arm64: switch to irq_stack during softirq
-In-Reply-To: <5661A5B0.3080504@arm.com>
+Date: Sun, 6 Dec 2015 22:56:15 +0900
+Subject: [PATCH v8 0/4] arm64: Add support for IRQ stack
+In-Reply-To: <1B79BF57-9B2D-49C2-9C09-48EF52BF2171@gmail.com>
 References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
- <1449226948-14251-5-git-send-email-james.morse@arm.com>
- <20151204140119.GL10123@e104818-lin.cambridge.arm.com>
- <5661A5B0.3080504@arm.com>
-Message-ID: <DD120C66-19BC-4667-97EA-3D47344A15CD@gmail.com>
+ <1B79BF57-9B2D-49C2-9C09-48EF52BF2171@gmail.com>
+Message-ID: <DE975D62-830B-43E4-ABC0-11F1B91E6D25@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Dec 4, 2015, at 11:39 PM, James Morse wrote:
-
-Hi James,
-
-> Hi Catalin,
+On Dec 4, 2015, at 9:17 PM, Jungseok Lee wrote:
+> On Dec 4, 2015, at 8:02 PM, James Morse wrote:
 > 
-> On 04/12/15 14:01, Catalin Marinas wrote:
->> On Fri, Dec 04, 2015 at 11:02:28AM +0000, James Morse wrote:
->>> +ENTRY(__do_softirq_on_irqstack)
->>> +	push	x19, lr
->>> +	push	x25, x26
->>> +
->>> +	irq_stack_entry lr
->>> +
->>> +	/* irq_stack_entry leaves irq_count in x25 */
->>> +	ldr	x1, [x25]
->>> +	add	x1, x1, #1
->>> +	str	x1, [x25]
->>> +
->>> +	bl	__do_softirq
->>> +
->>> +	ldr	x1, [x25]
->>> +	sub	x1, x1, #1
->>> +	str	x1, [x25]
->>> +
->>> +	irq_stack_exit
->>> +
->>> +	pop x25, x26
->>> +	pop x19, lr
->>> +	ret
->>> +ENDPROC(__do_softirq_on_irqstack)
+> Hi James,
+> 
+>> This consolidated series adds a per-cpu irq_stack, which will eventually allow
+>> us to reduce the size of task stacks.
 >> 
->> I was thinking of doing do_softirq_own_stack() entirely in assembly
->> without the need to check for on_irq_stack() check in C, just a test of
->> the irq_count value.
+>> Code in entry.S switches to the per-cpu irq_stack when irq_count is zero.
+>> This counter is updated in do_softirq_own_stack(), which is called before
+>> __do_softirq() re-enables interrupts, which could cause recursive use of the
+>> irq stack.
+>> 
+>> sp_el0 is used as a scratch register to store struct thread_info during el1
+>> execution, this means code to find it by masking the stack pointer no longer
+>> needs to be inlined. This also lets us remove the alignment requirements for
+>> the irq stack, (task stacks still need to be naturally aligned).
+>> 
+>> Patch 2 is a combination of Akashi Takahiro's 'arm64: unwind_frame for
+>> interrupt stack' and 'arm64: fix dump_backtrace() to show correct pt_regs at
+>> interrupt', both of which need to be present before irq_stack is enabled in
+>> Patch 3.
+>> 
+>> Patch 4 is new, following Catalin's comments, but I don't think it is
+>> necessary unless we also decrease the stack size, which I don't think we
+>> should do immediatly - it would be good to collect some max_stack_size values
+>> for various workloads first.
+>> 
+>> This series is based on the v4.4-rc3
+>> The series can be pulled from git://linux-arm.org/linux-jm.git -b irq_stack/v8
+>> 
+>> Comments welcome,
 > 
-> I tried that, but couldn't get it to work - maybe I'm missing a trick:
-> 
-> There are at least two ways into do_softirq_own_stack():
-> el1_irq() -> __irq_exit() -> do_softirq_own_stack(),
-> as well as:
-> cpu_switch_to(ksoftirqd) -> do_softirq_own_stack()
-> 
-> In both cases irq_count == 0 because do_softirq_own_stack() is where we
-> update irq_count [0]. I can only see two ways to tell them apart,
-> increment irq_count in el1_irq(), (which we don't like), or have that
-> bounds checking.
-> 
-> 
-> (We could increase hardirq_count() in el?_irq(), which would mean
-> in_irq()/in_interrupt() always returns true when on the irq_stack, which
-> would stop softirqs being processed here... but that is a fairly
-> significant change in behavior.)
+> At first glance, this series looks mature ;) I will leave feedbacks after playing
+> with this.
 
-It is not simple to utilize preempt_count which is based on task for stack
-switching based on core. Unluckily, I cannot give a specific challenge I've
-experienced.
-
->From implementation perspective, I think it is an advantage to use tpidr_el1
-for percpu variables. But, preempt_count based approach might not utilize it.
+I will hold off until the IRQ count management scheme is determined, which is
+an important design point.
 
 Best Regards
 Jungseok Lee
