@@ -1,589 +1,499 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sat, 5 Dec 2015 18:54:41 -0600
-Subject: [PATCH v5 2/4] pinctrl: sunxi: Add H3 PIO controller support
-In-Reply-To: <1449264283-25360-3-git-send-email-jenskuske@gmail.com>
-References: <1449264283-25360-1-git-send-email-jenskuske@gmail.com>
- <1449264283-25360-3-git-send-email-jenskuske@gmail.com>
-Message-ID: <20151206005441.GA27460@rob-hp-laptop>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 06 Dec 2015 04:16:15 +0200
+Subject: [PATCH v8 32/55] [media] media: use macros to check for V4L2
+ subdev entities
+In-Reply-To: <b94146f3b95e9adb08b11fffc896a9e747b2fa9c.1440902901.git.mchehab@osg.samsung.com>
+References: <cover.1440902901.git.mchehab@osg.samsung.com>
+ <b94146f3b95e9adb08b11fffc896a9e747b2fa9c.1440902901.git.mchehab@osg.samsung.com>
+Message-ID: <3216825.M3fFyKeUjZ@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2015 at 10:24:41PM +0100, Jens Kuske wrote:
-> The H3 uses the same pin controller as previous SoC's from Allwinner.
-> Add support for the pins controlled by the main PIO controller.
-> 
-> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
-> ---
->  .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
+Hi Mauro,
 
-For the binding:
+Thank you for the patch.
 
-Acked-by: Rob Herring <robh@kernel.org>
+On Sunday 30 August 2015 00:06:43 Mauro Carvalho Chehab wrote:
+> Instead of relying on media subtype, use the new macros to detect
+> if an entity is a subdev or an A/V DMA entity.
+> 
+> Please note that most drivers assume that there's just AV_DMA or
+> V4L2 subdevs. This is not true anymore, as we've added MC support
+> for DVB, and there are plans to add support for ALSA and FB/DRM
+> too.
+> 
+> Ok, on the current pipelines supported by those drivers, just V4L
+> stuff are there, but, assuming that some day a pipeline that also
+> works with other subsystems will ever added, it is better to add
+> explicit checks for the AV_DMA stuff.
+> 
+> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+> 
+> diff --git a/drivers/media/platform/exynos4-is/common.c
+> b/drivers/media/platform/exynos4-is/common.c index
+> 0eb34ecb8ee4..8c9a29e0e294 100644
+> --- a/drivers/media/platform/exynos4-is/common.c
+> +++ b/drivers/media/platform/exynos4-is/common.c
+> @@ -22,8 +22,7 @@ struct v4l2_subdev *fimc_find_remote_sensor(struct
+> media_entity *entity) while (pad->flags & MEDIA_PAD_FL_SINK) {
+>  		/* source pad */
+>  		pad = media_entity_remote_pad(pad);
+> -		if (pad == NULL ||
+> -		    media_entity_type(pad->entity) != MEDIA_ENT_T_V4L2_SUBDEV)
+> +		if (!pad || !is_media_entity_v4l2_subdev(pad->entity))
+>  			break;
+> 
+>  		sd = media_entity_to_v4l2_subdev(pad->entity);
+> diff --git a/drivers/media/platform/exynos4-is/fimc-capture.c
+> b/drivers/media/platform/exynos4-is/fimc-capture.c index
+> 0627a93b2f3b..e9810fee4c30 100644
+> --- a/drivers/media/platform/exynos4-is/fimc-capture.c
+> +++ b/drivers/media/platform/exynos4-is/fimc-capture.c
+> @@ -1141,8 +1141,7 @@ static int fimc_pipeline_validate(struct fimc_dev
+> *fimc) }
+>  		}
+> 
+> -		if (src_pad == NULL ||
+> -		    media_entity_type(src_pad->entity) != MEDIA_ENT_T_V4L2_SUBDEV)
+> +		if (!src_pad || !is_media_entity_v4l2_subdev(src_pad->entity))
+>  			break;
+> 
+>  		/* Don't call FIMC subdev operation to avoid nested locking */
+> @@ -1397,7 +1396,7 @@ static int fimc_link_setup(struct media_entity
+> *entity, struct fimc_vid_cap *vc = &fimc->vid_cap;
+>  	struct v4l2_subdev *sensor;
+> 
+> -	if (media_entity_type(remote->entity) != MEDIA_ENT_T_V4L2_SUBDEV)
+> +	if (!is_media_entity_v4l2_subdev(remote->entity))
+>  		return -EINVAL;
+> 
+>  	if (WARN_ON(fimc == NULL))
+> diff --git a/drivers/media/platform/exynos4-is/fimc-isp-video.c
+> b/drivers/media/platform/exynos4-is/fimc-isp-video.c index
+> 3d9ccbf5f10f..5fbaf5e39903 100644
+> --- a/drivers/media/platform/exynos4-is/fimc-isp-video.c
+> +++ b/drivers/media/platform/exynos4-is/fimc-isp-video.c
+> @@ -467,8 +467,7 @@ static int isp_video_pipeline_validate(struct fimc_isp
+> *isp)
+> 
+>  		/* Retrieve format at the source pad */
+>  		pad = media_entity_remote_pad(pad);
+> -		if (pad == NULL ||
+> -		    media_entity_type(pad->entity) != MEDIA_ENT_T_V4L2_SUBDEV)
+> +		if (!pad || !is_media_entity_v4l2_subdev(pad->entity))
+>  			break;
+> 
+>  		sd = media_entity_to_v4l2_subdev(pad->entity);
+> diff --git a/drivers/media/platform/exynos4-is/fimc-lite.c
+> b/drivers/media/platform/exynos4-is/fimc-lite.c index
+> b2607da4ad14..c2327147b360 100644
+> --- a/drivers/media/platform/exynos4-is/fimc-lite.c
+> +++ b/drivers/media/platform/exynos4-is/fimc-lite.c
+> @@ -814,8 +814,7 @@ static int fimc_pipeline_validate(struct fimc_lite
+> *fimc) }
+>  		/* Retrieve format at the source pad */
+>  		pad = media_entity_remote_pad(pad);
+> -		if (pad == NULL ||
+> -		    media_entity_type(pad->entity) != MEDIA_ENT_T_V4L2_SUBDEV)
+> +		if (!pad || !is_media_entity_v4l2_subdev(pad->entity))
+>  			break;
+> 
+>  		sd = media_entity_to_v4l2_subdev(pad->entity);
+> @@ -988,7 +987,6 @@ static int fimc_lite_link_setup(struct media_entity
+> *entity, {
+>  	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(entity);
+>  	struct fimc_lite *fimc = v4l2_get_subdevdata(sd);
+> -	unsigned int remote_ent_type = media_entity_type(remote->entity);
+>  	int ret = 0;
+> 
+>  	if (WARN_ON(fimc == NULL))
+> @@ -1000,7 +998,7 @@ static int fimc_lite_link_setup(struct media_entity
+> *entity,
+> 
+>  	switch (local->index) {
+>  	case FLITE_SD_PAD_SINK:
+> -		if (remote_ent_type != MEDIA_ENT_T_V4L2_SUBDEV) {
+> +		if (!is_media_entity_v4l2_subdev(remote->entity)) {
+>  			ret = -EINVAL;
+>  			break;
+>  		}
+> @@ -1018,7 +1016,7 @@ static int fimc_lite_link_setup(struct media_entity
+> *entity, case FLITE_SD_PAD_SOURCE_DMA:
+>  		if (!(flags & MEDIA_LNK_FL_ENABLED))
+>  			atomic_set(&fimc->out_path, FIMC_IO_NONE);
+> -		else if (remote_ent_type == MEDIA_ENT_T_DEVNODE)
+> +		else if (is_media_entity_v4l2_io(remote->entity))
+>  			atomic_set(&fimc->out_path, FIMC_IO_DMA);
+>  		else
+>  			ret = -EINVAL;
+> @@ -1027,7 +1025,7 @@ static int fimc_lite_link_setup(struct media_entity
+> *entity, case FLITE_SD_PAD_SOURCE_ISP:
+>  		if (!(flags & MEDIA_LNK_FL_ENABLED))
+>  			atomic_set(&fimc->out_path, FIMC_IO_NONE);
+> -		else if (remote_ent_type == MEDIA_ENT_T_V4L2_SUBDEV)
+> +		else if (is_media_entity_v4l2_subdev(remote->entity))
+>  			atomic_set(&fimc->out_path, FIMC_IO_ISP);
+>  		else
+>  			ret = -EINVAL;
+> diff --git a/drivers/media/platform/exynos4-is/media-dev.c
+> b/drivers/media/platform/exynos4-is/media-dev.c index
+> 92dbade2fffc..4a25df9dd869 100644
+> --- a/drivers/media/platform/exynos4-is/media-dev.c
+> +++ b/drivers/media/platform/exynos4-is/media-dev.c
+> @@ -88,8 +88,7 @@ static void fimc_pipeline_prepare(struct fimc_pipeline *p,
+> break;
+>  		}
+> 
+> -		if (pad == NULL ||
+> -		    media_entity_type(pad->entity) != MEDIA_ENT_T_V4L2_SUBDEV)
+> +		if (!pad || !is_media_entity_v4l2_subdev(pad->entity))
+>  			break;
+>  		sd = media_entity_to_v4l2_subdev(pad->entity);
+> 
+> @@ -1062,7 +1061,7 @@ static int __fimc_md_modify_pipelines(struct
+> media_entity *entity, bool enable) media_entity_graph_walk_start(&graph,
+> entity);
+> 
+>  	while ((entity = media_entity_graph_walk_next(&graph))) {
+> -		if (media_entity_type(entity) != MEDIA_ENT_T_DEVNODE)
+> +		if (!is_media_entity_v4l2_io(entity))
+>  			continue;
+> 
+>  		ret  = __fimc_md_modify_pipeline(entity, enable);
+> @@ -1076,7 +1075,7 @@ static int __fimc_md_modify_pipelines(struct
+> media_entity *entity, bool enable) media_entity_graph_walk_start(&graph,
+> entity_err);
+> 
+>  	while ((entity_err = media_entity_graph_walk_next(&graph))) {
+> -		if (media_entity_type(entity_err) != MEDIA_ENT_T_DEVNODE)
+> +		if (!is_media_entity_v4l2_io(entity_err))
+>  			continue;
+> 
+>  		__fimc_md_modify_pipeline(entity_err, !enable);
+> diff --git a/drivers/media/platform/omap3isp/isp.c
+> b/drivers/media/platform/omap3isp/isp.c index 69e7733d36cd..cb8ac90086c1
+> 100644
+> --- a/drivers/media/platform/omap3isp/isp.c
+> +++ b/drivers/media/platform/omap3isp/isp.c
+> @@ -691,7 +691,7 @@ static int isp_pipeline_pm_use_count(struct media_entity
+> *entity) media_entity_graph_walk_start(&graph, entity);
+> 
+>  	while ((entity = media_entity_graph_walk_next(&graph))) {
+> -		if (media_entity_type(entity) == MEDIA_ENT_T_DEVNODE)
+> +		if (is_media_entity_v4l2_io(entity))
+>  			use += entity->use_count;
+>  	}
+> 
+> @@ -714,7 +714,7 @@ static int isp_pipeline_pm_power_one(struct media_entity
+> *entity, int change) struct v4l2_subdev *subdev;
+>  	int ret;
+> 
+> -	subdev = media_entity_type(entity) == MEDIA_ENT_T_V4L2_SUBDEV
+> +	subdev = is_media_entity_v4l2_subdev(entity)
+>  	       ? media_entity_to_v4l2_subdev(entity) : NULL;
+> 
+>  	if (entity->use_count == 0 && change > 0 && subdev != NULL) {
+> @@ -754,7 +754,7 @@ static int isp_pipeline_pm_power(struct media_entity
+> *entity, int change) media_entity_graph_walk_start(&graph, entity);
+> 
+>  	while (!ret && (entity = media_entity_graph_walk_next(&graph)))
+> -		if (media_entity_type(entity) != MEDIA_ENT_T_DEVNODE)
+> +		if (is_media_entity_v4l2_subdev(entity))
+>  			ret = isp_pipeline_pm_power_one(entity, change);
+> 
+>  	if (!ret)
+> @@ -764,7 +764,7 @@ static int isp_pipeline_pm_power(struct media_entity
+> *entity, int change)
+> 
+>  	while ((first = media_entity_graph_walk_next(&graph))
+>  	       && first != entity)
+> -		if (media_entity_type(first) != MEDIA_ENT_T_DEVNODE)
+> +		if (is_media_entity_v4l2_subdev(first))
+>  			isp_pipeline_pm_power_one(first, -change);
+> 
+>  	return ret;
+> @@ -897,8 +897,7 @@ static int isp_pipeline_enable(struct isp_pipeline
+> *pipe, break;
+> 
+>  		pad = media_entity_remote_pad(pad);
+> -		if (pad == NULL ||
+> -		    media_entity_type(pad->entity) != MEDIA_ENT_T_V4L2_SUBDEV)
+> +		if (!pad || !is_media_entity_v4l2_subdev(pad->entity))
+>  			break;
+> 
+>  		entity = pad->entity;
+> @@ -988,8 +987,7 @@ static int isp_pipeline_disable(struct isp_pipeline
+> *pipe) break;
+> 
+>  		pad = media_entity_remote_pad(pad);
+> -		if (pad == NULL ||
+> -		    media_entity_type(pad->entity) != MEDIA_ENT_T_V4L2_SUBDEV)
+> +		if (!pad || !is_media_entity_v4l2_subdev(pad->entity))
+>  			break;
+> 
+>  		entity = pad->entity;
+> diff --git a/drivers/media/platform/omap3isp/ispvideo.c
+> b/drivers/media/platform/omap3isp/ispvideo.c index
+> 4c367352b1f7..52843ac2a9ca 100644
+> --- a/drivers/media/platform/omap3isp/ispvideo.c
+> +++ b/drivers/media/platform/omap3isp/ispvideo.c
+> @@ -210,8 +210,7 @@ isp_video_remote_subdev(struct isp_video *video, u32
+> *pad)
+> 
+>  	remote = media_entity_remote_pad(&video->pad);
+> 
+> -	if (remote == NULL ||
+> -	    media_entity_type(remote->entity) != MEDIA_ENT_T_V4L2_SUBDEV)
+> +	if (!remote || !is_media_entity_v4l2_subdev(remote->entity))
+>  		return NULL;
+> 
+>  	if (pad)
+> @@ -243,7 +242,7 @@ static int isp_video_get_graph_data(struct isp_video
+> *video, if (entity == &video->video.entity)
+>  			continue;
+> 
+> -		if (media_entity_type(entity) != MEDIA_ENT_T_DEVNODE)
+> +		if (!is_media_entity_v4l2_io(entity))
+>  			continue;
+> 
+>  		__video = to_isp_video(media_entity_to_video_device(entity));
+> @@ -917,7 +916,7 @@ static int isp_video_check_external_subdevs(struct
+> isp_video *video, return -EINVAL;
+>  	}
+> 
+> -	if (media_entity_type(source) != MEDIA_ENT_T_V4L2_SUBDEV)
+> +	if (!is_media_entity_v4l2_subdev(source))
+>  		return 0;
+> 
+>  	pipe->external = media_entity_to_v4l2_subdev(source);
+> diff --git a/drivers/media/platform/s3c-camif/camif-capture.c
+> b/drivers/media/platform/s3c-camif/camif-capture.c index
+> eae667eab1b9..fb5b016cc0a1 100644
+> --- a/drivers/media/platform/s3c-camif/camif-capture.c
+> +++ b/drivers/media/platform/s3c-camif/camif-capture.c
+> @@ -837,7 +837,7 @@ static int camif_pipeline_validate(struct camif_dev
+> *camif)
+> 
+>  	/* Retrieve format at the sensor subdev source pad */
+>  	pad = media_entity_remote_pad(&camif->pads[0]);
+> -	if (!pad || media_entity_type(pad->entity) != MEDIA_ENT_T_V4L2_SUBDEV)
+> +	if (!pad || !is_media_entity_v4l2_subdev(pad->entity))
+>  		return -EPIPE;
+> 
+>  	src_fmt.pad = pad->index;
+> diff --git a/drivers/media/platform/vsp1/vsp1_video.c
+> b/drivers/media/platform/vsp1/vsp1_video.c index 1f94c1a54e00..f74158224b93
+> 100644
+> --- a/drivers/media/platform/vsp1/vsp1_video.c
+> +++ b/drivers/media/platform/vsp1/vsp1_video.c
+> @@ -160,8 +160,7 @@ vsp1_video_remote_subdev(struct media_pad *local, u32
+> *pad) struct media_pad *remote;
+> 
+>  	remote = media_entity_remote_pad(local);
+> -	if (remote == NULL ||
+> -	    media_entity_type(remote->entity) != MEDIA_ENT_T_V4L2_SUBDEV)
+> +	if (!remote || !is_media_entity_v4l2_subdev(remote->entity))
+>  		return NULL;
+> 
+>  	if (pad)
+> @@ -326,7 +325,7 @@ static int vsp1_pipeline_validate_branch(struct
+> vsp1_pipeline *pipe, return -EPIPE;
+> 
+>  		/* We've reached a video node, that shouldn't have happened. */
+> -		if (media_entity_type(pad->entity) != MEDIA_ENT_T_V4L2_SUBDEV)
+> +		if (!is_media_entity_v4l2_subdev(pad->entity))
+>  			return -EPIPE;
+> 
+>  		entity = to_vsp1_entity(media_entity_to_v4l2_subdev(pad->entity));
+> @@ -423,7 +422,7 @@ static int vsp1_pipeline_validate(struct vsp1_pipeline
+> *pipe, struct vsp1_rwpf *rwpf;
+>  		struct vsp1_entity *e;
+> 
+> -		if (media_entity_type(entity) != MEDIA_ENT_T_V4L2_SUBDEV) {
+> +		if (is_media_entity_v4l2_io(entity)) {
+>  			pipe->num_video++;
+>  			continue;
+>  		}
+> @@ -692,7 +691,7 @@ void vsp1_pipeline_propagate_alpha(struct vsp1_pipeline
+> *pipe, pad = media_entity_remote_pad(&input->pads[RWPF_PAD_SOURCE]);
+> 
+>  	while (pad) {
+> -		if (media_entity_type(pad->entity) != MEDIA_ENT_T_V4L2_SUBDEV)
+> +		if (!is_media_entity_v4l2_subdev(pad->entity))
+>  			break;
+> 
+>  		entity = to_vsp1_entity(media_entity_to_v4l2_subdev(pad->entity));
+> diff --git a/drivers/media/platform/xilinx/xilinx-dma.c
+> b/drivers/media/platform/xilinx/xilinx-dma.c index
+> 88cd789cdaf7..8e14841bf445 100644
+> --- a/drivers/media/platform/xilinx/xilinx-dma.c
+> +++ b/drivers/media/platform/xilinx/xilinx-dma.c
+> @@ -49,8 +49,7 @@ xvip_dma_remote_subdev(struct media_pad *local, u32 *pad)
+>  	struct media_pad *remote;
+> 
+>  	remote = media_entity_remote_pad(local);
+> -	if (remote == NULL ||
+> -	    media_entity_type(remote->entity) != MEDIA_ENT_T_V4L2_SUBDEV)
+> +	if (!remote || !is_media_entity_v4l2_subdev(remote->entity))
+>  		return NULL;
+> 
+>  	if (pad)
+> @@ -113,8 +112,7 @@ static int xvip_pipeline_start_stop(struct xvip_pipeline
+> *pipe, bool start) break;
+> 
+>  		pad = media_entity_remote_pad(pad);
+> -		if (pad == NULL ||
+> -		    media_entity_type(pad->entity) != MEDIA_ENT_T_V4L2_SUBDEV)
+> +		if (!pad || !is_media_entity_v4l2_subdev(pad->entity))
+>  			break;
+> 
+>  		entity = pad->entity;
+> diff --git a/drivers/media/v4l2-core/v4l2-subdev.c
+> b/drivers/media/v4l2-core/v4l2-subdev.c index e6e1115d8215..60da43772de9
+> 100644
+> --- a/drivers/media/v4l2-core/v4l2-subdev.c
+> +++ b/drivers/media/v4l2-core/v4l2-subdev.c
+> @@ -526,7 +526,7 @@ static int
+>  v4l2_subdev_link_validate_get_format(struct media_pad *pad,
+>  				     struct v4l2_subdev_format *fmt)
+>  {
+> -	if (media_entity_type(pad->entity) == MEDIA_ENT_T_V4L2_SUBDEV) {
+> +	if (is_media_entity_v4l2_subdev(pad->entity)) {
+>  		struct v4l2_subdev *sd =
+>  			media_entity_to_v4l2_subdev(pad->entity);
+> 
+> diff --git a/drivers/staging/media/davinci_vpfe/vpfe_video.c
+> b/drivers/staging/media/davinci_vpfe/vpfe_video.c index
+> 92573fa852a9..16763e0831f2 100644
+> --- a/drivers/staging/media/davinci_vpfe/vpfe_video.c
+> +++ b/drivers/staging/media/davinci_vpfe/vpfe_video.c
+> @@ -148,7 +148,7 @@ static void vpfe_prepare_pipeline(struct
+> vpfe_video_device *video) while ((entity =
+> media_entity_graph_walk_next(&graph))) {
+>  		if (entity == &video->video_dev.entity)
+>  			continue;
+> -		if (media_entity_type(entity) != MEDIA_ENT_T_DEVNODE)
+> +		if ((!is_media_entity_v4l2_io(remote->entity))
+>  			continue;
+>  		far_end = to_vpfe_video(media_entity_to_video_device(entity));
+>  		if (far_end->type == V4L2_BUF_TYPE_VIDEO_OUTPUT)
+> @@ -293,7 +293,7 @@ static int vpfe_pipeline_enable(struct vpfe_pipeline
+> *pipe) media_entity_graph_walk_start(&graph, entity);
+>  	while ((entity = media_entity_graph_walk_next(&graph))) {
+> 
+> -		if (media_entity_type(entity) == MEDIA_ENT_T_DEVNODE)
+> +		if !is_media_entity_v4l2_subdev(entity))
 
->  drivers/pinctrl/sunxi/Kconfig                      |   4 +
->  drivers/pinctrl/sunxi/Makefile                     |   1 +
->  drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c           | 515 +++++++++++++++++++++
->  4 files changed, 521 insertions(+)
->  create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
+With these two chunks fixed,
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+I'm wondering, however, why you replace some occurrences of == 
+MEDIA_ENT_T_DEVNODE with !is_media_entity_v4l2_subdev and some other with 
+is_media_entity_v4l2_io.
+
+>  			continue;
+>  		subdev = media_entity_to_v4l2_subdev(entity);
+>  		ret = v4l2_subdev_call(subdev, video, s_stream, 1);
+> @@ -334,7 +334,7 @@ static int vpfe_pipeline_disable(struct vpfe_pipeline
+> *pipe)
 > 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-> index b321b26..e6ba602 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-> @@ -18,6 +18,7 @@ Required properties:
->    "allwinner,sun8i-a23-r-pinctrl"
->    "allwinner,sun8i-a33-pinctrl"
->    "allwinner,sun8i-a83t-pinctrl"
-> +  "allwinner,sun8i-h3-pinctrl"
->  
->  - reg: Should contain the register physical address and length for the
->    pin controller.
-> diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
-> index e68fd95..89ab7f5 100644
-> --- a/drivers/pinctrl/sunxi/Kconfig
-> +++ b/drivers/pinctrl/sunxi/Kconfig
-> @@ -51,6 +51,10 @@ config PINCTRL_SUN8I_A23_R
->  	depends on RESET_CONTROLLER
->  	select PINCTRL_SUNXI_COMMON
->  
-> +config PINCTRL_SUN8I_H3
-> +	def_bool MACH_SUN8I
-> +	select PINCTRL_SUNXI_COMMON
-> +
->  config PINCTRL_SUN9I_A80
->  	def_bool MACH_SUN9I
->  	select PINCTRL_SUNXI_COMMON
-> diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
-> index e080290..6bd818e 100644
-> --- a/drivers/pinctrl/sunxi/Makefile
-> +++ b/drivers/pinctrl/sunxi/Makefile
-> @@ -13,4 +13,5 @@ obj-$(CONFIG_PINCTRL_SUN8I_A23)		+= pinctrl-sun8i-a23.o
->  obj-$(CONFIG_PINCTRL_SUN8I_A23_R)	+= pinctrl-sun8i-a23-r.o
->  obj-$(CONFIG_PINCTRL_SUN8I_A33)		+= pinctrl-sun8i-a33.o
->  obj-$(CONFIG_PINCTRL_SUN8I_A83T)	+= pinctrl-sun8i-a83t.o
-> +obj-$(CONFIG_PINCTRL_SUN8I_H3)		+= pinctrl-sun8i-h3.o
->  obj-$(CONFIG_PINCTRL_SUN9I_A80)		+= pinctrl-sun9i-a80.o
-> diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
-> new file mode 100644
-> index 0000000..77d4cf0
-> --- /dev/null
-> +++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
-> @@ -0,0 +1,515 @@
-> +/*
-> + * Allwinner H3 SoCs pinctrl driver.
-> + *
-> + * Copyright (C) 2015 Jens Kuske <jenskuske@gmail.com>
-> + *
-> + * Based on pinctrl-sun8i-a23.c, which is:
-> + * Copyright (C) 2014 Chen-Yu Tsai <wens@csie.org>
-> + * Copyright (C) 2014 Maxime Ripard <maxime.ripard@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/pinctrl/pinctrl.h>
-> +
-> +#include "pinctrl-sunxi.h"
-> +
-> +static const struct sunxi_desc_pin sun8i_h3_pins[] = {
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 0),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "uart2"),		/* TX */
-> +		  SUNXI_FUNCTION(0x3, "jtag"),		/* MS */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 0)),	/* PA_EINT0 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 1),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "uart2"),		/* RX */
-> +		  SUNXI_FUNCTION(0x3, "jtag"),		/* CK */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 1)),	/* PA_EINT1 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 2),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "uart2"),		/* RTS */
-> +		  SUNXI_FUNCTION(0x3, "jtag"),		/* DO */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 2)),	/* PA_EINT2 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 3),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "uart2"),		/* CTS */
-> +		  SUNXI_FUNCTION(0x3, "jtag"),		/* DI */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 3)),	/* PA_EINT3 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 4),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "uart0"),		/* TX */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 4)),	/* PA_EINT4 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 5),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "uart0"),		/* RX */
-> +		  SUNXI_FUNCTION(0x3, "pwm0"),
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 5)),	/* PA_EINT5 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 6),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "sim"),		/* PWREN */
-> +		  SUNXI_FUNCTION(0x3, "pwm1"),
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 6)),	/* PA_EINT6 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 7),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "sim"),		/* CLK */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 7)),	/* PA_EINT7 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 8),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "sim"),		/* DATA */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 8)),	/* PA_EINT8 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 9),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "sim"),		/* RST */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 9)),	/* PA_EINT9 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 10),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "sim"),		/* DET */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 10)),	/* PA_EINT10 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 11),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "i2c0"),		/* SCK */
-> +		  SUNXI_FUNCTION(0x3, "di"),		/* TX */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 11)),	/* PA_EINT11 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 12),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "i2c0"),		/* SDA */
-> +		  SUNXI_FUNCTION(0x3, "di"),		/* RX */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 12)),	/* PA_EINT12 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 13),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "spi1"),		/* CS */
-> +		  SUNXI_FUNCTION(0x3, "uart3"),		/* TX */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 13)),	/* PA_EINT13 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 14),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "spi1"),		/* CLK */
-> +		  SUNXI_FUNCTION(0x3, "uart3"),		/* RX */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 14)),	/* PA_EINT14 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 15),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "spi1"),		/* MOSI */
-> +		  SUNXI_FUNCTION(0x3, "uart3"),		/* RTS */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 15)),	/* PA_EINT15 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 16),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "spi1"),		/* MISO */
-> +		  SUNXI_FUNCTION(0x3, "uart3"),		/* CTS */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 16)),	/* PA_EINT16 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 17),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "spdif"),		/* OUT */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 17)),	/* PA_EINT17 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 18),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "i2s0"),		/* SYNC */
-> +		  SUNXI_FUNCTION(0x3, "i2c1"),		/* SCK */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 18)),	/* PA_EINT18 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 19),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "i2s0"),		/* CLK */
-> +		  SUNXI_FUNCTION(0x3, "i2c1"),		/* SDA */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 19)),	/* PA_EINT19 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 20),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "i2s0"),		/* DOUT */
-> +		  SUNXI_FUNCTION(0x3, "sim"),		/* VPPEN */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 20)),	/* PA_EINT20 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 21),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "i2s0"),		/* DIN */
-> +		  SUNXI_FUNCTION(0x3, "sim"),		/* VPPPP */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 21)),	/* PA_EINT21 */
-> +	/* Hole */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 0),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "nand0"),		/* WE */
-> +		  SUNXI_FUNCTION(0x3, "spi0")),		/* MOSI */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 1),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "nand0"),		/* ALE */
-> +		  SUNXI_FUNCTION(0x3, "spi0")),		/* MISO */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 2),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "nand0"),		/* CLE */
-> +		  SUNXI_FUNCTION(0x3, "spi0")),		/* CLK */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 3),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "nand0"),		/* CE1 */
-> +		  SUNXI_FUNCTION(0x3, "spi0")),		/* CS */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 4),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "nand0")),	/* CE0 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 5),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "nand0"),		/* RE */
-> +		  SUNXI_FUNCTION(0x3, "mmc2")),		/* CLK */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 6),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "nand0"),		/* RB0 */
-> +		  SUNXI_FUNCTION(0x3, "mmc2")),		/* CMD */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 7),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "nand0")),	/* RB1 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 8),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ0 */
-> +		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D0 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 9),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ1 */
-> +		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D1 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 10),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ2 */
-> +		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D2 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 11),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ3 */
-> +		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D3 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 12),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ4 */
-> +		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D4 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 13),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ5 */
-> +		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D5 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 14),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "nand"),		/* DQ6 */
-> +		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D6 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 15),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "nand"),		/* DQ7 */
-> +		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D7 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 16),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "nand"),		/* DQS */
-> +		  SUNXI_FUNCTION(0x3, "mmc2")),		/* RST */
-> +	/* Hole */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 0),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "emac")),		/* RXD3 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 1),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "emac")),		/* RXD2 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 2),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "emac")),		/* RXD1 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 3),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "emac")),		/* RXD0 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 4),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "emac")),		/* RXCK */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 5),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "emac")),		/* RXCTL/RXDV */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 6),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "emac")),		/* RXERR */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 7),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "emac")),		/* TXD3 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 8),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "emac")),		/* TXD2 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 9),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "emac")),		/* TXD1 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 10),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "emac")),		/* TXD0 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 11),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "emac")),		/* CRS */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 12),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "emac")),		/* TXCK */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 13),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "emac")),		/* TXCTL/TXEN */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 14),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "emac")),		/* TXERR */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 15),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "emac")),		/* CLKIN/COL */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 16),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "emac")),		/* MDC */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 17),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "emac")),		/* MDIO */
-> +	/* Hole */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 0),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "csi"),		/* PCLK */
-> +		  SUNXI_FUNCTION(0x3, "ts")),		/* CLK */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 1),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "csi"),		/* MCLK */
-> +		  SUNXI_FUNCTION(0x3, "ts")),		/* ERR */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 2),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "csi"),		/* HSYNC */
-> +		  SUNXI_FUNCTION(0x3, "ts")),		/* SYNC */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 3),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "csi"),		/* VSYNC */
-> +		  SUNXI_FUNCTION(0x3, "ts")),		/* DVLD */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 4),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "csi"),		/* D0 */
-> +		  SUNXI_FUNCTION(0x3, "ts")),		/* D0 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 5),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "csi"),		/* D1 */
-> +		  SUNXI_FUNCTION(0x3, "ts")),		/* D1 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 6),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "csi"),		/* D2 */
-> +		  SUNXI_FUNCTION(0x3, "ts")),		/* D2 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 7),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "csi"),		/* D3 */
-> +		  SUNXI_FUNCTION(0x3, "ts")),		/* D3 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 8),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "csi"),		/* D4 */
-> +		  SUNXI_FUNCTION(0x3, "ts")),		/* D4 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 9),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "csi"),		/* D5 */
-> +		  SUNXI_FUNCTION(0x3, "ts")),		/* D5 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 10),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "csi"),		/* D6 */
-> +		  SUNXI_FUNCTION(0x3, "ts")),		/* D6 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 11),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "csi"),		/* D7 */
-> +		  SUNXI_FUNCTION(0x3, "ts")),		/* D7 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 12),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "csi"),		/* SCK */
-> +		  SUNXI_FUNCTION(0x3, "i2c2")),		/* SCK */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 13),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "csi"),		/* SDA */
-> +		  SUNXI_FUNCTION(0x3, "i2c2")),		/* SDA */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 14),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out")),
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 15),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out")),
-> +	/* Hole */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 0),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "mmc0"),		/* D1 */
-> +		  SUNXI_FUNCTION(0x3, "jtag")),		/* MS */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 1),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "mmc0"),		/* D0 */
-> +		  SUNXI_FUNCTION(0x3, "jtag")),		/* DI */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 2),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "mmc0"),		/* CLK */
-> +		  SUNXI_FUNCTION(0x3, "uart0")),	/* TX */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 3),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "mmc0"),		/* CMD */
-> +		  SUNXI_FUNCTION(0x3, "jtag")),		/* DO */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 4),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "mmc0"),		/* D3 */
-> +		  SUNXI_FUNCTION(0x3, "uart0")),	/* RX */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 5),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "mmc0"),		/* D2 */
-> +		  SUNXI_FUNCTION(0x3, "jtag")),		/* CK */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 6),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out")),
-> +	/* Hole */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 0),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "mmc1"),		/* CLK */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 0)),	/* PG_EINT0 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 1),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "mmc1"),		/* CMD */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 1)),	/* PG_EINT1 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 2),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "mmc1"),		/* D0 */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 2)),	/* PG_EINT2 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 3),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "mmc1"),		/* D1 */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 3)),	/* PG_EINT3 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 4),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "mmc1"),		/* D2 */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 4)),	/* PG_EINT4 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 5),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "mmc1"),		/* D3 */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 5)),	/* PG_EINT5 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 6),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "uart1"),		/* TX */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 6)),	/* PG_EINT6 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 7),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "uart1"),		/* RX */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 7)),	/* PG_EINT7 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 8),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "uart1"),		/* RTS */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 8)),	/* PG_EINT8 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 9),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "uart1"),		/* CTS */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 9)),	/* PG_EINT9 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 10),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "i2s1"),		/* SYNC */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 10)),	/* PG_EINT10 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 11),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "i2s1"),		/* CLK */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 11)),	/* PG_EINT11 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 12),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "i2s1"),		/* DOUT */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 12)),	/* PG_EINT12 */
-> +	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 13),
-> +		  SUNXI_FUNCTION(0x0, "gpio_in"),
-> +		  SUNXI_FUNCTION(0x1, "gpio_out"),
-> +		  SUNXI_FUNCTION(0x2, "i2s1"),		/* DIN */
-> +		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 13)),	/* PG_EINT13 */
-> +};
-> +
-> +static const struct sunxi_pinctrl_desc sun8i_h3_pinctrl_data = {
-> +	.pins = sun8i_h3_pins,
-> +	.npins = ARRAY_SIZE(sun8i_h3_pins),
-> +	.irq_banks = 2,
-> +};
-> +
-> +static int sun8i_h3_pinctrl_probe(struct platform_device *pdev)
-> +{
-> +	return sunxi_pinctrl_init(pdev,
-> +				  &sun8i_h3_pinctrl_data);
-> +}
-> +
-> +static const struct of_device_id sun8i_h3_pinctrl_match[] = {
-> +	{ .compatible = "allwinner,sun8i-h3-pinctrl", },
-> +	{}
-> +};
-> +
-> +static struct platform_driver sun8i_h3_pinctrl_driver = {
-> +	.probe	= sun8i_h3_pinctrl_probe,
-> +	.driver	= {
-> +		.name		= "sun8i-h3-pinctrl",
-> +		.of_match_table	= sun8i_h3_pinctrl_match,
-> +	},
-> +};
-> +builtin_platform_driver(sun8i_h3_pinctrl_driver);
-> -- 
-> 2.6.3
+>  	while ((entity = media_entity_graph_walk_next(&graph))) {
 > 
+> -		if (media_entity_type(entity) == MEDIA_ENT_T_DEVNODE)
+> +		if (!is_media_entity_v4l2_subdev(entity))
+>  			continue;
+>  		subdev = media_entity_to_v4l2_subdev(entity);
+>  		ret = v4l2_subdev_call(subdev, video, s_stream, 0);
+> diff --git a/drivers/staging/media/omap4iss/iss.c
+> b/drivers/staging/media/omap4iss/iss.c index 40591963b42b..44b88ff3ba83
+> 100644
+> --- a/drivers/staging/media/omap4iss/iss.c
+> +++ b/drivers/staging/media/omap4iss/iss.c
+> @@ -397,7 +397,7 @@ static int iss_pipeline_pm_use_count(struct media_entity
+> *entity) media_entity_graph_walk_start(&graph, entity);
+> 
+>  	while ((entity = media_entity_graph_walk_next(&graph))) {
+> -		if (media_entity_type(entity) == MEDIA_ENT_T_DEVNODE)
+> +		if (is_media_entity_v4l2_io(entity))
+>  			use += entity->use_count;
+>  	}
+> 
+> @@ -419,7 +419,7 @@ static int iss_pipeline_pm_power_one(struct media_entity
+> *entity, int change) {
+>  	struct v4l2_subdev *subdev;
+> 
+> -	subdev = media_entity_type(entity) == MEDIA_ENT_T_V4L2_SUBDEV
+> +	subdev = is_media_entity_v4l2_subdev(entity)
+>  	       ? media_entity_to_v4l2_subdev(entity) : NULL;
+> 
+>  	if (entity->use_count == 0 && change > 0 && subdev != NULL) {
+> @@ -461,7 +461,7 @@ static int iss_pipeline_pm_power(struct media_entity
+> *entity, int change) media_entity_graph_walk_start(&graph, entity);
+> 
+>  	while (!ret && (entity = media_entity_graph_walk_next(&graph)))
+> -		if (media_entity_type(entity) != MEDIA_ENT_T_DEVNODE)
+> +		if (is_media_entity_v4l2_subdev(entity))
+>  			ret = iss_pipeline_pm_power_one(entity, change);
+> 
+>  	if (!ret)
+> @@ -471,7 +471,7 @@ static int iss_pipeline_pm_power(struct media_entity
+> *entity, int change)
+> 
+>  	while ((first = media_entity_graph_walk_next(&graph))
+>  	       && first != entity)
+> -		if (media_entity_type(first) != MEDIA_ENT_T_DEVNODE)
+> +		if (is_media_entity_v4l2_subdev(first))
+>  			iss_pipeline_pm_power_one(first, -change);
+> 
+>  	return ret;
+> @@ -590,8 +590,7 @@ static int iss_pipeline_disable(struct iss_pipeline
+> *pipe, break;
+> 
+>  		pad = media_entity_remote_pad(pad);
+> -		if (pad == NULL ||
+> -		    media_entity_type(pad->entity) != MEDIA_ENT_T_V4L2_SUBDEV)
+> +		if (!pad || !is_media_entity_v4l2_subdev(pad->entity))
+>  			break;
+> 
+>  		entity = pad->entity;
+> @@ -658,8 +657,7 @@ static int iss_pipeline_enable(struct iss_pipeline
+> *pipe, break;
+> 
+>  		pad = media_entity_remote_pad(pad);
+> -		if (pad == NULL ||
+> -		    media_entity_type(pad->entity) != MEDIA_ENT_T_V4L2_SUBDEV)
+> +		if (!pad || !is_media_entity_v4l2_subdev(pad->entity))
+>  			break;
+> 
+>  		entity = pad->entity;
+> diff --git a/drivers/staging/media/omap4iss/iss_video.c
+> b/drivers/staging/media/omap4iss/iss_video.c index
+> 45a3f2d778fc..cbe5783735dc 100644
+> --- a/drivers/staging/media/omap4iss/iss_video.c
+> +++ b/drivers/staging/media/omap4iss/iss_video.c
+> @@ -191,8 +191,7 @@ iss_video_remote_subdev(struct iss_video *video, u32
+> *pad)
+> 
+>  	remote = media_entity_remote_pad(&video->pad);
+> 
+> -	if (remote == NULL ||
+> -	    media_entity_type(remote->entity) != MEDIA_ENT_T_V4L2_SUBDEV)
+> +	if (!remote || !is_media_entity_v4l2_subdev(remote->entity))
+>  		return NULL;
+> 
+>  	if (pad)
+> @@ -217,7 +216,7 @@ iss_video_far_end(struct iss_video *video)
+>  		if (entity == &video->video.entity)
+>  			continue;
+> 
+> -		if (media_entity_type(entity) != MEDIA_ENT_T_DEVNODE)
+> +		if (!is_media_entity_v4l2_io(entity))
+>  			continue;
+> 
+>  		far_end = to_iss_video(media_entity_to_video_device(entity));
+
+-- 
+Regards,
+
+Laurent Pinchart
