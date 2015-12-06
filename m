@@ -1,106 +1,56 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 6 Dec 2015 10:28:30 +0100
-Subject: [PATCH] arm: dts: berlin2q-marvell-dmp: add sdhci1 fully
- functionality
-In-Reply-To: <1448891679-7894-1-git-send-email-jszhang@marvell.com>
-References: <1448891679-7894-1-git-send-email-jszhang@marvell.com>
-Message-ID: <5663FFBE.1070708@gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Sun, 6 Dec 2015 10:28:15 +0100 (CET)
+Subject: [PATCH 0/5] Fix regression introduced by set_irq_flags() removal
+In-Reply-To: <alpine.DEB.2.11.1512051823140.3595@nanos>
+References: <1445347435-2333-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20151020140427.GE3953@io.lakedaemon.net>
+ <20151020160828.497fcc80@free-electrons.com>
+ <alpine.DEB.2.11.1510202121590.8159@nanos>
+ <20151111092638.587a53a4@free-electrons.com>
+ <alpine.DEB.2.11.1511131509180.3987@nanos>
+ <20151204120329.30a52cf4@free-electrons.com>
+ <alpine.DEB.2.11.1512051823140.3595@nanos>
+Message-ID: <alpine.DEB.2.11.1512061018450.3595@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.11.2015 14:54, Jisheng Zhang wrote:
-> The sdhci1 on Marvell BG2Q DMP board is used as sdcard interface, we
-> have gpios for card detection, write-protect, vqmmc and vmmc.
+Thomas,
+
+On Sat, 5 Dec 2015, Thomas Gleixner wrote:
+> On Fri, 4 Dec 2015, Thomas Petazzoni wrote:
+> > Well, the problem is that IRQ_NOAUTOEN is a global flag, which is OK
+> > for global interrupts, but not good for per-CPU interrupts, since you
+> > don't have the information on a per-CPU basis of which interrupt was
+> > enabled before suspend, and therefore should be re-enabled after resume.
+> > 
+> > Until now, we don't have the problem since the only per-CPU interrupt
+> > we were using was the local timer interrupt, and the local timers on
+> > secondary CPUs are switched off during suspend and re-enabled during
+> > resume. So re-enabling the interrupt on the boot CPU on resume is
+> > sufficient.
+> > 
+> > However, our network driver recently switched to using per-CPU
+> > interrupts as well, and in this case, it is really important to be able
+> > to re-enable the per-CPU interrupts and the appropriate CPUs at resume
+> > time. Since our HW registers are made so that it is not possible to
+> > read out at suspend time which interrupts are enabled, we have to ask
+> > the Linux kernel at resume time which interrupts should be re-enabled
+> > at the HW level. Which is what my more complicated series was doing.
+> > 
+> > Do you have other suggestions to allow us to know which per-CPU
+> > interrupts should be re-enabled on the different CPUs at resume time ?
 > 
-> This patch adds pinmux for this sdcard interface, then adds regulators
-> for vmmc and vqmmc, lastly adds cd-gpios, wp-gpios properties.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Ok. That makes sense. So I'm going to pick up the core change.
 
-Applied to berlin/dt.
+Second thoughts. That network driver example does not make sense.
 
-> ---
-> since v1:
+You have a suspend/resume mechanism and a cpu hotplug machinery in
+that driver, right? So that should be responsible for
+disabling/enabling the per cpu interrupts. I don't think it's the
+proper way to do that in the irq chip driver at some random point
+during resume as you'd reenable interrupts on cpus which are not
+online yet.
 
-Please also increment the patch subject version next time.
+Thanks,
 
-Thanks!
-
-Sebastian
-
->  - move sd1_pmux to soc dtsi
->  - remove cd-inverted and make cd-gpio GPIO_ACTIVE_LOW
-> 
->  arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 37 ++++++++++++++++++++++++++++--
->  arch/arm/boot/dts/berlin2q.dtsi            |  5 ++++
->  2 files changed, 40 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> index cdcf89b..33b2875 100644
-> --- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> +++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-> @@ -84,12 +84,45 @@
->  			gpio = <&portb 12 GPIO_ACTIVE_HIGH>;
->  			enable-active-high;
->  		};
-> +
-> +		reg_sdio1_vmmc: regulator at 3 {
-> +			compatible = "regulator-fixed";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			regulator-name = "sdio1_vmmc";
-> +			enable-active-high;
-> +			regulator-boot-on;
-> +			gpio = <&portb 21 GPIO_ACTIVE_HIGH>;
-> +		};
-> +
-> +		reg_sdio1_vqmmc: regulator at 4 {
-> +			compatible = "regulator-gpio";
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			regulator-name = "sdio1_vqmmc";
-> +			regulator-type = "voltage";
-> +			enable-active-high;
-> +			gpios = <&portb 16 GPIO_ACTIVE_HIGH>;
-> +			states = <3300000 0x1
-> +				  1800000 0x0>;
-> +		};
-> +	};
-> +};
-> +
-> +&soc_pinctrl {
-> +	sd1gpio_pmux: sd1pwr-pmux {
-> +		groups = "G23", "G32";
-> +		function = "gpio";
->  	};
->  };
->  
->  &sdhci1 {
-> -	broken-cd;
-> -	sdhci,wp-inverted;
-> +	vmmc-supply = <&reg_sdio1_vmmc>;
-> +	vqmmc-supply = <&reg_sdio1_vqmmc>;
-> +	cd-gpios = <&portc 30 GPIO_ACTIVE_LOW>;
-> +	wp-gpios = <&portd 0 GPIO_ACTIVE_HIGH>;
-> +	pinctrl-0 = <&sd1gpio_pmux>, <&sd1_pmux>;
-> +	pinctrl-names = "default";
->  	status = "okay";
->  };
->  
-> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-> index 8ea177f..73a9362 100644
-> --- a/arch/arm/boot/dts/berlin2q.dtsi
-> +++ b/arch/arm/boot/dts/berlin2q.dtsi
-> @@ -417,6 +417,11 @@
->  			soc_pinctrl: pin-controller {
->  				compatible = "marvell,berlin2q-soc-pinctrl";
->  
-> +				sd1_pmux: sd1-pmux {
-> +					groups = "G31";
-> +					function = "sd1";
-> +				};
-> +
->  				twsi0_pmux: twsi0-pmux {
->  					groups = "G6";
->  					function = "twsi0";
-> 
+	tglx
