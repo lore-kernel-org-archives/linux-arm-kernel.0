@@ -1,58 +1,86 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun,  6 Dec 2015 20:52:13 +0100
-Subject: [PATCH v9 0/8] imx25 adc and touchscreen driver
-Message-ID: <1449431542-1892-1-git-send-email-mpa@pengutronix.de>
+Date: Sun,  6 Dec 2015 20:52:14 +0100
+Subject: [PATCH v9 1/8] ARM: dt: Binding documentation for imx25 ADC/TSC
+In-Reply-To: <1449431542-1892-1-git-send-email-mpa@pengutronix.de>
+References: <1449431542-1892-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1449431542-1892-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This documentation describes the devicetree bindings for the
+ADC/Touchscreen unit of the i.MX25 SoC.
 
-another larger restructuring of the touchscreen driver and some smaller
-changes in other parts. The changes are noted below each patch description.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Acked-by: Jonathan Cameron <jic23@kernel.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
 
-Best Regards,
+Notes:
+    Changes in v9:
+     - Fixed some style things.
+    
+    Changes in v6:
+     - Removed adc-ref property and replaced it with refp and refn for positive and
+       negative references. The properties are optional now as the default
+       behaviour is a positive internal reference voltage and ADC GND as negative
+       reference.
 
-Markus
-
-
-Denis Carikli (2):
-  ARM: dts: imx25: Add TSC and ADC support
-  ARM: imx_v4_v5_defconfig: Add I.MX25 Touchscreen controller and ADC
-    support.
-
-Markus Pargmann (6):
-  ARM: dt: Binding documentation for imx25 ADC/TSC
-  ARM: dt: Binding documentation for imx25 GCQ
-  ARM: dt: Binding documentation for imx25 touchscreen controller
-  mfd: fsl imx25 Touchscreen ADC driver
-  iio: adc: fsl,imx25-gcq driver
-  input: touchscreen: imx25 tcq driver
-
- .../devicetree/bindings/iio/adc/fsl,imx25-gcq.txt  |  58 ++
- .../bindings/input/touchscreen/fsl-mx25-tcq.txt    |  35 ++
- .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    |  47 ++
- arch/arm/boot/dts/imx25.dtsi                       |  29 +-
- arch/arm/configs/imx_v4_v5_defconfig               |   4 +
- drivers/iio/adc/Kconfig                            |   7 +
- drivers/iio/adc/Makefile                           |   1 +
- drivers/iio/adc/fsl-imx25-gcq.c                    | 415 ++++++++++++++
- drivers/input/touchscreen/Kconfig                  |   9 +
- drivers/input/touchscreen/Makefile                 |   1 +
- drivers/input/touchscreen/fsl-imx25-tcq.c          | 596 +++++++++++++++++++++
- drivers/mfd/Kconfig                                |   9 +
- drivers/mfd/Makefile                               |   2 +
- drivers/mfd/fsl-imx25-tsadc.c                      | 203 +++++++
- include/dt-bindings/iio/adc/fsl-imx25-gcq.h        |  18 +
- include/linux/mfd/imx25-tsadc.h                    | 140 +++++
- 16 files changed, 1571 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt
- create mode 100644 Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
+ .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    | 47 ++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
- create mode 100644 drivers/iio/adc/fsl-imx25-gcq.c
- create mode 100644 drivers/input/touchscreen/fsl-imx25-tcq.c
- create mode 100644 drivers/mfd/fsl-imx25-tsadc.c
- create mode 100644 include/dt-bindings/iio/adc/fsl-imx25-gcq.h
- create mode 100644 include/linux/mfd/imx25-tsadc.h
 
+diff --git a/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+new file mode 100644
+index 000000000000..b03505286997
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+@@ -0,0 +1,47 @@
++Freescale MX25 ADC/TSC MultiFunction Device (MFD)
++
++This device combines two general purpose conversion queues one used for general
++ADC and the other used for touchscreens.
++
++Required properties:
++ - compatible:			Should be "fsl,imx25-tsadc".
++ - reg:				Start address and size of the memory area of
++ 					the device
++ - interrupts:			Interrupt for this device
++					(See: ../interrupt-controller/interrupts.txt)
++ - clocks:			An 'ipg' clock (See: ../clock/clock-bindings.txt)
++ - interrupt-controller:	This device is an interrupt controller. It
++   					controls the interrupts of both
++					conversion queues.
++ - #interrupt-cells:		Should be '<1>'.
++ - #address-cells:		Should be '<1>'.
++ - #size-cells:			Should be '<1>'.
++
++This device includes two conversion queues which can be added as subnodes.
++The first queue is for the touchscreen, the second for general purpose ADC.
++
++Example:
++	tscadc: tscadc at 50030000 {
++		compatible = "fsl,imx25-tsadc";
++		reg = <0x50030000 0xc>;
++		interrupts = <46>;
++		clocks = <&clks 119>;
++		clock-names = "ipg";
++		interrupt-controller;
++		#interrupt-cells = <1>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		tsc: tcq at 50030400 {
++			compatible = "fsl,imx25-tcq";
++			reg = <0x50030400 0x60>;
++			...
++		};
++
++		adc: gcq at 50030800 {
++			compatible = "fsl,imx25-gcq";
++			reg = <0x50030800 0x60>;
++			...
++		};
++	};
 -- 
 2.6.2
