@@ -1,86 +1,78 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Sun, 06 Dec 2015 13:33:20 +0200
-Subject: [PATCH 07/10] ARM: debug-ll: rework lpc32xx handling
-In-Reply-To: <1449268242-808553-8-git-send-email-arnd@arndb.de>
-References: <1449268242-808553-1-git-send-email-arnd@arndb.de>
- <1449268242-808553-8-git-send-email-arnd@arndb.de>
-Message-ID: <56641D00.40309@mleia.com>
+Date: Sun, 06 Dec 2015 13:36:43 +0200
+Subject: [GIT PULL] LPC32xx DTS changes for v4.4
+In-Reply-To: <565B024A.2030704@mleia.com>
+References: <1447863700-15681-1-git-send-email-vz@mleia.com>
+ <565B024A.2030704@mleia.com>
+Message-ID: <56641DCB.5080600@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.12.2015 00:30, Arnd Bergmann wrote:
-> LPC32xx can not yet be configured in a multiplatform kernel, but
-> if we ever get there, enabling one of the LPC32xx platforms
-> while trying to use DEBUG_LL for another platform can default to
-> the wrong UART address, as the options are purely based on the
-> architecture being enabled or not.
+On 29.11.2015 15:48, Vladimir Zapolskiy wrote:
+> Hi Arnd,
 > 
-> This changes the logic to use the LPC32xx default addresses only
-> if we have also picked the respective Kconfig symbols introduced
-> here.
+> On 18.11.2015 18:21, Vladimir Zapolskiy wrote:
+>> Hi arm-soc team,
+>>
+>> Please consider pulling these DTS changes for the NXP LPC32xx
+>> platform and related boards.
+>>
+>> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+>>
+>>   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   https://github.com/vzapolskiy/linux.git lpc32xx-dts
+>>
+>> for you to fetch changes up to aa29efb445f11506daca0db934331f144b38ddc4:
+>>
+>>   arm: dts: lpc32xx: move USB controller subdevices into own device node (2015-11-18 18:01:27 +0200)
 > 
-> While we're at it, this also reorders the virtual address as
-> it should be.
+> this is an old reviewed series, I suppose it is too late to include it
+> into v4.4, should I resend the same pull request for v4.5?
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/Kconfig.debug | 14 +++++++++++---
->  1 file changed, 11 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index b35392417378..9836d428a65d 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -480,6 +480,14 @@ choice
->  		  Say Y here if you want kernel low-level debugging support
->  		  on NXP LPC18xx/43xx UART0.
->  
-> +	config DEBUG_LPC32XX
-> +		bool "Kernel low-level debugging messages via NXP LPC32xx UART"
-> +		depends on ARCH_LPC32XX
-> +		select DEBUG_UART_8250
-> +		help
-> +		  Say Y here if you want kernel low-level debugging support
-> +		  on NXP LPC32xx based platforms.
-> +
->  	config DEBUG_MESON_UARTAO
->  		bool "Kernel low-level debugging via Meson6 UARTAO"
->  		depends on ARCH_MESON
-> @@ -1425,7 +1433,7 @@ config DEBUG_UART_PL01X
->  config DEBUG_UART_8250
->  	def_bool ARCH_EBSA110 || (FOOTBRIDGE && !DEBUG_DC21285_PORT) || \
->  		ARCH_IOP13XX || ARCH_IOP32X || ARCH_IOP33X || ARCH_IXP4XX || \
-> -		ARCH_LPC32XX || ARCH_RPC
-> +		ARCH_RPC
->  
->  # Compatibility options for BCM63xx
->  config DEBUG_UART_BCM63XX
-> @@ -1468,7 +1476,7 @@ config DEBUG_UART_PHYS
->  	default 0x3e000000 if DEBUG_BCM_KONA_UART
->  	default 0x4000e400 if DEBUG_LL_UART_EFM32
->  	default 0x40081000 if DEBUG_LPC18XX_UART0
-> -	default 0x40090000 if ARCH_LPC32XX
-> +	default 0x40090000 if DEBUG_LPC32XX
->  	default 0x40100000 if DEBUG_PXA_UART1
->  	default 0x42000000 if DEBUG_GEMINI
->  	default 0x50000000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART0 || \
-> @@ -1562,9 +1570,9 @@ config DEBUG_UART_VIRT
->  	default 0xf1c28000 if DEBUG_SUNXI_UART0
->  	default 0xf1c28400 if DEBUG_SUNXI_UART1
->  	default 0xf1f02800 if DEBUG_SUNXI_R_UART
-> +	default 0xf4090000 if DEBUG_LPC32XX
->  	default 0xf4200000 if DEBUG_GEMINI
->  	default 0xf6200000 if DEBUG_PXA_UART1
-> -	default 0xf4090000 if ARCH_LPC32XX
->  	default 0xf7000000 if DEBUG_SUN9I_UART0
->  	default 0xf7000000 if DEBUG_S3C64XX_UART && DEBUG_S3C_UART0
->  	default 0xf7000000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART0 || \
-> 
+> Or is it possible to merge it as is?
 
-For LPC32xx change:
+Is there anything, what prevents this changes from being merged?
 
-Acked-by: Vladimir Zapolskiy <vz@mleia.com>
+Thank you.
 
---
 With best wishes,
 Vladimir
+
+>> ----------------------------------------------------------------
+>> Main changes in the series:
+>> - Added description of the second PWM controller device
+>> - Added External Memory Controller device tree node (Primecell PL175)
+>> - Added device tree nodes for standard timer controllers
+>> - USB controllers are grouped
+>> - Various minor clean-ups needed for further development of LPC32xx
+>>
+>> ----------------------------------------------------------------
+>> Vladimir Zapolskiy (8):
+>>       arm: dts: lpc32xx: change include syntax to be C preprocessor friendly
+>>       arm: dts: lpc32xx: add labels to all defined peripheral nodes
+>>       arm: dts: lpc32xx: add reg property to cpu device node
+>>       arm: dts: lpc32xx: add device node for the second pwm controller
+>>       arm: dts: ea3250/phy3250: specify phys memory offset for lpc32xx boards
+>>       arm: dts: lpc32xx: add external memory controller device node
+>>       arm: dts: lpc32xx: add device nodes for standard timers
+>>       arm: dts: lpc32xx: move USB controller subdevices into own device node
+>>
+>>  arch/arm/boot/dts/ea3250.dts   |  41 +++++-------
+>>  arch/arm/boot/dts/lpc32xx.dtsi | 142 ++++++++++++++++++++++++++++++-----------
+>>  arch/arm/boot/dts/phy3250.dts  |  41 +++++-------
+>>  3 files changed, 139 insertions(+), 85 deletions(-)
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
