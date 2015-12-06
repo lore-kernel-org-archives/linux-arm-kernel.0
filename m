@@ -1,153 +1,94 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sun,  6 Dec 2015 16:34:26 +0100
-Subject: [PATCH] [media] constify stv6110x_devctl structure
-Message-ID: <1449416066-1202-1-git-send-email-Julia.Lawall@lip6.fr>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Sun, 6 Dec 2015 19:03:18 +0100
+Subject: [PATCH V3 2/6] acpi: pci: Setup MSI domain for ACPI based pci
+ devices
+In-Reply-To: <20151122113553.4fd81185@arm.com>
+References: <1445453249-32557-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1445453249-32557-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <20151119120807.07ffd476@arm.com> <5650DFB5.2010809@amd.com>
+ <20151122113553.4fd81185@arm.com>
+Message-ID: <56647866.8080802@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The stv6110x_devctl structure is never modified, so declare is as
-const.
+Hi Marc,
 
-Done with the help of Coccinelle.
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+On 11/22/2015 12:35 PM, Marc Zyngier wrote:
+> On Sat, 21 Nov 2015 15:18:45 -0600
+> Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> wrote:
+>
+>> Hi Marc,
+>>
+>> On 11/19/15 06:08, Marc Zyngier wrote:
+>>> On Wed, 21 Oct 2015 11:47:25 -0700
+>>> Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> wrote:
+>>>
+>>> Hi Suravee,
+>>>
+>>> Sorry it took so long to get to this series. Comments below.
+>> No worry.
+>>
+>>>> This patch introduces pci_host_bridge_acpi_msi_domain(), which returns
+>>>> the MSI domain of the specified PCI host bridge with DOMAIN_BUS_PCI_MSI
+>>>> bus token. Then, it is assigned to pci device.
+>>>>
+>>>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>>>> ---
+>>>>    drivers/pci/pci-acpi.c | 13 +++++++++++++
+>>>>    drivers/pci/probe.c    |  2 ++
+>>>>    include/linux/pci.h    |  7 +++++++
+>>>>    3 files changed, 22 insertions(+)
+>>>>
+>>>> diff --git a/drivers/pci/pci-acpi.c b/drivers/pci/pci-acpi.c
+>>>> index a32ba75..0e21ef4 100644
+>>>> --- a/drivers/pci/pci-acpi.c
+>>>> +++ b/drivers/pci/pci-acpi.c
+>>>> @@ -9,7 +9,9 @@
+>>>>
+>>>>    #include <linux/delay.h>
+>>>>    #include <linux/init.h>
+>>>> +#include <linux/irqdomain.h>
+>>>>    #include <linux/pci.h>
+>>>> +#include <linux/msi.h>
+>>>>    #include <linux/pci_hotplug.h>
+>>>>    #include <linux/module.h>
+>>>>    #include <linux/pci-aspm.h>
+>>>> @@ -689,6 +691,17 @@ static struct acpi_bus_type acpi_pci_bus = {
+>>>>    	.cleanup = pci_acpi_cleanup,
+>>>>    };
+>>>>
+>>>> +struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus)
+>>>> +{
+>>>> +	struct irq_domain *dom = NULL;
+>>>> +	struct fwnode_handle *fwnode = pci_msi_get_fwnode(&bus->dev);
+>>>> +
+>>>> +	if (fwnode)
+>>>> +		dom = irq_find_matching_fwnode(fwnode,
+>>>> +					       DOMAIN_BUS_PCI_MSI);
+>>>> +	return dom;
+>>>> +}
+>>>> +
+>>> Given this, I really question the need for what you define in patch #1
+>>> to be standalone. It is only used by ACPI (DT has its own private
+>>> helpers), and it is so far unlikely that it will be of any use for
+>>> other firmware interfaces.
+>>>
+>>> My suggestion is to get rid of pci_msi_get_fwnode() and move the
+>>> registration helper into this file. That'd be much simpler.
+>>>
+>>> Thanks,
+>>>
+>>> 	M.
+>>>
+>> Ok, I'll take care of this. I assume the rest of the patches looks ok.
+> I still need to finish going through it (I have minor comments so far
+> on some of the other patches), but I want to get the core ACPI stuff in
+> shape before doing anything else.
+I am trying to do similar thing for GICv3 & ITS, can you please have a look:
+http://lkml.iu.edu/hypermail/linux/kernel/1510.1/06139.html
 
----
- drivers/media/dvb-frontends/stv6110x.c               |    4 ++--
- drivers/media/dvb-frontends/stv6110x.h               |    4 ++--
- drivers/media/dvb-frontends/stv6110x_priv.h          |    2 +-
- drivers/media/pci/ddbridge/ddbridge-core.c           |    2 +-
- drivers/media/pci/ngene/ngene-cards.c                |    2 +-
- drivers/media/pci/ttpci/budget.c                     |    4 ++--
- drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.c |    2 +-
- drivers/media/usb/dvb-usb/technisat-usb2.c           |    2 +-
- 8 files changed, 11 insertions(+), 11 deletions(-)
+Can you please explain what ACPI core changes do you mean?
 
-diff --git a/drivers/media/dvb-frontends/stv6110x.c b/drivers/media/dvb-frontends/stv6110x.c
-index e66154e..a62c01e 100644
---- a/drivers/media/dvb-frontends/stv6110x.c
-+++ b/drivers/media/dvb-frontends/stv6110x.c
-@@ -355,7 +355,7 @@ static struct dvb_tuner_ops stv6110x_ops = {
- 	.release		= stv6110x_release
- };
- 
--static struct stv6110x_devctl stv6110x_ctl = {
-+static const struct stv6110x_devctl stv6110x_ctl = {
- 	.tuner_init		= stv6110x_init,
- 	.tuner_sleep		= stv6110x_sleep,
- 	.tuner_set_mode		= stv6110x_set_mode,
-@@ -369,7 +369,7 @@ static struct stv6110x_devctl stv6110x_ctl = {
- 	.tuner_get_status	= stv6110x_get_status,
- };
- 
--struct stv6110x_devctl *stv6110x_attach(struct dvb_frontend *fe,
-+const struct stv6110x_devctl *stv6110x_attach(struct dvb_frontend *fe,
- 					const struct stv6110x_config *config,
- 					struct i2c_adapter *i2c)
- {
-diff --git a/drivers/media/dvb-frontends/stv6110x.h b/drivers/media/dvb-frontends/stv6110x.h
-index 9f7eb25..696b6e5 100644
---- a/drivers/media/dvb-frontends/stv6110x.h
-+++ b/drivers/media/dvb-frontends/stv6110x.h
-@@ -55,12 +55,12 @@ struct stv6110x_devctl {
- 
- #if IS_REACHABLE(CONFIG_DVB_STV6110x)
- 
--extern struct stv6110x_devctl *stv6110x_attach(struct dvb_frontend *fe,
-+extern const struct stv6110x_devctl *stv6110x_attach(struct dvb_frontend *fe,
- 					       const struct stv6110x_config *config,
- 					       struct i2c_adapter *i2c);
- 
- #else
--static inline struct stv6110x_devctl *stv6110x_attach(struct dvb_frontend *fe,
-+static inline const struct stv6110x_devctl *stv6110x_attach(struct dvb_frontend *fe,
- 						      const struct stv6110x_config *config,
- 						      struct i2c_adapter *i2c)
- {
-diff --git a/drivers/media/dvb-frontends/stv6110x_priv.h b/drivers/media/dvb-frontends/stv6110x_priv.h
-index 0ec936a..a993aba 100644
---- a/drivers/media/dvb-frontends/stv6110x_priv.h
-+++ b/drivers/media/dvb-frontends/stv6110x_priv.h
-@@ -70,7 +70,7 @@ struct stv6110x_state {
- 	const struct stv6110x_config	*config;
- 	u8 				regs[8];
- 
--	struct stv6110x_devctl		*devctl;
-+	const struct stv6110x_devctl	*devctl;
- };
- 
- #endif /* __STV6110x_PRIV_H */
-diff --git a/drivers/media/pci/ddbridge/ddbridge-core.c b/drivers/media/pci/ddbridge/ddbridge-core.c
-index fba5b40..17f56a8 100644
---- a/drivers/media/pci/ddbridge/ddbridge-core.c
-+++ b/drivers/media/pci/ddbridge/ddbridge-core.c
-@@ -690,7 +690,7 @@ static int tuner_attach_stv6110(struct ddb_input *input, int type)
- 	struct stv090x_config *feconf = type ? &stv0900_aa : &stv0900;
- 	struct stv6110x_config *tunerconf = (input->nr & 1) ?
- 		&stv6110b : &stv6110a;
--	struct stv6110x_devctl *ctl;
-+	const struct stv6110x_devctl *ctl;
- 
- 	ctl = dvb_attach(stv6110x_attach, input->fe, tunerconf, i2c);
- 	if (!ctl) {
-diff --git a/drivers/media/pci/ngene/ngene-cards.c b/drivers/media/pci/ngene/ngene-cards.c
-index 039bed3..4e783a6 100644
---- a/drivers/media/pci/ngene/ngene-cards.c
-+++ b/drivers/media/pci/ngene/ngene-cards.c
-@@ -57,7 +57,7 @@ static int tuner_attach_stv6110(struct ngene_channel *chan)
- 		chan->dev->card_info->fe_config[chan->number];
- 	struct stv6110x_config *tunerconf = (struct stv6110x_config *)
- 		chan->dev->card_info->tuner_config[chan->number];
--	struct stv6110x_devctl *ctl;
-+	const struct stv6110x_devctl *ctl;
- 
- 	/* tuner 1+2: i2c adapter #0, tuner 3+4: i2c adapter #1 */
- 	if (chan->number < 2)
-diff --git a/drivers/media/pci/ttpci/budget.c b/drivers/media/pci/ttpci/budget.c
-index 99972be..b44639c 100644
---- a/drivers/media/pci/ttpci/budget.c
-+++ b/drivers/media/pci/ttpci/budget.c
-@@ -644,7 +644,7 @@ static void frontend_init(struct budget *budget)
- 		}
- 
- 	case 0x101c: { /* TT S2-1600 */
--			struct stv6110x_devctl *ctl;
-+			const struct stv6110x_devctl *ctl;
- 			saa7146_setgpio(budget->dev, 2, SAA7146_GPIO_OUTLO);
- 			msleep(50);
- 			saa7146_setgpio(budget->dev, 2, SAA7146_GPIO_OUTHI);
-@@ -697,7 +697,7 @@ static void frontend_init(struct budget *budget)
- 		break;
- 
- 	case 0x1020: { /* Omicom S2 */
--			struct stv6110x_devctl *ctl;
-+			const struct stv6110x_devctl *ctl;
- 			saa7146_setgpio(budget->dev, 2, SAA7146_GPIO_OUTLO);
- 			msleep(50);
- 			saa7146_setgpio(budget->dev, 2, SAA7146_GPIO_OUTHI);
-diff --git a/drivers/media/usb/dvb-usb/technisat-usb2.c b/drivers/media/usb/dvb-usb/technisat-usb2.c
-index 6c3c477..51487d2 100644
---- a/drivers/media/usb/dvb-usb/technisat-usb2.c
-+++ b/drivers/media/usb/dvb-usb/technisat-usb2.c
-@@ -512,7 +512,7 @@ static int technisat_usb2_frontend_attach(struct dvb_usb_adapter *a)
- 			&a->dev->i2c_adap, STV090x_DEMODULATOR_0);
- 
- 	if (a->fe_adap[0].fe) {
--		struct stv6110x_devctl *ctl;
-+		const struct stv6110x_devctl *ctl;
- 
- 		ctl = dvb_attach(stv6110x_attach,
- 				a->fe_adap[0].fe,
-diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.c
-index 69d7fe4..2c0015b 100644
---- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.c
-+++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.c
-@@ -118,7 +118,7 @@ int c8sectpfe_frontend_attach(struct dvb_frontend **fe,
- 		struct channel_info *tsin, int chan_num)
- {
- 	struct tda18212_config *tda18212;
--	struct stv6110x_devctl *fe2;
-+	const struct stv6110x_devctl *fe2;
- 	struct i2c_client *client;
- 	struct i2c_board_info tda18212_info = {
- 		.type = "tda18212",
+Regards,
+Tomasz
