@@ -1,16 +1,15 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun,  6 Dec 2015 11:37:11 +0100
-Subject: [GIT PULL 2/3] ARM64: berlin: SoC changes for v4.5 (round 1)
-In-Reply-To: <1449398232-13699-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1449398232-13699-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1449398232-13699-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Sun,  6 Dec 2015 11:37:10 +0100
+Subject: [GIT PULL 1/3] ARM64: berlin: DT changes for v4.5 (round 1)
+Message-ID: <1449398232-13699-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Arnd, Kevin, Olof,
 
-this is the first round of Marvell Berlin64 SoC changes for v4.5.
-With pinctrl available, we just select PINCTRL Kconfig for 64-bit Berlin.
+this is the first round of Marvell Berlin64 DT changes for v4.5.
+We have improving BG4CT support with added pinctrl, watchdog, PSCI,
+and cpuidle support.
 
 Please pull.
 
@@ -22,19 +21,26 @@ The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
 
 are available in the git repository at:
 
-  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin64-soc-for-4.5-1
+  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin64-dt-for-4.5-1
 
-for you to fetch changes up to 75d8e1baa5e086de02b9be1ae3eaeb591adc6cf0:
+for you to fetch changes up to 1544f99c0ac08376c0a3888aef7722d9f678020c:
 
-  arm64: berlin: add the pinctrl dependency for Marvell Berlin SoCs (2015-11-19 21:07:11 +0100)
-
-----------------------------------------------------------------
-Marvell Berlin64 SoC changes (round 1):
-- add PINCTRL dependency
+  arm64: dts: berlin4ct: support cpuidle-dt (2015-12-06 10:25:28 +0100)
 
 ----------------------------------------------------------------
-Jisheng Zhang (1):
-      arm64: berlin: add the pinctrl dependency for Marvell Berlin SoCs
+Marvell Berlin64 DT changes (round 1):
+- add pinctrl nodes and uart0 pinmux
+- add watchdog nodes
+- add PSCI-1.0 support
+- add cpuidle support
 
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
+----------------------------------------------------------------
+Jisheng Zhang (5):
+      arm64: dts: berlin4ct: add the pinctrl node
+      arm64: dts: berlin4ct: add default pinmux for uart0
+      arm64: dts: berlin4ct: add watchdog nodes
+      arm64: dts: berlin: PSCI-1.0 support
+      arm64: dts: berlin4ct: support cpuidle-dt
+
+ arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 63 +++++++++++++++++++++++++++++-
+ 1 file changed, 62 insertions(+), 1 deletion(-)
