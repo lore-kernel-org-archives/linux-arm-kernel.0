@@ -1,78 +1,42 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Sun, 06 Dec 2015 13:36:43 +0200
-Subject: [GIT PULL] LPC32xx DTS changes for v4.4
-In-Reply-To: <565B024A.2030704@mleia.com>
-References: <1447863700-15681-1-git-send-email-vz@mleia.com>
- <565B024A.2030704@mleia.com>
-Message-ID: <56641DCB.5080600@mleia.com>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Sun, 6 Dec 2015 22:15:19 +0900
+Subject: [PATCH v8 1/4] arm64: Store struct task_info in sp_el0
+In-Reply-To: <20151204132743.GH10123@e104818-lin.cambridge.arm.com>
+References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
+ <1449226948-14251-2-git-send-email-james.morse@arm.com>
+ <20151204132743.GH10123@e104818-lin.cambridge.arm.com>
+Message-ID: <7D8904A9-7A41-4258-B88F-ABA2F1136331@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.11.2015 15:48, Vladimir Zapolskiy wrote:
-> Hi Arnd,
-> 
-> On 18.11.2015 18:21, Vladimir Zapolskiy wrote:
->> Hi arm-soc team,
->>
->> Please consider pulling these DTS changes for the NXP LPC32xx
->> platform and related boards.
->>
->> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
->>
->>   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
->>
->> are available in the git repository at:
->>
->>   https://github.com/vzapolskiy/linux.git lpc32xx-dts
->>
->> for you to fetch changes up to aa29efb445f11506daca0db934331f144b38ddc4:
->>
->>   arm: dts: lpc32xx: move USB controller subdevices into own device node (2015-11-18 18:01:27 +0200)
-> 
-> this is an old reviewed series, I suppose it is too late to include it
-> into v4.4, should I resend the same pull request for v4.5?
-> 
-> Or is it possible to merge it as is?
+On Dec 4, 2015, at 10:27 PM, Catalin Marinas wrote:
 
-Is there anything, what prevents this changes from being merged?
+Hi Catalin,
 
-Thank you.
-
-With best wishes,
-Vladimir
-
->> ----------------------------------------------------------------
->> Main changes in the series:
->> - Added description of the second PWM controller device
->> - Added External Memory Controller device tree node (Primecell PL175)
->> - Added device tree nodes for standard timer controllers
->> - USB controllers are grouped
->> - Various minor clean-ups needed for further development of LPC32xx
->>
->> ----------------------------------------------------------------
->> Vladimir Zapolskiy (8):
->>       arm: dts: lpc32xx: change include syntax to be C preprocessor friendly
->>       arm: dts: lpc32xx: add labels to all defined peripheral nodes
->>       arm: dts: lpc32xx: add reg property to cpu device node
->>       arm: dts: lpc32xx: add device node for the second pwm controller
->>       arm: dts: ea3250/phy3250: specify phys memory offset for lpc32xx boards
->>       arm: dts: lpc32xx: add external memory controller device node
->>       arm: dts: lpc32xx: add device nodes for standard timers
->>       arm: dts: lpc32xx: move USB controller subdevices into own device node
->>
->>  arch/arm/boot/dts/ea3250.dts   |  41 +++++-------
->>  arch/arm/boot/dts/lpc32xx.dtsi | 142 ++++++++++++++++++++++++++++++-----------
->>  arch/arm/boot/dts/phy3250.dts  |  41 +++++-------
->>  3 files changed, 139 insertions(+), 85 deletions(-)
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
+> On Fri, Dec 04, 2015 at 11:02:25AM +0000, James Morse wrote:
+>> --- a/arch/arm64/kernel/entry.S
+>> +++ b/arch/arm64/kernel/entry.S
+> [...]
+>> @@ -599,6 +606,8 @@ ENTRY(cpu_switch_to)
+>> 	ldp	x29, x9, [x8], #16
+>> 	ldr	lr, [x8]
+>> 	mov	sp, x9
+>> +	and	x9, x9, #~(THREAD_SIZE - 1)
+>> +	msr	sp_el0, x9
+>> 	ret
+>> ENDPROC(cpu_switch_to)
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> At the beginning of the cpu_switch_to function, could we do
+> "mrs x9, sp_el0" instead to avoid the "and ... ~(THREAD_SIZE-1)"?
 > 
+> Otherwise:
+> 
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+
+Thanks for reviewing this one!
+
+If this one is picked up without re-spin, it would be better to change
+the word 'task_info' in the subject to 'thread_info' for clarification.
+
+Best Regards
+Jungseok Lee
