@@ -1,38 +1,40 @@
-From: zhaoxiu.zeng@gmail.com (Zhaoxiu Zeng)
-Date: Sun,  6 Dec 2015 18:11:45 +0800
-Subject: [PATCH 02/10] brcmstb_gisb: Replace "hweight_long(mask) != 1" with
- "!is_power_of_2(mask)"
-Message-ID: <1449396705-14235-1-git-send-email-zhaoxiu.zeng@gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sun,  6 Dec 2015 11:37:11 +0100
+Subject: [GIT PULL 2/3] ARM64: berlin: SoC changes for v4.5 (round 1)
+In-Reply-To: <1449398232-13699-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1449398232-13699-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1449398232-13699-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zeng Zhaoxiu <zhaoxiu.zeng@gmail.com>
+Arnd, Kevin, Olof,
 
-Signed-off-by: Zeng Zhaoxiu <zhaoxiu.zeng@gmail.com>
----
- drivers/bus/brcmstb_gisb.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+this is the first round of Marvell Berlin64 SoC changes for v4.5.
+With pinctrl available, we just select PINCTRL Kconfig for 64-bit Berlin.
 
-diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
-index f364fa4..2816a04 100644
---- a/drivers/bus/brcmstb_gisb.c
-+++ b/drivers/bus/brcmstb_gisb.c
-@@ -24,6 +24,7 @@
- #include <linux/of.h>
- #include <linux/bitops.h>
- #include <linux/pm.h>
-+#include <linux/log2.h>
- 
- #ifdef CONFIG_ARM
- #include <asm/bug.h>
-@@ -171,7 +172,7 @@ brcmstb_gisb_master_to_str(struct brcmstb_gisb_arb_device *gdev,
- {
- 	u32 mask = gdev->valid_mask & masters;
- 
--	if (hweight_long(mask) != 1)
-+	if (!is_power_of_2(mask))
- 		return NULL;
- 
- 	return gdev->master_names[ffs(mask) - 1];
--- 
-2.5.0
+Please pull.
+
+Sebastian
+
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+
+are available in the git repository at:
+
+  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin64-soc-for-4.5-1
+
+for you to fetch changes up to 75d8e1baa5e086de02b9be1ae3eaeb591adc6cf0:
+
+  arm64: berlin: add the pinctrl dependency for Marvell Berlin SoCs (2015-11-19 21:07:11 +0100)
+
+----------------------------------------------------------------
+Marvell Berlin64 SoC changes (round 1):
+- add PINCTRL dependency
+
+----------------------------------------------------------------
+Jisheng Zhang (1):
+      arm64: berlin: add the pinctrl dependency for Marvell Berlin SoCs
+
+ arch/arm64/Kconfig.platforms | 1 +
+ 1 file changed, 1 insertion(+)
