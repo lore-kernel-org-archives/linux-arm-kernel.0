@@ -1,37 +1,75 @@
 From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Sun, 6 Dec 2015 22:33:50 +0900
-Subject: [PATCH v8 0/4] arm64: Add support for IRQ stack
-In-Reply-To: <20151204135752.GK10123@e104818-lin.cambridge.arm.com>
+Date: Sun, 6 Dec 2015 22:51:10 +0900
+Subject: [PATCH v8 4/4] arm64: switch to irq_stack during softirq
+In-Reply-To: <5661A5B0.3080504@arm.com>
 References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
- <20151204135752.GK10123@e104818-lin.cambridge.arm.com>
-Message-ID: <7BAF1B7D-6A98-44D4-8F5B-AA6825B5DF8D@gmail.com>
+ <1449226948-14251-5-git-send-email-james.morse@arm.com>
+ <20151204140119.GL10123@e104818-lin.cambridge.arm.com>
+ <5661A5B0.3080504@arm.com>
+Message-ID: <DD120C66-19BC-4667-97EA-3D47344A15CD@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Dec 4, 2015, at 10:57 PM, Catalin Marinas wrote:
-> On Fri, Dec 04, 2015 at 11:02:24AM +0000, James Morse wrote:
->> Patch 4 is new, following Catalin's comments, but I don't think it is
->> necessary unless we also decrease the stack size,
-> 
-> That's the whole aim of this patchset, to try to to get back to 8KB
-> stacks.
-> 
->> which I don't think we should do immediatly - it would be good to
->> collect some max_stack_size values for various workloads first.
-> 
-> We could make it configurable though, maybe defaulting to 16KB for a
-> while.
-> 
-> IIRC, the stack overflows we had in the past were triggered when running
-> specweb but I don't remember whether it was hard or soft IRQs that
-> caused the issues (could have been both). We could run some tests again
-> and see how close we get to the 8KB limit.
-> 
-> BTW, what's the disadvantage of always switching to the IRQ stack in
-> do_softirq?
+On Dec 4, 2015, at 11:39 PM, James Morse wrote:
 
-As we know well, additional operations, such as IRQ count management and
-stack pointer update, are the only items I'm aware of.
+Hi James,
+
+> Hi Catalin,
+> 
+> On 04/12/15 14:01, Catalin Marinas wrote:
+>> On Fri, Dec 04, 2015 at 11:02:28AM +0000, James Morse wrote:
+>>> +ENTRY(__do_softirq_on_irqstack)
+>>> +	push	x19, lr
+>>> +	push	x25, x26
+>>> +
+>>> +	irq_stack_entry lr
+>>> +
+>>> +	/* irq_stack_entry leaves irq_count in x25 */
+>>> +	ldr	x1, [x25]
+>>> +	add	x1, x1, #1
+>>> +	str	x1, [x25]
+>>> +
+>>> +	bl	__do_softirq
+>>> +
+>>> +	ldr	x1, [x25]
+>>> +	sub	x1, x1, #1
+>>> +	str	x1, [x25]
+>>> +
+>>> +	irq_stack_exit
+>>> +
+>>> +	pop x25, x26
+>>> +	pop x19, lr
+>>> +	ret
+>>> +ENDPROC(__do_softirq_on_irqstack)
+>> 
+>> I was thinking of doing do_softirq_own_stack() entirely in assembly
+>> without the need to check for on_irq_stack() check in C, just a test of
+>> the irq_count value.
+> 
+> I tried that, but couldn't get it to work - maybe I'm missing a trick:
+> 
+> There are at least two ways into do_softirq_own_stack():
+> el1_irq() -> __irq_exit() -> do_softirq_own_stack(),
+> as well as:
+> cpu_switch_to(ksoftirqd) -> do_softirq_own_stack()
+> 
+> In both cases irq_count == 0 because do_softirq_own_stack() is where we
+> update irq_count [0]. I can only see two ways to tell them apart,
+> increment irq_count in el1_irq(), (which we don't like), or have that
+> bounds checking.
+> 
+> 
+> (We could increase hardirq_count() in el?_irq(), which would mean
+> in_irq()/in_interrupt() always returns true when on the irq_stack, which
+> would stop softirqs being processed here... but that is a fairly
+> significant change in behavior.)
+
+It is not simple to utilize preempt_count which is based on task for stack
+switching based on core. Unluckily, I cannot give a specific challenge I've
+experienced.
+
+>From implementation perspective, I think it is an advantage to use tpidr_el1
+for percpu variables. But, preempt_count based approach might not utilize it.
 
 Best Regards
 Jungseok Lee
