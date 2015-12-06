@@ -1,56 +1,63 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Sun,  6 Dec 2015 12:45:56 +0200
-Subject: [PATCH v2 4/5] clk: lpc18xx: add NXP specific COMMON_CLK_NXP
- configuration symbol
+Date: Sun,  6 Dec 2015 12:45:53 +0200
+Subject: [PATCH v2 1/5] dt-bindings: clock: add description of LPC32xx clock
+ controller
 In-Reply-To: <1449398757-16834-1-git-send-email-vz@mleia.com>
 References: <1449398757-16834-1-git-send-email-vz@mleia.com>
-Message-ID: <1449398757-16834-5-git-send-email-vz@mleia.com>
+Message-ID: <1449398757-16834-2-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change adds COMMON_CLK_NXP configuration symbol and enables it for
-NXP LPC18XX architecture, this is needed to reuse drivers/clk/nxp
-folder for NXP common clock framework drivers other than LPC18XX one.
+NXP LPC32xx SoC has a clocking and power control unit (CPC) as a part
+of system control block (SCB). CPC is supplied by two external
+oscillators and it manages core and most of peripheral
+clocks, the change adds description of DT bindings for clock
+controller found on LPC32xx SoC series.
 
 Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-Acked-by: Joachim Eastwood <manabian@gmail.com>
 ---
 Changes from v1 to v2:
-- removed explicit COMMON_CLK selection for NXP LPC18xx
+- none
 
- drivers/clk/Kconfig  | 5 +++++
- drivers/clk/Makefile | 2 +-
- 2 files changed, 6 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/clock/nxp,lpc3220-clk.txt  | 30 ++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/nxp,lpc3220-clk.txt
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index c3e3a02..7fc1eb9 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -175,6 +175,11 @@ config COMMON_CLK_PWM
- 	  Adapter driver so that any PWM output can be (mis)used as clock signal
- 	  at 50% duty cycle.
- 
-+config COMMON_CLK_NXP
-+	def_bool COMMON_CLK && ARCH_LPC18XX
-+	---help---
-+	  Support for clock providers on NXP platforms.
+diff --git a/Documentation/devicetree/bindings/clock/nxp,lpc3220-clk.txt b/Documentation/devicetree/bindings/clock/nxp,lpc3220-clk.txt
+new file mode 100644
+index 0000000..20cbca3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/nxp,lpc3220-clk.txt
+@@ -0,0 +1,30 @@
++NXP LPC32xx Clock Controller
 +
- config COMMON_CLK_PXA
- 	def_bool COMMON_CLK && ARCH_PXA
- 	---help---
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 820714c..15603c1 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -62,8 +62,8 @@ endif
- obj-$(CONFIG_PLAT_ORION)		+= mvebu/
- obj-$(CONFIG_ARCH_MESON)		+= meson/
- obj-$(CONFIG_ARCH_MXS)			+= mxs/
--obj-$(CONFIG_ARCH_LPC18XX)		+= nxp/
- obj-$(CONFIG_MACH_PISTACHIO)		+= pistachio/
-+obj-$(CONFIG_COMMON_CLK_NXP)		+= nxp/
- obj-$(CONFIG_COMMON_CLK_PXA)		+= pxa/
- obj-$(CONFIG_COMMON_CLK_QCOM)		+= qcom/
- obj-$(CONFIG_ARCH_ROCKCHIP)		+= rockchip/
++Required properties:
++- compatible: should be "nxp,lpc3220-clk"
++- reg:  should contain clock controller registers location and length
++- #clock-cells: must be 1, the cell holds id of a clock provided by the
++  clock controller
++- clocks: phandles of external oscillators, the list must contain one
++  32768 Hz oscillator and may have one optional high frequency oscillator
++- clock-names: list of external oscillator clock names, must contain
++  "xtal_32k" and may have optional "xtal"
++
++Examples:
++
++	/* System Control Block */
++	scb {
++		compatible = "simple-bus";
++		ranges = <0x0 0x040004000 0x00001000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		clk: clock-controller at 0 {
++			compatible = "nxp,lpc3220-clk";
++			reg = <0x00 0x114>;
++			#clock-cells = <1>;
++
++			clocks = <&xtal_32k>, <&xtal>;
++			clock-names = "xtal_32k", "xtal";
++		};
++	};
 -- 
 2.1.4
