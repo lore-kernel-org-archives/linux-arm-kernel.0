@@ -1,36 +1,45 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sat, 5 Dec 2015 23:24:29 -0500
-Subject: [RFC] User space to kernel space copy optimization
-In-Reply-To: <20151205081030.GM1854@localhost>
-References: <564A5057.9080203@codeaurora.org> <20151205081030.GM1854@localhost>
-Message-ID: <5663B87D.6010808@codeaurora.org>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Sat, 5 Dec 2015 20:39:16 -0800
+Subject: [PATCH LINUX v4 00/13] tty: xuartps: Fix lock ups
+Message-ID: <1449376769-13369-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/5/2015 3:10 AM, Vinod Koul wrote:
-> On Mon, Nov 16, 2015 at 04:53:27PM -0500, Sinan Kaya wrote:
->> One of the things I'm interested in is to use a memcpy capable DMA
->> engine HW to optimize user space and kernel space parameter copying.
->>
->> Of course, this will not be viable for all parameter sizes but I can see
->> this being useful. The goal is to save power in the cost of little
->> performance.
->>
->> Before I go and invent my own mechanism, I'd like to have ideas on what
->> an acceptable solution would look like. Especially, I'm looking for a
->> generic implementation that could plug into any DMA engine HW.
-> 
-> Do you have a proposal on how this generic solution should look like, broad
-> contours of the design to start off with and we can start from that point
-> 
+Hi,
 
-No, not yet. AFAIK, some of these optimization ideas have been tried by
-the Intel IO/AT in the past (kernel 2.6) and were rejected by the
-upstream. I wanted to see if anybody had better ideas these days that is
-upstream friendly.
+I picked up all the review tags from Peter and Moritz and addressed
+Peter's comments.
+Most patches are unchanged but I added the info Peter suggested/provided
+to some commit messages.
+The patches "tty: xuartps: Move request_irq to after setting up the HW",
+"tty: xuartps: Improve sysrq handling" and "tty: xuartps: Remove
+'_OFFSET' suffix from #defines" are new, implementing the suggestions
+Peter made in the v3 review (https://lkml.org/lkml/2015/11/21/172).
+I pretty much rewrote "tty: xuartps: Refactor IRQ handling" (was: "tty:
+xuartps: Only handle RX IRQs when RX is enabled"). Instead of adding a
+flag, we now disable/enable the RX interrupts together with the
+receiver. That should prevent the RX lock ups I saw.
+
+	Thanks,
+	S?ren
+
+S?ren Brinkmann (13):
+  tty: xuartps: Beautify read-modify writes
+  tty: xuartps: Use spinlock to serialize HW access
+  tty: xuartps: Don't consider circular buffer when enabling transmitter
+  tty: xuartps: Clear interrupt status register in shutdown
+  tty: xuartps: Improve startup function
+  tty: xuartps: Move request_irq to after setting up the HW
+  tty: xuartps: Keep lock for whole ISR
+  tty: xuartps: Acquire port lock for shutdown
+  tty: xuartps: Move RX path into helper function
+  tty: xuartps: Refactor IRQ handling
+  tty: xuartps: Cleanup: Reformat if-else
+  tty: xuartps: Improve sysrq handling
+  tty: xuartps: Remove '_OFFSET' suffix from #defines
+
+ drivers/tty/serial/xilinx_uartps.c | 451 ++++++++++++++++++-------------------
+ 1 file changed, 224 insertions(+), 227 deletions(-)
 
 -- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
-Linux Foundation Collaborative Project
+2.6.3.3.g9bb996a
