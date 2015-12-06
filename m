@@ -1,127 +1,86 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Sun,  6 Dec 2015 13:32:01 +0200
-Subject: [PATCH v2 5/6] pwm: lpc32xx: fix and simplify duty cycle and period
- calculations
-In-Reply-To: <1449401522-22590-1-git-send-email-vz@mleia.com>
-References: <1449401522-22590-1-git-send-email-vz@mleia.com>
-Message-ID: <1449401522-22590-6-git-send-email-vz@mleia.com>
+Date: Sun, 06 Dec 2015 13:33:20 +0200
+Subject: [PATCH 07/10] ARM: debug-ll: rework lpc32xx handling
+In-Reply-To: <1449268242-808553-8-git-send-email-arnd@arndb.de>
+References: <1449268242-808553-1-git-send-email-arnd@arndb.de>
+ <1449268242-808553-8-git-send-email-arnd@arndb.de>
+Message-ID: <56641D00.40309@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change fixes a problem, if duty_ns is too small in comparison
-to period_ns (as a valid corner case duty_ns is 0 ns), then due to
-PWM_DUTY() macro applied on a value the result is overflowed over 8
-bits, and instead of the highest bitfield duty cycle value 0xff the
-invalid duty cycle bitfield value 0x00 is written.
+On 05.12.2015 00:30, Arnd Bergmann wrote:
+> LPC32xx can not yet be configured in a multiplatform kernel, but
+> if we ever get there, enabling one of the LPC32xx platforms
+> while trying to use DEBUG_LL for another platform can default to
+> the wrong UART address, as the options are purely based on the
+> architecture being enabled or not.
+> 
+> This changes the logic to use the LPC32xx default addresses only
+> if we have also picked the respective Kconfig symbols introduced
+> here.
+> 
+> While we're at it, this also reorders the virtual address as
+> it should be.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/Kconfig.debug | 14 +++++++++++---
+>  1 file changed, 11 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index b35392417378..9836d428a65d 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -480,6 +480,14 @@ choice
+>  		  Say Y here if you want kernel low-level debugging support
+>  		  on NXP LPC18xx/43xx UART0.
+>  
+> +	config DEBUG_LPC32XX
+> +		bool "Kernel low-level debugging messages via NXP LPC32xx UART"
+> +		depends on ARCH_LPC32XX
+> +		select DEBUG_UART_8250
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on NXP LPC32xx based platforms.
+> +
+>  	config DEBUG_MESON_UARTAO
+>  		bool "Kernel low-level debugging via Meson6 UARTAO"
+>  		depends on ARCH_MESON
+> @@ -1425,7 +1433,7 @@ config DEBUG_UART_PL01X
+>  config DEBUG_UART_8250
+>  	def_bool ARCH_EBSA110 || (FOOTBRIDGE && !DEBUG_DC21285_PORT) || \
+>  		ARCH_IOP13XX || ARCH_IOP32X || ARCH_IOP33X || ARCH_IXP4XX || \
+> -		ARCH_LPC32XX || ARCH_RPC
+> +		ARCH_RPC
+>  
+>  # Compatibility options for BCM63xx
+>  config DEBUG_UART_BCM63XX
+> @@ -1468,7 +1476,7 @@ config DEBUG_UART_PHYS
+>  	default 0x3e000000 if DEBUG_BCM_KONA_UART
+>  	default 0x4000e400 if DEBUG_LL_UART_EFM32
+>  	default 0x40081000 if DEBUG_LPC18XX_UART0
+> -	default 0x40090000 if ARCH_LPC32XX
+> +	default 0x40090000 if DEBUG_LPC32XX
+>  	default 0x40100000 if DEBUG_PXA_UART1
+>  	default 0x42000000 if DEBUG_GEMINI
+>  	default 0x50000000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART0 || \
+> @@ -1562,9 +1570,9 @@ config DEBUG_UART_VIRT
+>  	default 0xf1c28000 if DEBUG_SUNXI_UART0
+>  	default 0xf1c28400 if DEBUG_SUNXI_UART1
+>  	default 0xf1f02800 if DEBUG_SUNXI_R_UART
+> +	default 0xf4090000 if DEBUG_LPC32XX
+>  	default 0xf4200000 if DEBUG_GEMINI
+>  	default 0xf6200000 if DEBUG_PXA_UART1
+> -	default 0xf4090000 if ARCH_LPC32XX
+>  	default 0xf7000000 if DEBUG_SUN9I_UART0
+>  	default 0xf7000000 if DEBUG_S3C64XX_UART && DEBUG_S3C_UART0
+>  	default 0xf7000000 if DEBUG_S3C24XX_UART && (DEBUG_S3C_UART0 || \
+> 
 
-For reference the LPC32xx spec defines PWMx_DUTY bitfield description
-is this way and it seems to be correct:
+For LPC32xx change:
 
- [Low]/[High] = [PWM_DUTY]/[256-PWM_DUTY], where 0 < PWM_DUTY <= 255.
+Acked-by: Vladimir Zapolskiy <vz@mleia.com>
 
-In addition according to my oscilloscope measurements LPC32xx PWM is
-"tristate" in sense that it produces a wave with floating min/max
-voltage levels for different duty cycle values, for corner cases:
-
-  PWM_DUTY == 0x01 => signal is in range from -1.05v to 0v
-  ....
-  PWM_DUTY == 0x80 => signal is in range from -0.75v to +0.75v
-  ....
-  PWM_DUTY == 0xff => signal is in range from 0v to +1.05v
-
-  PWM_DUTY == 0x00 => signal is around 0v, PWM is off
-
-Due to this peculiarity on very long period ranges (less than 1KHz)
-and odd pre-divider values PWM generated wave does not remind a
-clock shape signal, but rather a heartbit shape signal with positive
-and negative peaks, so I would recommend to use high-speed HCLK clock
-as a PWM parent clock and avoid using RTC clock as a parent.
-
-The change corrects PWM output in corner cases and prevents any
-possible overflows in calculation of values for PWM_DUTY and
-PWM_RELOADV bitfields, thus helper macro definitions may be removed.
-
-Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
----
-Changes from v1 to v2:
-- none
-
- drivers/pwm/pwm-lpc32xx.c | 53 +++++++++++++++++------------------------------
- 1 file changed, 19 insertions(+), 34 deletions(-)
-
-diff --git a/drivers/pwm/pwm-lpc32xx.c b/drivers/pwm/pwm-lpc32xx.c
-index 63468a8..294a68f 100644
---- a/drivers/pwm/pwm-lpc32xx.c
-+++ b/drivers/pwm/pwm-lpc32xx.c
-@@ -24,9 +24,7 @@ struct lpc32xx_pwm_chip {
- 	void __iomem *base;
- };
- 
--#define PWM_ENABLE	(1 << 31)
--#define PWM_RELOADV(x)	(((x) & 0xFF) << 8)
--#define PWM_DUTY(x)	((x) & 0xFF)
-+#define PWM_ENABLE	BIT(31)
- 
- #define to_lpc32xx_pwm_chip(_chip) \
- 	container_of(_chip, struct lpc32xx_pwm_chip, chip)
-@@ -38,40 +36,27 @@ static int lpc32xx_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	unsigned long long c;
- 	int period_cycles, duty_cycles;
- 	u32 val;
--
--	c = clk_get_rate(lpc32xx->clk) / 256;
--	c = c * period_ns;
--	do_div(c, NSEC_PER_SEC);
--
--	/* Handle high and low extremes */
--	if (c == 0)
--		c = 1;
--	if (c > 255)
--		c = 0; /* 0 set division by 256 */
--	period_cycles = c;
--
--	/* The duty-cycle value is as follows:
--	 *
--	 *  DUTY-CYCLE     HIGH LEVEL
--	 *      1            99.9%
--	 *      25           90.0%
--	 *      128          50.0%
--	 *      220          10.0%
--	 *      255           0.1%
--	 *      0             0.0%
--	 *
--	 * In other words, the register value is duty-cycle % 256 with
--	 * duty-cycle in the range 1-256.
--	 */
--	c = 256 * duty_ns;
--	do_div(c, period_ns);
--	if (c > 255)
--		c = 255;
--	duty_cycles = 256 - c;
-+	c = clk_get_rate(lpc32xx->clk);
-+
-+	/* The highest acceptable divisor is 256, which is represented by 0 */
-+	period_cycles = div64_u64(c * period_ns,
-+			       (unsigned long long)NSEC_PER_SEC * 256);
-+	if (!period_cycles)
-+		period_cycles = 1;
-+	if (period_cycles > 255)
-+		period_cycles = 0;
-+
-+	/* Compute 256 x #duty/period value and care for corner cases */
-+	duty_cycles = div64_u64((unsigned long long)(period_ns - duty_ns) * 256,
-+				period_ns);
-+	if (!duty_cycles)
-+		duty_cycles = 1;
-+	if (duty_cycles > 255)
-+		duty_cycles = 255;
- 
- 	val = readl(lpc32xx->base + (pwm->hwpwm << 2));
- 	val &= ~0xFFFF;
--	val |= PWM_RELOADV(period_cycles) | PWM_DUTY(duty_cycles);
-+	val |= (period_cycles << 8) | duty_cycles;
- 	writel(val, lpc32xx->base + (pwm->hwpwm << 2));
- 
- 	return 0;
--- 
-2.1.4
+--
+With best wishes,
+Vladimir
