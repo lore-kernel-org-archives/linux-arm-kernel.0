@@ -1,15 +1,18 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun,  6 Dec 2015 11:37:10 +0100
-Subject: [GIT PULL 1/3] ARM64: berlin: DT changes for v4.5 (round 1)
-Message-ID: <1449398232-13699-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Sun,  6 Dec 2015 11:37:12 +0100
+Subject: [GIT PULL 3/3] ARM: berlin: DT changes for v4.5 (round 1)
+In-Reply-To: <1449398232-13699-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1449398232-13699-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1449398232-13699-3-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Arnd, Kevin, Olof,
 
-this is the first round of Marvell Berlin64 DT changes for v4.5.
-We have improving BG4CT support with added pinctrl, watchdog, PSCI,
-and cpuidle support.
+this is the first round of Marvell Berlin DT changes for v4.5.
+We have a few DT cleanups for eMMC and duplicated interrupt-parent
+properties, watchdog nodes for all 32-bit Berlin SoCs, and full
+SDHCI1 functionality on BG2Q DMP board.
 
 Please pull.
 
@@ -21,26 +24,29 @@ The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
 
 are available in the git repository at:
 
-  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin64-dt-for-4.5-1
+  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-dt-for-4.5-1
 
-for you to fetch changes up to 1544f99c0ac08376c0a3888aef7722d9f678020c:
+for you to fetch changes up to ac4111abf3521dfb3038c44c053f7c43ee1fb1bd:
 
-  arm64: dts: berlin4ct: support cpuidle-dt (2015-12-06 10:25:28 +0100)
-
-----------------------------------------------------------------
-Marvell Berlin64 DT changes (round 1):
-- add pinctrl nodes and uart0 pinmux
-- add watchdog nodes
-- add PSCI-1.0 support
-- add cpuidle support
+  arm: dts: berlin2q-marvell-dmp: add sdhci1 fully functionality (2015-12-06 10:26:55 +0100)
 
 ----------------------------------------------------------------
-Jisheng Zhang (5):
-      arm64: dts: berlin4ct: add the pinctrl node
-      arm64: dts: berlin4ct: add default pinmux for uart0
-      arm64: dts: berlin4ct: add watchdog nodes
-      arm64: dts: berlin: PSCI-1.0 support
-      arm64: dts: berlin4ct: support cpuidle-dt
+Marvell Berlin DT changes (round 1):
+- BG2Q cleanups (DMP eMMC, duplicated interrupt-parents)
+- add BG2, BG2CD, BG2Q watchdog nodes
+- add BG2Q DMP SDHCI1 nodes
 
- arch/arm64/boot/dts/marvell/berlin4ct.dtsi | 63 +++++++++++++++++++++++++++++-
- 1 file changed, 62 insertions(+), 1 deletion(-)
+----------------------------------------------------------------
+Jisheng Zhang (6):
+      arm: dts: berlin2q-marvell-dmp: remove broken-cd from eMMC node
+      arm: dts: berlin2q: remove duplicated interrupt-parent
+      arm: dts: berlin2q: add watchdog nodes
+      arm: dts: berlin2cd: add watchdog nodes
+      arm: dts: berlin2: add watchdog nodes
+      arm: dts: berlin2q-marvell-dmp: add sdhci1 fully functionality
+
+ arch/arm/boot/dts/berlin2.dtsi             | 23 ++++++++++++++++++
+ arch/arm/boot/dts/berlin2cd.dtsi           | 23 ++++++++++++++++++
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 38 +++++++++++++++++++++++++++---
+ arch/arm/boot/dts/berlin2q.dtsi            | 34 +++++++++++++++++++++-----
+ 4 files changed, 109 insertions(+), 9 deletions(-)
