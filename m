@@ -1,52 +1,87 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun,  6 Dec 2015 11:37:12 +0100
-Subject: [GIT PULL 3/3] ARM: berlin: DT changes for v4.5 (round 1)
-In-Reply-To: <1449398232-13699-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1449398232-13699-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1449398232-13699-3-git-send-email-sebastian.hesselbarth@gmail.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Sun,  6 Dec 2015 12:45:55 +0200
+Subject: [PATCH v2 3/5] dt-bindings: clock: add NXP LPC32xx clock list for
+ consumers
+In-Reply-To: <1449398757-16834-1-git-send-email-vz@mleia.com>
+References: <1449398757-16834-1-git-send-email-vz@mleia.com>
+Message-ID: <1449398757-16834-4-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Kevin, Olof,
+The change adds a list of NXP LPC32xx clocks, which can be requested
+by clock consumers.
 
-this is the first round of Marvell Berlin DT changes for v4.5.
-We have a few DT cleanups for eMMC and duplicated interrupt-parent
-properties, watchdog nodes for all 32-bit Berlin SoCs, and full
-SDHCI1 functionality on BG2Q DMP board.
+Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+---
+Changes from v1 to v2:
+- incremented by 1 all clock values, possibly clock "0" may have a
+  special meaning in future
 
-Please pull.
+ include/dt-bindings/clock/lpc32xx-clock.h | 56 +++++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
+ create mode 100644 include/dt-bindings/clock/lpc32xx-clock.h
 
-Sebastian
-
-The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
-
-  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
-
-are available in the git repository at:
-
-  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-dt-for-4.5-1
-
-for you to fetch changes up to ac4111abf3521dfb3038c44c053f7c43ee1fb1bd:
-
-  arm: dts: berlin2q-marvell-dmp: add sdhci1 fully functionality (2015-12-06 10:26:55 +0100)
-
-----------------------------------------------------------------
-Marvell Berlin DT changes (round 1):
-- BG2Q cleanups (DMP eMMC, duplicated interrupt-parents)
-- add BG2, BG2CD, BG2Q watchdog nodes
-- add BG2Q DMP SDHCI1 nodes
-
-----------------------------------------------------------------
-Jisheng Zhang (6):
-      arm: dts: berlin2q-marvell-dmp: remove broken-cd from eMMC node
-      arm: dts: berlin2q: remove duplicated interrupt-parent
-      arm: dts: berlin2q: add watchdog nodes
-      arm: dts: berlin2cd: add watchdog nodes
-      arm: dts: berlin2: add watchdog nodes
-      arm: dts: berlin2q-marvell-dmp: add sdhci1 fully functionality
-
- arch/arm/boot/dts/berlin2.dtsi             | 23 ++++++++++++++++++
- arch/arm/boot/dts/berlin2cd.dtsi           | 23 ++++++++++++++++++
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 38 +++++++++++++++++++++++++++---
- arch/arm/boot/dts/berlin2q.dtsi            | 34 +++++++++++++++++++++-----
- 4 files changed, 109 insertions(+), 9 deletions(-)
+diff --git a/include/dt-bindings/clock/lpc32xx-clock.h b/include/dt-bindings/clock/lpc32xx-clock.h
+new file mode 100644
+index 0000000..bcb1c9a
+--- /dev/null
++++ b/include/dt-bindings/clock/lpc32xx-clock.h
+@@ -0,0 +1,56 @@
++/*
++ * Copyright (c) 2015 Vladimir Zapolskiy <vz@mleia.com>
++ *
++ * This code is released using a dual license strategy: BSD/GPL
++ * You can choose the licence that better fits your requirements.
++ *
++ * Released under the terms of 3-clause BSD License
++ * Released under the terms of GNU General Public License Version 2.0
++ *
++ */
++
++#ifndef __DT_BINDINGS_LPC32XX_CLOCK_H
++#define __DT_BINDINGS_LPC32XX_CLOCK_H
++
++/* LPC32XX System Control Block clocks */
++#define LPC32XX_CLK_RTC		1
++#define LPC32XX_CLK_DMA		2
++#define LPC32XX_CLK_MLC		3
++#define LPC32XX_CLK_SLC		4
++#define LPC32XX_CLK_LCD		5
++#define LPC32XX_CLK_MAC		6
++#define LPC32XX_CLK_SD		7
++#define LPC32XX_CLK_DDRAM	8
++#define LPC32XX_CLK_SSP0	9
++#define LPC32XX_CLK_SSP1	10
++#define LPC32XX_CLK_UART3	11
++#define LPC32XX_CLK_UART4	12
++#define LPC32XX_CLK_UART5	13
++#define LPC32XX_CLK_UART6	14
++#define LPC32XX_CLK_IRDA	15
++#define LPC32XX_CLK_I2C1	16
++#define LPC32XX_CLK_I2C2	17
++#define LPC32XX_CLK_TIMER0	18
++#define LPC32XX_CLK_TIMER1	19
++#define LPC32XX_CLK_TIMER2	20
++#define LPC32XX_CLK_TIMER3	21
++#define LPC32XX_CLK_TIMER4	22
++#define LPC32XX_CLK_TIMER5	23
++#define LPC32XX_CLK_WDOG	24
++#define LPC32XX_CLK_I2S0	25
++#define LPC32XX_CLK_I2S1	26
++#define LPC32XX_CLK_SPI1	27
++#define LPC32XX_CLK_SPI2	28
++#define LPC32XX_CLK_MCPWM	29
++#define LPC32XX_CLK_HSTIMER	30
++#define LPC32XX_CLK_KEY		31
++#define LPC32XX_CLK_PWM1	32
++#define LPC32XX_CLK_PWM2	33
++#define LPC32XX_CLK_ADC		34
++
++/* LPC32XX USB clocks */
++#define LPC32XX_USB_CLK_I2C	1
++#define LPC32XX_USB_CLK_DEVICE	2
++#define LPC32XX_USB_CLK_HOST	3
++
++#endif /* __DT_BINDINGS_LPC32XX_CLOCK_H */
+-- 
+2.1.4
