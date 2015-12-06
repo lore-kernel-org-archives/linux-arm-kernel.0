@@ -1,328 +1,110 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sun, 06 Dec 2015 23:28:32 +0000
-Subject: [PATCH v2 2/3] clk: add Dove PLL divider support for GPU, VMeta and
- AXI clocks
-Message-ID: <E1a5ijI-0007pk-0I@rmk-PC.arm.linux.org.uk>
+From: boqun.feng@gmail.com (Boqun Feng)
+Date: Mon, 7 Dec 2015 07:28:25 +0800
+Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
+ concurrent lockers
+In-Reply-To: <20151206192302.GS28602@linux.vnet.ibm.com>
+References: <20151203001141.GO28602@linux.vnet.ibm.com>
+ <20151203132839.GA3816@twins.programming.kicks-ass.net>
+ <20151203163243.GI11337@arm.com>
+ <20151203172207.GR28602@linux.vnet.ibm.com>
+ <20151204092110.GE17308@twins.programming.kicks-ass.net>
+ <20151204160706.GC28602@linux.vnet.ibm.com>
+ <20151204162453.GE15969@arm.com>
+ <20151204164446.GF28602@linux.vnet.ibm.com>
+ <20151206073712.GA1549@fixme-laptop.cn.ibm.com>
+ <20151206192302.GS28602@linux.vnet.ibm.com>
+Message-ID: <20151206232825.GA13845@fixme-laptop.cn.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Dove PLL dividers, which are used to generate the
-clocks for the AXI bus, as well as the GPU and VMeta peripherals.
+On Sun, Dec 06, 2015 at 11:23:02AM -0800, Paul E. McKenney wrote:
+> On Sun, Dec 06, 2015 at 03:37:23PM +0800, Boqun Feng wrote:
+> > Hi Paul,
+> > 
+> > On Fri, Dec 04, 2015 at 08:44:46AM -0800, Paul E. McKenney wrote:
+> > > On Fri, Dec 04, 2015 at 04:24:54PM +0000, Will Deacon wrote:
+> > > > On Fri, Dec 04, 2015 at 08:07:06AM -0800, Paul E. McKenney wrote:
+> > > > > On Fri, Dec 04, 2015 at 10:21:10AM +0100, Peter Zijlstra wrote:
+> > > > > > On Thu, Dec 03, 2015 at 09:22:07AM -0800, Paul E. McKenney wrote:
+> > > > > > > >   2. Only PowerPC is going to see the (very occassional) failures, so
+> > > > > > > >      testing this is nigh on impossible :(
+> > > > > > > 
+> > > > > > > Indeed, we clearly cannot rely on normal testing, witness rcutorture
+> > > > > > > failing to find the missing smp_mb__after_unlock_lock() instances that
+> > > > > > > Peter found by inspection.  So I believe that augmented testing is
+> > > > > > > required, perhaps as suggested above.
+> > > > > > 
+> > > > > > To be fair, those were in debug code and non critical for correctness
+> > > > > > per se. That is, at worst the debug print would've observed an incorrect
+> > > > > > value.
+> > > > > 
+> > > > > True enough, but there is still risk from people repurposing debug code
+> > > > > for non-debug uses.  Still, thank you, I don't feel -quite- so bad about
+> > > > > rcutorture's failure to find these.  ;-)
+> > > > 
+> > > > It's the ones that it's yet to find that you should be worried about,
+> > > > and the debug code is all fixed ;)
+> > > 
+> > > Fortunately, when Peter sent the patch fixing the debug-only
+> > > cases, he also created wrapper functions for the various types of
+> > > lock acquisition for rnp->lock.  Of course, the danger is that I
+> > > might type "raw_spin_lock_irqsave(&rnp->lock, flags)" instead of
+> > > "raw_spin_lock_irqsave_rcu_node(rnp, flags)" out of force of habit.
+> > > So I must occasionally scan the RCU source code for "spin_lock.*->lock",
+> > > which I just now did.  ;-)
+> > 
+> > Maybe you can rename ->lock of rnp to ->lock_acquired_on_your_own_risk
+> > to avoid the force of habit ;-)
+> 
+> Sold!  Though with a shorter alternate name...  And timing will be an
+> issue.  Probably needs to go into the first post-v4.5 set (due to the
+> high expected conflict rate), and probably needs to create wrappers for
+> the spin_unlock functions.
+> 
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/clk/mvebu/Makefile       |   2 +-
- drivers/clk/mvebu/dove-divider.c | 262 +++++++++++++++++++++++++++++++++++++++
- drivers/clk/mvebu/dove.c         |   6 +
- 3 files changed, 269 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/mvebu/dove-divider.c
+Or maybe, we introduce another address space of sparse like:
 
-diff --git a/drivers/clk/mvebu/Makefile b/drivers/clk/mvebu/Makefile
-index 645ac7ea3565..8866115486f7 100644
---- a/drivers/clk/mvebu/Makefile
-+++ b/drivers/clk/mvebu/Makefile
-@@ -7,6 +7,6 @@ obj-$(CONFIG_ARMADA_375_CLK)	+= armada-375.o
- obj-$(CONFIG_ARMADA_38X_CLK)	+= armada-38x.o
- obj-$(CONFIG_ARMADA_39X_CLK)	+= armada-39x.o
- obj-$(CONFIG_ARMADA_XP_CLK)	+= armada-xp.o
--obj-$(CONFIG_DOVE_CLK)		+= dove.o
-+obj-$(CONFIG_DOVE_CLK)		+= dove.o dove-divider.o
- obj-$(CONFIG_KIRKWOOD_CLK)	+= kirkwood.o
- obj-$(CONFIG_ORION_CLK)		+= orion.o
-diff --git a/drivers/clk/mvebu/dove-divider.c b/drivers/clk/mvebu/dove-divider.c
-new file mode 100644
-index 000000000000..d5c5bfa35a5a
---- /dev/null
-+++ b/drivers/clk/mvebu/dove-divider.c
-@@ -0,0 +1,262 @@
-+/*
-+ * Marvell Dove PMU Core PLL divider driver
-+ *
-+ * Cleaned up by substantially rewriting, and converted to DT by
-+ * Russell King.  Origin is not known.
-+ */
-+#include <linux/clk-provider.h>
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+
-+#include "dove-divider.h"
-+
-+struct dove_clk {
-+	const char *name;
-+	struct clk_hw hw;
-+	void __iomem *base;
-+	spinlock_t *lock;
-+	u8 div_bit_start;
-+	u8 div_bit_end;
-+	u8 div_bit_load;
-+	u8 div_bit_size;
-+	u32 *divider_table;
-+};
-+
-+enum {
-+	DIV_CTRL0 = 0,
-+	DIV_CTRL1 = 4,
-+	DIV_CTRL1_N_RESET_MASK = BIT(10),
-+};
-+
-+#define to_dove_clk(hw) container_of(hw, struct dove_clk, hw)
-+
-+static void dove_load_divider(void __iomem *base, u32 val, u32 mask, u32 load)
-+{
-+	u32 v;
-+
-+	v = readl_relaxed(base + DIV_CTRL1) | DIV_CTRL1_N_RESET_MASK;
-+	writel_relaxed(v, base + DIV_CTRL1);
-+
-+	v = (readl_relaxed(base + DIV_CTRL0) & ~(mask | load)) | val;
-+	writel_relaxed(v, base + DIV_CTRL0);
-+	writel_relaxed(v | load, base + DIV_CTRL0);
-+	ndelay(250);
-+	writel_relaxed(v, base + DIV_CTRL0);
-+}
-+
-+static unsigned int dove_get_divider(struct dove_clk *dc)
-+{
-+	unsigned int divider;
-+	u32 val;
-+
-+	val = readl_relaxed(dc->base + DIV_CTRL0);
-+	val >>= dc->div_bit_start;
-+
-+	divider = val & ~(~0 << dc->div_bit_size);
-+
-+	if (dc->divider_table)
-+		divider = dc->divider_table[divider];
-+
-+	return divider;
-+}
-+
-+static int dove_calc_divider(const struct dove_clk *dc, unsigned long rate,
-+			     unsigned long parent_rate, bool set)
-+{
-+	unsigned int divider, max;
-+
-+	divider = DIV_ROUND_CLOSEST(parent_rate, rate);
-+
-+	if (dc->divider_table) {
-+		unsigned int i;
-+
-+		for (i = 0; dc->divider_table[i]; i++)
-+			if (divider == dc->divider_table[i]) {
-+				divider = i;
-+				break;
-+			}
-+
-+		if (!dc->divider_table[i])
-+			return -EINVAL;
-+	} else {
-+		max = 1 << dc->div_bit_size;
-+
-+		if (set && (divider == 0 || divider >= max))
-+			return -EINVAL;
-+		if (divider >= max)
-+			divider = max - 1;
-+		else if (divider == 0)
-+			divider = 1;
-+	}
-+
-+	return divider;
-+}
-+
-+static unsigned long dove_recalc_rate(struct clk_hw *hw, unsigned long parent)
-+{
-+	struct dove_clk *dc = to_dove_clk(hw);
-+	unsigned int divider = dove_get_divider(dc);
-+	unsigned long rate = DIV_ROUND_CLOSEST(parent, divider);
-+
-+	pr_debug("%s(): %s divider=%u parent=%lu rate=%lu\n",
-+		 __func__, dc->name, divider, parent, rate);
-+
-+	return rate;
-+}
-+
-+static long dove_round_rate(struct clk_hw *hw, unsigned long rate,
-+			    unsigned long *parent)
-+{
-+	struct dove_clk *dc = to_dove_clk(hw);
-+	unsigned long parent_rate = *parent;
-+	int divider;
-+
-+	divider = dove_calc_divider(dc, rate, parent_rate, false);
-+	if (divider < 0)
-+		return divider;
-+
-+	rate = DIV_ROUND_CLOSEST(parent_rate, divider);
-+
-+	pr_debug("%s(): %s divider=%u parent=%lu rate=%lu\n",
-+		 __func__, dc->name, divider, parent_rate, rate);
-+
-+	return rate;
-+}
-+
-+static int dove_set_clock(struct clk_hw *hw, unsigned long rate,
-+			  unsigned long parent_rate)
-+{
-+	struct dove_clk *dc = to_dove_clk(hw);
-+	u32 mask, load, div;
-+	int divider;
-+
-+	divider = dove_calc_divider(dc, rate, parent_rate, true);
-+	if (divider < 0)
-+		return divider;
-+
-+	pr_debug("%s(): %s divider=%u parent=%lu rate=%lu\n",
-+		 __func__, dc->name, divider, parent_rate, rate);
-+
-+	div = (u32)divider << dc->div_bit_start;
-+	mask = ~(~0 << dc->div_bit_size) << dc->div_bit_start;
-+	load = BIT(dc->div_bit_load);
-+
-+	spin_lock(dc->lock);
-+	dove_load_divider(dc->base, div, mask, load);
-+	spin_unlock(dc->lock);
-+
-+	return 0;
-+}
-+
-+static const struct clk_ops dove_divider_ops = {
-+	.set_rate	= dove_set_clock,
-+	.round_rate	= dove_round_rate,
-+	.recalc_rate	= dove_recalc_rate,
-+};
-+
-+static struct clk *clk_register_dove_divider(struct device *dev,
-+	struct dove_clk *dc, const char **parent_names, size_t num_parents,
-+	void __iomem *base)
-+{
-+	char name[32];
-+	struct clk_init_data init = {
-+		.name = name,
-+		.ops = &dove_divider_ops,
-+		.parent_names = parent_names,
-+		.num_parents = num_parents,
-+	};
-+
-+	strlcpy(name, dc->name, sizeof(name));
-+
-+	dc->hw.init = &init;
-+	dc->base = base;
-+	dc->div_bit_size = dc->div_bit_end - dc->div_bit_start + 1;
-+
-+	return clk_register(dev, &dc->hw);
-+}
-+
-+static DEFINE_SPINLOCK(dove_divider_lock);
-+
-+static u32 axi_divider[] = {-1, 2, 1, 3, 4, 6, 5, 7, 8, 10, 9, 0};
-+
-+static struct dove_clk dove_hw_clocks[4] = {
-+	{
-+		.name = "axi",
-+		.lock = &dove_divider_lock,
-+		.div_bit_start = 1,
-+		.div_bit_end = 6,
-+		.div_bit_load = 7,
-+		.divider_table = axi_divider,
-+	}, {
-+		.name = "gpu",
-+		.lock = &dove_divider_lock,
-+		.div_bit_start = 8,
-+		.div_bit_end = 13,
-+		.div_bit_load = 14,
-+	}, {
-+		.name = "vmeta",
-+		.lock = &dove_divider_lock,
-+		.div_bit_start = 15,
-+		.div_bit_end = 20,
-+		.div_bit_load = 21,
-+	}, {
-+		.name = "lcd",
-+		.lock = &dove_divider_lock,
-+		.div_bit_start = 22,
-+		.div_bit_end = 27,
-+		.div_bit_load = 28,
-+	},
-+};
-+
-+static const char *core_pll[] = {
-+	"core-pll",
-+};
-+
-+static int dove_divider_init(struct device *dev, void __iomem *base,
-+	struct clk **clks)
-+{
-+	struct clk *clk;
-+	int i;
-+
-+	/*
-+	 * Create the core PLL clock.  We treat this as a fixed rate
-+	 * clock as we don't know any better, and documentation is sparse.
-+	 */
-+	clk = clk_register_fixed_rate(dev, core_pll[0], NULL, CLK_IS_ROOT,
-+				      2000000000UL);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	for (i = 0; i < ARRAY_SIZE(dove_hw_clocks); i++)
-+		clks[i] = clk_register_dove_divider(dev, &dove_hw_clocks[i],
-+						    core_pll,
-+						    ARRAY_SIZE(core_pll), base);
-+
-+	return 0;
-+}
-+
-+static struct clk *dove_divider_clocks[4];
-+
-+static struct clk_onecell_data dove_divider_data = {
-+	.clks = dove_divider_clocks,
-+	.clk_num = ARRAY_SIZE(dove_divider_clocks),
-+};
-+
-+void __init dove_divider_clk_init(struct device_node *np)
-+{
-+	void *base;
-+
-+	base = of_iomap(np, 0);
-+	if (WARN_ON(!base))
-+		return;
-+
-+	if (WARN_ON(dove_divider_init(NULL, base, dove_divider_clocks))) {
-+		iounmap(base);
-+		return;
-+	}
-+
-+	of_clk_add_provider(np, of_clk_src_onecell_get, &dove_divider_data);
-+}
-diff --git a/drivers/clk/mvebu/dove.c b/drivers/clk/mvebu/dove.c
-index b8c2424ac926..59fad9546c84 100644
---- a/drivers/clk/mvebu/dove.c
-+++ b/drivers/clk/mvebu/dove.c
-@@ -17,6 +17,7 @@
- #include <linux/io.h>
- #include <linux/of.h>
- #include "common.h"
-+#include "dove-divider.h"
- 
- /*
-  * Core Clocks
-@@ -184,9 +185,14 @@ static void __init dove_clk_init(struct device_node *np)
- {
- 	struct device_node *cgnp =
- 		of_find_compatible_node(NULL, NULL, "marvell,dove-gating-clock");
-+	struct device_node *ddnp =
-+		of_find_compatible_node(NULL, NULL, "marvell,dove-divider-clock");
- 
- 	mvebu_coreclk_setup(np, &dove_coreclks);
- 
-+	if (ddnp)
-+		dove_divider_clk_init(ddnp);
-+
- 	if (cgnp)
- 		mvebu_clk_gating_setup(cgnp, dove_gating_desc);
- }
--- 
-2.1.0
+	# define __private	__attribute__((noderef, address_space(6)))
+
+and macro to dereference private
+
+	# define private_dereference(p) ((typeof(*p) *) p)
+
+and define struct rcu_node like:
+
+	struct rcu_node {
+		raw_spinlock_t __private lock;	/* Root rcu_node's lock protects some */
+		...
+	};
+
+and finally raw_spin_{un}lock_rcu_node() like:
+
+	static inline void raw_spin_lock_rcu_node(struct rcu_node *rnp)
+	{
+		raw_spin_lock(private_dereference(&rnp->lock));
+		smp_mb__after_unlock_lock();
+	}
+
+	static inline void raw_spin_unlock_rcu_node(struct rcu_node *rnp)
+	{
+		raw_spin_unlock(private_dereference(&rnp->lock));
+	}
+
+This __private mechanism also works for others who wants to private
+their fields of struct, which is not supported by C.
+
+I will send two patches(one introduces __private and one uses it for
+rcu_node->lock) if you think this is not a bad idea ;-)
+
+Regards,
+Boqun
+
+> 							Thanx, Paul
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151207/c74e7a53/attachment.sig>
