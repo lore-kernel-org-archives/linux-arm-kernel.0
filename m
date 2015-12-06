@@ -1,79 +1,55 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Sat, 5 Dec 2015 20:39:26 -0800
-Subject: [PATCH LINUX v4 10/13] tty: xuartps: Refactor IRQ handling
+Date: Sat, 5 Dec 2015 20:39:17 -0800
+Subject: [PATCH LINUX v4 01/13] tty: xuartps: Beautify read-modify writes
 In-Reply-To: <1449376769-13369-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1449376769-13369-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1449376769-13369-11-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1449376769-13369-2-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The system could deadlock handling RX IRQs when RX-related IRQ
-conditions became true while the receiver was disabled. To avoid this,
-enable/disable the RX/TX IRQs together with the receiver/transmitter.
+Non-functional, formatting changes to ease reading the code.
 
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+Reviewed-by: Moritz Fischer <moritz.fischer@ettus.com>
 ---
- drivers/tty/serial/xilinx_uartps.c | 18 ++++++++++++------
- 1 file changed, 12 insertions(+), 6 deletions(-)
+ drivers/tty/serial/xilinx_uartps.c | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 3780d1cf207e..1229bb3a275e 100644
+index 009e0dbc12d2..50d4082d2354 100644
 --- a/drivers/tty/serial/xilinx_uartps.c
 +++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -126,6 +126,10 @@ MODULE_PARM_DESC(rx_timeout, "Rx timeout, 1-255");
- #define CDNS_UART_IXR_RXEMPTY	0x00000002 /* RX FIFO empty interrupt. */
- #define CDNS_UART_IXR_MASK	0x00001FFF /* Valid bit mask */
+@@ -515,12 +515,14 @@ static void cdns_uart_start_tx(struct uart_port *port)
+ 	if (uart_circ_empty(&port->state->xmit) || uart_tx_stopped(port))
+ 		return;
  
-+#define CDNS_UART_RX_IRQS	(CDNS_UART_IXR_PARITY | CDNS_UART_IXR_FRAMING | \
-+				 CDNS_UART_IXR_OVERRUN | CDNS_UART_IXR_RXTRIG | \
-+				 CDNS_UART_IXR_TOUT)
-+
- /* Goes in read_status_mask for break detection as the HW doesn't do it*/
- #define CDNS_UART_IXR_BRK	0x80000000
- 
-@@ -169,6 +173,7 @@ struct cdns_uart {
- 	unsigned int		baud;
- 	struct notifier_block	clk_rate_change_nb;
- };
-+
- #define to_cdns_uart(_nb) container_of(_nb, struct cdns_uart, \
- 		clk_rate_change_nb);
- 
-@@ -272,7 +277,8 @@ static irqreturn_t cdns_uart_isr(int irq, void *dev_id)
+-	status = readl(port->membase + CDNS_UART_CR_OFFSET);
+-	/* Set the TX enable bit and clear the TX disable bit to enable the
++	/*
++	 * Set the TX enable bit and clear the TX disable bit to enable the
+ 	 * transmitter.
  	 */
- 	isrstatus = readl(port->membase + CDNS_UART_ISR_OFFSET);
+-	writel((status & ~CDNS_UART_CR_TX_DIS) | CDNS_UART_CR_TX_EN,
+-			port->membase + CDNS_UART_CR_OFFSET);
++	status = readl(port->membase + CDNS_UART_CR_OFFSET);
++	status &= ~CDNS_UART_CR_TX_DIS;
++	status |= CDNS_UART_CR_TX_EN;
++	writel(status, port->membase + CDNS_UART_CR_OFFSET);
  
--	cdns_uart_handle_rx(port, isrstatus);
-+	if (isrstatus & CDNS_UART_RX_IRQS)
-+		cdns_uart_handle_rx(port, isrstatus);
+ 	while (numbytes-- && ((readl(port->membase + CDNS_UART_SR_OFFSET) &
+ 				CDNS_UART_SR_TXFULL)) != CDNS_UART_SR_TXFULL) {
+@@ -1123,8 +1125,9 @@ static void cdns_uart_console_write(struct console *co, const char *s,
+ 	 * clear the TX disable bit to enable the transmitter.
+ 	 */
+ 	ctrl = readl(port->membase + CDNS_UART_CR_OFFSET);
+-	writel((ctrl & ~CDNS_UART_CR_TX_DIS) | CDNS_UART_CR_TX_EN,
+-			port->membase + CDNS_UART_CR_OFFSET);
++	ctrl &= ~CDNS_UART_CR_TX_DIS;
++	ctrl |= CDNS_UART_CR_TX_EN;
++	writel(ctrl, port->membase + CDNS_UART_CR_OFFSET);
  
- 	/* Dispatch an appropriate handler */
- 	if ((isrstatus & CDNS_UART_IXR_TXEMPTY) == CDNS_UART_IXR_TXEMPTY) {
-@@ -580,9 +586,12 @@ static void cdns_uart_stop_rx(struct uart_port *port)
- {
- 	unsigned int regval;
- 
-+	/* Disable RX IRQs */
-+	writel(CDNS_UART_RX_IRQS, port->membase + CDNS_UART_IDR_OFFSET);
-+
-+	/* Disable the receiver */
- 	regval = readl(port->membase + CDNS_UART_CR_OFFSET);
- 	regval |= CDNS_UART_CR_RX_DIS;
--	/* Disable the receiver */
- 	writel(regval, port->membase + CDNS_UART_CR_OFFSET);
- }
- 
-@@ -810,10 +819,7 @@ static int cdns_uart_startup(struct uart_port *port)
- 			port->membase + CDNS_UART_ISR_OFFSET);
- 
- 	/* Set the Interrupt Registers with desired interrupts */
--	writel(CDNS_UART_IXR_TXEMPTY | CDNS_UART_IXR_PARITY |
--		CDNS_UART_IXR_FRAMING | CDNS_UART_IXR_OVERRUN |
--		CDNS_UART_IXR_RXTRIG | CDNS_UART_IXR_TOUT,
--		port->membase + CDNS_UART_IER_OFFSET);
-+	writel(CDNS_UART_RX_IRQS, port->membase + CDNS_UART_IER_OFFSET);
- 
- 	spin_unlock_irqrestore(&port->lock, flags);
- 
+ 	uart_console_write(port, s, count, cdns_uart_console_putchar);
+ 	cdns_uart_console_wait_tx(port);
 -- 
 2.6.3.3.g9bb996a
