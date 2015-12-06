@@ -1,45 +1,33 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Sat, 5 Dec 2015 20:39:24 -0800
-Subject: [PATCH LINUX v4 08/13] tty: xuartps: Acquire port lock for shutdown
-In-Reply-To: <1449376769-13369-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1449376769-13369-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1449376769-13369-9-git-send-email-soren.brinkmann@xilinx.com>
+From: Yuval.Mintz@qlogic.com (Yuval Mintz)
+Date: Sun, 6 Dec 2015 06:43:12 +0000
+Subject: [PATCH V4 net-next 4/5] net:hns: Add support of ethtool TSO set
+ option for Hip06 in HNS
+In-Reply-To: <565DA6F5.7040804@gmail.com>
+References: <1448048952-146714-1-git-send-email-salil.mehta@huawei.com>
+ <1448048952-146714-5-git-send-email-salil.mehta@huawei.com>
+ <CO2PR11MB00885531F54375191E6F015597180@CO2PR11MB0088.namprd11.prod.outlook.com>
+ <565DA6F5.7040804@gmail.com>
+Message-ID: <CO2PR11MB008864AFF3D819EFE7A7622B970A0@CO2PR11MB0088.namprd11.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shutting down the UART port can happen while console operations are in
-progress. Holding the port lock serializes these operations and avoids
-the UART HW to be disabled in the middle of console prints.
+> > Isn't AE_VERSION_1 something fixed once you publish your features?
+> > If it can't be changed, why not simply remove the features from
+> > `hw_features' instead of having to implement this ndo?
+> There could be a case where the feature is supported by the SoC
+> and therefore it is already part of the 'hw_features' but it has been
+> say DISABLED or ENABLED by ethtool. In such a case, we need to
+> make sure we strike off that feature from the 'features' flag.
+> 
+> Therefore, we need this leg I suppose. Let me know If I am missing
+> something here or there is a gap in my understanding.
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
----
- drivers/tty/serial/xilinx_uartps.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Look at ethtool_set_features() - if something isn't listed in hw_features,
+you're not support to be able to change it.
 
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 62224a58056b..80248cb46bf6 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -821,6 +821,9 @@ static int cdns_uart_startup(struct uart_port *port)
- static void cdns_uart_shutdown(struct uart_port *port)
- {
- 	int status;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&port->lock, flags);
- 
- 	/* Disable interrupts */
- 	status = readl(port->membase + CDNS_UART_IMR_OFFSET);
-@@ -830,6 +833,9 @@ static void cdns_uart_shutdown(struct uart_port *port)
- 	/* Disable the TX and RX */
- 	writel(CDNS_UART_CR_TX_DIS | CDNS_UART_CR_RX_DIS,
- 			port->membase + CDNS_UART_CR_OFFSET);
-+
-+	spin_unlock_irqrestore(&port->lock, flags);
-+
- 	free_irq(port->irq, port);
- }
- 
--- 
-2.6.3.3.g9bb996a
+If you can make a one-time decision when registering the netdevice
+whether this feature is supported by HW or not [assuming AE_VERSION_1
+is available at that point and can't later change] than it's the better alternative.
+
+Cheers,
+Yuval 
