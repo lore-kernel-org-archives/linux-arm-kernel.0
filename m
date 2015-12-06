@@ -1,61 +1,58 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 6 Dec 2015 08:44:50 +0800
-Subject: [PATCH v5 2/2] drm/bridge: Add I2C based driver for ps8640 bridge
-In-Reply-To: <1448272793-27232-2-git-send-email-jitao.shi@mediatek.com>
-Message-ID: <201512060814.Fqi6eJfv%fengguang.wu@intel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Sat, 5 Dec 2015 18:52:43 -0600
+Subject: [PATCH v4 1/5] dt-bindings: add SMP enable-method for Broadcom NSP
+In-Reply-To: <565F16F1.9070809@broadcom.com>
+References: <1448987049-17041-1-git-send-email-kapilh@broadcom.com>
+ <1448987049-17041-2-git-send-email-kapilh@broadcom.com>
+ <20151202152604.GA20467@rob-hp-laptop>
+ <565F16F1.9070809@broadcom.com>
+Message-ID: <CAL_JsqLQuXzLpFJj7b=_pPN1Tp66P2o69bytxGPHCQu30Qy_CQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jitao,
+On Wed, Dec 2, 2015 at 10:06 AM, Kapil Hali <kapilh@broadcom.com> wrote:
+> Hi Rob,
+>
+> On 12/2/2015 8:56 PM, Rob Herring wrote:
+>> On Tue, Dec 01, 2015 at 11:24:05AM -0500, Kapil Hali wrote:
+>>> Add a compatible string "brcm,bcm-nsp-smp" for Broadcom's
+>>> Northstar Plus CPU to the 32-bit ARM CPU device tree binding
+>>> documentation file and create a new binding documentation for
+>>> Northstar Plus CPU.
+>>>
+>>> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+>>> ---
+>>>  .../bindings/arm/bcm/brcm,nsp-cpu-method.txt       | 39 ++++++++++++++++++++++
+>>>  Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
+>>>  2 files changed, 40 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+>>> new file mode 100644
+>>> index 0000000..bf08872
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+>>> @@ -0,0 +1,39 @@
+>>> +Broadcom Northstar Plus SoC CPU Enable Method
+>>> +---------------------------------------------
+>>> +This binding defines the enable method used for starting secondary
+>>> +CPUs in the following Broadcom SoCs:
+>>> +  BCM58522, BCM58525, BCM58535, BCM58622, BCM58623, BCM58625, BCM88312
+>>> +
+>>> +The enable method is specified by defining the following required
+>>> +properties in the "cpus" device tree node:
+>>> +  - enable-method = "brcm,bcm-nsp-smp";
+>>> +  - secondary-boot-reg = <...>;
+>>
+>> Both of these are supposed to be per cpu core.
+>
+> 'enable-method' if not found in 'cpu' node is looked at in the 'cpus'
+> node. Except for two-three SoC families, 'enable-method' is within
+> 'cpus' node. Is my interpretation incorrect? Did I miss anything here?
 
-[auto build test ERROR on drm/drm-next]
-[also build test ERROR on v4.4-rc3 next-20151203]
+I'm not sure how you counted, but it is much more than 2-3 that are
+correct (including all of PPC). It is quite mixed in dts files, but it
+is documented to be per cpu node, so lets follow the documentation
+please.
 
-url:    https://github.com/0day-ci/linux/commits/Jitao-Shi/Documentation-bridge-Add-documentation-for-ps8640-DT-properties/20151123-180220
-base:   git://people.freedesktop.org/~airlied/linux.git drm-next
-config: mips-allmodconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=mips 
-
-All errors (new ones prefixed by >>):
-
-   drivers/gpu/drm/bridge/parade-ps8640.c: In function 'ps8640_prepare':
->> drivers/gpu/drm/bridge/parade-ps8640.c:183:2: error: implicit declaration of function 'gpiod_set_value' [-Werror=implicit-function-declaration]
-     gpiod_set_value(ps_bridge->gpio_slp_n, 1);
-     ^
-   drivers/gpu/drm/bridge/parade-ps8640.c: In function 'ps8640_probe':
->> drivers/gpu/drm/bridge/parade-ps8640.c:399:31: error: implicit declaration of function 'devm_gpiod_get' [-Werror=implicit-function-declaration]
-     ps_bridge->gpio_mode_sel_n = devm_gpiod_get(&client->dev, "mode-sel",
-                                  ^
->> drivers/gpu/drm/bridge/parade-ps8640.c:400:11: error: 'GPIOD_OUT_HIGH' undeclared (first use in this function)
-              GPIOD_OUT_HIGH);
-              ^
-   drivers/gpu/drm/bridge/parade-ps8640.c:400:11: note: each undeclared identifier is reported only once for each function it appears in
-   cc1: some warnings being treated as errors
-
-vim +/gpiod_set_value +183 drivers/gpu/drm/bridge/parade-ps8640.c
-
-   177		err = regulator_enable(ps_bridge->pwr_3v3_supply);
-   178		if (err < 0) {
-   179			DRM_ERROR("failed to enable vdd33-supply: %d\n", err);
-   180			goto err_regulator_disable;
-   181		}
-   182	
- > 183		gpiod_set_value(ps_bridge->gpio_slp_n, 1);
-   184		gpiod_set_value(ps_bridge->gpio_rst_n, 0);
-   185		usleep_range(500, 700);
-   186		gpiod_set_value(ps_bridge->gpio_rst_n, 1);
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 39669 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151206/d1adaf31/attachment-0001.obj>
+Rob
