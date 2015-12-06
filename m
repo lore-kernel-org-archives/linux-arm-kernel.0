@@ -1,94 +1,68 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Sun, 6 Dec 2015 19:03:18 +0100
-Subject: [PATCH V3 2/6] acpi: pci: Setup MSI domain for ACPI based pci
- devices
-In-Reply-To: <20151122113553.4fd81185@arm.com>
-References: <1445453249-32557-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1445453249-32557-3-git-send-email-Suravee.Suthikulpanit@amd.com>
- <20151119120807.07ffd476@arm.com> <5650DFB5.2010809@amd.com>
- <20151122113553.4fd81185@arm.com>
-Message-ID: <56647866.8080802@semihalf.com>
+From: kapilh@broadcom.com (Kapil Hali)
+Date: Sun, 6 Dec 2015 23:59:28 +0530
+Subject: [PATCH v4 1/5] dt-bindings: add SMP enable-method for Broadcom NSP
+In-Reply-To: <CAL_JsqLQuXzLpFJj7b=_pPN1Tp66P2o69bytxGPHCQu30Qy_CQ@mail.gmail.com>
+References: <1448987049-17041-1-git-send-email-kapilh@broadcom.com>
+ <1448987049-17041-2-git-send-email-kapilh@broadcom.com>
+ <20151202152604.GA20467@rob-hp-laptop> <565F16F1.9070809@broadcom.com>
+ <CAL_JsqLQuXzLpFJj7b=_pPN1Tp66P2o69bytxGPHCQu30Qy_CQ@mail.gmail.com>
+Message-ID: <56647E88.6040002@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Rob,
 
-
-On 11/22/2015 12:35 PM, Marc Zyngier wrote:
-> On Sat, 21 Nov 2015 15:18:45 -0600
-> Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> wrote:
->
->> Hi Marc,
+On 12/6/2015 6:22 AM, Rob Herring wrote:
+> On Wed, Dec 2, 2015 at 10:06 AM, Kapil Hali <kapilh@broadcom.com> wrote:
+>> Hi Rob,
 >>
->> On 11/19/15 06:08, Marc Zyngier wrote:
->>> On Wed, 21 Oct 2015 11:47:25 -0700
->>> Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> wrote:
->>>
->>> Hi Suravee,
->>>
->>> Sorry it took so long to get to this series. Comments below.
->> No worry.
->>
->>>> This patch introduces pci_host_bridge_acpi_msi_domain(), which returns
->>>> the MSI domain of the specified PCI host bridge with DOMAIN_BUS_PCI_MSI
->>>> bus token. Then, it is assigned to pci device.
+>> On 12/2/2015 8:56 PM, Rob Herring wrote:
+>>> On Tue, Dec 01, 2015 at 11:24:05AM -0500, Kapil Hali wrote:
+>>>> Add a compatible string "brcm,bcm-nsp-smp" for Broadcom's
+>>>> Northstar Plus CPU to the 32-bit ARM CPU device tree binding
+>>>> documentation file and create a new binding documentation for
+>>>> Northstar Plus CPU.
 >>>>
->>>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>>>> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
 >>>> ---
->>>>    drivers/pci/pci-acpi.c | 13 +++++++++++++
->>>>    drivers/pci/probe.c    |  2 ++
->>>>    include/linux/pci.h    |  7 +++++++
->>>>    3 files changed, 22 insertions(+)
+>>>>  .../bindings/arm/bcm/brcm,nsp-cpu-method.txt       | 39 ++++++++++++++++++++++
+>>>>  Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
+>>>>  2 files changed, 40 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
 >>>>
->>>> diff --git a/drivers/pci/pci-acpi.c b/drivers/pci/pci-acpi.c
->>>> index a32ba75..0e21ef4 100644
->>>> --- a/drivers/pci/pci-acpi.c
->>>> +++ b/drivers/pci/pci-acpi.c
->>>> @@ -9,7 +9,9 @@
->>>>
->>>>    #include <linux/delay.h>
->>>>    #include <linux/init.h>
->>>> +#include <linux/irqdomain.h>
->>>>    #include <linux/pci.h>
->>>> +#include <linux/msi.h>
->>>>    #include <linux/pci_hotplug.h>
->>>>    #include <linux/module.h>
->>>>    #include <linux/pci-aspm.h>
->>>> @@ -689,6 +691,17 @@ static struct acpi_bus_type acpi_pci_bus = {
->>>>    	.cleanup = pci_acpi_cleanup,
->>>>    };
->>>>
->>>> +struct irq_domain *pci_host_bridge_acpi_msi_domain(struct pci_bus *bus)
->>>> +{
->>>> +	struct irq_domain *dom = NULL;
->>>> +	struct fwnode_handle *fwnode = pci_msi_get_fwnode(&bus->dev);
+>>>> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+>>>> new file mode 100644
+>>>> index 0000000..bf08872
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+>>>> @@ -0,0 +1,39 @@
+>>>> +Broadcom Northstar Plus SoC CPU Enable Method
+>>>> +---------------------------------------------
+>>>> +This binding defines the enable method used for starting secondary
+>>>> +CPUs in the following Broadcom SoCs:
+>>>> +  BCM58522, BCM58525, BCM58535, BCM58622, BCM58623, BCM58625, BCM88312
 >>>> +
->>>> +	if (fwnode)
->>>> +		dom = irq_find_matching_fwnode(fwnode,
->>>> +					       DOMAIN_BUS_PCI_MSI);
->>>> +	return dom;
->>>> +}
->>>> +
->>> Given this, I really question the need for what you define in patch #1
->>> to be standalone. It is only used by ACPI (DT has its own private
->>> helpers), and it is so far unlikely that it will be of any use for
->>> other firmware interfaces.
+>>>> +The enable method is specified by defining the following required
+>>>> +properties in the "cpus" device tree node:
+>>>> +  - enable-method = "brcm,bcm-nsp-smp";
+>>>> +  - secondary-boot-reg = <...>;
 >>>
->>> My suggestion is to get rid of pci_msi_get_fwnode() and move the
->>> registration helper into this file. That'd be much simpler.
->>>
->>> Thanks,
->>>
->>> 	M.
->>>
->> Ok, I'll take care of this. I assume the rest of the patches looks ok.
-> I still need to finish going through it (I have minor comments so far
-> on some of the other patches), but I want to get the core ACPI stuff in
-> shape before doing anything else.
-I am trying to do similar thing for GICv3 & ITS, can you please have a look:
-http://lkml.iu.edu/hypermail/linux/kernel/1510.1/06139.html
+>>> Both of these are supposed to be per cpu core.
+>>
+>> 'enable-method' if not found in 'cpu' node is looked at in the 'cpus'
+>> node. Except for two-three SoC families, 'enable-method' is within
+>> 'cpus' node. Is my interpretation incorrect? Did I miss anything here?
+> 
+> I'm not sure how you counted, but it is much more than 2-3 that are
+> correct (including all of PPC). It is quite mixed in dts files, but it
+> is documented to be per cpu node, so lets follow the documentation
+> please.
+> 
+> Rob
+> 
+I looked at arch/arm/* and not other arch types. But, as you said, let
+us keep it how it is in documentation and I have already updated latest
+patch set reflecting this change.
 
-Can you please explain what ACPI core changes do you mean?
-
-Regards,
-Tomasz
+Thanks,
+Kapil
