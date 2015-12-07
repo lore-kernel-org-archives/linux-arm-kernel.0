@@ -1,88 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 07 Dec 2015 10:40:04 +0100
-Subject: arRe: [PATCH net-next 2/2] net: hns: enet specisies a reference to
- dsaf (config and documents)
-In-Reply-To: <566531C5.4050208@huawei.com>
-References: <1449295856-31068-1-git-send-email-yankejian@huawei.com>
- <23027215.8RIhViTVaB@wuerfel> <566531C5.4050208@huawei.com>
-Message-ID: <1503684.BNZUVaD74W@wuerfel>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 7 Dec 2015 10:42:24 +0100
+Subject: [PATCH v5 08/11] spi: imx: allow only WML aligned transfers to
+ use DMA
+In-Reply-To: <1449334629-4715-9-git-send-email-anton.bondarenko.sama@gmail.com>
+References: <1449334629-4715-1-git-send-email-anton.bondarenko.sama@gmail.com>
+ <1449334629-4715-9-git-send-email-anton.bondarenko.sama@gmail.com>
+Message-ID: <20151207094224.GC11966@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 December 2015 15:14:13 Yankejian wrote:
-> On 2015/12/6 6:19, Arnd Bergmann wrote:
-> > On Saturday 05 December 2015 14:10:56 yankejian wrote:
-> >> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
-> >> index 80411b2..ecacfa4 100644
-> >> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
-> >> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
-> >> @@ -4,8 +4,6 @@ Required properties:
-> >>  - compatible: should be "hisilicon,hns-dsaf-v1" or "hisilicon,hns-dsaf-v2".
-> >>    "hisilicon,hns-dsaf-v1" is for hip05.
-> >>    "hisilicon,hns-dsaf-v2" is for Hi1610 and Hi1612.
-> >> -- dsa-name: dsa fabric name who provide this interface.
-> >> -  should be "dsafX", X is the dsaf id.
-> >>  - mode: dsa fabric mode string. only support one of dsaf modes like these:
-> >>                 "2port-64vf",
-> >>                 "6port-16rss",
-> >> @@ -26,9 +24,8 @@ Required properties:
-> >>  
-> >>  Example:
-> >>  
-> >> -dsa: dsa at c7000000 {
-> >> +dsaf0: dsa at c7000000 {
-> >>         compatible = "hisilicon,hns-dsaf-v1";
-> >> -       dsa_name = "dsaf0";
-> >>         mode = "6port-16rss";
-> >>         interrupt-parent = <&mbigen_dsa>;
-> >>         reg = <0x0 0xC0000000 0x0 0x420000
-> >> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
-> >> index 41d19be..e6a9d1c 100644
-> >> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
-> >> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
-> >> @@ -4,8 +4,9 @@ Required properties:
-> >>  - compatible: "hisilicon,hns-nic-v1" or "hisilicon,hns-nic-v2".
-> >>    "hisilicon,hns-nic-v1" is for hip05.
-> >>    "hisilicon,hns-nic-v2" is for Hi1610 and Hi1612.
-> >> -- ae-name: accelerator name who provides this interface,
-> >> -  is simply a name referring to the name of name in the accelerator node.
-> >> +- ae-handle: accelerator engine handle for hns,
-> >> +  specifies a reference to the associating hardware driver node.
-> >> +  see Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
-> >>  - port-id: is the index of port provided by DSAF (the accelerator). DSAF can
-> >>    connect to 8 PHYs. Port 0 to 1 are both used for adminstration purpose. They
-> >>    are called debug ports.
-> >> @@ -41,7 +42,7 @@ Example:
-> >>  
-> >>
-> > This looks like an incompatible change, as you add and remove
-> > required properties. Is there a way to support both the old and
-> > the new style?
-> >
-> >       Arnd
-> >
-> > .
+On Sat, Dec 05, 2015 at 05:57:06PM +0100, Anton Bondarenko wrote:
+> RX DMA tail data handling doesn't work correctly in many cases with current
+> implementation. It happens because SPI core was setup to generates both RX
+> and RX TAIL events. And RX TAIL event does not work correctly.
+> This can be easily verified by sending SPI transaction with size modulus
+> WML(32 in our case) not equal 0.
 > 
-> Hi Arnd,
-> Thanks for your suggestions.  it must be set the same strings in dsaf node and every enet node before.
-> it seems inappropriate. as Rob Herring <robh@kernel.org> 's suggestions, that would solve associating
-> enet with a particular dsaf. so we discus the solution with Yisen Zhuang <yisen.zhuang@huawei.com>.
-> we decide to use the new way instead of the old one.
+> Also removing change introduced in f6ee9b582d2db652497b73c1f117591dfb6d3a90
+> since this change only fix usecases with transfer size from 33 to 128 bytes
+> and does not fix 129 bytes etc.
+> 
+> This is output from transaction with len 138 bytes in loopback mode at 10Mhz:
+> TX0000: a3 97 a2 55 53 be f1 fc f9 79 6b 52 14 13 e9 e2
+> TX0010: 2d 51 8e 1f 56 08 57 27 a7 05 d4 d0 52 82 77 75
+> TX0020: 1b 99 4a ed 58 3d 6a 52 36 d5 24 4a 68 8e ad 95
+> TX0030: 5f 3c 35 b5 c4 8c dd 6c 11 32 3d e2 b4 b4 59 cf
+> TX0040: ce 23 3d 27 df a7 f9 96 fc 1e e0 66 2c 0e 7b 8c
+> TX0050: ca 30 42 8f bc 9f 7b ce d1 b8 b1 87 ec 8a d6 bb
+> TX0060: 2e 15 63 0e 3c dc a4 3a 7a 06 20 a7 93 1b 34 dd
+> TX0070: 4c f5 ec 88 96 68 d6 68 a0 09 6f 8e 93 47 c9 41
+> TX0080: db ac cf 97 89 f3 51 05 79 71
+> 
+> RX0000: a3 97 a2 55 53 be f1 fc f9 79 6b 52 14 13 e9 e2
+> RX0010: 2d 51 8e 1f 56 08 57 27 a7 05 d4 d0 52 82 77 75
+> RX0020: 1b 99 4a ed 58 3d 6a 52 36 d5 24 4a 68 8e ad 95
+> RX0030: 5f 3c 35 00 00 b5 00 00 00 c4 00 00 8c 00 00 dd
+> RX0040: 6c 11 32 3d e2 b4 b4 59 cf ce 23 3d 27 df a7 f9
+> RX0050: 96 fc 1e e0 66 2c 0e 7b 8c ca 30 42 8f 1f 1f bc
+> RX0060: 9f 7b ce d1 b8 b1 87 ec 8a d6 bb 2e 15 63 0e ed
+> RX0070: ed 3c 58 58 58 dc 3d 3d a4 6a 6a 3a 52 52 7a 36
+> RX0080: 06 20 a7 93 1b 34 dd 4c f5 ec
+> 
+> Zeros at offset 33 and 34 caused by reading empty RX FIFO which not possible
+> if DMA RX read was triggered by RX event. This mean DMA was triggered
+> by RX TAIL event.
+> 
+> Signed-off-by: Anton Bondarenko <anton.bondarenko.sama@gmail.com>
+> ---
+>  drivers/spi/spi-imx.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index fa24637..7a68c62 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -204,8 +204,8 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
+>  {
+>  	struct spi_imx_data *spi_imx = spi_master_get_devdata(master);
+>  
+> -	if (spi_imx->dma_is_inited &&
+> -	    transfer->len > spi_imx->wml * sizeof(u32))
+> +	if (spi_imx->dma_is_inited && transfer->len > spi_imx->wml &&
+> +	    (transfer->len % spi_imx->wml) == 0)
+>  		return true;
 
-I agree the new form looks better than the original way, but I'm worried
-about the migration path. You don't explain in the patch description
-how you want to ensure that nothing breaks for existing systems.
+Must transfer->len really be bigger than spi_imx->wml? I would assume it
+should be >= instead. And where is the * sizeof(u32) gone? If that's
+unnecessary I heven't understood why.
 
-We generally try to avoid doing incompatible changes altogether and
-prefer to keep backwards compatibility, unless we can prove that no
-other systems exist that would get impacted by the change.
+Sascha
 
-Are you sure that nobody ships a DTB file for this hardware with their
-firmware that would now require an incompatible update which in turn
-breaks old kernels?
 
-Are you sure that there is no hardware using the same dsa hardware
-with out-of-tree dts files that need to make the same change but might
-not be aware of the change?
-
-	Arnd
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
