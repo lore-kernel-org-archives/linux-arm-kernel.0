@@ -1,127 +1,37 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 7 Dec 2015 16:43:14 -0600
-Subject: [PATCH v2] PCI: generic: Add support for Cavium ThunderX PCIe
- root complexes.
-In-Reply-To: <1442967415-13595-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1442967415-13595-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20151207224314.GE14429@localhost>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 7 Dec 2015 22:48:07 +0000
+Subject: [PATCH v8 3/4] arm64: Add do_softirq_own_stack() and enable
+ irq_stacks
+In-Reply-To: <1449226948-14251-4-git-send-email-james.morse@arm.com>
+References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
+ <1449226948-14251-4-git-send-email-james.morse@arm.com>
+Message-ID: <20151207224805.GA20777@MBP.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On Fri, Dec 04, 2015 at 11:02:27AM +0000, James Morse wrote:
+> entry.S is modified to switch to the per_cpu irq_stack during el{0,1}_irq.
+> irq_count is used to detect recursive interrupts on the irq_stack, it is
+> updated late by do_softirq_own_stack(), when called on the irq_stack, before
+> __do_softirq() re-enables interrupts to process softirqs.
+> 
+> do_softirq_own_stack() is added by this patch, but does not yet switch
+> stack.
+> 
+> This patch adds the dummy stack frame and data needed by the previous
+> stack tracing patches.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
 
-On Tue, Sep 22, 2015 at 05:16:55PM -0700, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
-> 
-> The config space for external PCIe root complexes on some Cavium
-> ThunderX SoCs is very similar to CAM and ECAM, but differs in the
-> shift values that have to be applied to the bus and devfn numbers to
-> compose that address window offset.  These root complexes also have
-> the interesting property that there is no root bridge, so the standard
-> manner of limiting scanning to only the first device doesn't work.  We
-> can use the standard pci-host-generic driver if we make a minor
-> addition to handle these differences, so we...
-> 
-> Add a mapping function for ThunderX PCIe root complexes with a bus
-> shift of 24 and devfn shift of 16.  Ignore accesses for devices other
-> than the first device on the primary bus.
-> 
-> Document the whole thing in devicetree/bindings/pci/host-generic-pci.txt
-> 
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
+In the interest of getting things moving on this series:
 
-I'm trying to sort the ThunderX stuff out.  Can you repost the current
-stuff so we can see it all together?
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Thanks,
-  Bjorn
+I propose that we skip patch 4 for now and, as James suggested, keep the
+THREAD_SIZE to 16KB for one more release cycle. It would be good to get
+some statistics on stack usage.
 
-> ---
-> 
-> This patch depends on:
-> https://lkml.org/lkml/2015/9/22/1189
-> 
-> Changes from v1:
-> 
->   - Added Acked-by:
-> 
->   - Removed two patches from the set that were somewhat unrelated.
-> 
->  .../devicetree/bindings/pci/host-generic-pci.txt   |  8 +++---
->  drivers/pci/host/pci-host-generic.c                | 29 ++++++++++++++++++++++
->  2 files changed, 34 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-> index 105a968..a5aed0f 100644
-> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-> @@ -14,9 +14,11 @@ tree bindings communicated in pci.txt:
->  
->  Properties of the host controller node:
->  
-> -- compatible     : Must be "pci-host-cam-generic" or "pci-host-ecam-generic"
-> -                   depending on the layout of configuration space (CAM vs
-> -                   ECAM respectively).
-> +- compatible     : One of the following with bus:devfn:reg mapped to the
-> +                   PCI config space address window in the bit positions shown:
-> +                   "pci-host-cam-generic" -- 'CAM'  bits 16:8:0
-> +                   "pci-host-ecam-generic" -- 'ECAM'  bits 20:12:0
-> +                   "cavium,pci-host-thunder-pem" --  bits 24:16:0
->  
->  - device_type    : Must be "pci".
->  
-> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> index b163fdc..853f6f6 100644
-> --- a/drivers/pci/host/pci-host-generic.c
-> +++ b/drivers/pci/host/pci-host-generic.c
-> @@ -91,6 +91,32 @@ static struct gen_pci_cfg_bus_ops gen_pci_cfg_ecam_bus_ops = {
->  	}
->  };
->  
-> +static void __iomem *gen_pci_map_cfg_bus_thunder_pem(struct pci_bus *bus,
-> +						     unsigned int devfn,
-> +						     int where)
-> +{
-> +	struct gen_pci *pci = bus->sysdata;
-> +	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
-> +
-> +	/*
-> +	 * Thunder PEM is a PCIe RC, but without a root bridge.  On
-> +	 * the primary bus, ignore accesses for devices other than
-> +	 * the first device.
-> +	 */
-> +	if (idx == 0 && (devfn & ~7u))
-> +		return NULL;
-> +	return pci->cfg.win[idx] + ((devfn << 16) | where);
-> +}
-> +
-> +static struct gen_pci_cfg_bus_ops gen_pci_cfg_thunder_pem_bus_ops = {
-> +	.bus_shift	= 24,
-> +	.ops		= {
-> +		.map_bus	= gen_pci_map_cfg_bus_thunder_pem,
-> +		.read		= pci_generic_config_read,
-> +		.write		= pci_generic_config_write,
-> +	}
-> +};
-> +
->  static const struct of_device_id gen_pci_of_match[] = {
->  	{ .compatible = "pci-host-cam-generic",
->  	  .data = &gen_pci_cfg_cam_bus_ops },
-> @@ -98,6 +124,9 @@ static const struct of_device_id gen_pci_of_match[] = {
->  	{ .compatible = "pci-host-ecam-generic",
->  	  .data = &gen_pci_cfg_ecam_bus_ops },
->  
-> +	{ .compatible = "cavium,pci-host-thunder-pem",
-> +	  .data = &gen_pci_cfg_thunder_pem_bus_ops },
-> +
->  	{ },
->  };
->  MODULE_DEVICE_TABLE(of, gen_pci_of_match);
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Patches 1-3 look fine to me on their own.
+
+-- 
+Catalin
