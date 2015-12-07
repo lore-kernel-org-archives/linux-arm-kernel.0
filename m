@@ -1,74 +1,140 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 7 Dec 2015 14:31:17 -0600
-Subject: [PATCH V1 00/11] MMCONFIG refactoring and ARM64 PCI hostbridge
- init based on ACPI
-In-Reply-To: <1445963922-22711-1-git-send-email-tn@semihalf.com>
-References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
-Message-ID: <20151207203117.GB14429@localhost>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 07 Dec 2015 21:37:34 +0100
+Subject: [PATCH v2 2/3] soc: dove: add legacy support to PMU driver
+In-Reply-To: <E1a5j6Q-000879-GO@rmk-PC.arm.linux.org.uk> (Russell King's
+ message of "Sun, 06 Dec 2015 23:52:26 +0000")
+References: <E1a5j6Q-000879-GO@rmk-PC.arm.linux.org.uk>
+Message-ID: <87r3iy9er5.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 27, 2015 at 05:38:31PM +0100, Tomasz Nowicki wrote:
-> From the functionality point of view this series might be split into two logic parts:
-> 1. Making MMCONFIG code arch-agnostic which allows all architectures to collect
->    PCI config regions and used when necessary.
-> 2. Using generic MMCONFIG code and introducing ACPI based PCI hostbridge
->    initialization for ARM64
-> 
-> Patches has been built on top of:
-> [Patch v7 0/7] Consolidate ACPI PCI root common code into ACPI core
-> https://lkml.org/lkml/2015/10/14/31
-> Git branch can be found here:
-> https://git.linaro.org/leg/acpi/acpi.git/shortlog/refs/heads/pci-acpi-upstream
-> 
-> This has been tested on Cavium ThunderX 1 socket server.
-> Any help in reviewing and testing is very appreciated.
-> 
-> Hanjun Guo (1):
->   XEN / PCI: Remove the dependence on arch x86 when PCI_MMCONFIG=y
-> 
-> Tomasz Nowicki (10):
->   x86, pci: Reorder logic of pci_mmconfig_insert() function
->   x86, pci, acpi: Move arch-agnostic MMCONFIG (aka ECAM) and ACPI code
->     out of arch/x86/ directory
->   pci, acpi, mcfg: Provide generic implementation of MCFG code
->     initialization.
->   x86, pci: mmconfig_{32,64}.c code refactoring - remove code
->     duplication.
->   x86, pci, ecam: mmconfig_64.c becomes default implementation for ECAM
->     driver.
->   pci, acpi, mcfg: Provide default RAW ACPI PCI config space accessors.
->   pci, acpi, ecam: Add flag to indicate whether ECAM region was hot
->     added or not.
->   x86, pci: Use previously added ECAM hot_added flag to remove ECAM
->     regions.
->   pci, acpi: Provide generic way to assign bus domain number.
->   arm64, pci, acpi: Support for ACPI based PCI hostbridge init
-> 
->  arch/arm64/Kconfig             |   6 +
->  arch/arm64/kernel/pci.c        | 208 ++++++++++++++++++++++++++++++++--
->  arch/x86/Kconfig               |   4 +
->  arch/x86/include/asm/pci_x86.h |  28 +----
->  arch/x86/pci/acpi.c            |  17 +--
->  arch/x86/pci/mmconfig-shared.c | 250 +++++++----------------------------------
->  arch/x86/pci/mmconfig_32.c     |  11 +-
->  arch/x86/pci/mmconfig_64.c     |  67 +----------
->  arch/x86/pci/numachip.c        |   1 +
->  drivers/acpi/Makefile          |   1 +
->  drivers/acpi/mcfg.c            | 104 +++++++++++++++++
->  drivers/acpi/pci_root.c        |   2 +-
->  drivers/pci/Kconfig            |  10 ++
->  drivers/pci/Makefile           |   5 +
->  drivers/pci/ecam.c             | 234 ++++++++++++++++++++++++++++++++++++++
->  drivers/pci/pci.c              |  30 ++++-
->  drivers/xen/pci.c              |   7 +-
->  include/linux/acpi.h           |   2 +
->  include/linux/ecam.h           |  44 ++++++++
->  19 files changed, 691 insertions(+), 340 deletions(-)
->  create mode 100644 drivers/acpi/mcfg.c
->  create mode 100644 drivers/pci/ecam.c
->  create mode 100644 include/linux/ecam.h
+Hi Russell,
+ 
+ On lun., d?c. 07 2015, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
 
-Waiting for an updated version after all the discussion.
+> Add support for legacy non-DT Dove to the PMU driver, so that we can
+> transition the legacy support over.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Bjorn
+Applied on mvebu/soc (and fixed a conflict in drivers/soc/Makefile)
+
+Thanks,
+
+Gregory
+
+> ---
+> This is a re-post of a previous patch, except I've split it into two to
+> make the eventual removal of legacy Dove easier, as I believe Arnd will
+> have some patches which touch legacy Dove which will conflict.  This
+> makes it possible to revert this when the legacy Dove code is removed.
+>
+>  drivers/soc/Makefile         |  1 +
+>  drivers/soc/dove/pmu.c       | 43 +++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/soc/dove/pmu.h | 18 ++++++++++++++++++
+>  3 files changed, 62 insertions(+)
+>
+> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+> index 0b12d777d3c4..c99192f30679 100644
+> --- a/drivers/soc/Makefile
+> +++ b/drivers/soc/Makefile
+> @@ -2,6 +2,7 @@
+>  # Makefile for the Linux Kernel SOC specific device drivers.
+>  #
+>  
+> +obj-$(CONFIG_ARCH_DOVE)		+= dove/
+>  obj-$(CONFIG_MACH_DOVE)		+= dove/
+>  obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
+>  obj-$(CONFIG_ARCH_QCOM)		+= qcom/
+> diff --git a/drivers/soc/dove/pmu.c b/drivers/soc/dove/pmu.c
+> index 052aecf29893..429e32cab55a 100644
+> --- a/drivers/soc/dove/pmu.c
+> +++ b/drivers/soc/dove/pmu.c
+> @@ -305,6 +305,49 @@ static int __init dove_init_pmu_irq(struct pmu_data *pmu, int irq)
+>  	return 0;
+>  }
+>  
+> +int __init dove_init_pmu_legacy(const struct dove_pmu_initdata *initdata)
+> +{
+> +	const struct dove_pmu_domain_initdata *domain_initdata;
+> +	struct pmu_data *pmu;
+> +	int ret;
+> +
+> +	pmu = kzalloc(sizeof(*pmu), GFP_KERNEL);
+> +	if (!pmu)
+> +		return -ENOMEM;
+> +
+> +	spin_lock_init(&pmu->lock);
+> +	pmu->pmc_base = initdata->pmc_base;
+> +	pmu->pmu_base = initdata->pmu_base;
+> +
+> +	pmu_reset_init(pmu);
+> +	for (domain_initdata = initdata->domains; domain_initdata->name;
+> +	     domain_initdata++) {
+> +		struct pmu_domain *domain;
+> +
+> +		domain = kzalloc(sizeof(*domain), GFP_KERNEL);
+> +		if (domain) {
+> +			domain->pmu = pmu;
+> +			domain->pwr_mask = domain_initdata->pwr_mask;
+> +			domain->rst_mask = domain_initdata->rst_mask;
+> +			domain->iso_mask = domain_initdata->iso_mask;
+> +			domain->base.name = domain_initdata->name;
+> +
+> +			__pmu_domain_register(domain, NULL);
+> +		}
+> +	}
+> +	pm_genpd_poweroff_unused();
+> +
+> +	ret = dove_init_pmu_irq(pmu, initdata->irq);
+> +	if (ret)
+> +		pr_err("dove_init_pmu_irq() failed: %d\n", ret);
+> +
+> +	if (pmu->irq_domain)
+> +		irq_domain_associate_many(pmu->irq_domain, IRQ_DOVE_PMU_START,
+> +					  0, NR_PMU_IRQS);
+> +
+> +	return 0;
+> +}
+> +
+>  /*
+>   * pmu: power-manager at d0000 {
+>   *	compatible = "marvell,dove-pmu";
+> diff --git a/include/linux/soc/dove/pmu.h b/include/linux/soc/dove/pmu.h
+> index 9c99f84bcc0e..431dfac595e7 100644
+> --- a/include/linux/soc/dove/pmu.h
+> +++ b/include/linux/soc/dove/pmu.h
+> @@ -1,6 +1,24 @@
+>  #ifndef LINUX_SOC_DOVE_PMU_H
+>  #define LINUX_SOC_DOVE_PMU_H
+>  
+> +#include <linux/types.h>
+> +
+> +struct dove_pmu_domain_initdata {
+> +	u32 pwr_mask;
+> +	u32 rst_mask;
+> +	u32 iso_mask;
+> +	const char *name;
+> +};
+> +
+> +struct dove_pmu_initdata {
+> +	void __iomem *pmc_base;
+> +	void __iomem *pmu_base;
+> +	int irq;
+> +	const struct dove_pmu_domain_initdata *domains;
+> +};
+> +
+> +int dove_init_pmu_legacy(const struct dove_pmu_initdata *);
+> +
+>  int dove_init_pmu(void);
+>  
+>  #endif
+> -- 
+> 2.1.0
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
