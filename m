@@ -1,36 +1,50 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  7 Dec 2015 11:50:30 +0000
-Subject: [PATCH 17/19] mfd: da9052-i2c: Fix tabbing/whitespace issue
+Date: Mon,  7 Dec 2015 11:50:28 +0000
+Subject: [PATCH 15/19] mfd: cs5535-mfd: Add missing line spacing and make
+ local array static
 In-Reply-To: <1449489032-14374-1-git-send-email-lee.jones@linaro.org>
 References: <1449489032-14374-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1449489032-14374-18-git-send-email-lee.jones@linaro.org>
+Message-ID: <1449489032-14374-16-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WARNING: suspect code indent for conditional statements (8, 24)
-+       if (!i2c_safe_reg(reg))
-+                       return regmap_read(da9052->regmap,
+WARNING: Missing a blank line after declarations
++       struct resource *res;
++       res = platform_get_resource(pdev, IORESOURCE_IO, 0);
 
-total: 0 errors, 1 warnings, 226 lines checked
+WARNING: char * array declaration might be better as static const
++       const char *acpi_clones[] = { "olpc-xo1-pm-acpi", "olpc-xo1-sci-acpi" };
 
-Cc: Support Opensource <support.opensource@diasemi.com>
+total: 0 errors, 2 warnings, 192 lines checked
+
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/da9052-i2c.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mfd/cs5535-mfd.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/da9052-i2c.c b/drivers/mfd/da9052-i2c.c
-index 0288700..d2feaa1 100644
---- a/drivers/mfd/da9052-i2c.c
-+++ b/drivers/mfd/da9052-i2c.c
-@@ -70,7 +70,7 @@ static int da9052_i2c_fix(struct da9052 *da9052, unsigned char reg)
- 	case DA9053_BA:
- 	case DA9053_BB:
- 		/* A dummy read to a safe register address. */
--	if (!i2c_safe_reg(reg))
-+		if (!i2c_safe_reg(reg))
- 			return regmap_read(da9052->regmap,
- 					   DA9052_PARK_REGISTER,
- 					   &val);
+diff --git a/drivers/mfd/cs5535-mfd.c b/drivers/mfd/cs5535-mfd.c
+index be91cb5..f9d277ff 100644
+--- a/drivers/mfd/cs5535-mfd.c
++++ b/drivers/mfd/cs5535-mfd.c
+@@ -60,6 +60,7 @@ static int cs5535_mfd_res_enable(struct platform_device *pdev)
+ static int cs5535_mfd_res_disable(struct platform_device *pdev)
+ {
+ 	struct resource *res;
++
+ 	res = platform_get_resource(pdev, IORESOURCE_IO, 0);
+ 	if (!res) {
+ 		dev_err(&pdev->dev, "can't fetch device resource info\n");
+@@ -114,7 +115,10 @@ static struct mfd_cell cs5535_mfd_cells[] = {
+ #ifdef CONFIG_OLPC
+ static void cs5535_clone_olpc_cells(void)
+ {
+-	const char *acpi_clones[] = { "olpc-xo1-pm-acpi", "olpc-xo1-sci-acpi" };
++	static const char *acpi_clones[] = {
++		"olpc-xo1-pm-acpi",
++		"olpc-xo1-sci-acpi"
++	};
+ 
+ 	if (!machine_is_olpc())
+ 		return;
 -- 
 1.9.1
