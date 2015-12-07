@@ -1,74 +1,34 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 7 Dec 2015 17:13:31 +0100
-Subject: [PATCH v3 3/7] arm64: split off early mapping code from
- early_fixmap_init()
-In-Reply-To: <20151207160856.GD7083@e104818-lin.cambridge.arm.com>
-References: <1447672998-20981-1-git-send-email-ard.biesheuvel@linaro.org>
- <1447672998-20981-4-git-send-email-ard.biesheuvel@linaro.org>
- <20151203121840.GB28731@leverpostej>
- <CAKv+Gu8fZ7YeOsnVdosddiDuYd=MW=OYg_Z4KbNU=yH1PWSw+g@mail.gmail.com>
- <20151207160856.GD7083@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu99n7e20EW63VCjHwtkppn3LkY1qWhhbpZYsz-vFT7v-A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 07 Dec 2015 17:16:43 +0100
+Subject: [PATCH] fbdev: auo_k190x: avoid unused function warnings
+In-Reply-To: <5665AF5C.4060801@ti.com>
+References: <3917686.rD8ezhD468@wuerfel> <5665AF5C.4060801@ti.com>
+Message-ID: <1678174.Yl1Wo71dkn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 December 2015 at 17:08, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, Dec 03, 2015 at 02:31:19PM +0100, Ard Biesheuvel wrote:
->> On 3 December 2015 at 13:18, Mark Rutland <mark.rutland@arm.com> wrote:
->> > As a heads-up, for avoiding TLB conflicts, I'm currently working on
->> > alternative way of creating the kernel page tables which will definitely
->> > conflict here, and may or may not supercede this approach.
->> >
->> > By adding new FIX_{PGD,PUD,PMD,PTE} indicees to the fixmap, we can
->> > allocate page tables from anywhere via memblock, and temporarily map
->> > them as we need to.
-> [...]
->> > That would avoid the need for the bootstrap tables. In head.S we'd only
->> > need to create a temporary (coarse-grained, RWX) kernel mapping (with
->> > the fixmap bolted on). Later we would create a whole new set of tables
->> > with a fine-grained kernel mapping and a full linear mapping using the
->> > new fixmap entries to temporarily map tables, then switch over to those
->> > atomically.
->
-> If we separate the kernel image mapping from the linear one, I think
-> things would be slightly simpler to avoid TLB conflicts (but I haven't
-> looked at Mark's patches yet).
->
->> If we change back to a full linear mapping, are we back to not putting
->> the Image astride a 1GB/32MB/512MB boundary (depending on page size)?
->>
->> Anyway, to illustrate where I am headed with this: in my next version
->> of this series, I intend to move the kernel mapping to the start of
->> the vmalloc area, which gets moved up 64 MB to make room for the
->> module area (which also moves down). That way, we can still load
->> modules as before, but no longer have a need for a dedicated carveout
->> for the kernel below PAGE_OFFSET.
->
-> This makes sense, I guess it can be easily added to the existing series
-> just by changing the KIMAGE_OFFSET macro.
->
+On Monday 07 December 2015 18:10:04 Tomi Valkeinen wrote:
+> On 20/11/15 23:47, Arnd Bergmann wrote:
+> > The auo_k190x framebuffer driver encloses the power-management
+> > functions in #ifdef CONFIG_PM, but the auok190x_suspend/resume
+> > functions are only really used when CONFIG_PM_SLEEP is also
+> > set, as a frequent gcc warning shows:
+> > 
+> > drivers/video/fbdev/auo_k190x.c:859:12: warning: 'auok190x_suspend' defined but not used
+> > drivers/video/fbdev/auo_k190x.c:899:12: warning: 'auok190x_resume' defined but not used
+> > 
+> > This changes the driver to remove the #ifdef and instead mark
+> > the functions as __maybe_unused, which is a nicer anyway, as it
+> > provides build testing for all the code in all configurations
+> > and is harder to get wrong.
+> 
+> Applied for 4.5.
+> 
+> Btw, do you know if the linker will optimize the __maybe_unused funcs
+> away if they are not used? I presume so.
+> 
 
-Indeed. The only difference is that the VM area needs to be reserved
-explicitly, to prevent vmalloc() from reusing it.
+The compiler does it correctly when built with -O1 or higher (we don't
+support -O0), and the linker is not involved here.
 
->> The next step is then to move the kernel Image up inside the vmalloc
->> area based on some randomness we get from the bootloader, and relocate
->> it in place (using the same approach as in the patches I sent out
->> beginning of this year). I have implemented module PLTs so that the
->> Image and the modules no longer need to be within 128 MB of each
->> other, which means that we can have full KASLR for modules and Image,
->> and also place the kernel anywhere in physical memory.The module PLTs
->> would be a runtime penalty only, i.e., a KASLR capable kernel running
->> without KASLR would not incur the penalty of branching via PLTs. The
->> only build time option is -mcmodel=large for modules so that data
->> symbol references are absolute, but that is unlike to hurt
->> performance.
->
-> I guess full KASLR would be conditional on a config option.
->
-
-Yes. But it would be nice if the only build time penalty is the use of
--mcmodel=large for modules, so that distro kernels can enable KASLR
-unconditionally (especially since -mcmodel=large is likely to be
-enabled for distro kernels anyway, due to the A53 erratum that
-requires it.)
+	Arnd
