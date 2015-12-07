@@ -1,83 +1,110 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 07 Dec 2015 14:55:20 +0000
-Subject: [PATCH v5 03/21] KVM: ARM64: Add offset defines for PMU registers
-In-Reply-To: <5665984F.30102@linaro.org>
-References: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
- <1449123091-20252-4-git-send-email-zhaoshenglong@huawei.com>
- <56659276.6060403@arm.com> <5665984F.30102@linaro.org>
-Message-ID: <56659DD8.6050109@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 7 Dec 2015 08:57:10 -0600
+Subject: [PATCH v2 1/3] pinctrl: Broadcom NSP GPIO-a device tree bindings
+In-Reply-To: <1449249057-12975-1-git-send-email-yrdreddy@broadcom.com>
+References: <1449249057-12975-1-git-send-email-yrdreddy@broadcom.com>
+Message-ID: <20151207145710.GA14994@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/15 14:31, Shannon Zhao wrote:
+On Fri, Dec 04, 2015 at 12:10:57PM -0500, Yendapally Reddy Dhananjaya Reddy wrote:
+> Device tree binding documentation for Broadcom NSP GPIO-a
 > 
+> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yrdreddy@broadcom.com>
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+> ---
+>  .../devicetree/bindings/pinctrl/brcm,nsp-gpio.txt  | 80 ++++++++++++++++++++++
+>  1 file changed, 80 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt
 > 
-> On 2015/12/7 22:06, Marc Zyngier wrote:
->> On 03/12/15 06:11, Shannon Zhao wrote:
->>> From: Shannon Zhao <shannon.zhao@linaro.org>
->>>
->>> We are about to trap and emulate acccesses to each PMU register
->>
->> s/acccesses/accesses/
->>
->>> individually. This adds the context offsets for the AArch64 PMU
->>> registers and their AArch32 counterparts.
->>>
->>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->>> ---
->>>   arch/arm64/include/asm/kvm_asm.h | 55 ++++++++++++++++++++++++++++++++++++----
->>>   1 file changed, 50 insertions(+), 5 deletions(-)
->>>
->>> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
->>> index 5e37710..4f804c1 100644
->>> --- a/arch/arm64/include/asm/kvm_asm.h
->>> +++ b/arch/arm64/include/asm/kvm_asm.h
->>> @@ -48,12 +48,34 @@
->>>   #define MDSCR_EL1	22	/* Monitor Debug System Control Register */
->>>   #define MDCCINT_EL1	23	/* Monitor Debug Comms Channel Interrupt Enable Reg */
->>>
->>
->> Coming back to this patch, it gives a clear view of where you have state
->> duplication.
->>
->>> +/* Performance Monitors Registers */
->>> +#define PMCR_EL0	24	/* Control Register */
->>> +#define PMOVSSET_EL0	25	/* Overflow Flag Status Set Register */
->>> +#define PMOVSCLR_EL0	26	/* Overflow Flag Status Clear Register */
->>
->> This should only be a single state. You don't even have to represent it
->> in the sysreg array, to be honest.
->>
-> Yeah, I could store the state in one of them and drop one of them here.
-
-Indeed.
-
->>> +#define PMSELR_EL0	27	/* Event Counter Selection Register */
->>> +#define PMCEID0_EL0	28	/* Common Event Identification Register 0 */
->>> +#define PMCEID1_EL0	29	/* Common Event Identification Register 1 */
->>> +#define PMEVCNTR0_EL0	30	/* Event Counter Register (0-30) */
->>> +#define PMEVCNTR30_EL0	60
->>> +#define PMCCNTR_EL0	61	/* Cycle Counter Register */
->>> +#define PMEVTYPER0_EL0	62	/* Event Type Register (0-30) */
->>> +#define PMEVTYPER30_EL0	92
->>> +#define PMCCFILTR_EL0	93	/* Cycle Count Filter Register */
->>> +#define PMXEVCNTR_EL0	94	/* Selected Event Count Register */
->>> +#define PMXEVTYPER_EL0	95	/* Selected Event Type Register */
->>
->> These "select" registers aren't real ones, but just a way to pick the
->> real register. They should be removed.
->>
-> I think these two could be retained, since it's convenient to handle the 
-> guest accessing by using "case PMXEVCNTR_EL0"
-
-Not really. This is just occupying pointless space is the register file,
-and it would be clearer to have a couple of helpers called directly from
-the sys_reg trap table.
-
-Please get rid of it.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt b/Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt
+> new file mode 100644
+> index 0000000..0844168
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/brcm,nsp-gpio.txt
+> @@ -0,0 +1,80 @@
+> +Broadcom Northstar plus (NSP) GPIO/PINCONF Controller
+> +
+> +Required properties:
+> +- compatible:
+> +    Must be "brcm,nsp-gpio-a"
+> +
+> +- reg:
+> +    Should contain the register physical address and length for each of
+> +    GPIO base, IO control registers
+> +
+> +- #gpio-cells:
+> +    Must be two. The first cell is the GPIO pin number (within the
+> +    controller's pin space) and the second cell is used for the following:
+> +    bit[0]: polarity (0 for active high and 1 for active low)
+> +
+> +- gpio-controller:
+> +    Specifies that the node is a GPIO controller
+> +
+> +- ngpios:
+> +    Number of gpios supported (58x25 supports 32 and 58x23 supports 24)
+> +
+> +Optional properties:
+> +- interrupts:
+> +    Interrupt ID
+> +
+> +- interrupt-controller:
+> +    Specifies that the node is an interrupt controller
+> +
+> +- gpio-ranges:
+> +    Specifies the mapping between gpio controller and pin-controllers pins.
+> +    This requires 4 fields in cells defined as -
+> +    1. Phandle of pin-controller.
+> +    2. GPIO base pin offset.
+> +    3  Pin-control base pin offset.
+> +    4. number of gpio pins which are linearly mapped from pin base.
+> +
+> +Supported generic PINCONF properties in child nodes:
+> +- pins:
+> +    The list of pins (within the controller's own pin space) that properties
+> +    in the node apply to. Pin names are "gpio-<pin>"
+> +
+> +- bias-disable:
+> +    Disable pin bias
+> +
+> +- bias-pull-up:
+> +    Enable internal pull up resistor
+> +
+> +- bias-pull-down:
+> +    Enable internal pull down resistor
+> +
+> +- drive-strength:
+> +    Valid drive strength values include 2, 4, 6, 8, 10, 12, 14, 16 (mA)
+> +
+> +Example:
+> +
+> +	gpioa: gpio at 18000020 {
+> +		compatible = "brcm,nsp-gpio-a";
+> +		reg = <0x18000020 0x100>,
+> +		      <0x1803f1c4 0x1c>;
+> +		#gpio-cells = <2>;
+> +		gpio-controller;
+> +		ngpios = <32>;
+> +		gpio-ranges = <&pinctrl 0 0 31>;
+> +		interrupt-controller;
+> +		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+> +
+> +		/* Hog a few default settings */
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&led>;
+> +		led: led {
+> +			pins = "gpio-1";
+> +			bias-pull-up;
+> +		};
+> +
+> +		pwr: pwr {
+> +			gpio-hog;
+> +			gpios = <3 1>;
+> +			output-high;
+> +		};
+> +	};
+> -- 
+> 2.1.0
+> 
