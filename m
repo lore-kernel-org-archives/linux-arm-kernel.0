@@ -1,69 +1,101 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Mon, 7 Dec 2015 15:37:42 +0800
-Subject: [PATCH v10 01/17] drm: bridge: analogix/dp: split exynos dp
- driver to bridge directory
-In-Reply-To: <1449470312-30880-1-git-send-email-ykk@rock-chips.com>
-References: <1449470239-30667-1-git-send-email-ykk@rock-chips.com>
- <1449470312-30880-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <56653746.5040306@rock-chips.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 07 Dec 2015 08:44:36 +0100
+Subject: [PATCH] drivers: dma-coherent: simplify dma_init_coherent_memory
+ return value
+In-Reply-To: <1449260058-3572-1-git-send-email-mina86@mina86.com>
+References: <1449260058-3572-1-git-send-email-mina86@mina86.com>
+Message-ID: <566538E4.30209@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
+On 2015-12-04 21:14, Michal Nazarewicz wrote:
+> Since only dma_declare_coherent_memory cares about
+> dma_init_coherent_memory returning part of flags as it return value,
+> move the condition to the former and simplify the latter.  This in
+> turn makes rmem_dma_device_init less confusing.
+>
+> Reported-by: Fugang Duan <B38611@freescale.com>
+> Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
 
-On 12/07/2015 02:38 PM, Yakir Yang wrote:
-> Split the dp core driver from exynos directory to bridge directory,
-> and rename the core driver to analogix_dp_*, rename the platform
-> code to exynos_dp.
->
-> Beside the new analogix_dp driver would export six hooks.
-> "analogix_dp_bind()" and "analogix_dp_unbind()"
-> "analogix_dp_suspned()" and "analogix_dp_resume()"
-> "analogix_dp_detect()" and "analogix_dp_get_modes()"
->
-> The bind/unbind symbols is used for analogix platform driver to connect
-> with analogix_dp core driver. And the detect/get_modes is used for analogix
-> platform driver to init the connector.
->
-> They reason why connector need register in helper driver is rockchip drm
-> haven't implement the atomic API, but Exynos drm have implement it, so
-> there would need two different connector helper functions, that's why we
-> leave the connector register in helper driver.
->
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
 > ---
+>   drivers/base/dma-coherent.c | 28 +++++++++++-----------------
+>   1 file changed, 11 insertions(+), 17 deletions(-)
 >
-> diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-> similarity index 50%
-> rename from drivers/gpu/drm/exynos/exynos_dp_core.c
-> rename to drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-> index aee3262..cd86413 100644
-> --- a/drivers/gpu/drm/exynos/exynos_dp_core.c
-> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+> index 55b8398..87b8083 100644
+> --- a/drivers/base/dma-coherent.c
+> +++ b/drivers/base/dma-coherent.c
+> @@ -17,9 +17,9 @@ struct dma_coherent_mem {
+>   	spinlock_t	spinlock;
+>   };
 >   
-> -static int exynos_dp_remove(struct platform_device *pdev)
-> +void analogix_dp_unbind(struct device *dev, struct device *master,
-> +			void *data)
+> -static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_addr,
+> -			     size_t size, int flags,
+> -			     struct dma_coherent_mem **mem)
+> +static bool dma_init_coherent_memory(
+> +	phys_addr_t phys_addr, dma_addr_t device_addr, size_t size, int flags,
+> +	struct dma_coherent_mem **mem)
 >   {
-> -	pm_runtime_disable(&pdev->dev);
-> -	component_del(&pdev->dev, &exynos_dp_ops);
-> +	struct analogix_dp_device *dp = dev_get_drvdata(dev);
+>   	struct dma_coherent_mem *dma_mem = NULL;
+>   	void __iomem *mem_base = NULL;
+> @@ -50,17 +50,13 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_add
+>   	spin_lock_init(&dma_mem->spinlock);
 >   
+>   	*mem = dma_mem;
+> -
+> -	if (flags & DMA_MEMORY_MAP)
+> -		return DMA_MEMORY_MAP;
+> -
+> -	return DMA_MEMORY_IO;
+> +	return true;
+>   
+>   out:
+>   	kfree(dma_mem);
+>   	if (mem_base)
+>   		iounmap(mem_base);
 > -	return 0;
-> +	analogix_dp_bridge_disable(dp->bridge);
-> +	pm_runtime_disable(&pdev->dev);
+> +	return false;
 >   }
-> +EXPORT_SYMBOL_GPL(analogix_dp_unbind);
 >   
+>   static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
+> @@ -88,15 +84,13 @@ int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
+>   				dma_addr_t device_addr, size_t size, int flags)
+>   {
+>   	struct dma_coherent_mem *mem;
+> -	int ret;
+>   
+> -	ret = dma_init_coherent_memory(phys_addr, device_addr, size, flags,
+> -				       &mem);
+> -	if (ret == 0)
+> +	if (!dma_init_coherent_memory(phys_addr, device_addr, size, flags,
+> +				      &mem))
+>   		return 0;
+>   
+>   	if (dma_assign_coherent_memory(dev, mem) == 0)
+> -		return ret;
+> +		return flags & DMA_MEMORY_MAP ? DMA_MEMORY_MAP : DMA_MEMORY_IO;
+>   
+>   	dma_release_coherent_memory(mem);
+>   	return 0;
+> @@ -281,9 +275,9 @@ static int rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
+>   	struct dma_coherent_mem *mem = rmem->priv;
+>   
+>   	if (!mem &&
+> -	    dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
+> -				     DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
+> -				     &mem) != DMA_MEMORY_MAP) {
+> +	    !dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
+> +				      DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
+> +				      &mem)) {
+>   		pr_err("Reserved memory: failed to init DMA memory pool at %pa, size %ld MiB\n",
+>   			&rmem->base, (unsigned long)rmem->size / SZ_1M);
+>   		return -ENODEV;
 
-Sorry to introduce an compiled error, my test 4.4-rc3 kernel have some
-different with linux-next kernel, so i used to write the patches on next 
-kernel,
-and back the changes to my 4.4 kernel to test.
-
-I already found this error when I'm testing, but forget to reserver this 
-changes
-to linux-next kernel, I would send a new version to fix this.
-
-- Yakir
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
