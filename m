@@ -1,29 +1,33 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Mon, 7 Dec 2015 16:24:00 +0100 (CET)
-Subject: [PATCH 06/10] ARM: debug-ll: rework gemini handling
-In-Reply-To: <1449268242-808553-7-git-send-email-arnd@arndb.de>
-References: <1449268242-808553-1-git-send-email-arnd@arndb.de>
- <1449268242-808553-7-git-send-email-arnd@arndb.de>
-Message-ID: <alpine.LNX.2.00.1512071623280.14799@T520.local>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 07 Dec 2015 16:23:43 +0100
+Subject: [PATCH v3 03/10] clk: samsung: exynos5420: add cpu clock
+ configuration data and instantiate cpu clock
+In-Reply-To: <1449250235-9613-4-git-send-email-b.zolnierkie@samsung.com>
+References: <1449250235-9613-1-git-send-email-b.zolnierkie@samsung.com>
+ <1449250235-9613-4-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <5665A47F.4000907@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 4 Dec 2015, Arnd Bergmann wrote:
+On 04/12/15 18:30, Bartlomiej Zolnierkiewicz wrote:
+> From: Thomas Abraham <thomas.ab@samsung.com>
+> 
+> With the addition of the new Samsung specific cpu-clock type, the
+> arm clock can be represented as a cpu-clock type. Add the CPU clock
+> configuration data and instantiate the CPU clock type for Exynos5420.
+> 
+> Changes by Bartlomiej:
+> - split Exynos5420 support from the original patches
+> - moved E5420_[EGL,KFC]_DIV0() macros to clk-exynos5420.c
+> 
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-> Gemini can not yet be configured in a multiplatform kernel, but
-> if we ever get there, enabling one of the gemini platforms
-> while trying to use DEBUG_LL for another platform can default to
-> the wrong UART address, as the options are purely based on the
-> architecture being enabled or not.
-> 
-> This changes the logic to use the gemini default addresses and
-> the flow control settings only if we have also picked the respective
-> Kconfig symbols introduced here.
-> 
-> While we're at it, this also reorders the virtual address as
-> it should be.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-Acked-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+-- 
+Regards,
+Sylwester
