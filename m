@@ -1,38 +1,31 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Mon, 7 Dec 2015 16:58:30 +0800
-Subject: [Xen-devel] [PATCH v3 07/62] arm/acpi: Add arch_acpi_os_map_memory
- helper function for ARM
-In-Reply-To: <565C6198.3070805@citrix.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>	<1447753261-7552-8-git-send-email-shannon.zhao@linaro.org>
- <alpine.DEB.2.02.1511231137000.1107@kaball.uk.xensource.com>
- <565C6198.3070805@citrix.com>
-Message-ID: <56654A36.6070708@huawei.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 7 Dec 2015 09:59:55 +0100
+Subject: [PATCH resend 3/6] ARM: dts: sun4i: Add DRAM gates
+In-Reply-To: <1449321407-4531-4-git-send-email-wens@csie.org>
+References: <1449321407-4531-1-git-send-email-wens@csie.org>
+ <1449321407-4531-4-git-send-email-wens@csie.org>
+Message-ID: <20151207085955.GB27957@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 2015/11/30 22:47, Julien Grall wrote:
-> Hi,
+On Sat, Dec 05, 2015 at 09:16:44PM +0800, Chen-Yu Tsai wrote:
+> The DRAM gates controls direct memory access for some peripherals.
+> These peripherals include the display pipeline, so add the required
+> gates to the simplefb nodes as well.
 > 
-> On 23/11/15 11:37, Stefano Stabellini wrote:
->> > On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
->>> >> From: Shannon Zhao <shannon.zhao@linaro.org>
->> > could you please add a couple of lines to the commit message mentioning
->> > why __va(phys) is an acceptable implementation of arch_acpi_os_map_memory?
-> FWIW, I already asked this question multiple time on the previous series
-> without clear answer.
-> 
-> __va should only be used when the memory is direct-mapped to Xen (i.e
-> accessible directly). On ARM64, this is only the case for the RAM. Can
-> someone confirm the ACPI will always reside to the RAM?
-I checked this with the UEFI SPEC. It says in 2.3.6 AArch64 Platforms:
-"If ACPI is supported :
-? ACPI Tables loaded at boot time can be contained in memory of type
-EfiACPIReclaimMemory (recommended) or EfiACPIMemoryNVS."
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-So I think it means the ACPI tables will always reside in RAM.
+Applied, thanks!
+Maxime
 
-Thanks,
 -- 
-Shannon
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151207/eb173f59/attachment.sig>
