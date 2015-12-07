@@ -1,160 +1,79 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Mon, 7 Dec 2015 21:06:29 +0800
-Subject: [PATCH v3] acpi, apei, arm64: APEI initial support for aarch64.
-In-Reply-To: <56655307.2010305@linaro.org>
-References: <1449162903-11203-1-git-send-email-fu.wei@linaro.org>
- <56655307.2010305@linaro.org>
-Message-ID: <CADyBb7uN3yftHdwWDZ34L6aArjNZ6Ai6bmbx-BoFn9xQdcqXvQ@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 7 Dec 2015 13:09:35 +0000
+Subject: [PATCH 3/5] iommu/arm-smmu: Invalidate TLBs properly
+In-Reply-To: <20151207110939.GB23430@arm.com>
+References: <cover.1449246988.git.robin.murphy@arm.com>
+ <2acaea8656f14a4421d7d466dd242fe5a3d0f6f6.1449246988.git.robin.murphy@arm.com>
+ <20151207110939.GB23430@arm.com>
+Message-ID: <5665850F.1060406@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
-
-On 7 December 2015 at 17:36, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> Hi Fu Wei,
->
-> On 12/04/2015 01:15 AM, fu.wei at linaro.org wrote:
+On 07/12/15 11:09, Will Deacon wrote:
+> On Fri, Dec 04, 2015 at 05:53:00PM +0000, Robin Murphy wrote:
+>> When invalidating an IOVA range potentially spanning multiple pages,
+>> such as when removing an entire intermediate-level table, we currently
+>> only issue an invalidation for the first IOVA of that range. Since the
+>> architecture specifies that address-based TLB maintenance operations
+>> target a single entry, an SMMU could feasibly retain live entries for
+>> subsequent pages within that unmapped range, which is not good.
 >>
->> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>> Make sure we hit every possible entry by iterating over the whole range
+>> at the granularity provided by the pagetable implementation.
 >>
->> This commit provides APEI arch-specific bits for aarch64
->>
->> The reason for wrapping "acpi_disable_cmcff" by
->> "#if defined(__i386__) || defined(__x86_64__)" in hest.c is:
->> according to ACPI spec CMC(Corrected Machine Check) is only for IA-32
->> Architecture.
->>
->> Changelog:
->> v3: Remove "acpi_disable_cmcff" from arm64 code,
->>      and wrap it in hest.c by "#if defined(__i386__) ||
->> defined(__x86_64__)"
->>
->> v2: https://lkml.org/lkml/2015/12/2/432
->>      Rebase to latest kernel version(4.4-rc3).
->>      Move arch_apei_flush_tlb_one() to arch/arm64/kernel/acpi.c
->>
->> v1: https://lkml.org/lkml/2015/8/14/199
->>      Move arch_apei_flush_tlb_one() to arch/arm64/include/asm/apci.h.
->>      Delete arch/arm64/kernel/apei.c.
->>      Add "#ifdef CONFIG_ACPI_APEI" for "acpi_disable_cmcff".
->
->
-> The version updates is not belong here, if you need to add
-> it, please place it under "---" below.
->
->>
->> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->> Tested-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
->> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 >> ---
+>>   drivers/iommu/arm-smmu.c | 19 ++++++++++++++++---
+>>   1 file changed, 16 insertions(+), 3 deletions(-)
 >
->
-> ...just here.
+> Can you do something similar for arm-smmu-v3.c as well, please?
 
-OK , thanks
+Something like this? (untested as I don't have a v3 model set up):
 
->
->
->>   arch/arm64/Kconfig            | 1 +
->>   arch/arm64/include/asm/acpi.h | 1 +
->>   arch/arm64/kernel/acpi.c      | 6 ++++++
->>   drivers/acpi/apei/hest.c      | 2 ++
->>   4 files changed, 10 insertions(+)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 871f217..58c8992 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -3,6 +3,7 @@ config ARM64
->>         select ACPI_CCA_REQUIRED if ACPI
->>         select ACPI_GENERIC_GSI if ACPI
->>         select ACPI_REDUCED_HARDWARE_ONLY if ACPI
->> +       select HAVE_ACPI_APEI if ACPI
->>         select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
->>         select ARCH_HAS_ELF_RANDOMIZE
->>         select ARCH_HAS_GCOV_PROFILE_ALL
->> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
->> index caafd63..7207f8e 100644
->> --- a/arch/arm64/include/asm/acpi.h
->> +++ b/arch/arm64/include/asm/acpi.h
->> @@ -94,6 +94,7 @@ static inline const char *acpi_get_enable_method(int
->> cpu)
->>
->>   #ifdef        CONFIG_ACPI_APEI
->>   pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
->> +void arch_apei_flush_tlb_one(unsigned long addr);
->>   #endif
->>
->>   #endif /*_ASM_ACPI_H*/
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> index d1ce8e2..7a742e7 100644
->> --- a/arch/arm64/kernel/acpi.c
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -32,6 +32,7 @@
->>   #ifdef CONFIG_ACPI_APEI
->>   # include <linux/efi.h>
->>   # include <asm/pgtable.h>
->> +# include <asm/tlbflush.h>
->>   #endif
->>
->>   int acpi_noirq = 1;           /* skip ACPI IRQ initialization */
->> @@ -233,4 +234,9 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
->>                 return __pgprot(PROT_NORMAL_NC);
->>         return __pgprot(PROT_DEVICE_nGnRnE);
->>   }
->> +
->> +void arch_apei_flush_tlb_one(unsigned long addr)
->> +{
->> +       flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
->> +}
->
->
-> Maybe just a static inline function in arch/arm64/include/asm/acpi.h
-> will be good?
+------>8------
+From: Robin Murphy <robin.murphy@arm.com>
+Date: Mon, 7 Dec 2015 12:52:56 +0000
+Subject: [PATCH] iommu/arm-smmu: Fix TLB invalidation
 
-yes, this suggestion makes sense, it is just one line.
-And I also understood the reason why the original author make this
-code like that:
-coordinating with x86 code.
+SMMUv3 operates under the same rules as SMMUv2 and the CPU
+architectures, so when invalidating an IOVA range we have to hit
+every address for which a TLB entry might exist.
 
-let's improve it this time.
+To fix this, issue commands for the whole range rather than just the
+initial address; as a minor optimisation, try to avoid flooding the
+queue by falling back to 'invalidate all' if the range is large.
 
->
->>   #endif
->> diff --git a/drivers/acpi/apei/hest.c b/drivers/acpi/apei/hest.c
->> index 20b3fcf..4ead747 100644
->> --- a/drivers/acpi/apei/hest.c
->> +++ b/drivers/acpi/apei/hest.c
->> @@ -232,8 +232,10 @@ void __init acpi_hest_init(void)
->>                 goto err;
->>         }
->>
->> +#if defined(__i386__) || defined(__x86_64__)
->>         if (!acpi_disable_cmcff)
->>                 apei_hest_parse(hest_parse_cmc, NULL);
->> +#endif
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+  drivers/iommu/arm-smmu-v3.c | 9 ++++++++-
+  1 file changed, 8 insertions(+), 1 deletion(-)
 
-OK, that makes sense, will do
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index c302b65..afa0b41 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1346,6 +1346,10 @@ static void 
+arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+  		},
+  	};
 
->
->
-> How about put it together into a function, and
-> introduce a stub function when no __i386__ and
-> __x86_64__ case?
->
-> Thanks
-> Hanjun
++	/* If we'd fill the whole queue or more, don't even bother... */
++	if (granule << smmu->cmdq.q.max_n_shift >= size / (CMDQ_ENT_DWORDS << 3))
++		return arm_smmu_tlb_inv_context(cookie);
++
+  	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
+  		cmd.opcode	= CMDQ_OP_TLBI_NH_VA;
+  		cmd.tlbi.asid	= smmu_domain->s1_cfg.cd.asid;
+@@ -1354,7 +1358,10 @@ static void 
+arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+  		cmd.tlbi.vmid	= smmu_domain->s2_cfg.vmid;
+  	}
 
+-	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
++	do {
++		arm_smmu_cmdq_issue_cmd(smmu, &cmd);
++		cmd.tlbi.addr += granule;
++	} while (size -= granule);
+  }
 
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
-Ph: +86 21 61221326(direct)
-Ph: +86 186 2020 4684 (mobile)
-Room 1512, Regus One Corporate Avenue,Level 15,
-One Corporate Avenue,222 Hubin Road,Huangpu District,
-Shanghai,China 200021
+  static struct iommu_gather_ops arm_smmu_gather_ops = {
