@@ -1,29 +1,47 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Mon, 7 Dec 2015 20:44:16 +0800
-Subject: [PATCH 2/2] ARM64: dts: mt8173: Add CPU OPP, clock and regulator
- supply properties
-In-Reply-To: <20151207100700.GH3294@ubuntu>
-References: <1449305584-414-1-git-send-email-pi-cheng.chen@linaro.org>
- <1449305584-414-3-git-send-email-pi-cheng.chen@linaro.org>
- <20151207100700.GH3294@ubuntu>
-Message-ID: <CALx668Vf73vwScD+_5JbuCT7yGrZ9PviHfy0zh6vyb_9m-M7LQ@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 7 Dec 2015 20:49:22 +0800
+Subject: [PATCH v2 5/7] usb: xhci: plat: Remove checks for optional clock in
+ error/remove path
+In-Reply-To: <1449492564-4803-1-git-send-email-jszhang@marvell.com>
+References: <1449492564-4803-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1449492564-4803-6-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 7, 2015 at 6:07 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 05-12-15, 16:53, Pi-Cheng Chen wrote:
->> +     cluster0_opp: opp_table0 {
->> +             compatible = "operating-points-v2";
->> +             opp-shared;
->> +             opp00 {
->
-> These have to named like: opp at 50700000, look at linux-next for this.
+Commit 63589e92c2d9 ("clk: Ignore error and NULL pointers passed to
+clk_{unprepare, disable}()") allows NULL or error pointer to be passed
+unconditionally.
 
-Will do it.
+This patch is to simplify probe error and remove code paths.
 
-Thanks,
-Pi-Cheng
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/usb/host/xhci-plat.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
->
-> --
-> viresh
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index d990135..62f02e5 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -197,8 +197,7 @@ put_usb3_hcd:
+ 	usb_put_hcd(xhci->shared_hcd);
+ 
+ disable_clk:
+-	if (!IS_ERR(clk))
+-		clk_disable_unprepare(clk);
++	clk_disable_unprepare(clk);
+ 
+ put_hcd:
+ 	usb_put_hcd(hcd);
+@@ -218,8 +217,7 @@ static int xhci_plat_remove(struct platform_device *dev)
+ 	usb_remove_hcd(hcd);
+ 	usb_put_hcd(xhci->shared_hcd);
+ 
+-	if (!IS_ERR(clk))
+-		clk_disable_unprepare(clk);
++	clk_disable_unprepare(clk);
+ 	usb_put_hcd(hcd);
+ 
+ 	return 0;
+-- 
+2.6.2
