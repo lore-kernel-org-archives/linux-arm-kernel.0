@@ -1,29 +1,34 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 7 Dec 2015 15:34:27 +0530
-Subject: [PATCH 1/2] cpufreq: mt8173: migrate to use operating-points-v2
- bindings
-In-Reply-To: <1449305584-414-2-git-send-email-pi-cheng.chen@linaro.org>
-References: <1449305584-414-1-git-send-email-pi-cheng.chen@linaro.org>
- <1449305584-414-2-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <20151207100427.GG3294@ubuntu>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Dec 2015 10:04:38 +0000
+Subject: [PATCH v2 1/3] dt-bindings: add Marvell PMU documentation
+In-Reply-To: <181206520.JBMXuTWYTV@wuerfel>
+References: <E1a5j6L-000873-3P@rmk-PC.arm.linux.org.uk>
+ <181206520.JBMXuTWYTV@wuerfel>
+Message-ID: <20151207100438.GL8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05-12-15, 16:53, Pi-Cheng Chen wrote:
-> diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
-> index 257bcb9..17e9cad 100644
-> --- a/drivers/cpufreq/mt8173-cpufreq.c
-> +++ b/drivers/cpufreq/mt8173-cpufreq.c
-> @@ -344,6 +344,9 @@ static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
->  	unsigned long rate;
->  	int ret;
->  
-> +	/* Mark the first owner of this CPU DVFS domain information */
-> +	cpumask_set_cpu(cpu, &info->cpus);
-> +
+On Mon, Dec 07, 2015 at 10:09:48AM +0100, Arnd Bergmann wrote:
+> On Sunday 06 December 2015 23:52:21 Russell King wrote:
+> > Add the required DT binding documentation for the Marvell PMU driver.
+> > 
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> > Who takes these patches?  This never got merged when the PMU driver
+> > itself was merged.
+> 
+> I'd say it should go along with the dts changes for mvebu, and we'll
+> merge it through arm-soc.
 
-This is bad, sorry about that. Please update
-dev_pm_opp_of_get_sharing_cpus() to update this as well.
+Well, it didn't, the dts changes are already in as well.  Someone now
+needs to pick it up independently.
+
+I wonder how many more of the undocumented bindings are actually caused
+by people not realising that the binding docs patches have been ignored.
+(Yes, I've found cases in the past where bindings are undocumented, and
+no, I don't keep a list and I don't remember which they were.)
 
 -- 
-viresh
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
