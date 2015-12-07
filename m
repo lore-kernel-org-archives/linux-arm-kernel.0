@@ -1,28 +1,28 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  7 Dec 2015 11:52:20 +0000
-Subject: [PATCH 1/1] ARM: multi_v7_defconfig: Remove unused Kconfig option
- MACH_UX500_DT
-Message-ID: <1449489140-14552-1-git-send-email-lee.jones@linaro.org>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Mon, 7 Dec 2015 12:00:01 +0000
+Subject: [Xen-devel] [PATCH v3 06/62] acpi: Refactor acpi_os_map_memory
+ to be architecturally independent
+In-Reply-To: <1447753261-7552-7-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-7-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <566574C1.30700@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/configs/multi_v7_defconfig | 1 -
- 1 file changed, 1 deletion(-)
+Hi Shannon,
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 03deb7f..71e297a 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -98,7 +98,6 @@ CONFIG_ARCH_UNIPHIER=y
- CONFIG_ARCH_U8500=y
- CONFIG_MACH_HREFV60=y
- CONFIG_MACH_SNOWBALL=y
--CONFIG_MACH_UX500_DT=y
- CONFIG_ARCH_VEXPRESS=y
- CONFIG_ARCH_VEXPRESS_CA9X4=y
- CONFIG_ARCH_VEXPRESS_TC2_PM=y
+On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Current acpi_os_map_memory is specific to x86. Refactor it to be
+> architecturally independent.
+
+The function acpi_os_unmap_memory should also be arch-independent.
+
+Otherwise, with the implementation you did on ARM (see patch #7), you
+will destroy by mistake the mapping in the page table for those regions.
+
+Regards,
+
 -- 
-1.9.1
+Julien Grall
