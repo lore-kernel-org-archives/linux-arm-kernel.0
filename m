@@ -1,87 +1,117 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 7 Dec 2015 10:27:47 +0100
-Subject: [PATCH v5 05/11] spi: imx: Add support for loopback for ECSPI
- controllers
-In-Reply-To: <1449334629-4715-6-git-send-email-anton.bondarenko.sama@gmail.com>
-References: <1449334629-4715-1-git-send-email-anton.bondarenko.sama@gmail.com>
- <1449334629-4715-6-git-send-email-anton.bondarenko.sama@gmail.com>
-Message-ID: <20151207092747.GA11966@pengutronix.de>
+From: dhdang@apm.com (Duc Dang)
+Date: Mon, 7 Dec 2015 01:29:24 -0800
+Subject: [PATCH v3 1/3] mailbox: Add support for APM X-Gene platform
+ mailbox driver
+In-Reply-To: <CABb+yY2zHycEmsVvp8OFwpJ1PZgrEPpV-oOe56wgFJ=EE0nTcg@mail.gmail.com>
+References: <1429863912.2927.43.camel@x220>
+ <cover.1447091625.git.dhdang@apm.com>
+ <b6f12c4d5f45205c356a61acd26aecff70b54e68.1447091626.git.dhdang@apm.com>
+ <CABb+yY2zHycEmsVvp8OFwpJ1PZgrEPpV-oOe56wgFJ=EE0nTcg@mail.gmail.com>
+Message-ID: <CADaLNDmSN3yGSKjLbZiyXgwdEVw0RDjvT7PFaZiv2ByfsrhdzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 05, 2015 at 05:57:03PM +0100, Anton Bondarenko wrote:
-> Support for ECSPI loopback for IMX51, IMX53 and IMX6Q using TEST register.
-> 
-> Signed-off-by: Mohsin Kazmi <mohsin_kazmi@mentor.com>
-> Signed-off-by: Anton Bondarenko <anton.bondarenko.sama@gmail.com>
-> ---
->  drivers/spi/spi-imx.c | 19 ++++++++++++++++---
->  1 file changed, 16 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index 363276d..3525616 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -246,6 +246,9 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
->  #define MX51_ECSPI_STAT		0x18
->  #define MX51_ECSPI_STAT_RR		(1 <<  3)
->  
-> +#define MX51_ECSPI_TEST			0x20
-> +#define MX51_ECSPI_LOOP			BIT(31)
-> +
->  /* MX51 eCSPI */
->  static unsigned int mx51_ecspi_clkdiv(unsigned int fin, unsigned int fspi,
->  				      unsigned int *fres)
-> @@ -316,6 +319,7 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
->  	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0, dma = 0;
->  	u32 tx_wml_cfg, rx_wml_cfg, rxt_wml_cfg;
->  	u32 clk = config->speed_hz, delay;
-> +	u32 lpb = 0;
->  
->  	/*
->  	 * The hardware seems to have a race condition when changing modes. The
-> @@ -356,6 +360,12 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
->  	writel(ctrl, spi_imx->base + MX51_ECSPI_CTRL);
->  	writel(cfg, spi_imx->base + MX51_ECSPI_CONFIG);
->  
-> +	if (config->mode & SPI_LOOP)
-> +		lpb |= MX51_ECSPI_LOOP;
-> +
-> +	if ((readl(spi_imx->base + MX51_ECSPI_TEST) & MX51_ECSPI_LOOP) != lpb)
-> +		writel(lpb, spi_imx->base + MX51_ECSPI_TEST);
-> +
->  	/*
->  	 * Wait until the changes in the configuration register CONFIGREG
->  	 * propagate into the hardware. It takes exactly one tick of the
-> @@ -1128,6 +1138,9 @@ static int spi_imx_probe(struct platform_device *pdev)
->  	spi_imx = spi_master_get_devdata(master);
->  	spi_imx->bitbang.master = master;
->  
-> +	spi_imx->devtype_data = of_id ? of_id->data :
-> +		(struct spi_imx_devtype_data *)pdev->id_entry->driver_data;
-> +
->  	for (i = 0; i < master->num_chipselect; i++) {
->  		int cs_gpio = of_get_named_gpio(np, "cs-gpios", i);
->  		if (!gpio_is_valid(cs_gpio) && mxc_platform_info)
-> @@ -1154,10 +1167,10 @@ static int spi_imx_probe(struct platform_device *pdev)
->  	spi_imx->bitbang.master->unprepare_message = spi_imx_unprepare_message;
->  	spi_imx->bitbang.master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
->  
-> -	init_completion(&spi_imx->xfer_done);
-> +	if (is_imx51_ecspi(spi_imx))
-> +		spi_imx->bitbang.master->mode_bits |= SPI_LOOP;
->  
-> -	spi_imx->devtype_data = of_id ? of_id->data :
-> -		(struct spi_imx_devtype_data *) pdev->id_entry->driver_data;
-> +	init_completion(&spi_imx->xfer_done);
+On Fri, Nov 20, 2015 at 3:47 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Mon, Nov 9, 2015 at 11:35 PM, Duc Dang <dhdang@apm.com> wrote:
+>> X-Gene mailbox controller provides 8 mailbox channels, with
+>> each channel has a dedicated interrupt line.
+>>
+>> [dhdang: rebase over 4.3-rc5, some minor changes to
+>> address comment in v2 patch set]
+>>
+> Do you want this to go into git logs?
 
-Some unrelated lines are moved in these two hunks. Is this necessary or
-just some leftover from development?
+Yes.
 
-Sascha
+I will also rebase the patch set to v4.4-rc1.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>
+>> Signed-off-by: Feng Kan <fkan@apm.com>
+>> Signed-off-by: Duc Dang <dhdang@apm.com>
+>> ---
+> here is the right place for any history. And it is good practice to
+> specify whatever changes were made from last revision.
+
+I will add change log into this section in next version of the patch.
+
+>
+>
+>> +
+>> +struct slimpro_mbox_chan {
+>> +       struct device *dev;
+>> +       struct mbox_chan *chan;
+>> +       void __iomem *reg;
+>> +       int id;
+>>
+> You don't seem to really need 'id'.
+
+I will remove 'id'.
+
+>
+>
+>> +
+>> +static void mb_chan_enable_int(struct slimpro_mbox_chan *mb_chan, u32 mask)
+>> +{
+>> +       u32 val = readl(mb_chan->reg + REG_DB_STATMASK);
+>> +
+>> +       val &= ~mask;
+>> +       writel(val, mb_chan->reg + REG_DB_STATMASK);
+>> +}
+>> +
+>> +static void mb_chan_disable_int(struct slimpro_mbox_chan *mb_chan, u32 mask)
+>> +{
+>> +       u32 val = readl(mb_chan->reg + REG_DB_STATMASK);
+>> +
+>> +       val |= mask;
+>> +       writel(val, mb_chan->reg + REG_DB_STATMASK);
+>> +}
+>> +
+> These 2 functions are called just once. And do what other drivers
+> usually inline. Wouldn't it be better to directly set & clear the bit
+> when needed?
+
+I will fold these 2 functions into their callers and then get rid of them.
+
+>
+>> +static int slimpro_mbox_send_data(struct mbox_chan *chan, void *msg)
+>> +{
+>> +       struct slimpro_mbox_chan *mb_chan =
+>> +                               (struct slimpro_mbox_chan *)chan->con_priv;
+>> +
+> You don't need to typecast a void pointer. Here and elsewhere.
+
+I will remove all the typecast of a void pointer in the driver.
+
+>
+>
+>> +
+>> +       /* Setup mailbox links */
+>> +       for (i = 0; i < MBOX_CNT; i++) {
+>> +               ctx->mc[i].irq = platform_get_irq(pdev, i);
+>>
+> You expect every platform to provide exactly 'MBOX_CNT' irqs and they
+> must be different (because you don't 'SHARE' when you request).
+> Usually developers relax either of the conditions.
+
+I will relax the MBOX_CNT irqs restriction: Platform can provide less
+than MBOX_CNT irqs, which also means less than MBOX_CNT mailbox
+channels.
+
+>
+>
+>> +static struct platform_driver slimpro_mbox_driver = {
+>> +       .probe  = slimpro_mbox_probe,
+>> +       .remove = slimpro_mbox_remove,
+>> +       .driver = {
+>> +               .name = "xgene-slimpro-mbox",
+>> +               .owner = THIS_MODULE,
+>>
+> No need to set .owner.
+
+I will remove it.
+
+>
+> Cheers.
+
+Regards,
+Duc Dang.
