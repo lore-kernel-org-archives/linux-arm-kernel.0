@@ -1,90 +1,103 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 7 Dec 2015 18:28:21 +0000
-Subject: [PATCH v2] iommu/arm-smmu: Invalidate TLBs properly
-In-Reply-To: <ac2d6aedf473cf01eb1df48a1f81614f0f74b0b1.1449501523.git.robin.murphy@arm.com>
-References: <2acaea8656f14a4421d7d466dd242fe5a3d0f6f6.1449246988.git.robin.murphy@arm.com>
- <ac2d6aedf473cf01eb1df48a1f81614f0f74b0b1.1449501523.git.robin.murphy@arm.com>
-Message-ID: <20151207182821.GH26191@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 7 Dec 2015 19:28:04 +0100 (CET)
+Subject: [RFC PATCH] irq: allow percpu_devid interrupts to be requested
+ with target mask
+In-Reply-To: <20151207173835.GF26191@arm.com>
+References: <1448624376-15570-1-git-send-email-will.deacon@arm.com>
+ <alpine.DEB.2.11.1511271622170.3572@nanos> <20151207173835.GF26191@arm.com>
+Message-ID: <alpine.DEB.2.11.1512071915060.3595@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 06:18:52PM +0000, Robin Murphy wrote:
-> When invalidating an IOVA range potentially spanning multiple pages,
-> such as when removing an entire intermediate-level table, we currently
-> only issue an invalidation for the first IOVA of that range. Since the
-> architecture specifies that address-based TLB maintenance operations
-> target a single entry, an SMMU could feasibly retain live entries for
-> subsequent pages within that unmapped range, which is not good.
-> 
-> Make sure we hit every possible entry by iterating over the whole range
-> at the granularity provided by the pagetable implementation.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
-> 
-> v2: include SMMUv3 fix, use the same shorter loop construct everywhere.
-> 
->  drivers/iommu/arm-smmu-v3.c |  5 ++++-
->  drivers/iommu/arm-smmu.c    | 16 +++++++++++++---
->  2 files changed, 17 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index c302b65..8bb5abf 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -1354,7 +1354,10 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
->  		cmd.tlbi.vmid	= smmu_domain->s2_cfg.vmid;
->  	}
->  
-> -	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
-> +	do {
-> +		arm_smmu_cmdq_issue_cmd(smmu, &cmd);
-> +		cmd.tlbi.addr += granule;
-> +	} while (size -= granule);
->  }
->  
->  static struct iommu_gather_ops arm_smmu_gather_ops = {
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 601e3dd..eb28c3e 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -597,12 +597,18 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
->  		if (!IS_ENABLED(CONFIG_64BIT) || smmu->version == ARM_SMMU_V1) {
->  			iova &= ~12UL;
->  			iova |= ARM_SMMU_CB_ASID(cfg);
-> -			writel_relaxed(iova, reg);
-> +			do {
-> +				writel_relaxed(iova, reg);
-> +				iova += granule;
-> +			} while (size -= granule);
->  #ifdef CONFIG_64BIT
->  		} else {
->  			iova >>= 12;
->  			iova |= (u64)ARM_SMMU_CB_ASID(cfg) << 48;
-> -			writeq_relaxed(iova, reg);
-> +			do {
-> +				writeq_relaxed(iova, reg);
-> +				iova += granule >> 12;
-> +			} while (size -= granule)
+Will,
 
-This doesn't compile.
+On Mon, 7 Dec 2015, Will Deacon wrote:
+> On Fri, Nov 27, 2015 at 08:15:52PM +0100, Thomas Gleixner wrote:
+> >    Now you want to use the same Linux irq number for the local timer
+> >    or whatever on all CPUs independent of the cluster, right?
+> > 
+> >    So the per cpu timer interrupt is requested once as a per cpu
+> >    interrupt with the linux irq number of cluster 0. But when you call
+> >    enable_per_cpu_irq() on a cpu from cluster 1 you want to use the
+> >    same linux irq number. But with the current scheme this ends up at
+> >    the wrong hw irq.
+> > 
+> >    That's why you introduced that cpumask stuff.
+> 
+> There's a slight niggle here, which I didn't communicate in the commit
+> log (because my use-case is indeed per-cluster). Interrupts can also
+> be wired on a per-cpu basis, but where you have multiple device/driver
+> instances and therefore can't use a single call to request_percpu_irq.
+> An example of this is Freescale's watchdog:
+> 
+>   http://www.spinics.net/lists/arm-kernel/msg464000.html
+> 
+> which is why I added Bhupesh to Cc. They seem to have 1 watchdog per
+> core, but signalling the same PPI number...
 
->  #endif
->  		}
->  #ifdef CONFIG_64BIT
-> @@ -610,7 +616,11 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
->  		reg = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
->  		reg += leaf ? ARM_SMMU_CB_S2_TLBIIPAS2L :
->  			      ARM_SMMU_CB_S2_TLBIIPAS2;
-> -		writeq_relaxed(iova >> 12, reg);
-> +		iova >>= 12;
-> +		do {
-> +			writeq_relaxed(iova, reg);
-> +			iova += granule >> 12;
-> +		} while (size -= granule)
+You can create both a PerCluster and a PerCPU domain.
 
-Same here.
+But in that particular case it's the same as the local timer which
+signals the same PPI on all CPUs, right? So the existing percpu irq
+stuff should just work for that watchdog thingy.
 
-Please at least build your patches, and preferably test them too.
+> >   enable_percpu_irq(12) <- On cluster 1
+> >   	enable_irq(irq13) -> hwirq20
+> > 
+> > We can do that, because all operations have to be invoked on the
+> > target cpu.
+> 
+> Ok, but what about existing callers? I think we either need a new
+> function or flag to indicate that the irq is per-cluster, otherwise we
+> run the risk of breaking things where the hwirq is actually the same.
 
-Will
+That's what I wrote a few lines up:
+
+> > enable/disable_percpu_irq() does:
+> > 
+> >     struct irq_desc *desc = irq_to_desc(irq);
+> >     struct irqdomain *domain = irq_desc_get_domain(desc);
+> > 
+> >     if (domain && domain->nr_clusters > 1)
+> >         desc = irq_to_desc(irq + domain->get_cluster(smp_processor_id());
+> > 
+> >     enable/disable(desc);
+
+
+> At the moment, the ARM perf binding in device-tree has an optional
+> "interrupt-affinity" field that describes the set of CPUs which use
+> the PPI number described elsewhere in the node. Perhaps we could parse
+> this when we create the new domain and selectively map irqs there.
+> 
+> Dunno -- needs prototyping!
+
+My device tree foo is close to zero, so I let the DT wizards come up
+with a solution. But you need some decription of this in the DT
+anyway, right?
+
+> > So far so good. Now we have the interrupt entry code which wants to
+> > translate hwirqX to a linux irq number. So we need some modification
+> > to irq_find_mapping() as well. We could do a domain specific
+> > find_mapping() callback, or add something to the core code.
+> > 
+> > 	if (domain->is_clustered_mapped) {
+> > 	      map = domain->map[domain->get_cluster(cpuid)];
+> > 	      return map[hwirq];
+> > 	}			  
+> > 
+> > works for a linear domain. A domain specific find_mapping() callback
+> > might be better suited, but thats a detail.
+> 
+> It's a little scary to tie the device-tree topology description (which
+> is usually used for scheduling and power management afaiu) directly
+> to the IRQ routing, but then if this does end up being per-cpu, there's
+> no real issue.
+
+Well, if your hardware is wired in scary ways, i.e. PPIs have a
+different meaning on different clusters/cpus, then you need some
+description in DT anyway. Translating that into a mapping is pretty
+much straight forward I guess.
+ 
+Thanks,
+
+	tglx
