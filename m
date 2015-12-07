@@ -1,86 +1,78 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 7 Dec 2015 13:34:36 +0000
-Subject: [PATCH 3/5] iommu/arm-smmu: Invalidate TLBs properly
-In-Reply-To: <5665850F.1060406@arm.com>
-References: <cover.1449246988.git.robin.murphy@arm.com>
- <2acaea8656f14a4421d7d466dd242fe5a3d0f6f6.1449246988.git.robin.murphy@arm.com>
- <20151207110939.GB23430@arm.com> <5665850F.1060406@arm.com>
-Message-ID: <20151207133435.GE23430@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 07 Dec 2015 13:38:02 +0000
+Subject: [PATCH v5 08/21] KVM: ARM64: Add reset and access handlers for
+ PMXEVTYPER register
+In-Reply-To: <1449123091-20252-9-git-send-email-zhaoshenglong@huawei.com>
+References: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
+ <1449123091-20252-9-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <56658BBA.4040600@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 01:09:35PM +0000, Robin Murphy wrote:
-> On 07/12/15 11:09, Will Deacon wrote:
-> >On Fri, Dec 04, 2015 at 05:53:00PM +0000, Robin Murphy wrote:
-> >>When invalidating an IOVA range potentially spanning multiple pages,
-> >>such as when removing an entire intermediate-level table, we currently
-> >>only issue an invalidation for the first IOVA of that range. Since the
-> >>architecture specifies that address-based TLB maintenance operations
-> >>target a single entry, an SMMU could feasibly retain live entries for
-> >>subsequent pages within that unmapped range, which is not good.
-> >>
-> >>Make sure we hit every possible entry by iterating over the whole range
-> >>at the granularity provided by the pagetable implementation.
-> >>
-> >>Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> >>---
-> >>  drivers/iommu/arm-smmu.c | 19 ++++++++++++++++---
-> >>  1 file changed, 16 insertions(+), 3 deletions(-)
-> >
-> >Can you do something similar for arm-smmu-v3.c as well, please?
+On 03/12/15 06:11, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> Something like this? (untested as I don't have a v3 model set up):
+> Since the reset value of PMXEVTYPER is UNKNOWN, use reset_unknown or
+> reset_unknown_cp15 for its reset handler. Add access handler which
+> emulates writing and reading PMXEVTYPER register. When writing to
+> PMXEVTYPER, call kvm_pmu_set_counter_event_type to create a perf_event
+> for the selected event type.
 > 
-> ------>8------
-> From: Robin Murphy <robin.murphy@arm.com>
-> Date: Mon, 7 Dec 2015 12:52:56 +0000
-> Subject: [PATCH] iommu/arm-smmu: Fix TLB invalidation
-> 
-> SMMUv3 operates under the same rules as SMMUv2 and the CPU
-> architectures, so when invalidating an IOVA range we have to hit
-> every address for which a TLB entry might exist.
-> 
-> To fix this, issue commands for the whole range rather than just the
-> initial address; as a minor optimisation, try to avoid flooding the
-> queue by falling back to 'invalidate all' if the range is large.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 > ---
->  drivers/iommu/arm-smmu-v3.c | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
+>  arch/arm64/kvm/sys_regs.c | 44 ++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 42 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index c302b65..afa0b41 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -1346,6 +1346,10 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned
-> long iova, size_t size,
->  		},
->  	};
-> 
-> +	/* If we'd fill the whole queue or more, don't even bother... */
-> +	if (granule << smmu->cmdq.q.max_n_shift >= size / (CMDQ_ENT_DWORDS << 3))
-> +		return arm_smmu_tlb_inv_context(cookie);
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index b0a8d88..6967a49 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -473,6 +473,17 @@ static void reset_pmceid(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>  	vcpu_sys_reg(vcpu, r->reg) = pmceid;
+>  }
+>  
+> +static bool pmu_counter_idx_valid(u64 pmcr, u64 idx)
+> +{
+> +	u64 val;
+> +
+> +	val = (pmcr >> ARMV8_PMCR_N_SHIFT) & ARMV8_PMCR_N_MASK;
+> +	if (idx >= val && idx != ARMV8_COUNTER_MASK)
+> +		return false;
+> +
+> +	return true;
+> +}
+> +
+>  /* PMU registers accessor. */
+>  static bool access_pmu_regs(struct kvm_vcpu *vcpu,
+>  			    const struct sys_reg_params *p,
+> @@ -482,6 +493,20 @@ static bool access_pmu_regs(struct kvm_vcpu *vcpu,
+>  
+>  	if (p->is_write) {
+>  		switch (r->reg) {
+> +		case PMXEVTYPER_EL0: {
+> +			u64 idx = vcpu_sys_reg(vcpu, PMSELR_EL0)
+> +				  & ARMV8_COUNTER_MASK;
+> +
+> +			if (!pmu_counter_idx_valid(vcpu_sys_reg(vcpu, PMCR_EL0),
+> +						   idx))
+> +				break;
+> +
+> +			val = *vcpu_reg(vcpu, p->Rt);
+> +			kvm_pmu_set_counter_event_type(vcpu, val, idx);
+> +			vcpu_sys_reg(vcpu, PMXEVTYPER_EL0) = val;
+> +			vcpu_sys_reg(vcpu, PMEVTYPER0_EL0 + idx) = val;
 
-Let's not bother with this heuristic for now. It's not at all clear where
-the trade off is between CPU time and I/O latency and this check doesn't
-take into account the current state of the command queue and/or how quickly
-it drains anyway.
+I'm really confused by this. PMXEVTYPER is not really a register, but
+level of indirection between PMEVTYPERn_EL0 and PMCCFILTER_EL0
+(depending on PMSELR_EL0.SEL). On its own, it doesn't exist.
 
->  	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
->  		cmd.opcode	= CMDQ_OP_TLBI_NH_VA;
->  		cmd.tlbi.asid	= smmu_domain->s1_cfg.cd.asid;
-> @@ -1354,7 +1358,10 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned
-> long iova, size_t size,
->  		cmd.tlbi.vmid	= smmu_domain->s2_cfg.vmid;
->  	}
-> 
-> -	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
-> +	do {
-> +		arm_smmu_cmdq_issue_cmd(smmu, &cmd);
-> +		cmd.tlbi.addr += granule;
-> +	} while (size -= granule);
+Here, you are making PMXEVTYPER_EL0 an actual register, storing the same
+value twice (and not handling PMCCFILTER_EL0). It definitely feels
+wrong. You should be able to trap it and propagate the access to the
+right register, without duplicating the state.
 
-This bit looks fine to me, thanks.
+Thanks,
 
-Will
+	M.
+-- 
+Jazz is not dead. It just smells funny...
