@@ -1,104 +1,44 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 07 Dec 2015 18:44:34 +0100
-Subject: [PATCH v2 1/3] dt-bindings: add Marvell PMU documentation
-In-Reply-To: <E1a5j6L-000873-3P@rmk-PC.arm.linux.org.uk> (Russell King's
- message of "Sun, 06 Dec 2015 23:52:21 +0000")
-References: <E1a5j6L-000873-3P@rmk-PC.arm.linux.org.uk>
-Message-ID: <878u56b1bx.fsf@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 7 Dec 2015 17:45:38 +0000
+Subject: [PATCH v3 01/22] arm64: Add macros to read/write system registers
+In-Reply-To: <20151207173520.GJ7083@e104818-lin.cambridge.arm.com>
+References: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
+ <1449485618-9443-2-git-send-email-marc.zyngier@arm.com>
+ <20151207173520.GJ7083@e104818-lin.cambridge.arm.com>
+Message-ID: <20151207174537.GD28024@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
- 
- On lun., d?c. 07 2015, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+On Mon, Dec 07, 2015 at 05:35:20PM +0000, Catalin Marinas wrote:
+> On Mon, Dec 07, 2015 at 10:53:17AM +0000, Marc Zyngier wrote:
+> > From: Mark Rutland <mark.rutland@arm.com>
+> > 
+> > Rather than crafting custom macros for reading/writing each system
+> > register provide generics accessors, read_sysreg and write_sysreg, for
+> > this purpose.
+> > 
+> > Unlike read_cpuid, calls to read_exception_reg are never expected
+> > to be optimized away or replaced with synthetic values.
+> 
+> What's read_exception_reg? Is it a macro somewhere?
 
-> Add the required DT binding documentation for the Marvell PMU driver.
->
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+That was what read_sysreg used to be called on a local branch of mine. I
+didn't spot that when reworking the patch.
 
-Applied on mvebu/dt
+So s/read_exception_reg/read_sysreg/ here.
+
+> > +#define read_sysreg(r) ({					\
+> > +	u64 __val;						\
+> > +	asm volatile("mrs %0, " __stringify(r) : "=r" (__val));	\
+> > +	__val;							\
+> > +})
+> 
+> And maybe a comment here on why this is always volatile.
+
+Makes sense to me.
+
+Marc, are you happy to turn the last sentence from the commit message
+into a comment here (with the substitution)?
 
 Thanks,
-
-Gregory
-
-> ---
-> Who takes these patches?  This never got merged when the PMU driver
-> itself was merged.
->
->  Documentation/devicetree/bindings/soc/dove/pmu.txt | 56 ++++++++++++++++++++++
->  1 file changed, 56 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/dove/pmu.txt
->
-> diff --git a/Documentation/devicetree/bindings/soc/dove/pmu.txt b/Documentation/devicetree/bindings/soc/dove/pmu.txt
-> new file mode 100644
-> index 000000000000..edd40b796b74
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/dove/pmu.txt
-> @@ -0,0 +1,56 @@
-> +Device Tree bindings for Marvell PMU
-> +
-> +Required properties:
-> + - compatible: value should be "marvell,dove-pmu".
-> +    May also include "simple-bus" if there are child devices, in which
-> +    case the ranges node is required.
-> + - reg: two base addresses and sizes of the PM controller and PMU.
-> + - interrupts: single interrupt number for the PMU interrupt
-> + - interrupt-controller: must be specified as the PMU itself is an
-> +    interrupt controller.
-> + - #interrupt-cells: must be 1.
-> + - #reset-cells: must be 1.
-> + - domains: sub-node containing domain descriptions
-> +
-> +Optional properties:
-> + - ranges: defines the address mapping for child devices, as per the
-> +   standard property of this name.  Required when compatible includes
-> +   "simple-bus".
-> +
-> +Power domain descriptions are listed as child nodes of the "domains"
-> +sub-node.  Each domain has the following properties:
-> +
-> +Required properties:
-> + - #power-domain-cells: must be 0.
-> +
-> +Optional properties:
-> + - marvell,pmu_pwr_mask: specifies the mask value for PMU power register
-> + - marvell,pmu_iso_mask: specifies the mask value for PMU isolation register
-> + - resets: points to the reset manager (PMU node) and reset index.
-> +
-> +Example:
-> +
-> +	pmu: power-management at d0000 {
-> +		compatible = "marvell,dove-pmu";
-> +		reg = <0xd0000 0x8000>, <0xd8000 0x8000>;
-> +		interrupts = <33>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +		#reset-cells = <1>;
-> +
-> +		domains {
-> +			vpu_domain: vpu-domain {
-> +				#power-domain-cells = <0>;
-> +				marvell,pmu_pwr_mask = <0x00000008>;
-> +				marvell,pmu_iso_mask = <0x00000001>;
-> +				resets = <&pmu 16>;
-> +			};
-> +
-> +			gpu_domain: gpu-domain {
-> +				#power-domain-cells = <0>;
-> +				marvell,pmu_pwr_mask = <0x00000004>;
-> +				marvell,pmu_iso_mask = <0x00000002>;
-> +				resets = <&pmu 18>;
-> +			};
-> +		};
-> +	};
-> -- 
-> 2.1.0
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Mark.
