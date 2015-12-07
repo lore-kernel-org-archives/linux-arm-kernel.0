@@ -1,39 +1,40 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 07 Dec 2015 13:16:06 +0000
-Subject: [PATCH] kexec: Add --lite option
-In-Reply-To: <20151207114839.GF16406@dhcppc13.redhat.com>
-References: <1445469125.30908.105.camel@infradead.org>
- <20151022031718.GB11227@dhcp-129-115.nay.redhat.com>
- <20151022125012.GB20847@redhat.com>
- <1445540891.30908.144.camel@infradead.org>
- <1446703011.12676.83.camel@freescale.com>
- <20151207114547.GE16406@dhcppc13.redhat.com>
- <20151207114839.GF16406@dhcppc13.redhat.com>
-Message-ID: <56658696.6070103@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Dec 2015 13:18:43 +0000
+Subject: [RFC PATCH 0/8] CPUs capacity information for heterogeneous
+ systems
+In-Reply-To: <20151207123654.GG14571@e106622-lin>
+References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
+ <20151207120244.GE14571@e106622-lin>
+ <20151207121135.GN8644@n2100.arm.linux.org.uk>
+ <20151207123654.GG14571@e106622-lin>
+Message-ID: <20151207131843.GP8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pratyush,
+On Mon, Dec 07, 2015 at 12:36:54PM +0000, Juri Lelli wrote:
+> On 07/12/15 12:11, Russell King - ARM Linux wrote:
+> > It looks like the second patch doesn't yet have the backing from the DT
+> > people, which prevents the remainder of the patch set progressing.  That's
+> > the sticking point which needs to be resolved.
+> > 
+> 
+> Agreed. That is exactly the point for which I was seeking more feedback.
+> OTOH, 7/8 and 8/8 may potentially work without the DT bindings, as they
+> simply expose a sysfs attribute. If you, and others, see value in them,
+> I can easily put them at the top of the series and post a v2. Thoughts?
 
-On 07/12/15 11:48, Pratyush Anand wrote:
->> 1) When we execute kexec() system call in first kernel, at that time it
->> calculates sha256 on all the binaries [1]. It take almost un-noticeable time
->> (less than a sec) there.
->>
->> 2) When purgatory is executed then it re-calculates sha256 using same routines
->> [2] on same binary data as that of case (1). But, now it takes 10-20 sec
->> (depending of size of binaries)?
->>
->> Why did not it take same time with O2 + D-cache enabled? I think, we should be
->> able to achieve same time in second case as well. What is missing?
+I've no idea, sorry.  When it comes to stuff like CPU level power
+management, the hardware I have is very limited in its capabilities
+(no support even for S2RAM.)  I've also never managed to get
+big.LITTLE working on my platforms that should support it.
 
-I haven't benchmarked this, but:
+Eg, I gave up with the TC2 tile in Versatile Express.  I forget the
+details, but getting it booting was exceedingly difficult, and no one
+really seemed interested in helping.  So my TC2 tile is collecting
+dust while the CA9x4 tile lives in the platform - which is now part of
+the nightly build/boot test farm.
 
-util_lib/sha256.c contains calls out to memcpy().
-In your case 1, this will use the glibc version. In case 2, it will use
-the version implemented in purgatory/string.c, which is a byte-by-byte copy.
-
-
-Thanks,
-
-James
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
