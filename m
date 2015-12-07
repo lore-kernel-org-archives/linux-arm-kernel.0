@@ -1,48 +1,64 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Mon, 7 Dec 2015 12:20:26 +0800
-Subject: [PATCH v5] pwm-backlight: Avoid backlight flicker when probed
- from DT
-In-Reply-To: <20151124162658.GJ807@x1>
-References: <1447866745-21567-1-git-send-email-p.zabel@pengutronix.de>
- <20151124162658.GJ807@x1>
-Message-ID: <CAGS+omCD3MLB+hf4R1aD+YZuB4SV8nu71oAm6V_bkfoE2im49A@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 07 Dec 2015 13:28:42 +0900
+Subject: [GIT PULL] ARM: Exynos fixes for v4.4
+In-Reply-To: <1448587563-31346-1-git-send-email-k.kozlowski@samsung.com>
+References: <1448587563-31346-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <56650AFA.7010906@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On 27.11.2015 10:26, Krzysztof Kozlowski wrote:
+> Hi Kukjin,
+> 
+> 
+> Two fixes for v4.4 cycle. Rafael wanted the cpufreq fix to go through
+> arm-soc tree.
+> 
+> Please note that location of repository has changed to kernel.org.
 
-On Wed, Nov 25, 2015 at 12:26 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Wed, 18 Nov 2015, Philipp Zabel wrote:
->
->> If the driver is probed from the device tree, and there is a phandle
->> property set on it, and the enable GPIO is already configured as output,
->> and the backlight is currently disabled, keep it disabled.
->> If all these conditions are met, assume there will be some other driver
->> that can enable the backlight at the appropriate time.
->>
->> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
->> Reviewed-by: Christian Gmeiner <christian.gmeiner@gmail.com>
->> Tested-by: Heiko Stuebner <heiko@sntech.de>
->> ---
->>  - Rebased onto v4.4-rc1
->>  - Added Heiko's Tested-by
->> ---
->>  drivers/video/backlight/pwm_bl.c | 23 ++++++++++++++++++++++-
->>  1 file changed, 22 insertions(+), 1 deletion(-)
->
-> Applied, thanks.
+Hi Arnd, Kevin and Olof,
 
-Hmm, where was this applied?  I do not see it in:
- * v4.4-rc4
- * linux-next next-20151203 (dcccebc - Add linux-next specific files
-for 20151203)
+Could you pull this directly for current RC-cycle? Kukjin mentioned that
+he does not have any patches in his queue for fixes.
 
-Nor do I see it in any branch in:
- * git://git.kernel.org/pub/scm/linux/kernel/git/lee/backlight
-Is this the right git?
-By the way this repository has a git tag called "HEAD", which is a bit
-annoying since every time I "git remote update" from here, git gets
-confused until I manually delete it (git tag -d HEAD).
+Best regards,
+Krzysztof
 
-Thanks,
--Dan
+
+> 
+> 
+> Best regards,
+> Krzysztof
+> 
+> 
+> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+> 
+>   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+> 
+> are available in the git repository at:
+> 
+>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-fixes-4.4
+> 
+> for you to fetch changes up to 62f49ee26f14753bd7fa634f51d537a79061bf0f:
+> 
+>   cpufreq: s3c24xx: Do not mark s3c2410_plls_add as __init (2015-11-27 10:10:32 +0900)
+> 
+> ----------------------------------------------------------------
+> Fixes for Exynos:
+> 1. Fix potential NULL pointer dereference in Exynos PMU driver.
+> 2. Remove incorrect __init annotation from s3c24xx cpufreq driver
+>    structures.
+> 
+> ----------------------------------------------------------------
+> Arnd Bergmann (1):
+>       cpufreq: s3c24xx: Do not mark s3c2410_plls_add as __init
+> 
+> Pankaj Dubey (1):
+>       ARM: EXYNOS: Fix potential NULL pointer access in exynos_sys_powerdown_conf
+> 
+>  arch/arm/mach-exynos/pmu.c                   | 6 +++++-
+>  arch/arm/mach-s3c24xx/pll-s3c2440-12000000.c | 2 +-
+>  arch/arm/mach-s3c24xx/pll-s3c2440-16934400.c | 2 +-
+>  drivers/cpufreq/s3c24xx-cpufreq.c            | 2 +-
+>  4 files changed, 8 insertions(+), 4 deletions(-)
+> 
