@@ -1,79 +1,71 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 7 Dec 2015 13:09:35 +0000
-Subject: [PATCH 3/5] iommu/arm-smmu: Invalidate TLBs properly
-In-Reply-To: <20151207110939.GB23430@arm.com>
-References: <cover.1449246988.git.robin.murphy@arm.com>
- <2acaea8656f14a4421d7d466dd242fe5a3d0f6f6.1449246988.git.robin.murphy@arm.com>
- <20151207110939.GB23430@arm.com>
-Message-ID: <5665850F.1060406@arm.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Mon,  7 Dec 2015 21:11:08 +0800
+Subject: [PATCH 1/2] ARM: dts: modify rk3288 jaq backlight-level
+Message-ID: <1449493869-32151-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/15 11:09, Will Deacon wrote:
-> On Fri, Dec 04, 2015 at 05:53:00PM +0000, Robin Murphy wrote:
->> When invalidating an IOVA range potentially spanning multiple pages,
->> such as when removing an entire intermediate-level table, we currently
->> only issue an invalidation for the first IOVA of that range. Since the
->> architecture specifies that address-based TLB maintenance operations
->> target a single entry, an SMMU could feasibly retain live entries for
->> subsequent pages within that unmapped range, which is not good.
->>
->> Make sure we hit every possible entry by iterating over the whole range
->> at the granularity provided by the pagetable implementation.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>   drivers/iommu/arm-smmu.c | 19 ++++++++++++++++---
->>   1 file changed, 16 insertions(+), 3 deletions(-)
->
-> Can you do something similar for arm-smmu-v3.c as well, please?
+the panel which jaq use require the pwm duty cycle larger than 3%,
+when the backlight status from power off to power on, otherwise the
+backlight will flush, so we modify the second brightness-level to 8,
+and when the backlight from power off to power on the pwm duty cycle
+will larger than 3%.
 
-Something like this? (untested as I don't have a v3 model set up):
-
------->8------
-From: Robin Murphy <robin.murphy@arm.com>
-Date: Mon, 7 Dec 2015 12:52:56 +0000
-Subject: [PATCH] iommu/arm-smmu: Fix TLB invalidation
-
-SMMUv3 operates under the same rules as SMMUv2 and the CPU
-architectures, so when invalidating an IOVA range we have to hit
-every address for which a TLB entry might exist.
-
-To fix this, issue commands for the whole range rather than just the
-initial address; as a minor optimisation, try to avoid flooding the
-queue by falling back to 'invalidate all' if the range is large.
-
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 ---
-  drivers/iommu/arm-smmu-v3.c | 9 ++++++++-
-  1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index c302b65..afa0b41 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1346,6 +1346,10 @@ static void 
-arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
-  		},
-  	};
+Changes in v1: None
 
-+	/* If we'd fill the whole queue or more, don't even bother... */
-+	if (granule << smmu->cmdq.q.max_n_shift >= size / (CMDQ_ENT_DWORDS << 3))
-+		return arm_smmu_tlb_inv_context(cookie);
+ arch/arm/boot/dts/rk3288-veyron-jaq.dts | 37 +++++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rk3288-veyron-jaq.dts b/arch/arm/boot/dts/rk3288-veyron-jaq.dts
+index c2f52cf..991b717 100644
+--- a/arch/arm/boot/dts/rk3288-veyron-jaq.dts
++++ b/arch/arm/boot/dts/rk3288-veyron-jaq.dts
+@@ -88,6 +88,43 @@
+ 	};
+ };
+ 
++&backlight {
++	/* Jaq panel PWM must be >= 3%, so start non-zero brightness at 8 */
++	brightness-levels = <
++		  0
++		  8   9  10  11  12  13  14  15
++		 16  17  18  19  20  21  22  23
++		 24  25  26  27  28  29  30  31
++		 32  33  34  35  36  37  38  39
++		 40  41  42  43  44  45  46  47
++		 48  49  50  51  52  53  54  55
++		 56  57  58  59  60  61  62  63
++		 64  65  66  67  68  69  70  71
++		 72  73  74  75  76  77  78  79
++		 80  81  82  83  84  85  86  87
++		 88  89  90  91  92  93  94  95
++		 96  97  98  99 100 101 102 103
++		104 105 106 107 108 109 110 111
++		112 113 114 115 116 117 118 119
++		120 121 122 123 124 125 126 127
++		128 129 130 131 132 133 134 135
++		136 137 138 139 140 141 142 143
++		144 145 146 147 148 149 150 151
++		152 153 154 155 156 157 158 159
++		160 161 162 163 164 165 166 167
++		168 169 170 171 172 173 174 175
++		176 177 178 179 180 181 182 183
++		184 185 186 187 188 189 190 191
++		192 193 194 195 196 197 198 199
++		200 201 202 203 204 205 206 207
++		208 209 210 211 212 213 214 215
++		216 217 218 219 220 221 222 223
++		224 225 226 227 228 229 230 231
++		232 233 234 235 236 237 238 239
++		240 241 242 243 244 245 246 247
++		248 249 250 251 252 253 254 255>;
++};
 +
-  	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
-  		cmd.opcode	= CMDQ_OP_TLBI_NH_VA;
-  		cmd.tlbi.asid	= smmu_domain->s1_cfg.cd.asid;
-@@ -1354,7 +1358,10 @@ static void 
-arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
-  		cmd.tlbi.vmid	= smmu_domain->s2_cfg.vmid;
-  	}
-
--	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
-+	do {
-+		arm_smmu_cmdq_issue_cmd(smmu, &cmd);
-+		cmd.tlbi.addr += granule;
-+	} while (size -= granule);
-  }
-
-  static struct iommu_gather_ops arm_smmu_gather_ops = {
+ &rk808 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pmic_int_l &dvs_1 &dvs_2>;
+-- 
+1.9.1
