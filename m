@@ -1,120 +1,132 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 07 Dec 2015 17:36:07 +0800
-Subject: [PATCH v3] acpi, apei, arm64: APEI initial support for aarch64.
-In-Reply-To: <1449162903-11203-1-git-send-email-fu.wei@linaro.org>
-References: <1449162903-11203-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <56655307.2010305@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 7 Dec 2015 10:36:22 +0100
+Subject: [PATCH v5] clk: sunxi: Add CLK_OF_DECLARE support for
+ sun8i-a23-apb0-clk driver
+In-Reply-To: <1449126330-21595-1-git-send-email-wens@csie.org>
+References: <1449126330-21595-1-git-send-email-wens@csie.org>
+Message-ID: <20151207093622.GE27957@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fu Wei,
+Hi,
 
-On 12/04/2015 01:15 AM, fu.wei at linaro.org wrote:
-> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->
-> This commit provides APEI arch-specific bits for aarch64
->
-> The reason for wrapping "acpi_disable_cmcff" by
-> "#if defined(__i386__) || defined(__x86_64__)" in hest.c is:
-> according to ACPI spec CMC(Corrected Machine Check) is only for IA-32
-> Architecture.
->
-> Changelog:
-> v3: Remove "acpi_disable_cmcff" from arm64 code,
->      and wrap it in hest.c by "#if defined(__i386__) || defined(__x86_64__)"
->
-> v2: https://lkml.org/lkml/2015/12/2/432
->      Rebase to latest kernel version(4.4-rc3).
->      Move arch_apei_flush_tlb_one() to arch/arm64/kernel/acpi.c
->
-> v1: https://lkml.org/lkml/2015/8/14/199
->      Move arch_apei_flush_tlb_one() to arch/arm64/include/asm/apci.h.
->      Delete arch/arm64/kernel/apei.c.
->      Add "#ifdef CONFIG_ACPI_APEI" for "acpi_disable_cmcff".
-
-The version updates is not belong here, if you need to add
-it, please place it under "---" below.
-
->
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> Tested-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+On Thu, Dec 03, 2015 at 03:05:30PM +0800, Chen-Yu Tsai wrote:
+> The APBS clock on sun9i is the same as the APB0 clock on sun8i. With
+> sun9i we are supporting the PRCM clocks by using CLK_OF_DECLARE,
+> instead of through a PRCM mfd device and subdevices for each clock
+> and reset control. As such we need a CLK_OF_DECLARE version of
+> the sun8i-a23-apb0-clk driver.
+> 
+> Also, build it for sun9i/A80, and not just for configurations with
+> MFD_SUN6I_PRCM enabled.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
-
-...just here.
-
->   arch/arm64/Kconfig            | 1 +
->   arch/arm64/include/asm/acpi.h | 1 +
->   arch/arm64/kernel/acpi.c      | 6 ++++++
->   drivers/acpi/apei/hest.c      | 2 ++
->   4 files changed, 10 insertions(+)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 871f217..58c8992 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -3,6 +3,7 @@ config ARM64
->   	select ACPI_CCA_REQUIRED if ACPI
->   	select ACPI_GENERIC_GSI if ACPI
->   	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
-> +	select HAVE_ACPI_APEI if ACPI
->   	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
->   	select ARCH_HAS_ELF_RANDOMIZE
->   	select ARCH_HAS_GCOV_PROFILE_ALL
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index caafd63..7207f8e 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -94,6 +94,7 @@ static inline const char *acpi_get_enable_method(int cpu)
->
->   #ifdef	CONFIG_ACPI_APEI
->   pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
-> +void arch_apei_flush_tlb_one(unsigned long addr);
->   #endif
->
->   #endif /*_ASM_ACPI_H*/
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index d1ce8e2..7a742e7 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -32,6 +32,7 @@
->   #ifdef CONFIG_ACPI_APEI
->   # include <linux/efi.h>
->   # include <asm/pgtable.h>
-> +# include <asm/tlbflush.h>
->   #endif
->
->   int acpi_noirq = 1;		/* skip ACPI IRQ initialization */
-> @@ -233,4 +234,9 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
->   		return __pgprot(PROT_NORMAL_NC);
->   	return __pgprot(PROT_DEVICE_nGnRnE);
->   }
-> +
-> +void arch_apei_flush_tlb_one(unsigned long addr)
+> 
+> Changes since v4:
+> 
+>   - Keep building clk-sun8i-apb0 for SUN6I_MFD_PRCM.
+> 
+>   - Add an error message and comment for when of_io_request_and_map()
+>     fails. of_io_request_and_map() merges a bunch of errors into -EINVAL,
+>     so this might not be the best approach. But I think having an error
+>     message when we know something is wrong (-EBUSY, -ENOMEM) is better.
+> 
+> ---
+>  drivers/clk/sunxi/Makefile         |  1 +
+>  drivers/clk/sunxi/clk-sun8i-apb0.c | 80 ++++++++++++++++++++++++++++++++------
+>  2 files changed, 69 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+> index 103efab05ca8..ccf21ba3b6b0 100644
+> --- a/drivers/clk/sunxi/Makefile
+> +++ b/drivers/clk/sunxi/Makefile
+> @@ -15,6 +15,7 @@ obj-y += clk-sun9i-core.o
+>  obj-y += clk-sun9i-mmc.o
+>  obj-y += clk-usb.o
+>  
+> +obj-$(CONFIG_MACH_SUN9I) += clk-sun8i-apb0.o
+>  obj-$(CONFIG_MACH_SUN9I) += clk-sun9i-cpus.o
+>  
+>  obj-$(CONFIG_MFD_SUN6I_PRCM) += \
+> diff --git a/drivers/clk/sunxi/clk-sun8i-apb0.c b/drivers/clk/sunxi/clk-sun8i-apb0.c
+> index 7ae5d2c2cde1..7ba61103a6f5 100644
+> --- a/drivers/clk/sunxi/clk-sun8i-apb0.c
+> +++ b/drivers/clk/sunxi/clk-sun8i-apb0.c
+> @@ -17,13 +17,77 @@
+>  #include <linux/clk-provider.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> +#include <linux/of_address.h>
+>  #include <linux/platform_device.h>
+>  
+> +static struct clk *sun8i_a23_apb0_register(struct device_node *node,
+> +					   void __iomem *reg)
 > +{
-> +	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
+> +	const char *clk_name = node->name;
+> +	const char *clk_parent;
+> +	struct clk *clk;
+> +	int ret;
+> +
+> +	clk_parent = of_clk_get_parent_name(node, 0);
+> +	if (!clk_parent)
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	of_property_read_string(node, "clock-output-names", &clk_name);
+> +
+> +	/* The A23 APB0 clock is a standard 2 bit wide divider clock */
+> +	clk = clk_register_divider(NULL, clk_name, clk_parent, 0, reg,
+> +				   0, 2, CLK_DIVIDER_POWER_OF_TWO, NULL);
+> +	if (IS_ERR(clk))
+> +		return clk;
+> +
+> +	ret = of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> +	if (ret)
+> +		goto err_unregister;
+> +
+> +	return clk;
+> +
+> +err_unregister:
+> +	clk_unregister_divider(clk);
+> +
+> +	return ERR_PTR(ret);
 > +}
+> +
+> +static void sun8i_a23_apb0_setup(struct device_node *node)
+> +{
+> +	void __iomem *reg;
+> +	struct resource res;
+> +	struct clk *clk;
+> +
+> +	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+> +	if (IS_ERR(reg)) {
+> +		/*
+> +		 * This happens with clk nodes instantiated through mfd,
+> +		 * as those do not have their resources assigned in the
+> +		 * device tree. Do not print an error in this case.
+> +		 */
+> +		if (PTR_ERR(reg) != -EINVAL)
+> +			pr_err("Could not get registers for a23-apb0-clk\n");
 
-Maybe just a static inline function in arch/arm64/include/asm/acpi.h
-will be good?
+This is not the only case you have to take into account.
 
->   #endif
-> diff --git a/drivers/acpi/apei/hest.c b/drivers/acpi/apei/hest.c
-> index 20b3fcf..4ead747 100644
-> --- a/drivers/acpi/apei/hest.c
-> +++ b/drivers/acpi/apei/hest.c
-> @@ -232,8 +232,10 @@ void __init acpi_hest_init(void)
->   		goto err;
->   	}
->
-> +#if defined(__i386__) || defined(__x86_64__)
->   	if (!acpi_disable_cmcff)
->   		apei_hest_parse(hest_parse_cmc, NULL);
-> +#endif
+There's also the case when you have a regular clock (and by regular I
+mean that is not in the PRCM) that will be probed by the
+CLK_OF_DECLARE mechanism and then later by the device model.
 
-How about put it together into a function, and
-introduce a stub function when no __i386__ and
-__x86_64__ case?
+In such a case, the second of_io_request_and_map will fail, and you
+will have an error returned that you do not ignore at the moment.
 
-Thanks
-Hanjun
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151207/33e31ae4/attachment.sig>
