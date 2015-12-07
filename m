@@ -1,32 +1,70 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 07 Dec 2015 14:04:00 -0800
-Subject: [PATCH v2 0/4] ARM: dts: vf610: relicense the device trees under
- GPLv2/X11
-In-Reply-To: <56660024.5020006@wwwdotorg.org>
-References: <1449525076-23569-1-git-send-email-stefan@agner.ch>
- <56660024.5020006@wwwdotorg.org>
-Message-ID: <ac03ae2d77dc47b7cb6ff258e291865e@agner.ch>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 7 Dec 2015 23:14:30 +0100
+Subject: [PATCH] ARM: mm: mark section-aligned portion of rodata NX
+In-Reply-To: <CAGXu5jKOn7S-GVu4bZU+B3QbrJZxen4mPzK7-TyzcFf7YiKDNA@mail.gmail.com>
+References: <20151207205432.GA5271@www.outflux.net>
+ <CAKv+Gu-q4ziskce+KneLTKZWi+sB_-4ZG4tyYssK7HNyqxAn4A@mail.gmail.com>
+ <CAGXu5jKOn7S-GVu4bZU+B3QbrJZxen4mPzK7-TyzcFf7YiKDNA@mail.gmail.com>
+Message-ID: <CAKv+Gu_L-9bnaDs-HAONgHARFpeEk41y0KUAFobBcdh1i9Ughg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-12-07 13:54, Stephen Warren wrote:
-> On 12/07/2015 02:51 PM, Stefan Agner wrote:
->> I collected the Acks I received so far and removed them from the list
->> below. Several Freescale addresses are no longer valid (the once
->> starting with --)... I would interprete the Ack from Yuan Yao as an
->> Ack from Freescale.
+On 7 December 2015 at 22:56, Kees Cook <keescook@chromium.org> wrote:
+> On Mon, Dec 7, 2015 at 1:52 PM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> On 7 December 2015 at 21:54, Kees Cook <keescook@chromium.org> wrote:
+>>> When rodata is large enough that it crosses a section boundary after the
+>>> kernel text, mark the rest NX. This is as close to full NX of rodata as
+>>> we can get without splitting page tables or doing section alignment via
+>>> CONFIG_DEBUG_ALIGN_RODATA.
+>>>
+>>> Signed-off-by: Kees Cook <keescook@chromium.org>
+>>> ---
+>>> I am baffled why I can't put the ALIGN in the ".start = " initializer.
+>>> GCC seems to think it's non-static, but only because of the "&" operator.
+>>> Does anyone see a way to do this that doesn't require the runtime ALIGN?
 >>
->> Matt, you introduced the vf610-cosmic.dts board, is it possible to
->> get an ack for this too? I think you did not receive v1 of this patch
->> due to an old email address, sorry about that.
-> 
-> I thought I'd already sent an ack for this, but it looks like I forgot somehow.
-> 
-> Acked-by: Stephen Warren <swarren@nvidia.com>
+>> Yes, but you need to move the ALIGN() expression to the linker script
+>> as the value of a new symbol
+>
+> I didn't see a way to do this without actually bumping the alignment
+> (CONFIG_DEBUG_ALIGN_RODATA already does that, I want the other case).
+> Do you have an example anywhere I could look at?
+>
 
-Sorry about the confusion, I do have your ack and hence removed you from
-the list. However I still put everyone in CC, probably not what I should
-have done?
+Something like this (untested)
 
---
-Stefan
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index 8b60fde5ce48..9fb98c5dd35b 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -336,6 +336,8 @@ SECTIONS
+  STABS_DEBUG
+ }
+
++__start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
++
+ /*
+  * These must never be empty
+  * If you have to comment these two assert statements out, your
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 8a63b4cdc0f2..ddacd3bd8f8b 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -592,15 +592,13 @@ static struct section_perm nx_perms[] = {
+  .mask = ~PMD_SECT_XN,
+  .prot = PMD_SECT_XN,
+  },
+-#ifdef CONFIG_DEBUG_RODATA
+  /* Make rodata NX (set RO in ro_perms below). */
+  {
+- .start  = (unsigned long)__start_rodata,
++ .start  = (unsigned long)__start_rodata_section_aligned,
+  .end    = (unsigned long)__init_begin,
+  .mask   = ~PMD_SECT_XN,
+  .prot   = PMD_SECT_XN,
+  },
+-#endif
+ };
+
+ #ifdef CONFIG_DEBUG_RODATA
