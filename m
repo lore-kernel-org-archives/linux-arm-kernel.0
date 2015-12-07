@@ -1,151 +1,118 @@
 From: boqun.feng@gmail.com (Boqun Feng)
-Date: Mon, 7 Dec 2015 08:26:01 +0800
+Date: Mon, 7 Dec 2015 08:45:04 +0800
 Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
  concurrent lockers
-In-Reply-To: <20151206192734.GT28602@linux.vnet.ibm.com>
-References: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
- <20151130155839.GK17308@twins.programming.kicks-ass.net>
- <20151201164035.GE27751@arm.com>
- <20151203001141.GO28602@linux.vnet.ibm.com>
- <20151203132839.GA3816@twins.programming.kicks-ass.net>
- <20151203163243.GI11337@arm.com>
+In-Reply-To: <20151207000047.GX28602@linux.vnet.ibm.com>
+References: <20151203163243.GI11337@arm.com>
  <20151203172207.GR28602@linux.vnet.ibm.com>
- <20151206081617.GB1549@fixme-laptop.cn.ibm.com>
- <20151206192734.GT28602@linux.vnet.ibm.com>
-Message-ID: <20151207002601.GB13845@fixme-laptop.cn.ibm.com>
+ <20151204092110.GE17308@twins.programming.kicks-ass.net>
+ <20151204160706.GC28602@linux.vnet.ibm.com>
+ <20151204162453.GE15969@arm.com>
+ <20151204164446.GF28602@linux.vnet.ibm.com>
+ <20151206073712.GA1549@fixme-laptop.cn.ibm.com>
+ <20151206192302.GS28602@linux.vnet.ibm.com>
+ <20151206232825.GA13845@fixme-laptop.cn.ibm.com>
+ <20151207000047.GX28602@linux.vnet.ibm.com>
+Message-ID: <20151207004504.GC13845@fixme-laptop.cn.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 06, 2015 at 11:27:34AM -0800, Paul E. McKenney wrote:
-> On Sun, Dec 06, 2015 at 04:16:17PM +0800, Boqun Feng wrote:
-> > Hi Paul,
-> > 
-> > On Thu, Dec 03, 2015 at 09:22:07AM -0800, Paul E. McKenney wrote:
-> > > On Thu, Dec 03, 2015 at 04:32:43PM +0000, Will Deacon wrote:
-> > > > Hi Peter, Paul,
+On Sun, Dec 06, 2015 at 04:00:47PM -0800, Paul E. McKenney wrote:
+> On Mon, Dec 07, 2015 at 07:28:25AM +0800, Boqun Feng wrote:
+> > On Sun, Dec 06, 2015 at 11:23:02AM -0800, Paul E. McKenney wrote:
+> > > On Sun, Dec 06, 2015 at 03:37:23PM +0800, Boqun Feng wrote:
+> > > > Hi Paul,
 > > > > 
-> > > > Firstly, thanks for writing that up. I agree that you have something
-> > > > that can work in theory, but see below.
-> > > > 
-> > > > On Thu, Dec 03, 2015 at 02:28:39PM +0100, Peter Zijlstra wrote:
-> > > > > On Wed, Dec 02, 2015 at 04:11:41PM -0800, Paul E. McKenney wrote:
-> > > > > > This looks architecture-agnostic to me:
+> > > > On Fri, Dec 04, 2015 at 08:44:46AM -0800, Paul E. McKenney wrote:
+> > > > > On Fri, Dec 04, 2015 at 04:24:54PM +0000, Will Deacon wrote:
+> > > > > > On Fri, Dec 04, 2015 at 08:07:06AM -0800, Paul E. McKenney wrote:
+> > > > > > > On Fri, Dec 04, 2015 at 10:21:10AM +0100, Peter Zijlstra wrote:
+> > > > > > > > On Thu, Dec 03, 2015 at 09:22:07AM -0800, Paul E. McKenney wrote:
+> > > > > > > > > >   2. Only PowerPC is going to see the (very occassional) failures, so
+> > > > > > > > > >      testing this is nigh on impossible :(
+> > > > > > > > > 
+> > > > > > > > > Indeed, we clearly cannot rely on normal testing, witness rcutorture
+> > > > > > > > > failing to find the missing smp_mb__after_unlock_lock() instances that
+> > > > > > > > > Peter found by inspection.  So I believe that augmented testing is
+> > > > > > > > > required, perhaps as suggested above.
+> > > > > > > > 
+> > > > > > > > To be fair, those were in debug code and non critical for correctness
+> > > > > > > > per se. That is, at worst the debug print would've observed an incorrect
+> > > > > > > > value.
+> > > > > > > 
+> > > > > > > True enough, but there is still risk from people repurposing debug code
+> > > > > > > for non-debug uses.  Still, thank you, I don't feel -quite- so bad about
+> > > > > > > rcutorture's failure to find these.  ;-)
 > > > > > > 
-> > > > > > a.	TSO systems have smp_mb__after_unlock_lock() be a no-op, and
-> > > > > > 	have a read-only implementation for spin_unlock_wait().
-> > > > > > 
-> > > > > > b.	Small-scale weakly ordered systems can also have
-> > > > > > 	smp_mb__after_unlock_lock() be a no-op, but must instead
-> > > > > > 	have spin_unlock_wait() acquire the lock and immediately 
-> > > > > > 	release it, or some optimized implementation of this.
-> > > > > > 
-> > > > > > c.	Large-scale weakly ordered systems are required to define
-> > > > > > 	smp_mb__after_unlock_lock() as smp_mb(), but can have a
-> > > > > > 	read-only implementation of spin_unlock_wait().
+> > > > > > It's the ones that it's yet to find that you should be worried about,
+> > > > > > and the debug code is all fixed ;)
 > > > > > 
-> > > > > This would still require all relevant spin_lock() sites to be annotated
-> > > > > with smp_mb__after_unlock_lock(), which is going to be a painful (no
-> > > > > warning when done wrong) exercise and expensive (added MBs all over the
-> > > > > place).
+> > > > > Fortunately, when Peter sent the patch fixing the debug-only
+> > > > > cases, he also created wrapper functions for the various types of
+> > > > > lock acquisition for rnp->lock.  Of course, the danger is that I
+> > > > > might type "raw_spin_lock_irqsave(&rnp->lock, flags)" instead of
+> > > > > "raw_spin_lock_irqsave_rcu_node(rnp, flags)" out of force of habit.
+> > > > > So I must occasionally scan the RCU source code for "spin_lock.*->lock",
+> > > > > which I just now did.  ;-)
+> > > > 
+> > > > Maybe you can rename ->lock of rnp to ->lock_acquired_on_your_own_risk
+> > > > to avoid the force of habit ;-)
 > > > 
-> > > On the lack of warning, agreed, but please see below.  On the added MBs,
-> > > the only alternative I have been able to come up with has even more MBs,
-> > > as in on every lock acquisition.  If I am missing something, please do
-> > > not keep it a secret!
-> > > 
+> > > Sold!  Though with a shorter alternate name...  And timing will be an
+> > > issue.  Probably needs to go into the first post-v4.5 set (due to the
+> > > high expected conflict rate), and probably needs to create wrappers for
+> > > the spin_unlock functions.
 > > 
-> > Maybe we can treat this problem as a problem of data accesses other than
-> > one of locks?
+> > Or maybe, we introduce another address space of sparse like:
 > > 
-> > Let's take the example of tsk->flags in do_exit() and tsk->pi_lock, we
-> > don't need to add a full barrier for every lock acquisition of
-> > ->pi_lock, because some critical sections of ->pi_lock don't access the
-> > PF_EXITING bit of ->flags at all. What we only need is to add a full
-> > barrier before reading the PF_EXITING bit in a critical section of
-> > ->pi_lock. To achieve this, we could introduce a primitive like
-> > smp_load_in_lock():
+> > 	# define __private	__attribute__((noderef, address_space(6)))
 > > 
-> > (on PPC and ARM64v8)
+> > and macro to dereference private
 > > 
-> > 	#define smp_load_in_lock(x, lock) 		\
-> > 		({ 					\
-> > 			smp_mb();			\
-> > 			READ_ONCE(x);			\
-> > 		})
+> > 	# define private_dereference(p) ((typeof(*p) *) p)
 > > 
-> > (on other archs)
-> > 	
-> > 	#define smp_load_in_lock(x, lock) READ_ONCE(x)
+> > and define struct rcu_node like:
 > > 
+> > 	struct rcu_node {
+> > 		raw_spinlock_t __private lock;	/* Root rcu_node's lock protects some */
+> > 		...
+> > 	};
 > > 
-> > And call it every time we read a data which is not protected by the
-> > current lock critical section but whose updaters synchronize with the
-> > current lock critical section with spin_unlock_wait().
+> > and finally raw_spin_{un}lock_rcu_node() like:
 > > 
-> > I admit the name may be bad and the second parameter @lock is for a way
-> > to diagnosing the usage which I haven't come up with yet ;-)
+> > 	static inline void raw_spin_lock_rcu_node(struct rcu_node *rnp)
+> > 	{
+> > 		raw_spin_lock(private_dereference(&rnp->lock));
+> > 		smp_mb__after_unlock_lock();
+> > 	}
 > > 
-> > Thoughts?
+> > 	static inline void raw_spin_unlock_rcu_node(struct rcu_node *rnp)
+> > 	{
+> > 		raw_spin_unlock(private_dereference(&rnp->lock));
+> > 	}
+> > 
+> > This __private mechanism also works for others who wants to private
+> > their fields of struct, which is not supported by C.
+> > 
+> > I will send two patches(one introduces __private and one uses it for
+> > rcu_node->lock) if you think this is not a bad idea ;-)
 > 
-> In other words, dispense with smp_mb__after_unlock_lock() in those cases,
-> and use smp_load_in_lock() to get the desired effect?
-> 
-
-Exactly.
-
-> If so, one concern is how to check for proper use of smp_load_in_lock().
-
-I also propose that on the updaters' side, we merge STORE and smp_mb()
-into another primitive, maybe smp_store_out_of_lock(). After that we
-make sure a smp_store_out_of_lock() plus a spin_unlock_wait() pairs with
-a spin_lock plus a smp_load_in_lock() in the following way:
-
-	CPU 0				CPU 1
-	==============================================================
-	smp_store_out_of_lock(o, NULL, lock);
-	<other stores or reads>
-	spin_unlock_wait(lock);		spin_lock(lock);
-					<other stores or reads>
-					obj = smp_load_in_lock(o, lock);
-
-Their names and this pairing pattern could help us check their usages.
-And we can also try to come up with a way to use lockdep to check their
-usages automatically. Anyway, I don't think that is more difficult to
-check the usage of smp_mb__after_unlock_lock() for the same purpose of
-ordering "Prior Write" with "Current Read" ;-)
-
-> Another concern is redundant smp_mb() instances in case of multiple
-> accesses to the data under a given critical section.
+> This approach reminds me of an old saying from my childhood: "Attacking
+> a flea with a sledgehammer".  ;-)
 > 
 
-First, I don't think there would be too many cases which a lock critical
-section needs to access multiple variables, which are modified outside
-the critical section and synchronized with spin_unlock_wait(). Because
-using spin_unlock_wait() to synchronize with lock critical sections is
-itself an very weird usage(you could just take the lock).
+;-) ;-) ;-)
 
-Second, even if we have redundant smp_mb()s, we avoid to:
+We have a similar saying in Chinese, using a different animal and a
+different tool ;-)
 
-1.	use a ll/sc loop on updaters' sides as Will proposed
-
-or
-
-2.	put a full barrier *just* following spin_lock() as you proposed,
-	which could forbid unrelated data accesses to be moved before
-	the store part of spin_lock().
-
-Whether these two perform better than redundant smp_mb()s in a lock
-critical section is uncertain, right?
-
-Third, even if this perform worse than Will's or your proposal, we don't
-need to maintain two quite different ways to solve the same problem for
-PPC and ARM64v8, that's one benefit of this.
+If rcu_node->lock is the only user then this is probably a bad idea, but
+if others also want to have a way to privatize some fields of the
+structure, this may be not that bad?
 
 Regards,
 Boqun
 
-> Or am I missing your point?
-> 
 > 							Thanx, Paul
 > 
 -------------- next part --------------
@@ -154,4 +121,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151207/cf2a48c2/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151207/a9c5f026/attachment.sig>
