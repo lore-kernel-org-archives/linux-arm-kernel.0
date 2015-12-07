@@ -1,138 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 07 Dec 2015 16:52:16 +0000
-Subject: [PATCH v3 05/22] arm64: KVM: Implement vgic-v3 save/restore
-In-Reply-To: <5665B663.8020705@samsung.com>
-References: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
- <1449485618-9443-6-git-send-email-marc.zyngier@arm.com>
- <5665B663.8020705@samsung.com>
-Message-ID: <5665B940.7000601@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 7 Dec 2015 16:57:04 +0000
+Subject: [RFC PATCH] arm64: Documentation: add list of software
+ workarounds for errata
+In-Reply-To: <1449505814-30096-1-git-send-email-will.deacon@arm.com>
+References: <1449505814-30096-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20151207165704.GI7083@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mario,
+On Mon, Dec 07, 2015 at 04:30:14PM +0000, Will Deacon wrote:
+> +| Implementor    | Component       | Erratum ID      | Kconfig                 |
+> ++----------------+-----------------+-----------------+-------------------------+
+> +| ARM            | Cortex-A53      | #826319         | ARM64_ERRATUM_826319    |
+> +| ARM            | Cortex-A53      | #827319         | ARM64_ERRATUM_827319    |
+> +| ARM            | Cortex-A53      | #824069         | ARM64_ERRATUM_824069    |
+> +| ARM            | Cortex-A53      | #819472         | ARM64_ERRATUM_819472    |
+> +| ARM            | Cortex-A53      | #845719         | ARM64_ERRATUM_845719    |
+> +| ARM            | Cortex-A53      | #843419         | ARM64_ERRATUM_843419    |
+> +| ARM            | Cortex-A57      | #832075         | ARM64_ERRATUM_832075    |
+> +| ARM            | Cortex-A57      | #852523         | N/A                     |
+> +| ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220    |
+> +|                |                 |                 |                         |
+> +| Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375    |
+> +| Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154    |
 
-On 07/12/15 16:40, Mario Smarduch wrote:
-> Hi Marc,
-> 
-> On 12/7/2015 2:53 AM, Marc Zyngier wrote:
->> Implement the vgic-v3 save restore as a direct translation of
->> the assembly code version.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/kvm/hyp/Makefile     |   1 +
->>  arch/arm64/kvm/hyp/hyp.h        |   3 +
->>  arch/arm64/kvm/hyp/vgic-v3-sr.c | 226 ++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 230 insertions(+)
->>  create mode 100644 arch/arm64/kvm/hyp/vgic-v3-sr.c
->>
->> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
->> index d8d5968..d1e38ce 100644
->> --- a/arch/arm64/kvm/hyp/Makefile
->> +++ b/arch/arm64/kvm/hyp/Makefile
->> @@ -3,3 +3,4 @@
->>  #
->>  
->>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
->> +obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
->> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
->> index ac63553..5759f9f 100644
->> --- a/arch/arm64/kvm/hyp/hyp.h
->> +++ b/arch/arm64/kvm/hyp/hyp.h
->> @@ -32,5 +32,8 @@
->>  void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
->>  void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
->>  
->> +void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
->> +void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
->> +
->>  #endif /* __ARM64_KVM_HYP_H__ */
->>  
->> diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
->> new file mode 100644
->> index 0000000..78d05f3
->> --- /dev/null
->> +++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
->> @@ -0,0 +1,226 @@
->> +/*
->> + * Copyright (C) 2012-2015 - ARM Ltd
->> + * Author: Marc Zyngier <marc.zyngier@arm.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include <linux/compiler.h>
->> +#include <linux/irqchip/arm-gic-v3.h>
->> +#include <linux/kvm_host.h>
->> +
->> +#include <asm/kvm_mmu.h>
->> +
->> +#include "hyp.h"
->> +
->> +#define vtr_to_max_lr_idx(v)		((v) & 0xf)
->> +#define vtr_to_nr_pri_bits(v)		(((u32)(v) >> 29) + 1)
->> +
->> +#define read_gicreg(r)							\
->> +	({								\
->> +		u64 reg;						\
->> +		asm volatile("mrs_s %0, " __stringify(r) : "=r" (reg));	\
->> +		reg;							\
->> +	})
->> +
->> +#define write_gicreg(v,r)						\
->> +	do {								\
->> +		u64 __val = (v);					\
->> +		asm volatile("msr_s " __stringify(r) ", %0" : : "r" (__val));\
->> +	} while (0)
->> +
->> +/* vcpu is already in the HYP VA space */
->> +void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
->> +{
->> +	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
->> +	u64 val;
->> +	u32 max_lr_idx, nr_pri_bits;
->> +
->> +	/*
->> +	 * Make sure stores to the GIC via the memory mapped interface
->> +	 * are now visible to the system register interface.
->> +	 */
->> +	dsb(st);
->> +
->> +	cpu_if->vgic_vmcr  = read_gicreg(ICH_VMCR_EL2);
->> +	cpu_if->vgic_misr  = read_gicreg(ICH_MISR_EL2);
->> +	cpu_if->vgic_eisr  = read_gicreg(ICH_EISR_EL2);
->> +	cpu_if->vgic_elrsr = read_gicreg(ICH_ELSR_EL2);
->> +
->> +	write_gicreg(0, ICH_HCR_EL2);
->> +	val = read_gicreg(ICH_VTR_EL2);
->> +	max_lr_idx = vtr_to_max_lr_idx(val);
->> +	nr_pri_bits = vtr_to_nr_pri_bits(val);
->> +
-> Can you setup a base pointer to cpu_if->vgic_lr and use an offset?
+BTW, since you describe the categories above, shall we add another
+column in this table for ARM Ltd hardware categorisation? Most (all, so
+far) of them are B anyway.
 
-I could, but I fail to see what we'd gain by using this (aside from
-slightly shorter lines). Or am I completely missing the point?
+Also, it would be nice for ARM licensees to add their own categories
+description to this document.
 
-> Also is there a way to get rid of the constants, that implicitly hard codes max
-> number of LRs, doesn't make the code portable.
+Otherwise the doc looks fine:
 
-Well, it is a sad fact of life that the maximum number of LRs *is*
-hardcoded to an architectural limit of 16. These are CPU registers, and
-there is only so many of them (and probably a lot less in practice -
-filling 4 of them has proved to be an extremely rare case).
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
