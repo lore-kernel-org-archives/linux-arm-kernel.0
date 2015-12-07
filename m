@@ -1,52 +1,52 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  7 Dec 2015 10:53:22 +0000
-Subject: [PATCH v3 06/22] arm64: KVM: Implement timer save/restore
+Date: Mon,  7 Dec 2015 10:53:23 +0000
+Subject: [PATCH v3 07/22] arm64: KVM: Implement system register save/restore
 In-Reply-To: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
 References: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1449485618-9443-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1449485618-9443-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the timer save restore as a direct translation of
+Implement the system register save/restore as a direct translation of
 the assembly code version.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/hyp/Makefile          |  1 +
- arch/arm64/kvm/hyp/hyp.h             |  3 ++
- arch/arm64/kvm/hyp/timer-sr.c        | 72 ++++++++++++++++++++++++++++++++++++
- include/clocksource/arm_arch_timer.h |  6 +++
- 4 files changed, 82 insertions(+)
- create mode 100644 arch/arm64/kvm/hyp/timer-sr.c
+ arch/arm64/kvm/hyp/Makefile    |  1 +
+ arch/arm64/kvm/hyp/hyp.h       |  3 ++
+ arch/arm64/kvm/hyp/sysreg-sr.c | 90 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 94 insertions(+)
+ create mode 100644 arch/arm64/kvm/hyp/sysreg-sr.c
 
 diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-index d1e38ce..455dc0a 100644
+index 455dc0a..ec94200 100644
 --- a/arch/arm64/kvm/hyp/Makefile
 +++ b/arch/arm64/kvm/hyp/Makefile
-@@ -4,3 +4,4 @@
- 
+@@ -5,3 +5,4 @@
  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
-+obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
++obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
 diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
-index 5759f9f..f213e46 100644
+index f213e46..778d56d 100644
 --- a/arch/arm64/kvm/hyp/hyp.h
 +++ b/arch/arm64/kvm/hyp/hyp.h
-@@ -35,5 +35,8 @@ void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
- void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
- void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+@@ -38,5 +38,8 @@ void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+ void __timer_save_state(struct kvm_vcpu *vcpu);
+ void __timer_restore_state(struct kvm_vcpu *vcpu);
  
-+void __timer_save_state(struct kvm_vcpu *vcpu);
-+void __timer_restore_state(struct kvm_vcpu *vcpu);
++void __sysreg_save_state(struct kvm_cpu_context *ctxt);
++void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
 +
  #endif /* __ARM64_KVM_HYP_H__ */
  
-diff --git a/arch/arm64/kvm/hyp/timer-sr.c b/arch/arm64/kvm/hyp/timer-sr.c
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
 new file mode 100644
-index 0000000..67292c0
+index 0000000..add8fcb
 --- /dev/null
-+++ b/arch/arm64/kvm/hyp/timer-sr.c
-@@ -0,0 +1,72 @@
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -0,0 +1,90 @@
 +/*
 + * Copyright (C) 2012-2015 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
@@ -64,7 +64,6 @@ index 0000000..67292c0
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <clocksource/arm_arch_timer.h>
 +#include <linux/compiler.h>
 +#include <linux/kvm_host.h>
 +
@@ -72,69 +71,71 @@ index 0000000..67292c0
 +
 +#include "hyp.h"
 +
-+/* vcpu is already in the HYP VA space */
-+void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
++/* ctxt is already in the HYP VA space */
++void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
 +{
-+	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
-+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-+	u64 val;
++	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
++	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
++	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg(sctlr_el1);
++	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
++	ctxt->sys_regs[CPACR_EL1]	= read_sysreg(cpacr_el1);
++	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg(ttbr0_el1);
++	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg(ttbr1_el1);
++	ctxt->sys_regs[TCR_EL1]		= read_sysreg(tcr_el1);
++	ctxt->sys_regs[ESR_EL1]		= read_sysreg(esr_el1);
++	ctxt->sys_regs[AFSR0_EL1]	= read_sysreg(afsr0_el1);
++	ctxt->sys_regs[AFSR1_EL1]	= read_sysreg(afsr1_el1);
++	ctxt->sys_regs[FAR_EL1]		= read_sysreg(far_el1);
++	ctxt->sys_regs[MAIR_EL1]	= read_sysreg(mair_el1);
++	ctxt->sys_regs[VBAR_EL1]	= read_sysreg(vbar_el1);
++	ctxt->sys_regs[CONTEXTIDR_EL1]	= read_sysreg(contextidr_el1);
++	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
++	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
++	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
++	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg(amair_el1);
++	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg(cntkctl_el1);
++	ctxt->sys_regs[PAR_EL1]		= read_sysreg(par_el1);
++	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
 +
-+	if (kvm->arch.timer.enabled) {
-+		timer->cntv_ctl = read_sysreg(cntv_ctl_el0);
-+		isb();
-+		timer->cntv_cval = read_sysreg(cntv_cval_el0);
-+	}
-+
-+	/* Disable the virtual timer */
-+	write_sysreg(0, cntv_ctl_el0);
-+
-+	/* Allow physical timer/counter access for the host */
-+	val = read_sysreg(cnthctl_el2);
-+	val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
-+	write_sysreg(val, cnthctl_el2);
-+
-+	/* Clear cntvoff for the host */
-+	write_sysreg(0, cntvoff_el2);
++	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
++	ctxt->gp_regs.regs.pc		= read_sysreg(elr_el2);
++	ctxt->gp_regs.regs.pstate	= read_sysreg(spsr_el2);
++	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
++	ctxt->gp_regs.elr_el1		= read_sysreg(elr_el1);
++	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg(spsr_el1);
 +}
 +
-+void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
++void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
 +{
-+	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
-+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-+	u64 val;
++	write_sysreg(ctxt->sys_regs[MPIDR_EL1],	  vmpidr_el2);
++	write_sysreg(ctxt->sys_regs[CSSELR_EL1],  csselr_el1);
++	write_sysreg(ctxt->sys_regs[SCTLR_EL1],	  sctlr_el1);
++	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  actlr_el1);
++	write_sysreg(ctxt->sys_regs[CPACR_EL1],	  cpacr_el1);
++	write_sysreg(ctxt->sys_regs[TTBR0_EL1],	  ttbr0_el1);
++	write_sysreg(ctxt->sys_regs[TTBR1_EL1],	  ttbr1_el1);
++	write_sysreg(ctxt->sys_regs[TCR_EL1],	  tcr_el1);
++	write_sysreg(ctxt->sys_regs[ESR_EL1],	  esr_el1);
++	write_sysreg(ctxt->sys_regs[AFSR0_EL1],	  afsr0_el1);
++	write_sysreg(ctxt->sys_regs[AFSR1_EL1],	  afsr1_el1);
++	write_sysreg(ctxt->sys_regs[FAR_EL1],	  far_el1);
++	write_sysreg(ctxt->sys_regs[MAIR_EL1],	  mair_el1);
++	write_sysreg(ctxt->sys_regs[VBAR_EL1],	  vbar_el1);
++	write_sysreg(ctxt->sys_regs[CONTEXTIDR_EL1], contextidr_el1);
++	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
++	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
++	write_sysreg(ctxt->sys_regs[TPIDR_EL1],	  tpidr_el1);
++	write_sysreg(ctxt->sys_regs[AMAIR_EL1],	  amair_el1);
++	write_sysreg(ctxt->sys_regs[CNTKCTL_EL1], cntkctl_el1);
++	write_sysreg(ctxt->sys_regs[PAR_EL1],	  par_el1);
++	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
 +
-+	/*
-+	 * Disallow physical timer access for the guest
-+	 * Physical counter access is allowed
-+	 */
-+	val = read_sysreg(cnthctl_el2);
-+	val &= ~CNTHCTL_EL1PCEN;
-+	val |= CNTHCTL_EL1PCTEN;
-+	write_sysreg(val, cnthctl_el2);
-+
-+	if (kvm->arch.timer.enabled) {
-+		write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
-+		write_sysreg(timer->cntv_cval, cntv_cval_el0);
-+		isb();
-+		write_sysreg(timer->cntv_ctl, cntv_ctl_el0);
-+	}
++	write_sysreg(ctxt->gp_regs.regs.sp,	sp_el0);
++	write_sysreg(ctxt->gp_regs.regs.pc,	elr_el2);
++	write_sysreg(ctxt->gp_regs.regs.pstate,	spsr_el2);
++	write_sysreg(ctxt->gp_regs.sp_el1,	sp_el1);
++	write_sysreg(ctxt->gp_regs.elr_el1,	elr_el1);
++	write_sysreg(ctxt->gp_regs.spsr[KVM_SPSR_EL1], spsr_el1);
 +}
-diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-index 9916d0e..25d0914 100644
---- a/include/clocksource/arm_arch_timer.h
-+++ b/include/clocksource/arm_arch_timer.h
-@@ -23,6 +23,12 @@
- #define ARCH_TIMER_CTRL_IT_MASK		(1 << 1)
- #define ARCH_TIMER_CTRL_IT_STAT		(1 << 2)
- 
-+#define CNTHCTL_EL1PCTEN		(1 << 0)
-+#define CNTHCTL_EL1PCEN			(1 << 1)
-+#define CNTHCTL_EVNTEN			(1 << 2)
-+#define CNTHCTL_EVNTDIR			(1 << 3)
-+#define CNTHCTL_EVNTI			(0xF << 4)
-+
- enum arch_timer_reg {
- 	ARCH_TIMER_REG_CTRL,
- 	ARCH_TIMER_REG_TVAL,
 -- 
 2.1.4
