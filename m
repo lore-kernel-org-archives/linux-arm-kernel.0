@@ -1,89 +1,140 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  7 Dec 2015 11:50:18 +0000
-Subject: [PATCH 05/19] mfd: ab8500-debugfs: Clean-up non-conforming commenting
- and print formatting
+Date: Mon,  7 Dec 2015 11:50:17 +0000
+Subject: [PATCH 04/19] mfd: ab8500-core: Fix many warnings reported by
+ Checkpatch
 In-Reply-To: <1449489032-14374-1-git-send-email-lee.jones@linaro.org>
 References: <1449489032-14374-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1449489032-14374-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1449489032-14374-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 WARNING: Block comments use a trailing */ on a separate line
-+                        * not be accessed from here */
++        * */
 
 WARNING: Block comments use a trailing */ on a separate line
-+                        * not be accessed from here */
++        * bank on higher 8 bits and reg in lower */
 
 WARNING: Block comments use a trailing */ on a separate line
-+                                * the output is wanted in any case */
++        * bank on higher 8 bits and reg in lower */
 
-WARNING: Consecutive strings are generally better as a single string
-+               "  addr=0x%08X, mask=0x%X, shift=%d" "value=0x%X\n",
+WARNING: suspect code indent for conditional statements (8, 24)
++       if (unlikely(*offset == 17))
++                       *offset = 24;
 
-total: 0 errors, 4 warnings, 3331 lines checked
+WARNING: suspect code indent for conditional statements (8, 24)
++       if (unlikely(*offset == 16))
++                       *offset = 25;
+
+WARNING: suspect code indent for conditional statements (8, 24)
++       if ((i == 3) && (*offset >= 24))
++                       *offset += 2;
+
+WARNING: ENOSYS means 'invalid syscall nr' and nothing else
++               return -ENOSYS;
+
+WARNING: static const char * array should probably be static const char * const
++       static const char *switch_off_status[] = {
+
+WARNING: static const char * array should probably be static const char * const
++       static const char *turn_on_status[] = {
+
+total: 0 errors, 9 warnings, 1867 lines checked
 
 Cc: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/ab8500-debugfs.c | 25 +++++++++++++++----------
- 1 file changed, 15 insertions(+), 10 deletions(-)
+ drivers/mfd/ab8500-core.c | 24 ++++++++++--------------
+ 1 file changed, 10 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
-index 0236cd7..69d9fff 100644
---- a/drivers/mfd/ab8500-debugfs.c
-+++ b/drivers/mfd/ab8500-debugfs.c
-@@ -242,8 +242,10 @@ static struct ab8500_prcmu_ranges ab8500_debug_ranges[AB8500_NUM_BANKS] = {
- 				.first = 0x40,
- 				.last = 0x44,
- 			},
--			/* 0x80-0x8B is SIM registers and should
--			 * not be accessed from here */
-+			/*
-+			 * 0x80-0x8B are SIM registers and should
-+			 * not be accessed from here
-+			 */
- 		},
- 	},
- 	[AB8500_USB] = {
-@@ -587,8 +589,10 @@ static struct ab8500_prcmu_ranges ab8505_debug_ranges[AB8500_NUM_BANKS] = {
- 				.first = 0x40,
- 				.last = 0x48,
- 			},
--			/* 0x80-0x8B is SIM registers and should
--			 * not be accessed from here */
-+			/*
-+			 * 0x80-0x8B are SIM registers and should
-+			 * not be accessed from here
-+			 */
- 		},
- 	},
- 	[AB8500_USB] = {
-@@ -1306,8 +1310,10 @@ static int ab8500_registers_print(struct device *dev, u32 bank,
- 			if (s) {
- 				seq_printf(s, "  [0x%02X/0x%02X]: 0x%02X\n",
- 					   bank, reg, value);
--				/* Error is not returned here since
--				 * the output is wanted in any case */
-+				/*
-+				 * Error is not returned here since
-+				 * the output is wanted in any case
-+				 */
- 				if (seq_has_overflowed(s))
- 					return 0;
- 			} else {
-@@ -2740,10 +2746,9 @@ static ssize_t hwreg_common_write(char *b, struct hwreg_cfg *cfg,
- 	*cfg = loc;
+diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+index fefbe4c..4080f01 100644
+--- a/drivers/mfd/ab8500-core.c
++++ b/drivers/mfd/ab8500-core.c
+@@ -113,7 +113,7 @@
+ #define AB8500_SWITCH_OFF_STATUS	0x00
  
- #ifdef ABB_HWREG_DEBUG
--	pr_warn("HWREG request: %s, %s,\n"
--		"  addr=0x%08X, mask=0x%X, shift=%d" "value=0x%X\n",
--		(write) ? "write" : "read",
--		REG_FMT_DEC(cfg) ? "decimal" : "hexa",
-+	pr_warn("HWREG request: %s, %s,\n", (write) ? "write" : "read",
-+		REG_FMT_DEC(cfg) ? "decimal" : "hexa");
-+	pr_warn("  addr=0x%08X, mask=0x%X, shift=%d" "value=0x%X\n",
- 		cfg->addr, cfg->mask, cfg->shift, val);
- #endif
+ #define AB8500_TURN_ON_STATUS		0x00
+-#define AB8505_TURN_ON_STATUS_2	0x04
++#define AB8505_TURN_ON_STATUS_2		0x04
  
+ #define AB8500_CH_USBCH_STAT1_REG	0x02
+ #define VBUS_DET_DBNC100		0x02
+@@ -211,7 +211,7 @@ static int set_register_interruptible(struct ab8500 *ab8500, u8 bank,
+ 	/*
+ 	 * Put the u8 bank and u8 register together into a an u16.
+ 	 * The bank on higher 8 bits and register in lower 8 bits.
+-	 * */
++	 */
+ 	u16 addr = ((u16)bank) << 8 | reg;
+ 
+ 	dev_vdbg(ab8500->dev, "wr: addr %#x <= %#x\n", addr, data);
+@@ -243,8 +243,6 @@ static int get_register_interruptible(struct ab8500 *ab8500, u8 bank,
+ 	u8 reg, u8 *value)
+ {
+ 	int ret;
+-	/* put the u8 bank and u8 reg together into a an u16.
+-	 * bank on higher 8 bits and reg in lower */
+ 	u16 addr = ((u16)bank) << 8 | reg;
+ 
+ 	mutex_lock(&ab8500->lock);
+@@ -278,8 +276,6 @@ static int mask_and_set_register_interruptible(struct ab8500 *ab8500, u8 bank,
+ 	u8 reg, u8 bitmask, u8 bitvalues)
+ {
+ 	int ret;
+-	/* put the u8 bank and u8 reg together into a an u16.
+-	 * bank on higher 8 bits and reg in lower */
+ 	u16 addr = ((u16)bank) << 8 | reg;
+ 
+ 	mutex_lock(&ab8500->lock);
+@@ -449,12 +445,12 @@ static void update_latch_offset(u8 *offset, int i)
+ {
+ 	/* Fix inconsistent ITFromLatch25 bit mapping... */
+ 	if (unlikely(*offset == 17))
+-			*offset = 24;
++		*offset = 24;
+ 	/* Fix inconsistent ab8540 bit mapping... */
+ 	if (unlikely(*offset == 16))
+-			*offset = 25;
++		*offset = 25;
+ 	if ((i == 3) && (*offset >= 24))
+-			*offset += 2;
++		*offset += 2;
+ }
+ 
+ static int ab8500_handle_hierarchical_line(struct ab8500 *ab8500,
+@@ -590,12 +586,12 @@ static int ab8500_irq_init(struct ab8500 *ab8500, struct device_node *np)
+ 
+ 	/* If ->irq_base is zero this will give a linear mapping */
+ 	ab8500->domain = irq_domain_add_simple(ab8500->dev->of_node,
+-			num_irqs, 0,
+-			&ab8500_irq_ops, ab8500);
++					       num_irqs, 0,
++					       &ab8500_irq_ops, ab8500);
+ 
+ 	if (!ab8500->domain) {
+ 		dev_err(ab8500->dev, "Failed to create irqdomain\n");
+-		return -ENOSYS;
++		return -ENODEV;
+ 	}
+ 
+ 	return 0;
+@@ -1549,7 +1545,7 @@ static struct attribute_group ab9540_attr_group = {
+ 
+ static int ab8500_probe(struct platform_device *pdev)
+ {
+-	static const char *switch_off_status[] = {
++	static const char * const switch_off_status[] = {
+ 		"Swoff bit programming",
+ 		"Thermal protection activation",
+ 		"Vbat lower then BattOk falling threshold",
+@@ -1558,7 +1554,7 @@ static int ab8500_probe(struct platform_device *pdev)
+ 		"Battery level lower than power on reset threshold",
+ 		"Power on key 1 pressed longer than 10 seconds",
+ 		"DB8500 thermal shutdown"};
+-	static const char *turn_on_status[] = {
++	static const char * const turn_on_status[] = {
+ 		"Battery rising (Vbat)",
+ 		"Power On Key 1 dbF",
+ 		"Power On Key 2 dbF",
 -- 
 1.9.1
