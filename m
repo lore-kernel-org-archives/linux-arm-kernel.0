@@ -1,35 +1,45 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  7 Dec 2015 10:11:10 +0000
-Subject: [PATCH 0/2] irqchip/gic-v3: Small cleanups for 4.4
-Message-ID: <1449483072-17694-1-git-send-email-marc.zyngier@arm.com>
+Date: Mon,  7 Dec 2015 10:11:12 +0000
+Subject: [PATCH 2/2] irqchip/gic-v3: Add missing include for barrier.h
+In-Reply-To: <1449483072-17694-1-git-send-email-marc.zyngier@arm.com>
+References: <1449483072-17694-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1449483072-17694-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas, Jason,
+Both the 32bit and 64bit versions of the GICv3 header file are using
+barriers, but neglect to include barrier.h, leading to an interesting
+splat in some circumstances.
 
-I've been sitting on a couple of one-liners that affect GICv3. Nothing
-dramatic (and certainly nothing that affects mainline today), but they
-do get in the way of a KVM/ARM series that is aimed at 4.5 [1], and
-I'd like to make sure we don't have too many ordering issues.
-
-Alternatively, I can either carry these patches (with some Acks), or
-rebase the KVM/ARM stuff on a stable branch (but that seems a bit
-overkill for such a small set of changes).
-
-Thanks,
-
-	M.
-
-[1] https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=kvm-arm64/wsinc
-
-Marc Zyngier (2):
-  irqchip/gic-v3: Add missing struct device_node declaration
-  irqchip/gic-v3: Add missing include for barrier.h
-
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
  arch/arm/include/asm/arch_gicv3.h   | 1 +
  arch/arm64/include/asm/arch_gicv3.h | 1 +
- include/linux/irqchip/arm-gic-v3.h  | 1 +
- 3 files changed, 3 insertions(+)
+ 2 files changed, 2 insertions(+)
 
+diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
+index 6607d97..7da5503 100644
+--- a/arch/arm/include/asm/arch_gicv3.h
++++ b/arch/arm/include/asm/arch_gicv3.h
+@@ -21,6 +21,7 @@
+ #ifndef __ASSEMBLY__
+ 
+ #include <linux/io.h>
++#include <asm/barrier.h>
+ 
+ #define __ACCESS_CP15(CRn, Op1, CRm, Op2)	p15, Op1, %0, CRn, CRm, Op2
+ #define __ACCESS_CP15_64(Op1, CRm)		p15, Op1, %Q0, %R0, CRm
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index 030cdcb..2731d3b 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -77,6 +77,7 @@
+ #ifndef __ASSEMBLY__
+ 
+ #include <linux/stringify.h>
++#include <asm/barrier.h>
+ 
+ /*
+  * Low-level accessors
 -- 
 2.1.4
