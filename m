@@ -1,48 +1,128 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 7 Dec 2015 08:42:20 -0600
-Subject: [PATCH v2 2/6] dt: lpc32xx: pwm: update documentation of LPC32xx
- PWM device
-In-Reply-To: <1449401522-22590-3-git-send-email-vz@mleia.com>
-References: <1449401522-22590-1-git-send-email-vz@mleia.com>
- <1449401522-22590-3-git-send-email-vz@mleia.com>
-Message-ID: <20151207144220.GA7414@rob-hp-laptop>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Mon, 07 Dec 2015 22:47:02 +0800
+Subject: [PATCH v5 00/21] KVM: ARM64: Add guest PMU support
+In-Reply-To: <5665937F.90507@arm.com>
+References: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
+ <5665937F.90507@arm.com>
+Message-ID: <56659BE6.3070601@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 06, 2015 at 01:31:58PM +0200, Vladimir Zapolskiy wrote:
-> NXP LPC32xx SoC has two separate PWM controller devices, update device
-> tree binding documentation to reflect this fact.
-> 
-> The change makes previous PWM device node description incompatible
-> with the new version.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+Hi Marc,
 
-Acked-by: Rob Herring <robh@kernel.org>
+On 2015/12/7 22:11, Marc Zyngier wrote:
+> Shannon,
+>
+> On 03/12/15 06:11, Shannon Zhao wrote:
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>
+>> This patchset adds guest PMU support for KVM on ARM64. It takes
+>> trap-and-emulate approach. When guest wants to monitor one event, it
+>> will be trapped by KVM and KVM will call perf_event API to create a perf
+>> event and call relevant perf_event APIs to get the count value of event.
+>>
+>> Use perf to test this patchset in guest. When using "perf list", it
+>> shows the list of the hardware events and hardware cache events perf
+>> supports. Then use "perf stat -e EVENT" to monitor some event. For
+>> example, use "perf stat -e cycles" to count cpu cycles and
+>> "perf stat -e cache-misses" to count cache misses.
+>>
+>> Below are the outputs of "perf stat -r 5 sleep 5" when running in host
+>> and guest.
+>>
+>> Host:
+>>   Performance counter stats for 'sleep 5' (5 runs):
+>>
+>>            0.510276      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.57% )
+>>                   1      context-switches          #    0.002 M/sec
+>>                   0      cpu-migrations            #    0.000 K/sec
+>>                  49      page-faults               #    0.096 M/sec                    ( +-  0.77% )
+>>             1064117      cycles                    #    2.085 GHz                      ( +-  1.56% )
+>>     <not supported>      stalled-cycles-frontend
+>>     <not supported>      stalled-cycles-backend
+>>              529051      instructions              #    0.50  insns per cycle          ( +-  0.55% )
+>>     <not supported>      branches
+>>                9894      branch-misses             #   19.390 M/sec                    ( +-  1.70% )
+>>
+>>         5.000853900 seconds time elapsed                                          ( +-  0.00% )
+>>
+>> Guest:
+>>   Performance counter stats for 'sleep 5' (5 runs):
+>>
+>>            0.642456      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.81% )
+>>                   1      context-switches          #    0.002 M/sec
+>>                   0      cpu-migrations            #    0.000 K/sec
+>>                  49      page-faults               #    0.076 M/sec                    ( +-  1.64% )
+>>             1322717      cycles                    #    2.059 GHz                      ( +-  1.88% )
+>>     <not supported>      stalled-cycles-frontend
+>>     <not supported>      stalled-cycles-backend
+>>              640944      instructions              #    0.48  insns per cycle          ( +-  1.10% )
+>>     <not supported>      branches
+>>               10665      branch-misses             #   16.600 M/sec                    ( +-  2.23% )
+>>
+>>         5.001181452 seconds time elapsed                                          ( +-  0.00% )
+>>
+>> Have a cycle counter read test like below in guest and host:
+>>
+>> static void test(void)
+>> {
+>> 	unsigned long count, count1, count2;
+>> 	count1 = read_cycles();
+>> 	count++;
+>> 	count2 = read_cycles();
+>> }
+>>
+>> Host:
+>> count1: 3046186213
+>> count2: 3046186347
+>> delta: 134
+>>
+>> Guest:
+>> count1: 5645797121
+>> count2: 5645797270
+>> delta: 149
+>>
+>> The gap between guest and host is very small. One reason for this I
+>> think is that it doesn't count the cycles in EL2 and host since we add
+>> exclude_hv = 1. So the cycles spent to store/restore registers which
+>> happens at EL2 are not included.
+>>
+>> This patchset can be fetched from [1] and the relevant QEMU version for
+>> test can be fetched from [2].
+>>
+>> The results of 'perf test' can be found from [3][4].
+>> The results of perf_event_tests test suite can be found from [5][6].
+>>
+>> Also, I have tested "perf top" in two VMs and host at the same time. It
+>> works well.
+>
+> I've commented on more issues I've found. Hopefully you'll be able to
+> respin this quickly enough, and end-up with a simpler code base (state
+> duplication is a bit messy).
+>
+Ok, will try my best :)
 
-> ---
-> Changes from v1 to v2:
-> - removed '0x' from a device node address and use lower case hex chars.
-> 
->  Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
-> index 1ab1abc..74b5bc5 100644
-> --- a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
-> +++ b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
-> @@ -8,5 +8,10 @@ Examples:
->  
->  pwm at 4005c000 {
->  	compatible = "nxp,lpc3220-pwm";
-> -	reg = <0x4005c000 0x8>;
-> +	reg = <0x4005c000 0x4>;
-> +};
-> +
-> +pwm at 4005c004 {
-> +	compatible = "nxp,lpc3220-pwm";
-> +	reg = <0x4005c004 0x4>;
->  };
-> -- 
-> 2.1.4
-> 
+> Another thing I have noticed is that you have dropped the vgic changes
+> that were configuring the interrupt. It feels like they should be
+> included, and configure the PPI as a LEVEL interrupt.
+The reason why I drop that is in upstream code PPIs are LEVEL interrupt 
+by default which is changed by the arch_timers patches. So is it 
+necessary to configure it again?
+
+> Also, looking at
+> your QEMU code, you seem to configure the interrupt as EDGE, which is
+> now how yor emulated HW behaves.
+>
+Sorry, the QEMU code is not updated while the version I use for test 
+locally configures the interrupt as LEVEL. I will push the newest one 
+tomorrow.
+
+> Looking forward to reviewing the next version.
+>
+> Thanks,
+>
+> 	M.
+>
+
+-- 
+Shannon
