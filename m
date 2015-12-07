@@ -1,72 +1,120 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  7 Dec 2015 10:53:17 +0000
-Subject: [PATCH v3 01/22] arm64: Add macros to read/write system registers
-In-Reply-To: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
-References: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1449485618-9443-2-git-send-email-marc.zyngier@arm.com>
+Date: Mon,  7 Dec 2015 10:53:16 +0000
+Subject: [PATCH v3 00/22] arm64: KVM: Rewriting the world switch in C
+Message-ID: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+Once upon a time, the KVM/arm64 world switch was a nice, clean, lean
+and mean piece of hand-crafted assembly code. Over time, features have
+crept in, the code has become harder to maintain, and the smallest
+change is a pain to introduce. The VHE patches are a prime example of
+why this doesn't work anymore.
 
-Rather than crafting custom macros for reading/writing each system
-register provide generics accessors, read_sysreg and write_sysreg, for
-this purpose.
+This series rewrites most of the existing assembly code in C, but keeps
+the existing code structure in place (most function names will look
+familiar to the reader). The biggest change is that we don't have to
+deal with a static register allocation (the compiler does it for us),
+we can easily follow structure and pointers, and only the lowest level
+is still in assembly code. Oh, and a negative diffstat.
 
-Unlike read_cpuid, calls to read_exception_reg are never expected
-to be optimized away or replaced with synthetic values.
+There is still a healthy dose of inline assembly (system register
+accessors, runtime code patching), but I've tried not to make it too
+invasive. The generated code, while not exactly brilliant, doesn't
+look too shaby. I do expect a small performance degradation, but I
+believe this is something we can improve over time (my initial
+measurements don't show any obvious regression though).
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Suzuki Poulose <suzuki.poulose@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/sysreg.h | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Assuming people are happy with the general approach taken here, I plan
+to rewrite the 32bit version in a similar vein, and reuse some parts
+of that code.
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index d48ab5b..c9c283a 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -20,6 +20,8 @@
- #ifndef __ASM_SYSREG_H
- #define __ASM_SYSREG_H
- 
-+#include <linux/stringify.h>
-+
- #include <asm/opcodes.h>
- 
- /*
-@@ -208,6 +210,8 @@
- 
- #else
- 
-+#include <linux/types.h>
-+
- asm(
- "	.irp	num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30\n"
- "	.equ	__reg_num_x\\num, \\num\n"
-@@ -232,6 +236,19 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
- 	val |= set;
- 	asm volatile("msr sctlr_el1, %0" : : "r" (val));
- }
-+
-+#define read_sysreg(r) ({					\
-+	u64 __val;						\
-+	asm volatile("mrs %0, " __stringify(r) : "=r" (__val));	\
-+	__val;							\
-+})
-+
-+#define write_sysreg(v, r) do {					\
-+	u64 __val = (u64)v;					\
-+	asm volatile("msr " __stringify(r) ", %0"		\
-+		     : : "r" (__val));				\
-+} while (0)
-+
- #endif
- 
- #endif	/* __ASM_SYSREG_H */
+Patches are against 4.4-rc4 (mostly), and I've pushed a branch out
+(kvm-arm64/wsinc). This has been tested on Juno, Seattle and the FVP
+model. I also have pushed out kvm-arm64/vhe-wsinc that implements VHE
+on top of these patches.
+
+* From v2:
+  - Extensive review by Christoffer (thanks!)
+  - Reuse the LR indexing macro used by the vgic-v3 layer
+  - Plenty of comments added to the code
+
+* From v1:
+  - A number of bugs have been squashed: vgic, FP/SIMD, debug, panic
+    (thanks to Mark, Steve, Ard and Alex for their reviews)
+  - Rebased on 4.4-rc2 plus KVM fixes aimed at -rc3 plus a couple
+    of gic-v3 fixes
+
+Marc Zyngier (21):
+  arm64: KVM: Add a HYP-specific header file
+  arm64: KVM: Implement vgic-v2 save/restore
+  KVM: arm/arm64: vgic-v3: Make the LR indexing macro public
+  arm64: KVM: Implement vgic-v3 save/restore
+  arm64: KVM: Implement timer save/restore
+  arm64: KVM: Implement system register save/restore
+  arm64: KVM: Implement 32bit system register save/restore
+  arm64: KVM: Implement debug save/restore
+  arm64: KVM: Implement guest entry
+  arm64: KVM: Add patchable function selector
+  arm64: KVM: Implement the core world switch
+  arm64: KVM: Implement fpsimd save/restore
+  arm64: KVM: Implement TLB handling
+  arm64: KVM: HYP mode entry points
+  arm64: KVM: Add panic handling
+  arm64: KVM: Add compatibility aliases
+  arm64: KVM: Map the kernel RO section into HYP
+  arm64: KVM: Move away from the assembly version of the world switch
+  arm64: KVM: Turn system register numbers to an enum
+  arm64: KVM: Cleanup asm-offset.c
+  arm64: KVM: Remove weak attributes
+
+Mark Rutland (1):
+  arm64: Add macros to read/write system registers
+
+ arch/arm/kvm/arm.c                   |    7 +
+ arch/arm64/include/asm/kvm_asm.h     |   76 ---
+ arch/arm64/include/asm/kvm_emulate.h |    1 -
+ arch/arm64/include/asm/kvm_host.h    |   81 ++-
+ arch/arm64/include/asm/kvm_mmio.h    |    1 -
+ arch/arm64/include/asm/sysreg.h      |   17 +
+ arch/arm64/kernel/asm-offsets.c      |   40 +-
+ arch/arm64/kvm/Makefile              |    3 +-
+ arch/arm64/kvm/guest.c               |    1 -
+ arch/arm64/kvm/handle_exit.c         |    1 +
+ arch/arm64/kvm/hyp.S                 | 1081 +---------------------------------
+ arch/arm64/kvm/hyp/Makefile          |   14 +
+ arch/arm64/kvm/hyp/debug-sr.c        |  140 +++++
+ arch/arm64/kvm/hyp/entry.S           |  161 +++++
+ arch/arm64/kvm/hyp/fpsimd.S          |   33 ++
+ arch/arm64/kvm/hyp/hyp-entry.S       |  212 +++++++
+ arch/arm64/kvm/hyp/hyp.h             |   90 +++
+ arch/arm64/kvm/hyp/switch.c          |  175 ++++++
+ arch/arm64/kvm/hyp/sysreg-sr.c       |  138 +++++
+ arch/arm64/kvm/hyp/timer-sr.c        |   72 +++
+ arch/arm64/kvm/hyp/tlb.c             |   80 +++
+ arch/arm64/kvm/hyp/vgic-v2-sr.c      |   84 +++
+ arch/arm64/kvm/hyp/vgic-v3-sr.c      |  228 +++++++
+ arch/arm64/kvm/sys_regs.c            |    1 +
+ arch/arm64/kvm/vgic-v2-switch.S      |  134 -----
+ arch/arm64/kvm/vgic-v3-switch.S      |  269 ---------
+ include/clocksource/arm_arch_timer.h |    6 +
+ include/kvm/arm_vgic.h               |    6 +
+ virt/kvm/arm/vgic-v3.c               |   11 +-
+ 29 files changed, 1551 insertions(+), 1612 deletions(-)
+ create mode 100644 arch/arm64/kvm/hyp/Makefile
+ create mode 100644 arch/arm64/kvm/hyp/debug-sr.c
+ create mode 100644 arch/arm64/kvm/hyp/entry.S
+ create mode 100644 arch/arm64/kvm/hyp/fpsimd.S
+ create mode 100644 arch/arm64/kvm/hyp/hyp-entry.S
+ create mode 100644 arch/arm64/kvm/hyp/hyp.h
+ create mode 100644 arch/arm64/kvm/hyp/switch.c
+ create mode 100644 arch/arm64/kvm/hyp/sysreg-sr.c
+ create mode 100644 arch/arm64/kvm/hyp/timer-sr.c
+ create mode 100644 arch/arm64/kvm/hyp/tlb.c
+ create mode 100644 arch/arm64/kvm/hyp/vgic-v2-sr.c
+ create mode 100644 arch/arm64/kvm/hyp/vgic-v3-sr.c
+ delete mode 100644 arch/arm64/kvm/vgic-v2-switch.S
+ delete mode 100644 arch/arm64/kvm/vgic-v3-switch.S
+
 -- 
 2.1.4
