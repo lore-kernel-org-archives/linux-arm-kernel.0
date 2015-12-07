@@ -1,196 +1,94 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  7 Dec 2015 10:53:25 +0000
-Subject: [PATCH v3 09/22] arm64: KVM: Implement debug save/restore
+Date: Mon,  7 Dec 2015 10:53:32 +0000
+Subject: [PATCH v3 16/22] arm64: KVM: Add panic handling
 In-Reply-To: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
 References: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1449485618-9443-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1449485618-9443-17-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the debug save restore as a direct translation of
-the assembly code version.
+Add the panic handler, together with the small bits of assembly
+code to call the kernel's panic implementation.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Tested-by: Alex Benn?e <alex.bennee@linaro.org>
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/hyp/Makefile   |   1 +
- arch/arm64/kvm/hyp/debug-sr.c | 137 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kvm/hyp/hyp.h      |   9 +++
- 3 files changed, 147 insertions(+)
- create mode 100644 arch/arm64/kvm/hyp/debug-sr.c
+ arch/arm64/kvm/hyp/hyp-entry.S | 11 ++++++++++-
+ arch/arm64/kvm/hyp/hyp.h       |  1 +
+ arch/arm64/kvm/hyp/switch.c    | 30 ++++++++++++++++++++++++++++++
+ 3 files changed, 41 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-index ec94200..ec14cac 100644
---- a/arch/arm64/kvm/hyp/Makefile
-+++ b/arch/arm64/kvm/hyp/Makefile
-@@ -6,3 +6,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
-+obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
-diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
-new file mode 100644
-index 0000000..7848322
---- /dev/null
-+++ b/arch/arm64/kvm/hyp/debug-sr.c
-@@ -0,0 +1,137 @@
-+/*
-+ * Copyright (C) 2015 - ARM Ltd
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index 818731a..8e58a3b 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -155,7 +155,16 @@ el1_irq:
+ 	mov	x1, #ARM_EXCEPTION_IRQ
+ 	b	__guest_exit
+ 
+-.macro invalid_vector	label, target = __kvm_hyp_panic
++ENTRY(__hyp_do_panic)
++	mov	lr, #(PSR_F_BIT | PSR_I_BIT | PSR_A_BIT | PSR_D_BIT |\
++		      PSR_MODE_EL1h)
++	msr	spsr_el2, lr
++	ldr	lr, =panic
++	msr	elr_el2, lr
++	eret
++ENDPROC(__hyp_do_panic)
 +
-+#include <linux/compiler.h>
-+#include <linux/kvm_host.h>
-+
-+#include <asm/kvm_mmu.h>
-+
-+#include "hyp.h"
-+
-+#define read_debug(r,n)		read_sysreg(r##n##_el1)
-+#define write_debug(v,r,n)	write_sysreg(v, r##n##_el1)
-+
-+#define save_debug(ptr,reg,nr)						\
-+	switch (nr) {							\
-+	case 15:	ptr[15] = read_debug(reg, 15);			\
-+	case 14:	ptr[14] = read_debug(reg, 14);			\
-+	case 13:	ptr[13] = read_debug(reg, 13);			\
-+	case 12:	ptr[12] = read_debug(reg, 12);			\
-+	case 11:	ptr[11] = read_debug(reg, 11);			\
-+	case 10:	ptr[10] = read_debug(reg, 10);			\
-+	case 9:		ptr[9] = read_debug(reg, 9);			\
-+	case 8:		ptr[8] = read_debug(reg, 8);			\
-+	case 7:		ptr[7] = read_debug(reg, 7);			\
-+	case 6:		ptr[6] = read_debug(reg, 6);			\
-+	case 5:		ptr[5] = read_debug(reg, 5);			\
-+	case 4:		ptr[4] = read_debug(reg, 4);			\
-+	case 3:		ptr[3] = read_debug(reg, 3);			\
-+	case 2:		ptr[2] = read_debug(reg, 2);			\
-+	case 1:		ptr[1] = read_debug(reg, 1);			\
-+	default:	ptr[0] = read_debug(reg, 0);			\
-+	}
-+
-+#define restore_debug(ptr,reg,nr)					\
-+	switch (nr) {							\
-+	case 15:	write_debug(ptr[15], reg, 15);			\
-+	case 14:	write_debug(ptr[14], reg, 14);			\
-+	case 13:	write_debug(ptr[13], reg, 13);			\
-+	case 12:	write_debug(ptr[12], reg, 12);			\
-+	case 11:	write_debug(ptr[11], reg, 11);			\
-+	case 10:	write_debug(ptr[10], reg, 10);			\
-+	case 9:		write_debug(ptr[9], reg, 9);			\
-+	case 8:		write_debug(ptr[8], reg, 8);			\
-+	case 7:		write_debug(ptr[7], reg, 7);			\
-+	case 6:		write_debug(ptr[6], reg, 6);			\
-+	case 5:		write_debug(ptr[5], reg, 5);			\
-+	case 4:		write_debug(ptr[4], reg, 4);			\
-+	case 3:		write_debug(ptr[3], reg, 3);			\
-+	case 2:		write_debug(ptr[2], reg, 2);			\
-+	case 1:		write_debug(ptr[1], reg, 1);			\
-+	default:	write_debug(ptr[0], reg, 0);			\
-+	}
-+
-+void __hyp_text __debug_save_state(struct kvm_vcpu *vcpu,
-+				   struct kvm_guest_debug_arch *dbg,
-+				   struct kvm_cpu_context *ctxt)
-+{
-+	u64 aa64dfr0;
-+	int brps, wrps;
-+
-+	if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY))
-+		return;
-+
-+	aa64dfr0 = read_sysreg(id_aa64dfr0_el1);
-+	brps = (aa64dfr0 >> 12) & 0xf;
-+	wrps = (aa64dfr0 >> 20) & 0xf;
-+
-+	save_debug(dbg->dbg_bcr, dbgbcr, brps);
-+	save_debug(dbg->dbg_bvr, dbgbvr, brps);
-+	save_debug(dbg->dbg_wcr, dbgwcr, wrps);
-+	save_debug(dbg->dbg_wvr, dbgwvr, wrps);
-+
-+	ctxt->sys_regs[MDCCINT_EL1] = read_sysreg(mdccint_el1);
-+}
-+
-+void __hyp_text __debug_restore_state(struct kvm_vcpu *vcpu,
-+				      struct kvm_guest_debug_arch *dbg,
-+				      struct kvm_cpu_context *ctxt)
-+{
-+	u64 aa64dfr0;
-+	int brps, wrps;
-+
-+	if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY))
-+		return;
-+
-+	aa64dfr0 = read_sysreg(id_aa64dfr0_el1);
-+
-+	brps = (aa64dfr0 >> 12) & 0xf;
-+	wrps = (aa64dfr0 >> 20) & 0xf;
-+
-+	restore_debug(dbg->dbg_bcr, dbgbcr, brps);
-+	restore_debug(dbg->dbg_bvr, dbgbvr, brps);
-+	restore_debug(dbg->dbg_wcr, dbgwcr, wrps);
-+	restore_debug(dbg->dbg_wvr, dbgwvr, wrps);
-+
-+	write_sysreg(ctxt->sys_regs[MDCCINT_EL1], mdccint_el1);
-+}
-+
-+void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
-+{
-+	/* If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY is set, perform
-+	 * a full save/restore cycle. */
-+	if ((vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_KDE) ||
-+	    (vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_MDE))
-+		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-+
-+	__debug_save_state(vcpu, &vcpu->arch.host_debug_state,
-+			   kern_hyp_va(vcpu->arch.host_cpu_context));
-+}
-+
-+void __hyp_text __debug_cond_restore_host_state(struct kvm_vcpu *vcpu)
-+{
-+	__debug_restore_state(vcpu, &vcpu->arch.host_debug_state,
-+			      kern_hyp_va(vcpu->arch.host_cpu_context));
-+
-+	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
-+		vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_DIRTY;
-+}
-+
-+u32 __hyp_text __debug_read_mdcr_el2(void)
-+{
-+	return read_sysreg(mdcr_el2);
-+}
++.macro invalid_vector	label, target = __hyp_panic
+ 	.align	2
+ \label:
+ 	b \target
 diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
-index bffd308..454e46f 100644
+index 70d4f69..fb27517 100644
 --- a/arch/arm64/kvm/hyp/hyp.h
 +++ b/arch/arm64/kvm/hyp/hyp.h
-@@ -43,5 +43,14 @@ void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
- void __sysreg32_save_state(struct kvm_vcpu *vcpu);
- void __sysreg32_restore_state(struct kvm_vcpu *vcpu);
+@@ -84,6 +84,7 @@ static inline bool __fpsimd_enabled(void)
+ }
  
-+void __debug_save_state(struct kvm_vcpu *vcpu,
-+			struct kvm_guest_debug_arch *dbg,
-+			struct kvm_cpu_context *ctxt);
-+void __debug_restore_state(struct kvm_vcpu *vcpu,
-+			   struct kvm_guest_debug_arch *dbg,
-+			   struct kvm_cpu_context *ctxt);
-+void __debug_cond_save_host_state(struct kvm_vcpu *vcpu);
-+void __debug_cond_restore_host_state(struct kvm_vcpu *vcpu);
-+
+ u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
++void __noreturn __hyp_do_panic(unsigned long, ...);
+ 
  #endif /* __ARM64_KVM_HYP_H__ */
  
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 608155f..b012870 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -141,3 +141,33 @@ int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+ 
+ 	return exit_code;
+ }
++
++static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%08llx\nFAR:%016llx HPFAR:%016llx PAR:%016llx\nVCPU:%p\n";
++
++void __hyp_text __noreturn __hyp_panic(void)
++{
++	unsigned long str_va = (unsigned long)__hyp_panic_string;
++	u64 spsr = read_sysreg(spsr_el2);
++	u64 elr = read_sysreg(elr_el2);
++	u64 par = read_sysreg(par_el1);
++
++	if (read_sysreg(vttbr_el2)) {
++		struct kvm_vcpu *vcpu;
++		struct kvm_cpu_context *host_ctxt;
++
++		vcpu = (struct kvm_vcpu *)read_sysreg(tpidr_el2);
++		host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
++		__deactivate_traps(vcpu);
++		__deactivate_vm(vcpu);
++		__sysreg_restore_state(host_ctxt);
++	}
++
++	/* Call panic for real */
++	__hyp_do_panic(hyp_kern_va(str_va),
++		       spsr,  elr,
++		       read_sysreg(esr_el2),   read_sysreg(far_el2),
++		       read_sysreg(hpfar_el2), par,
++		       (void *)read_sysreg(tpidr_el2));
++
++	unreachable();
++}
 -- 
 2.1.4
