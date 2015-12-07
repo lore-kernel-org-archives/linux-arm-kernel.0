@@ -1,76 +1,97 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 7 Dec 2015 22:52:49 +0100
-Subject: [PATCH] ARM: mm: mark section-aligned portion of rodata NX
-In-Reply-To: <20151207205432.GA5271@www.outflux.net>
-References: <20151207205432.GA5271@www.outflux.net>
-Message-ID: <CAKv+Gu-q4ziskce+KneLTKZWi+sB_-4ZG4tyYssK7HNyqxAn4A@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 7 Dec 2015 15:53:56 -0600
+Subject: [PATCH part3 v12 00/10] Cleanup platform pci_domain_nr()
+In-Reply-To: <1437393678-4077-1-git-send-email-wangyijing@huawei.com>
+References: <1437393678-4077-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <20151207215356.GD14429@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 December 2015 at 21:54, Kees Cook <keescook@chromium.org> wrote:
-> When rodata is large enough that it crosses a section boundary after the
-> kernel text, mark the rest NX. This is as close to full NX of rodata as
-> we can get without splitting page tables or doing section alignment via
-> CONFIG_DEBUG_ALIGN_RODATA.
->
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
-> I am baffled why I can't put the ALIGN in the ".start = " initializer.
-> GCC seems to think it's non-static, but only because of the "&" operator.
-> Does anyone see a way to do this that doesn't require the runtime ALIGN?
+On Mon, Jul 20, 2015 at 08:01:08PM +0800, Yijing Wang wrote:
+> This series is splitted out from previous patchset
+> "Refine PCI scan interfaces and make generic pci host bridge".
+> It try to clean up all platform pci_domain_nr(), save domain
+> in pci_host_bridge, so we could get domain number from the
+> common interface. 
+> 
+> v11->v12:
+>   Introduce wrap function pci_create_root_bus_generic()
+>   and pci_create_root_bus_generic() for arm/arm64 which
+>   enable CONFIG_PCI_DOMAINS_GENERIC.
+>   Rebased this series based 4.2-rc1
+> 
+> Yijing Wang (10):
+>   PCI: Save domain in pci_host_bridge
+>   PCI: Move pci_bus_assign_domain_nr() declaration into
+>     drivers/pci/pci.h
+>   PCI: Remove declaration for pci_get_new_domain_nr()
+>   PCI: Introduce pci_host_assign_domain_nr() to assign domain
+>   powerpc/PCI: Rename pcibios_root_bridge_prepare() to
+>     pcibios_root_bus_prepare()
+>   PCI: Make pci_host_bridge hold sysdata in drvdata
+>   PCI: Create pci host bridge prior to root bus
+>   PCI: Introduce common pci_domain_nr() and remove platform specific
+>     code
+>   PCI: Remove pci_bus_assign_domain_nr()
+>   IA64/PCI: Fix build warning found by kbuild test
+> 
+>  arch/alpha/include/asm/pci.h             |    2 -
+>  arch/alpha/kernel/pci.c                  |    4 +-
+>  arch/alpha/kernel/sys_nautilus.c         |    2 +-
+>  arch/arm/kernel/bios32.c                 |    2 +-
+>  arch/arm/mach-dove/pcie.c                |    2 +-
+>  arch/arm/mach-iop13xx/pci.c              |    4 +-
+>  arch/arm/mach-mv78xx0/pcie.c             |    2 +-
+>  arch/arm/mach-orion5x/pci.c              |    4 +-
+>  arch/frv/mb93090-mb00/pci-vdk.c          |    3 +-
+>  arch/ia64/include/asm/pci.h              |    1 -
+>  arch/ia64/pci/pci.c                      |    6 +-
+>  arch/ia64/sn/kernel/io_acpi_init.c       |    6 +-
+>  arch/ia64/sn/kernel/io_init.c            |    6 +-
+>  arch/m68k/coldfire/pci.c                 |    2 +-
+>  arch/microblaze/include/asm/pci.h        |    2 -
+>  arch/microblaze/pci/pci-common.c         |   15 +----
+>  arch/mips/include/asm/pci.h              |    2 -
+>  arch/mips/pci/pci.c                      |    4 +-
+>  arch/mn10300/unit-asb2305/pci.c          |    3 +-
+>  arch/powerpc/include/asm/machdep.h       |    2 +-
+>  arch/powerpc/include/asm/pci.h           |    2 -
+>  arch/powerpc/kernel/pci-common.c         |   21 ++-----
+>  arch/powerpc/platforms/pseries/pci.c     |    2 +-
+>  arch/powerpc/platforms/pseries/pseries.h |    2 +-
+>  arch/powerpc/platforms/pseries/setup.c   |    2 +-
+>  arch/s390/include/asm/pci.h              |    1 -
+>  arch/s390/pci/pci.c                      |   10 +---
+>  arch/sh/drivers/pci/pci.c                |    4 +-
+>  arch/sh/include/asm/pci.h                |    2 -
+>  arch/sparc/include/asm/pci_64.h          |    1 -
+>  arch/sparc/kernel/leon_pci.c             |    2 +-
+>  arch/sparc/kernel/pci.c                  |   21 +------
+>  arch/sparc/kernel/pcic.c                 |    2 +-
+>  arch/tile/include/asm/pci.h              |    2 -
+>  arch/tile/kernel/pci.c                   |    4 +-
+>  arch/tile/kernel/pci_gx.c                |    4 +-
+>  arch/unicore32/kernel/pci.c              |    2 +-
+>  arch/x86/include/asm/pci.h               |    6 --
+>  arch/x86/pci/acpi.c                      |    6 +-
+>  arch/x86/pci/common.c                    |    2 +-
+>  arch/xtensa/kernel/pci.c                 |    2 +-
+>  drivers/parisc/dino.c                    |    2 +-
+>  drivers/parisc/lba_pci.c                 |    2 +-
+>  drivers/pci/host/pci-versatile.c         |    3 +-
+>  drivers/pci/host/pci-xgene.c             |    2 +-
+>  drivers/pci/host/pcie-designware.c       |    2 +-
+>  drivers/pci/host/pcie-iproc.c            |    2 +-
+>  drivers/pci/host/pcie-xilinx.c           |    2 +-
+>  drivers/pci/hotplug/ibmphp_core.c        |    2 +-
+>  drivers/pci/pci.c                        |   31 ++++++++--
+>  drivers/pci/pci.h                        |    1 +
+>  drivers/pci/probe.c                      |   92 +++++++++++++++++-------------
+>  drivers/pci/xen-pcifront.c               |    2 +-
+>  include/linux/pci.h                      |   39 ++++++-------
+>  54 files changed, 161 insertions(+), 195 deletions(-)
 
-Yes, but you need to move the ALIGN() expression to the linker script
-as the value of a new symbol
+Doesn't apply to v4.4-rc2.  Please refresh and repost if this is still
+relevant.
 
-> ---
->  arch/arm/mm/init.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 321d3683dc7c..b40a0536ef60 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -579,6 +579,8 @@ struct section_perm {
->         pmdval_t clear;
->  };
->
-> +#define RODATA_IDX     0
-> +
->  static struct section_perm nx_perms[] = {
->         /* Make pages tables, etc before _stext RW (set NX). */
->         {
-> @@ -596,16 +598,14 @@ static struct section_perm nx_perms[] = {
->                 .mask   = ~PMD_SECT_XN,
->                 .prot   = PMD_SECT_XN,
->         },
-> -#ifdef CONFIG_DEBUG_ALIGN_RODATA
->         /* Make rodata NX (set RO in ro_perms below). */
-> -       {
-> +       [RODATA_IDX] = {
->                 .name   = "rodata NX",
->                 .start  = (unsigned long)__start_rodata,
->                 .end    = (unsigned long)__init_begin,
->                 .mask   = ~PMD_SECT_XN,
->                 .prot   = PMD_SECT_XN,
->         },
-> -#endif
->  };
->
->  static struct section_perm ro_perms[] = {
-> @@ -709,6 +709,9 @@ int __fix_kernmem_perms(void *unused)
->
->  void fix_kernmem_perms(void)
->  {
-> +       /* rodata may not be section aligned, so cover as much as we can. */
-> +       nx_perms[RODATA_IDX].start = ALIGN(nx_perms[RODATA_IDX].start,
-> +                                          SECTION_SIZE);
->         stop_machine(__fix_kernmem_perms, NULL, NULL);
->  }
->
-> --
-> 1.9.1
->
->
-> --
-> Kees Cook
-> Chrome OS & Brillo Security
+Bjorn
