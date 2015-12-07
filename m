@@ -1,64 +1,63 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 07 Dec 2015 13:28:42 +0900
-Subject: [GIT PULL] ARM: Exynos fixes for v4.4
-In-Reply-To: <1448587563-31346-1-git-send-email-k.kozlowski@samsung.com>
-References: <1448587563-31346-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <56650AFA.7010906@samsung.com>
+From: bayi.cheng@mediatek.com (bayi cheng)
+Date: Mon, 7 Dec 2015 12:34:12 +0800
+Subject: [PATCH] arm64: dts: mt8173: Add nor flash node
+In-Reply-To: <CAGS+omCuB3VGcPk3fezakdVDnFB3GAmMD+wZ_6nGdv+uHoB40g@mail.gmail.com>
+References: <1449460394-31601-1-git-send-email-bayi.cheng@mediatek.com>
+ <CAGS+omCuB3VGcPk3fezakdVDnFB3GAmMD+wZ_6nGdv+uHoB40g@mail.gmail.com>
+Message-ID: <1449462852.9118.25.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.11.2015 10:26, Krzysztof Kozlowski wrote:
-> Hi Kukjin,
+On Mon, 2015-12-07 at 12:09 +0800, Daniel Kurtz wrote:
+> Bayi,
 > 
+> On Mon, Dec 7, 2015 at 11:53 AM, Bayi Cheng <bayi.cheng@mediatek.com> wrote:
+> > Add Mediatek nor flash node
+> >
+> > Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
+> > Acked-by: Brian Norris <computersforpeace@gmail.com>
+> > ---
+> > Previous version of this patch is
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386005.html
+> > Drop flash node from mt8173.dtsi accroding review comment
 > 
-> Two fixes for v4.4 cycle. Rafael wanted the cpufreq fix to go through
-> arm-soc tree.
+> Is there a flash on mt8173-evb that can be accessed by the nor_flash ?
+> If so, can you include flash at 0 node in the mt8173-evb.dts.
 > 
-> Please note that location of repository has changed to kernel.org.
+> -Dan
+> 
+Hi Daniel, Thanks for your comments! you are right, there is a flash on
+mt8173-evb which can be accessed by the nor_flash, and I will include
+flash at 0 node in mt8173-evb.dts (kernel v3.18) too.
 
-Hi Arnd, Kevin and Olof,
-
-Could you pull this directly for current RC-cycle? Kukjin mentioned that
-he does not have any patches in his queue for fixes.
-
-Best regards,
-Krzysztof
-
-
-> 
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
-> The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
-> 
->   Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
-> 
-> are available in the git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-fixes-4.4
-> 
-> for you to fetch changes up to 62f49ee26f14753bd7fa634f51d537a79061bf0f:
-> 
->   cpufreq: s3c24xx: Do not mark s3c2410_plls_add as __init (2015-11-27 10:10:32 +0900)
-> 
-> ----------------------------------------------------------------
-> Fixes for Exynos:
-> 1. Fix potential NULL pointer dereference in Exynos PMU driver.
-> 2. Remove incorrect __init annotation from s3c24xx cpufreq driver
->    structures.
-> 
-> ----------------------------------------------------------------
-> Arnd Bergmann (1):
->       cpufreq: s3c24xx: Do not mark s3c2410_plls_add as __init
-> 
-> Pankaj Dubey (1):
->       ARM: EXYNOS: Fix potential NULL pointer access in exynos_sys_powerdown_conf
-> 
->  arch/arm/mach-exynos/pmu.c                   | 6 +++++-
->  arch/arm/mach-s3c24xx/pll-s3c2440-12000000.c | 2 +-
->  arch/arm/mach-s3c24xx/pll-s3c2440-16934400.c | 2 +-
->  drivers/cpufreq/s3c24xx-cpufreq.c            | 2 +-
->  4 files changed, 8 insertions(+), 4 deletions(-)
-> 
+Bayi
+> >
+> > ---
+> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 11 +++++++++++
+> >  1 file changed, 11 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > index 4dd5f93..af08e97 100644
+> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > @@ -387,6 +387,17 @@
+> >                         status = "disabled";
+> >                 };
+> >
+> > +               nor_flash: spi at 1100d000 {
+> > +                       compatible = "mediatek,mt8173-nor";
+> > +                       reg = <0 0x1100d000 0 0xe0>;
+> > +                       clocks = <&pericfg CLK_PERI_SPI>,
+> > +                                <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
+> > +                       clock-names = "spi", "sf";
+> > +                       #address-cells = <1>;
+> > +                       #size-cells = <0>;
+> > +                       status = "disabled";
+> > +               };
+> > +
+> >                 i2c3: i2c at 11010000 {
+> >                         compatible = "mediatek,mt8173-i2c";
+> >                         reg = <0 0x11010000 0 0x70>,
+> > --
+> > 1.8.1.1.dirty
+> >
