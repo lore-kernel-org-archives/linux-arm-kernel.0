@@ -1,41 +1,179 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 7 Dec 2015 20:49:21 +0800
-Subject: [PATCH v2 4/7] usb: xhci: plat: sort the headers in alphabetic order
+Date: Mon, 7 Dec 2015 20:49:23 +0800
+Subject: [PATCH v2 6/7] usb: xhci: plat: add generic PHY support
 In-Reply-To: <1449492564-4803-1-git-send-email-jszhang@marvell.com>
 References: <1449492564-4803-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1449492564-4803-5-git-send-email-jszhang@marvell.com>
+Message-ID: <1449492564-4803-7-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorting the headers in alphabetic order will help to reduce the conflict
-when adding new headers later.
+Marvell BG4CT SoC needs two phy: one for usb2 and another for usb3. Add
+the calls to retrieve generic PHY to xhci plat in order to support this.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- drivers/usb/host/xhci-plat.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/usb/host/xhci-plat.c | 87 ++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 75 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index cd49ae5..d990135 100644
+index 62f02e5..bb972a6 100644
 --- a/drivers/usb/host/xhci-plat.c
 +++ b/drivers/usb/host/xhci-plat.c
-@@ -11,15 +11,15 @@
-  * version 2 as published by the Free Software Foundation.
-  */
- 
-+#include <linux/acpi.h>
- #include <linux/clk.h>
+@@ -16,6 +16,7 @@
  #include <linux/dma-mapping.h>
  #include <linux/module.h>
  #include <linux/of.h>
++#include <linux/phy/phy.h>
  #include <linux/platform_device.h>
--#include <linux/usb/phy.h>
  #include <linux/slab.h>
-+#include <linux/usb/phy.h>
- #include <linux/usb/xhci_pdriver.h>
--#include <linux/acpi.h>
+ #include <linux/usb/phy.h>
+@@ -73,6 +74,37 @@ static int xhci_plat_start(struct usb_hcd *hcd)
+ 	return xhci_run(hcd);
+ }
  
- #include "xhci.h"
- #include "xhci-mvebu.h"
++static int xhci_plat_phy_init(struct usb_hcd *hcd)
++{
++	int ret;
++
++	if (hcd->phy) {
++		ret = phy_init(hcd->phy);
++		if (ret)
++			return ret;
++
++		ret = phy_power_on(hcd->phy);
++		if (ret) {
++			phy_exit(hcd->phy);
++			return ret;
++		}
++	} else {
++		ret = usb_phy_init(hcd->usb_phy);
++	}
++
++	return ret;
++}
++
++static void xhci_plat_phy_exit(struct usb_hcd *hcd)
++{
++	if (hcd->phy) {
++		phy_power_off(hcd->phy);
++		phy_exit(hcd->phy);
++	} else {
++		usb_phy_shutdown(hcd->usb_phy);
++	}
++}
++
+ static int xhci_plat_probe(struct platform_device *pdev)
+ {
+ 	struct device_node	*node = pdev->dev.of_node;
+@@ -83,6 +115,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	struct usb_hcd		*hcd;
+ 	struct clk              *clk;
+ 	struct usb_phy		*usb_phy;
++	struct phy		*phy;
+ 	int			ret;
+ 	int			irq;
+ 
+@@ -163,22 +196,44 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+ 		xhci->shared_hcd->can_do_streams = 1;
+ 
++	hcd->phy = devm_phy_get(&pdev->dev, "usb2-phy");
++	if (IS_ERR(hcd->phy)) {
++		ret = PTR_ERR(hcd->phy);
++		if (ret == -EPROBE_DEFER)
++			goto put_usb3_hcd;
++		hcd->phy = NULL;
++	}
++
++	phy = devm_phy_get(&pdev->dev, "usb-phy");
++	if (IS_ERR(phy)) {
++		ret = PTR_ERR(phy);
++		if (ret == -EPROBE_DEFER)
++			goto put_usb3_hcd;
++		phy = NULL;
++	}
++
+ 	usb_phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
+ 	if (IS_ERR(usb_phy)) {
+ 		ret = PTR_ERR(usb_phy);
+ 		if (ret == -EPROBE_DEFER)
+ 			goto put_usb3_hcd;
+ 		usb_phy = NULL;
+-	} else {
+-		ret = usb_phy_init(usb_phy);
+-		if (ret)
+-			goto put_usb3_hcd;
+ 	}
++
+ 	xhci->shared_hcd->usb_phy = usb_phy;
++	xhci->shared_hcd->phy = phy;
++
++	ret = xhci_plat_phy_init(hcd);
++	if (ret)
++		goto put_usb3_hcd;
++
++	ret = xhci_plat_phy_init(xhci->shared_hcd);
++	if (ret)
++		goto disable_usb2_phy;
+ 
+ 	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+ 	if (ret)
+-		goto disable_usb_phy;
++		goto disable_usb3_phy;
+ 
+ 	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
+ 	if (ret)
+@@ -190,8 +245,11 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ dealloc_usb2_hcd:
+ 	usb_remove_hcd(hcd);
+ 
+-disable_usb_phy:
+-	usb_phy_shutdown(usb_phy);
++disable_usb3_phy:
++	xhci_plat_phy_exit(xhci->shared_hcd);
++
++disable_usb2_phy:
++	xhci_plat_phy_exit(hcd);
+ 
+ put_usb3_hcd:
+ 	usb_put_hcd(xhci->shared_hcd);
+@@ -212,11 +270,11 @@ static int xhci_plat_remove(struct platform_device *dev)
+ 	struct clk *clk = xhci->clk;
+ 
+ 	usb_remove_hcd(xhci->shared_hcd);
+-	usb_phy_shutdown(xhci->shared_hcd->usb_phy);
+-
+-	usb_remove_hcd(hcd);
++	xhci_plat_phy_exit(xhci->shared_hcd);
+ 	usb_put_hcd(xhci->shared_hcd);
+ 
++	usb_remove_hcd(hcd);
++	xhci_plat_phy_exit(hcd);
+ 	clk_disable_unprepare(clk);
+ 	usb_put_hcd(hcd);
+ 
+@@ -242,7 +300,8 @@ static int xhci_plat_suspend(struct device *dev)
+ 	if (ret)
+ 		return ret;
+ 
+-	usb_phy_shutdown(xhci->shared_hcd->usb_phy);
++	xhci_plat_phy_exit(xhci->shared_hcd);
++	xhci_plat_phy_exit(hcd);
+ 	clk_disable_unprepare(xhci->clk);
+ 
+ 	return ret;
+@@ -258,7 +317,11 @@ static int xhci_plat_resume(struct device *dev)
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = usb_phy_init(xhci->shared_hcd->usb_phy);
++	ret = xhci_plat_phy_init(hcd);
++	if (ret)
++		return ret;
++
++	ret = xhci_plat_phy_init(xhci->shared_hcd);
+ 	if (ret)
+ 		return ret;
+ 
 -- 
 2.6.2
