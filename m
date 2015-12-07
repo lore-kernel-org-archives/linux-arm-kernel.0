@@ -1,49 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Dec 2015 21:16:56 +0000
-Subject: [PATCH v2 2/3] soc: dove: add legacy support to PMU driver
-In-Reply-To: <87d1ui9da0.fsf@free-electrons.com>
-References: <E1a5j6Q-000879-GO@rmk-PC.arm.linux.org.uk>
- <87r3iy9er5.fsf@free-electrons.com>
- <87mvtm9ejc.fsf@free-electrons.com>
- <87d1ui9da0.fsf@free-electrons.com>
-Message-ID: <20151207211656.GZ8644@n2100.arm.linux.org.uk>
+From: ben@smart-cactus.org (Ben Gamari)
+Date: Mon, 07 Dec 2015 22:19:05 +0100
+Subject: [PATCH v5 0/12] cpufreq: Add support for Exynos 5800, 5420,
+ and 5422
+In-Reply-To: <20151203103703.GC2097@ubuntu>
+References: <1449091167-20758-1-git-send-email-ben@smart-cactus.org>
+ <20151203060527.GH4302@ubuntu> <877fkv4ylk.fsf@smart-cactus.org>
+ <20151203103703.GC2097@ubuntu>
+Message-ID: <87mvtm9cty.fsf@smart-cactus.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 10:09:27PM +0100, Gregory CLEMENT wrote:
-> Hi Russell,
->  
->  On lun., d?c. 07 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-> 
-> >  On lun., d?c. 07 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-> >
-> >> Hi Russell,
-> >>  
-> >>  On lun., d?c. 07 2015, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
-> >>
-> >>> Add support for legacy non-DT Dove to the PMU driver, so that we can
-> >>> transition the legacy support over.
-> >>>
-> >>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> >>
-> >> Applied on mvebu/soc (and fixed a conflict in drivers/soc/Makefile)
-> >
-> > Eventually I applied it on mvebu/drivers rather than mvebu/soc
-> 
-> Actually I was too optimitic. It doesn't build on mvebu/soc (based on
-> 4.4-rc1).
-> 
-> First pm_genpd_poweroff_unused() had been removed since bb4b72fc63d4 "PM
-> / Domains: Remove pm_genpd_poweroff_unused() API ".
-> 
-> Then, even by removing the call this function to go furthetr I got other
-> errors such as: drivers/soc/dove/pmu.c:344:46: error:
-> ?IRQ_DOVE_PMU_START? undeclared (first use in this function)
+Viresh Kumar <viresh.kumar@linaro.org> writes:
 
-I guess that's with Arnd's patches?  Sigh, okay, it'll have to wait yet
-_another_ kernel cycle then.
+> On 03-12-15, 11:26, Ben Gamari wrote:
+>> Sounds reasonable to me. However, I'd just like to reiterate that this
+>> line of work can be pursued independently from the upstreaming of this
+>> series.
+>
+> I think this is the right time to upstream the right solution. Just
+> try it once, if you face lots of difficulties or issues, then we can
+> ofcourse see..
+>
+It looks like Bartlomiej has picked up this set. Regardless, while
+tracking down various devicetree issues I noticed that the cpu-supply
+and cpu%d-supply bindings appear to be completely undocumented. It
+seem as though this ought to be fixed.
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Cheers,
+
+- Ben
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 472 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151207/cc57cb0a/attachment.sig>
