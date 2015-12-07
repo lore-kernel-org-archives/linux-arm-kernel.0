@@ -1,43 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 07 Dec 2015 15:06:20 +0000
-Subject: [PATCH v5 21/21] KVM: ARM64: Add a new kvm ARM PMU device
-In-Reply-To: <566599C5.4030400@linaro.org>
-References: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
- <1449123091-20252-22-git-send-email-zhaoshenglong@huawei.com>
- <56659029.7040102@arm.com> <566599C5.4030400@linaro.org>
-Message-ID: <5665A06C.7060001@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 7 Dec 2015 16:09:31 +0100
+Subject: [PATCH CFT] ARM: orion: implement ARM delay timer
+In-Reply-To: <20151207150035.GQ8644@n2100.arm.linux.org.uk>
+References: <E1ZoD3b-0006UD-Rp@rmk-PC.arm.linux.org.uk>
+ <20151207101914.GM8644@n2100.arm.linux.org.uk>
+ <20151207140309.GC1118@lunn.ch>
+ <20151207150035.GQ8644@n2100.arm.linux.org.uk>
+Message-ID: <20151207150931.GK1118@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/15 14:37, Shannon Zhao wrote:
+On Mon, Dec 07, 2015 at 03:00:36PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Dec 07, 2015 at 03:03:09PM +0100, Andrew Lunn wrote:
+> > On Mon, Dec 07, 2015 at 10:19:14AM +0000, Russell King - ARM Linux wrote:
+> > > On Mon, Oct 19, 2015 at 05:13:07PM +0100, Russell King wrote:
+> > > > Implement an ARM delay timer to be used for udelay() on orion legacy
+> > > > platforms.  This allows us to skip the delay loop calibration at boot.
+> > > > 
+> > > > It also means that udelay() will be unaffected by CPU frequency changes
+> > > > when cpufreq is enabled on these platforms.
+> > > > 
+> > > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > > ---
+> > > > This needs to be tested beyond build testing...
+> > > 
+> > > So what's happening with this change?  I see no progress on it.
+> > 
+> > I said on IRC you had now tested it. Please send a Tested-by:
 > 
+> Sorry, I've totally lost track, I'd forgotten that it gets used on Dove.
 > 
-> On 2015/12/7 21:56, Marc Zyngier wrote:
->>> +static int kvm_arm_pmu_set_attr(struct kvm_device *dev,
->>>> +				struct kvm_device_attr *attr)
->>>> +{
->>>> +	switch (attr->group) {
->>>> +	case KVM_DEV_ARM_PMU_GRP_IRQ: {
->>>> +		int __user *uaddr = (int __user *)(long)attr->addr;
->>>> +		int reg;
->>>> +
->>>> +		if (get_user(reg, uaddr))
->>>> +			return -EFAULT;
->>>> +
->>>> +		if (reg < VGIC_NR_SGIS || reg >= VGIC_NR_PRIVATE_IRQS)
->>>> +			return -EINVAL;
->>>> +
->>>> +		return kvm_arm_pmu_set_irq(dev->kvm, reg);
->> What prevents the IRQ to be changed while the VM is already running?
->> This should probably be a one-shot thing (change it once, be denied
->> other changes).
-> 
-> So add a helper like vgic_initialized to check whether vPMU is initialized?
+> Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Something like that, yes.
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	  Andrew
