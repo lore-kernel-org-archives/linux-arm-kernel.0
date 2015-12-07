@@ -1,111 +1,175 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 07 Dec 2015 14:11:11 +0000
-Subject: [PATCH v5 00/21] KVM: ARM64: Add guest PMU support
-In-Reply-To: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <5665937F.90507@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 7 Dec 2015 08:12:21 -0600
+Subject: [PATCH net-next 2/2] net: hns: enet specisies a reference to
+ dsaf (config and documents)
+In-Reply-To: <1449302356-54658-3-git-send-email-yankejian@huawei.com>
+References: <1449302356-54658-1-git-send-email-yankejian@huawei.com>
+ <1449302356-54658-3-git-send-email-yankejian@huawei.com>
+Message-ID: <20151207141221.GA18040@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shannon,
+On Sat, Dec 05, 2015 at 03:59:16PM +0800, yankejian wrote:
+> when enet specisies a reference to dsaf, the correlative config and
 
-On 03/12/15 06:11, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> This patchset adds guest PMU support for KVM on ARM64. It takes
-> trap-and-emulate approach. When guest wants to monitor one event, it
-> will be trapped by KVM and KVM will call perf_event API to create a perf
-> event and call relevant perf_event APIs to get the count value of event.
-> 
-> Use perf to test this patchset in guest. When using "perf list", it
-> shows the list of the hardware events and hardware cache events perf
-> supports. Then use "perf stat -e EVENT" to monitor some event. For
-> example, use "perf stat -e cycles" to count cpu cycles and
-> "perf stat -e cache-misses" to count cache misses.
-> 
-> Below are the outputs of "perf stat -r 5 sleep 5" when running in host
-> and guest.
-> 
-> Host:
->  Performance counter stats for 'sleep 5' (5 runs):
-> 
->           0.510276      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.57% )
->                  1      context-switches          #    0.002 M/sec
->                  0      cpu-migrations            #    0.000 K/sec
->                 49      page-faults               #    0.096 M/sec                    ( +-  0.77% )
->            1064117      cycles                    #    2.085 GHz                      ( +-  1.56% )
->    <not supported>      stalled-cycles-frontend
->    <not supported>      stalled-cycles-backend
->             529051      instructions              #    0.50  insns per cycle          ( +-  0.55% )
->    <not supported>      branches
->               9894      branch-misses             #   19.390 M/sec                    ( +-  1.70% )
-> 
->        5.000853900 seconds time elapsed                                          ( +-  0.00% )
-> 
-> Guest:
->  Performance counter stats for 'sleep 5' (5 runs):
-> 
->           0.642456      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.81% )
->                  1      context-switches          #    0.002 M/sec
->                  0      cpu-migrations            #    0.000 K/sec
->                 49      page-faults               #    0.076 M/sec                    ( +-  1.64% )
->            1322717      cycles                    #    2.059 GHz                      ( +-  1.88% )
->    <not supported>      stalled-cycles-frontend
->    <not supported>      stalled-cycles-backend
->             640944      instructions              #    0.48  insns per cycle          ( +-  1.10% )
->    <not supported>      branches
->              10665      branch-misses             #   16.600 M/sec                    ( +-  2.23% )
-> 
->        5.001181452 seconds time elapsed                                          ( +-  0.00% )
-> 
-> Have a cycle counter read test like below in guest and host:
-> 
-> static void test(void)
-> {
-> 	unsigned long count, count1, count2;
-> 	count1 = read_cycles();
-> 	count++;
-> 	count2 = read_cycles();
-> }
-> 
-> Host:
-> count1: 3046186213
-> count2: 3046186347
-> delta: 134
-> 
-> Guest:
-> count1: 5645797121
-> count2: 5645797270
-> delta: 149
-> 
-> The gap between guest and host is very small. One reason for this I
-> think is that it doesn't count the cycles in EL2 and host since we add
-> exclude_hv = 1. So the cycles spent to store/restore registers which
-> happens at EL2 are not included.
-> 
-> This patchset can be fetched from [1] and the relevant QEMU version for
-> test can be fetched from [2].
-> 
-> The results of 'perf test' can be found from [3][4].
-> The results of perf_event_tests test suite can be found from [5][6].
-> 
-> Also, I have tested "perf top" in two VMs and host at the same time. It
-> works well.
+s/when/When/
 
-I've commented on more issues I've found. Hopefully you'll be able to
-respin this quickly enough, and end-up with a simpler code base (state
-duplication is a bit messy).
+> documents needs to update. this patch updates the correlative dtsi file
 
-Another thing I have noticed is that you have dropped the vgic changes
-that were configuring the interrupt. It feels like they should be
-included, and configure the PPI as a LEVEL interrupt. Also, looking at
-your QEMU code, you seem to configure the interrupt as EDGE, which is
-now how yor emulated HW behaves.
+s/this/This/
 
-Looking forward to reviewing the next version.
+> and bindings documents .
+                        ^
+extra space
 
-Thanks,
+This change breaks compatibility with old dtbs. IIRC, this is all new, 
+so maybe it doesn't matter, but you should be explicit that you are 
+doing that.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+
+> 
+> Signed-off-by: yankejian <yankejian@huawei.com>
+> ---
+>  .../devicetree/bindings/net/hisilicon-hns-dsaf.txt    |  5 +----
+>  .../devicetree/bindings/net/hisilicon-hns-nic.txt     |  7 ++++---
+>  arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi          | 19 +++++++++----------
+>  3 files changed, 14 insertions(+), 17 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
+> index 80411b2..ecacfa4 100644
+> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
+> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
+> @@ -4,8 +4,6 @@ Required properties:
+>  - compatible: should be "hisilicon,hns-dsaf-v1" or "hisilicon,hns-dsaf-v2".
+>    "hisilicon,hns-dsaf-v1" is for hip05.
+>    "hisilicon,hns-dsaf-v2" is for Hi1610 and Hi1612.
+> -- dsa-name: dsa fabric name who provide this interface.
+> -  should be "dsafX", X is the dsaf id.
+>  - mode: dsa fabric mode string. only support one of dsaf modes like these:
+>  		"2port-64vf",
+>  		"6port-16rss",
+> @@ -26,9 +24,8 @@ Required properties:
+>  
+>  Example:
+>  
+> -dsa: dsa at c7000000 {
+> +dsaf0: dsa at c7000000 {
+>  	compatible = "hisilicon,hns-dsaf-v1";
+> -	dsa_name = "dsaf0";
+>  	mode = "6port-16rss";
+>  	interrupt-parent = <&mbigen_dsa>;
+>  	reg = <0x0 0xC0000000 0x0 0x420000
+> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
+> index 41d19be..e6a9d1c 100644
+> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
+> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
+> @@ -4,8 +4,9 @@ Required properties:
+>  - compatible: "hisilicon,hns-nic-v1" or "hisilicon,hns-nic-v2".
+>    "hisilicon,hns-nic-v1" is for hip05.
+>    "hisilicon,hns-nic-v2" is for Hi1610 and Hi1612.
+> -- ae-name: accelerator name who provides this interface,
+> -  is simply a name referring to the name of name in the accelerator node.
+> +- ae-handle: accelerator engine handle for hns,
+> +  specifies a reference to the associating hardware driver node.
+> +  see Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
+>  - port-id: is the index of port provided by DSAF (the accelerator). DSAF can
+>    connect to 8 PHYs. Port 0 to 1 are both used for adminstration purpose. They
+>    are called debug ports.
+> @@ -41,7 +42,7 @@ Example:
+>  
+>  	ethernet at 0{
+>  		compatible = "hisilicon,hns-nic-v1";
+> -		ae-name = "dsaf0";
+> +		ae-handle = <&dsaf0>;
+>  		port-id = <0>;
+>  		local-mac-address = [a2 14 e4 4b 56 76];
+>  	};
+> diff --git a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi b/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
+> index 606dd5a..89c883e 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
+> @@ -23,9 +23,8 @@ soc0: soc at 000000000 {
+>  		};
+>  	};
+>  
+> -	dsa: dsa at c7000000 {
+> +	dsaf0: dsa at c7000000 {
+>  		compatible = "hisilicon,hns-dsaf-v1";
+> -		dsa_name = "dsaf0";
+>  		mode = "6port-16rss";
+>  		interrupt-parent = <&mbigen_dsa>;
+>  
+> @@ -127,7 +126,7 @@ soc0: soc at 000000000 {
+>  
+>  	eth0: ethernet at 0{
+>  		compatible = "hisilicon,hns-nic-v1";
+> -		ae-name = "dsaf0";
+> +		ae-handle = <&dsaf0>;
+>  		port-id = <0>;
+>  		local-mac-address = [00 00 00 01 00 58];
+>  		status = "disabled";
+> @@ -135,14 +134,14 @@ soc0: soc at 000000000 {
+>  	};
+>  	eth1: ethernet at 1{
+>  		compatible = "hisilicon,hns-nic-v1";
+> -		ae-name = "dsaf0";
+> +		ae-handle = <&dsaf0>;
+>  		port-id = <1>;
+>  		status = "disabled";
+>  		dma-coherent;
+>  	};
+>  	eth2: ethernet at 2{
+>  		compatible = "hisilicon,hns-nic-v1";
+> -		ae-name = "dsaf0";
+> +		ae-handle = <&dsaf0>;
+>  		port-id = <2>;
+>  		local-mac-address = [00 00 00 01 00 5a];
+>  		status = "disabled";
+> @@ -150,7 +149,7 @@ soc0: soc at 000000000 {
+>  	};
+>  	eth3: ethernet at 3{
+>  		compatible = "hisilicon,hns-nic-v1";
+> -		ae-name = "dsaf0";
+> +		ae-handle = <&dsaf0>;
+>  		port-id = <3>;
+>  		local-mac-address = [00 00 00 01 00 5b];
+>  		status = "disabled";
+> @@ -158,7 +157,7 @@ soc0: soc at 000000000 {
+>  	};
+>  	eth4: ethernet at 4{
+>  		compatible = "hisilicon,hns-nic-v1";
+> -		ae-name = "dsaf0";
+> +		ae-handle = <&dsaf0>;
+>  		port-id = <4>;
+>  		local-mac-address = [00 00 00 01 00 5c];
+>  		status = "disabled";
+> @@ -166,7 +165,7 @@ soc0: soc at 000000000 {
+>  	};
+>  	eth5: ethernet at 5{
+>  		compatible = "hisilicon,hns-nic-v1";
+> -		ae-name = "dsaf0";
+> +		ae-handle = <&dsaf0>;
+>  		port-id = <5>;
+>  		local-mac-address = [00 00 00 01 00 5d];
+>  		status = "disabled";
+> @@ -174,7 +173,7 @@ soc0: soc at 000000000 {
+>  	};
+>  	eth6: ethernet at 6{
+>  		compatible = "hisilicon,hns-nic-v1";
+> -		ae-name = "dsaf0";
+> +		ae-handle = <&dsaf0>;
+>  		port-id = <6>;
+>  		local-mac-address = [00 00 00 01 00 5e];
+>  		status = "disabled";
+> @@ -182,7 +181,7 @@ soc0: soc at 000000000 {
+>  	};
+>  	eth7: ethernet at 7{
+>  		compatible = "hisilicon,hns-nic-v1";
+> -		ae-name = "dsaf0";
+> +		ae-handle = <&dsaf0>;
+>  		port-id = <7>;
+>  		local-mac-address = [00 00 00 01 00 5f];
+>  		status = "disabled";
+> -- 
+> 1.9.1
+> 
