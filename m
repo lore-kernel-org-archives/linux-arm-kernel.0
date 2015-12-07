@@ -1,86 +1,54 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 7 Dec 2015 14:45:46 -0600
-Subject: [PATCH v9 3/8] ARM: dt: Binding documentation for imx25
- touchscreen controller
-In-Reply-To: <1449431542-1892-4-git-send-email-mpa@pengutronix.de>
-References: <1449431542-1892-1-git-send-email-mpa@pengutronix.de>
- <1449431542-1892-4-git-send-email-mpa@pengutronix.de>
-Message-ID: <20151207204546.GA30936@rob-hp-laptop>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 07 Dec 2015 21:48:29 +0100
+Subject: [PATCH v2 2/3] soc: dove: add legacy support to PMU driver
+In-Reply-To: <20151207204413.GY8644@n2100.arm.linux.org.uk> (Russell King's
+ message of "Mon, 7 Dec 2015 20:44:13 +0000")
+References: <E1a5j6Q-000879-GO@rmk-PC.arm.linux.org.uk>
+ <87r3iy9er5.fsf@free-electrons.com>
+ <87mvtm9ejc.fsf@free-electrons.com>
+ <20151207204413.GY8644@n2100.arm.linux.org.uk>
+Message-ID: <87io4a9e8y.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 06, 2015 at 08:52:16PM +0100, Markus Pargmann wrote:
-> This is the touchscreen conversion queue binding documentation. It uses
-> the shared imx25 ADC.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
-> 
-> Notes:
->     Changes in v9:
->      - Updated binding descriptions
->     
->     Changes in v5:
->      - Fix signed/unsigned comparison
->      - Fix unused variable settling_time by putting it in the correct argument list
->      - Use continous conversion queue with the repeat feature and a proper
->        repeat-wait. Previously the touchscreen caused massive number of interrupts.
-> 
->  .../bindings/input/touchscreen/fsl-mx25-tcq.txt    | 35 ++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt b/Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
-> new file mode 100644
-> index 000000000000..d45e50872114
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
-> @@ -0,0 +1,35 @@
-> +Freescale mx25 TS conversion queue module
-> +
-> +mx25 touchscreen conversion queue module which controls the ADC unit of the
-> +mx25 for attached touchscreens.
-> +
-> +Required properties:
-> + - compatible: Should be "fsl,imx25-tcq".
-> + - reg: Memory range of the device.
-> + - interrupts: Should be the interrupt number associated with this module within
-> +   the tscadc unit (<0>).
-> + - interrupt-parent: Should be a phandle to the tscadc unit.
-> + - fsl,wires: Should be '<4>' or '<5>'
-> +
-> +Optional properties:
-> + - fsl,pen-debounce: Pen debounce time in nanoseconds.
+Hi Russell King,
+ 
+ On lun., d?c. 07 2015, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-This and ...
+> On Mon, Dec 07, 2015 at 09:42:15PM +0100, Gregory CLEMENT wrote:
+>>  On lun., d?c. 07 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+>> 
+>> > Hi Russell,
+>> >  
+>> >  On lun., d?c. 07 2015, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+>> >
+>> >> Add support for legacy non-DT Dove to the PMU driver, so that we can
+>> >> transition the legacy support over.
+>> >>
+>> >> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> >
+>> > Applied on mvebu/soc (and fixed a conflict in drivers/soc/Makefile)
+>> 
+>> Eventually I applied it on mvebu/drivers rather than mvebu/soc
+>
+> Patches 2 and 3 should be applied one after each other to the very
+> same branch.  Having patch 3 independent means that things will
+> probably break.
 
-> + - fsl,pen-threshold: Pen-down threshold for the touchscreen. This is a value
-> +   between 1 and 4096. It is the ratio between the internal reference voltage
-> +   and the measured voltage after the plate was precharged. Resistence between
-> +   plates and therefore the voltage decreases with pressure so that a smaller
-> +   value is equivalent to a higher pressure.
-> + - fsl,settling-time: Settling time in nanoseconds. The settling time is before
-> +   the actual touch detection to wait for an even charge distribution in the
-> +   plate.
+Indeed it makes sens, so I put it back on mvebu/soc.
 
-... this still need units (-ns) appended to the property name.
+Thanks,
 
-> +
-> +This device includes two conversion queues which can be added as subnodes.
-> +The first queue is for the touchscreen, the second for general purpose ADC.
-> +
-> +Example:
-> +	tsc: tcq at 50030400 {
-> +		compatible = "fsl,imx25-tcq";
-> +		reg = <0x50030400 0x60>;
-> +		interrupt-parent = <&tscadc>;
-> +		interrupts = <0>;
-> +		fsl,wires = <4>;
-> +	};
+Gregory
+
+>
 > -- 
-> 2.6.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
