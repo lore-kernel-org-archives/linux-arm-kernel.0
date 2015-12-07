@@ -1,83 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 7 Dec 2015 16:47:15 +0000
-Subject: [PATCH] drivers: dma-coherent: use ioremap_wc() for DMA_MEMORY_MAP
-In-Reply-To: <CAPcyv4iUHoQ2DRP-K-BA33mjdHwUxY2JX5M1-dP+bN-Rr6ewyQ@mail.gmail.com>
-References: <1448029226-4914-1-git-send-email-brian.starkey@arm.com>
- <20151204105000.GD10123@e104818-lin.cambridge.arm.com>
- <CAPcyv4gti=49v4gUVjf=4nhxBCPPM3xmq6MQ2sBoBnKQbCS5MQ@mail.gmail.com>
- <20151204171554.GO10123@e104818-lin.cambridge.arm.com>
- <20151207132823.GC13179@e106950-lin.cambridge.arm.com>
- <CAPcyv4iUHoQ2DRP-K-BA33mjdHwUxY2JX5M1-dP+bN-Rr6ewyQ@mail.gmail.com>
-Message-ID: <20151207164714.GH7083@e104818-lin.cambridge.arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 07 Dec 2015 17:48:22 +0100
+Subject: [GIT PULL] ARM: mvebu: cleanup for v4.5 (#1)
+Message-ID: <87r3iycii1.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 08:19:27AM -0800, Dan Williams wrote:
-> On Mon, Dec 7, 2015 at 5:28 AM, Brian Starkey <brian.starkey@arm.com> wrote:
-> > On Fri, Dec 04, 2015 at 05:15:54PM +0000, Catalin Marinas wrote:
-> >>
-> >> On Fri, Dec 04, 2015 at 08:59:10AM -0800, Dan Williams wrote:
-> >>>
-> >>> On Fri, Dec 4, 2015 at 2:50 AM, Catalin Marinas <catalin.marinas@arm.com>
-> >>> wrote:
-> >>> > On Fri, Nov 20, 2015 at 02:20:26PM +0000, Brian Starkey wrote:
-> >>> >> When the DMA_MEMORY_MAP flag is used, memory which can be accessed
-> >>> >> directly should be returned, so use ioremap_wc() instead of ioremap().
-> >>> >> Also, ensure that the correct memset operation is used in
-> >>> >> dma_alloc_from_coherent() with respect to the region's flags.
-> >>> >>
-> >>> >> This fixes the below alignment fault on arm64, caused by invalid use
-> >>> >> of memset() on Device memory.
-> >>> >
-> >>> > This is indeed affecting both arm32 and arm64 systems.
-> >>> >
-> >>> >> diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
-> >>> >> index 55b8398..45358d0 100644
-> >>> >> --- a/drivers/base/dma-coherent.c
-> >>> >> +++ b/drivers/base/dma-coherent.c
-> >>> >> @@ -31,7 +31,10 @@ static int dma_init_coherent_memory(phys_addr_t
-> >>> >> phys_addr, dma_addr_t device_add
-> >>> >>       if (!size)
-> >>> >>               goto out;
-> >>> >>
-> >>> >> -     mem_base = ioremap(phys_addr, size);
-> >>> >> +     if (flags & DMA_MEMORY_MAP)
-> >>> >> +             mem_base = ioremap_wc(phys_addr, size);
-> >>> >> +     else
-> >>> >> +             mem_base = ioremap(phys_addr, size);
-> >>> >
-> >>> > I wonder whether a memremap() approach for the DMA_MEMORY_MAP case
-> >>> > would
-> >>> > be better. This API was added recently by commit 92281dee825f ("arch:
-> >>> > introduce memremap()"). It only supports write-back and write-through
-> >>> > but we could add a MEMREMAP_WC flag for this case.
-> >>>
-> >>> I originally included both MEMREMAP_WC and MEMREAMP_UC as potential
-> >>> flags to this api, but ultimately decided against it.  The memremap()
-> >>> api is meant for memory that is known to have no i/o side effects.  As
-> >>> far as I can see WC and UC usages are a muddy mix of "sometimes
-> >>> there's I/O side effects, but it depends by arch and driver".  In
-> >>> other words we can't drop the "__iomem" annotation from WC and UC
-> >>> mappings by default.
-> >
-> >
-> > The DMA_MEMORY_MAP flag is pretty much a statement of "no side-
-> > effects", so as Catalin says it would fit OK here. That said, if it's
-> > not possible to deprecate ioremap_wc() in the same way as
-> > ioremap_cache() then I wonder if there's even much benefit in adding
-> > it to memremap().
-> 
-> I don't see a problem adding a _WC option to memremap.
-> 
-> The only difference is that it can't replace ioremap_wc.  I.e. unlike
-> _WB, and _WT case where ioremap_cache and ioremap_wt are now
-> deprecated we'd have ioremap_wc continuing to live alongside
-> memremap(..., MEMREMAP_WC).
+Hi,
 
-I think that's fine. The difference is that memory returned by
-ioremap_wc() should (in theory) only be accessed with I/O accessors
-while the range returned by memremap(MEMREMAP_WC) will be directly
-accessible.
+Here is the first pull request for cleanup for mvebu for v4.5.
+(This is part of a first PR series of commit already in linux-next
+since a few weeks, if everything goes well, I planned a second PR at
+the end of the week)
+
+Gregory
+
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-cleanup-4.5-1
+
+for you to fetch changes up to 843cd366555ba7c676aa9ec3e468fa4602a8acba:
+
+  ARM: mvebu: remove unused mach/gpio.h (2015-12-01 13:48:44 +0100)
+
+----------------------------------------------------------------
+mvebu cleanup for 4.5 (part 1)
+
+remove unused mach/gpio.h in mach-mvebu
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      ARM: mvebu: remove unused mach/gpio.h
+
+ arch/arm/mach-mvebu/include/mach/gpio.h | 1 -
+ 1 file changed, 1 deletion(-)
+ delete mode 100644 arch/arm/mach-mvebu/include/mach/gpio.h
 
 -- 
-Catalin
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
