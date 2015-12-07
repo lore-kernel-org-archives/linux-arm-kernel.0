@@ -1,138 +1,83 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 7 Dec 2015 14:54:58 +0000
-Subject: [PATCH RFC 21/27] drivers: cpu-pd: Parse topology to setup CPU
- PM domains
-In-Reply-To: <1447799871-56374-22-git-send-email-lina.iyer@linaro.org>
-References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
- <1447799871-56374-22-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20151207145458.GA20538@red-moon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 07 Dec 2015 14:55:20 +0000
+Subject: [PATCH v5 03/21] KVM: ARM64: Add offset defines for PMU registers
+In-Reply-To: <5665984F.30102@linaro.org>
+References: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
+ <1449123091-20252-4-git-send-email-zhaoshenglong@huawei.com>
+ <56659276.6060403@arm.com> <5665984F.30102@linaro.org>
+Message-ID: <56659DD8.6050109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lina,
-
-On Tue, Nov 17, 2015 at 03:37:45PM -0700, Lina Iyer wrote:
-> Architectures that support CPU domain control in the firmware specify
-> the domain heirarchy as part of the topology nodes. Parse and initialize
-> domains from the topology node for such architectures.
+On 07/12/15 14:31, Shannon Zhao wrote:
 > 
-> Cc: Rob Herring <robherring2@gmail.com>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> ---
->  drivers/base/power/cpu-pd.c | 76 +++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/cpu-pd.h      |  1 +
->  2 files changed, 77 insertions(+)
 > 
-> diff --git a/drivers/base/power/cpu-pd.c b/drivers/base/power/cpu-pd.c
-> index e331ae6..2872c18 100644
-> --- a/drivers/base/power/cpu-pd.c
-> +++ b/drivers/base/power/cpu-pd.c
-> @@ -429,3 +429,79 @@ int of_attach_cpu_pm_domain(struct device_node *dn)
->  	return 0;
->  }
->  EXPORT_SYMBOL(of_attach_cpu_pm_domain);
-> +
-> +static int of_parse_cpu_pd(struct device_node *cluster,
-> +		const struct cpu_pd_ops *ops)
-> +{
-> +	struct device_node *domain_node;
-> +	struct generic_pm_domain *genpd;
-> +	char name[10];
-> +	struct device_node *c;
-> +	int i, ret;
-> +
-> +	for (i = 0; ; i++) {
-> +		snprintf(name, sizeof(name), "cluster%d", i);
-> +		c = of_get_child_by_name(cluster, name);
-> +		if (!c)
-> +			break;
-> +
-> +		domain_node = of_parse_phandle(c, "cluster", 0);
-> +		if (!domain_node)
-> +			return -1;
-> +
-> +		/* Initialize CPU PM domain domain at this level */
-> +		genpd = of_init_cpu_pm_domain(domain_node, ops);
-> +		if (IS_ERR(genpd))
-> +			return -1;
-> +
-> +		/* Initialize and attach child domains */
-> +		ret = of_parse_cpu_pd(c, ops);
-> +
-> +		/*
-> +		 * Attach the domain to its parent after reading
-> +		 * the children, so the mask of CPUs in this domain
-> +		 * are setup correctly.
-> +		 */
-> +		if (!ret)
-> +			of_attach_cpu_pm_domain(domain_node);
-> +
-> +		of_node_put(c);
-> +		if (ret != 0)
-> +			return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +/**
-> + * of_setup_cpu_domain_topology() - Setup the CPU domains from the CPU
-> + * topology node in DT.
-> + *
-> + * @ops: The PM domain suspend/resume ops for all the domains in the topology
-> + */
-> +int of_setup_cpu_domain_topology(const struct cpu_pd_ops *ops)
-> +{
-> +	struct device_node *cn, *map;
-> +	int ret = 0;
-> +
-> +	cn = of_find_node_by_path("/cpus");
-> +	if (!cn) {
-> +		pr_err("No CPU information found in DT\n");
-> +		return 0;
-> +	}
-> +
-> +	map = of_get_child_by_name(cn, "cpu-map");
-> +	if (!map)
-> +		goto out;
+> On 2015/12/7 22:06, Marc Zyngier wrote:
+>> On 03/12/15 06:11, Shannon Zhao wrote:
+>>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>>
+>>> We are about to trap and emulate acccesses to each PMU register
+>>
+>> s/acccesses/accesses/
+>>
+>>> individually. This adds the context offsets for the AArch64 PMU
+>>> registers and their AArch32 counterparts.
+>>>
+>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>>> ---
+>>>   arch/arm64/include/asm/kvm_asm.h | 55 ++++++++++++++++++++++++++++++++++++----
+>>>   1 file changed, 50 insertions(+), 5 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+>>> index 5e37710..4f804c1 100644
+>>> --- a/arch/arm64/include/asm/kvm_asm.h
+>>> +++ b/arch/arm64/include/asm/kvm_asm.h
+>>> @@ -48,12 +48,34 @@
+>>>   #define MDSCR_EL1	22	/* Monitor Debug System Control Register */
+>>>   #define MDCCINT_EL1	23	/* Monitor Debug Comms Channel Interrupt Enable Reg */
+>>>
+>>
+>> Coming back to this patch, it gives a clear view of where you have state
+>> duplication.
+>>
+>>> +/* Performance Monitors Registers */
+>>> +#define PMCR_EL0	24	/* Control Register */
+>>> +#define PMOVSSET_EL0	25	/* Overflow Flag Status Set Register */
+>>> +#define PMOVSCLR_EL0	26	/* Overflow Flag Status Clear Register */
+>>
+>> This should only be a single state. You don't even have to represent it
+>> in the sysreg array, to be honest.
+>>
+> Yeah, I could store the state in one of them and drop one of them here.
 
-I commented on this before, is this reliance on cpu-map necessary ?
-Could not you just rely on the "power-domains" phandle in the cpu
-nodes to build the cpumask for a specific power domain ? I think
-you should try to decouple the concept of power domain from the cpu-map
-cluster and I think this would also simplify your code in the process.
+Indeed.
 
-So to sum it up, I'd suggest you build the power domain cpumask by
-enumerating the cpus pointing at a specific power-domain node.
+>>> +#define PMSELR_EL0	27	/* Event Counter Selection Register */
+>>> +#define PMCEID0_EL0	28	/* Common Event Identification Register 0 */
+>>> +#define PMCEID1_EL0	29	/* Common Event Identification Register 1 */
+>>> +#define PMEVCNTR0_EL0	30	/* Event Counter Register (0-30) */
+>>> +#define PMEVCNTR30_EL0	60
+>>> +#define PMCCNTR_EL0	61	/* Cycle Counter Register */
+>>> +#define PMEVTYPER0_EL0	62	/* Event Type Register (0-30) */
+>>> +#define PMEVTYPER30_EL0	92
+>>> +#define PMCCFILTR_EL0	93	/* Cycle Count Filter Register */
+>>> +#define PMXEVCNTR_EL0	94	/* Selected Event Count Register */
+>>> +#define PMXEVTYPER_EL0	95	/* Selected Event Type Register */
+>>
+>> These "select" registers aren't real ones, but just a way to pick the
+>> real register. They should be removed.
+>>
+> I think these two could be retained, since it's convenient to handle the 
+> guest accessing by using "case PMXEVCNTR_EL0"
 
-Lorenzo
+Not really. This is just occupying pointless space is the register file,
+and it would be clearer to have a couple of helpers called directly from
+the sys_reg trap table.
 
-> +
-> +	ret = of_parse_cpu_pd(map, ops);
-> +	if (ret != 0)
-> +		goto out_map;
-> +
-> +out_map:
-> +	of_node_put(map);
-> +out:
-> +	of_node_put(cn);
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL(of_setup_cpu_domain_topology);
-> diff --git a/include/linux/cpu-pd.h b/include/linux/cpu-pd.h
-> index 489ee2f..e8290db 100644
-> --- a/include/linux/cpu-pd.h
-> +++ b/include/linux/cpu-pd.h
-> @@ -32,4 +32,5 @@ struct cpu_pm_domain {
->  struct generic_pm_domain *of_init_cpu_pm_domain(struct device_node *dn,
->  		const struct cpu_pd_ops *ops);
->  int of_attach_cpu_pm_domain(struct device_node *dn);
-> +int of_setup_cpu_domain_topology(const struct cpu_pd_ops *ops);
->  #endif /* __CPU_PD_H__ */
-> -- 
-> 2.1.4
-> 
+Please get rid of it.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
