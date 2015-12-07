@@ -1,76 +1,83 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Dec 2015 10:19:14 +0000
-Subject: [PATCH CFT] ARM: orion: implement ARM delay timer
-In-Reply-To: <E1ZoD3b-0006UD-Rp@rmk-PC.arm.linux.org.uk>
-References: <E1ZoD3b-0006UD-Rp@rmk-PC.arm.linux.org.uk>
-Message-ID: <20151207101914.GM8644@n2100.arm.linux.org.uk>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 7 Dec 2015 10:26:16 +0000
+Subject: [PATCH v5 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
+In-Reply-To: <1449000658-11475-4-git-send-email-dcashman@android.com>
+References: <1449000658-11475-1-git-send-email-dcashman@android.com>
+ <1449000658-11475-2-git-send-email-dcashman@android.com>
+ <1449000658-11475-3-git-send-email-dcashman@android.com>
+ <1449000658-11475-4-git-send-email-dcashman@android.com>
+Message-ID: <56655EC8.6030905@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 05:13:07PM +0100, Russell King wrote:
-> Implement an ARM delay timer to be used for udelay() on orion legacy
-> platforms.  This allows us to skip the delay loop calibration at boot.
+
+On 01/12/15 20:10, Daniel Cashman wrote:
+> From: dcashman <dcashman@google.com>
 > 
-> It also means that udelay() will be unaffected by CPU frequency changes
-> when cpufreq is enabled on these platforms.
+> arm64: arch_mmap_rnd() uses STACK_RND_MASK to generate the
+> random offset for the mmap base address.  This value represents a
+> compromise between increased ASLR effectiveness and avoiding
+> address-space fragmentation. Replace it with a Kconfig option, which
+> is sensibly bounded, so that platform developers may choose where to
+> place this compromise. Keep default values as new minimums.
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Daniel Cashman <dcashman@android.com>
 > ---
-> This needs to be tested beyond build testing...
+>  arch/arm64/Kconfig   | 31 +++++++++++++++++++++++++++++++
+>  arch/arm64/mm/mmap.c |  8 ++++++--
+>  2 files changed, 37 insertions(+), 2 deletions(-)
 
-So what's happening with this change?  I see no progress on it.
+[snip]
 
-> 
->  arch/arm/plat-orion/time.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm/plat-orion/time.c b/arch/arm/plat-orion/time.c
-> index 8085a8aac812..ffb93db68e9c 100644
-> --- a/arch/arm/plat-orion/time.c
-> +++ b/arch/arm/plat-orion/time.c
-> @@ -18,6 +18,7 @@
->  #include <linux/irq.h>
->  #include <linux/sched_clock.h>
->  #include <plat/time.h>
-> +#include <asm/delay.h>
+> diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
+> index ed17747..af461b9 100644
+> --- a/arch/arm64/mm/mmap.c
+> +++ b/arch/arm64/mm/mmap.c
+> @@ -51,8 +51,12 @@ unsigned long arch_mmap_rnd(void)
+>  {
+>  	unsigned long rnd;
 >  
->  /*
->   * MBus bridge block registers.
-> @@ -188,6 +189,15 @@ orion_time_set_base(void __iomem *_timer_base)
->  	timer_base = _timer_base;
+> -	rnd = (unsigned long)get_random_int() & STACK_RND_MASK;
+> -
+> +ifdef CONFIG_COMPAT
+> +	if (test_thread_flag(TIF_32BIT))
+> +		rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_compat_bits);
+> +	else
+> +#endif
+> +		rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_bits);
+>  	return rnd << PAGE_SHIFT;
 >  }
->  
-> +static unsigned long orion_delay_timer_read(void)
-> +{
-> +	return ~readl(timer_base + TIMER0_VAL_OFF);
-> +}
-> +
-> +static struct delay_timer orion_delay_timer = {
-> +	.read_current_timer = orion_delay_timer_read,
-> +};
-> +
->  void __init
->  orion_time_init(void __iomem *_bridge_base, u32 _bridge_timer1_clr_mask,
->  		unsigned int irq, unsigned int tclk)
-> @@ -202,6 +212,9 @@ orion_time_init(void __iomem *_bridge_base, u32 _bridge_timer1_clr_mask,
->  
->  	ticks_per_jiffy = (tclk + HZ/2) / HZ;
->  
-> +	orion_delay_timer.freq = tclk;
-> +	register_current_timer_delay(&orion_delay_timer);
-> +
->  	/*
->  	 * Set scale and timer for sched_clock.
->  	 */
-> -- 
-> 2.1.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+The above is causing a build failure on -next today.
+
+commit 42a6c8953112a9856dd09148c3d6a2cc106b6003
+Author: Jon Hunter <jonathanh@nvidia.com>
+Date:   Mon Dec 7 10:15:47 2015 +0000
+
+    ARM64: mm: Fix build failure caused by invalid ifdef statement
+    
+    Commit 2e4614190421 ("arm64-mm-support-arch_mmap_rnd_bits-v4") caused the
+    following build failure due to a missing "#". Fix this.
+    
+    arch/arm64/mm/mmap.c: In function ?arch_mmap_rnd?:
+    arch/arm64/mm/mmap.c:54:1: error: ?ifdef? undeclared (first use in this function)
+     ifdef CONFIG_COMPAT
+      ^
+    Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+
+diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
+index af461b935137..e59a75a308bc 100644
+--- a/arch/arm64/mm/mmap.c
++++ b/arch/arm64/mm/mmap.c
+@@ -51,7 +51,7 @@ unsigned long arch_mmap_rnd(void)
+ {
+        unsigned long rnd;
+ 
+-ifdef CONFIG_COMPAT
++#ifdef CONFIG_COMPAT
+        if (test_thread_flag(TIF_32BIT))
+                rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_compat_bits);
+        else
+
+Cheers
+Jon
