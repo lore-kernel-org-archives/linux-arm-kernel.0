@@ -1,123 +1,119 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  7 Dec 2015 10:53:30 +0000
-Subject: [PATCH v3 14/22] arm64: KVM: Implement TLB handling
+Date: Mon,  7 Dec 2015 10:53:33 +0000
+Subject: [PATCH v3 17/22] arm64: KVM: Add compatibility aliases
 In-Reply-To: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
 References: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1449485618-9443-15-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1449485618-9443-18-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the TLB handling as a direct translation of the assembly
-code version.
+So far, we've implemented the new world switch with a completely
+different namespace, so that we could have both implementation
+compiled in.
+
+Let's take things one step further by adding weak aliases that
+have the same names as the original implementation. The weak
+attributes allows the new implementation to be overriden by the
+old one, and everything still work.
+
+At a later point, we'll be able to simply drop the old code, and
+everything will hopefully keep working, thanks to the aliases we
+have just added. This also saves us repainting all the callers.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/hyp/Makefile |  1 +
- arch/arm64/kvm/hyp/entry.S  |  1 +
- arch/arm64/kvm/hyp/tlb.c    | 73 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 75 insertions(+)
- create mode 100644 arch/arm64/kvm/hyp/tlb.c
+ arch/arm64/kvm/hyp/debug-sr.c   | 3 +++
+ arch/arm64/kvm/hyp/hyp-entry.S  | 3 +++
+ arch/arm64/kvm/hyp/switch.c     | 3 +++
+ arch/arm64/kvm/hyp/tlb.c        | 9 +++++++++
+ arch/arm64/kvm/hyp/vgic-v3-sr.c | 3 +++
+ 5 files changed, 21 insertions(+)
 
-diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-index 56238d0..1a529f5 100644
---- a/arch/arm64/kvm/hyp/Makefile
-+++ b/arch/arm64/kvm/hyp/Makefile
-@@ -10,3 +10,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += entry.o
- obj-$(CONFIG_KVM_ARM_HOST) += switch.o
- obj-$(CONFIG_KVM_ARM_HOST) += fpsimd.o
-+obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
-diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-index 852ac12..cae59e5 100644
---- a/arch/arm64/kvm/hyp/entry.S
-+++ b/arch/arm64/kvm/hyp/entry.S
-@@ -148,6 +148,7 @@ ENTRY(__fpsimd_guest_restore)
- 	add	x0, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
- 	bl	__fpsimd_restore_state
+diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+index 7848322..d071f45 100644
+--- a/arch/arm64/kvm/hyp/debug-sr.c
++++ b/arch/arm64/kvm/hyp/debug-sr.c
+@@ -135,3 +135,6 @@ u32 __hyp_text __debug_read_mdcr_el2(void)
+ {
+ 	return read_sysreg(mdcr_el2);
+ }
++
++__alias(__debug_read_mdcr_el2)
++u32 __weak __kvm_get_mdcr_el2(void);
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index 8e58a3b..10d6d2a 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -189,6 +189,8 @@ ENDPROC(\label)
  
-+	// Skip restoring fpexc32 for AArch64 guests
- 	mrs	x1, hcr_el2
- 	tbnz	x1, #HCR_RW_SHIFT, 1f
- 	ldr	x4, [x2, #CPU_SYSREG_OFFSET(FPEXC32_EL2)]
+ 	.align 11
+ 
++	.weak	__kvm_hyp_vector
++ENTRY(__kvm_hyp_vector)
+ ENTRY(__hyp_vector)
+ 	ventry	el2t_sync_invalid		// Synchronous EL2t
+ 	ventry	el2t_irq_invalid		// IRQ EL2t
+@@ -210,3 +212,4 @@ ENTRY(__hyp_vector)
+ 	ventry	el1_fiq_invalid			// FIQ 32-bit EL1
+ 	ventry	el1_error_invalid		// Error 32-bit EL1
+ ENDPROC(__hyp_vector)
++ENDPROC(__kvm_hyp_vector)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index b012870..7457ae4 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -142,6 +142,9 @@ int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+ 	return exit_code;
+ }
+ 
++__alias(__guest_run)
++int __weak __kvm_vcpu_run(struct kvm_vcpu *vcpu);
++
+ static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%08llx\nFAR:%016llx HPFAR:%016llx PAR:%016llx\nVCPU:%p\n";
+ 
+ void __hyp_text __noreturn __hyp_panic(void)
 diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
-new file mode 100644
-index 0000000..6fcb93a
---- /dev/null
+index 6fcb93a..5f815cf 100644
+--- a/arch/arm64/kvm/hyp/tlb.c
 +++ b/arch/arm64/kvm/hyp/tlb.c
-@@ -0,0 +1,73 @@
-+/*
-+ * Copyright (C) 2015 - ARM Ltd
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
+@@ -48,6 +48,9 @@ void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ 	write_sysreg(0, vttbr_el2);
+ }
+ 
++__alias(__tlb_flush_vmid_ipa)
++void __weak __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
 +
-+#include "hyp.h"
+ void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
+ {
+ 	dsb(ishst);
+@@ -64,6 +67,9 @@ void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
+ 	write_sysreg(0, vttbr_el2);
+ }
+ 
++__alias(__tlb_flush_vmid)
++void __weak __kvm_tlb_flush_vmid(struct kvm *kvm);
 +
-+void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
-+{
-+	dsb(ishst);
+ void __hyp_text __tlb_flush_vm_context(void)
+ {
+ 	dsb(ishst);
+@@ -71,3 +77,6 @@ void __hyp_text __tlb_flush_vm_context(void)
+ 		     "ic ialluis	  ": : );
+ 	dsb(ish);
+ }
 +
-+	/* Switch to requested VMID */
-+	kvm = kern_hyp_va(kvm);
-+	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-+	isb();
++__alias(__tlb_flush_vm_context)
++void __weak __kvm_flush_vm_context(void);
+diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+index 78d05f3..a769458 100644
+--- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
++++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+@@ -224,3 +224,6 @@ u64 __hyp_text __vgic_v3_read_ich_vtr_el2(void)
+ {
+ 	return read_gicreg(ICH_VTR_EL2);
+ }
 +
-+	/*
-+	 * We could do so much better if we had the VA as well.
-+	 * Instead, we invalidate Stage-2 for this IPA, and the
-+	 * whole of Stage-1. Weep...
-+	 */
-+	ipa >>= 12;
-+	asm volatile("tlbi ipas2e1is, %0" : : "r" (ipa));
-+
-+	/*
-+	 * We have to ensure completion of the invalidation at Stage-2,
-+	 * since a table walk on another CPU could refill a TLB with a
-+	 * complete (S1 + S2) walk based on the old Stage-2 mapping if
-+	 * the Stage-1 invalidation happened first.
-+	 */
-+	dsb(ish);
-+	asm volatile("tlbi vmalle1is" : : );
-+	dsb(ish);
-+	isb();
-+
-+	write_sysreg(0, vttbr_el2);
-+}
-+
-+void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
-+{
-+	dsb(ishst);
-+
-+	/* Switch to requested VMID */
-+	kvm = kern_hyp_va(kvm);
-+	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-+	isb();
-+
-+	asm volatile("tlbi vmalls12e1is" : : );
-+	dsb(ish);
-+	isb();
-+
-+	write_sysreg(0, vttbr_el2);
-+}
-+
-+void __hyp_text __tlb_flush_vm_context(void)
-+{
-+	dsb(ishst);
-+	asm volatile("tlbi alle1is	\n"
-+		     "ic ialluis	  ": : );
-+	dsb(ish);
-+}
++__alias(__vgic_v3_read_ich_vtr_el2)
++u64 __weak __vgic_v3_get_ich_vtr_el2(void);
 -- 
 2.1.4
