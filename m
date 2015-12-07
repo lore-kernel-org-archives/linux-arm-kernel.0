@@ -1,34 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Dec 2015 12:11:35 +0000
-Subject: [RFC PATCH 0/8] CPUs capacity information for heterogeneous
- systems
-In-Reply-To: <20151207120244.GE14571@e106622-lin>
-References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
- <20151207120244.GE14571@e106622-lin>
-Message-ID: <20151207121135.GN8644@n2100.arm.linux.org.uk>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon,  7 Dec 2015 12:11:05 +0000
+Subject: [PATCH v5 4/4] MAINTAINERS: Add Liviu Dudau as maintainer for ARM
+ HDLCD driver.
+In-Reply-To: <1449490265-6752-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1449490265-6752-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1449490265-6752-5-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 12:02:44PM +0000, Juri Lelli wrote:
-> On 23/11/15 14:28, Juri Lelli wrote:
-> > Hi all,
-> > 
-> 
-> Hi again everybody,
-> 
-> thanks a lot to Rob and Vincent for feedback, but, IMHO, we'd need more
-> discussion happening on this series to figure out how we move forward;
-> so, this is a ping :-).  It's a simple information that we need to figure
-> out how to provide, and in which form, but it has the potential to form
-> a standardized basis for achieving important performance benefits.
+Update MAINTAINERS file for HDLCD driver.
 
-I'm happy to take the first patch, it looks like a simple clean up.
-Please arrange for it to land in my patch system.  Thanks.
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+Cc: Greg KH <gregkh@linuxfoundation.org>
+Cc: Joe Perches <joe@perches.com>
+Cc: Jiri Slaby <jslaby@suse.com>
 
-It looks like the second patch doesn't yet have the backing from the DT
-people, which prevents the remainder of the patch set progressing.  That's
-the sticking point which needs to be resolved.
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ MAINTAINERS | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
+diff --git a/MAINTAINERS b/MAINTAINERS
+index cba790b..8a637e3 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -820,6 +820,12 @@ S:	Maintained
+ F:	drivers/net/arcnet/
+ F:	include/uapi/linux/if_arcnet.h
+ 
++ARM HDLCD DRM DRIVER
++M:	Liviu Dudau <liviu.dudau@arm.com>
++S:	Maintained
++F:	drivers/gpu/drm/arm/
++F:	Documentation/devicetree/bindings/display/arm,hdlcd.txt
++
+ ARM MFM AND FLOPPY DRIVERS
+ M:	Ian Molton <spyro@f2s.com>
+ S:	Maintained
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.6.2
