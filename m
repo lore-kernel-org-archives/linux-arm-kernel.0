@@ -1,140 +1,71 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  7 Dec 2015 11:50:17 +0000
-Subject: [PATCH 04/19] mfd: ab8500-core: Fix many warnings reported by
- Checkpatch
+Date: Mon,  7 Dec 2015 11:50:22 +0000
+Subject: [PATCH 09/19] mfd: arizona-core: msleep() is unreliable for anything
+ <20ms use usleep_range() instead
 In-Reply-To: <1449489032-14374-1-git-send-email-lee.jones@linaro.org>
 References: <1449489032-14374-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1449489032-14374-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1449489032-14374-10-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WARNING: Block comments use a trailing */ on a separate line
-+        * */
+WARNING: msleep < 20ms can sleep for up to 20ms; see Documentation/timers/timers-howto.txt
++               msleep(1);
 
-WARNING: Block comments use a trailing */ on a separate line
-+        * bank on higher 8 bits and reg in lower */
+WARNING: msleep < 20ms can sleep for up to 20ms; see Documentation/timers/timers-howto.txt
++                       msleep(5);
 
-WARNING: Block comments use a trailing */ on a separate line
-+        * bank on higher 8 bits and reg in lower */
+WARNING: msleep < 20ms can sleep for up to 20ms; see Documentation/timers/timers-howto.txt
++               msleep(1);
 
-WARNING: suspect code indent for conditional statements (8, 24)
-+       if (unlikely(*offset == 17))
-+                       *offset = 24;
+WARNING: msleep < 20ms can sleep for up to 20ms; see Documentation/timers/timers-howto.txt
++               msleep(1);
 
-WARNING: suspect code indent for conditional statements (8, 24)
-+       if (unlikely(*offset == 16))
-+                       *offset = 25;
+total: 0 errors, 4 warnings, 1407 lines checked
 
-WARNING: suspect code indent for conditional statements (8, 24)
-+       if ((i == 3) && (*offset >= 24))
-+                       *offset += 2;
-
-WARNING: ENOSYS means 'invalid syscall nr' and nothing else
-+               return -ENOSYS;
-
-WARNING: static const char * array should probably be static const char * const
-+       static const char *switch_off_status[] = {
-
-WARNING: static const char * array should probably be static const char * const
-+       static const char *turn_on_status[] = {
-
-total: 0 errors, 9 warnings, 1867 lines checked
-
-Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: patches at opensource.wolfsonmicro.com
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/ab8500-core.c | 24 ++++++++++--------------
- 1 file changed, 10 insertions(+), 14 deletions(-)
+ drivers/mfd/arizona-core.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index fefbe4c..4080f01 100644
---- a/drivers/mfd/ab8500-core.c
-+++ b/drivers/mfd/ab8500-core.c
-@@ -113,7 +113,7 @@
- #define AB8500_SWITCH_OFF_STATUS	0x00
+diff --git a/drivers/mfd/arizona-core.c b/drivers/mfd/arizona-core.c
+index 44cfdbb..ceba17ca 100644
+--- a/drivers/mfd/arizona-core.c
++++ b/drivers/mfd/arizona-core.c
+@@ -239,7 +239,7 @@ static int arizona_poll_reg(struct arizona *arizona,
+ 		if ((val & mask) == target)
+ 			return 0;
  
- #define AB8500_TURN_ON_STATUS		0x00
--#define AB8505_TURN_ON_STATUS_2	0x04
-+#define AB8505_TURN_ON_STATUS_2		0x04
- 
- #define AB8500_CH_USBCH_STAT1_REG	0x02
- #define VBUS_DET_DBNC100		0x02
-@@ -211,7 +211,7 @@ static int set_register_interruptible(struct ab8500 *ab8500, u8 bank,
- 	/*
- 	 * Put the u8 bank and u8 register together into a an u16.
- 	 * The bank on higher 8 bits and register in lower 8 bits.
--	 * */
-+	 */
- 	u16 addr = ((u16)bank) << 8 | reg;
- 
- 	dev_vdbg(ab8500->dev, "wr: addr %#x <= %#x\n", addr, data);
-@@ -243,8 +243,6 @@ static int get_register_interruptible(struct ab8500 *ab8500, u8 bank,
- 	u8 reg, u8 *value)
- {
- 	int ret;
--	/* put the u8 bank and u8 reg together into a an u16.
--	 * bank on higher 8 bits and reg in lower */
- 	u16 addr = ((u16)bank) << 8 | reg;
- 
- 	mutex_lock(&ab8500->lock);
-@@ -278,8 +276,6 @@ static int mask_and_set_register_interruptible(struct ab8500 *ab8500, u8 bank,
- 	u8 reg, u8 bitmask, u8 bitvalues)
- {
- 	int ret;
--	/* put the u8 bank and u8 reg together into a an u16.
--	 * bank on higher 8 bits and reg in lower */
- 	u16 addr = ((u16)bank) << 8 | reg;
- 
- 	mutex_lock(&ab8500->lock);
-@@ -449,12 +445,12 @@ static void update_latch_offset(u8 *offset, int i)
- {
- 	/* Fix inconsistent ITFromLatch25 bit mapping... */
- 	if (unlikely(*offset == 17))
--			*offset = 24;
-+		*offset = 24;
- 	/* Fix inconsistent ab8540 bit mapping... */
- 	if (unlikely(*offset == 16))
--			*offset = 25;
-+		*offset = 25;
- 	if ((i == 3) && (*offset >= 24))
--			*offset += 2;
-+		*offset += 2;
- }
- 
- static int ab8500_handle_hierarchical_line(struct ab8500 *ab8500,
-@@ -590,12 +586,12 @@ static int ab8500_irq_init(struct ab8500 *ab8500, struct device_node *np)
- 
- 	/* If ->irq_base is zero this will give a linear mapping */
- 	ab8500->domain = irq_domain_add_simple(ab8500->dev->of_node,
--			num_irqs, 0,
--			&ab8500_irq_ops, ab8500);
-+					       num_irqs, 0,
-+					       &ab8500_irq_ops, ab8500);
- 
- 	if (!ab8500->domain) {
- 		dev_err(ab8500->dev, "Failed to create irqdomain\n");
--		return -ENOSYS;
-+		return -ENODEV;
+-		msleep(1);
++		usleep_range(1000, 5000);
  	}
  
- 	return 0;
-@@ -1549,7 +1545,7 @@ static struct attribute_group ab9540_attr_group = {
+ 	dev_err(arizona->dev, "Polling reg %u timed out: %x\n", reg, val);
+@@ -280,14 +280,14 @@ static void arizona_disable_reset(struct arizona *arizona)
+ 		case WM5110:
+ 		case WM8280:
+ 			/* Meet requirements for minimum reset duration */
+-			msleep(5);
++			usleep_range(5000, 10000);
+ 			break;
+ 		default:
+ 			break;
+ 		}
  
- static int ab8500_probe(struct platform_device *pdev)
- {
--	static const char *switch_off_status[] = {
-+	static const char * const switch_off_status[] = {
- 		"Swoff bit programming",
- 		"Thermal protection activation",
- 		"Vbat lower then BattOk falling threshold",
-@@ -1558,7 +1554,7 @@ static int ab8500_probe(struct platform_device *pdev)
- 		"Battery level lower than power on reset threshold",
- 		"Power on key 1 pressed longer than 10 seconds",
- 		"DB8500 thermal shutdown"};
--	static const char *turn_on_status[] = {
-+	static const char * const turn_on_status[] = {
- 		"Battery rising (Vbat)",
- 		"Power On Key 1 dbF",
- 		"Power On Key 2 dbF",
+ 		gpio_set_value_cansleep(arizona->pdata.reset, 1);
+-		msleep(1);
++		usleep_range(1000, 5000);
+ 	}
+ }
+ 
+@@ -1045,7 +1045,7 @@ int arizona_dev_init(struct arizona *arizona)
+ 			goto err_reset;
+ 		}
+ 
+-		msleep(1);
++		usleep_range(1000, 5000);
+ 	}
+ 
+ 	/* Ensure device startup is complete */
 -- 
 1.9.1
