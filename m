@@ -1,85 +1,108 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  7 Dec 2015 23:26:16 +0100
-Subject: [PATCH 21/23] staging: mt29f_spinand: switch to mtd_ooblayout_ops
-In-Reply-To: <1449527178-5930-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1449527178-5930-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1449527178-5930-22-git-send-email-boris.brezillon@free-electrons.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 7 Dec 2015 14:35:34 -0800
+Subject: [PATCH v2] ARM: mm: mark section-aligned portion of rodata NX
+Message-ID: <20151207223534.GA13722@www.outflux.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/staging/mt29f_spinand/mt29f_spinand.c | 44 ++++++++++++++++-----------
- 1 file changed, 26 insertions(+), 18 deletions(-)
+When rodata is large enough that it crosses a section boundary after the
+kernel text, mark the rest NX. This is as close to full NX of rodata as
+we can get without splitting page tables or doing section alignment via
+CONFIG_DEBUG_ALIGN_RODATA.
 
-diff --git a/drivers/staging/mt29f_spinand/mt29f_spinand.c b/drivers/staging/mt29f_spinand/mt29f_spinand.c
-index cb9d5ab..967d50a 100644
---- a/drivers/staging/mt29f_spinand/mt29f_spinand.c
-+++ b/drivers/staging/mt29f_spinand/mt29f_spinand.c
-@@ -42,23 +42,29 @@ static inline struct spinand_state *mtd_to_state(struct mtd_info *mtd)
- static int enable_hw_ecc;
- static int enable_read_hw_ecc;
+When the config is:
+
+ CONFIG_DEBUG_RODATA=y
+ # CONFIG_DEBUG_ALIGN_RODATA is not set
+
+Before:
+
+---[ Kernel Mapping ]---
+0x80000000-0x80100000           1M     RW NX SHD
+0x80100000-0x80a00000           9M     ro x  SHD
+0x80a00000-0xa0000000         502M     RW NX SHD
+
+After:
+
+---[ Kernel Mapping ]---
+0x80000000-0x80100000           1M     RW NX SHD
+0x80100000-0x80700000           6M     ro x  SHD
+0x80700000-0x80a00000           3M     ro NX SHD
+0x80a00000-0xa0000000         502M     RW NX SHD
+
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+v2:
+- static declaration, ard
+---
+ arch/arm/kernel/vmlinux.lds.S | 9 +++++++--
+ arch/arm/mm/init.c            | 7 ++++---
+ 2 files changed, 11 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index a6e395c53a48..9c249c71fda1 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -8,9 +8,7 @@
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
+ #include <asm/page.h>
+-#ifdef CONFIG_DEBUG_RODATA
+ #include <asm/pgtable.h>
+-#endif
  
--static struct nand_ecclayout spinand_oob_64 = {
--	.eccbytes = 24,
--	.eccpos = {
--		1, 2, 3, 4, 5, 6,
--		17, 18, 19, 20, 21, 22,
--		33, 34, 35, 36, 37, 38,
--		49, 50, 51, 52, 53, 54, },
--	.oobfree = {
--		{.offset = 8,
--			.length = 8},
--		{.offset = 24,
--			.length = 8},
--		{.offset = 40,
--			.length = 8},
--		{.offset = 56,
--			.length = 8},
--	}
-+static int spinand_oob_64_eccpos(struct mtd_info *mtd, int eccbyte)
-+{
-+	if (eccbyte > 23)
-+		return -ERANGE;
+ #define PROC_INFO							\
+ 	. = ALIGN(4);							\
+@@ -337,6 +335,13 @@ SECTIONS
+ }
+ 
+ /*
++ * Without CONFIG_DEBUG_ALIGN_RODATA, __start_rodata_section_aligned will
++ * be the first section-aligned location after __start_rodata. Otherwise,
++ * it will be equal to __start_rodata.
++ */
++__start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
 +
-+	return ((eccbyte / 6) * 16) + 1;
-+}
-+
-+static int spinand_oob_64_oobfree(struct mtd_info *mtd, int section,
-+				  struct nand_oobfree *oobfree)
-+{
-+	if (section > 3)
-+		return -ERANGE;
-+
-+	oobfree->offset = (section * 16) + 8;
-+	oobfree->length = 8;
-+
-+	return 0;
-+}
-+
-+const struct mtd_ooblayout_ops spinand_oob_64_ops = {
-+	.eccpos = spinand_oob_64_eccpos,
-+	.oobfree = spinand_oob_64_oobfree,
++/*
+  * These must never be empty
+  * If you have to comment these two assert statements out, your
+  * binutils is too old (for other reasons as well)
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 321d3683dc7c..6b16f6cf4843 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -579,6 +579,9 @@ struct section_perm {
+ 	pmdval_t clear;
  };
- #endif
  
-@@ -883,7 +889,6 @@ static int spinand_probe(struct spi_device *spi_nand)
++/* First section-aligned location@or after __start_rodata. */
++extern char __start_rodata_section_aligned[];
++
+ static struct section_perm nx_perms[] = {
+ 	/* Make pages tables, etc before _stext RW (set NX). */
+ 	{
+@@ -596,16 +599,14 @@ static struct section_perm nx_perms[] = {
+ 		.mask	= ~PMD_SECT_XN,
+ 		.prot	= PMD_SECT_XN,
+ 	},
+-#ifdef CONFIG_DEBUG_ALIGN_RODATA
+ 	/* Make rodata NX (set RO in ro_perms below). */
+ 	{
+ 		.name	= "rodata NX",
+-		.start  = (unsigned long)__start_rodata,
++		.start  = (unsigned long)__start_rodata_section_aligned,
+ 		.end    = (unsigned long)__init_begin,
+ 		.mask   = ~PMD_SECT_XN,
+ 		.prot   = PMD_SECT_XN,
+ 	},
+-#endif
+ };
  
- 	chip->ecc.strength = 1;
- 	chip->ecc.total	= chip->ecc.steps * chip->ecc.bytes;
--	chip->ecc.layout = &spinand_oob_64;
- 	chip->ecc.read_page = spinand_read_page_hwecc;
- 	chip->ecc.write_page = spinand_write_page_hwecc;
- #else
-@@ -911,6 +916,9 @@ static int spinand_probe(struct spi_device *spi_nand)
- 	mtd->priv = chip;
- 	mtd->dev.parent = &spi_nand->dev;
- 	mtd->oobsize = 64;
-+#ifdef CONFIG_MTD_SPINAND_ONDIEECC
-+	mtd_set_ooblayout(mtd, &spinand_oob_64_ops);
-+#endif
- 
- 	if (nand_scan(mtd, 1))
- 		return -ENXIO;
+ static struct section_perm ro_perms[] = {
 -- 
-2.1.4
+1.9.1
+
+
+-- 
+Kees Cook
+Chrome OS & Brillo Security
