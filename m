@@ -1,35 +1,138 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Mon, 7 Dec 2015 09:50:43 -0500
-Subject: [PATCH v2] ahci: compile out msi/msix infrastructure
-In-Reply-To: <20151206001323.35162.30974.stgit@dwillia2-desk3.jf.intel.com>
-References: <20151206001323.35162.30974.stgit@dwillia2-desk3.jf.intel.com>
-Message-ID: <20151207145043.GB9175@mtj.duckdns.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 7 Dec 2015 14:54:58 +0000
+Subject: [PATCH RFC 21/27] drivers: cpu-pd: Parse topology to setup CPU
+ PM domains
+In-Reply-To: <1447799871-56374-22-git-send-email-lina.iyer@linaro.org>
+References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
+ <1447799871-56374-22-git-send-email-lina.iyer@linaro.org>
+Message-ID: <20151207145458.GA20538@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 05, 2015 at 04:18:44PM -0800, Dan Williams wrote:
-> Quoting Arnd:
->     The AHCI driver is used for some on-chip devices that do not use PCI
->     for probing, and it can be built even when CONFIG_PCI is disabled, but
->     that now results in a build failure:
-> 
->     ata/libahci.c: In function 'ahci_host_activate_multi_irqs':
->     ata/libahci.c:2475:4: error: invalid use of undefined type 'struct msix_entry'
->     ata/libahci.c:2475:21: error: dereferencing pointer to incomplete type 'struct msix_entry'
-> 
-> Add ifdef CONFIG_PCI_MSI infrastructure to compile out the mutli-msi and
-> multi-msix code.
-> 
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Tested--by: Arnd Bergmann <arnd@arndb.de>
-> [arnd: fix up pci enabled case]
-> Reported-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> Fixes: d684a90d38e2 ("ahci: per-port msix support")
-> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+Hi Lina,
 
-Applied to libata/for-4.5 w/ the typo fixed.
+On Tue, Nov 17, 2015 at 03:37:45PM -0700, Lina Iyer wrote:
+> Architectures that support CPU domain control in the firmware specify
+> the domain heirarchy as part of the topology nodes. Parse and initialize
+> domains from the topology node for such architectures.
+> 
+> Cc: Rob Herring <robherring2@gmail.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+>  drivers/base/power/cpu-pd.c | 76 +++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/cpu-pd.h      |  1 +
+>  2 files changed, 77 insertions(+)
+> 
+> diff --git a/drivers/base/power/cpu-pd.c b/drivers/base/power/cpu-pd.c
+> index e331ae6..2872c18 100644
+> --- a/drivers/base/power/cpu-pd.c
+> +++ b/drivers/base/power/cpu-pd.c
+> @@ -429,3 +429,79 @@ int of_attach_cpu_pm_domain(struct device_node *dn)
+>  	return 0;
+>  }
+>  EXPORT_SYMBOL(of_attach_cpu_pm_domain);
+> +
+> +static int of_parse_cpu_pd(struct device_node *cluster,
+> +		const struct cpu_pd_ops *ops)
+> +{
+> +	struct device_node *domain_node;
+> +	struct generic_pm_domain *genpd;
+> +	char name[10];
+> +	struct device_node *c;
+> +	int i, ret;
+> +
+> +	for (i = 0; ; i++) {
+> +		snprintf(name, sizeof(name), "cluster%d", i);
+> +		c = of_get_child_by_name(cluster, name);
+> +		if (!c)
+> +			break;
+> +
+> +		domain_node = of_parse_phandle(c, "cluster", 0);
+> +		if (!domain_node)
+> +			return -1;
+> +
+> +		/* Initialize CPU PM domain domain at this level */
+> +		genpd = of_init_cpu_pm_domain(domain_node, ops);
+> +		if (IS_ERR(genpd))
+> +			return -1;
+> +
+> +		/* Initialize and attach child domains */
+> +		ret = of_parse_cpu_pd(c, ops);
+> +
+> +		/*
+> +		 * Attach the domain to its parent after reading
+> +		 * the children, so the mask of CPUs in this domain
+> +		 * are setup correctly.
+> +		 */
+> +		if (!ret)
+> +			of_attach_cpu_pm_domain(domain_node);
+> +
+> +		of_node_put(c);
+> +		if (ret != 0)
+> +			return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+> + * of_setup_cpu_domain_topology() - Setup the CPU domains from the CPU
+> + * topology node in DT.
+> + *
+> + * @ops: The PM domain suspend/resume ops for all the domains in the topology
+> + */
+> +int of_setup_cpu_domain_topology(const struct cpu_pd_ops *ops)
+> +{
+> +	struct device_node *cn, *map;
+> +	int ret = 0;
+> +
+> +	cn = of_find_node_by_path("/cpus");
+> +	if (!cn) {
+> +		pr_err("No CPU information found in DT\n");
+> +		return 0;
+> +	}
+> +
+> +	map = of_get_child_by_name(cn, "cpu-map");
+> +	if (!map)
+> +		goto out;
 
-Thanks.
+I commented on this before, is this reliance on cpu-map necessary ?
+Could not you just rely on the "power-domains" phandle in the cpu
+nodes to build the cpumask for a specific power domain ? I think
+you should try to decouple the concept of power domain from the cpu-map
+cluster and I think this would also simplify your code in the process.
 
--- 
-tejun
+So to sum it up, I'd suggest you build the power domain cpumask by
+enumerating the cpus pointing at a specific power-domain node.
+
+Lorenzo
+
+> +
+> +	ret = of_parse_cpu_pd(map, ops);
+> +	if (ret != 0)
+> +		goto out_map;
+> +
+> +out_map:
+> +	of_node_put(map);
+> +out:
+> +	of_node_put(cn);
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL(of_setup_cpu_domain_topology);
+> diff --git a/include/linux/cpu-pd.h b/include/linux/cpu-pd.h
+> index 489ee2f..e8290db 100644
+> --- a/include/linux/cpu-pd.h
+> +++ b/include/linux/cpu-pd.h
+> @@ -32,4 +32,5 @@ struct cpu_pm_domain {
+>  struct generic_pm_domain *of_init_cpu_pm_domain(struct device_node *dn,
+>  		const struct cpu_pd_ops *ops);
+>  int of_attach_cpu_pm_domain(struct device_node *dn);
+> +int of_setup_cpu_domain_topology(const struct cpu_pd_ops *ops);
+>  #endif /* __CPU_PD_H__ */
+> -- 
+> 2.1.4
+> 
