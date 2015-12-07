@@ -1,143 +1,64 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Mon, 7 Dec 2015 15:22:42 -0800
-Subject: [PATCH v2] PCI: generic: Add support for Cavium ThunderX PCIe
- root complexes.
-In-Reply-To: <20151207224314.GE14429@localhost>
-References: <1442967415-13595-1-git-send-email-ddaney.cavm@gmail.com>
- <20151207224314.GE14429@localhost>
-Message-ID: <566614C2.1030705@caviumnetworks.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 07 Dec 2015 15:35:10 -0800
+Subject: [PATCH v2 3/5] ARM: bcm2835: add rpi power domain driver
+In-Reply-To: <1449251148-19344-4-git-send-email-eric@anholt.net> (Eric
+ Anholt's message of "Fri, 4 Dec 2015 09:45:46 -0800")
+References: <1449251148-19344-1-git-send-email-eric@anholt.net>
+ <1449251148-19344-4-git-send-email-eric@anholt.net>
+Message-ID: <7hmvtln87l.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/2015 02:43 PM, Bjorn Helgaas wrote:
-> Hi David,
+Eric Anholt <eric@anholt.net> writes:
+
+> From: Alexander Aring <alex.aring@gmail.com>
 >
-> On Tue, Sep 22, 2015 at 05:16:55PM -0700, David Daney wrote:
->> From: David Daney <david.daney@cavium.com>
->>
->> The config space for external PCIe root complexes on some Cavium
->> ThunderX SoCs is very similar to CAM and ECAM, but differs in the
->> shift values that have to be applied to the bus and devfn numbers to
->> compose that address window offset.  These root complexes also have
->> the interesting property that there is no root bridge, so the standard
->> manner of limiting scanning to only the first device doesn't work.  We
->> can use the standard pci-host-generic driver if we make a minor
->> addition to handle these differences, so we...
->>
->> Add a mapping function for ThunderX PCIe root complexes with a bus
->> shift of 24 and devfn shift of 16.  Ignore accesses for devices other
->> than the first device on the primary bus.
->>
->> Document the whole thing in devicetree/bindings/pci/host-generic-pci.txt
->>
->> Signed-off-by: David Daney <david.daney@cavium.com>
->> Acked-by: Will Deacon <will.deacon@arm.com>
+> This patch adds support for several power domains on Raspberry Pi,
+> including USB (so it can be enabled even if the bootloader didn't do
+> it), and graphics.
 >
-> I'm trying to sort the ThunderX stuff out.  Can you repost the current
-> stuff so we can see it all together?
+> This patch is the combined work of Eric Anholt (who wrote USB support
+> inside of the Raspberry Pi firmware driver, and wrote the non-USB
+> domain support) and Alexander Aring (who separated the original USB
+> work out from the firmware driver).
 >
-
-Yes, I will post something soon.
-
-Let's not merge this version.  There are more improvements that I want 
-to make.  We are working through how to cleanly implement the use of 
-both pci-host-generic when using OF device tree as well as the ACPI root 
-complex code when ACPI is in use.  Ideally the same config accessor 
-functions would be used in both cases.
-
-Thanks for the follow up,
-David Daney
-
-
-
-> Thanks,
->    Bjorn
+> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> ---
 >
->> ---
->>
->> This patch depends on:
->> https://lkml.org/lkml/2015/9/22/1189
->>
->> Changes from v1:
->>
->>    - Added Acked-by:
->>
->>    - Removed two patches from the set that were somewhat unrelated.
->>
->>   .../devicetree/bindings/pci/host-generic-pci.txt   |  8 +++---
->>   drivers/pci/host/pci-host-generic.c                | 29 ++++++++++++++++++++++
->>   2 files changed, 34 insertions(+), 3 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
->> index 105a968..a5aed0f 100644
->> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
->> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
->> @@ -14,9 +14,11 @@ tree bindings communicated in pci.txt:
->>
->>   Properties of the host controller node:
->>
->> -- compatible     : Must be "pci-host-cam-generic" or "pci-host-ecam-generic"
->> -                   depending on the layout of configuration space (CAM vs
->> -                   ECAM respectively).
->> +- compatible     : One of the following with bus:devfn:reg mapped to the
->> +                   PCI config space address window in the bit positions shown:
->> +                   "pci-host-cam-generic" -- 'CAM'  bits 16:8:0
->> +                   "pci-host-ecam-generic" -- 'ECAM'  bits 20:12:0
->> +                   "cavium,pci-host-thunder-pem" --  bits 24:16:0
->>
->>   - device_type    : Must be "pci".
->>
->> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
->> index b163fdc..853f6f6 100644
->> --- a/drivers/pci/host/pci-host-generic.c
->> +++ b/drivers/pci/host/pci-host-generic.c
->> @@ -91,6 +91,32 @@ static struct gen_pci_cfg_bus_ops gen_pci_cfg_ecam_bus_ops = {
->>   	}
->>   };
->>
->> +static void __iomem *gen_pci_map_cfg_bus_thunder_pem(struct pci_bus *bus,
->> +						     unsigned int devfn,
->> +						     int where)
->> +{
->> +	struct gen_pci *pci = bus->sysdata;
->> +	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
->> +
->> +	/*
->> +	 * Thunder PEM is a PCIe RC, but without a root bridge.  On
->> +	 * the primary bus, ignore accesses for devices other than
->> +	 * the first device.
->> +	 */
->> +	if (idx == 0 && (devfn & ~7u))
->> +		return NULL;
->> +	return pci->cfg.win[idx] + ((devfn << 16) | where);
->> +}
->> +
->> +static struct gen_pci_cfg_bus_ops gen_pci_cfg_thunder_pem_bus_ops = {
->> +	.bus_shift	= 24,
->> +	.ops		= {
->> +		.map_bus	= gen_pci_map_cfg_bus_thunder_pem,
->> +		.read		= pci_generic_config_read,
->> +		.write		= pci_generic_config_write,
->> +	}
->> +};
->> +
->>   static const struct of_device_id gen_pci_of_match[] = {
->>   	{ .compatible = "pci-host-cam-generic",
->>   	  .data = &gen_pci_cfg_cam_bus_ops },
->> @@ -98,6 +124,9 @@ static const struct of_device_id gen_pci_of_match[] = {
->>   	{ .compatible = "pci-host-ecam-generic",
->>   	  .data = &gen_pci_cfg_ecam_bus_ops },
->>
->> +	{ .compatible = "cavium,pci-host-thunder-pem",
->> +	  .data = &gen_pci_cfg_thunder_pem_bus_ops },
->> +
->>   	{ },
->>   };
->>   MODULE_DEVICE_TABLE(of, gen_pci_of_match);
->> --
->> 1.9.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> v2: Add support for power domains other than USB, using the new
+>     firmware interface, reword commit message (changes by Eric)
+
+[...]
+
+> +/*
+> + * Firmware indices for the old power domains interface.  Only a few
+> + * of them were actually implemented.
+> + */
+> +#define RPI_OLD_POWER_DOMAIN_USB		3
+> +#define RPI_OLD_POWER_DOMAIN_V3D		10
+> +
+
+Is "old" the right word here?  Are there firmware versions that could be
+used instead?  What happens when the firwmware is updated next time?
+
+[...]
+
+> +	/*
+> +	 * Use the old firmware interface for USB power, so that we
+> +	 * can turn it on even if the firmware hasn't been updated.
+> +	 */
+> +	rpi_init_old_power_domain(rpi_domains, RPI_POWER_DOMAIN_USB,
+> +				  RPI_OLD_POWER_DOMAIN_USB, "USB");
+
+This seems a bit restrictive.
+
+To me, it seems that determining "old" or "new" (or revision of fw
+interface to use) should be described in DT, not hard-coded in the power
+domain driver.
+
+What about an additional DT property to describe that? or possibly
+another cell in the domain which could be used to optionally set
+old/legacy.
+
+Kevin
