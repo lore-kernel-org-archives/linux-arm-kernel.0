@@ -1,53 +1,40 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  7 Dec 2015 10:53:21 +0000
-Subject: [PATCH v3 05/22] arm64: KVM: Implement vgic-v3 save/restore
+Date: Mon,  7 Dec 2015 10:53:31 +0000
+Subject: [PATCH v3 15/22] arm64: KVM: HYP mode entry points
 In-Reply-To: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
 References: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1449485618-9443-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1449485618-9443-16-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the vgic-v3 save restore as a direct translation of
-the assembly code version.
+Add the entry points for HYP mode (both for hypercalls and
+exception handling).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/hyp/Makefile     |   1 +
- arch/arm64/kvm/hyp/hyp.h        |   3 +
- arch/arm64/kvm/hyp/vgic-v3-sr.c | 226 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 230 insertions(+)
- create mode 100644 arch/arm64/kvm/hyp/vgic-v3-sr.c
+ arch/arm64/kvm/hyp/Makefile    |   1 +
+ arch/arm64/kvm/hyp/hyp-entry.S | 203 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 204 insertions(+)
+ create mode 100644 arch/arm64/kvm/hyp/hyp-entry.S
 
 diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-index d8d5968..d1e38ce 100644
+index 1a529f5..826032b 100644
 --- a/arch/arm64/kvm/hyp/Makefile
 +++ b/arch/arm64/kvm/hyp/Makefile
-@@ -3,3 +3,4 @@
- #
- 
- obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
-+obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
-diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
-index ac63553..5759f9f 100644
---- a/arch/arm64/kvm/hyp/hyp.h
-+++ b/arch/arm64/kvm/hyp/hyp.h
-@@ -32,5 +32,8 @@
- void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
- void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
- 
-+void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
-+void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
-+
- #endif /* __ARM64_KVM_HYP_H__ */
- 
-diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+@@ -11,3 +11,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += entry.o
+ obj-$(CONFIG_KVM_ARM_HOST) += switch.o
+ obj-$(CONFIG_KVM_ARM_HOST) += fpsimd.o
+ obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
++obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
 new file mode 100644
-index 0000000..78d05f3
+index 0000000..818731a
 --- /dev/null
-+++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-@@ -0,0 +1,226 @@
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -0,0 +1,203 @@
 +/*
-+ * Copyright (C) 2012-2015 - ARM Ltd
++ * Copyright (C) 2015 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -63,214 +50,191 @@ index 0000000..78d05f3
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/compiler.h>
-+#include <linux/irqchip/arm-gic-v3.h>
-+#include <linux/kvm_host.h>
++#include <linux/linkage.h>
 +
++#include <asm/alternative.h>
++#include <asm/assembler.h>
++#include <asm/asm-offsets.h>
++#include <asm/cpufeature.h>
++#include <asm/kvm_arm.h>
++#include <asm/kvm_asm.h>
 +#include <asm/kvm_mmu.h>
 +
-+#include "hyp.h"
++	.text
++	.pushsection	.hyp.text, "ax"
 +
-+#define vtr_to_max_lr_idx(v)		((v) & 0xf)
-+#define vtr_to_nr_pri_bits(v)		(((u32)(v) >> 29) + 1)
++.macro	save_x0_to_x3
++	stp	x0, x1, [sp, #-16]!
++	stp	x2, x3, [sp, #-16]!
++.endm
 +
-+#define read_gicreg(r)							\
-+	({								\
-+		u64 reg;						\
-+		asm volatile("mrs_s %0, " __stringify(r) : "=r" (reg));	\
-+		reg;							\
-+	})
++.macro	restore_x0_to_x3
++	ldp	x2, x3, [sp], #16
++	ldp	x0, x1, [sp], #16
++.endm
 +
-+#define write_gicreg(v,r)						\
-+	do {								\
-+		u64 __val = (v);					\
-+		asm volatile("msr_s " __stringify(r) ", %0" : : "r" (__val));\
-+	} while (0)
++el1_sync:				// Guest trapped into EL2
++	save_x0_to_x3
 +
-+/* vcpu is already in the HYP VA space */
-+void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-+	u64 val;
-+	u32 max_lr_idx, nr_pri_bits;
++	mrs	x1, esr_el2
++	lsr	x2, x1, #ESR_ELx_EC_SHIFT
 +
-+	/*
-+	 * Make sure stores to the GIC via the memory mapped interface
-+	 * are now visible to the system register interface.
-+	 */
-+	dsb(st);
++	cmp	x2, #ESR_ELx_EC_HVC64
++	b.ne	el1_trap
 +
-+	cpu_if->vgic_vmcr  = read_gicreg(ICH_VMCR_EL2);
-+	cpu_if->vgic_misr  = read_gicreg(ICH_MISR_EL2);
-+	cpu_if->vgic_eisr  = read_gicreg(ICH_EISR_EL2);
-+	cpu_if->vgic_elrsr = read_gicreg(ICH_ELSR_EL2);
++	mrs	x3, vttbr_el2		// If vttbr is valid, the 64bit guest
++	cbnz	x3, el1_trap		// called HVC
 +
-+	write_gicreg(0, ICH_HCR_EL2);
-+	val = read_gicreg(ICH_VTR_EL2);
-+	max_lr_idx = vtr_to_max_lr_idx(val);
-+	nr_pri_bits = vtr_to_nr_pri_bits(val);
++	/* Here, we're pretty sure the host called HVC. */
++	restore_x0_to_x3
 +
-+	switch (max_lr_idx) {
-+	case 15:
-+		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(15)] = read_gicreg(ICH_LR15_EL2);
-+	case 14:
-+		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(14)] = read_gicreg(ICH_LR14_EL2);
-+	case 13:
-+		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(13)] = read_gicreg(ICH_LR13_EL2);
-+	case 12:
-+		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(12)] = read_gicreg(ICH_LR12_EL2);
-+	case 11:
-+		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(11)] = read_gicreg(ICH_LR11_EL2);
-+	case 10:
-+		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(10)] = read_gicreg(ICH_LR10_EL2);
-+	case 9:
-+		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(9)] = read_gicreg(ICH_LR9_EL2);
-+	case 8:
-+		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(8)] = read_gicreg(ICH_LR8_EL2);
-+	case 7:
-+		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(7)] = read_gicreg(ICH_LR7_EL2);
-+	case 6:
-+		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(6)] = read_gicreg(ICH_LR6_EL2);
-+	case 5:
-+		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(5)] = read_gicreg(ICH_LR5_EL2);
-+	case 4:
-+		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(4)] = read_gicreg(ICH_LR4_EL2);
-+	case 3:
-+		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(3)] = read_gicreg(ICH_LR3_EL2);
-+	case 2:
-+		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(2)] = read_gicreg(ICH_LR2_EL2);
-+	case 1:
-+		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(1)] = read_gicreg(ICH_LR1_EL2);
-+	case 0:
-+		cpu_if->vgic_lr[VGIC_V3_LR_INDEX(0)] = read_gicreg(ICH_LR0_EL2);
-+	}
++	/* Check for __hyp_get_vectors */
++	cbnz	x0, 1f
++	mrs	x0, vbar_el2
++	b	2f
 +
-+	switch (nr_pri_bits) {
-+	case 7:
-+		cpu_if->vgic_ap0r[3] = read_gicreg(ICH_AP0R3_EL2);
-+		cpu_if->vgic_ap0r[2] = read_gicreg(ICH_AP0R2_EL2);
-+	case 6:
-+		cpu_if->vgic_ap0r[1] = read_gicreg(ICH_AP0R1_EL2);
-+	default:
-+		cpu_if->vgic_ap0r[0] = read_gicreg(ICH_AP0R0_EL2);
-+	}
-+
-+	switch (nr_pri_bits) {
-+	case 7:
-+		cpu_if->vgic_ap1r[3] = read_gicreg(ICH_AP1R3_EL2);
-+		cpu_if->vgic_ap1r[2] = read_gicreg(ICH_AP1R2_EL2);
-+	case 6:
-+		cpu_if->vgic_ap1r[1] = read_gicreg(ICH_AP1R1_EL2);
-+	default:
-+		cpu_if->vgic_ap1r[0] = read_gicreg(ICH_AP1R0_EL2);
-+	}
-+
-+	val = read_gicreg(ICC_SRE_EL2);
-+	write_gicreg(val | ICC_SRE_EL2_ENABLE, ICC_SRE_EL2);
-+	isb(); /* Make sure ENABLE is set at EL2 before setting SRE at EL1 */
-+	write_gicreg(1, ICC_SRE_EL1);
-+}
-+
-+void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-+	u64 val;
-+	u32 max_lr_idx, nr_pri_bits;
++1:	stp	lr, xzr, [sp, #-16]!
 +
 +	/*
-+	 * VFIQEn is RES1 if ICC_SRE_EL1.SRE is 1. This causes a
-+	 * Group0 interrupt (as generated in GICv2 mode) to be
-+	 * delivered as a FIQ to the guest, with potentially fatal
-+	 * consequences. So we must make sure that ICC_SRE_EL1 has
-+	 * been actually programmed with the value we want before
-+	 * starting to mess with the rest of the GIC.
++	 * Compute the function address in EL2, and shuffle the parameters.
 +	 */
-+	write_gicreg(cpu_if->vgic_sre, ICC_SRE_EL1);
-+	isb();
++	kern_hyp_va	x0
++	mov	lr, x0
++	mov	x0, x1
++	mov	x1, x2
++	mov	x2, x3
++	blr	lr
 +
-+	write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
-+	write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
++	ldp	lr, xzr, [sp], #16
++2:	eret
 +
-+	val = read_gicreg(ICH_VTR_EL2);
-+	max_lr_idx = vtr_to_max_lr_idx(val);
-+	nr_pri_bits = vtr_to_nr_pri_bits(val);
++el1_trap:
++	/*
++	 * x1: ESR
++	 * x2: ESR_EC
++	 */
 +
-+	switch (nr_pri_bits) {
-+	case 7:
-+		 write_gicreg(cpu_if->vgic_ap1r[3], ICH_AP1R3_EL2);
-+		 write_gicreg(cpu_if->vgic_ap1r[2], ICH_AP1R2_EL2);
-+	case 6:
-+		 write_gicreg(cpu_if->vgic_ap1r[1], ICH_AP1R1_EL2);
-+	default:
-+		 write_gicreg(cpu_if->vgic_ap1r[0], ICH_AP1R0_EL2);
-+	}	 	                           
-+		 	                           
-+	switch (nr_pri_bits) {
-+	case 7:
-+		 write_gicreg(cpu_if->vgic_ap0r[3], ICH_AP0R3_EL2);
-+		 write_gicreg(cpu_if->vgic_ap0r[2], ICH_AP0R2_EL2);
-+	case 6:
-+		 write_gicreg(cpu_if->vgic_ap0r[1], ICH_AP0R1_EL2);
-+	default:
-+		 write_gicreg(cpu_if->vgic_ap0r[0], ICH_AP0R0_EL2);
-+	}
++	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
++	cmp	x2, #ESR_ELx_EC_FP_ASIMD
++	b.eq	__fpsimd_guest_restore
 +
-+	switch (max_lr_idx) {
-+	case 15:
-+		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(15)], ICH_LR15_EL2);
-+	case 14:
-+		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(14)], ICH_LR14_EL2);
-+	case 13:
-+		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(13)], ICH_LR13_EL2);
-+	case 12:
-+		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(12)], ICH_LR12_EL2);
-+	case 11:
-+		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(11)], ICH_LR11_EL2);
-+	case 10:
-+		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(10)], ICH_LR10_EL2);
-+	case 9:
-+		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(9)], ICH_LR9_EL2);
-+	case 8:
-+		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(8)], ICH_LR8_EL2);
-+	case 7:
-+		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(7)], ICH_LR7_EL2);
-+	case 6:
-+		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(6)], ICH_LR6_EL2);
-+	case 5:
-+		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(5)], ICH_LR5_EL2);
-+	case 4:
-+		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(4)], ICH_LR4_EL2);
-+	case 3:
-+		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(3)], ICH_LR3_EL2);
-+	case 2:
-+		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(2)], ICH_LR2_EL2);
-+	case 1:
-+		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(1)], ICH_LR1_EL2);
-+	case 0:
-+		write_gicreg(cpu_if->vgic_lr[VGIC_V3_LR_INDEX(0)], ICH_LR0_EL2);
-+	}
++	cmp	x2, #ESR_ELx_EC_DABT_LOW
++	mov	x0, #ESR_ELx_EC_IABT_LOW
++	ccmp	x2, x0, #4, ne
++	b.ne	1f		// Not an abort we care about
++
++	/* This is an abort. Check for permission fault */
++alternative_if_not ARM64_WORKAROUND_834220
++	and	x2, x1, #ESR_ELx_FSC_TYPE
++	cmp	x2, #FSC_PERM
++	b.ne	1f		// Not a permission fault
++alternative_else
++	nop			// Use the permission fault path to
++	nop			// check for a valid S1 translation,
++	nop			// regardless of the ESR value.
++alternative_endif
 +
 +	/*
-+	 * Ensures that the above will have reached the
-+	 * (re)distributors. This ensure the guest will read the
-+	 * correct values from the memory-mapped interface.
++	 * Check for Stage-1 page table walk, which is guaranteed
++	 * to give a valid HPFAR_EL2.
 +	 */
-+	isb();
-+	dsb(sy);
++	tbnz	x1, #7, 1f	// S1PTW is set
++
++	/* Preserve PAR_EL1 */
++	mrs	x3, par_el1
++	stp	x3, xzr, [sp, #-16]!
 +
 +	/*
-+	 * Prevent the guest from touching the GIC system registers if
-+	 * SRE isn't enabled for GICv3 emulation.
++	 * Permission fault, HPFAR_EL2 is invalid.
++	 * Resolve the IPA the hard way using the guest VA.
++	 * Stage-1 translation already validated the memory access rights.
++	 * As such, we can use the EL1 translation regime, and don't have
++	 * to distinguish between EL0 and EL1 access.
 +	 */
-+	if (!cpu_if->vgic_sre) {
-+		write_gicreg(read_gicreg(ICC_SRE_EL2) & ~ICC_SRE_EL2_ENABLE,
-+			     ICC_SRE_EL2);
-+	}
-+}
++	mrs	x2, far_el2
++	at	s1e1r, x2
++	isb
 +
-+u64 __hyp_text __vgic_v3_read_ich_vtr_el2(void)
-+{
-+	return read_gicreg(ICH_VTR_EL2);
-+}
++	/* Read result */
++	mrs	x3, par_el1
++	ldp	x0, xzr, [sp], #16	// Restore PAR_EL1 from the stack
++	msr	par_el1, x0
++	tbnz	x3, #0, 3f		// Bail out if we failed the translation
++	ubfx	x3, x3, #12, #36	// Extract IPA
++	lsl	x3, x3, #4		// and present it like HPFAR
++	b	2f
++
++1:	mrs	x3, hpfar_el2
++	mrs	x2, far_el2
++
++2:	mrs	x0, tpidr_el2
++	str	w1, [x0, #VCPU_ESR_EL2]
++	str	x2, [x0, #VCPU_FAR_EL2]
++	str	x3, [x0, #VCPU_HPFAR_EL2]
++
++	mov	x1, #ARM_EXCEPTION_TRAP
++	b	__guest_exit
++
++	/*
++	 * Translation failed. Just return to the guest and
++	 * let it fault again. Another CPU is probably playing
++	 * behind our back.
++	 */
++3:	restore_x0_to_x3
++
++	eret
++
++el1_irq:
++	save_x0_to_x3
++	mrs	x0, tpidr_el2
++	mov	x1, #ARM_EXCEPTION_IRQ
++	b	__guest_exit
++
++.macro invalid_vector	label, target = __kvm_hyp_panic
++	.align	2
++\label:
++	b \target
++ENDPROC(\label)
++.endm
++
++	/* None of these should ever happen */
++	invalid_vector	el2t_sync_invalid
++	invalid_vector	el2t_irq_invalid
++	invalid_vector	el2t_fiq_invalid
++	invalid_vector	el2t_error_invalid
++	invalid_vector	el2h_sync_invalid
++	invalid_vector	el2h_irq_invalid
++	invalid_vector	el2h_fiq_invalid
++	invalid_vector	el2h_error_invalid
++	invalid_vector	el1_sync_invalid
++	invalid_vector	el1_irq_invalid
++	invalid_vector	el1_fiq_invalid
++	invalid_vector	el1_error_invalid
++
++	.ltorg
++
++	.align 11
++
++ENTRY(__hyp_vector)
++	ventry	el2t_sync_invalid		// Synchronous EL2t
++	ventry	el2t_irq_invalid		// IRQ EL2t
++	ventry	el2t_fiq_invalid		// FIQ EL2t
++	ventry	el2t_error_invalid		// Error EL2t
++
++	ventry	el2h_sync_invalid		// Synchronous EL2h
++	ventry	el2h_irq_invalid		// IRQ EL2h
++	ventry	el2h_fiq_invalid		// FIQ EL2h
++	ventry	el2h_error_invalid		// Error EL2h
++
++	ventry	el1_sync			// Synchronous 64-bit EL1
++	ventry	el1_irq				// IRQ 64-bit EL1
++	ventry	el1_fiq_invalid			// FIQ 64-bit EL1
++	ventry	el1_error_invalid		// Error 64-bit EL1
++
++	ventry	el1_sync			// Synchronous 32-bit EL1
++	ventry	el1_irq				// IRQ 32-bit EL1
++	ventry	el1_fiq_invalid			// FIQ 32-bit EL1
++	ventry	el1_error_invalid		// Error 32-bit EL1
++ENDPROC(__hyp_vector)
 -- 
 2.1.4
