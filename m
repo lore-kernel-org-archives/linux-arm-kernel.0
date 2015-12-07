@@ -1,146 +1,140 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 07 Dec 2015 09:18:05 -0800
-Subject: [PATCH v3 05/22] arm64: KVM: Implement vgic-v3 save/restore
-In-Reply-To: <5665B940.7000601@arm.com>
-References: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
- <1449485618-9443-6-git-send-email-marc.zyngier@arm.com>
- <5665B663.8020705@samsung.com> <5665B940.7000601@arm.com>
-Message-ID: <5665BF4D.7090103@samsung.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 07 Dec 2015 18:22:39 +0100
+Subject: [PATCH v2 0/7] ARM: orion5x/mv78xx0 multiplatform
+In-Reply-To: <1449091629-2155735-1-git-send-email-arnd@arndb.de> (Arnd
+ Bergmann's message of "Wed, 2 Dec 2015 22:27:02 +0100")
+References: <1449091629-2155735-1-git-send-email-arnd@arndb.de>
+Message-ID: <871taycgww.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd,
+ 
+ On mer., d?c. 02 2015, Arnd Bergmann <arnd@arndb.de> wrote:
+
+> I've updated the series slightly to leave out the last two patches for
+> mach-dove. I think the MULTI_IRQ_HANDLER and SPARSE_IRQ use is useful
+> to have for all three platforms for consistency, and the watchdog change
+> is required to get orion5x to work right.
+>
+> Please have another look.
+>
+> I've also uploaded this series to
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/arnd/playground.git multiplatform-orion-4.3
+>
+> again, that version is based on v4.3, while the patches in these mails
+> are based on v4.4-rc3.
+>
+> I've left Andrew's Ack in place, hope that's ok.
+>
+
+I applied the series on mvebu/soc and I will try to see if I can test it
+on an mv78xx0 board.
+
+I applied the series on v4.4-rc1, so I had to merge "manually" the
+second patch. If everything goes well, should I use the v4.4-rc3 as
+reference for the pull request?
+
+Thanks,
+
+Gregory
 
 
-On 12/7/2015 8:52 AM, Marc Zyngier wrote:
-> Hi Mario,
-> 
-> On 07/12/15 16:40, Mario Smarduch wrote:
->> Hi Marc,
->>
->> On 12/7/2015 2:53 AM, Marc Zyngier wrote:
->>> Implement the vgic-v3 save restore as a direct translation of
->>> the assembly code version.
->>>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>  arch/arm64/kvm/hyp/Makefile     |   1 +
->>>  arch/arm64/kvm/hyp/hyp.h        |   3 +
->>>  arch/arm64/kvm/hyp/vgic-v3-sr.c | 226 ++++++++++++++++++++++++++++++++++++++++
->>>  3 files changed, 230 insertions(+)
->>>  create mode 100644 arch/arm64/kvm/hyp/vgic-v3-sr.c
->>>
->>> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
->>> index d8d5968..d1e38ce 100644
->>> --- a/arch/arm64/kvm/hyp/Makefile
->>> +++ b/arch/arm64/kvm/hyp/Makefile
->>> @@ -3,3 +3,4 @@
->>>  #
->>>  
->>>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
->>> +obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
->>> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
->>> index ac63553..5759f9f 100644
->>> --- a/arch/arm64/kvm/hyp/hyp.h
->>> +++ b/arch/arm64/kvm/hyp/hyp.h
->>> @@ -32,5 +32,8 @@
->>>  void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
->>>  void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
->>>  
->>> +void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
->>> +void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
->>> +
->>>  #endif /* __ARM64_KVM_HYP_H__ */
->>>  
->>> diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
->>> new file mode 100644
->>> index 0000000..78d05f3
->>> --- /dev/null
->>> +++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
->>> @@ -0,0 +1,226 @@
->>> +/*
->>> + * Copyright (C) 2012-2015 - ARM Ltd
->>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + *
->>> + * This program is distributed in the hope that it will be useful,
->>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>> + *
->>> + * You should have received a copy of the GNU General Public License
->>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>> + */
->>> +
->>> +#include <linux/compiler.h>
->>> +#include <linux/irqchip/arm-gic-v3.h>
->>> +#include <linux/kvm_host.h>
->>> +
->>> +#include <asm/kvm_mmu.h>
->>> +
->>> +#include "hyp.h"
->>> +
->>> +#define vtr_to_max_lr_idx(v)		((v) & 0xf)
->>> +#define vtr_to_nr_pri_bits(v)		(((u32)(v) >> 29) + 1)
->>> +
->>> +#define read_gicreg(r)							\
->>> +	({								\
->>> +		u64 reg;						\
->>> +		asm volatile("mrs_s %0, " __stringify(r) : "=r" (reg));	\
->>> +		reg;							\
->>> +	})
->>> +
->>> +#define write_gicreg(v,r)						\
->>> +	do {								\
->>> +		u64 __val = (v);					\
->>> +		asm volatile("msr_s " __stringify(r) ", %0" : : "r" (__val));\
->>> +	} while (0)
->>> +
->>> +/* vcpu is already in the HYP VA space */
->>> +void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
->>> +{
->>> +	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
->>> +	u64 val;
->>> +	u32 max_lr_idx, nr_pri_bits;
->>> +
->>> +	/*
->>> +	 * Make sure stores to the GIC via the memory mapped interface
->>> +	 * are now visible to the system register interface.
->>> +	 */
->>> +	dsb(st);
->>> +
->>> +	cpu_if->vgic_vmcr  = read_gicreg(ICH_VMCR_EL2);
->>> +	cpu_if->vgic_misr  = read_gicreg(ICH_MISR_EL2);
->>> +	cpu_if->vgic_eisr  = read_gicreg(ICH_EISR_EL2);
->>> +	cpu_if->vgic_elrsr = read_gicreg(ICH_ELSR_EL2);
->>> +
->>> +	write_gicreg(0, ICH_HCR_EL2);
->>> +	val = read_gicreg(ICH_VTR_EL2);
->>> +	max_lr_idx = vtr_to_max_lr_idx(val);
->>> +	nr_pri_bits = vtr_to_nr_pri_bits(val);
->>> +
->> Can you setup a base pointer to cpu_if->vgic_lr and use an offset?
-> 
-> I could, but I fail to see what we'd gain by using this (aside from
-> slightly shorter lines). Or am I completely missing the point?
+> Arnd Bergmann (7):
+>   ARM: orion: move watchdog setup to mach-orion5x
+>   ARM: orion: always use MULTI_IRQ_HANDLER
+>   ARM: orion: use SPARSE_IRQ everywhere
+>   ARM: mv78xx0: clean up mach/*.h headers
+>   ARM: mv78xx0: multiplatform support
+>   ARM: orion5x: clean up mach/*.h headers
+>   ARM: orion5x: multiplatform support
+>
+>  arch/arm/Kconfig                                   | 29 +------------
+>  arch/arm/configs/mv78xx0_defconfig                 |  3 ++
+>  arch/arm/configs/orion5x_defconfig                 |  3 ++
+>  arch/arm/mach-dove/cm-a510.c                       |  1 +
+>  arch/arm/mach-dove/common.c                        | 17 ++++++++
+>  arch/arm/mach-dove/dove-db-setup.c                 |  1 +
+>  arch/arm/mach-dove/include/mach/dove.h             |  2 +
+>  arch/arm/mach-dove/include/mach/entry-macro.S      | 33 ---------------
+>  arch/arm/mach-dove/include/mach/irqs.h             |  2 +-
+>  arch/arm/mach-dove/include/mach/pm.h               |  2 +-
+>  arch/arm/mach-dove/irq.c                           | 14 +------
+>  arch/arm/mach-mv78xx0/Kconfig                      | 15 +++++--
+>  arch/arm/mach-mv78xx0/Makefile                     |  2 +
+>  .../mach-mv78xx0/{include/mach => }/bridge-regs.h  |  4 +-
+>  arch/arm/mach-mv78xx0/buffalo-wxl-setup.c          |  3 +-
+>  arch/arm/mach-mv78xx0/common.c                     |  4 +-
+>  arch/arm/mach-mv78xx0/db78x00-bp-setup.c           |  3 +-
+>  arch/arm/mach-mv78xx0/include/mach/entry-macro.S   | 41 ------------------
+>  arch/arm/mach-mv78xx0/include/mach/hardware.h      | 14 -------
+>  arch/arm/mach-mv78xx0/include/mach/uncompress.h    | 46 ---------------------
+>  arch/arm/mach-mv78xx0/irq.c                        | 35 +++++++++++++++-
+>  arch/arm/mach-mv78xx0/{include/mach => }/irqs.h    |  4 +-
+>  arch/arm/mach-mv78xx0/mpp.c                        |  2 +-
+>  arch/arm/mach-mv78xx0/{include/mach => }/mv78xx0.h |  4 +-
+>  arch/arm/mach-mv78xx0/pcie.c                       |  2 +-
+>  arch/arm/mach-mv78xx0/rd78x00-masa-setup.c         |  3 +-
+>  arch/arm/mach-orion5x/Kconfig                      | 18 ++++++--
+>  arch/arm/mach-orion5x/Makefile                     |  2 +
+>  arch/arm/mach-orion5x/board-d2net.c                |  2 +-
+>  arch/arm/mach-orion5x/board-dt.c                   |  4 +-
+>  arch/arm/mach-orion5x/board-mss2.c                 |  4 +-
+>  arch/arm/mach-orion5x/board-rd88f5182.c            |  2 +-
+>  .../mach-orion5x/{include/mach => }/bridge-regs.h  |  4 +-
+>  arch/arm/mach-orion5x/common.c                     | 20 +++++++--
+>  arch/arm/mach-orion5x/db88f5281-setup.c            |  3 +-
+>  arch/arm/mach-orion5x/dns323-setup.c               |  3 +-
+>  arch/arm/mach-orion5x/include/mach/entry-macro.S   | 25 -----------
+>  arch/arm/mach-orion5x/include/mach/hardware.h      | 14 -------
+>  arch/arm/mach-orion5x/include/mach/uncompress.h    | 48 ----------------------
+>  arch/arm/mach-orion5x/irq.c                        | 13 +-----
+>  arch/arm/mach-orion5x/{include/mach => }/irqs.h    |  4 +-
+>  arch/arm/mach-orion5x/kurobox_pro-setup.c          |  4 +-
+>  arch/arm/mach-orion5x/ls-chl-setup.c               |  3 +-
+>  arch/arm/mach-orion5x/ls_hgl-setup.c               |  3 +-
+>  arch/arm/mach-orion5x/mpp.c                        |  2 +-
+>  arch/arm/mach-orion5x/mv2120-setup.c               |  3 +-
+>  arch/arm/mach-orion5x/net2big-setup.c              |  3 +-
+>  arch/arm/mach-orion5x/{include/mach => }/orion5x.h |  4 +-
+>  arch/arm/mach-orion5x/pci.c                        |  2 +-
+>  arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c       |  3 +-
+>  arch/arm/mach-orion5x/rd88f5181l-ge-setup.c        |  3 +-
+>  arch/arm/mach-orion5x/rd88f5182-setup.c            |  3 +-
+>  arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c       |  3 +-
+>  arch/arm/mach-orion5x/terastation_pro2-setup.c     |  3 +-
+>  arch/arm/mach-orion5x/ts209-setup.c                |  3 +-
+>  arch/arm/mach-orion5x/ts409-setup.c                |  3 +-
+>  arch/arm/mach-orion5x/ts78xx-setup.c               |  3 +-
+>  arch/arm/mach-orion5x/tsx09-common.c               |  2 +-
+>  arch/arm/mach-orion5x/wnr854t-setup.c              |  3 +-
+>  arch/arm/mach-orion5x/wrt350n-v2-setup.c           |  3 +-
+>  arch/arm/plat-orion/common.c                       | 21 ----------
+>  arch/arm/plat-orion/include/plat/common.h          |  2 -
+>  arch/arm/plat-orion/irq.c                          |  1 -
+>  arch/arm/plat-orion/mpp.c                          |  1 -
+>  64 files changed, 175 insertions(+), 361 deletions(-)
+>  delete mode 100644 arch/arm/mach-dove/include/mach/entry-macro.S
+>  rename arch/arm/mach-mv78xx0/{include/mach => }/bridge-regs.h (92%)
+>  delete mode 100644 arch/arm/mach-mv78xx0/include/mach/entry-macro.S
+>  delete mode 100644 arch/arm/mach-mv78xx0/include/mach/hardware.h
+>  delete mode 100644 arch/arm/mach-mv78xx0/include/mach/uncompress.h
+>  rename arch/arm/mach-mv78xx0/{include/mach => }/irqs.h (95%)
+>  rename arch/arm/mach-mv78xx0/{include/mach => }/mv78xx0.h (98%)
+>  rename arch/arm/mach-orion5x/{include/mach => }/bridge-regs.h (92%)
+>  delete mode 100644 arch/arm/mach-orion5x/include/mach/entry-macro.S
+>  delete mode 100644 arch/arm/mach-orion5x/include/mach/hardware.h
+>  delete mode 100644 arch/arm/mach-orion5x/include/mach/uncompress.h
+>  rename arch/arm/mach-orion5x/{include/mach => }/irqs.h (94%)
+>  rename arch/arm/mach-orion5x/{include/mach => }/orion5x.h (99%)
+>
+> -- 
+> 2.1.0.rc2
+>
 
-Skip adding the offset of vgic_lr to cpu_if pointer.
-> 
->> Also is there a way to get rid of the constants, that implicitly hard codes max
->> number of LRs, doesn't make the code portable.
-> 
-> Well, it is a sad fact of life that the maximum number of LRs *is*
-> hardcoded to an architectural limit of 16. These are CPU registers, and
-> there is only so many of them (and probably a lot less in practice -
-> filling 4 of them has proved to be an extremely rare case).
-
-Yes I'm aware of that it was 64 (or maybe still is) on armv7 but specs have
-changed from time to time.
-
-> 
-> Thanks,
-> 
-> 	M.
-> 
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
