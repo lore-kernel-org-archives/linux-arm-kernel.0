@@ -1,275 +1,55 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 7 Dec 2015 08:23:06 -0600
-Subject: [PATCH v6 2/5] ARM: BCM: Clean up SMP support for Broadcom Kona
-In-Reply-To: <1449316424-14549-3-git-send-email-kapilh@broadcom.com>
-References: <1449316424-14549-1-git-send-email-kapilh@broadcom.com>
- <1449316424-14549-3-git-send-email-kapilh@broadcom.com>
-Message-ID: <20151207142306.GA24119@rob-hp-laptop>
+Date: Mon, 7 Dec 2015 08:31:02 -0600
+Subject: [PATCH] clk: sunxi: Extend the simple gates and handle the
+ Allwinner H3
+In-Reply-To: <20151206100412.1a74b71da8e9ca28c6e61589@free.fr>
+References: <20151206100412.1a74b71da8e9ca28c6e61589@free.fr>
+Message-ID: <20151207143102.GA29097@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 05, 2015 at 06:53:41AM -0500, Kapil Hali wrote:
-> These changes cleans up SMP implementaion for Broadcom's
-> Kona SoC which are required for handling SMP for iProc
-> family of SoCs at a single place for BCM NSP and BCM Kona.
+On Sun, Dec 06, 2015 at 10:04:12AM +0100, Jean-Francois Moine wrote:
+> The H3 has a clock gate definition similar to the other Allwinner SoCs,
+> but with a different parent clock for each single gate.
 > 
-> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+> Adding the names of the parent clocks in both the source and output clocks
+> permits the use of the simple-gates driver to define the bus gates
+> of all known Allwinner SoCs.
+> 
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 > ---
->  .../bindings/arm/bcm/brcm,bcm11351-cpu-method.txt  | 12 ++--
->  arch/arm/boot/dts/bcm11351.dtsi                    |  4 +-
->  arch/arm/boot/dts/bcm21664.dtsi                    |  4 +-
-
-For the bindings:
-
-Acked-by: Rob Herring <robh@kernel.org>
-
->  arch/arm/mach-bcm/kona_smp.c                       | 82 ++++++++++++++--------
->  4 files changed, 64 insertions(+), 38 deletions(-)
+> This patch replaces a part of Jens Kuske's patch
+> 	[PATCH v5 1/4] clk: sunxi: Add H3 clocks support
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi.txt | 25 +++++++++++++++++++++++
+>  drivers/clk/sunxi/clk-simple-gates.c              | 14 ++++++++++++-
+>  2 files changed, 38 insertions(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method.txt
-> index 8240c02..3c5fe4b 100644
-> --- a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method.txt
-> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method.txt
-> @@ -1,17 +1,17 @@
->  Broadcom Kona Family CPU Enable Method
->  --------------------------------------
->  This binding defines the enable method used for starting secondary
-> -CPUs in the following Broadcom SoCs:
-> +CPU in the following Broadcom SoCs:
->    BCM11130, BCM11140, BCM11351, BCM28145, BCM28155, BCM21664
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index 8a47b77..5736e6d 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -70,6 +70,7 @@ Required properties:
+>  	"allwinner,sun8i-a23-usb-clk" - for usb gates + resets on A23
+>  	"allwinner,sun9i-a80-usb-mod-clk" - for usb gates + resets on A80
+>  	"allwinner,sun9i-a80-usb-phy-clk" - for usb phy gates + resets on A80
+> +	"allwinner,sunxi-gates-clk" - simple gates
 >  
->  The enable method is specified by defining the following required
-> -properties in the "cpus" device tree node:
-> +properties in the corresponding secondary "cpu" device tree node:
->    - enable-method = "brcm,bcm11351-cpu-method";
->    - secondary-boot-reg = <...>;
+>  Required properties for all clocks:
+>  - reg : shall be the control register address for the clock.
+> @@ -93,6 +94,12 @@ The "allwinner,sun9i-a80-mmc-config-clk" clock also requires:
+>  - #reset-cells : shall be set to 1
+>  - resets : shall be the reset control phandle for the mmc block.
 >  
->  The secondary-boot-reg property is a u32 value that specifies the
-> -physical address of the register used to request the ROM holding pen
-> -code release a secondary CPU.  The value written to the register is
-> +physical address of the register used to request the ROM code
-> +release a secondary CPU.  The value written to the register is
->  formed by encoding the target CPU id into the low bits of the
->  physical start address it should jump to.
->  
-> @@ -19,8 +19,6 @@ Example:
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> -		enable-method = "brcm,bcm11351-cpu-method";
-> -		secondary-boot-reg = <0x3500417c>;
->  
->  		cpu0: cpu at 0 {
->  			device_type = "cpu";
-> @@ -31,6 +29,8 @@ Example:
->  		cpu1: cpu at 1 {
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a9";
-> +			enable-method = "brcm,bcm11351-cpu-method";
-> +			secondary-boot-reg = <0x3500417c>;
->  			reg = <1>;
->  		};
->  	};
-> diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-> index 2ddaa51..18045c3 100644
-> --- a/arch/arm/boot/dts/bcm11351.dtsi
-> +++ b/arch/arm/boot/dts/bcm11351.dtsi
-> @@ -30,8 +30,6 @@
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> -		enable-method = "brcm,bcm11351-cpu-method";
-> -		secondary-boot-reg = <0x3500417c>;
->  
->  		cpu0: cpu at 0 {
->  			device_type = "cpu";
-> @@ -42,6 +40,8 @@
->  		cpu1: cpu at 1 {
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a9";
-> +			enable-method = "brcm,bcm11351-cpu-method";
-> +			secondary-boot-reg = <0x3500417c>;
->  			reg = <1>;
->  		};
->  	};
-> diff --git a/arch/arm/boot/dts/bcm21664.dtsi b/arch/arm/boot/dts/bcm21664.dtsi
-> index 2016b72..6dde95f 100644
-> --- a/arch/arm/boot/dts/bcm21664.dtsi
-> +++ b/arch/arm/boot/dts/bcm21664.dtsi
-> @@ -30,8 +30,6 @@
->         cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> -		enable-method = "brcm,bcm11351-cpu-method";
-> -		secondary-boot-reg = <0x35004178>;
->  
->  		cpu0: cpu at 0 {
->  			device_type = "cpu";
-> @@ -42,6 +40,8 @@
->  		cpu1: cpu at 1 {
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a9";
-> +			enable-method = "brcm,bcm11351-cpu-method";
-> +			secondary-boot-reg = <0x35004178>;
->  			reg = <1>;
->  		};
->  	};
-> diff --git a/arch/arm/mach-bcm/kona_smp.c b/arch/arm/mach-bcm/kona_smp.c
-> index 66a0465..15af781 100644
-> --- a/arch/arm/mach-bcm/kona_smp.c
-> +++ b/arch/arm/mach-bcm/kona_smp.c
-> @@ -1,5 +1,5 @@
->  /*
-> - * Copyright (C) 2014 Broadcom Corporation
-> + * Copyright (C) 2014-2015 Broadcom Corporation
->   * Copyright 2014 Linaro Limited
->   *
->   * This program is free software; you can redistribute it and/or
-> @@ -30,9 +30,10 @@
->  
->  /* Name of device node property defining secondary boot register location */
->  #define OF_SECONDARY_BOOT	"secondary-boot-reg"
-> +#define MPIDR_CPUID_BITMASK	0x3
->  
->  /* I/O address of register used to coordinate secondary core startup */
-> -static u32	secondary_boot;
-> +static u32	secondary_boot_addr;
->  
->  /*
->   * Enable the Cortex A9 Snoop Control Unit
-> @@ -78,44 +79,68 @@ static int __init scu_a9_enable(void)
->  static void __init bcm_smp_prepare_cpus(unsigned int max_cpus)
->  {
->  	static cpumask_t only_cpu_0 = { CPU_BITS_CPU0 };
-> -	struct device_node *node;
-> +	struct device_node *cpus_node = NULL;
-> +	struct device_node *cpu_node = NULL;
->  	int ret;
->  
-> -	BUG_ON(secondary_boot);		/* We're called only once */
-> -
->  	/*
->  	 * This function is only called via smp_ops->smp_prepare_cpu().
->  	 * That only happens if a "/cpus" device tree node exists
->  	 * and has an "enable-method" property that selects the SMP
->  	 * operations defined herein.
->  	 */
-> -	node = of_find_node_by_path("/cpus");
-> -	BUG_ON(!node);
-> -
-> -	/*
-> -	 * Our secondary enable method requires a "secondary-boot-reg"
-> -	 * property to specify a register address used to request the
-> -	 * ROM code boot a secondary code.  If we have any trouble
-> -	 * getting this we fall back to uniprocessor mode.
-> -	 */
-> -	if (of_property_read_u32(node, OF_SECONDARY_BOOT, &secondary_boot)) {
-> -		pr_err("%s: missing/invalid " OF_SECONDARY_BOOT " property\n",
-> -			node->name);
-> -		ret = -ENOENT;		/* Arrange to disable SMP */
-> -		goto out;
-> +	cpus_node = of_find_node_by_path("/cpus");
-> +	if (!cpus_node)
-> +		return;
+> +The "allwinner,sunxi-gates-clk" clock also requires:
+> +- clock-names : corresponding names of the parent clocks
+> +when the output clocks have different parents.
+> +These names must be 4 characters long and must appear as a prefix in
+> +the names of the output clocks. See example.
 > +
-> +	for_each_child_of_node(cpus_node, cpu_node) {
-> +		u32 cpuid;
-> +
-> +		if (of_node_cmp(cpu_node->type, "cpu"))
-> +			continue;
-> +
-> +		if (of_property_read_u32(cpu_node, "reg", &cpuid)) {
-> +			pr_debug("%s: missing reg property\n",
-> +				     cpu_node->full_name);
-> +			ret = -ENOENT;
-> +			goto out;
-> +		}
-> +
-> +		/*
-> +		 * "secondary-boot-reg" property should be defined only
-> +		 * for secondary cpu
-> +		 */
-> +		if ((cpuid & MPIDR_CPUID_BITMASK) == 1) {
-> +			/*
-> +			 * Our secondary enable method requires a
-> +			 * "secondary-boot-reg" property to specify a register
-> +			 * address used to request the ROM code boot a secondary
-> +			 * core. If we have any trouble getting this we fall
-> +			 * back to uniprocessor mode.
-> +			 */
-> +			if (of_property_read_u32(cpu_node,
-> +						OF_SECONDARY_BOOT,
-> +						&secondary_boot_addr)) {
-> +				pr_warn("%s: no" OF_SECONDARY_BOOT "property\n",
-> +					cpu_node->name);
-> +				ret = -ENOENT;
-> +				goto out;
-> +			}
-> +		}
->  	}
->  
->  	/*
-> -	 * Enable the SCU on Cortex A9 based SoCs.  If -ENOENT is
-> +	 * Enable the SCU on Cortex A9 based SoCs. If -ENOENT is
->  	 * returned, the SoC reported a uniprocessor configuration.
->  	 * We bail on any other error.
->  	 */
->  	ret = scu_a9_enable();
->  out:
-> -	of_node_put(node);
-> +	of_node_put(cpu_node);
-> +	of_node_put(cpus_node);
-> +
->  	if (ret) {
->  		/* Update the CPU present map to reflect uniprocessor mode */
-> -		BUG_ON(ret != -ENOENT);
->  		pr_warn("disabling SMP\n");
->  		init_cpu_present(&only_cpu_0);
->  	}
-> @@ -139,7 +164,7 @@ out:
->   * - Wait for the secondary boot register to be re-written, which
->   *   indicates the secondary core has started.
->   */
-> -static int bcm_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> +static int kona_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  {
->  	void __iomem *boot_reg;
->  	phys_addr_t boot_func;
-> @@ -154,15 +179,16 @@ static int bcm_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  		return -EINVAL;
->  	}
->  
-> -	if (!secondary_boot) {
-> +	if (!secondary_boot_addr) {
->  		pr_err("required secondary boot register not specified\n");
->  		return -EINVAL;
->  	}
->  
-> -	boot_reg = ioremap_nocache((phys_addr_t)secondary_boot, sizeof(u32));
-> +	boot_reg = ioremap_nocache(
-> +			(phys_addr_t)secondary_boot_addr, sizeof(u32));
->  	if (!boot_reg) {
->  		pr_err("unable to map boot register for cpu %u\n", cpu_id);
-> -		return -ENOSYS;
-> +		return -ENOMEM;
->  	}
->  
->  	/*
-> @@ -191,12 +217,12 @@ static int bcm_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  
->  	pr_err("timeout waiting for cpu %u to start\n", cpu_id);
->  
-> -	return -ENOSYS;
-> +	return -ENXIO;
->  }
->  
->  static struct smp_operations bcm_smp_ops __initdata = {
->  	.smp_prepare_cpus	= bcm_smp_prepare_cpus,
-> -	.smp_boot_secondary	= bcm_boot_secondary,
-> +	.smp_boot_secondary	= kona_boot_secondary,
->  };
->  CPU_METHOD_OF_DECLARE(bcm_smp_bcm281xx, "brcm,bcm11351-cpu-method",
->  			&bcm_smp_ops);
-> -- 
-> 2.1.0
-> 
+
+I don't think you should be encoding relationships of clocks using the 
+name strings. We describe relationships in DT via parent/child or 
+phandles.
+
+Rob
