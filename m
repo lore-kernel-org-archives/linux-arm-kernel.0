@@ -1,35 +1,58 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  7 Dec 2015 11:50:31 +0000
-Subject: [PATCH 18/19] mfd: da9052-irq: Fix trivial 'space before comma' error
+Date: Mon,  7 Dec 2015 11:50:29 +0000
+Subject: [PATCH 16/19] mfd: da903x: Fix white space and split string issues
 In-Reply-To: <1449489032-14374-1-git-send-email-lee.jones@linaro.org>
 References: <1449489032-14374-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1449489032-14374-19-git-send-email-lee.jones@linaro.org>
+Message-ID: <1449489032-14374-17-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ERROR: space prohibited before that ',' (ctx:WxW)
-+       da9052_free_irq(da9052, DA9052_IRQ_ADC_EOM , da9052);
+While we're at it, let's also match the MODULE_LICENSE with the header.
 
-total: 1 errors, 0 warnings, 290 lines checked
+WARNING: please, no space before tabs
++ * ^IMike Rapoport <mike@compulab.co.il>$
+
+WARNING: please, no space before tabs
++ * ^IEric Miao <eric.miao@marvell.com>$
+
+WARNING: quoted string split across lines
++MODULE_AUTHOR("Eric Miao <eric.miao@marvell.com>"
++             "Mike Rapoport <mike@compulab.co.il>");
+
+total: 0 errors, 3 warnings, 574 lines checked
 
 Cc: Support Opensource <support.opensource@diasemi.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/da9052-irq.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mfd/da903x.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/mfd/da9052-irq.c b/drivers/mfd/da9052-irq.c
-index f4cb461..cd4ca84 100644
---- a/drivers/mfd/da9052-irq.c
-+++ b/drivers/mfd/da9052-irq.c
-@@ -283,7 +283,7 @@ regmap_err:
+diff --git a/drivers/mfd/da903x.c b/drivers/mfd/da903x.c
+index ef7fe2a..cf3e7a2 100644
+--- a/drivers/mfd/da903x.c
++++ b/drivers/mfd/da903x.c
+@@ -2,10 +2,10 @@
+  * Base driver for Dialog Semiconductor DA9030/DA9034
+  *
+  * Copyright (C) 2008 Compulab, Ltd.
+- * 	Mike Rapoport <mike@compulab.co.il>
++ *	Mike Rapoport <mike@compulab.co.il>
+  *
+  * Copyright (C) 2006-2008 Marvell International Ltd.
+- * 	Eric Miao <eric.miao@marvell.com>
++ *	Eric Miao <eric.miao@marvell.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -569,6 +569,6 @@ static void __exit da903x_exit(void)
+ module_exit(da903x_exit);
  
- int da9052_irq_exit(struct da9052 *da9052)
- {
--	da9052_free_irq(da9052, DA9052_IRQ_ADC_EOM , da9052);
-+	da9052_free_irq(da9052, DA9052_IRQ_ADC_EOM, da9052);
- 	regmap_del_irq_chip(da9052->chip_irq, da9052->irq_data);
- 
- 	return 0;
+ MODULE_DESCRIPTION("PMIC Driver for Dialog Semiconductor DA9034");
+-MODULE_AUTHOR("Eric Miao <eric.miao@marvell.com>"
+-	      "Mike Rapoport <mike@compulab.co.il>");
+-MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Eric Miao <eric.miao@marvell.com>");
++MODULE_AUTHOR("Mike Rapoport <mike@compulab.co.il>");
++MODULE_LICENSE("GPL v2");
 -- 
 1.9.1
