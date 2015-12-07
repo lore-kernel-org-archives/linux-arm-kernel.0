@@ -1,186 +1,115 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 07 Dec 2015 22:09:27 +0100
-Subject: [PATCH v2 2/3] soc: dove: add legacy support to PMU driver
-In-Reply-To: <87mvtm9ejc.fsf@free-electrons.com> (Gregory CLEMENT's message of
- "Mon, 07 Dec 2015 21:42:15 +0100")
-References: <E1a5j6Q-000879-GO@rmk-PC.arm.linux.org.uk>
- <87r3iy9er5.fsf@free-electrons.com>
- <87mvtm9ejc.fsf@free-electrons.com>
-Message-ID: <87d1ui9da0.fsf@free-electrons.com>
+From: martyn.welch@collabora.co.uk (Martyn Welch)
+Date: Mon, 07 Dec 2015 21:10:55 +0000
+Subject: [PATCH 1/3] Device tree binding documentation for gpio-switch
+In-Reply-To: <20151207173702.GA17659@rob-hp-laptop>
+References: <1449250275-23435-1-git-send-email-martyn.welch@collabora.co.uk>
+ <1449250275-23435-2-git-send-email-martyn.welch@collabora.co.uk>
+ <20151207173702.GA17659@rob-hp-laptop>
+Message-ID: <5665F5DF.50002@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
- 
- On lun., d?c. 07 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
->  On lun., d?c. 07 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+
+On 07/12/15 17:37, Rob Herring wrote:
+> +Linus W
 >
->> Hi Russell,
->>  
->>  On lun., d?c. 07 2015, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
->>
->>> Add support for legacy non-DT Dove to the PMU driver, so that we can
->>> transition the legacy support over.
->>>
->>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->>
->> Applied on mvebu/soc (and fixed a conflict in drivers/soc/Makefile)
+> On Fri, Dec 04, 2015 at 05:31:13PM +0000, Martyn Welch wrote:
+>> This patch adds documentation for the gpio-switch binding. This binding
+>> provides a mechanism to bind named links to gpio, with the primary
+>> purpose of enabling standardised access to switches that might be standard
+>> across a group of devices but implemented differently on each device.
 >
-> Eventually I applied it on mvebu/drivers rather than mvebu/soc
+> This is good and what I suggested, but it now makes me wonder if switch
+> is generic enough. This boils down to needing to expose single gpio
+> lines to userspace with a defined function/use. IIRC, there's been some
+> discussion about this before along with improving the userspace
+> interface for GPIO in general. So I'd like to get Linus' thoughts on
+> this.
+>
 
-Actually I was too optimitic. It doesn't build on mvebu/soc (based on
-4.4-rc1).
-
-First pm_genpd_poweroff_unused() had been removed since bb4b72fc63d4 "PM
-/ Domains: Remove pm_genpd_poweroff_unused() API ".
-
-Then, even by removing the call this function to go furthetr I got other
-errors such as: drivers/soc/dove/pmu.c:344:46: error:
-?IRQ_DOVE_PMU_START? undeclared (first use in this function)
-
-Gregory
+No problem. Rename gpio-signal?
 
 >
+>> Signed-off-by: Martyn Welch <martyn.welch@collabora.co.uk>
+>> ---
+>>   .../devicetree/bindings/misc/gpio-switch.txt       | 47 ++++++++++++++++++++++
+>>   1 file changed, 47 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/misc/gpio-switch.txt
 >>
->> Thanks,
->>
->> Gregory
->>
->>> ---
->>> This is a re-post of a previous patch, except I've split it into two to
->>> make the eventual removal of legacy Dove easier, as I believe Arnd will
->>> have some patches which touch legacy Dove which will conflict.  This
->>> makes it possible to revert this when the legacy Dove code is removed.
->>>
->>>  drivers/soc/Makefile         |  1 +
->>>  drivers/soc/dove/pmu.c       | 43 +++++++++++++++++++++++++++++++++++++++++++
->>>  include/linux/soc/dove/pmu.h | 18 ++++++++++++++++++
->>>  3 files changed, 62 insertions(+)
->>>
->>> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
->>> index 0b12d777d3c4..c99192f30679 100644
->>> --- a/drivers/soc/Makefile
->>> +++ b/drivers/soc/Makefile
->>> @@ -2,6 +2,7 @@
->>>  # Makefile for the Linux Kernel SOC specific device drivers.
->>>  #
->>>  
->>> +obj-$(CONFIG_ARCH_DOVE)		+= dove/
->>>  obj-$(CONFIG_MACH_DOVE)		+= dove/
->>>  obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
->>>  obj-$(CONFIG_ARCH_QCOM)		+= qcom/
->>> diff --git a/drivers/soc/dove/pmu.c b/drivers/soc/dove/pmu.c
->>> index 052aecf29893..429e32cab55a 100644
->>> --- a/drivers/soc/dove/pmu.c
->>> +++ b/drivers/soc/dove/pmu.c
->>> @@ -305,6 +305,49 @@ static int __init dove_init_pmu_irq(struct pmu_data *pmu, int irq)
->>>  	return 0;
->>>  }
->>>  
->>> +int __init dove_init_pmu_legacy(const struct dove_pmu_initdata *initdata)
->>> +{
->>> +	const struct dove_pmu_domain_initdata *domain_initdata;
->>> +	struct pmu_data *pmu;
->>> +	int ret;
->>> +
->>> +	pmu = kzalloc(sizeof(*pmu), GFP_KERNEL);
->>> +	if (!pmu)
->>> +		return -ENOMEM;
->>> +
->>> +	spin_lock_init(&pmu->lock);
->>> +	pmu->pmc_base = initdata->pmc_base;
->>> +	pmu->pmu_base = initdata->pmu_base;
->>> +
->>> +	pmu_reset_init(pmu);
->>> +	for (domain_initdata = initdata->domains; domain_initdata->name;
->>> +	     domain_initdata++) {
->>> +		struct pmu_domain *domain;
->>> +
->>> +		domain = kzalloc(sizeof(*domain), GFP_KERNEL);
->>> +		if (domain) {
->>> +			domain->pmu = pmu;
->>> +			domain->pwr_mask = domain_initdata->pwr_mask;
->>> +			domain->rst_mask = domain_initdata->rst_mask;
->>> +			domain->iso_mask = domain_initdata->iso_mask;
->>> +			domain->base.name = domain_initdata->name;
->>> +
->>> +			__pmu_domain_register(domain, NULL);
->>> +		}
->>> +	}
->>> +	pm_genpd_poweroff_unused();
->>> +
->>> +	ret = dove_init_pmu_irq(pmu, initdata->irq);
->>> +	if (ret)
->>> +		pr_err("dove_init_pmu_irq() failed: %d\n", ret);
->>> +
->>> +	if (pmu->irq_domain)
->>> +		irq_domain_associate_many(pmu->irq_domain, IRQ_DOVE_PMU_START,
->>> +					  0, NR_PMU_IRQS);
->>> +
->>> +	return 0;
->>> +}
->>> +
->>>  /*
->>>   * pmu: power-manager at d0000 {
->>>   *	compatible = "marvell,dove-pmu";
->>> diff --git a/include/linux/soc/dove/pmu.h b/include/linux/soc/dove/pmu.h
->>> index 9c99f84bcc0e..431dfac595e7 100644
->>> --- a/include/linux/soc/dove/pmu.h
->>> +++ b/include/linux/soc/dove/pmu.h
->>> @@ -1,6 +1,24 @@
->>>  #ifndef LINUX_SOC_DOVE_PMU_H
->>>  #define LINUX_SOC_DOVE_PMU_H
->>>  
->>> +#include <linux/types.h>
->>> +
->>> +struct dove_pmu_domain_initdata {
->>> +	u32 pwr_mask;
->>> +	u32 rst_mask;
->>> +	u32 iso_mask;
->>> +	const char *name;
->>> +};
->>> +
->>> +struct dove_pmu_initdata {
->>> +	void __iomem *pmc_base;
->>> +	void __iomem *pmu_base;
->>> +	int irq;
->>> +	const struct dove_pmu_domain_initdata *domains;
->>> +};
->>> +
->>> +int dove_init_pmu_legacy(const struct dove_pmu_initdata *);
->>> +
->>>  int dove_init_pmu(void);
->>>  
->>>  #endif
->>> -- 
->>> 2.1.0
->>>
->>
->> -- 
->> Gregory Clement, Free Electrons
->> Kernel, drivers, real-time and embedded Linux
->> development, consulting, training and support.
->> http://free-electrons.com
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> diff --git a/Documentation/devicetree/bindings/misc/gpio-switch.txt b/Documentation/devicetree/bindings/misc/gpio-switch.txt
+>> new file mode 100644
+>> index 0000000..13528bd
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/misc/gpio-switch.txt
+>> @@ -0,0 +1,47 @@
+>> +Device-Tree bindings for gpio attached switches.
+>> +
+>> +This provides a mechanism to provide a named link to specified gpios. This can
+>> +be useful in instances such as when theres a need to monitor a switch, which is
+>> +common across a family of devices, but attached to different gpios and even
+>> +implemented in different ways on differnet devices.
+>> +
+>> +Required properties:
+>> +	- compatible = "gpio-switch";
+>> +
+>> +Each signal is represented as a sub-node of "gpio-switch". The naming of
+>> +sub-nodes is arbitrary.
+>> +
+>> +Required sub-node properties:
+>> +
+>> +	- label: Name to be given to gpio switch.
+>> +	- gpios: OF device-tree gpio specification.
+>> +
+>> +Optional sub-node properties:
+>> +
+>> +	- read-only: Boolean flag to mark the gpio as read-only, i.e. the line
+>> +	  should not be driven by the host.
 >
-> -- 
-> Gregory Clement, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
+> In terms a a switch use, allowing driving it would be an override of the
+> switch. Is that the idea here?
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Yeah - since it had become a lot more generic and a lot of 
+switches/signals would probably be implemented with a pull-up resistor 
+of something like that, it seemed to make sense to allow them to be 
+driven as well.
+
+>> +
+>> +Example nodes:
+>> +
+>> +        gpio-switch {
+>> +                compatible = "gpio-switch";
+>
+> Both from a binding and driver perspective, there is no point in
+> grouping these. Each node can simply have this compatible string.
+>
+
+True. I did it this way as this is how gpio-keys is implemented. OK, 
+that has one optional parameter (autorepeat) for the block and this has 
+none. Though I can also see that these probably have less in common than 
+the individual lines used in gpio-keys.
+
+>> +
+>> +                write-protect {
+>> +                        label = "write-protect";
+>> +                        gpios = <&gpx3 0 GPIO_ACTIVE_LOW>;
+>> +                        read-only;
+>> +                };
+>> +
+>> +                developer-switch {
+>> +                        label = "developer-switch";
+>> +                        gpios = <&gpx1 3 GPIO_ACTIVE_HIGH>;
+>> +                        read-only;
+>> +                };
+>> +
+>> +                recovery-switch {
+>> +                        label = "recovery-switch";
+>> +                        gpios = <&gpx0 7 GPIO_ACTIVE_LOW>;
+>> +                        read-only;
+>> +                };
+>> +        };
+>> +
+>> --
+>> 2.1.4
+>>
