@@ -1,87 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon,  7 Dec 2015 14:54:05 -0800
-Subject: [PATCH] mmc: pwrseq_simple: Fix regression with optional GPIOs
-Message-ID: <1449528845-25189-1-git-send-email-tony@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 07 Dec 2015 23:57:20 +0100
+Subject: [PATCH 0/5] multi and mvebu v5 defconfig updates
+In-Reply-To: <87610achog.fsf@free-electrons.com>
+References: <1449012812-9779-1-git-send-email-andrew@lunn.ch>
+ <87610achog.fsf@free-electrons.com>
+Message-ID: <4322870.qyT4ELuZLH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit ce037275861e ("mmc: pwrseq_simple: use GPIO descriptors array API")
-changed the handling MMC power sequence so GPIOs no longer are optional.
+On Monday 07 December 2015 18:06:07 Gregory CLEMENT wrote:
+> Hi Arnd
+>  
+>  On mer., d?c. 02 2015, Andrew Lunn <andrew@lunn.ch> wrote:
+> 
+> > This patchset updates both multi_v5_defconfig and mvebu_v5_defconfig.
+> > It adds support for Orion5x, now that it is multi-arch, and adds back
+> > DSA and its drivers, which now depends on switchdev.
+> >
+> > Andrew Lunn (5):
+> >   ARM: config: Regenerate multi_v5_defconfig
+> >   ARM: config: Reenable DSA in multi_v5_defconfig
+> >   ARM: config: Add orion5x to multi_v5_defconfig
+> 
+> >   ARM: mvebu: Reenable DSA in mvebu_v5_defconfig
+> >   ARM: mvebu: update v5 defconfig for Orion5x machines
+> 
+> To be sure there won't be a leftover, I applied the last 2 patches, but
+> not the 3 first ones, as for my understanding it is better that it is
+> managed by arm-soc directly.
+> 
+> 
 
-This broke SDIO WLAN at least for omap5 that can't yet use the reset GPIOs
-with pwrseq_simple as a wait is needed after enabling the SDIO device.
+Actually, I'd prefer you to put them in the same branch as the other
+patches. I can easily sort out any merge conflicts when merging the
+branch.
 
-Let's fix the problem by allocating the GPIO values array during init
-depending on the optional GPIOs found.
-
-Note that depending on the board specific configuration, some of the GPIOs
-can be permanently set up with pulls, so we want to keep pwrseq_simple
-GPIOs optional.
-
-Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- drivers/mmc/core/pwrseq_simple.c | 20 ++++++++++++++++----
- 1 file changed, 16 insertions(+), 4 deletions(-)
-
---- a/drivers/mmc/core/pwrseq_simple.c
-+++ b/drivers/mmc/core/pwrseq_simple.c
-@@ -24,6 +24,7 @@ struct mmc_pwrseq_simple {
- 	bool clk_enabled;
- 	struct clk *ext_clk;
- 	struct gpio_descs *reset_gpios;
-+	int *values;
- };
- 
- static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
-@@ -31,13 +32,15 @@ static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
- {
- 	int i;
- 	struct gpio_descs *reset_gpios = pwrseq->reset_gpios;
--	int values[reset_gpios->ndescs];
-+
-+	if (!reset_gpios || !reset_gpios->ndescs)
-+		return;
- 
- 	for (i = 0; i < reset_gpios->ndescs; i++)
--		values[i] = value;
-+		pwrseq->values[i] = value;
- 
- 	gpiod_set_array_value_cansleep(reset_gpios->ndescs, reset_gpios->desc,
--				       values);
-+				       pwrseq->values);
- }
- 
- static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
-@@ -84,6 +87,7 @@ static void mmc_pwrseq_simple_free(struct mmc_host *host)
- 	if (!IS_ERR(pwrseq->ext_clk))
- 		clk_put(pwrseq->ext_clk);
- 
-+	kfree(pwrseq->values);
- 	kfree(pwrseq);
- }
- 
-@@ -111,12 +115,20 @@ struct mmc_pwrseq *mmc_pwrseq_simple_alloc(struct mmc_host *host,
- 		goto free;
- 	}
- 
--	pwrseq->reset_gpios = gpiod_get_array(dev, "reset", GPIOD_OUT_HIGH);
-+	pwrseq->reset_gpios = gpiod_get_array_optional(dev, "reset",
-+						       GPIOD_OUT_HIGH);
- 	if (IS_ERR(pwrseq->reset_gpios)) {
- 		ret = PTR_ERR(pwrseq->reset_gpios);
- 		goto clk_put;
- 	}
- 
-+	if (pwrseq->reset_gpios && pwrseq->reset_gpios->ndescs) {
-+		pwrseq->values = kzalloc(pwrseq->reset_gpios->ndescs *
-+					 sizeof(int), GFP_KERNEL);
-+		if (!pwrseq->values)
-+			goto clk_put;
-+	}
-+
- 	pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
- 
- 	return &pwrseq->pwrseq;
--- 
-2.6.2
+	Arnd
