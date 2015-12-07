@@ -1,175 +1,68 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 7 Dec 2015 08:12:21 -0600
-Subject: [PATCH net-next 2/2] net: hns: enet specisies a reference to
- dsaf (config and documents)
-In-Reply-To: <1449302356-54658-3-git-send-email-yankejian@huawei.com>
-References: <1449302356-54658-1-git-send-email-yankejian@huawei.com>
- <1449302356-54658-3-git-send-email-yankejian@huawei.com>
-Message-ID: <20151207141221.GA18040@rob-hp-laptop>
+From: pmladek@suse.com (Petr Mladek)
+Date: Mon, 7 Dec 2015 15:16:46 +0100
+Subject: [PATCH v2 5/5] printk/nmi: Increase the size of the temporary
+ buffer
+In-Reply-To: <81211733-2484-40A9-9D4A-644AA27FBC73@gmail.com>
+References: <1448622572-16900-1-git-send-email-pmladek@suse.com>
+ <1448622572-16900-6-git-send-email-pmladek@suse.com>
+ <81211733-2484-40A9-9D4A-644AA27FBC73@gmail.com>
+Message-ID: <20151207141646.GF20935@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 05, 2015 at 03:59:16PM +0800, yankejian wrote:
-> when enet specisies a reference to dsaf, the correlative config and
-
-s/when/When/
-
-> documents needs to update. this patch updates the correlative dtsi file
-
-s/this/This/
-
-> and bindings documents .
-                        ^
-extra space
-
-This change breaks compatibility with old dtbs. IIRC, this is all new, 
-so maybe it doesn't matter, but you should be explicit that you are 
-doing that.
-
-
+On Mon 2015-11-30 08:42:04, yalin wang wrote:
 > 
-> Signed-off-by: yankejian <yankejian@huawei.com>
-> ---
->  .../devicetree/bindings/net/hisilicon-hns-dsaf.txt    |  5 +----
->  .../devicetree/bindings/net/hisilicon-hns-nic.txt     |  7 ++++---
->  arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi          | 19 +++++++++----------
->  3 files changed, 14 insertions(+), 17 deletions(-)
+> > On Nov 27, 2015, at 19:09, Petr Mladek <pmladek@suse.com> wrote:
+> > 
+> > Testing has shown that the backtrace sometimes does not fit
+> > into the 4kB temporary buffer that is used in NMI context.
+> > 
+> > The warnings are gone when I double the temporary buffer size.
+> > 
+> > Note that this problem existed even in the x86-specific
+> > implementation that was added by the commit a9edc8809328
+> > ("x86/nmi: Perform a safe NMI stack trace on all CPUs").
+> > Nobody noticed it because it did not print any warnings.
+> > 
+> > Signed-off-by: Petr Mladek <pmladek@suse.com>
+> > ---
+> > kernel/printk/nmi.c | 2 +-
+> > 1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/kernel/printk/nmi.c b/kernel/printk/nmi.c
+> > index 8af1e4016719..6111644d5f01 100644
+> > --- a/kernel/printk/nmi.c
+> > +++ b/kernel/printk/nmi.c
+> > @@ -42,7 +42,7 @@ atomic_t nmi_message_lost;
+> > struct nmi_seq_buf {
+> > 	atomic_t		len;	/* length of written data */
+> > 	struct irq_work		work;	/* IRQ work that flushes the buffer */
+> > -	unsigned char		buffer[PAGE_SIZE - sizeof(atomic_t) -
+> > +	unsigned char		buffer[2 * PAGE_SIZE - sizeof(atomic_t) -
+> > 				       sizeof(struct irq_work)];
+> > };
+> > 
 > 
-> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
-> index 80411b2..ecacfa4 100644
-> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
-> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
-> @@ -4,8 +4,6 @@ Required properties:
->  - compatible: should be "hisilicon,hns-dsaf-v1" or "hisilicon,hns-dsaf-v2".
->    "hisilicon,hns-dsaf-v1" is for hip05.
->    "hisilicon,hns-dsaf-v2" is for Hi1610 and Hi1612.
-> -- dsa-name: dsa fabric name who provide this interface.
-> -  should be "dsafX", X is the dsaf id.
->  - mode: dsa fabric mode string. only support one of dsaf modes like these:
->  		"2port-64vf",
->  		"6port-16rss",
-> @@ -26,9 +24,8 @@ Required properties:
->  
->  Example:
->  
-> -dsa: dsa at c7000000 {
-> +dsaf0: dsa at c7000000 {
->  	compatible = "hisilicon,hns-dsaf-v1";
-> -	dsa_name = "dsaf0";
->  	mode = "6port-16rss";
->  	interrupt-parent = <&mbigen_dsa>;
->  	reg = <0x0 0xC0000000 0x0 0x420000
-> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
-> index 41d19be..e6a9d1c 100644
-> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
-> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
-> @@ -4,8 +4,9 @@ Required properties:
->  - compatible: "hisilicon,hns-nic-v1" or "hisilicon,hns-nic-v2".
->    "hisilicon,hns-nic-v1" is for hip05.
->    "hisilicon,hns-nic-v2" is for Hi1610 and Hi1612.
-> -- ae-name: accelerator name who provides this interface,
-> -  is simply a name referring to the name of name in the accelerator node.
-> +- ae-handle: accelerator engine handle for hns,
-> +  specifies a reference to the associating hardware driver node.
-> +  see Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
->  - port-id: is the index of port provided by DSAF (the accelerator). DSAF can
->    connect to 8 PHYs. Port 0 to 1 are both used for adminstration purpose. They
->    are called debug ports.
-> @@ -41,7 +42,7 @@ Example:
->  
->  	ethernet at 0{
->  		compatible = "hisilicon,hns-nic-v1";
-> -		ae-name = "dsaf0";
-> +		ae-handle = <&dsaf0>;
->  		port-id = <0>;
->  		local-mac-address = [a2 14 e4 4b 56 76];
->  	};
-> diff --git a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi b/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
-> index 606dd5a..89c883e 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
-> @@ -23,9 +23,8 @@ soc0: soc at 000000000 {
->  		};
->  	};
->  
-> -	dsa: dsa at c7000000 {
-> +	dsaf0: dsa at c7000000 {
->  		compatible = "hisilicon,hns-dsaf-v1";
-> -		dsa_name = "dsaf0";
->  		mode = "6port-16rss";
->  		interrupt-parent = <&mbigen_dsa>;
->  
-> @@ -127,7 +126,7 @@ soc0: soc at 000000000 {
->  
->  	eth0: ethernet at 0{
->  		compatible = "hisilicon,hns-nic-v1";
-> -		ae-name = "dsaf0";
-> +		ae-handle = <&dsaf0>;
->  		port-id = <0>;
->  		local-mac-address = [00 00 00 01 00 58];
->  		status = "disabled";
-> @@ -135,14 +134,14 @@ soc0: soc at 000000000 {
->  	};
->  	eth1: ethernet at 1{
->  		compatible = "hisilicon,hns-nic-v1";
-> -		ae-name = "dsaf0";
-> +		ae-handle = <&dsaf0>;
->  		port-id = <1>;
->  		status = "disabled";
->  		dma-coherent;
->  	};
->  	eth2: ethernet at 2{
->  		compatible = "hisilicon,hns-nic-v1";
-> -		ae-name = "dsaf0";
-> +		ae-handle = <&dsaf0>;
->  		port-id = <2>;
->  		local-mac-address = [00 00 00 01 00 5a];
->  		status = "disabled";
-> @@ -150,7 +149,7 @@ soc0: soc at 000000000 {
->  	};
->  	eth3: ethernet at 3{
->  		compatible = "hisilicon,hns-nic-v1";
-> -		ae-name = "dsaf0";
-> +		ae-handle = <&dsaf0>;
->  		port-id = <3>;
->  		local-mac-address = [00 00 00 01 00 5b];
->  		status = "disabled";
-> @@ -158,7 +157,7 @@ soc0: soc at 000000000 {
->  	};
->  	eth4: ethernet at 4{
->  		compatible = "hisilicon,hns-nic-v1";
-> -		ae-name = "dsaf0";
-> +		ae-handle = <&dsaf0>;
->  		port-id = <4>;
->  		local-mac-address = [00 00 00 01 00 5c];
->  		status = "disabled";
-> @@ -166,7 +165,7 @@ soc0: soc at 000000000 {
->  	};
->  	eth5: ethernet at 5{
->  		compatible = "hisilicon,hns-nic-v1";
-> -		ae-name = "dsaf0";
-> +		ae-handle = <&dsaf0>;
->  		port-id = <5>;
->  		local-mac-address = [00 00 00 01 00 5d];
->  		status = "disabled";
-> @@ -174,7 +173,7 @@ soc0: soc at 000000000 {
->  	};
->  	eth6: ethernet at 6{
->  		compatible = "hisilicon,hns-nic-v1";
-> -		ae-name = "dsaf0";
-> +		ae-handle = <&dsaf0>;
->  		port-id = <6>;
->  		local-mac-address = [00 00 00 01 00 5e];
->  		status = "disabled";
-> @@ -182,7 +181,7 @@ soc0: soc at 000000000 {
->  	};
->  	eth7: ethernet at 7{
->  		compatible = "hisilicon,hns-nic-v1";
-> -		ae-name = "dsaf0";
-> +		ae-handle = <&dsaf0>;
->  		port-id = <7>;
->  		local-mac-address = [00 00 00 01 00 5f];
->  		status = "disabled";
-> -- 
-> 1.9.1
+> why not define like this:
 > 
+> union {
+> struct {atomic_t		len;	
+> 	struct irq_work		work;
+> }
+> unsigned char		buffer[PAGE_SIZE * 2] ;
+> }
+> 
+> we can make sure the union is 2 PAGE_SIZE .
+
+IMHO, this would add more confusion. It would just move the
+computation somewhere else. The union will have 2*PAGE_SIZE
+but the beginning of "buffer" will be shared with "len"
+and "work". Therefore, we would need to skip the beginning
+of the buffer when storing the data. By other words, we still
+will be able to use only (sizeof(buffer) - sizeof(atomic_t) -
+sizeof(struct irq_work)] of the "buffer".
+
+Or did I miss something, please?
+
+Best Regards,
+Petr
