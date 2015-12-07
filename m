@@ -1,198 +1,90 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon,  7 Dec 2015 18:18:53 +0000
-Subject: [PATCH v2] iommu/io-pgtable: Indicate granule for TLB maintenance
-In-Reply-To: <67223d4b1ff57f3f46e8c3102e663a063a50a7f7.1449246988.git.robin.murphy@arm.com>
-Message-ID: <d86f273f520fd8ab7baec0af120fce601e42f6ec.1449511351.git.robin.murphy@arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 07 Dec 2015 19:18:12 +0100
+Subject: [PATCH v4 0/8] cpufreq: add generic cpufreq driver support for
+ Exynos542x/5800 platforms
+Message-ID: <1449512300-17230-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IOMMU hardware with range-based TLB maintenance commands can work
-happily with the iova and size arguments passed via the tlb_add_flush
-callback, but for IOMMUs which require separate commands per entry in
-the range, it is not straightforward to infer the necessary granularity
-when it comes to issuing the actual commands.
+Hi,
 
-Add an additional argument indicating the granularity for the benefit
-of drivers needing to know, and update the ARM LPAE code appropriately
-(for non-leaf invalidations we currently just assume the worst-case
-page granularity rather than walking the table to check).
+This patch series adds generic cpufreq-dt driver support for
+Exynos542x/5800 (using the new CPU clock type which allows it).
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+It has been tested on Exynos5422 based ODROID-XU3 Lite board.
 
-v2: avoid truncation in iopte_deref - forcing the type promotion in
-    the subtraction rather than the shift still somewhat improves the
-    resulting 32-bit assembly code, too.
+Depends on:
+- next-20151124 branch of linux-next kernel tree
 
-assembly code
- drivers/iommu/arm-smmu-v3.c    |  2 +-
- drivers/iommu/arm-smmu.c       |  2 +-
- drivers/iommu/io-pgtable-arm.c | 27 +++++++++++++++------------
- drivers/iommu/io-pgtable.h     |  4 ++--
- drivers/iommu/ipmmu-vmsa.c     |  4 ++--
- 5 files changed, 21 insertions(+), 18 deletions(-)
+Changes since v3:
+- switched to using cpufreq-dt driver
+- updated patch descriptions to cover Exynos5422 support
+- added Acked-by from Sylwester to clock driver patches
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 4e5118a..c302b65 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1335,7 +1335,7 @@ static void arm_smmu_tlb_inv_context(void *cookie)
- }
- 
- static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
--					  bool leaf, void *cookie)
-+					  size_t granule, bool leaf, void *cookie)
- {
- 	struct arm_smmu_domain *smmu_domain = cookie;
- 	struct arm_smmu_device *smmu = smmu_domain->smmu;
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 47dc7a7..601e3dd 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -582,7 +582,7 @@ static void arm_smmu_tlb_inv_context(void *cookie)
- }
- 
- static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
--					  bool leaf, void *cookie)
-+					  size_t granule, bool leaf, void *cookie)
- {
- 	struct arm_smmu_domain *smmu_domain = cookie;
- 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index 366a354..7a5c772 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -58,8 +58,10 @@
- 	((((d)->levels - ((l) - ARM_LPAE_START_LVL(d) + 1))		\
- 	  * (d)->bits_per_level) + (d)->pg_shift)
- 
-+#define ARM_LPAE_GRANULE(d)		(1UL << (d)->pg_shift)
-+
- #define ARM_LPAE_PAGES_PER_PGD(d)					\
--	DIV_ROUND_UP((d)->pgd_size, 1UL << (d)->pg_shift)
-+	DIV_ROUND_UP((d)->pgd_size, ARM_LPAE_GRANULE(d))
- 
- /*
-  * Calculate the index at level l used to map virtual address a using the
-@@ -169,7 +171,7 @@
- /* IOPTE accessors */
- #define iopte_deref(pte,d)					\
- 	(__va((pte) & ((1ULL << ARM_LPAE_MAX_ADDR_BITS) - 1)	\
--	& ~((1ULL << (d)->pg_shift) - 1)))
-+	& ~(ARM_LPAE_GRANULE(d) - 1ULL)))
- 
- #define iopte_type(pte,l)					\
- 	(((pte) >> ARM_LPAE_PTE_TYPE_SHIFT) & ARM_LPAE_PTE_TYPE_MASK)
-@@ -326,7 +328,7 @@ static int __arm_lpae_map(struct arm_lpae_io_pgtable *data, unsigned long iova,
- 	/* Grab a pointer to the next level */
- 	pte = *ptep;
- 	if (!pte) {
--		cptep = __arm_lpae_alloc_pages(1UL << data->pg_shift,
-+		cptep = __arm_lpae_alloc_pages(ARM_LPAE_GRANULE(data),
- 					       GFP_ATOMIC, cfg);
- 		if (!cptep)
- 			return -ENOMEM;
-@@ -412,7 +414,7 @@ static void __arm_lpae_free_pgtable(struct arm_lpae_io_pgtable *data, int lvl,
- 	if (lvl == ARM_LPAE_START_LVL(data))
- 		table_size = data->pgd_size;
- 	else
--		table_size = 1UL << data->pg_shift;
-+		table_size = ARM_LPAE_GRANULE(data);
- 
- 	start = ptep;
- 	end = (void *)ptep + table_size;
-@@ -473,7 +475,7 @@ static int arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
- 
- 	__arm_lpae_set_pte(ptep, table, cfg);
- 	iova &= ~(blk_size - 1);
--	cfg->tlb->tlb_add_flush(iova, blk_size, true, data->iop.cookie);
-+	cfg->tlb->tlb_add_flush(iova, blk_size, blk_size, true, data->iop.cookie);
- 	return size;
- }
- 
-@@ -501,12 +503,13 @@ static int __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
- 
- 		if (!iopte_leaf(pte, lvl)) {
- 			/* Also flush any partial walks */
--			tlb->tlb_add_flush(iova, size, false, cookie);
-+			tlb->tlb_add_flush(iova, size, ARM_LPAE_GRANULE(data),
-+					   false, cookie);
- 			tlb->tlb_sync(cookie);
- 			ptep = iopte_deref(pte, data);
- 			__arm_lpae_free_pgtable(data, lvl + 1, ptep);
- 		} else {
--			tlb->tlb_add_flush(iova, size, true, cookie);
-+			tlb->tlb_add_flush(iova, size, size, true, cookie);
- 		}
- 
- 		return size;
-@@ -572,7 +575,7 @@ static phys_addr_t arm_lpae_iova_to_phys(struct io_pgtable_ops *ops,
- 	return 0;
- 
- found_translation:
--	iova &= ((1 << data->pg_shift) - 1);
-+	iova &= (ARM_LPAE_GRANULE(data) - 1);
- 	return ((phys_addr_t)iopte_to_pfn(pte,data) << data->pg_shift) | iova;
- }
- 
-@@ -670,7 +673,7 @@ arm_64_lpae_alloc_pgtable_s1(struct io_pgtable_cfg *cfg, void *cookie)
- 	      (ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_IRGN0_SHIFT) |
- 	      (ARM_LPAE_TCR_RGN_WBWA << ARM_LPAE_TCR_ORGN0_SHIFT);
- 
--	switch (1 << data->pg_shift) {
-+	switch (ARM_LPAE_GRANULE(data)) {
- 	case SZ_4K:
- 		reg |= ARM_LPAE_TCR_TG0_4K;
- 		break;
-@@ -771,7 +774,7 @@ arm_64_lpae_alloc_pgtable_s2(struct io_pgtable_cfg *cfg, void *cookie)
- 
- 	sl = ARM_LPAE_START_LVL(data);
- 
--	switch (1 << data->pg_shift) {
-+	switch (ARM_LPAE_GRANULE(data)) {
- 	case SZ_4K:
- 		reg |= ARM_LPAE_TCR_TG0_4K;
- 		sl++; /* SL0 format is different for 4K granule size */
-@@ -891,8 +894,8 @@ static void dummy_tlb_flush_all(void *cookie)
- 	WARN_ON(cookie != cfg_cookie);
- }
- 
--static void dummy_tlb_add_flush(unsigned long iova, size_t size, bool leaf,
--				void *cookie)
-+static void dummy_tlb_add_flush(unsigned long iova, size_t size,
-+				size_t granule, bool leaf, void *cookie)
- {
- 	WARN_ON(cookie != cfg_cookie);
- 	WARN_ON(!(size & cfg_cookie->pgsize_bitmap));
-diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
-index ac9e234..2e18469 100644
---- a/drivers/iommu/io-pgtable.h
-+++ b/drivers/iommu/io-pgtable.h
-@@ -26,8 +26,8 @@ enum io_pgtable_fmt {
-  */
- struct iommu_gather_ops {
- 	void (*tlb_flush_all)(void *cookie);
--	void (*tlb_add_flush)(unsigned long iova, size_t size, bool leaf,
--			      void *cookie);
-+	void (*tlb_add_flush)(unsigned long iova, size_t size, size_t granule,
-+			      bool leaf, void *cookie);
- 	void (*tlb_sync)(void *cookie);
- };
- 
-diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
-index 8cf605f..5b1166d 100644
---- a/drivers/iommu/ipmmu-vmsa.c
-+++ b/drivers/iommu/ipmmu-vmsa.c
-@@ -277,8 +277,8 @@ static void ipmmu_tlb_flush_all(void *cookie)
- 	ipmmu_tlb_invalidate(domain);
- }
- 
--static void ipmmu_tlb_add_flush(unsigned long iova, size_t size, bool leaf,
--				void *cookie)
-+static void ipmmu_tlb_add_flush(unsigned long iova, size_t size,
-+				size_t granule, bool leaf, void *cookie)
- {
- 	/* The hardware doesn't support selective TLB flush. */
- }
+Changes since v2:
+- ported over next-20151124 branch
+- integrated missing CLK_RECALC_NEW_RATES flags fix to patch #3
+  (from Anand Moon)
+- added regulator supply properties for ODROID-XU3 Lite and
+  ODROID-XU4 in patch #2
+- ported CPU OPPs to operating-points-v2 (from Ben Gamari)
+- added "ARM: dts: Exynos5422: fix OPP tables" patch (from Ben
+  Gamari)
+- added "cpufreq: arm-big-little: accept operating-points-v2
+  nodes" patch (from Ben Gamari)
+- renamed OPP nodes as opp@<opp-hz>
+
+Changes since v1:
+- added CPU cluster regulator supply properties to
+  exynos5420-arndale-octa.dts, exynos5420-peach-pit.dts,
+  exynos5420-smdk5420.dts and exynos5800-peach-pi.dts
+
+Changes over Thomas' original v12 code:
+- split Exynos5420 and Exynos5800 support
+- moved E5420_[EGL,KFC]_DIV0() macros to clk-exynos5420.c
+- disabled cpufreq if big.LITTLE switcher support is enabled
+- enhanced arm_big_little[_dt] driver with CPU cluster regulator
+  support
+- fixed CPU clock configuration data for Exynos5800
+- fixed CPU operating points setup for Exynos5800
+- added CPU cluster regulator supplies for ODROID-XU3 board
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+
+Bartlomiej Zolnierkiewicz (3):
+  ARM: dts: Exynos542x/5800: add cluster regulator supply properties
+  clk: samsung: exynos5422/5800: fix cpu clock configuration data
+  ARM: dts: Exynos5800: fix CPU OPP
+
+Ben Gamari (1):
+  ARM: dts: Exynos5422: fix OPP tables
+
+Thomas Abraham (4):
+  clk: samsung: exynos5420: add cpu clock configuration data and
+    instantiate cpu clock
+  ARM: dts: Exynos5420: add CPU OPP and regulator supply property
+  ARM: Exynos: use generic cpufreq driver for Exynos5420
+  ARM: Exynos: use generic cpufreq driver for Exynos5422/5800
+
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts   |   8 ++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts      |   8 ++
+ arch/arm/boot/dts/exynos5420-smdk5420.dts       |   8 ++
+ arch/arm/boot/dts/exynos5420.dtsi               | 122 ++++++++++++++++++
+ arch/arm/boot/dts/exynos5422-cpus.dtsi          |  10 ++
+ arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts |   8 ++
+ arch/arm/boot/dts/exynos5422-odroidxu3.dts      |   8 ++
+ arch/arm/boot/dts/exynos5422-odroidxu4.dts      |   8 ++
+ arch/arm/boot/dts/exynos5800-peach-pi.dts       |   8 ++
+ arch/arm/boot/dts/exynos5800.dtsi               | 165 ++++++++++++++++++++++++
+ arch/arm/mach-exynos/exynos.c                   |   4 +
+ drivers/clk/samsung/clk-exynos5420.c            |  88 ++++++++++++-
+ include/dt-bindings/clock/exynos5420.h          |   2 +
+ 13 files changed, 445 insertions(+), 2 deletions(-)
+
 -- 
 1.9.1
