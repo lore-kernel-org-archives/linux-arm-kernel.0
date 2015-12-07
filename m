@@ -1,174 +1,60 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  7 Dec 2015 10:53:28 +0000
-Subject: [PATCH v3 12/22] arm64: KVM: Implement the core world switch
+Date: Mon,  7 Dec 2015 10:53:27 +0000
+Subject: [PATCH v3 11/22] arm64: KVM: Add patchable function selector
 In-Reply-To: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
 References: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1449485618-9443-13-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1449485618-9443-12-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the core of the world switch in C. Not everything is there
-yet, and there is nothing to re-enter the world switch either.
+KVM so far relies on code patching, and is likely to use it more
+in the future. The main issue is that our alternative system works
+at the instruction level, while we'd like to have alternatives at
+the function level.
 
-But this already outlines the code structure well enough.
+In order to cope with this, add the "hyp_alternate_select" macro that
+outputs a brief sequence of code that in turn can be patched, allowing
+an alternative function to be selected.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/hyp/Makefile |   1 +
- arch/arm64/kvm/hyp/switch.c | 135 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 136 insertions(+)
- create mode 100644 arch/arm64/kvm/hyp/switch.c
+ arch/arm64/kvm/hyp/hyp.h | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-index 1e1ff06..9c11b0f 100644
---- a/arch/arm64/kvm/hyp/Makefile
-+++ b/arch/arm64/kvm/hyp/Makefile
-@@ -8,3 +8,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += entry.o
-+obj-$(CONFIG_KVM_ARM_HOST) += switch.o
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-new file mode 100644
-index 0000000..79f59c9
---- /dev/null
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -0,0 +1,135 @@
-+/*
-+ * Copyright (C) 2015 - ARM Ltd
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
+diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+index 0809653..73419a7 100644
+--- a/arch/arm64/kvm/hyp/hyp.h
++++ b/arch/arm64/kvm/hyp/hyp.h
+@@ -29,6 +29,30 @@
+ #define hyp_kern_va(v) (typeof(v))((unsigned long)(v) - HYP_PAGE_OFFSET \
+ 						      + PAGE_OFFSET)
+ 
++/**
++ * hyp_alternate_select - Generates patchable code sequences that are
++ * used to switch between two implementations of a function, depending
++ * on the availability of a feature.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ * @fname: a symbol name that will be defined as a function returning a
++ * function pointer whose type will match @orig and @alt
++ * @orig: A pointer to the default function, as returned by @fname when
++ * @cond doesn't hold
++ * @alt: A pointer to the alternate function, as returned by @fname
++ * when @cond holds
++ * @cond: a CPU feature (as described in asm/cpufeature.h)
 + */
-+
-+#include "hyp.h"
-+
-+static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
-+{
-+	u64 val;
-+
-+	/*
-+	 * We are about to set CPTR_EL2.TFP to trap all floating point
-+	 * register accesses to EL2, however, the ARM ARM clearly states that
-+	 * traps are only taken to EL2 if the operation would not otherwise
-+	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
-+	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
-+	 */
-+	val = vcpu->arch.hcr_el2;
-+	if (!(val & HCR_RW)) {
-+		write_sysreg(1 << 30, fpexc32_el2);
-+		isb();
-+	}
-+	write_sysreg(val, hcr_el2);
-+	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
-+	write_sysreg(1 << 15, hstr_el2);
-+	write_sysreg(CPTR_EL2_TTA | CPTR_EL2_TFP, cptr_el2);
-+	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
++#define hyp_alternate_select(fname, orig, alt, cond)			\
++typeof(orig) * __hyp_text fname(void)					\
++{									\
++	typeof(alt) *val = orig;					\
++	asm volatile(ALTERNATIVE("nop		\n",			\
++				 "mov	%0, %1	\n",			\
++				 cond)					\
++		     : "+r" (val) : "r" (alt));				\
++	return val;							\
 +}
 +
-+static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
-+{
-+	write_sysreg(HCR_RW, hcr_el2);
-+	write_sysreg(0, hstr_el2);
-+	write_sysreg(read_sysreg(mdcr_el2) & MDCR_EL2_HPMN_MASK, mdcr_el2);
-+	write_sysreg(0, cptr_el2);
-+}
-+
-+static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
-+{
-+	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
-+	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-+}
-+
-+static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
-+{
-+	write_sysreg(0, vttbr_el2);
-+}
-+
-+static hyp_alternate_select(__vgic_call_save_state,
-+			    __vgic_v2_save_state, __vgic_v3_save_state,
-+			    ARM64_HAS_SYSREG_GIC_CPUIF);
-+
-+static hyp_alternate_select(__vgic_call_restore_state,
-+			    __vgic_v2_restore_state, __vgic_v3_restore_state,
-+			    ARM64_HAS_SYSREG_GIC_CPUIF);
-+
-+static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
-+{
-+	__vgic_call_save_state()(vcpu);
-+	write_sysreg(read_sysreg(hcr_el2) & ~HCR_INT_OVERRIDE, hcr_el2);
-+}
-+
-+static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
-+{
-+	u64 val;
-+
-+	val = read_sysreg(hcr_el2);
-+	val |= 	HCR_INT_OVERRIDE;
-+	val |= vcpu->arch.irq_lines;
-+	write_sysreg(val, hcr_el2);
-+
-+	__vgic_call_restore_state()(vcpu);
-+}
-+
-+int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
-+{
-+	struct kvm_cpu_context *host_ctxt;
-+	struct kvm_cpu_context *guest_ctxt;
-+	u64 exit_code;
-+
-+	vcpu = kern_hyp_va(vcpu);
-+	write_sysreg(vcpu, tpidr_el2);
-+
-+	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-+	guest_ctxt = &vcpu->arch.ctxt;
-+
-+	__sysreg_save_state(host_ctxt);
-+	__debug_cond_save_host_state(vcpu);
-+
-+	__activate_traps(vcpu);
-+	__activate_vm(vcpu);
-+
-+	__vgic_restore_state(vcpu);
-+	__timer_restore_state(vcpu);
-+
-+	/*
-+	 * We must restore the 32-bit state before the sysregs, thanks
-+	 * to Cortex-A57 erratum #852523.
-+	 */
-+	__sysreg32_restore_state(vcpu);
-+	__sysreg_restore_state(guest_ctxt);
-+	__debug_restore_state(vcpu, kern_hyp_va(vcpu->arch.debug_ptr), guest_ctxt);
-+
-+	/* Jump in the fire! */
-+	exit_code = __guest_enter(vcpu, host_ctxt);
-+	/* And we're baaack! */
-+
-+	__sysreg_save_state(guest_ctxt);
-+	__sysreg32_save_state(vcpu);
-+	__timer_save_state(vcpu);
-+	__vgic_save_state(vcpu);
-+
-+	__deactivate_traps(vcpu);
-+	__deactivate_vm(vcpu);
-+
-+	__sysreg_restore_state(host_ctxt);
-+
-+	__debug_save_state(vcpu, kern_hyp_va(vcpu->arch.debug_ptr), guest_ctxt);
-+	__debug_cond_restore_host_state(vcpu);
-+
-+	return exit_code;
-+}
+ void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
+ void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+ 
 -- 
 2.1.4
