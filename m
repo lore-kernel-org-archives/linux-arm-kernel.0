@@ -1,66 +1,28 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  7 Dec 2015 23:26:06 +0100
-Subject: [PATCH 11/23] mtd: add mtd_eccpos(),
- mtd_oobfree() and mtd_eccbytes() helper functions
+Date: Mon,  7 Dec 2015 23:25:58 +0100
+Subject: [PATCH 03/23] mtd: nftl: kill unused oobinfo field
 In-Reply-To: <1449527178-5930-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1449527178-5930-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1449527178-5930-12-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1449527178-5930-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to make the ecclayout definition completely dynamic we need to
-rework the way these different ECC layouts are defined and iterated.
-
-Create the mtd_eccpos(), mtd_oobfree() and mtd_eccbytes() helpers to hide
-ecclayout definition internals to their users.
-
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- include/linux/mtd/mtd.h | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ include/linux/mtd/nftl.h | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/include/linux/mtd/mtd.h b/include/linux/mtd/mtd.h
-index 9cf13c4..25e3d0f 100644
---- a/include/linux/mtd/mtd.h
-+++ b/include/linux/mtd/mtd.h
-@@ -253,6 +253,38 @@ struct mtd_info {
- 	int usecount;
+diff --git a/include/linux/mtd/nftl.h b/include/linux/mtd/nftl.h
+index b059629..044daa0 100644
+--- a/include/linux/mtd/nftl.h
++++ b/include/linux/mtd/nftl.h
+@@ -50,7 +50,6 @@ struct NFTLrecord {
+         unsigned int nb_blocks;		/* number of physical blocks */
+         unsigned int nb_boot_blocks;	/* number of blocks used by the bios */
+         struct erase_info instr;
+-	struct nand_ecclayout oobinfo;
  };
  
-+static inline int mtd_eccpos(struct mtd_info *mtd, int eccbyte)
-+{
-+	if (!mtd->ecclayout)
-+		return -ENOTSUPP;
-+
-+	if (eccbyte >= mtd->ecclayout->eccbytes)
-+		return -ERANGE;
-+
-+	return mtd->ecclayout->eccpos[eccbyte];
-+}
-+
-+static inline int mtd_oobfree(struct mtd_info *mtd, int section,
-+			      struct nand_oobfree *oobfree)
-+{
-+	memset(oobfree, 0, sizeof(*oobfree));
-+
-+	if (!mtd->ecclayout)
-+		return -ENOTSUPP;
-+
-+	if (section >= MTD_MAX_OOBFREE_ENTRIES_LARGE)
-+		return -ERANGE;
-+
-+	*oobfree = mtd->ecclayout->oobfree[section];
-+
-+	return 0;
-+}
-+
-+static inline int mtd_eccbytes(struct mtd_info *mtd)
-+{
-+	return mtd->ecclayout ? mtd->ecclayout->eccbytes : 0;
-+}
-+
- static inline void mtd_set_of_node(struct mtd_info *mtd,
- 				   struct device_node *np)
- {
+ int NFTL_mount(struct NFTLrecord *s);
 -- 
 2.1.4
