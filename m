@@ -1,103 +1,186 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 7 Dec 2015 19:28:04 +0100 (CET)
-Subject: [RFC PATCH] irq: allow percpu_devid interrupts to be requested
- with target mask
-In-Reply-To: <20151207173835.GF26191@arm.com>
-References: <1448624376-15570-1-git-send-email-will.deacon@arm.com>
- <alpine.DEB.2.11.1511271622170.3572@nanos> <20151207173835.GF26191@arm.com>
-Message-ID: <alpine.DEB.2.11.1512071915060.3595@nanos>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 07 Dec 2015 18:38:01 +0000
+Subject: [PATCH v2] arm64: dts: juno: Add idle-states to device tree
+Message-ID: <1449513481.3012.16.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
+The latency times were suggested by Lorenzo Pieralisi after some ad hoc
+testing.
 
-On Mon, 7 Dec 2015, Will Deacon wrote:
-> On Fri, Nov 27, 2015 at 08:15:52PM +0100, Thomas Gleixner wrote:
-> >    Now you want to use the same Linux irq number for the local timer
-> >    or whatever on all CPUs independent of the cluster, right?
-> > 
-> >    So the per cpu timer interrupt is requested once as a per cpu
-> >    interrupt with the linux irq number of cluster 0. But when you call
-> >    enable_per_cpu_irq() on a cpu from cluster 1 you want to use the
-> >    same linux irq number. But with the current scheme this ends up at
-> >    the wrong hw irq.
-> > 
-> >    That's why you introduced that cpumask stuff.
-> 
-> There's a slight niggle here, which I didn't communicate in the commit
-> log (because my use-case is indeed per-cluster). Interrupts can also
-> be wired on a per-cpu basis, but where you have multiple device/driver
-> instances and therefore can't use a single call to request_percpu_irq.
-> An example of this is Freescale's watchdog:
-> 
->   http://www.spinics.net/lists/arm-kernel/msg464000.html
-> 
-> which is why I added Bhupesh to Cc. They seem to have 1 watchdog per
-> core, but signalling the same PPI number...
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
 
-You can create both a PerCluster and a PerCPU domain.
+Lorenzo, are you happy with my statement that you did 'ad hoc testing'
+to derive the figures or is there something more specific that's worth
+adding?
 
-But in that particular case it's the same as the local timer which
-signals the same PPI on all CPUs, right? So the existing percpu irq
-stuff should just work for that watchdog thingy.
+ arch/arm64/boot/dts/arm/juno-r1.dts | 28 ++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/arm/juno.dts    | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 56 insertions(+)
 
-> >   enable_percpu_irq(12) <- On cluster 1
-> >   	enable_irq(irq13) -> hwirq20
-> > 
-> > We can do that, because all operations have to be invoked on the
-> > target cpu.
-> 
-> Ok, but what about existing callers? I think we either need a new
-> function or flag to indicate that the irq is per-cluster, otherwise we
-> run the risk of breaking things where the hwirq is actually the same.
-
-That's what I wrote a few lines up:
-
-> > enable/disable_percpu_irq() does:
-> > 
-> >     struct irq_desc *desc = irq_to_desc(irq);
-> >     struct irqdomain *domain = irq_desc_get_domain(desc);
-> > 
-> >     if (domain && domain->nr_clusters > 1)
-> >         desc = irq_to_desc(irq + domain->get_cluster(smp_processor_id());
-> > 
-> >     enable/disable(desc);
-
-
-> At the moment, the ARM perf binding in device-tree has an optional
-> "interrupt-affinity" field that describes the set of CPUs which use
-> the PPI number described elsewhere in the node. Perhaps we could parse
-> this when we create the new domain and selectively map irqs there.
-> 
-> Dunno -- needs prototyping!
-
-My device tree foo is close to zero, so I let the DT wizards come up
-with a solution. But you need some decription of this in the DT
-anyway, right?
-
-> > So far so good. Now we have the interrupt entry code which wants to
-> > translate hwirqX to a linux irq number. So we need some modification
-> > to irq_find_mapping() as well. We could do a domain specific
-> > find_mapping() callback, or add something to the core code.
-> > 
-> > 	if (domain->is_clustered_mapped) {
-> > 	      map = domain->map[domain->get_cluster(cpuid)];
-> > 	      return map[hwirq];
-> > 	}			  
-> > 
-> > works for a linear domain. A domain specific find_mapping() callback
-> > might be better suited, but thats a detail.
-> 
-> It's a little scary to tie the device-tree topology description (which
-> is usually used for scheduling and power management afaiu) directly
-> to the IRQ routing, but then if this does end up being per-cpu, there's
-> no real issue.
-
-Well, if your hardware is wired in scary ways, i.e. PPIs have a
-different meaning on different clusters/cpus, then you need some
-description in DT anyway. Translating that into a mapping is pretty
-much straight forward I guess.
+diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+index 93bc3d7..8826f83 100644
+--- a/arch/arm64/boot/dts/arm/juno-r1.dts
++++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+@@ -60,6 +60,28 @@
+ 			};
+ 		};
  
-Thanks,
-
-	tglx
++		idle-states {
++			entry-method = "arm,psci";
++
++			CPU_SLEEP_0: cpu-sleep-0 {
++				compatible = "arm,idle-state";
++				arm,psci-suspend-param = <0x0010000>;
++				local-timer-stop;
++				entry-latency-us = <300>;
++				exit-latency-us = <1200>;
++				min-residency-us = <2000>;
++			};
++
++			CLUSTER_SLEEP_0: cluster-sleep-0 {
++				compatible = "arm,idle-state";
++				arm,psci-suspend-param = <0x1010000>;
++				local-timer-stop;
++				entry-latency-us = <300>;
++				exit-latency-us = <1200>;
++				min-residency-us = <2500>;
++			};
++		};
++
+ 		A57_0: cpu at 0 {
+ 			compatible = "arm,cortex-a57","arm,armv8";
+ 			reg = <0x0 0x0>;
+@@ -67,6 +89,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A57_L2>;
+ 			clocks = <&scpi_dvfs 0>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A57_1: cpu at 1 {
+@@ -76,6 +99,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A57_L2>;
+ 			clocks = <&scpi_dvfs 0>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A53_0: cpu at 100 {
+@@ -85,6 +109,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A53_1: cpu at 101 {
+@@ -94,6 +119,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A53_2: cpu at 102 {
+@@ -103,6 +129,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A53_3: cpu at 103 {
+@@ -112,6 +139,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A57_L2: l2-cache0 {
+diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+index 53442b5..dcfcf15 100644
+--- a/arch/arm64/boot/dts/arm/juno.dts
++++ b/arch/arm64/boot/dts/arm/juno.dts
+@@ -60,6 +60,28 @@
+ 			};
+ 		};
+ 
++		idle-states {
++			entry-method = "arm,psci";
++
++			CPU_SLEEP_0: cpu-sleep-0 {
++				compatible = "arm,idle-state";
++				arm,psci-suspend-param = <0x0010000>;
++				local-timer-stop;
++				entry-latency-us = <300>;
++				exit-latency-us = <1200>;
++				min-residency-us = <2000>;
++			};
++
++			CLUSTER_SLEEP_0: cluster-sleep-0 {
++				compatible = "arm,idle-state";
++				arm,psci-suspend-param = <0x1010000>;
++				local-timer-stop;
++				entry-latency-us = <300>;
++				exit-latency-us = <1200>;
++				min-residency-us = <2500>;
++			};
++		};
++
+ 		A57_0: cpu at 0 {
+ 			compatible = "arm,cortex-a57","arm,armv8";
+ 			reg = <0x0 0x0>;
+@@ -67,6 +89,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A57_L2>;
+ 			clocks = <&scpi_dvfs 0>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A57_1: cpu at 1 {
+@@ -76,6 +99,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A57_L2>;
+ 			clocks = <&scpi_dvfs 0>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A53_0: cpu at 100 {
+@@ -85,6 +109,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A53_1: cpu at 101 {
+@@ -94,6 +119,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A53_2: cpu at 102 {
+@@ -103,6 +129,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A53_3: cpu at 103 {
+@@ -112,6 +139,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A57_L2: l2-cache0 {
+-- 
+2.1.4
