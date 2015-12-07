@@ -1,37 +1,95 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 7 Dec 2015 22:48:07 +0000
-Subject: [PATCH v8 3/4] arm64: Add do_softirq_own_stack() and enable
- irq_stacks
-In-Reply-To: <1449226948-14251-4-git-send-email-james.morse@arm.com>
-References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
- <1449226948-14251-4-git-send-email-james.morse@arm.com>
-Message-ID: <20151207224805.GA20777@MBP.local>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 8 Dec 2015 06:48:53 +0800
+Subject: [PATCH 12/23] mtd: use mtd_eccpos() and mtd_oobfree() where
+ appropriate
+In-Reply-To: <1449527178-5930-13-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <201512080642.2MUjuxx4%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2015 at 11:02:27AM +0000, James Morse wrote:
-> entry.S is modified to switch to the per_cpu irq_stack during el{0,1}_irq.
-> irq_count is used to detect recursive interrupts on the irq_stack, it is
-> updated late by do_softirq_own_stack(), when called on the irq_stack, before
-> __do_softirq() re-enables interrupts to process softirqs.
-> 
-> do_softirq_own_stack() is added by this patch, but does not yet switch
-> stack.
-> 
-> This patch adds the dummy stack frame and data needed by the previous
-> stack tracing patches.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
+Hi Boris,
 
-In the interest of getting things moving on this series:
+[auto build test ERROR on next-20151207]
+[cannot apply to staging/staging-testing v4.4-rc4 v4.4-rc3 v4.4-rc2 v4.4-rc4]
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+url:    https://github.com/0day-ci/linux/commits/Boris-Brezillon/mtd-rework-ECC-layout-definition/20151208-063127
+config: i386-randconfig-x006-12070758 (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-I propose that we skip patch 4 for now and, as James suggested, keep the
-THREAD_SIZE to 16KB for one more release cycle. It would be good to get
-some statistics on stack usage.
+All error/warnings (new ones prefixed by >>):
 
-Patches 1-3 look fine to me on their own.
+   In file included from include/linux/linkage.h:4:0,
+                    from include/linux/kernel.h:6,
+                    from drivers/mtd/mtdswap.c:27:
+   drivers/mtd/mtdswap.c: In function 'mtdswap_add_mtd':
+>> drivers/mtd/mtdswap.c:1449:6: error: too few arguments to function 'mtd_oobfree'
+     if (mtd_oobfree(mtd, 0) < 0) {
+         ^
+   include/linux/compiler.h:147:28: note: in definition of macro '__trace_if'
+     if (__builtin_constant_p((cond)) ? !!(cond) :   \
+                               ^
+>> drivers/mtd/mtdswap.c:1449:2: note: in expansion of macro 'if'
+     if (mtd_oobfree(mtd, 0) < 0) {
+     ^
+   In file included from drivers/mtd/mtdswap.c:29:0:
+   include/linux/mtd/mtd.h:267:19: note: declared here
+    static inline int mtd_oobfree(struct mtd_info *mtd, int section,
+                      ^
+   In file included from include/linux/linkage.h:4:0,
+                    from include/linux/kernel.h:6,
+                    from drivers/mtd/mtdswap.c:27:
+>> drivers/mtd/mtdswap.c:1449:6: error: too few arguments to function 'mtd_oobfree'
+     if (mtd_oobfree(mtd, 0) < 0) {
+         ^
+   include/linux/compiler.h:147:40: note: in definition of macro '__trace_if'
+     if (__builtin_constant_p((cond)) ? !!(cond) :   \
+                                           ^
+>> drivers/mtd/mtdswap.c:1449:2: note: in expansion of macro 'if'
+     if (mtd_oobfree(mtd, 0) < 0) {
+     ^
+   In file included from drivers/mtd/mtdswap.c:29:0:
+   include/linux/mtd/mtd.h:267:19: note: declared here
+    static inline int mtd_oobfree(struct mtd_info *mtd, int section,
+                      ^
+   In file included from include/linux/linkage.h:4:0,
+                    from include/linux/kernel.h:6,
+                    from drivers/mtd/mtdswap.c:27:
+>> drivers/mtd/mtdswap.c:1449:6: error: too few arguments to function 'mtd_oobfree'
+     if (mtd_oobfree(mtd, 0) < 0) {
+         ^
+   include/linux/compiler.h:158:16: note: in definition of macro '__trace_if'
+      ______r = !!(cond);     \
+                   ^
+>> drivers/mtd/mtdswap.c:1449:2: note: in expansion of macro 'if'
+     if (mtd_oobfree(mtd, 0) < 0) {
+     ^
+   In file included from drivers/mtd/mtdswap.c:29:0:
+   include/linux/mtd/mtd.h:267:19: note: declared here
+    static inline int mtd_oobfree(struct mtd_info *mtd, int section,
+                      ^
 
--- 
-Catalin
+vim +/mtd_oobfree +1449 drivers/mtd/mtdswap.c
+
+  1443		if (PAGE_SIZE % mtd->writesize || mtd->writesize > PAGE_SIZE) {
+  1444			printk(KERN_ERR "%s: PAGE_SIZE %lu not multiple of write size"
+  1445				" %u\n", MTDSWAP_PREFIX, PAGE_SIZE, mtd->writesize);
+  1446			return;
+  1447		}
+  1448	
+> 1449		if (mtd_oobfree(mtd, 0) < 0) {
+  1450			printk(KERN_ERR "%s: mtd%d does not have OOB\n",
+  1451				MTDSWAP_PREFIX, mtd->index);
+  1452			return;
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 26343 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151208/5488955d/attachment-0001.obj>
