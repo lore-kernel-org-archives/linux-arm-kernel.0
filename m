@@ -1,50 +1,27 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Mon, 7 Dec 2015 15:48:33 +0000
-Subject: [PATCH v2 3/5] printk/nmi: Try hard to print Oops message in
- NMI context
-In-Reply-To: <20151204171255.GZ8644@n2100.arm.linux.org.uk>
-References: <1448622572-16900-1-git-send-email-pmladek@suse.com>
- <1448622572-16900-4-git-send-email-pmladek@suse.com>
- <20151201234437.GA8644@n2100.arm.linux.org.uk>
- <20151204152709.GA20935@pathway.suse.cz>
- <20151204171255.GZ8644@n2100.arm.linux.org.uk>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6D1CBE68C7@AcuExch.aculab.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 7 Dec 2015 21:33:57 +0530
+Subject: [PATCH v2] cpufreq: mt8173: move resources allocation into
+ ->probe()
+In-Reply-To: <CALx668XbV2CbuB0QL_3eV=JMTeOyjKP=s2mznadQxgGD_SGABg@mail.gmail.com>
+References: <1448785898-17838-4-git-send-email-pi-cheng.chen@linaro.org>
+ <1449295306-9222-1-git-send-email-pi-cheng.chen@linaro.org>
+ <CAGS+omBwHVAARNA=ZwK+fAwfJye6eDnxoKW6qCaH_haqsw9PJA@mail.gmail.com>
+ <CALx668XbV2CbuB0QL_3eV=JMTeOyjKP=s2mznadQxgGD_SGABg@mail.gmail.com>
+Message-ID: <20151207160357.GL3294@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King - ARM Linux
-> Sent: 04 December 2015 17:13
-...
-> I have a slightly different view...
-> 
-> > > I don't see bust_spinlocks() dealing with any of these locks, so IMHO
-> > > trying to make this work in NMI context strikes me as making the
-> > > existing solution more unreliable on ARM systems.
+On 07-12-15, 20:42, Pi-Cheng Chen wrote:
+> >>         ret = dev_pm_opp_init_cpufreq_table(info->cpu_dev, &freq_table);
 > >
-> > bust_spinlocks() calls printk_nmi_flush() that would call printk()
-> > that would zap "lockbuf_lock" and "console_sem" when in Oops and NMI.
-> > Yes, there might be more locks blocked but we try to break at least
-> > the first two walls. Also zapping is allowed only once per 30 seconds,
-> > see zap_locks(). Why do you think that it might make things more
-> > unreliable, please?
+> > Hmm. Does this change at init() time?  Or can we move this to probe(), too?
 > 
-> Take the scenario where CPU1 is in the middle of a printk(), and is
-> holding its lock.
-> 
-> CPU0 comes along and decides to trigger a NMI backtrace.  This sends
-> a NMI to CPU1, which takes it in the middle of the serial console
-> output.
-> 
-> With the existing solution, the NMI output will be written to the
-> temporary buffer, and CPU1 has finished handling the NMI it resumes
-> the serial console output, eventually dropping the lock.  That then
-> allows CPU0 to print the contents of all buffers, and we get NMI
-> printk output.
+> It doesn't change at init() time for MT8173 since we don't add OPP
+> dynamically and I don't see any problem to move it. I will move it to probe().
 
-Is the traceback from inside printk() or serial console code
-likely to be useful?
-If not then why not get the stacktrace generated when the relevant
-lock is released?
-That should save any faffing with a special buffer.
+No. None of this belongs to probe(), we do it there just to handle the
+EPROBE_DEFER thing. Please don't move anything that isn't required to
+be.
 
-	David
+-- 
+viresh
