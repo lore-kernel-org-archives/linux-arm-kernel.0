@@ -1,27 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 07 Dec 2015 10:14:02 +0100
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable fan,
- sensors and audio for Odroid XU3
-In-Reply-To: <1449449994-10110-1-git-send-email-k.kozlowski@samsung.com>
-References: <1449449994-10110-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <3286190.bAhobgE2la@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 7 Dec 2015 10:21:37 +0100
+Subject: [PATCH resend 5/6] ARM: dts: sun7i: Add DRAM gates
+In-Reply-To: <1449321407-4531-6-git-send-email-wens@csie.org>
+References: <1449321407-4531-1-git-send-email-wens@csie.org>
+ <1449321407-4531-6-git-send-email-wens@csie.org>
+Message-ID: <20151207092137.GC27957@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 December 2015 09:59:54 Krzysztof Kozlowski wrote:
-> For Odroid XU3-family enable the:
->  - PWM fan (to control the CPU fan using thermal subsystem),
->  - TI INA231 sensors (provide power measurements of big.LITTLE cores,
->    DRAM and GPU),
->  - Samsung sound (for Odroid XU3 and Snow as well).
+On Sat, Dec 05, 2015 at 09:16:46PM +0800, Chen-Yu Tsai wrote:
+> The DRAM gates controls direct memory access for some peripherals.
+> These peripherals include the display pipeline, so add the required
+> gates to the simplefb nodes as well.
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Looks good. Do you have a samsung/defconfig branch already that you
-can put this into, or should be pick it up into arm-soc directly?
+Applied, thanks!
+Maxime
 
-My preference is the former, but it would be a bit silly if that
-is the only samsung defconfig change we need.
-
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151207/94ba16a7/attachment-0001.sig>
