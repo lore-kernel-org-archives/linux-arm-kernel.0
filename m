@@ -1,54 +1,72 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Mon, 7 Dec 2015 10:38:30 +0000
-Subject: [Xen-devel] [PATCH v3 07/62] arm/acpi: Add
- arch_acpi_os_map_memory helper function for ARM
-In-Reply-To: <56656E5802000078000BC8C7@prv-mh.provo.novell.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-8-git-send-email-shannon.zhao@linaro.org>
- <alpine.DEB.2.02.1511231137000.1107@kaball.uk.xensource.com>
- <565C6198.3070805@citrix.com> <56654A36.6070708@huawei.com>
- <56656E5802000078000BC8C7@prv-mh.provo.novell.com>
-Message-ID: <1449484710.29724.45.camel@citrix.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon,  7 Dec 2015 10:53:17 +0000
+Subject: [PATCH v3 01/22] arm64: Add macros to read/write system registers
+In-Reply-To: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
+References: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1449485618-9443-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-12-07 at 03:32 -0700, Jan Beulich wrote:
-> > > > On 07.12.15 at 09:58, <zhaoshenglong@huawei.com> wrote:
-> > On 2015/11/30 22:47, Julien Grall wrote:
-> > > On 23/11/15 11:37, Stefano Stabellini wrote:
-> > > > > On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
-> > > > > > > From: Shannon Zhao <shannon.zhao@linaro.org>
-> > > > > could you please add a couple of lines to the commit message
-> > > > > mentioning
-> > > > > why __va(phys) is an acceptable implementation of
-> > > > > arch_acpi_os_map_memory?
-> > > FWIW, I already asked this question multiple time on the previous
-> > > series
-> > > without clear answer.
-> > > 
-> > > __va should only be used when the memory is direct-mapped to Xen (i.e
-> > > accessible directly). On ARM64, this is only the case for the RAM.
-> > > Can
-> > > someone confirm the ACPI will always reside to the RAM?
-> > I checked this with the UEFI SPEC. It says in 2.3.6 AArch64 Platforms:
-> > "If ACPI is supported :
-> > ? ACPI Tables loaded at boot time can be contained in memory of type
-> > EfiACPIReclaimMemory (recommended) or EfiACPIMemoryNVS."
-> > 
-> > So I think it means the ACPI tables will always reside in RAM.
-> 
-> I think NVS doesn't necessarily mean RAM.
+From: Mark Rutland <mark.rutland@arm.com>
 
-That's what I thought/expected too (sounds like it could be flash, CMOS,
-ROM etc), but looking at the ACPI 6.0 spec ("16.3.2 BIOS Initialization of
-Memory") it says:
+Rather than crafting custom macros for reading/writing each system
+register provide generics accessors, read_sysreg and write_sysreg, for
+this purpose.
 
-    Memory identified by the BIOS as being?    reserved by the BIOS for its use.
-    OSPM is required to tag this memory as cacheable, and to save     and
-    restore its image before entering an S4 state.
+Unlike read_cpuid, calls to read_exception_reg are never expected
+to be optimized away or replaced with synthetic values.
 
-IOW, if I'm reading that correctly, it actually is "memory", and it is only
-"NV" by virtue of requiring the OSPM to save/restore it over suspend (so
-not at all "NV" in the usual sense).
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Suzuki Poulose <suzuki.poulose@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/sysreg.h | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-Ian.
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index d48ab5b..c9c283a 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -20,6 +20,8 @@
+ #ifndef __ASM_SYSREG_H
+ #define __ASM_SYSREG_H
+ 
++#include <linux/stringify.h>
++
+ #include <asm/opcodes.h>
+ 
+ /*
+@@ -208,6 +210,8 @@
+ 
+ #else
+ 
++#include <linux/types.h>
++
+ asm(
+ "	.irp	num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30\n"
+ "	.equ	__reg_num_x\\num, \\num\n"
+@@ -232,6 +236,19 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
+ 	val |= set;
+ 	asm volatile("msr sctlr_el1, %0" : : "r" (val));
+ }
++
++#define read_sysreg(r) ({					\
++	u64 __val;						\
++	asm volatile("mrs %0, " __stringify(r) : "=r" (__val));	\
++	__val;							\
++})
++
++#define write_sysreg(v, r) do {					\
++	u64 __val = (u64)v;					\
++	asm volatile("msr " __stringify(r) ", %0"		\
++		     : : "r" (__val));				\
++} while (0)
++
+ #endif
+ 
+ #endif	/* __ASM_SYSREG_H */
+-- 
+2.1.4
