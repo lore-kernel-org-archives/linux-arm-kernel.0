@@ -1,21 +1,35 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 7 Dec 2015 15:37:00 +0530
-Subject: [PATCH 2/2] ARM64: dts: mt8173: Add CPU OPP, clock and regulator
- supply properties
-In-Reply-To: <1449305584-414-3-git-send-email-pi-cheng.chen@linaro.org>
-References: <1449305584-414-1-git-send-email-pi-cheng.chen@linaro.org>
- <1449305584-414-3-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <20151207100700.GH3294@ubuntu>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon,  7 Dec 2015 10:11:10 +0000
+Subject: [PATCH 0/2] irqchip/gic-v3: Small cleanups for 4.4
+Message-ID: <1449483072-17694-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05-12-15, 16:53, Pi-Cheng Chen wrote:
-> +	cluster0_opp: opp_table0 {
-> +		compatible = "operating-points-v2";
-> +		opp-shared;
-> +		opp00 {
+Thomas, Jason,
 
-These have to named like: opp at 50700000, look at linux-next for this.
+I've been sitting on a couple of one-liners that affect GICv3. Nothing
+dramatic (and certainly nothing that affects mainline today), but they
+do get in the way of a KVM/ARM series that is aimed at 4.5 [1], and
+I'd like to make sure we don't have too many ordering issues.
+
+Alternatively, I can either carry these patches (with some Acks), or
+rebase the KVM/ARM stuff on a stable branch (but that seems a bit
+overkill for such a small set of changes).
+
+Thanks,
+
+	M.
+
+[1] https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=kvm-arm64/wsinc
+
+Marc Zyngier (2):
+  irqchip/gic-v3: Add missing struct device_node declaration
+  irqchip/gic-v3: Add missing include for barrier.h
+
+ arch/arm/include/asm/arch_gicv3.h   | 1 +
+ arch/arm64/include/asm/arch_gicv3.h | 1 +
+ include/linux/irqchip/arm-gic-v3.h  | 1 +
+ 3 files changed, 3 insertions(+)
 
 -- 
-viresh
+2.1.4
