@@ -1,23 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 07 Dec 2015 10:12:23 +0100
-Subject: [PATCH v2 2/3] soc: dove: add legacy support to PMU driver
-In-Reply-To: <E1a5j6Q-000879-GO@rmk-PC.arm.linux.org.uk>
-References: <E1a5j6Q-000879-GO@rmk-PC.arm.linux.org.uk>
-Message-ID: <3992773.OhGRJ7lcb6@wuerfel>
+Date: Mon, 07 Dec 2015 10:14:02 +0100
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable fan,
+ sensors and audio for Odroid XU3
+In-Reply-To: <1449449994-10110-1-git-send-email-k.kozlowski@samsung.com>
+References: <1449449994-10110-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <3286190.bAhobgE2la@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 06 December 2015 23:52:26 Russell King wrote:
-> Add support for legacy non-DT Dove to the PMU driver, so that we can
-> transition the legacy support over.
+On Monday 07 December 2015 09:59:54 Krzysztof Kozlowski wrote:
+> For Odroid XU3-family enable the:
+>  - PWM fan (to control the CPU fan using thermal subsystem),
+>  - TI INA231 sensors (provide power measurements of big.LITTLE cores,
+>    DRAM and GPU),
+>  - Samsung sound (for Odroid XU3 and Snow as well).
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> This is a re-post of a previous patch, except I've split it into two to
-> make the eventual removal of legacy Dove easier, as I believe Arnd will
-> have some patches which touch legacy Dove which will conflict.  This
-> makes it possible to revert this when the legacy Dove code is removed.
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
 
-Looks good, all three patches
+Looks good. Do you have a samsung/defconfig branch already that you
+can put this into, or should be pick it up into arm-soc directly?
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+My preference is the former, but it would be a bit silly if that
+is the only samsung defconfig change we need.
+
+	Arnd
