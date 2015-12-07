@@ -1,56 +1,51 @@
-From: jslaby@suse.cz (Jiri Slaby)
-Date: Mon, 7 Dec 2015 13:19:35 +0100
-Subject: [PATCH v5 4/4] MAINTAINERS: Add Liviu Dudau as maintainer for ARM
- HDLCD driver.
-In-Reply-To: <1449490265-6752-5-git-send-email-Liviu.Dudau@arm.com>
-References: <1449490265-6752-1-git-send-email-Liviu.Dudau@arm.com>
- <1449490265-6752-5-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <56657957.3010202@suse.cz>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 7 Dec 2015 12:26:46 +0000
+Subject: [PATCH v3 5/7] arm64: move kernel mapping out of linear region
+In-Reply-To: <1447672998-20981-6-git-send-email-ard.biesheuvel@linaro.org>
+References: <1447672998-20981-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1447672998-20981-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20151207122642.GA7083@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/2015, 01:11 PM, Liviu Dudau wrote:
-> Update MAINTAINERS file for HDLCD driver.
-> 
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
-> Cc: Greg KH <gregkh@linuxfoundation.org>
-> Cc: Joe Perches <joe@perches.com>
-> Cc: Jiri Slaby <jslaby@suse.com>
-
-Please drop all of us who edited MAINTAINERS in the last decade from
-your CC list in next submissions. Naturally, we do not care about your
-changes in MAINTAINERS at all.
-
-get_maintainers perhaps should not return 'git log' people for the
-MAINTAINERS file?
-
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> ---
->  MAINTAINERS | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index cba790b..8a637e3 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -820,6 +820,12 @@ S:	Maintained
->  F:	drivers/net/arcnet/
->  F:	include/uapi/linux/if_arcnet.h
->  
-> +ARM HDLCD DRM DRIVER
-> +M:	Liviu Dudau <liviu.dudau@arm.com>
-> +S:	Maintained
-> +F:	drivers/gpu/drm/arm/
-> +F:	Documentation/devicetree/bindings/display/arm,hdlcd.txt
+On Mon, Nov 16, 2015 at 12:23:16PM +0100, Ard Biesheuvel wrote:
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 23cfc08fc8ba..d3e4b5d6a8d2 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+[...]
+> @@ -210,7 +210,15 @@ section_table:
+>  ENTRY(stext)
+>  	bl	preserve_boot_args
+>  	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
+> -	adrp	x24, __PHYS_OFFSET
 > +
->  ARM MFM AND FLOPPY DRIVERS
->  M:	Ian Molton <spyro@f2s.com>
->  S:	Maintained
-> 
+> +	/*
+> +	 * Before the linear mapping has been set up, __va() translations will
+> +	 * not produce usable virtual addresses unless we tweak PHYS_OFFSET to
+> +	 * compensate for the offset between the kernel mapping and the base of
+> +	 * the linear mapping. We will undo this in map_mem().
+> +	 */
 
-thanks,
+Minor typo in comment: I guess you meant "__pa() translations will not
+produce usable...".
+
+> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+> index 5a22a119a74c..f6272f450688 100644
+> --- a/arch/arm64/mm/dump.c
+> +++ b/arch/arm64/mm/dump.c
+> @@ -63,7 +63,8 @@ static struct addr_marker address_markers[] = {
+>  	{ PCI_IO_END,		"PCI I/O end" },
+>  	{ MODULES_VADDR,	"Modules start" },
+>  	{ MODULES_END,		"Modules end" },
+> -	{ PAGE_OFFSET,		"Kernel Mapping" },
+> +	{ KIMAGE_VADDR,		"Kernel Mapping" },
+> +	{ PAGE_OFFSET,		"Linear Mapping" },
+>  	{ -1,			NULL },
+>  };
+
+Apart from this, please change the pr_notice() in mem_init() to show the
+linear mapping at the end (keep them in ascending order).
+
 -- 
-js
-suse labs
+Catalin
