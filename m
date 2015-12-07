@@ -1,40 +1,78 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 7 Dec 2015 08:21:00 +0100
-Subject: [PATCH] ARM: avoid ARCH_MMAP_RND_BITS for NOMMU
-In-Reply-To: <2874133.c4GDUf0t6t@wuerfel>
-References: <2874133.c4GDUf0t6t@wuerfel>
-Message-ID: <20151207072100.GQ5072@pengutronix.de>
+From: plaes@plaes.org (Priit Laes)
+Date: Mon,  7 Dec 2015 09:26:00 +0200
+Subject: [PATCH 1/2] ARM: dts: sun4i: gemei-g9: Add touchscreen (Goodix
+ gt801x2) support
+In-Reply-To: <1449473161-3535-1-git-send-email-plaes@plaes.org>
+References: <1449473161-3535-1-git-send-email-plaes@plaes.org>
+Message-ID: <1449473161-3535-2-git-send-email-plaes@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 27, 2015 at 03:04:03PM +0100, Arnd Bergmann wrote:
-> ARM kernels with MMU disabled fail to build because of CONFIG_ARCH_MMAP_RND_BITS:
-> 
-> kernel/built-in.o:(.data+0x754): undefined reference to `mmap_rnd_bits'
-> kernel/built-in.o:(.data+0x76c): undefined reference to `mmap_rnd_bits_min'
-> kernel/built-in.o:(.data+0x770): undefined reference to `mmap_rnd_bits_max'
-> 
-> This changes the newly added line to only select this allow for
-> MMU-enabled kernels.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 14570b3fd31a ("arm: mm: support ARCH_MMAP_RND_BITS")
-> ---
-> Found on yesterday's linux-next with ARM randconfig. The commit that
-> introduced this is currently in Andrew's tree.
-> 
-> If you don't already have a fix, please either apply this patch on top,
-> or fold it into the original patch.
-hmm, our autobuilder still fails on this one because there has been no
-next release since some time. I hope the best for tomorrow's build :-)
+Goodix GT801 2+1 is a touchscreen controller supporting up to
+10 touches.
 
-Anyhow, it fixes the build for efm32_defconfig, so
+Enable pin and wakeup pin support is currently not implemented:
+ - enable pin (PI16, specified in FEX) seems to be wrong
+ - wakeup pin needs some additional reverse engineering work
 
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Signed-off-by: Priit Laes <plaes@plaes.org>
+---
+ arch/arm/boot/dts/sun4i-a10-gemei-g9.dts | 26 ++++++++++++++++++++++++--
+ 1 file changed, 24 insertions(+), 2 deletions(-)
 
-Best regards
-Uwe
-
+diff --git a/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts b/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
+index 1d73a98..52e6275 100644
+--- a/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
++++ b/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
+@@ -48,6 +48,7 @@
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/input/input.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
+ 
+ / {
+ 	model = "Gemei G9 Tablet";
+@@ -65,11 +66,11 @@
+ /*
+  * TODO:
+  *   2x cameras via CSI
+- *   audio input
++ *   audio input (+ ext. amplifier enable GPIO)
+  *   AXP battery management
+  *   NAND
+  *   OTG
+- *   Touchscreen - gt801_2plus1 @ i2c adapter 2 @ 0x48
++ *   Touchscreen enable and wakeup pins
+  */
+ &codec {
+ 	status = "okay";
+@@ -114,6 +115,27 @@
+ 	};
+ };
+ 
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins_a>;
++	status = "okay";
++
++	touchscreen at 55 {
++		compatible = "goodix,gt801_2plus1";
++		reg = <0x55>;
++
++		interrupt-parent = <&pio>;
++		interrupts = <7 21 IRQ_TYPE_EDGE_FALLING>; /* EINT21 (PH21) */
++
++		/*
++		 * TODO - figure out the wakeup pin:
++		 *   ctp_wakeup = port:PB13<1><default><default><1>
++		 * TODO - find correct GPIO pin, PI16 seems to be incorrect:
++		 *   ctp_en     = port:PI16<1><default><default><0>
++		 */
++	};
++};
++
+ &lradc {
+ 	vref-supply = <&reg_ldo2>;
+ 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.6.3
