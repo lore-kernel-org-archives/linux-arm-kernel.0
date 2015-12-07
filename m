@@ -1,74 +1,78 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 07 Dec 2015 22:24:58 +0100
-Subject: [PATCH v2 2/3] soc: dove: add legacy support to PMU driver
-In-Reply-To: <20151207211656.GZ8644@n2100.arm.linux.org.uk> (Russell King's
- message of "Mon, 7 Dec 2015 21:16:56 +0000")
-References: <E1a5j6Q-000879-GO@rmk-PC.arm.linux.org.uk>
- <87r3iy9er5.fsf@free-electrons.com>
- <87mvtm9ejc.fsf@free-electrons.com>
- <87d1ui9da0.fsf@free-electrons.com>
- <20151207211656.GZ8644@n2100.arm.linux.org.uk>
-Message-ID: <878u569ck5.fsf@free-electrons.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon,  7 Dec 2015 13:51:12 -0800
+Subject: [PATCH v2 0/4] ARM: dts: vf610: relicense the device trees under
+ GPLv2/X11
+Message-ID: <1449525076-23569-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell King,
- 
- On lun., d?c. 07 2015, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+I collected the Acks I received so far and removed them from the list
+below. Several Freescale addresses are no longer valid (the once
+starting with --)... I would interprete the Ack from Yuan Yao as an
+Ack from Freescale.
 
-> On Mon, Dec 07, 2015 at 10:09:27PM +0100, Gregory CLEMENT wrote:
->> Hi Russell,
->>  
->>  On lun., d?c. 07 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
->> 
->> >  On lun., d?c. 07 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
->> >
->> >> Hi Russell,
->> >>  
->> >>  On lun., d?c. 07 2015, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
->> >>
->> >>> Add support for legacy non-DT Dove to the PMU driver, so that we can
->> >>> transition the legacy support over.
->> >>>
->> >>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->> >>
->> >> Applied on mvebu/soc (and fixed a conflict in drivers/soc/Makefile)
->> >
->> > Eventually I applied it on mvebu/drivers rather than mvebu/soc
->> 
->> Actually I was too optimitic. It doesn't build on mvebu/soc (based on
->> 4.4-rc1).
->> 
->> First pm_genpd_poweroff_unused() had been removed since bb4b72fc63d4 "PM
->> / Domains: Remove pm_genpd_poweroff_unused() API ".
->> 
->> Then, even by removing the call this function to go furthetr I got other
->> errors such as: drivers/soc/dove/pmu.c:344:46: error:
->> ?IRQ_DOVE_PMU_START? undeclared (first use in this function)
->
-> I guess that's with Arnd's patches?  Sigh, okay, it'll have to wait yet
-> _another_ kernel cycle then.
+Matt, you introduced the vf610-cosmic.dts board, is it possible to
+get an ack for this too? I think you did not receive v1 of this patch
+due to an old email address, sorry about that.
 
-Yes I think the breakage comes from "ARM: orion: use SPARSE_IRQ
-everywhere". With this one mach/irqs.h is no more visible by
-drivers/soc/dove/pmu.c. But I am sure we can find a solution. It could
-not be the first time there is such issue when moving to multiplatform.
+vf???.dtsi:
+  --Chao Fu <B44548@freescale.com>
+  Cosmin Stoica <cosminstefan.stoica@freescale.com>
+  Frank Li <Frank.Li@freescale.com>
+  --Fugang Duan <B38611@freescale.com>
+  --Huang Shijie <b32955@freescale.com>
+  --Jingchang Lu <jingchang.lu@freescale.com>
+  --Xiubo Li <Li.Xiubo@freescale.com>
 
-Arnd, do you have some suggestion?
+vf610-colibri:
+  <all done>
 
-Thanks,
+vf610-cosmic:
+  Matt Porter <mporter@kernel.crashing.org>
 
-Gregory
+vf610-twr:
+  --Chao Fu <B44548@freescale.com>
+  Cosmin Stoica <cosminstefan.stoica@freescale.com>
+  --Fugang Duan <B38611@freescale.com>
+  --Jingchang Lu <b35083@freescale.com>
+  --Xiubo Li <Li.Xiubo@freescale.com>
 
+CC: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+CC: Bill Pringlemeir <bpringle@sympatico.ca>
+--CC: Chao Fu <B44548@freescale.com>
+CC: Cory Tusar <cory.tusar@pid1solutions.com>
+CC: Cosmin Stoica <cosminstefan.stoica@freescale.com>
+CC: Frank Li <Frank.Li@freescale.com>
+--CC: Fugang Duan <B38611@freescale.com>
+--CC: Huang Shijie <b32955@freescale.com>
+--CC: Jingchang Lu <jingchang.lu@freescale.com>
+CC: Lucas Stach <l.stach@pengutronix.de>
+CC: Matt Porter <mporter@kernel.crashing.org>
+CC: Olof Johansson <olof@lixom.net>
+CC: Sanchayan Maity <maitysanchayan@gmail.com>
+CC: Shawn Guo <shawnguo@kernel.org>
+CC: Stephen Warren <swarren@wwwdotorg.org>
+--CC: Xiubo Li <Li.Xiubo@freescale.com>
+CC: Yuan Yao <yao.yuan@freescale.com>
 
->
-> -- 
-> RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+Stefan Agner (4):
+  ARM: dts: vf610: relicense vf???.dtsi under GPLv2/X11
+  ARM: dts: vf610-colibri: relicense vf*colibri* under GPLv2/X11
+  ARM: dts: vf610-cosmic: relicense vf610-cosmic.dts under GPLv2/X11
+  ARM: dts: vf610-twr: relicense vf610-twr.dts under GPLv2/X11
+
+ arch/arm/boot/dts/vf-colibri-eval-v3.dtsi   | 40 ++++++++++++++++++++++++---
+ arch/arm/boot/dts/vf-colibri.dtsi           | 40 ++++++++++++++++++++++++---
+ arch/arm/boot/dts/vf500-colibri-eval-v3.dts | 40 ++++++++++++++++++++++++---
+ arch/arm/boot/dts/vf500-colibri.dtsi        | 40 ++++++++++++++++++++++++---
+ arch/arm/boot/dts/vf500.dtsi                | 40 ++++++++++++++++++++++++---
+ arch/arm/boot/dts/vf610-colibri-eval-v3.dts | 42 +++++++++++++++++++++++++----
+ arch/arm/boot/dts/vf610-colibri.dtsi        | 40 ++++++++++++++++++++++++---
+ arch/arm/boot/dts/vf610-cosmic.dts          | 40 ++++++++++++++++++++++++---
+ arch/arm/boot/dts/vf610-twr.dts             | 40 ++++++++++++++++++++++++---
+ arch/arm/boot/dts/vf610.dtsi                | 40 ++++++++++++++++++++++++---
+ arch/arm/boot/dts/vfxxx.dtsi                | 40 ++++++++++++++++++++++++---
+ 11 files changed, 397 insertions(+), 45 deletions(-)
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.6.3
