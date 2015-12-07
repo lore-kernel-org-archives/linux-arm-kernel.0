@@ -1,53 +1,65 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 7 Dec 2015 17:18:39 +0530
-Subject: [PATCH] kexec: Add --lite option
-In-Reply-To: <20151207114547.GE16406@dhcppc13.redhat.com>
-References: <1445469125.30908.105.camel@infradead.org>
- <20151022031718.GB11227@dhcp-129-115.nay.redhat.com>
- <20151022125012.GB20847@redhat.com>
- <1445540891.30908.144.camel@infradead.org>
- <1446703011.12676.83.camel@freescale.com>
- <20151207114547.GE16406@dhcppc13.redhat.com>
-Message-ID: <20151207114839.GF16406@dhcppc13.redhat.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon,  7 Dec 2015 11:50:13 +0000
+Subject: [PATCH 00/19] mfd: Lots of clean-ups
+Message-ID: <1449489032-14374-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, forgot to add linux-arm-kernel at lists.infradead.org. Now CCed.
+Over the next few months, I plan to run some of our protection systems;
+Checkpatch, Smatch, Sparse and Coccinelle etc on the subsystem and do my
+best to eliminate some of the issues unearthed.
 
-On 07/12/2015:05:15:47 PM, Pratyush Anand wrote:
-> +linux-arm-kernel at lists.infradead.org (May be someone from arm kernel list can
-> give some more input)
-> 
-> On 04/11/2015:11:56:51 PM, Scott Wood wrote:
-> > On Thu, 2015-10-22 at 12:08 -0700, Geoff Levand wrote:
-> > > I notice the difference on the my arm64 system, so I guess we
-> > > are even on that.
-> > 
-> > For me it was beyond "notice the difference" -- I thought it was completely 
-> > broken, and was preparing to debug, until it started spitting out output over 
-> > a minute later.
-> > 
-> > Compiling the sha256 code with -O2 instead of -O0 cut it down to around 10 
-> > seconds (still unpleasant, but not quite as crazy... still unacceptable for 
-> > non-kdump, though).
-> 
-> Yes, compiling purgatory code with -O2 helps to improve the timing, and I notice
-> that enabling D-cache on top of -O2 does not improve it further. However, I am
-> still not able to understand that why there is huge difference between following
-> two.
-> 
-> 1) When we execute kexec() system call in first kernel, at that time it
-> calculates sha256 on all the binaries [1]. It take almost un-noticeable time
-> (less than a sec) there.
-> 
-> 2) When purgatory is executed then it re-calculates sha256 using same routines
-> [2] on same binary data as that of case (1). But, now it takes 10-20 sec
-> (depending of size of binaries)?
-> 
-> Why did not it take same time with O2 + D-cache enabled? I think, we should be
-> able to achieve same time in second case as well. What is missing?
-> 
-> ~Pratyush
-> 
-> [1] http://git.kernel.org/cgit/utils/kernel/kexec/kexec-tools.git/tree/kexec/kexec.c#n650
-> [2] http://git.kernel.org/cgit/utils/kernel/kexec/kexec-tools.git/tree/purgatory/purgatory.c#n20
+This is the first submission that takes care of some (reasonable)
+Checkpatch warnings/errors on files [A-D].
+
+If MAINTAINERS lists file maintainers, they have been Cc'ed.
+
+Lee Jones (19):
+  mfd: aat2870-core: Remove unnecessary 'out of memory' message
+  mfd: ab3100-core.c: Fix multiple warnings reported by Checkpatch
+  mfd: ab2100-otp: Remove pointless 'out of memory' error message
+  mfd: ab8500-core: Fix many warnings reported by Checkpatch
+  mfd: ab8500-debugfs: Clean-up non-conforming commenting and print
+    formatting
+  mfd: ab8500-gpadc: Squash a whole bunch of Checkpatch warnings and one
+    error
+  mfd: ab8500-sysctrl: Fix Constify, printk => pr_info and formatting
+    issues
+  mfd: adp5520: Some trivial 'no space before tab' fixes
+  mfd: arizona-core: msleep() is unreliable for anything <20ms use
+    usleep_range() instead
+  mfd: arizona-i2c: Add blank line formatting after declaration
+  mfd: as3711: Repair OOM and 'line over 80 chars' formatting warnings
+  mfd: asic3: Fix a plethora of Checkpatch errors and warnings
+  mfd: cros_ec_i2c: Fix trivial 'tabs before spaces' whitespace issue.
+  mfd: cros_ec_spi: Repair comparison ordering issue
+  mfd: cs5535-mfd: Add missing line spacing and make local array static
+  mfd: da903x: Fix white space and split string issues
+  mfd: da9052-i2c: Fix tabbing/whitespace issue
+  mfd: da9052-irq: Fix trivial 'space before comma' error
+  mfd: davinci_voicecodec: Remove pointless 'out of memory' error
+    message
+
+ drivers/mfd/aat2870-core.c       |   5 +-
+ drivers/mfd/ab3100-core.c        |  23 +++----
+ drivers/mfd/ab3100-otp.c         |   5 +-
+ drivers/mfd/ab8500-core.c        |  24 +++----
+ drivers/mfd/ab8500-debugfs.c     |  25 ++++---
+ drivers/mfd/ab8500-gpadc.c       | 145 ++++++++++++++++++++-------------------
+ drivers/mfd/ab8500-sysctrl.c     |  13 ++--
+ drivers/mfd/adp5520.c            |   6 +-
+ drivers/mfd/arizona-core.c       |   8 +--
+ drivers/mfd/arizona-i2c.c        |   2 +
+ drivers/mfd/as3711.c             |  28 ++++----
+ drivers/mfd/asic3.c              |  27 ++++----
+ drivers/mfd/cros_ec_i2c.c        |   2 +-
+ drivers/mfd/cros_ec_spi.c        |   4 +-
+ drivers/mfd/cs5535-mfd.c         |   6 +-
+ drivers/mfd/da903x.c             |  10 +--
+ drivers/mfd/da9052-i2c.c         |   2 +-
+ drivers/mfd/da9052-irq.c         |   2 +-
+ drivers/mfd/davinci_voicecodec.c |   5 +-
+ 19 files changed, 170 insertions(+), 172 deletions(-)
+
+-- 
+1.9.1
