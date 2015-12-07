@@ -1,41 +1,43 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Mon, 07 Dec 2015 13:12:14 +1100
-Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
- concurrent lockers
-In-Reply-To: <20151204161355.GD28602@linux.vnet.ibm.com>
-References: <1448624646-15863-1-git-send-email-will.deacon@arm.com>
- <20151130155839.GK17308@twins.programming.kicks-ass.net>
- <20151201164035.GE27751@arm.com>
- <20151203001141.GO28602@linux.vnet.ibm.com>
- <20151203132839.GA3816@twins.programming.kicks-ass.net>
- <20151203163243.GI11337@arm.com>
- <20151203172207.GR28602@linux.vnet.ibm.com>
- <20151204093626.GF17308@twins.programming.kicks-ass.net>
- <20151204161355.GD28602@linux.vnet.ibm.com>
-Message-ID: <1449454334.23526.5.camel@ellerman.id.au>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 7 Dec 2015 10:36:14 +0800
+Subject: [PATCH v2 PART-RESEND 0/2] berlin sdhci clock clean up
+In-Reply-To: <566408ED.9040902@gmail.com>
+References: <1447671395-8023-1-git-send-email-jszhang@marvell.com>
+ <564E3191.8060109@gmail.com>	<566408ED.9040902@gmail.com>
+Message-ID: <20151207103614.04bafa78@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-12-04 at 08:13 -0800, Paul E. McKenney wrote:
-> On Fri, Dec 04, 2015 at 10:36:26AM +0100, Peter Zijlstra wrote:
-> > On Thu, Dec 03, 2015 at 09:22:07AM -0800, Paul E. McKenney wrote:
-> > > On the added MBs,
-> > > the only alternative I have been able to come up with has even more MBs,
-> > > as in on every lock acquisition.  If I am missing something, please do
-> > > not keep it a secret!
+Dear Sebastian,
+
+On Sun, 6 Dec 2015 11:07:41 +0100
+Sebastian Hesselbarth wrote:
+
+> On 19.11.2015 21:31, Sebastian Hesselbarth wrote:
+> > On 16.11.2015 11:56, Jisheng Zhang wrote:  
+> >> Add or fix the optional clock property, then remove the CLK_IGNORE_UNUSED
+> >> flag for sdio clk(s).
+> >>
+> >> This is a partialy resend of 
+> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/379457.html
+> >>
+> >> patch3, patch4 has been merged.  
 > > 
-> > You're right. And I suppose mpe is still on the fence wrt switching PPC
-> > over to RCsc lock order.. which would be all those extra MBs you talk
-> > about.
+> > Great! Really!
+> > 
+> > As they have been taken without my Acked-by, ignoring my request to
+> > _not_ remove the CLK_IGNORE_UNUSED flags _before_ these two, the
+> > remaining patches now become fixes.
+> > 
+> > Please resend the patches with a proper description what and why they
+> > are fixes now.  
 > 
-> Yes, I would like to avoid forcing that choice on him.
+> Is this going to be resolved anytime soon?
+> 
+> If not, I am going to send a revert for the CLK_IGNORE_UNUSED patch
+> and we start this from the beginning.
 
-Yeah I am on the fence :)
+I will send patches today.
 
-Obviously we don't want to be the only chumps finding (or not finding!) the
-really subtle locking bugs.
-
-But at the same time I have Anton in my other ear saying "performance
-performance!".
-
-cheers
+Thanks a lot,
+Jisheng
