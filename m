@@ -1,88 +1,68 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  7 Dec 2015 23:26:09 +0100
-Subject: [PATCH 14/23] mtd: use mtd_set_ecclayout() where appropriate
+Date: Mon,  7 Dec 2015 23:26:11 +0100
+Subject: [PATCH 16/23] mtd: docg3: switch to mtd_ooblayout_ops
 In-Reply-To: <1449527178-5930-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1449527178-5930-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1449527178-5930-15-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1449527178-5930-17-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the mtd_set_ecclayout() helper instead of directly assigning the
-mtd->ecclayout field.
-
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/devices/docg3.c        | 2 +-
- drivers/mtd/mtdconcat.c            | 2 +-
- drivers/mtd/mtdpart.c              | 2 +-
- drivers/mtd/nand/nand_base.c       | 2 +-
- drivers/mtd/onenand/onenand_base.c | 2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/mtd/devices/docg3.c | 34 +++++++++++++++++++++++++++++-----
+ 1 file changed, 29 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/mtd/devices/docg3.c b/drivers/mtd/devices/docg3.c
-index e7b2e43..6b516e1 100644
+index 6b516e1..7463dd8 100644
 --- a/drivers/mtd/devices/docg3.c
 +++ b/drivers/mtd/devices/docg3.c
-@@ -1857,7 +1857,7 @@ static int __init doc_set_driver_info(int chip_id, struct mtd_info *mtd)
+@@ -73,10 +73,34 @@ MODULE_PARM_DESC(reliable_mode, "Set the docg3 mode (0=normal MLC, 1=fast, "
+  * @eccpos: ecc positions (byte 7 is Hamming ECC, byte 8-14 are BCH ECC)
+  * @oobfree: free pageinfo bytes (byte 0 until byte 6, byte 15
+  */
+-static struct nand_ecclayout docg3_oobinfo = {
+-	.eccbytes = 8,
+-	.eccpos = {7, 8, 9, 10, 11, 12, 13, 14},
+-	.oobfree = {{0, 7}, {15, 1} },
++static int docg3_eccpos(struct mtd_info *mtd, int eccbyte)
++{
++	if (eccbyte >= 8)
++		return -ERANGE;
++
++	return eccbyte + 7;
++}
++
++static int docg3_oobfree(struct mtd_info *mtd, int section,
++			 struct nand_oobfree *oobfree)
++{
++	if (section > 1)
++		return -ERANGE;
++
++	if (!section) {
++		oobfree->offset = 0;
++		oobfree->length = 7;
++	} else {
++		oobfree->offset = 15;
++		oobfree->length = 1;
++	}
++
++	return 0;
++}
++
++static const struct nand_ooblayout_ops nand_ooblayout_docg3_ops = {
++	.eccpos = docg3_eccpos,
++	.oobfree = docg3_oobfree,
+ };
+ 
+ static inline u8 doc_readb(struct docg3 *docg3, u16 reg)
+@@ -1857,7 +1881,7 @@ static int __init doc_set_driver_info(int chip_id, struct mtd_info *mtd)
  	mtd->_read_oob = doc_read_oob;
  	mtd->_write_oob = doc_write_oob;
  	mtd->_block_isbad = doc_block_isbad;
--	mtd->ecclayout = &docg3_oobinfo;
-+	mtd_set_ecclayout(mtd, &docg3_oobinfo);
+-	mtd_set_ecclayout(mtd, &docg3_oobinfo);
++	mtd_set_ooblayout_ops(mtd, &nand_ooblayout_docg3_ops);
  	mtd->oobavail = 8;
  	mtd->ecc_strength = DOC_ECC_BCH_T;
  
-diff --git a/drivers/mtd/mtdconcat.c b/drivers/mtd/mtdconcat.c
-index 239a8c8..481565e 100644
---- a/drivers/mtd/mtdconcat.c
-+++ b/drivers/mtd/mtdconcat.c
-@@ -777,7 +777,7 @@ struct mtd_info *mtd_concat_create(struct mtd_info *subdev[],	/* subdevices to c
- 
- 	}
- 
--	concat->mtd.ecclayout = subdev[0]->ecclayout;
-+	mtd_set_ecclayout(&concat->mtd, subdev[0]->ecclayout);
- 
- 	concat->num_subdev = num_devs;
- 	concat->mtd.name = name;
-diff --git a/drivers/mtd/mtdpart.c b/drivers/mtd/mtdpart.c
-index c32b127..244faa8 100644
---- a/drivers/mtd/mtdpart.c
-+++ b/drivers/mtd/mtdpart.c
-@@ -536,7 +536,7 @@ static struct mtd_part *allocate_partition(struct mtd_info *master,
- 			part->name);
- 	}
- 
--	slave->mtd.ecclayout = master->ecclayout;
-+	mtd_set_ecclayout(&slave->mtd, master->ecclayout);
- 	slave->mtd.ecc_step_size = master->ecc_step_size;
- 	slave->mtd.ecc_strength = master->ecc_strength;
- 	slave->mtd.bitflip_threshold = master->bitflip_threshold;
-diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-index 30a0721..2b334cf 100644
---- a/drivers/mtd/nand/nand_base.c
-+++ b/drivers/mtd/nand/nand_base.c
-@@ -4365,7 +4365,7 @@ int nand_scan_tail(struct mtd_info *mtd)
- 	mtd->writebufsize = mtd->writesize;
- 
- 	/* propagate ecc info to mtd_info */
--	mtd->ecclayout = ecc->layout;
-+	mtd_set_ecclayout(mtd, ecc->layout);
- 	mtd->ecc_strength = ecc->strength;
- 	mtd->ecc_step_size = ecc->size;
- 	/*
-diff --git a/drivers/mtd/onenand/onenand_base.c b/drivers/mtd/onenand/onenand_base.c
-index 25e6bf2..b5937b7 100644
---- a/drivers/mtd/onenand/onenand_base.c
-+++ b/drivers/mtd/onenand/onenand_base.c
-@@ -4059,7 +4059,7 @@ int onenand_scan(struct mtd_info *mtd, int maxchips)
- 	     mtd_oobfree(mtd, i++, &oobfree))
- 		mtd->oobavail += oobfree.length;
- 
--	mtd->ecclayout = this->ecclayout;
-+	mtd_set_ecclayout(mtd, this->ecclayout);
- 	mtd->ecc_strength = 1;
- 
- 	/* Fill in remaining MTD driver data */
 -- 
 2.1.4
