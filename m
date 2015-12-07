@@ -1,87 +1,32 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 7 Dec 2015 09:12:57 +0100
-Subject: [PATCH v5 3/4] ARM: dts: sunxi: Add Allwinner H3 DTSI
-In-Reply-To: <1449264283-25360-4-git-send-email-jenskuske@gmail.com>
-References: <1449264283-25360-1-git-send-email-jenskuske@gmail.com>
- <1449264283-25360-4-git-send-email-jenskuske@gmail.com>
-Message-ID: <20151207091257.070723b67db726d9f05c6550@free.fr>
+From: yankejian@huawei.com (yankejian)
+Date: Mon, 7 Dec 2015 16:25:05 +0800
+Subject: [PATCH v2 next 0/2] dts: hisi: fixes no syscon error when init mdio
+Message-ID: <1449476707-224320-1-git-send-email-yankejian@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  4 Dec 2015 22:24:42 +0100
-Jens Kuske <jenskuske@gmail.com> wrote:
+this patchset fixes the bug that eth can't initial successful on hip05-D02
+because the dts files doesn't match the source code.
 
-> The Allwinner H3 is a home entertainment system oriented SoC with
-> four Cortex-A7 cores and a Mali-400MP2 GPU.
-> 
-> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
-> ---
->  arch/arm/boot/dts/sun8i-h3.dtsi | 497 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 497 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun8i-h3.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> new file mode 100644
-> index 0000000..1524130e
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> @@ -0,0 +1,497 @@
-	[snip]
-> +		bus_gates: clk at 01c20060 {
-> +			#clock-cells = <1>;
-> +			compatible = "allwinner,sun8i-h3-bus-gates-clk";
-> +			reg = <0x01c20060 0x14>;
-> +			clocks = <&ahb1>, <&ahb2>, <&apb1>, <&apb2>;
-> +			clock-names = "ahb1", "ahb2", "apb1", "apb2";
-> +			clock-indices = <5>, <6>, <8>,
-> +					<9>, <10>, <13>,
-> +					<14>, <17>, <18>,
-> +					<19>, <20>,
-> +					<21>, <23>,
-> +					<24>, <25>,
-> +					<26>, <27>,
-> +					<28>, <29>,
-> +					<30>, <31>, <32>,
-> +					<35>, <36>, <37>,
-> +					<40>, <41>, <43>,
-> +					<44>, <52>, <53>,
-> +					<54>, <64>,
-> +					<65>, <69>, <72>,
-> +					<76>, <77>, <78>,
-> +					<96>, <97>, <98>,
-> +					<112>, <113>,
-> +					<114>, <115>,
-> +					<116>, <128>, <135>;
-> +			clock-output-names = "bus_ce", "bus_dma", "bus_mmc0",
-> +					     "bus_mmc1", "bus_mmc2", "bus_nand",
-> +					     "bus_sdram", "bus_gmac", "bus_ts",
-> +					     "bus_hstimer", "bus_spi0",
-> +					     "bus_spi1", "bus_otg",
-> +					     "bus_otg_ehci0", "bus_ehci1",
-> +					     "bus_ehci2", "bus_ehci3",
-> +					     "bus_otg_ohci0", "bus_ohci1",
-> +					     "bus_ohci2", "bus_ohci3", "bus_ve",
-> +					     "bus_lcd0", "bus_lcd1", "bus_deint",
+yankejian (2):
+  dts: hisi: fixes no syscon error when init mdio
+  net: hns: fixes no syscon error when init mdio
 
-The tcon1 clock is used by both lcd0 and lcd1, while the tcon0 clock is used for TV output from lcd1, so, this should be:
+---
+change log:
+v2:
+ 1) update the related documented in the binding as well
+ 2) use the normal naming conventions using '-' instead of '_', and
+    update the related *.c files.
 
-	"bus_tcon0", "bus_tcon1", "bus_deint",
+v1:
+ initial version
 
-(the tcon1 clock is used by both lcd0 and lcd1, while
- the tcon0 clock is used for TV output from lcd1)
-
-> +					     "bus_csi", "bus_tve", "bus_hdmi",
-> +					     "bus_de", "bus_gpu", "bus_msgbox",
-> +					     "bus_spinlock", "bus_codec",
-> +					     "bus_spdif", "bus_pio", "bus_ths",
-> +					     "bus_i2s0", "bus_i2s1", "bus_i2s2",
-> +					     "bus_i2c0", "bus_i2c1", "bus_i2c2",
-> +					     "bus_uart0", "bus_uart1",
-> +					     "bus_uart2", "bus_uart3",
-> +					     "bus_scr", "bus_ephy", "bus_dbg";
-> +		};
-	[snip]
+ .../devicetree/bindings/arm/hisilicon/hisilicon.txt      | 16 ++++++++++++++++
+ arch/arm64/boot/dts/hisilicon/hip05.dtsi                 |  5 +++++
+ arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi             |  4 ++--
+ drivers/net/ethernet/hisilicon/hns_mdio.c                |  2 +-
+ 4 files changed, 24 insertions(+), 3 deletions(-)
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.9.1
