@@ -1,338 +1,59 @@
 From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Mon, 7 Dec 2015 15:09:12 +0100
-Subject: [PATCH linux-next 3/5] mtd: m25p80: add support of dual and quad spi
- protocols to all commands
+Date: Mon, 7 Dec 2015 15:09:13 +0100
+Subject: [PATCH linux-next 4/5] Documentation: atmel-quadspi: add binding file
+ for Atmel QSPI driver
 In-Reply-To: <cover.1449494420.git.cyrille.pitchen@atmel.com>
 References: <cover.1449494420.git.cyrille.pitchen@atmel.com>
-Message-ID: <3adb9e15b7d1e3b4e3bc5b53788ad679409b1025.1449494420.git.cyrille.pitchen@atmel.com>
+Message-ID: <caec561f882521b3896530404ecb2bbad9950435.1449494420.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before this patch, m25p80_read() supported few SPI protocols:
-- regular SPI 1-1-1
-- SPI Dual Output 1-1-2
-- SPI Quad Output 1-1-4
-On the other hand, all other m25p80_*() hooks only supported SPI 1-1-1.
-
-However once their Quad mode enabled, Micron and Macronix spi-nor memories
-expect all commands to use the SPI 4-4-4 protocol.
-
-Also, once their Dual mode enabled, Micron spi-nor memories expect all
-commands to use the SPI-2-2-2 protocol.
-
-So this patch adds support to all currently existing SPI protocols to
-cover as many protocols as possible.
+This patch documents the DT bindings for the driver of the Atmel QSPI
+controller embedded inside sama5d2x SoCs.
 
 Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 ---
- drivers/mtd/devices/m25p80.c | 233 +++++++++++++++++++++++++++++++++++--------
- 1 file changed, 193 insertions(+), 40 deletions(-)
+ .../devicetree/bindings/mtd/atmel-quadspi.txt      | 32 ++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
 
-diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
-index c9c3b7fa3051..8b09f77eeffb 100644
---- a/drivers/mtd/devices/m25p80.c
-+++ b/drivers/mtd/devices/m25p80.c
-@@ -27,22 +27,114 @@
- #include <linux/spi/flash.h>
- #include <linux/mtd/spi-nor.h>
- 
--#define	MAX_CMD_SIZE		6
-+#define	MAX_CMD_SIZE		8
- struct m25p {
- 	struct spi_device	*spi;
- 	struct spi_nor		spi_nor;
- 	u8			command[MAX_CMD_SIZE];
- };
- 
-+static inline int m25p80_proto2nbits(enum spi_protocol proto,
-+				     unsigned *code_nbits,
-+				     unsigned *addr_nbits,
-+				     unsigned *data_nbits)
-+{
-+	unsigned code, addr, data;
+diff --git a/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+new file mode 100644
+index 000000000000..e81f20f9faf1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+@@ -0,0 +1,32 @@
++* Atmel Quad Serial Peripheral Interface (QSPI)
 +
-+	switch (proto) {
-+	case SPI_PROTO_1_1_1:
-+		code = SPI_NBITS_SINGLE;
-+		addr = SPI_NBITS_SINGLE;
-+		data = SPI_NBITS_SINGLE;
-+		break;
++Required properties:
++- compatible:     Should be "atmel,sama5d2-qspi".
++- reg:            Should contain the locations and lengths of the base registers
++                  and the mapped memory.
++- reg-names:      Should contain the resource reg names:
++                  - qspi_base: configuration register address space
++                  - qspi_mmap: memory mapped address space
++- interrupts:     Should contain the interrupt for the device.
++- clocks:         The phandle of the clock needed by the QSPI controller.
++- #address-cells: Should be <1>.
++- #size-cells:    Should be <0>.
 +
-+	case SPI_PROTO_1_1_2:
-+		code = SPI_NBITS_SINGLE;
-+		addr = SPI_NBITS_SINGLE;
-+		data = SPI_NBITS_DUAL;
-+		break;
++Example:
 +
-+	case SPI_PROTO_1_1_4:
-+		code = SPI_NBITS_SINGLE;
-+		addr = SPI_NBITS_SINGLE;
-+		data = SPI_NBITS_QUAD;
-+		break;
++spi at f0020000 {
++	compatible = "atmel,sama5d2-qspi";
++	reg = <0xf0020000 0x100>, <0xd0000000 0x8000000>;
++	reg-names = "qpsi_base", "qspi_mmap";
++	interrupts = <52 IRQ_TYPE_LEVEL_HIGH 7>;
++	clocks = <&spi0_clk>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_spi0_default>;
++	status = "okay";
 +
-+	case SPI_PROTO_1_2_2:
-+		code = SPI_NBITS_SINGLE;
-+		addr = SPI_NBITS_DUAL;
-+		data = SPI_NBITS_DUAL;
-+		break;
-+
-+	case SPI_PROTO_1_4_4:
-+		code = SPI_NBITS_SINGLE;
-+		addr = SPI_NBITS_QUAD;
-+		data = SPI_NBITS_QUAD;
-+		break;
-+
-+	case SPI_PROTO_2_2_2:
-+		code = SPI_NBITS_DUAL;
-+		addr = SPI_NBITS_DUAL;
-+		data = SPI_NBITS_DUAL;
-+		break;
-+
-+	case SPI_PROTO_4_4_4:
-+		code = SPI_NBITS_QUAD;
-+		addr = SPI_NBITS_QUAD;
-+		data = SPI_NBITS_QUAD;
-+		break;
-+
-+	default:
-+		return -EINVAL;
-+
-+	}
-+
-+	if (code_nbits)
-+		*code_nbits = code;
-+	if (addr_nbits)
-+		*addr_nbits = addr;
-+	if (data_nbits)
-+		*data_nbits = data;
-+
-+	return 0;
-+}
-+
- static int m25p80_read_reg(struct spi_nor *nor, u8 code, u8 *val, int len)
- {
- 	struct m25p *flash = nor->priv;
- 	struct spi_device *spi = flash->spi;
-+	unsigned code_nbits, data_nbits;
-+	struct spi_transfer xfers[2];
- 	int ret;
- 
--	ret = spi_write_then_read(spi, &code, 1, val, len);
-+	/* Check the total length of command op code and data. */
-+	if (len + 1 > MAX_CMD_SIZE)
-+		return -EINVAL;
-+
-+	/* Get transfer protocols (addr_nbits is not relevant here). */
-+	ret = m25p80_proto2nbits(nor->reg_proto,
-+				 &code_nbits, NULL, &data_nbits);
-+	if (ret < 0)
-+		return ret;
-+
-+	/* Set up transfers. */
-+	memset(xfers, 0, sizeof(xfers));
-+
-+	flash->command[0] = code;
-+	xfers[0].len = 1;
-+	xfers[0].tx_buf = flash->command;
-+	xfers[0].tx_nbits = code_nbits;
-+
-+	xfers[1].len = len;
-+	xfers[1].rx_buf = &flash->command[1];
-+	xfers[1].rx_nbits = data_nbits;
-+
-+	/* Process command. */
-+	ret = spi_sync_transfer(spi, xfers, 2);
- 	if (ret < 0)
- 		dev_err(&spi->dev, "error %d reading %x\n", ret, code);
-+	else
-+		memcpy(val, &flash->command[1], len);
- 
- 	return ret;
- }
-@@ -65,12 +157,42 @@ static int m25p80_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len)
- {
- 	struct m25p *flash = nor->priv;
- 	struct spi_device *spi = flash->spi;
-+	unsigned code_nbits, data_nbits, num_xfers = 1;
-+	struct spi_transfer xfers[2];
-+	int ret;
-+
-+	/* Check the total length of command op code and data. */
-+	if (buf && (len + 1 > MAX_CMD_SIZE))
-+		return -EINVAL;
-+
-+	/* Get transfer protocols (addr_nbits is not relevant here). */
-+	ret = m25p80_proto2nbits(nor->reg_proto,
-+				 &code_nbits, NULL, &data_nbits);
-+	if (ret < 0)
-+		return ret;
-+
-+	/* Set up transfer(s). */
-+	memset(xfers, 0, sizeof(xfers));
- 
- 	flash->command[0] = opcode;
--	if (buf)
-+	xfers[0].len = 1;
-+	xfers[0].tx_buf = flash->command;
-+	xfers[0].tx_nbits = code_nbits;
-+
-+	if (buf) {
- 		memcpy(&flash->command[1], buf, len);
-+		if (data_nbits == code_nbits) {
-+			xfers[0].len += len;
-+		} else {
-+			xfers[1].len = len;
-+			xfers[1].tx_buf = &flash->command[1];
-+			xfers[1].tx_nbits = data_nbits;
-+			num_xfers++;
-+		}
-+	}
- 
--	return spi_write(spi, flash->command, len + 1);
-+	/* Process command. */
-+	return spi_sync_transfer(spi, xfers, num_xfers);
- }
- 
- static void m25p80_write(struct spi_nor *nor, loff_t to, size_t len,
-@@ -78,43 +200,54 @@ static void m25p80_write(struct spi_nor *nor, loff_t to, size_t len,
- {
- 	struct m25p *flash = nor->priv;
- 	struct spi_device *spi = flash->spi;
--	struct spi_transfer t[2] = {};
-+	unsigned code_nbits, addr_nbits, data_nbits, num_xfers = 1;
-+	struct spi_transfer xfers[3];
- 	struct spi_message m;
--	int cmd_sz = m25p_cmdsz(nor);
--
--	spi_message_init(&m);
-+	int ret, cmd_sz = m25p_cmdsz(nor);
- 
- 	if (nor->program_opcode == SPINOR_OP_AAI_WP && nor->sst_write_second)
- 		cmd_sz = 1;
- 
--	flash->command[0] = nor->program_opcode;
--	m25p_addr2cmd(nor, to, flash->command);
-+	/* Get transfer protocols. */
-+	ret = m25p80_proto2nbits(nor->write_proto,
-+				 &code_nbits, &addr_nbits, &data_nbits);
-+	if (ret < 0) {
-+		*retlen = 0;
-+		return;
-+	}
- 
--	t[0].tx_buf = flash->command;
--	t[0].len = cmd_sz;
--	spi_message_add_tail(&t[0], &m);
-+	/* Set up transfers. */
-+	memset(xfers, 0, sizeof(xfers));
- 
--	t[1].tx_buf = buf;
--	t[1].len = len;
--	spi_message_add_tail(&t[1], &m);
-+	flash->command[0] = nor->program_opcode;
-+	xfers[0].len = 1;
-+	xfers[0].tx_buf = flash->command;
-+	xfers[0].tx_nbits = code_nbits;
-+
-+	if (cmd_sz > 1) {
-+		m25p_addr2cmd(nor, to, flash->command);
-+		if (addr_nbits == code_nbits) {
-+			xfers[0].len += nor->addr_width;
-+		} else {
-+			xfers[1].len = nor->addr_width;
-+			xfers[1].tx_buf = &flash->command[1];
-+			xfers[1].tx_nbits = addr_nbits;
-+			num_xfers++;
-+		}
-+	}
-+
-+	xfers[num_xfers].len = len;
-+	xfers[num_xfers].tx_buf = buf;
-+	xfers[num_xfers].tx_nbits = data_nbits;
-+	num_xfers++;
- 
-+	/* Process command. */
-+	spi_message_init_with_transfers(&m, xfers, num_xfers);
- 	spi_sync(spi, &m);
- 
- 	*retlen += m.actual_length - cmd_sz;
- }
- 
--static inline unsigned int m25p80_rx_nbits(struct spi_nor *nor)
--{
--	switch (nor->flash_read) {
--	case SPI_NOR_DUAL:
--		return 2;
--	case SPI_NOR_QUAD:
--		return 4;
--	default:
--		return 0;
--	}
--}
--
- /*
-  * Read an address range from the nor chip.  The address range
-  * may be any size provided it is within the physical boundaries.
-@@ -124,28 +257,48 @@ static int m25p80_read(struct spi_nor *nor, loff_t from, size_t len,
- {
- 	struct m25p *flash = nor->priv;
- 	struct spi_device *spi = flash->spi;
--	struct spi_transfer t[2];
--	struct spi_message m;
-+	unsigned code_nbits, addr_nbits, data_nbits, num_xfers = 1;
- 	unsigned int dummy = nor->read_dummy;
-+	struct spi_transfer xfers[3];
-+	struct spi_message m;
-+	int ret;
-+
-+	/* Get transfer protocols. */
-+	ret = m25p80_proto2nbits(nor->read_proto,
-+				 &code_nbits, &addr_nbits, &data_nbits);
-+	if (ret < 0) {
-+		*retlen = 0;
-+		return ret;
-+	}
- 
- 	/* convert the dummy cycles to the number of bytes */
- 	dummy /= 8;
- 
--	spi_message_init(&m);
--	memset(t, 0, (sizeof t));
-+	/* Set up transfers. */
-+	memset(xfers, 0, sizeof(xfers));
- 
- 	flash->command[0] = nor->read_opcode;
--	m25p_addr2cmd(nor, from, flash->command);
-+	xfers[0].len = 1;
-+	xfers[0].tx_buf = flash->command;
-+	xfers[0].tx_nbits = code_nbits;
- 
--	t[0].tx_buf = flash->command;
--	t[0].len = m25p_cmdsz(nor) + dummy;
--	spi_message_add_tail(&t[0], &m);
-+	m25p_addr2cmd(nor, from, flash->command);
-+	if (addr_nbits == code_nbits) {
-+		xfers[0].len += nor->addr_width + dummy;
-+	} else {
-+		xfers[1].len = nor->addr_width + dummy;
-+		xfers[1].tx_buf = &flash->command[1];
-+		xfers[1].tx_nbits = addr_nbits;
-+		num_xfers++;
-+	}
- 
--	t[1].rx_buf = buf;
--	t[1].rx_nbits = m25p80_rx_nbits(nor);
--	t[1].len = len;
--	spi_message_add_tail(&t[1], &m);
-+	xfers[num_xfers].len = len;
-+	xfers[num_xfers].rx_buf = buf;
-+	xfers[num_xfers].rx_nbits = data_nbits;
-+	num_xfers++;
- 
-+	/* Process command. */
-+	spi_message_init_with_transfers(&m, xfers, num_xfers);
- 	spi_sync(spi, &m);
- 
- 	*retlen = m.actual_length - m25p_cmdsz(nor) - dummy;
++	m25p80 at 0 {
++		...
++	};
++};
 -- 
 1.8.2.2
