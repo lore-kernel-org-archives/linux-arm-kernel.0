@@ -1,62 +1,54 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 7 Dec 2015 11:34:55 +0100
-Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
- concurrent lockers
-In-Reply-To: <20151207004504.GC13845@fixme-laptop.cn.ibm.com>
-References: <20151203172207.GR28602@linux.vnet.ibm.com>
- <20151204092110.GE17308@twins.programming.kicks-ass.net>
- <20151204160706.GC28602@linux.vnet.ibm.com>
- <20151204162453.GE15969@arm.com>
- <20151204164446.GF28602@linux.vnet.ibm.com>
- <20151206073712.GA1549@fixme-laptop.cn.ibm.com>
- <20151206192302.GS28602@linux.vnet.ibm.com>
- <20151206232825.GA13845@fixme-laptop.cn.ibm.com>
- <20151207000047.GX28602@linux.vnet.ibm.com>
- <20151207004504.GC13845@fixme-laptop.cn.ibm.com>
-Message-ID: <20151207103455.GO17308@twins.programming.kicks-ass.net>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Mon, 7 Dec 2015 10:38:30 +0000
+Subject: [Xen-devel] [PATCH v3 07/62] arm/acpi: Add
+ arch_acpi_os_map_memory helper function for ARM
+In-Reply-To: <56656E5802000078000BC8C7@prv-mh.provo.novell.com>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-8-git-send-email-shannon.zhao@linaro.org>
+ <alpine.DEB.2.02.1511231137000.1107@kaball.uk.xensource.com>
+ <565C6198.3070805@citrix.com> <56654A36.6070708@huawei.com>
+ <56656E5802000078000BC8C7@prv-mh.provo.novell.com>
+Message-ID: <1449484710.29724.45.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 08:45:04AM +0800, Boqun Feng wrote:
-> > > Or maybe, we introduce another address space of sparse like:
+On Mon, 2015-12-07 at 03:32 -0700, Jan Beulich wrote:
+> > > > On 07.12.15 at 09:58, <zhaoshenglong@huawei.com> wrote:
+> > On 2015/11/30 22:47, Julien Grall wrote:
+> > > On 23/11/15 11:37, Stefano Stabellini wrote:
+> > > > > On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
+> > > > > > > From: Shannon Zhao <shannon.zhao@linaro.org>
+> > > > > could you please add a couple of lines to the commit message
+> > > > > mentioning
+> > > > > why __va(phys) is an acceptable implementation of
+> > > > > arch_acpi_os_map_memory?
+> > > FWIW, I already asked this question multiple time on the previous
+> > > series
+> > > without clear answer.
 > > > 
-> > > 	# define __private	__attribute__((noderef, address_space(6)))
-> > > 
-> > > and macro to dereference private
-> > > 
-> > > 	# define private_dereference(p) ((typeof(*p) *) p)
-> > > 
-> > > and define struct rcu_node like:
-> > > 
-> > > 	struct rcu_node {
-> > > 		raw_spinlock_t __private lock;	/* Root rcu_node's lock protects some */
-> > > 		...
-> > > 	};
-> > > 
-> > > and finally raw_spin_{un}lock_rcu_node() like:
-> > > 
-> > > 	static inline void raw_spin_lock_rcu_node(struct rcu_node *rnp)
-> > > 	{
-> > > 		raw_spin_lock(private_dereference(&rnp->lock));
-> > > 		smp_mb__after_unlock_lock();
-> > > 	}
-> > > 
-> > > 	static inline void raw_spin_unlock_rcu_node(struct rcu_node *rnp)
-> > > 	{
-> > > 		raw_spin_unlock(private_dereference(&rnp->lock));
-> > > 	}
-> > > 
-> > > This __private mechanism also works for others who wants to private
-> > > their fields of struct, which is not supported by C.
-> > > 
-> > > I will send two patches(one introduces __private and one uses it for
-> > > rcu_node->lock) if you think this is not a bad idea ;-)
+> > > __va should only be used when the memory is direct-mapped to Xen (i.e
+> > > accessible directly). On ARM64, this is only the case for the RAM.
+> > > Can
+> > > someone confirm the ACPI will always reside to the RAM?
+> > I checked this with the UEFI SPEC. It says in 2.3.6 AArch64 Platforms:
+> > "If ACPI is supported :
+> > ? ACPI Tables loaded at boot time can be contained in memory of type
+> > EfiACPIReclaimMemory (recommended) or EfiACPIMemoryNVS."
+> > 
+> > So I think it means the ACPI tables will always reside in RAM.
+> 
+> I think NVS doesn't necessarily mean RAM.
 
-> If rcu_node->lock is the only user then this is probably a bad idea, but
-> if others also want to have a way to privatize some fields of the
-> structure, this may be not that bad?
+That's what I thought/expected too (sounds like it could be flash, CMOS,
+ROM etc), but looking at the ACPI 6.0 spec ("16.3.2 BIOS Initialization of
+Memory") it says:
 
-Thomas might also want this for things like
-irq_common_data::state_use_accessors for instance.
+    Memory identified by the BIOS as being?    reserved by the BIOS for its use.
+    OSPM is required to tag this memory as cacheable, and to save     and
+    restore its image before entering an S4 state.
 
-And I'm fairly sure there's more out there.
+IOW, if I'm reading that correctly, it actually is "memory", and it is only
+"NV" by virtue of requiring the OSPM to save/restore it over suspend (so
+not at all "NV" in the usual sense).
+
+Ian.
