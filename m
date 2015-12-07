@@ -1,60 +1,39 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 7 Dec 2015 07:16:17 -0600
-Subject: [PATCH RESEND net-next 3/3] arm64: hip05-d02: Document
- devicetree bindings for Hisilicon D02 Board
-In-Reply-To: <1449302088-53037-4-git-send-email-yankejian@huawei.com>
-References: <1449302088-53037-1-git-send-email-yankejian@huawei.com>
- <1449302088-53037-4-git-send-email-yankejian@huawei.com>
-Message-ID: <20151207131617.GA25170@rob-hp-laptop>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 07 Dec 2015 13:16:06 +0000
+Subject: [PATCH] kexec: Add --lite option
+In-Reply-To: <20151207114839.GF16406@dhcppc13.redhat.com>
+References: <1445469125.30908.105.camel@infradead.org>
+ <20151022031718.GB11227@dhcp-129-115.nay.redhat.com>
+ <20151022125012.GB20847@redhat.com>
+ <1445540891.30908.144.camel@infradead.org>
+ <1446703011.12676.83.camel@freescale.com>
+ <20151207114547.GE16406@dhcppc13.redhat.com>
+ <20151207114839.GF16406@dhcppc13.redhat.com>
+Message-ID: <56658696.6070103@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 05, 2015 at 03:54:48PM +0800, yankejian wrote:
-> This patch adds documentation for the devicetree bindings used by the
-> DT files of Hisilicon Hip05-D02 development board.
-> 
-> Signed-off-by: yankejian <yankejian@huawei.com>
-> ---
->  .../devicetree/bindings/arm/hisilicon/hisilicon.txt      | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> index 6ac7c00..5318d78 100644
-> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> @@ -187,6 +187,22 @@ Example:
->  		reg = <0xb0000000 0x10000>;
->  	};
->  
-> +Hisilicon HiP05 PERISUB system controller
-> +
-> +Required properties:
-> +- compatible : "hisilicon,peri-c-subctrl", "syscon";
+Hi Pratyush,
 
-This should be more specific and have the SOC name in it.
+On 07/12/15 11:48, Pratyush Anand wrote:
+>> 1) When we execute kexec() system call in first kernel, at that time it
+>> calculates sha256 on all the binaries [1]. It take almost un-noticeable time
+>> (less than a sec) there.
+>>
+>> 2) When purgatory is executed then it re-calculates sha256 using same routines
+>> [2] on same binary data as that of case (1). But, now it takes 10-20 sec
+>> (depending of size of binaries)?
+>>
+>> Why did not it take same time with O2 + D-cache enabled? I think, we should be
+>> able to achieve same time in second case as well. What is missing?
 
-> +- reg : Register address and size
-> +
-> +The HiP05 PERISUB system controller is shared by peripheral controllers in
-> +HiP05 Soc to implement some basic configurations. the peripheral
-> + controllers include mdio, ddr, iic, uart, timer and so on.
-> +
-> +Example:
-> +	/* for HiP05 PCIe-SAS system */
-> +	pcie_sas: system_controller at 0xb0000000 {
-> +		compatible = "hisilicon,pcie-sas-subctrl", "syscon";
+I haven't benchmarked this, but:
 
-The example doesn't match.
+util_lib/sha256.c contains calls out to memcpy().
+In your case 1, this will use the glibc version. In case 2, it will use
+the version implemented in purgatory/string.c, which is a byte-by-byte copy.
 
-> +		reg = <0xb0000000 0x10000>;
-> +	};
->  -----------------------------------------------------------------------
->  Hisilicon CPU controller
->  
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Thanks,
+
+James
