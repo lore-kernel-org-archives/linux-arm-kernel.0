@@ -1,100 +1,37 @@
-From: jenskuske@gmail.com (Jens Kuske)
-Date: Mon, 7 Dec 2015 19:44:30 +0100
-Subject: [PATCH v5 3/4] ARM: dts: sunxi: Add Allwinner H3 DTSI
-In-Reply-To: <20151207091257.070723b67db726d9f05c6550@free.fr>
-References: <1449264283-25360-1-git-send-email-jenskuske@gmail.com>
- <1449264283-25360-4-git-send-email-jenskuske@gmail.com>
- <20151207091257.070723b67db726d9f05c6550@free.fr>
-Message-ID: <5665D38E.4050406@gmail.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Mon, 07 Dec 2015 10:47:14 -0800
+Subject: [PATCH v12 08/16] arm64/kexec: Add core kexec support
+In-Reply-To: <20151204035405.GB737@dhcppc13.redhat.com>
+References: <cover.1448403503.git.geoff@infradead.org>
+ <6ac232ad37d6b02cf2d5848b15236f26f5ac61ac.1448403503.git.geoff@infradead.org>
+ <20151127131306.GE23908@dhcppc13.redhat.com>
+ <1448909475.31214.27.camel@infradead.org>
+ <20151201021615.GA5704@dhcppc13.redhat.com>
+ <002101d12c66$ae985440$0bc8fcc0$@codeaurora.org>
+ <1449096562.6139.74.camel@infradead.org>
+ <000b01d12d84$4313a930$c93afb90$@codeaurora.org>
+ <1449172587.24127.12.camel@infradead.org> <5660E0B0.8010507@codeaurora.org>
+ <20151204035405.GB737@dhcppc13.redhat.com>
+Message-ID: <1449514034.24127.18.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/15 09:12, Jean-Francois Moine wrote:
-> On Fri,  4 Dec 2015 22:24:42 +0100
-> Jens Kuske <jenskuske@gmail.com> wrote:
+On Fri, 2015-12-04 at 09:24 +0530, Pratyush Anand wrote:
+> Hi Geoff,
 > 
->> The Allwinner H3 is a home entertainment system oriented SoC with
->> four Cortex-A7 cores and a Mali-400MP2 GPU.
->>
->> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
->> ---
->>  arch/arm/boot/dts/sun8i-h3.dtsi | 497 ++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 497 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/sun8i-h3.dtsi
->>
->> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
->> new file mode 100644
->> index 0000000..1524130e
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
->> @@ -0,0 +1,497 @@
-> 	[snip]
->> +		bus_gates: clk at 01c20060 {
->> +			#clock-cells = <1>;
->> +			compatible = "allwinner,sun8i-h3-bus-gates-clk";
->> +			reg = <0x01c20060 0x14>;
->> +			clocks = <&ahb1>, <&ahb2>, <&apb1>, <&apb2>;
->> +			clock-names = "ahb1", "ahb2", "apb1", "apb2";
->> +			clock-indices = <5>, <6>, <8>,
->> +					<9>, <10>, <13>,
->> +					<14>, <17>, <18>,
->> +					<19>, <20>,
->> +					<21>, <23>,
->> +					<24>, <25>,
->> +					<26>, <27>,
->> +					<28>, <29>,
->> +					<30>, <31>, <32>,
->> +					<35>, <36>, <37>,
->> +					<40>, <41>, <43>,
->> +					<44>, <52>, <53>,
->> +					<54>, <64>,
->> +					<65>, <69>, <72>,
->> +					<76>, <77>, <78>,
->> +					<96>, <97>, <98>,
->> +					<112>, <113>,
->> +					<114>, <115>,
->> +					<116>, <128>, <135>;
->> +			clock-output-names = "bus_ce", "bus_dma", "bus_mmc0",
->> +					     "bus_mmc1", "bus_mmc2", "bus_nand",
->> +					     "bus_sdram", "bus_gmac", "bus_ts",
->> +					     "bus_hstimer", "bus_spi0",
->> +					     "bus_spi1", "bus_otg",
->> +					     "bus_otg_ehci0", "bus_ehci1",
->> +					     "bus_ehci2", "bus_ehci3",
->> +					     "bus_otg_ohci0", "bus_ohci1",
->> +					     "bus_ohci2", "bus_ohci3", "bus_ve",
->> +					     "bus_lcd0", "bus_lcd1", "bus_deint",
+> On 03/12/2015:05:39:12 PM, Azriel Samson wrote:
+> > This was a setup issue on my side. kdump with your v11 patches worked fine
+> > without the above patch when I used your version of kexec-tools.
+> > 
+> > In kexec-tools, I had to skip check_cpu_nodes() since we are using ACPI and
+> > the device tree does not contain cpu_info.
 > 
-> The tcon1 clock is used by both lcd0 and lcd1, while the tcon0 clock is used for TV output from lcd1, so, this should be:
-> 
-> 	"bus_tcon0", "bus_tcon1", "bus_deint",
-> 
-> (the tcon1 clock is used by both lcd0 and lcd1, while
->  the tcon0 clock is used for TV output from lcd1)
+> I think, something like following should be squashed into patch "arm64: Add arm64
+> kexec support".
+> https://github.com/pratyushanand/kexec-tools/commit/85f403cabb9ae0d7a37d1656a00fb609a9525086
 
-Hi,
+I think it better to test for ACPI and then run
+any meaningful checks than to just ignore the
+check_cpu_nodes failure.
 
-These are only the ahb bus gates, not the module clocks.
-Naming them lcd might be a bit confusing, but it follows the naming we
-used since sun4i. And the tcon modules are still called lcd0 and lcd1
-module in the manual too.
-
-Interestingly there is only a tcon0 module clock in the manual and no
-tcon1, but that is not part of this patch.
-
-Jens
-
-
-> 
->> +					     "bus_csi", "bus_tve", "bus_hdmi",
->> +					     "bus_de", "bus_gpu", "bus_msgbox",
->> +					     "bus_spinlock", "bus_codec",
->> +					     "bus_spdif", "bus_pio", "bus_ths",
->> +					     "bus_i2s0", "bus_i2s1", "bus_i2s2",
->> +					     "bus_i2c0", "bus_i2c1", "bus_i2c2",
->> +					     "bus_uart0", "bus_uart1",
->> +					     "bus_uart2", "bus_uart3",
->> +					     "bus_scr", "bus_ephy", "bus_dbg";
->> +		};
-> 	[snip]
-> 
+-Geoff
