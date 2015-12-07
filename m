@@ -1,96 +1,44 @@
-From: damien.riegel@savoirfairelinux.com (Damien Riegel)
-Date: Mon, 7 Dec 2015 14:42:18 -0500
-Subject: [PATCH v7 2/6] mfd: syscon: add a DT property to set value width
-In-Reply-To: <20151207094020.GF3384@x1>
-References: <1448899191-13891-1-git-send-email-damien.riegel@savoirfairelinux.com>
- <1448899191-13891-3-git-send-email-damien.riegel@savoirfairelinux.com>
- <20151207094020.GF3384@x1>
-Message-ID: <20151207194218.GB6030@localhost>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 7 Dec 2015 21:18:05 +0100
+Subject: [PATCH v2 6/6] arm64: renesas: r8a7795: Add L2 cache-controller
+ nodes
+In-Reply-To: <20151207190355.GE28024@leverpostej>
+References: <1449512659-16688-1-git-send-email-geert+renesas@glider.be>
+ <1449512659-16688-7-git-send-email-geert+renesas@glider.be>
+ <5665D4C7.1050705@arm.com> <20151207190355.GE28024@leverpostej>
+Message-ID: <CAMuHMdWrXiYkcFwSkgbEfQRXvT2FsSTbqD72vtiedmeEZZKxLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 09:40:20AM +0000, Lee Jones wrote:
-> On Mon, 30 Nov 2015, Damien Riegel wrote:
-> 
-> > Currently syscon has a fixed configuration of 32 bits for register and
-> > values widths. In some cases, it would be desirable to be able to
-> > customize the value width.
-> > 
-> > For example, certain boards (like the ones manufactured by Technologic
-> > Systems) have a FPGA that is memory-mapped, but its registers are only
-> > 16-bit wide.
-> > 
-> > This patch adds an optional "reg-io-width" DT binding for syscon that
-> > allows to change the width for the data bus (i.e. val_bits). If this
-> > property is provided, it will also set the register stride to
-> > reg-io-width's value. If not provided, the default configuration is
-> > used.
-> > 
-> > Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
-> > ---
-> >  Documentation/devicetree/bindings/mfd/syscon.txt |  4 ++++
-> >  drivers/mfd/syscon.c                             | 13 +++++++++++++
-> >  2 files changed, 17 insertions(+)
-> 
-> Applied, thanks.
-> 
-Hi Lee,
+Hi Mark,
 
-Good to see this patch applied. What's going on now with the other
-patches of this serie ? How should I handle them ?
+On Mon, Dec 7, 2015 at 8:03 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Dec 07, 2015 at 06:49:43PM +0000, Sudeep Holla wrote:
+>> On 07/12/15 18:24, Geert Uytterhoeven wrote:
+>> >+    L2_CA57: cache-controller at 0 {
+>> >+            compatible = "cache";
+>> >+            arm,data-latency = <4 4 1>;
+>> >+            arm,tag-latency = <3 3 3>;
+>>
+>> Interesting, only PL2xx/3xx cache controller driver reads this from the
+>> DT and configures the controller. The integrated L2 found in
+>> A15/A7/A57/A53 needs doesn't make use of these values from the DT.
+>
+> These properties seem to be from l2cc.txt, which really only corresponds
+> to PL210/PL220/PL310 (and variants) and isn't as generic as it sounds.
+>
+> I don't see that these are necessary at all.
 
-Thanks,
-Damien
+The datasheet does mention the data/tag RAM latencies/setup values, so
+I put them in DT using the properties I could fine.
 
-> > diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
-> > index fe8150b..408f768 100644
-> > --- a/Documentation/devicetree/bindings/mfd/syscon.txt
-> > +++ b/Documentation/devicetree/bindings/mfd/syscon.txt
-> > @@ -13,6 +13,10 @@ Required properties:
-> >  - compatible: Should contain "syscon".
-> >  - reg: the register region can be accessed from syscon
-> >  
-> > +Optional property:
-> > +- reg-io-width: the size (in bytes) of the IO accesses that should be
-> > +  performed on the device.
-> > +
-> >  Examples:
-> >  gpr: iomuxc-gpr at 020e0000 {
-> >  	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
-> > diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-> > index 176bf0f..b7aabee 100644
-> > --- a/drivers/mfd/syscon.c
-> > +++ b/drivers/mfd/syscon.c
-> > @@ -47,6 +47,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
-> >  	struct syscon *syscon;
-> >  	struct regmap *regmap;
-> >  	void __iomem *base;
-> > +	u32 reg_io_width;
-> >  	int ret;
-> >  	struct regmap_config syscon_config = syscon_regmap_config;
-> >  
-> > @@ -69,6 +70,18 @@ static struct syscon *of_syscon_register(struct device_node *np)
-> >  	 else if (of_property_read_bool(np, "little-endian"))
-> >  		syscon_config.val_format_endian = REGMAP_ENDIAN_LITTLE;
-> >  
-> > +	/*
-> > +	 * search for reg-io-width property in DT. If it is not provided,
-> > +	 * default to 4 bytes. regmap_init_mmio will return an error if values
-> > +	 * are invalid so there is no need to check them here.
-> > +	 */
-> > +	ret = of_property_read_u32(np, "reg-io-width", &reg_io_width);
-> > +	if (ret)
-> > +		reg_io_width = 4;
-> > +
-> > +	syscon_config.reg_stride = reg_io_width;
-> > +	syscon_config.val_bits = reg_io_width * 8;
-> > +
-> >  	regmap = regmap_init_mmio(NULL, base, &syscon_config);
-> >  	if (IS_ERR(regmap)) {
-> >  		pr_err("regmap init failed\n");
-> 
-> -- 
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
