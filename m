@@ -1,36 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 07 Dec 2015 12:13:55 +0100
-Subject: [PATCH v5 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
-In-Reply-To: <56655EC8.6030905@nvidia.com>
-References: <1449000658-11475-1-git-send-email-dcashman@android.com>
- <1449000658-11475-4-git-send-email-dcashman@android.com>
- <56655EC8.6030905@nvidia.com>
-Message-ID: <1720878.JdEcLd8bhL@wuerfel>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 07 Dec 2015 11:28:44 +0000
+Subject: [PATCH v3 09/10] PM / Hibernate: Publish pages restored in-place
+ to arch code
+In-Reply-To: <20151205093534.GA7569@amd>
+References: <1448559168-8363-1-git-send-email-james.morse@arm.com>
+ <1448559168-8363-10-git-send-email-james.morse@arm.com>
+ <20151205093534.GA7569@amd>
+Message-ID: <56656D6C.5010004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 December 2015 10:26:16 Jon Hunter wrote:
-> 
-> diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
-> index af461b935137..e59a75a308bc 100644
-> --- a/arch/arm64/mm/mmap.c
-> +++ b/arch/arm64/mm/mmap.c
-> @@ -51,7 +51,7 @@ unsigned long arch_mmap_rnd(void)
->  {
->         unsigned long rnd;
->  
-> -ifdef CONFIG_COMPAT
-> +#ifdef CONFIG_COMPAT
->         if (test_thread_flag(TIF_32BIT))
->                 rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_compat_bits);
->         else
-> 
-> Cheers
-> 
+Hi Pavel,
 
-Ideally we'd remove the #ifdef around the mmap_rnd_compat_bits declaration
-and change this code to use
+On 05/12/15 09:35, Pavel Machek wrote:
+> On Thu 2015-11-26 17:32:47, James Morse wrote:
+>> Some architectures require code written to memory as if it were data to be
+>> 'cleaned' from any data caches before the processor can fetch them as new
+>> instructions.
+>>
+>> During resume from hibernate, the snapshot code copies some pages directly,
+>> meaning these architectures do not get a chance to perform their cache
+>> maintenance. Create a new list of pages that were restored in place, so
+>> that the arch code can perform this maintenance when necessary.
+> 
+> Umm. Could the copy function be modified to do the neccessary
+> flushing, instead?
 
-	if (IS_ENABLED(CONFIG_COMPAT) && test_thread_flag(TIF_32BIT))
+The copying is done by load_image_lzo() using memcpy() if you have
+compression enabled, and by load_image() using swap_read_page() if you
+don't.
 
-	Arnd
+I didn't do it here as it would clean every page copied, which was the
+worrying part of the previous approach. If there is an architecture
+where this cache-clean operation is expensive, it would slow down
+restore. I was trying to benchmark the impact of this on 32bit arm when
+I spotted it was broken.
+
+This allocated-same-page code path doesn't happen very often, so we
+don't want this to have an impact on the 'normal' code path. On 32bit
+arm I saw ~20 of these allocations out of ~60,000 pages.
+
+This new way allocates a few extra pages during restore, and doesn't
+assume that flush_cache_range() needs calling. It should have no impact
+on architectures that aren't using the new list.
+
+
+> Alternatively, can you just clean the whole cache before jumping to
+> the new kernel?
+
+On arm64, cleaning the whole cache means cleaning all of memory by
+virtual address, which would be a high price to pay when we only need to
+clean the pages we copied. The current implementation does clean all the
+page it copies, the problem is the ~0.03% that are copied behind its
+back. This patch publishes where those pages are.
+
+
+
+Thanks!
+
+James
