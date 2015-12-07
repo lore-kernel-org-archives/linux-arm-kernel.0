@@ -1,72 +1,45 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 7 Dec 2015 13:34:19 +0100
-Subject: [PATCH v3 5/7] arm64: move kernel mapping out of linear region
-In-Reply-To: <CAKv+Gu-XtzU0QvJQhJH+yXEppLnva1TS2ougN6i_6dvNZzo3YA@mail.gmail.com>
-References: <1447672998-20981-1-git-send-email-ard.biesheuvel@linaro.org>
- <1447672998-20981-6-git-send-email-ard.biesheuvel@linaro.org>
- <20151207122642.GA7083@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-XtzU0QvJQhJH+yXEppLnva1TS2ougN6i_6dvNZzo3YA@mail.gmail.com>
-Message-ID: <CAKv+Gu8un0YhVJ0Tji-GZ7TJr=t1PraBgHf60OLdYu09AuxSLw@mail.gmail.com>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Mon, 7 Dec 2015 12:36:54 +0000
+Subject: [RFC PATCH 0/8] CPUs capacity information for heterogeneous
+ systems
+In-Reply-To: <20151207121135.GN8644@n2100.arm.linux.org.uk>
+References: <1448288921-30307-1-git-send-email-juri.lelli@arm.com>
+ <20151207120244.GE14571@e106622-lin>
+ <20151207121135.GN8644@n2100.arm.linux.org.uk>
+Message-ID: <20151207123654.GG14571@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 December 2015 at 13:33, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 7 December 2015 at 13:26, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> On Mon, Nov 16, 2015 at 12:23:16PM +0100, Ard Biesheuvel wrote:
->>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
->>> index 23cfc08fc8ba..d3e4b5d6a8d2 100644
->>> --- a/arch/arm64/kernel/head.S
->>> +++ b/arch/arm64/kernel/head.S
->> [...]
->>> @@ -210,7 +210,15 @@ section_table:
->>>  ENTRY(stext)
->>>       bl      preserve_boot_args
->>>       bl      el2_setup                       // Drop to EL1, w20=cpu_boot_mode
->>> -     adrp    x24, __PHYS_OFFSET
->>> +
->>> +     /*
->>> +      * Before the linear mapping has been set up, __va() translations will
->>> +      * not produce usable virtual addresses unless we tweak PHYS_OFFSET to
->>> +      * compensate for the offset between the kernel mapping and the base of
->>> +      * the linear mapping. We will undo this in map_mem().
->>> +      */
->>
->> Minor typo in comment: I guess you meant "__pa() translations will not
->> produce usable...".
->>
->
-> No, not quite. __va() translations will normally produce addresses in
-> the linear mapping, which will not be set up when we first start using
-> it in create_mapping(). So until that time, we have to redirect __va()
-> translations into the kernel mapping, where swapper_pg_dir is
-> shadowed. I am hoping that Mark's planned changes to create_mapping()
-> will make this unnecessary, but I haven't seen any of his code yet.
->
-> As far as __pa() is concerned, that translation is actually tweaked so
-> it will always produce usable addresses, regardless of whether the
-> bias is still set or not. The reason is that va-to-pa translations are
-> always unambiguous.
->
+On 07/12/15 12:11, Russell King - ARM Linux wrote:
+> On Mon, Dec 07, 2015 at 12:02:44PM +0000, Juri Lelli wrote:
+> > On 23/11/15 14:28, Juri Lelli wrote:
+> > > Hi all,
+> > > 
+> > 
+> > Hi again everybody,
+> > 
+> > thanks a lot to Rob and Vincent for feedback, but, IMHO, we'd need more
+> > discussion happening on this series to figure out how we move forward;
+> > so, this is a ping :-).  It's a simple information that we need to figure
+> > out how to provide, and in which form, but it has the potential to form
+> > a standardized basis for achieving important performance benefits.
+> 
+> I'm happy to take the first patch, it looks like a simple clean up.
+> Please arrange for it to land in my patch system.  Thanks.
+> 
 
-... so of course, the comment is still wrong, -> s/virtual/physical/ addresses
+OK, will do. Thanks!
 
+> It looks like the second patch doesn't yet have the backing from the DT
+> people, which prevents the remainder of the patch set progressing.  That's
+> the sticking point which needs to be resolved.
+> 
 
->>> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
->>> index 5a22a119a74c..f6272f450688 100644
->>> --- a/arch/arm64/mm/dump.c
->>> +++ b/arch/arm64/mm/dump.c
->>> @@ -63,7 +63,8 @@ static struct addr_marker address_markers[] = {
->>>       { PCI_IO_END,           "PCI I/O end" },
->>>       { MODULES_VADDR,        "Modules start" },
->>>       { MODULES_END,          "Modules end" },
->>> -     { PAGE_OFFSET,          "Kernel Mapping" },
->>> +     { KIMAGE_VADDR,         "Kernel Mapping" },
->>> +     { PAGE_OFFSET,          "Linear Mapping" },
->>>       { -1,                   NULL },
->>>  };
->>
->> Apart from this, please change the pr_notice() in mem_init() to show the
->> linear mapping at the end (keep them in ascending order).
->>
->
-> OK
+Agreed. That is exactly the point for which I was seeking more feedback.
+OTOH, 7/8 and 8/8 may potentially work without the DT bindings, as they
+simply expose a sysfs attribute. If you, and others, see value in them,
+I can easily put them at the top of the series and post a v2. Thoughts?
+
+Best,
+
+- Juri
