@@ -1,85 +1,86 @@
-From: brian.starkey@arm.com (Brian Starkey)
-Date: Mon, 7 Dec 2015 13:28:24 +0000
-Subject: [PATCH] drivers: dma-coherent: use ioremap_wc() for DMA_MEMORY_MAP
-In-Reply-To: <20151204171554.GO10123@e104818-lin.cambridge.arm.com>
-References: <1448029226-4914-1-git-send-email-brian.starkey@arm.com>
- <20151204105000.GD10123@e104818-lin.cambridge.arm.com>
- <CAPcyv4gti=49v4gUVjf=4nhxBCPPM3xmq6MQ2sBoBnKQbCS5MQ@mail.gmail.com>
- <20151204171554.GO10123@e104818-lin.cambridge.arm.com>
-Message-ID: <20151207132823.GC13179@e106950-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 7 Dec 2015 13:34:36 +0000
+Subject: [PATCH 3/5] iommu/arm-smmu: Invalidate TLBs properly
+In-Reply-To: <5665850F.1060406@arm.com>
+References: <cover.1449246988.git.robin.murphy@arm.com>
+ <2acaea8656f14a4421d7d466dd242fe5a3d0f6f6.1449246988.git.robin.murphy@arm.com>
+ <20151207110939.GB23430@arm.com> <5665850F.1060406@arm.com>
+Message-ID: <20151207133435.GE23430@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2015 at 05:15:54PM +0000, Catalin Marinas wrote:
->On Fri, Dec 04, 2015 at 08:59:10AM -0800, Dan Williams wrote:
->> On Fri, Dec 4, 2015 at 2:50 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Fri, Nov 20, 2015 at 02:20:26PM +0000, Brian Starkey wrote:
->> >> When the DMA_MEMORY_MAP flag is used, memory which can be accessed
->> >> directly should be returned, so use ioremap_wc() instead of ioremap().
->> >> Also, ensure that the correct memset operation is used in
->> >> dma_alloc_from_coherent() with respect to the region's flags.
->> >>
->> >> This fixes the below alignment fault on arm64, caused by invalid use
->> >> of memset() on Device memory.
->> >
->> > This is indeed affecting both arm32 and arm64 systems.
->> >
->> >> diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
->> >> index 55b8398..45358d0 100644
->> >> --- a/drivers/base/dma-coherent.c
->> >> +++ b/drivers/base/dma-coherent.c
->> >> @@ -31,7 +31,10 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_add
->> >>       if (!size)
->> >>               goto out;
->> >>
->> >> -     mem_base = ioremap(phys_addr, size);
->> >> +     if (flags & DMA_MEMORY_MAP)
->> >> +             mem_base = ioremap_wc(phys_addr, size);
->> >> +     else
->> >> +             mem_base = ioremap(phys_addr, size);
->> >
->> > I wonder whether a memremap() approach for the DMA_MEMORY_MAP case would
->> > be better. This API was added recently by commit 92281dee825f ("arch:
->> > introduce memremap()"). It only supports write-back and write-through
->> > but we could add a MEMREMAP_WC flag for this case.
->>
->> I originally included both MEMREMAP_WC and MEMREAMP_UC as potential
->> flags to this api, but ultimately decided against it.  The memremap()
->> api is meant for memory that is known to have no i/o side effects.  As
->> far as I can see WC and UC usages are a muddy mix of "sometimes
->> there's I/O side effects, but it depends by arch and driver".  In
->> other words we can't drop the "__iomem" annotation from WC and UC
->> mappings by default.
+On Mon, Dec 07, 2015 at 01:09:35PM +0000, Robin Murphy wrote:
+> On 07/12/15 11:09, Will Deacon wrote:
+> >On Fri, Dec 04, 2015 at 05:53:00PM +0000, Robin Murphy wrote:
+> >>When invalidating an IOVA range potentially spanning multiple pages,
+> >>such as when removing an entire intermediate-level table, we currently
+> >>only issue an invalidation for the first IOVA of that range. Since the
+> >>architecture specifies that address-based TLB maintenance operations
+> >>target a single entry, an SMMU could feasibly retain live entries for
+> >>subsequent pages within that unmapped range, which is not good.
+> >>
+> >>Make sure we hit every possible entry by iterating over the whole range
+> >>at the granularity provided by the pagetable implementation.
+> >>
+> >>Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> >>---
+> >>  drivers/iommu/arm-smmu.c | 19 ++++++++++++++++---
+> >>  1 file changed, 16 insertions(+), 3 deletions(-)
+> >
+> >Can you do something similar for arm-smmu-v3.c as well, please?
+> 
+> Something like this? (untested as I don't have a v3 model set up):
+> 
+> ------>8------
+> From: Robin Murphy <robin.murphy@arm.com>
+> Date: Mon, 7 Dec 2015 12:52:56 +0000
+> Subject: [PATCH] iommu/arm-smmu: Fix TLB invalidation
+> 
+> SMMUv3 operates under the same rules as SMMUv2 and the CPU
+> architectures, so when invalidating an IOVA range we have to hit
+> every address for which a TLB entry might exist.
+> 
+> To fix this, issue commands for the whole range rather than just the
+> initial address; as a minor optimisation, try to avoid flooding the
+> queue by falling back to 'invalidate all' if the range is large.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index c302b65..afa0b41 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -1346,6 +1346,10 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned
+> long iova, size_t size,
+>  		},
+>  	};
+> 
+> +	/* If we'd fill the whole queue or more, don't even bother... */
+> +	if (granule << smmu->cmdq.q.max_n_shift >= size / (CMDQ_ENT_DWORDS << 3))
+> +		return arm_smmu_tlb_inv_context(cookie);
 
-The DMA_MEMORY_MAP flag is pretty much a statement of "no side-
-effects", so as Catalin says it would fit OK here. That said, if it's
-not possible to deprecate ioremap_wc() in the same way as
-ioremap_cache() then I wonder if there's even much benefit in adding
-it to memremap().
+Let's not bother with this heuristic for now. It's not at all clear where
+the trade off is between CPU time and I/O latency and this check doesn't
+take into account the current state of the command queue and/or how quickly
+it drains anyway.
 
->
->In this context, the dma_declare_coherent_memory(DMA_MEMORY_MAP)
->implementation is aimed at normal RAM with no side effects as later
->returned by dma_alloc_coherent(). To me it looks like memremap is better
->suited here for the DMA_MEMORY_MAP case. As per the
->Documentation/DMA-API.txt:
->
->  DMA_MEMORY_MAP - request that the memory returned from
->  dma_alloc_coherent() be directly writable.
->
->which means no __iomem. Of course, we still need ioremap for
->DMA_MEMORY_IO which is supposed to be written with memcpy_toio() etc.
->
->Which memory type should be used is left to the driver and it should
->pass the corresponding DMA_MEMORY_* flag.
->
+>  	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
+>  		cmd.opcode	= CMDQ_OP_TLBI_NH_VA;
+>  		cmd.tlbi.asid	= smmu_domain->s1_cfg.cd.asid;
+> @@ -1354,7 +1358,10 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned
+> long iova, size_t size,
+>  		cmd.tlbi.vmid	= smmu_domain->s2_cfg.vmid;
+>  	}
+> 
+> -	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
+> +	do {
+> +		arm_smmu_cmdq_issue_cmd(smmu, &cmd);
+> +		cmd.tlbi.addr += granule;
+> +	} while (size -= granule);
 
-This can still be achieved without adding _WC to memremap(). I can
-look at adding _WC to memremap() if that's deemed the preferred
-approach, but if that isn't clear-cut, then it would be nice to get
-this bug fixed now and worry about adding it to memremap() later.
+This bit looks fine to me, thanks.
 
--Brian
-
->-- Catalin
->
+Will
