@@ -1,97 +1,84 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 7 Dec 2015 16:27:45 +0000
-Subject: [PATCH v3 6/7] arm64: map linear region as non-executable
-In-Reply-To: <CAKv+Gu-e+FpXQGFWebBKieSJk7MT_SGEW8OLQFC5QopEPgPq-Q@mail.gmail.com>
-References: <1447672998-20981-1-git-send-email-ard.biesheuvel@linaro.org>
- <1447672998-20981-7-git-send-email-ard.biesheuvel@linaro.org>
- <20151207161953.GE7083@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-e+FpXQGFWebBKieSJk7MT_SGEW8OLQFC5QopEPgPq-Q@mail.gmail.com>
-Message-ID: <20151207162744.GF7083@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon,  7 Dec 2015 16:30:14 +0000
+Subject: [RFC PATCH] arm64: Documentation: add list of software workarounds
+ for errata
+Message-ID: <1449505814-30096-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 05:22:32PM +0100, Ard Biesheuvel wrote:
-> On 7 December 2015 at 17:19, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Mon, Nov 16, 2015 at 12:23:17PM +0100, Ard Biesheuvel wrote:
-> >> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> >> index c7ba171951c8..526eeb7e1e97 100644
-> >> --- a/arch/arm64/mm/mmu.c
-> >> +++ b/arch/arm64/mm/mmu.c
-> >> @@ -357,47 +357,10 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
-> >>                               phys, virt, size, prot, late_alloc);
-> >>  }
-> >>
-> >> -#ifdef CONFIG_DEBUG_RODATA
-> >>  static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
-> >>  {
-> >> -     /*
-> >> -      * Set up the executable regions using the existing section mappings
-> >> -      * for now. This will get more fine grained later once all memory
-> >> -      * is mapped
-> >> -      */
-> >> -     unsigned long kernel_x_start = round_down(__pa(_stext), SWAPPER_BLOCK_SIZE);
-> >> -     unsigned long kernel_x_end = round_up(__pa(__init_end), SWAPPER_BLOCK_SIZE);
-> >> -
-> >> -     if (end < kernel_x_start) {
-> >> -             create_mapping(start, __phys_to_virt(start),
-> >> -                     end - start, PAGE_KERNEL);
-> >> -     } else if (start >= kernel_x_end) {
-> >> -             create_mapping(start, __phys_to_virt(start),
-> >> -                     end - start, PAGE_KERNEL);
-> >> -     } else {
-> >> -             if (start < kernel_x_start)
-> >> -                     create_mapping(start, __phys_to_virt(start),
-> >> -                             kernel_x_start - start,
-> >> -                             PAGE_KERNEL);
-> >> -             create_mapping(kernel_x_start,
-> >> -                             __phys_to_virt(kernel_x_start),
-> >> -                             kernel_x_end - kernel_x_start,
-> >> -                             PAGE_KERNEL_EXEC);
-> >> -             if (kernel_x_end < end)
-> >> -                     create_mapping(kernel_x_end,
-> >> -                             __phys_to_virt(kernel_x_end),
-> >> -                             end - kernel_x_end,
-> >> -                             PAGE_KERNEL);
-> >> -     }
-> >> -
-> >> -}
-> >> -#else
-> >> -static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
-> >> -{
-> >> -     create_mapping(start, __phys_to_virt(start), end - start,
-> >> -                     PAGE_KERNEL_EXEC);
-> >> +     create_mapping(start, __phys_to_virt(start), end - start, PAGE_KERNEL);
-> >>  }
-> >> -#endif
-> >>
-> >>  struct bootstrap_pgtables {
-> >>       pte_t   pte[PTRS_PER_PTE];
-> >> @@ -471,7 +434,7 @@ static unsigned long __init bootstrap_region(struct bootstrap_pgtables *reg,
-> >>                                     SWAPPER_BLOCK_SIZE));
-> >>
-> >>               create_mapping(__pa(vstart - va_offset), vstart, vend - vstart,
-> >> -                            PAGE_KERNEL_EXEC);
-> >> +                            PAGE_KERNEL);
-> >>
-> >>               return vend;
-> >>       }
-> >
-> > These make sense. However, shall we go a step further and unmap the
-> > kernel image completely from the linear mapping, maybe based on
-> > CONFIG_DEBUG_RODATA? The mark_rodata_ro() function changes the text to
-> > read-only but you can still get writable access to it via
-> > __va(__pa(_stext)).
-> 
-> If we can tolerate the fragmentation, then yes, let's unmap it
-> completely. As long as we don't unmap the.pgdir section, since that
-> will be referenced via the linear mapping
+It's not immediately obvious which hardware errata are worked around in
+the Linux kernel for an arbitrary kernel tree, so add a file to keep
+track of what we're working around.
 
-I think we should do this in mark_rodata_ro() function *if*
-CONFIG_DEBUG_RODATA is enabled, otherwise we leave them as they are
-(non-exec linear mapping).
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ Documentation/arm64/silicon-errata.txt | 58 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
+ create mode 100644 Documentation/arm64/silicon-errata.txt
 
-The problem, as before is potential TLB conflicts that Mark is going to
-solve ;).
-
+diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+new file mode 100644
+index 000000000000..58b71ddf9b60
+--- /dev/null
++++ b/Documentation/arm64/silicon-errata.txt
+@@ -0,0 +1,58 @@
++                Silicon Errata and Software Workarounds
++                =======================================
++
++Author: Will Deacon <will.deacon@arm.com>
++Date  : 27 November 2015
++
++It is an unfortunate fact of life that hardware is often produced with
++so-called "errata", which can cause it to deviate from the architecture
++under specific circumstances.  For hardware produced by ARM, these
++errata are broadly classified into the following categories:
++
++  Category A: A critical error without a viable workaround.
++  Category B: A significant or critical error with an acceptable
++              workaround.
++  Category C: A minor error that is not expected to occur under normal
++              operation.
++
++For more information, consult one of the "Software Developers Errata
++Notice" documents available on infocenter.arm.com (registration
++required).
++
++As far as Linux is concerned, Category B errata may require some special
++treatment in the operating system. For example, avoiding a particular
++sequence of code, or configuring the processor in a particular way. A
++less common situation may require similar actions in order to declassify
++a Category A erratum into a Category C erratum. These are collectively
++known as "software workarounds" and are only required in the minority of
++cases (e.g. those cases that both require a non-secure workaround *and*
++can be triggered by Linux).
++
++For software workarounds that may adversely impact systems unaffected by
++the erratum in question, a Kconfig entry is added under "Kernel
++Features" -> "ARM errata workarounds via the alternatives framework".
++These are enabled by default and patched in at runtime when an affected
++CPU is detected. For less-intrusive workarounds, a Kconfig option is not
++available and the code is structured (preferably with a comment) in such
++a way that the erratum will not be hit.
++
++This approach can make it slightly onerous to determine exactly which
++errata are worked around in an arbitrary kernel source tree, so this
++file acts as a registry of software workarounds in the Linux Kernel and
++will be updated when new workarounds are committed and backported to
++stable kernels.
++
++| Implementor    | Component       | Erratum ID      | Kconfig                 |
+++----------------+-----------------+-----------------+-------------------------+
++| ARM            | Cortex-A53      | #826319         | ARM64_ERRATUM_826319    |
++| ARM            | Cortex-A53      | #827319         | ARM64_ERRATUM_827319    |
++| ARM            | Cortex-A53      | #824069         | ARM64_ERRATUM_824069    |
++| ARM            | Cortex-A53      | #819472         | ARM64_ERRATUM_819472    |
++| ARM            | Cortex-A53      | #845719         | ARM64_ERRATUM_845719    |
++| ARM            | Cortex-A53      | #843419         | ARM64_ERRATUM_843419    |
++| ARM            | Cortex-A57      | #832075         | ARM64_ERRATUM_832075    |
++| ARM            | Cortex-A57      | #852523         | N/A                     |
++| ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220    |
++|                |                 |                 |                         |
++| Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375    |
++| Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154    |
 -- 
-Catalin
+2.1.4
