@@ -1,39 +1,59 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon,  7 Dec 2015 10:56:03 +0000
-Subject: [PATCH 0/4] nvmem: new drivers for v4.5
-Message-ID: <1449485763-391-1-git-send-email-srinivas.kandagatla@linaro.org>
+Date: Mon,  7 Dec 2015 10:57:27 +0000
+Subject: [PATCH 1/4] DT: nvmem: Add NXP LPC18xx EEPROM memory binding
+ documentation
+In-Reply-To: <1449485763-391-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1449485763-391-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1449485847-437-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+From: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
 
-Here are 2 new nvmem drivers which are in the mailing list for long time
-and are good to go for some testing and find its way to v4.5-rc*.
+Add the devicetree binding document for NXP LPC18xx EEPROM memory.
 
-Could you please take these patches via char-misc tree.
-
-Thanks,
-srini
-
-Andrew-CT Chen (2):
-  dt-bindings: add document of mediatek efuse driver
-  nvmem: mediatek: Add Mediatek EFUSE driver
-
-Ariel D'Alessandro (2):
-  DT: nvmem: Add NXP LPC18xx EEPROM memory binding documentation
-  nvmem: NXP LPC18xx EEPROM memory NVMEM driver
-
- .../devicetree/bindings/nvmem/lpc1857-eeprom.txt   |  28 ++
- .../devicetree/bindings/nvmem/mtk-efuse.txt        |  36 +++
- drivers/nvmem/Kconfig                              |  20 ++
- drivers/nvmem/Makefile                             |   4 +
- drivers/nvmem/lpc18xx_eeprom.c                     | 330 +++++++++++++++++++++
- drivers/nvmem/mtk-efuse.c                          |  89 ++++++
- 6 files changed, 507 insertions(+)
+Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
+Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ .../devicetree/bindings/nvmem/lpc1857-eeprom.txt   | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt
- create mode 100644 Documentation/devicetree/bindings/nvmem/mtk-efuse.txt
- create mode 100644 drivers/nvmem/lpc18xx_eeprom.c
- create mode 100644 drivers/nvmem/mtk-efuse.c
 
+diff --git a/Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt b/Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt
+new file mode 100644
+index 0000000..809df68
+--- /dev/null
++++ b/Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt
+@@ -0,0 +1,28 @@
++* NXP LPC18xx EEPROM memory NVMEM driver
++
++Required properties:
++  - compatible: Should be "nxp,lpc1857-eeprom"
++  - reg: Must contain an entry with the physical base address and length
++    for each entry in reg-names.
++  - reg-names: Must include the following entries.
++    - reg: EEPROM registers.
++    - mem: EEPROM address space.
++  - clocks: Must contain an entry for each entry in clock-names.
++  - clock-names: Must include the following entries.
++    - eeprom: EEPROM operating clock.
++  - resets: Should contain a reference to the reset controller asserting
++    the EEPROM in reset.
++  - interrupts: Should contain EEPROM interrupt.
++
++Example:
++
++  eeprom: eeprom at 4000e000 {
++    compatible = "nxp,lpc1857-eeprom";
++    reg = <0x4000e000 0x1000>,
++          <0x20040000 0x4000>;
++    reg-names = "reg", "mem";
++    clocks = <&ccu1 CLK_CPU_EEPROM>;
++    clock-names = "eeprom";
++    resets = <&rgu 27>;
++    interrupts = <4>;
++  };
 -- 
 1.9.1
