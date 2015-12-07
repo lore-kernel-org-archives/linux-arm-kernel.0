@@ -1,33 +1,48 @@
-From: yankejian@huawei.com (yankejian)
-Date: Mon, 7 Dec 2015 16:25:07 +0800
-Subject: [PATCH v2 next 2/2] net: hns: fixes no syscon error when init mdio
-In-Reply-To: <1449476707-224320-1-git-send-email-yankejian@huawei.com>
-References: <1449476707-224320-1-git-send-email-yankejian@huawei.com>
-Message-ID: <1449476707-224320-3-git-send-email-yankejian@huawei.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Mon, 7 Dec 2015 16:19:53 +0800
+Subject: [PATCH] arm64: dts: mt8173: Add nor flash node
+In-Reply-To: <1449463619.9118.31.camel@mhfsdcap03>
+References: <1449460394-31601-1-git-send-email-bayi.cheng@mediatek.com>
+ <CAGS+omCuB3VGcPk3fezakdVDnFB3GAmMD+wZ_6nGdv+uHoB40g@mail.gmail.com>
+ <1449462852.9118.25.camel@mhfsdcap03> <1449463619.9118.31.camel@mhfsdcap03>
+Message-ID: <CAGS+omBycHuNaMy5vuEf0ZSRTniCS50qEdAY0=L1_1Wno4EBTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-as dtsi files use the normal naming conventions using '-' instead of '_'
-inside of property names, the driver needs to update the phandle name
-strings of the of_parse_phandle func.
+Bayi,
 
-Signed-off-by: yankejian <yankejian@huawei.com>
----
- drivers/net/ethernet/hisilicon/hns_mdio.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Mon, Dec 7, 2015 at 12:46 PM, bayi cheng <bayi.cheng@mediatek.com> wrote:
+> On Mon, 2015-12-07 at 12:34 +0800, bayi cheng wrote:
+>> On Mon, 2015-12-07 at 12:09 +0800, Daniel Kurtz wrote:
+>> > Bayi,
+>> >
+>> > On Mon, Dec 7, 2015 at 11:53 AM, Bayi Cheng <bayi.cheng@mediatek.com> wrote:
+>> > > Add Mediatek nor flash node
+>> > >
+>> > > Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
+>> > > Acked-by: Brian Norris <computersforpeace@gmail.com>
+>> > > ---
+>> > > Previous version of this patch is
+>> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386005.html
+>> > > Drop flash node from mt8173.dtsi accroding review comment
+>> >
+>> > Is there a flash on mt8173-evb that can be accessed by the nor_flash ?
+>> > If so, can you include flash at 0 node in the mt8173-evb.dts.
+>> >
+>> > -Dan
+>> >
+>> Hi Daniel, Thanks for your comments! you are right, there is a flash on
+>> mt8173-evb which can be accessed by the nor_flash, and I will include
+>> flash at 0 node in mt8173-evb.dts (kernel v3.18) too.
+>>
+>> Bayi
+>
+> Hi Dan, I have reworked a EVB board for spi nor verify, we replaced the
+> spi nand flash with spi nor flash on EVB board,
+> and our shipping EVB board haven't support spi nor flash, So I will not
+> include flash at 0 node in the mt8173-evb.dts. I am sorry to made you
+> confused!
 
-diff --git a/drivers/net/ethernet/hisilicon/hns_mdio.c b/drivers/net/ethernet/hisilicon/hns_mdio.c
-index 37491c8..1e07e91 100644
---- a/drivers/net/ethernet/hisilicon/hns_mdio.c
-+++ b/drivers/net/ethernet/hisilicon/hns_mdio.c
-@@ -458,7 +458,7 @@ static int hns_mdio_probe(struct platform_device *pdev)
- 	}
- 
- 	mdio_dev->subctrl_vbase =
--		syscon_node_to_regmap(of_parse_phandle(np, "subctrl_vbase", 0));
-+		syscon_node_to_regmap(of_parse_phandle(np, "subctrl-vbase", 0));
- 	if (IS_ERR(mdio_dev->subctrl_vbase)) {
- 		dev_warn(&pdev->dev, "no syscon hisilicon,peri-c-subctrl\n");
- 		mdio_dev->subctrl_vbase = NULL;
--- 
-1.9.1
+Thanks for confirming.
+
+Reviewed-by: Daniel Kurtz <djkurtz@chromium. org>
