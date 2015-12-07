@@ -1,15 +1,24 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Mon,  7 Dec 2015 14:40:26 +0800
-Subject: [PATCH v10 12/17] drm: bridge: analogix/dp: add some rk3288 special
- registers setting
+Date: Mon,  7 Dec 2015 14:40:58 +0800
+Subject: [PATCH v10 16/17] drm: bridge: analogix/dp: add edid modes parse in
+ get_modes method
 In-Reply-To: <1449470239-30667-1-git-send-email-ykk@rock-chips.com>
 References: <1449470239-30667-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1449470426-31433-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1449470458-31605-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RK3288 need some special registers setting, we can separate
-them out by the dev_type of plat_data.
+Display Port monitor could support kinds of mode which indicate
+in monitor edid, not just one single display resolution which
+defined in panel or devivetree property display timing.
+
+Note: Gustavo Padovan try to remove the controller and phy
+power on function in bind time at bellow commit:
+	drm/exynos: do not start enabling DP at bind() phase
+
+But for now driver need to read edid message in .get_modes()
+function, so controller must be inited in bind time, so we
+need to add controller init back.
 
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
@@ -20,201 +29,147 @@ Changes in v8: None
 Changes in v7: None
 Changes in v6: None
 Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-Changes in v2:
-- Fix compile failed dut to phy_pd_addr variable misspell error
+Changes in v4:
+- Call drm_panel_prepare() in .get_modes function, ensure panel should
+  power on before driver try to read edid message.
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 76 ++++++++++++++---------
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h | 12 ++++
- 2 files changed, 60 insertions(+), 28 deletions(-)
+Changes in v3:
+- Add edid modes parse support
 
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-index 861097a..21a3287 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-@@ -15,6 +15,8 @@
- #include <linux/delay.h>
- #include <linux/gpio.h>
+Changes in v2: None
+
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 26 ++++++++----
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.h | 46 +++++++++++-----------
+ 2 files changed, 42 insertions(+), 30 deletions(-)
+
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index 0f42d73..aa1a9be 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -107,7 +107,7 @@ static unsigned char analogix_dp_calc_edid_check_sum(unsigned char *edid_data)
  
-+#include <drm/bridge/analogix_dp.h>
-+
- #include "analogix_dp_core.h"
- #include "analogix_dp_reg.h"
+ static int analogix_dp_read_edid(struct analogix_dp_device *dp)
+ {
+-	unsigned char edid[EDID_BLOCK_LENGTH * 2];
++	unsigned char *edid = dp->edid;
+ 	unsigned int extend_block = 0;
+ 	unsigned char sum;
+ 	unsigned char test_vector;
+@@ -901,12 +901,6 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+ 			DRM_ERROR("failed to disable the panel\n");
+ 	}
  
-@@ -72,6 +74,14 @@ void analogix_dp_init_analog_param(struct analogix_dp_device *dp)
- 	reg = SEL_24M | TX_DVDD_BIT_1_0625V;
- 	writel(reg, dp->reg_base + ANALOGIX_DP_ANALOG_CTL_2);
+-	ret = analogix_dp_handle_edid(dp);
+-	if (ret) {
+-		dev_err(dp->dev, "unable to handle edid\n");
+-		return;
+-	}
+-
+ 	ret = analogix_dp_set_link_train(dp, dp->video_info.max_lane_count,
+ 					 dp->video_info.max_link_rate);
+ 	if (ret) {
+@@ -947,8 +941,24 @@ EXPORT_SYMBOL_GPL(analogix_dp_detect);
+ int analogix_dp_get_modes(struct device *dev)
+ {
+ 	struct analogix_dp_device *dp = dev_get_drvdata(dev);
++	struct edid *edid = (struct edid *)dp->edid;
+ 	int num_modes = 0;
  
-+	if (dp->plat_data && (dp->plat_data->dev_type == RK3288_DP)) {
-+		writel(REF_CLK_24M, dp->reg_base + ANALOGIX_DP_PLL_REG_1);
-+		writel(0x95, dp->reg_base + ANALOGIX_DP_PLL_REG_2);
-+		writel(0x40, dp->reg_base + ANALOGIX_DP_PLL_REG_3);
-+		writel(0x58, dp->reg_base + ANALOGIX_DP_PLL_REG_4);
-+		writel(0x22, dp->reg_base + ANALOGIX_DP_PLL_REG_5);
++	if (dp->plat_data && dp->plat_data->panel) {
++		if (drm_panel_prepare(dp->plat_data->panel)) {
++			DRM_ERROR("failed to setup the panel\n");
++			return -EINVAL;
++		}
 +	}
 +
- 	reg = DRIVE_DVDD_BIT_1_0625V | VCO_BIT_600_MICRO;
- 	writel(reg, dp->reg_base + ANALOGIX_DP_ANALOG_CTL_3);
- 
-@@ -206,81 +216,85 @@ void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
- 				       bool enable)
- {
- 	u32 reg;
-+	u32 phy_pd_addr = ANALOGIX_DP_PHY_PD;
++	if (analogix_dp_handle_edid(dp)) {
++		dev_err(dp->dev, "unable to handle edid\n");
++		return -EINVAL;
++	}
 +
-+	if (dp->plat_data && (dp->plat_data->dev_type == RK3288_DP))
-+		phy_pd_addr = ANALOGIX_DP_PD;
- 
- 	switch (block) {
- 	case AUX_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg |= AUX_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg &= ~AUX_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	case CH0_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg |= CH0_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg &= ~CH0_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	case CH1_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg |= CH1_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg &= ~CH1_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	case CH2_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg |= CH2_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg &= ~CH2_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	case CH3_BLOCK:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg |= CH3_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg &= ~CH3_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	case ANALOG_TOTAL:
- 		if (enable) {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg |= DP_PHY_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			reg = readl(dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			reg = readl(dp->reg_base + phy_pd_addr);
- 			reg &= ~DP_PHY_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	case POWER_ALL:
- 		if (enable) {
- 			reg = DP_PHY_PD | AUX_PD | CH3_PD | CH2_PD |
- 				CH1_PD | CH0_PD;
--			writel(reg, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
--			writel(0x00, dp->reg_base + ANALOGIX_DP_PHY_PD);
-+			writel(0x00, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
- 	default:
-@@ -399,8 +413,14 @@ void analogix_dp_init_aux(struct analogix_dp_device *dp)
- 	analogix_dp_reset_aux(dp);
- 
- 	/* Disable AUX transaction H/W retry */
--	reg = AUX_BIT_PERIOD_EXPECTED_DELAY(3) | AUX_HW_RETRY_COUNT_SEL(0) |
--	      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
-+	if (dp->plat_data && (dp->plat_data->dev_type == RK3288_DP))
-+		reg = AUX_BIT_PERIOD_EXPECTED_DELAY(0) |
-+		      AUX_HW_RETRY_COUNT_SEL(3) |
-+		      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
-+	else
-+		reg = AUX_BIT_PERIOD_EXPECTED_DELAY(3) |
-+		      AUX_HW_RETRY_COUNT_SEL(0) |
-+		      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
- 	writel(reg, dp->reg_base + ANALOGIX_DP_AUX_HW_RETRY_CTL);
- 
- 	/* Receive AUX Channel DEFER commands equal to DEFFER_COUNT*64 */
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
-index 738db4c..337912b 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
-@@ -22,6 +22,14 @@
- #define ANALOGIX_DP_VIDEO_CTL_8			0x3C
- #define ANALOGIX_DP_VIDEO_CTL_10		0x44
- 
-+#define ANALOGIX_DP_PLL_REG_1			0xfc
-+#define ANALOGIX_DP_PLL_REG_2			0x9e4
-+#define ANALOGIX_DP_PLL_REG_3			0x9e8
-+#define ANALOGIX_DP_PLL_REG_4			0x9ec
-+#define ANALOGIX_DP_PLL_REG_5			0xa00
++	drm_mode_connector_update_edid_property(dp->connector, edid);
++	num_modes += drm_add_edid_modes(dp->connector, edid);
 +
-+#define ANALOGIX_DP_PD				0x12c
-+
- #define ANALOGIX_DP_LANE_MAP			0x35C
+ 	if (dp->plat_data->panel)
+ 		num_modes += drm_panel_get_modes(dp->plat_data->panel);
  
- #define ANALOGIX_DP_ANALOG_CTL_1		0x370
-@@ -154,6 +162,10 @@
- #define VSYNC_POLARITY_CFG			(0x1 << 1)
- #define HSYNC_POLARITY_CFG			(0x1 << 0)
+@@ -1309,6 +1319,8 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
  
-+/* ANALOGIX_DP_PLL_REG_1 */
-+#define REF_CLK_24M				(0x1 << 1)
-+#define REF_CLK_27M				(0x0 << 1)
+ 	phy_power_on(dp->phy);
+ 
++	analogix_dp_init_dp(dp);
 +
- /* ANALOGIX_DP_LANE_MAP */
- #define LANE3_MAP_LOGIC_LANE_0			(0x0 << 6)
- #define LANE3_MAP_LOGIC_LANE_1			(0x1 << 6)
+ 	ret = devm_request_irq(&pdev->dev, dp->irq, analogix_dp_irq_handler,
+ 			       irq_flags, "analogix-dp", dp);
+ 	if (ret) {
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+index d3c7e0a..2bd2e0d 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+@@ -20,6 +20,28 @@
+ #define MAX_CR_LOOP 5
+ #define MAX_EQ_LOOP 5
+ 
++/* I2C EDID Chip ID, Slave Address */
++#define I2C_EDID_DEVICE_ADDR			0x50
++#define I2C_E_EDID_DEVICE_ADDR			0x30
++
++#define EDID_BLOCK_LENGTH			0x80
++#define EDID_HEADER_PATTERN			0x00
++#define EDID_EXTENSION_FLAG			0x7e
++#define EDID_CHECKSUM				0x7f
++
++/* DP_MAX_LANE_COUNT */
++#define DPCD_ENHANCED_FRAME_CAP(x)		(((x) >> 7) & 0x1)
++#define DPCD_MAX_LANE_COUNT(x)			((x) & 0x1f)
++
++/* DP_LANE_COUNT_SET */
++#define DPCD_LANE_COUNT_SET(x)			((x) & 0x1f)
++
++/* DP_TRAINING_LANE0_SET */
++#define DPCD_PRE_EMPHASIS_SET(x)		(((x) & 0x3) << 3)
++#define DPCD_PRE_EMPHASIS_GET(x)		(((x) >> 3) & 0x3)
++#define DPCD_VOLTAGE_SWING_SET(x)		(((x) & 0x3) << 0)
++#define DPCD_VOLTAGE_SWING_GET(x)		(((x) >> 0) & 0x3)
++
+ enum link_rate_type {
+ 	LINK_RATE_1_62GBPS = DP_LINK_BW_1_62,
+ 	LINK_RATE_2_70GBPS = DP_LINK_BW_2_7,
+@@ -161,6 +183,7 @@ struct analogix_dp_device {
+ 	int			dpms_mode;
+ 	int			hpd_gpio;
+ 	bool                    need_force_hpd;
++	unsigned char           edid[EDID_BLOCK_LENGTH * 2];
+ 
+ 	struct analogix_dp_plat_data *plat_data;
+ };
+@@ -260,27 +283,4 @@ int analogix_dp_is_video_stream_on(struct analogix_dp_device *dp);
+ void analogix_dp_config_video_slave_mode(struct analogix_dp_device *dp);
+ void analogix_dp_enable_scrambling(struct analogix_dp_device *dp);
+ void analogix_dp_disable_scrambling(struct analogix_dp_device *dp);
+-
+-/* I2C EDID Chip ID, Slave Address */
+-#define I2C_EDID_DEVICE_ADDR			0x50
+-#define I2C_E_EDID_DEVICE_ADDR			0x30
+-
+-#define EDID_BLOCK_LENGTH			0x80
+-#define EDID_HEADER_PATTERN			0x00
+-#define EDID_EXTENSION_FLAG			0x7e
+-#define EDID_CHECKSUM				0x7f
+-
+-/* DP_MAX_LANE_COUNT */
+-#define DPCD_ENHANCED_FRAME_CAP(x)		(((x) >> 7) & 0x1)
+-#define DPCD_MAX_LANE_COUNT(x)			((x) & 0x1f)
+-
+-/* DP_LANE_COUNT_SET */
+-#define DPCD_LANE_COUNT_SET(x)			((x) & 0x1f)
+-
+-/* DP_TRAINING_LANE0_SET */
+-#define DPCD_PRE_EMPHASIS_SET(x)		(((x) & 0x3) << 3)
+-#define DPCD_PRE_EMPHASIS_GET(x)		(((x) >> 3) & 0x3)
+-#define DPCD_VOLTAGE_SWING_SET(x)		(((x) & 0x3) << 0)
+-#define DPCD_VOLTAGE_SWING_GET(x)		(((x) >> 0) & 0x3)
+-
+ #endif /* _ANALOGIX_DP_CORE_H */
 -- 
 1.9.1
