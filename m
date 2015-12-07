@@ -1,29 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 7 Dec 2015 11:09:39 +0000
-Subject: [PATCH 3/5] iommu/arm-smmu: Invalidate TLBs properly
-In-Reply-To: <2acaea8656f14a4421d7d466dd242fe5a3d0f6f6.1449246988.git.robin.murphy@arm.com>
-References: <cover.1449246988.git.robin.murphy@arm.com>
- <2acaea8656f14a4421d7d466dd242fe5a3d0f6f6.1449246988.git.robin.murphy@arm.com>
-Message-ID: <20151207110939.GB23430@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 07 Dec 2015 12:13:55 +0100
+Subject: [PATCH v5 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
+In-Reply-To: <56655EC8.6030905@nvidia.com>
+References: <1449000658-11475-1-git-send-email-dcashman@android.com>
+ <1449000658-11475-4-git-send-email-dcashman@android.com>
+ <56655EC8.6030905@nvidia.com>
+Message-ID: <1720878.JdEcLd8bhL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 04, 2015 at 05:53:00PM +0000, Robin Murphy wrote:
-> When invalidating an IOVA range potentially spanning multiple pages,
-> such as when removing an entire intermediate-level table, we currently
-> only issue an invalidation for the first IOVA of that range. Since the
-> architecture specifies that address-based TLB maintenance operations
-> target a single entry, an SMMU could feasibly retain live entries for
-> subsequent pages within that unmapped range, which is not good.
+On Monday 07 December 2015 10:26:16 Jon Hunter wrote:
 > 
-> Make sure we hit every possible entry by iterating over the whole range
-> at the granularity provided by the pagetable implementation.
+> diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
+> index af461b935137..e59a75a308bc 100644
+> --- a/arch/arm64/mm/mmap.c
+> +++ b/arch/arm64/mm/mmap.c
+> @@ -51,7 +51,7 @@ unsigned long arch_mmap_rnd(void)
+>  {
+>         unsigned long rnd;
+>  
+> -ifdef CONFIG_COMPAT
+> +#ifdef CONFIG_COMPAT
+>         if (test_thread_flag(TIF_32BIT))
+>                 rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_compat_bits);
+>         else
 > 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/iommu/arm-smmu.c | 19 ++++++++++++++++---
->  1 file changed, 16 insertions(+), 3 deletions(-)
+> Cheers
+> 
 
-Can you do something similar for arm-smmu-v3.c as well, please?
+Ideally we'd remove the #ifdef around the mmap_rnd_compat_bits declaration
+and change this code to use
 
-Will
+	if (IS_ENABLED(CONFIG_COMPAT) && test_thread_flag(TIF_32BIT))
+
+	Arnd
