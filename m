@@ -1,108 +1,127 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 7 Dec 2015 14:35:34 -0800
-Subject: [PATCH v2] ARM: mm: mark section-aligned portion of rodata NX
-Message-ID: <20151207223534.GA13722@www.outflux.net>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 7 Dec 2015 16:43:14 -0600
+Subject: [PATCH v2] PCI: generic: Add support for Cavium ThunderX PCIe
+ root complexes.
+In-Reply-To: <1442967415-13595-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1442967415-13595-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20151207224314.GE14429@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When rodata is large enough that it crosses a section boundary after the
-kernel text, mark the rest NX. This is as close to full NX of rodata as
-we can get without splitting page tables or doing section alignment via
-CONFIG_DEBUG_ALIGN_RODATA.
+Hi David,
 
-When the config is:
+On Tue, Sep 22, 2015 at 05:16:55PM -0700, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> The config space for external PCIe root complexes on some Cavium
+> ThunderX SoCs is very similar to CAM and ECAM, but differs in the
+> shift values that have to be applied to the bus and devfn numbers to
+> compose that address window offset.  These root complexes also have
+> the interesting property that there is no root bridge, so the standard
+> manner of limiting scanning to only the first device doesn't work.  We
+> can use the standard pci-host-generic driver if we make a minor
+> addition to handle these differences, so we...
+> 
+> Add a mapping function for ThunderX PCIe root complexes with a bus
+> shift of 24 and devfn shift of 16.  Ignore accesses for devices other
+> than the first device on the primary bus.
+> 
+> Document the whole thing in devicetree/bindings/pci/host-generic-pci.txt
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
- CONFIG_DEBUG_RODATA=y
- # CONFIG_DEBUG_ALIGN_RODATA is not set
+I'm trying to sort the ThunderX stuff out.  Can you repost the current
+stuff so we can see it all together?
 
-Before:
+Thanks,
+  Bjorn
 
----[ Kernel Mapping ]---
-0x80000000-0x80100000           1M     RW NX SHD
-0x80100000-0x80a00000           9M     ro x  SHD
-0x80a00000-0xa0000000         502M     RW NX SHD
-
-After:
-
----[ Kernel Mapping ]---
-0x80000000-0x80100000           1M     RW NX SHD
-0x80100000-0x80700000           6M     ro x  SHD
-0x80700000-0x80a00000           3M     ro NX SHD
-0x80a00000-0xa0000000         502M     RW NX SHD
-
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
-v2:
-- static declaration, ard
----
- arch/arm/kernel/vmlinux.lds.S | 9 +++++++--
- arch/arm/mm/init.c            | 7 ++++---
- 2 files changed, 11 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index a6e395c53a48..9c249c71fda1 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -8,9 +8,7 @@
- #include <asm/thread_info.h>
- #include <asm/memory.h>
- #include <asm/page.h>
--#ifdef CONFIG_DEBUG_RODATA
- #include <asm/pgtable.h>
--#endif
- 
- #define PROC_INFO							\
- 	. = ALIGN(4);							\
-@@ -337,6 +335,13 @@ SECTIONS
- }
- 
- /*
-+ * Without CONFIG_DEBUG_ALIGN_RODATA, __start_rodata_section_aligned will
-+ * be the first section-aligned location after __start_rodata. Otherwise,
-+ * it will be equal to __start_rodata.
-+ */
-+__start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
-+
-+/*
-  * These must never be empty
-  * If you have to comment these two assert statements out, your
-  * binutils is too old (for other reasons as well)
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 321d3683dc7c..6b16f6cf4843 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -579,6 +579,9 @@ struct section_perm {
- 	pmdval_t clear;
- };
- 
-+/* First section-aligned location@or after __start_rodata. */
-+extern char __start_rodata_section_aligned[];
-+
- static struct section_perm nx_perms[] = {
- 	/* Make pages tables, etc before _stext RW (set NX). */
- 	{
-@@ -596,16 +599,14 @@ static struct section_perm nx_perms[] = {
- 		.mask	= ~PMD_SECT_XN,
- 		.prot	= PMD_SECT_XN,
- 	},
--#ifdef CONFIG_DEBUG_ALIGN_RODATA
- 	/* Make rodata NX (set RO in ro_perms below). */
- 	{
- 		.name	= "rodata NX",
--		.start  = (unsigned long)__start_rodata,
-+		.start  = (unsigned long)__start_rodata_section_aligned,
- 		.end    = (unsigned long)__init_begin,
- 		.mask   = ~PMD_SECT_XN,
- 		.prot   = PMD_SECT_XN,
- 	},
--#endif
- };
- 
- static struct section_perm ro_perms[] = {
--- 
-1.9.1
-
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+> ---
+> 
+> This patch depends on:
+> https://lkml.org/lkml/2015/9/22/1189
+> 
+> Changes from v1:
+> 
+>   - Added Acked-by:
+> 
+>   - Removed two patches from the set that were somewhat unrelated.
+> 
+>  .../devicetree/bindings/pci/host-generic-pci.txt   |  8 +++---
+>  drivers/pci/host/pci-host-generic.c                | 29 ++++++++++++++++++++++
+>  2 files changed, 34 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> index 105a968..a5aed0f 100644
+> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+> @@ -14,9 +14,11 @@ tree bindings communicated in pci.txt:
+>  
+>  Properties of the host controller node:
+>  
+> -- compatible     : Must be "pci-host-cam-generic" or "pci-host-ecam-generic"
+> -                   depending on the layout of configuration space (CAM vs
+> -                   ECAM respectively).
+> +- compatible     : One of the following with bus:devfn:reg mapped to the
+> +                   PCI config space address window in the bit positions shown:
+> +                   "pci-host-cam-generic" -- 'CAM'  bits 16:8:0
+> +                   "pci-host-ecam-generic" -- 'ECAM'  bits 20:12:0
+> +                   "cavium,pci-host-thunder-pem" --  bits 24:16:0
+>  
+>  - device_type    : Must be "pci".
+>  
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index b163fdc..853f6f6 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -91,6 +91,32 @@ static struct gen_pci_cfg_bus_ops gen_pci_cfg_ecam_bus_ops = {
+>  	}
+>  };
+>  
+> +static void __iomem *gen_pci_map_cfg_bus_thunder_pem(struct pci_bus *bus,
+> +						     unsigned int devfn,
+> +						     int where)
+> +{
+> +	struct gen_pci *pci = bus->sysdata;
+> +	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
+> +
+> +	/*
+> +	 * Thunder PEM is a PCIe RC, but without a root bridge.  On
+> +	 * the primary bus, ignore accesses for devices other than
+> +	 * the first device.
+> +	 */
+> +	if (idx == 0 && (devfn & ~7u))
+> +		return NULL;
+> +	return pci->cfg.win[idx] + ((devfn << 16) | where);
+> +}
+> +
+> +static struct gen_pci_cfg_bus_ops gen_pci_cfg_thunder_pem_bus_ops = {
+> +	.bus_shift	= 24,
+> +	.ops		= {
+> +		.map_bus	= gen_pci_map_cfg_bus_thunder_pem,
+> +		.read		= pci_generic_config_read,
+> +		.write		= pci_generic_config_write,
+> +	}
+> +};
+> +
+>  static const struct of_device_id gen_pci_of_match[] = {
+>  	{ .compatible = "pci-host-cam-generic",
+>  	  .data = &gen_pci_cfg_cam_bus_ops },
+> @@ -98,6 +124,9 @@ static const struct of_device_id gen_pci_of_match[] = {
+>  	{ .compatible = "pci-host-ecam-generic",
+>  	  .data = &gen_pci_cfg_ecam_bus_ops },
+>  
+> +	{ .compatible = "cavium,pci-host-thunder-pem",
+> +	  .data = &gen_pci_cfg_thunder_pem_bus_ops },
+> +
+>  	{ },
+>  };
+>  MODULE_DEVICE_TABLE(of, gen_pci_of_match);
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
