@@ -1,71 +1,48 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon,  7 Dec 2015 19:24:14 +0100
-Subject: [PATCH v2 1/6] ARM: shmobile: r8a73a4 dtsi: Add L2 cache-controller
- nodes
-In-Reply-To: <1449512659-16688-1-git-send-email-geert+renesas@glider.be>
-References: <1449512659-16688-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1449512659-16688-2-git-send-email-geert+renesas@glider.be>
+From: dcashman@android.com (Daniel Cashman)
+Date: Mon, 7 Dec 2015 10:26:34 -0800
+Subject: [PATCH v5 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
+In-Reply-To: <1720878.JdEcLd8bhL@wuerfel>
+References: <1449000658-11475-1-git-send-email-dcashman@android.com>
+ <1449000658-11475-4-git-send-email-dcashman@android.com>
+ <56655EC8.6030905@nvidia.com> <1720878.JdEcLd8bhL@wuerfel>
+Message-ID: <5665CF5A.1090207@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device nodes for the L2 caches, and link the CPU node to its L2
-cache node.
+On 12/07/2015 03:13 AM, Arnd Bergmann wrote:
+> On Monday 07 December 2015 10:26:16 Jon Hunter wrote:
+>>
+>> diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
+>> index af461b935137..e59a75a308bc 100644
+>> --- a/arch/arm64/mm/mmap.c
+>> +++ b/arch/arm64/mm/mmap.c
+>> @@ -51,7 +51,7 @@ unsigned long arch_mmap_rnd(void)
+>>  {
+>>         unsigned long rnd;
+>>  
+>> -ifdef CONFIG_COMPAT
+>> +#ifdef CONFIG_COMPAT
 
-The L2 cache for the Cortex-A15 CPU cores is 1 MiB large (organized as
-64 KiB x 16 ways), and located in PM domain A3SM. It requires the
-following settings:
-  - Tag RAM latency: 3 cycles,
-  - Data RAM latency: 4 cycles.
+Thank you Jon.  This ought to persuade me to do a final build against
+the final patch, rather than the ugly porting I had been doing.  I'll
+include this in v6. (how embarassing =/)
 
-The L2 cache for the Cortex-A7 CPU cores is 512 KiB large (organized as
-64 KiB x 8 ways), and located in PM domain A3KM.
+>>         if (test_thread_flag(TIF_32BIT))
+>>                 rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_compat_bits);
+>>         else
+>>
+>> Cheers
+>>
+> 
+> Ideally we'd remove the #ifdef around the mmap_rnd_compat_bits declaration
+> and change this code to use
+> 
+> 	if (IS_ENABLED(CONFIG_COMPAT) && test_thread_flag(TIF_32BIT))
+> 
+> 	Arnd
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-What are the DT bindings for Cortex-A15/A7 L2 cache controllers?
+That would result in "undefined reference to mmap_rnd_compat_bits" in
+the not-defined case, no?
 
-v2:
-  - New.
----
- arch/arm/boot/dts/r8a73a4.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
-
-diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
-index 86fab56cd6314df7..73f7ea3cb2209a00 100644
---- a/arch/arm/boot/dts/r8a73a4.dtsi
-+++ b/arch/arm/boot/dts/r8a73a4.dtsi
-@@ -29,6 +29,7 @@
- 			reg = <0>;
- 			clock-frequency = <1500000000>;
- 			power-domains = <&pd_a2sl>;
-+			next-level-cache = <&L2_CA15>;
- 		};
- 	};
- 
-@@ -45,6 +46,24 @@
- 			     <1 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
- 	};
- 
-+	L2_CA15: cache-controller at 0 {
-+		compatible = "cache";
-+		clocks = <&cpg_clocks R8A73A4_CLK_Z>;
-+		power-domains = <&pd_a3sm>;
-+		arm,data-latency = <4 4 0>;
-+		arm,tag-latency = <3 3 3>;
-+		cache-unified;
-+		cache-level = <2>;
-+	};
-+
-+	L2_CA7: cache-controller at 1 {
-+		compatible = "cache";
-+		clocks = <&cpg_clocks R8A73A4_CLK_Z2>;
-+		power-domains = <&pd_a3km>;
-+		cache-unified;
-+		cache-level = <2>;
-+	};
-+
- 	dbsc1: memory-controller at e6790000 {
- 		compatible = "renesas,dbsc-r8a73a4";
- 		reg = <0 0xe6790000 0 0x10000>;
--- 
-1.9.1
+Thank You,
+Dan
