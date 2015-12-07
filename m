@@ -1,61 +1,53 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 07 Dec 2015 11:28:44 +0000
-Subject: [PATCH v3 09/10] PM / Hibernate: Publish pages restored in-place
- to arch code
-In-Reply-To: <20151205093534.GA7569@amd>
-References: <1448559168-8363-1-git-send-email-james.morse@arm.com>
- <1448559168-8363-10-git-send-email-james.morse@arm.com>
- <20151205093534.GA7569@amd>
-Message-ID: <56656D6C.5010004@arm.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Mon, 7 Dec 2015 17:18:39 +0530
+Subject: [PATCH] kexec: Add --lite option
+In-Reply-To: <20151207114547.GE16406@dhcppc13.redhat.com>
+References: <1445469125.30908.105.camel@infradead.org>
+ <20151022031718.GB11227@dhcp-129-115.nay.redhat.com>
+ <20151022125012.GB20847@redhat.com>
+ <1445540891.30908.144.camel@infradead.org>
+ <1446703011.12676.83.camel@freescale.com>
+ <20151207114547.GE16406@dhcppc13.redhat.com>
+Message-ID: <20151207114839.GF16406@dhcppc13.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+Sorry, forgot to add linux-arm-kernel at lists.infradead.org. Now CCed.
 
-On 05/12/15 09:35, Pavel Machek wrote:
-> On Thu 2015-11-26 17:32:47, James Morse wrote:
->> Some architectures require code written to memory as if it were data to be
->> 'cleaned' from any data caches before the processor can fetch them as new
->> instructions.
->>
->> During resume from hibernate, the snapshot code copies some pages directly,
->> meaning these architectures do not get a chance to perform their cache
->> maintenance. Create a new list of pages that were restored in place, so
->> that the arch code can perform this maintenance when necessary.
+On 07/12/2015:05:15:47 PM, Pratyush Anand wrote:
+> +linux-arm-kernel at lists.infradead.org (May be someone from arm kernel list can
+> give some more input)
 > 
-> Umm. Could the copy function be modified to do the neccessary
-> flushing, instead?
-
-The copying is done by load_image_lzo() using memcpy() if you have
-compression enabled, and by load_image() using swap_read_page() if you
-don't.
-
-I didn't do it here as it would clean every page copied, which was the
-worrying part of the previous approach. If there is an architecture
-where this cache-clean operation is expensive, it would slow down
-restore. I was trying to benchmark the impact of this on 32bit arm when
-I spotted it was broken.
-
-This allocated-same-page code path doesn't happen very often, so we
-don't want this to have an impact on the 'normal' code path. On 32bit
-arm I saw ~20 of these allocations out of ~60,000 pages.
-
-This new way allocates a few extra pages during restore, and doesn't
-assume that flush_cache_range() needs calling. It should have no impact
-on architectures that aren't using the new list.
-
-
-> Alternatively, can you just clean the whole cache before jumping to
-> the new kernel?
-
-On arm64, cleaning the whole cache means cleaning all of memory by
-virtual address, which would be a high price to pay when we only need to
-clean the pages we copied. The current implementation does clean all the
-page it copies, the problem is the ~0.03% that are copied behind its
-back. This patch publishes where those pages are.
-
-
-
-Thanks!
-
-James
+> On 04/11/2015:11:56:51 PM, Scott Wood wrote:
+> > On Thu, 2015-10-22 at 12:08 -0700, Geoff Levand wrote:
+> > > I notice the difference on the my arm64 system, so I guess we
+> > > are even on that.
+> > 
+> > For me it was beyond "notice the difference" -- I thought it was completely 
+> > broken, and was preparing to debug, until it started spitting out output over 
+> > a minute later.
+> > 
+> > Compiling the sha256 code with -O2 instead of -O0 cut it down to around 10 
+> > seconds (still unpleasant, but not quite as crazy... still unacceptable for 
+> > non-kdump, though).
+> 
+> Yes, compiling purgatory code with -O2 helps to improve the timing, and I notice
+> that enabling D-cache on top of -O2 does not improve it further. However, I am
+> still not able to understand that why there is huge difference between following
+> two.
+> 
+> 1) When we execute kexec() system call in first kernel, at that time it
+> calculates sha256 on all the binaries [1]. It take almost un-noticeable time
+> (less than a sec) there.
+> 
+> 2) When purgatory is executed then it re-calculates sha256 using same routines
+> [2] on same binary data as that of case (1). But, now it takes 10-20 sec
+> (depending of size of binaries)?
+> 
+> Why did not it take same time with O2 + D-cache enabled? I think, we should be
+> able to achieve same time in second case as well. What is missing?
+> 
+> ~Pratyush
+> 
+> [1] http://git.kernel.org/cgit/utils/kernel/kexec/kexec-tools.git/tree/kexec/kexec.c#n650
+> [2] http://git.kernel.org/cgit/utils/kernel/kexec/kexec-tools.git/tree/purgatory/purgatory.c#n20
