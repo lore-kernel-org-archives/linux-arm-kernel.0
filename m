@@ -1,83 +1,70 @@
 From: xuejiancheng@huawei.com (xuejiancheng)
-Date: Mon, 7 Dec 2015 14:37:06 +0800
-Subject: [PATCH v2 4/9] ARM: dts: add dts files for hi3519-demb board
-In-Reply-To: <3047121.2z9SCS5Au2@wuerfel>
-References: <1449110668-23647-1-git-send-email-xuejiancheng@huawei.com>
- <1728470.0OiiXMcl88@wuerfel> <5660FA2E.6040601@huawei.com>
- <3047121.2z9SCS5Au2@wuerfel>
-Message-ID: <56652912.80308@huawei.com>
+Date: Mon, 7 Dec 2015 14:58:14 +0800
+Subject: [PATCH v2 3/9] ARM: hisi: enable Hi3519 soc
+In-Reply-To: <43938749.Z0h4RNddN6@wuerfel>
+References: <1449110565-23590-1-git-send-email-xuejiancheng@huawei.com>
+ <8647404.sBOFNLAMdU@wuerfel> <5661119E.9060309@huawei.com>
+ <43938749.Z0h4RNddN6@wuerfel>
+Message-ID: <56652E06.10309@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd,
 
-On 2015/12/4 18:49, Arnd Bergmann wrote:
-> On Friday 04 December 2015 10:27:58 xuejiancheng wrote:
->>>
->>>> +            sysctrl: system-controller at 12020000 {
->>>> +                    compatible = "hisilicon,sysctrl";
->>>> +                    reg = <0x12020000 0x1000>;
->>>> +                    reboot-offset = <0x4>;
->>>> +            };
->>>
->>> Is this one identical to the one in hip04?
->>>
->>> If not, pick a new unique compatible string
->>
->> Yes. It's compatible with the one in hip04.
-> 
-> Ok, we should add a compatible string for that then, as the hip04 apparently
-> has a slightly different layout from hip01.
-> 
-> Can you add a separate patch to clarify the existing hisilicon,sysctrl nodes?
-> 
-> It look like hi3620 accidentally uses the same string as hip04 already
-> but is actually a bit different.
-> 
-> Maybe split out the sysctrl binding from
-> Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt, as it has
-> you already have a couple of those, and it's not clear how they relate
-> to one another.
-> 
-> If we introduce a string for all hip04 compatible sysctrl devices, we should
-> document that and use it consistently, so hi3519 becomes
-> 
-> 	compatible = "hisilicon,hi3519-sysctrl", "hisilicon,hip04-sysctrl", "hisilicon,sysctrl";
-> 
-> but I'd clarify in the binding documentation that "hisilicon,sysctrl" should
-> only be used for hip04 and hi3519 but not the others.
-> 
-> As this seems to be a standard part, we can also think about making a
-> high-level driver for in in drivers/soc rather than relying on the syscon
-> driver which we tend to use more for one-off devices with random register
-> layouts.
-> 
-   Sorry. I didn't understand your meaning well and maybe I gave you a wrong description.
-Please allow me to clarify it again.
-   The "sysctrl" nodes here is just used for the "reboot" function. It is corresponding to
-the driver "drivers/power/reset/hisi-reboot.c". The compatible string in the driver is
-"hisilicon,sysctrl".
-   The layout of this block is also different from the one in HiP04.
-
+On 2015/12/5 5:54, Arnd Bergmann wrote:
+> On Friday 04 December 2015 12:07:58 xuejiancheng wrote:
+>> On 2015/12/3 17:40, Arnd Bergmann wrote:
+>>> On Thursday 03 December 2015 10:42:45 Jiancheng Xue wrote:
+>>>> --- a/arch/arm/mach-hisi/Kconfig
+>>>> +++ b/arch/arm/mach-hisi/Kconfig
+>>>> @@ -12,6 +12,14 @@ if ARCH_HISI
+>>>>  
+>>>>  menu "Hisilicon platform type"
+>>>>  
+>>>> +config ARCH_HI3519
+>>>> +       bool "Hisilicon Hi3519 Soc" if ARCH_MULTI_V7
+>>>> +       select HAVE_ARM_ARCH_TIMER
+>>>> +       select ARCH_HAS_RESET_CONTROLLER
 >>>> +
->>>> +            crg: crg at 12010000 {
->>>> +                    compatible = "hisilicon,hi3519-crg";
+>>>> +       help
+>>>> +         Support for Hisilicon Hi3519 Soc
+>>>> +
+>>>>  config ARCH_HI3xxx
+>>>>         bool "Hisilicon Hi36xx family" if ARCH_MULTI_V7
+>>>>         select CACHE_L2X0
 >>>
->>>
->>> what is a "crg"? Is there a standard name for these?
+>>> Do those need to be separate? I would just extend the Hi36xx
+>>> to cover all Hi3xxx, if nothing in the platform code really
+>>> depends on this.
 >>
->> The "crg" means Clock and Reset Generator. It's a block which supplies clock
->> and reset signals for other modules in the chip. I used "hi3519-clock"
->> in last version patch. Rob Herring suggested that it's better to use "hi3519-crg"
->> as the compatible string if it's a whole block.
+>> For HI3519, there is really no special platform code. But HI35xx and HI36xx soc families
+>> belong to different product lines in hisilicon. HI35xx family also composes of various
+>> architectures socs(single core, smp and big-little). So I think it may be clear to have
+>> separate arch definitions.
 >>
->> what about writing like this?
->>
->> crg: clock-reset-controller at 12010000 {
->>         compatible = "hisilicon,hi3519-crg";
->>         }
->>
+>> Could you give me more suggestions about this?  Thank you!
 > 
-> Ok, that's better.
+> For the most part, you already need to enable the device drivers for the
+> specific components on each chip, and the per-soc top-level options here
+> don't actually control the compilation of any particular code.
+> 
+> This is slightly different for some of the older platforms that for historic
+> reasons need fine-grained options. You could probably just make the device
+> drivers depend on "ARCH_HISI || COMPILE_TEST" in general, but some level
+> of classification is ok, in particular when the chips are not related at all.
+> 
+> In this case, my impression is that while HI3519 and HI36xx are made
+> by different business units, there is still a noticeable amount of shared
+> IP in them (e.g. the "sysctrl" node that seems to be shared with some of
+> the other chips as well), so grouping them together should make sense.
+
+HI35xx and HI36xx are designed totally independently, including IP selection.
+The relation between HI35xx and HI36xx is just like the one between HI36xx
+and HIP0x. In another word, HI35xx and HI36xx are not related except they all
+belong to hisilicon. So I don't think it's proper to group them together.
+
+Is it OK if I drop ARCH_HI3519 and use ARCH_HISI directly?
+
 > 
 > 	Arnd
 > 
