@@ -1,148 +1,86 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 07 Dec 2015 16:42:59 +0000
-Subject: [PATCH v5 02/21] KVM: ARM64: Define PMU data structure for each
- vcpu
-In-Reply-To: <5665A026.8000802@arm.com>
-References: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
- <1449123091-20252-3-git-send-email-zhaoshenglong@huawei.com>
- <5665A026.8000802@arm.com>
-Message-ID: <5665B713.3020900@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 7 Dec 2015 16:43:57 +0000
+Subject: [PATCH v3 7/7] arm64: allow kernel Image to be loaded anywhere
+ in physical memory
+In-Reply-To: <CAKv+Gu_azSnKUtuC5GgWyvEDznqGP4HR3WpUfA58BfPnFijg4A@mail.gmail.com>
+References: <1447672998-20981-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1447672998-20981-8-git-send-email-ard.biesheuvel@linaro.org>
+ <20151207153012.GB7083@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu_azSnKUtuC5GgWyvEDznqGP4HR3WpUfA58BfPnFijg4A@mail.gmail.com>
+Message-ID: <20151207164356.GG7083@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/15 15:05, Marc Zyngier wrote:
-> On 03/12/15 06:11, Shannon Zhao wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
->>
->> Here we plan to support virtual PMU for guest by full software
->> emulation, so define some basic structs and functions preparing for
->> futher steps. Define struct kvm_pmc for performance monitor counter and
->> struct kvm_pmu for performance monitor unit for each vcpu. According to
->> ARMv8 spec, the PMU contains at most 32(ARMV8_MAX_COUNTERS) counters.
->>
->> Since this only supports ARM64 (or PMUv3), add a separate config symbol
->> for it.
->>
->> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> ---
->>  arch/arm64/include/asm/kvm_host.h |  2 ++
->>  arch/arm64/kvm/Kconfig            |  8 ++++++++
->>  include/kvm/arm_pmu.h             | 41 +++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 51 insertions(+)
->>  create mode 100644 include/kvm/arm_pmu.h
->>
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index a35ce72..42e15bb 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -37,6 +37,7 @@
->>  
->>  #include <kvm/arm_vgic.h>
->>  #include <kvm/arm_arch_timer.h>
->> +#include <kvm/arm_pmu.h>
->>  
->>  #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
->>  
->> @@ -132,6 +133,7 @@ struct kvm_vcpu_arch {
->>  	/* VGIC state */
->>  	struct vgic_cpu vgic_cpu;
->>  	struct arch_timer_cpu timer_cpu;
->> +	struct kvm_pmu pmu;
->>  
->>  	/*
->>  	 * Anything that is not used directly from assembly code goes
->> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
->> index a5272c0..66da9a2 100644
->> --- a/arch/arm64/kvm/Kconfig
->> +++ b/arch/arm64/kvm/Kconfig
->> @@ -36,6 +36,7 @@ config KVM
->>  	select HAVE_KVM_EVENTFD
->>  	select HAVE_KVM_IRQFD
->>  	select KVM_ARM_VGIC_V3
->> +	select KVM_ARM_PMU
->>  	---help---
->>  	  Support hosting virtualized guest machines.
->>  	  We don't support KVM with 16K page tables yet, due to the multiple
->> @@ -48,6 +49,13 @@ config KVM_ARM_HOST
->>  	---help---
->>  	  Provides host support for ARM processors.
->>  
->> +config KVM_ARM_PMU
->> +	bool
->> +	depends on KVM_ARM_HOST && HW_PERF_EVENTS
->> +	---help---
->> +	  Adds support for a virtual Performance Monitoring Unit (PMU) in
->> +	  virtual machines.
->> +
->>  source drivers/vhost/Kconfig
->>  
->>  endif # VIRTUALIZATION
->> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
->> new file mode 100644
->> index 0000000..0c13470
->> --- /dev/null
->> +++ b/include/kvm/arm_pmu.h
->> @@ -0,0 +1,41 @@
->> +/*
->> + * Copyright (C) 2015 Linaro Ltd.
->> + * Author: Shannon Zhao <shannon.zhao@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#ifndef __ASM_ARM_KVM_PMU_H
->> +#define __ASM_ARM_KVM_PMU_H
->> +
->> +#include <linux/perf_event.h>
->> +#ifdef CONFIG_KVM_ARM_PMU
->> +#include <asm/pmu.h>
->> +#endif
->> +
->> +struct kvm_pmc {
->> +	u8 idx;/* index into the pmu->pmc array */
->> +	struct perf_event *perf_event;
->> +	struct kvm_vcpu *vcpu;
+On Mon, Dec 07, 2015 at 04:40:20PM +0100, Ard Biesheuvel wrote:
+> On 7 December 2015 at 16:30, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Mon, Nov 16, 2015 at 12:23:18PM +0100, Ard Biesheuvel wrote:
+> >> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> >> index b3b0175d7135..29a7dc5327b6 100644
+> >> --- a/arch/arm64/mm/init.c
+> >> +++ b/arch/arm64/mm/init.c
+> >> @@ -158,9 +159,55 @@ static int __init early_mem(char *p)
+> >>  }
+> >>  early_param("mem", early_mem);
+> >>
+> >> +static void __init enforce_memory_limit(void)
+> >> +{
+> >> +     const phys_addr_t kbase = round_down(__pa(_text), MIN_KIMG_ALIGN);
+> >> +     u64 to_remove = memblock_phys_mem_size() - memory_limit;
+> >> +     phys_addr_t max_addr = 0;
+> >> +     struct memblock_region *r;
+> >> +
+> >> +     if (memory_limit == (phys_addr_t)ULLONG_MAX)
+> >> +             return;
+> >> +
+> >> +     /*
+> >> +      * The kernel may be high up in physical memory, so try to apply the
+> >> +      * limit below the kernel first, and only let the generic handling
+> >> +      * take over if it turns out we haven't clipped enough memory yet.
+> >> +      */
+> >> +     for_each_memblock(memory, r) {
+> >> +             if (r->base + r->size > kbase) {
+> >> +                     u64 rem = min(to_remove, kbase - r->base);
+> >> +
+> >> +                     max_addr = r->base + rem;
+> >> +                     to_remove -= rem;
+> >> +                     break;
+> >> +             }
+> >> +             if (to_remove <= r->size) {
+> >> +                     max_addr = r->base + to_remove;
+> >> +                     to_remove = 0;
+> >> +                     break;
+> >> +             }
+> >> +             to_remove -= r->size;
+> >> +     }
+> >> +
+> >> +     memblock_remove(0, max_addr);
+> >
+> > I don't fully get the reason for this function. Do you want to keep the
+> > kernel around in memblock? How do we guarantee that the call below
+> > wouldn't remove it anyway?
 > 
-> Why do you need this? If you have the pointer to a kvm_pmc structure, it
-> is very cheap to compute the address of the vcpu:
+> The problem is that the ordinary memblock_enforce_memory_limit()
+> removes memory from the top, which means it will happily remove the
+> memory that covers your kernel image if it happens to be loaded high
+> up in physical memory.
+
+We could fix the memblock_reserve() call on the kernel image but apart
+from that we don't care about memblock's knowledge of the kernel text. A
+potential problem is freeing the init memory which assumes it's present
+in the linear mapping, though we could add additional checks here as
+well. Is memblock_end_of_DRAM() adjusted to the new maximum address
+after memblock_enforce_memory_limit()?
+
+> >> +
+> >> +     if (to_remove)
+> >> +             memblock_enforce_memory_limit(memory_limit);
+> >
+> > Shouldn't this be memblock_enforce_memory_limit(to_remove)?
 > 
-> static inline kvm_vcpu *kvm_pmc_to_vcpu(struct kvm_pmc *pmc)
-> {
-> 	struct kvm_pmu *pmu;
-> 	pmc -= pmc->idx;
-> 	pmu = container_of(pmc, struct kvm_pmu, pmc);
-> 	return container_of(pmu, struct kvm_vcpu, pmu);
-> }
-> 
-> All of which the compiler will happily optimize for you.
+> No, it takes the memory limit as input. 'to_remove + memory_limit'
+> will be exactly the remaining memory at this point.
 
-FWIW, actually compiling code looks something like this:
+You are right, I thought it's the memory to remove.
 
-static inline struct kvm_vcpu *kvm_pmc_to_vcpu(struct kvm_pmc *pmc)
-{
-	struct kvm_pmu *pmu;
-	struct kvm_vcpu_arch *vcpu_arch;
-
-	pmc -= pmc->idx;
-	pmu = container_of(pmc, struct kvm_pmu, pmc[0]);
-	vcpu_arch = container_of(pmu, struct kvm_vcpu_arch, pmu);
-	return container_of(vcpu_arch, struct kvm_vcpu, arch);
-}
-
-which amounts to 4 sub instructions.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
