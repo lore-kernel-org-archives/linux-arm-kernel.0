@@ -1,86 +1,88 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 7 Dec 2015 09:40:20 +0000
-Subject: [PATCH v7 2/6] mfd: syscon: add a DT property to set value width
-In-Reply-To: <1448899191-13891-3-git-send-email-damien.riegel@savoirfairelinux.com>
-References: <1448899191-13891-1-git-send-email-damien.riegel@savoirfairelinux.com>
- <1448899191-13891-3-git-send-email-damien.riegel@savoirfairelinux.com>
-Message-ID: <20151207094020.GF3384@x1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 07 Dec 2015 10:40:04 +0100
+Subject: arRe: [PATCH net-next 2/2] net: hns: enet specisies a reference to
+ dsaf (config and documents)
+In-Reply-To: <566531C5.4050208@huawei.com>
+References: <1449295856-31068-1-git-send-email-yankejian@huawei.com>
+ <23027215.8RIhViTVaB@wuerfel> <566531C5.4050208@huawei.com>
+Message-ID: <1503684.BNZUVaD74W@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Nov 2015, Damien Riegel wrote:
-
-> Currently syscon has a fixed configuration of 32 bits for register and
-> values widths. In some cases, it would be desirable to be able to
-> customize the value width.
+On Monday 07 December 2015 15:14:13 Yankejian wrote:
+> On 2015/12/6 6:19, Arnd Bergmann wrote:
+> > On Saturday 05 December 2015 14:10:56 yankejian wrote:
+> >> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
+> >> index 80411b2..ecacfa4 100644
+> >> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
+> >> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
+> >> @@ -4,8 +4,6 @@ Required properties:
+> >>  - compatible: should be "hisilicon,hns-dsaf-v1" or "hisilicon,hns-dsaf-v2".
+> >>    "hisilicon,hns-dsaf-v1" is for hip05.
+> >>    "hisilicon,hns-dsaf-v2" is for Hi1610 and Hi1612.
+> >> -- dsa-name: dsa fabric name who provide this interface.
+> >> -  should be "dsafX", X is the dsaf id.
+> >>  - mode: dsa fabric mode string. only support one of dsaf modes like these:
+> >>                 "2port-64vf",
+> >>                 "6port-16rss",
+> >> @@ -26,9 +24,8 @@ Required properties:
+> >>  
+> >>  Example:
+> >>  
+> >> -dsa: dsa at c7000000 {
+> >> +dsaf0: dsa at c7000000 {
+> >>         compatible = "hisilicon,hns-dsaf-v1";
+> >> -       dsa_name = "dsaf0";
+> >>         mode = "6port-16rss";
+> >>         interrupt-parent = <&mbigen_dsa>;
+> >>         reg = <0x0 0xC0000000 0x0 0x420000
+> >> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
+> >> index 41d19be..e6a9d1c 100644
+> >> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
+> >> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
+> >> @@ -4,8 +4,9 @@ Required properties:
+> >>  - compatible: "hisilicon,hns-nic-v1" or "hisilicon,hns-nic-v2".
+> >>    "hisilicon,hns-nic-v1" is for hip05.
+> >>    "hisilicon,hns-nic-v2" is for Hi1610 and Hi1612.
+> >> -- ae-name: accelerator name who provides this interface,
+> >> -  is simply a name referring to the name of name in the accelerator node.
+> >> +- ae-handle: accelerator engine handle for hns,
+> >> +  specifies a reference to the associating hardware driver node.
+> >> +  see Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
+> >>  - port-id: is the index of port provided by DSAF (the accelerator). DSAF can
+> >>    connect to 8 PHYs. Port 0 to 1 are both used for adminstration purpose. They
+> >>    are called debug ports.
+> >> @@ -41,7 +42,7 @@ Example:
+> >>  
+> >>
+> > This looks like an incompatible change, as you add and remove
+> > required properties. Is there a way to support both the old and
+> > the new style?
+> >
+> >       Arnd
+> >
+> > .
 > 
-> For example, certain boards (like the ones manufactured by Technologic
-> Systems) have a FPGA that is memory-mapped, but its registers are only
-> 16-bit wide.
-> 
-> This patch adds an optional "reg-io-width" DT binding for syscon that
-> allows to change the width for the data bus (i.e. val_bits). If this
-> property is provided, it will also set the register stride to
-> reg-io-width's value. If not provided, the default configuration is
-> used.
-> 
-> Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
-> ---
->  Documentation/devicetree/bindings/mfd/syscon.txt |  4 ++++
->  drivers/mfd/syscon.c                             | 13 +++++++++++++
->  2 files changed, 17 insertions(+)
+> Hi Arnd,
+> Thanks for your suggestions.  it must be set the same strings in dsaf node and every enet node before.
+> it seems inappropriate. as Rob Herring <robh@kernel.org> 's suggestions, that would solve associating
+> enet with a particular dsaf. so we discus the solution with Yisen Zhuang <yisen.zhuang@huawei.com>.
+> we decide to use the new way instead of the old one.
 
-Applied, thanks.
+I agree the new form looks better than the original way, but I'm worried
+about the migration path. You don't explain in the patch description
+how you want to ensure that nothing breaks for existing systems.
 
-> diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
-> index fe8150b..408f768 100644
-> --- a/Documentation/devicetree/bindings/mfd/syscon.txt
-> +++ b/Documentation/devicetree/bindings/mfd/syscon.txt
-> @@ -13,6 +13,10 @@ Required properties:
->  - compatible: Should contain "syscon".
->  - reg: the register region can be accessed from syscon
->  
-> +Optional property:
-> +- reg-io-width: the size (in bytes) of the IO accesses that should be
-> +  performed on the device.
-> +
->  Examples:
->  gpr: iomuxc-gpr at 020e0000 {
->  	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
-> diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-> index 176bf0f..b7aabee 100644
-> --- a/drivers/mfd/syscon.c
-> +++ b/drivers/mfd/syscon.c
-> @@ -47,6 +47,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
->  	struct syscon *syscon;
->  	struct regmap *regmap;
->  	void __iomem *base;
-> +	u32 reg_io_width;
->  	int ret;
->  	struct regmap_config syscon_config = syscon_regmap_config;
->  
-> @@ -69,6 +70,18 @@ static struct syscon *of_syscon_register(struct device_node *np)
->  	 else if (of_property_read_bool(np, "little-endian"))
->  		syscon_config.val_format_endian = REGMAP_ENDIAN_LITTLE;
->  
-> +	/*
-> +	 * search for reg-io-width property in DT. If it is not provided,
-> +	 * default to 4 bytes. regmap_init_mmio will return an error if values
-> +	 * are invalid so there is no need to check them here.
-> +	 */
-> +	ret = of_property_read_u32(np, "reg-io-width", &reg_io_width);
-> +	if (ret)
-> +		reg_io_width = 4;
-> +
-> +	syscon_config.reg_stride = reg_io_width;
-> +	syscon_config.val_bits = reg_io_width * 8;
-> +
->  	regmap = regmap_init_mmio(NULL, base, &syscon_config);
->  	if (IS_ERR(regmap)) {
->  		pr_err("regmap init failed\n");
+We generally try to avoid doing incompatible changes altogether and
+prefer to keep backwards compatibility, unless we can prove that no
+other systems exist that would get impacted by the change.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Are you sure that nobody ships a DTB file for this hardware with their
+firmware that would now require an incompatible update which in turn
+breaks old kernels?
+
+Are you sure that there is no hardware using the same dsa hardware
+with out-of-tree dts files that need to make the same change but might
+not be aware of the change?
+
+	Arnd
