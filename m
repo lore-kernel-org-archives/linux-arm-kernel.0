@@ -1,79 +1,96 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 7 Dec 2015 11:34:41 -0800
-Subject: [PATCH linux-next 0/5] mtd: spi-nor: add driver for Atmel QSPI
- controller
-In-Reply-To: <cover.1449494420.git.cyrille.pitchen@atmel.com>
-References: <cover.1449494420.git.cyrille.pitchen@atmel.com>
-Message-ID: <20151207193441.GO120110@google.com>
+From: damien.riegel@savoirfairelinux.com (Damien Riegel)
+Date: Mon, 7 Dec 2015 14:42:18 -0500
+Subject: [PATCH v7 2/6] mfd: syscon: add a DT property to set value width
+In-Reply-To: <20151207094020.GF3384@x1>
+References: <1448899191-13891-1-git-send-email-damien.riegel@savoirfairelinux.com>
+ <1448899191-13891-3-git-send-email-damien.riegel@savoirfairelinux.com>
+ <20151207094020.GF3384@x1>
+Message-ID: <20151207194218.GB6030@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Bean Huo
-
-Hi Cyrille,
-
-On Mon, Dec 07, 2015 at 03:09:09PM +0100, Cyrille Pitchen wrote:
-> Hi all,
+On Mon, Dec 07, 2015 at 09:40:20AM +0000, Lee Jones wrote:
+> On Mon, 30 Nov 2015, Damien Riegel wrote:
 > 
-> this series of patches adds support to the Atmel QSPI controller available
-> on sama5d2 SoCs. It was tested on a sama5d2 xplained ultra board with a 
-> Micron n25q128a13 QSPI memory and a at25df321a SPI memory.
+> > Currently syscon has a fixed configuration of 32 bits for register and
+> > values widths. In some cases, it would be desirable to be able to
+> > customize the value width.
+> > 
+> > For example, certain boards (like the ones manufactured by Technologic
+> > Systems) have a FPGA that is memory-mapped, but its registers are only
+> > 16-bit wide.
+> > 
+> > This patch adds an optional "reg-io-width" DT binding for syscon that
+> > allows to change the width for the data bus (i.e. val_bits). If this
+> > property is provided, it will also set the register stride to
+> > reg-io-width's value. If not provided, the default configuration is
+> > used.
+> > 
+> > Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+> > ---
+> >  Documentation/devicetree/bindings/mfd/syscon.txt |  4 ++++
+> >  drivers/mfd/syscon.c                             | 13 +++++++++++++
+> >  2 files changed, 17 insertions(+)
 > 
-> In order to use the Micron memory in its Quad SPI mode, the spi-nor
-> framework needed to be patched to fix the support of Quad/Dual SPI
-> protocols with some memory manufacturers such as Spansion, Micron and
-> Macronix. There are many comments in the source code to explain the
-> implementation choices based on the datasheets from memory manufacturers.
+> Applied, thanks.
 > 
+Hi Lee,
+
+Good to see this patch applied. What's going on now with the other
+patches of this serie ? How should I handle them ?
+
+Thanks,
+Damien
+
+> > diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
+> > index fe8150b..408f768 100644
+> > --- a/Documentation/devicetree/bindings/mfd/syscon.txt
+> > +++ b/Documentation/devicetree/bindings/mfd/syscon.txt
+> > @@ -13,6 +13,10 @@ Required properties:
+> >  - compatible: Should contain "syscon".
+> >  - reg: the register region can be accessed from syscon
+> >  
+> > +Optional property:
+> > +- reg-io-width: the size (in bytes) of the IO accesses that should be
+> > +  performed on the device.
+> > +
+> >  Examples:
+> >  gpr: iomuxc-gpr at 020e0000 {
+> >  	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
+> > diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
+> > index 176bf0f..b7aabee 100644
+> > --- a/drivers/mfd/syscon.c
+> > +++ b/drivers/mfd/syscon.c
+> > @@ -47,6 +47,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
+> >  	struct syscon *syscon;
+> >  	struct regmap *regmap;
+> >  	void __iomem *base;
+> > +	u32 reg_io_width;
+> >  	int ret;
+> >  	struct regmap_config syscon_config = syscon_regmap_config;
+> >  
+> > @@ -69,6 +70,18 @@ static struct syscon *of_syscon_register(struct device_node *np)
+> >  	 else if (of_property_read_bool(np, "little-endian"))
+> >  		syscon_config.val_format_endian = REGMAP_ENDIAN_LITTLE;
+> >  
+> > +	/*
+> > +	 * search for reg-io-width property in DT. If it is not provided,
+> > +	 * default to 4 bytes. regmap_init_mmio will return an error if values
+> > +	 * are invalid so there is no need to check them here.
+> > +	 */
+> > +	ret = of_property_read_u32(np, "reg-io-width", &reg_io_width);
+> > +	if (ret)
+> > +		reg_io_width = 4;
+> > +
+> > +	syscon_config.reg_stride = reg_io_width;
+> > +	syscon_config.val_bits = reg_io_width * 8;
+> > +
+> >  	regmap = regmap_init_mmio(NULL, base, &syscon_config);
+> >  	if (IS_ERR(regmap)) {
+> >  		pr_err("regmap init failed\n");
 > 
-> This series was based and tested on linux-next-20151207
-> 
-> 1 - Atmel QSPI + Micron n25q128a13 (atmel-quadspi.c driver)
-> 
-> SPI 1-1-1: This mode was tested replacing SPI_NOR_QUAD by SPI_NOR_FAST as
->            argument to spi_nor_scan() called from atmel_qspi_probe().
-> 
-> SPI 1-1-4: Bootloaders (at91bootstrap/uboot) don't enable the Quad SPI
->            mode of the Micron memory. When probed from Linux, the memory
->            uses its Extended SPI mode and replies to the regular Read ID
->            (0x9f) command.
-> 
-> SPI 4-4-4: The romcode enabled the Quad SPI mode the of Micron memory
->            before loading the at91bootstrap. When probed from Linux, the
->            memory uses its Quad SPI mode and no longer replies to the
->            regular Read ID (0x9f) command but instead to the Read ID
->            Multiple I/O (0xaf) command. The memory expects ALL commands
->            to use the SPI 4-4-4 protocol.
-
-I'll admit I'm a little fuzzy on the differences between dual and quad
-modes on various flash manufacturers. Can you help clear it up for me?
-I think some of the comments on patch 2 help too, but I'll just comment
-here for now.
-
-It looks like the current driver has problems regarding the non 1-x-y
-modes (e.g., 4-4-4), right? But I see that spi-nor.c never tries to
-send a 4_4_4 command; it only sets read_opcode to
-SPINOR_OP_READ_1_1_{1,2,4}. So is this an oversight in patches like
-Bean's patch?
-
-    commit 548cd3ab54da ("mtd: spi-nor: Add quad I/O support for Micron
-    SPI NOR")
-
-Why would we even need to enable quad modes like that, if we're not
-going to send the 4-4-4 opcodes?
-
-My next question (if my understanding is roughly correct) is, do we need
-the 4-4-4 modes, and what risks come with them? I understand we can
-shorten the command and address phases, but does that alone yield much
-performance benefit? And I think the risk is that a given system might
-not be prepared for the flash to be in a 4-4-4 mode, if the boot code
-tries to use 1-x-y commands.
-
-Also, I see a lot of good comments in patch 2 about Spansion vs.
-Macronix vs. Micron memories. I wonder if previous developers have
-completely tested their patches, or if they're just reading the
-datasheets... so, what kind have testing have you done? Do you have
-samples of all these flash to test?
-
-Regards,
-Brian
+> -- 
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
