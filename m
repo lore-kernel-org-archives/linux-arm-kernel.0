@@ -1,250 +1,146 @@
-From: jenskuske@gmail.com (Jens Kuske)
-Date: Mon, 7 Dec 2015 20:23:42 +0100
-Subject: [linux-sunxi] [PATCH resend 2/6] clk: sunxi: Add VE (Video
- Engine) module clock driver for sun[457]i
-In-Reply-To: <1449321407-4531-3-git-send-email-wens@csie.org>
-References: <1449321407-4531-1-git-send-email-wens@csie.org>
- <1449321407-4531-3-git-send-email-wens@csie.org>
-Message-ID: <5665DCBE.2020601@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 7 Dec 2015 13:26:55 -0600
+Subject: [PATCH] usb: musb: dsps: handle the
+ otg_state_a_wait_vrise_timeout case
+In-Reply-To: <87poyiegc7.fsf@free-electrons.com>
+References: <1440087153-31084-1-git-send-email-gregory.clement@free-electrons.com>
+ <55D719B1.8010700@free-electrons.com> <87twrfsbed.fsf@free-electrons.com>
+ <87d1wtf5ir.fsf@saruman.tx.rr.com> <87a8rde96m.fsf@free-electrons.com>
+ <87poyiegc7.fsf@free-electrons.com>
+Message-ID: <87poyinjpc.fsf@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/15 14:16, Chen-Yu Tsai wrote:
-> The video engine has its own special module clock, consisting of a clock
-> gate, configurable dividers, and a reset control.
-> 
 
 Hi,
 
-I've tested these patches on A20, everything works so far.
-I only read some bits from a random bitstream, so nothing fancy yet, but
-it shows that both dram and module clock are working.
-
-One small indentation error below, otherwise it looks good.
-
-> On later (sun[68]i) families, the reset control is moved out of this
-> piece of hardware and grouped with reset controls of other peripherals.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  Documentation/devicetree/bindings/clock/sunxi.txt |   4 +
->  drivers/clk/sunxi/Makefile                        |   1 +
->  drivers/clk/sunxi/clk-a10-ve.c                    | 171 ++++++++++++++++++++++
->  3 files changed, 176 insertions(+)
->  create mode 100644 drivers/clk/sunxi/clk-a10-ve.c
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index ef0b452806b1..14496056319f 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -74,6 +74,7 @@ Required properties:
->  	"allwinner,sun8i-h3-usb-clk" - for usb gates + resets on H3
->  	"allwinner,sun9i-a80-usb-mod-clk" - for usb gates + resets on A80
->  	"allwinner,sun9i-a80-usb-phy-clk" - for usb phy gates + resets on A80
-> +	"allwinner,sun4i-a10-ve-clk" - for the Video Engine clock
+Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
+> Hi Felipe,
+>
+> I am going back on this subject (again :) )
 >  
->  Required properties for all clocks:
->  - reg : shall be the control register address for the clock.
-> @@ -93,6 +94,9 @@ Required properties for all clocks:
->  And "allwinner,*-usb-clk" clocks also require:
->  - reset-cells : shall be set to 1
->  
-> +The "allwinner,sun4i-a10-ve-clk" clock also requires:
-> +- reset-cells : shall be set to 0
-> +
->  The "allwinner,sun9i-a80-mmc-config-clk" clock also requires:
->  - #reset-cells : shall be set to 1
->  - resets : shall be the reset control phandle for the mmc block.
-> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> index 103efab05ca8..78db91ad5af6 100644
-> --- a/drivers/clk/sunxi/Makefile
-> +++ b/drivers/clk/sunxi/Makefile
-> @@ -7,6 +7,7 @@ obj-y += clk-a10-codec.o
->  obj-y += clk-a10-hosc.o
->  obj-y += clk-a10-mod1.o
->  obj-y += clk-a10-pll2.o
-> +obj-y += clk-a10-ve.o
->  obj-y += clk-a20-gmac.o
->  obj-y += clk-mod0.o
->  obj-y += clk-simple-gates.o
-> diff --git a/drivers/clk/sunxi/clk-a10-ve.c b/drivers/clk/sunxi/clk-a10-ve.c
-> new file mode 100644
-> index 000000000000..de0fdb656150
-> --- /dev/null
-> +++ b/drivers/clk/sunxi/clk-a10-ve.c
-> @@ -0,0 +1,171 @@
-> +/*
-> + * Copyright 2015 Chen-Yu Tsai
-> + *
-> + * Chen-Yu Tsai <wens@csie.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/reset-controller.h>
-> +#include <linux/slab.h>
-> +#include <linux/spinlock.h>
-> +
-> +static DEFINE_SPINLOCK(ve_lock);
-> +
-> +#define SUN4I_VE_ENABLE		31
-> +#define SUN4I_VE_DIVIDER_SHIFT	16
-> +#define SUN4I_VE_DIVIDER_WIDTH	3
-> +#define SUN4I_VE_RESET		0
-> +
-> +/**
-> + * sunxi_ve_reset... - reset bit in ve clk registers handling
-> + */
-> +
-> +struct ve_reset_data {
-> +	void __iomem			*reg;
-> +	spinlock_t			*lock;
-> +	struct reset_controller_dev	rcdev;
-> +};
-> +
-> +static int sunxi_ve_reset_assert(struct reset_controller_dev *rcdev,
-> +				 unsigned long id)
-> +{
-> +	struct ve_reset_data *data = container_of(rcdev,
-> +						  struct ve_reset_data,
-> +						  rcdev);
-> +	unsigned long flags;
-> +	u32 reg;
-> +
-> +	spin_lock_irqsave(data->lock, flags);
-> +
-> +	reg = readl(data->reg);
-> +	writel(reg & ~BIT(SUN4I_VE_RESET), data->reg);
-> +
-> +	spin_unlock_irqrestore(data->lock, flags);
-> +
-> +	return 0;
-> +}
-> +
-> +static int sunxi_ve_reset_deassert(struct reset_controller_dev *rcdev,
-> +				   unsigned long id)
-> +{
-> +	struct ve_reset_data *data = container_of(rcdev,
-> +						  struct ve_reset_data,
-> +						  rcdev);
-> +	unsigned long flags;
-> +	u32 reg;
-> +
-> +	spin_lock_irqsave(data->lock, flags);
-> +
-> +	reg = readl(data->reg);
-> +	writel(reg | BIT(SUN4I_VE_RESET), data->reg);
-> +
-> +	spin_unlock_irqrestore(data->lock, flags);
-> +
-> +	return 0;
-> +}
-> +
-> +static int sunxi_ve_of_xlate(struct reset_controller_dev *rcdev,
-> +			     const struct of_phandle_args *reset_spec)
-> +{
-> +    if (WARN_ON(reset_spec->args_count != 0))
-> +	return -EINVAL;
-> +
-> +    return 0;
-    ^
-Spaces instead of tabs here.
+>  On mar., oct. 20 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+>
+>> Hi Felipe,
+>>  
+>>  On lun., oct. 05 2015, Felipe Balbi <balbi@ti.com> wrote:
+>>
+>>
+>>>> So after many tests on different devices, 200ms is enough for most of
+>>>> them, but for one, 2000ms (2s) was needed!
+>>>>
+>>>> I see several option:
+>>>> - adding a sysfs entry to setup the time
+>>>> - adding a debugs entry entry
+>>>> - adding configuration option in menuconfig
+>>>> - using 2000ms and hopping it was enough for everyone
+>>>>
+>>>> My preference would go to the first option, what is your opinion?
+>>>
+>>> I'm not sure if either of them is good. man 2s is just too large. If the
+>
+> Well 2s is lon I agree, but currently instead of 2s we have an infinite
+> wait, which is worse!
+>
+>>> device isn't following the specification, I'm afraid that device needs
+>>> to be fixed.
+>
+> I agree but these devices are for most of them USB stick that we find in
+> retail. We have no influence on them, so we have to do with them, even
+> if they do not follow the sepc.
+>
+> So what about using configfs or sysfs to let the user confgiure this
+> value if needed?
 
-> +}
-> +
-> +static struct reset_control_ops sunxi_ve_reset_ops = {
-> +	.assert		= sunxi_ve_reset_assert,
-> +	.deassert	= sunxi_ve_reset_deassert,
-> +};
-> +
-> +static void __init sun4i_ve_clk_setup(struct device_node *node)
-> +{
-> +	struct clk *clk;
-> +	struct clk_divider *div;
-> +	struct clk_gate *gate;
-> +	struct ve_reset_data *reset_data;
-> +	const char *parent;
-> +	const char *clk_name = node->name;
-> +	void __iomem *reg;
-> +	int err;
-> +
-> +	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-> +	if (IS_ERR(reg))
-> +		return;
-> +
-> +	div = kzalloc(sizeof(*div), GFP_KERNEL);
-> +	if (!div)
-> +		goto err_unmap;
-> +
-> +	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-> +	if (!gate)
-> +		goto err_free_div;
-> +
-> +	of_property_read_string(node, "clock-output-names", &clk_name);
-> +	parent = of_clk_get_parent_name(node, 0);
-> +
-> +	gate->reg = reg;
-> +	gate->bit_idx = SUN4I_VE_ENABLE;
-> +	gate->lock = &ve_lock;
-> +
-> +	div->reg = reg;
-> +	div->shift = SUN4I_VE_DIVIDER_SHIFT;
-> +	div->width = SUN4I_VE_DIVIDER_WIDTH;
-> +	div->lock = &ve_lock;
-> +
-> +	clk = clk_register_composite(NULL, clk_name, &parent, 1,
-> +				     NULL, NULL,
-> +				     &div->hw, &clk_divider_ops,
-> +				     &gate->hw, &clk_gate_ops,
-> +				     CLK_SET_RATE_PARENT);
-> +	if (IS_ERR(clk))
-> +		goto err_free_gate;
-> +
-> +	err = of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +	if (err)
-> +		goto err_unregister_clk;
-> +
-> +	reset_data = kzalloc(sizeof(*reset_data), GFP_KERNEL);
-> +	if (!reset_data)
-> +		goto err_del_provider;
-> +
-> +	reset_data->reg = reg;
-> +	reset_data->lock = &ve_lock;
-> +	reset_data->rcdev.nr_resets = 1;
-> +	reset_data->rcdev.ops = &sunxi_ve_reset_ops;
-> +	reset_data->rcdev.of_node = node;
-> +	reset_data->rcdev.of_xlate = sunxi_ve_of_xlate;
-> +	reset_data->rcdev.of_reset_n_cells = 0;
-> +	err = reset_controller_register(&reset_data->rcdev);
-> +	if (err)
-> +		goto err_free_reset;
-> +
-> +	return;
-> +
-> +err_free_reset:
-> +	kfree(reset_data);
-> +err_del_provider:
-> +	of_clk_del_provider(node);
-> +err_unregister_clk:
-> +	clk_unregister(clk);
-> +err_free_gate:
-> +	kfree(gate);
-> +err_free_div:
-> +	kfree(div);
-> +err_unmap:
-> +	iounmap(reg);
-> +}
-> +CLK_OF_DECLARE(sun4i_ve, "allwinner,sun4i-a10-ve-clk",
-> +	       sun4i_ve_clk_setup);
-> 
+iff we have to; I'm still not 100% convinced.
+
+> I go back on this because, your suggestion didn't work. At least, I
+> didn't manage to make it improve the situation.
+>
+> Thanks,
+>
+>>>
+>>> I think the real issue here is the lack of a disconnect IRQ from AM335x
+>>> devices. But here's something I've been meaning to test but never had
+>>> time. If you look into AM335x address space, there's a bit in the
+>>> wrapper which tells it to use the standard MUSB registers for IRQ,
+>>> instead of the TI-specific thing. Can you see if we get a disconnect IRQ
+>>> with that ?
+>>>
+>>> TRM is at [1], see page 2566. Basically, if you set bit 3 in register
+>>> offset 0x1014, then it should use Mentor IRQ registers. If that works,
+>>> quite a few problems will actually vanish :-p
+>>
+>> So I tried it with the following patch:
+>>
+>> -------------------------------------
+>> diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
+>> index c791ba5..c714500 100644
+>> --- a/drivers/usb/musb/musb_dsps.c
+>> +++ b/drivers/usb/musb/musb_dsps.c
+>> @@ -470,6 +470,7 @@ static int dsps_musb_init(struct musb *musb)
+>>  
+>>         /* Reset the musb */
+>>         dsps_writel(reg_base, wrp->control, (1 << wrp->reset));
+>> +       dsps_writel(musb->ctrl_base, wrp->control, BIT(3));
+
+overwritting reset.
+
+>>         musb->isr = dsps_interrupt;
+>>  
+>> @@ -625,6 +626,7 @@ static int dsps_musb_reset(struct musb *musb)
+>>         if (session_restart || !glue->sw_babble_enabled) {
+>>                 dev_info(musb->controller, "Restarting MUSB to recover from Babble\n");
+>>                 dsps_writel(musb->ctrl_base, wrp->control, (1 << wrp->reset));
+>> +               dsps_writel(musb->ctrl_base, wrp->control, BIT(3));
+
+here too. No wonder it won't work, right :-)
+
+>> I am not very familiar with that driver but my understanding was that
+>> the Mentor IRQ registeres are managed by the musb_interrupt() function
+>> which is called from the dsps_interrupt() interrupt handler.
+>>
+>> Am I right?
+
+yeah, however the way IRQs are reported is a different thing. AM335x
+introduced its own IRQ reporting scheme which, basically, reads MUSB
+generic IRQ status registers and reports on an AM335x specific
+register. No idea why TI did that for AM335x devices.
+
+>> if it is the case then it didn't fix the issue I had.
+>>
+>> I activated the following debug line:
+>>
+>> [musb_hdrc]musb_interrupt =_ "** IRQ %s usb%04x tx%04x rx%04x\012"
+>> [musb_dsps]dsps_interrupt =p "usbintr (%x) epintr(%x)\012"
+>>
+>> But I didn't get any interrupt while disconnecting the cable without any
+>> device connected on it (whereas I got an interrupt when I connected it).
+>>
+>> Note that I applied this patch instead of the "usb: musb: dsps: handle
+>> the otg_state_a_wait_vrise_timeout case", is what you had in mind ?
+
+yeah, that's what I had in mind. But your patch seems wrong :-)
+
+I tried writing a more correct version here and found 2 issues:
+
+a) bit 3 doesn't do anything :-p I cannot read IRQs from mentor's
+registers
+
+b) when setting RESET_ISOLATION bit, reads of CTRL register hang. Note
+that according to TRM, RESET_ISOLATION _must_ be set prior to a soft
+reset and cleared afterwards. But right after setting RESET_ISOLATION,
+if I try a read of CTRL, it'll hang forever.
+
+Bin, do you know about these problems ? They both seem rather alarming
+to me.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151207/a7414a16/attachment.sig>
