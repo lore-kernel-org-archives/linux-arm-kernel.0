@@ -1,13 +1,13 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 07 Dec 2015 17:50:23 +0100
-Subject: [GIT PULL] ARM: mvebu: dt for v4.5 (#1)
-Message-ID: <87mvtmcieo.fsf@free-electrons.com>
+Date: Mon, 07 Dec 2015 17:51:13 +0100
+Subject: [GIT PULL] ARM: mvebu: defconfig for v4.5 (#1)
+Message-ID: <87io4acida.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Here is the first pull request for dt for mvebu for v4.5.
+Here is the first pull request for defconfig for mvebu for v4.5.
 (This is part of a first PR series of commit already in linux-next
 since a few weeks, if everything goes well, I planned a second PR at
 the end of the week)
@@ -19,25 +19,24 @@ The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
 
 are available in the git repository at:
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.5-1
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-4.5-1
 
-for you to fetch changes up to 4627629bbb675665e902ad76ab96ac1ee5d17fd8:
+for you to fetch changes up to a0638365f6850855728a5ef5caf2aeab82a58035:
 
-  ARM: dt: mvebu: ix4-300d: Cleanup NAND partition ranges (2015-11-30 15:18:31 +0100)
-
-----------------------------------------------------------------
-mvebu dt for 4.5 (part 1)
-
-Update partition handling for ix4-300d
+  ARM: mvebu: add Kirkwood cpuidle to defconfig (2015-11-30 15:26:45 +0100)
 
 ----------------------------------------------------------------
-Sebastian Hesselbarth (3):
-      ARM: dt: mvebu: ix4-300d: remove whole flash partition
-      ARM: dt: mvebu: ix4-300d: move partitions to partition sub-node
-      ARM: dt: mvebu: ix4-300d: Cleanup NAND partition ranges
+mvebu defconfig for 4.5 (part 1)
 
- arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 72 ++++++++++++-------------
- 1 file changed, 36 insertions(+), 36 deletions(-)
+update of mvebu_v5 defconfig with the addition of cpuidle
+
+----------------------------------------------------------------
+Linus Walleij (2):
+      ARM: mvebu: update v5 defconfig
+      ARM: mvebu: add Kirkwood cpuidle to defconfig
+
+ arch/arm/configs/mvebu_v5_defconfig | 13 +++----------
+ 1 file changed, 3 insertions(+), 10 deletions(-)
 
 -- 
 Gregory Clement, Free Electrons
