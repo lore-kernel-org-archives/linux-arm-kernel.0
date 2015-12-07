@@ -1,86 +1,83 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 7 Dec 2015 16:43:57 +0000
-Subject: [PATCH v3 7/7] arm64: allow kernel Image to be loaded anywhere
- in physical memory
-In-Reply-To: <CAKv+Gu_azSnKUtuC5GgWyvEDznqGP4HR3WpUfA58BfPnFijg4A@mail.gmail.com>
-References: <1447672998-20981-1-git-send-email-ard.biesheuvel@linaro.org>
- <1447672998-20981-8-git-send-email-ard.biesheuvel@linaro.org>
- <20151207153012.GB7083@e104818-lin.cambridge.arm.com>
- <CAKv+Gu_azSnKUtuC5GgWyvEDznqGP4HR3WpUfA58BfPnFijg4A@mail.gmail.com>
-Message-ID: <20151207164356.GG7083@e104818-lin.cambridge.arm.com>
+Date: Mon, 7 Dec 2015 16:47:15 +0000
+Subject: [PATCH] drivers: dma-coherent: use ioremap_wc() for DMA_MEMORY_MAP
+In-Reply-To: <CAPcyv4iUHoQ2DRP-K-BA33mjdHwUxY2JX5M1-dP+bN-Rr6ewyQ@mail.gmail.com>
+References: <1448029226-4914-1-git-send-email-brian.starkey@arm.com>
+ <20151204105000.GD10123@e104818-lin.cambridge.arm.com>
+ <CAPcyv4gti=49v4gUVjf=4nhxBCPPM3xmq6MQ2sBoBnKQbCS5MQ@mail.gmail.com>
+ <20151204171554.GO10123@e104818-lin.cambridge.arm.com>
+ <20151207132823.GC13179@e106950-lin.cambridge.arm.com>
+ <CAPcyv4iUHoQ2DRP-K-BA33mjdHwUxY2JX5M1-dP+bN-Rr6ewyQ@mail.gmail.com>
+Message-ID: <20151207164714.GH7083@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 04:40:20PM +0100, Ard Biesheuvel wrote:
-> On 7 December 2015 at 16:30, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Mon, Nov 16, 2015 at 12:23:18PM +0100, Ard Biesheuvel wrote:
-> >> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> >> index b3b0175d7135..29a7dc5327b6 100644
-> >> --- a/arch/arm64/mm/init.c
-> >> +++ b/arch/arm64/mm/init.c
-> >> @@ -158,9 +159,55 @@ static int __init early_mem(char *p)
-> >>  }
-> >>  early_param("mem", early_mem);
+On Mon, Dec 07, 2015 at 08:19:27AM -0800, Dan Williams wrote:
+> On Mon, Dec 7, 2015 at 5:28 AM, Brian Starkey <brian.starkey@arm.com> wrote:
+> > On Fri, Dec 04, 2015 at 05:15:54PM +0000, Catalin Marinas wrote:
 > >>
-> >> +static void __init enforce_memory_limit(void)
-> >> +{
-> >> +     const phys_addr_t kbase = round_down(__pa(_text), MIN_KIMG_ALIGN);
-> >> +     u64 to_remove = memblock_phys_mem_size() - memory_limit;
-> >> +     phys_addr_t max_addr = 0;
-> >> +     struct memblock_region *r;
-> >> +
-> >> +     if (memory_limit == (phys_addr_t)ULLONG_MAX)
-> >> +             return;
-> >> +
-> >> +     /*
-> >> +      * The kernel may be high up in physical memory, so try to apply the
-> >> +      * limit below the kernel first, and only let the generic handling
-> >> +      * take over if it turns out we haven't clipped enough memory yet.
-> >> +      */
-> >> +     for_each_memblock(memory, r) {
-> >> +             if (r->base + r->size > kbase) {
-> >> +                     u64 rem = min(to_remove, kbase - r->base);
-> >> +
-> >> +                     max_addr = r->base + rem;
-> >> +                     to_remove -= rem;
-> >> +                     break;
-> >> +             }
-> >> +             if (to_remove <= r->size) {
-> >> +                     max_addr = r->base + to_remove;
-> >> +                     to_remove = 0;
-> >> +                     break;
-> >> +             }
-> >> +             to_remove -= r->size;
-> >> +     }
-> >> +
-> >> +     memblock_remove(0, max_addr);
+> >> On Fri, Dec 04, 2015 at 08:59:10AM -0800, Dan Williams wrote:
+> >>>
+> >>> On Fri, Dec 4, 2015 at 2:50 AM, Catalin Marinas <catalin.marinas@arm.com>
+> >>> wrote:
+> >>> > On Fri, Nov 20, 2015 at 02:20:26PM +0000, Brian Starkey wrote:
+> >>> >> When the DMA_MEMORY_MAP flag is used, memory which can be accessed
+> >>> >> directly should be returned, so use ioremap_wc() instead of ioremap().
+> >>> >> Also, ensure that the correct memset operation is used in
+> >>> >> dma_alloc_from_coherent() with respect to the region's flags.
+> >>> >>
+> >>> >> This fixes the below alignment fault on arm64, caused by invalid use
+> >>> >> of memset() on Device memory.
+> >>> >
+> >>> > This is indeed affecting both arm32 and arm64 systems.
+> >>> >
+> >>> >> diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+> >>> >> index 55b8398..45358d0 100644
+> >>> >> --- a/drivers/base/dma-coherent.c
+> >>> >> +++ b/drivers/base/dma-coherent.c
+> >>> >> @@ -31,7 +31,10 @@ static int dma_init_coherent_memory(phys_addr_t
+> >>> >> phys_addr, dma_addr_t device_add
+> >>> >>       if (!size)
+> >>> >>               goto out;
+> >>> >>
+> >>> >> -     mem_base = ioremap(phys_addr, size);
+> >>> >> +     if (flags & DMA_MEMORY_MAP)
+> >>> >> +             mem_base = ioremap_wc(phys_addr, size);
+> >>> >> +     else
+> >>> >> +             mem_base = ioremap(phys_addr, size);
+> >>> >
+> >>> > I wonder whether a memremap() approach for the DMA_MEMORY_MAP case
+> >>> > would
+> >>> > be better. This API was added recently by commit 92281dee825f ("arch:
+> >>> > introduce memremap()"). It only supports write-back and write-through
+> >>> > but we could add a MEMREMAP_WC flag for this case.
+> >>>
+> >>> I originally included both MEMREMAP_WC and MEMREAMP_UC as potential
+> >>> flags to this api, but ultimately decided against it.  The memremap()
+> >>> api is meant for memory that is known to have no i/o side effects.  As
+> >>> far as I can see WC and UC usages are a muddy mix of "sometimes
+> >>> there's I/O side effects, but it depends by arch and driver".  In
+> >>> other words we can't drop the "__iomem" annotation from WC and UC
+> >>> mappings by default.
 > >
-> > I don't fully get the reason for this function. Do you want to keep the
-> > kernel around in memblock? How do we guarantee that the call below
-> > wouldn't remove it anyway?
-> 
-> The problem is that the ordinary memblock_enforce_memory_limit()
-> removes memory from the top, which means it will happily remove the
-> memory that covers your kernel image if it happens to be loaded high
-> up in physical memory.
-
-We could fix the memblock_reserve() call on the kernel image but apart
-from that we don't care about memblock's knowledge of the kernel text. A
-potential problem is freeing the init memory which assumes it's present
-in the linear mapping, though we could add additional checks here as
-well. Is memblock_end_of_DRAM() adjusted to the new maximum address
-after memblock_enforce_memory_limit()?
-
-> >> +
-> >> +     if (to_remove)
-> >> +             memblock_enforce_memory_limit(memory_limit);
 > >
-> > Shouldn't this be memblock_enforce_memory_limit(to_remove)?
+> > The DMA_MEMORY_MAP flag is pretty much a statement of "no side-
+> > effects", so as Catalin says it would fit OK here. That said, if it's
+> > not possible to deprecate ioremap_wc() in the same way as
+> > ioremap_cache() then I wonder if there's even much benefit in adding
+> > it to memremap().
 > 
-> No, it takes the memory limit as input. 'to_remove + memory_limit'
-> will be exactly the remaining memory at this point.
+> I don't see a problem adding a _WC option to memremap.
+> 
+> The only difference is that it can't replace ioremap_wc.  I.e. unlike
+> _WB, and _WT case where ioremap_cache and ioremap_wt are now
+> deprecated we'd have ioremap_wc continuing to live alongside
+> memremap(..., MEMREMAP_WC).
 
-You are right, I thought it's the memory to remove.
+I think that's fine. The difference is that memory returned by
+ioremap_wc() should (in theory) only be accessed with I/O accessors
+while the range returned by memremap(MEMREMAP_WC) will be directly
+accessible.
 
 -- 
 Catalin
