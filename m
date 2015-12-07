@@ -1,65 +1,120 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 7 Dec 2015 09:35:07 +0000
-Subject: [PATCH v5] pwm-backlight: Avoid backlight flicker when probed
- from DT
-In-Reply-To: <CAGS+omCD3MLB+hf4R1aD+YZuB4SV8nu71oAm6V_bkfoE2im49A@mail.gmail.com>
-References: <1447866745-21567-1-git-send-email-p.zabel@pengutronix.de>
- <20151124162658.GJ807@x1>
- <CAGS+omCD3MLB+hf4R1aD+YZuB4SV8nu71oAm6V_bkfoE2im49A@mail.gmail.com>
-Message-ID: <20151207093507.GA3384@x1>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 07 Dec 2015 17:36:07 +0800
+Subject: [PATCH v3] acpi, apei, arm64: APEI initial support for aarch64.
+In-Reply-To: <1449162903-11203-1-git-send-email-fu.wei@linaro.org>
+References: <1449162903-11203-1-git-send-email-fu.wei@linaro.org>
+Message-ID: <56655307.2010305@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 07 Dec 2015, Daniel Kurtz wrote:
+Hi Fu Wei,
 
-> Hi Lee,
-> 
-> On Wed, Nov 25, 2015 at 12:26 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Wed, 18 Nov 2015, Philipp Zabel wrote:
-> >
-> >> If the driver is probed from the device tree, and there is a phandle
-> >> property set on it, and the enable GPIO is already configured as output,
-> >> and the backlight is currently disabled, keep it disabled.
-> >> If all these conditions are met, assume there will be some other driver
-> >> that can enable the backlight at the appropriate time.
-> >>
-> >> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> >> Reviewed-by: Christian Gmeiner <christian.gmeiner@gmail.com>
-> >> Tested-by: Heiko Stuebner <heiko@sntech.de>
-> >> ---
-> >>  - Rebased onto v4.4-rc1
-> >>  - Added Heiko's Tested-by
-> >> ---
-> >>  drivers/video/backlight/pwm_bl.c | 23 ++++++++++++++++++++++-
-> >>  1 file changed, 22 insertions(+), 1 deletion(-)
-> >
-> > Applied, thanks.
-> 
-> Hmm, where was this applied?  I do not see it in:
->  * v4.4-rc4
->  * linux-next next-20151203 (dcccebc - Add linux-next specific files
-> for 20151203)
-> 
-> Nor do I see it in any branch in:
->  * git://git.kernel.org/pub/scm/linux/kernel/git/lee/backlight
-> Is this the right git?
+On 12/04/2015 01:15 AM, fu.wei at linaro.org wrote:
+> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>
+> This commit provides APEI arch-specific bits for aarch64
+>
+> The reason for wrapping "acpi_disable_cmcff" by
+> "#if defined(__i386__) || defined(__x86_64__)" in hest.c is:
+> according to ACPI spec CMC(Corrected Machine Check) is only for IA-32
+> Architecture.
+>
+> Changelog:
+> v3: Remove "acpi_disable_cmcff" from arm64 code,
+>      and wrap it in hest.c by "#if defined(__i386__) || defined(__x86_64__)"
+>
+> v2: https://lkml.org/lkml/2015/12/2/432
+>      Rebase to latest kernel version(4.4-rc3).
+>      Move arch_apei_flush_tlb_one() to arch/arm64/kernel/acpi.c
+>
+> v1: https://lkml.org/lkml/2015/8/14/199
+>      Move arch_apei_flush_tlb_one() to arch/arm64/include/asm/apci.h.
+>      Delete arch/arm64/kernel/apei.c.
+>      Add "#ifdef CONFIG_ACPI_APEI" for "acpi_disable_cmcff".
 
-Yes, that's right.  When I say "applied", it means I applied it to my
-local repository.  I am careful not to allude to the patch being
-"pushed".  There is no guarantee when this will happen, since it
-completly depends how busy the subsystem is.  For Backlight, as the
-churn is low, the impetus for pushing is pretty low.
+The version updates is not belong here, if you need to add
+it, please place it under "---" below.
 
-It has been "pushed" now though.
+>
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> Tested-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> ---
 
-> By the way this repository has a git tag called "HEAD", which is a bit
-> annoying since every time I "git remote update" from here, git gets
-> confused until I manually delete it (git tag -d HEAD).
+...just here.
 
-Thanks for letting me know.  I have now removed this tag.
+>   arch/arm64/Kconfig            | 1 +
+>   arch/arm64/include/asm/acpi.h | 1 +
+>   arch/arm64/kernel/acpi.c      | 6 ++++++
+>   drivers/acpi/apei/hest.c      | 2 ++
+>   4 files changed, 10 insertions(+)
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 871f217..58c8992 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -3,6 +3,7 @@ config ARM64
+>   	select ACPI_CCA_REQUIRED if ACPI
+>   	select ACPI_GENERIC_GSI if ACPI
+>   	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+> +	select HAVE_ACPI_APEI if ACPI
+>   	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+>   	select ARCH_HAS_ELF_RANDOMIZE
+>   	select ARCH_HAS_GCOV_PROFILE_ALL
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index caafd63..7207f8e 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -94,6 +94,7 @@ static inline const char *acpi_get_enable_method(int cpu)
+>
+>   #ifdef	CONFIG_ACPI_APEI
+>   pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
+> +void arch_apei_flush_tlb_one(unsigned long addr);
+>   #endif
+>
+>   #endif /*_ASM_ACPI_H*/
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index d1ce8e2..7a742e7 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -32,6 +32,7 @@
+>   #ifdef CONFIG_ACPI_APEI
+>   # include <linux/efi.h>
+>   # include <asm/pgtable.h>
+> +# include <asm/tlbflush.h>
+>   #endif
+>
+>   int acpi_noirq = 1;		/* skip ACPI IRQ initialization */
+> @@ -233,4 +234,9 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
+>   		return __pgprot(PROT_NORMAL_NC);
+>   	return __pgprot(PROT_DEVICE_nGnRnE);
+>   }
+> +
+> +void arch_apei_flush_tlb_one(unsigned long addr)
+> +{
+> +	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
+> +}
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Maybe just a static inline function in arch/arm64/include/asm/acpi.h
+will be good?
+
+>   #endif
+> diff --git a/drivers/acpi/apei/hest.c b/drivers/acpi/apei/hest.c
+> index 20b3fcf..4ead747 100644
+> --- a/drivers/acpi/apei/hest.c
+> +++ b/drivers/acpi/apei/hest.c
+> @@ -232,8 +232,10 @@ void __init acpi_hest_init(void)
+>   		goto err;
+>   	}
+>
+> +#if defined(__i386__) || defined(__x86_64__)
+>   	if (!acpi_disable_cmcff)
+>   		apei_hest_parse(hest_parse_cmc, NULL);
+> +#endif
+
+How about put it together into a function, and
+introduce a stub function when no __i386__ and
+__x86_64__ case?
+
+Thanks
+Hanjun
