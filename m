@@ -1,77 +1,40 @@
-From: yankejian@huawei.com (Yankejian (Hackim Yim))
-Date: Mon, 7 Dec 2015 15:14:13 +0800
-Subject: [PATCH net-next 2/2] net: hns: enet specisies a reference to dsaf
- (config and documents)
-In-Reply-To: <23027215.8RIhViTVaB@wuerfel>
-References: <1449295856-31068-1-git-send-email-yankejian@huawei.com>
- <1449295856-31068-3-git-send-email-yankejian@huawei.com>
- <23027215.8RIhViTVaB@wuerfel>
-Message-ID: <566531C5.4050208@huawei.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 7 Dec 2015 08:21:00 +0100
+Subject: [PATCH] ARM: avoid ARCH_MMAP_RND_BITS for NOMMU
+In-Reply-To: <2874133.c4GDUf0t6t@wuerfel>
+References: <2874133.c4GDUf0t6t@wuerfel>
+Message-ID: <20151207072100.GQ5072@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Nov 27, 2015 at 03:04:03PM +0100, Arnd Bergmann wrote:
+> ARM kernels with MMU disabled fail to build because of CONFIG_ARCH_MMAP_RND_BITS:
+> 
+> kernel/built-in.o:(.data+0x754): undefined reference to `mmap_rnd_bits'
+> kernel/built-in.o:(.data+0x76c): undefined reference to `mmap_rnd_bits_min'
+> kernel/built-in.o:(.data+0x770): undefined reference to `mmap_rnd_bits_max'
+> 
+> This changes the newly added line to only select this allow for
+> MMU-enabled kernels.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 14570b3fd31a ("arm: mm: support ARCH_MMAP_RND_BITS")
+> ---
+> Found on yesterday's linux-next with ARM randconfig. The commit that
+> introduced this is currently in Andrew's tree.
+> 
+> If you don't already have a fix, please either apply this patch on top,
+> or fold it into the original patch.
+hmm, our autobuilder still fails on this one because there has been no
+next release since some time. I hope the best for tomorrow's build :-)
 
+Anyhow, it fixes the build for efm32_defconfig, so
 
-On 2015/12/6 6:19, Arnd Bergmann wrote:
-> On Saturday 05 December 2015 14:10:56 yankejian wrote:
->> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
->> index 80411b2..ecacfa4 100644
->> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
->> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
->> @@ -4,8 +4,6 @@ Required properties:
->>  - compatible: should be "hisilicon,hns-dsaf-v1" or "hisilicon,hns-dsaf-v2".
->>    "hisilicon,hns-dsaf-v1" is for hip05.
->>    "hisilicon,hns-dsaf-v2" is for Hi1610 and Hi1612.
->> -- dsa-name: dsa fabric name who provide this interface.
->> -  should be "dsafX", X is the dsaf id.
->>  - mode: dsa fabric mode string. only support one of dsaf modes like these:
->>                 "2port-64vf",
->>                 "6port-16rss",
->> @@ -26,9 +24,8 @@ Required properties:
->>  
->>  Example:
->>  
->> -dsa: dsa at c7000000 {
->> +dsaf0: dsa at c7000000 {
->>         compatible = "hisilicon,hns-dsaf-v1";
->> -       dsa_name = "dsaf0";
->>         mode = "6port-16rss";
->>         interrupt-parent = <&mbigen_dsa>;
->>         reg = <0x0 0xC0000000 0x0 0x420000
->> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
->> index 41d19be..e6a9d1c 100644
->> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
->> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
->> @@ -4,8 +4,9 @@ Required properties:
->>  - compatible: "hisilicon,hns-nic-v1" or "hisilicon,hns-nic-v2".
->>    "hisilicon,hns-nic-v1" is for hip05.
->>    "hisilicon,hns-nic-v2" is for Hi1610 and Hi1612.
->> -- ae-name: accelerator name who provides this interface,
->> -  is simply a name referring to the name of name in the accelerator node.
->> +- ae-handle: accelerator engine handle for hns,
->> +  specifies a reference to the associating hardware driver node.
->> +  see Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
->>  - port-id: is the index of port provided by DSAF (the accelerator). DSAF can
->>    connect to 8 PHYs. Port 0 to 1 are both used for adminstration purpose. They
->>    are called debug ports.
->> @@ -41,7 +42,7 @@ Example:
->>  
->>
-> This looks like an incompatible change, as you add and remove
-> required properties. Is there a way to support both the old and
-> the new style?
->
-> 	Arnd
->
-> .
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Hi Arnd,
-Thanks for your suggestions.  it must be set the same strings in dsaf node and every enet node before.
-it seems inappropriate. as Rob Herring <robh@kernel.org> 's suggestions, that would solve associating
-enet with a particular dsaf. so we discus the solution with Yisen Zhuang <yisen.zhuang@huawei.com>.
-we decide to use the new way instead of the old one.
+Best regards
+Uwe
 
-Best regards,
-yankejian
-
->
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
