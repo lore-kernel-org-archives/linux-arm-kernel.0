@@ -1,70 +1,143 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 08 Dec 2015 00:15:26 +0100
-Subject: [PATCH v2 2/3] soc: dove: add legacy support to PMU driver
-In-Reply-To: <878u569ck5.fsf@free-electrons.com>
-References: <E1a5j6Q-000879-GO@rmk-PC.arm.linux.org.uk>
- <20151207211656.GZ8644@n2100.arm.linux.org.uk>
- <878u569ck5.fsf@free-electrons.com>
-Message-ID: <3338599.KHgeg6bT8F@wuerfel>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Mon, 7 Dec 2015 15:22:42 -0800
+Subject: [PATCH v2] PCI: generic: Add support for Cavium ThunderX PCIe
+ root complexes.
+In-Reply-To: <20151207224314.GE14429@localhost>
+References: <1442967415-13595-1-git-send-email-ddaney.cavm@gmail.com>
+ <20151207224314.GE14429@localhost>
+Message-ID: <566614C2.1030705@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 December 2015 22:24:58 Gregory CLEMENT wrote:
-> Hi Russell King,
->  
->  On lun., d?c. 07 2015, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
-> > On Mon, Dec 07, 2015 at 10:09:27PM +0100, Gregory CLEMENT wrote:
-> >> Hi Russell,
-> >>  
-> >>  On lun., d?c. 07 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-> >> 
-> >> >  On lun., d?c. 07 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-> >> >
-> >> >> Hi Russell,
-> >> >>  
-> >> >>  On lun., d?c. 07 2015, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
-> >> >>
-> >> >>> Add support for legacy non-DT Dove to the PMU driver, so that we can
-> >> >>> transition the legacy support over.
-> >> >>>
-> >> >>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> >> >>
-> >> >> Applied on mvebu/soc (and fixed a conflict in drivers/soc/Makefile)
-> >> >
-> >> > Eventually I applied it on mvebu/drivers rather than mvebu/soc
-> >> 
-> >> Actually I was too optimitic. It doesn't build on mvebu/soc (based on
-> >> 4.4-rc1).
-> >> 
-> >> First pm_genpd_poweroff_unused() had been removed since bb4b72fc63d4 "PM
-> >> / Domains: Remove pm_genpd_poweroff_unused() API ".
-> >> 
-> >> Then, even by removing the call this function to go furthetr I got other
-> >> errors such as: drivers/soc/dove/pmu.c:344:46: error:
-> >> ?IRQ_DOVE_PMU_START? undeclared (first use in this function)
-> >
-> > I guess that's with Arnd's patches?  Sigh, okay, it'll have to wait yet
-> > _another_ kernel cycle then.
-> 
-> Yes I think the breakage comes from "ARM: orion: use SPARSE_IRQ
-> everywhere". With this one mach/irqs.h is no more visible by
-> drivers/soc/dove/pmu.c. But I am sure we can find a solution. It could
-> not be the first time there is such issue when moving to multiplatform.
-> 
-> Arnd, do you have some suggestion?
+On 12/07/2015 02:43 PM, Bjorn Helgaas wrote:
+> Hi David,
+>
+> On Tue, Sep 22, 2015 at 05:16:55PM -0700, David Daney wrote:
+>> From: David Daney <david.daney@cavium.com>
+>>
+>> The config space for external PCIe root complexes on some Cavium
+>> ThunderX SoCs is very similar to CAM and ECAM, but differs in the
+>> shift values that have to be applied to the bus and devfn numbers to
+>> compose that address window offset.  These root complexes also have
+>> the interesting property that there is no root bridge, so the standard
+>> manner of limiting scanning to only the first device doesn't work.  We
+>> can use the standard pci-host-generic driver if we make a minor
+>> addition to handle these differences, so we...
+>>
+>> Add a mapping function for ThunderX PCIe root complexes with a bus
+>> shift of 24 and devfn shift of 16.  Ignore accesses for devices other
+>> than the first device on the primary bus.
+>>
+>> Document the whole thing in devicetree/bindings/pci/host-generic-pci.txt
+>>
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>> Acked-by: Will Deacon <will.deacon@arm.com>
+>
+> I'm trying to sort the ThunderX stuff out.  Can you repost the current
+> stuff so we can see it all together?
+>
 
-It should be enough to add
+Yes, I will post something soon.
 
-#ifdef ARCH_DOVE
-#include <mach/irqs.h>
-#endif
+Let's not merge this version.  There are more improvements that I want 
+to make.  We are working through how to cleanly implement the use of 
+both pci-host-generic when using OF device tree as well as the ACPI root 
+complex code when ACPI is in use.  Ideally the same config accessor 
+functions would be used in both cases.
 
-in the file to avoid the error, and that can be done with or without
-my "ARM: orion: use SPARSE_IRQ everywhere" patch.
+Thanks for the follow up,
+David Daney
 
-Alternatively, we can avoid the header dependency in some way, e.g.
-by passing the interrupt range (or just the first IRQ) as a resource
-or through dove_pmu_domain_initdata.
 
-	Arnd
+
+> Thanks,
+>    Bjorn
+>
+>> ---
+>>
+>> This patch depends on:
+>> https://lkml.org/lkml/2015/9/22/1189
+>>
+>> Changes from v1:
+>>
+>>    - Added Acked-by:
+>>
+>>    - Removed two patches from the set that were somewhat unrelated.
+>>
+>>   .../devicetree/bindings/pci/host-generic-pci.txt   |  8 +++---
+>>   drivers/pci/host/pci-host-generic.c                | 29 ++++++++++++++++++++++
+>>   2 files changed, 34 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/pci/host-generic-pci.txt b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+>> index 105a968..a5aed0f 100644
+>> --- a/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+>> +++ b/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+>> @@ -14,9 +14,11 @@ tree bindings communicated in pci.txt:
+>>
+>>   Properties of the host controller node:
+>>
+>> -- compatible     : Must be "pci-host-cam-generic" or "pci-host-ecam-generic"
+>> -                   depending on the layout of configuration space (CAM vs
+>> -                   ECAM respectively).
+>> +- compatible     : One of the following with bus:devfn:reg mapped to the
+>> +                   PCI config space address window in the bit positions shown:
+>> +                   "pci-host-cam-generic" -- 'CAM'  bits 16:8:0
+>> +                   "pci-host-ecam-generic" -- 'ECAM'  bits 20:12:0
+>> +                   "cavium,pci-host-thunder-pem" --  bits 24:16:0
+>>
+>>   - device_type    : Must be "pci".
+>>
+>> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+>> index b163fdc..853f6f6 100644
+>> --- a/drivers/pci/host/pci-host-generic.c
+>> +++ b/drivers/pci/host/pci-host-generic.c
+>> @@ -91,6 +91,32 @@ static struct gen_pci_cfg_bus_ops gen_pci_cfg_ecam_bus_ops = {
+>>   	}
+>>   };
+>>
+>> +static void __iomem *gen_pci_map_cfg_bus_thunder_pem(struct pci_bus *bus,
+>> +						     unsigned int devfn,
+>> +						     int where)
+>> +{
+>> +	struct gen_pci *pci = bus->sysdata;
+>> +	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
+>> +
+>> +	/*
+>> +	 * Thunder PEM is a PCIe RC, but without a root bridge.  On
+>> +	 * the primary bus, ignore accesses for devices other than
+>> +	 * the first device.
+>> +	 */
+>> +	if (idx == 0 && (devfn & ~7u))
+>> +		return NULL;
+>> +	return pci->cfg.win[idx] + ((devfn << 16) | where);
+>> +}
+>> +
+>> +static struct gen_pci_cfg_bus_ops gen_pci_cfg_thunder_pem_bus_ops = {
+>> +	.bus_shift	= 24,
+>> +	.ops		= {
+>> +		.map_bus	= gen_pci_map_cfg_bus_thunder_pem,
+>> +		.read		= pci_generic_config_read,
+>> +		.write		= pci_generic_config_write,
+>> +	}
+>> +};
+>> +
+>>   static const struct of_device_id gen_pci_of_match[] = {
+>>   	{ .compatible = "pci-host-cam-generic",
+>>   	  .data = &gen_pci_cfg_cam_bus_ops },
+>> @@ -98,6 +124,9 @@ static const struct of_device_id gen_pci_of_match[] = {
+>>   	{ .compatible = "pci-host-ecam-generic",
+>>   	  .data = &gen_pci_cfg_ecam_bus_ops },
+>>
+>> +	{ .compatible = "cavium,pci-host-thunder-pem",
+>> +	  .data = &gen_pci_cfg_thunder_pem_bus_ops },
+>> +
+>>   	{ },
+>>   };
+>>   MODULE_DEVICE_TABLE(of, gen_pci_of_match);
+>> --
+>> 1.9.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
