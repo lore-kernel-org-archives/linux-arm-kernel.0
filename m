@@ -1,52 +1,105 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 7 Dec 2015 19:37:55 +0530
-Subject: [PATCH] kexec: Add --lite option
-In-Reply-To: <56658696.6070103@arm.com>
-References: <1445469125.30908.105.camel@infradead.org>
- <20151022031718.GB11227@dhcp-129-115.nay.redhat.com>
- <20151022125012.GB20847@redhat.com>
- <1445540891.30908.144.camel@infradead.org>
- <1446703011.12676.83.camel@freescale.com>
- <20151207114547.GE16406@dhcppc13.redhat.com>
- <20151207114839.GF16406@dhcppc13.redhat.com>
- <56658696.6070103@arm.com>
-Message-ID: <20151207140755.GG16406@dhcppc13.redhat.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Mon, 7 Dec 2015 15:09:09 +0100
+Subject: [PATCH linux-next 0/5] mtd: spi-nor: add driver for Atmel QSPI
+ controller
+Message-ID: <cover.1449494420.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+Hi all,
 
-Thanks for the reply.
+this series of patches adds support to the Atmel QSPI controller available
+on sama5d2 SoCs. It was tested on a sama5d2 xplained ultra board with a 
+Micron n25q128a13 QSPI memory and a at25df321a SPI memory.
 
-On 07/12/2015:01:16:06 PM, James Morse wrote:
-> Hi Pratyush,
-> 
-> On 07/12/15 11:48, Pratyush Anand wrote:
-> >> 1) When we execute kexec() system call in first kernel, at that time it
-> >> calculates sha256 on all the binaries [1]. It take almost un-noticeable time
-> >> (less than a sec) there.
-> >>
-> >> 2) When purgatory is executed then it re-calculates sha256 using same routines
-> >> [2] on same binary data as that of case (1). But, now it takes 10-20 sec
-> >> (depending of size of binaries)?
-> >>
-> >> Why did not it take same time with O2 + D-cache enabled? I think, we should be
-> >> able to achieve same time in second case as well. What is missing?
-> 
-> I haven't benchmarked this, but:
-> 
-> util_lib/sha256.c contains calls out to memcpy().
-> In your case 1, this will use the glibc version. In case 2, it will use
-> the version implemented in purgatory/string.c, which is a byte-by-byte copy.
-> 
+In order to use the Micron memory in its Quad SPI mode, the spi-nor
+framework needed to be patched to fix the support of Quad/Dual SPI
+protocols with some memory manufacturers such as Spansion, Micron and
+Macronix. There are many comments in the source code to explain the
+implementation choices based on the datasheets from memory manufacturers.
 
-Yes, I agree that byte copy is too slow. But, memcpy() in sha256_update() will
-copy only few bytes (I think max 126 bytes). Most of the data will be processed
-using loop while( length >= 64 ){}, where we do not have any memcpy.So, I do not
-think that this would be causing such a difference.
 
-Could it be the case that I am not using perfect memory attributes while setting
-up identity mapping and enabling D-cache. My implementation is here:
-https://github.com/pratyushanand/kexec-tools/commit/8efdbc56b52f99a8a074edd0ddc519d7b68be82f
+This series was based and tested on linux-next-20151207
 
-~Pratyush
+1 - Atmel QSPI + Micron n25q128a13 (atmel-quadspi.c driver)
+
+SPI 1-1-1: This mode was tested replacing SPI_NOR_QUAD by SPI_NOR_FAST as
+           argument to spi_nor_scan() called from atmel_qspi_probe().
+
+SPI 1-1-4: Bootloaders (at91bootstrap/uboot) don't enable the Quad SPI
+           mode of the Micron memory. When probed from Linux, the memory
+           uses its Extended SPI mode and replies to the regular Read ID
+           (0x9f) command.
+
+SPI 4-4-4: The romcode enabled the Quad SPI mode the of Micron memory
+           before loading the at91bootstrap. When probed from Linux, the
+           memory uses its Quad SPI mode and no longer replies to the
+           regular Read ID (0x9f) command but instead to the Read ID
+           Multiple I/O (0xaf) command. The memory expects ALL commands
+           to use the SPI 4-4-4 protocol.
+
+2 - Atmel SPI + at25df321a (m25p80.c driver)
+
+SPI 1-1-1: tested with the m25p80 driver for non regression purpose.
+
+
+mtd_speedtest was run with the Atmel QSPI controller + Micron memory to
+compare the performances of normal and quad SPI protocols. The SPI
+bus clock was configured to 83 MHz.
+
+1 - Fast Read 1-1-1
+
+mtd_speedtest: testing eraseblock write speed
+mtd_speedtest: eraseblock read speed is 9319 KiB/s
+[...]
+mtd_speedtest: testing page read speed
+mtd_speedtest: page read speed is 6649 KiB/s
+[...]
+mtd_speedtest: testing 2 page read speed
+mtd_speedtest: 2 page read speed is 7757 KiB/s
+
+2 - Fast Read 1-1-4
+
+mtd_speedtest: testing eraseblock read speed
+mtd_speedtest: eraseblock read speed is 30117 KiB/s
+[...]
+mtd_speedtest: testing page read speed
+mtd_speedtest: page read speed is 13096 KiB/s
+[...]
+mtd_speedtest: testing 2 page read speed
+mtd_speedtest: 2 page read speed is 18224 KiB/s
+
+
+So the performance improvements are:
+eraseblock read speed (65536 bytes) : +223%
+page read speed (512 bytes)         :  +97%
+2 page read speed (1024 bytes)      : +135%
+
+
+Best Regards,
+
+Cyrille
+
+Cyrille Pitchen (5):
+  mtd: spi-nor: properly detect the memory when it boots in Quad or Dual
+    mode
+  mtd: spi-nor: fix Quad SPI mode support for Spansion, Micron and
+    Macronix
+  mtd: m25p80: add support of dual and quad spi protocols to all
+    commands
+  Documentation: atmel-quadspi: add binding file for Atmel QSPI driver
+  mtd: atmel-quadspi: add driver for Atmel QSPI controller
+
+ .../devicetree/bindings/mtd/atmel-quadspi.txt      |  32 +
+ drivers/mtd/devices/m25p80.c                       | 233 +++++-
+ drivers/mtd/spi-nor/Kconfig                        |   8 +
+ drivers/mtd/spi-nor/Makefile                       |   3 +-
+ drivers/mtd/spi-nor/atmel-quadspi.c                | 877 +++++++++++++++++++++
+ drivers/mtd/spi-nor/spi-nor.c                      | 835 +++++++++++++++++---
+ include/linux/mtd/spi-nor.h                        |  38 +-
+ 7 files changed, 1880 insertions(+), 146 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+ create mode 100644 drivers/mtd/spi-nor/atmel-quadspi.c
+
+-- 
+1.8.2.2
