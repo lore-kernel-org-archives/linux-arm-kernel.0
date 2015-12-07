@@ -1,38 +1,86 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 07 Dec 2015 18:38:44 +0900
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable fan,
- sensors and audio for Odroid XU3
-In-Reply-To: <3286190.bAhobgE2la@wuerfel>
-References: <1449449994-10110-1-git-send-email-k.kozlowski@samsung.com>
- <3286190.bAhobgE2la@wuerfel>
-Message-ID: <566553A4.6080106@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 7 Dec 2015 09:40:20 +0000
+Subject: [PATCH v7 2/6] mfd: syscon: add a DT property to set value width
+In-Reply-To: <1448899191-13891-3-git-send-email-damien.riegel@savoirfairelinux.com>
+References: <1448899191-13891-1-git-send-email-damien.riegel@savoirfairelinux.com>
+ <1448899191-13891-3-git-send-email-damien.riegel@savoirfairelinux.com>
+Message-ID: <20151207094020.GF3384@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.12.2015 18:14, Arnd Bergmann wrote:
-> On Monday 07 December 2015 09:59:54 Krzysztof Kozlowski wrote:
->> For Odroid XU3-family enable the:
->>  - PWM fan (to control the CPU fan using thermal subsystem),
->>  - TI INA231 sensors (provide power measurements of big.LITTLE cores,
->>    DRAM and GPU),
->>  - Samsung sound (for Odroid XU3 and Snow as well).
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>
+On Mon, 30 Nov 2015, Damien Riegel wrote:
+
+> Currently syscon has a fixed configuration of 32 bits for register and
+> values widths. In some cases, it would be desirable to be able to
+> customize the value width.
 > 
-> Looks good. Do you have a samsung/defconfig branch already that you
-> can put this into, or should be pick it up into arm-soc directly?
+> For example, certain boards (like the ones manufactured by Technologic
+> Systems) have a FPGA that is memory-mapped, but its registers are only
+> 16-bit wide.
 > 
-> My preference is the former, but it would be a bit silly if that
-> is the only samsung defconfig change we need.
+> This patch adds an optional "reg-io-width" DT binding for syscon that
+> allows to change the width for the data bus (i.e. val_bits). If this
+> property is provided, it will also set the register stride to
+> reg-io-width's value. If not provided, the default configuration is
+> used.
+> 
+> Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+> ---
+>  Documentation/devicetree/bindings/mfd/syscon.txt |  4 ++++
+>  drivers/mfd/syscon.c                             | 13 +++++++++++++
+>  2 files changed, 17 insertions(+)
 
-I had a couple of defconfig patches in my queue but I sent them last
-week to Kukjin in pull request. He didn't pull it yet. Maybe he could
-apply this patch after pulling?
+Applied, thanks.
 
-Anyway we can wait for a few days to sort it out. If I don't have
-another defconfig patches then I will remind myself with applying it to
-arm-soc.
+> diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
+> index fe8150b..408f768 100644
+> --- a/Documentation/devicetree/bindings/mfd/syscon.txt
+> +++ b/Documentation/devicetree/bindings/mfd/syscon.txt
+> @@ -13,6 +13,10 @@ Required properties:
+>  - compatible: Should contain "syscon".
+>  - reg: the register region can be accessed from syscon
+>  
+> +Optional property:
+> +- reg-io-width: the size (in bytes) of the IO accesses that should be
+> +  performed on the device.
+> +
+>  Examples:
+>  gpr: iomuxc-gpr at 020e0000 {
+>  	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
+> diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
+> index 176bf0f..b7aabee 100644
+> --- a/drivers/mfd/syscon.c
+> +++ b/drivers/mfd/syscon.c
+> @@ -47,6 +47,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
+>  	struct syscon *syscon;
+>  	struct regmap *regmap;
+>  	void __iomem *base;
+> +	u32 reg_io_width;
+>  	int ret;
+>  	struct regmap_config syscon_config = syscon_regmap_config;
+>  
+> @@ -69,6 +70,18 @@ static struct syscon *of_syscon_register(struct device_node *np)
+>  	 else if (of_property_read_bool(np, "little-endian"))
+>  		syscon_config.val_format_endian = REGMAP_ENDIAN_LITTLE;
+>  
+> +	/*
+> +	 * search for reg-io-width property in DT. If it is not provided,
+> +	 * default to 4 bytes. regmap_init_mmio will return an error if values
+> +	 * are invalid so there is no need to check them here.
+> +	 */
+> +	ret = of_property_read_u32(np, "reg-io-width", &reg_io_width);
+> +	if (ret)
+> +		reg_io_width = 4;
+> +
+> +	syscon_config.reg_stride = reg_io_width;
+> +	syscon_config.val_bits = reg_io_width * 8;
+> +
+>  	regmap = regmap_init_mmio(NULL, base, &syscon_config);
+>  	if (IS_ERR(regmap)) {
+>  		pr_err("regmap init failed\n");
 
-Best regards,
-Krzysztof
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
