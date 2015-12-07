@@ -1,54 +1,73 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  7 Dec 2015 11:50:21 +0000
-Subject: [PATCH 08/19] mfd: adp5520: Some trivial 'no space before tab' fixes
+Date: Mon,  7 Dec 2015 11:50:20 +0000
+Subject: [PATCH 07/19] mfd: ab8500-sysctrl: Fix Constify,
+ printk => pr_info and formatting issues
 In-Reply-To: <1449489032-14374-1-git-send-email-lee.jones@linaro.org>
 References: <1449489032-14374-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1449489032-14374-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1449489032-14374-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WARNING: please, no space before tabs
-+ * ^IMike Rapoport <mike@compulab.co.il>$
+WARNING: char * array declaration might be better as static const
++       static char *pss[] = {"ab8500_ac", "pm2301", "ab8500_usb"};
 
-WARNING: please, no space before tabs
-+ * ^IEric Miao <eric.miao@marvell.com>$
+WARNING: Prefer [subsystem eg: netdev]_info([subsystem]dev, ... then dev_info(dev, ... then
+ pr_info(...  to printk(KERN_INFO ...
++                       printk(KERN_INFO
 
-WARNING: please, no space before tabs
-+^I.id_table ^I= adp5520_id,$
+WARNING: quoted string split across lines
++                              "Charger \"%s\" is connected with known battery."
++                              " Rebooting.\n",
 
-total: 0 errors, 3 warnings, 365 lines checked
+WARNING: quoted string split across lines
++                                       "unable to set sysClkReq%dRfClkBuf: "
++                                       "%d\n", j + 1, ret);
 
-Cc: Michael Hennerich <michael.hennerich@analog.com>
+total: 0 errors, 4 warnings, 199 lines checked
+
+Cc: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/adp5520.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/mfd/ab8500-sysctrl.c | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/mfd/adp5520.c b/drivers/mfd/adp5520.c
-index ae88654..d817f20 100644
---- a/drivers/mfd/adp5520.c
-+++ b/drivers/mfd/adp5520.c
-@@ -9,10 +9,10 @@
-  *
-  * Derived from da903x:
-  * Copyright (C) 2008 Compulab, Ltd.
-- * 	Mike Rapoport <mike@compulab.co.il>
-+ *	Mike Rapoport <mike@compulab.co.il>
-  *
-  * Copyright (C) 2006-2008 Marvell International Ltd.
-- * 	Eric Miao <eric.miao@marvell.com>
-+ *	Eric Miao <eric.miao@marvell.com>
-  *
-  * Licensed under the GPL-2 or later.
-  */
-@@ -355,7 +355,7 @@ static struct i2c_driver adp5520_driver = {
- 	},
- 	.probe		= adp5520_probe,
- 	.remove		= adp5520_remove,
--	.id_table 	= adp5520_id,
-+	.id_table	= adp5520_id,
- };
- 
- module_i2c_driver(adp5520_driver);
+diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
+index 0d18256..b9f0010 100644
+--- a/drivers/mfd/ab8500-sysctrl.c
++++ b/drivers/mfd/ab8500-sysctrl.c
+@@ -27,7 +27,7 @@ static void ab8500_power_off(void)
+ {
+ 	sigset_t old;
+ 	sigset_t all;
+-	static char *pss[] = {"ab8500_ac", "pm2301", "ab8500_usb"};
++	static const char * const pss[] = {"ab8500_ac", "pm2301", "ab8500_usb"};
+ 	int i;
+ 	bool charger_present = false;
+ 	union power_supply_propval val;
+@@ -68,10 +68,9 @@ static void ab8500_power_off(void)
+ 		ret = power_supply_get_property(psy,
+ 				POWER_SUPPLY_PROP_TECHNOLOGY, &val);
+ 		if (!ret && val.intval != POWER_SUPPLY_TECHNOLOGY_UNKNOWN) {
+-			printk(KERN_INFO
+-			       "Charger \"%s\" is connected with known battery."
+-			       " Rebooting.\n",
+-			       pss[i]);
++			pr_info("Charger '%s' is connected with known battery",
++				pss[i]);
++			pr_info(" - Rebooting.\n");
+ 			machine_restart("charging");
+ 		}
+ 		power_supply_put(psy);
+@@ -161,8 +160,8 @@ static int ab8500_sysctrl_probe(struct platform_device *pdev)
+ 					pdata->initial_req_buf_config[j]);
+ 			if (ret < 0) {
+ 				dev_err(&pdev->dev,
+-					"unable to set sysClkReq%dRfClkBuf: "
+-					"%d\n", j + 1, ret);
++					"Can't set sysClkReq%dRfClkBuf: %d\n",
++					j + 1, ret);
+ 			}
+ 		}
+ 	}
 -- 
 1.9.1
