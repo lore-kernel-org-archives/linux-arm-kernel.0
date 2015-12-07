@@ -1,41 +1,73 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 7 Dec 2015 13:48:31 +0000
-Subject: [PATCH 2/5] iommu/io-pgtable: Indicate granule for TLB maintenance
-In-Reply-To: <56657714.50504@arm.com>
-References: <cover.1449246988.git.robin.murphy@arm.com>
- <67223d4b1ff57f3f46e8c3102e663a063a50a7f7.1449246988.git.robin.murphy@arm.com>
- <20151207110804.GA23430@arm.com> <56657714.50504@arm.com>
-Message-ID: <20151207134831.GF23430@arm.com>
+From: bintian.wang@huawei.com (Bintian)
+Date: Mon, 7 Dec 2015 21:48:38 +0800
+Subject: [PATCH RESEND net-next 3/3] arm64: hip05-d02: Document devicetree
+ bindings for Hisilicon D02 Board
+In-Reply-To: <20151207131617.GA25170@rob-hp-laptop>
+References: <1449302088-53037-1-git-send-email-yankejian@huawei.com>
+ <1449302088-53037-4-git-send-email-yankejian@huawei.com>
+ <20151207131617.GA25170@rob-hp-laptop>
+Message-ID: <56658E36.40702@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 12:09:56PM +0000, Robin Murphy wrote:
-> On 07/12/15 11:08, Will Deacon wrote:
-> [...]
-> >>+#define ARM_LPAE_GRANULE(d)		(1UL << (d)->pg_shift)
-> >>+
-> >>  #define ARM_LPAE_PAGES_PER_PGD(d)					\
-> >>-	DIV_ROUND_UP((d)->pgd_size, 1UL << (d)->pg_shift)
-> >>+	DIV_ROUND_UP((d)->pgd_size, ARM_LPAE_GRANULE(d))
-> >>
-> >>  /*
-> >>   * Calculate the index at level l used to map virtual address a using the
-> >>@@ -169,7 +171,7 @@
-> >>  /* IOPTE accessors */
-> >>  #define iopte_deref(pte,d)					\
-> >>  	(__va((pte) & ((1ULL << ARM_LPAE_MAX_ADDR_BITS) - 1)	\
-> >>-	& ~((1ULL << (d)->pg_shift) - 1)))
-> >>+	& ~(ARM_LPAE_GRANULE(d) - 1)))
-> >
-> >Do we run the risk of truncating the VA on 32-bit ARM here?
-> 
-> Indeed, in all honesty I'd missed that, but since __va is going to truncate
-> it to a 32-bit void * anyway, doing it earlier in the expression actually
-> seems to result in better code - with iopte_deref wrapped like so to make it
-> easier to pick out:
+On 2015/12/7 21:16, Rob Herring wrote:
+> On Sat, Dec 05, 2015 at 03:54:48PM +0800, yankejian wrote:
+>> This patch adds documentation for the devicetree bindings used by the
+>> DT files of Hisilicon Hip05-D02 development board.
+>>
+>> Signed-off-by: yankejian <yankejian@huawei.com>
+You may need to configure as  "Kejian Yan <yankejian@huawei.com>"     :)
 
-Gah, I meant PA not VA, sorry. The PA is 40-bit, but with ARM_LPAE_GRANULE
-using unsigned long, we drop the top 8 bits of the output address field
-in the pte.
+BR,
 
-Will
+Bintian
+>> ---
+>>   .../devicetree/bindings/arm/hisilicon/hisilicon.txt      | 16 ++++++++++++++++
+>>   1 file changed, 16 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>> index 6ac7c00..5318d78 100644
+>> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>> @@ -187,6 +187,22 @@ Example:
+>>   		reg = <0xb0000000 0x10000>;
+>>   	};
+>>   
+>> +Hisilicon HiP05 PERISUB system controller
+>> +
+>> +Required properties:
+>> +- compatible : "hisilicon,peri-c-subctrl", "syscon";
+> This should be more specific and have the SOC name in it.
+>
+>> +- reg : Register address and size
+>> +
+>> +The HiP05 PERISUB system controller is shared by peripheral controllers in
+>> +HiP05 Soc to implement some basic configurations. the peripheral
+>> + controllers include mdio, ddr, iic, uart, timer and so on.
+>> +
+>> +Example:
+>> +	/* for HiP05 PCIe-SAS system */
+>> +	pcie_sas: system_controller at 0xb0000000 {
+>> +		compatible = "hisilicon,pcie-sas-subctrl", "syscon";
+> The example doesn't match.
+>
+>> +		reg = <0xb0000000 0x10000>;
+>> +	};
+>>   -----------------------------------------------------------------------
+>>   Hisilicon CPU controller
+>>   
+>> -- 
+>> 1.9.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+>
+> .
+>
