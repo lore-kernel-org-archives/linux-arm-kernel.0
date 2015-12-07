@@ -1,64 +1,150 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Dec 2015 15:01:43 +0000
-Subject: [PATCH 0/4] Component helper updates
-In-Reply-To: <20151123160210.GR8644@n2100.arm.linux.org.uk>
-References: <20151123160210.GR8644@n2100.arm.linux.org.uk>
-Message-ID: <20151207150143.GR8644@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 07 Dec 2015 15:05:10 +0000
+Subject: [PATCH v5 02/21] KVM: ARM64: Define PMU data structure for each
+ vcpu
+In-Reply-To: <1449123091-20252-3-git-send-email-zhaoshenglong@huawei.com>
+References: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
+ <1449123091-20252-3-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <5665A026.8000802@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Given the lack of interest in these patches, I've put these into my
-"for-next" branch so that they can get some exposure in linux-next.
+On 03/12/15 06:11, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Here we plan to support virtual PMU for guest by full software
+> emulation, so define some basic structs and functions preparing for
+> futher steps. Define struct kvm_pmc for performance monitor counter and
+> struct kvm_pmu for performance monitor unit for each vcpu. According to
+> ARMv8 spec, the PMU contains at most 32(ARMV8_MAX_COUNTERS) counters.
+> 
+> Since this only supports ARM64 (or PMUv3), add a separate config symbol
+> for it.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/include/asm/kvm_host.h |  2 ++
+>  arch/arm64/kvm/Kconfig            |  8 ++++++++
+>  include/kvm/arm_pmu.h             | 41 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 51 insertions(+)
+>  create mode 100644 include/kvm/arm_pmu.h
+> 
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index a35ce72..42e15bb 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -37,6 +37,7 @@
+>  
+>  #include <kvm/arm_vgic.h>
+>  #include <kvm/arm_arch_timer.h>
+> +#include <kvm/arm_pmu.h>
+>  
+>  #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
+>  
+> @@ -132,6 +133,7 @@ struct kvm_vcpu_arch {
+>  	/* VGIC state */
+>  	struct vgic_cpu vgic_cpu;
+>  	struct arch_timer_cpu timer_cpu;
+> +	struct kvm_pmu pmu;
+>  
+>  	/*
+>  	 * Anything that is not used directly from assembly code goes
+> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+> index a5272c0..66da9a2 100644
+> --- a/arch/arm64/kvm/Kconfig
+> +++ b/arch/arm64/kvm/Kconfig
+> @@ -36,6 +36,7 @@ config KVM
+>  	select HAVE_KVM_EVENTFD
+>  	select HAVE_KVM_IRQFD
+>  	select KVM_ARM_VGIC_V3
+> +	select KVM_ARM_PMU
+>  	---help---
+>  	  Support hosting virtualized guest machines.
+>  	  We don't support KVM with 16K page tables yet, due to the multiple
+> @@ -48,6 +49,13 @@ config KVM_ARM_HOST
+>  	---help---
+>  	  Provides host support for ARM processors.
+>  
+> +config KVM_ARM_PMU
+> +	bool
+> +	depends on KVM_ARM_HOST && HW_PERF_EVENTS
+> +	---help---
+> +	  Adds support for a virtual Performance Monitoring Unit (PMU) in
+> +	  virtual machines.
+> +
+>  source drivers/vhost/Kconfig
+>  
+>  endif # VIRTUALIZATION
+> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+> new file mode 100644
+> index 0000000..0c13470
+> --- /dev/null
+> +++ b/include/kvm/arm_pmu.h
+> @@ -0,0 +1,41 @@
+> +/*
+> + * Copyright (C) 2015 Linaro Ltd.
+> + * Author: Shannon Zhao <shannon.zhao@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef __ASM_ARM_KVM_PMU_H
+> +#define __ASM_ARM_KVM_PMU_H
+> +
+> +#include <linux/perf_event.h>
+> +#ifdef CONFIG_KVM_ARM_PMU
+> +#include <asm/pmu.h>
+> +#endif
+> +
+> +struct kvm_pmc {
+> +	u8 idx;/* index into the pmu->pmc array */
+> +	struct perf_event *perf_event;
+> +	struct kvm_vcpu *vcpu;
 
-On Mon, Nov 23, 2015 at 04:02:11PM +0000, Russell King - ARM Linux wrote:
-> Greg,
-> 
-> These four patches update the component helper by:
-> * Removing the legacy matching code with the .add_components method
->   in the master's operation structure.  Nothing in -rc1 appears to be
->   using the legacy functions or method, according to my git greps.
-> 
-> * A slight code reorganisation which results in slightly easier to read
->   code.
-> 
-> * Switch to tracking components via an array rather than a list, which
->   allows us to keep the matching and matched components together, and
->   more importantly allows us to reduce the amount of matching - with
->   this structure, we can incrementally add the component devices as
->   they become available, rather than re-running the list of matches
->   each time something changes.
-> 
-> * Fix the lack of match release functionality, which Liviu Dudau
->   reminded me was missing.  This allows people who want to pass
->   device_node structures in to (correctly) retain the reference to the
->   node, and drop the node when the need to do matches is no longer
->   required.
-> 
-> The first three patches have been well tested over the last year as I've
-> had them in my tree that long.  I hadn't considered them important enough
-> to send as they're only removing and cleaning up functionality.  However,
-> with the need to fix something, it now makes sense to get them merged.
-> 
-> The last patch has been tested with etnaviv DRM to prove that the match
-> release works by unloading the module.  On unload, the release function
-> is correctly called.
-> 
-> This is intended for the next merge window.  Please apply.
-> 
->  drivers/base/component.c  | 281 ++++++++++++++++++++++++----------------------
->  include/linux/component.h |  33 ++++--
->  2 files changed, 167 insertions(+), 147 deletions(-)
-> 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Why do you need this? If you have the pointer to a kvm_pmc structure, it
+is very cheap to compute the address of the vcpu:
 
+static inline kvm_vcpu *kvm_pmc_to_vcpu(struct kvm_pmc *pmc)
+{
+	struct kvm_pmu *pmu;
+	pmc -= pmc->idx;
+	pmu = container_of(pmc, struct kvm_pmu, pmc);
+	return container_of(pmu, struct kvm_vcpu, pmu);
+}
+
+All of which the compiler will happily optimize for you.
+
+> +	u64 bitmask;
+
+Looking at the code in pmu.c, there seem to be some confusion between
+u64 and unsigned long (see kvm_pmu_get_counter_value). Please make sure
+this is uniform.
+
+> +};
+> +
+> +struct kvm_pmu {
+> +#ifdef CONFIG_KVM_ARM_PMU
+> +	/* PMU IRQ Number per VCPU */
+> +	int irq_num;
+> +	struct kvm_pmc pmc[ARMV8_MAX_COUNTERS];
+> +#endif
+> +};
+> +
+> +#endif
+> 
+
+Thanks,
+
+	M.
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Jazz is not dead. It just smells funny...
