@@ -1,56 +1,48 @@
 From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Mon, 7 Dec 2015 12:09:35 +0800
-Subject: [PATCH] arm64: dts: mt8173: Add nor flash node
-In-Reply-To: <1449460394-31601-1-git-send-email-bayi.cheng@mediatek.com>
-References: <1449460394-31601-1-git-send-email-bayi.cheng@mediatek.com>
-Message-ID: <CAGS+omCuB3VGcPk3fezakdVDnFB3GAmMD+wZ_6nGdv+uHoB40g@mail.gmail.com>
+Date: Mon, 7 Dec 2015 12:20:26 +0800
+Subject: [PATCH v5] pwm-backlight: Avoid backlight flicker when probed
+ from DT
+In-Reply-To: <20151124162658.GJ807@x1>
+References: <1447866745-21567-1-git-send-email-p.zabel@pengutronix.de>
+ <20151124162658.GJ807@x1>
+Message-ID: <CAGS+omCD3MLB+hf4R1aD+YZuB4SV8nu71oAm6V_bkfoE2im49A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bayi,
+Hi Lee,
 
-On Mon, Dec 7, 2015 at 11:53 AM, Bayi Cheng <bayi.cheng@mediatek.com> wrote:
-> Add Mediatek nor flash node
+On Wed, Nov 25, 2015 at 12:26 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Wed, 18 Nov 2015, Philipp Zabel wrote:
 >
-> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
-> Acked-by: Brian Norris <computersforpeace@gmail.com>
-> ---
-> Previous version of this patch is
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386005.html
-> Drop flash node from mt8173.dtsi accroding review comment
+>> If the driver is probed from the device tree, and there is a phandle
+>> property set on it, and the enable GPIO is already configured as output,
+>> and the backlight is currently disabled, keep it disabled.
+>> If all these conditions are met, assume there will be some other driver
+>> that can enable the backlight at the appropriate time.
+>>
+>> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+>> Reviewed-by: Christian Gmeiner <christian.gmeiner@gmail.com>
+>> Tested-by: Heiko Stuebner <heiko@sntech.de>
+>> ---
+>>  - Rebased onto v4.4-rc1
+>>  - Added Heiko's Tested-by
+>> ---
+>>  drivers/video/backlight/pwm_bl.c | 23 ++++++++++++++++++++++-
+>>  1 file changed, 22 insertions(+), 1 deletion(-)
+>
+> Applied, thanks.
 
-Is there a flash on mt8173-evb that can be accessed by the nor_flash ?
-If so, can you include flash at 0 node in the mt8173-evb.dts.
+Hmm, where was this applied?  I do not see it in:
+ * v4.4-rc4
+ * linux-next next-20151203 (dcccebc - Add linux-next specific files
+for 20151203)
 
+Nor do I see it in any branch in:
+ * git://git.kernel.org/pub/scm/linux/kernel/git/lee/backlight
+Is this the right git?
+By the way this repository has a git tag called "HEAD", which is a bit
+annoying since every time I "git remote update" from here, git gets
+confused until I manually delete it (git tag -d HEAD).
+
+Thanks,
 -Dan
-
->
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 11 +++++++++++
->  1 file changed, 11 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index 4dd5f93..af08e97 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -387,6 +387,17 @@
->                         status = "disabled";
->                 };
->
-> +               nor_flash: spi at 1100d000 {
-> +                       compatible = "mediatek,mt8173-nor";
-> +                       reg = <0 0x1100d000 0 0xe0>;
-> +                       clocks = <&pericfg CLK_PERI_SPI>,
-> +                                <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
-> +                       clock-names = "spi", "sf";
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       status = "disabled";
-> +               };
-> +
->                 i2c3: i2c at 11010000 {
->                         compatible = "mediatek,mt8173-i2c";
->                         reg = <0 0x11010000 0 0x70>,
-> --
-> 1.8.1.1.dirty
->
