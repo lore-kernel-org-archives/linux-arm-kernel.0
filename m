@@ -1,132 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 7 Dec 2015 10:36:22 +0100
-Subject: [PATCH v5] clk: sunxi: Add CLK_OF_DECLARE support for
- sun8i-a23-apb0-clk driver
-In-Reply-To: <1449126330-21595-1-git-send-email-wens@csie.org>
-References: <1449126330-21595-1-git-send-email-wens@csie.org>
-Message-ID: <20151207093622.GE27957@lukather>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 07 Dec 2015 18:38:44 +0900
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable fan,
+ sensors and audio for Odroid XU3
+In-Reply-To: <3286190.bAhobgE2la@wuerfel>
+References: <1449449994-10110-1-git-send-email-k.kozlowski@samsung.com>
+ <3286190.bAhobgE2la@wuerfel>
+Message-ID: <566553A4.6080106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 07.12.2015 18:14, Arnd Bergmann wrote:
+> On Monday 07 December 2015 09:59:54 Krzysztof Kozlowski wrote:
+>> For Odroid XU3-family enable the:
+>>  - PWM fan (to control the CPU fan using thermal subsystem),
+>>  - TI INA231 sensors (provide power measurements of big.LITTLE cores,
+>>    DRAM and GPU),
+>>  - Samsung sound (for Odroid XU3 and Snow as well).
+>>
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>
+> 
+> Looks good. Do you have a samsung/defconfig branch already that you
+> can put this into, or should be pick it up into arm-soc directly?
+> 
+> My preference is the former, but it would be a bit silly if that
+> is the only samsung defconfig change we need.
 
-On Thu, Dec 03, 2015 at 03:05:30PM +0800, Chen-Yu Tsai wrote:
-> The APBS clock on sun9i is the same as the APB0 clock on sun8i. With
-> sun9i we are supporting the PRCM clocks by using CLK_OF_DECLARE,
-> instead of through a PRCM mfd device and subdevices for each clock
-> and reset control. As such we need a CLK_OF_DECLARE version of
-> the sun8i-a23-apb0-clk driver.
-> 
-> Also, build it for sun9i/A80, and not just for configurations with
-> MFD_SUN6I_PRCM enabled.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> 
-> Changes since v4:
-> 
->   - Keep building clk-sun8i-apb0 for SUN6I_MFD_PRCM.
-> 
->   - Add an error message and comment for when of_io_request_and_map()
->     fails. of_io_request_and_map() merges a bunch of errors into -EINVAL,
->     so this might not be the best approach. But I think having an error
->     message when we know something is wrong (-EBUSY, -ENOMEM) is better.
-> 
-> ---
->  drivers/clk/sunxi/Makefile         |  1 +
->  drivers/clk/sunxi/clk-sun8i-apb0.c | 80 ++++++++++++++++++++++++++++++++------
->  2 files changed, 69 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> index 103efab05ca8..ccf21ba3b6b0 100644
-> --- a/drivers/clk/sunxi/Makefile
-> +++ b/drivers/clk/sunxi/Makefile
-> @@ -15,6 +15,7 @@ obj-y += clk-sun9i-core.o
->  obj-y += clk-sun9i-mmc.o
->  obj-y += clk-usb.o
->  
-> +obj-$(CONFIG_MACH_SUN9I) += clk-sun8i-apb0.o
->  obj-$(CONFIG_MACH_SUN9I) += clk-sun9i-cpus.o
->  
->  obj-$(CONFIG_MFD_SUN6I_PRCM) += \
-> diff --git a/drivers/clk/sunxi/clk-sun8i-apb0.c b/drivers/clk/sunxi/clk-sun8i-apb0.c
-> index 7ae5d2c2cde1..7ba61103a6f5 100644
-> --- a/drivers/clk/sunxi/clk-sun8i-apb0.c
-> +++ b/drivers/clk/sunxi/clk-sun8i-apb0.c
-> @@ -17,13 +17,77 @@
->  #include <linux/clk-provider.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/of_address.h>
->  #include <linux/platform_device.h>
->  
-> +static struct clk *sun8i_a23_apb0_register(struct device_node *node,
-> +					   void __iomem *reg)
-> +{
-> +	const char *clk_name = node->name;
-> +	const char *clk_parent;
-> +	struct clk *clk;
-> +	int ret;
-> +
-> +	clk_parent = of_clk_get_parent_name(node, 0);
-> +	if (!clk_parent)
-> +		return ERR_PTR(-EINVAL);
-> +
-> +	of_property_read_string(node, "clock-output-names", &clk_name);
-> +
-> +	/* The A23 APB0 clock is a standard 2 bit wide divider clock */
-> +	clk = clk_register_divider(NULL, clk_name, clk_parent, 0, reg,
-> +				   0, 2, CLK_DIVIDER_POWER_OF_TWO, NULL);
-> +	if (IS_ERR(clk))
-> +		return clk;
-> +
-> +	ret = of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +	if (ret)
-> +		goto err_unregister;
-> +
-> +	return clk;
-> +
-> +err_unregister:
-> +	clk_unregister_divider(clk);
-> +
-> +	return ERR_PTR(ret);
-> +}
-> +
-> +static void sun8i_a23_apb0_setup(struct device_node *node)
-> +{
-> +	void __iomem *reg;
-> +	struct resource res;
-> +	struct clk *clk;
-> +
-> +	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-> +	if (IS_ERR(reg)) {
-> +		/*
-> +		 * This happens with clk nodes instantiated through mfd,
-> +		 * as those do not have their resources assigned in the
-> +		 * device tree. Do not print an error in this case.
-> +		 */
-> +		if (PTR_ERR(reg) != -EINVAL)
-> +			pr_err("Could not get registers for a23-apb0-clk\n");
+I had a couple of defconfig patches in my queue but I sent them last
+week to Kukjin in pull request. He didn't pull it yet. Maybe he could
+apply this patch after pulling?
 
-This is not the only case you have to take into account.
+Anyway we can wait for a few days to sort it out. If I don't have
+another defconfig patches then I will remind myself with applying it to
+arm-soc.
 
-There's also the case when you have a regular clock (and by regular I
-mean that is not in the PRCM) that will be probed by the
-CLK_OF_DECLARE mechanism and then later by the device model.
-
-In such a case, the second of_io_request_and_map will fail, and you
-will have an error returned that you do not ignore at the moment.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151207/33e31ae4/attachment.sig>
+Best regards,
+Krzysztof
