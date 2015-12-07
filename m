@@ -1,54 +1,69 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 07 Dec 2015 21:48:29 +0100
-Subject: [PATCH v2 2/3] soc: dove: add legacy support to PMU driver
-In-Reply-To: <20151207204413.GY8644@n2100.arm.linux.org.uk> (Russell King's
- message of "Mon, 7 Dec 2015 20:44:13 +0000")
-References: <E1a5j6Q-000879-GO@rmk-PC.arm.linux.org.uk>
- <87r3iy9er5.fsf@free-electrons.com>
- <87mvtm9ejc.fsf@free-electrons.com>
- <20151207204413.GY8644@n2100.arm.linux.org.uk>
-Message-ID: <87io4a9e8y.fsf@free-electrons.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 7 Dec 2015 12:54:32 -0800
+Subject: [PATCH] ARM: mm: mark section-aligned portion of rodata NX
+Message-ID: <20151207205432.GA5271@www.outflux.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell King,
+When rodata is large enough that it crosses a section boundary after the
+kernel text, mark the rest NX. This is as close to full NX of rodata as
+we can get without splitting page tables or doing section alignment via
+CONFIG_DEBUG_ALIGN_RODATA.
+
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+I am baffled why I can't put the ALIGN in the ".start = " initializer.
+GCC seems to think it's non-static, but only because of the "&" operator.
+Does anyone see a way to do this that doesn't require the runtime ALIGN?
+---
+ arch/arm/mm/init.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 321d3683dc7c..b40a0536ef60 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -579,6 +579,8 @@ struct section_perm {
+ 	pmdval_t clear;
+ };
  
- On lun., d?c. 07 2015, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
++#define RODATA_IDX	0
++
+ static struct section_perm nx_perms[] = {
+ 	/* Make pages tables, etc before _stext RW (set NX). */
+ 	{
+@@ -596,16 +598,14 @@ static struct section_perm nx_perms[] = {
+ 		.mask	= ~PMD_SECT_XN,
+ 		.prot	= PMD_SECT_XN,
+ 	},
+-#ifdef CONFIG_DEBUG_ALIGN_RODATA
+ 	/* Make rodata NX (set RO in ro_perms below). */
+-	{
++	[RODATA_IDX] = {
+ 		.name	= "rodata NX",
+ 		.start  = (unsigned long)__start_rodata,
+ 		.end    = (unsigned long)__init_begin,
+ 		.mask   = ~PMD_SECT_XN,
+ 		.prot   = PMD_SECT_XN,
+ 	},
+-#endif
+ };
+ 
+ static struct section_perm ro_perms[] = {
+@@ -709,6 +709,9 @@ int __fix_kernmem_perms(void *unused)
+ 
+ void fix_kernmem_perms(void)
+ {
++	/* rodata may not be section aligned, so cover as much as we can. */
++	nx_perms[RODATA_IDX].start = ALIGN(nx_perms[RODATA_IDX].start,
++					   SECTION_SIZE);
+ 	stop_machine(__fix_kernmem_perms, NULL, NULL);
+ }
+ 
+-- 
+1.9.1
 
-> On Mon, Dec 07, 2015 at 09:42:15PM +0100, Gregory CLEMENT wrote:
->>  On lun., d?c. 07 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
->> 
->> > Hi Russell,
->> >  
->> >  On lun., d?c. 07 2015, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
->> >
->> >> Add support for legacy non-DT Dove to the PMU driver, so that we can
->> >> transition the legacy support over.
->> >>
->> >> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->> >
->> > Applied on mvebu/soc (and fixed a conflict in drivers/soc/Makefile)
->> 
->> Eventually I applied it on mvebu/drivers rather than mvebu/soc
->
-> Patches 2 and 3 should be applied one after each other to the very
-> same branch.  Having patch 3 independent means that things will
-> probably break.
-
-Indeed it makes sens, so I put it back on mvebu/soc.
-
-Thanks,
-
-Gregory
-
->
-> -- 
-> RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Kees Cook
+Chrome OS & Brillo Security
