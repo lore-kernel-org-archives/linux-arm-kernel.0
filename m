@@ -1,41 +1,50 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 7 Dec 2015 17:48:05 +0200
-Subject: [PATCH] fbdev: sis: enforce selection of at least one backend
-In-Reply-To: <2902419.SMzMybotxA@wuerfel>
-References: <2902419.SMzMybotxA@wuerfel>
-Message-ID: <5665AA35.1040600@ti.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Mon, 7 Dec 2015 15:48:33 +0000
+Subject: [PATCH v2 3/5] printk/nmi: Try hard to print Oops message in
+ NMI context
+In-Reply-To: <20151204171255.GZ8644@n2100.arm.linux.org.uk>
+References: <1448622572-16900-1-git-send-email-pmladek@suse.com>
+ <1448622572-16900-4-git-send-email-pmladek@suse.com>
+ <20151201234437.GA8644@n2100.arm.linux.org.uk>
+ <20151204152709.GA20935@pathway.suse.cz>
+ <20151204171255.GZ8644@n2100.arm.linux.org.uk>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6D1CBE68C7@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 27/11/15 16:33, Arnd Bergmann wrote:
-> The sis framebuffer driver complains with a compile-time warning
-> if neither the FB_SIS_300 nor FB_SIS_315 symbols are selected:
+From: Russell King - ARM Linux
+> Sent: 04 December 2015 17:13
+...
+> I have a slightly different view...
 > 
-> drivers/video/fbdev/sis/sis_main.c:61:2: warning: #warning Neither CONFIG_FB_SIS_300 nor CONFIG_FB_SIS_315 is se
+> > > I don't see bust_spinlocks() dealing with any of these locks, so IMHO
+> > > trying to make this work in NMI context strikes me as making the
+> > > existing solution more unreliable on ARM systems.
+> >
+> > bust_spinlocks() calls printk_nmi_flush() that would call printk()
+> > that would zap "lockbuf_lock" and "console_sem" when in Oops and NMI.
+> > Yes, there might be more locks blocked but we try to break at least
+> > the first two walls. Also zapping is allowed only once per 30 seconds,
+> > see zap_locks(). Why do you think that it might make things more
+> > unreliable, please?
 > 
-> This is reasonable because it doesn't work in that case, but it's
-> also annoying for randconfig builds and is one of the most common
-> warnings I'm seeing on ARM now.
+> Take the scenario where CPU1 is in the middle of a printk(), and is
+> holding its lock.
 > 
-> This changes the Kconfig logic to prevent the silly configuration,
-> by always selecting the FB_SIS_300 variant if the other one is
-> not set.
+> CPU0 comes along and decides to trigger a NMI backtrace.  This sends
+> a NMI to CPU1, which takes it in the middle of the serial console
+> output.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> Sorry for sending this twice, it looks like I forgot the fbdev list and
-> Tomi as recipients the first time
+> With the existing solution, the NMI output will be written to the
+> temporary buffer, and CPU1 has finished handling the NMI it resumes
+> the serial console output, eventually dropping the lock.  That then
+> allows CPU0 to print the contents of all buffers, and we get NMI
+> printk output.
 
-Thanks, queued for 4.5.
+Is the traceback from inside printk() or serial console code
+likely to be useful?
+If not then why not get the stacktrace generated when the relevant
+lock is released?
+That should save any faffing with a special buffer.
 
- tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151207/b73370aa/attachment.sig>
+	David
