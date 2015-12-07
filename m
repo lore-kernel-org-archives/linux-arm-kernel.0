@@ -1,146 +1,79 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 7 Dec 2015 13:26:55 -0600
-Subject: [PATCH] usb: musb: dsps: handle the
- otg_state_a_wait_vrise_timeout case
-In-Reply-To: <87poyiegc7.fsf@free-electrons.com>
-References: <1440087153-31084-1-git-send-email-gregory.clement@free-electrons.com>
- <55D719B1.8010700@free-electrons.com> <87twrfsbed.fsf@free-electrons.com>
- <87d1wtf5ir.fsf@saruman.tx.rr.com> <87a8rde96m.fsf@free-electrons.com>
- <87poyiegc7.fsf@free-electrons.com>
-Message-ID: <87poyinjpc.fsf@saruman.tx.rr.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 7 Dec 2015 11:34:41 -0800
+Subject: [PATCH linux-next 0/5] mtd: spi-nor: add driver for Atmel QSPI
+ controller
+In-Reply-To: <cover.1449494420.git.cyrille.pitchen@atmel.com>
+References: <cover.1449494420.git.cyrille.pitchen@atmel.com>
+Message-ID: <20151207193441.GO120110@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
++ Bean Huo
 
-Hi,
+Hi Cyrille,
 
-Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
-> Hi Felipe,
->
-> I am going back on this subject (again :) )
->  
->  On mar., oct. 20 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
->
->> Hi Felipe,
->>  
->>  On lun., oct. 05 2015, Felipe Balbi <balbi@ti.com> wrote:
->>
->>
->>>> So after many tests on different devices, 200ms is enough for most of
->>>> them, but for one, 2000ms (2s) was needed!
->>>>
->>>> I see several option:
->>>> - adding a sysfs entry to setup the time
->>>> - adding a debugs entry entry
->>>> - adding configuration option in menuconfig
->>>> - using 2000ms and hopping it was enough for everyone
->>>>
->>>> My preference would go to the first option, what is your opinion?
->>>
->>> I'm not sure if either of them is good. man 2s is just too large. If the
->
-> Well 2s is lon I agree, but currently instead of 2s we have an infinite
-> wait, which is worse!
->
->>> device isn't following the specification, I'm afraid that device needs
->>> to be fixed.
->
-> I agree but these devices are for most of them USB stick that we find in
-> retail. We have no influence on them, so we have to do with them, even
-> if they do not follow the sepc.
->
-> So what about using configfs or sysfs to let the user confgiure this
-> value if needed?
+On Mon, Dec 07, 2015 at 03:09:09PM +0100, Cyrille Pitchen wrote:
+> Hi all,
+> 
+> this series of patches adds support to the Atmel QSPI controller available
+> on sama5d2 SoCs. It was tested on a sama5d2 xplained ultra board with a 
+> Micron n25q128a13 QSPI memory and a at25df321a SPI memory.
+> 
+> In order to use the Micron memory in its Quad SPI mode, the spi-nor
+> framework needed to be patched to fix the support of Quad/Dual SPI
+> protocols with some memory manufacturers such as Spansion, Micron and
+> Macronix. There are many comments in the source code to explain the
+> implementation choices based on the datasheets from memory manufacturers.
+> 
+> 
+> This series was based and tested on linux-next-20151207
+> 
+> 1 - Atmel QSPI + Micron n25q128a13 (atmel-quadspi.c driver)
+> 
+> SPI 1-1-1: This mode was tested replacing SPI_NOR_QUAD by SPI_NOR_FAST as
+>            argument to spi_nor_scan() called from atmel_qspi_probe().
+> 
+> SPI 1-1-4: Bootloaders (at91bootstrap/uboot) don't enable the Quad SPI
+>            mode of the Micron memory. When probed from Linux, the memory
+>            uses its Extended SPI mode and replies to the regular Read ID
+>            (0x9f) command.
+> 
+> SPI 4-4-4: The romcode enabled the Quad SPI mode the of Micron memory
+>            before loading the at91bootstrap. When probed from Linux, the
+>            memory uses its Quad SPI mode and no longer replies to the
+>            regular Read ID (0x9f) command but instead to the Read ID
+>            Multiple I/O (0xaf) command. The memory expects ALL commands
+>            to use the SPI 4-4-4 protocol.
 
-iff we have to; I'm still not 100% convinced.
+I'll admit I'm a little fuzzy on the differences between dual and quad
+modes on various flash manufacturers. Can you help clear it up for me?
+I think some of the comments on patch 2 help too, but I'll just comment
+here for now.
 
-> I go back on this because, your suggestion didn't work. At least, I
-> didn't manage to make it improve the situation.
->
-> Thanks,
->
->>>
->>> I think the real issue here is the lack of a disconnect IRQ from AM335x
->>> devices. But here's something I've been meaning to test but never had
->>> time. If you look into AM335x address space, there's a bit in the
->>> wrapper which tells it to use the standard MUSB registers for IRQ,
->>> instead of the TI-specific thing. Can you see if we get a disconnect IRQ
->>> with that ?
->>>
->>> TRM is at [1], see page 2566. Basically, if you set bit 3 in register
->>> offset 0x1014, then it should use Mentor IRQ registers. If that works,
->>> quite a few problems will actually vanish :-p
->>
->> So I tried it with the following patch:
->>
->> -------------------------------------
->> diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
->> index c791ba5..c714500 100644
->> --- a/drivers/usb/musb/musb_dsps.c
->> +++ b/drivers/usb/musb/musb_dsps.c
->> @@ -470,6 +470,7 @@ static int dsps_musb_init(struct musb *musb)
->>  
->>         /* Reset the musb */
->>         dsps_writel(reg_base, wrp->control, (1 << wrp->reset));
->> +       dsps_writel(musb->ctrl_base, wrp->control, BIT(3));
+It looks like the current driver has problems regarding the non 1-x-y
+modes (e.g., 4-4-4), right? But I see that spi-nor.c never tries to
+send a 4_4_4 command; it only sets read_opcode to
+SPINOR_OP_READ_1_1_{1,2,4}. So is this an oversight in patches like
+Bean's patch?
 
-overwritting reset.
+    commit 548cd3ab54da ("mtd: spi-nor: Add quad I/O support for Micron
+    SPI NOR")
 
->>         musb->isr = dsps_interrupt;
->>  
->> @@ -625,6 +626,7 @@ static int dsps_musb_reset(struct musb *musb)
->>         if (session_restart || !glue->sw_babble_enabled) {
->>                 dev_info(musb->controller, "Restarting MUSB to recover from Babble\n");
->>                 dsps_writel(musb->ctrl_base, wrp->control, (1 << wrp->reset));
->> +               dsps_writel(musb->ctrl_base, wrp->control, BIT(3));
+Why would we even need to enable quad modes like that, if we're not
+going to send the 4-4-4 opcodes?
 
-here too. No wonder it won't work, right :-)
+My next question (if my understanding is roughly correct) is, do we need
+the 4-4-4 modes, and what risks come with them? I understand we can
+shorten the command and address phases, but does that alone yield much
+performance benefit? And I think the risk is that a given system might
+not be prepared for the flash to be in a 4-4-4 mode, if the boot code
+tries to use 1-x-y commands.
 
->> I am not very familiar with that driver but my understanding was that
->> the Mentor IRQ registeres are managed by the musb_interrupt() function
->> which is called from the dsps_interrupt() interrupt handler.
->>
->> Am I right?
+Also, I see a lot of good comments in patch 2 about Spansion vs.
+Macronix vs. Micron memories. I wonder if previous developers have
+completely tested their patches, or if they're just reading the
+datasheets... so, what kind have testing have you done? Do you have
+samples of all these flash to test?
 
-yeah, however the way IRQs are reported is a different thing. AM335x
-introduced its own IRQ reporting scheme which, basically, reads MUSB
-generic IRQ status registers and reports on an AM335x specific
-register. No idea why TI did that for AM335x devices.
-
->> if it is the case then it didn't fix the issue I had.
->>
->> I activated the following debug line:
->>
->> [musb_hdrc]musb_interrupt =_ "** IRQ %s usb%04x tx%04x rx%04x\012"
->> [musb_dsps]dsps_interrupt =p "usbintr (%x) epintr(%x)\012"
->>
->> But I didn't get any interrupt while disconnecting the cable without any
->> device connected on it (whereas I got an interrupt when I connected it).
->>
->> Note that I applied this patch instead of the "usb: musb: dsps: handle
->> the otg_state_a_wait_vrise_timeout case", is what you had in mind ?
-
-yeah, that's what I had in mind. But your patch seems wrong :-)
-
-I tried writing a more correct version here and found 2 issues:
-
-a) bit 3 doesn't do anything :-p I cannot read IRQs from mentor's
-registers
-
-b) when setting RESET_ISOLATION bit, reads of CTRL register hang. Note
-that according to TRM, RESET_ISOLATION _must_ be set prior to a soft
-reset and cleared afterwards. But right after setting RESET_ISOLATION,
-if I try a read of CTRL, it'll hang forever.
-
-Bin, do you know about these problems ? They both seem rather alarming
-to me.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151207/a7414a16/attachment.sig>
+Regards,
+Brian
