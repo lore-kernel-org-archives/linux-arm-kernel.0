@@ -1,506 +1,130 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Mon,  7 Dec 2015 09:26:01 +0200
-Subject: [PATCH 2/2] input: gt801_2plus1 - Add initial support for Goodix
- GT801 2+1
-In-Reply-To: <1449473161-3535-1-git-send-email-plaes@plaes.org>
-References: <1449473161-3535-1-git-send-email-plaes@plaes.org>
-Message-ID: <1449473161-3535-3-git-send-email-plaes@plaes.org>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Mon, 7 Dec 2015 15:27:35 +0800
+Subject: [PATCH v3] acpi, apei, arm64: APEI initial support for aarch64.
+In-Reply-To: <1449162903-11203-1-git-send-email-fu.wei@linaro.org>
+References: <1449162903-11203-1-git-send-email-fu.wei@linaro.org>
+Message-ID: <CADyBb7vzio6O0kBeCu0FtCu-FUmiXese4BMXtMhT80a8-kb53Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds Goodix GT801 2+1 touchscreen controller support.
+Hi all,
 
-GT801 2+1 is a 10-finger touch controller consisting of
-ARM controller interfacing two GT801 5-finger controllers.
+On 4 December 2015 at 01:15,  <fu.wei@linaro.org> wrote:
+> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>
+> This commit provides APEI arch-specific bits for aarch64
+>
+> The reason for wrapping "acpi_disable_cmcff" by
+> "#if defined(__i386__) || defined(__x86_64__)" in hest.c is:
+> according to ACPI spec CMC(Corrected Machine Check) is only for IA-32
+> Architecture.
+>
+> Changelog:
+> v3: Remove "acpi_disable_cmcff" from arm64 code,
+>     and wrap it in hest.c by "#if defined(__i386__) || defined(__x86_64__)"
+>
+> v2: https://lkml.org/lkml/2015/12/2/432
+>     Rebase to latest kernel version(4.4-rc3).
+>     Move arch_apei_flush_tlb_one() to arch/arm64/kernel/acpi.c
+>
+> v1: https://lkml.org/lkml/2015/8/14/199
+>     Move arch_apei_flush_tlb_one() to arch/arm64/include/asm/apci.h.
+>     Delete arch/arm64/kernel/apei.c.
+>     Add "#ifdef CONFIG_ACPI_APEI" for "acpi_disable_cmcff".
+>
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> Tested-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> ---
+>  arch/arm64/Kconfig            | 1 +
+>  arch/arm64/include/asm/acpi.h | 1 +
+>  arch/arm64/kernel/acpi.c      | 6 ++++++
+>  drivers/acpi/apei/hest.c      | 2 ++
+>  4 files changed, 10 insertions(+)
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 871f217..58c8992 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -3,6 +3,7 @@ config ARM64
+>         select ACPI_CCA_REQUIRED if ACPI
+>         select ACPI_GENERIC_GSI if ACPI
+>         select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+> +       select HAVE_ACPI_APEI if ACPI
+>         select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+>         select ARCH_HAS_ELF_RANDOMIZE
+>         select ARCH_HAS_GCOV_PROFILE_ALL
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index caafd63..7207f8e 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -94,6 +94,7 @@ static inline const char *acpi_get_enable_method(int cpu)
+>
+>  #ifdef CONFIG_ACPI_APEI
+>  pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
+> +void arch_apei_flush_tlb_one(unsigned long addr);
+>  #endif
+>
+>  #endif /*_ASM_ACPI_H*/
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index d1ce8e2..7a742e7 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -32,6 +32,7 @@
+>  #ifdef CONFIG_ACPI_APEI
+>  # include <linux/efi.h>
+>  # include <asm/pgtable.h>
+> +# include <asm/tlbflush.h>
+>  #endif
+>
+>  int acpi_noirq = 1;            /* skip ACPI IRQ initialization */
+> @@ -233,4 +234,9 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
+>                 return __pgprot(PROT_NORMAL_NC);
+>         return __pgprot(PROT_DEVICE_nGnRnE);
+>  }
+> +
+> +void arch_apei_flush_tlb_one(unsigned long addr)
+> +{
+> +       flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
+> +}
+>  #endif
+> diff --git a/drivers/acpi/apei/hest.c b/drivers/acpi/apei/hest.c
+> index 20b3fcf..4ead747 100644
+> --- a/drivers/acpi/apei/hest.c
+> +++ b/drivers/acpi/apei/hest.c
+> @@ -232,8 +232,10 @@ void __init acpi_hest_init(void)
+>                 goto err;
+>         }
+>
+> +#if defined(__i386__) || defined(__x86_64__)
+>         if (!acpi_disable_cmcff)
+>                 apei_hest_parse(hest_parse_cmc, NULL);
+> +#endif
 
-Signed-off-by: Priit Laes <plaes@plaes.org>
----
- .../bindings/input/touchscreen/gt801_2plus1.txt    |  23 ++
- MAINTAINERS                                        |   6 +
- drivers/input/touchscreen/Kconfig                  |  19 +-
- drivers/input/touchscreen/Makefile                 |   1 +
- drivers/input/touchscreen/gt801_2plus1.c           | 375 +++++++++++++++++++++
- 5 files changed, 421 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/input/touchscreen/gt801_2plus1.txt
- create mode 100644 drivers/input/touchscreen/gt801_2plus1.c
+Another thought is moving acpi_disable_cmcff to drivers/acpi/apei/hest.c
+I am not sure which one is best, but AFAIK CMC(Corrected Machine Check)
+is only for IA-32 Architecture, so I thinks we can comment out this code
+in other architectures, even with "hest_parse_cmc".
 
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/gt801_2plus1.txt b/Documentation/devicetree/bindings/input/touchscreen/gt801_2plus1.txt
-new file mode 100644
-index 0000000..070ff5b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/input/touchscreen/gt801_2plus1.txt
-@@ -0,0 +1,23 @@
-+Device tree bindings for Goodix GT801 2+1 series touchscreen controller
-+
-+Required properties:
-+
-+ - compatible		: Should be "goodix,gt801_2plus1"
-+ - reg			: I2C address of the chip. Should be 0x55
-+ - interrupt-parent	: Interrupt controller to which the chip is connected
-+ - interrupts		: Interrupt to which the chip is connected
-+
-+Example:
-+
-+	i2c at 00000000 {
-+		/* ... */
-+
-+		touchscreen at 55 {
-+			compatible = "goodix,gt801_2plus1";
-+			reg = <0x55>;
-+			interrupt-parent = <&gpio>;
-+			interrupts = <0 0>;
-+		};
-+
-+		/* ... */
-+	};
-diff --git a/MAINTAINERS b/MAINTAINERS
-index cba790b..e292126 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -4743,6 +4743,12 @@ L:	linux-input at vger.kernel.org
- S:	Maintained
- F:	drivers/input/touchscreen/goodix.c
- 
-+GOODIX GT801 2PLUS1 TOUCHSCREEN
-+M:	Priit Laes <plaes@plaes.org>
-+L:	linux-input at vger.kernel.org
-+S:	Maintained
-+F:	drivers/input/touchscreen/gt801_2plus1.c
-+
- GPIO SUBSYSTEM
- M:	Linus Walleij <linus.walleij@linaro.org>
- M:	Alexandre Courbot <gnurou@gmail.com>
-diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
-index ae33da7..c7c3324 100644
---- a/drivers/input/touchscreen/Kconfig
-+++ b/drivers/input/touchscreen/Kconfig
-@@ -322,11 +322,11 @@ config TOUCHSCREEN_FUJITSU
- 	  module will be called fujitsu-ts.
- 
- config TOUCHSCREEN_GOODIX
--	tristate "Goodix I2C touchscreen"
-+	tristate "Goodix GT9xx I2C touchscreen"
- 	depends on I2C
- 	help
--	  Say Y here if you have the Goodix touchscreen (such as one
--	  installed in Onda v975w tablets) connected to your
-+	  Say Y here if you have one of the Goodix GT9xx touchscreens
-+	  (such as one installed in Onda v975w tablet) connected to your
- 	  system. It also supports 5-finger chip models, which can be
- 	  found on ARM tablets, like Wexler TAB7200 and MSI Primo73.
- 
-@@ -335,6 +335,19 @@ config TOUCHSCREEN_GOODIX
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called goodix.
- 
-+config TOUCHSCREEN_GT801_2PLUS1
-+	tristate "Goodix GT801 2+1 I2C touchscreen"
-+	depends on I2C
-+	help
-+	  Say Y here if you have the Goodix GT801 2+1 touchscreen.
-+	  This controller is found on some older ARM tablets like
-+	  (Gemei G9 and Zareason Zatab).
-+
-+	  If unsure, say N.
-+
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called gt801_2plus1.
-+
- config TOUCHSCREEN_ILI210X
- 	tristate "Ilitek ILI210X based touchscreen"
- 	depends on I2C
-diff --git a/drivers/input/touchscreen/Makefile b/drivers/input/touchscreen/Makefile
-index cbaa6ab..ff25d1b4 100644
---- a/drivers/input/touchscreen/Makefile
-+++ b/drivers/input/touchscreen/Makefile
-@@ -38,6 +38,7 @@ obj-$(CONFIG_TOUCHSCREEN_EGALAX)	+= egalax_ts.o
- obj-$(CONFIG_TOUCHSCREEN_FT6236)	+= ft6236.o
- obj-$(CONFIG_TOUCHSCREEN_FUJITSU)	+= fujitsu_ts.o
- obj-$(CONFIG_TOUCHSCREEN_GOODIX)	+= goodix.o
-+obj-$(CONFIG_TOUCHSCREEN_GT801_2PLUS1)	+= gt801_2plus1.o
- obj-$(CONFIG_TOUCHSCREEN_ILI210X)	+= ili210x.o
- obj-$(CONFIG_TOUCHSCREEN_IMX6UL_TSC)	+= imx6ul_tsc.o
- obj-$(CONFIG_TOUCHSCREEN_INEXIO)	+= inexio.o
-diff --git a/drivers/input/touchscreen/gt801_2plus1.c b/drivers/input/touchscreen/gt801_2plus1.c
-new file mode 100644
-index 0000000..e2be479
---- /dev/null
-+++ b/drivers/input/touchscreen/gt801_2plus1.c
-@@ -0,0 +1,375 @@
-+/*
-+ *  Driver for Goodix GT801 2+1 ARM touchscreen controllers
-+ *
-+ *  Copyright (c) 2015 Priit Laes <plaes@plaes.org>.
-+ *
-+ *  This code is based on goodix.c driver (c) 2014 Red Hat Inc,
-+ *  various Android codedumps (c) 2010 - 2012 Goodix Technology
-+ *  and cleanups done by Emilio L?pez (turl) for linux-sunxi.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License as published by the Free
-+ * Software Foundation; version 2 of the License.
-+ */
-+#include <asm/unaligned.h>
-+#include <linux/delay.h>
-+#include <linux/i2c.h>
-+#include <linux/irq.h>
-+#include <linux/module.h>
-+#include <linux/interrupt.h>
-+#include <linux/input/mt.h>
-+
-+struct gt801x_ts_data {
-+	struct i2c_client *client;
-+	struct input_dev *input_dev;
-+	int abs_x_max;
-+	int abs_y_max;
-+	unsigned int max_touch_num;
-+	unsigned int int_trigger_type;
-+};
-+
-+#define GOODIX_MAX_HEIGHT		4096
-+#define GOODIX_MAX_WIDTH		4096
-+#define GOODIX_INT_TRIGGER		1
-+#define GOODIX_MAX_CONTACTS		10
-+#define MAX_CONTACTS_LOC	5
-+#define RESOLUTION_LOC		1
-+#define TRIGGER_LOC		6
-+
-+/* Register defines */
-+#define GT801X_COOR_ADDR		0x01
-+#define GT801X_CONFIG_DATA	0x65
-+#define GT801X_REG_ID			0xf0
-+
-+/* Device specific defines */
-+#define GT801X_CONFIG_MAX_LENGTH	7
-+#define GT801X_CONTACT_SIZE		5
-+
-+static const unsigned long goodix_irq_flags[] = {
-+	IRQ_TYPE_EDGE_RISING,
-+	IRQ_TYPE_EDGE_FALLING,
-+	IRQ_TYPE_LEVEL_LOW,
-+	IRQ_TYPE_LEVEL_HIGH,
-+};
-+
-+/**
-+ * gt801x_i2c_read - read data from a register of the i2c slave device.
-+ *
-+ * @client: i2c device.
-+ * @reg: the register to read from.
-+ * @buf: raw write data buffer.
-+ * @len: length of the buffer to write
-+ */
-+static int gt801x_i2c_read(struct i2c_client *client,
-+			   u8 reg, u8 *buf, int len)
-+{
-+	struct i2c_msg msgs[2];
-+	int ret;
-+
-+	msgs[0].flags = 0;
-+	msgs[0].addr  = client->addr;
-+	msgs[0].len   = 1;
-+	msgs[0].buf   = &reg;
-+
-+	msgs[1].flags = I2C_M_RD;
-+	msgs[1].addr  = client->addr;
-+	msgs[1].len   = len;
-+	msgs[1].buf   = buf;
-+
-+	ret = i2c_transfer(client->adapter, msgs, 2);
-+	return ret < 0 ? ret : (ret != ARRAY_SIZE(msgs) ? -EIO : 0);
-+}
-+
-+/**
-+ * gt801x_process_events - Process incoming events
-+ *
-+ * @ts: our gt801x_ts_data pointer
-+ *
-+ * Called when the IRQ is triggered. Read the current device state, and push
-+ * the input events to the user space.
-+ */
-+static void gt801x_process_events(struct gt801x_ts_data *ts)
-+{
-+	u8 point_data[3 + GT801X_CONTACT_SIZE * GOODIX_MAX_CONTACTS];
-+	u8 touch_map[GOODIX_MAX_CONTACTS] = {0};
-+	int input_x, input_y, input_w;
-+	u8 checksum = 0;
-+	u16 touch_raw;
-+	u8 touch_num;
-+	int error;
-+	int loc;
-+	int i;
-+
-+	error = gt801x_i2c_read(ts->client, GT801X_COOR_ADDR,
-+				point_data, sizeof(point_data));
-+	if (error) {
-+		dev_err(&ts->client->dev, "I2C transfer error: %d\n", error);
-+		return;
-+	}
-+
-+	/* Fetch touch mapping bits */
-+	touch_raw = get_unaligned_le16(&point_data[0]);
-+	if (!touch_raw)
-+		return;
-+
-+	/* Build touch map */
-+	touch_num = 0;
-+	for (i = 0; (touch_raw != 0) && (i < ts->max_touch_num); i++) {
-+		if (touch_raw & 1)
-+			touch_map[touch_num++] = i;
-+			touch_raw >>= 1;
-+	}
-+
-+	/* Calculate checksum */
-+	for (i = 0; i < (touch_num*GT801X_CONTACT_SIZE + 3); i++)
-+		checksum += point_data[i];
-+	if (checksum != 0)
-+		return;
-+
-+	/* Report touches */
-+	for (i = 0; i < touch_num; i++) {
-+		loc = 2 + GT801X_CONTACT_SIZE * i;
-+		input_x = get_unaligned_be16(&point_data[loc]);
-+		input_y = get_unaligned_be16(&point_data[loc + 2]);
-+		input_w = point_data[loc + 4];
-+
-+		input_mt_slot(ts->input_dev, i);
-+		input_mt_report_slot_state(ts->input_dev, MT_TOOL_FINGER, true);
-+		input_report_abs(ts->input_dev, ABS_MT_POSITION_X, input_x);
-+		input_report_abs(ts->input_dev, ABS_MT_POSITION_Y, input_y);
-+		input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, input_w);
-+		input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR, input_w);
-+	}
-+
-+	input_mt_sync_frame(ts->input_dev);
-+	input_sync(ts->input_dev);
-+}
-+
-+/**
-+ * gt801x_ts_irq_handler - The IRQ handler
-+ *
-+ * @irq: interrupt number.
-+ * @dev_id: private data pointer.
-+ */
-+static irqreturn_t gt801x_ts_irq_handler(int irq, void *dev_id)
-+{
-+	gt801x_process_events((struct gt801x_ts_data *)dev_id);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+/**
-+ * gt801x_read_config - Read the embedded configuration of the panel
-+ *
-+ * @ts: our gt801x_ts_data pointer
-+ *
-+ * Must be called during probe
-+ */
-+static void gt801x_read_config(struct gt801x_ts_data *ts)
-+{
-+	u8 config[GT801X_CONFIG_MAX_LENGTH];
-+	int error;
-+
-+	error = gt801x_i2c_read(ts->client, GT801X_CONFIG_DATA,
-+				config,
-+				GT801X_CONFIG_MAX_LENGTH);
-+	if (error) {
-+		dev_warn(&ts->client->dev,
-+			 "Error reading config (%d), using defaults\n",
-+			 error);
-+		ts->abs_x_max = GOODIX_MAX_WIDTH;
-+		ts->abs_y_max = GOODIX_MAX_HEIGHT;
-+		ts->int_trigger_type = GOODIX_INT_TRIGGER;
-+		ts->max_touch_num = GOODIX_MAX_CONTACTS;
-+		return;
-+	}
-+
-+	ts->abs_x_max = get_unaligned_be16(&config[RESOLUTION_LOC]);
-+	ts->abs_y_max = get_unaligned_be16(&config[RESOLUTION_LOC + 2]);
-+	ts->int_trigger_type = config[TRIGGER_LOC] & 0x03;
-+	ts->max_touch_num = config[MAX_CONTACTS_LOC] & 0x0f;
-+	if (!ts->abs_x_max || !ts->abs_y_max || !ts->max_touch_num) {
-+		dev_err(&ts->client->dev,
-+			"Invalid config, using defaults\n");
-+		ts->abs_x_max = GOODIX_MAX_WIDTH;
-+		ts->abs_y_max = GOODIX_MAX_HEIGHT;
-+		ts->max_touch_num = GOODIX_MAX_CONTACTS;
-+	}
-+}
-+
-+/**
-+ * gt801x_read_version - Read GT801 2+1 touchscreen version
-+ *
-+ * @client: the i2c client
-+ * @version: output buffer containing the version on success
-+ * @id: output buffer containing the id on success
-+ */
-+static int gt801x_read_version(struct i2c_client *client, u16 *version, u16 *id)
-+{
-+	int error;
-+	u8 buf[16];
-+
-+	error = gt801x_i2c_read(client, GT801X_REG_ID, buf, sizeof(buf));
-+	if (error) {
-+		dev_err(&client->dev, "read version failed: %d\n", error);
-+		return error;
-+	}
-+	/* TODO: version info contains 'GT801NI_3R15_1AV' */
-+	print_hex_dump_bytes("", DUMP_PREFIX_NONE, buf, ARRAY_SIZE(buf));
-+	*id = 0x802;
-+	*version = 0x15;
-+	dev_info(&client->dev, "ID %d, version: %04x\n", *id, *version);
-+	return 0;
-+}
-+
-+/**
-+ * gt801x_i2c_test - I2C test function to check if the device answers.
-+ *
-+ * @client: the i2c client
-+ */
-+static int gt801x_i2c_test(struct i2c_client *client)
-+{
-+	int retry = 0;
-+	int error;
-+	u8 test;
-+
-+	while (retry++ < 2) {
-+		error = gt801x_i2c_read(client, GT801X_CONFIG_DATA,
-+					&test, 1);
-+		if (!error)
-+			return 0;
-+
-+		dev_err(&client->dev, "i2c test failed attempt %d: %d\n",
-+			retry, error);
-+		msleep(20);
-+	}
-+
-+	return error;
-+}
-+
-+/**
-+ * gt801x_request_input_dev - Allocate, populate and register the input device
-+ *
-+ * @ts: our gt801x_ts_data pointer
-+ * @version: device firmware version
-+ * @id: device ID
-+ *
-+ * Must be called during probe
-+ */
-+static int gt801x_request_input_dev(struct gt801x_ts_data *ts,
-+					u16 version, u16 id)
-+{
-+	int error;
-+
-+	ts->input_dev = devm_input_allocate_device(&ts->client->dev);
-+	if (!ts->input_dev) {
-+		dev_err(&ts->client->dev, "Failed to allocate input device.");
-+		return -ENOMEM;
-+	}
-+
-+	input_set_abs_params(ts->input_dev, ABS_MT_POSITION_X,
-+			     0, ts->abs_x_max, 0, 0);
-+	input_set_abs_params(ts->input_dev, ABS_MT_POSITION_Y,
-+			     0, ts->abs_y_max, 0, 0);
-+	input_set_abs_params(ts->input_dev, ABS_MT_WIDTH_MAJOR, 0, 255, 0, 0);
-+	input_set_abs_params(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0);
-+
-+	input_mt_init_slots(ts->input_dev, ts->max_touch_num,
-+			    INPUT_MT_DIRECT | INPUT_MT_DROP_UNUSED);
-+
-+	ts->input_dev->name = "Goodix Capacitive TouchScreen (GT801 2+1)";
-+	ts->input_dev->phys = "input/ts";
-+	ts->input_dev->id.bustype = BUS_I2C;
-+	ts->input_dev->id.vendor = 0x0416;
-+	ts->input_dev->id.product = id;
-+	ts->input_dev->id.version = version;
-+
-+	error = input_register_device(ts->input_dev);
-+	if (error) {
-+		dev_err(&ts->client->dev,
-+			"Failed to register input device: %d", error);
-+		return error;
-+	}
-+
-+	return 0;
-+}
-+
-+static int gt801x_ts_probe(struct i2c_client *client,
-+			   const struct i2c_device_id *id)
-+{
-+	struct gt801x_ts_data *ts;
-+	unsigned long irq_flags;
-+	int error;
-+	u16 version_info, id_info;
-+
-+	dev_dbg(&client->dev, "I2C Address: 0x%02x\n", client->addr);
-+
-+	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
-+		dev_err(&client->dev, "I2C check functionality failed.\n");
-+		return -ENXIO;
-+	}
-+
-+	ts = devm_kzalloc(&client->dev, sizeof(*ts), GFP_KERNEL);
-+	if (!ts)
-+		return -ENOMEM;
-+
-+	ts->client = client;
-+	i2c_set_clientdata(client, ts);
-+
-+	error = gt801x_i2c_test(client);
-+	if (error) {
-+		dev_err(&client->dev, "I2C communication failure: %d\n", error);
-+		return error;
-+	}
-+
-+	error = gt801x_read_version(client, &version_info, &id_info);
-+	if (error) {
-+		dev_err(&client->dev, "Read version failed.\n");
-+		return error;
-+	}
-+
-+	gt801x_read_config(ts);
-+
-+	error = gt801x_request_input_dev(ts, version_info, id_info);
-+	if (error)
-+		return error;
-+
-+	irq_flags = goodix_irq_flags[ts->int_trigger_type] | IRQF_ONESHOT;
-+	error = devm_request_threaded_irq(&ts->client->dev, client->irq,
-+					  NULL, gt801x_ts_irq_handler,
-+					  irq_flags, client->name, ts);
-+	if (error) {
-+		dev_err(&client->dev, "request IRQ failed: %d\n", error);
-+		return error;
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct i2c_device_id gt801x_ts_id[] = {
-+	{ "GDIX1001:00", 0 },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(i2c, gt801x_ts_id);
-+
-+#ifdef CONFIG_OF
-+static const struct of_device_id gt801x_of_match[] = {
-+	{ .compatible = "goodix,gt801_2plus1" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, gt801x_of_match);
-+#endif
-+
-+static struct i2c_driver gt801x_ts_driver = {
-+	.probe = gt801x_ts_probe,
-+	.id_table = gt801x_ts_id,
-+	.driver = {
-+		.name = "Goodix-TS",
-+		.of_match_table = of_match_ptr(gt801x_of_match),
-+	},
-+};
-+module_i2c_driver(gt801x_ts_driver);
-+
-+MODULE_AUTHOR("Priit Laes <plaes@plaes.org>");
-+MODULE_DESCRIPTION("Goodix GT801 2+1 touchscreen driver");
-+MODULE_LICENSE("GPL v2");
+Any suggestion?
+
+>
+>         if (!ghes_disable) {
+>                 rc = apei_hest_parse(hest_parse_ghes_count, &ghes_count);
+> --
+> 2.5.0
+>
+
+
+
 -- 
-2.6.3
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
+Ph: +86 21 61221326(direct)
+Ph: +86 186 2020 4684 (mobile)
+Room 1512, Regus One Corporate Avenue,Level 15,
+One Corporate Avenue,222 Hubin Road,Huangpu District,
+Shanghai,China 200021
