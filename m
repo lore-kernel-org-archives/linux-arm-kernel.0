@@ -1,73 +1,82 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Mon, 7 Dec 2015 08:19:27 -0800
-Subject: [PATCH] drivers: dma-coherent: use ioremap_wc() for DMA_MEMORY_MAP
-In-Reply-To: <20151207132823.GC13179@e106950-lin.cambridge.arm.com>
-References: <1448029226-4914-1-git-send-email-brian.starkey@arm.com>
- <20151204105000.GD10123@e104818-lin.cambridge.arm.com>
- <CAPcyv4gti=49v4gUVjf=4nhxBCPPM3xmq6MQ2sBoBnKQbCS5MQ@mail.gmail.com>
- <20151204171554.GO10123@e104818-lin.cambridge.arm.com>
- <20151207132823.GC13179@e106950-lin.cambridge.arm.com>
-Message-ID: <CAPcyv4iUHoQ2DRP-K-BA33mjdHwUxY2JX5M1-dP+bN-Rr6ewyQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 7 Dec 2015 16:19:53 +0000
+Subject: [PATCH v3 6/7] arm64: map linear region as non-executable
+In-Reply-To: <1447672998-20981-7-git-send-email-ard.biesheuvel@linaro.org>
+References: <1447672998-20981-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1447672998-20981-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20151207161953.GE7083@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 7, 2015 at 5:28 AM, Brian Starkey <brian.starkey@arm.com> wrote:
-> On Fri, Dec 04, 2015 at 05:15:54PM +0000, Catalin Marinas wrote:
->>
->> On Fri, Dec 04, 2015 at 08:59:10AM -0800, Dan Williams wrote:
->>>
->>> On Fri, Dec 4, 2015 at 2:50 AM, Catalin Marinas <catalin.marinas@arm.com>
->>> wrote:
->>> > On Fri, Nov 20, 2015 at 02:20:26PM +0000, Brian Starkey wrote:
->>> >> When the DMA_MEMORY_MAP flag is used, memory which can be accessed
->>> >> directly should be returned, so use ioremap_wc() instead of ioremap().
->>> >> Also, ensure that the correct memset operation is used in
->>> >> dma_alloc_from_coherent() with respect to the region's flags.
->>> >>
->>> >> This fixes the below alignment fault on arm64, caused by invalid use
->>> >> of memset() on Device memory.
->>> >
->>> > This is indeed affecting both arm32 and arm64 systems.
->>> >
->>> >> diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
->>> >> index 55b8398..45358d0 100644
->>> >> --- a/drivers/base/dma-coherent.c
->>> >> +++ b/drivers/base/dma-coherent.c
->>> >> @@ -31,7 +31,10 @@ static int dma_init_coherent_memory(phys_addr_t
->>> >> phys_addr, dma_addr_t device_add
->>> >>       if (!size)
->>> >>               goto out;
->>> >>
->>> >> -     mem_base = ioremap(phys_addr, size);
->>> >> +     if (flags & DMA_MEMORY_MAP)
->>> >> +             mem_base = ioremap_wc(phys_addr, size);
->>> >> +     else
->>> >> +             mem_base = ioremap(phys_addr, size);
->>> >
->>> > I wonder whether a memremap() approach for the DMA_MEMORY_MAP case
->>> > would
->>> > be better. This API was added recently by commit 92281dee825f ("arch:
->>> > introduce memremap()"). It only supports write-back and write-through
->>> > but we could add a MEMREMAP_WC flag for this case.
->>>
->>> I originally included both MEMREMAP_WC and MEMREAMP_UC as potential
->>> flags to this api, but ultimately decided against it.  The memremap()
->>> api is meant for memory that is known to have no i/o side effects.  As
->>> far as I can see WC and UC usages are a muddy mix of "sometimes
->>> there's I/O side effects, but it depends by arch and driver".  In
->>> other words we can't drop the "__iomem" annotation from WC and UC
->>> mappings by default.
->
->
-> The DMA_MEMORY_MAP flag is pretty much a statement of "no side-
-> effects", so as Catalin says it would fit OK here. That said, if it's
-> not possible to deprecate ioremap_wc() in the same way as
-> ioremap_cache() then I wonder if there's even much benefit in adding
-> it to memremap().
+On Mon, Nov 16, 2015 at 12:23:17PM +0100, Ard Biesheuvel wrote:
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index c7ba171951c8..526eeb7e1e97 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -357,47 +357,10 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+>  				phys, virt, size, prot, late_alloc);
+>  }
+>  
+> -#ifdef CONFIG_DEBUG_RODATA
+>  static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
+>  {
+> -	/*
+> -	 * Set up the executable regions using the existing section mappings
+> -	 * for now. This will get more fine grained later once all memory
+> -	 * is mapped
+> -	 */
+> -	unsigned long kernel_x_start = round_down(__pa(_stext), SWAPPER_BLOCK_SIZE);
+> -	unsigned long kernel_x_end = round_up(__pa(__init_end), SWAPPER_BLOCK_SIZE);
+> -
+> -	if (end < kernel_x_start) {
+> -		create_mapping(start, __phys_to_virt(start),
+> -			end - start, PAGE_KERNEL);
+> -	} else if (start >= kernel_x_end) {
+> -		create_mapping(start, __phys_to_virt(start),
+> -			end - start, PAGE_KERNEL);
+> -	} else {
+> -		if (start < kernel_x_start)
+> -			create_mapping(start, __phys_to_virt(start),
+> -				kernel_x_start - start,
+> -				PAGE_KERNEL);
+> -		create_mapping(kernel_x_start,
+> -				__phys_to_virt(kernel_x_start),
+> -				kernel_x_end - kernel_x_start,
+> -				PAGE_KERNEL_EXEC);
+> -		if (kernel_x_end < end)
+> -			create_mapping(kernel_x_end,
+> -				__phys_to_virt(kernel_x_end),
+> -				end - kernel_x_end,
+> -				PAGE_KERNEL);
+> -	}
+> -
+> -}
+> -#else
+> -static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
+> -{
+> -	create_mapping(start, __phys_to_virt(start), end - start,
+> -			PAGE_KERNEL_EXEC);
+> +	create_mapping(start, __phys_to_virt(start), end - start, PAGE_KERNEL);
+>  }
+> -#endif
+>  
+>  struct bootstrap_pgtables {
+>  	pte_t	pte[PTRS_PER_PTE];
+> @@ -471,7 +434,7 @@ static unsigned long __init bootstrap_region(struct bootstrap_pgtables *reg,
+>  				      SWAPPER_BLOCK_SIZE));
+>  
+>  		create_mapping(__pa(vstart - va_offset), vstart, vend - vstart,
+> -			       PAGE_KERNEL_EXEC);
+> +			       PAGE_KERNEL);
+>  
+>  		return vend;
+>  	}
 
-I don't see a problem adding a _WC option to memremap.
+These make sense. However, shall we go a step further and unmap the
+kernel image completely from the linear mapping, maybe based on
+CONFIG_DEBUG_RODATA? The mark_rodata_ro() function changes the text to
+read-only but you can still get writable access to it via
+__va(__pa(_stext)).
 
-The only difference is that it can't replace ioremap_wc.  I.e. unlike
-_WB, and _WT case where ioremap_cache and ioremap_wt are now
-deprecated we'd have ioremap_wc continuing to live alongside
-memremap(..., MEMREMAP_WC).
+-- 
+Catalin
