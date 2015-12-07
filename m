@@ -1,72 +1,63 @@
-From: xuejiancheng@huawei.com (xuejiancheng)
-Date: Mon, 7 Dec 2015 14:58:14 +0800
-Subject: [PATCH v2 3/9] ARM: hisi: enable Hi3519 soc
-In-Reply-To: <43938749.Z0h4RNddN6@wuerfel>
-References: <1449110565-23590-1-git-send-email-xuejiancheng@huawei.com>
- <8647404.sBOFNLAMdU@wuerfel> <5661119E.9060309@huawei.com>
- <43938749.Z0h4RNddN6@wuerfel>
-Message-ID: <56652E06.10309@huawei.com>
+From: ilya@compulab.co.il (Ilya Ledvich)
+Date: Mon,  7 Dec 2015 09:14:34 +0200
+Subject: [PATCH 3/8] ARM: dts: imx7d: cl-som-imx7: add eMMC support
+In-Reply-To: <1449472479-2521-1-git-send-email-ilya@compulab.co.il>
+References: <1449472479-2521-1-git-send-email-ilya@compulab.co.il>
+Message-ID: <1449472479-2521-4-git-send-email-ilya@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Add support for eMMC as a main storage.
 
-On 2015/12/5 5:54, Arnd Bergmann wrote:
-> On Friday 04 December 2015 12:07:58 xuejiancheng wrote:
->> On 2015/12/3 17:40, Arnd Bergmann wrote:
->>> On Thursday 03 December 2015 10:42:45 Jiancheng Xue wrote:
->>>> --- a/arch/arm/mach-hisi/Kconfig
->>>> +++ b/arch/arm/mach-hisi/Kconfig
->>>> @@ -12,6 +12,14 @@ if ARCH_HISI
->>>>  
->>>>  menu "Hisilicon platform type"
->>>>  
->>>> +config ARCH_HI3519
->>>> +       bool "Hisilicon Hi3519 Soc" if ARCH_MULTI_V7
->>>> +       select HAVE_ARM_ARCH_TIMER
->>>> +       select ARCH_HAS_RESET_CONTROLLER
->>>> +
->>>> +       help
->>>> +         Support for Hisilicon Hi3519 Soc
->>>> +
->>>>  config ARCH_HI3xxx
->>>>         bool "Hisilicon Hi36xx family" if ARCH_MULTI_V7
->>>>         select CACHE_L2X0
->>>
->>> Do those need to be separate? I would just extend the Hi36xx
->>> to cover all Hi3xxx, if nothing in the platform code really
->>> depends on this.
->>
->> For HI3519, there is really no special platform code. But HI35xx and HI36xx soc families
->> belong to different product lines in hisilicon. HI35xx family also composes of various
->> architectures socs(single core, smp and big-little). So I think it may be clear to have
->> separate arch definitions.
->>
->> Could you give me more suggestions about this?  Thank you!
-> 
-> For the most part, you already need to enable the device drivers for the
-> specific components on each chip, and the per-soc top-level options here
-> don't actually control the compilation of any particular code.
-> 
-> This is slightly different for some of the older platforms that for historic
-> reasons need fine-grained options. You could probably just make the device
-> drivers depend on "ARCH_HISI || COMPILE_TEST" in general, but some level
-> of classification is ok, in particular when the chips are not related at all.
-> 
-> In this case, my impression is that while HI3519 and HI36xx are made
-> by different business units, there is still a noticeable amount of shared
-> IP in them (e.g. the "sysctrl" node that seems to be shared with some of
-> the other chips as well), so grouping them together should make sense.
+Signed-off-by: Ilya Ledvich <ilya@compulab.co.il>
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+---
+ arch/arm/boot/dts/imx7d-cl-som-imx7.dts | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-HI35xx and HI36xx are designed totally independently, including IP selection.
-The relation between HI35xx and HI36xx is just like the one between HI36xx
-and HIP0x. In another word, HI35xx and HI36xx are not related except they all
-belong to hisilicon. So I don't think it's proper to group them together.
-
-Is it OK if I drop ARCH_HI3519 and use ARCH_HISI directly?
-
-> 
-> 	Arnd
-> 
-> .
-> 
+diff --git a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
+index a8f52cf..44849ab 100644
+--- a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
++++ b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
+@@ -154,6 +154,17 @@
+ 	status = "okay";
+ };
+ 
++&usdhc3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc3>;
++	assigned-clocks = <&clks IMX7D_USDHC3_ROOT_CLK>;
++	assigned-clock-rates = <400000000>;
++	bus-width = <8>;
++	fsl,tuning-step = <2>;
++	non-removable;
++	status = "okay";
++};
++
+ &iomuxc {
+ 	cl-som-imx7 {
+ 		pinctrl_i2c2: i2c2grp {
+@@ -175,5 +186,21 @@
+ 				MX7D_PAD_GPIO1_IO05__GPIO1_IO5		0x14 /* OTG PWREN */
+ 			>;
+ 		};
++
++		pinctrl_usdhc3: usdhc3grp {
++			fsl,pins = <
++				MX7D_PAD_SD3_CMD__SD3_CMD		0x59
++				MX7D_PAD_SD3_CLK__SD3_CLK		0x19
++				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
++				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
++				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
++				MX7D_PAD_SD3_DATA3__SD3_DATA3		0x59
++				MX7D_PAD_SD3_DATA4__SD3_DATA4		0x59
++				MX7D_PAD_SD3_DATA5__SD3_DATA5		0x59
++				MX7D_PAD_SD3_DATA6__SD3_DATA6		0x59
++				MX7D_PAD_SD3_DATA7__SD3_DATA7		0x59
++				MX7D_PAD_SD3_STROBE__SD3_STROBE		0x19
++			>;
++		};
+ 	};
+ };
+-- 
+1.9.1
