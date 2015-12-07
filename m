@@ -1,115 +1,49 @@
-From: martyn.welch@collabora.co.uk (Martyn Welch)
-Date: Mon, 07 Dec 2015 21:10:55 +0000
-Subject: [PATCH 1/3] Device tree binding documentation for gpio-switch
-In-Reply-To: <20151207173702.GA17659@rob-hp-laptop>
-References: <1449250275-23435-1-git-send-email-martyn.welch@collabora.co.uk>
- <1449250275-23435-2-git-send-email-martyn.welch@collabora.co.uk>
- <20151207173702.GA17659@rob-hp-laptop>
-Message-ID: <5665F5DF.50002@collabora.co.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Dec 2015 21:16:56 +0000
+Subject: [PATCH v2 2/3] soc: dove: add legacy support to PMU driver
+In-Reply-To: <87d1ui9da0.fsf@free-electrons.com>
+References: <E1a5j6Q-000879-GO@rmk-PC.arm.linux.org.uk>
+ <87r3iy9er5.fsf@free-electrons.com>
+ <87mvtm9ejc.fsf@free-electrons.com>
+ <87d1ui9da0.fsf@free-electrons.com>
+Message-ID: <20151207211656.GZ8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Dec 07, 2015 at 10:09:27PM +0100, Gregory CLEMENT wrote:
+> Hi Russell,
+>  
+>  On lun., d?c. 07 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+> 
+> >  On lun., d?c. 07 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+> >
+> >> Hi Russell,
+> >>  
+> >>  On lun., d?c. 07 2015, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+> >>
+> >>> Add support for legacy non-DT Dove to the PMU driver, so that we can
+> >>> transition the legacy support over.
+> >>>
+> >>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> >>
+> >> Applied on mvebu/soc (and fixed a conflict in drivers/soc/Makefile)
+> >
+> > Eventually I applied it on mvebu/drivers rather than mvebu/soc
+> 
+> Actually I was too optimitic. It doesn't build on mvebu/soc (based on
+> 4.4-rc1).
+> 
+> First pm_genpd_poweroff_unused() had been removed since bb4b72fc63d4 "PM
+> / Domains: Remove pm_genpd_poweroff_unused() API ".
+> 
+> Then, even by removing the call this function to go furthetr I got other
+> errors such as: drivers/soc/dove/pmu.c:344:46: error:
+> ?IRQ_DOVE_PMU_START? undeclared (first use in this function)
 
+I guess that's with Arnd's patches?  Sigh, okay, it'll have to wait yet
+_another_ kernel cycle then.
 
-On 07/12/15 17:37, Rob Herring wrote:
-> +Linus W
->
-> On Fri, Dec 04, 2015 at 05:31:13PM +0000, Martyn Welch wrote:
->> This patch adds documentation for the gpio-switch binding. This binding
->> provides a mechanism to bind named links to gpio, with the primary
->> purpose of enabling standardised access to switches that might be standard
->> across a group of devices but implemented differently on each device.
->
-> This is good and what I suggested, but it now makes me wonder if switch
-> is generic enough. This boils down to needing to expose single gpio
-> lines to userspace with a defined function/use. IIRC, there's been some
-> discussion about this before along with improving the userspace
-> interface for GPIO in general. So I'd like to get Linus' thoughts on
-> this.
->
-
-No problem. Rename gpio-signal?
-
->
->> Signed-off-by: Martyn Welch <martyn.welch@collabora.co.uk>
->> ---
->>   .../devicetree/bindings/misc/gpio-switch.txt       | 47 ++++++++++++++++++++++
->>   1 file changed, 47 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/misc/gpio-switch.txt
->>
->> diff --git a/Documentation/devicetree/bindings/misc/gpio-switch.txt b/Documentation/devicetree/bindings/misc/gpio-switch.txt
->> new file mode 100644
->> index 0000000..13528bd
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/misc/gpio-switch.txt
->> @@ -0,0 +1,47 @@
->> +Device-Tree bindings for gpio attached switches.
->> +
->> +This provides a mechanism to provide a named link to specified gpios. This can
->> +be useful in instances such as when theres a need to monitor a switch, which is
->> +common across a family of devices, but attached to different gpios and even
->> +implemented in different ways on differnet devices.
->> +
->> +Required properties:
->> +	- compatible = "gpio-switch";
->> +
->> +Each signal is represented as a sub-node of "gpio-switch". The naming of
->> +sub-nodes is arbitrary.
->> +
->> +Required sub-node properties:
->> +
->> +	- label: Name to be given to gpio switch.
->> +	- gpios: OF device-tree gpio specification.
->> +
->> +Optional sub-node properties:
->> +
->> +	- read-only: Boolean flag to mark the gpio as read-only, i.e. the line
->> +	  should not be driven by the host.
->
-> In terms a a switch use, allowing driving it would be an override of the
-> switch. Is that the idea here?
->
-
-Yeah - since it had become a lot more generic and a lot of 
-switches/signals would probably be implemented with a pull-up resistor 
-of something like that, it seemed to make sense to allow them to be 
-driven as well.
-
->> +
->> +Example nodes:
->> +
->> +        gpio-switch {
->> +                compatible = "gpio-switch";
->
-> Both from a binding and driver perspective, there is no point in
-> grouping these. Each node can simply have this compatible string.
->
-
-True. I did it this way as this is how gpio-keys is implemented. OK, 
-that has one optional parameter (autorepeat) for the block and this has 
-none. Though I can also see that these probably have less in common than 
-the individual lines used in gpio-keys.
-
->> +
->> +                write-protect {
->> +                        label = "write-protect";
->> +                        gpios = <&gpx3 0 GPIO_ACTIVE_LOW>;
->> +                        read-only;
->> +                };
->> +
->> +                developer-switch {
->> +                        label = "developer-switch";
->> +                        gpios = <&gpx1 3 GPIO_ACTIVE_HIGH>;
->> +                        read-only;
->> +                };
->> +
->> +                recovery-switch {
->> +                        label = "recovery-switch";
->> +                        gpios = <&gpx0 7 GPIO_ACTIVE_LOW>;
->> +                        read-only;
->> +                };
->> +        };
->> +
->> --
->> 2.1.4
->>
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
