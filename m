@@ -1,67 +1,41 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Mon, 7 Dec 2015 07:45:14 -0800
-Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
- concurrent lockers
-In-Reply-To: <20151207103455.GO17308@twins.programming.kicks-ass.net>
-References: <20151204092110.GE17308@twins.programming.kicks-ass.net>
- <20151204160706.GC28602@linux.vnet.ibm.com>
- <20151204162453.GE15969@arm.com>
- <20151204164446.GF28602@linux.vnet.ibm.com>
- <20151206073712.GA1549@fixme-laptop.cn.ibm.com>
- <20151206192302.GS28602@linux.vnet.ibm.com>
- <20151206232825.GA13845@fixme-laptop.cn.ibm.com>
- <20151207000047.GX28602@linux.vnet.ibm.com>
- <20151207004504.GC13845@fixme-laptop.cn.ibm.com>
- <20151207103455.GO17308@twins.programming.kicks-ass.net>
-Message-ID: <20151207154514.GZ28602@linux.vnet.ibm.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 7 Dec 2015 17:48:05 +0200
+Subject: [PATCH] fbdev: sis: enforce selection of at least one backend
+In-Reply-To: <2902419.SMzMybotxA@wuerfel>
+References: <2902419.SMzMybotxA@wuerfel>
+Message-ID: <5665AA35.1040600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 11:34:55AM +0100, Peter Zijlstra wrote:
-> On Mon, Dec 07, 2015 at 08:45:04AM +0800, Boqun Feng wrote:
-> > > > Or maybe, we introduce another address space of sparse like:
-> > > > 
-> > > > 	# define __private	__attribute__((noderef, address_space(6)))
-> > > > 
-> > > > and macro to dereference private
-> > > > 
-> > > > 	# define private_dereference(p) ((typeof(*p) *) p)
-> > > > 
-> > > > and define struct rcu_node like:
-> > > > 
-> > > > 	struct rcu_node {
-> > > > 		raw_spinlock_t __private lock;	/* Root rcu_node's lock protects some */
-> > > > 		...
-> > > > 	};
-> > > > 
-> > > > and finally raw_spin_{un}lock_rcu_node() like:
-> > > > 
-> > > > 	static inline void raw_spin_lock_rcu_node(struct rcu_node *rnp)
-> > > > 	{
-> > > > 		raw_spin_lock(private_dereference(&rnp->lock));
-> > > > 		smp_mb__after_unlock_lock();
-> > > > 	}
-> > > > 
-> > > > 	static inline void raw_spin_unlock_rcu_node(struct rcu_node *rnp)
-> > > > 	{
-> > > > 		raw_spin_unlock(private_dereference(&rnp->lock));
-> > > > 	}
-> > > > 
-> > > > This __private mechanism also works for others who wants to private
-> > > > their fields of struct, which is not supported by C.
-> > > > 
-> > > > I will send two patches(one introduces __private and one uses it for
-> > > > rcu_node->lock) if you think this is not a bad idea ;-)
-> 
-> > If rcu_node->lock is the only user then this is probably a bad idea, but
-> > if others also want to have a way to privatize some fields of the
-> > structure, this may be not that bad?
-> 
-> Thomas might also want this for things like
-> irq_common_data::state_use_accessors for instance.
-> 
-> And I'm fairly sure there's more out there.
 
-If Thomas takes it, I will consider also applying it to RCU.
 
-							Thanx, Paul
+On 27/11/15 16:33, Arnd Bergmann wrote:
+> The sis framebuffer driver complains with a compile-time warning
+> if neither the FB_SIS_300 nor FB_SIS_315 symbols are selected:
+> 
+> drivers/video/fbdev/sis/sis_main.c:61:2: warning: #warning Neither CONFIG_FB_SIS_300 nor CONFIG_FB_SIS_315 is se
+> 
+> This is reasonable because it doesn't work in that case, but it's
+> also annoying for randconfig builds and is one of the most common
+> warnings I'm seeing on ARM now.
+> 
+> This changes the Kconfig logic to prevent the silly configuration,
+> by always selecting the FB_SIS_300 variant if the other one is
+> not set.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> Sorry for sending this twice, it looks like I forgot the fbdev list and
+> Tomi as recipients the first time
+
+Thanks, queued for 4.5.
+
+ tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151207/b73370aa/attachment.sig>
