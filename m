@@ -1,36 +1,45 @@
-From: JBeulich@suse.com (Jan Beulich)
-Date: Mon, 07 Dec 2015 03:32:40 -0700
-Subject: [Xen-devel] [PATCH v3 07/62] arm/acpi: Add
- arch_acpi_os_map_memory helper function for ARM
-In-Reply-To: <56654A36.6070708@huawei.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-8-git-send-email-shannon.zhao@linaro.org>
- <alpine.DEB.2.02.1511231137000.1107@kaball.uk.xensource.com>
- <565C6198.3070805@citrix.com> <56654A36.6070708@huawei.com>
-Message-ID: <56656E5802000078000BC8C7@prv-mh.provo.novell.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Mon, 07 Dec 2015 13:33:55 +0300
+Subject: [PATCH 0/2] net: thunderx: Miscellaneous cleanups
+In-Reply-To: <1449464433-43343-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <y@samsung.com>
+ <1449464433-43343-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <014f01d130da$c72c2d60$55848820$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> On 07.12.15 at 09:58, <zhaoshenglong@huawei.com> wrote:
-> On 2015/11/30 22:47, Julien Grall wrote:
->> On 23/11/15 11:37, Stefano Stabellini wrote:
->>> > On Tue, 17 Nov 2015, shannon.zhao at linaro.org wrote:
->>>> >> From: Shannon Zhao <shannon.zhao@linaro.org>
->>> > could you please add a couple of lines to the commit message mentioning
->>> > why __va(phys) is an acceptable implementation of arch_acpi_os_map_memory?
->> FWIW, I already asked this question multiple time on the previous series
->> without clear answer.
->> 
->> __va should only be used when the memory is direct-mapped to Xen (i.e
->> accessible directly). On ARM64, this is only the case for the RAM. Can
->> someone confirm the ACPI will always reside to the RAM?
-> I checked this with the UEFI SPEC. It says in 2.3.6 AArch64 Platforms:
-> "If ACPI is supported :
-> ? ACPI Tables loaded at boot time can be contained in memory of type
-> EfiACPIReclaimMemory (recommended) or EfiACPIMemoryNVS."
+ Tested-by: Pavel Fedin <p.fedin@samsung.com>
+
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
+
+
+> -----Original Message-----
+> From: netdev-owner at vger.kernel.org [mailto:netdev-owner at vger.kernel.org] On Behalf Of Sunil
+> Goutham
+> Sent: Monday, December 07, 2015 8:01 AM
+> To: netdev at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; p.fedin at samsung.com;
+> Sunil.Goutham at caviumnetworks.com; Sunil Goutham
+> Subject: [PATCH 0/2] net: thunderx: Miscellaneous cleanups
 > 
-> So I think it means the ACPI tables will always reside in RAM.
-
-I think NVS doesn't necessarily mean RAM.
-
-Jan
+> From: Sunil Goutham <sgoutham@cavium.com>
+> 
+> This patch series contains contains couple of cleanup patches.
+> 
+> Sunil Goutham (1):
+>   net, thunderx: Remove unnecessary rcv buffer start address management
+> 
+> Yury Norov (1):
+>   net: thunderx: nicvf_queues: nivc_*_intr: remove duplication
+> 
+>  drivers/net/ethernet/cavium/thunder/nicvf_queues.c |  189 +++++---------------
+>  drivers/net/ethernet/cavium/thunder/nicvf_queues.h |   10 +-
+>  2 files changed, 51 insertions(+), 148 deletions(-)
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe netdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
