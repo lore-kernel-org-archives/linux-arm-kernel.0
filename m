@@ -1,101 +1,87 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 07 Dec 2015 08:44:36 +0100
-Subject: [PATCH] drivers: dma-coherent: simplify dma_init_coherent_memory
- return value
-In-Reply-To: <1449260058-3572-1-git-send-email-mina86@mina86.com>
-References: <1449260058-3572-1-git-send-email-mina86@mina86.com>
-Message-ID: <566538E4.30209@samsung.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 7 Dec 2015 09:12:57 +0100
+Subject: [PATCH v5 3/4] ARM: dts: sunxi: Add Allwinner H3 DTSI
+In-Reply-To: <1449264283-25360-4-git-send-email-jenskuske@gmail.com>
+References: <1449264283-25360-1-git-send-email-jenskuske@gmail.com>
+ <1449264283-25360-4-git-send-email-jenskuske@gmail.com>
+Message-ID: <20151207091257.070723b67db726d9f05c6550@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri,  4 Dec 2015 22:24:42 +0100
+Jens Kuske <jenskuske@gmail.com> wrote:
 
-On 2015-12-04 21:14, Michal Nazarewicz wrote:
-> Since only dma_declare_coherent_memory cares about
-> dma_init_coherent_memory returning part of flags as it return value,
-> move the condition to the former and simplify the latter.  This in
-> turn makes rmem_dma_device_init less confusing.
->
-> Reported-by: Fugang Duan <B38611@freescale.com>
-> Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
-
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
+> The Allwinner H3 is a home entertainment system oriented SoC with
+> four Cortex-A7 cores and a Mali-400MP2 GPU.
+> 
+> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
 > ---
->   drivers/base/dma-coherent.c | 28 +++++++++++-----------------
->   1 file changed, 11 insertions(+), 17 deletions(-)
->
-> diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
-> index 55b8398..87b8083 100644
-> --- a/drivers/base/dma-coherent.c
-> +++ b/drivers/base/dma-coherent.c
-> @@ -17,9 +17,9 @@ struct dma_coherent_mem {
->   	spinlock_t	spinlock;
->   };
->   
-> -static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_addr,
-> -			     size_t size, int flags,
-> -			     struct dma_coherent_mem **mem)
-> +static bool dma_init_coherent_memory(
-> +	phys_addr_t phys_addr, dma_addr_t device_addr, size_t size, int flags,
-> +	struct dma_coherent_mem **mem)
->   {
->   	struct dma_coherent_mem *dma_mem = NULL;
->   	void __iomem *mem_base = NULL;
-> @@ -50,17 +50,13 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_add
->   	spin_lock_init(&dma_mem->spinlock);
->   
->   	*mem = dma_mem;
-> -
-> -	if (flags & DMA_MEMORY_MAP)
-> -		return DMA_MEMORY_MAP;
-> -
-> -	return DMA_MEMORY_IO;
-> +	return true;
->   
->   out:
->   	kfree(dma_mem);
->   	if (mem_base)
->   		iounmap(mem_base);
-> -	return 0;
-> +	return false;
->   }
->   
->   static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
-> @@ -88,15 +84,13 @@ int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
->   				dma_addr_t device_addr, size_t size, int flags)
->   {
->   	struct dma_coherent_mem *mem;
-> -	int ret;
->   
-> -	ret = dma_init_coherent_memory(phys_addr, device_addr, size, flags,
-> -				       &mem);
-> -	if (ret == 0)
-> +	if (!dma_init_coherent_memory(phys_addr, device_addr, size, flags,
-> +				      &mem))
->   		return 0;
->   
->   	if (dma_assign_coherent_memory(dev, mem) == 0)
-> -		return ret;
-> +		return flags & DMA_MEMORY_MAP ? DMA_MEMORY_MAP : DMA_MEMORY_IO;
->   
->   	dma_release_coherent_memory(mem);
->   	return 0;
-> @@ -281,9 +275,9 @@ static int rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
->   	struct dma_coherent_mem *mem = rmem->priv;
->   
->   	if (!mem &&
-> -	    dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
-> -				     DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
-> -				     &mem) != DMA_MEMORY_MAP) {
-> +	    !dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
-> +				      DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
-> +				      &mem)) {
->   		pr_err("Reserved memory: failed to init DMA memory pool at %pa, size %ld MiB\n",
->   			&rmem->base, (unsigned long)rmem->size / SZ_1M);
->   		return -ENODEV;
+>  arch/arm/boot/dts/sun8i-h3.dtsi | 497 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 497 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun8i-h3.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> new file mode 100644
+> index 0000000..1524130e
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> @@ -0,0 +1,497 @@
+	[snip]
+> +		bus_gates: clk at 01c20060 {
+> +			#clock-cells = <1>;
+> +			compatible = "allwinner,sun8i-h3-bus-gates-clk";
+> +			reg = <0x01c20060 0x14>;
+> +			clocks = <&ahb1>, <&ahb2>, <&apb1>, <&apb2>;
+> +			clock-names = "ahb1", "ahb2", "apb1", "apb2";
+> +			clock-indices = <5>, <6>, <8>,
+> +					<9>, <10>, <13>,
+> +					<14>, <17>, <18>,
+> +					<19>, <20>,
+> +					<21>, <23>,
+> +					<24>, <25>,
+> +					<26>, <27>,
+> +					<28>, <29>,
+> +					<30>, <31>, <32>,
+> +					<35>, <36>, <37>,
+> +					<40>, <41>, <43>,
+> +					<44>, <52>, <53>,
+> +					<54>, <64>,
+> +					<65>, <69>, <72>,
+> +					<76>, <77>, <78>,
+> +					<96>, <97>, <98>,
+> +					<112>, <113>,
+> +					<114>, <115>,
+> +					<116>, <128>, <135>;
+> +			clock-output-names = "bus_ce", "bus_dma", "bus_mmc0",
+> +					     "bus_mmc1", "bus_mmc2", "bus_nand",
+> +					     "bus_sdram", "bus_gmac", "bus_ts",
+> +					     "bus_hstimer", "bus_spi0",
+> +					     "bus_spi1", "bus_otg",
+> +					     "bus_otg_ehci0", "bus_ehci1",
+> +					     "bus_ehci2", "bus_ehci3",
+> +					     "bus_otg_ohci0", "bus_ohci1",
+> +					     "bus_ohci2", "bus_ohci3", "bus_ve",
+> +					     "bus_lcd0", "bus_lcd1", "bus_deint",
 
-Best regards
+The tcon1 clock is used by both lcd0 and lcd1, while the tcon0 clock is used for TV output from lcd1, so, this should be:
+
+	"bus_tcon0", "bus_tcon1", "bus_deint",
+
+(the tcon1 clock is used by both lcd0 and lcd1, while
+ the tcon0 clock is used for TV output from lcd1)
+
+> +					     "bus_csi", "bus_tve", "bus_hdmi",
+> +					     "bus_de", "bus_gpu", "bus_msgbox",
+> +					     "bus_spinlock", "bus_codec",
+> +					     "bus_spdif", "bus_pio", "bus_ths",
+> +					     "bus_i2s0", "bus_i2s1", "bus_i2s2",
+> +					     "bus_i2c0", "bus_i2c1", "bus_i2c2",
+> +					     "bus_uart0", "bus_uart1",
+> +					     "bus_uart2", "bus_uart3",
+> +					     "bus_scr", "bus_ephy", "bus_dbg";
+> +		};
+	[snip]
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
