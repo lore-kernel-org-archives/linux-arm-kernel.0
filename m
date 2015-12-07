@@ -1,95 +1,87 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 8 Dec 2015 06:48:53 +0800
-Subject: [PATCH 12/23] mtd: use mtd_eccpos() and mtd_oobfree() where
- appropriate
-In-Reply-To: <1449527178-5930-13-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <201512080642.2MUjuxx4%fengguang.wu@intel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon,  7 Dec 2015 14:54:05 -0800
+Subject: [PATCH] mmc: pwrseq_simple: Fix regression with optional GPIOs
+Message-ID: <1449528845-25189-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Commit ce037275861e ("mmc: pwrseq_simple: use GPIO descriptors array API")
+changed the handling MMC power sequence so GPIOs no longer are optional.
 
-[auto build test ERROR on next-20151207]
-[cannot apply to staging/staging-testing v4.4-rc4 v4.4-rc3 v4.4-rc2 v4.4-rc4]
+This broke SDIO WLAN at least for omap5 that can't yet use the reset GPIOs
+with pwrseq_simple as a wait is needed after enabling the SDIO device.
 
-url:    https://github.com/0day-ci/linux/commits/Boris-Brezillon/mtd-rework-ECC-layout-definition/20151208-063127
-config: i386-randconfig-x006-12070758 (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+Let's fix the problem by allocating the GPIO values array during init
+depending on the optional GPIOs found.
 
-All error/warnings (new ones prefixed by >>):
+Note that depending on the board specific configuration, some of the GPIOs
+can be permanently set up with pulls, so we want to keep pwrseq_simple
+GPIOs optional.
 
-   In file included from include/linux/linkage.h:4:0,
-                    from include/linux/kernel.h:6,
-                    from drivers/mtd/mtdswap.c:27:
-   drivers/mtd/mtdswap.c: In function 'mtdswap_add_mtd':
->> drivers/mtd/mtdswap.c:1449:6: error: too few arguments to function 'mtd_oobfree'
-     if (mtd_oobfree(mtd, 0) < 0) {
-         ^
-   include/linux/compiler.h:147:28: note: in definition of macro '__trace_if'
-     if (__builtin_constant_p((cond)) ? !!(cond) :   \
-                               ^
->> drivers/mtd/mtdswap.c:1449:2: note: in expansion of macro 'if'
-     if (mtd_oobfree(mtd, 0) < 0) {
-     ^
-   In file included from drivers/mtd/mtdswap.c:29:0:
-   include/linux/mtd/mtd.h:267:19: note: declared here
-    static inline int mtd_oobfree(struct mtd_info *mtd, int section,
-                      ^
-   In file included from include/linux/linkage.h:4:0,
-                    from include/linux/kernel.h:6,
-                    from drivers/mtd/mtdswap.c:27:
->> drivers/mtd/mtdswap.c:1449:6: error: too few arguments to function 'mtd_oobfree'
-     if (mtd_oobfree(mtd, 0) < 0) {
-         ^
-   include/linux/compiler.h:147:40: note: in definition of macro '__trace_if'
-     if (__builtin_constant_p((cond)) ? !!(cond) :   \
-                                           ^
->> drivers/mtd/mtdswap.c:1449:2: note: in expansion of macro 'if'
-     if (mtd_oobfree(mtd, 0) < 0) {
-     ^
-   In file included from drivers/mtd/mtdswap.c:29:0:
-   include/linux/mtd/mtd.h:267:19: note: declared here
-    static inline int mtd_oobfree(struct mtd_info *mtd, int section,
-                      ^
-   In file included from include/linux/linkage.h:4:0,
-                    from include/linux/kernel.h:6,
-                    from drivers/mtd/mtdswap.c:27:
->> drivers/mtd/mtdswap.c:1449:6: error: too few arguments to function 'mtd_oobfree'
-     if (mtd_oobfree(mtd, 0) < 0) {
-         ^
-   include/linux/compiler.h:158:16: note: in definition of macro '__trace_if'
-      ______r = !!(cond);     \
-                   ^
->> drivers/mtd/mtdswap.c:1449:2: note: in expansion of macro 'if'
-     if (mtd_oobfree(mtd, 0) < 0) {
-     ^
-   In file included from drivers/mtd/mtdswap.c:29:0:
-   include/linux/mtd/mtd.h:267:19: note: declared here
-    static inline int mtd_oobfree(struct mtd_info *mtd, int section,
-                      ^
-
-vim +/mtd_oobfree +1449 drivers/mtd/mtdswap.c
-
-  1443		if (PAGE_SIZE % mtd->writesize || mtd->writesize > PAGE_SIZE) {
-  1444			printk(KERN_ERR "%s: PAGE_SIZE %lu not multiple of write size"
-  1445				" %u\n", MTDSWAP_PREFIX, PAGE_SIZE, mtd->writesize);
-  1446			return;
-  1447		}
-  1448	
-> 1449		if (mtd_oobfree(mtd, 0) < 0) {
-  1450			printk(KERN_ERR "%s: mtd%d does not have OOB\n",
-  1451				MTDSWAP_PREFIX, mtd->index);
-  1452			return;
-
+Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 26343 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151208/5488955d/attachment-0001.obj>
+ drivers/mmc/core/pwrseq_simple.c | 20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
+
+--- a/drivers/mmc/core/pwrseq_simple.c
++++ b/drivers/mmc/core/pwrseq_simple.c
+@@ -24,6 +24,7 @@ struct mmc_pwrseq_simple {
+ 	bool clk_enabled;
+ 	struct clk *ext_clk;
+ 	struct gpio_descs *reset_gpios;
++	int *values;
+ };
+ 
+ static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
+@@ -31,13 +32,15 @@ static void mmc_pwrseq_simple_set_gpios_value(struct mmc_pwrseq_simple *pwrseq,
+ {
+ 	int i;
+ 	struct gpio_descs *reset_gpios = pwrseq->reset_gpios;
+-	int values[reset_gpios->ndescs];
++
++	if (!reset_gpios || !reset_gpios->ndescs)
++		return;
+ 
+ 	for (i = 0; i < reset_gpios->ndescs; i++)
+-		values[i] = value;
++		pwrseq->values[i] = value;
+ 
+ 	gpiod_set_array_value_cansleep(reset_gpios->ndescs, reset_gpios->desc,
+-				       values);
++				       pwrseq->values);
+ }
+ 
+ static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
+@@ -84,6 +87,7 @@ static void mmc_pwrseq_simple_free(struct mmc_host *host)
+ 	if (!IS_ERR(pwrseq->ext_clk))
+ 		clk_put(pwrseq->ext_clk);
+ 
++	kfree(pwrseq->values);
+ 	kfree(pwrseq);
+ }
+ 
+@@ -111,12 +115,20 @@ struct mmc_pwrseq *mmc_pwrseq_simple_alloc(struct mmc_host *host,
+ 		goto free;
+ 	}
+ 
+-	pwrseq->reset_gpios = gpiod_get_array(dev, "reset", GPIOD_OUT_HIGH);
++	pwrseq->reset_gpios = gpiod_get_array_optional(dev, "reset",
++						       GPIOD_OUT_HIGH);
+ 	if (IS_ERR(pwrseq->reset_gpios)) {
+ 		ret = PTR_ERR(pwrseq->reset_gpios);
+ 		goto clk_put;
+ 	}
+ 
++	if (pwrseq->reset_gpios && pwrseq->reset_gpios->ndescs) {
++		pwrseq->values = kzalloc(pwrseq->reset_gpios->ndescs *
++					 sizeof(int), GFP_KERNEL);
++		if (!pwrseq->values)
++			goto clk_put;
++	}
++
+ 	pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
+ 
+ 	return &pwrseq->pwrseq;
+-- 
+2.6.2
