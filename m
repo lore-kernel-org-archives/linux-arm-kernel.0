@@ -1,21 +1,22 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 7 Dec 2015 10:21:37 +0100
-Subject: [PATCH resend 5/6] ARM: dts: sun7i: Add DRAM gates
-In-Reply-To: <1449321407-4531-6-git-send-email-wens@csie.org>
-References: <1449321407-4531-1-git-send-email-wens@csie.org>
- <1449321407-4531-6-git-send-email-wens@csie.org>
-Message-ID: <20151207092137.GC27957@lukather>
+Date: Mon, 7 Dec 2015 10:23:22 +0100
+Subject: [PATCH v5 2/4] pinctrl: sunxi: Add H3 PIO controller support
+In-Reply-To: <1449264283-25360-3-git-send-email-jenskuske@gmail.com>
+References: <1449264283-25360-1-git-send-email-jenskuske@gmail.com>
+ <1449264283-25360-3-git-send-email-jenskuske@gmail.com>
+Message-ID: <20151207092322.GD27957@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 05, 2015 at 09:16:46PM +0800, Chen-Yu Tsai wrote:
-> The DRAM gates controls direct memory access for some peripherals.
-> These peripherals include the display pipeline, so add the required
-> gates to the simplefb nodes as well.
+On Fri, Dec 04, 2015 at 10:24:41PM +0100, Jens Kuske wrote:
+> The H3 uses the same pin controller as previous SoC's from Allwinner.
+> Add support for the pins controlled by the main PIO controller.
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
 
-Applied, thanks!
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Thanks!
 Maxime
 
 -- 
@@ -28,4 +29,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151207/94ba16a7/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151207/a2216d0a/attachment.sig>
