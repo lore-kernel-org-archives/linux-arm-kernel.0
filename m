@@ -1,24 +1,36 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 7 Dec 2015 14:54:44 -0700
-Subject: [PATCH v2 0/4] ARM: dts: vf610: relicense the device trees under
- GPLv2/X11
-In-Reply-To: <1449525076-23569-1-git-send-email-stefan@agner.ch>
-References: <1449525076-23569-1-git-send-email-stefan@agner.ch>
-Message-ID: <56660024.5020006@wwwdotorg.org>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 7 Dec 2015 13:56:02 -0800
+Subject: [PATCH] ARM: mm: mark section-aligned portion of rodata NX
+In-Reply-To: <CAKv+Gu-q4ziskce+KneLTKZWi+sB_-4ZG4tyYssK7HNyqxAn4A@mail.gmail.com>
+References: <20151207205432.GA5271@www.outflux.net>
+ <CAKv+Gu-q4ziskce+KneLTKZWi+sB_-4ZG4tyYssK7HNyqxAn4A@mail.gmail.com>
+Message-ID: <CAGXu5jKOn7S-GVu4bZU+B3QbrJZxen4mPzK7-TyzcFf7YiKDNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/2015 02:51 PM, Stefan Agner wrote:
-> I collected the Acks I received so far and removed them from the list
-> below. Several Freescale addresses are no longer valid (the once
-> starting with --)... I would interprete the Ack from Yuan Yao as an
-> Ack from Freescale.
+On Mon, Dec 7, 2015 at 1:52 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 7 December 2015 at 21:54, Kees Cook <keescook@chromium.org> wrote:
+>> When rodata is large enough that it crosses a section boundary after the
+>> kernel text, mark the rest NX. This is as close to full NX of rodata as
+>> we can get without splitting page tables or doing section alignment via
+>> CONFIG_DEBUG_ALIGN_RODATA.
+>>
+>> Signed-off-by: Kees Cook <keescook@chromium.org>
+>> ---
+>> I am baffled why I can't put the ALIGN in the ".start = " initializer.
+>> GCC seems to think it's non-static, but only because of the "&" operator.
+>> Does anyone see a way to do this that doesn't require the runtime ALIGN?
 >
-> Matt, you introduced the vf610-cosmic.dts board, is it possible to
-> get an ack for this too? I think you did not receive v1 of this patch
-> due to an old email address, sorry about that.
+> Yes, but you need to move the ALIGN() expression to the linker script
+> as the value of a new symbol
 
-I thought I'd already sent an ack for this, but it looks like I forgot 
-somehow.
+I didn't see a way to do this without actually bumping the alignment
+(CONFIG_DEBUG_ALIGN_RODATA already does that, I want the other case).
+Do you have an example anywhere I could look at?
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+-Kees
+
+-- 
+Kees Cook
+Chrome OS & Brillo Security
