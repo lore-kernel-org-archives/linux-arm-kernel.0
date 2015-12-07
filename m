@@ -1,68 +1,86 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Mon, 7 Dec 2015 15:16:46 +0100
-Subject: [PATCH v2 5/5] printk/nmi: Increase the size of the temporary
- buffer
-In-Reply-To: <81211733-2484-40A9-9D4A-644AA27FBC73@gmail.com>
-References: <1448622572-16900-1-git-send-email-pmladek@suse.com>
- <1448622572-16900-6-git-send-email-pmladek@suse.com>
- <81211733-2484-40A9-9D4A-644AA27FBC73@gmail.com>
-Message-ID: <20151207141646.GF20935@pathway.suse.cz>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 7 Dec 2015 08:16:56 -0600
+Subject: [PATCH v6 1/5] dt-bindings: add SMP enable-method for Broadcom NSP
+In-Reply-To: <1449316424-14549-2-git-send-email-kapilh@broadcom.com>
+References: <1449316424-14549-1-git-send-email-kapilh@broadcom.com>
+ <1449316424-14549-2-git-send-email-kapilh@broadcom.com>
+Message-ID: <20151207141656.GA23414@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2015-11-30 08:42:04, yalin wang wrote:
+On Sat, Dec 05, 2015 at 06:53:40AM -0500, Kapil Hali wrote:
+> Add a compatible string "brcm,bcm-nsp-smp" for Broadcom's
+> Northstar Plus CPU to the 32-bit ARM CPU device tree binding
+> documentation file and create a new binding documentation for
+> Northstar Plus CPU.
 > 
-> > On Nov 27, 2015, at 19:09, Petr Mladek <pmladek@suse.com> wrote:
-> > 
-> > Testing has shown that the backtrace sometimes does not fit
-> > into the 4kB temporary buffer that is used in NMI context.
-> > 
-> > The warnings are gone when I double the temporary buffer size.
-> > 
-> > Note that this problem existed even in the x86-specific
-> > implementation that was added by the commit a9edc8809328
-> > ("x86/nmi: Perform a safe NMI stack trace on all CPUs").
-> > Nobody noticed it because it did not print any warnings.
-> > 
-> > Signed-off-by: Petr Mladek <pmladek@suse.com>
-> > ---
-> > kernel/printk/nmi.c | 2 +-
-> > 1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/kernel/printk/nmi.c b/kernel/printk/nmi.c
-> > index 8af1e4016719..6111644d5f01 100644
-> > --- a/kernel/printk/nmi.c
-> > +++ b/kernel/printk/nmi.c
-> > @@ -42,7 +42,7 @@ atomic_t nmi_message_lost;
-> > struct nmi_seq_buf {
-> > 	atomic_t		len;	/* length of written data */
-> > 	struct irq_work		work;	/* IRQ work that flushes the buffer */
-> > -	unsigned char		buffer[PAGE_SIZE - sizeof(atomic_t) -
-> > +	unsigned char		buffer[2 * PAGE_SIZE - sizeof(atomic_t) -
-> > 				       sizeof(struct irq_work)];
-> > };
-> > 
-> 
-> why not define like this:
-> 
-> union {
-> struct {atomic_t		len;	
-> 	struct irq_work		work;
-> }
-> unsigned char		buffer[PAGE_SIZE * 2] ;
-> }
-> 
-> we can make sure the union is 2 PAGE_SIZE .
+> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
 
-IMHO, this would add more confusion. It would just move the
-computation somewhere else. The union will have 2*PAGE_SIZE
-but the beginning of "buffer" will be shared with "len"
-and "work". Therefore, we would need to skip the beginning
-of the buffer when storing the data. By other words, we still
-will be able to use only (sizeof(buffer) - sizeof(atomic_t) -
-sizeof(struct irq_work)] of the "buffer".
+Acked-by: Rob Herring <robh@kernel.org>
 
-Or did I miss something, please?
-
-Best Regards,
-Petr
+> ---
+>  .../bindings/arm/bcm/brcm,nsp-cpu-method.txt       | 39 ++++++++++++++++++++++
+>  Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
+>  2 files changed, 40 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+> new file mode 100644
+> index 0000000..677ef9d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+> @@ -0,0 +1,39 @@
+> +Broadcom Northstar Plus SoC CPU Enable Method
+> +---------------------------------------------
+> +This binding defines the enable method used for starting secondary
+> +CPU in the following Broadcom SoCs:
+> +  BCM58522, BCM58525, BCM58535, BCM58622, BCM58623, BCM58625, BCM88312
+> +
+> +The enable method is specified by defining the following required
+> +properties in the corresponding secondary "cpu" device tree node:
+> +  - enable-method = "brcm,bcm-nsp-smp";
+> +  - secondary-boot-reg = <...>;
+> +
+> +The secondary-boot-reg property is a u32 value that specifies the
+> +physical address of the register which should hold the common
+> +entry point for a secondary CPU. This entry is cpu node specific
+> +and should be added per cpu. E.g., in case of NSP (BCM58625) which
+> +is a dual core CPU SoC, this entry should be added to cpu1 node.
+> +
+> +
+> +Example:
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu0: cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			next-level-cache = <&L2>;
+> +			reg = <0>;
+> +		};
+> +
+> +		cpu1: cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			next-level-cache = <&L2>;
+> +			enable-method = "brcm,bcm-nsp-smp";
+> +			secondary-boot-reg = <0xffff042c>;
+> +			reg = <1>;
+> +		};
+> +	};
+> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> index 3a07a87..d191554 100644
+> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> @@ -190,6 +190,7 @@ nodes to be present and contain the properties described below.
+>  			    "allwinner,sun6i-a31"
+>  			    "allwinner,sun8i-a23"
+>  			    "arm,psci"
+> +			    "brcm,bcm-nsp-smp"
+>  			    "brcm,brahma-b15"
+>  			    "marvell,armada-375-smp"
+>  			    "marvell,armada-380-smp"
+> -- 
+> 2.1.0
+> 
