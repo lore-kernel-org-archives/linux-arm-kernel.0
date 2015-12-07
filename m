@@ -1,71 +1,41 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  7 Dec 2015 11:50:22 +0000
-Subject: [PATCH 09/19] mfd: arizona-core: msleep() is unreliable for anything
- <20ms use usleep_range() instead
+Date: Mon,  7 Dec 2015 11:50:26 +0000
+Subject: [PATCH 13/19] mfd: cros_ec_i2c: Fix trivial 'tabs before spaces'
+ whitespace issue.
 In-Reply-To: <1449489032-14374-1-git-send-email-lee.jones@linaro.org>
 References: <1449489032-14374-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1449489032-14374-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <1449489032-14374-14-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WARNING: msleep < 20ms can sleep for up to 20ms; see Documentation/timers/timers-howto.txt
-+               msleep(1);
+ERROR: code indent should use tabs where possible
++ ^Iec_dev = devm_kzalloc(dev, sizeof(*ec_dev), GFP_KERNEL);$
 
-WARNING: msleep < 20ms can sleep for up to 20ms; see Documentation/timers/timers-howto.txt
-+                       msleep(5);
+WARNING: please, no space before tabs
++ ^Iec_dev = devm_kzalloc(dev, sizeof(*ec_dev), GFP_KERNEL);$
 
-WARNING: msleep < 20ms can sleep for up to 20ms; see Documentation/timers/timers-howto.txt
-+               msleep(1);
+WARNING: please, no spaces at the start of a line
++ ^Iec_dev = devm_kzalloc(dev, sizeof(*ec_dev), GFP_KERNEL);$
 
-WARNING: msleep < 20ms can sleep for up to 20ms; see Documentation/timers/timers-howto.txt
-+               msleep(1);
+total: 1 errors, 2 warnings, 366 lines checked
 
-total: 0 errors, 4 warnings, 1407 lines checked
-
-Cc: patches at opensource.wolfsonmicro.com
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/arizona-core.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/mfd/cros_ec_i2c.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/arizona-core.c b/drivers/mfd/arizona-core.c
-index 44cfdbb..ceba17ca 100644
---- a/drivers/mfd/arizona-core.c
-+++ b/drivers/mfd/arizona-core.c
-@@ -239,7 +239,7 @@ static int arizona_poll_reg(struct arizona *arizona,
- 		if ((val & mask) == target)
- 			return 0;
+diff --git a/drivers/mfd/cros_ec_i2c.c b/drivers/mfd/cros_ec_i2c.c
+index d06e4b4..43db7bd 100644
+--- a/drivers/mfd/cros_ec_i2c.c
++++ b/drivers/mfd/cros_ec_i2c.c
+@@ -292,7 +292,7 @@ static int cros_ec_i2c_probe(struct i2c_client *client,
+ 	struct cros_ec_device *ec_dev = NULL;
+ 	int err;
  
--		msleep(1);
-+		usleep_range(1000, 5000);
- 	}
+- 	ec_dev = devm_kzalloc(dev, sizeof(*ec_dev), GFP_KERNEL);
++	ec_dev = devm_kzalloc(dev, sizeof(*ec_dev), GFP_KERNEL);
+ 	if (!ec_dev)
+ 		return -ENOMEM;
  
- 	dev_err(arizona->dev, "Polling reg %u timed out: %x\n", reg, val);
-@@ -280,14 +280,14 @@ static void arizona_disable_reset(struct arizona *arizona)
- 		case WM5110:
- 		case WM8280:
- 			/* Meet requirements for minimum reset duration */
--			msleep(5);
-+			usleep_range(5000, 10000);
- 			break;
- 		default:
- 			break;
- 		}
- 
- 		gpio_set_value_cansleep(arizona->pdata.reset, 1);
--		msleep(1);
-+		usleep_range(1000, 5000);
- 	}
- }
- 
-@@ -1045,7 +1045,7 @@ int arizona_dev_init(struct arizona *arizona)
- 			goto err_reset;
- 		}
- 
--		msleep(1);
-+		usleep_range(1000, 5000);
- 	}
- 
- 	/* Ensure device startup is complete */
 -- 
 1.9.1
