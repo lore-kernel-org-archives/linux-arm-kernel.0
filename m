@@ -1,109 +1,82 @@
-From: xuejiancheng@huawei.com (xuejiancheng)
-Date: Tue, 8 Dec 2015 09:55:35 +0800
-Subject: [PATCH v2 3/9] ARM: hisi: enable Hi3519 soc
-In-Reply-To: <2329688.AAaHl8K2Zb@wuerfel>
-References: <1449110565-23590-1-git-send-email-xuejiancheng@huawei.com>
- <43938749.Z0h4RNddN6@wuerfel> <56652E06.10309@huawei.com>
- <2329688.AAaHl8K2Zb@wuerfel>
-Message-ID: <56663897.7040901@huawei.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Mon, 07 Dec 2015 18:14:36 -0800
+Subject: [PATCH v3 05/22] arm64: KVM: Implement vgic-v3 save/restore
+In-Reply-To: <5665CDDF.3090201@arm.com>
+References: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
+ <1449485618-9443-6-git-send-email-marc.zyngier@arm.com>
+ <5665B663.8020705@samsung.com> <5665B940.7000601@arm.com>
+ <5665BF4D.7090103@samsung.com> <5665C3C7.9010600@arm.com>
+ <5665CA68.2000401@samsung.com> <5665CDDF.3090201@arm.com>
+Message-ID: <56663D0C.1070500@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 2015/12/7 17:46, Arnd Bergmann wrote:
-> On Monday 07 December 2015 14:58:14 xuejiancheng wrote:
->> On 2015/12/5 5:54, Arnd Bergmann wrote:
->>> On Friday 04 December 2015 12:07:58 xuejiancheng wrote:
->>>> On 2015/12/3 17:40, Arnd Bergmann wrote:
->>>>> On Thursday 03 December 2015 10:42:45 Jiancheng Xue wrote:
->>>>>> --- a/arch/arm/mach-hisi/Kconfig
->>>>>> +++ b/arch/arm/mach-hisi/Kconfig
->>>>>> @@ -12,6 +12,14 @@ if ARCH_HISI
->>>>>>  
->>>>>>  menu "Hisilicon platform type"
->>>>>>  
->>>>>> +config ARCH_HI3519
->>>>>> +       bool "Hisilicon Hi3519 Soc" if ARCH_MULTI_V7
->>>>>> +       select HAVE_ARM_ARCH_TIMER
->>>>>> +       select ARCH_HAS_RESET_CONTROLLER
->>>>>> +
->>>>>> +       help
->>>>>> +         Support for Hisilicon Hi3519 Soc
->>>>>> +
->>>>>>  config ARCH_HI3xxx
->>>>>>         bool "Hisilicon Hi36xx family" if ARCH_MULTI_V7
->>>>>>         select CACHE_L2X0
->>>>>
->>>>> Do those need to be separate? I would just extend the Hi36xx
->>>>> to cover all Hi3xxx, if nothing in the platform code really
->>>>> depends on this.
->>>>
->>>> For HI3519, there is really no special platform code. But HI35xx and HI36xx soc families
->>>> belong to different product lines in hisilicon. HI35xx family also composes of various
->>>> architectures socs(single core, smp and big-little). So I think it may be clear to have
->>>> separate arch definitions.
->>>>
->>>> Could you give me more suggestions about this?  Thank you!
->>>
->>> For the most part, you already need to enable the device drivers for the
->>> specific components on each chip, and the per-soc top-level options here
->>> don't actually control the compilation of any particular code.
->>>
->>> This is slightly different for some of the older platforms that for historic
->>> reasons need fine-grained options. You could probably just make the device
->>> drivers depend on "ARCH_HISI || COMPILE_TEST" in general, but some level
->>> of classification is ok, in particular when the chips are not related at all.
->>>
->>> In this case, my impression is that while HI3519 and HI36xx are made
->>> by different business units, there is still a noticeable amount of shared
->>> IP in them (e.g. the "sysctrl" node that seems to be shared with some of
->>> the other chips as well), so grouping them together should make sense.
+On 12/7/2015 10:20 AM, Marc Zyngier wrote:
+> On 07/12/15 18:05, Mario Smarduch wrote:
 >>
->> HI35xx and HI36xx are designed totally independently, including IP selection.
->> The relation between HI35xx and HI36xx is just like the one between HI36xx
->> and HIP0x. In another word, HI35xx and HI36xx are not related except they all
->> belong to hisilicon. So I don't think it's proper to group them together.
 >>
->> Is it OK if I drop ARCH_HI3519 and use ARCH_HISI directly?
+>> On 12/7/2015 9:37 AM, Marc Zyngier wrote:
+[...]
+>>>
+>>
+>> I was thinking something like 'current_lr[VGIC_V3_LR_INDEX(...)]'.
 > 
-> I think we should come up with a way to handle this in general for
-> ARCH_HISI. It's not problem to have a couple of sub-options, but I'd
-> rather not have one for each SoC because I'm sure that hisilicon has
-> made dozens or possibly hundreds of ARM based SoCs that belong into
-> a couple of families.
-
-Agree with you.
-
+> That doesn't change anything, the compiler is perfectly able to 
+> optimize something like this:
 > 
-> The individual selection of IP blocks is not that important, because
-> those tend to just be generic device drivers that we can enable on
-> any platform using the defconfig files.
+> [...]
+> ffffffc0007f31ac:       38624862        ldrb    w2, [x3,w2,uxtw]
+> ffffffc0007f31b0:       10000063        adr     x3, ffffffc0007f31bc <__vgic_v3_save_state+0x64>
+> ffffffc0007f31b4:       8b228862        add     x2, x3, w2, sxtb #2
+> ffffffc0007f31b8:       d61f0040        br      x2
+> ffffffc0007f31bc:       d53ccde2        mrs     x2, s3_4_c12_c13_7
+> ffffffc0007f31c0:       f9001c02        str     x2, [x0,#56]
+> ffffffc0007f31c4:       d53ccdc2        mrs     x2, s3_4_c12_c13_6
+> ffffffc0007f31c8:       f9002002        str     x2, [x0,#64]
+> ffffffc0007f31cc:       d53ccda2        mrs     x2, s3_4_c12_c13_5
+> ffffffc0007f31d0:       f9002402        str     x2, [x0,#72]
+> ffffffc0007f31d4:       d53ccd82        mrs     x2, s3_4_c12_c13_4
+> ffffffc0007f31d8:       f9002802        str     x2, [x0,#80]
+> ffffffc0007f31dc:       d53ccd62        mrs     x2, s3_4_c12_c13_3
+> ffffffc0007f31e0:       f9002c02        str     x2, [x0,#88]
+> ffffffc0007f31e4:       d53ccd42        mrs     x2, s3_4_c12_c13_2
+> ffffffc0007f31e8:       f9003002        str     x2, [x0,#96]
+> ffffffc0007f31ec:       d53ccd22        mrs     x2, s3_4_c12_c13_1
+> ffffffc0007f31f0:       f9003402        str     x2, [x0,#104]
+> ffffffc0007f31f4:       d53ccd02        mrs     x2, s3_4_c12_c13_0
+> ffffffc0007f31f8:       f9003802        str     x2, [x0,#112]
+> ffffffc0007f31fc:       d53ccce2        mrs     x2, s3_4_c12_c12_7
+> ffffffc0007f3200:       f9003c02        str     x2, [x0,#120]
+> ffffffc0007f3204:       d53cccc2        mrs     x2, s3_4_c12_c12_6
+> ffffffc0007f3208:       f9004002        str     x2, [x0,#128]
+> ffffffc0007f320c:       d53ccca2        mrs     x2, s3_4_c12_c12_5
+> ffffffc0007f3210:       f9004402        str     x2, [x0,#136]
+> ffffffc0007f3214:       d53ccc82        mrs     x2, s3_4_c12_c12_4
+> ffffffc0007f3218:       f9004802        str     x2, [x0,#144]
+> ffffffc0007f321c:       d53ccc62        mrs     x2, s3_4_c12_c12_3
+> ffffffc0007f3220:       f9004c02        str     x2, [x0,#152]
+> ffffffc0007f3224:       d53ccc42        mrs     x2, s3_4_c12_c12_2
+> ffffffc0007f3228:       f9005002        str     x2, [x0,#160]
+> ffffffc0007f322c:       d53ccc22        mrs     x2, s3_4_c12_c12_1
+> ffffffc0007f3230:       f9005402        str     x2, [x0,#168]
+> ffffffc0007f3234:       d53ccc02        mrs     x2, s3_4_c12_c12_0
+> ffffffc0007f3238:       7100183f        cmp     w1, #0x6
+> ffffffc0007f323c:       f9005802        str     x2, [x0,#176]
 > 
-> You said that ARCH_HI3519 and HIP04 have an identical system controller,
-> but it's different for Hi36xx, correct?
+> As you can see, this is as optimal as it gets, short of being able
+> to find a nice way to use more than one register...
 
-No. The system controller of HI3519 is also different from HIP04. Maybe I gave you
-wrong descriptions. Sorry about that.
+Interesting, thanks for the dump I'm no expert on pipeline optimizations but I'm
+wondering with these system register accesses can these be executed out of order
+provided you didn't have what I thinks are write after read dependencies?
+It's only 4 registers here, there are some other longer stretches in subsequent
+patches.
 
+I minor note here is some white space in this patch.
 > 
-> So maybe we can generalize the HIP04 option to include all chips with
-> that system controller as they appear to share a common ancestry regardless
-> of the target market?
+> Thanks,
 > 
-
-I agree that we generalize some options regardless of the product line and target market.
-
-> The Hi35xx family includes some rather older chips as well based on ARM9
-> etc, correct? Are they closely related to the new one as well, or do they
-> just share the name?
-
-Yes. It's correct. They may share some IP blocks. But they may be very different
-from the new one for the arch code. I also don't think it's a good idea to make
-them share the same name.
-
-> 
-> 	Arnd
-> 
-> .
+> 	M.
 > 
