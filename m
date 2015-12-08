@@ -1,115 +1,70 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 8 Dec 2015 09:16:11 -0600
-Subject: [PATCH 8/8] ARM: dts: imx7d: sbc-imx7: add basic board support
-In-Reply-To: <1449472479-2521-9-git-send-email-ilya@compulab.co.il>
-References: <1449472479-2521-1-git-send-email-ilya@compulab.co.il>
- <1449472479-2521-9-git-send-email-ilya@compulab.co.il>
-Message-ID: <20151208151611.GA22609@rob-hp-laptop>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 8 Dec 2015 09:16:59 -0600
+Subject: [PATCH] usb: musb: dsps: handle the
+ otg_state_a_wait_vrise_timeout case
+In-Reply-To: <5666EC67.7000203@ti.com>
+References: <1440087153-31084-1-git-send-email-gregory.clement@free-electrons.com>
+ <55D719B1.8010700@free-electrons.com> <87twrfsbed.fsf@free-electrons.com>
+ <87d1wtf5ir.fsf@saruman.tx.rr.com> <87a8rde96m.fsf@free-electrons.com>
+ <87poyiegc7.fsf@free-electrons.com> <87poyinjpc.fsf@saruman.tx.rr.com>
+ <874mft9ukx.fsf@free-electrons.com> <87h9jtm37m.fsf@saruman.tx.rr.com>
+ <5666E9BE.5070907@ti.com> <87egexm2jr.fsf@saruman.tx.rr.com>
+ <5666EC67.7000203@ti.com>
+Message-ID: <878u55m0lw.fsf@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 09:14:39AM +0200, Ilya Ledvich wrote:
-> SBC-iMX7 is a single board computer designed for industrial
-> and embedded applications. It is based on the Freescale i.MX7
-> system-on-chip. SBC-iMX7 is implemented with the CL-SOM-iMX7
-> System-on-Module providing most of the functions, and SB-SOM-iMX7
-> carrier board providing additional peripheral functions and
-> connectors.
-> 
-> http://www.compulab.co.il/products/sbcs/sbc-imx7-freescale-i-mx-7-single-board-computer/
-> 
-> http://www.compulab.co.il/products/computer-on-modules/cl-som-imx7-freescale-i-mx-7-system-on-module/
-> 
-> Add basic board support, including SD card as a secondary boot and storage device
-> 
-> Signed-off-by: Ilya Ledvich <ilya@compulab.co.il>
-> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 
-Acked-by: Rob Herring <robh@kernel.org>
+Hi,
 
-> ---
->  Documentation/devicetree/bindings/arm/fsl.txt |  4 +++
->  arch/arm/boot/dts/Makefile                    |  1 +
->  arch/arm/boot/dts/imx7d-sbc-imx7.dts          | 43 +++++++++++++++++++++++++++
->  3 files changed, 48 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx7d-sbc-imx7.dts
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-> index 30b0ba1..15307d3 100644
-> --- a/Documentation/devicetree/bindings/arm/fsl.txt
-> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
-> @@ -57,6 +57,10 @@ i.MX7D CL-SOM-iMX7 Board
->  Required root node properties:
->      - compatible = "compulab,cl-som-imx7", "fsl,imx7d";
->  
-> +i.MX7D SBC-iMX7 Single Board Computer
-> +Required root node properties:
-> +    - compatible = "compulab,sbc-imx7", "compulab,cl-som-imx7", "fsl,imx7d";
-> +
->  Generic i.MX boards
->  -------------------
->  
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 83ed521..72ef172 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -351,6 +351,7 @@ dtb-$(CONFIG_SOC_IMX6UL) += \
->  	imx6ul-14x14-evk.dtb
->  dtb-$(CONFIG_SOC_IMX7D) += \
->  	imx7d-cl-som-imx7.dtb \
-> +	imx7d-sbc-imx7.dtb \
->  	imx7d-sdb.dtb
->  dtb-$(CONFIG_SOC_LS1021A) += \
->  	ls1021a-qds.dtb \
-> diff --git a/arch/arm/boot/dts/imx7d-sbc-imx7.dts b/arch/arm/boot/dts/imx7d-sbc-imx7.dts
-> new file mode 100644
-> index 0000000..3d5384a
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx7d-sbc-imx7.dts
-> @@ -0,0 +1,43 @@
-> +/*
-> + * Support for CompuLab SBC-iMX7 Single Board Computer
-> + *
-> + * Copyright (C) 2015 CompuLab Ltd. - http://www.compulab.co.il/
-> + * Author: Ilya Ledvich <ilya@compulab.co.il>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published by
-> + * the Free Software Foundation.
-> + */
-> +
-> +#include "imx7d-cl-som-imx7.dts"
-> +
-> +/ {
-> +	model = "CompuLab SBC-iMX7";
-> +	compatible = "compulab,sbc-imx7", "compulab,cl-som-imx7", "fsl,imx7d";
-> +};
-> +
-> +&usdhc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc1>;
-> +	cd-gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
-> +	wp-gpios = <&gpio5 1 GPIO_ACTIVE_HIGH>;
-> +	enable-sdio-wakeup;
-> +	status = "okay";
-> +};
-> +
-> +&iomuxc {
-> +	cl-som-imx7 {
-> +		pinctrl_usdhc1: usdhc1grp {
-> +			fsl,pins = <
-> +				MX7D_PAD_SD1_CMD__SD1_CMD		0x59
-> +				MX7D_PAD_SD1_CLK__SD1_CLK		0x19
-> +				MX7D_PAD_SD1_DATA0__SD1_DATA0		0x59
-> +				MX7D_PAD_SD1_DATA1__SD1_DATA1		0x59
-> +				MX7D_PAD_SD1_DATA2__SD1_DATA2		0x59
-> +				MX7D_PAD_SD1_DATA3__SD1_DATA3		0x59
-> +				MX7D_PAD_SD1_CD_B__GPIO5_IO0		0x59 /* CD */
-> +				MX7D_PAD_SD1_WP__GPIO5_IO1		0x59 /* WP */
-> +			>;
-> +		};
-> +	};
-> +};
-> -- 
-> 1.9.1
-> 
+Bin Liu <b-liu@ti.com> writes:
+>>>>> "This bit should be set high prior to setting bit 0 and cleared after bit 0
+>>>>> is cleared."
+>>>>>
+>>>>> and on the other side:
+>>>>> "Both the soft_reset and soft_reset_isolation bits should be asserted
+>>>>> simultaneously."
+>>>>>
+>>>>> The hang you saw could be explained by the following:
+>>>>> "Setting only the soft_reset_isolation bit will cause all USB0 output
+>>>>> signals to go to a known constant value via multiplexers.
+>>>>> This will
+>>>>> prevent future access to USB0."  page 2567
+>>>>
+>>>> good catch. Setting them together makes the hang go away.
+>>>>
+>>>> I still have the other problem, which is legacy IRQ reporting mode not
+>>>> really working.
+>>>>
+>>>
+>>> I never tried to change the IRQ mapping. The 8 MUSB interrupt will be
+>>> the same no matter where they are reported from. What do you expect when
+>>> switch to the MUSB IRQ reporting mode?
+>>
+>> read events from MUSB's registers instead of TI's :-) so, MUSB_INTRUSB,
+>> MUSB_INTRRX and MUSB_INTRTX.
+>>
+> I meant you expect to see any different event when switch to MUSB IRQ 
+> mode? The TI wrapper just reports the same 8 interrupt events. I don't 
+> think you would get any difference.
+
+still valid to make sure ;-)
+
+> BTY, I think I miss some context here. This Gregory's patch is trying to 
+> fix the OTG state machine problem in musb_dsps, which is replicated with 
+> a cable without a device connected. But it also mentions about 
+> non-compliant MSC devices. How are the thumb drives related to this OTG 
+> state issue?
+
+the problem seems to be caused by the missing disconnect IRQ. Not really
+missing, but taking seconds to trigger.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151208/6c125675/attachment.sig>
