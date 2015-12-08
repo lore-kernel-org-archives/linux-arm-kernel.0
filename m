@@ -1,235 +1,200 @@
-From: damien.riegel@savoirfairelinux.com (Damien Riegel)
-Date: Tue,  8 Dec 2015 11:41:38 -0500
-Subject: [PATCH v8 3/3] ARM: dts: TS-4800: add basic device tree
-In-Reply-To: <1449592898-24049-1-git-send-email-damien.riegel@savoirfairelinux.com>
-References: <1449592898-24049-1-git-send-email-damien.riegel@savoirfairelinux.com>
-Message-ID: <1449592898-24049-4-git-send-email-damien.riegel@savoirfairelinux.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 08 Dec 2015 16:42:13 +0000
+Subject: [PATCH v6 12/21] KVM: ARM64: Add reset and access handlers for
+ PMCNTENSET and PMCNTENCLR register
+In-Reply-To: <1449578860-15808-13-git-send-email-zhaoshenglong@huawei.com>
+References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
+ <1449578860-15808-13-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <56670865.2050705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This device tree adds support for TS-4800 by Technologic Systems. This
-board is based on MX51-babbage, but there are some subtle differences in
-the pins used, and there is an additional FPGA that is memory-mapped.
+On 08/12/15 12:47, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Since the reset value of PMCNTENSET and PMCNTENCLR is UNKNOWN, use
+> reset_unknown for its reset handler. Add a new case to emulate writing
+> PMCNTENSET or PMCNTENCLR register.
+> 
+> When writing to PMCNTENSET, call perf_event_enable to enable the perf
+> event. When writing to PMCNTENCLR, call perf_event_disable to disable
+> the perf event.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 39 +++++++++++++++++++++++++++++++++++----
+>  include/kvm/arm_pmu.h     |  4 ++++
+>  virt/kvm/arm/pmu.c        | 47 +++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 86 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 2304937..a780cb5 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -577,6 +577,21 @@ static bool access_pmu_regs(struct kvm_vcpu *vcpu,
+>  			vcpu_sys_reg(vcpu, r->reg) = p->regval;
+>  			break;
+>  		}
+> +		case PMCNTENSET_EL0: {
+> +			val = p->regval;
+> +			if (r->Op2 == 1) {
+> +				/* accessing PMCNTENSET_EL0 */
+> +				kvm_pmu_enable_counter(vcpu, val,
+> +				   vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E);
+> +				vcpu_sys_reg(vcpu, r->reg) |= val;
+> +			} else {
+> +
+> +				/* accessing PMCNTENCLR_EL0 */
+> +				kvm_pmu_disable_counter(vcpu, val);
+> +				vcpu_sys_reg(vcpu, r->reg) &= ~val;
+> +			}
+> +			break;
+> +		}
+>  		case PMCR_EL0: {
+>  			/* Only update writeable bits of PMCR */
+>  			val = vcpu_sys_reg(vcpu, r->reg);
+> @@ -817,10 +832,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  	  access_pmu_regs, reset_pmcr, PMCR_EL0, },
+>  	/* PMCNTENSET_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b001),
+> -	  trap_raz_wi },
+> +	  access_pmu_regs, reset_unknown, PMCNTENSET_EL0 },
+>  	/* PMCNTENCLR_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b010),
+> -	  trap_raz_wi },
+> +	  access_pmu_regs, reset_unknown, PMCNTENSET_EL0 },
+>  	/* PMOVSCLR_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b011),
+>  	  trap_raz_wi },
+> @@ -1137,6 +1152,20 @@ static bool access_pmu_cp15_regs(struct kvm_vcpu *vcpu,
+>  			vcpu_cp15(vcpu, r->reg) = p->regval;
+>  			break;
+>  		}
+> +		case c9_PMCNTENSET: {
+> +			val = p->regval;
+> +			if (r->Op2 == 1) {
+> +				/* accessing c9_PMCNTENSET */
+> +				kvm_pmu_enable_counter(vcpu, val,
+> +				       vcpu_cp15(vcpu, c9_PMCR) & ARMV8_PMCR_E);
+> +				vcpu_cp15(vcpu, r->reg) |= val;
+> +			} else {
+> +				/* accessing c9_PMCNTENCLR */
+> +				kvm_pmu_disable_counter(vcpu, val);
+> +				vcpu_cp15(vcpu, r->reg) &= ~val;
+> +			}
+> +			break;
+> +		}
+>  		case c9_PMCR: {
+>  			/* Only update writeable bits of PMCR */
+>  			val = vcpu_cp15(vcpu, r->reg);
+> @@ -1220,8 +1249,10 @@ static const struct sys_reg_desc cp15_regs[] = {
+>  	/* PMU */
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmu_cp15_regs,
+>  	  NULL, c9_PMCR },
+> -	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
+> -	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
+> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), access_pmu_cp15_regs,
+> +	  NULL, c9_PMCNTENSET },
+> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), access_pmu_cp15_regs,
+> +	  NULL, c9_PMCNTENSET },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmu_cp15_regs,
+>  	  NULL, c9_PMSELR },
+> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+> index 36bde48..e731656 100644
+> --- a/include/kvm/arm_pmu.h
+> +++ b/include/kvm/arm_pmu.h
+> @@ -39,6 +39,8 @@ struct kvm_pmu {
+>  
+>  #ifdef CONFIG_KVM_ARM_PMU
+>  u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx);
+> +void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val);
+> +void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u32 val, bool all_enable);
+>  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
+>  				    u32 select_idx);
+>  #else
+> @@ -46,6 +48,8 @@ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx)
+>  {
+>  	return 0;
+>  }
+> +void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val) {}
+> +void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u32 val, bool all_enable) {}
+>  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
+>  				    u32 select_idx) {}
+>  #endif
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index 15babf1..45586d2 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -90,6 +90,53 @@ static void kvm_pmu_stop_counter(struct kvm_pmc *pmc)
+>  }
+>  
+>  /**
+> + * kvm_pmu_enable_counter - enable selected PMU counter
+> + * @vcpu: The vcpu pointer
+> + * @val: the value guest writes to PMCNTENSET register
+> + * @all_enable: the value of PMCR.E
+> + *
+> + * Call perf_event_enable to start counting the perf event
+> + */
+> +void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u32 val, bool all_enable)
+> +{
+> +	int i;
+> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +	struct kvm_pmc *pmc;
+> +
+> +	if (!all_enable)
+> +		return;
 
-More details here:
-  http://wiki.embeddedarm.com/wiki/TS-4800
+You have the vcpu. Can you move the check for PMCR_EL0.E here instead of
+having it in both of the callers?
 
-Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
----
- arch/arm/boot/dts/Makefile         |   3 +-
- arch/arm/boot/dts/imx51-ts4800.dts | 190 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 192 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/imx51-ts4800.dts
+> +
+> +	for_each_set_bit(i, (const unsigned long *)&val, ARMV8_MAX_COUNTERS) {
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index bb8fa02..41b9985 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -258,7 +258,8 @@ dtb-$(CONFIG_SOC_IMX51) += \
- 	imx51-apf51dev.dtb \
- 	imx51-babbage.dtb \
- 	imx51-digi-connectcore-jsk.dtb \
--	imx51-eukrea-mbimxsd51-baseboard.dtb
-+	imx51-eukrea-mbimxsd51-baseboard.dtb \
-+	imx51-ts4800.dtb
- dtb-$(CONFIG_SOC_IMX53) += \
- 	imx53-ard.dtb \
- 	imx53-m53evk.dtb \
-diff --git a/arch/arm/boot/dts/imx51-ts4800.dts b/arch/arm/boot/dts/imx51-ts4800.dts
-new file mode 100644
-index 0000000..a0b2c6f
---- /dev/null
-+++ b/arch/arm/boot/dts/imx51-ts4800.dts
-@@ -0,0 +1,190 @@
-+/*
-+ * Copyright 2015 Savoir-faire Linux
-+ *
-+ * This device tree is based on imx51-babbage.dts
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include "imx51.dtsi"
-+
-+/ {
-+	model = "Technologic Systems TS-4800";
-+	compatible = "technologic,imx51-ts4800", "fsl,imx51";
-+
-+	chosen {
-+		stdout-path = &uart1;
-+	};
-+
-+	memory {
-+		reg = <0x90000000 0x10000000>;
-+	};
-+
-+	soc {
-+		fpga {
-+			compatible = "simple-bus";
-+			reg = <0xb0000000 0x1d000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			syscon: syscon at b0010000 {
-+				compatible = "syscon", "simple-mfd";
-+				reg = <0xb0010000 0x3d>;
-+				reg-io-width = <2>;
-+
-+				wdt at e {
-+					compatible = "technologic,ts4800-wdt";
-+					syscon = <&syscon 0xe>;
-+				};
-+			};
-+		};
-+	};
-+
-+	clocks {
-+		ckih1 {
-+			clock-frequency = <22579200>;
-+		};
-+
-+		ckih2 {
-+			clock-frequency = <24576000>;
-+		};
-+	};
-+};
-+
-+&esdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc1>;
-+	cd-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
-+	wp-gpios = <&gpio1 1 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec>;
-+	phy-mode = "mii";
-+	phy-reset-gpios = <&gpio2 14 GPIO_ACTIVE_LOW>;
-+	phy-reset-duration = <1>;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart3>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+
-+	rtc: m41t00 at 68 {
-+		compatible = "stm,m41t00";
-+		reg = <0x68>;
-+	};
-+};
-+
-+
-+&iomuxc {
-+	imx51-ts4800 {
-+
-+		pinctrl_ecspi1: ecspi1grp {
-+			fsl,pins = <
-+				MX51_PAD_CSPI1_MISO__ECSPI1_MISO	0x185
-+				MX51_PAD_CSPI1_MOSI__ECSPI1_MOSI	0x185
-+				MX51_PAD_CSPI1_SCLK__ECSPI1_SCLK	0x185
-+				MX51_PAD_CSPI1_SS0__GPIO4_24		0x85 /* CS0 */
-+			>;
-+		};
-+
-+		pinctrl_esdhc1: esdhc1grp {
-+			fsl,pins = <
-+				MX51_PAD_SD1_CMD__SD1_CMD		0x400020d5
-+				MX51_PAD_SD1_CLK__SD1_CLK		0x20d5
-+				MX51_PAD_SD1_DATA0__SD1_DATA0		0x20d5
-+				MX51_PAD_SD1_DATA1__SD1_DATA1		0x20d5
-+				MX51_PAD_SD1_DATA2__SD1_DATA2		0x20d5
-+				MX51_PAD_SD1_DATA3__SD1_DATA3		0x20d5
-+				MX51_PAD_GPIO1_0__GPIO1_0		0x100
-+				MX51_PAD_GPIO1_1__GPIO1_1		0x100
-+			>;
-+		};
-+
-+		pinctrl_fec: fecgrp {
-+			fsl,pins = <
-+				MX51_PAD_EIM_EB2__FEC_MDIO		0x000001f5
-+				MX51_PAD_EIM_EB3__FEC_RDATA1		0x00000085
-+				MX51_PAD_EIM_CS2__FEC_RDATA2		0x00000085
-+				MX51_PAD_EIM_CS3__FEC_RDATA3		0x00000085
-+				MX51_PAD_EIM_CS4__FEC_RX_ER		0x00000180
-+				MX51_PAD_EIM_CS5__FEC_CRS		0x00000180
-+				MX51_PAD_DISP2_DAT10__FEC_COL		0x00000180
-+				MX51_PAD_DISP2_DAT11__FEC_RX_CLK		0x00000180
-+				MX51_PAD_DISP2_DAT14__FEC_RDATA0		0x00002180
-+				MX51_PAD_DISP2_DAT15__FEC_TDATA0		0x00002004
-+				MX51_PAD_NANDF_CS2__FEC_TX_ER		0x00002004
-+				MX51_PAD_DI2_PIN2__FEC_MDC		0x00002004
-+				MX51_PAD_DISP2_DAT6__FEC_TDATA1		0x00002004
-+				MX51_PAD_DISP2_DAT7__FEC_TDATA2		0x00002004
-+				MX51_PAD_DISP2_DAT8__FEC_TDATA3		0x00002004
-+				MX51_PAD_DISP2_DAT9__FEC_TX_EN		0x00002004
-+				MX51_PAD_DISP2_DAT13__FEC_TX_CLK	0x00002180
-+				MX51_PAD_DISP2_DAT12__FEC_RX_DV		0x000020a4
-+				MX51_PAD_EIM_A20__GPIO2_14		0x00000085 /* Phy Reset */
-+			>;
-+		};
-+
-+		pinctrl_i2c2: i2c2grp {
-+			fsl,pins = <
-+				MX51_PAD_KEY_COL4__I2C2_SCL		0x400001ed
-+				MX51_PAD_KEY_COL5__I2C2_SDA		0x400001ed
-+			>;
-+		};
-+
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <
-+				MX51_PAD_UART1_RXD__UART1_RXD		0x1c5
-+				MX51_PAD_UART1_TXD__UART1_TXD		0x1c5
-+				MX51_PAD_UART1_RTS__UART1_RTS		0x1c5
-+				MX51_PAD_UART1_CTS__UART1_CTS		0x1c5
-+			>;
-+		};
-+
-+		pinctrl_uart2: uart2grp {
-+			fsl,pins = <
-+				MX51_PAD_UART2_RXD__UART2_RXD		0x1c5
-+				MX51_PAD_UART2_TXD__UART2_TXD		0x1c5
-+			>;
-+		};
-+
-+		pinctrl_uart3: uart3grp {
-+			fsl,pins = <
-+				MX51_PAD_EIM_D25__UART3_RXD		0x1c5
-+				MX51_PAD_EIM_D26__UART3_TXD		0x1c5
-+				MX51_PAD_EIM_D27__UART3_RTS		0x1c5
-+				MX51_PAD_EIM_D24__UART3_CTS		0x1c5
-+			>;
-+		};
-+
-+	};
-+};
+Nonononono... If you must have to use a long, use a long. Don't cast it
+to a different type (hint: big endian).
+
+> +		pmc = &pmu->pmc[i];
+> +		if (pmc->perf_event) {
+> +			perf_event_enable(pmc->perf_event);
+> +			if (pmc->perf_event->state != PERF_EVENT_STATE_ACTIVE)
+> +				kvm_debug("fail to enable perf event\n");
+> +		}
+> +	}
+> +}
+> +
+> +/**
+> + * kvm_pmu_disable_counter - disable selected PMU counter
+> + * @vcpu: The vcpu pointer
+> + * @val: the value guest writes to PMCNTENCLR register
+> + *
+> + * Call perf_event_disable to stop counting the perf event
+> + */
+> +void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val)
+> +{
+> +	int i;
+> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +	struct kvm_pmc *pmc;
+> +
+
+Why are enable and disable asymmetric (handling of PMCR.E)?
+
+> +	for_each_set_bit(i, (const unsigned long *)&val, ARMV8_MAX_COUNTERS) {
+> +		pmc = &pmu->pmc[i];
+> +		if (pmc->perf_event)
+> +			perf_event_disable(pmc->perf_event);
+> +	}
+> +}
+> +
+> +/**
+>   * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
+>   * @vcpu: The vcpu pointer
+>   * @data: The data guest writes to PMXEVTYPER_EL0
+> 
+
+Thanks,
+
+	M.
 -- 
-2.5.0
+Jazz is not dead. It just smells funny...
