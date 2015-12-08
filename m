@@ -1,26 +1,56 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 08 Dec 2015 11:57:27 -0500 (EST)
-Subject: [PATCH 00/13] mvneta Buffer Management and enhancements
-In-Reply-To: <CAPv3WKeTqWXvABPHovH6dqUz_qs88Wy7Q6cbOHsujt4CM0=32g@mail.gmail.com>
-References: <CAPv3WKcKm3X3Lys2HwYZXaZxPaajenF7av1wJKXqKxxwibXW4A@mail.gmail.com>
- <5661F449.5020205@gmail.com>
- <CAPv3WKeTqWXvABPHovH6dqUz_qs88Wy7Q6cbOHsujt4CM0=32g@mail.gmail.com>
-Message-ID: <20151208.115727.656709346003241561.davem@davemloft.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 Dec 2015 08:57:33 -0800
+Subject: [PATCH 02/10] clk: ti: Add few dm814x clock aliases
+In-Reply-To: <1449013103-23238-3-git-send-email-tony@atomide.com>
+References: <1449013103-23238-1-git-send-email-tony@atomide.com>
+ <1449013103-23238-3-git-send-email-tony@atomide.com>
+Message-ID: <20151208165732.GY23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcin Wojtas <mw@semihalf.com>
-Date: Tue, 8 Dec 2015 11:56:28 +0100
+* Tony Lindgren <tony@atomide.com> [151201 15:43]:
+> The timer clock aliases are needed early on dm814x. Let's also
+> add the aliases for the interconnects and MMC.
+> 
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-> Do you think you can point to anything similar that could be a sort
-> of reference for such solution?
+Anybody from the clock department care to ack this one? I'd like to
+get this series into Linux next as it fixes some some issues.
 
-I don't have much time to explain because I'm constantly backlogged doing
-patch review, but mostly it has to do with page management and avoiding
-atomic decrement/increment of page counts wherever possible while feeding
-blocks to the chip and receiving packets.
+Regards,
 
-Please don't ask me for any more details as I'm really backlogged doing
-patch review at the moment.
+Tony
 
-Thanks.
+
+>  drivers/clk/ti/clk-814x.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/clk/ti/clk-814x.c b/drivers/clk/ti/clk-814x.c
+> index e172920..9e85fcc 100644
+> --- a/drivers/clk/ti/clk-814x.c
+> +++ b/drivers/clk/ti/clk-814x.c
+> @@ -14,10 +14,14 @@ static struct ti_dt_clk dm814_clks[] = {
+>  	DT_CLK(NULL, "devosc_ck", "devosc_ck"),
+>  	DT_CLK(NULL, "mpu_ck", "mpu_ck"),
+>  	DT_CLK(NULL, "sysclk4_ck", "sysclk4_ck"),
+> +	DT_CLK(NULL, "sysclk5_ck", "sysclk5_ck"),
+>  	DT_CLK(NULL, "sysclk6_ck", "sysclk6_ck"),
+> +	DT_CLK(NULL, "sysclk8_ck", "sysclk8_ck"),
+>  	DT_CLK(NULL, "sysclk10_ck", "sysclk10_ck"),
+>  	DT_CLK(NULL, "sysclk18_ck", "sysclk18_ck"),
+>  	DT_CLK(NULL, "timer_sys_ck", "devosc_ck"),
+> +	DT_CLK(NULL, "timer1_fck", "timer1_fck"),
+> +	DT_CLK(NULL, "timer2_fck", "timer2_fck"),
+>  	DT_CLK(NULL, "cpsw_125mhz_gclk", "cpsw_125mhz_gclk"),
+>  	DT_CLK(NULL, "cpsw_cpts_rft_clk", "cpsw_cpts_rft_clk"),
+>  	{ .node_name = NULL },
+> -- 
+> 2.6.2
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
