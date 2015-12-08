@@ -1,240 +1,115 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 7 Dec 2015 20:59:19 -0600
-Subject: [PATCH 1/3] usb: misc: generic_onboard_hub: add generic onboard
- USB HUB driver
-In-Reply-To: <1449538670-7954-2-git-send-email-peter.chen@freescale.com>
-References: <1449538670-7954-1-git-send-email-peter.chen@freescale.com>
- <1449538670-7954-2-git-send-email-peter.chen@freescale.com>
-Message-ID: <87poyhmyrc.fsf@saruman.tx.rr.com>
+From: xuejiancheng@huawei.com (xuejiancheng)
+Date: Tue, 8 Dec 2015 11:03:20 +0800
+Subject: [PATCH v2 3/9] ARM: hisi: enable Hi3519 soc
+In-Reply-To: <56663897.7040901@huawei.com>
+References: <1449110565-23590-1-git-send-email-xuejiancheng@huawei.com>
+ <43938749.Z0h4RNddN6@wuerfel> <56652E06.10309@huawei.com>
+ <2329688.AAaHl8K2Zb@wuerfel> <56663897.7040901@huawei.com>
+Message-ID: <56664878.8040805@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi,
 
-Peter Chen <peter.chen@freescale.com> writes:
-> diff --git a/drivers/usb/misc/Makefile b/drivers/usb/misc/Makefile
-> index 45fd4ac..da52e9a 100644
-> --- a/drivers/usb/misc/Makefile
-> +++ b/drivers/usb/misc/Makefile
-> @@ -29,3 +29,4 @@ obj-$(CONFIG_USB_CHAOSKEY)		+= chaoskey.o
->  
->  obj-$(CONFIG_USB_SISUSBVGA)		+= sisusbvga/
->  obj-$(CONFIG_USB_LINK_LAYER_TEST)	+= lvstest.o
-> +obj-$(CONFIG_USB_ONBOARD_HUB)		+= generic_onboard_hub.o
-> diff --git a/drivers/usb/misc/generic_onboard_hub.c b/drivers/usb/misc/generic_onboard_hub.c
-> new file mode 100644
-> index 0000000..df722a0
-> --- /dev/null
-> +++ b/drivers/usb/misc/generic_onboard_hub.c
-> @@ -0,0 +1,162 @@
-> +/*
-> + * usb_hub_generic.c	The generic onboard USB HUB driver
-> + *
-> + * Copyright (C) 2015 Freescale Semiconductor, Inc.
-> + * Author: Peter Chen <peter.chen@freescale.com>
-> + *
-> + * This program is free software: you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2  of
-> + * the License as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +/*
-> + * This driver is only for the USB HUB devices which need to control
-> + * their external pins(clock, reset, etc), and these USB HUB devices
-> + * are soldered at the board.
-> + */
-> +
-> +#define DEBUG
+On 2015/12/8 9:55, xuejiancheng wrote:
+> 
+> 
+> On 2015/12/7 17:46, Arnd Bergmann wrote:
+>> On Monday 07 December 2015 14:58:14 xuejiancheng wrote:
+>>> On 2015/12/5 5:54, Arnd Bergmann wrote:
+>>>> On Friday 04 December 2015 12:07:58 xuejiancheng wrote:
+>>>>> On 2015/12/3 17:40, Arnd Bergmann wrote:
+>>>>>> On Thursday 03 December 2015 10:42:45 Jiancheng Xue wrote:
+>>>>>>> --- a/arch/arm/mach-hisi/Kconfig
+>>>>>>> +++ b/arch/arm/mach-hisi/Kconfig
+>>>>>>> @@ -12,6 +12,14 @@ if ARCH_HISI
+>>>>>>>  
+>>>>>>>  menu "Hisilicon platform type"
+>>>>>>>  
+>>>>>>> +config ARCH_HI3519
+>>>>>>> +       bool "Hisilicon Hi3519 Soc" if ARCH_MULTI_V7
+>>>>>>> +       select HAVE_ARM_ARCH_TIMER
+>>>>>>> +       select ARCH_HAS_RESET_CONTROLLER
+>>>>>>> +
+>>>>>>> +       help
+>>>>>>> +         Support for Hisilicon Hi3519 Soc
+>>>>>>> +
+>>>>>>>  config ARCH_HI3xxx
+>>>>>>>         bool "Hisilicon Hi36xx family" if ARCH_MULTI_V7
+>>>>>>>         select CACHE_L2X0
+>>>>>>
+>>>>>> Do those need to be separate? I would just extend the Hi36xx
+>>>>>> to cover all Hi3xxx, if nothing in the platform code really
+>>>>>> depends on this.
+>>>>>
+>>>>> For HI3519, there is really no special platform code. But HI35xx and HI36xx soc families
+>>>>> belong to different product lines in hisilicon. HI35xx family also composes of various
+>>>>> architectures socs(single core, smp and big-little). So I think it may be clear to have
+>>>>> separate arch definitions.
+>>>>>
+>>>>> Could you give me more suggestions about this?  Thank you!
+>>>>
+>>>> For the most part, you already need to enable the device drivers for the
+>>>> specific components on each chip, and the per-soc top-level options here
+>>>> don't actually control the compilation of any particular code.
+>>>>
+>>>> This is slightly different for some of the older platforms that for historic
+>>>> reasons need fine-grained options. You could probably just make the device
+>>>> drivers depend on "ARCH_HISI || COMPILE_TEST" in general, but some level
+>>>> of classification is ok, in particular when the chips are not related at all.
+>>>>
+>>>> In this case, my impression is that while HI3519 and HI36xx are made
+>>>> by different business units, there is still a noticeable amount of shared
+>>>> IP in them (e.g. the "sysctrl" node that seems to be shared with some of
+>>>> the other chips as well), so grouping them together should make sense.
+>>>
+>>> HI35xx and HI36xx are designed totally independently, including IP selection.
+>>> The relation between HI35xx and HI36xx is just like the one between HI36xx
+>>> and HIP0x. In another word, HI35xx and HI36xx are not related except they all
+>>> belong to hisilicon. So I don't think it's proper to group them together.
+>>>
+>>> Is it OK if I drop ARCH_HI3519 and use ARCH_HISI directly?
+>>
+>> I think we should come up with a way to handle this in general for
+>> ARCH_HISI. It's not problem to have a couple of sub-options, but I'd
+>> rather not have one for each SoC because I'm sure that hisilicon has
+>> made dozens or possibly hundreds of ARM based SoCs that belong into
+>> a couple of families.
+> 
+> Agree with you.
+> 
+>>
+>> The individual selection of IP blocks is not that important, because
+>> those tend to just be generic device drivers that we can enable on
+>> any platform using the defconfig files.
+>>
+>> You said that ARCH_HI3519 and HIP04 have an identical system controller,
+>> but it's different for Hi36xx, correct?
+> 
+> No. The system controller of HI3519 is also different from HIP04. Maybe I gave you
+> wrong descriptions. Sorry about that.
+> 
+>>
+>> So maybe we can generalize the HIP04 option to include all chips with
+>> that system controller as they appear to share a common ancestry regardless
+>> of the target market?
+>>
+> 
+> I agree that we generalize some options regardless of the product line and target market.
+> 
+>> The Hi35xx family includes some rather older chips as well based on ARM9
+>> etc, correct? Are they closely related to the new one as well, or do they
+>> just share the name?
+> 
+> Yes. It's correct. They may share some IP blocks. But they may be very different
+> from the new one for the arch code. I also don't think it's a good idea to make
+> them share the same name.
 
-nope
+I will use ARCH_HISI instead of ARCH_HI3519.
 
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/gpio.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_gpio.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regulator/consumer.h>
-> +#include <linux/slab.h>
-> +#include <linux/usb/generic_onboard_hub.h>
-
-<linux/platform_data/generic_onboard_hub.h> ?
-
-> +struct usb_hub_generic_data {
-> +	struct clk *clk;
-
-seriously ? Is this really all ? What about that reset line below ?
-
-In fact, that reset line should be using a generic reset-gpio.c instead
-of a raw gpio.
-
-> +static int usb_hub_generic_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct usb_hub_generic_platform_data *pdata = dev->platform_data;
-> +	struct usb_hub_generic_data *hub_data;
-> +	int reset_pol = 0, duration_us = 50, ret = 0;
-> +	struct gpio_desc *gpiod_reset = NULL;
-> +
-> +	hub_data = devm_kzalloc(dev, sizeof(*hub_data), GFP_KERNEL);
-> +	if (!hub_data)
-> +		return -ENOMEM;
-> +
-> +	if (dev->of_node) {
-> +		struct device_node *node = dev->of_node;
-> +
-> +		hub_data->clk = devm_clk_get(dev, "external_clk");
-> +		if (IS_ERR(hub_data->clk)) {
-> +			dev_dbg(dev, "Can't get external clock: %ld\n",
-> +					PTR_ERR(hub_data->clk));
-
-how about setting clock to NULL to here ? then you don't need IS_ERR()
-checks anywhere else.
-
-> +		}
-
-braces shouldn't be used here, if you add NULL trick above,
-however... then you can keep them.
-
-> +		/*
-> +		 * Try to get the information for HUB reset, the
-> +		 * default setting like below:
-> +		 *
-> +		 * - Reset state is low
-> +		 * - The duration is 50us
-> +		 */
-> +		if (of_find_property(node, "hub-reset-active-high", NULL))
-> +			reset_pol = 1;
-
-you see, this is definitely *not* generic. You should write a generic
-reset-gpio.c reset controller and describe the polarity on the gpio
-binding. This driver *always* uses reset_assert(); reset_deassert(); and
-reset-gpio implements though by gpiod_set_value() correctly.
-
-Polarity _must_ be described elsewhere in DT.
-
-> +		of_property_read_u32(node, "hub-reset-duration-us",
-> +			&duration_us);
-
-likewise, this should be described as a debounce time for the GPIO.
-
-> +		gpiod_reset = devm_gpiod_get_optional(dev, "hub-reset",
-> +			reset_pol ? GPIOD_OUT_HIGH : GPIOD_OUT_LOW);
-> +		ret = PTR_ERR_OR_ZERO(gpiod_reset);
-> +		if (ret) {
-> +			dev_err(dev, "Failed to get reset gpio, err = %d\n",
-> +				ret);
-> +			return ret;
-> +		}
-> +	} else if (pdata) {
-> +		hub_data->clk = pdata->ext_clk;
-> +		duration_us = pdata->gpio_reset_duration_us;
-> +		reset_pol = pdata->gpio_reset_polarity;
-> +
-> +		if (gpio_is_valid(pdata->gpio_reset)) {
-> +			ret = devm_gpio_request_one(
-> +				dev, pdata->gpio_reset, reset_pol
-> +				? GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW,
-> +				dev_name(dev));
-> +			if (!ret)
-> +				gpiod_reset = gpio_to_desc(pdata->gpio_reset);
-> +		}
-> +	}
-> +
-> +	if (!IS_ERR(hub_data->clk)) {
-> +		ret = clk_prepare_enable(hub_data->clk);
-> +		if (ret) {
-> +			dev_err(dev,
-> +				"Can't enable external clock: %d\n",
-> +				ret);
-> +			return ret;
-> +		}
-> +	}
-> +
-> +	if (gpiod_reset) {
-> +		/* Sanity check */
-> +		if (duration_us > 1000000)
-> +			duration_us = 50;
-
-this check makes no sense whatsoever. What I *really* need over 1s of
-debounce ?
-
-> +		usleep_range(duration_us, duration_us + 100);
-> +		gpiod_set_value(gpiod_reset, reset_pol ? 0 : 1);
-
-wrong. You should _not_ have polarity checks here. You should have
-already initialized the gpio as ACTIVE_HIGH or ACTIVE_LOW and gpiolib
-will handle the polarity for you.
-
-> +	}
-> +
-> +	dev_set_drvdata(dev, hub_data);
-> +	return ret;
-> +}
-> +
-> +static int usb_hub_generic_remove(struct platform_device *pdev)
-> +{
-> +	struct usb_hub_generic_data *hub_data = platform_get_drvdata(pdev);
-> +
-> +	if (!IS_ERR(hub_data->clk))
-> +		clk_disable_unprepare(hub_data->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id usb_hub_generic_dt_ids[] = {
-> +	{.compatible = "generic-onboard-hub"},
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, usb_hub_generic_dt_ids);
-> +#endif
-> +
-> +static struct platform_driver usb_hub_generic_driver = {
-> +	.probe = usb_hub_generic_probe,
-> +	.remove = usb_hub_generic_remove,
-> +	.driver = {
-> +		.name = "usb_hub_generic_onboard",
-> +		.of_match_table = usb_hub_generic_dt_ids,
-> +	 },
-> +};
-> +
-> +static int __init usb_hub_generic_init(void)
-> +{
-> +	return platform_driver_register(&usb_hub_generic_driver);
-> +}
-> +subsys_initcall(usb_hub_generic_init);
-> +
-> +static void __exit usb_hub_generic_exit(void)
-> +{
-> +	platform_driver_unregister(&usb_hub_generic_driver);
-> +}
-> +module_exit(usb_hub_generic_exit);
-
-module_platform_driver();
-
-> +MODULE_AUTHOR("Peter Chen <peter.chen@freescale.com>");
-> +MODULE_DESCRIPTION("Generic Onboard USB HUB driver");
-> +MODULE_LICENSE("GPL");
-
-comment header says GPL v2 only, this is GPL v2+. Which is correct ?
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151207/f2e29aad/attachment.sig>
+> 
+>>
+>> 	Arnd
+>>
+>> .
+>>
