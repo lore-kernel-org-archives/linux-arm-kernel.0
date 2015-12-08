@@ -1,251 +1,220 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Tue,  8 Dec 2015 18:32:29 +0000
-Subject: [PATCH v10 2/6] target-arm: kvm - implement software breakpoints
+Date: Tue,  8 Dec 2015 18:32:33 +0000
+Subject: [PATCH v10 6/6] tests/guest-debug: introduce basic gdbstub tests
 In-Reply-To: <1449599553-24713-1-git-send-email-alex.bennee@linaro.org>
 References: <1449599553-24713-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1449599553-24713-3-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1449599553-24713-7-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These don't involve messing around with debug registers, just setting
-the breakpoint instruction in memory. GDB will not use this mechanism if
-it can't access the memory to write the breakpoint.
+The aim of these tests is to combine with an appropriate kernel
+image (with symbol-file vmlinux) and check it behaves as it should.
+Given a kernel it checks:
 
-All the kernel has to do is ensure the hypervisor traps the breakpoint
-exceptions and returns to userspace.
+  - single step
+  - software breakpoint
+  - hardware breakpoint
+  - access, read and write watchpoints
+
+On success it returns 0 to the calling process.
+
+I've not plumbed this into the "make check" logic though as we need a
+solution for providing non-host binaries to the tests. However the test
+is structured to work with pretty much any Linux kernel image as it
+uses the basic kernel_init code which is common across architectures.
 
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 
---
-v2
-  - handle debug exit with new hsr exception info
-  - add verbosity to UNIMP message
-v3
-  - sync with kvm_cpu_synchronize_state() before checking PC.
-  - use internals.h defines
-  - use env->pc
-  - use proper format types
-v9
-  - add include for error_report
-  - define a brk_insn constant
-v10
-  - fix up for arm32 compile
-  - move sw_bp_code to kvm32 (stubs)/64 (working)
-  - move kvm_handle_debug to kvm32/64 as kvm_arm_handle_debug
-  - don't enable SW_BP unless the define is there
-  - wrap in have_guest_debug check
 ---
- target-arm/kvm.c     | 39 +++++++++++++++++-----------
- target-arm/kvm32.c   | 18 +++++++++++++
- target-arm/kvm64.c   | 72 ++++++++++++++++++++++++++++++++++++++++++++++++++++
- target-arm/kvm_arm.h |  9 +++++++
- 4 files changed, 123 insertions(+), 15 deletions(-)
+v10:
+ - fixup for Py2/3 cleanliness
+ - drop to shell on exception
+---
+ tests/guest-debug/test-gdbstub.py | 176 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 176 insertions(+)
+ create mode 100644 tests/guest-debug/test-gdbstub.py
 
-diff --git a/target-arm/kvm.c b/target-arm/kvm.c
-index 79ef4c6..7f44e22 100644
---- a/target-arm/kvm.c
-+++ b/target-arm/kvm.c
-@@ -17,6 +17,7 @@
- 
- #include "qemu-common.h"
- #include "qemu/timer.h"
-+#include "qemu/error-report.h"
- #include "sysemu/sysemu.h"
- #include "sysemu/kvm.h"
- #include "kvm_arm.h"
-@@ -516,9 +517,23 @@ MemTxAttrs kvm_arch_post_run(CPUState *cs, struct kvm_run *run)
-     return MEMTXATTRS_UNSPECIFIED;
- }
- 
+diff --git a/tests/guest-debug/test-gdbstub.py b/tests/guest-debug/test-gdbstub.py
+new file mode 100644
+index 0000000..31ba6c9
+--- /dev/null
++++ b/tests/guest-debug/test-gdbstub.py
+@@ -0,0 +1,176 @@
++#
++# This script needs to be run on startup
++# qemu -kernel ${KERNEL} -s -S
++# and then:
++# gdb ${KERNEL}.vmlinux -x ${QEMU_SRC}/tests/guest-debug/test-gdbstub.py
 +
- int kvm_arch_handle_exit(CPUState *cs, struct kvm_run *run)
- {
--    return 0;
-+    int ret = 0;
++import gdb
 +
-+    switch (run->exit_reason) {
-+    case KVM_EXIT_DEBUG:
-+        if (kvm_arm_handle_debug(cs, &run->debug.arch)) {
-+            ret = EXCP_DEBUG;
-+        } /* otherwise return to guest */
-+        break;
-+    default:
-+        qemu_log_mask(LOG_UNIMP, "%s: un-handled exit reason %d\n",
-+                      __func__, run->exit_reason);
-+        break;
-+    }
-+    return ret;
- }
- 
- bool kvm_arch_stop_on_emulation_error(CPUState *cs)
-@@ -541,16 +556,16 @@ int kvm_arch_on_sigbus(int code, void *addr)
-     return 1;
- }
- 
-+/* The #ifdef protections are until 32bit headers are imported and can
-+ * be removed once both 32 and 64 bit reach feature parity.
-+ */
- void kvm_arch_update_guest_debug(CPUState *cs, struct kvm_guest_debug *dbg)
- {
--    qemu_log_mask(LOG_UNIMP, "%s: not implemented\n", __func__);
--}
--
--int kvm_arch_insert_sw_breakpoint(CPUState *cs,
--                                  struct kvm_sw_breakpoint *bp)
--{
--    qemu_log_mask(LOG_UNIMP, "%s: not implemented\n", __func__);
--    return -EINVAL;
-+#ifdef KVM_GUESTDBG_USE_SW_BP
-+    if (kvm_sw_breakpoints_active(cs)) {
-+        dbg->control |= KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_USE_SW_BP;
-+    }
-+#endif
- }
- 
- int kvm_arch_insert_hw_breakpoint(target_ulong addr,
-@@ -567,12 +582,6 @@ int kvm_arch_remove_hw_breakpoint(target_ulong addr,
-     return -EINVAL;
- }
- 
--int kvm_arch_remove_sw_breakpoint(CPUState *cs,
--                                  struct kvm_sw_breakpoint *bp)
--{
--    qemu_log_mask(LOG_UNIMP, "%s: not implemented\n", __func__);
--    return -EINVAL;
--}
- 
- void kvm_arch_remove_all_hw_breakpoints(void)
- {
-diff --git a/target-arm/kvm32.c b/target-arm/kvm32.c
-index df1e2b0..5ce969f 100644
---- a/target-arm/kvm32.c
-+++ b/target-arm/kvm32.c
-@@ -475,3 +475,21 @@ int kvm_arch_get_registers(CPUState *cs)
- 
-     return 0;
- }
++failcount = 0
 +
-+int kvm_arch_insert_sw_breakpoint(CPUState *cs, struct kvm_sw_breakpoint *bp)
-+{
-+    qemu_log_mask(LOG_UNIMP, "%s: guest debug not yet implemented\n", __func__);
-+    return -EINVAL;
-+}
 +
-+int kvm_arch_remove_sw_breakpoint(CPUState *cs, struct kvm_sw_breakpoint *bp)
-+{
-+    qemu_log_mask(LOG_UNIMP, "%s: guest debug not yet implemented\n", __func__);
-+    return -EINVAL;
-+}
++def report(cond, msg):
++    "Report success/fail of test"
++    if cond:
++        print ("PASS: %s" % (msg))
++    else:
++        print ("FAIL: %s" % (msg))
++        failcount += 1
 +
-+bool kvm_arm_handle_debug(CPUState *cs, struct kvm_debug_exit_arch *debug_exit)
-+{
-+    qemu_log_mask(LOG_UNIMP, "%s: guest debug not yet implemented\n", __func__);
-+    return false;
-+}
-diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
-index d087794..3b3929d 100644
---- a/target-arm/kvm64.c
-+++ b/target-arm/kvm64.c
-@@ -18,6 +18,7 @@
- #include "config-host.h"
- #include "qemu-common.h"
- #include "qemu/timer.h"
-+#include "qemu/error-report.h"
- #include "sysemu/sysemu.h"
- #include "sysemu/kvm.h"
- #include "kvm_arm.h"
-@@ -481,3 +482,74 @@ int kvm_arch_get_registers(CPUState *cs)
-     /* TODO: other registers */
-     return ret;
- }
 +
-+/* C6.6.29 BRK instruction */
-+static const uint32_t brk_insn = 0xd4200000;
++def check_step():
++    "Step an instruction, check it moved."
++    start_pc = gdb.parse_and_eval('$pc')
++    gdb.execute("si")
++    end_pc = gdb.parse_and_eval('$pc')
 +
-+int kvm_arch_insert_sw_breakpoint(CPUState *cs, struct kvm_sw_breakpoint *bp)
-+{
-+    if (have_guest_debug) {
-+        if (cpu_memory_rw_debug(cs, bp->pc, (uint8_t *)&bp->saved_insn, 4, 0) ||
-+            cpu_memory_rw_debug(cs, bp->pc, (uint8_t *)&brk_insn, 4, 1)) {
-+            return -EINVAL;
-+        }
-+        return 0;
-+    } else {
-+        error_report("guest debug not supported on this kernel");
-+        return -EINVAL;
-+    }
-+}
++    return not (start_pc == end_pc)
 +
-+int kvm_arch_remove_sw_breakpoint(CPUState *cs, struct kvm_sw_breakpoint *bp)
-+{
-+    static uint32_t brk;
 +
-+    if (have_guest_debug) {
-+        if (cpu_memory_rw_debug(cs, bp->pc, (uint8_t *)&brk, 4, 0) ||
-+            brk != brk_insn ||
-+            cpu_memory_rw_debug(cs, bp->pc, (uint8_t *)&bp->saved_insn, 4, 1)) {
-+            return -EINVAL;
-+        }
-+        return 0;
-+    } else {
-+        error_report("guest debug not supported on this kernel");
-+        return -EINVAL;
-+    }
-+}
++def check_break(sym_name):
++    "Setup breakpoint, continue and check we stopped."
++    sym, ok = gdb.lookup_symbol(sym_name)
++    bp = gdb.Breakpoint(sym_name)
 +
-+/* See v8 ARM ARM D7.2.27 ESR_ELx, Exception Syndrome Register
-+ *
-+ * To minimise translating between kernel and user-space the kernel
-+ * ABI just provides user-space with the full exception syndrome
-+ * register value to be decoded in QEMU.
-+ */
++    gdb.execute("c")
 +
-+bool kvm_arm_handle_debug(CPUState *cs, struct kvm_debug_exit_arch *debug_exit)
-+{
-+    int hsr_ec = debug_exit->hsr >> ARM_EL_EC_SHIFT;
-+    ARMCPU *cpu = ARM_CPU(cs);
-+    CPUARMState *env = &cpu->env;
++    # hopefully we came back
++    end_pc = gdb.parse_and_eval('$pc')
++    print ("%s == %s %d" % (end_pc, sym.value(), bp.hit_count))
++    bp.delete()
 +
-+    /* Ensure PC is synchronised */
-+    kvm_cpu_synchronize_state(cs);
++    # can we test we hit bp?
++    return end_pc == sym.value()
 +
-+    switch (hsr_ec) {
-+    case EC_AA64_BKPT:
-+        if (kvm_find_sw_breakpoint(cs, env->pc)) {
-+            return true;
-+        }
-+        break;
-+    default:
-+        error_report("%s: unhandled debug exit (%"PRIx32", %"PRIx64")\n",
-+                     __func__, debug_exit->hsr, env->pc);
-+    }
 +
-+    /* If we don't handle this it could be it really is for the
-+       guest to handle */
-+    qemu_log_mask(LOG_UNIMP,
-+                  "%s: re-injecting exception not yet implemented"
-+                  " (0x%"PRIx32", %"PRIx64")\n",
-+                  __func__, hsr_ec, env->pc);
++# We need to do hbreak manually as the python interface doesn't export it
++def check_hbreak(sym_name):
++    "Setup hardware breakpoint, continue and check we stopped."
++    sym, ok = gdb.lookup_symbol(sym_name)
++    gdb.execute("hbreak %s" % (sym_name))
++    gdb.execute("c")
 +
-+    return false;
-+}
-diff --git a/target-arm/kvm_arm.h b/target-arm/kvm_arm.h
-index b516041..88f5b37 100644
---- a/target-arm/kvm_arm.h
-+++ b/target-arm/kvm_arm.h
-@@ -215,4 +215,13 @@ static inline const char *gic_class_name(void)
-  */
- const char *gicv3_class_name(void);
- 
-+/**
-+ * kvm_arm_handle_debug:
-+ * @cs: CPUState
-+ * @debug_exit: debug part of the KVM exit structure
-+ *
-+ * Returns: TRUE is the debug exception was handled.
-+ */
-+bool kvm_arm_handle_debug(CPUState *cs, struct kvm_debug_exit_arch *debug_exit);
++    # hopefully we came back
++    end_pc = gdb.parse_and_eval('$pc')
++    print ("%s == %s" % (end_pc, sym.value()))
 +
- #endif
++    if end_pc == sym.value():
++        gdb.execute("d 1")
++        return True
++    else:
++        return False
++
++
++class WatchPoint(gdb.Breakpoint):
++
++    def get_wpstr(self, sym_name):
++        "Setup sym and wp_str for given symbol."
++        self.sym, ok = gdb.lookup_symbol(sym_name)
++        wp_addr = gdb.parse_and_eval(sym_name).address
++        self.wp_str = '*(%(type)s)(&%(address)s)' % dict(
++            type = wp_addr.type, address = sym_name)
++
++        return(self.wp_str)
++
++    def __init__(self, sym_name, type):
++        wp_str = self.get_wpstr(sym_name)
++        super(WatchPoint, self).__init__(wp_str, gdb.BP_WATCHPOINT, type)
++
++    def stop(self):
++        end_pc = gdb.parse_and_eval('$pc')
++        print ("HIT WP @ %s" % (end_pc))
++        return True
++
++
++def do_one_watch(sym, wtype, text):
++
++    wp = WatchPoint(sym, wtype)
++    gdb.execute("c")
++    report_str = "%s for %s (%s)" % (text, sym, wp.sym.value())
++
++    if wp.hit_count > 0:
++        report(True, report_str)
++        wp.delete()
++    else:
++        report(False, report_str)
++
++
++def check_watches(sym_name):
++    "Watch a symbol for any access."
++
++    # Should hit for any read
++    do_one_watch(sym_name, gdb.WP_ACCESS, "awatch")
++
++    # Again should hit for reads
++    do_one_watch(sym_name, gdb.WP_READ, "rwatch")
++
++    # Finally when it is written
++    do_one_watch(sym_name, gdb.WP_WRITE, "watch")
++
++
++class CatchBreakpoint(gdb.Breakpoint):
++    def __init__(self, sym_name):
++        super(CatchBreakpoint, self).__init__(sym_name)
++        self.sym, ok = gdb.lookup_symbol(sym_name)
++
++    def stop(self):
++        end_pc = gdb.parse_and_eval('$pc')
++        print ("CB: %s == %s" % (end_pc, self.sym.value()))
++        if end_pc == self.sym.value():
++            report(False, "Hit final catchpoint")
++
++
++def run_test():
++    "Run throught the tests one by one"
++
++    print ("Checking we can step the first few instructions")
++    step_ok = 0
++    for i in range(3):
++        if check_step():
++            step_ok += 1
++
++    report(step_ok == 3, "single step in boot code")
++
++    print ("Checking HW breakpoint works")
++    break_ok = check_hbreak("kernel_init")
++    report(break_ok, "hbreak @ kernel_init")
++
++    # Can't set this up until we are in the kernel proper
++    # if we make it to run_init_process we've over-run and
++    # one of the tests failed
++    print ("Setup catch-all for run_init_process")
++    cbp = CatchBreakpoint("run_init_process")
++    cpb2 = CatchBreakpoint("try_to_run_init_process")
++
++    print ("Checking Normal breakpoint works")
++    break_ok = check_break("wait_for_completion")
++    report(break_ok, "break @ wait_for_completion")
++
++    print ("Checking watchpoint works")
++    check_watches("system_state")
++
++#
++# This runs as the script it sourced (via -x)
++#
++
++try:
++    print ("Connecting to remote")
++    gdb.execute("target remote localhost:1234")
++
++    # These are not very useful in scripts
++    gdb.execute("set pagination off")
++    gdb.execute("set confirm off")
++
++    # Run the actual tests
++    run_test()
++
++except:
++    print ("GDB Exception: %s" % (sys.exc_info()[0]))
++    failcount += 1
++    import code
++    code.InteractiveConsole(locals=globals()).interact()
++    raise
++
++# Finally kill the inferior and exit gdb with a count of failures
++gdb.execute("kill")
++exit(failcount)
 -- 
 2.6.3
