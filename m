@@ -1,38 +1,17 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Tue,  8 Dec 2015 16:33:02 -0600
-Subject: [GIT PULL] SoCFPGA defconfig for v4.5
-In-Reply-To: <1449613982-25888-1-git-send-email-dinh.linux@gmail.com>
-References: <1449613982-25888-1-git-send-email-dinh.linux@gmail.com>
-Message-ID: <1449613982-25888-2-git-send-email-dinh.linux@gmail.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 8 Dec 2015 16:54:29 -0600
+Subject: [PATCH] ARM: defconfig: qcom: Enable SSBI drivers
+In-Reply-To: <1448932137-12717-1-git-send-email-sboyd@codeaurora.org>
+References: <1448932137-12717-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20151208225429.GA12111@Agamemnon.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, and Olof:
+On Mon, Nov 30, 2015 at 05:08:57PM -0800, Stephen Boyd wrote:
+> Enable some ssbi drivers present on msm8660, msm8960 and apq8064
+> devices so that we fully exercise the devices present in the dts
+> files.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Please consider pulling this defconfig update for v4.5.
-
-Thanks,
-Dinh
-
-The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
-
-  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_defconfig_for_v4.5
-
-for you to fetch changes up to 93699220ecace65e5385511f9f7119fd49837adb:
-
-  arm: socfpga_defconfig: enable USB dual-role and cleanup (2015-12-03 16:17:55 -0600)
-
-----------------------------------------------------------------
-SoCFPGA defconfig update for v4.5
--Enable USB OTG dual-role and some cleanup by make savedefconfig
-
-----------------------------------------------------------------
-Dinh Nguyen (1):
-      arm: socfpga_defconfig: enable USB dual-role and cleanup
-
- arch/arm/configs/socfpga_defconfig | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+Acked-by: Andy Gross <andy.gross@codeaurora.org>
