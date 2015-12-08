@@ -1,76 +1,216 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 08 Dec 2015 16:32:59 +0100
-Subject: [PATCH 2/2] netcp: add more __le32 annotations
-In-Reply-To: <1578620.t1ANcREMZ8@wuerfel>
-References: <1578620.t1ANcREMZ8@wuerfel>
-Message-ID: <6435706.peaM34LhnV@wuerfel>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 08 Dec 2015 16:33:39 +0100
+Subject: [PATCH v10 0/17] Add Analogix Core Display Port Driver
+In-Reply-To: <1449470239-30667-1-git-send-email-ykk@rock-chips.com>
+References: <1449470239-30667-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1982691.ZDuzTFTUUe@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The handling of epib and psdata remains a bit unclear in the driver,
-as we access the same fields both as CPU-endian and through DMA
-from the device.
+Hi Yakir,
 
-Sparse warns about this:
-ti/netcp_core.c:1147:21: warning: incorrect type in assignment (different base types)
-ti/netcp_core.c:1147:21:    expected unsigned int [usertype] *[assigned] epib
-ti/netcp_core.c:1147:21:    got restricted __le32 *<noident>
+Am Montag, 7. Dezember 2015, 14:37:19 schrieb Yakir Yang:
+>    The Samsung Exynos eDP controller and Rockchip RK3288 eDP controller
+> share the same IP, so a lot of parts can be re-used. I split the common
+> code into bridge directory, then rk3288 and exynos only need to keep
+> some platform code. Cause I can't find the exact IP name of exynos dp
+> controller, so I decide to name dp core driver with "analogix" which I
+> find in rk3288 eDP TRM
 
-This uses __le32 types in a few places and uses __force where the code
-looks fishy. The previous patch should really have produced the correct
-behavior, but this second patch is needed to shut up the warnings about
-it. Ideally it would be slightly rewritten to not need those casts,
-but I don't dare do that without access to the hardware for proper
-testing.
+[...]
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/net/ethernet/ti/netcp.h      | 2 +-
- drivers/net/ethernet/ti/netcp_core.c | 9 +++++----
- 2 files changed, 6 insertions(+), 5 deletions(-)
+> Changes in v10:
+> - Correct the ROCKCHIP_ANALOGIX_DP indentation in Kconfig to tabs here
+> (Heiko) - Fix the wrong macro value of
+> GRF_EDP_REF_CLK_SEL_INTER_HIWORD_MASK BIT(4) -> BIT(20)
+> - Remove the surplus "plat_data" check. (Heiko)
+> -       switch (dp->plat_data && dp->plat_data->dev_type) {
+> +       switch (dp->plat_data->dev_type) {
+> - Revert parts of Gustavo Padovan's changes in commit:
+> 	drm/exynos: do not start enabling DP at bind() phase
+>   Add dp phy poweron function in bind time.
 
-diff --git a/drivers/net/ethernet/ti/netcp.h b/drivers/net/ethernet/ti/netcp.h
-index bb1bb72121c0..17a26a429b71 100644
---- a/drivers/net/ethernet/ti/netcp.h
-+++ b/drivers/net/ethernet/ti/netcp.h
-@@ -113,7 +113,7 @@ struct netcp_intf {
- #define	NETCP_PSDATA_LEN		KNAV_DMA_NUM_PS_WORDS
- struct netcp_packet {
- 	struct sk_buff		*skb;
--	u32			*epib;
-+	__le32			*epib;
- 	u32			*psdata;
- 	unsigned int		psdata_len;
- 	struct netcp_intf	*netcp;
-diff --git a/drivers/net/ethernet/ti/netcp_core.c b/drivers/net/ethernet/ti/netcp_core.c
-index eb2585e777e1..92d08eb262c2 100644
---- a/drivers/net/ethernet/ti/netcp_core.c
-+++ b/drivers/net/ethernet/ti/netcp_core.c
-@@ -1145,8 +1145,8 @@ static int netcp_tx_submit_skb(struct netcp_intf *netcp,
- 	p_info.ts_context = NULL;
- 	p_info.txtstamp_complete = NULL;
- 	p_info.epib = desc->epib;
--	p_info.psdata = desc->psdata;
--	memset(p_info.epib, 0, KNAV_DMA_NUM_EPIB_WORDS * sizeof(u32));
-+	p_info.psdata = (u32 __force *)desc->psdata;
-+	memset(p_info.epib, 0, KNAV_DMA_NUM_EPIB_WORDS * sizeof(__le32));
+The hotplug issue is still present, but I think I found the cause. When
+the first detect call happens, the display simply is still off. I just did
+some very basic tracing [0] and it seems the display simply is not enabled
+when it is supposed to get detected.
+
+And it seems injecting a drm_panel_prepare early for _testing_ [1] really
+did make the hotplug work on both my jerry and minnie.
+
+So I guess we should somehow make sure the panel is actually powered when
+detection is running. Although I'm not sure yet, how that should look like.
+
+
+Intuition suggests, making drm_panel calls nestable (similar to
+clk_prepare/unprepare, etc) and simply wrapping the detection code
+in a prepare-unprepare calls, but I'm not sure if Thierry might have other
+ideas ;-)
+
+
+Also my "log" below suggests some sort of mismatch between
+prepare/unprepare calls, as there are a lot more of the prepare-side.
+
+
+And the locking issue also seems to be still there [2].
+
+
+Heiko
+
+
+[0]
+[    2.797383] analogix_dp_reset
+[    2.800709] analogix_dp_init_hpd
+[    2.803960] analogix_dp_init_video
+[    2.807653] rockchip-drm display-subsystem: bound ff970000.dp (ops rockchip_dp_component_ops)
+[    2.817176] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+[    2.823799] [drm] No driver support for vblank timestamp query.
+[    2.829947] analogix_dp_detect
+[    2.833015] analogix_dp_get_plug_in_status: hpd status 0
+...
+[    2.893425] analogix_dp_get_plug_in_status: hpd status 0
+[    2.893456] rockchip-dp ff970000.dp: failed to get hpd plug status, try to force hpd
+[    2.893458] analogix_dp_force_hpd
+[    2.893464] analogix_dp_get_plug_in_status: hpd status 112
+[    2.893470] panel_simple_prepare
+[    2.952183] rockchip-dp ff970000.dp: EDID data does not include any extensions.
+[    2.961727] panel_simple_get_modes
+[    3.432154] analogix_dp_detect
+[    3.432158] analogix_dp_get_plug_in_status: hpd status 120
+[    3.432160] panel_simple_prepare
+[    3.433731] rockchip-dp ff970000.dp: EDID data does not include any extensions.
+[    3.443268] panel_simple_get_modes
+[    3.444668] panel_simple_prepare
+[    3.444755] analogix_dp_reset
+[    3.445078] analogix_dp_init_hpd
+[    3.445096] panel_simple_disable
+[    3.455349] analogix_dp_init_video
+[    3.558323] rockchip-dp ff970000.dp: Timeout of video streamclk ok
+[    3.558326] rockchip-dp ff970000.dp: unable to config video
+[    3.558328] panel_simple_enable
+[    3.573915] analogix_dp_detect
+[    3.573919] analogix_dp_get_plug_in_status: hpd status 72
+[    3.573921] panel_simple_prepare
+
+
+[1]
+diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+index 3990951..0c2dca5 100644
+--- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
++++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+@@ -399,6 +399,8 @@ static int rockchip_dp_probe(struct platform_device *pdev)
  
- 	/* Find out where to inject the packet for transmission */
- 	list_for_each_entry(tx_hook, &netcp->txhook_list_head, list) {
-@@ -1170,11 +1170,12 @@ static int netcp_tx_submit_skb(struct netcp_intf *netcp,
+        dp->plat_data.panel = panel;
  
- 	/* update descriptor */
- 	if (p_info.psdata_len) {
--		u32 *psdata = p_info.psdata;
-+		/* psdata points to both native-endian and device-endian data */
-+		__le32 *psdata = (void __force *)p_info.psdata;
- 
- 		memmove(p_info.psdata, p_info.psdata + p_info.psdata_len,
- 			p_info.psdata_len);
--		set_words(psdata, p_info.psdata_len, psdata);
-+		set_words(p_info.psdata, p_info.psdata_len, psdata);
- 		tmp |= (p_info.psdata_len & KNAV_DMA_DESC_PSLEN_MASK) <<
- 			KNAV_DMA_DESC_PSLEN_SHIFT;
- 	}
--- 
-2.1.0.rc2
++drm_panel_prepare(dp->plat_data.panel);
++
+        /*
+         * We just use the drvdata until driver run into component
+         * add function, and then we would set drvdata to null, so
+
+
+[2]
+[   11.971277] panel_simple_get_modes
+[  OK  ] Started LSB: X display manager for KDE.
+[  OK  ] Started LSB: Speech Dispatcher.
+[   12.007120] panel_simple_disable
+[   12.012323] 
+[   12.013820] ======================================================
+[   12.019993] [ INFO: possible circular locking dependency detected ]
+[   12.026250] 4.4.0-rc3+ #2755 Not tainted
+[   12.030165] -------------------------------------------------------
+[  12.036417] Xorg/793 is trying to acquire lock:
+[   12.040855]  ((&dp->hotplug_work)){+.+...}[   12.040870] 
+[   12.040870] but task is already holding lock:
+[   12.040871]  (crtc_ww_class_mutex){+.+.+.}, at: [<c0383600>] drm_modeset_lock+0x84/0x104
+[   12.040881] 
+[   12.040881] which lock already depends on the new lock.
+[   12.040881] 
+[   12.040882] 
+[   12.040882] the existing dependency chain (in reverse order) is:
+[   12.040883] 
+[   12.040883] -> #2 (crtc_ww_class_mutex){+.+.+.}:
+[   12.040887]        [<c0756374>] mutex_lock_nested+0x78/0x41c
+[   12.040893]        [<c038365c>] drm_modeset_lock+0xe0/0x104
+[   12.040896]        [<c0377888>] drm_mode_getconnector+0x168/0x38c
+[   12.040902]        [<c036ae58>] drm_ioctl+0x274/0x408
+[   12.040907]        [<c017cbc8>] do_vfs_ioctl+0x670/0x750
+[   12.040911]        [<c017cd04>] SyS_ioctl+0x5c/0x84
+[   12.040914]        [<c000ff80>] ret_fast_syscall+0x0/0x1c
+[   12.040920] 
+[   12.040920] -> #1 (&dev->mode_config.mutex){+.+.+.}:
+[   12.040924]        [<c0756374>] mutex_lock_nested+0x78/0x41c
+[   12.040928]        [<c035b3b4>] drm_helper_hpd_irq_event+0x40/0x150
+[   12.040934]        [<c038e0b0>] analogix_dp_hotplug+0x24/0x28
+[   12.040938]        [<c00450c4>] process_one_work+0x328/0x668
+[   12.040942]        [<c0046334>] worker_thread+0x2cc/0x41c
+[   12.040945]        [<c004bbe8>] kthread+0xf4/0x10c
+[   12.040950]        [<c0010010>] ret_from_fork+0x14/0x24
+[   12.040954] 
+[   12.040954] -> #0 ((&dp->hotplug_work)){+.+...}:
+[   12.040958]        [<c007f4ac>] lock_acquire+0x178/0x218
+[   12.040963]        [<c00437d0>] flush_work+0x4c/0x22c
+[   12.040966]        [<c038e45c>] analogix_dp_bridge_disable+0x74/0xf0
+[   12.040970]        [<c0385ef4>] drm_bridge_disable+0x34/0x38
+[   12.040973]        [<c0359044>] drm_crtc_helper_set_mode+0x200/0x424
+[   12.040977]        [<c0359a38>] drm_crtc_helper_set_config+0x6c0/0x988
+[   12.040981]        [<c0373ba8>] drm_mode_set_config_internal+0x60/0xdc
+[   12.040984]        [<c0378938>] drm_mode_setcrtc+0x3cc/0x474
+[   12.040988]        [<c036ae58>] drm_ioctl+0x274/0x408
+[   12.040991]        [<c017cbc8>] do_vfs_ioctl+0x670/0x750
+[   12.040994]        [<c017cd04>] SyS_ioctl+0x5c/0x84
+[   12.040997]        [<c000ff80>] ret_fast_syscall+0x0/0x1c
+[   12.041001] 
+[   12.041001] other info that might help us debug this:
+[   12.041001] 
+[   12.041002] Chain exists of:
+[   12.041002]   (&dp->hotplug_work) --> &dev->mode_config.mutex --> crtc_ww_class_mutex
+[   12.041007] 
+[   12.041008]  Possible unsafe locking scenario:
+[   12.041008] 
+[   12.041009]        CPU0                    CPU1
+[   12.041010]        ----                    ----
+[   12.041011]   lock(crtc_ww_class_mutex);
+[   12.041013]                                lock(&dev->mode_config.mutex);
+[   12.041016]                                lock(crtc_ww_class_mutex);
+[   12.041018]   lock((&dp->hotplug_work));
+[   12.041020] 
+[   12.041020]  *** DEADLOCK ***
+[   12.041020] 
+[   12.041023] 3 locks held by Xorg/793:
+[   12.041023]  #0:  (&dev->mode_config.mutex){+.+.+.}, at: [<c0383d48>] drm_modeset_lock_all+0x50/0xd8
+[   12.041030]  #1:  (crtc_ww_class_acquire){+.+.+.}, at: [<c0383d58>] drm_modeset_lock_all+0x60/0xd8
+[   12.041037]  #2:  (crtc_ww_class_mutex){+.+.+.}, at: [<c0383600>] drm_modeset_lock+0x84/0x104
+[   12.041044] 
+[   12.041044] stack backtrace:
+[   12.041048] CPU: 3 PID: 793 Comm: Xorg Not tainted 4.4.0-rc3+ #2755
+[   12.041049] Hardware name: Rockchip (Device Tree)
+[   12.041059] [<c0019914>] (unwind_backtrace) from [<c0014bcc>] (show_stack+0x20/0x24)
+[   12.041066] [<c0014bcc>] (show_stack) from [<c02c4484>] (dump_stack+0x84/0xb8)
+[   12.041072] [<c02c4484>] (dump_stack) from [<c007a2b8>] (print_circular_bug+0x278/0x2cc)
+[   12.041078] [<c007a2b8>] (print_circular_bug) from [<c007e850>] (__lock_acquire+0x14a0/0x1aec)
+[   12.041082] [<c007e850>] (__lock_acquire) from [<c007f4ac>] (lock_acquire+0x178/0x218)
+[   12.041086] [<c007f4ac>] (lock_acquire) from [<c00437d0>] (flush_work+0x4c/0x22c)
+[   12.041091] [<c00437d0>] (flush_work) from [<c038e45c>] (analogix_dp_bridge_disable+0x74/0xf0)
+[   12.041097] [<c038e45c>] (analogix_dp_bridge_disable) from [<c0385ef4>] (drm_bridge_disable+0x34/0x38)
+[   12.041102] [<c0385ef4>] (drm_bridge_disable) from [<c0359044>] (drm_crtc_helper_set_mode+0x200/0x424)
+[   12.041108] [<c0359044>] (drm_crtc_helper_set_mode) from [<c0359a38>] (drm_crtc_helper_set_config+0x6c0/0x988)
+[   12.041114] [<c0359a38>] (drm_crtc_helper_set_config) from [<c0373ba8>] (drm_mode_set_config_internal+0x60/0xdc)
+[   12.041119] [<c0373ba8>] (drm_mode_set_config_internal) from [<c0378938>] (drm_mode_setcrtc+0x3cc/0x474)
+[   12.041124] [<c0378938>] (drm_mode_setcrtc) from [<c036ae58>] (drm_ioctl+0x274/0x408)
+[   12.041129] [<c036ae58>] (drm_ioctl) from [<c017cbc8>] (do_vfs_ioctl+0x670/0x750)
+[   12.041134] [<c017cbc8>] (do_vfs_ioctl) from [<c017cd04>] (SyS_ioctl+0x5c/0x84)
+[   12.041138] [<c017cd04>] (SyS_ioctl) from [<c000ff80>] (ret_fast_syscall+0x0/0x1c)
+[   12.041210] panel_simple_unprepare
+[   12.041359] panel_simple_prepare
+[   12.101638] analogix_dp_reset
+[   12.101879] analogix_dp_init_hpd
+[   12.101897] panel_simple_disable
+[   12.108543] analogix_dp_irq_handler: irq-type 0
+[   12.110452] rockchip-dp ff970000.dp: Link Training Clock Recovery success
+[   12.111900] rockchip-dp ff970000.dp: Link Training success!
+[   12.113384] analogix_dp_init_video
+[   12.215825] rockchip-dp ff970000.dp: Timeout of video streamclk ok
+[   12.215829] rockchip-dp ff970000.dp: unable to config video
+[   12.215832] panel_simple_enable
+,at: [<c0043784>] flush_work+0x0/0x22c
