@@ -1,135 +1,215 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 8 Dec 2015 10:38:48 -0800
-Subject: [PATCH v2] ARM: mm: mark section-aligned portion of rodata NX
-In-Reply-To: <CAKv+Gu9EeKQk7GOAPV2cvff10=kD49u+oP-yEiOrJBPOF=QNtw@mail.gmail.com>
-References: <20151207223534.GA13722@www.outflux.net>
- <CAKv+Gu9EeKQk7GOAPV2cvff10=kD49u+oP-yEiOrJBPOF=QNtw@mail.gmail.com>
-Message-ID: <CAGXu5j+Pc7ucC4tmxHyDW7aW88pwQvMejuR2Ehdxp=vY+pv-5w@mail.gmail.com>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Tue,  8 Dec 2015 19:48:53 +0100
+Subject: [linux-sunxi][PATCH 1/2] ARM: dts: sun4i: Create common dtsi for mk802
+In-Reply-To: <1449600534-5098-1-git-send-email-codekipper@gmail.com>
+References: <1449600534-5098-1-git-send-email-codekipper@gmail.com>
+Message-ID: <1449600534-5098-2-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 7, 2015 at 11:47 PM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 7 December 2015 at 23:35, Kees Cook <keescook@chromium.org> wrote:
->> When rodata is large enough that it crosses a section boundary after the
->> kernel text, mark the rest NX. This is as close to full NX of rodata as
->> we can get without splitting page tables or doing section alignment via
->> CONFIG_DEBUG_ALIGN_RODATA.
->>
->> When the config is:
->>
->>  CONFIG_DEBUG_RODATA=y
->>  # CONFIG_DEBUG_ALIGN_RODATA is not set
->>
->> Before:
->>
->> ---[ Kernel Mapping ]---
->> 0x80000000-0x80100000           1M     RW NX SHD
->> 0x80100000-0x80a00000           9M     ro x  SHD
->> 0x80a00000-0xa0000000         502M     RW NX SHD
->>
->> After:
->>
->> ---[ Kernel Mapping ]---
->> 0x80000000-0x80100000           1M     RW NX SHD
->> 0x80100000-0x80700000           6M     ro x  SHD
->> 0x80700000-0x80a00000           3M     ro NX SHD
->> 0x80a00000-0xa0000000         502M     RW NX SHD
->>
->> Signed-off-by: Kees Cook <keescook@chromium.org>
->> ---
->> v2:
->> - static declaration, ard
->> ---
->>  arch/arm/kernel/vmlinux.lds.S | 9 +++++++--
->>  arch/arm/mm/init.c            | 7 ++++---
->>  2 files changed, 11 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
->> index a6e395c53a48..9c249c71fda1 100644
->> --- a/arch/arm/kernel/vmlinux.lds.S
->> +++ b/arch/arm/kernel/vmlinux.lds.S
->> @@ -8,9 +8,7 @@
->>  #include <asm/thread_info.h>
->>  #include <asm/memory.h>
->>  #include <asm/page.h>
->> -#ifdef CONFIG_DEBUG_RODATA
->>  #include <asm/pgtable.h>
->> -#endif
->>
->>  #define PROC_INFO                                                      \
->>         . = ALIGN(4);                                                   \
->> @@ -337,6 +335,13 @@ SECTIONS
->>  }
->>
->>  /*
->> + * Without CONFIG_DEBUG_ALIGN_RODATA, __start_rodata_section_aligned will
->> + * be the first section-aligned location after __start_rodata. Otherwise,
->> + * it will be equal to __start_rodata.
->> + */
->> +__start_rodata_section_aligned = ALIGN(__start_rodata, 1 << SECTION_SHIFT);
->> +
->> +/*
->>   * These must never be empty
->>   * If you have to comment these two assert statements out, your
->>   * binutils is too old (for other reasons as well)
->> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
->> index 321d3683dc7c..6b16f6cf4843 100644
->> --- a/arch/arm/mm/init.c
->> +++ b/arch/arm/mm/init.c
->> @@ -579,6 +579,9 @@ struct section_perm {
->>         pmdval_t clear;
->>  };
->>
->> +/* First section-aligned location at or after __start_rodata. */
->> +extern char __start_rodata_section_aligned[];
->> +
->>  static struct section_perm nx_perms[] = {
->>         /* Make pages tables, etc before _stext RW (set NX). */
->>         {
->> @@ -596,16 +599,14 @@ static struct section_perm nx_perms[] = {
->>                 .mask   = ~PMD_SECT_XN,
->>                 .prot   = PMD_SECT_XN,
->>         },
->> -#ifdef CONFIG_DEBUG_ALIGN_RODATA
->>         /* Make rodata NX (set RO in ro_perms below). */
->>         {
->>                 .name   = "rodata NX",
->> -               .start  = (unsigned long)__start_rodata,
->> +               .start  = (unsigned long)__start_rodata_section_aligned,
->>                 .end    = (unsigned long)__init_begin,
->
-> What happens if start > end ?
+From: Marcus Cooper <codekipper@gmail.com>
 
-It isn't possible, since rodata will be after text and before
-init_begin, so it must either less than or equal to init_begin. The
-equal case is quite possible, and that's fine, since both cases are
-(correctly) silently ignored by set_section_perms:
+There are a few variants of the mk802 boards. This commit adds a
+dtsi for the mk802 and modifies the original dts to reference it.
 
-                for (addr = perms[i].start; addr < perms[i].end; addr
-+= SECTION_SIZE)
-                    section_update(....
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+---
+ arch/arm/boot/dts/sun4i-a10-mk802.dts  |  64 +------------------
+ arch/arm/boot/dts/sun4i-a10-mk802.dtsi | 108 +++++++++++++++++++++++++++++++++
+ 2 files changed, 109 insertions(+), 63 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sun4i-a10-mk802.dtsi
 
--Kees
-
->
->>                 .mask   = ~PMD_SECT_XN,
->>                 .prot   = PMD_SECT_XN,
->>         },
->> -#endif
->>  };
->>
->>  static struct section_perm ro_perms[] = {
->> --
->> 1.9.1
->>
->>
->> --
->> Kees Cook
->> Chrome OS & Brillo Security
-
-
-
+diff --git a/arch/arm/boot/dts/sun4i-a10-mk802.dts b/arch/arm/boot/dts/sun4i-a10-mk802.dts
+index 3c7eebe..fd2f7fb 100644
+--- a/arch/arm/boot/dts/sun4i-a10-mk802.dts
++++ b/arch/arm/boot/dts/sun4i-a10-mk802.dts
+@@ -41,72 +41,10 @@
+  */
+ 
+ /dts-v1/;
+-#include "sun4i-a10.dtsi"
+-#include "sunxi-common-regulators.dtsi"
+-#include <dt-bindings/gpio/gpio.h>
++#include "sun4i-a10-mk802.dtsi"
+ 
+ / {
+ 	model = "MK802";
+ 	compatible = "allwinner,mk802", "allwinner,sun4i-a10";
+ 
+-	aliases {
+-		serial0 = &uart0;
+-	};
+-
+-	chosen {
+-		stdout-path = "serial0:115200n8";
+-	};
+-};
+-
+-&ehci0 {
+-	status = "okay";
+-};
+-
+-&ehci1 {
+-	status = "okay";
+-};
+-
+-&mmc0 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
+-	vmmc-supply = <&reg_vcc3v3>;
+-	bus-width = <4>;
+-	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
+-	cd-inverted;
+-	status = "okay";
+-};
+-
+-&ohci0 {
+-	status = "okay";
+-};
+-
+-&pio {
+-	usb2_vbus_pin_mk802: usb2_vbus_pin at 0 {
+-		allwinner,pins = "PH12";
+-		allwinner,function = "gpio_out";
+-		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+-	};
+-};
+-
+-&reg_usb1_vbus {
+-	status = "okay";
+-};
+-
+-&reg_usb2_vbus {
+-	pinctrl-0 = <&usb2_vbus_pin_mk802>;
+-	gpio = <&pio 7 12 GPIO_ACTIVE_HIGH>; /* PH12 */
+-	status = "okay";
+-};
+-
+-&uart0 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&uart0_pins_a>;
+-	status = "okay";
+-};
+-
+-&usbphy {
+-	usb1_vbus-supply = <&reg_usb1_vbus>;
+-	usb2_vbus-supply = <&reg_usb2_vbus>;
+-	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/sun4i-a10-mk802.dtsi b/arch/arm/boot/dts/sun4i-a10-mk802.dtsi
+new file mode 100644
+index 0000000..422ef9c
+--- /dev/null
++++ b/arch/arm/boot/dts/sun4i-a10-mk802.dtsi
+@@ -0,0 +1,108 @@
++/*
++ * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "sun4i-a10.dtsi"
++#include "sunxi-common-regulators.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
++	cd-inverted;
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&pio {
++	usb2_vbus_pin_mk802: usb2_vbus_pin at 0 {
++		allwinner,pins = "PH12";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++&reg_usb1_vbus {
++	status = "okay";
++};
++
++&reg_usb2_vbus {
++	pinctrl-0 = <&usb2_vbus_pin_mk802>;
++	gpio = <&pio 7 12 GPIO_ACTIVE_HIGH>; /* PH12 */
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usbphy {
++	usb1_vbus-supply = <&reg_usb1_vbus>;
++	usb2_vbus-supply = <&reg_usb2_vbus>;
++	status = "okay";
++};
 -- 
-Kees Cook
-Chrome OS & Brillo Security
+1.9.1
