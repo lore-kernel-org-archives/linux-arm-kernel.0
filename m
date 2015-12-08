@@ -1,39 +1,47 @@
-From: haibo.chen@freescale.com (Haibo Chen)
-Date: Tue, 8 Dec 2015 18:26:23 +0800
-Subject: [PATCH v5 4/4] ARM: dts: imx7d-sdb: add ADC support
-In-Reply-To: <1449570383-25716-1-git-send-email-haibo.chen@freescale.com>
-References: <1449570383-25716-1-git-send-email-haibo.chen@freescale.com>
-Message-ID: <1449570383-25716-5-git-send-email-haibo.chen@freescale.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 08 Dec 2015 10:22:53 +0000
+Subject: [PATCH V2] ARM: SWP emulation: Restore original *data when failed
+In-Reply-To: <726a7ce88982fba5df84e4d22b083e39b57a6bc6.1444900732.git.shengjiu.wang@freescale.com>
+References: <726a7ce88982fba5df84e4d22b083e39b57a6bc6.1444900732.git.shengjiu.wang@freescale.com>
+Message-ID: <5666AF7D.5000703@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ADC support for imx7d-sdb board.
+On 15/10/15 10:30, Shengjiu Wang wrote:
+> __user_swpX_asm maybe failed in first STREX operation, emulate_swpX
+> will try again, but the *data has been changed in first time. which
+> causes the result is wrong.
+> This patch is to fix this issue. When STREX succeed, change the *data.
+> if it fail, *data is not changed.
+> 
+> Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
+> ---
+>  arch/arm/kernel/swp_emulate.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
+> index 5b26e7e..c3fe769d 100644
+> --- a/arch/arm/kernel/swp_emulate.c
+> +++ b/arch/arm/kernel/swp_emulate.c
+> @@ -36,10 +36,10 @@
+>   */
+>  #define __user_swpX_asm(data, addr, res, temp, B)		\
+>  	__asm__ __volatile__(					\
+> -	"	mov		%2, %1\n"			\
+> -	"0:	ldrex"B"	%1, [%3]\n"			\
+> -	"1:	strex"B"	%0, %2, [%3]\n"			\
+> +	"0:	ldrex"B"	%2, [%3]\n"			\
+> +	"1:	strex"B"	%0, %1, [%3]\n"			\
+>  	"	cmp		%0, #0\n"			\
+> +	"	moveq		%1, %2\n"			\
+>  	"	movne		%0, %4\n"			\
+>  	"2:\n"							\
+>  	"	.section	 .text.fixup,\"ax\"\n"		\
+> 
 
-Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
----
- arch/arm/boot/dts/imx7d-sdb.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+I wonder what is status of this patch? I see that arm64 counterpart has
+landed in mainline, but I didn't manage to track down this one - is it
+because it never been submitted to patch system?
 
-diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-index 432aaf5..b2c4536 100644
---- a/arch/arm/boot/dts/imx7d-sdb.dts
-+++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -97,6 +97,16 @@
- 	};
- };
- 
-+&adc1 {
-+	vref-supply = <&reg_vref_1v8>;
-+	status = "okay";
-+};
-+
-+&adc2 {
-+	vref-supply = <&reg_vref_1v8>;
-+	status = "okay";
-+};
-+
- &cpu0 {
- 	arm-supply = <&sw1a_reg>;
- };
--- 
-1.9.1
+Thanks
+Vladimir
