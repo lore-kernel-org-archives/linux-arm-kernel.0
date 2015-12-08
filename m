@@ -1,93 +1,88 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Tue,  8 Dec 2015 19:48:54 +0100
-Subject: [linux-sunxi][PATCH 2/2] ARM: dts: sun4i: Add rikomagic mk802+ board
-In-Reply-To: <1449600534-5098-1-git-send-email-codekipper@gmail.com>
-References: <1449600534-5098-1-git-send-email-codekipper@gmail.com>
-Message-ID: <1449600534-5098-3-git-send-email-codekipper@gmail.com>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Tue, 8 Dec 2015 19:50:38 +0100
+Subject: [PATCH v2 6/6] arm64: renesas: r8a7795: Add L2 cache-controller
+ nodes
+In-Reply-To: <20151207190355.GE28024@leverpostej>
+References: <1449512659-16688-1-git-send-email-geert+renesas@glider.be>
+ <1449512659-16688-7-git-send-email-geert+renesas@glider.be>
+ <5665D4C7.1050705@arm.com> <20151207190355.GE28024@leverpostej>
+Message-ID: <5667267E.2080601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+On 07.12.2015 20:03, Mark Rutland wrote:
+> On Mon, Dec 07, 2015 at 06:49:43PM +0000, Sudeep Holla wrote:
+>>
+>> On 07/12/15 18:24, Geert Uytterhoeven wrote:
+>>> +	L2_CA57: cache-controller at 0 {
+>>> +		compatible = "cache";
+>>> +		arm,data-latency = <4 4 1>;
+>>> +		arm,tag-latency = <3 3 3>;
+>>
+>> Interesting, only PL2xx/3xx cache controller driver reads this from the
+>> DT and configures the controller. The integrated L2 found in
+>> A15/A7/A57/A53 needs doesn't make use of these values from the DT.
+>
+> These properties seem to be from l2cc.txt, which really only corresponds
+> to PL210/PL220/PL310 (and variants) and isn't as generic as it sounds.
+>
+> I don't see that these are necessary at all.
 
-The Rikomagic mk802+ is an Allwinner A10 based hdmi tv-stick, it features
-1G RAM, 4G nand, a mini-hdmi female connector, USB-A receptacle, mini-usb
-receptacle (OTG), USB-wifi and an internal microphone. Like the original
-mk802, it does not use any pmic.
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
----
- arch/arm/boot/dts/Makefile                |  1 +
- arch/arm/boot/dts/sun4i-a10-mk802-1gb.dts | 50 +++++++++++++++++++++++++++++++
- 2 files changed, 51 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun4i-a10-mk802-1gb.dts
+What's about a documentation patch like [1], then?
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ee8a1dc..f1cb0f8 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -600,6 +600,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
- 	sun4i-a10-marsboard.dtb \
- 	sun4i-a10-mini-xplus.dtb \
- 	sun4i-a10-mk802.dtb \
-+	sun4i-a10-mk802-1gb.dtb \
- 	sun4i-a10-mk802ii.dtb \
- 	sun4i-a10-olinuxino-lime.dtb \
- 	sun4i-a10-pcduino.dtb \
-diff --git a/arch/arm/boot/dts/sun4i-a10-mk802-1gb.dts b/arch/arm/boot/dts/sun4i-a10-mk802-1gb.dts
-new file mode 100644
-index 0000000..eb77633
---- /dev/null
-+++ b/arch/arm/boot/dts/sun4i-a10-mk802-1gb.dts
-@@ -0,0 +1,50 @@
-+/*
-+ * Copyright 2015 Marcus Cooper <codekipper@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
+
+For what is the arm64 dts entry
+
+cpu at 0 {
+	...
+	next-level-cache = <&L2_0>;
+};
+
+L2_0: l2-cache0 {
+	compatible = "cache";
+};
+
+good for at all, then?
+
+
+Best regards
+
+Dirk
+
+
+[1]
+
+diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt 
+b/Documentation/devicetree/bindings/arm/l2cc.txt
+index 06c88a4..f687aed 100644
+--- a/Documentation/devicetree/bindings/arm/l2cc.txt
++++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+@@ -1,12 +1,18 @@
+  * ARM L2 Cache Controller
+
+-ARM cores often have a separate level 2 cache controller. There are 
+various
++ARM 32-bit cores often have a separate level 2 cache controller. 
+There are various
+  implementations of the L2 cache controller with compatible 
+programming models.
+  Some of the properties that are just prefixed "cache-*" are taken 
+from section
+  3.7.3 of the ePAPR v1.1 specification which can be found at:
+ 
+https://www.power.org/wp-content/uploads/2012/06/Power_ePAPR_APPROVED_v1.1.pdf
+
+-The ARM L2 cache representation in the device tree should be done as 
+follows:
++ARM 64-bit cores (e.g. A15/A7/A57/A53) have an integrated level 2 
+cache which
++doesn't make use of any values from the kernel device tree. There is no
++L2 cache configuration done in the kernel. The L2 cache is assumed to be
++preconfigured by early secure boot code.
 +
-+/dts-v1/;
-+#include "sun4i-a10-mk802.dtsi"
-+
-+/ {
-+	model = "Rikomagic MK802+";
-+	compatible = "rikomagic,mk802-1gb", "allwinner,sun4i-a10";
-+
-+};
--- 
-1.9.1
++The ARM L2 cache representation for 32-bit cores in the device tree 
+should be done
++as follows:
+
+  Required properties:
