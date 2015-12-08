@@ -1,46 +1,98 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Dec 2015 13:49:52 +0000
-Subject: ARM64: kernel oops in 4.4-rc4+
-In-Reply-To: <CACVXFVPgTPYzHj0E7cSx=X+=t=0Am_yBSk6FnTZHeG0hyY6ipg@mail.gmail.com>
-References: <CACVXFVPnmKzv-mnDyjOnoQtxZ4kyWLtkymK1XhDThO8ibi7f7w@mail.gmail.com>
- <20151208103013.GA19612@arm.com>
- <CACVXFVPgTPYzHj0E7cSx=X+=t=0Am_yBSk6FnTZHeG0hyY6ipg@mail.gmail.com>
-Message-ID: <20151208134951.GI19612@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 8 Dec 2015 13:50:40 +0000
+Subject: [PATCH v7 2/6] mfd: syscon: add a DT property to set value width
+In-Reply-To: <20151207194218.GB6030@localhost>
+References: <1448899191-13891-1-git-send-email-damien.riegel@savoirfairelinux.com>
+ <1448899191-13891-3-git-send-email-damien.riegel@savoirfairelinux.com>
+ <20151207094020.GF3384@x1> <20151207194218.GB6030@localhost>
+Message-ID: <20151208135040.GH3384@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 09:08:32PM +0800, Ming Lei wrote:
-> On Tue, Dec 8, 2015 at 6:30 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, Dec 08, 2015 at 02:30:33PM +0800, Ming Lei wrote:
-> >> The attached kernel oops can be triggered immediately after
-> >> running the following command on APM Mustang:
-> >>
-> >>         $stress-ng --all 8 -t 10m
-> >>
-> >> [1] kernel oops log
-> >> stress-ng: info:  [5220] 5 failures reached, aborting stress process
-> >> [  265.782659] kernel BUG at ./arch/arm64/include/asm/pgtable.h:282!
-> >
-> > Yikes, this means we're replacing a writable pte with a clean pte, so
-> > there's a potential race w/ hardware DBM.
-> >
-> > Could you dump pte and *ptep please?
+On Mon, 07 Dec 2015, Damien Riegel wrote:
+
+> On Mon, Dec 07, 2015 at 09:40:20AM +0000, Lee Jones wrote:
+> > On Mon, 30 Nov 2015, Damien Riegel wrote:
+> > 
+> > > Currently syscon has a fixed configuration of 32 bits for register and
+> > > values widths. In some cases, it would be desirable to be able to
+> > > customize the value width.
+> > > 
+> > > For example, certain boards (like the ones manufactured by Technologic
+> > > Systems) have a FPGA that is memory-mapped, but its registers are only
+> > > 16-bit wide.
+> > > 
+> > > This patch adds an optional "reg-io-width" DT binding for syscon that
+> > > allows to change the width for the data bus (i.e. val_bits). If this
+> > > property is provided, it will also set the register stride to
+> > > reg-io-width's value. If not provided, the default configuration is
+> > > used.
+> > > 
+> > > Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+> > > ---
+> > >  Documentation/devicetree/bindings/mfd/syscon.txt |  4 ++++
+> > >  drivers/mfd/syscon.c                             | 13 +++++++++++++
+> > >  2 files changed, 17 insertions(+)
+> > 
+> > Applied, thanks.
+> > 
+> Hi Lee,
 > 
-> They are dumped as so:
-> 
-> set_pte_at: addr 470000, ptep fffffe00bc870238, *ptep 680047348a0bd3,
-> pte 680047348a0fd3
+> Good to see this patch applied. What's going on now with the other
+> patches of this serie ? How should I handle them ?
 
-Thanks for dumping these.
+Are there any build dependencies between them?
 
-It looks like we're trying to set the access flag in the pte, so its
-got nothing to do with swp entries (although they may well be broken
-anyway with these BUG_ONs). With H/W DBM enabled, we shouldn't be doing
-software management of the access flag, so the BUG_ON looks like a red
-herring in this case.
+> > > diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
+> > > index fe8150b..408f768 100644
+> > > --- a/Documentation/devicetree/bindings/mfd/syscon.txt
+> > > +++ b/Documentation/devicetree/bindings/mfd/syscon.txt
+> > > @@ -13,6 +13,10 @@ Required properties:
+> > >  - compatible: Should contain "syscon".
+> > >  - reg: the register region can be accessed from syscon
+> > >  
+> > > +Optional property:
+> > > +- reg-io-width: the size (in bytes) of the IO accesses that should be
+> > > +  performed on the device.
+> > > +
+> > >  Examples:
+> > >  gpr: iomuxc-gpr at 020e0000 {
+> > >  	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
+> > > diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
+> > > index 176bf0f..b7aabee 100644
+> > > --- a/drivers/mfd/syscon.c
+> > > +++ b/drivers/mfd/syscon.c
+> > > @@ -47,6 +47,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
+> > >  	struct syscon *syscon;
+> > >  	struct regmap *regmap;
+> > >  	void __iomem *base;
+> > > +	u32 reg_io_width;
+> > >  	int ret;
+> > >  	struct regmap_config syscon_config = syscon_regmap_config;
+> > >  
+> > > @@ -69,6 +70,18 @@ static struct syscon *of_syscon_register(struct device_node *np)
+> > >  	 else if (of_property_read_bool(np, "little-endian"))
+> > >  		syscon_config.val_format_endian = REGMAP_ENDIAN_LITTLE;
+> > >  
+> > > +	/*
+> > > +	 * search for reg-io-width property in DT. If it is not provided,
+> > > +	 * default to 4 bytes. regmap_init_mmio will return an error if values
+> > > +	 * are invalid so there is no need to check them here.
+> > > +	 */
+> > > +	ret = of_property_read_u32(np, "reg-io-width", &reg_io_width);
+> > > +	if (ret)
+> > > +		reg_io_width = 4;
+> > > +
+> > > +	syscon_config.reg_stride = reg_io_width;
+> > > +	syscon_config.val_bits = reg_io_width * 8;
+> > > +
+> > >  	regmap = regmap_init_mmio(NULL, base, &syscon_config);
+> > >  	if (IS_ERR(regmap)) {
+> > >  		pr_err("regmap init failed\n");
+> > 
 
-I'm not sure on the best fix for this, though. We can either make the
-BUG_ON dependent on the hardware supporting DBM or we could override
-ptep_set_access_flags to avoid the debug check.
-
-Will
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
