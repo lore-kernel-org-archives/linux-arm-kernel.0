@@ -1,133 +1,109 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Tue, 8 Dec 2015 14:30:33 +0800
-Subject: ARM64: kernel oops in 4.4-rc4+
-Message-ID: <CACVXFVPnmKzv-mnDyjOnoQtxZ4kyWLtkymK1XhDThO8ibi7f7w@mail.gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 8 Dec 2015 07:42:26 +0100
+Subject: [PATCH] clk: sunxi: Extend the simple gates and handle the
+ Allwinner H3
+In-Reply-To: <20151207143102.GA29097@rob-hp-laptop>
+References: <20151206100412.1a74b71da8e9ca28c6e61589@free.fr>
+ <20151207143102.GA29097@rob-hp-laptop>
+Message-ID: <20151208074226.17c75247f9eed69c9cac1d2d@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 7 Dec 2015 08:31:02 -0600
+Rob Herring <robh@kernel.org> wrote:
 
-The attached kernel oops can be triggered immediately after
-running the following command on APM Mustang:
+> On Sun, Dec 06, 2015 at 10:04:12AM +0100, Jean-Francois Moine wrote:
+> > The H3 has a clock gate definition similar to the other Allwinner SoCs,
+> > but with a different parent clock for each single gate.
+> > 
+> > Adding the names of the parent clocks in both the source and output clocks
+> > permits the use of the simple-gates driver to define the bus gates
+> > of all known Allwinner SoCs.
+> > 
+> > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> > ---
+> > This patch replaces a part of Jens Kuske's patch
+> > 	[PATCH v5 1/4] clk: sunxi: Add H3 clocks support
+> > ---
+> >  Documentation/devicetree/bindings/clock/sunxi.txt | 25 +++++++++++++++++++++++
+> >  drivers/clk/sunxi/clk-simple-gates.c              | 14 ++++++++++++-
+> >  2 files changed, 38 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> > index 8a47b77..5736e6d 100644
+> > --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> > +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> > @@ -70,6 +70,7 @@ Required properties:
+> >  	"allwinner,sun8i-a23-usb-clk" - for usb gates + resets on A23
+> >  	"allwinner,sun9i-a80-usb-mod-clk" - for usb gates + resets on A80
+> >  	"allwinner,sun9i-a80-usb-phy-clk" - for usb phy gates + resets on A80
+> > +	"allwinner,sunxi-gates-clk" - simple gates
+> >  
+> >  Required properties for all clocks:
+> >  - reg : shall be the control register address for the clock.
+> > @@ -93,6 +94,12 @@ The "allwinner,sun9i-a80-mmc-config-clk" clock also requires:
+> >  - #reset-cells : shall be set to 1
+> >  - resets : shall be the reset control phandle for the mmc block.
+> >  
+> > +The "allwinner,sunxi-gates-clk" clock also requires:
+> > +- clock-names : corresponding names of the parent clocks
+> > +when the output clocks have different parents.
+> > +These names must be 4 characters long and must appear as a prefix in
+> > +the names of the output clocks. See example.
+> > +
+> 
+> I don't think you should be encoding relationships of clocks using the 
+> name strings. We describe relationships in DT via parent/child or 
+> phandles.
 
-        $stress-ng --all 8 -t 10m
+As you know, in the H3, each of the 49 output clock has one of the 4
+main clocks as its source.
+There are 3 options for defining the source of each clock:
+1- all definitions are in the DT,
+2- some definitions are in the DT, some other ones are hard-coded,
+3- all definitions are hard-coded.
 
-[1] kernel oops log
-stress-ng: info:  [5220] 5 failures reached, aborting stress process
-[  265.782659] kernel BUG at ./arch/arm64/include/asm/pgtable.h:282!
-[  265.788726] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-[  265.794186] Modules linked in:
-[  265.797241] CPU: 1 PID: 15830 Comm: stress-ng-cache Tainted: G
-  W       4.4.0-rc4+ #54
-[  265.805638] Hardware name: AppliedMicro Mustang/Mustang, BIOS 2.0.0
-Oct 23 2015
-[  265.812911] task: fffffe02c4795180 ti: fffffe02c4870000 task.ti:
-fffffe02c4870000
-[  265.820364] PC is at ptep_set_access_flags+0xdc/0x104
-[  265.825395] LR is at handle_mm_fault+0xfe0/0x11e8
-[  265.830077] pc : [<fffffe00001e39c0>] lr : [<fffffe00001d62b4>]
-pstate: 20000145
-[  265.837436] sp : fffffe02c4873c90
-[  265.840733] x29: fffffe02c4873c90 x28: 00680047e20a0bd3
-[  265.846042] x27: fffffe02c07cf780 x26: 000000000000ffe0
-[  265.851352] x25: fffffe02c48e0000 x24: fffffe02c48c0000
-[  265.856662] x23: 0000000000000054 x22: fffffe07dedc5400
-[  265.861971] x21: fffffe02c12bab48 x20: 000003ff9f670000
-[  265.867282] x19: 0000000000000001 x18: 0000000000000000
-[  265.872593] x17: 0000000000474688 x16: 000003ff9f914258
-[  265.877902] x15: 0012df030706601b x14: 000003ff9f862600
-[  265.883211] x13: 00000003e8000000 x12: 0000000000000018
-[  265.888519] x11: 0000000000000007 x10: fffffe02c4873b00
-[  265.893828] x9 : 0000000000000000 x8 : fffffe02c4873c20
-[  265.899138] x7 : fffffe00001d55ac x6 : 0000000000000000
-[  265.904448] x5 : 0008000000000000 x4 : 00680047e20a0bd3
-[  265.909759] x3 : 00680047e20a0fd3 x2 : fffffe02c48efb38
-[  265.915070] x1 : 0008000000000000 x0 : 0008000000000080
-[  265.920381]
-[  265.921868] Process stress-ng-cache (pid: 15830, stack limit =
-0xfffffe02c4870020)
-[  265.929401] Stack: (0xfffffe02c4873c90 to 0xfffffe02c4874000)
-[  265.935120] 3c80:
-fffffe02c4873cd0 fffffe00001d62b4
-[  265.942912] 3ca0: fffffe02c12bab48 000003ff9f670000
-000000000000fb38 fffffe00001d5350
-[  265.950703] 3cc0: fffffe02c12bab48 fffffe00001d55ac
-fffffe02c4873db0 fffffe00000a2e90
-[  265.958495] 3ce0: fffffe02c4873ed0 fffffe02c4795180
-fffffe07dedc5400 000000009200000b
-[  265.966288] 3d00: 000003ff9f6723b6 0000000000000007
-0000000000000054 fffffe02c12bab48
-[  265.974080] 3d20: fffffe07dedc5498 0000000000020000
-fffffe02c4873da0 fffffe0000110af4
-[  265.981872] 3d40: fffffe02c48efb38 fffffe02c4795180
-fffffe02c4873d80 fffffe00000f0394
-[  265.989664] 3d60: fffffe0000aaca00 fffffe02c48cffe0
-0000000000000000 000000009200000b
-[  265.997456] 3d80: fffffe02c4873db0 fffffe00000a2ed4
-fffffe02c4873db0 fffffe00000a2d6c
-[  266.005248] 3da0: fffffe02c4873ed0 fffffe02c4795180
-fffffe02c4873e20 fffffe00000902c8
-[  266.013040] 3dc0: 000000009200000b fffffe0000cd60f0
-000003ff9f6723b6 fffffe02c4873ed0
-[  266.020832] 3de0: 0000000020000000 0000000000000024
-000000009200000b 000003ff9f6723b6
-[  266.028624] 3e00: 0000000000000001 fffffe02c4870000
-0000000000000001 fffffe00000944d4
-[  266.036416] 3e20: 000003ffc104a160 fffffe000009391c
-0000000000000000 000003ff9f79d7a0
-[  266.044209] 3e40: ffffffffffffffff 00000000004128f0
-ffffffffffffffff 0000000000412900
-[  266.052001] 3e60: 0000000020000000 fffffe0000097cb0
-fffffe02c4873e90 fffffe00000944d4
-[  266.059793] 3e80: fffffe02c4796180 fffffe02c4796300
-fffffe02c4873eb0 fffffe0000097cb0
-[  266.067585] 3ea0: 0000000000000008 000003ff9f79d7a0
-000003ffc104a160 fffffe0000093ba8
-[  266.075377] 3ec0: 0000000000000000 fffffe0000093a98
-00000000000e23b6 0000000000000001
-[  266.083169] 3ee0: 000000000000010d 00000000001d9e3c
-0000000000000008 00000000000003e8
-[  266.090960] 3f00: 000003ff9fb20000 0000000000475ae0
-000000000011dc49 0000000000008001
-[  266.098752] 3f20: 0000000000007504 0000000000000007
-0000000000000018 00000003e8000000
-[  266.106544] 3f40: 000003ff9f862600 0012df030706601b
-000003ff9f914258 0000000000474688
-[  266.114336] 3f60: 0000000000000000 000003ff9f590000
-000003ff9f79d7a0 0000000000009069
-[  266.122128] 3f80: 0000000000004650 0000000000475ae0
-00000000220d97ab 00000000001fffff
-[  266.129919] 3fa0: 000003ffc104a1e8 0000000000000001
-0000000000475698 000003ffc104a160
-[  266.137712] 3fc0: 0000000000412850 000003ffc104a160
-00000000004128f0 0000000020000000
-[  266.145504] 3fe0: 0000000000000000 ffffffffffffffff
-6b6b6b6b6b6b6b6b a56b6b6b6b6b6b6b
-[  266.153295] Call trace:
-[  266.155732] [<fffffe00001e39c0>] ptep_set_access_flags+0xdc/0x104
-[  266.161799] [<fffffe00001d62b4>] handle_mm_fault+0xfe0/0x11e8
-[  266.167519] [<fffffe00000a2e90>] do_page_fault+0x200/0x324
-[  266.172979] [<fffffe00000902c8>] do_mem_abort+0x40/0xa0
-[  266.178170] Exception stack(0xfffffe02c4873e30 to 0xfffffe02c4873f50)
-[  266.184578] 3e20:
-0000000000000000 000003ff9f79d7a0
-[  266.192370] 3e40: ffffffffffffffff 00000000004128f0
-ffffffffffffffff 0000000000412900
-[  266.200162] 3e60: 0000000020000000 fffffe0000097cb0
-fffffe02c4873e90 fffffe00000944d4
-[  266.207954] 3e80: fffffe02c4796180 fffffe02c4796300
-fffffe02c4873eb0 fffffe0000097cb0
-[  266.215746] 3ea0: 0000000000000008 000003ff9f79d7a0
-000003ffc104a160 fffffe0000093ba8
-[  266.223538] 3ec0: 0000000000000000 fffffe0000093a98
-00000000000e23b6 0000000000000001
-[  266.231329] 3ee0: 000000000000010d 00000000001d9e3c
-0000000000000008 00000000000003e8
-[  266.239121] 3f00: 000003ff9fb20000 0000000000475ae0
-000000000011dc49 0000000000008001
-[  266.246913] 3f20: 0000000000007504 0000000000000007
-0000000000000018 00000003e8000000
-[  266.254705] 3f40: 000003ff9f862600 0012df030706601b
-[  266.259561] [<fffffe000009391c>] el0_da+0x18/0x1c
-[  266.264244] Code: 8a000060 d2e00101 eb01001f 54fffb60 (d4210000)
-[  266.270370] ---[ end trace 9db51a647dfce800 ]---
+The 2nd option is the one proposed by Jens
+	https://lkml.org/lkml/2015/12/4/689
+In the code, the clock index gives the source clock.
+This means that this code is H3 specific and that it cannot be reused
+for an other SoC.
+
+So, instead of putting some information in the DT, the 3rd option could
+be done without too much overhead with a DT:
+
+	bus_gates: clk at 01c20060 {
+		#clock-cells = <1>;
+		compatible = "allwinner,sun8i-h3-bus-gates-clk";
+		reg = <0x01c20060 0x14>;
+		clocks = <&ahb1>, <&ahb2>, <&apb1>, <&apb2>;
+		clock-names = "ahb1", "ahb2", "apb1", "apb2";
+		/* no clock-indices, nor clock-output-names,
+		 * these ones are hard-coded */
+};
+
+But, this option, as the previous one, implies new code for each new
+SoC.
+
+I better like the 1st option (reusable/generic code).
+This one may be done in many ways:
+
+1.1- define a source phandle of each output clock.
+    There were many proposals for such definitions, the simplest being
+    mine:
+	https://lkml.org/lkml/2015/10/22/109
+    but this asked for a long list in 'clocks', and Maxime did not like
+    that.
+
+1.2- use a container per source clock
+	https://lkml.org/lkml/2015/10/23/?663
+
+1.3- use a part of the name of the output clock as the source reference.
+    Current proposal, which seemed to suit Maxime
+	https://lkml.org/lkml/2015/10/26/647
+
+1.4- have you any other idea?
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
