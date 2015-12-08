@@ -1,56 +1,75 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 08 Dec 2015 12:41:50 +0000
-Subject: [PATCH V2] ARM: SWP emulation: Restore original *data when failed
-In-Reply-To: <20151208104418.GB8644@n2100.arm.linux.org.uk>
-References: <726a7ce88982fba5df84e4d22b083e39b57a6bc6.1444900732.git.shengjiu.wang@freescale.com>
- <5666AF7D.5000703@arm.com> <20151208104418.GB8644@n2100.arm.linux.org.uk>
-Message-ID: <5666D00E.1000301@arm.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Tue,  8 Dec 2015 13:45:02 +0100
+Subject: [PATCH v3 0/9] Add STM32 pinctrl/GPIO driver
+Message-ID: <1449578711-6141-1-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/15 10:44, Russell King - ARM Linux wrote:
-> On Tue, Dec 08, 2015 at 10:22:53AM +0000, Vladimir Murzin wrote:
->> On 15/10/15 10:30, Shengjiu Wang wrote:
->>> __user_swpX_asm maybe failed in first STREX operation, emulate_swpX
->>> will try again, but the *data has been changed in first time. which
->>> causes the result is wrong.
->>> This patch is to fix this issue. When STREX succeed, change the *data.
->>> if it fail, *data is not changed.
->>>
->>> Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
->>> ---
->>>  arch/arm/kernel/swp_emulate.c | 6 +++---
->>>  1 file changed, 3 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
->>> index 5b26e7e..c3fe769d 100644
->>> --- a/arch/arm/kernel/swp_emulate.c
->>> +++ b/arch/arm/kernel/swp_emulate.c
->>> @@ -36,10 +36,10 @@
->>>   */
->>>  #define __user_swpX_asm(data, addr, res, temp, B)		\
->>>  	__asm__ __volatile__(					\
->>> -	"	mov		%2, %1\n"			\
->>> -	"0:	ldrex"B"	%1, [%3]\n"			\
->>> -	"1:	strex"B"	%0, %2, [%3]\n"			\
->>> +	"0:	ldrex"B"	%2, [%3]\n"			\
->>> +	"1:	strex"B"	%0, %1, [%3]\n"			\
->>>  	"	cmp		%0, #0\n"			\
->>> +	"	moveq		%1, %2\n"			\
->>>  	"	movne		%0, %4\n"			\
->>>  	"2:\n"							\
->>>  	"	.section	 .text.fixup,\"ax\"\n"		\
->>>
->>
->> I wonder what is status of this patch? I see that arm64 counterpart has
->> landed in mainline, but I didn't manage to track down this one - is it
->> because it never been submitted to patch system?
-> 
-> Most probably.
-> 
+Hi Linus, all,
 
-I've just submitted (on behalf of Shengjiu) it as 8475/1 with assumption
-you have no concerns about the patch.
+This is the second round of STM32 pinctrl series, which improves DT
+bindings declaration and documentation, and also fixes some commit fixup
+issues. The series also contains two more patches, adding GPIO LEDs
+support as a user of this driver.
 
-Thanks
-Vladimir
+The STM32 family has 16 pins per GPIO bank, and the number of bank varies
+depending on the model.
+
+Pins can be multiplexed either in GPIO mode, alternate function (up to 15
+functions per pin) or analog (for ADC/DAC).
+
+Changes since v2:
+-----------------
+ - Rebase on v4.4-rc1
+ - Declare leds also for Eval board
+ - Set green led as heartbeat
+ - Collect some acks
+
+Changes since v1:
+-----------------
+ - Add GPIO LEDs support in DT and defconfig
+ - Changes pinmux DT bindings from macros to raw values (Daniel)
+ - Improve DT bindings documentation (Daniel)
+ - Fix some commit fixup and rebase issues.
+
+Kind regards,
+Maxime
+
+Maxime Coquelin (9):
+  ARM: Kconfig: Introduce MACH_STM32F429 flag
+  Documentation: dt-bindings: Document STM32 pinctrl driver DT bindings
+  includes: dt-bindings: Add STM32F429 pinctrl DT bindings
+  pinctrl: Add STM32 MCUs support
+  ARM: mach-stm32: Select pinctrl
+  ARM: dts: Add pinctrl node to STM32F429
+  ARM: dts: Add USART1 pin config to STM32F429 boards
+  ARM: dts: Add leds support to STM32F429 boards
+  ARM: config: Enable GPIO Led driver in stm32_defconfig
+
+ .../bindings/pinctrl/st,stm32-pinctrl.txt          |  126 ++
+ arch/arm/Kconfig                                   |    6 +
+ arch/arm/boot/dts/stm32429i-eval.dts               |   19 +
+ arch/arm/boot/dts/stm32f429-disco.dts              |   13 +
+ arch/arm/boot/dts/stm32f429.dtsi                   |  110 ++
+ arch/arm/configs/stm32_defconfig                   |    1 +
+ drivers/pinctrl/Kconfig                            |    1 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/stm32/Kconfig                      |   16 +
+ drivers/pinctrl/stm32/Makefile                     |    5 +
+ drivers/pinctrl/stm32/pinctrl-stm32.c              |  856 +++++++++++
+ drivers/pinctrl/stm32/pinctrl-stm32.h              |   43 +
+ drivers/pinctrl/stm32/pinctrl-stm32f429.c          | 1598 ++++++++++++++++++++
+ include/dt-bindings/pinctrl/pinctrl-stm32.h        |   12 +
+ include/dt-bindings/pinctrl/stm32f429-pinfunc.h    | 1241 +++++++++++++++
+ 15 files changed, 4048 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+ create mode 100644 drivers/pinctrl/stm32/Kconfig
+ create mode 100644 drivers/pinctrl/stm32/Makefile
+ create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.c
+ create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32.h
+ create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32f429.c
+ create mode 100644 include/dt-bindings/pinctrl/pinctrl-stm32.h
+ create mode 100644 include/dt-bindings/pinctrl/stm32f429-pinfunc.h
+
+-- 
+1.9.1
