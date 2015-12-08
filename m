@@ -1,35 +1,65 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 Dec 2015 12:11:37 -0800
-Subject: [PATCH 02/10] clk: ti: Add few dm814x clock aliases
-In-Reply-To: <56672ED0.4050405@ti.com>
-References: <1449013103-23238-1-git-send-email-tony@atomide.com>
- <1449013103-23238-3-git-send-email-tony@atomide.com>
- <20151208165732.GY23396@atomide.com> <56672ED0.4050405@ti.com>
-Message-ID: <20151208201136.GZ23396@atomide.com>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Tue, 8 Dec 2015 12:19:00 -0800
+Subject: [PATCH v4 0/5] gicv2m: acpi: Add ACPI support for GICv2m MSI
+Message-ID: <1449605945-10707-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [151208 11:25]:
-> On 12/08/2015 06:57 PM, Tony Lindgren wrote:
-> >
-> >Anybody from the clock department care to ack this one?
-> 
-> Sorry been rather busy lately...
->
-> >I'd like to
-> >get this series into Linux next as it fixes some some issues.
-> 
-> Yeah looks good to me, don't have access to dm814x so can't test.
-> 
-> Acked-by: Tero Kristo <t-kristo@ti.com>
+This patch series has been forked from the following patch series since
+it no longer depends on the rest of the patches.
 
-Thanks.
+  [PATCH v4 00/10] ACPI GIC Self-probing, GICv2m and GICv3 support
+  https://lkml.org/lkml/2015/7/29/234
 
-> Are you planning to push this via omap tree if this is critical for you?
+It has been ported to use the newly introduced device fwnode_handle 
+for ACPI irqdmain introduced by Marc in the following patch series:
 
-Yes this series needs to be merged in certain order to keep t410
-booting. Should not conflict with anything else AFAIK.
+  [PATCH v2 00/17] Divorcing irqdomain and device_node
+  http://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git irq/irq-domain-fwnode-v2
 
-Regards,
+The following git branch contains the submitted patches along with
+the pre-requsite patches (mainly for ARM64 PCI support for ACPI).
 
-Tony
+  https://github.com/ssuthiku/linux.git	v2m-multiframe-v4
+
+This has been tested on AMD Seattle (Overdrive) RevB system. 
+
+NOTE: I have not tested ACPI GICv2m multiframe support since
+I don't have access to such system. Any helps are appreciated.
+
+Thanks,
+Suravee
+
+Changes from V3: (https://lkml.org/lkml/2015/10/21/691)
+  - Merged patch 2 into 1, and got rid off pci_msi_get_fwnode()
+    since only ACPI will likely use this. (per Marc suggestion)
+  - Rebased to 4.4.0-rc4
+
+Changes from V2: (https://lkml.org/lkml/2015/10/14/1010)
+  - Minor clean up from Tomasz review comment in patch 6/6.
+
+Changes from V1: (https://lkml.org/lkml/2015/10/13/859)
+  - Rebase on top of Marc's patch to addng support for multiple MSI frames
+    (https://lkml.org/lkml/2015/10/14/271)
+  - Adding fwnode convenient functions (patch 3 and 4)
+
+Suravee Suthikulpanit (5):
+  acpi: pci: Setup MSI domain for ACPI based pci devices
+  irqdomain: introduce is_fwnode_irqchip helper
+  irqdomain: Introduce irq_domain_get_irqchip_fwnode_name helper
+    function
+  gicv2m: Refactor to prepare for ACPI support
+  gicv2m: acpi: Introducing GICv2m ACPI support
+
+ drivers/irqchip/irq-gic-v2m.c   | 152 ++++++++++++++++++++++++++++++++++------
+ drivers/irqchip/irq-gic.c       |   5 +-
+ drivers/pci/pci-acpi.c          |  32 +++++++++
+ drivers/pci/probe.c             |   2 +
+ include/linux/irqchip/arm-gic.h |   4 ++
+ include/linux/irqdomain.h       |   6 ++
+ include/linux/pci.h             |  10 +++
+ kernel/irq/irqdomain.c          |  20 +++++-
+ 8 files changed, 208 insertions(+), 23 deletions(-)
+
+-- 
+2.1.0
