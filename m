@@ -1,11 +1,11 @@
 From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Tue, 08 Dec 2015 11:49:49 +0000
-Subject: [PATCH v9 3/6] target-arm: kvm - support for single step
-In-Reply-To: <CAFEAcA-YQ384sY1OWLaV9YAjzTZSyWqVLHx2moH-sCa+O6FvOw@mail.gmail.com>
+Date: Tue, 08 Dec 2015 12:02:11 +0000
+Subject: [PATCH v9 6/6] tests/guest-debug: introduce basic gdbstub tests
+In-Reply-To: <CAFEAcA9q1MpiM4vM+RH-YQ2RpB=eV-Xgyw1-yw6qHG0hbem6_Q@mail.gmail.com>
 References: <1447345251-22625-1-git-send-email-alex.bennee@linaro.org>
- <1447345251-22625-4-git-send-email-alex.bennee@linaro.org>
- <CAFEAcA-YQ384sY1OWLaV9YAjzTZSyWqVLHx2moH-sCa+O6FvOw@mail.gmail.com>
-Message-ID: <87r3ixp3c2.fsf@linaro.org>
+ <1447345251-22625-7-git-send-email-alex.bennee@linaro.org>
+ <CAFEAcA9q1MpiM4vM+RH-YQ2RpB=eV-Xgyw1-yw6qHG0hbem6_Q@mail.gmail.com>
+Message-ID: <87poyhp2rg.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,63 +13,41 @@ List-Id: linux-arm-kernel.lists.infradead.org
 Peter Maydell <peter.maydell@linaro.org> writes:
 
 > On 12 November 2015 at 16:20, Alex Benn?e <alex.bennee@linaro.org> wrote:
->> This adds support for single-step. There isn't much to do on the QEMU
->> side as after we set-up the request for single step via the debug ioctl
->> it is all handled within the kernel.
+>> From: Alex Benn?e <alex@bennee.com>
 >>
->> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>> The aim of these tests is to combine with an appropriate kernel
+>> image (with symbol-file vmlinux) and check it behaves as it should.
+>> Given a kernel it checks:
 >>
->> ---
->> v2
->>   - convert to using HSR_EC
->> v3
->>   - use internals.h definitions
->> ---
->>  target-arm/kvm.c | 10 ++++++++++
->>  1 file changed, 10 insertions(+)
+>>   - single step
+>>   - software breakpoint
+>>   - hardware breakpoint
+>>   - access, read and write watchpoints
 >>
->> diff --git a/target-arm/kvm.c b/target-arm/kvm.c
->> index 50f70ef..d505a7e 100644
->> --- a/target-arm/kvm.c
->> +++ b/target-arm/kvm.c
->> @@ -535,6 +535,13 @@ static int kvm_handle_debug(CPUState *cs, struct kvm_run *run)
->>      kvm_cpu_synchronize_state(cs);
+>> On success it returns 0 to the calling process.
 >>
->>      switch (hsr_ec) {
->> +    case EC_SOFTWARESTEP:
->> +        if (cs->singlestep_enabled) {
->> +            return true;
->> +        } else {
->> +            error_report("Came out of SINGLE STEP when not enabled");
->> +        }
->> +        break;
->>      case EC_AA64_BKPT:
->>          if (kvm_find_sw_breakpoint(cs, env->pc)) {
->>              return true;
->> @@ -595,6 +602,9 @@ int kvm_arch_on_sigbus(int code, void *addr)
->>
->>  void kvm_arch_update_guest_debug(CPUState *cs, struct kvm_guest_debug *dbg)
->>  {
->> +    if (cs->singlestep_enabled) {
->> +        dbg->control |= KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_SINGLESTEP;
->> +    }
+>> I've not plumbed this into the "make check" logic though as we need a
+>> solution for providing non-host binaries to the tests. However the test
+>> is structured to work with pretty much any Linux kernel image as it
+>> uses the basic kernel_init code which is common across architectures.
 >
-> Doesn't kvm_update_guest_debug() already set these bits, or am
-> I misreading it?
+> Do these tests pass if you run them on the TCG QEMU, just out
+> of interest?
 
-Yeah. This raises an interesting problem about what to do when we don't
-have the capability. I could suppress those bits in the update function
-but that seems a bit hacky.
+You'll be glad to know they do.
 
-Looking at the GDB capability code there doesn't seem to report
-breakpoint capability short of just failing when you try to set one.
+> I'm not a great fan of tests that aren't in 'make check'
+> because IME they just bitrot, but as you say we have no
+> sensible approach for handling tests that need to run real
+> guest code :-(
 
->
->>      if (kvm_sw_breakpoints_active(cs)) {
->>          dbg->control |= KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_USE_SW_BP;
->>      }
->> --
->> 2.6.3
+I was pondering if a git sub-project with large file support would work.
+We could add pre-built binaries to the tree with appropriate meta-data
+(src tree, version, config) to rebuild if required.
+
+There would be some degree of trust implied in the original builder
+though. Maybe a signed commit?
+
 >
 > thanks
 > -- PMM
