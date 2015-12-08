@@ -1,72 +1,142 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 8 Dec 2015 12:34:33 +0000
-Subject: [PATCH v4] acpi, apei, arm64: APEI initial support for aarch64.
-In-Reply-To: <1449558183-12259-1-git-send-email-fu.wei@linaro.org>
-References: <1449558183-12259-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <20151208123433.GB404@red-moon>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 08 Dec 2015 13:36:56 +0100
+Subject: [PATCH v3 2/3] soc: dove: add legacy support to PMU driver
+In-Reply-To: <E1a6Fk0-0004mw-Rg@rmk-PC.arm.linux.org.uk> (Russell King's
+ message of "Tue, 08 Dec 2015 10:43:28 +0000")
+References: <E1a6Fk0-0004mw-Rg@rmk-PC.arm.linux.org.uk>
+Message-ID: <87mvtl86c7.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 03:03:03PM +0800, fu.wei at linaro.org wrote:
-> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+Hi Russell,
+ 
+ On mar., d?c. 08 2015, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
 
-[...]
+> Add support for legacy non-DT Dove to the PMU driver, so that we can
+> transition the legacy support over.
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-> +#if defined(__i386__) || defined(__x86_64__)
->  /*
->   * Check if firmware advertises firmware first mode. We need FF bit to be set
->   * along with a set of MC banks which work in FF mode.
->   */
->  static int __init hest_parse_cmc(struct acpi_hest_header *hest_hdr, void *data)
->  {
-> -	return arch_apei_enable_cmcff(hest_hdr, data);
-> +	if (!acpi_disable_cmcff)
-
-Why do not you define the flag above in this file (move it out of x86 -
-that's what I was aiming at in my previous reply) and remove this ifdeffery
-altogether (First firmware handling could apply to arm64 too according to
-specs and ACPI on arm64 guidelines) ?
-
-arch_apei_enable_cmcff() is a weak function that does nothing on arm64
-and if we need to add an implementation we can do it later.
+I applied this patch on mvebu/soc instead of the v2. I still had to
+amend it by removing the pm_genpd_poweroff_unused call, and now it
+compiles.
 
 Thanks,
-Lorenzo
 
-> +		return !arch_apei_enable_cmcff(hest_hdr, data);
-> +
-> +	return 0;
+Gregory
+
+> ---
+> v3: add irq_domain_start to init data to kill build error in dove/pmu.c
+>
+>  drivers/soc/Makefile         |  1 +
+>  drivers/soc/dove/pmu.c       | 44 ++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/soc/dove/pmu.h | 19 +++++++++++++++++++
+>  3 files changed, 64 insertions(+)
+>
+> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+> index 0b12d777d3c4..c99192f30679 100644
+> --- a/drivers/soc/Makefile
+> +++ b/drivers/soc/Makefile
+> @@ -2,6 +2,7 @@
+>  # Makefile for the Linux Kernel SOC specific device drivers.
+>  #
+>  
+> +obj-$(CONFIG_ARCH_DOVE)		+= dove/
+>  obj-$(CONFIG_MACH_DOVE)		+= dove/
+>  obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
+>  obj-$(CONFIG_ARCH_QCOM)		+= qcom/
+> diff --git a/drivers/soc/dove/pmu.c b/drivers/soc/dove/pmu.c
+> index 052aecf29893..10c00be2c198 100644
+> --- a/drivers/soc/dove/pmu.c
+> +++ b/drivers/soc/dove/pmu.c
+> @@ -305,6 +305,50 @@ static int __init dove_init_pmu_irq(struct pmu_data *pmu, int irq)
+>  	return 0;
 >  }
 >  
-> +static inline int __init hest_ia_init(void)
+> +int __init dove_init_pmu_legacy(const struct dove_pmu_initdata *initdata)
 > +{
-> +	return apei_hest_parse(hest_parse_cmc, NULL);
-> +}
-> +#else
-> +static inline int __init hest_ia_init(void) { return 0; }
-> +#endif
+> +	const struct dove_pmu_domain_initdata *domain_initdata;
+> +	struct pmu_data *pmu;
+> +	int ret;
 > +
->  struct ghes_arr {
->  	struct platform_device **ghes_devs;
->  	unsigned int count;
-> @@ -232,8 +244,9 @@ void __init acpi_hest_init(void)
->  		goto err;
->  	}
+> +	pmu = kzalloc(sizeof(*pmu), GFP_KERNEL);
+> +	if (!pmu)
+> +		return -ENOMEM;
+> +
+> +	spin_lock_init(&pmu->lock);
+> +	pmu->pmc_base = initdata->pmc_base;
+> +	pmu->pmu_base = initdata->pmu_base;
+> +
+> +	pmu_reset_init(pmu);
+> +	for (domain_initdata = initdata->domains; domain_initdata->name;
+> +	     domain_initdata++) {
+> +		struct pmu_domain *domain;
+> +
+> +		domain = kzalloc(sizeof(*domain), GFP_KERNEL);
+> +		if (domain) {
+> +			domain->pmu = pmu;
+> +			domain->pwr_mask = domain_initdata->pwr_mask;
+> +			domain->rst_mask = domain_initdata->rst_mask;
+> +			domain->iso_mask = domain_initdata->iso_mask;
+> +			domain->base.name = domain_initdata->name;
+> +
+> +			__pmu_domain_register(domain, NULL);
+> +		}
+> +	}
+> +	pm_genpd_poweroff_unused();
+> +
+> +	ret = dove_init_pmu_irq(pmu, initdata->irq);
+> +	if (ret)
+> +		pr_err("dove_init_pmu_irq() failed: %d\n", ret);
+> +
+> +	if (pmu->irq_domain)
+> +		irq_domain_associate_many(pmu->irq_domain,
+> +					  initdata->irq_domain_start,
+> +					  0, NR_PMU_IRQS);
+> +
+> +	return 0;
+> +}
+> +
+>  /*
+>   * pmu: power-manager at d0000 {
+>   *	compatible = "marvell,dove-pmu";
+> diff --git a/include/linux/soc/dove/pmu.h b/include/linux/soc/dove/pmu.h
+> index 9c99f84bcc0e..765386972b55 100644
+> --- a/include/linux/soc/dove/pmu.h
+> +++ b/include/linux/soc/dove/pmu.h
+> @@ -1,6 +1,25 @@
+>  #ifndef LINUX_SOC_DOVE_PMU_H
+>  #define LINUX_SOC_DOVE_PMU_H
 >  
-> -	if (!acpi_disable_cmcff)
-> -		apei_hest_parse(hest_parse_cmc, NULL);
-> +	rc = hest_ia_init();
-> +	if (rc)
-> +		goto err;
+> +#include <linux/types.h>
+> +
+> +struct dove_pmu_domain_initdata {
+> +	u32 pwr_mask;
+> +	u32 rst_mask;
+> +	u32 iso_mask;
+> +	const char *name;
+> +};
+> +
+> +struct dove_pmu_initdata {
+> +	void __iomem *pmc_base;
+> +	void __iomem *pmu_base;
+> +	int irq;
+> +	int irq_domain_start;
+> +	const struct dove_pmu_domain_initdata *domains;
+> +};
+> +
+> +int dove_init_pmu_legacy(const struct dove_pmu_initdata *);
+> +
+>  int dove_init_pmu(void);
 >  
->  	if (!ghes_disable) {
->  		rc = apei_hest_parse(hest_parse_ghes_count, &ghes_count);
+>  #endif
 > -- 
-> 2.5.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+> 2.1.0
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
