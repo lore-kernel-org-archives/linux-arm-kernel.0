@@ -1,47 +1,228 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 8 Dec 2015 09:06:58 +0100
-Subject: [PATCH v5 3/4] ARM: dts: sunxi: Add Allwinner H3 DTSI
-In-Reply-To: <5665D38E.4050406@gmail.com>
-References: <1449264283-25360-1-git-send-email-jenskuske@gmail.com>
- <1449264283-25360-4-git-send-email-jenskuske@gmail.com>
- <20151207091257.070723b67db726d9f05c6550@free.fr>
- <5665D38E.4050406@gmail.com>
-Message-ID: <20151208090658.e471fcde7fd5e79c69706115@free.fr>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 08 Dec 2015 17:07:08 +0900
+Subject: [PATCH v4 6/8] ARM: dts: Exynos5800: fix CPU OPP
+In-Reply-To: <1449512300-17230-7-git-send-email-b.zolnierkie@samsung.com>
+References: <1449512300-17230-1-git-send-email-b.zolnierkie@samsung.com>
+ <1449512300-17230-7-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <56668FAC.2000702@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Dec 2015 19:44:30 +0100
-Jens Kuske <jenskuske@gmail.com> wrote:
-
-> >> +					     "bus_lcd0", "bus_lcd1", "bus_deint",
+On 08.12.2015 03:18, Bartlomiej Zolnierkiewicz wrote:
+> Fix CPU operating points for Exynos5800 (it use different
+> voltages than Exynos5420 and supports additional frequencies).
+> However don't use 2000MHz & 1900MHz OPPs (for A15 cores) and
+> 1400MHz OPP (for A7 cores) for now as they are not available
+> on all boards.
 > 
-> > 	"bus_tcon0", "bus_tcon1", "bus_deint",
-> > 
-> > (the tcon1 clock is used by both lcd0 and lcd1, while
-> >  the tcon0 clock is used for TV output from lcd1)
+> Based on Hardkernel's kernel for ODROID-XU3 board.
 > 
-> Hi,
+> Changes by Ben Gamari:
+> - Port to operating-points-v2
 > 
-> These are only the ahb bus gates, not the module clocks.
-> Naming them lcd might be a bit confusing, but it follows the naming we
-> used since sun4i. And the tcon modules are still called lcd0 and lcd1
-> module in the manual too.
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Doug Anderson <dianders@chromium.org>
+> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+> Cc: Andreas Faerber <afaerber@suse.de>
+> Cc: Sachin Kamat <sachin.kamat@linaro.org>
+> Cc: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Ben Gamari <ben@smart-cactus.org>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5800.dtsi | 165 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 165 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5800.dtsi b/arch/arm/boot/dts/exynos5800.dtsi
+> index c0bb356..e417218 100644
+> --- a/arch/arm/boot/dts/exynos5800.dtsi
+> +++ b/arch/arm/boot/dts/exynos5800.dtsi
+> @@ -17,8 +17,173 @@
+>  
+>  / {
+>  	compatible = "samsung,exynos5800", "samsung,exynos5";
+> +
+> +	cpu0_opp_table: opp_table0 {
 
-There is no reference to TCON0 in the LCDs registers (H3 V1.1 pages 428
-and 435), only TCON1.
+This includes exynos5420.dtsi, so override by label instead of
+duplicating full path.
 
-> Interestingly there is only a tcon0 module clock in the manual and no
-> tcon1, but that is not part of this patch.
+In the same time you don't have to duplicate all data - just override
+what you want:
+	&cpu0_opp_table {
+		opp00 at 1800000000 {
+			opp-microvolt = <1250000>;
+		};
+	};
 
-Well, I looked again in the 3.4 kernel and, for the LCD0/HDMI, there is
-no clock setting for TCON1: it just receives the AHB1 clock.
+That should be sufficient I think.
 
-This means that its gate ("bus_lcd1" or "ahb1_tcon1") must be enabled
-when streaming on LCD0 or LCD1.
+> +		compatible = "operating-points-v2";
+> +		opp-shared;
+> +		opp00 at 1800000000 {
+> +			opp-hz = /bits/ 64 <1800000000>;
+> +			opp-microvolt = <1250000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp01 at 1700000000 {
+> +			opp-hz = /bits/ 64 <1700000000>;
+> +			opp-microvolt = <1250000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp02 at 1600000000 {
+> +			opp-hz = /bits/ 64 <1600000000>;
+> +			opp-microvolt = <1250000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp03 at 1500000000 {
+> +			opp-hz = /bits/ 64 <1500000000>;
+> +			opp-microvolt = <1100000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp04 at 1400000000 {
+> +			opp-hz = /bits/ 64 <1400000000>;
+> +			opp-microvolt = <1100000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp05 at 1300000000 {
+> +			opp-hz = /bits/ 64 <1300000000>;
+> +			opp-microvolt = <1100000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp06 at 1200000000 {
+> +			opp-hz = /bits/ 64 <1200000000>;
+> +			opp-microvolt = <1000000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp07 at 1100000000 {
+> +			opp-hz = /bits/ 64 <1100000000>;
+> +			opp-microvolt = <1000000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp08 at 1000000000 {
+> +			opp-hz = /bits/ 64 <1000000000>;
+> +			opp-microvolt = <1000000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp09 at 900000000 {
+> +			opp-hz = /bits/ 64 <900000000>;
+> +			opp-microvolt = <1000000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp10 at 800000000 {
+> +			opp-hz = /bits/ 64 <800000000>;
+> +			opp-microvolt = <900000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp11 at 700000000 {
+> +			opp-hz = /bits/ 64 <700000000>;
+> +			opp-microvolt = <900000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp12 at 600000000 {
+> +			opp-hz = /bits/ 64 <600000000>;
+> +			opp-microvolt = <900000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp13 at 500000000 {
+> +			opp-hz = /bits/ 64 <500000000>;
+> +			opp-microvolt = <900000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp14 at 400000000 {
+> +			opp-hz = /bits/ 64 <400000000>;
+> +			opp-microvolt = <900000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp15 at 300000000 {
+> +			opp-hz = /bits/ 64 <300000000>;
+> +			opp-microvolt = <900000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp16 at 200000000 {
+> +			opp-hz = /bits/ 64 <200000000>;
+> +			opp-microvolt = <900000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +	};
+> +
+> +	cpu1_opp_table: opp_table1 {
+> +		compatible = "operating-points-v2";
+> +		opp-shared;
+> +		opp00 at 1300000000 {
+> +			opp-hz = /bits/ 64 <1300000000>;
+> +			opp-microvolt = <1250000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp01 at 1200000000 {
+> +			opp-hz = /bits/ 64 <1200000000>;
+> +			opp-microvolt = <1250000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp02 at 1100000000 {
+> +			opp-hz = /bits/ 64 <1100000000>;
+> +			opp-microvolt = <1250000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp03 at 1000000000 {
+> +			opp-hz = /bits/ 64 <1000000000>;
+> +			opp-microvolt = <1100000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp04 at 900000000 {
+> +			opp-hz = /bits/ 64 <900000000>;
+> +			opp-microvolt = <1100000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp05 at 800000000 {
+> +			opp-hz = /bits/ 64 <800000000>;
+> +			opp-microvolt = <1100000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp06 at 700000000 {
+> +			opp-hz = /bits/ 64 <700000000>;
+> +			opp-microvolt = <1000000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp07 at 600000000 {
+> +			opp-hz = /bits/ 64 <600000000>;
+> +			opp-microvolt = <1000000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp08 at 500000000 {
+> +			opp-hz = /bits/ 64 <500000000>;
+> +			opp-microvolt = <1000000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp09 at 400000000 {
+> +			opp-hz = /bits/ 64 <400000000>;
+> +			opp-microvolt = <1000000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp10 at 300000000 {
+> +			opp-hz = /bits/ 64 <300000000>;
+> +			opp-microvolt = <900000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp11 at 200000000 {
+> +			opp-hz = /bits/ 64 <200000000>;
+> +			opp-microvolt = <900000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +	};
+>  };
+>  
+> +&cpu0 { operating-points-v2 = <&cpu0_opp_table>; };
+> +&cpu1 { operating-points-v2 = <&cpu0_opp_table>; };
+> +&cpu2 { operating-points-v2 = <&cpu0_opp_table>; };
+> +&cpu3 { operating-points-v2 = <&cpu0_opp_table>; };
+> +
+> +&cpu4 { operating-points-v2 = <&cpu1_opp_table>; };
+> +&cpu5 { operating-points-v2 = <&cpu1_opp_table>; };
+> +&cpu6 { operating-points-v2 = <&cpu1_opp_table>; };
+> +&cpu7 { operating-points-v2 = <&cpu1_opp_table>; };
+> +
 
-The role of tcon0 is not yet clear to me, but it seems that its clock
-is the streaming clock for LCD1/TV, as the HDMI clock is for LCD0/HDMI.
+Why? These are set by exynos5420.dtsi already, aren't they?
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Best regards,
+Krzysztof
