@@ -1,77 +1,122 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 8 Dec 2015 09:43:58 +0100
-Subject: [linux-sunxi] [PATCH 21/23] staging: mt29f_spinand: switch to
- mtd_ooblayout_ops
-In-Reply-To: <CAGRGNgV09JJ7+hDVJwZcp89nEsgNS6r2Mo1_R+EEAT9=aR-Z_g@mail.gmail.com>
-References: <1449527178-5930-1-git-send-email-boris.brezillon@free-electrons.com>
- <1449527178-5930-22-git-send-email-boris.brezillon@free-electrons.com>
- <CAGRGNgV09JJ7+hDVJwZcp89nEsgNS6r2Mo1_R+EEAT9=aR-Z_g@mail.gmail.com>
-Message-ID: <20151208094358.2be0f191@bbrezillon>
+From: b18965@freescale.com (Alison Wang)
+Date: Tue, 8 Dec 2015 16:38:03 +0800
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable some drivers for LS1021A
+Message-ID: <1449563883-29317-1-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julian,
+This patch enables some drivers for LS1021A, such as
+GIANFAR, WATCHDOG, AUDIO, QSPI, I2C, ESDHC, EDMA, FTM.
+QorIQ Clock Framework and Ramdisk support is also enabled.
 
-On Tue, 8 Dec 2015 10:59:53 +1100
-Julian Calaby <julian.calaby@gmail.com> wrote:
+Signed-off-by: Alison Wang <alison.wang@freescale.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-> Hi Boris,
-> 
-> On Tue, Dec 8, 2015 at 9:26 AM, Boris Brezillon
-> <boris.brezillon@free-electrons.com> wrote:
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> >  drivers/staging/mt29f_spinand/mt29f_spinand.c | 44 ++++++++++++++++-----------
-> >  1 file changed, 26 insertions(+), 18 deletions(-)
-> >
-> > diff --git a/drivers/staging/mt29f_spinand/mt29f_spinand.c b/drivers/staging/mt29f_spinand/mt29f_spinand.c
-> > index cb9d5ab..967d50a 100644
-> > --- a/drivers/staging/mt29f_spinand/mt29f_spinand.c
-> > +++ b/drivers/staging/mt29f_spinand/mt29f_spinand.c
-> > @@ -42,23 +42,29 @@ static inline struct spinand_state *mtd_to_state(struct mtd_info *mtd)
-> >  static int enable_hw_ecc;
-> >  static int enable_read_hw_ecc;
-> >
-> > -static struct nand_ecclayout spinand_oob_64 = {
-> > -       .eccbytes = 24,
-> > -       .eccpos = {
-> > -               1, 2, 3, 4, 5, 6,
-> > -               17, 18, 19, 20, 21, 22,
-> > -               33, 34, 35, 36, 37, 38,
-> > -               49, 50, 51, 52, 53, 54, },
-> > -       .oobfree = {
-> > -               {.offset = 8,
-> > -                       .length = 8},
-> > -               {.offset = 24,
-> > -                       .length = 8},
-> > -               {.offset = 40,
-> > -                       .length = 8},
-> > -               {.offset = 56,
-> > -                       .length = 8},
-> > -       }
-> > +static int spinand_oob_64_eccpos(struct mtd_info *mtd, int eccbyte)
-> > +{
-> > +       if (eccbyte > 23)
-> > +               return -ERANGE;
-> > +
-> > +       return ((eccbyte / 6) * 16) + 1;
-> 
-> Are you sure this is correct? My reading of this is that we'd get 1
-> for eccbytes 0 through 5.
-> 
-> Would
-> 
-> ((eccbyte / 6) * 16) + (eccbyte % 6) + 1
-> 
-> be more correct?
-
-Absolutely. I'll fix that.
-
-Thanks,
-
-Boris
-
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index f6a2557..95e725c 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -128,6 +128,7 @@ CONFIG_KEXEC=y
+ CONFIG_CPU_FREQ=y
+ CONFIG_CPU_FREQ_STAT_DETAILS=y
+ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
++CONFIG_QORIQ_CPUFREQ=y
+ CONFIG_CPU_IDLE=y
+ CONFIG_ARM_CPUIDLE=y
+ CONFIG_NEON=y
+@@ -182,8 +183,11 @@ CONFIG_MTD_NAND_ATMEL=y
+ CONFIG_MTD_NAND_BRCMNAND=y
+ CONFIG_MTD_NAND_DAVINCI=y
+ CONFIG_MTD_SPI_NOR=y
++CONFIG_SPI_FSL_QUADSPI=y
+ CONFIG_MTD_UBI=y
+ CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_SIZE=65536
+ CONFIG_AD525X_DPOT=y
+ CONFIG_AD525X_DPOT_I2C=y
+ CONFIG_ATMEL_TCLIB=y
+@@ -210,6 +214,7 @@ CONFIG_HIX5HD2_GMAC=y
+ CONFIG_SUN4I_EMAC=y
+ CONFIG_MACB=y
+ CONFIG_NET_CALXEDA_XGMAC=y
++CONFIG_GIANFAR=y
+ CONFIG_IGB=y
+ CONFIG_MV643XX_ETH=y
+ CONFIG_MVNETA=y
+@@ -226,6 +231,7 @@ CONFIG_MARVELL_PHY=y
+ CONFIG_SMSC_PHY=y
+ CONFIG_BROADCOM_PHY=y
+ CONFIG_ICPLUS_PHY=y
++CONFIG_REALTEK_PHY=y
+ CONFIG_MICREL_PHY=y
+ CONFIG_FIXED_PHY=y
+ CONFIG_USB_PEGASUS=y
+@@ -312,6 +318,7 @@ CONFIG_I2C_DESIGNWARE_PLATFORM=y
+ CONFIG_I2C_DIGICOLOR=m
+ CONFIG_I2C_GPIO=m
+ CONFIG_I2C_EXYNOS5=y
++CONFIG_I2C_IMX=y
+ CONFIG_I2C_MV64XXX=y
+ CONFIG_I2C_RIIC=y
+ CONFIG_I2C_RK3X=y
+@@ -330,6 +337,7 @@ CONFIG_SPI=y
+ CONFIG_SPI_ATMEL=m
+ CONFIG_SPI_CADENCE=y
+ CONFIG_SPI_DAVINCI=y
++CONFIG_SPI_FSL_DSPI=y
+ CONFIG_SPI_OMAP24XX=y
+ CONFIG_SPI_ORION=y
+ CONFIG_SPI_PL022=y
+@@ -405,6 +413,7 @@ CONFIG_ARM_SP805_WATCHDOG=y
+ CONFIG_ORION_WATCHDOG=y
+ CONFIG_ST_LPC_WATCHDOG=y
+ CONFIG_SUNXI_WATCHDOG=y
++CONFIG_IMX2_WDT=y
+ CONFIG_TEGRA_WATCHDOG=m
+ CONFIG_MESON_WATCHDOG=y
+ CONFIG_DIGICOLOR_WATCHDOG=y
+@@ -525,6 +534,7 @@ CONFIG_SND_USB_AUDIO=y
+ CONFIG_SND_SOC=m
+ CONFIG_SND_ATMEL_SOC=m
+ CONFIG_SND_ATMEL_SOC_WM8904=m
++CONFIG_SND_SOC_FSL_SAI=m
+ CONFIG_SND_SOC_SH4_FSI=m
+ CONFIG_SND_SOC_RCAR=m
+ CONFIG_SND_SOC_RSRC_CARD=m
+@@ -537,6 +547,7 @@ CONFIG_SND_SOC_TEGRA_TRIMSLICE=m
+ CONFIG_SND_SOC_TEGRA_ALC5632=m
+ CONFIG_SND_SOC_TEGRA_MAX98090=m
+ CONFIG_SND_SOC_AK4642=m
++CONFIG_SND_SOC_SGTL5000=m
+ CONFIG_SND_SOC_WM8978=m
+ CONFIG_USB=y
+ CONFIG_USB_XHCI_HCD=y
+@@ -577,6 +588,7 @@ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_OF_ARASAN=y
+ CONFIG_MMC_SDHCI_OF_AT91=y
++CONFIG_MMC_SDHCI_OF_ESDHC=y
+ CONFIG_MMC_SDHCI_ESDHC_IMX=y
+ CONFIG_MMC_SDHCI_DOVE=y
+ CONFIG_MMC_SDHCI_TEGRA=y
+@@ -653,6 +665,7 @@ CONFIG_DMADEVICES=y
+ CONFIG_DW_DMAC=y
+ CONFIG_AT_HDMAC=y
+ CONFIG_AT_XDMAC=y
++CONFIG_FSL_EDMA=y
+ CONFIG_MV_XOR=y
+ CONFIG_TEGRA20_APB_DMA=y
+ CONFIG_SH_DMAE=y
+@@ -712,6 +725,7 @@ CONFIG_AK8975=y
+ CONFIG_PWM=y
+ CONFIG_PWM_ATMEL=m
+ CONFIG_PWM_ATMEL_TCB=m
++CONFIG_PWM_FSL_FTM=y
+ CONFIG_PWM_RENESAS_TPU=y
+ CONFIG_PWM_ROCKCHIP=m
+ CONFIG_PWM_SAMSUNG=m
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.1.0.27.g96db324
