@@ -1,51 +1,82 @@
-From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
-Date: Tue, 8 Dec 2015 11:01:04 +0200
-Subject: [PATCH v4 1/5] PCI: designware: add memory barrier after enabling
- region
-In-Reply-To: <1449149725-27607-2-git-send-email-stanimir.varbanov@linaro.org>
-References: <1449149725-27607-1-git-send-email-stanimir.varbanov@linaro.org>
- <1449149725-27607-2-git-send-email-stanimir.varbanov@linaro.org>
-Message-ID: <56669C50.9060700@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 08 Dec 2015 09:02:59 +0000
+Subject: [PATCH v5 03/21] KVM: ARM64: Add offset defines for PMU registers
+In-Reply-To: <56669036.9090606@huawei.com>
+References: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
+ <1449123091-20252-4-git-send-email-zhaoshenglong@huawei.com>
+ <56659276.6060403@arm.com> <5665984F.30102@linaro.org>
+ <56659DD8.6050109@arm.com> <56669036.9090606@huawei.com>
+Message-ID: <56669CC3.80601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2015 03:35 PM, Stanimir Varbanov wrote:
-> Add 'write memory' barrier after enable region in PCIE_ATU_CR2
-> register. The barrier is needed to ensure that the region enable
-> request has been reached it's destination at time when we
-> read/write to PCI configuration space.
+On 08/12/15 08:09, Shannon Zhao wrote:
+> Hi Marc,
 > 
-> Without this barrier PCI device enumeration during kernel boot
-> is not reliable, and reading configuration space for particular
-> PCI device on the bus returns zero aka no device.
-
-Anand, Jingoo, what is your opinion?
-
+> On 2015/12/7 22:55, Marc Zyngier wrote:
+>> On 07/12/15 14:31, Shannon Zhao wrote:
+>>>>
+>>>>
+>>>> On 2015/12/7 22:06, Marc Zyngier wrote:
+>>>>>> On 03/12/15 06:11, Shannon Zhao wrote:
+>>>>>>>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>>>>>>>
+>>>>>>>> We are about to trap and emulate acccesses to each PMU register
+>>>>>>
+>>>>>> s/acccesses/accesses/
+>>>>>>
+>>>>>>>> individually. This adds the context offsets for the AArch64 PMU
+>>>>>>>> registers and their AArch32 counterparts.
+>>>>>>>>
+>>>>>>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>>>>>>>> ---
+>>>>>>>>   arch/arm64/include/asm/kvm_asm.h | 55 ++++++++++++++++++++++++++++++++++++----
+>>>>>>>>   1 file changed, 50 insertions(+), 5 deletions(-)
+>>>>>>>>
+>>>>>>>> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+>>>>>>>> index 5e37710..4f804c1 100644
+>>>>>>>> --- a/arch/arm64/include/asm/kvm_asm.h
+>>>>>>>> +++ b/arch/arm64/include/asm/kvm_asm.h
+>>>>>>>> @@ -48,12 +48,34 @@
+>>>>>>>>   #define MDSCR_EL1	22	/* Monitor Debug System Control Register */
+>>>>>>>>   #define MDCCINT_EL1	23	/* Monitor Debug Comms Channel Interrupt Enable Reg */
+>>>>>>>>
+>>>>>>
+>>>>>> Coming back to this patch, it gives a clear view of where you have state
+>>>>>> duplication.
+>>>>>>
+>>>>>>>> +/* Performance Monitors Registers */
+>>>>>>>> +#define PMCR_EL0	24	/* Control Register */
+>>>>>>>> +#define PMOVSSET_EL0	25	/* Overflow Flag Status Set Register */
+>>>>>>>> +#define PMOVSCLR_EL0	26	/* Overflow Flag Status Clear Register */
+>>>>>>
+>>>>>> This should only be a single state. You don't even have to represent it
+>>>>>> in the sysreg array, to be honest.
+>>>>>>
 > 
-> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
-> ---
->  drivers/pci/host/pcie-designware.c |    5 +++++
->  1 file changed, 5 insertions(+)
+> Re-think about this. Since there are different operates to SET/CLR
+> registers, maybe it should keep both of them while only storing the
+> state in one of them.
 > 
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 02a7452bdf23..ed4dc2e2553b 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -164,6 +164,11 @@ static void dw_pcie_prog_outbound_atu(struct pcie_port *pp, int index,
->  	dw_pcie_writel_rc(pp, upper_32_bits(pci_addr), PCIE_ATU_UPPER_TARGET);
->  	dw_pcie_writel_rc(pp, type, PCIE_ATU_CR1);
->  	dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
-> +	/*
-> +	 * ensure that the ATU enable has been happaned before accessing
-> +	 * pci configuration/io spaces through dw_pcie_cfg_[read|write].
-> +	 */
-> +	wmb();
->  }
->  
->  static struct irq_chip dw_msi_irq_chip = {
-> 
+> To SET:
+> 	vcpu_sys_reg(vcpu, r->reg) |= val;
+> To CLR:
+> 	vcpu_sys_reg(vcpu, r->reg) &= ~val;
 
+There is really no point keeping both, because they are two views of the
+same state. They perform different action on the same data, so the way
+to look at it is to have different functions/methods that modify the
+same state.
 
+> Or keep one of them and within the access handler, according to the
+> operates encoding value to judge whether it's SET or CLR.
+
+That's indeed the way it should be. You just have to register different
+functions in the trap table. You could even move the register outside of
+the sys_reg array into the kvm_pmu structure.
+
+Thanks,
+
+	M.
 -- 
-regards,
-Stan
+Jazz is not dead. It just smells funny...
