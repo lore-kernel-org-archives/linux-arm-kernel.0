@@ -1,40 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 08 Dec 2015 10:51:50 +0100
-Subject: [PATCH] ARM: DTS: am33xx: Use the new DT bindings for the eDMA3
-In-Reply-To: <566689E2.7060907@ti.com>
-References: <1449225915-28879-1-git-send-email-peter.ujfalusi@ti.com>
- <20151204215115.GP23396@atomide.com> <566689E2.7060907@ti.com>
-Message-ID: <4387766.cHF7OBX0cm@wuerfel>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 08 Dec 2015 10:55:53 +0100
+Subject: [PATCH 0/5] multi and mvebu v5 defconfig updates
+In-Reply-To: <4322870.qyT4ELuZLH@wuerfel> (Arnd Bergmann's message of "Mon, 07
+ Dec 2015 23:57:20 +0100")
+References: <1449012812-9779-1-git-send-email-andrew@lunn.ch>
+ <87610achog.fsf@free-electrons.com> <4322870.qyT4ELuZLH@wuerfel>
+Message-ID: <87zixl8dsm.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 December 2015 09:42:26 Peter Ujfalusi wrote:
-> On 12/04/2015 11:51 PM, Tony Lindgren wrote:
-> >>
-> >> Please just drop the /bits/ 16 and use normal cells.
-> > 
-> > Yeah agreed, makes things less confusing for sure 
-> 
-> 4.4 will be the first kernel where we will have the new eDMA bindings. I have
-> chosen to use 16bit array for specifying the channels used for memcpy
-> (ti,edma-memcpy-channels) and for the reserving paRAM slots
-> (ti,edma-reserved-slot-ranges). As of now we have maximum of 64 channels and
-> 512 paRAM slots. 16bit is more than enough to store this information and it
-> even gives us enough room if ever in the future these numbers are going to
-> increase (which  they are not).
-> 
-> But in order to change them to 32bit the driver needs to be changed as well.
-> Currently we do not have drivers (in 4.4) using the new bindings, 4.4 is not
-> yet out, so it might be possible to change the binding document and the driver
-> to use 32bit arrays. The driver internally uses 16bit type for these which I'm
-> not going to change, but the code parsing the DT needs to be adjusted for the
-> new data type.
-> 
-> If Vinod is willing to take update for the DT binding of eDMA for 4.4-rc, I
-> can cook up the patch(es) to do so.
+Hi Arnd,
+ 
+ On lun., d?c. 07 2015, Arnd Bergmann <arnd@arndb.de> wrote:
 
-I hadn't realized that it was already in 4.4-rc. The change should be trivial
-enough though, so I'd still do it. If Vinod would rather not change it now,
-it's not overly important though.
+> On Monday 07 December 2015 18:06:07 Gregory CLEMENT wrote:
+>> Hi Arnd
+>>  
+>>  On mer., d?c. 02 2015, Andrew Lunn <andrew@lunn.ch> wrote:
+>> 
+>> > This patchset updates both multi_v5_defconfig and mvebu_v5_defconfig.
+>> > It adds support for Orion5x, now that it is multi-arch, and adds back
+>> > DSA and its drivers, which now depends on switchdev.
+>> >
+>> > Andrew Lunn (5):
+>> >   ARM: config: Regenerate multi_v5_defconfig
+>> >   ARM: config: Reenable DSA in multi_v5_defconfig
+>> >   ARM: config: Add orion5x to multi_v5_defconfig
+>> 
+>> >   ARM: mvebu: Reenable DSA in mvebu_v5_defconfig
+>> >   ARM: mvebu: update v5 defconfig for Orion5x machines
+>> 
+>> To be sure there won't be a leftover, I applied the last 2 patches, but
+>> not the 3 first ones, as for my understanding it is better that it is
+>> managed by arm-soc directly.
+>> 
+>> 
+>
+> Actually, I'd prefer you to put them in the same branch as the other
+> patches. I can easily sort out any merge conflicts when merging the
+> branch.
 
-	Arnd
+Ok. so I applied the whole series on mvebu/defconfig
+
+Thanks,
+
+Gregory
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
