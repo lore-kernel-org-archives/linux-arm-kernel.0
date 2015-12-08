@@ -1,100 +1,115 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 8 Dec 2015 08:19:31 +0000
-Subject: [PATCH v3 05/22] arm64: KVM: Implement vgic-v3 save/restore
-In-Reply-To: <56663D0C.1070500@samsung.com>
-References: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
- <1449485618-9443-6-git-send-email-marc.zyngier@arm.com>
- <5665B663.8020705@samsung.com> <5665B940.7000601@arm.com>
- <5665BF4D.7090103@samsung.com> <5665C3C7.9010600@arm.com>
- <5665CA68.2000401@samsung.com> <5665CDDF.3090201@arm.com>
- <56663D0C.1070500@samsung.com>
-Message-ID: <20151208081931.23def99d@why.wild-wind.fr.eu.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 08 Dec 2015 17:13:26 +0900
+Subject: [PATCH v4 7/8] ARM: dts: Exynos5422: fix OPP tables
+In-Reply-To: <1449512300-17230-8-git-send-email-b.zolnierkie@samsung.com>
+References: <1449512300-17230-1-git-send-email-b.zolnierkie@samsung.com>
+ <1449512300-17230-8-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <56669126.7050803@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Dec 2015 18:14:36 -0800
-Mario Smarduch <m.smarduch@samsung.com> wrote:
-
+On 08.12.2015 03:18, Bartlomiej Zolnierkiewicz wrote:
+> From: Ben Gamari <ben@smart-cactus.org>
 > 
+> The Exynos 5422 is identical to the 5800 except for the fact that it
+> boots from the A7 cores. Consequently, the core numbering is different:
+> cores 0-3 are A7s whereas 4-7 are A15s.
 > 
-> On 12/7/2015 10:20 AM, Marc Zyngier wrote:
-> > On 07/12/15 18:05, Mario Smarduch wrote:
-> >>
-> >>
-> >> On 12/7/2015 9:37 AM, Marc Zyngier wrote:
-> [...]
-> >>>
-> >>
-> >> I was thinking something like 'current_lr[VGIC_V3_LR_INDEX(...)]'.
-> > 
-> > That doesn't change anything, the compiler is perfectly able to 
-> > optimize something like this:
-> > 
-> > [...]
-> > ffffffc0007f31ac:       38624862        ldrb    w2, [x3,w2,uxtw]
-> > ffffffc0007f31b0:       10000063        adr     x3, ffffffc0007f31bc <__vgic_v3_save_state+0x64>
-> > ffffffc0007f31b4:       8b228862        add     x2, x3, w2, sxtb #2
-> > ffffffc0007f31b8:       d61f0040        br      x2
-> > ffffffc0007f31bc:       d53ccde2        mrs     x2, s3_4_c12_c13_7
-> > ffffffc0007f31c0:       f9001c02        str     x2, [x0,#56]
-> > ffffffc0007f31c4:       d53ccdc2        mrs     x2, s3_4_c12_c13_6
-> > ffffffc0007f31c8:       f9002002        str     x2, [x0,#64]
-> > ffffffc0007f31cc:       d53ccda2        mrs     x2, s3_4_c12_c13_5
-> > ffffffc0007f31d0:       f9002402        str     x2, [x0,#72]
-> > ffffffc0007f31d4:       d53ccd82        mrs     x2, s3_4_c12_c13_4
-> > ffffffc0007f31d8:       f9002802        str     x2, [x0,#80]
-> > ffffffc0007f31dc:       d53ccd62        mrs     x2, s3_4_c12_c13_3
-> > ffffffc0007f31e0:       f9002c02        str     x2, [x0,#88]
-> > ffffffc0007f31e4:       d53ccd42        mrs     x2, s3_4_c12_c13_2
-> > ffffffc0007f31e8:       f9003002        str     x2, [x0,#96]
-> > ffffffc0007f31ec:       d53ccd22        mrs     x2, s3_4_c12_c13_1
-> > ffffffc0007f31f0:       f9003402        str     x2, [x0,#104]
-> > ffffffc0007f31f4:       d53ccd02        mrs     x2, s3_4_c12_c13_0
-> > ffffffc0007f31f8:       f9003802        str     x2, [x0,#112]
-> > ffffffc0007f31fc:       d53ccce2        mrs     x2, s3_4_c12_c12_7
-> > ffffffc0007f3200:       f9003c02        str     x2, [x0,#120]
-> > ffffffc0007f3204:       d53cccc2        mrs     x2, s3_4_c12_c12_6
-> > ffffffc0007f3208:       f9004002        str     x2, [x0,#128]
-> > ffffffc0007f320c:       d53ccca2        mrs     x2, s3_4_c12_c12_5
-> > ffffffc0007f3210:       f9004402        str     x2, [x0,#136]
-> > ffffffc0007f3214:       d53ccc82        mrs     x2, s3_4_c12_c12_4
-> > ffffffc0007f3218:       f9004802        str     x2, [x0,#144]
-> > ffffffc0007f321c:       d53ccc62        mrs     x2, s3_4_c12_c12_3
-> > ffffffc0007f3220:       f9004c02        str     x2, [x0,#152]
-> > ffffffc0007f3224:       d53ccc42        mrs     x2, s3_4_c12_c12_2
-> > ffffffc0007f3228:       f9005002        str     x2, [x0,#160]
-> > ffffffc0007f322c:       d53ccc22        mrs     x2, s3_4_c12_c12_1
-> > ffffffc0007f3230:       f9005402        str     x2, [x0,#168]
-> > ffffffc0007f3234:       d53ccc02        mrs     x2, s3_4_c12_c12_0
-> > ffffffc0007f3238:       7100183f        cmp     w1, #0x6
-> > ffffffc0007f323c:       f9005802        str     x2, [x0,#176]
-> > 
-> > As you can see, this is as optimal as it gets, short of being able
-> > to find a nice way to use more than one register...
+> We can reuse the device tree of the 5800 for the 5422 but we must take
+> care to override the OPP tables and CPU clocks.  These are otherwise
+> inherited from the exynos5800 devicetree, which has the CPU clusters
+> reversed compared to the 5422. This results in the A15 cores only
+> reaching 1.4GHz, the maximum rate of the KFC clock.
 > 
-> Interesting, thanks for the dump I'm no expert on pipeline optimizations but I'm
-> wondering with these system register accesses can these be executed out of order
-> provided you didn't have what I thinks are write after read dependencies?
-
-System-register reads can be executed out of order, that is not a
-problem. Even the stores can be executed out of order as the CPU
-renames the GP registers (depending on the microarchitecture, of
-course).
-
-Now, what I'd *really* like to see is GCC to output something similar
-to what we have in the original code, where we use as many registers as
-possible to store the data, and output it in one go, possibly using
-strp. So far, I haven't found a way to convince the compiler to do so.
-
-> It's only 4 registers here, there are some other longer stretches in subsequent
-> patches.
+> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+> Signed-off-by: Ben Gamari <ben@smart-cactus.org>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5422-cpus.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
-> I minor note here is some white space in this patch.
 
-Ah, thanks for letting me know. I'll chase those.
+This looks like a very-non-atomic way of handling a change. You added
+opp tables to exynos5420 before so at that time they will be applied to
+Odroid XU3 family which uses different CPU order. After that you are
+fixing the tables to proper CPU order. Direct bisectability probably
+won't be an issue because all of DTS would go to separate branch... but
+the logic behind confuses.
 
-Thanks,
+I think this should be squashed into 3/8.
 
-	M.
--- 
-Without deviation from the norm, progress is not possible.
+Best regards,
+Krzysztof
+
+> diff --git a/arch/arm/boot/dts/exynos5422-cpus.dtsi b/arch/arm/boot/dts/exynos5422-cpus.dtsi
+> index b7f60c8..9a5131d 100644
+> --- a/arch/arm/boot/dts/exynos5422-cpus.dtsi
+> +++ b/arch/arm/boot/dts/exynos5422-cpus.dtsi
+> @@ -20,8 +20,10 @@
+>  	device_type = "cpu";
+>  	compatible = "arm,cortex-a7";
+>  	reg = <0x100>;
+> +	clocks = <&clock CLK_KFC_CLK>;
+>  	clock-frequency = <1000000000>;
+>  	cci-control-port = <&cci_control0>;
+> +	operating-points-v2 = <&cpu1_opp_table>;
+>  };
+>  
+>  &cpu1 {
+> @@ -30,6 +32,7 @@
+>  	reg = <0x101>;
+>  	clock-frequency = <1000000000>;
+>  	cci-control-port = <&cci_control0>;
+> +	operating-points-v2 = <&cpu1_opp_table>;
+>  };
+>  
+>  &cpu2 {
+> @@ -38,6 +41,7 @@
+>  	reg = <0x102>;
+>  	clock-frequency = <1000000000>;
+>  	cci-control-port = <&cci_control0>;
+> +	operating-points-v2 = <&cpu1_opp_table>;
+>  };
+>  
+>  &cpu3 {
+> @@ -46,14 +50,17 @@
+>  	reg = <0x103>;
+>  	clock-frequency = <1000000000>;
+>  	cci-control-port = <&cci_control0>;
+> +	operating-points-v2 = <&cpu1_opp_table>;
+>  };
+>  
+>  &cpu4 {
+>  	device_type = "cpu";
+>  	compatible = "arm,cortex-a15";
+>  	reg = <0x0>;
+> +	clocks = <&clock CLK_ARM_CLK>;
+>  	clock-frequency = <1800000000>;
+>  	cci-control-port = <&cci_control1>;
+> +	operating-points-v2 = <&cpu0_opp_table>;
+>  };
+>  
+>  &cpu5 {
+> @@ -62,6 +69,7 @@
+>  	reg = <0x1>;
+>  	clock-frequency = <1800000000>;
+>  	cci-control-port = <&cci_control1>;
+> +	operating-points-v2 = <&cpu0_opp_table>;
+>  };
+>  
+>  &cpu6 {
+> @@ -70,6 +78,7 @@
+>  	reg = <0x2>;
+>  	clock-frequency = <1800000000>;
+>  	cci-control-port = <&cci_control1>;
+> +	operating-points-v2 = <&cpu0_opp_table>;
+>  };
+>  
+>  &cpu7 {
+> @@ -78,4 +87,5 @@
+>  	reg = <0x3>;
+>  	clock-frequency = <1800000000>;
+>  	cci-control-port = <&cci_control1>;
+> +	operating-points-v2 = <&cpu0_opp_table>;
+>  };
+> 
