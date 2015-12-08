@@ -1,38 +1,25 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 08 Dec 2015 13:14:18 -0800
-Subject: [PATCH v5 0/4] ARM SMC Calling Convention interface
-In-Reply-To: <1449581315-14519-1-git-send-email-jens.wiklander@linaro.org>
- (Jens Wiklander's message of "Tue, 8 Dec 2015 14:28:31 +0100")
-References: <1449581315-14519-1-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <7hoae0k5hx.fsf@deeprootsystems.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 08 Dec 2015 22:34:42 +0100
+Subject: [PATCH] soc: TI knav_qmss: fix dma_addr_t printing
+In-Reply-To: <56670B21.5060209@oracle.com>
+References: <2560281.KhcNzi0XgD@wuerfel> <56670B21.5060209@oracle.com>
+Message-ID: <18371096.H4qt47cWYH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jens,
+On Tuesday 08 December 2015 08:53:53 santosh shilimkar wrote:
+> On 12/8/2015 7:30 AM, Arnd Bergmann wrote:
+> > The knav_qmss driver is currently broken when CONFIG_LPAE is
+> > set, which is a bit surprising because I'd expect that any serious
+> > users of this platforms would have more than 2GB of RAM and require
+> > LPAE.
+> >
+> Well it has been working with LPAE enable always. The production
+> systems do but IIRC, some of the Eval board were still build with
+> just 2 GB memory.
 
-Jens Wiklander <jens.wiklander@linaro.org> writes:
+Maybe that just means that the debug code is never used and we can remove
+all the dev_dbg instead? That might actually be nicer as it would reduce
+the amount of code in your driver (slightly).
 
-> This patch set is based on the Generic TEE subsystem v6 patchset
-> (https://lwn.net/Articles/662495/) sent out a few weeks ago. By isolating
-> the ARM SMC Calling Convention patches that are useful for other purposes
-> than to support the Generic TEE subsystem some complexity is removed from
-> that patch set.
->
-> This patch set adds a common interface to do an SMC or HVC following ARM
-> SMC Calling Convention. The interface is implemented for both the arm and
-> arm64 architectures and updates the PSCI driver to use this interface
-> instead for firmware communication.
-
-Build and boot tested on a variety of arm32 and arm64 platforms using
-kernelci.org.  The previous THUMB2_KERNEL=y build failures are gone.
-
-Tested-by: Kevin Hilman <khilman@linaro.org>
-
-kernelci.org results:
-
-Build: http://kernelci.org/build/arm-soc/kernel/v4.4-rc3-4-gccfbab1c1ebd/
-Boot: http://kernelci.org/boot/all/job/arm-soc/kernel/v4.4-rc3-4-gccfbab1c1ebd/
-
-(NOTE: the boot failures there appear to be lab-related issues, not related tot his patch.)
-
-Kevin
+	Arnd
