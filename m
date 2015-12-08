@@ -1,30 +1,38 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 8 Dec 2015 21:11:16 +0000
-Subject: [PATCH 0/4] ARM Versatile multi-platform support
-In-Reply-To: <1449607458-16850-1-git-send-email-robh@kernel.org>
-References: <1449607458-16850-1-git-send-email-robh@kernel.org>
-Message-ID: <CAFEAcA9Wkk+tAyrxuiLMOjQA2Y44qFGF+aXzhj7a9k6qnYobfQ@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 08 Dec 2015 13:14:18 -0800
+Subject: [PATCH v5 0/4] ARM SMC Calling Convention interface
+In-Reply-To: <1449581315-14519-1-git-send-email-jens.wiklander@linaro.org>
+ (Jens Wiklander's message of "Tue, 8 Dec 2015 14:28:31 +0100")
+References: <1449581315-14519-1-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <7hoae0k5hx.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 December 2015 at 20:44, Rob Herring <robh@kernel.org> wrote:
-> Arnd lit a fire under me to dust this off and get it merged. So here it
-> is. The main change from prior version is I merged all the code to a
-> single file. It's a bigger patch than I'd like, but I don't think trying
-> to do it in multiple steps is worth it.
->
-> This is dependent on some solution for the default platform choice on
-> !MMU builds (allnoconfig) as it can't be Versatile after this series.
-> Arnd has some ideas on how to address that.
->
-> This is tested under QEMU. Linus previously tested this on actual h/w
-> and had a problem with the display identification which needs
-> investigation or agreement to worry about it if and when someone
-> actually cares.
+Hi Jens,
 
-I handed my PB hardware and its PCI backplane back to Will
-and Marc some time back, so they're in the best position to
-do testing of the PCI part on real hardware if needed these days.
+Jens Wiklander <jens.wiklander@linaro.org> writes:
 
-thanks
--- PMM
+> This patch set is based on the Generic TEE subsystem v6 patchset
+> (https://lwn.net/Articles/662495/) sent out a few weeks ago. By isolating
+> the ARM SMC Calling Convention patches that are useful for other purposes
+> than to support the Generic TEE subsystem some complexity is removed from
+> that patch set.
+>
+> This patch set adds a common interface to do an SMC or HVC following ARM
+> SMC Calling Convention. The interface is implemented for both the arm and
+> arm64 architectures and updates the PSCI driver to use this interface
+> instead for firmware communication.
+
+Build and boot tested on a variety of arm32 and arm64 platforms using
+kernelci.org.  The previous THUMB2_KERNEL=y build failures are gone.
+
+Tested-by: Kevin Hilman <khilman@linaro.org>
+
+kernelci.org results:
+
+Build: http://kernelci.org/build/arm-soc/kernel/v4.4-rc3-4-gccfbab1c1ebd/
+Boot: http://kernelci.org/boot/all/job/arm-soc/kernel/v4.4-rc3-4-gccfbab1c1ebd/
+
+(NOTE: the boot failures there appear to be lab-related issues, not related tot his patch.)
+
+Kevin
