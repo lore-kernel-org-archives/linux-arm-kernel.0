@@ -1,137 +1,92 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 8 Dec 2015 07:55:05 -0600
-Subject: [PATCH 1/3] usb: misc: generic_onboard_hub: add generic onboard
- USB HUB driver
-In-Reply-To: <20151208091854.GA16881@shlinux2>
-References: <1449538670-7954-1-git-send-email-peter.chen@freescale.com>
- <1449538670-7954-2-git-send-email-peter.chen@freescale.com>
- <87poyhmyrc.fsf@saruman.tx.rr.com> <20151208091854.GA16881@shlinux2>
-Message-ID: <87k2opm4ee.fsf@saruman.tx.rr.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 8 Dec 2015 14:07:20 +0000
+Subject: [PATCH v4] acpi, apei, arm64: APEI initial support for aarch64.
+In-Reply-To: <CADyBb7tByoke4PGZqcx_jHvgCK0xNTneod8WoVv7VmoSYii+hg@mail.gmail.com>
+References: <1449558183-12259-1-git-send-email-fu.wei@linaro.org>
+ <20151208123433.GB404@red-moon> <5666D28C.4090305@linaro.org>
+ <CADyBb7tByoke4PGZqcx_jHvgCK0xNTneod8WoVv7VmoSYii+hg@mail.gmail.com>
+Message-ID: <20151208140720.GA2395@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Dec 08, 2015 at 09:08:24PM +0800, Fu Wei wrote:
+> Hi Lorenzo,
+> 
+> 
+> 
+> On 8 December 2015 at 20:52, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> > Hi Lorenzo,
+> >
+> > On 12/08/2015 08:34 PM, Lorenzo Pieralisi wrote:
+> >>
+> >> On Tue, Dec 08, 2015 at 03:03:03PM +0800, fu.wei at linaro.org wrote:
+> >>>
+> >>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> >>
+> >>
+> >> [...]
+> >>
+> >>> +#if defined(__i386__) || defined(__x86_64__)
+> >>>   /*
+> >>>    * Check if firmware advertises firmware first mode. We need FF bit to
+> >>> be set
+> >>>    * along with a set of MC banks which work in FF mode.
+> >>>    */
+> >>>   static int __init hest_parse_cmc(struct acpi_hest_header *hest_hdr,
+> >>> void *data)
+> >>>   {
+> >>> -       return arch_apei_enable_cmcff(hest_hdr, data);
+> >>> +       if (!acpi_disable_cmcff)
+> >>
+> >>
+> >> Why do not you define the flag above in this file (move it out of x86 -
+> >> that's what I was aiming at in my previous reply) and remove this
+> >> ifdeffery
+> >> altogether (First firmware handling could apply to arm64 too according to
+> >> specs and ACPI on arm64 guidelines) ?
+> >
+> >
+> > If I understand it correctly, CMC (Corrected Machine Check) is for IA32
+> > only, see section 18.3.2.1 IA-32 Architecture Machine Check Exception
+> > in ACPI 6.0. for ARM64, we can use other type of error source for
+> > firmware first handling, such as Generic Hardware Error Source, did
+> > I miss something?
+> 
+> yes, that is why I try to use "#if defined(__i386__) ||
+> defined(__x86_64__)" instead of moving acpi_disable_cmcff out of x86
+> code to here.
+> 
+> And I thinks we also can do "arch_apei_enable_cmcff" -->
+> "apei_enable_ia_cmcff" because that is IA32 only.
+> 
+> Please correct me if I misunderstand something.  Thanks :-)
 
-Hi,
+No you are right, I was confused by the arch_apei_enable_cmcff __weak
+function declaration, I am not sure that makes much sense, as you say.
 
-Peter Chen <peter.chen@freescale.com> writes:
->> seriously ? Is this really all ? What about that reset line below ?
->
-> The clock is PHY input clock on the HUB, this clock may from SoC's
-> PLL.
+Side note: I wonder if there is a way to make the TLB flushing API common
+across architectures therefore avoiding this arch_apei_flush_tlb* churn.
 
-oh, you might have misunderstood my comment. I'm saying that there is
-more than one thing you could cache in your private structure. That's
-all.
+Thanks,
+Lorenzo
 
->> > +static int usb_hub_generic_probe(struct platform_device *pdev)
->> > +{
->> > +	struct device *dev = &pdev->dev;
->> > +	struct usb_hub_generic_platform_data *pdata = dev->platform_data;
->> > +	struct usb_hub_generic_data *hub_data;
->> > +	int reset_pol = 0, duration_us = 50, ret = 0;
->> > +	struct gpio_desc *gpiod_reset = NULL;
->> > +
->> > +	hub_data = devm_kzalloc(dev, sizeof(*hub_data), GFP_KERNEL);
->> > +	if (!hub_data)
->> > +		return -ENOMEM;
->> > +
->> > +	if (dev->of_node) {
->> > +		struct device_node *node = dev->of_node;
->> > +
->> > +		hub_data->clk = devm_clk_get(dev, "external_clk");
->> > +		if (IS_ERR(hub_data->clk)) {
->> > +			dev_dbg(dev, "Can't get external clock: %ld\n",
->> > +					PTR_ERR(hub_data->clk));
->> 
->> how about setting clock to NULL to here ? then you don't need IS_ERR()
->> checks anywhere else.
->> 
->> > +		}
->> 
->> braces shouldn't be used here, if you add NULL trick above,
->> however... then you can keep them.
->> 
->
-> Braces aren't needed, it may not too much useful to using NULL
-> as a indicator for error pointer.
-
-heh, it's not about using it as an error pointer. I'm merely trying to
-make clk optional. NULL is a valid clk, meaning you won't get NULL
-pointer dereferences when passing it along clk_*() calls (if you find
-any, it's likely a bug in CCF), so NULL can be used to cope with
-optional clocks:
-
-         clk = clk_get(dev, "foo");
-         if (IS_ERR(clk)) {
-         	if (PTR_ERR(clk) == -EPROBE_DEFER)
-                	return -EPROBE_DEFER;
-                else
-                	clk = NULL;
-         }
-
->> > +		/*
->> > +		 * Try to get the information for HUB reset, the
->> > +		 * default setting like below:
->> > +		 *
->> > +		 * - Reset state is low
->> > +		 * - The duration is 50us
->> > +		 */
->> > +		if (of_find_property(node, "hub-reset-active-high", NULL))
->> > +			reset_pol = 1;
->> 
->> you see, this is definitely *not* generic. You should write a generic
->> reset-gpio.c reset controller and describe the polarity on the gpio
->> binding. This driver *always* uses reset_assert(); reset_deassert(); and
->> reset-gpio implements though by gpiod_set_value() correctly.
->> 
->> Polarity _must_ be described elsewhere in DT.
->> 
->> > +		of_property_read_u32(node, "hub-reset-duration-us",
->> > +			&duration_us);
->> 
->> likewise, this should be described as a debounce time for the GPIO.
->> 
->
-> Yes, if we are a reset gpio driver.
-
-even if you use a raw GPIO, polarity and duration must come through DT.
-
->> > +		usleep_range(duration_us, duration_us + 100);
->> > +		gpiod_set_value(gpiod_reset, reset_pol ? 0 : 1);
->> 
->> wrong. You should _not_ have polarity checks here. You should have
->> already initialized the gpio as ACTIVE_HIGH or ACTIVE_LOW and gpiolib
->> will handle the polarity for you.
->
-> Yes, you are right. I did not understand ACTIVE_LOW for gpio flag
-> before.
-
-with open source code, that's a rather poor excuse, Peter.
-
->> > +static int __init usb_hub_generic_init(void)
->> > +{
->> > +	return platform_driver_register(&usb_hub_generic_driver);
->> > +}
->> > +subsys_initcall(usb_hub_generic_init);
->> > +
->> > +static void __exit usb_hub_generic_exit(void)
->> > +{
->> > +	platform_driver_unregister(&usb_hub_generic_driver);
->> > +}
->> > +module_exit(usb_hub_generic_exit);
->> 
->> module_platform_driver();
->
-> I want this driver to be called before module init's.
-
-why ?
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151208/46d4f17b/attachment.sig>
+> Great thanks for your feedback :-)
+> 
+> >
+> > Thanks
+> > Hanjun
+> 
+> 
+> 
+> -- 
+> Best regards,
+> 
+> Fu Wei
+> Software Engineer
+> Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
+> Ph: +86 21 61221326(direct)
+> Ph: +86 186 2020 4684 (mobile)
+> Room 1512, Regus One Corporate Avenue,Level 15,
+> One Corporate Avenue,222 Hubin Road,Huangpu District,
+> Shanghai,China 200021
+> 
