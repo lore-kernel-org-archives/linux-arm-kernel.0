@@ -1,89 +1,72 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 8 Dec 2015 08:35:04 -0600
-Subject: [PATCH] usb: musb: dsps: handle the
- otg_state_a_wait_vrise_timeout case
-In-Reply-To: <5666E9BE.5070907@ti.com>
-References: <1440087153-31084-1-git-send-email-gregory.clement@free-electrons.com>
- <55D719B1.8010700@free-electrons.com> <87twrfsbed.fsf@free-electrons.com>
- <87d1wtf5ir.fsf@saruman.tx.rr.com> <87a8rde96m.fsf@free-electrons.com>
- <87poyiegc7.fsf@free-electrons.com> <87poyinjpc.fsf@saruman.tx.rr.com>
- <874mft9ukx.fsf@free-electrons.com> <87h9jtm37m.fsf@saruman.tx.rr.com>
- <5666E9BE.5070907@ti.com>
-Message-ID: <87egexm2jr.fsf@saruman.tx.rr.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 8 Dec 2015 09:36:02 -0500
+Subject: [PATCH V7 2/3] dma: add Qualcomm Technologies HIDMA management
+ driver
+In-Reply-To: <20151205075826.GI1854@localhost>
+References: <1448245707-27499-1-git-send-email-okaya@codeaurora.org>
+ <1448245707-27499-3-git-send-email-okaya@codeaurora.org>
+ <20151130082141.GB3901@localhost> <565C6039.6050404@codeaurora.org>
+ <20151201031710.GK3901@localhost> <565E7A3E.1070207@codeaurora.org>
+ <20151205075826.GI1854@localhost>
+Message-ID: <5666EAD2.1060408@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12/5/2015 2:58 AM, Vinod Koul wrote:
+> On Tue, Dec 01, 2015 at 11:57:34PM -0500, Sinan Kaya wrote:
+>> On 11/30/2015 10:17 PM, Vinod Koul wrote:
+>>> On Mon, Nov 30, 2015 at 09:42:01AM -0500, Sinan Kaya wrote:
+>>>
+>>>>>> +static int hidma_mgmt_probe(struct platform_device *pdev)
+>>>>>> +{
+>>>>>> +	struct hidma_mgmt_dev *mgmtdev;
+>>>>>> +	struct resource *res;
+>>>>>> +	void __iomem *virtaddr;
+>>>>>> +	int irq;
+>>>>>> +	int rc;
+>>>>>> +	u32 val;
+>>>>>> +
+>>>>>> +	pm_runtime_set_autosuspend_delay(&pdev->dev, AUTOSUSPEND_TIMEOUT);
+>>>>>> +	pm_runtime_use_autosuspend(&pdev->dev);
+>>>>>> +	pm_runtime_set_active(&pdev->dev);
+>>>>>> +	pm_runtime_enable(&pdev->dev);
+>>>>>
+>>>>> at this time pm core will treat device as fully enabled and pm methods can
+>>>>> be invoked, but you are not ready yet right. Typically these are done at the
+>>>>> end of the probe unless you have a reason... 
+>>>>
+>>>> I need it here because the clocks are declared as ACPI power resources.
+>>>> The kernel is turning off all power resources during initialization. In
+>>>> order for this code to touch the hardware, I need to call enable so that
+>>>> clocks are enabled once again.
+>>>
+>>> The question is are you ready in your driver routines to be invoked by pm
+>>> core?
+>>>
+>>
+>> I don't have any support for suspend and resume PM APIs. The only PM
+>> interface I support is PM runtime. PM can turn on/off the clocks based
+>> on the reference counts it maintains after get/set APIs. Since PM is
+>> turning off the clocks during power up before my driver load, I do need
+>> to grab this lock to re-enable it during HW initialization. Then, let PM
+>> turn off the clocks again after the AUTOSUSPEND_TIMEOUT when I'm done.
+>>
+>> Is there any other interaction with the PM that I'm not aware of?
+> 
+> No this is fine. The the runtime_resume will be onvoked and it will request
+> resources are those set before you enable the device?
+> 
 
-Hi,
+Yes, the only resource that this device needs for power management is
+the ACPI power resources. The device does not support suspend/resume via
+traditional _PS0 and _PS3 calls. ACPI power resources are initialized
+during power up while ACPI is being enumerated.
 
-Bin Liu <b-liu@ti.com> writes:
-> Felipe,
->
-> On 12/08/2015 08:20 AM, Felipe Balbi wrote:
->>
->> Hi,
->>
->> Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
->>>>>> if it is the case then it didn't fix the issue I had.
->>>>>>
->>>>>> I activated the following debug line:
->>>>>>
->>>>>> [musb_hdrc]musb_interrupt =_ "** IRQ %s usb%04x tx%04x rx%04x\012"
->>>>>> [musb_dsps]dsps_interrupt =p "usbintr (%x) epintr(%x)\012"
->>>>>>
->>>>>> But I didn't get any interrupt while disconnecting the cable without any
->>>>>> device connected on it (whereas I got an interrupt when I connected it).
->>>>>>
->>>>>> Note that I applied this patch instead of the "usb: musb: dsps: handle
->>>>>> the otg_state_a_wait_vrise_timeout case", is what you had in mind ?
->>>>
->>>> yeah, that's what I had in mind. But your patch seems wrong :-)
->>>>
->>>> I tried writing a more correct version here and found 2 issues:
->>>>
->>>> a) bit 3 doesn't do anything :-p I cannot read IRQs from mentor's
->>>> registers
->>>>
->>>> b) when setting RESET_ISOLATION bit, reads of CTRL register hang. Note
->>>> that according to TRM, RESET_ISOLATION _must_ be set prior to a soft
->>>> reset and cleared afterwards. But right after setting RESET_ISOLATION,
->>>> if I try a read of CTRL, it'll hang forever.
->>>
->>> The datasheet seems not very coherent about it,
->>>
->>> on one side we have:
->>> "This bit should be set high prior to setting bit 0 and cleared after bit 0
->>> is cleared."
->>>
->>> and on the other side:
->>> "Both the soft_reset and soft_reset_isolation bits should be asserted
->>> simultaneously."
->>>
->>> The hang you saw could be explained by the following:
->>> "Setting only the soft_reset_isolation bit will cause all USB0 output
->>> signals to go to a known constant value via multiplexers.
->>> This will
->>> prevent future access to USB0."  page 2567
->>
->> good catch. Setting them together makes the hang go away.
->>
->> I still have the other problem, which is legacy IRQ reporting mode not
->> really working.
->>
->
-> I never tried to change the IRQ mapping. The 8 MUSB interrupt will be 
-> the same no matter where they are reported from. What do you expect when 
-> switch to the MUSB IRQ reporting mode?
+The probing of the HIDMA driver happens much afterwards.
 
-read events from MUSB's registers instead of TI's :-) so, MUSB_INTRUSB,
-MUSB_INTRRX and MUSB_INTRTX.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151208/bb9fecd7/attachment-0001.sig>
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
+Linux Foundation Collaborative Project
