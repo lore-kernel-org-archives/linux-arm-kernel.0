@@ -1,105 +1,71 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 8 Dec 2015 11:17:46 -0800
-Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
- concurrent lockers
-In-Reply-To: <20151208083956.GA22564@fixme-laptop.cn.ibm.com>
-References: <20151204162453.GE15969@arm.com>
- <20151204164446.GF28602@linux.vnet.ibm.com>
- <20151206073712.GA1549@fixme-laptop.cn.ibm.com>
- <20151206192302.GS28602@linux.vnet.ibm.com>
- <20151206232825.GA13845@fixme-laptop.cn.ibm.com>
- <20151207000047.GX28602@linux.vnet.ibm.com>
- <20151207004504.GC13845@fixme-laptop.cn.ibm.com>
- <20151207103455.GO17308@twins.programming.kicks-ass.net>
- <20151207154514.GZ28602@linux.vnet.ibm.com>
- <20151208083956.GA22564@fixme-laptop.cn.ibm.com>
-Message-ID: <20151208191746.GQ28602@linux.vnet.ibm.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 8 Dec 2015 21:26:08 +0200
+Subject: [PATCH 02/10] clk: ti: Add few dm814x clock aliases
+In-Reply-To: <20151208165732.GY23396@atomide.com>
+References: <1449013103-23238-1-git-send-email-tony@atomide.com>
+ <1449013103-23238-3-git-send-email-tony@atomide.com>
+ <20151208165732.GY23396@atomide.com>
+Message-ID: <56672ED0.4050405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 04:42:59PM +0800, Boqun Feng wrote:
-> On Mon, Dec 07, 2015 at 07:45:14AM -0800, Paul E. McKenney wrote:
-> > On Mon, Dec 07, 2015 at 11:34:55AM +0100, Peter Zijlstra wrote:
-> > > On Mon, Dec 07, 2015 at 08:45:04AM +0800, Boqun Feng wrote:
-> > > > > > Or maybe, we introduce another address space of sparse like:
-> > > > > > 
-> > > > > > 	# define __private	__attribute__((noderef, address_space(6)))
-> > > > > > 
-> > > > > > and macro to dereference private
-> > > > > > 
-> > > > > > 	# define private_dereference(p) ((typeof(*p) *) p)
-> > > > > > 
-> > > > > > and define struct rcu_node like:
-> > > > > > 
-> > > > > > 	struct rcu_node {
-> > > > > > 		raw_spinlock_t __private lock;	/* Root rcu_node's lock protects some */
-> > > > > > 		...
-> > > > > > 	};
-> > > > > > 
-> > > > > > and finally raw_spin_{un}lock_rcu_node() like:
-> > > > > > 
-> > > > > > 	static inline void raw_spin_lock_rcu_node(struct rcu_node *rnp)
-> > > > > > 	{
-> > > > > > 		raw_spin_lock(private_dereference(&rnp->lock));
-> > > > > > 		smp_mb__after_unlock_lock();
-> > > > > > 	}
-> > > > > > 
-> > > > > > 	static inline void raw_spin_unlock_rcu_node(struct rcu_node *rnp)
-> > > > > > 	{
-> > > > > > 		raw_spin_unlock(private_dereference(&rnp->lock));
-> > > > > > 	}
-> > > > > > 
-> > > > > > This __private mechanism also works for others who wants to private
-> > > > > > their fields of struct, which is not supported by C.
-> > > > > > 
-> > > > > > I will send two patches(one introduces __private and one uses it for
-> > > > > > rcu_node->lock) if you think this is not a bad idea ;-)
-> > > 
-> > > > If rcu_node->lock is the only user then this is probably a bad idea, but
-> > > > if others also want to have a way to privatize some fields of the
-> > > > structure, this may be not that bad?
-> > > 
-> > > Thomas might also want this for things like
-> > > irq_common_data::state_use_accessors for instance.
-> 
-> Good to know! Thank you, Peter ;-)
-> 
-> > > 
-> > > And I'm fairly sure there's more out there.
-> > 
-> > If Thomas takes it, I will consider also applying it to RCU.
-> 
-> Paul, so I played with sparse a little more today, and found out that
-> the address_space(6) attribute actually doesn't work here. However, the
-> *noderef* attribute does work here, though the warning information is
-> not very verbose, as there is no number of the address space, for
-> example:
-> 
-> kernel/rcu/tree.c:4453:25: warning: incorrect type in argument 1 (different modifiers)
-> kernel/rcu/tree.c:4453:25:    expected struct raw_spinlock [usertype] *lock
-> kernel/rcu/tree.c:4453:25:    got struct raw_spinlock [noderef] *<noident>
-> 
-> In this example, I made rnp->lock __private and wrap *_{lock,unlock}()
-> and this warning refers the raw_spin_lock_init() in rcu_init_one(). If
-> we really want to privatize ->lock, we'd better also wrap this, I simply
-> make an example here.
-> 
-> Thoughts?
+On 12/08/2015 06:57 PM, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [151201 15:43]:
+>> The timer clock aliases are needed early on dm814x. Let's also
+>> add the aliases for the interconnects and MMC.
+>>
+>> Cc: Michael Turquette <mturquette@baylibre.com>
+>> Cc: Stephen Boyd <sboyd@codeaurora.org>
+>> Cc: Tero Kristo <t-kristo@ti.com>
+>> Signed-off-by: Tony Lindgren <tony@atomide.com>
+>
+> Anybody from the clock department care to ack this one?
 
-I don't have any particular objection to noderef.
+Sorry been rather busy lately...
 
-> The reason why address_space(6) doesn't work is that it's designed as an
-> attribute of a pointer other than any type, and sparse will replace the
-> members' address spaces with the address spaces of "parents" (objects of
-> that struct).
+> I'd like to
+> get this series into Linux next as it fixes some some issues.
 
-IIRC, we do an artificial dereference in rcu_dereference() and friends
-to get around this.  But if the noderef attribute is more natural,
-why not go with it?  For one thing, you can have something that is
-both __rcu and noderef, which would not be possible with sparse
-address space 6.
+Yeah looks good to me, don't have access to dm814x so can't test.
 
-Probably worth trying it out in a number of use cases, and perhaps you
-already tried it out on an int or some such.
+Acked-by: Tero Kristo <t-kristo@ti.com>
 
-							Thanx, Paul
+Are you planning to push this via omap tree if this is critical for you?
+
+-Tero
+
+>
+> Regards,
+>
+> Tony
+>
+>
+>>   drivers/clk/ti/clk-814x.c | 4 ++++
+>>   1 file changed, 4 insertions(+)
+>>
+>> diff --git a/drivers/clk/ti/clk-814x.c b/drivers/clk/ti/clk-814x.c
+>> index e172920..9e85fcc 100644
+>> --- a/drivers/clk/ti/clk-814x.c
+>> +++ b/drivers/clk/ti/clk-814x.c
+>> @@ -14,10 +14,14 @@ static struct ti_dt_clk dm814_clks[] = {
+>>   	DT_CLK(NULL, "devosc_ck", "devosc_ck"),
+>>   	DT_CLK(NULL, "mpu_ck", "mpu_ck"),
+>>   	DT_CLK(NULL, "sysclk4_ck", "sysclk4_ck"),
+>> +	DT_CLK(NULL, "sysclk5_ck", "sysclk5_ck"),
+>>   	DT_CLK(NULL, "sysclk6_ck", "sysclk6_ck"),
+>> +	DT_CLK(NULL, "sysclk8_ck", "sysclk8_ck"),
+>>   	DT_CLK(NULL, "sysclk10_ck", "sysclk10_ck"),
+>>   	DT_CLK(NULL, "sysclk18_ck", "sysclk18_ck"),
+>>   	DT_CLK(NULL, "timer_sys_ck", "devosc_ck"),
+>> +	DT_CLK(NULL, "timer1_fck", "timer1_fck"),
+>> +	DT_CLK(NULL, "timer2_fck", "timer2_fck"),
+>>   	DT_CLK(NULL, "cpsw_125mhz_gclk", "cpsw_125mhz_gclk"),
+>>   	DT_CLK(NULL, "cpsw_cpts_rft_clk", "cpsw_cpts_rft_clk"),
+>>   	{ .node_name = NULL },
+>> --
+>> 2.6.2
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
