@@ -1,175 +1,62 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 08 Dec 2015 13:37:14 +0000
-Subject: [PATCH v6 02/21] KVM: ARM64: Define PMU data structure for each
- vcpu
-In-Reply-To: <1449578860-15808-3-git-send-email-zhaoshenglong@huawei.com>
-References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
- <1449578860-15808-3-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <5666DD0A.5060004@arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 8 Dec 2015 10:41:57 -0300
+Subject: [PATCH v4 7/8] ARM: dts: Exynos5422: fix OPP tables
+In-Reply-To: <56669126.7050803@samsung.com>
+References: <1449512300-17230-1-git-send-email-b.zolnierkie@samsung.com>
+ <1449512300-17230-8-git-send-email-b.zolnierkie@samsung.com>
+ <56669126.7050803@samsung.com>
+Message-ID: <5666DE25.7090708@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/15 12:47, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+Hello Krzysztof,
+
+On 12/08/2015 05:13 AM, Krzysztof Kozlowski wrote:
+> On 08.12.2015 03:18, Bartlomiej Zolnierkiewicz wrote:
+>> From: Ben Gamari <ben@smart-cactus.org>
+>>
+>> The Exynos 5422 is identical to the 5800 except for the fact that it
+>> boots from the A7 cores. Consequently, the core numbering is different:
+>> cores 0-3 are A7s whereas 4-7 are A15s.
+>>
+>> We can reuse the device tree of the 5800 for the 5422 but we must take
+>> care to override the OPP tables and CPU clocks.  These are otherwise
+>> inherited from the exynos5800 devicetree, which has the CPU clusters
+>> reversed compared to the 5422. This results in the A15 cores only
+>> reaching 1.4GHz, the maximum rate of the KFC clock.
+>>
+>> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+>> Signed-off-by: Ben Gamari <ben@smart-cactus.org>
+>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos5422-cpus.dtsi | 10 ++++++++++
+>>  1 file changed, 10 insertions(+)
+>>
 > 
-> Here we plan to support virtual PMU for guest by full software
-> emulation, so define some basic structs and functions preparing for
-> futher steps. Define struct kvm_pmc for performance monitor counter and
-> struct kvm_pmu for performance monitor unit for each vcpu. According to
-> ARMv8 spec, the PMU contains at most 32(ARMV8_MAX_COUNTERS) counters.
-> 
-> Since this only supports ARM64 (or PMUv3), add a separate config symbol
-> for it.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/include/asm/kvm_host.h |  2 ++
->  arch/arm64/kvm/Kconfig            |  8 ++++++++
->  include/kvm/arm_pmu.h             | 40 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 50 insertions(+)
->  create mode 100644 include/kvm/arm_pmu.h
-> 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index a35ce72..42e15bb 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -37,6 +37,7 @@
->  
->  #include <kvm/arm_vgic.h>
->  #include <kvm/arm_arch_timer.h>
-> +#include <kvm/arm_pmu.h>
->  
->  #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
->  
-> @@ -132,6 +133,7 @@ struct kvm_vcpu_arch {
->  	/* VGIC state */
->  	struct vgic_cpu vgic_cpu;
->  	struct arch_timer_cpu timer_cpu;
-> +	struct kvm_pmu pmu;
->  
->  	/*
->  	 * Anything that is not used directly from assembly code goes
-> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-> index a5272c0..66da9a2 100644
-> --- a/arch/arm64/kvm/Kconfig
-> +++ b/arch/arm64/kvm/Kconfig
-> @@ -36,6 +36,7 @@ config KVM
->  	select HAVE_KVM_EVENTFD
->  	select HAVE_KVM_IRQFD
->  	select KVM_ARM_VGIC_V3
-> +	select KVM_ARM_PMU
-
-What if HW_PERF_EVENTS is not selected? Also, selecting HW_PERF_EVENTS
-is not enough, and you probably need PERF_EVENTS as well, So this should
-probably read:
-
-	select KVM_ARM_PMU if (HW_PERF_EVENTS && PERF_EVENTS)
-
->  	---help---
->  	  Support hosting virtualized guest machines.
->  	  We don't support KVM with 16K page tables yet, due to the multiple
-> @@ -48,6 +49,13 @@ config KVM_ARM_HOST
->  	---help---
->  	  Provides host support for ARM processors.
->  
-> +config KVM_ARM_PMU
-> +	bool
-> +	depends on KVM_ARM_HOST && HW_PERF_EVENTS
-
-and this line should be dropped.
-
-> +	---help---
-> +	  Adds support for a virtual Performance Monitoring Unit (PMU) in
-> +	  virtual machines.
-> +
->  source drivers/vhost/Kconfig
->  
->  endif # VIRTUALIZATION
-> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-> new file mode 100644
-> index 0000000..dea78f8
-> --- /dev/null
-> +++ b/include/kvm/arm_pmu.h
-> @@ -0,0 +1,40 @@
-> +/*
-> + * Copyright (C) 2015 Linaro Ltd.
-> + * Author: Shannon Zhao <shannon.zhao@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#ifndef __ASM_ARM_KVM_PMU_H
-> +#define __ASM_ARM_KVM_PMU_H
-> +
-> +#include <linux/perf_event.h>
-> +#ifdef CONFIG_KVM_ARM_PMU
-> +#include <asm/pmu.h>
-> +#endif
-> +
-> +struct kvm_pmc {
-> +	u8 idx;/* index into the pmu->pmc array */
-> +	struct perf_event *perf_event;
-> +	u64 bitmask;
-> +};
-> +
-> +struct kvm_pmu {
-> +#ifdef CONFIG_KVM_ARM_PMU
-> +	/* PMU IRQ Number per VCPU */
-> +	int irq_num;
-> +	struct kvm_pmc pmc[ARMV8_MAX_COUNTERS];
-> +#endif
-> +};
-> +
-> +#endif
+> This looks like a very-non-atomic way of handling a change. You added
+> opp tables to exynos5420 before so at that time they will be applied to
+> Odroid XU3 family which uses different CPU order. After that you are
+> fixing the tables to proper CPU order. Direct bisectability probably
+> won't be an issue because all of DTS would go to separate branch... but
+> the logic behind confuses.
 > 
 
-The repetition of #ifdef CONFIG_KVM_ARM_PMU is a bit ugly. How about
-something like this instead:
+Agreed.
 
-#ifndef __ASM_ARM_KVM_PMU_H
-#define __ASM_ARM_KVM_PMU_H
+> I think this should be squashed into 3/8.
+> 
 
-#ifdef CONFIG_KVM_ARM_PMU
+I think the patch should be split in two changes, the CPUs device nodes
+having the wrong clock for clusters is a bug and has to be fixed in a
+patch before adding the OPP tables and the OPP tables changes should be
+separated and merged with patch 3/8 as you suggest.
 
-#include <linux/perf_event.h>
-#include <asm/pmu.h>
+> Best regards,
+> Krzysztof
+> 
 
-struct kvm_pmc {
-	u8 idx;/* index into the pmu->pmc array */
-	struct perf_event *perf_event;
-	u64 bitmask;
-};
-
-struct kvm_pmu {
-	/* PMU IRQ Number per VCPU */
-	int irq_num;
-	struct kvm_pmc pmc[ARMV8_MAX_COUNTERS];
-};
-
-#else
-
-struct kvm_pmu {
-};
-
-#endif
-
-#endif
-
-and you can then populate the rest of the function prototype and stubs
-where needed.
-
-Thanks,
-
-	M.
+Best regards,
 -- 
-Jazz is not dead. It just smells funny...
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
