@@ -1,27 +1,35 @@
 From: alison_chaiken@mentor.com (Alison Chaiken)
-Date: Tue, 8 Dec 2015 15:48:38 -0800
-Subject: [PATCH v2 0/2] ARM: dts: imx6qdl-sabreauto: employ GPIO init-val for
- p-NOR
-In-Reply-To: <20151207082440.GY11966@pengutronix.de>
+Date: Tue, 8 Dec 2015 15:48:40 -0800
+Subject: [PATCH v2 2/2] ARM: dts: imx6qdl-sabreauto: enable partitions for
+ parallel NOR
+In-Reply-To: <1449618520-3432-1-git-send-email-alison_chaiken@mentor.com>
 References: <20151207082440.GY11966@pengutronix.de>
-Message-ID: <1449618520-3432-1-git-send-email-alison_chaiken@mentor.com>
+ <1449618520-3432-1-git-send-email-alison_chaiken@mentor.com>
+Message-ID: <1449618520-3432-3-git-send-email-alison_chaiken@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The parallel NOR that is attached to the i.MX6-SabreAuto WEIM switch
-needs a GPIO asserted at boot in order to probe properly.  Employ the
-GPIO init-val mechanism to set the GPIO.  Also, add partitions subnode
-to NOR device-tree node to make MTD initialization work.
+Add a 'partitions' property to the nor child of the WEIM bus so
+that ofpart will allow partition creation.
 
-Alison Chaiken (2):
-  ARM: dts: imx6qdl-sabreauto: assert GPIO at boot in order to connect
-    NOR
-  ARM: dts: imx6qdl-sabreauto: enable partitions for parallel NOR
+Signed-off-by: Alison Chaiken <alison_chaiken@mentor.com>
+---
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
- arch/arm/boot/dts/imx6qdl-sabreauto-eim-nor.dtsi | 43 ++++++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi         |  4 +++
- 2 files changed, 47 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6qdl-sabreauto-eim-nor.dtsi
-
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index 8263fc1..1a29fff 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -625,5 +625,9 @@
+ 		bank-width = <2>;
+ 		fsl,weim-cs-timing = <0x00620081 0x00000001 0x1c022000
+ 				0x0000c000 0x1404a38e 0x00000000>;
++		partitions at 0 {
++			label = "pnor";
++			reg = <0x0 0x1000000>;
++		};
+ 	};
+ };
 -- 
 2.6.2
