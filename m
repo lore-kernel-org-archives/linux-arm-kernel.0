@@ -1,54 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 08 Dec 2015 17:59:44 +0100
-Subject: [PATCH v3] bus: uniphier-system-bus: add UniPhier System Bus
- driver
-In-Reply-To: <1449591718-21753-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1449591718-21753-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <14233302.P9onBQovHz@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 08 Dec 2015 17:03:56 +0000
+Subject: [PATCH v6 15/21] KVM: ARM64: Add reset and access handlers for
+ PMUSERENR register
+In-Reply-To: <1449578860-15808-16-git-send-email-zhaoshenglong@huawei.com>
+References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
+ <1449578860-15808-16-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <56670D7C.9070902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 December 2015 01:21:58 Masahiro Yamada wrote:
-> The UniPhier System Bus is an external that connects on-board devices
-> to the UniPhier SoC.  Each bank (chip select) is dynamically mapped
-> to the CPU-viewed address base via the bus controller.  The bus
-> controller must be configured before any access to the bus.
+On 08/12/15 12:47, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> This driver parses the "ranges" property of the System Bus node and
-> initialized the bus controller.  After the bus becomes ready, devices
-> below it are populated.
+> The reset value of PMUSERENR_EL0 is UNKNOWN, use reset_unknown.
 > 
-> Note:
-> Each bank can be mapped anywhere in the supported address space;
-> there is nothing preventing us from assigning bank 0 on 0x42000000,
-> 0x43000000, or anywhere as long as such region is not used by others.
-> So, the "ranges" is just one possible software configuration, which
-> does not seem to fit in device tree because device tree is a hardware
-> description language.  However, of_translate_address() requires
-> "ranges" in every bus node between CPUs and device mapped on the CPU
-> address space.  In other words, "ranges" properties must be statically
-> defined in device tree.  After some discussion, I decided the dynamic
-> address reassignment by the driver is too bothersome.  Instead, the
-> device tree should provide a reasonable translation setup that the OS
-> can rely on.
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Acked-by: Rob Herring <robh@kernel.org>
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index c830fde..80b66c0 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -880,7 +880,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  	  access_pmu_pmxevcntr },
+>  	/* PMUSERENR_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b000),
+> -	  trap_raz_wi },
+> +	  access_pmu_regs, reset_unknown, PMUSERENR_EL0 },
 
-Looks very nice.
+So while the 64bit view of the register resets as unknown, a CPU
+resetting in 32bit mode resets as 0. I suggest you reset it as zero, and
+document that choice. You may have to revisit all the other registers
+that do reset as unknown for 64bit as well.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+>  	/* PMOVSSET_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b011),
+>  	  access_pmu_regs, reset_unknown, PMOVSSET_EL0 },
+> @@ -1301,7 +1301,8 @@ static const struct sys_reg_desc cp15_regs[] = {
+>  	  NULL, c9_PMCCNTR },
+>  	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), access_pmu_pmxevtyper },
+>  	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), access_pmu_pmxevcntr },
+> -	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
+> +	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), access_pmu_cp15_regs,
+> +	  NULL,  c9_PMUSERENR, 0 },
+>  	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), access_pmu_cp15_regs,
+>  	  NULL, c9_PMINTENSET },
+>  	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), access_pmu_cp15_regs,
+> 
 
-Just a little thought about one thing I found odd:
+Thanks,
 
-> +static int uniphier_system_bus_check_overlap(
-> +					struct uniphier_system_bus_priv tmp)
-> +{
-
-Did you intentionally pass this by value? Maybe do it explicitly using a pointer
-and memcpy to a local variable, which has a similar effect. Alternatively
-just check each newly probed child node for conflicts with any of the
-previous children. That is slightly more expensive at O(n^2) instead of O(n)
-but n is always small here and you can avoid sorting first.
-
-	Arnd
+	M.
+-- 
+Jazz is not dead. It just smells funny...
