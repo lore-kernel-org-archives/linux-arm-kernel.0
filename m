@@ -1,69 +1,89 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Mon, 7 Dec 2015 19:03:20 -0600
-Subject: [PATCH] kexec: Add --lite option
-In-Reply-To: <20151207140755.GG16406@dhcppc13.redhat.com>
-References: <1445469125.30908.105.camel@infradead.org>
- <20151022031718.GB11227@dhcp-129-115.nay.redhat.com>
- <20151022125012.GB20847@redhat.com>
- <1445540891.30908.144.camel@infradead.org>
- <1446703011.12676.83.camel@freescale.com>
- <20151207114547.GE16406@dhcppc13.redhat.com>
- <20151207114839.GF16406@dhcppc13.redhat.com> <56658696.6070103@arm.com>
- <20151207140755.GG16406@dhcppc13.redhat.com>
-Message-ID: <1449536600.15946.102.camel@freescale.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 07 Dec 2015 17:04:58 -0800
+Subject: [PATCH v2 3/5] ARM: bcm2835: add rpi power domain driver
+In-Reply-To: <7hmvtln87l.fsf@deeprootsystems.com>
+References: <1449251148-19344-1-git-send-email-eric@anholt.net>
+ <1449251148-19344-4-git-send-email-eric@anholt.net>
+ <7hmvtln87l.fsf@deeprootsystems.com>
+Message-ID: <87fuzdiwcl.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-12-07 at 19:37 +0530, Pratyush Anand wrote:
-> Hi James,
-> 
-> Thanks for the reply.
-> 
-> On 07/12/2015:01:16:06 PM, James Morse wrote:
-> > Hi Pratyush,
-> > 
-> > On 07/12/15 11:48, Pratyush Anand wrote:
-> > > > 1) When we execute kexec() system call in first kernel, at that time
-> > > > it
-> > > > calculates sha256 on all the binaries [1]. It take almost un
-> > > > -noticeable time
-> > > > (less than a sec) there.
-> > > > 
-> > > > 2) When purgatory is executed then it re-calculates sha256 using same
-> > > > routines
-> > > > [2] on same binary data as that of case (1). But, now it takes 10-20
-> > > > sec
-> > > > (depending of size of binaries)?
-> > > > 
-> > > > Why did not it take same time with O2 + D-cache enabled? I think, we
-> > > > should be
-> > > > able to achieve same time in second case as well. What is missing?
-> > 
-> > I haven't benchmarked this, but:
-> > 
-> > util_lib/sha256.c contains calls out to memcpy().
-> > In your case 1, this will use the glibc version. In case 2, it will use
-> > the version implemented in purgatory/string.c, which is a byte-by-byte
-> > copy.
-> > 
-> 
-> Yes, I agree that byte copy is too slow. But, memcpy() in sha256_update()
-> will
-> copy only few bytes (I think max 126 bytes). Most of the data will be
-> processed
-> using loop while( length >= 64 ){}, where we do not have any memcpy.So, I do
-> not
-> think that this would be causing such a difference.
-> 
-> Could it be the case that I am not using perfect memory attributes while
-> setting
-> up identity mapping and enabling D-cache. My implementation is here:
-> https://github.com/pratyushanand/kexec-tools/commit/8efdbc56b52f99a8a074edd0
-> ddc519d7b68be82f
+Kevin Hilman <khilman@kernel.org> writes:
 
-FWIW, purgatory is fast for me on PPC (sub-second), so between that (assuming
-it's not due to some PPC-specific optimization) and the fact that you don't
-see any improvement with cache, I'd guess there's something wrong with how
-you're enabling caches.
+> Eric Anholt <eric@anholt.net> writes:
+>
+>> From: Alexander Aring <alex.aring@gmail.com>
+>>
+>> This patch adds support for several power domains on Raspberry Pi,
+>> including USB (so it can be enabled even if the bootloader didn't do
+>> it), and graphics.
+>>
+>> This patch is the combined work of Eric Anholt (who wrote USB support
+>> inside of the Raspberry Pi firmware driver, and wrote the non-USB
+>> domain support) and Alexander Aring (who separated the original USB
+>> work out from the firmware driver).
+>>
+>> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> ---
+>>
+>> v2: Add support for power domains other than USB, using the new
+>>     firmware interface, reword commit message (changes by Eric)
+>
+> [...]
+>
+>> +/*
+>> + * Firmware indices for the old power domains interface.  Only a few
+>> + * of them were actually implemented.
+>> + */
+>> +#define RPI_OLD_POWER_DOMAIN_USB		3
+>> +#define RPI_OLD_POWER_DOMAIN_V3D		10
+>> +
+>
+> Is "old" the right word here?  Are there firmware versions that could be
+> used instead?  What happens when the firwmware is updated next time?
 
--Scott
+Old is a good word.  It's the old interface.
+
+As for what happens when the firmware is updated: Nothing.  The firmware
+is updated all the time, and it maintains backwards compatibility.
+Unless you mean "what happens when a newer, fancier power domain
+interface is created and we need a name for the newer one" and the
+answer is "this is a define entirely within the driver, and we can just
+rename it when we want to."
+
+> [...]
+>
+>> +	/*
+>> +	 * Use the old firmware interface for USB power, so that we
+>> +	 * can turn it on even if the firmware hasn't been updated.
+>> +	 */
+>> +	rpi_init_old_power_domain(rpi_domains, RPI_POWER_DOMAIN_USB,
+>> +				  RPI_OLD_POWER_DOMAIN_USB, "USB");
+>
+> This seems a bit restrictive.
+>
+> To me, it seems that determining "old" or "new" (or revision of fw
+> interface to use) should be described in DT, not hard-coded in the power
+> domain driver.
+>
+> What about an additional DT property to describe that? or possibly
+> another cell in the domain which could be used to optionally set
+> old/legacy.
+
+As the author and maintainer of the code, I don't feel it's restrictive.
+The firmware protocol is defined and is guaranteed to continue to exist,
+it's only useful for this platform, and defining a new set of custom
+devicetree properties for it would only obfuscate the implementation.
+DT is a useful tool for separating out the between-board differences for
+the same piece of hardware across multiple implementations at different
+addresses, while this is neither hardware nor in multiple
+implementations at different addresses.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151207/f1555bb1/attachment.sig>
