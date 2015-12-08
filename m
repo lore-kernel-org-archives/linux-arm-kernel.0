@@ -1,92 +1,64 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 8 Dec 2015 14:07:20 +0000
-Subject: [PATCH v4] acpi, apei, arm64: APEI initial support for aarch64.
-In-Reply-To: <CADyBb7tByoke4PGZqcx_jHvgCK0xNTneod8WoVv7VmoSYii+hg@mail.gmail.com>
-References: <1449558183-12259-1-git-send-email-fu.wei@linaro.org>
- <20151208123433.GB404@red-moon> <5666D28C.4090305@linaro.org>
- <CADyBb7tByoke4PGZqcx_jHvgCK0xNTneod8WoVv7VmoSYii+hg@mail.gmail.com>
-Message-ID: <20151208140720.GA2395@red-moon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 08 Dec 2015 14:10:40 +0000
+Subject: [PATCH v6 02/21] KVM: ARM64: Define PMU data structure for each
+ vcpu
+In-Reply-To: <20151208135335.GK19612@arm.com>
+References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
+ <1449578860-15808-3-git-send-email-zhaoshenglong@huawei.com>
+ <5666DD0A.5060004@arm.com> <20151208135335.GK19612@arm.com>
+Message-ID: <5666E4E0.8050504@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 09:08:24PM +0800, Fu Wei wrote:
-> Hi Lorenzo,
+On 08/12/15 13:53, Will Deacon wrote:
+> On Tue, Dec 08, 2015 at 01:37:14PM +0000, Marc Zyngier wrote:
+>> On 08/12/15 12:47, Shannon Zhao wrote:
+>>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>>
+>>> Here we plan to support virtual PMU for guest by full software
+>>> emulation, so define some basic structs and functions preparing for
+>>> futher steps. Define struct kvm_pmc for performance monitor counter and
+>>> struct kvm_pmu for performance monitor unit for each vcpu. According to
+>>> ARMv8 spec, the PMU contains at most 32(ARMV8_MAX_COUNTERS) counters.
+>>>
+>>> Since this only supports ARM64 (or PMUv3), add a separate config symbol
+>>> for it.
+>>>
+>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>>> ---
+>>>  arch/arm64/include/asm/kvm_host.h |  2 ++
+>>>  arch/arm64/kvm/Kconfig            |  8 ++++++++
+>>>  include/kvm/arm_pmu.h             | 40 +++++++++++++++++++++++++++++++++++++++
+>>>  3 files changed, 50 insertions(+)
+>>>  create mode 100644 include/kvm/arm_pmu.h
 > 
+> [...]
 > 
+>>> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+>>> index a5272c0..66da9a2 100644
+>>> --- a/arch/arm64/kvm/Kconfig
+>>> +++ b/arch/arm64/kvm/Kconfig
+>>> @@ -36,6 +36,7 @@ config KVM
+>>>  	select HAVE_KVM_EVENTFD
+>>>  	select HAVE_KVM_IRQFD
+>>>  	select KVM_ARM_VGIC_V3
+>>> +	select KVM_ARM_PMU
+>>
+>> What if HW_PERF_EVENTS is not selected? Also, selecting HW_PERF_EVENTS
+>> is not enough, and you probably need PERF_EVENTS as well, So this should
+>> probably read:
+>>
+>> 	select KVM_ARM_PMU if (HW_PERF_EVENTS && PERF_EVENTS)
 > 
-> On 8 December 2015 at 20:52, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> > Hi Lorenzo,
-> >
-> > On 12/08/2015 08:34 PM, Lorenzo Pieralisi wrote:
-> >>
-> >> On Tue, Dec 08, 2015 at 03:03:03PM +0800, fu.wei at linaro.org wrote:
-> >>>
-> >>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> >>
-> >>
-> >> [...]
-> >>
-> >>> +#if defined(__i386__) || defined(__x86_64__)
-> >>>   /*
-> >>>    * Check if firmware advertises firmware first mode. We need FF bit to
-> >>> be set
-> >>>    * along with a set of MC banks which work in FF mode.
-> >>>    */
-> >>>   static int __init hest_parse_cmc(struct acpi_hest_header *hest_hdr,
-> >>> void *data)
-> >>>   {
-> >>> -       return arch_apei_enable_cmcff(hest_hdr, data);
-> >>> +       if (!acpi_disable_cmcff)
-> >>
-> >>
-> >> Why do not you define the flag above in this file (move it out of x86 -
-> >> that's what I was aiming at in my previous reply) and remove this
-> >> ifdeffery
-> >> altogether (First firmware handling could apply to arm64 too according to
-> >> specs and ACPI on arm64 guidelines) ?
-> >
-> >
-> > If I understand it correctly, CMC (Corrected Machine Check) is for IA32
-> > only, see section 18.3.2.1 IA-32 Architecture Machine Check Exception
-> > in ACPI 6.0. for ARM64, we can use other type of error source for
-> > firmware first handling, such as Generic Hardware Error Source, did
-> > I miss something?
-> 
-> yes, that is why I try to use "#if defined(__i386__) ||
-> defined(__x86_64__)" instead of moving acpi_disable_cmcff out of x86
-> code to here.
-> 
-> And I thinks we also can do "arch_apei_enable_cmcff" -->
-> "apei_enable_ia_cmcff" because that is IA32 only.
-> 
-> Please correct me if I misunderstand something.  Thanks :-)
+> HW_PERF_EVENTS depends on ARM_PMU which in turn depends on PERF_EVENTS.
 
-No you are right, I was confused by the arch_apei_enable_cmcff __weak
-function declaration, I am not sure that makes much sense, as you say.
+in which case, let's make it:
 
-Side note: I wonder if there is a way to make the TLB flushing API common
-across architectures therefore avoiding this arch_apei_flush_tlb* churn.
+	select KVM_ARM_PMU if HW_PERF_EVENTS
 
-Thanks,
-Lorenzo
+which should give us the minimal chain. I hate the kernel config
+language! ;-)
 
-> Great thanks for your feedback :-)
-> 
-> >
-> > Thanks
-> > Hanjun
-> 
-> 
-> 
-> -- 
-> Best regards,
-> 
-> Fu Wei
-> Software Engineer
-> Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
-> Ph: +86 21 61221326(direct)
-> Ph: +86 186 2020 4684 (mobile)
-> Room 1512, Regus One Corporate Avenue,Level 15,
-> One Corporate Avenue,222 Hubin Road,Huangpu District,
-> Shanghai,China 200021
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
