@@ -1,46 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 08 Dec 2015 16:18:51 +0100
-Subject: [PATCH] cifs: avoid unused variable and label
-Message-ID: <1626899.G9TJfXXyu0@wuerfel>
+Date: Tue, 08 Dec 2015 16:21:05 +0100
+Subject: [PATCH] mfd: as3722: mark PM functions as __maybe_unused
+Message-ID: <2162790.qeSmLiztNV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly introduced cifs_clone_file_range() function produces
-two harmless compile-time warnings:
+The newly introduced as3722_i2c_suspend/resume functions are built
+unconditionally, but only used when power management is enabled,
+so we get a warning otherwise:
 
-cifsfs.c: In function 'cifs_clone_file_range':
-cifsfs.c:963:1: warning: label 'out_unlock' defined but not used [-Wunused-label]
-cifsfs.c:924:20: warning: unused variable 'src_tcon' [-Wunused-variable]
+drivers/mfd/as3722.c:427:12: warning: 'as3722_i2c_suspend' defined but not used [-Wunused-function]
+drivers/mfd/as3722.c:438:12: warning: 'as3722_i2c_resume' defined but not used [-Wunused-function]
 
-In both cases, removing the extraneous line avoids the warning.
+This marks them both as __maybe_unused, which avoids an ugly #ifdef
+and gives us best compile-time coverage. When they are unused, the
+compiler will silently drop the functions from its output.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: c6f2a1e2e5f8 ("vfs: pull btrfs clone API to vfs layer")
+Fixes: 35deff7eb212 ("mfd: as3722: Handle interrupts on suspend")
 ---
- fs/cifs/cifsfs.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/mfd/as3722.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Found on ARM allmodconfig builds.
-
-diff --git a/fs/cifs/cifsfs.c b/fs/cifs/cifsfs.c
-index 5cc7f5390a2a..b4d1cca853fc 100644
---- a/fs/cifs/cifsfs.c
-+++ b/fs/cifs/cifsfs.c
-@@ -921,7 +921,6 @@ static int cifs_clone_file_range(struct file *src_file, loff_t off,
- 	struct inode *target_inode = file_inode(dst_file);
- 	struct cifsFileInfo *smb_file_src = src_file->private_data;
- 	struct cifsFileInfo *smb_file_target = dst_file->private_data;
--	struct cifs_tcon *src_tcon = tlink_tcon(smb_file_src->tlink);
- 	struct cifs_tcon *target_tcon = tlink_tcon(smb_file_target->tlink);
- 	unsigned int xid;
- 	int rc;
-@@ -960,7 +959,6 @@ static int cifs_clone_file_range(struct file *src_file, loff_t off,
- 	/* force revalidate of size and timestamps of target file now
- 	   that target is updated on the server */
- 	CIFS_I(target_inode)->time = 0;
--out_unlock:
- 	/* although unlocking in the reverse order from locking is not
- 	   strictly necessary here it is a little cleaner to be consistent */
- 	unlock_two_nondirectories(src_inode, target_inode);
+diff --git a/drivers/mfd/as3722.c b/drivers/mfd/as3722.c
+index 3b21eb4bc480..e1f597f97f86 100644
+--- a/drivers/mfd/as3722.c
++++ b/drivers/mfd/as3722.c
+@@ -424,7 +424,7 @@ static int as3722_i2c_remove(struct i2c_client *i2c)
+ 	return 0;
+ }
+ 
+-static int as3722_i2c_suspend(struct device *dev)
++static int __maybe_unused as3722_i2c_suspend(struct device *dev)
+ {
+ 	struct as3722 *as3722 = dev_get_drvdata(dev);
+ 
+@@ -435,7 +435,7 @@ static int as3722_i2c_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int as3722_i2c_resume(struct device *dev)
++static int __maybe_unused as3722_i2c_resume(struct device *dev)
+ {
+ 	struct as3722 *as3722 = dev_get_drvdata(dev);
+ 
 -- 
 2.1.0.rc2
