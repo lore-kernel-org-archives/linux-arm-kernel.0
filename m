@@ -1,215 +1,84 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 8 Dec 2015 20:47:40 +0800
-Subject: [PATCH v6 21/21] KVM: ARM64: Add a new kvm ARM PMU device
+Date: Tue, 8 Dec 2015 20:47:38 +0800
+Subject: [PATCH v6 19/21] KVM: ARM64: Reset PMU state when resetting vcpu
 In-Reply-To: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1449578860-15808-22-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1449578860-15808-20-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add a new kvm device type KVM_DEV_TYPE_ARM_PMU_V3 for ARM PMU. Implement
-the kvm_device_ops for it.
+When resetting vcpu, it needs to reset the PMU state to initial status.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- Documentation/virtual/kvm/devices/arm-pmu.txt | 16 +++++
- arch/arm64/include/uapi/asm/kvm.h             |  3 +
- include/linux/kvm_host.h                      |  1 +
- include/uapi/linux/kvm.h                      |  2 +
- virt/kvm/arm/pmu.c                            | 93 +++++++++++++++++++++++++++
- virt/kvm/kvm_main.c                           |  4 ++
- 6 files changed, 119 insertions(+)
- create mode 100644 Documentation/virtual/kvm/devices/arm-pmu.txt
+ arch/arm64/kvm/reset.c |  3 +++
+ include/kvm/arm_pmu.h  |  2 ++
+ virt/kvm/arm/pmu.c     | 17 +++++++++++++++++
+ 3 files changed, 22 insertions(+)
 
-diff --git a/Documentation/virtual/kvm/devices/arm-pmu.txt b/Documentation/virtual/kvm/devices/arm-pmu.txt
-new file mode 100644
-index 0000000..5121f1f
---- /dev/null
-+++ b/Documentation/virtual/kvm/devices/arm-pmu.txt
-@@ -0,0 +1,16 @@
-+ARM Virtual Performance Monitor Unit (vPMU)
-+===========================================
-+
-+Device types supported:
-+  KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
-+
-+Instantiate one PMU instance for per VCPU through this API.
-+
-+Groups:
-+  KVM_DEV_ARM_PMU_GRP_IRQ
-+  Attributes:
-+    A value describing the interrupt number of PMU overflow interrupt. This
-+    interrupt should be a PPI.
-+
-+  Errors:
-+    -EINVAL: Value set is out of the expected range (from 16 to 31)
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 2d4ca4b..568afa2 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -204,6 +204,9 @@ struct kvm_arch_memory_slot {
- #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
- #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index f34745c..dfbce78 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -120,6 +120,9 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	/* Reset system registers */
+ 	kvm_reset_sys_regs(vcpu);
  
-+/* Device Control API: ARM PMU */
-+#define KVM_DEV_ARM_PMU_GRP_IRQ		0
++	/* Reset PMU */
++	kvm_pmu_vcpu_reset(vcpu);
 +
- /* KVM_IRQ_LINE irq field index values */
- #define KVM_ARM_IRQ_TYPE_SHIFT		24
- #define KVM_ARM_IRQ_TYPE_MASK		0xff
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index c923350..608dea6 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -1161,6 +1161,7 @@ extern struct kvm_device_ops kvm_mpic_ops;
- extern struct kvm_device_ops kvm_xics_ops;
- extern struct kvm_device_ops kvm_arm_vgic_v2_ops;
- extern struct kvm_device_ops kvm_arm_vgic_v3_ops;
-+extern struct kvm_device_ops kvm_arm_pmu_ops;
- 
- #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
- 
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 03f3618..4ba6fdd 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -1032,6 +1032,8 @@ enum kvm_device_type {
- #define KVM_DEV_TYPE_FLIC		KVM_DEV_TYPE_FLIC
- 	KVM_DEV_TYPE_ARM_VGIC_V3,
- #define KVM_DEV_TYPE_ARM_VGIC_V3	KVM_DEV_TYPE_ARM_VGIC_V3
-+	KVM_DEV_TYPE_ARM_PMU_V3,
-+#define	KVM_DEV_TYPE_ARM_PMU_V3		KVM_DEV_TYPE_ARM_PMU_V3
- 	KVM_DEV_TYPE_MAX,
+ 	/* Reset timer */
+ 	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
+ }
+diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+index c4041008..e0f5bfe 100644
+--- a/include/kvm/arm_pmu.h
++++ b/include/kvm/arm_pmu.h
+@@ -38,6 +38,7 @@ struct kvm_pmu {
  };
  
+ #ifdef CONFIG_KVM_ARM_PMU
++void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu);
+ void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
+ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx);
+ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val);
+@@ -49,6 +50,7 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
+ 				    u32 select_idx);
+ void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u32 val);
+ #else
++void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu) {}
+ void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
+ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx)
+ {
 diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index f8007c7..a84a4d7 100644
+index ff182d6..01e8eb2 100644
 --- a/virt/kvm/arm/pmu.c
 +++ b/virt/kvm/arm/pmu.c
-@@ -19,10 +19,13 @@
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
- #include <linux/perf_event.h>
-+#include <linux/uaccess.h>
- #include <asm/kvm_emulate.h>
- #include <kvm/arm_pmu.h>
- #include <kvm/arm_vgic.h>
- 
-+#include "vgic.h"
-+
- /**
-  * kvm_pmu_get_counter_value - get PMU counter value
-  * @vcpu: The vcpu pointer
-@@ -438,3 +441,93 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
- 
- 	pmc->perf_event = event;
+@@ -91,6 +91,23 @@ static void kvm_pmu_stop_counter(struct kvm_pmc *pmc)
  }
-+
-+static inline bool kvm_arm_pmu_initialized(struct kvm_vcpu *vcpu)
-+{
-+	return vcpu->arch.pmu.irq_num != -1;
-+}
-+
-+static int kvm_arm_pmu_set_irq(struct kvm *kvm, int irq)
-+{
-+	int j;
-+	struct kvm_vcpu *vcpu;
-+
-+	kvm_for_each_vcpu(j, vcpu, kvm) {
-+		struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+
-+		if (!kvm_arm_pmu_initialized(vcpu))
-+			kvm_debug("Set kvm ARM PMU irq: %d\n", irq);
-+			pmu->irq_num = irq;
-+	}
-+
-+	return 0;
-+}
-+
-+static int kvm_arm_pmu_create(struct kvm_device *dev, u32 type)
+ 
+ /**
++ * kvm_pmu_vcpu_reset - reset pmu state for cpu
++ * @vcpu: The vcpu pointer
++ *
++ */
++void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu)
 +{
 +	int i;
-+	struct kvm_vcpu *vcpu;
-+	struct kvm *kvm = dev->kvm;
++	struct kvm_pmu *pmu = &vcpu->arch.pmu;
 +
-+	kvm_for_each_vcpu(i, vcpu, kvm) {
-+		struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+
-+		memset(pmu, 0, sizeof(*pmu));
-+		kvm_pmu_vcpu_reset(vcpu);
-+		pmu->irq_num = -1;
++	for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
++		kvm_pmu_stop_counter(&pmu->pmc[i]);
++		pmu->pmc[i].idx = i;
++		pmu->pmc[i].bitmask = 0xffffffffUL;
 +	}
-+
-+	return 0;
 +}
 +
-+static void kvm_arm_pmu_destroy(struct kvm_device *dev)
-+{
-+	kfree(dev);
-+}
-+
-+static int kvm_arm_pmu_set_attr(struct kvm_device *dev,
-+				struct kvm_device_attr *attr)
-+{
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_PMU_GRP_IRQ: {
-+		int __user *uaddr = (int __user *)(long)attr->addr;
-+		int reg;
-+
-+		if (get_user(reg, uaddr))
-+			return -EFAULT;
-+
-+		if (reg < VGIC_NR_SGIS || reg >= VGIC_NR_PRIVATE_IRQS)
-+			return -EINVAL;
-+
-+		return kvm_arm_pmu_set_irq(dev->kvm, reg);
-+	}
-+	}
-+
-+	return -ENXIO;
-+}
-+
-+static int kvm_arm_pmu_get_attr(struct kvm_device *dev,
-+				struct kvm_device_attr *attr)
-+{
-+	return 0;
-+}
-+
-+static int kvm_arm_pmu_has_attr(struct kvm_device *dev,
-+				struct kvm_device_attr *attr)
-+{
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_PMU_GRP_IRQ:
-+		return 0;
-+	}
-+
-+	return -ENXIO;
-+}
-+
-+struct kvm_device_ops kvm_arm_pmu_ops = {
-+	.name = "kvm-arm-pmu",
-+	.create = kvm_arm_pmu_create,
-+	.destroy = kvm_arm_pmu_destroy,
-+	.set_attr = kvm_arm_pmu_set_attr,
-+	.get_attr = kvm_arm_pmu_get_attr,
-+	.has_attr = kvm_arm_pmu_has_attr,
-+};
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index 484079e..81a42cc 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -2647,6 +2647,10 @@ static struct kvm_device_ops *kvm_device_ops_table[KVM_DEV_TYPE_MAX] = {
- #ifdef CONFIG_KVM_XICS
- 	[KVM_DEV_TYPE_XICS]		= &kvm_xics_ops,
- #endif
-+
-+#ifdef CONFIG_KVM_ARM_PMU
-+	[KVM_DEV_TYPE_ARM_PMU_V3]	= &kvm_arm_pmu_ops,
-+#endif
- };
- 
- int kvm_register_device_ops(struct kvm_device_ops *ops, u32 type)
++/**
+  * kvm_pmu_flush_hwstate - flush pmu state to cpu
+  * @vcpu: The vcpu pointer
+  *
 -- 
 2.0.4
