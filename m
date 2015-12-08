@@ -1,68 +1,30 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Tue, 8 Dec 2015 10:59:53 +1100
-Subject: [linux-sunxi] [PATCH 21/23] staging: mt29f_spinand: switch to
- mtd_ooblayout_ops
-In-Reply-To: <1449527178-5930-22-git-send-email-boris.brezillon@free-electrons.com>
-References: <1449527178-5930-1-git-send-email-boris.brezillon@free-electrons.com>
- <1449527178-5930-22-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <CAGRGNgV09JJ7+hDVJwZcp89nEsgNS6r2Mo1_R+EEAT9=aR-Z_g@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 7 Dec 2015 16:14:06 -0800
+Subject: [PATCH 0/2] ARM: dts: Use MMC pwrseq instead regulators for IGEP
+ WiFi init
+In-Reply-To: <CAFqH_536_sG7fju=u39aMKmzXt8KDCxU1-dFM03H060zbh5qxw@mail.gmail.com>
+References: <1449165729-993-1-git-send-email-javier@osg.samsung.com>
+ <20151203181624.GW23396@atomide.com>
+ <566089E1.7050805@osg.samsung.com>
+ <20151203192719.GZ23396@atomide.com>
+ <CAFqH_536_sG7fju=u39aMKmzXt8KDCxU1-dFM03H060zbh5qxw@mail.gmail.com>
+Message-ID: <20151208001406.GS23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+* Enric Balletbo Serra <eballetbo@gmail.com> [151204 06:40]:
+> 2015-12-03 20:27 GMT+01:00 Tony Lindgren <tony@atomide.com>:
+> > * Javier Martinez Canillas <javier@osg.samsung.com> [151203 10:29]:
+> >
+> >> Since is working for the boards with the libertas chip, I preferred
+> >> to remove the DTS hack but left the boards with wlcore chip since
+> >> you said the startup-delay-us is needed there (but probably we should
+> >> add to the regulators in the boards that don't have it then).
+> >
+> > OK
+> 
+> I guess will be interesting cc'ing the ISEE people. Added Agusti and Pau.
 
-On Tue, Dec 8, 2015 at 9:26 AM, Boris Brezillon
-<boris.brezillon@free-electrons.com> wrote:
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  drivers/staging/mt29f_spinand/mt29f_spinand.c | 44 ++++++++++++++++-----------
->  1 file changed, 26 insertions(+), 18 deletions(-)
->
-> diff --git a/drivers/staging/mt29f_spinand/mt29f_spinand.c b/drivers/staging/mt29f_spinand/mt29f_spinand.c
-> index cb9d5ab..967d50a 100644
-> --- a/drivers/staging/mt29f_spinand/mt29f_spinand.c
-> +++ b/drivers/staging/mt29f_spinand/mt29f_spinand.c
-> @@ -42,23 +42,29 @@ static inline struct spinand_state *mtd_to_state(struct mtd_info *mtd)
->  static int enable_hw_ecc;
->  static int enable_read_hw_ecc;
->
-> -static struct nand_ecclayout spinand_oob_64 = {
-> -       .eccbytes = 24,
-> -       .eccpos = {
-> -               1, 2, 3, 4, 5, 6,
-> -               17, 18, 19, 20, 21, 22,
-> -               33, 34, 35, 36, 37, 38,
-> -               49, 50, 51, 52, 53, 54, },
-> -       .oobfree = {
-> -               {.offset = 8,
-> -                       .length = 8},
-> -               {.offset = 24,
-> -                       .length = 8},
-> -               {.offset = 40,
-> -                       .length = 8},
-> -               {.offset = 56,
-> -                       .length = 8},
-> -       }
-> +static int spinand_oob_64_eccpos(struct mtd_info *mtd, int eccbyte)
-> +{
-> +       if (eccbyte > 23)
-> +               return -ERANGE;
-> +
-> +       return ((eccbyte / 6) * 16) + 1;
+Applying these both into omap-for-v4.5/dt thanks.
 
-Are you sure this is correct? My reading of this is that we'd get 1
-for eccbytes 0 through 5.
-
-Would
-
-((eccbyte / 6) * 16) + (eccbyte % 6) + 1
-
-be more correct?
-
-Thanks,
-
--- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+Tony
