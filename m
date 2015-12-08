@@ -1,47 +1,175 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 8 Dec 2015 14:29:33 +0100
-Subject: [PATCH v3 3/7] arm64: split off early mapping code from
- early_fixmap_init()
-In-Reply-To: <20151208124016.GH19612@arm.com>
-References: <1447672998-20981-1-git-send-email-ard.biesheuvel@linaro.org>
- <1447672998-20981-4-git-send-email-ard.biesheuvel@linaro.org>
- <20151203121840.GB28731@leverpostej>
- <20151208124016.GH19612@arm.com>
-Message-ID: <CAKv+Gu-gvCy73ake0WFErYwP5f5pRAcXs_S1epiG53xs+Fz7Sg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 08 Dec 2015 13:37:14 +0000
+Subject: [PATCH v6 02/21] KVM: ARM64: Define PMU data structure for each
+ vcpu
+In-Reply-To: <1449578860-15808-3-git-send-email-zhaoshenglong@huawei.com>
+References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
+ <1449578860-15808-3-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <5666DD0A.5060004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 December 2015 at 13:40, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Dec 03, 2015 at 12:18:40PM +0000, Mark Rutland wrote:
->> Apologies that it's taken me so long to get around to this...
->>
->> On Mon, Nov 16, 2015 at 12:23:14PM +0100, Ard Biesheuvel wrote:
->> > This splits off and generalises the population of the statically
->> > allocated fixmap page tables so that we may reuse it later for
->> > the linear mapping once we move the kernel text mapping out of it.
->> >
->> > This also involves taking into account that table entries at any of
->> > the levels we are populating may have been populated already, since
->> > the fixmap mapping might not be disjoint up to the pgd level anymore
->> > from other early mappings.
->>
->> As a heads-up, for avoiding TLB conflicts, I'm currently working on
->> alternative way of creating the kernel page tables which will definitely
->> conflict here, and may or may not supercede this approach.
->
-> Given that the Christmas break is around the corner and your TLB series
-> is probably going to take some time to get right, I suggest we persevere
-> with Ard's current patch series for 4.5 and merge the TLB conflict solution
-> for 4.6. I don't want us to end up in a situation where this is needlessly
-> blocked on something that isn't quite ready.
->
-> Any objections? If not, Ard -- can you post a new version of this, please?
->
+On 08/12/15 12:47, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Here we plan to support virtual PMU for guest by full software
+> emulation, so define some basic structs and functions preparing for
+> futher steps. Define struct kvm_pmc for performance monitor counter and
+> struct kvm_pmu for performance monitor unit for each vcpu. According to
+> ARMv8 spec, the PMU contains at most 32(ARMV8_MAX_COUNTERS) counters.
+> 
+> Since this only supports ARM64 (or PMUv3), add a separate config symbol
+> for it.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/include/asm/kvm_host.h |  2 ++
+>  arch/arm64/kvm/Kconfig            |  8 ++++++++
+>  include/kvm/arm_pmu.h             | 40 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 50 insertions(+)
+>  create mode 100644 include/kvm/arm_pmu.h
+> 
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index a35ce72..42e15bb 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -37,6 +37,7 @@
+>  
+>  #include <kvm/arm_vgic.h>
+>  #include <kvm/arm_arch_timer.h>
+> +#include <kvm/arm_pmu.h>
+>  
+>  #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
+>  
+> @@ -132,6 +133,7 @@ struct kvm_vcpu_arch {
+>  	/* VGIC state */
+>  	struct vgic_cpu vgic_cpu;
+>  	struct arch_timer_cpu timer_cpu;
+> +	struct kvm_pmu pmu;
+>  
+>  	/*
+>  	 * Anything that is not used directly from assembly code goes
+> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+> index a5272c0..66da9a2 100644
+> --- a/arch/arm64/kvm/Kconfig
+> +++ b/arch/arm64/kvm/Kconfig
+> @@ -36,6 +36,7 @@ config KVM
+>  	select HAVE_KVM_EVENTFD
+>  	select HAVE_KVM_IRQFD
+>  	select KVM_ARM_VGIC_V3
+> +	select KVM_ARM_PMU
 
-Happy to post a new version, with the following remarks
-- my current private tree has evolved in the mean time, and I am now
-putting the kernel image at the base of the vmalloc region (and the
-module region right before)
-- I think Mark's changes would allow me to deobfuscate the VA bias
-that redirects __va() translations into the kernel VA space rather
-than the linear mapping
+What if HW_PERF_EVENTS is not selected? Also, selecting HW_PERF_EVENTS
+is not enough, and you probably need PERF_EVENTS as well, So this should
+probably read:
+
+	select KVM_ARM_PMU if (HW_PERF_EVENTS && PERF_EVENTS)
+
+>  	---help---
+>  	  Support hosting virtualized guest machines.
+>  	  We don't support KVM with 16K page tables yet, due to the multiple
+> @@ -48,6 +49,13 @@ config KVM_ARM_HOST
+>  	---help---
+>  	  Provides host support for ARM processors.
+>  
+> +config KVM_ARM_PMU
+> +	bool
+> +	depends on KVM_ARM_HOST && HW_PERF_EVENTS
+
+and this line should be dropped.
+
+> +	---help---
+> +	  Adds support for a virtual Performance Monitoring Unit (PMU) in
+> +	  virtual machines.
+> +
+>  source drivers/vhost/Kconfig
+>  
+>  endif # VIRTUALIZATION
+> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+> new file mode 100644
+> index 0000000..dea78f8
+> --- /dev/null
+> +++ b/include/kvm/arm_pmu.h
+> @@ -0,0 +1,40 @@
+> +/*
+> + * Copyright (C) 2015 Linaro Ltd.
+> + * Author: Shannon Zhao <shannon.zhao@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef __ASM_ARM_KVM_PMU_H
+> +#define __ASM_ARM_KVM_PMU_H
+> +
+> +#include <linux/perf_event.h>
+> +#ifdef CONFIG_KVM_ARM_PMU
+> +#include <asm/pmu.h>
+> +#endif
+> +
+> +struct kvm_pmc {
+> +	u8 idx;/* index into the pmu->pmc array */
+> +	struct perf_event *perf_event;
+> +	u64 bitmask;
+> +};
+> +
+> +struct kvm_pmu {
+> +#ifdef CONFIG_KVM_ARM_PMU
+> +	/* PMU IRQ Number per VCPU */
+> +	int irq_num;
+> +	struct kvm_pmc pmc[ARMV8_MAX_COUNTERS];
+> +#endif
+> +};
+> +
+> +#endif
+> 
+
+The repetition of #ifdef CONFIG_KVM_ARM_PMU is a bit ugly. How about
+something like this instead:
+
+#ifndef __ASM_ARM_KVM_PMU_H
+#define __ASM_ARM_KVM_PMU_H
+
+#ifdef CONFIG_KVM_ARM_PMU
+
+#include <linux/perf_event.h>
+#include <asm/pmu.h>
+
+struct kvm_pmc {
+	u8 idx;/* index into the pmu->pmc array */
+	struct perf_event *perf_event;
+	u64 bitmask;
+};
+
+struct kvm_pmu {
+	/* PMU IRQ Number per VCPU */
+	int irq_num;
+	struct kvm_pmc pmc[ARMV8_MAX_COUNTERS];
+};
+
+#else
+
+struct kvm_pmu {
+};
+
+#endif
+
+#endif
+
+and you can then populate the rest of the function prototype and stubs
+where needed.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
