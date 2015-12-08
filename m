@@ -1,41 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 08 Dec 2015 11:05:08 +0100
-Subject: [PATCH v2 0/7] ARM: orion5x/mv78xx0 multiplatform
-In-Reply-To: <871taycgww.fsf@free-electrons.com>
-References: <1449091629-2155735-1-git-send-email-arnd@arndb.de>
- <871taycgww.fsf@free-electrons.com>
-Message-ID: <8701651.rk8MftG23Y@wuerfel>
+Date: Tue, 08 Dec 2015 11:03:51 +0100
+Subject: [PATCH v5 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
+In-Reply-To: <5665CF5A.1090207@android.com>
+References: <1449000658-11475-1-git-send-email-dcashman@android.com>
+ <1720878.JdEcLd8bhL@wuerfel> <5665CF5A.1090207@android.com>
+Message-ID: <7610963.Sys3aageLY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 December 2015 18:22:39 Gregory CLEMENT wrote:
->  On mer., d?c. 02 2015, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > I've updated the series slightly to leave out the last two patches for
-> > mach-dove. I think the MULTI_IRQ_HANDLER and SPARSE_IRQ use is useful
-> > to have for all three platforms for consistency, and the watchdog change
-> > is required to get orion5x to work right.
-> >
-> > Please have another look.
-> >
-> > I've also uploaded this series to
-> >
-> > git://git.kernel.org/pub/scm/linux/kernel/git/arnd/playground.git multiplatform-orion-4.3
-> >
-> > again, that version is based on v4.3, while the patches in these mails
-> > are based on v4.4-rc3.
-> >
-> > I've left Andrew's Ack in place, hope that's ok.
-> >
-> 
-> I applied the series on mvebu/soc and I will try to see if I can test it
-> on an mv78xx0 board.
-> 
-> I applied the series on v4.4-rc1, so I had to merge "manually" the
-> second patch. If everything goes well, should I use the v4.4-rc3 as
-> reference for the pull request?
+On Monday 07 December 2015 10:26:34 Daniel Cashman wrote:
+> > Ideally we'd remove the #ifdef around the mmap_rnd_compat_bits declaration
+> > and change this code to use
+> > 
+> >       if (IS_ENABLED(CONFIG_COMPAT) && test_thread_flag(TIF_32BIT))
+> > 
+> That would result in "undefined reference to mmap_rnd_compat_bits" in
+> the not-defined case, no?
 
--rc1, -rc2 and -rc3 are all fine, but I'd like to avoid pulling
-in later -rc releases.
+No. The compiler eliminates all code paths that it knows are unused.
+The IS_ENABLED() macro is designed to let the compiler figure this out.
 
 	Arnd
