@@ -1,34 +1,38 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 08 Dec 2015 10:38:10 +0000
-Subject: [PATCH v3 3/3] ARM: dts: dove: add Dove divider clocks
-Message-ID: <E1a6Fes-0004dw-A8@rmk-PC.arm.linux.org.uk>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 08 Dec 2015 10:39:47 +0000
+Subject: [PATCH v3 10/10] arm64: kernel: Add support for
+ hibernate/suspend-to-disk.
+In-Reply-To: <20151201093143.GD21222@amd>
+References: <1448559168-8363-1-git-send-email-james.morse@arm.com>
+ <1448559168-8363-11-git-send-email-james.morse@arm.com>
+ <20151201093143.GD21222@amd>
+Message-ID: <5666B373.8070306@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the Dove divider clocks to the Dove dtsi file.
+Hi Pavel,
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/boot/dts/dove.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+On 01/12/15 09:31, Pavel Machek wrote:
+>> diff --git a/arch/arm64/include/asm/suspend.h b/arch/arm64/include/asm/suspend.h
+>> index 5faa3ce1fa3a..e75ad7aa268c 100644
+>> --- a/arch/arm64/include/asm/suspend.h
+>> +++ b/arch/arm64/include/asm/suspend.h
+>> @@ -1,3 +1,5 @@
+>> +#include <linux/suspend.h>
+>> +
+>>  #ifndef __ASM_SUSPEND_H
+>>  #define __ASM_SUSPEND_H
+>>
+> 
+> Actually... even additional includes should go after the #ifdef
+> guards.
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 179121630ad7..ea36a262d056 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -459,6 +459,12 @@
- 					#clock-cells = <1>;
- 				};
- 
-+				divider_clk: core-clock at 0064 {
-+					compatible = "marvell,dove-divider-clock";
-+					reg = <0x0064 0x8>;
-+					#clock-cells = <1>;
-+				};
-+
- 				pinctrl: pin-ctrl at 0200 {
- 					compatible = "marvell,dove-pinctrl";
- 					reg = <0x0200 0x14>,
--- 
-2.1.0
+Ooops - thanks for spotting that! I will send a fixup.
+
+(I'm expecting to publish a new version if there are newer versions of
+the four patches shared with kexec.)
+
+
+Thanks,
+
+James
