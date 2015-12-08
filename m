@@ -1,202 +1,118 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 8 Dec 2015 09:01:31 -0600
-Subject: [PATCH v10 05/17] dt-bindings: add document for analogix display
- port driver
-In-Reply-To: <1449470347-31062-1-git-send-email-ykk@rock-chips.com>
-References: <1449470239-30667-1-git-send-email-ykk@rock-chips.com>
- <1449470347-31062-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <20151208150131.GA8646@rob-hp-laptop>
+From: majun258@huawei.com (majun)
+Date: Tue, 8 Dec 2015 10:01:19 -0500
+Subject: [PATCH v9 1/4] dt-binding:Documents of the mbigen bindings
+In-Reply-To: <56606C02.3050702@arm.com>
+References: <1448248513-39760-1-git-send-email-majun258@huawei.com>
+ <1448248513-39760-2-git-send-email-majun258@huawei.com>
+ <56606C02.3050702@arm.com>
+Message-ID: <5666F0BF.3010103@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 02:39:07PM +0800, Yakir Yang wrote:
-> Analogix dp driver is split from exynos dp driver, so we just
-> make an copy of exynos_dp.txt, and then simplify exynos_dp.txt
-> 
-> Beside update some exynos dtsi file with the latest change
-> according to the devicetree binding documents.
-> 
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Hi Mark?
+	Do you have any comments about this patch?
+Thanks!
+Ma Jun
 
-Acked-by: Rob Herring <robh@kernel.org>
-
-> ---
-> Changes in v10: None
-> Changes in v9: None
-> Changes in v8:
-> - Correct the right document path of display-timing.txt (Heiko)
-> - Correct the misspell of 'from' to 'frm'. (Heiko)
+On 2015/12/3 11:21, Marc Zyngier wrote:
+> On 23/11/15 03:15, MaJun wrote:
+>> From: Ma Jun <majun258@huawei.com>
+>>
+>> Add the mbigen msi interrupt controller bindings document.
+>>
+>> This patch based on Mark Rutland's patch
+>> https://lkml.org/lkml/2015/7/23/558
+>>
+>> Signed-off-by: Ma Jun <majun258@huawei.com>
+>> ---
 > 
-> Changes in v7: None
-> Changes in v6: None
-> Changes in v5: None
-> Changes in v4:
-> - Split all DTS changes, and provide backward compatibility. Mark old
->   properties as deprecated but still support them. (Krzysztof)
-> - Update "analogix,hpd-gpio" to "hpd-gpios" prop name. (Rob)
-> - Deprecated some properties which could parsed from Edid/Mode/DPCD. (Thierry)
->     "analogix,color-space" & "analogix,color-depth"   &
->     "analogix,link-rate"   & "analogix,lane-count"    &
->     "analogix,ycbcr-coeff" & "analogix,dynamic-range" &
->     "vsync-active-high"    & "hsync-active-high"      & "interlaces"
+> Mark,
 > 
-> Changes in v3:
-> - Add devicetree binding documents. (Heiko)
-> - Remove sync pol & colorimetry properies from the new analogix dp driver
->   devicetree binding. (Thierry)
-> - Update the exist exynos dtsi file with the latest DP DT properies.
+> Do you mind having a look at this from a DT perspective?
 > 
-> Changes in v2: None
+> Thanks,
 > 
->  .../bindings/display/bridge/analogix_dp.txt        | 50 +++++++++++++++++
->  .../bindings/display/exynos/exynos_dp.txt          | 65 ++++++++--------------
->  2 files changed, 72 insertions(+), 43 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
+> 	M.
 > 
-> diff --git a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-> new file mode 100644
-> index 0000000..7659a7a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-> @@ -0,0 +1,50 @@
-> +Analogix Display Port bridge bindings
-> +
-> +Required properties for dp-controller:
-> +	-compatible:
-> +		platform specific such as:
-> +		 * "samsung,exynos5-dp"
-> +		 * "rockchip,rk3288-dp"
-> +	-reg:
-> +		physical base address of the controller and length
-> +		of memory mapped region.
-> +	-interrupts:
-> +		interrupt combiner values.
-> +	-clocks:
-> +		from common clock binding: handle to dp clock.
-> +	-clock-names:
-> +		from common clock binding: Shall be "dp".
-> +	-interrupt-parent:
-> +		phandle to Interrupt combiner node.
-> +	-phys:
-> +		from general PHY binding: the phandle for the PHY device.
-> +	-phy-names:
-> +		from general PHY binding: Should be "dp".
-> +
-> +Optional properties for dp-controller:
-> +	-hpd-gpios:
-> +		Hotplug detect GPIO.
-> +		Indicates which GPIO should be used for hotplug detection
-> +	-port@[X]: SoC specific port nodes with endpoint definitions as defined
-> +		in Documentation/devicetree/bindings/media/video-interfaces.txt,
-> +		please refer to the SoC specific binding document:
-> +		* Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-> +		* Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt
-> +
-> +
-> +[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
-> +-------------------------------------------------------------------------------
-> +
-> +Example:
-> +
-> +	dp-controller {
-> +		compatible = "samsung,exynos5-dp";
-> +		reg = <0x145b0000 0x10000>;
-> +		interrupts = <10 3>;
-> +		interrupt-parent = <&combiner>;
-> +		clocks = <&clock 342>;
-> +		clock-names = "dp";
-> +
-> +		phys = <&dp_phy>;
-> +		phy-names = "dp";
-> +	};
-> diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-> index 64693f2..9905081 100644
-> --- a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-> +++ b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-> @@ -31,45 +31,31 @@ Required properties for dp-controller:
->  		from general PHY binding: the phandle for the PHY device.
->  	-phy-names:
->  		from general PHY binding: Should be "dp".
-> -	-samsung,color-space:
-> -		input video data format.
-> -			COLOR_RGB = 0, COLOR_YCBCR422 = 1, COLOR_YCBCR444 = 2
-> -	-samsung,dynamic-range:
-> -		dynamic range for input video data.
-> -			VESA = 0, CEA = 1
-> -	-samsung,ycbcr-coeff:
-> -		YCbCr co-efficients for input video.
-> -			COLOR_YCBCR601 = 0, COLOR_YCBCR709 = 1
-> -	-samsung,color-depth:
-> -		number of bits per colour component.
-> -			COLOR_6 = 0, COLOR_8 = 1, COLOR_10 = 2, COLOR_12 = 3
-> -	-samsung,link-rate:
-> -		link rate supported by the panel.
-> -			LINK_RATE_1_62GBPS = 0x6, LINK_RATE_2_70GBPS = 0x0A
-> -	-samsung,lane-count:
-> -		number of lanes supported by the panel.
-> -			LANE_COUNT1 = 1, LANE_COUNT2 = 2, LANE_COUNT4 = 4
-> -	- display-timings: timings for the connected panel as described by
-> -		Documentation/devicetree/bindings/display/display-timing.txt
->  
->  Optional properties for dp-controller:
-> -	-interlaced:
-> -		interlace scan mode.
-> -			Progressive if defined, Interlaced if not defined
-> -	-vsync-active-high:
-> -		VSYNC polarity configuration.
-> -			High if defined, Low if not defined
-> -	-hsync-active-high:
-> -		HSYNC polarity configuration.
-> -			High if defined, Low if not defined
-> -	-samsung,hpd-gpio:
-> -		Hotplug detect GPIO.
-> -			Indicates which GPIO should be used for hotplug
-> -			detection
-> -	-video interfaces: Device node can contain video interface port
-> -			    nodes according to [1].
-> +	- display-timings: timings for the connected panel as described by
-> +		Documentation/devicetree/bindings/display/panel/display-timing.txt
-> +
-> +For the below properties, please refer to Analogix DP binding document:
-> + * Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-> +	-phys (required)
-> +	-phy-names (required)
-> +	-hpd-gpios (optional)
-> +	-video interfaces (optional)
->  
-> -[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
-> +Deprecated properties for DisplayPort:
-> +-interlaced:            deprecated prop that can parsed from drm_display_mode.
-> +-vsync-active-high:     deprecated prop that can parsed from drm_display_mode.
-> +-hsync-active-high:     deprecated prop that can parsed from drm_display_mode.
-> +-samsung,ycbcr-coeff:   deprecated prop that can parsed from drm_display_mode.
-> +-samsung,dynamic-range: deprecated prop that can parsed from drm_display_mode.
-> +-samsung,color-space:   deprecated prop that can parsed from drm_display_info.
-> +-samsung,color-depth:   deprecated prop that can parsed from drm_display_info.
-> +-samsung,link-rate:     deprecated prop that can reading from monitor by dpcd method.
-> +-samsung,lane-count:    deprecated prop that can reading from monitor by dpcd method.
-> +-samsung,hpd-gpio:      deprecated name for hpd-gpios.
-> +
-> +-------------------------------------------------------------------------------
->  
->  Example:
->  
-> @@ -88,13 +74,6 @@ SOC specific portion:
->  
->  Board Specific portion:
->  	dp-controller {
-> -		samsung,color-space = <0>;
-> -		samsung,dynamic-range = <0>;
-> -		samsung,ycbcr-coeff = <0>;
-> -		samsung,color-depth = <1>;
-> -		samsung,link-rate = <0x0a>;
-> -		samsung,lane-count = <4>;
-> -
->  		display-timings {
->  			native-mode = <&lcd_timing>;
->  			lcd_timing: 1366x768 {
-> -- 
-> 1.9.1
+>>  Documentation/devicetree/bindings/arm/mbigen.txt |   69 ++++++++++++++++++++++
+>>  1 files changed, 69 insertions(+), 0 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/mbigen.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/mbigen.txt b/Documentation/devicetree/bindings/arm/mbigen.txt
+>> new file mode 100644
+>> index 0000000..8ae59a9
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/mbigen.txt
+>> @@ -0,0 +1,69 @@
+>> +Hisilicon mbigen device tree bindings.
+>> +=======================================
+>> +
+>> +Mbigen means: message based interrupt generator.
+>> +
+>> +MBI is kind of msi interrupt only used on Non-PCI devices.
+>> +
+>> +To reduce the wired interrupt number connected to GIC,
+>> +Hisilicon designed mbigen to collect and generate interrupt.
+>> +
+>> +
+>> +Non-pci devices can connect to mbigen and generate the
+>> +interrupt by writing ITS register.
+>> +
+>> +The mbigen chip and devices connect to mbigen have the following properties:
+>> +
+>> +Mbigen main node required properties:
+>> +-------------------------------------------
+>> +- compatible: Should be "hisilicon,mbigen-v2"
+>> +- reg: Specifies the base physical address and size of the Mbigen
+>> +  registers.
+>> +- interrupt controller: Identifies the node as an interrupt controller
+>> +- msi-parent: This property has two cells.
+>> +	The 1st cell specifies the ITS this device connected.
+>> +	The 2nd cell specifies the device id.
+>> +- num-msis:Specifies the total number of interrupt this device has.
+>> +- #interrupt-cells : Specifies the number of cells needed to encode an
+>> +  interrupt source. The value must be 2.
+>> +
+>> +  The 1st cell is global hardware pin number of the interrupt.
+>> +	This value depends on the Soc design.
+>> +
+>> +  The 2nd cell is the interrupt trigger type.
+>> +	The value of this cell should be:
+>> +	1: rising edge triggered
+>> +	or
+>> +	4: high level triggered	
+>> +
+>> +Examples:
+>> +
+>> + 	mbigen_device_gmac:intc {
+>> +			compatible = "hisilicon,mbigen-v2";
+>> +			reg = <0x0 0xc0080000 0x0 0x10000>;
+>> +			interrupt-controller;
+>> +			msi-parent = <&its_dsa 0x40b1c>;
+>> +			num-msis = <9>;
+>> +			#interrupt-cells = <2>;
+>> + 	};
+>> +
+>> +Devices connect to mbigen required properties:
+>> +----------------------------------------------------
+>> +-interrupt-parent: Specifies the mbigen device node which device connected.
+>> +-interrupts:specifies the interrupt source.
+>> +  The 1st cell is global hardware pin number of the interrupt.
+>> +		This value depends on the Soc design.
+>> +  The 2nd cell is the interrupt trigger type(rising edge triggered or high
+>> +		level triggered)
+>> +
+>> +Examples:
+>> +	gmac0: ethernet at c2080000 {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +		reg = <0 0xc2080000 0 0x20000>,
+>> +		      <0 0xc0000000 0 0x1000>;
+>> +		interrupt-parent  = <&mbigen_device_gmac>;
+>> +		interrupts =	<656 1>,
+>> +				<657 1>;
+>> +	};
+>> +
+>>
 > 
 > 
