@@ -1,185 +1,163 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Tue, 8 Dec 2015 12:19:05 -0800
-Subject: [PATCH v4 5/5] gicv2m: acpi: Introducing GICv2m ACPI support
-In-Reply-To: <1449605945-10707-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1449605945-10707-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1449605945-10707-6-git-send-email-Suravee.Suthikulpanit@amd.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 8 Dec 2015 13:24:01 -0700
+Subject: [PATCH V6 00/26] Coresight integration with perf
+In-Reply-To: <1449176702-13213-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1449176702-13213-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <CANLsYkwKW+fJG5=CkR66izPbAx=hWa-COA2_Xz8tgxMdZ7hNUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces gicv2m_acpi_init(), which uses information
-in MADT GIC MSI frames structure to initialize GICv2m driver.
+On 3 December 2015 at 14:04, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+> This patchset aims to integrate configuration and control of
+> the Coresight tracers with the perf sub-system.
+>
+> The goal is to use PMUs to represent tracers and the auxiliary
+> buffer enhancement to collect processor traces.  As such a lot
+> of work is done to move the current Coresight sysFS oriented
+> configuration and control commands to perf's AUX API.
+>
+> For the time being the work concentrates on ETMv3 and ETB1.0
+> sink buffer.  Work on ETMv4 and other type of sink buffers
+> will follow once a foundation has been established.
+>
+> Best regards,
+> Mathieu
+>
+> Changes since V5:
+> * Addressed Arnaldo's comment about using a struct perf_evlist rather
+>   than a struct perf_session.
+> * Addressed kbuild test robot's anomaly report [1].
+> * Moved perf_aux_output_{begin|end} to etm_event_{start|stop} in
+>   accordance with [2].
+>
+> [1]. https://lkml.org/lkml/2015/11/30/46
+> [2]. http://thread.gmane.org/gmane.linux.kernel/2099328/focus=2099343
+>
+> Changes since V4:
+> * Reworked the way event configuration information is kept, fixing
+>   a few corner cases when doing per CPU tracing.
+> * Rebased on 4.4-rc1.
+> * Added 'Cc' to specific perf related patches in the hope of suscitating
+>   interest from reviewers, i.e perf maintainers.
+>
+> Changes since V3:
+> * Rebased to GKH's char-misc-next tree (e2d8680741ed).
+>
+> Changes since V2:
+> * Rebased to v4.3.
+> * Used the -M option to "git format-patch".
+> * Decoupled tracers and path - both are now completely independent.
+> * Moved path enablement/release to Perf's add/del functions.
+> * Moved PM runtime operations to the coresight core rather than
+>   individual drivers.
+> * Enhanced mutual exclusion scheme between perf and sysFS.
+> * Removed architecture specific define in perf cmd line tool.
+> * Got rid of unused fields in structure 'cs_buffers'.
+> * Enhanced changelog for patch 16/26.
+>
+> Changes since V1:
+>  * Fixed typos in typographical error in documentation.
+>  * Moved to a multi session support scheme.
+>  * Split static and dynamic tracer configuration.
+>  * Fixed configuration for user and kernel space tracing.
+>  * Using WARN_ON_ONCE() rather than WARN_ON().
+>  * Implemented strategy to prevent tracers from being used simultaneously.
+>  * Changed sink_ops::unset_buffer() to sink_ops::reset_buffer().
+>  * Moves ETM's sysFS interface from driver core to dedicated file.
+>  * Removed spinlock in "etm_cpu_id()".
+>  * Aggregated PMU driver pieces in a single patch.
+>  * Added user space changes and rebased everything to v4.3-rc5.
+>
+> Mathieu Poirier (26):
+>   coresight: etm3x: moving etm_readl/writel to header file
+>   coresight: etm3x: moving sysFS entries to dedicated file
+>   coresight: etm3x: unlocking tracers in default arch init
+>   coresight: etm3x: splitting struct etm_drvdata
+>   coresight: etm3x: implementing 'cpu_id()' API
+>   coresight: associating path with session rather than tracer
+>   coresight: moving PM runtime operations to core framework
+>   coresight: etm3x: adding operation mode for etm_enable()
+>   coresight: add API to get sink from path
+>   coresight: etm3x: set progbit to stop trace collection
+>   coresight: etm3x: changing default trace configuration
+>   coresight: etm3x: consolidating initial config
+>   coresight: etm3x: implementing user/kernel mode tracing
+>   coresight: etm3x: adding perf_get/set_config() API
+>   coresight: etm3x: implementing perf_enable/disable() API
+>   coresight: etb10: moving to local atomic operations
+>   coresight: adding operation mode for sink->enable()
+>   coresight: etb10: implementing AUX space API
+>   coresight: updating documentation to reflect integration with perf
+>   perf: changing pmu::setup_aux() parameter to include event
+>   coresight: etm-perf: new PMU driver for ETM tracers
+>   coresight: introducing a global trace ID function
+>   perf tools: making function set_max_cpu_num() non static
+>   perf tools: adding perf_evlist to *info_priv_size()
+>   perf tools: making coresight PMU listable
+>   perf tools: adding coresight etm PMU record capabilities
+>
+>  Documentation/trace/coresight.txt                  |  138 +-
+>  MAINTAINERS                                        |    4 +
+>  arch/x86/kernel/cpu/perf_event_intel_bts.c         |    4 +-
+>  arch/x86/kernel/cpu/perf_event_intel_pt.c          |    5 +-
+>  drivers/hwtracing/coresight/Kconfig                |    1 +
+>  drivers/hwtracing/coresight/Makefile               |    4 +-
+>  drivers/hwtracing/coresight/coresight-etb10.c      |  277 +++-
+>  drivers/hwtracing/coresight/coresight-etm-perf.c   |  447 +++++
+>  drivers/hwtracing/coresight/coresight-etm-perf.h   |   32 +
+>  drivers/hwtracing/coresight/coresight-etm.h        |  143 +-
+>  .../hwtracing/coresight/coresight-etm3x-sysfs.c    | 1442 ++++++++++++++++
+>  drivers/hwtracing/coresight/coresight-etm3x.c      | 1754 +++++---------------
+>  drivers/hwtracing/coresight/coresight-etm4x.c      |    8 +-
+>  drivers/hwtracing/coresight/coresight-funnel.c     |    2 -
+>  drivers/hwtracing/coresight/coresight-priv.h       |   15 +
+>  .../coresight/coresight-replicator-qcom.c          |    4 -
+>  drivers/hwtracing/coresight/coresight-replicator.c |    2 -
+>  drivers/hwtracing/coresight/coresight-tmc.c        |    7 +-
+>  drivers/hwtracing/coresight/coresight-tpiu.c       |    4 +-
+>  drivers/hwtracing/coresight/coresight.c            |  330 ++--
+>  include/linux/coresight-pmu.h                      |   39 +
+>  include/linux/coresight.h                          |   40 +-
+>  include/linux/perf_event.h                         |    2 +-
+>  kernel/events/ring_buffer.c                        |    2 +-
+>  tools/perf/arch/arm/util/Build                     |    2 +
+>  tools/perf/arch/arm/util/auxtrace.c                |   48 +
+>  tools/perf/arch/arm/util/cs_etm.c                  |  466 ++++++
+>  tools/perf/arch/arm/util/cs_etm.h                  |   44 +
+>  tools/perf/arch/arm/util/pmu.c                     |   34 +
+>  tools/perf/arch/x86/util/intel-bts.c               |    4 +-
+>  tools/perf/arch/x86/util/intel-pt.c                |    4 +-
+>  tools/perf/config/Makefile                         |   17 +-
+>  tools/perf/util/auxtrace.c                         |    8 +-
+>  tools/perf/util/auxtrace.h                         |    7 +-
+>  tools/perf/util/cpumap.c                           |    2 +-
+>  tools/perf/util/cpumap.h                           |    1 +
+>  36 files changed, 3753 insertions(+), 1590 deletions(-)
+>  create mode 100644 drivers/hwtracing/coresight/coresight-etm-perf.c
+>  create mode 100644 drivers/hwtracing/coresight/coresight-etm-perf.h
+>  create mode 100644 drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+>  create mode 100644 include/linux/coresight-pmu.h
+>  create mode 100644 tools/perf/arch/arm/util/auxtrace.c
+>  create mode 100644 tools/perf/arch/arm/util/cs_etm.c
+>  create mode 100644 tools/perf/arch/arm/util/cs_etm.h
+>  create mode 100644 tools/perf/arch/arm/util/pmu.c
+>
+> --
+> 2.1.4
+>
 
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/irqchip/irq-gic-v2m.c   | 95 +++++++++++++++++++++++++++++++++++++++++
- drivers/irqchip/irq-gic.c       |  3 ++
- include/linux/irqchip/arm-gic.h |  4 ++
- 3 files changed, 102 insertions(+)
+Arnaldo, Peter and Ingo,
 
-diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-index 7e60f7e..4f52e9a 100644
---- a/drivers/irqchip/irq-gic-v2m.c
-+++ b/drivers/irqchip/irq-gic-v2m.c
-@@ -15,9 +15,11 @@
- 
- #define pr_fmt(fmt) "GICv2m: " fmt
- 
-+#include <linux/acpi.h>
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
- #include <linux/kernel.h>
-+#include <linux/msi.h>
- #include <linux/of_address.h>
- #include <linux/of_pci.h>
- #include <linux/slab.h>
-@@ -138,6 +140,11 @@ static int gicv2m_irq_gic_domain_alloc(struct irq_domain *domain,
- 		fwspec.param[0] = 0;
- 		fwspec.param[1] = hwirq - 32;
- 		fwspec.param[2] = IRQ_TYPE_EDGE_RISING;
-+	} else if (is_fwnode_irqchip(domain->parent->fwnode)) {
-+		fwspec.fwnode = domain->parent->fwnode;
-+		fwspec.param_count = 2;
-+		fwspec.param[0] = hwirq;
-+		fwspec.param[1] = IRQ_TYPE_EDGE_RISING;
- 	} else {
- 		return -EINVAL;
- 	}
-@@ -255,6 +262,8 @@ static void gicv2m_teardown(void)
- 		kfree(v2m->bm);
- 		iounmap(v2m->base);
- 		of_node_put(to_of_node(v2m->fwnode));
-+		if (is_fwnode_irqchip(v2m->fwnode))
-+			irq_domain_free_fwnode(v2m->fwnode);
- 		kfree(v2m);
- 	}
- }
-@@ -359,6 +368,8 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
- 
- 	if (to_of_node(fwnode))
- 		name = to_of_node(fwnode)->name;
-+	else
-+		name = irq_domain_get_irqchip_fwnode_name(fwnode);
- 
- 	pr_info("Frame %s: range[%#lx:%#lx], SPI[%d:%d]\n", name,
- 		(unsigned long)res->start, (unsigned long)res->end,
-@@ -415,3 +426,87 @@ int __init gicv2m_of_init(struct device_node *node, struct irq_domain *parent)
- 		gicv2m_teardown();
- 	return ret;
- }
-+
-+#ifdef CONFIG_ACPI
-+static int acpi_num_msi;
-+
-+static struct fwnode_handle *gicv2m_get_fwnode(struct device *dev)
-+{
-+	struct v2m_data *data;
-+
-+	if (WARN_ON(acpi_num_msi <= 0))
-+		return NULL;
-+
-+	/* We only return the fwnode of the first MSI frame. */
-+	data = list_first_entry_or_null(&v2m_nodes, struct v2m_data, entry);
-+	if (!data)
-+		return NULL;
-+
-+	return data->fwnode;
-+}
-+
-+static int __init
-+acpi_parse_madt_msi(struct acpi_subtable_header *header,
-+		    const unsigned long end)
-+{
-+	int ret;
-+	struct resource res;
-+	u32 spi_start = 0, nr_spis = 0;
-+	struct acpi_madt_generic_msi_frame *m;
-+	struct fwnode_handle *fwnode = NULL;
-+
-+	m = (struct acpi_madt_generic_msi_frame *)header;
-+	if (BAD_MADT_ENTRY(m, end))
-+		return -EINVAL;
-+
-+	res.start = m->base_address;
-+	res.end = m->base_address + 0x1000;
-+
-+	if (m->flags & ACPI_MADT_OVERRIDE_SPI_VALUES) {
-+		spi_start = m->spi_base;
-+		nr_spis = m->spi_count;
-+
-+		pr_info("ACPI overriding V2M MSI_TYPER (base:%u, num:%u)\n",
-+			spi_start, nr_spis);
-+	}
-+
-+	fwnode = irq_domain_alloc_fwnode((void *)m->base_address);
-+	if (!fwnode) {
-+		pr_err("Unable to allocate GICv2m domain token\n");
-+		return -EINVAL;
-+	}
-+
-+	ret = gicv2m_init_one(fwnode, spi_start, nr_spis, &res);
-+	if (ret)
-+		irq_domain_free_fwnode(fwnode);
-+
-+	return ret;
-+}
-+
-+int __init gicv2m_acpi_init(struct irq_domain *parent)
-+{
-+	int ret;
-+
-+	if (acpi_num_msi > 0)
-+		return 0;
-+
-+	acpi_num_msi = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_MSI_FRAME,
-+				      acpi_parse_madt_msi, 0);
-+
-+	if (acpi_num_msi <= 0)
-+		goto err_out;
-+
-+	ret = gicv2m_allocate_domains(parent);
-+	if (ret)
-+		goto err_out;
-+
-+	pci_msi_register_fwnode_provider(&gicv2m_get_fwnode);
-+
-+	return 0;
-+
-+err_out:
-+	gicv2m_teardown();
-+	return -EINVAL;
-+}
-+
-+#endif /* CONFIG_ACPI */
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index fcd327f..e4463f7 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -1358,6 +1358,9 @@ static int __init gic_v2_acpi_init(struct acpi_subtable_header *header,
- 
- 	__gic_init_bases(0, -1, dist_base, cpu_base, 0, domain_handle);
- 
-+	if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
-+		gicv2m_acpi_init(gic_data[0].domain);
-+
- 	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, domain_handle);
- 	return 0;
- }
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index bae69e5..30b2ccb 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -108,6 +108,10 @@ void gic_init(unsigned int nr, int start,
- 
- int gicv2m_of_init(struct device_node *node, struct irq_domain *parent);
- 
-+#ifdef CONFIG_ACPI
-+int gicv2m_acpi_init(struct irq_domain *parent);
-+#endif
-+
- void gic_send_sgi(unsigned int cpu_id, unsigned int irq);
- int gic_get_cpu_id(unsigned int cpu);
- void gic_migrate_target(unsigned int new_cpu_id);
--- 
-2.1.0
+I would like to queue this work for 4.5 but need your help with
+reviewing patches 20 [1], 23 [2], 24 [3], 25 [4] and 26 [5].
+
+A "reviewed-by" would be greatly appreciated.
+
+Many thanks,
+Mathieu
+
+[1]. https://lkml.org/lkml/2015/12/3/682
+[2]. https://lkml.org/lkml/2015/12/3/688
+[3]. https://lkml.org/lkml/2015/12/3/683
+[4]. https://lkml.org/lkml/2015/12/3/686
+[5]. https://lkml.org/lkml/2015/12/3/684
