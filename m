@@ -1,53 +1,96 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 7 Dec 2015 19:13:06 -0800
-Subject: [GIT PULL] MTD/NAND cleanups for v4.5
-Message-ID: <20151208031306.GP120110@google.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 8 Dec 2015 11:16:31 +0800
+Subject: [PATCH 1/3] usb: misc: generic_onboard_hub: add generic onboard
+ USB HUB driver
+In-Reply-To: <1449538670-7954-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <201512081150.hIfZ22cp%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Peter,
 
-Per discussion with Arnd, I plan to pull these into the MTD tree for
-4.5, but you should probably have them too.
+[auto build test ERROR on usb/usb-testing]
+[also build test ERROR on v4.4-rc4 next-20151207]
 
-Full series posted here:
+url:    https://github.com/0day-ci/linux/commits/Peter-Chen/USB-add-generic-onboard-USB-HUB-driver/20151208-094428
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git usb-testing
+config: tile-allmodconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=tile 
 
-http://lists.infradead.org/pipermail/linux-mtd/2015-December/063828.html
+All error/warnings (new ones prefixed by >>):
 
-FYI, I got Arnd's 'ack' to take this one solely via MTD, since it's
-unlikely to get conflicts:
+   drivers/usb/misc/generic_onboard_hub.c: In function 'usb_hub_generic_probe':
+>> drivers/usb/misc/generic_onboard_hub.c:76:3: error: implicit declaration of function 'devm_gpiod_get_optional'
+>> drivers/usb/misc/generic_onboard_hub.c:77:16: error: 'GPIOD_OUT_HIGH' undeclared (first use in this function)
+   drivers/usb/misc/generic_onboard_hub.c:77:16: note: each undeclared identifier is reported only once for each function it appears in
+>> drivers/usb/misc/generic_onboard_hub.c:77:33: error: 'GPIOD_OUT_LOW' undeclared (first use in this function)
+>> drivers/usb/misc/generic_onboard_hub.c:95:5: error: implicit declaration of function 'gpio_to_desc'
+>> drivers/usb/misc/generic_onboard_hub.c:95:17: warning: assignment makes pointer from integer without a cast [enabled by default]
+>> drivers/usb/misc/generic_onboard_hub.c:114:3: error: implicit declaration of function 'gpiod_set_value'
+   cc1: some warnings being treated as errors
 
-http://lists.infradead.org/pipermail/linux-mtd/2015-December/063840.html
+vim +/devm_gpiod_get_optional +76 drivers/usb/misc/generic_onboard_hub.c
 
-The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+    70			if (of_find_property(node, "hub-reset-active-high", NULL))
+    71				reset_pol = 1;
+    72	
+    73			of_property_read_u32(node, "hub-reset-duration-us",
+    74				&duration_us);
+    75	
+  > 76			gpiod_reset = devm_gpiod_get_optional(dev, "hub-reset",
+  > 77				reset_pol ? GPIOD_OUT_HIGH : GPIOD_OUT_LOW);
+    78			ret = PTR_ERR_OR_ZERO(gpiod_reset);
+    79			if (ret) {
+    80				dev_err(dev, "Failed to get reset gpio, err = %d\n",
+    81					ret);
+    82				return ret;
+    83			}
+    84		} else if (pdata) {
+    85			hub_data->clk = pdata->ext_clk;
+    86			duration_us = pdata->gpio_reset_duration_us;
+    87			reset_pol = pdata->gpio_reset_polarity;
+    88	
+    89			if (gpio_is_valid(pdata->gpio_reset)) {
+    90				ret = devm_gpio_request_one(
+    91					dev, pdata->gpio_reset, reset_pol
+    92					? GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW,
+    93					dev_name(dev));
+    94				if (!ret)
+  > 95					gpiod_reset = gpio_to_desc(pdata->gpio_reset);
+    96			}
+    97		}
+    98	
+    99		if (!IS_ERR(hub_data->clk)) {
+   100			ret = clk_prepare_enable(hub_data->clk);
+   101			if (ret) {
+   102				dev_err(dev,
+   103					"Can't enable external clock: %d\n",
+   104					ret);
+   105				return ret;
+   106			}
+   107		}
+   108	
+   109		if (gpiod_reset) {
+   110			/* Sanity check */
+   111			if (duration_us > 1000000)
+   112				duration_us = 50;
+   113			usleep_range(duration_us, duration_us + 100);
+ > 114			gpiod_set_value(gpiod_reset, reset_pol ? 0 : 1);
+   115		}
+   116	
+   117		dev_set_drvdata(dev, hub_data);
 
-  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mtd.git tags/arm-soc/for-4.5/cleanup
-
-for you to fetch changes up to c993e09504fca192bac4ac3f5a3411ac68cba2e6:
-
-  ARM: nand: make use of mtd_to_nand() where appropriate (2015-12-07 18:58:20 -0800)
-
-----------------------------------------------------------------
-Two changes for NAND/MTD refactoring. The mtd_to_nand() helper will allow us to
-stop using mtd->priv for NAND drivers.
-
-----------------------------------------------------------------
-Boris BREZILLON (2):
-      mtd: nand: add an mtd_to_nand() helper
-      ARM: nand: make use of mtd_to_nand() where appropriate
-
- arch/arm/mach-ep93xx/snappercl15.c   | 4 ++--
- arch/arm/mach-ep93xx/ts72xx.c        | 4 ++--
- arch/arm/mach-imx/mach-qong.c        | 2 +-
- arch/arm/mach-ixp4xx/ixdp425-setup.c | 2 +-
- arch/arm/mach-omap1/board-nand.c     | 2 +-
- arch/arm/mach-orion5x/ts78xx-setup.c | 6 +++---
- arch/arm/mach-pxa/balloon3.c         | 2 +-
- arch/arm/mach-pxa/em-x270.c          | 2 +-
- arch/arm/mach-pxa/palmtx.c           | 2 +-
- include/linux/mtd/nand.h             | 5 +++++
- 10 files changed, 18 insertions(+), 13 deletions(-)
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 42151 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151208/1811f234/attachment-0001.obj>
