@@ -1,182 +1,103 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 8 Dec 2015 11:02:35 +0100
-Subject: [PATCH resend 2/6] clk: sunxi: Add VE (Video Engine) module
- clock driver for sun[457]i
-In-Reply-To: <1449321407-4531-3-git-send-email-wens@csie.org>
-References: <1449321407-4531-1-git-send-email-wens@csie.org>
- <1449321407-4531-3-git-send-email-wens@csie.org>
-Message-ID: <20151208100235.GQ27957@lukather>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 08 Dec 2015 10:02:59 +0000
+Subject: [PATCH v3 06/22] arm64: KVM: Implement timer save/restore
+In-Reply-To: <56663E10.2010108@samsung.com>
+References: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
+ <1449485618-9443-7-git-send-email-marc.zyngier@arm.com>
+ <56663E10.2010108@samsung.com>
+Message-ID: <5666AAD3.9000906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sat, Dec 05, 2015 at 09:16:43PM +0800, Chen-Yu Tsai wrote:
-> The video engine has its own special module clock, consisting of a clock
-> gate, configurable dividers, and a reset control.
+On 08/12/15 02:18, Mario Smarduch wrote:
 > 
-> On later (sun[68]i) families, the reset control is moved out of this
-> piece of hardware and grouped with reset controls of other peripherals.
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  Documentation/devicetree/bindings/clock/sunxi.txt |   4 +
->  drivers/clk/sunxi/Makefile                        |   1 +
->  drivers/clk/sunxi/clk-a10-ve.c                    | 171 ++++++++++++++++++++++
->  3 files changed, 176 insertions(+)
->  create mode 100644 drivers/clk/sunxi/clk-a10-ve.c
+> On 12/7/2015 2:53 AM, Marc Zyngier wrote:
+>> Implement the timer save restore as a direct translation of
+>> the assembly code version.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/hyp/Makefile          |  1 +
+>>  arch/arm64/kvm/hyp/hyp.h             |  3 ++
+>>  arch/arm64/kvm/hyp/timer-sr.c        | 72 ++++++++++++++++++++++++++++++++++++
+>>  include/clocksource/arm_arch_timer.h |  6 +++
+>>  4 files changed, 82 insertions(+)
+>>  create mode 100644 arch/arm64/kvm/hyp/timer-sr.c
+>>
+>> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+>> index d1e38ce..455dc0a 100644
+>> --- a/arch/arm64/kvm/hyp/Makefile
+>> +++ b/arch/arm64/kvm/hyp/Makefile
+>> @@ -4,3 +4,4 @@
+>>  
+>>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+>>  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
+>> +obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
+>> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+>> index 5759f9f..f213e46 100644
+>> --- a/arch/arm64/kvm/hyp/hyp.h
+>> +++ b/arch/arm64/kvm/hyp/hyp.h
+>> @@ -35,5 +35,8 @@ void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+>>  void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+>>  void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+>>  
+>> +void __timer_save_state(struct kvm_vcpu *vcpu);
+>> +void __timer_restore_state(struct kvm_vcpu *vcpu);
+>> +
+>>  #endif /* __ARM64_KVM_HYP_H__ */
+>>  
+>> diff --git a/arch/arm64/kvm/hyp/timer-sr.c b/arch/arm64/kvm/hyp/timer-sr.c
+>> new file mode 100644
+>> index 0000000..67292c0
+>> --- /dev/null
+>> +++ b/arch/arm64/kvm/hyp/timer-sr.c
+>> @@ -0,0 +1,72 @@
+>> +/*
+>> + * Copyright (C) 2012-2015 - ARM Ltd
+>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#include <clocksource/arm_arch_timer.h>
+>> +#include <linux/compiler.h>
+>> +#include <linux/kvm_host.h>
+>> +
+>> +#include <asm/kvm_mmu.h>
+>> +
+>> +#include "hyp.h"
+>> +
+>> +/* vcpu is already in the HYP VA space */
+>> +void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
+>> +{
+>> +	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+>> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>> +	u64 val;
+>> +
+>> +	if (kvm->arch.timer.enabled) {
+>> +		timer->cntv_ctl = read_sysreg(cntv_ctl_el0);
+>> +		isb();
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index ef0b452806b1..14496056319f 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -74,6 +74,7 @@ Required properties:
->  	"allwinner,sun8i-h3-usb-clk" - for usb gates + resets on H3
->  	"allwinner,sun9i-a80-usb-mod-clk" - for usb gates + resets on A80
->  	"allwinner,sun9i-a80-usb-phy-clk" - for usb phy gates + resets on A80
-> +	"allwinner,sun4i-a10-ve-clk" - for the Video Engine clock
->  
->  Required properties for all clocks:
->  - reg : shall be the control register address for the clock.
-> @@ -93,6 +94,9 @@ Required properties for all clocks:
->  And "allwinner,*-usb-clk" clocks also require:
->  - reset-cells : shall be set to 1
->  
-> +The "allwinner,sun4i-a10-ve-clk" clock also requires:
-> +- reset-cells : shall be set to 0
-> +
->  The "allwinner,sun9i-a80-mmc-config-clk" clock also requires:
->  - #reset-cells : shall be set to 1
->  - resets : shall be the reset control phandle for the mmc block.
-> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> index 103efab05ca8..78db91ad5af6 100644
-> --- a/drivers/clk/sunxi/Makefile
-> +++ b/drivers/clk/sunxi/Makefile
-> @@ -7,6 +7,7 @@ obj-y += clk-a10-codec.o
->  obj-y += clk-a10-hosc.o
->  obj-y += clk-a10-mod1.o
->  obj-y += clk-a10-pll2.o
-> +obj-y += clk-a10-ve.o
->  obj-y += clk-a20-gmac.o
->  obj-y += clk-mod0.o
->  obj-y += clk-simple-gates.o
-> diff --git a/drivers/clk/sunxi/clk-a10-ve.c b/drivers/clk/sunxi/clk-a10-ve.c
-> new file mode 100644
-> index 000000000000..de0fdb656150
-> --- /dev/null
-> +++ b/drivers/clk/sunxi/clk-a10-ve.c
-> @@ -0,0 +1,171 @@
-> +/*
-> + * Copyright 2015 Chen-Yu Tsai
-> + *
-> + * Chen-Yu Tsai <wens@csie.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/reset-controller.h>
-> +#include <linux/slab.h>
-> +#include <linux/spinlock.h>
-> +
-> +static DEFINE_SPINLOCK(ve_lock);
-> +
-> +#define SUN4I_VE_ENABLE		31
-> +#define SUN4I_VE_DIVIDER_SHIFT	16
-> +#define SUN4I_VE_DIVIDER_WIDTH	3
-> +#define SUN4I_VE_RESET		0
-> +
-> +/**
-> + * sunxi_ve_reset... - reset bit in ve clk registers handling
-> + */
-> +
-> +struct ve_reset_data {
-> +	void __iomem			*reg;
-> +	spinlock_t			*lock;
-> +	struct reset_controller_dev	rcdev;
-> +};
-> +
-> +static int sunxi_ve_reset_assert(struct reset_controller_dev *rcdev,
-> +				 unsigned long id)
-> +{
-> +	struct ve_reset_data *data = container_of(rcdev,
-> +						  struct ve_reset_data,
-> +						  rcdev);
-> +	unsigned long flags;
-> +	u32 reg;
-> +
-> +	spin_lock_irqsave(data->lock, flags);
-> +
-> +	reg = readl(data->reg);
-> +	writel(reg & ~BIT(SUN4I_VE_RESET), data->reg);
-> +
-> +	spin_unlock_irqrestore(data->lock, flags);
-> +
-> +	return 0;
-> +}
-> +
-> +static int sunxi_ve_reset_deassert(struct reset_controller_dev *rcdev,
-> +				   unsigned long id)
-> +{
-> +	struct ve_reset_data *data = container_of(rcdev,
-> +						  struct ve_reset_data,
-> +						  rcdev);
-> +	unsigned long flags;
-> +	u32 reg;
-> +
-> +	spin_lock_irqsave(data->lock, flags);
-> +
-> +	reg = readl(data->reg);
-> +	writel(reg | BIT(SUN4I_VE_RESET), data->reg);
-> +
-> +	spin_unlock_irqrestore(data->lock, flags);
-> +
-> +	return 0;
-> +}
+> Can you share the subtle insight why is the isb() needed here?
+> B2.7.3 mentions changes to system registers only.
 
-Is it me, or do we have this code duplicated everywhere now?
+This is actually a leftover of some previous code rework in the assembly
+version of this code, which has found its way into the new
+implementation. Duh.
 
-Maybe we should turn this into a small library.
+Thanks for pointing this out.
 
-> +static int sunxi_ve_of_xlate(struct reset_controller_dev *rcdev,
-> +			     const struct of_phandle_args *reset_spec)
-> +{
-> +    if (WARN_ON(reset_spec->args_count != 0))
-> +	return -EINVAL;
-> +
-> +    return 0;
-> +}
-
-And this could be part of the reset controller framework too.
-
-Anyway, both these comments can be fixed by a later patch. Can you
-take care of this?
-
-I've fixed the white space issue, and applied your patch.
-
-(and added Jens Tested-by)
-
-Thanks!
-Maxime
-
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151208/c63aa7cf/attachment-0001.sig>
+Jazz is not dead. It just smells funny...
