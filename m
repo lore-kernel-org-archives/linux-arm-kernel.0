@@ -1,454 +1,180 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed,  9 Dec 2015 01:21:58 +0900
-Subject: [PATCH v3] bus: uniphier-system-bus: add UniPhier System Bus driver
-Message-ID: <1449591718-21753-1-git-send-email-yamada.masahiro@socionext.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Tue, 8 Dec 2015 17:22:55 +0100
+Subject: [PATCH v4] mmc: meson: Add driver for the SD/MMC host found on
+ Amlogic MesonX SoCs
+In-Reply-To: <CAPDyKFp=buvJ8Li3XC8XSUAUO7BsE+U6vEQH2xTrgcHAkdG8bQ@mail.gmail.com>
+References: <1448988109-32630-1-git-send-email-carlo@caione.org>
+ <CAPDyKFp=buvJ8Li3XC8XSUAUO7BsE+U6vEQH2xTrgcHAkdG8bQ@mail.gmail.com>
+Message-ID: <CAOQ7t2aJAPWd3Xmvu7n0EWL-KC8ZriM3KryfsYEh556uXhuR+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The UniPhier System Bus is an external that connects on-board devices
-to the UniPhier SoC.  Each bank (chip select) is dynamically mapped
-to the CPU-viewed address base via the bus controller.  The bus
-controller must be configured before any access to the bus.
+On Tue, Dec 8, 2015 at 4:06 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 1 December 2015 at 17:41, Carlo Caione <carlo@caione.org> wrote:
 
-This driver parses the "ranges" property of the System Bus node and
-initialized the bus controller.  After the bus becomes ready, devices
-below it are populated.
+>> +Required properties:
+>> + - compatible : "amlogic,meson-mmc"
+>> + - reg : mmc controller base registers
+>> + - interrupts : mmc controller interrupt
+>> + - clocks : phandle to clock provider
+>> + - pinctrl-names : should contain "sdio_a" or "sdio_b"
+>
+> This is weird. I don't think you need this specific states.
+> You should be able to cope with common used "default" state.
+>
+> Later in the driver code I realize that you have some register bits
+> that is related to either using port a or port b. But I don't think
+> that is the same thing as having different pinctrls states.
 
-Note:
-Each bank can be mapped anywhere in the supported address space;
-there is nothing preventing us from assigning bank 0 on 0x42000000,
-0x43000000, or anywhere as long as such region is not used by others.
-So, the "ranges" is just one possible software configuration, which
-does not seem to fit in device tree because device tree is a hardware
-description language.  However, of_translate_address() requires
-"ranges" in every bus node between CPUs and device mapped on the CPU
-address space.  In other words, "ranges" properties must be statically
-defined in device tree.  After some discussion, I decided the dynamic
-address reassignment by the driver is too bothersome.  Instead, the
-device tree should provide a reasonable translation setup that the OS
-can rely on.
+Unfortunately documentation is not really clear about this. A
+multi-slot capable device maybe?
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
+> If you can't detect whether port a or b is used in runtime by the
+> driver, I suggest you add a separate meson mmc DT binding telling what
+> port is being used.
 
-Changes in v3:
-  - Minor fix of git-log
-  - Add Rob's Acked-by
+That was my initial idea. In v3 I had the "meson,sdio-port" property
+for that. I'll put it back in the next revision.
 
-Changes in v2:
-  - Re-design the binding, driver implementation
-    Switch to a single node, populate children after the bus is setup
+>> + - pinctrl-0: Should specify pin control groups used for this controller
+>> +
+>> +Optional properties:
+>> + - for cd, bus-width and additional generic mmc parameters
+>> +   please refer to mmc.txt within this directory
+>> +
+>> +Examples:
+>> +       mmc0: mmc at c1108c20 {
+>> +               pinctrl-names = "sdio_b";
+>> +               pinctrl-0 = <&mmc0_sd_b_pins>;
+>> +               compatible = "amlogic,meson-mmc";
+>> +               reg = <0xc1108c20 0x20>;
+>> +               interrupts = <0 28 1>;
+>> +               clocks = <&clkc CLKID_CLK81>;
+>> +       };
+>
+> Overall the DT documentation looks okay (beside the comments above).
+> Although, please separate it to become a patch 1/2. The rest below
+> shoud go into a patch 2/2.
+>
+> For the DT patch please include the DT maintainers when posting the new version.
 
- .../bindings/bus/uniphier-system-bus.txt           |  65 +++++
- MAINTAINERS                                        |   1 +
- drivers/bus/Kconfig                                |   8 +
- drivers/bus/Makefile                               |   1 +
- drivers/bus/uniphier-system-bus.c                  | 283 +++++++++++++++++++++
- 5 files changed, 358 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/bus/uniphier-system-bus.txt
- create mode 100644 drivers/bus/uniphier-system-bus.c
+I'll do.
 
-diff --git a/Documentation/devicetree/bindings/bus/uniphier-system-bus.txt b/Documentation/devicetree/bindings/bus/uniphier-system-bus.txt
-new file mode 100644
-index 0000000..5ec47c0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/bus/uniphier-system-bus.txt
-@@ -0,0 +1,65 @@
-+UniPhier System Bus
-+
-+The UniPhier System Bus is an external bus that connects on-board devices to
-+the UniPhier SoC.  It is a simple (semi-)parallel bus with address, data, and
-+some control signals.  It supports up to 8 banks (chip selects).
-+
-+Before any access to the bus, the bus controller must be configured; the bus
-+controller registers provide the control for the address translation from the
-+the System Bus to the parent bus.  The needed setup includes the base address,
-+the size, and some timing parameters of each bank.
-+
-+Required properties:
-+- compatible: should be "socionext,uniphier-system-bus".
-+- reg: offset and length of the register set for the bus controller device.
-+- #address-cells: should be 2.  The first cell is the bank number (chip select).
-+  The second cell is the address offset within the bank.
-+- #size-cells: should be 1.
-+- ranges: should provide a proper address translation from the System Bus to
-+  the parent bus.
-+
-+Note:
-+The address region(s) that can be assigned for the System Bus is implementation
-+defined.  Some SoCs can use 0x00000000-0x0fffffff and 0x40000000-0x4fffffff,
-+while other SoCs can only use 0x40000000-0x4fffffff.  There might be additional
-+limitations depending on SoCs and the boot mode.  The address translation is
-+arbitrary as long as the banks are assigned in the supported address space with
-+the required alignment and they do not overlap one another.
-+For example, it is possible to map:
-+  bank 0 to 0x42000000-0x43ffffff, bank 5 to 0x46000000-0x46ffffff
-+It is also possible to map:
-+  bank 0 to 0x48000000-0x49ffffff, bank 5 to 0x44000000-0x44ffffff
-+There is no reason to stick to a particular translation mapping, but the
-+"ranges" property should provide a "reasonable" default that is known to work.
-+The software should initialize the bus controller according to it.
-+
-+Example:
-+
-+	system-bus {
-+		compatible = "socionext,uniphier-system-bus";
-+		reg = <0x58c00000 0x400>;
-+		#address-cells = <2>;
-+		#size-cells = <1>;
-+		ranges = <1 0x00000000 0x42000000 0x02000000
-+			  5 0x00000000 0x46000000 0x01000000>;
-+
-+		ethernet at 1,01f00000 {
-+			compatible = "smsc,lan9115";
-+			reg = <1 0x01f00000 0x1000>;
-+			interrupts = <0 48 4>
-+			phy-mode = "mii";
-+		};
-+
-+		uart at 5,00200000 {
-+			compatible = "ns16550a";
-+			reg = <5 0x00200000 0x20>;
-+			interrupts = <0 49 4>
-+			clock-frequency = <12288000>;
-+		};
-+	};
-+
-+In this example,
-+ - the Ethernet device is connected at the offset 0x01f00000 of CS1 and
-+   mapped to 0x43f00000 of the parent bus.
-+ - the UART device is connected at the offset 0x00200000 of CS5 and
-+   mapped to 0x46200000 of the parent bus.
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 8278a10..8342520 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1643,6 +1643,7 @@ F:	arch/arm/include/asm/hardware/cache-uniphier.h
- F:	arch/arm/mach-uniphier/
- F:	arch/arm/mm/cache-uniphier.c
- F:	arch/arm64/boot/dts/socionext/
-+F:	drivers/bus/uniphier-system-bus.c
- F:	drivers/clk/uniphier/
- F:	drivers/i2c/busses/i2c-uniphier*
- F:	drivers/pinctrl/uniphier/
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index 116b363..9a92c07 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -131,6 +131,14 @@ config SUNXI_RSB
- 	  with various RSB based devices, such as AXP223, AXP8XX PMICs,
- 	  and AC100/AC200 ICs.
- 
-+config UNIPHIER_SYSTEM_BUS
-+	tristate "UniPhier System Bus driver"
-+	depends on ARCH_UNIPHIER && OF
-+	default y
-+	help
-+	  Support for UniPhier System Bus, a simple external bus.  This is
-+	  needed to use on-board devices connected to UniPhier SoCs.
-+
- config VEXPRESS_CONFIG
- 	bool "Versatile Express configuration bus"
- 	default y if ARCH_VEXPRESS
-diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
-index fcb9f97..ccff007 100644
---- a/drivers/bus/Makefile
-+++ b/drivers/bus/Makefile
-@@ -17,4 +17,5 @@ obj-$(CONFIG_OMAP_INTERCONNECT)	+= omap_l3_smx.o omap_l3_noc.o
- obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
- obj-$(CONFIG_SUNXI_RSB)		+= sunxi-rsb.o
- obj-$(CONFIG_SIMPLE_PM_BUS)	+= simple-pm-bus.o
-+obj-$(CONFIG_UNIPHIER_SYSTEM_BUS)	+= uniphier-system-bus.o
- obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-config.o
-diff --git a/drivers/bus/uniphier-system-bus.c b/drivers/bus/uniphier-system-bus.c
-new file mode 100644
-index 0000000..9864b8c
---- /dev/null
-+++ b/drivers/bus/uniphier-system-bus.c
-@@ -0,0 +1,283 @@
-+/*
-+ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/log2.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/sort.h>
-+
-+/* System Bus Controller registers */
-+#define UNIPHIER_SBC_BASE	0x100	/* base address of bank0 space */
-+#define    UNIPHIER_SBC_BASE_BE		BIT(0)	/* bank_enable */
-+#define UNIPHIER_SBC_CTRL0	0x200	/* timing parameter 0 of bank0 */
-+#define UNIPHIER_SBC_CTRL1	0x204	/* timing parameter 1 of bank0 */
-+#define UNIPHIER_SBC_CTRL2	0x208	/* timing parameter 2 of bank0 */
-+#define UNIPHIER_SBC_CTRL3	0x20c	/* timing parameter 3 of bank0 */
-+#define UNIPHIER_SBC_CTRL4	0x300	/* timing parameter 4 of bank0 */
-+
-+#define UNIPHIER_SBC_STRIDE	0x10	/* register stride to next bank */
-+#define UNIPHIER_SBC_NR_BANKS	8	/* number of banks (chip select) */
-+#define UNIPHIER_SBC_BASE_DUMMY	0xffffffff	/* data to squash bank 0, 1 */
-+
-+struct uniphier_system_bus_bank {
-+	u32 base;
-+	u32 end;
-+};
-+
-+struct uniphier_system_bus_priv {
-+	struct device *dev;
-+	void __iomem *membase;
-+	struct uniphier_system_bus_bank bank[UNIPHIER_SBC_NR_BANKS];
-+};
-+
-+static void uniphier_system_bus_set_reg(struct uniphier_system_bus_priv *priv)
-+{
-+	void __iomem *base_reg = priv->membase + UNIPHIER_SBC_BASE;
-+	u32 base, end, mask, val;
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(priv->bank); i++) {
-+		base = priv->bank[i].base;
-+		end = priv->bank[i].end;
-+
-+		if (base == end) {
-+			/*
-+			 * If SBC_BASE0 or SBC_BASE1 is set to zero, the access
-+			 * to anywhere in the system bus space is routed to
-+			 * bank 0 (if boot swap if off) or bank 1 (if boot swap
-+			 * if on).  It means that CPUs cannot get access to
-+			 * bank 2 or later.  In other words, bank 0/1 cannot
-+			 * be disabled even if its bank_enable bits is cleared.
-+			 * This seems odd, but it is how this hardware goes.
-+			 * As a workaround, dummy data (0xffffffff) should be
-+			 * set when the bank 0/1 is unused.  As for bank 2 and
-+			 * later, they can be simply disable by clearing the
-+			 * bank_enable bit.
-+			 */
-+			if (i < 2)
-+				val = UNIPHIER_SBC_BASE_DUMMY;
-+			else
-+				val = 0;
-+		} else {
-+			mask = base ^ (end - 1);
-+
-+			val = base & 0xfffe0000;
-+			val |= (~mask >> 16) & 0xfffe;
-+			val |= UNIPHIER_SBC_BASE_BE;
-+		}
-+		dev_dbg(priv->dev, "SBC_BASE[%d] = 0x%08x\n", i, val);
-+
-+		writel(val, base_reg + UNIPHIER_SBC_STRIDE * i);
-+	}
-+}
-+
-+static void uniphier_system_bus_check_boot_swap(
-+					struct uniphier_system_bus_priv *priv)
-+{
-+	void __iomem *base_reg = priv->membase + UNIPHIER_SBC_BASE;
-+	int is_swapped;
-+
-+	is_swapped = !(readl(base_reg) & UNIPHIER_SBC_BASE_BE);
-+
-+	dev_dbg(priv->dev, "Boot Swap: %s\n", is_swapped ? "on" : "off");
-+
-+	if (is_swapped)
-+		swap(priv->bank[0], priv->bank[1]);
-+}
-+
-+static int uniphier_system_bus_add_bank(struct uniphier_system_bus_priv *priv,
-+					int bank, u32 addr, u64 paddr, u32 size)
-+{
-+	u64 end, mask;
-+
-+	dev_dbg(priv->dev,
-+		"range found: bank = %d, addr = %08x, paddr = %08llx, size = %08x\n",
-+		bank, addr, paddr, size);
-+
-+	if (bank >= ARRAY_SIZE(priv->bank)) {
-+		dev_err(priv->dev, "unsupported bank number %d\n", bank);
-+		return -EINVAL;
-+	}
-+
-+	if (priv->bank[bank].base || priv->bank[bank].end) {
-+		dev_err(priv->dev,
-+			"range for bank %d has already been specified\n", bank);
-+		return -EINVAL;
-+	}
-+
-+	if (paddr > U32_MAX) {
-+		dev_err(priv->dev, "base address %llx is too high\n", paddr);
-+		return -EINVAL;
-+	}
-+
-+	end = paddr + size;
-+
-+	if (addr > paddr) {
-+		dev_err(priv->dev,
-+			"base %08x cannot be mapped to %08llx of parent\n",
-+			addr, paddr);
-+		return -EINVAL;
-+	}
-+	paddr -= addr;
-+
-+	paddr = round_down(paddr, 0x00020000);
-+	end = round_up(end, 0x00020000);
-+
-+	if (end > U32_MAX) {
-+		dev_err(priv->dev, "end address %08llx is too high\n", end);
-+		return -EINVAL;
-+	}
-+	mask = paddr ^ (end - 1);
-+	mask = roundup_pow_of_two(mask);
-+
-+	paddr = round_down(paddr, mask);
-+	end = round_up(end, mask);
-+
-+	priv->bank[bank].base = paddr;
-+	priv->bank[bank].end = end;
-+
-+	dev_dbg(priv->dev, "range added: bank = %d, addr = %08x, end = %08x\n",
-+		bank, priv->bank[bank].base, priv->bank[bank].end);
-+
-+	return 0;
-+}
-+
-+static int uniphier_system_bus_sort_cmp(const void *a, const void *b)
-+{
-+	return ((struct uniphier_system_bus_bank *)a)->base
-+		- ((struct uniphier_system_bus_bank *)b)->base;
-+}
-+
-+static int uniphier_system_bus_check_overlap(
-+					struct uniphier_system_bus_priv tmp)
-+{
-+	int i;
-+
-+	sort(&tmp.bank, ARRAY_SIZE(tmp.bank), sizeof(tmp.bank[0]),
-+	     uniphier_system_bus_sort_cmp, NULL);
-+
-+	for (i = 0; i < ARRAY_SIZE(tmp.bank) - 1; i++)
-+		if (tmp.bank[i].end > tmp.bank[i + 1].base) {
-+			dev_err(tmp.dev,
-+				"region overlap between %08x-%08x and %08x-%08x\n",
-+				tmp.bank[i].base, tmp.bank[i].end,
-+				tmp.bank[i + 1].base, tmp.bank[i + 1].end);
-+			return -EINVAL;
-+		}
-+
-+	return 0;
-+}
-+
-+static int uniphier_system_bus_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct uniphier_system_bus_priv *priv;
-+	struct resource *regs;
-+	const __be32 *ranges;
-+	u32 cells, addr, size;
-+	u64 paddr;
-+	int pna, bank, rlen, rone, ret;
-+
-+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	priv->membase = devm_ioremap_resource(dev, regs);
-+	if (IS_ERR(priv->membase))
-+		return PTR_ERR(priv->membase);
-+
-+	priv->dev = dev;
-+
-+	pna = of_n_addr_cells(dev->of_node);
-+
-+	ret = of_property_read_u32(dev->of_node, "#address-cells", &cells);
-+	if (ret) {
-+		dev_err(dev, "failed to get #address-cells\n");
-+		return ret;
-+	}
-+	if (cells != 2) {
-+		dev_err(dev, "#address-cells must be 2\n");
-+		return -EINVAL;
-+	}
-+
-+	ret = of_property_read_u32(dev->of_node, "#size-cells", &cells);
-+	if (ret) {
-+		dev_err(dev, "failed to get #size-cells\n");
-+		return ret;
-+	}
-+	if (cells != 1) {
-+		dev_err(dev, "#size-cells must be 1\n");
-+		return -EINVAL;
-+	}
-+
-+	ranges = of_get_property(dev->of_node, "ranges", &rlen);
-+	if (!ranges) {
-+		dev_err(dev, "failed to get ranges property\n");
-+		return -ENOENT;
-+	}
-+
-+	rlen /= sizeof(*ranges);
-+	rone = pna + 2;
-+
-+	for (; rlen >= rone; rlen -= rone) {
-+		bank = be32_to_cpup(ranges++);
-+		addr = be32_to_cpup(ranges++);
-+		paddr = of_translate_address(dev->of_node, ranges);
-+		if (paddr == OF_BAD_ADDR)
-+			return -EINVAL;
-+		ranges += pna;
-+		size = be32_to_cpup(ranges++);
-+
-+		ret = uniphier_system_bus_add_bank(priv, bank, addr,
-+						   paddr, size);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	ret = uniphier_system_bus_check_overlap(*priv);
-+	if (ret)
-+		return ret;
-+
-+	uniphier_system_bus_check_boot_swap(priv);
-+
-+	uniphier_system_bus_set_reg(priv);
-+
-+	/* Now, the bus is configured.  Populate platform_devices below it */
-+	return of_platform_populate(dev->of_node, of_default_bus_match_table,
-+				    NULL, dev);
-+}
-+
-+static const struct of_device_id uniphier_system_bus_match[] = {
-+	{ .compatible = "socionext,uniphier-system-bus" },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, uniphier_system_bus_match);
-+
-+static struct platform_driver uniphier_system_bus_driver = {
-+	.probe		= uniphier_system_bus_probe,
-+	.driver = {
-+		.name	= "uniphier-system-bus",
-+		.of_match_table = uniphier_system_bus_match,
-+	},
-+};
-+module_platform_driver(uniphier_system_bus_driver);
-+
-+MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
-+MODULE_DESCRIPTION("UniPhier System Bus driver");
-+MODULE_LICENSE("GPL");
+[...]
+
+>> +       clk_rate >>= 1;
+>> +       clk_div = clk_rate / clk_ios - !(clk_rate % clk_ios);
+>> +
+>> +       conf_reg = readl(host->base + SDIO_CONF);
+>> +       conf_reg &= ~REG_CONF_CLK_DIV_M;
+>> +       conf_reg |= clk_div;
+>> +       writel(conf_reg, host->base + SDIO_CONF);
+>> +
+>> +       dev_dbg(mmc_dev(mmc), "clk_ios: %d, clk_div: %d, clk_rate: %ld\n",
+>> +               clk_ios, clk_div, clk_rate);
+>
+> It's good practice to update mmc->actual_clock, as it's being used
+> from mmc core's debugfs support.
+
+Ok
+
+[...]
+
+>> +
+>> +       host = mmc_priv(mmc);
+>> +       host->mmc = mmc;
+>> +       host->timeout = msecs_to_jiffies(2000);
+>
+> I don't think this timeout will cover all cases, although I can't
+> really tell what a proper value should be as it's dynamically
+> changning between requests.
+>
+> Perhaps try to pick a value that's already being used by other hosts
+> is good enough!?
+
+Other drivers use 10s, so I'll try to pick the same value.
+
+I have actually a problem and a question related to this value. On the
+boards I'm currently using to test this driver I have no CD GPIO. In
+this case do I have to specify the MMC as "non-removable"? Also if I
+try to change an SD card at runtime I have to wait 3 times the timeout
+before being able to do it successfully.
+
+[...]
+
+>> +
+>> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +       host->base = devm_ioremap_resource(&pdev->dev, res);
+>> +       if (IS_ERR(host->base)) {
+>> +               ret = PTR_ERR(host->base);
+>> +               goto error_free_host;
+>> +       }
+>> +
+>> +       irq = platform_get_irq(pdev, 0);
+>> +       ret = devm_request_threaded_irq(&pdev->dev, irq, meson_mmc_irq,
+>> +                                       meson_mmc_irq_thread, 0, "meson_mmc",
+>> +                                       host);
+>> +       if (ret)
+>> +               goto error_free_host;
+>> +
+>> +       host->clk = devm_clk_get(&pdev->dev, NULL);
+>> +       if (IS_ERR(host->clk)) {
+>> +               ret = PTR_ERR(host->clk);
+>> +               goto error_free_host;
+>> +       }
+>
+> A clk_prepare_enable() is missing somwhere around here and of course
+> then the clock needs to be gated as well. Both in the error handling
+> of ->probe() but also in meson_mmc_remove().
+
+No clock gatings yet on this platform but I'll fix it.
+
+>> +
+>> +       /* we do not support scatter lists in hardware */
+>> +       mmc->max_segs = 1;
+>> +       mmc->max_req_size = SDIO_BOUNCE_REQ_SIZE;
+>> +       mmc->max_seg_size = mmc->max_req_size;
+>> +       mmc->max_blk_count = 256;
+>> +       mmc->max_blk_size = mmc->max_req_size / mmc->max_blk_count;
+>> +       mmc->f_min = 300000;
+>> +       mmc->f_max = 50000000;
+>> +       mmc->caps |= MMC_CAP_4_BIT_DATA;
+>> +       mmc->caps |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED;
+>> +       mmc->caps2 |= MMC_CAP2_NO_SDIO;
+>> +       mmc->ocr_avail = MMC_VDD_33_34;
+>> +       mmc->ops = &meson_mmc_ops;
+>> +
+>> +       spin_lock_init(&host->lock);
+>> +
+>> +       INIT_DELAYED_WORK(&host->timeout_work, meson_mmc_timeout);
+>> +
+>> +       pinctrl = devm_pinctrl_get(&pdev->dev);
+>> +       if (IS_ERR(pinctrl)) {
+>> +               ret = PTR_ERR(pinctrl);
+>> +               goto error_free_host;
+>> +       }
+>> +
+>> +       /* We need to know at runtime which port we are using */
+>> +       pins = pinctrl_lookup_state(pinctrl, "sdio_b");
+>> +       if (!IS_ERR(pins))
+>> +               host->port = 1; /* PORT_B */
+>> +       else
+>> +               host->port = 0; /* PORT_A */
+>> +
+>
+> I think the pinctrl code can be removed, according to my eariler
+> comments for the DT documentation.
+
+Agree
+
+> Instead you need a way to find out the currently used port...
+
+I really do not think this is feasible from the driver at runtime. So
+I'll go with the new DT property.
+
+[...]
+
+Thanks,
+
 -- 
-1.9.1
+Carlo Caione
