@@ -1,37 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 08 Dec 2015 16:39:45 +0100
-Subject: [PATCH] mtd: omap_elm: print interrupt resource using %pr
-Message-ID: <2101351.RbJOfbsbGX@wuerfel>
+Date: Tue, 08 Dec 2015 16:42:12 +0100
+Subject: [PATCH] dm verity: use sector_div for division
+Message-ID: <2666833.eM84rj4CYY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_LPAE is set on ARM, resource_size_t is 64-bit wide
-and we get a warning about an incorrect format string for printing
-the interrupt number in elm_probe:
+The dm verity sec implementation uses do_div for dividing a sector_t,
+which is slower than necessary when sector_t is a 32-bit type, and
+we now get a warning for this case:
 
-drivers/mtd/nand/omap_elm.c: In function 'elm_probe':
-drivers/mtd/nand/omap_elm.c:417:23: warning: format '%i' expects argument of type 'int', but argument 3 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
+include/asm-generic/div64.h:224:22: warning: passing argument 1 of '__div64_32' from incompatible pointer type [-Wincompatible-pointer-types]
+drivers/md/dm-verity-fec.c:725:6: note: in expansion of macro 'do_div'
+  if (do_div(f->rounds, f->rsn))
 
-This patch avoids the type mismatch by printing the interrupt as
-a resource using the %pr format string.
+This changes the code to use sector_div instead, which does the
+right thing and avoids the warning.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/mtd/nand/omap_elm.c | 2 +-
+ drivers/md/dm-verity-fec.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mtd/nand/omap_elm.c b/drivers/mtd/nand/omap_elm.c
-index 235ec7992b4c..11f174b07217 100644
---- a/drivers/mtd/nand/omap_elm.c
-+++ b/drivers/mtd/nand/omap_elm.c
-@@ -414,7 +414,7 @@ static int elm_probe(struct platform_device *pdev)
- 	ret = devm_request_irq(&pdev->dev, irq->start, elm_isr, 0,
- 			pdev->name, info);
- 	if (ret) {
--		dev_err(&pdev->dev, "failure requesting irq %i\n", irq->start);
-+		dev_err(&pdev->dev, "failure requesting %pr\n", &irq);
- 		return ret;
+I believe we had a fix for this in the series that introduced the optimized
+do_div, but the file got moved around and the fix got lost.
+
+diff --git a/drivers/md/dm-verity-fec.c b/drivers/md/dm-verity-fec.c
+index e722ce57520f..1bddaca37e98 100644
+--- a/drivers/md/dm-verity-fec.c
++++ b/drivers/md/dm-verity-fec.c
+@@ -722,7 +722,7 @@ int verity_fec_ctr(struct dm_verity *v)
  	}
  
+ 	f->rounds = f->blocks;
+-	if (do_div(f->rounds, f->rsn))
++	if (sector_div(f->rounds, f->rsn))
+ 		f->rounds++;
+ 
+ 	/*
 -- 
 2.1.0.rc2
