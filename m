@@ -1,176 +1,48 @@
-From: m.reichl@fivetechno.de (Markus Reichl)
-Date: Tue, 8 Dec 2015 11:16:58 +0100
-Subject: [PATCH v4 1/8] ARM: dts: Exynos542x/5800: add cluster regulator
- supply properties
-In-Reply-To: <1449512300-17230-2-git-send-email-b.zolnierkie@samsung.com>
-References: <1449512300-17230-1-git-send-email-b.zolnierkie@samsung.com>
- <1449512300-17230-2-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <5666AE1A.7070506@fivetechno.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 8 Dec 2015 12:22:09 +0200
+Subject: [PATCH] ARM: DTS: am33xx: Use the new DT bindings for the eDMA3
+In-Reply-To: <4387766.cHF7OBX0cm@wuerfel>
+References: <1449225915-28879-1-git-send-email-peter.ujfalusi@ti.com>
+ <20151204215115.GP23396@atomide.com> <566689E2.7060907@ti.com>
+ <4387766.cHF7OBX0cm@wuerfel>
+Message-ID: <5666AF51.9080306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-tested the patch successfully on Odroid-XU4.
-
-Thanks
---
-Markus
-
-Am 07.12.2015 um 19:18 schrieb Bartlomiej Zolnierkiewicz:
-> Add cluster regulator supply properties as a preparation to
-> adding generic cpufreq-dt driver support for Exynos542x and
-> Exynos5800 based boards.
+On 12/08/2015 11:51 AM, Arnd Bergmann wrote:
+> On Tuesday 08 December 2015 09:42:26 Peter Ujfalusi wrote:
+>> On 12/04/2015 11:51 PM, Tony Lindgren wrote:
+>>>>
+>>>> Please just drop the /bits/ 16 and use normal cells.
+>>>
+>>> Yeah agreed, makes things less confusing for sure 
+>>
+>> 4.4 will be the first kernel where we will have the new eDMA bindings. I have
+>> chosen to use 16bit array for specifying the channels used for memcpy
+>> (ti,edma-memcpy-channels) and for the reserving paRAM slots
+>> (ti,edma-reserved-slot-ranges). As of now we have maximum of 64 channels and
+>> 512 paRAM slots. 16bit is more than enough to store this information and it
+>> even gives us enough room if ever in the future these numbers are going to
+>> increase (which  they are not).
+>>
+>> But in order to change them to 32bit the driver needs to be changed as well.
+>> Currently we do not have drivers (in 4.4) using the new bindings, 4.4 is not
+>> yet out, so it might be possible to change the binding document and the driver
+>> to use 32bit arrays. The driver internally uses 16bit type for these which I'm
+>> not going to change, but the code parsing the DT needs to be adjusted for the
+>> new data type.
+>>
+>> If Vinod is willing to take update for the DT binding of eDMA for 4.4-rc, I
+>> can cook up the patch(es) to do so.
 > 
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Doug Anderson <dianders@chromium.org>
-> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Cc: Andreas Faerber <afaerber@suse.de>
-> Cc: Sachin Kamat <sachin.kamat@linaro.org>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5420-arndale-octa.dts   | 8 ++++++++
->  arch/arm/boot/dts/exynos5420-peach-pit.dts      | 8 ++++++++
->  arch/arm/boot/dts/exynos5420-smdk5420.dts       | 8 ++++++++
->  arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts | 8 ++++++++
->  arch/arm/boot/dts/exynos5422-odroidxu3.dts      | 8 ++++++++
->  arch/arm/boot/dts/exynos5422-odroidxu4.dts      | 8 ++++++++
->  arch/arm/boot/dts/exynos5800-peach-pi.dts       | 8 ++++++++
->  7 files changed, 56 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-> index 4ecef69..4229641 100644
-> --- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-> +++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-> @@ -52,6 +52,14 @@
->  	};
->  };
->  
-> +&cpu0 {
-> +	cpu-supply = <&buck2_reg>;
-> +};
-> +
-> +&cpu4 {
-> +	cpu-supply = <&buck6_reg>;
-> +};
-> +
->  &usbdrd_dwc3_1 {
->  	dr_mode = "host";
->  };
-> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> index 35cfb07..30f146b 100644
-> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> @@ -676,6 +676,14 @@
->  	};
->  };
->  
-> +&cpu0 {
-> +	cpu-supply = <&buck2_reg>;
-> +};
-> +
-> +&cpu4 {
-> +	cpu-supply = <&buck6_reg>;
-> +};
-> +
->  &i2c_2 {
->  	status = "okay";
->  	samsung,i2c-sda-delay = <100>;
-> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> index ac35aef..fdfe4e6 100644
-> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> @@ -423,3 +423,11 @@
->  &usbdrd_phy1 {
->  	vbus-supply = <&usb301_vbus_reg>;
->  };
-> +
-> +&cpu0 {
-> +	cpu-supply = <&buck2_reg>;
-> +};
-> +
-> +&cpu4 {
-> +	cpu-supply = <&buck6_reg>;
-> +};
-> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
-> index 2ae1cf4..0bfd981 100644
-> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
-> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
-> @@ -54,6 +54,14 @@
->  	};
->  };
->  
-> +&cpu0 {
-> +	cpu-supply = <&buck6_reg>;
-> +};
-> +
-> +&cpu4 {
-> +	cpu-supply = <&buck2_reg>;
-> +};
-> +
->  &pwm {
->  	/*
->  	 * PWM 0 -- fan
-> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-> index 432406d..b19561c 100644
-> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-> @@ -53,6 +53,14 @@
->  	};
->  };
->  
-> +&cpu0 {
-> +	cpu-supply = <&buck6_reg>;
-> +};
-> +
-> +&cpu4 {
-> +	cpu-supply = <&buck2_reg>;
-> +};
-> +
->  &i2c_0 {
->  	status = "okay";
->  
-> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu4.dts b/arch/arm/boot/dts/exynos5422-odroidxu4.dts
-> index 2faf886..bdc7106 100644
-> --- a/arch/arm/boot/dts/exynos5422-odroidxu4.dts
-> +++ b/arch/arm/boot/dts/exynos5422-odroidxu4.dts
-> @@ -32,6 +32,14 @@
->  	};
->  };
->  
-> +&cpu0 {
-> +	cpu-supply = <&buck6_reg>;
-> +};
-> +
-> +&cpu4 {
-> +	cpu-supply = <&buck2_reg>;
-> +};
-> +
->  &pwm {
->  	/*
->  	 * PWM 0 -- fan
-> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> index 7b018e4..03ff1ceb 100644
-> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> @@ -638,6 +638,14 @@
->  	};
->  };
->  
-> +&cpu0 {
-> +	cpu-supply = <&buck2_reg>;
-> +};
-> +
-> +&cpu4 {
-> +	cpu-supply = <&buck6_reg>;
-> +};
-> +
->  &i2c_2 {
->  	status = "okay";
->  	samsung,i2c-sda-delay = <100>;
-> 
+> I hadn't realized that it was already in 4.4-rc. The change should be trivial
+> enough though, so I'd still do it. If Vinod would rather not change it now,
+> it's not overly important though.
 
+But this change must be done before we have actual users of these properties,
+which is the am33xx, am437x and the da850 conversion series I have sent recently.
+We might want to have this changed for 4.4 since it is going to be an LTS
+release...
 
 -- 
-Markus Reichl
+P?ter
