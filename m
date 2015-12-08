@@ -1,138 +1,174 @@
 From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Tue,  8 Dec 2015 14:28:34 +0100
-Subject: [PATCH v5 3/4] arm64: add implementation for arm-smccc
+Date: Tue,  8 Dec 2015 14:28:35 +0100
+Subject: [PATCH v5 4/4] drivers: psci: replace psci firmware calls
 In-Reply-To: <1449581315-14519-1-git-send-email-jens.wiklander@linaro.org>
 References: <1449581315-14519-1-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <1449581315-14519-4-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <1449581315-14519-5-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds implementation for arm-smccc and enables CONFIG_HAVE_SMCCC.
+Switch to use a generic interface for issuing SMC/HVC based on ARM SMC
+Calling Convention. Removes now the now unused psci-call.S.
 
 Acked-by: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
 ---
- arch/arm64/Kconfig              |  1 +
- arch/arm64/kernel/Makefile      |  2 +-
- arch/arm64/kernel/arm64ksyms.c  |  5 +++++
- arch/arm64/kernel/asm-offsets.c |  3 +++
- arch/arm64/kernel/smccc-call.S  | 43 +++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 53 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/kernel/smccc-call.S
+ arch/arm/kernel/Makefile      |  1 -
+ arch/arm/kernel/psci-call.S   | 31 -------------------------------
+ arch/arm64/kernel/Makefile    |  2 +-
+ arch/arm64/kernel/psci-call.S | 28 ----------------------------
+ drivers/firmware/psci.c       | 23 +++++++++++++++++++++--
+ 5 files changed, 22 insertions(+), 63 deletions(-)
+ delete mode 100644 arch/arm/kernel/psci-call.S
+ delete mode 100644 arch/arm64/kernel/psci-call.S
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 871f217..96513d0 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -92,6 +92,7 @@ config ARM64
- 	select SPARSE_IRQ
- 	select SYSCTL_EXCEPTION_TRACE
- 	select HAVE_CONTEXT_TRACKING
-+	select HAVE_ARM_SMCCC
- 	help
- 	  ARM 64-bit (AArch64) Linux support.
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index d2d0042..80856de 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -88,7 +88,6 @@ obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
  
+ obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
+ ifeq ($(CONFIG_ARM_PSCI),y)
+-obj-y				+= psci-call.o
+ obj-$(CONFIG_SMP)		+= psci_smp.o
+ endif
+ 
+diff --git a/arch/arm/kernel/psci-call.S b/arch/arm/kernel/psci-call.S
+deleted file mode 100644
+index a78e9e1..0000000
+--- a/arch/arm/kernel/psci-call.S
++++ /dev/null
+@@ -1,31 +0,0 @@
+-/*
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * Copyright (C) 2015 ARM Limited
+- *
+- * Author: Mark Rutland <mark.rutland@arm.com>
+- */
+-
+-#include <linux/linkage.h>
+-
+-#include <asm/opcodes-sec.h>
+-#include <asm/opcodes-virt.h>
+-
+-/* int __invoke_psci_fn_hvc(u32 function_id, u32 arg0, u32 arg1, u32 arg2) */
+-ENTRY(__invoke_psci_fn_hvc)
+-	__HVC(0)
+-	bx	lr
+-ENDPROC(__invoke_psci_fn_hvc)
+-
+-/* int __invoke_psci_fn_smc(u32 function_id, u32 arg0, u32 arg1, u32 arg2) */
+-ENTRY(__invoke_psci_fn_smc)
+-	__SMC(0)
+-	bx	lr
+-ENDPROC(__invoke_psci_fn_smc)
 diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 474691f..0170bea 100644
+index 0170bea..27bf1e5 100644
 --- a/arch/arm64/kernel/Makefile
 +++ b/arch/arm64/kernel/Makefile
-@@ -17,7 +17,7 @@ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
- 			   hyp-stub.o psci.o psci-call.o cpu_ops.o insn.o	\
+@@ -14,7 +14,7 @@ CFLAGS_REMOVE_return_address.o = -pg
+ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
+ 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
+ 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
+-			   hyp-stub.o psci.o psci-call.o cpu_ops.o insn.o	\
++			   hyp-stub.o psci.o cpu_ops.o insn.o	\
  			   return_address.o cpuinfo.o cpu_errata.o		\
  			   cpufeature.o alternative.o cacheinfo.o		\
--			   smp.o smp_spin_table.o topology.o
-+			   smp.o smp_spin_table.o topology.o smccc-call.o
+ 			   smp.o smp_spin_table.o topology.o smccc-call.o
+diff --git a/arch/arm64/kernel/psci-call.S b/arch/arm64/kernel/psci-call.S
+deleted file mode 100644
+index cf83e61..0000000
+--- a/arch/arm64/kernel/psci-call.S
++++ /dev/null
+@@ -1,28 +0,0 @@
+-/*
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * Copyright (C) 2015 ARM Limited
+- *
+- * Author: Will Deacon <will.deacon@arm.com>
+- */
+-
+-#include <linux/linkage.h>
+-
+-/* int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1, u64 arg2) */
+-ENTRY(__invoke_psci_fn_hvc)
+-	hvc	#0
+-	ret
+-ENDPROC(__invoke_psci_fn_hvc)
+-
+-/* int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1, u64 arg2) */
+-ENTRY(__invoke_psci_fn_smc)
+-	smc	#0
+-	ret
+-ENDPROC(__invoke_psci_fn_smc)
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index d24f35d..f25cd79 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -13,6 +13,7 @@
  
- extra-$(CONFIG_EFI)			:= efi-entry.o
+ #define pr_fmt(fmt) "psci: " fmt
  
-diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
-index 3b6d8cc..678f30b0 100644
---- a/arch/arm64/kernel/arm64ksyms.c
-+++ b/arch/arm64/kernel/arm64ksyms.c
-@@ -26,6 +26,7 @@
- #include <linux/syscalls.h>
- #include <linux/uaccess.h>
- #include <linux/io.h>
 +#include <linux/arm-smccc.h>
+ #include <linux/errno.h>
+ #include <linux/linkage.h>
+ #include <linux/of.h>
+@@ -58,8 +59,6 @@ struct psci_operations psci_ops;
  
- #include <asm/checksum.h>
+ typedef unsigned long (psci_fn)(unsigned long, unsigned long,
+ 				unsigned long, unsigned long);
+-asmlinkage psci_fn __invoke_psci_fn_hvc;
+-asmlinkage psci_fn __invoke_psci_fn_smc;
+ static psci_fn *invoke_psci_fn;
  
-@@ -68,3 +69,7 @@ EXPORT_SYMBOL(test_and_change_bit);
- #ifdef CONFIG_FUNCTION_TRACER
- EXPORT_SYMBOL(_mcount);
- #endif
-+
-+	/* arm-smccc */
-+EXPORT_SYMBOL(arm_smccc_smc);
-+EXPORT_SYMBOL(arm_smccc_hvc);
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 25de8b2..bb493d4 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -28,6 +28,7 @@
- #include <asm/suspend.h>
- #include <asm/vdso_datapage.h>
- #include <linux/kbuild.h>
-+#include <linux/arm-smccc.h>
- 
- int main(void)
- {
-@@ -161,5 +162,7 @@ int main(void)
-   DEFINE(SLEEP_SAVE_SP_PHYS,	offsetof(struct sleep_save_sp, save_ptr_stash_phys));
-   DEFINE(SLEEP_SAVE_SP_VIRT,	offsetof(struct sleep_save_sp, save_ptr_stash));
- #endif
-+  DEFINE(ARM_SMCCC_RES_X0_OFFS,	offsetof(struct arm_smccc_res, a0));
-+  DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
-   return 0;
+ enum psci_function {
+@@ -107,6 +106,26 @@ bool psci_power_state_is_valid(u32 state)
+ 	return !(state & ~valid_mask);
  }
-diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
-new file mode 100644
-index 0000000..ae0496f
---- /dev/null
-+++ b/arch/arm64/kernel/smccc-call.S
-@@ -0,0 +1,43 @@
-+/*
-+ * Copyright (c) 2015, Linaro Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License Version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+#include <linux/linkage.h>
-+#include <asm/asm-offsets.h>
+ 
++static unsigned long __invoke_psci_fn_hvc(unsigned long function_id,
++			unsigned long arg0, unsigned long arg1,
++			unsigned long arg2)
++{
++	struct arm_smccc_res res;
 +
-+	.macro SMCCC instr
-+	.cfi_startproc
-+	\instr	#0
-+	ldr	x4, [sp]
-+	stp	x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
-+	stp	x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
-+	ret
-+	.cfi_endproc
-+	.endm
++	arm_smccc_hvc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
++	return res.a0;
++}
 +
-+/*
-+ * void arm_smccc_smc(unsigned long a0, unsigned long a1, unsigned long a2,
-+ *		  unsigned long a3, unsigned long a4, unsigned long a5,
-+ *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
-+ */
-+ENTRY(arm_smccc_smc)
-+	SMCCC	smc
-+ENDPROC(arm_smccc_smc)
++static unsigned long __invoke_psci_fn_smc(unsigned long function_id,
++			unsigned long arg0, unsigned long arg1,
++			unsigned long arg2)
++{
++	struct arm_smccc_res res;
 +
-+/*
-+ * void arm_smccc_hvc(unsigned long a0, unsigned long a1, unsigned long a2,
-+ *		  unsigned long a3, unsigned long a4, unsigned long a5,
-+ *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
-+ */
-+ENTRY(arm_smccc_hvc)
-+	SMCCC	hvc
-+ENDPROC(arm_smccc_hvc)
++	arm_smccc_smc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
++	return res.a0;
++}
++
+ static int psci_to_linux_errno(int errno)
+ {
+ 	switch (errno) {
 -- 
 1.9.1
