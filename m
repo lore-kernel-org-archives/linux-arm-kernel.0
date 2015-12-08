@@ -1,109 +1,104 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 8 Dec 2015 09:25:14 -0600
-Subject: [PATCH v2 next 1/2] dts: hisi: fixes no syscon error when init
- mdio
-In-Reply-To: <1449476707-224320-2-git-send-email-yankejian@huawei.com>
-References: <1449476707-224320-1-git-send-email-yankejian@huawei.com>
- <1449476707-224320-2-git-send-email-yankejian@huawei.com>
-Message-ID: <20151208152514.GA27037@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 08 Dec 2015 16:28:59 +0100
+Subject: [PATCH] net: ezchip: fix address space confusion in nps_enet.c
+Message-ID: <33732958.3idC7H2UPT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 04:25:06PM +0800, yankejian wrote:
-> Signed-nux start up, we get the log below:
-> "Hi-HNS_MDIO 803c0000.mdio: no syscon hisilicon,peri-c-subctrl
->  mdio_bus mdio at 803c0000: mdio sys ctl reg has not maped       "
-> 
-> the source code about the subctrl is dealled with syscon, but dts doesn't.
+The nps_enet driver happily mixes virtual, physical and __iomem
+addresses, which are all different depending on the architecture
+and configuration.  That causes a warning when building the code
+on ARM with LPAE mode enabled:
 
-The source...
+drivers/net/ethernet/ezchip/nps_enet.c: In function 'nps_enet_send_frame':
+drivers/net/ethernet/ezchip/nps_enet.c:370:13: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
 
-s/dealled/dealt/
+but will also fail to work for other reasons.
 
-> it cause such fault. so this patch adds the syscon info on dts files to
-> fixes it. and it adds documentation for the devicetree bindings used by
+In this patch, I'm trying to change the code to use only normal
+kernel pointers, which I assume is what the author actually meant:
 
-Capitalization please.
+* For reading or writing a 32-bit word that may be unaligned when
+  an SKB contains unaligned data, I'm using get_unaligned/put_unaligned()
+  rather than memcpy_fromio/toio.
 
-> DT files of Hisilicon Hip05-D02 development board.
-> 
-> Signed-off-by: yankejian <yankejian@huawei.com>
-> ---
-> change log:
-> v2:
->  1) updates the related documented in the binding as well
->  2) use the normal naming conventions using '-' instead of '_'
-> 
-> v1:
->  initial version
-> ---
->  .../devicetree/bindings/arm/hisilicon/hisilicon.txt      | 16 ++++++++++++++++
->  arch/arm64/boot/dts/hisilicon/hip05.dtsi                 |  5 +++++
->  arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi             |  4 ++--
->  3 files changed, 23 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> index 6ac7c00..9f05767 100644
-> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> @@ -187,6 +187,22 @@ Example:
->  		reg = <0xb0000000 0x10000>;
->  	};
->  
-> +Hisilicon HiP05 PERISUB system controller
-> +
-> +Required properties:
-> +- compatible : "hisilicon,peri-c-subctrl", "syscon";
-> +- reg : Register address and size
-> +
-> +The HiP05 PERISUB system controller is shared by peripheral controllers in
-> +HiP05 Soc to implement some basic configurations. the peripheral
-> +controllers include mdio, ddr, iic, uart, timer and so on.
-> +
-> +Example:
-> +	/* for HiP05 PCIe-SAS system */
-> +	peri-c-subctrl: sub-ctrl-c at 80000000 {
+* For converting a u8 pointer to a u32 pointer, I use a cast rather
+  than the incorrect virt_to_phys.
 
-s/sub-ctrl-c/syscon/
+* For copying a couple of bytes from one place to another while respecting
+  alignment, I use memcpy instead of memcpy_toio.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/net/ethernet/ezchip/nps_enet.c | 30 +++++++++---------------------
+ 1 file changed, 9 insertions(+), 21 deletions(-)
+
+It would be helpful to test this patch on real hardware before it gets applied.
+
+The current behavior is so obscure that it's hard to know what the author
+of the code actually intended to happen here, this is based on my best guess.
 
 
-> +		compatible = "hisilicon,peri-c-subctrl", "syscon";
-> +		reg = <0x0 0x80000000 0x0 0x10000>;
-> +	};
->  -----------------------------------------------------------------------
->  Hisilicon CPU controller
->  
-> diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-> index 4ff16d0..5fec740 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-> @@ -246,6 +246,11 @@
->  			clock-frequency = <200000000>;
->  		};
->  
-> +		peri_c_subctrl: sub-ctrl-c at 80000000 {
-> +			compatible = "hisilicon,peri-c-subctrl", "syscon";
-> +			reg = < 0x0 0x80000000 0x0 0x10000>;
-> +		};
-> +
->  		uart0: uart at 80300000 {
->  			compatible = "snps,dw-apb-uart";
->  			reg = <0x0 0x80300000 0x0 0x10000>;
-> diff --git a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi b/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
-> index 606dd5a..da7b6e6 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
-> @@ -10,8 +10,8 @@ soc0: soc at 000000000 {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
->  		compatible = "hisilicon,hns-mdio";
-> -		reg = <0x0 0x803c0000 0x0 0x10000
-> -		       0x0 0x80000000 0x0 0x10000>;
-> +		reg = <0x0 0x803c0000 0x0 0x10000>;
-> +		subctrl-vbase = <&peri_c_subctrl>;
->  
->  		soc0_phy0: ethernet-phy at 0 {
->  			reg = <0x0>;
-> -- 
-> 1.9.1
-> 
+diff --git a/drivers/net/ethernet/ezchip/nps_enet.c b/drivers/net/ethernet/ezchip/nps_enet.c
+index 63c2bcf8031a..b1026689b78f 100644
+--- a/drivers/net/ethernet/ezchip/nps_enet.c
++++ b/drivers/net/ethernet/ezchip/nps_enet.c
+@@ -48,21 +48,15 @@ static void nps_enet_read_rx_fifo(struct net_device *ndev,
+ 			*reg = nps_enet_reg_get(priv, NPS_ENET_REG_RX_BUF);
+ 	else { /* !dst_is_aligned */
+ 		for (i = 0; i < len; i++, reg++) {
+-			u32 buf =
+-				nps_enet_reg_get(priv, NPS_ENET_REG_RX_BUF);
+-
+-			/* to accommodate word-unaligned address of "reg"
+-			 * we have to do memcpy_toio() instead of simple "=".
+-			 */
+-			memcpy_toio((void __iomem *)reg, &buf, sizeof(buf));
++			u32 buf = nps_enet_reg_get(priv, NPS_ENET_REG_RX_BUF);
++			put_unaligned(buf, reg);
+ 		}
+ 	}
+ 
+ 	/* copy last bytes (if any) */
+ 	if (last) {
+ 		u32 buf = nps_enet_reg_get(priv, NPS_ENET_REG_RX_BUF);
+-
+-		memcpy_toio((void __iomem *)reg, &buf, last);
++		memcpy((u8*)reg, &buf, last);
+ 	}
+ }
+ 
+@@ -367,7 +361,7 @@ static void nps_enet_send_frame(struct net_device *ndev,
+ 	struct nps_enet_tx_ctl tx_ctrl;
+ 	short length = skb->len;
+ 	u32 i, len = DIV_ROUND_UP(length, sizeof(u32));
+-	u32 *src = (u32 *)virt_to_phys(skb->data);
++	u32 *src = (void *)skb->data;
+ 	bool src_is_aligned = IS_ALIGNED((unsigned long)src, sizeof(u32));
+ 
+ 	tx_ctrl.value = 0;
+@@ -375,17 +369,11 @@ static void nps_enet_send_frame(struct net_device *ndev,
+ 	if (src_is_aligned)
+ 		for (i = 0; i < len; i++, src++)
+ 			nps_enet_reg_set(priv, NPS_ENET_REG_TX_BUF, *src);
+-	else { /* !src_is_aligned */
+-		for (i = 0; i < len; i++, src++) {
+-			u32 buf;
+-
+-			/* to accommodate word-unaligned address of "src"
+-			 * we have to do memcpy_fromio() instead of simple "="
+-			 */
+-			memcpy_fromio(&buf, (void __iomem *)src, sizeof(buf));
+-			nps_enet_reg_set(priv, NPS_ENET_REG_TX_BUF, buf);
+-		}
+-	}
++	else /* !src_is_aligned */
++		for (i = 0; i < len; i++, src++)
++			nps_enet_reg_set(priv, NPS_ENET_REG_TX_BUF,
++					 get_unaligned(src));
++
+ 	/* Write the length of the Frame */
+ 	tx_ctrl.nt = length;
+ 
+-- 
+2.1.0.rc2
