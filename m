@@ -1,53 +1,33 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 8 Dec 2015 10:26:49 +0000
-Subject: [PATCH] ARM: tegra: Fix suspend hang on Tegra124 Chromebooks
-Message-ID: <1449570409-30244-1-git-send-email-jonathanh@nvidia.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 08 Dec 2015 10:29:58 +0000
+Subject: [PATCH v8 4/4] arm64: switch to irq_stack during softirq
+In-Reply-To: <20151204184038.GQ10123@e104818-lin.cambridge.arm.com>
+References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
+ <1449226948-14251-5-git-send-email-james.morse@arm.com>
+ <20151204140119.GL10123@e104818-lin.cambridge.arm.com>
+ <5661A5B0.3080504@arm.com>
+ <20151204184038.GQ10123@e104818-lin.cambridge.arm.com>
+Message-ID: <5666B126.3020002@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabling CPUFreq support for Tegra124 Chromebooks is causing the Tegra124
-to hang when resuming from suspend.
+On 04/12/15 18:40, Catalin Marinas wrote:
+> BTW, at which point does in_irq() return true for an interrupt (and when
+> it ceases to do so)?
 
-When CPUFreq is enabled, the CPU clock is changed from the PLLX clock to
-the DFLL clock during kernel boot. When resuming from suspend the CPU
-clock is temporarily changed back to the PLLX clock before switching back
-to the DFLL. If the DFLL is operating at a much lower frequency than the
-PLLX when we enter suspend, and so the CPU voltage rail is at a voltage
-too low for the CPUs to operate at the PLLX frequency, then the device
-will hang.
+It uses hardirq_count(), so its true between irq_enter() and irq_exit().
 
-Please note that the PLLX is used in the resume sequence to switch the CPU
-clock from the very slow 32K clock to a faster clock during early resume
-to speed up the resume sequence before the DFLL is resumed.
+The calls out from handle_IPI() are wrapped by these (except
+scheduler_ipi(), which calls them itself).
 
-Ideally, we should fix this by setting the suspend frequency so that it
-matches the PLLX frequency, however, that would be a bigger change. For
-now simply disable CPUFreq support for Tegra124 Chromebooks to avoid the
-hang when resuming from suspend.
+The other route looks like:
+gic_handle_irq() -> __handle_domain_irq()
+which wraps generic_handle_irq() in irq_enter()/irq_exit().
 
-Fixes: 9a0baee960a7 ("ARM: tegra: Enable CPUFreq support for Tegra124
-		      Chromebooks")
 
-Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
----
+I don't know how chained_irq_enter() changes/affects this.
 
-Please note that this fix is required for v4.4
 
- arch/arm/boot/dts/tegra124-nyan.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks,
 
-diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi b/arch/arm/boot/dts/tegra124-nyan.dtsi
-index 40c23a0b7cfc..ec1aa64ded68 100644
---- a/arch/arm/boot/dts/tegra124-nyan.dtsi
-+++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
-@@ -399,7 +399,7 @@
- 
- 	/* CPU DFLL clock */
- 	clock at 0,70110000 {
--		status = "okay";
-+		status = "disabled";
- 		vdd-cpu-supply = <&vdd_cpu>;
- 		nvidia,i2c-fs-rate = <400000>;
- 	};
--- 
-2.1.4
+James
