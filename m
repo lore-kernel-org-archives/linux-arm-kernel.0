@@ -1,85 +1,40 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 08 Dec 2015 10:50:49 +0100
-Subject: [PATCH 2/3] doc: dt-binding: generic onboard USB HUB
-In-Reply-To: <1449538670-7954-3-git-send-email-peter.chen@freescale.com>
-References: <1449538670-7954-1-git-send-email-peter.chen@freescale.com>
- <1449538670-7954-3-git-send-email-peter.chen@freescale.com>
-Message-ID: <1449568249.3691.15.camel@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 08 Dec 2015 10:51:50 +0100
+Subject: [PATCH] ARM: DTS: am33xx: Use the new DT bindings for the eDMA3
+In-Reply-To: <566689E2.7060907@ti.com>
+References: <1449225915-28879-1-git-send-email-peter.ujfalusi@ti.com>
+ <20151204215115.GP23396@atomide.com> <566689E2.7060907@ti.com>
+Message-ID: <4387766.cHF7OBX0cm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-Am Dienstag, den 08.12.2015, 09:37 +0800 schrieb Peter Chen:
-> Add dt-binding documentation for generic onboard USB HUB.
+On Tuesday 08 December 2015 09:42:26 Peter Ujfalusi wrote:
+> On 12/04/2015 11:51 PM, Tony Lindgren wrote:
+> >>
+> >> Please just drop the /bits/ 16 and use normal cells.
+> > 
+> > Yeah agreed, makes things less confusing for sure 
 > 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  .../bindings/usb/generic-onboard-hub.txt           | 28 ++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/generic-onboard-hub.txt
+> 4.4 will be the first kernel where we will have the new eDMA bindings. I have
+> chosen to use 16bit array for specifying the channels used for memcpy
+> (ti,edma-memcpy-channels) and for the reserving paRAM slots
+> (ti,edma-reserved-slot-ranges). As of now we have maximum of 64 channels and
+> 512 paRAM slots. 16bit is more than enough to store this information and it
+> even gives us enough room if ever in the future these numbers are going to
+> increase (which  they are not).
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/generic-onboard-hub.txt b/Documentation/devicetree/bindings/usb/generic-onboard-hub.txt
-> new file mode 100644
-> index 0000000..ea92205
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/generic-onboard-hub.txt
-> @@ -0,0 +1,28 @@
-> +Generic Onboard USB HUB
->+
-> +Required properties:
-> +- compatible: should be "generic-onboard-hub"
+> But in order to change them to 32bit the driver needs to be changed as well.
+> Currently we do not have drivers (in 4.4) using the new bindings, 4.4 is not
+> yet out, so it might be possible to change the binding document and the driver
+> to use 32bit arrays. The driver internally uses 16bit type for these which I'm
+> not going to change, but the code parsing the DT needs to be adjusted for the
+> new data type.
+> 
+> If Vinod is willing to take update for the DT binding of eDMA for 4.4-rc, I
+> can cook up the patch(es) to do so.
 
-This something we don't have to define ad-hoc. The hub hangs off an USB
-controller, right? The "Open Firmware recommended practice: USB"
-document already describes how to represent USB devices in a generic
-manner:
-http://www.firmware.org/1275/bindings/usb/usb-1_0.ps
+I hadn't realized that it was already in 4.4-rc. The change should be trivial
+enough though, so I'd still do it. If Vinod would rather not change it now,
+it's not overly important though.
 
-Is there a reason not to reuse this?
-
-The usb hub node would be a child of the usb controller node, and it
-could use
-	compatible = "usb,class9"; /* bDeviceClass 9 (Hub) */
-
-
-> +Optional properties:
-> +- clocks: the input clock for HUB.
-> +
-> +- clock-names: Should be "external_clk"
-
-Is clock-names necessary for a single clock?
-
-> +- hub-reset-gpios: Should specify the GPIO for reset.
-
-I'd prefer that to be just "reset-gpios", it is the only reset property
-in the hub node after all. And use the GPIO_ACTIVE_HIGH/LOW flags to
-indicate polarity.
-
-> +- hub-reset-active-high: the active reset signal is high, if this property is
-> +  not set, the active reset signal is low.
-
-Then this could be dropped.
-
-> +- hub-reset-duration-us: the duration for assert reset signal, the time unit
-> +  is microsecond.
-
-And consequently, this could just be called "reset-duration-us".
-It might make sense to define the same for other reset GPIOs, too.
-The Freescale FEC, for example, has "phy-reset-duration" (in ms)
-already.
-
-> +
-> +Example:
-> +
-> +	usb_hub1 {
-> +		compatible = "generic-onboard-hub";
-> +		clocks = <&clks IMX6QDL_CLK_CKO>;
-> +		clock-names = "external_clk";
-> +		hub-reset-gpios = <&gpio7 12 0>;
-> +		hub-reset-active-high;
-> +		hub-reset-duration-us = <2>;
-> +	};
-
-best regards
-Philipp
+	Arnd
