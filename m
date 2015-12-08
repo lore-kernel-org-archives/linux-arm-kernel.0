@@ -1,41 +1,36 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue,  8 Dec 2015 18:54:13 +0100
-Subject: [PATCH 08/13] ARM: shmobile: kzm9d dts: Update console parameters
-In-Reply-To: <1449597258-32623-1-git-send-email-geert+renesas@glider.be>
-References: <1449597258-32623-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1449597258-32623-9-git-send-email-geert+renesas@glider.be>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 08 Dec 2015 17:56:20 +0000
+Subject: [PATCH v6 00/21] KVM: ARM64: Add guest PMU support
+In-Reply-To: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <566719C4.9030305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a "serial1" alias for the serial console (it's labeled "uart1").
-Drop the "console=" parameter from the kernel command line, as it's no
-longer needed for DT-based platforms.
-Add the serial port config to chosen/stdout-path.
+Shannon,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/emev2-kzm9d.dts | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+On 08/12/15 12:47, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> This patchset adds guest PMU support for KVM on ARM64. It takes
+> trap-and-emulate approach. When guest wants to monitor one event, it
+> will be trapped by KVM and KVM will call perf_event API to create a perf
+> event and call relevant perf_event APIs to get the count value of event.
 
-diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
-index 8c24975e8f9d6638..191b565449509778 100644
---- a/arch/arm/boot/dts/emev2-kzm9d.dts
-+++ b/arch/arm/boot/dts/emev2-kzm9d.dts
-@@ -23,9 +23,13 @@
- 		reg = <0x40000000 0x8000000>;
- 	};
- 
-+	aliases {
-+		serial1 = &uart1;
-+	};
-+
- 	chosen {
--		bootargs = "console=ttyS1,115200n81 ignore_loglevel root=/dev/nfs ip=dhcp";
--		stdout-path = &uart1;
-+		bootargs = "ignore_loglevel root=/dev/nfs ip=dhcp";
-+		stdout-path = "serial1:115200n8";
- 	};
- 
- 	gpio_keys {
+There is still some work to do. A number of bugs, some design issues,
+and in general a lot of tidying up to do. If you want this in 4.5,
+you're going to have to address this quickly.
+
+But quickly doesn't mean rushing it, and I have the feeling that this is
+what you've done over the past week. Also, I've reviewed this series 3
+times during that time, and I feel a bit exhausted.
+
+So please do not send another one before the end of the week. take the
+time to address all the comments, ask questions if needed, and hopefully
+I can review it again next Monday.
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
