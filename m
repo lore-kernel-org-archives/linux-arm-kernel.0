@@ -1,47 +1,30 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 8 Dec 2015 09:33:45 -0500
-Subject: [PATCH V7 3/3] dma: add Qualcomm Technologies HIDMA channel driver
-In-Reply-To: <20151205080030.GJ1854@localhost>
-References: <1448245707-27499-1-git-send-email-okaya@codeaurora.org>
- <1448245707-27499-4-git-send-email-okaya@codeaurora.org>
- <20151130085948.GC3901@localhost> <565CAC4C.7080909@codeaurora.org>
- <20151201113458.GL3901@localhost> <565E0E1D.1040505@codeaurora.org>
- <565F40A5.2040701@codeaurora.org> <20151205080030.GJ1854@localhost>
-Message-ID: <5666EA49.2030206@codeaurora.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue,  8 Dec 2015 14:31:56 +0000
+Subject: [PATCH v5 03/11] ARM: multi_v7_defconfig: Enable support for PWM
+ Regulators
+In-Reply-To: <1449585124-15596-1-git-send-email-lee.jones@linaro.org>
+References: <1449585124-15596-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1449585124-15596-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/5/2015 3:00 AM, Vinod Koul wrote:
-> On Wed, Dec 02, 2015 at 02:04:05PM -0500, Sinan Kaya wrote:
->>>>> You are missing the point. Channel can be paused, yes but the descriptor
->>>>> is in queue and is not paused. The descriptor running is paused, yes.
->>>>> There is subtle difference between these
->>> I'll follow your recommendation. PAUSE for the currently active
->>> descriptor and DMA_IN_PROGRESS for the rest.
->>>
->>
->> I'm now confused.
->>
->> I looked at several DMA driver implementations.
->>
->> 1. They call dma_cookie_status function to see if the job is done.
->> 2. If done, they return right ahead.
->> 3. Otherwise, dma_cookie_status returns DMA_IN_PROGRESS.
->> 4. Next the code checks if the channel is paused and return value is
->> DMA_IN_PROGRESS. The code changes return code to DMA_PAUSED.
->>
->> Whereas, I was returning paused first before even checking if the
->> descriptor is done. Are you OK with the sequence 1..4 above?
-> 
-> Yes am okay with this with slight change in 4.
-> 
-> You should set to PAUSED only for current descriptor and not for the ones in
-> queue
-> 
-OK, I'll work on it.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/configs/multi_v7_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index f62dcb1..648ef57 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -434,7 +434,7 @@ CONFIG_REGULATOR_MAX77693=m
+ CONFIG_REGULATOR_MAX77802=m
+ CONFIG_REGULATOR_PALMAS=y
+ CONFIG_REGULATOR_PBIAS=y
+-CONFIG_REGULATOR_PWM=m
++CONFIG_REGULATOR_PWM=y
+ CONFIG_REGULATOR_QCOM_RPM=y
+ CONFIG_REGULATOR_QCOM_SMD_RPM=y
+ CONFIG_REGULATOR_S2MPS11=y
 -- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
-Linux Foundation Collaborative Project
+1.9.1
