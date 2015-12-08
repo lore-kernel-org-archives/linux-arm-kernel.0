@@ -1,55 +1,54 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Dec 2015 13:51:39 +0000
-Subject: [PATCH v3 3/7] arm64: split off early mapping code from
- early_fixmap_init()
-In-Reply-To: <CAKv+Gu-gvCy73ake0WFErYwP5f5pRAcXs_S1epiG53xs+Fz7Sg@mail.gmail.com>
-References: <1447672998-20981-1-git-send-email-ard.biesheuvel@linaro.org>
- <1447672998-20981-4-git-send-email-ard.biesheuvel@linaro.org>
- <20151203121840.GB28731@leverpostej>
- <20151208124016.GH19612@arm.com>
- <CAKv+Gu-gvCy73ake0WFErYwP5f5pRAcXs_S1epiG53xs+Fz7Sg@mail.gmail.com>
-Message-ID: <20151208135139.GJ19612@arm.com>
+Date: Tue, 8 Dec 2015 13:53:36 +0000
+Subject: [PATCH v6 02/21] KVM: ARM64: Define PMU data structure for each
+ vcpu
+In-Reply-To: <5666DD0A.5060004@arm.com>
+References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
+ <1449578860-15808-3-git-send-email-zhaoshenglong@huawei.com>
+ <5666DD0A.5060004@arm.com>
+Message-ID: <20151208135335.GK19612@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 02:29:33PM +0100, Ard Biesheuvel wrote:
-> On 8 December 2015 at 13:40, Will Deacon <will.deacon@arm.com> wrote:
-> > On Thu, Dec 03, 2015 at 12:18:40PM +0000, Mark Rutland wrote:
-> >> Apologies that it's taken me so long to get around to this...
-> >>
-> >> On Mon, Nov 16, 2015 at 12:23:14PM +0100, Ard Biesheuvel wrote:
-> >> > This splits off and generalises the population of the statically
-> >> > allocated fixmap page tables so that we may reuse it later for
-> >> > the linear mapping once we move the kernel text mapping out of it.
-> >> >
-> >> > This also involves taking into account that table entries at any of
-> >> > the levels we are populating may have been populated already, since
-> >> > the fixmap mapping might not be disjoint up to the pgd level anymore
-> >> > from other early mappings.
-> >>
-> >> As a heads-up, for avoiding TLB conflicts, I'm currently working on
-> >> alternative way of creating the kernel page tables which will definitely
-> >> conflict here, and may or may not supercede this approach.
-> >
-> > Given that the Christmas break is around the corner and your TLB series
-> > is probably going to take some time to get right, I suggest we persevere
-> > with Ard's current patch series for 4.5 and merge the TLB conflict solution
-> > for 4.6. I don't want us to end up in a situation where this is needlessly
-> > blocked on something that isn't quite ready.
-> >
-> > Any objections? If not, Ard -- can you post a new version of this, please?
-> >
-> 
-> Happy to post a new version, with the following remarks
-> - my current private tree has evolved in the mean time, and I am now
-> putting the kernel image at the base of the vmalloc region (and the
-> module region right before)
-> - I think Mark's changes would allow me to deobfuscate the VA bias
-> that redirects __va() translations into the kernel VA space rather
-> than the linear mapping
+On Tue, Dec 08, 2015 at 01:37:14PM +0000, Marc Zyngier wrote:
+> On 08/12/15 12:47, Shannon Zhao wrote:
+> > From: Shannon Zhao <shannon.zhao@linaro.org>
+> > 
+> > Here we plan to support virtual PMU for guest by full software
+> > emulation, so define some basic structs and functions preparing for
+> > futher steps. Define struct kvm_pmc for performance monitor counter and
+> > struct kvm_pmu for performance monitor unit for each vcpu. According to
+> > ARMv8 spec, the PMU contains at most 32(ARMV8_MAX_COUNTERS) counters.
+> > 
+> > Since this only supports ARM64 (or PMUv3), add a separate config symbol
+> > for it.
+> > 
+> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> > ---
+> >  arch/arm64/include/asm/kvm_host.h |  2 ++
+> >  arch/arm64/kvm/Kconfig            |  8 ++++++++
+> >  include/kvm/arm_pmu.h             | 40 +++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 50 insertions(+)
+> >  create mode 100644 include/kvm/arm_pmu.h
 
-I'll leave that up to you. I'm just trying to avoid you growing a dependency
-on something that's unlikely to make it for 4.5. If Mark separates out the
-parts you need, perhaps that offers us some middle ground.
+[...]
+
+> > diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+> > index a5272c0..66da9a2 100644
+> > --- a/arch/arm64/kvm/Kconfig
+> > +++ b/arch/arm64/kvm/Kconfig
+> > @@ -36,6 +36,7 @@ config KVM
+> >  	select HAVE_KVM_EVENTFD
+> >  	select HAVE_KVM_IRQFD
+> >  	select KVM_ARM_VGIC_V3
+> > +	select KVM_ARM_PMU
+> 
+> What if HW_PERF_EVENTS is not selected? Also, selecting HW_PERF_EVENTS
+> is not enough, and you probably need PERF_EVENTS as well, So this should
+> probably read:
+> 
+> 	select KVM_ARM_PMU if (HW_PERF_EVENTS && PERF_EVENTS)
+
+HW_PERF_EVENTS depends on ARM_PMU which in turn depends on PERF_EVENTS.
 
 Will
