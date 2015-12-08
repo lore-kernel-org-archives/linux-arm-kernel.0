@@ -1,40 +1,100 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 8 Dec 2015 09:11:17 +0100
-Subject: [PATCH v5 1/4] clk: sunxi: Add H3 clocks support
-In-Reply-To: <1449264283-25360-2-git-send-email-jenskuske@gmail.com>
-References: <1449264283-25360-1-git-send-email-jenskuske@gmail.com>
- <1449264283-25360-2-git-send-email-jenskuske@gmail.com>
-Message-ID: <20151208081117.GL27957@lukather>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 8 Dec 2015 08:19:31 +0000
+Subject: [PATCH v3 05/22] arm64: KVM: Implement vgic-v3 save/restore
+In-Reply-To: <56663D0C.1070500@samsung.com>
+References: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
+ <1449485618-9443-6-git-send-email-marc.zyngier@arm.com>
+ <5665B663.8020705@samsung.com> <5665B940.7000601@arm.com>
+ <5665BF4D.7090103@samsung.com> <5665C3C7.9010600@arm.com>
+ <5665CA68.2000401@samsung.com> <5665CDDF.3090201@arm.com>
+ <56663D0C.1070500@samsung.com>
+Message-ID: <20151208081931.23def99d@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jens,
+On Mon, 7 Dec 2015 18:14:36 -0800
+Mario Smarduch <m.smarduch@samsung.com> wrote:
 
-On Fri, Dec 04, 2015 at 10:24:40PM +0100, Jens Kuske wrote:
-> The H3 clock control unit is similar to the those of other sun8i family
-> members like the A23.
 > 
-> It adds a new bus gates clock similar to the simple gates, but with a
-> different parent clock for each single gate.
-> Some of the gates use the new AHB2 clock as parent, whose clock source
-> is muxable between AHB1 and PLL6/2. The documentation isn't totally clear
-> about which devices belong to AHB2 now, especially USB EHIC/OHIC, so it
-> is mostly based on Allwinner kernel source code.
 > 
-> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+> On 12/7/2015 10:20 AM, Marc Zyngier wrote:
+> > On 07/12/15 18:05, Mario Smarduch wrote:
+> >>
+> >>
+> >> On 12/7/2015 9:37 AM, Marc Zyngier wrote:
+> [...]
+> >>>
+> >>
+> >> I was thinking something like 'current_lr[VGIC_V3_LR_INDEX(...)]'.
+> > 
+> > That doesn't change anything, the compiler is perfectly able to 
+> > optimize something like this:
+> > 
+> > [...]
+> > ffffffc0007f31ac:       38624862        ldrb    w2, [x3,w2,uxtw]
+> > ffffffc0007f31b0:       10000063        adr     x3, ffffffc0007f31bc <__vgic_v3_save_state+0x64>
+> > ffffffc0007f31b4:       8b228862        add     x2, x3, w2, sxtb #2
+> > ffffffc0007f31b8:       d61f0040        br      x2
+> > ffffffc0007f31bc:       d53ccde2        mrs     x2, s3_4_c12_c13_7
+> > ffffffc0007f31c0:       f9001c02        str     x2, [x0,#56]
+> > ffffffc0007f31c4:       d53ccdc2        mrs     x2, s3_4_c12_c13_6
+> > ffffffc0007f31c8:       f9002002        str     x2, [x0,#64]
+> > ffffffc0007f31cc:       d53ccda2        mrs     x2, s3_4_c12_c13_5
+> > ffffffc0007f31d0:       f9002402        str     x2, [x0,#72]
+> > ffffffc0007f31d4:       d53ccd82        mrs     x2, s3_4_c12_c13_4
+> > ffffffc0007f31d8:       f9002802        str     x2, [x0,#80]
+> > ffffffc0007f31dc:       d53ccd62        mrs     x2, s3_4_c12_c13_3
+> > ffffffc0007f31e0:       f9002c02        str     x2, [x0,#88]
+> > ffffffc0007f31e4:       d53ccd42        mrs     x2, s3_4_c12_c13_2
+> > ffffffc0007f31e8:       f9003002        str     x2, [x0,#96]
+> > ffffffc0007f31ec:       d53ccd22        mrs     x2, s3_4_c12_c13_1
+> > ffffffc0007f31f0:       f9003402        str     x2, [x0,#104]
+> > ffffffc0007f31f4:       d53ccd02        mrs     x2, s3_4_c12_c13_0
+> > ffffffc0007f31f8:       f9003802        str     x2, [x0,#112]
+> > ffffffc0007f31fc:       d53ccce2        mrs     x2, s3_4_c12_c12_7
+> > ffffffc0007f3200:       f9003c02        str     x2, [x0,#120]
+> > ffffffc0007f3204:       d53cccc2        mrs     x2, s3_4_c12_c12_6
+> > ffffffc0007f3208:       f9004002        str     x2, [x0,#128]
+> > ffffffc0007f320c:       d53ccca2        mrs     x2, s3_4_c12_c12_5
+> > ffffffc0007f3210:       f9004402        str     x2, [x0,#136]
+> > ffffffc0007f3214:       d53ccc82        mrs     x2, s3_4_c12_c12_4
+> > ffffffc0007f3218:       f9004802        str     x2, [x0,#144]
+> > ffffffc0007f321c:       d53ccc62        mrs     x2, s3_4_c12_c12_3
+> > ffffffc0007f3220:       f9004c02        str     x2, [x0,#152]
+> > ffffffc0007f3224:       d53ccc42        mrs     x2, s3_4_c12_c12_2
+> > ffffffc0007f3228:       f9005002        str     x2, [x0,#160]
+> > ffffffc0007f322c:       d53ccc22        mrs     x2, s3_4_c12_c12_1
+> > ffffffc0007f3230:       f9005402        str     x2, [x0,#168]
+> > ffffffc0007f3234:       d53ccc02        mrs     x2, s3_4_c12_c12_0
+> > ffffffc0007f3238:       7100183f        cmp     w1, #0x6
+> > ffffffc0007f323c:       f9005802        str     x2, [x0,#176]
+> > 
+> > As you can see, this is as optimal as it gets, short of being able
+> > to find a nice way to use more than one register...
+> 
+> Interesting, thanks for the dump I'm no expert on pipeline optimizations but I'm
+> wondering with these system register accesses can these be executed out of order
+> provided you didn't have what I thinks are write after read dependencies?
 
-Applied, thanks!
+System-register reads can be executed out of order, that is not a
+problem. Even the stores can be executed out of order as the CPU
+renames the GP registers (depending on the microarchitecture, of
+course).
 
-Maxime
+Now, what I'd *really* like to see is GCC to output something similar
+to what we have in the original code, where we use as many registers as
+possible to store the data, and output it in one go, possibly using
+strp. So far, I haven't found a way to convince the compiler to do so.
 
+> It's only 4 registers here, there are some other longer stretches in subsequent
+> patches.
+> 
+> I minor note here is some white space in this patch.
+
+Ah, thanks for letting me know. I'll chase those.
+
+Thanks,
+
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151208/ad73f984/attachment.sig>
+Without deviation from the norm, progress is not possible.
