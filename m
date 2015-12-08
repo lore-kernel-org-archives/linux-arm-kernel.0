@@ -1,31 +1,40 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Tue, 8 Dec 2015 14:28:17 -0800
-Subject: [PATCH] soc: TI knav_qmss: fix dma_addr_t printing
-In-Reply-To: <18371096.H4qt47cWYH@wuerfel>
-References: <2560281.KhcNzi0XgD@wuerfel> <56670B21.5060209@oracle.com>
- <18371096.H4qt47cWYH@wuerfel>
-Message-ID: <56675981.5060206@oracle.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Tue,  8 Dec 2015 16:33:01 -0600
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.5
+Message-ID: <1449613982-25888-1-git-send-email-dinh.linux@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/8/2015 1:34 PM, Arnd Bergmann wrote:
-> On Tuesday 08 December 2015 08:53:53 santosh shilimkar wrote:
->> On 12/8/2015 7:30 AM, Arnd Bergmann wrote:
->>> The knav_qmss driver is currently broken when CONFIG_LPAE is
->>> set, which is a bit surprising because I'd expect that any serious
->>> users of this platforms would have more than 2GB of RAM and require
->>> LPAE.
->>>
->> Well it has been working with LPAE enable always. The production
->> systems do but IIRC, some of the Eval board were still build with
->> just 2 GB memory.
->
-> Maybe that just means that the debug code is never used and we can remove
-> all the dev_dbg instead? That might actually be nicer as it would reduce
-> the amount of code in your driver (slightly).
->
-It was added in intention so that it is useful. I agree if it is not
-used or useful, we should remove it.
+Hi Arnd, Kevin, and Olof:
 
-Regards,
-Santosh
+Please consider pulling this patch for v4.5.
+
+Thanks,
+Dinh
+
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_dts_for_v4.5
+
+for you to fetch changes up to 34a315883f60344f2116dcd445388531d09dc066:
+
+  ARM: socfpga: Add support for DENX MCV SoM and MCVEVK baseboard (2015-11-19 10:15:05 -0600)
+
+----------------------------------------------------------------
+SoCFPGA DTS update for v4.5
+- Add DT board file for Denx MCVEVK board
+
+----------------------------------------------------------------
+Marek Vasut (1):
+      ARM: socfpga: Add support for DENX MCV SoM and MCVEVK baseboard
+
+ arch/arm/boot/dts/Makefile                    |  1 +
+ arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi   | 33 ++++++++++
+ arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts | 94 +++++++++++++++++++++++++++
+ 3 files changed, 128 insertions(+)
+ create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
+ create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
