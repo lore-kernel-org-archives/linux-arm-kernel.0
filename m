@@ -1,60 +1,57 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 8 Dec 2015 00:30:59 -0200
-Subject: [PATCH 2/3] doc: dt-binding: generic onboard USB HUB
-In-Reply-To: <1449538670-7954-3-git-send-email-peter.chen@freescale.com>
-References: <1449538670-7954-1-git-send-email-peter.chen@freescale.com>
- <1449538670-7954-3-git-send-email-peter.chen@freescale.com>
-Message-ID: <CAOMZO5DfBW3hxp5odbefLQCmkocPy=LypVW5HJWzDkF__WD_sg@mail.gmail.com>
+From: ken.xue@amd.com (Ken Xue)
+Date: Tue, 8 Dec 2015 10:49:08 +0800
+Subject: [PATCH 1/2] acpi:apd: Add APM X-Gene ACPI I2C device support
+In-Reply-To: <1449533774-22672-2-git-send-email-lho@apm.com>
+References: <1449533774-22672-1-git-send-email-lho@apm.com>
+ <1449533774-22672-2-git-send-email-lho@apm.com>
+Message-ID: <1449542948.2175.41.camel@kxue-X58A-UD3R>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 7, 2015 at 11:37 PM, Peter Chen <peter.chen@freescale.com> wrote:
-> Add dt-binding documentation for generic onboard USB HUB.
->
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+On Mon, 2015-12-07 at 17:16 -0700, Loc Ho wrote:
+> Add APM X-Gene ACPI I2C device support by hooks into existent
+> ACPI apd driver. To fully enable support, require another
+> patch to add the X-Gene ACPI node into the DW I2C driver.
+> 
+> Signed-off-by: Loc Ho <lho@apm.com>
 > ---
->  .../bindings/usb/generic-onboard-hub.txt           | 28 ++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/generic-onboard-hub.txt
->
-> diff --git a/Documentation/devicetree/bindings/usb/generic-onboard-hub.txt b/Documentation/devicetree/bindings/usb/generic-onboard-hub.txt
-> new file mode 100644
-> index 0000000..ea92205
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/generic-onboard-hub.txt
-> @@ -0,0 +1,28 @@
-> +Generic Onboard USB HUB
+>  drivers/acpi/acpi_apd.c |    8 +++++++-
+>  1 files changed, 7 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/acpi/acpi_apd.c b/drivers/acpi/acpi_apd.c
+> index a450e7a..6a9cb8d 100644
+> --- a/drivers/acpi/acpi_apd.c
+> +++ b/drivers/acpi/acpi_apd.c
+> @@ -51,7 +51,7 @@ struct apd_private_data {
+>  	const struct apd_device_desc *dev_desc;
+>  };
+>  
+> -#ifdef CONFIG_X86_AMD_PLATFORM_DEVICE
+> +#if defined(CONFIG_X86_AMD_PLATFORM_DEVICE) || defined(CONFIG_ARM64)
+>  #define APD_ADDR(desc)	((unsigned long)&desc)
+>  
+>  static int acpi_apd_setup(struct apd_private_data *pdata)
+> @@ -76,6 +76,11 @@ static struct apd_device_desc cz_i2c_desc = {
+>  	.fixed_clk_rate = 133000000,
+>  };
+>  
+> +static struct apd_device_desc xgene_i2c_desc = {
+> +	.setup = acpi_apd_setup,
+> +	.fixed_clk_rate = 100000000,
+> +};
 > +
-> +Required properties:
-> +- compatible: should be "generic-onboard-hub"
-> +
-> +Optional properties:
-> +- clocks: the input clock for HUB.
-> +
-> +- clock-names: Should be "external_clk"
-> +
-> +- hub-reset-gpios: Should specify the GPIO for reset.
-> +
-> +- hub-reset-active-high: the active reset signal is high, if this property is
-> +  not set, the active reset signal is low.
-> +
-> +- hub-reset-duration-us: the duration for assert reset signal, the time unit
-> +  is microsecond.
-> +
-> +Example:
-> +
-> +       usb_hub1 {
-> +               compatible = "generic-onboard-hub";
-> +               clocks = <&clks IMX6QDL_CLK_CKO>;
-> +               clock-names = "external_clk";
-> +               hub-reset-gpios = <&gpio7 12 0>;
-> +               hub-reset-active-high;
+>  static struct apd_device_desc cz_uart_desc = {
+>  	.setup = acpi_apd_setup,
+>  	.fixed_clk_rate = 48000000,
+> @@ -135,6 +140,7 @@ static const struct acpi_device_id acpi_apd_device_ids[] = {
+>  	{ "AMD0010", APD_ADDR(cz_i2c_desc) },
+>  	{ "AMD0020", APD_ADDR(cz_uart_desc) },
+>  	{ "AMD0030", },
+> +	{ "APMC0D0F", APD_ADDR(xgene_i2c_desc) },
+It is better to split AMD devices and ARM devices with macros:
+CONFIG_X86_AMD_PLATFORM_DEVICE and CONFIG_ARM64.
 
-I think you could drop the 'hub-reset-active-high' property and do
-like this instead:
 
-hub-reset-gpios = <&gpio7 12 GPIO_ACTIVE_HIGH>;
-
-or
-
-hub-reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
+>  	{ }
+>  };
+>  
