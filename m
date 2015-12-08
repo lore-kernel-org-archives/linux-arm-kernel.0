@@ -1,118 +1,48 @@
-From: majun258@huawei.com (majun)
-Date: Tue, 8 Dec 2015 10:01:19 -0500
-Subject: [PATCH v9 1/4] dt-binding:Documents of the mbigen bindings
-In-Reply-To: <56606C02.3050702@arm.com>
-References: <1448248513-39760-1-git-send-email-majun258@huawei.com>
- <1448248513-39760-2-git-send-email-majun258@huawei.com>
- <56606C02.3050702@arm.com>
-Message-ID: <5666F0BF.3010103@huawei.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 8 Dec 2015 20:33:40 +0530
+Subject: [PATCH v5 04/11] ARM: STi: STiH407: Provide generic (safe) DVFS
+ configuration
+In-Reply-To: <1449585124-15596-5-git-send-email-lee.jones@linaro.org>
+References: <1449585124-15596-1-git-send-email-lee.jones@linaro.org>
+ <1449585124-15596-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <20151208150340.GI3692@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark?
-	Do you have any comments about this patch?
-Thanks!
-Ma Jun
+On 08-12-15, 14:31, Lee Jones wrote:
+> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> index 81f8121..9fa1e58 100644
+> --- a/arch/arm/boot/dts/stih407-family.dtsi
+> +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> @@ -22,15 +22,29 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a9";
+>  			reg = <0>;
+> +
+>  			/* u-boot puts hpen in SBC dmem at 0xa4 offset */
+>  			cpu-release-addr = <0x94100A4>;
+> +
+> +					 /* kHz     uV   */
+> +			operating-points = <1500000 0
+> +					    1200000 0
+> +					    800000  0
+> +					    500000  0>;
+>  		};
+>  		cpu at 1 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a9";
+>  			reg = <1>;
+> +
+>  			/* u-boot puts hpen in SBC dmem at 0xa4 offset */
+>  			cpu-release-addr = <0x94100A4>;
+> +
+> +					 /* kHz     uV   */
+> +			operating-points = <1500000 0
+> +					    1200000 0
+> +					    800000  0
+> +					    500000  0>;
 
-On 2015/12/3 11:21, Marc Zyngier wrote:
-> On 23/11/15 03:15, MaJun wrote:
->> From: Ma Jun <majun258@huawei.com>
->>
->> Add the mbigen msi interrupt controller bindings document.
->>
->> This patch based on Mark Rutland's patch
->> https://lkml.org/lkml/2015/7/23/558
->>
->> Signed-off-by: Ma Jun <majun258@huawei.com>
->> ---
-> 
-> Mark,
-> 
-> Do you mind having a look at this from a DT perspective?
-> 
-> Thanks,
-> 
-> 	M.
-> 
->>  Documentation/devicetree/bindings/arm/mbigen.txt |   69 ++++++++++++++++++++++
->>  1 files changed, 69 insertions(+), 0 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/arm/mbigen.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/mbigen.txt b/Documentation/devicetree/bindings/arm/mbigen.txt
->> new file mode 100644
->> index 0000000..8ae59a9
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/mbigen.txt
->> @@ -0,0 +1,69 @@
->> +Hisilicon mbigen device tree bindings.
->> +=======================================
->> +
->> +Mbigen means: message based interrupt generator.
->> +
->> +MBI is kind of msi interrupt only used on Non-PCI devices.
->> +
->> +To reduce the wired interrupt number connected to GIC,
->> +Hisilicon designed mbigen to collect and generate interrupt.
->> +
->> +
->> +Non-pci devices can connect to mbigen and generate the
->> +interrupt by writing ITS register.
->> +
->> +The mbigen chip and devices connect to mbigen have the following properties:
->> +
->> +Mbigen main node required properties:
->> +-------------------------------------------
->> +- compatible: Should be "hisilicon,mbigen-v2"
->> +- reg: Specifies the base physical address and size of the Mbigen
->> +  registers.
->> +- interrupt controller: Identifies the node as an interrupt controller
->> +- msi-parent: This property has two cells.
->> +	The 1st cell specifies the ITS this device connected.
->> +	The 2nd cell specifies the device id.
->> +- num-msis:Specifies the total number of interrupt this device has.
->> +- #interrupt-cells : Specifies the number of cells needed to encode an
->> +  interrupt source. The value must be 2.
->> +
->> +  The 1st cell is global hardware pin number of the interrupt.
->> +	This value depends on the Soc design.
->> +
->> +  The 2nd cell is the interrupt trigger type.
->> +	The value of this cell should be:
->> +	1: rising edge triggered
->> +	or
->> +	4: high level triggered	
->> +
->> +Examples:
->> +
->> + 	mbigen_device_gmac:intc {
->> +			compatible = "hisilicon,mbigen-v2";
->> +			reg = <0x0 0xc0080000 0x0 0x10000>;
->> +			interrupt-controller;
->> +			msi-parent = <&its_dsa 0x40b1c>;
->> +			num-msis = <9>;
->> +			#interrupt-cells = <2>;
->> + 	};
->> +
->> +Devices connect to mbigen required properties:
->> +----------------------------------------------------
->> +-interrupt-parent: Specifies the mbigen device node which device connected.
->> +-interrupts:specifies the interrupt source.
->> +  The 1st cell is global hardware pin number of the interrupt.
->> +		This value depends on the Soc design.
->> +  The 2nd cell is the interrupt trigger type(rising edge triggered or high
->> +		level triggered)
->> +
->> +Examples:
->> +	gmac0: ethernet at c2080000 {
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +		reg = <0 0xc2080000 0 0x20000>,
->> +		      <0 0xc0000000 0 0x1000>;
->> +		interrupt-parent  = <&mbigen_device_gmac>;
->> +		interrupts =	<656 1>,
->> +				<657 1>;
->> +	};
->> +
->>
-> 
-> 
+Why didn't you move to opp-v2 ?
+
+-- 
+viresh
