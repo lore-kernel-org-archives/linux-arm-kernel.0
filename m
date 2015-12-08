@@ -1,48 +1,59 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 08 Dec 2015 16:21:05 +0100
-Subject: [PATCH] mfd: as3722: mark PM functions as __maybe_unused
-Message-ID: <2162790.qeSmLiztNV@wuerfel>
+Date: Tue, 08 Dec 2015 16:23:51 +0100
+Subject: [PATCH 1/2] crypto: sahara: fix 64-bit dma_addr_t compilation
+Message-ID: <1707164.bU6CqSGiie@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly introduced as3722_i2c_suspend/resume functions are built
-unconditionally, but only used when power management is enabled,
-so we get a warning otherwise:
+The sahara hardware uses DMA descriptors with 32-bit addresses, but
+dma_addr_t is variable size depending on whether we want to support
+any devices that use 64-bit DMA addresses in hardware.
+This means that the definition of the DMA descriptor structure is wrong,
+and we helpfully get a compiler warning about them too:
 
-drivers/mfd/as3722.c:427:12: warning: 'as3722_i2c_suspend' defined but not used [-Wunused-function]
-drivers/mfd/as3722.c:438:12: warning: 'as3722_i2c_resume' defined but not used [-Wunused-function]
+drivers/crypto/sahara.c:423:372: warning: format '%x' expects argument of type 'unsigned int', but argument 4 has type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
 
-This marks them both as __maybe_unused, which avoids an ugly #ifdef
-and gives us best compile-time coverage. When they are unused, the
-compiler will silently drop the functions from its output.
+This changes the definition of the sahara_hw_desc and sahara_hw_link
+structures to only contain fixed-length members, which is required
+to make the driver work on ARM LPAE mode, and avoids most of the
+gcc warnings we get.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 35deff7eb212 ("mfd: as3722: Handle interrupts on suspend")
 ---
- drivers/mfd/as3722.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/crypto/sahara.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/mfd/as3722.c b/drivers/mfd/as3722.c
-index 3b21eb4bc480..e1f597f97f86 100644
---- a/drivers/mfd/as3722.c
-+++ b/drivers/mfd/as3722.c
-@@ -424,7 +424,7 @@ static int as3722_i2c_remove(struct i2c_client *i2c)
- 	return 0;
- }
+diff --git a/drivers/crypto/sahara.c b/drivers/crypto/sahara.c
+index cc738f3592a3..38bf12ae5589 100644
+--- a/drivers/crypto/sahara.c
++++ b/drivers/crypto/sahara.c
+@@ -130,18 +130,18 @@
+ #define SAHARA_REG_IDAR		0x20
  
--static int as3722_i2c_suspend(struct device *dev)
-+static int __maybe_unused as3722_i2c_suspend(struct device *dev)
- {
- 	struct as3722 *as3722 = dev_get_drvdata(dev);
+ struct sahara_hw_desc {
+-	u32		hdr;
+-	u32		len1;
+-	dma_addr_t	p1;
+-	u32		len2;
+-	dma_addr_t	p2;
+-	dma_addr_t	next;
++	u32	hdr;
++	u32	len1;
++	u32	p1;
++	u32	len2;
++	u32	p2;
++	u32	next;
+ };
  
-@@ -435,7 +435,7 @@ static int as3722_i2c_suspend(struct device *dev)
- 	return 0;
- }
+ struct sahara_hw_link {
+-	u32		len;
+-	dma_addr_t	p;
+-	dma_addr_t	next;
++	u32	len;
++	u32	p;
++	u32	next;
+ };
  
--static int as3722_i2c_resume(struct device *dev)
-+static int __maybe_unused as3722_i2c_resume(struct device *dev)
- {
- 	struct as3722 *as3722 = dev_get_drvdata(dev);
- 
+ struct sahara_ctx {
 -- 
 2.1.0.rc2
