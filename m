@@ -1,17 +1,38 @@
-From: ralf@linux-mips.org (Ralf Baechle)
-Date: Tue, 8 Dec 2015 11:11:21 +0100
-Subject: [PATCH 19/23] mtd: nand: switch all drivers to mtd_ooblayout_ops
-In-Reply-To: <1449527178-5930-20-git-send-email-boris.brezillon@free-electrons.com>
-References: <1449527178-5930-1-git-send-email-boris.brezillon@free-electrons.com>
- <1449527178-5930-20-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20151208101121.GA4221@linux-mips.org>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 08 Dec 2015 10:11:58 +0000
+Subject: [PATCH v7 3/3] arm64: Add do_softirq_own_stack() and enable
+ irq_stacks
+In-Reply-To: <20151204131242.GG10123@e104818-lin.cambridge.arm.com>
+References: <1447698128-8490-1-git-send-email-james.morse@arm.com>
+ <1447698128-8490-4-git-send-email-james.morse@arm.com>
+ <8F6484A9-18B9-4A81-B58D-528D81BC196D@gmail.com>
+ <20151127114715.GA25499@e104818-lin.cambridge.arm.com>
+ <56617243.5050602@arm.com>
+ <20151204131242.GG10123@e104818-lin.cambridge.arm.com>
+Message-ID: <5666ACEE.9070303@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 11:26:14PM +0100, Boris Brezillon wrote:
+On 04/12/15 13:12, Catalin Marinas wrote:
+> One thing I'm not clear about is whether __do_softirq can be preempted
+> when executed in process context, it could mess up our stack
+> assumptions.
 
-Looking good,
+Previously I thought not, because in __do_softirq():
+> __local_bh_disable_ip(_RET_IP_, SOFTIRQ_OFFSET);
 
-Acked-by: Ralf Baechle <ralf@linux-mips.org>
+Increases the softirq part of preempt_count, before:
+> local_irq_enable()
 
-  Ralf
+so preempt_count is always non-zero when we have interrupts (re)enabled
+on the irq_stack...
+
+... but its a little murkier than I first thought,
+__cond_resched_softirq() looks like it will re-schedule a task if it is
+processing softirqs, while softirqs are disabled.
+
+net/core/sock.c:__release_sock is the only caller, I haven't yet worked
+out if this can happen while on the irq stack.
+
+
+James
