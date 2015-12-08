@@ -1,57 +1,55 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 08 Dec 2015 17:03:56 +0000
-Subject: [PATCH v6 15/21] KVM: ARM64: Add reset and access handlers for
- PMUSERENR register
-In-Reply-To: <1449578860-15808-16-git-send-email-zhaoshenglong@huawei.com>
-References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
- <1449578860-15808-16-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <56670D7C.9070902@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Dec 2015 17:04:30 +0000
+Subject: [PATCH v2] ARM: dts: Add SolidRun Armada 388 Clearfog A1 DT file
+In-Reply-To: <87egew98ty.fsf@free-electrons.com>
+References: <E1a5hDy-0002rC-Oe@rmk-PC.arm.linux.org.uk>
+ <87egew98ty.fsf@free-electrons.com>
+Message-ID: <20151208170429.GE8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/15 12:47, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On Tue, Dec 08, 2015 at 05:57:45PM +0100, Gregory CLEMENT wrote:
+> Hi Russell,
+>  
+>  On dim., d?c. 06 2015, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
 > 
-> The reset value of PMUSERENR_EL0 is UNKNOWN, use reset_unknown.
+> > Add support for the SolidRun Armada 388 Clearfog A1 board.  This board
+> > has an Armada 388 microsom, dedicated gigabit ethernet, six switched
+> > gigabit ethernet ports, SFP cage, two Mini-PCIe/mSATA slots, a m.2 SATA
+> > slot, and a MikroBUS connector to allow MikroBUS modules to be added.
+> >
+> > This DT file adds support for all board facilities with the exception
+> > of full SFP support.
+> >
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+> I made some tests it on the Clearfog v2.0 I have: Ethernet (CON8 and
+> J11), i2c (using i2cdetect), USB stick on CON7.
 > 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index c830fde..80b66c0 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -880,7 +880,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  	  access_pmu_pmxevcntr },
->  	/* PMUSERENR_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b000),
-> -	  trap_raz_wi },
-> +	  access_pmu_regs, reset_unknown, PMUSERENR_EL0 },
+> For this one I tried to use an USB3 stick, but it was enumerated using
+> the High Speed profile and not the Super Speed one. But I think it is
+> because of the Serdes configuration done in U-Boot.
 
-So while the 64bit view of the register resets as unknown, a CPU
-resetting in 32bit mode resets as 0. I suggest you reset it as zero, and
-document that choice. You may have to revisit all the other registers
-that do reset as unknown for 64bit as well.
+Hmm, I don't have any USB3 hardware to check or debug.  Unless there's a
+bug in uboot, it looks like it's correctly configured to use the serdes
+lane 3 at the highest speed:
 
->  	/* PMOVSSET_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b011),
->  	  access_pmu_regs, reset_unknown, PMOVSSET_EL0 },
-> @@ -1301,7 +1301,8 @@ static const struct sys_reg_desc cp15_regs[] = {
->  	  NULL, c9_PMCCNTR },
->  	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), access_pmu_pmxevtyper },
->  	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), access_pmu_pmxevcntr },
-> -	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
-> +	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), access_pmu_cp15_regs,
-> +	  NULL,  c9_PMUSERENR, 0 },
->  	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), access_pmu_cp15_regs,
->  	  NULL, c9_PMINTENSET },
->  	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), access_pmu_cp15_regs,
-> 
+ | Lane # | Speed|    Type     |
+ ------------------------------|
+ |   0    |  3   |  SATA0      |
+ |   1    |  0   |  SGMII1     |
+ |   2    |  5   |  PCIe1      |
+ |   3    |  5   |  USB3 HOST1 |
+ |   4    |  5   |  PCIe2      |
+ |   5    |  0   |  SGMII2     |
+ -------------------------------
 
-Thanks,
+> so Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> and applied on mvebu/dt.
 
-	M.
+Thanks.
+
 -- 
-Jazz is not dead. It just smells funny...
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
