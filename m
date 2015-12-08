@@ -1,29 +1,70 @@
 From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue,  8 Dec 2015 13:45:07 +0100
-Subject: [PATCH v3 5/9] ARM: mach-stm32: Select pinctrl
+Date: Tue,  8 Dec 2015 13:45:09 +0100
+Subject: [PATCH v3 7/9] ARM: dts: Add USART1 pin config to STM32F429 boards
 In-Reply-To: <1449578711-6141-1-git-send-email-mcoquelin.stm32@gmail.com>
 References: <1449578711-6141-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1449578711-6141-6-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <1449578711-6141-8-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+This patch selects USART1 pin configuration on PA9/PA10 pins
+for both Eval and Disco boards.
 
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 ---
- arch/arm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/stm32429i-eval.dts  |  2 ++
+ arch/arm/boot/dts/stm32f429-disco.dts |  2 ++
+ arch/arm/boot/dts/stm32f429.dtsi      | 13 +++++++++++++
+ 3 files changed, 17 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4d2fcba..365714b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -963,6 +963,7 @@ config ARCH_STM32
- 	select ARCH_HAS_RESET_CONTROLLER
- 	select ARMV7M_SYSTICK
- 	select CLKSRC_STM32
-+	select PINCTRL
- 	select RESET_CONTROLLER
- 	help
- 	  Support for STMicroelectronics STM32 processors.
+diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
+index 6964fc9..71fe17a 100644
+--- a/arch/arm/boot/dts/stm32429i-eval.dts
++++ b/arch/arm/boot/dts/stm32429i-eval.dts
+@@ -71,5 +71,7 @@
+ };
+ 
+ &usart1 {
++	pinctrl-0 = <&usart1_pins_a>;
++	pinctrl-names = "default";
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/stm32f429-disco.dts b/arch/arm/boot/dts/stm32f429-disco.dts
+index f0b731d..e3ce796 100644
+--- a/arch/arm/boot/dts/stm32f429-disco.dts
++++ b/arch/arm/boot/dts/stm32f429-disco.dts
+@@ -71,5 +71,7 @@
+ };
+ 
+ &usart1 {
++	pinctrl-0 = <&usart1_pins_a>;
++	pinctrl-names = "default";
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index 62d2b3d..1cf713e 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -263,6 +263,19 @@
+ 				clocks = <&rcc 0 266>;
+ 				st,bank-name = "GPIOK";
+ 			};
++
++			usart1_pins_a: usart1 at 0 {
++				pins1 {
++					pinmux = <STM32F429_PA9_FUNC_USART1_TX>;
++					bias-disable;
++					drive-push-pull;
++					slew-rate = <0>;
++				};
++				pins2 {
++					pinmux = <STM32F429_PA10_FUNC_USART1_RX>;
++					bias-disable;
++				};
++			};
+ 		};
+ 
+ 		rcc: rcc at 40023810 {
 -- 
 1.9.1
