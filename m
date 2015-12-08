@@ -1,82 +1,169 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 08 Dec 2015 09:02:59 +0000
-Subject: [PATCH v5 03/21] KVM: ARM64: Add offset defines for PMU registers
-In-Reply-To: <56669036.9090606@huawei.com>
-References: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
- <1449123091-20252-4-git-send-email-zhaoshenglong@huawei.com>
- <56659276.6060403@arm.com> <5665984F.30102@linaro.org>
- <56659DD8.6050109@arm.com> <56669036.9090606@huawei.com>
-Message-ID: <56669CC3.80601@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 08 Dec 2015 10:07:58 +0100
+Subject: [PATCH] usb: musb: dsps: handle the
+ otg_state_a_wait_vrise_timeout case
+In-Reply-To: <87poyinjpc.fsf@saruman.tx.rr.com> (Felipe Balbi's message of
+ "Mon, 7 Dec 2015 13:26:55 -0600")
+References: <1440087153-31084-1-git-send-email-gregory.clement@free-electrons.com>
+ <55D719B1.8010700@free-electrons.com>
+ <87twrfsbed.fsf@free-electrons.com> <87d1wtf5ir.fsf@saruman.tx.rr.com>
+ <87a8rde96m.fsf@free-electrons.com>
+ <87poyiegc7.fsf@free-electrons.com> <87poyinjpc.fsf@saruman.tx.rr.com>
+Message-ID: <874mft9ukx.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/15 08:09, Shannon Zhao wrote:
-> Hi Marc,
-> 
-> On 2015/12/7 22:55, Marc Zyngier wrote:
->> On 07/12/15 14:31, Shannon Zhao wrote:
+Hi Felipe,
+ 
+ On lun., d?c. 07 2015, Felipe Balbi <balbi@ti.com> wrote:
+
+> Hi,
+>
+> Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
+>> Hi Felipe,
+>>
+>> I am going back on this subject (again :) )
+>>  
+>>  On mar., oct. 20 2015, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+>>
+>>> Hi Felipe,
+>>>  
+>>>  On lun., oct. 05 2015, Felipe Balbi <balbi@ti.com> wrote:
+>>>
+>>>
+>>>>> So after many tests on different devices, 200ms is enough for most of
+>>>>> them, but for one, 2000ms (2s) was needed!
+>>>>>
+>>>>> I see several option:
+>>>>> - adding a sysfs entry to setup the time
+>>>>> - adding a debugs entry entry
+>>>>> - adding configuration option in menuconfig
+>>>>> - using 2000ms and hopping it was enough for everyone
+>>>>>
+>>>>> My preference would go to the first option, what is your opinion?
 >>>>
+>>>> I'm not sure if either of them is good. man 2s is just too large. If the
+>>
+>> Well 2s is lon I agree, but currently instead of 2s we have an infinite
+>> wait, which is worse!
+>>
+>>>> device isn't following the specification, I'm afraid that device needs
+>>>> to be fixed.
+>>
+>> I agree but these devices are for most of them USB stick that we find in
+>> retail. We have no influence on them, so we have to do with them, even
+>> if they do not follow the sepc.
+>>
+>> So what about using configfs or sysfs to let the user confgiure this
+>> value if needed?
+>
+> iff we have to; I'm still not 100% convinced.
+>
+>> I go back on this because, your suggestion didn't work. At least, I
+>> didn't manage to make it improve the situation.
+>>
+>> Thanks,
+>>
 >>>>
->>>> On 2015/12/7 22:06, Marc Zyngier wrote:
->>>>>> On 03/12/15 06:11, Shannon Zhao wrote:
->>>>>>>> From: Shannon Zhao <shannon.zhao@linaro.org>
->>>>>>>>
->>>>>>>> We are about to trap and emulate acccesses to each PMU register
->>>>>>
->>>>>> s/acccesses/accesses/
->>>>>>
->>>>>>>> individually. This adds the context offsets for the AArch64 PMU
->>>>>>>> registers and their AArch32 counterparts.
->>>>>>>>
->>>>>>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->>>>>>>> ---
->>>>>>>>   arch/arm64/include/asm/kvm_asm.h | 55 ++++++++++++++++++++++++++++++++++++----
->>>>>>>>   1 file changed, 50 insertions(+), 5 deletions(-)
->>>>>>>>
->>>>>>>> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
->>>>>>>> index 5e37710..4f804c1 100644
->>>>>>>> --- a/arch/arm64/include/asm/kvm_asm.h
->>>>>>>> +++ b/arch/arm64/include/asm/kvm_asm.h
->>>>>>>> @@ -48,12 +48,34 @@
->>>>>>>>   #define MDSCR_EL1	22	/* Monitor Debug System Control Register */
->>>>>>>>   #define MDCCINT_EL1	23	/* Monitor Debug Comms Channel Interrupt Enable Reg */
->>>>>>>>
->>>>>>
->>>>>> Coming back to this patch, it gives a clear view of where you have state
->>>>>> duplication.
->>>>>>
->>>>>>>> +/* Performance Monitors Registers */
->>>>>>>> +#define PMCR_EL0	24	/* Control Register */
->>>>>>>> +#define PMOVSSET_EL0	25	/* Overflow Flag Status Set Register */
->>>>>>>> +#define PMOVSCLR_EL0	26	/* Overflow Flag Status Clear Register */
->>>>>>
->>>>>> This should only be a single state. You don't even have to represent it
->>>>>> in the sysreg array, to be honest.
->>>>>>
-> 
-> Re-think about this. Since there are different operates to SET/CLR
-> registers, maybe it should keep both of them while only storing the
-> state in one of them.
-> 
-> To SET:
-> 	vcpu_sys_reg(vcpu, r->reg) |= val;
-> To CLR:
-> 	vcpu_sys_reg(vcpu, r->reg) &= ~val;
+>>>> I think the real issue here is the lack of a disconnect IRQ from AM335x
+>>>> devices. But here's something I've been meaning to test but never had
+>>>> time. If you look into AM335x address space, there's a bit in the
+>>>> wrapper which tells it to use the standard MUSB registers for IRQ,
+>>>> instead of the TI-specific thing. Can you see if we get a disconnect IRQ
+>>>> with that ?
+>>>>
+>>>> TRM is at [1], see page 2566. Basically, if you set bit 3 in register
+>>>> offset 0x1014, then it should use Mentor IRQ registers. If that works,
+>>>> quite a few problems will actually vanish :-p
+>>>
+>>> So I tried it with the following patch:
+>>>
+>>> -------------------------------------
+>>> diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
+>>> index c791ba5..c714500 100644
+>>> --- a/drivers/usb/musb/musb_dsps.c
+>>> +++ b/drivers/usb/musb/musb_dsps.c
+>>> @@ -470,6 +470,7 @@ static int dsps_musb_init(struct musb *musb)
+>>>  
+>>>         /* Reset the musb */
+>>>         dsps_writel(reg_base, wrp->control, (1 << wrp->reset));
+>>> +       dsps_writel(musb->ctrl_base, wrp->control, BIT(3));
+>
+> overwritting reset.
+>
+>>>         musb->isr = dsps_interrupt;
+>>>  
+>>> @@ -625,6 +626,7 @@ static int dsps_musb_reset(struct musb *musb)
+>>>         if (session_restart || !glue->sw_babble_enabled) {
+>>>                 dev_info(musb->controller, "Restarting MUSB to recover from Babble\n");
+>>>                 dsps_writel(musb->ctrl_base, wrp->control, (1 << wrp->reset));
+>>> +               dsps_writel(musb->ctrl_base, wrp->control, BIT(3));
+>
+> here too. No wonder it won't work, right :-)
+>
+>>> I am not very familiar with that driver but my understanding was that
+>>> the Mentor IRQ registeres are managed by the musb_interrupt() function
+>>> which is called from the dsps_interrupt() interrupt handler.
+>>>
+>>> Am I right?
+>
+> yeah, however the way IRQs are reported is a different thing. AM335x
+> introduced its own IRQ reporting scheme which, basically, reads MUSB
+> generic IRQ status registers and reports on an AM335x specific
+> register. No idea why TI did that for AM335x devices.
+>
+>>> if it is the case then it didn't fix the issue I had.
+>>>
+>>> I activated the following debug line:
+>>>
+>>> [musb_hdrc]musb_interrupt =_ "** IRQ %s usb%04x tx%04x rx%04x\012"
+>>> [musb_dsps]dsps_interrupt =p "usbintr (%x) epintr(%x)\012"
+>>>
+>>> But I didn't get any interrupt while disconnecting the cable without any
+>>> device connected on it (whereas I got an interrupt when I connected it).
+>>>
+>>> Note that I applied this patch instead of the "usb: musb: dsps: handle
+>>> the otg_state_a_wait_vrise_timeout case", is what you had in mind ?
+>
+> yeah, that's what I had in mind. But your patch seems wrong :-)
+>
+> I tried writing a more correct version here and found 2 issues:
+>
+> a) bit 3 doesn't do anything :-p I cannot read IRQs from mentor's
+> registers
+>
+> b) when setting RESET_ISOLATION bit, reads of CTRL register hang. Note
+> that according to TRM, RESET_ISOLATION _must_ be set prior to a soft
+> reset and cleared afterwards. But right after setting RESET_ISOLATION,
+> if I try a read of CTRL, it'll hang forever.
 
-There is really no point keeping both, because they are two views of the
-same state. They perform different action on the same data, so the way
-to look at it is to have different functions/methods that modify the
-same state.
+The datasheet seems not very coherent about it,
 
-> Or keep one of them and within the access handler, according to the
-> operates encoding value to judge whether it's SET or CLR.
+on one side we have:
+"This bit should be set high prior to setting bit 0 and cleared after bit 0
+is cleared."
 
-That's indeed the way it should be. You just have to register different
-functions in the trap table. You could even move the register outside of
-the sys_reg array into the kvm_pmu structure.
+and on the other side:
+"Both the soft_reset and soft_reset_isolation bits should be asserted
+simultaneously."
 
-Thanks,
+The hang you saw could be explained by the following:
+"Setting only the soft_reset_isolation bit will cause all USB0 output
+signals to go to a known constant value via multiplexers.
+This will
+prevent future access to USB0."  page 2567
 
-	M.
+Gregory
+
+>
+> Bin, do you know about these problems ? They both seem rather alarming
+> to me.
+>
+> -- 
+> balbi
+
 -- 
-Jazz is not dead. It just smells funny...
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
