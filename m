@@ -1,34 +1,145 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Dec 2015 15:03:34 +0000
-Subject: [PATCH v5 1/4] arm/arm64: add arm-smccc
-In-Reply-To: <1449581315-14519-2-git-send-email-jens.wiklander@linaro.org>
-References: <1449581315-14519-1-git-send-email-jens.wiklander@linaro.org>
- <1449581315-14519-2-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <20151208150334.GD8644@n2100.arm.linux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 8 Dec 2015 09:03:56 -0600
+Subject: [PATCH v10 08/17] dt-bindings: add document for rockchip variant
+ of analogix_dp
+In-Reply-To: <1449470374-31191-1-git-send-email-ykk@rock-chips.com>
+References: <1449470239-30667-1-git-send-email-ykk@rock-chips.com>
+ <1449470374-31191-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <20151208150356.GA14750@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 02:28:32PM +0100, Jens Wiklander wrote:
-> diff --git a/init/Kconfig b/init/Kconfig
-> index c24b6f7..8d5a7b0 100644
-> --- a/init/Kconfig
-> +++ b/init/Kconfig
-> @@ -2061,3 +2061,6 @@ config ASN1
->  	  functions to call on what tags.
->  
->  source "kernel/Kconfig.locks"
+On Mon, Dec 07, 2015 at 02:39:34PM +0800, Yakir Yang wrote:
+> Rockchip DP driver is a helper driver of analogix_dp coder driver,
+> so most of the DT property should be descriped in analogix_dp document.
+> 
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
+I already acked the previous v10 you sent.
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+> ---
+> Changes in v10: None
+> Changes in v9:
+> - Document more details for 'ports' property.
+> 
+> Changes in v8:
+> - Modify the commit subject name. (Heiko)
+> 
+> Changes in v7: None
+> Changes in v6: None
+> Changes in v5:
+> - Split binding doc's from driver changes. (Rob)
+> - Add eDP hotplug pinctrl property. (Heiko)
+> 
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  .../display/rockchip/analogix_dp-rockchip.txt      | 91 ++++++++++++++++++++++
+>  1 file changed, 91 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
+> new file mode 100644
+> index 0000000..dae86c4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
+> @@ -0,0 +1,91 @@
+> +Rockchip RK3288 specific extensions to the Analogix Display Port
+> +================================
 > +
-> +config HAVE_ARM_SMCCC
-> +	bool
-
-I'm not sure why this has ended up in init/Kconfig - I suspect others
-will end up wondering the same.  arch/Kconfig looks to be a better
-place for it which is likely to be less controversial.  Please could
-you move it there?
-
-Thanks.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> +Required properties:
+> +- compatible: "rockchip,rk3288-edp";
+> +
+> +- reg: physical base address of the controller and length
+> +
+> +- clocks: from common clock binding: handle to dp clock.
+> +	  of memory mapped region.
+> +
+> +- clock-names: from common clock binding:
+> +	       Required elements: "dp" "pclk"
+> +
+> +- resets: Must contain an entry for each entry in reset-names.
+> +	  See ../reset/reset.txt for details.
+> +
+> +- pinctrl-names: Names corresponding to the chip hotplug pinctrl states.
+> +- pinctrl-0: pin-control mode. should be <&edp_hpd>
+> +
+> +- reset-names: Must include the name "dp"
+> +
+> +- rockchip,grf: this soc should set GRF regs, so need get grf here.
+> +
+> +- ports: there are 2 port nodes with endpoint definitions as defined in
+> +  Documentation/devicetree/bindings/media/video-interfaces.txt.
+> +    Port 0: contained 2 endpoints, connecting to the ouput of vop.
+> +    Port 1: contained 1 endpoint, connecting to the input of panel.
+> +
+> +For the below properties, please refer to Analogix DP binding document:
+> + * Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt
+> +- phys (required)
+> +- phy-names (required)
+> +- hpd-gpios (optional)
+> +-------------------------------------------------------------------------------
+> +
+> +Example:
+> +	dp-controller: dp at ff970000 {
+> +		compatible = "rockchip,rk3288-dp";
+> +		reg = <0xff970000 0x4000>;
+> +		interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cru SCLK_EDP>, <&cru PCLK_EDP_CTRL>;
+> +		clock-names = "dp", "pclk";
+> +		phys = <&dp_phy>;
+> +		phy-names = "dp";
+> +
+> +		rockchip,grf = <&grf>;
+> +		resets = <&cru 111>;
+> +		reset-names = "dp";
+> +
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&edp_hpd>;
+> +
+> +		status = "disabled";
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			edp_in: port at 0 {
+> +				reg = <0>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				edp_in_vopb: endpoint at 0 {
+> +					reg = <0>;
+> +					remote-endpoint = <&vopb_out_edp>;
+> +				};
+> +				edp_in_vopl: endpoint at 1 {
+> +					reg = <1>;
+> +					remote-endpoint = <&vopl_out_edp>;
+> +				};
+> +			};
+> +
+> +			edp_out: port at 1 {
+> +				reg = <1>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				edp_out_panel: endpoint {
+> +					reg = <0>;
+> +					remote-endpoint = <&panel_in_edp>
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+> +	pinctrl {
+> +		edp {
+> +			edp_hpd: edp-hpd {
+> +				rockchip,pins = <7 11 RK_FUNC_2 &pcfg_pull_none>;
+> +			};
+> +		};
+> +	};
+> -- 
+> 1.9.1
+> 
+> 
