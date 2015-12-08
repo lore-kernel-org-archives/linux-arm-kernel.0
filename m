@@ -1,54 +1,137 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Dec 2015 13:53:36 +0000
-Subject: [PATCH v6 02/21] KVM: ARM64: Define PMU data structure for each
- vcpu
-In-Reply-To: <5666DD0A.5060004@arm.com>
-References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
- <1449578860-15808-3-git-send-email-zhaoshenglong@huawei.com>
- <5666DD0A.5060004@arm.com>
-Message-ID: <20151208135335.GK19612@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 8 Dec 2015 07:55:05 -0600
+Subject: [PATCH 1/3] usb: misc: generic_onboard_hub: add generic onboard
+ USB HUB driver
+In-Reply-To: <20151208091854.GA16881@shlinux2>
+References: <1449538670-7954-1-git-send-email-peter.chen@freescale.com>
+ <1449538670-7954-2-git-send-email-peter.chen@freescale.com>
+ <87poyhmyrc.fsf@saruman.tx.rr.com> <20151208091854.GA16881@shlinux2>
+Message-ID: <87k2opm4ee.fsf@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 01:37:14PM +0000, Marc Zyngier wrote:
-> On 08/12/15 12:47, Shannon Zhao wrote:
-> > From: Shannon Zhao <shannon.zhao@linaro.org>
-> > 
-> > Here we plan to support virtual PMU for guest by full software
-> > emulation, so define some basic structs and functions preparing for
-> > futher steps. Define struct kvm_pmc for performance monitor counter and
-> > struct kvm_pmu for performance monitor unit for each vcpu. According to
-> > ARMv8 spec, the PMU contains at most 32(ARMV8_MAX_COUNTERS) counters.
-> > 
-> > Since this only supports ARM64 (or PMUv3), add a separate config symbol
-> > for it.
-> > 
-> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> > ---
-> >  arch/arm64/include/asm/kvm_host.h |  2 ++
-> >  arch/arm64/kvm/Kconfig            |  8 ++++++++
-> >  include/kvm/arm_pmu.h             | 40 +++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 50 insertions(+)
-> >  create mode 100644 include/kvm/arm_pmu.h
 
-[...]
+Hi,
 
-> > diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-> > index a5272c0..66da9a2 100644
-> > --- a/arch/arm64/kvm/Kconfig
-> > +++ b/arch/arm64/kvm/Kconfig
-> > @@ -36,6 +36,7 @@ config KVM
-> >  	select HAVE_KVM_EVENTFD
-> >  	select HAVE_KVM_IRQFD
-> >  	select KVM_ARM_VGIC_V3
-> > +	select KVM_ARM_PMU
-> 
-> What if HW_PERF_EVENTS is not selected? Also, selecting HW_PERF_EVENTS
-> is not enough, and you probably need PERF_EVENTS as well, So this should
-> probably read:
-> 
-> 	select KVM_ARM_PMU if (HW_PERF_EVENTS && PERF_EVENTS)
+Peter Chen <peter.chen@freescale.com> writes:
+>> seriously ? Is this really all ? What about that reset line below ?
+>
+> The clock is PHY input clock on the HUB, this clock may from SoC's
+> PLL.
 
-HW_PERF_EVENTS depends on ARM_PMU which in turn depends on PERF_EVENTS.
+oh, you might have misunderstood my comment. I'm saying that there is
+more than one thing you could cache in your private structure. That's
+all.
 
-Will
+>> > +static int usb_hub_generic_probe(struct platform_device *pdev)
+>> > +{
+>> > +	struct device *dev = &pdev->dev;
+>> > +	struct usb_hub_generic_platform_data *pdata = dev->platform_data;
+>> > +	struct usb_hub_generic_data *hub_data;
+>> > +	int reset_pol = 0, duration_us = 50, ret = 0;
+>> > +	struct gpio_desc *gpiod_reset = NULL;
+>> > +
+>> > +	hub_data = devm_kzalloc(dev, sizeof(*hub_data), GFP_KERNEL);
+>> > +	if (!hub_data)
+>> > +		return -ENOMEM;
+>> > +
+>> > +	if (dev->of_node) {
+>> > +		struct device_node *node = dev->of_node;
+>> > +
+>> > +		hub_data->clk = devm_clk_get(dev, "external_clk");
+>> > +		if (IS_ERR(hub_data->clk)) {
+>> > +			dev_dbg(dev, "Can't get external clock: %ld\n",
+>> > +					PTR_ERR(hub_data->clk));
+>> 
+>> how about setting clock to NULL to here ? then you don't need IS_ERR()
+>> checks anywhere else.
+>> 
+>> > +		}
+>> 
+>> braces shouldn't be used here, if you add NULL trick above,
+>> however... then you can keep them.
+>> 
+>
+> Braces aren't needed, it may not too much useful to using NULL
+> as a indicator for error pointer.
+
+heh, it's not about using it as an error pointer. I'm merely trying to
+make clk optional. NULL is a valid clk, meaning you won't get NULL
+pointer dereferences when passing it along clk_*() calls (if you find
+any, it's likely a bug in CCF), so NULL can be used to cope with
+optional clocks:
+
+         clk = clk_get(dev, "foo");
+         if (IS_ERR(clk)) {
+         	if (PTR_ERR(clk) == -EPROBE_DEFER)
+                	return -EPROBE_DEFER;
+                else
+                	clk = NULL;
+         }
+
+>> > +		/*
+>> > +		 * Try to get the information for HUB reset, the
+>> > +		 * default setting like below:
+>> > +		 *
+>> > +		 * - Reset state is low
+>> > +		 * - The duration is 50us
+>> > +		 */
+>> > +		if (of_find_property(node, "hub-reset-active-high", NULL))
+>> > +			reset_pol = 1;
+>> 
+>> you see, this is definitely *not* generic. You should write a generic
+>> reset-gpio.c reset controller and describe the polarity on the gpio
+>> binding. This driver *always* uses reset_assert(); reset_deassert(); and
+>> reset-gpio implements though by gpiod_set_value() correctly.
+>> 
+>> Polarity _must_ be described elsewhere in DT.
+>> 
+>> > +		of_property_read_u32(node, "hub-reset-duration-us",
+>> > +			&duration_us);
+>> 
+>> likewise, this should be described as a debounce time for the GPIO.
+>> 
+>
+> Yes, if we are a reset gpio driver.
+
+even if you use a raw GPIO, polarity and duration must come through DT.
+
+>> > +		usleep_range(duration_us, duration_us + 100);
+>> > +		gpiod_set_value(gpiod_reset, reset_pol ? 0 : 1);
+>> 
+>> wrong. You should _not_ have polarity checks here. You should have
+>> already initialized the gpio as ACTIVE_HIGH or ACTIVE_LOW and gpiolib
+>> will handle the polarity for you.
+>
+> Yes, you are right. I did not understand ACTIVE_LOW for gpio flag
+> before.
+
+with open source code, that's a rather poor excuse, Peter.
+
+>> > +static int __init usb_hub_generic_init(void)
+>> > +{
+>> > +	return platform_driver_register(&usb_hub_generic_driver);
+>> > +}
+>> > +subsys_initcall(usb_hub_generic_init);
+>> > +
+>> > +static void __exit usb_hub_generic_exit(void)
+>> > +{
+>> > +	platform_driver_unregister(&usb_hub_generic_driver);
+>> > +}
+>> > +module_exit(usb_hub_generic_exit);
+>> 
+>> module_platform_driver();
+>
+> I want this driver to be called before module init's.
+
+why ?
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151208/46d4f17b/attachment.sig>
