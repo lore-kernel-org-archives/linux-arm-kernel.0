@@ -1,117 +1,40 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 8 Dec 2015 15:53:07 +0000
-Subject: [PATCH v4] acpi, apei, arm64: APEI initial support for aarch64.
-In-Reply-To: <1449558183-12259-1-git-send-email-fu.wei@linaro.org>
-References: <1449558183-12259-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <5666FCE3.4070300@arm.com>
+From: noamc@ezchip.com (Noam Camus)
+Date: Tue, 8 Dec 2015 15:54:26 +0000
+Subject: [PATCH] net: ezchip: fix address space confusion in nps_enet.c
+In-Reply-To: <33732958.3idC7H2UPT@wuerfel>
+References: <33732958.3idC7H2UPT@wuerfel>
+Message-ID: <DB5PR02MB11413338E829BFCBB7F086AED6080@DB5PR02MB1141.eurprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/15 07:03, fu.wei at linaro.org wrote:
-> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->
-> This commit provides APEI arch-specific bits for aarch64
->
-> Meanwhile, add a new subfunction "hest_ia_init" for
-> "acpi_disable_cmcff" which is used by IA-32 Architecture
-> Corrected Machine Check (CMC).
->
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> Tested-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> ---
-> Changelog:
-> v4: Rebase to latest kernel version(4.4-rc4).
->      Move arch_apei_flush_tlb_one into header file as a inline function
->      Add a new subfunction "hest_ia_init" for "acpi_disable_cmcff".
->
-> v3: https://lkml.org/lkml/2015/12/3/521
->      Remove "acpi_disable_cmcff" from arm64 code,
->      and wrap it in hest.c by "#if defined(__i386__) || defined(__x86_64__)"
->
-> v2: https://lkml.org/lkml/2015/12/2/432
->      Rebase to latest kernel version(4.4-rc3).
->      Move arch_apei_flush_tlb_one() to arch/arm64/kernel/acpi.c
->
-> v1: https://lkml.org/lkml/2015/8/14/199
->      Move arch_apei_flush_tlb_one() to arch/arm64/include/asm/apci.h.
->      Delete arch/arm64/kernel/apei.c.
->      Add "#ifdef CONFIG_ACPI_APEI" for "acpi_disable_cmcff".
->
->   arch/arm64/Kconfig            |  1 +
->   arch/arm64/include/asm/acpi.h |  5 +++++
->   drivers/acpi/apei/hest.c      | 19 ++++++++++++++++---
->   3 files changed, 22 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 871f217..58c8992 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -3,6 +3,7 @@ config ARM64
->   	select ACPI_CCA_REQUIRED if ACPI
->   	select ACPI_GENERIC_GSI if ACPI
->   	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
-> +	select HAVE_ACPI_APEI if ACPI
->   	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
->   	select ARCH_HAS_ELF_RANDOMIZE
->   	select ARCH_HAS_GCOV_PROFILE_ALL
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index caafd63..31d3d9a 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -17,6 +17,7 @@
->
->   #include <asm/cputype.h>
->   #include <asm/smp_plat.h>
-> +#include <asm/tlbflush.h>
->
->   /* Macros for consistency checks of the GICC subtable of MADT */
->   #define ACPI_MADT_GICC_LENGTH	\
-> @@ -94,6 +95,10 @@ static inline const char *acpi_get_enable_method(int cpu)
->
->   #ifdef	CONFIG_ACPI_APEI
->   pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
-> +static inline void arch_apei_flush_tlb_one(unsigned long addr)
-> +{
-> +	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
-> +}
->   #endif
->
->   #endif /*_ASM_ACPI_H*/
-> diff --git a/drivers/acpi/apei/hest.c b/drivers/acpi/apei/hest.c
-> index 20b3fcf..715c58b 100644
-> --- a/drivers/acpi/apei/hest.c
-> +++ b/drivers/acpi/apei/hest.c
-> @@ -117,15 +117,27 @@ int apei_hest_parse(apei_hest_func_t func, void *data)
->   }
->   EXPORT_SYMBOL_GPL(apei_hest_parse);
->
-> +#if defined(__i386__) || defined(__x86_64__)
+>From: Arnd Bergmann [mailto:arnd at arndb.de] 
+>Sent: Tuesday, December 08, 2015 5:29 PM
+>To: David S. Miller
+>Cc: Noam Camus; Tal Zilcer; netdev at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+>Subject: [PATCH] net: ezchip: fix address space confusion in nps_enet.c
 
-Would it be better if define a symbol like :
+>The nps_enet driver happily mixes virtual, physical and __iomem addresses, which are all different depending on the architecture and configuration.  That causes a warning when building the code on ARM with LPAE mode enabled:
 
-HAVE_ARCH_APEI_CMCFF for x86 and wrap it around that ?
+>drivers/net/ethernet/ezchip/nps_enet.c: In function 'nps_enet_send_frame':
+>drivers/net/ethernet/ezchip/nps_enet.c:370:13: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
 
->   /*
->    * Check if firmware advertises firmware first mode. We need FF bit to be set
->    * along with a set of MC banks which work in FF mode.
->    */
->   static int __init hest_parse_cmc(struct acpi_hest_header *hest_hdr, void *data)
->   {
-> -	return arch_apei_enable_cmcff(hest_hdr, data);
-> +	if (!acpi_disable_cmcff)
-> +		return !arch_apei_enable_cmcff(hest_hdr, data);
-> +
-> +	return 0;
->   }
->
-> +static inline int __init hest_ia_init(void)
-> +{
-> +	return apei_hest_parse(hest_parse_cmc, NULL);
-> +}
-> +#else
-> +static inline int __init hest_ia_init(void) { return 0; }
-> +#endif
+>but will also fail to work for other reasons.
 
-Cheers
-Suzuki
+>In this patch, I'm trying to change the code to use only normal kernel pointers, which I assume is what the author actually meant:
+
+>* For reading or writing a 32-bit word that may be unaligned when
+> an SKB contains unaligned data, I'm using get_unaligned/put_unaligned()
+>  rather than memcpy_fromio/toio.
+
+>* For converting a u8 pointer to a u32 pointer, I use a cast rather
+>  than the incorrect virt_to_phys.
+
+>* For copying a couple of bytes from one place to another while respecting
+ > alignment, I use memcpy instead of memcpy_toio.
+
+>Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+I have tested it on my simulator environment and driver compiles cleanly and runs happily without any problem.
+Thank you.
+
+Acked-by Noam Camus <noamc@ezchip.com>
