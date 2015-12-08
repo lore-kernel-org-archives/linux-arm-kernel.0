@@ -1,36 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 08 Dec 2015 17:56:20 +0000
-Subject: [PATCH v6 00/21] KVM: ARM64: Add guest PMU support
-In-Reply-To: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <566719C4.9030305@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 8 Dec 2015 12:03:55 -0600
+Subject: [4.4-rc][PATCH v2] ARM: dts: am4372: fix clock source for arm twd
+ and global timers
+In-Reply-To: <1448898998-32749-1-git-send-email-grygorii.strashko@ti.com>
+References: <1448898998-32749-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <87wpsolsvo.fsf@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shannon,
 
-On 08/12/15 12:47, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> This patchset adds guest PMU support for KVM on ARM64. It takes
-> trap-and-emulate approach. When guest wants to monitor one event, it
-> will be trapped by KVM and KVM will call perf_event API to create a perf
-> event and call relevant perf_event APIs to get the count value of event.
+Hi,
 
-There is still some work to do. A number of bugs, some design issues,
-and in general a lot of tidying up to do. If you want this in 4.5,
-you're going to have to address this quickly.
+Grygorii Strashko <grygorii.strashko@ti.com> writes:
+> ARM TWD and Global timer are clocked by PERIPHCLK which is MPU_CLK/2.
+> But now they are clocked by dpll_mpu_m2_ck == MPU_CLK and, as result.
+> Timekeeping core misbehaves. For example, execution of command
+> "sleep 5" will take 10 sec instead of 5.
+>
+> Hence, fix it by adding mpu_periphclk ("fixed-factor-clock") and use
+> it for clocking ARM TWD and Global timer (same way as on OMAP4).
+>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Fixes:commit 8cbd4c2f6a99 ("arm: boot: dts: am4372: add ARM timers and SCU nodes")
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 
-But quickly doesn't mean rushing it, and I have the feeling that this is
-what you've done over the past week. Also, I've reviewed this series 3
-times during that time, and I feel a bit exhausted.
+this seems to be the best fix for this problem, yeah.
 
-So please do not send another one before the end of the week. take the
-time to address all the comments, ask questions if needed, and hopefully
-I can review it again next Monday.
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151208/b82a5540/attachment.sig>
