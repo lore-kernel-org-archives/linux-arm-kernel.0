@@ -1,52 +1,35 @@
 From: anton.bondarenko.sama@gmail.com (Anton Bondarenko)
-Date: Tue,  8 Dec 2015 07:43:44 +0100
-Subject: [PATCH v6 2/8] spi: imx: enable loopback only for ECSPI controller
- family
+Date: Tue,  8 Dec 2015 07:43:46 +0100
+Subject: [PATCH v6 4/8] spi: imx: defer spi initialization, if DMA engine is
 In-Reply-To: <1449557030-27525-1-git-send-email-anton.bondarenko.sama@gmail.com>
 References: <1449557030-27525-1-git-send-email-anton.bondarenko.sama@gmail.com>
-Message-ID: <1449557030-27525-3-git-send-email-anton.bondarenko.sama@gmail.com>
+Message-ID: <1449557030-27525-5-git-send-email-anton.bondarenko.sama@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Limit SPI_LOOP mode to ECSPI controller (iMX.51, iMX53 and i.MX6) only since
-there is no support in other families specific code for now.
+If SPI device supports DMA mode, but DMA controller is not yet
+available due to e.g. a delay in the corresponding kernel module
+initialization, retry to initialize SPI driver later on instead of
+falling back into PIO only mode.
 
 Signed-off-by: Anton Bondarenko <anton.bondarenko.sama@gmail.com>
 ---
- drivers/spi/spi-imx.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ drivers/spi/spi-imx.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index 3aa33c8..17a90dc 100644
+index c123060..d98c33c 100644
 --- a/drivers/spi/spi-imx.c
 +++ b/drivers/spi/spi-imx.c
-@@ -1140,6 +1140,9 @@ static int spi_imx_probe(struct platform_device *pdev)
- 	spi_imx = spi_master_get_devdata(master);
- 	spi_imx->bitbang.master = master;
- 
-+	spi_imx->devtype_data = of_id ? of_id->data :
-+		(struct spi_imx_devtype_data *)pdev->id_entry->driver_data;
+@@ -1222,6 +1222,9 @@ static int spi_imx_probe(struct platform_device *pdev)
+ 	 */
+ 	if (is_imx51_ecspi(spi_imx)) {
+ 		ret = spi_imx_sdma_init(&pdev->dev, spi_imx, master, res);
++		if (ret == -EPROBE_DEFER)
++			goto out_clk_put;
 +
- 	for (i = 0; i < master->num_chipselect; i++) {
- 		int cs_gpio = of_get_named_gpio(np, "cs-gpios", i);
- 		if (!gpio_is_valid(cs_gpio) && mxc_platform_info)
-@@ -1164,14 +1167,12 @@ static int spi_imx_probe(struct platform_device *pdev)
- 	spi_imx->bitbang.master->cleanup = spi_imx_cleanup;
- 	spi_imx->bitbang.master->prepare_message = spi_imx_prepare_message;
- 	spi_imx->bitbang.master->unprepare_message = spi_imx_unprepare_message;
--	spi_imx->bitbang.master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH |
--					     SPI_LOOP;
-+	spi_imx->bitbang.master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
-+	if (is_imx51_ecspi(spi_imx))
-+		spi_imx->bitbang.master->mode_bits |= SPI_LOOP;
- 
- 	init_completion(&spi_imx->xfer_done);
- 
--	spi_imx->devtype_data = of_id ? of_id->data :
--		(struct spi_imx_devtype_data *) pdev->id_entry->driver_data;
--
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	spi_imx->base = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(spi_imx->base)) {
+ 		if (ret < 0)
+ 			dev_err(&pdev->dev, "dma setup error %d, use pio\n",
+ 				ret);
 -- 
 2.6.3
