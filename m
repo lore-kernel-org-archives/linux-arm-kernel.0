@@ -1,33 +1,71 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 8 Dec 2015 11:54:11 +0100 (CET)
-Subject: [PATCH 0/5] Fix regression introduced by set_irq_flags() removal
-In-Reply-To: <20151208095835.582dc34b@free-electrons.com>
-References: <1445347435-2333-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20151020140427.GE3953@io.lakedaemon.net>
- <20151020160828.497fcc80@free-electrons.com>
- <alpine.DEB.2.11.1510202121590.8159@nanos>
- <20151111092638.587a53a4@free-electrons.com>
- <alpine.DEB.2.11.1511131509180.3987@nanos>
- <20151204120329.30a52cf4@free-electrons.com>
- <alpine.DEB.2.11.1512051823140.3595@nanos>
- <alpine.DEB.2.11.1512061018450.3595@nanos>
- <20151208095835.582dc34b@free-electrons.com>
-Message-ID: <alpine.DEB.2.11.1512081153410.3595@nanos>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Tue, 8 Dec 2015 11:56:28 +0100
+Subject: [PATCH 00/13] mvneta Buffer Management and enhancements
+In-Reply-To: <5661F449.5020205@gmail.com>
+References: <CAPv3WKc4zSmjtw_FeePCVCaq_aUubbCw_ggtxgxs0-7LwL7fHQ@mail.gmail.com>
+ <20151129.210210.1777978635596463961.davem@davemloft.net>
+ <CAPv3WKcHnJHCvg63Vs79RboNOuESU8jCLouKPRW4NdptAd_hag@mail.gmail.com>
+ <20151130.112500.293198684175670933.davem@redhat.com>
+ <CAPv3WKcKm3X3Lys2HwYZXaZxPaajenF7av1wJKXqKxxwibXW4A@mail.gmail.com>
+ <5661F449.5020205@gmail.com>
+Message-ID: <CAPv3WKeTqWXvABPHovH6dqUz_qs88Wy7Q6cbOHsujt4CM0=32g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Dec 2015, Thomas Petazzoni wrote:
-> When a device driver uses a normal (non per-CPU) interrupt, then it
-> doesn't have to take care of disabling the interrupt on suspend and
-> re-enabling the interrupt on resume at the interrupt controller level.
-> This is all transparently handled by the irqchip driver.
-> 
-> Why should the handling of per-CPU interrupts be different and require
-> explicit handling from each device driver rather than being
-> transparently handled by the irqchip driver ?
+Hi David,
 
-Fair enough. Did not think about the boot cpu part.
+2015-12-04 21:15 GMT+01:00 Florian Fainelli <f.fainelli@gmail.com>:
+> (no top posting please)
+>
+> On 02/12/15 00:26, Marcin Wojtas wrote:
+>> Hi Florian,
+>>
+>> Can you please describe in more details, what would you expect from
+>> such special abstraction layer regarding buffer managers? I'd like to
+>> understand more of your expectations and evaluate possible work.
+>
+> Well, something along these lines:
+>
+> - have the ability to register a particular pool (location + number of
+> buffers) in a way that is relatively device agnostic (initialization
+> would of course be device specific)
+>
+> - provide a set of buffer management APIs like those you proposed below,
+> and have some generic code that leverages what
+> drivers/net/ethernet/sun/niu.c does for instance
+>
+> - introduce a netdev_alloc_skb_from_pool() or something like that which
+> would limit the amount of code to change in your network driver to
+> benefit from that feature so based
+>
+> I am sure David would be able to suggest more detailed API.
+>
 
-Thanks,
+As we're getting closer to what a generic BM part, could you please
+share your thoughts on the possible API?
 
-	tglx
+
+>>>
+>>>> What kind of abstraction and helpers do you mean? Some kind of API
+>>>> (e.g. bm_alloc_buffer, bm_initialize_ring bm_put_buffer,
+>>>> bm_get_buffer), which would be used by platform drivers (and specific
+>>>> aplications if one wants to develop on top of the kernel)?
+>>>>
+>>>> In general, what is your top-view of such solution and its cooperation
+>>>> with the drivers?
+>>>
+>>> The tricky parts involved have to do with allocating pages for the
+>>> buffer pools and minimizing the number of atomic refcounting
+>>> operations on those pages for for the puts and gets, particularly
+>>> around buffer replenish runs.
+>>>
+>>> For example, if you're allocating a page for a buffer pool the device
+>>> will chop into N (for any N < PAGE_SIZE) byte pieces, you can
+>>> eliminate many atomic operations.
+>
+
+Do you think you can point to anything similar that could be a sort of
+reference for such solution?
+
+Best regards,
+Marcin
