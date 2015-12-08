@@ -1,67 +1,84 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Tue, 8 Dec 2015 21:08:32 +0800
-Subject: ARM64: kernel oops in 4.4-rc4+
-In-Reply-To: <20151208103013.GA19612@arm.com>
-References: <CACVXFVPnmKzv-mnDyjOnoQtxZ4kyWLtkymK1XhDThO8ibi7f7w@mail.gmail.com>
- <20151208103013.GA19612@arm.com>
-Message-ID: <CACVXFVPgTPYzHj0E7cSx=X+=t=0Am_yBSk6FnTZHeG0hyY6ipg@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 8 Dec 2015 15:15:31 +0200
+Subject: [PATCH 4/4] dmaengine: edma: Add support for DMA filter mapping
+ to slave devices
+In-Reply-To: <566063CA.20500@ti.com>
+References: <1449153192-9082-1-git-send-email-peter.ujfalusi@ti.com>
+ <1449153192-9082-5-git-send-email-peter.ujfalusi@ti.com>
+ <2675730.x1sS4Fa4y8@wuerfel> <566063CA.20500@ti.com>
+Message-ID: <5666D7F3.4000708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 8, 2015 at 6:30 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Dec 08, 2015 at 02:30:33PM +0800, Ming Lei wrote:
->> Hi,
->
-> [adding Catalin to cc]
->
->> The attached kernel oops can be triggered immediately after
->> running the following command on APM Mustang:
+On 12/03/2015 05:46 PM, Peter Ujfalusi wrote:
+> On 12/03/2015 05:38 PM, Arnd Bergmann wrote:
+>> On Thursday 03 December 2015 16:33:12 Peter Ujfalusi wrote:
+>>> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+>>> index 0675e268d577..46b305ea0d21 100644
+>>> --- a/drivers/dma/edma.c
+>>> +++ b/drivers/dma/edma.c
+>>> @@ -2297,6 +2297,12 @@ static int edma_probe(struct platform_device *pdev)
+>>>                 edma_set_chmap(&ecc->slave_chans[i], ecc->dummy_slot);
+>>>         }
+>>>  
+>>> +       if (info->slave_map) {
+>>> +               ecc->dma_slave.filter_map.map = info->slave_map;
+>>> +               ecc->dma_slave.filter_map.mapcnt = info->slavecnt;
+>>> +               ecc->dma_slave.filter_map.filter_fn = edma_filter_fn;
+>>> +       }
+>>> +
+>>>
 >>
->>         $stress-ng --all 8 -t 10m
->>
->> [1] kernel oops log
->> stress-ng: info:  [5220] 5 failures reached, aborting stress process
->> [  265.782659] kernel BUG at ./arch/arm64/include/asm/pgtable.h:282!
->
-> Yikes, this means we're replacing a writable pte with a clean pte, so
-> there's a potential race w/ hardware DBM.
->
-> Could you dump pte and *ptep please?
+>> Just a minor comment here: I think all three assignments can be done
+>> unconditionally.
+> 
+> True.
+> 
+>> As I mentioned before, I'd also remove 'struct dma_filter'
+>> and put the three members in struct dma_device directly. In fact, the
+>> filter function can go with the other function pointers for consistency.
+> 
+> I just like to keep things in one place ;)
+> I don't have strong stand on keeping the intermediate 'struct dma_filter'
+> Let's hear from Vinod regarding to this
 
-They are dumped as so:
 
-set_pte_at: addr 470000, ptep fffffe00bc870238, *ptep 680047348a0bd3,
-pte 680047348a0fd3
+One remaining design issue is on how and where to place the filter related
+variables/pointers:
 
-with the following change:
+Keep it separated as it was in the RFC and v01 series:
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 7e074f9..1c5f0ee 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -278,6 +278,12 @@ static inline void set_pte_at(struct mm_struct *mm, unsigne
-         */
-        if (IS_ENABLED(CONFIG_DEBUG_VM) && IS_ENABLED(CONFIG_ARM64_HW_AFDBM) &&
-            pte_valid(*ptep)) {
-+
-+               if (!pte_young(pte) || (pte_write(*ptep) && !pte_dirty(pte)))
-+                       trace_printk("%s: addr %lx, ptep %p, *ptep %llx, pte %ll
-+                               __func__, addr, ptep,
-+                               (unsigned long long)pte_val(*ptep),
-+                               (unsigned long long )pte_val(pte));
-                BUG_ON(!pte_young(pte));
-                BUG_ON(pte_write(*ptep) && !pte_dirty(pte));
+struct dma_slave_map {
+        const char *devname;
+        const char *slave;
+        void *param;
+};
 
->
->> [  265.788726] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
->> [  265.794186] Modules linked in:
->> [  265.797241] CPU: 1 PID: 15830 Comm: stress-ng-cache Tainted: G
->>   W       4.4.0-rc4+ #54
->
-> What changes do you have on top of -rc4?
+struct dma_filter {
+        dma_filter_fn fn;
+        int mapcnt;
+        const struct dma_slave_map *map;
+};
 
-Nothing else, and it is just built from the latest linus tree.
 
+struct dma_device {
+	...
+	struct dma_filter filter;
+	...
+};
+
+Or to have them under the dma_device directly:
+
+struct dma_device {
+	...
+	int filter_mapcnt;
+	const struct dma_slave_map *filter_map;
+	...
+	dma_filter_fn filter_fn;
+	...
+};
+
+Vinod: what is your preference for this?
 
 Thanks,
-Ming Lei
+P?ter
