@@ -1,57 +1,73 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Tue, 08 Dec 2015 12:02:11 +0000
-Subject: [PATCH v9 6/6] tests/guest-debug: introduce basic gdbstub tests
-In-Reply-To: <CAFEAcA9q1MpiM4vM+RH-YQ2RpB=eV-Xgyw1-yw6qHG0hbem6_Q@mail.gmail.com>
-References: <1447345251-22625-1-git-send-email-alex.bennee@linaro.org>
- <1447345251-22625-7-git-send-email-alex.bennee@linaro.org>
- <CAFEAcA9q1MpiM4vM+RH-YQ2RpB=eV-Xgyw1-yw6qHG0hbem6_Q@mail.gmail.com>
-Message-ID: <87poyhp2rg.fsf@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 8 Dec 2015 12:06:26 +0000
+Subject: ARM64: kernel oops in 4.4-rc4+
+In-Reply-To: <20151208105152.GB19612@arm.com>
+References: <CACVXFVPnmKzv-mnDyjOnoQtxZ4kyWLtkymK1XhDThO8ibi7f7w@mail.gmail.com>
+ <20151208103013.GA19612@arm.com> <20151208105152.GB19612@arm.com>
+Message-ID: <20151208120625.GA26759@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Dec 08, 2015 at 10:51:52AM +0000, Will Deacon wrote:
+> On Tue, Dec 08, 2015 at 10:30:13AM +0000, Will Deacon wrote:
+> > On Tue, Dec 08, 2015 at 02:30:33PM +0800, Ming Lei wrote:
+> > > The attached kernel oops can be triggered immediately after
+> > > running the following command on APM Mustang:
+> > > 
+> > >         $stress-ng --all 8 -t 10m
+> > > 
+> > > [1] kernel oops log
+> > > stress-ng: info:  [5220] 5 failures reached, aborting stress process
+> > > [  265.782659] kernel BUG at ./arch/arm64/include/asm/pgtable.h:282!
+> > 
+> > Yikes, this means we're replacing a writable pte with a clean pte, so
+> > there's a potential race w/ hardware DBM.
+> > 
+> > Could you dump pte and *ptep please?
+> 
+> I tried running this on my Juno and pretty quickly saw the OOM killer
+> coming in. Perhaps, in your case, pte is a swap entry and its confusing
+> the checks (so pte_dirty/pte_young are looking at random bits of the
+> file offset)?
 
-Peter Maydell <peter.maydell@linaro.org> writes:
+It could indeed be that the new pte is swap or file and the check misses
+that. The easiest is to move the check inside the if (pte_valid_user(pte))
+block:
 
-> On 12 November 2015 at 16:20, Alex Benn?e <alex.bennee@linaro.org> wrote:
->> From: Alex Benn?e <alex@bennee.com>
->>
->> The aim of these tests is to combine with an appropriate kernel
->> image (with symbol-file vmlinux) and check it behaves as it should.
->> Given a kernel it checks:
->>
->>   - single step
->>   - software breakpoint
->>   - hardware breakpoint
->>   - access, read and write watchpoints
->>
->> On success it returns 0 to the calling process.
->>
->> I've not plumbed this into the "make check" logic though as we need a
->> solution for providing non-host binaries to the tests. However the test
->> is structured to work with pretty much any Linux kernel image as it
->> uses the basic kernel_init code which is common across architectures.
->
-> Do these tests pass if you run them on the TCG QEMU, just out
-> of interest?
+--------------8<------------------------
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 7e074f93f383..12d89ee5ab7f 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -269,17 +269,17 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
+ 			pte_val(pte) &= ~PTE_RDONLY;
+ 		else
+ 			pte_val(pte) |= PTE_RDONLY;
+-	}
+ 
+-	/*
+-	 * If the existing pte is valid, check for potential race with
+-	 * hardware updates of the pte (ptep_set_access_flags safely changes
+-	 * valid ptes without going through an invalid entry).
+-	 */
+-	if (IS_ENABLED(CONFIG_DEBUG_VM) && IS_ENABLED(CONFIG_ARM64_HW_AFDBM) &&
+-	    pte_valid(*ptep)) {
+-		BUG_ON(!pte_young(pte));
+-		BUG_ON(pte_write(*ptep) && !pte_dirty(pte));
++		/*
++		 * If the existing pte is valid, check for potential race with
++		 * hardware updates of the pte (ptep_set_access_flags safely
++		 * changes valid ptes without going through an invalid entry).
++		 */
++		if (IS_ENABLED(CONFIG_DEBUG_VM) && IS_ENABLED(CONFIG_ARM64_HW_AFDBM) &&
++		    pte_valid(*ptep)) {
++			BUG_ON(!pte_young(pte));
++			BUG_ON(pte_write(*ptep) && !pte_dirty(pte));
++		}
+ 	}
+ 
+ 	set_pte(ptep, pte);
+--------------8<------------------------
 
-You'll be glad to know they do.
-
-> I'm not a great fan of tests that aren't in 'make check'
-> because IME they just bitrot, but as you say we have no
-> sensible approach for handling tests that need to run real
-> guest code :-(
-
-I was pondering if a git sub-project with large file support would work.
-We could add pre-built binaries to the tree with appropriate meta-data
-(src tree, version, config) to rebuild if required.
-
-There would be some degree of trust implied in the original builder
-though. Maybe a signed commit?
-
->
-> thanks
-> -- PMM
-
-
---
-Alex Benn?e
+-- 
+Catalin
