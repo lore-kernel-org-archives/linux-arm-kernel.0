@@ -1,228 +1,26 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 08 Dec 2015 17:07:08 +0900
-Subject: [PATCH v4 6/8] ARM: dts: Exynos5800: fix CPU OPP
-In-Reply-To: <1449512300-17230-7-git-send-email-b.zolnierkie@samsung.com>
-References: <1449512300-17230-1-git-send-email-b.zolnierkie@samsung.com>
- <1449512300-17230-7-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <56668FAC.2000702@samsung.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 8 Dec 2015 09:09:11 +0100
+Subject: [PATCH] clk: sunxi: Extend the simple gates and handle the
+ Allwinner H3
+In-Reply-To: <20151208075354.GJ27957@lukather>
+References: <20151206100412.1a74b71da8e9ca28c6e61589@free.fr>
+ <20151207143102.GA29097@rob-hp-laptop>
+ <20151208074226.17c75247f9eed69c9cac1d2d@free.fr>
+ <20151208075354.GJ27957@lukather>
+Message-ID: <20151208090911.1549c00eeade442c46d6276f@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.12.2015 03:18, Bartlomiej Zolnierkiewicz wrote:
-> Fix CPU operating points for Exynos5800 (it use different
-> voltages than Exynos5420 and supports additional frequencies).
-> However don't use 2000MHz & 1900MHz OPPs (for A15 cores) and
-> 1400MHz OPP (for A7 cores) for now as they are not available
-> on all boards.
+On Tue, 8 Dec 2015 08:53:54 +0100
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+
+> Look, we all agreed on a solution that raised all objections, but
+> yours.
 > 
-> Based on Hardkernel's kernel for ODROID-XU3 board.
-> 
-> Changes by Ben Gamari:
-> - Port to operating-points-v2
-> 
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Doug Anderson <dianders@chromium.org>
-> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> Cc: Andreas Faerber <afaerber@suse.de>
-> Cc: Sachin Kamat <sachin.kamat@linaro.org>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Signed-off-by: Ben Gamari <ben@smart-cactus.org>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5800.dtsi | 165 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 165 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5800.dtsi b/arch/arm/boot/dts/exynos5800.dtsi
-> index c0bb356..e417218 100644
-> --- a/arch/arm/boot/dts/exynos5800.dtsi
-> +++ b/arch/arm/boot/dts/exynos5800.dtsi
-> @@ -17,8 +17,173 @@
->  
->  / {
->  	compatible = "samsung,exynos5800", "samsung,exynos5";
-> +
-> +	cpu0_opp_table: opp_table0 {
+> I'm going to take Jens patch.
 
-This includes exynos5420.dtsi, so override by label instead of
-duplicating full path.
+OK. Good luck for the next SoCs!
 
-In the same time you don't have to duplicate all data - just override
-what you want:
-	&cpu0_opp_table {
-		opp00 at 1800000000 {
-			opp-microvolt = <1250000>;
-		};
-	};
-
-That should be sufficient I think.
-
-> +		compatible = "operating-points-v2";
-> +		opp-shared;
-> +		opp00 at 1800000000 {
-> +			opp-hz = /bits/ 64 <1800000000>;
-> +			opp-microvolt = <1250000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp01 at 1700000000 {
-> +			opp-hz = /bits/ 64 <1700000000>;
-> +			opp-microvolt = <1250000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp02 at 1600000000 {
-> +			opp-hz = /bits/ 64 <1600000000>;
-> +			opp-microvolt = <1250000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp03 at 1500000000 {
-> +			opp-hz = /bits/ 64 <1500000000>;
-> +			opp-microvolt = <1100000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp04 at 1400000000 {
-> +			opp-hz = /bits/ 64 <1400000000>;
-> +			opp-microvolt = <1100000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp05 at 1300000000 {
-> +			opp-hz = /bits/ 64 <1300000000>;
-> +			opp-microvolt = <1100000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp06 at 1200000000 {
-> +			opp-hz = /bits/ 64 <1200000000>;
-> +			opp-microvolt = <1000000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp07 at 1100000000 {
-> +			opp-hz = /bits/ 64 <1100000000>;
-> +			opp-microvolt = <1000000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp08 at 1000000000 {
-> +			opp-hz = /bits/ 64 <1000000000>;
-> +			opp-microvolt = <1000000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp09 at 900000000 {
-> +			opp-hz = /bits/ 64 <900000000>;
-> +			opp-microvolt = <1000000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp10 at 800000000 {
-> +			opp-hz = /bits/ 64 <800000000>;
-> +			opp-microvolt = <900000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp11 at 700000000 {
-> +			opp-hz = /bits/ 64 <700000000>;
-> +			opp-microvolt = <900000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp12 at 600000000 {
-> +			opp-hz = /bits/ 64 <600000000>;
-> +			opp-microvolt = <900000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp13 at 500000000 {
-> +			opp-hz = /bits/ 64 <500000000>;
-> +			opp-microvolt = <900000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp14 at 400000000 {
-> +			opp-hz = /bits/ 64 <400000000>;
-> +			opp-microvolt = <900000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp15 at 300000000 {
-> +			opp-hz = /bits/ 64 <300000000>;
-> +			opp-microvolt = <900000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp16 at 200000000 {
-> +			opp-hz = /bits/ 64 <200000000>;
-> +			opp-microvolt = <900000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +	};
-> +
-> +	cpu1_opp_table: opp_table1 {
-> +		compatible = "operating-points-v2";
-> +		opp-shared;
-> +		opp00 at 1300000000 {
-> +			opp-hz = /bits/ 64 <1300000000>;
-> +			opp-microvolt = <1250000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp01 at 1200000000 {
-> +			opp-hz = /bits/ 64 <1200000000>;
-> +			opp-microvolt = <1250000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp02 at 1100000000 {
-> +			opp-hz = /bits/ 64 <1100000000>;
-> +			opp-microvolt = <1250000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp03 at 1000000000 {
-> +			opp-hz = /bits/ 64 <1000000000>;
-> +			opp-microvolt = <1100000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp04 at 900000000 {
-> +			opp-hz = /bits/ 64 <900000000>;
-> +			opp-microvolt = <1100000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp05 at 800000000 {
-> +			opp-hz = /bits/ 64 <800000000>;
-> +			opp-microvolt = <1100000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp06 at 700000000 {
-> +			opp-hz = /bits/ 64 <700000000>;
-> +			opp-microvolt = <1000000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp07 at 600000000 {
-> +			opp-hz = /bits/ 64 <600000000>;
-> +			opp-microvolt = <1000000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp08 at 500000000 {
-> +			opp-hz = /bits/ 64 <500000000>;
-> +			opp-microvolt = <1000000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp09 at 400000000 {
-> +			opp-hz = /bits/ 64 <400000000>;
-> +			opp-microvolt = <1000000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp10 at 300000000 {
-> +			opp-hz = /bits/ 64 <300000000>;
-> +			opp-microvolt = <900000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +		opp11 at 200000000 {
-> +			opp-hz = /bits/ 64 <200000000>;
-> +			opp-microvolt = <900000>;
-> +			clock-latency-ns = <140000>;
-> +		};
-> +	};
->  };
->  
-> +&cpu0 { operating-points-v2 = <&cpu0_opp_table>; };
-> +&cpu1 { operating-points-v2 = <&cpu0_opp_table>; };
-> +&cpu2 { operating-points-v2 = <&cpu0_opp_table>; };
-> +&cpu3 { operating-points-v2 = <&cpu0_opp_table>; };
-> +
-> +&cpu4 { operating-points-v2 = <&cpu1_opp_table>; };
-> +&cpu5 { operating-points-v2 = <&cpu1_opp_table>; };
-> +&cpu6 { operating-points-v2 = <&cpu1_opp_table>; };
-> +&cpu7 { operating-points-v2 = <&cpu1_opp_table>; };
-> +
-
-Why? These are set by exynos5420.dtsi already, aren't they?
-
-Best regards,
-Krzysztof
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
