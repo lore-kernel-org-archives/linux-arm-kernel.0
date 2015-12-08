@@ -1,54 +1,204 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Dec 2015 12:07:44 +0000
-Subject: [PATCH v4 01/13] mm/memblock: add MEMBLOCK_NOMAP attribute to
- memblock memory table
-In-Reply-To: <CAKv+Gu9oboT_Lk8heJWRcM=oxRW=EWioVCvZLH7N0YCkfU5tJw@mail.gmail.com>
-References: <1448886507-3216-1-git-send-email-ard.biesheuvel@linaro.org>
- <1448886507-3216-2-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu9oboT_Lk8heJWRcM=oxRW=EWioVCvZLH7N0YCkfU5tJw@mail.gmail.com>
-Message-ID: <20151208120743.GG19612@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 8 Dec 2015 12:11:06 +0000
+Subject: [PATCH v2] arm64: dts: juno: Add idle-states to device tree
+In-Reply-To: <1449513481.3012.16.camel@linaro.org>
+References: <1449513481.3012.16.camel@linaro.org>
+Message-ID: <20151208121106.GA404@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Mon, Dec 07, 2015 at 06:38:01PM +0000, Jon Medhurst (Tixy) wrote:
+> The latency times were suggested by Lorenzo Pieralisi after some ad hoc
+> testing.
+> 
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+> 
+> Lorenzo, are you happy with my statement that you did 'ad hoc testing'
+> to derive the figures or is there something more specific that's worth
+> adding?
 
-On Thu, Dec 03, 2015 at 11:55:53AM +0100, Ard Biesheuvel wrote:
-> On 30 November 2015 at 13:28, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > This introduces the MEMBLOCK_NOMAP attribute and the required plumbing
-> > to make it usable as an indicator that some parts of normal memory
-> > should not be covered by the kernel direct mapping. It is up to the
-> > arch to actually honor the attribute when laying out this mapping,
-> > but the memblock code itself is modified to disregard these regions
-> > for allocations and other general use.
-> >
-> > Cc: linux-mm at kvack.org
-> > Cc: Alexander Kuleshov <kuleshovmail@gmail.com>
-> > Cc: Andrew Morton <akpm@linux-foundation.org>
-> > Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
-> >  include/linux/memblock.h |  8 ++++++
-> >  mm/memblock.c            | 28 ++++++++++++++++++++
-> >  2 files changed, 36 insertions(+)
+Well, it is what I did but I would rephrase the commit log. I am
+ok with the patch as it is as long as you update the commit log.
 
-[...]
+"This patch adds idle-states bindings data collected through a set
+of benchmarking experiments (latency and energy consumption) on Juno boards.
+Lantecies data represents the worst case scenarios as required by the DT
+idle-states bindings." or something like that.
 
-> May I kindly ask team-mm/Andrew/Alexander to chime in here, and
-> indicate whether you are ok with this patch going in for 4.5? If so,
-> could you please provide your ack so the patch can be kept together
-> with the rest of the series, which depends on it?
+Thanks,
+Lorenzo
 
-I'm keen to queue this in the arm64 tree, since it's a prerequisite for
-cleaning up a bunch of our EFI code and sharing it with 32-bit ARM.
-
-> I should note that this change should not affect any memblock users
-> that never set the MEMBLOCK_NOMAP flag, but please, if you see any
-> issues beyond 'this may conflict with other stuff we have queued for
-> 4.5', please do let me know.
-
-Indeed, I can't see that this would cause any issues, but I would really
-like an Ack from one of the MM maintainers before taking this.
-
-Please could somebody take a look?
-
-Will
+> 
+>  arch/arm64/boot/dts/arm/juno-r1.dts | 28 ++++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/arm/juno.dts    | 28 ++++++++++++++++++++++++++++
+>  2 files changed, 56 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+> index 93bc3d7..8826f83 100644
+> --- a/arch/arm64/boot/dts/arm/juno-r1.dts
+> +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+> @@ -60,6 +60,28 @@
+>  			};
+>  		};
+>  
+> +		idle-states {
+> +			entry-method = "arm,psci";
+> +
+> +			CPU_SLEEP_0: cpu-sleep-0 {
+> +				compatible = "arm,idle-state";
+> +				arm,psci-suspend-param = <0x0010000>;
+> +				local-timer-stop;
+> +				entry-latency-us = <300>;
+> +				exit-latency-us = <1200>;
+> +				min-residency-us = <2000>;
+> +			};
+> +
+> +			CLUSTER_SLEEP_0: cluster-sleep-0 {
+> +				compatible = "arm,idle-state";
+> +				arm,psci-suspend-param = <0x1010000>;
+> +				local-timer-stop;
+> +				entry-latency-us = <300>;
+> +				exit-latency-us = <1200>;
+> +				min-residency-us = <2500>;
+> +			};
+> +		};
+> +
+>  		A57_0: cpu at 0 {
+>  			compatible = "arm,cortex-a57","arm,armv8";
+>  			reg = <0x0 0x0>;
+> @@ -67,6 +89,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A57_L2>;
+>  			clocks = <&scpi_dvfs 0>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A57_1: cpu at 1 {
+> @@ -76,6 +99,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A57_L2>;
+>  			clocks = <&scpi_dvfs 0>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_0: cpu at 100 {
+> @@ -85,6 +109,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+>  			clocks = <&scpi_dvfs 1>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_1: cpu at 101 {
+> @@ -94,6 +119,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+>  			clocks = <&scpi_dvfs 1>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_2: cpu at 102 {
+> @@ -103,6 +129,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+>  			clocks = <&scpi_dvfs 1>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_3: cpu at 103 {
+> @@ -112,6 +139,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+>  			clocks = <&scpi_dvfs 1>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A57_L2: l2-cache0 {
+> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+> index 53442b5..dcfcf15 100644
+> --- a/arch/arm64/boot/dts/arm/juno.dts
+> +++ b/arch/arm64/boot/dts/arm/juno.dts
+> @@ -60,6 +60,28 @@
+>  			};
+>  		};
+>  
+> +		idle-states {
+> +			entry-method = "arm,psci";
+> +
+> +			CPU_SLEEP_0: cpu-sleep-0 {
+> +				compatible = "arm,idle-state";
+> +				arm,psci-suspend-param = <0x0010000>;
+> +				local-timer-stop;
+> +				entry-latency-us = <300>;
+> +				exit-latency-us = <1200>;
+> +				min-residency-us = <2000>;
+> +			};
+> +
+> +			CLUSTER_SLEEP_0: cluster-sleep-0 {
+> +				compatible = "arm,idle-state";
+> +				arm,psci-suspend-param = <0x1010000>;
+> +				local-timer-stop;
+> +				entry-latency-us = <300>;
+> +				exit-latency-us = <1200>;
+> +				min-residency-us = <2500>;
+> +			};
+> +		};
+> +
+>  		A57_0: cpu at 0 {
+>  			compatible = "arm,cortex-a57","arm,armv8";
+>  			reg = <0x0 0x0>;
+> @@ -67,6 +89,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A57_L2>;
+>  			clocks = <&scpi_dvfs 0>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A57_1: cpu at 1 {
+> @@ -76,6 +99,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A57_L2>;
+>  			clocks = <&scpi_dvfs 0>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_0: cpu at 100 {
+> @@ -85,6 +109,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+>  			clocks = <&scpi_dvfs 1>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_1: cpu at 101 {
+> @@ -94,6 +119,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+>  			clocks = <&scpi_dvfs 1>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_2: cpu at 102 {
+> @@ -103,6 +129,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+>  			clocks = <&scpi_dvfs 1>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_3: cpu at 103 {
+> @@ -112,6 +139,7 @@
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+>  			clocks = <&scpi_dvfs 1>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A57_L2: l2-cache0 {
+> -- 
+> 2.1.4
+> 
+> 
+> 
