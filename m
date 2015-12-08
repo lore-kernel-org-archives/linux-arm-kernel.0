@@ -1,102 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 08 Dec 2015 16:33:44 +0000
-Subject: [PATCH v6 11/21] KVM: ARM64: Add access handler for PMXEVCNTR
- register
-In-Reply-To: <1449578860-15808-12-git-send-email-zhaoshenglong@huawei.com>
-References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
- <1449578860-15808-12-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <56670668.8080306@arm.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Tue, 8 Dec 2015 10:35:51 -0600
+Subject: [PATCH] ARM:VDSO: use PTR_ERR_OR_ZERO for vma check
+In-Reply-To: <5654DC2E.7080908@mentor.com>
+References: <20151124065536.GA21679@jci-VirtualBox>
+ <5654DC2E.7080908@mentor.com>
+Message-ID: <566706E7.5010200@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/15 12:47, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On 11/24/2015 03:52 PM, Nathan Lynch wrote:
+> On 11/24/2015 12:56 AM, Mutharaju, Prasanna (P.) wrote:
+>> From: Prasanna Karthik <mkarthi3@visteon.com>
+>>
+>> Use PTR_ERR_OR_ZERO rather than if(IS_ERR(...)) + PTR_ERR
+>>
+>> Signed-off-by: Prasanna Karthik <mkarthi3@visteon.com>
+>> ---
+>>  arch/arm/kernel/vdso.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+>> index 54a5aea..994e971 100644
+>> --- a/arch/arm/kernel/vdso.c
+>> +++ b/arch/arm/kernel/vdso.c
+>> @@ -224,7 +224,7 @@ static int install_vvar(struct mm_struct *mm, unsigned long addr)
+>>  				       VM_READ | VM_MAYREAD,
+>>  				       &vdso_data_mapping);
+>>  
+>> -	return IS_ERR(vma) ? PTR_ERR(vma) : 0;
+>> +	return PTR_ERR_OR_ZERO(vma);
+>>  }
+>>  
 > 
-> Accessing PMXEVCNTR register is mapped to the PMEVCNTRn or PMCCNTR which
-> is selected by PMSELR.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 44 ++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 42 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index f7a73b5..2304937 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -516,6 +516,46 @@ out:
->  	return true;
->  }
->  
-> +static bool access_pmu_pmxevcntr(struct kvm_vcpu *vcpu,
-> +				 struct sys_reg_params *p,
-> +				 const struct sys_reg_desc *r)
-> +{
-> +	u64 pmcr, idx, val;
-> +
-> +	if (!vcpu_mode_is_32bit(vcpu)) {
-> +		pmcr = vcpu_sys_reg(vcpu, PMCR_EL0);
-> +		idx = vcpu_sys_reg(vcpu, PMSELR_EL0) & ARMV8_COUNTER_MASK;
-> +
-> +		if (!pmu_counter_idx_valid(pmcr, idx))
-> +			goto out;
-> +
-> +		val = kvm_pmu_get_counter_value(vcpu, idx);
-> +		if (!p->is_write) {
-> +			p->regval = val;
-> +			goto out;
-> +		}
-> +
-> +		vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + idx) += (s64)p->regval - val;
-> +	} else {
-> +		pmcr = vcpu_cp15(vcpu, c9_PMCR);
-> +		idx = vcpu_cp15(vcpu, c9_PMSELR) & ARMV8_COUNTER_MASK;
-> +
-> +		if (!pmu_counter_idx_valid(pmcr, idx))
-> +			goto out;
-> +
-> +		val = kvm_pmu_get_counter_value(vcpu, idx);
-> +		if (!p->is_write) {
-> +			p->regval = val;
-> +			goto out;
-> +		}
-> +
-> +		vcpu_cp15(vcpu, c14_PMEVCNTR0 + idx) += (s64)p->regval - val;
-> +	}
-> +
-> +out:
-> +	return true;
-> +}
+> Thanks, I think this is fine, but I won't be able to properly process
+> this until next week.
 
-There is definitely some common code with the handling of PMEVCNTRn
-here. Can you please factor it ?
-
-> +
->  /* PMU registers accessor. */
->  static bool access_pmu_regs(struct kvm_vcpu *vcpu,
->  			    struct sys_reg_params *p,
-> @@ -804,7 +844,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  	  access_pmu_pmxevtyper },
->  	/* PMXEVCNTR_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b010),
-> -	  trap_raz_wi },
-> +	  access_pmu_pmxevcntr },
->  	/* PMUSERENR_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b000),
->  	  trap_raz_wi },
-> @@ -1192,7 +1232,7 @@ static const struct sys_reg_desc cp15_regs[] = {
->  	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), access_pmu_cp15_regs,
->  	  NULL, c9_PMCCNTR },
->  	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), access_pmu_pmxevtyper },
-> -	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), trap_raz_wi },
-> +	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), access_pmu_pmxevcntr },
->  	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
->  	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), trap_raz_wi },
->  	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), trap_raz_wi },
-> 
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I've verified that this results in no change in generated code, and I
+have sent it to Russell to queue for 4.5, thanks.
