@@ -1,100 +1,103 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 8 Dec 2015 17:36:18 +0800
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 8 Dec 2015 10:44:02 +0100
 Subject: [PATCH 1/3] usb: misc: generic_onboard_hub: add generic onboard
  USB HUB driver
-In-Reply-To: <201512081150.hIfZ22cp%fengguang.wu@intel.com>
-References: <1449538670-7954-2-git-send-email-peter.chen@freescale.com>
- <201512081150.hIfZ22cp%fengguang.wu@intel.com>
-Message-ID: <20151208093617.GD16881@shlinux2>
+In-Reply-To: <20151208092655.GC16881@shlinux2>
+References: <1449538670-7954-1-git-send-email-peter.chen@freescale.com>
+ <1449538670-7954-2-git-send-email-peter.chen@freescale.com>
+ <20151208061905.GM11966@pengutronix.de>
+ <20151208092655.GC16881@shlinux2>
+Message-ID: <20151208094402.GP11966@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 11:16:31AM +0800, kbuild test robot wrote:
-> Hi Peter,
+On Tue, Dec 08, 2015 at 05:26:56PM +0800, Peter Chen wrote:
+> On Tue, Dec 08, 2015 at 07:19:05AM +0100, Sascha Hauer wrote:
+> > > +	hub_data = devm_kzalloc(dev, sizeof(*hub_data), GFP_KERNEL);
+> > > +	if (!hub_data)
+> > > +		return -ENOMEM;
+> > > +
+> > > +	if (dev->of_node) {
+> > > +		struct device_node *node = dev->of_node;
+> > > +
+> > > +		hub_data->clk = devm_clk_get(dev, "external_clk");
+> > 
+> > Please drop such _clk suffixes. The context already makes it clear that
+> > it's a clock.
+> > 
 > 
-> [auto build test ERROR on usb/usb-testing]
-> [also build test ERROR on v4.4-rc4 next-20151207]
+> Will change.
 > 
-> url:    https://github.com/0day-ci/linux/commits/Peter-Chen/USB-add-generic-onboard-USB-HUB-driver/20151208-094428
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git usb-testing
-> config: tile-allmodconfig (attached as .config)
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=tile 
+> > > +		if (IS_ERR(hub_data->clk)) {
+> > > +			dev_dbg(dev, "Can't get external clock: %ld\n",
+> > > +					PTR_ERR(hub_data->clk));
+> > > +		}
+> > > +
+> > > +		/*
+> > > +		 * Try to get the information for HUB reset, the
+> > > +		 * default setting like below:
+> > > +		 *
+> > > +		 * - Reset state is low
+> > > +		 * - The duration is 50us
+> > > +		 */
+> > > +		if (of_find_property(node, "hub-reset-active-high", NULL))
+> > > +			reset_pol = 1;
+> > > +
+> > > +		of_property_read_u32(node, "hub-reset-duration-us",
+> > > +			&duration_us);
+> > > +
+> > > +		gpiod_reset = devm_gpiod_get_optional(dev, "hub-reset",
+> > > +			reset_pol ? GPIOD_OUT_HIGH : GPIOD_OUT_LOW);
+> > > +		ret = PTR_ERR_OR_ZERO(gpiod_reset);
+> > > +		if (ret) {
+> > > +			dev_err(dev, "Failed to get reset gpio, err = %d\n",
+> > > +				ret);
+> > > +			return ret;
+> > > +		}
+> > > +	} else if (pdata) {
+> > > +		hub_data->clk = pdata->ext_clk;
+> > 
+> > Passing clocks in platform_data is a no go. clocks must always be
+> > retrieved with clk_get.
 > 
-> All error/warnings (new ones prefixed by >>):
+> Yes, you are right.
 > 
->    drivers/usb/misc/generic_onboard_hub.c: In function 'usb_hub_generic_probe':
-> >> drivers/usb/misc/generic_onboard_hub.c:76:3: error: implicit declaration of function 'devm_gpiod_get_optional'
-> >> drivers/usb/misc/generic_onboard_hub.c:77:16: error: 'GPIOD_OUT_HIGH' undeclared (first use in this function)
->    drivers/usb/misc/generic_onboard_hub.c:77:16: note: each undeclared identifier is reported only once for each function it appears in
-> >> drivers/usb/misc/generic_onboard_hub.c:77:33: error: 'GPIOD_OUT_LOW' undeclared (first use in this function)
-> >> drivers/usb/misc/generic_onboard_hub.c:95:5: error: implicit declaration of function 'gpio_to_desc'
-> >> drivers/usb/misc/generic_onboard_hub.c:95:17: warning: assignment makes pointer from integer without a cast [enabled by default]
-> >> drivers/usb/misc/generic_onboard_hub.c:114:3: error: implicit declaration of function 'gpiod_set_value'
->    cc1: some warnings being treated as errors
+> > 
+> > > +		duration_us = pdata->gpio_reset_duration_us;
+> > > +		reset_pol = pdata->gpio_reset_polarity;
+> > > +
+> > > +		if (gpio_is_valid(pdata->gpio_reset)) {
+> > > +			ret = devm_gpio_request_one(
+> > > +				dev, pdata->gpio_reset, reset_pol
+> > > +				? GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW,
+> > > +				dev_name(dev));
+> > > +			if (!ret)
+> > > +				gpiod_reset = gpio_to_desc(pdata->gpio_reset);
+> > 
+> > If the gpio is valid then being unable to get it is an error.
 > 
-> vim +/devm_gpiod_get_optional +76 drivers/usb/misc/generic_onboard_hub.c
-> 
->     70			if (of_find_property(node, "hub-reset-active-high", NULL))
->     71				reset_pol = 1;
->     72	
->     73			of_property_read_u32(node, "hub-reset-duration-us",
->     74				&duration_us);
->     75	
->   > 76			gpiod_reset = devm_gpiod_get_optional(dev, "hub-reset",
->   > 77				reset_pol ? GPIOD_OUT_HIGH : GPIOD_OUT_LOW);
->     78			ret = PTR_ERR_OR_ZERO(gpiod_reset);
->     79			if (ret) {
->     80				dev_err(dev, "Failed to get reset gpio, err = %d\n",
->     81					ret);
->     82				return ret;
->     83			}
->     84		} else if (pdata) {
->     85			hub_data->clk = pdata->ext_clk;
->     86			duration_us = pdata->gpio_reset_duration_us;
->     87			reset_pol = pdata->gpio_reset_polarity;
->     88	
->     89			if (gpio_is_valid(pdata->gpio_reset)) {
->     90				ret = devm_gpio_request_one(
->     91					dev, pdata->gpio_reset, reset_pol
->     92					? GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW,
->     93					dev_name(dev));
->     94				if (!ret)
->   > 95					gpiod_reset = gpio_to_desc(pdata->gpio_reset);
->     96			}
->     97		}
->     98	
->     99		if (!IS_ERR(hub_data->clk)) {
->    100			ret = clk_prepare_enable(hub_data->clk);
->    101			if (ret) {
->    102				dev_err(dev,
->    103					"Can't enable external clock: %d\n",
->    104					ret);
->    105				return ret;
->    106			}
->    107		}
->    108	
->    109		if (gpiod_reset) {
->    110			/* Sanity check */
->    111			if (duration_us > 1000000)
->    112				duration_us = 50;
->    113			usleep_range(duration_us, duration_us + 100);
->  > 114			gpiod_set_value(gpiod_reset, reset_pol ? 0 : 1);
->    115		}
->    116	
->    117		dev_set_drvdata(dev, hub_data);
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> I can't catch you, if the gpio is invalid, its descriptor will be NULL,
+> then, the code will not do any gpio operation.
 
-I will add <linux/gpio/consumer.h> at header file list.
+When the platform_data provides a gpio (gpio_is_valid() is true) then
+you must use the gpio. If then devm_gpio_request_one() fails you must
+bail out.
 
+> 
+> > 
+> > Do you need this platform_data stuff at all?
+> > 
+> 
+> If not, how can I cover the platform which does not use dts, but still
+> uses these kinds of HUBs?
+
+You can't, but are there any non device tree platforms which want to use
+this driver?
+
+Sascha
 
 -- 
-
-Best Regards,
-Peter Chen
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
