@@ -1,35 +1,58 @@
 From: anton.bondarenko.sama@gmail.com (Anton Bondarenko)
-Date: Tue,  8 Dec 2015 07:43:46 +0100
-Subject: [PATCH v6 4/8] spi: imx: defer spi initialization, if DMA engine is
+Date: Tue,  8 Dec 2015 07:43:48 +0100
+Subject: [PATCH v6 6/8] spi: imx: remove dead RX DMA tail handling code
 In-Reply-To: <1449557030-27525-1-git-send-email-anton.bondarenko.sama@gmail.com>
 References: <1449557030-27525-1-git-send-email-anton.bondarenko.sama@gmail.com>
-Message-ID: <1449557030-27525-5-git-send-email-anton.bondarenko.sama@gmail.com>
+Message-ID: <1449557030-27525-7-git-send-email-anton.bondarenko.sama@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If SPI device supports DMA mode, but DMA controller is not yet
-available due to e.g. a delay in the corresponding kernel module
-initialization, retry to initialize SPI driver later on instead of
-falling back into PIO only mode.
+transfer->len % wml for DMA capable transactions will always be 0
+due to recent change in can_dma checks. So it's safe to remove dead code
+in processing DMA.
 
 Signed-off-by: Anton Bondarenko <anton.bondarenko.sama@gmail.com>
 ---
- drivers/spi/spi-imx.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/spi/spi-imx.c | 13 -------------
+ 1 file changed, 13 deletions(-)
 
 diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index c123060..d98c33c 100644
+index 50e0a79..08492d6 100644
 --- a/drivers/spi/spi-imx.c
 +++ b/drivers/spi/spi-imx.c
-@@ -1222,6 +1222,9 @@ static int spi_imx_probe(struct platform_device *pdev)
- 	 */
- 	if (is_imx51_ecspi(spi_imx)) {
- 		ret = spi_imx_sdma_init(&pdev->dev, spi_imx, master, res);
-+		if (ret == -EPROBE_DEFER)
-+			goto out_clk_put;
-+
- 		if (ret < 0)
- 			dev_err(&pdev->dev, "dma setup error %d, use pio\n",
- 				ret);
+@@ -919,8 +919,6 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+ 	struct dma_async_tx_descriptor *desc_tx = NULL, *desc_rx = NULL;
+ 	int ret;
+ 	unsigned long timeout;
+-	u32 dma;
+-	int left;
+ 	struct spi_master *master = spi_imx->bitbang.master;
+ 	struct sg_table *tx = &transfer->tx_sg, *rx = &transfer->rx_sg;
+ 
+@@ -954,13 +952,6 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+ 	/* Trigger the cspi module. */
+ 	spi_imx->dma_finished = 0;
+ 
+-	dma = readl(spi_imx->base + MX51_ECSPI_DMA);
+-	dma = dma & (~MX51_ECSPI_DMA_RXT_WML_MASK);
+-	/* Change RX_DMA_LENGTH trigger dma fetch tail data */
+-	left = transfer->len % spi_imx->wml;
+-	if (left)
+-		writel(dma | (left << MX51_ECSPI_DMA_RXT_WML_OFFSET),
+-				spi_imx->base + MX51_ECSPI_DMA);
+ 	/*
+ 	 * Set these order to avoid potential RX overflow. The overflow may
+ 	 * happen if we enable SPI HW before starting RX DMA due to rescheduling
+@@ -992,10 +983,6 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
+ 			spi_imx->devtype_data->reset(spi_imx);
+ 			dmaengine_terminate_all(master->dma_rx);
+ 		}
+-		dma &= ~MX51_ECSPI_DMA_RXT_WML_MASK;
+-		writel(dma |
+-		       spi_imx->wml << MX51_ECSPI_DMA_RXT_WML_OFFSET,
+-		       spi_imx->base + MX51_ECSPI_DMA);
+ 	}
+ 
+ 	spi_imx->dma_finished = 1;
 -- 
 2.6.3
