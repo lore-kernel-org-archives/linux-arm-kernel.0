@@ -1,653 +1,235 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 08 Dec 2015 17:57:45 +0100
-Subject: [PATCH v2] ARM: dts: Add SolidRun Armada 388 Clearfog A1 DT file
-In-Reply-To: <E1a5hDy-0002rC-Oe@rmk-PC.arm.linux.org.uk> (Russell King's
- message of "Sun, 06 Dec 2015 21:52:06 +0000")
-References: <E1a5hDy-0002rC-Oe@rmk-PC.arm.linux.org.uk>
-Message-ID: <87egew98ty.fsf@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 08 Dec 2015 16:59:09 +0000
+Subject: [PATCH v6 14/21] KVM: ARM64: Add reset and access handlers for
+ PMOVSSET and PMOVSCLR register
+In-Reply-To: <1449578860-15808-15-git-send-email-zhaoshenglong@huawei.com>
+References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
+ <1449578860-15808-15-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <56670C5D.3020407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
- 
- On dim., d?c. 06 2015, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+On 08/12/15 12:47, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Since the reset value of PMOVSSET and PMOVSCLR is UNKNOWN, use
+> reset_unknown for its reset handler. Add a new case to emulate writing
+> PMOVSSET or PMOVSCLR register.
+> 
+> When writing non-zero value to PMOVSSET, pend PMU interrupt. When the
+> value writing to PMOVSCLR is equal to the current value, clear the PMU
+> pending interrupt.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 27 ++++++++++++++++--
+>  include/kvm/arm_pmu.h     |  4 +++
+>  virt/kvm/arm/pmu.c        | 72 +++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 100 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index c1dffb2..c830fde 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -601,6 +601,15 @@ static bool access_pmu_regs(struct kvm_vcpu *vcpu,
+>  				vcpu_sys_reg(vcpu, r->reg) &= ~p->regval;
+>  			break;
+>  		}
+> +		case PMOVSSET_EL0: {
+> +			if (r->CRm == 14)
+> +				/* accessing PMOVSSET_EL0 */
+> +				kvm_pmu_overflow_set(vcpu, p->regval);
+> +			else
+> +				/* accessing PMOVSCLR_EL0 */
+> +				kvm_pmu_overflow_clear(vcpu, p->regval);
+> +			break;
+> +		}
+>  		case PMCR_EL0: {
+>  			/* Only update writeable bits of PMCR */
+>  			val = vcpu_sys_reg(vcpu, r->reg);
+> @@ -847,7 +856,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  	  access_pmu_regs, reset_unknown, PMCNTENSET_EL0 },
+>  	/* PMOVSCLR_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b011),
+> -	  trap_raz_wi },
+> +	  access_pmu_regs, reset_unknown, PMOVSSET_EL0 },
+>  	/* PMSWINC_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b100),
+>  	  trap_raz_wi },
+> @@ -874,7 +883,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  	  trap_raz_wi },
+>  	/* PMOVSSET_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b011),
+> -	  trap_raz_wi },
+> +	  access_pmu_regs, reset_unknown, PMOVSSET_EL0 },
+>  
+>  	/* TPIDR_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b010),
+> @@ -1184,6 +1193,15 @@ static bool access_pmu_cp15_regs(struct kvm_vcpu *vcpu,
+>  				vcpu_cp15(vcpu, r->reg) &= ~p->regval;
+>  			break;
+>  		}
+> +		case c9_PMOVSSET: {
+> +			if (r->CRm == 14)
+> +				/* accessing c9_PMOVSSET */
+> +				kvm_pmu_overflow_set(vcpu, p->regval);
+> +			else
+> +				/* accessing c9_PMOVSCLR */
+> +				kvm_pmu_overflow_clear(vcpu, p->regval);
+> +			break;
+> +		}
+>  		case c9_PMCR: {
+>  			/* Only update writeable bits of PMCR */
+>  			val = vcpu_cp15(vcpu, r->reg);
+> @@ -1271,7 +1289,8 @@ static const struct sys_reg_desc cp15_regs[] = {
+>  	  NULL, c9_PMCNTENSET },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), access_pmu_cp15_regs,
+>  	  NULL, c9_PMCNTENSET },
+> -	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
+> +	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), access_pmu_cp15_regs,
+> +	  NULL, c9_PMOVSSET },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmu_cp15_regs,
+>  	  NULL, c9_PMSELR },
+>  	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmu_cp15_regs,
+> @@ -1287,6 +1306,8 @@ static const struct sys_reg_desc cp15_regs[] = {
+>  	  NULL, c9_PMINTENSET },
+>  	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), access_pmu_cp15_regs,
+>  	  NULL, c9_PMINTENSET },
+> +	{ Op1( 0), CRn( 9), CRm(14), Op2( 3), access_pmu_cp15_regs,
+> +	  NULL, c9_PMOVSSET },
+>  
+>  	{ Op1( 0), CRn(10), CRm( 2), Op2( 0), access_vm_reg, NULL, c10_PRRR },
+>  	{ Op1( 0), CRn(10), CRm( 2), Op2( 1), access_vm_reg, NULL, c10_NMRR },
+> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+> index e731656..a76df52 100644
+> --- a/include/kvm/arm_pmu.h
+> +++ b/include/kvm/arm_pmu.h
+> @@ -41,6 +41,8 @@ struct kvm_pmu {
+>  u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx);
+>  void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val);
+>  void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u32 val, bool all_enable);
+> +void kvm_pmu_overflow_clear(struct kvm_vcpu *vcpu, u32 val);
+> +void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u32 val);
+>  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
+>  				    u32 select_idx);
+>  #else
+> @@ -50,6 +52,8 @@ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx)
+>  }
+>  void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val) {}
+>  void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u32 val, bool all_enable) {}
+> +void kvm_pmu_overflow_clear(struct kvm_vcpu *vcpu, u32 val) {}
+> +void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u32 val) {}
+>  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
+>  				    u32 select_idx) {}
+>  #endif
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index 45586d2..ba7d11c 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -136,6 +136,78 @@ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val)
+>  	}
+>  }
+>  
+> +static u32 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
+> +{
+> +	u32 val;
+> +
+> +	if (!vcpu_mode_is_32bit(vcpu))
+> +	val = (vcpu_sys_reg(vcpu, PMCR_EL0) >> ARMV8_PMCR_N_SHIFT)
+> +	      & ARMV8_PMCR_N_MASK;
+> +	else
+> +	val = (vcpu_cp15(vcpu, c9_PMCR) >> ARMV8_PMCR_N_SHIFT)
+> +	      & ARMV8_PMCR_N_MASK;
 
-> Add support for the SolidRun Armada 388 Clearfog A1 board.  This board
-> has an Armada 388 microsom, dedicated gigabit ethernet, six switched
-> gigabit ethernet ports, SFP cage, two Mini-PCIe/mSATA slots, a m.2 SATA
-> slot, and a MikroBUS connector to allow MikroBUS modules to be added.
->
-> This DT file adds support for all board facilities with the exception
-> of full SFP support.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Indentation? Again, no need to distinguish 32 and 64bit here.
 
-I made some tests it on the Clearfog v2.0 I have: Ethernet (CON8 and
-J11), i2c (using i2cdetect), USB stick on CON7.
+> +
+> +	return GENMASK(val - 1, 0) | BIT(ARMV8_COUNTER_MASK);
+> +}
+> +
+> +/**
+> + * kvm_pmu_overflow_clear - clear PMU overflow interrupt
+> + * @vcpu: The vcpu pointer
+> + * @val: the value guest writes to PMOVSCLR register
+> + * @reg: the current value of PMOVSCLR register
+> + */
+> +void kvm_pmu_overflow_clear(struct kvm_vcpu *vcpu, u32 val)
+> +{
+> +	u32 mask = kvm_pmu_valid_counter_mask(vcpu);
+> +
+> +	if (!vcpu_mode_is_32bit(vcpu)) {
+> +		vcpu_sys_reg(vcpu, PMOVSSET_EL0) &= mask;
+> +		vcpu_sys_reg(vcpu, PMOVSSET_EL0) &= ~val;
+> +		val = vcpu_sys_reg(vcpu, PMOVSSET_EL0);
 
-For this one I tried to use an USB3 stick, but it was enumerated using
-the High Speed profile and not the Super Speed one. But I think it is
-because of the Serdes configuration done in U-Boot.
+I'm not fond of messing with the sysreg like this. Consider using a
+temporary variable.
 
+> +	} else {
+> +		vcpu_cp15(vcpu, c9_PMOVSSET) &= mask;
+> +		vcpu_cp15(vcpu, c9_PMOVSSET) &= ~val;
+> +		val = vcpu_cp15(vcpu, c9_PMOVSSET);
 
-so Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-and applied on mvebu/dt.
+Same here.
+
+> +	}
+> +
+> +	/* If all overflow bits are cleared, kick the vcpu to clear interrupt
+> +	 * pending status.
+> +	 */
+> +	if (val == 0)
+> +		kvm_vcpu_kick(vcpu);
+
+Do we really need to do so? This will be dropped on the next entry
+anyway, so i don't see the need to kick the vcpu again. Or am I missing
+something?
+
+> +}
+> +
+> +/**
+> + * kvm_pmu_overflow_set - set PMU overflow interrupt
+> + * @vcpu: The vcpu pointer
+> + * @val: the value guest writes to PMOVSSET register
+> + */
+> +void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u32 val)
+> +{
+> +	u32 mask = kvm_pmu_valid_counter_mask(vcpu);
+> +
+> +	val &= mask;
+> +	if (val == 0)
+> +		return;
+> +
+> +	if (!vcpu_mode_is_32bit(vcpu)) {
+> +		vcpu_sys_reg(vcpu, PMOVSSET_EL0) &= mask;
+> +		vcpu_sys_reg(vcpu, PMOVSSET_EL0) |= val;
+> +		val = vcpu_sys_reg(vcpu, PMCNTENSET_EL0)
+> +		      & vcpu_sys_reg(vcpu, PMINTENSET_EL1)
+> +		      & vcpu_sys_reg(vcpu, PMOVSSET_EL0);
+
+Same here.
+
+> +	} else {
+> +		vcpu_cp15(vcpu, c9_PMOVSSET) &= mask;
+> +		vcpu_cp15(vcpu, c9_PMOVSSET) |= val;
+> +		val = vcpu_cp15(vcpu, c9_PMCNTENSET)
+> +		      & vcpu_cp15(vcpu, c9_PMINTENSET)
+> +		      & vcpu_cp15(vcpu, c9_PMOVSSET);
+
+and here.
+
+> +	}
+> +
+> +	if (val != 0)
+> +		kvm_vcpu_kick(vcpu);
+> +}
+> +
+>  /**
+>   * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
+>   * @vcpu: The vcpu pointer
+> 
 
 Thanks,
 
-Gregory
-
-> ---
-> v2, without the mac-address properties.
->
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/armada-388-clearfog.dts          | 456 +++++++++++++++++++++
->  .../arm/boot/dts/armada-38x-solidrun-microsom.dtsi | 115 ++++++
->  3 files changed, 572 insertions(+)
->  create mode 100644 arch/arm/boot/dts/armada-388-clearfog.dts
->  create mode 100644 arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 30bbc3746130..7e6a0532c656 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -748,6 +748,7 @@ dtb-$(CONFIG_MACH_ARMADA_38X) += \
->  	armada-385-db-ap.dtb \
->  	armada-385-linksys-caiman.dtb \
->  	armada-385-linksys-cobra.dtb \
-> +	armada-388-clearfog.dtb \
->  	armada-388-db.dtb \
->  	armada-388-gp.dtb \
->  	armada-388-rd.dtb
-> diff --git a/arch/arm/boot/dts/armada-388-clearfog.dts b/arch/arm/boot/dts/armada-388-clearfog.dts
-> new file mode 100644
-> index 000000000000..c6e180eb3b11
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/armada-388-clearfog.dts
-> @@ -0,0 +1,456 @@
-> +/*
-> + * Device Tree file for SolidRun Clearfog revision A1 rev 2.0 (88F6828)
-> + *
-> + *  Copyright (C) 2015 Russell King
-> + *
-> + * This board is in development; the contents of this file work with
-> + * the A1 rev 2.0 of the board, which does not represent final
-> + * production board.  Things will change, don't expect this file to
-> + * remain compatible info the future.
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License
-> + *     version 2 as published by the Free Software Foundation.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "armada-388.dtsi"
-> +#include "armada-38x-solidrun-microsom.dtsi"
-> +
-> +/ {
-> +	model = "SolidRun Clearfog A1";
-> +	compatible = "solidrun,clearfog-a1", "marvell,armada388",
-> +		"marvell,armada385", "marvell,armada380";
-> +
-> +	aliases {
-> +		/* So that mvebu u-boot can update the MAC addresses */
-> +		ethernet1 = &eth0;
-> +		ethernet2 = &eth1;
-> +		ethernet3 = &eth2;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	reg_3p3v: regulator-3p3v {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "3P3V";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		regulator-always-on;
-> +	};
-> +
-> +	soc {
-> +		internal-regs {
-> +			ethernet at 30000 {
-> +				phy-mode = "sgmii";
-> +				status = "okay";
-> +
-> +				fixed-link {
-> +					speed = <1000>;
-> +					full-duplex;
-> +				};
-> +			};
-> +
-> +			ethernet at 34000 {
-> +				phy-mode = "sgmii";
-> +				status = "okay";
-> +
-> +				fixed-link {
-> +					speed = <1000>;
-> +					full-duplex;
-> +				};
-> +			};
-> +
-> +			i2c at 11000 {
-> +				/* Is there anything on this? */
-> +				clock-frequency = <100000>;
-> +				pinctrl-0 = <&i2c0_pins>;
-> +				pinctrl-names = "default";
-> +				status = "okay";
-> +
-> +				/*
-> +				 * PCA9655 GPIO expander, up to 1MHz clock.
-> +				 *  0-CON3 CLKREQ#
-> +				 *  1-CON3 PERST#
-> +				 *  2-CON2 PERST#
-> +				 *  3-CON3 W_DISABLE
-> +				 *  4-CON2 CLKREQ#
-> +				 *  5-USB3 overcurrent
-> +				 *  6-USB3 power
-> +				 *  7-CON2 W_DISABLE
-> +				 *  8-JP4 P1
-> +				 *  9-JP4 P4
-> +				 * 10-JP4 P5
-> +				 * 11-m.2 DEVSLP
-> +				 * 12-SFP_LOS
-> +				 * 13-SFP_TX_FAULT
-> +				 * 14-SFP_TX_DISABLE
-> +				 * 15-SFP_MOD_DEF0
-> +				 */
-> +				expander0: gpio-expander at 20 {
-> +					/*
-> +					 * This is how it should be:
-> +					 * compatible = "onnn,pca9655",
-> +					 *	 "nxp,pca9555";
-> +					 * but you can't do this because of
-> +					 * the way I2C works.
-> +					 */
-> +					compatible = "nxp,pca9555";
-> +					gpio-controller;
-> +					#gpio-cells = <2>;
-> +					reg = <0x20>;
-> +
-> +					pcie1_0_clkreq {
-> +						gpio-hog;
-> +						gpios = <0 GPIO_ACTIVE_LOW>;
-> +						input;
-> +						line-name = "pcie1.0-clkreq";
-> +					};
-> +					pcie1_0_w_disable {
-> +						gpio-hog;
-> +						gpios = <3 GPIO_ACTIVE_LOW>;
-> +						output-low;
-> +						line-name = "pcie1.0-w-disable";
-> +					};
-> +					pcie2_0_clkreq {
-> +						gpio-hog;
-> +						gpios = <4 GPIO_ACTIVE_LOW>;
-> +						input;
-> +						line-name = "pcie2.0-clkreq";
-> +					};
-> +					pcie2_0_w_disable {
-> +						gpio-hog;
-> +						gpios = <7 GPIO_ACTIVE_LOW>;
-> +						output-low;
-> +						line-name = "pcie2.0-w-disable";
-> +					};
-> +					usb3_ilimit {
-> +						gpio-hog;
-> +						gpios = <5 GPIO_ACTIVE_LOW>;
-> +						input;
-> +						line-name = "usb3-current-limit";
-> +					};
-> +					usb3_power {
-> +						gpio-hog;
-> +						gpios = <6 GPIO_ACTIVE_HIGH>;
-> +						output-high;
-> +						line-name = "usb3-power";
-> +					};
-> +					m2_devslp {
-> +						gpio-hog;
-> +						gpios = <11 GPIO_ACTIVE_HIGH>;
-> +						output-low;
-> +						line-name = "m.2 devslp";
-> +					};
-> +					sfp_los {
-> +						/* SFP loss of signal */
-> +						gpio-hog;
-> +						gpios = <12 GPIO_ACTIVE_HIGH>;
-> +						input;
-> +						line-name = "sfp-los";
-> +					};
-> +					sfp_tx_fault {
-> +						/* SFP laser fault */
-> +						gpio-hog;
-> +						gpios = <13 GPIO_ACTIVE_HIGH>;
-> +						input;
-> +						line-name = "sfp-tx-fault";
-> +					};
-> +					sfp_tx_disable {
-> +						/* SFP transmit disable */
-> +						gpio-hog;
-> +						gpios = <14 GPIO_ACTIVE_HIGH>;
-> +						output-low;
-> +						line-name = "sfp-tx-disable";
-> +					};
-> +					sfp_mod_def0 {
-> +						/* SFP module present */
-> +						gpio-hog;
-> +						gpios = <15 GPIO_ACTIVE_LOW>;
-> +						input;
-> +						line-name = "sfp-mod-def0";
-> +					};
-> +				};
-> +
-> +				/* The MCP3021 is 100kHz clock only */
-> +				mikrobus_adc: mcp3021 at 4c {
-> +					compatible = "microchip,mcp3021";
-> +					reg = <0x4c>;
-> +				};
-> +
-> +				/* Also something at 0x64 */
-> +			};
-> +
-> +			i2c at 11100 {
-> +				/*
-> +				 * Routed to SFP, mikrobus, and PCIe.
-> +				 * SFP limits this to 100kHz, and requires
-> +				 *  an AT24C01A/02/04 with address pins tied
-> +				 *  low, which takes addresses 0x50 and 0x51.
-> +				 * Mikrobus doesn't specify beyond an I2C
-> +				 *  bus being present.
-> +				 * PCIe uses ARP to assign addresses, or
-> +				 *  0x63-0x64.
-> +				 */
-> +				clock-frequency = <100000>;
-> +				pinctrl-0 = <&clearfog_i2c1_pins>;
-> +				pinctrl-names = "default";
-> +				status = "okay";
-> +			};
-> +
-> +			mdio at 72004 {
-> +				pinctrl-0 = <&mdio_pins>;
-> +				pinctrl-names = "default";
-> +
-> +				phy_dedicated: ethernet-phy at 0 {
-> +					/*
-> +					 * Annoyingly, the marvell phy driver
-> +					 * configures the LED register, rather
-> +					 * than preserving reset-loaded setting.
-> +					 * We undo that rubbish here.
-> +					 */
-> +					marvell,reg-init = <3 16 0 0x101e>;
-> +					reg = <0>;
-> +				};
-> +			};
-> +
-> +			pinctrl at 18000 {
-> +				clearfog_dsa0_clk_pins: clearfog-dsa0-clk-pins {
-> +					marvell,pins = "mpp46";
-> +					marvell,function = "ref";
-> +				};
-> +				clearfog_dsa0_pins: clearfog-dsa0-pins {
-> +					marvell,pins = "mpp23", "mpp41";
-> +					marvell,function = "gpio";
-> +				};
-> +				clearfog_i2c1_pins: i2c1-pins {
-> +					/* SFP, PCIe, mSATA, mikrobus */
-> +					marvell,pins = "mpp26", "mpp27";
-> +					marvell,function = "i2c1";
-> +				};
-> +				clearfog_sdhci_cd_pins: clearfog-sdhci-cd-pins {
-> +					marvell,pins = "mpp20";
-> +					marvell,function = "gpio";
-> +				};
-> +				clearfog_sdhci_pins: clearfog-sdhci-pins {
-> +					marvell,pins = "mpp21", "mpp28",
-> +						       "mpp37", "mpp38",
-> +						       "mpp39", "mpp40";
-> +					marvell,function = "sd0";
-> +				};
-> +				clearfog_spi1_cs_pins: spi1-cs-pins {
-> +					marvell,pins = "mpp55";
-> +					marvell,function = "spi1";
-> +				};
-> +				mikro_pins: mikro-pins {
-> +					/* int: mpp22 rst: mpp29 */
-> +					marvell,pins = "mpp22", "mpp29";
-> +					marvell,function = "gpio";
-> +				};
-> +				mikro_spi_pins: mikro-spi-pins {
-> +					marvell,pins = "mpp43";
-> +					marvell,function = "spi1";
-> +				};
-> +				mikro_uart_pins: mikro-uart-pins {
-> +					marvell,pins = "mpp24", "mpp25";
-> +					marvell,function = "ua1";
-> +				};
-> +				rear_button_pins: rear-button-pins {
-> +					marvell,pins = "mpp34";
-> +					marvell,function = "gpio";
-> +				};
-> +			};
-> +
-> +			sata at a8000 {
-> +				/* pinctrl? */
-> +				status = "okay";
-> +			};
-> +
-> +			sata at e0000 {
-> +				/* pinctrl? */
-> +				status = "okay";
-> +			};
-> +
-> +			sdhci at d8000 {
-> +				bus-width = <4>;
-> +				cd-gpios = <&gpio0 20 GPIO_ACTIVE_LOW>;
-> +				no-1-8-v;
-> +				pinctrl-0 = <&clearfog_sdhci_pins
-> +					     &clearfog_sdhci_cd_pins>;
-> +				pinctrl-names = "default";
-> +				status = "okay";
-> +				vmmc = <&reg_3p3v>;
-> +				wp-inverted;
-> +			};
-> +
-> +			serial at 12100 {
-> +				/* mikrobus uart */
-> +				pinctrl-0 = <&mikro_uart_pins>;
-> +				pinctrl-names = "default";
-> +				status = "okay";
-> +			};
-> +
-> +			spi at 10680 {
-> +				/*
-> +				 * We don't seem to have the W25Q32 on the
-> +				 * A1 Rev 2.0 boards, so disable SPI.
-> +				 * CS0: W25Q32 (doesn't appear to be present)
-> +				 * CS1:
-> +				 * CS2: mikrobus
-> +				 */
-> +				pinctrl-0 = <&spi1_pins
-> +					     &clearfog_spi1_cs_pins
-> +					     &mikro_spi_pins>;
-> +				pinctrl-names = "default";
-> +				status = "okay";
-> +
-> +				spi-flash at 0 {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +					compatible = "w25q32", "jedec,spi-nor";
-> +					reg = <0>; /* Chip select 0 */
-> +					spi-max-frequency = <3000000>;
-> +					status = "disabled";
-> +				};
-> +			};
-> +
-> +			usb at 58000 {
-> +				/* CON3, nearest  power. */
-> +				status = "okay";
-> +			};
-> +
-> +			usb3 at f0000 {
-> +				/* CON2, nearest CPU, USB2 only. */
-> +				status = "okay";
-> +			};
-> +
-> +			usb3 at f8000 {
-> +				/* CON7 */
-> +				status = "okay";
-> +			};
-> +		};
-> +
-> +		pcie-controller {
-> +			status = "okay";
-> +			/*
-> +			 * The two PCIe units are accessible through
-> +			 * the mini-PCIe connectors on the board.
-> +			 */
-> +			pcie at 2,0 {
-> +				/* Port 1, Lane 0. CON3, nearest power. */
-> +				reset-gpios = <&expander0 1 GPIO_ACTIVE_LOW>;
-> +				status = "okay";
-> +			};
-> +			pcie at 3,0 {
-> +				/* Port 2, Lane 0. CON2, nearest CPU. */
-> +				reset-gpios = <&expander0 2 GPIO_ACTIVE_LOW>;
-> +				status = "okay";
-> +			};
-> +		};
-> +	};
-> +
-> +	dsa at 0 {
-> +		compatible = "marvell,dsa";
-> +		dsa,ethernet = <&eth1>;
-> +		dsa,mii-bus = <&mdio>;
-> +		pinctrl-0 = <&clearfog_dsa0_clk_pins &clearfog_dsa0_pins>;
-> +		pinctrl-names = "default";
-> +		#address-cells = <2>;
-> +		#size-cells = <0>;
-> +
-> +		switch at 0 {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <4 0>;
-> +
-> +			port at 0 {
-> +				reg = <0>;
-> +				label = "lan1";
-> +			};
-> +
-> +			port at 1 {
-> +				reg = <1>;
-> +				label = "lan2";
-> +			};
-> +
-> +			port at 2 {
-> +				reg = <2>;
-> +				label = "lan3";
-> +			};
-> +
-> +			port at 3 {
-> +				reg = <3>;
-> +				label = "lan4";
-> +			};
-> +
-> +			port at 4 {
-> +				reg = <4>;
-> +				label = "lan5";
-> +			};
-> +
-> +			port at 5 {
-> +				reg = <5>;
-> +				label = "cpu";
-> +			};
-> +
-> +			port at 6 {
-> +				/* 88E1512 external phy */
-> +				reg = <6>;
-> +				label = "lan6";
-> +				fixed-link {
-> +					speed = <1000>;
-> +					full-duplex;
-> +				};
-> +			};
-> +		};
-> +	};
-> +
-> +	gpio-keys {
-> +		compatible = "gpio-keys";
-> +		pinctrl-0 = <&rear_button_pins>;
-> +		pinctrl-names = "default";
-> +
-> +		button_0 {
-> +			/* The rear SW3 button */
-> +			label = "Rear Button";
-> +			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
-> +			linux,can-disable;
-> +			linux,code = <BTN_0>;
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi b/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
-> new file mode 100644
-> index 000000000000..3f792a563c05
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
-> @@ -0,0 +1,115 @@
-> +/*
-> + * Device Tree file for SolidRun Armada 38x Microsom
-> + *
-> + *  Copyright (C) 2015 Russell King
-> + *
-> + * This board is in development; the contents of this file work with
-> + * the A1 rev 2.0 of the board, which does not represent final
-> + * production board.  Things will change, don't expect this file to
-> + * remain compatible info the future.
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License
-> + *     version 2 as published by the Free Software Foundation.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +#include <dt-bindings/input/input.h>
-> +#include <dt-bindings/gpio/gpio.h>
-> +
-> +/ {
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x10000000>; /* 256 MB */
-> +	};
-> +
-> +	soc {
-> +		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
-> +			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
-> +			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
-> +			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
-> +
-> +		internal-regs {
-> +			ethernet at 70000 {
-> +				pinctrl-0 = <&ge0_rgmii_pins>;
-> +				pinctrl-names = "default";
-> +				phy = <&phy_dedicated>;
-> +				phy-mode = "rgmii-id";
-> +				status = "okay";
-> +			};
-> +
-> +			mdio at 72004 {
-> +				/*
-> +				 * Add the phy clock here, so the phy can be
-> +				 * accessed to read its IDs prior to binding
-> +				 * with the driver.
-> +				 */
-> +				pinctrl-0 = <&mdio_pins &microsom_phy_clk_pins>;
-> +				pinctrl-names = "default";
-> +
-> +				phy_dedicated: ethernet-phy at 0 {
-> +					/*
-> +					 * Annoyingly, the marvell phy driver
-> +					 * configures the LED register, rather
-> +					 * than preserving reset-loaded setting.
-> +					 * We undo that rubbish here.
-> +					 */
-> +					marvell,reg-init = <3 16 0 0x101e>;
-> +					reg = <0>;
-> +				};
-> +			};
-> +
-> +			pinctrl at 18000 {
-> +				microsom_phy_clk_pins: microsom-phy-clk-pins {
-> +					marvell,pins = "mpp45";
-> +					marvell,function = "ref";
-> +				};
-> +			};
-> +
-> +			rtc at a3800 {
-> +				/*
-> +				 * If the rtc doesn't work, run "date reset"
-> +				 * twice in u-boot.
-> +				 */
-> +				status = "okay";
-> +			};
-> +
-> +			serial at 12000 {
-> +				pinctrl-0 = <&uart0_pins>;
-> +				pinctrl-names = "default";
-> +				status = "okay";
-> +			};
-> +		};
-> +	};
-> +};
-> -- 
-> 2.1.0
->
-
+	M.
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
