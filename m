@@ -1,55 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Dec 2015 17:04:30 +0000
-Subject: [PATCH v2] ARM: dts: Add SolidRun Armada 388 Clearfog A1 DT file
-In-Reply-To: <87egew98ty.fsf@free-electrons.com>
-References: <E1a5hDy-0002rC-Oe@rmk-PC.arm.linux.org.uk>
- <87egew98ty.fsf@free-electrons.com>
-Message-ID: <20151208170429.GE8644@n2100.arm.linux.org.uk>
+From: snitzer@redhat.com (Mike Snitzer)
+Date: Tue, 8 Dec 2015 12:10:13 -0500
+Subject: dm verity: use sector_div for division
+In-Reply-To: <2666833.eM84rj4CYY@wuerfel>
+References: <2666833.eM84rj4CYY@wuerfel>
+Message-ID: <20151208171013.GA4263@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 05:57:45PM +0100, Gregory CLEMENT wrote:
-> Hi Russell,
->  
->  On dim., d?c. 06 2015, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+On Tue, Dec 08 2015 at 10:42am -0500,
+Arnd Bergmann <arnd@arndb.de> wrote:
+
+> The dm verity sec implementation uses do_div for dividing a sector_t,
+> which is slower than necessary when sector_t is a 32-bit type, and
+> we now get a warning for this case:
 > 
-> > Add support for the SolidRun Armada 388 Clearfog A1 board.  This board
-> > has an Armada 388 microsom, dedicated gigabit ethernet, six switched
-> > gigabit ethernet ports, SFP cage, two Mini-PCIe/mSATA slots, a m.2 SATA
-> > slot, and a MikroBUS connector to allow MikroBUS modules to be added.
-> >
-> > This DT file adds support for all board facilities with the exception
-> > of full SFP support.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> include/asm-generic/div64.h:224:22: warning: passing argument 1 of '__div64_32' from incompatible pointer type [-Wincompatible-pointer-types]
+> drivers/md/dm-verity-fec.c:725:6: note: in expansion of macro 'do_div'
+>   if (do_div(f->rounds, f->rsn))
 > 
-> I made some tests it on the Clearfog v2.0 I have: Ethernet (CON8 and
-> J11), i2c (using i2cdetect), USB stick on CON7.
-> 
-> For this one I tried to use an USB3 stick, but it was enumerated using
-> the High Speed profile and not the Super Speed one. But I think it is
-> because of the Serdes configuration done in U-Boot.
+> This changes the code to use sector_div instead, which does the
+> right thing and avoids the warning.
 
-Hmm, I don't have any USB3 hardware to check or debug.  Unless there's a
-bug in uboot, it looks like it's correctly configured to use the serdes
-lane 3 at the highest speed:
+Thanks, I'll fold this in.
 
- | Lane # | Speed|    Type     |
- ------------------------------|
- |   0    |  3   |  SATA0      |
- |   1    |  0   |  SGMII1     |
- |   2    |  5   |  PCIe1      |
- |   3    |  5   |  USB3 HOST1 |
- |   4    |  5   |  PCIe2      |
- |   5    |  0   |  SGMII2     |
- -------------------------------
-
-> so Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> and applied on mvebu/dt.
-
-Thanks.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+(Btw, I did review this use of do_div(): but only to answer whether there
+was potential for a 64bit divide.  I concluded do_div() was fine but didn't
+look to see the data type for f->rounds was actually sector_t.)
