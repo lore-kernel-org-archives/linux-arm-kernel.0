@@ -1,25 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 08 Dec 2015 22:34:42 +0100
-Subject: [PATCH] soc: TI knav_qmss: fix dma_addr_t printing
-In-Reply-To: <56670B21.5060209@oracle.com>
-References: <2560281.KhcNzi0XgD@wuerfel> <56670B21.5060209@oracle.com>
-Message-ID: <18371096.H4qt47cWYH@wuerfel>
+Date: Tue, 08 Dec 2015 22:52:45 +0100
+Subject: [PATCH] cpufreq: tegra: add regulator dependency for T124
+Message-ID: <2194927.eV2s2QmZs0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 December 2015 08:53:53 santosh shilimkar wrote:
-> On 12/8/2015 7:30 AM, Arnd Bergmann wrote:
-> > The knav_qmss driver is currently broken when CONFIG_LPAE is
-> > set, which is a bit surprising because I'd expect that any serious
-> > users of this platforms would have more than 2GB of RAM and require
-> > LPAE.
-> >
-> Well it has been working with LPAE enable always. The production
-> systems do but IIRC, some of the Eval board were still build with
-> just 2 GB memory.
+This driver is the only one that calls regulator_sync_voltage(), but it
+can currently be built with CONFIG_REGULATOR disabled, producing
+this build error:
 
-Maybe that just means that the debug code is never used and we can remove
-all the dev_dbg instead? That might actually be nicer as it would reduce
-the amount of code in your driver (slightly).
+drivers/cpufreq/tegra124-cpufreq.c: In function 'tegra124_cpu_switch_to_pllx':
+drivers/cpufreq/tegra124-cpufreq.c:68:2: error: implicit declaration of function 'regulator_sync_voltage' [-Werror=implicit-function-declaration]
+  regulator_sync_voltage(priv->vdd_cpu_reg);
 
-	Arnd
+My first attempt was to implement a helper for this function
+for regulator_sync_voltage, but Mark Brown explained:
+
+   We don't do this for *all* regulator API functions - there's some where
+   using them strongly suggests that there is actually a dependency on
+   the regulator API.  This does seem like it might be falling into the
+   specialist category [...]
+   Looking at the code I'm pretty unclear on what the authors think the
+   use of _sync_voltage() is doing in the first place so it may be even
+   better to just remove the call.  It seems to have been included in the
+   first commit so there's not changelog explaining things and there's
+   no comment either.  I'd *expect* it to be a noop as far as I can see.
+
+This adds the dependency to make the driver always build successfully
+or not be enabled at all. Alternatively, we could investigate if the
+driver should stop calling regulator_sync_voltage instead.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 235a1ba73d92..b1f8a73e5a94 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -226,7 +226,7 @@ config ARM_TEGRA20_CPUFREQ
+ 
+ config ARM_TEGRA124_CPUFREQ
+ 	tristate "Tegra124 CPUFreq support"
+-	depends on ARCH_TEGRA && CPUFREQ_DT
++	depends on ARCH_TEGRA && CPUFREQ_DT && REGULATOR
+ 	default y
+ 	help
+ 	  This adds the CPUFreq driver support for Tegra124 SOCs.
