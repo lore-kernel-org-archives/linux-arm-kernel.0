@@ -1,41 +1,28 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 8 Dec 2015 09:14:01 -0600
-Subject: [PATCH 1/8] ARM: dts: imx7d: cl-som-imx7: add basic module support
-In-Reply-To: <1449472479-2521-2-git-send-email-ilya@compulab.co.il>
-References: <1449472479-2521-1-git-send-email-ilya@compulab.co.il>
- <1449472479-2521-2-git-send-email-ilya@compulab.co.il>
-Message-ID: <20151208151401.GA20042@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 08 Dec 2015 16:14:27 +0100
+Subject: [PATCH 01/19] ASoC: da7218: avoid 64-bit compile warning
+In-Reply-To: <3548574.qiC2AlzHH4@wuerfel>
+References: <3548574.qiC2AlzHH4@wuerfel>
+Message-ID: <6859274.7lKHWvMkkW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 09:14:32AM +0200, Ilya Ledvich wrote:
-> CL-SOM-iMX7 is a miniature System-on-Module (SoM) based on
-> Freescale i.MX7 System-on-Chip family.
+On Tuesday 08 December 2015 16:12:54 Arnd Bergmann wrote:
+> When building the da7218 driver on a 64-bit architecture, we get
+> a harmless warning:
 > 
-> http://www.compulab.co.il/products/computer-on-modules/cl-som-imx7-freescale-i-mx-7-system-on-module/
+> sound/soc/codecs/da7218.c: In function 'da7218_of_get_id':
+> sound/soc/codecs/da7218.c:2261:10: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
 > 
-> Add basic DT support for standalone module (without a carrier board):
+> This changes the code to use uintptr_t to ensure we have an integer
+> type of the same size as a pointer and won't get a warning on any
+> architecture.
 > 
-> * Memory configuration
-> * I2C2 bus
-> * PMIC
-> * UART1
-> 
-> Signed-off-by: Ilya Ledvich <ilya@compulab.co.il>
-> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 4d50934abd22 ("ASoC: da7218: Add da7218 codec driver")
 
-One nit, otherwise:
+Please ignore the "[01/19]", I didn't mean to send this as a series, so just
+apply it directly. I happen to send 19 patches to different maintainers
+and misused git-format-patch.
 
-Acked-by: Rob Herring <robh@kernel.org>
-
-> +&i2c2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c2>;
-> +	status = "okay";
-> +
-> +	pmic: pfuze3000 at 08 {
-
-Use generic node names: "pmic at 8"
-
-> +		compatible = "fsl,pfuze3000";
-> +		reg = <0x08>;
+	Arnd
