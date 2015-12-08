@@ -1,76 +1,148 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 8 Dec 2015 15:11:49 -0800
-Subject: [RESEND PATCH] modpost: don't add a trailing wildcard for OF
- module aliases
-In-Reply-To: <1449612813-27004-1-git-send-email-javier@osg.samsung.com>
-References: <1449612813-27004-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <20151208151149.50ee68b41c5b9bc833eb0c2b@linux-foundation.org>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Wed, 9 Dec 2015 08:13:35 +0900
+Subject: [PATCH v8 3/4] arm64: Add do_softirq_own_stack() and enable
+ irq_stacks
+In-Reply-To: <56671214.30402@arm.com>
+References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
+ <1449226948-14251-4-git-send-email-james.morse@arm.com>
+ <20151207224805.GA20777@MBP.local> <20151208114321.GD19612@arm.com>
+ <4EBA6141-5CFB-4CAC-97D2-26346AAA91F0@gmail.com> <56671214.30402@arm.com>
+Message-ID: <990C8EDA-22F3-4693-84B8-7E0FE699EC46@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  8 Dec 2015 19:13:32 -0300 Javier Martinez Canillas <javier@osg.samsung.com> wrote:
+On Dec 9, 2015, at 2:23 AM, James Morse wrote:
 
-> Commit ac551828993ee ("modpost: i2c aliases need no trailing wildcard")
-> removed the wildcard at the end of the I2C module aliases because I2C
-> devices have no IDs so the aliases are just arbitrary device names.
-> 
-> This is also true for OF modaliases since a compatible string is used
-> to define a specific IP hardware block. So the modalias should match a
-> specific compatible string and not attempt to match a compatible string
-> whose name matches the beginning of another one.
-> 
-> For example, the following driver module:
-> 
-> $ modinfo cros_ec_keyb | grep alias
-> alias:          platform:cros-ec-keyb
-> alias:          of:N*T*Cgoogle,cros-ec-keyb*
-> 
-> will be tried to be loaded for an alias of:N*T*Cgoogle,cros-ec-keyb-v2
-> but there could be a different driver that supports the device for that
-> compatible string so it's better to remove the trailing wildcard for OF.
-> 
-> Also, remove the word "always" from the add_wildcard() function comment
-> since that was carried from the time where a wildcard was always added
-> at the end of the module alias for all the devices.
-> 
-> Suggested-by: Brian Norris <computersforpeace@gmail.com>
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Reviewed-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> 
-> ---
-> Hello,
-> 
-> I sent this patch before [0] but was never picked. MAINTAINERS doesn't
-> say who should manage patches to file2alias so maybe I didn't add the
-> right person to the cc list.
+Hi James,
 
-z:/usr/src/git26> perl scripts/get_maintainer.pl -f scripts/mod 
-Rusty Russell <rusty@rustcorp.com.au> (commit_signer:18/27=67%)
+> On 08/12/15 16:02, Jungseok Lee wrote:
+>> I've seen the following BUG log with CONFIG_DEBUG_SPINLOCK=y kernel.
+>> 
+>> BUG: spinlock lockup suspected on CPU#1
+>> 
+>> Under that option, I cannot even complete a single kernel build successfully.
+>> I hope I'm the only person to experience it. My Android machine is running
+>> well for over 12 hours now with the below change.
+> 
+> I can't reproduce this, can you send me your .config file (off-list)? Do
+> you have any other patches in your tree? What hardware are you using?
 
-> Documentation/development-process/5.Posting says that if there is no
-> obvious maintainer, then Andrew Morton is often the patch target so
-> I'm re-sending to him.
+No additional patches with dragonboard410c [1]. I don't have Juno unfortunately.
+Please refer to 'Lock Debugging' and  'RCU Debugging' of .config. 
 
-Yep.  If I don't handle the particular patch, I know who does ;)
+#
+# Lock Debugging (spinlocks, mutexes, etc...)
+#
+# CONFIG_DEBUG_RT_MUTEXES is not set
+CONFIG_DEBUG_SPINLOCK=y
+CONFIG_DEBUG_MUTEXES=y
+# CONFIG_DEBUG_WW_MUTEX_SLOWPATH is not set
+CONFIG_DEBUG_LOCK_ALLOC=y
+CONFIG_PROVE_LOCKING=y
+CONFIG_LOCKDEP=y
+# CONFIG_LOCK_STAT is not set
+# CONFIG_DEBUG_LOCKDEP is not set
+# CONFIG_DEBUG_ATOMIC_SLEEP is not set
+# CONFIG_DEBUG_LOCKING_API_SELFTESTS is not set
+# CONFIG_LOCK_TORTURE_TEST is not set
+CONFIG_TRACE_IRQFLAGS=y
+CONFIG_STACKTRACE=y
+# CONFIG_DEBUG_KOBJECT is not set
+CONFIG_HAVE_DEBUG_BUGVERBOSE=y
+CONFIG_DEBUG_BUGVERBOSE=y
+# CONFIG_DEBUG_LIST is not set
+# CONFIG_DEBUG_PI_LIST is not set
+# CONFIG_DEBUG_SG is not set
+# CONFIG_DEBUG_NOTIFIERS is not set
+# CONFIG_DEBUG_CREDENTIALS is not set
 
-> --- a/scripts/mod/file2alias.c
-> +++ b/scripts/mod/file2alias.c
-> @@ -125,7 +125,7 @@ do {                                                            \
->                  sprintf(str + strlen(str), "*");                \
->  } while(0)
->  
-> -/* Always end in a wildcard, for future extension */
-> +/* End in a wildcard, for future extension */
->  static inline void add_wildcard(char *str)
->  {
->  	int len = strlen(str);
-> @@ -704,7 +704,6 @@ static int do_of_entry (const char *filename, void *symval, char *alias)
->  		if (isspace (*tmp))
->  			*tmp = '_';
->  
-> -	add_wildcard(alias);
->  	return 1;
->  }
->  ADD_TO_DEVTABLE("of", of_device_id, do_of_entry);
-> -- 
-> 2.4.3
+#
+# RCU Debugging
+#
+CONFIG_PROVE_RCU=y
+# CONFIG_PROVE_RCU_REPEATEDLY is not set
+# CONFIG_SPARSE_RCU_POINTER is not set
+# CONFIG_TORTURE_TEST is not set
+# CONFIG_RCU_TORTURE_TEST is not set
+CONFIG_RCU_CPU_STALL_TIMEOUT=21
+# CONFIG_RCU_TRACE is not set
+# CONFIG_RCU_EQS_DEBUG is not set
+# CONFIG_DEBUG_BLOCK_EXT_DEVT is not set
+# CONFIG_NOTIFIER_ERROR_INJECTION is not set
+# CONFIG_FAULT_INJECTION is not set
+CONFIG_HAVE_FUNCTION_TRACER=y
+CONFIG_HAVE_FUNCTION_GRAPH_TRACER=y
+CONFIG_HAVE_DYNAMIC_FTRACE=y
+CONFIG_HAVE_FTRACE_MCOUNT_RECORD=y
+CONFIG_HAVE_SYSCALL_TRACEPOINTS=y
+CONFIG_HAVE_C_RECORDMCOUNT=y
+CONFIG_TRACING_SUPPORT=y
+# CONFIG_FTRACE is not set
+
+>> If I read the patches correctly, the dummy stack frame looks as follows.
+>> 
+>>  top ------------ <- irq_stack_ptr
+>>      | dummy_lr |
+>>      ------------
+>>      |   x29    |
+>>      ------------ <- new frame pointer (x29)
+>>      |   x19    |
+>>      ------------
+>>      |   xzr    |
+>>      ------------
+>> 
+>> So, we should refer to x19 in order to retrieve frame->sp. But, frame->sp is
+>> xzr under the current implementation. I suspect this causes spinlock lockup.
+> 
+> This is the sort of place where it is too easy to make an off-by-one
+> error, I will go through it all with the debugger again tomorrow.
+> 
+> 
+> I'm not seeing this when testing on Juno. This would only affect the
+> tracing code, are you running perf or ftrace at the same time?
+
+No. I've got the same call trace Will reported when only trying kernel build.  
+
+> I've just re-tested this with defconfig, and the following hack:
+> =======%<=======
+> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+> index b947eeffa5b2..686086e4d870 100644
+> --- a/arch/arm64/kernel/stacktrace.c
+> +++ b/arch/arm64/kernel/stacktrace.c
+> @@ -72,8 +72,10 @@ int notrace unwind_frame(struct stackframe *frame)
+>         * If we reach the end of the stack - and its an interrupt stack,
+>         * read the original task stack pointer from the dummy frame.
+>         */
+> -       if (frame->sp == irq_stack_ptr)
+> +       if (frame->sp == irq_stack_ptr) {
+>                frame->sp = IRQ_STACK_TO_TASK_STACK(irq_stack_ptr);
+> +               BUG_ON(frame->sp == 0);
+> +       }
+> 
+>        return 0;
+> }
+> =======%<=======
+> 
+> While running:
+>> sudo ./perf record -e mem:<address of __do_softirq>:x -ag -- sleep 180
+> 
+> and
+> 
+>> dd if=/dev/sda of=/dev/null bs=512 iflag=direct;
+> 
+> This should cause lots of interrupts from /dev/sda, and cause the
+> tracing code to step between irq_stack and the original task stack
+> frequently. The BUG_ON() doesn't fire, and the perf trace output looks
+> correct.
+> 
+> 
+> My only theory is that there is an off by one, and its reading what was
+> x29 instead. This wouldn't show up in these tests, but might be a
+> problem for aarch32 user-space, as presumably x29==0 when it switches to
+> aarch64 mode for el0_irq(). I will try this tomorrow.
+
+My description on dummy stack frame was incorrect. frame->sp is retrieved from
+x29, not xzr currently. That is why 0x20 is needed instead of 0x10.
+
+Best Regards
+Jungseok Lee
