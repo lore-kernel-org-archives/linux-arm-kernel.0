@@ -1,48 +1,34 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 8 Dec 2015 20:33:40 +0530
-Subject: [PATCH v5 04/11] ARM: STi: STiH407: Provide generic (safe) DVFS
- configuration
-In-Reply-To: <1449585124-15596-5-git-send-email-lee.jones@linaro.org>
-References: <1449585124-15596-1-git-send-email-lee.jones@linaro.org>
- <1449585124-15596-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <20151208150340.GI3692@ubuntu>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Dec 2015 15:03:34 +0000
+Subject: [PATCH v5 1/4] arm/arm64: add arm-smccc
+In-Reply-To: <1449581315-14519-2-git-send-email-jens.wiklander@linaro.org>
+References: <1449581315-14519-1-git-send-email-jens.wiklander@linaro.org>
+ <1449581315-14519-2-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <20151208150334.GD8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08-12-15, 14:31, Lee Jones wrote:
-> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> index 81f8121..9fa1e58 100644
-> --- a/arch/arm/boot/dts/stih407-family.dtsi
-> +++ b/arch/arm/boot/dts/stih407-family.dtsi
-> @@ -22,15 +22,29 @@
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a9";
->  			reg = <0>;
+On Tue, Dec 08, 2015 at 02:28:32PM +0100, Jens Wiklander wrote:
+> diff --git a/init/Kconfig b/init/Kconfig
+> index c24b6f7..8d5a7b0 100644
+> --- a/init/Kconfig
+> +++ b/init/Kconfig
+> @@ -2061,3 +2061,6 @@ config ASN1
+>  	  functions to call on what tags.
+>  
+>  source "kernel/Kconfig.locks"
 > +
->  			/* u-boot puts hpen in SBC dmem at 0xa4 offset */
->  			cpu-release-addr = <0x94100A4>;
-> +
-> +					 /* kHz     uV   */
-> +			operating-points = <1500000 0
-> +					    1200000 0
-> +					    800000  0
-> +					    500000  0>;
->  		};
->  		cpu at 1 {
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a9";
->  			reg = <1>;
-> +
->  			/* u-boot puts hpen in SBC dmem at 0xa4 offset */
->  			cpu-release-addr = <0x94100A4>;
-> +
-> +					 /* kHz     uV   */
-> +			operating-points = <1500000 0
-> +					    1200000 0
-> +					    800000  0
-> +					    500000  0>;
+> +config HAVE_ARM_SMCCC
+> +	bool
 
-Why didn't you move to opp-v2 ?
+I'm not sure why this has ended up in init/Kconfig - I suspect others
+will end up wondering the same.  arch/Kconfig looks to be a better
+place for it which is likely to be less controversial.  Please could
+you move it there?
+
+Thanks.
 
 -- 
-viresh
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
