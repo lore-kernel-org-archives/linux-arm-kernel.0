@@ -1,27 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 8 Dec 2015 16:37:39 +0000
-Subject: [PATCH] regulator: add regulator_sync_voltage inline dummy
-In-Reply-To: <1983152.2iYiBkp4xd@wuerfel>
-References: <1983152.2iYiBkp4xd@wuerfel>
-Message-ID: <20151208163739.GS5727@sirena.org.uk>
+From: damien.riegel@savoirfairelinux.com (Damien Riegel)
+Date: Tue,  8 Dec 2015 11:41:36 -0500
+Subject: [PATCH v8 1/3] of: add vendor prefix for Technologic Systems
+In-Reply-To: <1449592898-24049-1-git-send-email-damien.riegel@savoirfairelinux.com>
+References: <1449592898-24049-1-git-send-email-damien.riegel@savoirfairelinux.com>
+Message-ID: <1449592898-24049-2-git-send-email-damien.riegel@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 04:43:35PM +0100, Arnd Bergmann wrote:
+Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-> This modifies the API header so we provide a static inline function
-> with the same prototype as the normal function of this name. This matches
-> what we do for all other regulator API functions and avoids the build
-> error.
-
-We don't do this for *all* regulator API functions - there's some where
-using them strongly suggests that there is actually a dependency on the
-regulator API.  This does seem like it might be falling into the
-specialist category...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151208/488de195/attachment.sig>
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 82d2ac9..d3a206d 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -215,6 +215,7 @@ stericsson	ST-Ericsson
+ synology	Synology, Inc.
+ tbs	TBS Technologies
+ tcl	Toby Churchill Ltd.
++technologic	Technologic Systems
+ thine	THine Electronics, Inc.
+ ti	Texas Instruments
+ tlm	Trusted Logic Mobility
+-- 
+2.5.0
