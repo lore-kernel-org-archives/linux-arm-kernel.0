@@ -1,34 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Dec 2015 10:51:52 +0000
-Subject: ARM64: kernel oops in 4.4-rc4+
-In-Reply-To: <20151208103013.GA19612@arm.com>
-References: <CACVXFVPnmKzv-mnDyjOnoQtxZ4kyWLtkymK1XhDThO8ibi7f7w@mail.gmail.com>
- <20151208103013.GA19612@arm.com>
-Message-ID: <20151208105152.GB19612@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 8 Dec 2015 11:54:11 +0100 (CET)
+Subject: [PATCH 0/5] Fix regression introduced by set_irq_flags() removal
+In-Reply-To: <20151208095835.582dc34b@free-electrons.com>
+References: <1445347435-2333-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20151020140427.GE3953@io.lakedaemon.net>
+ <20151020160828.497fcc80@free-electrons.com>
+ <alpine.DEB.2.11.1510202121590.8159@nanos>
+ <20151111092638.587a53a4@free-electrons.com>
+ <alpine.DEB.2.11.1511131509180.3987@nanos>
+ <20151204120329.30a52cf4@free-electrons.com>
+ <alpine.DEB.2.11.1512051823140.3595@nanos>
+ <alpine.DEB.2.11.1512061018450.3595@nanos>
+ <20151208095835.582dc34b@free-electrons.com>
+Message-ID: <alpine.DEB.2.11.1512081153410.3595@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 10:30:13AM +0000, Will Deacon wrote:
-> On Tue, Dec 08, 2015 at 02:30:33PM +0800, Ming Lei wrote:
-> > The attached kernel oops can be triggered immediately after
-> > running the following command on APM Mustang:
-> > 
-> >         $stress-ng --all 8 -t 10m
-> > 
-> > [1] kernel oops log
-> > stress-ng: info:  [5220] 5 failures reached, aborting stress process
-> > [  265.782659] kernel BUG at ./arch/arm64/include/asm/pgtable.h:282!
+On Tue, 8 Dec 2015, Thomas Petazzoni wrote:
+> When a device driver uses a normal (non per-CPU) interrupt, then it
+> doesn't have to take care of disabling the interrupt on suspend and
+> re-enabling the interrupt on resume at the interrupt controller level.
+> This is all transparently handled by the irqchip driver.
 > 
-> Yikes, this means we're replacing a writable pte with a clean pte, so
-> there's a potential race w/ hardware DBM.
-> 
-> Could you dump pte and *ptep please?
+> Why should the handling of per-CPU interrupts be different and require
+> explicit handling from each device driver rather than being
+> transparently handled by the irqchip driver ?
 
-I tried running this on my Juno and pretty quickly saw the OOM killer
-coming in. Perhaps, in your case, pte is a swap entry and its confusing
-the checks (so pte_dirty/pte_young are looking at random bits of the
-file offset)?
+Fair enough. Did not think about the boot cpu part.
 
-Anyway, I'll wait for you to dump those values.
+Thanks,
 
-Will
+	tglx
