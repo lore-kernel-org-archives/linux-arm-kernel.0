@@ -1,87 +1,168 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 8 Dec 2015 20:47:39 +0800
-Subject: [PATCH v6 20/21] KVM: ARM64: Free perf event of PMU when destroying
- vcpu
+Date: Tue, 8 Dec 2015 20:47:35 +0800
+Subject: [PATCH v6 16/21] KVM: ARM64: Add reset and access handlers for
+ PMSWINC register
 In-Reply-To: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1449578860-15808-21-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1449578860-15808-17-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-When KVM frees VCPU, it needs to free the perf_event of PMU.
+Add access handler which emulates writing and reading PMSWINC
+register and add support for creating software increment event.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/arm/kvm/arm.c    |  1 +
- include/kvm/arm_pmu.h |  2 ++
- virt/kvm/arm/pmu.c    | 21 +++++++++++++++++++++
- 3 files changed, 24 insertions(+)
+ arch/arm64/kvm/sys_regs.c | 16 +++++++++++++++-
+ include/kvm/arm_pmu.h     |  2 ++
+ virt/kvm/arm/pmu.c        | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 61 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index cd696ef..cea2176 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -259,6 +259,7 @@ void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
- 	kvm_mmu_free_memory_caches(vcpu);
- 	kvm_timer_vcpu_terminate(vcpu);
- 	kvm_vgic_vcpu_destroy(vcpu);
-+	kvm_pmu_vcpu_destroy(vcpu);
- 	kmem_cache_free(kvm_vcpu_cache, vcpu);
- }
- 
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 80b66c0..9baa654 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -610,6 +610,10 @@ static bool access_pmu_regs(struct kvm_vcpu *vcpu,
+ 				kvm_pmu_overflow_clear(vcpu, p->regval);
+ 			break;
+ 		}
++		case PMSWINC_EL0: {
++			kvm_pmu_software_increment(vcpu, p->regval);
++			break;
++		}
+ 		case PMCR_EL0: {
+ 			/* Only update writeable bits of PMCR */
+ 			val = vcpu_sys_reg(vcpu, r->reg);
+@@ -633,6 +637,8 @@ static bool access_pmu_regs(struct kvm_vcpu *vcpu,
+ 			p->regval = val;
+ 			break;
+ 		}
++		case PMSWINC_EL0:
++			return read_zero(vcpu, p);
+ 		case PMCR_EL0: {
+ 			/* PMCR.P & PMCR.C are RAZ */
+ 			val = vcpu_sys_reg(vcpu, r->reg)
+@@ -859,7 +865,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	  access_pmu_regs, reset_unknown, PMOVSSET_EL0 },
+ 	/* PMSWINC_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b100),
+-	  trap_raz_wi },
++	  access_pmu_regs, reset_unknown, PMSWINC_EL0 },
+ 	/* PMSELR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b101),
+ 	  access_pmu_regs, reset_unknown, PMSELR_EL0 },
+@@ -1202,6 +1208,10 @@ static bool access_pmu_cp15_regs(struct kvm_vcpu *vcpu,
+ 				kvm_pmu_overflow_clear(vcpu, p->regval);
+ 			break;
+ 		}
++		case c9_PMSWINC: {
++			kvm_pmu_software_increment(vcpu, p->regval);
++			break;
++		}
+ 		case c9_PMCR: {
+ 			/* Only update writeable bits of PMCR */
+ 			val = vcpu_cp15(vcpu, r->reg);
+@@ -1225,6 +1235,8 @@ static bool access_pmu_cp15_regs(struct kvm_vcpu *vcpu,
+ 			p->regval = val;
+ 			break;
+ 		}
++		case c9_PMSWINC:
++			return read_zero(vcpu, p);
+ 		case c9_PMCR: {
+ 			/* PMCR.P & PMCR.C are RAZ */
+ 			val = vcpu_cp15(vcpu, r->reg)
+@@ -1291,6 +1303,8 @@ static const struct sys_reg_desc cp15_regs[] = {
+ 	  NULL, c9_PMCNTENSET },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), access_pmu_cp15_regs,
+ 	  NULL, c9_PMOVSSET },
++	{ Op1( 0), CRn( 9), CRm(12), Op2( 4), access_pmu_cp15_regs,
++	  NULL, c9_PMSWINC },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 5), access_pmu_cp15_regs,
+ 	  NULL, c9_PMSELR },
+ 	{ Op1( 0), CRn( 9), CRm(12), Op2( 6), access_pmu_cp15_regs,
 diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index e0f5bfe..f7bc4bf 100644
+index a76df52..d12450a 100644
 --- a/include/kvm/arm_pmu.h
 +++ b/include/kvm/arm_pmu.h
-@@ -39,6 +39,7 @@ struct kvm_pmu {
- 
- #ifdef CONFIG_KVM_ARM_PMU
- void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu);
-+void kvm_pmu_vcpu_destroy(struct kvm_vcpu *vcpu);
- void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
- u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx);
- void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val);
-@@ -51,6 +52,7 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
- void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u32 val);
+@@ -43,6 +43,7 @@ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val);
+ void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u32 val, bool all_enable);
+ void kvm_pmu_overflow_clear(struct kvm_vcpu *vcpu, u32 val);
+ void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u32 val);
++void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u32 val);
+ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
+ 				    u32 select_idx);
  #else
- void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu) {}
-+void kvm_pmu_vcpu_destroy(struct kvm_vcpu *vcpu) {}
- void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
- u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx)
- {
+@@ -54,6 +55,7 @@ void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val) {}
+ void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u32 val, bool all_enable) {}
+ void kvm_pmu_overflow_clear(struct kvm_vcpu *vcpu, u32 val) {}
+ void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u32 val) {}
++void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u32 val) {}
+ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
+ 				    u32 select_idx) {}
+ #endif
 diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 01e8eb2..f8007c7 100644
+index ba7d11c..093e211 100644
 --- a/virt/kvm/arm/pmu.c
 +++ b/virt/kvm/arm/pmu.c
-@@ -108,6 +108,27 @@ void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu)
+@@ -209,6 +209,46 @@ void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u32 val)
  }
  
  /**
-+ * kvm_pmu_vcpu_destroy - free perf event of PMU for cpu
++ * kvm_pmu_software_increment - do software increment
 + * @vcpu: The vcpu pointer
-+ *
++ * @val: the value guest writes to PMSWINC register
 + */
-+void kvm_pmu_vcpu_destroy(struct kvm_vcpu *vcpu)
++void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u32 val)
 +{
 +	int i;
-+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
++	u32 type, enable, reg;
++
++	if (val == 0)
++		return;
 +
 +	for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
-+		struct kvm_pmc *pmc = &pmu->pmc[i];
-+
-+		if (pmc->perf_event) {
-+			perf_event_disable(pmc->perf_event);
-+			perf_event_release_kernel(pmc->perf_event);
-+			pmc->perf_event = NULL;
++		if (!((val >> i) & 0x1))
++			continue;
++		if (!vcpu_mode_is_32bit(vcpu)) {
++			type = vcpu_sys_reg(vcpu, PMEVTYPER0_EL0 + i)
++			       & ARMV8_EVTYPE_EVENT;
++			enable = vcpu_sys_reg(vcpu, PMCNTENSET_EL0);
++			if ((type == 0) && ((enable >> i) & 0x1)) {
++				vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + i)++;
++				reg = vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + i);
++				if ((reg & 0xFFFFFFFF) == 0)
++					kvm_pmu_overflow_set(vcpu, 1 >> i);
++			}
++		} else {
++			type = vcpu_cp15(vcpu, c14_PMEVTYPER0 + i)
++			       & ARMV8_EVTYPE_EVENT;
++			enable = vcpu_cp15(vcpu, c9_PMCNTENSET);
++			if ((type == 0) && ((enable >> i) & 0x1)) {
++				vcpu_cp15(vcpu, c14_PMEVCNTR0 + i)++;
++				reg = vcpu_cp15(vcpu, c14_PMEVCNTR0 + i);
++				if ((reg & 0xFFFFFFFF) == 0)
++					kvm_pmu_overflow_set(vcpu, 1 >> i);
++			}
 +		}
 +	}
 +}
 +
 +/**
-  * kvm_pmu_flush_hwstate - flush pmu state to cpu
+  * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
   * @vcpu: The vcpu pointer
-  *
+  * @data: The data guest writes to PMXEVTYPER_EL0
+@@ -231,6 +271,10 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
+ 	kvm_pmu_stop_counter(pmc);
+ 	eventsel = data & ARMV8_EVTYPE_EVENT;
+ 
++	/* For software increment event it does't need to create perf event */
++	if (eventsel == 0)
++		return;
++
+ 	memset(&attr, 0, sizeof(struct perf_event_attr));
+ 	attr.type = PERF_TYPE_RAW;
+ 	attr.size = sizeof(attr);
 -- 
 2.0.4
