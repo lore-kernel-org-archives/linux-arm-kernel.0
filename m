@@ -1,194 +1,80 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 8 Dec 2015 20:47:19 +0800
-Subject: [PATCH v6 00/21] KVM: ARM64: Add guest PMU support
-Message-ID: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Tue, 8 Dec 2015 21:08:24 +0800
+Subject: [PATCH v4] acpi, apei, arm64: APEI initial support for aarch64.
+In-Reply-To: <5666D28C.4090305@linaro.org>
+References: <1449558183-12259-1-git-send-email-fu.wei@linaro.org>
+ <20151208123433.GB404@red-moon> <5666D28C.4090305@linaro.org>
+Message-ID: <CADyBb7tByoke4PGZqcx_jHvgCK0xNTneod8WoVv7VmoSYii+hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+Hi Lorenzo,
 
-This patchset adds guest PMU support for KVM on ARM64. It takes
-trap-and-emulate approach. When guest wants to monitor one event, it
-will be trapped by KVM and KVM will call perf_event API to create a perf
-event and call relevant perf_event APIs to get the count value of event.
 
-Use perf to test this patchset in guest. When using "perf list", it
-shows the list of the hardware events and hardware cache events perf
-supports. Then use "perf stat -e EVENT" to monitor some event. For
-example, use "perf stat -e cycles" to count cpu cycles and
-"perf stat -e cache-misses" to count cache misses.
 
-Below are the outputs of "perf stat -r 5 sleep 5" when running in host
-and guest.
+On 8 December 2015 at 20:52, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> Hi Lorenzo,
+>
+> On 12/08/2015 08:34 PM, Lorenzo Pieralisi wrote:
+>>
+>> On Tue, Dec 08, 2015 at 03:03:03PM +0800, fu.wei at linaro.org wrote:
+>>>
+>>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>>
+>>
+>> [...]
+>>
+>>> +#if defined(__i386__) || defined(__x86_64__)
+>>>   /*
+>>>    * Check if firmware advertises firmware first mode. We need FF bit to
+>>> be set
+>>>    * along with a set of MC banks which work in FF mode.
+>>>    */
+>>>   static int __init hest_parse_cmc(struct acpi_hest_header *hest_hdr,
+>>> void *data)
+>>>   {
+>>> -       return arch_apei_enable_cmcff(hest_hdr, data);
+>>> +       if (!acpi_disable_cmcff)
+>>
+>>
+>> Why do not you define the flag above in this file (move it out of x86 -
+>> that's what I was aiming at in my previous reply) and remove this
+>> ifdeffery
+>> altogether (First firmware handling could apply to arm64 too according to
+>> specs and ACPI on arm64 guidelines) ?
+>
+>
+> If I understand it correctly, CMC (Corrected Machine Check) is for IA32
+> only, see section 18.3.2.1 IA-32 Architecture Machine Check Exception
+> in ACPI 6.0. for ARM64, we can use other type of error source for
+> firmware first handling, such as Generic Hardware Error Source, did
+> I miss something?
 
-Host:
- Performance counter stats for 'sleep 5' (5 runs):
+yes, that is why I try to use "#if defined(__i386__) ||
+defined(__x86_64__)" instead of moving acpi_disable_cmcff out of x86
+code to here.
 
-          0.510276      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.57% )
-                 1      context-switches          #    0.002 M/sec
-                 0      cpu-migrations            #    0.000 K/sec
-                49      page-faults               #    0.096 M/sec                    ( +-  0.77% )
-           1064117      cycles                    #    2.085 GHz                      ( +-  1.56% )
-   <not supported>      stalled-cycles-frontend
-   <not supported>      stalled-cycles-backend
-            529051      instructions              #    0.50  insns per cycle          ( +-  0.55% )
-   <not supported>      branches
-              9894      branch-misses             #   19.390 M/sec                    ( +-  1.70% )
+And I thinks we also can do "arch_apei_enable_cmcff" -->
+"apei_enable_ia_cmcff" because that is IA32 only.
 
-       5.000853900 seconds time elapsed                                          ( +-  0.00% )
+Please correct me if I misunderstand something.  Thanks :-)
 
-Guest:
- Performance counter stats for 'sleep 5' (5 runs):
+Great thanks for your feedback :-)
 
-          0.642456      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.81% )
-                 1      context-switches          #    0.002 M/sec
-                 0      cpu-migrations            #    0.000 K/sec
-                49      page-faults               #    0.076 M/sec                    ( +-  1.64% )
-           1322717      cycles                    #    2.059 GHz                      ( +-  1.88% )
-   <not supported>      stalled-cycles-frontend
-   <not supported>      stalled-cycles-backend
-            640944      instructions              #    0.48  insns per cycle          ( +-  1.10% )
-   <not supported>      branches
-             10665      branch-misses             #   16.600 M/sec                    ( +-  2.23% )
+>
+> Thanks
+> Hanjun
 
-       5.001181452 seconds time elapsed                                          ( +-  0.00% )
 
-Have a cycle counter read test like below in guest and host:
-
-static void test(void)
-{
-	unsigned long count, count1, count2;
-	count1 = read_cycles();
-	count++;
-	count2 = read_cycles();
-}
-
-Host:
-count1: 3046186213
-count2: 3046186347
-delta: 134
-
-Guest:
-count1: 5645797121
-count2: 5645797270
-delta: 149
-
-The gap between guest and host is very small. One reason for this I
-think is that it doesn't count the cycles in EL2 and host since we add
-exclude_hv = 1. So the cycles spent to store/restore registers which
-happens at EL2 are not included.
-
-This patchset can be fetched from [1] and the relevant QEMU version for
-test can be fetched from [2].
-
-The results of 'perf test' can be found from [3][4].
-The results of perf_event_tests test suite can be found from [5][6].
-
-Also, I have tested "perf top" in two VMs and host at the same time. It
-works well.
-
-Thanks,
-Shannon
-
-[1] https://git.linaro.org/people/shannon.zhao/linux-mainline.git  KVM_ARM64_PMU_v6
-[2] https://git.linaro.org/people/shannon.zhao/qemu.git  virtual_PMU
-[3] http://people.linaro.org/~shannon.zhao/PMU/perf-test-host.txt
-[4] http://people.linaro.org/~shannon.zhao/PMU/perf-test-guest.txt
-[5] http://people.linaro.org/~shannon.zhao/PMU/perf_event_tests-host.txt
-[6] http://people.linaro.org/~shannon.zhao/PMU/perf_event_tests-guest.txt
-
-Changes since v5:
-* Rebase on new linux kernel mainline
-* Remove state duplications and drop PMOVSCLR, PMCNTENCLR, PMINTENCLR,
-  PMXEVCNTR, PMXEVTYPER
-* Add a helper to check if vPMU is already initialized
-* remove kvm_vcpu from kvm_pmc
-
-Changes since v4:
-* Rebase on new linux kernel mainline 
-* Drop the reset handler of CP15 registers
-* Fix a compile failure on arch ARM due to lack of asm/pmu.h
-* Refactor the interrupt injecting flow according to Marc's suggestion
-* Check the value of PMSELR register
-* Calculate the attr.disabled according to PMCR.E and PMCNTENSET/CLR
-* Fix some coding style
-* Document the vPMU irq range
-
-Changes since v3:
-* Rebase on new linux kernel mainline 
-* Use ARMV8_MAX_COUNTERS instead of 32
-* Reset PMCR.E to zero.
-* Trigger overflow for software increment.
-* Optimize PMU interrupt inject logic.
-* Add handler for E,C,P bits of PMCR
-* Fix the overflow bug found by perf_event_tests
-* Run 'perf test', 'perf top' and perf_event_tests test suite
-* Add exclude_hv = 1 configuration to not count in EL2
-
-Changes since v2:
-* Directly use perf raw event type to create perf_event in KVM
-* Add a helper vcpu_sysreg_write
-* remove unrelated header file
-
-Changes since v1:
-* Use switch...case for registers access handler instead of adding
-  alone handler for each register
-* Try to use the sys_regs to store the register value instead of adding
-  new variables in struct kvm_pmc
-* Fix the handle of cp15 regs
-* Create a new kvm device vPMU, then userspace could choose whether to
-  create PMU
-* Fix the handle of PMU overflow interrupt
-
-Shannon Zhao (21):
-  ARM64: Move PMU register related defines to asm/pmu.h
-  KVM: ARM64: Define PMU data structure for each vcpu
-  KVM: ARM64: Add offset defines for PMU registers
-  KVM: ARM64: Add reset and access handlers for PMCR_EL0 register
-  KVM: ARM64: Add reset and access handlers for PMSELR register
-  KVM: ARM64: Add reset and access handlers for PMCEID0 and PMCEID1
-    register
-  KVM: ARM64: PMU: Add perf event map and introduce perf event creating
-    function
-  KVM: ARM64: Add access handler for PMEVTYPERn and PMCCFILTR register
-  KVM: ARM64: Add access handler for PMXEVTYPER register
-  KVM: ARM64: Add access handler for PMEVCNTRn and PMCCNTR register
-  KVM: ARM64: Add access handler for PMXEVCNTR register
-  KVM: ARM64: Add reset and access handlers for PMCNTENSET and
-    PMCNTENCLR register
-  KVM: ARM64: Add reset and access handlers for PMINTENSET and
-    PMINTENCLR register
-  KVM: ARM64: Add reset and access handlers for PMOVSSET and PMOVSCLR
-    register
-  KVM: ARM64: Add reset and access handlers for PMUSERENR register
-  KVM: ARM64: Add reset and access handlers for PMSWINC register
-  KVM: ARM64: Add helper to handle PMCR register bits
-  KVM: ARM64: Add PMU overflow interrupt routing
-  KVM: ARM64: Reset PMU state when resetting vcpu
-  KVM: ARM64: Free perf event of PMU when destroying vcpu
-  KVM: ARM64: Add a new kvm ARM PMU device
-
- Documentation/virtual/kvm/devices/arm-pmu.txt |  16 +
- arch/arm/kvm/arm.c                            |   3 +
- arch/arm64/include/asm/kvm_asm.h              |  45 ++-
- arch/arm64/include/asm/kvm_host.h             |   2 +
- arch/arm64/include/asm/pmu.h                  |  66 +++
- arch/arm64/include/uapi/asm/kvm.h             |   3 +
- arch/arm64/kernel/perf_event.c                |  36 +-
- arch/arm64/kvm/Kconfig                        |   8 +
- arch/arm64/kvm/Makefile                       |   1 +
- arch/arm64/kvm/reset.c                        |   3 +
- arch/arm64/kvm/sys_regs.c                     | 552 ++++++++++++++++++++++++--
- include/kvm/arm_pmu.h                         |  71 ++++
- include/linux/kvm_host.h                      |   1 +
- include/uapi/linux/kvm.h                      |   2 +
- virt/kvm/arm/pmu.c                            | 533 +++++++++++++++++++++++++
- virt/kvm/kvm_main.c                           |   4 +
- 16 files changed, 1278 insertions(+), 68 deletions(-)
- create mode 100644 Documentation/virtual/kvm/devices/arm-pmu.txt
- create mode 100644 arch/arm64/include/asm/pmu.h
- create mode 100644 include/kvm/arm_pmu.h
- create mode 100644 virt/kvm/arm/pmu.c
 
 -- 
-2.0.4
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
+Ph: +86 21 61221326(direct)
+Ph: +86 186 2020 4684 (mobile)
+Room 1512, Regus One Corporate Avenue,Level 15,
+One Corporate Avenue,222 Hubin Road,Huangpu District,
+Shanghai,China 200021
