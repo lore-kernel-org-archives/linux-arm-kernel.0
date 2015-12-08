@@ -1,25 +1,33 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Tue, 8 Dec 2015 17:34:14 -0300
-Subject: [PATCH V6 00/26] Coresight integration with perf
-In-Reply-To: <CANLsYkxaOpMcC8ULcTvC1tOd5yEcjH2ZiNS5Rp6UyodzNsAD1g@mail.gmail.com>
-References: <1449176702-13213-1-git-send-email-mathieu.poirier@linaro.org>
- <CANLsYkxaOpMcC8ULcTvC1tOd5yEcjH2ZiNS5Rp6UyodzNsAD1g@mail.gmail.com>
-Message-ID: <20151208203414.GN11564@kernel.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 8 Dec 2015 21:35:20 +0100
+Subject: [PATCH v4] mmc: meson: Add driver for the SD/MMC host found on
+ Amlogic MesonX SoCs
+In-Reply-To: <CAOQ7t2aJAPWd3Xmvu7n0EWL-KC8ZriM3KryfsYEh556uXhuR+g@mail.gmail.com>
+References: <1448988109-32630-1-git-send-email-carlo@caione.org>
+ <CAPDyKFp=buvJ8Li3XC8XSUAUO7BsE+U6vEQH2xTrgcHAkdG8bQ@mail.gmail.com>
+ <CAOQ7t2aJAPWd3Xmvu7n0EWL-KC8ZriM3KryfsYEh556uXhuR+g@mail.gmail.com>
+Message-ID: <CAPDyKFpcsKihuOiF5=RwoWrF0Jf7hRsXVSU5uV8qZf1mUsa-iQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Tue, Dec 08, 2015 at 01:29:00PM -0700, Mathieu Poirier escreveu:
-> On 3 December 2015 at 14:04, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
-> 
-> Arnaldo, Peter and Ingo,
-> 
-> I would like to queue this work for 4.5 but need your help with
-> reviewing patches 20 [1], 23 [2], 24 [3], 25 [4] and 26 [5].
-> 
-> A "reviewed-by" would be greatly appreciated.
+[...]
 
-I looked briefly at it and saw perf_session, IIRc, being passed to more
-functions, which I think can be done otherwise, as, again IIRC, all you
-need is available via perf_evlist, will look again.
+>
+> I have actually a problem and a question related to this value. On the
+> boards I'm currently using to test this driver I have no CD GPIO. In
+> this case do I have to specify the MMC as "non-removable"? Also if I
 
-- Arnaldo
+"non-removable" is intended to be used for eMMC or other cards
+(SD/SDIO) that is not possible to remove/insert at runtime.
+
+> try to change an SD card at runtime I have to wait 3 times the timeout
+> before being able to do it successfully.
+
+I guess you are using the "broken-cd" binding, which will enable
+MMC_CAP_NEEDS_POLL and thus the mmc core will poll to detect cards
+being inserted or removed.
+
+[...]
+
+Kind regards
+Uffe
