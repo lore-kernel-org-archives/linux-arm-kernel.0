@@ -1,70 +1,38 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 8 Dec 2015 09:16:59 -0600
-Subject: [PATCH] usb: musb: dsps: handle the
- otg_state_a_wait_vrise_timeout case
-In-Reply-To: <5666EC67.7000203@ti.com>
-References: <1440087153-31084-1-git-send-email-gregory.clement@free-electrons.com>
- <55D719B1.8010700@free-electrons.com> <87twrfsbed.fsf@free-electrons.com>
- <87d1wtf5ir.fsf@saruman.tx.rr.com> <87a8rde96m.fsf@free-electrons.com>
- <87poyiegc7.fsf@free-electrons.com> <87poyinjpc.fsf@saruman.tx.rr.com>
- <874mft9ukx.fsf@free-electrons.com> <87h9jtm37m.fsf@saruman.tx.rr.com>
- <5666E9BE.5070907@ti.com> <87egexm2jr.fsf@saruman.tx.rr.com>
- <5666EC67.7000203@ti.com>
-Message-ID: <878u55m0lw.fsf@saruman.tx.rr.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 08 Dec 2015 16:17:29 +0100
+Subject: [PATCH] net: fsl: avoid 64-bit warning on pq_mdio
+Message-ID: <2847304.4thPqtFFJS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The pq_mdio driver can now be built for ARM64, where we get a format
+string warning:
 
-Hi,
+drivers/net/ethernet/freescale/fsl_pq_mdio.c: In function 'fsl_pq_mdio_probe':
+drivers/net/ethernet/freescale/fsl_pq_mdio.c:467:25: warning: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'long int' [-Wformat=]
 
-Bin Liu <b-liu@ti.com> writes:
->>>>> "This bit should be set high prior to setting bit 0 and cleared after bit 0
->>>>> is cleared."
->>>>>
->>>>> and on the other side:
->>>>> "Both the soft_reset and soft_reset_isolation bits should be asserted
->>>>> simultaneously."
->>>>>
->>>>> The hang you saw could be explained by the following:
->>>>> "Setting only the soft_reset_isolation bit will cause all USB0 output
->>>>> signals to go to a known constant value via multiplexers.
->>>>> This will
->>>>> prevent future access to USB0."  page 2567
->>>>
->>>> good catch. Setting them together makes the hang go away.
->>>>
->>>> I still have the other problem, which is legacy IRQ reporting mode not
->>>> really working.
->>>>
->>>
->>> I never tried to change the IRQ mapping. The 8 MUSB interrupt will be
->>> the same no matter where they are reported from. What do you expect when
->>> switch to the MUSB IRQ reporting mode?
->>
->> read events from MUSB's registers instead of TI's :-) so, MUSB_INTRUSB,
->> MUSB_INTRRX and MUSB_INTRTX.
->>
-> I meant you expect to see any different event when switch to MUSB IRQ 
-> mode? The TI wrapper just reports the same 8 interrupt events. I don't 
-> think you would get any difference.
+The argument is an implicit ptrdiff_t from the subtraction of two pointers,
+so we should use the %z format string modifier to make this work on 64-bit
+architectures.
 
-still valid to make sure ;-)
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: fe761bcb9046 ("net: fsl: expands dependencies of NET_VENDOR_FREESCALE")
+---
+ drivers/net/ethernet/freescale/fsl_pq_mdio.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> BTY, I think I miss some context here. This Gregory's patch is trying to 
-> fix the OTG state machine problem in musb_dsps, which is replicated with 
-> a cable without a device connected. But it also mentions about 
-> non-compliant MSC devices. How are the thumb drives related to this OTG 
-> state issue?
-
-the problem seems to be caused by the missing disconnect IRQ. Not really
-missing, but taking seconds to trigger.
-
+diff --git a/drivers/net/ethernet/freescale/fsl_pq_mdio.c b/drivers/net/ethernet/freescale/fsl_pq_mdio.c
+index 55c36230e176..40071dad1c57 100644
+--- a/drivers/net/ethernet/freescale/fsl_pq_mdio.c
++++ b/drivers/net/ethernet/freescale/fsl_pq_mdio.c
+@@ -464,7 +464,7 @@ static int fsl_pq_mdio_probe(struct platform_device *pdev)
+ 			 * address). Print error message but continue anyway.
+ 			 */
+ 			if ((void *)tbipa > priv->map + resource_size(&res) - 4)
+-				dev_err(&pdev->dev, "invalid register map (should be at least 0x%04x to contain TBI address)\n",
++				dev_err(&pdev->dev, "invalid register map (should be at least 0x%04zx to contain TBI address)\n",
+ 					((void *)tbipa - priv->map) + 4);
+ 
+ 			iowrite32be(be32_to_cpup(prop), tbipa);
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151208/6c125675/attachment.sig>
+2.1.0.rc2
