@@ -1,53 +1,52 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 08 Dec 2015 10:55:53 +0100
-Subject: [PATCH 0/5] multi and mvebu v5 defconfig updates
-In-Reply-To: <4322870.qyT4ELuZLH@wuerfel> (Arnd Bergmann's message of "Mon, 07
- Dec 2015 23:57:20 +0100")
-References: <1449012812-9779-1-git-send-email-andrew@lunn.ch>
- <87610achog.fsf@free-electrons.com> <4322870.qyT4ELuZLH@wuerfel>
-Message-ID: <87zixl8dsm.fsf@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 08 Dec 2015 10:58:48 +0100
+Subject: [PATCH 2/3] doc: dt-binding: generic onboard USB HUB
+In-Reply-To: <1449568249.3691.15.camel@pengutronix.de>
+References: <1449538670-7954-1-git-send-email-peter.chen@freescale.com>
+ <1449538670-7954-3-git-send-email-peter.chen@freescale.com>
+ <1449568249.3691.15.camel@pengutronix.de>
+Message-ID: <19094869.VEiW4FjBL1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
- 
- On lun., d?c. 07 2015, Arnd Bergmann <arnd@arndb.de> wrote:
+On Tuesday 08 December 2015 10:50:49 Philipp Zabel wrote:
+> Am Dienstag, den 08.12.2015, 09:37 +0800 schrieb Peter Chen:
+> > Add dt-binding documentation for generic onboard USB HUB.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  .../bindings/usb/generic-onboard-hub.txt           | 28 ++++++++++++++++++++++
+> >  1 file changed, 28 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/usb/generic-onboard-hub.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/usb/generic-onboard-hub.txt b/Documentation/devicetree/bindings/usb/generic-onboard-hub.txt
+> > new file mode 100644
+> > index 0000000..ea92205
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/usb/generic-onboard-hub.txt
+> > @@ -0,0 +1,28 @@
+> > +Generic Onboard USB HUB
+> >+
+> > +Required properties:
+> > +- compatible: should be "generic-onboard-hub"
+> 
+> This something we don't have to define ad-hoc. The hub hangs off an USB
+> controller, right? The "Open Firmware recommended practice: USB"
+> document already describes how to represent USB devices in a generic
+> manner:
+> http://www.firmware.org/1275/bindings/usb/usb-1_0.ps
+> 
+> Is there a reason not to reuse this?
+> 
+> The usb hub node would be a child of the usb controller node, and it
+> could use
+> 	compatible = "usb,class9"; /* bDeviceClass 9 (Hub) */
 
-> On Monday 07 December 2015 18:06:07 Gregory CLEMENT wrote:
->> Hi Arnd
->>  
->>  On mer., d?c. 02 2015, Andrew Lunn <andrew@lunn.ch> wrote:
->> 
->> > This patchset updates both multi_v5_defconfig and mvebu_v5_defconfig.
->> > It adds support for Orion5x, now that it is multi-arch, and adds back
->> > DSA and its drivers, which now depends on switchdev.
->> >
->> > Andrew Lunn (5):
->> >   ARM: config: Regenerate multi_v5_defconfig
->> >   ARM: config: Reenable DSA in multi_v5_defconfig
->> >   ARM: config: Add orion5x to multi_v5_defconfig
->> 
->> >   ARM: mvebu: Reenable DSA in mvebu_v5_defconfig
->> >   ARM: mvebu: update v5 defconfig for Orion5x machines
->> 
->> To be sure there won't be a leftover, I applied the last 2 patches, but
->> not the 3 first ones, as for my understanding it is better that it is
->> managed by arm-soc directly.
->> 
->> 
->
-> Actually, I'd prefer you to put them in the same branch as the other
-> patches. I can easily sort out any merge conflicts when merging the
-> branch.
+Good point, I had not thought of that when I looked at the patches.
 
-Ok. so I applied the whole series on mvebu/defconfig
+Yes, let's do this way. I don't know if we ever implemented the simple
+patch to associate a USB device with a device_node, but if not, then
+let's do it now for this driver. A lot of people have asked for it in
+the past.
 
-Thanks,
-
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
