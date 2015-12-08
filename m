@@ -1,48 +1,51 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 8 Dec 2015 12:22:09 +0200
-Subject: [PATCH] ARM: DTS: am33xx: Use the new DT bindings for the eDMA3
-In-Reply-To: <4387766.cHF7OBX0cm@wuerfel>
-References: <1449225915-28879-1-git-send-email-peter.ujfalusi@ti.com>
- <20151204215115.GP23396@atomide.com> <566689E2.7060907@ti.com>
- <4387766.cHF7OBX0cm@wuerfel>
-Message-ID: <5666AF51.9080306@ti.com>
+From: haibo.chen@freescale.com (Haibo Chen)
+Date: Tue, 8 Dec 2015 18:26:19 +0800
+Subject: [PATCH v5 0/4] Add i.mx7d adc driver support
+Message-ID: <1449570383-25716-1-git-send-email-haibo.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08/2015 11:51 AM, Arnd Bergmann wrote:
-> On Tuesday 08 December 2015 09:42:26 Peter Ujfalusi wrote:
->> On 12/04/2015 11:51 PM, Tony Lindgren wrote:
->>>>
->>>> Please just drop the /bits/ 16 and use normal cells.
->>>
->>> Yeah agreed, makes things less confusing for sure 
->>
->> 4.4 will be the first kernel where we will have the new eDMA bindings. I have
->> chosen to use 16bit array for specifying the channels used for memcpy
->> (ti,edma-memcpy-channels) and for the reserving paRAM slots
->> (ti,edma-reserved-slot-ranges). As of now we have maximum of 64 channels and
->> 512 paRAM slots. 16bit is more than enough to store this information and it
->> even gives us enough room if ever in the future these numbers are going to
->> increase (which  they are not).
->>
->> But in order to change them to 32bit the driver needs to be changed as well.
->> Currently we do not have drivers (in 4.4) using the new bindings, 4.4 is not
->> yet out, so it might be possible to change the binding document and the driver
->> to use 32bit arrays. The driver internally uses 16bit type for these which I'm
->> not going to change, but the code parsing the DT needs to be adjusted for the
->> new data type.
->>
->> If Vinod is willing to take update for the DT binding of eDMA for 4.4-rc, I
->> can cook up the patch(es) to do so.
-> 
-> I hadn't realized that it was already in 4.4-rc. The change should be trivial
-> enough though, so I'd still do it. If Vinod would rather not change it now,
-> it's not overly important though.
+This patch set add imx7d adc driver support.
 
-But this change must be done before we have actual users of these properties,
-which is the am33xx, am437x and the da850 conversion series I have sent recently.
-We might want to have this changed for 4.4 since it is going to be an LTS
-release...
+Changes in v5:
+-call imx7d_adc_power_down() in driver probe when iio_device_register() failed
+-handle with adc channel conversion timeout in imx7d_adc_isr()
+
+Changes in v4:
+-sort the include head file alphabetically
+-really just clear the bit 31 of register REG_ADC_CH_A\B\C\D_CFG1 
+ in function imx7d_adc_sample_rate_set()
+-add document in imx7d_adc_isr() to clarify the clear operation
+-add function imx7d_adc_power_down()
+-adjust the format of the code and add some small changes
+
+Changes in v3:
+-move down the irq request in probe()
+-remove the property 'num-channels' in dts
+-remove some unused head file
+-add clear register operation in imx7d_adc_isr()
+
+Changes in v2:
+-prefix defines with IMX7D_ for all the register
+-use BIT macro to define a single bit
+-remove the dma_en from struct adc_feature which is not support currently
+-use static const array to replace the switch case code
+
+Haibo Chen (4):
+  iio: adc: add IMX7D ADC driver support
+  Documentation: add the binding file for Freescale imx7d ADC driver
+  ARM: dts: imx7d.dtsi: add ADC support
+  ARM: dts: imx7d-sdb: add ADC support
+
+ .../devicetree/bindings/iio/adc/imx7d-adc.txt      |  22 +
+ arch/arm/boot/dts/imx7d-sdb.dts                    |  10 +
+ arch/arm/boot/dts/imx7d.dtsi                       |  18 +
+ drivers/iio/adc/Kconfig                            |   9 +
+ drivers/iio/adc/Makefile                           |   1 +
+ drivers/iio/adc/imx7d_adc.c                        | 589 +++++++++++++++++++++
+ 6 files changed, 649 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/imx7d-adc.txt
+ create mode 100644 drivers/iio/adc/imx7d_adc.c
 
 -- 
-P?ter
+1.9.1
