@@ -1,77 +1,55 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 8 Dec 2015 16:08:22 +0000
-Subject: ARM64: kernel oops in 4.4-rc4+
-In-Reply-To: <20151208134951.GI19612@arm.com>
-References: <CACVXFVPnmKzv-mnDyjOnoQtxZ4kyWLtkymK1XhDThO8ibi7f7w@mail.gmail.com>
- <20151208103013.GA19612@arm.com>
- <CACVXFVPgTPYzHj0E7cSx=X+=t=0Am_yBSk6FnTZHeG0hyY6ipg@mail.gmail.com>
- <20151208134951.GI19612@arm.com>
-Message-ID: <20151208160821.GB26759@e104818-lin.cambridge.arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 8 Dec 2015 21:48:38 +0530
+Subject: [PATCH] dmaengine: at_hdmac: fix dma_addr_t printing
+In-Reply-To: <24590899.3e2244jrdI@wuerfel>
+References: <24590899.3e2244jrdI@wuerfel>
+Message-ID: <20151208161838.GS1854@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 01:49:52PM +0000, Will Deacon wrote:
-> On Tue, Dec 08, 2015 at 09:08:32PM +0800, Ming Lei wrote:
-> > On Tue, Dec 8, 2015 at 6:30 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > > On Tue, Dec 08, 2015 at 02:30:33PM +0800, Ming Lei wrote:
-> > >> The attached kernel oops can be triggered immediately after
-> > >> running the following command on APM Mustang:
-> > >>
-> > >>         $stress-ng --all 8 -t 10m
-> > >>
-> > >> [1] kernel oops log
-> > >> stress-ng: info:  [5220] 5 failures reached, aborting stress process
-> > >> [  265.782659] kernel BUG at ./arch/arm64/include/asm/pgtable.h:282!
-> > >
-> > > Yikes, this means we're replacing a writable pte with a clean pte, so
-> > > there's a potential race w/ hardware DBM.
-> > >
-> > > Could you dump pte and *ptep please?
-> > 
-> > They are dumped as so:
-> > 
-> > set_pte_at: addr 470000, ptep fffffe00bc870238, *ptep 680047348a0bd3,
-> > pte 680047348a0fd3
+On Tue, Dec 08, 2015 at 04:34:28PM +0100, Arnd Bergmann wrote:
+> A recent patch tried to improve the printk output of the atc_dump_lli()
+> function but introduced a bug, in which we end up dereferencing a
+> dma address as a pointer, and we even get a warning for it:
 > 
-> Thanks for dumping these.
+> drivers/dma/at_hdmac_regs.h: In function 'atc_dump_lli':
+> drivers/dma/at_hdmac_regs.h:388:4: warning: format '%p' expects argument of type 'void *', but argument 3 has type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
 > 
-> It looks like we're trying to set the access flag in the pte, so its
-> got nothing to do with swp entries (although they may well be broken
-> anyway with these BUG_ONs). With H/W DBM enabled, we shouldn't be doing
-> software management of the access flag, so the BUG_ON looks like a red
-> herring in this case.
+> This changes the code to pass the DMA address by reference, as expected
+> by printk.
 
-Setting the access flag is fine, clearing it is a potential problem (the
-first BUG_ON). If the line numbers match mainline, 282 means the second
-BUG_ON in set_pte_at(). The ptep_set_access_flags() is meant to update
-the access or dirty flags without corrupting the state. I think the
-scenario is:
+Thanks for this but i was planning to drop 096117032a36 "dmaengine: do not
+use 0x in front of %pad" as recomended by Dmitry, so we should fix this
+cleanly
 
-1. *ptep is writable and clean and old (PTE_WRITE && PTE_RDONLY && !PTE_AF)
-2. ptep_set_access_flags() tries to set PTE_AF while keeping the rest
-   unchanged
-3. BUG_ON triggers because a writable PTE is overridden with a writeable
-   && clean PTE, potentially overriding a hardware-updated dirty entry
+I will push out updated tree in a short while...
 
-Point 3 could easily cause us problems if you mix DBM and non-DBM agents
-in the same system.
-
-Another scenario when all agents can do DBM is for two CPUs to take a
-read fault on a non-present PTE. The first CPU that takes the mm
-semaphore updates the PTE from non-present to valid && writable && clean
-&& young. The second CPU comes in and finds the PTE present in
-handle_pte_fault() and goes on to do a ptep_set_access_flags(). At this
-point we have a race with any other agent updating the dirty status.
-
-I think the BUG_ON check is still useful, we just need at atomic
-implementation of ptep_set_access_flags(). I'll post something and take
-it from there (I need to think some more about how this would interact
-with the set_pte_at() checks for the dirty bit).
-
-BTW, I don't think the check for pte_valid(pte) is needed in
-set_pte_at() as we should never go from valid pte to file without
-break-before-make. With proper b-b-m, pte_valid(*ptep) is false, so no
-BUG_ON checks.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 096117032a36 ("dmaengine: do not use 0x in front of %pad")
+> ---
+>  drivers/dma/at_hdmac_regs.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
+> index 610907dbc11a..0474e4a0f02a 100644
+> --- a/drivers/dma/at_hdmac_regs.h
+> +++ b/drivers/dma/at_hdmac_regs.h
+> @@ -386,8 +386,8 @@ static void atc_dump_lli(struct at_dma_chan *atchan, struct at_lli *lli)
+>  {
+>  	dev_crit(chan2dev(&atchan->chan_common),
+>  		 "  desc: s%pad d%pad ctrl0x%x:0x%x l%pad\n",
+> -		 lli->saddr, lli->daddr,
+> -		 lli->ctrla, lli->ctrlb, lli->dscr);
+> +		 &lli->saddr, &lli->daddr,
+> +		 lli->ctrla, lli->ctrlb, &lli->dscr);
+>  }
+>  
+>  
+> -- 
+> 2.1.0.rc2
+> 
+> 
 
 -- 
-Catalin
+~Vinod
