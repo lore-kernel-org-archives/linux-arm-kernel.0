@@ -1,145 +1,82 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 8 Dec 2015 09:03:56 -0600
-Subject: [PATCH v10 08/17] dt-bindings: add document for rockchip variant
- of analogix_dp
-In-Reply-To: <1449470374-31191-1-git-send-email-ykk@rock-chips.com>
+Date: Tue, 8 Dec 2015 09:06:32 -0600
+Subject: [PATCH v10 10/17] dt-bindings: add document for rockchip dp phy
+In-Reply-To: <1449470390-31285-1-git-send-email-ykk@rock-chips.com>
 References: <1449470239-30667-1-git-send-email-ykk@rock-chips.com>
- <1449470374-31191-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <20151208150356.GA14750@rob-hp-laptop>
+ <1449470390-31285-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <20151208150632.GA16308@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 02:39:34PM +0800, Yakir Yang wrote:
-> Rockchip DP driver is a helper driver of analogix_dp coder driver,
-> so most of the DT property should be descriped in analogix_dp document.
+On Mon, Dec 07, 2015 at 02:39:50PM +0800, Yakir Yang wrote:
+> Add dt binding documentation for rockchip display port PHY.
 > 
 > Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-I already acked the previous v10 you sent.
+One possible typo below, otherwise:
 
 Acked-by: Rob Herring <robh@kernel.org>
 
 > ---
 > Changes in v10: None
-> Changes in v9:
-> - Document more details for 'ports' property.
-> 
+> Changes in v9: None
 > Changes in v8:
-> - Modify the commit subject name. (Heiko)
+> - Remove the specific address in the example node name. (Heiko)
 > 
-> Changes in v7: None
+> Changes in v7:
+> - Simplify the commit message. (Kishon)
+> 
 > Changes in v6: None
 > Changes in v5:
 > - Split binding doc's from driver changes. (Rob)
-> - Add eDP hotplug pinctrl property. (Heiko)
+> - Update the rockchip,grf explain in document, and correct the clock required
+>   elemets in document. (Rob & Heiko)
 > 
 > Changes in v4: None
 > Changes in v3: None
 > Changes in v2: None
 > 
->  .../display/rockchip/analogix_dp-rockchip.txt      | 91 ++++++++++++++++++++++
->  1 file changed, 91 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
+>  .../devicetree/bindings/phy/rockchip-dp-phy.txt    | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
+> diff --git a/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
 > new file mode 100644
-> index 0000000..dae86c4
+> index 0000000..00902cb
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
-> @@ -0,0 +1,91 @@
-> +Rockchip RK3288 specific extensions to the Analogix Display Port
-> +================================
+> +++ b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+> @@ -0,0 +1,22 @@
+> +Rockchip Soc Seroes Display Port PHY
+                   ^
+Is this supposed to be SerDes?
+
+> +------------------------------------
 > +
 > +Required properties:
-> +- compatible: "rockchip,rk3288-edp";
-> +
-> +- reg: physical base address of the controller and length
-> +
+> +- compatible : should be one of the following supported values:
+> +	 - "rockchip.rk3288-dp-phy"
 > +- clocks: from common clock binding: handle to dp clock.
-> +	  of memory mapped region.
-> +
+> +	of memory mapped region.
 > +- clock-names: from common clock binding:
-> +	       Required elements: "dp" "pclk"
-> +
-> +- resets: Must contain an entry for each entry in reset-names.
-> +	  See ../reset/reset.txt for details.
-> +
-> +- pinctrl-names: Names corresponding to the chip hotplug pinctrl states.
-> +- pinctrl-0: pin-control mode. should be <&edp_hpd>
-> +
-> +- reset-names: Must include the name "dp"
-> +
-> +- rockchip,grf: this soc should set GRF regs, so need get grf here.
-> +
-> +- ports: there are 2 port nodes with endpoint definitions as defined in
-> +  Documentation/devicetree/bindings/media/video-interfaces.txt.
-> +    Port 0: contained 2 endpoints, connecting to the ouput of vop.
-> +    Port 1: contained 1 endpoint, connecting to the input of panel.
-> +
-> +For the below properties, please refer to Analogix DP binding document:
-> + * Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt
-> +- phys (required)
-> +- phy-names (required)
-> +- hpd-gpios (optional)
-> +-------------------------------------------------------------------------------
+> +	Required elements: "24m"
+> +- rockchip,grf: phandle to the syscon managing the "general register files"
+> +- #phy-cells : from the generic PHY bindings, must be 0;
 > +
 > +Example:
-> +	dp-controller: dp at ff970000 {
-> +		compatible = "rockchip,rk3288-dp";
-> +		reg = <0xff970000 0x4000>;
-> +		interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru SCLK_EDP>, <&cru PCLK_EDP_CTRL>;
-> +		clock-names = "dp", "pclk";
-> +		phys = <&dp_phy>;
-> +		phy-names = "dp";
 > +
-> +		rockchip,grf = <&grf>;
-> +		resets = <&cru 111>;
-> +		reset-names = "dp";
-> +
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&edp_hpd>;
-> +
-> +		status = "disabled";
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			edp_in: port at 0 {
-> +				reg = <0>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				edp_in_vopb: endpoint at 0 {
-> +					reg = <0>;
-> +					remote-endpoint = <&vopb_out_edp>;
-> +				};
-> +				edp_in_vopl: endpoint at 1 {
-> +					reg = <1>;
-> +					remote-endpoint = <&vopl_out_edp>;
-> +				};
-> +			};
-> +
-> +			edp_out: port at 1 {
-> +				reg = <1>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				edp_out_panel: endpoint {
-> +					reg = <0>;
-> +					remote-endpoint = <&panel_in_edp>
-> +				};
-> +			};
-> +		};
-> +	};
-> +
-> +	pinctrl {
-> +		edp {
-> +			edp_hpd: edp-hpd {
-> +				rockchip,pins = <7 11 RK_FUNC_2 &pcfg_pull_none>;
-> +			};
-> +		};
-> +	};
+> +edp_phy: edp-phy {
+> +	compatible = "rockchip,rk3288-dp-phy";
+> +	rockchip,grf = <&grf>;
+> +	clocks = <&cru SCLK_EDP_24M>;
+> +	clock-names = "24m";
+> +	#phy-cells = <0>;
+> +};
 > -- 
 > 1.9.1
 > 
 > 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
