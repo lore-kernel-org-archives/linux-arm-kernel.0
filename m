@@ -1,98 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 8 Dec 2015 13:50:40 +0000
-Subject: [PATCH v7 2/6] mfd: syscon: add a DT property to set value width
-In-Reply-To: <20151207194218.GB6030@localhost>
-References: <1448899191-13891-1-git-send-email-damien.riegel@savoirfairelinux.com>
- <1448899191-13891-3-git-send-email-damien.riegel@savoirfairelinux.com>
- <20151207094020.GF3384@x1> <20151207194218.GB6030@localhost>
-Message-ID: <20151208135040.GH3384@x1>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 8 Dec 2015 13:51:39 +0000
+Subject: [PATCH v3 3/7] arm64: split off early mapping code from
+ early_fixmap_init()
+In-Reply-To: <CAKv+Gu-gvCy73ake0WFErYwP5f5pRAcXs_S1epiG53xs+Fz7Sg@mail.gmail.com>
+References: <1447672998-20981-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1447672998-20981-4-git-send-email-ard.biesheuvel@linaro.org>
+ <20151203121840.GB28731@leverpostej>
+ <20151208124016.GH19612@arm.com>
+ <CAKv+Gu-gvCy73ake0WFErYwP5f5pRAcXs_S1epiG53xs+Fz7Sg@mail.gmail.com>
+Message-ID: <20151208135139.GJ19612@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 07 Dec 2015, Damien Riegel wrote:
-
-> On Mon, Dec 07, 2015 at 09:40:20AM +0000, Lee Jones wrote:
-> > On Mon, 30 Nov 2015, Damien Riegel wrote:
-> > 
-> > > Currently syscon has a fixed configuration of 32 bits for register and
-> > > values widths. In some cases, it would be desirable to be able to
-> > > customize the value width.
-> > > 
-> > > For example, certain boards (like the ones manufactured by Technologic
-> > > Systems) have a FPGA that is memory-mapped, but its registers are only
-> > > 16-bit wide.
-> > > 
-> > > This patch adds an optional "reg-io-width" DT binding for syscon that
-> > > allows to change the width for the data bus (i.e. val_bits). If this
-> > > property is provided, it will also set the register stride to
-> > > reg-io-width's value. If not provided, the default configuration is
-> > > used.
-> > > 
-> > > Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
-> > > ---
-> > >  Documentation/devicetree/bindings/mfd/syscon.txt |  4 ++++
-> > >  drivers/mfd/syscon.c                             | 13 +++++++++++++
-> > >  2 files changed, 17 insertions(+)
-> > 
-> > Applied, thanks.
-> > 
-> Hi Lee,
+On Tue, Dec 08, 2015 at 02:29:33PM +0100, Ard Biesheuvel wrote:
+> On 8 December 2015 at 13:40, Will Deacon <will.deacon@arm.com> wrote:
+> > On Thu, Dec 03, 2015 at 12:18:40PM +0000, Mark Rutland wrote:
+> >> Apologies that it's taken me so long to get around to this...
+> >>
+> >> On Mon, Nov 16, 2015 at 12:23:14PM +0100, Ard Biesheuvel wrote:
+> >> > This splits off and generalises the population of the statically
+> >> > allocated fixmap page tables so that we may reuse it later for
+> >> > the linear mapping once we move the kernel text mapping out of it.
+> >> >
+> >> > This also involves taking into account that table entries at any of
+> >> > the levels we are populating may have been populated already, since
+> >> > the fixmap mapping might not be disjoint up to the pgd level anymore
+> >> > from other early mappings.
+> >>
+> >> As a heads-up, for avoiding TLB conflicts, I'm currently working on
+> >> alternative way of creating the kernel page tables which will definitely
+> >> conflict here, and may or may not supercede this approach.
+> >
+> > Given that the Christmas break is around the corner and your TLB series
+> > is probably going to take some time to get right, I suggest we persevere
+> > with Ard's current patch series for 4.5 and merge the TLB conflict solution
+> > for 4.6. I don't want us to end up in a situation where this is needlessly
+> > blocked on something that isn't quite ready.
+> >
+> > Any objections? If not, Ard -- can you post a new version of this, please?
+> >
 > 
-> Good to see this patch applied. What's going on now with the other
-> patches of this serie ? How should I handle them ?
+> Happy to post a new version, with the following remarks
+> - my current private tree has evolved in the mean time, and I am now
+> putting the kernel image at the base of the vmalloc region (and the
+> module region right before)
+> - I think Mark's changes would allow me to deobfuscate the VA bias
+> that redirects __va() translations into the kernel VA space rather
+> than the linear mapping
 
-Are there any build dependencies between them?
+I'll leave that up to you. I'm just trying to avoid you growing a dependency
+on something that's unlikely to make it for 4.5. If Mark separates out the
+parts you need, perhaps that offers us some middle ground.
 
-> > > diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
-> > > index fe8150b..408f768 100644
-> > > --- a/Documentation/devicetree/bindings/mfd/syscon.txt
-> > > +++ b/Documentation/devicetree/bindings/mfd/syscon.txt
-> > > @@ -13,6 +13,10 @@ Required properties:
-> > >  - compatible: Should contain "syscon".
-> > >  - reg: the register region can be accessed from syscon
-> > >  
-> > > +Optional property:
-> > > +- reg-io-width: the size (in bytes) of the IO accesses that should be
-> > > +  performed on the device.
-> > > +
-> > >  Examples:
-> > >  gpr: iomuxc-gpr at 020e0000 {
-> > >  	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
-> > > diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-> > > index 176bf0f..b7aabee 100644
-> > > --- a/drivers/mfd/syscon.c
-> > > +++ b/drivers/mfd/syscon.c
-> > > @@ -47,6 +47,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
-> > >  	struct syscon *syscon;
-> > >  	struct regmap *regmap;
-> > >  	void __iomem *base;
-> > > +	u32 reg_io_width;
-> > >  	int ret;
-> > >  	struct regmap_config syscon_config = syscon_regmap_config;
-> > >  
-> > > @@ -69,6 +70,18 @@ static struct syscon *of_syscon_register(struct device_node *np)
-> > >  	 else if (of_property_read_bool(np, "little-endian"))
-> > >  		syscon_config.val_format_endian = REGMAP_ENDIAN_LITTLE;
-> > >  
-> > > +	/*
-> > > +	 * search for reg-io-width property in DT. If it is not provided,
-> > > +	 * default to 4 bytes. regmap_init_mmio will return an error if values
-> > > +	 * are invalid so there is no need to check them here.
-> > > +	 */
-> > > +	ret = of_property_read_u32(np, "reg-io-width", &reg_io_width);
-> > > +	if (ret)
-> > > +		reg_io_width = 4;
-> > > +
-> > > +	syscon_config.reg_stride = reg_io_width;
-> > > +	syscon_config.val_bits = reg_io_width * 8;
-> > > +
-> > >  	regmap = regmap_init_mmio(NULL, base, &syscon_config);
-> > >  	if (IS_ERR(regmap)) {
-> > >  		pr_err("regmap init failed\n");
-> > 
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Will
