@@ -1,47 +1,36 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Tue, 8 Dec 2015 08:53:53 -0800
-Subject: [PATCH] soc: TI knav_qmss: fix dma_addr_t printing
-In-Reply-To: <2560281.KhcNzi0XgD@wuerfel>
-References: <2560281.KhcNzi0XgD@wuerfel>
-Message-ID: <56670B21.5060209@oracle.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 8 Dec 2015 16:54:56 +0000
+Subject: [PATCH] regulator: add regulator_sync_voltage inline dummy
+In-Reply-To: <18141514.YrJxqxh5jL@wuerfel>
+References: <1983152.2iYiBkp4xd@wuerfel> <20151208163739.GS5727@sirena.org.uk>
+ <18141514.YrJxqxh5jL@wuerfel>
+Message-ID: <20151208165456.GT5727@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/8/2015 7:30 AM, Arnd Bergmann wrote:
-> The knav_qmss driver is currently broken when CONFIG_LPAE is
-> set, which is a bit surprising because I'd expect that any serious
-> users of this platforms would have more than 2GB of RAM and require
-> LPAE.
->
-Well it has been working with LPAE enable always. The production
-systems do but IIRC, some of the Eval board were still build with
-just 2 GB memory.
+On Tue, Dec 08, 2015 at 05:49:20PM +0100, Arnd Bergmann wrote:
+> On Tuesday 08 December 2015 16:37:39 Mark Brown wrote:
+> > On Tue, Dec 08, 2015 at 04:43:35PM +0100, Arnd Bergmann wrote:
 
-> The compiler clearly warns about an incorrect use of dma_addr_t
-> in the debug kernel messages:
->
-> ti/knav_qmss_queue.c: In function 'knav_queue_setup_region':
-> ti/knav_qmss_queue.c:1025:117: warning: format '%x' expects argument of type 'unsigned int', but argument 9 has type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
-> ti/knav_qmss_queue.c:1025:117: warning: format '%x' expects argument of type 'unsigned int', but argument 10 has type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
-> ti/knav_qmss_queue.c: In function 'knav_queue_setup_link_ram':
-> ti/knav_qmss_queue.c:1175:118: warning: format '%x' expects argument of type 'unsigned int', but argument 4 has type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
->
-%x should have been %llx or %pad as your patch does now.
+> > We don't do this for *all* regulator API functions - there's some where
+> > using them strongly suggests that there is actually a dependency on the
+> > regulator API.  This does seem like it might be falling into the
+> > specialist category...
 
-> This patch changes all the debugging output to use the correct
-> %pad format string that works with both 32-bit and 64-bit dma_addr_t.
-> As the variable naming is somewhat confusing here, I also change
-> all *_phys names to *_dma when they refer to bus addresses that
-> are used for DMA rather than a physical memory address as seen from
-> the CPU. This is particularly important on keystone, because the
-> two things are not the same there.
->
-Right. Rename sounds good.
+> Ok, got it.
 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-Thanks for the patch Arnd !!
+> I guess we'll want something like the patch below in the cpufreq git, right?
 
-Wingman/Murali,
-Can you guys please test this patch and update the thread ?
-I will queue this up for next merge window.
+Yes, exactly - though looking at the code I'm pretty unclear on what the
+authors think the use of _sync_voltage() is doing in the first place so
+it may be even better to just remove the call.  It seems to have been
+included in the first commit so there's not changelog explaining things
+and there's no comment either.  I'd *expect* it to be a noop as far as I
+can see.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151208/ee54981d/attachment.sig>
