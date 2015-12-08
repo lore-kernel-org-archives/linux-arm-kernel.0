@@ -1,45 +1,229 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 8 Dec 2015 19:41:39 +0200
-Subject: [4.4-rc][PATCH v2] ARM: dts: am4372: fix clock source for arm twd
- and global timers
-In-Reply-To: <5660843E.3000801@ti.com>
-References: <1448898998-32749-1-git-send-email-grygorii.strashko@ti.com>
- <20151203163551.GQ23396@atomide.com> <5660843E.3000801@ti.com>
-Message-ID: <56671653.4030002@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 08 Dec 2015 17:43:42 +0000
+Subject: [PATCH v6 21/21] KVM: ARM64: Add a new kvm ARM PMU device
+In-Reply-To: <1449578860-15808-22-git-send-email-zhaoshenglong@huawei.com>
+References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
+ <1449578860-15808-22-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <566716CE.5080405@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony, Felipe, Tero,
-On 12/03/2015 08:04 PM, Grygorii Strashko wrote:
-> On 12/03/2015 06:35 PM, Tony Lindgren wrote:
->> * Grygorii Strashko <grygorii.strashko@ti.com> [151130 07:58]:
->>> ARM TWD and Global timer are clocked by PERIPHCLK which is MPU_CLK/2.
->>> But now they are clocked by dpll_mpu_m2_ck == MPU_CLK and, as result.
->>> Timekeeping core misbehaves. For example, execution of command
->>> "sleep 5" will take 10 sec instead of 5.
->>>
->>> Hence, fix it by adding mpu_periphclk ("fixed-factor-clock") and use
->>> it for clocking ARM TWD and Global timer (same way as on OMAP4).
->>>
->>> Cc: Tony Lindgren <tony@atomide.com>
->>> Cc: Felipe Balbi <balbi@ti.com>
->>> Cc: Tero Kristo <t-kristo@ti.com>
->>> Fixes:commit 8cbd4c2f6a99 ("arm: boot: dts: am4372: add ARM timers and SCU nodes")
->>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->>
->> Is this fix alone enough or do you still need to disable other the ARM
->> timers in the board specific dts file?
->>
->
-> This one is independent and it's required for -rc, because ARM TWD timer will be selected
-> now for am43xx even if http://www.spinics.net/lists/arm-kernel/msg459649.html
-> is not merged yet ;) in case of omap2plus_defconfig build.
->
->
+On 08/12/15 12:47, Shannon Zhao wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Add a new kvm device type KVM_DEV_TYPE_ARM_PMU_V3 for ARM PMU. Implement
+> the kvm_device_ops for it.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  Documentation/virtual/kvm/devices/arm-pmu.txt | 16 +++++
+>  arch/arm64/include/uapi/asm/kvm.h             |  3 +
+>  include/linux/kvm_host.h                      |  1 +
+>  include/uapi/linux/kvm.h                      |  2 +
+>  virt/kvm/arm/pmu.c                            | 93 +++++++++++++++++++++++++++
+>  virt/kvm/kvm_main.c                           |  4 ++
+>  6 files changed, 119 insertions(+)
+>  create mode 100644 Documentation/virtual/kvm/devices/arm-pmu.txt
+> 
+> diff --git a/Documentation/virtual/kvm/devices/arm-pmu.txt b/Documentation/virtual/kvm/devices/arm-pmu.txt
+> new file mode 100644
+> index 0000000..5121f1f
+> --- /dev/null
+> +++ b/Documentation/virtual/kvm/devices/arm-pmu.txt
+> @@ -0,0 +1,16 @@
+> +ARM Virtual Performance Monitor Unit (vPMU)
+> +===========================================
+> +
+> +Device types supported:
+> +  KVM_DEV_TYPE_ARM_PMU_V3         ARM Performance Monitor Unit v3
+> +
+> +Instantiate one PMU instance for per VCPU through this API.
+> +
+> +Groups:
+> +  KVM_DEV_ARM_PMU_GRP_IRQ
+> +  Attributes:
+> +    A value describing the interrupt number of PMU overflow interrupt. This
+> +    interrupt should be a PPI.
+> +
+> +  Errors:
+> +    -EINVAL: Value set is out of the expected range (from 16 to 31)
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index 2d4ca4b..568afa2 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -204,6 +204,9 @@ struct kvm_arch_memory_slot {
+>  #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
+>  #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
+>  
+> +/* Device Control API: ARM PMU */
+> +#define KVM_DEV_ARM_PMU_GRP_IRQ		0
+> +
+>  /* KVM_IRQ_LINE irq field index values */
+>  #define KVM_ARM_IRQ_TYPE_SHIFT		24
+>  #define KVM_ARM_IRQ_TYPE_MASK		0xff
+> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+> index c923350..608dea6 100644
+> --- a/include/linux/kvm_host.h
+> +++ b/include/linux/kvm_host.h
+> @@ -1161,6 +1161,7 @@ extern struct kvm_device_ops kvm_mpic_ops;
+>  extern struct kvm_device_ops kvm_xics_ops;
+>  extern struct kvm_device_ops kvm_arm_vgic_v2_ops;
+>  extern struct kvm_device_ops kvm_arm_vgic_v3_ops;
+> +extern struct kvm_device_ops kvm_arm_pmu_ops;
+>  
+>  #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
+>  
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index 03f3618..4ba6fdd 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -1032,6 +1032,8 @@ enum kvm_device_type {
+>  #define KVM_DEV_TYPE_FLIC		KVM_DEV_TYPE_FLIC
+>  	KVM_DEV_TYPE_ARM_VGIC_V3,
+>  #define KVM_DEV_TYPE_ARM_VGIC_V3	KVM_DEV_TYPE_ARM_VGIC_V3
+> +	KVM_DEV_TYPE_ARM_PMU_V3,
+> +#define	KVM_DEV_TYPE_ARM_PMU_V3		KVM_DEV_TYPE_ARM_PMU_V3
+>  	KVM_DEV_TYPE_MAX,
+>  };
+>  
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index f8007c7..a84a4d7 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -19,10 +19,13 @@
+>  #include <linux/kvm.h>
+>  #include <linux/kvm_host.h>
+>  #include <linux/perf_event.h>
+> +#include <linux/uaccess.h>
+>  #include <asm/kvm_emulate.h>
+>  #include <kvm/arm_pmu.h>
+>  #include <kvm/arm_vgic.h>
+>  
+> +#include "vgic.h"
+> +
+>  /**
+>   * kvm_pmu_get_counter_value - get PMU counter value
+>   * @vcpu: The vcpu pointer
+> @@ -438,3 +441,93 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
+>  
+>  	pmc->perf_event = event;
+>  }
+> +
+> +static inline bool kvm_arm_pmu_initialized(struct kvm_vcpu *vcpu)
+> +{
+> +	return vcpu->arch.pmu.irq_num != -1;
+> +}
+> +
+> +static int kvm_arm_pmu_set_irq(struct kvm *kvm, int irq)
+> +{
+> +	int j;
+> +	struct kvm_vcpu *vcpu;
+> +
+> +	kvm_for_each_vcpu(j, vcpu, kvm) {
+> +		struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +
+> +		if (!kvm_arm_pmu_initialized(vcpu))
+> +			kvm_debug("Set kvm ARM PMU irq: %d\n", irq);
+> +			pmu->irq_num = irq;
 
-Are there any comments objection?
-Could this patch be merged as part of -rc cycle?
+Missing braces? Also, you should consider returning an error if it has
+been initialized twice.
 
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int kvm_arm_pmu_create(struct kvm_device *dev, u32 type)
+> +{
+> +	int i;
+> +	struct kvm_vcpu *vcpu;
+> +	struct kvm *kvm = dev->kvm;
+> +
+> +	kvm_for_each_vcpu(i, vcpu, kvm) {
+> +		struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +
+> +		memset(pmu, 0, sizeof(*pmu));
+> +		kvm_pmu_vcpu_reset(vcpu);
+> +		pmu->irq_num = -1;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static void kvm_arm_pmu_destroy(struct kvm_device *dev)
+> +{
+> +	kfree(dev);
+> +}
+> +
+> +static int kvm_arm_pmu_set_attr(struct kvm_device *dev,
+> +				struct kvm_device_attr *attr)
+> +{
+> +	switch (attr->group) {
+> +	case KVM_DEV_ARM_PMU_GRP_IRQ: {
+> +		int __user *uaddr = (int __user *)(long)attr->addr;
+> +		int reg;
+> +
+> +		if (get_user(reg, uaddr))
+> +			return -EFAULT;
+> +
+> +		if (reg < VGIC_NR_SGIS || reg >= VGIC_NR_PRIVATE_IRQS)
+> +			return -EINVAL;
+> +
+> +		return kvm_arm_pmu_set_irq(dev->kvm, reg);
+> +	}
+> +	}
+> +
+> +	return -ENXIO;
+> +}
+> +
+> +static int kvm_arm_pmu_get_attr(struct kvm_device *dev,
+> +				struct kvm_device_attr *attr)
+> +{
+
+Shouldn't you be able to retrieve the configured interrupt?
+
+> +	return 0;
+> +}
+> +
+> +static int kvm_arm_pmu_has_attr(struct kvm_device *dev,
+> +				struct kvm_device_attr *attr)
+> +{
+> +	switch (attr->group) {
+> +	case KVM_DEV_ARM_PMU_GRP_IRQ:
+> +		return 0;
+> +	}
+> +
+> +	return -ENXIO;
+> +}
+> +
+> +struct kvm_device_ops kvm_arm_pmu_ops = {
+> +	.name = "kvm-arm-pmu",
+> +	.create = kvm_arm_pmu_create,
+> +	.destroy = kvm_arm_pmu_destroy,
+> +	.set_attr = kvm_arm_pmu_set_attr,
+> +	.get_attr = kvm_arm_pmu_get_attr,
+> +	.has_attr = kvm_arm_pmu_has_attr,
+> +};
+> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+> index 484079e..81a42cc 100644
+> --- a/virt/kvm/kvm_main.c
+> +++ b/virt/kvm/kvm_main.c
+> @@ -2647,6 +2647,10 @@ static struct kvm_device_ops *kvm_device_ops_table[KVM_DEV_TYPE_MAX] = {
+>  #ifdef CONFIG_KVM_XICS
+>  	[KVM_DEV_TYPE_XICS]		= &kvm_xics_ops,
+>  #endif
+> +
+> +#ifdef CONFIG_KVM_ARM_PMU
+> +	[KVM_DEV_TYPE_ARM_PMU_V3]	= &kvm_arm_pmu_ops,
+> +#endif
+>  };
+>  
+>  int kvm_register_device_ops(struct kvm_device_ops *ops, u32 type)
+> 
+
+Thanks,
+
+	M.
 -- 
-regards,
--grygorii
+Jazz is not dead. It just smells funny...
