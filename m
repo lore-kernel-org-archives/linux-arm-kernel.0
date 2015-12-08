@@ -1,22 +1,54 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 Dec 2015 16:19:43 -0800
-Subject: [PATCH] ARM: DTS: am33xx: Use the new DT bindings for the eDMA3
-In-Reply-To: <1449225915-28879-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1449225915-28879-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20151208001943.GT23396@atomide.com>
+Date: Mon, 7 Dec 2015 16:32:13 -0800
+Subject: [PATCH] mmc: pwrseq_simple: Fix regression with optional GPIOs
+In-Reply-To: <CAPDyKFpxiOJJdh-nLXjxv3DYJnW3RAf_9aqMfds46=-oqPd5ng@mail.gmail.com>
+References: <1449528845-25189-1-git-send-email-tony@atomide.com>
+ <CAPDyKFpxiOJJdh-nLXjxv3DYJnW3RAf_9aqMfds46=-oqPd5ng@mail.gmail.com>
+Message-ID: <20151208003213.GU23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [151204 02:46]:
-> +
-> +			ti,tptcs = <&edma_tptc0 7>, <&edma_tptc1 5>,
-> +				   <&edma_tptc2 0>;
-> +
-> +			ti,edma-memcpy-channels = /bits/ 16 <20 21>;
+* Ulf Hansson <ulf.hansson@linaro.org> [151207 16:20]:
+> +Linus
+> 
+> On 7 December 2015 at 23:54, Tony Lindgren <tony@atomide.com> wrote:
+> > Commit ce037275861e ("mmc: pwrseq_simple: use GPIO descriptors array API")
+> > changed the handling MMC power sequence so GPIOs no longer are optional.
+> >
+> > This broke SDIO WLAN at least for omap5 that can't yet use the reset GPIOs
+> > with pwrseq_simple as a wait is needed after enabling the SDIO device.
+> 
+> Can you elaborate on this. Did it break omap5 or not? :-)
 
-Is this safe to change to just ti,edma-memcpy-channels = <20 21> as
-suggested by Arnd?
+Yes it broke WLAN for omap5 that I just got fixed.. It only uses the clocks
+art of the pwrseq currently because of the delay needed.
 
-Regards,
+> Also, I am interested to know more about the waiting period you need.
+> I assume that's because of the HW's characteristic?
+
+At least TI wl12xx and Marvell 8787 need a delay after enabling the the WLAN.
+
+> Why can't we have that being described in DT and then make
+> pwrseq_simple *wait* if needed?
+
+We can, but I'm thinking that we might be better off adding support for
+regulators to pwrseq. Both TI wl12xx and Marvell 8787 get power from the
+battery, and probably have an integrated regulator.
+
+Also, the delay and the power up sequencey can be more complicated than what
+we currently support. In the 8787 case, pdn pin needs to be asserted for 300ms
+after power pins are stable and while reset is held high.
+
+> > Let's fix the problem by allocating the GPIO values array during init
+> > depending on the optional GPIOs found.
+> 
+> Certainly it shall be optional! I wonder how I could let that patch
+> slip through, my bad!
+
+OK good to hear :)
+
+> Thanks for fixing this!
+
+No problem, thanks,
 
 Tony
