@@ -1,198 +1,126 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 8 Dec 2015 07:19:05 +0100
-Subject: [PATCH 1/3] usb: misc: generic_onboard_hub: add generic onboard
- USB HUB driver
-In-Reply-To: <1449538670-7954-2-git-send-email-peter.chen@freescale.com>
-References: <1449538670-7954-1-git-send-email-peter.chen@freescale.com>
- <1449538670-7954-2-git-send-email-peter.chen@freescale.com>
-Message-ID: <20151208061905.GM11966@pengutronix.de>
+From: beanhuo@micron.com (=?gb2312?B?QmVhbiBIdW8gu/Sx87HzIChiZWFuaHVvKQ==?=)
+Date: Tue, 8 Dec 2015 06:21:00 +0000
+Subject: [PATCH linux-next 0/5] mtd: spi-nor: add driver for Atmel QSPI
+ controller
+In-Reply-To: <20151207193441.GO120110@google.com>
+References: <cover.1449494420.git.cyrille.pitchen@atmel.com>
+ <20151207193441.GO120110@google.com>
+Message-ID: <A765B125120D1346A63912DDE6D8B6310BF53437@NTXXIAMBX02.xacn.micron.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 09:37:48AM +0800, Peter Chen wrote:
-> Current USB HUB driver lacks of platform interfaces to configure
-> external signal on HUB chip, eg, the PHY input clock and gpio reset
-> pin for HUB, these kinds of HUBs are usually soldered at the board,
-> and they are not hot-plug USB devices.
+> -----Original Message-----
+> From: Brian Norris [mailto:computersforpeace at gmail.com]
+> Sent: Tuesday, December 08, 2015 3:35 AM
+> To: Cyrille Pitchen
+> Cc: linux-mtd at lists.infradead.org; nicolas.ferre at atmel.com; marex at denx.de;
+> vigneshr at ti.com; linux-kernel at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
+> robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
+> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Bean Huo ???
+> (beanhuo)
+> Subject: Re: [PATCH linux-next 0/5] mtd: spi-nor: add driver for Atmel QSPI
+> controller
 > 
-> With this patch, the user can configure the HUB's pins at platform
-> part (through dts or platform), and these configuration will be
-> effective before the USB bus can be used, we use subsys_initcall
-> for this driver.
+> + Bean Huo
 > 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  MAINTAINERS                             |   7 ++
->  drivers/usb/misc/Kconfig                |   9 ++
->  drivers/usb/misc/Makefile               |   1 +
->  drivers/usb/misc/generic_onboard_hub.c  | 162 ++++++++++++++++++++++++++++++++
->  include/linux/usb/generic_onboard_hub.h |  11 +++
->  5 files changed, 190 insertions(+)
->  create mode 100644 drivers/usb/misc/generic_onboard_hub.c
->  create mode 100644 include/linux/usb/generic_onboard_hub.h
+> Hi Cyrille,
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index e9caa4b..cc1981e 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -11121,6 +11121,13 @@ S:	Maintained
->  F:	Documentation/usb/ohci.txt
->  F:	drivers/usb/host/ohci*
->  
-> +USB Generic Onboard HUB Driver
-> +M:	Peter Chen <Peter.Chen@freescale.com>
-> +T:	git git://git.kernel.org/pub/scm/linux/kernel/git/peter.chen/usb.git
-> +L:	linux-usb at vger.kernel.org
-> +S:	Maintained
-> +F:	drivers/usb/misc/generic_onboard_hub.c
-> +
->  USB OTG FSM (Finite State Machine)
->  M:	Peter Chen <Peter.Chen@freescale.com>
->  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/peter.chen/usb.git
-> diff --git a/drivers/usb/misc/Kconfig b/drivers/usb/misc/Kconfig
-> index f7a7fc2..8921cae 100644
-> --- a/drivers/usb/misc/Kconfig
-> +++ b/drivers/usb/misc/Kconfig
-> @@ -268,3 +268,12 @@ config USB_CHAOSKEY
->  
->  	  To compile this driver as a module, choose M here: the
->  	  module will be called chaoskey.
-> +
-> +config USB_ONBOARD_HUB
-> +	tristate "Generic USB Onboard HUB"
-> +	help
-> +	  Say Y here if your board has an onboard HUB, and this hub needs
-> +	  to control its PHY clock and reset pin through external signals.
-> +	  If you are not sure, say N.
-> +
-> +	  To compile this driver as a module, choose M here.
-> diff --git a/drivers/usb/misc/Makefile b/drivers/usb/misc/Makefile
-> index 45fd4ac..da52e9a 100644
-> --- a/drivers/usb/misc/Makefile
-> +++ b/drivers/usb/misc/Makefile
-> @@ -29,3 +29,4 @@ obj-$(CONFIG_USB_CHAOSKEY)		+= chaoskey.o
->  
->  obj-$(CONFIG_USB_SISUSBVGA)		+= sisusbvga/
->  obj-$(CONFIG_USB_LINK_LAYER_TEST)	+= lvstest.o
-> +obj-$(CONFIG_USB_ONBOARD_HUB)		+= generic_onboard_hub.o
-> diff --git a/drivers/usb/misc/generic_onboard_hub.c b/drivers/usb/misc/generic_onboard_hub.c
-> new file mode 100644
-> index 0000000..df722a0
-> --- /dev/null
-> +++ b/drivers/usb/misc/generic_onboard_hub.c
-> @@ -0,0 +1,162 @@
-> +/*
-> + * usb_hub_generic.c	The generic onboard USB HUB driver
-> + *
-> + * Copyright (C) 2015 Freescale Semiconductor, Inc.
-> + * Author: Peter Chen <peter.chen@freescale.com>
-> + *
-> + * This program is free software: you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2  of
-> + * the License as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +/*
-> + * This driver is only for the USB HUB devices which need to control
-> + * their external pins(clock, reset, etc), and these USB HUB devices
-> + * are soldered at the board.
-> + */
-> +
-> +#define DEBUG
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/gpio.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_gpio.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regulator/consumer.h>
-> +#include <linux/slab.h>
-> +#include <linux/usb/generic_onboard_hub.h>
-> +
-> +struct usb_hub_generic_data {
-> +	struct clk *clk;
-> +};
-> +
-> +static int usb_hub_generic_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct usb_hub_generic_platform_data *pdata = dev->platform_data;
-> +	struct usb_hub_generic_data *hub_data;
-> +	int reset_pol = 0, duration_us = 50, ret = 0;
-> +	struct gpio_desc *gpiod_reset = NULL;
-> +
-> +	hub_data = devm_kzalloc(dev, sizeof(*hub_data), GFP_KERNEL);
-> +	if (!hub_data)
-> +		return -ENOMEM;
-> +
-> +	if (dev->of_node) {
-> +		struct device_node *node = dev->of_node;
-> +
-> +		hub_data->clk = devm_clk_get(dev, "external_clk");
+> On Mon, Dec 07, 2015 at 03:09:09PM +0100, Cyrille Pitchen wrote:
+> > Hi all,
+> >
+> > this series of patches adds support to the Atmel QSPI controller
+> > available on sama5d2 SoCs. It was tested on a sama5d2 xplained ultra
+> > board with a Micron n25q128a13 QSPI memory and a at25df321a SPI
+> memory.
+> >
+> > In order to use the Micron memory in its Quad SPI mode, the spi-nor
+> > framework needed to be patched to fix the support of Quad/Dual SPI
+> > protocols with some memory manufacturers such as Spansion, Micron and
+> > Macronix. There are many comments in the source code to explain the
+> > implementation choices based on the datasheets from memory
+> manufacturers.
+> >
+> >
+> > This series was based and tested on linux-next-20151207
+> >
+> > 1 - Atmel QSPI + Micron n25q128a13 (atmel-quadspi.c driver)
+> >
+> > SPI 1-1-1: This mode was tested replacing SPI_NOR_QUAD by
+> SPI_NOR_FAST as
+> >            argument to spi_nor_scan() called from atmel_qspi_probe().
+> >
+> > SPI 1-1-4: Bootloaders (at91bootstrap/uboot) don't enable the Quad SPI
+> >            mode of the Micron memory. When probed from Linux, the
+> memory
+> >            uses its Extended SPI mode and replies to the regular Read ID
+> >            (0x9f) command.
+> >
+> > SPI 4-4-4: The romcode enabled the Quad SPI mode the of Micron memory
+> >            before loading the at91bootstrap. When probed from Linux,
+> the
+> >            memory uses its Quad SPI mode and no longer replies to the
+> >            regular Read ID (0x9f) command but instead to the Read ID
+> >            Multiple I/O (0xaf) command. The memory expects ALL
+> commands
+> >            to use the SPI 4-4-4 protocol.
+> 
+> I'll admit I'm a little fuzzy on the differences between dual and quad modes on
+> various flash manufacturers. Can you help clear it up for me?
 
-Please drop such _clk suffixes. The context already makes it clear that
-it's a clock.
+For Micron SPI NOR spi quad mode, means that Qaud I/O prototocol, it follows I/O
+Bus width is command-address-Data 4-4-4, at this time, DQ0,DQ1,DQ2,DQ3
+are all used to transfer address/command/data. For this maybe not the same between
+different flash manufactures. For example, for Spansion Qspi NOR, its all instructions are
+transferred from host to memory as a single bit serial sequence on the DQ0 signal, even under
+Quad mode.  Dual mode the same as Qaud mode scenario.
 
-> +		if (IS_ERR(hub_data->clk)) {
-> +			dev_dbg(dev, "Can't get external clock: %ld\n",
-> +					PTR_ERR(hub_data->clk));
-> +		}
-> +
-> +		/*
-> +		 * Try to get the information for HUB reset, the
-> +		 * default setting like below:
-> +		 *
-> +		 * - Reset state is low
-> +		 * - The duration is 50us
-> +		 */
-> +		if (of_find_property(node, "hub-reset-active-high", NULL))
-> +			reset_pol = 1;
-> +
-> +		of_property_read_u32(node, "hub-reset-duration-us",
-> +			&duration_us);
-> +
-> +		gpiod_reset = devm_gpiod_get_optional(dev, "hub-reset",
-> +			reset_pol ? GPIOD_OUT_HIGH : GPIOD_OUT_LOW);
-> +		ret = PTR_ERR_OR_ZERO(gpiod_reset);
-> +		if (ret) {
-> +			dev_err(dev, "Failed to get reset gpio, err = %d\n",
-> +				ret);
-> +			return ret;
-> +		}
-> +	} else if (pdata) {
-> +		hub_data->clk = pdata->ext_clk;
+for SPI NOR 1-1-4, means command and address are transferred on the DQ0,
+but for data, being transferred on DQ0,DQ1,DQ2,DQ3.For this, it is the same
+between different flash manufacturers. Of course, at this moment, SPI NOR
+should work under extended I/O mode.
 
-Passing clocks in platform_data is a no go. clocks must always be
-retrieved with clk_get.
+> I think some of the comments on patch 2 help too, but I'll just comment here
+> for now.
+> It looks like the current driver has problems regarding the non 1-x-y modes
+> (e.g., 4-4-4), right? But I see that spi-nor.c never tries to send a 4_4_4
+> command; it only sets read_opcode to SPINOR_OP_READ_1_1_{1,2,4}. So is
+> this an oversight in patches like Bean's patch?
 
-> +		duration_us = pdata->gpio_reset_duration_us;
-> +		reset_pol = pdata->gpio_reset_polarity;
-> +
-> +		if (gpio_is_valid(pdata->gpio_reset)) {
-> +			ret = devm_gpio_request_one(
-> +				dev, pdata->gpio_reset, reset_pol
-> +				? GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW,
-> +				dev_name(dev));
-> +			if (!ret)
-> +				gpiod_reset = gpio_to_desc(pdata->gpio_reset);
+For SPINOR_OP_READ_1_1_{1,2,4} commands, Spi NOR actually works under
+Extended I/O mode, not Quad mode. They just push Spi NOR output data by Quad mode,
+Command and address still following extended I/O mode.
+For 4-4-4 I/O protocol, SPI NOR should change to Quad mode(just as my patch), 
+of course, SPI controller should support this. for Micron Qspi NOR, under quad mode,
+all commands/address/data are transferred on DQ0,DQ1,DQ2,DQ3 signals. No matter what
+kind of command. 
 
-If the gpio is valid then being unable to get it is an error.
 
-Do you need this platform_data stuff at all?
+>     commit 548cd3ab54da ("mtd: spi-nor: Add quad I/O support for Micron
+>     SPI NOR")
+> 
+> Why would we even need to enable quad modes like that, if we're not going
+> to send the 4-4-4 opcodes?
+I think, in order to high speed SPI NOR, after enable quad mode, 
+SPINOR_OP_READ_1_1_{1,2,4} commands don't need any more, normal read command (0x03)
+Can implement as them.
 
-Sascha
+> My next question (if my understanding is roughly correct) is, do we need the
+> 4-4-4 modes, and what risks come with them? I understand we can shorten
+> the command and address phases, but does that alone yield much
+> performance benefit? And I think the risk is that a given system might not be
+> prepared for the flash to be in a 4-4-4 mode, if the boot code tries to use 1-x-y
+> commands.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+As far as my current experience and knowledge, this still need to be enabled, especially for
+fast boot, and some IOT devices to store info into SPI NOR.
+For this patches, my current concern is that host side how to get different I/O protocol changes,
+and distinguish between different flash manufacturers I/O mode.
+
+> Also, I see a lot of good comments in patch 2 about Spansion vs.
+> Macronix vs. Micron memories. I wonder if previous developers have
+> completely tested their patches, or if they're just reading the datasheets... so,
+> what kind have testing have you done? Do you have samples of all these flash
+> to test?
+> Regards,
+> Brian
