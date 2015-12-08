@@ -1,37 +1,29 @@
 From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue,  8 Dec 2015 13:45:03 +0100
-Subject: [PATCH v3 1/9] ARM: Kconfig: Introduce MACH_STM32F429 flag
+Date: Tue,  8 Dec 2015 13:45:07 +0100
+Subject: [PATCH v3 5/9] ARM: mach-stm32: Select pinctrl
 In-Reply-To: <1449578711-6141-1-git-send-email-mcoquelin.stm32@gmail.com>
 References: <1449578711-6141-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1449578711-6141-2-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <1449578711-6141-6-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces the MACH_STM32F429 to make possible to only select
-STM32F429 pinctrl driver.
-
-By default, all the MACH_STM32Fxxx flags will be set with STM32 defconfig.
-
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 ---
- arch/arm/Kconfig | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 0365cbb..4d2fcba 100644
+index 4d2fcba..365714b 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -967,6 +967,11 @@ config ARCH_STM32
+@@ -963,6 +963,7 @@ config ARCH_STM32
+ 	select ARCH_HAS_RESET_CONTROLLER
+ 	select ARMV7M_SYSTICK
+ 	select CLKSRC_STM32
++	select PINCTRL
+ 	select RESET_CONTROLLER
  	help
  	  Support for STMicroelectronics STM32 processors.
- 
-+config MACH_STM32F429
-+	bool "STMicrolectronics STM32F429"
-+	depends on ARCH_STM32
-+	default y
-+
- # Definitions to make life easier
- config ARCH_ACORN
- 	bool
 -- 
 1.9.1
