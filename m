@@ -1,49 +1,47 @@
 From: haibo.chen@freescale.com (Haibo Chen)
-Date: Tue, 8 Dec 2015 18:26:21 +0800
-Subject: [PATCH v5 2/4] Documentation: add the binding file for Freescale
- imx7d ADC driver
+Date: Tue, 8 Dec 2015 18:26:22 +0800
+Subject: [PATCH v5 3/4] ARM: dts: imx7d.dtsi: add ADC support
 In-Reply-To: <1449570383-25716-1-git-send-email-haibo.chen@freescale.com>
 References: <1449570383-25716-1-git-send-email-haibo.chen@freescale.com>
-Message-ID: <1449570383-25716-3-git-send-email-haibo.chen@freescale.com>
+Message-ID: <1449570383-25716-4-git-send-email-haibo.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch adds the binding file for Freescale imx7d ADC driver.
+Add imx7d ADC support.
 
 Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/iio/adc/imx7d-adc.txt      | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iio/adc/imx7d-adc.txt
+ arch/arm/boot/dts/imx7d.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/iio/adc/imx7d-adc.txt b/Documentation/devicetree/bindings/iio/adc/imx7d-adc.txt
-new file mode 100644
-index 0000000..5c184b9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/iio/adc/imx7d-adc.txt
-@@ -0,0 +1,22 @@
-+Freescale imx7d ADC bindings
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index ebc053a..aa0624d 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -583,6 +583,24 @@
+ 			reg = <0x30400000 0x400000>;
+ 			ranges;
+ 
++			adc1: adc at 30610000 {
++				compatible = "fsl,imx7d-adc";
++				reg = <0x30610000 0x10000>;
++				interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_ADC_ROOT_CLK>;
++				clock-names = "adc";
++				status = "disabled";
++			};
 +
-+The devicetree bindings are for the ADC driver written for
-+imx7d SoC.
++			adc2: adc at 30620000 {
++				compatible = "fsl,imx7d-adc";
++				reg = <0x30620000 0x10000>;
++				interrupts = <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_ADC_ROOT_CLK>;
++				clock-names = "adc";
++				status = "disabled";
++			};
 +
-+Required properties:
-+- compatible: Should be "fsl,imx7d-adc"
-+- reg: Offset and length of the register set for the ADC device
-+- interrupts: The interrupt number for the ADC device
-+- clocks: The root clock of the ADC controller
-+- clock-names: Must contain "adc", matching entry in the clocks property
-+- vref-supply: The regulator supply ADC reference voltage
-+
-+Example:
-+adc1: adc at 30610000 {
-+	compatible = "fsl,imx7d-adc";
-+	reg = <0x30610000 0x10000>;
-+	interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
-+	clocks = <&clks IMX7D_ADC_ROOT_CLK>;
-+	clock-names = "adc";
-+	vref-supply = <&reg_vcc_3v3_mcu>;
-+};
+ 			pwm1: pwm at 30660000 {
+ 				compatible = "fsl,imx7d-pwm", "fsl,imx27-pwm";
+ 				reg = <0x30660000 0x10000>;
 -- 
 1.9.1
