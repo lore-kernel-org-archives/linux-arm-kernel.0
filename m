@@ -1,52 +1,109 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 08 Dec 2015 16:24:22 +0100
-Subject: [PATCH 2/2] crypto: sahara: fix debug output for 64-bit dma_addr_t
-In-Reply-To: <1707164.bU6CqSGiie@wuerfel>
-References: <1707164.bU6CqSGiie@wuerfel>
-Message-ID: <2836331.cLKdbzEk5h@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 8 Dec 2015 09:25:14 -0600
+Subject: [PATCH v2 next 1/2] dts: hisi: fixes no syscon error when init
+ mdio
+In-Reply-To: <1449476707-224320-2-git-send-email-yankejian@huawei.com>
+References: <1449476707-224320-1-git-send-email-yankejian@huawei.com>
+ <1449476707-224320-2-git-send-email-yankejian@huawei.com>
+Message-ID: <20151208152514.GA27037@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sahara_dump_descriptors and sahara_dump_links functions attempt
-to print a dma_addr_t value with a 0x%08x format string, which
-produces a warning when dma_addr_t is 64-bit wide:
+On Mon, Dec 07, 2015 at 04:25:06PM +0800, yankejian wrote:
+> Signed-nux start up, we get the log below:
+> "Hi-HNS_MDIO 803c0000.mdio: no syscon hisilicon,peri-c-subctrl
+>  mdio_bus mdio at 803c0000: mdio sys ctl reg has not maped       "
+> 
+> the source code about the subctrl is dealled with syscon, but dts doesn't.
 
-drivers/crypto/sahara.c:419:120: warning: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
+The source...
 
-This changes the code to use the %pad format string that is meant
-for dma_addr_t, which avoids the warning and gives us the correct
-output in all configurations.
+s/dealled/dealt/
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/crypto/sahara.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+> it cause such fault. so this patch adds the syscon info on dts files to
+> fixes it. and it adds documentation for the devicetree bindings used by
 
-diff --git a/drivers/crypto/sahara.c b/drivers/crypto/sahara.c
-index 38bf12ae5589..6c4f91c5e6b3 100644
---- a/drivers/crypto/sahara.c
-+++ b/drivers/crypto/sahara.c
-@@ -416,8 +416,8 @@ static void sahara_dump_descriptors(struct sahara_dev *dev)
- 		return;
- 
- 	for (i = 0; i < SAHARA_MAX_HW_DESC; i++) {
--		dev_dbg(dev->device, "Descriptor (%d) (0x%08x):\n",
--			i, dev->hw_phys_desc[i]);
-+		dev_dbg(dev->device, "Descriptor (%d) (%pad):\n",
-+			i, &dev->hw_phys_desc[i]);
- 		dev_dbg(dev->device, "\thdr = 0x%08x\n", dev->hw_desc[i]->hdr);
- 		dev_dbg(dev->device, "\tlen1 = %u\n", dev->hw_desc[i]->len1);
- 		dev_dbg(dev->device, "\tp1 = 0x%08x\n", dev->hw_desc[i]->p1);
-@@ -437,8 +437,8 @@ static void sahara_dump_links(struct sahara_dev *dev)
- 		return;
- 
- 	for (i = 0; i < SAHARA_MAX_HW_LINK; i++) {
--		dev_dbg(dev->device, "Link (%d) (0x%08x):\n",
--			i, dev->hw_phys_link[i]);
-+		dev_dbg(dev->device, "Link (%d) (%pad):\n",
-+			i, &dev->hw_phys_link[i]);
- 		dev_dbg(dev->device, "\tlen = %u\n", dev->hw_link[i]->len);
- 		dev_dbg(dev->device, "\tp = 0x%08x\n", dev->hw_link[i]->p);
- 		dev_dbg(dev->device, "\tnext = 0x%08x\n",
--- 
-2.1.0.rc2
+Capitalization please.
+
+> DT files of Hisilicon Hip05-D02 development board.
+> 
+> Signed-off-by: yankejian <yankejian@huawei.com>
+> ---
+> change log:
+> v2:
+>  1) updates the related documented in the binding as well
+>  2) use the normal naming conventions using '-' instead of '_'
+> 
+> v1:
+>  initial version
+> ---
+>  .../devicetree/bindings/arm/hisilicon/hisilicon.txt      | 16 ++++++++++++++++
+>  arch/arm64/boot/dts/hisilicon/hip05.dtsi                 |  5 +++++
+>  arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi             |  4 ++--
+>  3 files changed, 23 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> index 6ac7c00..9f05767 100644
+> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> @@ -187,6 +187,22 @@ Example:
+>  		reg = <0xb0000000 0x10000>;
+>  	};
+>  
+> +Hisilicon HiP05 PERISUB system controller
+> +
+> +Required properties:
+> +- compatible : "hisilicon,peri-c-subctrl", "syscon";
+> +- reg : Register address and size
+> +
+> +The HiP05 PERISUB system controller is shared by peripheral controllers in
+> +HiP05 Soc to implement some basic configurations. the peripheral
+> +controllers include mdio, ddr, iic, uart, timer and so on.
+> +
+> +Example:
+> +	/* for HiP05 PCIe-SAS system */
+> +	peri-c-subctrl: sub-ctrl-c at 80000000 {
+
+s/sub-ctrl-c/syscon/
+
+
+> +		compatible = "hisilicon,peri-c-subctrl", "syscon";
+> +		reg = <0x0 0x80000000 0x0 0x10000>;
+> +	};
+>  -----------------------------------------------------------------------
+>  Hisilicon CPU controller
+>  
+> diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
+> index 4ff16d0..5fec740 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hip05.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
+> @@ -246,6 +246,11 @@
+>  			clock-frequency = <200000000>;
+>  		};
+>  
+> +		peri_c_subctrl: sub-ctrl-c at 80000000 {
+> +			compatible = "hisilicon,peri-c-subctrl", "syscon";
+> +			reg = < 0x0 0x80000000 0x0 0x10000>;
+> +		};
+> +
+>  		uart0: uart at 80300000 {
+>  			compatible = "snps,dw-apb-uart";
+>  			reg = <0x0 0x80300000 0x0 0x10000>;
+> diff --git a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi b/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
+> index 606dd5a..da7b6e6 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
+> @@ -10,8 +10,8 @@ soc0: soc at 000000000 {
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  		compatible = "hisilicon,hns-mdio";
+> -		reg = <0x0 0x803c0000 0x0 0x10000
+> -		       0x0 0x80000000 0x0 0x10000>;
+> +		reg = <0x0 0x803c0000 0x0 0x10000>;
+> +		subctrl-vbase = <&peri_c_subctrl>;
+>  
+>  		soc0_phy0: ethernet-phy at 0 {
+>  			reg = <0x0>;
+> -- 
+> 1.9.1
+> 
