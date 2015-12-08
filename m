@@ -1,40 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 08 Dec 2015 16:34:28 +0100
-Subject: [PATCH] dmaengine: at_hdmac: fix dma_addr_t printing
-Message-ID: <24590899.3e2244jrdI@wuerfel>
+Date: Tue, 08 Dec 2015 16:35:51 +0100
+Subject: [PATCH] ASoC: fsl: use correct format string for dma_addr_t
+Message-ID: <1625124.fpu6AsNAkc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent patch tried to improve the printk output of the atc_dump_lli()
-function but introduced a bug, in which we end up dereferencing a
-dma address as a pointer, and we even get a warning for it:
+We get a warning for the imx-pcm-fiq driver when CONFIG_LPAE
+is enabled on ARM, because dma_addr_t is 64-bit then:
 
-drivers/dma/at_hdmac_regs.h: In function 'atc_dump_lli':
-drivers/dma/at_hdmac_regs.h:388:4: warning: format '%p' expects argument of type 'void *', but argument 3 has type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
+sound/soc/fsl/imx-pcm-fiq.c: In function 'snd_imx_pcm_mmap':
+sound/soc/fsl/imx-pcm-fiq.c:223:107: warning: format '%x' expects argument of type 'unsigned int', but argument 6 has type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
 
-This changes the code to pass the DMA address by reference, as expected
-by printk.
+This changes the printk to use the correct format string for
+printing a dma_addr_t.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 096117032a36 ("dmaengine: do not use 0x in front of %pad")
 ---
- drivers/dma/at_hdmac_regs.h | 4 ++--
+ sound/soc/fsl/imx-pcm-fiq.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
-index 610907dbc11a..0474e4a0f02a 100644
---- a/drivers/dma/at_hdmac_regs.h
-+++ b/drivers/dma/at_hdmac_regs.h
-@@ -386,8 +386,8 @@ static void atc_dump_lli(struct at_dma_chan *atchan, struct at_lli *lli)
- {
- 	dev_crit(chan2dev(&atchan->chan_common),
- 		 "  desc: s%pad d%pad ctrl0x%x:0x%x l%pad\n",
--		 lli->saddr, lli->daddr,
--		 lli->ctrla, lli->ctrlb, lli->dscr);
-+		 &lli->saddr, &lli->daddr,
-+		 lli->ctrla, lli->ctrlb, &lli->dscr);
+diff --git a/sound/soc/fsl/imx-pcm-fiq.c b/sound/soc/fsl/imx-pcm-fiq.c
+index 7abf6a079574..49d7513f429e 100644
+--- a/sound/soc/fsl/imx-pcm-fiq.c
++++ b/sound/soc/fsl/imx-pcm-fiq.c
+@@ -220,9 +220,9 @@ static int snd_imx_pcm_mmap(struct snd_pcm_substream *substream,
+ 	ret = dma_mmap_writecombine(substream->pcm->card->dev, vma,
+ 		runtime->dma_area, runtime->dma_addr, runtime->dma_bytes);
+ 
+-	pr_debug("%s: ret: %d %p 0x%08x 0x%08x\n", __func__, ret,
++	pr_debug("%s: ret: %d %p %pad 0x%08x\n", __func__, ret,
+ 			runtime->dma_area,
+-			runtime->dma_addr,
++			&runtime->dma_addr,
+ 			runtime->dma_bytes);
+ 	return ret;
  }
- 
- 
 -- 
 2.1.0.rc2
