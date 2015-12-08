@@ -1,89 +1,71 @@
-From: yankejian@huawei.com (Yankejian (Hackim Yim))
-Date: Tue, 8 Dec 2015 09:45:00 +0800
-Subject: [PATCH RESEND net-next 3/3] arm64: hip05-d02: Document devicetree
- bindings for Hisilicon D02 Board
-In-Reply-To: <56658E36.40702@huawei.com>
-References: <1449302088-53037-1-git-send-email-yankejian@huawei.com>
- <1449302088-53037-4-git-send-email-yankejian@huawei.com>
- <20151207131617.GA25170@rob-hp-laptop> <56658E36.40702@huawei.com>
-Message-ID: <5666361C.3070002@huawei.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 7 Dec 2015 22:53:30 -0300
+Subject: [PATCH] mmc: pwrseq_simple: Fix regression with optional GPIOs
+In-Reply-To: <20151208003213.GU23396@atomide.com>
+References: <1449528845-25189-1-git-send-email-tony@atomide.com>
+ <CAPDyKFpxiOJJdh-nLXjxv3DYJnW3RAf_9aqMfds46=-oqPd5ng@mail.gmail.com>
+ <20151208003213.GU23396@atomide.com>
+Message-ID: <5666381A.1080206@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Tony,
 
-
-On 2015/12/7 21:48, Bintian wrote:
-> On 2015/12/7 21:16, Rob Herring wrote:
->> On Sat, Dec 05, 2015 at 03:54:48PM +0800, yankejian wrote:
->>> This patch adds documentation for the devicetree bindings used by the
->>> DT files of Hisilicon Hip05-D02 development board.
+On 12/07/2015 09:32 PM, Tony Lindgren wrote:
+> * Ulf Hansson <ulf.hansson@linaro.org> [151207 16:20]:
+>> +Linus
+>>
+>> On 7 December 2015 at 23:54, Tony Lindgren <tony@atomide.com> wrote:
+>>> Commit ce037275861e ("mmc: pwrseq_simple: use GPIO descriptors array API")
+>>> changed the handling MMC power sequence so GPIOs no longer are optional.
 >>>
->>> Signed-off-by: yankejian <yankejian@huawei.com>
-> You may need to configure as  "Kejian Yan <yankejian@huawei.com>"     :)
->
-> BR,
->
-> Bintian
-
-agree, thanks
-
-BR,
-Kejian Yan
-
->>> ---
->>>   .../devicetree/bindings/arm/hisilicon/hisilicon.txt      | 16 ++++++++++++++++
->>>   1 file changed, 16 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
->>> index 6ac7c00..5318d78 100644
->>> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
->>> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
->>> @@ -187,6 +187,22 @@ Example:
->>>           reg = <0xb0000000 0x10000>;
->>>       };
->>>   +Hisilicon HiP05 PERISUB system controller
->>> +
->>> +Required properties:
->>> +- compatible : "hisilicon,peri-c-subctrl", "syscon";
->> This should be more specific and have the SOC name in it.
+>>> This broke SDIO WLAN at least for omap5 that can't yet use the reset GPIOs
+>>> with pwrseq_simple as a wait is needed after enabling the SDIO device.
 >>
->>> +- reg : Register address and size
->>> +
->>> +The HiP05 PERISUB system controller is shared by peripheral controllers in
->>> +HiP05 Soc to implement some basic configurations. the peripheral
->>> + controllers include mdio, ddr, iic, uart, timer and so on.
->>> +
->>> +Example:
->>> +    /* for HiP05 PCIe-SAS system */
->>> +    pcie_sas: system_controller at 0xb0000000 {
->>> +        compatible = "hisilicon,pcie-sas-subctrl", "syscon";
->> The example doesn't match.
+>> Can you elaborate on this. Did it break omap5 or not? :-)
+> 
+> Yes it broke WLAN for omap5 that I just got fixed.. It only uses the clocks
+> art of the pwrseq currently because of the delay needed.
+> 
+>> Also, I am interested to know more about the waiting period you need.
+>> I assume that's because of the HW's characteristic?
+> 
+> At least TI wl12xx and Marvell 8787 need a delay after enabling the the WLAN.
+> 
+>> Why can't we have that being described in DT and then make
+>> pwrseq_simple *wait* if needed?
+> 
+> We can, but I'm thinking that we might be better off adding support for
+> regulators to pwrseq. Both TI wl12xx and Marvell 8787 get power from the
+> battery, and probably have an integrated regulator.
+> 
+> Also, the delay and the power up sequencey can be more complicated than what
+> we currently support. In the 8787 case, pdn pin needs to be asserted for 300ms
+> after power pins are stable and while reset is held high.
+> 
+>>> Let's fix the problem by allocating the GPIO values array during init
+>>> depending on the optional GPIOs found.
 >>
-Thanks for this. I have changed this in PATCH V2 already floated.
+>> Certainly it shall be optional! I wonder how I could let that patch
+>> slip through, my bad!
+>
 
-BR
-Kejian Yan
->>> +        reg = <0xb0000000 0x10000>;
->>> +    };
->>>   -----------------------------------------------------------------------
->>>   Hisilicon CPU controller
->>>   -- 
->>> 1.9.1
->>>
->>> -- 
->>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> -- 
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
->>
->> .
->>
+I also wonder how I missed that in my patch, sorry for the mess :(
+ 
+> OK good to hear :)
+> 
+>> Thanks for fixing this!
 >
->
->
-> .
->
+
++1
+
+> No problem, thanks,
+> 
+> Tony
+> 
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
