@@ -1,103 +1,77 @@
-From: boqun.feng@gmail.com (Boqun Feng)
-Date: Tue, 8 Dec 2015 16:42:59 +0800
-Subject: [PATCH] arm64: spinlock: serialise spin_unlock_wait against
- concurrent lockers
-In-Reply-To: <20151207154514.GZ28602@linux.vnet.ibm.com>
-References: <20151204160706.GC28602@linux.vnet.ibm.com>
- <20151204162453.GE15969@arm.com>
- <20151204164446.GF28602@linux.vnet.ibm.com>
- <20151206073712.GA1549@fixme-laptop.cn.ibm.com>
- <20151206192302.GS28602@linux.vnet.ibm.com>
- <20151206232825.GA13845@fixme-laptop.cn.ibm.com>
- <20151207000047.GX28602@linux.vnet.ibm.com>
- <20151207004504.GC13845@fixme-laptop.cn.ibm.com>
- <20151207103455.GO17308@twins.programming.kicks-ass.net>
- <20151207154514.GZ28602@linux.vnet.ibm.com>
-Message-ID: <20151208083956.GA22564@fixme-laptop.cn.ibm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 8 Dec 2015 09:43:58 +0100
+Subject: [linux-sunxi] [PATCH 21/23] staging: mt29f_spinand: switch to
+ mtd_ooblayout_ops
+In-Reply-To: <CAGRGNgV09JJ7+hDVJwZcp89nEsgNS6r2Mo1_R+EEAT9=aR-Z_g@mail.gmail.com>
+References: <1449527178-5930-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1449527178-5930-22-git-send-email-boris.brezillon@free-electrons.com>
+ <CAGRGNgV09JJ7+hDVJwZcp89nEsgNS6r2Mo1_R+EEAT9=aR-Z_g@mail.gmail.com>
+Message-ID: <20151208094358.2be0f191@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 07:45:14AM -0800, Paul E. McKenney wrote:
-> On Mon, Dec 07, 2015 at 11:34:55AM +0100, Peter Zijlstra wrote:
-> > On Mon, Dec 07, 2015 at 08:45:04AM +0800, Boqun Feng wrote:
-> > > > > Or maybe, we introduce another address space of sparse like:
-> > > > > 
-> > > > > 	# define __private	__attribute__((noderef, address_space(6)))
-> > > > > 
-> > > > > and macro to dereference private
-> > > > > 
-> > > > > 	# define private_dereference(p) ((typeof(*p) *) p)
-> > > > > 
-> > > > > and define struct rcu_node like:
-> > > > > 
-> > > > > 	struct rcu_node {
-> > > > > 		raw_spinlock_t __private lock;	/* Root rcu_node's lock protects some */
-> > > > > 		...
-> > > > > 	};
-> > > > > 
-> > > > > and finally raw_spin_{un}lock_rcu_node() like:
-> > > > > 
-> > > > > 	static inline void raw_spin_lock_rcu_node(struct rcu_node *rnp)
-> > > > > 	{
-> > > > > 		raw_spin_lock(private_dereference(&rnp->lock));
-> > > > > 		smp_mb__after_unlock_lock();
-> > > > > 	}
-> > > > > 
-> > > > > 	static inline void raw_spin_unlock_rcu_node(struct rcu_node *rnp)
-> > > > > 	{
-> > > > > 		raw_spin_unlock(private_dereference(&rnp->lock));
-> > > > > 	}
-> > > > > 
-> > > > > This __private mechanism also works for others who wants to private
-> > > > > their fields of struct, which is not supported by C.
-> > > > > 
-> > > > > I will send two patches(one introduces __private and one uses it for
-> > > > > rcu_node->lock) if you think this is not a bad idea ;-)
-> > 
-> > > If rcu_node->lock is the only user then this is probably a bad idea, but
-> > > if others also want to have a way to privatize some fields of the
-> > > structure, this may be not that bad?
-> > 
-> > Thomas might also want this for things like
-> > irq_common_data::state_use_accessors for instance.
+Hi Julian,
 
-Good to know! Thank you, Peter ;-)
+On Tue, 8 Dec 2015 10:59:53 +1100
+Julian Calaby <julian.calaby@gmail.com> wrote:
 
-> > 
-> > And I'm fairly sure there's more out there.
+> Hi Boris,
 > 
-> If Thomas takes it, I will consider also applying it to RCU.
+> On Tue, Dec 8, 2015 at 9:26 AM, Boris Brezillon
+> <boris.brezillon@free-electrons.com> wrote:
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  drivers/staging/mt29f_spinand/mt29f_spinand.c | 44 ++++++++++++++++-----------
+> >  1 file changed, 26 insertions(+), 18 deletions(-)
+> >
+> > diff --git a/drivers/staging/mt29f_spinand/mt29f_spinand.c b/drivers/staging/mt29f_spinand/mt29f_spinand.c
+> > index cb9d5ab..967d50a 100644
+> > --- a/drivers/staging/mt29f_spinand/mt29f_spinand.c
+> > +++ b/drivers/staging/mt29f_spinand/mt29f_spinand.c
+> > @@ -42,23 +42,29 @@ static inline struct spinand_state *mtd_to_state(struct mtd_info *mtd)
+> >  static int enable_hw_ecc;
+> >  static int enable_read_hw_ecc;
+> >
+> > -static struct nand_ecclayout spinand_oob_64 = {
+> > -       .eccbytes = 24,
+> > -       .eccpos = {
+> > -               1, 2, 3, 4, 5, 6,
+> > -               17, 18, 19, 20, 21, 22,
+> > -               33, 34, 35, 36, 37, 38,
+> > -               49, 50, 51, 52, 53, 54, },
+> > -       .oobfree = {
+> > -               {.offset = 8,
+> > -                       .length = 8},
+> > -               {.offset = 24,
+> > -                       .length = 8},
+> > -               {.offset = 40,
+> > -                       .length = 8},
+> > -               {.offset = 56,
+> > -                       .length = 8},
+> > -       }
+> > +static int spinand_oob_64_eccpos(struct mtd_info *mtd, int eccbyte)
+> > +{
+> > +       if (eccbyte > 23)
+> > +               return -ERANGE;
+> > +
+> > +       return ((eccbyte / 6) * 16) + 1;
 > 
+> Are you sure this is correct? My reading of this is that we'd get 1
+> for eccbytes 0 through 5.
+> 
+> Would
+> 
+> ((eccbyte / 6) * 16) + (eccbyte % 6) + 1
+> 
+> be more correct?
 
-Paul, so I played with sparse a little more today, and found out that
-the address_space(6) attribute actually doesn't work here. However, the
-*noderef* attribute does work here, though the warning information is
-not very verbose, as there is no number of the address space, for
-example:
+Absolutely. I'll fix that.
 
-kernel/rcu/tree.c:4453:25: warning: incorrect type in argument 1 (different modifiers)
-kernel/rcu/tree.c:4453:25:    expected struct raw_spinlock [usertype] *lock
-kernel/rcu/tree.c:4453:25:    got struct raw_spinlock [noderef] *<noident>
+Thanks,
 
-In this example, I made rnp->lock __private and wrap *_{lock,unlock}()
-and this warning refers the raw_spin_lock_init() in rcu_init_one(). If
-we really want to privatize ->lock, we'd better also wrap this, I simply
-make an example here.
+Boris
 
-Thoughts?
-
-
-The reason why address_space(6) doesn't work is that it's designed as an
-attribute of a pointer other than any type, and sparse will replace the
-members' address spaces with the address spaces of "parents" (objects of
-that struct).
-
-Regards,
-Boqun
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151208/26bf05fc/attachment.sig>
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
