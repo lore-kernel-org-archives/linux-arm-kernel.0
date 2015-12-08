@@ -1,69 +1,40 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 8 Dec 2015 16:09:26 +0800
-Subject: [PATCH v5 03/21] KVM: ARM64: Add offset defines for PMU registers
-In-Reply-To: <56659DD8.6050109@arm.com>
-References: <1449123091-20252-1-git-send-email-zhaoshenglong@huawei.com>
- <1449123091-20252-4-git-send-email-zhaoshenglong@huawei.com>
- <56659276.6060403@arm.com> <5665984F.30102@linaro.org>
- <56659DD8.6050109@arm.com>
-Message-ID: <56669036.9090606@huawei.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 8 Dec 2015 09:11:17 +0100
+Subject: [PATCH v5 1/4] clk: sunxi: Add H3 clocks support
+In-Reply-To: <1449264283-25360-2-git-send-email-jenskuske@gmail.com>
+References: <1449264283-25360-1-git-send-email-jenskuske@gmail.com>
+ <1449264283-25360-2-git-send-email-jenskuske@gmail.com>
+Message-ID: <20151208081117.GL27957@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Jens,
 
-On 2015/12/7 22:55, Marc Zyngier wrote:
-> On 07/12/15 14:31, Shannon Zhao wrote:
->> > 
->> > 
->> > On 2015/12/7 22:06, Marc Zyngier wrote:
->>> >> On 03/12/15 06:11, Shannon Zhao wrote:
->>>> >>> From: Shannon Zhao <shannon.zhao@linaro.org>
->>>> >>>
->>>> >>> We are about to trap and emulate acccesses to each PMU register
->>> >>
->>> >> s/acccesses/accesses/
->>> >>
->>>> >>> individually. This adds the context offsets for the AArch64 PMU
->>>> >>> registers and their AArch32 counterparts.
->>>> >>>
->>>> >>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->>>> >>> ---
->>>> >>>   arch/arm64/include/asm/kvm_asm.h | 55 ++++++++++++++++++++++++++++++++++++----
->>>> >>>   1 file changed, 50 insertions(+), 5 deletions(-)
->>>> >>>
->>>> >>> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
->>>> >>> index 5e37710..4f804c1 100644
->>>> >>> --- a/arch/arm64/include/asm/kvm_asm.h
->>>> >>> +++ b/arch/arm64/include/asm/kvm_asm.h
->>>> >>> @@ -48,12 +48,34 @@
->>>> >>>   #define MDSCR_EL1	22	/* Monitor Debug System Control Register */
->>>> >>>   #define MDCCINT_EL1	23	/* Monitor Debug Comms Channel Interrupt Enable Reg */
->>>> >>>
->>> >>
->>> >> Coming back to this patch, it gives a clear view of where you have state
->>> >> duplication.
->>> >>
->>>> >>> +/* Performance Monitors Registers */
->>>> >>> +#define PMCR_EL0	24	/* Control Register */
->>>> >>> +#define PMOVSSET_EL0	25	/* Overflow Flag Status Set Register */
->>>> >>> +#define PMOVSCLR_EL0	26	/* Overflow Flag Status Clear Register */
->>> >>
->>> >> This should only be a single state. You don't even have to represent it
->>> >> in the sysreg array, to be honest.
->>> >>
+On Fri, Dec 04, 2015 at 10:24:40PM +0100, Jens Kuske wrote:
+> The H3 clock control unit is similar to the those of other sun8i family
+> members like the A23.
+> 
+> It adds a new bus gates clock similar to the simple gates, but with a
+> different parent clock for each single gate.
+> Some of the gates use the new AHB2 clock as parent, whose clock source
+> is muxable between AHB1 and PLL6/2. The documentation isn't totally clear
+> about which devices belong to AHB2 now, especially USB EHIC/OHIC, so it
+> is mostly based on Allwinner kernel source code.
+> 
+> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
 
-Re-think about this. Since there are different operates to SET/CLR
-registers, maybe it should keep both of them while only storing the
-state in one of them.
+Applied, thanks!
 
-To SET:
-	vcpu_sys_reg(vcpu, r->reg) |= val;
-To CLR:
-	vcpu_sys_reg(vcpu, r->reg) &= ~val;
-
-Or keep one of them and within the access handler, according to the
-operates encoding value to judge whether it's SET or CLR.
+Maxime
 
 -- 
-Shannon
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151208/ad73f984/attachment.sig>
