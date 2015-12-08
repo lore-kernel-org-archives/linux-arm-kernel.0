@@ -1,38 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Dec 2015 12:40:17 +0000
-Subject: [PATCH v3 3/7] arm64: split off early mapping code from
- early_fixmap_init()
-In-Reply-To: <20151203121840.GB28731@leverpostej>
-References: <1447672998-20981-1-git-send-email-ard.biesheuvel@linaro.org>
- <1447672998-20981-4-git-send-email-ard.biesheuvel@linaro.org>
- <20151203121840.GB28731@leverpostej>
-Message-ID: <20151208124016.GH19612@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 08 Dec 2015 12:41:50 +0000
+Subject: [PATCH V2] ARM: SWP emulation: Restore original *data when failed
+In-Reply-To: <20151208104418.GB8644@n2100.arm.linux.org.uk>
+References: <726a7ce88982fba5df84e4d22b083e39b57a6bc6.1444900732.git.shengjiu.wang@freescale.com>
+ <5666AF7D.5000703@arm.com> <20151208104418.GB8644@n2100.arm.linux.org.uk>
+Message-ID: <5666D00E.1000301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 03, 2015 at 12:18:40PM +0000, Mark Rutland wrote:
-> Apologies that it's taken me so long to get around to this...
+On 08/12/15 10:44, Russell King - ARM Linux wrote:
+> On Tue, Dec 08, 2015 at 10:22:53AM +0000, Vladimir Murzin wrote:
+>> On 15/10/15 10:30, Shengjiu Wang wrote:
+>>> __user_swpX_asm maybe failed in first STREX operation, emulate_swpX
+>>> will try again, but the *data has been changed in first time. which
+>>> causes the result is wrong.
+>>> This patch is to fix this issue. When STREX succeed, change the *data.
+>>> if it fail, *data is not changed.
+>>>
+>>> Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
+>>> ---
+>>>  arch/arm/kernel/swp_emulate.c | 6 +++---
+>>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
+>>> index 5b26e7e..c3fe769d 100644
+>>> --- a/arch/arm/kernel/swp_emulate.c
+>>> +++ b/arch/arm/kernel/swp_emulate.c
+>>> @@ -36,10 +36,10 @@
+>>>   */
+>>>  #define __user_swpX_asm(data, addr, res, temp, B)		\
+>>>  	__asm__ __volatile__(					\
+>>> -	"	mov		%2, %1\n"			\
+>>> -	"0:	ldrex"B"	%1, [%3]\n"			\
+>>> -	"1:	strex"B"	%0, %2, [%3]\n"			\
+>>> +	"0:	ldrex"B"	%2, [%3]\n"			\
+>>> +	"1:	strex"B"	%0, %1, [%3]\n"			\
+>>>  	"	cmp		%0, #0\n"			\
+>>> +	"	moveq		%1, %2\n"			\
+>>>  	"	movne		%0, %4\n"			\
+>>>  	"2:\n"							\
+>>>  	"	.section	 .text.fixup,\"ax\"\n"		\
+>>>
+>>
+>> I wonder what is status of this patch? I see that arm64 counterpart has
+>> landed in mainline, but I didn't manage to track down this one - is it
+>> because it never been submitted to patch system?
 > 
-> On Mon, Nov 16, 2015 at 12:23:14PM +0100, Ard Biesheuvel wrote:
-> > This splits off and generalises the population of the statically
-> > allocated fixmap page tables so that we may reuse it later for
-> > the linear mapping once we move the kernel text mapping out of it.
-> > 
-> > This also involves taking into account that table entries at any of
-> > the levels we are populating may have been populated already, since
-> > the fixmap mapping might not be disjoint up to the pgd level anymore
-> > from other early mappings.
+> Most probably.
 > 
-> As a heads-up, for avoiding TLB conflicts, I'm currently working on
-> alternative way of creating the kernel page tables which will definitely
-> conflict here, and may or may not supercede this approach.
 
-Given that the Christmas break is around the corner and your TLB series
-is probably going to take some time to get right, I suggest we persevere
-with Ard's current patch series for 4.5 and merge the TLB conflict solution
-for 4.6. I don't want us to end up in a situation where this is needlessly
-blocked on something that isn't quite ready.
+I've just submitted (on behalf of Shengjiu) it as 8475/1 with assumption
+you have no concerns about the patch.
 
-Any objections? If not, Ard -- can you post a new version of this, please?
-
-Will
+Thanks
+Vladimir
