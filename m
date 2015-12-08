@@ -1,40 +1,66 @@
-From: noamc@ezchip.com (Noam Camus)
-Date: Tue, 8 Dec 2015 15:54:26 +0000
-Subject: [PATCH] net: ezchip: fix address space confusion in nps_enet.c
-In-Reply-To: <33732958.3idC7H2UPT@wuerfel>
-References: <33732958.3idC7H2UPT@wuerfel>
-Message-ID: <DB5PR02MB11413338E829BFCBB7F086AED6080@DB5PR02MB1141.eurprd02.prod.outlook.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 8 Dec 2015 07:57:29 -0800
+Subject: [PATCH] mmc: pwrseq_simple: Fix regression with optional GPIOs
+In-Reply-To: <CAPDyKFrVQ_4u9rYN41w8y+uZwgxSCHZzpPRUTa5RswTkapOFTQ@mail.gmail.com>
+References: <1449528845-25189-1-git-send-email-tony@atomide.com>
+ <CAPDyKFpxiOJJdh-nLXjxv3DYJnW3RAf_9aqMfds46=-oqPd5ng@mail.gmail.com>
+ <20151208003213.GU23396@atomide.com>
+ <CAPDyKFrVQ_4u9rYN41w8y+uZwgxSCHZzpPRUTa5RswTkapOFTQ@mail.gmail.com>
+Message-ID: <20151208155728.GW23396@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From: Arnd Bergmann [mailto:arnd at arndb.de] 
->Sent: Tuesday, December 08, 2015 5:29 PM
->To: David S. Miller
->Cc: Noam Camus; Tal Zilcer; netdev at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->Subject: [PATCH] net: ezchip: fix address space confusion in nps_enet.c
+* Ulf Hansson <ulf.hansson@linaro.org> [151208 05:18]:
+> On 8 December 2015 at 01:32, Tony Lindgren <tony@atomide.com> wrote:
+> > * Ulf Hansson <ulf.hansson@linaro.org> [151207 16:20]:
+> >> +Linus
+> >>
+> >> On 7 December 2015 at 23:54, Tony Lindgren <tony@atomide.com> wrote:
+> >> > Commit ce037275861e ("mmc: pwrseq_simple: use GPIO descriptors array API")
+> >> > changed the handling MMC power sequence so GPIOs no longer are optional.
+> >> >
+> >> > This broke SDIO WLAN at least for omap5 that can't yet use the reset GPIOs
+> >> > with pwrseq_simple as a wait is needed after enabling the SDIO device.
+> >>
+> >> Can you elaborate on this. Did it break omap5 or not? :-)
+> >
+> > Yes it broke WLAN for omap5 that I just got fixed.. It only uses the clocks
+> > art of the pwrseq currently because of the delay needed.
+> >
+> >> Also, I am interested to know more about the waiting period you need.
+> >> I assume that's because of the HW's characteristic?
+> >
+> > At least TI wl12xx and Marvell 8787 need a delay after enabling the the WLAN.
+> >
+> >> Why can't we have that being described in DT and then make
+> >> pwrseq_simple *wait* if needed?
+> >
+> > We can, but I'm thinking that we might be better off adding support for
+> > regulators to pwrseq. Both TI wl12xx and Marvell 8787 get power from the
+> > battery, and probably have an integrated regulator.
+> 
+> Sounds very reasonable! Perhaps some of the delays can be handled
+> within the context of the regulator then!?
 
->The nps_enet driver happily mixes virtual, physical and __iomem addresses, which are all different depending on the architecture and configuration.  That causes a warning when building the code on ARM with LPAE mode enabled:
+Yes that's in the regulator binding. As long as the pwrseq code can sleep
+there's no problem with that.
 
->drivers/net/ethernet/ezchip/nps_enet.c: In function 'nps_enet_send_frame':
->drivers/net/ethernet/ezchip/nps_enet.c:370:13: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+> > Also, the delay and the power up sequencey can be more complicated than what
+> > we currently support. In the 8787 case, pdn pin needs to be asserted for 300ms
+> > after power pins are stable and while reset is held high.
+> 
+> I am for sure open to extend pwrseq_simple, please go ahead!
+> 
+> The initial version provided a proof of concept and the
+> infrastructure. I expect and want people to extend it to suit their
+> HWs.
+> 
+> If we at some point find that pwrseq_simple starts to become too
+> complex, we may add another pwrseq type with a corresponding new
+> compatible string.
 
->but will also fail to work for other reasons.
+Yeah OK I'll take a look when I get a chance.
 
->In this patch, I'm trying to change the code to use only normal kernel pointers, which I assume is what the author actually meant:
+Regards,
 
->* For reading or writing a 32-bit word that may be unaligned when
-> an SKB contains unaligned data, I'm using get_unaligned/put_unaligned()
->  rather than memcpy_fromio/toio.
-
->* For converting a u8 pointer to a u32 pointer, I use a cast rather
->  than the incorrect virt_to_phys.
-
->* For copying a couple of bytes from one place to another while respecting
- > alignment, I use memcpy instead of memcpy_toio.
-
->Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-I have tested it on my simulator environment and driver compiles cleanly and runs happily without any problem.
-Thank you.
-
-Acked-by Noam Camus <noamc@ezchip.com>
+Tony
