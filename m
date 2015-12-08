@@ -1,124 +1,242 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Tue,  8 Dec 2015 15:03:03 +0800
-Subject: [PATCH v4] acpi, apei, arm64: APEI initial support for aarch64.
-Message-ID: <1449558183-12259-1-git-send-email-fu.wei@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 08 Dec 2015 16:17:00 +0900
+Subject: [PATCH v4 3/8] ARM: dts: Exynos5420: add CPU OPP properties
+In-Reply-To: <1449512300-17230-4-git-send-email-b.zolnierkie@samsung.com>
+References: <1449512300-17230-1-git-send-email-b.zolnierkie@samsung.com>
+ <1449512300-17230-4-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <566683EC.9050806@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+On 08.12.2015 03:18, Bartlomiej Zolnierkiewicz wrote:
+> From: Thomas Abraham <thomas.ab@samsung.com>
+> 
+> For Exynos5420 platforms, add CPU operating points for
+> migrating from Exynos specific cpufreq driver to using
+> generic cpufreq driver.
+> 
+> Changes by Bartlomiej:
+> - split Exynos5420 support from the original patch
+> 
+> Changes by Ben Gamari:
+> - Port to operating-points-v2
+> 
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Doug Anderson <dianders@chromium.org>
+> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Cc: Andreas Faerber <afaerber@suse.de>
+> Cc: Sachin Kamat <sachin.kamat@linaro.org>
 
-This commit provides APEI arch-specific bits for aarch64
+Sachin's address does not work neither.
 
-Meanwhile, add a new subfunction "hest_ia_init" for
-"acpi_disable_cmcff" which is used by IA-32 Architecture
-Corrected Machine Check (CMC).
+> Cc: Thomas Abraham <thomas.ab@samsung.com>
 
-Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-Tested-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
----
-Changelog:
-v4: Rebase to latest kernel version(4.4-rc4).
-    Move arch_apei_flush_tlb_one into header file as a inline function
-    Add a new subfunction "hest_ia_init" for "acpi_disable_cmcff".
+Thomas' SoB disappeared.
 
-v3: https://lkml.org/lkml/2015/12/3/521
-    Remove "acpi_disable_cmcff" from arm64 code,
-    and wrap it in hest.c by "#if defined(__i386__) || defined(__x86_64__)"
+I see that you directly re-used Thomas' values for voltages and
+frequencies. For Exynos5420 we could go down to 200 MHz (for both cores)
+but this can be fine-tuned per-board later.
 
-v2: https://lkml.org/lkml/2015/12/2/432
-    Rebase to latest kernel version(4.4-rc3).
-    Move arch_apei_flush_tlb_one() to arch/arm64/kernel/acpi.c
+Best regards,
+Krzysztof
 
-v1: https://lkml.org/lkml/2015/8/14/199
-    Move arch_apei_flush_tlb_one() to arch/arm64/include/asm/apci.h.
-    Delete arch/arm64/kernel/apei.c.
-    Add "#ifdef CONFIG_ACPI_APEI" for "acpi_disable_cmcff".
 
- arch/arm64/Kconfig            |  1 +
- arch/arm64/include/asm/acpi.h |  5 +++++
- drivers/acpi/apei/hest.c      | 19 ++++++++++++++++---
- 3 files changed, 22 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 871f217..58c8992 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -3,6 +3,7 @@ config ARM64
- 	select ACPI_CCA_REQUIRED if ACPI
- 	select ACPI_GENERIC_GSI if ACPI
- 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
-+	select HAVE_ACPI_APEI if ACPI
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_HAS_ELF_RANDOMIZE
- 	select ARCH_HAS_GCOV_PROFILE_ALL
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index caafd63..31d3d9a 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -17,6 +17,7 @@
- 
- #include <asm/cputype.h>
- #include <asm/smp_plat.h>
-+#include <asm/tlbflush.h>
- 
- /* Macros for consistency checks of the GICC subtable of MADT */
- #define ACPI_MADT_GICC_LENGTH	\
-@@ -94,6 +95,10 @@ static inline const char *acpi_get_enable_method(int cpu)
- 
- #ifdef	CONFIG_ACPI_APEI
- pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
-+static inline void arch_apei_flush_tlb_one(unsigned long addr)
-+{
-+	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
-+}
- #endif
- 
- #endif /*_ASM_ACPI_H*/
-diff --git a/drivers/acpi/apei/hest.c b/drivers/acpi/apei/hest.c
-index 20b3fcf..715c58b 100644
---- a/drivers/acpi/apei/hest.c
-+++ b/drivers/acpi/apei/hest.c
-@@ -117,15 +117,27 @@ int apei_hest_parse(apei_hest_func_t func, void *data)
- }
- EXPORT_SYMBOL_GPL(apei_hest_parse);
- 
-+#if defined(__i386__) || defined(__x86_64__)
- /*
-  * Check if firmware advertises firmware first mode. We need FF bit to be set
-  * along with a set of MC banks which work in FF mode.
-  */
- static int __init hest_parse_cmc(struct acpi_hest_header *hest_hdr, void *data)
- {
--	return arch_apei_enable_cmcff(hest_hdr, data);
-+	if (!acpi_disable_cmcff)
-+		return !arch_apei_enable_cmcff(hest_hdr, data);
-+
-+	return 0;
- }
- 
-+static inline int __init hest_ia_init(void)
-+{
-+	return apei_hest_parse(hest_parse_cmc, NULL);
-+}
-+#else
-+static inline int __init hest_ia_init(void) { return 0; }
-+#endif
-+
- struct ghes_arr {
- 	struct platform_device **ghes_devs;
- 	unsigned int count;
-@@ -232,8 +244,9 @@ void __init acpi_hest_init(void)
- 		goto err;
- 	}
- 
--	if (!acpi_disable_cmcff)
--		apei_hest_parse(hest_parse_cmc, NULL);
-+	rc = hest_ia_init();
-+	if (rc)
-+		goto err;
- 
- 	if (!ghes_disable) {
- 		rc = apei_hest_parse(hest_parse_ghes_count, &ghes_count);
--- 
-2.5.0
+> Signed-off-by: Ben Gamari <ben@smart-cactus.org>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5420.dtsi | 122 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 122 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+> index 48a0a55..f8f70a5 100644
+> --- a/arch/arm/boot/dts/exynos5420.dtsi
+> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+> @@ -50,6 +50,116 @@
+>  		usbdrdphy1 = &usbdrd_phy1;
+>  	};
+>  
+> +	cpu0_opp_table: opp_table0 {
+> +		compatible = "operating-points-v2";
+> +		opp-shared;
+> +		opp00 at 1800000000 {
+> +			opp-hz = /bits/ 64 <1800000000>;
+> +			opp-microvolt = <1250000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp01 at 1700000000 {
+> +			opp-hz = /bits/ 64 <1700000000>;
+> +			opp-microvolt = <1212500>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp02 at 1600000000 {
+> +			opp-hz = /bits/ 64 <1600000000>;
+> +			opp-microvolt = <1175000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp03 at 1500000000 {
+> +			opp-hz = /bits/ 64 <1500000000>;
+> +			opp-microvolt = <1137500>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp04 at 1400000000 {
+> +			opp-hz = /bits/ 64 <1400000000>;
+> +			opp-microvolt = <1112500>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp05 at 1300000000 {
+> +			opp-hz = /bits/ 64 <1300000000>;
+> +			opp-microvolt = <1062500>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp06 at 1200000000 {
+> +			opp-hz = /bits/ 64 <1200000000>;
+> +			opp-microvolt = <1037500>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp07 at 1100000000 {
+> +			opp-hz = /bits/ 64 <1100000000>;
+> +			opp-microvolt = <1012500>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp08 at 1000000000 {
+> +			opp-hz = /bits/ 64 <1000000000>;
+> +			opp-microvolt = < 987500>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp09 at 900000000 {
+> +			opp-hz = /bits/ 64 <900000000>;
+> +			opp-microvolt = < 962500>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp10 at 800000000 {
+> +			opp-hz = /bits/ 64 <800000000>;
+> +			opp-microvolt = < 937500>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp11 at 700000000 {
+> +			opp-hz = /bits/ 64 <700000000>;
+> +			opp-microvolt = < 912500>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +	};
+> +
+> +	cpu1_opp_table: opp_table1 {
+> +		compatible = "operating-points-v2";
+> +		opp-shared;
+> +		opp00 at 1300000000 {
+> +			opp-hz = /bits/ 64 <1300000000>;
+> +			opp-microvolt = <1275000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp01 at 1200000000 {
+> +			opp-hz = /bits/ 64 <1200000000>;
+> +			opp-microvolt = <1212500>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp02 at 1100000000 {
+> +			opp-hz = /bits/ 64 <1100000000>;
+> +			opp-microvolt = <1162500>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp03 at 1000000000 {
+> +			opp-hz = /bits/ 64 <1000000000>;
+> +			opp-microvolt = <1112500>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp04 at 900000000 {
+> +			opp-hz = /bits/ 64 <900000000>;
+> +			opp-microvolt = <1062500>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp05 at 800000000 {
+> +			opp-hz = /bits/ 64 <800000000>;
+> +			opp-microvolt = <1025000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp06 at 700000000 {
+> +			opp-hz = /bits/ 64 <700000000>;
+> +			opp-microvolt = <975000>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +		opp07 at 600000000 {
+> +			opp-hz = /bits/ 64 <600000000>;
+> +			opp-microvolt = <937500>;
+> +			clock-latency-ns = <140000>;
+> +		};
+> +	};
+> +
+>  	cpus {
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> @@ -58,8 +168,11 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a15";
+>  			reg = <0x0>;
+> +			clocks = <&clock CLK_ARM_CLK>;
+> +			clock-names = "cpu-cluster.0";
+>  			clock-frequency = <1800000000>;
+>  			cci-control-port = <&cci_control1>;
+> +			operating-points-v2 = <&cpu0_opp_table>;
+>  		};
+>  
+>  		cpu1: cpu at 1 {
+> @@ -68,6 +181,7 @@
+>  			reg = <0x1>;
+>  			clock-frequency = <1800000000>;
+>  			cci-control-port = <&cci_control1>;
+> +			operating-points-v2 = <&cpu0_opp_table>;
+>  		};
+>  
+>  		cpu2: cpu at 2 {
+> @@ -76,6 +190,7 @@
+>  			reg = <0x2>;
+>  			clock-frequency = <1800000000>;
+>  			cci-control-port = <&cci_control1>;
+> +			operating-points-v2 = <&cpu0_opp_table>;
+>  		};
+>  
+>  		cpu3: cpu at 3 {
+> @@ -84,14 +199,18 @@
+>  			reg = <0x3>;
+>  			clock-frequency = <1800000000>;
+>  			cci-control-port = <&cci_control1>;
+> +			operating-points-v2 = <&cpu0_opp_table>;
+>  		};
+>  
+>  		cpu4: cpu at 100 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a7";
+>  			reg = <0x100>;
+> +			clocks = <&clock CLK_KFC_CLK>;
+> +			clock-names = "cpu-cluster.1";
+>  			clock-frequency = <1000000000>;
+>  			cci-control-port = <&cci_control0>;
+> +			operating-points-v2 = <&cpu1_opp_table>;
+>  		};
+>  
+>  		cpu5: cpu at 101 {
+> @@ -100,6 +219,7 @@
+>  			reg = <0x101>;
+>  			clock-frequency = <1000000000>;
+>  			cci-control-port = <&cci_control0>;
+> +			operating-points-v2 = <&cpu1_opp_table>;
+>  		};
+>  
+>  		cpu6: cpu at 102 {
+> @@ -108,6 +228,7 @@
+>  			reg = <0x102>;
+>  			clock-frequency = <1000000000>;
+>  			cci-control-port = <&cci_control0>;
+> +			operating-points-v2 = <&cpu1_opp_table>;
+>  		};
+>  
+>  		cpu7: cpu at 103 {
+> @@ -116,6 +237,7 @@
+>  			reg = <0x103>;
+>  			clock-frequency = <1000000000>;
+>  			cci-control-port = <&cci_control0>;
+> +			operating-points-v2 = <&cpu1_opp_table>;
+>  		};
+>  	};
+>  
+> 
