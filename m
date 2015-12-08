@@ -1,71 +1,109 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 7 Dec 2015 22:53:30 -0300
-Subject: [PATCH] mmc: pwrseq_simple: Fix regression with optional GPIOs
-In-Reply-To: <20151208003213.GU23396@atomide.com>
-References: <1449528845-25189-1-git-send-email-tony@atomide.com>
- <CAPDyKFpxiOJJdh-nLXjxv3DYJnW3RAf_9aqMfds46=-oqPd5ng@mail.gmail.com>
- <20151208003213.GU23396@atomide.com>
-Message-ID: <5666381A.1080206@osg.samsung.com>
+From: xuejiancheng@huawei.com (xuejiancheng)
+Date: Tue, 8 Dec 2015 09:55:35 +0800
+Subject: [PATCH v2 3/9] ARM: hisi: enable Hi3519 soc
+In-Reply-To: <2329688.AAaHl8K2Zb@wuerfel>
+References: <1449110565-23590-1-git-send-email-xuejiancheng@huawei.com>
+ <43938749.Z0h4RNddN6@wuerfel> <56652E06.10309@huawei.com>
+ <2329688.AAaHl8K2Zb@wuerfel>
+Message-ID: <56663897.7040901@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tony,
 
-On 12/07/2015 09:32 PM, Tony Lindgren wrote:
-> * Ulf Hansson <ulf.hansson@linaro.org> [151207 16:20]:
->> +Linus
->>
->> On 7 December 2015 at 23:54, Tony Lindgren <tony@atomide.com> wrote:
->>> Commit ce037275861e ("mmc: pwrseq_simple: use GPIO descriptors array API")
->>> changed the handling MMC power sequence so GPIOs no longer are optional.
+
+On 2015/12/7 17:46, Arnd Bergmann wrote:
+> On Monday 07 December 2015 14:58:14 xuejiancheng wrote:
+>> On 2015/12/5 5:54, Arnd Bergmann wrote:
+>>> On Friday 04 December 2015 12:07:58 xuejiancheng wrote:
+>>>> On 2015/12/3 17:40, Arnd Bergmann wrote:
+>>>>> On Thursday 03 December 2015 10:42:45 Jiancheng Xue wrote:
+>>>>>> --- a/arch/arm/mach-hisi/Kconfig
+>>>>>> +++ b/arch/arm/mach-hisi/Kconfig
+>>>>>> @@ -12,6 +12,14 @@ if ARCH_HISI
+>>>>>>  
+>>>>>>  menu "Hisilicon platform type"
+>>>>>>  
+>>>>>> +config ARCH_HI3519
+>>>>>> +       bool "Hisilicon Hi3519 Soc" if ARCH_MULTI_V7
+>>>>>> +       select HAVE_ARM_ARCH_TIMER
+>>>>>> +       select ARCH_HAS_RESET_CONTROLLER
+>>>>>> +
+>>>>>> +       help
+>>>>>> +         Support for Hisilicon Hi3519 Soc
+>>>>>> +
+>>>>>>  config ARCH_HI3xxx
+>>>>>>         bool "Hisilicon Hi36xx family" if ARCH_MULTI_V7
+>>>>>>         select CACHE_L2X0
+>>>>>
+>>>>> Do those need to be separate? I would just extend the Hi36xx
+>>>>> to cover all Hi3xxx, if nothing in the platform code really
+>>>>> depends on this.
+>>>>
+>>>> For HI3519, there is really no special platform code. But HI35xx and HI36xx soc families
+>>>> belong to different product lines in hisilicon. HI35xx family also composes of various
+>>>> architectures socs(single core, smp and big-little). So I think it may be clear to have
+>>>> separate arch definitions.
+>>>>
+>>>> Could you give me more suggestions about this?  Thank you!
 >>>
->>> This broke SDIO WLAN at least for omap5 that can't yet use the reset GPIOs
->>> with pwrseq_simple as a wait is needed after enabling the SDIO device.
+>>> For the most part, you already need to enable the device drivers for the
+>>> specific components on each chip, and the per-soc top-level options here
+>>> don't actually control the compilation of any particular code.
+>>>
+>>> This is slightly different for some of the older platforms that for historic
+>>> reasons need fine-grained options. You could probably just make the device
+>>> drivers depend on "ARCH_HISI || COMPILE_TEST" in general, but some level
+>>> of classification is ok, in particular when the chips are not related at all.
+>>>
+>>> In this case, my impression is that while HI3519 and HI36xx are made
+>>> by different business units, there is still a noticeable amount of shared
+>>> IP in them (e.g. the "sysctrl" node that seems to be shared with some of
+>>> the other chips as well), so grouping them together should make sense.
 >>
->> Can you elaborate on this. Did it break omap5 or not? :-)
-> 
-> Yes it broke WLAN for omap5 that I just got fixed.. It only uses the clocks
-> art of the pwrseq currently because of the delay needed.
-> 
->> Also, I am interested to know more about the waiting period you need.
->> I assume that's because of the HW's characteristic?
-> 
-> At least TI wl12xx and Marvell 8787 need a delay after enabling the the WLAN.
-> 
->> Why can't we have that being described in DT and then make
->> pwrseq_simple *wait* if needed?
-> 
-> We can, but I'm thinking that we might be better off adding support for
-> regulators to pwrseq. Both TI wl12xx and Marvell 8787 get power from the
-> battery, and probably have an integrated regulator.
-> 
-> Also, the delay and the power up sequencey can be more complicated than what
-> we currently support. In the 8787 case, pdn pin needs to be asserted for 300ms
-> after power pins are stable and while reset is held high.
-> 
->>> Let's fix the problem by allocating the GPIO values array during init
->>> depending on the optional GPIOs found.
+>> HI35xx and HI36xx are designed totally independently, including IP selection.
+>> The relation between HI35xx and HI36xx is just like the one between HI36xx
+>> and HIP0x. In another word, HI35xx and HI36xx are not related except they all
+>> belong to hisilicon. So I don't think it's proper to group them together.
 >>
->> Certainly it shall be optional! I wonder how I could let that patch
->> slip through, my bad!
->
-
-I also wonder how I missed that in my patch, sorry for the mess :(
- 
-> OK good to hear :)
+>> Is it OK if I drop ARCH_HI3519 and use ARCH_HISI directly?
 > 
->> Thanks for fixing this!
->
+> I think we should come up with a way to handle this in general for
+> ARCH_HISI. It's not problem to have a couple of sub-options, but I'd
+> rather not have one for each SoC because I'm sure that hisilicon has
+> made dozens or possibly hundreds of ARM based SoCs that belong into
+> a couple of families.
 
-+1
+Agree with you.
 
-> No problem, thanks,
 > 
-> Tony
+> The individual selection of IP blocks is not that important, because
+> those tend to just be generic device drivers that we can enable on
+> any platform using the defconfig files.
+> 
+> You said that ARCH_HI3519 and HIP04 have an identical system controller,
+> but it's different for Hi36xx, correct?
+
+No. The system controller of HI3519 is also different from HIP04. Maybe I gave you
+wrong descriptions. Sorry about that.
+
+> 
+> So maybe we can generalize the HIP04 option to include all chips with
+> that system controller as they appear to share a common ancestry regardless
+> of the target market?
 > 
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+I agree that we generalize some options regardless of the product line and target market.
+
+> The Hi35xx family includes some rather older chips as well based on ARM9
+> etc, correct? Are they closely related to the new one as well, or do they
+> just share the name?
+
+Yes. It's correct. They may share some IP blocks. But they may be very different
+from the new one for the arch code. I also don't think it's a good idea to make
+them share the same name.
+
+> 
+> 	Arnd
+> 
+> .
+> 
