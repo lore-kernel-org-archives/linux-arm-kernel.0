@@ -1,23 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 08 Dec 2015 11:03:51 +0100
-Subject: [PATCH v5 3/4] arm64: mm: support ARCH_MMAP_RND_BITS.
-In-Reply-To: <5665CF5A.1090207@android.com>
-References: <1449000658-11475-1-git-send-email-dcashman@android.com>
- <1720878.JdEcLd8bhL@wuerfel> <5665CF5A.1090207@android.com>
-Message-ID: <7610963.Sys3aageLY@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 8 Dec 2015 11:06:43 +0100
+Subject: [PATCH resend 6/6] ARM: dts: sun7i: Add VE (Video Engine) module
+ clock node
+In-Reply-To: <1449321407-4531-7-git-send-email-wens@csie.org>
+References: <1449321407-4531-1-git-send-email-wens@csie.org>
+ <1449321407-4531-7-git-send-email-wens@csie.org>
+Message-ID: <20151208100643.GR27957@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 07 December 2015 10:26:34 Daniel Cashman wrote:
-> > Ideally we'd remove the #ifdef around the mmap_rnd_compat_bits declaration
-> > and change this code to use
-> > 
-> >       if (IS_ENABLED(CONFIG_COMPAT) && test_thread_flag(TIF_32BIT))
-> > 
-> That would result in "undefined reference to mmap_rnd_compat_bits" in
-> the not-defined case, no?
+On Sat, Dec 05, 2015 at 09:16:47PM +0800, Chen-Yu Tsai wrote:
+> The video engine has its own module clock, which also includes a
+> reset control for it.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-No. The compiler eliminates all code paths that it knows are unused.
-The IS_ENABLED() macro is designed to let the compiler figure this out.
+Applied, thanks!
+Maxime
 
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151208/67d69796/attachment.sig>
