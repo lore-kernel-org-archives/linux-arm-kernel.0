@@ -1,115 +1,53 @@
-From: xuejiancheng@huawei.com (xuejiancheng)
-Date: Tue, 8 Dec 2015 11:03:20 +0800
-Subject: [PATCH v2 3/9] ARM: hisi: enable Hi3519 soc
-In-Reply-To: <56663897.7040901@huawei.com>
-References: <1449110565-23590-1-git-send-email-xuejiancheng@huawei.com>
- <43938749.Z0h4RNddN6@wuerfel> <56652E06.10309@huawei.com>
- <2329688.AAaHl8K2Zb@wuerfel> <56663897.7040901@huawei.com>
-Message-ID: <56664878.8040805@huawei.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 7 Dec 2015 19:13:06 -0800
+Subject: [GIT PULL] MTD/NAND cleanups for v4.5
+Message-ID: <20151208031306.GP120110@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+Per discussion with Arnd, I plan to pull these into the MTD tree for
+4.5, but you should probably have them too.
 
-On 2015/12/8 9:55, xuejiancheng wrote:
-> 
-> 
-> On 2015/12/7 17:46, Arnd Bergmann wrote:
->> On Monday 07 December 2015 14:58:14 xuejiancheng wrote:
->>> On 2015/12/5 5:54, Arnd Bergmann wrote:
->>>> On Friday 04 December 2015 12:07:58 xuejiancheng wrote:
->>>>> On 2015/12/3 17:40, Arnd Bergmann wrote:
->>>>>> On Thursday 03 December 2015 10:42:45 Jiancheng Xue wrote:
->>>>>>> --- a/arch/arm/mach-hisi/Kconfig
->>>>>>> +++ b/arch/arm/mach-hisi/Kconfig
->>>>>>> @@ -12,6 +12,14 @@ if ARCH_HISI
->>>>>>>  
->>>>>>>  menu "Hisilicon platform type"
->>>>>>>  
->>>>>>> +config ARCH_HI3519
->>>>>>> +       bool "Hisilicon Hi3519 Soc" if ARCH_MULTI_V7
->>>>>>> +       select HAVE_ARM_ARCH_TIMER
->>>>>>> +       select ARCH_HAS_RESET_CONTROLLER
->>>>>>> +
->>>>>>> +       help
->>>>>>> +         Support for Hisilicon Hi3519 Soc
->>>>>>> +
->>>>>>>  config ARCH_HI3xxx
->>>>>>>         bool "Hisilicon Hi36xx family" if ARCH_MULTI_V7
->>>>>>>         select CACHE_L2X0
->>>>>>
->>>>>> Do those need to be separate? I would just extend the Hi36xx
->>>>>> to cover all Hi3xxx, if nothing in the platform code really
->>>>>> depends on this.
->>>>>
->>>>> For HI3519, there is really no special platform code. But HI35xx and HI36xx soc families
->>>>> belong to different product lines in hisilicon. HI35xx family also composes of various
->>>>> architectures socs(single core, smp and big-little). So I think it may be clear to have
->>>>> separate arch definitions.
->>>>>
->>>>> Could you give me more suggestions about this?  Thank you!
->>>>
->>>> For the most part, you already need to enable the device drivers for the
->>>> specific components on each chip, and the per-soc top-level options here
->>>> don't actually control the compilation of any particular code.
->>>>
->>>> This is slightly different for some of the older platforms that for historic
->>>> reasons need fine-grained options. You could probably just make the device
->>>> drivers depend on "ARCH_HISI || COMPILE_TEST" in general, but some level
->>>> of classification is ok, in particular when the chips are not related at all.
->>>>
->>>> In this case, my impression is that while HI3519 and HI36xx are made
->>>> by different business units, there is still a noticeable amount of shared
->>>> IP in them (e.g. the "sysctrl" node that seems to be shared with some of
->>>> the other chips as well), so grouping them together should make sense.
->>>
->>> HI35xx and HI36xx are designed totally independently, including IP selection.
->>> The relation between HI35xx and HI36xx is just like the one between HI36xx
->>> and HIP0x. In another word, HI35xx and HI36xx are not related except they all
->>> belong to hisilicon. So I don't think it's proper to group them together.
->>>
->>> Is it OK if I drop ARCH_HI3519 and use ARCH_HISI directly?
->>
->> I think we should come up with a way to handle this in general for
->> ARCH_HISI. It's not problem to have a couple of sub-options, but I'd
->> rather not have one for each SoC because I'm sure that hisilicon has
->> made dozens or possibly hundreds of ARM based SoCs that belong into
->> a couple of families.
-> 
-> Agree with you.
-> 
->>
->> The individual selection of IP blocks is not that important, because
->> those tend to just be generic device drivers that we can enable on
->> any platform using the defconfig files.
->>
->> You said that ARCH_HI3519 and HIP04 have an identical system controller,
->> but it's different for Hi36xx, correct?
-> 
-> No. The system controller of HI3519 is also different from HIP04. Maybe I gave you
-> wrong descriptions. Sorry about that.
-> 
->>
->> So maybe we can generalize the HIP04 option to include all chips with
->> that system controller as they appear to share a common ancestry regardless
->> of the target market?
->>
-> 
-> I agree that we generalize some options regardless of the product line and target market.
-> 
->> The Hi35xx family includes some rather older chips as well based on ARM9
->> etc, correct? Are they closely related to the new one as well, or do they
->> just share the name?
-> 
-> Yes. It's correct. They may share some IP blocks. But they may be very different
-> from the new one for the arch code. I also don't think it's a good idea to make
-> them share the same name.
+Full series posted here:
 
-I will use ARCH_HISI instead of ARCH_HI3519.
+http://lists.infradead.org/pipermail/linux-mtd/2015-December/063828.html
 
-> 
->>
->> 	Arnd
->>
->> .
->>
+FYI, I got Arnd's 'ack' to take this one solely via MTD, since it's
+unlikely to get conflicts:
+
+http://lists.infradead.org/pipermail/linux-mtd/2015-December/063840.html
+
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mtd.git tags/arm-soc/for-4.5/cleanup
+
+for you to fetch changes up to c993e09504fca192bac4ac3f5a3411ac68cba2e6:
+
+  ARM: nand: make use of mtd_to_nand() where appropriate (2015-12-07 18:58:20 -0800)
+
+----------------------------------------------------------------
+Two changes for NAND/MTD refactoring. The mtd_to_nand() helper will allow us to
+stop using mtd->priv for NAND drivers.
+
+----------------------------------------------------------------
+Boris BREZILLON (2):
+      mtd: nand: add an mtd_to_nand() helper
+      ARM: nand: make use of mtd_to_nand() where appropriate
+
+ arch/arm/mach-ep93xx/snappercl15.c   | 4 ++--
+ arch/arm/mach-ep93xx/ts72xx.c        | 4 ++--
+ arch/arm/mach-imx/mach-qong.c        | 2 +-
+ arch/arm/mach-ixp4xx/ixdp425-setup.c | 2 +-
+ arch/arm/mach-omap1/board-nand.c     | 2 +-
+ arch/arm/mach-orion5x/ts78xx-setup.c | 6 +++---
+ arch/arm/mach-pxa/balloon3.c         | 2 +-
+ arch/arm/mach-pxa/em-x270.c          | 2 +-
+ arch/arm/mach-pxa/palmtx.c           | 2 +-
+ include/linux/mtd/nand.h             | 5 +++++
+ 10 files changed, 18 insertions(+), 13 deletions(-)
