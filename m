@@ -1,147 +1,60 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 07 Dec 2015 18:18:56 -0800
-Subject: [PATCH v3 06/22] arm64: KVM: Implement timer save/restore
-In-Reply-To: <1449485618-9443-7-git-send-email-marc.zyngier@arm.com>
-References: <1449485618-9443-1-git-send-email-marc.zyngier@arm.com>
- <1449485618-9443-7-git-send-email-marc.zyngier@arm.com>
-Message-ID: <56663E10.2010108@samsung.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 8 Dec 2015 00:30:59 -0200
+Subject: [PATCH 2/3] doc: dt-binding: generic onboard USB HUB
+In-Reply-To: <1449538670-7954-3-git-send-email-peter.chen@freescale.com>
+References: <1449538670-7954-1-git-send-email-peter.chen@freescale.com>
+ <1449538670-7954-3-git-send-email-peter.chen@freescale.com>
+Message-ID: <CAOMZO5DfBW3hxp5odbefLQCmkocPy=LypVW5HJWzDkF__WD_sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 12/7/2015 2:53 AM, Marc Zyngier wrote:
-> Implement the timer save restore as a direct translation of
-> the assembly code version.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Mon, Dec 7, 2015 at 11:37 PM, Peter Chen <peter.chen@freescale.com> wrote:
+> Add dt-binding documentation for generic onboard USB HUB.
+>
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
 > ---
->  arch/arm64/kvm/hyp/Makefile          |  1 +
->  arch/arm64/kvm/hyp/hyp.h             |  3 ++
->  arch/arm64/kvm/hyp/timer-sr.c        | 72 ++++++++++++++++++++++++++++++++++++
->  include/clocksource/arm_arch_timer.h |  6 +++
->  4 files changed, 82 insertions(+)
->  create mode 100644 arch/arm64/kvm/hyp/timer-sr.c
-> 
-> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-> index d1e38ce..455dc0a 100644
-> --- a/arch/arm64/kvm/hyp/Makefile
-> +++ b/arch/arm64/kvm/hyp/Makefile
-> @@ -4,3 +4,4 @@
->  
->  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
-> +obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
-> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
-> index 5759f9f..f213e46 100644
-> --- a/arch/arm64/kvm/hyp/hyp.h
-> +++ b/arch/arm64/kvm/hyp/hyp.h
-> @@ -35,5 +35,8 @@ void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
->  void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
->  void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
->  
-> +void __timer_save_state(struct kvm_vcpu *vcpu);
-> +void __timer_restore_state(struct kvm_vcpu *vcpu);
-> +
->  #endif /* __ARM64_KVM_HYP_H__ */
->  
-> diff --git a/arch/arm64/kvm/hyp/timer-sr.c b/arch/arm64/kvm/hyp/timer-sr.c
+>  .../bindings/usb/generic-onboard-hub.txt           | 28 ++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/generic-onboard-hub.txt
+>
+> diff --git a/Documentation/devicetree/bindings/usb/generic-onboard-hub.txt b/Documentation/devicetree/bindings/usb/generic-onboard-hub.txt
 > new file mode 100644
-> index 0000000..67292c0
+> index 0000000..ea92205
 > --- /dev/null
-> +++ b/arch/arm64/kvm/hyp/timer-sr.c
-> @@ -0,0 +1,72 @@
-> +/*
-> + * Copyright (C) 2012-2015 - ARM Ltd
-> + * Author: Marc Zyngier <marc.zyngier@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
+> +++ b/Documentation/devicetree/bindings/usb/generic-onboard-hub.txt
+> @@ -0,0 +1,28 @@
+> +Generic Onboard USB HUB
 > +
-> +#include <clocksource/arm_arch_timer.h>
-> +#include <linux/compiler.h>
-> +#include <linux/kvm_host.h>
+> +Required properties:
+> +- compatible: should be "generic-onboard-hub"
 > +
-> +#include <asm/kvm_mmu.h>
+> +Optional properties:
+> +- clocks: the input clock for HUB.
 > +
-> +#include "hyp.h"
+> +- clock-names: Should be "external_clk"
 > +
-> +/* vcpu is already in the HYP VA space */
-> +void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
-> +{
-> +	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
-> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> +	u64 val;
+> +- hub-reset-gpios: Should specify the GPIO for reset.
 > +
-> +	if (kvm->arch.timer.enabled) {
-> +		timer->cntv_ctl = read_sysreg(cntv_ctl_el0);
-> +		isb();
+> +- hub-reset-active-high: the active reset signal is high, if this property is
+> +  not set, the active reset signal is low.
+> +
+> +- hub-reset-duration-us: the duration for assert reset signal, the time unit
+> +  is microsecond.
+> +
+> +Example:
+> +
+> +       usb_hub1 {
+> +               compatible = "generic-onboard-hub";
+> +               clocks = <&clks IMX6QDL_CLK_CKO>;
+> +               clock-names = "external_clk";
+> +               hub-reset-gpios = <&gpio7 12 0>;
+> +               hub-reset-active-high;
 
-Can you share the subtle insight why is the isb() needed here?
-B2.7.3 mentions changes to system registers only.
+I think you could drop the 'hub-reset-active-high' property and do
+like this instead:
 
-> +		timer->cntv_cval = read_sysreg(cntv_cval_el0);
-> +	}
-> +
-> +	/* Disable the virtual timer */
-> +	write_sysreg(0, cntv_ctl_el0);
-> +
-> +	/* Allow physical timer/counter access for the host */
-> +	val = read_sysreg(cnthctl_el2);
-> +	val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
-> +	write_sysreg(val, cnthctl_el2);
-> +
-> +	/* Clear cntvoff for the host */
-> +	write_sysreg(0, cntvoff_el2);
-> +}
-> +
-> +void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
-> +{
-> +	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
-> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> +	u64 val;
-> +
-> +	/*
-> +	 * Disallow physical timer access for the guest
-> +	 * Physical counter access is allowed
-> +	 */
-> +	val = read_sysreg(cnthctl_el2);
-> +	val &= ~CNTHCTL_EL1PCEN;
-> +	val |= CNTHCTL_EL1PCTEN;
-> +	write_sysreg(val, cnthctl_el2);
-> +
-> +	if (kvm->arch.timer.enabled) {
-> +		write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
-> +		write_sysreg(timer->cntv_cval, cntv_cval_el0);
-> +		isb();
-> +		write_sysreg(timer->cntv_ctl, cntv_ctl_el0);
-> +	}
-> +}
-> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-> index 9916d0e..25d0914 100644
-> --- a/include/clocksource/arm_arch_timer.h
-> +++ b/include/clocksource/arm_arch_timer.h
-> @@ -23,6 +23,12 @@
->  #define ARCH_TIMER_CTRL_IT_MASK		(1 << 1)
->  #define ARCH_TIMER_CTRL_IT_STAT		(1 << 2)
->  
-> +#define CNTHCTL_EL1PCTEN		(1 << 0)
-> +#define CNTHCTL_EL1PCEN			(1 << 1)
-> +#define CNTHCTL_EVNTEN			(1 << 2)
-> +#define CNTHCTL_EVNTDIR			(1 << 3)
-> +#define CNTHCTL_EVNTI			(0xF << 4)
-> +
->  enum arch_timer_reg {
->  	ARCH_TIMER_REG_CTRL,
->  	ARCH_TIMER_REG_TVAL,
-> 
+hub-reset-gpios = <&gpio7 12 GPIO_ACTIVE_HIGH>;
+
+or
+
+hub-reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
