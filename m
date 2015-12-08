@@ -1,36 +1,26 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 8 Dec 2015 16:54:56 +0000
-Subject: [PATCH] regulator: add regulator_sync_voltage inline dummy
-In-Reply-To: <18141514.YrJxqxh5jL@wuerfel>
-References: <1983152.2iYiBkp4xd@wuerfel> <20151208163739.GS5727@sirena.org.uk>
- <18141514.YrJxqxh5jL@wuerfel>
-Message-ID: <20151208165456.GT5727@sirena.org.uk>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 08 Dec 2015 11:57:27 -0500 (EST)
+Subject: [PATCH 00/13] mvneta Buffer Management and enhancements
+In-Reply-To: <CAPv3WKeTqWXvABPHovH6dqUz_qs88Wy7Q6cbOHsujt4CM0=32g@mail.gmail.com>
+References: <CAPv3WKcKm3X3Lys2HwYZXaZxPaajenF7av1wJKXqKxxwibXW4A@mail.gmail.com>
+ <5661F449.5020205@gmail.com>
+ <CAPv3WKeTqWXvABPHovH6dqUz_qs88Wy7Q6cbOHsujt4CM0=32g@mail.gmail.com>
+Message-ID: <20151208.115727.656709346003241561.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 05:49:20PM +0100, Arnd Bergmann wrote:
-> On Tuesday 08 December 2015 16:37:39 Mark Brown wrote:
-> > On Tue, Dec 08, 2015 at 04:43:35PM +0100, Arnd Bergmann wrote:
+From: Marcin Wojtas <mw@semihalf.com>
+Date: Tue, 8 Dec 2015 11:56:28 +0100
 
-> > We don't do this for *all* regulator API functions - there's some where
-> > using them strongly suggests that there is actually a dependency on the
-> > regulator API.  This does seem like it might be falling into the
-> > specialist category...
+> Do you think you can point to anything similar that could be a sort
+> of reference for such solution?
 
-> Ok, got it.
+I don't have much time to explain because I'm constantly backlogged doing
+patch review, but mostly it has to do with page management and avoiding
+atomic decrement/increment of page counts wherever possible while feeding
+blocks to the chip and receiving packets.
 
-> I guess we'll want something like the patch below in the cpufreq git, right?
+Please don't ask me for any more details as I'm really backlogged doing
+patch review at the moment.
 
-Yes, exactly - though looking at the code I'm pretty unclear on what the
-authors think the use of _sync_voltage() is doing in the first place so
-it may be even better to just remove the call.  It seems to have been
-included in the first commit so there's not changelog explaining things
-and there's no comment either.  I'd *expect* it to be a noop as far as I
-can see.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151208/ee54981d/attachment.sig>
+Thanks.
