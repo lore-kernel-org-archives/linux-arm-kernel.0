@@ -1,71 +1,51 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue, 8 Dec 2015 11:56:28 +0100
-Subject: [PATCH 00/13] mvneta Buffer Management and enhancements
-In-Reply-To: <5661F449.5020205@gmail.com>
-References: <CAPv3WKc4zSmjtw_FeePCVCaq_aUubbCw_ggtxgxs0-7LwL7fHQ@mail.gmail.com>
- <20151129.210210.1777978635596463961.davem@davemloft.net>
- <CAPv3WKcHnJHCvg63Vs79RboNOuESU8jCLouKPRW4NdptAd_hag@mail.gmail.com>
- <20151130.112500.293198684175670933.davem@redhat.com>
- <CAPv3WKcKm3X3Lys2HwYZXaZxPaajenF7av1wJKXqKxxwibXW4A@mail.gmail.com>
- <5661F449.5020205@gmail.com>
-Message-ID: <CAPv3WKeTqWXvABPHovH6dqUz_qs88Wy7Q6cbOHsujt4CM0=32g@mail.gmail.com>
+From: biao.huang@mediatek.com (biao huang)
+Date: Tue, 8 Dec 2015 18:56:53 +0800
+Subject: [PATCH 2/5] dt-bindings: mediatek: Modify pinctrl bindings for
+ mt2701
+In-Reply-To: <20151127203800.GA9092@rob-hp-laptop>
+References: <1448527472-20651-1-git-send-email-biao.huang@mediatek.com>
+ <1448527472-20651-3-git-send-email-biao.huang@mediatek.com>
+ <20151127203800.GA9092@rob-hp-laptop>
+Message-ID: <1449572213.15850.3.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
-
-2015-12-04 21:15 GMT+01:00 Florian Fainelli <f.fainelli@gmail.com>:
-> (no top posting please)
->
-> On 02/12/15 00:26, Marcin Wojtas wrote:
->> Hi Florian,
->>
->> Can you please describe in more details, what would you expect from
->> such special abstraction layer regarding buffer managers? I'd like to
->> understand more of your expectations and evaluate possible work.
->
-> Well, something along these lines:
->
-> - have the ability to register a particular pool (location + number of
-> buffers) in a way that is relatively device agnostic (initialization
-> would of course be device specific)
->
-> - provide a set of buffer management APIs like those you proposed below,
-> and have some generic code that leverages what
-> drivers/net/ethernet/sun/niu.c does for instance
->
-> - introduce a netdev_alloc_skb_from_pool() or something like that which
-> would limit the amount of code to change in your network driver to
-> benefit from that feature so based
->
-> I am sure David would be able to suggest more detailed API.
->
-
-As we're getting closer to what a generic BM part, could you please
-share your thoughts on the possible API?
-
-
->>>
->>>> What kind of abstraction and helpers do you mean? Some kind of API
->>>> (e.g. bm_alloc_buffer, bm_initialize_ring bm_put_buffer,
->>>> bm_get_buffer), which would be used by platform drivers (and specific
->>>> aplications if one wants to develop on top of the kernel)?
->>>>
->>>> In general, what is your top-view of such solution and its cooperation
->>>> with the drivers?
->>>
->>> The tricky parts involved have to do with allocating pages for the
->>> buffer pools and minimizing the number of atomic refcounting
->>> operations on those pages for for the puts and gets, particularly
->>> around buffer replenish runs.
->>>
->>> For example, if you're allocating a page for a buffer pool the device
->>> will chop into N (for any N < PAGE_SIZE) byte pieces, you can
->>> eliminate many atomic operations.
->
-
-Do you think you can point to anything similar that could be a sort of
-reference for such solution?
-
-Best regards,
-Marcin
+On Sat, 2015-11-28 at 04:38 +0800, Rob Herring wrote:
+> On Thu, Nov 26, 2015 at 04:44:29PM +0800, Biao Huang wrote:
+> > Signed-off-by: Biao Huang <biao.huang@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt |    9 +++++----
+> >  1 file changed, 5 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
+> > index 0480bc3..ca6a27a 100644
+> > --- a/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
+> > +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt
+> > @@ -4,10 +4,11 @@ The Mediatek's Pin controller is used to control SoC pins.
+> >  
+> >  Required properties:
+> >  - compatible: value should be one of the following.
+> > -    (a) "mediatek,mt8135-pinctrl", compatible with mt8135 pinctrl.
+> > -    (b) "mediatek,mt8173-pinctrl", compatible with mt8173 pinctrl.
+> > -    (c) "mediatek,mt6397-pinctrl", compatible with mt6397 pinctrl.
+> > -    (d) "mediatek,mt8127-pinctrl", compatible with mt8127 pinctrl.
+> > +    (a) "mediatek,mt2701-pinctrl", compatible with mt2701 pinctrl.
+> > +    (b) "mediatek,mt6397-pinctrl", compatible with mt6397 pinctrl.
+> > +    (c) "mediatek,mt8135-pinctrl", compatible with mt8135 pinctrl.
+> > +    (d) "mediatek,mt8173-pinctrl", compatible with mt8173 pinctrl.
+> > +    (e) "mediatek,mt8127-pinctrl", compatible with mt8127 pinctrl.
+> 
+> If you were trying to sort these, they still aren't quite sorted. There 
+> is no point in sorting if you number (or letter) them because you will 
+> have to update many lines on any change. So drop the (a), (b), (c), etc.
+> 
+> Rob
+> 
+Thanks for your comments, I'll modify this in next patch. And patch v2
+will be sent in next week.
+> >  - pins-are-numbered: Specify the subnodes are using numbered pinmux to
+> >    specify pins.
+> >  - gpio-controller : Marks the device node as a gpio controller.
+> > -- 
+> > 1.7.9.5
+> > 
