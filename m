@@ -1,42 +1,43 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Wed,  9 Dec 2015 17:04:05 +0800
-Subject: [PATCH v1 0/8] This serial of patches add dts/pinctrl/clock-tree/doc
- for rk3228
-Message-ID: <1449651853-1667-1-git-send-email-jeffy.chen@rock-chips.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 09 Dec 2015 10:10:51 +0100
+Subject: [PATCH 1/3] usb: misc: generic_onboard_hub: add generic onboard
+ USB HUB driver
+In-Reply-To: <1449651460.3118.22.camel@pengutronix.de>
+References: <1449538670-7954-1-git-send-email-peter.chen@freescale.com>
+ <20151209085021.GF941@shlinux2> <1449651460.3118.22.camel@pengutronix.de>
+Message-ID: <13697561.KqG59a0ceW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform, with these patches, my evb board could boot into initramfs.
+On Wednesday 09 December 2015 09:57:40 Lucas Stach wrote:
+> Am Mittwoch, den 09.12.2015, 16:50 +0800 schrieb Peter Chen:
+> > On Tue, Dec 08, 2015 at 08:36:00AM -0700, Mathieu Poirier wrote:
+> > > On 7 December 2015 at 18:37, Peter Chen <peter.chen@freescale.com> wrote:
+> > > > +
+> > > > +       if (dev->of_node) {
+> > > > +               struct device_node *node = dev->of_node;
+> > > > +
+> > > > +               hub_data->clk = devm_clk_get(dev, "external_clk");
+> > > > +               if (IS_ERR(hub_data->clk)) {
+> > > > +                       dev_dbg(dev, "Can't get external clock: %ld\n",
+> > > > +                                       PTR_ERR(hub_data->clk));
+> > > > +               }
+> > > 
+> > > Is the intended behaviour to keep going here event when there is an
+> > > error?  Can the "hub_data" really work without a clock?
+> > 
+> > Yes, some HUB may work with fixed 24M OSC at the board, but they need to
+> > reset through external IO, so the clock is not need at this case, but
+> > reset pin is mandatory.
+> > 
+> If the hub always requires a clock it must not be optional. If you have
+> a fixed 24MHz clock on board add this to the DT as a fixed-clock and use
+> it as an input to the hub.
 
+I think it's fine to make the clock optional in the sense that you only
+need to list non-fixed clocks that have to be enabled and or controlled.
 
-Jeffy Chen (8):
-  pinctrl: rockchip: add support for the rk3228
-  clk: rockchip: add dt-binding header for rk3228
-  rockchip: add clock controller for rk3228
-  dt-bindings: add documentation of rk3228 clock controller
-  clk: rockchip: allow more than 2 parents for cpuclk
-  ARM: rockchip: enable support for RK3228 SoCs
-  ARM: dts: rockchip: add core rk3228 dtsi
-  ARM: dts: rockchip: add rk3228-evb board
+Which reminds me, should the driver call clk_set_rate()? It currently
+doesn't, but other machines might need that.
 
- .../bindings/clock/rockchip,rk3228-cru.txt         |  58 ++
- .../bindings/pinctrl/rockchip,pinctrl.txt          |   3 +-
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/rk3228-evb.dts                   |  56 ++
- arch/arm/boot/dts/rk3228.dtsi                      | 478 +++++++++++++
- arch/arm/mach-rockchip/rockchip.c                  |   1 +
- drivers/clk/rockchip/Makefile                      |   1 +
- drivers/clk/rockchip/clk-cpu.c                     |   4 +-
- drivers/clk/rockchip/clk-rk3228.c                  | 762 +++++++++++++++++++++
- drivers/clk/rockchip/clk.h                         |  11 +-
- drivers/pinctrl/pinctrl-rockchip.c                 |  53 ++
- include/dt-bindings/clock/rk3228-cru.h             | 220 ++++++
- 12 files changed, 1644 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3228-cru.txt
- create mode 100644 arch/arm/boot/dts/rk3228-evb.dts
- create mode 100644 arch/arm/boot/dts/rk3228.dtsi
- create mode 100644 drivers/clk/rockchip/clk-rk3228.c
- create mode 100644 include/dt-bindings/clock/rk3228-cru.h
-
--- 
-2.1.4
+	Arnd
