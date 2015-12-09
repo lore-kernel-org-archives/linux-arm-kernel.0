@@ -1,66 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 09 Dec 2015 17:36:03 +0100
-Subject: [PATCH] ARM: pxa: mark ezx structures as __maybe_unused
-Message-ID: <7455848.ygDvrz6r6S@wuerfel>
+Date: Wed, 09 Dec 2015 17:42:41 +0100
+Subject: [PATCH] iwlegacy: mark il_adjust_beacon_interval as noinline
+Message-ID: <36263581.L8412YxJjp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ezx platform contains multiple machine descriptors, but not all
-of them use all of the data structures, and it's possible to disable
-all of the machines, which produces some harmless warnings:
+With the new optimized do_div() code, some versions of gcc
+produce obviously incorrect code that leads to a link error
+in iwlegacy/common.o:
 
-mach-pxa/ezx.c:53:26: warning: 'ezx_pwm_lookup' defined but not used [-Wunused-variable]
-mach-pxa/ezx.c:86:31: warning: 'ezx_fb_info_1' defined but not used [-Wunused-variable]
-mach-pxa/ezx.c:107:31: warning: 'ezx_fb_info_2' defined but not used [-Wunused-variable]
-mach-pxa/ezx.c:113:32: warning: 'ezx_devices' defined but not used [-Wunused-variable]
-mach-pxa/ezx.c:117:22: warning: 'ezx_pin_config' defined but not used [-Wunused-variable]
+drivers/built-in.o: In function `il_send_rxon_timing':
+:(.text+0xa6b4d4): undefined reference to `____ilog2_NaN'
+:(.text+0xa6b4f0): undefined reference to `__aeabi_uldivmod'
 
-This marks all those structures as __maybe_unused to avoid the warnings.
-Obviously a configuration that contains the ezx platform but no specific
-model is a bit silly, but it should not cause compile-time warnings.
+In a few thousand randconfig builds, I have seen this problem
+a couple of times in this file, but never anywhere else in the
+kernel, so we can try to work around this in the only file
+that shows the behavior, by marking the il_adjust_beacon_interval
+function as noinline, which convinces gcc to use the unoptimized
+do_div() all the time.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/arch/arm/mach-pxa/ezx.c b/arch/arm/mach-pxa/ezx.c
-index b61b7971b54f..391ba898b971 100644
---- a/arch/arm/mach-pxa/ezx.c
-+++ b/arch/arm/mach-pxa/ezx.c
-@@ -50,7 +50,7 @@
- #define GPIO19_GEN1_CAM_RST		19
- #define GPIO28_GEN2_CAM_RST		28
+diff --git a/drivers/net/wireless/intel/iwlegacy/common.c b/drivers/net/wireless/intel/iwlegacy/common.c
+index 887114582583..6308bb217454 100644
+--- a/drivers/net/wireless/intel/iwlegacy/common.c
++++ b/drivers/net/wireless/intel/iwlegacy/common.c
+@@ -3602,7 +3602,7 @@ il_is_ht40_tx_allowed(struct il_priv *il, struct ieee80211_sta_ht_cap *ht_cap)
+ }
+ EXPORT_SYMBOL(il_is_ht40_tx_allowed);
  
--static struct pwm_lookup ezx_pwm_lookup[] = {
-+static struct pwm_lookup ezx_pwm_lookup[] __maybe_unused = {
- 	PWM_LOOKUP("pxa27x-pwm.0", 0, "pwm-backlight.0", NULL, 78700,
- 		   PWM_POLARITY_NORMAL),
- };
-@@ -83,7 +83,7 @@ static struct pxafb_mode_info mode_ezx_old = {
- 	.sync			= 0,
- };
- 
--static struct pxafb_mach_info ezx_fb_info_1 = {
-+static struct pxafb_mach_info ezx_fb_info_1 __maybe_unused = {
- 	.modes		= &mode_ezx_old,
- 	.num_modes	= 1,
- 	.lcd_conn	= LCD_COLOR_TFT_16BPP,
-@@ -104,17 +104,17 @@ static struct pxafb_mode_info mode_72r89803y01 = {
- 	.sync			= 0,
- };
- 
--static struct pxafb_mach_info ezx_fb_info_2 = {
-+static struct pxafb_mach_info ezx_fb_info_2 __maybe_unused = {
- 	.modes		= &mode_72r89803y01,
- 	.num_modes	= 1,
- 	.lcd_conn	= LCD_COLOR_TFT_18BPP,
- };
- 
--static struct platform_device *ezx_devices[] __initdata = {
-+static struct platform_device *ezx_devices[] __initdata __maybe_unused = {
- 	&ezx_backlight_device,
- };
- 
--static unsigned long ezx_pin_config[] __initdata = {
-+static unsigned long ezx_pin_config[] __initdata __maybe_unused = {
- 	/* PWM backlight */
- 	GPIO16_PWM0_OUT,
- 
+-static u16
++static u16 noinline
+ il_adjust_beacon_interval(u16 beacon_val, u16 max_beacon_val)
+ {
+ 	u16 new_val;
