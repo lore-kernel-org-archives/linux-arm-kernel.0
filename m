@@ -1,59 +1,46 @@
-From: daniel@zonque.org (Daniel Mack)
-Date: Wed, 9 Dec 2015 18:05:36 +0100
-Subject: [PATCH] ARM: pxa: mark raumfeld init functions as __maybe_unused
-In-Reply-To: <2245032.bpQt17WIoe@wuerfel>
-References: <2245032.bpQt17WIoe@wuerfel>
-Message-ID: <56685F60.6030200@zonque.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 9 Dec 2015 12:13:14 -0500 (EST)
+Subject: [PATCH] iwlegacy: mark il_adjust_beacon_interval as noinline
+In-Reply-To: <36263581.L8412YxJjp@wuerfel>
+References: <36263581.L8412YxJjp@wuerfel>
+Message-ID: <alpine.LFD.2.20.1512091209130.26920@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/2015 05:52 PM, Arnd Bergmann wrote:
-> The raumfeld.c file contains three similar machine definitions,
-> each with their own init function. If one or more of them are
-> disabled, we get compile-time warnings:
+On Wed, 9 Dec 2015, Arnd Bergmann wrote:
+
+> With the new optimized do_div() code, some versions of gcc
+> produce obviously incorrect code that leads to a link error
+> in iwlegacy/common.o:
 > 
-> arm/mach-pxa/raumfeld.c:1070:123: warning: 'raumfeld_connector_init' defined but not used [-Wunused-function]
-> arm/mach-pxa/raumfeld.c:1082:123: warning: 'raumfeld_speaker_init' defined but not used [-Wunused-function]
+> drivers/built-in.o: In function `il_send_rxon_timing':
+> :(.text+0xa6b4d4): undefined reference to `____ilog2_NaN'
+> :(.text+0xa6b4f0): undefined reference to `__aeabi_uldivmod'
 > 
-> This marks the functions as __maybe_unused to avoid the warnings.
+> In a few thousand randconfig builds, I have seen this problem
+> a couple of times in this file, but never anywhere else in the
+> kernel, so we can try to work around this in the only file
+> that shows the behavior, by marking the il_adjust_beacon_interval
+> function as noinline, which convinces gcc to use the unoptimized
+> do_div() all the time.
 > 
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Acked-by: Daniel Mack <daniel@zonque.org>
-
-Thanks!
-
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
 > 
-> diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-> index 0f67d94be297..8347d87a713d 100644
-> --- a/arch/arm/mach-pxa/raumfeld.c
-> +++ b/arch/arm/mach-pxa/raumfeld.c
-> @@ -1046,7 +1046,7 @@ static void __init raumfeld_common_init(void)
->  	i2c_register_board_info(1, &raumfeld_pwri2c_board_info, 1);
+> diff --git a/drivers/net/wireless/intel/iwlegacy/common.c b/drivers/net/wireless/intel/iwlegacy/common.c
+> index 887114582583..6308bb217454 100644
+> --- a/drivers/net/wireless/intel/iwlegacy/common.c
+> +++ b/drivers/net/wireless/intel/iwlegacy/common.c
+> @@ -3602,7 +3602,7 @@ il_is_ht40_tx_allowed(struct il_priv *il, struct ieee80211_sta_ht_cap *ht_cap)
 >  }
+>  EXPORT_SYMBOL(il_is_ht40_tx_allowed);
 >  
-> -static void __init raumfeld_controller_init(void)
-> +static void __init __maybe_unused raumfeld_controller_init(void)
+> -static u16
+> +static u16 noinline
+>  il_adjust_beacon_interval(u16 beacon_val, u16 max_beacon_val)
 >  {
->  	int ret;
->  
-> @@ -1067,7 +1067,7 @@ static void __init raumfeld_controller_init(void)
->  	raumfeld_w1_init();
->  }
->  
-> -static void __init raumfeld_connector_init(void)
-> +static void __init __maybe_unused raumfeld_connector_init(void)
->  {
->  	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_connector_pin_config));
->  	spi_register_board_info(ARRAY_AND_SIZE(connector_spi_devices));
-> @@ -1079,7 +1079,7 @@ static void __init raumfeld_connector_init(void)
->  	raumfeld_common_init();
->  }
->  
-> -static void __init raumfeld_speaker_init(void)
-> +static void __init __maybe_unused raumfeld_speaker_init(void)
->  {
->  	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_speaker_pin_config));
->  	spi_register_board_info(ARRAY_AND_SIZE(speaker_spi_devices));
+>  	u16 new_val;
+> 
 > 
