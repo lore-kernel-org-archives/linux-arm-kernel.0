@@ -1,60 +1,125 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  9 Dec 2015 12:44:40 +0000
-Subject: [RFC PATCH 05/20] asm-generic: make __set_fixmap_offset a static
- inline
+Date: Wed,  9 Dec 2015 12:44:50 +0000
+Subject: [RFC PATCH 15/20] arm64: mm: add functions to walk tables in fixmap
 In-Reply-To: <1449665095-20774-1-git-send-email-mark.rutland@arm.com>
 References: <1449665095-20774-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1449665095-20774-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <1449665095-20774-16-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently __set_fixmap_offset is a macro function which has a local
-variable called 'addr'. If a caller passes a 'phys' parameter which is
-derived from a variable also called 'addr', the local variable will
-shadow this, and the compiler will complain about the use of an
-uninitialized variable.
-
-It is likely that fixmap users may use the name 'addr' for variables
-that may be directly passed to __set_fixmap_offset, or that may be
-indirectly generated via other macros. Rather than placing the burden on
-callers to avoid the name 'addr', this patch changes __set_fixmap_offset
-into a static inline function, avoiding namespace collisions.
+As a prepratory step to allow us to allocate early page tables from
+unmapped memory using memblock_alloc, add new p??_fixmap* functions that
+can be used to walk page tables outside of the linear mapping by using
+fixmap slots.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- include/asm-generic/fixmap.h | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm64/include/asm/fixmap.h  | 10 ++++++++++
+ arch/arm64/include/asm/pgtable.h | 26 ++++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+)
 
-diff --git a/include/asm-generic/fixmap.h b/include/asm-generic/fixmap.h
-index 1cbb833..f9c27b6 100644
---- a/include/asm-generic/fixmap.h
-+++ b/include/asm-generic/fixmap.h
-@@ -70,13 +70,13 @@ static inline unsigned long virt_to_fix(const unsigned long vaddr)
- #endif
+diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+index 3097045..1a617d4 100644
+--- a/arch/arm64/include/asm/fixmap.h
++++ b/arch/arm64/include/asm/fixmap.h
+@@ -62,6 +62,16 @@ enum fixed_addresses {
  
- /* Return a pointer with offset calculated */
--#define __set_fixmap_offset(idx, phys, flags)		      \
--({							      \
--	unsigned long addr;				      \
--	__set_fixmap(idx, phys, flags);			      \
--	addr = fix_to_virt(idx) + ((phys) & (PAGE_SIZE - 1)); \
--	addr;						      \
--})
-+static inline unsigned long __set_fixmap_offset(enum fixed_addresses idx,
-+						phys_addr_t phys,
-+						pgprot_t flags)
-+{
-+	__set_fixmap(idx, phys, flags);
-+	return fix_to_virt(idx) + (phys & (PAGE_SIZE - 1));
-+}
+ 	FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
+ 	FIX_BTMAP_BEGIN = FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1,
++
++	/*
++	 * Used for kernel page table creation, so unmapped memory may be used
++	 * for tables.
++	 */
++	FIX_PTE,
++	FIX_PMD,
++	FIX_PUD,
++	FIX_PGD,
++
+ 	__end_of_fixed_addresses
+ };
  
- #define set_fixmap_offset(idx, phys) \
- 	__set_fixmap_offset(idx, phys, FIXMAP_PAGE_NORMAL)
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 9c679cf..8a00a1cb 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -57,6 +57,7 @@
+ 
+ #ifndef __ASSEMBLY__
+ 
++#include <asm/fixmap.h>
+ #include <linux/mmdebug.h>
+ 
+ extern void __pte_error(const char *file, int line, unsigned long val);
+@@ -426,6 +427,10 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+ #define pte_unmap(pte)			do { } while (0)
+ #define pte_unmap_nested(pte)		do { } while (0)
+ 
++#define pte_fixmap(addr)		((pte_t *)set_fixmap_offset(FIX_PTE, addr))
++#define pte_fixmap_offset(pmd, addr)	pte_fixmap(pte_offset_phys(pmd, addr))
++#define pte_fixmap_unmap()		clear_fixmap(FIX_PTE)
++
+ #define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
+ 
+ /*
+@@ -465,12 +470,21 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
+ #define pmd_offset_phys(dir, addr)	(pud_page_paddr(*(dir)) + pmd_index(addr) * sizeof(pmd_t))
+ #define pmd_offset(dir, addr)		((pmd_t *)__va(pmd_offset_phys((dir), (addr))))
+ 
++#define pmd_fixmap(addr)		((pmd_t *)set_fixmap_offset(FIX_PMD, addr))
++#define pmd_fixmap_offset(pud, addr)	pmd_fixmap(pmd_offset_phys(pud, addr))
++#define pmd_fixmap_unmap()		clear_fixmap(FIX_PMD)
++
+ #define pud_page(pud)		pfn_to_page(__phys_to_pfn(pud_val(pud) & PHYS_MASK))
+ 
+ #else
+ 
+ #define pud_page_paddr(pud)	({ BUILD_BUG(); 0; })
+ 
++/* Match pmd_offset folding in <asm/generic/pgtable-nopmd.h> */
++#define pmd_fixmap(addr)		NULL
++#define pmd_fixmap_offset(pudp, addr)	((pmd_t *)pudp)
++#define pmd_fixmap_unmap()
++
+ #endif	/* CONFIG_PGTABLE_LEVELS > 2 */
+ 
+ #if CONFIG_PGTABLE_LEVELS > 3
+@@ -503,12 +517,21 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+ #define pud_offset_phys(dir, addr)	(pgd_page_paddr(*(dir)) + pud_index(addr) * sizeof(pud_t))
+ #define pud_offset(dir, addr)		((pud_t *)__va(pud_offset_phys((dir), (addr))))
+ 
++#define pud_fixmap(addr)		((pud_t *)set_fixmap_offset(FIX_PUD, addr))
++#define pud_fixmap_offset(pgd, addr)	pud_fixmap(pmd_offset_phys(pgd, addr))
++#define pud_fixmap_unmap()		clear_fixmap(FIX_PUD)
++
+ #define pgd_page(pgd)		pfn_to_page(__phys_to_pfn(pgd_val(pgd) & PHYS_MASK))
+ 
+ #else
+ 
+ #define pgd_page_paddr(pgd)	({ BUILD_BUG(); 0;})
+ 
++/* Match pud_offset folding in <asm/generic/pgtable-nopud.h> */
++#define pud_fixmap(addr)		NULL
++#define pud_fixmap_offset(pgdp, addr)	((pud_t *)pgdp)
++#define pud_fixmap_unmap()
++
+ #endif  /* CONFIG_PGTABLE_LEVELS > 3 */
+ 
+ #define pgd_ERROR(pgd)		__pgd_error(__FILE__, __LINE__, pgd_val(pgd))
+@@ -523,6 +546,9 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+ /* to find an entry in a kernel page-table-directory */
+ #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
+ 
++#define pgd_fixmap(addr)		((pgd_t *)set_fixmap_offset(FIX_PGD, addr))
++#define pgd_fixmap_unmap()		clear_fixmap(FIX_PGD)
++
+ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
+ {
+ 	const pteval_t mask = PTE_USER | PTE_PXN | PTE_UXN | PTE_RDONLY |
 -- 
 1.9.1
