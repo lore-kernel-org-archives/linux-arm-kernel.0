@@ -1,105 +1,145 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Wed,  9 Dec 2015 14:21:04 +0100
-Subject: [PATCH v3 3/4] printk/nmi: Warn when some message has been lost in
- NMI context
-In-Reply-To: <1449667265-17525-1-git-send-email-pmladek@suse.com>
-References: <1449667265-17525-1-git-send-email-pmladek@suse.com>
-Message-ID: <1449667265-17525-4-git-send-email-pmladek@suse.com>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Wed,  9 Dec 2015 14:24:55 +0100
+Subject: [PATCH v6] arm/arm64: add arm-smccc
+Message-ID: <1449667495-23091-1-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We could not resize the temporary buffer in NMI context. Let's warn
-if a message is lost.
+Adds helpers to do SMC and HVC based on ARM SMC Calling Convention.
+CONFIG_HAVE_ARM_SMCCC is enabled for architectures that may support the
+SMC or HVC instruction. It's the responsibility of the caller to know if
+the SMC instruction is supported by the platform.
 
-This is rather theoretical. printk() should not be used in NMI.
-The only sensible use is when we want to print backtrace from all
-CPUs. The current buffer should be enough for this purpose.
+This patch doesn't provide an implementation of the declared functions.
+Later patches will bring in implementations and set
+CONFIG_HAVE_ARM_SMCCC for ARM and ARM64 respectively.
 
-Signed-off-by: Petr Mladek <pmladek@suse.com>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
 ---
- kernel/printk/nmi.c    |  5 ++++-
- kernel/printk/printk.c | 10 ++++++++++
- kernel/printk/printk.h | 11 +++++++++++
- 3 files changed, 25 insertions(+), 1 deletion(-)
 
-diff --git a/kernel/printk/nmi.c b/kernel/printk/nmi.c
-index 29a498586465..5465230b75ec 100644
---- a/kernel/printk/nmi.c
-+++ b/kernel/printk/nmi.c
-@@ -39,6 +39,7 @@
-  */
- DEFINE_PER_CPU(printk_func_t, printk_func) = vprintk_default;
- static int printk_nmi_irq_ready;
-+atomic_t nmi_message_lost;
+v6:
+* Move HAVE_ARM_SMCCC from init/Kconfig
+
+ arch/Kconfig              |  3 ++
+ include/linux/arm-smccc.h | 98 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 101 insertions(+)
+ create mode 100644 include/linux/arm-smccc.h
+
+diff --git a/arch/Kconfig b/arch/Kconfig
+index 4e949e5..ce3c0b0 100644
+--- a/arch/Kconfig
++++ b/arch/Kconfig
+@@ -564,4 +564,7 @@ config OLD_SIGACTION
+ config COMPAT_OLD_SIGACTION
+ 	bool
  
- #define NMI_LOG_BUF_LEN (4096 - sizeof(atomic_t) - sizeof(struct irq_work))
- 
-@@ -63,8 +64,10 @@ static int vprintk_nmi(const char *fmt, va_list args)
- again:
- 	len = atomic_read(&s->len);
- 
--	if (len >=  sizeof(s->buffer))
-+	if (len >=  sizeof(s->buffer)) {
-+		atomic_inc(&nmi_message_lost);
- 		return 0;
-+	}
- 
- 	/*
- 	 * Make sure that all old data have been read before the buffer was
-diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
-index 88641c74163d..a6bb0b0838f3 100644
---- a/kernel/printk/printk.c
-+++ b/kernel/printk/printk.c
-@@ -1669,6 +1669,7 @@ asmlinkage int vprintk_emit(int facility, int level,
- 	unsigned long flags;
- 	int this_cpu;
- 	int printed_len = 0;
-+	int nmi_message_lost;
- 	bool in_sched = false;
- 	/* cpu currently holding logbuf_lock in this function */
- 	static unsigned int logbuf_cpu = UINT_MAX;
-@@ -1719,6 +1720,15 @@ asmlinkage int vprintk_emit(int facility, int level,
- 					 strlen(recursion_msg));
- 	}
- 
-+	nmi_message_lost = get_nmi_message_lost();
-+	if (unlikely(nmi_message_lost)) {
-+		text_len = scnprintf(textbuf, sizeof(textbuf),
-+				     "BAD LUCK: lost %d message(s) from NMI context!",
-+				     nmi_message_lost);
-+		printed_len += log_store(0, 2, LOG_PREFIX|LOG_NEWLINE, 0,
-+					 NULL, 0, textbuf, text_len);
-+	}
++config HAVE_ARM_SMCCC
++	bool
 +
- 	/*
- 	 * The printf needs to come first; we need the syslog
- 	 * prefix which might be passed-in as a parameter.
-diff --git a/kernel/printk/printk.h b/kernel/printk/printk.h
-index dc97c1c4d53b..7f778b609492 100644
---- a/kernel/printk/printk.h
-+++ b/kernel/printk/printk.h
-@@ -34,6 +34,12 @@ static inline __printf(1, 0) int vprintk_func(const char *fmt, va_list args)
- 	return this_cpu_read(printk_func)(fmt, args);
- }
- 
-+extern atomic_t nmi_message_lost;
-+static inline int get_nmi_message_lost(void)
-+{
-+	return atomic_xchg(&nmi_message_lost, 0);
-+}
+ source "kernel/gcov/Kconfig"
+diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+new file mode 100644
+index 0000000..dea68a9
+--- /dev/null
++++ b/include/linux/arm-smccc.h
+@@ -0,0 +1,98 @@
++/*
++ * Copyright (c) 2015, Linaro Limited
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++#ifndef __LINUX_ARM_SMCCC_H
++#define __LINUX_ARM_SMCCC_H
 +
- #else /* CONFIG_PRINTK_NMI */
- 
- static inline __printf(1, 0) int vprintk_func(const char *fmt, va_list args)
-@@ -41,4 +47,9 @@ static inline __printf(1, 0) int vprintk_func(const char *fmt, va_list args)
- 	return vprintk_default(fmt, args);
- }
- 
-+static inline int get_nmi_message_lost(void)
-+{
-+	return 0;
-+}
++#include <linux/types.h>
++#include <linux/linkage.h>
 +
- #endif /* CONFIG_PRINTK_NMI */
++/*
++ * This file provides common defines for ARM SMC Calling Convention as
++ * specified in
++ * http://infocenter.arm.com/help/topic/com.arm.doc.den0028a/index.html
++ */
++
++#define ARM_SMCCC_SMC_32		(0 << 30)
++#define ARM_SMCCC_SMC_64		(1 << 30)
++#define ARM_SMCCC_FAST_CALL		(1 << 31)
++#define ARM_SMCCC_STD_CALL		(0 << 31)
++
++#define ARM_SMCCC_OWNER_MASK		0x3F
++#define ARM_SMCCC_OWNER_SHIFT		24
++
++#define ARM_SMCCC_FUNC_MASK		0xFFFF
++
++#define ARM_SMCCC_IS_FAST_CALL(smc_val)	((smc_val) & ARM_SMCCC_FAST_CALL)
++#define ARM_SMCCC_IS_64(smc_val)	((smc_val) & ARM_SMCCC_SMC_64)
++#define ARM_SMCCC_FUNC_NUM(smc_val)	((smc_val) & ARM_SMCCC_FUNC_MASK)
++#define ARM_SMCCC_OWNER_NUM(smc_val) \
++	(((smc_val) >> ARM_SMCCC_OWNER_SHIFT) & ARM_SMCCC_OWNER_MASK)
++
++#define ARM_SMCCC_CALL_VAL(type, calling_convention, owner, func_num) \
++	((type) | (calling_convention) | \
++	(((owner) & ARM_SMCCC_OWNER_MASK) << ARM_SMCCC_OWNER_SHIFT) | \
++	((func_num) & ARM_SMCCC_FUNC_MASK))
++
++#define ARM_SMCCC_OWNER_ARCH		0
++#define ARM_SMCCC_OWNER_CPU		1
++#define ARM_SMCCC_OWNER_SIP		2
++#define ARM_SMCCC_OWNER_OEM		3
++#define ARM_SMCCC_OWNER_STANDARD	4
++#define ARM_SMCCC_OWNER_TRUSTED_APP	48
++#define ARM_SMCCC_OWNER_TRUSTED_APP_END	49
++#define ARM_SMCCC_OWNER_TRUSTED_OS	50
++#define ARM_SMCCC_OWNER_TRUSTED_OS_END	63
++
++/**
++ * struct arm_smccc_res - Result from SMC/HVC call
++ * @a0-a3 result values from registers 0 to 3
++ */
++struct arm_smccc_res {
++	unsigned long a0;
++	unsigned long a1;
++	unsigned long a2;
++	unsigned long a3;
++};
++
++/**
++ * arm_smccc_smc() - make SMC calls
++ * @a0-a7: arguments passed in registers 0 to 7
++ * @res: result values from registers 0 to 3
++ *
++ * This function is used to make SMC calls following SMC Calling Convention.
++ * The content of the supplied param are copied to registers 0 to 7 prior
++ * to the SMC instruction. The return values are updated with the content
++ * from register 0 to 3 on return from the SMC instruction.
++ */
++asmlinkage void arm_smccc_smc(unsigned long a0, unsigned long a1,
++			unsigned long a2, unsigned long a3, unsigned long a4,
++			unsigned long a5, unsigned long a6, unsigned long a7,
++			struct arm_smccc_res *res);
++
++/**
++ * arm_smccc_hvc() - make HVC calls
++ * @a0-a7: arguments passed in registers 0 to 7
++ * @res: result values from registers 0 to 3
++ *
++ * This function is used to make HVC calls following SMC Calling
++ * Convention.  The content of the supplied param are copied to registers 0
++ * to 7 prior to the HVC instruction. The return values are updated with
++ * the content from register 0 to 3 on return from the HVC instruction.
++ */
++asmlinkage void arm_smccc_hvc(unsigned long a0, unsigned long a1,
++			unsigned long a2, unsigned long a3, unsigned long a4,
++			unsigned long a5, unsigned long a6, unsigned long a7,
++			struct arm_smccc_res *res);
++
++#endif /*__LINUX_ARM_SMCCC_H*/
 -- 
-1.8.5.6
+1.9.1
