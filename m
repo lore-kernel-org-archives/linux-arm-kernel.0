@@ -1,44 +1,49 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 09 Dec 2015 17:52:06 +0100
-Subject: [PATCH] ARM: pxa: cm-x2xx: avoid duplicate macro warnings
-Message-ID: <5126103.CuC5iMSqYG@wuerfel>
+Date: Wed, 09 Dec 2015 17:52:33 +0100
+Subject: [PATCH] ARM: pxa: mark raumfeld init functions as __maybe_unused
+Message-ID: <2245032.bpQt17WIoe@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In an old commit, we worked around the duplicate definition of
-GPIO24_SSP1_SFRM in cm-x2xx.c, which includes files for both
-pxa25x and pxa27x. Apparently the problem has come back and we
-now have four additional duplicate symbols that cause warnings:
+The raumfeld.c file contains three similar machine definitions,
+each with their own init function. If one or more of them are
+disabled, we get compile-time warnings:
 
-In file included from /git/arm-soc/arch/arm/mach-pxa/pxa27x.h:7:0,
-                 from /git/arm-soc/arch/arm/mach-pxa/cm-x2xx.c:27:
-/git/arm-soc/arch/arm/mach-pxa/mfp-pxa27x.h:21:0: warning: "GPIO86_GPIO" redefined
- #define GPIO86_GPIO  MFP_CFG_IN(GPIO86, AF0)
+arm/mach-pxa/raumfeld.c:1070:123: warning: 'raumfeld_connector_init' defined but not used [-Wunused-function]
+arm/mach-pxa/raumfeld.c:1082:123: warning: 'raumfeld_speaker_init' defined but not used [-Wunused-function]
 
-This uses the same hack as before and undefines all symbols that
-are defined more than once. Fortunately, cm-x2xx does not need
-any of these.
+This marks the functions as __maybe_unused to avoid the warnings.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/arch/arm/mach-pxa/cm-x2xx.c b/arch/arm/mach-pxa/cm-x2xx.c
-index f2d801160079..7202022ee243 100644
---- a/arch/arm/mach-pxa/cm-x2xx.c
-+++ b/arch/arm/mach-pxa/cm-x2xx.c
-@@ -24,7 +24,16 @@
+diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
+index 0f67d94be297..8347d87a713d 100644
+--- a/arch/arm/mach-pxa/raumfeld.c
++++ b/arch/arm/mach-pxa/raumfeld.c
+@@ -1046,7 +1046,7 @@ static void __init raumfeld_common_init(void)
+ 	i2c_register_board_info(1, &raumfeld_pwri2c_board_info, 1);
+ }
  
- #include "pxa25x.h"
- #undef GPIO24_SSP1_SFRM
-+#undef GPIO86_GPIO
-+#undef GPIO87_GPIO
-+#undef GPIO88_GPIO
-+#undef GPIO89_GPIO
- #include "pxa27x.h"
-+#undef GPIO24_SSP1_SFRM
-+#undef GPIO86_GPIO
-+#undef GPIO87_GPIO
-+#undef GPIO88_GPIO
-+#undef GPIO89_GPIO
- #include <mach/audio.h>
- #include <linux/platform_data/video-pxafb.h>
- #include <mach/smemc.h>
+-static void __init raumfeld_controller_init(void)
++static void __init __maybe_unused raumfeld_controller_init(void)
+ {
+ 	int ret;
+ 
+@@ -1067,7 +1067,7 @@ static void __init raumfeld_controller_init(void)
+ 	raumfeld_w1_init();
+ }
+ 
+-static void __init raumfeld_connector_init(void)
++static void __init __maybe_unused raumfeld_connector_init(void)
+ {
+ 	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_connector_pin_config));
+ 	spi_register_board_info(ARRAY_AND_SIZE(connector_spi_devices));
+@@ -1079,7 +1079,7 @@ static void __init raumfeld_connector_init(void)
+ 	raumfeld_common_init();
+ }
+ 
+-static void __init raumfeld_speaker_init(void)
++static void __init __maybe_unused raumfeld_speaker_init(void)
+ {
+ 	pxa3xx_mfp_config(ARRAY_AND_SIZE(raumfeld_speaker_pin_config));
+ 	spi_register_board_info(ARRAY_AND_SIZE(speaker_spi_devices));
