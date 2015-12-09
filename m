@@ -1,17 +1,20 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  9 Dec 2015 12:44:39 +0000
-Subject: [RFC PATCH 04/20] arm64: mm: assume PAGE SIZE for page table allocator
+Date: Wed,  9 Dec 2015 12:44:43 +0000
+Subject: [RFC PATCH 08/20] arm64: unmap idmap earlier
 In-Reply-To: <1449665095-20774-1-git-send-email-mark.rutland@arm.com>
 References: <1449665095-20774-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1449665095-20774-5-git-send-email-mark.rutland@arm.com>
+Message-ID: <1449665095-20774-9-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We pass a size parameter to early_alloc and late_alloc, but these are
-only ever used to allocate single pages. In late_alloc we always
-allocate a single page.
+During boot we leave the idmap in place until paging_init, as we
+previously had to wait for the zero page to become allocated and
+accessible.
 
-Remove the redundant size parameter.
+Now that we have a statically-allocated zero page, we can uninstall the
+idmap much earlier in the boot process, making it far eaier to spot
+accidental use of physical addresses. This also brings the cold boot
+path in line with the secondary boot path.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
@@ -20,104 +23,43 @@ Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/mm/mmu.c | 27 ++++++++++++---------------
- 1 file changed, 12 insertions(+), 15 deletions(-)
+ arch/arm64/kernel/setup.c | 6 ++++++
+ arch/arm64/mm/mmu.c       | 6 ------
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index f6621ba..cfed56f 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -314,6 +314,12 @@ void __init setup_arch(char **cmdline_p)
+ 	 */
+ 	local_async_enable();
+ 
++	/*
++	 * TTBR0 is only used for the identity mapping at this stage. Make it
++	 * point to zero page to avoid speculatively fetching new entries.
++	 */
++	cpu_uninstall_idmap();
++
+ 	efi_init();
+ 	arm64_memblock_init();
+ 
 diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 7dfb4a9..304ff23 100644
+index 98a98ac..0c16c25 100644
 --- a/arch/arm64/mm/mmu.c
 +++ b/arch/arm64/mm/mmu.c
-@@ -62,15 +62,15 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- }
- EXPORT_SYMBOL(phys_mem_access_prot);
+@@ -445,12 +445,6 @@ void __init paging_init(void)
+ 	fixup_executable();
  
--static void __init *early_alloc(unsigned long sz)
-+static void __init *early_alloc(void)
- {
- 	phys_addr_t phys;
- 	void *ptr;
- 
--	phys = memblock_alloc(sz, sz);
-+	phys = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
- 	BUG_ON(!phys);
- 	ptr = __va(phys);
--	memset(ptr, 0, sz);
-+	memset(ptr, 0, PAGE_SIZE);
- 	return ptr;
- }
- 
-@@ -95,12 +95,12 @@ static void split_pmd(pmd_t *pmd, pte_t *pte)
- static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 				  unsigned long end, unsigned long pfn,
- 				  pgprot_t prot,
--				  void *(*alloc)(unsigned long size))
-+				  void *(*alloc)(void))
- {
- 	pte_t *pte;
- 
- 	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
--		pte = alloc(PTRS_PER_PTE * sizeof(pte_t));
-+		pte = alloc();
- 		if (pmd_sect(*pmd))
- 			split_pmd(pmd, pte);
- 		__pmd_populate(pmd, __pa(pte), PMD_TYPE_TABLE);
-@@ -130,7 +130,7 @@ static void split_pud(pud_t *old_pud, pmd_t *pmd)
- static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 				  unsigned long addr, unsigned long end,
- 				  phys_addr_t phys, pgprot_t prot,
--				  void *(*alloc)(unsigned long size))
-+				  void *(*alloc)(void))
- {
- 	pmd_t *pmd;
- 	unsigned long next;
-@@ -139,7 +139,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
- 	 * Check for initial section mappings in the pgd/pud and remove them.
- 	 */
- 	if (pud_none(*pud) || pud_sect(*pud)) {
--		pmd = alloc(PTRS_PER_PMD * sizeof(pmd_t));
-+		pmd = alloc();
- 		if (pud_sect(*pud)) {
- 			/*
- 			 * need to have the 1G of mappings continue to be
-@@ -195,13 +195,13 @@ static inline bool use_1G_block(unsigned long addr, unsigned long next,
- static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- 				  unsigned long addr, unsigned long end,
- 				  phys_addr_t phys, pgprot_t prot,
--				  void *(*alloc)(unsigned long size))
-+				  void *(*alloc)(void))
- {
- 	pud_t *pud;
- 	unsigned long next;
- 
- 	if (pgd_none(*pgd)) {
--		pud = alloc(PTRS_PER_PUD * sizeof(pud_t));
-+		pud = alloc();
- 		pgd_populate(mm, pgd, pud);
- 	}
- 	BUG_ON(pgd_bad(*pgd));
-@@ -247,7 +247,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
- static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
- 				    phys_addr_t phys, unsigned long virt,
- 				    phys_addr_t size, pgprot_t prot,
--				    void *(*alloc)(unsigned long size))
-+				    void *(*alloc)(void))
- {
- 	unsigned long addr, length, end, next;
- 
-@@ -262,12 +262,9 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
- 	} while (pgd++, addr = next, addr != end);
- }
- 
--static void *late_alloc(unsigned long size)
-+static void *late_alloc(void)
- {
--	void *ptr;
+ 	bootmem_init();
 -
--	BUG_ON(size > PAGE_SIZE);
--	ptr = (void *)__get_free_page(PGALLOC_GFP);
-+	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
- 	BUG_ON(!ptr);
- 	return ptr;
+-	/*
+-	 * TTBR0 is only used for the identity mapping at this stage. Make it
+-	 * point to zero page to avoid speculatively fetching new entries.
+-	 */
+-	cpu_uninstall_idmap();
  }
+ 
+ /*
 -- 
 1.9.1
