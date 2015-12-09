@@ -1,60 +1,118 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 8 Dec 2015 21:24:03 -0600
-Subject: [PATCH 2/3] doc: dt-binding: generic onboard USB HUB
-In-Reply-To: <19094869.VEiW4FjBL1@wuerfel>
-References: <1449538670-7954-1-git-send-email-peter.chen@freescale.com>
- <1449538670-7954-3-git-send-email-peter.chen@freescale.com>
- <1449568249.3691.15.camel@pengutronix.de>
- <19094869.VEiW4FjBL1@wuerfel>
-Message-ID: <20151209032403.GA3716@rob-hp-laptop>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Wed, 9 Dec 2015 11:25:46 +0800
+Subject: [PATCH v4] acpi, apei, arm64: APEI initial support for aarch64.
+In-Reply-To: <20151208140720.GA2395@red-moon>
+References: <1449558183-12259-1-git-send-email-fu.wei@linaro.org>
+ <20151208123433.GB404@red-moon> <5666D28C.4090305@linaro.org>
+ <CADyBb7tByoke4PGZqcx_jHvgCK0xNTneod8WoVv7VmoSYii+hg@mail.gmail.com>
+ <20151208140720.GA2395@red-moon>
+Message-ID: <CADyBb7sLAJdiC=2UzKFsHQ=+Tfuwd6FGi80O9H+1sj70qtCiPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 10:58:48AM +0100, Arnd Bergmann wrote:
-> On Tuesday 08 December 2015 10:50:49 Philipp Zabel wrote:
-> > Am Dienstag, den 08.12.2015, 09:37 +0800 schrieb Peter Chen:
-> > > Add dt-binding documentation for generic onboard USB HUB.
-> > > 
-> > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > > ---
-> > >  .../bindings/usb/generic-onboard-hub.txt           | 28 ++++++++++++++++++++++
-> > >  1 file changed, 28 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/usb/generic-onboard-hub.txt
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/usb/generic-onboard-hub.txt b/Documentation/devicetree/bindings/usb/generic-onboard-hub.txt
-> > > new file mode 100644
-> > > index 0000000..ea92205
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/usb/generic-onboard-hub.txt
-> > > @@ -0,0 +1,28 @@
-> > > +Generic Onboard USB HUB
-> > >+
-> > > +Required properties:
-> > > +- compatible: should be "generic-onboard-hub"
-> > 
-> > This something we don't have to define ad-hoc. The hub hangs off an USB
-> > controller, right? The "Open Firmware recommended practice: USB"
-> > document already describes how to represent USB devices in a generic
-> > manner:
-> > http://www.firmware.org/1275/bindings/usb/usb-1_0.ps
-> > 
-> > Is there a reason not to reuse this?
-> > 
-> > The usb hub node would be a child of the usb controller node, and it
-> > could use
-> > 	compatible = "usb,class9"; /* bDeviceClass 9 (Hub) */
-> 
-> Good point, I had not thought of that when I looked at the patches.
->  
-> Yes, let's do this way. I don't know if we ever implemented the simple
-> patch to associate a USB device with a device_node, but if not, then
-> let's do it now for this driver. A lot of people have asked for it in
-> the past.
+Hi Lorenzo,
 
-Agreed. Also, some hubs have I2C buses as well, but I still think under 
-the USB bus is the right place.
+On 8 December 2015 at 22:07, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Tue, Dec 08, 2015 at 09:08:24PM +0800, Fu Wei wrote:
+>> Hi Lorenzo,
+>>
+>>
+>>
+>> On 8 December 2015 at 20:52, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>> > Hi Lorenzo,
+>> >
+>> > On 12/08/2015 08:34 PM, Lorenzo Pieralisi wrote:
+>> >>
+>> >> On Tue, Dec 08, 2015 at 03:03:03PM +0800, fu.wei at linaro.org wrote:
+>> >>>
+>> >>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>> >>
+>> >>
+>> >> [...]
+>> >>
+>> >>> +#if defined(__i386__) || defined(__x86_64__)
+>> >>>   /*
+>> >>>    * Check if firmware advertises firmware first mode. We need FF bit to
+>> >>> be set
+>> >>>    * along with a set of MC banks which work in FF mode.
+>> >>>    */
+>> >>>   static int __init hest_parse_cmc(struct acpi_hest_header *hest_hdr,
+>> >>> void *data)
+>> >>>   {
+>> >>> -       return arch_apei_enable_cmcff(hest_hdr, data);
+>> >>> +       if (!acpi_disable_cmcff)
+>> >>
+>> >>
+>> >> Why do not you define the flag above in this file (move it out of x86 -
+>> >> that's what I was aiming at in my previous reply) and remove this
+>> >> ifdeffery
+>> >> altogether (First firmware handling could apply to arm64 too according to
+>> >> specs and ACPI on arm64 guidelines) ?
+>> >
+>> >
+>> > If I understand it correctly, CMC (Corrected Machine Check) is for IA32
+>> > only, see section 18.3.2.1 IA-32 Architecture Machine Check Exception
+>> > in ACPI 6.0. for ARM64, we can use other type of error source for
+>> > firmware first handling, such as Generic Hardware Error Source, did
+>> > I miss something?
+>>
+>> yes, that is why I try to use "#if defined(__i386__) ||
+>> defined(__x86_64__)" instead of moving acpi_disable_cmcff out of x86
+>> code to here.
+>>
+>> And I thinks we also can do "arch_apei_enable_cmcff" -->
+>> "apei_enable_ia_cmcff" because that is IA32 only.
+>>
+>> Please correct me if I misunderstand something.  Thanks :-)
+>
+> No you are right, I was confused by the arch_apei_enable_cmcff __weak
+> function declaration, I am not sure that makes much sense, as you say.
+>
 
-However, one complication here is often (probably this case) these 
-addtional signals need to be controlled before the device enumerates.
+Thanks :-)
 
-Rob
+
+> Side note: I wonder if there is a way to make the TLB flushing API common
+> across architectures therefore avoiding this arch_apei_flush_tlb* churn.
+
+yes, make sense, I will think about this today , thanks for your suggestion.
+
+>
+> Thanks,
+> Lorenzo
+>
+>> Great thanks for your feedback :-)
+>>
+>> >
+>> > Thanks
+>> > Hanjun
+>>
+>>
+>>
+>> --
+>> Best regards,
+>>
+>> Fu Wei
+>> Software Engineer
+>> Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
+>> Ph: +86 21 61221326(direct)
+>> Ph: +86 186 2020 4684 (mobile)
+>> Room 1512, Regus One Corporate Avenue,Level 15,
+>> One Corporate Avenue,222 Hubin Road,Huangpu District,
+>> Shanghai,China 200021
+>>
+
+
+
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
+Ph: +86 21 61221326(direct)
+Ph: +86 186 2020 4684 (mobile)
+Room 1512, Regus One Corporate Avenue,Level 15,
+One Corporate Avenue,222 Hubin Road,Huangpu District,
+Shanghai,China 200021
