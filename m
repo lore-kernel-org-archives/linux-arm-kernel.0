@@ -1,117 +1,76 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Wed, 9 Dec 2015 15:45:33 +0000
-Subject: [PATCH 004/182] gpio: generic: factor into gpio_chip struct
-In-Reply-To: <1449666760-29876-1-git-send-email-linus.walleij@linaro.org>
-References: <1449666760-29876-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20151209154533.GO972@e106497-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 9 Dec 2015 15:55:11 +0000
+Subject: [PATCH V1 00/11] MMCONFIG refactoring and ARM64 PCI hostbridge
+ init based on ACPI
+In-Reply-To: <20151209100125.GA12632@jayachandranc.netlogicmicro.com>
+References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
+ <20151207203117.GB14429@localhost>
+ <20151209100125.GA12632@jayachandranc.netlogicmicro.com>
+Message-ID: <20151209155511.GB21048@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 09, 2015 at 02:12:40PM +0100, Linus Walleij wrote:
-> The separate struct bgpio_chip has been a pain to handle, both
-> by being confusingly similar in name to struct gpio_chip and
-> for being contained inside a struct so that struct gpio_chip
-> is contained in a struct contained in a struct, making several
-> steps of dereferencing necessary.
+On Wed, Dec 09, 2015 at 03:31:41PM +0530, Jayachandran C. wrote:
+> [trimmed the cc list a bit]
+> On Mon, Dec 07, 2015 at 02:31:17PM -0600, Bjorn Helgaas wrote:
+> > On Tue, Oct 27, 2015 at 05:38:31PM +0100, Tomasz Nowicki wrote:
+> [...]
+> > > 
+> > > Tomasz Nowicki (10):
+> > >   x86, pci: Reorder logic of pci_mmconfig_insert() function
+> > >   x86, pci, acpi: Move arch-agnostic MMCONFIG (aka ECAM) and ACPI code
+> > >     out of arch/x86/ directory
+> > >   pci, acpi, mcfg: Provide generic implementation of MCFG code
+> > >     initialization.
+> > >   x86, pci: mmconfig_{32,64}.c code refactoring - remove code
+> > >     duplication.
+> > >   x86, pci, ecam: mmconfig_64.c becomes default implementation for ECAM
+> > >     driver.
+> > >   pci, acpi, mcfg: Provide default RAW ACPI PCI config space accessors.
+> > >   pci, acpi, ecam: Add flag to indicate whether ECAM region was hot
+> > >     added or not.
+> > >   x86, pci: Use previously added ECAM hot_added flag to remove ECAM
+> > >     regions.
+> [...]
+> > 
+> > Waiting for an updated version after all the discussion.
 > 
-> Make things simpler: include the fields directly into
-> <linux/gpio/driver.h>, #ifdef:ed for CONFIG_GENERIC_GPIO, and
-> get rid of the <linux/basic_mmio_gpio.h> altogether. Prefix
-> some of the member variables with bgpio_* and add proper
-> kerneldoc while we're at it.
+> Hi Bjorn,
 > 
-> Modify all users to handle the change and use a struct
-> gpio_chip directly. And while we're at it: replace all
-> container_of() dereferencing by gpiochip_get_data() and
-> registering the gpio_chip with gpiochip_add_data().
+> After looking thru the code, I don't think moving the mmconfig code out
+> of x86 and using it in ARM64 is a good idea.
 > 
-> Cc: arm at kernel.org
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Alexander Shiyan <shc_work@mail.ru>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> Cc: Gregory Fong <gregory.0xf0@gmail.com>
-> Cc: Brian Norris <computersforpeace@gmail.com>
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> Cc: Rabin Vincent <rabin@rab.in>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-omap at vger.kernel.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: bcm-kernel-feedback-list at broadcom.com
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC folks and Lee: it would be great if you could
-> ACK the few lines hitting arch/arm/* and drivers/mfd/* in this
-> so I can take it through the GPIO tree.
-> ---
-
-[....]
-
->  drivers/mfd/vexpress-sysreg.c           |   8 +-
-
-[....]
-
-> diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
-> index 3e628df9280c..855c0204f09a 100644
-> --- a/drivers/mfd/vexpress-sysreg.c
-> +++ b/drivers/mfd/vexpress-sysreg.c
-> @@ -11,7 +11,7 @@
->   * Copyright (C) 2012 ARM Limited
->   */
->  
-> -#include <linux/basic_mmio_gpio.h>
-> +#include <linux/gpio/driver.h>
->  #include <linux/err.h>
->  #include <linux/io.h>
->  #include <linux/mfd/core.h>
-> @@ -164,7 +164,7 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
->  {
->  	struct resource *mem;
->  	void __iomem *base;
-> -	struct bgpio_chip *mmc_gpio_chip;
-> +	struct gpio_chip *mmc_gpio_chip;
->  	int master;
->  	u32 dt_hbi;
->  
-> @@ -201,8 +201,8 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  	bgpio_init(mmc_gpio_chip, &pdev->dev, 0x4, base + SYS_MCI,
->  			NULL, NULL, NULL, NULL, 0);
-> -	mmc_gpio_chip->gc.ngpio = 2;
-> -	gpiochip_add(&mmc_gpio_chip->gc);
-> +	mmc_gpio_chip->ngpio = 2;
-> +	gpiochip_add(mmc_gpio_chip);
->  
->  	return mfd_add_devices(&pdev->dev, PLATFORM_DEVID_AUTO,
->  			vexpress_sysreg_cells,
-
-[....]
-
-> -- 
-> 2.4.3
+> The code maintains a list of mapping of ECAM regions which can modified
+> at run time, and ends doing this sequence for doing a config access:
 > 
+>         rcu_read_lock();
+>         addr = pci_dev_base(seg, bus, devfn);
+> 	        list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list)
+> 			...find mapping...
+> 	do pci operation
+> 	rcu_read_unlock();
+> 
+> A lot of the complexity in mmconfig_*.c is to maintain and validate
+> the pci_mmcfg_list which seems to be unecessary.
 
-For the drivers/mfd/vexpress-sysreg.c part:
+That list is there to manage hotplug bridges, what makes you think
+it is not necessary ? Jiang (in CC) can certainly comment on that and
+how that list handling can be updated/simplified, if possible.
 
-Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> The better way would be to keep the mapping of ECAM region in the PCI
+> host bridge sysdata like pci-host-generic and directly access using
+> map_bus/read/write.
+> 
+> I see that early raw_pci_read/raw_pci_write may need to be supported.
+> I am not sure if this is needed in ARM64 - and if it is, we can handle
+> this by taking an early mapping for ECAM regions until the PCI host
+> bridges are setup, and dropping the mapping at that point.
 
+I do not think it is needed (and if it is it can be added later, it
+should not block this series), this was already debated in previous
+threads (and in the ASWG, where basically nobody could provide a reason
+why those raw accessors in ACPICA are meant to exist, they are there for
+AML to access config space, why that has to be happen before PCI busses
+are enumerated is still a mystery to me).
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Lorenzo
