@@ -1,30 +1,27 @@
-From: alison.wang@freescale.com (Huan Wang)
-Date: Wed, 9 Dec 2015 08:41:21 +0000
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable some drivers for LS1021A
-In-Reply-To: <3400541.YhcYNk5DCk@wuerfel>
-References: <1449563883-29317-1-git-send-email-b18965@freescale.com>
- <3400541.YhcYNk5DCk@wuerfel>
-Message-ID: <BN3PR0301MB0867F04C5F0D9182D4C34D1AFEE80@BN3PR0301MB0867.namprd03.prod.outlook.com>
+From: rsahu@apm.com (Rameshwar Sahu)
+Date: Wed, 9 Dec 2015 14:13:32 +0530
+Subject: [PATCH v2 0/3] dmaengine: Add supports for APM X-Gene SoC CRC32C
+ accerlerator driver
+In-Reply-To: <20151209082748.GA26696@gondor.apana.org.au>
+References: <rsahu@apm.com> <1447665169-14003-1-git-send-email-rsahu@apm.com>
+ <CAFd313yzBgWhTD2+Lz+RsdziAuc2kdZPS1L2FExET5sLirs_DQ@mail.gmail.com>
+ <20151209082748.GA26696@gondor.apana.org.au>
+Message-ID: <CAFd313z3zaXMAgKWa9KwQw1QxU4LuW_uoAz5_=42viYk2zaaOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Tuesday 08 December 2015 16:38:03 Alison Wang wrote:
-> > This patch enables some drivers for LS1021A, such as GIANFAR,
-> > WATCHDOG, AUDIO, QSPI, I2C, ESDHC, EDMA, FTM.
-> > QorIQ Clock Framework and Ramdisk support is also enabled.
-> >
-> > Signed-off-by: Alison Wang <alison.wang@freescale.com>
-> > ---
-> 
-> I think most of these can be made loadable modules, please do that and
-> only leave as much built-in as you need for booting.
-> 
-> Otherwise looks ok.
-> 
-> 
-[Alison Wang] Thanks for your advice. I will change most drivers as loadable
-modules in v2.
+On Wed, Dec 9, 2015 at 1:57 PM, Herbert Xu <herbert@gondor.apana.org.au> wrote:
+> On Wed, Dec 09, 2015 at 01:55:55PM +0530, Rameshwar Sahu wrote:
+>>
+>> Any comments on above patch ??
+>
+> My concern that there aren't going to be any in-kernel users remains.
+Yes, we are not upstream in-kernel users right now, but later client
+ma upstream there patches.
 
-
-Best Regards,
-Alison Wang
+>
+> Cheers,
+> --
+> Email: Herbert Xu <herbert@gondor.apana.org.au>
+> Home Page: http://gondor.apana.org.au/~herbert/
+> PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
