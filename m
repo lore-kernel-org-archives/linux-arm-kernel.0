@@ -1,62 +1,33 @@
-From: yankejian@huawei.com (Yankejian (Hackim Yim))
-Date: Wed, 9 Dec 2015 18:39:59 +0800
-Subject: [PATCH net-next 1/2] net: hns: enet specisies a reference to dsaf
-In-Reply-To: <56671D27.5070700@gmail.com>
-References: <1449302356-54658-1-git-send-email-yankejian@huawei.com>
- <1449302356-54658-2-git-send-email-yankejian@huawei.com>
- <56671D27.5070700@gmail.com>
-Message-ID: <566804FF.5000607@huawei.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 9 Dec 2015 11:42:35 +0100
+Subject: [PATCH 1/2] ARM: shmobile: r8a7793: Add missing serial devices to
+ DT
+In-Reply-To: <1448589166-11612-2-git-send-email-horms+renesas@verge.net.au>
+References: <1448589166-11612-1-git-send-email-horms+renesas@verge.net.au>
+ <1448589166-11612-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdUXaO6PynwOaEP9e88F10uJSoc7u848RgnDVRdqyYFnTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2015/12/9 2:10, Florian Fainelli wrote:
-> Subject: s/specisies/specifies/?
-
-Thanks for pointing it out. i will change it in next patchset.
-
-Best Regards,
-yankejian
-
-> On 04/12/15 23:59, yankejian wrote:
->> enet is associating with dasf. before this patch, the association is
->> the same strings between ae-name and dsa-name. in a general way, enet
->> specifies a reference to dsaf should be a good idea. so this patch
->> deletes the ae-name in enet, and adds parsing the ae-handle
->> from DT to set the associating with dsaf.
->>
->> Signed-off-by: yankejian <yankejian@huawei.com>
->> ---
-> [snip]
+On Fri, Nov 27, 2015 at 2:52 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Instantiate all serial devices in r8a7793 device tree
+> and set them as disabled by default.
 >
->> diff --git a/drivers/net/ethernet/hisilicon/hns/hnae.c b/drivers/net/ethernet/hisilicon/hns/hnae.c
->> index b364529..3bfe36f 100644
->> --- a/drivers/net/ethernet/hisilicon/hns/hnae.c
->> +++ b/drivers/net/ethernet/hisilicon/hns/hnae.c
->> @@ -95,21 +95,17 @@ static struct hnae_buf_ops hnae_bops = {
->>  static int __ae_match(struct device *dev, const void *data)
->>  {
->>  	struct hnae_ae_dev *hdev = cls_to_ae_dev(dev);
->> -	const char *ae_id = data;
->>  
->> -	if (!strncmp(ae_id, hdev->name, AE_NAME_SIZE))
->> -		return 1;
->> -
->> -	return 0;
->> +	return hdev->dev->of_node == data;
->>  }
->>  
->> -static struct hnae_ae_dev *find_ae(const char *ae_id)
->> +static struct hnae_ae_dev *find_ae(const struct device_node *ae_node)
->>  {
->>  	struct device *dev;
->>  
->> -	WARN_ON(!ae_id);
->> +	WARN_ON(!ae_node);
->>  
->> -	dev = class_find_device(hnae_class, NULL, ae_id, __ae_match);
->> +	dev = class_find_device(hnae_class, NULL, ae_node, __ae_match);
-> of_find_net_device_by_node might be used for this maybe?
-it needs return hnae_ae_dev so we didn't decide to use of_find_net_device_by_node.
-Thanks
+> Based on similar work for the r8a7791 by Laurent Pinchart.
+>
+> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
