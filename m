@@ -1,37 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 09 Dec 2015 17:42:41 +0100
-Subject: [PATCH] iwlegacy: mark il_adjust_beacon_interval as noinline
-Message-ID: <36263581.L8412YxJjp@wuerfel>
+Date: Wed, 09 Dec 2015 17:52:06 +0100
+Subject: [PATCH] ARM: pxa: cm-x2xx: avoid duplicate macro warnings
+Message-ID: <5126103.CuC5iMSqYG@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the new optimized do_div() code, some versions of gcc
-produce obviously incorrect code that leads to a link error
-in iwlegacy/common.o:
+In an old commit, we worked around the duplicate definition of
+GPIO24_SSP1_SFRM in cm-x2xx.c, which includes files for both
+pxa25x and pxa27x. Apparently the problem has come back and we
+now have four additional duplicate symbols that cause warnings:
 
-drivers/built-in.o: In function `il_send_rxon_timing':
-:(.text+0xa6b4d4): undefined reference to `____ilog2_NaN'
-:(.text+0xa6b4f0): undefined reference to `__aeabi_uldivmod'
+In file included from /git/arm-soc/arch/arm/mach-pxa/pxa27x.h:7:0,
+                 from /git/arm-soc/arch/arm/mach-pxa/cm-x2xx.c:27:
+/git/arm-soc/arch/arm/mach-pxa/mfp-pxa27x.h:21:0: warning: "GPIO86_GPIO" redefined
+ #define GPIO86_GPIO  MFP_CFG_IN(GPIO86, AF0)
 
-In a few thousand randconfig builds, I have seen this problem
-a couple of times in this file, but never anywhere else in the
-kernel, so we can try to work around this in the only file
-that shows the behavior, by marking the il_adjust_beacon_interval
-function as noinline, which convinces gcc to use the unoptimized
-do_div() all the time.
+This uses the same hack as before and undefines all symbols that
+are defined more than once. Fortunately, cm-x2xx does not need
+any of these.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/drivers/net/wireless/intel/iwlegacy/common.c b/drivers/net/wireless/intel/iwlegacy/common.c
-index 887114582583..6308bb217454 100644
---- a/drivers/net/wireless/intel/iwlegacy/common.c
-+++ b/drivers/net/wireless/intel/iwlegacy/common.c
-@@ -3602,7 +3602,7 @@ il_is_ht40_tx_allowed(struct il_priv *il, struct ieee80211_sta_ht_cap *ht_cap)
- }
- EXPORT_SYMBOL(il_is_ht40_tx_allowed);
+diff --git a/arch/arm/mach-pxa/cm-x2xx.c b/arch/arm/mach-pxa/cm-x2xx.c
+index f2d801160079..7202022ee243 100644
+--- a/arch/arm/mach-pxa/cm-x2xx.c
++++ b/arch/arm/mach-pxa/cm-x2xx.c
+@@ -24,7 +24,16 @@
  
--static u16
-+static u16 noinline
- il_adjust_beacon_interval(u16 beacon_val, u16 max_beacon_val)
- {
- 	u16 new_val;
+ #include "pxa25x.h"
+ #undef GPIO24_SSP1_SFRM
++#undef GPIO86_GPIO
++#undef GPIO87_GPIO
++#undef GPIO88_GPIO
++#undef GPIO89_GPIO
+ #include "pxa27x.h"
++#undef GPIO24_SSP1_SFRM
++#undef GPIO86_GPIO
++#undef GPIO87_GPIO
++#undef GPIO88_GPIO
++#undef GPIO89_GPIO
+ #include <mach/audio.h>
+ #include <linux/platform_data/video-pxafb.h>
+ #include <mach/smemc.h>
