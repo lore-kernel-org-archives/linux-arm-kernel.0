@@ -1,96 +1,67 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 9 Dec 2015 09:32:10 +0100
-Subject: [PATCH v3 bis 12/25] mtd: nand: use the mtd instance embedded
- in struct nand_chip
-In-Reply-To: <20151209001741.GT120110@google.com>
-References: <1448967802-25796-1-git-send-email-boris.brezillon@free-electrons.com>
- <1449046201-22921-1-git-send-email-boris.brezillon@free-electrons.com>
- <20151209001741.GT120110@google.com>
-Message-ID: <20151209093210.007a63b3@bbrezillon>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Wed, 9 Dec 2015 16:35:58 +0800
+Subject: [PATCH v6 12/21] KVM: ARM64: Add reset and access handlers for
+ PMCNTENSET and PMCNTENCLR register
+In-Reply-To: <56670865.2050705@arm.com>
+References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
+ <1449578860-15808-13-git-send-email-zhaoshenglong@huawei.com>
+ <56670865.2050705@arm.com>
+Message-ID: <5667E7EE.90908@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
 
-On Tue, 8 Dec 2015 16:17:41 -0800
-Brian Norris <computersforpeace@gmail.com> wrote:
 
+On 2015/12/9 0:42, Marc Zyngier wrote:
+>> +void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u32 val, bool all_enable)
+>> > +{
+>> > +	int i;
+>> > +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+>> > +	struct kvm_pmc *pmc;
+>> > +
+>> > +	if (!all_enable)
+>> > +		return;
+> You have the vcpu. Can you move the check for PMCR_EL0.E here instead of
+> having it in both of the callers?
 > 
-> > diff --git a/drivers/mtd/nand/cmx270_nand.c b/drivers/mtd/nand/cmx270_nand.c
-> > index 43bded6..84d027e 100644
-> > --- a/drivers/mtd/nand/cmx270_nand.c
-> > +++ b/drivers/mtd/nand/cmx270_nand.c
-> > @@ -160,10 +160,8 @@ static int __init cmx270_init(void)
-> >  	gpio_direction_input(GPIO_NAND_RB);
-> >  
-> >  	/* Allocate memory for MTD device structure and private data */
-> > -	cmx270_nand_mtd = kzalloc(sizeof(struct mtd_info) +
-> > -				  sizeof(struct nand_chip),
-> > -				  GFP_KERNEL);
-> > -	if (!cmx270_nand_mtd) {
-> > +	this = kzalloc(sizeof(struct nand_chip), GFP_KERNEL);
-> > +	if (!this) {
-> >  		ret = -ENOMEM;
-> >  		goto err_kzalloc;
-> >  	}
-> > @@ -175,8 +173,7 @@ static int __init cmx270_init(void)
-> >  		goto err_ioremap;
-> >  	}
-> >  
-> > -	/* Get pointer to private data */
-> > -	this = (struct nand_chip *)(&cmx270_nand_mtd[1]);
-> > +	cmx270_nand_mtd = nand_to_mtd(this);
+But it still needs to check PMCR_EL0.E in kvm_pmu_handle_pmcr(). When
+PMCR_EL0.E == 1, it calls kvm_pmu_enable_counter(), otherwise it calls
+kvm_pmu_disable_counter(). So as it checks already, just pass the result
+as a parameter.
+
+>> > +
+>> > +	for_each_set_bit(i, (const unsigned long *)&val, ARMV8_MAX_COUNTERS) {
+> Nonononono... If you must have to use a long, use a long. Don't cast it
+> to a different type (hint: big endian).
 > 
-> So, you make cmx270_nand_mtd no longer kzalloc()'d, but I still see the
-> cmx270_init() function end with:
+>> > +		pmc = &pmu->pmc[i];
+>> > +		if (pmc->perf_event) {
+>> > +			perf_event_enable(pmc->perf_event);
+>> > +			if (pmc->perf_event->state != PERF_EVENT_STATE_ACTIVE)
+>> > +				kvm_debug("fail to enable perf event\n");
+>> > +		}
+>> > +	}
+>> > +}
+>> > +
+>> > +/**
+>> > + * kvm_pmu_disable_counter - disable selected PMU counter
+>> > + * @vcpu: The vcpu pointer
+>> > + * @val: the value guest writes to PMCNTENCLR register
+>> > + *
+>> > + * Call perf_event_disable to stop counting the perf event
+>> > + */
+>> > +void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val)
+>> > +{
+>> > +	int i;
+>> > +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+>> > +	struct kvm_pmc *pmc;
+>> > +
+> Why are enable and disable asymmetric (handling of PMCR.E)?
 > 
-> err_scan:
->         iounmap(cmx270_nand_io);
-> err_ioremap:
->         kfree(cmx270_nand_mtd);  <----- *** this! ***
-
-Oh, crap.
-
-> err_kzalloc:
->         gpio_free(GPIO_NAND_RB);
-> err_gpio_request:
-> 	gpio_free(GPIO_NAND_CS);
-> 
-> 	return ret;
-> 
-> }
-> 
-> I have a feeling there's a failing in your coccinelle script somewhere.
-
-These changes are not automated, because it's kind of hard to address
-all the different cases where the following pattern is employed;
-
-var = kzalloc(sizeof(struct mtd_info) +
-	      sizeof(struct nand_chip) + ..., ...);
-
-Sometime var is an mtd_info pointer, sometime it's a nand_chip pointer
-or directly a pointer to the private struct.
-
-I'm pretty sure we could come up with a valid coccinelle script, but
-given the number of drivers using this approach I'm not sure it is
-worth it...
-
-> 
-> Given that I was only through 10 of 49 files changes, I think you might
-> need to take a comb over your patch better.
-
-I'll go over those changes one more time, but from my experience, these
-kind of bugs are spotted more easily by people who didn't write the
-code, so other reviews are more than welcome.
-
-Also, as you suggested, I'll split the changes in several commits (one
-per driver) so that you can pick them independently.
+To enable a counter, it needs both the PMCR_EL0.E and the corresponding
+bit of PMCNTENSET_EL0 set to 1. But to disable a counter, it only needs
+one of them and when PMCR_EL0.E == 0? it disables all the counters.
 
 Thanks,
-
-Boris
-
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Shannon
