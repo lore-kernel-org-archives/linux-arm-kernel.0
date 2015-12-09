@@ -1,205 +1,68 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 9 Dec 2015 09:21:02 +0800
-Subject: [PATCH v10 14/17] drm: bridge: analogix/dp: try force hpd after
- plug in lookup failed
-In-Reply-To: <20151208150954.GA17979@rob-hp-laptop>
-References: <1449470239-30667-1-git-send-email-ykk@rock-chips.com>
- <1449470442-31519-1-git-send-email-ykk@rock-chips.com>
- <20151208150954.GA17979@rob-hp-laptop>
-Message-ID: <566781FE.80500@rock-chips.com>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Tue, 8 Dec 2015 17:48:01 -0800
+Subject: [PATCH v5 0/5] gicv2m: acpi: Add ACPI support for GICv2m MSI
+Message-ID: <1449625686-5594-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+This patch series has been forked from the following patch series since
+it no longer depends on the rest of the patches.
 
-Thanks for your respond.
+  [PATCH v4 00/10] ACPI GIC Self-probing, GICv2m and GICv3 support
+  https://lkml.org/lkml/2015/7/29/234
 
-On 12/08/2015 11:09 PM, Rob Herring wrote:
-> On Mon, Dec 07, 2015 at 02:40:42PM +0800, Yakir Yang wrote:
->> Some edp screen do not have hpd signal, so we can't just return
->> failed when hpd plug in detect failed.
->>
->> This is an hardware property, so we need add a devicetree property
->> "analogix,need-force-hpd" to indicate this sutiation.
-> I can see this being common. Just make it "force-hpd".
+It has been ported to use the newly introduced device fwnode_handle 
+for ACPI irqdmain introduced by Marc in the following patch series:
 
-Okay, I would send the v10.1 out.
+  [PATCH v2 00/17] Divorcing irqdomain and device_node
+  http://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git irq/irq-domain-fwnode-v2
 
-- Yakir
+The following git branch contains the submitted patches along with
+the pre-requsite patches (mainly for ARM64 PCI support for ACPI).
 
-> Rob
->
->> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
->> ---
->> Changes in v10: None
->> Changes in v9: None
->> Changes in v8: None
->> Changes in v7: None
->> Changes in v6: None
->> Changes in v5: None
->> Changes in v4: None
->> Changes in v3:
->> - Add "analogix,need-force-hpd" to indicate whether driver need foce
->>    hpd when hpd detect failed.
->>
->> Changes in v2: None
->>
->>   .../bindings/display/bridge/analogix_dp.txt        |  4 ++-
->>   .../bindings/display/exynos/exynos_dp.txt          |  1 +
->>   .../display/rockchip/analogix_dp-rockchip.txt      |  1 +
->>   drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 36 +++++++++++++++++++---
->>   drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  2 ++
->>   drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  |  9 ++++++
->>   6 files changed, 47 insertions(+), 6 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
->> index 7659a7a..74f0e80 100644
->> --- a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
->> +++ b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
->> @@ -22,6 +22,9 @@ Required properties for dp-controller:
->>   		from general PHY binding: Should be "dp".
->>   
->>   Optional properties for dp-controller:
->> +	-analogix,need-force-hpd:
->> +		Indicate driver need force hpd when hpd detect failed, this
->> +		is used for some eDP screen which don't have hpd signal.
->>   	-hpd-gpios:
->>   		Hotplug detect GPIO.
->>   		Indicates which GPIO should be used for hotplug detection
->> @@ -31,7 +34,6 @@ Optional properties for dp-controller:
->>   		* Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
->>   		* Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt
->>   
->> -
->>   [1]: Documentation/devicetree/bindings/media/video-interfaces.txt
->>   -------------------------------------------------------------------------------
->>   
->> diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
->> index 9905081..8800164 100644
->> --- a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
->> +++ b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
->> @@ -41,6 +41,7 @@ For the below properties, please refer to Analogix DP binding document:
->>   	-phys (required)
->>   	-phy-names (required)
->>   	-hpd-gpios (optional)
->> +	-analogix,need-force-hpd (optional)
->>   	-video interfaces (optional)
->>   
->>   Deprecated properties for DisplayPort:
->> diff --git a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
->> index dae86c4..1f1e594 100644
->> --- a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
->> +++ b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
->> @@ -32,6 +32,7 @@ For the below properties, please refer to Analogix DP binding document:
->>   - phys (required)
->>   - phy-names (required)
->>   - hpd-gpios (optional)
->> +- analogix,need-force-hpd (optional)
->>   -------------------------------------------------------------------------------
->>   
->>   Example:
->> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
->> index a11504b..94968e4 100644
->> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
->> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
->> @@ -59,15 +59,38 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
->>   {
->>   	int timeout_loop = 0;
->>   
->> -	while (analogix_dp_get_plug_in_status(dp) != 0) {
->> +	while (timeout_loop < DP_TIMEOUT_LOOP_COUNT) {
->> +		if (analogix_dp_get_plug_in_status(dp) == 0)
->> +			return 0;
->> +
->>   		timeout_loop++;
->> -		if (timeout_loop > DP_TIMEOUT_LOOP_COUNT) {
->> -			dev_err(dp->dev, "failed to get hpd plug status\n");
->> -			return -ETIMEDOUT;
->> -		}
->>   		usleep_range(10, 11);
->>   	}
->>   
->> +	/*
->> +	 * Some edp screen do not have hpd signal, so we can't just
->> +	 * return failed when hpd plug in detect failed, DT property
->> +	 * "need-force-hpd" would indicate whether driver need this.
->> +	 */
->> +	if (!dp->need_force_hpd)
->> +		return -ETIMEDOUT;
->> +
->> +	/*
->> +	 * The eDP TRM indicate that if HPD_STATUS(RO) is 0, AUX CH
->> +	 * will not work, so we need to give a force hpd action to
->> +	 * set HPD_STATUS manually.
->> +	 */
->> +	dev_dbg(dp->dev, "failed to get hpd plug status, try to force hpd\n");
->> +
->> +	analogix_dp_force_hpd(dp);
->> +
->> +	if (analogix_dp_get_plug_in_status(dp) != 0) {
->> +		dev_err(dp->dev, "failed to get hpd plug in status\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	dev_dbg(dp->dev, "success to get plug in status after force hpd\n");
->> +
->>   	return 0;
->>   }
->>   
->> @@ -1246,6 +1269,9 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
->>   	if (IS_ERR(dp->reg_base))
->>   		return PTR_ERR(dp->reg_base);
->>   
->> +	dp->need_force_hpd =
->> +		of_property_read_bool(dev->of_node, "analogix,need-force-hpd");
->> +
->>   	dp->hpd_gpio = of_get_named_gpio(dev->of_node, "hpd-gpios", 0);
->>   	if (!gpio_is_valid(dp->hpd_gpio))
->>   		dp->hpd_gpio = of_get_named_gpio(dev->of_node,
->> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
->> index e6f8243..d3c7e0a 100644
->> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
->> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
->> @@ -160,6 +160,7 @@ struct analogix_dp_device {
->>   	struct phy		*phy;
->>   	int			dpms_mode;
->>   	int			hpd_gpio;
->> +	bool                    need_force_hpd;
->>   
->>   	struct analogix_dp_plat_data *plat_data;
->>   };
->> @@ -180,6 +181,7 @@ void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
->>   				       bool enable);
->>   void analogix_dp_init_analog_func(struct analogix_dp_device *dp);
->>   void analogix_dp_init_hpd(struct analogix_dp_device *dp);
->> +void analogix_dp_force_hpd(struct analogix_dp_device *dp);
->>   enum dp_irq_type analogix_dp_get_irq_type(struct analogix_dp_device *dp);
->>   void analogix_dp_clear_hotplug_interrupts(struct analogix_dp_device *dp);
->>   void analogix_dp_reset_aux(struct analogix_dp_device *dp);
->> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
->> index 21a3287..c7e2959 100644
->> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
->> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
->> @@ -365,6 +365,15 @@ void analogix_dp_init_hpd(struct analogix_dp_device *dp)
->>   	writel(reg, dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
->>   }
->>   
->> +void analogix_dp_force_hpd(struct analogix_dp_device *dp)
->> +{
->> +	u32 reg;
->> +
->> +	reg = readl(dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
->> +	reg = (F_HPD | HPD_CTRL);
->> +	writel(reg, dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
->> +}
->> +
->>   enum dp_irq_type analogix_dp_get_irq_type(struct analogix_dp_device *dp)
->>   {
->>   	u32 reg;
->> -- 
->> 1.9.1
->>
->>
->
->
+  https://github.com/ssuthiku/linux.git	v2m-multiframe-v5
+
+This has been tested on AMD Seattle (Overdrive) RevB system. 
+
+NOTE: I have not tested ACPI GICv2m multiframe support since
+I don't have access to such system. Any helps are appreciated.
+
+Thanks,
+Suravee
+
+Changes from V4: (https://lkml.org/lkml/2015/12/08/613)
+  - Fix build error when not specifying CONFIG_IRQ_DOMAIN.
+
+Changes from V3: (https://lkml.org/lkml/2015/10/21/691)
+  - Merged patch 2 into 1, and got rid off pci_msi_get_fwnode()
+    since only ACPI will likely use this. (per Marc suggestion)
+  - Rebased to 4.4.0-rc4
+
+Changes from V2: (https://lkml.org/lkml/2015/10/14/1010)
+  - Minor clean up from Tomasz review comment in patch 6/6.
+
+Changes from V1: (https://lkml.org/lkml/2015/10/13/859)
+  - Rebase on top of Marc's patch to addng support for multiple MSI frames
+    (https://lkml.org/lkml/2015/10/14/271)
+  - Adding fwnode convenient functions (patch 3 and 4)
+
+Suravee Suthikulpanit (5):
+  acpi: pci: Setup MSI domain for ACPI based pci devices
+  irqdomain: introduce is_fwnode_irqchip helper
+  irqdomain: Introduce irq_domain_get_irqchip_fwnode_name helper
+    function
+  gicv2m: Refactor to prepare for ACPI support
+  gicv2m: acpi: Introducing GICv2m ACPI support
+
+ drivers/irqchip/irq-gic-v2m.c   | 152 ++++++++++++++++++++++++++++++++++------
+ drivers/irqchip/irq-gic.c       |   5 +-
+ drivers/pci/pci-acpi.c          |  32 +++++++++
+ drivers/pci/probe.c             |   2 +
+ include/linux/irqchip/arm-gic.h |   4 ++
+ include/linux/irqdomain.h       |  11 +++
+ include/linux/pci.h             |  10 +++
+ kernel/irq/irqdomain.c          |  20 +++++-
+ 8 files changed, 213 insertions(+), 23 deletions(-)
+
+-- 
+2.1.0
