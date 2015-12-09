@@ -1,47 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 09 Dec 2015 09:55:43 +0100
-Subject: [PATCH 2/3] doc: dt-binding: generic onboard USB HUB
-In-Reply-To: <20151209081223.GB941@shlinux2>
-References: <1449538670-7954-1-git-send-email-peter.chen@freescale.com>
- <20151209032403.GA3716@rob-hp-laptop> <20151209081223.GB941@shlinux2>
-Message-ID: <4048406.zTEffj2eJ2@wuerfel>
+From: peda@lysator.liu.se (Peter Rosin)
+Date: Wed, 09 Dec 2015 09:56:19 +0100
+Subject: [RESEND RFC PATCH 0/2] Expose the PIO_ISR register on SAMA5D3
+In-Reply-To: <20151209080155.GB7411@odux.rfo.atmel.com>
+References: <1449544808-3163-1-git-send-email-peda@lysator.liu.se>
+ <20151209080155.GB7411@odux.rfo.atmel.com>
+Message-ID: <5667ECB3.1010107@lysator.liu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 09 December 2015 16:12:24 Peter Chen wrote:
-> On Tue, Dec 08, 2015 at 09:24:03PM -0600, Rob Herring wrote:
-> > On Tue, Dec 08, 2015 at 10:58:48AM +0100, Arnd Bergmann wrote:
-> > > On Tuesday 08 December 2015 10:50:49 Philipp Zabel wrote:
-> > > > This something we don't have to define ad-hoc. The hub hangs off an USB
-> > > > controller, right? The "Open Firmware recommended practice: USB"
-> > > > document already describes how to represent USB devices in a generic
-> > > > manner:
-> > > > http://www.firmware.org/1275/bindings/usb/usb-1_0.ps
-> > > > 
-> > > > Is there a reason not to reuse this?
-> > > > 
-> > > > The usb hub node would be a child of the usb controller node, and it
-> > > > could use
-> > > > 	compatible = "usb,class9"; /* bDeviceClass 9 (Hub) */
-> > > 
-> > > Good point, I had not thought of that when I looked at the patches.
-> > >  
-> > > Yes, let's do this way. I don't know if we ever implemented the simple
-> > > patch to associate a USB device with a device_node, but if not, then
-> > > let's do it now for this driver. A lot of people have asked for it in
-> > > the past.
-> > 
-> > Agreed. Also, some hubs have I2C buses as well, but I still think under 
-> > the USB bus is the right place.
-> > 
-> > However, one complication here is often (probably this case) these 
-> > addtional signals need to be controlled before the device enumerates.
-> > 
+Hi!
+
+On 2015-12-09 09:01, Ludovic Desroches wrote:
+> Hi Peter,
 > 
-> Yes, I did not find a way to let the USB bus code handle it, so I had to
-> write a platform driver to do it
+> On Tue, Dec 08, 2015 at 04:20:06AM +0100, Peter Rosin wrote:
+>> From: Peter Rosin <peda@axentia.se>
+>>
+>> Hi!
+>>
+>> I have a signal connected to a gpio pin which is the output of
+>> a comparator. By changing the level of one of the inputs to the
+>> comparator, I can detect the envelope of the other input to
+>> the comparator by using a series of measurements much in the
+>> same maner a manual ADC works, but watching for changes on the
+>> comparator over a period of time instead of only the immediate
+>> output.
+>>
+>> Now, the input signal to the comparator might have a high frequency,
+>> which will cause the output from the comparator (and thus the GPIO
+>> input) to change rapidly.
+>>
+>> A common(?) idiom for this is to use the interrupt status register
+>> to catch the glitches, but then not have any interrupt tied to
+>> the pin as that could possibly generate pointless bursts of
+>> (expensive) interrupts.
+>>
+> 
+> Well I don't know if this use case as already been considered. I
+> understand you don't want to be overwhelmed by interrupts but why not
+> using the interrupt to start polling the PDSR (Pin Data Status
+> Register)?
 
-Looping in Ulf, he solved the same problem for SDIO devices recently,
-and probably remembers the details best.
+That scheme will not work for me. There might be only one short
+glitch, and there might be a flood. I need to catch both. What could
+be made to work is some kind of one-off interrupt thingy. I.e. an
+interrupt that disabled itself when hit (if that is possibly without
+lockup?). That could be a small generic driver not specific to gpio,
+I suppose, but where should such a beast live and what user space
+interface should it have?
 
-	Arnd
+And while that is generic and will probably work in more cases, it
+seems complicated and quite a bit of a detour compared to simply
+reading the same info from a register.
+
+Are there really noone else using ISR type registers like this with
+Linux? In my mind that was pretty standard practice...
+
+> I am really not comfortable about exposing the ISR since there is a
+> clean on read. You have taken precautions by checking the IMR before but
+> if there is a single driver using a gpio as an irq, you will never get
+> the ISR.
+
+Yes, I'm aware of the limitation, but in my case that's not a problem,
+obviously. I have no (other) interrupt sources on the gpios covered by
+the ISR register in question.
+
+I take it that your major concern is the non-generality, i.e. that it
+is not possible to safely get at the ISR when there are interrupts
+enabled, and not the complication/overhead of the new lock?
+
+Cheers,
+Peter
