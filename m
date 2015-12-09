@@ -1,24 +1,23 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  9 Dec 2015 12:44:46 +0000
-Subject: [RFC PATCH 11/20] arm64: mm: move pte_* macros
+Date: Wed,  9 Dec 2015 12:44:48 +0000
+Subject: [RFC PATCH 13/20] arm64: mm: avoid redundant __pa(__va(x))
 In-Reply-To: <1449665095-20774-1-git-send-email-mark.rutland@arm.com>
 References: <1449665095-20774-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1449665095-20774-12-git-send-email-mark.rutland@arm.com>
+Message-ID: <1449665095-20774-14-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For pmd, pud, and pgd levels of table, functions including p?d_index and
-p?d_offset are defined after the p?d_page_vaddr function for the
-immediately higher level of table.
+When we "upgrade" to a section mapping, we free any table we made
+redundant by giving it back to memblock. To get the PA, we acquire the
+physical address and convert this to a VA, then subsequently convert
+this back to a PA.
 
-The pte functions however are defined much earlier, even though several
-rely on the later definition of pmd_page_vaddr. While this isn't
-currently a problem as these are macros, it prevents the logical
-grouping of later C functions (which cannot rely on prototypes for
-functions not yet defined).
+This works currently, but will not work if the tables are not accessed
+via linear map VAs (e.g. is we use fixmap slots).
 
-Move these definitions after pmd_page_vaddr, for consistency with the
-placement of these functions for other levels of table.
+This patch uses {pmd,pud}_page_paddr to acquire the PA. This avoids the
+__pa(__va()) round trip, saving some work and avoiding reliance on the
+linear mapping.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
@@ -27,46 +26,30 @@ Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/pgtable.h | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ arch/arm64/mm/mmu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 00f5a4b8..738cc37 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -134,16 +134,6 @@ extern unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)];
- #define pte_clear(mm,addr,ptep)	set_pte(ptep, __pte(0))
- #define pte_page(pte)		(pfn_to_page(pte_pfn(pte)))
- 
--/* Find an entry in the third-level page table. */
--#define pte_index(addr)		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
--
--#define pte_offset_kernel(dir,addr)	(pmd_page_vaddr(*(dir)) + pte_index(addr))
--
--#define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
--#define pte_offset_map_nested(dir,addr)	pte_offset_kernel((dir), (addr))
--#define pte_unmap(pte)			do { } while (0)
--#define pte_unmap_nested(pte)		do { } while (0)
--
- /*
-  * The following only work if pte_present(). Undefined behaviour otherwise.
-  */
-@@ -425,6 +415,16 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
- 	return __va(pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK);
- }
- 
-+/* Find an entry in the third-level page table. */
-+#define pte_index(addr)		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
-+
-+#define pte_offset_kernel(dir,addr)	(pmd_page_vaddr(*(dir)) + pte_index(addr))
-+
-+#define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
-+#define pte_offset_map_nested(dir,addr)	pte_offset_kernel((dir), (addr))
-+#define pte_unmap(pte)			do { } while (0)
-+#define pte_unmap_nested(pte)		do { } while (0)
-+
- #define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
- 
- /*
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 0c16c25..5ed1623 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -167,7 +167,7 @@ static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+ 			if (!pmd_none(old_pmd)) {
+ 				flush_tlb_all();
+ 				if (pmd_table(old_pmd)) {
+-					phys_addr_t table = __pa(pte_offset_map(&old_pmd, 0));
++					phys_addr_t table = pmd_page_paddr(old_pmd);
+ 					if (!WARN_ON_ONCE(slab_is_available()))
+ 						memblock_free(table, PAGE_SIZE);
+ 				}
+@@ -228,7 +228,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+ 			if (!pud_none(old_pud)) {
+ 				flush_tlb_all();
+ 				if (pud_table(old_pud)) {
+-					phys_addr_t table = __pa(pmd_offset(&old_pud, 0));
++					phys_addr_t table = pud_page_paddr(old_pud);
+ 					if (!WARN_ON_ONCE(slab_is_available()))
+ 						memblock_free(table, PAGE_SIZE);
+ 				}
 -- 
 1.9.1
