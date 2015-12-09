@@ -1,23 +1,23 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  9 Dec 2015 12:44:47 +0000
-Subject: [RFC PATCH 12/20] arm64: mm: add functions to walk page tables by PA
+Date: Wed,  9 Dec 2015 12:44:54 +0000
+Subject: [RFC PATCH 19/20] arm64: ensure _stext and _etext are page-aligned
 In-Reply-To: <1449665095-20774-1-git-send-email-mark.rutland@arm.com>
 References: <1449665095-20774-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1449665095-20774-13-git-send-email-mark.rutland@arm.com>
+Message-ID: <1449665095-20774-20-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow us to walk tables allocated into the fixmap, we need to acquire
-the physical address of a page, rather than the virtual address in the
-linear map.
+Currently we have separate ALIGN_DEBUG_RO{,_MIN} directives to align
+_etext and __init_begin. While we ensure that __init_begin is
+page-aligned, we do not provide the same guarantee for _etext. This is
+not problematic currently as the alignemtn of __init_begin is suffucient
+to prevent issues when we modify permissions.
 
-This patch adds new p??_page_paddr and p??_offset_phys functions to
-acquire the physical address of a next-level table, and changes
-p??_offset* into macros which simply convert this to a linear map VA.
-This renders p??_page_vaddr unused, end hence they are removed.
-
-At the pgd level, a new pgd_offset_raw function is added to find the
-relevant PGD entry given the base of a PGD and a virtual address.
+Subsequent patches will assume page alignment of segments of the kernel
+we wish to map with different permissions. To ensure this, move _etext
+after the ALIGN_DEBUG_RO_MIN for the init section. This renders the
+prior ALIGN_DEBUG_RO irrelevant, and hence it is removed. Likewise,
+upgrade to ALIGN_DEBUG_RO_MIN(PAGE_SIZE) for _stext.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
@@ -26,103 +26,33 @@ Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/pgtable.h | 39 +++++++++++++++++++++++----------------
- 1 file changed, 23 insertions(+), 16 deletions(-)
+ arch/arm64/kernel/vmlinux.lds.S | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 738cc37..9c679cf 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -410,15 +410,16 @@ static inline void pmd_clear(pmd_t *pmdp)
- 	set_pmd(pmdp, __pmd(0));
- }
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index f943a84..7de6c39 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -94,7 +94,7 @@ SECTIONS
+ 		_text = .;
+ 		HEAD_TEXT
+ 	}
+-	ALIGN_DEBUG_RO
++	ALIGN_DEBUG_RO_MIN(PAGE_SIZE)
+ 	.text : {			/* Real text segment		*/
+ 		_stext = .;		/* Text and read-only data	*/
+ 			__exception_text_start = .;
+@@ -115,10 +115,9 @@ SECTIONS
+ 	RO_DATA(PAGE_SIZE)
+ 	EXCEPTION_TABLE(8)
+ 	NOTES
+-	ALIGN_DEBUG_RO
+-	_etext = .;			/* End of text and rodata section */
  
--static inline pte_t *pmd_page_vaddr(pmd_t pmd)
-+static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
- {
--	return __va(pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK);
-+	return pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK;
- }
+ 	ALIGN_DEBUG_RO_MIN(PAGE_SIZE)
++	_etext = .;			/* End of text and rodata section */
+ 	__init_begin = .;
  
- /* Find an entry in the third-level page table. */
- #define pte_index(addr)		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
- 
--#define pte_offset_kernel(dir,addr)	(pmd_page_vaddr(*(dir)) + pte_index(addr))
-+#define pte_offset_phys(dir,addr)	(pmd_page_paddr(*(dir)) + pte_index(addr) * sizeof(pte_t))
-+#define pte_offset_kernel(dir,addr)	((pte_t *)__va(pte_offset_phys((dir), (addr))))
- 
- #define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
- #define pte_offset_map_nested(dir,addr)	pte_offset_kernel((dir), (addr))
-@@ -453,21 +454,23 @@ static inline void pud_clear(pud_t *pudp)
- 	set_pud(pudp, __pud(0));
- }
- 
--static inline pmd_t *pud_page_vaddr(pud_t pud)
-+static inline phys_addr_t pud_page_paddr(pud_t pud)
- {
--	return __va(pud_val(pud) & PHYS_MASK & (s32)PAGE_MASK);
-+	return pud_val(pud) & PHYS_MASK & (s32)PAGE_MASK;
- }
- 
- /* Find an entry in the second-level page table. */
- #define pmd_index(addr)		(((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
- 
--static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
--{
--	return (pmd_t *)pud_page_vaddr(*pud) + pmd_index(addr);
--}
-+#define pmd_offset_phys(dir, addr)	(pud_page_paddr(*(dir)) + pmd_index(addr) * sizeof(pmd_t))
-+#define pmd_offset(dir, addr)		((pmd_t *)__va(pmd_offset_phys((dir), (addr))))
- 
- #define pud_page(pud)		pfn_to_page(__phys_to_pfn(pud_val(pud) & PHYS_MASK))
- 
-+#else
-+
-+#define pud_page_paddr(pud)	({ BUILD_BUG(); 0; })
-+
- #endif	/* CONFIG_PGTABLE_LEVELS > 2 */
- 
- #if CONFIG_PGTABLE_LEVELS > 3
-@@ -489,21 +492,23 @@ static inline void pgd_clear(pgd_t *pgdp)
- 	set_pgd(pgdp, __pgd(0));
- }
- 
--static inline pud_t *pgd_page_vaddr(pgd_t pgd)
-+static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
- {
--	return __va(pgd_val(pgd) & PHYS_MASK & (s32)PAGE_MASK);
-+	return pgd_val(pgd) & PHYS_MASK & (s32)PAGE_MASK;
- }
- 
- /* Find an entry in the frst-level page table. */
- #define pud_index(addr)		(((addr) >> PUD_SHIFT) & (PTRS_PER_PUD - 1))
- 
--static inline pud_t *pud_offset(pgd_t *pgd, unsigned long addr)
--{
--	return (pud_t *)pgd_page_vaddr(*pgd) + pud_index(addr);
--}
-+#define pud_offset_phys(dir, addr)	(pgd_page_paddr(*(dir)) + pud_index(addr) * sizeof(pud_t))
-+#define pud_offset(dir, addr)		((pud_t *)__va(pud_offset_phys((dir), (addr))))
- 
- #define pgd_page(pgd)		pfn_to_page(__phys_to_pfn(pgd_val(pgd) & PHYS_MASK))
- 
-+#else
-+
-+#define pgd_page_paddr(pgd)	({ BUILD_BUG(); 0;})
-+
- #endif  /* CONFIG_PGTABLE_LEVELS > 3 */
- 
- #define pgd_ERROR(pgd)		__pgd_error(__FILE__, __LINE__, pgd_val(pgd))
-@@ -511,7 +516,9 @@ static inline pud_t *pud_offset(pgd_t *pgd, unsigned long addr)
- /* to find an entry in a page-table-directory */
- #define pgd_index(addr)		(((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
- 
--#define pgd_offset(mm, addr)	((mm)->pgd+pgd_index(addr))
-+#define pgd_offset_raw(pgd, addr)	((pgd) + pgd_index(addr))
-+
-+#define pgd_offset(mm, addr)	(pgd_offset_raw((mm)->pgd, (addr)))
- 
- /* to find an entry in a kernel page-table-directory */
- #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
+ 	INIT_TEXT_SECTION(8)
 -- 
 1.9.1
