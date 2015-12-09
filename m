@@ -1,38 +1,26 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 9 Dec 2015 09:51:19 +0200
-Subject: [PATCH 02/10] clk: ti: Add few dm814x clock aliases
-In-Reply-To: <20151208201136.GZ23396@atomide.com>
-References: <1449013103-23238-1-git-send-email-tony@atomide.com>
- <1449013103-23238-3-git-send-email-tony@atomide.com>
- <20151208165732.GY23396@atomide.com> <56672ED0.4050405@ti.com>
- <20151208201136.GZ23396@atomide.com>
-Message-ID: <5667DD77.2000900@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 9 Dec 2015 13:22:04 +0530
+Subject: [PATCH 0/6] ARM: DTS: da850: eDMA new bindings and MMC/SPI DMA
+ support
+In-Reply-To: <5667D5F3.80503@ti.com>
+References: <1449237210-16381-1-git-send-email-peter.ujfalusi@ti.com>
+ <5667D5F3.80503@ti.com>
+Message-ID: <5667DDA4.5090703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08/2015 10:11 PM, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [151208 11:25]:
->> On 12/08/2015 06:57 PM, Tony Lindgren wrote:
->>>
->>> Anybody from the clock department care to ack this one?
+On Wednesday 09 December 2015 12:49 PM, Peter Ujfalusi wrote:
+> Sekhar,
+> 
+> On 12/04/2015 03:53 PM, Peter Ujfalusi wrote:
+>> Hi,
 >>
->> Sorry been rather busy lately...
->>
->>> I'd like to
->>> get this series into Linux next as it fixes some some issues.
->>
->> Yeah looks good to me, don't have access to dm814x so can't test.
->>
->> Acked-by: Tero Kristo <t-kristo@ti.com>
->
-> Thanks.
->
->> Are you planning to push this via omap tree if this is critical for you?
->
-> Yes this series needs to be merged in certain order to keep t410
-> booting. Should not conflict with anything else AFAIK.
+>> Switch to use the new eDMA bindings and enable DMA for MMC0, SPI1.
+>> Add node for MMC1.
+> 
+> Can you hold on this one for a bit since the eDMA bindings might change still.
 
-Ok at least I am fine with that. The dm81xx clock alias file is pretty 
-independent of anything else.
+Sure, no problem!
 
--Tero
+Thanks,
+Sekhar
