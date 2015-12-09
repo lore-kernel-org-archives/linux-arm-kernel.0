@@ -1,169 +1,125 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 9 Dec 2015 16:45:05 +0800
-Subject: [PATCH 1/3] usb: misc: generic_onboard_hub: add generic onboard
- USB HUB driver
-In-Reply-To: <87k2opm4ee.fsf@saruman.tx.rr.com>
-References: <1449538670-7954-1-git-send-email-peter.chen@freescale.com>
- <1449538670-7954-2-git-send-email-peter.chen@freescale.com>
- <87poyhmyrc.fsf@saruman.tx.rr.com>
- <20151208091854.GA16881@shlinux2>
- <87k2opm4ee.fsf@saruman.tx.rr.com>
-Message-ID: <20151209084504.GE941@shlinux2>
+From: b18965@freescale.com (Alison Wang)
+Date: Wed, 9 Dec 2015 16:41:39 +0800
+Subject: [PATCH v2] ARM: multi_v7_defconfig: Enable some drivers for LS1021A
+Message-ID: <1449650499-28660-1-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 07:55:05AM -0600, Felipe Balbi wrote:
-> 
-> Hi,
-> 
-> Peter Chen <peter.chen@freescale.com> writes:
-> >> seriously ? Is this really all ? What about that reset line below ?
-> >
-> > The clock is PHY input clock on the HUB, this clock may from SoC's
-> > PLL.
-> 
-> oh, you might have misunderstood my comment. I'm saying that there is
-> more than one thing you could cache in your private structure. That's
-> all.
-> 
+This patch enables some drivers for LS1021A, such as
+GIANFAR, WATCHDOG, AUDIO, QSPI, I2C, ESDHC, EDMA, FTM.
+QorIQ Clock Framework and Ramdisk support is also enabled.
 
-How? I need to handle clock at both ->probe and ->remove.
+Signed-off-by: Alison Wang <alison.wang@freescale.com>
+---
+Changes since v1:
+- Make some drivers as loadable modules.
 
-> >> > +static int usb_hub_generic_probe(struct platform_device *pdev)
-> >> > +{
-> >> > +	struct device *dev = &pdev->dev;
-> >> > +	struct usb_hub_generic_platform_data *pdata = dev->platform_data;
-> >> > +	struct usb_hub_generic_data *hub_data;
-> >> > +	int reset_pol = 0, duration_us = 50, ret = 0;
-> >> > +	struct gpio_desc *gpiod_reset = NULL;
-> >> > +
-> >> > +	hub_data = devm_kzalloc(dev, sizeof(*hub_data), GFP_KERNEL);
-> >> > +	if (!hub_data)
-> >> > +		return -ENOMEM;
-> >> > +
-> >> > +	if (dev->of_node) {
-> >> > +		struct device_node *node = dev->of_node;
-> >> > +
-> >> > +		hub_data->clk = devm_clk_get(dev, "external_clk");
-> >> > +		if (IS_ERR(hub_data->clk)) {
-> >> > +			dev_dbg(dev, "Can't get external clock: %ld\n",
-> >> > +					PTR_ERR(hub_data->clk));
-> >> 
-> >> how about setting clock to NULL to here ? then you don't need IS_ERR()
-> >> checks anywhere else.
-> >> 
-> >> > +		}
-> >> 
-> >> braces shouldn't be used here, if you add NULL trick above,
-> >> however... then you can keep them.
-> >> 
-> >
-> > Braces aren't needed, it may not too much useful to using NULL
-> > as a indicator for error pointer.
-> 
-> heh, it's not about using it as an error pointer. I'm merely trying to
-> make clk optional. NULL is a valid clk, meaning you won't get NULL
-> pointer dereferences when passing it along clk_*() calls (if you find
-> any, it's likely a bug in CCF), so NULL can be used to cope with
-> optional clocks:
-> 
->          clk = clk_get(dev, "foo");
->          if (IS_ERR(clk)) {
->          	if (PTR_ERR(clk) == -EPROBE_DEFER)
->                 	return -EPROBE_DEFER;
->                 else
->                 	clk = NULL;
->          }
-> 
+ arch/arm/configs/multi_v7_defconfig | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-Get your point, so at coming code, we don't need to add condition
-to enable optional clock.
-
-> >> > +		/*
-> >> > +		 * Try to get the information for HUB reset, the
-> >> > +		 * default setting like below:
-> >> > +		 *
-> >> > +		 * - Reset state is low
-> >> > +		 * - The duration is 50us
-> >> > +		 */
-> >> > +		if (of_find_property(node, "hub-reset-active-high", NULL))
-> >> > +			reset_pol = 1;
-> >> 
-> >> you see, this is definitely *not* generic. You should write a generic
-> >> reset-gpio.c reset controller and describe the polarity on the gpio
-> >> binding. This driver *always* uses reset_assert(); reset_deassert(); and
-> >> reset-gpio implements though by gpiod_set_value() correctly.
-> >> 
-> >> Polarity _must_ be described elsewhere in DT.
-> >> 
-> >> > +		of_property_read_u32(node, "hub-reset-duration-us",
-> >> > +			&duration_us);
-> >> 
-> >> likewise, this should be described as a debounce time for the GPIO.
-> >> 
-> >
-> > Yes, if we are a reset gpio driver.
-> 
-> even if you use a raw GPIO, polarity and duration must come through DT.
-> 
-> >> > +		usleep_range(duration_us, duration_us + 100);
-> >> > +		gpiod_set_value(gpiod_reset, reset_pol ? 0 : 1);
-> >> 
-> >> wrong. You should _not_ have polarity checks here. You should have
-> >> already initialized the gpio as ACTIVE_HIGH or ACTIVE_LOW and gpiolib
-> >> will handle the polarity for you.
-> >
-> > Yes, you are right. I did not understand ACTIVE_LOW for gpio flag
-> > before.
-> 
-> with open source code, that's a rather poor excuse, Peter.
-
-I will pay attention to it, thanks.
-At my dts example, it is like below, I just treat it at raw gpio
-handling.
-
-	usb_hub1 {
-		compatible = "generic-onboard-hub";
-		clocks = <&clks IMX6QDL_CLK_CKO>;
-		clock-names = "external_clk";
-		hub-reset-active-high;
-		hub-reset-gpios = <&gpio7 12 0>;
-		hub-reset-duration-us = <2>;
-	};
-
-I will change it like below:
-	usb_hub1 {
-		compatible = "generic-onboard-hub";
-		clocks = <&clks IMX6QDL_CLK_CKO>;
-		clock-names = "clk";
-		reset-gpios = <&gpio7 12 GPIO_ACTIVE_HIGH>;
-		reset-duration-us = <2>;
-	};
-
-> 
-> >> > +static int __init usb_hub_generic_init(void)
-> >> > +{
-> >> > +	return platform_driver_register(&usb_hub_generic_driver);
-> >> > +}
-> >> > +subsys_initcall(usb_hub_generic_init);
-> >> > +
-> >> > +static void __exit usb_hub_generic_exit(void)
-> >> > +{
-> >> > +	platform_driver_unregister(&usb_hub_generic_driver);
-> >> > +}
-> >> > +module_exit(usb_hub_generic_exit);
-> >> 
-> >> module_platform_driver();
-> >
-> > I want this driver to be called before module init's.
-> 
-> why ?
-
-The USB HUB should be in ready state before controller
-tries to talk with it, otherwise, it may has noise at
-the bus during the HUB reset/power on process.
-
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index f6a2557..fb2159d 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -128,6 +128,7 @@ CONFIG_KEXEC=y
+ CONFIG_CPU_FREQ=y
+ CONFIG_CPU_FREQ_STAT_DETAILS=y
+ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
++CONFIG_QORIQ_CPUFREQ=y
+ CONFIG_CPU_IDLE=y
+ CONFIG_ARM_CPUIDLE=y
+ CONFIG_NEON=y
+@@ -182,8 +183,11 @@ CONFIG_MTD_NAND_ATMEL=y
+ CONFIG_MTD_NAND_BRCMNAND=y
+ CONFIG_MTD_NAND_DAVINCI=y
+ CONFIG_MTD_SPI_NOR=y
++CONFIG_SPI_FSL_QUADSPI=m
+ CONFIG_MTD_UBI=y
+ CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_SIZE=65536
+ CONFIG_AD525X_DPOT=y
+ CONFIG_AD525X_DPOT_I2C=y
+ CONFIG_ATMEL_TCLIB=y
+@@ -210,6 +214,7 @@ CONFIG_HIX5HD2_GMAC=y
+ CONFIG_SUN4I_EMAC=y
+ CONFIG_MACB=y
+ CONFIG_NET_CALXEDA_XGMAC=y
++CONFIG_GIANFAR=y
+ CONFIG_IGB=y
+ CONFIG_MV643XX_ETH=y
+ CONFIG_MVNETA=y
+@@ -226,6 +231,7 @@ CONFIG_MARVELL_PHY=y
+ CONFIG_SMSC_PHY=y
+ CONFIG_BROADCOM_PHY=y
+ CONFIG_ICPLUS_PHY=y
++CONFIG_REALTEK_PHY=y
+ CONFIG_MICREL_PHY=y
+ CONFIG_FIXED_PHY=y
+ CONFIG_USB_PEGASUS=y
+@@ -312,6 +318,7 @@ CONFIG_I2C_DESIGNWARE_PLATFORM=y
+ CONFIG_I2C_DIGICOLOR=m
+ CONFIG_I2C_GPIO=m
+ CONFIG_I2C_EXYNOS5=y
++CONFIG_I2C_IMX=m
+ CONFIG_I2C_MV64XXX=y
+ CONFIG_I2C_RIIC=y
+ CONFIG_I2C_RK3X=y
+@@ -330,6 +337,7 @@ CONFIG_SPI=y
+ CONFIG_SPI_ATMEL=m
+ CONFIG_SPI_CADENCE=y
+ CONFIG_SPI_DAVINCI=y
++CONFIG_SPI_FSL_DSPI=m
+ CONFIG_SPI_OMAP24XX=y
+ CONFIG_SPI_ORION=y
+ CONFIG_SPI_PL022=y
+@@ -405,6 +413,7 @@ CONFIG_ARM_SP805_WATCHDOG=y
+ CONFIG_ORION_WATCHDOG=y
+ CONFIG_ST_LPC_WATCHDOG=y
+ CONFIG_SUNXI_WATCHDOG=y
++CONFIG_IMX2_WDT=y
+ CONFIG_TEGRA_WATCHDOG=m
+ CONFIG_MESON_WATCHDOG=y
+ CONFIG_DIGICOLOR_WATCHDOG=y
+@@ -525,6 +534,7 @@ CONFIG_SND_USB_AUDIO=y
+ CONFIG_SND_SOC=m
+ CONFIG_SND_ATMEL_SOC=m
+ CONFIG_SND_ATMEL_SOC_WM8904=m
++CONFIG_SND_SOC_FSL_SAI=m
+ CONFIG_SND_SOC_SH4_FSI=m
+ CONFIG_SND_SOC_RCAR=m
+ CONFIG_SND_SOC_RSRC_CARD=m
+@@ -537,6 +547,7 @@ CONFIG_SND_SOC_TEGRA_TRIMSLICE=m
+ CONFIG_SND_SOC_TEGRA_ALC5632=m
+ CONFIG_SND_SOC_TEGRA_MAX98090=m
+ CONFIG_SND_SOC_AK4642=m
++CONFIG_SND_SOC_SGTL5000=m
+ CONFIG_SND_SOC_WM8978=m
+ CONFIG_USB=y
+ CONFIG_USB_XHCI_HCD=y
+@@ -577,6 +588,7 @@ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_OF_ARASAN=y
+ CONFIG_MMC_SDHCI_OF_AT91=y
++CONFIG_MMC_SDHCI_OF_ESDHC=m
+ CONFIG_MMC_SDHCI_ESDHC_IMX=y
+ CONFIG_MMC_SDHCI_DOVE=y
+ CONFIG_MMC_SDHCI_TEGRA=y
+@@ -653,6 +665,7 @@ CONFIG_DMADEVICES=y
+ CONFIG_DW_DMAC=y
+ CONFIG_AT_HDMAC=y
+ CONFIG_AT_XDMAC=y
++CONFIG_FSL_EDMA=m
+ CONFIG_MV_XOR=y
+ CONFIG_TEGRA20_APB_DMA=y
+ CONFIG_SH_DMAE=y
+@@ -712,6 +725,7 @@ CONFIG_AK8975=y
+ CONFIG_PWM=y
+ CONFIG_PWM_ATMEL=m
+ CONFIG_PWM_ATMEL_TCB=m
++CONFIG_PWM_FSL_FTM=m
+ CONFIG_PWM_RENESAS_TPU=y
+ CONFIG_PWM_ROCKCHIP=m
+ CONFIG_PWM_SAMSUNG=m
 -- 
-
-Best Regards,
-Peter Chen
+2.1.0.27.g96db324
