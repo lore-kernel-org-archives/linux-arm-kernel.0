@@ -1,77 +1,40 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Wed, 9 Dec 2015 10:27:34 -0800
-Subject: [PATCH] net/macb: add support for resetting PHY using GPIO
-In-Reply-To: <1449683383-5022-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1449683383-5022-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <CAAtXAHcHGC+5HJrCNTPhwhLSMmOPtMrjCYBRQxbzGq3GrML8Yw@mail.gmail.com>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Wed, 9 Dec 2015 12:51:31 -0600
+Subject: [PATCH v5 5/5] gicv2m: acpi: Introducing GICv2m ACPI support
+In-Reply-To: <56687008.3020703@arm.com>
+References: <1449625686-5594-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1449625686-5594-6-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <20151209103806.41488405@why.wild-wind.fr.eu.org> <56686C9F.6060804@amd.com>
+ <56687008.3020703@arm.com>
+Message-ID: <56687833.6040706@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+On 12/9/2015 12:16 PM, Marc Zyngier wrote:
+>>>> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+>>>> >>>[...]
+>>>> >>>@@ -359,6 +368,8 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
+>>>> >>>
+>>>> >>>   	if (to_of_node(fwnode))
+>>>> >>>   		name = to_of_node(fwnode)->name;
+>>>> >>>+	else
+>>>> >>>+		name = irq_domain_get_irqchip_fwnode_name(fwnode);
+>>> >>
+>>> >>Don't bother with that, the name associated with the domain is
+>>> >>absolutely meaningless. You are already printing the frame address,
+>>> >>which is enough to identify it, should someone need to debug this.
+>>> >>
+>>> >>Drop the name from the previous patch as well, and that will make one
+>>> >>less difference to care about. Patch #3 can die as well.
+>>> >>
+>> >
+>> >Ok. I'll just leave them blank (i.e. const char *name ="")
+> No, just remove name altogether. Nobody reads that anyway, and if they
+> want to find out, there is the address that's clear enough.
+>
+> Thanks,
+>
+> 	M.
 
-so far dealt with this in u-boot. The power down the PHY part makes
-sense, though. Minor nit down inline.
-Will need to test on hardware (Zynq).
-
-On Wed, Dec 9, 2015 at 9:49 AM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> With device tree it is no more possible to reset the PHY at board
-> level. Furthermore, doing in the driver allow to power down the PHY when
-> the network interface is no more used.
->
-> The patch introduces a new optional property "phy-reset-gpio" inspired
-> from the one use for the FEC.
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/net/macb.txt |  3 +++
->  drivers/net/ethernet/cadence/macb.c            | 26 ++++++++++++++++++++++++++
->  drivers/net/ethernet/cadence/macb.h            |  1 +
->  3 files changed, 30 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
-> index b5d7976..546d34d 100644
-> --- a/Documentation/devicetree/bindings/net/macb.txt
-> +++ b/Documentation/devicetree/bindings/net/macb.txt
-> @@ -19,6 +19,9 @@ Required properties:
->         Optional elements: 'tx_clk'
->  - clocks: Phandles to input clocks.
->
-> +Optional properties:
-> +- phy-reset-gpio : Should specify the gpio for phy reset
-> +
->  Examples:
->
->         macb0: ethernet at fffc4000 {
-> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-> index 88c1e1a..e630c56 100644
-> --- a/drivers/net/ethernet/cadence/macb.c
-> +++ b/drivers/net/ethernet/cadence/macb.c
-> @@ -30,6 +30,7 @@
->  #include <linux/of_device.h>
->  #include <linux/of_mdio.h>
->  #include <linux/of_net.h>
-> +#include <linux/of_gpio.h>
->
->  #include "macb.h"
->
-> @@ -2733,6 +2734,28 @@ static int at91ether_init(struct platform_device *pdev)
->         return 0;
->  }
->
-> +#ifdef CONFIG_OF
-> +static void macb_reset_phy(struct macb *bp, struct device_node *np, int state)
-> +{
-> +       if (!np)
-> +               return;
-> +
-> +       bp->reset_gpio = of_get_named_gpio(np, "phy-reset-gpio", 0);
-
-Any reason to do of_get_named() all the time instead of using the one
-you stored in bp->reset_gpio?
-You could move it to probe and then just use the stored value here ...
-not sure if it buys much ;-)
-
-Cheers,
-
-Moritz
+Ok.
+Suravee
