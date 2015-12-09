@@ -1,23 +1,23 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed,  9 Dec 2015 12:44:52 +0000
-Subject: [RFC PATCH 17/20] arm64: mm: allocate pagetables anywhere
+Date: Wed,  9 Dec 2015 12:44:47 +0000
+Subject: [RFC PATCH 12/20] arm64: mm: add functions to walk page tables by PA
 In-Reply-To: <1449665095-20774-1-git-send-email-mark.rutland@arm.com>
 References: <1449665095-20774-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1449665095-20774-18-git-send-email-mark.rutland@arm.com>
+Message-ID: <1449665095-20774-13-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that create_mapping uses fixmap slots to modify pte, pmd, and pud
-entries, we can access page tables anywhere in physical memory,
-regardless of the extent of the linear mapping.
+To allow us to walk tables allocated into the fixmap, we need to acquire
+the physical address of a page, rather than the virtual address in the
+linear map.
 
-Given that, we no longer need to limit memblock allocations during page
-table creation, and can leave the limit as its default
-MEMBLOCK_ALLOC_ANYWHERE.
+This patch adds new p??_page_paddr and p??_offset_phys functions to
+acquire the physical address of a next-level table, and changes
+p??_offset* into macros which simply convert this to a linear map VA.
+This renders p??_page_vaddr unused, end hence they are removed.
 
-We never add memory which will fall outside of the linear map range
-given phys_offset and MAX_MEMBLOCK_ADDR are configured appropriately, so
-any tables we create will fall in the linear map of the final tables.
+At the pgd level, a new pgd_offset_raw function is added to find the
+relevant PGD entry given the base of a PGD and a virtual address.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
@@ -26,63 +26,103 @@ Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/mm/mmu.c | 35 -----------------------------------
- 1 file changed, 35 deletions(-)
+ arch/arm64/include/asm/pgtable.h | 39 +++++++++++++++++++++++----------------
+ 1 file changed, 23 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 1a516ac..27dd475 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -365,20 +365,6 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
- static void __init map_mem(void)
- {
- 	struct memblock_region *reg;
--	phys_addr_t limit;
--
--	/*
--	 * Temporarily limit the memblock range. We need to do this as
--	 * create_mapping requires puds, pmds and ptes to be allocated from
--	 * memory addressable from the initial direct kernel mapping.
--	 *
--	 * The initial direct kernel mapping, located at swapper_pg_dir, gives
--	 * us PUD_SIZE (with SECTION maps) or PMD_SIZE (without SECTION maps,
--	 * memory starting from PHYS_OFFSET (which must be aligned to 2MB as
--	 * per Documentation/arm64/booting.txt).
--	 */
--	limit = PHYS_OFFSET + SWAPPER_INIT_MAP_SIZE;
--	memblock_set_current_limit(limit);
- 
- 	/* map all the memory banks */
- 	for_each_memblock(memory, reg) {
-@@ -388,29 +374,8 @@ static void __init map_mem(void)
- 		if (start >= end)
- 			break;
- 
--		if (ARM64_SWAPPER_USES_SECTION_MAPS) {
--			/*
--			 * For the first memory bank align the start address and
--			 * current memblock limit to prevent create_mapping() from
--			 * allocating pte page tables from unmapped memory. With
--			 * the section maps, if the first block doesn't end on section
--			 * size boundary, create_mapping() will try to allocate a pte
--			 * page, which may be returned from an unmapped area.
--			 * When section maps are not used, the pte page table for the
--			 * current limit is already present in swapper_pg_dir.
--			 */
--			if (start < limit)
--				start = ALIGN(start, SECTION_SIZE);
--			if (end < limit) {
--				limit = end & SECTION_MASK;
--				memblock_set_current_limit(limit);
--			}
--		}
- 		__map_memblock(start, end);
- 	}
--
--	/* Limit no longer required. */
--	memblock_set_current_limit(MEMBLOCK_ALLOC_ANYWHERE);
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 738cc37..9c679cf 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -410,15 +410,16 @@ static inline void pmd_clear(pmd_t *pmdp)
+ 	set_pmd(pmdp, __pmd(0));
  }
  
- static void __init fixup_executable(void)
+-static inline pte_t *pmd_page_vaddr(pmd_t pmd)
++static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+ {
+-	return __va(pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK);
++	return pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK;
+ }
+ 
+ /* Find an entry in the third-level page table. */
+ #define pte_index(addr)		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
+ 
+-#define pte_offset_kernel(dir,addr)	(pmd_page_vaddr(*(dir)) + pte_index(addr))
++#define pte_offset_phys(dir,addr)	(pmd_page_paddr(*(dir)) + pte_index(addr) * sizeof(pte_t))
++#define pte_offset_kernel(dir,addr)	((pte_t *)__va(pte_offset_phys((dir), (addr))))
+ 
+ #define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
+ #define pte_offset_map_nested(dir,addr)	pte_offset_kernel((dir), (addr))
+@@ -453,21 +454,23 @@ static inline void pud_clear(pud_t *pudp)
+ 	set_pud(pudp, __pud(0));
+ }
+ 
+-static inline pmd_t *pud_page_vaddr(pud_t pud)
++static inline phys_addr_t pud_page_paddr(pud_t pud)
+ {
+-	return __va(pud_val(pud) & PHYS_MASK & (s32)PAGE_MASK);
++	return pud_val(pud) & PHYS_MASK & (s32)PAGE_MASK;
+ }
+ 
+ /* Find an entry in the second-level page table. */
+ #define pmd_index(addr)		(((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
+ 
+-static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+-{
+-	return (pmd_t *)pud_page_vaddr(*pud) + pmd_index(addr);
+-}
++#define pmd_offset_phys(dir, addr)	(pud_page_paddr(*(dir)) + pmd_index(addr) * sizeof(pmd_t))
++#define pmd_offset(dir, addr)		((pmd_t *)__va(pmd_offset_phys((dir), (addr))))
+ 
+ #define pud_page(pud)		pfn_to_page(__phys_to_pfn(pud_val(pud) & PHYS_MASK))
+ 
++#else
++
++#define pud_page_paddr(pud)	({ BUILD_BUG(); 0; })
++
+ #endif	/* CONFIG_PGTABLE_LEVELS > 2 */
+ 
+ #if CONFIG_PGTABLE_LEVELS > 3
+@@ -489,21 +492,23 @@ static inline void pgd_clear(pgd_t *pgdp)
+ 	set_pgd(pgdp, __pgd(0));
+ }
+ 
+-static inline pud_t *pgd_page_vaddr(pgd_t pgd)
++static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+ {
+-	return __va(pgd_val(pgd) & PHYS_MASK & (s32)PAGE_MASK);
++	return pgd_val(pgd) & PHYS_MASK & (s32)PAGE_MASK;
+ }
+ 
+ /* Find an entry in the frst-level page table. */
+ #define pud_index(addr)		(((addr) >> PUD_SHIFT) & (PTRS_PER_PUD - 1))
+ 
+-static inline pud_t *pud_offset(pgd_t *pgd, unsigned long addr)
+-{
+-	return (pud_t *)pgd_page_vaddr(*pgd) + pud_index(addr);
+-}
++#define pud_offset_phys(dir, addr)	(pgd_page_paddr(*(dir)) + pud_index(addr) * sizeof(pud_t))
++#define pud_offset(dir, addr)		((pud_t *)__va(pud_offset_phys((dir), (addr))))
+ 
+ #define pgd_page(pgd)		pfn_to_page(__phys_to_pfn(pgd_val(pgd) & PHYS_MASK))
+ 
++#else
++
++#define pgd_page_paddr(pgd)	({ BUILD_BUG(); 0;})
++
+ #endif  /* CONFIG_PGTABLE_LEVELS > 3 */
+ 
+ #define pgd_ERROR(pgd)		__pgd_error(__FILE__, __LINE__, pgd_val(pgd))
+@@ -511,7 +516,9 @@ static inline pud_t *pud_offset(pgd_t *pgd, unsigned long addr)
+ /* to find an entry in a page-table-directory */
+ #define pgd_index(addr)		(((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
+ 
+-#define pgd_offset(mm, addr)	((mm)->pgd+pgd_index(addr))
++#define pgd_offset_raw(pgd, addr)	((pgd) + pgd_index(addr))
++
++#define pgd_offset(mm, addr)	(pgd_offset_raw((mm)->pgd, (addr)))
+ 
+ /* to find an entry in a kernel page-table-directory */
+ #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
 -- 
 1.9.1
