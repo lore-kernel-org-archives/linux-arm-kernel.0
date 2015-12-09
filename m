@@ -1,39 +1,40 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 9 Dec 2015 13:10:18 +0200
-Subject: [GIT PULL for 4.4] DT/dmaengine: edma: Update for the new bindings
-Message-ID: <56680C1A.3050009@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 9 Dec 2015 11:25:36 +0000
+Subject: [PATCH v5 08/11] ARM: STi: Register CPUFreq device
+In-Reply-To: <3682335.fAt9xNcJFr@wuerfel>
+References: <1449585124-15596-1-git-send-email-lee.jones@linaro.org>
+ <1449585124-15596-9-git-send-email-lee.jones@linaro.org>
+ <3682335.fAt9xNcJFr@wuerfel>
+Message-ID: <20151209112536.GB17876@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Vinod,
+On Wed, 09 Dec 2015, Arnd Bergmann wrote:
 
-As Arnd suggested, the two patch from the following series:
-https://www.mail-archive.com/linux-omap at vger.kernel.org/msg122201.html
+> On Tuesday 08 December 2015 14:32:01 Lee Jones wrote:
+> > @@ -161,3 +166,11 @@ struct smp_operations __initdata sti_smp_ops = {
+> >         .smp_secondary_init     = sti_secondary_init,
+> >         .smp_boot_secondary     = sti_boot_secondary,
+> >  };
+> > +
+> > +/**
+> > + * CPUFreq Registration
+> > + */
+> > +void init_cpufreq(void)
+> > +{
+> > +       platform_device_register_simple("sti-cpufreq", -1, NULL, 0);
+> > +}
+> > 
+> 
+> Can you please do this under drivers/cpufreq somewhere?
+> 
+> I really don't want to any more of these in platform code. Requiring a
+> device to be created just to probe the driver is really silly.
 
-plus Acked-by from Arnd is available for pull if you prefer that way.
+Already on it.  Bear with.
 
-
-Regards,
-P?ter
-================================================================
-The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
-
-  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
-
-are available in the git repository at:
-
-  https://github.com/omap-audio/linux-audio.git for-4.4/peter/edma_binding_update
-
-for you to fetch changes up to af9089852e0ecd6ae7336992d29b04d7d82b404a:
-
-  dmaengine: edma: DT: Change reserved slot array from 16bit to 32bit type (2015-12-09 11:56:56 +0200)
-
-----------------------------------------------------------------
-Peter Ujfalusi (2):
-      dmaengine: edma: DT: Change memcpy channel array from 16bit to 32bit type
-      dmaengine: edma: DT: Change reserved slot array from 16bit to 32bit type
-
- Documentation/devicetree/bindings/dma/ti-edma.txt | 10 ++++------
- drivers/dma/edma.c                                | 53 +++++++++++++++++++++++++++++++++++------------------
- include/linux/platform_data/edma.h                |  2 +-
- 3 files changed, 40 insertions(+), 25 deletions(-)
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
