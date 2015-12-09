@@ -1,9 +1,10 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  9 Dec 2015 15:58:08 +0000
-Subject: [PATCH v6 01/10] ARM: multi_v7_defconfig: Enable ST's PWM driver
+Date: Wed,  9 Dec 2015 15:58:10 +0000
+Subject: [PATCH v6 03/10] ARM: multi_v7_defconfig: Enable support for PWM
+ Regulators
 In-Reply-To: <1449676697-25432-1-git-send-email-lee.jones@linaro.org>
 References: <1449676697-25432-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1449676697-25432-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1449676697-25432-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,17 +14,17 @@ Signed-off-by: Lee Jones <lee.jones@linaro.org>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 69a22fd..99b87b6 100644
+index f62dcb1..648ef57 100644
 --- a/arch/arm/configs/multi_v7_defconfig
 +++ b/arch/arm/configs/multi_v7_defconfig
-@@ -690,7 +690,7 @@ CONFIG_PWM_SUN4I=y
- CONFIG_PWM_TEGRA=y
- CONFIG_PWM_VT8500=y
- CONFIG_PHY_HIX5HD2_SATA=y
--CONFIG_PWM_STI=m
-+CONFIG_PWM_STI=y
- CONFIG_OMAP_USB2=y
- CONFIG_TI_PIPE3=y
- CONFIG_PHY_BERLIN_USB=y
+@@ -434,7 +434,7 @@ CONFIG_REGULATOR_MAX77693=m
+ CONFIG_REGULATOR_MAX77802=m
+ CONFIG_REGULATOR_PALMAS=y
+ CONFIG_REGULATOR_PBIAS=y
+-CONFIG_REGULATOR_PWM=m
++CONFIG_REGULATOR_PWM=y
+ CONFIG_REGULATOR_QCOM_RPM=y
+ CONFIG_REGULATOR_QCOM_SMD_RPM=y
+ CONFIG_REGULATOR_S2MPS11=y
 -- 
 1.9.1
