@@ -1,57 +1,47 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed,  9 Dec 2015 12:48:26 +0100
-Subject: [PATCH v2 13/14] ARM: dts: dove: add DT GPU support
+Date: Wed,  9 Dec 2015 12:48:27 +0100
+Subject: [PATCH v2 14/14] ARM: dts: enable GPU for SolidRun's Cubox
 In-Reply-To: <1449661707-30532-1-git-send-email-l.stach@pengutronix.de>
 References: <1449661707-30532-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1449661707-30532-13-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1449661707-30532-14-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Add DT support for the Vivante GC600 GPU on Marvell Dove platforms.
-These nodes default to being disabled unless a platform decides they
-should be enabled.
+Enable the GPU for SolidRun's Cubox.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- arch/arm/boot/dts/dove.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/dove-cubox.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index cd58c2e62757..ea1d999ca7a7 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -33,6 +33,12 @@
- 		marvell,tauros2-cache-features = <0>;
+diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
+index e6fa251e17b9..af3cb633135f 100644
+--- a/arch/arm/boot/dts/dove-cubox.dts
++++ b/arch/arm/boot/dts/dove-cubox.dts
+@@ -62,6 +62,10 @@
+ 		pinctrl-0 = <&pmx_gpio_19>;
+ 		pinctrl-names = "default";
  	};
- 
++
 +	gpu-subsystem {
-+		compatible = "marvell,dove-gpu-subsystem";
-+		cores = <&gpu>;
-+		status = "disabled";
++		status = "okay";
 +	};
-+
- 	i2c-mux {
- 		compatible = "i2c-mux-pinctrl";
- 		#address-cells = <1>;
-@@ -776,6 +782,16 @@
- 				#address-cells = <1>;
- 				#size-cells = <1>;
- 			};
-+
-+			gpu: gpu at 840000 {
-+				clocks = <&divider_clk 1>;
-+				clock-names = "core";
-+				compatible = "vivante,gc";
-+				interrupts = <48>;
-+				power-domains = <&gpu_domain>;
-+				reg = <0x840000 0x4000>;
-+				status = "disabled";
-+			};
- 		};
- 	};
  };
+ 
+ &uart0 { status = "okay"; };
+@@ -74,6 +78,10 @@
+ 	reg = <1>;
+ };
+ 
++&gpu {
++	status = "okay";
++};
++
+ &i2c0 {
+ 	status = "okay";
+ 	clock-frequency = <100000>;
 -- 
 2.6.2
