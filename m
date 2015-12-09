@@ -1,64 +1,194 @@
-From: jchandra@broadcom.com (Jayachandran C.)
-Date: Wed, 9 Dec 2015 15:31:41 +0530
-Subject: [PATCH V1 00/11] MMCONFIG refactoring and ARM64 PCI hostbridge
- init based on ACPI
-In-Reply-To: <20151207203117.GB14429@localhost>
-References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
- <20151207203117.GB14429@localhost>
-Message-ID: <20151209100125.GA12632@jayachandranc.netlogicmicro.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 09 Dec 2015 09:40:53 +0000
+Subject: [PATCH v3] arm64: dts: juno: Add idle-states to device tree
+Message-ID: <1449654053.2818.6.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[trimmed the cc list a bit]
-On Mon, Dec 07, 2015 at 02:31:17PM -0600, Bjorn Helgaas wrote:
-> On Tue, Oct 27, 2015 at 05:38:31PM +0100, Tomasz Nowicki wrote:
-[...]
-> > 
-> > Tomasz Nowicki (10):
-> >   x86, pci: Reorder logic of pci_mmconfig_insert() function
-> >   x86, pci, acpi: Move arch-agnostic MMCONFIG (aka ECAM) and ACPI code
-> >     out of arch/x86/ directory
-> >   pci, acpi, mcfg: Provide generic implementation of MCFG code
-> >     initialization.
-> >   x86, pci: mmconfig_{32,64}.c code refactoring - remove code
-> >     duplication.
-> >   x86, pci, ecam: mmconfig_64.c becomes default implementation for ECAM
-> >     driver.
-> >   pci, acpi, mcfg: Provide default RAW ACPI PCI config space accessors.
-> >   pci, acpi, ecam: Add flag to indicate whether ECAM region was hot
-> >     added or not.
-> >   x86, pci: Use previously added ECAM hot_added flag to remove ECAM
-> >     regions.
-[...]
-> 
-> Waiting for an updated version after all the discussion.
+This patch adds idle-states bindings data collected through a set of
+benchmarking experiments (latency and energy consumption) on Juno
+boards. Latencies data represents the worst case scenarios as required
+by the DT idle-states bindings.
 
-Hi Bjorn,
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
 
-After looking thru the code, I don't think moving the mmconfig code out
-of x86 and using it in ARM64 is a good idea.
+I don't know if this needs any other Ack or can finally go in (through
+arm soc tree?)
 
-The code maintains a list of mapping of ECAM regions which can modified
-at run time, and ends doing this sequence for doing a config access:
+Changes since v2:
+- Updated commit message to Lorenzo's suggested text.
 
-        rcu_read_lock();
-        addr = pci_dev_base(seg, bus, devfn);
-	        list_for_each_entry_rcu(cfg, &pci_mmcfg_list, list)
-			...find mapping...
-	do pci operation
-	rcu_read_unlock();
+Changes since v1:
+- Updated latency times to those provided by Lorenzo
+- Included Juno r1 dt
 
-A lot of the complexity in mmconfig_*.c is to maintain and validate
-the pci_mmcfg_list which seems to be unecessary.
+ arch/arm64/boot/dts/arm/juno-r1.dts | 28 ++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/arm/juno.dts    | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 56 insertions(+)
 
-The better way would be to keep the mapping of ECAM region in the PCI
-host bridge sysdata like pci-host-generic and directly access using
-map_bus/read/write.
-
-I see that early raw_pci_read/raw_pci_write may need to be supported.
-I am not sure if this is needed in ARM64 - and if it is, we can handle
-this by taking an early mapping for ECAM regions until the PCI host
-bridges are setup, and dropping the mapping at that point.
-
-Thanks,
-JC.
+diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+index 93bc3d7..8826f83 100644
+--- a/arch/arm64/boot/dts/arm/juno-r1.dts
++++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+@@ -60,6 +60,28 @@
+ 			};
+ 		};
+ 
++		idle-states {
++			entry-method = "arm,psci";
++
++			CPU_SLEEP_0: cpu-sleep-0 {
++				compatible = "arm,idle-state";
++				arm,psci-suspend-param = <0x0010000>;
++				local-timer-stop;
++				entry-latency-us = <300>;
++				exit-latency-us = <1200>;
++				min-residency-us = <2000>;
++			};
++
++			CLUSTER_SLEEP_0: cluster-sleep-0 {
++				compatible = "arm,idle-state";
++				arm,psci-suspend-param = <0x1010000>;
++				local-timer-stop;
++				entry-latency-us = <300>;
++				exit-latency-us = <1200>;
++				min-residency-us = <2500>;
++			};
++		};
++
+ 		A57_0: cpu at 0 {
+ 			compatible = "arm,cortex-a57","arm,armv8";
+ 			reg = <0x0 0x0>;
+@@ -67,6 +89,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A57_L2>;
+ 			clocks = <&scpi_dvfs 0>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A57_1: cpu at 1 {
+@@ -76,6 +99,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A57_L2>;
+ 			clocks = <&scpi_dvfs 0>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A53_0: cpu at 100 {
+@@ -85,6 +109,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A53_1: cpu at 101 {
+@@ -94,6 +119,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A53_2: cpu at 102 {
+@@ -103,6 +129,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A53_3: cpu at 103 {
+@@ -112,6 +139,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A57_L2: l2-cache0 {
+diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+index 53442b5..dcfcf15 100644
+--- a/arch/arm64/boot/dts/arm/juno.dts
++++ b/arch/arm64/boot/dts/arm/juno.dts
+@@ -60,6 +60,28 @@
+ 			};
+ 		};
+ 
++		idle-states {
++			entry-method = "arm,psci";
++
++			CPU_SLEEP_0: cpu-sleep-0 {
++				compatible = "arm,idle-state";
++				arm,psci-suspend-param = <0x0010000>;
++				local-timer-stop;
++				entry-latency-us = <300>;
++				exit-latency-us = <1200>;
++				min-residency-us = <2000>;
++			};
++
++			CLUSTER_SLEEP_0: cluster-sleep-0 {
++				compatible = "arm,idle-state";
++				arm,psci-suspend-param = <0x1010000>;
++				local-timer-stop;
++				entry-latency-us = <300>;
++				exit-latency-us = <1200>;
++				min-residency-us = <2500>;
++			};
++		};
++
+ 		A57_0: cpu at 0 {
+ 			compatible = "arm,cortex-a57","arm,armv8";
+ 			reg = <0x0 0x0>;
+@@ -67,6 +89,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A57_L2>;
+ 			clocks = <&scpi_dvfs 0>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A57_1: cpu at 1 {
+@@ -76,6 +99,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A57_L2>;
+ 			clocks = <&scpi_dvfs 0>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A53_0: cpu at 100 {
+@@ -85,6 +109,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A53_1: cpu at 101 {
+@@ -94,6 +119,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A53_2: cpu at 102 {
+@@ -103,6 +129,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A53_3: cpu at 103 {
+@@ -112,6 +139,7 @@
+ 			enable-method = "psci";
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
++			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+ 		};
+ 
+ 		A57_L2: l2-cache0 {
+-- 
+2.1.4
