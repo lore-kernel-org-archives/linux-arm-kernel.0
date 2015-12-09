@@ -1,142 +1,38 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 9 Dec 2015 15:38:09 +0800
-Subject: [PATCH v6 07/21] KVM: ARM64: PMU: Add perf event map and introduce
- perf event creating function
-In-Reply-To: <5666FAB6.4070903@arm.com>
-References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
- <1449578860-15808-8-git-send-email-zhaoshenglong@huawei.com>
- <5666FAB6.4070903@arm.com>
-Message-ID: <5667DA61.8080106@huawei.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 9 Dec 2015 09:51:19 +0200
+Subject: [PATCH 02/10] clk: ti: Add few dm814x clock aliases
+In-Reply-To: <20151208201136.GZ23396@atomide.com>
+References: <1449013103-23238-1-git-send-email-tony@atomide.com>
+ <1449013103-23238-3-git-send-email-tony@atomide.com>
+ <20151208165732.GY23396@atomide.com> <56672ED0.4050405@ti.com>
+ <20151208201136.GZ23396@atomide.com>
+Message-ID: <5667DD77.2000900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12/08/2015 10:11 PM, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [151208 11:25]:
+>> On 12/08/2015 06:57 PM, Tony Lindgren wrote:
+>>>
+>>> Anybody from the clock department care to ack this one?
+>>
+>> Sorry been rather busy lately...
+>>
+>>> I'd like to
+>>> get this series into Linux next as it fixes some some issues.
+>>
+>> Yeah looks good to me, don't have access to dm814x so can't test.
+>>
+>> Acked-by: Tero Kristo <t-kristo@ti.com>
+>
+> Thanks.
+>
+>> Are you planning to push this via omap tree if this is critical for you?
+>
+> Yes this series needs to be merged in certain order to keep t410
+> booting. Should not conflict with anything else AFAIK.
 
+Ok at least I am fine with that. The dm81xx clock alias file is pretty 
+independent of anything else.
 
-On 2015/12/8 23:43, Marc Zyngier wrote:
-> On 08/12/15 12:47, Shannon Zhao wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
->> +/**
->> + * kvm_pmu_get_counter_value - get PMU counter value
->> + * @vcpu: The vcpu pointer
->> + * @select_idx: The counter index
->> + */
->> +u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx)
->> +{
->> +	u64 counter, enabled, running;
->> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
->> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
->> +
->> +	if (!vcpu_mode_is_32bit(vcpu))
->> +		counter = vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + select_idx);
->> +	else
->> +		counter = vcpu_cp15(vcpu, c14_PMEVCNTR0 + select_idx);
->> +
->> +	if (pmc->perf_event)
->> +		counter += perf_event_read_value(pmc->perf_event, &enabled,
->> +						 &running);
->> +
->> +	return counter & pmc->bitmask;
-> 
-> This one confused me for a while. Is it the case that you return
-> whatever is in the vcpu view of the counter, plus anything that perf
-> itself has counted? If so, I'd appreciate a comment here...
-> 
-Yes, the real counter value is the current counter value plus the value
-perf event counts. I'll add a comment.
-
->> +}
->> +
->> +static bool kvm_pmu_counter_is_enabled(struct kvm_vcpu *vcpu, u32 select_idx)
->> +{
->> +	if (!vcpu_mode_is_32bit(vcpu))
->> +		return (vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E) &
->> +		       (vcpu_sys_reg(vcpu, PMCNTENSET_EL0) >> select_idx);
-> 
-> This looks wrong. Shouldn't it be:
-> 
-> return ((vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMCR_E) &&
->         (vcpu_sys_reg(vcpu, PMCNTENSET_EL0) & (1 << select_idx)));
-> 
->> +	else
->> +		return (vcpu_sys_reg(vcpu, c9_PMCR) & ARMV8_PMCR_E) &
->> +		       (vcpu_sys_reg(vcpu, c9_PMCNTENSET) >> select_idx);
->> +}
-> 
-> Also, I don't really see why we need to check the 32bit version, which
-> has the exact same content.
-> 
->> +
->> +static inline struct kvm_vcpu *kvm_pmc_to_vcpu(struct kvm_pmc *pmc)
->> +{
->> +	struct kvm_pmu *pmu;
->> +	struct kvm_vcpu_arch *vcpu_arch;
->> +
->> +	pmc -= pmc->idx;
->> +	pmu = container_of(pmc, struct kvm_pmu, pmc[0]);
->> +	vcpu_arch = container_of(pmu, struct kvm_vcpu_arch, pmu);
->> +	return container_of(vcpu_arch, struct kvm_vcpu, arch);
->> +}
->> +
->> +/**
->> + * kvm_pmu_stop_counter - stop PMU counter
->> + * @pmc: The PMU counter pointer
->> + *
->> + * If this counter has been configured to monitor some event, release it here.
->> + */
->> +static void kvm_pmu_stop_counter(struct kvm_pmc *pmc)
->> +{
->> +	struct kvm_vcpu *vcpu = kvm_pmc_to_vcpu(pmc);
->> +	u64 counter;
->> +
->> +	if (pmc->perf_event) {
->> +		counter = kvm_pmu_get_counter_value(vcpu, pmc->idx);
->> +		if (!vcpu_mode_is_32bit(vcpu))
->> +			vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + pmc->idx) = counter;
->> +		else
->> +			vcpu_cp15(vcpu, c14_PMEVCNTR0 + pmc->idx) = counter;
-> 
-> Same thing - we don't need to make a difference between 32 and 64bit.
-> 
-So it's fine to drop all the vcpu_mode_is_32bit(vcpu) check of this
-series? The only one we should take care is the PMCCNTR, right?
-
->> +
->> +		perf_event_release_kernel(pmc->perf_event);
->> +		pmc->perf_event = NULL;
->> +	}
->> +}
->> +
->> +/**
->> + * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
->> + * @vcpu: The vcpu pointer
->> + * @data: The data guest writes to PMXEVTYPER_EL0
->> + * @select_idx: The number of selected counter
->> + *
->> + * When OS accesses PMXEVTYPER_EL0, that means it wants to set a PMC to count an
->> + * event with given hardware event number. Here we call perf_event API to
->> + * emulate this action and create a kernel perf event for it.
->> + */
->> +void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
->> +				    u32 select_idx)
->> +{
->> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
->> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
->> +	struct perf_event *event;
->> +	struct perf_event_attr attr;
->> +	u32 eventsel;
->> +	u64 counter;
->> +
->> +	kvm_pmu_stop_counter(pmc);
-> 
-> Wait. I didn't realize this before, but you have the vcpu right here.
-> Why don't you pass it as a parameter to kvm_pmu_stop_counter and avoid
-> the kvm_pmc_to_vcpu thing altogether?
-> 
-Yeah, we could pass vcpu as a parameter for this function. But the
-kvm_pmc_to_vcpu helper is also used in kvm_pmu_perf_overflow() and
-within kvm_pmu_perf_overflow it needs the pmc->idx, we couldn't pass
-vcpu as a parameter, so this helper is necessary for kvm_pmu_perf_overflow.
-
-Thanks,
--- 
-Shannon
+-Tero
