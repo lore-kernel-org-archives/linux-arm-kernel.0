@@ -1,139 +1,81 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed,  9 Dec 2015 17:26:57 +0000
-Subject: [PATCH 2/2] arm64: Implement ptep_set_access_flags() for hardware
- AF/DBM
-In-Reply-To: <1449682017-23729-1-git-send-email-catalin.marinas@arm.com>
-References: <1449682017-23729-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1449682017-23729-3-git-send-email-catalin.marinas@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 9 Dec 2015 17:33:33 +0000
+Subject: [PATCH] cpufreq: tegra: add regulator dependency for T124
+In-Reply-To: <20151209144734.GB5727@sirena.org.uk>
+References: <2194927.eV2s2QmZs0@wuerfel> <5668188F.2080202@nvidia.com>
+ <20151209144734.GB5727@sirena.org.uk>
+Message-ID: <566865ED.3020106@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When hardware updates of the access and dirty states are enabled, the
-default ptep_set_access_flags() implementation based on calling
-set_pte_at() directly is potentially racy. This triggers the "racy dirty
-state clearing" warning in set_pte_at() because an existing writable PTE
-is overridden with a clean entry.
 
-There are two main scenarios for this situation:
+On 09/12/15 14:47, Mark Brown wrote:
+> * PGP Signed by an unknown key
+> 
+> On Wed, Dec 09, 2015 at 12:03:27PM +0000, Jon Hunter wrote:
+>> On 08/12/15 21:52, Arnd Bergmann wrote:
+> 
+>>> My first attempt was to implement a helper for this function
+>>> for regulator_sync_voltage, but Mark Brown explained:
+> 
+>>>    We don't do this for *all* regulator API functions - there's some where
+>>>    using them strongly suggests that there is actually a dependency on
+>>>    the regulator API.  This does seem like it might be falling into the
+>>>    specialist category [...]
+>>>    Looking at the code I'm pretty unclear on what the authors think the
+>>>    use of _sync_voltage() is doing in the first place so it may be even
+>>>    better to just remove the call.  It seems to have been included in the
+>>>    first commit so there's not changelog explaining things and there's
+>>>    no comment either.  I'd *expect* it to be a noop as far as I can see.
+> 
+>> In this sequence we are switching from the DFLL clock source (which
+>> directly controls the voltage) back to a PLL (which does not control the
+>> voltage directly). What we want to do is to restore the voltage back to
+>> the voltage it was operating at before we switched to the DFLL clock
+>> (which could have changed it).
+> 
+> If changes implemented by the clock driver are trashing the regulator
+> settings I would expect the clock driver to be responsible for fixing
+> things up rather than another driver that happens to use the clock.  I'd
+> also expect some kind of internal documentation explaining what's going
+> on, and possibly 
 
-1. The CPU getting an access fault does not support hardware updates of
-   the access/dirty flags. However, a different agent in the system
-   (e.g. SMMU) can do this, therefore overriding a writable entry with a
-   clean one could potentially lose the automatically updated dirty
-   status
+Yes, the DFLL clock driver could restore the voltage, however, that
+does not guarantee that the voltage is still sufficient for the other
+clock source.
 
-2. A more complex situation is possible when all CPUs support hardware
-   AF/DBM:
+>> I am not familiar with regulator_sync_voltage() but from the comment it
+>> does say that it will re-apply the last voltage that was configured for
+>> the regulator. So I can see what they were doing. The question I have
+>> is, if the consumer has not explicitly called regulator_set_voltage()
+>> then what does regulator_sync_voltage() do? I am wondering if we should
+>> have been doing a regulator_get_voltage() during the probe and a
+>> regulator_set_voltage() when switching back?
+> 
+> This *is* the sort of thing _sync() is intended for, though it's mainly
+> expected to be used in cases like suspend where things have been powered
+> off.  As you can see from the code it's based on the settings that
+> software made, but then if nothing in software has any need to configure
+> anything then why do we even care that the hardware changed anything?
 
-   a) Initial state: shareable + writable vma and pte_none(pte)
-   b) Read fault taken by two threads of the same process on different
-      CPUs
-   c) CPU0 takes the mmap_sem and proceeds to handling the fault. It
-      eventually reaches do_set_pte() which sets a writable + clean pte.
-      CPU0 releases the mmap_sem
-   d) CPU1 acquires the mmap_sem and proceeds to handle_pte_fault(). The
-      pte entry it reads is present, writable and clean and it continues
-      to pte_mkyoung()
-   e) CPU1 calls ptep_set_access_flags()
+Yes, that's my point. When switching between these clock sources, I
+think that software does need to set something and so we should care.
 
-   If between (d) and (e) the hardware (another CPU) updates the dirty
-   state (clears PTE_RDONLY), CPU1 will override the PTR_RDONLY bit
-   marking the entry clean again.
+> Setting the voltage you've read back sounds broken, if the hardware
+> might randomly change things how do you know the settings we read were
+> sane?  Shouldn't we know what voltage range the device requires in a
+> given mode and set that - that's much more normal?
 
-This patch implements an arm64-specific ptep_set_access_flags() function
-which performs an atomic update of the AF bit. For the cases where the
-new entry is already dirty or read-only, there is no race with the
-hardware update, therefore it performs a set_pte() directly.
+The hardware will not randomly change the voltage until the DFLL is
+enabled and so you would have to do this before.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Reported-by: Ming Lei <tom.leiming@gmail.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/pgtable.h |  5 ++++
- arch/arm64/mm/fault.c            | 57 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 62 insertions(+)
+Yes, setting the frequency and voltage as defined by a given operating
+mode would make sense. However, I am not sure we have those defined in
+the kernel for this PLL and would have to be added.
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 002dc61a4dff..77bc5d6ed4e9 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -536,6 +536,11 @@ static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
- }
- 
- #ifdef CONFIG_ARM64_HW_AFDBM
-+#define __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
-+extern int ptep_set_access_flags(struct vm_area_struct *vma,
-+				 unsigned long address, pte_t *ptep,
-+				 pte_t entry, int dirty);
-+
- /*
-  * Atomic pte/pmd modifications.
-  */
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 92ddac1e8ca2..b393ee2eeda2 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -81,6 +81,63 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
- 	printk("\n");
- }
- 
-+#ifdef CONFIG_ARM64_HW_AFDBM
-+/*
-+ * It only sets the access flags (dirty, accessed), as well as write
-+ * permission, and only to a more permissive setting. This function needs to
-+ * cope with hardware update of the accessed/dirty state by other agents in
-+ * the system. It can safely skip the __sync_icache_dcache() call as in
-+ * set_pte_at() since the PTE is never changed from no-exec to exec by this
-+ * function.
-+ * It returns whether the PTE actually changed.
-+ */
-+int ptep_set_access_flags(struct vm_area_struct *vma,
-+			  unsigned long address, pte_t *ptep,
-+			  pte_t entry, int dirty)
-+{
-+	unsigned int tmp;
-+
-+	if (pte_same(*ptep, entry))
-+		return 0;
-+
-+	/*
-+	 * If the PTE is read-only, the hardware cannot update the dirty state
-+	 * (clear the PTE_RDONLY bit). If we write a dirty entry, we can
-+	 * ignore the race with the hardware update since we set both accessed
-+	 * and dirty states anyway. The caller guarantees that the new PTE is
-+	 * writable when dirty != 0.
-+	 */
-+	if (dirty || !pte_write(entry)) {
-+		/* avoid a subsequent fault on read-only entries */
-+		if (dirty)
-+			pte_val(entry) &= ~PTE_RDONLY;
-+		set_pte(ptep, entry);
-+		goto flush;
-+	}
-+
-+	VM_WARN_ONCE(!pte_write(*ptep) && pte_write(entry),
-+		     "%s: making pte writable without dirty: %016llx -> %016llx\n",
-+		     __func__, pte_val(*ptep), pte_val(entry));
-+
-+	/*
-+	 * Setting the access flag on a writable entry must be done atomically
-+	 * to avoid racing with the hardware update of the dirty state.
-+	 */
-+	asm volatile("//	ptep_set_access_flags\n"
-+	"	prfm	pstl1strm, %2\n"
-+	"1:	ldxr	%0, %2\n"
-+	"	orr	%0, %0, %3		// set PTE_AF\n"
-+	"	stxr	%w1, %0, %2\n"
-+	"	cbnz	%w1, 1b\n"
-+	: "=&r" (entry), "=&r" (tmp), "+Q" (pte_val(*ptep))
-+	: "L" (PTE_AF));
-+
-+flush:
-+	flush_tlb_fix_spurious_fault(vma, address);
-+	return 1;
-+}
-+#endif
-+
- /*
-  * The kernel tried to access some page that wasn't present.
-  */
+I was thinking that during boot we could read the default voltage and
+frequency set by the bootloader and use this as it should not be
+changing dynamically at this point because the cpufreq driver has not
+been activated yet.
+
+Jon
