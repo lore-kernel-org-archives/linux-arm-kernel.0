@@ -1,74 +1,40 @@
-From: alison_chaiken@mentor.com (Alison Chaiken)
-Date: Tue, 8 Dec 2015 15:48:39 -0800
-Subject: [PATCH v2 1/2] ARM: dts: imx6qdl-sabreauto: assert GPIO at boot in
- order to connect NOR
-In-Reply-To: <1449618520-3432-1-git-send-email-alison_chaiken@mentor.com>
-References: <20151207082440.GY11966@pengutronix.de>
- <1449618520-3432-1-git-send-email-alison_chaiken@mentor.com>
-Message-ID: <1449618520-3432-2-git-send-email-alison_chaiken@mentor.com>
+From: psidhu@gateworks.com (Pushpal Sidhu)
+Date: Tue, 8 Dec 2015 16:09:12 -0800
+Subject: Bad FEC tx TCP ethernet performance with certain defconfig
+Message-ID: <CAD1M063HAxb+5p2MzK_2=WPK_8jJoEMEsxS8L7S1UxStr6XnZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PAD_EIM_D18 must be pulled low at boot in order for the parallel NOR
-connected to the EIM switch to probe properly.  Otherwise the imx-weim
-device will register properly, but cfi_qry_present() will return
-"U-V-]" rather than "Q-R-Y".  Employ the gpio-initval mechanism in
-GPIO5 node in the SabreAuto device-tree in order to set the pin.
+Hi all,
 
-Signed-off-by: Alison Chaiken <alison_chaiken@mentor.com>
----
- arch/arm/boot/dts/imx6qdl-sabreauto-eim-nor.dtsi | 43 ++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6qdl-sabreauto-eim-nor.dtsi
+I've found a state in which the TCP tx performance is severely
+degraded when using a specific defconfig and I can't really figure out
+the differences between the imx_v6_v7_defconfig vs. this one in both
+the 4.3 kernel and 4.4-rc4. Please see [1] and [2] for links to the
+".config.bad" and ".config.good" for a comparison for the 4.4-rc4
+kernel.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto-eim-nor.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto-eim-nor.dtsi
-new file mode 100644
-index 0000000..66a9aa2
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto-eim-nor.dtsi
-@@ -0,0 +1,43 @@
-+/*
-+ * Copyright 2012 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ * Copyright (c) 2012-2015 Mentor Graphics Inc.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+&weim {
-+	status = "okay";
-+};
-+
-+&gpio5 {
-+	p4 {
-+		/* Select NOR or I2C3 via setting of port-expander
-+		 * steering logic.
-+		 * Low: Attach p-NOR line D18.
-+		 * High: Attach I2C3 line SDA.
-+		 */
-+		gpio-initval;
-+		gpios = <4 GPIO_ACTIVE_HIGH>;
-+		output-low;
-+		line-name = "SelNORorI2C3";
-+	};
-+};
-+
-+&i2c3 {
-+	status = "disabled";
-+};
-+
-+/* the following devices have pinmux conflicts with NOR */
-+&uart3 {
-+	status = "disabled";
-+};
-+
-+&ecspi1 {
-+	status = "disabled";
-+};
--- 
-2.6.2
+With the bad config, I achieve roughly 120mbps, but it can vary
+between 70~200mbps, but only with TCP tx traffic. I get normal
+performance when transmitting UDP, or receiving TCP/UDP. I've verified
+that this has nothing to do with netfilter/iptables by
+enabling/disabling it.
+
+I also found that when I backported the 4.3. fec_main driver to a
+downstream vendor 3.14 vendor kernel, the same thing would occur
+unless I set CONFIG_PROVE_LOCKING=y, in which case the performance is
+normal. However, this behavior does not translate to the 4.4-rc4
+kernel.
+
+Finally, on the same system, I happen to have a NIC that's not the FEC
+and I can't seem to show the problem on it, so it appears to be FEC
+specific.
+
+Can anyone reproduce my findings? I'm wondering if this is a known
+problem, but I couldn't figure out the right thing to search on the
+web or something.
+
+[1] http://pastebin.com/PsjfhBqv
+[2] http://pastebin.com/FE1qET5S
+
+- Pushpal
