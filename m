@@ -1,148 +1,504 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 9 Dec 2015 10:16:57 +0100
-Subject: [PATCH v5] clk: sunxi: Add CLK_OF_DECLARE support for
- sun8i-a23-apb0-clk driver
-In-Reply-To: <CAGb2v65GQYgnKcmTqXCZpRMpbZiPKMyrg628wc4i+pK6=v62Eg@mail.gmail.com>
-References: <1449126330-21595-1-git-send-email-wens@csie.org>
- <20151207093622.GE27957@lukather>
- <CAGb2v65GQYgnKcmTqXCZpRMpbZiPKMyrg628wc4i+pK6=v62Eg@mail.gmail.com>
-Message-ID: <20151209091657.GV27957@lukather>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Wed,  9 Dec 2015 17:04:12 +0800
+Subject: [PATCH v1 7/8] ARM: dts: rockchip: add core rk3228 dtsi
+In-Reply-To: <1449651853-1667-1-git-send-email-jeffy.chen@rock-chips.com>
+References: <1449651853-1667-1-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <1449651853-1667-8-git-send-email-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 07, 2015 at 09:46:24PM +0800, Chen-Yu Tsai wrote:
-> On Mon, Dec 7, 2015 at 5:36 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On Thu, Dec 03, 2015 at 03:05:30PM +0800, Chen-Yu Tsai wrote:
-> >> The APBS clock on sun9i is the same as the APB0 clock on sun8i. With
-> >> sun9i we are supporting the PRCM clocks by using CLK_OF_DECLARE,
-> >> instead of through a PRCM mfd device and subdevices for each clock
-> >> and reset control. As such we need a CLK_OF_DECLARE version of
-> >> the sun8i-a23-apb0-clk driver.
-> >>
-> >> Also, build it for sun9i/A80, and not just for configurations with
-> >> MFD_SUN6I_PRCM enabled.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >>
-> >> Changes since v4:
-> >>
-> >>   - Keep building clk-sun8i-apb0 for SUN6I_MFD_PRCM.
-> >>
-> >>   - Add an error message and comment for when of_io_request_and_map()
-> >>     fails. of_io_request_and_map() merges a bunch of errors into -EINVAL,
-> >>     so this might not be the best approach. But I think having an error
-> >>     message when we know something is wrong (-EBUSY, -ENOMEM) is better.
-> >>
-> >> ---
-> >>  drivers/clk/sunxi/Makefile         |  1 +
-> >>  drivers/clk/sunxi/clk-sun8i-apb0.c | 80 ++++++++++++++++++++++++++++++++------
-> >>  2 files changed, 69 insertions(+), 12 deletions(-)
-> >>
-> >> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> >> index 103efab05ca8..ccf21ba3b6b0 100644
-> >> --- a/drivers/clk/sunxi/Makefile
-> >> +++ b/drivers/clk/sunxi/Makefile
-> >> @@ -15,6 +15,7 @@ obj-y += clk-sun9i-core.o
-> >>  obj-y += clk-sun9i-mmc.o
-> >>  obj-y += clk-usb.o
-> >>
-> >> +obj-$(CONFIG_MACH_SUN9I) += clk-sun8i-apb0.o
-> >>  obj-$(CONFIG_MACH_SUN9I) += clk-sun9i-cpus.o
-> >>
-> >>  obj-$(CONFIG_MFD_SUN6I_PRCM) += \
-> >> diff --git a/drivers/clk/sunxi/clk-sun8i-apb0.c b/drivers/clk/sunxi/clk-sun8i-apb0.c
-> >> index 7ae5d2c2cde1..7ba61103a6f5 100644
-> >> --- a/drivers/clk/sunxi/clk-sun8i-apb0.c
-> >> +++ b/drivers/clk/sunxi/clk-sun8i-apb0.c
-> >> @@ -17,13 +17,77 @@
-> >>  #include <linux/clk-provider.h>
-> >>  #include <linux/module.h>
-> >>  #include <linux/of.h>
-> >> +#include <linux/of_address.h>
-> >>  #include <linux/platform_device.h>
-> >>
-> >> +static struct clk *sun8i_a23_apb0_register(struct device_node *node,
-> >> +                                        void __iomem *reg)
-> >> +{
-> >> +     const char *clk_name = node->name;
-> >> +     const char *clk_parent;
-> >> +     struct clk *clk;
-> >> +     int ret;
-> >> +
-> >> +     clk_parent = of_clk_get_parent_name(node, 0);
-> >> +     if (!clk_parent)
-> >> +             return ERR_PTR(-EINVAL);
-> >> +
-> >> +     of_property_read_string(node, "clock-output-names", &clk_name);
-> >> +
-> >> +     /* The A23 APB0 clock is a standard 2 bit wide divider clock */
-> >> +     clk = clk_register_divider(NULL, clk_name, clk_parent, 0, reg,
-> >> +                                0, 2, CLK_DIVIDER_POWER_OF_TWO, NULL);
-> >> +     if (IS_ERR(clk))
-> >> +             return clk;
-> >> +
-> >> +     ret = of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> >> +     if (ret)
-> >> +             goto err_unregister;
-> >> +
-> >> +     return clk;
-> >> +
-> >> +err_unregister:
-> >> +     clk_unregister_divider(clk);
-> >> +
-> >> +     return ERR_PTR(ret);
-> >> +}
-> >> +
-> >> +static void sun8i_a23_apb0_setup(struct device_node *node)
-> >> +{
-> >> +     void __iomem *reg;
-> >> +     struct resource res;
-> >> +     struct clk *clk;
-> >> +
-> >> +     reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-> >> +     if (IS_ERR(reg)) {
-> >> +             /*
-> >> +              * This happens with clk nodes instantiated through mfd,
-> >> +              * as those do not have their resources assigned in the
-> >> +              * device tree. Do not print an error in this case.
-> >> +              */
-> >> +             if (PTR_ERR(reg) != -EINVAL)
-> >> +                     pr_err("Could not get registers for a23-apb0-clk\n");
-> >
-> > This is not the only case you have to take into account.
-> >
-> > There's also the case when you have a regular clock (and by regular I
-> > mean that is not in the PRCM) that will be probed by the
-> > CLK_OF_DECLARE mechanism and then later by the device model.
-> >
-> > In such a case, the second of_io_request_and_map will fail, and you
-> > will have an error returned that you do not ignore at the moment.
-> 
-> Right. It will return -EBUSY. But ignoring it and returning 0 is telling
-> the driver core that the device successfully binded. I think this is
-> wrong.
+Initial release for rk3228 shared dtsi.
 
-Well, technically, it is already bound.
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
 
-> Normal clocks should be in the "clocks" node, and wouldn't be probed a
-> second time through the device model, would it? Am I missing something?
+ arch/arm/boot/dts/rk3228.dtsi | 478 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 478 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rk3228.dtsi
 
-Hmmm, that's true.
-
-Maxime
-
+diff --git a/arch/arm/boot/dts/rk3228.dtsi b/arch/arm/boot/dts/rk3228.dtsi
+new file mode 100644
+index 0000000..d6b3e40
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3228.dtsi
+@@ -0,0 +1,478 @@
++/*
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/pinctrl/rockchip.h>
++#include <dt-bindings/clock/rk3228-cru.h>
++#include "skeleton.dtsi"
++
++/ {
++	compatible = "rockchip,rk3228";
++
++	interrupt-parent = <&gic>;
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x60000000 0x40000000>;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu0: cpu at f00 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0xf00>;
++			resets = <&cru SRST_CORE0>;
++			operating-points = <
++				/* KHz    uV */
++				 816000 1000000
++			>;
++			clock-latency = <40000>;
++			clocks = <&cru ARMCLK>;
++		};
++
++		cpu1: cpu at f01 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0xf01>;
++			resets = <&cru SRST_CORE1>;
++		};
++
++		cpu2: cpu at f02 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0xf02>;
++			resets = <&cru SRST_CORE2>;
++		};
++
++		cpu3: cpu at f03 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0xf03>;
++			resets = <&cru SRST_CORE3>;
++		};
++	};
++
++	amba {
++		compatible = "arm,amba-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		pdma: pdma at 110f0000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x110f0000 0x4000>;
++			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
++			#dma-cells = <1>;
++			clocks = <&cru ACLK_DMAC>;
++			clock-names = "apb_pclk";
++		};
++	};
++
++	arm-pmu {
++		compatible = "arm,cortex-a7-pmu";
++		interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&cpu0>, <&cpu1>, <&cpu2>, <&cpu3>;
++	};
++
++	timer {
++		compatible = "arm,armv7-timer";
++		arm,cpu-registers-not-fw-configured;
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
++		clock-frequency = <24000000>;
++	};
++
++	hdmiphy_phy: hdmiphy_phy {
++		compatible = "fixed-clock";
++		clock-frequency = <594000000>;
++		clock-output-names = "hdmiphy_phy";
++		#clock-cells = <0>;
++	};
++
++	phy_50m_out: phy_50m_out {
++		compatible = "fixed-clock";
++		clock-frequency = <50000000>;
++		clock-output-names = "phy_50m_out";
++		#clock-cells = <0>;
++	};
++
++	usb480m_phy0: usb480m_phy0 {
++		compatible = "fixed-clock";
++		clock-frequency = <480000000>;
++		clock-output-names = "usb480m_phy0";
++		#clock-cells = <0>;
++	};
++
++	usb480m_phy1: usb480m_phy1 {
++		compatible = "fixed-clock";
++		clock-frequency = <480000000>;
++		clock-output-names = "usb480m_phy1";
++		#clock-cells = <0>;
++	};
++
++	xin24m: oscillator {
++		compatible = "fixed-clock";
++		clock-frequency = <24000000>;
++		clock-output-names = "xin24m";
++		#clock-cells = <0>;
++	};
++
++	cru: clock-controller at 110e0000 {
++		compatible = "rockchip,rk3228-cru";
++		reg = <0x110e0000 0x1000>;
++		rockchip,grf = <&grf>;
++		#clock-cells = <1>;
++		#reset-cells = <1>;
++		assigned-clocks = <&cru PLL_GPLL>;
++		assigned-clock-rates = <594000000>;
++	};
++
++	gic: interrupt-controller at 32010000 {
++		compatible = "arm,gic-400";
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		#address-cells = <0>;
++
++		reg = <0x32011000 0x1000>,
++		      <0x32012000 0x1000>;
++	};
++
++	grf: syscon at 11000000 {
++		compatible = "syscon";
++		reg = <0x11000000 0x1000>;
++	};
++
++	timer: timer at 110c0000 {
++		compatible = "rockchip,rk3288-timer";
++		reg = <0x110c0000 0x20>;
++		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&xin24m>, <&cru PCLK_TIMER>;
++		clock-names = "timer", "pclk";
++	};
++
++	emmc: dwmmc at 30020000 {
++		compatible = "rockchip,rk3288-dw-mshc";
++		clock-frequency = <37500000>;
++		clock-freq-min-max = <400000 37500000>;
++		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>,
++		<&cru SCLK_EMMC_DRV>, <&cru SCLK_EMMC_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu_drv", "ciu_sample";
++		fifo-depth = <0x100>;
++		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
++		reg = <0x30020000 0x4000>;
++		broken-cd;
++		bus-width = <8>;
++		cap-mmc-highspeed;
++		mmc-ddr-1_8v;
++		disable-wp;
++		non-removable;
++		num-slots = <1>;
++		default-sample-phase = <158>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_bus8>;
++		status = "disabled";
++	};
++
++	pwm0: pwm at 110b0000 {
++		compatible = "rockchip,rk3288-pwm";
++		reg = <0x110b0000 0x10>;
++		#pwm-cells = <3>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm0_pin>;
++		status = "disabled";
++	};
++
++	pwm1: pwm at 110b0010 {
++		compatible = "rockchip,rk3288-pwm";
++		reg = <0x110b0010 0x10>;
++		#pwm-cells = <3>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm1_pin>;
++		status = "disabled";
++	};
++
++	pwm2: pwm at 110b0020 {
++		compatible = "rockchip,rk3288-pwm";
++		reg = <0x110b0020 0x10>;
++		#pwm-cells = <3>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm2_pin>;
++		status = "disabled";
++	};
++
++	pwm3: pwm at 110b0030 {
++		compatible = "rockchip,rk3288-pwm";
++		reg = <0x110b0030 0x10>;
++		#pwm-cells = <2>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm3_pin>;
++		status = "disabled";
++	};
++
++	uart0: serial at 11010000 {
++		compatible = "snps,dw-apb-uart";
++		reg = <0x11010000 0x100>;
++		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		clock-frequency = <24000000>;
++		clocks = <&cru SCLK_UART0>, <&cru PCLK_UART0>;
++		clock-names = "baudclk", "apb_pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart0_xfer &uart0_cts &uart0_rts>;
++		status = "disabled";
++	};
++
++	uart1: serial at 11020000 {
++		compatible = "snps,dw-apb-uart";
++		reg = <0x11020000 0x100>;
++		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		clock-frequency = <24000000>;
++		clocks = <&cru SCLK_UART1>, <&cru PCLK_UART1>;
++		clock-names = "baudclk", "apb_pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart1_xfer>;
++		status = "disabled";
++	};
++
++	uart2: serial at 11030000 {
++		compatible = "snps,dw-apb-uart";
++		reg = <0x11030000 0x100>;
++		interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		clock-frequency = <24000000>;
++		clocks = <&cru SCLK_UART2>, <&cru PCLK_UART2>;
++		clock-names = "baudclk", "apb_pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart2_xfer>;
++		status = "disabled";
++	};
++
++
++	pinctrl: pinctrl {
++		compatible = "rockchip,rk3228-pinctrl";
++		rockchip,grf = <&grf>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		gpio0: gpio0 at 11110000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x11110000 0x100>;
++			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO0>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio1: gpio1 at 11120000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x11120000 0x100>;
++			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO1>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio2: gpio2 at 11130000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x11130000 0x100>;
++			interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO2>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio3: gpio3 at 11140000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x11140000 0x100>;
++			interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO3>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		pcfg_pull_up: pcfg-pull-up {
++			bias-pull-up;
++		};
++
++		pcfg_pull_down: pcfg-pull-down {
++			bias-pull-down;
++		};
++
++		pcfg_pull_none: pcfg-pull-none {
++			bias-disable;
++		};
++
++		emmc {
++			emmc_clk: emmc-clk {
++				rockchip,pins = <2 7 RK_FUNC_2 &pcfg_pull_none>;
++			};
++
++			emmc_cmd: emmc-cmd {
++				rockchip,pins = <1 22 RK_FUNC_2 &pcfg_pull_none>;
++			};
++
++			emmc_bus8: emmc-bus8 {
++				rockchip,pins = <1 24 RK_FUNC_2 &pcfg_pull_none>,
++						<1 25 RK_FUNC_2 &pcfg_pull_none>,
++						<1 26 RK_FUNC_2 &pcfg_pull_none>,
++						<1 27 RK_FUNC_2 &pcfg_pull_none>,
++						<1 28 RK_FUNC_2 &pcfg_pull_none>,
++						<1 29 RK_FUNC_2 &pcfg_pull_none>,
++						<1 30 RK_FUNC_2 &pcfg_pull_none>,
++						<1 31 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		pwm0 {
++			pwm0_pin: pwm0-pin {
++				rockchip,pins = <3 21 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		pwm1 {
++			pwm1_pin: pwm1-pin {
++				rockchip,pins = <0 30 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		pwm2 {
++			pwm2_pin: pwm2-pin {
++				rockchip,pins = <1 12 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		pwm3 {
++			pwm3_pin: pwm3-pin {
++				rockchip,pins = <1 11 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		uart0 {
++			uart0_xfer: uart0-xfer {
++				rockchip,pins = <2 26 RK_FUNC_1 &pcfg_pull_none>,
++						<2 27 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			uart0_cts: uart0-cts {
++				rockchip,pins = <2 29 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			uart0_rts: uart0-rts {
++				rockchip,pins = <0 17 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		uart1 {
++			uart1_xfer: uart1-xfer {
++				rockchip,pins = <1 9 RK_FUNC_1 &pcfg_pull_none>,
++						<1 10 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			uart1_cts: uart1-cts {
++				rockchip,pins = <1 8 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			uart1_rts: uart1-rts {
++				rockchip,pins = <1 11 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		uart2 {
++			uart2_xfer: uart2-xfer {
++				rockchip,pins = <1 18 RK_FUNC_2 &pcfg_pull_none>,
++						<1 19 RK_FUNC_2 &pcfg_pull_none>;
++			};
++
++			uart2_cts: uart2-cts {
++				rockchip,pins = <0 25 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			uart2_rts: uart2-rts {
++				rockchip,pins = <0 24 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++	};
++};
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151209/574d0975/attachment.sig>
+2.1.4
