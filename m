@@ -1,56 +1,56 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 09 Dec 2015 16:31:25 +0100
-Subject: [PATCH v2 4/9] ARM: dts: add dts files for hi3519-demb board
-In-Reply-To: <5666548B.90502@huawei.com>
-References: <1449110668-23647-1-git-send-email-xuejiancheng@huawei.com>
- <56652912.80308@huawei.com> <5666548B.90502@huawei.com>
-Message-ID: <5533669.m0KDLq8XOc@wuerfel>
+Date: Wed, 09 Dec 2015 16:32:11 +0100
+Subject: [PATCH v2 3/9] ARM: hisi: enable Hi3519 soc
+In-Reply-To: <56664878.8040805@huawei.com>
+References: <1449110565-23590-1-git-send-email-xuejiancheng@huawei.com>
+ <56663897.7040901@huawei.com> <56664878.8040805@huawei.com>
+Message-ID: <4297924.YW2IR8MmHA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 December 2015 11:54:51 xuejiancheng wrote:
-> On 2015/12/7 14:37, xuejiancheng wrote:
+On Tuesday 08 December 2015 11:03:20 xuejiancheng wrote:
+> >>
+> >> I think we should come up with a way to handle this in general for
+> >> ARCH_HISI. It's not problem to have a couple of sub-options, but I'd
+> >> rather not have one for each SoC because I'm sure that hisilicon has
+> >> made dozens or possibly hundreds of ARM based SoCs that belong into
+> >> a couple of families.
 > > 
-> > On 2015/12/4 18:49, Arnd Bergmann wrote:
-> >> On Friday 04 December 2015 10:27:58 xuejiancheng wrote:
-> >>>>
-> >> Maybe split out the sysctrl binding from
-> >> Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt, as it has
-> >> you already have a couple of those, and it's not clear how they relate
-> >> to one another.
+> > Agree with you.
+> > 
 > >>
-> >> If we introduce a string for all hip04 compatible sysctrl devices, we should
-> >> document that and use it consistently, so hi3519 becomes
+> >> The individual selection of IP blocks is not that important, because
+> >> those tend to just be generic device drivers that we can enable on
+> >> any platform using the defconfig files.
 > >>
-> >>      compatible = "hisilicon,hi3519-sysctrl", "hisilicon,hip04-sysctrl", "hisilicon,sysctrl";
+> >> You said that ARCH_HI3519 and HIP04 have an identical system controller,
+> >> but it's different for Hi36xx, correct?
+> > 
+> > No. The system controller of HI3519 is also different from HIP04. Maybe I gave you
+> > wrong descriptions. Sorry about that.
+> > 
 > >>
-> >> but I'd clarify in the binding documentation that "hisilicon,sysctrl" should
-> >> only be used for hip04 and hi3519 but not the others.
+> >> So maybe we can generalize the HIP04 option to include all chips with
+> >> that system controller as they appear to share a common ancestry regardless
+> >> of the target market?
 > >>
-> >> As this seems to be a standard part, we can also think about making a
-> >> high-level driver for in in drivers/soc rather than relying on the syscon
-> >> driver which we tend to use more for one-off devices with random register
-> >> layouts.
-> >>
-> >    Sorry. I didn't understand your meaning well and maybe I gave you a wrong description.
-> > Please allow me to clarify it again.
-> >    The "sysctrl" nodes here is just used for the "reboot" function. It is corresponding to
-> > the driver "drivers/power/reset/hisi-reboot.c". The compatible string in the driver is
-> > "hisilicon,sysctrl".
-> >    The layout of this block is also different from the one in HiP04.
+> > 
+> > I agree that we generalize some options regardless of the product line and target market.
+> > 
+> >> The Hi35xx family includes some rather older chips as well based on ARM9
+> >> etc, correct? Are they closely related to the new one as well, or do they
+> >> just share the name?
+> > 
+> > Yes. It's correct. They may share some IP blocks. But they may be very different
+> > from the new one for the arch code. I also don't think it's a good idea to make
+> > them share the same name.
 > 
-> I'll use "syscon" as the compatible value for sysctrl node and "syscon-reboot" for a new reboot node.
+> I will use ARCH_HISI instead of ARCH_HI3519.
 > 
 > 
 
-This is not what I meant. You have to use "syscon" as the most generic
-"compatible" value here, but should add a machine specific string
-as a more specific one. "hisilicon,sysctrl" is not appropriate because
-it does not identify the IP block uniquely, you can only use that
-in combination with another more specific string.
+Do you mean you want to remove the other options as well?
 
-That way, we have to option to create a high-level driver for the IP
-block later if it turns out that we need some more generic functionality
-that is provided by those registers.
+We should do this consistently at least within the Kconfig file.
 
 	Arnd
