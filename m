@@ -1,29 +1,64 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 09 Dec 2015 17:33:45 +0100
-Subject: [PATCH] nwflash: use no_seek_end_llseek_size
-Message-ID: <4235779.ynpqSv1Kc4@wuerfel>
+Date: Wed, 09 Dec 2015 17:35:05 +0100
+Subject: [PATCH] ARM: pxa: use PWM lookup table for all machines
+Message-ID: <3221771.lHXPua29rx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recently introduced no_seek_end_llseek was wrong, it should
-be no_seek_end_llseek_size:
+The recent change to use a pwm lookup table for the ezx machines
+was incomplete and only changed the a780 model, but not the
+other ones in the same file.
 
-drivers/char/nwflash.c: In function 'flash_llseek':
-drivers/char/nwflash.c:280:8: error: too many arguments to function 'no_seek_end_llseek'
+This adds the missing calls to pwm_add_table().
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 00c1b53c0e61 ("new helpers: no_seek_end_llseek{,_size}()")
+Fixes: c3322022897c ("ARM: pxa: ezx: Use PWM lookup table")
+Acked-by: Thierry Reding <thierry.reding@gmail.com>
+---
+If nobody has any objections, I'll queue this up for 4.4. No backport
+is needed as it only broke in this release.
 
-diff --git a/drivers/char/nwflash.c b/drivers/char/nwflash.c
-index 362fb1e230e3..dbe598de9b74 100644
---- a/drivers/char/nwflash.c
-+++ b/drivers/char/nwflash.c
-@@ -277,7 +277,7 @@ static loff_t flash_llseek(struct file *file, loff_t offset, int orig)
- 		printk(KERN_DEBUG "flash_llseek: offset=0x%X, orig=0x%X.\n",
- 		       (unsigned int) offset, orig);
+diff --git a/arch/arm/mach-pxa/ezx.c b/arch/arm/mach-pxa/ezx.c
+index 391ba898b971..34ad0a89d4a9 100644
+--- a/arch/arm/mach-pxa/ezx.c
++++ b/arch/arm/mach-pxa/ezx.c
+@@ -889,6 +889,7 @@ static void __init e680_init(void)
  
--	ret = no_seek_end_llseek(file, offset, orig, gbFlashSize);
-+	ret = no_seek_end_llseek_size(file, offset, orig, gbFlashSize);
- 	mutex_unlock(&flash_mutex);
- 	return ret;
+ 	pxa_set_keypad_info(&e680_keypad_platform_data);
+ 
++	pwm_add_table(ezx_pwm_lookup, ARRAY_SIZE(ezx_pwm_lookup));
+ 	platform_add_devices(ARRAY_AND_SIZE(ezx_devices));
+ 	platform_add_devices(ARRAY_AND_SIZE(e680_devices));
+ }
+@@ -956,6 +957,7 @@ static void __init a1200_init(void)
+ 
+ 	pxa_set_keypad_info(&a1200_keypad_platform_data);
+ 
++	pwm_add_table(ezx_pwm_lookup, ARRAY_SIZE(ezx_pwm_lookup));
+ 	platform_add_devices(ARRAY_AND_SIZE(ezx_devices));
+ 	platform_add_devices(ARRAY_AND_SIZE(a1200_devices));
+ }
+@@ -1148,6 +1150,7 @@ static void __init a910_init(void)
+ 		platform_device_register(&a910_camera);
+ 	}
+ 
++	pwm_add_table(ezx_pwm_lookup, ARRAY_SIZE(ezx_pwm_lookup));
+ 	platform_add_devices(ARRAY_AND_SIZE(ezx_devices));
+ 	platform_add_devices(ARRAY_AND_SIZE(a910_devices));
+ }
+@@ -1215,6 +1218,7 @@ static void __init e6_init(void)
+ 
+ 	pxa_set_keypad_info(&e6_keypad_platform_data);
+ 
++	pwm_add_table(ezx_pwm_lookup, ARRAY_SIZE(ezx_pwm_lookup));
+ 	platform_add_devices(ARRAY_AND_SIZE(ezx_devices));
+ 	platform_add_devices(ARRAY_AND_SIZE(e6_devices));
+ }
+@@ -1256,6 +1260,7 @@ static void __init e2_init(void)
+ 
+ 	pxa_set_keypad_info(&e2_keypad_platform_data);
+ 
++	pwm_add_table(ezx_pwm_lookup, ARRAY_SIZE(ezx_pwm_lookup));
+ 	platform_add_devices(ARRAY_AND_SIZE(ezx_devices));
+ 	platform_add_devices(ARRAY_AND_SIZE(e2_devices));
  }
