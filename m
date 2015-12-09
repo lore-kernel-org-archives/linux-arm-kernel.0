@@ -1,56 +1,76 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 09 Dec 2015 18:16:40 +0000
-Subject: [PATCH v5 5/5] gicv2m: acpi: Introducing GICv2m ACPI support
-In-Reply-To: <56686C9F.6060804@amd.com>
-References: <1449625686-5594-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1449625686-5594-6-git-send-email-Suravee.Suthikulpanit@amd.com>
- <20151209103806.41488405@why.wild-wind.fr.eu.org> <56686C9F.6060804@amd.com>
-Message-ID: <56687008.3020703@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 9 Dec 2015 19:18:27 +0100
+Subject: [PATCH] net/macb: add support for resetting PHY using GPIO
+In-Reply-To: <1449683383-5022-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1449683383-5022-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20151209181827.GS13328@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/15 18:02, Suravee Suthikulanit wrote:
-> Hi Marc,
+On Wed, Dec 09, 2015 at 06:49:43PM +0100, Gregory CLEMENT wrote:
+> With device tree it is no more possible to reset the PHY at board
+> level. Furthermore, doing in the driver allow to power down the PHY when
+> the network interface is no more used.
 > 
-> On 12/9/2015 4:38 AM, Marc Zyngier wrote:
->> On Tue, 8 Dec 2015 17:48:06 -0800
->> Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> wrote:
->>
->>> This patch introduces gicv2m_acpi_init(), which uses information
->>> in MADT GIC MSI frames structure to initialize GICv2m driver.
->>>
->>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>> ---
->>>   drivers/irqchip/irq-gic-v2m.c   | 95 +++++++++++++++++++++++++++++++++++++++++
->>>   drivers/irqchip/irq-gic.c       |  3 ++
->>>   include/linux/irqchip/arm-gic.h |  4 ++
->>>   3 files changed, 102 insertions(+)
->>>
->>> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
->>> [...]
->>> @@ -359,6 +368,8 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
->>>
->>>   	if (to_of_node(fwnode))
->>>   		name = to_of_node(fwnode)->name;
->>> +	else
->>> +		name = irq_domain_get_irqchip_fwnode_name(fwnode);
->>
->> Don't bother with that, the name associated with the domain is
->> absolutely meaningless. You are already printing the frame address,
->> which is enough to identify it, should someone need to debug this.
->>
->> Drop the name from the previous patch as well, and that will make one
->> less difference to care about. Patch #3 can die as well.
->>
+> The patch introduces a new optional property "phy-reset-gpio" inspired
+> from the one use for the FEC.
 > 
-> Ok. I'll just leave them blank (i.e. const char *name ="")
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/net/macb.txt |  3 +++
+>  drivers/net/ethernet/cadence/macb.c            | 26 ++++++++++++++++++++++++++
+>  drivers/net/ethernet/cadence/macb.h            |  1 +
+>  3 files changed, 30 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
+> index b5d7976..546d34d 100644
+> --- a/Documentation/devicetree/bindings/net/macb.txt
+> +++ b/Documentation/devicetree/bindings/net/macb.txt
+> @@ -19,6 +19,9 @@ Required properties:
+>  	Optional elements: 'tx_clk'
+>  - clocks: Phandles to input clocks.
+>  
+> +Optional properties:
+> +- phy-reset-gpio : Should specify the gpio for phy reset
 
-No, just remove name altogether. Nobody reads that anyway, and if they
-want to find out, there is the address that's clear enough.
+Hi Gregory
 
-Thanks,
+It is convention to use the plural here. So it should be phy-reset-gpios.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> +
+>  Examples:
+>  
+>  	macb0: ethernet at fffc4000 {
+> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+> index 88c1e1a..e630c56 100644
+> --- a/drivers/net/ethernet/cadence/macb.c
+> +++ b/drivers/net/ethernet/cadence/macb.c
+> @@ -30,6 +30,7 @@
+>  #include <linux/of_device.h>
+>  #include <linux/of_mdio.h>
+>  #include <linux/of_net.h>
+> +#include <linux/of_gpio.h>
+>  
+>  #include "macb.h"
+>  
+> @@ -2733,6 +2734,28 @@ static int at91ether_init(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_OF
+> +static void macb_reset_phy(struct macb *bp, struct device_node *np, int state)
+> +{
+> +	if (!np)
+> +		return;
+> +
+> +	bp->reset_gpio = of_get_named_gpio(np, "phy-reset-gpio", 0);
+> +
+> +	if (gpio_is_valid(bp->reset_gpio))
+> +		gpio_direction_output(bp->reset_gpio, state);
+
+This does not handle the flags part of the GPIO descriptor in device
+tree. i.e. ACTIVE_LOW or ACTIVE_HIGH. I think the FEC driver has the
+same issue, and is not the best driver to copy. Using the gpiod API
+will solve this issue.
+
+     Andrew
