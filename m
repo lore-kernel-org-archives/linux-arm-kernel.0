@@ -1,109 +1,125 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 9 Dec 2015 14:08:10 -0600
-Subject: [PATCH for 4.4 2/2] dmaengine: edma: DT: Change reserved slot
- array from 16bit to 32bit type
-In-Reply-To: <1449649091-9848-3-git-send-email-peter.ujfalusi@ti.com>
-References: <1449649091-9848-1-git-send-email-peter.ujfalusi@ti.com>
- <1449649091-9848-3-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20151209200810.GA28037@rob-hp-laptop>
+Date: Wed, 9 Dec 2015 14:09:05 -0600
+Subject: [PATCH v1 1/8] pinctrl: rockchip: add support for the rk3228
+In-Reply-To: <1449651853-1667-2-git-send-email-jeffy.chen@rock-chips.com>
+References: <1449651853-1667-1-git-send-email-jeffy.chen@rock-chips.com>
+ <1449651853-1667-2-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <20151209200905.GA28970@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 09, 2015 at 10:18:11AM +0200, Peter Ujfalusi wrote:
-> This change makes the DT file to be easier to read since the reserved slots
-> array does not need the '/bits/ 16' to be specified, which might confuse
-> some people.
+On Wed, Dec 09, 2015 at 05:04:06PM +0800, Jeffy Chen wrote:
+> The pinctrl of rk3228 is much the same as rk3288's, but
+> without pmu.
 > 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> 
+> ---
+> 
+>  .../bindings/pinctrl/rockchip,pinctrl.txt          |  3 +-
 
-This too should have info on why you are breaking compatibility.
+For the binding:
 
 Acked-by: Rob Herring <robh@kernel.org>
 
-> ---
->  Documentation/devicetree/bindings/dma/ti-edma.txt |  5 ++--
->  drivers/dma/edma.c                                | 31 ++++++++++++++++++-----
->  2 files changed, 27 insertions(+), 9 deletions(-)
+>  drivers/pinctrl/pinctrl-rockchip.c                 | 53 ++++++++++++++++++++++
+>  2 files changed, 55 insertions(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/dma/ti-edma.txt b/Documentation/devicetree/bindings/dma/ti-edma.txt
-> index ae8b8f1d6e69..079b42a81d7c 100644
-> --- a/Documentation/devicetree/bindings/dma/ti-edma.txt
-> +++ b/Documentation/devicetree/bindings/dma/ti-edma.txt
-> @@ -56,9 +56,8 @@ edma: edma at 49000000 {
+> diff --git a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+> index 391ef4b..0cd701b 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+> @@ -21,7 +21,8 @@ defined as gpio sub-nodes of the pinmux controller.
+>  Required properties for iomux controller:
+>    - compatible: one of "rockchip,rk2928-pinctrl", "rockchip,rk3066a-pinctrl"
+>  		       "rockchip,rk3066b-pinctrl", "rockchip,rk3188-pinctrl"
+> -		       "rockchip,rk3288-pinctrl", "rockchip,rk3368-pinctrl"
+> +		       "rockchip,rk3228-pinctrl", "rockchip,rk3288-pinctrl"
+> +		       "rockchip,rk3368-pinctrl"
+>    - rockchip,grf: phandle referencing a syscon providing the
+>  	 "general register files"
 >  
->  	/* Channel 20 and 21 is allocated for memcpy */
->  	ti,edma-memcpy-channels = <20 21>;
-> -	/* The following PaRAM slots are reserved: 35-45 and 100-110 */
-> -	ti,edma-reserved-slot-ranges = /bits/ 16 <35 10>,
-> -				       /bits/ 16 <100 10>;
-> +	/* The following PaRAM slots are reserved: 35-44 and 100-109 */
-> +	ti,edma-reserved-slot-ranges = <35 10>, <100 10>;
+> diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+> index a065112..faab36e 100644
+> --- a/drivers/pinctrl/pinctrl-rockchip.c
+> +++ b/drivers/pinctrl/pinctrl-rockchip.c
+> @@ -614,6 +614,40 @@ static void rk3288_calc_drv_reg_and_bit(struct rockchip_pin_bank *bank,
+>  	}
+>  }
+>  
+> +#define RK3228_PULL_OFFSET		0x100
+> +
+> +static void rk3228_calc_pull_reg_and_bit(struct rockchip_pin_bank *bank,
+> +				    int pin_num, struct regmap **regmap,
+> +				    int *reg, u8 *bit)
+> +{
+> +	struct rockchip_pinctrl *info = bank->drvdata;
+> +
+> +	*regmap = info->regmap_base;
+> +	*reg = RK3228_PULL_OFFSET;
+> +	*reg += bank->bank_num * RK3188_PULL_BANK_STRIDE;
+> +	*reg += ((pin_num / RK3188_PULL_PINS_PER_REG) * 4);
+> +
+> +	*bit = (pin_num % RK3188_PULL_PINS_PER_REG);
+> +	*bit *= RK3188_PULL_BITS_PER_PIN;
+> +}
+> +
+> +#define RK3228_DRV_GRF_OFFSET		0x200
+> +
+> +static void rk3228_calc_drv_reg_and_bit(struct rockchip_pin_bank *bank,
+> +				    int pin_num, struct regmap **regmap,
+> +				    int *reg, u8 *bit)
+> +{
+> +	struct rockchip_pinctrl *info = bank->drvdata;
+> +
+> +	*regmap = info->regmap_base;
+> +	*reg = RK3228_DRV_GRF_OFFSET;
+> +	*reg += bank->bank_num * RK3288_DRV_BANK_STRIDE;
+> +	*reg += ((pin_num / RK3288_DRV_PINS_PER_REG) * 4);
+> +
+> +	*bit = (pin_num % RK3288_DRV_PINS_PER_REG);
+> +	*bit *= RK3288_DRV_BITS_PER_PIN;
+> +}
+> +
+>  #define RK3368_PULL_GRF_OFFSET		0x100
+>  #define RK3368_PULL_PMU_OFFSET		0x10
+>  
+> @@ -2143,6 +2177,23 @@ static struct rockchip_pin_ctrl rk3188_pin_ctrl = {
+>  		.pull_calc_reg		= rk3188_calc_pull_reg_and_bit,
 >  };
 >  
->  edma_tptc0: tptc at 49800000 {
-> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-> index 89fc17f3a6ff..a0f217349c07 100644
-> --- a/drivers/dma/edma.c
-> +++ b/drivers/dma/edma.c
-> @@ -2015,31 +2015,50 @@ static struct edma_soc_info *edma_setup_info_from_dt(struct device *dev,
->  				&sz);
->  	if (prop) {
->  		const char pname[] = "ti,edma-reserved-slot-ranges";
-> +		u32 (*tmp)[2];
->  		s16 (*rsv_slots)[2];
-> -		size_t nelm = sz / sizeof(*rsv_slots);
-> +		size_t nelm = sz / sizeof(*tmp);
->  		struct edma_rsv_info *rsv_info;
-> +		int i;
->  
->  		if (!nelm)
->  			return info;
->  
-> +		tmp = kcalloc(nelm, sizeof(*tmp), GFP_KERNEL);
-> +		if (!tmp)
-> +			return ERR_PTR(-ENOMEM);
+> +static struct rockchip_pin_bank rk3228_pin_banks[] = {
+> +	PIN_BANK(0, 32, "gpio0"),
+> +	PIN_BANK(1, 32, "gpio1"),
+> +	PIN_BANK(2, 32, "gpio2"),
+> +	PIN_BANK(3, 32, "gpio3"),
+> +};
 > +
->  		rsv_info = devm_kzalloc(dev, sizeof(*rsv_info), GFP_KERNEL);
-> -		if (!rsv_info)
-> +		if (!rsv_info) {
-> +			kfree(tmp);
->  			return ERR_PTR(-ENOMEM);
-> +		}
->  
->  		rsv_slots = devm_kcalloc(dev, nelm + 1, sizeof(*rsv_slots),
->  					 GFP_KERNEL);
-> -		if (!rsv_slots)
-> +		if (!rsv_slots) {
-> +			kfree(tmp);
->  			return ERR_PTR(-ENOMEM);
-> +		}
->  
-> -		ret = of_property_read_u16_array(dev->of_node, pname,
-> -						 (u16 *)rsv_slots, nelm * 2);
-> -		if (ret)
-> +		ret = of_property_read_u32_array(dev->of_node, pname,
-> +						 (u32 *)tmp, nelm * 2);
-> +		if (ret) {
-> +			kfree(tmp);
->  			return ERR_PTR(ret);
-> +		}
->  
-> +		for (i = 0; i < nelm; i++) {
-> +			rsv_slots[i][0] = tmp[i][0];
-> +			rsv_slots[i][1] = tmp[i][1];
-> +		}
->  		rsv_slots[nelm][0] = -1;
->  		rsv_slots[nelm][1] = -1;
+> +static struct rockchip_pin_ctrl rk3228_pin_ctrl = {
+> +		.pin_banks		= rk3228_pin_banks,
+> +		.nr_banks		= ARRAY_SIZE(rk3228_pin_banks),
+> +		.label			= "RK3228-GPIO",
+> +		.type			= RK3288,
+> +		.grf_mux_offset		= 0x0,
+> +		.pull_calc_reg		= rk3228_calc_pull_reg_and_bit,
+> +		.drv_calc_reg		= rk3228_calc_drv_reg_and_bit,
+> +};
 > +
->  		info->rsv = rsv_info;
->  		info->rsv->rsv_slots = (const s16 (*)[2])rsv_slots;
-> +
-> +		kfree(tmp);
->  	}
->  
->  	return info;
+>  static struct rockchip_pin_bank rk3288_pin_banks[] = {
+>  	PIN_BANK_IOMUX_FLAGS(0, 24, "gpio0", IOMUX_SOURCE_PMU,
+>  					     IOMUX_SOURCE_PMU,
+> @@ -2220,6 +2271,8 @@ static const struct of_device_id rockchip_pinctrl_dt_match[] = {
+>  		.data = (void *)&rk3066b_pin_ctrl },
+>  	{ .compatible = "rockchip,rk3188-pinctrl",
+>  		.data = (void *)&rk3188_pin_ctrl },
+> +	{ .compatible = "rockchip,rk3228-pinctrl",
+> +		.data = (void *)&rk3228_pin_ctrl },
+>  	{ .compatible = "rockchip,rk3288-pinctrl",
+>  		.data = (void *)&rk3288_pin_ctrl },
+>  	{ .compatible = "rockchip,rk3368-pinctrl",
 > -- 
-> 2.6.3
+> 2.1.4
+> 
 > 
 > --
 > To unsubscribe from this list: send the line "unsubscribe devicetree" in
