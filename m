@@ -1,55 +1,50 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Wed,  9 Dec 2015 09:57:14 +0000
-Subject: [RFC PATCH v3 3/8] arm64: head.S : Change register usage
-In-Reply-To: <1449655039-22022-1-git-send-email-suzuki.poulose@arm.com>
-References: <1449655039-22022-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1449655039-22022-4-git-send-email-suzuki.poulose@arm.com>
+Date: Wed,  9 Dec 2015 09:57:11 +0000
+Subject: [RFC PATCH v3 0/8] arm64: Verify early CPU features
+Message-ID: <1449655039-22022-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The stack information for a secondary CPU (struct secondary_data)
-is passed on in x21 before the MMU is turned on. The boot CPU uses
-x21 to store the FDT pointer. In a common code shared by these
-CPUs, it gets difficult to use the information. So, we use
-x22 for passing the secondary_data and initialise it with NULL
-for the booting CPU for consistency. This will be used in a following
-patch.
+This series adds support for verifying some of the cpufeatures
+that are decided early in the boot process based on the boot
+CPU and cannot be delayed until all the CPUs are up (e.g, ASIDBits
+and may be VHE?). It also adds support for handling the failures
+in booting the secondary CPUs which could not be synchronised
+with the master CPU, otherwise.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/kernel/head.S |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+It also adds one of the users of this early hook, check for ASIDBits.
+The mm_context id is based on the ASIDBits width supported by the
+boot CPU and is used early in the initialisation. So we need to make
+sure that all the secondary CPUs supports the width reported by the
+booting CPU, failing which we crash the system.
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 23cfc08..b225d34 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -221,6 +221,7 @@ ENTRY(stext)
- 	 */
- 	ldr	x27, =__mmap_switched		// address to jump to after
- 						// MMU has been enabled
-+	mov	x22, 0				// &secondary_data for Boot CPU
- 	adr_l	lr, __enable_mmu		// return (PIC) address
- 	b	__cpu_setup			// initialise processor
- ENDPROC(stext)
-@@ -598,13 +599,13 @@ ENTRY(secondary_startup)
- 	adrp	x26, swapper_pg_dir
- 	bl	__cpu_setup			// initialise processor
- 
--	ldr	x21, =secondary_data
-+	ldr	x22, =secondary_data
- 	ldr	x27, =__secondary_switched	// address to jump to after enabling the MMU
- 	b	__enable_mmu
- ENDPROC(secondary_startup)
- 
- ENTRY(__secondary_switched)
--	ldr	x0, [x21]			// get secondary_data.stack
-+	ldr	x0, [x22]			// get secondary_data.stack
- 	mov	sp, x0
- 	mov	x29, #0
- 	b	secondary_start_kernel
+This series has been tested on Juno, Fast model by injecting smaller
+ASIDBits and lack of page-size support.
+
+Changes since V2:
+ - Add support for synchronising the booting status of a secondary
+   CPU. Added RFC Tag. Patch - 4
+ - Panic the system with incompatible ASIDBits
+
+Suzuki K. Poulose (8):
+  arm64: Introduce cpu_die_early
+  arm64: Move cpu_die_early to smp.c
+  arm64: head.S : Change register usage
+  arm64: Handle early CPU boot failures
+  arm64: Enable CPU capability verification unconditionally
+  arm64: Add hook for checking early CPU features
+  arm64: Add helper for extracting ASIDBits
+  arm64: Ensure the secondary CPUs have safe ASIDBits size
+
+ arch/arm64/include/asm/cpufeature.h  |    6 ---
+ arch/arm64/include/asm/mmu_context.h |    2 +
+ arch/arm64/include/asm/smp.h         |   25 +++++++++++-
+ arch/arm64/kernel/asm-offsets.c      |    3 ++
+ arch/arm64/kernel/cpufeature.c       |   48 ++++++++--------------
+ arch/arm64/kernel/head.S             |   22 ++++++++--
+ arch/arm64/kernel/smp.c              |   73 +++++++++++++++++++++++++++++++++-
+ arch/arm64/mm/context.c              |   52 ++++++++++++++++++------
+ 8 files changed, 176 insertions(+), 55 deletions(-)
+
 -- 
 1.7.9.5
