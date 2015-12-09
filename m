@@ -1,33 +1,33 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 9 Dec 2015 10:13:42 -0300
-Subject: [PATCH v4 0/8] cpufreq: add generic cpufreq driver support for
- Exynos542x/5800 platforms
-In-Reply-To: <1449512300-17230-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1449512300-17230-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <56682906.50607@osg.samsung.com>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Wed, 9 Dec 2015 14:16:21 +0100
+Subject: [PATCH v5 1/4] arm/arm64: add arm-smccc
+In-Reply-To: <20151208150334.GD8644@n2100.arm.linux.org.uk>
+References: <1449581315-14519-1-git-send-email-jens.wiklander@linaro.org>
+ <1449581315-14519-2-git-send-email-jens.wiklander@linaro.org>
+ <20151208150334.GD8644@n2100.arm.linux.org.uk>
+Message-ID: <20151209131619.GA22755@ermac>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Bartlomiej,
-
-On 12/07/2015 03:18 PM, Bartlomiej Zolnierkiewicz wrote:
-> Hi,
+On Tue, Dec 08, 2015 at 03:03:34PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Dec 08, 2015 at 02:28:32PM +0100, Jens Wiklander wrote:
+> > diff --git a/init/Kconfig b/init/Kconfig
+> > index c24b6f7..8d5a7b0 100644
+> > --- a/init/Kconfig
+> > +++ b/init/Kconfig
+> > @@ -2061,3 +2061,6 @@ config ASN1
+> >  	  functions to call on what tags.
+> >  
+> >  source "kernel/Kconfig.locks"
+> > +
+> > +config HAVE_ARM_SMCCC
+> > +	bool
 > 
-> This patch series adds generic cpufreq-dt driver support for
-> Exynos542x/5800 (using the new CPU clock type which allows it).
-> 
-> It has been tested on Exynos5422 based ODROID-XU3 Lite board.
->
+> I'm not sure why this has ended up in init/Kconfig - I suspect others
+> will end up wondering the same.  arch/Kconfig looks to be a better
+> place for it which is likely to be less controversial.  Please could
+> you move it there?
 
-I tested on an Exynos5800 Peach Pi and all governors are working
-as expected on both the Cortex-A7 and Cortex-A15 cores.
+Thanks, I'll fix.
 
-So for the whole series:
-
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+/Jens
