@@ -1,33 +1,391 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed,  9 Dec 2015 12:48:16 +0100
-Subject: [PATCH v2 03/14] drm/etnaviv: add etnaviv UAPI header
+Date: Wed,  9 Dec 2015 12:48:21 +0100
+Subject: [PATCH v2 08/14] drm/etnaviv: add GPU MMU handling functionality
 In-Reply-To: <1449661707-30532-1-git-send-email-l.stach@pengutronix.de>
 References: <1449661707-30532-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1449661707-30532-3-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1449661707-30532-8-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: The etnaviv authors <dri-devel@lists.freedesktop.org>
 
-This adds the header defining the user/kernel API for the
-etnaviv DRM driver.
+This adds the GPU MMU handling functionality, used to drive the MMUs
+attached to each GPU core.
 
 Signed-off-by: Christian Gmeiner <christian.gmeiner@gmail.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
-v2: Change include path to plain "drm.h"
----
- include/uapi/drm/etnaviv_drm.h | 221 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 221 insertions(+)
- create mode 100644 include/uapi/drm/etnaviv_drm.h
+ drivers/gpu/drm/etnaviv/etnaviv_iommu.c    | 240 +++++++++++++++++++++++
+ drivers/gpu/drm/etnaviv/etnaviv_iommu.h    |  28 +++
+ drivers/gpu/drm/etnaviv/etnaviv_iommu_v2.c |  33 ++++
+ drivers/gpu/drm/etnaviv/etnaviv_iommu_v2.h |  25 +++
+ drivers/gpu/drm/etnaviv/etnaviv_mmu.c      | 299 +++++++++++++++++++++++++++++
+ drivers/gpu/drm/etnaviv/etnaviv_mmu.h      |  71 +++++++
+ 6 files changed, 696 insertions(+)
+ create mode 100644 drivers/gpu/drm/etnaviv/etnaviv_iommu.c
+ create mode 100644 drivers/gpu/drm/etnaviv/etnaviv_iommu.h
+ create mode 100644 drivers/gpu/drm/etnaviv/etnaviv_iommu_v2.c
+ create mode 100644 drivers/gpu/drm/etnaviv/etnaviv_iommu_v2.h
+ create mode 100644 drivers/gpu/drm/etnaviv/etnaviv_mmu.c
+ create mode 100644 drivers/gpu/drm/etnaviv/etnaviv_mmu.h
 
-diff --git a/include/uapi/drm/etnaviv_drm.h b/include/uapi/drm/etnaviv_drm.h
+diff --git a/drivers/gpu/drm/etnaviv/etnaviv_iommu.c b/drivers/gpu/drm/etnaviv/etnaviv_iommu.c
 new file mode 100644
-index 000000000000..65d0096e1953
+index 000000000000..522cfd447892
 --- /dev/null
-+++ b/include/uapi/drm/etnaviv_drm.h
-@@ -0,0 +1,221 @@
++++ b/drivers/gpu/drm/etnaviv/etnaviv_iommu.c
+@@ -0,0 +1,240 @@
++/*
++ * Copyright (C) 2014 Christian Gmeiner <christian.gmeiner@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/iommu.h>
++#include <linux/platform_device.h>
++#include <linux/sizes.h>
++#include <linux/slab.h>
++#include <linux/dma-mapping.h>
++#include <linux/bitops.h>
++
++#include "etnaviv_gpu.h"
++#include "etnaviv_mmu.h"
++#include "etnaviv_iommu.h"
++#include "state_hi.xml.h"
++
++#define PT_SIZE		SZ_2M
++#define PT_ENTRIES	(PT_SIZE / sizeof(u32))
++
++#define GPU_MEM_START	0x80000000
++
++struct etnaviv_iommu_domain_pgtable {
++	u32 *pgtable;
++	dma_addr_t paddr;
++};
++
++struct etnaviv_iommu_domain {
++	struct iommu_domain domain;
++	struct device *dev;
++	void *bad_page_cpu;
++	dma_addr_t bad_page_dma;
++	struct etnaviv_iommu_domain_pgtable pgtable;
++	spinlock_t map_lock;
++};
++
++static struct etnaviv_iommu_domain *to_etnaviv_domain(struct iommu_domain *domain)
++{
++	return container_of(domain, struct etnaviv_iommu_domain, domain);
++}
++
++static int pgtable_alloc(struct etnaviv_iommu_domain_pgtable *pgtable,
++			 size_t size)
++{
++	pgtable->pgtable = dma_alloc_coherent(NULL, size, &pgtable->paddr, GFP_KERNEL);
++	if (!pgtable->pgtable)
++		return -ENOMEM;
++
++	return 0;
++}
++
++static void pgtable_free(struct etnaviv_iommu_domain_pgtable *pgtable,
++			 size_t size)
++{
++	dma_free_coherent(NULL, size, pgtable->pgtable, pgtable->paddr);
++}
++
++static u32 pgtable_read(struct etnaviv_iommu_domain_pgtable *pgtable,
++			   unsigned long iova)
++{
++	/* calcuate index into page table */
++	unsigned int index = (iova - GPU_MEM_START) / SZ_4K;
++	phys_addr_t paddr;
++
++	paddr = pgtable->pgtable[index];
++
++	return paddr;
++}
++
++static void pgtable_write(struct etnaviv_iommu_domain_pgtable *pgtable,
++			  unsigned long iova, phys_addr_t paddr)
++{
++	/* calcuate index into page table */
++	unsigned int index = (iova - GPU_MEM_START) / SZ_4K;
++
++	pgtable->pgtable[index] = paddr;
++}
++
++static int __etnaviv_iommu_init(struct etnaviv_iommu_domain *etnaviv_domain)
++{
++	u32 *p;
++	int ret, i;
++
++	etnaviv_domain->bad_page_cpu = dma_alloc_coherent(etnaviv_domain->dev,
++						  SZ_4K,
++						  &etnaviv_domain->bad_page_dma,
++						  GFP_KERNEL);
++	if (!etnaviv_domain->bad_page_cpu)
++		return -ENOMEM;
++
++	p = etnaviv_domain->bad_page_cpu;
++	for (i = 0; i < SZ_4K / 4; i++)
++		*p++ = 0xdead55aa;
++
++	ret = pgtable_alloc(&etnaviv_domain->pgtable, PT_SIZE);
++	if (ret < 0) {
++		dma_free_coherent(etnaviv_domain->dev, SZ_4K,
++				  etnaviv_domain->bad_page_cpu,
++				  etnaviv_domain->bad_page_dma);
++		return ret;
++	}
++
++	for (i = 0; i < PT_ENTRIES; i++)
++		etnaviv_domain->pgtable.pgtable[i] =
++			etnaviv_domain->bad_page_dma;
++
++	spin_lock_init(&etnaviv_domain->map_lock);
++
++	return 0;
++}
++
++static void etnaviv_domain_free(struct iommu_domain *domain)
++{
++	struct etnaviv_iommu_domain *etnaviv_domain = to_etnaviv_domain(domain);
++
++	pgtable_free(&etnaviv_domain->pgtable, PT_SIZE);
++
++	dma_free_coherent(etnaviv_domain->dev, SZ_4K,
++			  etnaviv_domain->bad_page_cpu,
++			  etnaviv_domain->bad_page_dma);
++
++	kfree(etnaviv_domain);
++}
++
++static int etnaviv_iommuv1_map(struct iommu_domain *domain, unsigned long iova,
++	   phys_addr_t paddr, size_t size, int prot)
++{
++	struct etnaviv_iommu_domain *etnaviv_domain = to_etnaviv_domain(domain);
++
++	if (size != SZ_4K)
++		return -EINVAL;
++
++	spin_lock(&etnaviv_domain->map_lock);
++	pgtable_write(&etnaviv_domain->pgtable, iova, paddr);
++	spin_unlock(&etnaviv_domain->map_lock);
++
++	return 0;
++}
++
++static size_t etnaviv_iommuv1_unmap(struct iommu_domain *domain,
++	unsigned long iova, size_t size)
++{
++	struct etnaviv_iommu_domain *etnaviv_domain = to_etnaviv_domain(domain);
++
++	if (size != SZ_4K)
++		return -EINVAL;
++
++	spin_lock(&etnaviv_domain->map_lock);
++	pgtable_write(&etnaviv_domain->pgtable, iova,
++		      etnaviv_domain->bad_page_dma);
++	spin_unlock(&etnaviv_domain->map_lock);
++
++	return SZ_4K;
++}
++
++static phys_addr_t etnaviv_iommu_iova_to_phys(struct iommu_domain *domain,
++	dma_addr_t iova)
++{
++	struct etnaviv_iommu_domain *etnaviv_domain = to_etnaviv_domain(domain);
++
++	return pgtable_read(&etnaviv_domain->pgtable, iova);
++}
++
++static size_t etnaviv_iommuv1_dump_size(struct iommu_domain *domain)
++{
++	return PT_SIZE;
++}
++
++static void etnaviv_iommuv1_dump(struct iommu_domain *domain, void *buf)
++{
++	struct etnaviv_iommu_domain *etnaviv_domain = to_etnaviv_domain(domain);
++
++	memcpy(buf, etnaviv_domain->pgtable.pgtable, PT_SIZE);
++}
++
++static struct etnaviv_iommu_ops etnaviv_iommu_ops = {
++	.ops = {
++		.domain_free = etnaviv_domain_free,
++		.map = etnaviv_iommuv1_map,
++		.unmap = etnaviv_iommuv1_unmap,
++		.iova_to_phys = etnaviv_iommu_iova_to_phys,
++		.pgsize_bitmap = SZ_4K,
++	},
++	.dump_size = etnaviv_iommuv1_dump_size,
++	.dump = etnaviv_iommuv1_dump,
++};
++
++void etnaviv_iommu_domain_restore(struct etnaviv_gpu *gpu,
++	struct iommu_domain *domain)
++{
++	struct etnaviv_iommu_domain *etnaviv_domain = to_etnaviv_domain(domain);
++	u32 pgtable;
++
++	/* set page table address in MC */
++	pgtable = (u32)etnaviv_domain->pgtable.paddr;
++
++	gpu_write(gpu, VIVS_MC_MMU_FE_PAGE_TABLE, pgtable);
++	gpu_write(gpu, VIVS_MC_MMU_TX_PAGE_TABLE, pgtable);
++	gpu_write(gpu, VIVS_MC_MMU_PE_PAGE_TABLE, pgtable);
++	gpu_write(gpu, VIVS_MC_MMU_PEZ_PAGE_TABLE, pgtable);
++	gpu_write(gpu, VIVS_MC_MMU_RA_PAGE_TABLE, pgtable);
++}
++
++struct iommu_domain *etnaviv_iommu_domain_alloc(struct etnaviv_gpu *gpu)
++{
++	struct etnaviv_iommu_domain *etnaviv_domain;
++	int ret;
++
++	etnaviv_domain = kzalloc(sizeof(*etnaviv_domain), GFP_KERNEL);
++	if (!etnaviv_domain)
++		return NULL;
++
++	etnaviv_domain->dev = gpu->dev;
++
++	etnaviv_domain->domain.type = __IOMMU_DOMAIN_PAGING;
++	etnaviv_domain->domain.ops = &etnaviv_iommu_ops.ops;
++	etnaviv_domain->domain.geometry.aperture_start = GPU_MEM_START;
++	etnaviv_domain->domain.geometry.aperture_end = GPU_MEM_START + PT_ENTRIES * SZ_4K - 1;
++
++	ret = __etnaviv_iommu_init(etnaviv_domain);
++	if (ret)
++		goto out_free;
++
++	return &etnaviv_domain->domain;
++
++out_free:
++	kfree(etnaviv_domain);
++	return NULL;
++}
+diff --git a/drivers/gpu/drm/etnaviv/etnaviv_iommu.h b/drivers/gpu/drm/etnaviv/etnaviv_iommu.h
+new file mode 100644
+index 000000000000..cf45503f6b6f
+--- /dev/null
++++ b/drivers/gpu/drm/etnaviv/etnaviv_iommu.h
+@@ -0,0 +1,28 @@
++/*
++ * Copyright (C) 2014 Christian Gmeiner <christian.gmeiner@gmail.com>
++  *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __ETNAVIV_IOMMU_H__
++#define __ETNAVIV_IOMMU_H__
++
++#include <linux/iommu.h>
++struct etnaviv_gpu;
++
++struct iommu_domain *etnaviv_iommu_domain_alloc(struct etnaviv_gpu *gpu);
++void etnaviv_iommu_domain_restore(struct etnaviv_gpu *gpu,
++	struct iommu_domain *domain);
++struct iommu_domain *etnaviv_iommu_v2_domain_alloc(struct etnaviv_gpu *gpu);
++
++#endif /* __ETNAVIV_IOMMU_H__ */
+diff --git a/drivers/gpu/drm/etnaviv/etnaviv_iommu_v2.c b/drivers/gpu/drm/etnaviv/etnaviv_iommu_v2.c
+new file mode 100644
+index 000000000000..fbb4aed3dc80
+--- /dev/null
++++ b/drivers/gpu/drm/etnaviv/etnaviv_iommu_v2.c
+@@ -0,0 +1,33 @@
++/*
++ * Copyright (C) 2014 Christian Gmeiner <christian.gmeiner@gmail.com>
++  *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/iommu.h>
++#include <linux/platform_device.h>
++#include <linux/sizes.h>
++#include <linux/slab.h>
++#include <linux/dma-mapping.h>
++#include <linux/bitops.h>
++
++#include "etnaviv_gpu.h"
++#include "etnaviv_iommu.h"
++#include "state_hi.xml.h"
++
++
++struct iommu_domain *etnaviv_iommu_v2_domain_alloc(struct etnaviv_gpu *gpu)
++{
++	/* TODO */
++	return NULL;
++}
+diff --git a/drivers/gpu/drm/etnaviv/etnaviv_iommu_v2.h b/drivers/gpu/drm/etnaviv/etnaviv_iommu_v2.h
+new file mode 100644
+index 000000000000..603ea41c5389
+--- /dev/null
++++ b/drivers/gpu/drm/etnaviv/etnaviv_iommu_v2.h
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (C) 2014 Christian Gmeiner <christian.gmeiner@gmail.com>
++  *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __ETNAVIV_IOMMU_V2_H__
++#define __ETNAVIV_IOMMU_V2_H__
++
++#include <linux/iommu.h>
++struct etnaviv_gpu;
++
++struct iommu_domain *etnaviv_iommu_v2_domain_alloc(struct etnaviv_gpu *gpu);
++
++#endif /* __ETNAVIV_IOMMU_V2_H__ */
+diff --git a/drivers/gpu/drm/etnaviv/etnaviv_mmu.c b/drivers/gpu/drm/etnaviv/etnaviv_mmu.c
+new file mode 100644
+index 000000000000..6743bc648dc8
+--- /dev/null
++++ b/drivers/gpu/drm/etnaviv/etnaviv_mmu.c
+@@ -0,0 +1,299 @@
 +/*
 + * Copyright (C) 2015 Etnaviv Project
 + *
@@ -44,210 +402,365 @@ index 000000000000..65d0096e1953
 + * this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#ifndef __ETNAVIV_DRM_H__
-+#define __ETNAVIV_DRM_H__
++#include "etnaviv_drv.h"
++#include "etnaviv_gem.h"
++#include "etnaviv_gpu.h"
++#include "etnaviv_mmu.h"
 +
-+#include "drm.h"
++static int etnaviv_fault_handler(struct iommu_domain *iommu, struct device *dev,
++		unsigned long iova, int flags, void *arg)
++{
++	DBG("*** fault: iova=%08lx, flags=%d", iova, flags);
++	return 0;
++}
 +
-+/* Please note that modifications to all structs defined here are
-+ * subject to backwards-compatibility constraints:
-+ *  1) Do not use pointers, use __u64 instead for 32 bit / 64 bit
-+ *     user/kernel compatibility
-+ *  2) Keep fields aligned to their size
-+ *  3) Because of how drm_ioctl() works, we can add new fields at
-+ *     the end of an ioctl if some care is taken: drm_ioctl() will
-+ *     zero out the new fields at the tail of the ioctl, so a zero
-+ *     value should have a backwards compatible meaning.  And for
-+ *     output params, userspace won't see the newly added output
-+ *     fields.. so that has to be somehow ok.
-+ */
++int etnaviv_iommu_map(struct etnaviv_iommu *iommu, u32 iova,
++		struct sg_table *sgt, unsigned len, int prot)
++{
++	struct iommu_domain *domain = iommu->domain;
++	struct scatterlist *sg;
++	unsigned int da = iova;
++	unsigned int i, j;
++	int ret;
 +
-+/* timeouts are specified in clock-monotonic absolute times (to simplify
-+ * restarting interrupted ioctls).  The following struct is logically the
-+ * same as 'struct timespec' but 32/64b ABI safe.
-+ */
-+struct drm_etnaviv_timespec {
-+	__s64 tv_sec;          /* seconds */
-+	__s64 tv_nsec;         /* nanoseconds */
-+};
++	if (!domain || !sgt)
++		return -EINVAL;
 +
-+#define ETNAVIV_PARAM_GPU_MODEL                     0x01
-+#define ETNAVIV_PARAM_GPU_REVISION                  0x02
-+#define ETNAVIV_PARAM_GPU_FEATURES_0                0x03
-+#define ETNAVIV_PARAM_GPU_FEATURES_1                0x04
-+#define ETNAVIV_PARAM_GPU_FEATURES_2                0x05
-+#define ETNAVIV_PARAM_GPU_FEATURES_3                0x06
-+#define ETNAVIV_PARAM_GPU_FEATURES_4                0x07
++	for_each_sg(sgt->sgl, sg, sgt->nents, i) {
++		u32 pa = sg_dma_address(sg) - sg->offset;
++		size_t bytes = sg_dma_len(sg) + sg->offset;
 +
-+#define ETNAVIV_PARAM_GPU_STREAM_COUNT              0x10
-+#define ETNAVIV_PARAM_GPU_REGISTER_MAX              0x11
-+#define ETNAVIV_PARAM_GPU_THREAD_COUNT              0x12
-+#define ETNAVIV_PARAM_GPU_VERTEX_CACHE_SIZE         0x13
-+#define ETNAVIV_PARAM_GPU_SHADER_CORE_COUNT         0x14
-+#define ETNAVIV_PARAM_GPU_PIXEL_PIPES               0x15
-+#define ETNAVIV_PARAM_GPU_VERTEX_OUTPUT_BUFFER_SIZE 0x16
-+#define ETNAVIV_PARAM_GPU_BUFFER_SIZE               0x17
-+#define ETNAVIV_PARAM_GPU_INSTRUCTION_COUNT         0x18
-+#define ETNAVIV_PARAM_GPU_NUM_CONSTANTS             0x19
++		VERB("map[%d]: %08x %08x(%zx)", i, iova, pa, bytes);
 +
-+#define ETNA_MAX_PIPES 4
++		ret = iommu_map(domain, da, pa, bytes, prot);
++		if (ret)
++			goto fail;
 +
-+struct drm_etnaviv_param {
-+	__u32 pipe;           /* in */
-+	__u32 param;          /* in, ETNAVIV_PARAM_x */
-+	__u64 value;          /* out (get_param) or in (set_param) */
-+};
++		da += bytes;
++	}
 +
++	return 0;
++
++fail:
++	da = iova;
++
++	for_each_sg(sgt->sgl, sg, i, j) {
++		size_t bytes = sg_dma_len(sg) + sg->offset;
++
++		iommu_unmap(domain, da, bytes);
++		da += bytes;
++	}
++	return ret;
++}
++
++int etnaviv_iommu_unmap(struct etnaviv_iommu *iommu, u32 iova,
++		struct sg_table *sgt, unsigned len)
++{
++	struct iommu_domain *domain = iommu->domain;
++	struct scatterlist *sg;
++	unsigned int da = iova;
++	int i;
++
++	for_each_sg(sgt->sgl, sg, sgt->nents, i) {
++		size_t bytes = sg_dma_len(sg) + sg->offset;
++		size_t unmapped;
++
++		unmapped = iommu_unmap(domain, da, bytes);
++		if (unmapped < bytes)
++			return unmapped;
++
++		VERB("unmap[%d]: %08x(%zx)", i, iova, bytes);
++
++		BUG_ON(!PAGE_ALIGNED(bytes));
++
++		da += bytes;
++	}
++
++	return 0;
++}
++
++static void etnaviv_iommu_remove_mapping(struct etnaviv_iommu *mmu,
++	struct etnaviv_vram_mapping *mapping)
++{
++	struct etnaviv_gem_object *etnaviv_obj = mapping->object;
++
++	etnaviv_iommu_unmap(mmu, mapping->vram_node.start,
++			    etnaviv_obj->sgt, etnaviv_obj->base.size);
++	drm_mm_remove_node(&mapping->vram_node);
++}
++
++int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
++	struct etnaviv_gem_object *etnaviv_obj, u32 memory_base,
++	struct etnaviv_vram_mapping *mapping)
++{
++	struct etnaviv_vram_mapping *free = NULL;
++	struct sg_table *sgt = etnaviv_obj->sgt;
++	struct drm_mm_node *node;
++	int ret;
++
++	lockdep_assert_held(&etnaviv_obj->lock);
++
++	mutex_lock(&mmu->lock);
++
++	/* v1 MMU can optimize single entry (contiguous) scatterlists */
++	if (sgt->nents == 1 && !(etnaviv_obj->flags & ETNA_BO_FORCE_MMU)) {
++		u32 iova;
++
++		iova = sg_dma_address(sgt->sgl) - memory_base;
++		if (iova < 0x80000000 - sg_dma_len(sgt->sgl)) {
++			mapping->iova = iova;
++			list_add_tail(&mapping->mmu_node, &mmu->mappings);
++			mutex_unlock(&mmu->lock);
++			return 0;
++		}
++	}
++
++	node = &mapping->vram_node;
++	while (1) {
++		struct etnaviv_vram_mapping *m, *n;
++		struct list_head list;
++		bool found;
++
++		ret = drm_mm_insert_node_in_range(&mmu->mm, node,
++			etnaviv_obj->base.size, 0, mmu->last_iova, ~0UL,
++			DRM_MM_SEARCH_DEFAULT);
++
++		if (ret != -ENOSPC)
++			break;
++
++		/*
++		 * If we did not search from the start of the MMU region,
++		 * try again in case there are free slots.
++		 */
++		if (mmu->last_iova) {
++			mmu->last_iova = 0;
++			mmu->need_flush = true;
++			continue;
++		}
++
++		/* Try to retire some entries */
++		drm_mm_init_scan(&mmu->mm, etnaviv_obj->base.size, 0, 0);
++
++		found = 0;
++		INIT_LIST_HEAD(&list);
++		list_for_each_entry(free, &mmu->mappings, mmu_node) {
++			/* If this vram node has not been used, skip this. */
++			if (!free->vram_node.mm)
++				continue;
++
++			/*
++			 * If the iova is pinned, then it's in-use,
++			 * so we must keep its mapping.
++			 */
++			if (free->use)
++				continue;
++
++			list_add(&free->scan_node, &list);
++			if (drm_mm_scan_add_block(&free->vram_node)) {
++				found = true;
++				break;
++			}
++		}
++
++		if (!found) {
++			/* Nothing found, clean up and fail */
++			list_for_each_entry_safe(m, n, &list, scan_node)
++				BUG_ON(drm_mm_scan_remove_block(&m->vram_node));
++			break;
++		}
++
++		/*
++		 * drm_mm does not allow any other operations while
++		 * scanning, so we have to remove all blocks first.
++		 * If drm_mm_scan_remove_block() returns false, we
++		 * can leave the block pinned.
++		 */
++		list_for_each_entry_safe(m, n, &list, scan_node)
++			if (!drm_mm_scan_remove_block(&m->vram_node))
++				list_del_init(&m->scan_node);
++
++		/*
++		 * Unmap the blocks which need to be reaped from the MMU.
++		 * Clear the mmu pointer to prevent the get_iova finding
++		 * this mapping.
++		 */
++		list_for_each_entry_safe(m, n, &list, scan_node) {
++			etnaviv_iommu_remove_mapping(mmu, m);
++			m->mmu = NULL;
++			list_del_init(&m->mmu_node);
++			list_del_init(&m->scan_node);
++		}
++
++		/*
++		 * We removed enough mappings so that the new allocation will
++		 * succeed.  Ensure that the MMU will be flushed before the
++		 * associated commit requesting this mapping, and retry the
++		 * allocation one more time.
++		 */
++		mmu->need_flush = true;
++	}
++
++	if (ret < 0) {
++		mutex_unlock(&mmu->lock);
++		return ret;
++	}
++
++	mmu->last_iova = node->start + etnaviv_obj->base.size;
++	mapping->iova = node->start;
++	ret = etnaviv_iommu_map(mmu, node->start, sgt, etnaviv_obj->base.size,
++				IOMMU_READ | IOMMU_WRITE);
++
++	if (ret < 0) {
++		drm_mm_remove_node(node);
++		mutex_unlock(&mmu->lock);
++		return ret;
++	}
++
++	list_add_tail(&mapping->mmu_node, &mmu->mappings);
++	mutex_unlock(&mmu->lock);
++
++	return ret;
++}
++
++void etnaviv_iommu_unmap_gem(struct etnaviv_iommu *mmu,
++	struct etnaviv_vram_mapping *mapping)
++{
++	WARN_ON(mapping->use);
++
++	mutex_lock(&mmu->lock);
++
++	/* If the vram node is on the mm, unmap and remove the node */
++	if (mapping->vram_node.mm == &mmu->mm)
++		etnaviv_iommu_remove_mapping(mmu, mapping);
++
++	list_del(&mapping->mmu_node);
++	mutex_unlock(&mmu->lock);
++}
++
++void etnaviv_iommu_destroy(struct etnaviv_iommu *mmu)
++{
++	drm_mm_takedown(&mmu->mm);
++	iommu_domain_free(mmu->domain);
++	kfree(mmu);
++}
++
++struct etnaviv_iommu *etnaviv_iommu_new(struct etnaviv_gpu *gpu,
++	struct iommu_domain *domain, enum etnaviv_iommu_version version)
++{
++	struct etnaviv_iommu *mmu;
++
++	mmu = kzalloc(sizeof(*mmu), GFP_KERNEL);
++	if (!mmu)
++		return ERR_PTR(-ENOMEM);
++
++	mmu->domain = domain;
++	mmu->gpu = gpu;
++	mmu->version = version;
++	mutex_init(&mmu->lock);
++	INIT_LIST_HEAD(&mmu->mappings);
++
++	drm_mm_init(&mmu->mm, domain->geometry.aperture_start,
++		    domain->geometry.aperture_end -
++		      domain->geometry.aperture_start + 1);
++
++	iommu_set_fault_handler(domain, etnaviv_fault_handler, gpu->dev);
++
++	return mmu;
++}
++
++size_t etnaviv_iommu_dump_size(struct etnaviv_iommu *iommu)
++{
++	struct etnaviv_iommu_ops *ops;
++
++	ops = container_of(iommu->domain->ops, struct etnaviv_iommu_ops, ops);
++
++	return ops->dump_size(iommu->domain);
++}
++
++void etnaviv_iommu_dump(struct etnaviv_iommu *iommu, void *buf)
++{
++	struct etnaviv_iommu_ops *ops;
++
++	ops = container_of(iommu->domain->ops, struct etnaviv_iommu_ops, ops);
++
++	ops->dump(iommu->domain, buf);
++}
+diff --git a/drivers/gpu/drm/etnaviv/etnaviv_mmu.h b/drivers/gpu/drm/etnaviv/etnaviv_mmu.h
+new file mode 100644
+index 000000000000..fff215a47630
+--- /dev/null
++++ b/drivers/gpu/drm/etnaviv/etnaviv_mmu.h
+@@ -0,0 +1,71 @@
 +/*
-+ * GEM buffers:
-+ */
-+
-+#define ETNA_BO_CACHE_MASK   0x000f0000
-+/* cache modes */
-+#define ETNA_BO_CACHED       0x00010000
-+#define ETNA_BO_WC           0x00020000
-+#define ETNA_BO_UNCACHED     0x00040000
-+/* map flags */
-+#define ETNA_BO_FORCE_MMU    0x00100000
-+
-+struct drm_etnaviv_gem_new {
-+	__u64 size;           /* in */
-+	__u32 flags;          /* in, mask of ETNA_BO_x */
-+	__u32 handle;         /* out */
-+};
-+
-+struct drm_etnaviv_gem_info {
-+	__u32 handle;         /* in */
-+	__u32 pad;
-+	__u64 offset;         /* out, offset to pass to mmap() */
-+};
-+
-+#define ETNA_PREP_READ        0x01
-+#define ETNA_PREP_WRITE       0x02
-+#define ETNA_PREP_NOSYNC      0x04
-+
-+struct drm_etnaviv_gem_cpu_prep {
-+	__u32 handle;         /* in */
-+	__u32 op;             /* in, mask of ETNA_PREP_x */
-+	struct drm_etnaviv_timespec timeout;   /* in */
-+};
-+
-+struct drm_etnaviv_gem_cpu_fini {
-+	__u32 handle;         /* in */
-+	__u32 flags;          /* in, placeholder for now, no defined values */
-+};
-+
-+/*
-+ * Cmdstream Submission:
-+ */
-+
-+/* The value written into the cmdstream is logically:
-+ * relocbuf->gpuaddr + reloc_offset
++ * Copyright (C) 2015 Etnaviv Project
 + *
-+ * NOTE that reloc's must be sorted by order of increasing submit_offset,
-+ * otherwise EINVAL.
-+ */
-+struct drm_etnaviv_gem_submit_reloc {
-+	__u32 submit_offset;  /* in, offset from submit_bo */
-+	__u32 reloc_idx;      /* in, index of reloc_bo buffer */
-+	__u64 reloc_offset;   /* in, offset from start of reloc_bo */
-+};
-+
-+/* Each buffer referenced elsewhere in the cmdstream submit (ie. the
-+ * cmdstream buffer(s) themselves or reloc entries) has one (and only
-+ * one) entry in the submit->bos[] table.
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
 + *
-+ * As a optimization, the current buffer (gpu virtual address) can be
-+ * passed back through the 'presumed' field.  If on a subsequent reloc,
-+ * userspace passes back a 'presumed' address that is still valid,
-+ * then patching the cmdstream for this entry is skipped.  This can
-+ * avoid kernel needing to map/access the cmdstream bo in the common
-+ * case.
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#define ETNA_SUBMIT_BO_READ             0x0001
-+#define ETNA_SUBMIT_BO_WRITE            0x0002
-+struct drm_etnaviv_gem_submit_bo {
-+	__u32 flags;          /* in, mask of ETNA_SUBMIT_BO_x */
-+	__u32 handle;         /* in, GEM handle */
-+	__u64 presumed;       /* in/out, presumed buffer address */
++
++#ifndef __ETNAVIV_MMU_H__
++#define __ETNAVIV_MMU_H__
++
++#include <linux/iommu.h>
++
++enum etnaviv_iommu_version {
++	ETNAVIV_IOMMU_V1 = 0,
++	ETNAVIV_IOMMU_V2,
 +};
 +
-+/* Each cmdstream submit consists of a table of buffers involved, and
-+ * one or more cmdstream buffers.  This allows for conditional execution
-+ * (context-restore), and IB buffers needed for per tile/bin draw cmds.
-+ */
-+#define ETNA_PIPE_3D      0x00
-+#define ETNA_PIPE_2D      0x01
-+#define ETNA_PIPE_VG      0x02
-+struct drm_etnaviv_gem_submit {
-+	__u32 fence;          /* out */
-+	__u32 pipe;           /* in */
-+	__u32 exec_state;     /* in, initial execution state (ETNA_PIPE_x) */
-+	__u32 nr_bos;         /* in, number of submit_bo's */
-+	__u32 nr_relocs;      /* in, number of submit_reloc's */
-+	__u32 stream_size;    /* in, cmdstream size */
-+	__u64 bos;            /* in, ptr to array of submit_bo's */
-+	__u64 relocs;         /* in, ptr to array of submit_reloc's */
-+	__u64 stream;         /* in, ptr to cmdstream */
++struct etnaviv_gpu;
++struct etnaviv_vram_mapping;
++
++struct etnaviv_iommu_ops {
++	struct iommu_ops ops;
++	size_t (*dump_size)(struct iommu_domain *);
++	void (*dump)(struct iommu_domain *, void *);
 +};
 +
-+/* The normal way to synchronize with the GPU is just to CPU_PREP on
-+ * a buffer if you need to access it from the CPU (other cmdstream
-+ * submission from same or other contexts, PAGE_FLIP ioctl, etc, all
-+ * handle the required synchronization under the hood).  This ioctl
-+ * mainly just exists as a way to implement the gallium pipe_fence
-+ * APIs without requiring a dummy bo to synchronize on.
-+ */
-+#define ETNA_WAIT_NONBLOCK      0x01
-+struct drm_etnaviv_wait_fence {
-+	__u32 pipe;           /* in */
-+	__u32 fence;          /* in */
-+	__u32 flags;          /* in, mask of ETNA_WAIT_x */
-+	__u32 pad;
-+	struct drm_etnaviv_timespec timeout;   /* in */
++struct etnaviv_iommu {
++	struct etnaviv_gpu *gpu;
++	struct iommu_domain *domain;
++
++	enum etnaviv_iommu_version version;
++
++	/* memory manager for GPU address area */
++	struct mutex lock;
++	struct list_head mappings;
++	struct drm_mm mm;
++	u32 last_iova;
++	bool need_flush;
 +};
 +
-+#define ETNA_USERPTR_READ	0x01
-+#define ETNA_USERPTR_WRITE	0x02
-+struct drm_etnaviv_gem_userptr {
-+	__u64 user_ptr;	/* in, page aligned user pointer */
-+	__u64 user_size;	/* in, page aligned user size */
-+	__u32 flags;		/* in, flags */
-+	__u32 handle;	/* out, non-zero handle */
-+};
++struct etnaviv_gem_object;
 +
-+struct drm_etnaviv_gem_wait {
-+	__u32 pipe;				/* in */
-+	__u32 handle;				/* in, bo to be waited for */
-+	__u32 flags;				/* in, mask of ETNA_WAIT_x  */
-+	__u32 pad;
-+	struct drm_etnaviv_timespec timeout;	/* in */
-+};
++int etnaviv_iommu_attach(struct etnaviv_iommu *iommu, const char **names,
++	int cnt);
++int etnaviv_iommu_map(struct etnaviv_iommu *iommu, u32 iova,
++	struct sg_table *sgt, unsigned len, int prot);
++int etnaviv_iommu_unmap(struct etnaviv_iommu *iommu, u32 iova,
++	struct sg_table *sgt, unsigned len);
++int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
++	struct etnaviv_gem_object *etnaviv_obj, u32 memory_base,
++	struct etnaviv_vram_mapping *mapping);
++void etnaviv_iommu_unmap_gem(struct etnaviv_iommu *mmu,
++	struct etnaviv_vram_mapping *mapping);
++void etnaviv_iommu_destroy(struct etnaviv_iommu *iommu);
 +
-+#define DRM_ETNAVIV_GET_PARAM          0x00
-+/* placeholder:
-+#define DRM_ETNAVIV_SET_PARAM          0x01
-+ */
-+#define DRM_ETNAVIV_GEM_NEW            0x02
-+#define DRM_ETNAVIV_GEM_INFO           0x03
-+#define DRM_ETNAVIV_GEM_CPU_PREP       0x04
-+#define DRM_ETNAVIV_GEM_CPU_FINI       0x05
-+#define DRM_ETNAVIV_GEM_SUBMIT         0x06
-+#define DRM_ETNAVIV_WAIT_FENCE         0x07
-+#define DRM_ETNAVIV_GEM_USERPTR        0x08
-+#define DRM_ETNAVIV_GEM_WAIT           0x09
-+#define DRM_ETNAVIV_NUM_IOCTLS         0x0a
++size_t etnaviv_iommu_dump_size(struct etnaviv_iommu *iommu);
++void etnaviv_iommu_dump(struct etnaviv_iommu *iommu, void *buf);
 +
-+#define DRM_IOCTL_ETNAVIV_GET_PARAM    DRM_IOWR(DRM_COMMAND_BASE + DRM_ETNAVIV_GET_PARAM, struct drm_etnaviv_param)
-+#define DRM_IOCTL_ETNAVIV_GEM_NEW      DRM_IOWR(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_NEW, struct drm_etnaviv_gem_new)
-+#define DRM_IOCTL_ETNAVIV_GEM_INFO     DRM_IOWR(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_INFO, struct drm_etnaviv_gem_info)
-+#define DRM_IOCTL_ETNAVIV_GEM_CPU_PREP DRM_IOW(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_CPU_PREP, struct drm_etnaviv_gem_cpu_prep)
-+#define DRM_IOCTL_ETNAVIV_GEM_CPU_FINI DRM_IOW(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_CPU_FINI, struct drm_etnaviv_gem_cpu_fini)
-+#define DRM_IOCTL_ETNAVIV_GEM_SUBMIT   DRM_IOWR(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_SUBMIT, struct drm_etnaviv_gem_submit)
-+#define DRM_IOCTL_ETNAVIV_WAIT_FENCE   DRM_IOW(DRM_COMMAND_BASE + DRM_ETNAVIV_WAIT_FENCE, struct drm_etnaviv_wait_fence)
-+#define DRM_IOCTL_ETNAVIV_GEM_USERPTR  DRM_IOWR(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_USERPTR, struct drm_etnaviv_gem_userptr)
-+#define DRM_IOCTL_ETNAVIV_GEM_WAIT     DRM_IOW(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_WAIT, struct drm_etnaviv_gem_wait)
++struct etnaviv_iommu *etnaviv_iommu_new(struct etnaviv_gpu *gpu,
++	struct iommu_domain *domain, enum etnaviv_iommu_version version);
 +
-+#endif /* __ETNAVIV_DRM_H__ */
++#endif /* __ETNAVIV_MMU_H__ */
 -- 
 2.6.2
