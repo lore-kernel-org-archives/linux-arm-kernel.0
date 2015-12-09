@@ -1,77 +1,33 @@
-From: mwelling@ieee.org (Michael Welling)
-Date: Wed, 9 Dec 2015 17:08:52 -0600
-Subject: [PATCH 004/182] gpio: generic: factor into gpio_chip struct
-In-Reply-To: <1449666760-29876-1-git-send-email-linus.walleij@linaro.org>
-References: <1449666760-29876-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20151209230852.GB28304@deathstar>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 10 Dec 2015 00:11:38 +0100
+Subject: [PATCH v1 4/8] dt-bindings: add documentation of rk3228 clock
+ controller
+In-Reply-To: <20151209201200.GA29732@rob-hp-laptop>
+References: <1449651853-1667-1-git-send-email-jeffy.chen@rock-chips.com>
+ <1449651853-1667-5-git-send-email-jeffy.chen@rock-chips.com>
+ <20151209201200.GA29732@rob-hp-laptop>
+Message-ID: <26848197.iMXfor9NuY@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 09, 2015 at 02:12:40PM +0100, Linus Walleij wrote:
-...
-> @@ -55,16 +54,16 @@ static int moxart_gpio_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> -	bgc->gc.label = "moxart-gpio";
-> -	bgc->gc.request = gpiochip_generic_request;
-> -	bgc->gc.free = gpiochip_generic_free;
-> -	bgc->data = bgc->read_reg(bgc->reg_set);
-> -	bgc->gc.base = 0;
-> -	bgc->gc.ngpio = 32;
-> -	bgc->gc.parent = dev;
-> -	bgc->gc.owner = THIS_MODULE;
-> +	gc->label = "moxart-gpio";
-> +	gc->request = gpiochip_generic_request;
-> +	gc->free = gpiochip_generic_free;
-> +	gc->bgpio_data = bgc->read_reg(bgc->reg_set);
-> +	gc->base = 0;
-> +	gc->ngpio = 32;
-> +	gc->parent = dev;
-> +	gc->owner = THIS_MODULE;
->  
-> -	ret = gpiochip_add(&bgc->gc);
-> +	ret = gpiochip_add_data(gc, NULL);
->  	if (ret) {
+Hi Rob,
 
-gpiochip_add is still mentioned in the dev_err below.
+Am Mittwoch, 9. Dezember 2015, 14:12:00 schrieb Rob Herring:
+> On Wed, Dec 09, 2015 at 05:04:09PM +0800, Jeffy Chen wrote:
+> > Add the devicetree binding for the cru on the rk3228 which quite similar
+> > structured as previous clock controllers.
+> > 
+> > Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> 
+> Seems like there is a lot of duplication across Rockchip cru bindings. 
+> Perhaps they should be combined?
 
->  		dev_err(dev, "%s: gpiochip_add failed\n",
->  			dev->of_node->full_name);
-...
+You're right and I've put that on my list for the near future.
 
-> @@ -226,14 +225,14 @@ static int sdv_gpio_probe(struct pci_dev *pdev,
->  		writel(mux_val, sd->gpio_pub_base + GPMUXCTL);
->  	}
->  
-> -	ret = bgpio_init(&sd->bgpio, &pdev->dev, 4,
-> +	ret = bgpio_init(&sd->chip, &pdev->dev, 4,
->  			sd->gpio_pub_base + GPINR, sd->gpio_pub_base + GPOUTR,
->  			NULL, sd->gpio_pub_base + GPOER, NULL, 0);
->  	if (ret)
->  		goto unmap;
-> -	sd->bgpio.gc.ngpio = SDV_NUM_PUB_GPIOS;
-> +	sd->chip.ngpio = SDV_NUM_PUB_GPIOS;
->  
-> -	ret = gpiochip_add(&sd->bgpio.gc);
-> +	ret = gpiochip_add_data(&sd->chip, sd);
->  	if (ret < 0) {
 
-Also still mentioned here in the dev_err.
+> Otherwise:
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
 
->  		dev_err(&pdev->dev, "gpiochip_add() failed.\n");
->  		goto unmap;
-...
- 
-> @@ -201,8 +201,8 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  	bgpio_init(mmc_gpio_chip, &pdev->dev, 0x4, base + SYS_MCI,
->  			NULL, NULL, NULL, NULL, 0);
-
-Was going to complain about this one not switching to _data but it was
-addressed in a follow up patch.
-
-> -	mmc_gpio_chip->gc.ngpio = 2;
-> -	gpiochip_add(&mmc_gpio_chip->gc);
-> +	mmc_gpio_chip->ngpio = 2;
-> +	gpiochip_add(mmc_gpio_chip);
+Thanks
+Heiko
