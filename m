@@ -1,99 +1,63 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 09 Dec 2015 14:36:05 +0000
-Subject: [PATCH v8 3/4] arm64: Add do_softirq_own_stack() and enable
- irq_stacks
-In-Reply-To: <20151209134541.GH9303@arm.com>
-References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
- <1449226948-14251-4-git-send-email-james.morse@arm.com>
- <20151209134541.GH9303@arm.com>
-Message-ID: <56683C55.7060305@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 9 Dec 2015 14:47:34 +0000
+Subject: [PATCH] cpufreq: tegra: add regulator dependency for T124
+In-Reply-To: <5668188F.2080202@nvidia.com>
+References: <2194927.eV2s2QmZs0@wuerfel>
+ <5668188F.2080202@nvidia.com>
+Message-ID: <20151209144734.GB5727@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Wed, Dec 09, 2015 at 12:03:27PM +0000, Jon Hunter wrote:
+> On 08/12/15 21:52, Arnd Bergmann wrote:
 
-On 09/12/15 13:45, Will Deacon wrote:
->> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->> index fc87373d3f88..81cc5380977d 100644
->> --- a/arch/arm64/kernel/entry.S
->> +++ b/arch/arm64/kernel/entry.S
->> @@ -27,6 +27,7 @@
->>  #include <asm/cpufeature.h>
->>  #include <asm/errno.h>
->>  #include <asm/esr.h>
->> +#include <asm/irq.h>
->>  #include <asm/thread_info.h>
->>  #include <asm/unistd.h>
->>  
->> @@ -175,6 +176,42 @@ alternative_endif
->>  	mrs	\rd, sp_el0
->>  	.endm
->>  
->> +	.macro	irq_stack_entry, dummy_lr
->> +	mov	x19, sp			// preserve the original sp
->> +
->> +	adr_l	x25, irq_stack
->> +	mrs	x26, tpidr_el1
->> +	add	x25, x25, x26
-> 
-> Perhaps we could add a macro to assembler.h to correspond to __my_cpu_offset
-> in percpu.h?
+> > My first attempt was to implement a helper for this function
+> > for regulator_sync_voltage, but Mark Brown explained:
 
-Is it worth going all the way and having a this_cpu_ptr() macro? I can't
-think of any other use for reading tpidr_el1 from asm.
+> >    We don't do this for *all* regulator API functions - there's some where
+> >    using them strongly suggests that there is actually a dependency on
+> >    the regulator API.  This does seem like it might be falling into the
+> >    specialist category [...]
+> >    Looking at the code I'm pretty unclear on what the authors think the
+> >    use of _sync_voltage() is doing in the first place so it may be even
+> >    better to just remove the call.  It seems to have been included in the
+> >    first commit so there's not changelog explaining things and there's
+> >    no comment either.  I'd *expect* it to be a noop as far as I can see.
 
+> In this sequence we are switching from the DFLL clock source (which
+> directly controls the voltage) back to a PLL (which does not control the
+> voltage directly). What we want to do is to restore the voltage back to
+> the voltage it was operating at before we switched to the DFLL clock
+> (which could have changed it).
 
->> +
->> +	/*
->> +	 * Check the lowest address on irq_stack for the irq_count value,
->> +	 * incremented by do_softirq_own_stack if we have re-enabled irqs
->> +	 * while on the irq_stack.
->> +	 */
->> +	ldr	x26, [x25]
->> +	cbnz	x26, 9998f		// recursive use?
->> +
->> +	/* switch to the irq stack */
->> +	mov	x26, #IRQ_STACK_START_SP
->> +	add	x26, x25, x26
->> +	mov	sp, x26
->> +
->> +	/* Add a dummy stack frame */
->> +	stp     x29, \dummy_lr, [sp, #-16]!           // dummy stack frame
->> +	mov	x29, sp
->> +	stp     xzr, x19, [sp, #-16]!
-> 
-> Hmm. I'm not sure we necessarily want to push a frame when the interrupt
-> was taken from userspace. The unwinder will either explode (which should
-> be fixed separately) or truncate the walk anyway.
+If changes implemented by the clock driver are trashing the regulator
+settings I would expect the clock driver to be responsible for fixing
+things up rather than another driver that happens to use the clock.  I'd
+also expect some kind of internal documentation explaining what's going
+on, and possibly 
 
-I think the exploding is due to insufficient sanity checks round the:
->???????if (frame->sp == irq_stack_ptr)
->??????????????frame->sp = IRQ_STACK_TO_TASK_STACK(irq_stack_ptr);
+> I am not familiar with regulator_sync_voltage() but from the comment it
+> does say that it will re-apply the last voltage that was configured for
+> the regulator. So I can see what they were doing. The question I have
+> is, if the consumer has not explicitly called regulator_set_voltage()
+> then what does regulator_sync_voltage() do? I am wondering if we should
+> have been doing a regulator_get_voltage() during the probe and a
+> regulator_set_voltage() when switching back?
 
-This is effectively allowing the maybe-bogus-fp value at the bottom of
-the irq_stack to pass the bounds checking, without doing any checking of
-the IRQ_STACK_TO_TASK_STACK(irq_stack_ptr) value.
+This *is* the sort of thing _sync() is intended for, though it's mainly
+expected to be used in cases like suspend where things have been powered
+off.  As you can see from the code it's based on the settings that
+software made, but then if nothing in software has any need to configure
+anything then why do we even care that the hardware changed anything?
 
-An extra thing we can do here is check that both this new frame->sp and
-frame->fp point into current->stack.
-
-
-> If we changed this so that we only push a frame when taking an interrupt
-> from EL1, could we then avoid pushing x19 as well and get the unwinder
-> to walk back through the pushed fp like it usually would?
-
-x19 is also struct pt_regs, which dump_backtrace() wants to print the
-registers that were passed into gic_handle_irq(). I think this still
-needs to be found at a known location on the stack.
-
-
-> For the case where we've come from EL0, we want to zero fp.
-
-That sounds better - I will see how it behaves.
-
-
-
-Thanks!
-
-
-James
+Setting the voltage you've read back sounds broken, if the hardware
+might randomly change things how do you know the settings we read were
+sane?  Shouldn't we know what voltage range the device requires in a
+given mode and set that - that's much more normal?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151209/29aea2c8/attachment.sig>
