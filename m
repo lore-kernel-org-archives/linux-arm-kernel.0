@@ -1,185 +1,51 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Tue, 8 Dec 2015 17:48:06 -0800
-Subject: [PATCH v5 5/5] gicv2m: acpi: Introducing GICv2m ACPI support
-In-Reply-To: <1449625686-5594-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1449625686-5594-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1449625686-5594-6-git-send-email-Suravee.Suthikulpanit@amd.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 8 Dec 2015 23:00:13 -0300
+Subject: [RESEND PATCH] modpost: don't add a trailing wildcard for OF
+ module aliases
+In-Reply-To: <20151208151149.50ee68b41c5b9bc833eb0c2b@linux-foundation.org>
+References: <1449612813-27004-1-git-send-email-javier@osg.samsung.com>
+ <20151208151149.50ee68b41c5b9bc833eb0c2b@linux-foundation.org>
+Message-ID: <56678B2D.1040905@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces gicv2m_acpi_init(), which uses information
-in MADT GIC MSI frames structure to initialize GICv2m driver.
+Hello Andrew,
 
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/irqchip/irq-gic-v2m.c   | 95 +++++++++++++++++++++++++++++++++++++++++
- drivers/irqchip/irq-gic.c       |  3 ++
- include/linux/irqchip/arm-gic.h |  4 ++
- 3 files changed, 102 insertions(+)
+On 12/08/2015 08:11 PM, Andrew Morton wrote:
+> On Tue,  8 Dec 2015 19:13:32 -0300 Javier Martinez Canillas <javier@osg.samsung.com> wrote:
 
-diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-index 7e60f7e..4f52e9a 100644
---- a/drivers/irqchip/irq-gic-v2m.c
-+++ b/drivers/irqchip/irq-gic-v2m.c
-@@ -15,9 +15,11 @@
+[snip]
+
+>>
+>> I sent this patch before [0] but was never picked. MAINTAINERS doesn't
+>> say who should manage patches to file2alias so maybe I didn't add the
+>> right person to the cc list.
+> 
+> z:/usr/src/git26> perl scripts/get_maintainer.pl -f scripts/mod 
+> Rusty Russell <rusty@rustcorp.com.au> (commit_signer:18/27=67%)
+>
+
+Yes, I use get_maintainer.pl but usually with the --no-git-fallback since
+the --git-fallback option tends to be too noisy and people complain that
+are cc'ed on random patches just because they touched a file in the past.
+
+IOW, there is no way to know only by looking at get_maintainer.pl output
+if Rusty has only made a lot of changes to that repo or if he acts as a
+maintainer (i.e: picks patches and send pull requests).
+
+For these cases, is good to have a proper entry in MAINTAINERS.
  
- #define pr_fmt(fmt) "GICv2m: " fmt
- 
-+#include <linux/acpi.h>
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
- #include <linux/kernel.h>
-+#include <linux/msi.h>
- #include <linux/of_address.h>
- #include <linux/of_pci.h>
- #include <linux/slab.h>
-@@ -138,6 +140,11 @@ static int gicv2m_irq_gic_domain_alloc(struct irq_domain *domain,
- 		fwspec.param[0] = 0;
- 		fwspec.param[1] = hwirq - 32;
- 		fwspec.param[2] = IRQ_TYPE_EDGE_RISING;
-+	} else if (is_fwnode_irqchip(domain->parent->fwnode)) {
-+		fwspec.fwnode = domain->parent->fwnode;
-+		fwspec.param_count = 2;
-+		fwspec.param[0] = hwirq;
-+		fwspec.param[1] = IRQ_TYPE_EDGE_RISING;
- 	} else {
- 		return -EINVAL;
- 	}
-@@ -255,6 +262,8 @@ static void gicv2m_teardown(void)
- 		kfree(v2m->bm);
- 		iounmap(v2m->base);
- 		of_node_put(to_of_node(v2m->fwnode));
-+		if (is_fwnode_irqchip(v2m->fwnode))
-+			irq_domain_free_fwnode(v2m->fwnode);
- 		kfree(v2m);
- 	}
- }
-@@ -359,6 +368,8 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
- 
- 	if (to_of_node(fwnode))
- 		name = to_of_node(fwnode)->name;
-+	else
-+		name = irq_domain_get_irqchip_fwnode_name(fwnode);
- 
- 	pr_info("Frame %s: range[%#lx:%#lx], SPI[%d:%d]\n", name,
- 		(unsigned long)res->start, (unsigned long)res->end,
-@@ -415,3 +426,87 @@ int __init gicv2m_of_init(struct device_node *node, struct irq_domain *parent)
- 		gicv2m_teardown();
- 	return ret;
- }
-+
-+#ifdef CONFIG_ACPI
-+static int acpi_num_msi;
-+
-+static struct fwnode_handle *gicv2m_get_fwnode(struct device *dev)
-+{
-+	struct v2m_data *data;
-+
-+	if (WARN_ON(acpi_num_msi <= 0))
-+		return NULL;
-+
-+	/* We only return the fwnode of the first MSI frame. */
-+	data = list_first_entry_or_null(&v2m_nodes, struct v2m_data, entry);
-+	if (!data)
-+		return NULL;
-+
-+	return data->fwnode;
-+}
-+
-+static int __init
-+acpi_parse_madt_msi(struct acpi_subtable_header *header,
-+		    const unsigned long end)
-+{
-+	int ret;
-+	struct resource res;
-+	u32 spi_start = 0, nr_spis = 0;
-+	struct acpi_madt_generic_msi_frame *m;
-+	struct fwnode_handle *fwnode = NULL;
-+
-+	m = (struct acpi_madt_generic_msi_frame *)header;
-+	if (BAD_MADT_ENTRY(m, end))
-+		return -EINVAL;
-+
-+	res.start = m->base_address;
-+	res.end = m->base_address + 0x1000;
-+
-+	if (m->flags & ACPI_MADT_OVERRIDE_SPI_VALUES) {
-+		spi_start = m->spi_base;
-+		nr_spis = m->spi_count;
-+
-+		pr_info("ACPI overriding V2M MSI_TYPER (base:%u, num:%u)\n",
-+			spi_start, nr_spis);
-+	}
-+
-+	fwnode = irq_domain_alloc_fwnode((void *)m->base_address);
-+	if (!fwnode) {
-+		pr_err("Unable to allocate GICv2m domain token\n");
-+		return -EINVAL;
-+	}
-+
-+	ret = gicv2m_init_one(fwnode, spi_start, nr_spis, &res);
-+	if (ret)
-+		irq_domain_free_fwnode(fwnode);
-+
-+	return ret;
-+}
-+
-+int __init gicv2m_acpi_init(struct irq_domain *parent)
-+{
-+	int ret;
-+
-+	if (acpi_num_msi > 0)
-+		return 0;
-+
-+	acpi_num_msi = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_MSI_FRAME,
-+				      acpi_parse_madt_msi, 0);
-+
-+	if (acpi_num_msi <= 0)
-+		goto err_out;
-+
-+	ret = gicv2m_allocate_domains(parent);
-+	if (ret)
-+		goto err_out;
-+
-+	pci_msi_register_fwnode_provider(&gicv2m_get_fwnode);
-+
-+	return 0;
-+
-+err_out:
-+	gicv2m_teardown();
-+	return -EINVAL;
-+}
-+
-+#endif /* CONFIG_ACPI */
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index fcd327f..e4463f7 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -1358,6 +1358,9 @@ static int __init gic_v2_acpi_init(struct acpi_subtable_header *header,
- 
- 	__gic_init_bases(0, -1, dist_base, cpu_base, 0, domain_handle);
- 
-+	if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
-+		gicv2m_acpi_init(gic_data[0].domain);
-+
- 	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, domain_handle);
- 	return 0;
- }
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index bae69e5..30b2ccb 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -108,6 +108,10 @@ void gic_init(unsigned int nr, int start,
- 
- int gicv2m_of_init(struct device_node *node, struct irq_domain *parent);
- 
-+#ifdef CONFIG_ACPI
-+int gicv2m_acpi_init(struct irq_domain *parent);
-+#endif
-+
- void gic_send_sgi(unsigned int cpu_id, unsigned int irq);
- int gic_get_cpu_id(unsigned int cpu);
- void gic_migrate_target(unsigned int new_cpu_id);
+>> Documentation/development-process/5.Posting says that if there is no
+>> obvious maintainer, then Andrew Morton is often the patch target so
+>> I'm re-sending to him.
+> 
+> Yep.  If I don't handle the particular patch, I know who does ;)
+>
+
+I see that you picked the patch already, thanks a lot for your help!
+
+Best regards,
 -- 
-2.1.0
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
