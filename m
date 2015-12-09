@@ -1,32 +1,33 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed,  9 Dec 2015 12:48:22 +0100
-Subject: [PATCH v2 09/14] drm/etnaviv: add GPU core dump functionality
+Date: Wed,  9 Dec 2015 12:48:16 +0100
+Subject: [PATCH v2 03/14] drm/etnaviv: add etnaviv UAPI header
 In-Reply-To: <1449661707-30532-1-git-send-email-l.stach@pengutronix.de>
 References: <1449661707-30532-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1449661707-30532-9-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1449661707-30532-3-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: The etnaviv authors <dri-devel@lists.freedesktop.org>
 
-This adds functionality to allow post-portem GPU analysis.
+This adds the header defining the user/kernel API for the
+etnaviv DRM driver.
 
 Signed-off-by: Christian Gmeiner <christian.gmeiner@gmail.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- drivers/gpu/drm/etnaviv/etnaviv_dump.c | 227 +++++++++++++++++++++++++++++++++
- drivers/gpu/drm/etnaviv/etnaviv_dump.h |  54 ++++++++
- 2 files changed, 281 insertions(+)
- create mode 100644 drivers/gpu/drm/etnaviv/etnaviv_dump.c
- create mode 100644 drivers/gpu/drm/etnaviv/etnaviv_dump.h
+v2: Change include path to plain "drm.h"
+---
+ include/uapi/drm/etnaviv_drm.h | 221 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 221 insertions(+)
+ create mode 100644 include/uapi/drm/etnaviv_drm.h
 
-diff --git a/drivers/gpu/drm/etnaviv/etnaviv_dump.c b/drivers/gpu/drm/etnaviv/etnaviv_dump.c
+diff --git a/include/uapi/drm/etnaviv_drm.h b/include/uapi/drm/etnaviv_drm.h
 new file mode 100644
-index 000000000000..bf8fa859e8be
+index 000000000000..65d0096e1953
 --- /dev/null
-+++ b/drivers/gpu/drm/etnaviv/etnaviv_dump.c
-@@ -0,0 +1,227 @@
++++ b/include/uapi/drm/etnaviv_drm.h
+@@ -0,0 +1,221 @@
 +/*
 + * Copyright (C) 2015 Etnaviv Project
 + *
@@ -43,276 +44,210 @@ index 000000000000..bf8fa859e8be
 + * this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/devcoredump.h>
-+#include "etnaviv_dump.h"
-+#include "etnaviv_gem.h"
-+#include "etnaviv_gpu.h"
-+#include "etnaviv_mmu.h"
-+#include "state.xml.h"
-+#include "state_hi.xml.h"
++#ifndef __ETNAVIV_DRM_H__
++#define __ETNAVIV_DRM_H__
 +
-+struct core_dump_iterator {
-+	void *start;
-+	struct etnaviv_dump_object_header *hdr;
-+	void *data;
-+};
++#include "drm.h"
 +
-+static const unsigned short etnaviv_dump_registers[] = {
-+	VIVS_HI_AXI_STATUS,
-+	VIVS_HI_CLOCK_CONTROL,
-+	VIVS_HI_IDLE_STATE,
-+	VIVS_HI_AXI_CONFIG,
-+	VIVS_HI_INTR_ENBL,
-+	VIVS_HI_CHIP_IDENTITY,
-+	VIVS_HI_CHIP_FEATURE,
-+	VIVS_HI_CHIP_MODEL,
-+	VIVS_HI_CHIP_REV,
-+	VIVS_HI_CHIP_DATE,
-+	VIVS_HI_CHIP_TIME,
-+	VIVS_HI_CHIP_MINOR_FEATURE_0,
-+	VIVS_HI_CACHE_CONTROL,
-+	VIVS_HI_AXI_CONTROL,
-+	VIVS_PM_POWER_CONTROLS,
-+	VIVS_PM_MODULE_CONTROLS,
-+	VIVS_PM_MODULE_STATUS,
-+	VIVS_PM_PULSE_EATER,
-+	VIVS_MC_MMU_FE_PAGE_TABLE,
-+	VIVS_MC_MMU_TX_PAGE_TABLE,
-+	VIVS_MC_MMU_PE_PAGE_TABLE,
-+	VIVS_MC_MMU_PEZ_PAGE_TABLE,
-+	VIVS_MC_MMU_RA_PAGE_TABLE,
-+	VIVS_MC_DEBUG_MEMORY,
-+	VIVS_MC_MEMORY_BASE_ADDR_RA,
-+	VIVS_MC_MEMORY_BASE_ADDR_FE,
-+	VIVS_MC_MEMORY_BASE_ADDR_TX,
-+	VIVS_MC_MEMORY_BASE_ADDR_PEZ,
-+	VIVS_MC_MEMORY_BASE_ADDR_PE,
-+	VIVS_MC_MEMORY_TIMING_CONTROL,
-+	VIVS_MC_BUS_CONFIG,
-+	VIVS_FE_DMA_STATUS,
-+	VIVS_FE_DMA_DEBUG_STATE,
-+	VIVS_FE_DMA_ADDRESS,
-+	VIVS_FE_DMA_LOW,
-+	VIVS_FE_DMA_HIGH,
-+	VIVS_FE_AUTO_FLUSH,
-+};
-+
-+static void etnaviv_core_dump_header(struct core_dump_iterator *iter,
-+	u32 type, void *data_end)
-+{
-+	struct etnaviv_dump_object_header *hdr = iter->hdr;
-+
-+	hdr->magic = cpu_to_le32(ETDUMP_MAGIC);
-+	hdr->type = cpu_to_le32(type);
-+	hdr->file_offset = cpu_to_le32(iter->data - iter->start);
-+	hdr->file_size = cpu_to_le32(data_end - iter->data);
-+
-+	iter->hdr++;
-+	iter->data += hdr->file_size;
-+}
-+
-+static void etnaviv_core_dump_registers(struct core_dump_iterator *iter,
-+	struct etnaviv_gpu *gpu)
-+{
-+	struct etnaviv_dump_registers *reg = iter->data;
-+	unsigned int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(etnaviv_dump_registers); i++, reg++) {
-+		reg->reg = etnaviv_dump_registers[i];
-+		reg->value = gpu_read(gpu, etnaviv_dump_registers[i]);
-+	}
-+
-+	etnaviv_core_dump_header(iter, ETDUMP_BUF_REG, reg);
-+}
-+
-+static void etnaviv_core_dump_mmu(struct core_dump_iterator *iter,
-+	struct etnaviv_gpu *gpu, size_t mmu_size)
-+{
-+	etnaviv_iommu_dump(gpu->mmu, iter->data);
-+
-+	etnaviv_core_dump_header(iter, ETDUMP_BUF_MMU, iter->data + mmu_size);
-+}
-+
-+static void etnaviv_core_dump_mem(struct core_dump_iterator *iter, u32 type,
-+	void *ptr, size_t size, u64 iova)
-+{
-+	memcpy(iter->data, ptr, size);
-+
-+	iter->hdr->iova = cpu_to_le64(iova);
-+
-+	etnaviv_core_dump_header(iter, type, iter->data + size);
-+}
-+
-+void etnaviv_core_dump(struct etnaviv_gpu *gpu)
-+{
-+	struct core_dump_iterator iter;
-+	struct etnaviv_vram_mapping *vram;
-+	struct etnaviv_gem_object *obj;
-+	struct etnaviv_cmdbuf *cmd;
-+	unsigned int n_obj, n_bomap_pages;
-+	size_t file_size, mmu_size;
-+	__le64 *bomap, *bomap_start;
-+
-+	mmu_size = etnaviv_iommu_dump_size(gpu->mmu);
-+
-+	/* We always dump registers, mmu, ring and end marker */
-+	n_obj = 4;
-+	n_bomap_pages = 0;
-+	file_size = ARRAY_SIZE(etnaviv_dump_registers) *
-+			sizeof(struct etnaviv_dump_registers) +
-+		    mmu_size + gpu->buffer->size;
-+
-+	/* Add in the active command buffers */
-+	list_for_each_entry(cmd, &gpu->active_cmd_list, node) {
-+		file_size += cmd->size;
-+		n_obj++;
-+	}
-+
-+	/* Add in the active buffer objects */
-+	list_for_each_entry(vram, &gpu->mmu->mappings, mmu_node) {
-+		if (!vram->use)
-+			continue;
-+
-+		obj = vram->object;
-+		file_size += obj->base.size;
-+		n_bomap_pages += obj->base.size >> PAGE_SHIFT;
-+		n_obj++;
-+	}
-+
-+	/* If we have any buffer objects, add a bomap object */
-+	if (n_bomap_pages) {
-+		file_size += n_bomap_pages * sizeof(__le64);
-+		n_obj++;
-+	}
-+
-+	/* Add the size of the headers */
-+	file_size += sizeof(*iter.hdr) * n_obj;
-+
-+	/* Allocate the file in vmalloc memory, it's likely to be big */
-+	iter.start = vmalloc(file_size);
-+	if (!iter.start) {
-+		dev_warn(gpu->dev, "failed to allocate devcoredump file\n");
-+		return;
-+	}
-+
-+	/* Point the data member after the headers */
-+	iter.hdr = iter.start;
-+	iter.data = &iter.hdr[n_obj];
-+
-+	memset(iter.hdr, 0, iter.data - iter.start);
-+
-+	etnaviv_core_dump_registers(&iter, gpu);
-+	etnaviv_core_dump_mmu(&iter, gpu, mmu_size);
-+	etnaviv_core_dump_mem(&iter, ETDUMP_BUF_RING, gpu->buffer->vaddr,
-+			      gpu->buffer->size, gpu->buffer->paddr);
-+
-+	list_for_each_entry(cmd, &gpu->active_cmd_list, node)
-+		etnaviv_core_dump_mem(&iter, ETDUMP_BUF_CMD, cmd->vaddr,
-+				      cmd->size, cmd->paddr);
-+
-+	/* Reserve space for the bomap */
-+	if (n_bomap_pages) {
-+		bomap_start = bomap = iter.data;
-+		memset(bomap, 0, sizeof(*bomap) * n_bomap_pages);
-+		etnaviv_core_dump_header(&iter, ETDUMP_BUF_BOMAP,
-+					 bomap + n_bomap_pages);
-+	} else {
-+		/* Silence warning */
-+		bomap_start = bomap = NULL;
-+	}
-+
-+	list_for_each_entry(vram, &gpu->mmu->mappings, mmu_node) {
-+		struct page **pages;
-+		void *vaddr;
-+
-+		if (vram->use == 0)
-+			continue;
-+
-+		obj = vram->object;
-+
-+		pages = etnaviv_gem_get_pages(obj);
-+		if (pages) {
-+			int j;
-+
-+			iter.hdr->data[0] = bomap - bomap_start;
-+
-+			for (j = 0; j < obj->base.size >> PAGE_SHIFT; j++)
-+				*bomap++ = cpu_to_le64(page_to_phys(*pages++));
-+		}
-+
-+		iter.hdr->iova = cpu_to_le64(vram->iova);
-+
-+		vaddr = etnaviv_gem_vaddr(&obj->base);
-+		if (vaddr && !IS_ERR(vaddr))
-+			memcpy(iter.data, vaddr, obj->base.size);
-+
-+		etnaviv_core_dump_header(&iter, ETDUMP_BUF_BO, iter.data +
-+					 obj->base.size);
-+	}
-+
-+	etnaviv_core_dump_header(&iter, ETDUMP_BUF_END, iter.data);
-+
-+	dev_coredumpv(gpu->dev, iter.start, iter.data - iter.start, GFP_KERNEL);
-+}
-diff --git a/drivers/gpu/drm/etnaviv/etnaviv_dump.h b/drivers/gpu/drm/etnaviv/etnaviv_dump.h
-new file mode 100644
-index 000000000000..97f2f8db9133
---- /dev/null
-+++ b/drivers/gpu/drm/etnaviv/etnaviv_dump.h
-@@ -0,0 +1,54 @@
-+/*
-+ * Copyright (C) 2015 Etnaviv Project
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Etnaviv devcoredump file definitions
++/* Please note that modifications to all structs defined here are
++ * subject to backwards-compatibility constraints:
++ *  1) Do not use pointers, use __u64 instead for 32 bit / 64 bit
++ *     user/kernel compatibility
++ *  2) Keep fields aligned to their size
++ *  3) Because of how drm_ioctl() works, we can add new fields at
++ *     the end of an ioctl if some care is taken: drm_ioctl() will
++ *     zero out the new fields at the tail of the ioctl, so a zero
++ *     value should have a backwards compatible meaning.  And for
++ *     output params, userspace won't see the newly added output
++ *     fields.. so that has to be somehow ok.
 + */
-+#ifndef ETNAVIV_DUMP_H
-+#define ETNAVIV_DUMP_H
 +
-+#include <linux/types.h>
-+
-+enum {
-+	ETDUMP_MAGIC = 0x414e5445,
-+	ETDUMP_BUF_REG = 0,
-+	ETDUMP_BUF_MMU,
-+	ETDUMP_BUF_RING,
-+	ETDUMP_BUF_CMD,
-+	ETDUMP_BUF_BOMAP,
-+	ETDUMP_BUF_BO,
-+	ETDUMP_BUF_END,
++/* timeouts are specified in clock-monotonic absolute times (to simplify
++ * restarting interrupted ioctls).  The following struct is logically the
++ * same as 'struct timespec' but 32/64b ABI safe.
++ */
++struct drm_etnaviv_timespec {
++	__s64 tv_sec;          /* seconds */
++	__s64 tv_nsec;         /* nanoseconds */
 +};
 +
-+struct etnaviv_dump_object_header {
-+	__le32 magic;
-+	__le32 type;
-+	__le32 file_offset;
-+	__le32 file_size;
-+	__le64 iova;
-+	__le32 data[2];
++#define ETNAVIV_PARAM_GPU_MODEL                     0x01
++#define ETNAVIV_PARAM_GPU_REVISION                  0x02
++#define ETNAVIV_PARAM_GPU_FEATURES_0                0x03
++#define ETNAVIV_PARAM_GPU_FEATURES_1                0x04
++#define ETNAVIV_PARAM_GPU_FEATURES_2                0x05
++#define ETNAVIV_PARAM_GPU_FEATURES_3                0x06
++#define ETNAVIV_PARAM_GPU_FEATURES_4                0x07
++
++#define ETNAVIV_PARAM_GPU_STREAM_COUNT              0x10
++#define ETNAVIV_PARAM_GPU_REGISTER_MAX              0x11
++#define ETNAVIV_PARAM_GPU_THREAD_COUNT              0x12
++#define ETNAVIV_PARAM_GPU_VERTEX_CACHE_SIZE         0x13
++#define ETNAVIV_PARAM_GPU_SHADER_CORE_COUNT         0x14
++#define ETNAVIV_PARAM_GPU_PIXEL_PIPES               0x15
++#define ETNAVIV_PARAM_GPU_VERTEX_OUTPUT_BUFFER_SIZE 0x16
++#define ETNAVIV_PARAM_GPU_BUFFER_SIZE               0x17
++#define ETNAVIV_PARAM_GPU_INSTRUCTION_COUNT         0x18
++#define ETNAVIV_PARAM_GPU_NUM_CONSTANTS             0x19
++
++#define ETNA_MAX_PIPES 4
++
++struct drm_etnaviv_param {
++	__u32 pipe;           /* in */
++	__u32 param;          /* in, ETNAVIV_PARAM_x */
++	__u64 value;          /* out (get_param) or in (set_param) */
 +};
 +
-+/* Registers object, an array of these */
-+struct etnaviv_dump_registers {
-+	__le32 reg;
-+	__le32 value;
++/*
++ * GEM buffers:
++ */
++
++#define ETNA_BO_CACHE_MASK   0x000f0000
++/* cache modes */
++#define ETNA_BO_CACHED       0x00010000
++#define ETNA_BO_WC           0x00020000
++#define ETNA_BO_UNCACHED     0x00040000
++/* map flags */
++#define ETNA_BO_FORCE_MMU    0x00100000
++
++struct drm_etnaviv_gem_new {
++	__u64 size;           /* in */
++	__u32 flags;          /* in, mask of ETNA_BO_x */
++	__u32 handle;         /* out */
 +};
 +
-+#ifdef __KERNEL__
-+struct etnaviv_gpu;
-+void etnaviv_core_dump(struct etnaviv_gpu *gpu);
-+#endif
++struct drm_etnaviv_gem_info {
++	__u32 handle;         /* in */
++	__u32 pad;
++	__u64 offset;         /* out, offset to pass to mmap() */
++};
 +
-+#endif
++#define ETNA_PREP_READ        0x01
++#define ETNA_PREP_WRITE       0x02
++#define ETNA_PREP_NOSYNC      0x04
++
++struct drm_etnaviv_gem_cpu_prep {
++	__u32 handle;         /* in */
++	__u32 op;             /* in, mask of ETNA_PREP_x */
++	struct drm_etnaviv_timespec timeout;   /* in */
++};
++
++struct drm_etnaviv_gem_cpu_fini {
++	__u32 handle;         /* in */
++	__u32 flags;          /* in, placeholder for now, no defined values */
++};
++
++/*
++ * Cmdstream Submission:
++ */
++
++/* The value written into the cmdstream is logically:
++ * relocbuf->gpuaddr + reloc_offset
++ *
++ * NOTE that reloc's must be sorted by order of increasing submit_offset,
++ * otherwise EINVAL.
++ */
++struct drm_etnaviv_gem_submit_reloc {
++	__u32 submit_offset;  /* in, offset from submit_bo */
++	__u32 reloc_idx;      /* in, index of reloc_bo buffer */
++	__u64 reloc_offset;   /* in, offset from start of reloc_bo */
++};
++
++/* Each buffer referenced elsewhere in the cmdstream submit (ie. the
++ * cmdstream buffer(s) themselves or reloc entries) has one (and only
++ * one) entry in the submit->bos[] table.
++ *
++ * As a optimization, the current buffer (gpu virtual address) can be
++ * passed back through the 'presumed' field.  If on a subsequent reloc,
++ * userspace passes back a 'presumed' address that is still valid,
++ * then patching the cmdstream for this entry is skipped.  This can
++ * avoid kernel needing to map/access the cmdstream bo in the common
++ * case.
++ */
++#define ETNA_SUBMIT_BO_READ             0x0001
++#define ETNA_SUBMIT_BO_WRITE            0x0002
++struct drm_etnaviv_gem_submit_bo {
++	__u32 flags;          /* in, mask of ETNA_SUBMIT_BO_x */
++	__u32 handle;         /* in, GEM handle */
++	__u64 presumed;       /* in/out, presumed buffer address */
++};
++
++/* Each cmdstream submit consists of a table of buffers involved, and
++ * one or more cmdstream buffers.  This allows for conditional execution
++ * (context-restore), and IB buffers needed for per tile/bin draw cmds.
++ */
++#define ETNA_PIPE_3D      0x00
++#define ETNA_PIPE_2D      0x01
++#define ETNA_PIPE_VG      0x02
++struct drm_etnaviv_gem_submit {
++	__u32 fence;          /* out */
++	__u32 pipe;           /* in */
++	__u32 exec_state;     /* in, initial execution state (ETNA_PIPE_x) */
++	__u32 nr_bos;         /* in, number of submit_bo's */
++	__u32 nr_relocs;      /* in, number of submit_reloc's */
++	__u32 stream_size;    /* in, cmdstream size */
++	__u64 bos;            /* in, ptr to array of submit_bo's */
++	__u64 relocs;         /* in, ptr to array of submit_reloc's */
++	__u64 stream;         /* in, ptr to cmdstream */
++};
++
++/* The normal way to synchronize with the GPU is just to CPU_PREP on
++ * a buffer if you need to access it from the CPU (other cmdstream
++ * submission from same or other contexts, PAGE_FLIP ioctl, etc, all
++ * handle the required synchronization under the hood).  This ioctl
++ * mainly just exists as a way to implement the gallium pipe_fence
++ * APIs without requiring a dummy bo to synchronize on.
++ */
++#define ETNA_WAIT_NONBLOCK      0x01
++struct drm_etnaviv_wait_fence {
++	__u32 pipe;           /* in */
++	__u32 fence;          /* in */
++	__u32 flags;          /* in, mask of ETNA_WAIT_x */
++	__u32 pad;
++	struct drm_etnaviv_timespec timeout;   /* in */
++};
++
++#define ETNA_USERPTR_READ	0x01
++#define ETNA_USERPTR_WRITE	0x02
++struct drm_etnaviv_gem_userptr {
++	__u64 user_ptr;	/* in, page aligned user pointer */
++	__u64 user_size;	/* in, page aligned user size */
++	__u32 flags;		/* in, flags */
++	__u32 handle;	/* out, non-zero handle */
++};
++
++struct drm_etnaviv_gem_wait {
++	__u32 pipe;				/* in */
++	__u32 handle;				/* in, bo to be waited for */
++	__u32 flags;				/* in, mask of ETNA_WAIT_x  */
++	__u32 pad;
++	struct drm_etnaviv_timespec timeout;	/* in */
++};
++
++#define DRM_ETNAVIV_GET_PARAM          0x00
++/* placeholder:
++#define DRM_ETNAVIV_SET_PARAM          0x01
++ */
++#define DRM_ETNAVIV_GEM_NEW            0x02
++#define DRM_ETNAVIV_GEM_INFO           0x03
++#define DRM_ETNAVIV_GEM_CPU_PREP       0x04
++#define DRM_ETNAVIV_GEM_CPU_FINI       0x05
++#define DRM_ETNAVIV_GEM_SUBMIT         0x06
++#define DRM_ETNAVIV_WAIT_FENCE         0x07
++#define DRM_ETNAVIV_GEM_USERPTR        0x08
++#define DRM_ETNAVIV_GEM_WAIT           0x09
++#define DRM_ETNAVIV_NUM_IOCTLS         0x0a
++
++#define DRM_IOCTL_ETNAVIV_GET_PARAM    DRM_IOWR(DRM_COMMAND_BASE + DRM_ETNAVIV_GET_PARAM, struct drm_etnaviv_param)
++#define DRM_IOCTL_ETNAVIV_GEM_NEW      DRM_IOWR(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_NEW, struct drm_etnaviv_gem_new)
++#define DRM_IOCTL_ETNAVIV_GEM_INFO     DRM_IOWR(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_INFO, struct drm_etnaviv_gem_info)
++#define DRM_IOCTL_ETNAVIV_GEM_CPU_PREP DRM_IOW(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_CPU_PREP, struct drm_etnaviv_gem_cpu_prep)
++#define DRM_IOCTL_ETNAVIV_GEM_CPU_FINI DRM_IOW(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_CPU_FINI, struct drm_etnaviv_gem_cpu_fini)
++#define DRM_IOCTL_ETNAVIV_GEM_SUBMIT   DRM_IOWR(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_SUBMIT, struct drm_etnaviv_gem_submit)
++#define DRM_IOCTL_ETNAVIV_WAIT_FENCE   DRM_IOW(DRM_COMMAND_BASE + DRM_ETNAVIV_WAIT_FENCE, struct drm_etnaviv_wait_fence)
++#define DRM_IOCTL_ETNAVIV_GEM_USERPTR  DRM_IOWR(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_USERPTR, struct drm_etnaviv_gem_userptr)
++#define DRM_IOCTL_ETNAVIV_GEM_WAIT     DRM_IOW(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_WAIT, struct drm_etnaviv_gem_wait)
++
++#endif /* __ETNAVIV_DRM_H__ */
 -- 
 2.6.2
