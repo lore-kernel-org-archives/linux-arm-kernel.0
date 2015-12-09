@@ -1,1890 +1,1280 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed,  9 Dec 2015 12:48:18 +0100
-Subject: [PATCH v2 05/14] drm/etnaviv: add GPU core driver
+Date: Wed,  9 Dec 2015 12:48:17 +0100
+Subject: [PATCH v2 04/14] drm/etnaviv: add generated hardware description
+ headers
 In-Reply-To: <1449661707-30532-1-git-send-email-l.stach@pengutronix.de>
 References: <1449661707-30532-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1449661707-30532-5-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1449661707-30532-4-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: The etnaviv authors <dri-devel@lists.freedesktop.org>
 
-This adds the GPU core driver part of the etnaviv DRM driver.
+This adds all the generated hardware description headers for the
+etnaviv DRM driver.
 
 Signed-off-by: Christian Gmeiner <christian.gmeiner@gmail.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- drivers/gpu/drm/etnaviv/etnaviv_gpu.c | 1644 +++++++++++++++++++++++++++++++++
- drivers/gpu/drm/etnaviv/etnaviv_gpu.h |  209 +++++
- 2 files changed, 1853 insertions(+)
- create mode 100644 drivers/gpu/drm/etnaviv/etnaviv_gpu.c
- create mode 100644 drivers/gpu/drm/etnaviv/etnaviv_gpu.h
+ drivers/gpu/drm/etnaviv/cmdstream.xml.h | 218 +++++++++++++++++
+ drivers/gpu/drm/etnaviv/common.xml.h    | 249 +++++++++++++++++++
+ drivers/gpu/drm/etnaviv/state.xml.h     | 351 +++++++++++++++++++++++++++
+ drivers/gpu/drm/etnaviv/state_hi.xml.h  | 407 ++++++++++++++++++++++++++++++++
+ 4 files changed, 1225 insertions(+)
+ create mode 100644 drivers/gpu/drm/etnaviv/cmdstream.xml.h
+ create mode 100644 drivers/gpu/drm/etnaviv/common.xml.h
+ create mode 100644 drivers/gpu/drm/etnaviv/state.xml.h
+ create mode 100644 drivers/gpu/drm/etnaviv/state_hi.xml.h
 
-diff --git a/drivers/gpu/drm/etnaviv/etnaviv_gpu.c b/drivers/gpu/drm/etnaviv/etnaviv_gpu.c
+diff --git a/drivers/gpu/drm/etnaviv/cmdstream.xml.h b/drivers/gpu/drm/etnaviv/cmdstream.xml.h
 new file mode 100644
-index 000000000000..d39093dc37e6
+index 000000000000..8c44ba9a694e
 --- /dev/null
-+++ b/drivers/gpu/drm/etnaviv/etnaviv_gpu.c
-@@ -0,0 +1,1644 @@
-+/*
-+ * Copyright (C) 2015 Etnaviv Project
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/component.h>
-+#include <linux/fence.h>
-+#include <linux/moduleparam.h>
-+#include <linux/of_device.h>
-+#include "etnaviv_dump.h"
-+#include "etnaviv_gpu.h"
-+#include "etnaviv_gem.h"
-+#include "etnaviv_mmu.h"
-+#include "etnaviv_iommu.h"
-+#include "etnaviv_iommu_v2.h"
-+#include "common.xml.h"
-+#include "state.xml.h"
-+#include "state_hi.xml.h"
-+#include "cmdstream.xml.h"
-+
-+static const struct platform_device_id gpu_ids[] = {
-+	{ .name = "etnaviv-gpu,2d" },
-+	{ },
-+};
-+
-+static bool etnaviv_dump_core = true;
-+module_param_named(dump_core, etnaviv_dump_core, bool, 0600);
-+
-+/*
-+ * Driver functions:
-+ */
-+
-+int etnaviv_gpu_get_param(struct etnaviv_gpu *gpu, u32 param, u64 *value)
-+{
-+	switch (param) {
-+	case ETNAVIV_PARAM_GPU_MODEL:
-+		*value = gpu->identity.model;
-+		break;
-+
-+	case ETNAVIV_PARAM_GPU_REVISION:
-+		*value = gpu->identity.revision;
-+		break;
-+
-+	case ETNAVIV_PARAM_GPU_FEATURES_0:
-+		*value = gpu->identity.features;
-+		break;
-+
-+	case ETNAVIV_PARAM_GPU_FEATURES_1:
-+		*value = gpu->identity.minor_features0;
-+		break;
-+
-+	case ETNAVIV_PARAM_GPU_FEATURES_2:
-+		*value = gpu->identity.minor_features1;
-+		break;
-+
-+	case ETNAVIV_PARAM_GPU_FEATURES_3:
-+		*value = gpu->identity.minor_features2;
-+		break;
-+
-+	case ETNAVIV_PARAM_GPU_FEATURES_4:
-+		*value = gpu->identity.minor_features3;
-+		break;
-+
-+	case ETNAVIV_PARAM_GPU_STREAM_COUNT:
-+		*value = gpu->identity.stream_count;
-+		break;
-+
-+	case ETNAVIV_PARAM_GPU_REGISTER_MAX:
-+		*value = gpu->identity.register_max;
-+		break;
-+
-+	case ETNAVIV_PARAM_GPU_THREAD_COUNT:
-+		*value = gpu->identity.thread_count;
-+		break;
-+
-+	case ETNAVIV_PARAM_GPU_VERTEX_CACHE_SIZE:
-+		*value = gpu->identity.vertex_cache_size;
-+		break;
-+
-+	case ETNAVIV_PARAM_GPU_SHADER_CORE_COUNT:
-+		*value = gpu->identity.shader_core_count;
-+		break;
-+
-+	case ETNAVIV_PARAM_GPU_PIXEL_PIPES:
-+		*value = gpu->identity.pixel_pipes;
-+		break;
-+
-+	case ETNAVIV_PARAM_GPU_VERTEX_OUTPUT_BUFFER_SIZE:
-+		*value = gpu->identity.vertex_output_buffer_size;
-+		break;
-+
-+	case ETNAVIV_PARAM_GPU_BUFFER_SIZE:
-+		*value = gpu->identity.buffer_size;
-+		break;
-+
-+	case ETNAVIV_PARAM_GPU_INSTRUCTION_COUNT:
-+		*value = gpu->identity.instruction_count;
-+		break;
-+
-+	case ETNAVIV_PARAM_GPU_NUM_CONSTANTS:
-+		*value = gpu->identity.num_constants;
-+		break;
-+
-+	default:
-+		DBG("%s: invalid param: %u", dev_name(gpu->dev), param);
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static void etnaviv_hw_specs(struct etnaviv_gpu *gpu)
-+{
-+	if (gpu->identity.minor_features0 &
-+	    chipMinorFeatures0_MORE_MINOR_FEATURES) {
-+		u32 specs[2];
-+
-+		specs[0] = gpu_read(gpu, VIVS_HI_CHIP_SPECS);
-+		specs[1] = gpu_read(gpu, VIVS_HI_CHIP_SPECS_2);
-+
-+		gpu->identity.stream_count =
-+			(specs[0] & VIVS_HI_CHIP_SPECS_STREAM_COUNT__MASK)
-+				>> VIVS_HI_CHIP_SPECS_STREAM_COUNT__SHIFT;
-+		gpu->identity.register_max =
-+			(specs[0] & VIVS_HI_CHIP_SPECS_REGISTER_MAX__MASK)
-+				>> VIVS_HI_CHIP_SPECS_REGISTER_MAX__SHIFT;
-+		gpu->identity.thread_count =
-+			(specs[0] & VIVS_HI_CHIP_SPECS_THREAD_COUNT__MASK)
-+				>> VIVS_HI_CHIP_SPECS_THREAD_COUNT__SHIFT;
-+		gpu->identity.vertex_cache_size =
-+			(specs[0] & VIVS_HI_CHIP_SPECS_VERTEX_CACHE_SIZE__MASK)
-+				>> VIVS_HI_CHIP_SPECS_VERTEX_CACHE_SIZE__SHIFT;
-+		gpu->identity.shader_core_count =
-+			(specs[0] & VIVS_HI_CHIP_SPECS_SHADER_CORE_COUNT__MASK)
-+				>> VIVS_HI_CHIP_SPECS_SHADER_CORE_COUNT__SHIFT;
-+		gpu->identity.pixel_pipes =
-+			(specs[0] & VIVS_HI_CHIP_SPECS_PIXEL_PIPES__MASK)
-+				>> VIVS_HI_CHIP_SPECS_PIXEL_PIPES__SHIFT;
-+		gpu->identity.vertex_output_buffer_size =
-+			(specs[0] & VIVS_HI_CHIP_SPECS_VERTEX_OUTPUT_BUFFER_SIZE__MASK)
-+				>> VIVS_HI_CHIP_SPECS_VERTEX_OUTPUT_BUFFER_SIZE__SHIFT;
-+
-+		gpu->identity.buffer_size =
-+			(specs[1] & VIVS_HI_CHIP_SPECS_2_BUFFER_SIZE__MASK)
-+				>> VIVS_HI_CHIP_SPECS_2_BUFFER_SIZE__SHIFT;
-+		gpu->identity.instruction_count =
-+			(specs[1] & VIVS_HI_CHIP_SPECS_2_INSTRUCTION_COUNT__MASK)
-+				>> VIVS_HI_CHIP_SPECS_2_INSTRUCTION_COUNT__SHIFT;
-+		gpu->identity.num_constants =
-+			(specs[1] & VIVS_HI_CHIP_SPECS_2_NUM_CONSTANTS__MASK)
-+				>> VIVS_HI_CHIP_SPECS_2_NUM_CONSTANTS__SHIFT;
-+	}
-+
-+	/* Fill in the stream count if not specified */
-+	if (gpu->identity.stream_count == 0) {
-+		if (gpu->identity.model >= 0x1000)
-+			gpu->identity.stream_count = 4;
-+		else
-+			gpu->identity.stream_count = 1;
-+	}
-+
-+	/* Convert the register max value */
-+	if (gpu->identity.register_max)
-+		gpu->identity.register_max = 1 << gpu->identity.register_max;
-+	else if (gpu->identity.model == 0x0400)
-+		gpu->identity.register_max = 32;
-+	else
-+		gpu->identity.register_max = 64;
-+
-+	/* Convert thread count */
-+	if (gpu->identity.thread_count)
-+		gpu->identity.thread_count = 1 << gpu->identity.thread_count;
-+	else if (gpu->identity.model == 0x0400)
-+		gpu->identity.thread_count = 64;
-+	else if (gpu->identity.model == 0x0500 ||
-+		 gpu->identity.model == 0x0530)
-+		gpu->identity.thread_count = 128;
-+	else
-+		gpu->identity.thread_count = 256;
-+
-+	if (gpu->identity.vertex_cache_size == 0)
-+		gpu->identity.vertex_cache_size = 8;
-+
-+	if (gpu->identity.shader_core_count == 0) {
-+		if (gpu->identity.model >= 0x1000)
-+			gpu->identity.shader_core_count = 2;
-+		else
-+			gpu->identity.shader_core_count = 1;
-+	}
-+
-+	if (gpu->identity.pixel_pipes == 0)
-+		gpu->identity.pixel_pipes = 1;
-+
-+	/* Convert virtex buffer size */
-+	if (gpu->identity.vertex_output_buffer_size) {
-+		gpu->identity.vertex_output_buffer_size =
-+			1 << gpu->identity.vertex_output_buffer_size;
-+	} else if (gpu->identity.model == 0x0400) {
-+		if (gpu->identity.revision < 0x4000)
-+			gpu->identity.vertex_output_buffer_size = 512;
-+		else if (gpu->identity.revision < 0x4200)
-+			gpu->identity.vertex_output_buffer_size = 256;
-+		else
-+			gpu->identity.vertex_output_buffer_size = 128;
-+	} else {
-+		gpu->identity.vertex_output_buffer_size = 512;
-+	}
-+
-+	switch (gpu->identity.instruction_count) {
-+	case 0:
-+		if ((gpu->identity.model == 0x2000 &&
-+		     gpu->identity.revision == 0x5108) ||
-+		    gpu->identity.model == 0x880)
-+			gpu->identity.instruction_count = 512;
-+		else
-+			gpu->identity.instruction_count = 256;
-+		break;
-+
-+	case 1:
-+		gpu->identity.instruction_count = 1024;
-+		break;
-+
-+	case 2:
-+		gpu->identity.instruction_count = 2048;
-+		break;
-+
-+	default:
-+		gpu->identity.instruction_count = 256;
-+		break;
-+	}
-+
-+	if (gpu->identity.num_constants == 0)
-+		gpu->identity.num_constants = 168;
-+}
-+
-+static void etnaviv_hw_identify(struct etnaviv_gpu *gpu)
-+{
-+	u32 chipIdentity;
-+
-+	chipIdentity = gpu_read(gpu, VIVS_HI_CHIP_IDENTITY);
-+
-+	/* Special case for older graphic cores. */
-+	if (VIVS_HI_CHIP_IDENTITY_FAMILY(chipIdentity) ==  0x01) {
-+		gpu->identity.model    = 0x500; /* gc500 */
-+		gpu->identity.revision = VIVS_HI_CHIP_IDENTITY_REVISION(chipIdentity);
-+	} else {
-+
-+		gpu->identity.model = gpu_read(gpu, VIVS_HI_CHIP_MODEL);
-+		gpu->identity.revision = gpu_read(gpu, VIVS_HI_CHIP_REV);
-+
-+		/*
-+		 * !!!! HACK ALERT !!!!
-+		 * Because people change device IDs without letting software
-+		 * know about it - here is the hack to make it all look the
-+		 * same.  Only for GC400 family.
-+		 */
-+		if ((gpu->identity.model & 0xff00) == 0x0400 &&
-+		    gpu->identity.model != 0x0420) {
-+			gpu->identity.model = gpu->identity.model & 0x0400;
-+		}
-+
-+		/* Another special case */
-+		if (gpu->identity.model == 0x300 &&
-+		    gpu->identity.revision == 0x2201) {
-+			u32 chipDate = gpu_read(gpu, VIVS_HI_CHIP_DATE);
-+			u32 chipTime = gpu_read(gpu, VIVS_HI_CHIP_TIME);
-+
-+			if (chipDate == 0x20080814 && chipTime == 0x12051100) {
-+				/*
-+				 * This IP has an ECO; put the correct
-+				 * revision in it.
-+				 */
-+				gpu->identity.revision = 0x1051;
-+			}
-+		}
-+	}
-+
-+	dev_info(gpu->dev, "model: GC%x, revision: %x\n",
-+		 gpu->identity.model, gpu->identity.revision);
-+
-+	gpu->identity.features = gpu_read(gpu, VIVS_HI_CHIP_FEATURE);
-+
-+	/* Disable fast clear on GC700. */
-+	if (gpu->identity.model == 0x700)
-+		gpu->identity.features &= ~chipFeatures_FAST_CLEAR;
-+
-+	if ((gpu->identity.model == 0x500 && gpu->identity.revision < 2) ||
-+	    (gpu->identity.model == 0x300 && gpu->identity.revision < 0x2000)) {
-+
-+		/*
-+		 * GC500 rev 1.x and GC300 rev < 2.0 doesn't have these
-+		 * registers.
-+		 */
-+		gpu->identity.minor_features0 = 0;
-+		gpu->identity.minor_features1 = 0;
-+		gpu->identity.minor_features2 = 0;
-+		gpu->identity.minor_features3 = 0;
-+	} else
-+		gpu->identity.minor_features0 =
-+				gpu_read(gpu, VIVS_HI_CHIP_MINOR_FEATURE_0);
-+
-+	if (gpu->identity.minor_features0 &
-+	    chipMinorFeatures0_MORE_MINOR_FEATURES) {
-+		gpu->identity.minor_features1 =
-+				gpu_read(gpu, VIVS_HI_CHIP_MINOR_FEATURE_1);
-+		gpu->identity.minor_features2 =
-+				gpu_read(gpu, VIVS_HI_CHIP_MINOR_FEATURE_2);
-+		gpu->identity.minor_features3 =
-+				gpu_read(gpu, VIVS_HI_CHIP_MINOR_FEATURE_3);
-+	}
-+
-+	/* GC600 idle register reports zero bits where modules aren't present */
-+	if (gpu->identity.model == chipModel_GC600) {
-+		gpu->idle_mask = VIVS_HI_IDLE_STATE_TX |
-+				 VIVS_HI_IDLE_STATE_RA |
-+				 VIVS_HI_IDLE_STATE_SE |
-+				 VIVS_HI_IDLE_STATE_PA |
-+				 VIVS_HI_IDLE_STATE_SH |
-+				 VIVS_HI_IDLE_STATE_PE |
-+				 VIVS_HI_IDLE_STATE_DE |
-+				 VIVS_HI_IDLE_STATE_FE;
-+	} else {
-+		gpu->idle_mask = ~VIVS_HI_IDLE_STATE_AXI_LP;
-+	}
-+
-+	etnaviv_hw_specs(gpu);
-+}
-+
-+static void etnaviv_gpu_load_clock(struct etnaviv_gpu *gpu, u32 clock)
-+{
-+	gpu_write(gpu, VIVS_HI_CLOCK_CONTROL, clock |
-+		  VIVS_HI_CLOCK_CONTROL_FSCALE_CMD_LOAD);
-+	gpu_write(gpu, VIVS_HI_CLOCK_CONTROL, clock);
-+}
-+
-+static int etnaviv_hw_reset(struct etnaviv_gpu *gpu)
-+{
-+	u32 control, idle;
-+	unsigned long timeout;
-+	bool failed = true;
-+
-+	/* TODO
-+	 *
-+	 * - clock gating
-+	 * - puls eater
-+	 * - what about VG?
-+	 */
-+
-+	/* We hope that the GPU resets in under one second */
-+	timeout = jiffies + msecs_to_jiffies(1000);
-+
-+	while (time_is_after_jiffies(timeout)) {
-+		control = VIVS_HI_CLOCK_CONTROL_DISABLE_DEBUG_REGISTERS |
-+			  VIVS_HI_CLOCK_CONTROL_FSCALE_VAL(0x40);
-+
-+		/* enable clock */
-+		etnaviv_gpu_load_clock(gpu, control);
-+
-+		/* Wait for stable clock.  Vivante's code waited for 1ms */
-+		usleep_range(1000, 10000);
-+
-+		/* isolate the GPU. */
-+		control |= VIVS_HI_CLOCK_CONTROL_ISOLATE_GPU;
-+		gpu_write(gpu, VIVS_HI_CLOCK_CONTROL, control);
-+
-+		/* set soft reset. */
-+		control |= VIVS_HI_CLOCK_CONTROL_SOFT_RESET;
-+		gpu_write(gpu, VIVS_HI_CLOCK_CONTROL, control);
-+
-+		/* wait for reset. */
-+		msleep(1);
-+
-+		/* reset soft reset bit. */
-+		control &= ~VIVS_HI_CLOCK_CONTROL_SOFT_RESET;
-+		gpu_write(gpu, VIVS_HI_CLOCK_CONTROL, control);
-+
-+		/* reset GPU isolation. */
-+		control &= ~VIVS_HI_CLOCK_CONTROL_ISOLATE_GPU;
-+		gpu_write(gpu, VIVS_HI_CLOCK_CONTROL, control);
-+
-+		/* read idle register. */
-+		idle = gpu_read(gpu, VIVS_HI_IDLE_STATE);
-+
-+		/* try reseting again if FE it not idle */
-+		if ((idle & VIVS_HI_IDLE_STATE_FE) == 0) {
-+			dev_dbg(gpu->dev, "FE is not idle\n");
-+			continue;
-+		}
-+
-+		/* read reset register. */
-+		control = gpu_read(gpu, VIVS_HI_CLOCK_CONTROL);
-+
-+		/* is the GPU idle? */
-+		if (((control & VIVS_HI_CLOCK_CONTROL_IDLE_3D) == 0) ||
-+		    ((control & VIVS_HI_CLOCK_CONTROL_IDLE_2D) == 0)) {
-+			dev_dbg(gpu->dev, "GPU is not idle\n");
-+			continue;
-+		}
-+
-+		failed = false;
-+		break;
-+	}
-+
-+	if (failed) {
-+		idle = gpu_read(gpu, VIVS_HI_IDLE_STATE);
-+		control = gpu_read(gpu, VIVS_HI_CLOCK_CONTROL);
-+
-+		dev_err(gpu->dev, "GPU failed to reset: FE %sidle, 3D %sidle, 2D %sidle\n",
-+			idle & VIVS_HI_IDLE_STATE_FE ? "" : "not ",
-+			control & VIVS_HI_CLOCK_CONTROL_IDLE_3D ? "" : "not ",
-+			control & VIVS_HI_CLOCK_CONTROL_IDLE_2D ? "" : "not ");
-+
-+		return -EBUSY;
-+	}
-+
-+	/* We rely on the GPU running, so program the clock */
-+	control = VIVS_HI_CLOCK_CONTROL_DISABLE_DEBUG_REGISTERS |
-+		  VIVS_HI_CLOCK_CONTROL_FSCALE_VAL(0x40);
-+
-+	/* enable clock */
-+	etnaviv_gpu_load_clock(gpu, control);
-+
-+	return 0;
-+}
-+
-+static void etnaviv_gpu_hw_init(struct etnaviv_gpu *gpu)
-+{
-+	u16 prefetch;
-+
-+	if (gpu->identity.model == chipModel_GC320 &&
-+	    gpu_read(gpu, VIVS_HI_CHIP_TIME) != 0x2062400 &&
-+	    (gpu->identity.revision == 0x5007 ||
-+	     gpu->identity.revision == 0x5220)) {
-+		u32 mc_memory_debug;
-+
-+		mc_memory_debug = gpu_read(gpu, VIVS_MC_DEBUG_MEMORY) & ~0xff;
-+
-+		if (gpu->identity.revision == 0x5007)
-+			mc_memory_debug |= 0x0c;
-+		else
-+			mc_memory_debug |= 0x08;
-+
-+		gpu_write(gpu, VIVS_MC_DEBUG_MEMORY, mc_memory_debug);
-+	}
-+
-+	/*
-+	 * Update GPU AXI cache atttribute to "cacheable, no allocate".
-+	 * This is necessary to prevent the iMX6 SoC locking up.
-+	 */
-+	gpu_write(gpu, VIVS_HI_AXI_CONFIG,
-+		  VIVS_HI_AXI_CONFIG_AWCACHE(2) |
-+		  VIVS_HI_AXI_CONFIG_ARCACHE(2));
-+
-+	/* GC2000 rev 5108 needs a special bus config */
-+	if (gpu->identity.model == 0x2000 && gpu->identity.revision == 0x5108) {
-+		u32 bus_config = gpu_read(gpu, VIVS_MC_BUS_CONFIG);
-+		bus_config &= ~(VIVS_MC_BUS_CONFIG_FE_BUS_CONFIG__MASK |
-+				VIVS_MC_BUS_CONFIG_TX_BUS_CONFIG__MASK);
-+		bus_config |= VIVS_MC_BUS_CONFIG_FE_BUS_CONFIG(1) |
-+			      VIVS_MC_BUS_CONFIG_TX_BUS_CONFIG(0);
-+		gpu_write(gpu, VIVS_MC_BUS_CONFIG, bus_config);
-+	}
-+
-+	/* set base addresses */
-+	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_RA, gpu->memory_base);
-+	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_FE, gpu->memory_base);
-+	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_TX, gpu->memory_base);
-+	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_PEZ, gpu->memory_base);
-+	gpu_write(gpu, VIVS_MC_MEMORY_BASE_ADDR_PE, gpu->memory_base);
-+
-+	/* setup the MMU page table pointers */
-+	etnaviv_iommu_domain_restore(gpu, gpu->mmu->domain);
-+
-+	/* Start command processor */
-+	prefetch = etnaviv_buffer_init(gpu);
-+
-+	gpu_write(gpu, VIVS_HI_INTR_ENBL, ~0U);
-+	gpu_write(gpu, VIVS_FE_COMMAND_ADDRESS,
-+		  gpu->buffer->paddr - gpu->memory_base);
-+	gpu_write(gpu, VIVS_FE_COMMAND_CONTROL,
-+		  VIVS_FE_COMMAND_CONTROL_ENABLE |
-+		  VIVS_FE_COMMAND_CONTROL_PREFETCH(prefetch));
-+}
-+
-+int etnaviv_gpu_init(struct etnaviv_gpu *gpu)
-+{
-+	int ret, i;
-+	struct iommu_domain *iommu;
-+	enum etnaviv_iommu_version version;
-+	bool mmuv2;
-+
-+	ret = pm_runtime_get_sync(gpu->dev);
-+	if (ret < 0)
-+		return ret;
-+
-+	etnaviv_hw_identify(gpu);
-+
-+	if (gpu->identity.model == 0) {
-+		dev_err(gpu->dev, "Unknown GPU model\n");
-+		pm_runtime_put_autosuspend(gpu->dev);
-+		return -ENXIO;
-+	}
-+
-+	ret = etnaviv_hw_reset(gpu);
-+	if (ret)
-+		goto fail;
-+
-+	/* Setup IOMMU.. eventually we will (I think) do this once per context
-+	 * and have separate page tables per context.  For now, to keep things
-+	 * simple and to get something working, just use a single address space:
-+	 */
-+	mmuv2 = gpu->identity.minor_features1 & chipMinorFeatures1_MMU_VERSION;
-+	dev_dbg(gpu->dev, "mmuv2: %d\n", mmuv2);
-+
-+	if (!mmuv2) {
-+		iommu = etnaviv_iommu_domain_alloc(gpu);
-+		version = ETNAVIV_IOMMU_V1;
-+	} else {
-+		iommu = etnaviv_iommu_v2_domain_alloc(gpu);
-+		version = ETNAVIV_IOMMU_V2;
-+	}
-+
-+	if (!iommu) {
-+		ret = -ENOMEM;
-+		goto fail;
-+	}
-+
-+	/* TODO: we will leak here memory - fix it! */
-+
-+	gpu->mmu = etnaviv_iommu_new(gpu, iommu, version);
-+	if (!gpu->mmu) {
-+		ret = -ENOMEM;
-+		goto fail;
-+	}
-+
-+	/* Create buffer: */
-+	gpu->buffer = etnaviv_gpu_cmdbuf_new(gpu, PAGE_SIZE, 0);
-+	if (!gpu->buffer) {
-+		ret = -ENOMEM;
-+		dev_err(gpu->dev, "could not create command buffer\n");
-+		goto fail;
-+	}
-+	if (gpu->buffer->paddr - gpu->memory_base > 0x80000000) {
-+		ret = -EINVAL;
-+		dev_err(gpu->dev,
-+			"command buffer outside valid memory window\n");
-+		goto free_buffer;
-+	}
-+
-+	/* Setup event management */
-+	spin_lock_init(&gpu->event_spinlock);
-+	init_completion(&gpu->event_free);
-+	for (i = 0; i < ARRAY_SIZE(gpu->event); i++) {
-+		gpu->event[i].used = false;
-+		complete(&gpu->event_free);
-+	}
-+
-+	/* Now program the hardware */
-+	mutex_lock(&gpu->lock);
-+	etnaviv_gpu_hw_init(gpu);
-+	mutex_unlock(&gpu->lock);
-+
-+	pm_runtime_mark_last_busy(gpu->dev);
-+	pm_runtime_put_autosuspend(gpu->dev);
-+
-+	return 0;
-+
-+free_buffer:
-+	etnaviv_gpu_cmdbuf_free(gpu->buffer);
-+	gpu->buffer = NULL;
-+fail:
-+	pm_runtime_mark_last_busy(gpu->dev);
-+	pm_runtime_put_autosuspend(gpu->dev);
-+
-+	return ret;
-+}
-+
-+#ifdef CONFIG_DEBUG_FS
-+struct dma_debug {
-+	u32 address[2];
-+	u32 state[2];
-+};
-+
-+static void verify_dma(struct etnaviv_gpu *gpu, struct dma_debug *debug)
-+{
-+	u32 i;
-+
-+	debug->address[0] = gpu_read(gpu, VIVS_FE_DMA_ADDRESS);
-+	debug->state[0]   = gpu_read(gpu, VIVS_FE_DMA_DEBUG_STATE);
-+
-+	for (i = 0; i < 500; i++) {
-+		debug->address[1] = gpu_read(gpu, VIVS_FE_DMA_ADDRESS);
-+		debug->state[1]   = gpu_read(gpu, VIVS_FE_DMA_DEBUG_STATE);
-+
-+		if (debug->address[0] != debug->address[1])
-+			break;
-+
-+		if (debug->state[0] != debug->state[1])
-+			break;
-+	}
-+}
-+
-+int etnaviv_gpu_debugfs(struct etnaviv_gpu *gpu, struct seq_file *m)
-+{
-+	struct dma_debug debug;
-+	u32 dma_lo, dma_hi, axi, idle;
-+	int ret;
-+
-+	seq_printf(m, "%s Status:\n", dev_name(gpu->dev));
-+
-+	ret = pm_runtime_get_sync(gpu->dev);
-+	if (ret < 0)
-+		return ret;
-+
-+	dma_lo = gpu_read(gpu, VIVS_FE_DMA_LOW);
-+	dma_hi = gpu_read(gpu, VIVS_FE_DMA_HIGH);
-+	axi = gpu_read(gpu, VIVS_HI_AXI_STATUS);
-+	idle = gpu_read(gpu, VIVS_HI_IDLE_STATE);
-+
-+	verify_dma(gpu, &debug);
-+
-+	seq_puts(m, "\tfeatures\n");
-+	seq_printf(m, "\t minor_features0: 0x%08x\n",
-+		   gpu->identity.minor_features0);
-+	seq_printf(m, "\t minor_features1: 0x%08x\n",
-+		   gpu->identity.minor_features1);
-+	seq_printf(m, "\t minor_features2: 0x%08x\n",
-+		   gpu->identity.minor_features2);
-+	seq_printf(m, "\t minor_features3: 0x%08x\n",
-+		   gpu->identity.minor_features3);
-+
-+	seq_puts(m, "\tspecs\n");
-+	seq_printf(m, "\t stream_count:  %d\n",
-+			gpu->identity.stream_count);
-+	seq_printf(m, "\t register_max: %d\n",
-+			gpu->identity.register_max);
-+	seq_printf(m, "\t thread_count: %d\n",
-+			gpu->identity.thread_count);
-+	seq_printf(m, "\t vertex_cache_size: %d\n",
-+			gpu->identity.vertex_cache_size);
-+	seq_printf(m, "\t shader_core_count: %d\n",
-+			gpu->identity.shader_core_count);
-+	seq_printf(m, "\t pixel_pipes: %d\n",
-+			gpu->identity.pixel_pipes);
-+	seq_printf(m, "\t vertex_output_buffer_size: %d\n",
-+			gpu->identity.vertex_output_buffer_size);
-+	seq_printf(m, "\t buffer_size: %d\n",
-+			gpu->identity.buffer_size);
-+	seq_printf(m, "\t instruction_count: %d\n",
-+			gpu->identity.instruction_count);
-+	seq_printf(m, "\t num_constants: %d\n",
-+			gpu->identity.num_constants);
-+
-+	seq_printf(m, "\taxi: 0x%08x\n", axi);
-+	seq_printf(m, "\tidle: 0x%08x\n", idle);
-+	idle |= ~gpu->idle_mask & ~VIVS_HI_IDLE_STATE_AXI_LP;
-+	if ((idle & VIVS_HI_IDLE_STATE_FE) == 0)
-+		seq_puts(m, "\t FE is not idle\n");
-+	if ((idle & VIVS_HI_IDLE_STATE_DE) == 0)
-+		seq_puts(m, "\t DE is not idle\n");
-+	if ((idle & VIVS_HI_IDLE_STATE_PE) == 0)
-+		seq_puts(m, "\t PE is not idle\n");
-+	if ((idle & VIVS_HI_IDLE_STATE_SH) == 0)
-+		seq_puts(m, "\t SH is not idle\n");
-+	if ((idle & VIVS_HI_IDLE_STATE_PA) == 0)
-+		seq_puts(m, "\t PA is not idle\n");
-+	if ((idle & VIVS_HI_IDLE_STATE_SE) == 0)
-+		seq_puts(m, "\t SE is not idle\n");
-+	if ((idle & VIVS_HI_IDLE_STATE_RA) == 0)
-+		seq_puts(m, "\t RA is not idle\n");
-+	if ((idle & VIVS_HI_IDLE_STATE_TX) == 0)
-+		seq_puts(m, "\t TX is not idle\n");
-+	if ((idle & VIVS_HI_IDLE_STATE_VG) == 0)
-+		seq_puts(m, "\t VG is not idle\n");
-+	if ((idle & VIVS_HI_IDLE_STATE_IM) == 0)
-+		seq_puts(m, "\t IM is not idle\n");
-+	if ((idle & VIVS_HI_IDLE_STATE_FP) == 0)
-+		seq_puts(m, "\t FP is not idle\n");
-+	if ((idle & VIVS_HI_IDLE_STATE_TS) == 0)
-+		seq_puts(m, "\t TS is not idle\n");
-+	if (idle & VIVS_HI_IDLE_STATE_AXI_LP)
-+		seq_puts(m, "\t AXI low power mode\n");
-+
-+	if (gpu->identity.features & chipFeatures_DEBUG_MODE) {
-+		u32 read0 = gpu_read(gpu, VIVS_MC_DEBUG_READ0);
-+		u32 read1 = gpu_read(gpu, VIVS_MC_DEBUG_READ1);
-+		u32 write = gpu_read(gpu, VIVS_MC_DEBUG_WRITE);
-+
-+		seq_puts(m, "\tMC\n");
-+		seq_printf(m, "\t read0: 0x%08x\n", read0);
-+		seq_printf(m, "\t read1: 0x%08x\n", read1);
-+		seq_printf(m, "\t write: 0x%08x\n", write);
-+	}
-+
-+	seq_puts(m, "\tDMA ");
-+
-+	if (debug.address[0] == debug.address[1] &&
-+	    debug.state[0] == debug.state[1]) {
-+		seq_puts(m, "seems to be stuck\n");
-+	} else if (debug.address[0] == debug.address[1]) {
-+		seq_puts(m, "adress is constant\n");
-+	} else {
-+		seq_puts(m, "is runing\n");
-+	}
-+
-+	seq_printf(m, "\t address 0: 0x%08x\n", debug.address[0]);
-+	seq_printf(m, "\t address 1: 0x%08x\n", debug.address[1]);
-+	seq_printf(m, "\t state 0: 0x%08x\n", debug.state[0]);
-+	seq_printf(m, "\t state 1: 0x%08x\n", debug.state[1]);
-+	seq_printf(m, "\t last fetch 64 bit word: 0x%08x 0x%08x\n",
-+		   dma_lo, dma_hi);
-+
-+	ret = 0;
-+
-+	pm_runtime_mark_last_busy(gpu->dev);
-+	pm_runtime_put_autosuspend(gpu->dev);
-+
-+	return ret;
-+}
-+#endif
-+
-+/*
-+ * Power Management:
-+ */
-+static int enable_clk(struct etnaviv_gpu *gpu)
-+{
-+	if (gpu->clk_core)
-+		clk_prepare_enable(gpu->clk_core);
-+	if (gpu->clk_shader)
-+		clk_prepare_enable(gpu->clk_shader);
-+
-+	return 0;
-+}
-+
-+static int disable_clk(struct etnaviv_gpu *gpu)
-+{
-+	if (gpu->clk_core)
-+		clk_disable_unprepare(gpu->clk_core);
-+	if (gpu->clk_shader)
-+		clk_disable_unprepare(gpu->clk_shader);
-+
-+	return 0;
-+}
-+
-+static int enable_axi(struct etnaviv_gpu *gpu)
-+{
-+	if (gpu->clk_bus)
-+		clk_prepare_enable(gpu->clk_bus);
-+
-+	return 0;
-+}
-+
-+static int disable_axi(struct etnaviv_gpu *gpu)
-+{
-+	if (gpu->clk_bus)
-+		clk_disable_unprepare(gpu->clk_bus);
-+
-+	return 0;
-+}
-+
-+/*
-+ * Hangcheck detection for locked gpu:
-+ */
-+static void recover_worker(struct work_struct *work)
-+{
-+	struct etnaviv_gpu *gpu = container_of(work, struct etnaviv_gpu,
-+					       recover_work);
-+	unsigned long flags;
-+	unsigned int i;
-+
-+	dev_err(gpu->dev, "hangcheck recover!\n");
-+
-+	if (pm_runtime_get_sync(gpu->dev) < 0)
-+		return;
-+
-+	mutex_lock(&gpu->lock);
-+
-+	/* Only catch the first event, or when manually re-armed */
-+	if (etnaviv_dump_core) {
-+		etnaviv_core_dump(gpu);
-+		etnaviv_dump_core = false;
-+	}
-+
-+	etnaviv_hw_reset(gpu);
-+
-+	/* complete all events, the GPU won't do it after the reset */
-+	spin_lock_irqsave(&gpu->event_spinlock, flags);
-+	for (i = 0; i < ARRAY_SIZE(gpu->event); i++) {
-+		if (!gpu->event[i].used)
-+			continue;
-+		fence_signal(gpu->event[i].fence);
-+		gpu->event[i].fence = NULL;
-+		gpu->event[i].used = false;
-+		complete(&gpu->event_free);
-+		/*
-+		 * Decrement the PM count for each stuck event. This is safe
-+		 * even in atomic context as we use ASYNC RPM here.
-+		 */
-+		pm_runtime_put_autosuspend(gpu->dev);
-+	}
-+	spin_unlock_irqrestore(&gpu->event_spinlock, flags);
-+	gpu->completed_fence = gpu->active_fence;
-+
-+	etnaviv_gpu_hw_init(gpu);
-+	gpu->switch_context = true;
-+
-+	mutex_unlock(&gpu->lock);
-+	pm_runtime_mark_last_busy(gpu->dev);
-+	pm_runtime_put_autosuspend(gpu->dev);
-+
-+	/* Retire the buffer objects in a work */
-+	etnaviv_queue_work(gpu->drm, &gpu->retire_work);
-+}
-+
-+static void hangcheck_timer_reset(struct etnaviv_gpu *gpu)
-+{
-+	DBG("%s", dev_name(gpu->dev));
-+	mod_timer(&gpu->hangcheck_timer,
-+		  round_jiffies_up(jiffies + DRM_ETNAVIV_HANGCHECK_JIFFIES));
-+}
-+
-+static void hangcheck_handler(unsigned long data)
-+{
-+	struct etnaviv_gpu *gpu = (struct etnaviv_gpu *)data;
-+	u32 fence = gpu->completed_fence;
-+	bool progress = false;
-+
-+	if (fence != gpu->hangcheck_fence) {
-+		gpu->hangcheck_fence = fence;
-+		progress = true;
-+	}
-+
-+	if (!progress) {
-+		u32 dma_addr = gpu_read(gpu, VIVS_FE_DMA_ADDRESS);
-+		int change = dma_addr - gpu->hangcheck_dma_addr;
-+
-+		if (change < 0 || change > 16) {
-+			gpu->hangcheck_dma_addr = dma_addr;
-+			progress = true;
-+		}
-+	}
-+
-+	if (!progress && fence_after(gpu->active_fence, fence)) {
-+		dev_err(gpu->dev, "hangcheck detected gpu lockup!\n");
-+		dev_err(gpu->dev, "     completed fence: %u\n", fence);
-+		dev_err(gpu->dev, "     active fence: %u\n",
-+			gpu->active_fence);
-+		etnaviv_queue_work(gpu->drm, &gpu->recover_work);
-+	}
-+
-+	/* if still more pending work, reset the hangcheck timer: */
-+	if (fence_after(gpu->active_fence, gpu->hangcheck_fence))
-+		hangcheck_timer_reset(gpu);
-+}
-+
-+static void hangcheck_disable(struct etnaviv_gpu *gpu)
-+{
-+	del_timer_sync(&gpu->hangcheck_timer);
-+	cancel_work_sync(&gpu->recover_work);
-+}
-+
-+/* fence object management */
-+struct etnaviv_fence {
-+	struct etnaviv_gpu *gpu;
-+	struct fence base;
-+};
-+
-+static inline struct etnaviv_fence *to_etnaviv_fence(struct fence *fence)
-+{
-+	return container_of(fence, struct etnaviv_fence, base);
-+}
-+
-+static const char *etnaviv_fence_get_driver_name(struct fence *fence)
-+{
-+	return "etnaviv";
-+}
-+
-+static const char *etnaviv_fence_get_timeline_name(struct fence *fence)
-+{
-+	struct etnaviv_fence *f = to_etnaviv_fence(fence);
-+
-+	return dev_name(f->gpu->dev);
-+}
-+
-+static bool etnaviv_fence_enable_signaling(struct fence *fence)
-+{
-+	return true;
-+}
-+
-+static bool etnaviv_fence_signaled(struct fence *fence)
-+{
-+	struct etnaviv_fence *f = to_etnaviv_fence(fence);
-+
-+	return fence_completed(f->gpu, f->base.seqno);
-+}
-+
-+static void etnaviv_fence_release(struct fence *fence)
-+{
-+	struct etnaviv_fence *f = to_etnaviv_fence(fence);
-+
-+	kfree_rcu(f, base.rcu);
-+}
-+
-+static const struct fence_ops etnaviv_fence_ops = {
-+	.get_driver_name = etnaviv_fence_get_driver_name,
-+	.get_timeline_name = etnaviv_fence_get_timeline_name,
-+	.enable_signaling = etnaviv_fence_enable_signaling,
-+	.signaled = etnaviv_fence_signaled,
-+	.wait = fence_default_wait,
-+	.release = etnaviv_fence_release,
-+};
-+
-+static struct fence *etnaviv_gpu_fence_alloc(struct etnaviv_gpu *gpu)
-+{
-+	struct etnaviv_fence *f;
-+
-+	f = kzalloc(sizeof(*f), GFP_KERNEL);
-+	if (!f)
-+		return NULL;
-+
-+	f->gpu = gpu;
-+
-+	fence_init(&f->base, &etnaviv_fence_ops, &gpu->fence_spinlock,
-+		   gpu->fence_context, ++gpu->next_fence);
-+
-+	return &f->base;
-+}
-+
-+int etnaviv_gpu_fence_sync_obj(struct etnaviv_gem_object *etnaviv_obj,
-+	unsigned int context, bool exclusive)
-+{
-+	struct reservation_object *robj = etnaviv_obj->resv;
-+	struct reservation_object_list *fobj;
-+	struct fence *fence;
-+	int i, ret;
-+
-+	if (!exclusive) {
-+		ret = reservation_object_reserve_shared(robj);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	/*
-+	 * If we have any shared fences, then the exclusive fence
-+	 * should be ignored as it will already have been signalled.
-+	 */
-+	fobj = reservation_object_get_list(robj);
-+	if (!fobj || fobj->shared_count == 0) {
-+		/* Wait on any existing exclusive fence which isn't our own */
-+		fence = reservation_object_get_excl(robj);
-+		if (fence && fence->context != context) {
-+			ret = fence_wait(fence, true);
-+			if (ret)
-+				return ret;
-+		}
-+	}
-+
-+	if (!exclusive || !fobj)
-+		return 0;
-+
-+	for (i = 0; i < fobj->shared_count; i++) {
-+		fence = rcu_dereference_protected(fobj->shared[i],
-+						reservation_object_held(robj));
-+		if (fence->context != context) {
-+			ret = fence_wait(fence, true);
-+			if (ret)
-+				return ret;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+/*
-+ * event management:
-+ */
-+
-+static unsigned int event_alloc(struct etnaviv_gpu *gpu)
-+{
-+	unsigned long ret, flags;
-+	unsigned int i, event = ~0U;
-+
-+	ret = wait_for_completion_timeout(&gpu->event_free,
-+					  msecs_to_jiffies(10 * 10000));
-+	if (!ret)
-+		dev_err(gpu->dev, "wait_for_completion_timeout failed");
-+
-+	spin_lock_irqsave(&gpu->event_spinlock, flags);
-+
-+	/* find first free event */
-+	for (i = 0; i < ARRAY_SIZE(gpu->event); i++) {
-+		if (gpu->event[i].used == false) {
-+			gpu->event[i].used = true;
-+			event = i;
-+			break;
-+		}
-+	}
-+
-+	spin_unlock_irqrestore(&gpu->event_spinlock, flags);
-+
-+	return event;
-+}
-+
-+static void event_free(struct etnaviv_gpu *gpu, unsigned int event)
-+{
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&gpu->event_spinlock, flags);
-+
-+	if (gpu->event[event].used == false) {
-+		dev_warn(gpu->dev, "event %u is already marked as free",
-+			 event);
-+		spin_unlock_irqrestore(&gpu->event_spinlock, flags);
-+	} else {
-+		gpu->event[event].used = false;
-+		spin_unlock_irqrestore(&gpu->event_spinlock, flags);
-+
-+		complete(&gpu->event_free);
-+	}
-+}
-+
-+/*
-+ * Cmdstream submission/retirement:
-+ */
-+
-+struct etnaviv_cmdbuf *etnaviv_gpu_cmdbuf_new(struct etnaviv_gpu *gpu, u32 size,
-+	size_t nr_bos)
-+{
-+	struct etnaviv_cmdbuf *cmdbuf;
-+	size_t sz = size_vstruct(nr_bos, sizeof(cmdbuf->bo[0]),
-+				 sizeof(*cmdbuf));
-+
-+	cmdbuf = kzalloc(sz, GFP_KERNEL);
-+	if (!cmdbuf)
-+		return NULL;
-+
-+	cmdbuf->vaddr = dma_alloc_writecombine(gpu->dev, size, &cmdbuf->paddr,
-+					       GFP_KERNEL);
-+	if (!cmdbuf->vaddr) {
-+		kfree(cmdbuf);
-+		return NULL;
-+	}
-+
-+	cmdbuf->gpu = gpu;
-+	cmdbuf->size = size;
-+
-+	return cmdbuf;
-+}
-+
-+void etnaviv_gpu_cmdbuf_free(struct etnaviv_cmdbuf *cmdbuf)
-+{
-+	dma_free_writecombine(cmdbuf->gpu->dev, cmdbuf->size,
-+			      cmdbuf->vaddr, cmdbuf->paddr);
-+	kfree(cmdbuf);
-+}
-+
-+static void retire_worker(struct work_struct *work)
-+{
-+	struct etnaviv_gpu *gpu = container_of(work, struct etnaviv_gpu,
-+					       retire_work);
-+	u32 fence = gpu->completed_fence;
-+	struct etnaviv_cmdbuf *cmdbuf, *tmp;
-+	unsigned int i;
-+
-+	mutex_lock(&gpu->lock);
-+	list_for_each_entry_safe(cmdbuf, tmp, &gpu->active_cmd_list, node) {
-+		if (!fence_is_signaled(cmdbuf->fence))
-+			break;
-+
-+		list_del(&cmdbuf->node);
-+		fence_put(cmdbuf->fence);
-+
-+		for (i = 0; i < cmdbuf->nr_bos; i++) {
-+			struct etnaviv_gem_object *etnaviv_obj = cmdbuf->bo[i];
-+
-+			atomic_dec(&etnaviv_obj->gpu_active);
-+			/* drop the refcount taken in etnaviv_gpu_submit */
-+			etnaviv_gem_put_iova(gpu, &etnaviv_obj->base);
-+		}
-+
-+		etnaviv_gpu_cmdbuf_free(cmdbuf);
-+	}
-+
-+	gpu->retired_fence = fence;
-+
-+	mutex_unlock(&gpu->lock);
-+
-+	wake_up_all(&gpu->fence_event);
-+}
-+
-+int etnaviv_gpu_wait_fence_interruptible(struct etnaviv_gpu *gpu,
-+	u32 fence, struct timespec *timeout)
-+{
-+	int ret;
-+
-+	if (fence_after(fence, gpu->next_fence)) {
-+		DRM_ERROR("waiting on invalid fence: %u (of %u)\n",
-+				fence, gpu->next_fence);
-+		return -EINVAL;
-+	}
-+
-+	if (!timeout) {
-+		/* No timeout was requested: just test for completion */
-+		ret = fence_completed(gpu, fence) ? 0 : -EBUSY;
-+	} else {
-+		unsigned long remaining = etnaviv_timeout_to_jiffies(timeout);
-+
-+		ret = wait_event_interruptible_timeout(gpu->fence_event,
-+						fence_completed(gpu, fence),
-+						remaining);
-+		if (ret == 0) {
-+			DBG("timeout waiting for fence: %u (retired: %u completed: %u)",
-+				fence, gpu->retired_fence,
-+				gpu->completed_fence);
-+			ret = -ETIMEDOUT;
-+		} else if (ret != -ERESTARTSYS) {
-+			ret = 0;
-+		}
-+	}
-+
-+	return ret;
-+}
-+
-+/*
-+ * Wait for an object to become inactive.  This, on it's own, is not race
-+ * free: the object is moved by the retire worker off the active list, and
-+ * then the iova is put.  Moreover, the object could be re-submitted just
-+ * after we notice that it's become inactive.
-+ *
-+ * Although the retirement happens under the gpu lock, we don't want to hold
-+ * that lock in this function while waiting.
-+ */
-+int etnaviv_gpu_wait_obj_inactive(struct etnaviv_gpu *gpu,
-+	struct etnaviv_gem_object *etnaviv_obj, struct timespec *timeout)
-+{
-+	unsigned long remaining;
-+	long ret;
-+
-+	if (!timeout)
-+		return !is_active(etnaviv_obj) ? 0 : -EBUSY;
-+
-+	remaining = etnaviv_timeout_to_jiffies(timeout);
-+
-+	ret = wait_event_interruptible_timeout(gpu->fence_event,
-+					       !is_active(etnaviv_obj),
-+					       remaining);
-+	if (ret > 0) {
-+		struct etnaviv_drm_private *priv = gpu->drm->dev_private;
-+
-+		/* Synchronise with the retire worker */
-+		flush_workqueue(priv->wq);
-+		return 0;
-+	} else if (ret == -ERESTARTSYS) {
-+		return -ERESTARTSYS;
-+	} else {
-+		return -ETIMEDOUT;
-+	}
-+}
-+
-+int etnaviv_gpu_pm_get_sync(struct etnaviv_gpu *gpu)
-+{
-+	return pm_runtime_get_sync(gpu->dev);
-+}
-+
-+void etnaviv_gpu_pm_put(struct etnaviv_gpu *gpu)
-+{
-+	pm_runtime_mark_last_busy(gpu->dev);
-+	pm_runtime_put_autosuspend(gpu->dev);
-+}
-+
-+/* add bo's to gpu's ring, and kick gpu: */
-+int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
-+	struct etnaviv_gem_submit *submit, struct etnaviv_cmdbuf *cmdbuf)
-+{
-+	struct fence *fence;
-+	unsigned int event, i;
-+	int ret;
-+
-+	ret = etnaviv_gpu_pm_get_sync(gpu);
-+	if (ret < 0)
-+		return ret;
-+
-+	mutex_lock(&gpu->lock);
-+
-+	/*
-+	 * TODO
-+	 *
-+	 * - flush
-+	 * - data endian
-+	 * - prefetch
-+	 *
-+	 */
-+
-+	event = event_alloc(gpu);
-+	if (unlikely(event == ~0U)) {
-+		DRM_ERROR("no free event\n");
-+		ret = -EBUSY;
-+		goto out_unlock;
-+	}
-+
-+	fence = etnaviv_gpu_fence_alloc(gpu);
-+	if (!fence) {
-+		event_free(gpu, event);
-+		ret = -ENOMEM;
-+		goto out_unlock;
-+	}
-+
-+	gpu->event[event].fence = fence;
-+	submit->fence = fence->seqno;
-+	gpu->active_fence = submit->fence;
-+
-+	if (gpu->lastctx != cmdbuf->ctx) {
-+		gpu->mmu->need_flush = true;
-+		gpu->switch_context = true;
-+		gpu->lastctx = cmdbuf->ctx;
-+	}
-+
-+	etnaviv_buffer_queue(gpu, event, cmdbuf);
-+
-+	cmdbuf->fence = fence;
-+	list_add_tail(&cmdbuf->node, &gpu->active_cmd_list);
-+
-+	/* We're committed to adding this command buffer, hold a PM reference */
-+	pm_runtime_get_noresume(gpu->dev);
-+
-+	for (i = 0; i < submit->nr_bos; i++) {
-+		struct etnaviv_gem_object *etnaviv_obj = submit->bos[i].obj;
-+		u32 iova;
-+
-+		/* Each cmdbuf takes a refcount on the iova */
-+		etnaviv_gem_get_iova(gpu, &etnaviv_obj->base, &iova);
-+		cmdbuf->bo[i] = etnaviv_obj;
-+		atomic_inc(&etnaviv_obj->gpu_active);
-+
-+		if (submit->bos[i].flags & ETNA_SUBMIT_BO_WRITE)
-+			reservation_object_add_excl_fence(etnaviv_obj->resv,
-+							  fence);
-+		else
-+			reservation_object_add_shared_fence(etnaviv_obj->resv,
-+							    fence);
-+	}
-+	cmdbuf->nr_bos = submit->nr_bos;
-+	hangcheck_timer_reset(gpu);
-+	ret = 0;
-+
-+out_unlock:
-+	mutex_unlock(&gpu->lock);
-+
-+	etnaviv_gpu_pm_put(gpu);
-+
-+	return ret;
-+}
-+
-+/*
-+ * Init/Cleanup:
-+ */
-+static irqreturn_t irq_handler(int irq, void *data)
-+{
-+	struct etnaviv_gpu *gpu = data;
-+	irqreturn_t ret = IRQ_NONE;
-+
-+	u32 intr = gpu_read(gpu, VIVS_HI_INTR_ACKNOWLEDGE);
-+
-+	if (intr != 0) {
-+		int event;
-+
-+		pm_runtime_mark_last_busy(gpu->dev);
-+
-+		dev_dbg(gpu->dev, "intr 0x%08x\n", intr);
-+
-+		if (intr & VIVS_HI_INTR_ACKNOWLEDGE_AXI_BUS_ERROR) {
-+			dev_err(gpu->dev, "AXI bus error\n");
-+			intr &= ~VIVS_HI_INTR_ACKNOWLEDGE_AXI_BUS_ERROR;
-+		}
-+
-+		while ((event = ffs(intr)) != 0) {
-+			struct fence *fence;
-+
-+			event -= 1;
-+
-+			intr &= ~(1 << event);
-+
-+			dev_dbg(gpu->dev, "event %u\n", event);
-+
-+			fence = gpu->event[event].fence;
-+			gpu->event[event].fence = NULL;
-+			fence_signal(fence);
-+
-+			/*
-+			 * Events can be processed out of order.  Eg,
-+			 * - allocate and queue event 0
-+			 * - allocate event 1
-+			 * - event 0 completes, we process it
-+			 * - allocate and queue event 0
-+			 * - event 1 and event 0 complete
-+			 * we can end up processing event 0 first, then 1.
-+			 */
-+			if (fence_after(fence->seqno, gpu->completed_fence))
-+				gpu->completed_fence = fence->seqno;
-+
-+			event_free(gpu, event);
-+
-+			/*
-+			 * We need to balance the runtime PM count caused by
-+			 * each submission.  Upon submission, we increment
-+			 * the runtime PM counter, and allocate one event.
-+			 * So here, we put the runtime PM count for each
-+			 * completed event.
-+			 */
-+			pm_runtime_put_autosuspend(gpu->dev);
-+		}
-+
-+		/* Retire the buffer objects in a work */
-+		etnaviv_queue_work(gpu->drm, &gpu->retire_work);
-+
-+		ret = IRQ_HANDLED;
-+	}
-+
-+	return ret;
-+}
-+
-+static int etnaviv_gpu_clk_enable(struct etnaviv_gpu *gpu)
-+{
-+	int ret;
-+
-+	ret = enable_clk(gpu);
-+	if (ret)
-+		return ret;
-+
-+	ret = enable_axi(gpu);
-+	if (ret) {
-+		disable_clk(gpu);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int etnaviv_gpu_clk_disable(struct etnaviv_gpu *gpu)
-+{
-+	int ret;
-+
-+	ret = disable_axi(gpu);
-+	if (ret)
-+		return ret;
-+
-+	ret = disable_clk(gpu);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+
-+static int etnaviv_gpu_hw_suspend(struct etnaviv_gpu *gpu)
-+{
-+	if (gpu->buffer) {
-+		unsigned long timeout;
-+
-+		/* Replace the last WAIT with END */
-+		etnaviv_buffer_end(gpu);
-+
-+		/*
-+		 * We know that only the FE is busy here, this should
-+		 * happen quickly (as the WAIT is only 200 cycles).  If
-+		 * we fail, just warn and continue.
-+		 */
-+		timeout = jiffies + msecs_to_jiffies(100);
-+		do {
-+			u32 idle = gpu_read(gpu, VIVS_HI_IDLE_STATE);
-+
-+			if ((idle & gpu->idle_mask) == gpu->idle_mask)
-+				break;
-+
-+			if (time_is_before_jiffies(timeout)) {
-+				dev_warn(gpu->dev,
-+					 "timed out waiting for idle: idle=0x%x\n",
-+					 idle);
-+				break;
-+			}
-+
-+			udelay(5);
-+		} while (1);
-+	}
-+
-+	return etnaviv_gpu_clk_disable(gpu);
-+}
-+
-+#ifdef CONFIG_PM
-+static int etnaviv_gpu_hw_resume(struct etnaviv_gpu *gpu)
-+{
-+	u32 clock;
-+	int ret;
-+
-+	ret = mutex_lock_killable(&gpu->lock);
-+	if (ret)
-+		return ret;
-+
-+	clock = VIVS_HI_CLOCK_CONTROL_DISABLE_DEBUG_REGISTERS |
-+		VIVS_HI_CLOCK_CONTROL_FSCALE_VAL(0x40);
-+
-+	etnaviv_gpu_load_clock(gpu, clock);
-+	etnaviv_gpu_hw_init(gpu);
-+
-+	gpu->switch_context = true;
-+
-+	mutex_unlock(&gpu->lock);
-+
-+	return 0;
-+}
-+#endif
-+
-+static int etnaviv_gpu_bind(struct device *dev, struct device *master,
-+	void *data)
-+{
-+	struct drm_device *drm = data;
-+	struct etnaviv_drm_private *priv = drm->dev_private;
-+	struct etnaviv_gpu *gpu = dev_get_drvdata(dev);
-+	int ret;
-+
-+#ifdef CONFIG_PM
-+	ret = pm_runtime_get_sync(gpu->dev);
-+#else
-+	ret = etnaviv_gpu_clk_enable(gpu);
-+#endif
-+	if (ret < 0)
-+		return ret;
-+
-+	gpu->drm = drm;
-+	gpu->fence_context = fence_context_alloc(1);
-+	spin_lock_init(&gpu->fence_spinlock);
-+
-+	INIT_LIST_HEAD(&gpu->active_cmd_list);
-+	INIT_WORK(&gpu->retire_work, retire_worker);
-+	INIT_WORK(&gpu->recover_work, recover_worker);
-+	init_waitqueue_head(&gpu->fence_event);
-+
-+	setup_timer(&gpu->hangcheck_timer, hangcheck_handler,
-+			(unsigned long)gpu);
-+
-+	priv->gpu[priv->num_gpus++] = gpu;
-+
-+	pm_runtime_mark_last_busy(gpu->dev);
-+	pm_runtime_put_autosuspend(gpu->dev);
-+
-+	return 0;
-+}
-+
-+static void etnaviv_gpu_unbind(struct device *dev, struct device *master,
-+	void *data)
-+{
-+	struct etnaviv_gpu *gpu = dev_get_drvdata(dev);
-+
-+	DBG("%s", dev_name(gpu->dev));
-+
-+	hangcheck_disable(gpu);
-+
-+#ifdef CONFIG_PM
-+	pm_runtime_get_sync(gpu->dev);
-+	pm_runtime_put_sync_suspend(gpu->dev);
-+#else
-+	etnaviv_gpu_hw_suspend(gpu);
-+#endif
-+
-+	if (gpu->buffer) {
-+		etnaviv_gpu_cmdbuf_free(gpu->buffer);
-+		gpu->buffer = NULL;
-+	}
-+
-+	if (gpu->mmu) {
-+		etnaviv_iommu_destroy(gpu->mmu);
-+		gpu->mmu = NULL;
-+	}
-+
-+	gpu->drm = NULL;
-+}
-+
-+static const struct component_ops gpu_ops = {
-+	.bind = etnaviv_gpu_bind,
-+	.unbind = etnaviv_gpu_unbind,
-+};
-+
-+static const struct of_device_id etnaviv_gpu_match[] = {
-+	{
-+		.compatible = "vivante,gc"
-+	},
-+	{ /* sentinel */ }
-+};
-+
-+static int etnaviv_gpu_platform_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct etnaviv_gpu *gpu;
-+	int err = 0;
-+
-+	gpu = devm_kzalloc(dev, sizeof(*gpu), GFP_KERNEL);
-+	if (!gpu)
-+		return -ENOMEM;
-+
-+	gpu->dev = &pdev->dev;
-+	mutex_init(&gpu->lock);
-+
-+	/*
-+	 * Set the GPU base address to the start of physical memory.  This
-+	 * ensures that if we have up to 2GB, the v1 MMU can address the
-+	 * highest memory.  This is important as command buffers may be
-+	 * allocated outside of this limit.
-+	 */
-+	gpu->memory_base = PHYS_OFFSET;
-+
-+	/* Map registers: */
-+	gpu->mmio = etnaviv_ioremap(pdev, NULL, dev_name(gpu->dev));
-+	if (IS_ERR(gpu->mmio))
-+		return PTR_ERR(gpu->mmio);
-+
-+	/* Get Interrupt: */
-+	gpu->irq = platform_get_irq(pdev, 0);
-+	if (gpu->irq < 0) {
-+		err = gpu->irq;
-+		dev_err(dev, "failed to get irq: %d\n", err);
-+		goto fail;
-+	}
-+
-+	err = devm_request_irq(&pdev->dev, gpu->irq, irq_handler, 0,
-+			       dev_name(gpu->dev), gpu);
-+	if (err) {
-+		dev_err(dev, "failed to request IRQ%u: %d\n", gpu->irq, err);
-+		goto fail;
-+	}
-+
-+	/* Get Clocks: */
-+	gpu->clk_bus = devm_clk_get(&pdev->dev, "bus");
-+	DBG("clk_bus: %p", gpu->clk_bus);
-+	if (IS_ERR(gpu->clk_bus))
-+		gpu->clk_bus = NULL;
-+
-+	gpu->clk_core = devm_clk_get(&pdev->dev, "core");
-+	DBG("clk_core: %p", gpu->clk_core);
-+	if (IS_ERR(gpu->clk_core))
-+		gpu->clk_core = NULL;
-+
-+	gpu->clk_shader = devm_clk_get(&pdev->dev, "shader");
-+	DBG("clk_shader: %p", gpu->clk_shader);
-+	if (IS_ERR(gpu->clk_shader))
-+		gpu->clk_shader = NULL;
-+
-+	/* TODO: figure out max mapped size */
-+	dev_set_drvdata(dev, gpu);
-+
-+	/*
-+	 * We treat the device as initially suspended.  The runtime PM
-+	 * autosuspend delay is rather arbitary: no measurements have
-+	 * yet been performed to determine an appropriate value.
-+	 */
-+	pm_runtime_use_autosuspend(gpu->dev);
-+	pm_runtime_set_autosuspend_delay(gpu->dev, 200);
-+	pm_runtime_enable(gpu->dev);
-+
-+	err = component_add(&pdev->dev, &gpu_ops);
-+	if (err < 0) {
-+		dev_err(&pdev->dev, "failed to register component: %d\n", err);
-+		goto fail;
-+	}
-+
-+	return 0;
-+
-+fail:
-+	return err;
-+}
-+
-+static int etnaviv_gpu_platform_remove(struct platform_device *pdev)
-+{
-+	component_del(&pdev->dev, &gpu_ops);
-+	pm_runtime_disable(&pdev->dev);
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM
-+static int etnaviv_gpu_rpm_suspend(struct device *dev)
-+{
-+	struct etnaviv_gpu *gpu = dev_get_drvdata(dev);
-+	u32 idle, mask;
-+
-+	/* If we have outstanding fences, we're not idle */
-+	if (gpu->completed_fence != gpu->active_fence)
-+		return -EBUSY;
-+
-+	/* Check whether the hardware (except FE) is idle */
-+	mask = gpu->idle_mask & ~VIVS_HI_IDLE_STATE_FE;
-+	idle = gpu_read(gpu, VIVS_HI_IDLE_STATE) & mask;
-+	if (idle != mask)
-+		return -EBUSY;
-+
-+	return etnaviv_gpu_hw_suspend(gpu);
-+}
-+
-+static int etnaviv_gpu_rpm_resume(struct device *dev)
-+{
-+	struct etnaviv_gpu *gpu = dev_get_drvdata(dev);
-+	int ret;
-+
-+	ret = etnaviv_gpu_clk_enable(gpu);
-+	if (ret)
-+		return ret;
-+
-+	/* Re-initialise the basic hardware state */
-+	if (gpu->drm && gpu->buffer) {
-+		ret = etnaviv_gpu_hw_resume(gpu);
-+		if (ret) {
-+			etnaviv_gpu_clk_disable(gpu);
-+			return ret;
-+		}
-+	}
-+
-+	return 0;
-+}
-+#endif
-+
-+static const struct dev_pm_ops etnaviv_gpu_pm_ops = {
-+	SET_RUNTIME_PM_OPS(etnaviv_gpu_rpm_suspend, etnaviv_gpu_rpm_resume,
-+			   NULL)
-+};
-+
-+struct platform_driver etnaviv_gpu_driver = {
-+	.driver = {
-+		.name = "etnaviv-gpu",
-+		.owner = THIS_MODULE,
-+		.pm = &etnaviv_gpu_pm_ops,
-+		.of_match_table = etnaviv_gpu_match,
-+	},
-+	.probe = etnaviv_gpu_platform_probe,
-+	.remove = etnaviv_gpu_platform_remove,
-+	.id_table = gpu_ids,
-+};
-diff --git a/drivers/gpu/drm/etnaviv/etnaviv_gpu.h b/drivers/gpu/drm/etnaviv/etnaviv_gpu.h
++++ b/drivers/gpu/drm/etnaviv/cmdstream.xml.h
+@@ -0,0 +1,218 @@
++#ifndef CMDSTREAM_XML
++#define CMDSTREAM_XML
++
++/* Autogenerated file, DO NOT EDIT manually!
++
++This file was generated by the rules-ng-ng headergen tool in this git repository:
++http://0x04.net/cgit/index.cgi/rules-ng-ng
++git clone git://0x04.net/rules-ng-ng
++
++The rules-ng-ng source files this header was generated from are:
++- cmdstream.xml (  12589 bytes, from 2014-02-17 14:57:56)
++- common.xml    (  18437 bytes, from 2015-03-25 11:27:41)
++
++Copyright (C) 2014
++*/
++
++
++#define FE_OPCODE_LOAD_STATE					0x00000001
++#define FE_OPCODE_END						0x00000002
++#define FE_OPCODE_NOP						0x00000003
++#define FE_OPCODE_DRAW_2D					0x00000004
++#define FE_OPCODE_DRAW_PRIMITIVES				0x00000005
++#define FE_OPCODE_DRAW_INDEXED_PRIMITIVES			0x00000006
++#define FE_OPCODE_WAIT						0x00000007
++#define FE_OPCODE_LINK						0x00000008
++#define FE_OPCODE_STALL						0x00000009
++#define FE_OPCODE_CALL						0x0000000a
++#define FE_OPCODE_RETURN					0x0000000b
++#define FE_OPCODE_CHIP_SELECT					0x0000000d
++#define PRIMITIVE_TYPE_POINTS					0x00000001
++#define PRIMITIVE_TYPE_LINES					0x00000002
++#define PRIMITIVE_TYPE_LINE_STRIP				0x00000003
++#define PRIMITIVE_TYPE_TRIANGLES				0x00000004
++#define PRIMITIVE_TYPE_TRIANGLE_STRIP				0x00000005
++#define PRIMITIVE_TYPE_TRIANGLE_FAN				0x00000006
++#define PRIMITIVE_TYPE_LINE_LOOP				0x00000007
++#define PRIMITIVE_TYPE_QUADS					0x00000008
++#define VIV_FE_LOAD_STATE					0x00000000
++
++#define VIV_FE_LOAD_STATE_HEADER				0x00000000
++#define VIV_FE_LOAD_STATE_HEADER_OP__MASK			0xf8000000
++#define VIV_FE_LOAD_STATE_HEADER_OP__SHIFT			27
++#define VIV_FE_LOAD_STATE_HEADER_OP_LOAD_STATE			0x08000000
++#define VIV_FE_LOAD_STATE_HEADER_FIXP				0x04000000
++#define VIV_FE_LOAD_STATE_HEADER_COUNT__MASK			0x03ff0000
++#define VIV_FE_LOAD_STATE_HEADER_COUNT__SHIFT			16
++#define VIV_FE_LOAD_STATE_HEADER_COUNT(x)			(((x) << VIV_FE_LOAD_STATE_HEADER_COUNT__SHIFT) & VIV_FE_LOAD_STATE_HEADER_COUNT__MASK)
++#define VIV_FE_LOAD_STATE_HEADER_OFFSET__MASK			0x0000ffff
++#define VIV_FE_LOAD_STATE_HEADER_OFFSET__SHIFT			0
++#define VIV_FE_LOAD_STATE_HEADER_OFFSET(x)			(((x) << VIV_FE_LOAD_STATE_HEADER_OFFSET__SHIFT) & VIV_FE_LOAD_STATE_HEADER_OFFSET__MASK)
++#define VIV_FE_LOAD_STATE_HEADER_OFFSET__SHR			2
++
++#define VIV_FE_END						0x00000000
++
++#define VIV_FE_END_HEADER					0x00000000
++#define VIV_FE_END_HEADER_EVENT_ID__MASK			0x0000001f
++#define VIV_FE_END_HEADER_EVENT_ID__SHIFT			0
++#define VIV_FE_END_HEADER_EVENT_ID(x)				(((x) << VIV_FE_END_HEADER_EVENT_ID__SHIFT) & VIV_FE_END_HEADER_EVENT_ID__MASK)
++#define VIV_FE_END_HEADER_EVENT_ENABLE				0x00000100
++#define VIV_FE_END_HEADER_OP__MASK				0xf8000000
++#define VIV_FE_END_HEADER_OP__SHIFT				27
++#define VIV_FE_END_HEADER_OP_END				0x10000000
++
++#define VIV_FE_NOP						0x00000000
++
++#define VIV_FE_NOP_HEADER					0x00000000
++#define VIV_FE_NOP_HEADER_OP__MASK				0xf8000000
++#define VIV_FE_NOP_HEADER_OP__SHIFT				27
++#define VIV_FE_NOP_HEADER_OP_NOP				0x18000000
++
++#define VIV_FE_DRAW_2D						0x00000000
++
++#define VIV_FE_DRAW_2D_HEADER					0x00000000
++#define VIV_FE_DRAW_2D_HEADER_COUNT__MASK			0x0000ff00
++#define VIV_FE_DRAW_2D_HEADER_COUNT__SHIFT			8
++#define VIV_FE_DRAW_2D_HEADER_COUNT(x)				(((x) << VIV_FE_DRAW_2D_HEADER_COUNT__SHIFT) & VIV_FE_DRAW_2D_HEADER_COUNT__MASK)
++#define VIV_FE_DRAW_2D_HEADER_DATA_COUNT__MASK			0x07ff0000
++#define VIV_FE_DRAW_2D_HEADER_DATA_COUNT__SHIFT			16
++#define VIV_FE_DRAW_2D_HEADER_DATA_COUNT(x)			(((x) << VIV_FE_DRAW_2D_HEADER_DATA_COUNT__SHIFT) & VIV_FE_DRAW_2D_HEADER_DATA_COUNT__MASK)
++#define VIV_FE_DRAW_2D_HEADER_OP__MASK				0xf8000000
++#define VIV_FE_DRAW_2D_HEADER_OP__SHIFT				27
++#define VIV_FE_DRAW_2D_HEADER_OP_DRAW_2D			0x20000000
++
++#define VIV_FE_DRAW_2D_TOP_LEFT					0x00000008
++#define VIV_FE_DRAW_2D_TOP_LEFT_X__MASK				0x0000ffff
++#define VIV_FE_DRAW_2D_TOP_LEFT_X__SHIFT			0
++#define VIV_FE_DRAW_2D_TOP_LEFT_X(x)				(((x) << VIV_FE_DRAW_2D_TOP_LEFT_X__SHIFT) & VIV_FE_DRAW_2D_TOP_LEFT_X__MASK)
++#define VIV_FE_DRAW_2D_TOP_LEFT_Y__MASK				0xffff0000
++#define VIV_FE_DRAW_2D_TOP_LEFT_Y__SHIFT			16
++#define VIV_FE_DRAW_2D_TOP_LEFT_Y(x)				(((x) << VIV_FE_DRAW_2D_TOP_LEFT_Y__SHIFT) & VIV_FE_DRAW_2D_TOP_LEFT_Y__MASK)
++
++#define VIV_FE_DRAW_2D_BOTTOM_RIGHT				0x0000000c
++#define VIV_FE_DRAW_2D_BOTTOM_RIGHT_X__MASK			0x0000ffff
++#define VIV_FE_DRAW_2D_BOTTOM_RIGHT_X__SHIFT			0
++#define VIV_FE_DRAW_2D_BOTTOM_RIGHT_X(x)			(((x) << VIV_FE_DRAW_2D_BOTTOM_RIGHT_X__SHIFT) & VIV_FE_DRAW_2D_BOTTOM_RIGHT_X__MASK)
++#define VIV_FE_DRAW_2D_BOTTOM_RIGHT_Y__MASK			0xffff0000
++#define VIV_FE_DRAW_2D_BOTTOM_RIGHT_Y__SHIFT			16
++#define VIV_FE_DRAW_2D_BOTTOM_RIGHT_Y(x)			(((x) << VIV_FE_DRAW_2D_BOTTOM_RIGHT_Y__SHIFT) & VIV_FE_DRAW_2D_BOTTOM_RIGHT_Y__MASK)
++
++#define VIV_FE_DRAW_PRIMITIVES					0x00000000
++
++#define VIV_FE_DRAW_PRIMITIVES_HEADER				0x00000000
++#define VIV_FE_DRAW_PRIMITIVES_HEADER_OP__MASK			0xf8000000
++#define VIV_FE_DRAW_PRIMITIVES_HEADER_OP__SHIFT			27
++#define VIV_FE_DRAW_PRIMITIVES_HEADER_OP_DRAW_PRIMITIVES	0x28000000
++
++#define VIV_FE_DRAW_PRIMITIVES_COMMAND				0x00000004
++#define VIV_FE_DRAW_PRIMITIVES_COMMAND_TYPE__MASK		0x000000ff
++#define VIV_FE_DRAW_PRIMITIVES_COMMAND_TYPE__SHIFT		0
++#define VIV_FE_DRAW_PRIMITIVES_COMMAND_TYPE(x)			(((x) << VIV_FE_DRAW_PRIMITIVES_COMMAND_TYPE__SHIFT) & VIV_FE_DRAW_PRIMITIVES_COMMAND_TYPE__MASK)
++
++#define VIV_FE_DRAW_PRIMITIVES_START				0x00000008
++
++#define VIV_FE_DRAW_PRIMITIVES_COUNT				0x0000000c
++
++#define VIV_FE_DRAW_INDEXED_PRIMITIVES				0x00000000
++
++#define VIV_FE_DRAW_INDEXED_PRIMITIVES_HEADER			0x00000000
++#define VIV_FE_DRAW_INDEXED_PRIMITIVES_HEADER_OP__MASK		0xf8000000
++#define VIV_FE_DRAW_INDEXED_PRIMITIVES_HEADER_OP__SHIFT		27
++#define VIV_FE_DRAW_INDEXED_PRIMITIVES_HEADER_OP_DRAW_INDEXED_PRIMITIVES	0x30000000
++
++#define VIV_FE_DRAW_INDEXED_PRIMITIVES_COMMAND			0x00000004
++#define VIV_FE_DRAW_INDEXED_PRIMITIVES_COMMAND_TYPE__MASK	0x000000ff
++#define VIV_FE_DRAW_INDEXED_PRIMITIVES_COMMAND_TYPE__SHIFT	0
++#define VIV_FE_DRAW_INDEXED_PRIMITIVES_COMMAND_TYPE(x)		(((x) << VIV_FE_DRAW_INDEXED_PRIMITIVES_COMMAND_TYPE__SHIFT) & VIV_FE_DRAW_INDEXED_PRIMITIVES_COMMAND_TYPE__MASK)
++
++#define VIV_FE_DRAW_INDEXED_PRIMITIVES_START			0x00000008
++
++#define VIV_FE_DRAW_INDEXED_PRIMITIVES_COUNT			0x0000000c
++
++#define VIV_FE_DRAW_INDEXED_PRIMITIVES_OFFSET			0x00000010
++
++#define VIV_FE_WAIT						0x00000000
++
++#define VIV_FE_WAIT_HEADER					0x00000000
++#define VIV_FE_WAIT_HEADER_DELAY__MASK				0x0000ffff
++#define VIV_FE_WAIT_HEADER_DELAY__SHIFT				0
++#define VIV_FE_WAIT_HEADER_DELAY(x)				(((x) << VIV_FE_WAIT_HEADER_DELAY__SHIFT) & VIV_FE_WAIT_HEADER_DELAY__MASK)
++#define VIV_FE_WAIT_HEADER_OP__MASK				0xf8000000
++#define VIV_FE_WAIT_HEADER_OP__SHIFT				27
++#define VIV_FE_WAIT_HEADER_OP_WAIT				0x38000000
++
++#define VIV_FE_LINK						0x00000000
++
++#define VIV_FE_LINK_HEADER					0x00000000
++#define VIV_FE_LINK_HEADER_PREFETCH__MASK			0x0000ffff
++#define VIV_FE_LINK_HEADER_PREFETCH__SHIFT			0
++#define VIV_FE_LINK_HEADER_PREFETCH(x)				(((x) << VIV_FE_LINK_HEADER_PREFETCH__SHIFT) & VIV_FE_LINK_HEADER_PREFETCH__MASK)
++#define VIV_FE_LINK_HEADER_OP__MASK				0xf8000000
++#define VIV_FE_LINK_HEADER_OP__SHIFT				27
++#define VIV_FE_LINK_HEADER_OP_LINK				0x40000000
++
++#define VIV_FE_LINK_ADDRESS					0x00000004
++
++#define VIV_FE_STALL						0x00000000
++
++#define VIV_FE_STALL_HEADER					0x00000000
++#define VIV_FE_STALL_HEADER_OP__MASK				0xf8000000
++#define VIV_FE_STALL_HEADER_OP__SHIFT				27
++#define VIV_FE_STALL_HEADER_OP_STALL				0x48000000
++
++#define VIV_FE_STALL_TOKEN					0x00000004
++#define VIV_FE_STALL_TOKEN_FROM__MASK				0x0000001f
++#define VIV_FE_STALL_TOKEN_FROM__SHIFT				0
++#define VIV_FE_STALL_TOKEN_FROM(x)				(((x) << VIV_FE_STALL_TOKEN_FROM__SHIFT) & VIV_FE_STALL_TOKEN_FROM__MASK)
++#define VIV_FE_STALL_TOKEN_TO__MASK				0x00001f00
++#define VIV_FE_STALL_TOKEN_TO__SHIFT				8
++#define VIV_FE_STALL_TOKEN_TO(x)				(((x) << VIV_FE_STALL_TOKEN_TO__SHIFT) & VIV_FE_STALL_TOKEN_TO__MASK)
++
++#define VIV_FE_CALL						0x00000000
++
++#define VIV_FE_CALL_HEADER					0x00000000
++#define VIV_FE_CALL_HEADER_PREFETCH__MASK			0x0000ffff
++#define VIV_FE_CALL_HEADER_PREFETCH__SHIFT			0
++#define VIV_FE_CALL_HEADER_PREFETCH(x)				(((x) << VIV_FE_CALL_HEADER_PREFETCH__SHIFT) & VIV_FE_CALL_HEADER_PREFETCH__MASK)
++#define VIV_FE_CALL_HEADER_OP__MASK				0xf8000000
++#define VIV_FE_CALL_HEADER_OP__SHIFT				27
++#define VIV_FE_CALL_HEADER_OP_CALL				0x50000000
++
++#define VIV_FE_CALL_ADDRESS					0x00000004
++
++#define VIV_FE_CALL_RETURN_PREFETCH				0x00000008
++
++#define VIV_FE_CALL_RETURN_ADDRESS				0x0000000c
++
++#define VIV_FE_RETURN						0x00000000
++
++#define VIV_FE_RETURN_HEADER					0x00000000
++#define VIV_FE_RETURN_HEADER_OP__MASK				0xf8000000
++#define VIV_FE_RETURN_HEADER_OP__SHIFT				27
++#define VIV_FE_RETURN_HEADER_OP_RETURN				0x58000000
++
++#define VIV_FE_CHIP_SELECT					0x00000000
++
++#define VIV_FE_CHIP_SELECT_HEADER				0x00000000
++#define VIV_FE_CHIP_SELECT_HEADER_OP__MASK			0xf8000000
++#define VIV_FE_CHIP_SELECT_HEADER_OP__SHIFT			27
++#define VIV_FE_CHIP_SELECT_HEADER_OP_CHIP_SELECT		0x68000000
++#define VIV_FE_CHIP_SELECT_HEADER_ENABLE_CHIP15			0x00008000
++#define VIV_FE_CHIP_SELECT_HEADER_ENABLE_CHIP14			0x00004000
++#define VIV_FE_CHIP_SELECT_HEADER_ENABLE_CHIP13			0x00002000
++#define VIV_FE_CHIP_SELECT_HEADER_ENABLE_CHIP12			0x00001000
++#define VIV_FE_CHIP_SELECT_HEADER_ENABLE_CHIP11			0x00000800
++#define VIV_FE_CHIP_SELECT_HEADER_ENABLE_CHIP10			0x00000400
++#define VIV_FE_CHIP_SELECT_HEADER_ENABLE_CHIP9			0x00000200
++#define VIV_FE_CHIP_SELECT_HEADER_ENABLE_CHIP8			0x00000100
++#define VIV_FE_CHIP_SELECT_HEADER_ENABLE_CHIP7			0x00000080
++#define VIV_FE_CHIP_SELECT_HEADER_ENABLE_CHIP6			0x00000040
++#define VIV_FE_CHIP_SELECT_HEADER_ENABLE_CHIP5			0x00000020
++#define VIV_FE_CHIP_SELECT_HEADER_ENABLE_CHIP4			0x00000010
++#define VIV_FE_CHIP_SELECT_HEADER_ENABLE_CHIP3			0x00000008
++#define VIV_FE_CHIP_SELECT_HEADER_ENABLE_CHIP2			0x00000004
++#define VIV_FE_CHIP_SELECT_HEADER_ENABLE_CHIP1			0x00000002
++#define VIV_FE_CHIP_SELECT_HEADER_ENABLE_CHIP0			0x00000001
++
++
++#endif /* CMDSTREAM_XML */
+diff --git a/drivers/gpu/drm/etnaviv/common.xml.h b/drivers/gpu/drm/etnaviv/common.xml.h
 new file mode 100644
-index 000000000000..c75d50359ab0
+index 000000000000..9e585d51fb78
 --- /dev/null
-+++ b/drivers/gpu/drm/etnaviv/etnaviv_gpu.h
-@@ -0,0 +1,209 @@
-+/*
-+ * Copyright (C) 2015 Etnaviv Project
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
++++ b/drivers/gpu/drm/etnaviv/common.xml.h
+@@ -0,0 +1,249 @@
++#ifndef COMMON_XML
++#define COMMON_XML
 +
-+#ifndef __ETNAVIV_GPU_H__
-+#define __ETNAVIV_GPU_H__
++/* Autogenerated file, DO NOT EDIT manually!
 +
-+#include <linux/clk.h>
-+#include <linux/regulator/consumer.h>
++This file was generated by the rules-ng-ng headergen tool in this git repository:
++http://0x04.net/cgit/index.cgi/rules-ng-ng
++git clone git://0x04.net/rules-ng-ng
 +
-+#include "etnaviv_drv.h"
++The rules-ng-ng source files this header was generated from are:
++- state_vg.xml (   5973 bytes, from 2015-03-25 11:26:01)
++- common.xml   (  18437 bytes, from 2015-03-25 11:27:41)
 +
-+struct etnaviv_gem_submit;
++Copyright (C) 2015
++*/
 +
-+struct etnaviv_chip_identity {
-+	/* Chip model. */
-+	u32 model;
 +
-+	/* Revision value.*/
-+	u32 revision;
++#define PIPE_ID_PIPE_3D						0x00000000
++#define PIPE_ID_PIPE_2D						0x00000001
++#define SYNC_RECIPIENT_FE					0x00000001
++#define SYNC_RECIPIENT_RA					0x00000005
++#define SYNC_RECIPIENT_PE					0x00000007
++#define SYNC_RECIPIENT_DE					0x0000000b
++#define SYNC_RECIPIENT_VG					0x0000000f
++#define SYNC_RECIPIENT_TESSELATOR				0x00000010
++#define SYNC_RECIPIENT_VG2					0x00000011
++#define SYNC_RECIPIENT_TESSELATOR2				0x00000012
++#define SYNC_RECIPIENT_VG3					0x00000013
++#define SYNC_RECIPIENT_TESSELATOR3				0x00000014
++#define ENDIAN_MODE_NO_SWAP					0x00000000
++#define ENDIAN_MODE_SWAP_16					0x00000001
++#define ENDIAN_MODE_SWAP_32					0x00000002
++#define chipModel_GC300						0x00000300
++#define chipModel_GC320						0x00000320
++#define chipModel_GC350						0x00000350
++#define chipModel_GC355						0x00000355
++#define chipModel_GC400						0x00000400
++#define chipModel_GC410						0x00000410
++#define chipModel_GC420						0x00000420
++#define chipModel_GC450						0x00000450
++#define chipModel_GC500						0x00000500
++#define chipModel_GC530						0x00000530
++#define chipModel_GC600						0x00000600
++#define chipModel_GC700						0x00000700
++#define chipModel_GC800						0x00000800
++#define chipModel_GC860						0x00000860
++#define chipModel_GC880						0x00000880
++#define chipModel_GC1000					0x00001000
++#define chipModel_GC2000					0x00002000
++#define chipModel_GC2100					0x00002100
++#define chipModel_GC4000					0x00004000
++#define RGBA_BITS_R						0x00000001
++#define RGBA_BITS_G						0x00000002
++#define RGBA_BITS_B						0x00000004
++#define RGBA_BITS_A						0x00000008
++#define chipFeatures_FAST_CLEAR					0x00000001
++#define chipFeatures_SPECIAL_ANTI_ALIASING			0x00000002
++#define chipFeatures_PIPE_3D					0x00000004
++#define chipFeatures_DXT_TEXTURE_COMPRESSION			0x00000008
++#define chipFeatures_DEBUG_MODE					0x00000010
++#define chipFeatures_Z_COMPRESSION				0x00000020
++#define chipFeatures_YUV420_SCALER				0x00000040
++#define chipFeatures_MSAA					0x00000080
++#define chipFeatures_DC						0x00000100
++#define chipFeatures_PIPE_2D					0x00000200
++#define chipFeatures_ETC1_TEXTURE_COMPRESSION			0x00000400
++#define chipFeatures_FAST_SCALER				0x00000800
++#define chipFeatures_HIGH_DYNAMIC_RANGE				0x00001000
++#define chipFeatures_YUV420_TILER				0x00002000
++#define chipFeatures_MODULE_CG					0x00004000
++#define chipFeatures_MIN_AREA					0x00008000
++#define chipFeatures_NO_EARLY_Z					0x00010000
++#define chipFeatures_NO_422_TEXTURE				0x00020000
++#define chipFeatures_BUFFER_INTERLEAVING			0x00040000
++#define chipFeatures_BYTE_WRITE_2D				0x00080000
++#define chipFeatures_NO_SCALER					0x00100000
++#define chipFeatures_YUY2_AVERAGING				0x00200000
++#define chipFeatures_HALF_PE_CACHE				0x00400000
++#define chipFeatures_HALF_TX_CACHE				0x00800000
++#define chipFeatures_YUY2_RENDER_TARGET				0x01000000
++#define chipFeatures_MEM32					0x02000000
++#define chipFeatures_PIPE_VG					0x04000000
++#define chipFeatures_VGTS					0x08000000
++#define chipFeatures_FE20					0x10000000
++#define chipFeatures_BYTE_WRITE_3D				0x20000000
++#define chipFeatures_RS_YUV_TARGET				0x40000000
++#define chipFeatures_32_BIT_INDICES				0x80000000
++#define chipMinorFeatures0_FLIP_Y				0x00000001
++#define chipMinorFeatures0_DUAL_RETURN_BUS			0x00000002
++#define chipMinorFeatures0_ENDIANNESS_CONFIG			0x00000004
++#define chipMinorFeatures0_TEXTURE_8K				0x00000008
++#define chipMinorFeatures0_CORRECT_TEXTURE_CONVERTER		0x00000010
++#define chipMinorFeatures0_SPECIAL_MSAA_LOD			0x00000020
++#define chipMinorFeatures0_FAST_CLEAR_FLUSH			0x00000040
++#define chipMinorFeatures0_2DPE20				0x00000080
++#define chipMinorFeatures0_CORRECT_AUTO_DISABLE			0x00000100
++#define chipMinorFeatures0_RENDERTARGET_8K			0x00000200
++#define chipMinorFeatures0_2BITPERTILE				0x00000400
++#define chipMinorFeatures0_SEPARATE_TILE_STATUS_WHEN_INTERLEAVED	0x00000800
++#define chipMinorFeatures0_SUPER_TILED				0x00001000
++#define chipMinorFeatures0_VG_20				0x00002000
++#define chipMinorFeatures0_TS_EXTENDED_COMMANDS			0x00004000
++#define chipMinorFeatures0_COMPRESSION_FIFO_FIXED		0x00008000
++#define chipMinorFeatures0_HAS_SIGN_FLOOR_CEIL			0x00010000
++#define chipMinorFeatures0_VG_FILTER				0x00020000
++#define chipMinorFeatures0_VG_21				0x00040000
++#define chipMinorFeatures0_SHADER_HAS_W				0x00080000
++#define chipMinorFeatures0_HAS_SQRT_TRIG			0x00100000
++#define chipMinorFeatures0_MORE_MINOR_FEATURES			0x00200000
++#define chipMinorFeatures0_MC20					0x00400000
++#define chipMinorFeatures0_MSAA_SIDEBAND			0x00800000
++#define chipMinorFeatures0_BUG_FIXES0				0x01000000
++#define chipMinorFeatures0_VAA					0x02000000
++#define chipMinorFeatures0_BYPASS_IN_MSAA			0x04000000
++#define chipMinorFeatures0_HZ					0x08000000
++#define chipMinorFeatures0_NEW_TEXTURE				0x10000000
++#define chipMinorFeatures0_2D_A8_TARGET				0x20000000
++#define chipMinorFeatures0_CORRECT_STENCIL			0x40000000
++#define chipMinorFeatures0_ENHANCE_VR				0x80000000
++#define chipMinorFeatures1_RSUV_SWIZZLE				0x00000001
++#define chipMinorFeatures1_V2_COMPRESSION			0x00000002
++#define chipMinorFeatures1_VG_DOUBLE_BUFFER			0x00000004
++#define chipMinorFeatures1_EXTRA_EVENT_STATES			0x00000008
++#define chipMinorFeatures1_NO_STRIPING_NEEDED			0x00000010
++#define chipMinorFeatures1_TEXTURE_STRIDE			0x00000020
++#define chipMinorFeatures1_BUG_FIXES3				0x00000040
++#define chipMinorFeatures1_AUTO_DISABLE				0x00000080
++#define chipMinorFeatures1_AUTO_RESTART_TS			0x00000100
++#define chipMinorFeatures1_DISABLE_PE_GATING			0x00000200
++#define chipMinorFeatures1_L2_WINDOWING				0x00000400
++#define chipMinorFeatures1_HALF_FLOAT				0x00000800
++#define chipMinorFeatures1_PIXEL_DITHER				0x00001000
++#define chipMinorFeatures1_TWO_STENCIL_REFERENCE		0x00002000
++#define chipMinorFeatures1_EXTENDED_PIXEL_FORMAT		0x00004000
++#define chipMinorFeatures1_CORRECT_MIN_MAX_DEPTH		0x00008000
++#define chipMinorFeatures1_2D_DITHER				0x00010000
++#define chipMinorFeatures1_BUG_FIXES5				0x00020000
++#define chipMinorFeatures1_NEW_2D				0x00040000
++#define chipMinorFeatures1_NEW_FP				0x00080000
++#define chipMinorFeatures1_TEXTURE_HALIGN			0x00100000
++#define chipMinorFeatures1_NON_POWER_OF_TWO			0x00200000
++#define chipMinorFeatures1_LINEAR_TEXTURE_SUPPORT		0x00400000
++#define chipMinorFeatures1_HALTI0				0x00800000
++#define chipMinorFeatures1_CORRECT_OVERFLOW_VG			0x01000000
++#define chipMinorFeatures1_NEGATIVE_LOG_FIX			0x02000000
++#define chipMinorFeatures1_RESOLVE_OFFSET			0x04000000
++#define chipMinorFeatures1_OK_TO_GATE_AXI_CLOCK			0x08000000
++#define chipMinorFeatures1_MMU_VERSION				0x10000000
++#define chipMinorFeatures1_WIDE_LINE				0x20000000
++#define chipMinorFeatures1_BUG_FIXES6				0x40000000
++#define chipMinorFeatures1_FC_FLUSH_STALL			0x80000000
++#define chipMinorFeatures2_LINE_LOOP				0x00000001
++#define chipMinorFeatures2_LOGIC_OP				0x00000002
++#define chipMinorFeatures2_UNK2					0x00000004
++#define chipMinorFeatures2_SUPERTILED_TEXTURE			0x00000008
++#define chipMinorFeatures2_UNK4					0x00000010
++#define chipMinorFeatures2_RECT_PRIMITIVE			0x00000020
++#define chipMinorFeatures2_COMPOSITION				0x00000040
++#define chipMinorFeatures2_CORRECT_AUTO_DISABLE_COUNT		0x00000080
++#define chipMinorFeatures2_UNK8					0x00000100
++#define chipMinorFeatures2_UNK9					0x00000200
++#define chipMinorFeatures2_UNK10				0x00000400
++#define chipMinorFeatures2_SAMPLERBASE_16			0x00000800
++#define chipMinorFeatures2_UNK12				0x00001000
++#define chipMinorFeatures2_UNK13				0x00002000
++#define chipMinorFeatures2_UNK14				0x00004000
++#define chipMinorFeatures2_EXTRA_TEXTURE_STATE			0x00008000
++#define chipMinorFeatures2_FULL_DIRECTFB			0x00010000
++#define chipMinorFeatures2_2D_TILING				0x00020000
++#define chipMinorFeatures2_THREAD_WALKER_IN_PS			0x00040000
++#define chipMinorFeatures2_TILE_FILLER				0x00080000
++#define chipMinorFeatures2_UNK20				0x00100000
++#define chipMinorFeatures2_2D_MULTI_SOURCE_BLIT			0x00200000
++#define chipMinorFeatures2_UNK22				0x00400000
++#define chipMinorFeatures2_UNK23				0x00800000
++#define chipMinorFeatures2_UNK24				0x01000000
++#define chipMinorFeatures2_MIXED_STREAMS			0x02000000
++#define chipMinorFeatures2_2D_420_L2CACHE			0x04000000
++#define chipMinorFeatures2_UNK27				0x08000000
++#define chipMinorFeatures2_2D_NO_INDEX8_BRUSH			0x10000000
++#define chipMinorFeatures2_TEXTURE_TILED_READ			0x20000000
++#define chipMinorFeatures2_UNK30				0x40000000
++#define chipMinorFeatures2_UNK31				0x80000000
++#define chipMinorFeatures3_ROTATION_STALL_FIX			0x00000001
++#define chipMinorFeatures3_UNK1					0x00000002
++#define chipMinorFeatures3_2D_MULTI_SOURCE_BLT_EX		0x00000004
++#define chipMinorFeatures3_UNK3					0x00000008
++#define chipMinorFeatures3_UNK4					0x00000010
++#define chipMinorFeatures3_UNK5					0x00000020
++#define chipMinorFeatures3_UNK6					0x00000040
++#define chipMinorFeatures3_UNK7					0x00000080
++#define chipMinorFeatures3_UNK8					0x00000100
++#define chipMinorFeatures3_UNK9					0x00000200
++#define chipMinorFeatures3_BUG_FIXES10				0x00000400
++#define chipMinorFeatures3_UNK11				0x00000800
++#define chipMinorFeatures3_BUG_FIXES11				0x00001000
++#define chipMinorFeatures3_UNK13				0x00002000
++#define chipMinorFeatures3_UNK14				0x00004000
++#define chipMinorFeatures3_UNK15				0x00008000
++#define chipMinorFeatures3_UNK16				0x00010000
++#define chipMinorFeatures3_UNK17				0x00020000
++#define chipMinorFeatures3_UNK18				0x00040000
++#define chipMinorFeatures3_UNK19				0x00080000
++#define chipMinorFeatures3_UNK20				0x00100000
++#define chipMinorFeatures3_UNK21				0x00200000
++#define chipMinorFeatures3_UNK22				0x00400000
++#define chipMinorFeatures3_UNK23				0x00800000
++#define chipMinorFeatures3_UNK24				0x01000000
++#define chipMinorFeatures3_UNK25				0x02000000
++#define chipMinorFeatures3_UNK26				0x04000000
++#define chipMinorFeatures3_UNK27				0x08000000
++#define chipMinorFeatures3_UNK28				0x10000000
++#define chipMinorFeatures3_UNK29				0x20000000
++#define chipMinorFeatures3_UNK30				0x40000000
++#define chipMinorFeatures3_UNK31				0x80000000
++#define chipMinorFeatures4_UNK0					0x00000001
++#define chipMinorFeatures4_UNK1					0x00000002
++#define chipMinorFeatures4_UNK2					0x00000004
++#define chipMinorFeatures4_UNK3					0x00000008
++#define chipMinorFeatures4_UNK4					0x00000010
++#define chipMinorFeatures4_UNK5					0x00000020
++#define chipMinorFeatures4_UNK6					0x00000040
++#define chipMinorFeatures4_UNK7					0x00000080
++#define chipMinorFeatures4_UNK8					0x00000100
++#define chipMinorFeatures4_UNK9					0x00000200
++#define chipMinorFeatures4_UNK10				0x00000400
++#define chipMinorFeatures4_UNK11				0x00000800
++#define chipMinorFeatures4_UNK12				0x00001000
++#define chipMinorFeatures4_UNK13				0x00002000
++#define chipMinorFeatures4_UNK14				0x00004000
++#define chipMinorFeatures4_UNK15				0x00008000
++#define chipMinorFeatures4_UNK16				0x00010000
++#define chipMinorFeatures4_UNK17				0x00020000
++#define chipMinorFeatures4_UNK18				0x00040000
++#define chipMinorFeatures4_UNK19				0x00080000
++#define chipMinorFeatures4_UNK20				0x00100000
++#define chipMinorFeatures4_UNK21				0x00200000
++#define chipMinorFeatures4_UNK22				0x00400000
++#define chipMinorFeatures4_UNK23				0x00800000
++#define chipMinorFeatures4_UNK24				0x01000000
++#define chipMinorFeatures4_UNK25				0x02000000
++#define chipMinorFeatures4_UNK26				0x04000000
++#define chipMinorFeatures4_UNK27				0x08000000
++#define chipMinorFeatures4_UNK28				0x10000000
++#define chipMinorFeatures4_UNK29				0x20000000
++#define chipMinorFeatures4_UNK30				0x40000000
++#define chipMinorFeatures4_UNK31				0x80000000
 +
-+	/* Supported feature fields. */
-+	u32 features;
++#endif /* COMMON_XML */
+diff --git a/drivers/gpu/drm/etnaviv/state.xml.h b/drivers/gpu/drm/etnaviv/state.xml.h
+new file mode 100644
+index 000000000000..368218304566
+--- /dev/null
++++ b/drivers/gpu/drm/etnaviv/state.xml.h
+@@ -0,0 +1,351 @@
++#ifndef STATE_XML
++#define STATE_XML
 +
-+	/* Supported minor feature fields. */
-+	u32 minor_features0;
++/* Autogenerated file, DO NOT EDIT manually!
 +
-+	/* Supported minor feature 1 fields. */
-+	u32 minor_features1;
++This file was generated by the rules-ng-ng headergen tool in this git repository:
++http://0x04.net/cgit/index.cgi/rules-ng-ng
++git clone git://0x04.net/rules-ng-ng
 +
-+	/* Supported minor feature 2 fields. */
-+	u32 minor_features2;
++The rules-ng-ng source files this header was generated from are:
++- state.xml    (  18882 bytes, from 2015-03-25 11:42:32)
++- common.xml   (  18437 bytes, from 2015-03-25 11:27:41)
++- state_hi.xml (  23420 bytes, from 2015-03-25 11:47:21)
++- state_2d.xml (  51549 bytes, from 2015-03-25 11:25:06)
++- state_3d.xml (  54600 bytes, from 2015-03-25 11:25:19)
++- state_vg.xml (   5973 bytes, from 2015-03-25 11:26:01)
 +
-+	/* Supported minor feature 3 fields. */
-+	u32 minor_features3;
++Copyright (C) 2015
++*/
 +
-+	/* Number of streams supported. */
-+	u32 stream_count;
 +
-+	/* Total number of temporary registers per thread. */
-+	u32 register_max;
++#define VARYING_COMPONENT_USE_UNUSED				0x00000000
++#define VARYING_COMPONENT_USE_USED				0x00000001
++#define VARYING_COMPONENT_USE_POINTCOORD_X			0x00000002
++#define VARYING_COMPONENT_USE_POINTCOORD_Y			0x00000003
++#define FE_VERTEX_STREAM_CONTROL_VERTEX_STRIDE__MASK		0x000000ff
++#define FE_VERTEX_STREAM_CONTROL_VERTEX_STRIDE__SHIFT		0
++#define FE_VERTEX_STREAM_CONTROL_VERTEX_STRIDE(x)		(((x) << FE_VERTEX_STREAM_CONTROL_VERTEX_STRIDE__SHIFT) & FE_VERTEX_STREAM_CONTROL_VERTEX_STRIDE__MASK)
++#define VIVS_FE							0x00000000
 +
-+	/* Maximum number of threads. */
-+	u32 thread_count;
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG(i0)		       (0x00000600 + 0x4*(i0))
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG__ESIZE			0x00000004
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG__LEN			0x00000010
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_TYPE__MASK		0x0000000f
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_TYPE__SHIFT		0
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_TYPE_BYTE			0x00000000
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_TYPE_UNSIGNED_BYTE	0x00000001
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_TYPE_SHORT		0x00000002
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_TYPE_UNSIGNED_SHORT	0x00000003
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_TYPE_INT			0x00000004
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_TYPE_UNSIGNED_INT		0x00000005
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_TYPE_FLOAT		0x00000008
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_TYPE_HALF_FLOAT		0x00000009
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_TYPE_FIXED		0x0000000b
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_TYPE_INT_10_10_10_2	0x0000000c
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_TYPE_UNSIGNED_INT_10_10_10_2	0x0000000d
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_ENDIAN__MASK		0x00000030
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_ENDIAN__SHIFT		4
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_ENDIAN(x)			(((x) << VIVS_FE_VERTEX_ELEMENT_CONFIG_ENDIAN__SHIFT) & VIVS_FE_VERTEX_ELEMENT_CONFIG_ENDIAN__MASK)
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_NONCONSECUTIVE		0x00000080
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_STREAM__MASK		0x00000700
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_STREAM__SHIFT		8
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_STREAM(x)			(((x) << VIVS_FE_VERTEX_ELEMENT_CONFIG_STREAM__SHIFT) & VIVS_FE_VERTEX_ELEMENT_CONFIG_STREAM__MASK)
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_NUM__MASK			0x00003000
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_NUM__SHIFT		12
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_NUM(x)			(((x) << VIVS_FE_VERTEX_ELEMENT_CONFIG_NUM__SHIFT) & VIVS_FE_VERTEX_ELEMENT_CONFIG_NUM__MASK)
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_NORMALIZE__MASK		0x0000c000
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_NORMALIZE__SHIFT		14
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_NORMALIZE_OFF		0x00000000
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_NORMALIZE_ON		0x00008000
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_START__MASK		0x00ff0000
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_START__SHIFT		16
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_START(x)			(((x) << VIVS_FE_VERTEX_ELEMENT_CONFIG_START__SHIFT) & VIVS_FE_VERTEX_ELEMENT_CONFIG_START__MASK)
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_END__MASK			0xff000000
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_END__SHIFT		24
++#define VIVS_FE_VERTEX_ELEMENT_CONFIG_END(x)			(((x) << VIVS_FE_VERTEX_ELEMENT_CONFIG_END__SHIFT) & VIVS_FE_VERTEX_ELEMENT_CONFIG_END__MASK)
 +
-+	/* Number of shader cores. */
-+	u32 shader_core_count;
++#define VIVS_FE_CMD_STREAM_BASE_ADDR				0x00000640
 +
-+	/* Size of the vertex cache. */
-+	u32 vertex_cache_size;
++#define VIVS_FE_INDEX_STREAM_BASE_ADDR				0x00000644
 +
-+	/* Number of entries in the vertex output buffer. */
-+	u32 vertex_output_buffer_size;
++#define VIVS_FE_INDEX_STREAM_CONTROL				0x00000648
++#define VIVS_FE_INDEX_STREAM_CONTROL_TYPE__MASK			0x00000003
++#define VIVS_FE_INDEX_STREAM_CONTROL_TYPE__SHIFT		0
++#define VIVS_FE_INDEX_STREAM_CONTROL_TYPE_UNSIGNED_CHAR		0x00000000
++#define VIVS_FE_INDEX_STREAM_CONTROL_TYPE_UNSIGNED_SHORT	0x00000001
++#define VIVS_FE_INDEX_STREAM_CONTROL_TYPE_UNSIGNED_INT		0x00000002
 +
-+	/* Number of pixel pipes. */
-+	u32 pixel_pipes;
++#define VIVS_FE_VERTEX_STREAM_BASE_ADDR				0x0000064c
 +
-+	/* Number of instructions. */
-+	u32 instruction_count;
++#define VIVS_FE_VERTEX_STREAM_CONTROL				0x00000650
 +
-+	/* Number of constants. */
-+	u32 num_constants;
++#define VIVS_FE_COMMAND_ADDRESS					0x00000654
 +
-+	/* Buffer size */
-+	u32 buffer_size;
-+};
++#define VIVS_FE_COMMAND_CONTROL					0x00000658
++#define VIVS_FE_COMMAND_CONTROL_PREFETCH__MASK			0x0000ffff
++#define VIVS_FE_COMMAND_CONTROL_PREFETCH__SHIFT			0
++#define VIVS_FE_COMMAND_CONTROL_PREFETCH(x)			(((x) << VIVS_FE_COMMAND_CONTROL_PREFETCH__SHIFT) & VIVS_FE_COMMAND_CONTROL_PREFETCH__MASK)
++#define VIVS_FE_COMMAND_CONTROL_ENABLE				0x00010000
 +
-+struct etnaviv_event {
-+	bool used;
-+	struct fence *fence;
-+};
++#define VIVS_FE_DMA_STATUS					0x0000065c
 +
-+struct etnaviv_cmdbuf;
++#define VIVS_FE_DMA_DEBUG_STATE					0x00000660
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE__MASK			0x0000001f
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE__SHIFT		0
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_IDLE			0x00000000
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_DEC			0x00000001
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_ADR0			0x00000002
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_LOAD0			0x00000003
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_ADR1			0x00000004
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_LOAD1			0x00000005
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_3DADR			0x00000006
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_3DCMD			0x00000007
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_3DCNTL		0x00000008
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_3DIDXCNTL		0x00000009
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_INITREQDMA		0x0000000a
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_DRAWIDX		0x0000000b
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_DRAW			0x0000000c
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_2DRECT0		0x0000000d
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_2DRECT1		0x0000000e
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_2DDATA0		0x0000000f
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_2DDATA1		0x00000010
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_WAITFIFO		0x00000011
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_WAIT			0x00000012
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_LINK			0x00000013
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_END			0x00000014
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_STATE_STALL			0x00000015
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_DMA_STATE__MASK		0x00000300
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_DMA_STATE__SHIFT		8
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_DMA_STATE_IDLE		0x00000000
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_DMA_STATE_START		0x00000100
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_DMA_STATE_REQ		0x00000200
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_DMA_STATE_END		0x00000300
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_FETCH_STATE__MASK		0x00000c00
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_FETCH_STATE__SHIFT		10
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_FETCH_STATE_IDLE		0x00000000
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_FETCH_STATE_RAMVALID	0x00000400
++#define VIVS_FE_DMA_DEBUG_STATE_CMD_FETCH_STATE_VALID		0x00000800
++#define VIVS_FE_DMA_DEBUG_STATE_REQ_DMA_STATE__MASK		0x00003000
++#define VIVS_FE_DMA_DEBUG_STATE_REQ_DMA_STATE__SHIFT		12
++#define VIVS_FE_DMA_DEBUG_STATE_REQ_DMA_STATE_IDLE		0x00000000
++#define VIVS_FE_DMA_DEBUG_STATE_REQ_DMA_STATE_WAITIDX		0x00001000
++#define VIVS_FE_DMA_DEBUG_STATE_REQ_DMA_STATE_CAL		0x00002000
++#define VIVS_FE_DMA_DEBUG_STATE_CAL_STATE__MASK			0x0000c000
++#define VIVS_FE_DMA_DEBUG_STATE_CAL_STATE__SHIFT		14
++#define VIVS_FE_DMA_DEBUG_STATE_CAL_STATE_IDLE			0x00000000
++#define VIVS_FE_DMA_DEBUG_STATE_CAL_STATE_LDADR			0x00004000
++#define VIVS_FE_DMA_DEBUG_STATE_CAL_STATE_IDXCALC		0x00008000
++#define VIVS_FE_DMA_DEBUG_STATE_VE_REQ_STATE__MASK		0x00030000
++#define VIVS_FE_DMA_DEBUG_STATE_VE_REQ_STATE__SHIFT		16
++#define VIVS_FE_DMA_DEBUG_STATE_VE_REQ_STATE_IDLE		0x00000000
++#define VIVS_FE_DMA_DEBUG_STATE_VE_REQ_STATE_CKCACHE		0x00010000
++#define VIVS_FE_DMA_DEBUG_STATE_VE_REQ_STATE_MISS		0x00020000
 +
-+struct etnaviv_gpu {
-+	struct drm_device *drm;
-+	struct device *dev;
-+	struct mutex lock;
-+	struct etnaviv_chip_identity identity;
-+	struct etnaviv_file_private *lastctx;
-+	bool switch_context;
++#define VIVS_FE_DMA_ADDRESS					0x00000664
 +
-+	/* 'ring'-buffer: */
-+	struct etnaviv_cmdbuf *buffer;
++#define VIVS_FE_DMA_LOW						0x00000668
 +
-+	/* bus base address of memory  */
-+	u32 memory_base;
++#define VIVS_FE_DMA_HIGH					0x0000066c
 +
-+	/* event management: */
-+	struct etnaviv_event event[30];
-+	struct completion event_free;
-+	spinlock_t event_spinlock;
++#define VIVS_FE_AUTO_FLUSH					0x00000670
 +
-+	/* list of currently in-flight command buffers */
-+	struct list_head active_cmd_list;
++#define VIVS_FE_UNK00678					0x00000678
 +
-+	u32 idle_mask;
++#define VIVS_FE_UNK0067C					0x0000067c
 +
-+	/* Fencing support */
-+	u32 next_fence;
-+	u32 active_fence;
-+	u32 completed_fence;
-+	u32 retired_fence;
-+	wait_queue_head_t fence_event;
-+	unsigned int fence_context;
-+	spinlock_t fence_spinlock;
++#define VIVS_FE_VERTEX_STREAMS(i0)			       (0x00000000 + 0x4*(i0))
++#define VIVS_FE_VERTEX_STREAMS__ESIZE				0x00000004
++#define VIVS_FE_VERTEX_STREAMS__LEN				0x00000008
 +
-+	/* worker for handling active-list retiring: */
-+	struct work_struct retire_work;
++#define VIVS_FE_VERTEX_STREAMS_BASE_ADDR(i0)		       (0x00000680 + 0x4*(i0))
 +
-+	void __iomem *mmio;
-+	int irq;
++#define VIVS_FE_VERTEX_STREAMS_CONTROL(i0)		       (0x000006a0 + 0x4*(i0))
 +
-+	struct etnaviv_iommu *mmu;
++#define VIVS_FE_UNK00700(i0)				       (0x00000700 + 0x4*(i0))
++#define VIVS_FE_UNK00700__ESIZE					0x00000004
++#define VIVS_FE_UNK00700__LEN					0x00000010
 +
-+	/* Power Control: */
-+	struct clk *clk_bus;
-+	struct clk *clk_core;
-+	struct clk *clk_shader;
++#define VIVS_FE_UNK00740(i0)				       (0x00000740 + 0x4*(i0))
++#define VIVS_FE_UNK00740__ESIZE					0x00000004
++#define VIVS_FE_UNK00740__LEN					0x00000010
 +
-+	/* Hang Detction: */
-+#define DRM_ETNAVIV_HANGCHECK_PERIOD 500 /* in ms */
-+#define DRM_ETNAVIV_HANGCHECK_JIFFIES msecs_to_jiffies(DRM_ETNAVIV_HANGCHECK_PERIOD)
-+	struct timer_list hangcheck_timer;
-+	u32 hangcheck_fence;
-+	u32 hangcheck_dma_addr;
-+	struct work_struct recover_work;
-+};
++#define VIVS_FE_UNK00780(i0)				       (0x00000780 + 0x4*(i0))
++#define VIVS_FE_UNK00780__ESIZE					0x00000004
++#define VIVS_FE_UNK00780__LEN					0x00000010
 +
-+struct etnaviv_cmdbuf {
-+	/* device this cmdbuf is allocated for */
-+	struct etnaviv_gpu *gpu;
-+	/* user context key, must be unique between all active users */
-+	struct etnaviv_file_private *ctx;
-+	/* cmdbuf properties */
-+	void *vaddr;
-+	dma_addr_t paddr;
-+	u32 size;
-+	u32 user_size;
-+	/* fence after which this buffer is to be disposed */
-+	struct fence *fence;
-+	/* target exec state */
-+	u32 exec_state;
-+	/* per GPU in-flight list */
-+	struct list_head node;
-+	/* BOs attached to this command buffer */
-+	unsigned int nr_bos;
-+	struct etnaviv_gem_object *bo[0];
-+};
++#define VIVS_GL							0x00000000
 +
-+static inline void gpu_write(struct etnaviv_gpu *gpu, u32 reg, u32 data)
-+{
-+	etnaviv_writel(data, gpu->mmio + reg);
-+}
++#define VIVS_GL_PIPE_SELECT					0x00003800
++#define VIVS_GL_PIPE_SELECT_PIPE__MASK				0x00000001
++#define VIVS_GL_PIPE_SELECT_PIPE__SHIFT				0
++#define VIVS_GL_PIPE_SELECT_PIPE(x)				(((x) << VIVS_GL_PIPE_SELECT_PIPE__SHIFT) & VIVS_GL_PIPE_SELECT_PIPE__MASK)
 +
-+static inline u32 gpu_read(struct etnaviv_gpu *gpu, u32 reg)
-+{
-+	return etnaviv_readl(gpu->mmio + reg);
-+}
++#define VIVS_GL_EVENT						0x00003804
++#define VIVS_GL_EVENT_EVENT_ID__MASK				0x0000001f
++#define VIVS_GL_EVENT_EVENT_ID__SHIFT				0
++#define VIVS_GL_EVENT_EVENT_ID(x)				(((x) << VIVS_GL_EVENT_EVENT_ID__SHIFT) & VIVS_GL_EVENT_EVENT_ID__MASK)
++#define VIVS_GL_EVENT_FROM_FE					0x00000020
++#define VIVS_GL_EVENT_FROM_PE					0x00000040
++#define VIVS_GL_EVENT_SOURCE__MASK				0x00001f00
++#define VIVS_GL_EVENT_SOURCE__SHIFT				8
++#define VIVS_GL_EVENT_SOURCE(x)					(((x) << VIVS_GL_EVENT_SOURCE__SHIFT) & VIVS_GL_EVENT_SOURCE__MASK)
 +
-+static inline bool fence_completed(struct etnaviv_gpu *gpu, u32 fence)
-+{
-+	return fence_after_eq(gpu->completed_fence, fence);
-+}
++#define VIVS_GL_SEMAPHORE_TOKEN					0x00003808
++#define VIVS_GL_SEMAPHORE_TOKEN_FROM__MASK			0x0000001f
++#define VIVS_GL_SEMAPHORE_TOKEN_FROM__SHIFT			0
++#define VIVS_GL_SEMAPHORE_TOKEN_FROM(x)				(((x) << VIVS_GL_SEMAPHORE_TOKEN_FROM__SHIFT) & VIVS_GL_SEMAPHORE_TOKEN_FROM__MASK)
++#define VIVS_GL_SEMAPHORE_TOKEN_TO__MASK			0x00001f00
++#define VIVS_GL_SEMAPHORE_TOKEN_TO__SHIFT			8
++#define VIVS_GL_SEMAPHORE_TOKEN_TO(x)				(((x) << VIVS_GL_SEMAPHORE_TOKEN_TO__SHIFT) & VIVS_GL_SEMAPHORE_TOKEN_TO__MASK)
 +
-+static inline bool fence_retired(struct etnaviv_gpu *gpu, u32 fence)
-+{
-+	return fence_after_eq(gpu->retired_fence, fence);
-+}
++#define VIVS_GL_FLUSH_CACHE					0x0000380c
++#define VIVS_GL_FLUSH_CACHE_DEPTH				0x00000001
++#define VIVS_GL_FLUSH_CACHE_COLOR				0x00000002
++#define VIVS_GL_FLUSH_CACHE_TEXTURE				0x00000004
++#define VIVS_GL_FLUSH_CACHE_PE2D				0x00000008
++#define VIVS_GL_FLUSH_CACHE_TEXTUREVS				0x00000010
++#define VIVS_GL_FLUSH_CACHE_SHADER_L1				0x00000020
++#define VIVS_GL_FLUSH_CACHE_SHADER_L2				0x00000040
 +
-+int etnaviv_gpu_get_param(struct etnaviv_gpu *gpu, u32 param, u64 *value);
++#define VIVS_GL_FLUSH_MMU					0x00003810
++#define VIVS_GL_FLUSH_MMU_FLUSH_FEMMU				0x00000001
++#define VIVS_GL_FLUSH_MMU_FLUSH_UNK1				0x00000002
++#define VIVS_GL_FLUSH_MMU_FLUSH_UNK2				0x00000004
++#define VIVS_GL_FLUSH_MMU_FLUSH_PEMMU				0x00000008
++#define VIVS_GL_FLUSH_MMU_FLUSH_UNK4				0x00000010
 +
-+int etnaviv_gpu_init(struct etnaviv_gpu *gpu);
++#define VIVS_GL_VERTEX_ELEMENT_CONFIG				0x00003814
 +
-+#ifdef CONFIG_DEBUG_FS
-+int etnaviv_gpu_debugfs(struct etnaviv_gpu *gpu, struct seq_file *m);
-+#endif
++#define VIVS_GL_MULTI_SAMPLE_CONFIG				0x00003818
++#define VIVS_GL_MULTI_SAMPLE_CONFIG_MSAA_SAMPLES__MASK		0x00000003
++#define VIVS_GL_MULTI_SAMPLE_CONFIG_MSAA_SAMPLES__SHIFT		0
++#define VIVS_GL_MULTI_SAMPLE_CONFIG_MSAA_SAMPLES_NONE		0x00000000
++#define VIVS_GL_MULTI_SAMPLE_CONFIG_MSAA_SAMPLES_2X		0x00000001
++#define VIVS_GL_MULTI_SAMPLE_CONFIG_MSAA_SAMPLES_4X		0x00000002
++#define VIVS_GL_MULTI_SAMPLE_CONFIG_MSAA_SAMPLES_MASK		0x00000008
++#define VIVS_GL_MULTI_SAMPLE_CONFIG_MSAA_ENABLES__MASK		0x000000f0
++#define VIVS_GL_MULTI_SAMPLE_CONFIG_MSAA_ENABLES__SHIFT		4
++#define VIVS_GL_MULTI_SAMPLE_CONFIG_MSAA_ENABLES(x)		(((x) << VIVS_GL_MULTI_SAMPLE_CONFIG_MSAA_ENABLES__SHIFT) & VIVS_GL_MULTI_SAMPLE_CONFIG_MSAA_ENABLES__MASK)
++#define VIVS_GL_MULTI_SAMPLE_CONFIG_MSAA_ENABLES_MASK		0x00000100
++#define VIVS_GL_MULTI_SAMPLE_CONFIG_UNK12__MASK			0x00007000
++#define VIVS_GL_MULTI_SAMPLE_CONFIG_UNK12__SHIFT		12
++#define VIVS_GL_MULTI_SAMPLE_CONFIG_UNK12(x)			(((x) << VIVS_GL_MULTI_SAMPLE_CONFIG_UNK12__SHIFT) & VIVS_GL_MULTI_SAMPLE_CONFIG_UNK12__MASK)
++#define VIVS_GL_MULTI_SAMPLE_CONFIG_UNK12_MASK			0x00008000
++#define VIVS_GL_MULTI_SAMPLE_CONFIG_UNK16__MASK			0x00030000
++#define VIVS_GL_MULTI_SAMPLE_CONFIG_UNK16__SHIFT		16
++#define VIVS_GL_MULTI_SAMPLE_CONFIG_UNK16(x)			(((x) << VIVS_GL_MULTI_SAMPLE_CONFIG_UNK16__SHIFT) & VIVS_GL_MULTI_SAMPLE_CONFIG_UNK16__MASK)
++#define VIVS_GL_MULTI_SAMPLE_CONFIG_UNK16_MASK			0x00080000
 +
-+int etnaviv_gpu_fence_sync_obj(struct etnaviv_gem_object *etnaviv_obj,
-+	unsigned int context, bool exclusive);
++#define VIVS_GL_VARYING_TOTAL_COMPONENTS			0x0000381c
++#define VIVS_GL_VARYING_TOTAL_COMPONENTS_NUM__MASK		0x000000ff
++#define VIVS_GL_VARYING_TOTAL_COMPONENTS_NUM__SHIFT		0
++#define VIVS_GL_VARYING_TOTAL_COMPONENTS_NUM(x)			(((x) << VIVS_GL_VARYING_TOTAL_COMPONENTS_NUM__SHIFT) & VIVS_GL_VARYING_TOTAL_COMPONENTS_NUM__MASK)
 +
-+void etnaviv_gpu_retire(struct etnaviv_gpu *gpu);
-+int etnaviv_gpu_wait_fence_interruptible(struct etnaviv_gpu *gpu,
-+	u32 fence, struct timespec *timeout);
-+int etnaviv_gpu_wait_obj_inactive(struct etnaviv_gpu *gpu,
-+	struct etnaviv_gem_object *etnaviv_obj, struct timespec *timeout);
-+int etnaviv_gpu_submit(struct etnaviv_gpu *gpu,
-+	struct etnaviv_gem_submit *submit, struct etnaviv_cmdbuf *cmdbuf);
-+struct etnaviv_cmdbuf *etnaviv_gpu_cmdbuf_new(struct etnaviv_gpu *gpu,
-+					      u32 size, size_t nr_bos);
-+void etnaviv_gpu_cmdbuf_free(struct etnaviv_cmdbuf *cmdbuf);
-+int etnaviv_gpu_pm_get_sync(struct etnaviv_gpu *gpu);
-+void etnaviv_gpu_pm_put(struct etnaviv_gpu *gpu);
++#define VIVS_GL_VARYING_NUM_COMPONENTS				0x00003820
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR0__MASK		0x00000007
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR0__SHIFT		0
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR0(x)			(((x) << VIVS_GL_VARYING_NUM_COMPONENTS_VAR0__SHIFT) & VIVS_GL_VARYING_NUM_COMPONENTS_VAR0__MASK)
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR1__MASK		0x00000070
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR1__SHIFT		4
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR1(x)			(((x) << VIVS_GL_VARYING_NUM_COMPONENTS_VAR1__SHIFT) & VIVS_GL_VARYING_NUM_COMPONENTS_VAR1__MASK)
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR2__MASK		0x00000700
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR2__SHIFT		8
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR2(x)			(((x) << VIVS_GL_VARYING_NUM_COMPONENTS_VAR2__SHIFT) & VIVS_GL_VARYING_NUM_COMPONENTS_VAR2__MASK)
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR3__MASK		0x00007000
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR3__SHIFT		12
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR3(x)			(((x) << VIVS_GL_VARYING_NUM_COMPONENTS_VAR3__SHIFT) & VIVS_GL_VARYING_NUM_COMPONENTS_VAR3__MASK)
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR4__MASK		0x00070000
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR4__SHIFT		16
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR4(x)			(((x) << VIVS_GL_VARYING_NUM_COMPONENTS_VAR4__SHIFT) & VIVS_GL_VARYING_NUM_COMPONENTS_VAR4__MASK)
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR5__MASK		0x00700000
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR5__SHIFT		20
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR5(x)			(((x) << VIVS_GL_VARYING_NUM_COMPONENTS_VAR5__SHIFT) & VIVS_GL_VARYING_NUM_COMPONENTS_VAR5__MASK)
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR6__MASK		0x07000000
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR6__SHIFT		24
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR6(x)			(((x) << VIVS_GL_VARYING_NUM_COMPONENTS_VAR6__SHIFT) & VIVS_GL_VARYING_NUM_COMPONENTS_VAR6__MASK)
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR7__MASK		0x70000000
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR7__SHIFT		28
++#define VIVS_GL_VARYING_NUM_COMPONENTS_VAR7(x)			(((x) << VIVS_GL_VARYING_NUM_COMPONENTS_VAR7__SHIFT) & VIVS_GL_VARYING_NUM_COMPONENTS_VAR7__MASK)
 +
-+extern struct platform_driver etnaviv_gpu_driver;
++#define VIVS_GL_VARYING_COMPONENT_USE(i0)		       (0x00003828 + 0x4*(i0))
++#define VIVS_GL_VARYING_COMPONENT_USE__ESIZE			0x00000004
++#define VIVS_GL_VARYING_COMPONENT_USE__LEN			0x00000002
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP0__MASK		0x00000003
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP0__SHIFT		0
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP0(x)			(((x) << VIVS_GL_VARYING_COMPONENT_USE_COMP0__SHIFT) & VIVS_GL_VARYING_COMPONENT_USE_COMP0__MASK)
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP1__MASK		0x0000000c
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP1__SHIFT		2
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP1(x)			(((x) << VIVS_GL_VARYING_COMPONENT_USE_COMP1__SHIFT) & VIVS_GL_VARYING_COMPONENT_USE_COMP1__MASK)
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP2__MASK		0x00000030
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP2__SHIFT		4
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP2(x)			(((x) << VIVS_GL_VARYING_COMPONENT_USE_COMP2__SHIFT) & VIVS_GL_VARYING_COMPONENT_USE_COMP2__MASK)
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP3__MASK		0x000000c0
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP3__SHIFT		6
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP3(x)			(((x) << VIVS_GL_VARYING_COMPONENT_USE_COMP3__SHIFT) & VIVS_GL_VARYING_COMPONENT_USE_COMP3__MASK)
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP4__MASK		0x00000300
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP4__SHIFT		8
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP4(x)			(((x) << VIVS_GL_VARYING_COMPONENT_USE_COMP4__SHIFT) & VIVS_GL_VARYING_COMPONENT_USE_COMP4__MASK)
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP5__MASK		0x00000c00
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP5__SHIFT		10
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP5(x)			(((x) << VIVS_GL_VARYING_COMPONENT_USE_COMP5__SHIFT) & VIVS_GL_VARYING_COMPONENT_USE_COMP5__MASK)
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP6__MASK		0x00003000
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP6__SHIFT		12
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP6(x)			(((x) << VIVS_GL_VARYING_COMPONENT_USE_COMP6__SHIFT) & VIVS_GL_VARYING_COMPONENT_USE_COMP6__MASK)
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP7__MASK		0x0000c000
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP7__SHIFT		14
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP7(x)			(((x) << VIVS_GL_VARYING_COMPONENT_USE_COMP7__SHIFT) & VIVS_GL_VARYING_COMPONENT_USE_COMP7__MASK)
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP8__MASK		0x00030000
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP8__SHIFT		16
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP8(x)			(((x) << VIVS_GL_VARYING_COMPONENT_USE_COMP8__SHIFT) & VIVS_GL_VARYING_COMPONENT_USE_COMP8__MASK)
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP9__MASK		0x000c0000
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP9__SHIFT		18
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP9(x)			(((x) << VIVS_GL_VARYING_COMPONENT_USE_COMP9__SHIFT) & VIVS_GL_VARYING_COMPONENT_USE_COMP9__MASK)
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP10__MASK		0x00300000
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP10__SHIFT		20
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP10(x)			(((x) << VIVS_GL_VARYING_COMPONENT_USE_COMP10__SHIFT) & VIVS_GL_VARYING_COMPONENT_USE_COMP10__MASK)
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP11__MASK		0x00c00000
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP11__SHIFT		22
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP11(x)			(((x) << VIVS_GL_VARYING_COMPONENT_USE_COMP11__SHIFT) & VIVS_GL_VARYING_COMPONENT_USE_COMP11__MASK)
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP12__MASK		0x03000000
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP12__SHIFT		24
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP12(x)			(((x) << VIVS_GL_VARYING_COMPONENT_USE_COMP12__SHIFT) & VIVS_GL_VARYING_COMPONENT_USE_COMP12__MASK)
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP13__MASK		0x0c000000
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP13__SHIFT		26
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP13(x)			(((x) << VIVS_GL_VARYING_COMPONENT_USE_COMP13__SHIFT) & VIVS_GL_VARYING_COMPONENT_USE_COMP13__MASK)
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP14__MASK		0x30000000
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP14__SHIFT		28
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP14(x)			(((x) << VIVS_GL_VARYING_COMPONENT_USE_COMP14__SHIFT) & VIVS_GL_VARYING_COMPONENT_USE_COMP14__MASK)
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP15__MASK		0xc0000000
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP15__SHIFT		30
++#define VIVS_GL_VARYING_COMPONENT_USE_COMP15(x)			(((x) << VIVS_GL_VARYING_COMPONENT_USE_COMP15__SHIFT) & VIVS_GL_VARYING_COMPONENT_USE_COMP15__MASK)
 +
-+#endif /* __ETNAVIV_GPU_H__ */
++#define VIVS_GL_UNK03834					0x00003834
++
++#define VIVS_GL_UNK03838					0x00003838
++
++#define VIVS_GL_API_MODE					0x0000384c
++#define VIVS_GL_API_MODE_OPENGL					0x00000000
++#define VIVS_GL_API_MODE_OPENVG					0x00000001
++#define VIVS_GL_API_MODE_OPENCL					0x00000002
++
++#define VIVS_GL_CONTEXT_POINTER					0x00003850
++
++#define VIVS_GL_UNK03A00					0x00003a00
++
++#define VIVS_GL_STALL_TOKEN					0x00003c00
++#define VIVS_GL_STALL_TOKEN_FROM__MASK				0x0000001f
++#define VIVS_GL_STALL_TOKEN_FROM__SHIFT				0
++#define VIVS_GL_STALL_TOKEN_FROM(x)				(((x) << VIVS_GL_STALL_TOKEN_FROM__SHIFT) & VIVS_GL_STALL_TOKEN_FROM__MASK)
++#define VIVS_GL_STALL_TOKEN_TO__MASK				0x00001f00
++#define VIVS_GL_STALL_TOKEN_TO__SHIFT				8
++#define VIVS_GL_STALL_TOKEN_TO(x)				(((x) << VIVS_GL_STALL_TOKEN_TO__SHIFT) & VIVS_GL_STALL_TOKEN_TO__MASK)
++#define VIVS_GL_STALL_TOKEN_FLIP0				0x40000000
++#define VIVS_GL_STALL_TOKEN_FLIP1				0x80000000
++
++#define VIVS_DUMMY						0x00000000
++
++#define VIVS_DUMMY_DUMMY					0x0003fffc
++
++
++#endif /* STATE_XML */
+diff --git a/drivers/gpu/drm/etnaviv/state_hi.xml.h b/drivers/gpu/drm/etnaviv/state_hi.xml.h
+new file mode 100644
+index 000000000000..0064f2640396
+--- /dev/null
++++ b/drivers/gpu/drm/etnaviv/state_hi.xml.h
+@@ -0,0 +1,407 @@
++#ifndef STATE_HI_XML
++#define STATE_HI_XML
++
++/* Autogenerated file, DO NOT EDIT manually!
++
++This file was generated by the rules-ng-ng headergen tool in this git repository:
++http://0x04.net/cgit/index.cgi/rules-ng-ng
++git clone git://0x04.net/rules-ng-ng
++
++The rules-ng-ng source files this header was generated from are:
++- state_hi.xml (  23420 bytes, from 2015-03-25 11:47:21)
++- common.xml   (  18437 bytes, from 2015-03-25 11:27:41)
++
++Copyright (C) 2015
++*/
++
++
++#define MMU_EXCEPTION_SLAVE_NOT_PRESENT				0x00000001
++#define MMU_EXCEPTION_PAGE_NOT_PRESENT				0x00000002
++#define MMU_EXCEPTION_WRITE_VIOLATION				0x00000003
++#define VIVS_HI							0x00000000
++
++#define VIVS_HI_CLOCK_CONTROL					0x00000000
++#define VIVS_HI_CLOCK_CONTROL_CLK3D_DIS				0x00000001
++#define VIVS_HI_CLOCK_CONTROL_CLK2D_DIS				0x00000002
++#define VIVS_HI_CLOCK_CONTROL_FSCALE_VAL__MASK			0x000001fc
++#define VIVS_HI_CLOCK_CONTROL_FSCALE_VAL__SHIFT			2
++#define VIVS_HI_CLOCK_CONTROL_FSCALE_VAL(x)			(((x) << VIVS_HI_CLOCK_CONTROL_FSCALE_VAL__SHIFT) & VIVS_HI_CLOCK_CONTROL_FSCALE_VAL__MASK)
++#define VIVS_HI_CLOCK_CONTROL_FSCALE_CMD_LOAD			0x00000200
++#define VIVS_HI_CLOCK_CONTROL_DISABLE_RAM_CLK_GATING		0x00000400
++#define VIVS_HI_CLOCK_CONTROL_DISABLE_DEBUG_REGISTERS		0x00000800
++#define VIVS_HI_CLOCK_CONTROL_SOFT_RESET			0x00001000
++#define VIVS_HI_CLOCK_CONTROL_IDLE_3D				0x00010000
++#define VIVS_HI_CLOCK_CONTROL_IDLE_2D				0x00020000
++#define VIVS_HI_CLOCK_CONTROL_IDLE_VG				0x00040000
++#define VIVS_HI_CLOCK_CONTROL_ISOLATE_GPU			0x00080000
++#define VIVS_HI_CLOCK_CONTROL_DEBUG_PIXEL_PIPE__MASK		0x00f00000
++#define VIVS_HI_CLOCK_CONTROL_DEBUG_PIXEL_PIPE__SHIFT		20
++#define VIVS_HI_CLOCK_CONTROL_DEBUG_PIXEL_PIPE(x)		(((x) << VIVS_HI_CLOCK_CONTROL_DEBUG_PIXEL_PIPE__SHIFT) & VIVS_HI_CLOCK_CONTROL_DEBUG_PIXEL_PIPE__MASK)
++
++#define VIVS_HI_IDLE_STATE					0x00000004
++#define VIVS_HI_IDLE_STATE_FE					0x00000001
++#define VIVS_HI_IDLE_STATE_DE					0x00000002
++#define VIVS_HI_IDLE_STATE_PE					0x00000004
++#define VIVS_HI_IDLE_STATE_SH					0x00000008
++#define VIVS_HI_IDLE_STATE_PA					0x00000010
++#define VIVS_HI_IDLE_STATE_SE					0x00000020
++#define VIVS_HI_IDLE_STATE_RA					0x00000040
++#define VIVS_HI_IDLE_STATE_TX					0x00000080
++#define VIVS_HI_IDLE_STATE_VG					0x00000100
++#define VIVS_HI_IDLE_STATE_IM					0x00000200
++#define VIVS_HI_IDLE_STATE_FP					0x00000400
++#define VIVS_HI_IDLE_STATE_TS					0x00000800
++#define VIVS_HI_IDLE_STATE_AXI_LP				0x80000000
++
++#define VIVS_HI_AXI_CONFIG					0x00000008
++#define VIVS_HI_AXI_CONFIG_AWID__MASK				0x0000000f
++#define VIVS_HI_AXI_CONFIG_AWID__SHIFT				0
++#define VIVS_HI_AXI_CONFIG_AWID(x)				(((x) << VIVS_HI_AXI_CONFIG_AWID__SHIFT) & VIVS_HI_AXI_CONFIG_AWID__MASK)
++#define VIVS_HI_AXI_CONFIG_ARID__MASK				0x000000f0
++#define VIVS_HI_AXI_CONFIG_ARID__SHIFT				4
++#define VIVS_HI_AXI_CONFIG_ARID(x)				(((x) << VIVS_HI_AXI_CONFIG_ARID__SHIFT) & VIVS_HI_AXI_CONFIG_ARID__MASK)
++#define VIVS_HI_AXI_CONFIG_AWCACHE__MASK			0x00000f00
++#define VIVS_HI_AXI_CONFIG_AWCACHE__SHIFT			8
++#define VIVS_HI_AXI_CONFIG_AWCACHE(x)				(((x) << VIVS_HI_AXI_CONFIG_AWCACHE__SHIFT) & VIVS_HI_AXI_CONFIG_AWCACHE__MASK)
++#define VIVS_HI_AXI_CONFIG_ARCACHE__MASK			0x0000f000
++#define VIVS_HI_AXI_CONFIG_ARCACHE__SHIFT			12
++#define VIVS_HI_AXI_CONFIG_ARCACHE(x)				(((x) << VIVS_HI_AXI_CONFIG_ARCACHE__SHIFT) & VIVS_HI_AXI_CONFIG_ARCACHE__MASK)
++
++#define VIVS_HI_AXI_STATUS					0x0000000c
++#define VIVS_HI_AXI_STATUS_WR_ERR_ID__MASK			0x0000000f
++#define VIVS_HI_AXI_STATUS_WR_ERR_ID__SHIFT			0
++#define VIVS_HI_AXI_STATUS_WR_ERR_ID(x)				(((x) << VIVS_HI_AXI_STATUS_WR_ERR_ID__SHIFT) & VIVS_HI_AXI_STATUS_WR_ERR_ID__MASK)
++#define VIVS_HI_AXI_STATUS_RD_ERR_ID__MASK			0x000000f0
++#define VIVS_HI_AXI_STATUS_RD_ERR_ID__SHIFT			4
++#define VIVS_HI_AXI_STATUS_RD_ERR_ID(x)				(((x) << VIVS_HI_AXI_STATUS_RD_ERR_ID__SHIFT) & VIVS_HI_AXI_STATUS_RD_ERR_ID__MASK)
++#define VIVS_HI_AXI_STATUS_DET_WR_ERR				0x00000100
++#define VIVS_HI_AXI_STATUS_DET_RD_ERR				0x00000200
++
++#define VIVS_HI_INTR_ACKNOWLEDGE				0x00000010
++#define VIVS_HI_INTR_ACKNOWLEDGE_INTR_VEC__MASK			0x7fffffff
++#define VIVS_HI_INTR_ACKNOWLEDGE_INTR_VEC__SHIFT		0
++#define VIVS_HI_INTR_ACKNOWLEDGE_INTR_VEC(x)			(((x) << VIVS_HI_INTR_ACKNOWLEDGE_INTR_VEC__SHIFT) & VIVS_HI_INTR_ACKNOWLEDGE_INTR_VEC__MASK)
++#define VIVS_HI_INTR_ACKNOWLEDGE_AXI_BUS_ERROR			0x80000000
++
++#define VIVS_HI_INTR_ENBL					0x00000014
++#define VIVS_HI_INTR_ENBL_INTR_ENBL_VEC__MASK			0xffffffff
++#define VIVS_HI_INTR_ENBL_INTR_ENBL_VEC__SHIFT			0
++#define VIVS_HI_INTR_ENBL_INTR_ENBL_VEC(x)			(((x) << VIVS_HI_INTR_ENBL_INTR_ENBL_VEC__SHIFT) & VIVS_HI_INTR_ENBL_INTR_ENBL_VEC__MASK)
++
++#define VIVS_HI_CHIP_IDENTITY					0x00000018
++#define VIVS_HI_CHIP_IDENTITY_FAMILY__MASK			0xff000000
++#define VIVS_HI_CHIP_IDENTITY_FAMILY__SHIFT			24
++#define VIVS_HI_CHIP_IDENTITY_FAMILY(x)				(((x) << VIVS_HI_CHIP_IDENTITY_FAMILY__SHIFT) & VIVS_HI_CHIP_IDENTITY_FAMILY__MASK)
++#define VIVS_HI_CHIP_IDENTITY_PRODUCT__MASK			0x00ff0000
++#define VIVS_HI_CHIP_IDENTITY_PRODUCT__SHIFT			16
++#define VIVS_HI_CHIP_IDENTITY_PRODUCT(x)			(((x) << VIVS_HI_CHIP_IDENTITY_PRODUCT__SHIFT) & VIVS_HI_CHIP_IDENTITY_PRODUCT__MASK)
++#define VIVS_HI_CHIP_IDENTITY_REVISION__MASK			0x0000f000
++#define VIVS_HI_CHIP_IDENTITY_REVISION__SHIFT			12
++#define VIVS_HI_CHIP_IDENTITY_REVISION(x)			(((x) << VIVS_HI_CHIP_IDENTITY_REVISION__SHIFT) & VIVS_HI_CHIP_IDENTITY_REVISION__MASK)
++
++#define VIVS_HI_CHIP_FEATURE					0x0000001c
++
++#define VIVS_HI_CHIP_MODEL					0x00000020
++
++#define VIVS_HI_CHIP_REV					0x00000024
++
++#define VIVS_HI_CHIP_DATE					0x00000028
++
++#define VIVS_HI_CHIP_TIME					0x0000002c
++
++#define VIVS_HI_CHIP_MINOR_FEATURE_0				0x00000034
++
++#define VIVS_HI_CACHE_CONTROL					0x00000038
++
++#define VIVS_HI_MEMORY_COUNTER_RESET				0x0000003c
++
++#define VIVS_HI_PROFILE_READ_BYTES8				0x00000040
++
++#define VIVS_HI_PROFILE_WRITE_BYTES8				0x00000044
++
++#define VIVS_HI_CHIP_SPECS					0x00000048
++#define VIVS_HI_CHIP_SPECS_STREAM_COUNT__MASK			0x0000000f
++#define VIVS_HI_CHIP_SPECS_STREAM_COUNT__SHIFT			0
++#define VIVS_HI_CHIP_SPECS_STREAM_COUNT(x)			(((x) << VIVS_HI_CHIP_SPECS_STREAM_COUNT__SHIFT) & VIVS_HI_CHIP_SPECS_STREAM_COUNT__MASK)
++#define VIVS_HI_CHIP_SPECS_REGISTER_MAX__MASK			0x000000f0
++#define VIVS_HI_CHIP_SPECS_REGISTER_MAX__SHIFT			4
++#define VIVS_HI_CHIP_SPECS_REGISTER_MAX(x)			(((x) << VIVS_HI_CHIP_SPECS_REGISTER_MAX__SHIFT) & VIVS_HI_CHIP_SPECS_REGISTER_MAX__MASK)
++#define VIVS_HI_CHIP_SPECS_THREAD_COUNT__MASK			0x00000f00
++#define VIVS_HI_CHIP_SPECS_THREAD_COUNT__SHIFT			8
++#define VIVS_HI_CHIP_SPECS_THREAD_COUNT(x)			(((x) << VIVS_HI_CHIP_SPECS_THREAD_COUNT__SHIFT) & VIVS_HI_CHIP_SPECS_THREAD_COUNT__MASK)
++#define VIVS_HI_CHIP_SPECS_VERTEX_CACHE_SIZE__MASK		0x0001f000
++#define VIVS_HI_CHIP_SPECS_VERTEX_CACHE_SIZE__SHIFT		12
++#define VIVS_HI_CHIP_SPECS_VERTEX_CACHE_SIZE(x)			(((x) << VIVS_HI_CHIP_SPECS_VERTEX_CACHE_SIZE__SHIFT) & VIVS_HI_CHIP_SPECS_VERTEX_CACHE_SIZE__MASK)
++#define VIVS_HI_CHIP_SPECS_SHADER_CORE_COUNT__MASK		0x01f00000
++#define VIVS_HI_CHIP_SPECS_SHADER_CORE_COUNT__SHIFT		20
++#define VIVS_HI_CHIP_SPECS_SHADER_CORE_COUNT(x)			(((x) << VIVS_HI_CHIP_SPECS_SHADER_CORE_COUNT__SHIFT) & VIVS_HI_CHIP_SPECS_SHADER_CORE_COUNT__MASK)
++#define VIVS_HI_CHIP_SPECS_PIXEL_PIPES__MASK			0x0e000000
++#define VIVS_HI_CHIP_SPECS_PIXEL_PIPES__SHIFT			25
++#define VIVS_HI_CHIP_SPECS_PIXEL_PIPES(x)			(((x) << VIVS_HI_CHIP_SPECS_PIXEL_PIPES__SHIFT) & VIVS_HI_CHIP_SPECS_PIXEL_PIPES__MASK)
++#define VIVS_HI_CHIP_SPECS_VERTEX_OUTPUT_BUFFER_SIZE__MASK	0xf0000000
++#define VIVS_HI_CHIP_SPECS_VERTEX_OUTPUT_BUFFER_SIZE__SHIFT	28
++#define VIVS_HI_CHIP_SPECS_VERTEX_OUTPUT_BUFFER_SIZE(x)		(((x) << VIVS_HI_CHIP_SPECS_VERTEX_OUTPUT_BUFFER_SIZE__SHIFT) & VIVS_HI_CHIP_SPECS_VERTEX_OUTPUT_BUFFER_SIZE__MASK)
++
++#define VIVS_HI_PROFILE_WRITE_BURSTS				0x0000004c
++
++#define VIVS_HI_PROFILE_WRITE_REQUESTS				0x00000050
++
++#define VIVS_HI_PROFILE_READ_BURSTS				0x00000058
++
++#define VIVS_HI_PROFILE_READ_REQUESTS				0x0000005c
++
++#define VIVS_HI_PROFILE_READ_LASTS				0x00000060
++
++#define VIVS_HI_GP_OUT0						0x00000064
++
++#define VIVS_HI_GP_OUT1						0x00000068
++
++#define VIVS_HI_GP_OUT2						0x0000006c
++
++#define VIVS_HI_AXI_CONTROL					0x00000070
++#define VIVS_HI_AXI_CONTROL_WR_FULL_BURST_MODE			0x00000001
++
++#define VIVS_HI_CHIP_MINOR_FEATURE_1				0x00000074
++
++#define VIVS_HI_PROFILE_TOTAL_CYCLES				0x00000078
++
++#define VIVS_HI_PROFILE_IDLE_CYCLES				0x0000007c
++
++#define VIVS_HI_CHIP_SPECS_2					0x00000080
++#define VIVS_HI_CHIP_SPECS_2_BUFFER_SIZE__MASK			0x000000ff
++#define VIVS_HI_CHIP_SPECS_2_BUFFER_SIZE__SHIFT			0
++#define VIVS_HI_CHIP_SPECS_2_BUFFER_SIZE(x)			(((x) << VIVS_HI_CHIP_SPECS_2_BUFFER_SIZE__SHIFT) & VIVS_HI_CHIP_SPECS_2_BUFFER_SIZE__MASK)
++#define VIVS_HI_CHIP_SPECS_2_INSTRUCTION_COUNT__MASK		0x0000ff00
++#define VIVS_HI_CHIP_SPECS_2_INSTRUCTION_COUNT__SHIFT		8
++#define VIVS_HI_CHIP_SPECS_2_INSTRUCTION_COUNT(x)		(((x) << VIVS_HI_CHIP_SPECS_2_INSTRUCTION_COUNT__SHIFT) & VIVS_HI_CHIP_SPECS_2_INSTRUCTION_COUNT__MASK)
++#define VIVS_HI_CHIP_SPECS_2_NUM_CONSTANTS__MASK		0xffff0000
++#define VIVS_HI_CHIP_SPECS_2_NUM_CONSTANTS__SHIFT		16
++#define VIVS_HI_CHIP_SPECS_2_NUM_CONSTANTS(x)			(((x) << VIVS_HI_CHIP_SPECS_2_NUM_CONSTANTS__SHIFT) & VIVS_HI_CHIP_SPECS_2_NUM_CONSTANTS__MASK)
++
++#define VIVS_HI_CHIP_MINOR_FEATURE_2				0x00000084
++
++#define VIVS_HI_CHIP_MINOR_FEATURE_3				0x00000088
++
++#define VIVS_HI_CHIP_MINOR_FEATURE_4				0x00000094
++
++#define VIVS_PM							0x00000000
++
++#define VIVS_PM_POWER_CONTROLS					0x00000100
++#define VIVS_PM_POWER_CONTROLS_ENABLE_MODULE_CLOCK_GATING	0x00000001
++#define VIVS_PM_POWER_CONTROLS_DISABLE_STALL_MODULE_CLOCK_GATING	0x00000002
++#define VIVS_PM_POWER_CONTROLS_DISABLE_STARVE_MODULE_CLOCK_GATING	0x00000004
++#define VIVS_PM_POWER_CONTROLS_TURN_ON_COUNTER__MASK		0x000000f0
++#define VIVS_PM_POWER_CONTROLS_TURN_ON_COUNTER__SHIFT		4
++#define VIVS_PM_POWER_CONTROLS_TURN_ON_COUNTER(x)		(((x) << VIVS_PM_POWER_CONTROLS_TURN_ON_COUNTER__SHIFT) & VIVS_PM_POWER_CONTROLS_TURN_ON_COUNTER__MASK)
++#define VIVS_PM_POWER_CONTROLS_TURN_OFF_COUNTER__MASK		0xffff0000
++#define VIVS_PM_POWER_CONTROLS_TURN_OFF_COUNTER__SHIFT		16
++#define VIVS_PM_POWER_CONTROLS_TURN_OFF_COUNTER(x)		(((x) << VIVS_PM_POWER_CONTROLS_TURN_OFF_COUNTER__SHIFT) & VIVS_PM_POWER_CONTROLS_TURN_OFF_COUNTER__MASK)
++
++#define VIVS_PM_MODULE_CONTROLS					0x00000104
++#define VIVS_PM_MODULE_CONTROLS_DISABLE_MODULE_CLOCK_GATING_FE	0x00000001
++#define VIVS_PM_MODULE_CONTROLS_DISABLE_MODULE_CLOCK_GATING_DE	0x00000002
++#define VIVS_PM_MODULE_CONTROLS_DISABLE_MODULE_CLOCK_GATING_PE	0x00000004
++
++#define VIVS_PM_MODULE_STATUS					0x00000108
++#define VIVS_PM_MODULE_STATUS_MODULE_CLOCK_GATED_FE		0x00000001
++#define VIVS_PM_MODULE_STATUS_MODULE_CLOCK_GATED_DE		0x00000002
++#define VIVS_PM_MODULE_STATUS_MODULE_CLOCK_GATED_PE		0x00000004
++
++#define VIVS_PM_PULSE_EATER					0x0000010c
++
++#define VIVS_MMUv2						0x00000000
++
++#define VIVS_MMUv2_SAFE_ADDRESS					0x00000180
++
++#define VIVS_MMUv2_CONFIGURATION				0x00000184
++#define VIVS_MMUv2_CONFIGURATION_MODE__MASK			0x00000001
++#define VIVS_MMUv2_CONFIGURATION_MODE__SHIFT			0
++#define VIVS_MMUv2_CONFIGURATION_MODE_MODE4_K			0x00000000
++#define VIVS_MMUv2_CONFIGURATION_MODE_MODE1_K			0x00000001
++#define VIVS_MMUv2_CONFIGURATION_MODE_MASK			0x00000008
++#define VIVS_MMUv2_CONFIGURATION_FLUSH__MASK			0x00000010
++#define VIVS_MMUv2_CONFIGURATION_FLUSH__SHIFT			4
++#define VIVS_MMUv2_CONFIGURATION_FLUSH_FLUSH			0x00000010
++#define VIVS_MMUv2_CONFIGURATION_FLUSH_MASK			0x00000080
++#define VIVS_MMUv2_CONFIGURATION_ADDRESS_MASK			0x00000100
++#define VIVS_MMUv2_CONFIGURATION_ADDRESS__MASK			0xfffffc00
++#define VIVS_MMUv2_CONFIGURATION_ADDRESS__SHIFT			10
++#define VIVS_MMUv2_CONFIGURATION_ADDRESS(x)			(((x) << VIVS_MMUv2_CONFIGURATION_ADDRESS__SHIFT) & VIVS_MMUv2_CONFIGURATION_ADDRESS__MASK)
++
++#define VIVS_MMUv2_STATUS					0x00000188
++#define VIVS_MMUv2_STATUS_EXCEPTION0__MASK			0x00000003
++#define VIVS_MMUv2_STATUS_EXCEPTION0__SHIFT			0
++#define VIVS_MMUv2_STATUS_EXCEPTION0(x)				(((x) << VIVS_MMUv2_STATUS_EXCEPTION0__SHIFT) & VIVS_MMUv2_STATUS_EXCEPTION0__MASK)
++#define VIVS_MMUv2_STATUS_EXCEPTION1__MASK			0x00000030
++#define VIVS_MMUv2_STATUS_EXCEPTION1__SHIFT			4
++#define VIVS_MMUv2_STATUS_EXCEPTION1(x)				(((x) << VIVS_MMUv2_STATUS_EXCEPTION1__SHIFT) & VIVS_MMUv2_STATUS_EXCEPTION1__MASK)
++#define VIVS_MMUv2_STATUS_EXCEPTION2__MASK			0x00000300
++#define VIVS_MMUv2_STATUS_EXCEPTION2__SHIFT			8
++#define VIVS_MMUv2_STATUS_EXCEPTION2(x)				(((x) << VIVS_MMUv2_STATUS_EXCEPTION2__SHIFT) & VIVS_MMUv2_STATUS_EXCEPTION2__MASK)
++#define VIVS_MMUv2_STATUS_EXCEPTION3__MASK			0x00003000
++#define VIVS_MMUv2_STATUS_EXCEPTION3__SHIFT			12
++#define VIVS_MMUv2_STATUS_EXCEPTION3(x)				(((x) << VIVS_MMUv2_STATUS_EXCEPTION3__SHIFT) & VIVS_MMUv2_STATUS_EXCEPTION3__MASK)
++
++#define VIVS_MMUv2_CONTROL					0x0000018c
++#define VIVS_MMUv2_CONTROL_ENABLE				0x00000001
++
++#define VIVS_MMUv2_EXCEPTION_ADDR(i0)			       (0x00000190 + 0x4*(i0))
++#define VIVS_MMUv2_EXCEPTION_ADDR__ESIZE			0x00000004
++#define VIVS_MMUv2_EXCEPTION_ADDR__LEN				0x00000004
++
++#define VIVS_MC							0x00000000
++
++#define VIVS_MC_MMU_FE_PAGE_TABLE				0x00000400
++
++#define VIVS_MC_MMU_TX_PAGE_TABLE				0x00000404
++
++#define VIVS_MC_MMU_PE_PAGE_TABLE				0x00000408
++
++#define VIVS_MC_MMU_PEZ_PAGE_TABLE				0x0000040c
++
++#define VIVS_MC_MMU_RA_PAGE_TABLE				0x00000410
++
++#define VIVS_MC_DEBUG_MEMORY					0x00000414
++#define VIVS_MC_DEBUG_MEMORY_SPECIAL_PATCH_GC320		0x00000008
++#define VIVS_MC_DEBUG_MEMORY_FAST_CLEAR_BYPASS			0x00100000
++#define VIVS_MC_DEBUG_MEMORY_COMPRESSION_BYPASS			0x00200000
++
++#define VIVS_MC_MEMORY_BASE_ADDR_RA				0x00000418
++
++#define VIVS_MC_MEMORY_BASE_ADDR_FE				0x0000041c
++
++#define VIVS_MC_MEMORY_BASE_ADDR_TX				0x00000420
++
++#define VIVS_MC_MEMORY_BASE_ADDR_PEZ				0x00000424
++
++#define VIVS_MC_MEMORY_BASE_ADDR_PE				0x00000428
++
++#define VIVS_MC_MEMORY_TIMING_CONTROL				0x0000042c
++
++#define VIVS_MC_MEMORY_FLUSH					0x00000430
++
++#define VIVS_MC_PROFILE_CYCLE_COUNTER				0x00000438
++
++#define VIVS_MC_DEBUG_READ0					0x0000043c
++
++#define VIVS_MC_DEBUG_READ1					0x00000440
++
++#define VIVS_MC_DEBUG_WRITE					0x00000444
++
++#define VIVS_MC_PROFILE_RA_READ					0x00000448
++
++#define VIVS_MC_PROFILE_TX_READ					0x0000044c
++
++#define VIVS_MC_PROFILE_FE_READ					0x00000450
++
++#define VIVS_MC_PROFILE_PE_READ					0x00000454
++
++#define VIVS_MC_PROFILE_DE_READ					0x00000458
++
++#define VIVS_MC_PROFILE_SH_READ					0x0000045c
++
++#define VIVS_MC_PROFILE_PA_READ					0x00000460
++
++#define VIVS_MC_PROFILE_SE_READ					0x00000464
++
++#define VIVS_MC_PROFILE_MC_READ					0x00000468
++
++#define VIVS_MC_PROFILE_HI_READ					0x0000046c
++
++#define VIVS_MC_PROFILE_CONFIG0					0x00000470
++#define VIVS_MC_PROFILE_CONFIG0_FE__MASK			0x0000000f
++#define VIVS_MC_PROFILE_CONFIG0_FE__SHIFT			0
++#define VIVS_MC_PROFILE_CONFIG0_FE_RESET			0x0000000f
++#define VIVS_MC_PROFILE_CONFIG0_DE__MASK			0x00000f00
++#define VIVS_MC_PROFILE_CONFIG0_DE__SHIFT			8
++#define VIVS_MC_PROFILE_CONFIG0_DE_RESET			0x00000f00
++#define VIVS_MC_PROFILE_CONFIG0_PE__MASK			0x000f0000
++#define VIVS_MC_PROFILE_CONFIG0_PE__SHIFT			16
++#define VIVS_MC_PROFILE_CONFIG0_PE_PIXEL_COUNT_KILLED_BY_COLOR_PIPE	0x00000000
++#define VIVS_MC_PROFILE_CONFIG0_PE_PIXEL_COUNT_KILLED_BY_DEPTH_PIPE	0x00010000
++#define VIVS_MC_PROFILE_CONFIG0_PE_PIXEL_COUNT_DRAWN_BY_COLOR_PIPE	0x00020000
++#define VIVS_MC_PROFILE_CONFIG0_PE_PIXEL_COUNT_DRAWN_BY_DEPTH_PIPE	0x00030000
++#define VIVS_MC_PROFILE_CONFIG0_PE_PIXELS_RENDERED_2D		0x000b0000
++#define VIVS_MC_PROFILE_CONFIG0_PE_RESET			0x000f0000
++#define VIVS_MC_PROFILE_CONFIG0_SH__MASK			0x0f000000
++#define VIVS_MC_PROFILE_CONFIG0_SH__SHIFT			24
++#define VIVS_MC_PROFILE_CONFIG0_SH_SHADER_CYCLES		0x04000000
++#define VIVS_MC_PROFILE_CONFIG0_SH_PS_INST_COUNTER		0x07000000
++#define VIVS_MC_PROFILE_CONFIG0_SH_RENDERED_PIXEL_COUNTER	0x08000000
++#define VIVS_MC_PROFILE_CONFIG0_SH_VS_INST_COUNTER		0x09000000
++#define VIVS_MC_PROFILE_CONFIG0_SH_RENDERED_VERTICE_COUNTER	0x0a000000
++#define VIVS_MC_PROFILE_CONFIG0_SH_VTX_BRANCH_INST_COUNTER	0x0b000000
++#define VIVS_MC_PROFILE_CONFIG0_SH_VTX_TEXLD_INST_COUNTER	0x0c000000
++#define VIVS_MC_PROFILE_CONFIG0_SH_PXL_BRANCH_INST_COUNTER	0x0d000000
++#define VIVS_MC_PROFILE_CONFIG0_SH_PXL_TEXLD_INST_COUNTER	0x0e000000
++#define VIVS_MC_PROFILE_CONFIG0_SH_RESET			0x0f000000
++
++#define VIVS_MC_PROFILE_CONFIG1					0x00000474
++#define VIVS_MC_PROFILE_CONFIG1_PA__MASK			0x0000000f
++#define VIVS_MC_PROFILE_CONFIG1_PA__SHIFT			0
++#define VIVS_MC_PROFILE_CONFIG1_PA_INPUT_VTX_COUNTER		0x00000003
++#define VIVS_MC_PROFILE_CONFIG1_PA_INPUT_PRIM_COUNTER		0x00000004
++#define VIVS_MC_PROFILE_CONFIG1_PA_OUTPUT_PRIM_COUNTER		0x00000005
++#define VIVS_MC_PROFILE_CONFIG1_PA_DEPTH_CLIPPED_COUNTER	0x00000006
++#define VIVS_MC_PROFILE_CONFIG1_PA_TRIVIAL_REJECTED_COUNTER	0x00000007
++#define VIVS_MC_PROFILE_CONFIG1_PA_CULLED_COUNTER		0x00000008
++#define VIVS_MC_PROFILE_CONFIG1_PA_RESET			0x0000000f
++#define VIVS_MC_PROFILE_CONFIG1_SE__MASK			0x00000f00
++#define VIVS_MC_PROFILE_CONFIG1_SE__SHIFT			8
++#define VIVS_MC_PROFILE_CONFIG1_SE_CULLED_TRIANGLE_COUNT	0x00000000
++#define VIVS_MC_PROFILE_CONFIG1_SE_CULLED_LINES_COUNT		0x00000100
++#define VIVS_MC_PROFILE_CONFIG1_SE_RESET			0x00000f00
++#define VIVS_MC_PROFILE_CONFIG1_RA__MASK			0x000f0000
++#define VIVS_MC_PROFILE_CONFIG1_RA__SHIFT			16
++#define VIVS_MC_PROFILE_CONFIG1_RA_VALID_PIXEL_COUNT		0x00000000
++#define VIVS_MC_PROFILE_CONFIG1_RA_TOTAL_QUAD_COUNT		0x00010000
++#define VIVS_MC_PROFILE_CONFIG1_RA_VALID_QUAD_COUNT_AFTER_EARLY_Z	0x00020000
++#define VIVS_MC_PROFILE_CONFIG1_RA_TOTAL_PRIMITIVE_COUNT	0x00030000
++#define VIVS_MC_PROFILE_CONFIG1_RA_PIPE_CACHE_MISS_COUNTER	0x00090000
++#define VIVS_MC_PROFILE_CONFIG1_RA_PREFETCH_CACHE_MISS_COUNTER	0x000a0000
++#define VIVS_MC_PROFILE_CONFIG1_RA_CULLED_QUAD_COUNT		0x000b0000
++#define VIVS_MC_PROFILE_CONFIG1_RA_RESET			0x000f0000
++#define VIVS_MC_PROFILE_CONFIG1_TX__MASK			0x0f000000
++#define VIVS_MC_PROFILE_CONFIG1_TX__SHIFT			24
++#define VIVS_MC_PROFILE_CONFIG1_TX_TOTAL_BILINEAR_REQUESTS	0x00000000
++#define VIVS_MC_PROFILE_CONFIG1_TX_TOTAL_TRILINEAR_REQUESTS	0x01000000
++#define VIVS_MC_PROFILE_CONFIG1_TX_TOTAL_DISCARDED_TEXTURE_REQUESTS	0x02000000
++#define VIVS_MC_PROFILE_CONFIG1_TX_TOTAL_TEXTURE_REQUESTS	0x03000000
++#define VIVS_MC_PROFILE_CONFIG1_TX_UNKNOWN			0x04000000
++#define VIVS_MC_PROFILE_CONFIG1_TX_MEM_READ_COUNT		0x05000000
++#define VIVS_MC_PROFILE_CONFIG1_TX_MEM_READ_IN_8B_COUNT		0x06000000
++#define VIVS_MC_PROFILE_CONFIG1_TX_CACHE_MISS_COUNT		0x07000000
++#define VIVS_MC_PROFILE_CONFIG1_TX_CACHE_HIT_TEXEL_COUNT	0x08000000
++#define VIVS_MC_PROFILE_CONFIG1_TX_CACHE_MISS_TEXEL_COUNT	0x09000000
++#define VIVS_MC_PROFILE_CONFIG1_TX_RESET			0x0f000000
++
++#define VIVS_MC_PROFILE_CONFIG2					0x00000478
++#define VIVS_MC_PROFILE_CONFIG2_MC__MASK			0x0000000f
++#define VIVS_MC_PROFILE_CONFIG2_MC__SHIFT			0
++#define VIVS_MC_PROFILE_CONFIG2_MC_TOTAL_READ_REQ_8B_FROM_PIPELINE	0x00000001
++#define VIVS_MC_PROFILE_CONFIG2_MC_TOTAL_READ_REQ_8B_FROM_IP	0x00000002
++#define VIVS_MC_PROFILE_CONFIG2_MC_TOTAL_WRITE_REQ_8B_FROM_PIPELINE	0x00000003
++#define VIVS_MC_PROFILE_CONFIG2_MC_RESET			0x0000000f
++#define VIVS_MC_PROFILE_CONFIG2_HI__MASK			0x00000f00
++#define VIVS_MC_PROFILE_CONFIG2_HI__SHIFT			8
++#define VIVS_MC_PROFILE_CONFIG2_HI_AXI_CYCLES_READ_REQUEST_STALLED	0x00000000
++#define VIVS_MC_PROFILE_CONFIG2_HI_AXI_CYCLES_WRITE_REQUEST_STALLED	0x00000100
++#define VIVS_MC_PROFILE_CONFIG2_HI_AXI_CYCLES_WRITE_DATA_STALLED	0x00000200
++#define VIVS_MC_PROFILE_CONFIG2_HI_RESET			0x00000f00
++
++#define VIVS_MC_PROFILE_CONFIG3					0x0000047c
++
++#define VIVS_MC_BUS_CONFIG					0x00000480
++#define VIVS_MC_BUS_CONFIG_FE_BUS_CONFIG__MASK			0x0000000f
++#define VIVS_MC_BUS_CONFIG_FE_BUS_CONFIG__SHIFT			0
++#define VIVS_MC_BUS_CONFIG_FE_BUS_CONFIG(x)			(((x) << VIVS_MC_BUS_CONFIG_FE_BUS_CONFIG__SHIFT) & VIVS_MC_BUS_CONFIG_FE_BUS_CONFIG__MASK)
++#define VIVS_MC_BUS_CONFIG_TX_BUS_CONFIG__MASK			0x000000f0
++#define VIVS_MC_BUS_CONFIG_TX_BUS_CONFIG__SHIFT			4
++#define VIVS_MC_BUS_CONFIG_TX_BUS_CONFIG(x)			(((x) << VIVS_MC_BUS_CONFIG_TX_BUS_CONFIG__SHIFT) & VIVS_MC_BUS_CONFIG_TX_BUS_CONFIG__MASK)
++
++#define VIVS_MC_START_COMPOSITION				0x00000554
++
++#define VIVS_MC_128B_MERGE					0x00000558
++
++
++#endif /* STATE_HI_XML */
 -- 
 2.6.2
