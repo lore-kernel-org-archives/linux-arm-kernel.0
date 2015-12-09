@@ -1,74 +1,73 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Wed, 9 Dec 2015 09:29:44 +0000
-Subject: [PATCH 1/3] usb: misc: generic_onboard_hub: add generic onboard
- USB HUB driver
-In-Reply-To: <1449652391.3118.24.camel@pengutronix.de>
-References: <1449538670-7954-1-git-send-email-peter.chen@freescale.com>
- <1449538670-7954-2-git-send-email-peter.chen@freescale.com>
- <CANLsYkwfLSQKEw1a-Y_dguu-yutnTeQv73cMxPFooMjzTv4n1A@mail.gmail.com>
- <20151209085021.GF941@shlinux2> <1449651460.3118.22.camel@pengutronix.de>
- <20151209085959.GG941@shlinux2> <1449652391.3118.24.camel@pengutronix.de>
-Message-ID: <CY1PR0301MB199537D4B971E52589C7C54481E80@CY1PR0301MB1995.namprd03.prod.outlook.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Wed, 9 Dec 2015 10:37:40 +0100
+Subject: [PATCH v3 2/9] Documentation: dt-bindings: Document STM32 pinctrl
+ driver DT bindings
+In-Reply-To: <20151209034137.GA15954@rob-hp-laptop>
+References: <1449578711-6141-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1449578711-6141-3-git-send-email-mcoquelin.stm32@gmail.com>
+ <20151209034137.GA15954@rob-hp-laptop>
+Message-ID: <CALszF6Ct5omDxbysmD=7MHYDT5-EowKH+L+sqSbp29R9tHfkdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rob,
 
+2015-12-09 4:41 GMT+01:00 Rob Herring <robh@kernel.org>:
+> On Tue, Dec 08, 2015 at 01:45:04PM +0100, Maxime Coquelin wrote:
+>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> ---
+>>  .../bindings/pinctrl/st,stm32-pinctrl.txt          | 126 +++++++++++++++++++++
+>>  1 file changed, 126 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+>> new file mode 100644
+>> index 0000000..7b4800c
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+>> @@ -0,0 +1,126 @@
+>> +* STM32 GPIO and Pin Mux/Config controller
+>> +
+>> +STMicroelectronics's STM32 MCUs intregrate a GPIO and Pin mux/config hardware
+>> +controller. It controls the input/output settings on the available pins and
+>> +also provides ability to multiplex and configure the output of various on-chip
+>> +controllers onto these pads.
+>> +
+>> +Pin controller node:
+>> +Required properies:
+>> + - compatible: value should be one of the following:
+>> +   (a) "st,stm32f429-pinctrl"
+>> + - #address-cells: The value of this property must be 1
+>> + - #size-cells       : The value of this property must be 1
+>> + - ranges    : defines mapping between pin controller node (parent) to
+>> +   gpio-bank node (children).
+>> + - pins-are-numbered: Specify the subnodes are using numbered pinmux to
+>> +   specify pins.
+>> +
+>> +GPIO controller/bank node:
+>> +Required properties:
+>> + - gpio-controller : Indicates this device is a GPIO controller
+>> + - #gpio-cells         : Should be two.
+>> +                     The first cell is the pin number
+>> +                     The second one is the polarity:
+>> +                             - 0 for active high
+>> +                             - 1 for active low
+>> + - reg                 : The gpio address range, relative to the pinctrl range
+>> + - clocks      : clock that drives this bank
+>> + - st,bank-name        : Should be a name string for this bank as specified in
+>> +   the datasheet
+>
+> How do you intend to use this? We should come up with something generic
+> or drop it.
+Good point.
+It is used to have a meaningful name set in gpio_chip's label.
+I see two alternatives:
+ 1. replace "st,bank-name" with label
+ 2. use aliases, and construct label in driver with something like:
+     kasprintf(GFP_KERNEL, "GPIO%c", 'A' + of_alias_get_id(np, "gpio"));
 
-Best regards,
-Peter Chen
+What do you prefer?
+Do you have other ideas?
 
-> -----Original Message-----
-> From: Lucas Stach [mailto:l.stach at pengutronix.de]
-> Sent: Wednesday, December 09, 2015 5:13 PM
-> To: Chen Peter-B29397 <Peter.Chen@freescale.com>
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>; Mark Rutland
-> <mark.rutland@arm.com>; devicetree at vger.kernel.org; festevam at gmail.com;
-> Philipp Zabel <p.zabel@pengutronix.de>; Pawe? Moll <pawel.moll@arm.com>;
-> Greg KH <gregkh@linuxfoundation.org>; linux-usb at vger.kernel.org;
-> patryk at kowalczyk.ws; Rob Herring <robh+dt@kernel.org>;
-> stern at rowland.harvard.edu; kernel at pengutronix.de; Shawn Guo
-> <shawnguo@kernel.org>; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/3] usb: misc: generic_onboard_hub: add generic
-> onboard USB HUB driver
-> 
-> Am Mittwoch, den 09.12.2015, 17:00 +0800 schrieb Peter Chen:
-> > On Wed, Dec 09, 2015 at 09:57:40AM +0100, Lucas Stach wrote:
-> > > Am Mittwoch, den 09.12.2015, 16:50 +0800 schrieb Peter Chen:
-> > > > On Tue, Dec 08, 2015 at 08:36:00AM -0700, Mathieu Poirier wrote:
-> > > > > On 7 December 2015 at 18:37, Peter Chen <peter.chen@freescale.com>
-> wrote:
-> > > > > > +
-> > > > > > +       if (dev->of_node) {
-> > > > > > +               struct device_node *node = dev->of_node;
-> > > > > > +
-> > > > > > +               hub_data->clk = devm_clk_get(dev, "external_clk");
-> > > > > > +               if (IS_ERR(hub_data->clk)) {
-> > > > > > +                       dev_dbg(dev, "Can't get external clock: %ld\n",
-> > > > > > +                                       PTR_ERR(hub_data->clk));
-> > > > > > +               }
-> > > > >
-> > > > > Is the intended behaviour to keep going here event when there is
-> > > > > an error?  Can the "hub_data" really work without a clock?
-> > > >
-> > > > Yes, some HUB may work with fixed 24M OSC at the board, but they
-> > > > need to reset through external IO, so the clock is not need at
-> > > > this case, but reset pin is mandatory.
-> > > >
-> > > If the hub always requires a clock it must not be optional. If you
-> > > have a fixed 24MHz clock on board add this to the DT as a
-> > > fixed-clock and use it as an input to the hub.
-> > >
-> >
-> > This fixed 24MHz clock may from a fixed crystal on board, it is always
-> > on, no software need to control it, imx51-bbg board is an example.
-> >
-> And that's wh it is a fixed-clock. Please look it up in the DT binding
-> documentation.
-
-Yes, I see similar things are described at [1], but why we need this
-additional entry at dts for this case,  it is always on, no software
-is needed.
- 
-[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
- 
-Peter
+Thanks,
+Maxime
