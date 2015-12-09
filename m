@@ -1,64 +1,61 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Tue, 8 Dec 2015 17:48:03 -0800
-Subject: [PATCH v5 2/5] irqdomain: introduce is_fwnode_irqchip helper
+Date: Tue, 8 Dec 2015 17:48:04 -0800
+Subject: [PATCH v5 3/5] irqdomain: Introduce
+ irq_domain_get_irqchip_fwnode_name helper function
 In-Reply-To: <1449625686-5594-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 References: <1449625686-5594-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1449625686-5594-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1449625686-5594-4-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since there will be several places checking if fwnode.type
-is equal FWNODE_IRQCHIP, this patch adds a convenient function
-for this purpose.
+This patch adds an accessor function to retrieve struct irqchip_fwid.name.
 
 Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 ---
- drivers/irqchip/irq-gic.c | 2 +-
- include/linux/irqdomain.h | 5 +++++
- kernel/irq/irqdomain.c    | 2 +-
- 3 files changed, 7 insertions(+), 2 deletions(-)
+ include/linux/irqdomain.h |  1 +
+ kernel/irq/irqdomain.c    | 18 ++++++++++++++++++
+ 2 files changed, 19 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index abf2ffa..fcd327f 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -972,7 +972,7 @@ static int gic_irq_domain_translate(struct irq_domain *d,
- 		return 0;
- 	}
- 
--	if (fwspec->fwnode->type == FWNODE_IRQCHIP) {
-+	if (is_fwnode_irqchip(fwspec->fwnode)) {
- 		if(fwspec->param_count != 2)
- 			return -EINVAL;
- 
 diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index a06feda..d72fabc 100644
+index d72fabc..c0a95a9 100644
 --- a/include/linux/irqdomain.h
 +++ b/include/linux/irqdomain.h
-@@ -211,6 +211,11 @@ static inline struct fwnode_handle *of_node_to_fwnode(struct device_node *node)
- 	return node ? &node->fwnode : NULL;
- }
- 
-+static inline bool is_fwnode_irqchip(struct fwnode_handle *fwnode)
-+{
-+	return fwnode && fwnode->type == FWNODE_IRQCHIP;
-+}
-+
- static inline struct irq_domain *irq_find_matching_host(struct device_node *node,
- 							enum irq_domain_bus_token bus_token)
- {
+@@ -187,6 +187,7 @@ static inline struct device_node *irq_domain_get_of_node(struct irq_domain *d)
+ #ifdef CONFIG_IRQ_DOMAIN
+ struct fwnode_handle *irq_domain_alloc_fwnode(void *data);
+ void irq_domain_free_fwnode(struct fwnode_handle *fwnode);
++const char *irq_domain_get_irqchip_fwnode_name(struct fwnode_handle *fwnode);
+ struct irq_domain *__irq_domain_add(struct fwnode_handle *fwnode, int size,
+ 				    irq_hw_number_t hwirq_max, int direct_max,
+ 				    const struct irq_domain_ops *ops,
 diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 22aa961..7f34d98 100644
+index 7f34d98..a8c1cf6 100644
 --- a/kernel/irq/irqdomain.c
 +++ b/kernel/irq/irqdomain.c
-@@ -70,7 +70,7 @@ void irq_domain_free_fwnode(struct fwnode_handle *fwnode)
- {
- 	struct irqchip_fwid *fwid;
+@@ -79,6 +79,24 @@ void irq_domain_free_fwnode(struct fwnode_handle *fwnode)
+ }
  
--	if (WARN_ON(fwnode->type != FWNODE_IRQCHIP))
-+	if (WARN_ON(!is_fwnode_irqchip(fwnode)))
- 		return;
- 
- 	fwid = container_of(fwnode, struct irqchip_fwid, fwnode);
+ /**
++ * irq_domain_get_irqchip_fwnode_name - Retrieve associated name of
++ *                                      specified irqchip fwnode
++ * @fwnode: Specified fwnode_handle
++ *
++ * Returns associated name of the specified fwnode, or NULL on failure.
++ */
++const char *irq_domain_get_irqchip_fwnode_name(struct fwnode_handle *fwnode)
++{
++	struct irqchip_fwid *fwid;
++
++	if (!is_fwnode_irqchip(fwnode))
++		return NULL;
++
++	fwid = container_of(fwnode, struct irqchip_fwid, fwnode);
++	return fwid->name;
++}
++
++/**
+  * __irq_domain_add() - Allocate a new irq_domain data structure
+  * @of_node: optional device-tree node of the interrupt controller
+  * @size: Size of linear map; 0 for radix mapping only
 -- 
 2.1.0
