@@ -1,75 +1,78 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Wed,  9 Dec 2015 09:57:18 +0000
-Subject: [RFC PATCH v3 7/8] arm64: Add helper for extracting ASIDBits
+Date: Wed,  9 Dec 2015 09:57:16 +0000
+Subject: [RFC PATCH v3 5/8] arm64: Enable CPU capability verification
+ unconditionally
 In-Reply-To: <1449655039-22022-1-git-send-email-suzuki.poulose@arm.com>
 References: <1449655039-22022-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1449655039-22022-8-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1449655039-22022-6-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a helper to extract ASIDBits on the current cpu
+We verify the capabilities of the secondary CPUs only when
+hotplug is enabled. The boot time activated CPUs do not
+go through the verification by checking whether the system
+wide capabilities were initialised or not.
+
+This patch removes the capability check dependency on CONFIG_HOTPLUG_CPU,
+to make sure that all the secondary CPUs go through the check.
+The boot time activated CPUs will still skip the system wide
+capability check. The plan is to hook in a check for CPU features
+used by the kernel at early boot up, based on the Boot CPU values.
 
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/mm/context.c |   36 +++++++++++++++++++++++-------------
- 1 file changed, 23 insertions(+), 13 deletions(-)
+ arch/arm64/include/asm/cpufeature.h |    6 ------
+ arch/arm64/kernel/cpufeature.c      |   10 ----------
+ 2 files changed, 16 deletions(-)
 
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index e87f53f..643bf4b 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -40,6 +40,28 @@ static cpumask_t tlb_flush_pending;
- #define ASID_FIRST_VERSION	(1UL << asid_bits)
- #define NUM_USER_ASIDS		ASID_FIRST_VERSION
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 8f271b8..26024c4 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -164,13 +164,7 @@ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 			    const char *info);
+ void check_local_cpu_errata(void);
  
-+/* Get the ASIDBits supported by the current CPU */
-+static u32 get_cpu_asid_bits(void)
-+{
-+	u32 asid;
-+	int fld = cpuid_feature_extract_field(read_cpuid(ID_AA64MMFR0_EL1),
-+						ID_AA64MMFR0_ASID_SHIFT);
-+
-+	switch (fld) {
-+	default:
-+		pr_warn("CPU%d: Unknown ASID size (%d); assuming 8-bit\n",
-+					smp_processor_id(),  fld);
-+		/* Fallthrough */
-+	case 0:
-+		asid = 8;
-+		break;
-+	case 2:
-+		asid = 16;
-+	}
-+
-+	return asid;
-+}
-+
- static void flush_context(unsigned int cpu)
- {
- 	int i;
-@@ -187,19 +209,7 @@ switch_mm_fastpath:
+-#ifdef CONFIG_HOTPLUG_CPU
+ void verify_local_cpu_capabilities(void);
+-#else
+-static inline void verify_local_cpu_capabilities(void)
+-{
+-}
+-#endif
  
- static int asids_init(void)
+ u64 read_system_reg(u32 id);
+ 
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 517a3af..b94a198 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -767,8 +767,6 @@ static void enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
+ 			on_each_cpu(caps[i].enable, NULL, true);
+ }
+ 
+-#ifdef CONFIG_HOTPLUG_CPU
+-
+ /*
+  * Flag to indicate if we have computed the system wide
+  * capabilities based on the boot time active CPUs. This
+@@ -873,14 +871,6 @@ void verify_local_cpu_capabilities(void)
+ 	}
+ }
+ 
+-#else	/* !CONFIG_HOTPLUG_CPU */
+-
+-static inline void set_sys_caps_initialised(void)
+-{
+-}
+-
+-#endif	/* CONFIG_HOTPLUG_CPU */
+-
+ static void setup_feature_capabilities(void)
  {
--	int fld = cpuid_feature_extract_field(read_cpuid(ID_AA64MMFR0_EL1), 4);
--
--	switch (fld) {
--	default:
--		pr_warn("Unknown ASID size (%d); assuming 8-bit\n", fld);
--		/* Fallthrough */
--	case 0:
--		asid_bits = 8;
--		break;
--	case 2:
--		asid_bits = 16;
--	}
--
-+	asid_bits = get_cpu_asid_bits();
- 	/* If we end up with more CPUs than ASIDs, expect things to crash */
- 	WARN_ON(NUM_USER_ASIDS < num_possible_cpus());
- 	atomic64_set(&asid_generation, ASID_FIRST_VERSION);
+ 	update_cpu_capabilities(arm64_features, "detected feature:");
 -- 
 1.7.9.5
