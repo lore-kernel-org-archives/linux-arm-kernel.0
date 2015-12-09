@@ -1,28 +1,36 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 09 Dec 2015 21:38:59 +0100
-Subject: [PATCH] ARM: pxa: use PWM lookup table for all machines
-In-Reply-To: <3221771.lHXPua29rx@wuerfel> (Arnd Bergmann's message of "Wed, 09
- Dec 2015 17:35:05 +0100")
-References: <3221771.lHXPua29rx@wuerfel>
-Message-ID: <877fknl5lo.fsf@belgarion.home>
+Date: Wed, 09 Dec 2015 21:46:30 +0100
+Subject: [PATCH] ARM: pxa: mark ezx structures as __maybe_unused
+In-Reply-To: <7455848.ygDvrz6r6S@wuerfel> (Arnd Bergmann's message of "Wed, 09
+ Dec 2015 17:36:03 +0100")
+References: <7455848.ygDvrz6r6S@wuerfel>
+Message-ID: <8737vbl595.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Arnd Bergmann <arnd@arndb.de> writes:
 
-> The recent change to use a pwm lookup table for the ezx machines
-> was incomplete and only changed the a780 model, but not the
-> other ones in the same file.
+> The ezx platform contains multiple machine descriptors, but not all
+> of them use all of the data structures, and it's possible to disable
+> all of the machines, which produces some harmless warnings:
 >
-> This adds the missing calls to pwm_add_table().
+> mach-pxa/ezx.c:53:26: warning: 'ezx_pwm_lookup' defined but not used [-Wunused-variable]
+> mach-pxa/ezx.c:86:31: warning: 'ezx_fb_info_1' defined but not used [-Wunused-variable]
+> mach-pxa/ezx.c:107:31: warning: 'ezx_fb_info_2' defined but not used [-Wunused-variable]
+> mach-pxa/ezx.c:113:32: warning: 'ezx_devices' defined but not used [-Wunused-variable]
+> mach-pxa/ezx.c:117:22: warning: 'ezx_pin_config' defined but not used [-Wunused-variable]
+>
+> This marks all those structures as __maybe_unused to avoid the warnings.
+> Obviously a configuration that contains the ezx platform but no specific
+> model is a bit silly, but it should not cause compile-time warnings.
 >
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: c3322022897c ("ARM: pxa: ezx: Use PWM lookup table")
-> Acked-by: Thierry Reding <thierry.reding@gmail.com>
-> ---
-> If nobody has any objections, I'll queue this up for 4.4. No backport
-> is needed as it only broke in this release.
 Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+
+I think you'll take that through your tree, as I'm passing the v4.5 pull. If you
+want me to take them, just tell me, but I think v4.5 is already prepared on your
+side as I've seen a mail from Boris talking about pxa patches going through mtd
+tree for v4.5.
 
 Cheers.
 
