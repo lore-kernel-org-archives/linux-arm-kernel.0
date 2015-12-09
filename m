@@ -1,87 +1,64 @@
-From: sunil.kovvuri@gmail.com (Sunil Goutham)
-Date: Wed,  9 Dec 2015 17:08:01 +0530
-Subject: [PATCH 2/2] net: thunderx: Enable CQE count threshold interrupt
-In-Reply-To: <y>
-References: <y>
-Message-ID: <1449661081-15435-3-git-send-email-sunil.kovvuri@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 9 Dec 2015 11:38:53 +0000
+Subject: [PATCH v8 3/4] arm64: Add do_softirq_own_stack() and enable
+ irq_stacks
+In-Reply-To: <5667F897.5070005@arm.com>
+References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
+ <1449226948-14251-4-git-send-email-james.morse@arm.com>
+ <20151207224805.GA20777@MBP.local> <20151208114321.GD19612@arm.com>
+ <4EBA6141-5CFB-4CAC-97D2-26346AAA91F0@gmail.com>
+ <56671214.30402@arm.com> <5667F897.5070005@arm.com>
+Message-ID: <20151209113852.GC9303@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
+On Wed, Dec 09, 2015 at 09:47:03AM +0000, James Morse wrote:
+> On 08/12/15 17:23, James Morse wrote:
+> > My only theory is that there is an off by one, and its reading what was
+> > x29 instead. This wouldn't show up in these tests, but might be a
+> > problem for aarch32 user-space, as presumably x29==0 when it switches to
+> > aarch64 mode for el0_irq(). I will try this tomorrow.
+> 
+> Yup, this is what is happening. Its an off-by-one due to broken thinking
+> about how the stack works. My broken thinking was:
+> 
+> >   top ------------
+> >       | dummy_lr | <- irq_stack_ptr
+> >       ------------
+> >       |   x29    |
+> >       ------------
+> >       |   x19    | <- irq_stack_ptr - 0x10
+> >       ------------
+> >       |   xzr    |
+> >       ------------
+> 
+> But the stack-pointer is decreased before use. So it actually looks like
+> this:
+> 
+> >       ------------
+> >       |          |  <- irq_stack_ptr
+> >   top ------------
+> >       | dummy_lr |
+> >       ------------
+> >       |   x29    | <- irq_stack_ptr - 0x10
+> >       ------------
+> >       |   x19    |
+> >       ------------
+> >       |   xzr    | <- irq_stack_ptr - 0x20
+> >       ------------
+> 
+> The value being used as the original stack is x29, which in all the
+> tests is sp but without the current frames data, hence there are no
+> missing frames in the output.
+> 
+> Jungseok Lee picked it up with a 32bit user space because aarch32 can't
+> use x29, so it remains 0 forever. The fix he posted is correct.
+> 
+> Will: do you want to take Jungseok Lee's patch as a 'Fixes:', or is it
+> easier if I repost the series?
 
-This feature is introduced in pass-2 chip and with this CQ interrupt
-coalescing will work based on both timer and count.
+I'll take it as a fix on top, but I still want to get to the bottom of
+why unwind_frame appeared to be exploding. We really shouldn't be relying
+on the frame layout to provide us with safe addresses in there.
 
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/nic.h          |    2 ++
- drivers/net/ethernet/cavium/thunder/nicvf_main.c   |    2 +-
- drivers/net/ethernet/cavium/thunder/nicvf_queues.c |    5 ++++-
- drivers/net/ethernet/cavium/thunder/nicvf_queues.h |    3 ++-
- 4 files changed, 9 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
-index 02571f4..e782856 100644
---- a/drivers/net/ethernet/cavium/thunder/nic.h
-+++ b/drivers/net/ethernet/cavium/thunder/nic.h
-@@ -34,6 +34,8 @@
- /* NIC priv flags */
- #define	NIC_SRIOV_ENABLED		BIT(0)
- 
-+#define	VNIC_NAPI_WEIGHT		NAPI_POLL_WEIGHT
-+
- /* Min/Max packet size */
- #define	NIC_HW_MIN_FRS			64
- #define	NIC_HW_MAX_FRS			9200 /* 9216 max packet including FCS */
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index c24cb2a..e06a7f8 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -1155,7 +1155,7 @@ int nicvf_open(struct net_device *netdev)
- 		cq_poll->cq_idx = qidx;
- 		cq_poll->nicvf = nic;
- 		netif_napi_add(netdev, &cq_poll->napi, nicvf_poll,
--			       NAPI_POLL_WEIGHT);
-+			       VNIC_NAPI_WEIGHT);
- 		napi_enable(&cq_poll->napi);
- 		nic->napi[qidx] = cq_poll;
- 	}
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-index b11fc09..4e9709e 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-@@ -299,7 +299,10 @@ static int nicvf_init_cmp_queue(struct nicvf *nic,
- 		return err;
- 
- 	cq->desc = cq->dmem.base;
--	cq->thresh = CMP_QUEUE_CQE_THRESH;
-+	if (!pass1_silicon(nic->pdev))
-+		cq->thresh = CMP_QUEUE_CQE_THRESH;
-+	else
-+		cq->thresh = 0;
- 	nic->cq_coalesce_usecs = (CMP_QUEUE_TIMER_THRESH * 0.05) - 1;
- 
- 	return 0;
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-index a4f6667..0fae6ad 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-@@ -10,6 +10,7 @@
- #define NICVF_QUEUES_H
- 
- #include <linux/netdevice.h>
-+#include "nic.h"
- #include "q_struct.h"
- 
- #define MAX_QUEUE_SET			128
-@@ -75,7 +76,7 @@
-  */
- #define CMP_QSIZE		CMP_QUEUE_SIZE2
- #define CMP_QUEUE_LEN		(1ULL << (CMP_QSIZE + 10))
--#define CMP_QUEUE_CQE_THRESH	0
-+#define CMP_QUEUE_CQE_THRESH	(VNIC_NAPI_WEIGHT / 2)
- #define CMP_QUEUE_TIMER_THRESH	80 /* ~2usec */
- 
- #define RBDR_SIZE		RBDR_SIZE0
--- 
-1.7.1
+Will
