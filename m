@@ -1,49 +1,58 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Wed, 9 Dec 2015 14:55:44 +0800
-Subject: [PATCH v6 1/5] dt-bindings: iommu: Add binding for mediatek IOMMU
-In-Reply-To: <20151209033302.GA12091@rob-hp-laptop>
-References: <1449568153-15643-1-git-send-email-yong.wu@mediatek.com>
- <1449568153-15643-2-git-send-email-yong.wu@mediatek.com>
- <20151209033302.GA12091@rob-hp-laptop>
-Message-ID: <1449644144.14761.44.camel@mhfsdcap03>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Wed, 09 Dec 2015 07:59:20 +0100
+Subject: [RFC] ARM: remove VIRT_TO_BUS
+In-Reply-To: <1630488.4B57tj3Z8o@wuerfel>
+References: <1630488.4B57tj3Z8o@wuerfel>
+Message-ID: <s5hsi3cyunr.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-also add Mark.
-
-On Tue, 2015-12-08 at 21:33 -0600, Rob Herring wrote:
-> On Tue, Dec 08, 2015 at 05:49:09PM +0800, Yong Wu wrote:
-> > This patch add mediatek iommu dts binding document.
-> > 
-> > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/iommu/mediatek,iommu.txt   |  68 +++++++++++++
-> >  include/dt-bindings/memory/mt8173-larb-port.h      | 111 +++++++++++++++++++++
+On Tue, 08 Dec 2015 22:54:45 +0100,
+Arnd Bergmann wrote:
 > 
-> This should be iommu rather than memory.
-
-Hi Rob,
-   Thanks very much for review.
-
-   From the HW, all the larbs and ports are defined in the SMI.
-About the position of the SMI code, We also discussed before in [1].
-So I put the header file in /dt-bindings/memory/.
-
-This is a smi larb-port header file, maybe we should move this header
-file into this patch:
-[2/5] dt-bindings: mediatek: Add smi dts binding
-
-is it ok if we move it into [2/5]?
-
-[1]
-http://lists.infradead.org/pipermail/linux-mediatek/2015-March/000121.html
-
+> All drivers that are relevant for rpc or footbridge have stopped
+> using virt_to_bus a while ago, so we can remove it and avoid some
+> harmless randconfig warnings for drivers that we do not care about:
 > 
-> Otherwise, it looks okay to me.
-
-Thanks.
-
+> drivers/atm/zatm.c: In function 'poll_rx':
+> drivers/atm/zatm.c:401:18: warning: 'bus_to_virt' is deprecated [-Wdeprecated-declarations]
+>    skb = ((struct rx_buffer_head *) bus_to_virt(here[2]))->skb;
 > 
-> >  2 files changed, 179 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
-> >  create mode 100644 include/dt-bindings/memory/mt8173-larb-port.h
+> FWIW, the remaining drivers using this are:
+> 
+> ATM:  firestream, zatm, ambassador, horizon
+> ISDN: hisax/netjet
+> V4L:  STA2X11, zoran
+> Net:  Appletalk LTPC, Tulip DE4x5, Toshiba IrDA
+> WAN:  comtrol sv11, cosa, lanmedia, sealevel
+> SCSI: DPT_I2O, buslogic
+> VME:  CA91C142
+> 
+> My best guess is that all of the above are so hopelessly obsolete that
+> we are best off removing all of them form the kernel, but that can be
+> done another time.
+> 
+> The sound drivers used to rely on virt_to_bus, but don't any more.
+> As a lot of architectures don't provide VIRT_TO_BUS any more, removing
+> the dependency in sounds/oss/ would make the deprecated drivers appear
+> there, which we probably don't want. Instead I'm replacing the
+> simple dependency with 'VIRT_TO_BUS || RPC || NETWINDER' so we can
+> still build these sound drivers for the platforms that need them,
+> but don't change anything on other architectures.
+
+Yeah, agreed.
+
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> No hurry for this one. If we can agree that it's a good idea, we
+> can probably do the sound/oss change first, and then do the
+> rest for the following merge window. If nobody cares about picking
+> up the sound/oss patches, we can also just do it as one patch.
+
+I'm willing to apply sound/oss one now.  Could you split the patch for
+that?
+
+
+thanks,
+
+Takashi
