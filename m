@@ -1,30 +1,29 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  9 Dec 2015 15:58:10 +0000
-Subject: [PATCH v6 03/10] ARM: multi_v7_defconfig: Enable support for PWM
- Regulators
+Date: Wed,  9 Dec 2015 15:58:09 +0000
+Subject: [PATCH v6 02/10] ARM: multi_v7_defconfig: Enable ST's Power Reset
+ driver
 In-Reply-To: <1449676697-25432-1-git-send-email-lee.jones@linaro.org>
 References: <1449676697-25432-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1449676697-25432-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1449676697-25432-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/configs/multi_v7_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index f62dcb1..648ef57 100644
+index 99b87b6..f62dcb1 100644
 --- a/arch/arm/configs/multi_v7_defconfig
 +++ b/arch/arm/configs/multi_v7_defconfig
-@@ -434,7 +434,7 @@ CONFIG_REGULATOR_MAX77693=m
- CONFIG_REGULATOR_MAX77802=m
- CONFIG_REGULATOR_PALMAS=y
- CONFIG_REGULATOR_PBIAS=y
--CONFIG_REGULATOR_PWM=m
-+CONFIG_REGULATOR_PWM=y
- CONFIG_REGULATOR_QCOM_RPM=y
- CONFIG_REGULATOR_QCOM_SMD_RPM=y
- CONFIG_REGULATOR_S2MPS11=y
+@@ -371,6 +371,7 @@ CONFIG_POWER_RESET_GPIO=y
+ CONFIG_POWER_RESET_GPIO_RESTART=y
+ CONFIG_POWER_RESET_KEYSTONE=y
+ CONFIG_POWER_RESET_RMOBILE=y
++CONFIG_POWER_RESET_ST=y
+ CONFIG_SENSORS_LM90=y
+ CONFIG_SENSORS_LM95245=y
+ CONFIG_SENSORS_NTC_THERMISTOR=m
 -- 
 1.9.1
