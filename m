@@ -1,106 +1,36 @@
-From: yankejian@huawei.com (Yankejian (Hackim Yim))
-Date: Wed, 9 Dec 2015 17:25:13 +0800
-Subject: arRe: [PATCH net-next 2/2] net: hns: enet specisies a reference
- to dsaf (config and documents)
-In-Reply-To: <1503684.BNZUVaD74W@wuerfel>
-References: <1449295856-31068-1-git-send-email-yankejian@huawei.com>
- <23027215.8RIhViTVaB@wuerfel> <566531C5.4050208@huawei.com>
- <1503684.BNZUVaD74W@wuerfel>
-Message-ID: <5667F379.2010108@huawei.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 9 Dec 2015 10:28:22 +0100
+Subject: [PATCH] ARM: shmobile: defconfig: Enable CONFIG_PRINTK_TIME
+In-Reply-To: <20151201064434.GI16260@verge.net.au>
+References: <1448890534-1430-1-git-send-email-geert+renesas@glider.be>
+ <20151201064434.GI16260@verge.net.au>
+Message-ID: <CAMuHMdWy3BWSe7ASwN4JejoJR8cDT06gSA5d+bPSRB7COR3Mzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Simon,
 
+On Tue, Dec 1, 2015 at 7:44 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Nov 30, 2015 at 02:35:34PM +0100, Geert Uytterhoeven wrote:
+>> Enable timestamps for kernel log output to improve debugging.
+>> You can always use "dmesg -t" to strip the timestamps.
+>>
+>> Don't specify CONFIG_LOG_BUF_SHIFT=16 while we're at it.  There's a
+>> reason the default in Kconfig is higher ;-)
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> Thanks, I have queued this up.
 
-On 2015/12/7 17:40, Arnd Bergmann wrote:
-> On Monday 07 December 2015 15:14:13 Yankejian wrote:
->> On 2015/12/6 6:19, Arnd Bergmann wrote:
->>> On Saturday 05 December 2015 14:10:56 yankejian wrote:
->>>> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
->>>> index 80411b2..ecacfa4 100644
->>>> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
->>>> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
->>>> @@ -4,8 +4,6 @@ Required properties:
->>>>  - compatible: should be "hisilicon,hns-dsaf-v1" or "hisilicon,hns-dsaf-v2".
->>>>    "hisilicon,hns-dsaf-v1" is for hip05.
->>>>    "hisilicon,hns-dsaf-v2" is for Hi1610 and Hi1612.
->>>> -- dsa-name: dsa fabric name who provide this interface.
->>>> -  should be "dsafX", X is the dsaf id.
->>>>  - mode: dsa fabric mode string. only support one of dsaf modes like these:
->>>>                 "2port-64vf",
->>>>                 "6port-16rss",
->>>> @@ -26,9 +24,8 @@ Required properties:
->>>>  
->>>>  Example:
->>>>  
->>>> -dsa: dsa at c7000000 {
->>>> +dsaf0: dsa at c7000000 {
->>>>         compatible = "hisilicon,hns-dsaf-v1";
->>>> -       dsa_name = "dsaf0";
->>>>         mode = "6port-16rss";
->>>>         interrupt-parent = <&mbigen_dsa>;
->>>>         reg = <0x0 0xC0000000 0x0 0x420000
->>>> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
->>>> index 41d19be..e6a9d1c 100644
->>>> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
->>>> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-nic.txt
->>>> @@ -4,8 +4,9 @@ Required properties:
->>>>  - compatible: "hisilicon,hns-nic-v1" or "hisilicon,hns-nic-v2".
->>>>    "hisilicon,hns-nic-v1" is for hip05.
->>>>    "hisilicon,hns-nic-v2" is for Hi1610 and Hi1612.
->>>> -- ae-name: accelerator name who provides this interface,
->>>> -  is simply a name referring to the name of name in the accelerator node.
->>>> +- ae-handle: accelerator engine handle for hns,
->>>> +  specifies a reference to the associating hardware driver node.
->>>> +  see Documentation/devicetree/bindings/net/hisilicon-hns-dsaf.txt
->>>>  - port-id: is the index of port provided by DSAF (the accelerator). DSAF can
->>>>    connect to 8 PHYs. Port 0 to 1 are both used for adminstration purpose. They
->>>>    are called debug ports.
->>>> @@ -41,7 +42,7 @@ Example:
->>>>  
->>>>
->>> This looks like an incompatible change, as you add and remove
->>> required properties. Is there a way to support both the old and
->>> the new style?
->>>
->>>       Arnd
->>>
->>> .
->> Hi Arnd,
->> Thanks for your suggestions.  it must be set the same strings in dsaf node and every enet node before.
->> it seems inappropriate. as Rob Herring <robh@kernel.org> 's suggestions, that would solve associating
->> enet with a particular dsaf. so we discus the solution with Yisen Zhuang <yisen.zhuang@huawei.com>.
->> we decide to use the new way instead of the old one.
-> I agree the new form looks better than the original way, but I'm worried
-> about the migration path. You don't explain in the patch description
-> how you want to ensure that nothing breaks for existing systems.
->
-> We generally try to avoid doing incompatible changes altogether and
-> prefer to keep backwards compatibility, unless we can prove that no
-> other systems exist that would get impacted by the change.
->
-> Are you sure that nobody ships a DTB file for this hardware with their
-> firmware that would now require an incompatible update which in turn
-> breaks old kernels?
->
-> Are you sure that there is no hardware using the same dsa hardware
-> with out-of-tree dts files that need to make the same change but might
-> not be aware of the change?
->
-> 	Arnd
->
-> .
- 
- hi Arnd.
+Still not present in renesas-devel?
 
- thanks a lot for pointing it out.
+Gr{oetje,eeting}s,
 
- It is great regret that this change breaks compatibility with old dtbs.
- this is a new driver which is run on developing boards, and all the
- clients' boards are developing boards. So we provide them a method to
- update the firmware on the board, once we update the dtsi and kernel,
- we require our clients to update the existed firmware and kernel.
- Therefore, these changes is actually under control. Shall we treat this
- by this way?
+                        Geert
 
- thanks very much.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
