@@ -1,191 +1,211 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 8 Dec 2015 16:36:24 -0800
-Subject: [PATCH v2 00/25] mtd: nand: refactor the NAND subsystem (part 1)
-In-Reply-To: <1448967802-25796-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1448967802-25796-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20151209003624.GU120110@google.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Wed, 9 Dec 2015 09:02:56 +0800
+Subject: [PATCH v10 05/17] dt-bindings: add document for analogix display
+ port driver
+In-Reply-To: <20151208150131.GA8646@rob-hp-laptop>
+References: <1449470239-30667-1-git-send-email-ykk@rock-chips.com>
+ <1449470347-31062-1-git-send-email-ykk@rock-chips.com>
+ <20151208150131.GA8646@rob-hp-laptop>
+Message-ID: <56677DC0.3080903@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Rob,
 
-On Tue, Dec 01, 2015 at 12:02:57PM +0100, Boris Brezillon wrote:
-> Hello,
-> 
-> This huge series aims at clarifying the relationship between the mtd and
-> nand_chip structures and hiding NAND framework internals to NAND
-> controller drivers.
-> 
-> The first part of the series provide an mtd_to_nand() helper to hide the
-> way mtd and nand_chip are linked together.
-> 
-> The second part of the series embeds the mtd structure into the nand_chip
-> one so that NAND controller drivers don't have to bother allocating the
-> MTD device and linking it with the NAND chip.
-> 
-> The last part of the series hides accesses to the chip->priv field behind
-> two helper functions.
-> 
-> This allows removal of some of the boilerplate code done in all NAND
-> controller drivers, but most importantly, it unifies a bit the way NAND
-> chip structures are instantiated (even though we still have two different
-> kinds of drivers: those embedding the nand_chip struct into their private
-> nand chip representation, and those allocating two different structures
-> and linking them together with the chip->priv field).
-> 
-> As said in the title, this refactoring is only the first step. I plan to
-> rework the NAND controller / NAND chip separation for pretty much the same
-> reasons: clarifying the separation between the two concepts, and getting
-> rid of more boilerplate code in NAND controller drivers.
-> 
-> Stay tuned ;-).
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> Changes since v1:
-> - dropped already applied patches
-> - fixed some typos
-> - manually fixed some modifications omitted by the coccinelle scripts
-> - manually reworked modifactions done by coccinelle scripts to improve
->   readability and fix coding style issues
-> 
-> Boris Brezillon (25):
->   ARM: nand: make use of mtd_to_nand() where appropriate
+Thanks
 
-I've sent this (+ the introduction of mtd_to_nand()) in a pull request
-to arm-soc, as well as to l2-mtd.git.
+- Yakir
 
->   blackfin: nand: make use of mtd_to_nand() where appropriate
->   cris: nand: make use of mtd_to_nand() where appropriate
->   mips: nand: make use of mtd_to_nand() where appropriate
-
-I've based these on v4.4-rc1 and brought them into l2-mtd.git, in case
-any arch/{blackfin,cris,mips}/ people want to pull them in too.
-
->   sh: nand: make use of mtd_to_nand() where appropriate
->   mtd: nand: make use of mtd_to_nand() in NAND core code
->   mtd: nand: make use of mtd_to_nand() in NAND drivers
->   staging: mt29f_spinand: make use of mtd_to_nand()
->   mtd: nand: embed an mtd_info structure into nand_chip
->   mtd: nand: add nand_to_mtd() helper
-
-Pulled the rest up to here into l2-mtd.git.
-
->   coccinelle: nand: detect and correct drivers embedding an mtd_info
->     object
-
-I believe Julia had comments on this. That probably would go through the
-kbuild tree in the end anyway (?).
-
->   mtd: nand: use the mtd instance embedded in struct nand_chip
-
-There's still at least one problem in this patch (commented on the
-patch). It touches a lot of drivers, so any extra review would be great.
-
->   mtd: nand: update the documentation to reflect framework changes
->   staging: mt29f_spinand: use the mtd instance embedded in struct
->     nand_chip
->   cris: nand: use the mtd instance embedded in struct nand_chip
->   mtd: nand: update mtd_to_nand()
->   mtd: nand: remove useless mtd->priv = chip assignments
->   cris: nand: remove useless mtd->priv = chip assignments
->   staging: mt29f_spinand: remove useless mtd->priv = chip assignment
->   mtd: nand: simplify nand_dt_init() usage
->   mtd: nand: kill the chip->flash_node field
->   mtd: nand: add helpers to access ->priv
->   ARM: make use of nand_set/get_controller_data() helpers
->   mtd: nand: make use of nand_set/get_controller_data() helpers
->   staging: mt29f_spinand: make use of nand_set/get_controller_data()
->     helpers
-
-All the rest look good to me. I'll wait until I get a good copy of patch
-12 before taking them.
-
-Brian
-
->  Documentation/DocBook/mtdnand.tmpl             |  31 +++---
->  arch/arm/mach-ep93xx/snappercl15.c             |   4 +-
->  arch/arm/mach-ep93xx/ts72xx.c                  |   4 +-
->  arch/arm/mach-imx/mach-qong.c                  |   2 +-
->  arch/arm/mach-ixp4xx/ixdp425-setup.c           |   6 +-
->  arch/arm/mach-omap1/board-nand.c               |   2 +-
->  arch/arm/mach-orion5x/ts78xx-setup.c           |   6 +-
->  arch/arm/mach-pxa/balloon3.c                   |   2 +-
->  arch/arm/mach-pxa/em-x270.c                    |   2 +-
->  arch/arm/mach-pxa/palmtx.c                     |   2 +-
->  arch/blackfin/mach-bf537/boards/stamp.c        |   2 +-
->  arch/blackfin/mach-bf561/boards/acvilon.c      |   2 +-
->  arch/cris/arch-v32/drivers/mach-a3/nandflash.c |   8 +-
->  arch/cris/arch-v32/drivers/mach-fs/nandflash.c |   8 +-
->  arch/mips/alchemy/devboards/db1200.c           |   2 +-
->  arch/mips/alchemy/devboards/db1300.c           |   2 +-
->  arch/mips/alchemy/devboards/db1550.c           |   2 +-
->  arch/mips/pnx833x/common/platform.c            |   2 +-
->  arch/mips/rb532/devices.c                      |   2 +-
->  arch/sh/boards/mach-migor/setup.c              |   2 +-
->  drivers/mtd/nand/ams-delta.c                   |  26 ++---
->  drivers/mtd/nand/atmel_nand.c                  | 118 ++++++++++----------
->  drivers/mtd/nand/au1550nd.c                    |  40 +++----
->  drivers/mtd/nand/bcm47xxnflash/bcm47xxnflash.h |   1 -
->  drivers/mtd/nand/bcm47xxnflash/main.c          |   9 +-
->  drivers/mtd/nand/bcm47xxnflash/ops_bcm4706.c   |  34 +++---
->  drivers/mtd/nand/bf5xx_nand.c                  |  25 ++---
->  drivers/mtd/nand/brcmnand/brcmnand.c           |  54 +++++----
->  drivers/mtd/nand/cafe_nand.c                   |  51 +++++----
->  drivers/mtd/nand/cmx270_nand.c                 |  20 ++--
->  drivers/mtd/nand/cs553x_nand.c                 |  30 +++--
->  drivers/mtd/nand/davinci_nand.c                |  37 ++++---
->  drivers/mtd/nand/denali.c                      |  67 ++++++-----
->  drivers/mtd/nand/denali.h                      |   1 -
->  drivers/mtd/nand/diskonchip.c                  | 148 ++++++++++++-------------
->  drivers/mtd/nand/docg4.c                       |  91 ++++++++-------
->  drivers/mtd/nand/fsl_elbc_nand.c               |  61 +++++-----
->  drivers/mtd/nand/fsl_ifc_nand.c                |  71 ++++++------
->  drivers/mtd/nand/fsl_upm.c                     |  31 +++---
->  drivers/mtd/nand/fsmc_nand.c                   |  69 ++++++------
->  drivers/mtd/nand/gpio.c                        |  19 ++--
->  drivers/mtd/nand/gpmi-nand/gpmi-lib.c          |   2 +-
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.c         |  67 ++++++-----
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.h         |   1 -
->  drivers/mtd/nand/hisi504_nand.c                |  48 ++++----
->  drivers/mtd/nand/jz4740_nand.c                 |  14 +--
->  drivers/mtd/nand/lpc32xx_mlc.c                 |  32 +++---
->  drivers/mtd/nand/lpc32xx_slc.c                 |  42 ++++---
->  drivers/mtd/nand/mpc5121_nfc.c                 |  52 +++++----
->  drivers/mtd/nand/mxc_nand.c                    |  76 +++++++------
->  drivers/mtd/nand/nand_base.c                   | 102 +++++++++--------
->  drivers/mtd/nand/nand_bbt.c                    |  32 +++---
->  drivers/mtd/nand/nand_bch.c                    |   4 +-
->  drivers/mtd/nand/nand_ecc.c                    |   4 +-
->  drivers/mtd/nand/nandsim.c                     |  35 +++---
->  drivers/mtd/nand/ndfc.c                        |  53 ++++-----
->  drivers/mtd/nand/nuc900_nand.c                 |  25 ++---
->  drivers/mtd/nand/omap2.c                       | 109 ++++++++++--------
->  drivers/mtd/nand/orion_nand.c                  |  13 +--
->  drivers/mtd/nand/pasemi_nand.c                 |  21 ++--
->  drivers/mtd/nand/plat_nand.c                   |  16 +--
->  drivers/mtd/nand/pxa3xx_nand.c                 |  70 ++++++------
->  drivers/mtd/nand/r852.c                        |  41 +++----
->  drivers/mtd/nand/r852.h                        |   1 -
->  drivers/mtd/nand/s3c2410.c                     |  32 +++---
->  drivers/mtd/nand/sh_flctl.c                    |   9 +-
->  drivers/mtd/nand/sharpsl.c                     |  23 ++--
->  drivers/mtd/nand/sm_common.c                   |   2 +-
->  drivers/mtd/nand/socrates_nand.c               |  24 ++--
->  drivers/mtd/nand/sunxi_nand.c                  |  40 ++++---
->  drivers/mtd/nand/tmio_nand.c                   |  13 ++-
->  drivers/mtd/nand/txx9ndfmc.c                   |  25 ++---
->  drivers/mtd/nand/vf610_nfc.c                   |   9 +-
->  drivers/mtd/nand/xway_nand.c                   |   4 +-
->  drivers/staging/mt29f_spinand/mt29f_spinand.c  |  19 ++--
->  include/linux/mtd/nand.h                       |  26 ++++-
->  include/linux/mtd/sh_flctl.h                   |   3 +-
->  scripts/coccinelle/api/nand-priv-no-mtd.cocci  |  91 +++++++++++++++
->  78 files changed, 1179 insertions(+), 1097 deletions(-)
->  create mode 100644 scripts/coccinelle/api/nand-priv-no-mtd.cocci
-> 
-> -- 
-> 2.1.4
-> 
+On 12/08/2015 11:01 PM, Rob Herring wrote:
+> On Mon, Dec 07, 2015 at 02:39:07PM +0800, Yakir Yang wrote:
+>> Analogix dp driver is split from exynos dp driver, so we just
+>> make an copy of exynos_dp.txt, and then simplify exynos_dp.txt
+>>
+>> Beside update some exynos dtsi file with the latest change
+>> according to the devicetree binding documents.
+>>
+>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+>> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+>
+>> ---
+>> Changes in v10: None
+>> Changes in v9: None
+>> Changes in v8:
+>> - Correct the right document path of display-timing.txt (Heiko)
+>> - Correct the misspell of 'from' to 'frm'. (Heiko)
+>>
+>> Changes in v7: None
+>> Changes in v6: None
+>> Changes in v5: None
+>> Changes in v4:
+>> - Split all DTS changes, and provide backward compatibility. Mark old
+>>    properties as deprecated but still support them. (Krzysztof)
+>> - Update "analogix,hpd-gpio" to "hpd-gpios" prop name. (Rob)
+>> - Deprecated some properties which could parsed from Edid/Mode/DPCD. (Thierry)
+>>      "analogix,color-space" & "analogix,color-depth"   &
+>>      "analogix,link-rate"   & "analogix,lane-count"    &
+>>      "analogix,ycbcr-coeff" & "analogix,dynamic-range" &
+>>      "vsync-active-high"    & "hsync-active-high"      & "interlaces"
+>>
+>> Changes in v3:
+>> - Add devicetree binding documents. (Heiko)
+>> - Remove sync pol & colorimetry properies from the new analogix dp driver
+>>    devicetree binding. (Thierry)
+>> - Update the exist exynos dtsi file with the latest DP DT properies.
+>>
+>> Changes in v2: None
+>>
+>>   .../bindings/display/bridge/analogix_dp.txt        | 50 +++++++++++++++++
+>>   .../bindings/display/exynos/exynos_dp.txt          | 65 ++++++++--------------
+>>   2 files changed, 72 insertions(+), 43 deletions(-)
+>>   create mode 100644 Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
+>> new file mode 100644
+>> index 0000000..7659a7a
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
+>> @@ -0,0 +1,50 @@
+>> +Analogix Display Port bridge bindings
+>> +
+>> +Required properties for dp-controller:
+>> +	-compatible:
+>> +		platform specific such as:
+>> +		 * "samsung,exynos5-dp"
+>> +		 * "rockchip,rk3288-dp"
+>> +	-reg:
+>> +		physical base address of the controller and length
+>> +		of memory mapped region.
+>> +	-interrupts:
+>> +		interrupt combiner values.
+>> +	-clocks:
+>> +		from common clock binding: handle to dp clock.
+>> +	-clock-names:
+>> +		from common clock binding: Shall be "dp".
+>> +	-interrupt-parent:
+>> +		phandle to Interrupt combiner node.
+>> +	-phys:
+>> +		from general PHY binding: the phandle for the PHY device.
+>> +	-phy-names:
+>> +		from general PHY binding: Should be "dp".
+>> +
+>> +Optional properties for dp-controller:
+>> +	-hpd-gpios:
+>> +		Hotplug detect GPIO.
+>> +		Indicates which GPIO should be used for hotplug detection
+>> +	-port@[X]: SoC specific port nodes with endpoint definitions as defined
+>> +		in Documentation/devicetree/bindings/media/video-interfaces.txt,
+>> +		please refer to the SoC specific binding document:
+>> +		* Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+>> +		* Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt
+>> +
+>> +
+>> +[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
+>> +-------------------------------------------------------------------------------
+>> +
+>> +Example:
+>> +
+>> +	dp-controller {
+>> +		compatible = "samsung,exynos5-dp";
+>> +		reg = <0x145b0000 0x10000>;
+>> +		interrupts = <10 3>;
+>> +		interrupt-parent = <&combiner>;
+>> +		clocks = <&clock 342>;
+>> +		clock-names = "dp";
+>> +
+>> +		phys = <&dp_phy>;
+>> +		phy-names = "dp";
+>> +	};
+>> diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+>> index 64693f2..9905081 100644
+>> --- a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+>> +++ b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+>> @@ -31,45 +31,31 @@ Required properties for dp-controller:
+>>   		from general PHY binding: the phandle for the PHY device.
+>>   	-phy-names:
+>>   		from general PHY binding: Should be "dp".
+>> -	-samsung,color-space:
+>> -		input video data format.
+>> -			COLOR_RGB = 0, COLOR_YCBCR422 = 1, COLOR_YCBCR444 = 2
+>> -	-samsung,dynamic-range:
+>> -		dynamic range for input video data.
+>> -			VESA = 0, CEA = 1
+>> -	-samsung,ycbcr-coeff:
+>> -		YCbCr co-efficients for input video.
+>> -			COLOR_YCBCR601 = 0, COLOR_YCBCR709 = 1
+>> -	-samsung,color-depth:
+>> -		number of bits per colour component.
+>> -			COLOR_6 = 0, COLOR_8 = 1, COLOR_10 = 2, COLOR_12 = 3
+>> -	-samsung,link-rate:
+>> -		link rate supported by the panel.
+>> -			LINK_RATE_1_62GBPS = 0x6, LINK_RATE_2_70GBPS = 0x0A
+>> -	-samsung,lane-count:
+>> -		number of lanes supported by the panel.
+>> -			LANE_COUNT1 = 1, LANE_COUNT2 = 2, LANE_COUNT4 = 4
+>> -	- display-timings: timings for the connected panel as described by
+>> -		Documentation/devicetree/bindings/display/display-timing.txt
+>>   
+>>   Optional properties for dp-controller:
+>> -	-interlaced:
+>> -		interlace scan mode.
+>> -			Progressive if defined, Interlaced if not defined
+>> -	-vsync-active-high:
+>> -		VSYNC polarity configuration.
+>> -			High if defined, Low if not defined
+>> -	-hsync-active-high:
+>> -		HSYNC polarity configuration.
+>> -			High if defined, Low if not defined
+>> -	-samsung,hpd-gpio:
+>> -		Hotplug detect GPIO.
+>> -			Indicates which GPIO should be used for hotplug
+>> -			detection
+>> -	-video interfaces: Device node can contain video interface port
+>> -			    nodes according to [1].
+>> +	- display-timings: timings for the connected panel as described by
+>> +		Documentation/devicetree/bindings/display/panel/display-timing.txt
+>> +
+>> +For the below properties, please refer to Analogix DP binding document:
+>> + * Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
+>> +	-phys (required)
+>> +	-phy-names (required)
+>> +	-hpd-gpios (optional)
+>> +	-video interfaces (optional)
+>>   
+>> -[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
+>> +Deprecated properties for DisplayPort:
+>> +-interlaced:            deprecated prop that can parsed from drm_display_mode.
+>> +-vsync-active-high:     deprecated prop that can parsed from drm_display_mode.
+>> +-hsync-active-high:     deprecated prop that can parsed from drm_display_mode.
+>> +-samsung,ycbcr-coeff:   deprecated prop that can parsed from drm_display_mode.
+>> +-samsung,dynamic-range: deprecated prop that can parsed from drm_display_mode.
+>> +-samsung,color-space:   deprecated prop that can parsed from drm_display_info.
+>> +-samsung,color-depth:   deprecated prop that can parsed from drm_display_info.
+>> +-samsung,link-rate:     deprecated prop that can reading from monitor by dpcd method.
+>> +-samsung,lane-count:    deprecated prop that can reading from monitor by dpcd method.
+>> +-samsung,hpd-gpio:      deprecated name for hpd-gpios.
+>> +
+>> +-------------------------------------------------------------------------------
+>>   
+>>   Example:
+>>   
+>> @@ -88,13 +74,6 @@ SOC specific portion:
+>>   
+>>   Board Specific portion:
+>>   	dp-controller {
+>> -		samsung,color-space = <0>;
+>> -		samsung,dynamic-range = <0>;
+>> -		samsung,ycbcr-coeff = <0>;
+>> -		samsung,color-depth = <1>;
+>> -		samsung,link-rate = <0x0a>;
+>> -		samsung,lane-count = <4>;
+>> -
+>>   		display-timings {
+>>   			native-mode = <&lcd_timing>;
+>>   			lcd_timing: 1366x768 {
+>> -- 
+>> 1.9.1
+>>
+>>
+>
+>
