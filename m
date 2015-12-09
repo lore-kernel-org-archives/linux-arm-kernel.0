@@ -1,85 +1,60 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 9 Dec 2015 14:14:14 -0600
-Subject: [PATCH v2 02/14] drm/etnaviv: add devicetree bindings
-In-Reply-To: <1449661707-30532-2-git-send-email-l.stach@pengutronix.de>
-References: <1449661707-30532-1-git-send-email-l.stach@pengutronix.de>
- <1449661707-30532-2-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20151209201414.GA31697@rob-hp-laptop>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 09 Dec 2015 15:26:22 -0500 (EST)
+Subject: [PATCH 1/2] net: thunderx: HW TSO support for pass-2 hardware
+In-Reply-To: <00b701d13279$d54d9c80$7fe8d580$@samsung.com>
+References: <y@samsung.com>
+ <1449661081-15435-2-git-send-email-sunil.kovvuri@gmail.com>
+ <00b701d13279$d54d9c80$7fe8d580$@samsung.com>
+Message-ID: <20151209.152622.589509558160050773.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 09, 2015 at 12:48:15PM +0100, Lucas Stach wrote:
-> Etnaviv follows the same priciple as imx-drm to have a virtual
-> master device node to bind all the individual GPU cores together
-> into one DRM device.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+From: Pavel Fedin <p.fedin@samsung.com>
+Date: Wed, 09 Dec 2015 15:05:01 +0300
 
-Acked-by: Rob Herring <robh@kernel.org>
+>  Hello!
+> 
+>> -----Original Message-----
+>> From: netdev-owner at vger.kernel.org [mailto:netdev-owner at vger.kernel.org] On Behalf Of Sunil
+>> Goutham
+>> Sent: Wednesday, December 09, 2015 2:38 PM
+>> To: netdev at vger.kernel.org
+>> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; p.fedin at samsung.com;
+>> Sunil.Goutham at caviumnetworks.com; Sunil Goutham
+>> Subject: [PATCH 1/2] net: thunderx: HW TSO support for pass-2 hardware
+>> 
+>> From: Sunil Goutham <sgoutham@cavium.com>
+>> 
+>> This adds support for offloading TCP segmentation to HW in pass-2
+>> revision of hardware. Both driver level SW TSO for pass1.x chips
+>> and HW TSO for pass-2 chip will co-exist.
+>> 
+>> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+>> ---
+>>  drivers/net/ethernet/cavium/thunder/nic.h          |   12 ++++++--
+>>  drivers/net/ethernet/cavium/thunder/nic_main.c     |   11 ++-----
+>>  drivers/net/ethernet/cavium/thunder/nicvf_main.c   |   15 ++++++++-
+>>  drivers/net/ethernet/cavium/thunder/nicvf_queues.c |   20 ++++++++++---
+>>  drivers/net/ethernet/cavium/thunder/q_struct.h     |   30 ++++++++++---------
+>>  5 files changed, 56 insertions(+), 32 deletions(-)
+>> 
+>> diff --git a/drivers/net/ethernet/cavium/thunder/nic.h
+>> b/drivers/net/ethernet/cavium/thunder/nic.h
+>> index 39ca674..02571f4 100644
+>> --- a/drivers/net/ethernet/cavium/thunder/nic.h
+>> +++ b/drivers/net/ethernet/cavium/thunder/nic.h
+>> @@ -262,9 +262,10 @@ struct nicvf {
+>>  	struct pci_dev		*pdev;
+>>  	u8			vf_id;
+>>  	u8			node;
+>> -	u8			tns_mode:1;
+>> -	u8			sqs_mode:1;
+>> -	u8			loopback_supported:1;
+>> +	bool			tns_mode:1;
+>> +	bool			sqs_mode:1;
+> 
+>  These little refactors are creeping in your code without even being mentioned in the commit message, this is not good practice
+> IMHO. Additionally, may be turn these two flags into something like:
 
-> ---
-> v2: Add note why a more specific compatible isn't needed for
-> GPU core nodes.
-> ---
->  .../bindings/display/etnaviv/etnaviv-drm.txt       | 49 ++++++++++++++++++++++
->  1 file changed, 49 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/etnaviv/etnaviv-drm.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/display/etnaviv/etnaviv-drm.txt b/Documentation/devicetree/bindings/display/etnaviv/etnaviv-drm.txt
-> new file mode 100644
-> index 000000000000..01254f40b11b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/etnaviv/etnaviv-drm.txt
-> @@ -0,0 +1,49 @@
-> +Etnaviv DRM master device
-> +================================
-> +
-> +The Etnaviv DRM master device is a virtual device needed to list all
-> +Vivante GPU cores that comprise the GPU subsystem.
-> +
-> +Required properties:
-> +- compatible: Should be one of
-> +    "fsl,imx-gpu-subsystem"
-> +    "marvell,dove-gpu-subsystem"
-> +- cores: Should contain a list of phandles pointing to Vivante GPU devices
-> +
-> +example:
-> +
-> +gpu-subsystem {
-> +	compatible = "fsl,imx-gpu-subsystem";
-> +	cores = <&gpu_2d>, <&gpu_3d>;
-> +};
-> +
-> +
-> +Vivante GPU core devices
-> +====================
-> +
-> +Required properties:
-> +- compatible: Should be "vivante,gc"
-> +  A more specific compatible is not needed, as the cores contain chip
-> +  identification registers at fixed locations, which provide all the
-> +  necessary information to the driver.
-> +- reg: should be register base and length as documented in the
-> +  datasheet
-> +- interrupts: Should contain the cores interrupt line
-> +- clocks: should contain one clock for entry in clock-names
-> +  see Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +- clock-names:
-> +   - "bus":    AXI/register clock
-> +   - "core":   GPU core clock
-> +   - "shader": Shader clock (only required if GPU has feature PIPE_3D)
-> +
-> +example:
-> +
-> +gpu_3d: gpu at 00130000 {
-> +	compatible = "vivante,gc";
-> +	reg = <0x00130000 0x4000>;
-> +	interrupts = <0 9 IRQ_TYPE_LEVEL_HIGH>;
-> +	clocks = <&clks IMX6QDL_CLK_GPU3D_AXI>,
-> +	         <&clks IMX6QDL_CLK_GPU3D_CORE>,
-> +	         <&clks IMX6QDL_CLK_GPU3D_SHADER>;
-> +	clock-names = "bus", "core", "shader";
-> +};
-> -- 
-> 2.6.2
-> 
+Also I disagree completely with boolean bitfields.  Just use plain 'bool' and let
+the compiler decide how to lay it out.
