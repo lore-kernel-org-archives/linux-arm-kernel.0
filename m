@@ -1,32 +1,130 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 9 Dec 2015 11:29:27 +0000
-Subject: [PATCH v4 01/13] mm/memblock: add MEMBLOCK_NOMAP attribute to
- memblock memory table
-In-Reply-To: <20151208142341.b91ab5728f244a68231e3b87@linux-foundation.org>
-References: <1448886507-3216-1-git-send-email-ard.biesheuvel@linaro.org>
- <1448886507-3216-2-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu9oboT_Lk8heJWRcM=oxRW=EWioVCvZLH7N0YCkfU5tJw@mail.gmail.com>
- <20151208120743.GG19612@arm.com>
- <20151208142341.b91ab5728f244a68231e3b87@linux-foundation.org>
-Message-ID: <20151209112926.GA9303@arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 09 Dec 2015 12:30:10 +0100
+Subject: [PATCH v1 1/8] pinctrl: rockchip: add support for the rk3228
+In-Reply-To: <1449651853-1667-2-git-send-email-jeffy.chen@rock-chips.com>
+References: <1449651853-1667-1-git-send-email-jeffy.chen@rock-chips.com>
+ <1449651853-1667-2-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <2989163.WWcXAyahsV@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 08, 2015 at 02:23:41PM -0800, Andrew Morton wrote:
-> On Tue, 8 Dec 2015 12:07:44 +0000 Will Deacon <will.deacon@arm.com> wrote:
-> 
-> > > I should note that this change should not affect any memblock users
-> > > that never set the MEMBLOCK_NOMAP flag, but please, if you see any
-> > > issues beyond 'this may conflict with other stuff we have queued for
-> > > 4.5', please do let me know.
-> > 
-> > Indeed, I can't see that this would cause any issues, but I would really
-> > like an Ack from one of the MM maintainers before taking this.
-> > 
-> > Please could somebody take a look?
-> 
-> It looks OK to me.  Please go ahead and merge it via an arm tree.
+Hi Jeffy,
 
-Will do, thanks Andrew.
+Am Mittwoch, 9. Dezember 2015, 17:04:06 schrieb Jeffy Chen:
+> The pinctrl of rk3228 is much the same as rk3288's, but
+> without pmu.
+> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-Will
+After verifying the offset and register-layout values with the TRM
+
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
+
+I just love how that still seems to fit for new socs ;-)
+
+
+Thanks
+Heiko
+
+
+> ---
+> 
+>  .../bindings/pinctrl/rockchip,pinctrl.txt          |  3 +-
+>  drivers/pinctrl/pinctrl-rockchip.c                 | 53
+> ++++++++++++++++++++++ 2 files changed, 55 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+> b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt index
+> 391ef4b..0cd701b 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+> @@ -21,7 +21,8 @@ defined as gpio sub-nodes of the pinmux controller.
+>  Required properties for iomux controller:
+>    - compatible: one of "rockchip,rk2928-pinctrl",
+> "rockchip,rk3066a-pinctrl" "rockchip,rk3066b-pinctrl",
+> "rockchip,rk3188-pinctrl"
+> -		       "rockchip,rk3288-pinctrl", "rockchip,rk3368-pinctrl"
+> +		       "rockchip,rk3228-pinctrl", "rockchip,rk3288-pinctrl"
+> +		       "rockchip,rk3368-pinctrl"
+>    - rockchip,grf: phandle referencing a syscon providing the
+>  	 "general register files"
+> 
+> diff --git a/drivers/pinctrl/pinctrl-rockchip.c
+> b/drivers/pinctrl/pinctrl-rockchip.c index a065112..faab36e 100644
+> --- a/drivers/pinctrl/pinctrl-rockchip.c
+> +++ b/drivers/pinctrl/pinctrl-rockchip.c
+> @@ -614,6 +614,40 @@ static void rk3288_calc_drv_reg_and_bit(struct
+> rockchip_pin_bank *bank, }
+>  }
+> 
+> +#define RK3228_PULL_OFFSET		0x100
+> +
+> +static void rk3228_calc_pull_reg_and_bit(struct rockchip_pin_bank *bank,
+> +				    int pin_num, struct regmap **regmap,
+> +				    int *reg, u8 *bit)
+> +{
+> +	struct rockchip_pinctrl *info = bank->drvdata;
+> +
+> +	*regmap = info->regmap_base;
+> +	*reg = RK3228_PULL_OFFSET;
+> +	*reg += bank->bank_num * RK3188_PULL_BANK_STRIDE;
+> +	*reg += ((pin_num / RK3188_PULL_PINS_PER_REG) * 4);
+> +
+> +	*bit = (pin_num % RK3188_PULL_PINS_PER_REG);
+> +	*bit *= RK3188_PULL_BITS_PER_PIN;
+> +}
+> +
+> +#define RK3228_DRV_GRF_OFFSET		0x200
+> +
+> +static void rk3228_calc_drv_reg_and_bit(struct rockchip_pin_bank *bank,
+> +				    int pin_num, struct regmap **regmap,
+> +				    int *reg, u8 *bit)
+> +{
+> +	struct rockchip_pinctrl *info = bank->drvdata;
+> +
+> +	*regmap = info->regmap_base;
+> +	*reg = RK3228_DRV_GRF_OFFSET;
+> +	*reg += bank->bank_num * RK3288_DRV_BANK_STRIDE;
+> +	*reg += ((pin_num / RK3288_DRV_PINS_PER_REG) * 4);
+> +
+> +	*bit = (pin_num % RK3288_DRV_PINS_PER_REG);
+> +	*bit *= RK3288_DRV_BITS_PER_PIN;
+> +}
+> +
+>  #define RK3368_PULL_GRF_OFFSET		0x100
+>  #define RK3368_PULL_PMU_OFFSET		0x10
+> 
+> @@ -2143,6 +2177,23 @@ static struct rockchip_pin_ctrl rk3188_pin_ctrl = {
+>  		.pull_calc_reg		= rk3188_calc_pull_reg_and_bit,
+>  };
+> 
+> +static struct rockchip_pin_bank rk3228_pin_banks[] = {
+> +	PIN_BANK(0, 32, "gpio0"),
+> +	PIN_BANK(1, 32, "gpio1"),
+> +	PIN_BANK(2, 32, "gpio2"),
+> +	PIN_BANK(3, 32, "gpio3"),
+> +};
+> +
+> +static struct rockchip_pin_ctrl rk3228_pin_ctrl = {
+> +		.pin_banks		= rk3228_pin_banks,
+> +		.nr_banks		= ARRAY_SIZE(rk3228_pin_banks),
+> +		.label			= "RK3228-GPIO",
+> +		.type			= RK3288,
+> +		.grf_mux_offset		= 0x0,
+> +		.pull_calc_reg		= rk3228_calc_pull_reg_and_bit,
+> +		.drv_calc_reg		= rk3228_calc_drv_reg_and_bit,
+> +};
+> +
+>  static struct rockchip_pin_bank rk3288_pin_banks[] = {
+>  	PIN_BANK_IOMUX_FLAGS(0, 24, "gpio0", IOMUX_SOURCE_PMU,
+>  					     IOMUX_SOURCE_PMU,
+> @@ -2220,6 +2271,8 @@ static const struct of_device_id
+> rockchip_pinctrl_dt_match[] = { .data = (void *)&rk3066b_pin_ctrl },
+>  	{ .compatible = "rockchip,rk3188-pinctrl",
+>  		.data = (void *)&rk3188_pin_ctrl },
+> +	{ .compatible = "rockchip,rk3228-pinctrl",
+> +		.data = (void *)&rk3228_pin_ctrl },
+>  	{ .compatible = "rockchip,rk3288-pinctrl",
+>  		.data = (void *)&rk3288_pin_ctrl },
+>  	{ .compatible = "rockchip,rk3368-pinctrl",
