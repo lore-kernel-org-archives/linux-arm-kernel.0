@@ -1,61 +1,56 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 09 Dec 2015 09:47:03 +0000
-Subject: [PATCH v8 3/4] arm64: Add do_softirq_own_stack() and enable
- irq_stacks
-In-Reply-To: <56671214.30402@arm.com>
-References: <1449226948-14251-1-git-send-email-james.morse@arm.com>
- <1449226948-14251-4-git-send-email-james.morse@arm.com>
- <20151207224805.GA20777@MBP.local> <20151208114321.GD19612@arm.com>
- <4EBA6141-5CFB-4CAC-97D2-26346AAA91F0@gmail.com> <56671214.30402@arm.com>
-Message-ID: <5667F897.5070005@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 09 Dec 2015 10:52:27 +0100
+Subject: [PATCH v4 1/5] PCI: designware: add memory barrier after enabling
+ region
+In-Reply-To: <CAHM4w1k_EAt+xBBYyG3B7W9Fegc4j+uRq5t_biUsxOGt+k+xUA@mail.gmail.com>
+References: <1449149725-27607-1-git-send-email-stanimir.varbanov@linaro.org>
+ <56669C50.9060700@linaro.org>
+ <CAHM4w1k_EAt+xBBYyG3B7W9Fegc4j+uRq5t_biUsxOGt+k+xUA@mail.gmail.com>
+Message-ID: <1975309.Hla8QhEqf4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/15 17:23, James Morse wrote:
-> My only theory is that there is an off by one, and its reading what was
-> x29 instead. This wouldn't show up in these tests, but might be a
-> problem for aarch32 user-space, as presumably x29==0 when it switches to
-> aarch64 mode for el0_irq(). I will try this tomorrow.
+On Wednesday 09 December 2015 10:10:05 Pratyush Anand wrote:
+> On Tue, Dec 8, 2015 at 2:31 PM, Stanimir Varbanov
+> > > Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
+> > > ---
+> > >  drivers/pci/host/pcie-designware.c |    5 +++++
+> > >  1 file changed, 5 insertions(+)
+> > >
+> > > diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> > > index 02a7452bdf23..ed4dc2e2553b 100644
+> > > --- a/drivers/pci/host/pcie-designware.c
+> > > +++ b/drivers/pci/host/pcie-designware.c
+> > > @@ -164,6 +164,11 @@ static void dw_pcie_prog_outbound_atu(struct pcie_port *pp, int index,
+> > >       dw_pcie_writel_rc(pp, upper_32_bits(pci_addr), PCIE_ATU_UPPER_TARGET);
+> > >       dw_pcie_writel_rc(pp, type, PCIE_ATU_CR1);
+> > >       dw_pcie_writel_rc(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
+> > > +     /*
+> > > +      * ensure that the ATU enable has been happaned before accessing
+> > > +      * pci configuration/io spaces through dw_pcie_cfg_[read|write].
+> > > +      */
+> > > +     wmb();
+> > >  }
+> > >
+> 
+> 
+> My understnading is that since writel() of dw_pcie_writel_rc() in
+> above code and readl(), writel() of dw_pcie_cfg_[read|write]() (which
+> will follow) goes through same device (ie PCIe host here). So, it is
+> guaranteed that 1st writel() will be executed before later
+> readl()/writel(). If that is true then we do not need any explicit
+> barrier here.
+> 
+> Arnd, Russel: whats your opinion here.
 
-Yup, this is what is happening. Its an off-by-one due to broken thinking
-about how the stack works. My broken thinking was:
+I think the ordering is only enforced if the two register accesses are
+on the same device as seen from the bus, and it's possible that the
+RC registers and the config space registers are not considered the
+same thing here.
 
->   top ------------
->       | dummy_lr | <- irq_stack_ptr
->       ------------
->       |   x29    |
->       ------------
->       |   x19    | <- irq_stack_ptr - 0x10
->       ------------
->       |   xzr    |
->       ------------
+For config write, this is not a problem, because the config space write
+has a wmb() that enforces ordering, but it's possible that the config
+space read may hit the device in parallel with the PCIE_ATU_ENABLE
+write.
 
-But the stack-pointer is decreased before use. So it actually looks like
-this:
-
->       ------------
->       |          |  <- irq_stack_ptr
->   top ------------
->       | dummy_lr |
->       ------------
->       |   x29    | <- irq_stack_ptr - 0x10
->       ------------
->       |   x19    |
->       ------------
->       |   xzr    | <- irq_stack_ptr - 0x20
->       ------------
-
-The value being used as the original stack is x29, which in all the
-tests is sp but without the current frames data, hence there are no
-missing frames in the output.
-
-Jungseok Lee picked it up with a 32bit user space because aarch32 can't
-use x29, so it remains 0 forever. The fix he posted is correct.
-
-Will: do you want to take Jungseok Lee's patch as a 'Fixes:', or is it
-easier if I repost the series?
-
-
-Thanks,
-
-James
+	Arnd
