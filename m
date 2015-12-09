@@ -1,67 +1,30 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 9 Dec 2015 16:35:58 +0800
-Subject: [PATCH v6 12/21] KVM: ARM64: Add reset and access handlers for
- PMCNTENSET and PMCNTENCLR register
-In-Reply-To: <56670865.2050705@arm.com>
-References: <1449578860-15808-1-git-send-email-zhaoshenglong@huawei.com>
- <1449578860-15808-13-git-send-email-zhaoshenglong@huawei.com>
- <56670865.2050705@arm.com>
-Message-ID: <5667E7EE.90908@huawei.com>
+From: alison.wang@freescale.com (Huan Wang)
+Date: Wed, 9 Dec 2015 08:41:21 +0000
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable some drivers for LS1021A
+In-Reply-To: <3400541.YhcYNk5DCk@wuerfel>
+References: <1449563883-29317-1-git-send-email-b18965@freescale.com>
+ <3400541.YhcYNk5DCk@wuerfel>
+Message-ID: <BN3PR0301MB0867F04C5F0D9182D4C34D1AFEE80@BN3PR0301MB0867.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2015/12/9 0:42, Marc Zyngier wrote:
->> +void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u32 val, bool all_enable)
->> > +{
->> > +	int i;
->> > +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
->> > +	struct kvm_pmc *pmc;
->> > +
->> > +	if (!all_enable)
->> > +		return;
-> You have the vcpu. Can you move the check for PMCR_EL0.E here instead of
-> having it in both of the callers?
+> On Tuesday 08 December 2015 16:38:03 Alison Wang wrote:
+> > This patch enables some drivers for LS1021A, such as GIANFAR,
+> > WATCHDOG, AUDIO, QSPI, I2C, ESDHC, EDMA, FTM.
+> > QorIQ Clock Framework and Ramdisk support is also enabled.
+> >
+> > Signed-off-by: Alison Wang <alison.wang@freescale.com>
+> > ---
 > 
-But it still needs to check PMCR_EL0.E in kvm_pmu_handle_pmcr(). When
-PMCR_EL0.E == 1, it calls kvm_pmu_enable_counter(), otherwise it calls
-kvm_pmu_disable_counter(). So as it checks already, just pass the result
-as a parameter.
-
->> > +
->> > +	for_each_set_bit(i, (const unsigned long *)&val, ARMV8_MAX_COUNTERS) {
-> Nonononono... If you must have to use a long, use a long. Don't cast it
-> to a different type (hint: big endian).
+> I think most of these can be made loadable modules, please do that and
+> only leave as much built-in as you need for booting.
 > 
->> > +		pmc = &pmu->pmc[i];
->> > +		if (pmc->perf_event) {
->> > +			perf_event_enable(pmc->perf_event);
->> > +			if (pmc->perf_event->state != PERF_EVENT_STATE_ACTIVE)
->> > +				kvm_debug("fail to enable perf event\n");
->> > +		}
->> > +	}
->> > +}
->> > +
->> > +/**
->> > + * kvm_pmu_disable_counter - disable selected PMU counter
->> > + * @vcpu: The vcpu pointer
->> > + * @val: the value guest writes to PMCNTENCLR register
->> > + *
->> > + * Call perf_event_disable to stop counting the perf event
->> > + */
->> > +void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u32 val)
->> > +{
->> > +	int i;
->> > +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
->> > +	struct kvm_pmc *pmc;
->> > +
-> Why are enable and disable asymmetric (handling of PMCR.E)?
+> Otherwise looks ok.
 > 
-To enable a counter, it needs both the PMCR_EL0.E and the corresponding
-bit of PMCNTENSET_EL0 set to 1. But to disable a counter, it only needs
-one of them and when PMCR_EL0.E == 0? it disables all the counters.
+> 
+[Alison Wang] Thanks for your advice. I will change most drivers as loadable
+modules in v2.
 
-Thanks,
--- 
-Shannon
+
+Best Regards,
+Alison Wang
